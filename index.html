@@ -26209,10 +26209,11 @@ function acidMutate(st, L, lanes, R, rnd, inten = 25){
         if (lanes.notes) s.note = acidNear(o.note, sc, R.root, inten, rnd);
         if (lanes.oct && rnd() < R.octave * inten / 100){ const up = rnd() < 0.5; s.note = up ? (s.note + 12 <= 24 ? s.note + 12 : s.note - 12) : (s.note - 12 >= -12 ? s.note - 12 : s.note + 12); } }
       else if (lanes.notes || lanes.oct) s.note = f.note; }
-    else s.accent = false;
-    const pv = st[(i + L - 1) % L];
-    if (L > 1){ if (s.gate !== ACID_NOTE || pv.gate === ACID_REST){ if (lanes.slide || lanes.time) pv.slide = false; }
-      else if (lanes.slide){ const sl = sty === 1 ? (s.note !== pv.note ? 1.3 : 0.4) : sty === 2 ? 0.6 : sty === 3 ? 1.8 : 1; pv.slide = rnd() < R.slide * sl * (Math.abs(s.note - pv.note) >= 7 ? 1.5 : 1); } } }
+    else s.accent = false; }
+  // slides: after every picked step has its final gate and note, so the wrap-around pair (L-1 to 0) sees current values
+  if (L > 1) for (let i = 0; i < L; i++){ if (!only[i]) continue; const s = st[i], pv = st[(i + L - 1) % L];
+    if (s.gate !== ACID_NOTE || pv.gate === ACID_REST){ if (lanes.slide || lanes.time) pv.slide = false; }
+    else if (lanes.slide){ const sl = sty === 1 ? (s.note !== pv.note ? 1.3 : 0.4) : sty === 2 ? 0.6 : sty === 3 ? 1.8 : 1; pv.slide = rnd() < R.slide * sl * (Math.abs(s.note - pv.note) >= 7 ? 1.5 : 1); } }
   return only;
 }
 // The phrase's rows y0..y0+L-1 as steps, and back.

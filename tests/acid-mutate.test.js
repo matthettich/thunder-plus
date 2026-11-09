@@ -80,6 +80,20 @@ test('acid mutate: rests stay rests with TIME off; accents and gates only change
   const g2 = line(16); c.acidRoll(g2, 16, LA, Rr(c), rng(3)); assert.deepEqual(J(g), J(g2), 'seeded, repeatable');
 });
 
+test('acid mutate: with TIME off every gate stays, picked or not', () => {
+  const c = ctx();
+  for (let seed = 1; seed <= 40; seed++){ const st = line(16, i => i % 7); st[3].gate = 2; st[4].gate = 1; st[9].gate = 2; const before = J(st);
+    c.acidMutate(st, 16, { notes: true, oct: true, acc: true, slide: true, time: false }, Rr(c), rng(seed), 100);
+    st.forEach((s, i) => assert.equal(s.gate, before[i].gate, `step ${i} seed ${seed}`)); }
+});
+
+test('acid mutate: no slide is left on a step that ends up silent, across the wrap-around', () => {
+  const c = ctx();
+  for (let seed = 1; seed <= 200; seed++){ const st = line(16, i => i % 7); st.forEach(s => { s.slide = true; });
+    const only = c.acidMutate(st, 16, LA, Rr(c), rng(seed), 100);
+    st.forEach((s, i) => { const nx = st[(i + 1) % 16]; if (only[(i + 1) % 16] && s.gate === 2) assert.equal(s.slide, false, `step ${i} seed ${seed}`); }); }
+});
+
 // a phrase with hand work in it: volumes, FX in any column, instrument changes, note-offs, a second note column
 function handPhrase(){
   const c = ctx(), P = Array.from({ length: 16 }, () => c.blankRow()), PSL = 1;
