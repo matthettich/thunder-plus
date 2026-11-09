@@ -12,3 +12,6 @@ test('the control bar Play plays this screen in the tracker', () => {
 test('the control bar Play is not hidden on a folded phone', () => {
   assert.doesNotMatch(src, /body\.mob \.top #tSong\{display:none\}/);
 });
+test('PAD mode on a small screen drops only the COMMANDS row play button', () => {
+  assert.match(src, /@media \(max-width:699px\)\{ \.tcmd\.cpad:not\(\.cmini\) button\[data-c=song\]\{display:none\} \}/);
+});

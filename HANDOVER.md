@@ -593,7 +593,7 @@ Written up from the commits on 9 Nov; none of it has been tried on a real Fold.
 ## 9 Nov: control bar Play plays this screen (build 538)
 
 Owner's call: `#tSong`, labeled Play, runs `playCtx` in the tracker (the phrase on Phrase, the song on Song), so the phrase stays one tap on a
-phone now that the pad's PLAY has the song. Outside the tracker it still plays the song. It now also shows on a folded phone (it used to be hidden there because the pad's PLAY did its job); the top bar is tightened under 400 px to fit. `tests/play-keys.test.js` guards all this. If it goes unused it can be removed.
+phone now that the pad's PLAY has the song. Outside the tracker it still plays the song. It now also shows on a folded phone (it used to be hidden there because the pad's PLAY did its job); the top bar is tightened under 400 px to fit. Under 700 px in PAD mode the COMMANDS row drops its ▶, since the pad's PLAY sits right below it (owner chose this over hiding REDO; saves the Song screen a third row). `tests/play-keys.test.js` guards all this. If it goes unused it can be removed.
 
 ## 9 Nov: pad PLAY matches Space, OPTION is ALT (build 537, same PR as the wording audit)
 
