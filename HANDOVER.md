@@ -366,6 +366,7 @@ clock mapping at that latency (7 Nov (16)). Re-check MIDI timing with Measure…
 
 ## Desktop releases
 
+- **v1.3.4-beta.2** (9 Nov 2026, pre-release; owner asked for a beta desktop; Run workflow through the API from `beta` at build 541, run 42700107769): MOD screen, chains rail lines, acid Mutate. **v1.3.4-beta.1**: the same at build 540, without acid Mutate. Owner, 9 Nov: hold further desktop betas for now.
 - **v1.3.3** (8 Nov 2026; owner: update the desktop app at a stopping point; Run workflow through the API with version 1.3.3, from `main` at build 523): builds 517–523 on top of v1.3.2 (`· beta` label, Mobile SHIFT+▲, pad MUTE / SOLO, the review fixes).
 - **v1.3.2** (8 Nov 2026; owner: update the desktop app at a stopping point; Run workflow through the API with version 1.3.2, from `main` at build 516, run 42544191974, succeeded): builds 515–516 on top of v1.3.1 (touch sliders in dialogs, instrument big step, FLY label and same-row order, mobile stalls).
 - **v1.3.1** (8 Nov 2026; owner: "Build the main and desktop app"; PR #18 beta → main at build 514, Run workflow through the API with version 1.3.1, run 42522985460): Live engines setting and lighter …waves live (513–514) on top of v1.3.0. Owner wants Thunder Plus changes to go through PRs (ask CodeRabbit with "@coderabbitai review" on PRs into beta).
@@ -580,6 +581,10 @@ Start a session by asking for results. Fix on `beta`.
   the edge `R.t0`, "waiting…" while armed), `rcdClk` / `rcdFmt` / `rcdFreeSecs`, a 250 ms timer only while recording; the
   final length stays until the next take. recorder-check covers FREE, PATTERN, Stop, next take and closing mid-take.
 
+
+## 9 Nov: chains rail feed view (build 542)
+
+Owner: a track that feeds a chain should show it, with the rest greyed, to see what's feeding a chain and what happens to that feed. `chainFeed(t)` finds the track's Track In modules, walks the cables forward (`chainReach`, cycle-safe) to the first Chain Out, and uses `chainMods(outTrack)` for the module set. `dkChnRail` takes `feed`: this track's number in the IN tag stands out, off-path blocks and cables are grey (`dim`, a second `path.off`), `+ CONTROLS` stays off because controls belong to the output track. Only when the track has no chain of its own. Tests: `tests/chains-feed.test.js`. IN lines are spaced across the tag, not under each number.
 
 ## 9 Nov: acid Mutate intensity (build 541)
 
