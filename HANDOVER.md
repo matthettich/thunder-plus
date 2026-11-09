@@ -581,6 +581,11 @@ Start a session by asking for results. Fix on `beta`.
   final length stays until the next take. recorder-check covers FREE, PATTERN, Stop, next take and closing mid-take.
 
 
+## 9 Nov: chains rail lines; MOD target steps (build 540)
+
+Owner: lines between the blocks in the chains rail, in an accent color, spread out when few. `dkChnRail` records which cable joins which tag or block (`rail._dk`, from `S.chainPatch.cables`), `dkcDraw` does one layout read and draws on an SVG layer behind them (`.dkclines`, no pointer events; straight lines, the owner's choice after trying curves and right angles, and he may go back to curves), `dkcWire` redraws on a size change only, never on a tick. The IN tag gets one line per Track In module (12 at most); other pairs one per cable, 2 at most. Gaps grow up to 34 px when there's room; with many modules, today's 7 px and cut-off. Accent on the 909 skin is the weakest against the rail (contrast 1.89); darken it there if the owner minds.
+MOD: Ctrl/⌘+arrows on TARGET step `tgtPicker`'s flattened list (▲▼ eight at a time), keeping SHAPE, RATE and DEPTH; on an empty row the first press adds this track's first target.
+
 ## 9 Nov: MOD screen, first version (build 539, PR from `feat/mod-screen`)
 
 Owner: four LFOs per track for now; internal FX and instruments, …pump later; build stepwise and verify before the harder parts, knowingly past the feature freeze. Sonnet subagents built it, the lead reviewed.
