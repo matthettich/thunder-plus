@@ -548,6 +548,11 @@ Sliders in `.ask` dialogs (every generator, Record a sample) couldn't be moved o
 native slider), and `.acidr` / `.acidf` carry `touch-action:pan-y`, or the browser cancels the drag as a pan. Checked with
 emulated touch drags on a Pixel 7 profile: no movement before, correct distance after, on Acid line and a generic `genPanel`.
 
+## 8 Nov: SHIFT+▲ goes to Arrange on Mobile (build 518)
+
+Owner's request: with the Mobile setting on, SHIFT+▲ calls `go('song')` from every screen (Project stays on SHIFT+◀▶ and its tab).
+Desktop keeps Project / back. Build 517 added ` · beta` beside the build number on the beta copy.
+
 ## 8 Nov: mobile stalls during playback (build 516; partly fixed)
 
 Owner: stutter, slowdown, clicks, then rushing on the Fold, on the Page sequencer too. Profiling a Pixel 7 profile at 4x CPU throttle
