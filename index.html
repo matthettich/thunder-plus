@@ -3193,8 +3193,8 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
     </div>
     <div class="tinl tinlp" id="tInlPad" hidden aria-label="Instruments and their pads"></div>
     <div class="keys wide">
-      <button type="button" class="k kw" data-b="mute" id="kMute" title="Mute this track; tap again to unmute">MUTE</button><button type="button" class="k kw" data-b="xposeUp" title="Transpose the phrase selection up a semitone">SEMI +</button><button type="button" class="k kw" data-b="xposeDn" title="Transpose the phrase selection down a semitone">SEMI −</button><button type="button" class="k kw" data-b="shift">SHIFT</button><button type="button" class="k kw" data-b="play" id="kPlay">PLAY</button>
-      <button type="button" class="k kw" data-b="solo" id="kSolo" title="Solo this track; tap again to un-solo">SOLO</button><button type="button" class="k kw" data-b="gen" id="kGen" title="Generate: the pattern generators (Acid line, Euclidean fill…) for this phrase">GEN</button><button type="button" class="k kw" data-b="loop" id="kLoop" title="Loop the pattern: the song repeats the row it is on until you turn it off (Alt+L in KEYS mode)">LOOP</button><button type="button" class="k kw" data-b="opt">OPTION</button><button type="button" class="k kw" data-b="edit">EDIT</button>
+      <button type="button" class="k kw" data-b="solo" id="kSolo" title="Solo this track; tap again to un-solo">SOLO</button><button type="button" class="k kw" data-b="xposeUp" title="Transpose the phrase selection up a semitone">SEMI +</button><button type="button" class="k kw" data-b="xposeDn" title="Transpose the phrase selection down a semitone">SEMI −</button><button type="button" class="k kw" data-b="shift">SHIFT</button><button type="button" class="k kw" data-b="play" id="kPlay">PLAY</button>
+      <button type="button" class="k kw" data-b="mute" id="kMute" title="Mute this track; tap again to unmute">MUTE</button><button type="button" class="k kw" data-b="gen" id="kGen" title="Generate: the pattern generators (Acid line, Euclidean fill…) for this phrase">GEN</button><button type="button" class="k kw" data-b="loop" id="kLoop" title="Loop the pattern: the song repeats the row it is on until you turn it off (Alt+L in KEYS mode)">LOOP</button><button type="button" class="k kw" data-b="opt">OPTION</button><button type="button" class="k kw" data-b="edit">EDIT</button>
     </div>
     </div>
   </div>
@@ -22839,7 +22839,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 521;
+const BUILD = 522;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD + (location.pathname.includes('/beta/') ? ' · beta' : '');
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
