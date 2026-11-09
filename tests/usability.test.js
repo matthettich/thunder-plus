@@ -426,7 +426,7 @@ test('mobile stalls: playhead-only Arrange redraws are thinned on touch, and the
 });
 
 test('Mobile: SHIFT+▲ goes to Arrange from every screen', () => {
-  assert.match(H.read('index.html'), /if \(dir === 'up' && isMobile\(\)\) return tv !== 'song' \? go\('song'\) : null;/);
+  assert.match(H.read('index.html'), /if \(dir === 'up' && isMobile\(\)\)\{ if \(apF === 'arr'\) return null; if \(apArrOk\(\)\)\{ apFocus\('arr', true\);/);
 });
 
 test('the pad has latching MUTE and SOLO', () => {
