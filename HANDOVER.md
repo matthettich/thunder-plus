@@ -548,6 +548,11 @@ Sliders in `.ask` dialogs (every generator, Record a sample) couldn't be moved o
 native slider), and `.acidr` / `.acidf` carry `touch-action:pan-y`, or the browser cancels the drag as a pan. Checked with
 emulated touch drags on a Pixel 7 profile: no movement before, correct distance after, on Acid line and a generic `genPanel`.
 
+## 8 Nov: pad MUTE and SOLO (build 519)
+
+Owner's request: a new column before SEMI+/GEN. `press` calls `muteKey()` / `soloKey()`, so a second tap undoes it, and each button lights for
+the current track (set in `draw`). The pad's keys are about 15% narrower for it (`--kw` now 8.1 key widths); OPTION is labelled OPT to fit.
+
 ## 8 Nov: SHIFT+▲ goes to Arrange on Mobile (build 518)
 
 Owner's request: with the Mobile setting on, SHIFT+▲ calls `go('song')` from every screen (Project stays on SHIFT+◀▶ and its tab).
