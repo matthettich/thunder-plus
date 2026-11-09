@@ -563,6 +563,9 @@ emulated touch drags on a Pixel 7 profile: no movement before, correct distance 
   simulation plain arrows were cheap and SHIFT+arrow screen changes were not, which doesn't quite match his report. Next: the per-screen cost of
   `go()` / `draw()`; on the phone, whether `PW.ps` is false (pump synths then render on the main thread under Render). Notes after Stop: suspected
   output buffer under Safest, not measured on a device; Stop kills voices at `currentTime`, not heard time.
+- **Owner's phone test of 523 (8 Nov):** no difference between plain arrows and SHIFT+arrows, and it definitely hangs and stutters in the background (Page sequencer).
+  So the simulation's arrows-vs-screens split doesn't hold on the Fold. Build 524 keeps the old 0.5 s re-anchor while hidden, since 516's 0.15 s could add gaps to a hidden page's bursts.
+  Background trouble is older (31 Oct, and 6 Nov's 0.83× measurement). Headless can't reproduce it; the next evidence is the Playback report from the phone.
 - **Mobile setting found off (8 Nov).** The owner's phone showed the desktop top bar. Nothing that day touches the setting (`platform` in localStorage,
   default only if nothing is saved). Cause unknown; if it recurs after an update, look at storage.
 - **CodeRabbit on 515–522** (review-only PR #30, closed): two findings, both real and fixed in 523: the pad's MUTE muted picked Song blocks instead

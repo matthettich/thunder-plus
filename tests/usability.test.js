@@ -422,7 +422,7 @@ test('instrument big step: past either end it stays put rather than clamping to 
 test('mobile stalls: playhead-only Arrange redraws are thinned on touch, and the page sequencer moves on sooner there', () => {
   const src = H.read('index.html');
   assert.match(src, /if \(playDraw && COARSE\)\{ const t = performance\.now\(\); if \(t - arrPlayT < 240\) return;/);
-  assert.match(src, /s\.time < ctx\.currentTime - \(COARSE \? 0\.15 : 0\.5\)/, 'desktop keeps 0.5 s');
+  assert.match(src, /s\.time < ctx\.currentTime - \(COARSE && !document\.hidden \? 0\.15 : 0\.5\)/, 'desktop keeps 0.5 s');
 });
 
 test('Mobile: SHIFT+▲ goes to Arrange from every screen', () => {
