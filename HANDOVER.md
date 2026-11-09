@@ -526,7 +526,7 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0) and `link/` (Ableton
 
 The owner's top priority to add is the MOD screen. Work down the list; ask before reordering it. The owner will run the tests listed under "Tests the owner will run" below.
 
-1. **MOD screen: LFOs assignable to FX parameters** (owner, 8 Nov: "I will want to do this"; not built, after the stability work). A new screen named
+1. **MOD screen: LFOs assignable to FX parameters** (owner, 8 Nov; first version built 9 Nov, build 539, see "9 Nov: MOD screen" below. Still to come, one step at a time: …pump effects as targets, live engines' own filter and envelope via item 2's per-engine map, renders matching live, smoothing where steps are audible). The original brief: A new screen named
   **MOD between FX and PROJECT**; PROJECT can become PROJ if the tabs need room (six already fill a folded phone: check at real size; hide the tab when
   folded, SHIFT+◀▶ still reaching it, only if it's still too tight). Suggested: one LFO per row (track, slot, parameter, shape, rate, depth), an "Add LFO…"
   on an FX parameter's value menu opening MOD with that target, a small mark on modulated parameters. Alternative was a pop-up by the parameter. Already
@@ -580,6 +580,16 @@ Start a session by asking for results. Fix on `beta`.
   the edge `R.t0`, "waiting…" while armed), `rcdClk` / `rcdFmt` / `rcdFreeSecs`, a 250 ms timer only while recording; the
   final length stays until the next take. recorder-check covers FREE, PATTERN, Stop, next take and closing mid-take.
 
+
+## 9 Nov: MOD screen, first version (build 539, PR from `feat/mod-screen`)
+
+Owner: four LFOs per track for now; internal FX and instruments, …pump later; build stepwise and verify before the harder parts, knowingly past the feature freeze. Sonnet subagents built it, the lead reviewed.
+- **Data:** `S.perf.lfo[t]` is now an array of up to `PLFO_MAX` (4) `{id, sh, rt, dp}`, no holes; `normPerf` still reads the old single object. Perform's lock sheet edits entry 0 only.
+- **Sequencer (`makeSeq`, regenerated into `core/seq-core.js`):** LFOs on the same target add around its one value; point counts as before (4 a row live, 2 in renders, 1 for cut / res / dec). Checked headless: A+B equals A and B summed within rounding (800 points), main and core events identical.
+- **Screen:** `mod` in `VIEWS` between `fx` and `project`, sharing the FX screen's track (`cFxT`, master included). Helpers `modPick`, `modDel`, `modBump`, `modEdit`, `lfoAdd`. "Add LFO…" on FX rows (`cmdCtx`) and the FX bar (`valMenu`'s `o.lfo`), never …pump. `~` mark (`.lfom`) on modulated FX screen rows only, not the FX bar.
+- **Keys:** Alt+7 is now MOD; PROJECT has no Alt key (Alt+8 stays …waves, which `viewKey` takes first). Owner may want this changed.
+- **Instrument targets are what existed:** vol, pan, and cut / res / dec, which update once a row on the next rendered note; on live engines cut / res are only an output low-pass and dec doesn't reach them.
+- **Not tested:** touch hold-and-drag on a real device; the owner's ear. `tools/seq-golden.mjs` fails 3 of 4 songs before and after this work with the same counts (the recordings look stale, 1–2 extra events), not touched.
 
 ## 9 Nov: builds 531–535 (on `beta`, not on `main` yet)
 

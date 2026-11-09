@@ -948,11 +948,12 @@ body.dropping::after{content:''; position:fixed; inset:6px; border:3px dashed va
 .tscr[data-ts="peach"]{--ts-bg:#fbe9dc} .tscr[data-ts="butter"]{--ts-bg:#f8f1d4}
 /* Each tracker screen has its own pastel: its tab, its button in the side map and (with SCREEN on BY SCREEN) the screen itself. */
 [data-v="song"]{--tc:#dbe6f8} [data-v="sect"]{--tc:#e9e0f8} [data-v="phrase"]{--tc:#d8f0e2} [data-v="inst"]{--tc:#fbe2d2}
-[data-v="mixer"]{--tc:#f6edc8} [data-v="fx"]{--tc:#f8dce8} [data-v="project"]{--tc:#d5eef2}
+[data-v="mixer"]{--tc:#f6edc8} [data-v="fx"]{--tc:#f8dce8} [data-v="mod"]{--tc:#ebdcf6} [data-v="project"]{--tc:#d5eef2}
 .tscr[data-ts="rainbow"]{--ts-bg:var(--tc, #e3ebf8)}
 .ttabs button[data-v],.tmap button[data-v]{background:color-mix(in srgb, var(--tc) 55%, var(--side)); color:#1b2130}
 .ttabs button[data-v].on,.tmap button[data-v].on{background:var(--tc); color:#1b2130; font-weight:700; box-shadow:inset 0 -3px 0 #1b2130}
 /* (sweep, 4 Nov) empty cells a quarter of the way from the skin's dim colour toward its ink: still quiet, no longer near invisible (about 1:1 on most skins) */
+.tscr .lfom{color:var(--fxac, var(--ts-hot)); font-weight:700}   /* a parameter an LFO moves (MOD): the ~ after its name */
 .tscr .e{color:var(--ts-dim); color:color-mix(in srgb, var(--ts-dim) 75%, var(--ts-ink))}
 .tscr .v{color:var(--ts-ink)}
 .tscr .rn{color:var(--ts-rn)}
@@ -3167,7 +3168,7 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
       <div class="tmap" id="tMap">
         <button type="button" data-v="project" class="wide">PROJECT</button>
         <button type="button" data-v="song">SONG</button><button type="button" data-v="sect">SECT</button><button type="button" data-v="phrase">PHRASE</button><button type="button" data-v="inst">INST</button>
-        <button type="button" data-v="mixer" style="grid-column:span 2">MIXER</button><button type="button" data-v="fx" style="grid-column:span 2">FX</button>
+        <button type="button" data-v="mixer" style="grid-column:span 2">MIXER</button><button type="button" data-v="fx">FX</button><button type="button" data-v="mod">MOD</button>
       </div>
       <div class="tcard tcst"><div class="tstat"><b id="tState"><svg class="ic" aria-hidden="true"><use href="#ic-stop"/></svg>STOPPED</b><span id="tBpm"></span></div>
         <div class="tmeters" id="tMeters"></div></div>
@@ -3192,11 +3193,11 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
         <dt>Command row</dt><dd>buttons for change, clear, select, copy (no selection: what is under the cursor; a note brings its instrument), cut, paste, undo, redo · CLN (clone) and CLN↓ (clone to the row below) on the song</dd>
         <dt>Touch</dt><dd>tap to move, tap again to open or add, drag up or down to change</dd>
         <dt>Row numbers</dt><dd>tap to select that line, tap another to grow it</dd>
-        <dt>Keys</dt><dd>the keyboard works in both modes: arrows move, Enter opens, Space plays, typing letters and hex edits the cell · Shift selects lines, Z option, X edit · Alt+1–7 screens · F5–F8 transport · Ctrl+Z undo · Ctrl+C X V A copy, cut, paste, all · Ctrl+S save, Shift+Ctrl+S save as, Ctrl+O open</dd>
+        <dt>Keys</dt><dd>the keyboard works in both modes: arrows move, Enter opens, Space plays, typing letters and hex edits the cell · Shift selects lines, Z option, X edit · Alt+1–7 screens (7 is MOD) · F5–F8 transport · Ctrl+Z undo · Ctrl+C X V A copy, cut, paste, all · Ctrl+S save, Shift+Ctrl+S save as, Ctrl+O open</dd>
       </dl>
       <dl class="tlegend" id="tLegKeys" hidden>
         <dt>? or F1</dt><dd>all the keys, and how the tracker works</dd>
-        <dt>Alt + 1–7</dt><dd>Song, Sect, Phrase, Inst, Mixer, FX, Project · Alt+0 the synth · Alt+8 waves · Alt+9 chains · Alt+` back to the last view</dd>
+        <dt>Alt + 1–7</dt><dd>Song, Sect, Phrase, Inst, Mixer, FX, MOD (PROJECT: its tab, or SHIFT+▶ from MOD) · Alt+0 the synth · Alt+8 waves · Alt+9 chains · Alt+` back to the last view</dd>
         <dt>F2 F3 F4</dt><dd>Phrase, Mixer, Inst</dd>
         <dt>F5 F6 F7 F8</dt><dd>play song · play this screen · song from cursor · stop (F8 again: all notes off)</dd>
         <dt>Arrows</dt><dd>move · Alt/⌥+arrows change screen (◀▶ in tab order, ▲ Project, ▼ Mixer, one step at a time: from Mixer ▲ goes back to the middle screens; on Phrase and Song ⌥+▲▼ go to the pattern above / below, as Shift+⌥+▲▼ do)</dd>
@@ -3377,6 +3378,7 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
 <h3>Track effects</h3>
 <p>Each track and the master have 8 effect slots (FX screen, or the Mixer’s FX row): 73 effects on a track and 82 on a bus or the master (with the nine pump ones; pump EQ goes on any track), in groups: dynamics and EQ (compressors, Bus and Glue Comp, limiter, noise gate, transient shaper, multiband, air), filters (filter, ladder, low and high cut, auto-wah, vowel, envelope filter), drive and lo-fi (saturation, drive, overdrive, tube, tape, wavefolder, bitcrush, lo-fi, degrade, vintage sampler (an SP-1200, SP-12, MPC60, SP-202 at each of its grades, or Emulator II: their rate and bit depth, converters, filters and noise), vinyl, dub tape, cab), modulation (chorus, ensemble, dimension, flanger, phaser, tremolo, auto-pan, rotary, ring mod, cross-mod, frequency shifter), delays (simple, tape, BBD, pitch, granular, reverse echo), reverbs (room, plate, spring, space, Galactic, pitch reverb, convolution), pitch and voice (pitch shifter, harmonizer, pitch correct), resonators (resonator, comb, Rings), spectral and granular (Clouds, Beads, spectral, extreme stretch), rhythmic (Flex, Step gate, Retrigger, trance gate, pump, Beat grains, Beat scramble, Glitch sequencer) and utility (stereo width, utility). The pad's Add effect menu has 65 of them. On the Mixer’s FX row, ALT (Ctrl/⌘ in KEYS mode) + ▲▶ turns a track's effects on in order, up to eight, and ALT + ▼◀ turns the last one off without losing its settings — turn the count back up and it returns; with none on, slots fill from 1. EDIT on the row opens the FX screen. Renders include them; stems skip the master effects and limiter. For drums and IDM: <b>Beat grains</b> (a rhythmic grain cloud in time with the song, after Output Portal: rate, density, size, position, spray, pitch and random pitch, reverse, shape, stereo, freeze), <b>Beat scramble</b> (re-orders the last bar's slices, some reversed; keep the beats, new every bar or looped) and <b>Glitch sequencer</b> (each step may stutter, reverse, jump an octave, tape-stop, crush or drop out). Under a slot's controls, <b>› PRESET</b> lists INIT, factory presets (over 230 across the effects) and the song's own, and <b>› SAVE AS PRESET…</b> keeps the slot's settings for that effect. <b>› EQ WINDOW</b> (at the bottom of the FX screen, on any track) opens the track's pump EQ in its own window, adding one to a free slot if needed; pump EQ works on every track, the other pump effects on buses and the master.</p>
 <p><b>The FX screen</b> keeps the slot list and the open slot's controls apart: ▲▼ move within one of the two, and ◀▶ (or a sideways swipe) open the slot under the cursor and go back to the list — so scrolling never changes the effect you are editing. A filled slot shows ›, and the open one shows ▪.</p>
+<p><b>The MOD screen</b> (between FX and PROJECT) lists the track's four LFOs, one a row: TARGET (EDIT or a click opens the target list; it starts at this track), SHAPE, RATE (a cycle every 1/32 … 8 bars, in time with the song) and DEPTH (00–FF). EDIT+arrows or a drag change a value, Delete takes the LFO out, ALT+◀▶ picks another track (the master too), and it follows the FX screen's track. Right-click an effect parameter on the FX screen (or its value on the FX bar) → <b>Add LFO…</b> puts one on it; a ~ after a parameter's name shows that an LFO moves it. …pump effects aren't targets yet.</p>
 <p><b>chains</b> (the modular effects screen) is live: adding or removing a module, moving a cable, or turning a slider is heard at once — no need to restart playback. Its <b>Resample</b> module records what passes through it into a pad, starting on the next bar, and slices it so you can chop it like a breakbeat.</p></section>
     <section id="hGen"><h2>Generators</h2><p>GEN (PAD mode, beside LOOP), Edit ▾ → Generators, or a right-click. Each opens a panel that stays up while the song plays: <kbd>G</kbd> rolls again, <kbd>Space</kbd> plays, <kbd>Esc</kbd> or Done closes, and each roll is one undo step. They write into the selected rows, else the whole phrase (Drum pattern: the song row under the cursor).</p><table>
 <tr><td>Drum pattern</td><td>A beat across tracks: KICK, SNARE, HATS and PERC each get a track and an instrument (found from your pad names). STYLE (Four on the floor, Broken beat, Jungle, Footwork, Halftime, IDM euclidean), DENSITY, VARIATION (later bars change, a fill at the end). A track with nothing on the row gets a new phrase; a block that also plays elsewhere is made a unique copy first (SHARED), unless you choose to rewrite it everywhere</td></tr>
@@ -12900,7 +12902,7 @@ document.addEventListener('keydown', e => {
     if (tp.on) tStopUser(); else tStart('song', {row:songRow()}); return; }
   // SOLO / MUTE (owner, 8 Nov): on this screen too, for the track the panel follows (see soloMuteKey)
   if (soloMuteKey(e)){ e.preventDefault(); return; }
-  if (e.altKey && /^Digit[1-7]$/.test(e.code)){ e.preventDefault(); setView('tracker'); go(VIEWS[+e.code.slice(5) - 1]); return; }
+  if (e.altKey && /^Digit[1-8]$/.test(e.code)){ e.preventDefault(); setView('tracker'); go(VIEWS[+e.code.slice(5) - 1]); return; }
   // FIX (UI sweep, 4 Nov): Alt/⌥+S, Song settings "from any screen" (owner, 3 Nov), the Synth page too (it was the tracker's only)
   if (e.altKey && !e.shiftKey && e.code === 'KeyS' && view === 'synth'){ e.preventDefault(); if (!pbOpen) setSheet('song'); return; }
   // F-KEYS OFF THE TRACKER (1 Nov, audit #1): F2–F4 go to Phrase / Mixer / Inst, F5 plays the song from the top, F6 this screen
@@ -15341,7 +15343,7 @@ const resetClick = e => e.pointerType !== 'touch' && e.button === 0 && (e.altKey
 function valMenu(e, title, o){
   e.preventDefault(); e.stopPropagation(); if (typeof sxMenu !== 'function') return;
   sxMenu(e.clientX, e.clientY, String(title || '').toUpperCase(), [{l:'Reset to default', f:o.reset || (() => {}), off:!o.reset}, {l:'Type a value…', f:o.type || (() => {}), off:!o.type},
-    ...(o.learn ? [{l:'Learn a MIDI knob for it', f:o.learn}] : []), ...(o.more ? [null, ...o.more] : [])]);
+    ...(o.learn ? [{l:'Learn a MIDI knob for it', f:o.learn}] : []), ...(o.lfo ? [{l:'Add LFO…', f:() => lfoAdd(o.lfo)}] : []), ...(o.more ? [null, ...o.more] : [])]);
 }
 // A level typed as hex (00–FF, as the tracker shows it) or in dB ("-6", "-6 dB", "+2.5"); null when it isn't either.
 function parseLevel(txt, fromDb){
@@ -19317,7 +19319,7 @@ function demoSong(){
 // PERFORM's sizes and LFO lists, set early (PERFORM below sets the same again): the saved song is read just below, before the
 // PERFORM block runs, and normSong saw them undefined then: scenes A / B came back empty, parts shrank to one, and a song with
 // a track LFO threw (PLFO_SHAPES.length), so the app opened the starter beat instead and autosaved it over the song.
-var PERF_SCENES = 16, PERF_MACROS = 8, PERF_PARTS = 16, PLFO_RATES = [1/8, 1/4, 1/2, 1, 2, 4, 8, 16, 32], PLFO_SHAPES = ['Sine', 'Triangle', 'Saw up', 'Saw down', 'Square', 'Random'];
+var PERF_SCENES = 16, PERF_MACROS = 8, PERF_PARTS = 16, PLFO_MAX = 4, PLFO_RATES = [1/8, 1/4, 1/2, 1, 2, 4, 8, 16, 32], PLFO_SHAPES = ['Sine', 'Triangle', 'Saw up', 'Saw down', 'Square', 'Random'];
 // FIRST RUN (owner, 31 Oct): with no song saved yet the app opens the bundled ELECTRO project (sounds/ELECTRO.thunder);
 // the starter beat stays underneath until it has loaded (and if it can't be fetched).
 let FIRST_SONG = false;
@@ -19637,11 +19639,11 @@ const SWINGB = ['8ths', '16ths', 'Triplet', 'Dotted-8th', 'Half', 'Wide-6', 'Wid
      xa, xb, xf   the scenes on A and B, and the crossfader (00 = all A, FF = all B) the song starts with
      mac 8 macros {n, v (00–FF, the start value), tg:[{id, lo, hi}]}: one control, several targets, each between lo and hi
      lk  {track: [id, id, id, id]}: what LK1–LK4 on that track's rows set
-     lfo {track: {id, sh, rt, dp}}: a track LFO (shape, rate as an index of PLFO_RATES in beats a cycle, depth)
+     lfo {track: [{id, sh, rt, dp}, … up to PLFO_MAX]}: a track's LFOs (shape, rate as an index of PLFO_RATES in beats a cycle, depth)
    S.parts (saved in the song): 16 parts {n, insts, mix:[[vol, pan]…], fx:{'t:s':{k:v}}}: a sound setup PRT switches to. */
 // (var and function: normSong reads the saved song at start-up, before this line runs; the vars are also set before that: FIRST RUN)
 var PERF_SCENES = 16, PERF_MACROS = 8, PERF_PARTS = 16;
-var PLFO_RATES = [1/8, 1/4, 1/2, 1, 2, 4, 8, 16, 32], PLFO_RATE_NAMES = ['1/32', '1/16', '1/8', '1/4', '1/2', '1 bar', '2 bars', '4 bars', '8 bars'];
+var PLFO_MAX = 4, PLFO_RATES = [1/8, 1/4, 1/2, 1, 2, 4, 8, 16, 32], PLFO_RATE_NAMES = ['1/32', '1/16', '1/8', '1/4', '1/2', '1 bar', '2 bars', '4 bars', '8 bars'];
 var PLFO_SHAPES = ['Sine', 'Triangle', 'Saw up', 'Saw down', 'Square', 'Random'];
 function freshPerf(){ return {sc:Array.from({length:PERF_SCENES}, (_, i) => ({n:'', v:{}})), xa:0, xb:1, xf:0,
   mac:Array.from({length:PERF_MACROS}, (_, i) => ({n:'M' + (i + 1), v:0, tg:[]})), lk:{}, lfo:{}}; }
@@ -19654,8 +19656,10 @@ function normPerf(j){
   if (Array.isArray(j.mac)) j.mac.slice(0, PERF_MACROS).forEach((m, i) => { if (!m || typeof m !== 'object') return;
     P.mac[i] = {n:typeof m.n === 'string' && m.n.trim() ? m.n.slice(0, 12) : 'M' + (i + 1), v:v8(m.v), tg:(Array.isArray(m.tg) ? m.tg : []).filter(g => g && tgtOk(g.id)).slice(0, 8).map(g => ({id:g.id, lo:v8(g.lo), hi:v8(g.hi == null ? 255 : g.hi)}))}; });
   if (j.lk && typeof j.lk === 'object') for (const k in j.lk){ const t = int(k, -1); if (t >= 0 && t <= 128 && Array.isArray(j.lk[k])) P.lk[t] = [0, 1, 2, 3].map(n => tgtOk(j.lk[k][n]) ? j.lk[k][n] : null); }
-  if (j.lfo && typeof j.lfo === 'object') for (const k in j.lfo){ const t = int(k, -1), L = j.lfo[k]; if (t >= 0 && t <= 128 && L && tgtOk(L.id))
-    P.lfo[t] = {id:L.id, sh:clamp(int(L.sh, 0), 0, PLFO_SHAPES.length - 1), rt:clamp(int(L.rt, 3), 0, PLFO_RATES.length - 1), dp:v8(L.dp == null ? 128 : L.dp)}; }
+  if (j.lfo && typeof j.lfo === 'object') for (const k in j.lfo){ const t = int(k, -1);   // one object (the old shape) or an array of up to PLFO_MAX
+    const a = (Array.isArray(j.lfo[k]) ? j.lfo[k] : [j.lfo[k]]).filter(L => L && typeof L === 'object' && tgtOk(L.id)).slice(0, PLFO_MAX).map(L =>
+      ({id:L.id, sh:clamp(int(L.sh, 0), 0, PLFO_SHAPES.length - 1), rt:clamp(int(L.rt, 3), 0, PLFO_RATES.length - 1), dp:v8(L.dp == null ? 128 : L.dp)}));
+    if (t >= 0 && t <= 128 && a.length) P.lfo[t] = a; }
   return P;
 }
 function normParts(j){
@@ -20106,10 +20110,14 @@ function makeSeq(S, mode, o){
       }
       // TRACK LFO (owner, 1 Nov; Perform → LFO): a few points a row (2 in a render) around the target's value now (its scene,
       // macro or own), in time with the song; a filter target (cut / res / dec) once a row, for the notes that start on it.
-      { const L = PFS.lfo[t]; if (L && tgtOk(L.id)){ const g = tgtParse(L.id), fl = g.k === 'cut' || g.k === 'res' || g.k === 'dec', n = fl ? 1 : PL ? Math.min(4, api.tks) : 2, per = PLFO_RATES[L.rt] || 1;
+      // Several LFOs on one target add around its one value (the first LFO of a target leads; the later ones are summed into its points).
+      { const La = PFS.lfo[t]; if (Array.isArray(La)) for (let i = 0; i < La.length; i++){ const L = La[i]; if (!L || !tgtOk(L.id)) continue;
+          let dup = false; for (let j = 0; j < i; j++) if (La[j] && La[j].id === L.id){ dup = true; break; } if (dup) continue;
+          const g = tgtParse(L.id), fl = g.k === 'cut' || g.k === 'res' || g.k === 'dec', n = fl ? 1 : PL ? Math.min(4, api.tks) : 2;
           const c = PF.sent.has(L.id) ? PF.sent.get(L.id) : tgtOwn(L.id, S);
-          for (let k = 0; k < n; k++){ const tt = t0 + dur * k / n, bt = (api.bt + (tt - t0) * api.bpm / 60) / per, cyc = Math.floor(bt);
-            evs.push(...tgtEvs(L.id, clamp(Math.round(c + lfoAt(L.sh, bt - cyc, cyc) * L.dp / 2), 0, 255), tt, PF.pno)); } } }
+          for (let k = 0; k < n; k++){ const tt = t0 + dur * k / n; let v = c;
+            for (let j = i; j < La.length; j++){ const M = La[j]; if (!M || M.id !== L.id) continue; const bt = (api.bt + (tt - t0) * api.bpm / 60) / (PLFO_RATES[M.rt] || 1), cyc = Math.floor(bt); v += lfoAt(M.sh, bt - cyc, cyc) * M.dp / 2; }
+            evs.push(...tgtEvs(L.id, clamp(Math.round(v), 0, 255), tt, PF.pno)); } } }
       if (muted){ evs.length = ev0; if (!T.mut) evs.push({type:'off', t:t0, track:t}); delete pos[t].sc; pos[t].off = true; }   // entering a muted block silences what is ringing
       T.mut = muted;
       const L = (mode === 'song' && pid < 0) ? emptyLen() : lenOf(pid);
@@ -21574,7 +21582,7 @@ function padBlink(e){
    Off (Page), nothing here runs. */
 // CORE_REV: a hash of core/seq-core.js, written by tools/make-core.mjs. The offline cache keeps a file by its URL, so the
 // URL must change whenever the file does (the build number alone left phones on an old core all evening, 2 Nov).
-const CORE_REV = 'bg11m6';
+const CORE_REV = '37iagj';
 const CORE_WANT = 7;   // the core's message set this page speaks (core-processor.js CORE_V); an older core is not used
 const CORE_URL = () => 'core/seq-core.js?v=' + BUILD + '-' + CORE_REV;
 const core = {node:null, ready:false, loading:null, gen:0, sent:new Map(), sT:0, tally:new Map(), mir:null};   // mir: what the core's song holds, as JSON per part (coreDiff)   // tally: events by who played them (test hook)
@@ -22925,8 +22933,8 @@ function irsUI(sec){
 function setSong(s, msg){ tStop(true); tp.paused = null; irsAdopt(s); S = s; setTimeout(() => { try { irsResolve(); } catch(e){ tpLog('could not load the song’s impulse responses', e); } }, 0); swingNote(); scNote(); setTimeout(mstSync, 0); try { projSet(null, null); } catch(e){ projFile = null; } resetCursors(); last.sect = last.phrase = 0; phraseToCursor(); CH.doc = S.chainPatch || null; chainsDropFrame(); if (rt){ rt.pl.buses.forEach(b => { if (b && b.chn) b.chn._sent = null; }); rtAllFx(); rtRoute(); rt.pl.applyMix(); } saveS(); draw(); if (msg) toast(msg); try { PumpFX._notifyAll('load'); } catch(e){} }
 
 /* ---------- views ---------- */
-const MID = ['song', 'sect', 'phrase', 'inst'], VIEWS = ['song', 'sect', 'phrase', 'inst', 'mixer', 'fx', 'project'], GRIDV = new Set(['song', 'sect', 'phrase']);
-const VNAME = {song:'SONG', sect:'SECT', phrase:'PHRASE', inst:'INST', mixer:'MIXER', fx:'FX', project:'PROJECT'};
+const MID = ['song', 'sect', 'phrase', 'inst'], VIEWS = ['song', 'sect', 'phrase', 'inst', 'mixer', 'fx', 'mod', 'project'], GRIDV = new Set(['song', 'sect', 'phrase']);
+const VNAME = {song:'SONG', sect:'SECT', phrase:'PHRASE', inst:'INST', mixer:'MIXER', fx:'FX', mod:'MOD', project:'PROJECT'};
 let tv = 'song', midV = 'song';
 // SECT (Project): hidden by default. The sect screen and its data stay, the song just points straight at
 // phrases: a new song block gets its own sect with one phrase in it, and SHIFT+▶ opens the phrase.
@@ -22980,7 +22988,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 538;
+const BUILD = 539;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD + (location.pathname.includes('/beta/') ? ' · beta' : '');
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -23304,7 +23312,7 @@ function setStepDec(on){ stepDec = on; try { localStorage.setItem(SDK, on ? '1' 
 function setTScale(v){ tScale = clamp(Math.round(v / 10) * 10, 60, 200); try { localStorage.setItem(TSK, String(tScale)); } catch(e){} fit(); draw(); }
 function setMixScale(v){ mixScale = clamp(Math.round(v / 10) * 10, 60, 200); try { localStorage.setItem(MSK, String(mixScale)); } catch(e){} fit(); draw(); }
 function setArr(m){ arrMode = m; try { localStorage.setItem(ARK, String(m)); } catch(e){} arrBody(); arrSig = ''; draw(); fit(); draw(); }
-const cs = {song:{x:0, y:0, top:0}, sect:{x:0, y:0}, phrase:{x:0, y:0, top:0}, inst:{x:0, y:0}, mixer:{x:0, y:0}, fx:{x:0, y:0}, project:{x:0, y:0}};
+const cs = {song:{x:0, y:0, top:0}, sect:{x:0, y:0}, phrase:{x:0, y:0, top:0}, inst:{x:0, y:0}, mixer:{x:0, y:0}, fx:{x:0, y:0}, mod:{x:0, y:0}, project:{x:0, y:0}};
 let cSect = 0, cPhrase = 0, cInst = 0, cTrack = 0, cFxT = 0, cFxS = 0, lastFxType = 'eq', selA = null, clip = null;
 const last = {sect:0, phrase:0, note:ROOT, vol:255, inst:0, fxc:0, fxv:0};
 // Has an instrument been chosen yet (typed, changed, picked up, or picked on INST)? Until then EDIT on a note keeps the row's own.
@@ -23743,7 +23751,7 @@ function fxRows(){
   rows.push({l:'ACTIVE', gap:true, desc:TFX[f.type].long, tog:true, get:() => f.on ? 1 : 0, set:v => { f.on = !!v; fxChanged(t); }, min:0, max:1, d:1, fmt:v => onOff(v) + `  slot ${k + 1} ` + TFX[f.type].n,
     info:() => `Slot ${k + 1}: ${TFX[f.type].long}. ` + (TFX[f.type].about ? TFX[f.type].about + ' ' + (pumpLatTxt(t, k) ? pumpLatTxt(t, k)[0].toUpperCase() + pumpLatTxt(t, k).slice(1) + '. ' : '') : '') + 'OFF bypasses it'});
   const PU = TFX[f.type].pump;   // …PUMP: a pump effect's boxes (fmt sees the slot: it shows the exact value), its presets and OPEN
-  for (const q of TFX[f.type].ps) rows.push({l:q.l, get:() => f[q.k], set:v => { f[q.k] = v; delete f.pname; fxChanged(t); }, min:q.min, max:q.max, big:q.names ? (q.max > 40 ? 8 : 1) : q.band ? 1 : 16, d:q.d, tog:q.names && q.names.length === 2,
+  for (const q of TFX[f.type].ps) rows.push({l:q.l, lfo:PU ? '' : 'fx:' + t + ':' + k + ':' + TFX[f.type].ps.indexOf(q), get:() => f[q.k], set:v => { f[q.k] = v; delete f.pname; fxChanged(t); }, min:q.min, max:q.max, big:q.names ? (q.max > 40 ? 8 : 1) : q.band ? 1 : 16, d:q.d, tog:q.names && q.names.length === 2,
     fmt:v => q.names ? q.names[v] : q.band ? q.fmt(v, f) : (q.min < 0 ? sgn(v) : q.max > 99 ? hx(v) : d2(v)) + '  ' + q.fmt(v, f),
     info:() => TFX[f.type].long + ' · ' + q.l.toLowerCase() + (PU ? pumpRowInfo(t, k, q) : '')});
   if (!PU){
@@ -23928,12 +23936,58 @@ function projRows(){
       info:() => 'While the song plays, Android shows a play / stop notification so the song keeps going when you switch apps. OFF: no notification.'},
   ];
 }
+/* MOD SCREEN (owner, 9 Nov): the current track's LFOs (up to PLFO_MAX, S.perf.lfo[track]), one a row: TARGET, SHAPE, RATE, DEPTH.
+   The track is the FX screen's (cFxT; the master is MT = NT). Rows are positional on screen but the stored array has no holes:
+   a target picked on an empty row appends, Delete shifts the later rows up. Edits call saveS(), which is what makes them undo. */
+const modT = () => cFxT >= NT ? MT : cFxT;
+const modArr = () => { const a = S.perf && S.perf.lfo && S.perf.lfo[modT()]; return Array.isArray(a) ? a : []; };
+const modLab = L => tgtParse(L.id).t === modT() ? tgtLabel(L.id, true) : tgtLabel(L.id);
+const modRate = rt => PLFO_RATE_NAMES[rt] || '?';
+function modPick(y){
+  const t = modT();
+  tgtPicker(id => { const P = perfOf(), a = P.lfo[t] || (P.lfo[t] = []), i = Math.min(y, a.length);
+    if (i >= PLFO_MAX) return; a[i] = {id, sh:0, rt:3, dp:128}; cs.mod.y = i; saveS(); draw(); }, t === MT ? 99 : t);
+}
+function modDel(y){
+  const a = modArr(); if (!a[y]) return toast('LFO ' + (y + 1) + ' is empty.');
+  a.splice(y, 1); if (!a.length) delete S.perf.lfo[modT()]; saveS(); draw(); toast('LFO ' + (y + 1) + ' removed' + (a.length ? ' · ' + a.length + ' left' : ''));
+}
+function modBump(d, big){
+  const c = cs.mod, L = modArr()[c.y];
+  if (!L) return toast('LFO ' + (c.y + 1) + ' is empty: EDIT on TARGET picks what it moves.', 2500);
+  if (c.x === 0) return toast('EDIT on TARGET picks another target.', 2000);
+  if (c.x === 1) L.sh = clamp(L.sh + d, 0, PLFO_SHAPES.length - 1);
+  else if (c.x === 2) L.rt = clamp(L.rt + d, 0, PLFO_RATES.length - 1);
+  else L.dp = clamp(L.dp + d * (big ? 16 : 1), 0, 255);
+  saveS(); draw();
+}
+// EDIT / Enter: TARGET opens the picker; SHAPE and RATE step on (round to the first); DEPTH takes a hex number
+async function modEdit(){
+  const c = cs.mod, L = modArr()[c.y];
+  if (c.x === 0 || !L) return modPick(c.y);
+  if (c.x === 1) L.sh = (L.sh + 1) % PLFO_SHAPES.length; else if (c.x === 2) L.rt = (L.rt + 1) % PLFO_RATES.length;
+  else { const a = await askText({title:'LFO ' + (c.y + 1) + ' DEPTH', body:'A hex value, 00–FF (now ' + hx(L.dp) + ').'}, '', 4, 'Set'); if (a == null) return;
+    const m = /^\s*([0-9a-f]{1,2})\s*$/i.exec(a); if (!m) return toast('Not a hex value: 00–FF'); L.dp = parseInt(m[1], 16); }
+  saveS(); draw();
+}
+// ADD LFO… (right-click on an internal FX parameter: the FX screen's rows, the FX bar's values): adds an LFO on it and opens MOD on
+// its row; a target that has one already just opens it; a track with four says so.
+function lfoAdd(id){
+  const g = tgtParse(id), t = g.t >= NT ? MT : g.t, a = (S.perf && S.perf.lfo && S.perf.lfo[t]) || [];
+  let i = a.findIndex(L => L.id === id), msg = '';
+  if (i < 0){
+    if (a.length >= PLFO_MAX){ i = 0; msg = (t === MT ? 'The master' : 'Track ' + d2(t + 1)) + ' has ' + PLFO_MAX + ' LFOs already: remove one on MOD to add this.'; }
+    else { const P = perfOf(); (P.lfo[t] || (P.lfo[t] = [])).push({id, sh:0, rt:3, dp:128}); i = P.lfo[t].length - 1; saveS(); msg = 'LFO ' + (i + 1) + ' added: ' + tgtLabel(id, true) + '. SHAPE, RATE and DEPTH are on this row.'; }
+  } else msg = 'That parameter already has an LFO (row ' + (i + 1) + ').';
+  go('mod'); cFxT = t >= NT ? NT : t; cs.mod.y = i; cs.mod.x = 0; draw(); toast(msg, 4000);
+}
 const rowsOf = v => v === 'inst' ? instRows() : v === 'project' ? projRows() : v === 'fx' ? fxRows() : [];
 function dims(v){
   if (v === 'song') return {w:ntr(), h:256};
   if (v === 'sect') return {w:2, h:16};
   if (v === 'phrase') return {w:RW, h:plen(cPhrase)};
   if (v === 'mixer') return {w:ntr(), h:8};
+  if (v === 'mod') return {w:4, h:PLFO_MAX};
   return {w:1, h:rowsOf(v).length};
 }
 
@@ -24037,6 +24091,7 @@ function insertAt(x, y, k){
 }
 function bump(d, big){
   const c = cs[tv];
+  if (tv === 'mod') return modBump(d, big);
   if (onPset()) return psetSet(c.x, psetGet(c.x) + d * (big ? (c.x ? 4 : 8) : 1));
   if (GRIDV.has(tv)){
     const k = kindAt(tv, c.x); let v = getCell(tv, c.x, c.y);
@@ -24269,6 +24324,7 @@ function editTap(enter, stamp){   // stamp: Shift+Enter, which writes the curren
     return;
   }
   if (tv === 'mixer'){ if (c.y === 7 && c.mx === 1) return openMst(); if (c.y === 5) return go('fx'); if (c.y === 4){ setChainOn(c.x, !S.chainOn[c.x]); draw(); return; } if (mixFv()){ toast(`Track ${d2(c.x + 1)} · VOL ${hx(S.mix[c.x].vol)} · ${dB(trackGain(S.mix[c.x].vol))} · Del resets to E0`); return; } if (c.y === 6){ scSay(c.x); return; } /* SOURCE: the SC row only shows; Enter / EDIT says what listens to the track */ if (c.y === 2 || c.y === 3){ const m = S.mix[c.x]; if (c.y === 2) setMute(m, !m.mute); else setSolo(m, !m.solo); mixChanged(); draw(); } return; }
+  if (tv === 'mod') return modEdit();
   const r = rowsOf(tv)[c.y]; if (!r) return;
   // ONE CONFIRM (27 Oct, Phase 2): a row that replaces something asks in the app's one dialog (it took a second EDIT, the
   // "Tap EDIT twice" note). A double EDIT still goes straight through (editDouble), as before.
@@ -24452,7 +24508,7 @@ function dupPattern(){
 // chains isn't copied: its patch is one for the whole song.
 // tAt: the track to copy (the Song / Arrange right-click menu's block), else the screen's own track.
 function dupTrack(notes, tAt){
-  const mst = tAt != null ? tAt === MT : tv === 'mixer' ? onMstCell() : tv === 'fx' ? cFxT >= NT : cTrack === MT;
+  const mst = tAt != null ? tAt === MT : tv === 'mixer' ? onMstCell() : tv === 'fx' || tv === 'mod' ? cFxT >= NT : cTrack === MT;
   if (mst) return toast('The master can’t be duplicated.');
   let t = tAt != null ? tAt : dkTrack(), PF = polyFrom(), poly = t >= PF, end = poly ? ntr() : PF;
   const free = () => { for (let u = t + 1; u < end; u++) if (S.song.every(row => row[u] < 0)) return u; return -1; };
@@ -24562,6 +24618,7 @@ function del(){
   if (onPset()) return psetSet(cs.phrase.x, cs.phrase.x ? 0 : 16);
   if (tv === 'song'){ if (sxPicks.length){ const pk = sxPicks.map(p => [p.y, p.t]); sxPicks = []; return songDelete(pk, true); }   // picked cells: cleared, their phrases kept
     return songDelete(songCells(), false); }
+  if (tv === 'mod') return modDel(cs.mod.y);
   if (tv === 'fx' && cs.fx.y >= 1 && cs.fx.y <= FXSLOTS) return fxDelLast(cFxT);   // Delete takes the last effect off the chain
   if (selA) return clearSel();   // FIX (27 Oct, audit K4): Delete clears the selection; Ctrl/⌘+X cuts (Delete used to cut, losing the clipboard)
   const c = cs[tv];
@@ -24676,7 +24733,7 @@ function setMute(m, v){ m.mute = !!v; if (m.mute) m.solo = false; }
 function setSolo(m, v){ m.solo = !!v; if (m.solo) m.mute = false; }
 function muteKey(trackOnly){
   if (trackOnly !== true && tv === 'song' && sxPicks.length) return sxMuteCells(sxPicks.map(p => [p.y, p.t]));   // picked cells
-  const mst = tv === 'song' ? cs.song.x === MT : tv === 'mixer' ? onMstCell() : tv === 'fx' ? cFxT >= NT : cTrack === MT;
+  const mst = tv === 'song' ? cs.song.x === MT : tv === 'mixer' ? onMstCell() : tv === 'fx' || tv === 'mod' ? cFxT >= NT : cTrack === MT;
   if (mst) return toast('The master can’t be muted.');
   const t = dkTrack(), m = S.mix[t]; if (!m) return;
   setMute(m, !m.mute); mixChanged(); draw();
@@ -24684,7 +24741,7 @@ function muteKey(trackOnly){
 }
 function soloKey(all){
   if (all){ if (!S.mix.some(m => m.solo)) return toast('Nothing is soloed.'); S.mix.forEach(m => m.solo = false); mixChanged(); draw(); return toast('Solo cleared: every track plays.'); }
-  const mst = tv === 'song' ? cs.song.x === MT : tv === 'mixer' ? onMstCell() : tv === 'fx' ? cFxT >= NT : cTrack === MT;
+  const mst = tv === 'song' ? cs.song.x === MT : tv === 'mixer' ? onMstCell() : tv === 'fx' || tv === 'mod' ? cFxT >= NT : cTrack === MT;
   if (mst) return toast('The master can’t be soloed.');
   const t = dkTrack(), m = S.mix[t]; if (!m) return;
   setSolo(m, !m.solo); mixChanged(); draw();
@@ -25108,7 +25165,7 @@ function go(v){
     if (cid >= 0){ cSect = cid; cTrack = cs.song.x; const ch = S.chains[cid]; const r = ch ? ch.findIndex(q => q[0] >= 0) : -1; if (r >= 0){ cs.sect.y = r; cPhrase = ch[r][0]; } } }
   if (v === 'phrase' && tv === 'sect'){ const r = sectRow(cSect, cs.sect.y); if (r && r[0] >= 0) cPhrase = r[0]; }
   if (v === 'inst' && tv === 'phrase'){ const p = S.phrases[cPhrase], r = p && p[cs.phrase.y]; if (r && r[IC] >= 0) cInst = r[IC]; }
-  if (v === 'fx' && tv === 'mixer') cFxT = cs.mixer.y === 7 ? NT : cs.mixer.x;
+  if ((v === 'fx' || v === 'mod') && tv === 'mixer') cFxT = cs.mixer.y === 7 ? NT : cs.mixer.x;
   if (tv === 'song' && v !== 'song') cTrack = cs.song.x;
   // Only the screens that edit a track (Song, Sect, Phrase) point FX and the Mixer at it. From anywhere else (Project, …)
   // they keep what they had, so the master bus stays picked after a trip to Project and back. Inst sits between Phrase
@@ -25117,12 +25174,12 @@ function go(v){
   if (v === 'inst' && tv !== 'inst') instViaTrk = GRIDV.has(tv);
   // FX FOLLOWS ARRANGE (owner, 22 Oct): Mixer and FX open on the track the Song / Arrange cursor is on (the master column:
   // the master), not the track the phrase was opened on: those differ once Arrange's cursor moves to an empty block.
-  if (fromTrack && (v === 'fx' || (v === 'mixer' && tv !== 'mixer'))){
+  if (fromTrack && (v === 'fx' || v === 'mod' || (v === 'mixer' && tv !== 'mixer'))){
     const t = cs.song.x === MT ? MT : Math.min(cs.song.x, ntr() - 1);
-    if (v === 'fx') cFxT = t === MT ? NT : t;
+    if (v === 'fx' || v === 'mod') cFxT = t === MT ? NT : t;
     else if (t === MT) cs.mixer.y = 7; else { cs.mixer.x = t; if (cs.mixer.y === 7) cs.mixer.y = 0; }
   }
-  if (v === 'mixer' && tv === 'fx'){ if (cFxT < NT){ cs.mixer.x = cFxT; if (cs.mixer.y === 7) cs.mixer.y = 0; } else cs.mixer.y = 7; }   // FX on the master: the Mixer's master row
+  if (v === 'mixer' && (tv === 'fx' || tv === 'mod')){ if (cFxT < NT){ cs.mixer.x = cFxT; if (cs.mixer.y === 7) cs.mixer.y = 0; } else cs.mixer.y = 7; }   // FX on the master: the Mixer's master row
   const refit = (tv === 'mixer') !== (v === 'mixer');   // the Mixer is sized for more rows
   tv = v; if (MID.includes(v)) midV = v; selA = null; sxPicks = []; if (refit) fit(); draw(); saveCur();
 }
@@ -25134,9 +25191,9 @@ function nav(dir){
   if (dir === 'down') return tv === 'project' ? go(midV) : tv !== 'mixer' ? go('mixer') : null;
   // PATTERN VIEW: PHRASE | PATTERN stays as chosen (owner, 19 Oct); Shift+▶ from the pattern goes on to Inst like the
   // phrase does (it used to switch back to the plain phrase, so walking the screens turned PATTERN off).
-  // ◀▶ run along every screen in tab order: Song, Sect, Phrase, Inst, Mixer, FX, Project.
-  if (dir === 'right' && (tv === 'inst' || tv === 'mixer' || tv === 'fx')) return go(VIEWS[VIEWS.indexOf(tv) + 1]);
-  if (dir === 'left' && (tv === 'mixer' || tv === 'fx' || tv === 'project')) return tv === 'mixer' ? go('inst') : go(VIEWS[VIEWS.indexOf(tv) - 1]);
+  // ◀▶ run along every screen in tab order: Song, Sect, Phrase, Inst, Mixer, FX, MOD, Project.
+  if (dir === 'right' && (tv === 'inst' || tv === 'mixer' || tv === 'fx' || tv === 'mod')) return go(VIEWS[VIEWS.indexOf(tv) + 1]);
+  if (dir === 'left' && (tv === 'mixer' || tv === 'fx' || tv === 'mod' || tv === 'project')) return tv === 'mixer' ? go('inst') : go(VIEWS[VIEWS.indexOf(tv) - 1]);
   if (!MID.includes(tv)) return;
   if (dir === 'left'){ const M = midList(), i = M.indexOf(tv); return i > 0 ? go(M[i - 1]) : null; }
   // On an empty cell, still change screen: show the sect or phrase that was last open.
@@ -25187,7 +25244,7 @@ function optDir(dir, grid){
   if (tv === 'phrase' && grid && patNavOn && phraseGrid(dir)) return;
   if (tv === 'phrase'){ const step = big ? (patNavOn ? 1 : 16) : 1; cPhrase = clamp(cPhrase + dn * step, 0, NPH - 1); selA = null; followPhraseBlock(); return draw(); }
   if (tv === 'inst'){ cInst = last.inst = clamp(cInst + dn, 0, NI - 1); instPicked = true; return draw(); }
-  if (tv === 'fx'){ const n = ntr(), i = cFxT >= NT ? n : cFxT, j = (i + dn + n + 1) % (n + 1); cFxT = j >= n ? NT : j; return draw(); }
+  if (tv === 'fx' || tv === 'mod'){ const n = ntr(), i = cFxT >= NT ? n : cFxT, j = (i + dn + n + 1) % (n + 1); cFxT = j >= n ? NT : j; return draw(); }
 }
 // The phrase editor's spatial move: from the Song block that plays this phrase, go to the nearest filled block
 // in that direction (▲▼ same track, rows above/below; ◀▶ same row, tracks left/right) and open its phrase, with
@@ -25524,7 +25581,7 @@ $('tCmd').addEventListener('click', e => { const b = e.target.closest('button[da
    use it; Arrange as the Song screen adds the ones its own right-click menu doesn't have. As on the row, the Song
    screen has the two clones instead of the ±16 steps. Keys: Ctrl/⌘ ones and Del work in both input modes; the value
    is Ctrl/⌘+arrows (and EDIT (X) + arrows in PAD mode). */
-const CMD_NOUN = {song:'block', sect:'sect', phrase:'phrase', inst:'instrument', fx:'FX track', mixer:'track', project:'setting'};
+const CMD_NOUN = {song:'block', sect:'sect', phrase:'phrase', inst:'instrument', fx:'FX track', mod:'LFO track', mixer:'track', project:'setting'};
 // 'mod+shift+C' → ⇧⌘C on a Mac, Ctrl+Shift+C elsewhere.
 function keyHint(s){
   if (!s) return '';
@@ -26267,6 +26324,7 @@ const HINT = {
   inst:'EDIT+◀▶ ±1 ▲▼ ±more · EDIT on › runs it · ALT+◀▶ other instrument · SHIFT+◀ phrase',
   mixer:'EDIT+◀▶ ±1 ▲▼ ±16 · ▼ from SC: the VOL fader · ALT+arrows other track · FX row: ALT+▲ FX on (up to 8), ALT+▼ off · EDIT mutes, solos, toggles CHN or opens FX · SC row: lit when the track is a sidechain source (EDIT says for what) · ALT+EDIT reset · SHIFT+▶ FX · SHIFT+▲ back',
   fx:'EDIT adds · ▶ opens its controls · EDIT+◀▶ change · ALT+EDIT remove or reset · ALT+◀▶ other track · SHIFT+◀ mixer',
+  mod:'EDIT on TARGET picks what it moves · EDIT+◀▶ ±1 ▲▼ ±more · ALT+EDIT removes the LFO · ALT+◀▶ other track · SHIFT+◀ fx · SHIFT+▶ project',
   project:'EDIT on › runs it · EDIT+◀▶ change · ALT+EDIT reset · SHIFT+▼ back',
 };
 // PATTERN NAV off: the Song hint names the old ALT keys (◀▶ previous/next block, ▲▼ page 16 rows).
@@ -26324,6 +26382,8 @@ function info(){
       return `${trkLab(c.x)}${trkKind(c.x)} · TRIM ${trimS(m.trim)} into ` + (chainsFeed(c.x) ? 'chains and ' : '') + `its FX` + (ip ? ` · in peak ${ip}` + (b.ipk >= 0.999 ? ' (over 0 dB!)' : '') : '') + ` · VOL ${dB(trackGain(m.vol))} (the bar on the meter)`; }
     return `${trkLab(c.x)}${trkKind(c.x)} · TRIM ${trimS(m.trim)} · VOL ${dB(trackGain(m.vol))} · ${panS(m.pan)}` + (m.mute ? ' · muted' : '') + (m.solo ? ' · solo' : '');
   }
+  if (tv === 'mod'){ const M = modArr()[c.y], who = fxWho(cFxT) + ' · LFO ' + (c.y + 1);
+    return M ? `${who} · ${modLab(M)} · ${PLFO_SHAPES[M.sh]}, a cycle every ${modRate(M.rt)} · depth ${hx(M.dp)} (${Math.round(M.dp / 255 * 100)}%)` : `${who} is empty · EDIT picks a target for it`; }
   const r = rowsOf(tv)[c.y]; if (!r || !r.info) return '';
   return typeof r.info === 'function' ? r.info(r.get ? r.get() : 0) : r.info;
 }
@@ -26609,11 +26669,21 @@ function draw(){
       {t:'MASTERING ' + (mstOn() ? 'ON' : 'OFF'), cls:'mstc' + (mstOn() ? ' on' : '') + (mxc === 1 ? ' cur' : ''), x:1, y:7}, '  ',
       {t:'OUT ', cls:'lb', title:'Master OUT: the master fader, after the limiter (FF = 0 dB, no boost). Its bar is on the meter below'}, {t:hx(mo), cls:'v' + (mxc === 2 ? ' cur' : ''), x:2, y:7, title:'OUT ' + dB(curve(mo))}]);
     for (const ch of ['L', 'R']) L.push([{t:ch + '   ', cls:'lb'}, {t:'', cls:'mm m1'}, {t:'', cls:'mm m2'}, {t:'', cls:'mm m3'}, {t:'', cls:'mm e'}, ' ', {t:'', cls:'mm lb'}]);
+  } else if (tv === 'mod'){
+    // MOD: one LFO a row (TARGET, SHAPE, RATE, DEPTH); an empty row shows a dash target
+    const A = modArr(), labs = A.map(modLab), tw = Math.max(6, ...labs.map(l => l.length)), sp = (q, n) => ' '.repeat(Math.max(0, n - q.length));
+    title = 'MOD ' + fxWho(cFxT); sub = A.length ? A.length + ' of ' + PLFO_MAX + ' LFOs' : 'no LFOs';
+    L.push([{t:'   TARGET' + sp('TARGET', tw) + ' SHAPE    RATE   DEPTH', cls:'lb'}]);
+    for (let y = 0; y < PLFO_MAX; y++){ const M = A[y], n = {t:(y + 1) + '  ', cls:'lb'};
+      if (!M){ L.push([n, {t:'---', cls:cc(0, y, 'e'), x:0, y}, sp('---', tw) + ' ', {t:'--', cls:cc(1, y, 'e'), x:1, y}, sp('--', 8) + ' ', {t:'--', cls:cc(2, y, 'e'), x:2, y}, sp('--', 6) + ' ', {t:'--', cls:cc(3, y, 'e'), x:3, y}]); continue; }
+      const sh = PLFO_SHAPES[M.sh] || '?', rt = modRate(M.rt);
+      L.push([n, {t:labs[y], cls:cc(0, y, / \(empty\)$/.test(labs[y]) ? 'e' : 'cf'), x:0, y, title:tgtLabel(M.id)}, sp(labs[y], tw) + ' ', {t:sh, cls:cc(1, y, 'v'), x:1, y}, sp(sh, 8) + ' ', {t:rt, cls:cc(2, y, 'v'), x:2, y}, sp(rt, 6) + ' ', {t:hx(M.dp), cls:cc(3, y, 'v'), x:3, y}]); }
   } else {
     if (tv === 'inst'){ title = 'INST ' + hx(cInst); const I = S.insts[cInst]; sub = (I.mo | 0) === 1 ? midiTag(cInst).trim() : (isSyn(I.pad) ? 'SYNTH ' : 'PAD ') + hx(I.pad) + midiTag(cInst); }
     if (tv === 'project') sub = S.name;
     if (tv === 'fx'){ title = 'FX ' + fxWho(cFxT); const A = cFxT >= NT ? S.mfx : S.tfx[cFxT]; sub = fxList(A) || 'no effects'; }
     const RR = rowsOf(tv), lw = Math.max(12, ...RR.filter(r => !r.act).map(r => r.l.length + 1));   // labels like PLAY NOTE ON ENTRY ran into their values
+    const lfoOn = tv === 'fx' ? new Set(Object.values((S.perf && S.perf.lfo) || {}).flat().map(M => M.id)) : null;   // MOD: parameters an LFO moves get a ~
     var fxA = null, fxB = null;   // FX: the slot list (TRACK and the slots) is its own scrolling pane, the controls below it
     RR.forEach((r, y) => {
       if (tv === 'fx' && y === 0) fxA = L.length;
@@ -26623,7 +26693,7 @@ function draw(){
       else if (r.gap) L.push([]);
       if (r.act){ L.push([{t:r.l, cls:cc(0, y, 'act'), x:0, y}]); return; }
       const val = r.show ? r.show() : r.fmt ? r.fmt(r.get()) : (r.min < 0 ? sgn(r.get()) : hx(r.get()));
-      L.push([{t:r.l.padEnd(lw), cls:'lb', x:0, y}, {t:val, cls:cc(0, y, 'v'), x:0, y}]);
+      L.push([{t:lfoOn && r.lfo && lfoOn.has(r.lfo) ? r.l.padEnd(lw - 1) + '~' : r.l.padEnd(lw), cls:'lb' + (lfoOn && r.lfo && lfoOn.has(r.lfo) ? ' lfom' : ''), x:0, y}, {t:val, cls:cc(0, y, 'v'), x:0, y}]);
       // FX: the slot whose controls are shown is highlighted (owner, 2 Nov: "make it clearer what effect you are editing")
       if (tv === 'fx' && y >= 1 && y <= FXSLOTS && y - 1 === cFxS) L[L.length - 1].fxsel = true;
       if (tv === 'fx' && y === FXSLOTS) fxB = L.length;
@@ -26714,8 +26784,8 @@ function draw(){
     $('tCmd').hidden = !show; document.body.classList.toggle('cmdv', show && !mini); cmdTips(); }
   const sb = $('tCmd').querySelector('[data-c=song]'); if (sb){ sb.textContent = cmdSongLab(); sb.classList.toggle('on', tp.on); }
   const onSong = tv === 'song';
-  { const seq = ['song', ...(sectsOn ? ['sect'] : []), 'phrase', 'inst', 'mixer', 'fx', 'project'];
-    const TCV = {song:'#dbe6f8', sect:'#e9e0f8', phrase:'#d8f0e2', inst:'#fbe2d2', mixer:'#f6edc8', fx:'#f8dce8', project:'#d5eef2'};
+  { const seq = ['song', ...(sectsOn ? ['sect'] : []), 'phrase', 'inst', 'mixer', 'fx', 'mod', 'project'];
+    const TCV = {song:'#dbe6f8', sect:'#e9e0f8', phrase:'#d8f0e2', inst:'#fbe2d2', mixer:'#f6edc8', fx:'#f8dce8', mod:'#ebdcf6', project:'#d5eef2'};
     let i = 0; $('tCmd').querySelectorAll('button[data-c]').forEach(b => { const on = !(onSong ? b.dataset.c === 'b:-16' || b.dataset.c === 'b:16' : b.dataset.c === 'clone' || b.dataset.c === 'cldn');
       if (on) b.style.setProperty('--sh', TCV[seq[i++ % seq.length]]); });
     // The pad takes the same colours in turn, except PLAY is always green (Phrase): it swaps with whichever key had green.
@@ -27732,7 +27802,7 @@ function focusT(){
   const n = ntr(), tr = t => t === MT ? MT : Math.min(t, n - 1);
   if (tv === 'song' || (apReady && apF)) return tr(cs.song.x);
   if (tv === 'mixer') return cs.mixer.y === 7 ? MT : tr(cs.mixer.x);
-  if (tv === 'fx') return cFxT >= NT ? MT : tr(cFxT);
+  if (tv === 'fx' || tv === 'mod') return cFxT >= NT ? MT : tr(cFxT);
   return tr(cTrack);
 }
 const dkMst = () => focusT() === MT;
@@ -27743,7 +27813,7 @@ const dkTrack = () => { const t = focusT(); return t === MT ? ntr() - 1 : t; };
 function dkInstNow(){
   const blockInst = (y, t) => { const v = S.song[y] ? S.song[y][t] : -1; if (v < 0) return -1; const ph = firstPhrase(v); return ph >= 0 ? phraseInfo(ph).inst : -1; };
   if (tv === 'song'){ const i = blockInst(cs.song.y, cs.song.x); if (i >= 0) return i; }
-  if (tv === 'song' || tv === 'mixer' || tv === 'fx'){ const t = dkTrack(); for (let y = 0; y < 256; y++){ const i = blockInst(y, t); if (i >= 0) return i; } }
+  if (tv === 'song' || tv === 'mixer' || tv === 'fx' || tv === 'mod'){ const t = dkTrack(); for (let y = 0; y < 256; y++){ const i = blockInst(y, t); if (i >= 0) return i; } }
   return cInst;
 }
 let dkInst = 0;
@@ -27878,11 +27948,11 @@ function lockSheet(t = focusT()){
       r.append(el('span', 'pfl', 'LK' + (n + 1)), b);
       if (lk[n]){ const x = el('button', 'sm', '✕'); x.type = 'button'; x.addEventListener('click', () => { lk[n] = null; P.lk[t] = lk; if (lk.every(v => !v)) delete P.lk[t]; saveS(); render(); }); r.append(x); }
       list.append(r); }
-    const L = P.lfo[t]; list.append(el('h3', null, 'LFO'));
+    const L = (P.lfo[t] || [])[0]; list.append(el('h3', null, 'LFO'));   // the first of the track's LFOs; the others are left as they are
     const r = el('div', 'pfrow'), b = el('button', 'sm', L ? tgtLabel(L.id, true) : 'Pick a target…'); b.type = 'button';
-    b.addEventListener('click', () => { sh.done(); tgtPicker(id => { P.lfo[t] = Object.assign({sh:0, rt:3, dp:128}, P.lfo[t] || {}, {id}); saveS(); lockSheet(t); }, t === MT ? 99 : t); });
+    b.addEventListener('click', () => { sh.done(); tgtPicker(id => { const a = P.lfo[t] || (P.lfo[t] = []); a[0] = Object.assign({sh:0, rt:3, dp:128}, a[0] || {}, {id}); saveS(); lockSheet(t); }, t === MT ? 99 : t); });
     r.append(el('span', 'pfl', 'TARGET'), b);
-    if (L){ const x = el('button', 'sm', '✕'); x.type = 'button'; x.addEventListener('click', () => { delete P.lfo[t]; saveS(); render(); }); r.append(x); }
+    if (L){ const x = el('button', 'sm', '✕'); x.type = 'button'; x.addEventListener('click', () => { P.lfo[t].shift(); if (!P.lfo[t].length) delete P.lfo[t]; saveS(); render(); }); r.append(x); }
     list.append(r);
     if (L){ const sel = (lab, names, v, set) => { const rr = el('div', 'pfrow'), s = el('select'); names.forEach((n, i) => s.append(new Option(n, i))); s.value = v; s.addEventListener('change', () => { set(+s.value); saveS(); s.blur(); }); rr.append(el('span', 'pfl', lab), s); return rr; };
       list.append(sel('SHAPE', PLFO_SHAPES, L.sh, v => L.sh = v), sel('RATE', PLFO_RATE_NAMES, L.rt, v => L.rt = v), perfRow('DEPTH', L.dp, v => { L.dp = v; saveS(); }, null));
@@ -28292,7 +28362,7 @@ function deckFxBar(){
           inp.addEventListener('pointerdown', e => e.stopPropagation());
           inp.addEventListener('blur', () => fin(true)); };
         v.addEventListener('dblclick', e => { e.preventDefault(); editIt(); });
-        v.addEventListener('contextmenu', e => valMenu(e, q.l, {reset:() => set(q.d), type:typeIt}));
+        v.addEventListener('contextmenu', e => valMenu(e, q.l, {reset:() => set(q.d), type:typeIt, lfo:isPumpT(f.type) ? null : 'fx:' + t + ':' + k + ':' + D.ps.indexOf(q)}));
         dkFbVals.push(() => { const g = getF(); if (g && document.activeElement !== v && !v.classList.contains('drag') && !v.classList.contains('edit')) v.textContent = show(g[q.k]); });
       }
       col.dataset.k = k; bar.append(col);
@@ -30861,7 +30931,7 @@ function altDrag(e, x, y){
    lines. A click still only selects it, and a click on the selected value acts as before (EDIT). Ctrl/⌘ takes big steps,
    Shift slows a drag down (27 Oct: Shift took big steps). */
 const valCell = (s, x, y) => !!s && !onPset() && (tv === 'mixer' ? y === 0 || y === 1 || (y === 7 && (x === 0 || x === 2))
-  : (tv === 'fx' || tv === 'inst' || tv === 'project') && y >= 0 && !(tv === 'fx' && y >= 1 && y <= FXSLOTS) && !s.classList.contains('lb') && !s.classList.contains('act'));   // FX slot rows: a drag moves the effect (FX SCREEN DRAG), never swaps it (2 Nov)
+  : tv === 'mod' ? x >= 1 && y >= 0 : (tv === 'fx' || tv === 'inst' || tv === 'project') && y >= 0 && !(tv === 'fx' && y >= 1 && y <= FXSLOTS) && !s.classList.contains('lb') && !s.classList.contains('act'));   // FX slot rows: a drag moves the effect (FX SCREEN DRAG), never swaps it (2 Nov)
 const gridDown = e => {
   // RIGHT-CLICK (Ctrl+click on a Mac): the cell under the mouse becomes the cursor, unless it is inside the selection
   // (which stays); the contextmenu event that follows opens the commands there (cmdCtx). Nothing is edited or dragged.
@@ -30916,7 +30986,7 @@ const gridDown = e => {
   if (selA && selA.v === tv && GRIDV.has(tv) && y >= 0){ c.x = x; c.y = y; draw(); return startScroll(e); }
   if (tv === 'mixer' && y === 7){ if (x === 1){ c.y = 7; c.mx = 1; draw(); openMst(); return; } if (c.mx === 1){ c.mx = x; c.y = 7; draw(); return startScroll(e); } }
   // (the master row's cells are numbered by mx, not track: GAIN STAGING, 27 Oct, added OUT as mx 2)
-  const was = tv === 'mixer' && y === 7 ? c.y === 7 && (c.mx || 0) === x : GRIDV.has(tv) || tv === 'mixer' ? c.x === x && c.y === y : c.y === y;
+  const was = tv === 'mixer' && y === 7 ? c.y === 7 && (c.mx || 0) === x : GRIDV.has(tv) || tv === 'mixer' || tv === 'mod' ? c.x === x && c.y === y : c.y === y;
   if (e.pointerType === 'mouse' && e.button === 0 && valCell(s, x, y)){   // VALUE MOUSE: the drag changes it from the start
     if (tv === 'mixer' && y === 7){ c.y = 7; c.mx = x; } else { c.x = x; c.y = y; } if (!was) draw();
     drag = {id:e.pointerId, y0:e.clientY, lastY:e.clientY, acc:0, edit:true, tap:was, moved:false, sy:c.y, mp:false, hold:false};
@@ -30984,7 +31054,8 @@ function cmdCtx(e){
   // RIGHT-CLICK (menu audit, 2 Nov): the commands for what's under the pointer; Undo / Redo, selecting, value steps,
   // previous / next and play stay on their keys and in Edit ▾.
   const DROP = new Set(['undo', 'redo', 'sel', 'all', 'b:16', 'b:1', 'b:-1', 'b:-16', 'prev', 'next', 'song']);
-  sxMenu(e.clientX, e.clientY, VNAME[tv] + (sel ? ' · SELECTION' : ''), menuTidy(cmdItems().filter(x => !x || !DROP.has(x.a))));
+  const lr = tv === 'fx' ? rowsOf('fx')[cs.fx.y] : null;   // ADD LFO…: on an internal FX parameter's row
+  sxMenu(e.clientX, e.clientY, VNAME[tv] + (sel ? ' · SELECTION' : ''), [...(lr && lr.lfo ? [{l:'Add LFO…', f:() => lfoAdd(lr.lfo)}, null] : []), ...menuTidy(cmdItems().filter(x => !x || !DROP.has(x.a)))]);
 }
 scr.addEventListener('contextmenu', cmdCtx);
 scr.addEventListener('wheel', () => sxMenuClose(), {passive:true});
@@ -31131,7 +31202,7 @@ function soloMuteKey(e){
 }
 function globalKeys(e){
   const mod = e.ctrlKey || e.metaKey;
-  if (e.altKey && !mod && /^Digit[1-7]$/.test(e.code)){ go(VIEWS[+e.code.slice(5) - 1]); return true; }
+  if (e.altKey && !mod && /^Digit[1-8]$/.test(e.code)){ go(VIEWS[+e.code.slice(5) - 1]); return true; }
   if (e.altKey && !mod && e.code === 'Digit0'){ setView('synth'); return true; }
   if (mod && !e.altKey && !e.shiftKey && (e.code === 'Space' || e.key === ' ')){ if (!e.repeat) playPatLoop(); return true; }   // play this pattern, looped
   if (soloMuteKey(e)) return true;   // (Ctrl/⌘+/ solo, / and \ mute: soloMuteKey, above, shared with the other screens)
@@ -31403,6 +31474,7 @@ function typeHex(d){
     if (c.y === 7 && c.mx === 2){ S.mout = v; moApply(); } else if (c.y === 7){ S.master = v; rtRoute(); } else if (c.y === 4){ setChainOn(c.x, !!v); return; } else if (mixFv()) S.mix[c.x].vol = v; else if (c.y === 0) S.mix[c.x].trim = v; else if (c.y === 1) S.mix[c.x].pan = v; else return;   // GAIN STAGING: TRIM, OUT; the VOL fader
     if (done) hexBuf.key = ''; mixChanged(); draw(); return;
   }
+  if (tv === 'mod'){ const L = modArr()[c.y]; if (!L || c.x !== 3) return; L.dp = v; if (done) hexBuf.key = ''; saveS(); draw(); return; }   // DEPTH: type it
   const r = rowsOf(tv)[c.y]; if (!r || !r.get || r.tog) return;
   r.set(clamp(v, r.min, r.max)); if (r.after) r.after(); if (done) hexBuf.key = ''; saveS(); draw();
 }
@@ -31602,6 +31674,7 @@ const HINTK = {
   inst:'Notes Z–; Q–P play it · Ctrl+arrows change · Enter types a value or runs › rows · [ ] other instrument · Alt+← phrase',
   mixer:'Notes play through the track · Ctrl+arrows change · Enter types TRIM / PAN / VOL, mutes, solos, toggles CHN or opens FX · FX row: Ctrl+▲ on, Ctrl+▼ off · SC row: Enter says what it feeds · Del resets · Alt+→ FX',
   fx:'Notes play through its effects · Ctrl+arrows change · Enter adds or types a value · → opens its controls · Del removes or resets · [ ] other track · Alt+← mixer',
+  mod:'Ctrl+arrows change · Enter on TARGET picks one, on SHAPE / RATE steps on, on DEPTH types hex · Del removes the LFO · [ ] other track · Alt+← fx · Alt+→ project',
   project:'Ctrl+arrows change · Enter runs › rows · Del resets · Ctrl+S save · Shift+Ctrl+S save as · Ctrl+O open · Ctrl+N new song',
 };
 
@@ -31932,7 +32005,7 @@ function viewKey(code){
   if (code === 'Digit0'){ setView('synth'); return true; }
   if (code === 'Digit8' || code === 'Digit9'){ const v = code === 'Digit8' ? 'waves' : 'chains';
     if (noEdFor(v)) toast((v === 'waves' ? 'waves' : 'chains') + ' is hidden on Mobile: Settings → App shows it.'); else setView(v); return true; }
-  const d = /^Digit([1-7])$/.exec(code); if (d){ setView('tracker'); go(VIEWS[+d[1] - 1]); return true; }
+  const d = /^Digit([1-8])$/.exec(code); if (d){ setView('tracker'); go(VIEWS[+d[1] - 1]); return true; }
   return false;
 }
 document.addEventListener('keydown', e => {
@@ -32057,6 +32130,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [539, '9 Nov', ['New screen: MOD, between FX and PROJECT. Four LFOs a track, one a row: pick a target, then SHAPE, RATE and DEPTH. Right-click an effect parameter on the FX screen (or its value on the FX bar) → Add LFO… puts one on it, and a ~ marks the parameters an LFO moves. Alt+7 is MOD (PROJECT: its tab, or SHIFT+▶ from MOD).']],
   [538, '9 Nov', ['The control bar’s Play button plays this screen (the phrase on Phrase); the pad’s PLAY plays the song. On a small screen in PAD mode, COMMANDS has no ▶ of its own. Hints say ALT.']],
   [537, '9 Nov', ['Pad: PLAY now plays the song and SHIFT+PLAY this screen, the same as Space and Shift+Space. OPTION is now called ALT, to match the keyboard.']],
   [536, '9 Nov', ['Clearer wording in menus, tooltips and notifications, with American spelling throughout. The names lose their dots: Thunder, Thunder Plus, pump, chains and waves.']],
