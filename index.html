@@ -1135,8 +1135,8 @@ body:not(.legon) .tside .tlegend{display:none}
 #tPad #kMute{background:#ff2e93 !important; color:#141414 !important} #tPad #kSolo{background:#23a45c !important; color:#141414 !important}   /* (!important: the skins style lit keys very specifically) */
 /* ON states (owner, 8 Nov: both went the same black): MUTE on = white with a thick hot-pink ring and pink text; SOLO on = bright lime with dark text and a thick dark-green ring.
    Each reads on the light and dark skins alike (white and lime are bright in all of them; the rings carry the colour). */
-#tPad #kMute.lt{background:#fff !important; color:#e0006e !important; border:4px solid #ff2e93 !important; box-shadow:4px 4px 0 0 #ff2e93 !important; font-weight:800}
-#tPad #kSolo.lt{background:#d4ff2a !important; color:#0b2a10 !important; border:4px solid #0b5a1c !important; box-shadow:4px 4px 0 0 #0b5a1c !important; font-weight:800}
+#tPad #kMute.lt:not(#zz):not(#zz):not(#zz){background:#fff !important; color:#e0006e !important; border:4px solid #ff2e93 !important; box-shadow:4px 4px 0 0 #ff2e93 !important; font-weight:800}
+#tPad #kSolo.lt:not(#zz):not(#zz):not(#zz){background:#d4ff2a !important; color:#0b2a10 !important; border:4px solid #0b5a1c !important; box-shadow:4px 4px 0 0 #0b5a1c !important; font-weight:800}
 /* LOOP and PLAY when engaged (owner, 9 Nov): lit the same way as MUTE and SOLO, each its own colour, on every skin */
 #tPad #kLoop.on:not(#zz):not(#zz):not(#zz){background:#7cecff !important; color:#06384a !important; border:4px solid #0a6a8c !important; box-shadow:4px 4px 0 0 #0a6a8c !important; font-weight:800; text-shadow:none !important}
 #tPad #kPlay.on:not(#zz):not(#zz):not(#zz), .tcmd button[data-c=song].on:not(#zz):not(#zz):not(#zz):not(#zz):not(#zz){background:#ffc23d !important; color:#3a2200 !important; border:4px solid #a85f00 !important; box-shadow:4px 4px 0 0 #a85f00 !important; font-weight:800; text-shadow:none !important}
@@ -1678,7 +1678,7 @@ body.sdesk .dock:not(.vtrk) .pads .pad:nth-child(17)::before{content:'More slots
 /* BUS COLOURS (5 Nov): each bus and the tracks feeding it in that bus's Arrange colour (--busN, set from BUS_COLORS);
    a send is the same colour in stripes */
 .bc1{--bc:var(--bus1)} .bc2{--bc:var(--bus2)} .bc3{--bc:var(--bus3)} .bc4{--bc:var(--bus4)} .bc5{--bc:var(--bus5)} .bc6{--bc:var(--bus6)} .bc7{--bc:var(--bus7)} .bc8{--bc:var(--bus8)}
-:root:is([data-skin="matrix"],[data-skin="bwterm"],[data-skin="espresso"]){--mxbus:#4fd8eb} :root[data-skin="matrixlight"]{--mxbus:#0a7f95}
+:root:is([data-skin="matrix"],[data-skin="bwterm"],[data-skin="lowpower"],[data-skin="espresso"]){--mxbus:#4fd8eb} :root[data-skin="matrixlight"]{--mxbus:#0a7f95}
 :root[data-skin="night"]{--mxbus:#ff7ab6} :root[data-skin="midnight"]{--mxbus:#ffc857}
 :root[data-skin="ocean"]{--mxbus:#7a4fc9} :root[data-skin="miami"]{--mxbus:#5b5be0} :root:is([data-skin="tomato"],[data-skin="desert"]){--mxbus:#2f6fd6}
 :root[data-skin="winter"]{--mxbus:#c0568f}
@@ -2069,7 +2069,7 @@ body.mob .dogs.idle .bob{animation-iteration-count:9} body.mob .dogs.idle .tail{
 @keyframes dkBreath{0%,100%{transform:scaleY(1)} 50%{transform:scaleY(1.025)}}
 @keyframes dkWag{0%,100%{transform:rotate(0deg)} 50%{transform:rotate(-10deg)}}
 @media (prefers-reduced-motion: reduce){ .dogs .bob, .dogs .tail{animation:none!important} }
-:root:is([data-skin="matrix"],[data-skin="bwterm"],[data-skin="night"],[data-skin="espresso"],[data-skin="midnight"],[data-skin="matrixlight"],[data-skin="haring"],[data-skin="idm"],[data-skin="idmpink"],[data-skin="idmpg"],[data-skin="vice"],[data-skin="te"],[data-skin="opuntia"],[data-skin="mpc"],[data-skin="nord"],[data-skin="tr808"],[data-skin="tr909"],[data-skin="sp202"],[data-skin="wes"],[data-skin="m8"],[data-skin="calcwatch"],[data-skin="bauhaus"],[data-skin="swiss"],[data-skin="destijl"],[data-skin="memphis"],[data-skin="valentine"],[data-skin="eames"],[data-skin="vignelli"],[data-skin="bondi"],[data-skin="dx7"],[data-skin="lcdgreen"]) .dogs{--dk-pink:var(--mxsoft)}
+:root:is([data-skin="matrix"],[data-skin="bwterm"],[data-skin="lowpower"],[data-skin="night"],[data-skin="espresso"],[data-skin="midnight"],[data-skin="matrixlight"],[data-skin="haring"],[data-skin="idm"],[data-skin="idmpink"],[data-skin="idmpg"],[data-skin="vice"],[data-skin="te"],[data-skin="opuntia"],[data-skin="mpc"],[data-skin="nord"],[data-skin="tr808"],[data-skin="tr909"],[data-skin="sp202"],[data-skin="wes"],[data-skin="m8"],[data-skin="calcwatch"],[data-skin="bauhaus"],[data-skin="swiss"],[data-skin="destijl"],[data-skin="memphis"],[data-skin="valentine"],[data-skin="eames"],[data-skin="vignelli"],[data-skin="bondi"],[data-skin="dx7"],[data-skin="lcdgreen"]) .dogs{--dk-pink:var(--mxsoft)}
 /* DRUM (the phrase stage's DANCE · DRUM · KEYS): the pittie behind a drum kit with sticks, the husky on bongos. The kit
    only shows in .drum; arms rest over their drums (CSS variables) and strike with dogsHit(); no hops or breathing. */
 .dogs .kit{display:none}
@@ -2477,10 +2477,10 @@ body.mob .dogs.idle .bob{animation-iteration-count:9} body.mob .dogs.idle .tail{
    second panel tone, so the app's menus read as their own strip above the SONG / PHRASE… row, and the screen tabs are
    plain words with the open one underlined. Only the bar's own buttons change (the menus that open from it keep the skin's
    colours); a pressed button stays filled. Dark Simple skins, Pastel and Minimal are unchanged. */
-:root[data-skinbase="term"]:not([data-skin="matrix"],[data-skin="bwterm"],[data-skin="night"],[data-skin="espresso"],[data-skin="midnight"],[data-skin="matrixlight"],[data-skin="haring"],[data-skin="idm"],[data-skin="idmpink"],[data-skin="idmpg"],[data-skin="vice"],[data-skin="te"],[data-skin="opuntia"],[data-skin="mpc"],[data-skin="nord"],[data-skin="tr808"],[data-skin="tr909"],[data-skin="sp202"],[data-skin="wes"],[data-skin="m8"],[data-skin="calcwatch"],[data-skin="bauhaus"],[data-skin="swiss"],[data-skin="destijl"],[data-skin="memphis"],[data-skin="valentine"],[data-skin="eames"],[data-skin="vignelli"],[data-skin="bondi"],[data-skin="dx7"],[data-skin="lcdgreen"]) .top{background:var(--mxpanel2)}
-:root[data-skinbase="term"]:not([data-skin="matrix"],[data-skin="bwterm"],[data-skin="night"],[data-skin="espresso"],[data-skin="midnight"],[data-skin="matrixlight"],[data-skin="haring"],[data-skin="idm"],[data-skin="idmpink"],[data-skin="idmpg"],[data-skin="vice"],[data-skin="te"],[data-skin="opuntia"],[data-skin="mpc"],[data-skin="nord"],[data-skin="tr808"],[data-skin="tr909"],[data-skin="sp202"],[data-skin="wes"],[data-skin="m8"],[data-skin="calcwatch"],[data-skin="bauhaus"],[data-skin="swiss"],[data-skin="destijl"],[data-skin="memphis"],[data-skin="valentine"],[data-skin="eames"],[data-skin="vignelli"],[data-skin="bondi"],[data-skin="dx7"],[data-skin="lcdgreen"]) :is(.top, .top > .seg, .top > .setwrap) > :is(button:not(#bUpd):not(.on), .kitname):not(#zz){background:var(--mxpanel2)}
-:root[data-skinbase="term"]:not([data-skin="matrix"],[data-skin="bwterm"],[data-skin="night"],[data-skin="espresso"],[data-skin="midnight"],[data-skin="matrixlight"],[data-skin="haring"],[data-skin="idm"],[data-skin="idmpink"],[data-skin="idmpg"],[data-skin="vice"],[data-skin="te"],[data-skin="opuntia"],[data-skin="mpc"],[data-skin="nord"],[data-skin="tr808"],[data-skin="tr909"],[data-skin="sp202"],[data-skin="wes"],[data-skin="m8"],[data-skin="calcwatch"],[data-skin="bauhaus"],[data-skin="swiss"],[data-skin="destijl"],[data-skin="memphis"],[data-skin="valentine"],[data-skin="eames"],[data-skin="vignelli"],[data-skin="bondi"],[data-skin="dx7"],[data-skin="lcdgreen"]) .ttabs button[data-v]:not(#zz){border-color:transparent; background:transparent; box-shadow:none}
-:root[data-skinbase="term"]:not([data-skin="matrix"],[data-skin="bwterm"],[data-skin="night"],[data-skin="espresso"],[data-skin="midnight"],[data-skin="matrixlight"],[data-skin="haring"],[data-skin="idm"],[data-skin="idmpink"],[data-skin="idmpg"],[data-skin="vice"],[data-skin="te"],[data-skin="opuntia"],[data-skin="mpc"],[data-skin="nord"],[data-skin="tr808"],[data-skin="tr909"],[data-skin="sp202"],[data-skin="wes"],[data-skin="m8"],[data-skin="calcwatch"],[data-skin="bauhaus"],[data-skin="swiss"],[data-skin="destijl"],[data-skin="memphis"],[data-skin="valentine"],[data-skin="eames"],[data-skin="vignelli"],[data-skin="bondi"],[data-skin="dx7"],[data-skin="lcdgreen"]) .ttabs button[data-v].on:not(#zz){background:transparent!important; color:var(--mx)!important; box-shadow:inset 0 -4px 0 var(--mx)!important; font-weight:700}
+:root[data-skinbase="term"]:not([data-skin="matrix"],[data-skin="bwterm"],[data-skin="lowpower"],[data-skin="night"],[data-skin="espresso"],[data-skin="midnight"],[data-skin="matrixlight"],[data-skin="haring"],[data-skin="idm"],[data-skin="idmpink"],[data-skin="idmpg"],[data-skin="vice"],[data-skin="te"],[data-skin="opuntia"],[data-skin="mpc"],[data-skin="nord"],[data-skin="tr808"],[data-skin="tr909"],[data-skin="sp202"],[data-skin="wes"],[data-skin="m8"],[data-skin="calcwatch"],[data-skin="bauhaus"],[data-skin="swiss"],[data-skin="destijl"],[data-skin="memphis"],[data-skin="valentine"],[data-skin="eames"],[data-skin="vignelli"],[data-skin="bondi"],[data-skin="dx7"],[data-skin="lcdgreen"]) .top{background:var(--mxpanel2)}
+:root[data-skinbase="term"]:not([data-skin="matrix"],[data-skin="bwterm"],[data-skin="lowpower"],[data-skin="night"],[data-skin="espresso"],[data-skin="midnight"],[data-skin="matrixlight"],[data-skin="haring"],[data-skin="idm"],[data-skin="idmpink"],[data-skin="idmpg"],[data-skin="vice"],[data-skin="te"],[data-skin="opuntia"],[data-skin="mpc"],[data-skin="nord"],[data-skin="tr808"],[data-skin="tr909"],[data-skin="sp202"],[data-skin="wes"],[data-skin="m8"],[data-skin="calcwatch"],[data-skin="bauhaus"],[data-skin="swiss"],[data-skin="destijl"],[data-skin="memphis"],[data-skin="valentine"],[data-skin="eames"],[data-skin="vignelli"],[data-skin="bondi"],[data-skin="dx7"],[data-skin="lcdgreen"]) :is(.top, .top > .seg, .top > .setwrap) > :is(button:not(#bUpd):not(.on), .kitname):not(#zz){background:var(--mxpanel2)}
+:root[data-skinbase="term"]:not([data-skin="matrix"],[data-skin="bwterm"],[data-skin="lowpower"],[data-skin="night"],[data-skin="espresso"],[data-skin="midnight"],[data-skin="matrixlight"],[data-skin="haring"],[data-skin="idm"],[data-skin="idmpink"],[data-skin="idmpg"],[data-skin="vice"],[data-skin="te"],[data-skin="opuntia"],[data-skin="mpc"],[data-skin="nord"],[data-skin="tr808"],[data-skin="tr909"],[data-skin="sp202"],[data-skin="wes"],[data-skin="m8"],[data-skin="calcwatch"],[data-skin="bauhaus"],[data-skin="swiss"],[data-skin="destijl"],[data-skin="memphis"],[data-skin="valentine"],[data-skin="eames"],[data-skin="vignelli"],[data-skin="bondi"],[data-skin="dx7"],[data-skin="lcdgreen"]) .ttabs button[data-v]:not(#zz){border-color:transparent; background:transparent; box-shadow:none}
+:root[data-skinbase="term"]:not([data-skin="matrix"],[data-skin="bwterm"],[data-skin="lowpower"],[data-skin="night"],[data-skin="espresso"],[data-skin="midnight"],[data-skin="matrixlight"],[data-skin="haring"],[data-skin="idm"],[data-skin="idmpink"],[data-skin="idmpg"],[data-skin="vice"],[data-skin="te"],[data-skin="opuntia"],[data-skin="mpc"],[data-skin="nord"],[data-skin="tr808"],[data-skin="tr909"],[data-skin="sp202"],[data-skin="wes"],[data-skin="m8"],[data-skin="calcwatch"],[data-skin="bauhaus"],[data-skin="swiss"],[data-skin="destijl"],[data-skin="memphis"],[data-skin="valentine"],[data-skin="eames"],[data-skin="vignelli"],[data-skin="bondi"],[data-skin="dx7"],[data-skin="lcdgreen"]) .ttabs button[data-v].on:not(#zz){background:transparent!important; color:var(--mx)!important; box-shadow:inset 0 -4px 0 var(--mx)!important; font-weight:700}
 /* SKIN TITLE BARS (owner, 3 Nov: "using the 909 skin … the light grey/white title bars look odd"): the term base gave the
    title bars --side, i.e. --mxpanel, which in most light skins is a paler, near-white tint of the case (909 #e0e2e3 on
    #cfd2d4, IDM #f2f1ec on #e9e8e3), so every head read as a white chip pasted on. They now take the skin's second panel
@@ -2533,7 +2533,7 @@ body.mob .dogs.idle .bob{animation-iteration-count:9} body.mob .dogs.idle .tail{
 :root[data-skin="greywhite"]{--mxmst:#c9b7f2}
 :root[data-skin="contrast"]{--mxmst:#d6331f; --mxmston:#ffffff}
 :root[data-skinbase="term"] .tdeck{--tk-mono:var(--mx); --tk-poly:var(--mxpoly); --scfill:color-mix(in srgb, var(--mx) 45%, var(--mxbg))}
-:root:is([data-skin="matrix"],[data-skin="bwterm"],[data-skin="night"],[data-skin="espresso"],[data-skin="midnight"],[data-skin="matrixlight"],[data-skin="haring"],[data-skin="idm"],[data-skin="idmpink"],[data-skin="idmpg"],[data-skin="vice"],[data-skin="te"],[data-skin="opuntia"],[data-skin="mpc"],[data-skin="nord"],[data-skin="tr808"],[data-skin="tr909"],[data-skin="sp202"],[data-skin="wes"],[data-skin="m8"],[data-skin="calcwatch"],[data-skin="bauhaus"],[data-skin="swiss"],[data-skin="destijl"],[data-skin="memphis"],[data-skin="valentine"],[data-skin="eames"],[data-skin="vignelli"],[data-skin="bondi"],[data-skin="dx7"],[data-skin="lcdgreen"]) .tdeck{--stpink:var(--mx)}
+:root:is([data-skin="matrix"],[data-skin="bwterm"],[data-skin="lowpower"],[data-skin="night"],[data-skin="espresso"],[data-skin="midnight"],[data-skin="matrixlight"],[data-skin="haring"],[data-skin="idm"],[data-skin="idmpink"],[data-skin="idmpg"],[data-skin="vice"],[data-skin="te"],[data-skin="opuntia"],[data-skin="mpc"],[data-skin="nord"],[data-skin="tr808"],[data-skin="tr909"],[data-skin="sp202"],[data-skin="wes"],[data-skin="m8"],[data-skin="calcwatch"],[data-skin="bauhaus"],[data-skin="swiss"],[data-skin="destijl"],[data-skin="memphis"],[data-skin="valentine"],[data-skin="eames"],[data-skin="vignelli"],[data-skin="bondi"],[data-skin="dx7"],[data-skin="lcdgreen"]) .tdeck{--stpink:var(--mx)}
 :root[data-skinbase="term"] :is(#dkScope,#dkInst,#dkChn,#dkFx,#dkStrip){--dkc:var(--mx)} :root[data-skinbase="term"] #dkScope{--dkp:3%} :root[data-skinbase="term"] #dkInst{--dkp:7%} :root[data-skinbase="term"] #dkChn{--dkp:9%} :root[data-skinbase="term"] #dkFx{--dkp:11%} :root[data-skinbase="term"] #dkStrip{--dkp:15%}
 :root[data-skinbase="term"] .dkh .dksolo{background:var(--mxsoft); color:var(--mxon)} :root[data-skinbase="term"] .stms button.so.on{background:var(--mxsoft); color:var(--mxon)}
 :root[data-skinbase="term"] .tarr .tagrid b.gm{--ar-empty:color-mix(in srgb, var(--tk-mono) 22%, var(--mxbg))} :root[data-skinbase="term"] .tarr .tagrid b.gp{--ar-empty:color-mix(in srgb, var(--tk-poly) 18%, var(--mxbg))}
@@ -2541,10 +2541,61 @@ body.mob .dogs.idle .bob{animation-iteration-count:9} body.mob .dogs.idle .tail{
    could go grey (plum: green into pink gave #d2d0d2). Light skins mix it with white so the hue stays; the dark skins
    (near-neutral backgrounds) keep mixing with theirs. */
 :root[data-skinbase="term"] .tarr .tagrid b.gp{--ar-empty:color-mix(in srgb, var(--tk-poly) 35%, #ffffff)}
-:root:is([data-skin="matrix"],[data-skin="bwterm"],[data-skin="night"],[data-skin="espresso"],[data-skin="midnight"],[data-skin="matrixlight"],[data-skin="haring"],[data-skin="idm"],[data-skin="idmpink"],[data-skin="idmpg"],[data-skin="vice"],[data-skin="te"],[data-skin="opuntia"],[data-skin="mpc"],[data-skin="nord"],[data-skin="tr808"],[data-skin="tr909"],[data-skin="sp202"],[data-skin="wes"],[data-skin="m8"],[data-skin="calcwatch"],[data-skin="bauhaus"],[data-skin="swiss"],[data-skin="destijl"],[data-skin="memphis"],[data-skin="valentine"],[data-skin="eames"],[data-skin="vignelli"],[data-skin="bondi"],[data-skin="dx7"],[data-skin="lcdgreen"]) .tarr .tagrid b.gp{--ar-empty:color-mix(in srgb, var(--tk-poly) 22%, var(--mxbg))}
+:root:is([data-skin="matrix"],[data-skin="bwterm"],[data-skin="lowpower"],[data-skin="night"],[data-skin="espresso"],[data-skin="midnight"],[data-skin="matrixlight"],[data-skin="haring"],[data-skin="idm"],[data-skin="idmpink"],[data-skin="idmpg"],[data-skin="vice"],[data-skin="te"],[data-skin="opuntia"],[data-skin="mpc"],[data-skin="nord"],[data-skin="tr808"],[data-skin="tr909"],[data-skin="sp202"],[data-skin="wes"],[data-skin="m8"],[data-skin="calcwatch"],[data-skin="bauhaus"],[data-skin="swiss"],[data-skin="destijl"],[data-skin="memphis"],[data-skin="valentine"],[data-skin="eames"],[data-skin="vignelli"],[data-skin="bondi"],[data-skin="dx7"],[data-skin="lcdgreen"]) .tarr .tagrid b.gp{--ar-empty:color-mix(in srgb, var(--tk-poly) 22%, var(--mxbg))}
 :root[data-skinbase="term"] .tagrid b.f[style]{background:color-mix(in srgb, var(--mx) var(--ibp, 100%), var(--mxsoft)); color:var(--mxon)} :root[data-skinbase="term"] .tagrid b.f{text-shadow:none; box-shadow:0 0 8px var(--mxglowc)}
 :root[data-skinbase="term"] .tscr .nbl, :root[data-skinbase="term"] .tscr .nbr{color:var(--mx2)}
 :root[data-skinbase="term"] ::selection{background:var(--mx); color:var(--mxon)}
+/* LOW POWER (black) (owner, 9 Nov, Fold OLED: "the current skins are a little hard to read"): pure #000 wherever it is large (body, panels,
+   grid, pad area), near-white text (#f2f2f2, 18:1), a different bright colour for each part of a tracker line, thin 1px grey outlines
+   instead of filled keys, no glow, blur or animation. Every text colour is 7:1 or better on black (measured; the grey outlines 5:1).
+   JetBrains Mono throughout (the bundled 400 / 700 faces; Share Tech Mono is thinner). To remove: this block, the SKINS entry, and the
+   [data-skin="lowpower"] added to the dark-skin lists (grep them). */
+:root[data-skin="lowpower"]{--mx:#f2f2f2; --mx2:#d0d0d0; --mxdim:#6e6e6e; --mxbg:#000000; --mxpanel:#000000; --mxpanel2:#000000; --mxon:#000000;
+  --mxsoft:#7ee787; --mxpoly:#6fd8ff; --mxglowc:transparent; --mxscan:transparent; --mxred:#ff7a7a; --mxcur:#ffe14d; --mxcuron:#000000; --mxline:#8a8a8a; --mxbus:#c9a7ff;
+  --font:"JetBrains Mono",ui-monospace,Menlo,monospace; --mono:"JetBrains Mono",ui-monospace,Menlo,monospace; color-scheme:dark}
+:root[data-skin="lowpower"] *{text-shadow:none!important; backdrop-filter:none!important; -webkit-backdrop-filter:none!important}
+:root[data-skin="lowpower"] :is(.tscr,.tscr[data-ts]){--ts-rn:#b4b4b4; --ts-inst:#7ee787; --ts-fx:#ffb454; --ts-vol:#6fd8ff; --ts-th:#d0d0d0; --ts-dim:#9a9a9a; --ts-line:#8a8a8a;
+  --ts-sel:#0e2552; --ts-pl-bg:#0d5c2c; --ts-pl:#ffffff; --ts-hint:#d0d0d0; --ts-info:#d0d0d0; --ts-mute:#ff7a7a; --ts-solo:#7ee787; --tk-mono:#f2f2f2; --tk-poly:#6fd8ff; --tk-mst:#ffb454}
+:root[data-skin="lowpower"] .tscr .v{color:#ff9ed0}
+:root[data-skin="lowpower"] .tscr .e{color:#9a9a9a}
+:root[data-skin="lowpower"] .tscr .tgrid, :root[data-skin="lowpower"] .tscr .tgrid span{font-weight:700}
+:root[data-skin="lowpower"] .tscr .sel{outline:1px solid #6f9cf0; outline-offset:-1px}
+:root[data-skin="lowpower"] .tscr .cur, :root[data-skin="lowpower"] .tscr :is(.e,.cn,.cv,.ci,.cf,.v,.mt).cur{background:#ffe14d; color:#000000; outline:2px solid #ffffff; outline-offset:-2px}
+:root[data-skin="lowpower"] .tscr :is(.e,.cn,.cv,.ci,.cf,.v,.mt).pl:not(.cur){color:#ffffff}
+:root[data-skin="lowpower"] .pads .pad .pm, :root[data-skin="lowpower"] .pads .pad.syn b::after{color:#d0d0d0!important}
+:root[data-skin="lowpower"] .gset :is(input.msw1,label.cb input[type=checkbox]){background:#000; border-color:#8a8a8a}
+:root[data-skin="lowpower"] .gset :is(input.msw1,label.cb input[type=checkbox])::before{background:#a0a0a0}
+:root[data-skin="lowpower"] .gset :is(input.msw1,label.cb input[type=checkbox]):checked{background:#000; border-color:#7ee787}
+:root[data-skin="lowpower"] .gset :is(input.msw1,label.cb input[type=checkbox]):checked::before{background:#7ee787}
+:root[data-skin="lowpower"] #apStrip .apsr b:not(.p):not(.m):not(#zz){background:#000!important; box-shadow:inset 0 0 0 1px #3a3a3a}
+:root[data-skin="lowpower"] #apStrip .apsr b.f:not(.p):not(#zz){color:var(--tk); box-shadow:inset 0 0 0 1px var(--tk)}
+:root[data-skin="lowpower"] #apStrip .apsr b.p:not(#zz){background:#0d5c2c!important; color:#ffffff}
+/* SONG / ARRANGE: blocks are outlines in their group's colour (white mono, cyan poly, amber master, violet bus), not fills; the cursor block is the one fill */
+:root[data-skin="lowpower"] .tarr{--tkc:#f2f2f2}
+:root[data-skin="lowpower"] .tagrid b.gp, :root[data-skin="lowpower"] .tagp b.gp, :root[data-skin="lowpower"] .tgbox.gp b{--tkc:#6fd8ff}
+:root[data-skin="lowpower"] .tagrid b.gx, :root[data-skin="lowpower"] .tagp b.gx, :root[data-skin="lowpower"] .tgbox.gx b{--tkc:#ffb454}
+:root[data-skin="lowpower"] .tagrid b.bg{--tkc:#c9a7ff}
+:root[data-skin="lowpower"] :is(.tagp b,.tgbox b){background:#000!important; color:var(--tkc,#f2f2f2)!important; box-shadow:inset 0 0 0 1px var(--tkc,#f2f2f2)!important; font-weight:700}
+:root[data-skin="lowpower"] .tagrid b.f:is(.gm,.gp,.gx,.bg,.bus):not(#zz){background:#000!important; background-image:none!important; color:var(--tkc,#f2f2f2)!important; box-shadow:inset 0 0 0 1px var(--tkc,#f2f2f2)!important; text-shadow:none}
+:root[data-skin="lowpower"] .tagrid b.f.p:is(.gm,.gp,.gx,.bg,.bus):not(#zz), :root[data-skin="lowpower"] .tagrid b.f.p[style]:not(#zz){background:#0d5c2c!important; background-image:none!important; color:#ffffff!important; box-shadow:inset 0 0 0 2px #7ee787!important}
+:root[data-skin="lowpower"] .tarr .tagrid b:is(.gm,.gp,.gx):not(.f):not(.p):not(.m):not(.c):not(#zz){--ar-empty:#000000; background:#000000!important; background-image:none!important; box-shadow:inset 0 0 0 1px #3a3a3a!important}
+:root[data-skin="lowpower"] .tagrid b.o:not(#zz){background:#000!important; color:#ff7a7a!important; box-shadow:inset 0 0 0 1px #ff7a7a!important}
+:root[data-skin="lowpower"] .tagrid b.c:not(#zz), :root[data-skin="lowpower"] .tagrid b.f.c:is(.gm,.gp,.gx,.bg,.bus):not(#zz){background:#ffe14d!important; background-image:none!important; color:#000000!important; box-shadow:inset 0 0 0 2px #ffffff!important}
+:root[data-skin="lowpower"] :is(button,select,input[type=text],input[type=number],textarea,.lcell,.layercard,.fxcard,.voicecard,.setmenu,.mstwin){background:#000; color:#f2f2f2; border-color:#8a8a8a; border-width:1px}
+:root[data-skin="lowpower"] :is(button.on,.seg button.on,.ttabs button.on,.ttabs button[data-v].on,.tmap button[data-v].on,#bFile.on,.top #bSet.on){
+  background:#242424!important; color:#ffffff!important; border-color:#f2f2f2; box-shadow:inset 0 0 0 1px #f2f2f2; font-weight:700}
+:root[data-skin="lowpower"] #tDeck .dkh .dkt:not(.mstb){background:#000; color:#f2f2f2; border-color:#8a8a8a}
+:root[data-skin="lowpower"] :is(.tcmd button,.tkp .kp,.pads .pad){background:#000; color:#f2f2f2; border:1px solid #8a8a8a; box-shadow:none}
+:root[data-skin="lowpower"] :is(.tcmd button.dn,.tkp .kp.dn,.pads .pad.hit,.pads .pad.hit.hit){background:#2c2c2c!important; color:#ffffff!important; border-color:#ffffff; box-shadow:inset 0 0 0 1px #ffffff}
+:root[data-skin="lowpower"] :is(.tcmd button.on,.tkp .kp.on,.tkp .kp.blk){background:#242424; color:#ffffff; border-color:#f2f2f2}
+:root[data-skin="lowpower"] #tPad .k:not(#zz){background:#000; color:#f2f2f2; border:1px solid #8a8a8a; font-weight:700; box-shadow:none}
+:root[data-skin="lowpower"] :is(#tPad .k.dn,#tPad .k.on):not(#zz){background:#2c2c2c; color:#ffffff; border-color:#ffffff; box-shadow:inset 0 0 0 1px #ffffff}
+/* the pad's MUTE / SOLO / LOOP / PLAY: the global rules paint MUTE pink and SOLO green as fills (!important); here they are black keys with
+   their colour as outline and label, and lit (.lt, LOOP on, PLAY on) keeps its fill, with a label that reads on it */
+:root[data-skin="lowpower"] #tPad #kMute:not(#zz){background:#000!important; color:#ff7ab8!important; border:1px solid #ff2e93!important}
+:root[data-skin="lowpower"] #tPad #kSolo:not(#zz){background:#000!important; color:#5fe08e!important; border:1px solid #23a45c!important}
+:root[data-skin="lowpower"] #tPad #kLoop.on:not(#zz):not(#zz){background:#1f9d5c!important; color:#000000!important; border:1px solid #1f9d5c!important}
+:root[data-skin="lowpower"] :is(#tPad .k.lt,#tPad #kPlay.on):not(#zz){background:#7ee787; color:#000000; border-color:#7ee787}
 /* Simple rainbow dynamic: the same, with the whole page turning slowly round the colour wheel (see rbWheel()). */
 /* Simple rainbow: Simple grey's look, but every button, key, tab, pad, meter and tracker entry takes its own colour.
    --ci is an element's place among its siblings and --ri a tracker line's number, both 0–11; the hue is (ci + ri) × 30°,
@@ -12454,6 +12505,7 @@ function bassVizKick(){ if (!bvRaf) bvRaf = requestAnimationFrame(bassViz); }
 function bassViz(){
   bvRaf = 0; if (document.hidden) return;   // BATTERY: parked while hidden; the screen coming back kicks it (visibilitychange, end of file)
   const cv = $('bassCv'); if (!cv || $('bassWrap').hidden || view === 'tracker' || !isBassV(V())) return;
+  if (lpHold(bassViz.t || 0)){ bvRaf = requestAnimationFrame(bassViz); return; } bassViz.t = performance.now();
   const dpr = devicePixelRatio || 1, W = cv.clientWidth, H = cv.clientHeight; if (!W || !H) return;
   if (cv.width !== Math.round(W * dpr)){ cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); }
   const g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, H);
@@ -13058,7 +13110,7 @@ function sndColours(){
 function sndSoon(){ if (!sndQ) sndQ = requestAnimationFrame(() => { sndQ = 0; if (!sndOn()) return; sndColours(); sndSpecPaint(); sndScopePaint(false); sndWake(); }); }
 function sndWake(){ if (!sndRaf && sndOn()) sndRaf = requestAnimationFrame(sndFrame); }
 function sndFrame(){
-  sndRaf = 0; if (!sndOn() || document.hidden) return; if (!sndCol) sndColours();   // BATTERY: parked while hidden (sndWake on return)
+  sndRaf = 0; if (!sndOn() || document.hidden) return; if (lpHold(sndFrame.t || 0)){ sndRaf = requestAnimationFrame(sndFrame); return; } sndFrame.t = performance.now(); if (!sndCol) sndColours();   // BATTERY: parked while hidden (sndWake on return)
   const t = ctx ? ctx.currentTime - heardLat() : 0;
   for (let i = sndPH.length - 1; i >= 0; i--) if (t > sndPH[i].end) sndPH.splice(i, 1);
   const live = !!ctx && (tp.on || performance.now() - audioWake < 1500 || sndPH.length > 0);
@@ -13980,6 +14032,7 @@ const SKINS = [
   {id:'dx7', name:'DX7', base:'term', dots:['#2f2b28', '#e8e2d6', '#5bbfae', '#9b3245']},
   {id:'lcdgreen', name:'Pea-green LCD', base:'term', dots:['#9bbc0f', '#0f380f', '#306230', '#8bac0f']},
   {id:'bwterm', name:'Simple black', base:'term', dots:['#000000', '#ffffff', '#5a5a5a', '#9a9a9a']},
+  {id:'lowpower', name:'Low power (black)', base:'term', dots:['#000000', '#f2f2f2', '#ffb454', '#6fd8ff']},
   {id:'bwlight', name:'Simple white', base:'term', dots:['#ffffff', '#000000', '#a6a6a6', '#6b6b6b']},
   {id:'mustard', name:'Simple mustard', base:'term', dots:['#e3d9f6', '#a37800', '#f2cf63', '#6f55bf']},
   {id:'sage', name:'Simple sage', base:'term', dots:['#e2ecdc', '#2f5d3a', '#8fb88f', '#a3612c']},
@@ -22917,7 +22970,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 531;
+const BUILD = 532;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD + (location.pathname.includes('/beta/') ? ' · beta' : '');
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -22989,6 +23042,14 @@ function playheadKey(){
   draw(); }   // off unless turned on (owner, 31 Oct: it was on by default)
 function setResume(on){ resumeOn = on; try { localStorage.setItem(RSK, on ? '1' : '0'); } catch(e){} draw(); }
 var phOff = (() => { try { return clamp(parseInt(localStorage.getItem('thunderplus-phoff-v1') || '0', 10) || 0, -100, 300); } catch(e){ return 0; } })();   // PLAYHEAD OFFSET, ms
+// LOW POWER DISPLAY (owner, 9 Nov: battery on the Fold): ON caps the playback drawing at about 24 a second (the screen's rate otherwise).
+// Sound, scheduling and the sequencer are untouched: the frame loop still drains the play positions and checks for the end every
+// display frame, and only the drawing waits. Per device (localStorage), not in the song. To remove: this block, its four gates
+// (lpOn in frame, hmDraw, sndFrame, bassViz, mwLoop) and the LOW POWER DISPLAY row in Settings.
+var lpOn = (() => { try { return localStorage.getItem('thunderplus-lowpower-v1') === '1'; } catch(e){ return false; } })(), lpNext = 0, lpPend = false;
+var LP_MS = 1000 / 24, LP_GATE = 38;
+var lpHold = last => lpOn && tp.on && performance.now() - last < LP_GATE;   // a meter or animation asks: is it too soon to draw again?
+function setLowPower(on){ lpOn = !!on; lpNext = 0; lpPend = false; try { localStorage.setItem('thunderplus-lowpower-v1', on ? '1' : '0'); } catch(e){} }
 function setPhOff(v){ phOff = clamp(Math.round((v | 0) / 5) * 5, -100, 300); try { localStorage.setItem('thunderplus-phoff-v1', String(phOff)); } catch(e){} }
 const curKey = () => [tv, cs.song.x, cs.song.y, cs.phrase.y, cs.sect.y, cPhrase, cSect, cTrack].join(',');
 // Pads mode: OPTION + arrows move around the Song grid, in the phrase editor (phraseGrid) and on the Song screen (songGridDir).
@@ -23798,6 +23859,8 @@ function projRows(){
       info:() => 'Size of the Mixer only, separate from TEXT SIZE: 100 % fills the screen, which is already larger than the 80 % Desktop text size gave it. Above that it takes whatever room is left, never past the screen (all its rows stay visible); bigger shows fewer tracks at once, and the window follows the cursor (TRK nn–nn of 32 ◀▶)'},
     {l:'PLAYHEAD OFFSET', get:() => phOff, set:v => setPhOff(v), min:-100, max:300, step:5, big:25, d:0, fmt:v => v ? sgn(v) + ' ms' : '0 ms',
       info:() => 'Moves the playhead to match what you hear, on this device: + later (Bluetooth headphones, a slow screen), − earlier. The app already allows for the output latency it is told about'},
+    {l:'LOW POWER DISPLAY', ck:'Low power display (saves battery)', get:() => lpOn ? 1 : 0, set:v => setLowPower(!!v), min:0, max:1, tog:true, d:0, fmt:onOff,   // LOW POWER DISPLAY
+      info:() => 'ON: while a song plays, the screen redraws about 24 times a second instead of at the screen’s full rate. That saves battery; the picture is a little less smooth, and the sound is unchanged. OFF (the default): as before. This device only'},
     {l:'FOLLOW', segs:true, get:() => followMode, set:v => setFollow(v), min:0, max:2, d:0, fmt:v => ['OFF', 'PATTERN', 'ON'][v] || 'OFF',
       info:() => 'While the song plays. ON: Song and Phrase scroll with the playhead, and Phrase (and Sect) switch to what the cursor’s track is playing. PATTERN: Phrase (and Sect) switch to what the cursor’s track is playing and Arrange turns its pages with the song, but the phrase’s rows stay where you put them. OFF: the screen stays where you put it, except that Arrange still turns its pages when the playhead runs off it. While you work in Arrange it waits until you’ve left it alone for a minute. The cursor stays on its row in every mode, so you can edit while it plays'},
     {l:'TAB', segs:true, get:() => tabTracks ? 1 : 0, set:v => setTabTracks(!!v), min:0, max:1, d:1, fmt:v => v ? 'TRACKS' : 'COLUMNS',
@@ -27607,7 +27670,7 @@ function mwLoop(){
   if (!mwOpenNow) return;
   if (document.hidden && !tp.on) return;   // BATTERY: parked while hidden and not playing (visibilitychange restarts it)
   mwRaf = requestAnimationFrame(mwLoop);
-  const now = performance.now(); if (now - (mwLoop.t || 0) < 33) return; mwLoop.t = now;
+  const now = performance.now(); if (now - (mwLoop.t || 0) < (lpOn && tp.on ? LP_GATE : 33)) return; mwLoop.t = now;
   const m = mstMeter, live = !!(m && S.mst.on && (tp.on || now - audioWake < 1500));
   // chain readouts
   $('mwChain').querySelectorAll('.mwst').forEach(b => { const k = b.dataset.k, gr = b.querySelector('.gr');
@@ -27949,7 +28012,7 @@ function hmFrame(now){
 }
 function hmDraw(now){
   // Levels are read even while the meter itself isn't shown (phone width): frameIdle() uses them to know something sounds.
-  const c = $('hMeter'); if (document.hidden || now - HM.t < 32) return;
+  const c = $('hMeter'); if (document.hidden || now - HM.t < (lpOn && tp.on ? LP_GATE : 32)) return;
   const dt = HM.t ? Math.min(0.2, (now - HM.t) / 1000) : 0.03; HM.t = now;
   const live = hmAttach(), dk = Math.pow(10, -20 * dt / 20);   // falls 20 dB a second
   for (let s = 0; s < 2; s++){
@@ -30461,6 +30524,8 @@ function frame(){
   raf = 0; if (view !== 'tracker') return;
   if (document.hidden && !tp.on && !rendering) raf = -1;
   else if (frameIdle()){ raf = -1; rafT = setTimeout(() => { raf = 0; frame(); }, 200); } else raf = requestAnimationFrame(frame);
+  let lpSkip = false;   // LOW POWER DISPLAY: this frame only drains the play positions; the drawing waits for the next one due
+  if (lpOn && tp.on){ const nw = performance.now(); if (nw < lpNext - 2) lpSkip = true; else lpNext = nw - lpNext > 100 ? nw + LP_MS : lpNext + LP_MS; } else if (lpPend) lpPend = false;
   if (tp.on && ctx){
     let ch = false;
     // PLAYHEAD ON THE SOUND (owner, 6 Nov, Fold: "the playhead passes the note enough before we hear it that it is noticeable"):
@@ -30473,8 +30538,9 @@ function frame(){
       // the song's timer starts again when the song wraps back up (owner, 31 Oct: it stayed at 0:00 after the first time through)
       if (tp.mode === 'song'){ let mx = -1; e.pos.forEach((q, i) => { if (q && i !== MT && q.row > mx) mx = q.row; });
         if (mx >= 0){ if ((tp.hiRow != null && mx !== tp.hiRow) || (tp.loopV && e.pos.some((q, i) => q && i !== MT && q.step === 0) && e.t - tp.t0 > 0.05)){ tp.row0 = mx; tp.t0 = e.t; tp.lenTot = null; } tp.hiRow = mx; } } }
-    if (!tp.seq.alive() && !tp.q.length && ctx.currentTime > tp.seq.time + 0.3) tStop(); else if (ch){ followPlay(); playDraw = true; try { draw(); } finally { playDraw = false; } }
+    if (!tp.seq.alive() && !tp.q.length && ctx.currentTime > tp.seq.time + 0.3) tStop(); else if (ch || lpPend){ if (lpSkip) lpPend = true; else { lpPend = false; followPlay(); playDraw = true; try { draw(); } finally { playDraw = false; } } }
   }
+  if (lpSkip) return;
   tickDots(); tickLen();
   cpuMeter();
   // Meters read the analysers ~30×/s instead of every display frame, and stop once nothing has
@@ -31964,6 +32030,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [532, '9 Nov', ['Settings › Screen: LOW POWER DISPLAY draws playback at about 24 frames a second to save battery; the sound doesn’t change.', 'New skin: Low power (black), pure black and high contrast.']],
   [531, '9 Nov', ['Pad: the Save key is the size of MUTE, beside it. LOOP, PLAY and the play-song button light up like MUTE and SOLO when engaged.']],
   [530, '9 Nov', ['Pad: the Save key sits to the left of SOLO and MUTE.']],
   [529, '9 Nov', ['Phone list: the arrows reach every phrase column; the playhead allows for the master’s lookahead; FOLLOW holds for 4 s while you edit, and Arrange pages again after it; tapping an empty block opens a fresh phrase for it; LEFT goes by the row playing; steadier playback under Safest.', 'New commands ATK and REL (rendered sounds); CUT and RES work on the live engines too.', 'Pad: clearer MUTE and SOLO, a Save key (unfolded); messages at the top on phones; …chains always shown unfolded; the Synth pads scroll; mute and solo clear each other; M.PAT on Arrange; a wider resize grip; new songs start with mastering off, and the master’s FX screen opens CALM, COMP and TONE.', 'Battery: background timers rest when nothing is playing or the app is hidden. RET and RTG are labelled note repeat and FX stutter.']],
