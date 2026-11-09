@@ -522,33 +522,73 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0) and `link/` (Ableton
 
 ## To-do (owner's list: keep it current; newest dated entries below have the details)
 
-- [ ] **Tracker commands that control the live instruments** (owner, 8 Nov: "I would love commands that can control the live instruments"). Today CUT / RES reach live engines only as a low-pass on their output (`liveCut`), and ATK / REL / DEC work on rendered sounds only. Wanted: commands driving each live engine's own filter and envelope (…pump live synths, …waves live, bass, vox); each engine's parameters differ, so it needs a per-engine map.
-- [ ] **MOD screen: LFOs assignable to FX parameters** (owner, 8 Nov: "I will want to do this"; not built, after the stability work). A new screen named
+### Feature priority (owner, 9 Nov: build future features in this order)
+
+The owner's top priority to add is the MOD screen. Work down the list; ask before reordering it. The owner will run the tests listed under "Tests the owner will run" below.
+
+1. **MOD screen: LFOs assignable to FX parameters** (owner, 8 Nov: "I will want to do this"; not built, after the stability work). A new screen named
   **MOD between FX and PROJECT**; PROJECT can become PROJ if the tabs need room (six already fill a folded phone: check at real size; hide the tab when
   folded, SHIFT+◀▶ still reaching it, only if it's still too tight). Suggested: one LFO per row (track, slot, parameter, shape, rate, depth), an "Add LFO…"
   on an FX parameter's value menu opening MOD with that target, a small mark on modulated parameters. Alternative was a pop-up by the parameter. Already
   built: Perform → LFOs (`S.perf.lfo[t]` {id, sh, rt, dp}, one per track, `fx:t:s:p` targets, not …pump; 4 points a row live, 2 in renders, so steppy at fast
   rates). Several per track means a save-format change, and audio-rate smoothing is per-effect work.
+2. **Tracker commands that control the live instruments** (owner, 8 Nov: "I would love commands that can control the live instruments"). Today CUT / RES reach live engines only as a low-pass on their output (`liveCut`), and ATK / REL / DEC work on rendered sounds only. Wanted: commands driving each live engine's own filter and envelope (…pump live synths, …waves live, bass, vox); each engine's parameters differ, so it needs a per-engine map.
+3. **Renoise-style automation lanes** (owner, 30 Oct: wanted). Plan in outline: "Possible future work: automation lanes, like Renoise" below. Shares its playback path with `FXV` / `fxp` events, so check what MOD builds first and reuse it.
+4. **Search in the effect pickers** (owner, 30 Oct: nice to have). Survey and suggested order: "Possible future work: search and tidier groups in the sound and effect pickers" below; start with type-to-filter in the fxp pop-up. Line numbers there are from build 270.
+5. **Track reordering** (moving a track next to its bus, as other DAWs do). Big job: every song row, mixer, send, bus
+  group, block mute and MIDI mapping refers to tracks by index, so it all has to be renumbered together. Owner (2 Nov):
+  later, not while stabilising. **More than 32 tracks** (owner, Oct: likely up to 128) goes with it: the GUI and the mono / poly split need working out first. Anything built above that stores a track index (MOD's `fx:t:s:p` targets, automation lanes) joins the renumbering.
+6. **Song sync between devices through Google Drive** (planned, owner undecided; wants to pick up the last save on Android, Mac and Windows): "3 Nov (48): plan, not built" below. Confirm with the owner before starting.
+7. **Live performance mode** (plan: "Plan: live performance mode" under 1 Nov (7–11)), starting with the queued pattern
+  change it needs.
+8. **Put off for now, in one bucket:** sampler key zones, velocity layers and round robin (5 Nov); pump AMP (on hold); porting pump TABLE (skipped).
+
+### Tests the owner will run (owner, 9 Nov: will do these)
+
+Start a session by asking for results. Fix on `beta`.
+
+- **Desktop v1.3.0 helper checklist:** https://claude.ai/artifact/6CgCLiVo8HEH3ywky5znWM (see "PICK UP HERE" in the START HERE brief), including monitoring after reopening the window and clock in, which "seemed out of sync slightly".
+- **Windows:** recording (WASAPI) and MIDI (WinMM).
+- **Ableton Link:** CI build on Mac / Windows, then against Live or Koala.
+- **Phone, builds 529–535 on a real Fold:** the list in "9 Nov, end of session: what to test on the phone", plus "9 Nov: builds 531–535" below.
+- **Phone clock toggle test:** a simple song hidden about 20 s with Background play off, then with Keep screen on off, Copy report after each (see "8 Nov, end of session").
+- **Hardware MIDI tests.**
+
+### Bugs still open
+
+- **Phone audio clock runs fast while playing** (biggest one; cause unknown): "8 Nov, end of session". A resync is sketched there; build it only if the toggle test's log shows it can help.
+- **Stutter that stops under LOOP:** Arrange redraw ruled out in emulation; next suspect is sounds prepared the first time a pattern plays.
+- **Quieter output after switching to Safest:** not found; needs a report from a run that sounds quiet.
+- **Notes after Stop:** looks like buffer plus effect tails, not measured on a device.
+- **Mobile setting found off once** (8 Nov): cause unknown; look at storage if it recurs.
+- Bug reports: the owner resubmits the Synth-page → Song-screen issue if they can reproduce it (note removed 2 Nov).
+
+### Longer-term priority (owner, 9 Nov: the bigger items, in this order)
+
+1. **Native desktop app, including its host framework decision and VST hosting.** **A more stable desktop app, when the owner wants one** (7 Nov): `docs/NATIVE-DESKTOP-PLAN.md` section 14 lists which of
+  7 Nov's bugs came from the web platform, and the options cheapest first: stay web; a native I/O helper inside Electron
+  (MIDI out first, then inputs, maybe audio out), built like the `link/` addon; or the full native host (phases 3–6). Framework decision: plan section 11.
+2. **Helper phase C, audio output, only if timing is still off.** **Native I/O helper** (7 Nov): phases A and B are released in desktop v1.3.0 (8 Nov). What remains is the owner's v1.3.0 and Windows tests, then phase C (audio output) only if MIDI vs audio timing is still off: "PICK UP HERE: EVERYTHING STILL NEEDED" in the START HERE brief, design in `docs/NATIVE-IO-HELPER-PLAN.md`.
+3. **Skins cull** (which to keep).
+4. **Synth engine as a VST, then Android and iOS apps** (plan only so far): `docs/ENGINE-PLUGIN-PLAN.md`. Its engine port is phase 3 of `docs/NATIVE-DESKTOP-PLAN.md`, so do it once, in `core/`.
+5. **Before-selling checklist:** "Before a commercial release" above (renaming vintage sampler models, skins that name products, and the rest). Can wait; the owner has leaned away from selling.
+
+### Done
+
 - [x] **Recording counter in Record a sample** (owner, 7 Nov 21:18; built 8 Nov, build 512, by a Sonnet subagent, checked by the
   lead): `.rectime` beside Record (m:ss, h:mm:ss past an hour), on the audio clock from capture start (`RCD.t0w`; PATTERN from
   the edge `R.t0`, "waiting…" while armed), `rcdClk` / `rcdFmt` / `rcdFreeSecs`, a 250 ms timer only while recording; the
   final length stays until the next take. recorder-check covers FREE, PATTERN, Stop, next take and closing mid-take.
-- **Track reordering** (moving a track next to its bus, as other DAWs do). Big job: every song row, mixer, send, bus
-  group, block mute and MIDI mapping refers to tracks by index, so it all has to be renumbered together. Owner (2 Nov):
-  later, not while stabilising.
-- **Live performance mode** (plan: "Plan: live performance mode" under 1 Nov (7–11)), starting with the queued pattern
-  change it needs.
-- Skins cull (which to keep); hardware MIDI tests; the native host framework (plan section 11).
-- **Native I/O helper** (7 Nov): A0 done on the 500R8; A1 + part of A2 built (1.3.0-beta.7), waiting for the owner's test: "PICK UP HERE: EVERYTHING STILL NEEDED" in the START HERE brief.
-  Was: the brief is "Build the native I/O helper — START HERE" near the top of this file; design in `docs/NATIVE-IO-HELPER-PLAN.md`: phase A every input channel in Record a
-  sample (the owner's interface has no mixer, so inputs 3+ can't be routed to 1/2), B MIDI out / in, C output only if needed.
-  Owner answered its section 9 on 7 Nov (recorded there and in the brief).
-- **A more stable desktop app, when the owner wants one** (7 Nov): `docs/NATIVE-DESKTOP-PLAN.md` section 14 lists which of
-  7 Nov's bugs came from the web platform, and the options cheapest first: stay web; a native I/O helper inside Electron
-  (MIDI out first, then inputs, maybe audio out), built like the `link/` addon; or the full native host (phases 3–6).
-- Owner to test (3 Nov): Ableton Link's CI build on Mac / Windows, then against Live or Koala.
-- Bug reports: the owner resubmits the Synth-page → Song-screen issue if they can reproduce it (note removed 2 Nov).
 
+
+## 9 Nov: builds 531–535 (on `beta`, not on `main` yet)
+
+Written up from the commits on 9 Nov; none of it has been tried on a real Fold.
+- **531:** Pad: Save beside Mute; Loop, Play and play-song light up.
+- **532:** Low power display option (off by default): limits playback drawing to about 24 fps; positions are still drained every frame, so timing and follow are unchanged. A black, high-contrast Low power skin.
+- **533:** With Low power display on and the app on screen, the audio engine sleeps after 30 s of silence. Not while playing, rendering, recording or with MIDI input connected; it stays awake while a pad is sounding. Off keeps the old behaviour.
+- **534:** Low power display picks the Low power skin; it applies even if storage fails, and a stale saved skin is cleared.
+- **535:** Phone: less layout work while playing; the playback report logs stalls.
 
 ## 9 Nov, end of session: what to test on the phone (build 530, on `beta`)
 
