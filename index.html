@@ -616,7 +616,7 @@ body:not(.nowv) .wvMobNote{display:none}
    play: the pads, the keypad and the PAD buttons (touch-action:none there), and the Arrange keeps its own pinch (.tagrid). */
 .pads, .pad{touch-action:pan-x pan-y}
 .pad{height:70px; border:1px solid var(--line); background:var(--panel); display:flex; flex-direction:column;
-  justify-content:space-between; align-items:flex-start; padding:6px 8px; text-align:left; font-size:var(--fs-3); touch-action:none; min-width:0; gap:0}
+  justify-content:space-between; align-items:flex-start; padding:6px 8px; text-align:left; font-size:var(--fs-3); touch-action:pan-y; min-width:0; gap:0}   /* pan-y (owner, 8 Nov: the pad grid would not scroll by touch): a vertical drag scrolls the dock; a tap still plays on pointerdown, and the scroll's pointercancel releases the note */
 .pad b{font-size:var(--fs-5); font-weight:600}
 /* A voice per track adds up to 32 track pads past the 8 drums: same 8-across pads, same 70px height,
    scrolling up and down inside the dock (the band above keeps its own place). */
@@ -1128,9 +1128,15 @@ body:not(.legon) .tside .tlegend{display:none}
 .keys.wide .k.kw{font-size:var(--fs-2)}
 /* MUTE / SOLO (owner, 8 Nov): nice to have, so only where there's room (unfolded and larger). Pink / green when off, black when on. */
 #kMute, #kSolo{display:none}
-@container (min-width:600px){ .keys.wide{grid-template-columns:repeat(5,calc(var(--kw, var(--k)) * 1.02))} #kMute, #kSolo{display:inline-flex} .tpad{--kw:min(var(--k), calc((100cqw - 75px) / 8.1))} }
+/* SAVE (owner, 8 Nov): a floppy-disk key beside MUTE (the Save song action), with a blank cell above it so PLAY stays over EDIT. 6 columns: 3 d-pad + 6 × 1.02 keys = 9.12 widths, 6 gaps (84px). */
+#kSave, .ksp{display:none}
+#kSave .ick{width:2em; height:2em}
+@container (min-width:600px){ .keys.wide{grid-template-columns:repeat(6,calc(var(--kw, var(--k)) * 1.02))} #kMute, #kSolo, #kSave{display:inline-flex} .ksp{display:block} .tpad{--kw:min(var(--k), calc((100cqw - 84px) / 9.12))} }
 #tPad #kMute{background:#ff2e93 !important; color:#141414 !important} #tPad #kSolo{background:#23a45c !important; color:#141414 !important}   /* (!important: the skins style lit keys very specifically) */
-#tPad #kMute.lt, #tPad #kSolo.lt{background:#141414 !important; color:#fff !important}
+/* ON states (owner, 8 Nov: both went the same black): MUTE on = white with a thick hot-pink ring and pink text; SOLO on = bright lime with dark text and a thick dark-green ring.
+   Each reads on the light and dark skins alike (white and lime are bright in all of them; the rings carry the colour). */
+#tPad #kMute.lt{background:#fff !important; color:#e0006e !important; border:4px solid #ff2e93 !important; box-shadow:4px 4px 0 0 #ff2e93 !important; font-weight:800}
+#tPad #kSolo.lt{background:#d4ff2a !important; color:#0b2a10 !important; border:4px solid #0b5a1c !important; box-shadow:4px 4px 0 0 #0b5a1c !important; font-weight:800}
 .k.dn,.k.on{background:var(--ink); color:var(--inv)}
 #kPlay.on{background:var(--pl); border-color:var(--line); color:var(--inv)}
 .k.lt{background:var(--pl); color:var(--inv); border-color:var(--line)}
@@ -1160,15 +1166,16 @@ body:not(.legon) .tside .tlegend{display:none}
 .tcmd button[hidden]{display:none} .tcmd button[data-c=song]{font-size:var(--fs-5)} .tcmd.cpad :is([data-c=undo],[data-c=redo]){font-size:20px; font-weight:500; line-height:1} .tcmd :is([data-c=prev],[data-c=next]){font-size:24px; font-weight:500; line-height:1}
 /* One row on wide screens. */
 @media (min-width:700px){
-  .tcmd, .tcmd.song{grid-template-columns:repeat(14,minmax(0,1fr))}
+  .tcmd{grid-template-columns:repeat(14,minmax(0,1fr))} .tcmd.song{grid-template-columns:repeat(15,minmax(0,1fr))}
 }
 /* NO CLN ON A NARROW ROW (owner, 1 Nov): below 1000 px (phones, the Fold unfolded) the big COMMANDS row leaves CLN out, so
    the Song screen has 14 buttons like the others and ▶ stays on its row (a 15th wrapped onto a second row and shrank the
    phrase and Arrange). UNIQ and CLN↓ stay; CLN is still Ctrl/⌘+Alt+C, in Edit ▾ and in the thin COMMAND BAR. Wider
    windows show it, with 15 columns on the Song screen. */
 .tcmd:not(.cmini) button[data-c=clone]{display:none}
+/* M.PAT (owner, 8 Nov): Arrange's one more button: the Song screen's row is 15 columns from 700 px (it was 14, full), 16 from 1000 px with CLN */
 @media (min-width:1000px){
-  .tcmd.song{grid-template-columns:repeat(15,minmax(0,1fr))}
+  .tcmd.song{grid-template-columns:repeat(16,minmax(0,1fr))}
   .tcmd.song:not(.cmini) button[data-c=clone]:not([hidden]){display:inline-flex}
 }
 /* ▶ (play the song) always sits in the last column, on whichever row it lands: never alone at the left of a row. */
@@ -1258,6 +1265,8 @@ body.mob .top .kitname{width:auto; flex:1 1 90px; min-width:64px; max-width:220p
    pushed ⚙ and CPU off the side (the page scrolled sideways). There the tabs give way and scroll inside themselves. */
 @media (max-width:520px){ body.mob .top #segView{flex:0 1 auto; min-width:0; overflow-x:auto; scrollbar-width:none} body.mob .top #segView::-webkit-scrollbar{display:none} body.mob .top #segView button{padding-inline:8px} }
 body.mob .top .brand{flex-shrink:1; min-width:0; overflow:hidden}
+/* With the …chains tab showing (unfolded, or ticked) the tabs are one longer: the name shrinks so the whole title bar stays on one line, unclipped (owner, 8 Nov). */
+body.mob:not(.noch) .top .brand{font-size:15px; letter-spacing:.03em; margin-right:0}
 #bFile .filei{display:none; width:20px; height:20px} body.mob #bFile .filei{display:block} body.mob #bFile .filet{display:none} body.mob #bFile{display:inline-flex; align-items:center; padding:0 12px}   /* the phone: a folder (owner: the ▾ alone was confusing) */
 body.mob .top #tLen{min-height:34px; padding:0 8px; align-self:auto}
 /* LOOP on the pad (owner): lit in its own colour while the pattern loops */
@@ -1288,6 +1297,14 @@ body.mob .top #tLen{min-height:34px; padding:0 8px; align-self:auto}
 .kp.play{background:var(--pl); color:var(--inv)}
 body.trkv .toast{bottom:calc(var(--k) * 2 + 40px + env(safe-area-inset-bottom,0px))}
 @media (min-width:1100px) and (pointer:fine){ body .toast, body.trkv .toast, body.trkv.cmdv .toast{bottom:auto; top:96px; max-width:min(720px, calc(100% - 32px)); cursor:pointer} }
+/* PHONE TOASTS (owner, 8 Nov: they sat over the pad and the grid, which is where the thumbs are): at the very top, under the
+   safe-area inset, over the title bar. Small, one or two lines, tap to dismiss. (After the desktop rule above; the two never match together.) */
+@media (pointer:coarse), (max-width:700px){
+  body .toast, body.trkv .toast, body.trkv.cmdv .toast{bottom:auto; top:calc(3px + env(safe-area-inset-top,0px)); width:max-content; max-width:calc(100% - 12px); padding:4px 10px; font-size:var(--fs-3); line-height:1.25;
+    border-width:1.5px; box-shadow:2px 2px 0 0 var(--ink); cursor:pointer; display:flex; align-items:center; gap:8px; overflow:hidden; max-height:calc(2.5em + 10px)}
+  .toast[hidden]{display:none}
+  .toast .tact{flex:none; min-height:32px; padding:0 12px; margin:-2px 0 -2px 4px!important; font-size:var(--fs-2)}
+}
 /* Phones: taller buttons under the screen, easier to hit with a thumb (the screen's text shrinks to keep 16 rows in view). */
 @media (pointer:coarse) and (max-width:760px){
   .tcmd{gap:10px 8px; padding-top:8px}
@@ -1421,6 +1438,11 @@ body.sxsecs .tarr{padding-left:calc(var(--sxw, 88px) + 4px)}   /* (beside Phrase
 body.arrleft .tbody > .tarr{order:-1; border-left:0; border-right:1px solid var(--line)}
 body.arrleft .tbody > .tarr .tarrh{left:auto; right:-13px; width:12px}   /* (owner, 31 Oct) outside the panel: half of it lay over Arrange's scrollbar, so grabbing the scrollbar resized the panel */
 body.arrleft .tbody > .tarr .tarrh::after{left:4px}
+/* RESIZE BAR ON A PHONE (owner, 8 Nov): the grip outside the panel was 12 px wide, too thin for a finger. A touch screen gets 26 px (it takes no layout width: it is absolute, and reaches out over the screen's edge, not into Arrange's scrollbar). */
+@media (pointer:coarse){
+  body.arrleft .tbody > .tarr .tarrh{right:-25px; width:26px}
+  body.arrleft .tbody > .tarr .tarrh::after{left:5px}
+}
 /* ARRANGE SCROLLBAR (owner, 31 Oct: hard to grab): a wide, plainly visible thumb, with a mouse (phones keep their overlay one) */
 @media (pointer:fine){
 .tagrid::-webkit-scrollbar{width:14px; height:14px; background:transparent}
@@ -2037,6 +2059,8 @@ body.sdesk .dock:not(.vtrk) .pads .pad:nth-child(17)::before{content:'More slots
 .dogs .d1 .tail{transform-origin:0% 100%} .dogs .d2 .tail{transform-origin:0% 85%}
 .dogs.idle .bob{animation:dkBreath 3.4s ease-in-out infinite} .dogs.idle .d2 .bob{animation-delay:-1.7s}
 .dogs.idle .tail{animation:dkWag 2.6s ease-in-out infinite}
+/* BATTERY (8 Nov): on a phone the breath and tail rest after about 30 s of standing still (both keyframes start and end at the pose at rest, so nothing jumps); an infinite animation on SVG parts asks for a new display frame every refresh for as long as the stage is showing. */
+body.mob .dogs.idle .bob{animation-iteration-count:9} body.mob .dogs.idle .tail{animation-iteration-count:12}
 .dogs.dance .dog{--aL:112deg; --aR:-112deg}
 .dogs .al, .dogs .ar{transition:transform .14s ease-out}
 @keyframes dkBreath{0%,100%{transform:scaleY(1)} 50%{transform:scaleY(1.025)}}
@@ -2642,6 +2666,7 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
 <!-- One icon set, drawn like the rest of the app: 2px lines, outline shapes, square ends. -->
 <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false"><defs>
   <symbol id="ic-play" viewBox="0 0 24 24"><path d="M7 4.5 L19.5 12 L7 19.5Z"/></symbol>
+  <symbol id="ic-save" viewBox="0 0 24 24"><path d="M4 4 H17.5 L20 6.5 V20 H4Z M7.5 4 V9 H16 V4 M7.5 20 V13.5 H16.5 V20"/></symbol>
   <symbol id="ic-stop" viewBox="0 0 24 24"><rect x="5.5" y="5.5" width="13" height="13"/></symbol>
   <symbol id="ic-close" viewBox="0 0 24 24"><path d="M6 6 L18 18 M18 6 L6 18"/></symbol>
   <symbol id="ic-folder" viewBox="0 0 24 24"><path d="M3 6.5 V18.5 H21 V8.5 H11.5 L9.5 6.5 Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></symbol>
@@ -3193,8 +3218,8 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
     </div>
     <div class="tinl tinlp" id="tInlPad" hidden aria-label="Instruments and their pads"></div>
     <div class="keys wide">
-      <button type="button" class="k kw" data-b="solo" id="kSolo" title="Solo this track; tap again to un-solo">SOLO</button><button type="button" class="k kw" data-b="xposeUp" title="Transpose the phrase selection up a semitone">SEMI +</button><button type="button" class="k kw" data-b="xposeDn" title="Transpose the phrase selection down a semitone">SEMI −</button><button type="button" class="k kw" data-b="shift">SHIFT</button><button type="button" class="k kw" data-b="play" id="kPlay">PLAY</button>
-      <button type="button" class="k kw" data-b="mute" id="kMute" title="Mute this track; tap again to unmute">MUTE</button><button type="button" class="k kw" data-b="gen" id="kGen" title="Generate: the pattern generators (Acid line, Euclidean fill…) for this phrase">GEN</button><button type="button" class="k kw" data-b="loop" id="kLoop" title="Loop the pattern: the song repeats the row it is on until you turn it off (Alt+L in KEYS mode)">LOOP</button><button type="button" class="k kw" data-b="opt">OPTION</button><button type="button" class="k kw" data-b="edit">EDIT</button>
+      <button type="button" class="k kw" data-b="solo" id="kSolo" title="Solo this track; tap again to un-solo">SOLO</button><span class="ksp" aria-hidden="true"></span><button type="button" class="k kw" data-b="xposeUp" title="Transpose the phrase selection up a semitone">SEMI +</button><button type="button" class="k kw" data-b="xposeDn" title="Transpose the phrase selection down a semitone">SEMI −</button><button type="button" class="k kw" data-b="shift">SHIFT</button><button type="button" class="k kw" data-b="play" id="kPlay">PLAY</button>
+      <button type="button" class="k kw" data-b="mute" id="kMute" title="Mute this track; tap again to unmute">MUTE</button><button type="button" class="k kw" data-b="save" id="kSave" title="Save song" aria-label="Save song"><svg class="ic ick" aria-hidden="true"><use href="#ic-save"/></svg></button><button type="button" class="k kw" data-b="gen" id="kGen" title="Generate: the pattern generators (Acid line, Euclidean fill…) for this phrase">GEN</button><button type="button" class="k kw" data-b="loop" id="kLoop" title="Loop the pattern: the song repeats the row it is on until you turn it off (Alt+L in KEYS mode)">LOOP</button><button type="button" class="k kw" data-b="opt">OPTION</button><button type="button" class="k kw" data-b="edit">EDIT</button>
     </div>
     </div>
   </div>
@@ -3279,7 +3304,7 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
     <section id="hPad"><h2>Tracker · PAD mode</h2><table><tr><td>Arrows</td><td>Move</td></tr><tr><td>SHIFT + ◀▶</td><td>Change screen (through every screen in tab order)</td></tr><tr><td>SHIFT + ▲▼</td><td>Mobile: Arrange (▲). Otherwise Project (▲). Mixer (▼), from any screen, and back the same way (M8 style). To select, use SHIFT + OPTION or SEL</td></tr><tr><td>EDIT</td><td>Add, or run a › row · in a phrase, on a filled note, instrument, volume or effect, picks it up; on an empty one, drops it (EDIT + arrows changes a note in place) · on an empty Song / Arrange block, makes a new empty pattern (EDIT + arrows then changes its number) · tap twice (within about half a second) for a note off, the effect list on an effect, a unique copy of a song block, or a new sect</td></tr><tr><td>EDIT + arrows</td><td>Change the value (◀▶ by 1, ▲▼ by more)</td></tr><tr><td>OPTION + EDIT</td><td>Clear (with a selection: cut)</td></tr><tr><td>OPTION + arrows</td><td>Other sect, phrase, instrument or FX track: ▲ ◀ the one before, ▼ ▶ the one after · on the Mixer's FX row, turn a track's effects on (▲▶) or off (▼◀) · in Song, the nearest block that way (PATTERN NAV; off: ◀▶ previous / next block in the track, ▲▼ 16 rows)</td></tr><tr><td>OPTION + arrows in Phrase</td><td>Go to the phrase above / below on this track (▲▼) or to the left / right on this row (◀▶), as laid out on the Song grid. A phrase not in the song steps by number. (Settings → Input → PATTERN NAV; off: ▲▼ jump 16 phrases)</td></tr><tr><td>SHIFT + OPTION + arrows</td><td>In the Song grid: jump to the next / previous phrase on this row (◀▶), or the same track's phrase above / below (▲▼) — the same in KEYS mode</td></tr><tr><td>SHIFT + OPTION</td><td>Start or cancel a selection (SEL on the command row too); arrows grow it, OPTION copies, OPTION+EDIT cuts</td></tr><tr><td>SHIFT + EDIT</td><td>Paste</td></tr><tr><td>PLAY · SHIFT + PLAY</td><td>Play this screen · play the song · with LOOP on, PLAY loops the selected rows</td><tr><td>LOOP · SEMI +/−</td><td>Loop the selection (sticky) · transpose the phrase selection ±1 semitone at once</td></tr><tr><td>◀ ▶ on the FX screen</td><td>Open a slot's controls · back to the slot list (a sideways swipe does it too)</td></tr><tr><td>EDIT on an FX slot</td><td>A list of every effect (like the FX command list): pick one and its controls open; its own effect, marked NOW, keeps its settings; --- empties the slot</td></tr><tr><td>Row numbers</td><td>Tap to select whole lines, then COPY and PASTE</td></tr></table><p><b>One finger is enough.</b> With <b>Sticky keys</b> on, tap SHIFT or OPTION alone and it stays lit for the next button. The <b>command row</b> (Project → COMMANDS) gives every two-key command its own button: change, prev/next, clear, select, copy, cut, paste, play song, and on the SONG screen CLN↓ (clones the block, or the selected blocks, into new numbers on a new row below; the rows below move down) and CLN (clone): the block under the cursor is copied, phrases and all, to the next free number.</p><p>On a computer keyboard in PAD mode the keyboard is not disabled: arrows move, <kbd>Enter</kbd> opens, <kbd>Space</kbd> plays, typing letters and hex edits the cell, and <kbd>Shift</kbd> selects lines (so does <kbd>Ctrl/⌘</kbd> <kbd>Shift</kbd> <kbd>▲▼</kbd>, as in KEYS mode). <kbd>Z</kbd> stays OPTION (not a note), <kbd>X</kbd> stays EDIT, and <kbd>Alt</kbd>+arrows page (OPTION+arrow) rather than change the value.</p><h3>Touch</h3><p>Tap a cell to move there; tap it again to open or add. To change the cursor’s cell by dragging, rest your finger on it a moment (a short buzz), then drag up or down; a quick swipe scrolls, from anywhere.</p></section>
     <section id="hFx"><h2>FX column commands</h2>
 <p>Each phrase row has three effect columns: a command and a hex value. The info line at the bottom of the screen explains the one under the cursor.</p>
-<div class="fxg"><div><code>CSL</code>MIDI CC glide: the <code>CCA</code>–<code>CCD</code> commands on the same row move to their value over XY ticks instead of jumping (00: across the step), from the value sent before</div><div><code>DIR</code>play direction for this track from the next row on: 00 forward, 01 backwards, 02 ping-pong, 03 a random row each step (a phrase still lasts as many steps as it has rows)</div><div><code>BYP</code>…chains module X (the number on its BYP button; 0 = all) in (Y 0), bypassed (Y 1), or the other way from the patch for Y rows then back</div><div><code>FXO</code>effect slot X (0 = all) off (XY with Y 0), on (Y 1), or on for Y rows then back</div><div><code>FXS</code>pick what FXV moves on this track: slot X (1–8), its parameter Y (1–F, in the FX screen's order)</div><div><code>FXV</code>set that parameter, 00 its lowest – FF its highest (the slot's own value comes back when the song stops)</div><div><code>SCA</code>this track's scale from here on: X the root (0 = C … B), Y the scale (0 off, 1 major, 2 minor, 3 harmonic minor…); KEY FOLLOW instruments</div><div><code>SCG</code>every track's scale from here on, as SCA</div><div><code>CUT</code>low-pass the pad from here on, 00 dark – FF off</div><div><code>FDI</code>fade the note in over XX ticks</div><div><code>TRM</code>tremolo on the note: X cycles a beat, Y depth</div><div><code>APN</code>auto-pan the note: X cycles a beat, Y width</div><div><code>TVL</code>this track's level from here on, 00 silent – FF the mixer's (back at stop)</div><div><code>TPN</code>this track's pan from here on, 80 centre (back at stop)</div><div><code>STP</code>stop every note: 00 this track, 01 every track</div><div><code>LPB</code>lines per beat for every track from here on (00 the phrases' own)</div><div><code>PDL</code>the whole song waits XX rows</div><div><code>ONE</code>one note of the row's chord, at random</div><div><code>MPB</code>MIDI pitch bend, 80 centre</div><div><code>MAT</code>MIDI channel pressure</div><div><code>RES</code>resonance for CUT</div><div><code>DEC</code>shorten the pad from here on, 00 a click – FF its own length</div><div><code>FLX</code>Flex pattern: 00 off, 01–10, then 11–FF in families by the first digit: 1 roll, 2 stutter, 3 build, 4 reverse, 5 pitch down, 6 pitch up, 7 tape, 8 scratch, 9 gate, A filter, B crush, C fade repeat, D juggle, E groove, F chaos (the second digit picks the variant)</div><div><code>GAT</code>Step gate pattern: 00 custom, 01–0F</div><div><code>RTG</code>retrigger every X (1 = 1/4 … 5 = 1/64, 6–8 triplets) for Y rows; 00 stops</div><div><code>ARP</code>arpeggio: the note, +X, +Y semitones</div><div><code>ARC</code>arpeggio pattern (X) and speed in ticks (Y)</div><div><code>CHA</code>chance the note plays</div><div><code>PRB</code>chance the command to its left happens (as RND changes it; with none, the note's chance)</div><div><code>MUT</code>play variation XX of the pad's sound (INST › RANGE: how far); RND or RNL after it for a new one each time</div><div><code>GEN</code>play a fresh sound XX of the instrument's GEN TYPE (INST › GEN TYPE, FAMILY, RANGE)</div><div><code>DEL</code>delay the note by XX ticks</div><div><code>GRV</code>groove for this track: X ticks even, Y odd</div><div><code>GGR</code>groove for every track</div><div><code>HOP</code>end the phrase; the next starts at row XX (00–1F; row 00 if that’s past its length)</div><div><code>INS</code>play with instrument XX</div><div><code>KIL</code>stop the note after XX ticks</div><div><code>OFF</code>fade the note out after XX ticks</div><div><code>NTH</code>play on pass Y of every X</div><div><code>RET</code>retrigger every Y ticks, X fades</div><div><code>REP</code>repeat the last command, adding XX</div><div><code>RND</code>randomise the command to the left</div><div><code>RNL</code>RND as a random walk</div><div><code>PSL</code>slide from the last pitch</div><div><code>PBN</code>bend the pitch across the step</div><div><code>PVB</code>vibrato: X speed, Y depth</div><div><code>SED</code>seed the random numbers</div><div><code>TPO</code>tempo in BPM</div><div><code>TIC</code>ticks a step from here on (00: the project’s)</div><div><code>TSP</code>transpose the track from here on</div><div><code>VOL</code>volume</div><div><code>PIT</code>pitch in semitones (signed)</div><div><code>FIN</code>fine tune in cents</div><div><code>PLY</code>00 forwards, 01 reversed</div><div><code>STA</code>start point into the sound</div><div><code>PAN</code>pan, 80 is centre</div><div><code>WOB</code>bass wobble rate from here on: 01 4 bars, 02 2 bars, 03 1 bar, 04 1/2, 05 1/2T, 06 1/4, 07 1/4T, 08 1/8D, 09 1/8, 0A 1/8T, 0B 1/16, 0C 1/16T, 0D 1/32; 00 the voice’s own</div><div><code>CCA</code>–<code>CCD</code>MIDI CC: 00–7F to the instrument’s CC slot A–D (the CC numbers are on INST)</div><div><code>PGM</code>MIDI program change 00–7F, just before the row’s note</div><div><code>CND</code>a condition, as on the Elektron boxes: Y 0 FILL (plays while FILL is on), 1 !FILL, 2 PRE (this track’s last condition — NTH, CHA or 1ST — came out true), 3 !PRE, 4 NEI (the neighbour’s did: X its track number, 0 = the track to the left), 5 !NEI, 6 1ST (the first pass through this row since PLAY), 7 !1ST</div><div><code>NUD</code>nudge ± ticks: 01–7F late, FF–80 early (up to half a step)</div><div><code>RTV</code>the RET retriggers’ level: + rises to the last hit (the first ones softer), − fades, 1/32 a hit</div><div><code>SLC</code>on a sliced sound, play slice XX (00 the first); the note pitches it, C-4 as it is</div><div><code>XFD</code>the crossfader between scene A and scene B (Perform): 00 all A … FF all B</div><div><code>MAC</code>macro X (1–8) to Y (0 lowest – F highest)</div><div><code>LK1</code>–<code>LK4</code>set what this track’s lock 1–4 points at (Perform → Locks) to XX until the next note without it</div><div><code>PRT</code>switch to part XX (Perform → Parts: instruments, mixer and effect values); 00 back to the song’s own. STOP goes back too</div></div>
+<div class="fxg"><div><code>CSL</code>MIDI CC glide: the <code>CCA</code>–<code>CCD</code> commands on the same row move to their value over XY ticks instead of jumping (00: across the step), from the value sent before</div><div><code>DIR</code>play direction for this track from the next row on: 00 forward, 01 backwards, 02 ping-pong, 03 a random row each step (a phrase still lasts as many steps as it has rows)</div><div><code>BYP</code>…chains module X (the number on its BYP button; 0 = all) in (Y 0), bypassed (Y 1), or the other way from the patch for Y rows then back</div><div><code>FXO</code>effect slot X (0 = all) off (XY with Y 0), on (Y 1), or on for Y rows then back</div><div><code>FXS</code>pick what FXV moves on this track: slot X (1–8), its parameter Y (1–F, in the FX screen's order)</div><div><code>FXV</code>set that parameter, 00 its lowest – FF its highest (the slot's own value comes back when the song stops)</div><div><code>SCA</code>this track's scale from here on: X the root (0 = C … B), Y the scale (0 off, 1 major, 2 minor, 3 harmonic minor…); KEY FOLLOW instruments</div><div><code>SCG</code>every track's scale from here on, as SCA</div><div><code>CUT</code>low-pass the pad from here on, 00 dark – FF off</div><div><code>FDI</code>fade the note in over XX ticks</div><div><code>TRM</code>tremolo on the note: X cycles a beat, Y depth</div><div><code>APN</code>auto-pan the note: X cycles a beat, Y width</div><div><code>TVL</code>this track's level from here on, 00 silent – FF the mixer's (back at stop)</div><div><code>TPN</code>this track's pan from here on, 80 centre (back at stop)</div><div><code>STP</code>stop every note: 00 this track, 01 every track</div><div><code>LPB</code>lines per beat for every track from here on (00 the phrases' own)</div><div><code>PDL</code>the whole song waits XX rows</div><div><code>ONE</code>one note of the row's chord, at random</div><div><code>MPB</code>MIDI pitch bend, 80 centre</div><div><code>MAT</code>MIDI channel pressure</div><div><code>RES</code>resonance for CUT</div><div><code>DEC</code>shorten the pad from here on, 00 a click – FF its own length</div><div><code>FLX</code>Flex pattern: 00 off, 01–10, then 11–FF in families by the first digit: 1 roll, 2 stutter, 3 build, 4 reverse, 5 pitch down, 6 pitch up, 7 tape, 8 scratch, 9 gate, A filter, B crush, C fade repeat, D juggle, E groove, F chaos (the second digit picks the variant)</div><div><code>GAT</code>Step gate pattern: 00 custom, 01–0F</div><div><code>RTG</code>FX stutter: the <b>Retrigger effect</b> in a slot repeats every X (1 = 1/4 … 5 = 1/64, 6–8 triplets) for Y rows; 00 stops. It needs that effect in a slot (typing RTG adds it to a free one)</div><div><code>ARP</code>arpeggio: the note, +X, +Y semitones</div><div><code>ARC</code>arpeggio pattern (X) and speed in ticks (Y)</div><div><code>CHA</code>chance the note plays</div><div><code>PRB</code>chance the command to its left happens (as RND changes it; with none, the note's chance)</div><div><code>MUT</code>play variation XX of the pad's sound (INST › RANGE: how far); RND or RNL after it for a new one each time</div><div><code>GEN</code>play a fresh sound XX of the instrument's GEN TYPE (INST › GEN TYPE, FAMILY, RANGE)</div><div><code>DEL</code>delay the note by XX ticks</div><div><code>GRV</code>groove for this track: X ticks even, Y odd</div><div><code>GGR</code>groove for every track</div><div><code>HOP</code>end the phrase; the next starts at row XX (00–1F; row 00 if that’s past its length)</div><div><code>INS</code>play with instrument XX</div><div><code>KIL</code>stop the note after XX ticks</div><div><code>OFF</code>fade the note out after XX ticks</div><div><code>NTH</code>play on pass Y of every X</div><div><code>RET</code>note repeat: the note itself retriggers every Y ticks, X fades each hit (needs no effect; RTG is the effect stutter)</div><div><code>REP</code>repeat the last command, adding XX</div><div><code>RND</code>randomise the command to the left</div><div><code>RNL</code>RND as a random walk</div><div><code>PSL</code>slide from the last pitch</div><div><code>PBN</code>bend the pitch across the step</div><div><code>PVB</code>vibrato: X speed, Y depth</div><div><code>SED</code>seed the random numbers</div><div><code>TPO</code>tempo in BPM</div><div><code>TIC</code>ticks a step from here on (00: the project’s)</div><div><code>TSP</code>transpose the track from here on</div><div><code>VOL</code>volume</div><div><code>PIT</code>pitch in semitones (signed)</div><div><code>FIN</code>fine tune in cents</div><div><code>PLY</code>00 forwards, 01 reversed</div><div><code>STA</code>start point into the sound</div><div><code>PAN</code>pan, 80 is centre</div><div><code>WOB</code>bass wobble rate from here on: 01 4 bars, 02 2 bars, 03 1 bar, 04 1/2, 05 1/2T, 06 1/4, 07 1/4T, 08 1/8D, 09 1/8, 0A 1/8T, 0B 1/16, 0C 1/16T, 0D 1/32; 00 the voice’s own</div><div><code>CCA</code>–<code>CCD</code>MIDI CC: 00–7F to the instrument’s CC slot A–D (the CC numbers are on INST)</div><div><code>PGM</code>MIDI program change 00–7F, just before the row’s note</div><div><code>CND</code>a condition, as on the Elektron boxes: Y 0 FILL (plays while FILL is on), 1 !FILL, 2 PRE (this track’s last condition — NTH, CHA or 1ST — came out true), 3 !PRE, 4 NEI (the neighbour’s did: X its track number, 0 = the track to the left), 5 !NEI, 6 1ST (the first pass through this row since PLAY), 7 !1ST</div><div><code>NUD</code>nudge ± ticks: 01–7F late, FF–80 early (up to half a step)</div><div><code>RTV</code>the RET note repeats’ level: + rises to the last hit (the first ones softer), − fades, 1/32 a hit</div><div><code>SLC</code>on a sliced sound, play slice XX (00 the first); the note pitches it, C-4 as it is</div><div><code>XFD</code>the crossfader between scene A and scene B (Perform): 00 all A … FF all B</div><div><code>MAC</code>macro X (1–8) to Y (0 lowest – F highest)</div><div><code>LK1</code>–<code>LK4</code>set what this track’s lock 1–4 points at (Perform → Locks) to XX until the next note without it</div><div><code>PRT</code>switch to part XX (Perform → Parts: instruments, mixer and effect values); 00 back to the song’s own. STOP goes back too</div></div>
 <p><b>MIDI instruments</b> (INST › OUTPUT MIDI or PAD+MIDI) send to their <b>PORT</b> A–D: ⚙ Settings → MIDI (on a computer, Audio &amp; MIDI ▾ in the top bar) says which cable each letter is on this device, so a song plays the same on the phone and the computer. <code>CCA</code>–<code>CCD</code> and <code>PGM</code> work on rows without a note too (on the track’s last instrument), and <code>RND</code>, <code>RNL</code> and <code>REP</code> change them like any command. <code>PSL</code>, <code>PBN</code>, <code>PVB</code>, <code>PIT</code>/<code>FIN</code> on a held note and fractions of a semitone are sent as pitch bend: set INST › <b>BEND RANGE</b> to the range your gear bends. <code>ARP</code> plays its steps as notes, then the note itself again (unless the next row retunes it or plays another note).</p>
 <p><b>LFO → CC:</b> INST › <b>LFO CC</b> (set a CC number) runs an LFO on that CC while the song plays: SHAPE, RATE in time with the song (T triplet, D dotted), DEPTH (127 is the whole range), CENTRE, and RESTART (FREE from PLAY, NOTE at each of the instrument’s notes). <b>Song position:</b> with clock out on, playing the song from a row partway into a block sends Song Position Pointer and Continue, so the gear starts at the same place; with clock in on, the other device’s Continue after a Song Position Pointer plays the song from there.</p>
 <p><b>Playing and recording from a MIDI keyboard:</b> ⚙ Settings → MIDI → <b>Keys play</b>: in the tracker the keyboard plays the instrument you're on (the INST screen's, or the cursor row's in a phrase) and holds it while the key is down; a MIDI instrument plays its gear, with bend, aftertouch, sustain and every unlearned knob passed through. <b>Notes in</b> picks the input and channel, <b>Clock from</b> the input Clock in follows, and each port has its own <b>delay</b>. <b>REC</b> on the top strip (F9): stopped, a note or chord goes in at the cursor and the cursor moves on when you let go; playing, notes land on the step they were played on in the track under the cursor, with velocity and OFFs (a take is one undo step). <b>CLICK</b> is the metronome; Settings → <b>Record &amp; play</b> has its level, the count-in, REC TIMING (STEP, or TICKS: the step plus a <code>DEL</code>) and LIVE TRANSPOSE (a key transposes the KEY FOLLOW instruments as the song plays).</p>
@@ -8061,7 +8086,9 @@ setTimeout(keyHintsApply, 0);
 const MEK = 'thunderplus-mobile-editors-v1', MCK = 'thunderplus-mobile-chains-v1', MWK = 'thunderplus-mobile-waves-v1';
 const mobGet = k => { try { const v = localStorage.getItem(k); if (v === '0' || v === '1') return v === '1'; return localStorage.getItem(MEK) === '1'; } catch(e){ return false; } };
 let mobCh = mobGet(MCK), mobWv = mobGet(MWK);
-const noChains = () => isMobile() && !mobCh, noWaves = () => isMobile() && !mobWv;
+// …chains always shows on the unfolded Fold (Mobile setup, 600px or more), tick or no tick; folded follows the tick (owner, 8 Nov).
+const mqUnfolded = matchMedia('(min-width:600px)');
+const noChains = () => isMobile() && !mobCh && !mqUnfolded.matches, noWaves = () => isMobile() && !mobWv;
 const noEdFor = v => v === 'chains' ? noChains() : v === 'waves' ? noWaves() : false;
 function setMobEd(kind, on){
   if (kind === 'chains'){ mobCh = !!on; try { localStorage.setItem(MCK, mobCh ? '1' : '0'); } catch(e){} }
@@ -8103,6 +8130,7 @@ function applyPlatform(){
 }
 $('ckMobile').addEventListener('change', e => setPlatform(e.target.checked ? 'mobile' : 'desktop'));
 $('ckMobCh').addEventListener('change', e => setMobEd('chains', e.target.checked));
+mqUnfolded.addEventListener('change', () => { if (!isMobile()) return; applyPlatform(); if (noEdFor(view)) setView('synth'); });   // folding / unfolding: the …chains tab comes and goes
 // KEEP SCREEN ON / BACKGROUND PLAY here too (stability pass: they were only on the PROJECT screen); ticked from their settings each time the panel shows
 { const w = $('ckWake'), b = $('ckBgPlay'), sync = () => { try { w.checked = !!wlOn; b.checked = !!bgOn; } catch(e){} };
   w.addEventListener('change', () => { setWlOn(w.checked); draw(); }); b.addEventListener('change', () => { setBgOn(b.checked); draw(); });
@@ -8202,7 +8230,7 @@ function audio(){
     prerender();   // ensure() re-renders only the pads whose rate differs from this context's
   }
   if (ctx.state === 'suspended') ctx.resume();
-  bgArm(); hmWake();   // BATTERY: a sound restarts the hidden-idle countdown and wakes the header meter at once
+  bgArm(); hmWake(); idleWake();   // BATTERY: a sound restarts the hidden-idle countdown and wakes the header meter and the sleeping timers at once
   return ctx;
 }
 /* ---------- pad rendering: a background Worker, with the UI thread as the fallback ----------
@@ -12421,7 +12449,7 @@ function bassUI(){
 let bvRaf = 0, bvCore = null;
 function bassVizKick(){ if (!bvRaf) bvRaf = requestAnimationFrame(bassViz); }
 function bassViz(){
-  bvRaf = 0;
+  bvRaf = 0; if (document.hidden) return;   // BATTERY: parked while hidden; the screen coming back kicks it (visibilitychange, end of file)
   const cv = $('bassCv'); if (!cv || $('bassWrap').hidden || view === 'tracker' || !isBassV(V())) return;
   const dpr = devicePixelRatio || 1, W = cv.clientWidth, H = cv.clientHeight; if (!W || !H) return;
   if (cv.width !== Math.round(W * dpr)){ cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); }
@@ -13027,7 +13055,7 @@ function sndColours(){
 function sndSoon(){ if (!sndQ) sndQ = requestAnimationFrame(() => { sndQ = 0; if (!sndOn()) return; sndColours(); sndSpecPaint(); sndScopePaint(false); sndWake(); }); }
 function sndWake(){ if (!sndRaf && sndOn()) sndRaf = requestAnimationFrame(sndFrame); }
 function sndFrame(){
-  sndRaf = 0; if (!sndOn()) return; if (!sndCol) sndColours();
+  sndRaf = 0; if (!sndOn() || document.hidden) return; if (!sndCol) sndColours();   // BATTERY: parked while hidden (sndWake on return)
   const t = ctx ? ctx.currentTime - heardLat() : 0;
   for (let i = sndPH.length - 1; i >= 0; i--) if (t > sndPH[i].end) sndPH.splice(i, 1);
   const live = !!ctx && (tp.on || performance.now() - audioWake < 1500 || sndPH.length > 0);
@@ -13826,7 +13854,7 @@ function heardLat(){
   let v = (ctx.baseLatency || 0) + (ctx.outputLatency || 0); hlTs = false;
   try { const ts = ctx.state === 'running' && ctx.getOutputTimestamp ? ctx.getOutputTimestamp() : null;
     if (ts && ts.contextTime > 0 && ts.performanceTime > 0){ const d = ctx.currentTime - (ts.contextTime + (now - ts.performanceTime) / 1000);
-      if (d > v && d < 0.6){ v = d; hlTs = true; } } } catch(e){}
+      if (d > v && d < 1){ v = d; hlTs = true; } } } catch(e){}
   v = Math.min(1, Math.max(0, v)); hlV = hlV ? hlV * 0.85 + v * 0.15 : v; return hlV; }
 let audDevs = [];
 function audStatus(){
@@ -13987,9 +14015,13 @@ function rbWheel(){
   const de = document.documentElement;
   clearInterval(rbT); rbT = 0; de.style.removeProperty('filter'); de.style.removeProperty('--rbo');
   if (skin !== 'rainbowdyn' || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-  const t0 = performance.now();
-  rbT = setInterval(() => { if (!document.hidden) de.style.setProperty('--rbo', ((performance.now() - t0) * 0.018 % 360).toFixed(1) + 'deg'); }, 100);
+  rbT0 = performance.now(); if (!document.hidden) rbRun();
 }
+// BATTERY (8 Nov): no timer at all while the app is hidden (it only skipped the write before); the colours carry on from the same
+// place when it comes back, as the phase is read from the clock.
+var rbT0;   // var, no initialiser: rbWheel() may run before this line
+function rbRun(){ const de = document.documentElement; clearInterval(rbT); rbT = setInterval(() => { de.style.setProperty('--rbo', ((performance.now() - rbT0) * 0.018 % 360).toFixed(1) + 'deg'); }, 100); }
+document.addEventListener('visibilitychange', () => { if (skin !== 'rainbowdyn' || !rbT0 || matchMedia('(prefers-reduced-motion: reduce)').matches) return; if (document.hidden){ clearInterval(rbT); rbT = 0; } else if (!rbT) rbRun(); });
 // MATRIX TABS (owner, 31 Oct): in the Matrix skins the screen tabs (Tracker … Chains) end where the tracker's tabs below
 // (… PROJECT) do: their buttons share out the difference. Other skins, or a gap too big to be the same row of tabs: as is.
 function alignTabs(){
@@ -16975,7 +17007,7 @@ const CC_NAMES = {0:'bank select', 1:'mod wheel', 2:'breath', 4:'foot', 5:'glide
 // A port letter's cable on this device, for INST.
 const portName = p => { const o = midiOut(p); return o ? (o.name || 'connected') : midi.outIds[p] ? 'not connected now' : 'no cable: Settings › MIDI'; };
 const FXC = ['ARP','ARC','CHA','DEL','GRV','GGR','HOP','INS','KIL','OFF','NTH','RET','REP','RND','RNL','PSL','PBN','PVB','SED','TPO','TSP','VOL','PIT','FIN','PLY','STA','PAN','TIC','WOB','FXO','FLX','GAT','RTG',
-  'CCA','CCB','CCC','CCD','PGM','BYP','CSL','DIR','MUT','GEN','PRB','FXS','FXV','SCA','SCG','CUT','RES','DEC','FDI','TRM','APN','TVL','TPN','STP','LPB','PDL','ONE','MPB','MAT','CND','NUD','RTV','SLC','XFD','MAC','LK1','LK2','LK3','LK4','PRT','END','JMP','FLY'];   // new commands go on the end, so saved songs keep their numbers
+  'CCA','CCB','CCC','CCD','PGM','BYP','CSL','DIR','MUT','GEN','PRB','FXS','FXV','SCA','SCG','CUT','RES','DEC','FDI','TRM','APN','TVL','TPN','STP','LPB','PDL','ONE','MPB','MAT','CND','NUD','RTV','SLC','XFD','MAC','LK1','LK2','LK3','LK4','PRT','END','JMP','FLY','ATK','REL'];   // new commands go on the end, so saved songs keep their numbers
 const FXC_V1 = ['RET','DEL','CUT','CHA','PSL','RND','OFS','REV','PAN','TPO','HOP'];   // song files before v2
 const V1NAME = {CUT:'KIL', OFS:'STA', REV:'PLY'};
 const SIGNED = new Set(['PBN','TSP','PIT','FIN','NUD','RTV']);
@@ -17002,6 +17034,8 @@ const FXI = {
   SCA:v => `This track's scale from here on: ${SCALES[Math.min(SCALES.length - 1, v & 15)][0]} on ${NN[(v >> 4) % 12].replace('-', '')} (KEY FOLLOW instruments)`,
   SCG:v => `Every track's scale from here on: ${SCALES[Math.min(SCALES.length - 1, v & 15)][0]} on ${NN[(v >> 4) % 12].replace('-', '')} (KEY FOLLOW instruments; SCA wins on its track)`,
   CUT:v => v >= 255 ? 'Filter off (open) from here on' : `Low-pass the pad at ${Math.round(cutHz(v))} Hz from here on`,
+  ATK:v => v >= 255 ? 'The sound’s own attack from here on' : `Notes fade in over ${decSec(v) < 1 ? Math.round(decSec(v) * 1000) + ' ms' : decSec(v).toFixed(2) + ' s'} from here on (rendered sounds)`,
+  REL:v => v >= 255 ? 'The sound’s own release from here on' : `Synth notes release over ${decSec(v) < 1 ? Math.round(decSec(v) * 1000) + ' ms' : decSec(v).toFixed(2) + ' s'} from here on (rendered sounds)`,
   RES:v => `Resonance ${Math.round(v / 2.55)}% for CUT, from here on`,
   DEC:v => v >= 255 ? 'The pad’s own length from here on' : `The pad fades out over ${decSec(v) < 1 ? Math.round(decSec(v) * 1000) + ' ms' : decSec(v).toFixed(2) + ' s'} from here on`,
   MUT:v => `Mutate: variation ${hx(v)} of the pad’s sound, as far as the instrument’s RANGE lets it (the same number, the same sound; RND or RNL to the right picks a new one)`,
@@ -17022,7 +17056,7 @@ const FXI = {
   // PERFORM and the Elektron conditions (1 Nov)
   CND:v => { const n = ['FILL','!FILL','PRE','!PRE','NEI','!NEI','1ST','!1ST'][Math.min(7, v & 15)], X = v >> 4; return 'Play only if ' + n + ' · ' + ({FILL:'FILL is on', '!FILL':'FILL is off', PRE:'this track’s last condition was true', '!PRE':'this track’s last condition was false', NEI:'the ' + (X ? 'track ' + X + '’s' : 'track to the left’s') + ' last condition was true', '!NEI':'the ' + (X ? 'track ' + X + '’s' : 'track to the left’s') + ' last condition was false', '1ST':'it’s the first pass since PLAY', '!1ST':'it’s not the first pass'})[n]; },
   NUD:v => { const n = s8(v); return n ? `Play ${Math.abs(n)} tick${Math.abs(n) === 1 ? '' : 's'} ${n < 0 ? 'early' : 'late'}` : 'On time'; },
-  RTV:v => { const n = s8(v); return n > 0 ? `Retriggers rise: the first ${n}/32 softer a hit` : n < 0 ? `Retriggers fade ${-n}/32 a hit` : 'Retriggers all at one level'; },
+  RTV:v => { const n = s8(v); return n > 0 ? `Note repeats (RET) rise: the first ${n}/32 softer a hit` : n < 0 ? `Note repeats (RET) fade ${-n}/32 a hit` : 'Note repeats (RET) all at one level'; },
   SLC:v => `Play slice ${v + 1} (the note pitches it)`,
   XFD:v => `Crossfader to ${Math.round(v / 2.55)}% (scene A → B)`,
   MAC:v => (v >> 4) >= 1 && (v >> 4) <= 8 ? `Macro ${v >> 4} (${(perfOf().mac[(v >> 4) - 1] || {}).n || ''}) to ${Math.round((v & 15) * 100 / 15)}%` : 'Macro X (1–8) to Y (0–F)',
@@ -17030,7 +17064,7 @@ const FXI = {
   END:v => 'End of the song: playing the song stops here (this row doesn’t play); a render ends here too',
   JMP:v => `Jump: the whole song goes on from song row ${rS(v, 3)} (every track, from the top of its block); in a render, a jump back ends it`,
   PRT:v => v ? `Switch to part ${v}${S.parts && S.parts[v - 1] ? '' : ' (empty: the song’s own)'}` : 'Back to the song’s own sound (no part)',
-  RET:v => (v & 15) ? `Retrigger every ${ticksS(v & 15)} to the end of the step` + ((v >> 4) ? `, ${v >> 4}/16 quieter a hit` : '') : 'RET XY: retrigger every Y ticks, X fades each hit',
+  RET:v => (v & 15) ? `Note repeat: the note retriggers every ${ticksS(v & 15)} to the end of the step` + ((v >> 4) ? `, ${v >> 4}/16 quieter a hit` : '') : 'RET XY: note repeat, the note retriggers every Y ticks, X fades each hit (for an effect stutter use RTG)',
   REP:v => `Repeat the track’s last command, adding ${hx(v)} each time`,
   RND:v => `Randomise the command to the left: down by up to ${v >> 4}, up by up to ${v & 15} (on its own, the note’s pitch in semitones)`,
   RNL:v => `Like RND, but each random value starts from the last one (a random walk): −${v >> 4} / +${v & 15}`,
@@ -17056,7 +17090,7 @@ const FXI = {
   FLY:v => `Flex FLY pattern ${hx(v)}: ${FlexCore.NAMES2[v]} (the second bank: IDM; on this track's Flex effect; in the MST column, the master's)`,
   FLX:v => { const k = flxCap(v); return `Flex pattern ${hx(k)}: ${FlexCore.NAMES[k]}${k !== v ? ' (this song keeps FLX 11–FF as pattern 10: Project → FLX 11–FF)' : ''} (on this track's Flex effect; in the MST column, the master's)`; },
   GAT:v => v === 0 ? 'Step gate off: the gate opens until the next GAT' : v >= 16 ? 'Step gate: the slot’s CUSTOM steps (STEPS 1-8, 9-16)' : `Step gate pattern ${v}: ${StepGateCore.NAMES[v]}`,
-  RTG:v => { const X = v >> 4, Y = v & 15; return !X ? 'Retrigger off' : `Retrigger every ${RetrigCore.NAMES[Math.min(8, X) - 1]}` + (Y ? ` for ${Y} rows` : ' until RTG 00') + ' (X: 1 = 1/4 … 5 = 1/64, 6–8 triplets)'; },
+  RTG:v => { const X = v >> 4, Y = v & 15; return !X ? 'FX stutter off (the Retrigger effect)' : `FX stutter: the Retrigger effect repeats every ${RetrigCore.NAMES[Math.min(8, X) - 1]}` + (Y ? ` for ${Y} rows` : ' until RTG 00') + ' (X: 1 = 1/4 … 5 = 1/64, 6–8 triplets; needs the Retrigger effect in a slot)'; },
   WOB:v => v ? `Bass wobble ${BASS_DIVN[Math.min(BASS_DIV.length, v) - 1]} from here on (01 = 4 bars … 0D = 1/32)` : 'WOB 00: back to the bass voice’s own wobble rate',
   PGM:v => `MIDI program change to ${Math.min(127, v)} (00–7F; most gear shows it as ${Math.min(127, v) + 1}), sent just before this row’s note`,
   CSL:v => v ? `The CCA–CCD commands on this row glide to their value over ${ticksS(v)} (from the value sent before)` : 'CSL 00: the CCA–CCD commands on this row glide to their value across the step',
@@ -18247,10 +18281,10 @@ const freshChainFx = () => new Array(FXSLOTS).fill(null);
 const normChainFx = a => Array.from({length:FXSLOTS}, (_, k) => Array.isArray(a) ? normTfx(a[k]) : null);
 /* …PUMP MASTERING (owner, 2 Nov: "swap the mastering chain for the pump mastering fx with the auto master as the final
    plugin… mastering default on"): a new song's last master FX slots hold …pump EQ → CALM → COMP → TONE → MASTER (the auto master, last),
-   on. S.mstPump marks the song: MASTERING (Mixer, Settings, the master strip) switches those …pump slots on and off and
+   (8 Nov: off in a new song; was on). S.mstPump marks the song: MASTERING (Mixer, Settings, the master strip) switches those …pump slots on and off and
    opens pump MASTER's window. Songs from before keep the old mastering stage (S.mst) exactly as saved. */
 const MST_PUMP = ['peq', 'pcalm', 'pcomp', 'ptone', 'pmaster'];   // (2 Nov, later) + CALM (the resonance suppressor) and TONE: EQ → CALM → COMP → TONE → MASTER
-function mstPumpFresh(){ const A = freshChainFx(); try { MST_PUMP.forEach((k, i) => { if (TFX[k]) A[FXSLOTS - MST_PUMP.length + i] = freshTfx(k); }); } catch(e){} return A; }
+function mstPumpFresh(){ const A = freshChainFx(); try { MST_PUMP.forEach((k, i) => { if (TFX[k]){ const f = A[FXSLOTS - MST_PUMP.length + i] = freshTfx(k); f.on = false; } }); } catch(e){} return A; }   // MASTERING OFF IN A NEW SONG (owner, 8 Nov): the slots are there, switched off; MASTERING (or each slot) turns them on
 const mstPumpSlots = () => (S.mfx || []).map((f, k) => f && MST_PUMP.includes(f.type) ? k : -1).filter(k => k >= 0);
 const mstOn = () => S.mstPump ? mstPumpSlots().some(k => S.mfx[k].on) : !!S.mst.on;
 function mstSetOn(v){
@@ -19814,13 +19848,13 @@ function makeSeq(S, mode, o){
         else if (X <= FXSLOTS || X === 9) for (const k of X === 9 ? all : [X - 1]){ evs.push({type:'fxc', t:at, track:t, p:'sw' + k, v:Y ? 1 : 0});
           if (Y >= 2) evs.push({type:'fxc', t:at + Y * line, track:t, p:'sw' + k, v:-1}); } }
       // FLX / GAT / RTG (owner, 31 Oct): a pattern given to an effect switched off by FXO switches its slot back as set (on)
-      const slotWake = (cmd, on) => { if (!on) return; const A = t >= MT ? S.mfx : S.tfx[t], ty = FX_NEEDS[cmd];
-        (A || []).forEach((f, k) => { if (f && f.type === ty && k < FXSLOTS) evs.push({type:'fxc', t:at, track:t, p:'sw' + k, v:-1}); }); };
+      const slotWake = (cmd, on, sw = -1, at2 = at) => { if (!on) return; const A = t >= MT ? S.mfx : S.tfx[t], ty = FX_NEEDS[cmd];
+        (A || []).forEach((f, k) => { if (f && f.type === ty && k < FXSLOTS) evs.push({type:'fxc', t:at2, track:t, p:'sw' + k, v:sw}); }); };
       if (fx.FLX != null){ evs.push({type:'fxc', t:at, track:t, p:'flx', v:flxCap(fx.FLX)}); slotWake('FLX', fx.FLX > 0); }
       if (fx.FLY != null){ evs.push({type:'fxc', t:at, track:t, p:'flx', v:fx.FLY ? 256 + fx.FLY : 0}); slotWake('FLY', fx.FLY > 0); }   // FLY (5 Nov): the Flex's second bank, 256 + v
       if (fx.GAT != null){ evs.push({type:'fxc', t:at, track:t, p:'gat', v:fx.GAT === 0 ? 0 : fx.GAT >= 16 ? 16 : fx.GAT}); slotWake('GAT', fx.GAT !== 0); }   // GAT 00 stops it, 10 and up: the CUSTOM steps
-      if (fx.RTG != null){ const X = fx.RTG >> 4, Y = fx.RTG & 15; evs.push({type:'fxc', t:at, track:t, p:'rtg', v:X ? Math.min(8, X) : 0}); slotWake('RTG', X > 0);
-        if (X && Y) evs.push({type:'fxc', t:at + Y * line, track:t, p:'rtg', v:-1}); }
+      if (fx.RTG != null){ const X = fx.RTG >> 4, Y = fx.RTG & 15; evs.push({type:'fxc', t:at, track:t, p:'rtg', v:X ? Math.min(8, X) : 0}); slotWake('RTG', true, X ? 1 : -1);   /* (9 Nov, owner: a new RTG switches the slot on, even one saved off; RTG 00 puts it back as saved) */
+        if (X && Y){ evs.push({type:'fxc', t:at + Y * line, track:t, p:'rtg', v:-1}); slotWake('RTG', true, -1, at + Y * line); } }
       if (t === MT && fx.VOL != null) evs.push({type:'mvol', t:at, v:fx.VOL});
       // BYP XY (…chains module bypass): X the module's number (0 = all), Y 0 in, 1 bypassed, 2–F flipped for Y rows
       if (fx.BYP != null && t < MT){ const X = fx.BYP >> 4, Y = fx.BYP & 15;
@@ -19894,6 +19928,8 @@ function makeSeq(S, mode, o){
         if (fx.CUT != null) T.cut = fx.CUT >= 255 ? null : fx.CUT;
         if (fx.RES != null) T.res = fx.RES;
         if (fx.DEC != null) T.dec = fx.DEC >= 255 ? null : fx.DEC;
+        if (fx.ATK != null) T.cAtk = fx.ATK >= 255 ? null : fx.ATK;
+        if (fx.REL != null) T.cRel = fx.REL >= 255 ? null : fx.REL;
         if (fx.ARC != null) T.arc = {mode:fx.ARC >> 4, spd:(fx.ARC & 15) || 1};
         if (fx.DIR != null){ T.dir = Math.min(3, fx.DIR); T.pp = T.dir === 1 ? -1 : 1; }   // DIR: from the next row on
         if (fx.HOP != null) hop = Math.min(fx.HOP, PROWS - 1);
@@ -19970,7 +20006,7 @@ function makeSeq(S, mode, o){
             if (!q) firstRate = rate;
             const ev = {type:'note', t:nat, track:t, poly, col:ncol[q], pad:vtrk ? voiceForTrack(t) : I.pad, rate, gain:gain * hg, pan:fx.PAN != null ? fx.PAN : I.pan, ofs:fx.STA != null ? fx.STA : I.ofs,
               rev:fx.PLY != null ? (fx.PLY & 1) === 1 : !!I.rev, cut:fx.KIL != null ? nat + fx.KIL * tick : null, rel:fx.OFF != null ? nat + fx.OFF * tick : null,
-              slide:fx.PSL && !q ? {from:T.rate, dur:fx.PSL * tick} : null, vk:fx.GEN != null ? 'g' + fx.GEN : fx.MUT != null ? 'm' + fx.MUT : null, tw:pc != null || pdc != null ? {cut:pc, res:prs, dec:pdc} : null, slc:fx.SLC != null ? fx.SLC : null, fdi:fx.FDI ? fx.FDI * tick : 0, trm:fx.TRM || 0, apn:fx.APN || 0, wob:fx.WOB != null ? wobOf(fx.WOB) : null, acc:(fx.VOL != null ? fx.VOL : r[VC]) >= 0xC0, ...mods,
+              slide:fx.PSL && !q ? {from:T.rate, dur:fx.PSL * tick} : null, vk:fx.GEN != null ? 'g' + fx.GEN : fx.MUT != null ? 'm' + fx.MUT : null, tw:pc != null || pdc != null ? {cut:pc, res:prs, dec:pdc} : null, ...(T.cRel != null ? {rlo:decSec(T.cRel)} : {}), slc:fx.SLC != null ? fx.SLC : null, fdi:fx.FDI != null ? fx.FDI * tick : T.cAtk != null ? decSec(T.cAtk) : 0, trm:fx.TRM || 0, apn:fx.APN || 0, wob:fx.WOB != null ? wobOf(fx.WOB) : null, acc:(fx.VOL != null ? fx.VOL : r[VC]) >= 0xC0, ...mods,
               ii, mn:note + 12 + ntc / 100, vel:hg * (fx.VOL != null ? fx.VOL : r[VC] >= 0 ? r[VC] : 255) / 255, tick, vc:fx.VOL != null ? fx.VOL : r[VC]};   // ii, mn (MIDI note: C-4 is 60), vel: for MIDI out; tick: NOTE LEN
             if (!o.sim && ((I.slc | 0) > 1 || I.sync)){ const c = o.live ? ensurePlay(ev.pad) : ensure(ev.pad); if (c){ applyChop(ev, I, ev.pad, n, note - n, nb, c.data, c.sr); if (!q) firstRate = ev.rate; } }
             if (ev.vk && o.live && !o.sim) try { varWant(ev); } catch(e){}   // MUT / GEN: start its render now, ahead of the note
@@ -20262,8 +20298,18 @@ function makePlayer(ac, out, getBuf, live){
     const kv = kit.voices[ev.pad], ck = kv ? kv.choke : 0;
     bassNote(ev, pick, T, ck); return true;
   }
+  // CUT / RES ON LIVE ENGINES (9 Nov, owner: CUT did nothing on a synth): a live engine has no sample to shape, so its output
+  // goes through a low-pass, put in the first time a note asks for one. ATK, REL and DEC stay with the rendered sounds.
+  function liveCut(b, t, tw){
+    const on = !!(tw && tw.cut != null); let f = b.node.__lp; if (!on && !f) return;
+    if (!f){ f = ac.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 20000; try { b.node.disconnect(b.g); } catch(e){} b.node.connect(f); f.connect(b.g); b.node.__lp = f; }
+    f.frequency.cancelScheduledValues(t); f.Q.cancelScheduledValues(t);
+    f.frequency.setValueAtTime(on ? Math.min(cutHz(tw.cut), ac.sampleRate * 0.45) : 20000, t);
+    f.Q.setValueAtTime(on ? 0.7 + clamp(tw.res | 0, 0, 255) / 255 * 14 : 0.7, t);
+  }
   function bassNote(ev, b, T, ck, fk){
     const t = Math.max(ev.t, ac.currentTime), leg = ev.slide && ev.slide.dur > 0 ? 1 : 0;
+    liveCut(b, t, ev.tw);
     for (const P of [b.gate, b.trig, b.leg]) P.cancelScheduledValues(t);
     try { b.rate.cancelAndHoldAtTime(t); } catch(e){ b.rate.cancelScheduledValues(t); }
     if (leg){ b.rate.setValueAtTime(ev.slide.from, t); b.rate.linearRampToValueAtTime(ev.rate, t + ev.slide.dur); } else b.rate.setValueAtTime(ev.rate, t);
@@ -20506,7 +20552,7 @@ function makePlayer(ac, out, getBuf, live){
         if (!(ev.fdi > 0)) g.gain.value = ev.gain * (1 - k); o.connect(d); d.connect(g.gain); lfos.push(o); }
       if (ev.apn && dep(ev.apn) > 0){ const o = ac.createOscillator(), d = ac.createGain(); o.frequency.value = hz(ev.apn); d.gain.value = dep(ev.apn); o.connect(d); d.connect(pn.pan); lfos.push(o); }
       for (const o of lfos){ o.start(t0n); src.addEventListener('ended', () => { try { o.stop(); o.disconnect(); } catch(e){} }); } }
-    const syn = isSyn(ev.pad), v = {src, f, g, pn, base:ev.rate, rate:ev.rate, choke:ck, col:ev.col, ended:false, stopAt:null, syn, rel:syn && kv ? relOf(kv) : 0};
+    const syn = isSyn(ev.pad), v = {src, f, g, pn, base:ev.rate, rate:ev.rate, choke:ck, col:ev.col, ended:false, stopAt:null, syn, rel:syn && kv ? (ev.rlo != null ? ev.rlo : relOf(kv)) : 0};
     if (!ev.slide) pitchMods(v, ev.t, ev.rate, ev);
     const off = ev.ofsSec != null ? (ev.rev ? Math.max(0, b.duration - ev.ofsSec - ev.durSec) : ev.ofsSec) : clamp(ev.ofs, 0, 255) / 256 * b.duration;
     const st0 = Math.max(ev.t, ac.currentTime);
@@ -20998,11 +21044,25 @@ let bassURL = null; const bassLoad = new WeakMap(), bassOK = new WeakSet(), bass
 const PSYN_WK = 'pump/synth/pump-synth-worklet.js?v=7', psOK = new WeakSet(), psSent = new WeakSet();
 // …WAVES LIVE: the …waves worklet in the tracker's own context (thunder-wlive); wlSent: the contexts that have the wasm
 const WAVES_WK = 'waves/waves-worklet.js?v=34', wlOK = new WeakSet(), wlSent = new WeakSet();
+/* BATTERY (8 Nov, Fold): a bookkeeping timer that only does something in one situation (playing, the screen visible, one
+   screen open) had been waking the phone 2 to 16 times a second for nothing. idleTick(fn, fast, busy, slow) calls fn every
+   `fast` ms while busy() says so and every `slow` ms otherwise (fn runs either way, so its own reset-when-idle code still
+   runs). idleWake() brings the sleeping ones back to their fast pace at once: the screen coming back, a view change, PLAY (via
+   frameWake) and any new sound (audio()) call it. Nothing here touches the audio, the sequencer or what the timers compute. */
+var IDLE = null;
+function idleTick(fn, fast, busy, slow){
+  const o = {sleep:false, t:0};
+  const run = () => { o.t = 0; let b = true; try { fn(); } catch(e){} try { b = !!busy(); } catch(e){} o.sleep = !b; o.t = setTimeout(run, b ? fast : slow); };
+  o.wake = () => { if (!o.sleep) return; clearTimeout(o.t); o.sleep = false; o.t = setTimeout(run, fast); };
+  (IDLE || (IDLE = [])).push(o); o.t = setTimeout(run, fast); return o;
+}
+function idleWake(){ if (IDLE) for (const o of IDLE) o.wake(); }
+document.addEventListener('visibilitychange', () => { if (!document.hidden) idleWake(); });
 /* …PUMP SYNTHS live, THE SAFETY NET (owner, 26 Oct): while the song plays, once a second: if the audio is dropping out or
    the audio thread is nearly full, and the live …pump nodes are a real part of that, twice in a row, the live engines
    switch to their renders for the rest of this visit (psLive.off): their nodes go, and the next notes play the pads'
    renders, the same values' sound. Said once; a reload tries live again. An export always plays them live. */
-setInterval(() => {
+idleTick(() => {
   if (psLive.off || aset.psLive === 'render' || !rt || !rt.pl || !tp.on || !ctx || document.hidden) { psLive.strikes = 0; return; }
   const {load, nodes} = rt.pl.psLoad(); if (!nodes){ psLive.strikes = 0; return; }
   const now = performance.now(), cap = cpu.cap && now - cpu.cap.t < 3000 ? cpu.cap : null, pr = cpu.probe && now - cpu.probe.t < 1500 ? cpu.probe : null;
@@ -21010,7 +21070,7 @@ setInterval(() => {
   const over = load > 0.12 && (drop || (whole != null && whole > 0.92) || load > 0.75);
   psLive.strikes = over ? psLive.strikes + 1 : 0;
   if (psLive.strikes >= 2) psFallback('this device couldn’t keep up with them live');
-}, 1000);
+}, 1000, () => tp.on && !document.hidden, 3000);   // BATTERY: a second's check only while the song plays
 function psFallback(why){
   if (psLive.off) return; psLive.off = true; psLive.strikes = 0;
   try { if (rt && rt.pl) rt.pl.psDrop(); } catch(e){}
@@ -21305,7 +21365,7 @@ function tStart(mode, o){
   if (mode === 'song' && (o.row | 0) > 0) try { chaseFx(o.row | 0, seq.time); } catch(e){ tpLog('chase', e); }   // CHASE: the effect commands before the start row
   tp.core = false;
   if (aset.core === 'core' && core.ready && !core.bad && !(o && o.page)) coreStart(mode, o, t0start, rsFirst ? {ref:pz.ref, row:pz.row, step:pz.step} : null);
-  pbLog('PLAY ' + mode + ' · ' + pbState());   // not loaded yet: this PLAY as before, the core loads at STOP
+  pbLog('PLAY ' + mode + ' · ' + pbState()); setTimeout(() => { if (tp.on) pbLog(`4 s into PLAY: level ${pbLevel()}`); }, 4000);   // (9 Nov: to compare Latency settings)   // not loaded yet: this PLAY as before, the core loads at STOP
   if (lkp) lkStarted(lkp);   // ABLETON LINK: Link's exact tempo; ours tells the session
   tp.timer = pumpTimer(); pump(); if (!handing) draw(); songBtn(); chainsTempo(); if (typeof frameWake === 'function') frameWake();   // (a hand-over happens out of view: no draw, which was most of its time)
   bgPlay(true);   // BACKGROUND PLAY
@@ -21412,7 +21472,8 @@ function pumpRun(){
   // The page was stopped for a while (a frozen tab, a long pause, a system dialog): rather than playing every row
   // missed in that time at once, move the timeline on so the song continues from where it was.
   // On a touch screen it moves on sooner (8 Nov): a stall of 0.7 s played nine overdue notes at once, heard as the song rushing and clicking. Not while hidden: the system runs a hidden page in bursts, and each move would be a gap.
-  if (s.alive() && s.time < ctx.currentTime - (COARSE && !document.hidden ? 0.15 : 0.5) && s.base != null){ const d = ctx.currentTime + 0.08 - s.time; if (PB.pg){ PB.pg.re++; PB.pg.skip += d; } s.base += d; s.time += d; if (s.btT != null) s.btT += d; }
+  const outLat = Math.min(0.6, (ctx.baseLatency || 0) + (ctx.outputLatency || 0));   // (9 Nov, owner: Safest stuttered most) the audio clock moves in steps of the output buffer: under Safest one step passed 0.15 s, so a healthy song kept being moved on, and a 0.25 s lead was thin
+  if (s.alive() && s.time < ctx.currentTime - (COARSE && !document.hidden ? Math.max(0.15, outLat + 0.05) : 0.5) && s.base != null){ const d = ctx.currentTime + 0.08 - s.time; if (PB.pg){ PB.pg.re++; PB.pg.skip += d; } s.base += d; s.time += d; if (s.btT != null) s.btT += d; }
   // Schedule 250 ms ahead, so a busy moment on the UI thread can't make notes late (it was 150 ms on a computer).
   // Tracker edits and mutes reach notes after that; pads, keys, previews and STOP are immediate. With the app in the
   // background (owner, 31 Oct: stutters there) 1.2 s: the system runs a hidden page's thread late and in bursts, and
@@ -21420,7 +21481,7 @@ function pumpRun(){
   // SCREEN OFF (owner, 6 Nov, Fold: "as the screen is turning off, the cpu spikes"): the jump from 0.25 to 1.2 s booked a
   // second of notes (and built their voices) in one tick, just as the phone lowers its clocks. It now grows over about a
   // second (0.75 s of lead per second); coming back, it drops at once as before.
-  const want = document.hidden ? 1.2 : 0.25, nowP = performance.now(), dtP = tp.aheadT ? Math.min(2, (nowP - tp.aheadT) / 1000) : 0; tp.aheadT = nowP;
+  const want = document.hidden ? 1.2 : Math.max(0.25, outLat + 0.1), nowP = performance.now(), dtP = tp.aheadT ? Math.min(2, (nowP - tp.aheadT) / 1000) : 0; tp.aheadT = nowP;
   const ahead = tp.ahead = want <= (tp.ahead || 0.25) ? want : Math.min(want, (tp.ahead || 0.25) + 0.75 * dtP);
   while (tp.stopAt == null && s.alive() && s.time < ctx.currentTime + ahead && n++ < (document.hidden ? 256 : 64)){
     const r = s.step(); if (rcdGateEdge(r)) break; for (const e of r.evs){ if (moEv(e)) continue; rt.pl.play(e); if (e.type === 'note') padBlink(e); } tp.q.push({t:r.t, pos:r.pos, bpm:s.bpm, tks:r.tks, line:r.line}); rcdStep(tp.q[tp.q.length - 1]);
@@ -21435,7 +21496,7 @@ function padBlink(e){
   if (view === 'tracker'){ if (inlOn && e.ii != null) inlBlink(e); return; }   // INST LIST: the instrument flashes (3 Nov)
   if (!padEls[e.pad]) return;
   if (sndOn()){ let au = true; try { au = audible(e.track); } catch(err){} if (au) sndHit(e.pad, e.t, e.rate, false, e); sndWake(); }   // the sound view's line, and its scope
-  const ms = Math.max(0, (e.t - ctx.currentTime + heardLat()) * 1000);
+  const ms = Math.max(0, (e.t - ctx.currentTime + heardLat() + moFxLat()) * 1000);
   setTimeout(() => { if (tp.on && view !== 'tracker' && audible(e.track)) flash(e.pad); }, ms);
 }
 /* ===== THUNDER CORE, LIVE (plan phase 2b; Settings → Audio → Sequencer: Audio thread β) =====
@@ -21448,7 +21509,7 @@ function padBlink(e){
    Off (Page), nothing here runs. */
 // CORE_REV: a hash of core/seq-core.js, written by tools/make-core.mjs. The offline cache keeps a file by its URL, so the
 // URL must change whenever the file does (the build number alone left phones on an old core all evening, 2 Nov).
-const CORE_REV = 'rl3y62';
+const CORE_REV = '5t6z46';
 const CORE_WANT = 7;   // the core's message set this page speaks (core-processor.js CORE_V); an older core is not used
 const CORE_URL = () => 'core/seq-core.js?v=' + BUILD + '-' + CORE_REV;
 const core = {node:null, ready:false, loading:null, gen:0, sent:new Map(), sT:0, tally:new Map(), mir:null};   // mir: what the core's song holds, as JSON per part (coreDiff)   // tally: events by who played them (test hook)
@@ -21590,13 +21651,13 @@ const pbState = () => `ctx ${ctx ? ctx.state + ' t=' + ctx.currentTime.toFixed(2
 const pbPg = () => { const P = PB.pg; PB.pg = null; return P ? ` · page ticks ${P.n}, longest gap ${P.gap.toFixed(2)} s, least lead ${P.lead.toFixed(2)} s, moved on ${P.re}× (${P.skip.toFixed(2)} s)` : ''; };
 // CLOCK DETAIL (8 Nov): on the Fold the audio clock runs ahead of real time while playing. Once a second, while playing and for 5 s after STOP, a line goes in the
 // report if the clock moved more than 0.1 s away from real time (and every 10 s anyway): what the browser says about the output, to tell which side is racing.
-{ let w0 = 0, c0 = 0, n = 0; setInterval(() => { try {
+{ let w0 = 0, c0 = 0, n = 0; idleTick(() => { try {
   if (!ctx || (!tp.on && performance.now() - PB.stopT > 5000)){ w0 = 0; return; }
   const w = Date.now() / 1000, c = ctx.currentTime; if (!w0){ w0 = w; c0 = c; return; }
   const dw = w - w0, dc = c - c0; w0 = w; c0 = c; n++; if (Math.abs(dc - dw) < 0.1 && n % 10) return;
   const ts = ctx.getOutputTimestamp ? ctx.getOutputTimestamp() : {}, st = ctx.playbackStats, b = typeof bgEl !== 'undefined' && bgEl;
   pbLog(`clock +${dc.toFixed(2)} s in ${dw.toFixed(2)} s · out t=${(+ts.contextTime || 0).toFixed(2)} lat ${ctx.baseLatency.toFixed(3)}+${(ctx.outputLatency || 0).toFixed(3)} sr ${ctx.sampleRate}` + (st ? ` · stats total ${(+st.totalDuration || 0).toFixed(2)} underrun ${(+st.underrunDuration || 0).toFixed(2)} ×${st.underrunEvents | 0}` : '') + (b ? ` · bg ${b.paused ? 'paused' : 'on'} ${b.currentTime.toFixed(2)}` : '') + ' · ' + pbState());
-} catch(e){} }, 1000); }
+} catch(e){} }, 1000, () => !!ctx && (tp.on || performance.now() - PB.stopT <= 5000), 2500); }   // BATTERY: only while playing and 5 s after (also while hidden: that is what it is for)
 function pbLevel(){ try { const A = rt && rt.man; if (!A) return '-'; let m = 0; for (const a of A){ const b = new Float32Array(a.fftSize); a.getFloatTimeDomainData(b); for (const x of b) m = Math.max(m, Math.abs(x)); } return m ? (20 * Math.log10(m)).toFixed(1) + ' dB' : 'silent'; } catch(e){ return '?'; } }
 /* HYBRID (owner, 6 Nov: "Build the hybrid and make sure we don't break anything on desktop"): on a phone or tablet, the
    moment the app is hidden (the screen off, another app, the shade) while the audio-thread sequencer plays the song, the
@@ -21645,7 +21706,7 @@ function coreFail(self){
   if (row >= 0 && mode === 'song') tStart('song', {row});
   const went = row >= 0 && mode === 'song' ? 'the song moved to the page sequencer' : 'playback stopped; PLAY uses the page sequencer';
   toast((self && self.why === 'deaf' ? 'The audio thread got too busy to hear the app, so ' : 'The audio clock went out of step, so ') + went + ' (until the app reloads).', 5000); }
-setInterval(() => { try { pbClock(); } catch(e){} }, 2000);
+idleTick(() => { try { pbClock(); } catch(e){} }, 2000, () => tp.on, 4000);   // BATTERY: every 2 s while playing (hidden too), a slow reset check otherwise
 function pbSum(){ const now = performance.now(); if (now - PB.t < 2000) return; PB.t = now;
   if (PB.n) pbLog(`rows ${PB.n} · latest note ${(PB.late * 1000).toFixed(0)} ms late · dropped ${PB.drop} · ahead ${(PB.ahead * 1000).toFixed(0)} ms · core skips ${PB.skips} · voices ${rt && rt.pl.aliveN ? rt.pl.aliveN() : '?'}`);
   PB.n = PB.late = PB.drop = PB.ahead = 0; }
@@ -21749,7 +21810,8 @@ function tStop(quiet){
   }
   // STOP CURSOR: a STOP you make (not a restart, a song change or the song running out while hidden) puts the cursor there
   const stopP = !quiet && stopToPlayhead() && tp.on && tp.pos && tp.pos.some(Boolean) ? {P:tp.pos.map(q => q && Object.assign({}, q)), mode:tp.mode} : null;
-  tp.timer = 0; tp.on = false; fpMem = null; tp.q = []; tp.pos = null; tp.snd = null; tp.stopAt = null; tp.ahead = tp.aheadT = 0;
+  const home = !quiet && tp.on && !stopToPlayhead() ? fpHome : null;   // (9 Nov, owner: with ON STOP at STAYS it still ended up at the playback spot: FOLLOW had carried it there)
+  tp.timer = 0; tp.on = false; fpMem = null; fpHome = null; tp.q = []; tp.pos = null; tp.snd = null; tp.stopAt = null; tp.ahead = tp.aheadT = 0;
   // HAND-OVER (seqHandover): the core and the voices already booked keep sounding until the page sequencer's first step
   if (tp.core){ tp.core = false; core.gen++; if (!handing){ coreWire(false); try { core.node.port.postMessage({op:'stop', at:ctx.currentTime}); } catch(e){} } }
   else if (aset.core === 'core' && !core.ready && ctx) setTimeout(() => { try { if (!tp.on) coreLoad(); } catch(e){} }, 400);
@@ -21761,6 +21823,7 @@ function tStop(quiet){
   chainsTempo();
   if (!handing){ bgPlay(false); wakeLock(false); }   // BACKGROUND PLAY, KEEP SCREEN ON (a hand-over plays on)
   if (stopP) try { if (curToPlay(stopP.P, stopP.mode) && tp.paused) tp.paused.key = curKey(); } catch(e){ tpLog('stop cursor', e); }
+  else if (home) try { cs.song.y = home.y; cs.song.top = home.top; cPhrase = home.p; cSect = home.s; cs.phrase.y = home.py; cs.phrase.top = home.ptop; cs.song.pg = cs.phrase.pg = false; if (tp.paused) tp.paused.key = curKey(); } catch(e){ tpLog('stop cursor', e); }
   if (!quiet) draw();
 }
 /* ===== REC, METRONOME AND COUNT-IN (20 Oct) =====
@@ -21959,7 +22022,7 @@ function setWlOn(on){ wlOn = !!on; try { localStorage.setItem('thunderplus-wakel
 // the lock is checked every 2 s and taken again if it's gone.)
 let wlQ = Promise.resolve();
 function wakeLock(on){ wlQ = wlQ.then(() => wakeLock1(on)).catch(() => {}); return wlQ; }
-setInterval(() => { if (tp.on && wlOn && !wlLock && !document.hidden) wakeLock(true); }, 2000);
+idleTick(() => { if (tp.on && wlOn && !wlLock && !document.hidden) wakeLock(true); }, 2000, () => tp.on, 5000);   // BATTERY: the check only matters while playing
 // Phones and tablets only (a computer's screen sleeping doesn't touch playback, and Electron refuses it). (A phone's refusal,
 // e.g. in battery saver, is tried again every 2 s, as the saver may be turned off.)
 async function wakeLock1(on){
@@ -22851,7 +22914,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 528;
+const BUILD = 529;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD + (location.pathname.includes('/beta/') ? ' · beta' : '');
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -22901,6 +22964,7 @@ const stopToPlayhead = () => (tv === 'song' || (typeof apReady !== 'undefined' &
 // The edit cursor onto a playing (or stopped) position: P = per-track positions, mode = the sequencer's mode. Returns true when it moved.
 function curToPlay(P, mode){
   if (!P || !P.some(Boolean)) return false;
+  cs.song.pg = false; cs.phrase.pg = false;   // (9 Nov, owner: phrase / playhead on stop) rows the playhead paged no longer hide the cursor
   if (mode === 'song'){
     const want = tv === 'song' ? cs.song.x : cTrack, t = P[want] && P[want].row >= 0 && want !== MT ? want : P.findIndex((q, i) => q && q.row >= 0 && i !== MT); if (t < 0) return false;
     const q = P[t], own = t === want;
@@ -22943,6 +23007,7 @@ let kpOn = (() => { try { const v = localStorage.getItem(KPOK); if (v === '0' ||
 function setKp(on){ kpOn = !!on; try { localStorage.setItem(KPOK, kpOn ? '1' : '0'); } catch(e){} draw(); fit(); draw(); }
 // Song: the cursor's row follows its track. Sect and Phrase: they switch to what the cursor's track is
 // playing and the cursor rides along. Not while a selection is being made.
+var fpHome = null;   // STAYS (9 Nov): where the cursor was before FOLLOW first moved it
 var fpMem = null;   // FOLLOW PATTERN: what each track last played (cleared on STOP and when the follow mode changes)
 function followPlay(){
   if (!tp.on || !tp.pos || sdrag || drag) return;
@@ -22952,6 +23017,8 @@ function followPlay(){
   // A SELECTION keeps the cursor and the selection where they are, but Arrange still turns its pages with the playhead
   // (owner, 2 Nov: after selecting rows, Arrange stopped paging even with FOLLOW on: this used to return before paging).
   if (selA){ arrFollowPage(own); return; }
+  if (performance.now() - workT < FOLLOW_HOLD){ arrFollowPage(own); return; }
+  if (!fpHome || workT > fpHome.t) fpHome = {t:performance.now(), y:cs.song.y, top:cs.song.top, p:cPhrase, s:cSect, py:cs.phrase.y, ptop:cs.phrase.top};   // EDITING: it catches up when you've let go (a change made meanwhile still shows then)
   if (followMode === 1){   // FOLLOW PATTERN: only which phrase / sect is shown follows the cursor's track; nothing scrolls
     // ON A CHANGE ONLY (owner, 7 Nov: "a single phrase on a track, I can't move the cursor off of that phrase"): it jumps when
     // what the track plays changes, not on every step, so with one phrase (or one block) playing you can move away from it.
@@ -22995,14 +23062,17 @@ function followPlay(){
 // EVERY FOLLOW MODE (owner, 3 Nov): FOLLOW OFF pages Arrange too. WORKING IN ARRANGE (Arrange has the keys, or it is the Song
 // screen with FOLLOW OFF): it doesn't page while you work there, only after a minute with no key, click or wheel (arrActT,
 // arrHandT); any of them starts the minute again.
-let arrHandT = -1e9, arrActT = -1e9;
+let arrHandT = -1e9, arrActT = -1e9, arrTouchT = -1e9, workT = -1e9;
+const FOLLOW_HOLD = 4000;   // (9 Nov, owner: follow pulled the cursor while editing) for this long after a key or a press on the grid or pad, nothing moves the cursor or the open phrase
 const ARR_IDLE = 60000;
-window.addEventListener('keydown', e => { if (e.key !== ' ' && !/^(Shift|Control|Alt|Meta|AltGraph|CapsLock)$/.test(e.key)) arrActT = performance.now(); }, true);
-$('tArr').addEventListener('pointerdown', () => { arrActT = performance.now(); }, true);
+window.addEventListener('keydown', e => { if (e.key !== ' ' && !/^(Shift|Control|Alt|Meta|AltGraph|CapsLock)$/.test(e.key)) arrActT = workT = performance.now(); }, true);
+window.addEventListener('pointerdown', e => { const q = e.target && e.target.closest; if (q && e.target.closest('[data-b="play"],[data-b="loop"],[data-b="stop"]')) return; if (q && (e.target.closest('#tPad') || e.target.closest('#tArr') || grid.contains(e.target))) workT = performance.now(); }, true);
+$('tArr').addEventListener('pointerdown', () => { arrActT = arrTouchT = performance.now(); }, true);
 function arrFollowPage(own){
   const now = performance.now();
-  if (now - arrHandT < 4000) return;
-  if ((apF === 'arr' || (asongOn() && !followMode)) && now - Math.max(arrActT, arrHandT) < ARR_IDLE) return;
+  if (now - Math.max(arrHandT, arrTouchT) < FOLLOW_HOLD) return;   // (9 Nov, owner: tapping blocks made the view fight itself)
+  // A follow mode that's on pages again after the short hold; FOLLOW OFF keeps the owner's minute (3 Nov)
+  if ((apF === 'arr' || asongOn()) && now - Math.max(arrActT, arrHandT) < (followMode ? FOLLOW_HOLD : ARR_IDLE)) return;
   try { if (tp.mode === 'song' && own && own.row >= 0 && (asongOn() || (tv !== 'song' && apPanel()))){
     const VR = Math.max(2, arrRows()), top = cs.song.top || 0;
     if (own.row < top || own.row > top + VR - 1){ cs.song.top = clamp(own.row, 0, Math.max(0, 256 - VR)); cs.song.pg = true; } } } catch(e){}
@@ -23563,6 +23633,14 @@ function eqWindow(t){
   else if (!A[k].on){ A[k].on = true; fxChanged(t); draw(); }
   PumpFX.open(t, k);
 }
+// MASTERING WINDOWS ON A PHONE (owner, 8 Nov): › MASTERING opens only pump MASTER and the others sat behind select-slot, scroll to its
+// last row, tap › OPEN twice. On the master each of CALM, COMP and TONE gets its own row (EQ has › EQ WINDOW): one select, one more tap.
+function mstWinRows(){
+  if (!S.mstPump) return [];
+  const out = []; (S.mfx || []).forEach((f, k) => { if (f && MST_PUMP.includes(f.type) && f.type !== 'pmaster' && f.type !== 'peq' && TFX[f.type])
+    out.push({l:'› ' + TFX[f.type].n + ' WINDOW', gap:!out.length, act:() => PumpFX.open(NT, k), info:() => 'Opens ' + TFX[f.type].long + ' (master slot ' + (k + 1) + ') in its own window; its CHAIN menu opens the others'}); });
+  return out;
+}
 function fxRows(){
   const t = cFxT, A = t >= NT ? S.mfx : S.tfx[t], cy = cs.fx.y;
   if (cy >= 1 && cy <= FXSLOTS) cFxS = cy - 1;
@@ -23579,7 +23657,7 @@ function fxRows(){
     info:v => v ? `Slot ${k + 1} runs ${TFX[FLk(k)[v - 1]].long}. EDIT lists the effects, EDIT+arrows steps through them, ▶ opens its controls, OPTION+EDIT removes it` : `Empty. EDIT lists the effects to pick one; EDIT+arrows steps through them. Slots run top to bottom`});
   const k = cFxS, f = A[k];
   const addT = () => fxtOk(t, lastFxType) ? lastFxType : 'eq';
-  if (!f){ rows.push({l:'› ADD TO SLOT ' + (k + 1), gap:true, act:() => { A[k] = freshTfx(addT()); fxChanged(t); draw(); }, info:() => `Puts ${TFX[addT()].long} in slot ${k + 1}`}); return (t >= NT ? rows.concat([{l:'› MASTERING', gap:true, act:() => openMst(), info:() => 'EQ, resonance suppressor, compressor and limiter on the master bus (' + (S.mst.on ? 'on' : 'off') + ')'}]) : rows).concat([eqRow]); }
+  if (!f){ rows.push({l:'› ADD TO SLOT ' + (k + 1), gap:true, act:() => { A[k] = freshTfx(addT()); fxChanged(t); draw(); }, info:() => `Puts ${TFX[addT()].long} in slot ${k + 1}`}); return (t >= NT ? rows.concat([{l:'› MASTERING', gap:true, act:() => openMst(), info:() => 'EQ, resonance suppressor, compressor and limiter on the master bus (' + (S.mst.on ? 'on' : 'off') + ')'}]) : rows).concat([eqRow], t >= NT ? mstWinRows() : []); }
   rows.push({l:'ACTIVE', gap:true, desc:TFX[f.type].long, tog:true, get:() => f.on ? 1 : 0, set:v => { f.on = !!v; fxChanged(t); }, min:0, max:1, d:1, fmt:v => onOff(v) + `  slot ${k + 1} ` + TFX[f.type].n,
     info:() => `Slot ${k + 1}: ${TFX[f.type].long}. ` + (TFX[f.type].about ? TFX[f.type].about + ' ' + (pumpLatTxt(t, k) ? pumpLatTxt(t, k)[0].toUpperCase() + pumpLatTxt(t, k).slice(1) + '. ' : '') : '') + 'OFF bypasses it'});
   const PU = TFX[f.type].pump;   // …PUMP: a pump effect's boxes (fmt sees the slot: it shows the exact value), its presets and OPEN
@@ -23603,7 +23681,7 @@ function fxRows(){
     }
     if (PU === 'meter') rows.push({l:'› RESET', act:() => { PumpFX.set(t, k, {reset:(f.pump.reset | 0) + 1}, {live:true, keepPreset:true}); toast('pump METER: loudness reset.'); }, info:() => 'Starts the loudness measurement again (integrated, LRA, maxima)'});
   }
-  return (t >= NT ? rows.concat([{l:'› MASTERING', gap:true, act:() => openMst(), info:() => 'EQ, resonance suppressor, compressor and limiter on the master bus (' + (S.mst.on ? 'on' : 'off') + ')'}]) : rows).concat([eqRow]);
+  return (t >= NT ? rows.concat([{l:'› MASTERING', gap:true, act:() => openMst(), info:() => 'EQ, resonance suppressor, compressor and limiter on the master bus (' + (S.mst.on ? 'on' : 'off') + ')'}]) : rows).concat([eqRow], t >= NT ? mstWinRows() : []);
 }
 // The FX screen is two regions: the slot list (TRACK + SLOT 1–4) and the controls of one slot
 // (ACTIVE + its parameters). ▶ (or a sideways swipe right) opens the slot under the cursor; ◀ (or a
@@ -23908,7 +23986,7 @@ function bump(d, big){
     else { const m = S.mix[c.x];
       if (c.y === 0) m.trim = clamp((m.trim == null ? TRIM_0 : m.trim) + d * (big ? 16 : 1), 0, 255);   // GAIN STAGING: the first row is TRIM
       else if (c.y === 1) m.pan = clamp(m.pan + d * (big ? 16 : 1), 0, 255);
-      else if (c.y === 2) m.mute = d > 0; else if (c.y === 3) m.solo = d > 0; }   // (SC row: a light now, nothing to change)
+      else if (c.y === 2) setMute(m, d > 0); else if (c.y === 3) setSolo(m, d > 0); }   // (SC row: a light now, nothing to change)
     mixChanged(); draw(); return;
   }
   const r = rowsOf(tv)[c.y]; if (!r || !r.get) return;
@@ -23918,18 +23996,18 @@ function bump(d, big){
 // EDIT on a phrase FX column opens a list of every command with a short note on what it does.
 // Touch: tap one to highlight it, tap it again to choose. Pad: ▲▼ move, EDIT chooses, OPTION closes.
 // Keyboard: arrows, Enter chooses, Esc closes, a letter jumps. Mouse: a click chooses.
-const FXB = {END:'End of the song: playing stops at this row', JMP:'Jump: the whole song goes on from song row XX (JMP 00: back to the top)', FDI:'Fade the note in over XX ticks', TRM:'Tremolo on the note: X speed (cycles a beat), Y depth', APN:'Auto-pan the note: X speed (cycles a beat), Y depth', TVL:'Track level from here on: 00 silent – FF the mixer’s', TPN:'Track pan from here on: 00 left, 80 centre, FF right (back to the mixer’s at stop)', STP:'Stop: 00 every note on this track, 01 every note on every track', LPB:'Lines per beat for every track from here on (01–10; 00 the phrases’ own)', PDL:'Pause the song for XX rows (every track waits)', ONE:'Play one note of this row’s chord, picked at random', MPB:'MIDI pitch bend: 00 down, 80 centre, FF up', MAT:'MIDI channel pressure 00–7F', FXS:'Effect parameter to move: X the slot (1–8), Y its parameter (1–F, as listed on the FX screen)', FXV:'Set the parameter FXS picked: 00 its lowest – FF its highest', SCA:'Scale for this track from here on: X the root (0 C … B), Y the scale (0 off, 1 major, 2 minor…)', SCG:'Scale for every track from here on, as SCA', CUT:'Low-pass the pad from here on: 00 dark – FF open (off)', RES:'Filter resonance for CUT, from here on', DEC:'Shorten the pad from here on: 00 a click – FF its own length', MUT:'Mutate: the note plays variation XX of its pad (INST › RANGE says how far)', GEN:'Generate: the note plays a fresh sound XX of the instrument’s GEN TYPE (INST › FAMILY, RANGE)', PRB:'Chance the command to the left happens (00 never – FF always)', ARP:'Arpeggio: the note, +X and +Y semitones', ARC:'Arpeggio shape (X) and speed in ticks (Y)', CHA:'Chance the note plays (00 never – FF always)',
+const FXB = {ATK:'Fade notes in from here on: 00 quick – FE slow, FF its own attack (rendered sounds)', REL:'Synth note release from here on: 00 short – FE long, FF its own (rendered sounds)', END:'End of the song: playing stops at this row', JMP:'Jump: the whole song goes on from song row XX (JMP 00: back to the top)', FDI:'Fade the note in over XX ticks', TRM:'Tremolo on the note: X speed (cycles a beat), Y depth', APN:'Auto-pan the note: X speed (cycles a beat), Y depth', TVL:'Track level from here on: 00 silent – FF the mixer’s', TPN:'Track pan from here on: 00 left, 80 centre, FF right (back to the mixer’s at stop)', STP:'Stop: 00 every note on this track, 01 every note on every track', LPB:'Lines per beat for every track from here on (01–10; 00 the phrases’ own)', PDL:'Pause the song for XX rows (every track waits)', ONE:'Play one note of this row’s chord, picked at random', MPB:'MIDI pitch bend: 00 down, 80 centre, FF up', MAT:'MIDI channel pressure 00–7F', FXS:'Effect parameter to move: X the slot (1–8), Y its parameter (1–F, as listed on the FX screen)', FXV:'Set the parameter FXS picked: 00 its lowest – FF its highest', SCA:'Scale for this track from here on: X the root (0 C … B), Y the scale (0 off, 1 major, 2 minor…)', SCG:'Scale for every track from here on, as SCA', CUT:'Low-pass the pad from here on: 00 dark – FF open (off)', RES:'Filter resonance for CUT, from here on', DEC:'Shorten the pad from here on: 00 a click – FF its own length', MUT:'Mutate: the note plays variation XX of its pad (INST › RANGE says how far)', GEN:'Generate: the note plays a fresh sound XX of the instrument’s GEN TYPE (INST › FAMILY, RANGE)', PRB:'Chance the command to the left happens (00 never – FF always)', ARP:'Arpeggio: the note, +X and +Y semitones', ARC:'Arpeggio shape (X) and speed in ticks (Y)', CHA:'Chance the note plays (00 never – FF always)',
   DEL:'Delay the note by ticks', GRV:'Groove: ticks on even (X) and odd (Y) steps', GGR:'Groove for every track at once', HOP:'End the phrase here; the next starts at row XX',
   INS:'Play the note with this instrument', KIL:'Cut the note after ticks', OFF:'Fade the note out after ticks', NTH:'Play only on pass Y of every X times',
-  RET:'Retrigger every Y ticks; X fades each hit', REP:'Repeat the track’s last command, adding the value', RND:'Randomise the command to the left (or the pitch)',
+  RET:'Note repeat: retrigger the note every Y ticks within the step, X fades each hit (no effect needed)', REP:'Repeat the track’s last command, adding the value', RND:'Randomise the command to the left (or the pitch)',
   RNL:'Like RND, as a random walk from the last value', PSL:'Slide the pitch from the last note over ticks', PBN:'Bend the pitch ± semitones over the step',
   PVB:'Vibrato: X speed, Y depth', SED:'Seed the randomness so it repeats the same way', TPO:'Set the tempo in BPM (hex)', TSP:'Transpose the track from here on',
   VOL:'Set the volume (also of a playing note)', PIT:'Pitch the note ± semitones', FIN:'Fine tune ± cents', PLY:'Play reversed (01) or forwards (00)',
   STA:'Start part way into the sound', PAN:'Pan left or right (80 centre)', TIC:'Ticks a step from here on', WOB:'Bass wobble rate from here on (00 the voice’s own)',
-  FXO:'Effect slot X (1–8, 9 = all) off (Y 0), on (1) or on for Y rows; FXO 00: every slot back as set', BYP:'…chains module X (its number on BYP, 0 = all) in (Y 0), bypassed (1), or the other way from the patch for Y rows', FLX:'Flex pattern (00 off, 01–10 the first sixteen; 11–FF: first digit the family, second the variant; lengths are note values). A Flex set to STARTS ON FLX is off until the first FLX', FLY:'Flex, second bank: IDM patterns (00 off, 01–0F one of each family; 10–FF: 1 pitch rolls, 2 euclid, 3 probability, 4 slice pitch, 5 freeze and smear, 6 CD skips, 7 bounces, 8 mutating shuffles, 9 stutter edits, A polymeter, B warp, C reverse rolls and rewinds, D grains, E texture, F chaos 2). Plays on the same Flex as FLX: the later one wins', GAT:'Step gate pattern (00 custom, 01–0F); STARTS ON GAT: open until the first GAT', RTG:'Retrigger: X rate (1 = 1/4 … 8 = 1/32T), Y rows (0 = until RTG 00)',
+  FXO:'Effect slot X (1–8, 9 = all) off (Y 0), on (1) or on for Y rows; FXO 00: every slot back as set', BYP:'…chains module X (its number on BYP, 0 = all) in (Y 0), bypassed (1), or the other way from the patch for Y rows', FLX:'Flex pattern (00 off, 01–10 the first sixteen; 11–FF: first digit the family, second the variant; lengths are note values). A Flex set to STARTS ON FLX is off until the first FLX', FLY:'Flex, second bank: IDM patterns (00 off, 01–0F one of each family; 10–FF: 1 pitch rolls, 2 euclid, 3 probability, 4 slice pitch, 5 freeze and smear, 6 CD skips, 7 bounces, 8 mutating shuffles, 9 stutter edits, A polymeter, B warp, C reverse rolls and rewinds, D grains, E texture, F chaos 2). Plays on the same Flex as FLX: the later one wins', GAT:'Step gate pattern (00 custom, 01–0F); STARTS ON GAT: open until the first GAT', RTG:'FX stutter: switches the Retrigger effect on, X rate (1 = 1/4 … 8 = 1/32T), Y rows (0 = until RTG 00). Needs the Retrigger effect in a slot (added if one is free)',
   PGM:'MIDI program change (00–7F)', CSL:'MIDI CC glide: this row’s CCA–CCD move to their value over XY ticks (00 the step)',
   CND:'Condition: 0 FILL, 1 !FILL, 2 PRE, 3 !PRE, 4 NEI, 5 !NEI, 6 1ST, 7 !1ST (NEI: X the track, 0 = the left one)', NUD:'Nudge ± ticks (early or late)',
-  RTV:'Retrigger curve: + rises to the last hit, − fades', SLC:'Play slice XX of a sliced sound', XFD:'Crossfader 00 scene A … FF scene B',
+  RTV:'Note repeat (RET) curve: + rises to the last hit, − fades', SLC:'Play slice XX of a sliced sound', XFD:'Crossfader 00 scene A … FF scene B',
   MAC:'Macro X (1–8) to Y (0–F)', LK1:'Lock 1 (Perform → Locks) to XX', LK2:'Lock 2 to XX', LK3:'Lock 3 to XX', LK4:'Lock 4 to XX', PRT:'Switch to part XX (00 = the song’s own)',
   DIR:'Play direction from here on: 00 forward, 01 backwards, 02 ping-pong, 03 random'};
 for (const c of CC_CMDS) FXB[c] = `MIDI CC: send 00–7F to the instrument’s CC ${c[2]}`;
@@ -23939,11 +24017,11 @@ for (const c of CC_CMDS) FXB[c] = `MIDI CC: send 00–7F to the instrument’s C
 const FXC_GROUPS = [
   ['Volume and pan', ['VOL', 'PAN', 'FDI', 'TRM', 'APN', 'TVL', 'TPN']],
   ['Pitch and arpeggio', ['PIT', 'FIN', 'TSP', 'SCA', 'SCG', 'PSL', 'PBN', 'PVB', 'ARP', 'ARC']],
-  ['Note timing', ['DEL', 'NUD', 'KIL', 'OFF', 'RET', 'RTV', 'STP']],
-  ['Sound', ['INS', 'STA', 'SLC', 'PLY', 'WOB', 'MUT', 'GEN', 'CUT', 'RES', 'DEC']],
+  ['Note timing and repeat', ['DEL', 'NUD', 'KIL', 'OFF', 'RET', 'RTV', 'STP']],
+  ['Sound', ['INS', 'STA', 'SLC', 'PLY', 'WOB', 'MUT', 'GEN', 'CUT', 'RES', 'DEC', 'ATK', 'REL']],
   ['Chance and random', ['CHA', 'PRB', 'CND', 'ONE', 'NTH', 'RND', 'RNL', 'SED', 'REP']],
   ['Perform', ['XFD', 'MAC', 'LK1', 'LK2', 'LK3', 'LK4', 'PRT']],
-  ['Effects', ['FXO', 'FXS', 'FXV', 'BYP', 'FLX', 'FLY', 'GAT', 'RTG']],
+  ['Effects and FX patterns', ['FXO', 'FXS', 'FXV', 'BYP', 'FLX', 'FLY', 'GAT', 'RTG']],
   ['Tempo and groove', ['TPO', 'TIC', 'LPB', 'PDL', 'GRV', 'GGR']],
   ['Play order', ['HOP', 'DIR', 'END', 'JMP']],
   ['MIDI', ['PGM', 'CCA', 'CCB', 'CCC', 'CCD', 'CSL', 'MPB', 'MAT']]];
@@ -24106,7 +24184,7 @@ function editTap(enter, stamp){   // stamp: Shift+Enter, which writes the curren
     else if (tv === 'phrase'){ const p = S.phrases[cPhrase]; if (p) aud(p[c.y]); }
     return;
   }
-  if (tv === 'mixer'){ if (c.y === 7 && c.mx === 1) return openMst(); if (c.y === 5) return go('fx'); if (c.y === 4){ setChainOn(c.x, !S.chainOn[c.x]); draw(); return; } if (mixFv()){ toast(`Track ${d2(c.x + 1)} · VOL ${hx(S.mix[c.x].vol)} · ${dB(trackGain(S.mix[c.x].vol))} · Del resets to E0`); return; } if (c.y === 6){ scSay(c.x); return; } /* SOURCE: the SC row only shows; Enter / EDIT says what listens to the track */ if (c.y === 2 || c.y === 3){ const m = S.mix[c.x]; if (c.y === 2) m.mute = !m.mute; else m.solo = !m.solo; mixChanged(); draw(); } return; }
+  if (tv === 'mixer'){ if (c.y === 7 && c.mx === 1) return openMst(); if (c.y === 5) return go('fx'); if (c.y === 4){ setChainOn(c.x, !S.chainOn[c.x]); draw(); return; } if (mixFv()){ toast(`Track ${d2(c.x + 1)} · VOL ${hx(S.mix[c.x].vol)} · ${dB(trackGain(S.mix[c.x].vol))} · Del resets to E0`); return; } if (c.y === 6){ scSay(c.x); return; } /* SOURCE: the SC row only shows; Enter / EDIT says what listens to the track */ if (c.y === 2 || c.y === 3){ const m = S.mix[c.x]; if (c.y === 2) setMute(m, !m.mute); else setSolo(m, !m.solo); mixChanged(); draw(); } return; }
   const r = rowsOf(tv)[c.y]; if (!r) return;
   // ONE CONFIRM (27 Oct, Phase 2): a row that replaces something asks in the app's one dialog (it took a second EDIT, the
   // "Tap EDIT twice" note). A double EDIT still goes straight through (editDouble), as before.
@@ -24509,12 +24587,15 @@ function playPatLoop(){
 // the mixer's S does; all: clear every solo (as the deck's SOLO button).
 // / (owner, 20 Oct: Renoise's mute key): mutes or unmutes the whole track (the mixer's M), as soloKey picks it. On the Song
 // screen M still mutes just the block under the cursor.
+// MUTE AND SOLO CLEAR EACH OTHER (owner, 8 Nov): muting a soloed track un-solos it, soloing a muted one unmutes it.
+function setMute(m, v){ m.mute = !!v; if (m.mute) m.solo = false; }
+function setSolo(m, v){ m.solo = !!v; if (m.solo) m.mute = false; }
 function muteKey(trackOnly){
   if (trackOnly !== true && tv === 'song' && sxPicks.length) return sxMuteCells(sxPicks.map(p => [p.y, p.t]));   // picked cells
   const mst = tv === 'song' ? cs.song.x === MT : tv === 'mixer' ? onMstCell() : tv === 'fx' ? cFxT >= NT : cTrack === MT;
   if (mst) return toast('The master can’t be muted.');
   const t = dkTrack(), m = S.mix[t]; if (!m) return;
-  m.mute = !m.mute; mixChanged(); draw();
+  setMute(m, !m.mute); mixChanged(); draw();
   toast(`${m.mute ? 'Muted' : 'Unmuted'} track ${d2(t + 1)} · / or \\ again ${m.mute ? 'unmutes' : 'mutes'} it`);
 }
 function soloKey(all){
@@ -24522,7 +24603,7 @@ function soloKey(all){
   const mst = tv === 'song' ? cs.song.x === MT : tv === 'mixer' ? onMstCell() : tv === 'fx' ? cFxT >= NT : cTrack === MT;
   if (mst) return toast('The master can’t be soloed.');
   const t = dkTrack(), m = S.mix[t]; if (!m) return;
-  m.solo = !m.solo; mixChanged(); draw();
+  setSolo(m, !m.solo); mixChanged(); draw();
   const n = S.mix.filter(q => q.solo).length;
   toast(m.solo ? `Solo on: track ${d2(t + 1)}` + (n > 1 ? ` (${n} soloed)` : '') + ' · ' + keyHint('mod+shift+/') + ' clears every solo' : `Solo off: track ${d2(t + 1)}` + (n ? ` (${n} still soloed)` : ''));
 }
@@ -24806,7 +24887,7 @@ function move(dx, dy){
   }
   if (tv === 'mixer' && dy) c.fv = false;
   else if (tv === 'song' && dx){ const ui = clamp((c.x === MT ? ntr() : c.x) + dx, 0, ntr()); c.x = ui === ntr() ? MT : ui; }   // the master column sits after the last track
-  else if (!(tv === 'song' && c.x === MT)) c.x = clamp(c.x + dx, 0, d.w - 1);   // FOCUS TRACK (24 Oct): ▲▼ on the master column stay on it (they jumped to the last track)
+  else if (!(tv === 'song' && c.x === MT) && !(tv === 'phrase' && dx)) c.x = clamp(c.x + dx, 0, d.w - 1);   // (the phrase already stepped through its columns above: a second plain step skipped every other one) FOCUS TRACK (24 Oct): ▲▼ on the master column stay on it (they jumped to the last track)
   const wasY = c.y; c.y = clamp(c.y + dy, 0, d.h - 1);
   if (tv === 'mixer' && c.y === 7 && wasY !== 7) c.mx = 0;
   draw();
@@ -24862,6 +24943,17 @@ function drawPat(){
 // so typing notes never waits on it, and while playing the total is worked out once, at PLAY.
 const lenCache = new Map(); let lenVer = -1, lenS = null, lenMode = 0, lenT = 0, lenTV = -1;
 const lenFresh = () => lenVer === songVer && lenS === S;
+// LEFT / TO while playing (9 Nov, owner: LEFT ran out about 8 patterns early): when each row starts, from one simulated pass of
+// the song, so the readout goes by the row actually playing. Timing it from the start alone lost every LOOP repeat and hop.
+let lenTab = null;
+function songLenTab(top){
+  const now = performance.now(), fresh = lenTab && lenTab.top === top && lenTab.S === S;
+  if (fresh && (lenTab.v === songVer || now - lenTab.w < 5000)) return lenTab;   // edits while playing: at most one pass per 5 s
+  const at = new Map(); let end = 0;
+  try { const seq = makeSeq(S, 'song', {row:top, once:true, sim:true}), t0 = seq.time; let g = 0;
+    for (; seq.alive() && g < 200000 && end < 7200; g++){ const r = seq.step(), o = r.t - t0; let mx = -1; r.pos.forEach((q, i) => { if (q && i !== MT && q.row > mx) mx = q.row; }); if (mx >= 0 && !at.has(mx)) at.set(mx, o); end = Math.max(end, o + r.line); } } catch(e){}
+  return lenTab = {top, S, v:songVer, w:now, at, end};
+}
 function songRemain(row){
   if (!lenFresh()){ lenCache.clear(); lenVer = songVer; lenS = S; }
   if (lenCache.has(row)) return lenCache.get(row);
@@ -24887,7 +24979,7 @@ function tickLen(now){
   if (tp.on){
     if (tp.mode !== 'song') txt = '—';
     else {
-      if (tp.lenTot == null){ const top = songBlockTop(tp.row0); tp.lenTot = songRemain(tp.row0); tp.lenPre = Math.max(0, songRemain(top) - tp.lenTot); }
+      if (tp.lenTot == null){ const top = songBlockTop(tp.row0), T = songLenTab(top), a = T.at.get(tp.row0); if (a != null){ tp.lenPre = a; tp.lenTot = Math.max(0, T.end - a); } else { tp.lenTot = songRemain(tp.row0); tp.lenPre = Math.max(0, songRemain(top) - tp.lenTot); } }
       // past the end and still playing: the song went round again (a one-row song never shows a lower row; see the heard steps)
       if (tot_ok(tp) && ctx.currentTime - tp.t0 > tp.lenTot + 0.05){ tp.t0 += tp.lenTot; tp.row0 = songBlockTop(tp.row0); tp.lenTot = null; return tickLen(now); }
       const el = Math.max(0, ctx.currentTime - tp.t0), tot = tp.lenTot;
@@ -25216,6 +25308,7 @@ function press(b, fromKey){
     if (mod('shift')){ used.shift = true; takeLatch(); if (tp.on) tStopUser(); else tStart('song', {row:songRow()}); } else playCtx(); return; }
   // LOOP is a sticky toggle, not a held key: a tap flips it (the pattern loop; LOOP SEL is in the tab bar on a computer).
   if (b === 'loop'){ toggleLoopPat(); clearTimeout(rep); return; }
+  if (b === 'save'){ clearTimeout(rep); saveProj(false); return; }   // SAVE (owner, 8 Nov): the same Save song as the File menu and Ctrl/⌘+S (a tap, not a key held)
   if (b === 'mute' || b === 'solo'){ clearTimeout(rep); b === 'mute' ? muteKey(true) : soloKey(); return; }   // MUTE / SOLO (owner, 8 Nov): a tap latches, a second tap undoes it
   if (b === 'gen'){ clearTimeout(rep); genMenu(); return; }   // GEN (owner, 6 Nov): the generators, under SEMI + beside LOOP
   if (b === 'xposeUp'){ transposeSel(1, true); clearTimeout(rep); return; }
@@ -25226,6 +25319,7 @@ function press(b, fromKey){
   if (!fromKey) rep = setTimeout(function r(){ dirPress(b, l); rep = setTimeout(r, 70); }, 330);
 }
 function release(b, fromKey){
+  if (b === 'save'){ clearTimeout(rep); return; }
   if (b === 'loop' || b === 'gen' || b === 'mute' || b === 'solo' || b === 'xposeUp' || b === 'xposeDn'){ keyVis(); return; }
   if (b in held){
     if (!held[b]) return;
@@ -25259,7 +25353,8 @@ const CMDS = [['b:-16', '−−', 'Change the value down a lot (EDIT+▼)'], ['b
   ['uniq', 'UNIQ', 'Make unique: each selected block (or picked cells) gets new phrases, in place'], ['clone', 'CLN', 'Clone: copies the block (or the selected blocks); PASTE then puts a unique copy with new numbers at the cursor (Ctrl/⌘+Alt+C)'],
   ['cldn', 'CLN↓', 'Clone the block (or selected blocks) into new, unique numbers on a new row below; the rows below move down (Ctrl/⌘+Shift+C)'], ['copy', 'COPY', 'Copy the selection, or what is under the cursor (a note comes with its instrument) (OPTION)'],
   ['cut', 'CUT', 'Cut the selection, or what is under the cursor (OPTION+EDIT)'], ['paste', 'PASTE', 'Paste (SHIFT+EDIT)'],
-  ['undo', 'UNDO', 'Undo the last change to the song (Ctrl/⌘+Z)'], ['redo', 'REDO', 'Redo (Ctrl/⌘+Y)'], ['song', '▶', 'Play the song from the cursor row, or stop it (SHIFT+PLAY)']];
+  ['undo', 'UNDO', 'Undo the last change to the song (Ctrl/⌘+Z)'], ['redo', 'REDO', 'Redo (Ctrl/⌘+Y)'], ['song', '▶', 'Play the song from the cursor row, or stop it (SHIFT+PLAY)'],
+  ['mpat', 'M.PAT', 'Mute or unmute the pattern block under the cursor, or every block in the selection (as Alt+click, M on the Song). The track’s own MUTE is on the pad and in the Mixer']];   // MUTE PATTERN (owner, 8 Nov): Arrange only
 function cmdAction(a){
   fxpClose();
   takeLatch();
@@ -25282,16 +25377,17 @@ function cmdAction(a){
   if (c === 'uniq') return makeUnique();
   if (c === 'clone') return cloneHere();
   if (c === 'cldn') return cloneDown();
+  if (c === 'mpat'){ if (tv !== 'song') return toast('M.PAT mutes blocks on Arrange.'); const r = sxRect(); if (r) return sxMuteRect(r); if (sxPicks.length) return sxMuteCells(sxPicks.map(p => [p.y, p.t])); return toggleBlockMute(cs.song.y, cs.song.x); }
   if (c === 'song'){ if (tp.on) tStopUser(); else tStart('song', {row:songRow()}); }
 }
 for (const [a, t, lbl] of CMDS){ const b = el('button'); b.innerHTML = t; b.type = 'button'; b.dataset.c = a; b.setAttribute('aria-label', lbl); b.title = lbl; $('tCmd').append(b); }
 // In PAD mode CLEAR moves between PASTE and UNDO, so a thumb can reach it on a phone; KEYS mode keeps
 // the original order. The buttons are moved, not rebuilt, so the tap handlers stay attached.
-const CMD_PAD_ORDER = ['b:-16', 'b:-1', 'b:1', 'b:16', 'prev', 'next', 'sel', 'uniq', 'clone', 'cldn', 'copy', 'cut', 'paste', 'clr', 'undo', 'redo', 'song'];
+const CMD_PAD_ORDER = ['b:-16', 'b:-1', 'b:1', 'b:16', 'prev', 'next', 'sel', 'uniq', 'clone', 'cldn', 'mpat', 'copy', 'cut', 'paste', 'clr', 'undo', 'redo', 'song'];
 const CMD_PAD_SHORT = {clr:'CLR', sel:'SEL', paste:'PST', undo:'↶', redo:'↷'};
 // COMMAND BAR: the Edit menu's order (undo · clipboard · select · clones · value · previous / next · play) and words.
-const CMD_MINI_ORDER = ['undo', 'redo', 'cut', 'copy', 'paste', 'clr', 'rrow', 'sel', 'uniq', 'clone', 'cldn', 'b:-16', 'b:-1', 'b:1', 'b:16', 'prev', 'next', 'song'];
-const CMD_MINI_LAB = {undo:'UNDO', redo:'REDO', cut:'CUT', copy:'COPY', paste:'PASTE', clr:'CLEAR', rrow:'REMOVE', sel:'SELECT', clone:'CLONE', cldn:'CLONE↓', 'b:-16':'−−', 'b:-1':'−', 'b:1':'+', 'b:16':'++', prev:'‹ PREV', next:'NEXT ›'};
+const CMD_MINI_ORDER = ['undo', 'redo', 'cut', 'copy', 'paste', 'clr', 'rrow', 'sel', 'uniq', 'clone', 'cldn', 'mpat', 'b:-16', 'b:-1', 'b:1', 'b:16', 'prev', 'next', 'song'];
+const CMD_MINI_LAB = {undo:'UNDO', redo:'REDO', cut:'CUT', copy:'COPY', paste:'PASTE', clr:'CLEAR', rrow:'REMOVE', sel:'SELECT', clone:'CLONE', cldn:'CLONE↓', mpat:'MUTE PAT', 'b:-16':'−−', 'b:-1':'−', 'b:1':'+', 'b:16':'++', prev:'‹ PREV', next:'NEXT ›'};
 const cmdSongLab = () => cmdMini() ? (tp.on ? '■ STOP' : '▶ SONG') : tp.on ? '■' : '▶';
 function applyCmdOrder(){
   const host = $('tCmd'), by = {}, mini = cmdMini();
@@ -25420,7 +25516,7 @@ function cmdItems(full){
         : {a:'rins', l:'Insert a row', k:keyHint('mod+Enter'), f:() => rowOp('insert'), off:!rowsOk || !!selA},
       onSong ? {a:'rmrow', l:'Remove the song row (rows below move up)', k:keyHint('mod+shift+Backspace'), f:songRowRemove}
         : selA ? {a:'rrow', l:'Remove these rows (rows below move up)', k:'', f:rowsRemove, off:!rowsOk} : {a:'rdel', l:'Remove the row (rows below move up)', k:keyHint('mod+Backspace'), f:() => rowOp('remove'), off:!rowsOk}] : []),
-    ...(onSong || full ? [{h:'Song blocks'}, it('clone', 'Clone (paste puts a unique copy)', 'mod+alt+C', {off:!onSong}), it('cldn', 'Clone down (into a new row below)', 'mod+shift+C', {off:!onSong}),
+    ...(onSong || full ? [{h:'Song blocks'}, it('clone', 'Clone (paste puts a unique copy)', 'mod+alt+C', {off:!onSong}), it('cldn', 'Clone down (into a new row below)', 'mod+shift+C', {off:!onSong}), it('mpat', 'Mute / unmute the block (or the selected blocks)', '', {off:!onSong}),
       {a:'dup', l:'Duplicate the pattern (insert below)', k:onSong ? keyHint('mod+D') : '', f:() => dupKey(false), off:!onSong}, {a:'insp', l:'Insert paste (new rows below)', k:keyHint('mod+alt+V'), f:insertPaste, off:!onSong || !(clip && clip.v === 'song')},
       ...(onSong && !full ? [{a:'rmrow', l:'Remove the row (rows below move up)', k:keyHint('mod+shift+Backspace'), f:songRowRemove}] : [])] : []),
     {h:'Track'},
@@ -26541,7 +26637,7 @@ function draw(){
     for (const k in pc){ const b = $('tPad').querySelector(`.k[data-b=${k}]`); if (b) b.style.setProperty('--sh', pc[k]); } }
   $('tCmd').querySelectorAll('[data-c="b:-16"],[data-c="b:16"]').forEach(b => b.hidden = onSong);
   $('tCmd').querySelectorAll('[data-c="b:-1"],[data-c="b:1"],[data-c=prev],[data-c=next]').forEach(b => b.hidden = false);   // Arrange's row hides them (apSongLines)
-  $('tCmd').querySelectorAll('[data-c=uniq],[data-c=clone],[data-c=cldn]').forEach(b => b.hidden = !onSong); $('tCmd').classList.toggle('song', onSong);   // CLN's narrow-screen hiding is in the CSS (.tcmd)
+  $('tCmd').querySelectorAll('[data-c=uniq],[data-c=clone],[data-c=cldn],[data-c=mpat]').forEach(b => b.hidden = !onSong); $('tCmd').classList.toggle('song', onSong);    // CLN's narrow-screen hiding is in the CSS (.tcmd)
   const selB = $('tCmd').querySelector('[data-c=sel]'); if (selB) selB.classList.toggle('on', !!selA);
   $('tState').innerHTML = tp.on ? ico('play') + 'PLAYING ' + VNAME[tp.mode] : rendering ? ico('render') + 'RENDERING' : ico('stop') + 'STOPPED';
   $('tBpm').textContent = (tp.on ? tp.bpm : S.bpm) + ' BPM · ' + (tp.on ? tp.tks : S.ticks || TICKS) + ' TICKS' + (S.swing > 50 ? ' · SWING ' + S.swing + '%' : '');
@@ -26670,7 +26766,7 @@ grid.addEventListener('pointerdown', e => {
   const i = meterEls.indexOf(m); if (i < 0) return;
   const t = mixL + i % mixN; e.preventDefault(); e.stopPropagation();
   cs.mixer.x = t; cs.mixer.y = 6; cs.mixer.fv = true; cs.mixer.mx = 0;
-  if (e.altKey || e.metaKey){ S.mix[t].mute = !S.mix[t].mute; mixChanged(); }
+  if (e.altKey || e.metaKey){ setMute(S.mix[t], !S.mix[t].mute); mixChanged(); }
   draw();
 }, true);
 grid.addEventListener('pointermove', e => {
@@ -27506,6 +27602,7 @@ function mwLimDraw(){
 }
 function mwLoop(){
   if (!mwOpenNow) return;
+  if (document.hidden && !tp.on) return;   // BATTERY: parked while hidden and not playing (visibilitychange restarts it)
   mwRaf = requestAnimationFrame(mwLoop);
   const now = performance.now(); if (now - (mwLoop.t || 0) < 33) return; mwLoop.t = now;
   const m = mstMeter, live = !!(m && S.mst.on && (tp.on || now - audioWake < 1500));
@@ -27764,8 +27861,8 @@ stVol.addEventListener('contextmenu', e => valMenu(e, dkMst() ? 'Master OUT' : '
 stPan.addEventListener('input', () => { if (dkMst()) return; const t = dkTrack(); S.mix[t].pan = +stPan.value; mixChanged(); deckStrip(); });
 stVol.addEventListener('dblclick', stReset);
 stPan.addEventListener('dblclick', () => { if (dkMst()) return; S.mix[dkTrack()].pan = 128; mixChanged(); deckStrip(); });
-$('stMute').addEventListener('click', () => { if (dkMst()) return; const m = S.mix[dkTrack()]; m.mute = !m.mute; mixChanged(); draw(); });
-$('stSolo').addEventListener('click', () => { if (dkMst()) return; const m = S.mix[dkTrack()]; m.solo = !m.solo; mixChanged(); draw(); });
+$('stMute').addEventListener('click', () => { if (dkMst()) return; const m = S.mix[dkTrack()]; setMute(m, !m.mute); mixChanged(); draw(); });
+$('stSolo').addEventListener('click', () => { if (dkMst()) return; const m = S.mix[dkTrack()]; setSolo(m, !m.solo); mixChanged(); draw(); });
 function deckStrip(){
   try { perfDraw(); } catch(e){}   // PERFORM part
   const anySolo = S.mix.some(m => m.solo); $('dkSolo').hidden = !anySolo || !deckShown();
@@ -27837,10 +27934,14 @@ function hmAttach(){
    brings it straight back (audio() calls hmWake(), and the next look catches anything else within 160 ms). */
 var hmSleepT = 0;   // var, not let: audio() calls hmWake() and may run before this line has
 function hmWake(){ if (hmSleepT){ clearTimeout(hmSleepT); hmSleepT = 0; requestAnimationFrame(hmFrame); } }
+// BATTERY (8 Nov): quiet, it looks again 5 times a second from a plain timer (no display frame is asked for: a rAF every 160 ms
+// made the screen compose a frame each time); hidden and not playing it parks, and the screen coming back restarts it.
+var hmParked = false;
 function hmFrame(now){
   hmDraw(now);
+  if (document.hidden && !tp.on){ hmParked = true; return; }
   const quiet = !tp.on && HM.lv[0] < 0.004 && HM.lv[1] < 0.004 && HM.pk[0] < 0.004 && HM.pk[1] < 0.004;
-  if (quiet) hmSleepT = setTimeout(() => { hmSleepT = 0; requestAnimationFrame(hmFrame); }, 160);
+  if (quiet) hmSleepT = setTimeout(() => { hmSleepT = 0; hmFrame(performance.now()); }, 200);
   else requestAnimationFrame(hmFrame);
 }
 function hmDraw(now){
@@ -29164,8 +29265,11 @@ function setArrLeft(on){ arrLeft = !!on; try { localStorage.setItem('thunderplus
 // The song keeps room for all its tracks at a readable size (about 12px type: 52 columns of text), and the side
 // panel keeps its place when it is showing, so a wide ARRANGE never cuts the song off.
 const SONG_MIN = () => Math.round(BASEW * CW * 12 + 24);
-const arrMax = () => { const side = document.querySelector('.tside'), sw = side && side.offsetParent ? side.offsetWidth : 0;
-  return Math.max(200, (arrEl.parentElement.clientWidth || innerWidth) - sw - SONG_MIN()); };
+// FOLDED PHONE (owner, 8 Nov): under 600 px the song's own minimum left no range at all (max = min = 200), so the grip moved nothing.
+// There the panel goes from 120 px to whatever leaves the screen 170 px.
+const arrMin = () => innerWidth < 600 ? 120 : 200;
+const arrMax = () => { const side = document.querySelector('.tside'), sw = side && side.offsetParent ? side.offsetWidth : 0, room = (arrEl.parentElement.clientWidth || innerWidth) - sw;
+  return Math.max(arrMin(), innerWidth < 600 ? room - 170 : room - SONG_MIN()); };
 // Works out whether ARRANGE shows and how wide it is from the window's size right now. Called on every resize
 // (and once a second as a backstop), so it follows the Fold opening and closing with the app already running.
 function arrLayout(force){
@@ -29173,7 +29277,7 @@ function arrLayout(force){
   const key = [w, h, arrMode, arrW, view].join(':'); if (!force && key === arrKey) return false; arrKey = key;
   const vis = arrMode === 2 || (arrMode === 1 && w >= 600 && h >= 500), B = document.body.classList;
   B.toggle('arrvis', vis); B.toggle('arrnarrow', vis && w < 1100); B.toggle('arrsmall', w < 900); B.toggle('arrtiny', w < 600);
-  arrEl.style.width = arrW ? clamp(arrW, 200, arrMax()) + 'px' : '';
+  arrEl.style.width = arrW ? clamp(arrW, arrMin(), arrMax()) + 'px' : '';
   arrSig = ''; arrCurY = -1; fit(); draw(); return true;
 }
 // Every "the page changed shape" signal (window, visual viewport, the screen element, fonts arriving) lands here and
@@ -29193,7 +29297,7 @@ if (window.visualViewport) visualViewport.addEventListener('resize', () => sched
 if (screen.orientation) screen.orientation.addEventListener('change', () => setTimeout(() => arrLayout(true), 150));
 document.addEventListener('visibilitychange', () => { if (!document.hidden) setTimeout(() => arrLayout(true), 150); });
 new ResizeObserver(() => scheduleRefit(false)).observe(document.documentElement);
-setInterval(() => { if (!document.hidden) arrLayout(); }, 1000);
+idleTick(() => { if (!document.hidden) arrLayout(); }, 1000, () => !document.hidden, 3000);   // BATTERY: nothing to check while hidden (the visibilitychange above lays out on return)
 // The line over the song's info and the line over ARRANGE's footer meet in one straight line across: whichever
 // block is shorter grows upward to the other's line.
 const tInfoBox = document.querySelector('.tinfo'), arrFoot = arrEl.querySelector('.tafoot');
@@ -29229,7 +29333,7 @@ $('tArrH').addEventListener('pointermove', e => {
   if (!arrDrag || e.pointerId !== arrDrag.id) return;
   const dx = (arrLeft ? e.clientX - arrDrag.x0 : arrDrag.x0 - e.clientX);   // the grip is on the edge facing the screen
   if (Math.abs(dx) > 3) arrDrag.moved = true; if (!arrDrag.moved) return;
-  arrW = clamp(Math.round(arrDrag.w0 + dx), 200, arrMax()); arrEl.style.width = arrW + 'px';
+  arrW = clamp(Math.round(arrDrag.w0 + dx), arrMin(), arrMax()); arrEl.style.width = arrW + 'px';
   // The panel's width follows the finger every frame; the song's text is re-fitted at most ~8 times a second while
   // dragging (fit()+draw() is ~150 ms on a phone, which made the drag crawl) and once more on release.
   const now = performance.now(); if (!arrDrag.t || now - arrDrag.t > 120){ arrDrag.t = now; arrSig = ''; fit(); draw(); }
@@ -29392,7 +29496,7 @@ function drawArr0(PH){
       h += `<b class="${cls.trim()}"${sty} data-y="${y}" data-t="${t}">${lab}</b>`;
     }
     if (mx){ const v = S.song[y][MT];   // the master column: commands only, never muted
-      h += `<span></span><b class="gx${v < 0 ? '' : isEmptySect(S.chains[v]) ? ' z' : sectMstOff(v) ? ' o' : ' f'}" data-y="${y}" data-t="${MT}">${v < 0 ? '' : hp(songShown(v))}</b>`; }
+      h += `<span></span><b class="gx${v < 0 ? '' : isEmptySect(S.chains[v]) || !sectHasData(v) ? ' z' : sectMstOff(v) ? ' o' : ' f'}" data-y="${y}" data-t="${MT}">${v < 0 ? '' : hp(songShown(v))}</b>`; }
     h += '</div>';
   }
   const PF = polyFrom();
@@ -29525,7 +29629,7 @@ function arrGo(y, t, sysDbl){
   if (!asongOn() && apArrGo(y, t)) return;   // ARRANGE PAGING: on Phrase a tap pages into Arrange instead
   // Beside any other screen a tap on an EMPTY cell just puts the song cursor there, highlighted, and the screen stays
   // (owner, 19 Oct: it used to open the Song screen). A block still goes to the Song screen, twice opens its phrase.
-  if (!asongOn() && tv !== 'song' && !(S.song[y] && S.song[y][t] >= 0)){ cs.song.x = t; cs.song.y = y; cTrack = t; arrTap = {t:0, k:''}; draw(); return; }   // (the track the Phrase and Pattern view open on, 31 Oct)
+  if (!asongOn() && tv !== 'song' && !(S.song[y] && S.song[y][t] >= 0)){ cs.song.x = t; cs.song.y = y; cTrack = t; arrTap = {t:0, k:''}; if (tv === 'phrase' && !pvActive() && t !== MT && !isBusT(t)) phraseToCursor(); draw(); return; }   // (the track the Phrase and Pattern view open on, 31 Oct)
   cs.song.x = t; cs.song.y = y; cTrack = t;
   const k = y + ':' + t, now = performance.now(), dbl = arrTap.k === k && (now - arrTap.t < 380 || !!sysDbl);
   arrTap = {t:dbl ? 0 : now, k:dbl ? '' : k};
@@ -29596,10 +29700,10 @@ function arrSetZoom(z, fx, cx){
 function arrZoomDone(){ try { localStorage.setItem(AZK, String(arrZoom)); } catch(_){} arrSig = ''; arrCurX = cs.song.x; draw(); }
 // Zoomed, the song cursor's block is kept in view when the cursor changes track (Song screen, keys, a tap).
 function arrFollowX(){
-  if (arrZoom <= 1 || cs.song.x === arrCurX) return; arrCurX = cs.song.x;
-  const b = arrGrid.querySelector('b.c'); if (!b) return;
+  if (arrZoom <= 1 || cs.song.x === arrCurX) return;
+  const b = arrGrid.querySelector('b.c'); if (!b) return; arrCurX = cs.song.x;
   const g = arrGrid.getBoundingClientRect(), r = b.getBoundingClientRect(), rn = arrGrid.querySelector('.rn'), lw = rn ? rn.getBoundingClientRect().width + 4 : 26;
-  if (r.left < g.left + lw) arrGrid.scrollLeft -= g.left + lw - r.left; else if (r.right > g.right) arrGrid.scrollLeft += r.right - g.right;
+  arrGrid.scrollLeft += (r.left + r.right) / 2 - (g.left + lw + g.right) / 2;   // (9 Nov, owner) centred on the cursor, not just in view
   arrHSync();
 }
 function arrCancelPress(){ if (arrPress){ clearTimeout(arrPress.tm); if (arrPress.el) arrPress.el.classList.remove('charge'); arrPress = null; } }
@@ -29713,7 +29817,7 @@ arrGrid.addEventListener('contextmenu', e => e.preventDefault());
   // is how we mute specific phrases?"): Alt/⌥-click mutes the track, as Alt-click mutes a block; a plain click picks the
   // track (the song cursor goes to it), a double-click names it (no mute on the way now), a right-click solos.
   th.addEventListener('click', e => { const i = e.target.closest('i[data-t]'); if (!i || pt !== 'mouse') return; const t = +i.dataset.t, m = S.mix[t]; if (!m) return;
-    if (e.altKey){ m.mute = !m.mute; mixChanged(); draw(); toast(`Track ${d2(t + 1)} ${m.mute ? 'muted' : 'unmuted'} · right-click solos it`); return; }
+    if (e.altKey){ setMute(m, !m.mute); mixChanged(); draw(); toast(`Track ${d2(t + 1)} ${m.mute ? 'muted' : 'unmuted'} · right-click solos it`); return; }
     cs.song.x = t; if (!(apReady && apF)) cTrack = t; draw(); if (hdDbl(t)) nameTrack(t); });
   // FIX (UI sweep, 4 Nov): stopPropagation. On the Song screen Arrange sits inside the tracker screen, and the solo redraws the
   // header, so the event reached cmdCtx from a detached number (its #tArr check missed) and the Edit menu opened over the solo.
@@ -30248,11 +30352,16 @@ function globalCpuValue(){
    (AudioContext.playbackStats) that count is used; otherwise the audio clock is compared with the page clock
    (getOutputTimestamp): when the audio thread falls behind, the audio clock slips back against real time. */
 const glitch = {n:0, t:-1e9, off:null, base:null};
+// BATTERY (8 Nov): the scan is for a song playing or a sound just made; with nothing sounding it drops to a slow check (below).
+// The count is rebased when it comes back from such a quiet stretch (a stall while silent is not a dropout), but never over a
+// stretch of PLAYBACK (a song playing with the screen off still has its dropouts counted when the screen comes back).
+const glitchBusy = () => tp.on || performance.now() - audioWake < 8000 || HM.lv[0] >= 0.004 || HM.lv[1] >= 0.004;
 function glitchScan(){
-  if (!ctx || ctx.state !== 'running' || document.hidden){ glitch.off = null; return; }
-  const ps = ctx.playbackStats;
+  if (!ctx || ctx.state !== 'running' || document.hidden || !glitchBusy()){ glitch.off = null; if (!tp.on) glitch.rb = true; return; }
+  const ps = ctx.playbackStats, rb = glitch.rb; glitch.rb = false;
   if (ps && typeof ps.underrunEvents === 'number'){
     if (glitch.base == null) glitch.base = ps.underrunEvents;
+    else if (rb) glitch.base = ps.underrunEvents - glitch.n;
     const k = ps.underrunEvents - glitch.base; if (k > glitch.n){ glitch.n = k; glitch.t = performance.now(); dropNote(); }
     return;
   }
@@ -30265,7 +30374,7 @@ function glitchScan(){
   else if (d < -12) glitch.off = off;          // a resume or a clock re-sync: start again from here
   else glitch.off += d * 0.05;                 // follow the two clocks' slow drift
 }
-setInterval(glitchScan, 100);
+idleTick(glitchScan, 100, () => !!ctx && ctx.state === 'running' && !document.hidden && glitchBusy(), 1500);
 /* DROPOUT TIP (owner's punch list, 2 Nov: phones that stutter). Four dropouts within a minute while the song plays, on a
    latency other than Safest: once (ever), a toast offers Safest, which gives the audio thread a bigger buffer. It reloads
    the app (the song and kit are saved first). */
@@ -30290,10 +30399,10 @@ function cpuMeter(){
   b.title = (cap ? 'Whole audio engine (Chrome’s render capacity), not just the effects.' : pr ? 'Whole audio engine: how much of each audio block the audio thread spends working (every sound, effect and voice). Over 100% means it can’t keep up.' : 'The time the audio engine’s own processing takes: track and master effects, …chains and bass voices (this browser doesn’t report the total audio load).')
     + (glitch.n ? ' Dropouts since the sound started: ' + glitch.n + '.' : '');
 }
-setInterval(() => { if (view !== 'tracker' && !document.hidden) cpuMeter(); }, 500);
+idleTick(() => { if (view !== 'tracker' && !document.hidden) cpuMeter(); }, 500, () => view !== 'tracker' && !document.hidden, 2000);   // BATTERY: the tracker's own frame loop updates it there
 // …chains screen meters: sample each routed track's chains return and push it into the frame.
 // Runs on its own timer (the tracker frame loop is off while the …chains screen is open).
-setInterval(() => {
+idleTick(() => {
   if (view !== 'chains' || document.hidden || !rt || !CH.frame) return;
   const out = new Array(NT).fill(0), inp = new Array(NT).fill(0);
   let any = false;
@@ -30326,7 +30435,7 @@ setInterval(() => {
   // BYP: modules bypassed now in any track engine (the editor lights their buttons, the tracker's switches included)
   const byp = new Set(); for (let t = 0; t < ntr(); t++){ const c = rt.pl.buses[t] && rt.pl.buses[t].chn; if (c && c.byp && c.modsT > fresh) for (const id of c.byp) byp.add(id); }
   if (any || chMeterWanted){ const api = chApi(); if (api && api.meters) api.meters({ peaks:out, peaksIn:inp, load:globalCpuValue(), mods, shows, jacks, byp:[...byp] }); }
-}, 60);
+}, 60, () => view === 'chains' && !document.hidden, 1500);   // BATTERY: 16 wake-ups a second only while the …chains screen is open (setView wakes it)
 $('tCpu').addEventListener('click', () => {
   const cap = cpu.cap, L = fxLoads().filter(x => x[1] > 0.0005).sort((a, b) => b[1] - a[1]);
   const fx = L.length ? 'By part: ' + L.map(([n, v]) => `${n} ${(v * 100).toFixed(1)}%`).join(' · ') : 'No track effects running.';
@@ -30342,10 +30451,13 @@ $('tCpu').addEventListener('click', () => {
 // a tail ringing out) the loop stays at full rate, read from the header meter.
 let rafT = 0;
 const frameIdle = () => !tp.on && !rendering && performance.now() - audioWake > 1500 && !(HM.lv[0] >= 0.004 || HM.lv[1] >= 0.004);
-function frameWake(){ if (raf === -1){ clearTimeout(rafT); raf = 0; } if (!raf && view === 'tracker') frame(); }
+// BATTERY (8 Nov): hidden and not playing, the loop parks (no timer at all); the screen coming back wakes it (visibilitychange,
+// near the end of the file). The idle check is 5 a second, not 10.
+function frameWake(){ idleWake(); if (raf === -1){ clearTimeout(rafT); raf = 0; } if (!raf && view === 'tracker') frame(); }
 function frame(){
   raf = 0; if (view !== 'tracker') return;
-  if (frameIdle()){ raf = -1; rafT = setTimeout(() => { raf = 0; frame(); }, 100); } else raf = requestAnimationFrame(frame);
+  if (document.hidden && !tp.on && !rendering) raf = -1;
+  else if (frameIdle()){ raf = -1; rafT = setTimeout(() => { raf = 0; frame(); }, 200); } else raf = requestAnimationFrame(frame);
   if (tp.on && ctx){
     let ch = false;
     // PLAYHEAD ON THE SOUND (owner, 6 Nov, Fold: "the playhead passes the note enough before we hear it that it is noticeable"):
@@ -30353,11 +30465,11 @@ function frame(){
     // Bluetooth more) is taken off, as the pad blinks and meters already do.
     // PLAYHEAD OFFSET (owner, 6 Nov: "it would be great to be able to tweak the visual alignment"): Settings → Screen, in 5 ms
     // steps, this device: + moves the playhead later (Bluetooth, a slow screen), − earlier
-    const hear = ctx.currentTime + 0.01 - heardLat() - phOff / 1000;
+    const hear = ctx.currentTime + 0.01 - heardLat() - moFxLat() - phOff / 1000;   // (9 Nov, owner: picture ahead of the sound) moFxLat: the master's lookahead and latency compensation delay the sound after the output's own latency
     while (tp.q.length && tp.q[0].t <= hear){ const e = tp.q.shift(); if (!tp.pos) tp.pos = new Array(NT).fill(null); e.pos.forEach((q, i) => { if (q){ tp.pos[i] = q; sndKeep(i, q); } }); tp.bpm = e.bpm; tp.tks = e.tks; tp.line = e.line; tp.st = e.t; ch = true;
       // the song's timer starts again when the song wraps back up (owner, 31 Oct: it stayed at 0:00 after the first time through)
       if (tp.mode === 'song'){ let mx = -1; e.pos.forEach((q, i) => { if (q && i !== MT && q.row > mx) mx = q.row; });
-        if (mx >= 0){ if (tp.hiRow != null && mx < tp.hiRow){ tp.row0 = mx; tp.t0 = e.t; tp.lenTot = null; } tp.hiRow = mx; } } }
+        if (mx >= 0){ if ((tp.hiRow != null && mx !== tp.hiRow) || (tp.loopV && e.pos.some((q, i) => q && i !== MT && q.step === 0) && e.t - tp.t0 > 0.05)){ tp.row0 = mx; tp.t0 = e.t; tp.lenTot = null; } tp.hiRow = mx; } } }
     if (!tp.seq.alive() && !tp.q.length && ctx.currentTime > tp.seq.time + 0.3) tStop(); else if (ch){ followPlay(); playDraw = true; try { draw(); } finally { playDraw = false; } }
   }
   tickDots(); tickLen();
@@ -30399,16 +30511,17 @@ for (let t = 0; t < NT; t++){
   // to it where the screen has tracks); a tap on a touch screen still mutes (there is no Alt there)
   let mpt = ''; m.addEventListener('pointerdown', e => { mpt = e.pointerType; });
   m.addEventListener('click', e => { if (mpt === 'mouse' && !e.altKey){ if (t >= ntr()) return; if (tv === 'song' || tv === 'mixer') cs[tv].x = t; else cTrack = t; if (!(apReady && apF)) cs.song.x = t; draw(); return; }
-    S.mix[t].mute = !S.mix[t].mute; mixChanged(); draw(); if (mpt === 'mouse') toast(`Track ${d2(t + 1)} ${S.mix[t].mute ? 'muted' : 'unmuted'} · right-click solos it`); }); $('tMeters').append(m);
+    setMute(S.mix[t], !S.mix[t].mute); mixChanged(); draw(); if (mpt === 'mouse') toast(`Track ${d2(t + 1)} ${S.mix[t].mute ? 'muted' : 'unmuted'} · right-click solos it`); }); $('tMeters').append(m);
   m.addEventListener('contextmenu', e => { e.preventDefault(); if (e.pointerType !== 'touch') soloTrack(t); });   // MOUSE SELECT: right-click solos
   m.addEventListener('dblclick', () => nameTrack(t));   // TRACK NAMES (the two clicks muted and unmuted it)
 }
 document.querySelectorAll('#trk .k[data-b]').forEach(k => {
   const b = k.dataset.b, ptrs = new Set();
-  k.addEventListener('pointerdown', e => { e.preventDefault(); try { k.setPointerCapture(e.pointerId); } catch(_){} ptrs.add(e.pointerId); if (!(b in held)) k.classList.add('dn'); press(b); });
+  k.addEventListener('pointerdown', e => { e.preventDefault(); try { k.setPointerCapture(e.pointerId); } catch(_){} ptrs.add(e.pointerId); k._pd = true; if (!(b in held)) k.classList.add('dn'); press(b); });
   const up = e => { if (!ptrs.delete(e.pointerId)) return; if (!(b in held)) k.classList.remove('dn'); release(b); };
   k.addEventListener('pointerup', up); k.addEventListener('pointercancel', up);
-  k.addEventListener('click', () => { if (!ptrJust()){ press(b, true); release(b, true); } });
+  k.addEventListener('click', () => { const pd = k._pd; k._pd = false; if (pd && b === 'save') return;   /* (SAVE already ran on the press: a long hold must not save twice) */
+    if (!ptrJust()){ press(b, true); release(b, true); } });
 });
 $('trk').addEventListener('contextmenu', e => e.preventDefault());
 /* ===== SELECTION TOOLS (21 Oct): Renoise's Advanced Edit, the parts a tracker uses most =====
@@ -30637,7 +30750,7 @@ window.addEventListener('keydown', e => { if (e.key === 'Escape' && msel){ e.pre
 // a click still mutes.
 function soloTrack(t){
   const m = S.mix[t]; if (!m || t >= ntr()) return;
-  m.solo = !m.solo; mixChanged(); draw();
+  setSolo(m, !m.solo); mixChanged(); draw();
   const n = S.mix.filter(q => q.solo).length;
   toast(m.solo ? `Solo on: track ${d2(t + 1)}` + (n > 1 ? ` (${n} soloed)` : '') + ' · right-click it again to un-solo' : `Solo off: track ${d2(t + 1)}` + (n ? ` (${n} still soloed)` : ''));
 }
@@ -30695,7 +30808,7 @@ const gridDown = e => {
   // the Mixer's mutes. The master column's always moves the cursor.
   if (y === -1){ const mouse = e.pointerType === 'mouse', mute = S.mix[x] && x !== MT && (mouse ? e.altKey : tv !== 'song');
     if (!mute){ c.x = x; draw(); if (hdDbl(x)) nameTrack(x); return; }
-    S.mix[x].mute = !S.mix[x].mute; mixChanged(); draw(); toast(`Track ${d2(x + 1)} ${S.mix[x].mute ? 'muted' : 'unmuted'} · right-click solos it`); return; }
+    setMute(S.mix[x], !S.mix[x].mute); mixChanged(); draw(); toast(`Track ${d2(x + 1)} ${S.mix[x].mute ? 'muted' : 'unmuted'} · right-click solos it`); return; }
   // ALT-DRAG EDITS (owner, 27 Oct, Phase 2, as Renoise): with a mouse a drag always selects, and Alt/⌥-drag changes the
   // value of the cell it starts on (Ctrl/⌘ as well: big steps; Shift: slower). On the Song an Alt-click that doesn't move
   // still mutes the block, as before. An empty cell only mutes (Song) or does nothing: a drag never adds a block or note.
@@ -31426,7 +31539,9 @@ let apSong = false, apIn = 0, apWent = false, apLastKey = '', apTap = {t:0, k:''
 var apHold = false, apDirty = false, apReady = false;
 function setApOn(on){ apOn = !!on; try { localStorage.setItem(APK, apOn ? '1' : '0'); } catch(e){} if (!apOn && apF === 'arr') apFocus(null); draw(); }
 function setSsOn(on){ ssOn = !!on; try { localStorage.setItem(SSK, ssOn ? '1' : '0'); } catch(e){} if (!ssOn && apF === 'strip') apFocus(null); draw(); }
-const apPanel = () => arrMode > 0 && arrEl.offsetWidth > 0;
+// (9 Nov) offsetWidth forces a layout, and a playhead redraw asked many times over: read it at most twice a second then
+let apPW = -1, apPT = 0;
+const apPanel = () => { if (!(arrMode > 0)) return false; const n = performance.now(); if (playDraw && apPW >= 0 && n - apPT < 500) return apPW > 0; apPT = n; apPW = arrEl.offsetWidth; return apPW > 0; };
 const apArrOk = () => apOn && view === 'tracker' && tv !== 'song' && !asongOn() && apPanel();
 const apStripOk = () => ssOn && !spOn /* SIMPLE PHRASE */ && view === 'tracker' && tv === 'phrase' && !apPanel() && (isMobile() || innerWidth < 600);
 const apOk = f => f === 'arr' ? apArrOk() : f === 'strip' ? apStripOk() : false;
@@ -31482,6 +31597,7 @@ function apFollow(){
   if (apHost === 'fx') cFxT = t === MT ? NT : Math.min(t, ntr() - 1);
   else if (apHost === 'mixer'){ if (t === MT) cs.mixer.y = 7; else { cs.mixer.x = Math.min(t, ntr() - 1); if (cs.mixer.y === 7) cs.mixer.y = 0; } }
   const r = S.song[cs.song.y], cid = r ? r[cs.song.x] : -1, p = cid >= 0 ? firstPhrase(cid) : -1;
+  if (cid < 0 && tv === 'phrase' && !pvActive() && t !== MT && !isBusT(t)){ cTrack = t; phraseToCursor(); return true; }   // (9 Nov, owner: a generated line and notes went into the last phrase, not this empty block)
   if (p < 0 || (p === cPhrase && cTrack === cs.song.x)) return hm;
   cPhrase = p; cTrack = cs.song.x; cSect = cid;
   if (apHost === 'inst'){ const ii = phraseInfo(p).inst; if (ii >= 0) cInst = ii; }
@@ -31661,7 +31777,7 @@ function apSongLines(){
   // ARRANGE ROW (owner, 1 Nov): with Arrange (or the song strip) holding the keys the row is for blocks, so − + and ‹ › go
   // (EDIT+◀▶ still changes a block's number; the arrows and OPTION+arrows move between blocks). draw() brings them back.
   cmd.querySelectorAll('[data-c="b:-16"],[data-c="b:16"],[data-c="b:-1"],[data-c="b:1"],[data-c=prev],[data-c=next]').forEach(b => b.hidden = true);
-  cmd.querySelectorAll('[data-c=uniq],[data-c=clone],[data-c=cldn]').forEach(b => b.hidden = false); cmd.classList.add('song');
+  cmd.querySelectorAll('[data-c=uniq],[data-c=clone],[data-c=cldn],[data-c=mpat]').forEach(b => b.hidden = false); cmd.classList.add('song');
   const sb = cmd.querySelector('[data-c=sel]'); if (sb) sb.classList.toggle('on', !!apSel);
   if (keys && kpOn) apAsSong(drawKeypad);
 }
@@ -31730,6 +31846,7 @@ document.addEventListener('keydown', e => {
 function setView(v){
   fxpClose();
   const was = view;
+  idleWake();   // BATTERY: the …chains meter timer and the CPU meter timer sleep except on their own screens
   if (v !== was) try { releaseKeys(); } catch(e){}   // KEYS PLAY: keys held on one screen don't hang on the next
   if (noEdFor(v)) v = 'synth';   // Mobile: no …waves / …chains editor unless Settings → App shows it (they still play)
   view = v === 'tracker' || v === 'waves' || v === 'chains' ? v : 'synth';
@@ -31845,6 +31962,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
   [519, '8 Nov', ['The pad has MUTE and SOLO buttons on unfolded and larger screens: pink and green when off, black when on. Tap to latch, tap again to undo.']],
+  [529, '9 Nov', ['Phone list: the arrows reach every phrase column; the playhead allows for the master’s lookahead; FOLLOW holds for 4 s while you edit, and Arrange pages again after it; tapping an empty block opens a fresh phrase for it; LEFT goes by the row playing; steadier playback under Safest.', 'New commands ATK and REL (rendered sounds); CUT and RES work on the live engines too.', 'Pad: clearer MUTE and SOLO, a Save key (unfolded); messages at the top on phones; …chains always shown unfolded; the Synth pads scroll; mute and solo clear each other; M.PAT on Arrange; a wider resize grip; new songs start with mastering off, and the master’s FX screen opens CALM, COMP and TONE.', 'Battery: background timers rest when nothing is playing or the app is hidden. RET and RTG are labelled note repeat and FX stutter.']],
   [528, '8 Nov', ['(Testing) The playback report notes when the audio clock runs away from real time.']],
   [527, '8 Nov', ['Holding ▲ or ▼ on the pad runs through the effect and command lists.']],
   [526, '8 Nov', ['Mobile: SHIFT + ▲ now goes to the Arrange panel beside the screen when it is showing.', 'Mixer: OPTION + arrows go to another track, as on FX. On the FX row, OPTION + ▲▼ still turn effects on and off.']],
@@ -32628,7 +32746,7 @@ const pvBandT = (e, s) => { if (!pvActive() || !s) return -1; if (s.classList.co
 grid.addEventListener('pointerdown', e => {
   if (e.pointerType !== 'mouse' || e.button !== 0) return;
   const t = pvBandT(e, e.target.closest('.pvh')); if (t < 0) return;
-  if (e.altKey){ e.stopPropagation(); e.preventDefault(); S.mix[t].mute = !S.mix[t].mute; mixChanged(); draw(); toast(`Track ${d2(t + 1)} ${S.mix[t].mute ? 'muted' : 'unmuted'}`); return; }
+  if (e.altKey){ e.stopPropagation(); e.preventDefault(); setMute(S.mix[t], !S.mix[t].mute); mixChanged(); draw(); toast(`Track ${d2(t + 1)} ${S.mix[t].mute ? 'muted' : 'unmuted'}`); return; }
   if (hdDbl(t)){ e.stopPropagation(); e.preventDefault(); nameTrack(t); }
 }, true);
 grid.addEventListener('contextmenu', e => { const t = pvBandT(e, e.target.closest('.pvh')); if (t < 0) return; e.preventDefault(); e.stopPropagation(); soloTrack(t); }, true);
@@ -32869,6 +32987,13 @@ async function checkUpdate(manual){
 }
 if (navigator.serviceWorker) navigator.serviceWorker.addEventListener('controllerchange', () => { if (hadSW) updBanner(); });
 document.addEventListener('visibilitychange', () => { if (!document.hidden) checkUpdate(false); });
+// BATTERY (8 Nov): the screen coming back restarts every loop that parks while the app is hidden (the tracker frame loop, the header
+// meter, the bass picture, the sound editor's scope, the master window); each re-checks its own conditions.
+document.addEventListener('visibilitychange', () => { if (document.hidden) return;
+  try { frameWake(); } catch(e){}
+  try { if (hmParked){ hmParked = false; requestAnimationFrame(hmFrame); } } catch(e){}
+  try { bassVizKick(); sndWake(); } catch(e){}
+  try { if (mwOpenNow){ cancelAnimationFrame(mwRaf); mwLoop(); } } catch(e){} });
 setTimeout(() => checkUpdate(false), 3000);
 setTimeout(thunderOffer, 2500);
 setTimeout(() => { if (kit.voices.some(v => v && v.engine === 'sf')) sfPrepare(null); }, 1800);   // SoundFont pads: load their fonts (from this device) after start-up
