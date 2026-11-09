@@ -23056,7 +23056,12 @@ var LP_MS = 1000 / 24, LP_GATE = 38;
 var lpHold = last => lpOn && tp.on && performance.now() - last < LP_GATE;   // a meter or animation asks: is it too soon to draw again?
 // (9 Nov, owner) turning it on picks the Low power skin; turning it off goes back to the skin you had. Any skin can still be chosen while it's on.
 const LP_SKIN_K = 'thunderplus-lowpower-skin-v1';
-function lpSkin(on){ try { if (on){ if (skin !== 'lowpower'){ localStorage.setItem(LP_SKIN_K, skin); applySkin('lowpower'); } } else if (skin === 'lowpower'){ const w = localStorage.getItem(LP_SKIN_K); if (w) applySkin(w); } } catch(e){} }
+var lpPrev = '';
+function lpSkin(on){
+  if (on){ if (skin !== 'lowpower'){ lpPrev = skin; try { localStorage.setItem(LP_SKIN_K, skin); } catch(e){} applySkin('lowpower'); } else { lpPrev = ''; try { localStorage.removeItem(LP_SKIN_K); } catch(e){} } return; }
+  if (skin !== 'lowpower') return;
+  let w = lpPrev; if (!w) try { w = localStorage.getItem(LP_SKIN_K) || ''; } catch(e){} if (w) applySkin(w);
+}
 function setLowPower(on){ if (!!on !== lpOn) lpSkin(!!on); lpOn = !!on; lpNext = 0; lpPend = false; clearTimeout(bgSusT); bgSusT = 0; if (lpOn && ctx) bgSusT = setTimeout(bgIdle, bgWait()); else if (!lpOn && bgSus && !document.hidden){ bgSus = false; if (ctx && ctx.state === 'suspended') ctx.resume().catch(() => {}); } try { localStorage.setItem('thunderplus-lowpower-v1', on ? '1' : '0'); } catch(e){} }
 function setPhOff(v){ phOff = clamp(Math.round((v | 0) / 5) * 5, -100, 300); try { localStorage.setItem('thunderplus-phoff-v1', String(phOff)); } catch(e){} }
 const curKey = () => [tv, cs.song.x, cs.song.y, cs.phrase.y, cs.sect.y, cPhrase, cSect, cTrack].join(',');
