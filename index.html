@@ -23869,7 +23869,8 @@ function bump(d, big){
       case 'tsp': v = clamp(v + d * (big ? 12 : 1), -128, 127); break;
       case 'note': v = v === OFF ? last.note : clamp(v + d * (big ? 12 : 1), 0, 119); break;
       // NI instruments (00–3F): the big step jumps 8 at a time (00–07 the drum pads, 08–0F the synths, and on).
-      case 'inst': { const nv = clamp(v + d * (big ? 8 : 1), 0, NI - 1); if (nv === v) toast(`Instruments go 00–${hx(NI - 1)} (${NI} of them, in hex: 0F is 15, 10 is 16). Each plays the slot set on INST › PAD.`); v = nv; break; }
+      // A big step that would run past either end does nothing (owner, 8 Nov: a slip onto ▼ while editing sent low numbers to 00).
+      case 'inst': { if (big && (v + d * 8 < 0 || v + d * 8 > NI - 1)) return; const nv = clamp(v + d * (big ? 8 : 1), 0, NI - 1); if (nv === v) toast(`Instruments go 00–${hx(NI - 1)} (${NI} of them, in hex: 0F is 15, 10 is 16). Each plays the slot set on INST › PAD.`); v = nv; break; }
       case 'fxc': if (mstView()){ const L = FXLIST_MST.slice(1), n = L.length, i = Math.max(0, L.indexOf(v)); v = L[((i + d * (big ? 4 : 1)) % n + n) % n]; }
         else v = ((v + d * (big ? 4 : 1)) % FXC.length + FXC.length) % FXC.length; break;
     }

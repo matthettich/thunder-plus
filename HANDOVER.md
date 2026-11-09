@@ -548,6 +548,11 @@ Sliders in `.ask` dialogs (every generator, Record a sample) couldn't be moved o
 native slider), and `.acidr` / `.acidf` carry `touch-action:pan-y`, or the browser cancels the drag as a pan. Checked with
 emulated touch drags on a Pixel 7 profile: no movement before, correct distance after, on Acid line and a generic `genPanel`.
 
+## 8 Nov: instrument big step can't overshoot (build 515)
+
+EDIT+▲▼ (and the other big-step routes through `bump`) on an instrument now does nothing if the 8-step would pass 00 or the top,
+instead of clamping: a slip from ▶ onto ▼ was sending low instruments to 00 (owner's choice). Single steps still stop at the ends.
+
 ## 8 Nov: …waves live per-bus running; "Live engines" setting (build 513, beta only)
 
 Owner: make the live/rendered switch's name cover …waves live, and cut phone CPU by sharing one running patch across pads.

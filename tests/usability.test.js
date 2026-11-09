@@ -414,3 +414,7 @@ test('dialog sliders take touch: the shared drag serves .ask on touch, and the r
   assert.match(src, /!sliderOk\(r, e\.pointerType === 'touch'\)/, 'the drag says it is a touch');
   assert.match(src, /\.acidr, \.acidf:has\(input\[type=range\]\)\{touch-action:pan-y\}/, 'no horizontal pan cancels the drag');
 });
+
+test('instrument big step: past either end it stays put rather than clamping to 00', () => {
+  assert.match(H.read('index.html'), /case 'inst': \{ if \(big && \(v \+ d \* 8 < 0 \|\| v \+ d \* 8 > NI - 1\)\) return;/);
+});
