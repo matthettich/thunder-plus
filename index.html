@@ -1128,10 +1128,10 @@ body:not(.legon) .tside .tlegend{display:none}
 .keys.wide .k.kw{font-size:var(--fs-2)}
 /* MUTE / SOLO (owner, 8 Nov): nice to have, so only where there's room (unfolded and larger). Pink / green when off, black when on. */
 #kMute, #kSolo{display:none}
-/* SAVE (owner, 8 Nov): a floppy-disk key beside MUTE (the Save song action), with a blank cell above it so PLAY stays over EDIT. 6 columns: 3 d-pad + 6 × 1.02 keys = 9.12 widths, 6 gaps (84px). */
-#kSave, .ksp{display:none}
+/* SAVE (owner, 8 Nov): a floppy-disk key to the left of SOLO and MUTE, both rows tall (the Save song action). 6 columns: 3 d-pad + 6 × 1.02 keys = 9.12 widths, 6 gaps (84px). */
+#kSave{display:none; grid-row:span 2}
 #kSave .ick{width:2em; height:2em}
-@container (min-width:600px){ .keys.wide{grid-template-columns:repeat(6,calc(var(--kw, var(--k)) * 1.02))} #kMute, #kSolo, #kSave{display:inline-flex} .ksp{display:block} .tpad{--kw:min(var(--k), calc((100cqw - 84px) / 9.12))} }
+@container (min-width:600px){ .keys.wide{grid-template-columns:repeat(6,calc(var(--kw, var(--k)) * 1.02))} #kMute, #kSolo, #kSave{display:inline-flex} .tpad{--kw:min(var(--k), calc((100cqw - 84px) / 9.12))} }
 #tPad #kMute{background:#ff2e93 !important; color:#141414 !important} #tPad #kSolo{background:#23a45c !important; color:#141414 !important}   /* (!important: the skins style lit keys very specifically) */
 /* ON states (owner, 8 Nov: both went the same black): MUTE on = white with a thick hot-pink ring and pink text; SOLO on = bright lime with dark text and a thick dark-green ring.
    Each reads on the light and dark skins alike (white and lime are bright in all of them; the rings carry the colour). */
@@ -3218,8 +3218,8 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
     </div>
     <div class="tinl tinlp" id="tInlPad" hidden aria-label="Instruments and their pads"></div>
     <div class="keys wide">
-      <button type="button" class="k kw" data-b="solo" id="kSolo" title="Solo this track; tap again to un-solo">SOLO</button><span class="ksp" aria-hidden="true"></span><button type="button" class="k kw" data-b="xposeUp" title="Transpose the phrase selection up a semitone">SEMI +</button><button type="button" class="k kw" data-b="xposeDn" title="Transpose the phrase selection down a semitone">SEMI −</button><button type="button" class="k kw" data-b="shift">SHIFT</button><button type="button" class="k kw" data-b="play" id="kPlay">PLAY</button>
-      <button type="button" class="k kw" data-b="mute" id="kMute" title="Mute this track; tap again to unmute">MUTE</button><button type="button" class="k kw" data-b="save" id="kSave" title="Save song" aria-label="Save song"><svg class="ic ick" aria-hidden="true"><use href="#ic-save"/></svg></button><button type="button" class="k kw" data-b="gen" id="kGen" title="Generate: the pattern generators (Acid line, Euclidean fill…) for this phrase">GEN</button><button type="button" class="k kw" data-b="loop" id="kLoop" title="Loop the pattern: the song repeats the row it is on until you turn it off (Alt+L in KEYS mode)">LOOP</button><button type="button" class="k kw" data-b="opt">OPTION</button><button type="button" class="k kw" data-b="edit">EDIT</button>
+      <button type="button" class="k kw" data-b="save" id="kSave" title="Save song" aria-label="Save song"><svg class="ic ick" aria-hidden="true"><use href="#ic-save"/></svg></button><button type="button" class="k kw" data-b="solo" id="kSolo" title="Solo this track; tap again to un-solo">SOLO</button><button type="button" class="k kw" data-b="xposeUp" title="Transpose the phrase selection up a semitone">SEMI +</button><button type="button" class="k kw" data-b="xposeDn" title="Transpose the phrase selection down a semitone">SEMI −</button><button type="button" class="k kw" data-b="shift">SHIFT</button><button type="button" class="k kw" data-b="play" id="kPlay">PLAY</button>
+      <button type="button" class="k kw" data-b="mute" id="kMute" title="Mute this track; tap again to unmute">MUTE</button><button type="button" class="k kw" data-b="gen" id="kGen" title="Generate: the pattern generators (Acid line, Euclidean fill…) for this phrase">GEN</button><button type="button" class="k kw" data-b="loop" id="kLoop" title="Loop the pattern: the song repeats the row it is on until you turn it off (Alt+L in KEYS mode)">LOOP</button><button type="button" class="k kw" data-b="opt">OPTION</button><button type="button" class="k kw" data-b="edit">EDIT</button>
     </div>
     </div>
   </div>
@@ -22914,7 +22914,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 529;
+const BUILD = 530;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD + (location.pathname.includes('/beta/') ? ' · beta' : '');
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -31962,6 +31962,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
   [519, '8 Nov', ['The pad has MUTE and SOLO buttons on unfolded and larger screens: pink and green when off, black when on. Tap to latch, tap again to undo.']],
+  [530, '9 Nov', ['Pad: the Save key sits to the left of SOLO and MUTE.']],
   [529, '9 Nov', ['Phone list: the arrows reach every phrase column; the playhead allows for the master’s lookahead; FOLLOW holds for 4 s while you edit, and Arrange pages again after it; tapping an empty block opens a fresh phrase for it; LEFT goes by the row playing; steadier playback under Safest.', 'New commands ATK and REL (rendered sounds); CUT and RES work on the live engines too.', 'Pad: clearer MUTE and SOLO, a Save key (unfolded); messages at the top on phones; …chains always shown unfolded; the Synth pads scroll; mute and solo clear each other; M.PAT on Arrange; a wider resize grip; new songs start with mastering off, and the master’s FX screen opens CALM, COMP and TONE.', 'Battery: background timers rest when nothing is playing or the app is hidden. RET and RTG are labelled note repeat and FX stutter.']],
   [528, '8 Nov', ['(Testing) The playback report notes when the audio clock runs away from real time.']],
   [527, '8 Nov', ['Holding ▲ or ▼ on the pad runs through the effect and command lists.']],
