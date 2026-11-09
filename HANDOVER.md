@@ -551,7 +551,7 @@ emulated touch drags on a Pixel 7 profile: no movement before, correct distance 
 ## 8 Nov: pad MUTE and SOLO (build 519)
 
 Owner's request: a new column before SEMI+/GEN. `press` calls `muteKey()` / `soloKey()`, so a second tap undoes it, and each button lights for
-the current track (set in `draw`). The pad's keys are about 15% narrower for it (`--kw` now 8.1 key widths); OPTION is labelled OPT to fit.
+the current track (set in `draw`). Build 520: only when the pad's container is 600px or wider (folded keeps its old layout); pink / green off, black on.
 
 ## 8 Nov: SHIFT+▲ goes to Arrange on Mobile (build 518)
 
