@@ -24021,7 +24021,7 @@ function modScSync(rebuilt){
   const rects = [];   // {x, y, w, h, lab: label strip height}
   if (full){   // wide: full scopes in the empty area under the rows, left aligned like the text
     const N = grp.length, cols = Math.min(N, Math.max(1, Math.floor(fw / 320))), cw = Math.max(200, Math.min(420, (fw - (cols - 1) * gap) / cols)), rows = Math.ceil(N / cols), ch = clamp((freeH - (rows - 1) * gap) / rows, 48, 170);
-    grp.forEach((q, i) => rects.push({x:gx0 + (i % cols) * (cw + gap), y:freeTop + Math.floor(i / cols) * (ch + gap), w:cw, h:ch, lab:lh}));
+    grp.forEach((q, i) => { const ry = freeTop + Math.floor(i / cols) * (ch + gap); rects.push(ry + ch <= gy1 + 1 ? {x:gx0 + (i % cols) * (cw + gap), y:ry, w:cw, h:ch, lab:lh} : null); });   // a scope that doesn't fit isn't drawn
   } else {   // folded: a small scope right beside each filled row, a column after the longest row; the sums under the rows
     const rx = tr + fs * .8, rw = gx1 - rx - 2; let k = 0;
     const sums = grp.filter(q => q.sum).length, sw = sums ? Math.min(240, (fw - (sums - 1) * gap) / sums) : 0;
