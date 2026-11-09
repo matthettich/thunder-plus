@@ -121,3 +121,16 @@ test('perform: the sequencer (index.html and the audio-thread core) plays every 
     assert.doesNotMatch(t, /PFS\.lfo\[t\];\s*if \(L && /, f + ': no single-object reader left');
   }
 });
+
+test('MOD screen: sits between FX and PROJECT in the tab order, and the Alt+digit keys reach all eight screens', () => {
+  const m = src.match(/VIEWS = (\[[^\]]*\])/); assert.ok(m, 'VIEWS not found');
+  const V = JSON.parse(m[1].replace(/'/g, '"'));
+  assert.deepEqual(V.slice(-3), ['fx', 'mod', 'project'], 'VIEWS order: …fx, mod, project');
+  assert.equal(V.length, 8);
+  assert.match(src, /VNAME = \{[^}]*mod:'MOD'/); assert.match(src, /\[data-v="mod"\]\{--tc:#/);
+  assert.equal((src.match(/\^Digit\[1-8\]\$\/\.test\(e\.code\)\)[^}]{0,80}go\(VIEWS/g) || []).length, 2, 'the two Alt+digit tests');
+  assert.equal((src.match(/\/\^Digit\(\[1-8\]\)\$\//g) || []).length, 1, 'viewKey');
+  assert.ok(!/Digit\[1-7\]|Digit\(\[1-7\]\)/.test(src), 'no Alt+digit test still stops at 7');
+  assert.match(src, /dir === 'right' && \(tv === 'inst' \|\| tv === 'mixer' \|\| tv === 'fx' \|\| tv === 'mod'\)/, 'SHIFT+▶ walks FX → MOD → PROJECT');
+  assert.match(src, /dir === 'left' && \(tv === 'mixer' \|\| tv === 'fx' \|\| tv === 'mod' \|\| tv === 'project'\)/, 'SHIFT+◀ walks back');
+});

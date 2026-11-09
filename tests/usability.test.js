@@ -314,7 +314,7 @@ test('one rule for value controls (3 Nov): faders, strip, FX bar and pump drag r
   assert.match(src, /base = clamp\(base \+ \(from - ev\.clientY\) \/ h \* 255 \* dragMul\(ev\), 0, 255\); from = ev\.clientY;/, 'strip fader');
   assert.match(src, /x = clamp\(x \+ \(ly - ev\.clientY\) \/ per \* dragMul\(ev\), q\.min, q\.max\); ly = ev\.clientY;/, 'FX bar values');
   assert.match(src, /out\.addEventListener\('dblclick', e => \{ e\.stopPropagation\(\); reset\(\); \}\);/, 'a slider readout double-click resets');
-  assert.match(src, /valMenu\(e, q\.l, \{reset:\(\) => set\(q\.d\), type:typeIt\}\)/, 'FX bar menu');
+  assert.match(src, /valMenu\(e, q\.l, \{reset:\(\) => set\(q\.d\), type:typeIt, lfo:[^}]*\}\)/, 'FX bar menu (and its Add LFO…)');
   assert.match(src, /const wheelOk = r => !!r && \(r\.hasAttribute\('data-wheel'\)/, 'data-wheel controls take the wheel after the rest');
   const k = H.read('pump/ui/kit.js');
   assert.match(k, /const dragMul = m => m\.shift \? 0\.1 : m\.cmd \? 4 : 1;/, 'pump: dragMul');
