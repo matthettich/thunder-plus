@@ -550,6 +550,29 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0) and `link/` (Ableton
 - Bug reports: the owner resubmits the Synth-page → Song-screen issue if they can reproduce it (note removed 2 Nov).
 
 
+## 9 Nov, end of session: what to test on the phone (build 530, on `beta`)
+
+Nothing from builds 529–530 has been tried on a real Fold, only in emulation. Start a session by asking the owner for these.
+
+**Most useful first:**
+1. Play the song through twice with Arrange showing: does the stutter ease on the second pass? (That would mean sounds being prepared the first time they play.)
+2. Playhead against the sound. If still off, try mastering off.
+3. Tap an empty block in Arrange, enter a note, change instrument, press LOOP: it should stay and play.
+4. Acid line on an empty track: lands in that block, audible, also soloed.
+
+**Feel:** 5. arrows reach every column (FX numbers, INST, poly middle columns); 6. FOLLOW PATTERN while editing holds, Arrange pages about 4 s after letting go, selecting patterns doesn't fight; 7. PHRASE / ARRANGE ON STOP at STAYS keep the cursor (if it jumps to the top: did "Back to the top of the song" show? That's STOP tapped twice within 450 ms); 8. LEFT timer lands on the song's end after heavy LOOP use.
+
+**Sounds:** 9. CUT / RES on a synth track, ATK / REL on a rendered sound (nothing on live engines yet); 10. RTG on a slot saved off switches it on; 11. Balanced and Safest on headphones (owner's next test): report any run that sounds quieter, with Copy report and which headphones.
+
+**Look over:** pad layout (Save left of SOLO / MUTE), messages at the top, M.PAT, the resize bar by finger.
+
+**Owner's decisions (9 Nov):** 4 s follow hold (will test); Save and MUTE unfolded only; a drag starting on a pad may sound it; a new RTG switches its slot on.
+
+**Findings so far.**
+- Stutter that stops under LOOP: the owner had Arrange showing, but the Arrange redraw is ruled out in emulation (4× CPU throttle: about 10 ms per pattern change; spikes only at PLAY). Next suspect: sounds prepared the first time a new pattern plays.
+- Safest level drop: not Thunder. Build 529 reports, phone speaker: 4 s into PLAY Balanced −9.7 dB, Safest −9.2 and −7.8 dB (single peak readings). Output delay Balanced 55 ms; Safest 87–104 ms, but 302 ms in the build 527 report, so Android doesn't give the same path each time. Theory, unproven: the level depends on that path. Need a report from a run that sounds quiet.
+- Audio clock: 1:1 while playing in these reports (Balanced and Safest), about 8% fast in the build 527 Safest report; still fast while hidden (8.43 s in 7.00 s, Balanced, after STOP). Cause still unknown.
+
 ## 9 Nov: the owner's phone bug list (build 529 on, branch `fix/mobile-list`, PR into `beta`)
 
 Delegated to Sonnet agents, each diff reviewed by the lead: arrow columns (`move()` stepped the phrase twice), pad and title bar, Arrange and master, battery and retrigger labels.
