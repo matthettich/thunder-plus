@@ -389,7 +389,7 @@ test('build 398: …waves live engine', () => {
 
 /* ───────── FOLLOW PATTERN jumps on a change only (owner, 7 Nov: one phrase on a track trapped the cursor) ───────── */
 test('FOLLOW PATTERN: a track playing one phrase lets the cursor move off it; a new phrase or row still pulls it over', () => {
-  const blk = cut('index.html', /var fpMem = null;[\s\S]*?\nfunction followPlay\(\)\{[\s\S]*?\n\}\n(?=\/\/ ARRANGE PAGES)/, 'fpMem and followPlay');
+  const blk = cut('index.html', /var fpHome = null;[^\n]*\nvar fpMem = null;[\s\S]*?\nfunction followPlay\(\)\{[\s\S]*?\n\}\n(?=\/\/ ARRANGE PAGES)/, 'fpMem and followPlay');
   const c = run(`var tp = {on:true, mode:'song', pos:null}, sdrag = 0, drag = 0, tv = 'phrase', cTrack = 0, followMode = 1, selA = null,
     cSect = 0, cPhrase = 0, arrHandT = -1e9, workT = -1e9, FOLLOW_HOLD = 4000, apReady = false, apF = '', apLastKey = '', cs = {phrase:{y:0}, song:{x:0, y:0}};
     const plen = () => 16, pvActive = () => false, pvFollow = () => {}, arrFollowPage = () => {}, asongOn = () => false;

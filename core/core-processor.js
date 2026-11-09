@@ -155,7 +155,6 @@ class Rd {
     this.l1 = 0; this.l2 = 0; this.ring = new Float32Array(RD_RING);
     const s0 = Math.max(0, Math.floor(start) - 4096); this.hi = s0; this.lo = s0;   // (the filter settles in the warm-up)
     this.kd = tau ? Math.exp(-1 / (tau * sr)) : 1; this.e = tau ? Math.pow(this.kd, s0) : 1;
-    this.atk = tw.atk != null ? Math.ceil(decSec(tw.atk) * sr) : 0;   // ATK
   }
   raw(c, i){ const D = c ? this.src2 : this.src; if (!D || i < 0 || i >= this.len) return 0; return D[this.rev ? this.len - 1 - i : i]; }
   at(c, i){
@@ -164,7 +163,6 @@ class Rd {
     while (this.hi <= i){ const n = this.hi; let x = n < this.len ? this.src[n] : 0;
       if (this.f){ const v3 = x - this.l2, v1 = this.a1 * this.l1 + this.a2 * v3, v2 = this.l2 + this.a2 * this.l1 + this.a3 * v3; this.l1 = 2 * v1 - this.l1; this.l2 = 2 * v2 - this.l2; x = v2; }
       if (this.tau){ x *= this.e; this.e *= this.kd; const m = this.N - 1 - n; if (m < 64) x *= m / Math.min(this.N, 64); }
-      if (n < this.atk) x *= n / this.atk;
       this.ring[n & RD_M] = x; this.hi = n + 1; }
     return i < this.hi - RD_RING ? 0 : this.ring[i & RD_M];
   }

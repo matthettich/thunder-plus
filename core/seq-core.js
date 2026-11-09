@@ -21,7 +21,6 @@ function shapeData(src, sr, tw){
     let l1 = 0, l2 = 0; for (let i = 0; i < N; i++){ const v3 = d[i] - l2, v1 = a1 * l1 + a2 * v3, v2 = l2 + a2 * l1 + a3 * v3; l1 = 2 * v1 - l1; l2 = 2 * v2 - l2; d[i] = v2; }
   }
   if (tau){ const k = Math.exp(-1 / (tau * sr)); let e = 1; for (let i = 0; i < N; i++){ d[i] *= e; e *= k; } const fl = Math.min(N, 64); for (let i = 0; i < fl; i++) d[N - 1 - i] *= i / fl; }
-  if (tw.atk != null){ const A = Math.min(N, Math.ceil(decSec(tw.atk) * sr)); for (let i = 0; i < A; i++) d[i] *= i / A; }   // ATK
   return d;
 }
 const SF_DEF = {8:13500, 25:-12000, 26:-12000, 27:-12000, 28:-12000, 30:-12000, 33:-12000, 34:-12000, 35:-12000, 36:-12000, 38:-12000, 46:-1, 47:-1, 56:100, 58:-1};
@@ -375,13 +374,13 @@ function makeSeq(S, mode, o){
         else if (X <= FXSLOTS || X === 9) for (const k of X === 9 ? all : [X - 1]){ evs.push({type:'fxc', t:at, track:t, p:'sw' + k, v:Y ? 1 : 0});
           if (Y >= 2) evs.push({type:'fxc', t:at + Y * line, track:t, p:'sw' + k, v:-1}); } }
       // FLX / GAT / RTG (owner, 31 Oct): a pattern given to an effect switched off by FXO switches its slot back as set (on)
-      const slotWake = (cmd, on) => { if (!on) return; const A = t >= MT ? S.mfx : S.tfx[t], ty = FX_NEEDS[cmd];
-        (A || []).forEach((f, k) => { if (f && f.type === ty && k < FXSLOTS) evs.push({type:'fxc', t:at, track:t, p:'sw' + k, v:-1}); }); };
+      const slotWake = (cmd, on, sw = -1, at2 = at) => { if (!on) return; const A = t >= MT ? S.mfx : S.tfx[t], ty = FX_NEEDS[cmd];
+        (A || []).forEach((f, k) => { if (f && f.type === ty && k < FXSLOTS) evs.push({type:'fxc', t:at2, track:t, p:'sw' + k, v:sw}); }); };
       if (fx.FLX != null){ evs.push({type:'fxc', t:at, track:t, p:'flx', v:flxCap(fx.FLX)}); slotWake('FLX', fx.FLX > 0); }
       if (fx.FLY != null){ evs.push({type:'fxc', t:at, track:t, p:'flx', v:fx.FLY ? 256 + fx.FLY : 0}); slotWake('FLY', fx.FLY > 0); }   // FLY (5 Nov): the Flex's second bank, 256 + v
       if (fx.GAT != null){ evs.push({type:'fxc', t:at, track:t, p:'gat', v:fx.GAT === 0 ? 0 : fx.GAT >= 16 ? 16 : fx.GAT}); slotWake('GAT', fx.GAT !== 0); }   // GAT 00 stops it, 10 and up: the CUSTOM steps
-      if (fx.RTG != null){ const X = fx.RTG >> 4, Y = fx.RTG & 15; evs.push({type:'fxc', t:at, track:t, p:'rtg', v:X ? Math.min(8, X) : 0}); slotWake('RTG', X > 0);
-        if (X && Y) evs.push({type:'fxc', t:at + Y * line, track:t, p:'rtg', v:-1}); }
+      if (fx.RTG != null){ const X = fx.RTG >> 4, Y = fx.RTG & 15; evs.push({type:'fxc', t:at, track:t, p:'rtg', v:X ? Math.min(8, X) : 0}); slotWake('RTG', true, X ? 1 : -1);   /* (9 Nov, owner: a new RTG switches the slot on, even one saved off; RTG 00 puts it back as saved) */
+        if (X && Y){ evs.push({type:'fxc', t:at + Y * line, track:t, p:'rtg', v:-1}); slotWake('RTG', true, -1, at + Y * line); } }
       if (t === MT && fx.VOL != null) evs.push({type:'mvol', t:at, v:fx.VOL});
       // BYP XY (…chains module bypass): X the module's number (0 = all), Y 0 in, 1 bypassed, 2–F flipped for Y rows
       if (fx.BYP != null && t < MT){ const X = fx.BYP >> 4, Y = fx.BYP & 15;
@@ -455,8 +454,8 @@ function makeSeq(S, mode, o){
         if (fx.CUT != null) T.cut = fx.CUT >= 255 ? null : fx.CUT;
         if (fx.RES != null) T.res = fx.RES;
         if (fx.DEC != null) T.dec = fx.DEC >= 255 ? null : fx.DEC;
-        if (fx.ATK != null) T.atk = fx.ATK >= 255 ? null : fx.ATK;
-        if (fx.REL != null) T.rel = fx.REL >= 255 ? null : fx.REL;
+        if (fx.ATK != null) T.cAtk = fx.ATK >= 255 ? null : fx.ATK;
+        if (fx.REL != null) T.cRel = fx.REL >= 255 ? null : fx.REL;
         if (fx.ARC != null) T.arc = {mode:fx.ARC >> 4, spd:(fx.ARC & 15) || 1};
         if (fx.DIR != null){ T.dir = Math.min(3, fx.DIR); T.pp = T.dir === 1 ? -1 : 1; }   // DIR: from the next row on
         if (fx.HOP != null) hop = Math.min(fx.HOP, PROWS - 1);
@@ -533,7 +532,7 @@ function makeSeq(S, mode, o){
             if (!q) firstRate = rate;
             const ev = {type:'note', t:nat, track:t, poly, col:ncol[q], pad:vtrk ? voiceForTrack(t) : I.pad, rate, gain:gain * hg, pan:fx.PAN != null ? fx.PAN : I.pan, ofs:fx.STA != null ? fx.STA : I.ofs,
               rev:fx.PLY != null ? (fx.PLY & 1) === 1 : !!I.rev, cut:fx.KIL != null ? nat + fx.KIL * tick : null, rel:fx.OFF != null ? nat + fx.OFF * tick : null,
-              slide:fx.PSL && !q ? {from:T.rate, dur:fx.PSL * tick} : null, vk:fx.GEN != null ? 'g' + fx.GEN : fx.MUT != null ? 'm' + fx.MUT : null, tw:pc != null || pdc != null || T.atk != null ? {cut:pc, res:prs, dec:pdc, atk:T.atk} : null, ...(T.rel != null ? {rlo:decSec(T.rel)} : {}), slc:fx.SLC != null ? fx.SLC : null, fdi:fx.FDI ? fx.FDI * tick : 0, trm:fx.TRM || 0, apn:fx.APN || 0, wob:fx.WOB != null ? wobOf(fx.WOB) : null, acc:(fx.VOL != null ? fx.VOL : r[VC]) >= 0xC0, ...mods,
+              slide:fx.PSL && !q ? {from:T.rate, dur:fx.PSL * tick} : null, vk:fx.GEN != null ? 'g' + fx.GEN : fx.MUT != null ? 'm' + fx.MUT : null, tw:pc != null || pdc != null ? {cut:pc, res:prs, dec:pdc} : null, ...(T.cRel != null ? {rlo:decSec(T.cRel)} : {}), slc:fx.SLC != null ? fx.SLC : null, fdi:fx.FDI ? fx.FDI * tick : T.cAtk != null ? decSec(T.cAtk) : 0, trm:fx.TRM || 0, apn:fx.APN || 0, wob:fx.WOB != null ? wobOf(fx.WOB) : null, acc:(fx.VOL != null ? fx.VOL : r[VC]) >= 0xC0, ...mods,
               ii, mn:note + 12 + ntc / 100, vel:hg * (fx.VOL != null ? fx.VOL : r[VC] >= 0 ? r[VC] : 255) / 255, tick, vc:fx.VOL != null ? fx.VOL : r[VC]};   // ii, mn (MIDI note: C-4 is 60), vel: for MIDI out; tick: NOTE LEN
             if (!o.sim && ((I.slc | 0) > 1 || I.sync)){ const c = o.live ? ensurePlay(ev.pad) : ensure(ev.pad); if (c){ applyChop(ev, I, ev.pad, n, note - n, nb, c.data, c.sr); if (!q) firstRate = ev.rate; } }
             if (ev.vk && o.live && !o.sim) try { varWant(ev); } catch(e){}   // MUT / GEN: start its render now, ahead of the note
@@ -828,7 +827,6 @@ class Rd {
     this.l1 = 0; this.l2 = 0; this.ring = new Float32Array(RD_RING);
     const s0 = Math.max(0, Math.floor(start) - 4096); this.hi = s0; this.lo = s0;   // (the filter settles in the warm-up)
     this.kd = tau ? Math.exp(-1 / (tau * sr)) : 1; this.e = tau ? Math.pow(this.kd, s0) : 1;
-    this.atk = tw.atk != null ? Math.ceil(decSec(tw.atk) * sr) : 0;   // ATK
   }
   raw(c, i){ const D = c ? this.src2 : this.src; if (!D || i < 0 || i >= this.len) return 0; return D[this.rev ? this.len - 1 - i : i]; }
   at(c, i){
@@ -837,7 +835,6 @@ class Rd {
     while (this.hi <= i){ const n = this.hi; let x = n < this.len ? this.src[n] : 0;
       if (this.f){ const v3 = x - this.l2, v1 = this.a1 * this.l1 + this.a2 * v3, v2 = this.l2 + this.a2 * this.l1 + this.a3 * v3; this.l1 = 2 * v1 - this.l1; this.l2 = 2 * v2 - this.l2; x = v2; }
       if (this.tau){ x *= this.e; this.e *= this.kd; const m = this.N - 1 - n; if (m < 64) x *= m / Math.min(this.N, 64); }
-      if (n < this.atk) x *= n / this.atk;
       this.ring[n & RD_M] = x; this.hi = n + 1; }
     return i < this.hi - RD_RING ? 0 : this.ring[i & RD_M];
   }

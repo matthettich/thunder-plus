@@ -10520,7 +10520,6 @@ function shapeData(src, sr, tw){
     let l1 = 0, l2 = 0; for (let i = 0; i < N; i++){ const v3 = d[i] - l2, v1 = a1 * l1 + a2 * v3, v2 = l2 + a2 * l1 + a3 * v3; l1 = 2 * v1 - l1; l2 = 2 * v2 - l2; d[i] = v2; }
   }
   if (tau){ const k = Math.exp(-1 / (tau * sr)); let e = 1; for (let i = 0; i < N; i++){ d[i] *= e; e *= k; } const fl = Math.min(N, 64); for (let i = 0; i < fl; i++) d[N - 1 - i] *= i / fl; }
-  if (tw.atk != null){ const A = Math.min(N, Math.ceil(decSec(tw.atk) * sr)); for (let i = 0; i < A; i++) d[i] *= i / A; }   // ATK
   return d;
 }
 // An AudioBuffer for a note with MUT / GEN and / or CUT / RES / DEC on context ac: offline renders (exports) make it here
@@ -10542,7 +10541,7 @@ function varBuf(ev, ac){
   if (!rec && !ev.tw) return null;
   if (!rec){ const c = live ? ensurePlay(ev.pad) : ensure(ev.pad); if (!c) return null; rec = c; key = 'p' + ev.pad + ':r' + (slotAt(padRev, ev.pad) || 0) + ':' + c.sr; }
   if (ev.tw){
-    const k2 = key + ':c' + ev.tw.cut + ':q' + ev.tw.res + ':d' + ev.tw.dec + ':a' + ev.tw.atk; let r2 = VAR.map.get(k2);
+    const k2 = key + ':c' + ev.tw.cut + ':q' + ev.tw.res + ':d' + ev.tw.dec; let r2 = VAR.map.get(k2);
     if (!r2 || r2.src !== rec.data){ r2 = {sr:rec.sr, data:shapeData(rec.data, rec.sr, ev.tw), src:rec.data}; varPut(k2, r2); }
     rec = r2; key = k2;
   }
@@ -19849,13 +19848,13 @@ function makeSeq(S, mode, o){
         else if (X <= FXSLOTS || X === 9) for (const k of X === 9 ? all : [X - 1]){ evs.push({type:'fxc', t:at, track:t, p:'sw' + k, v:Y ? 1 : 0});
           if (Y >= 2) evs.push({type:'fxc', t:at + Y * line, track:t, p:'sw' + k, v:-1}); } }
       // FLX / GAT / RTG (owner, 31 Oct): a pattern given to an effect switched off by FXO switches its slot back as set (on)
-      const slotWake = (cmd, on) => { if (!on) return; const A = t >= MT ? S.mfx : S.tfx[t], ty = FX_NEEDS[cmd];
-        (A || []).forEach((f, k) => { if (f && f.type === ty && k < FXSLOTS) evs.push({type:'fxc', t:at, track:t, p:'sw' + k, v:-1}); }); };
+      const slotWake = (cmd, on, sw = -1, at2 = at) => { if (!on) return; const A = t >= MT ? S.mfx : S.tfx[t], ty = FX_NEEDS[cmd];
+        (A || []).forEach((f, k) => { if (f && f.type === ty && k < FXSLOTS) evs.push({type:'fxc', t:at2, track:t, p:'sw' + k, v:sw}); }); };
       if (fx.FLX != null){ evs.push({type:'fxc', t:at, track:t, p:'flx', v:flxCap(fx.FLX)}); slotWake('FLX', fx.FLX > 0); }
       if (fx.FLY != null){ evs.push({type:'fxc', t:at, track:t, p:'flx', v:fx.FLY ? 256 + fx.FLY : 0}); slotWake('FLY', fx.FLY > 0); }   // FLY (5 Nov): the Flex's second bank, 256 + v
       if (fx.GAT != null){ evs.push({type:'fxc', t:at, track:t, p:'gat', v:fx.GAT === 0 ? 0 : fx.GAT >= 16 ? 16 : fx.GAT}); slotWake('GAT', fx.GAT !== 0); }   // GAT 00 stops it, 10 and up: the CUSTOM steps
-      if (fx.RTG != null){ const X = fx.RTG >> 4, Y = fx.RTG & 15; evs.push({type:'fxc', t:at, track:t, p:'rtg', v:X ? Math.min(8, X) : 0}); slotWake('RTG', X > 0);
-        if (X && Y) evs.push({type:'fxc', t:at + Y * line, track:t, p:'rtg', v:-1}); }
+      if (fx.RTG != null){ const X = fx.RTG >> 4, Y = fx.RTG & 15; evs.push({type:'fxc', t:at, track:t, p:'rtg', v:X ? Math.min(8, X) : 0}); slotWake('RTG', true, X ? 1 : -1);   /* (9 Nov, owner: a new RTG switches the slot on, even one saved off; RTG 00 puts it back as saved) */
+        if (X && Y){ evs.push({type:'fxc', t:at + Y * line, track:t, p:'rtg', v:-1}); slotWake('RTG', true, -1, at + Y * line); } }
       if (t === MT && fx.VOL != null) evs.push({type:'mvol', t:at, v:fx.VOL});
       // BYP XY (…chains module bypass): X the module's number (0 = all), Y 0 in, 1 bypassed, 2–F flipped for Y rows
       if (fx.BYP != null && t < MT){ const X = fx.BYP >> 4, Y = fx.BYP & 15;
@@ -19929,8 +19928,8 @@ function makeSeq(S, mode, o){
         if (fx.CUT != null) T.cut = fx.CUT >= 255 ? null : fx.CUT;
         if (fx.RES != null) T.res = fx.RES;
         if (fx.DEC != null) T.dec = fx.DEC >= 255 ? null : fx.DEC;
-        if (fx.ATK != null) T.atk = fx.ATK >= 255 ? null : fx.ATK;
-        if (fx.REL != null) T.rel = fx.REL >= 255 ? null : fx.REL;
+        if (fx.ATK != null) T.cAtk = fx.ATK >= 255 ? null : fx.ATK;
+        if (fx.REL != null) T.cRel = fx.REL >= 255 ? null : fx.REL;
         if (fx.ARC != null) T.arc = {mode:fx.ARC >> 4, spd:(fx.ARC & 15) || 1};
         if (fx.DIR != null){ T.dir = Math.min(3, fx.DIR); T.pp = T.dir === 1 ? -1 : 1; }   // DIR: from the next row on
         if (fx.HOP != null) hop = Math.min(fx.HOP, PROWS - 1);
@@ -20007,7 +20006,7 @@ function makeSeq(S, mode, o){
             if (!q) firstRate = rate;
             const ev = {type:'note', t:nat, track:t, poly, col:ncol[q], pad:vtrk ? voiceForTrack(t) : I.pad, rate, gain:gain * hg, pan:fx.PAN != null ? fx.PAN : I.pan, ofs:fx.STA != null ? fx.STA : I.ofs,
               rev:fx.PLY != null ? (fx.PLY & 1) === 1 : !!I.rev, cut:fx.KIL != null ? nat + fx.KIL * tick : null, rel:fx.OFF != null ? nat + fx.OFF * tick : null,
-              slide:fx.PSL && !q ? {from:T.rate, dur:fx.PSL * tick} : null, vk:fx.GEN != null ? 'g' + fx.GEN : fx.MUT != null ? 'm' + fx.MUT : null, tw:pc != null || pdc != null || T.atk != null ? {cut:pc, res:prs, dec:pdc, atk:T.atk} : null, ...(T.rel != null ? {rlo:decSec(T.rel)} : {}), slc:fx.SLC != null ? fx.SLC : null, fdi:fx.FDI ? fx.FDI * tick : 0, trm:fx.TRM || 0, apn:fx.APN || 0, wob:fx.WOB != null ? wobOf(fx.WOB) : null, acc:(fx.VOL != null ? fx.VOL : r[VC]) >= 0xC0, ...mods,
+              slide:fx.PSL && !q ? {from:T.rate, dur:fx.PSL * tick} : null, vk:fx.GEN != null ? 'g' + fx.GEN : fx.MUT != null ? 'm' + fx.MUT : null, tw:pc != null || pdc != null ? {cut:pc, res:prs, dec:pdc} : null, ...(T.cRel != null ? {rlo:decSec(T.cRel)} : {}), slc:fx.SLC != null ? fx.SLC : null, fdi:fx.FDI ? fx.FDI * tick : T.cAtk != null ? decSec(T.cAtk) : 0, trm:fx.TRM || 0, apn:fx.APN || 0, wob:fx.WOB != null ? wobOf(fx.WOB) : null, acc:(fx.VOL != null ? fx.VOL : r[VC]) >= 0xC0, ...mods,
               ii, mn:note + 12 + ntc / 100, vel:hg * (fx.VOL != null ? fx.VOL : r[VC] >= 0 ? r[VC] : 255) / 255, tick, vc:fx.VOL != null ? fx.VOL : r[VC]};   // ii, mn (MIDI note: C-4 is 60), vel: for MIDI out; tick: NOTE LEN
             if (!o.sim && ((I.slc | 0) > 1 || I.sync)){ const c = o.live ? ensurePlay(ev.pad) : ensure(ev.pad); if (c){ applyChop(ev, I, ev.pad, n, note - n, nb, c.data, c.sr); if (!q) firstRate = ev.rate; } }
             if (ev.vk && o.live && !o.sim) try { varWant(ev); } catch(e){}   // MUT / GEN: start its render now, ahead of the note
@@ -21366,7 +21365,7 @@ function tStart(mode, o){
   if (mode === 'song' && (o.row | 0) > 0) try { chaseFx(o.row | 0, seq.time); } catch(e){ tpLog('chase', e); }   // CHASE: the effect commands before the start row
   tp.core = false;
   if (aset.core === 'core' && core.ready && !core.bad && !(o && o.page)) coreStart(mode, o, t0start, rsFirst ? {ref:pz.ref, row:pz.row, step:pz.step} : null);
-  pbLog('PLAY ' + mode + ' · ' + pbState());   // not loaded yet: this PLAY as before, the core loads at STOP
+  pbLog('PLAY ' + mode + ' · ' + pbState()); setTimeout(() => { if (tp.on) pbLog(`4 s into PLAY: level ${pbLevel()}`); }, 4000);   // (9 Nov: to compare Latency settings)   // not loaded yet: this PLAY as before, the core loads at STOP
   if (lkp) lkStarted(lkp);   // ABLETON LINK: Link's exact tempo; ours tells the session
   tp.timer = pumpTimer(); pump(); if (!handing) draw(); songBtn(); chainsTempo(); if (typeof frameWake === 'function') frameWake();   // (a hand-over happens out of view: no draw, which was most of its time)
   bgPlay(true);   // BACKGROUND PLAY
@@ -21510,7 +21509,7 @@ function padBlink(e){
    Off (Page), nothing here runs. */
 // CORE_REV: a hash of core/seq-core.js, written by tools/make-core.mjs. The offline cache keeps a file by its URL, so the
 // URL must change whenever the file does (the build number alone left phones on an old core all evening, 2 Nov).
-const CORE_REV = '1pd82rw';
+const CORE_REV = '12a7jut';
 const CORE_WANT = 7;   // the core's message set this page speaks (core-processor.js CORE_V); an older core is not used
 const CORE_URL = () => 'core/seq-core.js?v=' + BUILD + '-' + CORE_REV;
 const core = {node:null, ready:false, loading:null, gen:0, sent:new Map(), sT:0, tally:new Map(), mir:null};   // mir: what the core's song holds, as JSON per part (coreDiff)   // tally: events by who played them (test hook)
@@ -21811,7 +21810,8 @@ function tStop(quiet){
   }
   // STOP CURSOR: a STOP you make (not a restart, a song change or the song running out while hidden) puts the cursor there
   const stopP = !quiet && stopToPlayhead() && tp.on && tp.pos && tp.pos.some(Boolean) ? {P:tp.pos.map(q => q && Object.assign({}, q)), mode:tp.mode} : null;
-  tp.timer = 0; tp.on = false; fpMem = null; tp.q = []; tp.pos = null; tp.snd = null; tp.stopAt = null; tp.ahead = tp.aheadT = 0;
+  const home = !quiet && tp.on && !stopToPlayhead() ? fpHome : null;   // (9 Nov, owner: with ON STOP at STAYS it still ended up at the playback spot: FOLLOW had carried it there)
+  tp.timer = 0; tp.on = false; fpMem = null; fpHome = null; tp.q = []; tp.pos = null; tp.snd = null; tp.stopAt = null; tp.ahead = tp.aheadT = 0;
   // HAND-OVER (seqHandover): the core and the voices already booked keep sounding until the page sequencer's first step
   if (tp.core){ tp.core = false; core.gen++; if (!handing){ coreWire(false); try { core.node.port.postMessage({op:'stop', at:ctx.currentTime}); } catch(e){} } }
   else if (aset.core === 'core' && !core.ready && ctx) setTimeout(() => { try { if (!tp.on) coreLoad(); } catch(e){} }, 400);
@@ -21823,6 +21823,7 @@ function tStop(quiet){
   chainsTempo();
   if (!handing){ bgPlay(false); wakeLock(false); }   // BACKGROUND PLAY, KEEP SCREEN ON (a hand-over plays on)
   if (stopP) try { if (curToPlay(stopP.P, stopP.mode) && tp.paused) tp.paused.key = curKey(); } catch(e){ tpLog('stop cursor', e); }
+  else if (home) try { cs.song.y = home.y; cs.song.top = home.top; cPhrase = home.p; cSect = home.s; cs.phrase.y = home.py; cs.phrase.top = home.ptop; cs.song.pg = cs.phrase.pg = false; if (tp.paused) tp.paused.key = curKey(); } catch(e){ tpLog('stop cursor', e); }
   if (!quiet) draw();
 }
 /* ===== REC, METRONOME AND COUNT-IN (20 Oct) =====
@@ -23006,6 +23007,7 @@ let kpOn = (() => { try { const v = localStorage.getItem(KPOK); if (v === '0' ||
 function setKp(on){ kpOn = !!on; try { localStorage.setItem(KPOK, kpOn ? '1' : '0'); } catch(e){} draw(); fit(); draw(); }
 // Song: the cursor's row follows its track. Sect and Phrase: they switch to what the cursor's track is
 // playing and the cursor rides along. Not while a selection is being made.
+var fpHome = null;   // STAYS (9 Nov): where the cursor was before FOLLOW first moved it
 var fpMem = null;   // FOLLOW PATTERN: what each track last played (cleared on STOP and when the follow mode changes)
 function followPlay(){
   if (!tp.on || !tp.pos || sdrag || drag) return;
@@ -23015,7 +23017,8 @@ function followPlay(){
   // A SELECTION keeps the cursor and the selection where they are, but Arrange still turns its pages with the playhead
   // (owner, 2 Nov: after selecting rows, Arrange stopped paging even with FOLLOW on: this used to return before paging).
   if (selA){ arrFollowPage(own); return; }
-  if (performance.now() - workT < FOLLOW_HOLD){ arrFollowPage(own); return; }   // EDITING: it catches up when you've let go (a change made meanwhile still shows then)
+  if (performance.now() - workT < FOLLOW_HOLD){ arrFollowPage(own); return; }
+  if (!fpHome || workT > fpHome.t) fpHome = {t:performance.now(), y:cs.song.y, top:cs.song.top, p:cPhrase, s:cSect, py:cs.phrase.y, ptop:cs.phrase.top};   // EDITING: it catches up when you've let go (a change made meanwhile still shows then)
   if (followMode === 1){   // FOLLOW PATTERN: only which phrase / sect is shown follows the cursor's track; nothing scrolls
     // ON A CHANGE ONLY (owner, 7 Nov: "a single phrase on a track, I can't move the cursor off of that phrase"): it jumps when
     // what the track plays changes, not on every step, so with one phrase (or one block) playing you can move away from it.
