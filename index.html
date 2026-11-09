@@ -1129,8 +1129,8 @@ body:not(.legon) .tside .tlegend{display:none}
 /* MUTE / SOLO (owner, 8 Nov): nice to have, so only where there's room (unfolded and larger). Pink / green when off, black when on. */
 #kMute, #kSolo{display:none}
 @container (min-width:600px){ .keys.wide{grid-template-columns:repeat(5,calc(var(--kw, var(--k)) * 1.02))} #kMute, #kSolo{display:inline-flex} .tpad{--kw:min(var(--k), calc((100cqw - 75px) / 8.1))} }
-#tPad #kMute{background:#ff2e93; color:#141414} #tPad #kSolo{background:#23a45c; color:#141414}
-#tPad #kMute.lt, #tPad #kSolo.lt{background:#141414; color:#fff}
+#tPad #kMute{background:#ff2e93 !important; color:#141414 !important} #tPad #kSolo{background:#23a45c !important; color:#141414 !important}   /* (!important: the skins style lit keys very specifically) */
+#tPad #kMute.lt, #tPad #kSolo.lt{background:#141414 !important; color:#fff !important}
 .k.dn,.k.on{background:var(--ink); color:var(--inv)}
 #kPlay.on{background:var(--pl); border-color:var(--line); color:var(--inv)}
 .k.lt{background:var(--pl); color:var(--inv); border-color:var(--line)}
@@ -22839,7 +22839,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 520;
+const BUILD = 521;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD + (location.pathname.includes('/beta/') ? ' · beta' : '');
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
