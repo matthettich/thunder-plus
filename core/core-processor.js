@@ -155,6 +155,7 @@ class Rd {
     this.l1 = 0; this.l2 = 0; this.ring = new Float32Array(RD_RING);
     const s0 = Math.max(0, Math.floor(start) - 4096); this.hi = s0; this.lo = s0;   // (the filter settles in the warm-up)
     this.kd = tau ? Math.exp(-1 / (tau * sr)) : 1; this.e = tau ? Math.pow(this.kd, s0) : 1;
+    this.atk = tw.atk != null ? Math.ceil(decSec(tw.atk) * sr) : 0;   // ATK
   }
   raw(c, i){ const D = c ? this.src2 : this.src; if (!D || i < 0 || i >= this.len) return 0; return D[this.rev ? this.len - 1 - i : i]; }
   at(c, i){
@@ -163,6 +164,7 @@ class Rd {
     while (this.hi <= i){ const n = this.hi; let x = n < this.len ? this.src[n] : 0;
       if (this.f){ const v3 = x - this.l2, v1 = this.a1 * this.l1 + this.a2 * v3, v2 = this.l2 + this.a2 * this.l1 + this.a3 * v3; this.l1 = 2 * v1 - this.l1; this.l2 = 2 * v2 - this.l2; x = v2; }
       if (this.tau){ x *= this.e; this.e *= this.kd; const m = this.N - 1 - n; if (m < 64) x *= m / Math.min(this.N, 64); }
+      if (n < this.atk) x *= n / this.atk;
       this.ring[n & RD_M] = x; this.hi = n + 1; }
     return i < this.hi - RD_RING ? 0 : this.ring[i & RD_M];
   }
@@ -466,7 +468,7 @@ class ThunderCore extends AudioWorkletProcessor {
     if (ev.fdi > 0){ g.set(0, t0n); g.lin(ev.gain, t0n + ev.fdi); }
     if (ev.trm && dep(ev.trm) > 0){ const k = dep(ev.trm) / 2; trm = {hz:hz(ev.trm), d:ev.gain * k, t:t0n}; if (!(ev.fdi > 0)) g.v0 = ev.gain * (1 - k); }
     if (ev.apn && dep(ev.apn) > 0) apn = {hz:hz(ev.apn), d:dep(ev.apn), t:t0n};
-    const syn = !!kv.syn, v = {data, data2, sr:c.sr, r, g, f, pn, trm, apn, base:ev.rate, rate:ev.rate, choke:ck, col:ev.col, ended:false, stopAt:null, syn, rel:syn ? kv.rel || 0 : 0, track:ev.track, end:Infinity, pos:0, t0:0};
+    const syn = !!kv.syn, v = {data, data2, sr:c.sr, r, g, f, pn, trm, apn, base:ev.rate, rate:ev.rate, choke:ck, col:ev.col, ended:false, stopAt:null, syn, rel:syn ? (ev.rlo != null ? ev.rlo : kv.rel || 0) : 0, track:ev.track, end:Infinity, pos:0, t0:0};
     if (!ev.slide) this.pitchMods(v, ev.t, ev.rate, ev);
     const off = ev.ofsSec != null ? (ev.rev ? Math.max(0, dur - ev.ofsSec - ev.durSec) : ev.ofsSec) : Math.max(0, Math.min(255, ev.ofs || 0)) / 256 * dur;
     if (off > 0.0005){ f.set(0, t0n); f.lin(1, t0n + 0.0015); }

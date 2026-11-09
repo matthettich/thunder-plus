@@ -391,7 +391,7 @@ test('build 398: …waves live engine', () => {
 test('FOLLOW PATTERN: a track playing one phrase lets the cursor move off it; a new phrase or row still pulls it over', () => {
   const blk = cut('index.html', /var fpMem = null;[\s\S]*?\nfunction followPlay\(\)\{[\s\S]*?\n\}\n(?=\/\/ ARRANGE PAGES)/, 'fpMem and followPlay');
   const c = run(`var tp = {on:true, mode:'song', pos:null}, sdrag = 0, drag = 0, tv = 'phrase', cTrack = 0, followMode = 1, selA = null,
-    cSect = 0, cPhrase = 0, arrHandT = -1e9, apReady = false, apF = '', apLastKey = '', cs = {phrase:{y:0}, song:{x:0, y:0}};
+    cSect = 0, cPhrase = 0, arrHandT = -1e9, workT = -1e9, FOLLOW_HOLD = 4000, apReady = false, apF = '', apLastKey = '', cs = {phrase:{y:0}, song:{x:0, y:0}};
     const plen = () => 16, pvActive = () => false, pvFollow = () => {}, arrFollowPage = () => {}, asongOn = () => false;
     ${blk}
     this.api = { step(P){ tp.pos = P; followPlay(); }, st: () => ({cPhrase, y: cs.song.y}), set(o){ if ('cPhrase' in o) cPhrase = o.cPhrase; if ('y' in o) cs.song.y = o.y; if ('tv' in o) tv = o.tv; },
@@ -422,7 +422,7 @@ test('instrument big step: past either end it stays put rather than clamping to 
 test('mobile stalls: playhead-only Arrange redraws are thinned on touch, and the page sequencer moves on sooner there', () => {
   const src = H.read('index.html');
   assert.match(src, /if \(playDraw && COARSE\)\{ const t = performance\.now\(\); if \(t - arrPlayT < 240\) return;/);
-  assert.match(src, /s\.time < ctx\.currentTime - \(COARSE && !document\.hidden \? 0\.15 : 0\.5\)/, 'desktop keeps 0.5 s');
+  assert.match(src, /s\.time < ctx\.currentTime - \(COARSE && !document\.hidden \? Math\.max\(0\.15, outLat \+ 0\.05\) : 0\.5\)/, 'desktop keeps 0.5 s');
 });
 
 test('Mobile: SHIFT+▲ goes to Arrange from every screen', () => {
@@ -433,4 +433,19 @@ test('the pad has latching MUTE and SOLO', () => {
   const src = H.read('index.html');
   assert.match(src, /data-b="mute" id="kMute"/); assert.match(src, /data-b="solo" id="kSolo"/);
   assert.match(src, /if \(b === 'mute' \|\| b === 'solo'\)\{ clearTimeout\(rep\); b === 'mute' \? muteKey\(true\) : soloKey\(\); return; \}/);
+});
+
+test('Phrase ◀ ▶ step one column at a time (no skipped INST / FX value / chord columns)', () => {
+  const blk = cut('index.html', /function move\(dx, dy\)\{[\s\S]*?\n\}\n/, 'move');
+  const run1 = (cols, from, dx) => {
+    const cs = { phrase: { x: from, y: 0 } };
+    const c = run(blk + '\nthis.go = () => move(' + dx + ', 0);', { tv: 'phrase', cs, dims: () => ({ w: 12, h: 16 }), pvActive: () => false, pCols: () => cols,
+      mstView: () => false, busFxView: () => false, draw() {}, FX0: 6 });
+    c.go(); return cs.phrase.x;
+  };
+  const mono = [0, 4, 5, 6, 7, 8, 9, 10, 11], poly = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
+  for (const cols of [mono, poly]) for (let i = 0; i < cols.length; i++) {
+    assert.equal(run1(cols, cols[i], 1), cols[Math.min(i + 1, cols.length - 1)], 'right from ' + cols[i]);
+    assert.equal(run1(cols, cols[i], -1), cols[Math.max(i - 1, 0)], 'left from ' + cols[i]);
+  }
 });
