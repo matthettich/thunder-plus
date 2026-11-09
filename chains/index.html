@@ -1708,7 +1708,7 @@ const NOTES = {
   trackIn: m => 'Tracker track ' + (m.params.track | 0) + ' in (stereo). Standalone this is silence; in …Thunder Plus it carries that track’s sound.',
   chainOut: m => 'Returns to tracker track ' + (m.params.track | 0) + ' (stereo, after Level). In …Thunder Plus the Mixer sends it back through that track and anything after it.'
 };
-for (const t in MODULES) if (MODULES[t].fx && !NOTES[t]) NOTES[t] = () => WASM_OK.tfx ? null : 'Couldn’t load the effects code (dsp/tfx.wasm), so this passes sound through unchanged.';
+for (const t in MODULES) if (MODULES[t].fx && !NOTES[t]) NOTES[t] = () => WASM_OK.tfx ? null : 'Couldn’t load the effects. This module passes sound through unchanged.';
 NOTES.rings = NOTES.rings || NOTES.eq; NOTES.clouds = NOTES.clouds || NOTES.eq;
 let WASM_OK = { tfx:true };
 
@@ -1950,7 +1950,7 @@ class ChainsBridge {
   _recv(m){
     if (!m || (m.target && m.target !== TARGET)) return;
     if (m.op === 'ready'){
-      if (m.value.protocol !== PROTOCOL){ this._emit('error', { message:'Stale engine: bump CACHE in sw.js and reload.' }); return; }
+      if (m.value.protocol !== PROTOCOL){ this._emit('error', { message:'The sound engine is out of date. Reload the page to update it.' }); return; }
       this._ready = true;
       for (const q of this._queue) this.port.postMessage(q);
       this._queue.length = 0; this._emit('ready', m.value);
@@ -2060,7 +2060,7 @@ const PORT_TIP = {
   scin:{ out:{ l:'Audio', t:'Sidechain audio — what Source picks (a track’s own sound, or a send). Patch into any audio input.' },
          env:{ l:'Envelope', t:'Sidechain envelope — rises as the sidechain hits, as a control voltage. Patch into a CV jack to open something on each hit (a cutoff…).' },
          duck:{ l:'Duck', t:'Sidechain duck — 1 while the sidechain is quiet, dipping on each hit. Patch into a VCA’s CV to duck a sound (the classic pump).' } },
-  sccomp:{ sc:{ t:'Sidechain input — patch a signal here to duck by it (it always wins), or leave it unpatched and pick Source. The light flashes with the sidechain it hears.' } },
+  sccomp:{ sc:{ t:'Sidechain input: a cable here always wins. Patch any signal to duck by it, or leave it unpatched to use Source. The light flashes with the sidechain it hears.' } },
   buscomp:{ sc:{ t:'Sidechain input — a cable here always wins: patch a Sidechain In (set to a track or a send) to duck by it. Unpatched: Source (Self, a track or a send).' } },
   glue:{ sc:{ t:'Sidechain input — a cable here always wins: patch a Sidechain In (set to a track or a send) to duck by it. Unpatched: Source (Self, a track or a send).' } },
   scout:{ in:{ t:'What to send: Send (1–8) carries it to every Sidechain In set to that send, in this chain or another track’s.' } },
@@ -2116,8 +2116,8 @@ function routeTrackChange(n, v){
   // after their own faders, and its fader and effects level them all. Back on a Track In's track, it's an insert again.
   const bus = !ins.some(m => (m.params.track | 0) === N);
   if (!bus && outs.some(m => m !== n.m && !m.bus && (m.params.track | 0) === N)){ toast('Track ' + N + ' already has a chain, so this one stays on track ' + old + '.'); return { reject:true }; }
-  if (bus && !n.m.bus) toast('Chain Out to track ' + N + ': a bus. The tracks whose Track In feed it now play through track ' + N + ', after their own faders; track ' + N + '’s fader and effects level them all.', 6000);
-  if (!bus && n.m.bus) toast('Chain Out back on track ' + N + ': an insert again.');
+  if (bus && !n.m.bus) toast('Chain Out is now a bus on track ' + N + '. The tracks feeding it play through track ' + N + ' after their own faders. Track ' + N + '’s fader and effects level them all.', 6000);
+  if (!bus && n.m.bus) toast('Chain Out is back on track ' + N + ' as an insert.');
   n.m.bus = bus ? 1 : 0;
   return { v:N };
 }
@@ -2125,7 +2125,7 @@ function alignChainTracks(quiet){
   const { ins, outs } = chainTrackLists();
   if (ins.length !== 1) return;   // with several Track Ins, pairing is up to the user
   const N = ins[0].params.track | 0;
-  for (const o of outs) if (!o.bus && (o.params.track | 0) !== N){ applyChainTrack(o, N); if (!quiet) toast('Chain Out follows the Track In — track ' + N + '.'); }   // a bus keeps its track
+  for (const o of outs) if (!o.bus && (o.params.track | 0) !== N){ applyChainTrack(o, N); if (!quiet) toast('Chain Out now follows the Track In on track ' + N + '.'); }   // a bus keeps its track
 }
 function setParam(n, key, v, fromUser){
   if (key === 'track' && (n.m.type === 'trackIn' || n.m.type === 'chainOut')){
@@ -2392,7 +2392,7 @@ function applyPreset(n, name, vals){
 function paintPre(n){
   if (!n.preBtn) return; const nm = n.m.pre;
   n.preBtn.firstChild.textContent = nm ? nm + (n.m.preEd ? ' (edited)' : '') : '—';
-  n.preBtn.title = nm ? 'Preset: ' + nm + (n.m.preEd ? ', changed since' : '') + '. Click for presets, Default, or to save yours.' : 'Presets: pick one, go back to Default, or save this module’s settings as yours';
+  n.preBtn.title = nm ? 'Preset: ' + nm + (n.m.preEd ? ' (changed since it was applied)' : '') + '. Click for presets, Default, or to save yours.' : 'Presets: pick one, go back to Default, or save this module’s settings as yours';
 }
 function preMenu(n, btn){
   const t = n.m.type, def = MODULES[t], r = btn.getBoundingClientRect(), fac = PRESETS[t] || [], mine = preUserOf(t), cur = n.m.pre, mark = s => (s === cur && !n.m.preEd ? '✓ ' : '') + s;
@@ -2404,7 +2404,7 @@ function preMenu(n, btn){
     const nm = nm0 && nm0.trim().slice(0, 40); if (!nm) return;
     const vals = {}; for (const k in def.params) if (!PRE_SKIP.has(k)) vals[k] = n.m.params[k];
     const list = preUserOf(t).filter(x => x[0] !== nm); list.push([nm, vals]); list.sort((a, b) => a[0].localeCompare(b[0])); preUserSet(t, list);
-    n.m.pre = nm; delete n.m.preEd; paintPre(n); store.touch(); toast('Saved “' + nm + '”: it’s in every ' + def.label + '’s Preset list.');
+    n.m.pre = nm; delete n.m.preEd; paintPre(n); store.touch(); toast('Saved “' + nm + '”. It now shows in every ' + def.label + ' preset list.');
   }]);
   if (mine.length) items.push(['Delete one of yours…', () => showMenu(r.left, r.bottom + 2, mine.map(([nm]) => ['Delete “' + nm + '”', () => {
     preUserSet(t, preUserOf(t).filter(x => x[0] !== nm)); for (const x of nodes.values()) if (x.m.type === t && x.m.pre === nm) paintPre(x); toast('Deleted the preset “' + nm + '”.'); }]))]);
@@ -3292,7 +3292,7 @@ function renderQuick(){
     grid.append(h('div', {class:'pwrap'}, paletteItem(t, LABELS[t], true), un));
   }
   quickEl.replaceChildren(
-    h('div', {class:'qhead'}, h('span', {class:'qt', text:'Quick access'}), h('span', {class:'qhint', text:'★ a module below to add it here'})),
+    h('div', {class:'qhead'}, h('span', {class:'qt', text:'Quick access'}), h('span', {class:'qhint', text:'Star a module below to add it here.'})),
     pstate.quick.length ? grid : h('div', {class:'qempty', text:'Nothing here yet. Star any module below to keep it handy.'}));
   for (const [key, st] of Object.entries(stars)){
     const t = key.replace(/:all$/, ''), on = pstate.quick.includes(t);
@@ -3555,7 +3555,7 @@ const PAGE_ABOUT = {
   repeat:'Repeat: beat repeat. While Hold is on (or Gate is high) it loops the slice that just played, one note value long; Decay fades each pass and Pitch drops it. Reverse plays the slice backwards; Tape stop slows the sound to a halt.',
   vocoder:'A vocoder: the sound you patch into In L is the carrier, and In R is the modulator that shapes it (leave In R unpatched and it uses In for both). Mode picks the band count — Talkbox and the 4…64 band banks split the carrier into bands that the modulator’s levels open and close, or Spectral cross-synthesises them with an FFT. Resonance sharpens the bands, Attack and Release set how fast the levels follow, Mix blends the vocoded sound with the dry carrier, and Level sets the output.',
   scin:'Sidechain In: brings a sidechain into this chain. Source picks what it listens to: a send (Send 1–8, what a Sidechain Out sends) or one track’s own sound, before its effects and fader, so even a muted “ghost” kick drives it. The meter shows what it hears (IN) and the envelope (ENV), before you patch it anywhere. Out is the sound (Level sets how loud), Envelope rises with each hit (to open a filter) and Duck dips with it (into a VCA’s CV, to pump a sound). Sensitivity sets how hard the hits push them (raise it for a quiet kick) and Release how fast they recover. Or just drop a Sidechain Comp after this track’s sound.',
-  scout:'Sidechain Out: sends what you patch into it to Send 1–8. Any Sidechain In with its Send set to that number hears it, in this chain or in another track’s (in …Thunder Plus a block later, about 3 ms). So a drum bus made here can duck the pads on another track: Sidechain Out → Send 1 here, and there Sidechain In (Send 1) → the SC of a compressor.',
+  scout:'Sidechain Out: sends what you patch into it to Send 1–8. Any Sidechain In with its Send set to that number hears it, in this chain or in another track’s (in …Thunder Plus, about 3 ms later). So a drum bus made here can duck the pads on another track: Sidechain Out → Send 1 here, and there Sidechain In (Send 1) → the SC of a compressor.',
   sccomp:'Sidechain Comp: ducks its In by the sidechain — whatever is patched into SC, or what Source picks (another track or a send), so a kick on another track can pump this one. Threshold, Ratio, Attack, Release, Makeup and Mix. With Source on Self and nothing in SC it compresses its own input.',
   lfo:'A slow oscillator for wobbles and sweeps. Depth sets how far it moves a slider; Sync to tempo follows the tempo. Reset restarts its cycle.',
   adsr:'An envelope for shaping effects: patch a gate into it and its output into a slider’s modulation jack.',
@@ -3579,7 +3579,7 @@ function helpDoc(){
     ['Modules', 'Open the Modules list on the left. Click a module to add it to the middle of the view, or drag it onto the patch. Star a module to keep it in Quick access. Drag a module by its title bar; double-click the title bar to collapse it. Double-click a slider to reset it, or its value to type one.'],
     ['Selecting and the right-click menu', 'As in Max: click a module to select it, Shift-click to add it or take it out, Shift-drag on the background for a selection box (a plain drag there moves the view to it). Delete or Backspace removes the selection. Hold Option (Alt on Windows) and drag a module’s title bar to copy it (or the selection) and drop the copy where you let go; Option-click opens its help; Ctrl/⌘-click works a module without selecting it. Right-click to group them, copy, duplicate, delete, or make a custom module that you can add again from the list.'],
     ['Presets', 'Effects and sound sources have a Preset row at the top. Pick a factory preset (it sets every control: the ones it names, the rest back to their defaults), Default, or one of yours; Undo takes it back. Save as a preset keeps the module’s settings on this device under a name, for every patch; Delete one of yours removes one. The row keeps the preset’s name and says “edited” once you move a control.'],
-    ['Bypass', 'BYP on an effect’s title bar passes its dry sound (its number, 1–F, is what the tracker’s BYP command switches from a phrase: BYP 31 bypasses module 3 on that track, BYP 20 brings module 2 back).'],
+    ['Bypass', 'BYP on an effect’s title bar passes its dry sound. In a phrase, the tracker’s BYP command switches it by its number (1–F): BYP 31 bypasses module 3 on that track, BYP 20 brings module 2 back.'],
     ['MIDI learn', 'Press MIDI learn, click a slider, then move a knob on your controller. Press Delete to clear the slider’s mapping, and Done when you’re finished.'],
     ['Saving', 'Your patch saves itself as you work. File → Save downloads it as a .chains.json file; Open loads one (…waves patches open too, keeping their effects). Settings → Backups holds earlier versions.']
   ];

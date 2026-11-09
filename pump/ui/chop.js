@@ -238,7 +238,7 @@ U.define('chop', {W:1000, H:628, nW:480, nH:978, bypass:true, back:0, make(ui){
     layout, drawBody, key, keyUp, help,
     hover(x, y){
       const lp = learnAt(x, y); if (lp >= 0){ ui.status = 'Learn: then press a MIDI note or a computer key for pad ' + (lp + 1); return; }
-      const p = padAt(x, y); if (p >= 0){ ui.status = 'Hold to play pad ' + (p + 1) + ' (its key ' + keyName(Math.round(V(ps(p, 'key')))) + ', its MIDI note ' + noteName(V(ps(p, 'note'))) + '); two held loop'; return; }
+      const p = padAt(x, y); if (p >= 0){ ui.status = 'Hold to play pad ' + (p + 1) + ' (key ' + keyName(Math.round(V(ps(p, 'key')))) + ', MIDI note ' + noteName(V(ps(p, 'note'))) + '). Hold two to loop.'; return; }
       if (regionR.has(x, y)) ui.status = 'The captured bar, cut into slices: it follows the song until a pad goes down';
       else if (nowR.has(x, y) && ninOff) ui.status = 'MIDI notes reach CHOP from the slot’s NOTES FROM (FX screen); it is OFF';
     },

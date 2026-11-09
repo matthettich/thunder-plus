@@ -117,13 +117,13 @@ U.define('master', {W:940, H:560, nW:480, nH:1060, bypass:true, back:8192, make(
   destM.textFn = () => { const i = curDest(); return i >= 0 ? DEST[i].face + ' ' + DEST[i].lufs : 'CUSTOM ' + V('target').toFixed(1); };
   destM.tip = 'Destination: sets the loudness TARGET for where the master is going (Streaming -14, Standard -13.5 = the reference’s level, Vinyl -12 with the bass mono below 150 Hz, Club -9). Wheel steps through them';
   const modeSeg = ui.seg('loud_mode', ['GENTLE', 'TARGET']);
-  modeSeg.tip = 'Gentle: only as loud as the peaks allow (a couple of dB of peak limiting at most), never past TARGET. Target: to TARGET, however much limiting it takes';
+  modeSeg.tip = 'Gentle: only as loud as the peaks allow (a couple of dB of peak limiting at most), never past TARGET. Target: reaches TARGET, however much limiting it takes.';
   const targetDial = ui.dial('target', 'TARGET', 's'); targetDial.tip = 'Loudness target (LUFS, integrated). In Gentle mode the most it will reach';
   const ceilDial = ui.dial('ceiling', 'CEILING', 's'); ceilDial.tip = 'True-peak ceiling (dBTP). -1 is safe for streaming encodes; 0 gives about 1 dB more level';
   targetDial.tabGroup = ceilDial.tabGroup = 2;
   // ADVANCED: offsets on top of what auto chose, and the details
   const advBtn = ui.button('ADVANCED', () => setAdvanced(!advanced), () => advanced);
-  advBtn.tip = 'Advanced: tweak what auto set (every value is an offset on top of auto: zero = auto), plus eight free EQ bands. A key';
+  advBtn.tip = 'Advanced: tweak what auto set (every value is an offset on top of auto: zero = auto), plus eight free EQ bands. Shortcut: A.';
   const resetTrimBtn = ui.button('RESET TRIMS', () => { const o = {}; TRIMS.forEach(s => o[s] = 0); ui.setMany(o); ui.status = 'Tone back to what auto set'; });
   resetTrimBtn.small = true; resetTrimBtn.tip = 'Put the nine auto tone points back where auto set them';
   const clearBandsBtn = ui.button('CLEAR BANDS', () => { const o = {}; for (let b = 0; b < NUB; b++) o[bs(b, 'on')] = 0; ui.setMany(o); ui.status = 'Free bands off'; });

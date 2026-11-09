@@ -1611,8 +1611,8 @@ for (let k = 1; k <= MIXN; k++) PORT_LABEL['in' + k] = 'In ' + k;
 const NOTES = {
   hostIn:'Notes from your computer keyboard, MIDI, the on-screen keys and Sequencers.',
   seq:'Plays its steps through Host In, like a keyboard. Set the tempo in Settings.',
-  plaits: () => WASM_OK.dsp ? null : 'Couldn’t load the Plaits code (dsp/thunder-dsp.wasm).',
-  elements: () => WASM_OK.dsp ? null : 'Couldn’t load the Elements code (dsp/thunder-dsp.wasm).',
+  plaits: () => WASM_OK.dsp ? null : 'Couldn’t load the Plaits sound engine.',
+  elements: () => WASM_OK.dsp ? null : 'Couldn’t load the Elements sound engine.',
   out: m => EMBED ? 'Plays on Waves In ' + m.params.slot + '. In …Thunder Plus, choose “…waves” as a layer’s oscillator and pick Waves In ' + m.params.slot + '.'
     : 'Plays on Waves In ' + m.params.slot + '. On its own, …waves plays every output through your speakers. Patch only In for mono.'
 };

@@ -190,7 +190,7 @@ U.define('tune', {W:1100, H:620, nW:480, nH:1000, bypass:true, cmdKeys:'a', make
   const formDial = dial('formant', 'FORMANT', 's', true, 'Formant: the voice’s character up (smaller, brighter) or down (bigger, darker) without changing the pitch', 2);
   const followBtn = ui.toggle('formant_follow', 'FORMANTS FOLLOW'); followBtn.small = true; followBtn.tip = 'Formants follow the pitch (the chipmunk / giant sound); off keeps them where they were';
   // ---- HARMONY ----
-  const harmSeg = ui.seg('harm_mode', ['OFF', 'SCALE', 'FIXED']); harmSeg.tip = 'Harmony: Scale = steps of the scale above or below the corrected note (2 = a third, 4 = a fifth); Fixed = semitones; with MIDI = Harmony notes the held notes';
+  const harmSeg = ui.seg('harm_mode', ['OFF', 'SCALE', 'FIXED']); harmSeg.tip = 'Harmony: Scale = scale steps above or below the corrected note (2 = a third, 4 = a fifth). Fixed = semitones. MIDI set to Harmony: the held notes set the harmony.';
   const intDial = [], lvlDial = [], panDial = [];
   for (let h = 0; h < NV; h++){
     intDial[h] = dial('h' + (h + 1), 'VOICE ' + (h + 1), 's', true, 'Harmony interval (scale steps in Scale, semitones in Fixed)', 3);

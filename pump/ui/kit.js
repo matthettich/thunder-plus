@@ -823,7 +823,7 @@ function open(t, k, info){
   const id = t + '/' + k, have = wins.get(id);
   if (have && have.type === info.type){ have.raise(); try { have.el.focus({preventScroll:true}); } catch(e){} return have; }
   if (have) have.close();
-  if (!defs[info.type]){ FX.toast('pump ' + PM.fx[info.type].name + ': its window comes in a later update. The FX boxes change its main settings.'); return null; }
+  if (!defs[info.type]){ FX.toast('pump ' + PM.fx[info.type].name + ' doesn’t have a full window yet. The FX boxes change its main settings.'); return null; }
   if (innerWidth < NARROW) for (const w of [...wins.values()]) w.close();   // a phone shows one window at a time
   const w = new Win(t, k, info); wins.set(id, w); w.raise();
   try { w.el.focus({preventScroll:true}); } catch(e){}
