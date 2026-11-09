@@ -21406,12 +21406,13 @@ function pumpRun(){
   if (tp.stopAt != null && ctx.currentTime >= tp.stopAt - 0.005) return tStop();   // EXACT STOP: its time has come
   if (tp.core) return corePump();   // THUNDER CORE: the audio thread steps the song; this tick only books MIDI clock, LFOs, clicks
   audioWake = performance.now();
+  { const P = PB.pg || (PB.pg = {n:0, gap:0, lead:9, re:0, skip:0, w:0}), w = Date.now() / 1000; if (P.w) P.gap = Math.max(P.gap, w - P.w); P.w = w; P.n++; if (tp.seq.alive()) P.lead = Math.min(P.lead, tp.seq.time - ctx.currentTime); }
   if ((view !== 'tracker' || document.hidden) && tp.q.length > 96) tp.q.splice(0, tp.q.length - 96);   // nothing drains the play positions while the synth is open (or the app is hidden: no frames)
   const s = tp.seq; let n = 0;
   // The page was stopped for a while (a frozen tab, a long pause, a system dialog): rather than playing every row
   // missed in that time at once, move the timeline on so the song continues from where it was.
   // On a touch screen it moves on sooner (8 Nov): a stall of 0.7 s played nine overdue notes at once, heard as the song rushing and clicking. Not while hidden: the system runs a hidden page in bursts, and each move would be a gap.
-  if (s.alive() && s.time < ctx.currentTime - (COARSE && !document.hidden ? 0.15 : 0.5) && s.base != null){ const d = ctx.currentTime + 0.08 - s.time; s.base += d; s.time += d; if (s.btT != null) s.btT += d; }
+  if (s.alive() && s.time < ctx.currentTime - (COARSE && !document.hidden ? 0.15 : 0.5) && s.base != null){ const d = ctx.currentTime + 0.08 - s.time; if (PB.pg){ PB.pg.re++; PB.pg.skip += d; } s.base += d; s.time += d; if (s.btT != null) s.btT += d; }
   // Schedule 250 ms ahead, so a busy moment on the UI thread can't make notes late (it was 150 ms on a computer).
   // Tracker edits and mutes reach notes after that; pads, keys, previews and STOP are immediate. With the app in the
   // background (owner, 31 Oct: stutters there) 1.2 s: the system runs a hidden page's thread late and in bursts, and
@@ -21584,7 +21585,9 @@ function coreStart(mode, o, t0, rs){
    3 seconds after a STOP. */
 const PB = {handT0:0, handW:0, ck:null, ckBad:0, stopT:0, log:[], n:0, late:0, drop:0, ahead:0, stray:0, strayT:0, skips:0, t:0};
 function pbLog(s){ try { PB.log.push((performance.now() / 1000).toFixed(2) + ' ' + s); if (PB.log.length > 400) PB.log.splice(0, 100); } catch(e){} }
-const pbState = () => `ctx ${ctx ? ctx.state + ' t=' + ctx.currentTime.toFixed(2) : '-'} on=${tp.on ? 1 : 0} core=${tp.core ? 1 : 0} seq=${aset.core} hidden=${document.hidden ? 1 : 0}`;
+const pbState = () => `ctx ${ctx ? ctx.state + ' t=' + ctx.currentTime.toFixed(2) : '-'} on=${tp.on ? 1 : 0} core=${tp.core ? 1 : 0} seq=${aset.core} hidden=${document.hidden ? 1 : 0} wall=${(Date.now() / 1000 % 100000).toFixed(2)}`;
+// BACKGROUND TIMING (8 Nov): how the Page sequencer's tick fared since the screen last changed: the longest wait between ticks (wall clock), how close the song came to running out, and any jumps forward
+const pbPg = () => { const P = PB.pg; PB.pg = null; return P ? ` · page ticks ${P.n}, longest gap ${P.gap.toFixed(2)} s, least lead ${P.lead.toFixed(2)} s, moved on ${P.re}× (${P.skip.toFixed(2)} s)` : ''; };
 function pbLevel(){ try { const A = rt && rt.man; if (!A) return '-'; let m = 0; for (const a of A){ const b = new Float32Array(a.fftSize); a.getFloatTimeDomainData(b); for (const x of b) m = Math.max(m, Math.abs(x)); } return m ? (20 * Math.log10(m)).toFixed(1) + ' dB' : 'silent'; } catch(e){ return '?'; } }
 /* HYBRID (owner, 6 Nov: "Build the hybrid and make sure we don't break anything on desktop"): on a phone or tablet, the
    moment the app is hidden (the screen off, another app, the shade) while the audio-thread sequencer plays the song, the
@@ -21644,7 +21647,7 @@ async function pbCopy(){
   try { await navigator.clipboard.writeText(txt); toast('Playback report copied: paste it into the chat.', 3500); }
   catch(e){ try { await deliver('thunder-playback-report.txt', new Blob([txt], {type:'text/plain'})); } catch(e2){ toast('Couldn’t copy the report here.'); } }
 }
-document.addEventListener('visibilitychange', () => pbLog((document.hidden ? 'screen off / hidden · ' : 'screen on / visible · ') + pbState()));
+document.addEventListener('visibilitychange', () => pbLog((document.hidden ? 'screen off / hidden · ' : 'screen on / visible · ') + pbState() + pbPg()));
 function coreMsg(d){
   // PLAYBACK REPORT: rows the core sends after STOP (or from an older PLAY) mean it is still stepping: say so, and stop it again
   if (d.op === 'rows' && (!tp.on || !tp.core || d.gen !== core.gen)){ PB.stray += d.rows.length; PB.strayN = (PB.strayN || 0) + 1;
@@ -22839,7 +22842,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 524;
+const BUILD = 525;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD + (location.pathname.includes('/beta/') ? ' · beta' : '');
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
