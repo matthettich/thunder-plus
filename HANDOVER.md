@@ -566,6 +566,9 @@ emulated touch drags on a Pixel 7 profile: no movement before, correct distance 
 - **Owner's phone test of 523 (8 Nov):** no difference between plain arrows and SHIFT+arrows, and it definitely hangs and stutters in the background (Page sequencer).
   So the simulation's arrows-vs-screens split doesn't hold on the Fold. Build 524 keeps the old 0.5 s re-anchor while hidden, since 516's 0.15 s could add gaps to a hidden page's bursts.
   Background trouble is older (31 Oct, and 6 Nov's 0.83× measurement). Headless can't reproduce it; the next evidence is the Playback report from the phone.
+- **Owner's playback report, build 523:** with the app hidden, `ctx.currentTime` got ahead of `performance.now()` by 1.41 s in 30 s and by 12.85 s in 26 s, and never while visible; the context stayed running.
+  Either the page clock stopped (a sleeping CPU) or the audio clock ran fast (dropped output). Build 525 adds a `wall=` (Date.now) to each report line and, at each screen change, the Page tick count, longest gap, least lead and re-anchors, to tell which.
+  Stop: voices 0 and stray rows 0, level −21 to −26 dB 1 s after, −48 to −52 dB at 3 s, with output latency 183 ms under Safest, so the spill looks like buffer plus effect tails.
 - **Mobile setting found off (8 Nov).** The owner's phone showed the desktop top bar. Nothing that day touches the setting (`platform` in localStorage,
   default only if nothing is saved). Cause unknown; if it recurs after an update, look at storage.
 - **CodeRabbit on 515–522** (review-only PR #30, closed): two findings, both real and fixed in 523: the pad's MUTE muted picked Song blocks instead
