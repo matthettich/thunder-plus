@@ -264,3 +264,17 @@ test('shared blocks: waves and chains carry byte-identical SHARED MODULES and SH
   assert.equal(blk('chains/chains-worklet.js', 'SHARED MODULES'), blk('waves/waves-worklet.js', 'SHARED MODULES'), 'DSP block differs: edit chains/ (the source of truth) and run python3 tools/sync-shared.py');
   assert.equal(blk('chains/index.html', 'SHARED EDITOR'), blk('waves/index.html', 'SHARED EDITOR'), 'editor block differs: edit chains/ and run python3 tools/sync-shared.py');
 });
+
+/* ───────── mute and solo clear each other; new songs start with mastering off (index.html) ───────── */
+test('track mute and solo clear each other, and a new song’s …pump mastering slots are there but off', () => {
+  const blk = cut('index.html', /function setMute\(m, v\)\{[^\n]*\nfunction setSolo\(m, v\)\{[^\n]*\n/, 'setMute / setSolo');
+  const c = sandbox({}); vm.runInContext(blk + '\nthis.setMute=setMute; this.setSolo=setSolo;', c);
+  const m = { mute: false, solo: true };
+  c.setMute(m, true); assert.deepEqual([m.mute, m.solo], [true, false], 'muting a soloed track un-solos it');
+  c.setSolo(m, true); assert.deepEqual([m.mute, m.solo], [false, true], 'soloing a muted track unmutes it');
+  c.setSolo(m, false); assert.deepEqual([m.mute, m.solo], [false, false], 'un-soloing leaves mute alone');
+  const fresh = cut('index.html', /function mstPumpFresh\(\)\{[^\n]*\n/, 'mstPumpFresh');
+  assert.match(fresh, /f\.on = false/, 'the fresh …pump mastering slots are switched off');
+  const song = cut('index.html', /function freshSong\(\)\{[\s\S]*?\n\}\n/, 'freshSong');
+  assert.match(song, /mfx:mstPumpFresh\(\), mstPump:true/, 'a new song keeps the slots (MASTERING turns them on)');
+});

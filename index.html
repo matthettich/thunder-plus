@@ -1166,15 +1166,16 @@ body:not(.legon) .tside .tlegend{display:none}
 .tcmd button[hidden]{display:none} .tcmd button[data-c=song]{font-size:var(--fs-5)} .tcmd.cpad :is([data-c=undo],[data-c=redo]){font-size:20px; font-weight:500; line-height:1} .tcmd :is([data-c=prev],[data-c=next]){font-size:24px; font-weight:500; line-height:1}
 /* One row on wide screens. */
 @media (min-width:700px){
-  .tcmd, .tcmd.song{grid-template-columns:repeat(14,minmax(0,1fr))}
+  .tcmd{grid-template-columns:repeat(14,minmax(0,1fr))} .tcmd.song{grid-template-columns:repeat(15,minmax(0,1fr))}
 }
 /* NO CLN ON A NARROW ROW (owner, 1 Nov): below 1000 px (phones, the Fold unfolded) the big COMMANDS row leaves CLN out, so
    the Song screen has 14 buttons like the others and ▶ stays on its row (a 15th wrapped onto a second row and shrank the
    phrase and Arrange). UNIQ and CLN↓ stay; CLN is still Ctrl/⌘+Alt+C, in Edit ▾ and in the thin COMMAND BAR. Wider
    windows show it, with 15 columns on the Song screen. */
 .tcmd:not(.cmini) button[data-c=clone]{display:none}
+/* M.PAT (owner, 8 Nov): Arrange's one more button: the Song screen's row is 15 columns from 700 px (it was 14, full), 16 from 1000 px with CLN */
 @media (min-width:1000px){
-  .tcmd.song{grid-template-columns:repeat(15,minmax(0,1fr))}
+  .tcmd.song{grid-template-columns:repeat(16,minmax(0,1fr))}
   .tcmd.song:not(.cmini) button[data-c=clone]:not([hidden]){display:inline-flex}
 }
 /* ▶ (play the song) always sits in the last column, on whichever row it lands: never alone at the left of a row. */
@@ -1437,6 +1438,11 @@ body.sxsecs .tarr{padding-left:calc(var(--sxw, 88px) + 4px)}   /* (beside Phrase
 body.arrleft .tbody > .tarr{order:-1; border-left:0; border-right:1px solid var(--line)}
 body.arrleft .tbody > .tarr .tarrh{left:auto; right:-13px; width:12px}   /* (owner, 31 Oct) outside the panel: half of it lay over Arrange's scrollbar, so grabbing the scrollbar resized the panel */
 body.arrleft .tbody > .tarr .tarrh::after{left:4px}
+/* RESIZE BAR ON A PHONE (owner, 8 Nov): the grip outside the panel was 12 px wide, too thin for a finger. A touch screen gets 26 px (it takes no layout width: it is absolute, and reaches out over the screen's edge, not into Arrange's scrollbar). */
+@media (pointer:coarse){
+  body.arrleft .tbody > .tarr .tarrh{right:-25px; width:26px}
+  body.arrleft .tbody > .tarr .tarrh::after{left:5px}
+}
 /* ARRANGE SCROLLBAR (owner, 31 Oct: hard to grab): a wide, plainly visible thumb, with a mouse (phones keep their overlay one) */
 @media (pointer:fine){
 .tagrid::-webkit-scrollbar{width:14px; height:14px; background:transparent}
@@ -18270,10 +18276,10 @@ const freshChainFx = () => new Array(FXSLOTS).fill(null);
 const normChainFx = a => Array.from({length:FXSLOTS}, (_, k) => Array.isArray(a) ? normTfx(a[k]) : null);
 /* …PUMP MASTERING (owner, 2 Nov: "swap the mastering chain for the pump mastering fx with the auto master as the final
    plugin… mastering default on"): a new song's last master FX slots hold …pump EQ → CALM → COMP → TONE → MASTER (the auto master, last),
-   on. S.mstPump marks the song: MASTERING (Mixer, Settings, the master strip) switches those …pump slots on and off and
+   (8 Nov: off in a new song; was on). S.mstPump marks the song: MASTERING (Mixer, Settings, the master strip) switches those …pump slots on and off and
    opens pump MASTER's window. Songs from before keep the old mastering stage (S.mst) exactly as saved. */
 const MST_PUMP = ['peq', 'pcalm', 'pcomp', 'ptone', 'pmaster'];   // (2 Nov, later) + CALM (the resonance suppressor) and TONE: EQ → CALM → COMP → TONE → MASTER
-function mstPumpFresh(){ const A = freshChainFx(); try { MST_PUMP.forEach((k, i) => { if (TFX[k]) A[FXSLOTS - MST_PUMP.length + i] = freshTfx(k); }); } catch(e){} return A; }
+function mstPumpFresh(){ const A = freshChainFx(); try { MST_PUMP.forEach((k, i) => { if (TFX[k]){ const f = A[FXSLOTS - MST_PUMP.length + i] = freshTfx(k); f.on = false; } }); } catch(e){} return A; }   // MASTERING OFF IN A NEW SONG (owner, 8 Nov): the slots are there, switched off; MASTERING (or each slot) turns them on
 const mstPumpSlots = () => (S.mfx || []).map((f, k) => f && MST_PUMP.includes(f.type) ? k : -1).filter(k => k >= 0);
 const mstOn = () => S.mstPump ? mstPumpSlots().some(k => S.mfx[k].on) : !!S.mst.on;
 function mstSetOn(v){
@@ -23604,6 +23610,14 @@ function eqWindow(t){
   else if (!A[k].on){ A[k].on = true; fxChanged(t); draw(); }
   PumpFX.open(t, k);
 }
+// MASTERING WINDOWS ON A PHONE (owner, 8 Nov): › MASTERING opens only pump MASTER and the others sat behind select-slot, scroll to its
+// last row, tap › OPEN twice. On the master each of CALM, COMP and TONE gets its own row (EQ has › EQ WINDOW): one select, one more tap.
+function mstWinRows(){
+  if (!S.mstPump) return [];
+  const out = []; (S.mfx || []).forEach((f, k) => { if (f && MST_PUMP.includes(f.type) && f.type !== 'pmaster' && f.type !== 'peq' && TFX[f.type])
+    out.push({l:'› ' + TFX[f.type].n + ' WINDOW', gap:!out.length, act:() => PumpFX.open(NT, k), info:() => 'Opens ' + TFX[f.type].long + ' (master slot ' + (k + 1) + ') in its own window; its CHAIN menu opens the others'}); });
+  return out;
+}
 function fxRows(){
   const t = cFxT, A = t >= NT ? S.mfx : S.tfx[t], cy = cs.fx.y;
   if (cy >= 1 && cy <= FXSLOTS) cFxS = cy - 1;
@@ -23620,7 +23634,7 @@ function fxRows(){
     info:v => v ? `Slot ${k + 1} runs ${TFX[FLk(k)[v - 1]].long}. EDIT lists the effects, EDIT+arrows steps through them, ▶ opens its controls, OPTION+EDIT removes it` : `Empty. EDIT lists the effects to pick one; EDIT+arrows steps through them. Slots run top to bottom`});
   const k = cFxS, f = A[k];
   const addT = () => fxtOk(t, lastFxType) ? lastFxType : 'eq';
-  if (!f){ rows.push({l:'› ADD TO SLOT ' + (k + 1), gap:true, act:() => { A[k] = freshTfx(addT()); fxChanged(t); draw(); }, info:() => `Puts ${TFX[addT()].long} in slot ${k + 1}`}); return (t >= NT ? rows.concat([{l:'› MASTERING', gap:true, act:() => openMst(), info:() => 'EQ, resonance suppressor, compressor and limiter on the master bus (' + (S.mst.on ? 'on' : 'off') + ')'}]) : rows).concat([eqRow]); }
+  if (!f){ rows.push({l:'› ADD TO SLOT ' + (k + 1), gap:true, act:() => { A[k] = freshTfx(addT()); fxChanged(t); draw(); }, info:() => `Puts ${TFX[addT()].long} in slot ${k + 1}`}); return (t >= NT ? rows.concat([{l:'› MASTERING', gap:true, act:() => openMst(), info:() => 'EQ, resonance suppressor, compressor and limiter on the master bus (' + (S.mst.on ? 'on' : 'off') + ')'}]) : rows).concat([eqRow], t >= NT ? mstWinRows() : []); }
   rows.push({l:'ACTIVE', gap:true, desc:TFX[f.type].long, tog:true, get:() => f.on ? 1 : 0, set:v => { f.on = !!v; fxChanged(t); }, min:0, max:1, d:1, fmt:v => onOff(v) + `  slot ${k + 1} ` + TFX[f.type].n,
     info:() => `Slot ${k + 1}: ${TFX[f.type].long}. ` + (TFX[f.type].about ? TFX[f.type].about + ' ' + (pumpLatTxt(t, k) ? pumpLatTxt(t, k)[0].toUpperCase() + pumpLatTxt(t, k).slice(1) + '. ' : '') : '') + 'OFF bypasses it'});
   const PU = TFX[f.type].pump;   // …PUMP: a pump effect's boxes (fmt sees the slot: it shows the exact value), its presets and OPEN
@@ -23644,7 +23658,7 @@ function fxRows(){
     }
     if (PU === 'meter') rows.push({l:'› RESET', act:() => { PumpFX.set(t, k, {reset:(f.pump.reset | 0) + 1}, {live:true, keepPreset:true}); toast('pump METER: loudness reset.'); }, info:() => 'Starts the loudness measurement again (integrated, LRA, maxima)'});
   }
-  return (t >= NT ? rows.concat([{l:'› MASTERING', gap:true, act:() => openMst(), info:() => 'EQ, resonance suppressor, compressor and limiter on the master bus (' + (S.mst.on ? 'on' : 'off') + ')'}]) : rows).concat([eqRow]);
+  return (t >= NT ? rows.concat([{l:'› MASTERING', gap:true, act:() => openMst(), info:() => 'EQ, resonance suppressor, compressor and limiter on the master bus (' + (S.mst.on ? 'on' : 'off') + ')'}]) : rows).concat([eqRow], t >= NT ? mstWinRows() : []);
 }
 // The FX screen is two regions: the slot list (TRACK + SLOT 1–4) and the controls of one slot
 // (ACTIVE + its parameters). ▶ (or a sideways swipe right) opens the slot under the cursor; ◀ (or a
@@ -23949,7 +23963,7 @@ function bump(d, big){
     else { const m = S.mix[c.x];
       if (c.y === 0) m.trim = clamp((m.trim == null ? TRIM_0 : m.trim) + d * (big ? 16 : 1), 0, 255);   // GAIN STAGING: the first row is TRIM
       else if (c.y === 1) m.pan = clamp(m.pan + d * (big ? 16 : 1), 0, 255);
-      else if (c.y === 2) m.mute = d > 0; else if (c.y === 3) m.solo = d > 0; }   // (SC row: a light now, nothing to change)
+      else if (c.y === 2) setMute(m, d > 0); else if (c.y === 3) setSolo(m, d > 0); }   // (SC row: a light now, nothing to change)
     mixChanged(); draw(); return;
   }
   const r = rowsOf(tv)[c.y]; if (!r || !r.get) return;
@@ -24147,7 +24161,7 @@ function editTap(enter, stamp){   // stamp: Shift+Enter, which writes the curren
     else if (tv === 'phrase'){ const p = S.phrases[cPhrase]; if (p) aud(p[c.y]); }
     return;
   }
-  if (tv === 'mixer'){ if (c.y === 7 && c.mx === 1) return openMst(); if (c.y === 5) return go('fx'); if (c.y === 4){ setChainOn(c.x, !S.chainOn[c.x]); draw(); return; } if (mixFv()){ toast(`Track ${d2(c.x + 1)} · VOL ${hx(S.mix[c.x].vol)} · ${dB(trackGain(S.mix[c.x].vol))} · Del resets to E0`); return; } if (c.y === 6){ scSay(c.x); return; } /* SOURCE: the SC row only shows; Enter / EDIT says what listens to the track */ if (c.y === 2 || c.y === 3){ const m = S.mix[c.x]; if (c.y === 2) m.mute = !m.mute; else m.solo = !m.solo; mixChanged(); draw(); } return; }
+  if (tv === 'mixer'){ if (c.y === 7 && c.mx === 1) return openMst(); if (c.y === 5) return go('fx'); if (c.y === 4){ setChainOn(c.x, !S.chainOn[c.x]); draw(); return; } if (mixFv()){ toast(`Track ${d2(c.x + 1)} · VOL ${hx(S.mix[c.x].vol)} · ${dB(trackGain(S.mix[c.x].vol))} · Del resets to E0`); return; } if (c.y === 6){ scSay(c.x); return; } /* SOURCE: the SC row only shows; Enter / EDIT says what listens to the track */ if (c.y === 2 || c.y === 3){ const m = S.mix[c.x]; if (c.y === 2) setMute(m, !m.mute); else setSolo(m, !m.solo); mixChanged(); draw(); } return; }
   const r = rowsOf(tv)[c.y]; if (!r) return;
   // ONE CONFIRM (27 Oct, Phase 2): a row that replaces something asks in the app's one dialog (it took a second EDIT, the
   // "Tap EDIT twice" note). A double EDIT still goes straight through (editDouble), as before.
@@ -24550,12 +24564,15 @@ function playPatLoop(){
 // the mixer's S does; all: clear every solo (as the deck's SOLO button).
 // / (owner, 20 Oct: Renoise's mute key): mutes or unmutes the whole track (the mixer's M), as soloKey picks it. On the Song
 // screen M still mutes just the block under the cursor.
+// MUTE AND SOLO CLEAR EACH OTHER (owner, 8 Nov): muting a soloed track un-solos it, soloing a muted one unmutes it.
+function setMute(m, v){ m.mute = !!v; if (m.mute) m.solo = false; }
+function setSolo(m, v){ m.solo = !!v; if (m.solo) m.mute = false; }
 function muteKey(trackOnly){
   if (trackOnly !== true && tv === 'song' && sxPicks.length) return sxMuteCells(sxPicks.map(p => [p.y, p.t]));   // picked cells
   const mst = tv === 'song' ? cs.song.x === MT : tv === 'mixer' ? onMstCell() : tv === 'fx' ? cFxT >= NT : cTrack === MT;
   if (mst) return toast('The master can’t be muted.');
   const t = dkTrack(), m = S.mix[t]; if (!m) return;
-  m.mute = !m.mute; mixChanged(); draw();
+  setMute(m, !m.mute); mixChanged(); draw();
   toast(`${m.mute ? 'Muted' : 'Unmuted'} track ${d2(t + 1)} · / or \\ again ${m.mute ? 'unmutes' : 'mutes'} it`);
 }
 function soloKey(all){
@@ -24563,7 +24580,7 @@ function soloKey(all){
   const mst = tv === 'song' ? cs.song.x === MT : tv === 'mixer' ? onMstCell() : tv === 'fx' ? cFxT >= NT : cTrack === MT;
   if (mst) return toast('The master can’t be soloed.');
   const t = dkTrack(), m = S.mix[t]; if (!m) return;
-  m.solo = !m.solo; mixChanged(); draw();
+  setSolo(m, !m.solo); mixChanged(); draw();
   const n = S.mix.filter(q => q.solo).length;
   toast(m.solo ? `Solo on: track ${d2(t + 1)}` + (n > 1 ? ` (${n} soloed)` : '') + ' · ' + keyHint('mod+shift+/') + ' clears every solo' : `Solo off: track ${d2(t + 1)}` + (n ? ` (${n} still soloed)` : ''));
 }
@@ -25313,7 +25330,8 @@ const CMDS = [['b:-16', '−−', 'Change the value down a lot (EDIT+▼)'], ['b
   ['uniq', 'UNIQ', 'Make unique: each selected block (or picked cells) gets new phrases, in place'], ['clone', 'CLN', 'Clone: copies the block (or the selected blocks); PASTE then puts a unique copy with new numbers at the cursor (Ctrl/⌘+Alt+C)'],
   ['cldn', 'CLN↓', 'Clone the block (or selected blocks) into new, unique numbers on a new row below; the rows below move down (Ctrl/⌘+Shift+C)'], ['copy', 'COPY', 'Copy the selection, or what is under the cursor (a note comes with its instrument) (OPTION)'],
   ['cut', 'CUT', 'Cut the selection, or what is under the cursor (OPTION+EDIT)'], ['paste', 'PASTE', 'Paste (SHIFT+EDIT)'],
-  ['undo', 'UNDO', 'Undo the last change to the song (Ctrl/⌘+Z)'], ['redo', 'REDO', 'Redo (Ctrl/⌘+Y)'], ['song', '▶', 'Play the song from the cursor row, or stop it (SHIFT+PLAY)']];
+  ['undo', 'UNDO', 'Undo the last change to the song (Ctrl/⌘+Z)'], ['redo', 'REDO', 'Redo (Ctrl/⌘+Y)'], ['song', '▶', 'Play the song from the cursor row, or stop it (SHIFT+PLAY)'],
+  ['mpat', 'M.PAT', 'Mute or unmute the pattern block under the cursor, or every block in the selection (as Alt+click, M on the Song). The track’s own MUTE is on the pad and in the Mixer']];   // MUTE PATTERN (owner, 8 Nov): Arrange only
 function cmdAction(a){
   fxpClose();
   takeLatch();
@@ -25336,16 +25354,17 @@ function cmdAction(a){
   if (c === 'uniq') return makeUnique();
   if (c === 'clone') return cloneHere();
   if (c === 'cldn') return cloneDown();
+  if (c === 'mpat'){ if (tv !== 'song') return toast('M.PAT mutes blocks on Arrange.'); const r = sxRect(); if (r) return sxMuteRect(r); if (sxPicks.length) return sxMuteCells(sxPicks.map(p => [p.y, p.t])); return toggleBlockMute(cs.song.y, cs.song.x); }
   if (c === 'song'){ if (tp.on) tStopUser(); else tStart('song', {row:songRow()}); }
 }
 for (const [a, t, lbl] of CMDS){ const b = el('button'); b.innerHTML = t; b.type = 'button'; b.dataset.c = a; b.setAttribute('aria-label', lbl); b.title = lbl; $('tCmd').append(b); }
 // In PAD mode CLEAR moves between PASTE and UNDO, so a thumb can reach it on a phone; KEYS mode keeps
 // the original order. The buttons are moved, not rebuilt, so the tap handlers stay attached.
-const CMD_PAD_ORDER = ['b:-16', 'b:-1', 'b:1', 'b:16', 'prev', 'next', 'sel', 'uniq', 'clone', 'cldn', 'copy', 'cut', 'paste', 'clr', 'undo', 'redo', 'song'];
+const CMD_PAD_ORDER = ['b:-16', 'b:-1', 'b:1', 'b:16', 'prev', 'next', 'sel', 'uniq', 'clone', 'cldn', 'mpat', 'copy', 'cut', 'paste', 'clr', 'undo', 'redo', 'song'];
 const CMD_PAD_SHORT = {clr:'CLR', sel:'SEL', paste:'PST', undo:'↶', redo:'↷'};
 // COMMAND BAR: the Edit menu's order (undo · clipboard · select · clones · value · previous / next · play) and words.
-const CMD_MINI_ORDER = ['undo', 'redo', 'cut', 'copy', 'paste', 'clr', 'rrow', 'sel', 'uniq', 'clone', 'cldn', 'b:-16', 'b:-1', 'b:1', 'b:16', 'prev', 'next', 'song'];
-const CMD_MINI_LAB = {undo:'UNDO', redo:'REDO', cut:'CUT', copy:'COPY', paste:'PASTE', clr:'CLEAR', rrow:'REMOVE', sel:'SELECT', clone:'CLONE', cldn:'CLONE↓', 'b:-16':'−−', 'b:-1':'−', 'b:1':'+', 'b:16':'++', prev:'‹ PREV', next:'NEXT ›'};
+const CMD_MINI_ORDER = ['undo', 'redo', 'cut', 'copy', 'paste', 'clr', 'rrow', 'sel', 'uniq', 'clone', 'cldn', 'mpat', 'b:-16', 'b:-1', 'b:1', 'b:16', 'prev', 'next', 'song'];
+const CMD_MINI_LAB = {undo:'UNDO', redo:'REDO', cut:'CUT', copy:'COPY', paste:'PASTE', clr:'CLEAR', rrow:'REMOVE', sel:'SELECT', clone:'CLONE', cldn:'CLONE↓', mpat:'MUTE PAT', 'b:-16':'−−', 'b:-1':'−', 'b:1':'+', 'b:16':'++', prev:'‹ PREV', next:'NEXT ›'};
 const cmdSongLab = () => cmdMini() ? (tp.on ? '■ STOP' : '▶ SONG') : tp.on ? '■' : '▶';
 function applyCmdOrder(){
   const host = $('tCmd'), by = {}, mini = cmdMini();
@@ -25474,7 +25493,7 @@ function cmdItems(full){
         : {a:'rins', l:'Insert a row', k:keyHint('mod+Enter'), f:() => rowOp('insert'), off:!rowsOk || !!selA},
       onSong ? {a:'rmrow', l:'Remove the song row (rows below move up)', k:keyHint('mod+shift+Backspace'), f:songRowRemove}
         : selA ? {a:'rrow', l:'Remove these rows (rows below move up)', k:'', f:rowsRemove, off:!rowsOk} : {a:'rdel', l:'Remove the row (rows below move up)', k:keyHint('mod+Backspace'), f:() => rowOp('remove'), off:!rowsOk}] : []),
-    ...(onSong || full ? [{h:'Song blocks'}, it('clone', 'Clone (paste puts a unique copy)', 'mod+alt+C', {off:!onSong}), it('cldn', 'Clone down (into a new row below)', 'mod+shift+C', {off:!onSong}),
+    ...(onSong || full ? [{h:'Song blocks'}, it('clone', 'Clone (paste puts a unique copy)', 'mod+alt+C', {off:!onSong}), it('cldn', 'Clone down (into a new row below)', 'mod+shift+C', {off:!onSong}), it('mpat', 'Mute / unmute the block (or the selected blocks)', '', {off:!onSong}),
       {a:'dup', l:'Duplicate the pattern (insert below)', k:onSong ? keyHint('mod+D') : '', f:() => dupKey(false), off:!onSong}, {a:'insp', l:'Insert paste (new rows below)', k:keyHint('mod+alt+V'), f:insertPaste, off:!onSong || !(clip && clip.v === 'song')},
       ...(onSong && !full ? [{a:'rmrow', l:'Remove the row (rows below move up)', k:keyHint('mod+shift+Backspace'), f:songRowRemove}] : [])] : []),
     {h:'Track'},
@@ -26595,7 +26614,7 @@ function draw(){
     for (const k in pc){ const b = $('tPad').querySelector(`.k[data-b=${k}]`); if (b) b.style.setProperty('--sh', pc[k]); } }
   $('tCmd').querySelectorAll('[data-c="b:-16"],[data-c="b:16"]').forEach(b => b.hidden = onSong);
   $('tCmd').querySelectorAll('[data-c="b:-1"],[data-c="b:1"],[data-c=prev],[data-c=next]').forEach(b => b.hidden = false);   // Arrange's row hides them (apSongLines)
-  $('tCmd').querySelectorAll('[data-c=uniq],[data-c=clone],[data-c=cldn]').forEach(b => b.hidden = !onSong); $('tCmd').classList.toggle('song', onSong);   // CLN's narrow-screen hiding is in the CSS (.tcmd)
+  $('tCmd').querySelectorAll('[data-c=uniq],[data-c=clone],[data-c=cldn],[data-c=mpat]').forEach(b => b.hidden = !onSong); $('tCmd').classList.toggle('song', onSong);    // CLN's narrow-screen hiding is in the CSS (.tcmd)
   const selB = $('tCmd').querySelector('[data-c=sel]'); if (selB) selB.classList.toggle('on', !!selA);
   $('tState').innerHTML = tp.on ? ico('play') + 'PLAYING ' + VNAME[tp.mode] : rendering ? ico('render') + 'RENDERING' : ico('stop') + 'STOPPED';
   $('tBpm').textContent = (tp.on ? tp.bpm : S.bpm) + ' BPM · ' + (tp.on ? tp.tks : S.ticks || TICKS) + ' TICKS' + (S.swing > 50 ? ' · SWING ' + S.swing + '%' : '');
@@ -26724,7 +26743,7 @@ grid.addEventListener('pointerdown', e => {
   const i = meterEls.indexOf(m); if (i < 0) return;
   const t = mixL + i % mixN; e.preventDefault(); e.stopPropagation();
   cs.mixer.x = t; cs.mixer.y = 6; cs.mixer.fv = true; cs.mixer.mx = 0;
-  if (e.altKey || e.metaKey){ S.mix[t].mute = !S.mix[t].mute; mixChanged(); }
+  if (e.altKey || e.metaKey){ setMute(S.mix[t], !S.mix[t].mute); mixChanged(); }
   draw();
 }, true);
 grid.addEventListener('pointermove', e => {
@@ -27818,8 +27837,8 @@ stVol.addEventListener('contextmenu', e => valMenu(e, dkMst() ? 'Master OUT' : '
 stPan.addEventListener('input', () => { if (dkMst()) return; const t = dkTrack(); S.mix[t].pan = +stPan.value; mixChanged(); deckStrip(); });
 stVol.addEventListener('dblclick', stReset);
 stPan.addEventListener('dblclick', () => { if (dkMst()) return; S.mix[dkTrack()].pan = 128; mixChanged(); deckStrip(); });
-$('stMute').addEventListener('click', () => { if (dkMst()) return; const m = S.mix[dkTrack()]; m.mute = !m.mute; mixChanged(); draw(); });
-$('stSolo').addEventListener('click', () => { if (dkMst()) return; const m = S.mix[dkTrack()]; m.solo = !m.solo; mixChanged(); draw(); });
+$('stMute').addEventListener('click', () => { if (dkMst()) return; const m = S.mix[dkTrack()]; setMute(m, !m.mute); mixChanged(); draw(); });
+$('stSolo').addEventListener('click', () => { if (dkMst()) return; const m = S.mix[dkTrack()]; setSolo(m, !m.solo); mixChanged(); draw(); });
 function deckStrip(){
   try { perfDraw(); } catch(e){}   // PERFORM part
   const anySolo = S.mix.some(m => m.solo); $('dkSolo').hidden = !anySolo || !deckShown();
@@ -29218,8 +29237,11 @@ function setArrLeft(on){ arrLeft = !!on; try { localStorage.setItem('thunderplus
 // The song keeps room for all its tracks at a readable size (about 12px type: 52 columns of text), and the side
 // panel keeps its place when it is showing, so a wide ARRANGE never cuts the song off.
 const SONG_MIN = () => Math.round(BASEW * CW * 12 + 24);
-const arrMax = () => { const side = document.querySelector('.tside'), sw = side && side.offsetParent ? side.offsetWidth : 0;
-  return Math.max(200, (arrEl.parentElement.clientWidth || innerWidth) - sw - SONG_MIN()); };
+// FOLDED PHONE (owner, 8 Nov): under 600 px the song's own minimum left no range at all (max = min = 200), so the grip moved nothing.
+// There the panel goes from 120 px to whatever leaves the screen 170 px.
+const arrMin = () => innerWidth < 600 ? 120 : 200;
+const arrMax = () => { const side = document.querySelector('.tside'), sw = side && side.offsetParent ? side.offsetWidth : 0, room = (arrEl.parentElement.clientWidth || innerWidth) - sw;
+  return Math.max(arrMin(), innerWidth < 600 ? room - 170 : room - SONG_MIN()); };
 // Works out whether ARRANGE shows and how wide it is from the window's size right now. Called on every resize
 // (and once a second as a backstop), so it follows the Fold opening and closing with the app already running.
 function arrLayout(force){
@@ -29227,7 +29249,7 @@ function arrLayout(force){
   const key = [w, h, arrMode, arrW, view].join(':'); if (!force && key === arrKey) return false; arrKey = key;
   const vis = arrMode === 2 || (arrMode === 1 && w >= 600 && h >= 500), B = document.body.classList;
   B.toggle('arrvis', vis); B.toggle('arrnarrow', vis && w < 1100); B.toggle('arrsmall', w < 900); B.toggle('arrtiny', w < 600);
-  arrEl.style.width = arrW ? clamp(arrW, 200, arrMax()) + 'px' : '';
+  arrEl.style.width = arrW ? clamp(arrW, arrMin(), arrMax()) + 'px' : '';
   arrSig = ''; arrCurY = -1; fit(); draw(); return true;
 }
 // Every "the page changed shape" signal (window, visual viewport, the screen element, fonts arriving) lands here and
@@ -29283,7 +29305,7 @@ $('tArrH').addEventListener('pointermove', e => {
   if (!arrDrag || e.pointerId !== arrDrag.id) return;
   const dx = (arrLeft ? e.clientX - arrDrag.x0 : arrDrag.x0 - e.clientX);   // the grip is on the edge facing the screen
   if (Math.abs(dx) > 3) arrDrag.moved = true; if (!arrDrag.moved) return;
-  arrW = clamp(Math.round(arrDrag.w0 + dx), 200, arrMax()); arrEl.style.width = arrW + 'px';
+  arrW = clamp(Math.round(arrDrag.w0 + dx), arrMin(), arrMax()); arrEl.style.width = arrW + 'px';
   // The panel's width follows the finger every frame; the song's text is re-fitted at most ~8 times a second while
   // dragging (fit()+draw() is ~150 ms on a phone, which made the drag crawl) and once more on release.
   const now = performance.now(); if (!arrDrag.t || now - arrDrag.t > 120){ arrDrag.t = now; arrSig = ''; fit(); draw(); }
@@ -29446,7 +29468,7 @@ function drawArr0(PH){
       h += `<b class="${cls.trim()}"${sty} data-y="${y}" data-t="${t}">${lab}</b>`;
     }
     if (mx){ const v = S.song[y][MT];   // the master column: commands only, never muted
-      h += `<span></span><b class="gx${v < 0 ? '' : isEmptySect(S.chains[v]) ? ' z' : sectMstOff(v) ? ' o' : ' f'}" data-y="${y}" data-t="${MT}">${v < 0 ? '' : hp(songShown(v))}</b>`; }
+      h += `<span></span><b class="gx${v < 0 ? '' : isEmptySect(S.chains[v]) || !sectHasData(v) ? ' z' : sectMstOff(v) ? ' o' : ' f'}" data-y="${y}" data-t="${MT}">${v < 0 ? '' : hp(songShown(v))}</b>`; }
     h += '</div>';
   }
   const PF = polyFrom();
@@ -29767,7 +29789,7 @@ arrGrid.addEventListener('contextmenu', e => e.preventDefault());
   // is how we mute specific phrases?"): Alt/⌥-click mutes the track, as Alt-click mutes a block; a plain click picks the
   // track (the song cursor goes to it), a double-click names it (no mute on the way now), a right-click solos.
   th.addEventListener('click', e => { const i = e.target.closest('i[data-t]'); if (!i || pt !== 'mouse') return; const t = +i.dataset.t, m = S.mix[t]; if (!m) return;
-    if (e.altKey){ m.mute = !m.mute; mixChanged(); draw(); toast(`Track ${d2(t + 1)} ${m.mute ? 'muted' : 'unmuted'} · right-click solos it`); return; }
+    if (e.altKey){ setMute(m, !m.mute); mixChanged(); draw(); toast(`Track ${d2(t + 1)} ${m.mute ? 'muted' : 'unmuted'} · right-click solos it`); return; }
     cs.song.x = t; if (!(apReady && apF)) cTrack = t; draw(); if (hdDbl(t)) nameTrack(t); });
   // FIX (UI sweep, 4 Nov): stopPropagation. On the Song screen Arrange sits inside the tracker screen, and the solo redraws the
   // header, so the event reached cmdCtx from a detached number (its #tArr check missed) and the Edit menu opened over the solo.
@@ -30453,7 +30475,7 @@ for (let t = 0; t < NT; t++){
   // to it where the screen has tracks); a tap on a touch screen still mutes (there is no Alt there)
   let mpt = ''; m.addEventListener('pointerdown', e => { mpt = e.pointerType; });
   m.addEventListener('click', e => { if (mpt === 'mouse' && !e.altKey){ if (t >= ntr()) return; if (tv === 'song' || tv === 'mixer') cs[tv].x = t; else cTrack = t; if (!(apReady && apF)) cs.song.x = t; draw(); return; }
-    S.mix[t].mute = !S.mix[t].mute; mixChanged(); draw(); if (mpt === 'mouse') toast(`Track ${d2(t + 1)} ${S.mix[t].mute ? 'muted' : 'unmuted'} · right-click solos it`); }); $('tMeters').append(m);
+    setMute(S.mix[t], !S.mix[t].mute); mixChanged(); draw(); if (mpt === 'mouse') toast(`Track ${d2(t + 1)} ${S.mix[t].mute ? 'muted' : 'unmuted'} · right-click solos it`); }); $('tMeters').append(m);
   m.addEventListener('contextmenu', e => { e.preventDefault(); if (e.pointerType !== 'touch') soloTrack(t); });   // MOUSE SELECT: right-click solos
   m.addEventListener('dblclick', () => nameTrack(t));   // TRACK NAMES (the two clicks muted and unmuted it)
 }
@@ -30692,7 +30714,7 @@ window.addEventListener('keydown', e => { if (e.key === 'Escape' && msel){ e.pre
 // a click still mutes.
 function soloTrack(t){
   const m = S.mix[t]; if (!m || t >= ntr()) return;
-  m.solo = !m.solo; mixChanged(); draw();
+  setSolo(m, !m.solo); mixChanged(); draw();
   const n = S.mix.filter(q => q.solo).length;
   toast(m.solo ? `Solo on: track ${d2(t + 1)}` + (n > 1 ? ` (${n} soloed)` : '') + ' · right-click it again to un-solo' : `Solo off: track ${d2(t + 1)}` + (n ? ` (${n} still soloed)` : ''));
 }
@@ -30750,7 +30772,7 @@ const gridDown = e => {
   // the Mixer's mutes. The master column's always moves the cursor.
   if (y === -1){ const mouse = e.pointerType === 'mouse', mute = S.mix[x] && x !== MT && (mouse ? e.altKey : tv !== 'song');
     if (!mute){ c.x = x; draw(); if (hdDbl(x)) nameTrack(x); return; }
-    S.mix[x].mute = !S.mix[x].mute; mixChanged(); draw(); toast(`Track ${d2(x + 1)} ${S.mix[x].mute ? 'muted' : 'unmuted'} · right-click solos it`); return; }
+    setMute(S.mix[x], !S.mix[x].mute); mixChanged(); draw(); toast(`Track ${d2(x + 1)} ${S.mix[x].mute ? 'muted' : 'unmuted'} · right-click solos it`); return; }
   // ALT-DRAG EDITS (owner, 27 Oct, Phase 2, as Renoise): with a mouse a drag always selects, and Alt/⌥-drag changes the
   // value of the cell it starts on (Ctrl/⌘ as well: big steps; Shift: slower). On the Song an Alt-click that doesn't move
   // still mutes the block, as before. An empty cell only mutes (Song) or does nothing: a drag never adds a block or note.
@@ -31719,7 +31741,7 @@ function apSongLines(){
   // ARRANGE ROW (owner, 1 Nov): with Arrange (or the song strip) holding the keys the row is for blocks, so − + and ‹ › go
   // (EDIT+◀▶ still changes a block's number; the arrows and OPTION+arrows move between blocks). draw() brings them back.
   cmd.querySelectorAll('[data-c="b:-16"],[data-c="b:16"],[data-c="b:-1"],[data-c="b:1"],[data-c=prev],[data-c=next]').forEach(b => b.hidden = true);
-  cmd.querySelectorAll('[data-c=uniq],[data-c=clone],[data-c=cldn]').forEach(b => b.hidden = false); cmd.classList.add('song');
+  cmd.querySelectorAll('[data-c=uniq],[data-c=clone],[data-c=cldn],[data-c=mpat]').forEach(b => b.hidden = false); cmd.classList.add('song');
   const sb = cmd.querySelector('[data-c=sel]'); if (sb) sb.classList.toggle('on', !!apSel);
   if (keys && kpOn) apAsSong(drawKeypad);
 }
@@ -32686,7 +32708,7 @@ const pvBandT = (e, s) => { if (!pvActive() || !s) return -1; if (s.classList.co
 grid.addEventListener('pointerdown', e => {
   if (e.pointerType !== 'mouse' || e.button !== 0) return;
   const t = pvBandT(e, e.target.closest('.pvh')); if (t < 0) return;
-  if (e.altKey){ e.stopPropagation(); e.preventDefault(); S.mix[t].mute = !S.mix[t].mute; mixChanged(); draw(); toast(`Track ${d2(t + 1)} ${S.mix[t].mute ? 'muted' : 'unmuted'}`); return; }
+  if (e.altKey){ e.stopPropagation(); e.preventDefault(); setMute(S.mix[t], !S.mix[t].mute); mixChanged(); draw(); toast(`Track ${d2(t + 1)} ${S.mix[t].mute ? 'muted' : 'unmuted'}`); return; }
   if (hdDbl(t)){ e.stopPropagation(); e.preventDefault(); nameTrack(t); }
 }, true);
 grid.addEventListener('contextmenu', e => { const t = pvBandT(e, e.target.closest('.pvh')); if (t < 0) return; e.preventDefault(); e.stopPropagation(); soloTrack(t); }, true);
