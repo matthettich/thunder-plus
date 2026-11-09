@@ -22839,7 +22839,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 522;
+const BUILD = 523;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD + (location.pathname.includes('/beta/') ? ' · beta' : '');
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -24497,8 +24497,8 @@ function playPatLoop(){
 // the mixer's S does; all: clear every solo (as the deck's SOLO button).
 // / (owner, 20 Oct: Renoise's mute key): mutes or unmutes the whole track (the mixer's M), as soloKey picks it. On the Song
 // screen M still mutes just the block under the cursor.
-function muteKey(){
-  if (tv === 'song' && sxPicks.length) return sxMuteCells(sxPicks.map(p => [p.y, p.t]));   // picked cells
+function muteKey(trackOnly){
+  if (trackOnly !== true && tv === 'song' && sxPicks.length) return sxMuteCells(sxPicks.map(p => [p.y, p.t]));   // picked cells
   const mst = tv === 'song' ? cs.song.x === MT : tv === 'mixer' ? onMstCell() : tv === 'fx' ? cFxT >= NT : cTrack === MT;
   if (mst) return toast('The master can’t be muted.');
   const t = dkTrack(), m = S.mix[t]; if (!m) return;
@@ -25200,7 +25200,7 @@ function press(b, fromKey){
     if (mod('shift')){ used.shift = true; takeLatch(); if (tp.on) tStopUser(); else tStart('song', {row:songRow()}); } else playCtx(); return; }
   // LOOP is a sticky toggle, not a held key: a tap flips it (the pattern loop; LOOP SEL is in the tab bar on a computer).
   if (b === 'loop'){ toggleLoopPat(); clearTimeout(rep); return; }
-  if (b === 'mute' || b === 'solo'){ clearTimeout(rep); b === 'mute' ? muteKey() : soloKey(); return; }   // MUTE / SOLO (owner, 8 Nov): a tap latches, a second tap undoes it
+  if (b === 'mute' || b === 'solo'){ clearTimeout(rep); b === 'mute' ? muteKey(true) : soloKey(); return; }   // MUTE / SOLO (owner, 8 Nov): a tap latches, a second tap undoes it
   if (b === 'gen'){ clearTimeout(rep); genMenu(); return; }   // GEN (owner, 6 Nov): the generators, under SEMI + beside LOOP
   if (b === 'xposeUp'){ transposeSel(1, true); clearTimeout(rep); return; }
   if (b === 'xposeDn'){ transposeSel(-1, true); clearTimeout(rep); return; }
