@@ -1,4 +1,4 @@
-/* …pump pop-up windows, stage 3: what BAND, WIDE and HEAT share (matthettich/pump common/ui/MultibandUI.hpp and the
+/* pump pop-up windows, stage 3: what BAND, WIDE and HEAT share (matthettich/pump common/ui/MultibandUI.hpp and the
    crossover maths of common/dsp/Multiband.hpp). Band regions between draggable crossover handles, the strip of per-band
    S / M / B keys across the top of the display, and the multiband interaction set:
      drag a crossover handle (Shift: fine), double-click it to type (Tab: next crossover), wheel on it: 1/12 octave

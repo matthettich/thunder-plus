@@ -117,7 +117,7 @@ test('perform: the sequencer (index.html and the audio-thread core) plays every 
   for (const f of ['index.html', 'core/seq-core.js']){
     const t = H.read(f), i = t.indexOf('const La = PFS.lfo[t]'); assert.ok(i > 0, f + ': iterates the LFO array');
     const blk = t.slice(i, i + 1500);
-    assert.match(blk, /Array\.isArray\(La\)/); assert.match(blk, /j < La\.length/, f + ': sums every LFO on a target');
+    assert.match(blk, /Array\.isArray\(La\)/); assert.match(blk, /j < La\.length/, f + ': sums every LFO on a target'); assert.match(blk, /v \+= lfoAt\(M\.sh/, f + ': adds, not overwrites');
     assert.doesNotMatch(t, /PFS\.lfo\[t\];\s*if \(L && /, f + ': no single-object reader left');
   }
 });

@@ -1,4 +1,4 @@
-// ...Thunder Plus as a desktop app: one window running the same index.html as the website.
+// Thunder Plus as a desktop app: one window running the same index.html as the website.
 const { app, BrowserWindow, session, shell, Menu, protocol, net, ipcMain, dialog, powerSaveBlocker, utilityProcess, MessageChannelMain, systemPreferences } = require('electron');
 const path = require('path');
 const fs = require('fs'), fsp = fs.promises;
@@ -22,7 +22,7 @@ const ioAddonPath = () => path.join(__dirname, 'io', 'thunder_io.node').replace(
 let ioChild = null; const ioGate = createRestartGate();
 
 // The app is served from app://thunder/ rather than opened as plain files. Plain files can't fetch each
-// other, load audio worklets or talk across frames, which the …waves and …chains editors (frames inside
+// other, load audio worklets or talk across frames, which the waves and chains editors (frames inside
 // the app) and the mastering and bass engines need.
 const ROOT = path.join(__dirname, 'app');
 protocol.registerSchemesAsPrivileged([{ scheme:'app', privileges:{ standard:true, secure:true, supportFetchAPI:true, corsEnabled:true, stream:true } }]);
@@ -37,7 +37,7 @@ app.commandLine.appendSwitch('disable-background-timer-throttling');
 app.commandLine.appendSwitch('disable-backgrounding-occluded-windows');
 // APP NAP (owner, 5 Nov: stutters on an M4 with the app in the background, FLX rows especially): the switches above are
 // Chromium's own; macOS's App Nap is a level below them and still slows a hidden app's timers (the page's 25 ms pump and the
-// rows it books ahead: live engines, …pump FXV, MIDI out) and lowers its threads' priority. While the song plays the page
+// rows it books ahead: live engines, pump FXV, MIDI out) and lowers its threads' priority. While the song plays the page
 // asks for 'prevent-app-suspension' (thunder:playing), and lets it go on STOP so an idle app can still nap.
 let napBlock = -1;
 function setPlaying(on){
@@ -100,12 +100,12 @@ async function writeProj(p, text){
   try { await fsp.writeFile(tmp, text, 'utf8'); await fsp.rename(tmp, p); return { ok: true, path: p }; }
   catch (e) { try { await fsp.unlink(tmp); } catch (_) {} return { error: e.message }; }
 }
-const PROJ_FILTERS = [{ name: '...Thunder Plus project', extensions: ['thunder', 'json'] }];
+const PROJ_FILTERS = [{ name: 'Thunder Plus project', extensions: ['thunder', 'json'] }];
 
 function createWindow(){
   win = new BrowserWindow({
     width: 1400, height: 900, minWidth: 380, minHeight: 500,
-    backgroundColor: '#f0e6f4', title: '...Thunder Plus',
+    backgroundColor: '#f0e6f4', title: 'Thunder Plus',
     icon: path.join(ROOT, 'icons', 'plus-icon-512.png'),
     autoHideMenuBar: true,
     // preload.js: the page's only bridge to the shell (the updater: version, check now, get it).
@@ -144,7 +144,7 @@ app.whenReady().then(() => {
   if (process.platform !== 'darwin') Menu.setApplicationMenu(null);   // the Mac keeps its menu so ⌘C / ⌘V / ⌘Q work
   createWindow();
   // New versions come from the GitHub Releases page (see updater.js). The page asks through preload.js.
-  const updates = setupUpdates({ name: '...Thunder Plus', page: 'https://github.com/matthettich/thunder-plus/releases/latest', repo: 'matthettich/thunder-plus' });
+  const updates = setupUpdates({ name: 'Thunder Plus', page: 'https://github.com/matthettich/thunder-plus/releases/latest', repo: 'matthettich/thunder-plus' });
   ipcMain.handle('thunder:upd-state', () => updates.state());
   ipcMain.handle('thunder:upd-check', () => updates.check());
   ipcMain.handle('thunder:upd-act', () => updates.act());
@@ -158,7 +158,7 @@ app.whenReady().then(() => {
   ipcMain.handle('thunder:file-saveas', async (e, name, text, near) => {
     const base = String(name || 'Song.thunder').replace(/[\\/:*?"<>|]/g, '_');
     const dir = isProj(near) && fs.existsSync(path.dirname(near)) ? path.dirname(near) : app.getPath('documents');
-    const r = await dialog.showSaveDialog(win, { defaultPath: path.join(dir, base), filters: [{ name: '...Thunder Plus project', extensions: ['thunder'] }] });
+    const r = await dialog.showSaveDialog(win, { defaultPath: path.join(dir, base), filters: [{ name: 'Thunder Plus project', extensions: ['thunder'] }] });
     if (r.canceled || !r.filePath) return null;
     return writeProj(isProj(r.filePath) ? r.filePath : r.filePath + '.thunder', text);
   });

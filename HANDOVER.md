@@ -526,7 +526,7 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0) and `link/` (Ableton
 
 The owner's top priority to add is the MOD screen. Work down the list; ask before reordering it. The owner will run the tests listed under "Tests the owner will run" below.
 
-1. **MOD screen: LFOs assignable to FX parameters** (owner, 8 Nov; first version built 9 Nov, build 536, see "9 Nov: MOD screen" below. Still to come, one step at a time: …pump effects as targets, live engines' own filter and envelope via item 2's per-engine map, renders matching live, smoothing where steps are audible). The original brief: A new screen named
+1. **MOD screen: LFOs assignable to FX parameters** (owner, 8 Nov; first version built 9 Nov, build 538, see "9 Nov: MOD screen" below. Still to come, one step at a time: …pump effects as targets, live engines' own filter and envelope via item 2's per-engine map, renders matching live, smoothing where steps are audible). The original brief: A new screen named
   **MOD between FX and PROJECT**; PROJECT can become PROJ if the tabs need room (six already fill a folded phone: check at real size; hide the tab when
   folded, SHIFT+◀▶ still reaching it, only if it's still too tight). Suggested: one LFO per row (track, slot, parameter, shape, rate, depth), an "Add LFO…"
   on an FX parameter's value menu opening MOD with that target, a small mark on modulated parameters. Alternative was a pop-up by the parameter. Already
@@ -581,7 +581,7 @@ Start a session by asking for results. Fix on `beta`.
   final length stays until the next take. recorder-check covers FREE, PATTERN, Stop, next take and closing mid-take.
 
 
-## 9 Nov: MOD screen, first version (build 536, PR from `feat/mod-screen`)
+## 9 Nov: MOD screen, first version (build 538, PR from `feat/mod-screen`)
 
 Owner: four LFOs per track for now; internal FX and instruments, …pump later; build stepwise and verify before the harder parts, knowingly past the feature freeze. Sonnet subagents built it, the lead reviewed.
 - **Data:** `S.perf.lfo[t]` is now an array of up to `PLFO_MAX` (4) `{id, sh, rt, dp}`, no holes; `normPerf` still reads the old single object. Perform's lock sheet edits entry 0 only.
@@ -599,6 +599,22 @@ Written up from the commits on 9 Nov; none of it has been tried on a real Fold.
 - **533:** With Low power display on and the app on screen, the audio engine sleeps after 30 s of silence. Not while playing, rendering, recording or with MIDI input connected; it stays awake while a pad is sounding. Off keeps the old behaviour.
 - **534:** Low power display picks the Low power skin; it applies even if storage fails, and a stale saved skin is cleared.
 - **535:** Phone: less layout work while playing; the playback report logs stalls.
+
+## 9 Nov: pad PLAY matches Space, OPTION is ALT (build 537, same PR as the wording audit)
+
+Owner's call after a pad-vs-keys comparison. On every input the same rule now holds through `playKey(shift)`: PLAY or Space plays
+the song (on the Song screen, `playCtx`, so LOOP SEL's rows still loop), SHIFT+PLAY or Shift+Space plays this screen. This reverses
+the 27 Oct note that the on-screen PLAY kept the pad's meaning. The pad's OPTION is labeled ALT to match the keyboard; the internal
+name is still `opt`. Pad SHIFT+arrows (screens) and ALT+arrows (other phrase or block) were deliberately left as they are.
+
+## 9 Nov: wording audit (build 536, branch `fix/wording-audit`, PR into `beta`)
+
+The owner asked for an audit of awkward menu and notification text, then for the fixes. About 180 strings were rewritten and the
+longest pop-ups tightened. Owner's naming decisions: American spelling in visible text (code identifiers and CSS stay as they
+were); no dots on any name (Thunder, Thunder Plus, pump, chains, waves); say "desktop app", not "helper", to users;
+"A voice per track" became "A kit slot per track" (the internal `vtrk` name is unchanged). Audio thread / Page stay as the
+sequencer names. The installed app's productName was already Thunder Plus; `electron/package.json` only had its
+descriptions and shortcut name changed. Write new user-facing text in plain sentences: say what is true now, no "as before", no colon-joined clauses.
 
 ## 9 Nov, end of session: what to test on the phone (build 530, on `beta`)
 
