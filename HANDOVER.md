@@ -366,6 +366,7 @@ clock mapping at that latency (7 Nov (16)). Re-check MIDI timing with Measure…
 
 ## Desktop releases
 
+- **v1.3.1** (8 Nov 2026; owner: "Build the main and desktop app"; PR #18 beta → main at build 514, Run workflow through the API with version 1.3.1, run 42522985460): Live engines setting and lighter …waves live (513–514) on top of v1.3.0. Owner wants Thunder Plus changes to go through PRs (ask CodeRabbit with "@coderabbitai review" on PRs into beta).
 - **v1.2.101** (7 Nov 2026; for the owner's MIDI testing; Run workflow through the API with version 1.2.101, from `main` at build
   485, run 42432167168): Measure's note (482), INPUTS wording (483), Measure resets the engine (484), MIDI mapping floored at
   the reported latency (485) on top of v1.2.100.
@@ -539,6 +540,23 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0) and `link/` (Ableton
 - Owner to test (3 Nov): Ableton Link's CI build on Mac / Windows, then against Live or Koala.
 - Bug reports: the owner resubmits the Synth-page → Song-screen issue if they can reproduce it (note removed 2 Nov).
 
+
+## 8 Nov: dialog sliders on touch (build 515)
+
+Sliders in `.ask` dialogs (every generator, Record a sample) couldn't be moved on a phone: CSS takes touches off sliders on
+`pointer:coarse` and the shared drag skipped `.ask`. `sliderOk(r, touch)` now lets touch through for dialogs (a mouse keeps the
+native slider), and `.acidr` / `.acidf` carry `touch-action:pan-y`, or the browser cancels the drag as a pan. Checked with
+emulated touch drags on a Pixel 7 profile: no movement before, correct distance after, on Acid line and a generic `genPanel`.
+
+## 8 Nov: FLY label and same-row order (build 515)
+
+The FX bar capped the Flex param at 255, so every FLY showed as `FLX FF`. FLX and FLY on one row now follow column order: the
+rightmost plays (owner's go-ahead; the sequencer used to emit FLX then FLY, so FLY always won).
+
+## 8 Nov: instrument big step can't overshoot (build 515)
+
+EDIT+▲▼ (and the other big-step routes through `bump`) on an instrument now does nothing if the 8-step would pass 00 or the top,
+instead of clamping: a slip from ▶ onto ▼ was sending low instruments to 00 (owner's choice). Single steps still stop at the ends.
 
 ## 8 Nov: …waves live per-bus running; "Live engines" setting (build 513, beta only)
 
