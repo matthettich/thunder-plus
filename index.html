@@ -22842,7 +22842,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 525;
+const BUILD = 526;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD + (location.pathname.includes('/beta/') ? ' · beta' : '');
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -24942,8 +24942,9 @@ function go(v){
   tv = v; if (MID.includes(v)) midV = v; selA = null; sxPicks = []; if (refit) fit(); draw(); saveCur();
 }
 function nav(dir){
-  // MOBILE (owner, 8 Nov): SHIFT+▲ goes to Arrange from every tracker screen (the Project screen stays on SHIFT+◀▶ and its tab)
-  if (dir === 'up' && isMobile()) return tv !== 'song' ? go('song') : null;
+  // MOBILE (owner, 8 Nov): SHIFT+▲ goes to Arrange from every tracker screen: the panel beside the screen when it's showing (it takes the
+  // keys, as SHIFT+◀ does from Phrase), otherwise the Song screen, which is Arrange there. Project stays on SHIFT+◀▶ and its tab.
+  if (dir === 'up' && isMobile()){ if (apF === 'arr') return null; if (apArrOk()){ apFocus('arr', true); draw(); return null; } return tv !== 'song' ? go('song') : null; }
   if (dir === 'up') return tv === 'mixer' ? go(midV) : tv !== 'project' ? go('project') : null;
   if (dir === 'down') return tv === 'project' ? go(midV) : tv !== 'mixer' ? go('mixer') : null;
   // PATTERN VIEW: PHRASE | PATTERN stays as chosen (owner, 19 Oct); Shift+▶ from the pattern goes on to Inst like the
@@ -24985,8 +24986,9 @@ function optDir(dir, grid){
   // next number on Sect, Inst and FX); ◀ is earlier, ▶ later. dn: the step in number for this key.
   const dn = big ? -d : d;
   if (tv === 'phrase' && !(grid && patNavOn) && pvActive()){ phShownGo(); return pvRow(dir === 'up' ? -1 : dir === 'down' ? 1 : d); }   // PATTERN VIEW: Ctrl+▲▼, [ ], ‹ › step song rows
-  // Mixer FX row: OPTION+▲▶ turn effects on in order (up to eight), OPTION+▼◀ turn the last one back off.
-  if (tv === 'mixer'){ if (cs.mixer.y === 5) fxActiveStep(cs.mixer.x, d); else toast('OPTION + arrows on the Mixer work on the FX row: ▲ ▶ turn the next effect on, ▼ ◀ the last one off.', 2500); return; }   // (owner, 7 Nov: off that row they did nothing)
+  // Mixer FX row: OPTION+▲ turns effects on in order (up to eight), OPTION+▼ turns the last one back off.
+  // OPTION arrows on the Mixer go to another track, as on FX (owner, 8 Nov); only ▲▼ on the FX row keep turning effects on and off.
+  if (tv === 'mixer'){ if (big && cs.mixer.y === 5) fxActiveStep(cs.mixer.x, d); else move(dn, 0); return; }
   // The Song screen (and Arrange holding the keys on Phrase): PAD mode's OPTION+arrows move like the phrase editor's,
   // to the nearest filled block that way (songGridDir). With PATTERN NAV off: ◀▶ previous/next block in the track,
   // ▲▼ 16 rows, as before.
@@ -26069,7 +26071,7 @@ const HINT = {
   phraseM:'Master phrase: commands only · EDIT add a command (VOL level, FXO effects on/off, FLX GAT RTG patterns) · EDIT+◀▶ ±1 ▲▼ ±more · OPT+EDIT clear',
   phrase:'EDIT add note · EDIT×2 note off · EDIT+◀▶ ±1 ▲▼ ±octave · OPT+EDIT clear · OPT+arrows go to phrase · SHIFT+▶ inst',
   inst:'EDIT+◀▶ ±1 ▲▼ ±more · EDIT on › runs it · OPT+◀▶ other instrument · SHIFT+◀ phrase',
-  mixer:'EDIT+◀▶ ±1 ▲▼ ±16 · ▼ from SC: the VOL fader · FX row: OPT+▲▶ FX on (up to 8), OPT+▼◀ off · EDIT mutes, solos, toggles CHN or opens FX · SC row: lit when the track is a sidechain source (EDIT says for what) · OPT+EDIT reset · SHIFT+▶ FX · SHIFT+▲ back',
+  mixer:'EDIT+◀▶ ±1 ▲▼ ±16 · ▼ from SC: the VOL fader · OPT+arrows other track · FX row: OPT+▲ FX on (up to 8), OPT+▼ off · EDIT mutes, solos, toggles CHN or opens FX · SC row: lit when the track is a sidechain source (EDIT says for what) · OPT+EDIT reset · SHIFT+▶ FX · SHIFT+▲ back',
   fx:'EDIT adds · ▶ opens its controls · EDIT+◀▶ change · OPT+EDIT remove or reset · OPT+◀▶ other track · SHIFT+◀ mixer',
   project:'EDIT on › runs it · EDIT+◀▶ change · OPT+EDIT reset · SHIFT+▼ back',
 };
@@ -31832,6 +31834,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
   [519, '8 Nov', ['The pad has MUTE and SOLO buttons on unfolded and larger screens: pink and green when off, black when on. Tap to latch, tap again to undo.']],
+  [526, '8 Nov', ['Mobile: SHIFT + ▲ now goes to the Arrange panel beside the screen when it is showing.', 'Mixer: OPTION + arrows go to another track, as on FX. On the FX row, OPTION + ▲▼ still turn effects on and off.']],
   [518, '8 Nov', ['Mobile: SHIFT + ▲ goes to Arrange from every tracker screen.']],
   [514, '8 Nov', ['Live engines: the setting always shows, and its help and message name every …pump live engine as well as …waves live.']],
   [513, '8 Nov', ['Settings → Audio → Live engines (it was called …pump live): the name now says what it does, and it covers …waves live too, as does the message when a device can’t keep up.', '…waves live is lighter: each pad now runs only the part of the patch that feeds its Bus, with the same sound.']],

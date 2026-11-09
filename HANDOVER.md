@@ -585,7 +585,7 @@ the current track (set in `draw`). Build 520: only when the pad's container is 6
 
 ## 8 Nov: SHIFT+▲ goes to Arrange on Mobile (build 518)
 
-Owner's request: with the Mobile setting on, SHIFT+▲ calls `go('song')` from every screen (Project stays on SHIFT+◀▶ and its tab).
+Build 526 also: Mixer OPTION+arrows change track, as FX does (OPTION+▲▼ on the FX row still turn effects on and off, owner may want that changed). Build 526: with the Arrange panel showing, SHIFT+▲ gives it the keys (`apFocus('arr', true)`) and stays on the screen; otherwise as below. Owner's request: with the Mobile setting on, SHIFT+▲ calls `go('song')` from every screen (Project stays on SHIFT+◀▶ and its tab).
 Desktop keeps Project / back. Build 517 added ` · beta` beside the build number on the beta copy.
 
 ## 8 Nov: mobile stalls during playback (build 516; partly fixed)
