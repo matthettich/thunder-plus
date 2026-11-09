@@ -145,7 +145,7 @@ body.mob .deskmenu{display:none}
 :is(#gset,.rlock) input[type=range]:not(.unl){pointer-events:none; opacity:.5}
 /* ONE SLIDER (27 Oct, Phase 2): a vertical swipe over a slider scrolls the page; the value tip while dragging; the slider the
    wheel will move (it rested under the pointer) is outlined */
-input[type=range], .row:has(> input[type=range]){touch-action:pan-y}
+input[type=range], .row:has(> input[type=range]), .acidr, .acidf:has(input[type=range]){touch-action:pan-y}
 @media (pointer:coarse){ input[type=range]:not(:is(#gset, .rlock) *){pointer-events:none} }
 .sldtip{position:fixed; z-index:140; transform:translate(-50%, calc(-100% - 6px)); padding:2px 7px; border-radius:4px; background:var(--ink, #222); color:var(--panel, #fff); font:600 12px/1.5 var(--font); pointer-events:none; white-space:nowrap}
 input[type=range].wheelon, [data-wheel].wheelon{outline:2px solid var(--ink); outline-offset:2px; border-radius:4px}
@@ -15228,7 +15228,9 @@ async function rcdPanel(pad, opts){
    Right-click a slider for Reset / Type a value / Learn a MIDI knob (makeRow); the wheel nudges the slider the pointer rests
    on (WHEEL FOCUS; one only passed over doesn't take it, so the page still scrolls); a drag is relative, Shift a tenth (ONE SLIDER).
    Not the settings menus' sliders (they lock against stray touches). To remove: this block and the contextmenu in makeRow. */
-const sliderOk = r => !!r && r.matches && r.matches('input[type=range]') && !r.disabled && !r.closest('#gset, .rlock, .ask');
+// Dialogs (.ask: the generators, Record…) keep the browser's own slider under a mouse; on a touch screen CSS takes their touches away
+// like every other slider's, so the drag below has to serve them too (8 Nov: Acid line's sliders couldn't be moved on a phone).
+const sliderOk = (r, touch) => !!r && r.matches && r.matches('input[type=range]') && !r.disabled && !r.closest(touch ? '#gset, .rlock' : '#gset, .rlock, .ask');
 /* ONE RULE FOR VALUE CONTROLS (owner, mouse audit 3 Nov): sliders, faders, the FX bar's values and the …pump windows'
    controls all take the mouse the same way:
    - a drag moves the value from where it is; Shift held is ten times finer and Ctrl/⌘ held four times coarser, read on
@@ -15393,7 +15395,7 @@ function sliderAt(e){
 }
 document.addEventListener('pointerdown', e => {
   const r = sliderAt(e);
-  if (e.button !== 0 || !sliderOk(r)) return;
+  if (e.button !== 0 || !sliderOk(r, e.pointerType === 'touch')) return;
   e.preventDefault(); e.stopPropagation();
   if (ctxPress(e)) return;   // Ctrl+click on a Mac is the right-click: the menu opens, the value stays (3 Nov)
   const touch = e.pointerType === 'touch';
@@ -19866,7 +19868,8 @@ function makeSeq(S, mode, o){
           }
           T.last = {c, v}; cmds.push({c, v});
         }
-        const fx = {}; for (const q of cmds) fx[q.c] = q.v;
+        // FLX and FLY share one Flex, so on one row the rightmost of the two is the one that plays (8 Nov)
+        const fx = {}; for (const q of cmds){ if (q.c === 'FLX') delete fx.FLY; else if (q.c === 'FLY') delete fx.FLX; fx[q.c] = q.v; }
         if (fx.TPO != null && fx.TPO >= 40) nb = fx.TPO;
         if (fx.GRV != null) T.grv = fx.GRV ? [(fx.GRV >> 4) || api.tks, (fx.GRV & 15) || api.tks] : null;
         if (fx.GGR != null) ngrv = fx.GGR ? [(fx.GGR >> 4) || api.tks, (fx.GGR & 15) || api.tks] : null;
@@ -21435,7 +21438,7 @@ function padBlink(e){
    Off (Page), nothing here runs. */
 // CORE_REV: a hash of core/seq-core.js, written by tools/make-core.mjs. The offline cache keeps a file by its URL, so the
 // URL must change whenever the file does (the build number alone left phones on an old core all evening, 2 Nov).
-const CORE_REV = 'x761n5';
+const CORE_REV = 'rl3y62';
 const CORE_WANT = 7;   // the core's message set this page speaks (core-processor.js CORE_V); an older core is not used
 const CORE_URL = () => 'core/seq-core.js?v=' + BUILD + '-' + CORE_REV;
 const core = {node:null, ready:false, loading:null, gen:0, sent:new Map(), sT:0, tally:new Map(), mir:null};   // mir: what the core's song holds, as JSON per part (coreDiff)   // tally: events by who played them (test hook)
@@ -22827,7 +22830,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 514;
+const BUILD = 515;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD;
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -23867,7 +23870,8 @@ function bump(d, big){
       case 'tsp': v = clamp(v + d * (big ? 12 : 1), -128, 127); break;
       case 'note': v = v === OFF ? last.note : clamp(v + d * (big ? 12 : 1), 0, 119); break;
       // NI instruments (00–3F): the big step jumps 8 at a time (00–07 the drum pads, 08–0F the synths, and on).
-      case 'inst': { const nv = clamp(v + d * (big ? 8 : 1), 0, NI - 1); if (nv === v) toast(`Instruments go 00–${hx(NI - 1)} (${NI} of them, in hex: 0F is 15, 10 is 16). Each plays the slot set on INST › PAD.`); v = nv; break; }
+      // A big step that would run past either end does nothing (owner, 8 Nov: a slip onto ▼ while editing sent low numbers to 00).
+      case 'inst': { if (big && (v + d * 8 < 0 || v + d * 8 > NI - 1)) return; const nv = clamp(v + d * (big ? 8 : 1), 0, NI - 1); if (nv === v) toast(`Instruments go 00–${hx(NI - 1)} (${NI} of them, in hex: 0F is 15, 10 is 16). Each plays the slot set on INST › PAD.`); v = nv; break; }
       case 'fxc': if (mstView()){ const L = FXLIST_MST.slice(1), n = L.length, i = Math.max(0, L.indexOf(v)); v = L[((i + d * (big ? 4 : 1)) % n + n) % n]; }
         else v = ((v + d * (big ? 4 : 1)) % FXC.length + FXC.length) % FXC.length; break;
     }
@@ -28729,7 +28733,7 @@ let dkFlexC = null, dkPatN = 0;   // dkPatN: pictures drawn (test hook)
 function dkFxPatState(f, k, t, at){
   const sw = fxcNow(t, 'sw' + k, at), on = sw < -0.5 ? !!f.on : sw > 0.5;
   if (f.type === 'flex'){ const c = fxcNow(t, 'flx', at), wait = c < 0 && !!f.wait && !(sw > 0.5);
-    const p = c >= 0 ? Math.min(255, Math.round(c)) : wait ? 0 : f.pat | 0;
+    const p = c >= 0 ? Math.min(511, Math.round(c)) : wait ? 0 : f.pat | 0;
     const fly = p >= 256;   // FLY: the param carries 256 + its value
     return {on, wait, src:c >= 0 ? (fly ? 'FLY' : 'FLX') : wait ? 'WAITS FOR FLX' : 'PATTERN', p, name:(fly ? 'FLY ' + hx(p - 256) + ' · ' + (FlexCore.NAMES2[p - 256] || '?') : 'FLX ' + hx(p) + ' · ' + (FlexCore.NAMES[p] || '?'))}; }
   if (f.type === 'sgate'){ const c = fxcNow(t, 'gat', at), g = c >= 0 ? Math.round(c) : -1, wait = g === 0 || (g < 0 && !!f.wait && !(sw > 0.5)), p = g > 0 ? (g >= 16 ? 0 : g) : f.pat | 0;
