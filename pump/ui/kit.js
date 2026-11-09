@@ -54,7 +54,7 @@ function skinDark(){
     return getComputedStyle(document.documentElement).colorScheme.includes('dark'); } catch(e){ return false; }
 }
 /* SKIN THEME (owner, 24 Oct: the windows' own pink / cyan / lime palettes looked out of place in Thunder): unless the DARK
-   key has picked pump's own light or dark look on this device, a window takes its colours from Thunder's skin, the
+   key has picked pump's own light or dark look on this device, a window takes its colors from Thunder's skin, the
    tracker screen's (the --ts-* and --tk-* variables): its background and ink, the cursor's colour as the accent, the
    track colours as the second accent. themeFor() is the one entry; buildTheme() stays pump's own palettes. */
 let probe = null;
@@ -451,7 +451,7 @@ class Win {
     cm.setFn = i => { const r = this.chainRows()[i]; if (r && r.k !== this.k) FX.open(this.t, r.k); }; cm.textFn = () => 'CHAIN';
     this.helpBtn = this.button('?', () => { this.help = !this.help; }, () => this.help); this.helpBtn.small = true; this.helpBtn.tip = 'Mouse and keyboard shortcuts (?)';
     this.darkBtn = this.button('DARK', () => this.setDark(!this.dark), () => this.dark); this.darkBtn.small = true;
-    this.darkBtn.tip = 'pump’s own light or dark colours (remembered on this device; Ctrl/Cmd-click: follow Thunder’s skin again, the default)';
+    this.darkBtn.tip = 'pump’s own light or dark colors (remembered on this device; Ctrl/Cmd-click: follow Thunder’s skin again, the default)';
     this.darkBtn.onExclusive = () => { try { localStorage.removeItem(THEME_KEY); } catch(e){} for (const w of wins.values()) w.setDark(themeDark(), true); this.status = 'Follows Thunder’s skin'; };
     if (this.D.bypass !== false){ this.bypBtn = this.button('BYPASS', () => this.setOn(!this.on), () => !this.on); this.bypBtn.small = true;
       this.bypBtn.tip = 'Bypass: the FX slot’s ACTIVE (latency-matched, so the timing never jumps)'; }

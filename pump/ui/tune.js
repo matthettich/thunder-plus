@@ -181,7 +181,7 @@ U.define('tune', {W:1100, H:620, nW:480, nH:1000, bypass:true, cmdKeys:'a', make
   const rangeSeg = ui.seg('range', ['HIGH', 'MID', 'LOW']); rangeSeg.tip = 'Voice range: High 100-1200 Hz, Mid 70-900 Hz, Low 50-600 Hz (lower ranges need a little more latency)';
   const retuneDial = dial('retune', 'RETUNE', 'm', false, 'Retune speed: how fast the voice is pulled onto the note (0 = at once: the hard, stepped sound)', 1);
   const amountDial = dial('amount', 'AMOUNT', 'm', false, 'Amount of correction', 1);
-  const humanDial = dial('humanize', 'HUMANIZE', 'm', false, 'Humanize: correct the note’s centre and leave vibrato and small movements alone', 1);
+  const humanDial = dial('humanize', 'HUMANIZE', 'm', false, 'Humanize: correct the note’s center and leave vibrato and small movements alone', 1);
   const flexDial = dial('flex', 'FLEX', 'm', false, 'Flex: notes already within this many cents of the target are left alone (only bigger misses are fixed)', 1);
   // ---- PITCH / FORMANT ----
   const vibDial = dial('vib_depth', 'VIBRATO', 's', false, 'Added vibrato depth (cents), faded in after each new note', 2);
@@ -232,7 +232,7 @@ U.define('tune', {W:1100, H:620, nW:480, nH:1000, bypass:true, cmdKeys:'a', make
     return s;
   };
   const pct = v => (100 * v).toFixed(0) + '%';
-  const straightSl = mkSlider('STRAIGHTEN', 0, 1, 0, 'straighten', pct, 'Straighten: pulls the selected notes’ slow drift toward their centre (100 % = a flat line)');
+  const straightSl = mkSlider('STRAIGHTEN', 0, 1, 0, 'straighten', pct, 'Straighten: pulls the selected notes’ slow drift toward their center (100 % = a flat line)');
   const vibSl = mkSlider('VIBRATO', 0, 2, 1, 'vibrato', pct, 'Vibrato: the selected notes’ own vibrato, removed (0) to doubled (200 %)');
   const formSl = mkSlider('FORMANT', -12, 12, 0, 'formant', v => signed(v, 1) + ' st', 'Formant of the selected notes');
   const gainSl = mkSlider('GAIN', -24, 12, 0, 'gainDb', v => signed(v, 1) + ' dB', 'Level of the selected notes');
@@ -579,7 +579,7 @@ U.define('tune', {W:1100, H:620, nW:480, nH:1000, bypass:true, cmdKeys:'a', make
     const p = plotRect();
     if (graphMode() && keysRect().has(x, y)){ ui.status = 'Drag the keyboard: scroll the pitch   Alt+wheel: zoom pitch'; return; }
     if (!p.has(x, y)) return;
-    if (!graphMode()){ ui.status = 'The pitch sung (thin), what comes out (neon), the target notes and the harmonies (second colour)'; return; }
+    if (!graphMode()){ ui.status = 'The pitch sung (thin), what comes out (neon), the target notes and the harmonies (second color)'; return; }
     const hit = noteAt(x, y);
     if (hit >= 0){ const n = notes[hit], nn = lround(n.dst);
       ui.status = noteName(nn) + ' ' + signed(lround(100 * (n.dst - nn)), 0) + ' c  (sung ' + signed(n.dst - n.src, 2) + ' st)   ' + (n.t1 - n.t0).toFixed(2) + ' s   drag: move (Alt free)   double-click: snap to the scale'; }

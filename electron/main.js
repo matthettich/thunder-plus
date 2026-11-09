@@ -1,4 +1,4 @@
-// ...Thunder Plus as a desktop app: one window running the same index.html as the website.
+// Thunder Plus as a desktop app: one window running the same index.html as the website.
 const { app, BrowserWindow, session, shell, Menu, protocol, net, ipcMain, dialog, powerSaveBlocker, utilityProcess, MessageChannelMain, systemPreferences } = require('electron');
 const path = require('path');
 const fs = require('fs'), fsp = fs.promises;
@@ -100,12 +100,12 @@ async function writeProj(p, text){
   try { await fsp.writeFile(tmp, text, 'utf8'); await fsp.rename(tmp, p); return { ok: true, path: p }; }
   catch (e) { try { await fsp.unlink(tmp); } catch (_) {} return { error: e.message }; }
 }
-const PROJ_FILTERS = [{ name: '...Thunder Plus project', extensions: ['thunder', 'json'] }];
+const PROJ_FILTERS = [{ name: 'Thunder Plus project', extensions: ['thunder', 'json'] }];
 
 function createWindow(){
   win = new BrowserWindow({
     width: 1400, height: 900, minWidth: 380, minHeight: 500,
-    backgroundColor: '#f0e6f4', title: '...Thunder Plus',
+    backgroundColor: '#f0e6f4', title: 'Thunder Plus',
     icon: path.join(ROOT, 'icons', 'plus-icon-512.png'),
     autoHideMenuBar: true,
     // preload.js: the page's only bridge to the shell (the updater: version, check now, get it).
@@ -144,7 +144,7 @@ app.whenReady().then(() => {
   if (process.platform !== 'darwin') Menu.setApplicationMenu(null);   // the Mac keeps its menu so ⌘C / ⌘V / ⌘Q work
   createWindow();
   // New versions come from the GitHub Releases page (see updater.js). The page asks through preload.js.
-  const updates = setupUpdates({ name: '...Thunder Plus', page: 'https://github.com/matthettich/thunder-plus/releases/latest', repo: 'matthettich/thunder-plus' });
+  const updates = setupUpdates({ name: 'Thunder Plus', page: 'https://github.com/matthettich/thunder-plus/releases/latest', repo: 'matthettich/thunder-plus' });
   ipcMain.handle('thunder:upd-state', () => updates.state());
   ipcMain.handle('thunder:upd-check', () => updates.check());
   ipcMain.handle('thunder:upd-act', () => updates.act());
@@ -158,7 +158,7 @@ app.whenReady().then(() => {
   ipcMain.handle('thunder:file-saveas', async (e, name, text, near) => {
     const base = String(name || 'Song.thunder').replace(/[\\/:*?"<>|]/g, '_');
     const dir = isProj(near) && fs.existsSync(path.dirname(near)) ? path.dirname(near) : app.getPath('documents');
-    const r = await dialog.showSaveDialog(win, { defaultPath: path.join(dir, base), filters: [{ name: '...Thunder Plus project', extensions: ['thunder'] }] });
+    const r = await dialog.showSaveDialog(win, { defaultPath: path.join(dir, base), filters: [{ name: 'Thunder Plus project', extensions: ['thunder'] }] });
     if (r.canceled || !r.filePath) return null;
     return writeProj(isProj(r.filePath) ? r.filePath : r.filePath + '.thunder', text);
   });

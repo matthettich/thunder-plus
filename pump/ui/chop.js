@@ -149,7 +149,7 @@ U.define('chop', {W:1000, H:628, nW:480, nH:978, bypass:true, back:0, make(ui){
     } else { ui.stroke(b, t.dim, 1.5); ui.text(b.cx, b.cy, pendNow ? (nar ? 'WAITING' : 'WAITING FOR THE GRID') : 'LIVE', 'label', 13, t.ink2, 'center', 1.2); }
     let n = 0; for (let q = 0; q < PADS; q++) n += heldNow >> q & 1;
     const l1 = n >= 2 && V('loop_two') >= 0.5 ? n + ' PADS: LOOPING' : n + ' PAD' + (n === 1 ? '' : 'S') + ' HELD';
-    const l2 = 'QUANTISE ' + Q_NAMES[clamp(Math.round(V('quantise')), 0, 4)].toUpperCase();
+    const l2 = 'QUANTIZE ' + Q_NAMES[clamp(Math.round(V('quantise')), 0, 4)].toUpperCase();
     const l3 = learn >= 0 ? 'LEARNING PAD ' + (learn + 1) + ': A NOTE OR A KEY' : (ninOff && V('midi_notes') >= 0.5 ? 'NO NOTES IN: SET NOTES FROM' : '');
     const l3c = learn >= 0 ? t.ink : t.red;
     if (!nar){ ui.text(r.x + 12, r.y + 122, l1, 'label', 9.5, t.ink2, 'left', 0.6); ui.text(r.x + 12, r.y + 142, l2, 'label', 9.5, t.ink2, 'left', 0.6);
@@ -181,7 +181,7 @@ U.define('chop', {W:1000, H:628, nW:480, nH:978, bypass:true, back:0, make(ui){
     ui.stroke(editR, t.dim, 1); ui.caption(editR.x + 12, editR.y + 16, 'PAD ' + (sel + 1));
     ui.caption(fxSeg.r.x, fxSeg.r.y - 10, 'EFFECT');
     ui.stroke(kitR, t.dim, 1); ui.caption(kitR.x + 12, kitR.y + 16, 'CHOPPER');
-    ui.caption(slicesSeg.r.x, slicesSeg.r.y - 10, 'SLICES'); ui.caption(lenMenu.r.x, lenMenu.r.y - 10, 'LENGTH'); ui.caption(quantMenu.r.x, quantMenu.r.y - 10, 'QUANTISE');
+    ui.caption(slicesSeg.r.x, slicesSeg.r.y - 10, 'SLICES'); ui.caption(lenMenu.r.x, lenMenu.r.y - 10, 'LENGTH'); ui.caption(quantMenu.r.x, quantMenu.r.y - 10, 'QUANTIZE');
   }
 
   // ---- the pads' pointers: taken before the kit sees them (several at once; no long-press on a held pad)
@@ -217,7 +217,7 @@ U.define('chop', {W:1000, H:628, nW:480, nH:978, bypass:true, back:0, make(ui){
   const codeOf = e => e.code || e.key;
   function key(e, m){
     if (m.cmd || m.alt || e.ctrlKey || e.metaKey) return false;
-    if (e.key === 'Escape' && learn >= 0){ learn = -1; ui.status = 'Learn cancelled'; return true; }
+    if (e.key === 'Escape' && learn >= 0){ learn = -1; ui.status = 'Learn canceled'; return true; }
     if (e.key.length !== 1) return false;
     const k = e.key.toLowerCase().charCodeAt(0); if (k <= 32 || k > 126) return false;
     if (e.repeat) return keyPads.has(codeOf(e));

@@ -41,7 +41,7 @@ button{cursor:pointer}
 .bar h1{font-size:19px; font-weight:600; margin:0 6px 0 0; letter-spacing:-.01em}
 .bar .spacer{flex:1}
 .embed .bar h1{display:none}
-/* a control that is in …Thunder Plus's bottom panel: a small dot before its name */
+/* a control that is in Thunder Plus's bottom panel: a small dot before its name */
 .row.indeck > .lbl::before{content:''; display:inline-block; width:6px; height:6px; margin:0 5px 1px 0; border-radius:50%; background:var(--mod, #8a63d8); vertical-align:middle}
 .embed .setwrap{display:none}   /* File/Settings live in the app's top bar when embedded */
 .embed #cpuv{display:none}   /* the app's top bar owns the CPU readout */
@@ -91,7 +91,7 @@ button{cursor:pointer}
 .ctxitem:disabled{opacity:.4}
 
 /* ---------- layout ---------- */
-/* The bar under the patch: the same darker grey as the tracker's control bar in ...Thunder Plus. */
+/* The bar under the patch: the same darker grey as the tracker's control bar in Thunder Plus. */
 .split{display:grid; grid-template-columns:38px minmax(0,1fr); min-height:0; border-bottom:10px solid color-mix(in srgb, var(--side) 84%, #000)}
 .split > *{border-bottom:1px solid #111}
 
@@ -377,7 +377,7 @@ document.addEventListener('contextmenu', e => { if (e.cancelable && !(e.target.c
    Phase 1 is UI-only: Track In modules are silence standalone; the host wires
    tracker audio in Phase 2. */
 // CHAN_COUNT: the tracks a patch can address (as the engine, 128 since 20 Oct). TRK_N: how many the pickers list, the
-// host app's track count (...Thunder Plus says, thunderChains.tracks), else 32. NSEND: Sidechain Out's sends.
+// host app's track count (Thunder Plus says, thunderChains.tracks), else 32. NSEND: Sidechain Out's sends.
 const PROTOCOL = 2, TARGET = 'chains', CHAN_COUNT = 128, NSEND = 8;
 const TRK_N = (() => { try { const w = window.parent !== window && window.parent.thunderChains; return w && w.tracks > 0 ? Math.min(CHAN_COUNT, w.tracks | 0) : 32; } catch (e) { return 32; } })();
 const trackOpts = () => Array.from({length:TRK_N}, (_, i) => [i + 1, 'Track ' + (i + 1)]);
@@ -508,7 +508,7 @@ const SHARED_ABOUT = {
   ott:'Multiband squash: splits the sound into low, mid and high and pushes each toward the same level, lifting quiet detail and pressing loud parts down, the hyped OTT sound. Depth sets how much.',
   fshift:'Frequency shifter: moves every partial by the same number of Hz (unlike pitch shift), so sounds go inharmonic, metallic or barber-pole with Feedback.',
   vinyl:'Vinyl (based on Airwindows ToVinyl4): the low end narrowed and filtered as a record lathe needs, the top limited, and groove wear.',
-  dub:'Dub tape (based on Airwindows Dubly): the encode/decode squash of an old tape noise reducer, for dense, colourful dub-style saturation.',
+  dub:'Dub tape (based on Airwindows Dubly): the encode/decode squash of an old tape noise reducer, for dense, colorful dub-style saturation.',
   cab:'Speaker cab (based on Airwindows Cabs): guitar and bass cabinet models with room sound and off-axis tone.',
   tube:'Tube (based on Airwindows Tube2): warm tube-style saturation; Tube adds the asymmetric character.',
   flanger:'Flanger (based on DaisySP): a short modulated delay with feedback, from gentle jet sweeps to metallic swooshes.',
@@ -534,7 +534,7 @@ const SHARED_ABOUT = {
   blades:'A multimode filter that can be gentle or driven. Cutoff, Resonance and Drive, Mode picks low-pass, band-pass, high-pass or notch, and Slope picks 2-pole or 4-pole (steeper). Patch modulation into Cutoff for sweeps; a resonance CV jack is on the slider too.',
   meta:'Takes two sounds and combines them. Crossfade blends In and Mod, Ring mod multiplies them (bell-like sums), Wave fold bends In through a sine shaper (Amount sets the folding), and Comparator flips In’s sign with Mod — audio-rate logic. Mix sets the dry/wet.',
   phaser:'Sweeps notches through the sound: Stages sets how deep the notches are, Rate (or Sync to tempo) sweeps them, Depth and Feedback set how far and how sharp, and a CV input drives the sweep too.',
-  width:'Sets the stereo width from mono (0%) through normal (100%) to extra-wide (200%) with a mid/side control. Bass mono collapses the low end to the centre so wide sounds keep their punch. In R is optional.',
+  width:'Sets the stereo width from mono (0%) through normal (100%) to extra-wide (200%) with a mid/side control. Bass mono collapses the low end to the center so wide sounds keep their punch. In R is optional.',
   pingpong:'A stereo delay that bounces left to right. Sync to tempo picks a Division (1/16…1 bar), or turn Sync off and set Time. Repeats, Tone and Mix shape it. In R is optional.',
 };
 /* New modules (Oct 2026): utilities, reverbs, chorus, ring mod and rhythm. */
@@ -545,7 +545,7 @@ Object.assign(SHARED_MODULES, {
     ui:{ input:{l:'Input', f:db}, ceil:{l:'Ceiling', f:db}, rel:{l:'Release', f:secs} }, display:'dyn',
     about:'Limiter: a peak limiter with a 2 ms look-ahead, so nothing gets past Ceiling. Input pushes the sound into it for more loudness; Release sets how fast it lets go. The display shows the curve (Input up to Ceiling), the levels in and out and the gain reduction.' }, STEREO),
   utility:Object.assign({ label:'Utility', scope:'mono', params:{ gain:[0,-60,24,.1], pan:[0,-1,1,.01], mono:[0,0,1,1], flip:[0,0,3,1], mute:[0,0,1,1] },
-    ui:{ gain:{l:'Gain', f:v => v <= -59.9 ? '−∞ dB' : db(v)}, pan:{l:'Pan', f:v => Math.abs(v) < .005 ? 'Centre' : (v < 0 ? 'L ' : 'R ') + Math.round(Math.abs(v) * 100)},
+    ui:{ gain:{l:'Gain', f:v => v <= -59.9 ? '−∞ dB' : db(v)}, pan:{l:'Pan', f:v => Math.abs(v) < .005 ? 'Center' : (v < 0 ? 'L ' : 'R ') + Math.round(Math.abs(v) * 100)},
       mono:{l:'Stereo', c:opts(['Stereo','Mono'])}, flip:{l:'Polarity', c:opts(['Normal','Flip left','Flip right','Flip both'])}, mute:{l:'Mute', c:opts(['Sound on','Muted'])} },
     about:'Utility: gain (smoothed, so moving it never clicks), pan, mono, polarity flip and mute, for anywhere in a patch.' }, STEREO),
   ringmod:{ label:'Ring mod', scope:'mono', inputs:{ in:'audio', inR:'audio', car:'audio', freq:'cv' }, outputs:{ out:'audio', outR:'audio' },
@@ -642,8 +642,8 @@ Object.assign(SHARED_MODULES, {
     params:lifeParams(), display:'life',
     ui:Object.assign(hideKeys(['b0', 'b1', 'b2', 'b3', 'b4', 'b5', 'b6', 'b7']), {
       w:{l:'Width', f:v => Math.round(v) + ' steps'}, div:{l:'Step', c:opts(STEP_NAMES)}, gens:{l:'Loop', f:v => v < 0.5 ? 'Evolve' : Math.round(v) + ' gens'},
-      trig:{l:'Fire on', c:opts(['Alive', 'Born'])}, rule:{l:'Rule', c:opts(['Life', 'HighLife', 'Seeds', 'Maze', 'Day & Night'])}, rot:{l:'Colours', f:v => '+' + Math.round(v)}, len:{l:'Gate length', f:pct} }),
-    about:'Life: a Game of Life sequencer. Draw cells on the grid (tap or drag; Clear, Random and Glider help). A playhead sweeps the columns, one per Step at the song tempo (or one per pulse on Clock), and every live cell in its column fires the gate of its row: patch the coloured outputs 1–8 into a Blip drum. After each sweep the cells live one generation, so the rhythm changes as patterns grow, move and die. Loop brings your drawing back every N generations (Evolve never does), Fire on Born plays only new cells, Rule picks the world, Colours turns which row feeds which output. Any fires on every hit; Count is how many cells are in the column.' }
+      trig:{l:'Fire on', c:opts(['Alive', 'Born'])}, rule:{l:'Rule', c:opts(['Life', 'HighLife', 'Seeds', 'Maze', 'Day & Night'])}, rot:{l:'Colors', f:v => '+' + Math.round(v)}, len:{l:'Gate length', f:pct} }),
+    about:'Life: a Game of Life sequencer. Draw cells on the grid (tap or drag; Clear, Random and Glider help). A playhead sweeps the columns, one per Step at the song tempo (or one per pulse on Clock), and every live cell in its column fires the gate of its row: patch the colored outputs 1–8 into a Blip drum. After each sweep the cells live one generation, so the rhythm changes as patterns grow, move and die. Loop brings your drawing back every N generations (Evolve never does), Fire on Born plays only new cells, Rule picks the world, Colors turns which row feeds which output. Any fires on every hit; Count is how many cells are in the column.' }
 });
 SHARED_MODULES.reson = { label:'Resonator', scope:'mono', inputs:{ in:'audio', inR:'audio', note:'cv' }, outputs:{ out:'audio', outR:'audio' },
   params:{ note:[48, 24, 96, 1], chord:[3, 0, 11, 1], mode:[0, 0, 1, 1], decay:[.5, 0, 1, .01], bright:[.6, 0, 1, .01], spread:[.5, 0, 1, .01], mix:[.5, 0, 1, .01] },
@@ -653,9 +653,9 @@ SHARED_MODULES.reson = { label:'Resonator', scope:'mono', inputs:{ in:'audio', i
   about:'Resonator: up to five tuned resonators ringing at Note and a Chord above it (octaves, fifths, major, minor, sevenths, fourths, harmonics…), so drums, noise or a voice ring out in harmony. String rings with every harmonic, Tube only the odd ones (hollow, like a pipe). Decay sets how long they ring, Bright how much top end survives, Spread places the voices across the stereo field. Patch a pitch CV into Note to play it (a Sequencer, Steps, Pitch Follow…); the Note knob then transposes it (C3 = as played).' };
 SHARED_MODULES.degrade = Object.assign({ label:'Degrade', scope:'mono', params:{ bits:[24, 1, 24, .1], rate:[1, 0, 1, .001], noise:[.15, 0, 1, .01], color:[.3, 0, 1, .01], follow:[.6, 0, 1, .01], dry:[0, 0, 1, .01], wet:[1, 0, 1, .01] },
   ui:{ bits:{l:'Bits', f:v => v >= 23.5 ? 'Off' : v.toFixed(1) + ' bit'}, rate:{l:'Rate', f:v => v >= .999 ? 'Off' : khz(300 * Math.pow(160, v))},
-    noise:{l:'Noise', f:v => v < .005 ? 'Off' : (20 * Math.log10(v * v * .25)).toFixed(1) + ' dB'}, color:{l:'Colour', f:v => v < .02 ? 'White' : v > .98 ? 'Dark' : pct(v) + ' dark'},
+    noise:{l:'Noise', f:v => v < .005 ? 'Off' : (20 * Math.log10(v * v * .25)).toFixed(1) + ' dB'}, color:{l:'Color', f:v => v < .02 ? 'White' : v > .98 ? 'Dark' : pct(v) + ' dark'},
     follow:{l:'Follow', f:pct}, dry:{l:'Dry', f:pct}, wet:{l:'Wet', f:pct} },
-  about:'Degrade: lo-fi in one box, after the classic tracker lofi plugins. Bits crushes (24 is off), Rate lowers the sample rate (the top is off), and Noise adds a floor of hiss, from a whisper up to −12 dB: Colour darkens it from white, and Follow makes it track the sound, so it breathes with the notes and silence stays clean. A little Noise on a soft sine helps it stand out in a mix. Dry and Wet are separate.' }, STEREO);
+  about:'Degrade: lo-fi in one box, after the classic tracker lofi plugins. Bits crushes (24 is off), Rate lowers the sample rate (the top is off), and Noise adds a floor of hiss, from a whisper up to −12 dB: Color darkens it from white, and Follow makes it track the sound, so it breathes with the notes and silence stays clean. A little Noise on a soft sine helps it stand out in a mix. Dry and Wet are separate.' }, STEREO);
 Object.assign(SHARED_PORT_LABEL, { t1:'1', t2:'2', t3:'3', t4:'4', t5:'5', t6:'6', t7:'7', t8:'8', g1:'1', g2:'2', g3:'3', g4:'4', g5:'5', g6:'6', g7:'7', g8:'8', any:'Any', count:'Count' });
 SHARED_PALETTE.push(['Drums', [['blipdrum', 'Blip drum (8 voices)']], 'audio']);
 SHARED_PALETTE.find(g => g[0] === 'Rhythm and logic')[1].unshift(['life', 'Life (Game of Life)']);
@@ -830,7 +830,7 @@ Object.assign(SHARED_MODULES, {
     params:{ formula:[0,0,15,1], rate:[8000,1000,32000,1], a:[128,0,255,1], b:[128,0,255,1], c:[128,0,255,1], mode:[0,0,2,1], smooth:[0,0,1,.01], level:[.7,0,1,.01] },
     ui:{ formula:{l:'Formula', c:opts(BB_NAMES)}, rate:{l:'Rate', f:khz}, a:{l:'a', f:whole}, b:{l:'b', f:whole}, c:{l:'c', f:whole},
       mode:{l:'Mode', c:opts(['8-bit', 'Signed 8-bit', 'Linear'])}, smooth:{l:'Smooth', f:v => v < .005 ? 'Off' : pct(v)}, level:{l:'Level', f:pct} },
-    about:'Bytebeat: music from one line of integer maths, the 2011 discovery that a formula of a counter t (like t*(t>>5|t>>8)), played as 8-bit samples, makes melodies and rhythms. Pick one of sixteen formulas; Rate is its clock (8 kHz is the classic sound), and a cable in Pitch plays it from a sequencer (0.5 = A4). The knobs a, b and c are numbers the formula reads (0–255): on Arp machine, Pulse chord, Modulo bass, Pipe drone, Hiss beat, Sine tune, Triangle bass and Hash noise they change the tune or the texture. Mode: 8-bit is the classic, Signed 8-bit is harsher, Linear suits the sine and triangle ones. Smooth takes the edge off the steps. Reset (and PLAY) starts the formula from the beginning. Write your own formulas on a pad in …Thunder Plus (the Bytebeat engine).' },
+    about:'Bytebeat: music from one line of integer maths, the 2011 discovery that a formula of a counter t (like t*(t>>5|t>>8)), played as 8-bit samples, makes melodies and rhythms. Pick one of sixteen formulas; Rate is its clock (8 kHz is the classic sound), and a cable in Pitch plays it from a sequencer (0.5 = A4). The knobs a, b and c are numbers the formula reads (0–255): on Arp machine, Pulse chord, Modulo bass, Pipe drone, Hiss beat, Sine tune, Triangle bass and Hash noise they change the tune or the texture. Mode: 8-bit is the classic, Signed 8-bit is harsher, Linear suits the sine and triangle ones. Smooth takes the edge off the steps. Reset (and PLAY) starts the formula from the beginning. Write your own formulas on a pad in Thunder Plus (the Bytebeat engine).' },
   chaos:{ label:'Chaos', scope:'mono', inputs:{ rate:'cv', reset:'gate' }, outputs:{ x:'cv', y:'cv', z:'cv', out:'audio', trig:'gate' },
     params:{ model:[0,0,6,1], rate:[.35,0,1,.001], chaos:[.6,0,1,.01], smooth:[0,0,1,.01], level:[.8,0,1,.01] },
     ui:{ model:{l:'Model', c:opts(CHAOS_MODELS)}, rate:{l:'Rate', f:chaosHz}, chaos:{l:'Chaos', f:pct}, smooth:{l:'Smooth', f:v => v < .005 ? 'Off' : pct(v)}, level:{l:'Level', f:pct} },
@@ -1081,7 +1081,7 @@ const MODULE_USE = {
   scin:'Set Source to the kick’s track, then patch Duck into a VCA’s CV on a pad for a pump, or Envelope into a filter’s Cutoff jack so the filter opens on every kick.',
   scout:'In the drum chain, patch the drums into a Sidechain Out on Send 1. In the pad’s chain, a Sidechain In on Send 1 → the SC of a compressor makes the drums duck the pad.',
   resample:'Put it after a chain you like, set Bars to 2 and Record to Armed while the song plays: the next two bars land in a pad, sliced and ready to chop.',
-  out:'The last module of every patch: patch your VCA (or its effects) into In L and In R. In …Thunder, Output picks which Waves In it plays on.',
+  out:'The last module of every patch: patch your VCA (or its effects) into In L and In R. In Thunder, Output picks which Waves In it plays on.',
   hostIn:'Start each voice here: Pitch → an oscillator’s Pitch, Gate → an ADSR’s Gate, and Velocity into a VCA’s Gain jack so harder notes play louder.',
   seq:'Set eight notes, turn Run on and you hear a bass line without a keyboard (it plays through Host In). Set a step to Rest for space.',
   string:'Host In Pitch and Gate in, Decay long and Position near the bridge for a twangy pluck; raise Mute for palm-muted chugs.',
@@ -1131,7 +1131,7 @@ const MODULE_USE = {
   crush:'On drums: Downsample around 40%, Bits 8 and Mix 50% add crunchy grit while keeping the punch.',
   lofi:'On a drum break: Rate down a bit and Bits around 10 for gritty, old-sampler crunch; raise Hardness for more bite.',
   degrade:'On a clean synth: Bits 12, Rate a little down, and some Noise with Follow on, for a sampled-from-tape tracker feel.',
-  tape:'On a drum bus or the mix: Input a little up, some Head bump and gentle Flutter for warm, analog-sounding tape colour.',
+  tape:'On a drum bus or the mix: Input a little up, some Head bump and gentle Flutter for warm, analog-sounding tape color.',
   vinyl:'On a clean sample or mix: Groove wear a little up and High limit down for an old-record feel.',
   dub:'On a drum or dub bus: Amount around 50% for dense, saturated tape squash.',
   // modulation effects
@@ -1361,9 +1361,9 @@ const dynDb = d => d <= -90 ? '−∞' : (d > .05 ? '+' : d < -.05 ? '−' : '')
 function buildDyn(n, box, kind){
   const cv = h('canvas', {class:'dyncv'}), lv = kind === 'dynlv';
   box.append(cv);
-  box.title = lv ? 'The last 2.5 s: grey, the level going in; teal, what comes out. The number is how much louder (+) or quieter (−) it comes out.'
+  box.title = lv ? 'The last 2.5 s: gray, the level going in; teal, what comes out. The number is how much louder (+) or quieter (−) it comes out.'
     : 'Left: the transfer curve, level in (across) to level out (up), from these settings; dashed, the threshold; the dot, the sound now. '
-      + 'Right: the last 2.5 s: grey, the level it hears; teal, what comes out; orange from the top, the gain reduction (its peak in dB above).';
+      + 'Right: the last 2.5 s: gray, the level it hears; teal, what comes out; orange from the top, the gain reduction (its peak in dB above).';
   const i = h('i'), v = h('span', {text:'—'}), tr = h('div', {class:'tr'}, i); i.style.transform = 'scaleX(0)';
   const mini = h('div', {class:'shw dmini' + (lv ? '' : ' gr'), title: lv ? 'Level out, and the change from the level in' : 'Gain reduction'},
     h('div', {class:'ch'}, h('span', {text: lv ? 'OUT' : 'GR'}), tr, v));
@@ -1520,7 +1520,7 @@ function trackInStereoUp(d){
 
 /* Mixers: Inputs picks how many channels show, 1 to 16 (old patches open with 4). The rest hide, with their cables. */
 const MIXN = 16, MIXT = new Set(['mixer', 'smixer']);
-const panTxt = v => Math.abs(v) < .005 ? 'Centre' : (v < 0 ? 'L ' : 'R ') + Math.round(Math.abs(v) * 100);
+const panTxt = v => Math.abs(v) < .005 ? 'Center' : (v < 0 ? 'L ' : 'R ') + Math.round(Math.abs(v) * 100);
 function mixDef(label, scope, stereo){
   const inputs = {}, params = { chans:[4,1,MIXN,1] };
   const ui = { chans:{ l:'Inputs', c:Array.from({ length:MIXN }, (_, i) => [i + 1, String(i + 1)]), fixed:true } };
@@ -1669,7 +1669,7 @@ for (const [t, d] of Object.entries(MODULES)){
 const plabel = (t, k) => (MODULES[t].ui[k] || {}).l || k;
 const fmtOf = (t, k) => (MODULES[t].ui[k] || {}).f || (v => (+v).toFixed(2));
 const choicesOf = (t, k) => (MODULES[t].ui[k] || {}).c || null;
-/* ---------- the bottom panel (…Thunder Plus): controls mapped out of this patch ----------
+/* ---------- the bottom panel (Thunder Plus): controls mapped out of this patch ----------
    Right-click a control (or a module) → Add to the bottom panel. The list lives in the patch (doc.deck), so it saves with
    the song; each entry carries what the app needs to draw the control without this editor open: the module's and the
    control's names, the range, the choices, and how the value reads (a named format, or the text at 33 points across the
@@ -1705,8 +1705,8 @@ const PORT_LABEL = { pitch:'Pitch', gate:'Gate', vel:'Velocity', fm:'FM', out:'O
 };
 for (let k = 1; k <= MIXN; k++){ PORT_LABEL['in' + k] = 'In ' + k; PORT_LABEL['in' + k + 'R'] = 'In ' + k + ' R'; }
 const NOTES = {
-  trackIn: m => 'Tracker track ' + (m.params.track | 0) + ' in (stereo). Standalone this is silence; in …Thunder Plus it carries that track’s sound.',
-  chainOut: m => 'Returns to tracker track ' + (m.params.track | 0) + ' (stereo, after Level). In …Thunder Plus the Mixer sends it back through that track and anything after it.'
+  trackIn: m => 'Tracker track ' + (m.params.track | 0) + ' in (stereo). Standalone this is silence; in Thunder Plus it carries that track’s sound.',
+  chainOut: m => 'Returns to tracker track ' + (m.params.track | 0) + ' (stereo, after Level). In Thunder Plus the Mixer sends it back through that track and anything after it.'
 };
 for (const t in MODULES) if (MODULES[t].fx && !NOTES[t]) NOTES[t] = () => WASM_OK.tfx ? null : 'Couldn’t load the effects. This module passes sound through unchanged.';
 NOTES.rings = NOTES.rings || NOTES.eq; NOTES.clouds = NOTES.clouds || NOTES.eq;
@@ -1748,7 +1748,7 @@ function askDialog(msg, opts){
 const typing = e => e.target && e.target.closest && e.target.closest('input:not([type=range]):not([type=checkbox]), select, textarea, [contenteditable="true"]');
 const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
 const newId = p => (p || 'm') + Date.now().toString(36) + Math.floor(Math.random() * 1296).toString(36);
-/* Inside …Thunder Plus the editor runs in a frame: the patch lives in Thunder's song (window.parent.thunderChains),
+/* Inside Thunder Plus the editor runs in a frame: the patch lives in Thunder's song (window.parent.thunderChains),
    and everything else is saved under its own names so it never mixes with the standalone …chains. */
 const TW = (() => { try { return window.parent !== window && window.parent.thunderChains || null; } catch (e) { return null; } })();
 const EMBED = !!TW, KP = EMBED ? 'thunderplus.chains.' : 'chains.';
@@ -1759,14 +1759,14 @@ const tpLog = (() => { const seen = new Set(); return (where, err) => { try {
   const msg = String(err && err.message || err), key = where + '|' + msg; if (seen.has(key) || seen.size >= 100) return; seen.add(key); console.warn('[chains] ' + where + ': ' + msg);
 } catch (_) { /* the logger must never throw */ } }; })();
 
-/* VIEW KEYS (owner, 22 Oct): inside ...Thunder Plus, Alt+0 the synth, Alt+1–7 the tracker's screens, Alt+8 …waves, Alt+9
+/* VIEW KEYS (owner, 22 Oct): inside Thunder Plus, Alt+0 the synth, Alt+1–7 the tracker's screens, Alt+8 …waves, Alt+9
    …chains and Alt+` back to the last view work from here too: this page has the keys while it shows, so it passes them on. */
 if (EMBED) window.addEventListener('keydown', e => {
   if (!e.altKey || e.ctrlKey || e.metaKey || e.shiftKey || e.repeat || !/^(Digit[0-9]|Backquote)$/.test(e.code) || !TW.viewKey) return;
   const t = e.target; if (t && t.closest && t.closest('input:not([type=range]):not([type=checkbox]), textarea, [contenteditable="true"]')) return;
   e.preventDefault(); e.stopPropagation(); TW.viewKey(e.code);
 }, true);
-/* APP KEYS (Thunder Plus owner, 27 Oct, Phase 2): inside …Thunder Plus the app's keys work here as on every screen:
+/* APP KEYS (Thunder Plus owner, 27 Oct, Phase 2): inside Thunder Plus the app's keys work here as on every screen:
    F2–F9 (screens, transport, REC), Ctrl/⌘+S (Shift: Save as), Ctrl/⌘+O and Ctrl/⌘+N act on the PROJECT (Space already plays the song, below). The patch's own Save / Open / New are in the app's File menu.
    Ctrl/⌘+Z is the song's undo too (ONE UNDO). */
 if (EMBED) window.addEventListener('keydown', e => {
@@ -1927,7 +1927,7 @@ class ChainsBridge {
     this._on = { ready:[], meter:[], shed:[], error:[] };
     this.port.onmessage = e => this._recv(e.data);
   }
-  /* The effects code from ...Thunder (tfx.wasm). A worklet can't fetch, so the page does. */
+  /* The effects code from Thunder (tfx.wasm). A worklet can't fetch, so the page does. */
   static wasm(){
     const get = u => fetch(u).then(r => r.ok ? r.arrayBuffer() : null).catch(() => null);
     return ChainsBridge._wasm || (ChainsBridge._wasm = Promise.all([get('./dsp/tfx.wasm'), get('../pump/pump.wasm?v=6')]));   // PUMP MODULES: …pump's effects
@@ -2013,7 +2013,7 @@ function normalize(d){
   d.format = 'chains.patch';
   d.modules = d.modules || []; d.cables = d.cables || []; d.groups = d.groups || []; d.custom = d.custom || [];
   // SOURCE (21 Oct): an older patch's Sidechain In (src: a track, snd: a send) and Source (source: Self or the old mixer bus)
-  // become one Source (sck). ...Thunder Plus converts its songs first (the bus becomes the track that fed it); here the bus
+  // become one Source (sck). Thunder Plus converts its songs first (the bus becomes the track that fed it); here the bus
   // becomes Self (Off on a Sidechain In).
   for (const m of d.modules){
     if (!m || !m.params || typeof m.params.sck === 'number' || !MODULES[m.type] || !MODULES[m.type].params.sck) continue;
@@ -2476,7 +2476,7 @@ function buildNode(m){
     const ch = choicesOf(m.type, k);
     kids.push(ch ? choice(n, k, ch) : slider(n, k, def.params[k]));
   }
-  // Track In: what the track sends into the chain. Chain Out: what comes back out of it (in …Thunder Plus, from the song).
+  // Track In: what the track sends into the chain. Chain Out: what comes back out of it (in Thunder Plus, from the song).
   if (m.type === 'chainOut' || m.type === 'trackIn'){ n.meter = h('span'); const io = m.type === 'trackIn' ? 'IN' : 'OUT';
     kids.push(h('div', {class:'iom', title:(io === 'IN' ? 'Level the track sends into this chain' : 'Level coming out of this chain') + ' (track ' + ((m.params.track | 0) || 1) + ')'},
       h('b', {text:io}), h('div', {class:'prog'}, n.meter))); }
@@ -3161,7 +3161,7 @@ ws.addEventListener('contextmenu', e => {
   const el = e.target.closest('.node'), id = el && el.dataset.id;
   if (id && !selected.has(id)){ clearSel(); setSel(id, true); }
   const sel = [...selected], n = sel.length, items = [];
-  // Inside …Thunder Plus: put a control, or all of a module's, in the bottom panel (it shows them for the track whose chain they're in).
+  // Inside Thunder Plus: put a control, or all of a module's, in the bottom panel (it shows them for the track whose chain they're in).
   if (EMBED && id && nodes.has(id)){
     const nd = nodes.get(id), m = nd.m, row = e.target.closest('.row[data-key]'), key = row && row.dataset.id === id ? row.dataset.key : null, title = m.label || MODULES[m.type].label;
     if (key && m.params[key] != null){
@@ -3414,7 +3414,7 @@ document.getElementById('fimpmods').addEventListener('click', () => pickFile('cu
 const pnameEl = document.getElementById('pname');
 {
   if (EMBED){
-    // …Thunder Plus shows this page as its "…chains" screen: it pauses the sound when you switch away and saves into the song.
+    // Thunder Plus shows this page as its "…chains" screen: it pauses the sound when you switch away and saves into the song.
     window.chainsEmbed = {
       pause(){ if (store){ clearTimeout(store._timer); if (store.dirty) store.save(); } if (bridge) bridge.ctx.suspend().catch(() => {}); },   // store/bridge: not there yet if the screen is left at once
       resume(){ if (bridge) bridge.resume(); try { paintChainOff(); } catch (e) {} },
@@ -3535,11 +3535,11 @@ document.getElementById('hintx').addEventListener('click', () => { hint.hidden =
 // Each module type's description: the Help page's cards and the ? on each module's title bar (with SHARED_ABOUT and the
 // modules' own about for the shared ones).
 const PAGE_ABOUT = {
-  trackIn:'Your tracker track, in stereo. Pick the track; in …Thunder Plus it carries that track’s sound. On its own it is silence — patch it through effects into a Chain Out. With its Chain Out on the same track it is an insert (the sound before the track’s own effects and fader). Into a Chain Out on another track it is a bus send: the track is heard after its own effects, fader and pan, and plays through that bus (several Track Ins into a mixer, a compressor, then Chain Out to a free track make a group bus). Bus send: Before its fader takes the track after its effects but before its fader and pan, so its fader no longer changes what the bus hears (a reverb or monitor send); mute and solo still silence it.',
+  trackIn:'Your tracker track, in stereo. Pick the track; in Thunder Plus it carries that track’s sound. On its own it is silence — patch it through effects into a Chain Out. With its Chain Out on the same track it is an insert (the sound before the track’s own effects and fader). Into a Chain Out on another track it is a bus send: the track is heard after its own effects, fader and pan, and plays through that bus (several Track Ins into a mixer, a compressor, then Chain Out to a free track make a group bus). Bus send: Before its fader takes the track after its effects but before its fader and pan, so its fader no longer changes what the bus hears (a reverb or monitor send); mute and solo still silence it.',
   vcf:'A filter. Low-pass softens, band-pass keeps the middle, high-pass thins. Patch an envelope into Cutoff for classic sweeps.',
   vca:'An amplifier. Patch an envelope into CV so notes start and stop (with nothing in CV it stays open); Gain sets the loudness.',
   mixer:'Mixes up to 16 sounds, each with its own level, plus a master level. Inputs sets how many channels it shows (4 to start).',
-  smixer:'Mixes up to 16 stereo sounds into a stereo out: each pair (In 1 and In 1 R…) has a level and a pan, plus a master level. Inputs sets how many pairs it shows (4 to start). Patch only In 1 for a mono source; centre pan leaves a stereo source untouched.',
+  smixer:'Mixes up to 16 stereo sounds into a stereo out: each pair (In 1 and In 1 R…) has a level and a pan, plus a master level. Inputs sets how many pairs it shows (4 to start). Patch only In 1 for a mono source; center pan leaves a stereo source untouched.',
   eq:'Airwindows EQ: treble, mid and bass with their frequencies, plus low-pass and high-pass filters.',
   comp:'Airwindows Pressure4: a compressor. Pressure sets how hard it works; Mix blends in the dry sound for parallel compression.',
   saturation:'Airwindows Density: warm saturation and drive.',
@@ -3555,7 +3555,7 @@ const PAGE_ABOUT = {
   repeat:'Repeat: beat repeat. While Hold is on (or Gate is high) it loops the slice that just played, one note value long; Decay fades each pass and Pitch drops it. Reverse plays the slice backwards; Tape stop slows the sound to a halt.',
   vocoder:'A vocoder: the sound you patch into In L is the carrier, and In R is the modulator that shapes it (leave In R unpatched and it uses In for both). Mode picks the band count — Talkbox and the 4…64 band banks split the carrier into bands that the modulator’s levels open and close, or Spectral cross-synthesises them with an FFT. Resonance sharpens the bands, Attack and Release set how fast the levels follow, Mix blends the vocoded sound with the dry carrier, and Level sets the output.',
   scin:'Sidechain In: brings a sidechain into this chain. Source picks what it listens to: a send (Send 1–8, what a Sidechain Out sends) or one track’s own sound, before its effects and fader, so even a muted “ghost” kick drives it. The meter shows what it hears (IN) and the envelope (ENV), before you patch it anywhere. Out is the sound (Level sets how loud), Envelope rises with each hit (to open a filter) and Duck dips with it (into a VCA’s CV, to pump a sound). Sensitivity sets how hard the hits push them (raise it for a quiet kick) and Release how fast they recover. Or just drop a Sidechain Comp after this track’s sound.',
-  scout:'Sidechain Out: sends what you patch into it to Send 1–8. Any Sidechain In with its Send set to that number hears it, in this chain or in another track’s (in …Thunder Plus, about 3 ms later). So a drum bus made here can duck the pads on another track: Sidechain Out → Send 1 here, and there Sidechain In (Send 1) → the SC of a compressor.',
+  scout:'Sidechain Out: sends what you patch into it to Send 1–8. Any Sidechain In with its Send set to that number hears it, in this chain or in another track’s (in Thunder Plus, about 3 ms later). So a drum bus made here can duck the pads on another track: Sidechain Out → Send 1 here, and there Sidechain In (Send 1) → the SC of a compressor.',
   sccomp:'Sidechain Comp: ducks its In by the sidechain — whatever is patched into SC, or what Source picks (another track or a send), so a kick on another track can pump this one. Threshold, Ratio, Attack, Release, Makeup and Mix. With Source on Self and nothing in SC it compresses its own input.',
   lfo:'A slow oscillator for wobbles and sweeps. Depth sets how far it moves a slider; Sync to tempo follows the tempo. Reset restarts its cycle.',
   adsr:'An envelope for shaping effects: patch a gate into it and its output into a slider’s modulation jack.',
@@ -3572,7 +3572,7 @@ function helpDoc(){
   const ABOUT = PAGE_ABOUT;
   const guide = [
     ['Patching', 'Drag from an output jack (right edge) to an input jack (left edge). Teal cables carry sound, purple dashed cables carry modulation and pink dashed cables carry gates. Every slider has a small purple jack on its left for modulation. Drag a patched input to move its cable, or drop it on empty space to unplug. Double-click a cable to remove it. Hold Option (Alt on Windows) and click while drawing a cable to bend it, or Option-drag an existing cable.'],
-    ['Modulation', 'Patch any signal into a slider’s small purple jack and it moves that slider: the slider sets the centre, and the signal swings it across its range. The value turns purple and a mark shows where the slider really is. Use the Depth slider on an LFO or envelope, or an Attenuverter, to make the swing smaller.'],
+    ['Modulation', 'Patch any signal into a slider’s small purple jack and it moves that slider: the slider sets the center, and the signal swings it across its range. The value turns purple and a mark shows where the slider really is. Use the Depth slider on an LFO or envelope, or an Attenuverter, to make the swing smaller.'],
     ['Sound as modulation', 'Audio can drive anything a control voltage can. Patch a sound into Envelope Follow to make it swell a filter or level, into Gate Extract to fire envelopes and clocks from hits, or into Pitch Follow to track a monophonic melody. Then shape it with Slew (to smooth it), Sample & Hold (to step it) or Quantizer (to snap it to a scale).'],
     ['Tracks', 'Each track has its own Track In and Chain Out. In the Mixer, turning a track’s CHN on adds that track’s pair (wired straight through, in a column below everything else) without leaving the Mixer, so every track gets its own chain and toggling one never disturbs another; the next time you come here, the patch is fitted so you see them all. If that track already has a chain, switching its CHN on just runs it through that chain again. The output always follows its own input — set the Track In and its Chain Out moves with it, and a Chain Out can’t be pointed elsewhere. Picking a track that is already used also jumps to and highlights the existing chain. A track takes one pair; control (cv/gate) inputs are not limited.'],
     ['Moving around', 'Scroll with two fingers or turn the mouse wheel to pan (Shift+wheel sideways); with a mouse a middle-button drag pans too, and on a touch screen dragging the background does. Pinch or Ctrl/⌘+wheel zooms; the zoom buttons are in the top bar (click the percentage to type one, Fit shows everything).'],
@@ -3635,7 +3635,7 @@ function onMeter(m){
   const el = document.getElementById('cpuv'), p = Math.round(m.load * 100);
   el.textContent = 'CPU ' + p + '%' + (m.quality === 'draft' ? ' · draft' : '');
   el.className = 'fps ' + (m.load < .5 ? 'good' : m.load <= .8 ? 'ok' : 'low');
-  // The label must say which engine this is: in …Thunder this page's engine is the preview only.
+  // The label must say which engine this is: in Thunder this page's engine is the preview only.
   el.title = EMBED
     ? 'Preview engine only (the silent test tone and the patch’s own output). The song’s real CPU load is the meter in the Tracker top bar — its tooltip names the breakdown. When the song plays, levels here are the tracker audio.'
     : (m.load < .5 ? 'Plenty of room' : m.load <= .8 ? 'Getting busy' : 'Overloaded: try Draft quality or fewer heavy effects.');
@@ -3654,7 +3654,7 @@ function onMeter(m){
 /* Modulated sliders, as in ...Seeds: a cable in a slider's purple jack turns its value purple and bold, and a
    purple mark under the slider shows the live position the LFO (or any control) is moving it to. A cabled slider
    is marked straight away, at its own value, until the engine reports live values (audio not started yet, or
-   …chains in …Thunder Plus before a track runs through it). */
+   …chains in Thunder Plus before a track runs through it). */
 let modded = new Map(), modSeen = 0;
 function paintMods(list){
   const now = new Map();
@@ -3697,7 +3697,7 @@ function paintHostCpu(){
   el.className = 'fps ' + (v == null ? '' : v < .5 ? 'good' : v <= .8 ? 'ok' : 'low');
   el.title = 'The song’s CPU load — the same value as the Tracker’s top-bar meter, not this page.';
 }
-/* Jack meters: [id, 'in'|'out', port, peak] from the engine (the song's, inside …Thunder Plus), each one falling
+/* Jack meters: [id, 'in'|'out', port, peak] from the engine (the song's, inside Thunder Plus), each one falling
    back smoothly when it goes quiet or stops arriving. */
 let jackSeen = 0;
 function paintJacks(list){
@@ -3818,7 +3818,7 @@ function startEngine(){
   return ChainsBridge.standalone({ quality: doc.quality || 'full', transport: doc.transport }).then(wireBridge)
     .catch(err => toast('The sound engine couldn’t start: ' + (err && err.message || err), 6000));
 }
-// Embedded (…Thunder): the host owns the audio, so don't start a second, silent engine here —
+// Embedded (Thunder): the host owns the audio, so don't start a second, silent engine here —
 // it wasted CPU and made this page's meter disagree with the Tracker's. Standalone keeps it.
 if (!EMBED) startEngine();
 function unlockAudio(){ if (bridge){ bridge.resume(); removeEventListener('pointerdown', unlockAudio, true); removeEventListener('keydown', unlockAudio, true); } }

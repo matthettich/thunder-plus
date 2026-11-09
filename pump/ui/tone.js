@@ -26,7 +26,7 @@ U.define('tone', {W:1000, H:620, nW:480, nH:886, bypass:true, back:8192, make(ui
 
   const recDial = ui.dial('recover', 'RECOVER', 'l'); recDial.tip = 'Recover: brings up frequencies that are masked or under-represented (never lifts noise)';
   const tameDial = ui.dial('tame', 'TAME', 'l'); tameDial.tip = 'Tame: pulls down frequencies that dominate the balance';
-  const biasDial = ui.dial('bias', 'BIAS', 'l', true); biasDial.tip = 'Bias: + favours taming (cuts), - favours recovering (boosts)';
+  const biasDial = ui.dial('bias', 'BIAS', 'l', true); biasDial.tip = 'Bias: + favors taming (cuts), - favors recovering (boosts)';
   const brightDial = ui.dial('brighten', 'BRIGHTEN', 'l', true); brightDial.tip = 'Brighten: tilts the target and the curve around 1 kHz (+ brighter, - darker)';
   const bodyDial = ui.dial('body', 'BODY', 'l', true); bodyDial.tip = 'Body: low-end shelf on the target, below about 150 Hz (+ fuller, - leaner)';
   recDial.tabGroup = tameDial.tabGroup = biasDial.tabGroup = 1; brightDial.tabGroup = bodyDial.tabGroup = 2;
