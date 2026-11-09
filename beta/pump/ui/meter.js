@@ -1,4 +1,4 @@
-/* …pump METER pop-up (stage 2): plugins/meter/UIMeter.cpp in the browser. The loudness screen (integrated,
+/* pump METER pop-up (stage 2): plugins/meter/UIMeter.cpp in the browser. The loudness screen (integrated,
    short-term, momentary, maxima, LRA, true peak, PLR, PSR), the loudness history since the reset, the spectrum, the
    stereo meters, the target / history / scale settings and the L/R peak + RMS meters. */
 (() => {

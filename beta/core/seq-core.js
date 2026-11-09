@@ -382,7 +382,7 @@ function makeSeq(S, mode, o){
       if (fx.RTG != null){ const X = fx.RTG >> 4, Y = fx.RTG & 15; evs.push({type:'fxc', t:at, track:t, p:'rtg', v:X ? Math.min(8, X) : 0}); slotWake('RTG', true, X ? 1 : -1);   /* (9 Nov, owner: a new RTG switches the slot on, even one saved off; RTG 00 puts it back as saved) */
         if (X && Y){ evs.push({type:'fxc', t:at + Y * line, track:t, p:'rtg', v:-1}); slotWake('RTG', true, -1, at + Y * line); } }
       if (t === MT && fx.VOL != null) evs.push({type:'mvol', t:at, v:fx.VOL});
-      // BYP XY (…chains module bypass): X the module's number (0 = all), Y 0 in, 1 bypassed, 2–F flipped for Y rows
+      // BYP XY (chains module bypass): X the module's number (0 = all), Y 0 in, 1 bypassed, 2–F flipped for Y rows
       if (fx.BYP != null && t < MT){ const X = fx.BYP >> 4, Y = fx.BYP & 15;
         for (let k = X ? X : 1; k <= (X ? X : 15); k++){ evs.push({type:'chc', t:at, track:t, p:'b' + k, v:Y >= 2 ? 2 : Y});
           if (Y >= 2) evs.push({type:'chc', t:at + Y * line, track:t, p:'b' + k, v:-1}); } }
@@ -605,7 +605,7 @@ function makeSeq(S, mode, o){
       T.rel += dur; T.g++;
       if (newRow) T.r0 = T.rel;   // LIVE SONG EDITS: the song row starts here (what a waking track lines up with)
     }
-    // TPO or TIC on this row: tell the player, so tempo-synced …chains modules follow (live and in renders).
+    // TPO or TIC on this row: tell the player, so tempo-synced chains modules follow (live and in renders).
     if (pdl) for (const T of tr) if (T.on) T.rel += pdl;   // PDL: the whole song waits
     if (nb !== api.bpm || api.tks !== tks0) evs.push({type:'tempo', t:t0, bpm:nb, tks:api.tks});
     api.bpm = nb; api.grv = ngrv;

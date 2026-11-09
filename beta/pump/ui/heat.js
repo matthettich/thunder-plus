@@ -1,4 +1,4 @@
-/* …pump HEAT pop-up (stage 3): plugins/heat/UIHeat.cpp in the browser. Input (faint) and output spectra behind the band
+/* pump HEAT pop-up (stage 3): plugins/heat/UIHeat.cpp in the browser. Input (faint) and output spectra behind the band
    regions; each band glows with how hard it drives its curve (its level plus drive), shows its drive as a draggable
    bar (0..24 dB) with the curve name and band mix; crossover handles and the S / M / B strip (multiband.js). Below:
    the selected band (curve, drive, mix, level) with its transfer curve, and the globals. */
