@@ -548,6 +548,15 @@ Sliders in `.ask` dialogs (every generator, Record a sample) couldn't be moved o
 native slider), and `.acidr` / `.acidf` carry `touch-action:pan-y`, or the browser cancels the drag as a pan. Checked with
 emulated touch drags on a Pixel 7 profile: no movement before, correct distance after, on Acid line and a generic `genPanel`.
 
+## 8 Nov: mobile stalls during playback (build 516; partly fixed)
+
+Owner: stutter, slowdown, clicks, then rushing on the Fold, on the Page sequencer too. Profiling a Pixel 7 profile at 4x CPU throttle
+put most main-thread time in `drawArr` on every played row. On touch screens (`COARSE`) a playhead-only Arrange redraw now runs
+about 4×/s, `isSendT` asks `busPlan` once per `drawArr` (`busPlanM`), and the page sequencer re-anchors at 0.15 s behind instead of
+0.5 s. Measured, SHIFT+arrow screen changes while playing, 2 runs each: notes booked late 18 and 25 → 4 and 7. **Not fixed:** the
+screen changes themselves are still long tasks (6–8 s of 10 s at 4x). Next: what `go()`/`draw()` costs per screen. Unmeasured on a real
+phone. Notes heard after Stop are suspected to be the output buffer under Safest (Stop kills voices at `currentTime`, not heard time).
+
 ## 8 Nov: FLY label and same-row order (build 515)
 
 The FX bar capped the Flex param at 255, so every FLY showed as `FLX FF`. FLX and FLY on one row now follow column order: the
