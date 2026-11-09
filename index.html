@@ -19868,7 +19868,8 @@ function makeSeq(S, mode, o){
           }
           T.last = {c, v}; cmds.push({c, v});
         }
-        const fx = {}; for (const q of cmds) fx[q.c] = q.v;
+        // FLX and FLY share one Flex, so on one row the rightmost of the two is the one that plays (8 Nov)
+        const fx = {}; for (const q of cmds){ if (q.c === 'FLX') delete fx.FLY; else if (q.c === 'FLY') delete fx.FLX; fx[q.c] = q.v; }
         if (fx.TPO != null && fx.TPO >= 40) nb = fx.TPO;
         if (fx.GRV != null) T.grv = fx.GRV ? [(fx.GRV >> 4) || api.tks, (fx.GRV & 15) || api.tks] : null;
         if (fx.GGR != null) ngrv = fx.GGR ? [(fx.GGR >> 4) || api.tks, (fx.GGR & 15) || api.tks] : null;
@@ -21437,7 +21438,7 @@ function padBlink(e){
    Off (Page), nothing here runs. */
 // CORE_REV: a hash of core/seq-core.js, written by tools/make-core.mjs. The offline cache keeps a file by its URL, so the
 // URL must change whenever the file does (the build number alone left phones on an old core all evening, 2 Nov).
-const CORE_REV = 'x761n5';
+const CORE_REV = 'rl3y62';
 const CORE_WANT = 7;   // the core's message set this page speaks (core-processor.js CORE_V); an older core is not used
 const CORE_URL = () => 'core/seq-core.js?v=' + BUILD + '-' + CORE_REV;
 const core = {node:null, ready:false, loading:null, gen:0, sent:new Map(), sT:0, tally:new Map(), mir:null};   // mir: what the core's song holds, as JSON per part (coreDiff)   // tally: events by who played them (test hook)
@@ -28732,7 +28733,7 @@ let dkFlexC = null, dkPatN = 0;   // dkPatN: pictures drawn (test hook)
 function dkFxPatState(f, k, t, at){
   const sw = fxcNow(t, 'sw' + k, at), on = sw < -0.5 ? !!f.on : sw > 0.5;
   if (f.type === 'flex'){ const c = fxcNow(t, 'flx', at), wait = c < 0 && !!f.wait && !(sw > 0.5);
-    const p = c >= 0 ? Math.min(255, Math.round(c)) : wait ? 0 : f.pat | 0;
+    const p = c >= 0 ? Math.min(511, Math.round(c)) : wait ? 0 : f.pat | 0;
     const fly = p >= 256;   // FLY: the param carries 256 + its value
     return {on, wait, src:c >= 0 ? (fly ? 'FLY' : 'FLX') : wait ? 'WAITS FOR FLX' : 'PATTERN', p, name:(fly ? 'FLY ' + hx(p - 256) + ' · ' + (FlexCore.NAMES2[p - 256] || '?') : 'FLX ' + hx(p) + ' · ' + (FlexCore.NAMES[p] || '?'))}; }
   if (f.type === 'sgate'){ const c = fxcNow(t, 'gat', at), g = c >= 0 ? Math.round(c) : -1, wait = g === 0 || (g < 0 && !!f.wait && !(sw > 0.5)), p = g > 0 ? (g >= 16 ? 0 : g) : f.pat | 0;

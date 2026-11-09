@@ -548,6 +548,11 @@ Sliders in `.ask` dialogs (every generator, Record a sample) couldn't be moved o
 native slider), and `.acidr` / `.acidf` carry `touch-action:pan-y`, or the browser cancels the drag as a pan. Checked with
 emulated touch drags on a Pixel 7 profile: no movement before, correct distance after, on Acid line and a generic `genPanel`.
 
+## 8 Nov: FLY label and same-row order (build 515)
+
+The FX bar capped the Flex param at 255, so every FLY showed as `FLX FF`. FLX and FLY on one row now follow column order: the
+rightmost plays (owner's go-ahead; the sequencer used to emit FLX then FLY, so FLY always won).
+
 ## 8 Nov: instrument big step can't overshoot (build 515)
 
 EDIT+▲▼ (and the other big-step routes through `bump`) on an instrument now does nothing if the 8-step would pass 00 or the top,

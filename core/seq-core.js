@@ -436,7 +436,8 @@ function makeSeq(S, mode, o){
           }
           T.last = {c, v}; cmds.push({c, v});
         }
-        const fx = {}; for (const q of cmds) fx[q.c] = q.v;
+        // FLX and FLY share one Flex, so on one row the rightmost of the two is the one that plays (8 Nov)
+        const fx = {}; for (const q of cmds){ if (q.c === 'FLX') delete fx.FLY; else if (q.c === 'FLY') delete fx.FLX; fx[q.c] = q.v; }
         if (fx.TPO != null && fx.TPO >= 40) nb = fx.TPO;
         if (fx.GRV != null) T.grv = fx.GRV ? [(fx.GRV >> 4) || api.tks, (fx.GRV & 15) || api.tks] : null;
         if (fx.GGR != null) ngrv = fx.GGR ? [(fx.GGR >> 4) || api.tks, (fx.GGR & 15) || api.tks] : null;
