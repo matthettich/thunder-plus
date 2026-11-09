@@ -21410,8 +21410,8 @@ function pumpRun(){
   const s = tp.seq; let n = 0;
   // The page was stopped for a while (a frozen tab, a long pause, a system dialog): rather than playing every row
   // missed in that time at once, move the timeline on so the song continues from where it was.
-  // On a touch screen it moves on sooner (8 Nov): a stall of 0.7 s played nine overdue notes at once, heard as the song rushing and clicking.
-  if (s.alive() && s.time < ctx.currentTime - (COARSE ? 0.15 : 0.5) && s.base != null){ const d = ctx.currentTime + 0.08 - s.time; s.base += d; s.time += d; if (s.btT != null) s.btT += d; }
+  // On a touch screen it moves on sooner (8 Nov): a stall of 0.7 s played nine overdue notes at once, heard as the song rushing and clicking. Not while hidden: the system runs a hidden page in bursts, and each move would be a gap.
+  if (s.alive() && s.time < ctx.currentTime - (COARSE && !document.hidden ? 0.15 : 0.5) && s.base != null){ const d = ctx.currentTime + 0.08 - s.time; s.base += d; s.time += d; if (s.btT != null) s.btT += d; }
   // Schedule 250 ms ahead, so a busy moment on the UI thread can't make notes late (it was 150 ms on a computer).
   // Tracker edits and mutes reach notes after that; pads, keys, previews and STOP are immediate. With the app in the
   // background (owner, 31 Oct: stutters there) 1.2 s: the system runs a hidden page's thread late and in bursts, and
@@ -22839,7 +22839,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 523;
+const BUILD = 524;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD + (location.pathname.includes('/beta/') ? ' · beta' : '');
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
