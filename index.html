@@ -21588,6 +21588,15 @@ function pbLog(s){ try { PB.log.push((performance.now() / 1000).toFixed(2) + ' '
 const pbState = () => `ctx ${ctx ? ctx.state + ' t=' + ctx.currentTime.toFixed(2) : '-'} on=${tp.on ? 1 : 0} core=${tp.core ? 1 : 0} seq=${aset.core} hidden=${document.hidden ? 1 : 0} wall=${(Date.now() / 1000 % 100000).toFixed(2)}`;
 // BACKGROUND TIMING (8 Nov): how the Page sequencer's tick fared since the screen last changed: the longest wait between ticks (wall clock), how close the song came to running out, and any jumps forward
 const pbPg = () => { const P = PB.pg; PB.pg = null; return P ? ` · page ticks ${P.n}, longest gap ${P.gap.toFixed(2)} s, least lead ${P.lead.toFixed(2)} s, moved on ${P.re}× (${P.skip.toFixed(2)} s)` : ''; };
+// CLOCK DETAIL (8 Nov): on the Fold the audio clock runs ahead of real time while playing. Once a second, while playing and for 5 s after STOP, a line goes in the
+// report if the clock moved more than 0.1 s away from real time (and every 10 s anyway): what the browser says about the output, to tell which side is racing.
+{ let w0 = 0, c0 = 0, n = 0; setInterval(() => { try {
+  if (!ctx || (!tp.on && performance.now() - PB.stopT > 5000)){ w0 = 0; return; }
+  const w = Date.now() / 1000, c = ctx.currentTime; if (!w0){ w0 = w; c0 = c; return; }
+  const dw = w - w0, dc = c - c0; w0 = w; c0 = c; n++; if (Math.abs(dc - dw) < 0.1 && n % 10) return;
+  const ts = ctx.getOutputTimestamp ? ctx.getOutputTimestamp() : {}, st = ctx.playbackStats, b = typeof bgEl !== 'undefined' && bgEl;
+  pbLog(`clock +${dc.toFixed(2)} s in ${dw.toFixed(2)} s · out t=${(+ts.contextTime || 0).toFixed(2)} lat ${ctx.baseLatency.toFixed(3)}+${(ctx.outputLatency || 0).toFixed(3)} sr ${ctx.sampleRate}` + (st ? ` · stats total ${(+st.totalDuration || 0).toFixed(2)} underrun ${(+st.underrunDuration || 0).toFixed(2)} ×${st.underrunEvents | 0}` : '') + (b ? ` · bg ${b.paused ? 'paused' : 'on'} ${b.currentTime.toFixed(2)}` : '') + ' · ' + pbState());
+} catch(e){} }, 1000); }
 function pbLevel(){ try { const A = rt && rt.man; if (!A) return '-'; let m = 0; for (const a of A){ const b = new Float32Array(a.fftSize); a.getFloatTimeDomainData(b); for (const x of b) m = Math.max(m, Math.abs(x)); } return m ? (20 * Math.log10(m)).toFixed(1) + ' dB' : 'silent'; } catch(e){ return '?'; } }
 /* HYBRID (owner, 6 Nov: "Build the hybrid and make sure we don't break anything on desktop"): on a phone or tablet, the
    moment the app is hidden (the screen off, another app, the shade) while the audio-thread sequencer plays the song, the
@@ -22842,7 +22851,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 527;
+const BUILD = 528;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD + (location.pathname.includes('/beta/') ? ' · beta' : '');
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -31836,6 +31845,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
   [519, '8 Nov', ['The pad has MUTE and SOLO buttons on unfolded and larger screens: pink and green when off, black when on. Tap to latch, tap again to undo.']],
+  [528, '8 Nov', ['(Testing) The playback report notes when the audio clock runs away from real time.']],
   [527, '8 Nov', ['Holding ▲ or ▼ on the pad runs through the effect and command lists.']],
   [526, '8 Nov', ['Mobile: SHIFT + ▲ now goes to the Arrange panel beside the screen when it is showing.', 'Mixer: OPTION + arrows go to another track, as on FX. On the FX row, OPTION + ▲▼ still turn effects on and off.']],
   [518, '8 Nov', ['Mobile: SHIFT + ▲ goes to Arrange from every tracker screen.']],
