@@ -1,4 +1,4 @@
-/* …pump EQ pop-up (stage 2): plugins/eq/UIEQ.cpp in the browser. The curve display with the pre/post analyzers, the
+/* pump EQ pop-up (stage 2): plugins/eq/UIEQ.cpp in the browser. The curve display with the pre/post analyzers, the
    band nodes (drag, double-click to add, Alt-hold to solo, Alt-drag empty space to listen, box select, wheel for Q),
    the selected band's panel and the globals, through PumpUI (kit.js) and window.PumpFX. */
 (() => {

@@ -590,6 +590,22 @@ Written up from the commits on 9 Nov; none of it has been tried on a real Fold.
 - **534:** Low power display picks the Low power skin; it applies even if storage fails, and a stale saved skin is cleared.
 - **535:** Phone: less layout work while playing; the playback report logs stalls.
 
+## 9 Nov: pad PLAY matches Space, OPTION is ALT (build 537, same PR as the wording audit)
+
+Owner's call after a pad-vs-keys comparison. On every input the same rule now holds through `playKey(shift)`: PLAY or Space plays
+the song (on the Song screen, `playCtx`, so LOOP SEL's rows still loop), SHIFT+PLAY or Shift+Space plays this screen. This reverses
+the 27 Oct note that the on-screen PLAY kept the pad's meaning. The pad's OPTION is labeled ALT to match the keyboard; the internal
+name is still `opt`. Pad SHIFT+arrows (screens) and ALT+arrows (other phrase or block) were deliberately left as they are.
+
+## 9 Nov: wording audit (build 536, branch `fix/wording-audit`, PR into `beta`)
+
+The owner asked for an audit of awkward menu and notification text, then for the fixes. About 180 strings were rewritten and the
+longest pop-ups tightened. Owner's naming decisions: American spelling in visible text (code identifiers and CSS stay as they
+were); no dots on any name (Thunder, Thunder Plus, pump, chains, waves); say "desktop app", not "helper", to users;
+"A voice per track" became "A kit slot per track" (the internal `vtrk` name is unchanged). Audio thread / Page stay as the
+sequencer names. The installed app's productName was already Thunder Plus; `electron/package.json` only had its
+descriptions and shortcut name changed. Write new user-facing text in plain sentences: say what is true now, no "as before", no colon-joined clauses.
+
 ## 9 Nov, end of session: what to test on the phone (build 530, on `beta`)
 
 Nothing from builds 529–530 has been tried on a real Fold, only in emulation. Start a session by asking the owner for these.

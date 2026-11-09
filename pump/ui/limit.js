@@ -1,4 +1,4 @@
-/* …pump LIMIT pop-up (stage 2): plugins/limit/UILimit.cpp in the browser. The 5 s level / gain-reduction history with
+/* pump LIMIT pop-up (stage 2): plugins/limit/UILimit.cpp in the browser. The 5 s level / gain-reduction history with
    the draggable gain and ceiling, the loudness target and short-term line, In / GR / Out meters, the loudness screen
    and the controls below. */
 (() => {
@@ -6,7 +6,7 @@
 const U = window.PumpUI; if (!U) return;
 const {R, clamp, css, mix, alpha, Dial, Feed} = U;
 const HP = 1000, NSTY = 7, OSN = ['Off', '2x', '4x', '8x'], TGT = [0, -14, -16, -9, -9, -14, 0];
-const DESC = [['Slow leveling does most', 'of the work: the cleanest,', 'least coloured limiting.'], ['Transients pass the', 'leveling stage and the', 'release snaps back.'],
+const DESC = [['Slow leveling does most', 'of the work: the cleanest,', 'least colored limiting.'], ['Transients pass the', 'leveling stage and the', 'release snaps back.'],
   ['Brickwall only, with a', 'transient-aware release', 'that keeps micro-dynamics.'], ['Balanced leveling and', 'brickwall. A safe first', 'choice for any master.'],
   ['Soft clipping ahead of a', 'fast brickwall: loud and', 'dense, with some grit.'], ['RMS leveling, light', 'clipping and a fast', 'release: loud and clear.'],
   ['Early attack and slow', 'release: avoids audible', 'distortion at all costs.']];

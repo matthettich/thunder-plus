@@ -1,4 +1,4 @@
-/* …pump WIDE pop-up (stage 3): plugins/wide/UIWide.cpp in the browser. Left: mid (fill) and side (line) spectra behind
+/* pump WIDE pop-up (stage 3): plugins/wide/UIWide.cpp in the browser. Left: mid (fill) and side (line) spectra behind
    the band regions, each band's width as a draggable bar (100% = unchanged) with its stereoize amount, the mono-bass
    line, crossover handles and the S / M / B strip (multiband.js). Right: the polar-sample vectorscope (half disc,
    mono straight up, L and R on the diagonals, out-of-phase content toward the flat edge) with phosphor
