@@ -954,6 +954,17 @@ body.dropping::after{content:''; position:fixed; inset:6px; border:3px dashed va
 .ttabs button[data-v].on,.tmap button[data-v].on{background:var(--tc); color:#1b2130; font-weight:700; box-shadow:inset 0 -3px 0 #1b2130}
 /* (sweep, 4 Nov) empty cells a quarter of the way from the skin's dim colour toward its ink: still quiet, no longer near invisible (about 1:1 on most skins) */
 .tscr .lfom{color:var(--fxac, var(--ts-hot)); font-weight:700}   /* a parameter an LFO moves (MOD): the ~ after its name */
+/* MOD scopes: a layer over the text grid that never takes a click (pointer-events:none); thin square lines, no rounding */
+.modsc{position:absolute; left:0; top:0; width:0; height:0; z-index:1; pointer-events:none; color:var(--fxac, var(--ts-hot))}
+.modsc, .modsc *{pointer-events:none!important; border-radius:0!important}
+.modsc .msc{position:absolute; box-sizing:border-box; border:1px solid var(--ts-line); overflow:hidden}
+.modsc .msc[hidden], .modsc .msl[hidden]{display:none}
+.modsc .msl{display:block; font-style:normal; font-size:.72em; line-height:1.5; padding:0 .4em; white-space:nowrap; overflow:hidden; color:var(--ts-th); border-bottom:1px solid var(--ts-line); box-sizing:border-box}
+.modsc .msc.sum .msl{color:var(--ts-ink)}
+.modsc .msw{position:relative; width:100%}
+.modsc .msw::before{content:''; position:absolute; left:0; right:0; top:50%; height:0; border-top:1px dotted var(--ts-line)}
+.modsc canvas{position:absolute; left:0; top:0; display:block}
+.modsc .msd{position:absolute; left:0; top:0; width:5px; height:5px; margin:-2px 0 0 -2px; background:currentColor; will-change:transform}
 .tscr .e{color:var(--ts-dim); color:color-mix(in srgb, var(--ts-dim) 75%, var(--ts-ink))}
 .tscr .v{color:var(--ts-ink)}
 .tscr .rn{color:var(--ts-rn)}
@@ -3384,7 +3395,7 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
 <h3>Track effects</h3>
 <p>Each track and the master have 8 effect slots (FX screen, or the Mixer’s FX row): 73 effects on a track and 82 on a bus or the master (with the nine pump ones; pump EQ goes on any track), in groups: dynamics and EQ (compressors, Bus and Glue Comp, limiter, noise gate, transient shaper, multiband, air), filters (filter, ladder, low and high cut, auto-wah, vowel, envelope filter), drive and lo-fi (saturation, drive, overdrive, tube, tape, wavefolder, bitcrush, lo-fi, degrade, vintage sampler (an SP-1200, SP-12, MPC60, SP-202 at each of its grades, or Emulator II: their rate and bit depth, converters, filters and noise), vinyl, dub tape, cab), modulation (chorus, ensemble, dimension, flanger, phaser, tremolo, auto-pan, rotary, ring mod, cross-mod, frequency shifter), delays (simple, tape, BBD, pitch, granular, reverse echo), reverbs (room, plate, spring, space, Galactic, pitch reverb, convolution), pitch and voice (pitch shifter, harmonizer, pitch correct), resonators (resonator, comb, Rings), spectral and granular (Clouds, Beads, spectral, extreme stretch), rhythmic (Flex, Step gate, Retrigger, trance gate, pump, Beat grains, Beat scramble, Glitch sequencer) and utility (stereo width, utility). The pad's Add effect menu has 65 of them. On the Mixer’s FX row, ALT (Ctrl/⌘ in KEYS mode) + ▲▶ turns a track's effects on in order, up to eight, and ALT + ▼◀ turns the last one off without losing its settings — turn the count back up and it returns; with none on, slots fill from 1. EDIT on the row opens the FX screen. Renders include them; stems skip the master effects and limiter. For drums and IDM: <b>Beat grains</b> (a rhythmic grain cloud in time with the song, after Output Portal: rate, density, size, position, spray, pitch and random pitch, reverse, shape, stereo, freeze), <b>Beat scramble</b> (re-orders the last bar's slices, some reversed; keep the beats, new every bar or looped) and <b>Glitch sequencer</b> (each step may stutter, reverse, jump an octave, tape-stop, crush or drop out). Under a slot's controls, <b>› PRESET</b> lists INIT, factory presets (over 230 across the effects) and the song's own, and <b>› SAVE AS PRESET…</b> keeps the slot's settings for that effect. <b>› EQ WINDOW</b> (at the bottom of the FX screen, on any track) opens the track's pump EQ in its own window, adding one to a free slot if needed; pump EQ works on every track, the other pump effects on buses and the master.</p>
 <p><b>The FX screen</b> keeps the slot list and the open slot's controls apart: ▲▼ move within one of the two, and ◀▶ (or a sideways swipe) open the slot under the cursor and go back to the list — so scrolling never changes the effect you are editing. A filled slot shows ›, and the open one shows ▪.</p>
-<p><b>The MOD screen</b> (between FX and PROJECT) lists the track's four LFOs, one a row: TARGET (EDIT or a click opens the target list; it starts at this track), SHAPE, RATE (a cycle every 1/32 … 8 bars, in time with the song) and DEPTH (00–FF). EDIT+arrows or a drag change a value (on TARGET they step through the target list, ▲▼ eight at a time), Delete takes the LFO out, ALT+◀▶ picks another track (the master too), and it follows the FX screen's track. Right-click an effect parameter on the FX screen (or its value on the FX bar) → <b>Add LFO…</b> puts one on it; a ~ after a parameter's name shows that an LFO moves it. …pump effects aren't targets yet.</p>
+<p><b>The MOD screen</b> (between FX and PROJECT) lists the track's four LFOs, one a row: TARGET (EDIT or a click opens the target list; it starts at this track), SHAPE, RATE (a cycle every 1/32 … 8 bars, in time with the song) and DEPTH (00–FF). EDIT+arrows or a drag change a value (on TARGET they step through the target list, ▲▼ eight at a time), Delete takes the LFO out, ALT+◀▶ picks another track (the master too), and it follows the FX screen's track. Right-click an effect parameter on the FX screen (or its value on the FX bar) → <b>Add LFO…</b> puts one on it; a ~ after a parameter's name shows that an LFO moves it. Each LFO has a scope that draws its shape, with a dot that moves along it in time with the song (two or more LFOs on one target also get a scope of their sum); wide screens show them under the rows, a folded phone beside each row, and LOW POWER DISPLAY draws them still. …pump effects aren't targets yet.</p>
 <p><b>chains</b> (the modular effects screen) is live: adding or removing a module, moving a cable, or turning a slider is heard at once — no need to restart playback. Its <b>Resample</b> module records what passes through it into a pad, starting on the next bar, and slices it so you can chop it like a breakbeat.</p></section>
     <section id="hGen"><h2>Generators</h2><p>GEN (PAD mode, beside LOOP), Edit ▾ → Generators, or a right-click. Each opens a panel that stays up while the song plays: <kbd>G</kbd> rolls again, <kbd>Space</kbd> plays, <kbd>Esc</kbd> or Done closes, and each roll is one undo step. They write into the selected rows, else the whole phrase (Drum pattern: the song row under the cursor).</p><table>
 <tr><td>Drum pattern</td><td>A beat across tracks: KICK, SNARE, HATS and PERC each get a track and an instrument (found from your pad names). STYLE (Four on the floor, Broken beat, Jungle, Footwork, Halftime, IDM euclidean), DENSITY, VARIATION (later bars change, a fill at the end). A track with nothing on the row gets a new phrase; a block that also plays elsewhere is made a unique copy first (SHARED), unless you choose to rewrite it everywhere</td></tr>
@@ -22994,7 +23005,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 541;
+const BUILD = 543;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD + (location.pathname.includes('/beta/') ? ' · beta' : '');
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -23949,6 +23960,87 @@ const modT = () => cFxT >= NT ? MT : cFxT;
 const modArr = () => { const a = S.perf && S.perf.lfo && S.perf.lfo[modT()]; return Array.isArray(a) ? a : []; };
 const modLab = L => tgtParse(L.id).t === modT() ? tgtLabel(L.id, true) : tgtLabel(L.id);
 const modRate = rt => PLFO_RATE_NAMES[rt] || '?';
+/* MOD SCOPES (owner, 9 Nov): each LFO drawn as a small scope, the real lfoAt, depth as height, a square playhead on the wave in time with
+   the song. Two or more LFOs on one target add a scope of their sum (around the middle, clamped like the sequencer's).
+   WINDOW: 2 cycles of the LFO's rate (4 for Random, so its steps show); a sum shows 2 cycles of its slowest LFO (4 with a Random one).
+   Random depends on the cycle number, so its window is aligned to whole windows from the song's start and is drawn again each time
+   the playhead enters the next one; every other shape is drawn once per change (modScKey). The waveform is cached in a canvas; the
+   frame loop only moves the dot (frame -> modScTick, about 20 a second, only on MOD, playing, visible, LOW POWER DISPLAY off).
+   The dot reads the beat the way the grid's playhead reads its time: ctx.currentTime + 0.01 - heardLat() - moFxLat() - phOff
+   through fxcBeat (the booked 'beat' events, the same clock the sequencer's LFO phase comes from). Nothing here touches makeSeq or the audio. */
+var MS_CYC = 2, MS_CYC_RND = 4;
+function modWin(items){ let per = 0, rnd = false; for (const L of items){ per = Math.max(per, PLFO_RATES[L.rt] || 1); if (L.sh === 5) rnd = true; } return (rnd ? MS_CYC_RND : MS_CYC) * (per || 1); }
+function modMix(items, bt, mid = 128){ let v = mid; for (const L of items){ const x = bt / (PLFO_RATES[L.rt] || 1), cyc = Math.floor(x); v += lfoAt(L.sh, x - cyc, cyc) * L.dp / 2; } return clamp(v, 0, 255); }
+function modScKey(items, w, h, dpr, col, bt){ return items.map(L => L.sh + '.' + L.rt + '.' + L.dp).join(',') + '|' + w + 'x' + h + '|' + dpr + '|' + col + '|' + (items.some(L => L.sh === 5) ? Math.floor(bt / modWin(items)) : ''); }
+// the scopes for this track: one a filled row, then one sum for each target with two or more LFOs
+function modScGroups(){
+  const A = modArr(), out = [], by = new Map();
+  A.forEach((L, y) => { if (!L) return; out.push({items:[L], y, lab:(y + 1) + ' ' + (PLFO_SHAPES[L.sh] || '?') + ' · ' + modRate(L.rt)}); (by.get(L.id) || by.set(L.id, []).get(L.id)).push(L); });
+  for (const [, g] of by) if (g.length > 1) out.push({items:g, sum:true, lab:'SUM · ' + modLab(g[0])});
+  return out;
+}
+var modSc = {el:null, pool:[], geo:'', on:false, t:0, moves:0, draws:0, col:'', n:0};
+function modScOff(){ if (modSc.el) modSc.el.style.display = 'none'; modSc.on = false; }
+function modScBeat(){ if (!tp.on || lpOn || !ctx) return 0; const b = fxcBeat(ctx.currentTime + 0.01 - heardLat() - moFxLat() - phOff / 1000); return b == null ? 0 : Math.max(0, b); }
+function modScDraw(e, bt){
+  const dpr = e.dpr, w = Math.round(e.ww * dpr), h = Math.round(e.wh * dpr); if (w < 4 || h < 4) return;
+  const key = modScKey(e.items, e.ww, e.wh, dpr, modSc.col, bt); if (key === e.key) return; e.key = key; modSc.draws++;
+  const cv = e.cv; if (cv.width !== w) cv.width = w; if (cv.height !== h) cv.height = h;
+  const g = cv.getContext('2d'), win = modWin(e.items), base = e.items.some(L => L.sh === 5) ? Math.floor(bt / win) * win : 0, pad = e.pad * dpr, n = w;
+  g.clearRect(0, 0, w, h); g.strokeStyle = modSc.col; g.lineWidth = Math.max(1, dpr); g.lineJoin = 'miter'; g.lineCap = 'butt'; g.beginPath();
+  for (let i = 0; i < n; i++){ const v = modMix(e.items, base + win * i / (n - 1)), y = pad + (1 - v / 255) * (h - 2 * pad); if (i) g.lineTo(i + .5, y); else g.moveTo(.5, y); }
+  g.stroke();
+}
+function modScMove(bt){
+  for (let i = 0; i < modSc.n; i++){ const e = modSc.pool[i], dot = e.dot;
+    if (lpOn){ dot.style.display = 'none'; continue; } dot.style.display = '';
+    const win = modWin(e.items), wi = Math.floor(bt / win), x = (bt - wi * win) / win * e.ww, v = modMix(e.items, bt), y = e.pad + (1 - v / 255) * (e.wh - 2 * e.pad);
+    if (e.items.some(L => L.sh === 5)) modScDraw(e, bt);   // Random: the window turned over
+    const s = 'translate(' + x.toFixed(1) + 'px,' + y.toFixed(1) + 'px)'; if (e.tf !== s){ e.tf = s; dot.style.transform = s; } }
+  modSc.moves++;
+}
+function modScTick(){
+  if (tv !== 'mod' || !modSc.on || !tp.on || lpOn || document.hidden || !ctx) return;
+  const now = performance.now(); if (now - modSc.t < 45) return; modSc.t = now;
+  modScMove(modScBeat());
+}
+function modScSync(rebuilt){
+  if (tv !== 'mod' || !modArr().length){ if (modSc.on) modScOff(); return; }
+  let layer = modSc.el; if (!layer){ layer = modSc.el = el('div', 'modsc'); layer.setAttribute('aria-hidden', 'true'); scr.append(layer); }
+  const de = document.documentElement, dpr = Math.min(2, devicePixelRatio || 1), grp = modScGroups();
+  const geo = [scr.clientWidth, scr.clientHeight, Math.round((($('tStage') || {}).hidden ? 0 : $('tStage').getBoundingClientRect().left)), scr.style.fontSize, de.dataset.skin, scr.dataset.ts, fxAcV, dpr, lpOn ? 1 : 0, grp.map(q => q.items.map(L => L.sh + '.' + L.rt + '.' + L.dp + '.' + L.id).join(',')).join(';')].join('|');
+  layer.style.display = 'block'; modSc.on = true;
+  if (!rebuilt && geo === modSc.geo){ if (!tp.on) modScMove(0); return; }
+  modSc.geo = geo; modSc.col = getComputedStyle(layer).color;
+  const sr = scr.getBoundingClientRect(), g = grid.getBoundingClientRect(), ox = sr.left + scr.clientLeft, oy = sr.top + scr.clientTop;
+  const fs = parseFloat(scr.style.fontSize) || 14, lns = grid.querySelectorAll(':scope > .ln'); if (lns.length < PLFO_MAX + 1) return;
+  const stg = $('tStage'), sgr = stg && !stg.hidden && stg.offsetParent ? stg.getBoundingClientRect() : null;   // the dogs / peek beside the grid: keep clear of them
+  const gx0 = g.left, gx1 = g.left + grid.clientWidth, gy1 = g.top + grid.clientHeight, gw = gx1 - gx0, gap = Math.round(fs * .6);
+  const last = lns[PLFO_MAX].getBoundingClientRect(); let tr = 0; for (let y = 1; y <= PLFO_MAX; y++){ const c = lns[y].lastElementChild; if (c) tr = Math.max(tr, c.getBoundingClientRect().right); }
+  const freeTop = last.bottom + fs * .6, freeH = gy1 - freeTop, fx1 = sgr && sgr.width > 0 && sgr.left > gx0 && sgr.bottom > freeTop && sgr.top < gy1 ? Math.min(gx1, sgr.left - fs * .6) : gx1, fw = fx1 - gx0, full = gw >= 600 && freeH >= 100, lh = Math.round(fs * .72 * 1.5);
+  const rects = [];   // {x, y, w, h, lab: label strip height}
+  if (full){   // wide: full scopes in the empty area under the rows, left aligned like the text
+    const N = grp.length, cols = Math.min(N, Math.max(1, Math.floor(fw / 320))), cw = Math.max(200, Math.min(420, (fw - (cols - 1) * gap) / cols)), rows = Math.ceil(N / cols), ch = clamp((freeH - (rows - 1) * gap) / rows, 48, 170);
+    grp.forEach((q, i) => rects.push({x:gx0 + (i % cols) * (cw + gap), y:freeTop + Math.floor(i / cols) * (ch + gap), w:cw, h:ch, lab:lh}));
+  } else {   // folded: a small scope right beside each filled row, a column after the longest row; the sums under the rows
+    const rx = tr + fs * .8, rw = gx1 - rx - 2; let k = 0;
+    const sums = grp.filter(q => q.sum).length, sw = sums ? Math.min(240, (fw - (sums - 1) * gap) / sums) : 0;
+    grp.forEach(q => { if (!q.sum){ const r = lns[1 + q.y].getBoundingClientRect(); rects.push(rw >= 36 ? {x:rx, y:r.top + r.height * .1, w:rw, h:r.height * .8, lab:0} : null); }
+      else if (freeH >= fs * 4.5){ rects.push({x:gx0 + (k++) * (sw + gap), y:freeTop, w:sw, h:Math.min(freeH, fs * 6), lab:lh}); } else rects.push(null); });
+  }
+  let n = 0;
+  grp.forEach((q, i) => { const r = rects[i]; if (!r) return;
+    let e = modSc.pool[n]; if (!e){ e = {box:el('div', 'msc'), lab:el('i', 'msl'), wave:el('div', 'msw'), cv:document.createElement('canvas'), dot:el('b', 'msd'), key:'', tf:'', dpr:1, items:[], ww:0, wh:0, pad:2};
+      e.wave.append(e.cv, e.dot); e.box.append(e.lab, e.wave); layer.append(e.box); modSc.pool[n] = e; }
+    n++; e.items = q.items; e.dpr = dpr; e.box.hidden = false; e.box.classList.toggle('sum', !!q.sum);
+    const bw = Math.round(r.w), bh = Math.round(r.h), wh = Math.max(4, bh - r.lab - 2);
+    const bs = e.box.style; bs.left = Math.round(r.x - ox) + 'px'; bs.top = Math.round(r.y - oy) + 'px'; bs.width = bw + 'px'; bs.height = bh + 'px';
+    e.lab.hidden = !r.lab; e.lab.style.height = r.lab + 'px'; if (r.lab) e.lab.textContent = q.lab;
+    e.ww = bw - 2; e.wh = wh; e.wave.style.height = wh + 'px'; e.cv.style.width = e.ww + 'px'; e.cv.style.height = wh + 'px'; e.pad = Math.min(3, wh / 6); e.tf = ''; e.key = '';
+  });
+  for (let i = n; i < modSc.pool.length; i++) modSc.pool[i].box.hidden = true;
+  modSc.n = n; const bt = modScBeat(); for (let i = 0; i < n; i++) modScDraw(modSc.pool[i], bt); modScMove(bt);
+}
 function modPick(y){
   const t = modT();
   tgtPicker(id => { const P = perfOf(), a = P.lfo[t] || (P.lfo[t] = []), i = Math.min(y, a.length);
@@ -26792,6 +26884,7 @@ function draw(){
   const rebuilt = gh !== gridHTML; if (rebuilt){ gridHTML = gh; grid.innerHTML = gh; gridLit = []; }
   if (tv === 'fx') fxPaneFit(rebuilt);   // unchanged screens (most redraws while playing) skip the rebuild
   pvBusFrame(rebuilt);
+  modScSync(rebuilt);   // MOD: the LFO scopes (nothing on any other screen)
   // The playing line: its row number lit, and the whole line inverted, like Arrange's playing blocks (owner, 19 Oct).
   if (prLit || gridLit.length){ for (const e of gridLit) e.classList.remove('pl', 'plr'); gridLit = [];
     if (prLit) for (const y of prLit){ const e = grid.querySelector(`span.rn[data-r="${y}"]`); if (e){ e.classList.add('pl'); gridLit.push(e);
@@ -30776,7 +30869,7 @@ function frame(){
     if (!tp.seq.alive() && !tp.q.length && ctx.currentTime > tp.seq.time + 0.3) tStop(); else if (ch || lpPend){ if (lpSkip) lpPend = true; else { lpPend = false; followPlay(); playDraw = true; try { draw(); } finally { playDraw = false; } } }
   }
   if (lpSkip) return;
-  tickDots(); tickLen();
+  tickDots(); tickLen(); modScTick();
   cpuMeter();
   // Meters read the analysers ~30×/s instead of every display frame, and stop once nothing has
   // sounded for a moment: this loop runs for the whole life of the tracker view, so scanning 32
@@ -32272,6 +32365,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [543, '9 Nov', ['MOD: each LFO now has a small scope that draws its real shape (depth sets the height) with a dot that moves along it in time with the song while it plays. Two or more LFOs on the same target also get a scope of their sum. Wide screens put the scopes under the rows; a folded phone puts a small one beside each row. They stand still with LOW POWER DISPLAY on, and cost nothing on other screens.']],
   [541, '9 Nov', ['Acid line: MUTATE INTENSITY (1–100) sets how many steps Mutate changes, from one step to the whole line. A changed note moves to a near note of the scale (farther at higher intensity), so the line stays related to the one you had. Mutate leaves the volumes, effects and instrument changes you added by hand on the rows it doesn’t change, and Original (O) puts back the phrase as it was when the panel opened.']],
   [540, '9 Nov', ['…chains on the bottom panel: lines now join Track In, the modules and Chain Out, drawn from the patch’s real cables in the skin’s accent color, and the blocks spread out a little when there’s room. MOD: Ctrl/⌘+arrows on TARGET step through the target list.']],
   [539, '9 Nov', ['New screen: MOD, between FX and PROJECT. Four LFOs a track, one a row: pick a target, then SHAPE, RATE and DEPTH. Right-click an effect parameter on the FX screen (or its value on the FX bar) → Add LFO… puts one on it, and a ~ marks the parameters an LFO moves. Alt+7 is MOD (PROJECT: its tab, or SHIFT+▶ from MOD).']],

@@ -581,6 +581,10 @@ Start a session by asking for results. Fix on `beta`.
   final length stays until the next take. recorder-check covers FREE, PATTERN, Stop, next take and closing mid-take.
 
 
+## 9 Nov: LFO scopes on MOD (build 543)
+
+Owner: show the LFOs visually. One scope per filled row, from the real `lfoAt`, depth sets the height, and a sum scope for LFOs sharing a target. `modScSync` lays out a persistent layer in `#tScr` (`pointer-events:none`, under the rows when wide, beside each row when folded); `modScDraw` caches each waveform; `modScTick`, from the existing `frame()`, moves only the dot at about 18 fps and only on MOD while playing. Dot time is the grid playhead's (`fxcBeat`, `heardLat`, `moFxLat`, `phOff`). Low power display: static shapes, no dot. Measured headless only: dot about 20 ms ahead of the playhead on average; not checked against real speakers.
+
 ## 9 Nov: acid Mutate intensity (build 541)
 
 Owner: Mutate should make changes from small to large that relate to the line, keeping hand tweaks. In `acidLine`: "Mutate intensity" (`acidSet.mut`, 1–100, default 25, session only) and Original (O), as in `mutatePhrase`. `acidMutate(…, inten)` picks exactly round(L × intensity / 100) distinct steps (notes first when TIME is off; a press retries up to 8 times if nothing changed). `acidNear` moves a sounding note within the scale, at most `acidMutDeg` degrees, small moves likelier. `acidWriteMut` writes only the picked rows and only what changed: the old path rewrote every step row, losing hand volumes, instruments, note-offs, other poly columns and PSL parameters. Generate is unchanged. A slide re-rolls as "slide into the picked step", so writes stay on picked rows. Tests: `tests/acid-mutate.test.js`.
