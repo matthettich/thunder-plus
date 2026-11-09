@@ -1106,10 +1106,10 @@ body:not(.legon) .tside .tlegend{display:none}
    ~370px) 3 d-pad keys + 4 wide keys + gaps + padding came to ~380px and pushed PLAY/EDIT off the right edge.
    7.08 = 3 + 4 × 1.02 key widths; 66px = the 5 column gaps (45) + the d-pad/keys gap (16) + the 4px offset shadow + 1. */
 .tctl{container-type:inline-size}
-.tpad{--kw:min(var(--k), calc((100cqw - 66px) / 7.08))}
+.tpad{--kw:min(var(--k), calc((100cqw - 75px) / 8.1))}   /* (8 Nov: MUTE / SOLO add a column: 8.1 key widths, one more 9px gap) */
 .dpad{display:grid; grid-template-columns:repeat(3,var(--kw, var(--k))); grid-template-rows:repeat(2,var(--k)); gap:10px 9px}
 .keys{display:grid; grid-template-columns:repeat(2,calc(var(--kw, var(--k)) * 1.45)); grid-template-rows:repeat(2,var(--k)); gap:10px 9px}
-.keys.wide{grid-template-columns:repeat(4,calc(var(--kw, var(--k)) * 1.02))}
+.keys.wide{grid-template-columns:repeat(5,calc(var(--kw, var(--k)) * 1.02))}
 /* The nav/edit pad: the command row inverted. A darker grey panel; buttons in a screen's colour, on white outlined offset blocks. */
 .tctl{background:color-mix(in srgb, var(--side) 84%, #000)}
 /* FX BAR IN THE PAGE COLOUR (owner, 5 Nov, mockup C): with the bottom panel showing, its area is the page colour, divided
@@ -1125,7 +1125,7 @@ body:not(.legon) .tside .tlegend{display:none}
 #tPad .k.lt, #tPad #kPlay.on{background:var(--pl); color:var(--inv)}
 .k{min-height:0; padding:0; font-size:18px; font-weight:600; touch-action:none}
 .k.kw{font-size:var(--fs-2); letter-spacing:.04em}
-.keys.wide .k.kw{font-size:var(--fs-2)}
+.keys.wide .k.kw{font-size:var(--fs-2); letter-spacing:0}
 .k.dn,.k.on{background:var(--ink); color:var(--inv)}
 #kPlay.on{background:var(--pl); border-color:var(--line); color:var(--inv)}
 .k.lt{background:var(--pl); color:var(--inv); border-color:var(--line)}
@@ -3188,8 +3188,8 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
     </div>
     <div class="tinl tinlp" id="tInlPad" hidden aria-label="Instruments and their pads"></div>
     <div class="keys wide">
-      <button type="button" class="k kw" data-b="xposeUp" title="Transpose the phrase selection up a semitone">SEMI +</button><button type="button" class="k kw" data-b="xposeDn" title="Transpose the phrase selection down a semitone">SEMI −</button><button type="button" class="k kw" data-b="shift">SHIFT</button><button type="button" class="k kw" data-b="play" id="kPlay">PLAY</button>
-      <button type="button" class="k kw" data-b="gen" id="kGen" title="Generate: the pattern generators (Acid line, Euclidean fill…) for this phrase">GEN</button><button type="button" class="k kw" data-b="loop" id="kLoop" title="Loop the pattern: the song repeats the row it is on until you turn it off (Alt+L in KEYS mode)">LOOP</button><button type="button" class="k kw" data-b="opt">OPTION</button><button type="button" class="k kw" data-b="edit">EDIT</button>
+      <button type="button" class="k kw" data-b="mute" id="kMute" title="Mute this track; tap again to unmute">MUTE</button><button type="button" class="k kw" data-b="xposeUp" title="Transpose the phrase selection up a semitone">SEMI +</button><button type="button" class="k kw" data-b="xposeDn" title="Transpose the phrase selection down a semitone">SEMI −</button><button type="button" class="k kw" data-b="shift">SHIFT</button><button type="button" class="k kw" data-b="play" id="kPlay">PLAY</button>
+      <button type="button" class="k kw" data-b="solo" id="kSolo" title="Solo this track; tap again to un-solo">SOLO</button><button type="button" class="k kw" data-b="gen" id="kGen" title="Generate: the pattern generators (Acid line, Euclidean fill…) for this phrase">GEN</button><button type="button" class="k kw" data-b="loop" id="kLoop" title="Loop the pattern: the song repeats the row it is on until you turn it off (Alt+L in KEYS mode)">LOOP</button><button type="button" class="k kw" data-b="opt" aria-label="Option" title="Option">OPT</button><button type="button" class="k kw" data-b="edit">EDIT</button>
     </div>
     </div>
   </div>
@@ -22834,7 +22834,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 518;
+const BUILD = 519;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD + (location.pathname.includes('/beta/') ? ' · beta' : '');
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -25195,6 +25195,7 @@ function press(b, fromKey){
     if (mod('shift')){ used.shift = true; takeLatch(); if (tp.on) tStopUser(); else tStart('song', {row:songRow()}); } else playCtx(); return; }
   // LOOP is a sticky toggle, not a held key: a tap flips it (the pattern loop; LOOP SEL is in the tab bar on a computer).
   if (b === 'loop'){ toggleLoopPat(); clearTimeout(rep); return; }
+  if (b === 'mute' || b === 'solo'){ clearTimeout(rep); b === 'mute' ? muteKey() : soloKey(); return; }   // MUTE / SOLO (owner, 8 Nov): a tap latches, a second tap undoes it
   if (b === 'gen'){ clearTimeout(rep); genMenu(); return; }   // GEN (owner, 6 Nov): the generators, under SEMI + beside LOOP
   if (b === 'xposeUp'){ transposeSel(1, true); clearTimeout(rep); return; }
   if (b === 'xposeDn'){ transposeSel(-1, true); clearTimeout(rep); return; }
@@ -25204,7 +25205,7 @@ function press(b, fromKey){
   if (!fromKey) rep = setTimeout(function r(){ dirPress(b, l); rep = setTimeout(r, 70); }, 330);
 }
 function release(b, fromKey){
-  if (b === 'loop' || b === 'gen' || b === 'xposeUp' || b === 'xposeDn'){ keyVis(); return; }
+  if (b === 'loop' || b === 'gen' || b === 'mute' || b === 'solo' || b === 'xposeUp' || b === 'xposeDn'){ keyVis(); return; }
   if (b in held){
     if (!held[b]) return;
     held[b] = false;
@@ -26267,6 +26268,7 @@ function draw(){
   if (arrPlace()) scheduleRefit(false);   // Arrange moved into (or out of) the Song screen: size the text again next frame
   if (spSync()) fit();   // SIMPLE PHRASE: on or off for this screen, so the phrase is sized again (and Arrange hides)
   pvSync();   // PATTERN VIEW: its buttons and bar, and the text size when it turns on or off
+  { const m = S.mix[dkTrack()], a = $('kMute'), b = $('kSolo'); if (a) a.classList.toggle('lt', !!(m && m.mute)); if (b) b.classList.toggle('lt', !!(m && m.solo)); }   // the pad's MUTE / SOLO show this track's state
   phStageSwitch();   // DANCE · DRUM · KEYS · HIDE on the title line
   if (selA && selA.v !== tv) selA = null;
   // The FX target follows the track being edited: moving to another phrase (or block) moves the FX panel and the FX
@@ -26513,7 +26515,7 @@ function draw(){
     let i = 0; $('tCmd').querySelectorAll('button[data-c]').forEach(b => { const on = !(onSong ? b.dataset.c === 'b:-16' || b.dataset.c === 'b:16' : b.dataset.c === 'clone' || b.dataset.c === 'cldn');
       if (on) b.style.setProperty('--sh', TCV[seq[i++ % seq.length]]); });
     // The pad takes the same colours in turn, except PLAY is always green (Phrase): it swaps with whichever key had green.
-    const pc = {}; i = 0; for (const k of ['up', 'left', 'down', 'right', 'xposeUp', 'xposeDn', 'shift', 'play', 'loop', 'opt', 'edit', 'gen']) pc[k] = TCV[seq[i++ % seq.length]];
+    const pc = {}; i = 0; for (const k of ['up', 'left', 'down', 'right', 'xposeUp', 'xposeDn', 'shift', 'play', 'loop', 'opt', 'edit', 'gen', 'mute', 'solo']) pc[k] = TCV[seq[i++ % seq.length]];
     const g = Object.keys(pc).reverse().find(k => pc[k] === TCV.phrase && k !== 'play'); if (g && pc.play !== TCV.phrase){ pc[g] = pc.play; pc.play = TCV.phrase; }
     for (const k in pc){ const b = $('tPad').querySelector(`.k[data-b=${k}]`); if (b) b.style.setProperty('--sh', pc[k]); } }
   $('tCmd').querySelectorAll('[data-c="b:-16"],[data-c="b:16"]').forEach(b => b.hidden = onSong);
@@ -31821,6 +31823,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [519, '8 Nov', ['The pad has MUTE and SOLO buttons: tap to latch, tap again to undo. They light for the current track.']],
   [518, '8 Nov', ['Mobile: SHIFT + ▲ goes to Arrange from every tracker screen.']],
   [514, '8 Nov', ['Live engines: the setting always shows, and its help and message name every …pump live engine as well as …waves live.']],
   [513, '8 Nov', ['Settings → Audio → Live engines (it was called …pump live): the name now says what it does, and it covers …waves live too, as does the message when a device can’t keep up.', '…waves live is lighter: each pad now runs only the part of the patch that feeds its Bus, with the same sound.']],
