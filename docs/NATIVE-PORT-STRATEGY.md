@@ -232,6 +232,10 @@ swap with no rework: both wait on N1.
 
 ## 9. Where a session starts
 
+**The task-by-task plan is [`port/WORKPLAN.md`](port/WORKPLAN.md)** (written after this file, from a full inventory of the
+engine and of today's messages; where the two differ, the work plan is right: in particular N1 also needs the 28 JS
+effects of the shared …chains / …waves block, and the size estimates here predate the inventory).
+
 - "Start the native spike": do N0. Lead (Fable) writes the briefs and reviews; Sonnet agents build the Android shell,
   the CMake / CI targets and the measurements; nothing in `index.html` changes except a `caps` check.
 - Read first: this file; `NATIVE-DESKTOP-PLAN.md` sections 4–6 and 8 (core rules, bridge, timing); `io/README.md`
