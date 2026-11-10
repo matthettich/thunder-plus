@@ -1000,6 +1000,8 @@ body.dropping::after{content:''; position:fixed; inset:6px; border:3px dashed va
   .dkh{height:32px} .dkh .dkt, .dkh .dkx, .dkh .dksolo{height:28px}
   .dkh .dkx{width:36px}
   .sxmenu button, .askitem, .setmenu button{min-height:40px}
+  .gfile .fitem{min-height:40px}   /* beats .gfile .fitem{min-height:30px} above, which came later in the sheet (U5) */
+  .gfile .fitem kbd:not(.mcar){display:none}   /* no Ctrl+ shortcuts on a touch screen */
   .tarrh{width:32px; left:-16px}
 }
 .mfbar::before{content:''; position:absolute; left:0; right:0; top:-5px; bottom:-5px}   /* an easier grab than 3 px */
