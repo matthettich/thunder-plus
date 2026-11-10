@@ -23872,7 +23872,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 560;
+const BUILD = 561;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD + (location.pathname.includes('/beta/') ? ' · beta' : '');
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -33302,6 +33302,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [561, '10 Nov', ['Sturdier audio: the engines no longer assume the browser hands them audio in blocks of exactly 128 samples (Chrome is adding other sizes), and a …pump synth that crashes or produces a broken signal now goes silent or resets itself instead of taking the sound down. No change to how anything sounds.']],
   [560, '10 Nov', ['Android: if a song is playing when the app goes to the background with Background play off, the app says so when you come back and offers to turn it on (with it off, playback breaks up and the volume keys move the ringer).']],
   [559, '10 Nov', ['The playback report now lists the settings that matter for it (Background play, Keep screen on, Low power, Latency, Runaway kick).']],
   [558, '10 Nov', ['Android experiment: the hidden background-play clip is now a very quiet 40 Hz tone (about −60 dB) instead of near-silence, to see whether Android then treats the app as a media player (locked-screen volume keys changing media volume, not the ringer). The playback report says what the media session did.']],
