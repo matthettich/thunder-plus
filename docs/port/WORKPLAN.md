@@ -20,9 +20,29 @@ C++ library that the same interface talks to from thin native apps. The interfac
 - To begin the port at all: "start the native spike" (stage N0; nothing before that phrase).
 
 **Read, in this order, and no more than this before acting:** (1) this file, sections 0–3 and 7; (2) the stage you
-are on in section 4; (3) for a unit, its row in `ENGINE-INVENTORY.md` "Suggested port units" and the rows it names;
+are on in section 4 (for N0 also section 10, where each task is written out); (3) for a unit, its row in `ENGINE-INVENTORY.md` "Suggested port units" and the rows it names;
 (4) `CORE-BRIDGE.md` only if the task touches the bridge. `HANDOVER.md`'s To-do section has the owner's standing
-decisions about the app itself; the strategy document is background, not instructions.
+decisions about the app itself; the strategy document is background, not instructions. `CLAUDE.md` says to read
+`HANDOVER.md` first: for a port session that means its To-do section only (the file is long and mostly about the app).
+Where `ENGINE-INVENTORY.md` says `core/` for new C++ (unit U02), it means `native/core/`; the existing `core/` folder
+is the app's JavaScript and is never edited.
+
+**Before the very first task (A1), check two things.** (a) `git show origin/beta:docs/port/WORKPLAN.md` works: the
+plan must be on `beta` before `native` is cut from it; if it is not, stop and ask the owner to merge the plan's PR.
+(b) You have a tool that spawns agents. If you do not: do an unmarked or **F-review** task yourself by following its
+brief exactly (then ask for the review); an **F** task goes to section 9 either way.
+
+**Where things live once `native` exists.** `docs/port/` (this plan, its status table, the bridge spec, results) is
+edited on `native` only; `beta` keeps the copy from the day the branch was cut. `HANDOVER.md` is edited on `beta`
+only. The files a port session may change outside `native/` are exactly: `docs/port/**` and
+`.github/workflows/native*.yml` (new workflow files; never an existing workflow). Anything else outside `native/`
+needs the owner.
+
+**Who pushes.** Workers commit in their worktree and never push. The manager creates and pushes `native`, pushes each
+unit's branch, opens every PR, and reads CI. In these sessions `gh pr …` commands fail (GitHub's GraphQL is blocked):
+use the REST form, for example `gh api repos/matthettich/thunder-plus/pulls -f title=… -f head=… -f base=native`,
+`gh api repos/matthettich/thunder-plus/actions/runs?branch=<branch>` for CI, and
+`gh api repos/matthettich/thunder-plus/issues/<n>/comments -f body="@coderabbitai review"`.
 
 **The manager's session loop (one task or one unit per session, started fresh):**
 1. `git fetch origin && git checkout native && git merge origin/beta` (N0 task A1 creates `native`; before that, work
@@ -32,7 +52,8 @@ decisions about the app itself; the strategy document is background, not instruc
    start a stage whose previous stage has not exited.
 3. If the task is marked **F** (Fable designs or builds): do not attempt it. Spawn a Fable agent with the brief, or add
    it to section 9 and tell the owner. Stop there for that task; pick another only if it does not depend on it.
-4. Otherwise write the brief from the template (section 6; the N0 briefs are already written in section 10), spawn
+4. Otherwise write the brief (units: the template in section 6; N0 tasks: the wrapper at the top of section 10 around
+   the task's own text), spawn
    one Sonnet worker in its own worktree, and wait. One worker per unit; at most two units at a time, and only when
    they touch different folders.
 5. When the worker reports: run the gate command yourself. PASS: open the PR into `native`, comment
@@ -67,7 +88,7 @@ change a file outside `native/`.
 | Role | Model | Does | Never does |
 |---|---|---|---|
 | Manager | Opus (or Fable) | Keeps this plan's status table, writes briefs from the template (section 6), spawns workers, runs the gate commands, merges PRs into `native`, reports to the owner at stage exits | Judges audio quality or real-time safety by reading; changes a gate; skips a failed gate |
-| Worker | Sonnet | One unit per session: translate, build, make the gate pass | Touches anything outside its unit's folders; edits goldens to make a test pass |
+| Worker | Sonnet | One unit per session: translate, build, make the gate pass. On `native`, inside `native/`, a Sonnet worker may write audio-thread code: the gate and, where marked, the Fable review are what make that safe. (The rule in `HANDOVER.md` that cheaper models never change audio code is about the app on `beta` and still holds there) | Touches anything outside its unit's folders; edits goldens to make a test pass |
 | Audio lead | Fable | Designs marked **F** below; reviews every PR marked **F-review** line by line (real-time safety, timing, numerics); decides when a gate itself is wrong | |
 | Chores | Haiku | Branch sync, CI reruns, release notes, status table updates | |
 
@@ -117,6 +138,7 @@ line by line; no mark = Sonnet builds, the gate decides, manager merges.
 | A4 | Bridge transport proof on Android: `thunderCore.send` / `on` round trip at 60 messages a second for 5 minutes with no loss; `put` of a 53 MB buffer by both candidate paths, timed | Sonnet | a results table in `native/tests/RESULTS-N0.md`; Fable picks the path |
 | A5 | Real-time test harness: runs the core's callback offline under an allocator that aborts on allocation, and a clock-drift logger (frames rendered vs wall time, underruns) the app shows on a debug screen | **F** | harness fails on a deliberate `new` in the callback; passes on the test core |
 | A6 | Owner test on the Fold: 5 minutes screen on, 5 screen off, 5 in the background, with A5's logger | Owner | **Clock reads 1.00 s in 1.00 s (±0.1 %) in all three, 0 underruns after the first second; output latency recorded.** If not: stop the port and report |
+| A8, A9 | Checks written out in section 10: libremidi's Android / iOS backends; whether a saved song always carries its samples | Sonnet | findings in `native/tests/RESULTS-N0.md` |
 | A7 | Usage census: a Node tool that reads the owner's `.thunder` files and counts which engines, layer types, effects, pump types, chains / waves modules and commands they use | Sonnet | a table in `native/tests/CENSUS.md`; the manager reorders units inside a stage by it (most used first) |
 
 **Owner decision at the end of N0: go or stop.** Also confirm: Android before desktop; permissive parts, not JUCE.
@@ -212,7 +234,7 @@ you could not port and why.
 
 | Stage | State | Notes |
 |---|---|---|
-| N0 | not started: waiting for the owner's "start the native spike" | A1 ☐ A2 ☐ A5 ☐ A3 ☐ A4 ☐ A7 ☐ A6 ☐ (tick each with its PR number) |
+| N0 | not started: waiting for the owner's "start the native spike" | A1 ☐ A2 ☐ A5 ☐ A3 ☐ A4 ☐ A7 ☐ A8 ☐ A9 ☐ A6 ☐ (tick each with its PR number) |
 | N1 | not started | Steps 1–11 of section 4; list each unit here with its PR as it lands. U01 may start early on `beta` if the owner wants better engine tests now |
 | N2 | not started | |
 | N3 | not started | |
@@ -234,6 +256,23 @@ you could not port and why.
   the real time the first five units took.
 
 ## 10. Stage N0, written out (so the first sessions need no design work)
+
+**Brief wrapper for an N0 task** (the manager sends this with the task's paragraph below pasted in as TASK):
+
+```
+You are building one task of the Thunder Plus native spike. Repo /home/claude/thunder-plus, branch native
+(git fetch origin && git checkout native && git merge origin/beta; npm test must pass before you start).
+READ FIRST: docs/port/WORKPLAN.md sections 1, 3 and the top of section 10 (layout and C API)<, and CORE-BRIDGE.md
+sections 2 and 4 for A4 / A5>.
+TASK: <the task's paragraph from section 10, whole>
+YOU MAY CHANGE: native/**, docs/port/** results files named in the task, .github/workflows/native*.yml. Nothing else.
+DO NOT: read index.html whole (3.2 MB), edit any existing workflow, add a dependency that is not pinned, push,
+or open a PR. Commit in your worktree on a branch named n0/<task>.
+LOCAL CHECK: whatever of the gate can run here (cmake configure / build / ctest for A1, A5; node for A7). The CI part
+of the gate is checked by the manager after pushing.
+BUDGET: <the task's number> tool calls. After 3 failed attempts at the same step, stop and report.
+REPORT (under 250 words): commits, local check output, what the manager must verify in CI, anything unclear.
+```
 
 Builds happen in GitHub Actions, not in the session's sandbox (no Android SDK there, and package installs may be
 blocked): a task is "built" when its CI job is green and its artefact is attached. Folder layout from A1:
@@ -260,8 +299,9 @@ data, frames)`, `thunder_destroy(core)`. `thunder_process` is the only function 
 `.github/workflows/native.yml` running CMake configure, build and `ctest` on `ubuntu-latest` for pushes to `native`
 and PRs into it. Gate: the workflow is green. Do not touch any existing workflow.
 
-**A2. CI targets** (Sonnet, about 50). Extend `native.yml`: wasm with wasi-sdk (copy how `dsp/build.sh` gets and
-calls it; output `thunder_core.wasm` as an artefact, not committed), Windows x64 (MSVC), macOS universal (arm64 +
+**A2. CI targets** (Sonnet, about 50). Extend `native.yml`: wasm with wasi-sdk (download a pinned wasi-sdk release in the job; `dsp/build.sh` shows the compiler flags the
+repo's wasm is built with but does not fetch the SDK, it expects `SYSROOT` / `RESDIR` in the environment; output
+`thunder_core.wasm` as an artefact, not committed), Windows x64 (MSVC), macOS universal (arm64 +
 x86_64), Android arm64-v8a (the runner's preinstalled NDK through CMake's Android toolchain file). Gate: four green
 jobs with artefacts. If a runner lacks a tool, install it in the job with a pinned version; never vendor a toolchain
 into the repo.
@@ -270,7 +310,8 @@ into the repo.
 debug allocator hook (replace global `operator new` / `malloc` in the test binary; a thread-local "in audio callback"
 flag makes any allocation abort with a message), `native/tools/rt-check.sh` that runs a test rendering 60 s through
 `thunder_process` with the flag set, and a clock logger in the core: counts frames rendered, takes the host's
-monotonic time at each callback, and once a second emits `clock {f, wallNs, sr, under}` (CORE-BRIDGE section 4).
+monotonic time at each callback, and ten times a second emits `clock {f, wallNs, sr, outLat, under}` exactly as
+CORE-BRIDGE section 4 defines it (the Android overlay in A3 prints one summary line a second from these).
 Gate: `rt-check.sh` prints PASS on the test core and FAIL when a deliberate allocation is compiled in
 (`-DTHUNDER_RT_SELFTEST=1`).
 
@@ -300,7 +341,7 @@ messages a second for 5 minutes and counts echoes and their round-trip time; the
 (a) `WebMessageCompat` ArrayBuffer if `WebViewFeature.WEB_MESSAGE_ARRAY_BUFFER` is supported, (b) writing chunks to a
 file through a `WebViewAssetLoader` POST handler or `addWebMessageListener`, timing both. Gate:
 `native/tests/RESULTS-N0.md` holds a table (messages sent / received / lost, median and worst round trip, seconds per
-path for the buffer, device model, WebView version). Fable picks the path and updates CORE-BRIDGE section 6.
+path for the buffer, device model, WebView version). Fable picks the path and updates CORE-BRIDGE sections 2 and 6.
 
 **A7. Usage census** (Sonnet, about 40; needs the owner's songs, section 11). `native/tools/census.mjs`: Node, no
 dependencies; reads every `.thunder` under a folder given on the command line and counts per song and in total:
@@ -316,7 +357,19 @@ five with another app in front. Copy the overlay's log and paste it to the manag
 frames / sample-rate within ±0.1 % of the wall time elapsed, and underruns stay at 0 after the first second. Also
 note by ear: no rushing, no gaps. The manager records the numbers in `RESULTS-N0.md` and asks for go / stop.
 
-Order: A1 → A2 → A5 → A3 → A4, with A7 any time after A1. A6 last.
+**A8. MIDI library check** (Sonnet, about 25; no code in the app). Establish from libremidi 5.4.3's source in
+`io/vendor` and its documentation whether it has working Android (AMidi) and iOS (CoreMIDI) backends at that
+version; if Android is missing or experimental, the plan for H2 is AMidi through a small JNI layer. Gate: half a page
+in `native/tests/RESULTS-N0.md` with the files and lines that show it, and the recommendation.
+
+**A9. Does a saved song always carry its samples?** (Sonnet, about 30; read-only on the app, runs on `beta`.) The
+inventory found that a sample layer still loading from IndexedDB at save time is written as a reference only. Find
+the save path (`songOut` / the kit's sample serialising; grep `b64`), establish whether Save waits for loading
+samples, and write a headless test that saves during a slow sample load and checks the file. Gate: the finding in
+`RESULTS-N0.md`; if a save can drop a sample, an entry under "Bugs still open" in `HANDOVER.md` on `beta` marked for
+the owner (it is an app bug today, independent of the port). Also note there that SoundFonts are not in the file.
+
+Order: A1 → A2 → A5 → A3 → A4, with A7, A8 and A9 any time after A1. A6 last.
 
 ## 11. What the port needs from the owner, and when
 
