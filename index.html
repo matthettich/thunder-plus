@@ -13412,7 +13412,7 @@ async function smpSaveGate(capMs, quiet){
     if (!smpResolving && smpNoAudio()) break;   // the lookup finished and these are not in this browser's storage
   }
   const n = smpNoAudio(); if (!n) return true;
-  if (quiet) return false;
+  if (quiet) return !smpResolving;   // (a backup waits only for samples still loading; ones that are gone for good must not stop backups for ever)
   const what = n + (n > 1 ? ' samples' : ' sample');
   return await askYes(smpResolving ? {title:what + ' not loaded yet', body:what + (n > 1 ? ' have' : ' has') + ' not finished loading, so the file would be saved without ' + (n > 1 ? 'them' : 'it') + '. Wait a moment and save again, or save anyway.'}
     : {title:what + ' could not be found', body:what + (n > 1 ? ' were' : ' was') + ' not found in this browser’s storage: the file would be saved without ' + (n > 1 ? 'them' : 'it') + '. Save anyway?'}, 'Save anyway');
@@ -20676,7 +20676,7 @@ function makePlayer(ac, out, getBuf, live){
       const o = clock.offset, at = Math.max(ev.t, ac.currentTime);
       if (!clk.on){ clk.on = true; clk.base = Math.floor(ev.b / 16) * 16; o.setValueAtTime(ev.b - clk.base, at); clk.lt = at; clk.lv = ev.b - clk.base; PB.rsGap = 0; return; }
       const v = ev.b - clk.base;
-      // HOLD KEEPS THE TEMPO (11 Nov, HOLD_CLK_FLAT): rsHold moved this beat on by d, so the ramp from the last beat took d longer, the clock's slope
+      // HOLD KEEPS THE TEMPO (10 Nov, HOLD_CLK_FLAT): rsHold moved this beat on by d, so the ramp from the last beat took d longer, the clock's slope
       // fell, and the effects' modules (Simple delay, ...) read that as a slower tempo: their delay TIME glided (pitching). The clock now waits
       // flat for the d, then ramps at the song's own slope. (clkSpb treats a flat clock as stalled and keeps the tempo it had.)
       if (HOLD_CLK_FLAT && PB.rsGap > 0 && clk.lt != null){ const g = Math.min(PB.rsGap, at - clk.lt - 1e-4); PB.rsGap = 0; if (g > 1e-4) o.setValueAtTime(clk.lv, clk.lt + g); }
@@ -21811,7 +21811,7 @@ async function devRecover(why, again){
     if (rkBusy()) return;   // (RUNAWAY KICK: its short pause; the next trigger tries again)
     const now = performance.now();
     if (!again){ if (now - DR.t < 500) return; DR.t = now; clearTimeout(DR.T); DR.T = setTimeout(() => devRecover(why + ' (settled)', true), 1000); }
-    pbLog('device: ' + why + ' · ' + pbState());
+    if (stuck) pbLog('device: ' + why + ' · ' + pbState());   // (only when something is wrong: a focus with a chosen output must not fill the report)
     DR.busy = true; let changed = false;
     if (stuck && !bgSus){ try { ctx.resume().catch(() => {}); changed = true; } catch(e){} }
     if (sinkOk2 && (aset.sink || DR.fb) && navigator.mediaDevices && navigator.mediaDevices.enumerateDevices){
@@ -22507,7 +22507,7 @@ function countIn(t0, bars, bpm){
 var bgOn = (() => { try { return localStorage.getItem('thunderplus-bgplay-v1') !== '0'; } catch(e){ return true; } })();
 var bgEl = null, bgHandlers = false;
 var bgAndroid = /Android/i.test(navigator.userAgent);   // var: tStop() may run before this line
-/* BG_RESTART (11 Nov): Android may pause the element when another app takes audio focus, and nothing started it again, so the page
+/* BG_RESTART (10 Nov): Android may pause the element when another app takes audio focus, and nothing started it again, so the page
    lost its "media player" standing and could be frozen with the screen off. When the element pauses or ends while the song plays and
    BACKGROUND PLAY is on, and it was not the app's own pause (bgSelfT) nor the user's (a Media Session pause / stop: bgUserT, which stops
    the song), it is started again: at once, and if that is refused or it stops again within 2 s, once more after 1 s, then on the next
@@ -23468,7 +23468,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 551;
+const BUILD = 552;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD + (location.pathname.includes('/beta/') ? ' · beta' : '');
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -32898,6 +32898,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [552, '10 Nov', ['Saving a project, sharing it or exporting a kit now waits for samples that are still loading, and asks before writing a file without a sample\'s audio.', 'If your audio output is unplugged or the computer wakes from sleep, the app reopens the sound: it plays on the system default and returns to your output when it is back. Reset audio engine re-applies the output too, and …waves follows it.', 'Phone: synced delays no longer bend in pitch while the song is being held in time; background play is started again if Android pauses it.', 'Smoother first use of effects, and no freeze when resuming late in a long song (computer, Audio thread sequencer).']],
   [551, '10 Nov', ['Settings › Audio › Reset audio settings puts every audio test setting back to its default (songs, kits, output, level and MIDI setup are kept).', 'Phone experiment, RUNAWAY KICK (TEST), on by default: when the audio clock runs several times too fast for over a second (screen off, effects loaded), the engine is paused for a moment to try to break it. The playback report says what happened.']],
   [550, '10 Nov', ['New in Settings › Screen: BIGGER CELLS ON TOUCH (off by default) makes Arrange and Song cells at least 28×24 px on a touch screen; the grid then scrolls sideways.']],
   [549, '10 Nov', ['Record a sample keeps its input, mode and latency settings: changing the REC or metronome settings no longer resets them.']],
