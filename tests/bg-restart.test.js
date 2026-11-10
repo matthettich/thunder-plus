@@ -12,15 +12,15 @@ function rig({ bgOn = true, android = true, refuse = false } = {}) {
   const clock = { now: 5000 }, log = [], timers = [], handlers = {}, docL = {}, els = [];
   class FakeAudio {
     constructor() { this.paused = true; this.L = {}; this.plays = 0; els.push(this); }
-    addEventListener(t, f) { this.L[t] = f; }
+    addEventListener(t, f) { (this.L[t] = this.L[t] || []).push(f); }
     play() { this.plays++; if (refuse) return Promise.reject({ name: 'NotAllowedError' }); this.paused = false; return Promise.resolve(); }
     pause() { this.paused = true; }
-    fire(t) { this.paused = true; this.L[t] && this.L[t](); }   // the system paused it
+    fire(t) { this.paused = true; (this.L[t] || []).forEach(f => f()); }   // the system paused it
   }
   const tp = { on: true }, st = { stops: 0 };
   const ctx = vm.createContext({ Math, Promise, console, performance: { now: () => clock.now }, Audio: FakeAudio, URL: { createObjectURL: () => 'blob:x' }, Blob: function () {}, ArrayBuffer, DataView,
     localStorage: { getItem: () => (bgOn ? '1' : '0'), setItem() {} }, navigator: { userAgent: android ? 'Android' : 'Linux', mediaSession: { setActionHandler: (k, f) => { handlers[k] = f; } } },
-    MediaMetadata: function () {}, S: { name: 'x' }, tp, tStop: () => { st.stops++; tp.on = false; ctx.bgPlay(false); }, playCtx() {}, pbLog: s => log.push(s), pbState: () => 'state',
+    MediaMetadata: function () {}, S: { name: 'x' }, tp, tStop: () => { st.stops++; tp.on = false; ctx.bgPlay(false); }, playCtx() {}, pbLog: s => { if (!/^media session: /.test(s)) log.push(s); }, pbState: () => 'state',
     setTimeout: (f, ms) => { timers.push({ f, ms }); return timers.length; },
     document: { hidden: false, addEventListener: (t, f) => { docL[t] = f; } } });
   vm.runInContext(m[0].replace(/\/\* ===== END BACKGROUND PLAY$/, ''), ctx);

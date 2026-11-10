@@ -22868,6 +22868,12 @@ var bgAndroid = /Android/i.test(navigator.userAgent);   // var: tStop() may run 
    the song), it is started again: at once, and if that is refused or it stops again within 2 s, once more after 1 s, then on the next
    return to the app or touch. At most BG_RESTART_MAX starts per PLAY, each logged with its outcome. Kill switch: BG_RESTART. */
 const BG_RESTART = true, BG_RESTART_MAX = 3;
+/* MS_ACTIVE (10 Nov, owner: a hardware volume key pressed with the screen locked changed the RINGER, so Android did not see a media player):
+   the element's clip is now a 40 Hz sine at about -60 dBFS instead of +-1 bit (-96 dBFS): Chrome's own silence threshold for output is
+   about -72 dBFS (unverified for the Media Session / focus path), so the old clip may have counted as silent media. Inaudible on a phone
+   (40 Hz, 0.1 % of full scale, under the song). The Media Session is also given the song name when it starts, and every start / stop /
+   system pause of the element and the session state is written to the playback report ("media session: ..."). False = the old clip, no new lines. */
+const MS_ACTIVE = true, MS_LEVEL = 0.001;
 var bgSelfT = 0, bgUserT = 0, bgRst = {run:false, n:0, last:0, wait:false, hooks:false};
 function bgOwnPause(){ bgSelfT = performance.now(); try { if (bgEl && !bgEl.paused) bgEl.pause(); } catch(e){} }
 function bgTry(why){
@@ -22894,9 +22900,13 @@ function bgClip(){
   const w = (o, t) => { for (let i = 0; i < t.length; i++) v.setUint8(o + i, t.charCodeAt(i)); };
   w(0, 'RIFF'); v.setUint32(4, 36 + n * 2, true); w(8, 'WAVE'); w(12, 'fmt '); v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
   v.setUint32(24, sr, true); v.setUint32(28, sr * 2, true); v.setUint16(32, 2, true); v.setUint16(34, 16, true); w(36, 'data'); v.setUint32(40, n * 2, true);
-  for (let i = 0; i < n; i++) v.setInt16(44 + i * 2, i & 1, true);   // not pure zeros, in case a browser skips "silent" media
+  if (MS_ACTIVE) for (let i = 0; i < n; i++) v.setInt16(44 + i * 2, Math.round(Math.sin(2 * Math.PI * 40 * i / sr) * MS_LEVEL * 32767), true);   // 8 s = 320 whole cycles: loops without a click
+  else for (let i = 0; i < n; i++) v.setInt16(44 + i * 2, i & 1, true);   // not pure zeros, in case a browser skips "silent" media
   return URL.createObjectURL(new Blob([b], {type:'audio/wav'}));
 }
+function msLog(t){ if (MS_ACTIVE) try { pbLog('media session: ' + t); } catch(e){} }
+function msEl(){ try { const m = navigator.mediaSession; return 'paused=' + bgEl.paused + ' muted=' + bgEl.muted + ' vol=' + bgEl.volume + ' dur=' + Math.round(bgEl.duration || 0) + 's session=' + (m && m.playbackState); } catch(e){ return '?'; } }
+function msHook(el){ try { ['playing', 'pause', 'ended', 'volumechange', 'error'].forEach(t => el.addEventListener(t, () => msLog('element ' + t + ' · ' + msEl()))); } catch(e){} }
 function bgPlay(on){
   const ms = navigator.mediaSession;
   if (on && !bgOn) on = false;
@@ -22908,12 +22918,13 @@ function bgPlay(on){
     if (on) ms.metadata = new MediaMetadata({title:S.name || 'Song', artist:'Thunder Plus',
       artwork:[{src:'icons/plus-icon-192.png?v=3', sizes:'192x192', type:'image/png'}, {src:'icons/plus-icon-512.png?v=3', sizes:'512x512', type:'image/png'}]});
     if (on || bgHandlers) ms.playbackState = on ? 'playing' : 'paused';
+    if (MS_ACTIVE && (on || bgHandlers)) msLog((on ? 'session set: playing, title "' + (S.name || 'Song') + '"' : 'session set: paused') + ' · state ' + ms.playbackState);
   } catch(e){}
   if (!bgAndroid) return;
   if (on){
-    if (!bgEl){ bgEl = new Audio(bgClip()); bgEl.loop = true; bgEl.preload = 'auto'; bgEl.addEventListener('pause', bgSysPause); bgEl.addEventListener('ended', bgSysPause); bgHooks(); }
+    if (!bgEl){ bgEl = new Audio(bgClip()); bgEl.loop = true; bgEl.preload = 'auto'; bgEl.addEventListener('pause', bgSysPause); if (MS_ACTIVE) msHook(bgEl); bgEl.addEventListener('ended', bgSysPause); bgHooks(); }
     if (!bgRst.run){ bgRst.run = true; bgRst.n = 0; bgRst.last = 0; bgRst.wait = false; }   // a new PLAY: three restarts again
-    try { const p = bgEl.play(); if (p && p.catch) p.catch(() => {}); } catch(e){}
+    try { const p = bgEl.play(); if (p && p.then) p.then(() => msLog('element play() ok · ' + msEl()), e => msLog('element play() refused: ' + (e && e.name || e) + ' · ' + msEl())); } catch(e){}
   } else { bgRst.run = false; bgRst.wait = false; if (bgEl && !bgEl.paused) bgOwnPause(); }
 }
 /* ===== END BACKGROUND PLAY ===== */
@@ -23823,7 +23834,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 557;
+const BUILD = 558;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD + (location.pathname.includes('/beta/') ? ' · beta' : '');
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -33253,6 +33264,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [558, '10 Nov', ['Android experiment: the hidden background-play clip is now a very quiet 40 Hz tone (about −60 dB) instead of near-silence, to see whether Android then treats the app as a media player (locked-screen volume keys changing media volume, not the ringer). The playback report says what the media session did.']],
   [557, '10 Nov', ['Phone: after the engine was paused to break a runaway clock (the RUNAWAY KICK experiment), the song went silent until STOP: it had been moved on twice. Fixed.']],
   [556, '10 Nov', ['MOD: every band of …pump EQ, BAND, WIDE and HEAT can be an LFO target (the band selected when you choose Add LFO…), and Add LFO… is in the …pump windows\' right-click menu.', 'MOD: the master out level is a target (after the limiter).', 'Rendered songs now use the same LFO resolution as live playback.']],
   [555, '10 Nov', ['The commands CUT, RES, ATK, DEC and REL now reach the live synths\' own filter and envelope while a note is held (bass, acid, machine, vox and the …pump live synths): CUT on the same scale as on sampled pads, FF = the pad\'s own knob.', 'MOD on live synths: an LFO on CUT, RES or DEC now sweeps a held note both ways around the knob, and four new targets, ENV (filter envelope), ATK, SUS and REL, appear on tracks that play a live synth.', 'Starting a song from a later row applies the CUT / RES / ATK / DEC / REL commands already in force to the live synths.']],
