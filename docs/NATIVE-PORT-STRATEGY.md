@@ -11,6 +11,11 @@ and the parity question is answered.
 
 ## 1. Why now: what changed on 10 Nov
 
+> **Caveat added later on 10 Nov:** the phone turned out to have Background play switched OFF during that day's screen-off
+> tests, and with it back on a 20 s hidden run with the same worklets loaded held its clock (HANDOVER, "with Background
+> play ON the phone held its clock"). The claim below that the web path cannot cure Android is therefore UNPROVEN until a
+> long hidden run with Background play on has been made. The port's other benefits do not depend on it.
+
 The Worklets test on the Fold (HANDOVER "10 Nov (night): worklets confirmed") showed that with **any** AudioWorklet
 module loaded, Chrome on the phone renders more audio than the device takes and drops the surplus: 208 s rendered while
 83 s played, 137 underruns. With worklets off the clock held exactly. Every effect, live engine and the audio-thread

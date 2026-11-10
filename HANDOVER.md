@@ -582,6 +582,10 @@ The owner's top priority to add is the MOD screen. Work down the list; ask befor
 
 Start a session by asking for results. Fix on `beta`. Web beta: https://matthettich.github.io/thunder-plus/beta/ (build 547 as of 10 Nov morning, 548 once its PR merges; the night of 9–10 Nov shipped 544–547, see the four "10 Nov" entries below. Decisions the lead made that night for the owner to confirm or reverse: on a phone the saved Sequencer default plays on the Page unless Audio thread is picked on that device; on a phone the safety limiter is its stand-in until another worklet loads; the resync only runs with a worklet loaded and its margins are untested on a device). Desktop: v1.3.4-beta.2 (build 541, no feed view or scopes); further desktop betas on hold until the owner asks.
 
+**The test that decides how urgent the native port is (phone, Background play ON: check the report's `settings:` line)**
+- [ ] **Long screen-off run:** your normal song WITH effects, PLAY, screen off for 3–5 minutes, press a volume key once in the middle, screen on, STOP, Copy playback report. By ear: steady the whole time? Does the volume key change media volume now (no vibration)? The report: clock lines near 1.00, `held` / `kicked` counts, underruns.
+- [ ] **The same with a heavier song** (more effects, live synths).
+
 **Build 559 (phone: Background play was OFF)**
 - [ ] **Turn Background play back on** (Settings › Audio › Reset audio settings does it, or the Background play switch), then repeat the screen-off test and the locked-screen volume key test, and Copy playback report: its third line now lists the settings, and `media session: …` lines should appear at PLAY. Everything measured on the phone with the screen off on 10 Nov (the runaway, the kick, the volume key) was with Background play OFF.
 
@@ -743,6 +747,12 @@ Suggested order: N0 → N1 → N2 (phone cured) → N4 with N3 alongside → N5 
   the edge `R.t0`, "waiting…" while armed), `rcdClk` / `rcdFmt` / `rcdFreeSecs`, a 250 ms timer only while recording; the
   final length stays until the next take. recorder-check covers FREE, PATTERN, Stop, next take and closing mid-take.
 
+
+## 10 Nov (afternoon): with Background play ON the phone held its clock with effects loaded (build 559 report). THE PORT'S PREMISE NEEDS RE-CHECKING
+
+After Reset audio settings (report header: `background play on · latency balanced · runaway kick on`; worklets `chains, cpu, master, tfx` loaded; the phone plays on the Page sequencer): PLAY, 20 s with the screen off: `clock +0.99 s in 1.00 s` throughout, 1 underrun, `held 0×, kicked 0×`, the background element playing (`media session: element playing`, `bg on`). Owner: "Things were really stable". **This contradicts the conclusion of 10 Nov night ("with any worklet module loaded, Chrome on this phone renders more than the device takes") as a general statement: that Worklets test, and every screen-off report of 10 Nov, may have been made with Background play off** (it was off until this reset; when it went off is not known: the 8 Nov toggle test asked for it off). What is established: Background play off + worklets + hidden → underruns from the first second and a runaway within 15–30 s; Background play on + worklets + hidden → healthy for 20 s (one run). **Not yet known:** minutes-long hidden playback with Background play on, the locked-screen volume key with it on, the owner's bigger songs, and whether the 9–10 Nov on-screen burst ("it began in the first second on screen before anything played") also depended on it.
+- **Consequence for `docs/NATIVE-PORT-STRATEGY.md` section 1 ("the web path cannot cure Android"): unproven until the owner repeats a long screen-off run with Background play on.** If that holds, the native port is no longer the only cure for the phone; its other benefits (latency, drivers, plugins, battery, one engine for the plugin) stand. The owner (10 Nov, 13:52, before this report): stop hacking at Chrome audio, finish MOD and stability, then put the energy into the port. Tell him this finding before N0 starts.
+- The build 558 media-session lines work: `session set: playing`, `element play() ok`. The 40 Hz clip and the kick stay as they are (kill switches `MS_ACTIVE`, `RUNKICK`) until the long run says whether they are needed.
 
 ## 10 Nov (afternoon): the phone had Background play OFF all along today (build 559)
 
