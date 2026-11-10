@@ -191,7 +191,7 @@ function tgtParse(id){ const a = String(id).split(':'); return {k:a[0], t:+a[1],
 function tgtFx(g, Sx = S){ const A = g.t >= MT ? Sx.mfx : Sx.tfx[g.t], f = A && A[g.s]; if (!f || !TFX[f.type]) return null; const q = TFX[f.type].ps[g.p]; return q && (!isPumpT(f.type) || q.lfo) ? {f, q} : null; }
 function tgtOwn(id, Sx = S){
   const g = tgtParse(id);
-  if (g.k === 'vol') return g.t < NT ? Sx.mix[g.t].vol : 255;
+  if (g.k === 'vol') return g.t < NT ? Sx.mix[g.t].vol : Sx.mout == null ? 255 : Sx.mout;   // the master: the OUT fader's own byte (S.mout; the song's own is never written)
   if (g.k === 'pan') return g.t < NT ? Sx.mix[g.t].pan : 128;
   if (g.k === 'fx'){ const x = tgtFx(g, Sx); return x ? clamp(Math.round((x.f[x.q.k] - x.q.min) / ((x.q.max - x.q.min) || 1) * 255), 0, 255) : 0; }
   // cut / dec: open (255); res: none (0). env / atk / sus / rel (live engines, 10 Nov): 0. Only the OFFSET from the engine's own value reaches the engine
@@ -210,7 +210,7 @@ function tgtEvs(id, v, at, pno){
   const g = tgtParse(id), own = v == null;
   if (g.k === 'env' || g.k === 'atk' || g.k === 'sus' || g.k === 'rel') return [];   // live engines only: makeSeq's `eng` event carries them (from PF.sent and the LFOs); nothing for the notes (PF.pno)
   if (g.k === 'cut' || g.k === 'res' || g.k === 'dec'){ const o = pno.get(g.t) || {}; if (own) delete o[g.k]; else o[g.k] = v; pno.set(g.t, o); return []; }
-  if (g.k === 'vol') return g.t < NT ? [{type:'tva', t:at, track:g.t, v:own ? S.mix[g.t].vol : v}] : [];
+  if (g.k === 'vol') return g.t < NT ? [{type:'tva', t:at, track:g.t, v:own ? S.mix[g.t].vol : v}] : g.t === MT ? [{type:'mout', t:at, track:MT, v:own ? tgtOwn(id) : v}] : [];   // the master: 'mout', the OUT fader (not 'mvol', the drive)
   if (g.k === 'pan') return g.t < NT ? [{type:'tpn', t:at, track:g.t, v:own ? S.mix[g.t].pan : v}] : [];
   if (g.k === 'fx') return tgtFx(g) ? [{type:'fxp', t:at, track:g.t, slot:g.s, pi:g.p, v:own ? tgtOwn(id) : v}] : [];
   return [];
@@ -1064,10 +1064,12 @@ class ThunderCore extends AudioWorkletProcessor {
      track's VOL / mute / solo; NT + 2, one per track, a pan offset (target − the mixer's pan) added to its StereoPanner's
      pan; NT + 3, the master's level offset (target − its knob) added to the master gain. The page plugs a channel in when
      the first such command for it arrives and stops touching that param itself; STOP unplugs them all. */
-  mixReset(){ this.mg = new Array(NT).fill(null); this.mp = new Array(NT).fill(null); this.mm = null; }
+  mixReset(){ this.mg = new Array(NT).fill(null); this.mp = new Array(NT).fill(null); this.mm = null; this.mo = null; }
   mixEv(ev){
     const at = Math.max(ev.t, currentTime);
     if (ev.type === 'mvol'){ const A = this.mm || (this.mm = new Auto(0)); A.hold(at); A.lin(curve(ev.v) - curve(S && S.master != null ? S.master : 255), at + 0.004); return true; }
+    // MOD vol:MT (11 Nov): the master OUT fader (after the limiter). Output NT + 4: its offset (target − S.mout's gain) is added to the OUT gain; the 4 ms glide of TVA
+    if (ev.type === 'mout'){ const A = this.mo || (this.mo = new Auto(0)); A.target(curve(ev.v) - curve(S && S.mout != null ? S.mout : 255), at, 0.004); return true; }
     const t = ev.track; if (t == null || t < 0 || t >= NT) return false;
     const m = S && S.mix && S.mix[t];
     if (ev.type === 'tpn'){ const A = this.mp[t] || (this.mp[t] = new Auto(0)), P = v => Math.max(-1, Math.min(1, (v - 128) / 127));
@@ -1093,10 +1095,11 @@ class ThunderCore extends AudioWorkletProcessor {
     L.engOn = true;
   }
   mixOut(outputs, N, dt){
-    const G = outputs[NT + 1], P = outputs[NT + 2], M = outputs[NT + 3];
+    const G = outputs[NT + 1], P = outputs[NT + 2], M = outputs[NT + 3], O = outputs[NT + 4];
     if (G) for (let t = 0; t < G.length; t++) this.mixFill(G[t], this.mg[t], 1, N, dt);
     if (P) for (let t = 0; t < P.length; t++) this.mixFill(P[t], this.mp[t], 0, N, dt);
     if (M) this.mixFill(M[0], this.mm, 0, N, dt);
+    if (O) this.mixFill(O[0], this.mo, 0, N, dt);
   }
   mixFill(C, A, d, N, dt){ if (!C) return; if (!A){ C.fill(d); return; } A.prune(currentTime); const c = A.constFrom(currentTime); if (c != null){ C.fill(c); return; } for (let i = 0; i < N; i++) C[i] = A.at(currentTime + i * dt); }   // (a method: no closure per block)
   play(d){
@@ -1342,7 +1345,7 @@ class ThunderCore extends AudioWorkletProcessor {
       const v = ev.b - this.clkBase; A.lin(v + 1, at); if (v >= 16){ this.clkBase += 16; A.set(v - 16 + 1, at); } return true; }
     if (ev.type === 'stp'){ for (let k = 0; k <= NT; k++) if (ev.all || k === ev.track){ for (const v of this.T(k)) this.kill(v, ev.t, 0.004); this.T(k).length = 0; } return false; }
     if (ev.type === 'eng'){ this.engEv(ev); return false; }   // (false: the page's player sets its own params from it too: the same values)
-    if (ev.type === 'tvl' || ev.type === 'tva' || ev.type === 'tpn' || ev.type === 'mvol') return this.mixEv(ev);
+    if (ev.type === 'tvl' || ev.type === 'tva' || ev.type === 'tpn' || ev.type === 'mvol' || ev.type === 'mout') return this.mixEv(ev);
     if (ev.type === 'off' && ev.track != null){ const T = this.T(ev.track);
       if (ev.cols){ for (let k = T.length - 1; k >= 0; k--) if (ev.cols.includes(T[k].col)){ this.kill(T[k], ev.t, this.relTc(T[k])); T.splice(k, 1); } return false; }
       for (const v of T) this.kill(v, ev.t, this.relTc(v)); T.length = 0; return false; }
