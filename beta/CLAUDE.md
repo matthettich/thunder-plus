@@ -17,3 +17,4 @@
   entry). "Give me my test checklist" means: read that section and make a Claude Doc grouped by phone, computer and hardware.
 - Day-to-day work goes on the `beta` branch; `main` only by merging `beta` when the owner asks. Keep `HANDOVER.md` up to
   date at the end of a session.
+- `FlexCore`, `StepGateCore`, `RetrigCore`, `clkSpb` in `chains/` and `waves/` worklets are generated from `index.html`: after changing one, run `node tools/make-fx-cores.mjs` (as `node tools/make-core.mjs` for `makeSeq`).
