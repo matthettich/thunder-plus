@@ -8319,7 +8319,7 @@ function audio(){
     ctx.addEventListener && ctx.addEventListener('statechange', () => { try { pbLog('engine ' + ctx.state + ' · ' + pbState()); } catch(e){} audStatus(); if (typeof audioInterrupted === 'function') audioInterrupted(); });
     prerender();   // ensure() re-renders only the pads whose rate differs from this context's
   }
-  if (ctx.state === 'suspended'){ bgSus = false; ctx.resume(); }
+  if (ctx.state !== 'running' && ctx.state !== 'closed'){ bgSus = false; ctx.resume().catch(() => {}); }   // (10 Nov: not only 'suspended': newer Chrome reports 'interrupted' after a call or a device switch)
   bgArm(); hmWake(); idleWake();   // BATTERY: a sound restarts the hidden-idle countdown and wakes the header meter and the sleeping timers at once
   return ctx;
 }
@@ -21475,6 +21475,7 @@ function tStart(mode, o){
   tp.timer = pumpTimer(); pump(); if (!handing) draw(); songBtn(); chainsTempo(); if (typeof frameWake === 'function') frameWake();   // (a hand-over happens out of view: no draw, which was most of its time)
   bgPlay(true);   // BACKGROUND PLAY
   wakeLock(true);   // KEEP SCREEN ON
+  audioInterrupted();   // 10 Nov: a context that stays stopped stops the transport after 2.5 s with the toast, for PLAY too (it had only the statechange)
   void r;
 }
 /* FX BAR · PATTERN EFFECTS (3 Nov): the FLX / GAT / RTG / FXO values booked on each track's (and the master's) effect node,
@@ -21563,7 +21564,7 @@ function bgIdle(){
 document.addEventListener('visibilitychange', () => {
   clearTimeout(bgSusT); bgSusT = 0;
   if (document.hidden){ if (ctx) bgSusT = setTimeout(bgIdle, 20000); return; }
-  if (bgSus){ bgSus = false; if (ctx && ctx.state === 'suspended') ctx.resume().catch(() => {}); }
+  if (bgSus){ bgSus = false; if (ctx && ctx.state !== 'running' && ctx.state !== 'closed') ctx.resume().catch(() => {}); }   // (10 Nov: 'interrupted' too)
   if (lpOn && ctx) bgSusT = setTimeout(bgIdle, bgWait());
 });
 function pump(){
@@ -23147,7 +23148,8 @@ function lpSkin(on){
   if (skin !== 'lowpower') return;
   let w = lpPrev; if (!w) try { w = localStorage.getItem(LP_SKIN_K) || ''; } catch(e){} if (w) applySkin(w);
 }
-function setLowPower(on){ if (!!on !== lpOn) lpSkin(!!on); lpOn = !!on; lpNext = 0; lpPend = false; clearTimeout(bgSusT); bgSusT = 0; if (lpOn && ctx) bgSusT = setTimeout(bgIdle, bgWait()); else if (!lpOn && bgSus && !document.hidden){ bgSus = false; if (ctx && ctx.state === 'suspended') ctx.resume().catch(() => {}); } try { localStorage.setItem('thunderplus-lowpower-v1', on ? '1' : '0'); } catch(e){} }
+// (10 Nov: setLowPower resumes an 'interrupted' context too, like audio())
+function setLowPower(on){ if (!!on !== lpOn) lpSkin(!!on); lpOn = !!on; lpNext = 0; lpPend = false; clearTimeout(bgSusT); bgSusT = 0; if (lpOn && ctx) bgSusT = setTimeout(bgIdle, bgWait()); else if (!lpOn && bgSus && !document.hidden){ bgSus = false; if (ctx && ctx.state !== 'running' && ctx.state !== 'closed') ctx.resume().catch(() => {}); } try { localStorage.setItem('thunderplus-lowpower-v1', on ? '1' : '0'); } catch(e){} }
 function setPhOff(v){ phOff = clamp(Math.round((v | 0) / 5) * 5, -100, 300); try { localStorage.setItem('thunderplus-phoff-v1', String(phOff)); } catch(e){} }
 const curKey = () => [tv, cs.song.x, cs.song.y, cs.phrase.y, cs.sect.y, cPhrase, cSect, cTrack].join(',');
 // Pads mode: ALT + arrows move around the Song grid, in the phrase editor (phraseGrid) and on the Song screen (songGridDir).

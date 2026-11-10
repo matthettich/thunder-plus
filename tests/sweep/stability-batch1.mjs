@@ -37,4 +37,15 @@ if (want('F2')){   // one event that throws is skipped; a flood still stops the 
   add('F2 audio-thread sequencer batch: the bad event is skipped, the rest of the batch plays', r3.usedCore && !r3.err && r3.got.join() === 'a,b,c', JSON.stringify(r3));
   await A.close();
 }
+if (want('F3')){   // a context that reports 'interrupted' is resumed, and PLAY on one that stays stopped gives up after 2.5 s
+  const A = await fresh();
+  const r = await A.run(`audio(); let res = 0; const o = ctx.resume.bind(ctx); ctx.resume = function(){ res++; return o(); };
+    Object.defineProperty(ctx, 'state', {configurable:true, get: () => 'interrupted'});
+    audio(); const afterAudio = res; const msgs = [], ot = toast; toast = function(m){ msgs.push(String(m)); return ot.apply(this, arguments); };
+    tStart('song', {row:0}); await new Promise(r => setTimeout(r, 1000)); const onAt1 = tp.on; await new Promise(r => setTimeout(r, 2500)); const onAt35 = tp.on; toast = ot; tStop(true);
+    return {afterAudio, resumes:res, onAt1, onAt35, msgs};`);
+  add('F3 audio() resumes an interrupted context', r.afterAudio === 1, JSON.stringify(r));
+  add('F3 PLAY with the state stuck: still on at 1 s, stopped by 3.5 s with the toast', r.onAt1 && !r.onAt35 && r.msgs.some(m => /interrupted/i.test(m)), JSON.stringify(r));
+  await A.close();
+}
 process.exit(table(rows) ? 1 : 0);
