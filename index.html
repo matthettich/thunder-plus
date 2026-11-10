@@ -21051,12 +21051,29 @@ function resetAudio(quiet){
    so asking for tfx asks for chains too. */
 function rtTfxLoad(){
   if (!rt || rt.fxAsk) return; rt.fxAsk = true;
-  tfxReady(ctx).then(ok => { if (!rt) return; rt.fxOk = ok; rtAllFx(); if (!ok && !NOWK && (S.tfx.some(fxCount) || fxCount(S.mfx))) toast('Track effects need a newer browser here.'); });
+  rtPending(tfxReady(ctx).then(ok => { if (!rt) return; rt.fxOk = ok; rtAllFx(); if (!ok && !NOWK && (S.tfx.some(fxCount) || fxCount(S.mfx))) toast('Track effects need a newer browser here.'); }));
   rtChnLoad();
 }
 function rtChnLoad(){
   if (!rt || rt.chnAsk) return; rt.chnAsk = true;
-  chainsReady(ctx).then(ok => { if (!rt) return; rt.chnOk = ok; if (ok){ chnSync.add(ctx); rtAllFx(); } else if ((S.chainOn || []).some(Boolean) && !NOWK) toast('chains needs a newer browser here.'); });
+  rtPending(chainsReady(ctx).then(ok => { if (!rt) return; rt.chnOk = ok; if (ok){ chnSync.add(ctx); rtAllFx(); } else if ((S.chainOn || []).some(Boolean) && !NOWK) toast('chains needs a newer browser here.'); }));
+}
+/* FIRST PLAY WAITS FOR THE EFFECT MODULES (10 Nov, audio review): the `.then` handlers above run rtAllFx (every track's chain and effect
+   nodes, 0.5 s of main thread) the moment the tfx / chains modules arrive, which on a PLAY as the first touch was 1-4 bars into the
+   song. rtPending keeps each handler's promise on rt.pend until it has run; tStart waits for them, once, with the live warm-up's wait
+   (FIRST_PLAY_WAIT_MS in all). Set FIRST_PLAY_WAIT false for the old behaviour (nothing tracked, no wait). */
+const FIRST_PLAY_WAIT = true, FIRST_PLAY_WAIT_MS = 900;
+function rtPending(p){
+  if (!FIRST_PLAY_WAIT || !rt || !rt.pend) return p;
+  const set = rt.pend, q = p.then(() => {}, () => {}).then(() => { set.delete(q); }); set.add(q); return p;   // (q never rejects: a throwing handler must not stop PLAY)
+}
+// The promises PLAY waits for, or null (the usual PLAY: nothing pending, no extra tick). Not for a start that is synced to something:
+// Link (a peer's start has its own time), an external MIDI clock, a take being recorded, REC's count-in, and the phones' audio-thread
+// hand-over (wkLazy: those load only what the song uses, and a hand-over carries on at an exact step).
+function playWaitFor(o){
+  if (!rt || !rt.pend || !rt.pend.size) return null;
+  if (wkLazy() || (o && (o.rz || o.page)) || mx.slave || mx.inRun || RCD.starting || rec.on || (lk && (lk.pend || lkLive()))) return null;
+  return [...rt.pend];
 }
 // Phones (10 Nov): load them when track t (NT: the master) has an effect slot filled (on or off: FXO can switch it on) or a chain
 // feeds it. Every way an effect or chain comes into use reaches rtFx(t) (fxChanged, rtAllFx after a song, undo or kit load,
@@ -21081,7 +21098,7 @@ function rtInit(){
   if (!rt){
     // mo: the master OUT fader (GAIN STAGING, 27 Oct), after mastering and the safety limiter, before the device's level
     const out = ctx.createGain(), mo = ctx.createGain(), lim = safeLim(ctx, mo); mo.gain.value = curve(S.mout == null ? 255 : S.mout); mo.connect(master);
-    rt = {out, mo, lim, mfx:null, fxOk:false, chnOk:false, pl:makePlayer(ctx, out, rtBuf, true), mlv:[0, 0], mpk:[0, 0], mpt:[0, 0]}; rtRoute(); rt.pl.applyMix(); mstSync(); if (wkLazy()) wkLiveEnsure(); else bassReady(ctx).then(ok => { if (ok) liveWarmSoon(200); });
+    rt = {out, mo, lim, mfx:null, fxOk:false, chnOk:false, pend:new Set(), pl:makePlayer(ctx, out, rtBuf, true), mlv:[0, 0], mpk:[0, 0], mpt:[0, 0]}; rtRoute(); rt.pl.applyMix(); mstSync(); if (wkLazy()) wkLiveEnsure(); else bassReady(ctx).then(ok => { if (ok) liveWarmSoon(200); });
     // the master meter listens to everything going out, synth pads included
     const sp = ctx.createChannelSplitter(2); rt.man = [ctx.createAnalyser(), ctx.createAnalyser()];
     master.connect(sp); rt.man.forEach((a, i) => { a.fftSize = 1024; sp.connect(a, i); });
@@ -21487,8 +21504,9 @@ let warmTok = null;   // 10 Nov: the booked first-PLAY warm-up (tStart); STOP cl
 function tStart(mode, o){
   // LIVE WARM-UP: the first PLAY of a session starts the audio engine; with live engine pads in the kit it waits (once, at
   // most 600 ms) for their worklets, so their nodes can be made before the first notes instead of on them
-  if (!(o && o._warm) && !tp.on){ rtInit(); if (!bassOK.has(ctx) && (wkLazy() ? wkLiveWanted() : kit.voices.some((v, i) => v && isLivePad(i)))){ if (warmTok) return; const oo = Object.assign({}, o, {_warm:true}), tok = warmTok = {};
-    Promise.race([bassReady(ctx), new Promise(r => setTimeout(r, 600))]).then(() => { if (warmTok === tok){ warmTok = null; if (!tp.on) tStart(mode, oo); } }); return; } }
+  // 10 Nov: and for the effect and chains modules' handlers still to run (playWaitFor), so rtAllFx is not 1-4 bars into the song
+  if (!(o && o._warm) && !tp.on){ rtInit(); const live = !bassOK.has(ctx) && (wkLazy() ? wkLiveWanted() : kit.voices.some((v, i) => v && isLivePad(i))), pend = playWaitFor(o); if (live || pend){ if (warmTok) return; const oo = Object.assign({}, o, {_warm:true}), tok = warmTok = {};
+    Promise.race([pend ? Promise.all(live ? [bassReady(ctx), ...pend] : pend) : bassReady(ctx), new Promise(r => setTimeout(r, pend ? FIRST_PLAY_WAIT_MS : 600))]).then(() => { if (warmTok === tok){ warmTok = null; if (!tp.on) tStart(mode, oo); } }); return; } }
   if (typeof varPrefetch === 'function') varPrefetch();   // MUT / GEN
   if (mode === 'song' && loopPat && !(o && o.loop)){ o = Object.assign({}, o, {loop:{v:'pat', y0:o.row, y1:o.row}}); patRow = o.row; patCur = cs.song.y; }   // LOOP: the pattern
   const wasOn = tp.on;   // REC: no count-in when PLAY jumps somewhere else mid-song
