@@ -21410,11 +21410,12 @@ let fxRestartN = 0;
 // The song row PLAY starts from: the cursor's row when anything plays on it (owner, 31 Oct: the cursor on an empty cell of a
 // filled row started from the top), else the next row down that has something, else the top.
 const songRow = () => { const y0 = cs.song.y; for (let y = y0; y < 256; y++){ const r = S.song[y]; if (r && r.some(v => v >= 0)) return y; } return 0; };
+let warmTok = null;   // 10 Nov: the booked first-PLAY warm-up (tStart); STOP clears it, so a STOP inside the window is not followed by the song
 function tStart(mode, o){
   // LIVE WARM-UP: the first PLAY of a session starts the audio engine; with live engine pads in the kit it waits (once, at
   // most 600 ms) for their worklets, so their nodes can be made before the first notes instead of on them
-  if (!(o && o._warm) && !tp.on){ rtInit(); if (!bassOK.has(ctx) && kit.voices.some((v, i) => v && isLivePad(i))){ const oo = Object.assign({}, o, {_warm:true});
-    Promise.race([bassReady(ctx), new Promise(r => setTimeout(r, 600))]).then(() => { if (!tp.on) tStart(mode, oo); }); return; } }
+  if (!(o && o._warm) && !tp.on){ rtInit(); if (!bassOK.has(ctx) && kit.voices.some((v, i) => v && isLivePad(i))){ if (warmTok) return; const oo = Object.assign({}, o, {_warm:true}), tok = warmTok = {};
+    Promise.race([bassReady(ctx), new Promise(r => setTimeout(r, 600))]).then(() => { if (warmTok === tok){ warmTok = null; if (!tp.on) tStart(mode, oo); } }); return; } }
   if (typeof varPrefetch === 'function') varPrefetch();   // MUT / GEN
   if (mode === 'song' && loopPat && !(o && o.loop)){ o = Object.assign({}, o, {loop:{v:'pat', y0:o.row, y1:o.row}}); patRow = o.row; patCur = cs.song.y; }   // LOOP: the pattern
   const wasOn = tp.on;   // REC: no count-in when PLAY jumps somewhere else mid-song
@@ -21915,7 +21916,7 @@ function corePump(){
 /* PANIC (27 Oct, audit B18): Stop when already stopped (F8 again) lets go of everything still sounding: the voices, and on
    every MIDI port and channel All Sound Off, All Notes Off and the sustain pedal up (a stop only sent All Notes Off on the
    channels the song used). Effect tails ring on; Settings → Audio → Reset audio engine clears those too. */
-function stopKey(){ if (tp.on) return tStop(); panic(); }
+function stopKey(){ if (tp.on) return tStop(); warmTok = null; panic(); }   // (10 Nov: warmTok: a STOP inside the first PLAY's warm-up cancels it)
 function panic(){
   try { if (rt && ctx) rt.pl.stopAll(ctx.currentTime); } catch(e){}
   try { moRelease(); } catch(e){}
@@ -21927,6 +21928,7 @@ function panic(){
 let stopTapT = 0;
 function toTop(){ tp.paused = null; cs.song.y = 0; cs.song.top = 0; try { draw(); } catch(e){} toast('Back to the top of the song.', 1500); }
 function tStop(quiet){
+  warmTok = null;   // 10 Nov: a STOP (or a restart) cancels a first PLAY still warming up
   // RECORD INTO A PAD: a pattern take ends where the song stops. Only a song that was playing: FIX (6 Nov) the first PLAY of
   // a session with live pads starts a moment later (LIVE WARM-UP), and its tStop(true) dropped the take Record had armed.
   if (RCD.sync && !RCD.starting && tp.on) rcdSongStopped();
