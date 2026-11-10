@@ -8361,7 +8361,8 @@ function audio(){
     try { if (ctx.renderCapacity){ ctx.renderCapacity.addEventListener('update', e => { cpu.cap = {avg:e.averageLoad, peak:e.peakLoad, under:e.underrunRatio, t:performance.now()}; }); ctx.renderCapacity.start({updateInterval:0.5}); } else if (!wkLazy()) cpuProbe(ctx); } catch(e){}   // no renderCapacity: time the audio thread (phones: when the first other module loads, wkHook)
     master = ctx.createGain(); master.gain.value = clamp(aset.vol, 0, 100) / 100; master.connect(ctx.destination);
     if (!wkLazy()) try { mwReady(ctx); } catch(e){ tpLog('safety limiter did not start', e); }   // (phones: the stand-in until another module loads, safeLim)   // the safety limiter's worklet, loading before the first note needs it
-    ctx.addEventListener && ctx.addEventListener('statechange', () => { try { pbLog('engine ' + ctx.state + ' · ' + pbState()); } catch(e){} audStatus(); if (typeof audioInterrupted === 'function') audioInterrupted(); });
+    ctx.addEventListener && ctx.addEventListener('statechange', () => { try { pbLog('engine ' + ctx.state + ' · ' + pbState()); } catch(e){} audStatus(); if (typeof audioInterrupted === 'function') audioInterrupted(); try { devOnState(); } catch(e){} });
+    try { ctx.addEventListener('sinkchange', () => { try { pbLog('engine output changed · ' + pbState()); devRecover('sinkchange'); } catch(e){} }); } catch(e){}   // (DEVICE RECOVERY)
     prerender();   // ensure() re-renders only the pads whose rate differs from this context's
   }
   if (ctx.state !== 'running' && ctx.state !== 'closed' && !rkKick){ bgSus = false; ctx.resume().catch(() => {}); }   // (RUNAWAY KICK: not while its short pause runs) (10 Nov: not only 'suspended': newer Chrome reports 'interrupted' after a call or a device switch)
@@ -14068,7 +14069,7 @@ $('audOut').addEventListener('change', async e => {
     try { await ctx.setSinkId(id); toast('Playing through ' + (id ? name : 'the system default') + '.'); }
     catch(err){ toastErr('Couldn’t switch to that output' + (err && err.message ? ': ' + err.message : '.')); }
   } else if (sinkOk) toast('Saved. It plays through ' + (id ? name : 'the system default') + ' from the first sound.');
-  audStatus();
+  audStatus(); try { const w = wvApi(); if (w && w.sinkChanged) w.sinkChanged(); } catch(e){}
 });
 $('audNames').addEventListener('click', async () => {
   // Browsers only name output devices once the page has been allowed a microphone; it's closed again at once.
@@ -14135,7 +14136,7 @@ $('audDefaults').addEventListener('click', async () => {
   toast('Audio settings are back to their defaults.');
 });
 $('audReport').addEventListener('click', () => pbCopy());
-if (navigator.mediaDevices && navigator.mediaDevices.addEventListener) navigator.mediaDevices.addEventListener('devicechange', () => { if (!$('pAudio').hidden) audRefresh(); });
+if (navigator.mediaDevices && navigator.mediaDevices.addEventListener) navigator.mediaDevices.addEventListener('devicechange', () => { if (!$('pAudio').hidden) audRefresh(); try { devRecover('devicechange'); } catch(e){} });
 /* ---------- skins (the Seeds set) ---------- */
 const SKINS = [
   {id:'auto', name:'Pastel (follows your system)', base:'pastel', dots:['#d6dbe4', '#dce7f6', '#f5eec6', '#f6dae3']},
@@ -21158,6 +21159,7 @@ function resetAudio(quiet){
   // THE RECORDER'S MONITOR follows the new master (it stayed on the old one: monitoring went silent after a reset with Record a sample open)
   if (RCD.mon){ try { RCD.mon.disconnect(); RCD.mon.connect(master); } catch(e){} }
   rtInit(); if (ctx.state !== 'running' && ctx.resume) ctx.resume();
+  try { devRecover('reset audio engine'); } catch(e){}   // (DEVICE RECOVERY) last: reopen the output choice
   if (!quiet) toast('Audio engine reset: every note and effect cleared.');
 }
 /* The track effects and chains modules, once per live graph (rt.fxAsk / rt.chnAsk). tfx loads chains first (the shared MODFX modules),
@@ -21773,6 +21775,56 @@ document.addEventListener('visibilitychange', () => {
   if (bgSus){ bgSus = false; if (ctx && ctx.state !== 'running' && ctx.state !== 'closed') ctx.resume().catch(() => {}); }   // (10 Nov: 'interrupted' too)
   if (lpOn && ctx) bgSusT = setTimeout(bgIdle, bgWait());
 });
+/* DEVICE RECOVERY (10 Nov): the output goes away or changes (interface unplugged, the system switches its default, the computer
+   sleeps and wakes) and nothing reopened it: silent until a reload. devRecover(why) is the one place that puts it right, from
+   'devicechange', a context that stopped by itself, the context's 'sinkchange', a wake (a jump in the clock, the desktop app's
+   power event), the window coming back, and Reset audio engine. It resumes a stopped context (never while the app is asleep on
+   purpose: bgSus, or while a runaway kick is in flight: rkBusy) and, if the chosen output is no longer there, plays on the system
+   default WITHOUT forgetting the choice (aset.sink stays; it switches back when the device returns). At most one run per 500 ms,
+   and a second one 1 s after (devices settle). With nothing wrong (running, no chosen output) it returns before logging.
+   DEV_RECOVER = false turns all of it off. Recorder inputs and the native helper are not touched. */
+const DEV_RECOVER = true;
+const DR = {t:0, T:0, busy:false, fb:null, names:{}, wall:0};   // fb: {id, label} while the chosen output is gone and we play on the default
+const devSink = () => DR.fb ? '' : (aset.sink || '');   // the output the engine should be on (the waves editor's frame asks too)
+async function devRecover(why, again){
+  if (!DEV_RECOVER || !ctx || ctx.state === 'closed' || DR.busy) return;
+  try {
+    if (DR.fb && DR.fb.id !== aset.sink) DR.fb = null;   // the choice was changed meanwhile
+    const sinkOk2 = !!(sinkOk && ctx.setSinkId), st = ctx.state, stuck = st === 'suspended' || st === 'interrupted';
+    if (!again && (st === 'running' || (stuck && bgSus)) && !(sinkOk2 && (aset.sink || DR.fb))) return;   // nothing to look at
+    if (rkBusy()) return;   // (RUNAWAY KICK: its short pause; the next trigger tries again)
+    const now = performance.now();
+    if (!again){ if (now - DR.t < 500) return; DR.t = now; clearTimeout(DR.T); DR.T = setTimeout(() => devRecover(why + ' (settled)', true), 1000); }
+    pbLog('device: ' + why + ' · ' + pbState());
+    DR.busy = true; let changed = false;
+    if (stuck && !bgSus){ try { ctx.resume().catch(() => {}); changed = true; } catch(e){} }
+    if (sinkOk2 && (aset.sink || DR.fb) && navigator.mediaDevices && navigator.mediaDevices.enumerateDevices){
+      let outs = []; try { outs = (await navigator.mediaDevices.enumerateDevices()).filter(d => d.kind === 'audiooutput' && d.deviceId); } catch(e){}
+      outs.forEach(d => { if (d.label) DR.names[d.deviceId] = d.label; });
+      if (outs.length && ctx && ctx.state !== 'closed' && !rkBusy() && aset.sink){   // (an empty list: can't tell, leave it)
+        const id = aset.sink, here = outs.some(d => d.deviceId === id), label = () => DR.names[id] || 'saved output';
+        if (!here && !(DR.fb && DR.fb.id === id)){
+          try { await ctx.setSinkId(''); DR.fb = {id, label:label()}; changed = true; toastErr('The audio output “' + DR.fb.label + '” is gone: playing on the system default.'); }
+          catch(e){ pbLog('device: could not fall back to the default · ' + (e && e.message)); }
+        } else if (here && DR.fb && DR.fb.id === id){
+          try { await ctx.setSinkId(id); const l = DR.fb.label; DR.fb = null; changed = true; toast('Audio output “' + l + '” is back.'); }
+          catch(e){ pbLog('device: could not switch back to the output · ' + (e && e.message)); }
+        } else if (here && !DR.fb && typeof ctx.sinkId === 'string' && ctx.sinkId !== id){   // (it was not there when the engine started, now it is)
+          try { await ctx.setSinkId(id); changed = true; } catch(e){ pbLog('device: could not open the saved output · ' + (e && e.message)); }
+        }
+      }
+    }
+    if (changed){ pbLog('device: done · ' + pbState() + ' sink=' + (DR.fb ? 'default (saved output gone)' : (typeof ctx.sinkId === 'string' ? ctx.sinkId || 'default' : '?'))); try { audStatus(); } catch(e){} try { const a = wvApi(); if (a && a.sinkChanged) a.sinkChanged(); } catch(e){} }
+  } catch(e){ try { pbLog('device: failed · ' + (e && e.message)); } catch(e2){} }
+  finally { DR.busy = false; }
+}
+// the context stopped by itself (not the app's own sleep, not a kick), with the screen showing: also when nothing is playing (audioInterrupted above is for the song)
+function devOnState(){ if (ctx && (ctx.state === 'suspended' || ctx.state === 'interrupted') && !bgSus && !document.hidden) devRecover('engine ' + ctx.state); }
+document.addEventListener('visibilitychange', () => { if (!document.hidden) devRecover('screen back'); });
+window.addEventListener('focus', () => devRecover('window focus'));
+// a wake without the shell's help: the wall clock jumped by more than 5 s between two ticks, both with the app showing
+idleTick(() => { const w = Date.now(), p = DR.wall; DR.wall = document.hidden ? 0 : w; if (p && !document.hidden && w - p > 5000) devRecover('woke from sleep'); }, 2000, () => !document.hidden, 5000);
+{ const P = window.thunderDesktop && window.thunderDesktop.power; if (P) try { P.on(why => devRecover('system ' + (why === 'unlock-screen' ? 'unlock' : 'resume'))); } catch(e){} }
 function pump(){
   try { pumpRun(); }
   catch(e){ console.error(e); try { tStop(); } catch(e2){} toastErr('Playback stopped: ' + ((e && e.message) || 'something went wrong') + '.', 5000); }

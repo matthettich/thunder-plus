@@ -1,5 +1,5 @@
 // Thunder Plus as a desktop app: one window running the same index.html as the website.
-const { app, BrowserWindow, session, shell, Menu, protocol, net, ipcMain, dialog, powerSaveBlocker, utilityProcess, MessageChannelMain, systemPreferences } = require('electron');
+const { app, BrowserWindow, session, shell, Menu, protocol, net, ipcMain, dialog, powerSaveBlocker, utilityProcess, MessageChannelMain, systemPreferences, powerMonitor } = require('electron');
 const path = require('path');
 const fs = require('fs'), fsp = fs.promises;
 const { pathToFileURL } = require('url');
@@ -143,6 +143,8 @@ app.whenReady().then(() => {
   session.defaultSession.setPermissionCheckHandler((wc, perm, origin, d) => ALLOW.has(perm) || (perm === 'media' && audioOnly(d)));
   if (process.platform !== 'darwin') Menu.setApplicationMenu(null);   // the Mac keeps its menu so ⌘C / ⌘V / ⌘Q work
   createWindow();
+  // DEVICE RECOVERY (10 Nov): the computer woke from sleep / the screen was unlocked: the page checks its audio output again (thunder:power).
+  try { for (const ev of ['resume', 'unlock-screen']) powerMonitor.on(ev, () => { if (win && !win.isDestroyed()) win.webContents.send('thunder:power', ev); }); } catch (e) {}
   // New versions come from the GitHub Releases page (see updater.js). The page asks through preload.js.
   const updates = setupUpdates({ name: 'Thunder Plus', page: 'https://github.com/matthettich/thunder-plus/releases/latest', repo: 'matthettich/thunder-plus' });
   ipcMain.handle('thunder:upd-state', () => updates.state());

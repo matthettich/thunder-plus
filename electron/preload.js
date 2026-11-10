@@ -46,6 +46,7 @@ contextBridge.exposeInMainWorld('thunderDesktop', {
   // NATIVE I/O HELPER: start() forks the helper (first call) and hands the page a MessagePort, which arrives as a window
   // 'message' ({thunderIo:true}, ports[0]; the first thing on it is the helper's hello). available: this app has the helper path.
   io: { start: () => ipcRenderer.invoke('thunder:io-start'), mic: () => ipcRenderer.invoke('thunder:io-mic'), available: true },   // mic: asked for when an input opens (the helper also runs for MIDI alone)
+  power: { on: cb => { const f = (e, why) => cb(why); ipcRenderer.on('thunder:power', f); return () => ipcRenderer.removeListener('thunder:power', f); } },   // 'resume' / 'unlock-screen': the computer woke (DEVICE RECOVERY)
   updates: {
     state: () => ipcRenderer.invoke('thunder:upd-state'),   // {version, avail, ready, notifyOnly, dl (0–1 while downloading), file}
     check: () => ipcRenderer.invoke('thunder:upd-check'),   // check now and say the result in a box
