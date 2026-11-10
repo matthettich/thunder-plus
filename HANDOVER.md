@@ -580,7 +580,7 @@ The owner's top priority to add is the MOD screen. Work down the list; ask befor
 
 ### Owner's punch list (owner, 9 Nov: will test these later; keep it current)
 
-Start a session by asking for results. Fix on `beta`. Web beta: https://matthettich.github.io/thunder-plus/beta/ (build 543 as of 9 Nov evening). Desktop: v1.3.4-beta.2 (build 541, no feed view or scopes); further desktop betas on hold until the owner asks.
+Start a session by asking for results. Fix on `beta`. Web beta: https://matthettich.github.io/thunder-plus/beta/ (build 546 as of 10 Nov, 547 once its PR merges; the night of 9–10 Nov shipped 544–547, see the four "10 Nov" entries below. Decisions the lead made that night for the owner to confirm or reverse: on a phone the saved Sequencer default plays on the Page unless Audio thread is picked on that device; on a phone the safety limiter is its stand-in until another worklet loads; the resync only runs with a worklet loaded and its margins are untested on a device). Desktop: v1.3.4-beta.2 (build 541, no feed view or scopes); further desktop betas on hold until the owner asks.
 
 **Build 546 (phone): the song is held when the clock leaps**
 - [ ] **Your normal song with effects**, Page sequencer: PLAY, screen off 20–30 s, back, STOP, Copy playback report. By ear: does it keep its tempo now (gaps are expected, rushing is not)? The report's `page ticks …` lines end with `held N× (S s)`.
@@ -597,7 +597,7 @@ Start a session by asking for results. Fix on `beta`. Web beta: https://matthett
 - [ ] **Worklets test (the important one), Fold, a simple song, Page sequencer:** (1) Settings › Audio › Worklets **On** (if it was Off: Apply (reload) first): PLAY, turn the screen off about 20 s, back on, STOP, Copy playback report. (2) Worklets **Off (test)**, Apply (reload), the same steps, Copy report. The report's second line says `worklets on` or `worklets OFF (test)`: check it matches before comparing. Effects are silent in Off; that is expected. Also by ear: does Off stutter or rush less?
 - [ ] **Stopped and hidden:** in each mode (applied and reloaded as above), PLAY a few seconds so the engine is running, STOP, screen off about 15 s (under 20 s, before the engine sleeps), back on, Copy report. Same with Off.
 - [ ] **Stutter under song play:** the song that stutters with Arrange showing and stops under LOOP: play it through once, STOP, Copy report (it now has `slow …` and `long frame` lines). Does that song use MUT, CUT, RES or DEC on sample pads?
-- [ ] **Unique per track:** on an empty track a pattern brought from another track gets its own copy; after that, moving it up or down that track, repeating it there, and rearranging the song make no new patterns.
+- [ ] **Unique per track (build 547):** on an empty track a pattern brought from another track gets its own copy; after that, moving it up or down that track, repeating it there, and rearranging the song make no new patterns. Should Alt-drag copies onto another track also get their own copy (today they share)?
 
 **New on 9 Nov (web beta, builds 536–543)**
 - [ ] **MOD by ear:** do fast rates (1/16, 1/32) sound steppy? Which effects? That decides where smoothing goes.
@@ -644,6 +644,11 @@ Start a session by asking for results. Fix on `beta`. Web beta: https://matthett
   the edge `R.t0`, "waiting…" while armed), `rcdClk` / `rcdFmt` / `rcdFreeSecs`, a 250 ms timer only while recording; the
   final length stays until the next take. recorder-check covers FREE, PATTERN, Stop, next take and closing mid-take.
 
+
+## 10 Nov (night): unique per track, first time only (build 547)
+
+Owner: "only apply the first time a pattern is entered on a track. I want to be able to rearrange the order of existing patterns without generating a bunch of new patterns"; on an empty track new patterns should still be unique. `blockMixed` now says "copy" only when another track holds the block and this track does not hold it in another row. `mselApply` (selection drag-move) records the cells it empties in `uniqVac` so a move along a track never copies, and a move to another track copies only if the block also stays on its old track. Master-column guard and setting-off unchanged. Tests: `tests/uniq.test.js` (logic only; not run in a browser). Sonnet agent, diff read by the lead. A first agent ran four hours and produced nothing; the second, with a two-step brief and a tool-call limit, took four minutes.
+Not changed, for the owner: Alt-drag copy in Arrange / Song (`sxApply`) writes the grid directly, so a copy dragged onto another track shares the pattern with no unique copy (existing behaviour); cut then paste back onto the same track still copies in an older song where another track shares that pattern; `songRowsInsert` / `songRowsRemove` were not read.
 
 ## 10 Nov (night): phone resync, "hold the song" (build 546)
 
