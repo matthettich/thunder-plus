@@ -20647,9 +20647,15 @@ function makePlayer(ac, out, getBuf, live){
     if (ev.type === 'tempo'){ tempoTo(ev); return; }
     if (ev.type === 'beat'){
       const o = clock.offset, at = Math.max(ev.t, ac.currentTime);
-      if (!clk.on){ clk.on = true; clk.base = Math.floor(ev.b / 16) * 16; o.setValueAtTime(ev.b - clk.base, at); return; }
-      const v = ev.b - clk.base; o.linearRampToValueAtTime(v, at);
+      if (!clk.on){ clk.on = true; clk.base = Math.floor(ev.b / 16) * 16; o.setValueAtTime(ev.b - clk.base, at); clk.lt = at; clk.lv = ev.b - clk.base; PB.rsGap = 0; return; }
+      const v = ev.b - clk.base;
+      // HOLD KEEPS THE TEMPO (11 Nov, HOLD_CLK_FLAT): rsHold moved this beat on by d, so the ramp from the last beat took d longer, the clock's slope
+      // fell, and the effects' modules (Simple delay, ...) read that as a slower tempo: their delay TIME glided (pitching). The clock now waits
+      // flat for the d, then ramps at the song's own slope. (clkSpb treats a flat clock as stalled and keeps the tempo it had.)
+      if (HOLD_CLK_FLAT && PB.rsGap > 0 && clk.lt != null){ const g = Math.min(PB.rsGap, at - clk.lt - 1e-4); PB.rsGap = 0; if (g > 1e-4) o.setValueAtTime(clk.lv, clk.lt + g); }
+      o.linearRampToValueAtTime(v, at);
       if (v >= 16){ clk.base += 16; o.setValueAtTime(v - 16, at); }
+      clk.lt = at; clk.lv = v >= 16 ? v - 16 : v;
       return;
     }
     // FXO / FLX / GAT / RTG: automation on the track's (or the master's) effect node.
@@ -21775,6 +21781,7 @@ function pump(){
    no outLat here (a first version with a drift threshold held every step of a 0.2 s clock and stopped the song).
    Phones and tablets only, the Page sequencer, and not while anything else owns the timing (rsScope). RESYNC: kill switch. */
 const RESYNC = true;
+const HOLD_CLK_FLAT = true;   // kill switch: a hold waits the effects' beat clock flat instead of slowing it (Simple delay time kept; see play() 'beat')
 // (Lead, 10 Nov: only with a worklet module loaded on the context (wkUsed): the owner's phone held 1:1 for 45 s with none, so a song
 // without them is never touched. RS_CREEP 0.09, not 0.04: with ticks up to 60 ms apart and step times off by 30 ms the lower edge is
 // misread by more than 0.04, and each false hold is a small pause in a healthy song (8 in 30 s simulated; 1 at 0.09).)
@@ -21798,7 +21805,7 @@ function rsTick(s){
 // Everything that holds a time on the audio clock for the song moves on by d, as the moved-on rule does for the sequencer. Not the
 // notes already booked (tp.q, the voices, MIDI sent): they were given to the engine.
 function rsHold(s, d){
-  s.base += d; s.time += d; if (s.btT != null) s.btT += d;
+  s.base += d; s.time += d; if (s.btT != null) s.btT += d; PB.rsGap = (PB.rsGap || 0) + d;   // (rsGap: the effects' beat clock waits flat for d, HOLD_CLK_FLAT)
   tp.t0 += d; if (tp.st) tp.st += d; stgT0 += d;   // LEFT timer, step flash, the stage's beat
   if (mx.beat) mx.beat = Object.assign({}, mx.beat, {t:mx.beat.t + d}); if (mx.t0 != null) mx.t0 += d;   // the beat clock: metronome, MIDI LFOs
   for (const L of mx.lfo) if (L){ if (L.t != null) L.t += d; L.trig = L.trig.map(x => x + d); }
