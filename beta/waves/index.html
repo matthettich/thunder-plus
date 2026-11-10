@@ -714,7 +714,7 @@ function drawLife(n){
   g.fillStyle = cs.getPropertyValue('--muted') || '#888'; g.font = '10px sans-serif'; if (live) g.fillText('gen ' + S.gen, Wd - 44, H - 3);
 }
 // Redraw the bars and grids a few times a second (edits from sliders, menus and undo show up too).
-setInterval(() => { for (const n of nodes.values()) if (n.show && (n.show.kind === 'bars' || n.show.kind === 'life') && n.el.isConnected){
+setInterval(() => { if (napping()) return; for (const n of nodes.values()) if (n.show && (n.show.kind === 'bars' || n.show.kind === 'life') && n.el.isConnected){
   if (n.show.kind === 'bars'){ for (let i = 0; i < 8; i++) n.show.lit[i] *= .8; drawBars(n); } else drawLife(n); } }, 90);
 /* ── For chains/index.html, inside the SHARED EDITOR block (after the existing Object.assign(SHARED_MODULES, …)
    calls, before "The bar editor (Blip drum) and the grid (Life)"). Uses only helpers already in that block or just
@@ -1375,7 +1375,7 @@ function dynSchedule(){
     for (const n of nodes.values()){ const S = n.show; if (!S || !S.dirty || (S.kind !== 'dyn' && S.kind !== 'dynlv')) continue; S.dirty = false; if (n.el.isConnected && !n.m.collapsed) drawDyn(n); } });
 }
 // A setting moved (the curve), or the module was unfolded: draw again even with no sound coming in.
-setInterval(() => { for (const n of nodes.values()){ const S = n.show; if (!S || (S.kind !== 'dyn' && S.kind !== 'dynlv')) continue;
+setInterval(() => { if (napping()) return; for (const n of nodes.values()){ const S = n.show; if (!S || (S.kind !== 'dyn' && S.kind !== 'dynlv')) continue;
   if (n.m.collapsed || !n.el.isConnected){ S.sig = ''; continue; }
   const f = DYN[n.m.type], sig = (f ? JSON.stringify(f(n.m.params)) : 'lv') + S.cv.clientWidth;
   if (sig !== S.sig){ S.sig = sig; drawDyn(n); } } }, 150);
@@ -1659,6 +1659,14 @@ const newId = p => (p || 'm') + Date.now().toString(36) + Math.floor(Math.random
    and everything else is saved under its own names so it never mixes with the standalone waves. */
 const TW = (() => { try { return window.parent !== window && window.parent.thunderWaves || null; } catch (e) { return null; } })();
 const EMBED = !!TW, KP = EMBED ? 'thunderplus.waves.' : 'waves.';
+/* EMBEDDED ENGINE (Thunder Plus, 10 Nov, audio review): inside Thunder Plus this page started its own AudioContext and worklet at load,
+   even if nothing was ever played here, and its timers ran on after the screen was left. Embedded, the engine now starts on the first
+   note (key, on-screen key, MIDI: engNote), the patch goes to it as it starts (wireBridge), the context is suspended when the host
+   calls pause() (screen left) or the page is hidden, and the timers below skip while napping(). On its own this page is unchanged.
+   LAZY_ENGINE = false: the old behaviour (engine at load, no nap). */
+const LAZY_ENGINE = true, lazy = EMBED && LAZY_ENGINE;
+let napScreen = false, napHidden = false;
+const napping = () => napScreen || napHidden;
 /* A save or load that fails is reported (console only) instead of vanishing. Inside Thunder Plus it goes to the page's own
    tpLog, so everything is read from one place (window.tpLogs there); on its own it prints here, once per message. */
 const tpLog = (() => { const seen = new Set(); return (where, err) => { try {
@@ -2965,8 +2973,8 @@ const pnameEl = document.getElementById('pname');
   if (EMBED){
     // Thunder Plus shows this page as its "waves" screen: it pauses the sound when you switch away and saves into the kit.
     window.wavesEmbed = {
-      pause(){ if (store){ clearTimeout(store._timer); if (store.dirty) store.save(); } held.forEach(p => bridge && bridge.noteOff(p)); held.clear(); if (bridge) bridge.ctx.suspend().catch(() => {}); },
-      resume(){ if (bridge) bridge.resume(); },
+      pause(){ if (store){ clearTimeout(store._timer); if (store.dirty) store.save(); } held.forEach(p => engNote(false, p)); held.clear(); if (lazy) napScreen = true; if (bridge) bridge.ctx.suspend().catch(() => {}); },
+      resume(){ if (lazy) napScreen = false; if (bridge && !napHidden) bridge.resume(); },
       /* ONE UNDO: the app's undo or redo put another version of this patch in the song; show it here (no reload). */
       setDoc(d){ if (!store) return; clearTimeout(store._timer); store.undo.length = 0; store.redo.length = 0;
         store._restore(JSON.stringify(normalize(d ? JSON.parse(JSON.stringify(d)) : blankDoc()))); clearTimeout(store._timer); store.dirty = false; },
@@ -2999,6 +3007,8 @@ const pnameEl = document.getElementById('pname');
     // reaches the kit too (swiping the app away on the phone may never fire pagehide).
     window.__wavesFlush = () => { if (store.dirty) store.save(); };
     document.addEventListener('visibilitychange', () => { if (document.hidden && store.dirty) store.save(); });
+    // Hidden: the context sleeps; visible again: it wakes only if the screen is the one showing and the engine was ever started.
+    if (lazy) document.addEventListener('visibilitychange', () => { napHidden = document.hidden; if (document.hidden){ if (bridge) bridge.ctx.suspend().catch(() => {}); } else if (bridge && !napScreen) bridge.resume(); });
   }
 }
 pnameEl.addEventListener('change', () => { store.snapshot(); doc.meta.name = pnameEl.value.trim() || 'Untitled'; pnameEl.value = doc.meta.name; });
@@ -3123,7 +3133,7 @@ window.addEventListener('keydown', e => { const ov = document.getElementById('he
 {
   const lbl = document.getElementById('emptylbl'), cols = ['#2e9e5b','#139a9a','#2f6fc7','#5b5bd6','#8a4fd0','#c447b0','#d1456e','#e07a2e','#c99a00','#5f9e28','#2f6fc7'];
   lbl.replaceChildren(...'start making waves'.split('').map((ch, i) => { const sp = h('span', {text: ch}); sp.style.color = cols[i % cols.length]; return sp; }));
-  setInterval(() => { const empty = !!doc && !doc.modules.length; if (lbl.hidden === empty) lbl.hidden = !empty; }, 400);
+  setInterval(() => { if (napping()) return; const empty = !!doc && !doc.modules.length; if (lbl.hidden === empty) lbl.hidden = !empty; }, 400);
 }
 
 /* ═══════════════ meters, MIDI learn, keyboard ═══════════════ */
@@ -3145,7 +3155,7 @@ function paintJacks(list){
     }
   }
 }
-setInterval(() => { if (doc && Date.now() - jackSeen > 250) paintJacks(null); }, 120);
+setInterval(() => { if (napping()) return; if (doc && Date.now() - jackSeen > 250) paintJacks(null); }, 120);
 function onMeter(m){
   modSeen = Date.now();
   const el = document.getElementById('cpuv'), p = Math.round(m.load * 100);
@@ -3193,7 +3203,7 @@ function paintMods(list){
 }
 
 // No live values for a moment (engine paused or not routed): keep cabled sliders marked, and unmark unplugged ones.
-setInterval(() => { if (doc && Date.now() - modSeen > 400) paintMods([]); }, 200);
+setInterval(() => { if (napping()) return; if (doc && Date.now() - modSeen > 400) paintMods([]); }, 200);
 const learnBar = document.getElementById('learnbar'), learnText = document.getElementById('learntext'), learnBtn = document.getElementById('midilearn');
 function setLearn(on){
   learn.on = on; learn.armed = null;
@@ -3240,22 +3250,22 @@ const K_CODE = {KeyZ:'z', KeyS:'s', KeyX:'x', KeyD:'d', KeyC:'c', KeyV:'v', KeyG
   KeyQ:'q', Digit2:'2', KeyW:'w', Digit3:'3', KeyE:'e', KeyR:'r', Digit5:'5', KeyT:'t', Digit6:'6', KeyY:'y', Digit7:'7', KeyU:'u', KeyI:'i', Digit9:'9', KeyO:'o', Digit0:'0', KeyP:'p'};
 const keyOf = e => K_CODE[e.code] || (e.key || '').toLowerCase();
 window.addEventListener('keydown', e => {
-  if (e.repeat || e.metaKey || e.ctrlKey || e.altKey || typing(e) || !bridge) return;
+  if (e.repeat || e.metaKey || e.ctrlKey || e.altKey || typing(e) || (!bridge && !lazy)) return;
   const k0 = (e.key || '').toLowerCase();
   if (k0 === '-' || k0 === '='){ octave = Math.max(-4, Math.min(4, octave + (k0 === '=' ? 1 : -1))); toast('Octave ' + (octave + 4)); return; }
   const key = keyOf(e), p = pitchOf(key); if (p < 0 || held.has(key)) return;
-  const pitch = p + octave * 12; held.set(key, pitch); bridge.resume(); bridge.noteOn(pitch, 1);
+  const pitch = p + octave * 12; held.set(key, pitch); if (bridge) bridge.resume(); engNote(true, pitch, 1);
 });
-window.addEventListener('keyup', e => { const key = keyOf(e), pitch = held.get(key); if (pitch == null) return; held.delete(key); if (bridge) bridge.noteOff(pitch); });
-window.addEventListener('blur', () => { held.forEach(p => bridge && bridge.noteOff(p)); held.clear(); });
+window.addEventListener('keyup', e => { const key = keyOf(e), pitch = held.get(key); if (pitch == null) return; held.delete(key); engNote(false, pitch); });
+window.addEventListener('blur', () => { held.forEach(p => engNote(false, p)); held.clear(); });
 /* on-screen keys */
 {
   const host = document.getElementById('touchkeys');
   const names = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B','C'];
   names.forEach((nm, i) => {
     const b = h('button', {text: nm, 'aria-label':'Play ' + nm});
-    const on = e => { e.preventDefault(); e.stopPropagation(); if (b.classList.contains('on') || !bridge) return; b.classList.add('on'); bridge.resume(); bridge.noteOn(i + octave * 12, 1); b._p = i + octave * 12; };
-    const off = () => { if (!b.classList.contains('on')) return; b.classList.remove('on'); if (bridge) bridge.noteOff(b._p); };
+    const on = e => { e.preventDefault(); e.stopPropagation(); if (b.classList.contains('on') || (!bridge && !lazy)) return; b.classList.add('on'); if (bridge) bridge.resume(); engNote(true, i + octave * 12, 1); b._p = i + octave * 12; };
+    const off = () => { if (!b.classList.contains('on')) return; b.classList.remove('on'); engNote(false, b._p); };
     b.addEventListener('pointerdown', on); b.addEventListener('pointerup', off); b.addEventListener('pointerleave', off); b.addEventListener('pointercancel', off);
     host.append(b);
   });
@@ -3308,13 +3318,34 @@ function startEngine(maxVoices){
   return WavesBridge.standalone({ maxVoices, quality: doc.quality || 'full', transport: doc.transport }).then(wireBridge)
     .catch(err => toast('The sound engine couldn’t start: ' + (err && err.message || err), 6000));
 }
+// LAZY ENGINE: a note starts it; notes that come while it starts wait here (offs too, so a key let go early is not left sounding).
+// engStart is the one way the embedded engine starts or restarts: while it runs (engGoing) nothing starts another, and a voice
+// count changed meanwhile is applied when it finishes.
+let engGoing = false; const evQ = [];
+function engStart(nv){
+  engGoing = true;
+  return startEngine(nv).then(() => {
+    const want = (doc.voice && doc.voice.maxVoices) || 8;
+    if (bridge && want !== nv){ const old = bridge; bridge = null; old.dispose(); return engStart(want); }
+    const q = evQ.splice(0); engGoing = false;
+    if (!bridge) return;   // (it could not start: the toast said so; the next note tries again)
+    if (napping()){ bridge.ctx.suspend().catch(() => {}); return; }   // (the screen was left meanwhile)
+    bridge.resume(); for (const [o, p, v] of q) { if (o) bridge.noteOn(p, v); else bridge.noteOff(p); } });
+}
 vSel.addEventListener('change', () => {
   const nv = +vSel.value; doc.voice.maxVoices = nv; store.dirty = true; store.save();
+  if (lazy && !bridge) return;   // (not started yet: it starts with this number; starting: engStart applies it when it finishes)
   toast('Restarting the sound with ' + nv + ' voice' + (nv === 1 ? '' : 's') + '…');
   const old = bridge; bridge = null; if (old) old.dispose();
-  startEngine(nv).then(() => bridge && bridge.resume());
+  if (lazy) engStart(nv); else startEngine(nv).then(() => bridge && bridge.resume());
 });
-startEngine((doc.voice && doc.voice.maxVoices) || 8);
+if (!lazy) startEngine((doc.voice && doc.voice.maxVoices) || 8);
+function engNote(on, pitch, vel){
+  if (bridge){ if (on){ if (napping()) return; bridge.noteOn(pitch, vel); } else bridge.noteOff(pitch); return; }   // (napping: the context is suspended, a note-on would wait in the port and burst out on resume)
+  if (!lazy || (!on && !engGoing)) return;
+  evQ.push([on, pitch, vel]);
+  if (on && !engGoing) engStart((doc.voice && doc.voice.maxVoices) || 8);
+}
 function unlockAudio(){ if (bridge){ bridge.resume(); removeEventListener('pointerdown', unlockAudio, true); removeEventListener('keydown', unlockAudio, true); } }
 addEventListener('pointerdown', unlockAudio, true);
 addEventListener('keydown', unlockAudio, true);
@@ -3322,7 +3353,7 @@ addEventListener('keydown', unlockAudio, true);
 /* MIDI */
 const midiSel = document.getElementById('setmidiin');
 midi = new WavesMidi({
-  onNote: o => { if (!bridge) return; if (o.on) bridge.noteOn(o.pitch, o.vel); else bridge.noteOff(o.pitch); },
+  onNote: o => { if (!bridge && !lazy) return; engNote(o.on, o.pitch, o.vel); },
   onCC: (cc, val) => {
     const r = learn.handle(cc, val);
     if (r.learned != null){

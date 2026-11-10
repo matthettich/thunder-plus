@@ -730,7 +730,7 @@ function drawLife(n){
   g.fillStyle = cs.getPropertyValue('--muted') || '#888'; g.font = '10px sans-serif'; if (live) g.fillText('gen ' + S.gen, Wd - 44, H - 3);
 }
 // Redraw the bars and grids a few times a second (edits from sliders, menus and undo show up too).
-setInterval(() => { for (const n of nodes.values()) if (n.show && (n.show.kind === 'bars' || n.show.kind === 'life') && n.el.isConnected){
+setInterval(() => { if (napping()) return; for (const n of nodes.values()) if (n.show && (n.show.kind === 'bars' || n.show.kind === 'life') && n.el.isConnected){
   if (n.show.kind === 'bars'){ for (let i = 0; i < 8; i++) n.show.lit[i] *= .8; drawBars(n); } else drawLife(n); } }, 90);
 /* ── For chains/index.html, inside the SHARED EDITOR block (after the existing Object.assign(SHARED_MODULES, …)
    calls, before "The bar editor (Blip drum) and the grid (Life)"). Uses only helpers already in that block or just
@@ -1391,7 +1391,7 @@ function dynSchedule(){
     for (const n of nodes.values()){ const S = n.show; if (!S || !S.dirty || (S.kind !== 'dyn' && S.kind !== 'dynlv')) continue; S.dirty = false; if (n.el.isConnected && !n.m.collapsed) drawDyn(n); } });
 }
 // A setting moved (the curve), or the module was unfolded: draw again even with no sound coming in.
-setInterval(() => { for (const n of nodes.values()){ const S = n.show; if (!S || (S.kind !== 'dyn' && S.kind !== 'dynlv')) continue;
+setInterval(() => { if (napping()) return; for (const n of nodes.values()){ const S = n.show; if (!S || (S.kind !== 'dyn' && S.kind !== 'dynlv')) continue;
   if (n.m.collapsed || !n.el.isConnected){ S.sig = ''; continue; }
   const f = DYN[n.m.type], sig = (f ? JSON.stringify(f(n.m.params)) : 'lv') + S.cv.clientWidth;
   if (sig !== S.sig){ S.sig = sig; drawDyn(n); } } }, 150);
@@ -1752,6 +1752,7 @@ const newId = p => (p || 'm') + Date.now().toString(36) + Math.floor(Math.random
    and everything else is saved under its own names so it never mixes with the standalone chains. */
 const TW = (() => { try { return window.parent !== window && window.parent.thunderChains || null; } catch (e) { return null; } })();
 const EMBED = !!TW, KP = EMBED ? 'thunderplus.chains.' : 'chains.';
+const napping = () => false;   // (the shared editor's timers ask; only waves, embedded, ever naps them: it has its own engine)
 /* A save or load that fails is reported (console only) instead of vanishing. Inside Thunder Plus it goes to the page's own
    tpLog, so everything is read from one place (window.tpLogs there); on its own it prints here, once per message. */
 const tpLog = (() => { const seen = new Set(); return (where, err) => { try {
