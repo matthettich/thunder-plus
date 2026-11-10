@@ -4,7 +4,7 @@ import { openApp, table, live } from './lib.mjs';
 const only = (process.argv[2] || '').split(',').filter(Boolean), want = k => !only.length || only.includes(k);
 const rows = [], add = (n, ok, d) => { const r = [n, ok ? 'PASS' : 'FAIL', d || '']; rows.push(r); live(r); };
 // a first PLAY whose live worklets are not ready yet: the warm-up waits 400 ms for them
-const SLOW = `bassOK.delete(ctx); bassLoad.set(ctx, new Promise(r => setTimeout(() => r(true), 400)));`;
+const SLOW = `audio(); bassOK.delete(ctx); bassLoad.set(ctx, new Promise(r => setTimeout(() => r(true), 400)));`;
 // a loaded machine can crash the page: run a section again (up to 3 times) when the browser went away
 async function retry(f){ for (let i = 0; ; i++){ try { return await f(); } catch(e){ if (i >= 2 || !/closed|crash/i.test(e.message)) throw e; } } }
 async function fresh(opts, init){ const A = await openApp(opts); if (init) await A.run(init); return A; }
@@ -30,7 +30,7 @@ if (want('F2')){   // one event that throws is skipped; a flood still stops the 
     tStart('song', {row:0}); await new Promise(r => setTimeout(r, 3000)); const on = tp.on; tStop(true); rt.pl.play = o; return {on, threw};`);
   add('F2 page sequencer, every event throws: the song stops as before', r2.on === false, JSON.stringify(r2));
   // the audio-thread sequencer's batch: a bad event in the middle of a row must not drop the rest of the batch
-  const r3 = await A.run(`aset.core = 'core'; rtInit(); coreLoad(); for (let i = 0; i < 60 && !core.ready; i++) await new Promise(r => setTimeout(r, 100));
+  const r3 = await A.run(`aset.core = 'core'; aset.corePick = true; rtInit(); coreLoad(); for (let i = 0; i < 60 && !core.ready; i++) await new Promise(r => setTimeout(r, 100));
     tStart('song', {row:0}); await new Promise(r => setTimeout(r, 500)); const usedCore = !!tp.core, got = []; const o = rt.pl.play;
     rt.pl.play = function(e){ if (e.mark === 'bad') throw new Error('bad event'); if (e.mark) { got.push(e.mark); return; } return o.apply(this, arguments); };
     const t = ctx.currentTime + 0.3, ev = m => ({type:'off', track:0, t, mark:m}); let err = null;
@@ -60,7 +60,7 @@ if (want('F4')){   // the hand-over to the page sequencer must not cut the MIDI 
   let A, r;
   for (let attempt = 0; attempt < 4; attempt++){   // (a loaded machine can make the core's own watchdog let go of the song: try again)
     A = await fresh({ page: PIXEL });
-    r = await A.run(MIDIRIG + `aset.core = 'core'; rtInit(); coreLoad(); for (let i = 0; i < 60 && !core.ready; i++) await new Promise(r => setTimeout(r, 100));
+    r = await A.run(MIDIRIG + `aset.core = 'core'; aset.corePick = true; rtInit(); coreLoad(); for (let i = 0; i < 60 && !core.ready; i++) await new Promise(r => setTimeout(r, 100));
     tStart('song', {row:0}); for (let i = 0; i < 50 && !tp.core; i++) await new Promise(r => setTimeout(r, 100)); await new Promise(r => setTimeout(r, 1500)); const core0 = !!tp.core, bad = core.bad, on0 = tp.on, held0 = mx.held.reduce((a, H) => a + (H ? H.length : 0), 0), notes = log.filter(m => (m[0] & 0xF0) === 0x90).length;
     log.length = 0; let rel = 0, stp = 0; const oR = moRelease, oS = moStop; moRelease = function(){ rel++; return oR.apply(this, arguments); }; moStop = function(){ stp++; return oS.apply(this, arguments); };
     Object.defineProperty(document, 'hidden', {configurable:true, get: () => true}); document.dispatchEvent(new Event('visibilitychange'));
