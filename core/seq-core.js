@@ -878,7 +878,7 @@ globalThis.__tcOv = (proc, P, n) => {
   const Q = {}, dt = 1 / sampleRate;
   for (const k in P){ const A = ov.p.get(k); if (!A){ Q[k] = P[k]; continue; }
     A.prune(currentTime);
-    const src = P[k], b = ov.buf.get(k) || (ov.buf.set(k, new Float32Array(n)), ov.buf.get(k));
+    const src = P[k], b = ov.buf.get(k) && ov.buf.get(k).length === n ? ov.buf.get(k) : (ov.buf.set(k, new Float32Array(n)), ov.buf.get(k));
     const c = A.from > currentTime + n * dt ? null : A.constFrom(currentTime);
     if (A.from <= currentTime && c != null){ Q[k] = [c]; continue; }
     for (let i = 0; i < n; i++){ const t = currentTime + i * dt; b[i] = t < A.from ? (src.length > 1 ? src[i] : src[0]) : A.at(t); }
@@ -1193,7 +1193,7 @@ class ThunderCore extends AudioWorkletProcessor {
   sfRun(v, out, N){
     const L = out[0], R = out[1] || out[0], dt = 1 / sampleRate, t0 = currentTime;
     v.g.prune(t0); v.f.prune(t0); v.pn.prune(t0); v.r.prune(t0);
-    const sL = v.sL || (v.sL = new Float32Array(128)), sR = v.sR || (v.sR = new Float32Array(128)); sL.fill(0); sR.fill(0);
+    const sL = v.sL && v.sL.length >= N ? v.sL : (v.sL = new Float32Array(Math.max(128, N))), sR = v.sR && v.sR.length >= N ? v.sR : (v.sR = new Float32Array(Math.max(128, N))); sL.fill(0); sR.fill(0);   // (the block length, not 128: grown once)
     const rc = v.r.constFrom(t0); let any = false;
     for (const z of v.sf){ if (z.done) continue;
       z.env.prune(t0); z.r.prune(t0); if (z.flt) z.flt.fr.prune(t0);
