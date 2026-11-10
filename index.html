@@ -21803,6 +21803,11 @@ async function devRecover(why, again){
 }
 // the context stopped by itself (not the app's own sleep, not a kick), with the screen showing: also when nothing is playing (audioInterrupted above is for the song)
 function devOnState(){ if (ctx && (ctx.state === 'suspended' || ctx.state === 'interrupted') && !bgSus && !document.hidden) devRecover('engine ' + ctx.state); }
+document.addEventListener('visibilitychange', () => { if (!document.hidden) devRecover('screen back'); });
+window.addEventListener('focus', () => devRecover('window focus'));
+// a wake without the shell's help: the wall clock jumped by more than 5 s between two ticks, both with the app showing
+idleTick(() => { const w = Date.now(), p = DR.wall; DR.wall = document.hidden ? 0 : w; if (p && !document.hidden && w - p > 5000) devRecover('woke from sleep'); }, 2000, () => !document.hidden, 5000);
+{ const P = window.thunderDesktop && window.thunderDesktop.power; if (P) try { P.on(why => devRecover('system ' + (why === 'unlock-screen' ? 'unlock' : 'resume'))); } catch(e){} }
 function pump(){
   try { pumpRun(); }
   catch(e){ console.error(e); try { tStop(); } catch(e2){} toastErr('Playback stopped: ' + ((e && e.message) || 'something went wrong') + '.', 5000); }
