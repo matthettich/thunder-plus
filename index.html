@@ -23501,7 +23501,8 @@ const mstShared = new Set();   // phrases already warned about this session
 let mstUniqIn = false;
 // UNIQUE PER TRACK (owner, 3 Nov: "make a unique pattern if copying from one track to another, I'll probably mess that up
 // all the time… Maybe we make it a setting"): with SX.uniq on (the default) a block also gets its own copy when another
-// TRACK already uses it. The same block down its own track (repeats) stays shared.
+// TRACK already uses it. The same block down its own track (repeats) stays shared. 10 Nov: and only the first time (below).
+let uniqVac = [];   // 10 Nov, owner: [row, track, cid] of cells a move has just emptied; they still count as "this track held it"
 function blockMixed(cid, x, y){
   // 10 Nov, owner: only the FIRST time a block comes onto a track is copied. A block this track already holds (in another
   // row) can be repeated or moved up and down it with no copy, even if another track also holds it.
@@ -23511,6 +23512,7 @@ function blockMixed(cid, x, y){
     else { if (row[MT] === cid && r !== y) return true;
       if (uq){ if (r !== y && row[x] === cid) here = true;
         for (let t = 0; t < MT; t++) if (t !== x && row[t] === cid) other = true; } } }
+  if (!here && uq && uniqVac.some(q => q[1] === x && q[2] === cid)) here = true;
   return other && !here;
 }
 const blockOnMst = cid => S.song.some(r => r && r[MT] === cid);
@@ -24012,7 +24014,7 @@ function projRows(){
       info:() => 'With SECTIONS on: the SECT lane also shows in Arrange beside the phrase (it takes a little of Arrange’s width), so section names are there while you edit. Off: only on the Song screen'},
     {l:'ROW COLOR IN PATTERN', ck:'Pattern view: right-click a row number to color the song row', get:() => SX.pvcol ? 1 : 0, set:v => sxSet('pvcol', !!v), min:0, max:1, tog:true, d:1, fmt:onOff,
       info:() => 'In Pattern view, right-click a row number (or SONG ROW in its bar) to color this pattern’s song row, the same as right-clicking the row number in Arrange; SONG ROW then shows in that color. Off: the right-click menu as usual'},
-    {l:'UNIQUE PER TRACK', ck:'A block put on another track gets its own copy', get:() => SX.uniq ? 1 : 0, set:v => sxSet('uniq', !!v), min:0, max:1, tog:true, d:1, fmt:onOff,
+    {l:'UNIQUE PER TRACK', ck:'A pattern brought onto a track that doesn’t have it yet gets its own copy. Moving or repeating a pattern on its own track never copies.', get:() => SX.uniq ? 1 : 0, set:v => sxSet('uniq', !!v), min:0, max:1, tog:true, d:1, fmt:onOff,
       info:() => 'ON: a block pasted, cloned, dragged or typed onto a track when another track already uses it gets its own copy (new phrase numbers), so editing one never changes the other; the same block down its own track still repeats. OFF: tracks can share blocks, as before. The master column always keeps its own'},
     {l:'LOOP DRAG', ck:'Song: drag the row numbers to loop', get:() => SX.loop ? 1 : 0, set:v => sxSet('loop', !!v), min:0, max:1, tog:true, d:1, fmt:onOff,
       info:() => 'Drag down the Song screen’s row numbers to loop those rows (PLAY on this screen loops them; LOOP SEL turns it off). A tap still plays from that row'},
@@ -31304,10 +31306,11 @@ function mselApply(m, copy){
   const r = m.r, dx = m.dx, dy = m.dy; if (!dx && !dy) return draw();
   const D = [], mu = [];
   for (let y = r.y0; y <= r.y1; y++){ const row = [], mr = []; for (let x = r.x0; x <= r.x1; x++){ row.push(getCell(tv, x, y)); mr.push(tv === 'song' && x !== MT && blockMuted(S, y, x)); } D.push(row); mu.push(mr); }
-  if (!copy) for (let y = r.y0; y <= r.y1; y++) for (let x = r.x0; x <= r.x1; x++) setCell(tv, x, y, kindAt(tv, x) === 'tsp' ? 0 : -1);
-  const d = dims(tv);
-  D.forEach((row, j) => row.forEach((v, i) => { const x = r.x0 + i + dx, y = r.y0 + j + dy; if (y < 0 || y >= d.h || x < 0 || (x >= d.w && x !== MT)) return;
-    setCell(tv, x, y, v); if (tv === 'song' && x !== MT && v >= 0) setBlockMute(y, x, !!mu[j][i]); }));
+  const vac = [];   // a move empties its cells first, then writes: UNIQUE PER TRACK must still see that this track held the block (10 Nov, owner)
+  if (!copy) for (let y = r.y0; y <= r.y1; y++) for (let x = r.x0; x <= r.x1; x++){ if (tv === 'song' && x !== MT){ const v0 = S.song[y][x]; if (v0 >= 0) vac.push([y, x, v0]); } setCell(tv, x, y, kindAt(tv, x) === 'tsp' ? 0 : -1); }
+  const d = dims(tv); uniqVac = vac;
+  try { D.forEach((row, j) => row.forEach((v, i) => { const x = r.x0 + i + dx, y = r.y0 + j + dy; if (y < 0 || y >= d.h || x < 0 || (x >= d.w && x !== MT)) return;
+    setCell(tv, x, y, v); if (tv === 'song' && x !== MT && v >= 0) setBlockMute(y, x, !!mu[j][i]); })); } finally { uniqVac = []; }
   saveS(); draw();
   const n = m.line ? (r.y1 - r.y0 + 1) + ' line' + (r.y1 > r.y0 ? 's' : '') : mselN(r) + ' cells';
   toast(`${copy ? 'Copied' : 'Moved'} ${n} · ${keyHint('mod+Z')} undoes it`);

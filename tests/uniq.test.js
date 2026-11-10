@@ -3,7 +3,7 @@
 'use strict';
 const test = require('node:test'), assert = require('node:assert/strict'), vm = require('vm');
 const H = require('./helpers');
-const m = H.read('index.html').match(/function blockMixed\(cid, x, y\)\{[\s\S]*?\n\}\n/);
+const m = H.read('index.html').match(/let uniqVac = \[\];[^\n]*\nfunction blockMixed\(cid, x, y\)\{[\s\S]*?\n\}\n/);
 assert.ok(m, 'index.html: could not find blockMixed; the code moved, update this test');
 const MT = 8;
 function mk(uniq, cells) {   // cells: [row, track, cid]
@@ -30,4 +30,16 @@ test('setting off: only the master cases are mixed', () => {
   assert.equal(mk(false, [[0, 1, 5]]).blockMixed(5, 2, 3), false);
   assert.equal(mk(false, [[0, MT, 5]]).blockMixed(5, 2, 3), true);
   assert.equal(mk(false, [[0, 1, 5]]).blockMixed(5, MT, 3), true);
+});
+test('vacated cells (a move empties the source first): own-track vacated counts as held, no copy', () => {
+  // block 5 on tracks 1 and 2 (an older song); track 2's cell at row 0 is moved to row 3: emptied first, then written
+  const c = mk(true, [[1, 1, 5]]);
+  assert.equal(c.blockMixed(5, 2, 3), true, 'without the vacated list the emptied source looks like "first time on this track"');
+  vm.runInContext('uniqVac = [[0, 2, 5]]', c); assert.equal(c.blockMixed(5, 2, 3), false, 'with it: a move on its own track');
+  // a move across tracks: block 5 on track 1 only, moved to track 2 (source emptied): no other track holds it -> no copy
+  assert.equal(mk(true, [[0, 1, 5]].slice(1)).blockMixed(5, 2, 3), false);
+  // ... but the block also stays elsewhere on the source track (not vacated): still a real first time on track 2
+  const d = mk(true, [[4, 1, 5]]); vm.runInContext('uniqVac = [[0, 1, 5]]', d); assert.equal(d.blockMixed(5, 2, 3), true);
+  // a vacated cell on ANOTHER track never excuses a copy, and the master guard still wins
+  const e = mk(true, [[0, MT, 5]]); vm.runInContext('uniqVac = [[0, 2, 5]]', e); assert.equal(e.blockMixed(5, 2, 3), true);
 });
