@@ -23278,7 +23278,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 549;
+const BUILD = 550;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD + (location.pathname.includes('/beta/') ? ' · beta' : '');
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -32708,6 +32708,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [550, '10 Nov', ['New in Settings › Screen: BIGGER CELLS ON TOUCH (off by default) makes Arrange and Song cells at least 28×24 px on a touch screen; the grid then scrolls sideways.']],
   [549, '10 Nov', ['Record a sample keeps its input, mode and latency settings: changing the REC or metronome settings no longer resets them.']],
   [548, '10 Nov', ['The first PLAY of a session waits a moment (under a second) for the effects to finish loading, so the song no longer stumbles in its first bars.', 'MIDI notes booked ahead while the app is hidden are cut short on STOP instead of playing out (Web MIDI; drum gear that ignores note-off can still sound them).', '…waves inside Thunder Plus starts its own sound engine only when you first play a note there, and sleeps when you leave the screen.', 'Less work while idle: the CPU meter, the Mixer meters and faders and the Mixer spectrum only redraw when something changed (the CPU bar now steps).', 'Phone: a pad press holds Arrange\'s paging like a key does; pad keys no longer fire twice on a slow press; Tracker | Synth fits when folded; File rows are taller and Help & keys is at the bottom of File when folded; FX opens on SLOT 1 the first time, then where you left it; Settings has a Done button; pop-up messages sit below the tabs and can be turned off in Settings › Screen (problems still show); bigger touch targets in the header and tabs.', 'The preset buttons read Pad presets… and Engine presets….']],
   [547, '10 Nov', ['Unique per track now applies only the first time a pattern comes onto a track. A pattern the track already has can be repeated or moved up and down it with no new copies, and moving a selection to another track copies only when the pattern also stays behind on its old track.']],
