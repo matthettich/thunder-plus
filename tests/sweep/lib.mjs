@@ -17,7 +17,7 @@ export async function openApp(opts = {}){
   await new Promise(ok => srv.listen(0, ok));
   const port = srv.address().port;
   const browser = await chromium.launch({ ...(CHROME ? { executablePath: CHROME } : {}), args: ['--autoplay-policy=no-user-gesture-required', ...(opts.args || [])] });
-  const page = await browser.newPage({ viewport: { width: opts.w || 1400, height: opts.h || 900 } });
+  const page = await browser.newPage({ viewport: { width: opts.w || 1400, height: opts.h || 900 }, ...(opts.page || {}) });   // opts.page: more newPage options (a phone's user agent...)
   const errors = [];
   page.on('pageerror', e => errors.push('pageerror: ' + e.message));
   page.on('console', m => { if (m.type() === 'error') errors.push('console.error: ' + m.text()); });

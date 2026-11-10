@@ -60,7 +60,7 @@ test('link: main.js loads the addon optionally, and every handler answers withou
   // index.html: no Link without the desktop bridge (the website), and every hook outside the block is guarded
   const html = H.read('index.html');
   assert.match(html, /const LINKAPI = \(window\.thunderDesktop && window\.thunderDesktop\.link\) \|\| null;/);
-  assert.match(html, /const lkp = lk \? lkPlan\(/); assert.match(html, /if \(tp\.on && lk && !lk\.restart\) lkStopped\(\)/);
+  assert.match(html, /const lkp = lk \? lkPlan\(/); assert.match(html, /if \(tp\.on && lk && !lk\.restart\) (lkStopped\(\)|G\('Link', lkStopped\))/);   // (10 Nov: tStop runs it through its logging helper G)
 });
 
 test('link: the real addon, when built here (node link/build.js), loads and answers without going on the network', { skip: !fs.existsSync(path.join(H.ROOT, 'electron/link/thunder_link.node')) && 'not built here' }, async () => {
