@@ -21945,31 +21945,36 @@ let stopTapT = 0;
 function toTop(){ tp.paused = null; cs.song.y = 0; cs.song.top = 0; try { draw(); } catch(e){} toast('Back to the top of the song.', 1500); }
 function tStop(quiet){
   warmTok = null;   // 10 Nov: a STOP (or a restart) cancels a first PLAY still warming up
+  // 10 Nov (audit): a throw in one step used to leave PLAYING over silence with no timer, or the Android background stream and the
+  // screen lock held after STOP. Each step that can throw now runs through G (logged, then the next); the order is unchanged.
+  const G = (what, f) => { try { f(); } catch(e){ tpLog('STOP: ' + what, e); } };
   // RECORD INTO A PAD: a pattern take ends where the song stops. Only a song that was playing: FIX (6 Nov) the first PLAY of
   // a session with live pads starts a moment later (LIVE WARM-UP), and its tStop(true) dropped the take Record had armed.
-  if (RCD.sync && !RCD.starting && tp.on) rcdSongStopped();
-  if (tp.on){ PB.stopT = performance.now(); PB.strayN = 0; if (!quiet) pbAfterStop(); }   // (every stop, quiet ones too: the deaf-core check counts from the latest)
-  if (tp.on && lk && !lk.restart) lkStopped();   // ABLETON LINK: start / stop sync
-  if (tp.timer) tp.timer.stop();
+  if (RCD.sync && !RCD.starting && tp.on) G('record', rcdSongStopped);
+  if (tp.on){ PB.stopT = performance.now(); PB.strayN = 0; if (!quiet) G('stop report', pbAfterStop); }   // (every stop, quiet ones too: the deaf-core check counts from the latest)
+  if (tp.on && lk && !lk.restart) G('Link', lkStopped);   // ABLETON LINK: start / stop sync
+  if (tp.timer) G('pump timer', () => tp.timer.stop());
   // RESUME: where the song stopped (the positions last heard), the track it follows, and the cursor then
-  if (tp.on && tp.mode === 'song' && tp.pos && tp.pos.some(Boolean)){
+  if (tp.on && tp.mode === 'song' && tp.pos && tp.pos.some(Boolean)) G('resume point', () => {
     const P = tp.pos.map(q => q && Object.assign({}, q)), want = tv === 'song' ? cs.song.x : cTrack;
     const ref = P[want] && P[want].row >= 0 && want !== MT ? want : P.findIndex((q, i) => q && q.row >= 0 && i !== MT);
     tp.paused = ref >= 0 ? {pos:P, ref, row:P[ref].row, step:P[ref].step, key:curKey()} : null;
-  }
+  });
   // STOP CURSOR: a STOP you make (not a restart, a song change or the song running out while hidden) puts the cursor there
-  const stopP = !quiet && stopToPlayhead() && tp.on && tp.pos && tp.pos.some(Boolean) ? {P:tp.pos.map(q => q && Object.assign({}, q)), mode:tp.mode} : null;
-  const home = !quiet && tp.on && !stopToPlayhead() ? fpHome : null;   // (9 Nov, owner: with ON STOP at STAYS it still ended up at the playback spot: FOLLOW had carried it there)
+  let stopP = null, home = null;
+  G('stop cursor', () => {
+  stopP = !quiet && stopToPlayhead() && tp.on && tp.pos && tp.pos.some(Boolean) ? {P:tp.pos.map(q => q && Object.assign({}, q)), mode:tp.mode} : null;
+  home = !quiet && tp.on && !stopToPlayhead() ? fpHome : null; });   // (9 Nov, owner: with ON STOP at STAYS it still ended up at the playback spot: FOLLOW had carried it there)
   tp.timer = 0; tp.on = false; fpMem = null; fpHome = null; tp.q = []; tp.pos = null; tp.snd = null; tp.stopAt = null; tp.ahead = tp.aheadT = 0;
   // HAND-OVER (seqHandover): the core and the voices already booked keep sounding until the page sequencer's first step
-  if (tp.core){ tp.core = false; core.gen++; if (!handing){ coreWire(false); try { core.node.port.postMessage({op:'stop', at:ctx.currentTime}); } catch(e){} } }
+  if (tp.core){ tp.core = false; core.gen++; if (!handing) G('core', () => { coreWire(false); try { core.node.port.postMessage({op:'stop', at:ctx.currentTime}); } catch(e){} }); }
   else if (aset.core === 'core' && !core.ready && ctx) setTimeout(() => { try { if (!tp.on) coreLoad(); } catch(e){} }, 400);
-  if (rt && !handing) rt.pl.stopAll(ctx.currentTime);
+  if (rt && !handing) G('stop voices', () => rt.pl.stopAll(ctx.currentTime));
   fxcTL.m.clear(); fxcTL.beats.length = 0;   // FX BAR: STOP puts the switches back (resetSeq)
-  if (!handing || mx.clk.on) moStop();   // 10 Nov: a hand-over keeps the MIDI notes sounding (moStop's All Notes Off cut them; moStart resets what the restart needs; with clock out on, the old Stop + Start)
+  if (!handing || mx.clk.on) G('MIDI stop', moStop);   // 10 Nov: a hand-over keeps the MIDI notes sounding (moStop's All Notes Off cut them; moStart resets what the restart needs; with clock out on, the old Stop + Start)
   try { metStop(); recEndTake(); clearTimeout(rec.cntT); rec.cnt = 0; recBtn(); } catch(e){}   // REC: clicks booked ahead stop, the take is one undo step
-  songBtn();
-  chainsTempo();
+  G('transport button', songBtn);
+  G('chains tempo', chainsTempo);
   if (!handing){ bgPlay(false); wakeLock(false); }   // BACKGROUND PLAY, KEEP SCREEN ON (a hand-over plays on)
   if (stopP) try { if (curToPlay(stopP.P, stopP.mode) && tp.paused) tp.paused.key = curKey(); } catch(e){ tpLog('stop cursor', e); }
   else if (home) try { cs.song.y = home.y; cs.song.top = home.top; cPhrase = home.p; cSect = home.s; cs.phrase.y = home.py; cs.phrase.top = home.ptop; cs.song.pg = cs.phrase.pg = false; if (tp.paused) tp.paused.key = curKey(); } catch(e){ tpLog('stop cursor', e); }

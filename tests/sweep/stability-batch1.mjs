@@ -5,6 +5,8 @@ const only = (process.argv[2] || '').split(',').filter(Boolean), want = k => !on
 const rows = [], add = (n, ok, d) => { const r = [n, ok ? 'PASS' : 'FAIL', d || '']; rows.push(r); live(r); };
 // a first PLAY whose live worklets are not ready yet: the warm-up waits 400 ms for them
 const SLOW = `bassOK.delete(ctx); bassLoad.set(ctx, new Promise(r => setTimeout(() => r(true), 400)));`;
+// a loaded machine can crash the page: run a section again (up to 3 times) when the browser went away
+async function retry(f){ for (let i = 0; ; i++){ try { return await f(); } catch(e){ if (i >= 2 || !/closed|crash/i.test(e.message)) throw e; } } }
 async function fresh(opts, init){ const A = await openApp(opts); if (init) await A.run(init); return A; }
 
 if (want('F1')){   // PLAY then STOP inside the first-PLAY warm-up must not start the song
@@ -81,5 +83,20 @@ if (want('F5')){   // an effect change booked ahead must not land after STOP's r
   const restored = r.got.length >= 1 && r.got[r.got.length - 1] === r.got[0];
   add('F5 FXV booked 0.2 s ahead, then STOP: the last message to the effect is the restore', restored && r.got.length === 1, JSON.stringify(r));
   await A.close();
+}
+if (want('F6')){   // tStop is exception-safe: the state flips and the background stream is released whatever throws
+  const A = await fresh();
+  const r = await A.run(`const o = rcdSongStopped; rcdSongStopped = function(){ throw new Error('rcd broke'); };
+    tStart('song', {row:0}); for (let i = 0; i < 120 && !tp.on; i++) await new Promise(r => setTimeout(r, 100)); const on0 = tp.on; await new Promise(r => setTimeout(r, 300));
+    RCD.sync = true; let thrown = null; try { tStop(); } catch(e){ thrown = e.message; }
+    const off = !tp.on, noTimer = !tp.timer; rcdSongStopped = o; RCD.sync = false;
+    tStart('song', {row:0}); await new Promise(r => setTimeout(r, 800)); const again = tp.on; tStop(true); return {on0, thrown, off, noTimer, again};`);
+  add('F6 rcdSongStopped throws: tp.on is false after STOP and PLAY works again', r.on0 && r.off && r.noTimer && r.again, JSON.stringify(r));
+  await A.close();
+  const r2 = await retry(async () => { const B = await fresh({ page: PIXEL }); try { return await B.run(`const o = rt.pl.stopAll; rt.pl.stopAll = function(){ throw new Error('stopAll broke'); };
+    tStart('song', {row:0}); for (let i = 0; i < 120 && !tp.on; i++) await new Promise(r => setTimeout(r, 100)); await new Promise(r => setTimeout(r, 300));
+    const playing = !!bgEl && !bgEl.paused, bgOn0 = bgOn, android = bgAndroid; try { tStop(); } catch(e){} await new Promise(r => setTimeout(r, 100));
+    const r = {bgOn0, android, playing, paused:!bgEl || bgEl.paused, off:!tp.on}; rt.pl.stopAll = o; return r;`); } finally { await B.close().catch(() => {}); } });
+  add('F6 stopAll throws on Android: the background stream is paused after STOP', r2.android && r2.playing && r2.paused && r2.off, JSON.stringify(r2));
 }
 process.exit(table(rows) ? 1 : 0);
