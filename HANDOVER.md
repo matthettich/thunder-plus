@@ -582,6 +582,11 @@ The owner's top priority to add is the MOD screen. Work down the list; ask befor
 
 Start a session by asking for results. Fix on `beta`. Web beta: https://matthettich.github.io/thunder-plus/beta/ (build 547 as of 10 Nov morning, 548 once its PR merges; the night of 9–10 Nov shipped 544–547, see the four "10 Nov" entries below. Decisions the lead made that night for the owner to confirm or reverse: on a phone the saved Sequencer default plays on the Page unless Audio thread is picked on that device; on a phone the safety limiter is its stand-in until another worklet loads; the resync only runs with a worklet loaded and its margins are untested on a device). Desktop: v1.3.4-beta.2 (build 541, no feed view or scopes); further desktop betas on hold until the owner asks.
 
+**Build 557 (phone: the kick, again)**
+- [ ] **Runaway kick, retest:** the simple song with the delay, Page sequencer, PLAY, screen off, press a volume key (that sets the runaway off within a second or two), wait 15 s, screen on, STOP, Copy playback report. By ear: a short gap at the kick, then the song CARRIES ON (in build 555 / 556 it went silent until STOP). The report should show `kicked 1×` and `moved on 0×` for that stretch.
+- [ ] **Volume keys with the screen off:** do they change the MEDIA volume or the ringer (the phone vibrated: ringer)? Does every press set off the dropout, or only the first?
+- [ ] **After a runaway:** pads feel late (the report header read 389–391 ms of output delay twice after one, 43 before)? Does reloading fix it?
+
 **Build 556**
 - [ ] **MOD on a …pump EQ band:** select a band in a pump EQ, right-click its FREQ (or GAIN) › Add LFO…: that band sweeps, the others stay; a second LFO on another band works at the same time. The MOD screen lists only bands in use ("FX1 pEQ · B3 FREQ"). Same for BAND / WIDE / HEAT.
 - [ ] **Add LFO… inside a …pump window:** right-click a knob in the window: the entry is there (not on switches / choices) and the window closes after adding: is closing right?
@@ -731,6 +736,14 @@ Suggested order: N0 → N1 → N2 (phone cured) → N4 with N3 alongside → N5 
   the edge `R.t0`, "waiting…" while armed), `rcdClk` / `rcdFmt` / `rcdFreeSecs`, a 250 ms timer only while recording; the
   final length stays until the next take. recorder-check covers FREE, PATTERN, Stop, next take and closing mid-take.
 
+
+## 10 Nov (afternoon): the kick works; the silence after it was the lead's own bug (build 557)
+
+Two reports from the owner's Fold (builds 555 and 556, the simple song with a delay, Page sequencer, screen off). **The kick breaks the runaway:** the clock reached ×4.5 about 14–17 s after hiding, the kick fired (`pausing the engine 150 ms`), the engine was running again 0.4 s later and `kick result` read +1.93 and +1.96 s in 2.00 s; one more one-second burst (+9.5 s) about 6 s later cleared without a kick. Without the kick (build 550) the runaway lasted about 14 s (167 s of surplus clock).
+- **But the song then went fully silent until STOP** (owner: "audio dropped, phone vibrated … then no sound. Fully silent. It comes back after a stop and start"). Cause, from the reports' page lines (`moved on 1× (22.74 s), held 105× (37.26 s)`; `moved on 1× (38.01 s), held 89× (49.58 s)`): the clock leaps 22–38 s at the instant `ctx.suspend()` lands; while the kick was in flight `rsTick` returned early (the lead's `rkBusy` correction of build 551, which keeps the learned band), so the moved-on rule in `pumpRun` moved the song on by the leap, and at the resume `rsTick`, band intact, held it by the same leap again: the next row lay 22–38 s ahead. **Fix:** `pumpRun` returns right after `rkTick()` while `rkBusy()`: nothing is booked and the moved-on rule does not run during the pause; `rsTick` takes the leap once, with `rsHold`'s full bookkeeping, when the engine runs again. `tests/runkick.test.js` gains a leap-at-suspend case.
+- **The owner found a trigger:** pressing a volume key with the screen locked sets the dropout off (reproduced by him); the phone vibrated, so the key moved the RINGER, not media volume: Android did not treat the page as playing media at that moment. Not investigated: whether a Media Session `playbackState = 'playing'` / metadata makes the keys act on media volume, and whether the vibration itself (the haptics path) disturbs the output stream.
+- **After a runaway the output delay stays high:** the report header read `latency 21 + 389 ms` (and 391 the first time) against 43 before; the per-line `lat` values are cached at 0.043. Pads will feel late until a reload. Not fixed (a context rebuild needs a reload today).
+- Idea not built: the kick could fire sooner (it waits three 0.5 s windows above ×3).
 
 ## 10 Nov (afternoon): MOD: pump bands, pump windows, master out, render parity (build 556)
 

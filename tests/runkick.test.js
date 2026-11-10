@@ -104,3 +104,14 @@ test('kick: a resume that does not take is tried again at 1 s, then handed to th
   R.run(5, 1); R.run(8, 14);
   assert.ok(R.calls.filter(c => c.startsWith('resume@')).length >= 2, 'a second resume'); assert.ok(R.calls.some(c => c.startsWith('interrupted@')), 'the interruption path was called');
 });
+
+test('kick: a clock that leaps at the moment of the suspend is taken once (lead, 10 Nov: the owner heard silence after a kick: the moved-on rule and the hold both took a 38 s leap)', () => {
+  assert.match(src, /if \(RUNKICK\) rkTick\(\);[^\n]*\n  if \(RUNKICK && rkBusy\(\)\) return;/, 'pumpRun books nothing and does not move the song on while a kick is in flight');
+  const R = rig(); const sus = R.ctx.suspend; R.ctx.suspend = function(){ this.currentTime += 38; return sus.call(this); };   // the phone: the clock jumps as the suspend lands
+  R.run(5, 1); const s0 = R.s.time, c0 = R.ctx.currentTime, w0 = R.clock.now;
+  R.run(4, 14); R.run(3, 1);   // the runaway, the kick (with its leap), then a healthy clock
+  assert.equal(R.calls.filter(c => c.startsWith('suspend@')).length, 1, 'one kick');
+  const clockAhead = (R.ctx.currentTime - c0) - (R.clock.now - w0) / 1000, held = R.s.time - s0;
+  assert.ok(clockAhead > 38, 'the clock ran ahead by the leap and more: ' + clockAhead.toFixed(1));
+  assert.ok(Math.abs(held - clockAhead) < 1.5, 'the song was moved on by what the clock ran ahead, once: held ' + held.toFixed(2) + ' s of ' + clockAhead.toFixed(2) + ' s');
+});
