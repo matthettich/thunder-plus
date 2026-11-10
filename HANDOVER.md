@@ -582,6 +582,9 @@ The owner's top priority to add is the MOD screen. Work down the list; ask befor
 
 Start a session by asking for results. Fix on `beta`. Web beta: https://matthettich.github.io/thunder-plus/beta/ (build 547 as of 10 Nov morning, 548 once its PR merges; the night of 9–10 Nov shipped 544–547, see the four "10 Nov" entries below. Decisions the lead made that night for the owner to confirm or reverse: on a phone the saved Sequencer default plays on the Page unless Audio thread is picked on that device; on a phone the safety limiter is its stand-in until another worklet loads; the resync only runs with a worklet loaded and its margins are untested on a device). Desktop: v1.3.4-beta.2 (build 541, no feed view or scopes); further desktop betas on hold until the owner asks.
 
+**Build 559 (phone: Background play was OFF)**
+- [ ] **Turn Background play back on** (Settings › Audio › Reset audio settings does it, or the Background play switch), then repeat the screen-off test and the locked-screen volume key test, and Copy playback report: its third line now lists the settings, and `media session: …` lines should appear at PLAY. Everything measured on the phone with the screen off on 10 Nov (the runaway, the kick, the volume key) was with Background play OFF.
+
 **Build 558 (phone: is the app a media player to Android?)**
 - [ ] **Locked-screen volume key:** PLAY, lock the screen, press a volume key: is the slider that appears the MEDIA one (no vibration), does the sound carry on, and is there a media control for Thunder Plus on the lock screen? Then Copy playback report (it has `media session: …` lines; if the key still moved the ringer, the lines just before say whether the background element was paused or refused).
 - [ ] **The 40 Hz tone:** on headphones or monitors from the phone, with a quiet song: can you hear or measure a constant 40 Hz at about −60 dB while playing (Android only; not in renders or recordings)? If it bothers you it can go lower, or off (`MS_ACTIVE`).
@@ -740,6 +743,11 @@ Suggested order: N0 → N1 → N2 (phone cured) → N4 with N3 alongside → N5 
   the edge `R.t0`, "waiting…" while armed), `rcdClk` / `rcdFmt` / `rcdFreeSecs`, a 250 ms timer only while recording; the
   final length stays until the next take. recorder-check covers FREE, PATTERN, Stop, next take and closing mid-take.
 
+
+## 10 Nov (afternoon): the phone had Background play OFF all along today (build 559)
+
+The owner's build 558 report had no `media session:` line at all. In `bgPlay`, `if (on && !bgOn) on = false` comes first, and with `on` false and no handlers yet nothing is logged, so the only way to get no line at PLAY is `bgOn` false: **Background play is switched off on the Fold** (most likely left off after the 8 Nov "phone clock toggle test", which asked for it off). So Android has had no media player to see: the page is an ordinary hidden tab (throttled, underruns climbing from the first second), and volume keys move the ringer. **Every screen-off measurement of 10 Nov (the runaway about 15–30 s after hiding, the kick, the volume-key dropout) was made in that state** and needs repeating with Background play on before any conclusion about them stands; the Worklets test of 9–10 Nov may have been too (not known). In that same report the build 557 fix held: `moved on 0×, held 167× (14.82 s), kicked 1×`, no leap at the suspend this time (34.09 vs 33.01), `kick result` +1.93 s in 2.00 s; a second runaway began 3 s later and `RK_GAP` (8 s) kept a second kick from firing before the owner stopped.
+- Build 559: the report header gains a `settings:` line (Background play, Keep screen on, Low power, Latency, Runaway kick) with a note when Background play is off on Android. Lesson for sessions: a test that asks the owner to switch something off must ask for it back on, and reports must show the settings.
 
 ## 10 Nov (afternoon): media session experiment for the locked-screen volume keys (build 558)
 
