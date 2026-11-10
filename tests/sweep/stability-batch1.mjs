@@ -109,4 +109,26 @@ if (want('F7')){   // the deck's spectrum analyser follows the master after Rese
     const before = await tone(1000); resetAudio(true); const after = await tone(3000); return {before, after};`); } finally { await A.close().catch(() => {}); } });
   add('F7 a tone into the master shows on the spectrum before and after Reset audio engine', r.before > -60 && r.after > -60, JSON.stringify(r));
 }
+if (want('F8')){   // MUT through renderVoice: the shared samples render as the base64 copies did (the Node test in tests/ checks the voices themselves)
+  const r = await retry(async () => { const A = await fresh(); try { return await A.run(`
+    const oldSrc = mutVoice.toString().replace('voiceToJSON(base, true)', 'voiceToJSON(base, false)').split('\\n').filter(l => l.indexOf('base.layers[i].sample') < 0).join('\\n');
+    if (oldSrc.indexOf('voiceToJSON(base, false)') < 0 || oldSrc.indexOf('base.layers[i].sample') >= 0) return {setup:'could not rebuild the old mutVoice'};
+    const mutOld = eval('(' + oldSrc + ')'); let R = 12345; const rnd = () => (R = (R * 1664525 + 1013904223) >>> 0) / 4294967296;
+    const res = {};
+    for (const grid of [true, false]){
+      const data = n => Float32Array.from({length:n}, (_, i) => { const x = Math.sin(i / 9) * 0.7 + (rnd() - 0.5) * 0.2; return grid ? Math.fround(Math.round(x * 32767) / 32767) : x; });
+      const base = mkVoice('T', [{type:'sample', dec:400, level:0.8}, {type:'sine', dec:200}, {type:'sample', a:0.2, dec:300, tune:3}]);
+      base.layers[0].sample = {sr:44100, name:'A', id:'sa', data:data(8820)}; base.layers[2].sample = {sr:22050, name:'B', id:'sb', data:data(4410), data2:data(4410)};
+      const lens = base.layers.map(L => L.sample ? L.sample.data.length : 0); let worst = 0, n = 0, same = true;
+      for (const seed of [1, 4, 11, 30]) for (const amt of [0.1, 0.5, 1]){
+        const a = renderVoice(mutVoice(base, seed, amt), 48000), b = renderVoice(mutOld(base, seed, amt), 48000); n++;
+        if (a.length !== b.length) same = false; else for (let i = 0; i < a.length; i++){ const d = Math.abs(a[i] - b[i]); if (d > worst) worst = d; }
+        if (a.r && b.r) for (let i = 0; i < a.r.length; i++){ const d = Math.abs(a.r[i] - b.r[i]); if (d > worst) worst = d; }
+      }
+      res[grid ? 'grid' : 'float'] = {worst, n, same, lensKept:base.layers.every((L, i) => (L.sample ? L.sample.data.length : 0) === lens[i])};
+    }
+    return res;`); } finally { await A.close().catch(() => {}); } });
+  const ok = !r.setup && r.grid.same && r.grid.worst === 0 && r.float.same && r.float.worst < 2e-5 && r.grid.lensKept && r.float.lensKept;
+  add('F8 MUT renders: bit-identical on 16-bit-grid samples, under 2e-5 on float samples', ok, JSON.stringify(r));
+}
 process.exit(table(rows) ? 1 : 0);

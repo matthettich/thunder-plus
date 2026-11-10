@@ -10546,7 +10546,10 @@ function genVoice(type, fam, seed, range){
 const MUT_LAYER = {tune:['add', 12], fine:['add', 50], dec:['mul', 1.5], atk:['mul', 1.2], hold:['mul', 1], rel:['mul', 1], pDec:['mul', 1.5], pAmt:['mul', 1], lpCut:['mul', 2], hpCut:['mul', 2],
   a:['unit', 0.6], b:['unit', 0.6], lpRes:['unit', 0.4], hpRes:['unit', 0.4], level:['mul', 0.4]};
 function mutVoice(base, seed, amt){
-  const v = voiceFromJSON(JSON.parse(JSON.stringify(voiceToJSON(base, false)))), r = (i, j) => varNoise(seed, i, j) * 2 - 1;
+  // 10 Nov: the samples are not copied through base64 (2 ms per second of audio on a computer, several times that on a phone, and rounded to 16 bits):
+  // the new layers share the base layers' sample objects. Nothing writes into a sample's data (renderVoice copies before it swaps channels; the Worker gets a structured clone).
+  const v = voiceFromJSON(JSON.parse(JSON.stringify(voiceToJSON(base, true)))), r = (i, j) => varNoise(seed, i, j) * 2 - 1;
+  v.layers.forEach((L, i) => { const s = base.layers[i] && base.layers[i].sample; if (s) L.sample = s; });
   const ek = base.engine && base.engine !== 'layers' ? base.engine : null, ui = ek && typeof XUI !== 'undefined' && XUI[ek];
   if (ek && v[ek] && ui && ui.rows){
     let i = 0; const P = v[ek];
