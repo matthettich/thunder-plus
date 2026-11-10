@@ -2655,6 +2655,17 @@ body.mob .dogs.idle .bob{animation-iteration-count:9} body.mob .dogs.idle .tail{
 :root[data-skinbase="term"] .tagrid b.f.p, :root[data-skinbase="term"] .tagrid b.f.p[style]{background:transparent; color:var(--mx); box-shadow:inset 0 0 0 2px var(--mx)}
 :root:is([data-skin="rainbow"],[data-skin="rainbowdyn"]) .tagrid b.f.p{background:#fff!important; color:oklch(.45 .16 var(--rbh)); box-shadow:inset 0 0 0 2px oklch(.62 .16 var(--rbh))}
 :root:is([data-skin="rainbow"],[data-skin="rainbowdyn"]) .tagrid b:not(.f){--rbh:calc((var(--ci, 0) + var(--ri, 0)) * 30deg + 10deg + var(--rbo, 0deg)); background:oklch(.94 .03 var(--rbh))}
+/* TOUCH TARGETS (usability audit U4): heights and hit areas only, on a touch screen; the looks stay, desktop is untouched. The Tracker | Synth switch is left alone. */
+@media (pointer:coarse){
+  .top .tsong, .top .tcpu, .ttabs button, #bFile, #bEdit, #bView, #bAud, .top #bSet, .top #bHelp{min-height:40px}
+  .pfav, #tArr .tahd .azb{position:relative}
+  .pfav::before{content:''; position:absolute; left:-4px; right:-4px; top:50%; height:40px; transform:translateY(-50%)}
+  #tArr .tahd .azb::before{content:''; position:absolute; inset:-8px}
+  #tArr .tahd .appin, #apStrip .appin{position:relative}
+  #tArr .tahd .appin::before, #apStrip .appin::before{content:''; position:absolute; left:0; right:0; top:50%; height:40px; transform:translateY(-50%)}
+  .gset label.cb{min-height:40px}
+  .gset :is(#audReset, #audReport){min-height:40px}
+}
 </style>
 <style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}</style>
 <style>
