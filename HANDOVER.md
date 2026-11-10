@@ -525,7 +525,7 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0) and `link/` (Ableton
 
 ### Where things stand (10 Nov, 15:10: READ THIS FIRST; it supersedes older lines below where they disagree)
 
-**Web beta: build 560** (https://matthettich.github.io/thunder-plus/beta/). `main` and the desktop app are far behind (desktop v1.3.4-beta.2 = build 541): nothing since build 541 is on the desktop; a desktop beta from `beta` only when the owner asks. Every PR into `beta` now runs `npm test` and the sequencer goldens in GitHub Actions (`tests.yml`).
+**Web beta: build 561** (https://matthettich.github.io/thunder-plus/beta/). `main` and the desktop app are far behind (desktop v1.3.4-beta.2 = build 541): nothing since build 541 is on the desktop; a desktop beta from `beta` only when the owner asks. Every PR into `beta` now runs `npm test` and the sequencer goldens in GitHub Actions (`tests.yml`).
 
 **Owner's direction (10 Nov afternoon):** keep working on AUDIO STABILITY of the web app; the native port is PARKED ("especially if we can lower the priority of a port"). He will test when he has time ("it's been hard for me to have the time to review"): do not block on him; queue tests in the punch list.
 
@@ -539,7 +539,7 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0) and `link/` (Ableton
 5. Small choices: the "Help" header in File; closing the pump window after Add LFO…; scenes / macros on CUT for live synths (offset from the knob); whether the PROJECT screen's BACKGROUND PLAY row should go or ask first (a stray EDIT can flip it).
 
 **Queued work that needs no owner input (do in this order; delegate to Sonnet, lead reviews audio):**
-1. Review and merge what was running at 15:10: `fix/worklet-robustness` (block sizes other than 128, pump-synth wasm guard, chains' Flex / Step gate copies) and `test/soak` (`tests/sweep/soak.mjs` + `docs/audits/2026-11-10-soak.md`); then fix what the soak finds (leaks, growth, stalls over 10 minutes).
+1. (`fix/worklet-robustness` is MERGED as build 561, see the 10 Nov entry; `test/soak` still to review. A new owner choice came out of it: chains / waves Flex pattern SCRATCH has depth 0.125 there and 0.105 in the track effect, and Step gate with Pattern CV at 0 plays the custom steps there; unifying the copies changes old chains patches, so it waits for his word.) Was: review and merge what was running at 15:10: `fix/worklet-robustness` (block sizes other than 128, pump-synth wasm guard, chains' Flex / Step gate copies) and `test/soak` (`tests/sweep/soak.mjs` + `docs/audits/2026-11-10-soak.md`); then fix what the soak finds (leaks, growth, stalls over 10 minutes).
 2. Smoothing, ONLY if the owner hears steps: the effect host ramps a modulated value toward its next point per block, scoped to pitch / cutoff-type parameters (lead designs; about one session).
 3. Left from the memory pass: per-block garbage in the chains / waves hosts and some modules (generated / shared text), `rvMix`, `__tcOv`'s per-block objects, pump-synth worklet's `at` closure.
 4. Battery finding 3: `clocked` effect worklets and the master / chains / core with silence shortcuts while stopped (audio review).
@@ -611,6 +611,9 @@ The owner's top priority to add is the MOD screen. Work down the list; ask befor
 ### Owner's punch list (owner, 9 Nov: will test these later; keep it current)
 
 Start a session by asking for results. Fix on `beta`. (10 Nov, 15:10: the web beta is build 560; the build numbers in the rest of this paragraph are older.) Web beta: https://matthettich.github.io/thunder-plus/beta/ (build 547 as of 10 Nov morning, 548 once its PR merges; the night of 9–10 Nov shipped 544–547, see the four "10 Nov" entries below. Decisions the lead made that night for the owner to confirm or reverse: on a phone the saved Sequencer default plays on the Page unless Audio thread is picked on that device; on a phone the safety limiter is its stand-in until another worklet loads; the resync only runs with a worklet loaded and its margins are untested on a device). Desktop: v1.3.4-beta.2 (build 541, no feed view or scopes); further desktop betas on hold until the owner asks.
+
+**Build 561** (sturdier audio; nothing should sound different)
+- [ ] Phone and computer: play two or three songs you know well (one with …pump synths, one with a chains or waves track). Pass: they sound as before; no "stopped working" toast.
 
 **Build 560**
 - [ ] **Background play guard (phone):** switch Background play off (Settings, or the PROJECT screen's row): a note says it is for testing only. PLAY, lock the screen a few seconds, come back: a message offers "Turn on"; tap it: it is on again and the report shows the session starting.
@@ -780,6 +783,10 @@ Suggested order: N0 → N1 → N2 (phone cured) → N4 with N3 alongside → N5 
   the edge `R.t0`, "waiting…" while armed), `rcdClk` / `rcdFmt` / `rcdFreeSecs`, a 250 ms timer only while recording; the
   final length stays until the next take. recorder-check covers FREE, PATTERN, Stop, next take and closing mid-take.
 
+
+## 10 Nov (late afternoon): worklets take any block length; pump synth guard (build 561)
+
+Sonnet agent, lead reviewed the diff. **Why:** Chrome is adding a render size hint, so a block need not be 128 frames; `ThunderFx` threw at 256, the engines dropped or overran frames, the core's SoundFont scratch gave NaN. **What:** `tcChunks` (same text in `index.html`'s `TFX_SRC`, `pump-synth-worklet.js`, `chains-worklet.js`, `waves-worklet.js`) runs a block over 128 in chunks of at most 128 on views; 128 or less takes the old path (bit-identical, tested); over 4096 → silence + `{failed:'block size N'}`. Core scratch / override buffers follow the block length; the master meter counts frames. Known limit: chunks after the first see the block's `currentTime` (per-block timing slightly coarser on long blocks). **Pump synth:** a throw in `process()` → silent, marked failed, one toast; a non-finite sample (found by the existing output loop) → block zeroed, engine freed and reopened, `{nan}` logged, the 8th reset gives up. Tests: `tests/block-size.test.js`, `tests/psyn-guard.test.js`. **Not done, owner's choice:** chains / waves keep their own Flex / Step gate / Retrig copies (hand-maintained, no tool): Flex SCRATCH depth 0.125 vs the track effect's 0.105, and Step gate at Pattern CV 0 = custom steps vs gate open; all else is bit-identical.
 
 ## 10 Nov (afternoon): Background play guard (build 560); the port is parked
 

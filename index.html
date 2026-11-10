@@ -3450,7 +3450,7 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
 </div>
 <div class="toast" id="toast" role="status" aria-live="polite" title="Tap to dismiss" hidden></div>
 
-<script src="waves/waves-worklet.js?v=34"></script>
+<script src="waves/waves-worklet.js?v=35"></script>
 <!-- LXR ENGINES (23 Oct 2026): the LXR-02 firmware's drum voices, GPL-3.0, all of it in lxr/. Optional: without the folder
      this fails quietly and the app has no Firmware engines. The render Worker loads the same file (LXR_JS below). -->
 <script src="lxr/lxr-engine.js?v=2"></script>
@@ -8325,12 +8325,12 @@ const cpu = {cap:null, t:0, probe:null, on:false};
    back to the worklet timings. Checked headless against added work: 0, 17, 30, 53, 85% as the graph grew. */
 const CPU_PROBE = `registerProcessor('thunder-cpu', class extends AudioWorkletProcessor {
   constructor(){ super(); this.g = []; this.last = 0; this.t0 = 0; }
-  process(){
-    const n = Date.now();
+  process(ins, outs){
+    const n = Date.now(), fr = (outs && outs[0] && outs[0][0] && outs[0][0].length) || (ins && ins[0] && ins[0][0] && ins[0][0].length) || 128;   // (the block length, when the node has a channel to tell it)
     if (this.last){ const d = n - this.last; if (d < 200) this.g.push(d); } else this.t0 = n;   // a long gap: suspended, not busy
     this.last = n;
     if (n - this.t0 >= 500 && this.g.length > 20){
-      const q = 128000 / sampleRate, g = this.g, N = g.length; let W = 0, sm = 0, ns = 0, nb = 0;
+      const q = fr * 1000 / sampleRate, g = this.g, N = g.length; let W = 0, sm = 0, ns = 0, nb = 0;
       for (const d of g){ W += d; if (d > 1.5 * q) nb++; else { sm += d; ns++; } }
       const m = W / N; let load = null;
       if (m > 1.15 * q) load = m / q;                       // can't keep up: busy all the time, and late
@@ -8430,7 +8430,7 @@ self.onmessage = async e => {
       if (m.op === 'done') j.ok({data:m.data, data2:m.data2 || null, st:m.st}); else j.no(new Error(m.err));
     };
     w.onerror = e => { e.preventDefault && e.preventDefault(); rwDown(); };
-    w.postMessage({op:'init', pl:plMod, tx:txMod, lx:lxMod || null, ps:psMod || null, wv:new URL('waves/waves-worklet.js?v=34', location.href).href});
+    w.postMessage({op:'init', pl:plMod, tx:txMod, lx:lxMod || null, ps:psMod || null, wv:new URL('waves/waves-worklet.js?v=35', location.href).href});
     PW.w = w;
   } catch(e){ PW.w = null; }
 }
@@ -18606,6 +18606,23 @@ const TFX_SRC = `
    than any gain row gives). Anything below is clipped at ±8 and goes on (the master's limiter follows). */
 const hotBad = (oL, oR, n) => { for (let k = 0; k < n; k++){ const a = oL[k], b = oR[k]; if (!(a > -64 && a < 64 && b > -64 && b < 64)) return true; } return false; };
 const hotClip = (L, R, n) => { for (let k = 0; k < n; k++){ const a = L[k], b = R[k]; if (a > 8) L[k] = 8; else if (a < -8) L[k] = -8; if (b > 8) R[k] = 8; else if (b < -8) R[k] = -8; } };
+/* ANY BLOCK LENGTH (10 Nov): Chrome is adding a render size hint, so a block need not be 128 frames. tcChunks runs one (a function of the code
+   written for at most B frames) over a longer block in chunks of at most B, on views of the same buffers (no copy). Thunder
+   Core's parameter overrides are made once for the whole block, then off for the chunks, and its post gain / pan runs once at
+   the end. A block longer than 4096 fails soft: silence, and one {failed:'block size N'} to the page. (A block of 128 or less
+   never comes here: it takes the old path unchanged.) */
+function tcChunks(self, ins, outs, P, B, one){
+  const N = outs[0][0].length;
+  if (N > 4096){ for (const g of outs) for (const c of g) c.fill(0); if (!self.__bsFail){ self.__bsFail = 1; self.port.postMessage({failed:'block size ' + N}); } return true; }
+  if (self.__ov && globalThis.__tcOv) P = globalThis.__tcOv(self, P, N);
+  const ov = self.__ov; self.__ov = null; let ok = true;   // (read after: __tcOv lets go of an expired override)
+  try { for (let a = 0; a < N && ok; a += B){ const e = Math.min(a + B, N), v = c => c.subarray(a, e), Q = {};
+      for (const k in P){ const A = P[k]; Q[k] = A.length > 1 ? v(A) : A; }
+      ok = one.call(self, ins.map(g => g.map(v)), outs.map(g => g.map(v)), Q) !== false; } }
+  finally { self.__ov = ov; }
+  if (ok && ov && globalThis.__tcPost) globalThis.__tcPost(self, outs[0]);
+  return ok;
+}
 class ThunderFx extends AudioWorkletProcessor {
   // bp: the song position in beats from the player's clock. sw0–sw3: tracker FXO switches per slot (−1 = the slot's
   // own on/off). flx, gat, rtg: tracker FLX / GAT / RTG (−1 = the effect's own setting).
@@ -18826,7 +18843,8 @@ class ThunderFx extends AudioWorkletProcessor {
       this.L.set(this.cL); this.R.set(this.cR); return; }
     if (s.wi >= 0){ const dg = s.rv[0], wg = s.rv[1], cL = this.cL, cR = this.cR; for (let k = 0; k < n; k++){ L[k] = cL[k] * dg + L[k] * wg; R[k] = cR[k] * dg + R[k] * wg; } }   // REVERB MIX
   }
-  process(inputs, outputs, params){
+  process(inputs, outputs, params){ return outputs[0][0].length <= 128 ? this.p1(inputs, outputs, params) : tcChunks(this, inputs, outputs, params, 128, this.p1); }   // (any block length: the code below is for at most 128 frames)
+  p1(inputs, outputs, params){
     if (this.dead) return false;
     if (this.__q && this.__q.length){ const q = this.__q, due = currentTime + 64 / sampleRate; while (q.length && q[0][0] <= due) this.port.onmessage({data:q.shift()[1]}); }   // THUNDER CORE: FXV at its time
     if (this.__ov && globalThis.__tcOv) params = globalThis.__tcOv(this, params, outputs[0][0].length);   // THUNDER CORE
@@ -18928,7 +18946,7 @@ function chainsReady(ac){
     chnLoaded.set(ac, (async () => {
       await tfxLoad; await tfxModLoad; if (!chnBin() || !ac.audioWorklet || !window.AudioWorkletNode) return false;
       if (!chnURL){
-        const src = await (await fetch('chains/chains-worklet.js?v=44')).text();
+        const src = await (await fetch('chains/chains-worklet.js?v=45')).text();
         chnURL = URL.createObjectURL(new Blob([src], {type:'application/javascript'}));
       }
       wkNote(ac, 'chains'); await ac.audioWorklet.addModule(chnURL);
@@ -20652,7 +20670,9 @@ function makePlayer(ac, out, getBuf, live, mo){   // mo: the master OUT gain (af
       psSent.add(ac);
       const g = ac.createGain(), pn = ac.createStereoPanner(), P = k => node.parameters.get(k);
       node.connect(g); g.connect(pn); pn.connect(buses[t].inp);
-      node.load = 0; node.port.onmessage = e => { const d = e.data; if (d && typeof d.load === 'number') node.load = node.load * 0.6 + d.load * 0.4; };
+      node.load = 0; node.port.onmessage = e => { const d = e.data; if (d && typeof d.load === 'number') node.load = node.load * 0.6 + d.load * 0.4;
+        else if (d && d.failed && !node.psFailed){ node.psFailed = true; tpLog('pump synth live node', new Error(d.failed)); toastErr('A …pump synth stopped working and is silent until the page is reloaded.'); }   // (a wasm trap: the node is silent from now on)
+        else if (d && d.nan && !node.psNan){ node.psNan = true; tpLog('pump synth live node', new Error('its output was not finite: the engine was reset')); } };
       const lanes = [0, 1, 2, 3].map(j => ({node, g, pn, pad, kind, ps:true, lane:j, rate:P('r' + j), gate:P('g' + j), trig:P('t' + j), leg:P('l' + j), vel:P('v' + j), n:0, lastOn:-1, cur:null}));
       const b = lanes[0]; b.lanes = lanes; b.fileRef = frzSample(V); b.bpm = P('bpm'); if (b.bpm) b.bpm.value = bpmNow;   // the song's tempo (WOB's wobble; tempoTo moves it)
       bassN.set(key, b); if (live) bassLive.add(b);
@@ -21673,9 +21693,9 @@ class XP_${name} extends AudioWorkletProcessor {
 registerProcessor('thunder-${name}', XP_${name});`;
 let bassURL = null; const bassLoad = new WeakMap(), bassOK = new WeakSet(), bassLive = new Set();
 // …PUMP SYNTHS live: their worklet, loaded with the others; psSent: the contexts whose audio thread has the wasm's bytes
-const PSYN_WK = 'pump/synth/pump-synth-worklet.js?v=9', psOK = new WeakSet(), psSent = new WeakSet();
+const PSYN_WK = 'pump/synth/pump-synth-worklet.js?v=11', psOK = new WeakSet(), psSent = new WeakSet();
 // …WAVES LIVE: the waves worklet in the tracker's own context (thunder-wlive); wlSent: the contexts that have the wasm
-const WAVES_WK = 'waves/waves-worklet.js?v=34', wlOK = new WeakSet(), wlSent = new WeakSet();
+const WAVES_WK = 'waves/waves-worklet.js?v=35', wlOK = new WeakSet(), wlSent = new WeakSet();
 /* BATTERY (8 Nov, Fold): a bookkeeping timer that only does something in one situation (playing, the screen visible, one
    screen open) had been waking the phone 2 to 16 times a second for nothing. idleTick(fn, fast, busy, slow) calls fn every
    `fast` ms while busy() says so and every `slow` ms otherwise (fn runs either way, so its own reset-when-idle code still
@@ -21758,7 +21778,7 @@ const isLivePad = i => isSyn(i) && (isBassV(kit.voices[i]) || isVoxV(kit.voices[
 const liveX = v => !!(v && XENG[v.engine] && XENG[v.engine].live);
 // A bass voice was edited: the live nodes playing it hear the change at once.
 function bassPush(i){ const v = kit.voices[i], vx = isVoxV(v), lx = liveX(v); if (!isBassV(v) && !vx && !lx) return; const kind = vx ? 'vox' : lx ? v.engine : 'bass', p = vx ? voxParams(v) : lx ? xParams(v) : bassParams(v); for (const b of bassLive) if (b.pad === i && b.kind === kind) try { const fs = lx ? frzSample(v) : null; if (b.lanes && fs !== (b.fileRef || null)){ b.fileRef = fs; b.node.port.postMessage({set:p, file:fs ? {d:fs.data, sr:fs.sr} : {d:null}}); } else b.node.port.postMessage({set:p}); } catch(e){} }   // FREEZE FILE: the sound only when it changed
-const MW_URL = 'master-worklet.js?v=6', mwLoad = new WeakMap();
+const MW_URL = 'master-worklet.js?v=7', mwLoad = new WeakMap();
 function mwReady(ac){ if (!mwLoad.has(ac)){ const go = ac.audioWorklet && !wkOff(ac), pr = go ? ac.audioWorklet.addModule(MW_URL).then(() => true, () => false) : Promise.resolve(false); mwLoad.set(ac, pr); if (go) wkNote(ac, 'master'); } return mwLoad.get(ac); }
 const mstSet = M => ({sup:M.sup, comp:M.comp, lim:M.lim});
 const mstNeedsWk = M => M.sup.on || M.comp.on || M.lim.on;
@@ -22323,7 +22343,7 @@ function padBlink(e){
 // Phones and tablets (10 Nov): the audio-thread sequencer's module (a second thread) loads only when the owner picked it there
 // (aset.corePick, set in Settings); the saved default 'core' plays on the Page sequencer on such a device.
 function coreWanted(){ return aset.core === 'core' && (!wkLazy() || !!aset.corePick); }   // (a declaration: the Settings row reads it at load)
-const CORE_REV = 'zqd29l';
+const CORE_REV = '4wmvnw';
 const CORE_WANT = 7;   // the core's message set this page speaks (core-processor.js CORE_V); an older core is not used
 const CORE_URL = () => 'core/seq-core.js?v=' + BUILD + '-' + CORE_REV;
 const core = {node:null, ready:false, loading:null, gen:0, sent:new Map(), sT:0, tally:new Map(), mir:null};   // mir: what the core's song holds, as JSON per part (coreDiff)   // tally: events by who played them (test hook)
@@ -23852,7 +23872,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 560;
+const BUILD = 561;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD + (location.pathname.includes('/beta/') ? ' · beta' : '');
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -33282,6 +33302,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [561, '10 Nov', ['Sturdier audio: the engines no longer assume the browser hands them audio in blocks of exactly 128 samples (Chrome is adding other sizes), and a …pump synth that crashes or produces a broken signal now goes silent or resets itself instead of taking the sound down. No change to how anything sounds.']],
   [560, '10 Nov', ['Android: if a song is playing when the app goes to the background with Background play off, the app says so when you come back and offers to turn it on (with it off, playback breaks up and the volume keys move the ringer).']],
   [559, '10 Nov', ['The playback report now lists the settings that matter for it (Background play, Keep screen on, Low power, Latency, Runaway kick).']],
   [558, '10 Nov', ['Android experiment: the hidden background-play clip is now a very quiet 40 Hz tone (about −60 dB) instead of near-silence, to see whether Android then treats the app as a media player (locked-screen volume keys changing media volume, not the ringer). The playback report says what the media session did.']],
