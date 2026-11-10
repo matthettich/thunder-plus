@@ -61,10 +61,10 @@ const fxMk = (a, B) => {
   for (let k = 0; k < 8; k++) P['sw' + k] = [-1]; for (const k in P) P[k] = Float32Array.from(P[k]);
   return { ins: [[s, s], [], []], P };
 };
-test('ThunderFx (thunder-tfx): 64 / 128 / 256 / 384 frames; 128 identical to aaf7554; a 256 block = two 128 blocks', () => {
+test('ThunderFx (thunder-tfx): 64 / 128 / 256 / 384 frames; 128 identical to aaf7554; a 256 block = two 128 blocks', { skip: !ACORN && 'needs acorn' }, () => {
   matrix('tfx', fxBuild, fxMk, { oldSrc: HTML0, newSrc: HTML });
 });
-test('ThunderFx: a block longer than 4096 fails soft (silence, one failed message, keeps running)', () => {
+test('ThunderFx: a block longer than 4096 fails soft (silence, one failed message, keeps running)', { skip: !ACORN && 'needs acorn' }, () => {
   const node = fxBuild(HTML), B = 4097, outs = [[new Float32Array(B).fill(1), new Float32Array(B).fill(1)]], { ins, P } = (() => { const s = new Float32Array(B), P = fxMk(0, 1).P; P.bp = new Float32Array(B); return { ins: [[s, s], [], []], P }; })();
   for (let i = 0; i < 3; i++) assert.equal(node.process(ins, outs, P), true);
   assert.equal(peak(outs[0][0]), 0); assert.deepEqual(node.posts.filter(m => m.failed), [{ failed: 'block size 4097' }]);
