@@ -523,6 +523,40 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0) and `link/` (Ableton
 
 ## To-do (owner's list: keep it current; newest dated entries below have the details)
 
+### Stability plan (owner, 9 Nov night: "my priority is getting the app to a usable, efficient, and stable place for Android, Mac, and Windows")
+
+The owner's goal is stability and usability first, with only the MOD page and its live-instrument targets as near-term features. How to work it: the lead plans and writes each brief, lower-cost agents the lead spawns do the work, the lead verifies every result (reads the diff, reruns the tests) before pushing. Every change goes through a PR into `beta` with a CodeRabbit review asked for (`@coderabbitai review`; it skips `beta` PRs otherwise). Audio, timing and both sequencers stay under the lead's line-by-line review.
+
+0. **Land build 544 and unique-per-track** (10 Nov, see the dated entry below). Done when both PRs are reviewed and merged, and the owner has run the Worklets test on the Fold.
+1. **Confirm the 9 Nov fixes.** Agents retest each item of "9 Nov: the owner's phone bug list" and builds 531–543 headless (Pixel 7 profile and desktop). Lead sorts each into fixed / not fixed / only testable on the phone. Done when every item has a status and the owner's punch list is current.
+2. **Stability on Android.** Waits on the Worklets test. Clock holds with worklets off: build a phone-safe audio mode (which effects and limiter can run on native nodes; a context made without worklets when the song needs none). Clock still races: build the resync sketched in "8 Nov, end of session". Either way fix what the `slow …` and `long frame` report lines show for the stutter that stops under LOOP.
+3. **Battery audit.** Agents measure main-thread and audio CPU idle, playing and hidden, per screen, and list every timer, redraw and node that runs when it needn't. Known candidates: sleep the engine sooner when hidden and stopped on phones (20 s today; held back until the Worklets test is done, since the test needs that window), …waves embedded starts its own AudioContext and worklet when its screen is opened (`waves/index.html` `startEngine`, no EMBED guard) and it stays alive, five to seven worklet modules loaded at first touch whether or not the song uses them. Done when before / after numbers show the saving and the golden and timing tests are unchanged.
+4. **Usability audit.** Agents walk every screen folded, unfolded, Mac and Windows sizes for awkward flows, dead ends and keys or gestures that differ between screens (start from `docs/USABILITY-AUDIT.md` and the 3 Nov mouse audit so nothing decided is reopened). Lead ranks; only findings that change something the owner chose go to the owner. Small fixes ship in batches.
+5. **Mac and Windows desktop.** Agents run the desktop checks (MIDI, Ableton Link, the I/O helper, updater) and reduce the hardware checklist to what only the owner can do. A desktop beta from `beta` once steps 1–4 are in.
+6. **MOD page, then live instruments.** Harden MOD as built (the owner's by-ear and touch checks), then its targets on the live engines' own filter and envelope, one engine at a time (Feature priority items 1 and 2).
+
+Steps 1, 3 and 4 can run side by side. Step 2 waits on the phone test. Step 6 is last.
+
+### Which model for which work (owner, 9 Nov night: wants to spend usage carefully; the top model only for audio work and verification)
+
+| Work | Model |
+|---|---|
+| Archiving old handover entries, build number / changelog / `sw.js` bumps, merging reviewed PRs, checking on CodeRabbit, starting desktop builds | Haiku 5.5 |
+| Stability plan steps 1, 3 (measuring), 4 and 5: retesting fixes, battery measurements, the usability walk, wording and layout fixes, song-grid behaviour (like unique per track), MOD page interface work, desktop checks | Sonnet 5.5 |
+| Planning or reviewing non-audio work | Opus 5.5 |
+| Reading playback reports, the phone clock and worklet problem (plan step 2), anything in either sequencer, the audio thread, worklets, timing or latency, and the final check on any audio change | Fable 5.2 |
+
+Rules for every session, whichever model:
+- One job per chat, started fresh. Read this To-do section first, not the whole file.
+- Every change goes through a PR into `beta`; ask for the review with a `@coderabbitai review` comment, fix real findings, merge only when it and `npm test` are clean.
+- A cheaper model does not change sequencer, audio-thread, worklet, timing or latency code. If a fix needs it, write what is needed under "Bugs still open" marked **for audio review** and stop there.
+- End by updating the punch list and adding a short dated entry.
+
+Opening lines the owner can paste:
+- Haiku: "Pull thunder-plus, read the To-do section of HANDOVER.md, and do this housekeeping job: …"
+- Sonnet: "Pull thunder-plus, read the To-do section of HANDOVER.md, and do step N of the Stability plan. Follow the rules under 'Which model for which work'."
+- Fable: "Pull thunder-plus. Here are my playback reports from the punch list: …" or "Review the items marked for audio review."
+
 ### Feature priority (owner, 9 Nov: build future features in this order)
 
 The owner's top priority to add is the MOD screen. Work down the list; ask before reordering it. The owner will run the tests in "Owner's punch list" below.
@@ -547,6 +581,12 @@ The owner's top priority to add is the MOD screen. Work down the list; ask befor
 ### Owner's punch list (owner, 9 Nov: will test these later; keep it current)
 
 Start a session by asking for results. Fix on `beta`. Web beta: https://matthettich.github.io/thunder-plus/beta/ (build 543 as of 9 Nov evening). Desktop: v1.3.4-beta.2 (build 541, no feed view or scopes); further desktop betas on hold until the owner asks.
+
+**New on 10 Nov (build 544 and unique-per-track; on the web beta once their PRs merge)**
+- [ ] **Worklets test (the important one), Fold, a simple song, Page sequencer:** (1) Settings › Audio › Worklets **On**: PLAY, turn the screen off about 20 s, back on, STOP, Copy playback report. (2) Worklets **Off (test)**, Apply (reload), the same steps, Copy report. Effects are silent in Off; that is expected. Also by ear: does Off stutter or rush less?
+- [ ] **Stopped and hidden:** with Worklets On, STOP, screen off about 15 s (under 20 s, before the engine sleeps), back on, Copy report. Same with Off.
+- [ ] **Stutter under song play:** the song that stutters with Arrange showing and stops under LOOP: play it through once, STOP, Copy report (it now has `slow …` and `long frame` lines). Does that song use MUT, CUT, RES or DEC on sample pads?
+- [ ] **Unique per track:** on an empty track a pattern brought from another track gets its own copy; after that, moving it up or down that track, repeating it there, and rearranging the song make no new patterns.
 
 **New on 9 Nov (web beta, builds 536–543)**
 - [ ] **MOD by ear:** do fast rates (1/16, 1/32) sound steppy? Which effects? That decides where smoothing goes.
@@ -593,6 +633,16 @@ Start a session by asking for results. Fix on `beta`. Web beta: https://matthett
   the edge `R.t0`, "waiting…" while armed), `rcdClk` / `rcdFmt` / `rcdFreeSecs`, a 250 ms timer only while recording; the
   final length stays until the next take. recorder-check covers FREE, PATTERN, Stop, next take and closing mid-take.
 
+
+## 10 Nov: phone clock re-read; Worklets test switch, clock log while hidden, slow-work timing (build 544)
+
+Owner asked what the stutter work had missed. Three things (read-only audit, then build 544; draft by the lead, finished and tested by a Sonnet agent, verified by the lead):
+- **The clock evidence was misread.** The build 529 Balanced report shows the clock racing with the song STOPPED and the screen off (7.40 s of audio time in 5.95 s), so it is not the song or the sequencer. The "8% fast while playing" (527, Safest) happened once, right after the engine started with a 302 ms buffer, and never again: more likely a one-time buffer fill than a rate error. The 528 clock log stopped 5 s after STOP, so it never covered a racing stretch. It now runs while hidden with the engine running and for 10 s after coming back (`pbCkOn`).
+- **Untested suspect: worklets.** Even a sample-only song on Page + Render loaded 7 worklet modules and made 14 worklet nodes at first touch (CPU probe, safety limiter, bass / pump-synth / waves modules, chains, tfx). Chrome renders a context on a second thread once it uses AudioWorklet, and on Android keeps adaptive buffering (Chrome 136 dropped both on desktop only). Hypothesis, NOT confirmed in current Chromium source: when that thread is held up with the app hidden, each device callback queues a render sized from a growing buffer target, so the context over-renders and the surplus is dropped: dropouts plus a leaping clock, and afterwards more hidden delay (the playhead ahead of the sound). Test: Settings › Audio › **Worklets: Off (test)** (`aset.noWk`, `NOWK`, `wkOff(ac)`; applies on reload). The page context then makes zero `addModule` and zero `AudioWorkletNode` (measured headless, Pixel 7 profile, Page and Audio-thread settings); effects, chains, live engines and the core are silent or unused, the limiter is its stand-in, exports are untouched. Not guarded: the recorder's `thunder-rec` and the helper's `thunder-io-in` (recording only), so don't record during the test.
+- **Stutter that stops under LOOP: a real candidate.** `varBuf` built the variation's voice again for every note until its Worker render landed (21 builds per key in a 20-note test, now 1); for a MUT on a pad with a sample, `mutVoice` base64-encodes and decodes the whole sample each time (still does once per key: `voiceToJSON(base, false)`; worth changing if the report shows it). Also first use of a CUT / RES / DEC value copies and filters the sample on the page, and a new phrase rebuilds the grid. The report now logs `slow <what> N ms … row R` (4 ms or more, while playing) for varVoice, varBuf, shapeData, stretchData, rtBufPlain, ensure, and `long frame` lines (120 ms or more) with the top functions.
+- Also found, not changed: embedded …waves starts its own AudioContext and worklet when its screen opens (`waves/index.html` `startEngine`, no EMBED guard). Held back on purpose until the Worklets test is done: sleeping the engine sooner when hidden and stopped on phones.
+- Reading the test: Off holds 1:1 where On races → build the phone-safe audio mode (plan step 2). Both race → not worklets; look at `out t`, `stats total` and `bg` in the new hidden lines as in "8 Nov, end of session".
+- Sources: Chromium `audio_destination.cc` (older revision: one render task posted per device callback, FIFO not re-checked), "New in Chrome 136: WebAudio Lower Latency" (fugu-dev), Chromium issue 40133762.
 
 ## 9 Nov: LFO scopes on MOD (build 543)
 
