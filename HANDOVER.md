@@ -540,6 +540,7 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0) and `link/` (Ableton
 
 **Queued work that needs no owner input (do in this order; delegate to Sonnet, lead reviews audio):**
 1. (`fix/worklet-robustness` is MERGED as build 561, see the 10 Nov entry; `test/soak` still to review. A new owner choice came out of it: chains / waves Flex pattern SCRATCH has depth 0.125 there and 0.105 in the track effect, and Step gate with Pattern CV at 0 plays the custom steps there; unifying the copies changes old chains patches, so it waits for his word.) Was: review and merge what was running at 15:10: `fix/worklet-robustness` (block sizes other than 128, pump-synth wasm guard, chains' Flex / Step gate copies) and `test/soak` (`tests/sweep/soak.mjs` + `docs/audits/2026-11-10-soak.md`); then fix what the soak finds (leaks, growth, stalls over 10 minutes).
+1a. From the soak test (merged; see the 10 Nov entry): stop `draw()` re-assigning unchanged text (`#tTitle`, `#tInfo`, readouts); then a 20-minute page-vs-core sequencer A/B on a quiet machine (the core showed more dropouts; unproven).
 2. Smoothing, ONLY if the owner hears steps: the effect host ramps a modulated value toward its next point per block, scoped to pitch / cutoff-type parameters (lead designs; about one session).
 3. Left from the memory pass: per-block garbage in the chains / waves hosts and some modules (generated / shared text), `rvMix`, `__tcOv`'s per-block objects, pump-synth worklet's `at` closure.
 4. Battery finding 3: `clocked` effect worklets and the master / chains / core with silence shortcuts while stopped (audio review).
@@ -783,6 +784,10 @@ Suggested order: N0 → N1 → N2 (phone cured) → N4 with N3 alongside → N5 
   the edge `R.t0`, "waiting…" while armed), `rcdClk` / `rcdFmt` / `rcdFreeSecs`, a 250 ms timer only while recording; the
   final length stays until the next take. recorder-check covers FREE, PATTERN, Stop, next take and closing mid-take.
 
+
+## 10 Nov (late afternoon): soak test (test only; no leak found)
+
+Sonnet agent. `node tests/sweep/soak.mjs --minutes=10 --seq=page|core [--phone]` (see `tests/sweep/README.md`); the write-up is `docs/audits/2026-11-10-soak.md`. Three runs (page 10 min, core 10 min, page with 4x CPU throttle 8 min): **0 FAIL**; heap after GC grew 0.03–0.07 MB / min; DOM, listeners, timers, voices, audio nodes and the app's queues all return to level. Shared machine, so timings are trends only. **Findings to act on (queued in "Where things stand"):** (1) `draw()` assigns `#tTitle` / `#tInfo` (and the `<output>` readouts, `#tState`, Mixer spans) every redraw even when unchanged: about 500 text nodes a second of GC pressure while playing, worse on the phone; fix = assign only when the string changes. (2) The core sequencer showed about 10x the page sequencer's dropouts (24.6 vs 2.4 a minute; one note 924 ms late; 4 notes dropped at a song reload): UNPROVEN (machine load); needs a 20-minute A/B on a quiet machine. (3) On a throttled CPU the page sequencer "moved on" 19 times a minute: its margin on a slow phone is thin. (4) A song reload costs 3–14 s of main-thread long tasks. Not measured: a phone's audio stack, the hidden page, real input, MIDI, Link, anything slower than 1 MB / min over two hours.
 
 ## 10 Nov (late afternoon): worklets take any block length; pump synth guard (build 561)
 
