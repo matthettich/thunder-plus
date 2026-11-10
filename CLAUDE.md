@@ -8,7 +8,8 @@
 - **If the owner says "continue the helper"** (or reports how the helper beta went): start at "PICK UP HERE" in the START HERE
   section of `HANDOVER.md` (PR #14, the helper, is merged into `beta` and `main` as of 8 Nov; the `io-helper` branch is history).
 - **Native Mac / Windows / Android / iOS apps:** the plan is "Native port" in the To-do section of `HANDOVER.md` with
-  `docs/NATIVE-PORT-STRATEGY.md`. A question about it gets an answer from those, nothing built. Start stage N0 (and only N0)
+  `docs/NATIVE-PORT-STRATEGY.md`; the task-by-task plan is `docs/port/WORKPLAN.md` (port work goes on the `native` branch, in
+  `native/` only, never in the app's own files). A question about it gets an answer from those, nothing built. Start stage N0 (and only N0)
   only when the owner says so in words, such as "start the native spike".
 - Entries dated before 8 Nov 2026 are in `docs/HANDOVER-ARCHIVE.md`.
 - Day-to-day work goes on the `beta` branch; `main` only by merging `beta` when the owner asks. Keep `HANDOVER.md` up to
