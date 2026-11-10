@@ -21143,6 +21143,7 @@ function resetAudio(quiet){
   // THE RECORDER'S MONITOR follows the new master (it stayed on the old one: monitoring went silent after a reset with Record a sample open)
   if (RCD.mon){ try { RCD.mon.disconnect(); RCD.mon.connect(master); } catch(e){} }
   rtInit(); if (ctx.state !== 'running' && ctx.resume) ctx.resume();
+  try { devRecover('reset audio engine'); } catch(e){}   // (DEVICE RECOVERY) last: reopen the output choice
   if (!quiet) toast('Audio engine reset: every note and effect cleared.');
 }
 /* The track effects and chains modules, once per live graph (rt.fxAsk / rt.chnAsk). tfx loads chains first (the shared MODFX modules),
