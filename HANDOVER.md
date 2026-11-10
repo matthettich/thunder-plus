@@ -582,6 +582,11 @@ The owner's top priority to add is the MOD screen. Work down the list; ask befor
 
 Start a session by asking for results. Fix on `beta`. Web beta: https://matthettich.github.io/thunder-plus/beta/ (build 547 as of 10 Nov morning, 548 once its PR merges; the night of 9–10 Nov shipped 544–547, see the four "10 Nov" entries below. Decisions the lead made that night for the owner to confirm or reverse: on a phone the saved Sequencer default plays on the Page unless Audio thread is picked on that device; on a phone the safety limiter is its stand-in until another worklet loads; the resync only runs with a worklet loaded and its margins are untested on a device). Desktop: v1.3.4-beta.2 (build 541, no feed view or scopes); further desktop betas on hold until the owner asks.
 
+**Build 554**
+- [ ] **MOD on a …pump effect:** right-click a …pump knob (for example COMP threshold on a track, or a creative effect's knob) › Add LFO…: it sweeps audibly while the song plays, returns to your own setting on STOP, and the knob shows `~`. Zipper noise at fast rates? (Per-band EQ rows are not targets yet; the …pump pop-up windows have no Add LFO… yet.)
+- [ ] **Level comparison (Safest vs Balanced, or anything else):** play the same 15 s of a song on each setting, STOP, Copy playback report: compare the `level over this play: average … peak …` lines (a difference under about 1 dB is nothing).
+- [ ] **Save with a missing impulse response or preset sample** (only if you ever see it): the question now names what is missing.
+
 **Build 553**
 - [ ] **MOD on the master and on a bus:** put an LFO on a master effect parameter (no pattern in the master column) and one on a bus effect: both move while the song plays, and the scope's dot keeps time. An LFO on a track that is silent for a few song rows carries on in phase when the track comes back.
 - [ ] **MOD in Phrase / BUS PLAY:** playing one phrase, only that track's LFOs, its buses' and the master's move.
@@ -710,6 +715,13 @@ Suggested order: N0 → N1 → N2 (phone cured) → N4 with N3 alongside → N5 
   the edge `R.t0`, "waiting…" while armed), `rcdClk` / `rcdFmt` / `rcdFreeSecs`, a 250 ms timer only while recording; the
   final length stays until the next take. recorder-check covers FREE, PATTERN, Stop, next take and closing mid-take.
 
+
+## 10 Nov (afternoon): MOD pump targets; save gate widened; level over a play (build 554)
+
+- **MOD pump targets** (Sonnet agent, diff read by the lead). A pump row is a target (`q.lfo`, `q.pi`) when it is a continuous, automatable knob and not a band row, selector, whole-number row, output / bypass or a Thunder-added row. Same id `fx:t:s:p`. `pumpPv(D, f, ov)` builds the plugin's whole value list from the song's `f.pump` plus the moved rows (`{pset:{slot, pv}}`); in the core it runs from the parameter table the page sends with `coreTfx` (`pd`), on the page through `fxpMsg` / `fxpTo`; renders use the page path. The song's own value is never written; STOP restores the slot. `CORE_REV qohjyu`. `tests/mod-pump.test.js`. **Open:** per-band rows (EQ bands, BAND / WIDE / HEAT per-band) need a target id that carries the band: a format decision; no Add LFO… in the pump pop-up windows.
+- **Save gate** now also counts song-preset samples (`fullSmp` wrote `null`) and impulse responses (`irsFull` kept a bare `{ref}`; `irsResolve` only ran at start-up), waits for all three kinds and names them in the question. Wavetables, resynth data and frozen samples are always inline; SoundFonts stay out of the file on purpose.
+- **Level over a play:** `pbLvReset` / `pbLvRead` / `pbLvStop`: mean square and peak of the master analysers, four readings a second from a timer that exists only while a song plays (lead's change from the agent's once a second), logged at STOP and in the report header. A quiet STOP before a restart gets no summary. Hidden: the timer slows to once a second; whether the analysers update while hidden was not checked.
+- **Design for MOD and tracker commands on the live engines:** `docs/mod/ENGINE-TARGETS-DESIGN.md` (the contract: twelve k-rate AudioParams per live node, `c*` commanded bytes and `o*` signed offsets; per-engine map; delivery), on facts in `docs/mod/ENGINE-TARGETS-FACTS.md`. Commands keep their sampled-pad meaning (CUT on the 30 Hz – 18 kHz scale, FF = the pad's own knob); LFOs sweep both ways around what is in force; new targets `env`, `atk`, `sus`, `rel`; no new commands. Build next: engines (bass / vox / acid / mach; pump synths), then delivery.
 
 ## 10 Nov (afternoon): MOD step 1, LFOs always run (build 553)
 

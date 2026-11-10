@@ -538,10 +538,17 @@ class ThunderCore extends AudioWorkletProcessor {
     }
     // FXV (3 Nov): the selected control of an effect slot, makePlayer's fxpTo: the slot's settings are worked out here
     // (TFX_MAP: the effect's own map()) and handed to its node at the row's time. Effects whose map isn't in the core
-    // (TFX_MAP) and …pump slots stay on the page.
+    // (TFX_MAP) stay on the page. A …pump slot (MOD, 10 Nov) takes the rows that are LFO targets (q.lfo): its value list is made
+    // by pumpPv from the song's own f.pump and the moved rows, with the parameter table (TFX[k].pd) the page sent.
     if (ev.type === 'fxp'){
       const proc = tcNodes().get('fx:' + ev.track), A = S && (ev.track >= NT ? S.mfx : S.tfx && S.tfx[ev.track]), f = A && A[ev.slot];
-      if (!proc || !f || !TFX[f.type] || TFX[f.type].pump || !fxvMap(TFX[f.type], f.type)) return false;
+      if (!proc || !f || !TFX[f.type]) return false;
+      if (TFX[f.type].pump){
+        const D = TFX[f.type], q = D.ps[ev.pi]; if (!D.pd || !q || !q.lfo) return false;
+        const key = ev.track + ':' + ev.slot, ov = Object.assign({}, this.fxOv.get(key)); ov[q.k] = q.min + Math.round((q.max - q.min) * ev.v / 255);
+        this.fxOv.set(key, ov); tcAt(proc, Math.max(ev.t, currentTime), {pset:{slot:ev.slot, pv:pumpPv(D, f, ov)}}); return true;
+      }
+      if (!fxvMap(TFX[f.type], f.type)) return false;
       const q = TFX[f.type].ps[ev.pi]; if (!q) return false;
       const key = ev.track + ':' + ev.slot, ov = Object.assign({}, this.fxOv.get(key)); ov[q.k] = q.min + Math.round((q.max - q.min) * ev.v / 255);
       const m = fxvMsg(f, ev.slot, ov, this.seq ? this.seq.bpm : S.bpm); if (!m) return false;
@@ -589,7 +596,7 @@ class ThunderCore extends AudioWorkletProcessor {
     this.fxTouched.clear();
     // FXV: the slots' own settings again (makePlayer's resetSeq does the same for the ones the page moved)
     for (const [key, ov] of this.fxOv){ const [t, k] = key.split(':').map(Number), proc = tcNodes().get('fx:' + t), A = S && (t >= NT ? S.mfx : S.tfx && S.tfx[t]), f = A && A[k];
-      const m = proc && f && fxvMsg(f, k, {}, S.bpm); if (m){ if (proc.__q) proc.__q = proc.__q.filter(x => !(x[1].pset && x[1].pset.slot === k)); tcAt(proc, at, m); } }
+      const m = proc && f && (TFX[f.type] && TFX[f.type].pump ? (TFX[f.type].pd ? {pset:{slot:k, pv:pumpPv(TFX[f.type], f, null)}} : null) : fxvMsg(f, k, {}, S.bpm)); if (m){ if (proc.__q) proc.__q = proc.__q.filter(x => !(x[1].pset && x[1].pset.slot === k)); tcAt(proc, at, m); } }
     this.fxOv.clear(); }
 
   /* ---- live engines: makePlayer's bassNode / bassNote / polyVox / polyPs, driving the registered nodes ---- */
