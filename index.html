@@ -8794,6 +8794,11 @@ setTimeout(() => { try { $('toast').addEventListener('click', () => toastNext())
 const TOK = 'thunderplus-toasts-v1';
 let toastsOn = (() => { try { return localStorage.getItem(TOK) !== '0'; } catch(e){ return true; } })();
 function setToastsOn(on){ toastsOn = !!on; try { localStorage.setItem(TOK, on ? '1' : '0'); } catch(e){} if (!toastsOn){ try { const t = $('toast'); if (t && !t.hidden && !toastLong) toastNext(); } catch(e){} } }
+// BIGGER CELLS ON TOUCH (owner, 10 Nov): Settings › Screen. On a touch screen (Mobile setup or a coarse pointer) Arrange (which is also the Song screen)
+// gets cells at least 28 px wide and 24 px high, via arrSize() below; the grid then scrolls sideways. Off (the default): nothing changes. Not the Mixer, not the classic text Song grid.
+const BCK = 'thunderplus-bigcells-v1';
+let bigCellsOn = (() => { try { return localStorage.getItem(BCK) === '1'; } catch(e){ return false; } })();
+function setBigCells(on){ bigCellsOn = !!on; try { localStorage.setItem(BCK, on ? '1' : '0'); } catch(e){} try { arrSig = ''; arrLayout(true); draw(); } catch(e){} }
 const toastErr = (msg, ms) => toast(msg, ms, 'err');
 function toast(msg, ms, sev){ const t = $('toast'); let top = 2000;
   if (!toastsOn && sev !== 'err') return;
@@ -24165,6 +24170,8 @@ function projRows(){
       info:() => 'ON: the Phrase screen gets PHRASE | PATTERN buttons (the choice stays until you switch). PATTERN shows every track’s phrase for one song row side by side, and the open track is edited in place. Wide screens only (computer, or Fold when unfolded). OFF: no PHRASE | PATTERN buttons.'},
     {l:'POP-UP MESSAGES', ck:'Show pop-up messages', get:() => toastsOn ? 1 : 0, set:v => setToastsOn(!!v), min:0, max:1, tog:true, d:1, fmt:onOff,
       info:() => 'ON: the small messages that say what just happened. OFF: they stay hidden, except the ones that report a failure or work that may be lost (couldn’t save, storage full, audio or MIDI trouble)'},
+    {l:'BIGGER CELLS ON TOUCH', ck:'Bigger Arrange cells on a touch screen', get:() => bigCellsOn ? 1 : 0, set:v => setBigCells(!!v), min:0, max:1, tog:true, d:0, fmt:onOff,
+      info:() => 'Arrange and Song cells at least 28×24 px on a touch screen (the grid then scrolls sideways; the Mixer has MIXER SIZE in View). Does nothing with a mouse on a computer, nor on the classic text Song screen'},
     {l:'KEY HINTS', ck:'Show key hints under the screens', get:() => keyHints ? 1 : 0, set:v => setKeyHints(!!v), min:0, max:1, tog:true, d:1, fmt:onOff,
       info:() => 'ON: the line of keys under each screen and the tips under Arrange. OFF: more room for the phrase and the arrangement; the line describing the command or value under the cursor stays'},
     {l:'MENU HELP', ck:'Show explanations in menus', get:() => menuHelpOn() ? 1 : 0, set:v => setMenuHelp(!!v), min:0, max:1, tog:true, d:0, fmt:onOff,
@@ -29942,11 +29949,12 @@ let arrLit = [], arrSig = '', arrTap = {t:0, k:''}, arrCurY = -1;
 const ARR_ZOOM_BTNS = true;
 const AZK = 'thunderplus-arrange-zoom-v1', AZ_MAX = 3, AZ_STEPS = [1, 1.5, 2, 2.5, 3];
 let arrZoom = (() => { try { const z = parseFloat(localStorage.getItem(AZK)); return z >= 1 && z <= AZ_MAX ? z : 1; } catch(e){ return 1; } })();
+let arrBigPre = null, arrBigFloor = 0;   // BIGGER CELLS: the zoom the user chose while the cells are raised to the floor; the zoom that makes a cell 28 px
 let arrPinch = null, arrCurX = -1, arrWheelT = 0, arrFitW = 30;
 // On a computer (Desktop, a mouse) zoom is gentler and stops sooner: blocks grow to about 84 px wide at most, in 1.25×
 // steps (Ctrl+wheel about 1.15× a notch), and the song cursor's block stays where it is on screen while zooming.
 const arrDeskZ = () => !document.body.classList.contains('mob') && !matchMedia('(pointer: coarse)').matches;
-const arrZMax = () => arrDeskZ() ? clamp(84 / Math.max(6, arrFitW), 1.25, AZ_MAX) : AZ_MAX;
+const arrZMax = () => arrDeskZ() ? clamp(84 / Math.max(6, arrFitW), 1.25, AZ_MAX) : Math.max(AZ_MAX, arrBigFloor);
 const arrPtrs = new Set();
 const arrEl = $('tArr'), arrGrid = $('tArrGrid');
 const arrShown = () => (arrMode > 0 || asongOn()) && arrEl.offsetWidth > 0;
@@ -30373,7 +30381,13 @@ function arrSize(){
   const PFs = polyFrom(), SP = ms ? 12 : 4, nSp = (PFs > 0 && PFs < NA ? 1 : 0) + mx;
   const RNW = ms ? 30 : sm ? 18 : 22;   // the row-number column (wider as the Song screen: see body.asong in the CSS)
   const W = arrGrid.clientWidth, cwFit = (W - (sm ? 12 : 16) - RNW - nSp * SP - (NA + mx + nSp) * (sm ? 1 : 2)) / (NA + mx);
-  arrFitW = cwFit; if (arrZoom > arrZMax()) arrZoom = arrZMax();   // a zoom saved on a smaller screen
+  arrFitW = cwFit;
+  // BIGGER CELLS ON TOUCH: raise the zoom to the one that makes a cell 28 px wide, and the rows to 24 px; Off or a mouse: as before.
+  const bigOn = bigCellsOn && !arrDeskZ();
+  arrBigFloor = bigOn ? Math.min(6, 28 / Math.max(6, cwFit)) : 0;
+  if (bigOn && arrBigFloor > 1 && arrZoom < arrBigFloor - 0.005){ if (arrBigPre == null) arrBigPre = arrZoom; arrZoom = arrBigFloor; }
+  else if (!bigOn && arrBigPre != null){ arrZoom = arrBigPre; arrBigPre = null; }
+  if (arrZoom > arrZMax()) arrZoom = arrZMax();   // a zoom saved on a smaller screen
   const z = arrZoom > 1 ? arrZoom : 1;
   const col = z > 1 ? Math.max(6, cwFit * z).toFixed(1) + 'px' : 'minmax(0,1fr)', grp = [];
   if (ms){ if (PFs > 0) grp.push(`repeat(${PFs},${col})`); if (NA > PFs) grp.push(`repeat(${NA - PFs},${col})`); grp.push(col); }
@@ -30381,7 +30395,7 @@ function arrSize(){
   arrEl.style.setProperty('--arcols', grp.join(` ${SP}px `));
   // As the Song screen the row height comes from the space the grid HAS (arrAvail), not the grid's own height: drawArr
   // snaps that height to whole rows, so reading it back here flipped 12 rows ↔ 13 rows on every redraw during playback.
-  const cw = (W - 34) / (NA + mx + 0.3 + (G + mx) * 0.2) * z, rh = clamp(Math.round(cw * 0.8), 16, z > 1 ? (arrDeskZ() ? (ms ? 34 : 40) : 44) : ms ? clamp(Math.floor(arrAvail() / 12) - 3, 16, 30) : 40);   // as the Song screen: at least about 12 rows, as the text grid showed
+  const cw = (W - 34) / (NA + mx + 0.3 + (G + mx) * 0.2) * z, rh = Math.max(bigOn ? 24 : 0, clamp(Math.round(cw * 0.8), 16, z > 1 ? (arrDeskZ() ? (ms ? 34 : 40) : 44) : ms ? clamp(Math.floor(arrAvail() / 12) - 3, 16, 30) : 40));   // as the Song screen: at least about 12 rows, as the text grid showed
   // THREE DIGITS: the label also has to fit the block's width (three characters); too narrow for 7 px text, no label.
   const lf = Math.min(clamp(Math.round(rh * 0.5), 8, 16), Math.floor(cwFit * z / 2));
   arrGrid.style.setProperty('--arh', rh + 'px'); arrGrid.style.setProperty('--arf', Math.max(7, lf) + 'px'); arrEl.classList.toggle('arnolab', lf < 7);
@@ -30407,13 +30421,14 @@ function arrSetZoom(z, fx, cx){
       cx = r.left + r.width / 2 - g.left; if (cx < lw || cx > g.width) cx = (lw + g.width) / 2; }
   }
   if (fx == null && !el){ cx = arrGrid.clientWidth / 2; fx = (arrGrid.scrollLeft + cx) / Math.max(1, arrGrid.scrollWidth); }
+  arrBigPre = arrBigFloor && z < arrBigFloor - 0.005 ? z : null;   // BIGGER CELLS: below the floor, remember what was asked for (it comes back when the setting is turned Off)
   arrZoom = z; arrSize();
   if (el && el.isConnected){ const g = arrGrid.getBoundingClientRect(), r = el.getBoundingClientRect(); arrGrid.scrollLeft = Math.max(0, arrGrid.scrollLeft + r.left + r.width / 2 - g.left - cx); }
   else arrGrid.scrollLeft = Math.max(0, fx * arrGrid.scrollWidth - cx);
   arrHSync(); arrAlign();
 }
 // The view stays where the pinch left it: following the cursor only resumes when the cursor changes track.
-function arrZoomDone(){ try { localStorage.setItem(AZK, String(arrZoom)); } catch(_){} arrSig = ''; arrCurX = cs.song.x; draw(); }
+function arrZoomDone(){ try { localStorage.setItem(AZK, String(arrBigPre != null ? arrBigPre : arrZoom)); } catch(_){} arrSig = ''; arrCurX = cs.song.x; draw(); }
 // Zoomed, the song cursor's block is kept in view when the cursor changes track (Song screen, keys, a tap).
 function arrFollowX(){
   if (arrZoom <= 1 || cs.song.x === arrCurX) return;
