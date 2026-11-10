@@ -304,9 +304,12 @@ class MasterProcessor extends AudioWorkletProcessor {
     this.port.onmessage = e => { const d = e.data || {}; if (d.set) this.apply(d.set); if (d.resetPeak) this.tpMax = 0; if (d.dispose) this.dead = true; };
   }
   apply(s){
-    if (s.sup){ this.on.sup = !!s.sup.on; this.sup.set(s.sup); }
-    if (s.comp){ this.on.comp = !!s.comp.on; this.comp.set(s.comp); }
-    if (s.lim){ this.on.lim = !!s.lim.on; this.lim.set(s.lim); }
+    // A NaN / Infinity setting (or a compressor ratio of 0 or less) would poison a stage's state for good, so such a value is
+    // ignored and the stage keeps its previous one. Finite settings go through unchanged.
+    const fin = o => { const r = {}; for (const k in o){ const v = o[k]; if (typeof v !== 'number' || (v - v) === 0) r[k] = v; } return r; };
+    if (s.sup){ this.on.sup = !!s.sup.on; this.sup.set(fin(s.sup)); }
+    if (s.comp){ this.on.comp = !!s.comp.on; const c = fin(s.comp); if (!(c.ratio > 0)) delete c.ratio; this.comp.set(c); }
+    if (s.lim){ this.on.lim = !!s.lim.on; this.lim.set(fin(s.lim)); }
   }
   process(inputs, outputs){
     if (this.dead) return false;   // replaced by a new chain: let the browser collect this node
@@ -315,7 +318,9 @@ class MasterProcessor extends AudioWorkletProcessor {
     const a = inp && inp[0], b = inp && (inp[1] || inp[0]);
     const t0 = Date.now();
     if (a){ L.set(a); R.set(b); } else { L.fill(0); R.fill(0); }
-    let ip = 0; for (let i = 0; i < n; i++){ const v = Math.max(Math.abs(L[i]), Math.abs(R[i])); if (v > ip) ip = v; }
+    // One NaN or Infinity sample would poison the compressor's gain and the suppressor's spectrum for good (and a block of it
+    // would reach the output), so a sample outside (-64, 64) or not a number is replaced by silence, in this same loop.
+    let ip = 0; for (let i = 0; i < n; i++){ let x = L[i], y = R[i]; if (!(x > -64 && x < 64)) L[i] = x = 0; if (!(y > -64 && y < 64)) R[i] = y = 0; const v = Math.max(Math.abs(x), Math.abs(y)); if (v > ip) ip = v; }
     if (this.meters) this.inLu.process(L, R, n);
     if (this.on.sup) this.sup.process(L, R, n);
     if (this.on.comp){ this.comp.process(L, R, n); }
