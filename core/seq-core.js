@@ -831,6 +831,11 @@ const varBufs = new Map(), varShaped = new Map(); let varBytes = 0;   // (varSha
    (CUT / RES / DEC) runs shapeData's filter and decay sample by sample as the note reaches them (into a ring), from where
    the note starts (with a short warm-up before an offset start), and ends it where shapeData would have cut it (N). */
 const RD_RING = 16384, RD_M = RD_RING - 1;
+/* The ring is 64 KB, allocated when a SHAPED note starts (on the audio thread). A note's reader is read only while its voice is
+   in `alive`; when the voice ends, process1 gives the ring back (Rd.free) and the next shaped note takes it, cleared to zeros
+   exactly as a new Float32Array is (the reader can look at slots it never wrote). At most RD_POOL_MAX are kept; when the pool
+   is empty a new one is made. */
+const RD_POOL = [], RD_POOL_MAX = 32;
 class Rd {
   constructor(src, src2, sr, tw, rev, start){
     this.src = src; this.src2 = src2; this.rev = rev; this.len = src.length; this.N = this.len; this.tw = tw;
@@ -839,10 +844,11 @@ class Rd {
     this.f = tw.cut != null;
     if (this.f){ const fc = Math.min(cutHz(tw.cut), sr * 0.45), g = Math.tan(Math.PI * fc / sr), k = 2 - 2 * Math.min(clamp(tw.res | 0, 0, 255) / 255 * 0.97, 0.97);
       this.a1 = 1 / (1 + g * (g + k)); this.a2 = g * this.a1; this.a3 = g * this.a2; }
-    this.l1 = 0; this.l2 = 0; this.ring = new Float32Array(RD_RING);
+    this.l1 = 0; this.l2 = 0; this.ring = RD_POOL.length ? RD_POOL.pop().fill(0) : new Float32Array(RD_RING);
     const s0 = Math.max(0, Math.floor(start) - 4096); this.hi = s0; this.lo = s0;   // (the filter settles in the warm-up)
     this.kd = tau ? Math.exp(-1 / (tau * sr)) : 1; this.e = tau ? Math.pow(this.kd, s0) : 1;
   }
+  free(){ const r = this.ring; if (r){ this.ring = null; if (RD_POOL.length < RD_POOL_MAX) RD_POOL.push(r); } }   // (the voice is over: nothing reads this reader again)
   raw(c, i){ const D = c ? this.src2 : this.src; if (!D || i < 0 || i >= this.len) return 0; return D[this.rev ? this.len - 1 - i : i]; }
   at(c, i){
     if (!this.tw) return this.raw(c, i);
@@ -1394,7 +1400,7 @@ class ThunderCore extends AudioWorkletProcessor {
             L[i] += (x * ll + y * rl) * k; R[i] += (x * lr + y * rr) * k; p += inc; } }
         else for (let i = 0; i < N; i++){ if (p >= len - 1){ v.ended = true; break; } const j = p | 0, x = D[j] + (D[j + 1] - D[j]) * (p - j); L[i] += x * kl; R[i] += x * kr; p += inc; }
         v.pos = p;
-        if (v.ended){ this.alive.delete(v); const T = this.vs[v.track]; if (T){ const q = T.indexOf(v); if (q >= 0) T.splice(q, 1); } }
+        if (v.ended){ this.alive.delete(v); const T = this.vs[v.track]; if (T){ const q = T.indexOf(v); if (q >= 0) T.splice(q, 1); } if (RD){ RD.free(); v.rd = null; } }
         continue;
       }
       v.g.prune(tb0); v.f.prune(tb0); v.pn.prune(tb0); v.r.prune(tb0);   // (no array per voice per block)
@@ -1411,7 +1417,7 @@ class ThunderCore extends AudioWorkletProcessor {
           L[i] += y * Math.cos(a); R[i] += y * Math.sin(a); }
         v.pos += v.r.at(t) * inc0;
       }
-      if (v.ended){ this.alive.delete(v); const T = this.vs[v.track]; if (T){ const k = T.indexOf(v); if (k >= 0) T.splice(k, 1); } }
+      if (v.ended){ this.alive.delete(v); const T = this.vs[v.track]; if (T){ const k = T.indexOf(v); if (k >= 0) T.splice(k, 1); } if (RD){ RD.free(); v.rd = null; } }
     }
     return true;
   }
