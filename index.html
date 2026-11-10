@@ -2912,7 +2912,7 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
       <div class="segrow" title="Device uses the output’s own rate. Changes when audio restarts"><span>Rate</span><div class="seg" id="segARate"></div></div>
       <div class="audrow" title="Delays everything else so tracks with pump effects that look ahead (LIMIT, CALM, TONE, linear-phase EQ) stay in time. Off: those tracks play a little late. Renders follow this setting."><span>Latency comp</span><input type="checkbox" class="msw1" id="ckPdc" aria-label="Latency compensation"></div>
       <div class="segrow" id="psLiveRow" hidden><span>Live engines</span><div class="seg" id="segPsLive"></div></div>
-      <div class="segrow" id="coreRow" title="Where the song is sequenced. Audio thread: the steps are worked out on the audio thread and rendered pads play there, so a busy screen can’t make them late. Page: as before."><span>Sequencer</span><div class="seg" id="segCore"></div></div>
+      <div class="segrow" id="coreRow" title="Where the song is sequenced. Audio thread: the steps are worked out on the audio thread and rendered pads play there, so a busy screen can’t make them late. Page: as before. On a phone or tablet it plays on the Page unless you pick Audio thread here, because loading it can slow the phone’s audio clock."><span>Sequencer</span><div class="seg" id="segCore"></div></div>
       <div class="segrow" id="noWkRow" title="For testing a phone whose audio clock runs fast. Off (test): track effects, chains, live engines and the audio-thread sequencer are silent or unused, and the safety limiter uses its simpler stand-in. Changes when the app reloads."><span>Worklets</span><div class="seg" id="segNoWk"></div></div>
       <div class="btnrow" id="audRestartRow" hidden><span class="lbl">Takes effect when audio restarts (the app reloads; your song and kit are kept)</span><button id="audRestart" class="on">Apply (reload)</button></div>
       <div class="audrow audfoot"><button class="sm" id="audReset" title="Clears stuck notes and effects: stops playback and rebuilds every sound and effect from scratch. Your song and kit are untouched.">Reset audio engine</button> <button class="sm" id="audReport" title="Copies a short playback log (screen on or off, sequencer state, how late the rows came, what still sounded after STOP) to paste into a bug report.">Copy playback report</button></div>
@@ -8253,6 +8253,23 @@ const latOf = () => aset.latPick && aset.lat ? aset.lat : ((typeof platform !== 
 // Read once at start-up: it takes a reload to change. To remove: this block, wkOff's callers and the Worklets row.
 const NOWK = !!aset.noWk;
 const wkOff = ac => NOWK && !!ctx && ac === ctx;   // (an export's own OfflineAudioContext is never ctx, even before the page's context exists)
+/* LAZY WORKLETS (10 Nov, phones and tablets only: seqHandHere()). With any module loaded the page's context renders on a second
+   thread, and on the owner's phone its clock then ran far ahead of real time (build 544's test: Worklets Off held 1:1). So on a phone
+   or tablet a module loads when the song or the player needs it: track effects, chains, a live engine pad, the audio-thread
+   sequencer (only if picked in Settings), mastering's worklet. The safety limiter stays the stand-in until another module has
+   loaded, then upgrades once. Computers load everything at first touch as before. wkUsed(ctx) is what loaded, in order (the report's header). */
+let wkHand = null;   // (seqHandHere's answer: it doesn't change in a session; rtFx asks on every slider move)
+const wkLazy = () => !NOWK && (wkHand === null ? (wkHand = !!seqHandHere()) : wkHand);
+const wkUsedMap = new WeakMap(), wkUsed = ac => { let s = wkUsedMap.get(ac); if (!s && ac) wkUsedMap.set(ac, s = new Set()); return s || new Set(); };
+function wkNote(ac, name){   // called where a loader really calls addModule on the page's context
+  if (!ac || ac !== ctx) return; const u = wkUsed(ac); if (u.has(name)) return; u.add(name);
+  try { pbLog('worklet module loaded: ' + name); } catch(e){}
+  if (name !== 'cpu' && wkLazy()) Promise.resolve().then(wkHook);
+}
+function wkHook(){   // a module has loaded on a phone: the context is on the second thread anyway from here
+  try { if (ctx && !ctx.renderCapacity) cpuProbe(ctx); } catch(e){}   // the CPU meter's probe, only without renderCapacity
+  for (const f of [...safeLims]) try { f._up(); } catch(e){}
+}
 function asetSave(){ try { localStorage.setItem(AUK, JSON.stringify(aset)); } catch(e){} }
 const psLive = {off:false, strikes:0};   // …PUMP SYNTHS live: the safety net's switch for this visit (see psFallback)
 let aLive = null; // the latency and rate the running context was made with
@@ -8268,7 +8285,7 @@ try {
   if (aset.rate) srGuess = aset.rate;
   else { const AC = window.AudioContext || window.webkitAudioContext, c = new AC({latencyHint:latOf()}); srGuess = c.sampleRate || 48000; if (c.close) c.close().catch(() => {}); }
 } catch(e){}
-const cpu = {cap:null, t:0, probe:null};
+const cpu = {cap:null, t:0, probe:null, on:false};
 /* CPU probe (18 Oct). Chrome (desktop and the Fold) doesn't offer renderCapacity, so the meter only timed the app's own
    worklets (effects, chains, live voices): a song of pads and rendered synths read 0%. A tiny AudioWorklet node, run
    every 128-frame quantum like everything else, notes the wall time of each call. The audio thread renders a burst of
@@ -8296,7 +8313,7 @@ const CPU_PROBE = `registerProcessor('thunder-cpu', class extends AudioWorkletPr
   }
 });`;
 function cpuProbe(ac){
-  if (wkOff(ac) || !ac.audioWorklet || !window.AudioWorkletNode) return;
+  if (wkOff(ac) || !ac.audioWorklet || !window.AudioWorkletNode || cpu.on) return; cpu.on = true; wkNote(ac, 'cpu');
   const url = URL.createObjectURL(new Blob([CPU_PROBE], {type:'text/javascript'}));
   ac.audioWorklet.addModule(url).then(() => {
     if (ac !== ctx) return;
@@ -8313,9 +8330,9 @@ function audio(){
     try { ctx = new AC(ao); } catch(e){ ctx = new AC({latencyHint:'interactive'}); }
     aLive = {lat:ao.latencyHint, rate:aset.rate};
     if (aset.sink && ctx.setSinkId) ctx.setSinkId(aset.sink).catch(() => { audStatus(); });
-    try { if (ctx.renderCapacity){ ctx.renderCapacity.addEventListener('update', e => { cpu.cap = {avg:e.averageLoad, peak:e.peakLoad, under:e.underrunRatio, t:performance.now()}; }); ctx.renderCapacity.start({updateInterval:0.5}); } else cpuProbe(ctx); } catch(e){}   // no renderCapacity: time the audio thread
+    try { if (ctx.renderCapacity){ ctx.renderCapacity.addEventListener('update', e => { cpu.cap = {avg:e.averageLoad, peak:e.peakLoad, under:e.underrunRatio, t:performance.now()}; }); ctx.renderCapacity.start({updateInterval:0.5}); } else if (!wkLazy()) cpuProbe(ctx); } catch(e){}   // no renderCapacity: time the audio thread (phones: when the first other module loads, wkHook)
     master = ctx.createGain(); master.gain.value = clamp(aset.vol, 0, 100) / 100; master.connect(ctx.destination);
-    try { mwReady(ctx); } catch(e){ tpLog('safety limiter did not start', e); }   // the safety limiter's worklet, loading before the first note needs it
+    if (!wkLazy()) try { mwReady(ctx); } catch(e){ tpLog('safety limiter did not start', e); }   // (phones: the stand-in until another module loads, safeLim)   // the safety limiter's worklet, loading before the first note needs it
     ctx.addEventListener && ctx.addEventListener('statechange', () => { try { pbLog('engine ' + ctx.state + ' · ' + pbState()); } catch(e){} audStatus(); if (typeof audioInterrupted === 'function') audioInterrupted(); });
     prerender();   // ensure() re-renders only the pads whose rate differs from this context's
   }
@@ -14012,8 +14029,8 @@ const updPsLive = makeSeg($('segPsLive'), [['auto', 'Auto'], ['render', 'Rendere
   aset.psLive = v; asetSave(); psLive.off = false; psLive.strikes = 0;
   if (v === 'render'){ try { if (rt && rt.pl) rt.pl.psDrop(); } catch(e){} }
   psLiveNote(); });
-const updCore = makeSeg($('segCore'), [['core', 'Audio thread'], ['page', 'Page (old)']], () => aset.core === 'page' ? 'page' : 'core', v => {
-  aset.core = v; asetSave();
+const updCore = makeSeg($('segCore'), [['core', 'Audio thread'], ['page', 'Page (old)']], () => coreWanted() ? 'core' : 'page', v => {
+  aset.core = v; aset.corePick = true; asetSave();
   if (v === 'core'){ if (ctx) coreLoad(); toast('Sequencer: audio thread, from the next PLAY.', 3000); } else toast('Sequencer: page, from the next PLAY.', 2500); });
 const updNoWk = makeSeg($('segNoWk'), [[0, 'On'], [1, 'Off (test)']], () => aset.noWk ? 1 : 0, v => { aset.noWk = !!v; asetSave(); audRestartRow(); });   // WORKLETS OFF (test)
 function psLiveNote(){
@@ -14681,7 +14698,7 @@ async function rcdOpen1(){
   // NATIVE INPUT (desktop app, INPUT ENGINE Auto): every channel of the interface, through the helper; the browser's input otherwise
   if (IOAPI && aset.inEngine !== 'browser'){
     try {
-      if (RCD.mod !== ctx){ await ctx.audioWorklet.addModule(URL.createObjectURL(new Blob([RCD_WORKLET], {type:'application/javascript'}))); RCD.mod = ctx; }
+      if (RCD.mod !== ctx){ wkNote(ctx, 'rec'); await ctx.audioWorklet.addModule(URL.createObjectURL(new Blob([RCD_WORKLET], {type:'application/javascript'}))); RCD.mod = ctx; }
       const node = new AudioWorkletNode(ctx, 'thunder-rec', {numberOfInputs:1, numberOfOutputs:0, channelCount:2, channelCountMode:'explicit', channelInterpretation:'speakers'});
       const mon = ctx.createGain(); mon.gain.value = rcdSet.mon ? 1 : 0; mon.connect(master);
       node.port.onmessage = e => rcdMsg(e.data);
@@ -14710,7 +14727,7 @@ async function rcdOpen1(){
   if (!s){ try { s = await md.getUserMedia({audio:base}); } catch(e){ toast(e && e.name === 'NotAllowedError' ? 'Recording needs permission to use an audio input.' : 'Couldn’t open an audio input.', 5000); return false; } }
   if (gone()){ s.getTracks().forEach(t => t.stop()); return false; }   // (closed while the browser asked: CodeRabbit)
   try {
-    if (RCD.mod !== ctx){ await ctx.audioWorklet.addModule(URL.createObjectURL(new Blob([RCD_WORKLET], {type:'application/javascript'}))); RCD.mod = ctx; }
+    if (RCD.mod !== ctx){ wkNote(ctx, 'rec'); await ctx.audioWorklet.addModule(URL.createObjectURL(new Blob([RCD_WORKLET], {type:'application/javascript'}))); RCD.mod = ctx; }
     if (gone()){ s.getTracks().forEach(t => t.stop()); return false; }
     const src = ctx.createMediaStreamSource(s), node = new AudioWorkletNode(ctx, 'thunder-rec', {numberOfInputs:1, numberOfOutputs:0, channelCount:2, channelCountMode:'explicit', channelInterpretation:'speakers'});
     const mon = ctx.createGain(); mon.gain.value = rcdSet.mon ? 1 : 0; mon.connect(master);
@@ -16708,7 +16725,7 @@ async function rcdOpenIo(rec, mon){
   if (!o || !o.ok){ RCD.ioWhy = dev.name + ' wouldn’t open: ' + ((o && o.why) || 'no answer'); if (!o) iohAsk({op:'close'}); return false; }
   let node;
   try {   // (CodeRabbit, PR #14: if the worklet can't be set up after the device opened, close it in the helper too)
-    if (RCD.iomod !== ctx){ await ctx.audioWorklet.addModule(URL.createObjectURL(new Blob([IOIN_WORKLET], {type:'application/javascript'}))); RCD.iomod = ctx; }
+    if (RCD.iomod !== ctx){ wkNote(ctx, 'io'); await ctx.audioWorklet.addModule(URL.createObjectURL(new Blob([IOIN_WORKLET], {type:'application/javascript'}))); RCD.iomod = ctx; }
     node = new AudioWorkletNode(ctx, 'thunder-io-in', {numberOfInputs:0, numberOfOutputs:2, outputChannelCount:[2, 2]});
   } catch(e){ iohAsk({op:'close'}); throw e; }
   const D = Math.min(0.5, (ctx.baseLatency || 0) + (ctx.outputLatency || 0) + 0.12);   // the output's own latency + room for the hops (beta.4: 40 ms fell behind mid-take; D costs the take nothing, rcdLat takes it back)
@@ -18728,7 +18745,7 @@ function chainsReady(ac){
         const src = await (await fetch('chains/chains-worklet.js?v=43')).text();
         chnURL = URL.createObjectURL(new Blob([src], {type:'application/javascript'}));
       }
-      await ac.audioWorklet.addModule(chnURL);
+      wkNote(ac, 'chains'); await ac.audioWorklet.addModule(chnURL);
       return true;
     })().catch(() => false));
   }
@@ -18982,7 +18999,7 @@ function tfxReady(ac){
       await tfxLoad; if (!tfxBin() || !ac.audioWorklet || !window.AudioWorkletNode) return false;
       await chainsReady(ac);   // the chains engine publishes the shared modules (ChainsDSP) in the audio thread, for the MODFX slots
       if (!tfxURL) tfxURL = URL.createObjectURL(new Blob([rvMix.toString() + '\n' + DegradeCore.toString() + '\n' + VSampCore.toString() + '\n' + ResonCore.toString() + '\n' + PitchFxCore.toString() + '\n' + clkSpb.toString() + '\n' + FlexCore.toString() + '\n' + StepGateCore.toString() + '\n' + RetrigCore.toString() + '\n' + beatLock.toString() + '\n' + bkHash.toString() + '\n' + GrainsCore.toString() + '\n' + ScrambleCore.toString() + '\n' + GlitchCore.toString() + '\n' + TFX_SRC], {type:'application/javascript'}));
-      await ac.audioWorklet.addModule(tfxURL);
+      wkNote(ac, 'tfx'); await ac.audioWorklet.addModule(tfxURL);
       return true;
     })().catch(() => false));
   }
@@ -20333,7 +20350,7 @@ function makePlayer(ac, out, getBuf, live){
   const bassN = new Map(); let bpmNow = (S && S.bpm) || 120;
   function bassDrop(k, b){ try { b.gate.value = 0; b.node.port.postMessage({dispose:true}); b.node.port.onmessage = null; b.node.disconnect(); b.g.disconnect(); b.pn.disconnect(); } catch(e){} bassLive.delete(b); bassN.delete(k); }
   function bassNode(t, pad, j){
-    if (!bassOK.has(ac)) return null;
+    if (!bassOK.has(ac)){ if (ac === ctx && wkLazy()) wkLiveEnsure(true); return null; }   // phones: a live pad is sounding without its module: load it, play the render now
     const V = kit.voices[pad], vx = isVoxV(V), lx = liveX(V), kind = vx ? 'vox' : lx ? V.engine : 'bass', key = t + ':' + pad + ':' + kind + (j ? ':' + j : ''); let b = bassN.get(key); if (b) return b;
     // The pad's engine changed: drop this track's nodes of the old kind, or every engine switch would leave one running.
     for (const [k, o] of bassN) if (k.startsWith(t + ':' + pad + ':') && o.kind !== kind) bassDrop(k, o);
@@ -20542,7 +20559,8 @@ function makePlayer(ac, out, getBuf, live){
       if (n && n.parameters) for (const k of FXP){ const q = n.parameters.get(k); if (q) try { q.cancelScheduledValues(at); q.setValueAtTime(-1, at); } catch(e){} }
       for (const k of [...fxcPend.keys()]) if (k.startsWith(ev.track + ':')) fxcPend.delete(k);
       return; }
-    if (ev.type === 'fxc'){ const n = fxNodeOf(ev.track), q = n && n.parameters && n.parameters.get(ev.p);
+    if (ev.type === 'fxc'){ if (ac === ctx && wkLazy() && !(rt && rt.fxAsk) && /^sw/.test(ev.p)) wkFxAsk(ev.track, true);   // phones: a switch for a slot the song didn't need yet
+      const n = fxNodeOf(ev.track), q = n && n.parameters && n.parameters.get(ev.p);
       if (q) try { q.setValueAtTime(ev.v, Math.max(ev.t, ac.currentTime)); } catch(e){}
       else { const k = ev.track + ':' + ev.p, L = fxcPend.get(k) || []; L.push(ev); fxcPend.set(k, L); }   // FIRST PLAY (owner, 31 Oct): the effect isn't built yet: it gets the values when it is
       return; }
@@ -20982,11 +21000,23 @@ function softClip(ac){
     for (let i = 0; i < n; i++){ const x = i / (n - 1) * 2 - 1, a = Math.abs(x); c[i] = Math.sign(x) * (a <= k * ceil ? a : k * ceil + (ceil - k * ceil) * Math.tanh((a - k * ceil) / (ceil - k * ceil))); } }
   const w = ac.createWaveShaper(); w.curve = softCurve; return w;
 }
+const safeLims = new Set();
 function safeLim(ac, dest){
   const inp = ac.createGain(), stand = mkLimiter(ac), sc = softClip(ac); inp.connect(stand); stand.connect(sc); sc.connect(dest);
-  let wk = null, dead = false;
-  mwReady(ac).then(ok => { if (!ok || dead) return; try { wk = safeWk(ac); inp.disconnect(); sc.disconnect(); inp.connect(wk); wk.connect(dest); } catch(e){ wk = null; } });
-  inp._drop = () => { dead = true; try { inp.disconnect(); sc.disconnect(); } catch(e){} if (wk){ try { wk.port.postMessage({dispose:true}); wk.disconnect(); } catch(e){} } };
+  let wk = null, dead = false, up = false; const extra = [];
+  // The worklet limiter takes over. On a phone this happens once, when another module has loaded (the context is on the second
+  // thread anyway), so it fades over 40 ms from the stand-in; on a computer it is the swap at start-up, as before.
+  const upgrade = fade => { if (up || dead) return; up = true;
+    mwReady(ac).then(ok => { if (!ok || dead) return; try { wk = safeWk(ac);
+      if (!fade){ inp.disconnect(); sc.disconnect(); inp.connect(wk); wk.connect(dest); return; }
+      const gs = ac.createGain(), gw = ac.createGain(), t = ac.currentTime; extra.push(gs, gw);
+      sc.disconnect(); sc.connect(gs); gs.connect(dest); gw.gain.value = 0; inp.connect(wk); wk.connect(gw); gw.connect(dest);
+      gs.gain.setValueAtTime(1, t); gs.gain.linearRampToValueAtTime(0, t + 0.04); gw.gain.setValueAtTime(0, t); gw.gain.linearRampToValueAtTime(1, t + 0.04);
+      setTimeout(() => { if (dead) return; try { inp.disconnect(stand); stand.disconnect(); sc.disconnect(); gs.disconnect(); } catch(e){} }, 120);
+    } catch(e){ wk = null; } }); };
+  inp._up = () => upgrade(true); safeLims.add(inp);
+  if (!(wkLazy() && ac === ctx)) upgrade(false); else if (wkUsed(ac).size) upgrade(true);
+  inp._drop = () => { dead = true; safeLims.delete(inp); try { inp.disconnect(); sc.disconnect(); } catch(e){} for (const n of extra) try { n.disconnect(); } catch(e){} if (wk){ try { wk.port.postMessage({dispose:true}); wk.disconnect(); } catch(e){} } };
   return inp;
 }
 // Reset audio engine (Settings → Audio): stop, tear the live graph down (every track's voices, live synth nodes, track
@@ -21012,18 +21042,47 @@ function resetAudio(quiet){
   rtInit(); if (ctx.state !== 'running' && ctx.resume) ctx.resume();
   if (!quiet) toast('Audio engine reset: every note and effect cleared.');
 }
+/* The track effects and chains modules, once per live graph (rt.fxAsk / rt.chnAsk). tfx loads chains first (the shared MODFX modules),
+   so asking for tfx asks for chains too. */
+function rtTfxLoad(){
+  if (!rt || rt.fxAsk) return; rt.fxAsk = true;
+  tfxReady(ctx).then(ok => { if (!rt) return; rt.fxOk = ok; rtAllFx(); if (!ok && !NOWK && (S.tfx.some(fxCount) || fxCount(S.mfx))) toast('Track effects need a newer browser here.'); });
+  rtChnLoad();
+}
+function rtChnLoad(){
+  if (!rt || rt.chnAsk) return; rt.chnAsk = true;
+  chainsReady(ctx).then(ok => { if (!rt) return; rt.chnOk = ok; if (ok){ chnSync.add(ctx); rtAllFx(); } else if ((S.chainOn || []).some(Boolean) && !NOWK) toast('chains needs a newer browser here.'); });
+}
+// Phones (10 Nov): load them when track t (NT: the master) has an effect slot filled (on or off: FXO can switch it on) or a chain
+// feeds it. Every way an effect or chain comes into use reaches rtFx(t) (fxChanged, rtAllFx after a song, undo or kit load,
+// setChainOn, chainsPush, AUTO SLOT's fxNeed), and rtInit asks for every track.
+// A slot that is filled but switched off (every new song has the master's pump slots so) counts only if a pattern command can
+// switch it on later (FXO, FLX, FLY, GAT, RTG: slotWake) or the player meets such a switch (play: 'sw', sw = true).
+let wkCmdS = null, wkCmdV = -1, wkCmdR = false;
+function wkFxCmds(){
+  if (wkCmdS === S && wkCmdV === songVer) return wkCmdR;
+  const ids = new Set(['FXO', 'FLX', 'FLY', 'GAT', 'RTG'].map(c => FXC.indexOf(c))); let hit = false;
+  for (const ph of S.phrases) if (ph && !hit) for (const r of ph){ if (!r) continue; for (let m = FX0; m < RW; m += 2) if (ids.has(r[m])){ hit = true; break; } if (hit) break; }
+  wkCmdS = S; wkCmdV = songVer; return wkCmdR = hit;
+}
+function wkFxAsk(t, sw){
+  if (!rt || !wkLazy()) return;
+  const A = t < NT ? S.tfx[t] : S.mfx;
+  if (!rt.fxAsk && fxAny(A) && (fxCount(A) > 0 || sw || wkFxCmds())) rtTfxLoad();
+  if (!rt.chnAsk && t < NT && chainsFeed(t)) rtChnLoad();
+}
 function rtInit(){
   audio();
   if (!rt){
     // mo: the master OUT fader (GAIN STAGING, 27 Oct), after mastering and the safety limiter, before the device's level
     const out = ctx.createGain(), mo = ctx.createGain(), lim = safeLim(ctx, mo); mo.gain.value = curve(S.mout == null ? 255 : S.mout); mo.connect(master);
-    rt = {out, mo, lim, mfx:null, fxOk:false, chnOk:false, pl:makePlayer(ctx, out, rtBuf, true), mlv:[0, 0], mpk:[0, 0], mpt:[0, 0]}; rtRoute(); rt.pl.applyMix(); mstSync(); bassReady(ctx).then(ok => { if (ok) liveWarmSoon(200); });
+    rt = {out, mo, lim, mfx:null, fxOk:false, chnOk:false, pl:makePlayer(ctx, out, rtBuf, true), mlv:[0, 0], mpk:[0, 0], mpt:[0, 0]}; rtRoute(); rt.pl.applyMix(); mstSync(); if (wkLazy()) wkLiveEnsure(); else bassReady(ctx).then(ok => { if (ok) liveWarmSoon(200); });
     // the master meter listens to everything going out, synth pads included
     const sp = ctx.createChannelSplitter(2); rt.man = [ctx.createAnalyser(), ctx.createAnalyser()];
     master.connect(sp); rt.man.forEach((a, i) => { a.fftSize = 1024; sp.connect(a, i); });
-    tfxReady(ctx).then(ok => { rt.fxOk = ok; rtAllFx(); if (!ok && !NOWK && (S.tfx.some(fxCount) || fxCount(S.mfx))) toast('Track effects need a newer browser here.'); });
-    if (aset.core === 'core') setTimeout(() => { try { if (!tp.on) coreLoad(); } catch(e){} }, 0);   // not mid-song: loading it (the module, the song, every pad's render) made the first PLAY stutter
-    chainsReady(ctx).then(ok => { rt.chnOk = ok; if (ok){ chnSync.add(ctx); rtAllFx(); } else if ((S.chainOn || []).some(Boolean) && !NOWK) toast('chains needs a newer browser here.'); });
+    if (wkLazy()){ for (let t = 0; t <= NT; t++) wkFxAsk(t); } else rtTfxLoad();   // phones: only what the song uses (wkFxAsk)
+    if (coreWanted()) setTimeout(() => { try { if (!tp.on) coreLoad(); } catch(e){} }, 0);   // not mid-song: loading it (the module, the song, every pad's render) made the first PLAY stutter
+    if (!wkLazy()) rtChnLoad();
     if (NOWK && (S.tfx.some(fxCount) || fxCount(S.mfx) || (S.chainOn || []).some(Boolean))) toast('Worklets are off for testing (Settings › Audio), so track effects and chains are silent.', 4000);   // one toast for both (WORKLETS OFF)
   }
   return rt;
@@ -21181,14 +21240,22 @@ function psFallback(why){
   toast('The pump and waves live engines are using pre-rendered sound for now: ' + why + '. Settings → Audio → Live engines: tap Auto to try live again.', 8000);
   try { psLiveNote(); } catch(e){}
 }
+// Phones (10 Nov): the live engines' modules (bass, vox, acid, mach, pump synths, waves live load as one group) only when the song
+// plays a live pad: from rtInit, after a song or kit change (liveWarm), at PLAY (tStart waits for it) and when a live pad's note
+// reaches bassNode without them (it plays its render meanwhile). A pump or waves pad on Render (Settings) doesn't count.
+function wkLiveWanted(max){ return liveUses(max || 512).some(u => { const v = kit.voices[u[1]]; return !((isPsV(v) || isWlV(v)) && aset.psLive === 'render'); }); }
+function wkLiveEnsure(now){
+  if (!ctx || !rt || !wkLazy() || bassLoad.has(ctx) || !(now || wkLiveWanted())) return;
+  bassReady(ctx).then(ok => { if (ok) liveWarmSoon(200); });
+}
 function bassReady(ac){
   if (wkOff(ac)) return Promise.resolve(false);   // WORKLETS OFF (test)
   if (!bassLoad.has(ac)){
     let pr = Promise.resolve(false);
     try { if (ac.audioWorklet){ if (!bassURL) bassURL = URL.createObjectURL(new Blob([BassCore.toString() + BASS_PROC + '\n' + VoxCore.toString() + VOX_PROC + '\n' + AcidCore.toString() + XPROC('acid', 'AcidCore') + '\n' + MachCore.toString() + XPROC('mach', 'MachCore')], {type:'text/javascript'}));
-      pr = ac.audioWorklet.addModule(bassURL).then(() => { bassOK.add(ac); return true; }, () => false)
-        .then(ok => typeof PsynCore === 'undefined' ? ok : ac.audioWorklet.addModule(PSYN_WK).then(() => { psOK.add(ac); return ok; }, e => { tpLog('pump synths live worklet (the live ones play their renders)', e); return ok; }))
-        .then(ok => ac.audioWorklet.addModule(WAVES_WK).then(() => { wlOK.add(ac); return ok; }, e => { tpLog('waves live worklet (it plays its render)', e); return ok; })); } } catch(e){}
+      wkNote(ac, 'bass'); pr = ac.audioWorklet.addModule(bassURL).then(() => { bassOK.add(ac); return true; }, () => false)
+        .then(ok => typeof PsynCore === 'undefined' ? ok : (wkNote(ac, 'psyn'), ac.audioWorklet.addModule(PSYN_WK)).then(() => { psOK.add(ac); return ok; }, e => { tpLog('pump synths live worklet (the live ones play their renders)', e); return ok; }))
+        .then(ok => (wkNote(ac, 'waves'), ac.audioWorklet.addModule(WAVES_WK)).then(() => { wlOK.add(ac); return ok; }, e => { tpLog('waves live worklet (it plays its render)', e); return ok; })); } } catch(e){}
     bassLoad.set(ac, pr);
   }
   return bassLoad.get(ac);
@@ -21208,7 +21275,7 @@ function liveUses(max){ const out = new Map();
   return [...out.values()]; }
 let liveWarmKey = '';   // the song and kit the last full warm-up saw: PLAY skips its scan (~170 ms on a long song) when they haven't changed
 const liveKey = () => songVer + '|' + kit.voices.map(v => v ? v.engine || '' : '').join(',');
-function liveWarm(max){ if (!rt || !ctx) return 0; if (max && liveWarmKey === liveKey() && ctx && bassOK.has(ctx)) return 0;
+function liveWarm(max){ if (!rt || !ctx) return 0; if (wkLazy() && !bassLoad.has(ctx)){ wkLiveEnsure(); return 0; } if (max && liveWarmKey === liveKey() && ctx && bassOK.has(ctx)) return 0;
   const L = liveUses(max); if (!max && bassOK.has(ctx)) liveWarmKey = liveKey(); return L.length ? rt.pl.warm(L) : 0; }
 // The first touch or key press of a session starts the audio engine (a gesture is needed for it), so by the first PLAY its
 // worklets are loaded and the live engines' nodes made: PLAY needn't wait for them (BATTERY: hidden and idle, it suspends).
@@ -21222,7 +21289,7 @@ const liveX = v => !!(v && XENG[v.engine] && XENG[v.engine].live);
 // A bass voice was edited: the live nodes playing it hear the change at once.
 function bassPush(i){ const v = kit.voices[i], vx = isVoxV(v), lx = liveX(v); if (!isBassV(v) && !vx && !lx) return; const kind = vx ? 'vox' : lx ? v.engine : 'bass', p = vx ? voxParams(v) : lx ? xParams(v) : bassParams(v); for (const b of bassLive) if (b.pad === i && b.kind === kind) try { const fs = lx ? frzSample(v) : null; if (b.lanes && fs !== (b.fileRef || null)){ b.fileRef = fs; b.node.port.postMessage({set:p, file:fs ? {d:fs.data, sr:fs.sr} : {d:null}}); } else b.node.port.postMessage({set:p}); } catch(e){} }   // FREEZE FILE: the sound only when it changed
 const MW_URL = 'master-worklet.js?v=5', mwLoad = new WeakMap();
-function mwReady(ac){ if (!mwLoad.has(ac)){ const pr = ac.audioWorklet && !wkOff(ac) ? ac.audioWorklet.addModule(MW_URL).then(() => true, () => false) : Promise.resolve(false); mwLoad.set(ac, pr); } return mwLoad.get(ac); }
+function mwReady(ac){ if (!mwLoad.has(ac)){ const go = ac.audioWorklet && !wkOff(ac), pr = go ? ac.audioWorklet.addModule(MW_URL).then(() => true, () => false) : Promise.resolve(false); mwLoad.set(ac, pr); if (go) wkNote(ac, 'master'); } return mwLoad.get(ac); }
 const mstSet = M => ({sup:M.sup, comp:M.comp, lim:M.lim});
 const mstNeedsWk = M => M.sup.on || M.comp.on || M.lim.on;
 // Samples the chain delays the sound by (the suppressor's FFT and the limiter's lookahead); renders trim it off.
@@ -21290,6 +21357,7 @@ function moApply(){ if (rt && rt.mo && ctx) rt.mo.gain.setTargetAtTime(curve(S.m
 // Sends a track's (or with t = NT, the master's) effect list to the live worklets.
 function rtFx(t){
   if (!rt) return;
+  if (wkLazy()) wkFxAsk(t);   // phones: the effects / chains modules load when something needs them
   if (t < NT) return rt.pl.setFx(t, tfxChain(S.tfx[t], ctx.sampleRate, S.bpm), rt.fxOk);
   // (setFx re-seats inp -> [chains?] -> [fx?] -> g, and retries when the chains module finishes loading.)
   const chain = rt.fxOk ? tfxChain(S.mfx, ctx.sampleRate, S.bpm) : [];
@@ -21413,7 +21481,7 @@ const songRow = () => { const y0 = cs.song.y; for (let y = y0; y < 256; y++){ co
 function tStart(mode, o){
   // LIVE WARM-UP: the first PLAY of a session starts the audio engine; with live engine pads in the kit it waits (once, at
   // most 600 ms) for their worklets, so their nodes can be made before the first notes instead of on them
-  if (!(o && o._warm) && !tp.on){ rtInit(); if (!bassOK.has(ctx) && kit.voices.some((v, i) => v && isLivePad(i))){ const oo = Object.assign({}, o, {_warm:true});
+  if (!(o && o._warm) && !tp.on){ rtInit(); if (!bassOK.has(ctx) && (wkLazy() ? wkLiveWanted() : kit.voices.some((v, i) => v && isLivePad(i)))){ const oo = Object.assign({}, o, {_warm:true});
     Promise.race([bassReady(ctx), new Promise(r => setTimeout(r, 600))]).then(() => { if (!tp.on) tStart(mode, oo); }); return; } }
   if (typeof varPrefetch === 'function') varPrefetch();   // MUT / GEN
   if (mode === 'song' && loopPat && !(o && o.loop)){ o = Object.assign({}, o, {loop:{v:'pat', y0:o.row, y1:o.row}}); patRow = o.row; patCur = cs.song.y; }   // LOOP: the pattern
@@ -21424,7 +21492,7 @@ function tStart(mode, o){
   const pz0 = tp.paused; tp.paused = null; const rzH = !!(o && o.rz), pz = rzH ? o.rz : pz0;
   const resume = mode === 'song' && pz && S.song[pz.row] && S.song[pz.row][pz.ref] >= 0 && (rzH || (resumeOn && !wasOn && !(o && o.loop) && pz.key === curKey()));
   if (resume) o = Object.assign({}, o, {row:pz.row});
-  const r = rtInit();
+  const r = rtInit(); if (wkLazy()) for (let t = 0; t <= NT; t++) wkFxAsk(t);   // phones: the effects a pattern command may use (a command typed since the last touch)
   const seq = makeSeq(S, mode, Object.assign({}, o, {live:true}));   // live: chops never render on this thread (ensurePlay)
   if (!seq.alive()){ toast(mode === 'song' ? `Row ${rS(o.row, 3)} is empty. Put a sect on it, or move to a row that has some.` : 'Nothing to play here yet.'); draw(); return; }
   // Up to date, or the last render while the Worker finishes. A pad with no render at all (PLAY pressed straight
@@ -21468,7 +21536,7 @@ function tStart(mode, o){
   }
   if (mode === 'song' && (o.row | 0) > 0) try { chaseFx(o.row | 0, seq.time); } catch(e){ tpLog('chase', e); }   // CHASE: the effect commands before the start row
   tp.core = false;
-  if (aset.core === 'core' && core.ready && !core.bad && !(o && o.page)) coreStart(mode, o, t0start, rsFirst ? {ref:pz.ref, row:pz.row, step:pz.step} : null);
+  if (coreWanted() && core.ready && !core.bad && !(o && o.page)) coreStart(mode, o, t0start, rsFirst ? {ref:pz.ref, row:pz.row, step:pz.step} : null);
   pbLog('PLAY ' + mode + ' · ' + pbState()); setTimeout(() => { if (tp.on) pbLog(`4 s into PLAY: level ${pbLevel()}`); }, 4000);   // (9 Nov: to compare Latency settings)   // not loaded yet: this PLAY as before, the core loads at STOP
   if (lkp) lkStarted(lkp);   // ABLETON LINK: Link's exact tempo; ours tells the session
   tp.timer = pumpTimer(); pump(); if (!handing) draw(); songBtn(); chainsTempo(); if (typeof frameWake === 'function') frameWake();   // (a hand-over happens out of view: no draw, which was most of its time)
@@ -21618,6 +21686,9 @@ function padBlink(e){
    Off (Page), nothing here runs. */
 // CORE_REV: a hash of core/seq-core.js, written by tools/make-core.mjs. The offline cache keeps a file by its URL, so the
 // URL must change whenever the file does (the build number alone left phones on an old core all evening, 2 Nov).
+// Phones and tablets (10 Nov): the audio-thread sequencer's module (a second thread) loads only when the owner picked it there
+// (aset.corePick, set in Settings); the saved default 'core' plays on the Page sequencer on such a device.
+function coreWanted(){ return aset.core === 'core' && (!wkLazy() || !!aset.corePick); }   // (a declaration: the Settings row reads it at load)
 const CORE_REV = '37iagj';
 const CORE_WANT = 7;   // the core's message set this page speaks (core-processor.js CORE_V); an older core is not used
 const CORE_URL = () => 'core/seq-core.js?v=' + BUILD + '-' + CORE_REV;
@@ -21625,7 +21696,7 @@ const core = {node:null, ready:false, loading:null, gen:0, sent:new Map(), sT:0,
 function coreLoad(){
   if (core.loading) return core.loading;
   if (NOWK || !ctx || !ctx.audioWorklet || !rt) return Promise.resolve(false);
-  core.loading = ctx.audioWorklet.addModule(CORE_URL()).then(() => {
+  wkNote(ctx, 'core'); core.loading = ctx.audioWorklet.addModule(CORE_URL()).then(() => {
     const n = new AudioWorkletNode(ctx, 'thunder-core', {numberOfInputs:0, numberOfOutputs:NT + 4, outputChannelCount:[...new Array(NT).fill(2), 1, NT, NT, 1]});   // + the mix outputs (coreMixT)
     n.port.onmessage = e => { try { coreMsg(e.data || {}); } catch(err){ tpLog('core message', err); } };
     core.node = n; core.ready = true; core.sent.clear(); coreSyncAll(); return true;
@@ -21843,7 +21914,7 @@ function pbSum(){ const now = performance.now(); if (now - PB.t < 2000) return; 
   PB.n = PB.late = PB.drop = PB.ahead = 0; }
 function pbAfterStop(){ PB.stopT = performance.now(); pbLog('STOP · ' + pbState()); for (const ms of [1000, 3000]) setTimeout(() => pbLog(`${ms / 1000} s after STOP: level ${pbLevel()} · voices ${rt && rt.pl.aliveN ? rt.pl.aliveN() : '?'} · stray rows ${PB.stray} · ` + pbState()), ms); }
 async function pbCopy(){
-  const head = `Thunder Plus build ${BUILD} · ${navigator.userAgent}\nlatency ${ctx ? Math.round((ctx.baseLatency || 0) * 1000) + ' + ' + Math.round((ctx.outputLatency || 0) * 1000) + ' ms · heard ' + Math.round(heardLat() * 1000) + ' ms' : '-'} · worklets ${NOWK ? 'OFF (test)' : 'on'} · ${pbState()}\n`;
+  const head = `Thunder Plus build ${BUILD} · ${navigator.userAgent}\nlatency ${ctx ? Math.round((ctx.baseLatency || 0) * 1000) + ' + ' + Math.round((ctx.outputLatency || 0) * 1000) + ' ms · heard ' + Math.round(heardLat() * 1000) + ' ms' : '-'} · worklets ${NOWK ? 'OFF (test)' : ctx && wkUsed(ctx).size ? [...wkUsed(ctx)].join(', ') : 'none'} · ${pbState()}\n`;
   const txt = head + PB.log.join('\n');
   try { await navigator.clipboard.writeText(txt); toast('Playback report copied: paste it into the chat.', 3500); }
   catch(e){ try { await deliver('thunder-playback-report.txt', new Blob([txt], {type:'text/plain'})); } catch(e2){ toast('Couldn’t copy the report here.'); } }
@@ -21858,7 +21929,7 @@ function coreMsg(d){
     // DEAF CORE (owner's report, 6 Nov, Fold: after the screen timed out mid-song, the core kept stepping for 18 s+ after STOP,
     // re-sent STOPs included: its audio thread was too busy to read messages). Still at it 1.5 s after STOP: let it go (it is
     // cut off from the tracks and the page) and load a fresh one for the next PLAY.
-    if (!tp.on && PB.stopT && now - PB.stopT > 1500 && PB.strayN >= 3){ /* (still sending, batch after batch: not one late batch) */ pbLog('the audio-thread sequencer didn’t stop: dropped it, a fresh one loads'); try { coreDrop(); } catch(e){} setTimeout(() => { try { if (!tp.on && aset.core === 'core') coreLoad(); } catch(e){} }, 300); return; } }
+    if (!tp.on && PB.stopT && now - PB.stopT > 1500 && PB.strayN >= 3){ /* (still sending, batch after batch: not one late batch) */ pbLog('the audio-thread sequencer didn’t stop: dropped it, a fresh one loads'); try { coreDrop(); } catch(e){} setTimeout(() => { try { if (!tp.on && coreWanted()) coreLoad(); } catch(e){} }, 300); return; } }
   if (d.op === 'ready'){ core.v = d.v; if (d.v !== CORE_WANT){ core.ready = false; toast('The audio-thread sequencer here is out of date. Reload the app to use it. Until then, playback uses the Page sequencer.', 5000); } return; }
   if (d.op === 'error'){ tpLog('core: ' + d.where, new Error(d.message)); return; }
   if (d.op === 'started'){ pbLog(`core PLAY: reached the audio thread ${Math.round(-d.late * 1000)} ms before its start, took ${d.ms} ms`); return; }
@@ -21945,7 +22016,7 @@ function tStop(quiet){
   tp.timer = 0; tp.on = false; fpMem = null; fpHome = null; tp.q = []; tp.pos = null; tp.snd = null; tp.stopAt = null; tp.ahead = tp.aheadT = 0;
   // HAND-OVER (seqHandover): the core and the voices already booked keep sounding until the page sequencer's first step
   if (tp.core){ tp.core = false; core.gen++; if (!handing){ coreWire(false); try { core.node.port.postMessage({op:'stop', at:ctx.currentTime}); } catch(e){} } }
-  else if (aset.core === 'core' && !core.ready && ctx) setTimeout(() => { try { if (!tp.on) coreLoad(); } catch(e){} }, 400);
+  else if (coreWanted() && !core.ready && ctx) setTimeout(() => { try { if (!tp.on) coreLoad(); } catch(e){} }, 400);
   if (rt && !handing) rt.pl.stopAll(ctx.currentTime);
   fxcTL.m.clear(); fxcTL.beats.length = 0;   // FX BAR: STOP puts the switches back (resetSeq)
   moStop();
@@ -23045,7 +23116,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 544;
+const BUILD = 545;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD + (location.pathname.includes('/beta/') ? ' · beta' : '');
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -32434,6 +32505,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [545, '10 Nov', ['On phones and tablets the audio engine now loads its extra audio-thread parts only when a song uses effects, chains, live engines or the audio-thread sequencer, which keeps the phone’s audio clock steady for songs that don’t. The playback report lists which parts are loaded. On a phone the Sequencer setting plays on the Page until you pick Audio thread yourself.']],
   [544, '10 Nov', ['(Testing) A Worklets setting in Settings › Audio (On, or Off for a phone clock test), the playback report now logs the audio clock while the app is hidden and any slow work while the song plays, and a MUT or GEN variation no longer rebuilds its sound for every note while it renders.']],
   [543, '9 Nov', ['MOD: each LFO now has a small scope that draws its real shape (depth sets the height) with a dot that moves along it in time with the song while it plays. Two or more LFOs on the same target also get a scope of their sum. Wide screens put the scopes under the rows; a folded phone puts a small one beside each row. They stand still with LOW POWER DISPLAY on, and cost nothing on other screens.']],
   [542, '9 Nov', ['…chains on the bottom panel: a track that feeds a chain through a Track In now shows that chain too. This track’s signal is lit from its Track In to the Chain Out, and the other inputs, modules and lines are greyed (still clickable). The IN tag greys the other tracks’ numbers, and the title says which track’s chain it is.']],
@@ -33603,7 +33675,7 @@ if (new URLSearchParams(location.search).has('seqtest')) window.__seqTest = {
   },
   // THUNDER CORE live (phase 2b): switch the sequencer, and read the core's own timing counters (notes it booked, how many
   // late, the worst, the smallest lead) since the last call.
-  async coreOn(on){ aset.core = on ? 'core' : 'page'; rtInit(); if (on){ const ok = await coreLoad(); return !!ok; } return true; },
+  async coreOn(on){ aset.core = on ? 'core' : 'page'; aset.corePick = true; rtInit(); if (on){ const ok = await coreLoad(); return !!ok; } return true; },
   // Does the core's song equal this one? (after edits: the patch sync)
   coreSig(){ return new Promise(ok => { if (!core.ready) return ok(null); const f = e => { if (e.data && e.data.op === 'sig'){ core.node.port.removeEventListener('message', f); const j = JSON.stringify(S); let h = 0; for (let i = 0; i < j.length; i++) h = (h * 31 + j.charCodeAt(i)) | 0; ok({same:e.data.h === h && e.data.len === j.length, core:e.data.len, page:j.length}); } };
     core.node.port.addEventListener('message', f); corePost({op:'sig'}); setTimeout(() => ok(null), 1000); }); },

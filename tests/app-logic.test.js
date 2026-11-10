@@ -153,7 +153,58 @@ test('worklets off (test): default off, and every worklet loader on the page con
   assert.match(cut('index.html', /function mwReady\(ac\)\{[^\n]*\n/, 'mwReady'), /!wkOff\(ac\)/);
   assert.match(cut('index.html', /function coreLoad\(\)\{[^\n]*\n[^\n]*\n[^\n]*\n/, 'coreLoad'), /NOWK \|\|/);
   assert.match(src, /if \(mstNeedsWk\(M\) && !wkOff\(ac\)\)/, 'the live mastering chain makes no worklet node either');
-  assert.match(src, /worklets \$\{NOWK \? 'OFF \(test\)' : 'on'\}/, 'the playback report says which');
+  assert.match(src, /worklets \$\{NOWK \? 'OFF \(test\)' : ctx && wkUsed\(ctx\)\.size \? \[\.\.\.wkUsed\(ctx\)\]\.join\(', '\) : 'none'\}/, 'the playback report says which modules are loaded');
+});
+
+/* ───────── LAZY WORKLETS (10 Nov, build 545): phones and tablets load a worklet module only when the song needs it ───────── */
+test('lazy worklets: the gate is phones only, every loader records itself, and each way a module is needed reaches its loader', () => {
+  const src = H.read('index.html');
+  assert.match(src, /const wkLazy = \(\) => !NOWK && \(wkHand === null \? \(wkHand = !!seqHandHere\(\)\) : wkHand\);/, 'phones and tablets only (seqHandHere), never with the test switch');
+  assert.match(src, /function wkNote\(ac, name\)\{[^\n]*\n[^\n]*ac !== ctx/, 'only the page\'s own context is recorded');
+  for (const n of ['cpu', 'master', 'chains', 'tfx', 'bass', 'psyn', 'waves', 'core', 'rec', 'io']) assert.match(src, new RegExp("wkNote\\((ac|ctx), '" + n + "'\\)"), n + ' records itself where it calls addModule');
+  // the CPU probe and the safety limiter's worklet wait for another module on a phone
+  assert.match(src, /else if \(!wkLazy\(\)\) cpuProbe\(ctx\)/, 'no CPU probe at start on a phone');
+  assert.match(src, /if \(!wkLazy\(\)\) try \{ mwReady\(ctx\); \}/, 'no limiter worklet at start on a phone');
+  assert.match(src, /if \(!\(wkLazy\(\) && ac === ctx\)\) upgrade\(false\); else if \(wkUsed\(ac\)\.size\) upgrade\(true\);/, 'safeLim: computers swap at once, phones only once something else has loaded');
+  assert.match(src, /function wkHook\(\)\{[^\n]*\n[^\n]*cpuProbe\(ctx\)[^\n]*\n[^\n]*f\._up\(\)/, 'the first other module starts the probe and upgrades the limiters');
+  assert.match(src, /let wk = null, dead = false, up = false;/, 'the limiter upgrades at most once');
+  // rtInit: computers load everything as before, phones ask per track
+  const ri = cut('index.html', /function rtInit\(\)\{[\s\S]*?\n\}\n/, 'rtInit');
+  assert.match(ri, /if \(wkLazy\(\)\) wkLiveEnsure\(\); else bassReady\(ctx\)/);
+  assert.match(ri, /if \(wkLazy\(\)\)\{ for \(let t = 0; t <= NT; t\+\+\) wkFxAsk\(t\); \} else rtTfxLoad\(\);/);
+  assert.match(ri, /if \(!wkLazy\(\)\) rtChnLoad\(\);/);
+  assert.match(ri, /if \(coreWanted\(\)\) setTimeout/);
+  // effects and chains: rtFx is the one place everything passes (fxChanged, rtAllFx after a song / undo / kit, setChainOn, chainsPush, AUTO SLOT)
+  assert.match(cut('index.html', /function rtFx\(t\)\{\n[^\n]*\n[^\n]*\n/, 'rtFx'), /if \(wkLazy\(\)\) wkFxAsk\(t\)/);
+  assert.match(src, /function fxChanged\(t\)\{ pumpSyncT\(t\); saveS\(\); rtFx\(t\);/);
+  assert.match(src, /function rtAllFx\(\)\{ for \(let t = 0; t <= NT; t\+\+\) rtFx\(t\); \}/);
+  assert.match(src, /A\[k\] = freshTfx\(type\); fxChanged\(t\);/, 'AUTO SLOT goes through fxChanged');
+  assert.match(src, /if \(!rt\.fxAsk && fxAny\(A\) && \(fxCount\(A\) > 0 \|\| sw \|\| wkFxCmds\(\)\)\) rtTfxLoad\(\);/, 'an effect that is on, or off with a command that can switch it on');
+  assert.match(src, /if \(!rt\.chnAsk && t < NT && chainsFeed\(t\)\) rtChnLoad\(\);/);
+  assert.match(src, /\/\^sw\/\.test\(ev\.p\)\) wkFxAsk\(ev\.track, true\)/, 'the player asks when a pattern switches a slot');
+  // live engines
+  assert.match(src, /function wkLiveEnsure\(now\)\{\n[^\n]*bassLoad\.has\(ctx\)/);
+  assert.match(src, /if \(wkLazy\(\) && !bassLoad\.has\(ctx\)\)\{ wkLiveEnsure\(\); return 0; \}/, 'liveWarm (after every song or kit change)');
+  assert.match(src, /\(wkLazy\(\) \? wkLiveWanted\(\) : kit\.voices\.some\(\(v, i\) => v && isLivePad\(i\)\)\)/, 'tStart waits for the live engines only when the song plays a live pad');
+  assert.match(src, /if \(ac === ctx && wkLazy\(\)\) wkLiveEnsure\(true\); return null;/, 'a live note without its module loads it and plays the render');
+  assert.match(src, /\(isPsV\(v\) \|\| isWlV\(v\)\) && aset\.psLive === 'render'/, 'a pump or waves pad on Render needs no live module');
+});
+test('lazy worklets: the saved Sequencer default is not a pick on a phone (aset.corePick), and an explicit pick is honoured', () => {
+  const src = H.read('index.html');
+  assert.doesNotMatch(src, /corePick:\s*(true|1)\b/, 'not set by default');
+  assert.match(src, /function coreWanted\(\)\{ return aset\.core === 'core' && \(!wkLazy\(\) \|\| !!aset\.corePick\); \}/);
+  assert.match(src, /aset\.core = v; aset\.corePick = true; asetSave\(\);/, 'the Settings handler marks the pick (as aset.latPick does)');
+  assert.equal((src.match(/aset\.core === 'core'/g) || []).length, 1, 'only coreWanted reads the raw setting: every loader asks it');
+  assert.match(src, /if \(coreWanted\(\) && core\.ready && !core\.bad && !\(o && o\.page\)\) coreStart\(/);
+  assert.match(src, /plays on the Page unless you pick Audio thread here/, 'the Sequencer row says so');
+  const c = sandbox({ aset: { core: 'core' }, wkLazy: () => true });
+  vm.runInContext(cut('index.html', /function coreWanted\(\)\{[^\n]*\n/, 'coreWanted') + '\nthis.coreWanted = coreWanted;', c);
+  assert.equal(c.coreWanted(), false, 'phone, saved default: Page');
+  c.aset.corePick = true; assert.equal(c.coreWanted(), true, 'phone, picked: Audio thread');
+  const d = sandbox({ aset: { core: 'core' }, wkLazy: () => false });
+  vm.runInContext(cut('index.html', /function coreWanted\(\)\{[^\n]*\n/, 'coreWanted') + '\nthis.coreWanted = coreWanted;', d);
+  assert.equal(d.coreWanted(), true, 'computer: as before');
+  d.aset.core = 'page'; assert.equal(d.coreWanted(), false);
 });
 
 test('variations: a render that is pending does not build the voice again for every note (and leaves no empty map entry)', () => {
