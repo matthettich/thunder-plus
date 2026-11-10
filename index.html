@@ -115,6 +115,11 @@ body.mob .deskmenu{display:none}
 .gset{width:min(400px, calc(100vw - 20px)); max-height:calc(100vh - 80px); overflow-y:auto; overscroll-behavior:contain}
 @supports (height: 1dvh){ .gset{max-height:calc(100dvh - 80px)} }
 .gsetbody{padding:0}
+/* DONE (owner, 10 Nov): a Close in the Settings sheet that stays in view while it scrolls. Touch / Mobile setup only: a desktop dropdown is left as it was. */
+.gsethead{display:none}
+body.mob .gsethead{display:flex; justify-content:flex-end; position:sticky; top:-4px; z-index:3; margin:-4px -4px 0; padding:4px; background:var(--panel); border-bottom:1px solid var(--line)}
+@media (pointer:coarse){ .gsethead{display:flex; justify-content:flex-end; position:sticky; top:-4px; z-index:3; margin:-4px -4px 0; padding:4px; background:var(--panel); border-bottom:1px solid var(--line)} }
+.gsethead button{min-height:40px; min-width:72px; font-weight:600}
 .gset .gsec{padding:8px 8px 10px; display:grid; gap:8px}
 .gset .gsec + .gsec{border-top:1px solid var(--line)}
 .gset .gsec[hidden]{display:none}
@@ -2805,6 +2810,7 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
     <div class="phlbody" id="phlBody"></div>
   </div>
   <div class="setmenu gset" id="gset" hidden role="dialog" aria-label="Settings">
+    <div class="gsethead" id="gsetHead"><button type="button" id="gsetDone" aria-label="Close Settings">Done</button></div>
     <div class="gsetbody" id="gsetBody"><div class="gsec" id="gsecProj" hidden></div><div class="gsec" id="gsecScreen" hidden></div><div class="gsec" id="gsecPatch" hidden></div></div>
   </div>
   </div>
@@ -8783,7 +8789,14 @@ const toastQ = []; let toastLong = false, toastQuick = null;
 // toastOnce: a notice that only needs reading once on this device (key: what it is about)
 function toastOnce(key, msg, ms){ const K = 'thunderplus-seen-' + key; try { if (localStorage.getItem(K)) return; localStorage.setItem(K, '1'); } catch(e){} toast(msg, ms); }
 setTimeout(() => { try { $('toast').addEventListener('click', () => toastNext()); } catch(e){} }, 0);
-function toast(msg, ms){ const t = $('toast'); let top = 2000;
+// POP-UP MESSAGES setting (owner, 10 Nov): Settings › Screen. Off hides ordinary toasts; toastErr() (3rd argument 'err') is for a failure or
+// possible lost work (couldn’t save, storage full, audio / MIDI failing, needs a newer browser…) and always shows.
+const TOK = 'thunderplus-toasts-v1';
+let toastsOn = (() => { try { return localStorage.getItem(TOK) !== '0'; } catch(e){ return true; } })();
+function setToastsOn(on){ toastsOn = !!on; try { localStorage.setItem(TOK, on ? '1' : '0'); } catch(e){} if (!toastsOn){ try { const t = $('toast'); if (t && !t.hidden && !toastLong) toastNext(); } catch(e){} } }
+const toastErr = (msg, ms) => toast(msg, ms, 'err');
+function toast(msg, ms, sev){ const t = $('toast'); let top = 2000;
+  if (!toastsOn && sev !== 'err') return;
   if (busNote){ msg = msg ? msg + ' · ' + busNote : busNote; busNote = ''; top = 4500; }   // BUS: the one-time note rides along
   msg = String(msg == null ? '' : msg);
   // an error with no time of its own stays up long enough to read (audit B3: "Couldn’t save…" went in 2 s)
@@ -8791,8 +8804,16 @@ function toast(msg, ms){ const t = $('toast'); let top = 2000;
   const dur = typeof ms === 'number' && ms > 0 ? clamp(ms, 1000, 12000) : err ? clamp(2500 + msg.length * 30, 4000, 8000) : clamp(1000 + msg.length * 20, 1300, top), long = dur >= 4000;
   if (toastLong && !t.hidden){ if (long){ if (toastQ.length < 3) toastQ.push([msg, dur]); } else toastQuick = [msg, dur]; return; }
   toastShow(msg, dur, long); }
+// PHONE (body.mob): just below the screen-tab strip (#tTabs, else the top bar), measured each time, so it never covers either (owner, 10 Nov)
+function toastPlace(t){
+  try {
+    if (!document.body.classList.contains('mob')){ t.style.top = t.style.bottom = ''; return; }
+    let b = 0; for (const el of [document.querySelector('.top'), $('tTabs')]){ if (el && el.offsetHeight) b = Math.max(b, el.getBoundingClientRect().bottom); }
+    t.style.bottom = 'auto'; t.style.top = Math.round(b + 3) + 'px';
+  } catch(e){}
+}
 function toastShow(msg, dur, long){
-  const t = $('toast'); t.textContent = msg; t.hidden = false; clearTimeout(tt); toastLong = long;
+  const t = $('toast'); t.textContent = msg; t.hidden = false; toastPlace(t); clearTimeout(tt); toastLong = long;
   tt = setTimeout(toastNext, dur); }
 function toastNext(){
   const t = $('toast'); clearTimeout(tt); t.hidden = true; toastLong = false;
@@ -11535,7 +11556,7 @@ function sfLoad(id){
     if (!bytes) throw new Error('SoundFont “' + id + '” isn’t on this device. Load it on the Synth page (Engine: SoundFont).');
     const f = parseSF(bytes); f.id = id; SF.fonts.set(id, f);
     return f;
-  })().catch(e => { SF.loading.delete(id); toast(e.message || 'SoundFont failed to load.', 6000); return null; }));
+  })().catch(e => { SF.loading.delete(id); toastErr(e.message || 'SoundFont failed to load.', 6000); return null; }));
   return SF.loading.get(id);
 }
 // Sample data, decoded once per font and sample: {d:Float32Array, sr, ls, le} (loop in frames of d).
@@ -12811,7 +12832,7 @@ $('fxAdd').addEventListener('change', e => {
   const t = e.target.value; e.target.value = ''; if (!t) return;
   const v = V(); v.fx = v.fx || []; if (v.fx.length >= 6) return toast('Up to 6 effects per pad.');
   e.target.blur();
-  v.fx.push(freshFx(t)); if (!fxReady(v.fx[v.fx.length - 1])) toast(plFailed ? 'Effects couldn’t load in this view. They work in the installed app.' : 'Effects are still loading.');
+  v.fx.push(freshFx(t)); if (!fxReady(v.fx[v.fx.length - 1])) toastErr(plFailed ? 'Effects couldn’t load in this view. They work in the installed app.' : 'Effects are still loading.');
   renderFx(); changed();
 });
 const tailRow = makeRow({l:'Tail', min:0, max:8, c:'half', d:2, f:v => v.toFixed(1) + ' s'}, 'tail', V, {idp:'fx', noTrack:true, on:() => changed()});
@@ -12827,7 +12848,7 @@ function renderFx(){
     const mk = (label, fn, aria) => { const b = el('button', 'sm', label); b.type = 'button'; if (aria) b.setAttribute('aria-label', aria); b.addEventListener('click', fn); head.append(b); return b; };
     // ‹ › page this slot through the effects, in the + Add effect menu's order (the new one starts at its defaults)
     const pg = (dir, kb) => { const ks = fxOrder(), i = ks.indexOf(f.type), t = ks[(i + dir + ks.length) % ks.length];
-      const nf = freshFx(t); nf.on = f.on; v.fx[idx] = nf; if (!fxReady(nf)) toast(plFailed ? 'Effects couldn’t load in this view. They work in the installed app.' : 'Effects are still loading.');
+      const nf = freshFx(t); nf.on = f.on; v.fx[idx] = nf; if (!fxReady(nf)) toastErr(plFailed ? 'Effects couldn’t load in this view. They work in the installed app.' : 'Effects are still loading.');
       renderFx(); changed(); const b = $('fxList').children[idx]; const q = b && b.querySelector(kb ? '.fxhead .n' : dir < 0 ? '.fxpg.l' : '.fxpg.r'); if (q) q.focus({preventScroll:true}); };
     const pl = mk('', () => pg(-1), 'Previous effect'), nm = el('span', 'n', d.name), pr = mk('', () => pg(1), 'Next effect');
     pl.innerHTML = ico('left'); pr.innerHTML = ico('right'); pl.className = 'sm fxpg l'; pr.className = 'sm fxpg r';
@@ -13361,7 +13382,7 @@ async function resolveSamples(){
     }
     refreshAll();
     if (borrowed) save();   // samples read from Thunder's old store are copied into this app's own
-    if (missing) toast(missing + (missing > 1 ? ' samples' : ' sample') + ' couldn’t be found in this browser’s storage. Load the kit or project file to get them back.', 6000);
+    if (missing) toastErr(missing + (missing > 1 ? ' samples' : ' sample') + ' couldn’t be found in this browser’s storage. Load the kit or project file to get them back.', 6000);
     else { smpTidy(); if (!borrowed && typeof thunderTidy === 'function') setTimeout(thunderTidy, 3000); }
     // A kit saved before samples moved to IndexedDB still has them inside localStorage: move them now.
     try { if ((localStorage.getItem(KEY) || '').includes('"b64"')) save(); } catch(e){}
@@ -13411,7 +13432,7 @@ function save(){
   }
   if (!storeWrite(KEY, JSON.stringify(kitToJSON(false)))){
     // Too big with the audio inside: keep the settings at least, and say so (the samples are gone after a reload).
-    if (storeWrite(KEY, JSON.stringify(kitToJSON(true))) && typeof toast === 'function') toast('Storage is full: the kit was saved without its samples. Export a kit or project file to keep them.');
+    if (storeWrite(KEY, JSON.stringify(kitToJSON(true))) && typeof toast === 'function') toastErr('Storage is full: the kit was saved without its samples. Export a kit or project file to keep them.');
   }
 }
 function loadSaved(){ try { const s = localStorage.getItem(KEY) || localStorage.getItem(OLD_KEY); return s ? kitFromJSON(JSON.parse(s)) : null; } catch(e){ console.warn('Couldn’t load the saved kit', e); return null; } }
@@ -13512,8 +13533,8 @@ async function writeOut(to, filename, blob){
   if (to.ai) return deliverAI(filename, blob);
   if (to.path){ const r = await DESK.outWrite(to.path, await blob.arrayBuffer());
     if (r && r.ok){ const nm = r.path.split(/[\\/]/).pop(); toastAct('Saved ' + nm + ' in ' + r.path.slice(0, r.path.length - nm.length - 1), 'Show', () => DESK.outShow(r.path)); }
-    else toast('Couldn’t save it: ' + ((r && r.error) || 'unknown error')); return; }
-  if (to.h){ try { const w = await to.h.createWritable(); await w.write(blob); await w.close(); toast('Saved ' + (to.h.name || filename)); } catch(e){ toast('Couldn’t save it: ' + ((e && e.message) || e)); } return; }
+    else toastErr('Couldn’t save it: ' + ((r && r.error) || 'unknown error')); return; }
+  if (to.h){ try { const w = await to.h.createWritable(); await w.write(blob); await w.close(); toast('Saved ' + (to.h.name || filename)); } catch(e){ toastErr('Couldn’t save it: ' + ((e && e.message) || e)); } return; }
   const url = URL.createObjectURL(blob), a = document.createElement('a');
   a.href = url; a.download = filename; document.body.append(a); a.click(); a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 5000); toast('Saved ' + filename + ' to your Downloads folder', 4000);
@@ -13551,9 +13572,9 @@ let passProg = null;   // pass() reports how far its render has got here (0–1)
 async function deliverAI(filename, blob){
   if (inAI){
     let dl = null; try { dl = await window.claude.use('downloads'); } catch(e){}
-    if (!dl){ toast('Saving files isn’t available in this view.'); return; }
+    if (!dl){ toastErr('Saving files isn’t available in this view.'); return; }
     try { await dl.save({filename, data:blob}); toast('Saved ' + filename); }
-    catch(e){ if (e && e.code === 'declined') return; toast(e && e.code === 'rate_limited' ? 'A save is already waiting for you.' : 'Couldn’t save: ' + ((e && e.message) || 'unknown error')); }
+    catch(e){ if (e && e.code === 'declined') return; toastErr(e && e.code === 'rate_limited' ? 'A save is already waiting for you.' : 'Couldn’t save: ' + ((e && e.message) || 'unknown error')); }
     return;
   }
   const url = URL.createObjectURL(blob), a = document.createElement('a');
@@ -13570,7 +13591,7 @@ $('bExKit').addEventListener('click', () => { const fs = []; for (let i = 0; i <
 const canShare = !inAI && !!(navigator.canShare && window.File) && (() => { try { return navigator.canShare({files:[new File([new Uint8Array(4)], 'a.wav', {type:'audio/wav'})]}); } catch(e){ return false; } })();
 async function share(files){
   try { await navigator.share({files, title:'Thunder'}); }
-  catch(e){ if (e && e.name !== 'AbortError') toast('Sharing didn’t work here. Use Save instead.'); }
+  catch(e){ if (e && e.name !== 'AbortError') toastErr('Sharing didn’t work here. Use Save instead.'); }
 }
 if (canShare){
   $('bShPad').hidden = false; $('bShKit').hidden = false;
@@ -13693,6 +13714,7 @@ const gsetPress = (mode, btn) => gsetOpen() && gsetBtn === btn ? gsetToggle(fals
 for (const [id] of GLOBAL_SECS){ const s = $(id); if (s){ s.hidden = true; s.classList.add('gsec'); $('gsetBody').append(s); } }
 for (const id of INNER_SECS){ const s = $(id); if (s) $('gsetBody').append(s); }   // parked here; buildProj / buildScreen place them
 $('bSet').addEventListener('click', () => gsetPress('set', $('bSet')));
+$('gsetDone').addEventListener('click', () => gsetToggle(false));   // same as tapping the gear again
 $('bView').addEventListener('click', () => gsetPress('view', $('bView')));
 $('bAud').addEventListener('click', () => gsetPress('aud', $('bAud')));
 // Settings sliders are locked so scrolling the menu, or a stray tap on a slider's track, can't change a setting.
@@ -13765,8 +13787,6 @@ function fileItems(){
   return [
     // MENUS (owner, 31 Oct: things in the right place): with the Edit menu on screen, Undo / Redo and Phrases… are there
     // only; a phone has no Edit menu, so they stay here
-    // HELP when folded: the top bar's ? is hidden at 480 px and under, so Help is the first row here (usability audit U1)
-    ...(window.matchMedia && matchMedia('(max-width:480px)').matches ? [{l:'Help & keys', f:() => showHelp()}] : []),
     ...(ed ? [] : [{h:'Edit'}, {l:'Undo', k:K('mod+Z'), f:() => undoStep(-1), off:!undo.past.length && !vUndo.t.some(Boolean)}, {l:'Redo', k:K('mod+shift+Z'), f:() => undoStep(1), off:!undo.future.length}, {l:'Phrases… (find ones not on the song)', f:() => phlOpen(true)}]),
     {h:'Project'},
     {l:'New song', k:K('mod+N'), f:newSong, ask:'song'},
@@ -13809,7 +13829,9 @@ function fileItems(){
       {l:'Clear all kit slots', f:clearKit, ask:'kit'},
       null,
       {l:(vtrk ? '✓ ' : '') + 'A kit slot per track', f:() => { setVtrk(!vtrk); try { $('ckVtrk').checked = vtrk; } catch(e){} }}]},   // (from ⚙'s Kit, 2 Nov)
-    ...(deskUpdApi ? [{h:'App'}, {l:'Check for updates…' + (deskUpd && deskUpd.version ? ' (you have ' + deskUpd.version + ')' : ''), f:() => deskUpdApi.check()}] : [])
+    ...(deskUpdApi ? [{h:'App'}, {l:'Check for updates…' + (deskUpd && deskUpd.version ? ' (you have ' + deskUpd.version + ')' : ''), f:() => deskUpdApi.check()}] : []),
+    // HELP when folded: the top bar's ? is hidden at 480 px and under, so Help is the LAST row here (usability audit U1; owner: at the bottom)
+    ...(window.matchMedia && matchMedia('(max-width:480px)').matches ? [{h:'Help'}, {l:'Help & keys', f:() => showHelp()}] : [])
   ];
 }
 /* ---------- DESKTOP APP UPDATES (electron/preload.js → window.thunderDesktop) ----------
@@ -14548,7 +14570,7 @@ function smbAdd(S){
   let ok = false; for (const n of [SMB_MAX, 10, 3, 1]){ try { localStorage.setItem(SMB_K, JSON.stringify(a.slice(0, n))); ok = true; break; } catch(e){} }
   SMB_MEM = ok ? null : a; if (!ok) tpLog('RECENT could not be saved (storage full): kept for this session only');
   smpHeld.set(S.id, S);   // (so a RECENT row loads from memory even if the store write below is slow or fails; the minute-by-minute prune lets it go once no pad names it)
-  try { smpPut(S).catch(e => { tpLog('could not store the sample for RECENT', e); toast('This sample is too big for the browser’s storage: RECENT will only have it until the app closes.', 7000); }); } catch(e){}
+  try { smpPut(S).catch(e => { tpLog('could not store the sample for RECENT', e); toastErr('This sample is too big for the browser’s storage: RECENT will only have it until the app closes.', 7000); }); } catch(e){}
 }
 const smbDb = () => idbOpen('thunderplus-browser');   // (its store is called 'smp' too: idbOpen makes that one; here it holds the folder handle)
 async function smbKv(k, v){ try { const db = await smbDb(); return await new Promise(res => { const tx = db.transaction('smp', v === undefined ? 'readonly' : 'readwrite'), st = tx.objectStore('smp');
@@ -14558,7 +14580,7 @@ async function smbPerm(ask){ const d = SMB.dir; if (!d) return (SMB.perm = '');
   try { let p = await d.queryPermission({mode:'read'}); if (p !== 'granted' && ask) p = await d.requestPermission({mode:'read'}); return (SMB.perm = p); } catch(e){ return (SMB.perm = 'denied'); } }
 async function smbPickDir(){
   try { const d = await window.showDirectoryPicker({id:'thunder-samples', mode:'read'}); SMB.dir = d; SMB.files = null; await smbKv('folder', d); SMB.perm = 'granted'; smbScan(); }
-  catch(e){ if (e && e.name !== 'AbortError') toast('Couldn’t open that folder.'); }
+  catch(e){ if (e && e.name !== 'AbortError') toastErr('Couldn’t open that folder.'); }
 }
 // Every audio file under the folder (subfolders too, up to 8 deep and 20,000 files), sorted by path
 async function smbScan(){
@@ -14740,13 +14762,13 @@ async function rcdOpen1(){
     } catch(e){ tpLog('native input', e); rcdCloseIo(); Object.assign(RCD, {node:null, mon:null}); RCD.ioWhy = String((e && e.message) || e); }
     // NO SILENT FALLBACK: with Engine Native and the helper there, a failed open says why and records nothing (the browser's input
     // would have quietly given only inputs 1–2). Without the helper at all, the browser's input is used, as the window says.
-    if (IOH.state === 'ready'){ RCD.note = 'Native input: ' + (RCD.ioWhy || 'it didn’t open') + '. Try again, or pick Engine Browser.'; toast(RCD.note, 6000); return false; }
+    if (IOH.state === 'ready'){ RCD.note = 'Native input: ' + (RCD.ioWhy || 'it didn’t open') + '. Try again, or pick Engine Browser.'; toastErr(RCD.note, 6000); return false; }
   }
   const md = navigator.mediaDevices; if (!md || !md.getUserMedia){ toast('This browser can’t record audio.'); return false; }
   const base = {echoCancellation:false, noiseSuppression:false, autoGainControl:false, channelCount:{ideal:32}};   // INPUTS: every channel it has
   let s = null;
   if (rcdSet.input){ try { s = await md.getUserMedia({audio:Object.assign({}, base, {deviceId:{exact:rcdSet.input}})}); } catch(e){} }
-  if (!s){ try { s = await md.getUserMedia({audio:base}); } catch(e){ toast(e && e.name === 'NotAllowedError' ? 'Recording needs permission to use an audio input.' : 'Couldn’t open an audio input.', 5000); return false; } }
+  if (!s){ try { s = await md.getUserMedia({audio:base}); } catch(e){ toastErr(e && e.name === 'NotAllowedError' ? 'Recording needs permission to use an audio input.' : 'Couldn’t open an audio input.', 5000); return false; } }
   if (gone()){ s.getTracks().forEach(t => t.stop()); return false; }   // (closed while the browser asked: CodeRabbit)
   try {
     if (RCD.mod !== ctx){ wkNote(ctx, 'rec'); await ctx.audioWorklet.addModule(URL.createObjectURL(new Blob([RCD_WORKLET], {type:'application/javascript'}))); RCD.mod = ctx; }
@@ -16665,7 +16687,7 @@ function nmLost(){
   if (IOH.port){ try { IOH.port.onmessage = null; IOH.port.close(); } catch(e){} }
   iohPend.forEach(r => r(null)); iohPend.clear();
   Object.assign(IOH, {state:'off', port:null, midi:false, clk:null, clkT:0});
-  toast('The desktop app’s MIDI connection stopped. Reconnecting.', 5000);
+  toastErr('The desktop app’s MIDI connection stopped. Reconnecting.', 5000);
   connectMidi();
 }
 function nmClose(){ const acc = NM.acc; if (!acc) return; NM.acc = null; clearInterval(NM.scanT); clearInterval(NM.clkT); IOH.onMidi = null;
@@ -18972,7 +18994,7 @@ function chainsNode(ac, track, patch, tempo, cid){
     }
     if (d.op === 'shed' && d.value) toast(d.value.recovered ? 'chains: CPU is free again, back to full quality.' : 'chains is busy: dropped to draft quality.', 5000);
     if (d.op === 'resample' && d.value) resampleIn(d.value);
-    if (d.op === 'error' && d.value) toast('chains: ' + (d.value.message || d.value.op), 5000);
+    if (d.op === 'error' && d.value) toastErr('chains: ' + (d.value.message || d.value.op), 5000);
   };
   n._sent = patch ? chnClone(patch) : null;   // the patch this node already has
   return n;   // the processorOptions above load the initial patch; later changes go as diffs
@@ -19108,7 +19130,7 @@ function tfxNode(ac, chain, cid){
     if (d.pump) PumpFX._feed(n, d.pump);
     if (d.pst) PumpFX._pst(n, d.pst);   // …PUMP STATE: the plugin changed its own (MASTER learned)
     if (d.plat){ n.plat = d.plat; PumpFX._lat(n, d.plat); }
-    if (d.failed){ const t = String(d.failed).split(':')[1], F = TFX[t]; toast((F ? F.long.replace(/^based on /, '') : 'An effect') + ' stopped working and was bypassed. Change its settings to restart it.'); } };
+    if (d.failed){ const t = String(d.failed).split(':')[1], F = TFX[t]; toastErr((F ? F.long.replace(/^based on /, '') : 'An effect') + ' stopped working and was bypassed. Change its settings to restart it.'); } };
   // FIX (sweep, 4 Nov): a node that can't start at all (the browser out of memory for its DSP, seen after many renders in a
   // small-memory browser) passed its track through dry with no word; now it says so, once per audio context.
   n.onprocessorerror = () => { if (tfxErrAc.has(ac)) return; tfxErrAc.add(ac);
@@ -19546,7 +19568,7 @@ function flushKit(){
 addEventListener('pagehide', () => { flushS(); flushKit(); saveCur(); });
 // Another tab of the app saved the song or kit: say so once (the last tab to save wins).
 let tabWarned = false;
-addEventListener('storage', e => { if (!tabWarned && (e.key === TK || e.key === KEY) && e.newValue !== null){ tabWarned = true; toast('Thunder Plus is open in another tab too. The last tab to save wins, so use just one tab.', 6000); } });
+addEventListener('storage', e => { if (!tabWarned && (e.key === TK || e.key === KEY) && e.newValue !== null){ tabWarned = true; toastErr('Thunder Plus is open in another tab too. The last tab to save wins, so use just one tab.', 6000); } });
 document.addEventListener('visibilitychange', () => { if (document.hidden){ flushS(); flushKit(); saveCur(); } });
 // A phrase opened from an empty song block is placed in that block once it has a note (see nav()).
 let pendPlace = null;
@@ -21095,12 +21117,12 @@ function resetAudio(quiet){
    so asking for tfx asks for chains too. */
 function rtTfxLoad(){
   if (!rt || rt.fxAsk) return; rt.fxAsk = true;
-  rtPending(tfxReady(ctx).then(ok => { if (!rt) return; rt.fxOk = ok; rtAllFx(); if (!ok && !NOWK && (S.tfx.some(fxCount) || fxCount(S.mfx))) toast('Track effects need a newer browser here.'); }));
+  rtPending(tfxReady(ctx).then(ok => { if (!rt) return; rt.fxOk = ok; rtAllFx(); if (!ok && !NOWK && (S.tfx.some(fxCount) || fxCount(S.mfx))) toastErr('Track effects need a newer browser here.'); }));
   rtChnLoad();
 }
 function rtChnLoad(){
   if (!rt || rt.chnAsk) return; rt.chnAsk = true;
-  rtPending(chainsReady(ctx).then(ok => { if (!rt) return; rt.chnOk = ok; if (ok){ chnSync.add(ctx); rtAllFx(); } else if ((S.chainOn || []).some(Boolean) && !NOWK) toast('chains needs a newer browser here.'); }));
+  rtPending(chainsReady(ctx).then(ok => { if (!rt) return; rt.chnOk = ok; if (ok){ chnSync.add(ctx); rtAllFx(); } else if ((S.chainOn || []).some(Boolean) && !NOWK) toastErr('chains needs a newer browser here.'); }));
 }
 /* FIRST PLAY WAITS FOR THE EFFECT MODULES (10 Nov, audio review): the `.then` handlers above run rtAllFx (every track's chain and effect
    nodes, 0.5 s of main thread) the moment the tfx / chains modules arrive, which on a PLAY as the first touch was 1-4 bars into the
@@ -21672,7 +21694,7 @@ function audioInterrupted(){
   if (!ctx || !tp.on) return;
   if (ctx.state === 'running'){ clearTimeout(intT); intT = 0; return; }
   try { ctx.resume().catch(() => {}); } catch(e){}
-  if (!intT) intT = setTimeout(() => { intT = 0; if (tp.on && ctx && ctx.state !== 'running'){ tStop(); toast('Audio was interrupted: press PLAY to continue.', 4000); } }, 2500);
+  if (!intT) intT = setTimeout(() => { intT = 0; if (tp.on && ctx && ctx.state !== 'running'){ tStop(); toastErr('Audio was interrupted: press PLAY to continue.', 4000); } }, 2500);
 }
 document.addEventListener('visibilitychange', () => { if (!document.hidden) audioInterrupted(); });
 /* BATTERY (27 Oct): once the first sound started the engine, the AudioContext ran for as long as the app stayed open: its
@@ -21704,7 +21726,7 @@ document.addEventListener('visibilitychange', () => {
 });
 function pump(){
   try { pumpRun(); }
-  catch(e){ console.error(e); try { tStop(); } catch(e2){} toast('Playback stopped: ' + ((e && e.message) || 'something went wrong') + '.', 5000); }
+  catch(e){ console.error(e); try { tStop(); } catch(e2){} toastErr('Playback stopped: ' + ((e && e.message) || 'something went wrong') + '.', 5000); }
 }
 /* PHONE RESYNC (10 Nov; owner's Fold, Chrome with AudioWorklet modules loaded): Chrome renders more audio than the device plays, so
    ctx.currentTime runs ahead of real time in bursts and for many seconds at 1.2× to 2.3× (61.7 s of clock in 40.4 s of wall during
@@ -22553,7 +22575,7 @@ async function renderOut(stems){
     if (stems) await writeOut(to, fname, zipBlob(files));
     else if (inAI) await writeOut(to, `${base} mix.zip`, zipBlob(files));
     else await writeOut(to, files[0].name, new Blob([files[0].data], {type:'audio/wav'}));
-  } catch(err){ if (err && err.message === RENDER_CANCEL) toast('Render canceled: nothing was saved.'); else toast('Render failed: ' + ((err && err.message) || err)); }
+  } catch(err){ if (err && err.message === RENDER_CANCEL) toast('Render canceled: nothing was saved.'); else toastErr('Render failed: ' + ((err && err.message) || err)); }
   finally { rendering = false; passProg = null; rprog.close(); draw(); }
 }
 /* ===== RENDER PART (21 Oct): render a phrase selection (or the whole phrase), or song rows (the selection, else the
@@ -22662,14 +22684,14 @@ async function renderPart(dest){
       if (cand.length){ ins = cand[0]; S.insts[ins].pad = pad; saveS(); } }
     draw();
     toast(`Rendered ${part.label} (${secs} s) into slot ${hx(pad)}` + (ins >= 0 ? ` · instrument ${hx(ins)} plays it` : ''), 6000);
-  } catch(err){ toast('Render failed: ' + ((err && err.message) || err)); }
+  } catch(err){ toastErr('Render failed: ' + ((err && err.message) || err)); }
   finally { rendering = false; draw(); }
 }
 /* ===== RENDER PART end ===== */
 async function shareLast(){
   if (!lastR) return toast('Render something first.');
   try { await navigator.share({files:lastR.map(f => new File([f.data], f.name, {type:'audio/wav'})), title:'Thunder'}); }
-  catch(e){ if (e && e.name !== 'AbortError') toast('Sharing didn’t work here. The render was saved to your downloads.'); }
+  catch(e){ if (e && e.name !== 'AbortError') toastErr('Sharing didn’t work here. The render was saved to your downloads.'); }
 }
 const canFS = !inAI && typeof window.showSaveFilePicker === 'function';
 // Chrome Android (132+) has the file pickers now, but its `types` filter is MIME-based and hides a custom
@@ -22693,7 +22715,7 @@ async function shareProj(){
   flushS(); await presetSmpFill();
   const f = new File([projBlob()], projName(), {type:'application/json'});
   try { await navigator.share({files:[f], title:S.name || 'Thunder project'}); }
-  catch(e){ if (e && e.name === 'AbortError') return; await deliver(f.name, projBlob()); toast('Sharing didn’t work here, so the project was saved to your downloads instead.'); }
+  catch(e){ if (e && e.name === 'AbortError') return; await deliver(f.name, projBlob()); toastErr('Sharing didn’t work here, so the project was saved to your downloads instead.'); }
 }
 async function writeTo(h){ const w = await h.createWritable(); await w.write(projBlob()); await w.close(); }
 // The browser's file permission: asked again after a restart (a click or Ctrl/⌘+S counts as the go-ahead).
@@ -22763,7 +22785,7 @@ async function defSongSave(){
   const ok = await askYes({title:'Save as default song?', body:'New song will start from this song (its tracks, buses, chains, effects, mixer, tempo and phrases) on this device. The kit stays separate.' + (defSongTxt() ? ' It replaces your current default.' : '')}, 'Save as default');
   if (!ok) return;
   try { localStorage.setItem(DSK, JSON.stringify(songOut(S))); toast('Saved as the default song: New song starts from it.', 3000); }
-  catch(e){ toast('Couldn’t save the default song: this device’s storage is full.', 4000); }
+  catch(e){ toastErr('Couldn’t save the default song: this device’s storage is full.', 4000); }
 }
 async function defSongForget(){
   const ok = await askYes({title:'Forget the default song?', body:'New song starts from the blank song again.'}, 'Forget');
@@ -22781,8 +22803,8 @@ async function saveProj(as){
     flushS(); await presetSmpFill();
     if (DESK){
       if (!as && projPath){ const r = await DESK.save(projPath, projText()); if (r && r.ok){ setDirty(false); projSet(projPath, null); toast('Saved ' + projLabel()); return true; }
-        toast('Couldn’t save to ' + projLabel() + (r && r.error ? ': ' + r.error : '') + '. Choose where to save it.', 5000); }
-      const r = await DESK.saveAs(projName(), projText(), projPath || ''); if (!r || !r.ok) { if (r && r.error) toast('Couldn’t save: ' + r.error); return false; }
+        toastErr('Couldn’t save to ' + projLabel() + (r && r.error ? ': ' + r.error : '') + '. Choose where to save it.', 5000); }
+      const r = await DESK.saveAs(projName(), projText(), projPath || ''); if (!r || !r.ok) { if (r && r.error) toastErr('Couldn’t save: ' + r.error); return false; }
       setDirty(false); projSet(r.path, null); toast('Saved ' + projLabel()); return true;
     }
     if (!as && projFile){
@@ -22792,7 +22814,7 @@ async function saveProj(as){
     if (canFS){
       try { const h = await window.showSaveFilePicker(Object.assign({suggestedName:projName()}, isAndroid ? {} : {types:PJT})); await writeTo(h); setDirty(false); projSet(null, h); toast('Saved ' + h.name); return true; }
       // FIX (sweep, 4 Nov): when the picker itself fails (not Cancel), the song still gets saved, as a download
-      catch(e){ if (e && e.name === 'AbortError') return false; toast('Couldn’t save there (' + ((e && e.message) || e) + '), so it went to your downloads.', 6000);
+      catch(e){ if (e && e.name === 'AbortError') return false; toastErr('Couldn’t save there (' + ((e && e.message) || e) + '), so it went to your downloads.', 6000);
         await deliver(projName(), projBlob()); setDirty(false); return true; }
     }
     if (as){ const n = await askText({title:'Save project as', body:'The song is renamed and saved to your downloads.'}, S.name, 40, 'Save'); if (n == null) return false; S.name = n.trim().slice(0, 40) || 'Song'; saveS(); draw(); }
@@ -22806,7 +22828,7 @@ async function loadProjText(text, name, where){
     const j = JSON.parse(text);
     if (!j || (!j.song && j.app !== 'thunder-song')) throw new Error('This file isn’t a Thunder project.');
     // VERSION: a file saved by a newer build may use things this one doesn't have yet. It still opens; the user is told to update.
-    if (typeof j.build === 'number' && j.build > BUILD) toast(`Saved by a newer version of Thunder Plus. Some things may not play as they should. Update the app.`, 9000);
+    if (typeof j.build === 'number' && j.build > BUILD) toastErr(`Saved by a newer version of Thunder Plus. Some things may not play as they should. Update the app.`, 9000);
     if (j.kit){ const k = kitFromJSON(j.kit); if (!await kitReplaceOk(k, 'Open this project?')) return false; setKit(k); }
     const ns = normSong(j.app === 'thunder-song' ? j : j.song); if (ns.presets) try { presetsByRef(ns.presets); } catch(e){ tpLog('could not move preset samples out of the loaded song', e); }
     setSong(ns, 'Loaded ' + (j.song && j.song.name || name));
@@ -22821,10 +22843,10 @@ async function loadProjText(text, name, where){
 async function loadProjFile(f, h){ return loadProjText(await f.text(), f.name, h ? {h} : null); }
 async function openProj(){
   if (!await okToLeave('opening another project')) return;
-  if (DESK){ const r = await DESK.open(); if (r && r.text != null) loadProjText(r.text, r.name, {path:r.path}); else if (r && r.error) toast('Couldn’t open it: ' + r.error); return; }
+  if (DESK){ const r = await DESK.open(); if (r && r.text != null) loadProjText(r.text, r.name, {path:r.path}); else if (r && r.error) toastErr('Couldn’t open it: ' + r.error); return; }
   if (canFS && !isAndroid && typeof window.showOpenFilePicker === 'function'){
     try { const [h] = await window.showOpenFilePicker({types:PJT}); await loadProjFile(await h.getFile(), h); }
-    catch(e){ if (e && e.name !== 'AbortError') toast('Couldn’t open that file.'); }
+    catch(e){ if (e && e.name !== 'AbortError') toastErr('Couldn’t open that file.'); }
     return;
   }
   // Android's picker filters by MIME type, and a custom .thunder often arrives as application/octet-stream
@@ -22846,7 +22868,7 @@ async function openRecent(){
   if (k < 0) return; const e = recentL[k];
   if (!await okToLeave('opening ' + e.name)) return;
   if (e.path && DESK){ const r = await DESK.read(e.path); if (r && r.text != null) return loadProjText(r.text, r.name, {path:r.path});
-    recentL.splice(k, 1); kvSet('recent', recentL); return toast('Couldn’t open ' + e.name + (r && r.error ? ': ' + r.error : '') + '. It was taken off the list.', 5000); }
+    recentL.splice(k, 1); kvSet('recent', recentL); return toastErr('Couldn’t open ' + e.name + (r && r.error ? ': ' + r.error : '') + '. It was taken off the list.', 5000); }
   if (e.h){ if (!await fsPerm(e.h, false)) return toast('The browser didn’t allow opening ' + e.name + '.');
     try { return await loadProjFile(await e.h.getFile(), e.h); } catch(err){ recentL.splice(k, 1); kvSet('recent', recentL); return toast('Couldn’t open ' + e.name + ': it may have moved. It was taken off the list.', 5000); } }
 }
@@ -22869,14 +22891,14 @@ async function restoreBackup(){
   const k = await askPick({title:'Restore a backup', body:'Song and kit as they were. The newest is first.'}, idx.map(e => `${e.name} · ${new Date(e.at).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})} (${ago(e.at)})`));
   if (k < 0) return;
   if (!await okToLeave('restoring the backup')) return;
-  const text = await kvGet(idx[k].k); if (!text) return toast('That backup couldn’t be read.');
+  const text = await kvGet(idx[k].k); if (!text) return toastErr('That backup couldn’t be read.');
   if (await loadProjText(text, idx[k].name, {dirty:true})) toast('Restored the backup of ' + idx[k].name + ' from ' + ago(idx[k].at) + '. Save it to keep it in a file.', 5000);
 }
 // DESKTOP APP: closing the window asks first when there are unsaved changes; a .thunder file opened from the desktop
 // (double-click, or dropped on the app's icon) arrives here by path.
 if (DESK_APP){
   try { DESK_APP.onCloseAsk(async () => { DESK_APP.closeAck(); let ok = true; try { ok = await okToLeave('closing the app'); } catch(e){} DESK_APP.closeReply(ok); }); } catch(e){}
-  try { DESK_APP.onOpenPath(async p => { if (!await okToLeave('opening ' + String(p).split(/[\\/]/).pop())) return; const r = await DESK.read(p); if (r && r.text != null) loadProjText(r.text, r.name, {path:r.path}); else toast('Couldn’t open ' + p + (r && r.error ? ': ' + r.error : '')); }); } catch(e){}
+  try { DESK_APP.onOpenPath(async p => { if (!await okToLeave('opening ' + String(p).split(/[\\/]/).pop())) return; const r = await DESK.read(p); if (r && r.text != null) loadProjText(r.text, r.name, {path:r.path}); else toastErr('Couldn’t open ' + p + (r && r.error ? ': ' + r.error : '')); }); } catch(e){}
   try { DESK_APP.ready(); } catch(e){}
 }
 setTimeout(dirtyShow, 0);
@@ -23006,7 +23028,7 @@ function parseSmf(buf){
 }
 async function importMidiFile(f){
   try { recEndTake(); } catch(e){}
-  let m; try { m = parseSmf(await f.arrayBuffer()); } catch(e){ return toast('Couldn’t read that MIDI file' + (e && e.message ? ': ' + e.message : '') + '.', 5000); }
+  let m; try { m = parseSmf(await f.arrayBuffer()); } catch(e){ return toastErr('Couldn’t read that MIDI file' + (e && e.message ? ': ' + e.message : '') + '.', 5000); }
   if (!m.tracks.length) return toast('That MIDI file has no notes.');
   const t0 = tv === 'song' ? Math.min(cs.song.x, ntr() - 1) : Math.min(cTrack, ntr() - 1), y0 = cs.song.y;
   const L = clamp(S.dlen || 16, 1, PROWS), lpb = S.lpb || 4, stepK = m.ppq / lpb, tks = S.ticks || TICKS;
@@ -23073,7 +23095,7 @@ async function thunderImport(asked){
   const tk = lsGet(T_KIT), ts = lsGet(T_SONG); if (!tk && !ts) return toast('No Thunder work saved in this browser.');
   let kitJ = null, songJ = null;
   try { if (tk) kitJ = kitFromJSON(JSON.parse(tk)); if (ts) songJ = normSong(JSON.parse(ts)); }
-  catch(e){ try { console.warn('Thunder saved work read failed', e); } catch(_){} return toast('Couldn’t read Thunder’s saved work.'); }
+  catch(e){ try { console.warn('Thunder saved work read failed', e); } catch(_){} return toastErr('Couldn’t read Thunder’s saved work.'); }
   if (!asked){
     const what = [songJ && `song “${songJ.name || 'Song'}”`, kitJ && `kit “${kitJ.name || 'Kit'}”`].filter(Boolean).join(' and ');
     if (!await askYes({title:'Open Thunder’s saved work?', body:`Thunder is now part of Thunder Plus (Settings → App → Mobile). Its ${what} can still be found in this browser.\n\nYour current song “${S.name || 'Song'}” and kit “${kit.name || 'Kit'}” are saved to a project file first. You can also do this later from File.`}, 'Open')){
@@ -23131,7 +23153,7 @@ function phraseToCursor(){
   if (x >= MT || (typeof isBusT === 'function' && isBusT(x))) return;
   if (cid >= 0){ const p = firstPhrase(cid); cSect = cid; if (p >= 0) cPhrase = p; return; }
   const fp = freePhrase(); if (fp < 0) return; cPhrase = fp; cs.phrase.y = 0; pendPlace = {x, y, p:fp}; }
-function resetCursors(){ cSect = cPhrase = cInst = cTrack = cFxT = cFxS = 0; for (const k in cs) Object.assign(cs[k], {x:0, y:0, top:0}); selA = null; }
+function resetCursors(){ fxOpenedOnce = false; cSect = cPhrase = cInst = cTrack = cFxT = cFxS = 0; for (const k in cs) Object.assign(cs[k], {x:0, y:0, top:0}); selA = null; }
 // A song's pattern numbering starts at 00. last.sect/last.phrase are the last sect/phrase NUMBER placed, and
 // they seed the first empty cell you type into — so a new song used to inherit the old song's number (a new
 // song began at 06 after the last one ended at 05). They are song-scoped, so reset them with the song.
@@ -23577,6 +23599,7 @@ function setTScale(v){ tScale = clamp(Math.round(v / 10) * 10, 60, 200); try { l
 function setMixScale(v){ mixScale = clamp(Math.round(v / 10) * 10, 60, 200); try { localStorage.setItem(MSK, String(mixScale)); } catch(e){} fit(); draw(); }
 function setArr(m){ arrMode = m; try { localStorage.setItem(ARK, String(m)); } catch(e){} arrBody(); arrSig = ''; draw(); fit(); draw(); }
 const cs = {song:{x:0, y:0, top:0}, sect:{x:0, y:0}, phrase:{x:0, y:0, top:0}, inst:{x:0, y:0}, mixer:{x:0, y:0}, fx:{x:0, y:0}, mod:{x:0, y:0}, project:{x:0, y:0}};
+let fxOpenedOnce = false;   // not saved: has FX been opened since the session / the last new song or load
 let cSect = 0, cPhrase = 0, cInst = 0, cTrack = 0, cFxT = 0, cFxS = 0, lastFxType = 'eq', selA = null, clip = null;
 const last = {sect:0, phrase:0, note:ROOT, vol:255, inst:0, fxc:0, fxv:0};
 // Has an instrument been chosen yet (typed, changed, picked up, or picked on INST)? Until then EDIT on a note keeps the row's own.
@@ -23975,7 +23998,7 @@ async function fxPresetSave(t, k){
 const FXU_K = 'thunderplus-fxuser-v1';
 let fxUser = (() => { try { return normFxPre(JSON.parse(localStorage.getItem(FXU_K) || '{}')); } catch(e){ return {}; } })();
 function fxUserList(type){ const L = fxUser && fxUser[type]; return Array.isArray(L) ? L : []; }
-function fxUserPut(type, name, v){ fxUser[type] = fxUserList(type).filter(p => p.name !== name).concat([{name, v}]); try { localStorage.setItem(FXU_K, JSON.stringify(fxUser)); } catch(e){ toast('My presets couldn’t be saved on this device (storage full?): the preset is in the song.'); } }
+function fxUserPut(type, name, v){ fxUser[type] = fxUserList(type).filter(p => p.name !== name).concat([{name, v}]); try { localStorage.setItem(FXU_K, JSON.stringify(fxUser)); } catch(e){ toastErr('My presets couldn’t be saved on this device (storage full?): the preset is in the song.'); } }
 function normFxPre(j){
   const o = {}; if (!j || typeof j !== 'object') return o;
   for (const type of Object.keys(j)) if (TFX[type] && !TFX[type].pump && Array.isArray(j[type]))
@@ -24140,6 +24163,8 @@ function projRows(){
       info:() => 'Every instrument and the pad it plays (long names are cut short). In the side panel; without it, in PAD mode between the arrows and the buttons when there is room. Tap one to open it on INST'},
     {l:'PATTERN VIEW', ck:'Pattern view on the Phrase screen', get:() => pvOn ? 1 : 0, set:v => setPv(!!v), min:0, max:1, tog:true, d:1, fmt:v => v ? 'ON' : 'OFF',   // PATTERN VIEW
       info:() => 'ON: the Phrase screen gets PHRASE | PATTERN buttons (the choice stays until you switch). PATTERN shows every track’s phrase for one song row side by side, and the open track is edited in place. Wide screens only (computer, or Fold when unfolded). OFF: no PHRASE | PATTERN buttons.'},
+    {l:'POP-UP MESSAGES', ck:'Show pop-up messages', get:() => toastsOn ? 1 : 0, set:v => setToastsOn(!!v), min:0, max:1, tog:true, d:1, fmt:onOff,
+      info:() => 'ON: the small messages that say what just happened. OFF: they stay hidden, except the ones that report a failure or work that may be lost (couldn’t save, storage full, audio or MIDI trouble)'},
     {l:'KEY HINTS', ck:'Show key hints under the screens', get:() => keyHints ? 1 : 0, set:v => setKeyHints(!!v), min:0, max:1, tog:true, d:1, fmt:onOff,
       info:() => 'ON: the line of keys under each screen and the tips under Arrange. OFF: more room for the phrase and the arrangement; the line describing the command or value under the cursor stays'},
     {l:'MENU HELP', ck:'Show explanations in menus', get:() => menuHelpOn() ? 1 : 0, set:v => setMenuHelp(!!v), min:0, max:1, tog:true, d:0, fmt:onOff,
@@ -25512,8 +25537,9 @@ function toggleBlockMute(y, t){
 let instViaTrk = false;   // Inst was opened from Song, Sect or Phrase (go: Mixer and FX then follow the song track)
 function go(v){
   fxpClose();
-  // FX opens with the cursor on SLOT 1, where EDIT adds an effect (it did nothing on the TRACK row; usability audit U2). A cursor the user moved stays.
-  if (v === 'fx' && tv !== 'fx' && cs.fx.y === 0) cs.fx.y = 1;
+  // FX opens with the cursor on SLOT 1, where EDIT adds an effect (it did nothing on the TRACK row; usability audit U2), but only the FIRST time
+  // in a session (and after a new song / load, resetCursors); after that it returns to wherever the cursor was left, TRACK row included (owner).
+  if (v === 'fx' && tv !== 'fx'){ if (!fxOpenedOnce && cs.fx.y === 0) cs.fx.y = 1; fxOpenedOnce = true; }
   if (v === 'sect' && !sectsOn) v = 'phrase';
   // Opening a phrase from the Song screen always resolves to that block's own phrase, whether the SECT page
   // is shown or hidden: an empty block gets its phrase made first, so you never land on the previous phrase.
@@ -33782,7 +33808,7 @@ async function openSharedProject(){
     await c.delete(key);
     const name = decodeURIComponent(r.headers.get('x-name') || 'Shared project.thunder');
     await openProjectFile(new File([await r.blob()], name, {type:r.headers.get('content-type') || 'application/octet-stream'}));
-  } catch(e){ tpLog('the shared project could not be opened', e); toast('That shared project couldn’t be read. Save it and use File ▾ → LOAD PROJECT.', 7000); }
+  } catch(e){ tpLog('the shared project could not be opened', e); toastErr('That shared project couldn’t be read. Save it and use File ▾ → LOAD PROJECT.', 7000); }
 }
 if (new URLSearchParams(location.search).has('shared')) setTimeout(openSharedProject, 0);
 else if (FIRST_SONG) setTimeout(async () => {
