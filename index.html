@@ -21221,7 +21221,7 @@ const isLivePad = i => isSyn(i) && (isBassV(kit.voices[i]) || isVoxV(kit.voices[
 const liveX = v => !!(v && XENG[v.engine] && XENG[v.engine].live);
 // A bass voice was edited: the live nodes playing it hear the change at once.
 function bassPush(i){ const v = kit.voices[i], vx = isVoxV(v), lx = liveX(v); if (!isBassV(v) && !vx && !lx) return; const kind = vx ? 'vox' : lx ? v.engine : 'bass', p = vx ? voxParams(v) : lx ? xParams(v) : bassParams(v); for (const b of bassLive) if (b.pad === i && b.kind === kind) try { const fs = lx ? frzSample(v) : null; if (b.lanes && fs !== (b.fileRef || null)){ b.fileRef = fs; b.node.port.postMessage({set:p, file:fs ? {d:fs.data, sr:fs.sr} : {d:null}}); } else b.node.port.postMessage({set:p}); } catch(e){} }   // FREEZE FILE: the sound only when it changed
-const MW_URL = 'master-worklet.js?v=5', mwLoad = new WeakMap();
+const MW_URL = 'master-worklet.js?v=6', mwLoad = new WeakMap();
 function mwReady(ac){ if (!mwLoad.has(ac)){ const pr = ac.audioWorklet && !wkOff(ac) ? ac.audioWorklet.addModule(MW_URL).then(() => true, () => false) : Promise.resolve(false); mwLoad.set(ac, pr); } return mwLoad.get(ac); }
 const mstSet = M => ({sup:M.sup, comp:M.comp, lim:M.lim});
 const mstNeedsWk = M => M.sup.on || M.comp.on || M.lim.on;

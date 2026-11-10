@@ -227,8 +227,8 @@ class Limiter {
   tpPeak(h){
     // Catmull-Rom between h[1] and h[2] at 1/4, 1/2, 3/4 (a 4x oversampled estimate of intersample peaks)
     let m = Math.max(Math.abs(h[1]), Math.abs(h[2]));
-    for (const t of [.25, .5, .75]){
-      const t2 = t * t, t3 = t2 * t;
+    for (let q = 1; q < 4; q++){   // (no array literal here: this runs twice a sample and an array a call fed the scavenger)
+      const t = q * .25, t2 = t * t, t3 = t2 * t;
       const v = 0.5 * ((2 * h[1]) + (-h[0] + h[2]) * t + (2 * h[0] - 5 * h[1] + 4 * h[2] - h[3]) * t2 + (-h[0] + 3 * h[1] - 3 * h[2] + h[3]) * t3);
       if (Math.abs(v) > m) m = Math.abs(v);
     }
