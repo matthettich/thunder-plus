@@ -13414,21 +13414,42 @@ async function resolveSamples(){
     try { if (S && S.presets && JSON.stringify(S.presets).includes('"b64"')){ await Promise.all(presetsByRef(S.presets)); saveS(); } } catch(e){ tpLog('could not move preset samples out of the song', e); }
   } finally { smpResolving = false; }
 }
-// SAVE SAFETY: a file must not be written without the audio of a sample the user still has. smpToJSON writes only a {ref}
-// for a layer whose audio has not arrived from IndexedDB yet (right for the localStorage autosave, wrong for a file).
-// smpNoAudio counts those layers; smpSaveGate waits (capped) for the load, then asks before an incomplete file is written.
-function smpNoAudio(){ let n = 0; for (const v of kit.voices) for (const L of v.layers) if (L.sample && L.sample.id && !L.sample.data) n++; return n; }
+// SAVE SAFETY: a file must not be written without the audio of a sample the user still has. A project file inlines three
+// kinds of audio that live by reference until loaded: pad layer samples (smpToJSON writes only a {ref} while data is
+// null), song-preset samples (fullSmp writes sample:null when the audio is neither on a pad nor held) and the song's
+// impulse responses (irsFull keeps the bare {ref} when IRDATA lacks it). Wavetables (wtData) and resynth data (rsData) are
+// plain JSON inside the voice, and a frozen sample (frzSample) is an ordinary layer sample, so they are never missing.
+// SoundFonts are deliberately not in the file. smpNoAudio lists what has no data yet, by kind; smpSaveGate waits (capped)
+// for the loads, then asks before an incomplete file is written.
+var smpFillBusy = 0;   // preset-sample / impulse-response lookups in flight (smpResolving covers the pad samples)
+function smpNoAudio(){
+  const o = {samples:0, presets:0, irs:0, n:0}, pad = new Set();
+  for (const v of kit.voices) for (const L of v.layers) if (L.sample && L.sample.id && !L.sample.data){ o.samples++; pad.add(L.sample.id); }
+  const P = SP(), refs = new Set(), see = l => { const s = l && l.sample; if (s && s.ref && !s.b64 && !pad.has(s.ref)) refs.add(s.ref); };
+  for (const p of P.voices) for (const l of (p.v && p.v.layers) || []) see(l);
+  for (const p of P.layers) see(p.l);
+  for (const id of refs) if (!smpById(id)) o.presets++;
+  for (const e of S.irs || []) if (e && ((e.L && e.L.ref && !IRDATA.has(e.L.ref)) || (e.R && e.R.ref && !IRDATA.has(e.R.ref)))) o.irs++;
+  o.n = o.samples + o.presets + o.irs; return o;
+}
+function smpGateLoading(){ return smpResolving || smpFillBusy > 0; }
 async function smpSaveGate(capMs, quiet){
   const wait = ms => new Promise(r => setTimeout(r, ms)), end = Date.now() + (capMs || 10000);
-  while (smpNoAudio() && Date.now() < end){
-    if (smpResolving) await wait(100); else await Promise.race([resolveSamples(), wait(Math.max(1, end - Date.now()))]);
-    if (!smpResolving && smpNoAudio()) break;   // the lookup finished and these are not in this browser's storage
+  const look = async () => { const m = smpNoAudio(), jobs = [], idle = !smpFillBusy;
+    if (m.samples && !smpResolving) jobs.push(resolveSamples());
+    if (m.presets && idle){ smpFillBusy++; jobs.push(presetSmpFill().catch(() => {}).finally(() => { smpFillBusy--; })); }
+    if (m.irs && idle){ smpFillBusy++; jobs.push(irsResolve().catch(() => {}).finally(() => { smpFillBusy--; })); }
+    await Promise.all(jobs); };
+  while (smpNoAudio().n && Date.now() < end){
+    if (smpGateLoading()) await wait(100); else await Promise.race([look(), wait(Math.max(1, end - Date.now()))]);
+    if (!smpGateLoading() && smpNoAudio().n) break;   // the lookups finished and these are not in this browser's storage
   }
-  const n = smpNoAudio(); if (!n) return true;
-  if (quiet) return !smpResolving;   // (a backup waits only for samples still loading; ones that are gone for good must not stop backups for ever)
-  const what = n + (n > 1 ? ' samples' : ' sample');
-  return await askYes(smpResolving ? {title:what + ' not loaded yet', body:what + (n > 1 ? ' have' : ' has') + ' not finished loading, so the file would be saved without ' + (n > 1 ? 'them' : 'it') + '. Wait a moment and save again, or save anyway.'}
-    : {title:what + ' could not be found', body:what + (n > 1 ? ' were' : ' was') + ' not found in this browser’s storage: the file would be saved without ' + (n > 1 ? 'them' : 'it') + '. Save anyway?'}, 'Save anyway');
+  const m = smpNoAudio(), n = m.n; if (!n) return true;
+  if (quiet) return !smpGateLoading();   // (a backup waits only for audio still loading; things gone for good must not stop backups for ever)
+  const part = (k, one, many) => k ? k + ' ' + (k > 1 ? many : one) : '', parts = [part(m.samples, 'sample', 'samples'), part(m.presets, 'preset sample', 'preset samples'), part(m.irs, 'impulse response', 'impulse responses')].filter(Boolean);
+  const what = parts.length > 1 ? parts.slice(0, -1).join(', ') + ' and ' + parts[parts.length - 1] : parts[0], pl = n > 1;
+  return await askYes(smpGateLoading() ? {title:what + ' not loaded yet', body:what + (pl ? ' have' : ' has') + ' not finished loading, so the file would be saved without ' + (pl ? 'them' : 'it') + '. Wait a moment and save again, or save anyway.'}
+    : {title:what + ' could not be found', body:what + (pl ? ' were' : ' was') + ' not found in this browser’s storage: the file would be saved without ' + (pl ? 'them' : 'it') + '. Save anyway?'}, 'Save anyway');
 }
 // Drops stored samples the kit no longer uses (only from this app's own store). Samples the saved kit and song still
 // name count as used (another tab may have saved them), and nothing is dropped while another tab of the app is open:
