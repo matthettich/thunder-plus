@@ -99,4 +99,14 @@ if (want('F6')){   // tStop is exception-safe: the state flips and the backgroun
     const r = {bgOn0, android, playing, paused:!bgEl || bgEl.paused, off:!tp.on}; rt.pl.stopAll = o; return r;`); } finally { await B.close().catch(() => {}); } });
   add('F6 stopAll throws on Android: the background stream is paused after STOP', r2.android && r2.playing && r2.paused && r2.off, JSON.stringify(r2));
 }
+if (want('F7')){   // the deck's spectrum analyser follows the master after Reset audio engine
+  // a tone into the master (not the song: a quiet bar would pass either way); the level at that tone's own bins, so what the analyser
+  // heard before the reset can't stand in for it
+  const r = await retry(async () => { const A = await fresh(); try { return await A.run(`rtInit();
+    const tone = async f => { const o = ctx.createOscillator(), g = ctx.createGain(); o.frequency.value = f; g.gain.value = 0.3; o.connect(g); g.connect(master); const a = specAnalyser(); o.start();
+      await new Promise(r => setTimeout(r, 500)); const d = new Float32Array(a.frequencyBinCount); a.getFloatFrequencyData(d); o.stop(); g.disconnect();
+      const k = Math.round(f / (ctx.sampleRate / a.fftSize)); let m = -Infinity; for (let b = k - 2; b <= k + 2; b++) if (d[b] > m) m = d[b]; return Math.round(m); };
+    const before = await tone(1000); resetAudio(true); const after = await tone(3000); return {before, after};`); } finally { await A.close().catch(() => {}); } });
+  add('F7 a tone into the master shows on the spectrum before and after Reset audio engine', r.before > -60 && r.after > -60, JSON.stringify(r));
+}
 process.exit(table(rows) ? 1 : 0);

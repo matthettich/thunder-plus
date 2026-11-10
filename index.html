@@ -28308,7 +28308,7 @@ function deckStripMeter(now){
 }
 // Scope: the master's spectrum, drawn as Quite Noise draws its Shape graph — 20 Hz to 20 kHz across, faint
 // lines at 100, 1k and 10k, a dashed reference at −48 dB, and the spectrum filled in the section's colour.
-let dkAn = null, dkSpec = null, dkScopeT = 0, dkScopeIdle = false;
+let dkAn = null, dkAnM = null, dkSpec = null, dkScopeT = 0, dkScopeIdle = false;   // dkAnM: the master dkAn listens to (10 Nov)
 /* HEADER METER (owner, 24 Oct): the master's level, left over right, in the top bar on every screen. It listens to the master
    gain (everything you hear goes through it: pads, previews, the tracker), so it re-attaches when the audio restarts with a
    new master. −48 dB at the left, 0 dB at the right edge: the ink bar, its last 6 dB amber, a peak tick that holds for a
@@ -28398,7 +28398,10 @@ function hmDraw(now){
 }
 $('hMeter').addEventListener('click', () => { HM.clip = false; HM.pk = [0, 0]; HM.drawn = ''; });
 requestAnimationFrame(hmFrame);
-function specAnalyser(){ if (!dkAn && rt && ctx){ try { dkAn = ctx.createAnalyser(); dkAn.fftSize = 4096; dkAn.smoothingTimeConstant = 0.8; master.connect(dkAn); dkSpec = new Float32Array(dkAn.frequencyBinCount); } catch(e){ dkAn = null; } } return dkAn; }
+function specAnalyser(){
+  // 10 Nov: Reset audio engine (and Measure) replace `master`; the analyser stayed on the old one and the spectrum went flat until reload
+  if (dkAn && dkAnM !== master){ try { dkAnM.disconnect(dkAn); } catch(e){} dkAn = dkAnM = null; }
+  if (!dkAn && rt && ctx){ try { dkAn = ctx.createAnalyser(); dkAn.fftSize = 4096; dkAn.smoothingTimeConstant = 0.8; master.connect(dkAn); dkAnM = master; dkSpec = new Float32Array(dkAn.frequencyBinCount); } catch(e){ dkAn = null; } } return dkAn; }
 function deckScope(now){
   if (!deckShown() || !deck.scope || deck.fxbar || now - dkScopeT < 50) return; dkScopeT = now;
   const c = $('dkScopeC'), r = c.getBoundingClientRect(), dpr = Math.min(2, devicePixelRatio || 1); if (!r.width || !r.height) return;
