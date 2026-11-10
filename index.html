@@ -2938,7 +2938,8 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
       <div class="segrow" id="coreRow" title="Where the song is sequenced. Audio thread: the steps are worked out on the audio thread and rendered pads play there, so a busy screen can’t make them late. Page: as before. On a phone or tablet it plays on the Page unless you pick Audio thread here, because loading it can slow the phone’s audio clock."><span>Sequencer</span><div class="seg" id="segCore"></div></div>
       <div class="segrow" id="noWkRow" title="For testing a phone whose audio clock runs fast. Off (test): track effects, chains, live engines and the audio-thread sequencer are silent or unused, and the safety limiter uses its simpler stand-in. Changes when the app reloads."><span>Worklets</span><div class="seg" id="segNoWk"></div></div>
       <div class="btnrow" id="audRestartRow" hidden><span class="lbl">Takes effect when audio restarts (the app reloads; your song and kit are kept)</span><button id="audRestart" class="on">Apply (reload)</button></div>
-      <div class="audrow audfoot"><button class="sm" id="audReset" title="Clears stuck notes and effects: stops playback and rebuilds every sound and effect from scratch. Your song and kit are untouched.">Reset audio engine</button> <button class="sm" id="audReport" title="Copies a short playback log (screen on or off, sequencer state, how late the rows came, what still sounded after STOP) to paste into a bug report.">Copy playback report</button> <button class="sm" id="audDefaults" title="Puts every audio setting on this device back to its default: Latency, Rate, Latency comp, Live engines, Sequencer, Worklets, Keep screen on, Background play and Low power display. Songs, kits and your MIDI setup are kept.">Reset audio settings</button></div>
+      <div class="segrow" id="rkRow" title="Phone, Page sequencer: when the audio clock runs several times too fast for over a second, pause the engine for a moment to break it. An experiment: Off restores the old behaviour."><span>RUNAWAY KICK (TEST)</span><div class="seg" id="segRk"></div></div>
+      <div class="audrow audfoot"><button class="sm" id="audReset" title="Clears stuck notes and effects: stops playback and rebuilds every sound and effect from scratch. Your song and kit are untouched.">Reset audio engine</button> <button class="sm" id="audReport" title="Copies a short playback log (screen on or off, sequencer state, how late the rows came, what still sounded after STOP) to paste into a bug report.">Copy playback report</button> <button class="sm" id="audDefaults" title="Puts every audio setting on this device back to its default: Latency, Rate, Latency comp, Live engines, Sequencer, Worklets, Runaway kick, Keep screen on, Background play and Low power display. Songs, kits and your MIDI setup are kept.">Reset audio settings</button></div>
     </div>
   </section>
 
@@ -8363,7 +8364,7 @@ function audio(){
     ctx.addEventListener && ctx.addEventListener('statechange', () => { try { pbLog('engine ' + ctx.state + ' · ' + pbState()); } catch(e){} audStatus(); if (typeof audioInterrupted === 'function') audioInterrupted(); });
     prerender();   // ensure() re-renders only the pads whose rate differs from this context's
   }
-  if (ctx.state !== 'running' && ctx.state !== 'closed'){ bgSus = false; ctx.resume().catch(() => {}); }   // (10 Nov: not only 'suspended': newer Chrome reports 'interrupted' after a call or a device switch)
+  if (ctx.state !== 'running' && ctx.state !== 'closed' && !rkKick){ bgSus = false; ctx.resume().catch(() => {}); }   // (RUNAWAY KICK: not while its short pause runs) (10 Nov: not only 'suspended': newer Chrome reports 'interrupted' after a call or a device switch)
   bgArm(); hmWake(); idleWake();   // BATTERY: a sound restarts the hidden-idle countdown and wakes the header meter and the sleeping timers at once
   return ctx;
 }
@@ -14086,6 +14087,8 @@ const updCore = makeSeg($('segCore'), [['core', 'Audio thread'], ['page', 'Page 
   aset.core = v; aset.corePick = true; asetSave();
   if (v === 'core'){ if (ctx) coreLoad(); toast('Sequencer: audio thread, from the next PLAY.', 3000); } else toast('Sequencer: page, from the next PLAY.', 2500); });
 const updNoWk = makeSeg($('segNoWk'), [[0, 'On'], [1, 'Off (test)']], () => aset.noWk ? 1 : 0, v => { aset.noWk = !!v; asetSave(); audRestartRow(); });   // WORKLETS OFF (test)
+var rkOn = (() => { try { return localStorage.getItem('thunderplus-runkick-v1') !== '0'; } catch(e){ return true; } })();   // RUNAWAY KICK (TEST): per device, at once
+const updRk = makeSeg($('segRk'), [[1, 'On'], [0, 'Off']], () => rkOn ? 1 : 0, v => { rkOn = !!v; try { localStorage.setItem('thunderplus-runkick-v1', v ? '1' : '0'); } catch(e){} });
 function psLiveNote(){
   $('psLiveRow').hidden = false;   // waves live uses it too, with or without the pump engines
   $('psLiveRow').title = aset.psLive === 'render'
@@ -14104,6 +14107,7 @@ $('audDefaults').addEventListener('click', async () => {
   const hadCore = coreWanted();
   audResetAset(aset); asetSave();
   try { setWlOn(true); setBgOn(true); if (lpOn) setLowPower(false); } catch(e){ tpLog('reset audio: screen / background / low power failed', e); }
+  try { rkOn = true; localStorage.removeItem('thunderplus-runkick-v1'); updRk(); } catch(e){}   // RUNAWAY KICK (TEST): on is its default
   if ((ctx && aLive && (aLive.lat !== latOf() || aLive.rate !== aset.rate)) || NOWK !== !!aset.noWk){
     try { save(); } catch(e){ tpLog('save before restart failed', e); } applyUpdate(); return; }
   psLive.off = false; psLive.strikes = 0;
@@ -21654,7 +21658,7 @@ function tStart(mode, o){
   if (mode === 'song' && (o.row | 0) > 0) try { chaseFx(o.row | 0, seq.time); } catch(e){ tpLog('chase', e); }   // CHASE: the effect commands before the start row
   tp.core = false;
   if (coreWanted() && core.ready && !core.bad && !(o && o.page)) coreStart(mode, o, t0start, rsFirst ? {ref:pz.ref, row:pz.row, step:pz.step} : null);
-  pbLog('PLAY ' + mode + ' · ' + pbState()); setTimeout(() => { if (tp.on) pbLog(`4 s into PLAY: level ${pbLevel()}`); }, 4000);   // (9 Nov: to compare Latency settings)   // not loaded yet: this PLAY as before, the core loads at STOP
+  rkReset(); pbLog('PLAY ' + mode + ' · ' + pbState()); setTimeout(() => { if (tp.on) pbLog(`4 s into PLAY: level ${pbLevel()}`); }, 4000);   // (9 Nov: to compare Latency settings)   // not loaded yet: this PLAY as before, the core loads at STOP
   if (lkp) lkStarted(lkp);   // ABLETON LINK: Link's exact tempo; ours tells the session
   tp.timer = pumpTimer(); pump(); if (!handing) draw(); songBtn(); chainsTempo(); if (typeof frameWake === 'function') frameWake();   // (a hand-over happens out of view: no draw, which was most of its time)
   bgPlay(true);   // BACKGROUND PLAY
@@ -21720,6 +21724,7 @@ let intT = 0;
 function audioInterrupted(){
   if (!ctx || !tp.on) return;
   if (ctx.state === 'running'){ clearTimeout(intT); intT = 0; return; }
+  if (rkKick) return;   // RUNAWAY KICK: its own short suspend, resumed by rkTick: not an interruption (no resume here, no 2.5 s stop)
   try { ctx.resume().catch(() => {}); } catch(e){}
   if (!intT) intT = setTimeout(() => { intT = 0; if (tp.on && ctx && ctx.state !== 'running'){ tStop(); toastErr('Audio was interrupted: press PLAY to continue.', 4000); } }, 2500);
 }
@@ -21730,6 +21735,7 @@ document.addEventListener('visibilitychange', () => { if (!document.hidden) audi
    has sounded for 20 s, the engine is suspended. Coming back resumes it at once, and anything that makes a sound resumes it
    through audio(). It is left running while following MIDI clock or with a MIDI input connected, so the MPC can start the
    song or play notes with the screen off without the first beat waiting for the audio to restart. */
+var rkKick = null;   // RUNAWAY KICK: {at, rate} while the engine is paused by rkTick (var: audio() reads it before this line may have run)
 var bgSusT = 0, bgSus = false, lastSnd = 0;   // var, not let: audio() calls bgArm() and may run before this line has
 /* ON SCREEN (9 Nov, owner): with LOW POWER DISPLAY on, it also sleeps with the app showing, after 30 s of silence. audio() wakes it
    on the next note; the clock stands still while asleep, so that note starts a moment late rather than being cut. */
@@ -21778,6 +21784,7 @@ function rsTick(s){
   if (!tp.on || tp.core || !ctx || !rsScope()){ PB.rsA = null; return; }
   PB.rsN = (PB.rsN || 0) + 1;   // (test hook: how often this ran)
   const w = performance.now() / 1000, o = ctx.currentTime - w; let A = PB.rsA;
+  if (A && A.seq === s && ctx.state !== 'running' && rkBusy()){ A.wl = w; return; }   // RUNAWAY KICK's pause: keep the learned band (learning again takes 0.4 s, and at 14x that is 5 s of song let through); the clock does not move meanwhile
   if (!A || A.seq !== s || ctx.state !== 'running' || w - A.wl > 1) A = PB.rsA = {seq:s, wl:w, T:new Float64Array(128), O:new Float64Array(128), n:0, h:0, adj:0, ready:false, base:0, top:0};   // PLAY, not running, or the page itself was frozen (the moved-on rule's): learn again
   A.wl = w;
   const T = A.T, O = A.O; while (A.n && w - T[(A.h - A.n) & 127] > RS_W) A.n--;
@@ -21798,8 +21805,44 @@ function rsHold(s, d){
   for (const P of mx.pend) if (P) for (const x of P){ x.t += d; if (isFinite(x.end)) x.end += d; }   // ARP returns
   for (const r of mx.ccr){ r.t0 += d; r.t1 += d; r.at += d; } for (const x of mx.echo) x.t += d;
   tp.rsUntil = performance.now() + 4000;   // a short look-ahead for a few seconds, even hidden
+  PB.rk.sum += d;   // RUNAWAY KICK's detector
   const P = PB.pg; if (P){ P.rs++; P.rsS += d; }
   const nw = performance.now(); if (nw - (PB.rsLogT || 0) > 1000){ PB.rsLogT = nw; pbLog(`held the song: audio clock leapt +${d.toFixed(2)} s`); } }
+/* RUNAWAY KICK (10 Nov, EXPERIMENT; owner's Fold, screen off, effects loaded): the audio clock sometimes runs about 14x for 10-15 s. rsHold
+   keeps the SONG in place but the engine itself is being run too fast (low, clicky, pitching delays). When the surplus rsHold sees stays
+   above RK_RATE (clock seconds per real second) for RK_N windows of RK_WIN s, the context is suspended for RK_PAUSE ms and resumed, to see
+   whether that breaks the runaway. The pump tick does the resume (a hidden page's timers are throttled). RUNKICK: kill switch; Settings >
+   Audio > RUNAWAY KICK (TEST) (rkOn): per device. At most RK_MAX kicks per PLAY, RK_GAP ms apart. The log lines say what happened. */
+const RUNKICK = true;
+const RK_WIN = 0.5, RK_RATE = 2.0, RK_N = 3, RK_PAUSE = 150, RK_GAP = 8000, RK_MAX = 4;
+const rkBusy = () => !!rkKick || !!(PB.rk.watch && PB.rk.watch.t0 == null);   // paused by a kick, or resumed and not yet running again
+function rkReset(){   // PLAY and STOP: forget the detector; a pause still pending is ended now (the engine is never left suspended by this)
+  const R = PB.rk; R.sum = 0; R.hot = 0; R.win = 0; R.n = 0; R.last = -1e9; R.watch = null;
+  if (rkKick){ rkKick = null; try { if (ctx && ctx.state !== 'running' && ctx.state !== 'closed') ctx.resume().catch(() => {}); } catch(e){} } }
+function rkTick(){
+  const R = PB.rk, now = performance.now();
+  if (rkKick){
+    if (now - rkKick.at < RK_PAUSE) return;
+    const k = rkKick; rkKick = null; R.last = k.at; R.n++; R.sum = 0; R.hot = 0; R.win = 0; R.watch = {at:now, t0:null, c0:0};
+    try { ctx.resume().catch(() => {}); } catch(e){}
+    pbLog('kick: resuming the engine after ' + Math.round(now - k.at) + ' ms · ' + pbState()); return;
+  }
+  const W = R.watch;
+  if (W){
+    if (W.t0 == null){ if (ctx.state === 'running'){ W.t0 = now; W.c0 = ctx.currentTime; } else if (now - W.at > 1000 && !W.re){ W.re = 1; try { ctx.resume().catch(() => {}); } catch(e){} }
+      else if (now - W.at > 3000){ R.watch = null; pbLog('kick result: the engine did not return to running · ' + pbState()); audioInterrupted(); } }   // (the ordinary path: resume, and STOP with a message if it stays down)
+    else if (now - W.t0 >= 2000){ R.watch = null; pbLog('kick result: clock +' + ((ctx.currentTime - W.c0) * 2000 / (now - W.t0)).toFixed(2) + ' s in 2.00 s after the kick (1.00 per second is healthy) · ' + pbState()); }
+  }
+  if (!RUNKICK || !rkOn || !tp.on || tp.core || !ctx || ctx.state !== 'running' || !rsScope()){ R.sum = 0; R.hot = 0; R.win = 0; return; }
+  if (!R.win){ R.win = now; R.sum = 0; return; }
+  if (now - R.win < RK_WIN * 1000) return;
+  const rate = R.sum / ((now - R.win) / 1000); R.sum = 0; R.win = now;
+  R.hot = rate > RK_RATE ? R.hot + 1 : 0;
+  if (R.hot < RK_N || now - R.last <= RK_GAP || R.n >= RK_MAX) return;
+  R.hot = 0; rkKick = {at:now, rate};
+  pbLog('kick: audio clock ran ×' + (1 + rate).toFixed(1) + ' for ' + (RK_N * RK_WIN).toFixed(1) + ' s: pausing the engine ' + RK_PAUSE + ' ms · ' + pbState());
+  try { ctx.suspend().catch(() => {}); } catch(e){}
+}
 // One pump tick. An error here used to repeat every 25 ms with the screen showing PLAYING over silence; pump() stops.
 function pumpRun(){
   if (!tp.on) return;
@@ -21815,6 +21858,7 @@ function pumpRun(){
   const outLat = Math.min(0.6, (ctx.baseLatency || 0) + (ctx.outputLatency || 0));   // (9 Nov, owner: Safest stuttered most) the audio clock moves in steps of the output buffer: under Safest one step passed 0.15 s, so a healthy song kept being moved on, and a 0.25 s lead was thin
   // 10 Nov, HOLD THE SONG (see PHONE RESYNC): before the moved-on rule on purpose, which then only sees what a stall left behind.
   if (RESYNC && s.alive() && s.base != null) rsTick(s); else PB.rsA = null;
+  if (RUNKICK) rkTick();   // (also on a tick where rsTick returned early)
   if (s.alive() && s.time < ctx.currentTime - (COARSE && !document.hidden ? Math.max(0.15, outLat + 0.05) : 0.5) && s.base != null){ const d = ctx.currentTime + 0.08 - s.time; if (PB.pg){ PB.pg.re++; PB.pg.skip += d; } s.base += d; s.time += d; if (s.btT != null) s.btT += d; }
   // Schedule 250 ms ahead, so a busy moment on the UI thread can't make notes late (it was 150 ms on a computer).
   // Tracker edits and mutes reach notes after that; pads, keys, previews and STOP are immediate. With the app in the
@@ -21989,11 +22033,11 @@ function coreStart(mode, o, t0, rs){
    state, a 2-second summary of the core's rows while playing (how many, how late or early, notes dropped as late, the
    core's catch-up skips), rows still arriving after STOP (and the STOP sent again then), and the level and live voices 1 and
    3 seconds after a STOP. */
-const PB = {handT0:0, handW:0, ck:null, ckBad:0, stopT:0, log:[], n:0, late:0, drop:0, ahead:0, stray:0, strayT:0, skips:0, t:0};
+const PB = {handT0:0, handW:0, ck:null, ckBad:0, stopT:0, log:[], n:0, late:0, drop:0, ahead:0, stray:0, strayT:0, skips:0, t:0, rk:{sum:0, hot:0, win:0, n:0, last:-1e9, watch:null}};
 function pbLog(s){ try { PB.log.push((performance.now() / 1000).toFixed(2) + ' ' + s); if (PB.log.length > 400) PB.log.splice(0, 100); } catch(e){} }
 const pbState = () => `ctx ${ctx ? ctx.state + ' t=' + ctx.currentTime.toFixed(2) : '-'} on=${tp.on ? 1 : 0} core=${tp.core ? 1 : 0} seq=${aset.core} hidden=${document.hidden ? 1 : 0} wall=${(Date.now() / 1000 % 100000).toFixed(2)}`;
 // BACKGROUND TIMING (8 Nov): how the Page sequencer's tick fared since the screen last changed: the longest wait between ticks (wall clock), how close the song came to running out, and any jumps forward
-const pbPg = () => { const P = PB.pg; PB.pg = null; return P ? ` · page ticks ${P.n}, longest gap ${P.gap.toFixed(2)} s, least lead ${P.lead.toFixed(2)} s, moved on ${P.re}× (${P.skip.toFixed(2)} s), held ${P.rs || 0}× (${(P.rsS || 0).toFixed(2)} s)` : ''; };
+const pbPg = () => { const P = PB.pg; PB.pg = null; return P ? ` · page ticks ${P.n}, longest gap ${P.gap.toFixed(2)} s, least lead ${P.lead.toFixed(2)} s, moved on ${P.re}× (${P.skip.toFixed(2)} s), held ${P.rs || 0}× (${(P.rsS || 0).toFixed(2)} s), kicked ${PB.rk.n}×` : ''; };
 // (10 Nov: the 529 report showed the clock racing with the song stopped and the screen off, where this log had already gone quiet.
 // It now also runs while the app is hidden with the engine running, and for 10 s after it comes back.)
 function pbCkOn(){ if (!ctx) return false; const n = performance.now(); return tp.on || n - PB.stopT <= 5000 || (ctx.state === 'running' && (document.hidden || n - (PB.visT || -1e9) <= 10000)); }
@@ -22197,7 +22241,7 @@ function tStop(quiet){
   G('stop cursor', () => {
   stopP = !quiet && stopToPlayhead() && tp.on && tp.pos && tp.pos.some(Boolean) ? {P:tp.pos.map(q => q && Object.assign({}, q)), mode:tp.mode} : null;
   home = !quiet && tp.on && !stopToPlayhead() ? fpHome : null; });   // (9 Nov, owner: with ON STOP at STAYS it still ended up at the playback spot: FOLLOW had carried it there)
-  tp.timer = 0; tp.on = false; fpMem = null; fpHome = null; tp.q = []; tp.pos = null; tp.snd = null; tp.stopAt = null; tp.ahead = tp.aheadT = 0; tp.rsUntil = 0; PB.rsA = null;
+  tp.timer = 0; tp.on = false; fpMem = null; fpHome = null; tp.q = []; tp.pos = null; tp.snd = null; tp.stopAt = null; tp.ahead = tp.aheadT = 0; tp.rsUntil = 0; PB.rsA = null; G('runaway kick', rkReset);
   // HAND-OVER (seqHandover): the core and the voices already booked keep sounding until the page sequencer's first step
   if (tp.core){ tp.core = false; core.gen++; if (!handing) G('core', () => { coreWire(false); try { core.node.port.postMessage({op:'stop', at:ctx.currentTime}); } catch(e){} }); }
   else if (coreWanted() && !core.ready && ctx) setTimeout(() => { try { if (!tp.on) coreLoad(); } catch(e){} }, 400);
@@ -23300,7 +23344,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 550;
+const BUILD = 551;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD + (location.pathname.includes('/beta/') ? ' · beta' : '');
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -32730,6 +32774,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [551, '10 Nov', ['Settings › Audio › Reset audio settings puts every audio test setting back to its default (songs, kits, output, level and MIDI setup are kept).', 'Phone experiment, RUNAWAY KICK (TEST), on by default: when the audio clock runs several times too fast for over a second (screen off, effects loaded), the engine is paused for a moment to try to break it. The playback report says what happened.']],
   [550, '10 Nov', ['New in Settings › Screen: BIGGER CELLS ON TOUCH (off by default) makes Arrange and Song cells at least 28×24 px on a touch screen; the grid then scrolls sideways.']],
   [549, '10 Nov', ['Record a sample keeps its input, mode and latency settings: changing the REC or metronome settings no longer resets them.']],
   [548, '10 Nov', ['The first PLAY of a session waits a moment (under a second) for the effects to finish loading, so the song no longer stumbles in its first bars.', 'MIDI notes booked ahead while the app is hidden are cut short on STOP instead of playing out (Web MIDI; drum gear that ignores note-off can still sound them).', '…waves inside Thunder Plus starts its own sound engine only when you first play a note there, and sleeps when you leave the screen.', 'Less work while idle: the CPU meter, the Mixer meters and faders and the Mixer spectrum only redraw when something changed (the CPU bar now steps).', 'Phone: a pad press holds Arrange\'s paging like a key does; pad keys no longer fire twice on a slow press; Tracker | Synth fits when folded; File rows are taller and Help & keys is at the bottom of File when folded; FX opens on SLOT 1 the first time, then where you left it; Settings has a Done button; pop-up messages sit below the tabs and can be turned off in Settings › Screen (problems still show); bigger touch targets in the header and tabs.', 'The preset buttons read Pad presets… and Engine presets….']],
