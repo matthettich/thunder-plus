@@ -23503,12 +23503,15 @@ let mstUniqIn = false;
 // all the time… Maybe we make it a setting"): with SX.uniq on (the default) a block also gets its own copy when another
 // TRACK already uses it. The same block down its own track (repeats) stays shared.
 function blockMixed(cid, x, y){
-  const isM = x === MT, uq = !isM && SX.uniq;
+  // 10 Nov, owner: only the FIRST time a block comes onto a track is copied. A block this track already holds (in another
+  // row) can be repeated or moved up and down it with no copy, even if another track also holds it.
+  const isM = x === MT, uq = !isM && SX.uniq; let other = false, here = false;
   for (let r = 0; r < 256; r++){ const row = S.song[r]; if (!row) continue;
     if (isM){ for (let t = 0; t < MT; t++) if (row[t] === cid) return true; }
     else { if (row[MT] === cid && r !== y) return true;
-      if (uq) for (let t = 0; t < MT; t++) if (t !== x && row[t] === cid) return true; } }
-  return false;
+      if (uq){ if (r !== y && row[x] === cid) here = true;
+        for (let t = 0; t < MT; t++) if (t !== x && row[t] === cid) other = true; } } }
+  return other && !here;
 }
 const blockOnMst = cid => S.song.some(r => r && r[MT] === cid);
 function mstUniq(src){   // newBlock's copy (a new sect and new phrases), without moving the cursor or saying anything
