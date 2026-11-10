@@ -13400,6 +13400,22 @@ async function resolveSamples(){
     try { if (S && S.presets && JSON.stringify(S.presets).includes('"b64"')){ await Promise.all(presetsByRef(S.presets)); saveS(); } } catch(e){ tpLog('could not move preset samples out of the song', e); }
   } finally { smpResolving = false; }
 }
+// SAVE SAFETY: a file must not be written without the audio of a sample the user still has. smpToJSON writes only a {ref}
+// for a layer whose audio has not arrived from IndexedDB yet (right for the localStorage autosave, wrong for a file).
+// smpNoAudio counts those layers; smpSaveGate waits (capped) for the load, then asks before an incomplete file is written.
+function smpNoAudio(){ let n = 0; for (const v of kit.voices) for (const L of v.layers) if (L.sample && L.sample.id && !L.sample.data) n++; return n; }
+async function smpSaveGate(capMs, quiet){
+  const wait = ms => new Promise(r => setTimeout(r, ms)), end = Date.now() + (capMs || 10000);
+  while (smpNoAudio() && Date.now() < end){
+    if (smpResolving) await wait(100); else await Promise.race([resolveSamples(), wait(Math.max(1, end - Date.now()))]);
+    if (!smpResolving && smpNoAudio()) break;   // the lookup finished and these are not in this browser's storage
+  }
+  const n = smpNoAudio(); if (!n) return true;
+  if (quiet) return false;
+  const what = n + (n > 1 ? ' samples' : ' sample');
+  return await askYes(smpResolving ? {title:what + ' not loaded yet', body:what + (n > 1 ? ' have' : ' has') + ' not finished loading, so the file would be saved without ' + (n > 1 ? 'them' : 'it') + '. Wait a moment and save again, or save anyway.'}
+    : {title:what + ' could not be found', body:what + (n > 1 ? ' were' : ' was') + ' not found in this browser’s storage: the file would be saved without ' + (n > 1 ? 'them' : 'it') + '. Save anyway?'}, 'Save anyway');
+}
 // Drops stored samples the kit no longer uses (only from this app's own store). Samples the saved kit and song still
 // name count as used (another tab may have saved them), and nothing is dropped while another tab of the app is open:
 // a second tab loading a kit used to delete the first tab's samples from under it.
@@ -14288,7 +14304,7 @@ for (const sk of SKINS){
   b.append(d, el('span', null, sk.name)); b.addEventListener('click', () => applySkin(sk.id)); $('skins').append(b);
 }
 applySkin(skin);
-$('bSaveKit').addEventListener('click', () => deliver(kitBase() + '.json', new Blob([JSON.stringify(kitToJSON(false))], {type:'application/json'})));
+$('bSaveKit').addEventListener('click', async () => { if (!await smpSaveGate()) return; deliver(kitBase() + '.json', new Blob([JSON.stringify(kitToJSON(false))], {type:'application/json'})); });
 $('bLoadKit').addEventListener('click', () => $('kitIn').click());
 // A kit slot per track (off by default: the classic 16 slots). On, slots 9+ follow the song's tracks.
 $('ckVtrk').checked = vtrk;
@@ -22784,6 +22800,7 @@ const projName = () => `${safe(S.name || 'Song')}.thunder`;
 const canShareProj = () => !inAI && !!(navigator.canShare && window.File) && (() => { try { return navigator.canShare({files:[new File(['{}'], 'a.json', {type:'application/json'})]}); } catch(e){ return false; } })();
 async function shareProj(){
   flushS(); await presetSmpFill();
+  if (!await smpSaveGate()) return;
   const f = new File([projBlob()], projName(), {type:'application/json'});
   try { await navigator.share({files:[f], title:S.name || 'Thunder project'}); }
   catch(e){ if (e && e.name === 'AbortError') return; await deliver(f.name, projBlob()); toastErr('Sharing didn’t work here, so the project was saved to your downloads instead.'); }
@@ -22872,6 +22889,7 @@ async function saveProj(as){
   if (saving) return false; saving = true;
   try {
     flushS(); await presetSmpFill();
+    if (!await smpSaveGate()) return false;
     if (DESK){
       if (!as && projPath){ const r = await DESK.save(projPath, projText()); if (r && r.ok){ setDirty(false); projSet(projPath, null); toast('Saved ' + projLabel()); return true; }
         toastErr('Couldn’t save to ' + projLabel() + (r && r.error ? ': ' + r.error : '') + '. Choose where to save it.', 5000); }
@@ -22948,6 +22966,7 @@ const BK_N = 10, BK_MS = 180000;
 async function backupNow(force){
   if (!bkDirty && !force) return;
   try { bkDirty = false; flushS(); await presetSmpFill();
+    if (!await smpSaveGate(10000, true)){ bkDirty = true; return; }   // a backup without its samples is skipped; the next one is tried in 3 minutes
     const text = projText(), idx = (await kvGet('bkIndex')) || [], k = 'bk' + Date.now();
     await kvSet(k, text); idx.unshift({k, at:Date.now(), name:S.name || 'Song', kb:Math.round(text.length / 1024)});
     while (idx.length > BK_N){ const o = idx.pop(); await kvDel(o.k); }
