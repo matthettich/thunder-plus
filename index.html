@@ -18259,6 +18259,15 @@ const pumpBoxKind = p => p.ch ? 'ch' : (p.flags & PF_BOOL) ? 'bool' : (p.flags &
 function pumpByte(p, v){ const k = pumpBoxKind(p); return k === 'ch' ? Math.round(v - p.min) : k === 'bool' ? (v >= 0.5 ? 1 : 0) : k === 'int' ? Math.round(v) : Math.round(pumpNorm(p, v) * 255); }
 function pumpUnbyte(p, b){ const k = pumpBoxKind(p); return k === 'ch' ? p.min + b : k === 'bool' ? (b ? 1 : 0) : k === 'int' ? b : pumpFrom(p, b / 255); }
 const pumpSymOf = (q, f) => q.tpl.replace('#', String(clamp((f.sel | 0), 0, q.selN - 1) + 1));
+// MOD (owner, 10 Nov): a pump slot's whole value list (the worklet's pv, in the plugin's parameter order) with some rows moved. ov: row
+// key (q.k) -> the row's value as the FX screen's box has it (the byte for a knob row), as FXV's overrides are. D is the slot's TFX entry,
+// D.pd its parameter table (the page has pump's own; the core is sent a copy of the fields used here), so both sides make the same
+// list. Rows that are not modulation targets (no q.lfo) and values missing from f.pump stay at the slot's own / the default.
+function pumpPv(D, f, ov){
+  const pv = D.pd.map(p => { const v = f.pump && f.pump[p.s]; return v === undefined ? p.def : v; });
+  if (ov) for (const q of D.ps) if (q.lfo && ov[q.k] !== undefined){ const p = D.pd[q.pi]; pv[q.pi] = pumpClamp(p, pumpUnbyte(p, ov[q.k])); }
+  return pv;
+}
 function pumpFresh(type){
   const fx = pumpFx(type), f = {type:PUMP_KEY(type), on:true, pump:{}};
   for (const p of fx.params) f.pump[p.s] = p.def;
@@ -18317,12 +18326,15 @@ for (const type of PUMP_TYPES){
     if (kind === 'ch') Object.assign(q, {min:0, max:p.ch.length - 1, names:p.ch.map(s => s.toUpperCase())});
     else if (kind === 'bool') Object.assign(q, {min:0, max:1, names:['OFF', 'ON']});
     else Object.assign(q, {min:kind === 'int' ? p.min : 0, max:kind === 'int' ? p.max : 255});
+    // MOD (10 Nov): a knob row is an LFO target when it is a continuous value the plugin lets a host automate and its own row (no band: the
+    // id fx:t:s:p cannot say which band the row meant). Choices, switches, whole-number ranges, band rows and meters stay out.
+    if (kind === 'cont' && !r.includes('#') && (p.flags & PF_AUTO) && !pumpSkip(p)){ q.lfo = true; q.pi = pumpIdx[type][r]; }
     // the text: the exact value while the byte still matches it (a pop-up or preset can set values between the steps)
     q.fmt = (v, f) => { const pp = f && f.pump ? fx.params[pumpIdx[type][pumpSymOf(q, f)]] : p, cur = f && f.pump ? f.pump[pp.s] : undefined;
       return pumpFmt(pp, cur !== undefined && pumpByte(pp, cur) === v ? cur : pumpUnbyte(pp, v)); };
     ps.push(q);
   }
-  TFX[PUMP_KEY(type)] = {n:PUMP_SHORT[type], long:'pump ' + fx.name + ': ' + fx.long.toLowerCase(), about:fx.about, pump:type, pt:PUMP_TYPES.indexOf(type), sel:B.sel || 0, sck:B.rows.includes('@sck'), ps,
+  TFX[PUMP_KEY(type)] = {n:PUMP_SHORT[type], long:'pump ' + fx.name + ': ' + fx.long.toLowerCase(), about:fx.about, pump:type, pt:PUMP_TYPES.indexOf(type), sel:B.sel || 0, sck:B.rows.includes('@sck'), ps, pd:fx.params,
     // the plugin's own values by symbol (the dynamics display reads its curve from these)
     map:f => f.pump || {}};
   FX_GROUP[PUMP_KEY(type)] = PUMP_GROUP[type] || 'Mastering (pump)';
@@ -19864,8 +19876,8 @@ const perfOf = (Sx = S) => Sx.perf || (Sx.perf = freshPerf());
 // The target's parts: {k, t, s, p}
 function tgtParse(id){ const a = String(id).split(':'); return {k:a[0], t:+a[1], s:a[2] != null ? +a[2] : -1, p:a[3] != null ? +a[3] : -1}; }
 const tgtTrk = t => t >= MT ? 'MASTER' : 'TRACK ' + d2(t + 1);
-// The effect slot a fx target points at, and its parameter (null when the slot is empty, pump, or another effect now)
-function tgtFx(g, Sx = S){ const A = g.t >= MT ? Sx.mfx : Sx.tfx[g.t], f = A && A[g.s]; if (!f || !TFX[f.type] || isPumpT(f.type)) return null; const q = TFX[f.type].ps[g.p]; return q ? {f, q} : null; }
+// The effect slot a fx target points at, and its parameter (null when the slot is empty, another effect now, or a pump row that is not a target: q.lfo)
+function tgtFx(g, Sx = S){ const A = g.t >= MT ? Sx.mfx : Sx.tfx[g.t], f = A && A[g.s]; if (!f || !TFX[f.type]) return null; const q = TFX[f.type].ps[g.p]; return q && (!isPumpT(f.type) || q.lfo) ? {f, q} : null; }
 function tgtLabel(id, short){
   const g = tgtParse(id), w = tgtTrk(g.t);
   if (g.k === 'fx'){ const x = tgtFx(g); return (short ? '' : w + ' · ') + (x ? 'FX' + (g.s + 1) + ' ' + TFX[x.f.type].n + ' ' + x.q.l : 'FX' + (g.s + 1) + ' (empty)'); }
@@ -19884,7 +19896,7 @@ function tgtList(t){
   const L = [];
   if (t < NT){ L.push(['vol:' + t, 'VOL'], ['pan:' + t, 'PAN'], ['cut:' + t, 'CUT · pad filter'], ['res:' + t, 'RES · pad resonance'], ['dec:' + t, 'DEC · pad decay']); }
   const A = t >= MT ? S.mfx : S.tfx[t];
-  (A || []).forEach((f, s) => { if (!f || !TFX[f.type] || isPumpT(f.type)) return; TFX[f.type].ps.forEach((q, p) => L.push(['fx:' + t + ':' + s + ':' + p, 'FX' + (s + 1) + ' ' + TFX[f.type].n + ' · ' + q.l])); });
+  (A || []).forEach((f, s) => { if (!f || !TFX[f.type]) return; TFX[f.type].ps.forEach((q, p) => isPumpT(f.type) && !q.lfo || L.push(['fx:' + t + ':' + s + ':' + p, 'FX' + (s + 1) + ' ' + TFX[f.type].n + ' · ' + q.l])); });
   return L;
 }
 // What the scenes (A, B, the crossfader) and the macros ask for now: Map(id → 00–FF). st: {xf, mac:[values]}.
@@ -20662,7 +20674,7 @@ function makePlayer(ac, out, getBuf, live){
     } else { const g = seqGen; setTimeout(() => { if (g === seqGen) f(); }, Math.max(0, (t - ac.currentTime) * 1000)); }
   }
   // FXV (owner, 30 Oct): a parameter of one effect slot, set from the song. The slot's other settings stay; the changes add
-  // up per slot (fxOv) and go back to the slot's own when the song stops (resetSeq). pump slots don't take it.
+  // up per slot (fxOv) and go back to the slot's own when the song stops (resetSeq). A ...pump slot takes it for the rows that are MOD targets (q.lfo), by pumpPv; the song's f.pump is never written.
   const fxOv = new Map();
   // TVL / TPN (owner, 30 Oct): a track's level (a share of its fader) and pan from the song, back to the mixer's at stop.
   const tvlOv = new Map(), tpnOv = new Map();
@@ -20674,14 +20686,15 @@ function makePlayer(ac, out, getBuf, live){
     else { tpnOv.set(ev.track, ev.v); try { b.p.pan.setTargetAtTime(clamp((ev.v - 128) / 127, -1, 1), Math.max(ev.t, ac.currentTime), 0.004); } catch(e){} }
   }
   function fxpMsg(t, k, ov){
-    const A = t >= MT ? S.mfx : S.tfx[t], f = A && A[k]; if (!f || isPumpT(f.type) || !TFX[f.type]) return null;
+    const A = t >= MT ? S.mfx : S.tfx[t], f = A && A[k]; if (!f || !TFX[f.type]) return null;
+    if (isPumpT(f.type)) return {pset:{slot:k, pv:pumpPv(TFX[f.type], f, ov)}};   // MOD: a ...pump slot's whole value list, the song's own with the moved rows
     const D = TFX[f.type], f2 = Object.assign({}, f, ov), vals = D.map(f2, ac.sampleRate, bpmNow);
     if (D.mod) return {pset:{slot:k, mp:vals}};
     const p = new Array(12).fill(0); vals.forEach((v, i) => p[i] = v); return {pset:{slot:k, p}};
   }
   function fxpTo(ev){
-    const A = ev.track >= MT ? S.mfx : S.tfx[ev.track], f = A && A[ev.slot]; if (!f || isPumpT(f.type) || !TFX[f.type]) return;
-    const q = TFX[f.type].ps[ev.pi]; if (!q) return;
+    const A = ev.track >= MT ? S.mfx : S.tfx[ev.track], f = A && A[ev.slot]; if (!f || !TFX[f.type]) return;
+    const q = TFX[f.type].ps[ev.pi]; if (!q || (isPumpT(f.type) && !q.lfo)) return;
     const key = ev.track + ':' + ev.slot, ov = Object.assign({}, fxOv.get(key)); ov[q.k] = q.min + Math.round((q.max - q.min) * ev.v / 255); fxOv.set(key, ov);
     const m = fxpMsg(ev.track, ev.slot, ov); if (!m) return;
     atTime(ev.t, () => { const n = fxNodeOf(ev.track); if (n && n.port) try { n.port.postMessage(m); } catch(e){} });
@@ -22039,7 +22052,7 @@ function padBlink(e){
 // Phones and tablets (10 Nov): the audio-thread sequencer's module (a second thread) loads only when the owner picked it there
 // (aset.corePick, set in Settings); the saved default 'core' plays on the Page sequencer on such a device.
 function coreWanted(){ return aset.core === 'core' && (!wkLazy() || !!aset.corePick); }   // (a declaration: the Settings row reads it at load)
-const CORE_REV = 'aigv0e';
+const CORE_REV = 'qohjyu';
 const CORE_WANT = 7;   // the core's message set this page speaks (core-processor.js CORE_V); an older core is not used
 const CORE_URL = () => 'core/seq-core.js?v=' + BUILD + '-' + CORE_REV;
 const core = {node:null, ready:false, loading:null, gen:0, sent:new Map(), sT:0, tally:new Map(), mir:null};   // mir: what the core's song holds, as JSON per part (coreDiff)   // tally: events by who played them (test hook)
@@ -24294,7 +24307,7 @@ function fxRows(){
   rows.push({l:'ACTIVE', gap:true, desc:TFX[f.type].long, tog:true, get:() => f.on ? 1 : 0, set:v => { f.on = !!v; fxChanged(t); }, min:0, max:1, d:1, fmt:v => onOff(v) + `  slot ${k + 1} ` + TFX[f.type].n,
     info:() => `Slot ${k + 1}: ${TFX[f.type].long}. ` + (TFX[f.type].about ? TFX[f.type].about + ' ' + (pumpLatTxt(t, k) ? pumpLatTxt(t, k)[0].toUpperCase() + pumpLatTxt(t, k).slice(1) + '. ' : '') : '') + 'OFF bypasses it'});
   const PU = TFX[f.type].pump;   // …PUMP: a pump effect's boxes (fmt sees the slot: it shows the exact value), its presets and OPEN
-  for (const q of TFX[f.type].ps) rows.push({l:q.l, lfo:PU ? '' : 'fx:' + t + ':' + k + ':' + TFX[f.type].ps.indexOf(q), get:() => f[q.k], set:v => { f[q.k] = v; delete f.pname; fxChanged(t); }, min:q.min, max:q.max, big:q.names ? (q.max > 40 ? 8 : 1) : q.band ? 1 : 16, d:q.d, tog:q.names && q.names.length === 2,
+  for (const q of TFX[f.type].ps) rows.push({l:q.l, lfo:PU && !q.lfo ? '' : 'fx:' + t + ':' + k + ':' + TFX[f.type].ps.indexOf(q), get:() => f[q.k], set:v => { f[q.k] = v; delete f.pname; fxChanged(t); }, min:q.min, max:q.max, big:q.names ? (q.max > 40 ? 8 : 1) : q.band ? 1 : 16, d:q.d, tog:q.names && q.names.length === 2,
     fmt:v => q.names ? q.names[v] : q.band ? q.fmt(v, f) : (q.min < 0 ? sgn(v) : q.max > 99 ? hx(v) : d2(v)) + '  ' + q.fmt(v, f),
     info:() => TFX[f.type].long + ' · ' + q.l.toLowerCase() + (PU ? pumpRowInfo(t, k, q) : '')});
   if (!PU){
@@ -29087,7 +29100,7 @@ function deckFxBar(){
           inp.addEventListener('pointerdown', e => e.stopPropagation());
           inp.addEventListener('blur', () => fin(true)); };
         v.addEventListener('dblclick', e => { e.preventDefault(); editIt(); });
-        v.addEventListener('contextmenu', e => valMenu(e, q.l, {reset:() => set(q.d), type:typeIt, lfo:isPumpT(f.type) ? null : 'fx:' + t + ':' + k + ':' + D.ps.indexOf(q)}));
+        v.addEventListener('contextmenu', e => valMenu(e, q.l, {reset:() => set(q.d), type:typeIt, lfo:isPumpT(f.type) && !q.lfo ? null : 'fx:' + t + ':' + k + ':' + D.ps.indexOf(q)}));
         dkFbVals.push(() => { const g = getF(); if (g && document.activeElement !== v && !v.classList.contains('drag') && !v.classList.contains('edit')) v.textContent = show(g[q.k]); });
       }
       col.dataset.k = k; bar.append(col);
@@ -34101,7 +34114,8 @@ if (new URLSearchParams(location.search).has('pbshow')){ try {
    stay identical. Math.random is seeded for the run, so GEN / PRB / random commands repeat. Inert without ?seqtest. */
 /* THUNDER CORE (plan phase 2): what the audio-thread sequencer (core/seq-core.js) needs from the page besides the song: the
    per-voice-track setting, the slot count, and the effect table's pump flags and control ranges (TFX itself holds DSP). */
-function coreTfx(){ const o = {}; for (const k in TFX) o[k] = {pump:!!TFX[k].pump, mod:!!TFX[k].mod, cv:TFX[k].cv || null, ps:(TFX[k].ps || []).map(q => ({k:q.k, min:q.min, max:q.max}))}; return o; }
+function coreTfx(){ const o = {}; for (const k in TFX) o[k] = {pump:!!TFX[k].pump, mod:!!TFX[k].mod, cv:TFX[k].cv || null, ps:(TFX[k].ps || []).map(q => q.lfo ? {k:q.k, min:q.min, max:q.max, lfo:true, pi:q.pi} : {k:q.k, min:q.min, max:q.max}),
+  ...(TFX[k].pd ? {pd:TFX[k].pd.map(p => ({s:p.s, min:p.min, max:p.max, def:p.def, scale:p.scale, skew:p.skew, flags:p.flags}))} : {})}; return o; }
 function coreVars(){ return {vtrk, NSLOT, TFX:coreTfx()}; }
 if (new URLSearchParams(location.search).has('seqtest')) window.__seqTest = {
   idleSleep(m, d){ IDLE_SLEEP_S = m; IDLE_SLEEP_DESK_S = d; if (ctx && ctx.state === 'running'){ clearTimeout(bgSusT); bgSusT = setTimeout(bgIdle, bgWait()); } return {wait:bgWait(), hand:seqHandHere()}; },   // IDLE SLEEP test hook: shorter times
