@@ -523,6 +523,36 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0) and `link/` (Ableton
 
 ## To-do (owner's list: keep it current; newest dated entries below have the details)
 
+### Where things stand (10 Nov, 15:10: READ THIS FIRST; it supersedes older lines below where they disagree)
+
+**Web beta: build 560** (https://matthettich.github.io/thunder-plus/beta/). `main` and the desktop app are far behind (desktop v1.3.4-beta.2 = build 541): nothing since build 541 is on the desktop; a desktop beta from `beta` only when the owner asks. Every PR into `beta` now runs `npm test` and the sequencer goldens in GitHub Actions (`tests.yml`).
+
+**Owner's direction (10 Nov afternoon):** keep working on AUDIO STABILITY of the web app; the native port is PARKED ("especially if we can lower the priority of a port"). He will test when he has time ("it's been hard for me to have the time to review"): do not block on him; queue tests in the punch list.
+
+**Done on 10 Nov (builds 548–560):** the three audio-review fixes, usability / battery quick wins, save safety (a real data-loss bug), device recovery, the delay clock under holds, background-play restart, audio-thread stalls, idle sleep, audio-thread memory, engine goldens and CI, **MOD finished except smoothing** (LFOs always run; pump targets incl. bands and windows; live-engine targets and the tracker commands on live engines; master out; render parity), Reset audio settings, the runaway kick and its fix, the media-session experiment, the Background play guard, level over a play.
+
+**Waiting on the owner (all in the punch list below; the first three matter most):**
+1. **The long screen-off run with Background play ON** (3–5 minutes, a volume key press in the middle): decides whether the phone needs the native port at all, and whether the kick (`RUNKICK`) and the 40 Hz background clip (`MS_ACTIVE`) stay.
+2. **MOD by ear:** steps at 1/16–1/32 on a filter cutoff and on a delay-time / pitch parameter of a built-in effect (decides smoothing: he said steps are fine except pitch and sometimes filters); live-synth CUT / LFO on a held note; old songs that used CUT / RES on a live synth (now the synth's own filter, not a low-pass after it).
+3. **Desktop hardware:** unplug / replug the interface, default output change, sleep and wake, Reset audio engine; Windows recording and MIDI; the helper checklist; Link.
+4. A playback report from the song that stutters and then stops under LOOP. Whether pads feel late after a runaway (output delay read about 390 ms twice).
+5. Small choices: the "Help" header in File; closing the pump window after Add LFO…; scenes / macros on CUT for live synths (offset from the knob); whether the PROJECT screen's BACKGROUND PLAY row should go or ask first (a stray EDIT can flip it).
+
+**Queued work that needs no owner input (do in this order; delegate to Sonnet, lead reviews audio):**
+1. Review and merge what was running at 15:10: `fix/worklet-robustness` (block sizes other than 128, pump-synth wasm guard, chains' Flex / Step gate copies) and `test/soak` (`tests/sweep/soak.mjs` + `docs/audits/2026-11-10-soak.md`); then fix what the soak finds (leaks, growth, stalls over 10 minutes).
+2. Smoothing, ONLY if the owner hears steps: the effect host ramps a modulated value toward its next point per block, scoped to pitch / cutoff-type parameters (lead designs; about one session).
+3. Left from the memory pass: per-block garbage in the chains / waves hosts and some modules (generated / shared text), `rvMix`, `__tcOv`'s per-block objects, pump-synth worklet's `at` closure.
+4. Battery finding 3: `clocked` effect worklets and the master / chains / core with silence shortcuts while stopped (audio review).
+5. The master chain's roughly −58 dB high-band floor on bass-heavy mixes (limiter / clipper harmonics; found by the engine-targets sweep): is it intended?
+6. Vox REL has no audible tail in a render (older than build 555); pump live synths are not repeatable render to render.
+7. Ableton Link desktop builds in CI; `tools/flex-check.mjs` and `tools/sampler-check.mjs` still build the core node with NT + 4 outputs (now NT + 5).
+8. Usability leftovers: audit items U4 Close / Done, U6, U12, U14, U15, U16; screens never walked (Pattern view on touch, Synth page unfolded, pump windows); `~` mark inside the pump windows.
+9. Reset audio engine cannot rebuild the AudioContext (a stuck stream or the 390 ms delay after a runaway needs a reload).
+
+**Parked:** the native port (`docs/NATIVE-PORT-STRATEGY.md`, `docs/port/WORKPLAN.md`; its "only cure for the phone" premise is unproven, see the 10 Nov entry "with Background play ON"). Feature freeze otherwise holds: MOD was the exception and is done.
+
+**The older sections below ("Stability plan", "Feature priority" items 1–2) describe the plan as of 9 Nov and are largely done; keep them for the decisions they record.**
+
 ### Stability plan (owner, 9 Nov night: "my priority is getting the app to a usable, efficient, and stable place for Android, Mac, and Windows")
 
 The owner's goal is stability and usability first, with only the MOD page and its live-instrument targets as near-term features. How to work it: the lead plans and writes each brief, lower-cost agents the lead spawns do the work, the lead verifies every result (reads the diff, reruns the tests) before pushing. Every change goes through a PR into `beta` with a CodeRabbit review asked for (`@coderabbitai review`; it skips `beta` PRs otherwise). Audio, timing and both sequencers stay under the lead's line-by-line review.
@@ -580,7 +610,10 @@ The owner's top priority to add is the MOD screen. Work down the list; ask befor
 
 ### Owner's punch list (owner, 9 Nov: will test these later; keep it current)
 
-Start a session by asking for results. Fix on `beta`. Web beta: https://matthettich.github.io/thunder-plus/beta/ (build 547 as of 10 Nov morning, 548 once its PR merges; the night of 9–10 Nov shipped 544–547, see the four "10 Nov" entries below. Decisions the lead made that night for the owner to confirm or reverse: on a phone the saved Sequencer default plays on the Page unless Audio thread is picked on that device; on a phone the safety limiter is its stand-in until another worklet loads; the resync only runs with a worklet loaded and its margins are untested on a device). Desktop: v1.3.4-beta.2 (build 541, no feed view or scopes); further desktop betas on hold until the owner asks.
+Start a session by asking for results. Fix on `beta`. (10 Nov, 15:10: the web beta is build 560; the build numbers in the rest of this paragraph are older.) Web beta: https://matthettich.github.io/thunder-plus/beta/ (build 547 as of 10 Nov morning, 548 once its PR merges; the night of 9–10 Nov shipped 544–547, see the four "10 Nov" entries below. Decisions the lead made that night for the owner to confirm or reverse: on a phone the saved Sequencer default plays on the Page unless Audio thread is picked on that device; on a phone the safety limiter is its stand-in until another worklet loads; the resync only runs with a worklet loaded and its margins are untested on a device). Desktop: v1.3.4-beta.2 (build 541, no feed view or scopes); further desktop betas on hold until the owner asks.
+
+**Build 560**
+- [ ] **Background play guard (phone):** switch Background play off (Settings, or the PROJECT screen's row): a note says it is for testing only. PLAY, lock the screen a few seconds, come back: a message offers "Turn on"; tap it: it is on again and the report shows the session starting.
 
 **The test that decides how urgent the native port is (phone, Background play ON: check the report's `settings:` line)**
 - [ ] **Long screen-off run:** your normal song WITH effects, PLAY, screen off for 3–5 minutes, press a volume key once in the middle, screen on, STOP, Copy playback report. By ear: steady the whole time? Does the volume key change media volume now (no vibration)? The report: clock lines near 1.00, `held` / `kicked` counts, underruns.
@@ -747,6 +780,10 @@ Suggested order: N0 → N1 → N2 (phone cured) → N4 with N3 alongside → N5 
   the edge `R.t0`, "waiting…" while armed), `rcdClk` / `rcdFmt` / `rcdFreeSecs`, a 250 ms timer only while recording; the
   final length stays until the next take. recorder-check covers FREE, PATTERN, Stop, next take and closing mid-take.
 
+
+## 10 Nov (afternoon): Background play guard (build 560); the port is parked
+
+Owner (15:01): "I am down to continue working towards audio stability, especially if we can lower the priority of a port." **The native port is parked** (N0 not started; the plan stays on file) until the long screen-off run with Background play on says whether the phone needs it. Build 560 (Sonnet agent, diff read by the lead): `setBgOn(on, byHand)`; on Android, hidden while playing with it off logs `hidden while playing with Background play OFF…` each time and, once a page load, a `toastAct` on return offers "Turn on" (`bgGuardHide` / `bgGuardShow`); switching it off by hand shows a "for testing only" toast; the Settings title and the PROJECT row hint state the consequence. Nothing in the code turns it off by itself: the only `setBgOn(false)` callers are the Settings checkbox and **the tracker PROJECT screen's BACKGROUND PLAY row** (reachable with the pad, so it can be flipped by a stray EDIT: a likely way it went off). `tests/bgplay-guard.test.js`. Running: worklet robustness (block sizes, pump-synth guard, chains' Flex copies) and a soak test (`tests/sweep/soak.mjs`).
 
 ## 10 Nov (afternoon): with Background play ON the phone held its clock with effects loaded (build 559 report). THE PORT'S PREMISE NEEDS RE-CHECKING
 
