@@ -87,9 +87,9 @@ function loadCore(text, tfx){
 // What the page sends the core as TFX: coreTfx() from index.html, run on the page's TFX.
 const coreTfx = () => { const f = cut(/function coreTfx\(\)\{[^\n]*\n[^\n]*\n/, 'coreTfx'); run(f); return JSON.parse(JSON.stringify(run('coreTfx()'))); };
 const NEW = () => loadCore(H.read('core/seq-core.js'), coreTfx());
-function play(ctx, S, mode = 'song', steps = 64){
+function play(ctx, S, mode = 'song', steps = 64, o = {}){
   ctx.__S = JSON.parse(JSON.stringify(S)); vm.runInContext('S = __S;', ctx);
-  const sq = ctx.makeSeq(ctx.__S, mode, { row: 0, once: true, sim: true }), evs = [];
+  const sq = ctx.makeSeq(ctx.__S, mode, Object.assign({ row: 0, once: true, sim: true }, o)), evs = [];
   for (let i = 0; i < steps && sq.alive(); i++) evs.push(...sq.step().evs);
   return JSON.parse(JSON.stringify(evs));
 }
@@ -100,7 +100,7 @@ test('an LFO on a pump parameter: fxp events on every step, following the shape 
   const i = rowOf('comp', 'p_ratio'), S = song('comp'); S.tfx[2][0].p_ratio = 100;
   S.perf.lfo[2] = [{ id: `fx:2:0:${i}`, sh: 0, rt: 5, dp: 100 }];
   const ev = play(NEW(), S).filter(e => e.type === 'fxp');
-  assert.equal(ev.length, 16 * 2, '2 points a step in a render, 16 steps');
+  assert.equal(ev.length, 16 * 4, '4 points a step in a render (as live), 16 steps');
   ev.forEach(e => { assert.equal(e.track, 2); assert.equal(e.slot, 0); assert.equal(e.pi, i); assert.equal(e.v, sineAt(e.t, 100, 5, 100), 'follows the sine at t=' + e.t); });
   const vs = ev.map(e => e.v); assert.ok(Math.max(...vs) >= 100 + 49 && Math.min(...vs) <= 100 - 49);
 });
@@ -190,7 +190,8 @@ test('a song with no pump LFO: the old core and the new one send the same events
   for (const pumpSlot of [false, true]){
     const S = song('comp'); if (!pumpSlot){ S.tfx[2] = []; S.mfx = []; }
     S.tfx[3] = [nat]; S.perf.lfo = { 3: [{ id: 'vol:3', sh: 1, rt: 4, dp: 80 }], 1: [{ id: 'pan:1', sh: 0, rt: 5, dp: 60 }] };
-    const a = play(old, S), b = play(cur, S); total += a.length;
+    const LIVEO = { live: true, sim: false };   // (live: a render now has 4 points a step like live, so its vol / pan LFOs differ from the old core's 2 by design; live is unchanged)
+    const a = play(old, S, 'song', 64, LIVEO), b = play(cur, S, 'song', 64, LIVEO); total += a.length;
     assert.deepEqual(b, a, 'pump slot in the song: ' + pumpSlot);
   }
   assert.ok(total > 100, 'events were produced (' + total + ')');

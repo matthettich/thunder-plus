@@ -191,7 +191,7 @@ function tgtParse(id){ const a = String(id).split(':'); return {k:a[0], t:+a[1],
 function tgtFx(g, Sx = S){ const A = g.t >= MT ? Sx.mfx : Sx.tfx[g.t], f = A && A[g.s]; if (!f || !TFX[f.type]) return null; const q = TFX[f.type].ps[g.p]; return q && (!isPumpT(f.type) || q.lfo) ? {f, q} : null; }
 function tgtOwn(id, Sx = S){
   const g = tgtParse(id);
-  if (g.k === 'vol') return g.t < NT ? Sx.mix[g.t].vol : 255;
+  if (g.k === 'vol') return g.t < NT ? Sx.mix[g.t].vol : Sx.mout == null ? 255 : Sx.mout;   // the master: the OUT fader's own byte (S.mout; the song's own is never written)
   if (g.k === 'pan') return g.t < NT ? Sx.mix[g.t].pan : 128;
   if (g.k === 'fx'){ const x = tgtFx(g, Sx); return x ? clamp(Math.round((x.f[x.q.k] - x.q.min) / ((x.q.max - x.q.min) || 1) * 255), 0, 255) : 0; }
   // cut / dec: open (255); res: none (0). env / atk / sus / rel (live engines, 10 Nov): 0. Only the OFFSET from the engine's own value reaches the engine
@@ -210,7 +210,7 @@ function tgtEvs(id, v, at, pno){
   const g = tgtParse(id), own = v == null;
   if (g.k === 'env' || g.k === 'atk' || g.k === 'sus' || g.k === 'rel') return [];   // live engines only: makeSeq's `eng` event carries them (from PF.sent and the LFOs); nothing for the notes (PF.pno)
   if (g.k === 'cut' || g.k === 'res' || g.k === 'dec'){ const o = pno.get(g.t) || {}; if (own) delete o[g.k]; else o[g.k] = v; pno.set(g.t, o); return []; }
-  if (g.k === 'vol') return g.t < NT ? [{type:'tva', t:at, track:g.t, v:own ? S.mix[g.t].vol : v}] : [];
+  if (g.k === 'vol') return g.t < NT ? [{type:'tva', t:at, track:g.t, v:own ? S.mix[g.t].vol : v}] : g.t === MT ? [{type:'mout', t:at, track:MT, v:own ? tgtOwn(id) : v}] : [];   // the master: 'mout', the OUT fader (not 'mvol', the drive)
   if (g.k === 'pan') return g.t < NT ? [{type:'tpn', t:at, track:g.t, v:own ? S.mix[g.t].pan : v}] : [];
   if (g.k === 'fx') return tgtFx(g) ? [{type:'fxp', t:at, track:g.t, slot:g.s, pi:g.p, v:own ? tgtOwn(id) : v}] : [];
   return [];
@@ -426,7 +426,7 @@ function makeSeq(S, mode, o){
        (signed byte offsets, +-255)}. The sequencer cannot know whether a pad is live (the core has no kit), so it sends it for every track with something to say
        (a command in force, an LFO, a scene value) and the player drops it where the track has no live node; a song with none of these sends none.
        o = the value unclamped - its centre (the command's byte when one is in force, else the target's own: tgtOwn), so an LFO swings both ways round it; a scene,
-       macro or lock value on the target (PF.sent) is an offset from tgtOwn while no command is in force. An LFO gives ne points a step (4 live, 2 in renders),
+       macro or lock value on the target (PF.sent) is an offset from tgtOwn while no command is in force. An LFO gives ne points a step (4 live and in renders, lfoPts),
        sent every step; otherwise one event at the step's start, only when c or o changed since the last one (T.eng; none yet = the defaults, so a state in force
        at the first step goes out at once, and one that returns to the defaults sends the defaults). PF.pno (the sampled pads) is written as before. */
     const ENGK = ['cut', 'res', 'env', 'atk', 'dec', 'sus', 'rel'], R3 = x => Math.round(x * 1000) / 1000;
@@ -442,10 +442,14 @@ function makeSeq(S, mode, o){
       for (let p = 0; p < np; p++) evs.push({type:'eng', t:t0 + dur * p / np, track:u, c:Object.assign({}, c), o:os[p]});
       T.eng = last;
     };
-    const lfoEvs = (t, t0, dur) => { const La = PFS.lfo[t], ne = PL ? Math.min(4, api.tks) : 2, EP = new Map();
+    // LFO points a step (11 Nov: renders match live). LIVE: up to 4. RENDER: an effect target (fx) costs one suspend of the OfflineAudioContext a point (atTime),
+    // so it has its own count; vol / pan / the engine targets are AudioParam automation, free. All at 4 = what was heard live (measured 11 Nov: 16 bars, four effect LFOs: 511 suspends and ~3.6 s at 2 points, 1023 and ~3.9 s at 4, +8 %; so 4 for every kind; set FX back to 2 if a slow device needs it).
+    const LFO_PTS_LIVE = 4, LFO_PTS_RENDER_FX = 4, LFO_PTS_RENDER_PARAM = 4;
+    const lfoPts = fx => Math.min(PL ? LFO_PTS_LIVE : fx ? LFO_PTS_RENDER_FX : LFO_PTS_RENDER_PARAM, api.tks);
+    const lfoEvs = (t, t0, dur) => { const La = PFS.lfo[t], ne = lfoPts(false), EP = new Map();
       if (Array.isArray(La)) for (let i = 0; i < La.length; i++){ const L = La[i]; if (!L || !tgtOk(L.id)) continue;
         let dup = false; for (let j = 0; j < i; j++) if (La[j] && La[j].id === L.id){ dup = true; break; } if (dup) continue;
-        const g = tgtParse(L.id), fl = g.k === 'cut' || g.k === 'res' || g.k === 'dec', n = fl ? 1 : PL ? Math.min(4, api.tks) : 2;
+        const g = tgtParse(L.id), fl = g.k === 'cut' || g.k === 'res' || g.k === 'dec', n = fl ? 1 : lfoPts(g.k === 'fx');
         const c = PF.sent.has(L.id) ? PF.sent.get(L.id) : tgtOwn(L.id, S);
         const sw = (tt, v = 0) => { for (let j = i; j < La.length; j++){ const M = La[j]; if (!M || M.id !== L.id) continue; const bt = (api.bt + (tt - t0) * api.bpm / 60) / (PLFO_RATES[M.rt] || 1), cyc = Math.floor(bt); v += lfoAt(M.sh, bt - cyc, cyc) * M.dp / 2; } return v; };
         if (!(g.k === 'env' || g.k === 'atk' || g.k === 'sus' || g.k === 'rel')) for (let k = 0; k < n; k++){ const tt = t0 + dur * k / n;
@@ -633,7 +637,7 @@ function makeSeq(S, mode, o){
           if (any) evs.push(m);
         }
       }
-      // TRACK LFO (owner, 1 Nov; Perform → LFO): a few points a row (2 in a render) around the target's value now (its scene,
+      // TRACK LFO (owner, 1 Nov; Perform → LFO): a few points a row (4 live and in a render: lfoPts) around the target's value now (its scene,
       // macro or own), in time with the song; a filter target (cut / res / dec) once a row, for the notes that start on it.
       // Several LFOs on one target add around its one value (the first LFO of a target leads; the later ones are summed into its points).
       lfoEvs(t, t0, dur); lfoRan[t] = true;
@@ -1060,10 +1064,12 @@ class ThunderCore extends AudioWorkletProcessor {
      track's VOL / mute / solo; NT + 2, one per track, a pan offset (target − the mixer's pan) added to its StereoPanner's
      pan; NT + 3, the master's level offset (target − its knob) added to the master gain. The page plugs a channel in when
      the first such command for it arrives and stops touching that param itself; STOP unplugs them all. */
-  mixReset(){ this.mg = new Array(NT).fill(null); this.mp = new Array(NT).fill(null); this.mm = null; }
+  mixReset(){ this.mg = new Array(NT).fill(null); this.mp = new Array(NT).fill(null); this.mm = null; this.mo = null; }
   mixEv(ev){
     const at = Math.max(ev.t, currentTime);
     if (ev.type === 'mvol'){ const A = this.mm || (this.mm = new Auto(0)); A.hold(at); A.lin(curve(ev.v) - curve(S && S.master != null ? S.master : 255), at + 0.004); return true; }
+    // MOD vol:MT (11 Nov): the master OUT fader (after the limiter). Output NT + 4: its offset (target − S.mout's gain) is added to the OUT gain; the 4 ms glide of TVA
+    if (ev.type === 'mout'){ const A = this.mo || (this.mo = new Auto(0)); A.target(curve(ev.v) - curve(S && S.mout != null ? S.mout : 255), at, 0.004); return true; }
     const t = ev.track; if (t == null || t < 0 || t >= NT) return false;
     const m = S && S.mix && S.mix[t];
     if (ev.type === 'tpn'){ const A = this.mp[t] || (this.mp[t] = new Auto(0)), P = v => Math.max(-1, Math.min(1, (v - 128) / 127));
@@ -1089,10 +1095,11 @@ class ThunderCore extends AudioWorkletProcessor {
     L.engOn = true;
   }
   mixOut(outputs, N, dt){
-    const G = outputs[NT + 1], P = outputs[NT + 2], M = outputs[NT + 3];
+    const G = outputs[NT + 1], P = outputs[NT + 2], M = outputs[NT + 3], O = outputs[NT + 4];
     if (G) for (let t = 0; t < G.length; t++) this.mixFill(G[t], this.mg[t], 1, N, dt);
     if (P) for (let t = 0; t < P.length; t++) this.mixFill(P[t], this.mp[t], 0, N, dt);
     if (M) this.mixFill(M[0], this.mm, 0, N, dt);
+    if (O) this.mixFill(O[0], this.mo, 0, N, dt);
   }
   mixFill(C, A, d, N, dt){ if (!C) return; if (!A){ C.fill(d); return; } A.prune(currentTime); const c = A.constFrom(currentTime); if (c != null){ C.fill(c); return; } for (let i = 0; i < N; i++) C[i] = A.at(currentTime + i * dt); }   // (a method: no closure per block)
   play(d){
@@ -1338,7 +1345,7 @@ class ThunderCore extends AudioWorkletProcessor {
       const v = ev.b - this.clkBase; A.lin(v + 1, at); if (v >= 16){ this.clkBase += 16; A.set(v - 16 + 1, at); } return true; }
     if (ev.type === 'stp'){ for (let k = 0; k <= NT; k++) if (ev.all || k === ev.track){ for (const v of this.T(k)) this.kill(v, ev.t, 0.004); this.T(k).length = 0; } return false; }
     if (ev.type === 'eng'){ this.engEv(ev); return false; }   // (false: the page's player sets its own params from it too: the same values)
-    if (ev.type === 'tvl' || ev.type === 'tva' || ev.type === 'tpn' || ev.type === 'mvol') return this.mixEv(ev);
+    if (ev.type === 'tvl' || ev.type === 'tva' || ev.type === 'tpn' || ev.type === 'mvol' || ev.type === 'mout') return this.mixEv(ev);
     if (ev.type === 'off' && ev.track != null){ const T = this.T(ev.track);
       if (ev.cols){ for (let k = T.length - 1; k >= 0; k--) if (ev.cols.includes(T[k].col)){ this.kill(T[k], ev.t, this.relTc(T[k])); T.splice(k, 1); } return false; }
       for (const v of T) this.kill(v, ev.t, this.relTc(v)); T.length = 0; return false; }
