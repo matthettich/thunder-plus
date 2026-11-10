@@ -299,3 +299,24 @@ test('track mute and solo clear each other, and a new song’s …pump mastering
   const song = cut('index.html', /function freshSong\(\)\{[\s\S]*?\n\}\n/, 'freshSong');
   assert.match(song, /mfx:mstPumpFresh\(\), mstPump:true/, 'a new song keeps the slots (MASTERING turns them on)');
 });
+
+/* ───────── phone resync (10 Nov): hold the song when the audio clock leaps (source guards only; the behaviour was checked in headless Chrome with a faked audio clock) ───────── */
+test('phone resync: kill switch, scope (phones only, Page sequencer, no take-ups, Link or MIDI clock), measuring, and the order in pumpRun', () => {
+  const src = H.read('index.html');
+  assert.match(src, /const RESYNC = true;/, 'the kill switch exists and is on');
+  const scope = cut('index.html', /const rsScope = \(\) => [^\n]*\n/, 'rsScope');
+  for (const k of ['seqHandHere()', 'RCD.sync', 'RCD.on', 'rec.on', 'lkLive()', 'clkWanted()', 'midi.clkIn', 'mx.slave', 'tp.stopAt == null']) assert.ok(scope.includes(k), 'rsScope checks ' + k);
+  const tick = cut('index.html', /function rsTick\(s, outLat\)\{[\s\S]*?\n\/\/ Everything/, 'rsTick');
+  assert.match(tick, /!tp\.on \|\| tp\.core \|\| !ctx \|\| !rsScope\(\)/, 'only while the Page sequencer plays');
+  assert.match(tick, /ctx\.state !== 'running' \|\| w - A\.wl > 1/, 're-anchors when not running, and after a frozen page');
+  assert.match(tick, /if \(d < 0 \|\| w - A\.t0 < 1\.5\)\{ A\.c = c; A\.w = w; return; \}/, 'the anchor follows a slow clock; the first 1.5 s only measure');
+  assert.match(tick, /d > Math\.max\(rsThresh\(outLat\), q \* 1\.3\)/, 'the threshold is never under 1.3 steps of a clock that moves in buffers (else every step is held and the song stands still)');
+  assert.match(src, /const rsThresh = outLat => Math\.max\(0\.12, outLat \* 0\.75 \+ 0\.05\);/, 'the leap threshold');
+  const hold = cut('index.html', /function rsHold\(s, d\)\{[\s\S]*?held the song: audio clock leapt[^\n]*\n/, 'rsHold');
+  for (const k of ['s.base += d; s.time += d; if (s.btT != null) s.btT += d', 'tp.t0 += d', 'mx.beat', 'mx.pend', 'mx.lfo', 'P.rs++; P.rsS += d', 'tp.rsUntil']) assert.ok(hold.includes(k), 'rsHold moves ' + k);
+  const pump = cut('index.html', /function pumpRun\(\)\{[\s\S]*?\n\}\n/, 'pumpRun');
+  assert.ok(pump.includes('rsTick(s, outLat)') && pump.indexOf('rsTick(s, outLat)') < pump.indexOf('PB.pg.re++'), 'the hold runs before the moved-on rule');
+  assert.ok(pump.indexOf('PB.pg.re++') < pump.indexOf('PB.rsA.c = ctx.currentTime'), 'the moved-on rule re-anchors the hold');
+  assert.match(pump, /document\.hidden && !\(tp\.rsUntil > performance\.now\(\)\) \? 1\.2/, 'the hidden look-ahead stays short for a few seconds after a hold');
+  assert.match(src, /held \$\{P\.rs \|\| 0\}× \(\$\{\(P\.rsS \|\| 0\)\.toFixed\(2\)\} s\)/, 'the report line counts holds');
+});

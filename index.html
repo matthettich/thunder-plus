@@ -21569,20 +21569,66 @@ function pump(){
   try { pumpRun(); }
   catch(e){ console.error(e); try { tStop(); } catch(e2){} toast('Playback stopped: ' + ((e && e.message) || 'something went wrong') + '.', 5000); }
 }
+/* PHONE RESYNC (10 Nov; owner's Fold, Chrome with AudioWorklet modules loaded): Chrome renders more audio than the device plays, so
+   ctx.currentTime runs ahead of real time in bursts (61.7 s of clock in 40.4 s of wall during a song; +4 s, +7 s, +32 s in a
+   second) and the Page sequencer, booking against that clock, rushed the song at 1.5× with pieces missing. We can't stop Chrome
+   doing it; this keeps the SONG at real-time speed. Each tick: drift = (clock − clock at the anchor) − (wall − wall at the anchor).
+   The clock moves in steps of the output buffer (up to about outLat), so one tick is noisy by up to that: only a drift above
+   rsThresh (or 1.3 measured steps, rsStep) counts as a leap, and the anchor follows the clock whenever drift is negative (a slow clock, an underrun), so the
+   noise stays above the baseline and a later leap is measured from it. A leap moves the whole timeline on by the same amount
+   (rsHold), so nothing is skipped and nothing is booked for the leap; what is already booked can't be taken back.
+   Phones and tablets only, the Page sequencer, and not while anything else owns the timing (rsScope). RESYNC: kill switch. */
+const RESYNC = true;
+const rsThresh = outLat => Math.max(0.12, outLat * 0.75 + 0.05);
+const rsScope = () => seqHandHere() && !RCD.sync && !RCD.on && !rec.on && !lkLive() && !clkWanted() && !midi.clkIn && !mx.slave && tp.stopAt == null;   // (as seqHandover: take-ups and Link / MIDI clock keep their own timing)
+function rsTick(s, outLat){
+  if (!tp.on || tp.core || !ctx || !rsScope()){ PB.rsA = null; return; }
+  PB.rsN = (PB.rsN || 0) + 1;   // (test hook: how often this ran)
+  const c = ctx.currentTime, w = performance.now() / 1000, A = PB.rsA, q = rsStep(c, w);
+  if (!A || A.seq !== s || ctx.state !== 'running' || w - A.wl > 1){ PB.rsA = {seq:s, c, w, wl:w, t0:A && A.seq === s ? A.t0 : w}; return; }   // PLAY, not running, or the page itself was frozen (the moved-on rule's)
+  A.wl = w; const d = (c - A.c) - (w - A.w);
+  if (d < 0 || w - A.t0 < 1.5){ A.c = c; A.w = w; return; }   // (the first 1.5 s of a PLAY only learn the clock's step)
+  if (d > Math.max(rsThresh(outLat), q * 1.3)){ rsHold(s, d - q / 2); A.c = c; A.w = w; } }   // (on a stepped clock the reading sits anywhere in a step: half a step too high on average)
+// The clock's own step: a clock that moves in whole buffers stands still for most ticks and then moves by one buffer, so its drift
+// swings by that much with nothing wrong. Measured from the ticks (25 ms apart): when a fifth or more saw no movement, the step
+// is the median of the movements; 0 for a clock that moves smoothly. (Found in the headless check: a 0.2 s step against a 0.12 s
+// threshold held every step, and the song stood still.) The leap threshold is never under 1.3 steps.
+function rsStep(c, w){
+  const Q = PB.rsQ || (PB.rsQ = {c:null, w:0, z:[], m:[], q:0});
+  if (Q.c == null){ Q.c = c; Q.w = w; return 0; }
+  if (w - Q.w < 0.015) return Q.q;
+  const dc = c - Q.c; Q.c = c; Q.w = w;
+  Q.z.push(dc < 0.0005 ? 1 : 0); if (Q.z.length > 40) Q.z.shift(); if (dc >= 0.0005){ Q.m.push(dc); if (Q.m.length > 24) Q.m.shift(); }
+  if (Q.z.length < 16 || Q.m.length < 3 || Q.z.reduce((a, b) => a + b, 0) < Q.z.length * 0.2) return Q.q = 0;
+  return Q.q = Q.m.slice().sort((a, b) => a - b)[Q.m.length >> 1]; }
+// Everything that holds a time on the audio clock for the song moves on by d, as the moved-on rule does for the sequencer. Not the
+// notes already booked (tp.q, the voices, MIDI sent): they were given to the engine.
+function rsHold(s, d){
+  s.base += d; s.time += d; if (s.btT != null) s.btT += d;
+  tp.t0 += d; if (tp.st) tp.st += d; stgT0 += d;   // LEFT timer, step flash, the stage's beat
+  if (mx.beat) mx.beat = Object.assign({}, mx.beat, {t:mx.beat.t + d}); if (mx.t0 != null) mx.t0 += d;   // the beat clock: metronome, MIDI LFOs
+  for (const L of mx.lfo) if (L){ if (L.t != null) L.t += d; L.trig = L.trig.map(x => x + d); }
+  for (const P of mx.pend) if (P) for (const x of P){ x.t += d; if (isFinite(x.end)) x.end += d; }   // ARP returns
+  for (const r of mx.ccr){ r.t0 += d; r.t1 += d; r.at += d; } for (const x of mx.echo) x.t += d;
+  tp.rsUntil = performance.now() + 4000;   // a short look-ahead for a few seconds, even hidden
+  const P = PB.pg; if (P){ P.rs++; P.rsS += d; }
+  const nw = performance.now(); if (nw - (PB.rsLogT || 0) > 1000){ PB.rsLogT = nw; pbLog(`held the song: audio clock leapt +${d.toFixed(2)} s`); } }
 // One pump tick. An error here used to repeat every 25 ms with the screen showing PLAYING over silence; pump() stops.
 function pumpRun(){
   if (!tp.on) return;
   if (tp.stopAt != null && ctx.currentTime >= tp.stopAt - 0.005) return tStop();   // EXACT STOP: its time has come
   if (tp.core) return corePump();   // THUNDER CORE: the audio thread steps the song; this tick only books MIDI clock, LFOs, clicks
   audioWake = performance.now();
-  { const P = PB.pg || (PB.pg = {n:0, gap:0, lead:9, re:0, skip:0, w:0}), w = Date.now() / 1000; if (P.w){ P.gap = Math.max(P.gap, w - P.w); if (w - P.w > 0.4) pbLog(`stall ${(w - P.w).toFixed(2)} s · last touch or key ${((performance.now() - workT) / 1000).toFixed(1)} s ago · ${tv} ${apF || ''} · ` + pbState()); } P.w = w; P.n++; if (tp.seq.alive()) P.lead = Math.min(P.lead, tp.seq.time - ctx.currentTime); }
+  { const P = PB.pg || (PB.pg = {n:0, gap:0, lead:9, re:0, skip:0, rs:0, rsS:0, w:0}), w = Date.now() / 1000; if (P.w){ P.gap = Math.max(P.gap, w - P.w); if (w - P.w > 0.4) pbLog(`stall ${(w - P.w).toFixed(2)} s · last touch or key ${((performance.now() - workT) / 1000).toFixed(1)} s ago · ${tv} ${apF || ''} · ` + pbState()); } P.w = w; P.n++; if (tp.seq.alive()) P.lead = Math.min(P.lead, tp.seq.time - ctx.currentTime); }
   if ((view !== 'tracker' || document.hidden) && tp.q.length > 96) tp.q.splice(0, tp.q.length - 96);   // nothing drains the play positions while the synth is open (or the app is hidden: no frames)
   const s = tp.seq; let n = 0;
   // The page was stopped for a while (a frozen tab, a long pause, a system dialog): rather than playing every row
   // missed in that time at once, move the timeline on so the song continues from where it was.
   // On a touch screen it moves on sooner (8 Nov): a stall of 0.7 s played nine overdue notes at once, heard as the song rushing and clicking. Not while hidden: the system runs a hidden page in bursts, and each move would be a gap.
   const outLat = Math.min(0.6, (ctx.baseLatency || 0) + (ctx.outputLatency || 0));   // (9 Nov, owner: Safest stuttered most) the audio clock moves in steps of the output buffer: under Safest one step passed 0.15 s, so a healthy song kept being moved on, and a 0.25 s lead was thin
-  if (s.alive() && s.time < ctx.currentTime - (COARSE && !document.hidden ? Math.max(0.15, outLat + 0.05) : 0.5) && s.base != null){ const d = ctx.currentTime + 0.08 - s.time; if (PB.pg){ PB.pg.re++; PB.pg.skip += d; } s.base += d; s.time += d; if (s.btT != null) s.btT += d; }
+  // 10 Nov, HOLD THE SONG (see PHONE RESYNC): before the moved-on rule on purpose, which then only sees what a stall left behind.
+  if (RESYNC && s.alive() && s.base != null) rsTick(s, outLat); else PB.rsA = null;
+  if (s.alive() && s.time < ctx.currentTime - (COARSE && !document.hidden ? Math.max(0.15, outLat + 0.05) : 0.5) && s.base != null){ const d = ctx.currentTime + 0.08 - s.time; if (PB.pg){ PB.pg.re++; PB.pg.skip += d; } s.base += d; s.time += d; if (s.btT != null) s.btT += d; if (PB.rsA){ PB.rsA.c = ctx.currentTime; PB.rsA.w = performance.now() / 1000; } }   // (10 Nov: a new baseline for rsTick)
   // Schedule 250 ms ahead, so a busy moment on the UI thread can't make notes late (it was 150 ms on a computer).
   // Tracker edits and mutes reach notes after that; pads, keys, previews and STOP are immediate. With the app in the
   // background (owner, 31 Oct: stutters there) 1.2 s: the system runs a hidden page's thread late and in bursts, and
@@ -21590,7 +21636,7 @@ function pumpRun(){
   // SCREEN OFF (owner, 6 Nov, Fold: "as the screen is turning off, the cpu spikes"): the jump from 0.25 to 1.2 s booked a
   // second of notes (and built their voices) in one tick, just as the phone lowers its clocks. It now grows over about a
   // second (0.75 s of lead per second); coming back, it drops at once as before.
-  const want = document.hidden ? 1.2 : Math.max(0.25, outLat + 0.1), nowP = performance.now(), dtP = tp.aheadT ? Math.min(2, (nowP - tp.aheadT) / 1000) : 0; tp.aheadT = nowP;
+  const want = document.hidden && !(tp.rsUntil > performance.now()) ? 1.2 : Math.max(0.25, outLat + 0.1), nowP = performance.now(), dtP = tp.aheadT ? Math.min(2, (nowP - tp.aheadT) / 1000) : 0; tp.aheadT = nowP;   // (10 Nov: for 4 s after the song was held, the short look-ahead even hidden: less booked ahead of a clock that is leaping)
   const ahead = tp.ahead = want <= (tp.ahead || 0.25) ? want : Math.min(want, (tp.ahead || 0.25) + 0.75 * dtP);
   while (tp.stopAt == null && s.alive() && s.time < ctx.currentTime + ahead && n++ < (document.hidden ? 256 : 64)){
     const r = s.step(); if (rcdGateEdge(r)) break; for (const e of r.evs){ if (moEv(e)) continue; rt.pl.play(e); if (e.type === 'note') padBlink(e); } tp.q.push({t:r.t, pos:r.pos, bpm:s.bpm, tks:r.tks, line:r.line}); rcdStep(tp.q[tp.q.length - 1]);
@@ -21757,7 +21803,7 @@ const PB = {handT0:0, handW:0, ck:null, ckBad:0, stopT:0, log:[], n:0, late:0, d
 function pbLog(s){ try { PB.log.push((performance.now() / 1000).toFixed(2) + ' ' + s); if (PB.log.length > 400) PB.log.splice(0, 100); } catch(e){} }
 const pbState = () => `ctx ${ctx ? ctx.state + ' t=' + ctx.currentTime.toFixed(2) : '-'} on=${tp.on ? 1 : 0} core=${tp.core ? 1 : 0} seq=${aset.core} hidden=${document.hidden ? 1 : 0} wall=${(Date.now() / 1000 % 100000).toFixed(2)}`;
 // BACKGROUND TIMING (8 Nov): how the Page sequencer's tick fared since the screen last changed: the longest wait between ticks (wall clock), how close the song came to running out, and any jumps forward
-const pbPg = () => { const P = PB.pg; PB.pg = null; return P ? ` · page ticks ${P.n}, longest gap ${P.gap.toFixed(2)} s, least lead ${P.lead.toFixed(2)} s, moved on ${P.re}× (${P.skip.toFixed(2)} s)` : ''; };
+const pbPg = () => { const P = PB.pg; PB.pg = null; return P ? ` · page ticks ${P.n}, longest gap ${P.gap.toFixed(2)} s, least lead ${P.lead.toFixed(2)} s, moved on ${P.re}× (${P.skip.toFixed(2)} s), held ${P.rs || 0}× (${(P.rsS || 0).toFixed(2)} s)` : ''; };
 // (10 Nov: the 529 report showed the clock racing with the song stopped and the screen off, where this log had already gone quiet.
 // It now also runs while the app is hidden with the engine running, and for 10 s after it comes back.)
 function pbCkOn(){ if (!ctx) return false; const n = performance.now(); return tp.on || n - PB.stopT <= 5000 || (ctx.state === 'running' && (document.hidden || n - (PB.visT || -1e9) <= 10000)); }
@@ -21942,7 +21988,7 @@ function tStop(quiet){
   // STOP CURSOR: a STOP you make (not a restart, a song change or the song running out while hidden) puts the cursor there
   const stopP = !quiet && stopToPlayhead() && tp.on && tp.pos && tp.pos.some(Boolean) ? {P:tp.pos.map(q => q && Object.assign({}, q)), mode:tp.mode} : null;
   const home = !quiet && tp.on && !stopToPlayhead() ? fpHome : null;   // (9 Nov, owner: with ON STOP at STAYS it still ended up at the playback spot: FOLLOW had carried it there)
-  tp.timer = 0; tp.on = false; fpMem = null; fpHome = null; tp.q = []; tp.pos = null; tp.snd = null; tp.stopAt = null; tp.ahead = tp.aheadT = 0;
+  tp.timer = 0; tp.on = false; fpMem = null; fpHome = null; tp.q = []; tp.pos = null; tp.snd = null; tp.stopAt = null; tp.ahead = tp.aheadT = 0; tp.rsUntil = 0; PB.rsA = null;
   // HAND-OVER (seqHandover): the core and the voices already booked keep sounding until the page sequencer's first step
   if (tp.core){ tp.core = false; core.gen++; if (!handing){ coreWire(false); try { core.node.port.postMessage({op:'stop', at:ctx.currentTime}); } catch(e){} } }
   else if (aset.core === 'core' && !core.ready && ctx) setTimeout(() => { try { if (!tp.on) coreLoad(); } catch(e){} }, 400);
