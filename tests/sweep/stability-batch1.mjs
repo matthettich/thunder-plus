@@ -18,4 +18,23 @@ if (want('F1')){   // PLAY then STOP inside the first-PLAY warm-up must not star
   add('F1 PLAY alone (pressed twice) still starts after the warm-up', r2 === true, String(r2));
   await B.close();
 }
+
+if (want('F2')){   // one event that throws is skipped; a flood still stops the song
+  const A = await fresh();
+  const r = await A.run(`aset.core = 'page'; let n = 0, ok = 0, threw = 0; const o = rt.pl.play; rt.pl.play = function(e){ if (e.type === 'note' && ++n % 3 === 0){ threw++; throw new Error('bad event'); } if (e.type === 'note') ok++; return o.apply(this, arguments); };
+    tStart('song', {row:0}); await new Promise(r => setTimeout(r, 3000)); const on = tp.on, usedCore = !!tp.core; tStop(true); rt.pl.play = o; return {on, usedCore, ok, threw};`);
+  add('F2 page sequencer, every third note throws: the song keeps playing, the others play', r.on && !r.usedCore && r.threw >= 2 && r.ok >= 3, JSON.stringify(r));
+  const r2 = await A.run(`let threw = 0; const o = rt.pl.play; rt.pl.play = function(e){ threw++; throw new Error('broken engine'); };
+    tStart('song', {row:0}); await new Promise(r => setTimeout(r, 3000)); const on = tp.on; tStop(true); rt.pl.play = o; return {on, threw};`);
+  add('F2 page sequencer, every event throws: the song stops as before', r2.on === false, JSON.stringify(r2));
+  // the audio-thread sequencer's batch: a bad event in the middle of a row must not drop the rest of the batch
+  const r3 = await A.run(`aset.core = 'core'; rtInit(); coreLoad(); for (let i = 0; i < 60 && !core.ready; i++) await new Promise(r => setTimeout(r, 100));
+    tStart('song', {row:0}); await new Promise(r => setTimeout(r, 500)); const usedCore = !!tp.core, got = []; const o = rt.pl.play;
+    rt.pl.play = function(e){ if (e.mark === 'bad') throw new Error('bad event'); if (e.mark) { got.push(e.mark); return; } return o.apply(this, arguments); };
+    const t = ctx.currentTime + 0.3, ev = m => ({type:'off', track:0, t, mark:m}); let err = null;
+    try { coreMsg({op:'rows', gen:core.gen, time:t, bpm:S.bpm, tks:6, base:0, btT:0, alive:true, rows:[{t, pos:[], bpm:S.bpm, tks:6, line:0, evs:[ev('a'), ev('bad'), ev('b')]}, {t:t + 0.1, pos:[], bpm:S.bpm, tks:6, line:1, evs:[ev('c')]}]}); } catch(e){ err = e.message; }
+    const on = tp.on; tStop(true); rt.pl.play = o; return {usedCore, on, got, err};`);
+  add('F2 audio-thread sequencer batch: the bad event is skipped, the rest of the batch plays', r3.usedCore && !r3.err && r3.got.join() === 'a,b,c', JSON.stringify(r3));
+  await A.close();
+}
 process.exit(table(rows) ? 1 : 0);
