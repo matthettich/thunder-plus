@@ -730,7 +730,8 @@ body.mlearn .row.mtarget input[type=range]{outline:3px solid var(--pl); outline-
 .ask .askmsg{white-space:pre-wrap; line-height:1.4; font-size:var(--fs-4); color:var(--muted)}
 body.dropping::after{content:''; position:fixed; inset:6px; border:3px dashed var(--ink); border-radius:12px; pointer-events:none; z-index:90; opacity:.5}   /* FILE DROP */
 .pad.droptgt{outline:3px dashed var(--ink); outline-offset:2px}
-#bFile.dirty::before{content:'•'; color:var(--rec, #e0564a); font-weight:800; margin-right:4px}   /* FILE SAFETY: unsaved changes */
+#bFile.dirty::before{content:'•'; color:var(--rec, #e0564a); font-weight:800; margin-right:4px}
+body.mob #bFile.dirty{position:relative} body.mob #bFile.dirty::before{position:absolute; top:1px; right:4px; margin:0; line-height:1}   /* on the phone the dot sits on the corner: inline it widened File and squeezed Tracker | Synth (U10) */   /* FILE SAFETY: unsaved changes */
 /* TRACK NAMES: the colour swatches in the track dialog, and the colour on a named track's number, meter and title */
 .ask .askswatch{display:flex; flex-wrap:wrap; gap:8px; margin:10px 0 4px}
 .ask .askswatch button{width:30px; height:30px; min-height:0; padding:0; border-radius:50%; border:2px solid var(--line); background:var(--sw, transparent)}
@@ -818,7 +819,7 @@ body.dropping::after{content:''; position:fixed; inset:6px; border:3px dashed va
 .welcome h2{margin:0 0 10px; font-size:var(--fs-5)}
 .welcome ol{margin:0; padding-left:1.3em; line-height:1.5; font-size:var(--fs-4)} .welcome li+li{margin-top:6px}
 .welcome kbd{font:inherit; font-weight:600; padding:0 5px; border:1px solid var(--line); border-radius:3px; background:var(--panel)}
-.welcome .wfoot{margin-top:14px; display:flex; justify-content:space-between; align-items:center; gap:10px; font-size:var(--fs-3); color:var(--muted)}
+.welcome .wfoot{margin-top:14px; flex-wrap:wrap; display:flex; justify-content:space-between; align-items:center; gap:10px; font-size:var(--fs-3); color:var(--muted)}
 .welcome .wfoot button{min-height:34px; white-space:nowrap}
 /* The preset browser: a sheet with the categories as rows that open and close (one open at a time), This song and
    Recent first, a search box, ▶ to hear a preset before taking it, Save and Import as buttons. The same sheet
@@ -1000,6 +1001,8 @@ body.dropping::after{content:''; position:fixed; inset:6px; border:3px dashed va
   .dkh{height:32px} .dkh .dkt, .dkh .dkx, .dkh .dksolo{height:28px}
   .dkh .dkx{width:36px}
   .sxmenu button, .askitem, .setmenu button{min-height:40px}
+  .gfile .fitem{min-height:40px}   /* beats .gfile .fitem{min-height:30px} above, which came later in the sheet (U5) */
+  .gfile .fitem kbd:not(.mcar){display:none}   /* no Ctrl+ shortcuts on a touch screen */
   .tarrh{width:32px; left:-16px}
 }
 .mfbar::before{content:''; position:absolute; left:0; right:0; top:-5px; bottom:-5px}   /* an easier grab than 3 px */
@@ -2656,6 +2659,17 @@ body.mob .dogs.idle .bob{animation-iteration-count:9} body.mob .dogs.idle .tail{
 :root[data-skinbase="term"] .tagrid b.f.p, :root[data-skinbase="term"] .tagrid b.f.p[style]{background:transparent; color:var(--mx); box-shadow:inset 0 0 0 2px var(--mx)}
 :root:is([data-skin="rainbow"],[data-skin="rainbowdyn"]) .tagrid b.f.p{background:#fff!important; color:oklch(.45 .16 var(--rbh)); box-shadow:inset 0 0 0 2px oklch(.62 .16 var(--rbh))}
 :root:is([data-skin="rainbow"],[data-skin="rainbowdyn"]) .tagrid b:not(.f){--rbh:calc((var(--ci, 0) + var(--ri, 0)) * 30deg + 10deg + var(--rbo, 0deg)); background:oklch(.94 .03 var(--rbh))}
+/* TOUCH TARGETS (usability audit U4): heights and hit areas only, on a touch screen; the looks stay, desktop is untouched. The Tracker | Synth switch is left alone. */
+@media (pointer:coarse){
+  .top .tsong, .top .tcpu, .ttabs button, #bFile, #bEdit, #bView, #bAud, .top #bSet, .top #bHelp{min-height:40px}
+  .pfav, #tArr .tahd .azb{position:relative}
+  .pfav::before{content:''; position:absolute; left:-4px; right:-4px; top:50%; height:40px; transform:translateY(-50%)}
+  #tArr .tahd .azb::before{content:''; position:absolute; inset:-8px}
+  #tArr .tahd .appin, #apStrip .appin{position:relative}
+  #tArr .tahd .appin::before, #apStrip .appin::before{content:''; position:absolute; left:0; right:0; top:50%; height:40px; transform:translateY(-50%)}
+  .gset label.cb{min-height:40px}
+  .gset :is(#audReset, #audReport){min-height:40px}
+}
 </style>
 <style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}</style>
 <style>
@@ -2928,7 +2942,7 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
       <div class="vrow vttl"><span class="ttl" id="vNum">Pad 1</span><span class="vmeter" id="vMeter" title="Level of what you play here (pads, keys, MIDI), −48 to +6 dB. The line is 0 dB: past it the bar turns red and the safety limiter (Project → LIMITER) is holding the peaks down." aria-hidden="true"><i></i><b></b></span></div>
       <div class="vrow vid"><input id="vName" type="text" aria-label="Pad name" spellcheck="false"><button class="sm play" id="vPlay" title="Play this pad (Space)"><svg class="ic" aria-hidden="true"><use href="#ic-play"/></svg>Play</button></div>
       <div class="vrow vact">
-        <button type="button" id="vPre" class="sm presel" title="Presets: factory sounds and your own, saved in this song.">Presets…</button>
+        <button type="button" id="vPre" class="sm presel" title="Presets: factory sounds and your own, saved in this song.">Pad presets…</button>
         <span class="grp" role="group" aria-label="Make"><button class="sm" id="vRand">Random</button><button class="sm" id="vInit">Init</button></span>
         <span class="grp" role="group" aria-label="Clipboard"><button class="sm" id="vCopy">Copy</button><button class="sm" id="vPaste">Paste</button></span>
       </div>
@@ -11294,7 +11308,7 @@ function preStep(kind, d){
 }
 function preLabels(){
   for (const [id, kind] of [['bassPre', 'bass'], ['blipPre', 'blip'], ['voxPre', 'vox'], ['xPre', 'x']]){ const b = $(id + 'Btn'); if (!b) continue;
-    const [L] = preSpec(kind), i = preAt.get(preKey(kind)), t = i != null && L[i] ? L[i][0] : 'Presets…'; if (b.textContent !== t){ b.textContent = t; b.title = i != null ? 'Preset: ' + t + ' (tap for the list)' : 'Presets for this engine'; } }
+    const [L] = preSpec(kind), i = preAt.get(preKey(kind)), t = i != null && L[i] ? L[i][0] : 'Engine presets…'; if (b.textContent !== t){ b.textContent = t; b.title = i != null ? 'Preset: ' + t + ' (tap for the list)' : 'Presets for this engine'; } }
 }
 let pbOpen = null, pbPreview = null;
 function stopPreview(){ if (pbPreview){ try { pbPreview.stop(); } catch(e){} pbPreview = null; } }
@@ -11366,7 +11380,7 @@ function presetSheet(kind){
   // under the finger, so the sheet took a preset and closed at once — the Piano / EP / Organ lists are tall enough to
   // reach the card header.)
   if (ENGINE_PRESET_SHEET) for (const [id, kind] of [['bassPre', 'bass'], ['blipPre', 'blip'], ['voxPre', 'vox'], ['xPre', 'x']]){ const sel = $(id); if (!sel) continue;
-    const b = el('button', 'sm presel engpre', 'Presets…'); b.type = 'button'; b.id = id + 'Btn'; b.title = 'Presets for this engine'; b.setAttribute('aria-haspopup', 'dialog');
+    const b = el('button', 'sm presel engpre', 'Engine presets…'); b.type = 'button'; b.id = id + 'Btn'; b.title = 'Presets for this engine'; b.setAttribute('aria-haspopup', 'dialog');
     sel.hidden = true; b.addEventListener('click', () => presetSheet(kind));
     // PRESET STEP (owner, 24 Oct): ◀ ▶ either side step through this engine's presets (wrapping), as the engine's ◀ ▶ do
     const arr = (d, t, lab) => { const a = el('button', 'sm engstep', t); a.type = 'button'; a.title = lab; a.setAttribute('aria-label', lab); a.addEventListener('click', () => preStep(kind, d)); return a; };
@@ -13751,6 +13765,8 @@ function fileItems(){
   return [
     // MENUS (owner, 31 Oct: things in the right place): with the Edit menu on screen, Undo / Redo and Phrases… are there
     // only; a phone has no Edit menu, so they stay here
+    // HELP when folded: the top bar's ? is hidden at 480 px and under, so Help is the first row here (usability audit U1)
+    ...(window.matchMedia && matchMedia('(max-width:480px)').matches ? [{l:'Help & keys', f:() => showHelp()}] : []),
     ...(ed ? [] : [{h:'Edit'}, {l:'Undo', k:K('mod+Z'), f:() => undoStep(-1), off:!undo.past.length && !vUndo.t.some(Boolean)}, {l:'Redo', k:K('mod+shift+Z'), f:() => undoStep(1), off:!undo.future.length}, {l:'Phrases… (find ones not on the song)', f:() => phlOpen(true)}]),
     {h:'Project'},
     {l:'New song', k:K('mod+N'), f:newSong, ask:'song'},
@@ -25453,6 +25469,8 @@ function toggleBlockMute(y, t){
 let instViaTrk = false;   // Inst was opened from Song, Sect or Phrase (go: Mixer and FX then follow the song track)
 function go(v){
   fxpClose();
+  // FX opens with the cursor on SLOT 1, where EDIT adds an effect (it did nothing on the TRACK row; usability audit U2). A cursor the user moved stays.
+  if (v === 'fx' && tv !== 'fx' && cs.fx.y === 0) cs.fx.y = 1;
   if (v === 'sect' && !sectsOn) v = 'phrase';
   // Opening a phrase from the Song screen always resolves to that block's own phrase, whether the SECT page
   // is shown or hidden: an empty block gets its phrase made first, so you never land on the previous phrase.
