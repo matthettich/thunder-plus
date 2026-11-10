@@ -1303,7 +1303,7 @@ body.mob .top #tLen{min-height:34px; padding:0 8px; align-self:auto}
 #tSong.on .tl.alt{visibility:visible}
 .tcpu{border:0; border-left:1px solid var(--line); min-height:36px; padding:0 10px; font-size:var(--fs-3); font-weight:600; letter-spacing:.04em; flex:none; white-space:nowrap;
   font-variant-numeric:tabular-nums; position:relative; min-width:84px; text-align:left; background:var(--ttl)}
-.tcpu i{position:absolute; left:0; bottom:0; height:4px; width:0; background:var(--ink); transition:width .3s}
+.tcpu i{position:absolute; left:0; bottom:0; height:4px; width:0; background:var(--ink)}
 .tcpu.warn i{background:var(--pl)}
 .tcpu.hot{color:var(--rec)} .tcpu.hot i{background:var(--rec)}
 .tpad{display:flex; justify-content:space-between; align-items:center; gap:16px; flex:1}
@@ -31008,12 +31008,17 @@ function cpuMeter(){
   const b = $('tCpu'); if (!b) return;
   const fx = fxLoads().reduce((a, x) => a + x[1], 0), cap = cpu.cap && now - cpu.cap.t < 3000 ? cpu.cap : null, pr = cpu.probe && now - cpu.probe.t < 1500 ? cpu.probe : null;
   const v = !ctx ? null : cap ? cap.avg : pr ? pr.load : fx;
-  { const sp = b.querySelector('span'); let w = sp.querySelector('.cpuw'); if (!w){ w = document.createElement('em'); w.className = 'cpuw'; w.textContent = 'CPU '; } sp.textContent = v == null ? '0%' : Math.round(v * 100) + '%'; sp.prepend(w); b.title = 'Audio load (CPU) · click for details'; }   // the "CPU " word hides on the cover screen
-  b.querySelector('i').style.width = v == null ? '0' : Math.min(100, v * 100).toFixed(0) + '%';
+  const txt = v == null ? '0%' : Math.round(v * 100) + '%', wid = v == null ? '0' : Math.min(100, v * 100).toFixed(0) + '%';
   const drop = now - glitch.t < 3000;   // a dropout in the last 3 s turns the meter red
-  b.classList.toggle('warn', v != null && v > 0.5); b.classList.toggle('hot', v != null && (v > 0.8 || (cap && cap.under > 0) || drop));
-  b.title = (cap ? 'Whole audio engine (Chrome’s render capacity), not just the effects.' : pr ? 'Whole audio engine: how much of the available time it uses for every sound, effect and voice. Over 100% means it can’t keep up.' : 'The time the audio engine’s own processing takes: track and master effects, chains and bass voices (this browser doesn’t report the total audio load).')
+  const warn = v != null && v > 0.5, hot = v != null && (v > 0.8 || (cap && cap.under > 0) || drop);
+  const ttl = (cap ? 'Whole audio engine (Chrome’s render capacity), not just the effects.' : pr ? 'Whole audio engine: how much of the available time it uses for every sound, effect and voice. Over 100% means it can’t keep up.' : 'The time the audio engine’s own processing takes: track and master effects, chains and bass voices (this browser doesn’t report the total audio load).')
     + (glitch.n ? ' Dropouts since the sound started: ' + glitch.n + '.' : '');
+  // BATTERY: touch the DOM only when something shown changed (a rewrite every 500 ms kept the page restyling while idle)
+  const key = txt + '|' + wid + '|' + warn + '|' + hot + '|' + ttl; if (b._cpuKey === key) return; b._cpuKey = key;
+  const sp = b.querySelector('span'); let w = sp.querySelector('.cpuw'); if (!w){ w = document.createElement('em'); w.className = 'cpuw'; w.textContent = 'CPU '; }
+  sp.textContent = txt; sp.prepend(w);   // the "CPU " word hides on the cover screen
+  b.querySelector('i').style.width = wid;
+  b.classList.toggle('warn', warn); b.classList.toggle('hot', hot); b.title = ttl;
 }
 idleTick(() => { if (view !== 'tracker' && !document.hidden) cpuMeter(); }, 500, () => view !== 'tracker' && !document.hidden, 2000);   // BATTERY: the tracker's own frame loop updates it there
 // chains screen meters: sample each routed track's chains return and push it into the frame.
