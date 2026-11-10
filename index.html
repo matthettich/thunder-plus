@@ -226,7 +226,7 @@ input[type=range].wheelon, [data-wheel].wheelon{outline:2px solid var(--ink); ou
 .gset .mclk{flex-wrap:nowrap} .gset .mclk select{flex:1 1 90px; min-width:0}
 .gset .mmap{display:flex; gap:6px; flex-wrap:wrap} .gset .mmap button{flex:none}
 .gset .audfoot{gap:8px; flex-wrap:wrap; justify-content:flex-end; margin-top:6px; padding-top:8px; border-top:1px solid var(--track)}
-#pAudio .audfoot :is(#audReset, #audReport){min-height:26px; padding:0 8px; font-size:var(--fs-2); color:var(--muted)}
+#pAudio .audfoot :is(#audReset, #audReport, #audDefaults){min-height:26px; padding:0 8px; font-size:var(--fs-2); color:var(--muted)}
 @media (pointer:coarse){ .gset input.mck{width:26px; height:26px} .gset input.mck:checked::after{left:8px; top:3px; width:6px; height:12px} .gset input.msw1{width:44px; height:26px} .gset input.msw1::before{width:18px; height:18px} .gset input.msw1:checked::before{transform:translateX(18px)} }
 @media (max-width:420px){ .gset .mports.mtab{grid-template-columns:22px minmax(0,1fr) auto 40px; gap:6px} .gset .mports.mtab .mlat input{width:46px} .gset .mports.mtab .mph{letter-spacing:.04em} .gset .mports.mtab .mph:first-child{visibility:hidden} .gset .mclkh{margin-left:28px}
   .gset .audrow:has(.mch) select:not(.mch){flex:1 1 0} .gset .audrow select.mch{flex:0 0 112px} #gset #pMidi :is(.audrow, .mports) select{padding:0 0 0 6px} #gset #pMidi .audrow select.mch{flex-basis:118px} .gset .mclk .mclkf{display:none} }
@@ -257,7 +257,7 @@ input[type=range].wheelon, [data-wheel].wheelon{outline:2px solid var(--ink); ou
 .gset label.cb{font-size:var(--fs-3)}
 .gset .setbuildL{margin-left:auto; font-variant-numeric:tabular-nums}
 .gset .audrow:has(.mch){flex-wrap:nowrap} .gset .audrow:has(.mch) select:not(.mch){flex:1 1 90px} .gset .audrow select.mch{flex:0 0 120px}
-.gset :is(#audReset, #audReport){font-size:var(--fs-3)}
+.gset :is(#audReset, #audReport, #audDefaults){font-size:var(--fs-3)}
 /* two levels: the panel's title (Project, Screen) plain and larger; its sections (Audio, Song, Mastering…) small caps on a rule */
 .gset .sethead{font:700 var(--fs-4)/1.2 var(--font, inherit); letter-spacing:0; text-transform:none; border:0; margin:2px 0 4px; padding:0}
 /* every row's label alike: muted, regular weight (it was bold on some rows, muted on others) */
@@ -308,11 +308,11 @@ input[type=range].wheelon, [data-wheel].wheelon{outline:2px solid var(--ink); ou
 .gset .tsec .band, .gset .tsec .band.grey{padding:0}
 .gset .tsr input[type=range]{flex:1 1 60px; min-width:50px}
 .gset .tsr .tsc output{min-width:0}
-.gset :is(#audReset, #audReport){min-height:30px; padding:0 10px}
+.gset :is(#audReset, #audReport, #audDefaults){min-height:30px; padding:0 10px}
 .gset .tsr.sbtn > button:hover, .gset #bMst:hover{background:var(--panel2)}
 .gset #pMaster .btnrow{display:block}
 /* action buttons (Test sound, Reset audio engine, Check for update…) all one size */
-.gset :is(#audReset, #audReport){font-size:var(--fs-3)}
+.gset :is(#audReset, #audReport, #audDefaults){font-size:var(--fs-3)}
 .gset .btnrow{gap:6px; align-items:center}
 .gset #storeInfo{flex:1 1 100%; font-size:var(--fs-3); color:var(--muted); line-height:1.4}
 @media (pointer:coarse){ .gset .tsr.sbtn > button, .gset #bMst{min-height:46px} .gset label.cb{min-height:38px} .gset label.cb input[type=checkbox]{width:42px; height:24px} .gset label.cb input[type=checkbox]::before{width:16px; height:16px} .gset label.cb input[type=checkbox]:checked::before{transform:translateX(18px)} }
@@ -434,7 +434,7 @@ body:not(.nowv) .wvMobNote{display:none}
 :is(#pAudio,#pMidi) :is(.segrow,.audrow)>span:first-child{width:96px; white-space:nowrap}
 #pAudio .audrow select#audOut{flex-basis:150px}
 #pAudio .btnrow:has(#audReset) > .lbl{display:none}
-#pAudio :is(#audReset, #audReport){min-height:30px; padding:0 10px; font-size:var(--fs-3)}   /* (MENU PASS 2: the same size as Test sound) */
+#pAudio :is(#audReset, #audReport, #audDefaults){min-height:30px; padding:0 10px; font-size:var(--fs-3)}   /* (MENU PASS 2: the same size as Test sound) */
 :is(#pAudio,#pMidi) .audrow .mlat input{width:52px}
 /* GEAR DELAY (owner, 7 Nov: a negative delay's − or digits were cut off): room for −50 and the number spinner, everywhere it shows */
 .mlat input[type=number]{width:74px!important; min-width:74px; box-sizing:border-box; text-align:right}
@@ -2673,7 +2673,7 @@ body.mob .dogs.idle .bob{animation-iteration-count:9} body.mob .dogs.idle .tail{
   #tArr .tahd .appin, #apStrip .appin{position:relative}
   #tArr .tahd .appin::before, #apStrip .appin::before{content:''; position:absolute; left:0; right:0; top:50%; height:40px; transform:translateY(-50%)}
   .gset label.cb{min-height:40px}
-  .gset :is(#audReset, #audReport){min-height:40px}
+  .gset :is(#audReset, #audReport, #audDefaults){min-height:40px}
 }
 </style>
 <style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}</style>
@@ -2938,7 +2938,7 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
       <div class="segrow" id="coreRow" title="Where the song is sequenced. Audio thread: the steps are worked out on the audio thread and rendered pads play there, so a busy screen can’t make them late. Page: as before. On a phone or tablet it plays on the Page unless you pick Audio thread here, because loading it can slow the phone’s audio clock."><span>Sequencer</span><div class="seg" id="segCore"></div></div>
       <div class="segrow" id="noWkRow" title="For testing a phone whose audio clock runs fast. Off (test): track effects, chains, live engines and the audio-thread sequencer are silent or unused, and the safety limiter uses its simpler stand-in. Changes when the app reloads."><span>Worklets</span><div class="seg" id="segNoWk"></div></div>
       <div class="btnrow" id="audRestartRow" hidden><span class="lbl">Takes effect when audio restarts (the app reloads; your song and kit are kept)</span><button id="audRestart" class="on">Apply (reload)</button></div>
-      <div class="audrow audfoot"><button class="sm" id="audReset" title="Clears stuck notes and effects: stops playback and rebuilds every sound and effect from scratch. Your song and kit are untouched.">Reset audio engine</button> <button class="sm" id="audReport" title="Copies a short playback log (screen on or off, sequencer state, how late the rows came, what still sounded after STOP) to paste into a bug report.">Copy playback report</button></div>
+      <div class="audrow audfoot"><button class="sm" id="audReset" title="Clears stuck notes and effects: stops playback and rebuilds every sound and effect from scratch. Your song and kit are untouched.">Reset audio engine</button> <button class="sm" id="audReport" title="Copies a short playback log (screen on or off, sequencer state, how late the rows came, what still sounded after STOP) to paste into a bug report.">Copy playback report</button> <button class="sm" id="audDefaults" title="Puts every audio setting on this device back to its default: Latency, Rate, Latency comp, Live engines, Sequencer, Worklets, Keep screen on, Background play and Low power display. Songs, kits and your MIDI setup are kept.">Reset audio settings</button></div>
     </div>
   </section>
 
@@ -8294,6 +8294,10 @@ function wkHook(){   // a module has loaded on a phone: the context is on the se
   for (const f of [...safeLims]) try { f._up(); } catch(e){}
 }
 function asetSave(){ try { localStorage.setItem(AUK, JSON.stringify(aset)); } catch(e){} }
+// RESET AUDIO SETTINGS (10 Nov, owner: "reset any testing settings"): the defaults of Settings → Audio's saved fields, in one place. A field
+// with no default of its own (latPick, corePick, noWk) is removed, which is how the loaders read "default". Output, level, MIDI, input engines,
+// Link and the playhead offset are the owner's setup, not tests, so they are not here. Used by the Reset audio settings button.
+function audResetAset(a){ a.lat = 'interactive'; a.rate = 0; a.pdc = false; a.psLive = 'auto'; a.core = 'core'; delete a.latPick; delete a.corePick; delete a.noWk; return a; }
 const psLive = {off:false, strikes:0};   // …PUMP SYNTHS live: the safety net's switch for this visit (see psFallback)
 let aLive = null; // the latency and rate the running context was made with
 
@@ -14092,6 +14096,24 @@ function psLiveNote(){
 psLiveNote();
 $('audRestart').addEventListener('click', () => { try { save(); } catch(e){ tpLog('save before restart failed', e); } applyUpdate(); });
 $('audReset').addEventListener('click', () => resetAudio());
+// RESET AUDIO SETTINGS: every per-device audio switch back to its default (the per-device ones outside aset: Keep screen on, Background play, Low power
+// display). If Latency, Rate or Worklets then differ from what the running audio was made with, it reloads exactly as Apply (reload) does (the song is
+// saved first); otherwise it re-applies in place.
+$('audDefaults').addEventListener('click', async () => {
+  if (!await askYes({title:'Reset audio settings', body:'Put every audio setting back to its default? Songs, kits and your MIDI setup are kept.'}, 'Reset')) return;
+  const hadCore = coreWanted();
+  audResetAset(aset); asetSave();
+  try { setWlOn(true); setBgOn(true); if (lpOn) setLowPower(false); } catch(e){ tpLog('reset audio: screen / background / low power failed', e); }
+  if ((ctx && aLive && (aLive.lat !== latOf() || aLive.rate !== aset.rate)) || NOWK !== !!aset.noWk){
+    try { save(); } catch(e){ tpLog('save before restart failed', e); } applyUpdate(); return; }
+  psLive.off = false; psLive.strikes = 0;
+  try { if (rt && rt.pl){ rt.pl.pdcSync(); } } catch(e){}
+  try { if (ctx && coreWanted() && !hadCore) coreLoad(); } catch(e){}
+  try { $('ckWake').checked = !!wlOn; $('ckBgPlay').checked = !!bgOn; } catch(e){}
+  for (const u of [updLat, updPdc, updARate, updPsLive, updCore, updNoWk]) try { u(); } catch(e){}
+  psLiveNote(); audRestartRow(); try { draw(); } catch(e){}
+  toast('Audio settings are back to their defaults.');
+});
 $('audReport').addEventListener('click', () => pbCopy());
 if (navigator.mediaDevices && navigator.mediaDevices.addEventListener) navigator.mediaDevices.addEventListener('devicechange', () => { if (!$('pAudio').hidden) audRefresh(); });
 /* ---------- skins (the Seeds set) ---------- */
