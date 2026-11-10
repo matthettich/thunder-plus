@@ -256,7 +256,7 @@ test('bands: an LFO on band 3\'s frequency moves only that parameter; two LFOs o
   S.perf.lfo[2] = [{ id: `fx:2:0:${fr}:2`, sh: 0, rt: 5, dp: 200 }];
   withSong(S);
   const evs = play(NEW(), S).filter(e => e.type === 'fxp');
-  assert.equal(evs.length, 32); evs.forEach(e => { assert.equal(e.pi, fr); assert.equal(e.b, 2); assert.equal(e.track, 2); assert.equal(e.slot, 0); });
+  assert.equal(evs.length, 64, 'renders use 4 points a step like live since build 556'); evs.forEach(e => { assert.equal(e.pi, fr); assert.equal(e.b, 2); assert.equal(e.track, 2); assert.equal(e.slot, 0); });
   // the core: the delivered list differs from the slot's own at b3_freq only
   const C = loadCore(H.read('core/seq-core.js'), coreTfx()); C.__S = JSON.parse(JSON.stringify(S)); vm.runInContext('S = __S;', C);
   const queued = []; C.__out = queued; vm.runInContext('tcAt = (proc, at, msg) => globalThis.__out.push([at, msg]);', C);

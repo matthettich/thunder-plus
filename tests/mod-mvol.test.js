@@ -46,7 +46,7 @@ test('tgtList: vol:MT is listed for the master only, as "VOL · master out"; it 
   const id = 'vol:' + MT, M = run('tgtList(MT)');
   assert.deepEqual(JSON.parse(JSON.stringify(M.filter(([i]) => i === id))), [[id, 'VOL · master out']]);
   for (let t = 0; t < NT; t++) assert.ok(!run(`tgtList(${t})`).some(([i]) => i === id), 'track ' + t + ' does not list the master');
-  assert.ok(run(`tgtOk('${id}')`)); assert.deepEqual(JSON.parse(JSON.stringify(run(`tgtParse('${id}')`))), { k: 'vol', t: MT, s: -1, p: -1 });
+  assert.ok(run(`tgtOk('${id}')`)); assert.deepEqual(JSON.parse(JSON.stringify(run(`tgtParse('${id}')`))), { k: 'vol', t: MT, s: -1, p: -1, b: null });   // (b: the optional band part of a banded pump target, build 556)
   assert.equal(run(`tgtLabel('${id}')`), 'MASTER · VOL (master out)'); assert.equal(run(`tgtLabel('${id}', true)`), 'VOL (master out)');
   assert.equal(run(`tgtOwn('${id}')`), 77, 'the fader\'s own byte (S.mout)');
   delete PAGE.S.mout; assert.equal(run(`tgtOwn('${id}')`), 255, 'a song with no mout: FF');

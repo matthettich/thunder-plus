@@ -582,6 +582,13 @@ The owner's top priority to add is the MOD screen. Work down the list; ask befor
 
 Start a session by asking for results. Fix on `beta`. Web beta: https://matthettich.github.io/thunder-plus/beta/ (build 547 as of 10 Nov morning, 548 once its PR merges; the night of 9–10 Nov shipped 544–547, see the four "10 Nov" entries below. Decisions the lead made that night for the owner to confirm or reverse: on a phone the saved Sequencer default plays on the Page unless Audio thread is picked on that device; on a phone the safety limiter is its stand-in until another worklet loads; the resync only runs with a worklet loaded and its margins are untested on a device). Desktop: v1.3.4-beta.2 (build 541, no feed view or scopes); further desktop betas on hold until the owner asks.
 
+**Build 556**
+- [ ] **MOD on a …pump EQ band:** select a band in a pump EQ, right-click its FREQ (or GAIN) › Add LFO…: that band sweeps, the others stay; a second LFO on another band works at the same time. The MOD screen lists only bands in use ("FX1 pEQ · B3 FREQ"). Same for BAND / WIDE / HEAT.
+- [ ] **Add LFO… inside a …pump window:** right-click a knob in the window: the entry is there (not on switches / choices) and the window closes after adding: is closing right?
+- [ ] **MOD on the master out:** on the master, the last target is VOL · master out: the whole mix swells and dips, the limiter is not pushed harder, and the OUT fader reads what you set after STOP.
+- [ ] **Renders vs live:** a rendered song with fast LFOs sounds like it did live (renders used half the LFO resolution before).
+- [ ] **Smoothing check (decides whether it gets built):** an LFO at 1/16 or 1/32 on a built-in effect's filter cutoff, and on a delay time or pitch parameter: acceptable, or a staircase?
+
 **Build 555 (live synths: commands and MOD on a held note)**
 - [ ] **CUT on a held live note:** a long bass (or acid / machine) note with `CUT 30` on its row and `CUT FF` a bar later: it goes dark and opens again without retriggering. `RES`, `ATK`, `DEC`, `REL` likewise (acid has a fixed attack; vox: CUT acts on brightness, only ATK / REL otherwise; …pump kits and fold are untouched).
 - [ ] **MOD on a live synth:** on a track playing a live synth, the TARGET list has CUT, RES, DEC, ENV, ATK, SUS, REL. An LFO on CUT sweeps the held note up and down around the knob; try ENV and SUS. Steppy or clicky at fast rates? (Listen on the track, not for tiny movements under heavy master limiting.)
@@ -724,6 +731,14 @@ Suggested order: N0 → N1 → N2 (phone cured) → N4 with N3 alongside → N5 
   the edge `R.t0`, "waiting…" while armed), `rcdClk` / `rcdFmt` / `rcdFreeSecs`, a 250 ms timer only while recording; the
   final length stays until the next take. recorder-check covers FREE, PATTERN, Stop, next take and closing mid-take.
 
+
+## 10 Nov (afternoon): MOD: pump bands, pump windows, master out, render parity (build 556)
+
+- **Per-band pump targets.** The lead's format decision: a banded row's id carries the band as an optional fifth part, `fx:t:s:p:b` (0-based; four-part ids unchanged). Bands are fixed in number (EQ 24, BAND / WIDE / HEAT 4; none can be added or removed), stored as `f.pump['b3_freq']` (1-based in the symbol). Band rows carry `q.lfo` and `q.pb` (each band's parameter index); `tgtOk` / `tgtParse` (`b`) / `tgtFx` / `tgtList` (only bands in use: `tgtBandOn`) / `tgtLabel` / `tgtOwn` / `tgtEvs` (`b` on the event) / `fxpTo`; `pumpPv` overrides keyed by the band's symbol; the core's `fxp` branch takes `ev.b` (`coreTfx` sends `pb`). Add LFO… on a band row targets the selected band (`tgtRowId`).
+- **Add LFO… in the pump windows:** one shared right-click menu in `pump/ui/kit.js` (`?v=10`), `PumpFX.lfoId` / `PumpFX.addLfo` in index.html; closes the window after adding; no `~` mark in the windows (would need every control's draw code).
+- **Master out target `vol:MT`:** the OUT fader (`S.mout`, gain node `rt.mo`, after the limiter; `S.master` is the drive and is not touched). New `mout` event (the existing `mvol` moves the drive): page `setTargetAtTime(curve(v), t, 0.004)`; core `mixEv` / `mixOut` on a new output NT + 4 plugged into `rt.mo.gain` (`coreLoad` makes NT + 5 outputs; `tools/flex-check.mjs` and `tools/sampler-check.mjs` still build NT + 4: guarded, not run). `resetSeq` restores `curve(S.mout)`.
+- **Render parity:** measured in headless Chrome (16 bars, four effect LFOs): 2 points a step 3.6 s / 511 suspends, 4 points 3.9 s / 1023 (+8 %), so renders now use 4 like live for every target kind (`LFO_PTS_LIVE`, `LFO_PTS_RENDER_FX`, `LFO_PTS_RENDER_PARAM`, `lfoPts`). A render with 1 tick a step gives 1 point (was 2).
+- Two Sonnet agents; the lead merged the two (three conflicts in `tgtLabel` / `tgtList` / `CORE_REV`, core regenerated). **MOD still open:** smoothing (the owner: steps are fine except pitch and sometimes filters; he will listen: see the punch list; the lead's plan if needed: the effect host ramps a modulated value toward its next point per block, scoped to pitch / cutoff-type parameters).
 
 ## 10 Nov (afternoon): commands and MOD on the live engines (build 555)
 
