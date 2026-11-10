@@ -16924,7 +16924,9 @@ let plFailed = false;
   // …PUMP SYNTHS: pump/synth/pump-synth.wasm, compiled here and handed to the render Worker (as LXR's is)
   const psP = typeof PsynCore !== 'undefined' ? PsynCore.load('pump/synth/pump-synth.wasm?v=7').catch(e => { tpLog('pump synths wasm (the pump engines will be silent)', e); return null; }) : Promise.resolve(null);
   // …PUMP: the pump mastering effects (pump/pump.wasm), fetched alongside; effect nodes that asked for it get it now
-  bytes(PUMP_WASM).then(b => { pumpWasmBytes = b; for (const n of pumpWait) try { n.port.postMessage({pumpBytes:b}); } catch(e){} pumpWait.clear(); pumpToChains(b);
+  bytes(PUMP_WASM).then(async b => {
+    if (WASM_PRECOMPILE) try { pumpWasmMod = await WebAssembly.compile(b); } catch(e){ pumpWasmMod = null; }   // compiled here, before any node gets it (they pass sound until it arrives, as before)
+    pumpWasmBytes = b; for (const n of pumpWait) try { n.port.postMessage(pumpWasmMod ? {pumpModule:pumpWasmMod} : {pumpBytes:b}); } catch(e){} pumpWait.clear(); pumpToChains(b);
     return WebAssembly.instantiate(b, imp).then(r => { pumpMain = r.instance.exports; if (pumpMain._initialize) pumpMain._initialize(); try { if (typeof rt !== 'undefined' && rt && rt.pl) rt.pl.pdcSync(); } catch(e){} }); }).catch(e => { if (PM) console.warn('pump effects', e); });
   const [plB, txB] = await Promise.all([bytes(WASM_DSP).catch(e => { tpLog('wasm fetch (dsp)', e); return null; }), bytes(WASM_TFX).catch(e => { tpLog('wasm fetch (effects)', e); return null; })]);
   tfxBytes = txB || false; tfxLoadDone();
@@ -16935,9 +16937,10 @@ let plFailed = false;
   } catch(e){ plFailed = true; plMod = null; tpLog('wasm init (dsp: Plaits / Elements will be silent)', e); }
   try {
     if (!txB) throw new Error('no tfx wasm');
-    txMod = await WebAssembly.compile(txB);
+    txMod = await WebAssembly.compile(txB); if (WASM_PRECOMPILE) tfxMod = txMod;
     TX = await WebAssembly.instantiate(txMod, imp); if (TX.exports._initialize) TX.exports._initialize();
-  } catch(e){ txMod = null; tpLog('wasm init (effects: the wasm effects will be bypassed)', e); }
+  } catch(e){ txMod = null; tfxMod = null; tpLog('wasm init (effects: the wasm effects will be bypassed)', e); }
+  tfxModDone();
   try {
     if (globalThis.WavesDSP && plMod && txMod){ WavesDSP.wasmInit({dspModule:plMod, tfxModule:txMod}); WV.ready = true; }
     if (plMod) globalThis.__wlMods = {dsp:plMod, tfx:txMod};   // …WAVES LIVE: its nodes get the compiled modules
@@ -18540,8 +18543,9 @@ class ThunderFx extends AudioWorkletProcessor {
     const op = o.processorOptions || {};
     const __op = op; if (__op.cid){ this.__cid = __op.cid; (globalThis.__tcNodes || (globalThis.__tcNodes = new Map())).set(__op.cid, this); }   // THUNDER CORE: FXO / FLX / GAT / RTG from the audio thread
     if (op.irs !== undefined) globalThis.__thunderIR = op.irs;   // the song's impulse responses (Convolution reverb), for this whole audio thread
-    if (!globalThis.__tfxMod) globalThis.__tfxMod = new WebAssembly.Module(op.bytes);
+    if (!globalThis.__tfxMod) globalThis.__tfxMod = op.module || new WebAssembly.Module(op.bytes);   // op.module: compiled on the page (WASM_PRECOMPILE)
     if (op.pump && !globalThis.__pumpBytes) globalThis.__pumpBytes = op.pump;   // …PUMP: pump.wasm, compiled when a pump slot first needs it
+    if (op.pumpModule && !globalThis.__pumpMod) globalThis.__pumpMod = op.pumpModule;   // (or the module the page compiled)
     this.ptel = new Map(); this.platS = '';   // …PUMP: the pump slots whose full telemetry a pop-up wants (key → {back, rp}); the latencies last reported
     const z = () => 0;
     this.x = new WebAssembly.Instance(globalThis.__tfxMod, {wasi_snapshot_preview1:{fd_close:z, fd_seek:z, fd_write:z, proc_exit:z}}).exports;
@@ -18559,7 +18563,7 @@ class ThunderFx extends AudioWorkletProcessor {
         const c = this.tapIdx[v - 9]; return (c >= 0 && this.taps && this.taps[c]) || this.zero; }};
     this.set(op.chain || []);
     this.port.onmessage = e => { if (e.data === null){ this.dead = true; for (const s of this.slots) this.drop(s); this.slots = []; } else if (e.data && e.data.irs !== undefined) globalThis.__thunderIR = e.data.irs; else if (e.data && e.data.tapmap) this.setTap(e.data.tapmap); else if (e.data && e.data.tel !== undefined) this.tel = !!e.data.tel; else if (e.data && e.data.lvl !== undefined){ this.lvl = !!e.data.lvl; this.lvlN = 0; this.lvlP = new Float32Array(8); }
-      else if (e.data && e.data.pumpBytes){ if (!globalThis.__pumpBytes) globalThis.__pumpBytes = e.data.pumpBytes; this.pumpAsked = false; this.set(this.chain || []); }
+      else if (e.data && (e.data.pumpBytes || e.data.pumpModule)){ if (e.data.pumpModule && !globalThis.__pumpMod) globalThis.__pumpMod = e.data.pumpModule; if (e.data.pumpBytes && !globalThis.__pumpBytes) globalThis.__pumpBytes = e.data.pumpBytes; this.pumpAsked = false; this.set(this.chain || []); }
       else if (e.data && e.data.ptel){ const q = e.data.ptel; if (q.on) this.ptel.set(q.key, {back:Math.max(0, Math.min(32768, q.back | 0)), rp:[]}); else this.ptel.delete(q.key); }
       else if (e.data && e.data.pset){ const q = e.data.pset, ch = (this.chain || []).map(c => c && c.slot === q.slot ? Object.assign({}, c, q.p ? {p:q.p} : {}, q.mp ? {mp:q.mp} : {}, q.pv ? {pv:q.pv} : {}) : c); this.set(ch); }   // FXV: one slot's settings for now (the chain's own come back with the next full set)
       else if (e.data && e.data.pmidi){ const q = this.pq || (this.pq = []); for (const m of e.data.pmidi) q.push(m); q.sort((a, b) => a[1] - b[1]); }   // …PUMP CREATIVE: [slot, at (s), status, d1, d2]
@@ -18570,10 +18574,10 @@ class ThunderFx extends AudioWorkletProcessor {
   setTap(list){ this.tapIdx.fill(-1); (Array.isArray(list) ? list : []).forEach((t, i) => { if (t >= 0 && t < 128) this.tapIdx[t] = i; }); }
   // …PUMP: the pump mastering effects (pump.wasm: their plugins' own DSP), one module instance for this audio thread
   pumpX(){
-    const g = globalThis; if (g.__pumpX) return g.__pumpX; if (!g.__pumpBytes) return null;
-    try { const z = () => 0, m = new WebAssembly.Module(g.__pumpBytes);
+    const g = globalThis; if (g.__pumpX) return g.__pumpX; if (!g.__pumpMod && !g.__pumpBytes) return null;
+    try { const z = () => 0, m = g.__pumpMod || new WebAssembly.Module(g.__pumpBytes);
       const x = new WebAssembly.Instance(m, {wasi_snapshot_preview1:{fd_close:z, fd_seek:z, fd_write:z, proc_exit:z}}).exports;
-      if (x._initialize) x._initialize(); g.__pumpX = x; return x; } catch (e){ g.__pumpBytes = null; return null; }
+      if (x._initialize) x._initialize(); g.__pumpX = x; return x; } catch (e){ g.__pumpBytes = null; g.__pumpMod = null; return null; }
   }
   pumpIO(P){ if (this.pbuf !== P.memory.buffer){ this.pbuf = P.memory.buffer; this.pIO = [0, 1, 2, 3].map(c => new Float32Array(this.pbuf, P.pump_io(c), 128)); } return this.pIO; }
   pumpNew(P, s){
@@ -18826,12 +18830,18 @@ class ThunderFx extends AudioWorkletProcessor {
 registerProcessor('thunder-tfx', ThunderFx);
 `;
 let tfxBytes = null, tfxURL = null;
+/* WASM_PRECOMPILE: tfx / pump / pump-synth wasm are compiled once on this page and the WebAssembly.Module goes to the audio
+   threads (as waves live's does); the worklet then only instantiates. false: the bytes are sent and compiled on the audio thread, as before. */
+const WASM_PRECOMPILE = true;
+let tfxMod = null, pumpWasmMod = null;   // the compiled modules (null: not compiled, or it failed: the bytes go instead)
+let tfxModDone = null; const tfxModLoad = new Promise(r => { tfxModDone = r; });   // settled once the page's compile of tfx.wasm has finished (or failed)
 let tfxLoadDone = null; const tfxLoad = new Promise(r => { tfxLoadDone = r; });   // settled by the wasm loader (fetched, or failed)
 const tfxLoaded = new WeakMap();
 /* chains host: one thunder-chains node per track (chains/chains-worklet.js).
    Loaded lazily per AudioContext, reusing the same tfx.wasm bytes as the track FX. */
 let chnURL = null;
 const chnLoaded = new WeakMap();
+const tfxModOpt = () => tfxMod || null, pumpModOpt = () => pumpWasmMod || null;   // the page-compiled modules (null with WASM_PRECOMPILE off, or when a compile failed)
 function chnBin(){
   const b = tfxBin();   // chains FX are the same tfx.wasm build as the track FX
   return b || null;
@@ -18840,9 +18850,9 @@ function chainsReady(ac){
   if (wkOff(ac)) return Promise.resolve(false);   // WORKLETS OFF (test)
   if (!chnLoaded.has(ac)){
     chnLoaded.set(ac, (async () => {
-      await tfxLoad; if (!chnBin() || !ac.audioWorklet || !window.AudioWorkletNode) return false;
+      await tfxLoad; await tfxModLoad; if (!chnBin() || !ac.audioWorklet || !window.AudioWorkletNode) return false;
       if (!chnURL){
-        const src = await (await fetch('chains/chains-worklet.js?v=43')).text();
+        const src = await (await fetch('chains/chains-worklet.js?v=44')).text();
         chnURL = URL.createObjectURL(new Blob([src], {type:'application/javascript'}));
       }
       wkNote(ac, 'chains'); await ac.audioWorklet.addModule(chnURL);
@@ -18995,9 +19005,9 @@ function chainsNode(ac, track, patch, tempo, cid){
   // Sidechain Outs, one channel per send. 'max' so the inputs arrive with all their channels.
   const n = new AudioWorkletNode(ac, 'thunder-chains', {numberOfInputs:6, numberOfOutputs:2, outputChannelCount:[2, 8], channelCount:2,
     channelCountMode:'max', channelInterpretation:'speakers',
-    processorOptions:{cid:cid || null, bytes:chnBin(), pump:pumpBin() || null, track, patch, quality:'full', transport:{tempo:tempo || S.bpm || 120, lpb:S.lpb || 4, ticks:S.ticks || TICKS, playing:tp.on}, irs:irsOpt(ac),
+    processorOptions:Object.assign({cid:cid || null, track, patch, quality:'full', transport:{tempo:tempo || S.bpm || 120, lpb:S.lpb || 4, ticks:S.ticks || TICKS, playing:tp.on}, irs:irsOpt(ac),
       // BUS and SOURCE maps from the start (later changes go as messages): an offline render can finish before a message arrives.
-      busMap:(busPlan().feeds.get(track) || []).slice(0, 32), tapMap:chnTapList(patch)}});
+      busMap:(busPlan().feeds.get(track) || []).slice(0, 32), tapMap:chnTapList(patch)}, tfxModOpt() ? {tfxModule:tfxModOpt()} : {bytes:chnBin()}, pumpModOpt() ? {pumpModule:pumpModOpt()} : {pump:pumpBin() || null})});
   n.load = 0;
   // 2048 samples (~45 ms) per look, read every 60 ms, so short hits (hats, clicks) still show on the meters.
   n.an = ac.createAnalyser(); n.an.fftSize = 2048;   // hears the chains return: the chain screen's Chain Out meters
@@ -19096,7 +19106,7 @@ function tfxReady(ac){
   if (wkOff(ac)) return Promise.resolve(false);   // WORKLETS OFF (test)
   if (!tfxLoaded.has(ac)){
     tfxLoaded.set(ac, (async () => {
-      await tfxLoad; if (!tfxBin() || !ac.audioWorklet || !window.AudioWorkletNode) return false;
+      await tfxLoad; await tfxModLoad; if (!tfxBin() || !ac.audioWorklet || !window.AudioWorkletNode) return false;
       await chainsReady(ac);   // the chains engine publishes the shared modules (ChainsDSP) in the audio thread, for the MODFX slots
       if (!tfxURL) tfxURL = URL.createObjectURL(new Blob([rvMix.toString() + '\n' + DegradeCore.toString() + '\n' + VSampCore.toString() + '\n' + ResonCore.toString() + '\n' + PitchFxCore.toString() + '\n' + clkSpb.toString() + '\n' + FlexCore.toString() + '\n' + StepGateCore.toString() + '\n' + RetrigCore.toString() + '\n' + beatLock.toString() + '\n' + bkHash.toString() + '\n' + GrainsCore.toString() + '\n' + ScrambleCore.toString() + '\n' + GlitchCore.toString() + '\n' + TFX_SRC], {type:'application/javascript'}));
       wkNote(ac, 'tfx'); await ac.audioWorklet.addModule(tfxURL);
@@ -19152,12 +19162,12 @@ function tfxNode(ac, chain, cid){
   // Inputs: 0 the track, 1 (SOURCE) the picked tracks' own sounds, one channel each ('tapmap'), 2 (SENDS) the Sidechain Out sends.
   const pb = pumpBin() && !pumpSent.has(ac) ? pumpBin() : null; if (pb) pumpSent.add(ac);
   const n = new AudioWorkletNode(ac, 'thunder-tfx', {numberOfInputs:3, numberOfOutputs:1, outputChannelCount:[2], channelCount:2,
-    channelCountMode:'max', channelInterpretation:'speakers', processorOptions:{bytes:tfxBin(), chain, irs:irsOpt(ac), tapMap:keyTrackList(), pump:pb, cid:cid || null}});   // irs: this audio thread's copy of the song's impulse responses
+    channelCountMode:'max', channelInterpretation:'speakers', processorOptions:Object.assign({chain, irs:irsOpt(ac), tapMap:keyTrackList(), cid:cid || null}, tfxModOpt() ? {module:tfxModOpt()} : {bytes:tfxBin()}, pb ? (pumpModOpt() ? {pumpModule:pumpModOpt()} : {pump:pb}) : {pump:null})});   // irs: this audio thread's copy of the song's impulse responses
   n.load = 0; n.port.onmessage = e => { const d = e.data; if (!d) return;
     if (typeof d.load === 'number') n.load = n.load * 0.6 + d.load * 0.4;
     if (d.dyn) fxDynIn(n, d.dyn);
     if (d.lvl){ n.lvl = d.lvl; n.lvlT = performance.now(); }   // FX BAR: each slot's level out (fxLvlSet)
-    if (d.needPump){ if (pumpBin()) n.port.postMessage({pumpBytes:pumpBin()}); else pumpWait.add(n); }
+    if (d.needPump){ if (pumpBin()) n.port.postMessage(pumpModOpt() ? {pumpModule:pumpModOpt()} : {pumpBytes:pumpBin()}); else pumpWait.add(n); }
     if (d.pump) PumpFX._feed(n, d.pump);
     if (d.pst) PumpFX._pst(n, d.pst);   // …PUMP STATE: the plugin changed its own (MASTER learned)
     if (d.plat){ n.plat = d.plat; PumpFX._lat(n, d.plat); }
@@ -20478,7 +20488,7 @@ function makePlayer(ac, out, getBuf, live){
     if (!sp || !by || !psOK.has(ac) || (ac === ctx && (psLive.off || aset.psLive === 'render'))) return null;   // (Settings → Audio → Live engines)
     try {
       const node = new AudioWorkletNode(ac, 'thunder-psyn', {numberOfInputs:0, numberOfOutputs:1, outputChannelCount:[2],
-        processorOptions:Object.assign({p:xParams(V), cid:live ? key : null}, sp, psSent.has(ac) ? {} : {bytes:by}, frzSample(V) ? {file:{d:frzSample(V).data, sr:frzSample(V).sr}} : {})});
+        processorOptions:Object.assign({p:xParams(V), cid:live ? key : null}, sp, psSent.has(ac) ? {} : (WASM_PRECOMPILE && PsynCore.module() ? {module:PsynCore.module()} : {bytes:by}), frzSample(V) ? {file:{d:frzSample(V).data, sr:frzSample(V).sr}} : {})});
       psSent.add(ac);
       const g = ac.createGain(), pn = ac.createStereoPanner(), P = k => node.parameters.get(k);
       node.connect(g); g.connect(pn); pn.connect(buses[t].inp);
@@ -21322,7 +21332,7 @@ class XP_${name} extends AudioWorkletProcessor {
 registerProcessor('thunder-${name}', XP_${name});`;
 let bassURL = null; const bassLoad = new WeakMap(), bassOK = new WeakSet(), bassLive = new Set();
 // …PUMP SYNTHS live: their worklet, loaded with the others; psSent: the contexts whose audio thread has the wasm's bytes
-const PSYN_WK = 'pump/synth/pump-synth-worklet.js?v=7', psOK = new WeakSet(), psSent = new WeakSet();
+const PSYN_WK = 'pump/synth/pump-synth-worklet.js?v=8', psOK = new WeakSet(), psSent = new WeakSet();
 // …WAVES LIVE: the waves worklet in the tracker's own context (thunder-wlive); wlSent: the contexts that have the wasm
 const WAVES_WK = 'waves/waves-worklet.js?v=34', wlOK = new WeakSet(), wlSent = new WeakSet();
 /* BATTERY (8 Nov, Fold): a bookkeeping timer that only does something in one situation (playing, the screen visible, one
