@@ -21322,9 +21322,53 @@ class BassProc extends AudioWorkletProcessor {
     {name:'trig', defaultValue:0, automationRate:'a-rate'},
     {name:'leg', defaultValue:0, minValue:0, maxValue:1, automationRate:'a-rate'},
     {name:'bpm', defaultValue:120, minValue:10, maxValue:999, automationRate:'k-rate'},
-    {name:'wob', defaultValue:0, minValue:0, maxValue:64, automationRate:'k-rate'}]; }
+    {name:'wob', defaultValue:0, minValue:0, maxValue:64, automationRate:'k-rate'},
+    {name:'cCut', defaultValue:-1, minValue:-1, maxValue:255, automationRate:'k-rate'},
+    {name:'cRes', defaultValue:-1, minValue:-1, maxValue:255, automationRate:'k-rate'},
+    {name:'cDec', defaultValue:-1, minValue:-1, maxValue:255, automationRate:'k-rate'},
+    {name:'cAtk', defaultValue:-1, minValue:-1, maxValue:255, automationRate:'k-rate'},
+    {name:'cRel', defaultValue:-1, minValue:-1, maxValue:255, automationRate:'k-rate'},
+    {name:'oCut', defaultValue:0, minValue:-255, maxValue:255, automationRate:'k-rate'},
+    {name:'oRes', defaultValue:0, minValue:-255, maxValue:255, automationRate:'k-rate'},
+    {name:'oEnv', defaultValue:0, minValue:-255, maxValue:255, automationRate:'k-rate'},
+    {name:'oAtk', defaultValue:0, minValue:-255, maxValue:255, automationRate:'k-rate'},
+    {name:'oDec', defaultValue:0, minValue:-255, maxValue:255, automationRate:'k-rate'},
+    {name:'oSus', defaultValue:0, minValue:-255, maxValue:255, automationRate:'k-rate'},
+    {name:'oRel', defaultValue:0, minValue:-255, maxValue:255, automationRate:'k-rate'}]; }
   constructor(o){ super(); this.c = new BassCore(sampleRate); this.c.set((o.processorOptions || {}).p || {}); this.lt = 0; this.lg = false; this.ms = 0; this.fr = 0; const __op = (o && o.processorOptions) || {}; if (__op.cid){ this.__cid = __op.cid; (globalThis.__tcNodes || (globalThis.__tcNodes = new Map())).set(__op.cid, this); }
     this.port.onmessage = e => { const d = e.data || {}; if (d.set) this.c.set(d.set); if (d.dispose){ this.dead = true; if (this.__cid && globalThis.__tcNodes && globalThis.__tcNodes.get(this.__cid) === this) globalThis.__tcNodes.delete(this.__cid); } }; }
+  /* ENGINE TARGETS (docs/mod/ENGINE-TARGETS-DESIGN.md sections 2-4): twelve k-rate params, read once per quantum. All at their
+     defaults: nothing here runs. Otherwise the effective values are swapped into the core's parameter object for this quantum's
+     DSP and put back in engOff (called from a finally), so the stored (knob) values never change. No allocation per quantum. */
+  efm(){ return [['cut', 30, 18000], ['res', 0, 1], ['fenv', -6, 6], ['atk', 0.5, 2000], ['dec', 1, 4000], ['sus', 0, 1], ['rel', 1, 4000]]; }
+  eg(A, d){ return A && A[0] === A[0] ? A[0] : d; }
+  ec(x, a, b){ return x < a ? a : x > b ? b : x; }
+  engOn(P){
+    const v = this.ev || (this.ev = new Float64Array(12));
+    v[0] = this.eg(P.cCut, -1); v[1] = this.eg(P.cRes, -1); v[2] = this.eg(P.cDec, -1); v[3] = this.eg(P.cAtk, -1); v[4] = this.eg(P.cRel, -1);
+    v[5] = this.eg(P.oCut, 0); v[6] = this.eg(P.oRes, 0); v[7] = this.eg(P.oEnv, 0); v[8] = this.eg(P.oAtk, 0); v[9] = this.eg(P.oDec, 0); v[10] = this.eg(P.oSus, 0); v[11] = this.eg(P.oRel, 0);
+    if (!(v[0] >= 0 || v[1] >= 0 || v[2] >= 0 || v[3] >= 0 || v[4] >= 0 || v[5] !== 0 || v[6] !== 0 || v[7] !== 0 || v[8] !== 0 || v[9] !== 0 || v[10] !== 0 || v[11] !== 0)) return;
+    const p = this.c.p, F = this.ef || (this.ef = this.efm()), sv = this.es || (this.es = new Float64Array(7)), CI = this.ci || (this.ci = [0, 1, -1, 3, 2, -1, 4]);
+    for (let k = 0; k < 7; k++) if (F[k]) sv[k] = p[F[k][0]];
+    this.ed = true;
+    const K = 18000 / 30, D = 4 / 0.008;
+    for (let k = 0; k < 7; k++){
+      const f = F[k]; if (!f) continue;
+      const ci = CI[k], c = ci < 0 ? -1 : v[ci], o = v[5 + k];
+      if (c < 0 && o === 0) continue;
+      const own = sv[k], lo = f[1], hi = f[2]; let e;
+      if (k === 0 && !f[3]) e = this.ec((c < 0 ? own : 30 * Math.pow(K, c / 255)) * Math.pow(K, o / 255), lo, hi);
+      else if (k === 0 || k === 1 || k === 5){ const b = c < 0 ? (own - lo) / (hi - lo) : c / 255; e = lo + this.ec(b + o / 255, 0, 1) * (hi - lo); }
+      else if (k === 2) e = this.ec(own + o / 255 * (hi - lo), lo, hi);
+      else { const b = c < 0 ? own / 1000 : 0.008 * Math.pow(D, Math.min(c, 254) / 254); e = this.ec(b * Math.pow(D, o / 254), lo / 1000, hi / 1000) * 1000; }
+      p[f[0]] = e;
+    }
+  }
+  engOff(){
+    if (!this.ed) return; this.ed = false;
+    const p = this.c.p, F = this.ef, sv = this.es;
+    for (let k = 0; k < 7; k++) if (F[k]) p[F[k][0]] = sv[k];
+  }
   process(ins, outs, P){
     if (this.dead) return false;
     if (this.__ov && globalThis.__tcOv) P = globalThis.__tcOv(this, P, outs[0][0].length);   // THUNDER CORE drives this node (core-processor.js)
@@ -21332,6 +21376,7 @@ class BassProc extends AudioWorkletProcessor {
     c.bpm = P.bpm[0]; c.wob = P.wob[0];
     const t0 = Date.now();   // (no closure per block: the rate is read inline)
     let s = 0;
+    try { this.engOn(P);
     for (let i = 0; i < n; i++){
       const tg = trig.length > 1 ? trig[i] : trig[0], ga = (gate.length > 1 ? gate[i] : gate[0]) >= 0.5;
       if (tg !== this.lt || ga !== this.lg){
@@ -21343,6 +21388,7 @@ class BassProc extends AudioWorkletProcessor {
       }
     }
     c.render(L, R, s, n, rate.length > 1 ? rate[s] : rate[0]);
+    } finally { this.engOff(); }
     this.ms += Date.now() - t0; this.fr += n;
     if (this.__ov && globalThis.__tcPost) globalThis.__tcPost(this, outs[0]);
     if (this.fr >= sampleRate / 2){ this.port.postMessage({load:this.ms / (this.fr / sampleRate * 1000)}); this.ms = 0; this.fr = 0; }
@@ -21361,15 +21407,60 @@ class VoxProc extends AudioWorkletProcessor {
     {name:'trig', defaultValue:0, automationRate:'a-rate'},
     {name:'leg', defaultValue:0, minValue:0, maxValue:1, automationRate:'a-rate'},
     {name:'syl', defaultValue:0, automationRate:'a-rate'},
-    {name:'same', defaultValue:0, minValue:0, maxValue:1, automationRate:'a-rate'}]; }
+    {name:'same', defaultValue:0, minValue:0, maxValue:1, automationRate:'a-rate'},
+    {name:'cCut', defaultValue:-1, minValue:-1, maxValue:255, automationRate:'k-rate'},
+    {name:'cRes', defaultValue:-1, minValue:-1, maxValue:255, automationRate:'k-rate'},
+    {name:'cDec', defaultValue:-1, minValue:-1, maxValue:255, automationRate:'k-rate'},
+    {name:'cAtk', defaultValue:-1, minValue:-1, maxValue:255, automationRate:'k-rate'},
+    {name:'cRel', defaultValue:-1, minValue:-1, maxValue:255, automationRate:'k-rate'},
+    {name:'oCut', defaultValue:0, minValue:-255, maxValue:255, automationRate:'k-rate'},
+    {name:'oRes', defaultValue:0, minValue:-255, maxValue:255, automationRate:'k-rate'},
+    {name:'oEnv', defaultValue:0, minValue:-255, maxValue:255, automationRate:'k-rate'},
+    {name:'oAtk', defaultValue:0, minValue:-255, maxValue:255, automationRate:'k-rate'},
+    {name:'oDec', defaultValue:0, minValue:-255, maxValue:255, automationRate:'k-rate'},
+    {name:'oSus', defaultValue:0, minValue:-255, maxValue:255, automationRate:'k-rate'},
+    {name:'oRel', defaultValue:0, minValue:-255, maxValue:255, automationRate:'k-rate'}]; }
   constructor(o){ super(); this.c = new VoxCore(sampleRate); this.c.set((o.processorOptions || {}).p || {}); this.lt = 0; this.lg = false; this.ms = 0; this.fr = 0; const __op = (o && o.processorOptions) || {}; if (__op.cid){ this.__cid = __op.cid; (globalThis.__tcNodes || (globalThis.__tcNodes = new Map())).set(__op.cid, this); }
     this.port.onmessage = e => { const d = e.data || {}; if (d.set) this.c.set(d.set); if (d.dispose){ this.dead = true; if (this.__cid && globalThis.__tcNodes && globalThis.__tcNodes.get(this.__cid) === this) globalThis.__tcNodes.delete(this.__cid); } }; }
+  /* ENGINE TARGETS (docs/mod/ENGINE-TARGETS-DESIGN.md sections 2-4): twelve k-rate params, read once per quantum. All at their
+     defaults: nothing here runs. Otherwise the effective values are swapped into the core's parameter object for this quantum's
+     DSP and put back in engOff (called from a finally), so the stored (knob) values never change. No allocation per quantum. */
+  efm(){ return [['bright', 0, 1, 1], null, null, ['atk', 0.5, 400], null, null, ['rel', 1, 3000]]; }
+  eg(A, d){ return A && A[0] === A[0] ? A[0] : d; }
+  ec(x, a, b){ return x < a ? a : x > b ? b : x; }
+  engOn(P){
+    const v = this.ev || (this.ev = new Float64Array(12));
+    v[0] = this.eg(P.cCut, -1); v[1] = this.eg(P.cRes, -1); v[2] = this.eg(P.cDec, -1); v[3] = this.eg(P.cAtk, -1); v[4] = this.eg(P.cRel, -1);
+    v[5] = this.eg(P.oCut, 0); v[6] = this.eg(P.oRes, 0); v[7] = this.eg(P.oEnv, 0); v[8] = this.eg(P.oAtk, 0); v[9] = this.eg(P.oDec, 0); v[10] = this.eg(P.oSus, 0); v[11] = this.eg(P.oRel, 0);
+    if (!(v[0] >= 0 || v[1] >= 0 || v[2] >= 0 || v[3] >= 0 || v[4] >= 0 || v[5] !== 0 || v[6] !== 0 || v[7] !== 0 || v[8] !== 0 || v[9] !== 0 || v[10] !== 0 || v[11] !== 0)) return;
+    const p = this.c.p, F = this.ef || (this.ef = this.efm()), sv = this.es || (this.es = new Float64Array(7)), CI = this.ci || (this.ci = [0, 1, -1, 3, 2, -1, 4]);
+    for (let k = 0; k < 7; k++) if (F[k]) sv[k] = p[F[k][0]];
+    this.ed = true;
+    const K = 18000 / 30, D = 4 / 0.008;
+    for (let k = 0; k < 7; k++){
+      const f = F[k]; if (!f) continue;
+      const ci = CI[k], c = ci < 0 ? -1 : v[ci], o = v[5 + k];
+      if (c < 0 && o === 0) continue;
+      const own = sv[k], lo = f[1], hi = f[2]; let e;
+      if (k === 0 && !f[3]) e = this.ec((c < 0 ? own : 30 * Math.pow(K, c / 255)) * Math.pow(K, o / 255), lo, hi);
+      else if (k === 0 || k === 1 || k === 5){ const b = c < 0 ? (own - lo) / (hi - lo) : c / 255; e = lo + this.ec(b + o / 255, 0, 1) * (hi - lo); }
+      else if (k === 2) e = this.ec(own + o / 255 * (hi - lo), lo, hi);
+      else { const b = c < 0 ? own / 1000 : 0.008 * Math.pow(D, Math.min(c, 254) / 254); e = this.ec(b * Math.pow(D, o / 254), lo / 1000, hi / 1000) * 1000; }
+      p[f[0]] = e;
+    }
+  }
+  engOff(){
+    if (!this.ed) return; this.ed = false;
+    const p = this.c.p, F = this.ef, sv = this.es;
+    for (let k = 0; k < 7; k++) if (F[k]) p[F[k][0]] = sv[k];
+  }
   process(ins, outs, P){
     if (this.dead) return false;
     if (this.__ov && globalThis.__tcOv) P = globalThis.__tcOv(this, P, outs[0][0].length);   // THUNDER CORE drives this node (core-processor.js)
     const o = outs[0], L = o[0], R = o[1] || o[0], n = L.length, c = this.c, rate = P.rate, gate = P.gate, trig = P.trig, leg = P.leg, syl = P.syl, same = P.same;
     const t0 = Date.now();
     let s = 0;
+    try { this.engOn(P);
     for (let i = 0; i < n; i++){
       const tg = vxAt(trig, i), ga = vxAt(gate, i) >= 0.5;
       if (tg !== this.lt || ga !== this.lg){
@@ -21381,6 +21472,7 @@ class VoxProc extends AudioWorkletProcessor {
       }
     }
     c.render(L, R, s, n, vxAt(rate, s));
+    } finally { this.engOff(); }
     this.ms += Date.now() - t0; this.fr += n;
     if (this.__ov && globalThis.__tcPost) globalThis.__tcPost(this, outs[0]);
     if (this.fr >= sampleRate / 2){ this.port.postMessage({load:this.ms / (this.fr / sampleRate * 1000)}); this.ms = 0; this.fr = 0; }
@@ -21396,14 +21488,59 @@ class XP_${name} extends AudioWorkletProcessor {
     {name:'gate', defaultValue:0, minValue:0, maxValue:1, automationRate:'a-rate'},
     {name:'trig', defaultValue:0, automationRate:'a-rate'},
     {name:'leg', defaultValue:0, minValue:0, maxValue:1, automationRate:'a-rate'},
-    {name:'acc', defaultValue:0, minValue:0, maxValue:1, automationRate:'a-rate'}]; }
+    {name:'acc', defaultValue:0, minValue:0, maxValue:1, automationRate:'a-rate'},
+    {name:'cCut', defaultValue:-1, minValue:-1, maxValue:255, automationRate:'k-rate'},
+    {name:'cRes', defaultValue:-1, minValue:-1, maxValue:255, automationRate:'k-rate'},
+    {name:'cDec', defaultValue:-1, minValue:-1, maxValue:255, automationRate:'k-rate'},
+    {name:'cAtk', defaultValue:-1, minValue:-1, maxValue:255, automationRate:'k-rate'},
+    {name:'cRel', defaultValue:-1, minValue:-1, maxValue:255, automationRate:'k-rate'},
+    {name:'oCut', defaultValue:0, minValue:-255, maxValue:255, automationRate:'k-rate'},
+    {name:'oRes', defaultValue:0, minValue:-255, maxValue:255, automationRate:'k-rate'},
+    {name:'oEnv', defaultValue:0, minValue:-255, maxValue:255, automationRate:'k-rate'},
+    {name:'oAtk', defaultValue:0, minValue:-255, maxValue:255, automationRate:'k-rate'},
+    {name:'oDec', defaultValue:0, minValue:-255, maxValue:255, automationRate:'k-rate'},
+    {name:'oSus', defaultValue:0, minValue:-255, maxValue:255, automationRate:'k-rate'},
+    {name:'oRel', defaultValue:0, minValue:-255, maxValue:255, automationRate:'k-rate'}]; }
   constructor(o){ super(); this.c = new ${core}(sampleRate); this.c.set((o.processorOptions || {}).p || {}); this.lt = 0; this.lg = false; this.ms = 0; this.fr = 0; const __op = (o && o.processorOptions) || {}; if (__op.cid){ this.__cid = __op.cid; (globalThis.__tcNodes || (globalThis.__tcNodes = new Map())).set(__op.cid, this); }
     this.port.onmessage = e => { const d = e.data || {}; if (d.set) this.c.set(d.set); if (d.dispose){ this.dead = true; if (this.__cid && globalThis.__tcNodes && globalThis.__tcNodes.get(this.__cid) === this) globalThis.__tcNodes.delete(this.__cid); } }; }
+  /* ENGINE TARGETS (docs/mod/ENGINE-TARGETS-DESIGN.md sections 2-4): twelve k-rate params, read once per quantum. All at their
+     defaults: nothing here runs. Otherwise the effective values are swapped into the core's parameter object for this quantum's
+     DSP and put back in engOff (called from a finally), so the stored (knob) values never change. No allocation per quantum. */
+  efm(){ return ${name === 'acid' ? "[['cut', 40, 6000], ['res', 0, 1.05], ['envAmt', 0, 1], null, ['ampDec', 1, 4000], ['sus', 0, 1], ['rel', 1, 1000]]" : "[['lp', 60, 16000], ['res', 0, 1], ['fenv', 0, 1], ['atk', 0.5, 2000], ['dec', 1, 4000], ['sus', 0, 1], ['rel', 1, 4000]]"}; }
+  eg(A, d){ return A && A[0] === A[0] ? A[0] : d; }
+  ec(x, a, b){ return x < a ? a : x > b ? b : x; }
+  engOn(P){
+    const v = this.ev || (this.ev = new Float64Array(12));
+    v[0] = this.eg(P.cCut, -1); v[1] = this.eg(P.cRes, -1); v[2] = this.eg(P.cDec, -1); v[3] = this.eg(P.cAtk, -1); v[4] = this.eg(P.cRel, -1);
+    v[5] = this.eg(P.oCut, 0); v[6] = this.eg(P.oRes, 0); v[7] = this.eg(P.oEnv, 0); v[8] = this.eg(P.oAtk, 0); v[9] = this.eg(P.oDec, 0); v[10] = this.eg(P.oSus, 0); v[11] = this.eg(P.oRel, 0);
+    if (!(v[0] >= 0 || v[1] >= 0 || v[2] >= 0 || v[3] >= 0 || v[4] >= 0 || v[5] !== 0 || v[6] !== 0 || v[7] !== 0 || v[8] !== 0 || v[9] !== 0 || v[10] !== 0 || v[11] !== 0)) return;
+    const p = this.c.p, F = this.ef || (this.ef = this.efm()), sv = this.es || (this.es = new Float64Array(7)), CI = this.ci || (this.ci = [0, 1, -1, 3, 2, -1, 4]);
+    for (let k = 0; k < 7; k++) if (F[k]) sv[k] = p[F[k][0]];
+    this.ed = true;
+    const K = 18000 / 30, D = 4 / 0.008;
+    for (let k = 0; k < 7; k++){
+      const f = F[k]; if (!f) continue;
+      const ci = CI[k], c = ci < 0 ? -1 : v[ci], o = v[5 + k];
+      if (c < 0 && o === 0) continue;
+      const own = sv[k], lo = f[1], hi = f[2]; let e;
+      if (k === 0 && !f[3]) e = this.ec((c < 0 ? own : 30 * Math.pow(K, c / 255)) * Math.pow(K, o / 255), lo, hi);
+      else if (k === 0 || k === 1 || k === 5){ const b = c < 0 ? (own - lo) / (hi - lo) : c / 255; e = lo + this.ec(b + o / 255, 0, 1) * (hi - lo); }
+      else if (k === 2) e = this.ec(own + o / 255 * (hi - lo), lo, hi);
+      else { const b = c < 0 ? own / 1000 : 0.008 * Math.pow(D, Math.min(c, 254) / 254); e = this.ec(b * Math.pow(D, o / 254), lo / 1000, hi / 1000) * 1000; }
+      p[f[0]] = e;
+    }
+  }
+  engOff(){
+    if (!this.ed) return; this.ed = false;
+    const p = this.c.p, F = this.ef, sv = this.es;
+    for (let k = 0; k < 7; k++) if (F[k]) p[F[k][0]] = sv[k];
+  }
   process(ins, outs, P){
     if (this.dead) return false;
     if (this.__ov && globalThis.__tcOv) P = globalThis.__tcOv(this, P, outs[0][0].length);   // THUNDER CORE drives this node (core-processor.js)
     const o = outs[0], L = o[0], R = o[1] || o[0], n = L.length, c = this.c, at = (A, i) => A.length > 1 ? A[i] : A[0], t0 = Date.now();
     let s = 0;
+    try { this.engOn(P);
     for (let i = 0; i < n; i++){
       const tg = at(P.trig, i), ga = at(P.gate, i) >= 0.5;
       if (tg !== this.lt || ga !== this.lg){
@@ -21415,6 +21552,7 @@ class XP_${name} extends AudioWorkletProcessor {
       }
     }
     c.render(L, R, s, n, at(P.rate, s));
+    } finally { this.engOff(); }
     this.ms += Date.now() - t0; this.fr += n;
     if (this.__ov && globalThis.__tcPost) globalThis.__tcPost(this, outs[0]);
     if (this.fr >= sampleRate / 2){ this.port.postMessage({load:this.ms / (this.fr / sampleRate * 1000)}); this.ms = 0; this.fr = 0; }
