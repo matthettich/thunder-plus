@@ -7,7 +7,7 @@ const src = H.read('index.html'), core = H.read('core/core-processor.js');
 function cut(text, re, what) { const m = text.match(re); assert.ok(m, `could not find ${what}; the code moved or changed shape, so this test needs updating`); return m[0]; }
 
 test('stereo: the audio thread pans a stereo pad as a StereoPannerNode does (balance), centred = untouched', () => {
-  const stBal = new Function(cut(core, /function stBal\(pan\)\{[^\n]*\}/, 'stBal') + '; return stBal;')();
+  const stBal = new Function('const SBAL = [0, 0, 0, 0];' + cut(core, /function stBal\(pan\)\{[^\n]*\}/, 'stBal') + '; return stBal;')();   // (SBAL: the one array it fills, 10 Nov)
   assert.deepEqual(stBal(0).map(x => +x.toFixed(9)), [1, 0, 0, 1]);
   const [ll, rl, lr, rr] = stBal(-1); assert.equal(ll, 1); assert.ok(Math.abs(rl - 1) < 1e-9); assert.equal(lr, 0); assert.ok(Math.abs(rr) < 1e-9);   // hard left: R folds into L
   const R1 = stBal(1); assert.ok(Math.abs(R1[0]) < 1e-9); assert.ok(Math.abs(R1[2] - 1) < 1e-9); assert.equal(R1[3], 1);
