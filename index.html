@@ -21570,37 +21570,35 @@ function pump(){
   catch(e){ console.error(e); try { tStop(); } catch(e2){} toast('Playback stopped: ' + ((e && e.message) || 'something went wrong') + '.', 5000); }
 }
 /* PHONE RESYNC (10 Nov; owner's Fold, Chrome with AudioWorklet modules loaded): Chrome renders more audio than the device plays, so
-   ctx.currentTime runs ahead of real time in bursts (61.7 s of clock in 40.4 s of wall during a song; +4 s, +7 s, +32 s in a
-   second) and the Page sequencer, booking against that clock, rushed the song at 1.5× with pieces missing. We can't stop Chrome
-   doing it; this keeps the SONG at real-time speed. Each tick: drift = (clock − clock at the anchor) − (wall − wall at the anchor).
-   The clock moves in steps of the output buffer (up to about outLat), so one tick is noisy by up to that: only a drift above
-   rsThresh (or 1.3 measured steps, rsStep) counts as a leap, and the anchor follows the clock whenever drift is negative (a slow clock, an underrun), so the
-   noise stays above the baseline and a later leap is measured from it. A leap moves the whole timeline on by the same amount
-   (rsHold), so nothing is skipped and nothing is booked for the leap; what is already booked can't be taken back.
+   ctx.currentTime runs ahead of real time in bursts and for many seconds at 1.2× to 2.3× (61.7 s of clock in 40.4 s of wall during
+   a song; +4 s, +7 s, +32 s in a second) and the Page sequencer, booking against that clock, rushed the song with pieces missing.
+   We can't stop Chrome doing it; this keeps the SONG at real-time speed. Each tick: o = clock − wall. A clock that moves in whole
+   buffers (about 0.2 s here) but averages 1× makes o saw inside a band whose lower and upper edges stay put; racing lifts both.
+   The last 0.6 s of o is kept: lo = its lowest, hi = its highest (not counting this tick). base and top are the two edges, learned
+   0.4 s after PLAY. A tick whose o is more than RS_LEAP over top is a leap: the song is held by the excess at once, in this tick, so
+   nothing is booked for it. If lo has crept more than RS_CREEP over base (racing in steps too small for that), the song is held by
+   the creep. A clock behind real time (underruns) only moves base and top down. A hold moves the whole timeline on (rsHold), so
+   nothing is skipped; what is already booked can't be taken back. adj is the sum of the holds: each sample is stored as o − adj,
+   the clock as it would have been had the song been held all along (a creep also lowers the samples still in the window). The band is measured, not assumed, so
+   no outLat here (a first version with a drift threshold held every step of a 0.2 s clock and stopped the song).
    Phones and tablets only, the Page sequencer, and not while anything else owns the timing (rsScope). RESYNC: kill switch. */
 const RESYNC = true;
-const rsThresh = outLat => Math.max(0.12, outLat * 0.75 + 0.05);
+const RS_W = 0.6, RS_FULL = 0.4, RS_LEAP = 0.06, RS_CREEP = 0.04;   // window and learning time (s); how far over the upper edge is a leap, and over the lower edge a creep (s)
 const rsScope = () => seqHandHere() && !RCD.sync && !RCD.on && !rec.on && !lkLive() && !clkWanted() && !midi.clkIn && !mx.slave && tp.stopAt == null;   // (as seqHandover: take-ups and Link / MIDI clock keep their own timing)
-function rsTick(s, outLat){
+function rsTick(s){
   if (!tp.on || tp.core || !ctx || !rsScope()){ PB.rsA = null; return; }
   PB.rsN = (PB.rsN || 0) + 1;   // (test hook: how often this ran)
-  const c = ctx.currentTime, w = performance.now() / 1000, A = PB.rsA, q = rsStep(c, w);
-  if (!A || A.seq !== s || ctx.state !== 'running' || w - A.wl > 1){ PB.rsA = {seq:s, c, w, wl:w, t0:A && A.seq === s ? A.t0 : w}; return; }   // PLAY, not running, or the page itself was frozen (the moved-on rule's)
-  A.wl = w; const d = (c - A.c) - (w - A.w);
-  if (d < 0 || w - A.t0 < 1.5){ A.c = c; A.w = w; return; }   // (the first 1.5 s of a PLAY only learn the clock's step)
-  if (d > Math.max(rsThresh(outLat), q * 1.3)){ rsHold(s, d - q / 2); A.c = c; A.w = w; } }   // (on a stepped clock the reading sits anywhere in a step: half a step too high on average)
-// The clock's own step: a clock that moves in whole buffers stands still for most ticks and then moves by one buffer, so its drift
-// swings by that much with nothing wrong. Measured from the ticks (25 ms apart): when a fifth or more saw no movement, the step
-// is the median of the movements; 0 for a clock that moves smoothly. (Found in the headless check: a 0.2 s step against a 0.12 s
-// threshold held every step, and the song stood still.) The leap threshold is never under 1.3 steps.
-function rsStep(c, w){
-  const Q = PB.rsQ || (PB.rsQ = {c:null, w:0, z:[], m:[], q:0});
-  if (Q.c == null){ Q.c = c; Q.w = w; return 0; }
-  if (w - Q.w < 0.015) return Q.q;
-  const dc = c - Q.c; Q.c = c; Q.w = w;
-  Q.z.push(dc < 0.0005 ? 1 : 0); if (Q.z.length > 40) Q.z.shift(); if (dc >= 0.0005){ Q.m.push(dc); if (Q.m.length > 24) Q.m.shift(); }
-  if (Q.z.length < 16 || Q.m.length < 3 || Q.z.reduce((a, b) => a + b, 0) < Q.z.length * 0.2) return Q.q = 0;
-  return Q.q = Q.m.slice().sort((a, b) => a - b)[Q.m.length >> 1]; }
+  const w = performance.now() / 1000, o = ctx.currentTime - w; let A = PB.rsA;
+  if (!A || A.seq !== s || ctx.state !== 'running' || w - A.wl > 1) A = PB.rsA = {seq:s, wl:w, T:new Float64Array(128), O:new Float64Array(128), n:0, h:0, adj:0, ready:false, base:0, top:0};   // PLAY, not running, or the page itself was frozen (the moved-on rule's): learn again
+  A.wl = w;
+  const T = A.T, O = A.O; while (A.n && w - T[(A.h - A.n) & 127] > RS_W) A.n--;
+  let lo = Infinity, hi = -Infinity; for (let k = 1; k <= A.n; k++){ const v = O[(A.h - k) & 127]; if (v < lo) lo = v; if (v > hi) hi = v; }
+  const full = A.n > 0 && w - T[(A.h - A.n) & 127] >= RS_FULL;
+  if (!A.ready){ if (full){ A.ready = true; A.base = lo; A.top = hi; } }
+  else if (o - A.adj > A.top + RS_LEAP){ const d = o - A.adj - A.top; A.adj += d; rsHold(s, d); }   // a leap
+  else if (A.n && lo < A.base){ A.base = lo; if (full && hi < A.top) A.top = hi; }   // a clock behind: the band moves down
+  else if (full && lo > A.base + RS_CREEP){ const d = lo - A.base; A.adj += d; rsHold(s, d); for (let k = 1; k <= A.n; k++) O[(A.h - k) & 127] -= d; }   // racing in small steps: the window is as it would have been without the rise
+  T[A.h] = w; O[A.h] = o - A.adj; A.h = (A.h + 1) & 127; if (A.n < 127) A.n++; }
 // Everything that holds a time on the audio clock for the song moves on by d, as the moved-on rule does for the sequencer. Not the
 // notes already booked (tp.q, the voices, MIDI sent): they were given to the engine.
 function rsHold(s, d){
@@ -21627,8 +21625,8 @@ function pumpRun(){
   // On a touch screen it moves on sooner (8 Nov): a stall of 0.7 s played nine overdue notes at once, heard as the song rushing and clicking. Not while hidden: the system runs a hidden page in bursts, and each move would be a gap.
   const outLat = Math.min(0.6, (ctx.baseLatency || 0) + (ctx.outputLatency || 0));   // (9 Nov, owner: Safest stuttered most) the audio clock moves in steps of the output buffer: under Safest one step passed 0.15 s, so a healthy song kept being moved on, and a 0.25 s lead was thin
   // 10 Nov, HOLD THE SONG (see PHONE RESYNC): before the moved-on rule on purpose, which then only sees what a stall left behind.
-  if (RESYNC && s.alive() && s.base != null) rsTick(s, outLat); else PB.rsA = null;
-  if (s.alive() && s.time < ctx.currentTime - (COARSE && !document.hidden ? Math.max(0.15, outLat + 0.05) : 0.5) && s.base != null){ const d = ctx.currentTime + 0.08 - s.time; if (PB.pg){ PB.pg.re++; PB.pg.skip += d; } s.base += d; s.time += d; if (s.btT != null) s.btT += d; if (PB.rsA){ PB.rsA.c = ctx.currentTime; PB.rsA.w = performance.now() / 1000; } }   // (10 Nov: a new baseline for rsTick)
+  if (RESYNC && s.alive() && s.base != null) rsTick(s); else PB.rsA = null;
+  if (s.alive() && s.time < ctx.currentTime - (COARSE && !document.hidden ? Math.max(0.15, outLat + 0.05) : 0.5) && s.base != null){ const d = ctx.currentTime + 0.08 - s.time; if (PB.pg){ PB.pg.re++; PB.pg.skip += d; } s.base += d; s.time += d; if (s.btT != null) s.btT += d; }
   // Schedule 250 ms ahead, so a busy moment on the UI thread can't make notes late (it was 150 ms on a computer).
   // Tracker edits and mutes reach notes after that; pads, keys, previews and STOP are immediate. With the app in the
   // background (owner, 31 Oct: stutters there) 1.2 s: the system runs a hidden page's thread late and in bursts, and
