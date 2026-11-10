@@ -44,9 +44,11 @@ test('a load that never finishes does not block a save beyond the cap', async ()
   assert.match(t.st.asked[0].msg.title, /1 sample not loaded yet/);
 });
 
-test('quiet mode (automatic backups) never asks: it just reports an incomplete kit', async () => {
-  const t = mk([{ sample: notYet() }], async () => {});
-  assert.equal(await t.gate(100, true), false); assert.equal(t.st.asked.length, 0);
+test('quiet mode (automatic backups) never asks: a sample still loading skips the backup, one that is gone for good does not (lead, 10 Nov)', async () => {
+  const gone = mk([{ sample: notYet() }], async () => {});   // the lookup finished: not in storage
+  assert.equal(await gone.gate(100, true), true, 'backups carry on without it, as before'); assert.equal(gone.st.asked.length, 0);
+  const slow = mk([{ sample: notYet() }], () => new Promise(() => {}));   // a load that never finishes
+  assert.equal(await slow.gate(150, true), false, 'still loading: skip this backup'); assert.equal(slow.st.asked.length, 0);
 });
 
 test('every file-writing path goes through the gate', () => {

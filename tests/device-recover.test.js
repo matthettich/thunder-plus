@@ -30,7 +30,7 @@ test('chosen output gone: falls back to the default, one error toast, the saved 
   assert.equal(R.sb.aset.sink, 'usb1', 'saved choice kept');
   R.clock.now += 1000; await R.run('again'); await R.run('again2', true);
   assert.equal(R.errs.length, 1, 'said once'); assert.deepEqual(R.calls, ['sink:']);
-  assert.ok(R.log.some(l => /^device: devicechange/.test(l)) && R.log.some(l => /^device: done/.test(l)));
+  assert.ok(R.log.some(l => /^device: done/.test(l)), 'the change is logged'); assert.ok(!R.log.some(l => /^device: devicechange/.test(l)), 'a trigger with a running engine is not logged (lead, 10 Nov)');
 });
 
 test('the output comes back: switched back, plain toast', async () => {
