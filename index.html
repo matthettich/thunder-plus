@@ -25454,6 +25454,8 @@ function toggleBlockMute(y, t){
 let instViaTrk = false;   // Inst was opened from Song, Sect or Phrase (go: Mixer and FX then follow the song track)
 function go(v){
   fxpClose();
+  // FX opens with the cursor on SLOT 1, where EDIT adds an effect (it did nothing on the TRACK row; usability audit U2). A cursor the user moved stays.
+  if (v === 'fx' && tv !== 'fx' && cs.fx.y === 0) cs.fx.y = 1;
   if (v === 'sect' && !sectsOn) v = 'phrase';
   // Opening a phrase from the Song screen always resolves to that block's own phrase, whether the SECT page
   // is shown or hidden: an empty block gets its phrase made first, so you never land on the previous phrase.
