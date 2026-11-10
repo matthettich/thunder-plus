@@ -22,7 +22,7 @@ jobs:
         with:
           node-version: 22
       - name: acorn (some tests cut functions out of index.html with it; they skip without it)
-        run: npm i --no-save --no-audit --no-fund acorn@8
+        run: npm i --no-save --no-audit --no-fund acorn@8 acorn-walk@8
       - name: Node tests (npm test)
         run: npm test
       - name: Playwright driver (no browser download; the image has Chrome)
