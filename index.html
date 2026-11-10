@@ -23358,7 +23358,7 @@ let arrHandT = -1e9, arrActT = -1e9, arrTouchT = -1e9, workT = -1e9;
 const FOLLOW_HOLD = 4000;   // (9 Nov, owner: follow pulled the cursor while editing) for this long after a key or a press on the grid or pad, nothing moves the cursor or the open phrase
 const ARR_IDLE = 60000;
 window.addEventListener('keydown', e => { if (e.key !== ' ' && !/^(Shift|Control|Alt|Meta|AltGraph|CapsLock)$/.test(e.key)) arrActT = workT = performance.now(); }, true);
-window.addEventListener('pointerdown', e => { const q = e.target && e.target.closest; if (q && e.target.closest('[data-b="play"],[data-b="loop"],[data-b="stop"]')) return; if (q && (e.target.closest('#tPad') || e.target.closest('#tArr') || grid.contains(e.target))) workT = performance.now(); }, true);
+window.addEventListener('pointerdown', e => { const q = e.target && e.target.closest; if (q && e.target.closest('[data-b="play"],[data-b="loop"],[data-b="stop"]')) return; if (q && (e.target.closest('#tPad') || e.target.closest('#tArr') || grid.contains(e.target))) workT = performance.now(); if (q && e.target.closest('#tPad')) arrActT = workT; }, true);   // (10 Nov) on a phone the pad is the keyboard: a pad press holds Arrange's paging like a key does
 $('tArr').addEventListener('pointerdown', () => { arrActT = arrTouchT = performance.now(); }, true);
 function arrFollowPage(own){
   const now = performance.now();
