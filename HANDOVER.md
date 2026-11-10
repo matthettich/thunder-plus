@@ -582,6 +582,10 @@ The owner's top priority to add is the MOD screen. Work down the list; ask befor
 
 Start a session by asking for results. Fix on `beta`. Web beta: https://matthettich.github.io/thunder-plus/beta/ (build 543 as of 9 Nov evening). Desktop: v1.3.4-beta.2 (build 541, no feed view or scopes); further desktop betas on hold until the owner asks.
 
+**Build 546 (phone): the song is held when the clock leaps**
+- [ ] **Your normal song with effects**, Page sequencer: PLAY, screen off 20–30 s, back, STOP, Copy playback report. By ear: does it keep its tempo now (gaps are expected, rushing is not)? The report's `page ticks …` lines end with `held N× (S s)`.
+- [ ] **Same song, screen on for a minute:** any small pauses that were not there before? (`held` should stay 0 while the clock lines read 1.00 s in 1.00 s.)
+
 **Build 545 (phone, after it reaches the web beta)**
 - [ ] **A song with no effects** (pads and samples only), Page sequencer, Worklets On: Copy playback report should say `worklets none` on its second line. PLAY, screen off 20 s, back, STOP, Copy report: the clock lines should read about 1.00 s in 1.00 s and it should sound steady.
 - [ ] **Your normal song with effects:** it plays with its effects as before; the report lists what loaded (for example `chains, cpu, master, tfx`). Expect this one can still rush when hidden until the resync lands.
@@ -640,6 +644,11 @@ Start a session by asking for results. Fix on `beta`. Web beta: https://matthett
   the edge `R.t0`, "waiting…" while armed), `rcdClk` / `rcdFmt` / `rcdFreeSecs`, a 250 ms timer only while recording; the
   final length stays until the next take. recorder-check covers FREE, PATTERN, Stop, next take and closing mid-take.
 
+
+## 10 Nov (night): phone resync, "hold the song" (build 546)
+
+Owner asked for a resync safety net. Phones and tablets, Page sequencer, only while a worklet module is loaded on the context (`wkUsed(ctx).size`: without one the phone's clock held 1:1, so those songs are never touched), not during takes, Link or MIDI clock (`rsScope`). `rsTick` (called in `pumpRun` before the moved-on rule) watches the offset between the audio clock and real time over the last 0.6 s: the clock moves in steps of the output buffer, so the offset saws inside a band; a sample more than `RS_LEAP` 0.06 s over the band's upper edge is a leap, held in the same tick; the lower edge rising more than `RS_CREEP` 0.09 s is sustained racing, held too; a clock running slow (underruns) is followed, never corrected. `rsHold(s, d)` moves the song's timeline on by d as the moved-on rule does, plus `tp.t0`, `tp.st`, `stgT0`, `mx.beat`, `mx.t0`, the MIDI LFOs, ARP returns, CC ramps and echoes; notes already booked can't move. For 4 s after a hold the look-ahead stays short even hidden (`tp.rsUntil`). Kill switch `RESYNC`. The report's page line ends `held N× (S s)` and logs `held the song: audio clock leapt +D s`.
+Built by a Sonnet agent from the lead's design; the lead rejected its first detector (drift against a threshold with a step estimate: it left about 38% of a sustained rush on a stepped clock) for the envelope one, then gated it on loaded worklets and widened the creep margin from 0.04 (8 false holds in 30 s with jittered ticks, each a small pause in a healthy song) to 0.09 (0). Simulated on a faked clock, with the fix / without: 1× in 0.2 s steps with jitter, 30 s: 0 holds; 1.5× stepped, 20 s: +0.09 s / +9.6 s; 2.3×, 10 s: 0.00 s (peak 0.28) / runs away; +4 s and +32 s leaps: held in the same tick; the phone's pattern (1×, 1.4× with pauses, a +7 s burst): −0.46 s after 45 s (the pauses are followed on purpose) / +2.8 s; hidden page 1.5×: −0.25 s / +10.4 s. Scripts were in the session scratchpad (`vtest.mjs`). **Never run on a real phone:** the thresholds are the first thing to adjust from a report (false holds on a healthy clock would show as `held` counts while the clock lines read 1.00 s in 1.00 s).
 
 ## 10 Nov (night): worklets confirmed as the phone clock's cause; build 545
 
