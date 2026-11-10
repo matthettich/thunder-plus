@@ -2913,6 +2913,7 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
       <div class="audrow" title="Delays everything else so tracks with pump effects that look ahead (LIMIT, CALM, TONE, linear-phase EQ) stay in time. Off: those tracks play a little late. Renders follow this setting."><span>Latency comp</span><input type="checkbox" class="msw1" id="ckPdc" aria-label="Latency compensation"></div>
       <div class="segrow" id="psLiveRow" hidden><span>Live engines</span><div class="seg" id="segPsLive"></div></div>
       <div class="segrow" id="coreRow" title="Where the song is sequenced. Audio thread: the steps are worked out on the audio thread and rendered pads play there, so a busy screen can’t make them late. Page: as before."><span>Sequencer</span><div class="seg" id="segCore"></div></div>
+      <div class="segrow" id="noWkRow" title="For testing a phone whose audio clock runs fast. Off (test): track effects, chains, live engines and the audio-thread sequencer are silent or unused, and the safety limiter uses its simpler stand-in. Changes when the app reloads."><span>Worklets</span><div class="seg" id="segNoWk"></div></div>
       <div class="btnrow" id="audRestartRow" hidden><span class="lbl">Takes effect when audio restarts (the app reloads; your song and kit are kept)</span><button id="audRestart" class="on">Apply (reload)</button></div>
       <div class="audrow audfoot"><button class="sm" id="audReset" title="Clears stuck notes and effects: stops playback and rebuilds every sound and effect from scratch. Your song and kit are untouched.">Reset audio engine</button> <button class="sm" id="audReport" title="Copies a short playback log (screen on or off, sequencer state, how late the rows came, what still sounded after STOP) to paste into a bug report.">Copy playback report</button></div>
     </div>
@@ -8245,6 +8246,13 @@ const aset = (() => { const d = {sink:'', lat:'interactive', rate:0, vol:90, psL
 // The desktop app starts on Balanced too (owner, 31 Oct: playback stuttered in the desktop app and not in the browser on the
 // same computer; the app keeps its own settings, so it was on Lowest, the smallest buffer). A pick in Settings → Audio wins.
 const latOf = () => aset.latPick && aset.lat ? aset.lat : ((typeof platform !== 'undefined' && platform === 'mobile') || window.thunderDesktop ? 'balanced' : 'interactive');
+// WORKLETS OFF (test, 10 Nov; owner's Fold: the audio clock races with the app hidden, even stopped and silent): Chrome renders a
+// context on a second thread once that context loads any AudioWorklet module, for the life of the context. With aset.noWk on,
+// the page's own context loads none: no CPU probe, no safety-limiter worklet (its stand-in compressor and soft clip stay), no
+// live engines, no track effects, no chains, no audio-thread sequencer. Renders and exports (their own contexts) are untouched.
+// Read once at start-up: it takes a reload to change. To remove: this block, wkOff's callers and the Worklets row.
+const NOWK = !!aset.noWk;
+const wkOff = ac => NOWK && !!ctx && ac === ctx;   // (an export's own OfflineAudioContext is never ctx, even before the page's context exists)
 function asetSave(){ try { localStorage.setItem(AUK, JSON.stringify(aset)); } catch(e){} }
 const psLive = {off:false, strikes:0};   // …PUMP SYNTHS live: the safety net's switch for this visit (see psFallback)
 let aLive = null; // the latency and rate the running context was made with
@@ -8288,7 +8296,7 @@ const CPU_PROBE = `registerProcessor('thunder-cpu', class extends AudioWorkletPr
   }
 });`;
 function cpuProbe(ac){
-  if (!ac.audioWorklet || !window.AudioWorkletNode) return;
+  if (wkOff(ac) || !ac.audioWorklet || !window.AudioWorkletNode) return;
   const url = URL.createObjectURL(new Blob([CPU_PROBE], {type:'text/javascript'}));
   ac.audioWorklet.addModule(url).then(() => {
     if (ac !== ctx) return;
@@ -10613,12 +10621,13 @@ function varBuf(ev, ac){
   if (ev.vk){
     key = varKey(ev); rec = VAR.map.get(key);
     if (rec && rec.sr !== sr && !live) rec = null;
-    if (!rec){
+    if (rec){ VAR.map.delete(key); VAR.map.set(key, rec); }   // most recent last
+    else if (!(live && tp.on && VAR.pend.has(key))){   // (10 Nov) not when its render is on the way: don't build the voice again for every note (a MUT of a sample pad copies the whole sample each time)
       const v = varVoice(ev);
       if (v){ const hold = isSyn(ev.pad) ? v.len : 0;
         if (!live || (!tp.on && !(PW.ready && rwCan(v)))){ rec = {sr, data:varLevel(ev, renderVoice(v, sr, null, hold))}; varPut(key, rec); }
-        else varWant(ev); }
-    } else { VAR.map.delete(key); VAR.map.set(key, rec); }   // most recent last
+        else varWant(ev, v); }
+    }
   }
   if (!rec && !ev.tw) return null;
   if (!rec){ const c = live ? ensurePlay(ev.pad) : ensure(ev.pad); if (!c) return null; rec = c; key = 'p' + ev.pad + ':r' + (slotAt(padRev, ev.pad) || 0) + ':' + c.sr; }
@@ -10644,9 +10653,9 @@ function varPrefetch(){
           if (!seen.has(k)){ seen.add(k); n++; varWant(ev); } } } });
   } catch(e){ tpLog('MUT/GEN prefetch', e); }
 }
-function varWant(ev){
+function varWant(ev, v0){
   const key = varKey(ev); if (VAR.map.has(key) || VAR.pend.has(key)) return;
-  const v = varVoice(ev); if (!v) return;
+  const v = v0 || varVoice(ev); if (!v) return;
   const sr = padSR(); VAR.pend.add(key);
   const done = data => { VAR.pend.delete(key); if (data){ const rec = {sr, data:varLevel(ev, data)}; varPut(key, rec); coreVar(ev, rec); } };
   if (PW.ready && rwCan(v)) renderAsync(v, sr, isSyn(ev.pad) ? v.len : 0, false).then(r => done(r && r.data), () => done(null));
@@ -13964,7 +13973,7 @@ async function audRefresh(){
   updLat(); updARate(); updPdc(); audRestartRow(); audStatus();
 }
 function audLvlShow(){ const v = aset.vol; $('audLvlV').textContent = v <= 0 ? '−∞ dB' : (20 * Math.log10(v / 100)).toFixed(1) + ' dB'; }
-function audRestartRow(){ $('audRestartRow').hidden = !(ctx && aLive && (aLive.lat !== latOf() || aLive.rate !== aset.rate)); }
+function audRestartRow(){ $('audRestartRow').hidden = !((ctx && aLive && (aLive.lat !== latOf() || aLive.rate !== aset.rate)) || NOWK !== !!aset.noWk); }
 $('audOut').addEventListener('change', async e => {
   const id = e.target.value, name = e.target.selectedOptions[0] ? e.target.selectedOptions[0].textContent : '';
   aset.sink = id; asetSave();
@@ -14006,6 +14015,7 @@ const updPsLive = makeSeg($('segPsLive'), [['auto', 'Auto'], ['render', 'Rendere
 const updCore = makeSeg($('segCore'), [['core', 'Audio thread'], ['page', 'Page (old)']], () => aset.core === 'page' ? 'page' : 'core', v => {
   aset.core = v; asetSave();
   if (v === 'core'){ if (ctx) coreLoad(); toast('Sequencer: audio thread, from the next PLAY.', 3000); } else toast('Sequencer: page, from the next PLAY.', 2500); });
+const updNoWk = makeSeg($('segNoWk'), [[0, 'On'], [1, 'Off (test)']], () => aset.noWk ? 1 : 0, v => { aset.noWk = !!v; asetSave(); audRestartRow(); });   // WORKLETS OFF (test)
 function psLiveNote(){
   $('psLiveRow').hidden = false;   // waves live uses it too, with or without the pump engines
   $('psLiveRow').title = aset.psLive === 'render'
@@ -18710,6 +18720,7 @@ function chnBin(){
   return b || null;
 }
 function chainsReady(ac){
+  if (wkOff(ac)) return Promise.resolve(false);   // WORKLETS OFF (test)
   if (!chnLoaded.has(ac)){
     chnLoaded.set(ac, (async () => {
       await tfxLoad; if (!chnBin() || !ac.audioWorklet || !window.AudioWorkletNode) return false;
@@ -18965,6 +18976,7 @@ function chainsAutoTracks(){
 function tfxBin(){ return tfxBytes || null; }   // the effects wasm, once the loader has fetched it (false when it couldn't)
 // Resolves true once this audio context can make effect nodes.
 function tfxReady(ac){
+  if (wkOff(ac)) return Promise.resolve(false);   // WORKLETS OFF (test)
   if (!tfxLoaded.has(ac)){
     tfxLoaded.set(ac, (async () => {
       await tfxLoad; if (!tfxBin() || !ac.audioWorklet || !window.AudioWorkletNode) return false;
@@ -21009,9 +21021,10 @@ function rtInit(){
     // the master meter listens to everything going out, synth pads included
     const sp = ctx.createChannelSplitter(2); rt.man = [ctx.createAnalyser(), ctx.createAnalyser()];
     master.connect(sp); rt.man.forEach((a, i) => { a.fftSize = 1024; sp.connect(a, i); });
-    tfxReady(ctx).then(ok => { rt.fxOk = ok; rtAllFx(); if (!ok && (S.tfx.some(fxCount) || fxCount(S.mfx))) toast('Track effects need a newer browser here.'); });
+    tfxReady(ctx).then(ok => { rt.fxOk = ok; rtAllFx(); if (!ok && !NOWK && (S.tfx.some(fxCount) || fxCount(S.mfx))) toast('Track effects need a newer browser here.'); });
     if (aset.core === 'core') setTimeout(() => { try { if (!tp.on) coreLoad(); } catch(e){} }, 0);   // not mid-song: loading it (the module, the song, every pad's render) made the first PLAY stutter
-    chainsReady(ctx).then(ok => { rt.chnOk = ok; if (ok){ chnSync.add(ctx); rtAllFx(); } else if ((S.chainOn || []).some(Boolean)) toast('chains needs a newer browser here.'); });
+    chainsReady(ctx).then(ok => { rt.chnOk = ok; if (ok){ chnSync.add(ctx); rtAllFx(); } else if ((S.chainOn || []).some(Boolean) && !NOWK) toast('chains needs a newer browser here.'); });
+    if (NOWK && (S.tfx.some(fxCount) || fxCount(S.mfx) || (S.chainOn || []).some(Boolean))) toast('Worklets are off for testing (Settings › Audio), so track effects and chains are silent.', 4000);   // one toast for both (WORKLETS OFF)
   }
   return rt;
 }
@@ -21169,6 +21182,7 @@ function psFallback(why){
   try { psLiveNote(); } catch(e){}
 }
 function bassReady(ac){
+  if (wkOff(ac)) return Promise.resolve(false);   // WORKLETS OFF (test)
   if (!bassLoad.has(ac)){
     let pr = Promise.resolve(false);
     try { if (ac.audioWorklet){ if (!bassURL) bassURL = URL.createObjectURL(new Blob([BassCore.toString() + BASS_PROC + '\n' + VoxCore.toString() + VOX_PROC + '\n' + AcidCore.toString() + XPROC('acid', 'AcidCore') + '\n' + MachCore.toString() + XPROC('mach', 'MachCore')], {type:'text/javascript'}));
@@ -21208,7 +21222,7 @@ const liveX = v => !!(v && XENG[v.engine] && XENG[v.engine].live);
 // A bass voice was edited: the live nodes playing it hear the change at once.
 function bassPush(i){ const v = kit.voices[i], vx = isVoxV(v), lx = liveX(v); if (!isBassV(v) && !vx && !lx) return; const kind = vx ? 'vox' : lx ? v.engine : 'bass', p = vx ? voxParams(v) : lx ? xParams(v) : bassParams(v); for (const b of bassLive) if (b.pad === i && b.kind === kind) try { const fs = lx ? frzSample(v) : null; if (b.lanes && fs !== (b.fileRef || null)){ b.fileRef = fs; b.node.port.postMessage({set:p, file:fs ? {d:fs.data, sr:fs.sr} : {d:null}}); } else b.node.port.postMessage({set:p}); } catch(e){} }   // FREEZE FILE: the sound only when it changed
 const MW_URL = 'master-worklet.js?v=5', mwLoad = new WeakMap();
-function mwReady(ac){ if (!mwLoad.has(ac)){ const pr = ac.audioWorklet ? ac.audioWorklet.addModule(MW_URL).then(() => true, () => false) : Promise.resolve(false); mwLoad.set(ac, pr); } return mwLoad.get(ac); }
+function mwReady(ac){ if (!mwLoad.has(ac)){ const pr = ac.audioWorklet && !wkOff(ac) ? ac.audioWorklet.addModule(MW_URL).then(() => true, () => false) : Promise.resolve(false); mwLoad.set(ac, pr); } return mwLoad.get(ac); }
 const mstSet = M => ({sup:M.sup, comp:M.comp, lim:M.lim});
 const mstNeedsWk = M => M.sup.on || M.comp.on || M.lim.on;
 // Samples the chain delays the sound by (the suppressor's FFT and the limiter's lookahead); renders trim it off.
@@ -21227,7 +21241,7 @@ const eqShape = eq => !eq.on ? 'off' : eq.bands.map(b => b.on ? b.type + (b.type
 function mstChain(ac, M, live){
   const input = ac.createGain(), output = ac.createGain(), eq = eqBuild(ac, M.eq);
   let wk = null;
-  if (mstNeedsWk(M)){ try { wk = new AudioWorkletNode(ac, 'thunder-master', {numberOfInputs:1, numberOfOutputs:1, outputChannelCount:[2], channelCount:2, channelCountMode:'explicit', processorOptions:{set:mstSet(M), meters:live}}); } catch(e){ wk = null; } }
+  if (mstNeedsWk(M) && !wkOff(ac)){ try { wk = new AudioWorkletNode(ac, 'thunder-master', {numberOfInputs:1, numberOfOutputs:1, outputChannelCount:[2], channelCount:2, channelCountMode:'explicit', processorOptions:{set:mstSet(M), meters:live}}); } catch(e){ wk = null; } }
   let h = input; for (const n of eq){ h.connect(n); h = n; } if (wk){ h.connect(wk); h = wk; } h.connect(output);
   return {input, output, eq, wk, shape:eqShape(M.eq) + '|' + !!wk};
 }
@@ -21610,7 +21624,7 @@ const CORE_URL = () => 'core/seq-core.js?v=' + BUILD + '-' + CORE_REV;
 const core = {node:null, ready:false, loading:null, gen:0, sent:new Map(), sT:0, tally:new Map(), mir:null};   // mir: what the core's song holds, as JSON per part (coreDiff)   // tally: events by who played them (test hook)
 function coreLoad(){
   if (core.loading) return core.loading;
-  if (!ctx || !ctx.audioWorklet || !rt) return Promise.resolve(false);
+  if (NOWK || !ctx || !ctx.audioWorklet || !rt) return Promise.resolve(false);
   core.loading = ctx.audioWorklet.addModule(CORE_URL()).then(() => {
     const n = new AudioWorkletNode(ctx, 'thunder-core', {numberOfInputs:0, numberOfOutputs:NT + 4, outputChannelCount:[...new Array(NT).fill(2), 1, NT, NT, 1]});   // + the mix outputs (coreMixT)
     n.port.onmessage = e => { try { coreMsg(e.data || {}); } catch(err){ tpLog('core message', err); } };
@@ -21744,15 +21758,36 @@ function pbLog(s){ try { PB.log.push((performance.now() / 1000).toFixed(2) + ' '
 const pbState = () => `ctx ${ctx ? ctx.state + ' t=' + ctx.currentTime.toFixed(2) : '-'} on=${tp.on ? 1 : 0} core=${tp.core ? 1 : 0} seq=${aset.core} hidden=${document.hidden ? 1 : 0} wall=${(Date.now() / 1000 % 100000).toFixed(2)}`;
 // BACKGROUND TIMING (8 Nov): how the Page sequencer's tick fared since the screen last changed: the longest wait between ticks (wall clock), how close the song came to running out, and any jumps forward
 const pbPg = () => { const P = PB.pg; PB.pg = null; return P ? ` · page ticks ${P.n}, longest gap ${P.gap.toFixed(2)} s, least lead ${P.lead.toFixed(2)} s, moved on ${P.re}× (${P.skip.toFixed(2)} s)` : ''; };
+// (10 Nov: the 529 report showed the clock racing with the song stopped and the screen off, where this log had already gone quiet.
+// It now also runs while the app is hidden with the engine running, and for 10 s after it comes back.)
+function pbCkOn(){ if (!ctx) return false; const n = performance.now(); return tp.on || n - PB.stopT <= 5000 || (ctx.state === 'running' && (document.hidden || n - (PB.visT || -1e9) <= 10000)); }
+document.addEventListener('visibilitychange', () => { if (!document.hidden) PB.visT = performance.now(); });
+// SLOW WORK (10 Nov; owner: a stutter with the song playing through its rows that stops under LOOP): while the song plays, anything
+// here that holds the page for 4 ms or more goes in the report with the song row, and so does any frame the browser calls long
+// (120 ms or more) with the functions that took the time. Testing aid: to remove, delete this block.
+{ const W = (name, f, x) => function(...a){ const t = performance.now(), r = f.apply(this, a), d = performance.now() - t;
+    if (d >= 4 && tp.on){ let m = ''; try { m = x ? ' · ' + x(a, r) : ''; } catch(e){} pbLog(`slow ${name} ${d.toFixed(0)} ms${m} · row ${tp.hiRow}`); } return r; };
+  const ev = a => `pad ${a[0].pad + 1} inst ${a[0].ii}${a[0].vk ? ' var ' + a[0].vk : ''}${a[0].tw ? ' CUT/RES/DEC' : ''}`;
+  try {
+    varVoice = W('variation voice', varVoice, ev); varBuf = W('variation sound', varBuf, ev);
+    shapeData = W('CUT/RES/DEC shaping', shapeData, a => `${a[0].length} samples`);
+    stretchData = W('tempo stretch', stretchData, a => `${a[0].length} samples`);
+    rtBufPlain = W('first buffer', rtBufPlain, a => `pad ${a[0] + 1}${a[1] ? ' reversed' : ''}`);
+    ensure = W('pad render on the page', ensure, a => `pad ${a[0] + 1}`);
+  } catch(e){ tpLog('slow-work timing not installed', e); }
+  let last = 0;
+  try { new PerformanceObserver(l => { if (!tp.on) return; for (const e of l.getEntries()){ const n = performance.now(); if (e.duration < 120 || n - last < 250) continue; last = n;
+      const sc = (e.scripts || []).slice().sort((p, q) => q.duration - p.duration).slice(0, 3).map(q => `${String(q.sourceFunctionName || q.invoker || '?').slice(0, 40)} ${q.duration | 0}`).join(', ');
+      pbLog(`long frame ${e.duration | 0} ms (blocked ${e.blockingDuration | 0}) · row ${tp.hiRow}${sc ? ' · ' + sc : ''}`); } }).observe({type:'long-animation-frame'}); } catch(e){} }
 // CLOCK DETAIL (8 Nov): on the Fold the audio clock runs ahead of real time while playing. Once a second, while playing and for 5 s after STOP, a line goes in the
 // report if the clock moved more than 0.1 s away from real time (and every 10 s anyway): what the browser says about the output, to tell which side is racing.
 { let w0 = 0, c0 = 0, n = 0; idleTick(() => { try {
-  if (!ctx || (!tp.on && performance.now() - PB.stopT > 5000)){ w0 = 0; return; }
+  if (!pbCkOn()){ w0 = 0; return; }
   const w = Date.now() / 1000, c = ctx.currentTime; if (!w0){ w0 = w; c0 = c; return; }
   const dw = w - w0, dc = c - c0; w0 = w; c0 = c; n++; if (Math.abs(dc - dw) < 0.1 && n % 10) return;
   const ts = ctx.getOutputTimestamp ? ctx.getOutputTimestamp() : {}, st = ctx.playbackStats, b = typeof bgEl !== 'undefined' && bgEl;
-  pbLog(`clock +${dc.toFixed(2)} s in ${dw.toFixed(2)} s · out t=${(+ts.contextTime || 0).toFixed(2)} lat ${ctx.baseLatency.toFixed(3)}+${(ctx.outputLatency || 0).toFixed(3)} sr ${ctx.sampleRate}` + (st ? ` · stats total ${(+st.totalDuration || 0).toFixed(2)} underrun ${(+st.underrunDuration || 0).toFixed(2)} ×${st.underrunEvents | 0}` : '') + (b ? ` · bg ${b.paused ? 'paused' : 'on'} ${b.currentTime.toFixed(2)}` : '') + ' · ' + pbState());
-} catch(e){} }, 1000, () => !!ctx && (tp.on || performance.now() - PB.stopT <= 5000), 2500); }   // BATTERY: only while playing and 5 s after (also while hidden: that is what it is for)
+  pbLog(`clock +${dc.toFixed(2)} s in ${dw.toFixed(2)} s · out t=${(+ts.contextTime || 0).toFixed(2)} (${ts.performanceTime ? ((performance.now() - ts.performanceTime) / 1000).toFixed(2) : '?'} s old) lat ${ctx.baseLatency.toFixed(3)}+${(ctx.outputLatency || 0).toFixed(3)} sr ${ctx.sampleRate}` + (st ? ` · stats total ${(+st.totalDuration || 0).toFixed(2)} underrun ${(+st.underrunDuration || 0).toFixed(2)} ×${st.underrunEvents | 0}` : '') + (b ? ` · bg ${b.paused ? 'paused' : 'on'} ${b.currentTime.toFixed(2)}` : '') + ' · ' + pbState());
+} catch(e){} }, 1000, () => pbCkOn(), 2500); }   // BATTERY: only while playing and 5 s after (also while hidden: that is what it is for)
 function pbLevel(){ try { const A = rt && rt.man; if (!A) return '-'; let m = 0; for (const a of A){ const b = new Float32Array(a.fftSize); a.getFloatTimeDomainData(b); for (const x of b) m = Math.max(m, Math.abs(x)); } return m ? (20 * Math.log10(m)).toFixed(1) + ' dB' : 'silent'; } catch(e){ return '?'; } }
 /* HYBRID (owner, 6 Nov: "Build the hybrid and make sure we don't break anything on desktop"): on a phone or tablet, the
    moment the app is hidden (the screen off, another app, the shade) while the audio-thread sequencer plays the song, the
@@ -21808,7 +21843,7 @@ function pbSum(){ const now = performance.now(); if (now - PB.t < 2000) return; 
   PB.n = PB.late = PB.drop = PB.ahead = 0; }
 function pbAfterStop(){ PB.stopT = performance.now(); pbLog('STOP · ' + pbState()); for (const ms of [1000, 3000]) setTimeout(() => pbLog(`${ms / 1000} s after STOP: level ${pbLevel()} · voices ${rt && rt.pl.aliveN ? rt.pl.aliveN() : '?'} · stray rows ${PB.stray} · ` + pbState()), ms); }
 async function pbCopy(){
-  const head = `Thunder Plus build ${BUILD} · ${navigator.userAgent}\nlatency ${ctx ? Math.round((ctx.baseLatency || 0) * 1000) + ' + ' + Math.round((ctx.outputLatency || 0) * 1000) + ' ms · heard ' + Math.round(heardLat() * 1000) + ' ms' : '-'} · ${pbState()}\n`;
+  const head = `Thunder Plus build ${BUILD} · ${navigator.userAgent}\nlatency ${ctx ? Math.round((ctx.baseLatency || 0) * 1000) + ' + ' + Math.round((ctx.outputLatency || 0) * 1000) + ' ms · heard ' + Math.round(heardLat() * 1000) + ' ms' : '-'} · worklets ${NOWK ? 'OFF (test)' : 'on'} · ${pbState()}\n`;
   const txt = head + PB.log.join('\n');
   try { await navigator.clipboard.writeText(txt); toast('Playback report copied: paste it into the chat.', 3500); }
   catch(e){ try { await deliver('thunder-playback-report.txt', new Blob([txt], {type:'text/plain'})); } catch(e2){ toast('Couldn’t copy the report here.'); } }
@@ -23010,7 +23045,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 543;
+const BUILD = 544;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD + (location.pathname.includes('/beta/') ? ' · beta' : '');
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -32399,6 +32434,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [544, '10 Nov', ['(Testing) A Worklets setting in Settings › Audio (On, or Off for a phone clock test), the playback report now logs the audio clock while the app is hidden and any slow work while the song plays, and a MUT or GEN variation no longer rebuilds its sound for every note while it renders.']],
   [543, '9 Nov', ['MOD: each LFO now has a small scope that draws its real shape (depth sets the height) with a dot that moves along it in time with the song while it plays. Two or more LFOs on the same target also get a scope of their sum. Wide screens put the scopes under the rows; a folded phone puts a small one beside each row. They stand still with LOW POWER DISPLAY on, and cost nothing on other screens.']],
   [542, '9 Nov', ['…chains on the bottom panel: a track that feeds a chain through a Track In now shows that chain too. This track’s signal is lit from its Track In to the Chain Out, and the other inputs, modules and lines are greyed (still clickable). The IN tag greys the other tracks’ numbers, and the title says which track’s chain it is.']],
   [541, '9 Nov', ['Acid line: MUTATE INTENSITY (1–100) sets how many steps Mutate changes, from one step to the whole line. A changed note moves to a near note of the scale (farther at higher intensity), so the line stays related to the one you had. Mutate leaves the volumes, effects and instrument changes you added by hand on the rows it doesn’t change, and Original (O) puts back the phrase as it was when the panel opened.']],

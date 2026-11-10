@@ -142,6 +142,27 @@ test('build number: the page\'s BUILD is the service-worker cache number, so "wh
   assert.ok(n > 0);
 });
 
+/* ───────── WORKLETS OFF (test switch, 10 Nov): a phone clock test, so the page's own context loads no worklet ───────── */
+test('worklets off (test): default off, and every worklet loader on the page context checks wkOff first', () => {
+  const src = H.read('index.html');
+  assert.match(src, /const NOWK = !!aset\.noWk;/, 'read once at start-up, from the saved audio settings');
+  assert.doesNotMatch(src, /noWk:\s*(true|1)\b/, 'the default is off');
+  assert.match(src, /const wkOff = ac => NOWK && !!ctx && ac === ctx;/, 'only the page\'s own context: exports keep their worklets');
+  const body = name => cut('index.html', new RegExp('function ' + name + '\\([^)]*\\)\\{[^\\n]*\\n[^\\n]*\\n'), name);
+  for (const f of ['cpuProbe', 'chainsReady', 'tfxReady', 'bassReady']) assert.match(body(f), /wkOff\(ac\)/, f + ' asks wkOff');
+  assert.match(cut('index.html', /function mwReady\(ac\)\{[^\n]*\n/, 'mwReady'), /!wkOff\(ac\)/);
+  assert.match(cut('index.html', /function coreLoad\(\)\{[^\n]*\n[^\n]*\n[^\n]*\n/, 'coreLoad'), /NOWK \|\|/);
+  assert.match(src, /if \(mstNeedsWk\(M\) && !wkOff\(ac\)\)/, 'the live mastering chain makes no worklet node either');
+  assert.match(src, /worklets \$\{NOWK \? 'OFF \(test\)' : 'on'\}/, 'the playback report says which');
+});
+
+test('variations: a render that is pending does not build the voice again for every note (and leaves no empty map entry)', () => {
+  const blk = cut('index.html', /function varBuf\(ev, ac\)\{[\s\S]*?\n\}\n/, 'varBuf');
+  assert.match(blk, /else if \(!\(live && tp\.on && VAR\.pend\.has\(key\)\)\)\{/);
+  assert.match(blk, /varWant\(ev, v\)/, 'the voice just built goes to the render');
+  assert.match(blk, /if \(rec\)\{ VAR\.map\.delete\(key\); VAR\.map\.set\(key, rec\); \}/, 'the most-recent-last touch only for a real record');
+});
+
 /* ───────── the Electron CSP header (electron/main.js) ───────── */
 test('electron CSP: report-only, no outside origins, wasm and blob allowed, and the response is passed through intact', async () => {
   const src = H.read('electron/main.js'), csp = src.match(/const CSP = \[[\s\S]*?\]\.join\('; '\);/)[0], wc = src.match(/const withCsp = res => \{[^\n]*\};/)[0];
