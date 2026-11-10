@@ -56,7 +56,10 @@ argues the gate is wrong, that is a "For Fable" item, not a manager decision.
    second, with a two-step brief, took four minutes).
 7. Licences: only permissive code in `native/core/`. LXR is GPL-3.0-only and stays a separate optional module (U04).
    `pump` sources come from the owner's `matthettich/pump` repo (U03: ask the owner how to bring them in: submodule
-   or copy). Pin every upstream commit.
+   or copy; a submodule keeps one copy). Owner, 10 Nov: asked whether the pump VSTs could just be copied over. The
+   built VST files cannot (desktop-only binaries; a song would not play on the phone), but the pump DSP is already C++
+   and is compiled in as it is: nothing in pump is ported, only the hosting glue around it (U18). Pin every upstream
+   commit.
 
 ## 4. Order of work
 
