@@ -320,7 +320,7 @@ class ThunderCore extends AudioWorkletProcessor {
   mixEv(ev){
     const at = Math.max(ev.t, currentTime);
     if (ev.type === 'mvol'){ const A = this.mm || (this.mm = new Auto(0)); A.hold(at); A.lin(curve(ev.v) - curve(S && S.master != null ? S.master : 255), at + 0.004); return true; }
-    // MOD vol:MT (11 Nov): the master OUT fader (after the limiter). Output NT + 4: its offset (target − S.mout's gain) is added to the OUT gain; the 4 ms glide of TVA
+    // MOD vol:MT (10 Nov): the master OUT fader (after the limiter). Output NT + 4: its offset (target − S.mout's gain) is added to the OUT gain; the 4 ms glide of TVA
     if (ev.type === 'mout'){ const A = this.mo || (this.mo = new Auto(0)); A.target(curve(ev.v) - curve(S && S.mout != null ? S.mout : 255), at, 0.004); return true; }
     const t = ev.track; if (t == null || t < 0 || t >= NT) return false;
     const m = S && S.mix && S.mix[t];
@@ -570,8 +570,8 @@ class ThunderCore extends AudioWorkletProcessor {
       const proc = tcNodes().get('fx:' + ev.track), A = S && (ev.track >= NT ? S.mfx : S.tfx && S.tfx[ev.track]), f = A && A[ev.slot];
       if (!proc || !f || !TFX[f.type]) return false;
       if (TFX[f.type].pump){
-        const D = TFX[f.type], q = D.ps[ev.pi]; if (!D.pd || !q || !q.lfo) return false;
-        const key = ev.track + ':' + ev.slot, ov = Object.assign({}, this.fxOv.get(key)); ov[q.k] = q.min + Math.round((q.max - q.min) * ev.v / 255);
+        const D = TFX[f.type], q = D.ps[ev.pi]; if (!D.pd || !q || !q.lfo || (q.pb && !(ev.b >= 0 && ev.b < q.pb.length))) return false;   // a banded row (q.pb) needs its band
+        const key = ev.track + ':' + ev.slot, ov = Object.assign({}, this.fxOv.get(key)); ov[q.pb ? D.pd[q.pb[ev.b]].s : q.k] = q.min + Math.round((q.max - q.min) * ev.v / 255);
         this.fxOv.set(key, ov); tcAt(proc, Math.max(ev.t, currentTime), {pset:{slot:ev.slot, pv:pumpPv(D, f, ov)}}); return true;
       }
       if (!fxvMap(TFX[f.type], f.type)) return false;

@@ -318,7 +318,7 @@ test('one rule for value controls (3 Nov): faders, strip, FX bar and pump drag r
   assert.match(src, /const wheelOk = r => !!r && \(r\.hasAttribute\('data-wheel'\)/, 'data-wheel controls take the wheel after the rest');
   const k = H.read('pump/ui/kit.js');
   assert.match(k, /const dragMul = m => m\.shift \? 0\.1 : m\.cmd \? 4 : 1;/, 'pump: dragMul');
-  assert.match(k, /'Reset to default', 'Type a value…'\]/, 'pump: right-click menu');
+  assert.match(k, /'Reset to default', 'Type a value…'[,\]]/, 'pump: right-click menu');
   assert.match(k, /if \(c !== this\.wheelC\) return;/, 'pump: the wheel waits for the rest');
 });
 
