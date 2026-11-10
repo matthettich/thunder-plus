@@ -21747,7 +21747,7 @@ function tStart(mode, o){
   if (mode === 'song' && (o.row | 0) > 0) try { chaseFx(o.row | 0, seq.time); } catch(e){ tpLog('chase', e); }   // CHASE: the effect commands before the start row
   tp.core = false;
   if (coreWanted() && core.ready && !core.bad && !(o && o.page)) coreStart(mode, o, t0start, rsFirst ? {ref:pz.ref, row:pz.row, step:pz.step} : null);
-  rkReset(); pbLog('PLAY ' + mode + ' · ' + pbState()); setTimeout(() => { if (tp.on) pbLog(`4 s into PLAY: level ${pbLevel()}`); }, 4000);   // (9 Nov: to compare Latency settings)   // not loaded yet: this PLAY as before, the core loads at STOP
+  rkReset(); pbLog('PLAY ' + mode + ' · ' + pbState()); pbLvReset(); setTimeout(() => { if (tp.on) pbLog(`4 s into PLAY: level ${pbLevel()}`); }, 4000);   // (9 Nov: to compare Latency settings)   // not loaded yet: this PLAY as before, the core loads at STOP
   if (lkp) lkStarted(lkp);   // ABLETON LINK: Link's exact tempo; ours tells the session
   tp.timer = pumpTimer(); pump(); if (!handing) draw(); songBtn(); chainsTempo(); if (typeof frameWake === 'function') frameWake();   // (a hand-over happens out of view: no draw, which was most of its time)
   bgPlay(true);   // BACKGROUND PLAY
@@ -22232,7 +22232,7 @@ document.addEventListener('visibilitychange', () => { if (!document.hidden) PB.v
       pbLog(`long frame ${e.duration | 0} ms (blocked ${e.blockingDuration | 0}) · row ${tp.hiRow}${sc ? ' · ' + sc : ''}`); } }).observe({type:'long-animation-frame'}); } catch(e){} }
 // CLOCK DETAIL (8 Nov): on the Fold the audio clock runs ahead of real time while playing. Once a second, while playing and for 5 s after STOP, a line goes in the
 // report if the clock moved more than 0.1 s away from real time (and every 10 s anyway): what the browser says about the output, to tell which side is racing.
-{ let w0 = 0, c0 = 0, n = 0; idleTick(() => { try {
+{ let w0 = 0, c0 = 0, n = 0; idleTick(() => { pbLvRead(); try {
   if (!pbCkOn()){ w0 = 0; return; }
   const w = Date.now() / 1000, c = ctx.currentTime; if (!w0){ w0 = w; c0 = c; return; }
   const dw = w - w0, dc = c - c0; w0 = w; c0 = c; n++; if (Math.abs(dc - dw) < 0.1 && n % 10) return;
@@ -22240,6 +22240,20 @@ document.addEventListener('visibilitychange', () => { if (!document.hidden) PB.v
   pbLog(`clock +${dc.toFixed(2)} s in ${dw.toFixed(2)} s · out t=${(+ts.contextTime || 0).toFixed(2)} (${ts.performanceTime ? ((performance.now() - ts.performanceTime) / 1000).toFixed(2) : '?'} s old) lat ${ctx.baseLatency.toFixed(3)}+${(ctx.outputLatency || 0).toFixed(3)} sr ${ctx.sampleRate}` + (st ? ` · stats total ${(+st.totalDuration || 0).toFixed(2)} underrun ${(+st.underrunDuration || 0).toFixed(2)} ×${st.underrunEvents | 0}` : '') + (b ? ` · bg ${b.paused ? 'paused' : 'on'} ${b.currentTime.toFixed(2)}` : '') + ' · ' + pbState());
 } catch(e){} }, 1000, () => pbCkOn(), 2500); }   // BATTERY: only while playing and 5 s after (also while hidden: that is what it is for)
 function pbLevel(){ try { const A = rt && rt.man; if (!A) return '-'; let m = 0; for (const a of A){ const b = new Float32Array(a.fftSize); a.getFloatTimeDomainData(b); for (const x of b) m = Math.max(m, Math.abs(x)); } return m ? (20 * Math.log10(m)).toFixed(1) + ' dB' : 'silent'; } catch(e){ return '?'; } }
+// LEVEL OVER A PLAY (10 Nov): the single reading 4 s into PLAY varies by ~7 dB, so each PLAY also keeps the average (RMS) and the peak of the
+// SAME master analysers (rt.man), read once a second by the clock-detail tick below (it runs for the whole of playback, hidden too; no new node
+// or timer). Plain numbers only: the sum of the readings' mean squares, their count and the highest peak. Reset at PLAY, logged at STOP.
+const PB_LV_S = 1;   // seconds between readings (the clock-detail tick's period)
+function pbLvReset(){ PB.lv = {on:true, sum:0, n:0, pk:0}; }
+function pbLvAdd(ms, pk){ const L = PB.lv; if (!L || !L.on) return; L.sum += ms; L.n++; if (pk > L.pk) L.pk = pk; }
+function pbLvText(L){ L = L || PB.lv; if (!L || !L.n) return null; const db = x => x > 0 ? (10 * Math.log10(x)).toFixed(1) + ' dB' : 'silent';
+  return `average ${db(L.sum / L.n)} (RMS), peak ${db(L.pk * L.pk)}, ${L.n * PB_LV_S} s measured`; }
+function pbLvRead(){ try { const L = PB.lv; if (!L || !L.on || !tp.on || !ctx || ctx.state !== 'running') return; const A = rt && rt.man; if (!A) return;
+  const b = PB.lvB || (PB.lvB = new Float32Array(1024)); let s = 0, p = 0, c = 0;
+  for (const a of A){ const n = Math.min(b.length, a.fftSize); a.getFloatTimeDomainData(b); for (let k = 0; k < n; k++){ const x = b[k]; s += x * x; c++; const q = x < 0 ? -x : x; if (q > p) p = q; } }
+  if (c) pbLvAdd(s / c, p); } catch(e){} }
+function pbLvStop(){ const L = PB.lv; if (!L || !L.on) return; L.on = false; const t = pbLvText(L); pbLog('level over this play: ' + (t || 'not measured (under ' + PB_LV_S + ' s)')); PB.lvDone = t; }
+// END LEVEL OVER A PLAY
 /* HYBRID (owner, 6 Nov: "Build the hybrid and make sure we don't break anything on desktop"): on a phone or tablet, the
    moment the app is hidden (the screen off, another app, the shade) while the audio-thread sequencer plays the song, the
    song carries on from the next step not yet sounding on the page sequencer, at that step's own time, so nothing is
@@ -22305,9 +22319,9 @@ idleTick(() => { try { pbClock(); } catch(e){} }, 2000, () => tp.on, 4000);   //
 function pbSum(){ const now = performance.now(); if (now - PB.t < 2000) return; PB.t = now;
   if (PB.n) pbLog(`rows ${PB.n} · latest note ${(PB.late * 1000).toFixed(0)} ms late · dropped ${PB.drop} · ahead ${(PB.ahead * 1000).toFixed(0)} ms · core skips ${PB.skips} · voices ${rt && rt.pl.aliveN ? rt.pl.aliveN() : '?'}`);
   PB.n = PB.late = PB.drop = PB.ahead = 0; }
-function pbAfterStop(){ PB.stopT = performance.now(); pbLog('STOP · ' + pbState()); for (const ms of [1000, 3000]) setTimeout(() => pbLog(`${ms / 1000} s after STOP: level ${pbLevel()} · voices ${rt && rt.pl.aliveN ? rt.pl.aliveN() : '?'} · stray rows ${PB.stray} · ` + pbState()), ms); }
+function pbAfterStop(){ PB.stopT = performance.now(); pbLvStop(); pbLog('STOP · ' + pbState()); for (const ms of [1000, 3000]) setTimeout(() => pbLog(`${ms / 1000} s after STOP: level ${pbLevel()} · voices ${rt && rt.pl.aliveN ? rt.pl.aliveN() : '?'} · stray rows ${PB.stray} · ` + pbState()), ms); }
 async function pbCopy(){
-  const head = `Thunder Plus build ${BUILD} · ${navigator.userAgent}\nlatency ${ctx ? Math.round((ctx.baseLatency || 0) * 1000) + ' + ' + Math.round((ctx.outputLatency || 0) * 1000) + ' ms · heard ' + Math.round(heardLat() * 1000) + ' ms' : '-'} · worklets ${NOWK ? 'OFF (test)' : ctx && wkUsed(ctx).size ? [...wkUsed(ctx)].join(', ') : 'none'} · ${pbState()}\n`;
+  const head = `Thunder Plus build ${BUILD} · ${navigator.userAgent}\nlatency ${ctx ? Math.round((ctx.baseLatency || 0) * 1000) + ' + ' + Math.round((ctx.outputLatency || 0) * 1000) + ' ms · heard ' + Math.round(heardLat() * 1000) + ' ms' : '-'} · worklets ${NOWK ? 'OFF (test)' : ctx && wkUsed(ctx).size ? [...wkUsed(ctx)].join(', ') : 'none'} · ${pbState()}${PB.lvDone ? '\nlevel over the last play: ' + PB.lvDone : ''}\n`;
   const txt = head + PB.log.join('\n');
   try { await navigator.clipboard.writeText(txt); toast('Playback report copied: paste it into the chat.', 3500); }
   catch(e){ try { await deliver('thunder-playback-report.txt', new Blob([txt], {type:'text/plain'})); } catch(e2){ toastErr('Couldn’t copy the report here.'); } }
