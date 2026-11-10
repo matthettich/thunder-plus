@@ -18285,10 +18285,12 @@ const pumpSymOf = (q, f) => q.tpl.replace('#', String(clamp((f.sel | 0), 0, q.se
 // MOD (owner, 10 Nov): a pump slot's whole value list (the worklet's pv, in the plugin's parameter order) with some rows moved. ov: row
 // key (q.k) -> the row's value as the FX screen's box has it (the byte for a knob row), as FXV's overrides are. D is the slot's TFX entry,
 // D.pd its parameter table (the page has pump's own; the core is sent a copy of the fields used here), so both sides make the same
-// list. Rows that are not modulation targets (no q.lfo) and values missing from f.pump stay at the slot's own / the default.
+// list. A banded row (q.pb: its parameter index in each band) is moved per band: ov[the band's symbol, e.g. 'b3_freq']. Rows that are not modulation targets (no q.lfo) and values missing from f.pump stay at the slot's own / the default.
 function pumpPv(D, f, ov){
   const pv = D.pd.map(p => { const v = f.pump && f.pump[p.s]; return v === undefined ? p.def : v; });
-  if (ov) for (const q of D.ps) if (q.lfo && ov[q.k] !== undefined){ const p = D.pd[q.pi]; pv[q.pi] = pumpClamp(p, pumpUnbyte(p, ov[q.k])); }
+  if (ov) for (const q of D.ps) if (q.lfo){
+    if (q.pb){ for (const i of q.pb){ const p = D.pd[i]; if (p && ov[p.s] !== undefined) pv[i] = pumpClamp(p, pumpUnbyte(p, ov[p.s])); } }   // a banded row: one override per band, keyed by that band's parameter symbol
+    else if (ov[q.k] !== undefined){ const p = D.pd[q.pi]; pv[q.pi] = pumpClamp(p, pumpUnbyte(p, ov[q.k])); } }
   return pv;
 }
 function pumpFresh(type){
@@ -18349,9 +18351,12 @@ for (const type of PUMP_TYPES){
     if (kind === 'ch') Object.assign(q, {min:0, max:p.ch.length - 1, names:p.ch.map(s => s.toUpperCase())});
     else if (kind === 'bool') Object.assign(q, {min:0, max:1, names:['OFF', 'ON']});
     else Object.assign(q, {min:kind === 'int' ? p.min : 0, max:kind === 'int' ? p.max : 255});
-    // MOD (10 Nov): a knob row is an LFO target when it is a continuous value the plugin lets a host automate and its own row (no band: the
-    // id fx:t:s:p cannot say which band the row meant). Choices, switches, whole-number ranges, band rows and meters stay out.
+    // MOD (10 Nov): a knob row is an LFO target when it is a continuous value the plugin lets a host automate. Choices, switches, whole-number ranges and meters stay out.
     if (kind === 'cont' && !r.includes('#') && (p.flags & PF_AUTO) && !pumpSkip(p)){ q.lfo = true; q.pi = pumpIdx[type][r]; }
+    // A banded row (10 Nov) is a target per band: the id fx:t:s:p:b names the band (0-based, the plugin's own number); q.pb[b] is that band's parameter index.
+    else if (kind === 'cont' && r.includes('#') && B.sel && (p.flags & PF_AUTO) && !pumpSkip(p)){
+      const pb = Array.from({length:B.sel}, (_, b) => pumpIdx[type][r.replace('#', String(b + 1))]);
+      if (pb.every(i => i !== undefined)){ q.lfo = true; q.pb = pb; q.pi = pb[0]; } }
     // the text: the exact value while the byte still matches it (a pop-up or preset can set values between the steps)
     q.fmt = (v, f) => { const pp = f && f.pump ? fx.params[pumpIdx[type][pumpSymOf(q, f)]] : p, cur = f && f.pump ? f.pump[pp.s] : undefined;
       return pumpFmt(pp, cur !== undefined && pumpByte(pp, cur) === v ? cur : pumpUnbyte(pp, v)); };
@@ -19874,7 +19879,7 @@ var PLFO_MAX = 4, PLFO_RATES = [1/8, 1/4, 1/2, 1, 2, 4, 8, 16, 32], PLFO_RATE_NA
 var PLFO_SHAPES = ['Sine', 'Triangle', 'Saw up', 'Saw down', 'Square', 'Random'];
 function freshPerf(){ return {sc:Array.from({length:PERF_SCENES}, (_, i) => ({n:'', v:{}})), xa:0, xb:1, xf:0,
   mac:Array.from({length:PERF_MACROS}, (_, i) => ({n:'M' + (i + 1), v:0, tg:[]})), lk:{}, lfo:{}}; }
-function tgtOk(id){ return typeof id === 'string' && /^(vol|pan|cut|res|dec|env|atk|sus|rel):\d+$|^fx:\d+:\d+:\d+$/.test(id); }
+function tgtOk(id){ return typeof id === 'string' && /^(vol|pan|cut|res|dec|env|atk|sus|rel):\d+$|^fx:\d+:\d+:\d+(:\d+)?$/.test(id); }
 function normPerf(j){
   const P = freshPerf(); if (!j || typeof j !== 'object') return P;
   const v8 = x => clamp(int(x, 0), 0, 255), vals = o => { const r = {}; if (o && typeof o === 'object') for (const k in o) if (tgtOk(k)) r[k] = v8(o[k]); return r; };
@@ -19897,13 +19902,23 @@ function normParts(j){
 }
 const perfOf = (Sx = S) => Sx.perf || (Sx.perf = freshPerf());
 // The target's parts: {k, t, s, p}
-function tgtParse(id){ const a = String(id).split(':'); return {k:a[0], t:+a[1], s:a[2] != null ? +a[2] : -1, p:a[3] != null ? +a[3] : -1}; }
+function tgtParse(id){ const a = String(id).split(':'); return {k:a[0], t:+a[1], s:a[2] != null ? +a[2] : -1, p:a[3] != null ? +a[3] : -1, b:a[4] != null ? +a[4] : null}; }   // b: the band of a banded ...pump row (fx:t:s:p:b), else null
 const tgtTrk = t => t >= MT ? 'MASTER' : 'TRACK ' + d2(t + 1);
 // The effect slot a fx target points at, and its parameter (null when the slot is empty, another effect now, or a pump row that is not a target: q.lfo)
-function tgtFx(g, Sx = S){ const A = g.t >= MT ? Sx.mfx : Sx.tfx[g.t], f = A && A[g.s]; if (!f || !TFX[f.type]) return null; const q = TFX[f.type].ps[g.p]; return q && (!isPumpT(f.type) || q.lfo) ? {f, q} : null; }
+// A banded ...pump row needs its band (g.b, 0..selN-1) and any other row must not have one; {f, q, b, pi}: pi is the plugin's parameter index (pumps only).
+function tgtFx(g, Sx = S){ const A = g.t >= MT ? Sx.mfx : Sx.tfx[g.t], f = A && A[g.s]; if (!f || !TFX[f.type]) return null; const q = TFX[f.type].ps[g.p], pu = isPumpT(f.type);
+  if (!q || (pu && !q.lfo) || (!!q.pb !== (g.b != null)) || (q.pb && !(g.b >= 0 && g.b < q.pb.length))) return null;
+  return {f, q, b:g.b, pi:q.pb ? q.pb[g.b] : q.pi}; }
+// The label of a row, with its band: 'B3 FREQ'
+const tgtRowL = (q, b) => b == null ? q.l : 'B' + (b + 1) + ' ' + q.l.replace(/^BAND /, '');
+// The target id of row q of slot k's effect f (track t): '' when it is not one; a banded row names the band selected now.
+const tgtRowId = (t, k, f, q) => { const D = TFX[f.type]; return isPumpT(f.type) && !q.lfo ? '' : 'fx:' + t + ':' + k + ':' + D.ps.indexOf(q) + (q.pb ? ':' + clamp(f.sel | 0, 0, q.selN - 1) : ''); };
+// Is band b of a banded ...pump effect in use (EQ: its USED switch; BAND / WIDE / HEAT: below the BANDS count)?
+function tgtBandOn(f, b){ const P = f.pump || {}, pd = TFX[f.type].pd, ix = n => pd.findIndex(p => p.s === n), g = n => { const i = ix(n); return P[n] !== undefined ? P[n] : i >= 0 ? pd[i].def : 0; };
+  return ix('b1_used') >= 0 ? g('b' + (b + 1) + '_used') >= 0.5 : b < g('bands'); }
 function tgtLabel(id, short){
   const g = tgtParse(id), w = tgtTrk(g.t);
-  if (g.k === 'fx'){ const x = tgtFx(g); return (short ? '' : w + ' · ') + (x ? 'FX' + (g.s + 1) + ' ' + TFX[x.f.type].n + ' ' + x.q.l : 'FX' + (g.s + 1) + ' (empty)'); }
+  if (g.k === 'fx'){ const x = tgtFx(g); return (short ? '' : w + ' · ') + (x ? 'FX' + (g.s + 1) + ' ' + TFX[x.f.type].n + ' ' + tgtRowL(x.q, x.b) : 'FX' + (g.s + 1) + ' (empty)'); }
   return (short ? '' : w + ' · ') + {vol:'VOL', pan:'PAN', cut:'CUT (pad filter)', res:'RES (pad resonance)', dec:'DEC (pad decay)', env:'ENV (filter envelope)', atk:'ATK (attack)', sus:'SUS (sustain)', rel:'REL (release)'}[g.k];
 }
 // The song's own value of a target (what a scene that doesn't hold it, a macro at rest, or an LFO's centre start from)
@@ -19911,7 +19926,8 @@ function tgtOwn(id, Sx = S){
   const g = tgtParse(id);
   if (g.k === 'vol') return g.t < NT ? Sx.mix[g.t].vol : 255;
   if (g.k === 'pan') return g.t < NT ? Sx.mix[g.t].pan : 128;
-  if (g.k === 'fx'){ const x = tgtFx(g, Sx); return x ? clamp(Math.round((x.f[x.q.k] - x.q.min) / ((x.q.max - x.q.min) || 1) * 255), 0, 255) : 0; }
+  if (g.k === 'fx'){ const x = tgtFx(g, Sx); if (x && x.q.pb){ const p = TFX[x.f.type].pd[x.pi]; return clamp(pumpByte(p, x.f.pump && x.f.pump[p.s] !== undefined ? x.f.pump[p.s] : p.def), 0, 255); }
+    return x ? clamp(Math.round((x.f[x.q.k] - x.q.min) / ((x.q.max - x.q.min) || 1) * 255), 0, 255) : 0; }
   // cut / dec: open (255); res: none (0). env / atk / sus / rel (live engines, 10 Nov): 0. Only the OFFSET from the engine's own value reaches the engine
   // (makeSeq's `eng` event: o = value - centre), so no centre is needed: 0 makes an LFO's o the plain swing (+/- depth / 2, never clamped at the bottom).
   return g.k === 'cut' || g.k === 'dec' ? 255 : 0;
@@ -19937,7 +19953,10 @@ function tgtList(t){
   if (t < NT){ L.push(['vol:' + t, 'VOL'], ['pan:' + t, 'PAN'], ['cut:' + t, 'CUT · pad filter'], ['res:' + t, 'RES · pad resonance'], ['dec:' + t, 'DEC · pad decay']);
     if (tgtLive(t)) L.push(['env:' + t, 'ENV · filter envelope'], ['atk:' + t, 'ATK · attack'], ['sus:' + t, 'SUS · sustain'], ['rel:' + t, 'REL · release']); }   // live engines (10 Nov)
   const A = t >= MT ? S.mfx : S.tfx[t];
-  (A || []).forEach((f, s) => { if (!f || !TFX[f.type]) return; TFX[f.type].ps.forEach((q, p) => isPumpT(f.type) && !q.lfo || L.push(['fx:' + t + ':' + s + ':' + p, 'FX' + (s + 1) + ' ' + TFX[f.type].n + ' · ' + q.l])); });
+  (A || []).forEach((f, s) => { if (!f || !TFX[f.type]) return; const nm = 'FX' + (s + 1) + ' ' + TFX[f.type].n + ' · ';
+    TFX[f.type].ps.forEach((q, p) => { if (isPumpT(f.type) && !q.lfo) return;
+      if (q.pb){ for (let b = 0; b < q.pb.length; b++) if (tgtBandOn(f, b)) L.push(['fx:' + t + ':' + s + ':' + p + ':' + b, nm + tgtRowL(q, b)]); }   // only the bands in use
+      else L.push(['fx:' + t + ':' + s + ':' + p, nm + q.l]); }); });
   return L;
 }
 // What the scenes (A, B, the crossfader) and the macros ask for now: Map(id → 00–FF). st: {xf, mac:[values]}.
@@ -19960,7 +19979,7 @@ function tgtEvs(id, v, at, pno){
   if (g.k === 'cut' || g.k === 'res' || g.k === 'dec'){ const o = pno.get(g.t) || {}; if (own) delete o[g.k]; else o[g.k] = v; pno.set(g.t, o); return []; }
   if (g.k === 'vol') return g.t < NT ? [{type:'tva', t:at, track:g.t, v:own ? S.mix[g.t].vol : v}] : [];
   if (g.k === 'pan') return g.t < NT ? [{type:'tpn', t:at, track:g.t, v:own ? S.mix[g.t].pan : v}] : [];
-  if (g.k === 'fx') return tgtFx(g) ? [{type:'fxp', t:at, track:g.t, slot:g.s, pi:g.p, v:own ? tgtOwn(id) : v}] : [];
+  if (g.k === 'fx') return tgtFx(g) ? [g.b != null ? {type:'fxp', t:at, track:g.t, slot:g.s, pi:g.p, b:g.b, v:own ? tgtOwn(id) : v} : {type:'fxp', t:at, track:g.t, slot:g.s, pi:g.p, v:own ? tgtOwn(id) : v}] : [];
   return [];
 }
 // Live: send what the performance asks for now, only what changed since the last send (sent).
@@ -20791,8 +20810,8 @@ function makePlayer(ac, out, getBuf, live){
   }
   function fxpTo(ev){
     const A = ev.track >= MT ? S.mfx : S.tfx[ev.track], f = A && A[ev.slot]; if (!f || !TFX[f.type]) return;
-    const q = TFX[f.type].ps[ev.pi]; if (!q || (isPumpT(f.type) && !q.lfo)) return;
-    const key = ev.track + ':' + ev.slot, ov = Object.assign({}, fxOv.get(key)); ov[q.k] = q.min + Math.round((q.max - q.min) * ev.v / 255); fxOv.set(key, ov);
+    const q = TFX[f.type].ps[ev.pi]; if (!q || (isPumpT(f.type) && !q.lfo) || (q.pb && !(ev.b >= 0 && ev.b < q.pb.length))) return;
+    const key = ev.track + ':' + ev.slot, ov = Object.assign({}, fxOv.get(key)); ov[q.pb ? TFX[f.type].pd[q.pb[ev.b]].s : q.k] = q.min + Math.round((q.max - q.min) * ev.v / 255); fxOv.set(key, ov);   // a banded row: keyed by that band's parameter symbol
     const m = fxpMsg(ev.track, ev.slot, ov); if (!m) return;
     atTime(ev.t, () => { const n = fxNodeOf(ev.track); if (n && n.port) try { n.port.postMessage(m); } catch(e){} });
   }
@@ -22289,7 +22308,7 @@ function padBlink(e){
 // Phones and tablets (10 Nov): the audio-thread sequencer's module (a second thread) loads only when the owner picked it there
 // (aset.corePick, set in Settings); the saved default 'core' plays on the Page sequencer on such a device.
 function coreWanted(){ return aset.core === 'core' && (!wkLazy() || !!aset.corePick); }   // (a declaration: the Settings row reads it at load)
-const CORE_REV = '1r5l0m9';
+const CORE_REV = 'wfnlaw';
 const CORE_WANT = 7;   // the core's message set this page speaks (core-processor.js CORE_V); an older core is not used
 const CORE_URL = () => 'core/seq-core.js?v=' + BUILD + '-' + CORE_REV;
 const core = {node:null, ready:false, loading:null, gen:0, sent:new Map(), sT:0, tally:new Map(), mir:null};   // mir: what the core's song holds, as JSON per part (coreDiff)   // tally: events by who played them (test hook)
@@ -24558,7 +24577,7 @@ function fxRows(){
   rows.push({l:'ACTIVE', gap:true, desc:TFX[f.type].long, tog:true, get:() => f.on ? 1 : 0, set:v => { f.on = !!v; fxChanged(t); }, min:0, max:1, d:1, fmt:v => onOff(v) + `  slot ${k + 1} ` + TFX[f.type].n,
     info:() => `Slot ${k + 1}: ${TFX[f.type].long}. ` + (TFX[f.type].about ? TFX[f.type].about + ' ' + (pumpLatTxt(t, k) ? pumpLatTxt(t, k)[0].toUpperCase() + pumpLatTxt(t, k).slice(1) + '. ' : '') : '') + 'OFF bypasses it'});
   const PU = TFX[f.type].pump;   // …PUMP: a pump effect's boxes (fmt sees the slot: it shows the exact value), its presets and OPEN
-  for (const q of TFX[f.type].ps) rows.push({l:q.l, lfo:PU && !q.lfo ? '' : 'fx:' + t + ':' + k + ':' + TFX[f.type].ps.indexOf(q), get:() => f[q.k], set:v => { f[q.k] = v; delete f.pname; fxChanged(t); }, min:q.min, max:q.max, big:q.names ? (q.max > 40 ? 8 : 1) : q.band ? 1 : 16, d:q.d, tog:q.names && q.names.length === 2,
+  for (const q of TFX[f.type].ps) rows.push({l:q.l, lfo:tgtRowId(t, k, f, q), get:() => f[q.k], set:v => { f[q.k] = v; delete f.pname; fxChanged(t); }, min:q.min, max:q.max, big:q.names ? (q.max > 40 ? 8 : 1) : q.band ? 1 : 16, d:q.d, tog:q.names && q.names.length === 2,
     fmt:v => q.names ? q.names[v] : q.band ? q.fmt(v, f) : (q.min < 0 ? sgn(v) : q.max > 99 ? hx(v) : d2(v)) + '  ' + q.fmt(v, f),
     info:() => TFX[f.type].long + ' · ' + q.l.toLowerCase() + (PU ? pumpRowInfo(t, k, q) : '')});
   if (!PU){
@@ -29351,7 +29370,7 @@ function deckFxBar(){
           inp.addEventListener('pointerdown', e => e.stopPropagation());
           inp.addEventListener('blur', () => fin(true)); };
         v.addEventListener('dblclick', e => { e.preventDefault(); editIt(); });
-        v.addEventListener('contextmenu', e => valMenu(e, q.l, {reset:() => set(q.d), type:typeIt, lfo:isPumpT(f.type) && !q.lfo ? null : 'fx:' + t + ':' + k + ':' + D.ps.indexOf(q)}));
+        v.addEventListener('contextmenu', e => valMenu(e, q.l, {reset:() => set(q.d), type:typeIt, lfo:tgtRowId(t, k, getF() || f, q) || null}));
         dkFbVals.push(() => { const g = getF(); if (g && document.activeElement !== v && !v.classList.contains('drag') && !v.classList.contains('edit')) v.textContent = show(g[q.k]); });
       }
       col.dataset.k = k; bar.append(col);
@@ -34367,7 +34386,7 @@ if (new URLSearchParams(location.search).has('pbshow')){ try {
    stay identical. Math.random is seeded for the run, so GEN / PRB / random commands repeat. Inert without ?seqtest. */
 /* THUNDER CORE (plan phase 2): what the audio-thread sequencer (core/seq-core.js) needs from the page besides the song: the
    per-voice-track setting, the slot count, and the effect table's pump flags and control ranges (TFX itself holds DSP). */
-function coreTfx(){ const o = {}; for (const k in TFX) o[k] = {pump:!!TFX[k].pump, mod:!!TFX[k].mod, cv:TFX[k].cv || null, ps:(TFX[k].ps || []).map(q => q.lfo ? {k:q.k, min:q.min, max:q.max, lfo:true, pi:q.pi} : {k:q.k, min:q.min, max:q.max}),
+function coreTfx(){ const o = {}; for (const k in TFX) o[k] = {pump:!!TFX[k].pump, mod:!!TFX[k].mod, cv:TFX[k].cv || null, ps:(TFX[k].ps || []).map(q => q.lfo ? {k:q.k, min:q.min, max:q.max, lfo:true, pi:q.pi, ...(q.pb ? {pb:q.pb} : {})} : {k:q.k, min:q.min, max:q.max}),
   ...(TFX[k].pd ? {pd:TFX[k].pd.map(p => ({s:p.s, min:p.min, max:p.max, def:p.def, scale:p.scale, skew:p.skew, flags:p.flags}))} : {})}; return o; }
 function coreVars(){ return {vtrk, NSLOT, TFX:coreTfx()}; }
 if (new URLSearchParams(location.search).has('seqtest')) window.__seqTest = {

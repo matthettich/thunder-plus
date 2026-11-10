@@ -1,5 +1,6 @@
 // MOD: ...pump effects as LFO targets (owner, 10 Nov). Rows of a pump slot that are continuous values (q.lfo) are targets with the usual
-// id fx:track:slot:row; selectors, switches, whole-number ranges and band rows are not. No browser: the pump block and the PERFORM block
+// id fx:track:slot:row; selectors, switches and whole-number ranges are not. A banded row (EQ, BAND, WIDE, HEAT) is a target per band, with
+// the band as a fifth part: fx:track:slot:row:band (0-based). No browser: the pump block and the PERFORM block
 // are cut out of index.html and run in a vm (as perform.test.js does), makeSeq is read from core/seq-core.js, and the core's pump
 // delivery is run in the core's own scope. The old core (git HEAD at the time of this change) pins that a song with no pump LFO is unchanged.
 'use strict';
@@ -47,10 +48,11 @@ test('tgtList: a pump COMP and EQ slot list their continuous rows, never selecto
     assert.ok(mine.length > 0, type + ' has targets');
     const D = run(`TFX.p${type}`);
     for (const [id, label] of mine){
-      const q = D.ps[+id.split(':')[3]];
-      assert.ok(q.lfo, id + ' ' + label + ' is a target row'); assert.ok(!q.names && !q.band && !(q.tpl || '').includes('#') && q.min === 0 && q.max === 255, label + ' is a plain 00-FF knob');
+      const q = D.ps[+id.split(':')[3]], banded = id.split(':').length === 5;
+      assert.ok(q.lfo, id + ' ' + label + ' is a target row'); assert.ok(!q.names && !q.band && (banded || !(q.tpl || '').includes('#')) && q.min === 0 && q.max === 255, label + ' is a plain 00-FF knob');
+      assert.equal(!!q.pb, banded, 'a banded row has a band in its id, any other has none');
       assert.ok(run(`tgtOk('${id}')`) && run(`tgtFx(tgtParse('${id}'))`) !== null, id + ' resolves');
-      assert.match(label, new RegExp('^FX1 ' + D.n + ' · ' + q.l));
+      assert.match(label, new RegExp('^FX1 ' + D.n + ' · ' + (banded ? 'B\\d+ ' + q.l.replace(/^BAND /, '') : q.l)));
     }
     const ls = mine.map(([, l]) => l);
     if (type === 'comp'){
@@ -59,7 +61,7 @@ test('tgtList: a pump COMP and EQ slot list their continuous rows, never selecto
     } else {
       assert.ok(ls.some(l => l.endsWith('· OUTPUT')), 'EQ lists its output gain');
       for (const no of ['BAND', 'AUTO GAIN', 'PHASE']) assert.ok(!ls.some(l => l.endsWith('· ' + no)), 'EQ does not list ' + no);
-      assert.ok(!ls.some(l => /FREQ|SHAPE|Q$|SLOPE|GAIN$/.test(l) && !/OUTPUT/.test(l)), 'EQ lists no band-dependent row (the id cannot name a band)');
+      assert.ok(!ls.some(l => /SHAPE|SLOPE|PLACE|USED/.test(l)), 'EQ lists no selector or switch row of a band');
     }
     assert.ok(L.some(([id]) => id === 'vol:2'), 'the track\'s own targets are still there');
   }
@@ -183,7 +185,7 @@ test('the page: the fxp for a pump row builds the same message; a row that is no
 });
 
 test('a song with no pump LFO: the old core and the new one send the same events (a pump slot in the song or not)', t => {
-  let old; try { old = loadCore(execFileSync('git', ['show', 'HEAD:core/seq-core.js'], { cwd: H.ROOT, encoding: 'utf8', maxBuffer: 1 << 28, stdio: ['ignore', 'pipe', 'ignore'] }), coreTfx()); }
+  let old; try { old = loadCore(execFileSync('git', ['show', 'd30da1c:core/seq-core.js'], { cwd: H.ROOT, encoding: 'utf8', maxBuffer: 1 << 28, stdio: ['ignore', 'pipe', 'ignore'] }), coreTfx()); }
   catch (e){ t.skip('git history is not here'); return; }
   const cur = NEW(), nat = { type: 'eq', treble: 128, mid: 50 };
   let total = 0;
@@ -194,4 +196,99 @@ test('a song with no pump LFO: the old core and the new one send the same events
     assert.deepEqual(b, a, 'pump slot in the song: ' + pumpSlot);
   }
   assert.ok(total > 100, 'events were produced (' + total + ')');
+});
+
+// ---- per-band targets (owner, 10 Nov) ----------------------------------------------------------------------------------------------
+const eqSong = (bandsOn = [0, 2, 5]) => { const S = song('eq'), f = S.tfx[2][0]; for (const b of bandsOn) f.pump['b' + (b + 1) + '_used'] = 1; return S; };
+const bandRow = (type, key) => run(`TFX.p${type}.ps.findIndex(q => q.tpl === '${key}')`);
+const bandIds = (L, n = 5) => L.filter(([id]) => id.startsWith('fx:2:0:') && id.split(':').length === n);
+const pvOf = (S, ov, type = 'eq') => { const C = loadCore(H.read('core/seq-core.js'), coreTfx()); C.__f = JSON.parse(JSON.stringify(S.tfx[2][0])); C.__ov = ov; return Array.from(vm.runInContext(`pumpPv(TFX.p${type}, __f, __ov)`, C)); };
+
+test('bands: the EQ lists each band in use with its own id and label; unused bands are not listed; four-part ids still mean non-banded rows', () => {
+  const S = withSong(eqSong()), L = Array.from(run('tgtList(2)')).filter(([id]) => id.startsWith('fx:2:0:')), fr = bandRow('eq', 'b#_freq');
+  assert.ok(fr >= 0 && run(`TFX.peq.ps[${fr}].pb.length`) === 24, 'EQ has 24 bands');
+  const freq = L.filter(([id]) => id.startsWith(`fx:2:0:${fr}:`));
+  assert.deepEqual(freq.map(([id]) => id), [0, 2, 5].map(b => `fx:2:0:${fr}:${b}`), 'only the bands in use, one id each');
+  assert.deepEqual(freq.map(([, l]) => l), ['FX1 pEQ · B1 FREQ', 'FX1 pEQ · B3 FREQ', 'FX1 pEQ · B6 FREQ']);
+  for (const [id] of L) assert.ok(run(`tgtOk('${id}')`) && run(`tgtFx(tgtParse('${id}'))`), id);
+  assert.equal(new Set(L.map(([id]) => id)).size, L.length, 'ids are distinct');
+  for (const r of ['b#_gain', 'b#_q', 'b#_dyn_range', 'b#_dyn_thresh']) assert.ok(L.some(([id]) => id.startsWith(`fx:2:0:${bandRow('eq', r)}:`)), r + ' is listed');
+  // the same banded row WITHOUT a band, or a non-banded row WITH one, is no target
+  assert.equal(run(`tgtFx(tgtParse('fx:2:0:${fr}'))`), null); assert.equal(run(`tgtFx(tgtParse('fx:2:0:${fr}:24'))`), null, 'band 25 does not exist');
+  const og = rowOf('eq', 'p_out_gain'); assert.ok(run(`tgtFx(tgtParse('fx:2:0:${og}'))`)); assert.equal(run(`tgtFx(tgtParse('fx:2:0:${og}:1'))`), null);
+  assert.deepEqual(JSON.parse(JSON.stringify(run(`tgtParse('fx:2:0:${fr}:3')`))), { k: 'fx', t: 2, s: 0, p: fr, b: 3 }); assert.equal(run(`tgtParse('fx:2:0:${og}').b`), null);
+  assert.equal(run(`tgtOk('fx:2:0:${fr}:3')`), true); assert.equal(run(`tgtOk('fx:2:0:${fr}:3:4')`), false); assert.equal(run("tgtOk('vol:2:3')"), false);
+  // BAND / WIDE / HEAT: the bands below the BANDS count
+  for (const [type, n] of [['band', 3], ['wide', 4], ['heat', 3]]){
+    const S2 = withSong(song(type)), L2 = bandIds(Array.from(run('tgtList(2)')));
+    assert.ok(L2.length > 0 && L2.every(([, l]) => /^FX1 \S+ · B[1-4] /.test(l)), type + ' lists banded rows: ' + L2.slice(0, 2).map(x => x[1]));
+    assert.deepEqual([...new Set(L2.map(([id]) => +id.split(':')[4]))].sort(), Array.from({ length: n }, (_, b) => b), type + ': ' + n + ' bands in use');
+    S2.tfx[2][0].pump.bands = 1; assert.deepEqual([...new Set(bandIds(Array.from(run('tgtList(2)'))).map(([id]) => +id.split(':')[4]))], [0]);
+  }
+  withSong(S);
+});
+
+test('bands: tgtOwn is that band\'s own byte; the label names the band; the id is inert when the slot changed type', () => {
+  const S = withSong(eqSong()), f = S.tfx[2][0], fr = bandRow('eq', 'b#_freq'), og = rowOf('eq', 'p_out_gain'), I3 = run('pumpIdx.eq.b3_freq'), I1 = run('pumpIdx.eq.b1_freq');
+  f.pump.b3_freq = 250; f.pump.b1_freq = 5000; f.sel = 1;
+  const before = JSON.stringify(S);
+  assert.equal(run(`tgtOwn('fx:2:0:${fr}:2')`), run(`pumpByte(pumpFx('eq').params[${I3}], 250)`));
+  assert.equal(run(`tgtOwn('fx:2:0:${fr}:0')`), run(`pumpByte(pumpFx('eq').params[${I1}], 5000)`));
+  assert.notEqual(run(`tgtOwn('fx:2:0:${fr}:2')`), run(`tgtOwn('fx:2:0:${fr}:0')`));
+  assert.equal(run(`tgtLabel('fx:2:0:${fr}:2', true)`), 'FX1 pEQ B3 FREQ'); assert.equal(run(`tgtLabel('fx:2:0:${fr}:2')`), 'TRACK 03 · FX1 pEQ B3 FREQ');
+  assert.equal(JSON.stringify(S), before, 'asking changes nothing');
+  // the row's Add LFO… id is for the band selected now
+  f.sel = 4; assert.equal(run(`tgtRowId(2, 0, S.tfx[2][0], TFX.peq.ps[${fr}])`), `fx:2:0:${fr}:4`);
+  assert.equal(run(`tgtRowId(2, 0, S.tfx[2][0], TFX.peq.ps[${og}])`), `fx:2:0:${og}`, 'a non-banded row: four parts');
+  assert.equal(run(`tgtRowId(2, 0, S.tfx[2][0], TFX.peq.ps[${rowOf('eq', 'p_auto_gain')}])`), '', 'a switch: none');
+  // the slot is now a COMP: the five-part id is inert, and nothing throws
+  S.tfx[2][0] = run("pumpFresh('comp')");
+  assert.equal(run(`tgtFx(tgtParse('fx:2:0:${fr}:2'))`), null); assert.equal(run(`tgtOwn('fx:2:0:${fr}:2')`), 0); assert.match(run(`tgtLabel('fx:2:0:${fr}:2')`), /FX1/);
+  assert.equal(run(`tgtEvs('fx:2:0:${fr}:2', 100, 1, new Map()).length`), 0);
+  S.tfx[2][0] = { type: 'eq', treble: 1 }; assert.equal(run(`tgtFx(tgtParse('fx:2:0:${fr}:2'))`), null, 'a built-in EQ');
+  S.tfx[2] = []; assert.equal(run(`tgtFx(tgtParse('fx:2:0:${fr}:2'))`), null, 'an empty slot');
+});
+
+test('bands: an LFO on band 3\'s frequency moves only that parameter; two LFOs on two bands both act; the song\'s own values stay', () => {
+  const S = eqSong(), fr = bandRow('eq', 'b#_freq'), gr = bandRow('eq', 'b#_gain'), f = S.tfx[2][0]; f.pump.b3_freq = 250; f.pump.b6_gain = 3;
+  const own = JSON.stringify(f);
+  S.perf.lfo[2] = [{ id: `fx:2:0:${fr}:2`, sh: 0, rt: 5, dp: 200 }];
+  withSong(S);
+  const evs = play(NEW(), S).filter(e => e.type === 'fxp');
+  assert.equal(evs.length, 32); evs.forEach(e => { assert.equal(e.pi, fr); assert.equal(e.b, 2); assert.equal(e.track, 2); assert.equal(e.slot, 0); });
+  // the core: the delivered list differs from the slot's own at b3_freq only
+  const C = loadCore(H.read('core/seq-core.js'), coreTfx()); C.__S = JSON.parse(JSON.stringify(S)); vm.runInContext('S = __S;', C);
+  const queued = []; C.__out = queued; vm.runInContext('tcAt = (proc, at, msg) => globalThis.__out.push([at, msg]);', C);
+  C.__tcNodes = new Map([['fx:2', {}]]);
+  const core = new C.__registered['thunder-core'](), h = Object.getOwnPropertyNames(Object.getPrototypeOf(core)).find(n => /^(ev|play|doEv|coreEv|onEv|handle)/i.test(n) && String(core[n]).includes("ev.type === 'fxp'"));
+  const fx = run('pumpFx("eq")'), own0 = Array.from(fx.params, pp => f.pump[pp.s] ?? pp.def), i3 = run('pumpIdx.eq.b3_freq'), i6 = run('pumpIdx.eq.b6_gain');
+  const at = v => run(`pumpClamp(pumpFx('eq').params[${i3}], pumpUnbyte(pumpFx('eq').params[${i3}], ${v}))`);
+  const lo = evs.reduce((a, e) => e.v < a.v ? e : a), hi = evs.reduce((a, e) => e.v > a.v ? e : a);
+  assert.equal(core[h]({ ...lo, t: 1 }), true); let pv = queued[queued.length - 1][1].pset.pv;
+  pv.forEach((v, j) => { if (j !== i3) assert.equal(v, own0[j], 'untouched: ' + fx.params[j].s); }); assert.notEqual(pv[i3], own0[i3]); assert.equal(pv[i3], at(lo.v));
+  // a second LFO on band 6's gain: both are held (distinct keys), the first is not overwritten
+  assert.equal(core[h]({ type: 'fxp', t: 1.1, track: 2, slot: 0, pi: gr, b: 5, v: 255 }), true); pv = queued[queued.length - 1][1].pset.pv;
+  assert.equal(pv[i6], fx.params[i6].max, 'band 6 gain at the top'); assert.equal(pv[i3], at(lo.v), 'band 3 frequency still moved');
+  assert.equal(core[h]({ ...hi, t: 1.2 }), true); pv = queued[queued.length - 1][1].pset.pv; assert.equal(pv[i6], fx.params[i6].max); assert.equal(pv[i3], at(hi.v));
+  // no band, or a band that is not there: not handled
+  assert.equal(core[h]({ type: 'fxp', t: 2, track: 2, slot: 0, pi: gr, v: 5 }), false); assert.equal(core[h]({ type: 'fxp', t: 2, track: 2, slot: 0, pi: gr, b: 24, v: 5 }), false);
+  assert.equal(JSON.stringify(C.__S.tfx[2][0]), own, 'the song is untouched');
+  // the page's side builds the same list
+  const ov = { b3_freq: lo.v, b6_gain: 255 };
+  assert.deepEqual(Array.from(run('pumpPv(TFX.peq, S.tfx[2][0], ov)', { ov })), pvOf(S, ov), 'page pumpPv == core pumpPv');
+  assert.deepEqual(Array.from(run('pumpPv(TFX.peq, S.tfx[2][0], {})')), own0);
+  // the page's fxpTo: two bands -> one message holding both
+  const blk = cut(/  function fxpMsg\(t, k, ov\)\{[\s\S]*?\n(?=  function tempoTo)/, 'fxpMsg / fxpTo'), sent = [];
+  const ctx = vm.createContext(Object.assign(Object.create(null), { Math, Object, Map, Array, isPumpT: k => run(`isPumpT('${k}')`), TFX: PAGE.TFX, S, MT, pumpPv: PAGE.pumpPv,
+    ac: { sampleRate: 48000 }, bpmNow: 120, fxOv: new Map(), fxNodeOf: () => ({ port: { postMessage: m => sent.push(m) } }), atTime: (t, f) => f() }));
+  vm.runInContext(blk, ctx);
+  ctx.fxpTo({ t: 1, track: 2, slot: 0, pi: fr, b: 2, v: 0 }); ctx.fxpTo({ t: 1, track: 2, slot: 0, pi: gr, b: 5, v: 255 }); ctx.fxpTo({ t: 1, track: 2, slot: 0, pi: gr, v: 255 }); ctx.fxpTo({ t: 1, track: 2, slot: 0, pi: gr, b: 99, v: 255 });
+  assert.equal(sent.length, 2, 'a banded row without (or beyond) its band is ignored');
+  const last = sent[1].pset.pv; assert.equal(last[i6], fx.params[i6].max); assert.equal(last[i3], at(0));
+  assert.equal(JSON.stringify(S.tfx[2][0]), own, 'the page leaves the song alone');
+});
+
+test('bands: a four-part pump LFO behaves as before (the COMP ratio row, no band in the event)', () => {
+  const i = rowOf('comp', 'p_ratio'), S = song('comp'); S.perf.lfo[2] = [{ id: `fx:2:0:${i}`, sh: 0, rt: 5, dp: 100 }]; withSong(S);
+  const ev = play(NEW(), S).filter(e => e.type === 'fxp'); assert.ok(ev.length > 0); ev.forEach(e => assert.ok(!('b' in e), 'no band key on a non-banded event'));
 });
