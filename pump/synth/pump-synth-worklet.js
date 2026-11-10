@@ -17,7 +17,7 @@ const LANES = 4;
 const WASI = {wasi_snapshot_preview1:{fd_close:() => 0, fd_seek:() => 0, fd_write:() => 0, proc_exit:() => 0}};
 /* ENGINE TARGETS (docs/mod/ENGINE-TARGETS-DESIGN.md sections 2-4): per instrument type (the wasm's type id), the plugin's own
  * symbols for the seven targets, as [symbol, min, max] from pump-synth-meta.js (cutoff in Hz, res / sustain in %, the amp
- * times in ms, filter_env in % (WOB: octaves)). A type that is not here (the kits, FOLD, COIL, TRACT, FREEZE: no cutoff or
+ * times in ms, filter_env in % (WOB: octaves)). A type that is not here (the kits, FOLD: no cutoff or
  * envelope of their own) ignores the twelve parameters. tests/eng-targets-pump.test.js checks this table against the meta. */
 const TARGETS = ['cut', 'res', 'env', 'atk', 'dec', 'sus', 'rel'];
 const TMAP = {
@@ -25,6 +25,9 @@ const TMAP = {
   1:{cut:['cutoff', 20, 20000], res:['res', 0, 100], env:['filter_env', -100, 100], atk:['a_a', 0.5, 10000], dec:['a_d', 1, 10000], sus:['a_s', 0, 100], rel:['a_r', 1, 15000]},    // POLY
   3:{cut:['cutoff', 30, 18000], res:['reso', 0, 100], env:['env_cut', -100, 100], atk:['attack', 0.5, 5000], dec:['decay', 1, 10000], sus:['sustain', 0, 100], rel:['release', 1, 10000]},   // ORBIT
   5:{cut:['cutoff', 30, 20000], res:['res', 0, 100], env:['filter_env', -100, 100], atk:['attack', 0.5, 3000], dec:['decay', 5, 5000], sus:['sustain', 0, 100], rel:['release', 2, 5000]},   // GLOSS
+  2:{dec:['decay', 0.1, 15, 1], rel:['release', 0.02, 8, 1]},   // COIL: the springs' ring and release, in seconds (a fourth number: units per second); no cutoff, resonance, filter envelope, attack or sustain
+  6:{atk:['attack', 1, 8000], dec:['decay', 1, 10000], sus:['sustain', 0, 100], rel:['release', 1, 12000]},   // TRACT: the amp envelope only
+  11:{atk:['attack', 1, 8000], dec:['decay', 1, 10000], sus:['sustain', 0, 100], rel:['release', 1, 12000]},   // FREEZE: the amp envelope only
   12:{cut:['cutoff', 20, 16000], res:['res', 0, 100], env:['filter_env', -4, 8], atk:['attack', 0.5, 5000], dec:['decay', 1, 10000], sus:['sustain', 0, 100], rel:['release', 1, 10000]},   // WOB
 };
 const CUT_K = 18000 / 30, ENV_D = 4 / 0.008, COMMIT_EVERY = 1;   // COMMIT_EVERY: a modulated value is committed at most every Nth quantum
@@ -60,7 +63,7 @@ class PsynProc extends AudioWorkletProcessor {
     this.h = -1; this.dirty = false; this.dead = false;
     // engine targets: the staged index of each target's symbol (-1 = this type has none); ef: this quantum's effective values (NaN = the pad's own), last: those last committed
     const tm = TMAP[this.type]; this.tm = null; this.modOn = false; this.mq = 0; this.ef = new Float64Array(7); this.last = new Float64Array(7); this.ix = new Int32Array(7).fill(-1);
-    if (tm){ TARGETS.forEach((k, i) => { this.ix[i] = this.syms.indexOf(tm[k][0]); }); if (this.ix.some(i => i >= 0)) this.tm = tm; }
+    if (tm){ TARGETS.forEach((k, i) => { this.ix[i] = tm[k] ? this.syms.indexOf(tm[k][0]) : -1; }); if (this.ix.some(i => i >= 0)) this.tm = tm; }
     this.lane = Array.from({length:LANES}, () => ({note:-1, lt:0, lg:false}));
     this.bl = 0; this.sent = 8192; this.quiet = 1e9; this.ms = 0; this.fr = 0;
     this.file = op.file || null; this.fileDirty = !!this.file;   // FREEZE FILE: the pad's own sound
@@ -80,8 +83,8 @@ class PsynProc extends AudioWorkletProcessor {
     if (!(cCut >= 0 || cRes >= 0 || cDec >= 0 || cAtk >= 0 || cRel >= 0 || oCut !== 0 || oRes !== 0 || oEnv !== 0 || oAtk !== 0 || oDec !== 0 || oSus !== 0 || oRel !== 0)) return false;
     const tm = this.tm, T = (i, c, o) => {   // seconds-based envelope time (stored as ms)
       if (ix[i] < 0 || (c < 0 && o === 0)) return; const own = this.own(i), m = tm[TARGETS[i]]; if (own !== own) return;
-      const base = c < 0 ? own / 1000 : 0.008 * Math.pow(ENV_D, Math.min(c, 254) / 254);
-      ef[i] = clamp(base * Math.pow(ENV_D, o / 254), m[1] / 1000, m[2] / 1000) * 1000; };
+      const u = m[3] || 1000, base = c < 0 ? own / u : 0.008 * Math.pow(ENV_D, Math.min(c, 254) / 254);
+      ef[i] = clamp(base * Math.pow(ENV_D, o / 254), m[1] / u, m[2] / u) * u; };
     if (ix[0] >= 0 && (cCut >= 0 || oCut !== 0)){ const own = this.own(0), m = tm.cut; if (own === own || cCut >= 0){ const base = cCut < 0 ? own : 30 * Math.pow(CUT_K, cCut / 255); ef[0] = clamp(base * Math.pow(CUT_K, oCut / 255), m[1], m[2]); } }
     if (ix[1] >= 0 && (cRes >= 0 || oRes !== 0)){ const own = this.own(1), m = tm.res, span = m[2] - m[1]; if (own === own || cRes >= 0){ const b = cRes < 0 ? (own - m[1]) / span : cRes / 255; ef[1] = m[1] + clamp(b + oRes / 255, 0, 1) * span; } }
     if (ix[2] >= 0 && oEnv !== 0){ const own = this.own(2), m = tm.env; if (own === own) ef[2] = clamp(own + (oEnv / 255) * (m[2] - m[1]), m[1], m[2]); }

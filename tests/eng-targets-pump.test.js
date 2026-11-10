@@ -7,7 +7,9 @@ const test = require('node:test'), assert = require('node:assert/strict'), vm = 
 const H = require('./helpers');
 
 const MAPPED = { pmonol: 'mono', ppolyl: 'poly', porbitl: 'orbit', pglossl: 'gloss', pwobl: 'wob' };
-const UNMAPPED = ['pcoill', 'pfoldl', 'ptractl', 'pstrikel', 'pboingl', 'pfreezel', 'px0xl', 'plifel'];
+const UNMAPPED = ['pfoldl', 'pstrikel', 'pboingl', 'px0xl', 'plifel'];
+// the amp envelope only (no cutoff, resonance or filter envelope: they keep the post-engine liveCut): the symbols each really has
+const ENV_ONLY = { pcoill: { meta: 'coil', id: 2, n: 2 }, ptractl: { meta: 'tract', id: 6, n: 4 }, pfreezel: { meta: 'freeze', id: 11, n: 4 } };
 const CUR = H.read('pump/synth/pump-synth-worklet.js');
 // the worklet before this feature: the commit the work started from (7307828); if git can't show it (a shallow copy), the
 // identity tests fall back to a node with the twelve params left out, which takes the same path
@@ -60,15 +62,16 @@ const BRIGHT = k => Object.assign({ cutoff: 12000, res: 10, reso: 10, filter_env
 const KEYS = Object.keys(MAPPED);
 
 test('eng-targets pump: the target table matches the plugin metadata (symbols, limits) and the staged order', () => {
-  const ids = { pmonol: 0, ppolyl: 1, porbitl: 3, pglossl: 5, pwobl: 12 };
-  for (const k of KEYS) {
-    const h = mk(k), tm = (() => { const m = META.synth[MAPPED[k]]; return m; })(), src = CUR.match(new RegExp('\\n  ' + ids[k] + ':\\{[^\\n]*'))[0];
+  const ids = { pmonol: 0, ppolyl: 1, porbitl: 3, pglossl: 5, pwobl: 12, pcoill: 2, ptractl: 6, pfreezel: 11 };
+  for (const k of KEYS.concat(Object.keys(ENV_ONLY))) {
+    const h = mk(k), tm = META.synth[MAPPED[k] || ENV_ONLY[k].meta], src = CUR.match(new RegExp('\\n  ' + ids[k] + ':\\{[^\\n]*'))[0];
     const spec = CORE.liveSpec(k); assert.equal(spec.type, ids[k], k + ': the wasm type id');
-    for (const m of src.matchAll(/(\w+):\['(\w+)', ([-\d.]+), ([-\d.]+)\]/g)) {
+    for (const m of src.matchAll(/(\w+):\['(\w+)', ([-\d.]+), ([-\d.]+)(?:, 1)?\]/g)) {
       const p = tm.params.find(q => q.s === m[2]); assert.ok(p, k + ': ' + m[2] + ' is a symbol'); assert.ok(spec.syms.includes(m[2]), k + ': ' + m[2] + ' is staged');
-      assert.equal(+m[3], p.min, k + ' ' + m[2] + ' min'); assert.equal(+m[4], p.max, k + ' ' + m[2] + ' max');
+      assert.ok(Math.abs(+m[3] - p.min) <= 1e-6 * Math.abs(p.min), k + ' ' + m[2] + ' min'); assert.ok(Math.abs(+m[4] - p.max) <= 1e-6 * Math.abs(p.max), k + ' ' + m[2] + ' max');   // (the meta holds float32s)
     }
-    assert.equal((src.match(/\['/g) || []).length, 7, k + ': seven targets'); assert.ok(h.node.tm, k + ': mapped');
+    assert.equal((src.match(/\['/g) || []).length, ENV_ONLY[k] ? ENV_ONLY[k].n : 7, k + ': the targets it has');
+    if (ENV_ONLY[k]) for (const t of ['cut', 'res', 'env']) assert.ok(!new RegExp('\\b' + t + ':').test(src), k + ': no ' + t); assert.ok(h.node.tm, k + ': mapped');
   }
   for (const k of UNMAPPED) assert.equal(mk(k).node.tm, null, k + ': unmapped');
 });
@@ -180,4 +183,34 @@ test('eng-targets pump: cost of a commit while modulating (printed)', () => {
     assert.ok(n > 300 && n <= 400, k + ': a commit in each quantum where the values changed (' + n + ')');
   }
   console.log('commit cost:'); console.table(out);
+});
+
+// COIL (decay, release in seconds), TRACT and FREEZE (attack, decay, sustain, release in ms): the amp envelope only
+test('eng-targets pump: coil / tract / freeze: defaults bit-identical to before; cut / res / env ignored; the envelope reacts, held and new note; this.p untouched; extremes finite', () => {
+  const ks = Object.keys(ENV_ONLY), ign = { cCut: 20, cRes: 200, oCut: -255, oRes: 255, oEnv: 255 };
+  for (const k of ks) {
+    const own = k === 'pcoill' ? {} : { sustain: 40, attack: 5 }, o = { offAt: 100 };
+    const a = run(mk(k, own), 160, o), b = run(mk(k, own), 160, Object.assign({ omit: true }, o));
+    assert.ok(same(a, b), k + ': defaults differ from the twelve left out');
+    assert.ok(a.some(v => Math.abs(v) > 1e-4), k + ': the note sounds (peak ' + a.reduce((m, v) => Math.max(m, Math.abs(v)), 0) + ')');
+    if (REF) assert.ok(same(a, run(mk(k, own, REF), 160, Object.assign({ omit: true }, o))), k + ': differs from before');
+    assert.ok(same(a, run(mk(k, own), 160, Object.assign({ mod: () => ign }, o))), k + ': cut / res / env are not ignored');
+    const h = mk(k, own), before = JSON.stringify(h.node.p);
+    const tail = d => energy(d, 140 * 128, 260 * 128), rel = { offAt: 40 };
+    const plain = run(mk(k, own), 300, rel);
+    const r1 = run(mk(k, own), 300, Object.assign({ mod: () => ({ cRel: 230 }) }, rel)), r2 = run(mk(k, own), 300, Object.assign({ mod: () => ({ oRel: 254 }) }, rel));
+    assert.ok(tail(r1) > 3 * tail(plain) + 1e-12 && tail(r2) > 3 * tail(plain) + 1e-12, k + ': a longer release lengthens the tail (' + tail(plain) + ' / ' + tail(r1) + ' / ' + tail(r2) + ')');
+    const reach = {};
+    for (const m of [{ oDec: -254 }, { oDec: 254 }, { cDec: 5 }, ...(k === 'pcoill' ? [] : [{ oAtk: 254 }, { cAtk: 230 }, { oSus: -255 }])]) {
+      const e = JSON.stringify(m); const pl = run(mk(k, own), 140, { offAt: 100 }), nw = run(mk(k, own), 140, { offAt: 100, mod: () => m }), st = run(mk(k, own), 140, { offAt: 100, mod: q => q >= 40 ? m : {} });
+      reach[e] = { newNote: !same(pl, nw), heldNote: !same(pl.subarray(40 * 128), st.subarray(40 * 128)) };
+      assert.ok(reach[e].newNote, k + ': ' + e + ' changes nothing');
+    }
+    console.log(k + ' (true: reacts):', JSON.stringify(reach));
+    run(h, 60, { mod: q => ({ cCut: 30, oCut: 40, oEnv: 80, cAtk: 50, oAtk: 40, cDec: 60, oDec: -40, oSus: -70, cRel: 10, oRel: 100 }) });
+    assert.equal(JSON.stringify(h.node.p), before, k + ': this.p changed');
+    for (const e of [{ cAtk: 255, oAtk: 255, cDec: 255, oDec: 255, oSus: 255, cRel: 255, oRel: 255 }, { cAtk: 0, oAtk: -255, cDec: 0, oDec: -255, oSus: -255, cRel: 0, oRel: -255 }, { oDec: 1e6, cRel: 300, oSus: NaN }]) {
+      for (const v of run(mk(k, own), 100, { offAt: 60, mod: () => e })) assert.ok(Number.isFinite(v) && Math.abs(v) < 20, k + ': ' + JSON.stringify(e) + ' gives ' + v);
+    }
+  }
 });
