@@ -216,6 +216,11 @@ function makeSeq(S, mode, o){
   const once = !!o.once, tr = []; let loop = o.loop || null;
   // BUS FX ONLY (owner, 22 Oct): the tracks that are buses when PLAY starts play their commands, not their notes; a track
   // that becomes a bus while it plays keeps its notes until PLAY starts again.
+  // LFOs that can be heard (owner, 10 Nov): null = every track's; a phrase, a sect or BUS PLAY play one set of tracks, so only
+  // their LFOs, those of the buses they feed (even through other buses) and the master's run.
+  let hearT = null;
+  if (mode !== 'song' || o.only){ hearT = new Set(mode === 'song' ? o.only : [o.track]); const w = [...hearT], tg = busPlan().targets;
+    while (w.length) for (const b of tg.get(w.pop()) || []) if (!hearT.has(b)){ hearT.add(b); w.push(b); } }
   const busT = new Set(); for (let t = 0; t < NT; t++) if (isBusT(t)) busT.add(t);   // loop: {y0,y1} rows to cycle; api.setLoop swaps it while playing
   const fresh = () => ({on:false, empty:false, row:0, cr:0, step:0, inst:0, rate:1, tsp:0, next:-1, last:null, rnl:{}, rnlNote:0, nth:new Map(), arc:{mode:0, spd:1},
     rel:0, g:0, grv:null, dir:0, pp:1, cnt:0, r0:0});   // dir/pp/cnt: DIR's play direction, ping-pong heading, steps played this pass; r0: when it entered its song row
@@ -392,6 +397,15 @@ function makeSeq(S, mode, o){
       const cid = mode === 'phrase' ? -1 : sectId(T, t), ch = cid >= 0 ? S.chains[cid] : null, chRow = ch ? ch[T.cr] : null;
       const g = cmdV(r0(T, mode === 'phrase' ? o.phrase : (!T.empty && chRow ? chRow[0] : -1)), GGRI);
       if (g != null) api.grv = ngrv = grvOf(g, api.tks); }
+    // TRACK LFO of track t for the span [t0, t0 + dur) (own row, or for an idle track the time to the next step): see below.
+    const lfoEvs = (t, t0, dur) => { const La = PFS.lfo[t]; if (Array.isArray(La)) for (let i = 0; i < La.length; i++){ const L = La[i]; if (!L || !tgtOk(L.id)) continue;
+        let dup = false; for (let j = 0; j < i; j++) if (La[j] && La[j].id === L.id){ dup = true; break; } if (dup) continue;
+        const g = tgtParse(L.id), fl = g.k === 'cut' || g.k === 'res' || g.k === 'dec', n = fl ? 1 : PL ? Math.min(4, api.tks) : 2;
+        const c = PF.sent.has(L.id) ? PF.sent.get(L.id) : tgtOwn(L.id, S);
+        for (let k = 0; k < n; k++){ const tt = t0 + dur * k / n; let v = c;
+          for (let j = i; j < La.length; j++){ const M = La[j]; if (!M || M.id !== L.id) continue; const bt = (api.bt + (tt - t0) * api.bpm / 60) / (PLFO_RATES[M.rt] || 1), cyc = Math.floor(bt); v += lfoAt(M.sh, bt - cyc, cyc) * M.dp / 2; }
+          evs.push(...tgtEvs(L.id, clamp(Math.round(v), 0, 255), tt, PF.pno)); } } };
+    const lfoRan = [];   // the tracks whose own row ran this step (their LFO went out with it)
     for (let t = 0; t <= MT; t++){
       const T = tr[t]; if (!T.on || T.rel > rel0 + 1e-9) continue;
       const cid = mode === 'phrase' ? -1 : sectId(T, t), ch = cid >= 0 ? S.chains[cid] : null, chRow = ch ? ch[T.cr] : null;
@@ -573,13 +587,7 @@ function makeSeq(S, mode, o){
       // TRACK LFO (owner, 1 Nov; Perform → LFO): a few points a row (2 in a render) around the target's value now (its scene,
       // macro or own), in time with the song; a filter target (cut / res / dec) once a row, for the notes that start on it.
       // Several LFOs on one target add around its one value (the first LFO of a target leads; the later ones are summed into its points).
-      { const La = PFS.lfo[t]; if (Array.isArray(La)) for (let i = 0; i < La.length; i++){ const L = La[i]; if (!L || !tgtOk(L.id)) continue;
-          let dup = false; for (let j = 0; j < i; j++) if (La[j] && La[j].id === L.id){ dup = true; break; } if (dup) continue;
-          const g = tgtParse(L.id), fl = g.k === 'cut' || g.k === 'res' || g.k === 'dec', n = fl ? 1 : PL ? Math.min(4, api.tks) : 2;
-          const c = PF.sent.has(L.id) ? PF.sent.get(L.id) : tgtOwn(L.id, S);
-          for (let k = 0; k < n; k++){ const tt = t0 + dur * k / n; let v = c;
-            for (let j = i; j < La.length; j++){ const M = La[j]; if (!M || M.id !== L.id) continue; const bt = (api.bt + (tt - t0) * api.bpm / 60) / (PLFO_RATES[M.rt] || 1), cyc = Math.floor(bt); v += lfoAt(M.sh, bt - cyc, cyc) * M.dp / 2; }
-            evs.push(...tgtEvs(L.id, clamp(Math.round(v), 0, 255), tt, PF.pno)); } } }
+      lfoEvs(t, t0, dur); lfoRan[t] = true;
       if (muted){ evs.length = ev0; if (!T.mut) evs.push({type:'off', t:t0, track:t}); delete pos[t].sc; pos[t].off = true; }   // entering a muted block silences what is ringing
       T.mut = muted;
       const L = (mode === 'song' && pid < 0) ? emptyLen() : lenOf(pid);
@@ -611,9 +619,20 @@ function makeSeq(S, mode, o){
     }
     // TPO or TIC on this row: tell the player, so tempo-synced chains modules follow (live and in renders).
     if (pdl) for (const T of tr) if (T.on) T.rel += pdl;   // PDL: the whole song waits
+    let nx = Infinity; for (const T of tr) if (T.on && T.rel < nx) nx = T.rel;
+    /* LFOs ALWAYS RUN (owner, 10 Nov): a track with no pattern on this song row (or the master with no MST cell) still moves its
+       LFOs, one step at a time from this step to the next, on the song's beat clock (api.bt) so the phase never restarts. A muted
+       block (on the song row of the first track due this step) stays still. Only what can be heard: in a phrase, a sect or BUS PLAY, the tracks playing, the
+       buses they feed (hearT) and the master. A track on its own clock (an LPB or groove of its own) sends its LFO with its rows. */
+    let nl = nx; if (nl === Infinity) for (let t = 0; t <= MT; t++) if (lfoRan[t] && tr[t].rel < nl) nl = tr[t].rel;   // the song's last step: to where its tracks stopped
+    if (nl !== Infinity){ const dI = api.base + nl - t0, ld = mode === 'song' ? pos.find(Boolean) : null;
+      for (let t = 0; t <= MT; t++){
+        if (lfoRan[t] || tr[t].on || !(t < (S.ntr || 16) || t === MT)) continue;
+        const La = PFS.lfo[t]; if (!Array.isArray(La) || !La.length || (hearT && t < MT && !hearT.has(t))) continue;
+        if (ld && t < MT && blockMuted(S, ld.row, t)) continue;
+        lfoEvs(t, t0, dI); } }
     if (nb !== api.bpm || api.tks !== tks0) evs.push({type:'tempo', t:t0, bpm:nb, tks:api.tks});
     api.bpm = nb; api.grv = ngrv;
-    let nx = Infinity; for (const T of tr) if (T.on && T.rel < nx) nx = T.rel;
     api.time = api.base + (nx === Infinity ? rel0 : nx);
     return {t:t0, evs, pos, tks:api.tks, line:60 / api.bpm / (S.lpb || 4)};
   };
@@ -784,7 +803,10 @@ class Auto {
    to its output by __tcPost (the page sets those nodes to 1 and centre when the core takes the node over). */
 // STEREO SAMPLES (5 Nov): the StereoPannerNode's law for a stereo input (Web Audio spec), as [L→L, R→L, L→R, R→R]:
 // panned left the right channel folds into the left, panned right the left into the right; centred, each stays put.
-function stBal(pan){ if (pan <= 0){ const a = (pan + 1) * Math.PI / 2; return [1, Math.cos(a), 0, Math.sin(a)]; } const a = pan * Math.PI / 2; return [Math.cos(a), 0, Math.sin(a), 1]; }
+// stBal runs per SAMPLE on a stereo pad whose pan or gain is moving: it fills one shared array (no array per call). Callers
+// read the four numbers at once ([ll, rl, lr, rr] = stBal(p)) and never keep it. ZERO4: the "no balance" row, never written.
+const SBAL = [0, 0, 0, 0], ZERO4 = [0, 0, 0, 0];
+function stBal(pan){ const o = SBAL; if (pan <= 0){ const a = (pan + 1) * Math.PI / 2; o[0] = 1; o[1] = Math.cos(a); o[2] = 0; o[3] = Math.sin(a); return o; } const a = pan * Math.PI / 2; o[0] = Math.cos(a); o[1] = 0; o[2] = Math.sin(a); o[3] = 1; return o; }
 const tcNodes = () => globalThis.__tcNodes || (globalThis.__tcNodes = new Map());
 function tcOver(proc){ return proc.__ov || (proc.__ov = {p:new Map(), buf:new Map(), g:new Auto(1), pn:new Auto(0), until:Infinity}); }
 globalThis.__tcOv = (proc, P, n) => {
@@ -828,6 +850,11 @@ const varBufs = new Map(), varShaped = new Map(); let varBytes = 0;   // (varSha
    (CUT / RES / DEC) runs shapeData's filter and decay sample by sample as the note reaches them (into a ring), from where
    the note starts (with a short warm-up before an offset start), and ends it where shapeData would have cut it (N). */
 const RD_RING = 16384, RD_M = RD_RING - 1;
+/* The ring is 64 KB, allocated when a SHAPED note starts (on the audio thread). A note's reader is read only while its voice is
+   in `alive`; when the voice ends, process1 gives the ring back (Rd.free) and the next shaped note takes it, cleared to zeros
+   exactly as a new Float32Array is (the reader can look at slots it never wrote). At most RD_POOL_MAX are kept; when the pool
+   is empty a new one is made. */
+const RD_POOL = [], RD_POOL_MAX = 32;
 class Rd {
   constructor(src, src2, sr, tw, rev, start){
     this.src = src; this.src2 = src2; this.rev = rev; this.len = src.length; this.N = this.len; this.tw = tw;
@@ -836,10 +863,11 @@ class Rd {
     this.f = tw.cut != null;
     if (this.f){ const fc = Math.min(cutHz(tw.cut), sr * 0.45), g = Math.tan(Math.PI * fc / sr), k = 2 - 2 * Math.min(clamp(tw.res | 0, 0, 255) / 255 * 0.97, 0.97);
       this.a1 = 1 / (1 + g * (g + k)); this.a2 = g * this.a1; this.a3 = g * this.a2; }
-    this.l1 = 0; this.l2 = 0; this.ring = new Float32Array(RD_RING);
+    this.l1 = 0; this.l2 = 0; this.ring = RD_POOL.length ? RD_POOL.pop().fill(0) : new Float32Array(RD_RING);
     const s0 = Math.max(0, Math.floor(start) - 4096); this.hi = s0; this.lo = s0;   // (the filter settles in the warm-up)
     this.kd = tau ? Math.exp(-1 / (tau * sr)) : 1; this.e = tau ? Math.pow(this.kd, s0) : 1;
   }
+  free(){ const r = this.ring; if (r){ this.ring = null; if (RD_POOL.length < RD_POOL_MAX) RD_POOL.push(r); } }   // (the voice is over: nothing reads this reader again)
   raw(c, i){ const D = c ? this.src2 : this.src; if (!D || i < 0 || i >= this.len) return 0; return D[this.rev ? this.len - 1 - i : i]; }
   at(c, i){
     if (!this.tw) return this.raw(c, i);
@@ -991,12 +1019,12 @@ class ThunderCore extends AudioWorkletProcessor {
     return true;
   }
   mixOut(outputs, N, dt){
-    const fill = (C, A, d) => { if (!C) return; if (!A){ C.fill(d); return; } A.prune(currentTime); const c = A.constFrom(currentTime); if (c != null){ C.fill(c); return; } for (let i = 0; i < N; i++) C[i] = A.at(currentTime + i * dt); };
     const G = outputs[NT + 1], P = outputs[NT + 2], M = outputs[NT + 3];
-    if (G) for (let t = 0; t < G.length; t++) fill(G[t], this.mg[t], 1);
-    if (P) for (let t = 0; t < P.length; t++) fill(P[t], this.mp[t], 0);
-    if (M) fill(M[0], this.mm, 0);
+    if (G) for (let t = 0; t < G.length; t++) this.mixFill(G[t], this.mg[t], 1, N, dt);
+    if (P) for (let t = 0; t < P.length; t++) this.mixFill(P[t], this.mp[t], 0, N, dt);
+    if (M) this.mixFill(M[0], this.mm, 0, N, dt);
   }
+  mixFill(C, A, d, N, dt){ if (!C) return; if (!A){ C.fill(d); return; } A.prune(currentTime); const c = A.constFrom(currentTime); if (c != null){ C.fill(c); return; } for (let i = 0; i < N; i++) C[i] = A.at(currentTime + i * dt); }   // (a method: no closure per block)
   play(d){
     const ms0 = Date.now(), at0 = currentTime;   // PLAYBACK REPORT: how late this PLAY reached the audio thread, and how long it took
     this.stopAll(currentTime); this.mixReset(); this.clkOn = false; this.clk.cancel(currentTime); this.clk.set(0, currentTime);
@@ -1075,7 +1103,7 @@ class ThunderCore extends AudioWorkletProcessor {
   // One block of a SoundFont voice into its track's output (as the page's nodes: zones → [zone pan] → gain → fade → pan)
   sfRun(v, out, N){
     const L = out[0], R = out[1] || out[0], dt = 1 / sampleRate, t0 = currentTime;
-    for (const A of [v.g, v.f, v.pn, v.r]) A.prune(t0);
+    v.g.prune(t0); v.f.prune(t0); v.pn.prune(t0); v.r.prune(t0);
     const sL = v.sL || (v.sL = new Float32Array(128)), sR = v.sR || (v.sR = new Float32Array(128)); sL.fill(0); sR.fill(0);
     const rc = v.r.constFrom(t0); let any = false;
     for (const z of v.sf){ if (z.done) continue;
@@ -1381,7 +1409,7 @@ class ThunderCore extends AudioWorkletProcessor {
       const gc = v.trm ? null : v.g.constFrom(tb0), fc = v.f.constFrom(tb0), pc = v.apn ? null : v.pn.constFrom(tb0), rc = v.r.constFrom(tb0);
       if (gc != null && fc != null && pc != null && rc != null && v.t0 <= tb0 && v.end >= tb1){
         const k = gc * fc, a = (pc + 1) * Math.PI / 4, kl = k * Math.cos(a), kr = k * Math.sin(a), inc = rc * inc0; let p = v.pos;
-        if (RD){ const st = !RD.tw && v.data2, [ll, rl, lr, rr] = st ? stBal(pc) : [0, 0, 0, 0];   // REVERSED / SHAPED (Rd): the same, read through the reader
+        if (RD){ const st = !RD.tw && v.data2, [ll, rl, lr, rr] = st ? stBal(pc) : ZERO4;   // REVERSED / SHAPED (Rd): the same, read through the reader
           for (let i = 0; i < N; i++){ if (p >= len - 1){ v.ended = true; break; } const j = p | 0, f = p - j, d0 = RD.at(0, j), x = d0 + (RD.at(0, j + 1) - d0) * f;
             if (st){ const e0 = RD.at(1, j), y = e0 + (RD.at(1, j + 1) - e0) * f; L[i] += (x * ll + y * rl) * k; R[i] += (x * lr + y * rr) * k; }
             else { L[i] += x * kl; R[i] += x * kr; }
@@ -1391,10 +1419,10 @@ class ThunderCore extends AudioWorkletProcessor {
             L[i] += (x * ll + y * rl) * k; R[i] += (x * lr + y * rr) * k; p += inc; } }
         else for (let i = 0; i < N; i++){ if (p >= len - 1){ v.ended = true; break; } const j = p | 0, x = D[j] + (D[j + 1] - D[j]) * (p - j); L[i] += x * kl; R[i] += x * kr; p += inc; }
         v.pos = p;
-        if (v.ended){ this.alive.delete(v); const T = this.vs[v.track]; if (T){ const q = T.indexOf(v); if (q >= 0) T.splice(q, 1); } }
+        if (v.ended){ this.alive.delete(v); const T = this.vs[v.track]; if (T){ const q = T.indexOf(v); if (q >= 0) T.splice(q, 1); } if (RD){ RD.free(); v.rd = null; } }
         continue;
       }
-      for (const A of [v.g, v.f, v.pn, v.r]) A.prune(tb0);
+      v.g.prune(tb0); v.f.prune(tb0); v.pn.prune(tb0); v.r.prune(tb0);   // (no array per voice per block)
       for (let i = 0; i < N; i++){
         const t = currentTime + i * dt;
         if (t < v.t0) continue;
@@ -1408,7 +1436,7 @@ class ThunderCore extends AudioWorkletProcessor {
           L[i] += y * Math.cos(a); R[i] += y * Math.sin(a); }
         v.pos += v.r.at(t) * inc0;
       }
-      if (v.ended){ this.alive.delete(v); const T = this.vs[v.track]; if (T){ const k = T.indexOf(v); if (k >= 0) T.splice(k, 1); } }
+      if (v.ended){ this.alive.delete(v); const T = this.vs[v.track]; if (T){ const k = T.indexOf(v); if (k >= 0) T.splice(k, 1); } if (RD){ RD.free(); v.rd = null; } }
     }
     return true;
   }
