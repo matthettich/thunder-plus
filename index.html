@@ -1306,7 +1306,7 @@ body.mob .top #tLen{min-height:34px; padding:0 8px; align-self:auto}
 #tSong.on .tl.alt{visibility:visible}
 .tcpu{border:0; border-left:1px solid var(--line); min-height:36px; padding:0 10px; font-size:var(--fs-3); font-weight:600; letter-spacing:.04em; flex:none; white-space:nowrap;
   font-variant-numeric:tabular-nums; position:relative; min-width:84px; text-align:left; background:var(--ttl)}
-.tcpu i{position:absolute; left:0; bottom:0; height:4px; width:0; background:var(--ink); transition:width .3s}
+.tcpu i{position:absolute; left:0; bottom:0; height:4px; width:0; background:var(--ink)}
 .tcpu.warn i{background:var(--pl)}
 .tcpu.hot{color:var(--rec)} .tcpu.hot i{background:var(--rec)}
 .tpad{display:flex; justify-content:space-between; align-items:center; gap:16px; flex:1}
@@ -27170,8 +27170,8 @@ function draw(){
   const selB = $('tCmd').querySelector('[data-c=sel]'); if (selB) selB.classList.toggle('on', !!selA);
   $('tState').innerHTML = tp.on ? ico('play') + 'PLAYING ' + VNAME[tp.mode] : rendering ? ico('render') + 'RENDERING' : ico('stop') + 'STOPPED';
   $('tBpm').textContent = (tp.on ? tp.bpm : S.bpm) + ' BPM · ' + (tp.on ? tp.tks : S.ticks || TICKS) + ' TICKS' + (S.swing > 50 ? ' · SWING ' + S.swing + '%' : '');
-  document.querySelectorAll('#tMeters .mtr').forEach((m, t) => { m.classList.toggle('mu', !audible(t)); m.classList.toggle('so', !!(S.mix[t] && S.mix[t].solo)); m.hidden = t >= ntr();
-    const c = tCol(t), tip = trkTip(t) + ' · tap mutes' + (COARSE_PT ? '' : ', right-click solos, double-click names'); if (m.title !== tip) m.title = tip; m.classList.toggle('tcl', !!c); if (c) m.style.setProperty('--tc', c); });
+  document.querySelectorAll('#tMeters .mtr').forEach((m, t) => { m.classList.toggle('mu', !audible(t)); m.classList.toggle('so', !!(S.mix[t] && S.mix[t].solo)); { const hd = t >= ntr(); if (m.hidden !== hd) m.hidden = hd; }   // BATTERY: write only what differs
+    const c = tCol(t), tip = trkTip(t) + ' · tap mutes' + (COARSE_PT ? '' : ', right-click solos, double-click names'); if (m.title !== tip) m.title = tip; m.classList.toggle('tcl', !!c); if (c && m._tc !== c){ m._tc = c; m.style.setProperty('--tc', c); } });
   paintMeters();
   instList();
   apAfterDraw();   // ARRANGE PAGING: focus look, phrase follow, song strip
@@ -27218,8 +27218,11 @@ function mixFaders(){
     const t = mixL + i, a = meterEls[i].getBoundingClientRect(), z = meterEls[(MH - 1) * mixN + i].getBoundingClientRect(), b = host.children[i];
     const top = a.top + oy, bot = z.bottom + oy, rowH = (bot - top) / MH, d = volDb(S.mix[t].vol);
     const y = mfY(d, top, bot, rowH);
-    Object.assign(b.style, {left:(a.left + ox - 2).toFixed(1) + 'px', width:(a.width + 4).toFixed(1) + 'px', top:(y - 1.5).toFixed(1) + 'px'});
-    b.dataset.t = t; b.dataset.top = top; b.dataset.bot = bot; b.title = 'Track ' + d2(t + 1) + ' · VOL ' + hx(S.mix[t].vol) + ' · ' + dB(trackGain(S.mix[t].vol)) + ' · the fader, after chains and the FX (TRIM is above, before them) · drag to change, double-click for 0 dB';
+    // BATTERY: this runs on every redraw while playing; write an attribute only when its value differs from the last one written
+    const L1 = (a.left + ox - 2).toFixed(1) + 'px', W1 = (a.width + 4).toFixed(1) + 'px', T1 = (y - 1.5).toFixed(1) + 'px';
+    if (b._mfL !== L1 || b._mfW !== W1 || b._mfT !== T1){ b._mfL = L1; b._mfW = W1; b._mfT = T1; Object.assign(b.style, {left:L1, width:W1, top:T1}); }
+    if (b.dataset.t !== String(t)) b.dataset.t = t; if (b.dataset.top !== String(top)) b.dataset.top = top; if (b.dataset.bot !== String(bot)) b.dataset.bot = bot;
+    const ttl = 'Track ' + d2(t + 1) + ' · VOL ' + hx(S.mix[t].vol) + ' · ' + dB(trackGain(S.mix[t].vol)) + ' · the fader, after chains and the FX (TRIM is above, before them) · drag to change, double-click for 0 dB'; if (b.title !== ttl) b.title = ttl;
     b.classList.toggle('mu', !!S.mix[t].mute); b.classList.toggle('cur', mixFv() && t === cs.mixer.x);
   }
   mixOutBar();
@@ -27318,10 +27321,10 @@ function paintMeters(){
   const bs = rt ? rt.pl.buses : null;
   if (trimEls.length){ const now = performance.now(), lit = trimEls.map((e, i) => { const b = bs && bs[mixL + i], p = b && now - (b.iseen || 0) < 1000 ? b.ipk : 0; return p >= 0.891 ? 2 : p >= 0.5 ? 1 : 0; });
     const sig = lit.join(''); if (sig !== trimLit){ trimLit = sig; trimEls.forEach((e, i) => { e.classList.toggle('ih', lit[i] === 1); e.classList.toggle('ic', lit[i] === 2); }); } }   // GAIN STAGING: the TRIM light
-  document.querySelectorAll('#tMeters .mtr i').forEach((e, t) => { e.style.height = (bs ? lvl(bs[t].lv) * 100 : 0).toFixed(1) + '%'; });
+  document.querySelectorAll('#tMeters .mtr i').forEach((e, t) => { const h = (bs ? lvl(bs[t].lv) * 100 : 0).toFixed(1) + '%'; if (e._h !== h){ e._h = h; e.style.height = h; } });   // BATTERY: only a changed height is written
   // Track meters: element k * mixN + i is line k (from the top) of the i-th track on screen.
   meterEls.forEach((e, i) => { const k = Math.floor(i / mixN), t = mixL + i % mixN, f = (bs ? lvl(bs[t].lv) : 0) * MH * 8 - (MH - 1 - k) * 8;
-    const ch = BLK[clamp(Math.round(f), 0, 8)]; e.textContent = ch + ch; });
+    const ch = BLK[clamp(Math.round(f), 0, 8)], tx = ch + ch; if (e.textContent !== tx) e.textContent = tx; });
   // Master: a horizontal bar per side, −48 to 0 dB in MW cells, plus the peak in dB.
   if (masterEls.length === 10){
     const cut = mcutOn = mCut(); for (const k of [0, 5]){ const ln = masterEls[k].closest('.ln'); if (ln && ln.classList.contains('mcut') !== cut) ln.classList.toggle('mcut', cut); }   // MASTER CUT FLASH
@@ -27330,9 +27333,9 @@ function paintMeters(){
       const m = rt && rt.mlv ? rt.mlv[s] : 0, f = lvl(m) * MW, base = s * 5;
       zones.forEach(([a, b], z) => { let t = ''; for (let i = a; i < b; i++){ const x = f - i; t += x >= 1 ? '█' : x > 0 ? HB[Math.round(x * 8)] : ''; }
         const e = masterEls[base + z]; if (e.textContent !== t){ e.textContent = t; e.style.width = 'calc(' + t.length + ' * var(--chw, 1ch))'; } });   // as wide as its cells (see .mt)
-      masterEls[base + 3].textContent = '·'.repeat(Math.max(0, MW - Math.ceil(f)));
+      { const e3 = masterEls[base + 3], t3 = '·'.repeat(Math.max(0, MW - Math.ceil(f))); if (e3.textContent !== t3) e3.textContent = t3; }
       const pk = rt && rt.mpk ? rt.mpk[s] : 0;
-      masterEls[base + 4].textContent = pk > 0.00002 ? (20 * Math.log10(pk)).toFixed(1).padStart(5) + (pk >= 0.999 ? ' CLIP' : '') : '  −∞';
+      { const e4 = masterEls[base + 4], t4 = pk > 0.00002 ? (20 * Math.log10(pk)).toFixed(1).padStart(5) + (pk >= 0.999 ? ' CLIP' : '') : '  −∞'; if (e4.textContent !== t4) e4.textContent = t4; }
     });
   }
 }
@@ -27554,7 +27557,7 @@ function stageCanvas(force){
   if (k === 'preview') return stagePreview();
   if (k === 'piano') return stagePiano(force);
   if (k === 'wave') return stageWave();
-  if (k === 'spec') return stageSpec();
+  if (k === 'spec') return stageSpec(force);
   if (k === 'chain') return stageChain();
 }
 // Sect: the phrase under the cursor as a little piano roll, time running down like the tracker.
@@ -27628,8 +27631,15 @@ function stageWave(){
     if (mx < mn) continue; g.fillRect(x, H / 2 - mx * H * .46, 1, Math.max(dpr, (mx - mn) * H * .46)); }
 }
 // Mixer: the master's spectrum, drawn like the bottom panel's scope.
-function stageSpec(){
-  const X = stgCtx(); if (!X) return; const {g, W, H, dpr} = X; $('tStagePhT').textContent = 'MASTER · 20 Hz – 20 kHz';
+function stageSpec(force){
+  // BATTERY: stopped (nothing live to show), the panel is a still picture: draw it once and skip until something it shows changes
+  // (live again, a forced layout, the skin or theme, the box size, zoom / dpr). Live, it redraws every tick as before.
+  const an0 = specAnalyser(), live0 = !!an0 && (tp.on || performance.now() - audioWake < 1500);
+  if (!live0){
+    const de = document.documentElement, st = $('tStage').style, sig = 'idle|' + !!an0 + '|' + de.getAttribute('data-skin') + '|' + de.className + '|' + document.body.className + '|' + st.width + '|' + st.height + '|' + (devicePixelRatio || 1) + '|' + innerWidth + 'x' + innerHeight;
+    if (!force && sig === stgSig) return; stgSig = sig;
+  } else stgSig = '';
+  const X = stgCtx(); if (!X) { stgSig = ''; return; } const {g, W, H, dpr} = X; { const t = 'MASTER · 20 Hz – 20 kHz', e = $('tStagePhT'); if (e.textContent !== t) e.textContent = t; }
   g.clearRect(0, 0, W, H); g.strokeStyle = X.dim; g.lineWidth = dpr; g.strokeRect(.5, .5, W - 1, H - 1);
   const xOf = f => Math.log(f / 20) / Math.log(1000) * W, TOP = -12, BOT = -96, yOf = db => (TOP - db) / (TOP - BOT) * H;
   [100, 1000, 10000].forEach(f => { const x = xOf(f); g.beginPath(); g.moveTo(x, 0); g.lineTo(x, H); g.stroke(); g.fillStyle = X.mid; g.font = `${10 * dpr}px ${X.font}`; g.fillText(f >= 1000 ? f / 1000 + 'k' : f, x + 3 * dpr, H - 5 * dpr); });
@@ -31011,12 +31021,17 @@ function cpuMeter(){
   const b = $('tCpu'); if (!b) return;
   const fx = fxLoads().reduce((a, x) => a + x[1], 0), cap = cpu.cap && now - cpu.cap.t < 3000 ? cpu.cap : null, pr = cpu.probe && now - cpu.probe.t < 1500 ? cpu.probe : null;
   const v = !ctx ? null : cap ? cap.avg : pr ? pr.load : fx;
-  { const sp = b.querySelector('span'); let w = sp.querySelector('.cpuw'); if (!w){ w = document.createElement('em'); w.className = 'cpuw'; w.textContent = 'CPU '; } sp.textContent = v == null ? '0%' : Math.round(v * 100) + '%'; sp.prepend(w); b.title = 'Audio load (CPU) · click for details'; }   // the "CPU " word hides on the cover screen
-  b.querySelector('i').style.width = v == null ? '0' : Math.min(100, v * 100).toFixed(0) + '%';
+  const txt = v == null ? '0%' : Math.round(v * 100) + '%', wid = v == null ? '0' : Math.min(100, v * 100).toFixed(0) + '%';
   const drop = now - glitch.t < 3000;   // a dropout in the last 3 s turns the meter red
-  b.classList.toggle('warn', v != null && v > 0.5); b.classList.toggle('hot', v != null && (v > 0.8 || (cap && cap.under > 0) || drop));
-  b.title = (cap ? 'Whole audio engine (Chrome’s render capacity), not just the effects.' : pr ? 'Whole audio engine: how much of the available time it uses for every sound, effect and voice. Over 100% means it can’t keep up.' : 'The time the audio engine’s own processing takes: track and master effects, chains and bass voices (this browser doesn’t report the total audio load).')
+  const warn = v != null && v > 0.5, hot = v != null && (v > 0.8 || (cap && cap.under > 0) || drop);
+  const ttl = (cap ? 'Whole audio engine (Chrome’s render capacity), not just the effects.' : pr ? 'Whole audio engine: how much of the available time it uses for every sound, effect and voice. Over 100% means it can’t keep up.' : 'The time the audio engine’s own processing takes: track and master effects, chains and bass voices (this browser doesn’t report the total audio load).')
     + (glitch.n ? ' Dropouts since the sound started: ' + glitch.n + '.' : '');
+  // BATTERY: touch the DOM only when something shown changed (a rewrite every 500 ms kept the page restyling while idle)
+  const key = txt + '|' + wid + '|' + warn + '|' + hot + '|' + ttl; if (b._cpuKey === key) return; b._cpuKey = key;
+  const sp = b.querySelector('span'); let w = sp.querySelector('.cpuw'); if (!w){ w = document.createElement('em'); w.className = 'cpuw'; w.textContent = 'CPU '; }
+  sp.textContent = txt; sp.prepend(w);   // the "CPU " word hides on the cover screen
+  b.querySelector('i').style.width = wid;
+  b.classList.toggle('warn', warn); b.classList.toggle('hot', hot); b.title = ttl;
 }
 idleTick(() => { if (view !== 'tracker' && !document.hidden) cpuMeter(); }, 500, () => view !== 'tracker' && !document.hidden, 2000);   // BATTERY: the tracker's own frame loop updates it there
 // chains screen meters: sample each routed track's chains return and push it into the frame.
