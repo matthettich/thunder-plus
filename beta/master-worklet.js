@@ -334,7 +334,7 @@ class MasterProcessor extends AudioWorkletProcessor {
       this.outLu.process(L, R, n);
       this.inPk = Math.max(this.inPk, ip); this.outPk = Math.max(this.outPk, op); this.tpMax = Math.max(this.tpMax, op);
       this.compGr = Math.min(this.compGr, this.on.comp ? this.comp.gr : 0);
-      if (++this.n >= Math.round(sampleRate / 128 / 20)){
+      if ((this.n += n / 128) >= Math.round(sampleRate / 128 / 20)){
         this.n = 0;
         this.port.postMessage({meter:{inPk:this.inPk, outPk:this.outPk, tp:this.tpMax, inLu:this.inLu.shortTerm(), outLu:this.outLu.shortTerm(),
           load:this.load || 0, comp:this.compGr, compIn:this.on.comp ? this.comp.detMax : -200, lim:this.on.lim ? linToDb(this.lim.grMin) : 0, sup:this.on.sup ? this.sup.bands(48) : null}});

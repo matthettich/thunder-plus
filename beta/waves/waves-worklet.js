@@ -4864,6 +4864,23 @@ const OP = { patch:'patch', add:'add', remove:'remove', connect:'connect', disco
    Only inside an AudioWorklet. Loaded as a plain <script> on a page (as ...Thunder Plus does, to
    render waves patches into its pads), the engine above is all there is: WavesEngine, wasmInit, MODULES. */
 if (typeof AudioWorkletProcessor !== 'undefined'){
+/* ANY BLOCK LENGTH (10 Nov): Chrome is adding a render size hint, so a block need not be 128 frames. tcChunks runs one (a function of the code
+   written for at most B frames) over a longer block in chunks of at most B, on views of the same buffers (no copy). Thunder
+   Core's parameter overrides are made once for the whole block, then off for the chunks, and its post gain / pan runs once at
+   the end. A block longer than 4096 fails soft: silence, and one {failed:'block size N'} to the page. (A block of 128 or less
+   never comes here: it takes the old path unchanged.) */
+function tcChunks(self, ins, outs, P, B, one){
+  const N = outs[0][0].length;
+  if (N > 4096){ for (const g of outs) for (const c of g) c.fill(0); if (!self.__bsFail){ self.__bsFail = 1; self.port.postMessage({failed:'block size ' + N}); } return true; }
+  if (self.__ov && globalThis.__tcOv) P = globalThis.__tcOv(self, P, N);
+  const ov = self.__ov; self.__ov = null; let ok = true;   // (read after: __tcOv lets go of an expired override)
+  try { for (let a = 0; a < N && ok; a += B){ const e = Math.min(a + B, N), v = c => c.subarray(a, e), Q = {};
+      for (const k in P){ const A = P[k]; Q[k] = A.length > 1 ? v(A) : A; }
+      ok = one.call(self, ins.map(g => g.map(v)), outs.map(g => g.map(v)), Q) !== false; } }
+  finally { self.__ov = ov; }
+  if (ok && ov && globalThis.__tcPost) globalThis.__tcPost(self, outs[0]);
+  return ok;
+}
 class WavesProcessor extends AudioWorkletProcessor {
   constructor(options){
     super();
@@ -4884,17 +4901,18 @@ class WavesProcessor extends AudioWorkletProcessor {
     catch (err){ this.port.postMessage({ target:TARGET, op:OP.error, value:{ op:m.op, message:String(err?.message || err) } }); }
   }
   /* Standalone, every bus plays through the speakers; in Thunder each bus is its own input. */
-  process(_ins, outs){
+  process(_ins, outs){ return outs[0][0].length <= BLOCK ? this.p1(_ins, outs) : tcChunks(this, _ins, outs, undefined, BLOCK, this.p1); }   // (any block length: p1 is for at most BLOCK frames)
+  p1(_ins, outs){
     const e = this.engine;
-    try { e.process(BLOCK); }
+    try { e.process(outs[0][0].length); }
     catch (err){ e.busesL.fill(0); e.busesR.fill(0); if ((this._blocks & 255) === 0) this.port.postMessage({ target:TARGET, op:OP.error, value:{ op:'process', message:String(err?.message || err) } }); }
     const out = outs[0], L = out[0], R = out[1] || out[0];
     L.fill(0); if (R !== L) R.fill(0);
     for (let k = 0; k < BUS_COUNT; k++){
       const o = k * BLOCK;
-      for (let i = 0; i < BLOCK; i++){ L[i] += e.busesL[o + i]; if (R !== L) R[i] += e.busesR[o + i]; }
+      for (let i = 0; i < L.length; i++){ L[i] += e.busesL[o + i]; if (R !== L) R[i] += e.busesR[o + i]; }
     }
-    for (let i = 0; i < BLOCK; i++){ L[i] = soft(L[i]); if (R !== L) R[i] = soft(R[i]); }
+    for (let i = 0; i < L.length; i++){ L[i] = soft(L[i]); if (R !== L) R[i] = soft(R[i]); }
     if (e.telemetryOn && (++this._blocks % 12) === 0) this.port.postMessage({ target:TARGET, op:OP.meter, value:e.telemetry() });
     else if (!e.telemetryOn) this._blocks++;
     return true;
@@ -4940,7 +4958,8 @@ class WavesLiveProc extends AudioWorkletProcessor {
   }
   busOf(){ return Math.min(BUS_COUNT, Math.max(1, (+this.p.bus | 0) || 1)); }
   pitch(r){ return 36 + (+this.p.tune || 0) + 12 * Math.log2(r > 1e-6 ? r : 1e-6) - 60; }
-  process(_ins, outs, P){
+  process(_ins, outs, P){ return outs[0][0].length <= BLOCK ? this.p1(_ins, outs, P) : tcChunks(this, _ins, outs, P, BLOCK, this.p1); }   // (any block length: p1 is for at most BLOCK frames)
+  p1(_ins, outs, P){
     if (this.__ov && globalThis.__tcOv) P = globalThis.__tcOv(this, P, outs[0][0].length);
     const o = outs[0], L = o[0], R = o[1] || o[0], n = L.length, e = this.e, V = e.voices;
     if (this.dead){ try { e.dispose(); } catch (_) {} return false; }
@@ -4974,7 +4993,7 @@ class WavesLiveProc extends AudioWorkletProcessor {
     }
     const held = this.lane.some(l => l.row >= 0 && V.rows[l.row].gate);
     if (!held && !any && this.quiet > sampleRate * 2){ L.fill(0); if (R !== L) R.fill(0); return true; }
-    try { e.process(BLOCK); } catch (_) { e.busesL.fill(0); e.busesR.fill(0); }
+    try { e.process(n); } catch (_) { e.busesL.fill(0); e.busesR.fill(0); }
     const bus = this.busOf(), off = (bus - 1) * BLOCK;
     const g = Math.pow(10, (+this.p.level || 0) / 20), dv = +this.p.drive || 0, dr = dv > 0.001 ? 1 + dv * dv * 10 : 0, dn = dr ? 1 / Math.tanh(dr) : 1;
     let pk = 0;
