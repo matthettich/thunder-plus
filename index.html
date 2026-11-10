@@ -27167,8 +27167,8 @@ function draw(){
   const selB = $('tCmd').querySelector('[data-c=sel]'); if (selB) selB.classList.toggle('on', !!selA);
   $('tState').innerHTML = tp.on ? ico('play') + 'PLAYING ' + VNAME[tp.mode] : rendering ? ico('render') + 'RENDERING' : ico('stop') + 'STOPPED';
   $('tBpm').textContent = (tp.on ? tp.bpm : S.bpm) + ' BPM · ' + (tp.on ? tp.tks : S.ticks || TICKS) + ' TICKS' + (S.swing > 50 ? ' · SWING ' + S.swing + '%' : '');
-  document.querySelectorAll('#tMeters .mtr').forEach((m, t) => { m.classList.toggle('mu', !audible(t)); m.classList.toggle('so', !!(S.mix[t] && S.mix[t].solo)); m.hidden = t >= ntr();
-    const c = tCol(t), tip = trkTip(t) + ' · tap mutes' + (COARSE_PT ? '' : ', right-click solos, double-click names'); if (m.title !== tip) m.title = tip; m.classList.toggle('tcl', !!c); if (c) m.style.setProperty('--tc', c); });
+  document.querySelectorAll('#tMeters .mtr').forEach((m, t) => { m.classList.toggle('mu', !audible(t)); m.classList.toggle('so', !!(S.mix[t] && S.mix[t].solo)); { const hd = t >= ntr(); if (m.hidden !== hd) m.hidden = hd; }   // BATTERY: write only what differs
+    const c = tCol(t), tip = trkTip(t) + ' · tap mutes' + (COARSE_PT ? '' : ', right-click solos, double-click names'); if (m.title !== tip) m.title = tip; m.classList.toggle('tcl', !!c); if (c && m._tc !== c){ m._tc = c; m.style.setProperty('--tc', c); } });
   paintMeters();
   instList();
   apAfterDraw();   // ARRANGE PAGING: focus look, phrase follow, song strip
@@ -27215,8 +27215,11 @@ function mixFaders(){
     const t = mixL + i, a = meterEls[i].getBoundingClientRect(), z = meterEls[(MH - 1) * mixN + i].getBoundingClientRect(), b = host.children[i];
     const top = a.top + oy, bot = z.bottom + oy, rowH = (bot - top) / MH, d = volDb(S.mix[t].vol);
     const y = mfY(d, top, bot, rowH);
-    Object.assign(b.style, {left:(a.left + ox - 2).toFixed(1) + 'px', width:(a.width + 4).toFixed(1) + 'px', top:(y - 1.5).toFixed(1) + 'px'});
-    b.dataset.t = t; b.dataset.top = top; b.dataset.bot = bot; b.title = 'Track ' + d2(t + 1) + ' · VOL ' + hx(S.mix[t].vol) + ' · ' + dB(trackGain(S.mix[t].vol)) + ' · the fader, after chains and the FX (TRIM is above, before them) · drag to change, double-click for 0 dB';
+    // BATTERY: this runs on every redraw while playing; write an attribute only when its value differs from the last one written
+    const L1 = (a.left + ox - 2).toFixed(1) + 'px', W1 = (a.width + 4).toFixed(1) + 'px', T1 = (y - 1.5).toFixed(1) + 'px';
+    if (b._mfL !== L1 || b._mfW !== W1 || b._mfT !== T1){ b._mfL = L1; b._mfW = W1; b._mfT = T1; Object.assign(b.style, {left:L1, width:W1, top:T1}); }
+    if (b.dataset.t !== String(t)) b.dataset.t = t; if (b.dataset.top !== String(top)) b.dataset.top = top; if (b.dataset.bot !== String(bot)) b.dataset.bot = bot;
+    const ttl = 'Track ' + d2(t + 1) + ' · VOL ' + hx(S.mix[t].vol) + ' · ' + dB(trackGain(S.mix[t].vol)) + ' · the fader, after chains and the FX (TRIM is above, before them) · drag to change, double-click for 0 dB'; if (b.title !== ttl) b.title = ttl;
     b.classList.toggle('mu', !!S.mix[t].mute); b.classList.toggle('cur', mixFv() && t === cs.mixer.x);
   }
   mixOutBar();
@@ -27315,10 +27318,10 @@ function paintMeters(){
   const bs = rt ? rt.pl.buses : null;
   if (trimEls.length){ const now = performance.now(), lit = trimEls.map((e, i) => { const b = bs && bs[mixL + i], p = b && now - (b.iseen || 0) < 1000 ? b.ipk : 0; return p >= 0.891 ? 2 : p >= 0.5 ? 1 : 0; });
     const sig = lit.join(''); if (sig !== trimLit){ trimLit = sig; trimEls.forEach((e, i) => { e.classList.toggle('ih', lit[i] === 1); e.classList.toggle('ic', lit[i] === 2); }); } }   // GAIN STAGING: the TRIM light
-  document.querySelectorAll('#tMeters .mtr i').forEach((e, t) => { e.style.height = (bs ? lvl(bs[t].lv) * 100 : 0).toFixed(1) + '%'; });
+  document.querySelectorAll('#tMeters .mtr i').forEach((e, t) => { const h = (bs ? lvl(bs[t].lv) * 100 : 0).toFixed(1) + '%'; if (e._h !== h){ e._h = h; e.style.height = h; } });   // BATTERY: only a changed height is written
   // Track meters: element k * mixN + i is line k (from the top) of the i-th track on screen.
   meterEls.forEach((e, i) => { const k = Math.floor(i / mixN), t = mixL + i % mixN, f = (bs ? lvl(bs[t].lv) : 0) * MH * 8 - (MH - 1 - k) * 8;
-    const ch = BLK[clamp(Math.round(f), 0, 8)]; e.textContent = ch + ch; });
+    const ch = BLK[clamp(Math.round(f), 0, 8)], tx = ch + ch; if (e.textContent !== tx) e.textContent = tx; });
   // Master: a horizontal bar per side, −48 to 0 dB in MW cells, plus the peak in dB.
   if (masterEls.length === 10){
     const cut = mcutOn = mCut(); for (const k of [0, 5]){ const ln = masterEls[k].closest('.ln'); if (ln && ln.classList.contains('mcut') !== cut) ln.classList.toggle('mcut', cut); }   // MASTER CUT FLASH
@@ -27327,9 +27330,9 @@ function paintMeters(){
       const m = rt && rt.mlv ? rt.mlv[s] : 0, f = lvl(m) * MW, base = s * 5;
       zones.forEach(([a, b], z) => { let t = ''; for (let i = a; i < b; i++){ const x = f - i; t += x >= 1 ? '█' : x > 0 ? HB[Math.round(x * 8)] : ''; }
         const e = masterEls[base + z]; if (e.textContent !== t){ e.textContent = t; e.style.width = 'calc(' + t.length + ' * var(--chw, 1ch))'; } });   // as wide as its cells (see .mt)
-      masterEls[base + 3].textContent = '·'.repeat(Math.max(0, MW - Math.ceil(f)));
+      { const e3 = masterEls[base + 3], t3 = '·'.repeat(Math.max(0, MW - Math.ceil(f))); if (e3.textContent !== t3) e3.textContent = t3; }
       const pk = rt && rt.mpk ? rt.mpk[s] : 0;
-      masterEls[base + 4].textContent = pk > 0.00002 ? (20 * Math.log10(pk)).toFixed(1).padStart(5) + (pk >= 0.999 ? ' CLIP' : '') : '  −∞';
+      { const e4 = masterEls[base + 4], t4 = pk > 0.00002 ? (20 * Math.log10(pk)).toFixed(1).padStart(5) + (pk >= 0.999 ? ' CLIP' : '') : '  −∞'; if (e4.textContent !== t4) e4.textContent = t4; }
     });
   }
 }
