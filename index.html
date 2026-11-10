@@ -22245,7 +22245,7 @@ document.addEventListener('visibilitychange', () => { if (!document.hidden) PB.v
       pbLog(`long frame ${e.duration | 0} ms (blocked ${e.blockingDuration | 0}) · row ${tp.hiRow}${sc ? ' · ' + sc : ''}`); } }).observe({type:'long-animation-frame'}); } catch(e){} }
 // CLOCK DETAIL (8 Nov): on the Fold the audio clock runs ahead of real time while playing. Once a second, while playing and for 5 s after STOP, a line goes in the
 // report if the clock moved more than 0.1 s away from real time (and every 10 s anyway): what the browser says about the output, to tell which side is racing.
-{ let w0 = 0, c0 = 0, n = 0; idleTick(() => { pbLvRead(); try {
+{ let w0 = 0, c0 = 0, n = 0; idleTick(() => { try {
   if (!pbCkOn()){ w0 = 0; return; }
   const w = Date.now() / 1000, c = ctx.currentTime; if (!w0){ w0 = w; c0 = c; return; }
   const dw = w - w0, dc = c - c0; w0 = w; c0 = c; n++; if (Math.abs(dc - dw) < 0.1 && n % 10) return;
@@ -22256,16 +22256,16 @@ function pbLevel(){ try { const A = rt && rt.man; if (!A) return '-'; let m = 0;
 // LEVEL OVER A PLAY (10 Nov): the single reading 4 s into PLAY varies by ~7 dB, so each PLAY also keeps the average (RMS) and the peak of the
 // SAME master analysers (rt.man), read once a second by the clock-detail tick below (it runs for the whole of playback, hidden too; no new node
 // or timer). Plain numbers only: the sum of the readings' mean squares, their count and the highest peak. Reset at PLAY, logged at STOP.
-const PB_LV_S = 1;   // seconds between readings (the clock-detail tick's period)
-function pbLvReset(){ PB.lv = {on:true, sum:0, n:0, pk:0}; }
+const PB_LV_MS = 250;   // (lead, 10 Nov) four readings a second from its own timer, only while a song plays: once a second of 21 ms windows was too few to compare two short plays
+function pbLvReset(){ if (PB.lv && PB.lv.T) clearInterval(PB.lv.T); PB.lv = {on:true, sum:0, n:0, pk:0, t0:performance.now(), T:setInterval(pbLvRead, PB_LV_MS)}; }
 function pbLvAdd(ms, pk){ const L = PB.lv; if (!L || !L.on) return; L.sum += ms; L.n++; if (pk > L.pk) L.pk = pk; }
 function pbLvText(L){ L = L || PB.lv; if (!L || !L.n) return null; const db = x => x > 0 ? (10 * Math.log10(x)).toFixed(1) + ' dB' : 'silent';
-  return `average ${db(L.sum / L.n)} (RMS), peak ${db(L.pk * L.pk)}, ${L.n * PB_LV_S} s measured`; }
+  return `average ${db(L.sum / L.n)} (RMS), peak ${db(L.pk * L.pk)}, ${L.n} readings in ${(((L.t1 || performance.now()) - L.t0) / 1000).toFixed(0)} s`; }
 function pbLvRead(){ try { const L = PB.lv; if (!L || !L.on || !tp.on || !ctx || ctx.state !== 'running') return; const A = rt && rt.man; if (!A) return;
   const b = PB.lvB || (PB.lvB = new Float32Array(1024)); let s = 0, p = 0, c = 0;
   for (const a of A){ const n = Math.min(b.length, a.fftSize); a.getFloatTimeDomainData(b); for (let k = 0; k < n; k++){ const x = b[k]; s += x * x; c++; const q = x < 0 ? -x : x; if (q > p) p = q; } }
   if (c) pbLvAdd(s / c, p); } catch(e){} }
-function pbLvStop(){ const L = PB.lv; if (!L || !L.on) return; L.on = false; const t = pbLvText(L); pbLog('level over this play: ' + (t || 'not measured (under ' + PB_LV_S + ' s)')); PB.lvDone = t; }
+function pbLvStop(){ const L = PB.lv; if (!L || !L.on) return; L.on = false; if (L.T){ clearInterval(L.T); L.T = 0; } L.t1 = performance.now(); const t = pbLvText(L); pbLog('level over this play: ' + (t || 'not measured (too short)')); PB.lvDone = t; }
 // END LEVEL OVER A PLAY
 /* HYBRID (owner, 6 Nov: "Build the hybrid and make sure we don't break anything on desktop"): on a phone or tablet, the
    moment the app is hidden (the screen off, another app, the shade) while the audio-thread sequencer plays the song, the
@@ -23572,7 +23572,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 553;
+const BUILD = 554;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD + (location.pathname.includes('/beta/') ? ' · beta' : '');
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -33002,6 +33002,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [554, '10 Nov', ['MOD: …pump effect knobs can be LFO targets (Add LFO… on the knob; per-band EQ rows not yet).', 'Saving also waits for, and asks about, song-preset samples and impulse responses that are missing.', 'The playback report gives the average and peak level of each play, so two settings can be compared.']],
   [553, '10 Nov', ['MOD: LFOs now run whenever the song plays, on any track, bus or the master, even when that track has no pattern on the current row (an LFO on a master effect used to stand still). A muted block still stops its LFO.', 'Battery: with nothing playing, the sound engine now goes to sleep after 90 seconds on a phone (5 minutes on a computer) and wakes on the next sound.', 'Fewer clicks under load: the audio engine creates far less memory garbage while playing, and long shaped samples no longer pile up in memory.']],
   [552, '10 Nov', ['Saving a project, sharing it or exporting a kit now waits for samples that are still loading, and asks before writing a file without a sample\'s audio.', 'If your audio output is unplugged or the computer wakes from sleep, the app reopens the sound: it plays on the system default and returns to your output when it is back. Reset audio engine re-applies the output too, and …waves follows it.', 'Phone: synced delays no longer bend in pitch while the song is being held in time; background play is started again if Android pauses it.', 'Smoother first use of effects, and no freeze when resuming late in a long song (computer, Audio thread sequencer).']],
   [551, '10 Nov', ['Settings › Audio › Reset audio settings puts every audio test setting back to its default (songs, kits, output, level and MIDI setup are kept).', 'Phone experiment, RUNAWAY KICK (TEST), on by default: when the audio clock runs several times too fast for over a second (screen off, effects loaded), the engine is paused for a moment to try to break it. The playback report says what happened.']],
