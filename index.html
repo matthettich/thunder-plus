@@ -23131,7 +23131,7 @@ function phraseToCursor(){
   if (x >= MT || (typeof isBusT === 'function' && isBusT(x))) return;
   if (cid >= 0){ const p = firstPhrase(cid); cSect = cid; if (p >= 0) cPhrase = p; return; }
   const fp = freePhrase(); if (fp < 0) return; cPhrase = fp; cs.phrase.y = 0; pendPlace = {x, y, p:fp}; }
-function resetCursors(){ cSect = cPhrase = cInst = cTrack = cFxT = cFxS = 0; for (const k in cs) Object.assign(cs[k], {x:0, y:0, top:0}); selA = null; }
+function resetCursors(){ fxOpenedOnce = false; cSect = cPhrase = cInst = cTrack = cFxT = cFxS = 0; for (const k in cs) Object.assign(cs[k], {x:0, y:0, top:0}); selA = null; }
 // A song's pattern numbering starts at 00. last.sect/last.phrase are the last sect/phrase NUMBER placed, and
 // they seed the first empty cell you type into — so a new song used to inherit the old song's number (a new
 // song began at 06 after the last one ended at 05). They are song-scoped, so reset them with the song.
@@ -23577,6 +23577,7 @@ function setTScale(v){ tScale = clamp(Math.round(v / 10) * 10, 60, 200); try { l
 function setMixScale(v){ mixScale = clamp(Math.round(v / 10) * 10, 60, 200); try { localStorage.setItem(MSK, String(mixScale)); } catch(e){} fit(); draw(); }
 function setArr(m){ arrMode = m; try { localStorage.setItem(ARK, String(m)); } catch(e){} arrBody(); arrSig = ''; draw(); fit(); draw(); }
 const cs = {song:{x:0, y:0, top:0}, sect:{x:0, y:0}, phrase:{x:0, y:0, top:0}, inst:{x:0, y:0}, mixer:{x:0, y:0}, fx:{x:0, y:0}, mod:{x:0, y:0}, project:{x:0, y:0}};
+let fxOpenedOnce = false;   // not saved: has FX been opened since the session / the last new song or load
 let cSect = 0, cPhrase = 0, cInst = 0, cTrack = 0, cFxT = 0, cFxS = 0, lastFxType = 'eq', selA = null, clip = null;
 const last = {sect:0, phrase:0, note:ROOT, vol:255, inst:0, fxc:0, fxv:0};
 // Has an instrument been chosen yet (typed, changed, picked up, or picked on INST)? Until then EDIT on a note keeps the row's own.
@@ -25512,8 +25513,9 @@ function toggleBlockMute(y, t){
 let instViaTrk = false;   // Inst was opened from Song, Sect or Phrase (go: Mixer and FX then follow the song track)
 function go(v){
   fxpClose();
-  // FX opens with the cursor on SLOT 1, where EDIT adds an effect (it did nothing on the TRACK row; usability audit U2). A cursor the user moved stays.
-  if (v === 'fx' && tv !== 'fx' && cs.fx.y === 0) cs.fx.y = 1;
+  // FX opens with the cursor on SLOT 1, where EDIT adds an effect (it did nothing on the TRACK row; usability audit U2), but only the FIRST time
+  // in a session (and after a new song / load, resetCursors); after that it returns to wherever the cursor was left, TRACK row included (owner).
+  if (v === 'fx' && tv !== 'fx'){ if (!fxOpenedOnce && cs.fx.y === 0) cs.fx.y = 1; fxOpenedOnce = true; }
   if (v === 'sect' && !sectsOn) v = 'phrase';
   // Opening a phrase from the Song screen always resolves to that block's own phrase, whether the SECT page
   // is shown or hidden: an empty block gets its phrase made first, so you never land on the previous phrase.
