@@ -15924,7 +15924,7 @@ function msend(bytes, t, early, p){
   const o = midiOut(p); if (!o || !ctx) return;
   const at = t == null ? 0 : a2p(t + moFxLat()) - (early ? mLatOf(p) : 0), now = performance.now();
   if (!o.native && at - now > MOB_AHEAD && !document.hidden) return mobPut(o, bytes, at);   // (NATIVE MIDI: the helper's queue is cleared on STOP itself)
-  try { o.send(bytes, Math.max(now, at)); } catch(e){}
+  try { const ts = Math.max(now, at); o.send(bytes, ts); if (MOLED_ON && document.hidden && !o.native) moledNote(o, bytes, ts, now); } catch(e){}
 }
 /* FX LATENCY (owner, 7 Nov: MIDI early; "midi and audio seem to align if I move the synth/audio up two lines"). Everything
    Thunder plays reaches the speaker later than the time it is booked for by the lookahead on the way out: the mastering
@@ -15949,10 +15949,34 @@ function mobPut(o, b, at){
   q.splice(lo, 0, {o, b, at}); if (!MOB.tm) MOB.tm = setInterval(mobFlush, 15); }
 function mobFlush(all){
   const q = MOB.q, now = performance.now(), lim = all === true ? Infinity : now + MOB_AHEAD; let i = 0;
+  if (MOLED.length) moledPrune(now);
   while (i < q.length && q[i].at <= lim){ const x = q[i++]; try { x.o.send(x.b, Math.max(now, x.at)); } catch(e){} }
   if (i) q.splice(0, i); if (!q.length && MOB.tm){ clearInterval(MOB.tm); MOB.tm = 0; } }
 function mobDrop(){ MOB.q.length = 0; if (MOB.tm){ clearInterval(MOB.tm); MOB.tm = 0; } }
 document.addEventListener('visibilitychange', () => { if (document.hidden && MOB.q.length) mobFlush(true); });
+/* HIDDEN-PAGE LEDGER (10 Nov, audio review): hidden, msend hands notes straight to the port with timestamps up to ~1.2 s ahead (timers
+   are throttled, so the outbox cannot feed them), and Web MIDI cannot recall them: notes sounded after STOP. Every note-on sent that
+   way is remembered (port, channel, note, time); moRelease (STOP, panic, OUTPUT / PORT / CH changes) sends each one still ahead its
+   note-off 1 ms after its own start (a blip, not its full length), then All Notes Off now and again after the last of them. The
+   native helper has clear() and is not ledgered. MOLED_ON = false: nothing is remembered or sent (the old behaviour). */
+const MOLED_ON = true, MOLED_MAX = 256, MOLED = [];
+function moledPrune(now){ let j = 0; for (const x of MOLED) if (x.at > now) MOLED[j++] = x; MOLED.length = j; }
+function moledNote(o, b, ts, now){
+  moledPrune(now);
+  if ((b[0] & 0xF0) !== 0x90 || !(b[2] > 0) || !(ts > now)) return;   // only note-ons that are still ahead (clock, CC, program are not ledgered)
+  if (MOLED.length >= MOLED_MAX) MOLED.shift();
+  MOLED.push({o, ch:b[0] & 15, n:b[1], at:ts});
+}
+function moledCut(){
+  if (!MOLED.length) return;
+  moledPrune(performance.now()); if (!MOLED.length) return;
+  const chs = new Map(); let end = 0;
+  for (const o of new Set(MOLED.map(x => x.o))) try { if (typeof o.clear === 'function') o.clear(); } catch(e){}   // (Chrome has none: then the note-offs do it)
+  for (const x of MOLED){ try { x.o.send([0x80 | x.ch, x.n, 0], x.at + 1); } catch(e){} end = Math.max(end, x.at + 1);
+    if (!chs.has(x.o)) chs.set(x.o, new Set()); chs.get(x.o).add(x.ch); }
+  for (const [o, cs] of chs) for (const ch of cs) try { o.send([0xB0 | ch, 123, 0]); o.send([0xB0 | ch, 123, 0], end + 1); } catch(e){}   // All Notes Off: now, and after the last booked note
+  MOLED.length = 0;
+}
 const msendClk = (bytes, t) => { for (const p of clkPorts()) msend(bytes, t, false, p); };
 const moEnd = e => Math.min(e.cut != null ? e.cut : Infinity, e.rel != null ? e.rel : Infinity);
 function offOne(h, at){ if (h.end <= at) return; msend([0x80 | h.ch, h.n, 0], Math.max(at, h.t + 0.001), true, h.p); h.end = at; }
@@ -16288,6 +16312,7 @@ function moLfo(s){
 function moRelease(){
   const now = ctx ? ctx.currentTime : 0, cleared = new Set();
   if (!tp.on) mobDrop();   // OUTBOX: the notes still waiting never go
+  if (MOLED_ON) try { moledCut(); } catch(e){}   // HIDDEN-PAGE LEDGER: the notes handed to the port ahead of time
   if (!tp.on) for (let p = 0; p < NPORT; p++){ const o = midiOut(p); if (!o || cleared.has(o)) continue; cleared.add(o);
     try { if (typeof o.clear === 'function') o.clear(); } catch(e){} }   // drop what was booked ahead (not every browser can)
   for (const H of mx.held) if (H) for (const h of H) if (h.end > now){
