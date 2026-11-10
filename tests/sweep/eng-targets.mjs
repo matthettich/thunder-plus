@@ -210,9 +210,10 @@ globalThis.__live = {
   // sample the twelve params of every live node every 'every' ms for 'ms'
   async sample(ms, every){ const o = [], t0 = performance.now(); while (performance.now() - t0 < ms){ o.push({w:performance.now() - t0, c:ctx.currentTime, s:this.snap()}); await new Promise(r => setTimeout(r, every)); } return o; },
   stop(){ tStop(true); },
-  // a tap on the master: the samples of the left channel from now on (a ScriptProcessor)
-  tapOn(){ const sp = ctx.createScriptProcessor(2048, 2, 2), z = ctx.createGain(); z.gain.value = 0; this.chunks = []; sp.onaudioprocess = e => { this.chunks.push(new Float32Array(e.inputBuffer.getChannelData(0))); }; master.connect(sp); sp.connect(z); z.connect(ctx.destination); this.sp = sp; this.z = z; },
-  tapOff(){ try { master.disconnect(this.sp); this.sp.disconnect(); this.z.disconnect(); } catch(e){} this.sp.onaudioprocess = null; let n = 0; for (const c of this.chunks) n += c.length; const d = new Float32Array(n); let o = 0; for (const c of this.chunks){ d.set(c, o); o += c.length; } this.chunks = []; return d; },
+  // a tap on rt.out (the mix before the master chain): the samples of the left channel from now on (a ScriptProcessor). NOT on master: the master chain
+  // limiter / clipper makes harmonics of a bass note that fill the 2 kHz+ band (a floor of ~1.3e-3 at any cutoff) and hide the filter (found 10 Nov)
+  tapOn(){ const sp = ctx.createScriptProcessor(2048, 2, 2), z = ctx.createGain(); z.gain.value = 0; this.chunks = []; sp.onaudioprocess = e => { this.chunks.push(new Float32Array(e.inputBuffer.getChannelData(0))); }; this.src = rt.out; this.src.connect(sp); sp.connect(z); z.connect(ctx.destination); this.sp = sp; this.z = z; },
+  tapOff(){ try { this.src.disconnect(this.sp); this.sp.disconnect(); this.z.disconnect(); } catch(e){} this.sp.onaudioprocess = null; let n = 0; for (const c of this.chunks) n += c.length; const d = new Float32Array(n); let o = 0; for (const c of this.chunks){ d.set(c, o); o += c.length; } this.chunks = []; return d; },
   // the 2 kHz high band of a captured buffer in n slices of dt s from the first sound
   bands(d, n, dt, skip){ const sr = ctx.sampleRate; let on = 0; while (on < d.length && Math.abs(d[on]) < 0.02) on++; const H = __e2e.hp(d, sr), o = [], w = []; for (let i = 0; i < n; i++){ const a = on + Math.round((skip + i * dt) * sr), b = a + Math.round(dt * sr); o.push(__e2e.rms(H, a, b)); w.push(__e2e.rms(d, a, b)); } return {hi:o, all:w, onset:on / sr, len:d.length / sr}; },
   async rec(spec, core, ms, n, dt, skip){ const st = await this.start(spec, core); this.tapOn(); await new Promise(r => setTimeout(r, ms)); const d = this.tapOff(); const r = this.bands(d, n, dt, skip); this.stop(); await new Promise(r2 => setTimeout(r2, 500)); return {...r, st}; },
@@ -269,9 +270,9 @@ async function liveD(){
   const c = await R(S1(bass));
   const sus = await R(S1(bass, {}, [[0, 'sus:0', 0, 5, 0xFF]]));
   const swS = mx(sus.all) / Math.max(mn(sus.all), 1e-9);
-  add('D5 core: an LFO on sus:t (whole-band level) swings the master', swS > 1.5, `sus LFO whole band ${fa(sus.all)} (ratio ${swS.toFixed(2)}), none ${fa(a.all)}`);
+  add('D5 core: an LFO on sus:t (whole-band level) swings the mix', swS > 1.5, `sus LFO whole band ${fa(sus.all)} (ratio ${swS.toFixed(2)}), none ${fa(a.all)}`);
   const flat = x => mx(x.hi) / mn(x.hi), swing = mx(b.hi) / Math.max(mn(b.hi), 1e-9);
-  add('D1 core: high band of the master swings with the cutoff LFO', swing > 2.5 && flat(a) < 1.5, `LFO ${fa(b.hi)} (ratio ${swing.toFixed(1)}); none ${fa(a.hi)} (ratio ${flat(a).toFixed(2)}); whole band: LFO ${fa(b.all)} none ${fa(a.all)}; onset ${b.onset.toFixed(2)} s`);
+  add('D1 core: high band of the mix (rt.out) swings with the cutoff LFO', swing > 2.5 && flat(a) < 1.5, `LFO ${fa(b.hi)} (ratio ${swing.toFixed(1)}); none ${fa(a.hi)} (ratio ${flat(a).toFixed(2)}); whole band: LFO ${fa(b.all)} none ${fa(a.all)}; onset ${b.onset.toFixed(2)} s`);
   const d = Math.max(...a.hi.map((x, i) => Math.abs(x - c.hi[i]) / x));
   add('D2 core: after STOP a new note with no commands sounds as before (the overrides are cleared)', d < 0.25, `before ${fa(a.hi)} | after the LFO song ${fa(c.hi)} (worst relative difference ${d.toFixed(3)})`);
   const e = await R(S1(bass, { cmds: [[0, 'CUT', 0x30], [16, 'CUT', 0xFF]] }));
