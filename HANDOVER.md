@@ -582,6 +582,9 @@ The owner's top priority to add is the MOD screen. Work down the list; ask befor
 
 Start a session by asking for results. Fix on `beta`. Web beta: https://matthettich.github.io/thunder-plus/beta/ (build 547 as of 10 Nov morning, 548 once its PR merges; the night of 9–10 Nov shipped 544–547, see the four "10 Nov" entries below. Decisions the lead made that night for the owner to confirm or reverse: on a phone the saved Sequencer default plays on the Page unless Audio thread is picked on that device; on a phone the safety limiter is its stand-in until another worklet loads; the resync only runs with a worklet loaded and its margins are untested on a device). Desktop: v1.3.4-beta.2 (build 541, no feed view or scopes); further desktop betas on hold until the owner asks.
 
+**Build 560**
+- [ ] **Background play guard (phone):** switch Background play off (Settings, or the PROJECT screen's row): a note says it is for testing only. PLAY, lock the screen a few seconds, come back: a message offers "Turn on"; tap it: it is on again and the report shows the session starting.
+
 **The test that decides how urgent the native port is (phone, Background play ON: check the report's `settings:` line)**
 - [ ] **Long screen-off run:** your normal song WITH effects, PLAY, screen off for 3–5 minutes, press a volume key once in the middle, screen on, STOP, Copy playback report. By ear: steady the whole time? Does the volume key change media volume now (no vibration)? The report: clock lines near 1.00, `held` / `kicked` counts, underruns.
 - [ ] **The same with a heavier song** (more effects, live synths).
@@ -747,6 +750,10 @@ Suggested order: N0 → N1 → N2 (phone cured) → N4 with N3 alongside → N5 
   the edge `R.t0`, "waiting…" while armed), `rcdClk` / `rcdFmt` / `rcdFreeSecs`, a 250 ms timer only while recording; the
   final length stays until the next take. recorder-check covers FREE, PATTERN, Stop, next take and closing mid-take.
 
+
+## 10 Nov (afternoon): Background play guard (build 560); the port is parked
+
+Owner (15:01): "I am down to continue working towards audio stability, especially if we can lower the priority of a port." **The native port is parked** (N0 not started; the plan stays on file) until the long screen-off run with Background play on says whether the phone needs it. Build 560 (Sonnet agent, diff read by the lead): `setBgOn(on, byHand)`; on Android, hidden while playing with it off logs `hidden while playing with Background play OFF…` each time and, once a page load, a `toastAct` on return offers "Turn on" (`bgGuardHide` / `bgGuardShow`); switching it off by hand shows a "for testing only" toast; the Settings title and the PROJECT row hint state the consequence. Nothing in the code turns it off by itself: the only `setBgOn(false)` callers are the Settings checkbox and **the tracker PROJECT screen's BACKGROUND PLAY row** (reachable with the pad, so it can be flipped by a stray EDIT: a likely way it went off). `tests/bgplay-guard.test.js`. Running: worklet robustness (block sizes, pump-synth guard, chains' Flex copies) and a soak test (`tests/sweep/soak.mjs`).
 
 ## 10 Nov (afternoon): with Background play ON the phone held its clock with effects loaded (build 559 report). THE PORT'S PREMISE NEEDS RE-CHECKING
 
