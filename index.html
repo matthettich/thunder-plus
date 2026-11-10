@@ -13750,6 +13750,8 @@ function fileItems(){
   return [
     // MENUS (owner, 31 Oct: things in the right place): with the Edit menu on screen, Undo / Redo and Phrases… are there
     // only; a phone has no Edit menu, so they stay here
+    // HELP when folded: the top bar's ? is hidden at 480 px and under, so Help is the first row here (usability audit U1)
+    ...(window.matchMedia && matchMedia('(max-width:480px)').matches ? [{l:'Help & keys', f:() => showHelp()}] : []),
     ...(ed ? [] : [{h:'Edit'}, {l:'Undo', k:K('mod+Z'), f:() => undoStep(-1), off:!undo.past.length && !vUndo.t.some(Boolean)}, {l:'Redo', k:K('mod+shift+Z'), f:() => undoStep(1), off:!undo.future.length}, {l:'Phrases… (find ones not on the song)', f:() => phlOpen(true)}]),
     {h:'Project'},
     {l:'New song', k:K('mod+N'), f:newSong, ask:'song'},
