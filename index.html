@@ -1283,6 +1283,9 @@ body.mob .top .kitname{width:auto; flex:1 1 90px; min-width:64px; max-width:220p
 /* FIX (sweep, 4 Nov): on a phone's narrow screen (the Fold's cover screen) with waves and chains shown, the four screen tabs
    pushed ⚙ and CPU off the side (the page scrolled sideways). There the tabs give way and scroll inside themselves. */
 @media (max-width:520px){ body.mob .top #segView{flex:0 1 auto; min-width:0; overflow-x:auto; scrollbar-width:none} body.mob .top #segView::-webkit-scrollbar{display:none} body.mob .top #segView button{padding-inline:8px} }
+/* (10 Nov) Tracker | Synth keeps both words on a phone (360-412 px clipped "Synth" to "Synt"): with two buttons the switch never shrinks or scrolls, the rest of the bar gives way (gap 6 -> 4 px). Waves / Chains still scroll it. */
+@media (max-width:520px){ body.mob .top #segView:not(:has(button:nth-child(3))){flex:none; overflow:visible} }
+@media (max-width:420px){ body.mob .top{gap:4px} }
 body.mob .top .brand{flex-shrink:1; min-width:0; overflow:hidden}
 /* With the chains tab showing (unfolded, or ticked) the tabs are one longer: the name shrinks so the whole title bar stays on one line, unclipped (owner, 8 Nov). */
 body.mob:not(.noch) .top .brand{font-size:15px; letter-spacing:.03em; margin-right:0}

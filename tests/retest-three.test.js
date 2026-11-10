@@ -12,3 +12,6 @@ test('a pad key click that follows its own pointerdown never fires again', () =>
   assert.doesNotMatch(src, /if \(pd && b === 'save'\) return;/);
   assert.match(src, /k\.addEventListener\('pointercancel', e => \{ k\._pd = false; up\(e\); \}\)/);
 });
+test('the two-button view switch does not shrink on a phone', () => {
+  assert.match(src, /@media \(max-width:520px\)\{ body\.mob \.top #segView:not\(:has\(button:nth-child\(3\)\)\)\{flex:none; overflow:visible\} \}/);
+});
