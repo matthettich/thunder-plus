@@ -366,6 +366,7 @@ clock mapping at that latency (7 Nov (16)). Re-check MIDI timing with Measure…
 
 ## Desktop releases
 
+- **v1.3.4-beta.2** (9 Nov 2026, pre-release; owner asked for a beta desktop; Run workflow through the API from `beta` at build 541, run 42700107769): MOD screen, chains rail lines, acid Mutate. **v1.3.4-beta.1**: the same at build 540, without acid Mutate. Owner, 9 Nov: hold further desktop betas for now.
 - **v1.3.3** (8 Nov 2026; owner: update the desktop app at a stopping point; Run workflow through the API with version 1.3.3, from `main` at build 523): builds 517–523 on top of v1.3.2 (`· beta` label, Mobile SHIFT+▲, pad MUTE / SOLO, the review fixes).
 - **v1.3.2** (8 Nov 2026; owner: update the desktop app at a stopping point; Run workflow through the API with version 1.3.2, from `main` at build 516, run 42544191974, succeeded): builds 515–516 on top of v1.3.1 (touch sliders in dialogs, instrument big step, FLY label and same-row order, mobile stalls).
 - **v1.3.1** (8 Nov 2026; owner: "Build the main and desktop app"; PR #18 beta → main at build 514, Run workflow through the API with version 1.3.1, run 42522985460): Live engines setting and lighter …waves live (513–514) on top of v1.3.0. Owner wants Thunder Plus changes to go through PRs (ask CodeRabbit with "@coderabbitai review" on PRs into beta).
@@ -524,7 +525,7 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0) and `link/` (Ableton
 
 ### Feature priority (owner, 9 Nov: build future features in this order)
 
-The owner's top priority to add is the MOD screen. Work down the list; ask before reordering it. The owner will run the tests listed under "Tests the owner will run" below.
+The owner's top priority to add is the MOD screen. Work down the list; ask before reordering it. The owner will run the tests in "Owner's punch list" below.
 
 1. **MOD screen: LFOs assignable to FX parameters** (owner, 8 Nov; first version built 9 Nov, build 539, see "9 Nov: MOD screen" below. Still to come, one step at a time: …pump effects as targets, live engines' own filter and envelope via item 2's per-engine map, renders matching live, smoothing where steps are audible). The original brief: A new screen named
   **MOD between FX and PROJECT**; PROJECT can become PROJ if the tabs need room (six already fill a folded phone: check at real size; hide the tab when
@@ -543,16 +544,28 @@ The owner's top priority to add is the MOD screen. Work down the list; ask befor
   change it needs.
 8. **Put off for now, in one bucket:** sampler key zones, velocity layers and round robin (5 Nov); pump AMP (on hold); porting pump TABLE (skipped).
 
-### Tests the owner will run (owner, 9 Nov: will do these)
+### Owner's punch list (owner, 9 Nov: will test these later; keep it current)
 
-Start a session by asking for results. Fix on `beta`.
+Start a session by asking for results. Fix on `beta`. Web beta: https://matthettich.github.io/thunder-plus/beta/ (build 543 as of 9 Nov evening). Desktop: v1.3.4-beta.2 (build 541, no feed view or scopes); further desktop betas on hold until the owner asks.
 
-- **Desktop v1.3.0 helper checklist:** https://claude.ai/artifact/6CgCLiVo8HEH3ywky5znWM (see "PICK UP HERE" in the START HERE brief), including monitoring after reopening the window and clock in, which "seemed out of sync slightly".
-- **Windows:** recording (WASAPI) and MIDI (WinMM).
-- **Ableton Link:** CI build on Mac / Windows, then against Live or Koala.
-- **Phone, builds 529–535 on a real Fold:** the list in "9 Nov, end of session: what to test on the phone", plus "9 Nov: builds 531–535" below.
-- **Phone clock toggle test:** a simple song hidden about 20 s with Background play off, then with Keep screen on off, Copy report after each (see "8 Nov, end of session").
-- **Hardware MIDI tests.**
+**New on 9 Nov (web beta, builds 536–543)**
+- [ ] **MOD by ear:** do fast rates (1/16, 1/32) sound steppy? Which effects? That decides where smoothing goes.
+- [ ] **MOD on the master:** an LFO on a master FX parameter actually moves during playback (never confirmed).
+- [ ] **MOD on the Fold:** touch hold-and-drag on SHAPE / RATE / DEPTH; tabs fit folded.
+- [ ] **MOD keys:** Alt+7 opens MOD; Ctrl/⌘+arrows step TARGET (▲▼ by eight), SHAPE, RATE, DEPTH; ⌘ on a real Mac.
+- [ ] **Add LFO…** from an FX parameter's right-click (FX screen and FX bar); the `~` mark on modulated rows.
+- [ ] **LFO scopes:** shapes look right; the dot keeps time with what you hear (measured only against the app's clocks, about 20 ms ahead of the playhead); SUM scope with two LFOs on one target; Low power display shows still shapes; no extra load on the phone.
+- [ ] **Acid Mutate:** intensity low vs high stays related to the line; hand tweaks (volumes, instruments, FX, note-offs) survive; Original (O) restores; TIME off keeps the rhythm.
+- [ ] **Chains rail lines:** straight accent lines from real cables look right on your patches; 909 skin contrast OK? (curves are a quick revert if wanted).
+- [ ] **Chains feed view:** a track feeding a chain shows it, its path lit, the rest greyed; the output track's view unchanged.
+
+**Carried over**
+- [ ] **Desktop v1.3.0 helper checklist:** https://claude.ai/artifact/6CgCLiVo8HEH3ywky5znWM (see "PICK UP HERE" in the START HERE brief), including monitoring after reopening the window and clock in, which "seemed out of sync slightly".
+- [ ] **Windows:** recording (WASAPI) and MIDI (WinMM).
+- [ ] **Ableton Link:** CI build on Mac / Windows, then against Live or Koala.
+- [ ] **Phone, builds 529–535 on a real Fold:** the list in "9 Nov, end of session: what to test on the phone", plus "9 Nov: builds 531–535" below.
+- [ ] **Phone clock toggle test:** a simple song hidden about 20 s with Background play off, then with Keep screen on off, Copy report after each (see "8 Nov, end of session").
+- [ ] **Hardware MIDI tests.**
 
 ### Bugs still open
 
@@ -584,6 +597,9 @@ Start a session by asking for results. Fix on `beta`.
 ## 9 Nov: LFO scopes on MOD (build 543)
 
 Owner: show the LFOs visually. One scope per filled row, from the real `lfoAt`, depth sets the height, and a sum scope for LFOs sharing a target. `modScSync` lays out a persistent layer in `#tScr` (`pointer-events:none`, under the rows when wide, beside each row when folded); `modScDraw` caches each waveform; `modScTick`, from the existing `frame()`, moves only the dot at about 18 fps and only on MOD while playing. Dot time is the grid playhead's (`fxcBeat`, `heardLat`, `moFxLat`, `phOff`). Low power display: static shapes, no dot. Measured headless only: dot about 20 ms ahead of the playhead on average; not checked against real speakers.
+## 9 Nov: chains rail feed view (build 542)
+
+Owner: a track that feeds a chain should show it, with the rest greyed, to see what's feeding a chain and what happens to that feed. `chainFeed(t)` finds the track's Track In modules, walks the cables forward (`chainReach`, cycle-safe) to the first Chain Out, and uses `chainMods(outTrack)` for the module set. `dkChnRail` takes `feed`: this track's number in the IN tag stands out, off-path blocks and cables are grey (`dim`, a second `path.off`), `+ CONTROLS` stays off because controls belong to the output track. Only when the track has no chain of its own. Tests: `tests/chains-feed.test.js`. IN lines are spaced across the tag, not under each number.
 
 ## 9 Nov: acid Mutate intensity (build 541)
 

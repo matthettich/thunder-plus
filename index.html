@@ -1933,6 +1933,11 @@ body.sdesk .dock:not(.vtrk) .pads .pad:nth-child(17)::before{content:'More slots
 .dkcrail > .dkclines{position:absolute; left:0; top:0; z-index:0; pointer-events:none; overflow:visible}
 .dkclines path{fill:none; stroke:var(--fxac, var(--ts-hot, #ff5a1f)); stroke-width:1.25; stroke-linecap:round}
 .dkcrail.chnoff .dkclines{opacity:.5}
+/* feed view (another track's chain): what isn't this track's signal is greyed, still readable and clickable */
+#tDeck .dkcrail .dkcb.dim{opacity:.5; color:var(--muted)}
+#tDeck .dkcrail .dkcb.dim .fon.on{background:var(--muted); border-color:var(--muted)}
+.dkcrail .dkcend.dim, .dkcrail .dkcend .dkcdim{opacity:.5}
+.dkclines path.off{stroke:var(--muted); opacity:.6}
 /* folded: the title strip, then the rail (blocks only, narrower) */
 #tDeck.fxbar #dkChn.col.hasrail{flex:0 0 auto; width:auto; min-width:26px; flex-direction:row}
 #tDeck.fxbar #dkChn.col.hasrail > .dkh{flex:0 0 26px; border-right:1px solid var(--line)}
@@ -29366,6 +29371,26 @@ function chainMods(t){
   while (q.length) for (const a of inc.get(q.pop()) || []) if (!act.has(a)){ act.add(a); q.push(a); }
   return act;
 }
+/* FEED VIEW (9 Nov): a track with no chain of its own that is the source of a Track In module shows the chain that Track In feeds.
+   chainReach is the walk (pure, cycle-safe: every module reached going forward over the cables from some modules). chainFeed(t)
+   finds the output track(s) the Track In(s) of track t reach (the first in the bench's order is shown) and takes that track's module
+   set the way chainMods does; path is what this track's signal passes through on its way to that Chain Out. null when it feeds nothing. */
+function chainReach(d, ids){
+  const nx = new Map(), seen = new Set(ids), w = [...ids];
+  for (const c of (d && d.cables) || []) if (c && Array.isArray(c.from) && Array.isArray(c.to)){ if (!nx.has(c.from[0])) nx.set(c.from[0], []); nx.get(c.from[0]).push(c.to[0]); }
+  while (w.length) for (const b of nx.get(w.pop()) || []) if (!seen.has(b)){ seen.add(b); w.push(b); }
+  return seen;
+}
+function chainFeed(t){
+  const d = S.chainPatch; if (!d || !Array.isArray(d.modules) || !(t >= 0 && t < NT)) return null;
+  const trk = m => clamp(int(m.params && m.params.track, 1), 1, NT) - 1;
+  const starts = d.modules.filter(m => m && m.type === 'trackIn' && trk(m) === t).map(m => m.id); if (!starts.length) return null;
+  const reach = chainReach(d, starts), outs = [];
+  for (const m of d.modules) if (m && m.type === 'chainOut' && reach.has(m.id) && !outs.includes(trk(m))) outs.push(trk(m));
+  if (!outs.length) return null;
+  const act = chainMods(outs[0]);
+  return {act, path:new Set([...reach].filter(id => act.has(id))), outT:outs[0], outs};
+}
 // The editor's value formats, by name (deck entries made with a format of the module's own carry its text at 33 points).
 const DKC_FMT = {pct:v => Math.round(v * 100) + '%', spct:v => (v > 0 ? '+' : '') + Math.round(v * 100) + '%', semis:v => (v > 0 ? '+' : '') + Math.round(v) + ' st',
   cents:v => (v > 0 ? '+' : '') + Math.round(v) + ' ct', secs:v => v < 1 ? Math.round(v * 1000) + ' ms' : v.toFixed(2) + ' s', hz:v => (v < 10 ? v.toFixed(2) : v.toFixed(1)) + ' Hz',
@@ -29449,24 +29474,25 @@ function dkcDraw(rail){
   const R = rail.getBoundingClientRect(), box = new Map(), outs = new Map(), ins = new Map(), L = [];
   for (const el of D.nodes.values()) if (!box.has(el)){ const r = el.getBoundingClientRect(); box.set(el, {l:r.left - R.left + rail.scrollLeft, t:r.top - R.top + rail.scrollTop, w:r.width, h:r.height}); }
   for (const e of D.edges){ const a = D.nodes.get(e.a), b = D.nodes.get(e.b); if (!a || !b || a === b) continue;
-    for (let i = 0; i < e.n; i++){ const l = {a, b}; L.push(l); if (!outs.has(a)) outs.set(a, []); if (!ins.has(b)) ins.set(b, []); outs.get(a).push(l); ins.get(b).push(l); } }
+    for (let i = 0; i < e.n; i++){ const l = {a, b, off:!!e.off}; L.push(l); if (!outs.has(a)) outs.set(a, []); if (!ins.has(b)) ins.set(b, []); outs.get(a).push(l); ins.get(b).push(l); } }
   const at = (el, list, l, bottom) => { const r = box.get(el), i = list.indexOf(l), n = list.length, pad = Math.min(8, r.w / 4);
     return [r.l + (n < 2 ? r.w / 2 : pad + (r.w - 2 * pad) * i / (n - 1)), bottom ? r.t + r.h : r.t]; };
   let svg = D.svg; if (!svg){ svg = D.svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg'); svg.setAttribute('class', 'dkclines'); svg.setAttribute('aria-hidden', 'true'); rail.prepend(svg); }
   svg.setAttribute('width', W); svg.setAttribute('height', H); svg.setAttribute('viewBox', '0 0 ' + W + ' ' + H);
-  const f = n => Math.round(n * 10) / 10; let d = '';
+  const f = n => Math.round(n * 10) / 10; let d = '', dx = '';   // dx: the greyed lines of feed view
   for (const l of L){
     const A = box.get(l.a), B = box.get(l.b);
     if (Math.abs(A.l - B.l) > 20){   // another column: from the side of one to the side of the other
       const ar = B.l > A.l, x1 = ar ? A.l + A.w : A.l, y1 = A.t + A.h / 2, x2 = ar ? B.l : B.l + B.w, y2 = B.t + B.h / 2;
-      d += 'M' + f(x1) + ' ' + f(y1) + 'L' + f(x2) + ' ' + f(y2);
+      if (l.off) dx += 'M' + f(x1) + ' ' + f(y1) + 'L' + f(x2) + ' ' + f(y2); else d += 'M' + f(x1) + ' ' + f(y1) + 'L' + f(x2) + ' ' + f(y2);
       continue;
     }
     const down = B.t >= A.t + A.h - 1; if (!down && !(A.t >= B.t + B.h - 1)) continue;   // (up: a cable back up the list)
     const p = at(l.a, outs.get(l.a), l, down), q = at(l.b, ins.get(l.b), l, !down);
-    d += 'M' + f(p[0]) + ' ' + f(p[1]) + 'L' + f(q[0]) + ' ' + f(q[1]);   // straight lines (owner, 9 Nov)
+    if (l.off) dx += 'M' + f(p[0]) + ' ' + f(p[1]) + 'L' + f(q[0]) + ' ' + f(q[1]); else d += 'M' + f(p[0]) + ' ' + f(p[1]) + 'L' + f(q[0]) + ' ' + f(q[1]);   // straight lines (owner, 9 Nov)
   }
-  svg.replaceChildren(); if (d){ const pa = document.createElementNS('http://www.w3.org/2000/svg', 'path'); pa.setAttribute('d', d); svg.append(pa); }
+  svg.replaceChildren();
+  for (const [dd, cl] of [[dx, 'off'], [d, '']]) if (dd){ const pa = document.createElementNS('http://www.w3.org/2000/svg', 'path'); pa.setAttribute('d', dd); if (cl) pa.setAttribute('class', cl); svg.append(pa); }   // (greyed first, so this track's lines sit on top)
   D.key = W + 'x' + H + '|' + rail.children.length;
 }
 function dkcWire(rail){   // once the rail is in the page: draw, then again only when its size changes
@@ -29478,20 +29504,27 @@ function dkcWire(rail){   // once the rail is in the page: draw, then again only
   D.ro.observe(rail);
 }
 function dkcReveal(id){ if (noChains()) return; openChains(); if (!id) return; const go = () => { const a = chApi(); return !!(a && a.reveal && a.reveal(id)); }; if (!go()){ setTimeout(go, 200); setTimeout(go, 600); } }
-function dkChnRail(t, act, folded){
-  const mods = chainOrder(t, act), on = !!(S.chainOn && S.chainOn[t]), rail = el('div', 'dkcrail' + (on ? '' : ' chnoff') + (folded ? ' fold' : ''));
+function dkChnRail(t, act, folded, feed){   // feed: another track's chain, this track's signal lit (see chainFeed)
+  const mods = chainOrder(t, act), on = !!(S.chainOn && S.chainOn[t]), rail = el('div', 'dkcrail' + (on ? '' : ' chnoff') + (folded ? ' fold' : '') + (feed ? ' feed' : ''));
   const ins = mods.filter(m => m.type === 'trackIn'), outs = mods.filter(m => m.type === 'chainOut'), mid = mods.filter(m => m.type !== 'trackIn' && m.type !== 'chainOut');
   const nodes = new Map(), end = (txt, tip, ids) => { const e = el('span', 'dkcend', txt); e.title = tip; rail.append(e); for (const m of ids) nodes.set(m.id, e); };
-  const tr = m => d2(clamp(int(m.params && m.params.track, 1), 1, NT));
-  if (ins.length) end((folded ? 'IN ' : 'IN · TRACK ') + ins.map(tr).join(' '), 'Track In: the sound coming in' + (on ? '' : ' (CHN is off on the Mixer: chains is not heard on this track)'), ins);
+  const tr = m => d2(clamp(int(m.params && m.params.track, 1), 1, NT)), lit = id => !feed || feed.path.has(id);
+  const cue = feed ? 'Feeds OUT · TRACK ' + d2(feed.outT + 1) + ': this is another track’s chain, with track ' + d2(t + 1) + '’s sound lit' + (feed.outs.length > 1 ? '. Track ' + d2(t + 1) + ' also feeds OUT · TRACK ' + feed.outs.slice(1).map(o => d2(o + 1)).join(', ') + '; this shows the first' : '') : '';
+  if (feed && ins.length){   // one span a number, so this track's stands out and the others are greyed
+    const e = el('span', 'dkcend', folded ? 'IN ' : 'IN · TRACK '); e.title = cue + '. Track In: the sound coming in' + (on ? '' : ' (CHN is off on the Mixer: chains is not heard on this track)');
+    ins.forEach((m, i) => { if (i) e.append(' '); e.append(el('span', feed.path.has(m.id) ? null : 'dkcdim', tr(m))); });
+    rail.append(e); for (const m of ins) nodes.set(m.id, e);
+  } else if (ins.length) end((folded ? 'IN ' : 'IN · TRACK ') + ins.map(tr).join(' '), 'Track In: the sound coming in' + (on ? '' : ' (CHN is off on the Mixer: chains is not heard on this track)'), ins);
   for (const m of mid){
-    const byp = ((m.params && m.params._byp) || 0) >= .5, b = el('button', 'dkcb' + (byp ? ' off' : ''));
+    const byp = ((m.params && m.params._byp) || 0) >= .5, b = el('button', 'dkcb' + (byp ? ' off' : '') + (lit(m.id) ? '' : ' dim'));
     b.type = 'button'; b.append(el('i', 'fon' + (byp ? '' : ' on')), el('span', null, dkcLab(m)));
     b.title = dkcLab(m) + (byp ? ' (bypassed)' : '') + (noChains() ? '' : ' · open it in chains');
     b.addEventListener('click', e => { e.stopPropagation(); dkcReveal(m.id); }); rail.append(b); nodes.set(m.id, b);
   }
-  if (outs.length) end((folded ? 'OUT ' : 'OUT · TRACK ') + outs.map(tr).join(' '), 'Chain Out: where it goes (a bus when it is another track)', outs);
-  if (!mods.length && !folded && !noChains()){ const ad = el('button', 'dkcadd', '+ …CHAINS'); ad.type = 'button'; ad.title = 'No chains on track ' + d2(t + 1) + ': open chains to patch one';
+  if (outs.length){ end((folded ? 'OUT ' : 'OUT · TRACK ') + outs.map(tr).join(' '), (feed ? cue + '. ' : '') + 'Chain Out: where it goes (a bus when it is another track)', outs);
+    if (feed && !outs.some(m => lit(m.id))) rail.lastChild.classList.add('dim'); }
+  if (feed){}   // (feed view: + CONTROLS stays out, since a chain's controls show on its own output track)
+  else if (!mods.length && !folded && !noChains()){ const ad = el('button', 'dkcadd', '+ …CHAINS'); ad.type = 'button'; ad.title = 'No chains on track ' + d2(t + 1) + ': open chains to patch one';
     ad.addEventListener('click', e => { e.stopPropagation(); openChains(); }); rail.append(ad); }
   else if (!folded && !noChains()){ const ad = el('button', 'dkcadd sm', '+ CONTROLS'); ad.type = 'button';
     ad.title = 'In chains, right-click a control or a module → Add to the bottom panel; it shows here for the track whose chain it is in';
@@ -29503,38 +29536,39 @@ function dkChnRail(t, act, folded){
     const a = c.from[0], b = nodes.get(c.to[0]) === nodes.get(outs[0] && outs[0].id) ? 'OUT' : c.to[0], k = a + '>' + b;
     if (!grp.has(k)) grp.set(k, {a, b: c.to[0], ports:new Set()}); grp.get(k).ports.add(c.from[1] + '>' + c.to[1]);
   }
-  const edges = [...grp.values()].map(g => ({a:g.a, b:g.b, n:inId.has(g.a) ? 1 : Math.min(2, g.ports.size)}));
+  const edges = [...grp.values()].map(g => ({a:g.a, b:g.b, n:inId.has(g.a) ? 1 : Math.min(2, g.ports.size), off:!lit(g.a)}));
   edges.sort((x, y) => (inId.has(y.a) ? 1 : 0) - (inId.has(x.a) ? 1 : 0));   // (stable: Track In lines first, in the patch's order)
   let nIn = 0; rail._dk = {nodes, edges: edges.filter(e => !inId.has(e.a) || ++nIn <= 12)};
   return rail;
 }
-const dkChnRailSig = (t, act) => { const d = S.chainPatch; if (!d || !act.size) return t + '|-'; const c = (d.cables || []).filter(x => x && x.from && act.has(x.from[0])).map(x => x.from[0] + '>' + x.to[0]).join(',');
-  return t + '|' + (S.chainOn && S.chainOn[t] ? 1 : 0) + '|' + d.modules.filter(m => m && act.has(m.id)).map(m => m.id + (m.label || '') + ((m.params && m.params._byp) >= .5 ? 'b' : '')).join(',') + '|' + c; };
+const dkChnRailSig = (t, act, feed) => { const d = S.chainPatch; if (!d || !act.size) return t + '|-'; const c = (d.cables || []).filter(x => x && x.from && act.has(x.from[0])).map(x => x.from[0] + '>' + x.to[0]).join(',');
+  return t + '|' + (S.chainOn && S.chainOn[t] ? 1 : 0) + '|' + d.modules.filter(m => m && act.has(m.id)).map(m => m.id + (m.label || '') + ((m.params && m.params._byp) >= .5 ? 'b' : '') + (m.type === 'trackIn' || m.type === 'chainOut' ? '@' + (m.params && m.params.track) : '')).join(',') + '|' + c
+    + (feed ? '|feed ' + feed.outT + ' ' + feed.outs.length + ' ' + [...feed.path].join(',') : ''); };
 let dkChnRailK = '';
 function deckChnFold(){   // FX BAR, …CHAINS folded: the rail beside its title (none without modules: the plain strip)
   const sec = dkSec('chn'), fold = deck.fxbar && !deck.chn && !sec.hidden && deckShown();
   let r = $('dkChnRail'); if (!fold){ if (r){ r.remove(); sec.classList.remove('hasrail'); dkChnRailK = ''; } return; }
-  const t = dkTrack(), act = chainMods(t), k = dkChnRailSig(t, act) + '|' + noChains();
+  const t = dkTrack(), own = chainMods(t), feed = own.size ? null : chainFeed(t), act = feed ? feed.act : own, k = dkChnRailSig(t, act, feed) + '|' + noChains();
   if (k === dkChnRailK && r) return; dkChnRailK = k;
   if (r) r.remove();
   const has = [...act].some(id => { const m = S.chainPatch.modules.find(q => q && q.id === id); return m && m.type !== 'trackIn' && m.type !== 'chainOut'; });
   sec.classList.toggle('hasrail', has); if (!has) return;
-  r = dkChnRail(t, act, true); r.id = 'dkChnRail'; sec.append(r); dkcWire(r);
+  r = dkChnRail(t, act, true, feed); r.id = 'dkChnRail'; sec.append(r); dkcWire(r);
 }
 function deckChains(){
   try { deckChnFold(); } catch(e){}
   if (!deckShown() || !deck.chn || dkSec('chn').hidden) return;   // FOCUS TRACK: hidden on the master
-  const t = dkTrack(), d = S.chainPatch, L = (d && Array.isArray(d.deck)) ? d.deck : [], act = chainMods(t);
+  const t = dkTrack(), d = S.chainPatch, L = (d && Array.isArray(d.deck)) ? d.deck : [], act = chainMods(t), feed = !act.size && deck.fxbar ? chainFeed(t) : null;
   const byId = new Map(((d && d.modules) || []).map(m => [m.id, m]));
   const live = L.filter(x => x && byId.has(x.id) && byId.get(x.id).params && typeof byId.get(x.id).params[x.p] === 'number');
   const here = live.filter(x => act.has(x.id)), elsewhere = live.length - here.length;
-  $('dkChnT').textContent = '…CHAINS · TRACK ' + d2(t + 1);
+  $('dkChnT').textContent = feed ? '…CHAINS · FEEDS OUT · TRACK ' + d2(feed.outT + 1) : '…CHAINS · TRACK ' + d2(t + 1);
   $('dkChnI').textContent = here.length ? here.length + ' control' + (here.length === 1 ? '' : 's') + (elsewhere ? ' · ' + elsewhere + ' on other tracks' : '') : '';
-  const sig = t + '|' + (act.size ? [...act].join(',') : '-') + '|' + here.map(x => x.id + '.' + x.p).join(',') + '|' + live.length + (deck.fxbar && !here.length ? '|rail ' + dkChnRailSig(t, act) : '');
+  const sig = t + '|' + (act.size ? [...act].join(',') : '-') + '|' + here.map(x => x.id + '.' + x.p).join(',') + '|' + live.length + (deck.fxbar && !here.length ? '|rail ' + dkChnRailSig(t, feed ? feed.act : act, feed) : '');
   if (sig !== dkChnSig){
     dkChnSig = sig; dkChnT = t; const box = $('dkChnRows'); box.replaceChildren(); dkChnRows = [];
     box.classList.toggle('hasrail', !!deck.fxbar && !here.length);
-    if (!here.length && deck.fxbar){ const rl = dkChnRail(t, act, false); box.append(rl); dkcWire(rl); return; }   // FX BAR: the rail instead of the help text
+    if (!here.length && deck.fxbar){ const rl = dkChnRail(t, feed ? feed.act : act, false, feed); box.append(rl); dkcWire(rl); return; }   // FX BAR: the rail instead of the help text
     if (!here.length){
       // Fit and finish (2 Nov): one line and a button instead of a paragraph; the how-to is the button's tooltip
       const p = el('p', 'note dkempty', !act.size ? 'No chains on track ' + d2(t + 1) : 'No controls here yet' + (elsewhere ? ' (' + elsewhere + ' on other tracks)' : ''));
@@ -32366,6 +32400,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
   [543, '9 Nov', ['MOD: each LFO now has a small scope that draws its real shape (depth sets the height) with a dot that moves along it in time with the song while it plays. Two or more LFOs on the same target also get a scope of their sum. Wide screens put the scopes under the rows; a folded phone puts a small one beside each row. They stand still with LOW POWER DISPLAY on, and cost nothing on other screens.']],
+  [542, '9 Nov', ['…chains on the bottom panel: a track that feeds a chain through a Track In now shows that chain too. This track’s signal is lit from its Track In to the Chain Out, and the other inputs, modules and lines are greyed (still clickable). The IN tag greys the other tracks’ numbers, and the title says which track’s chain it is.']],
   [541, '9 Nov', ['Acid line: MUTATE INTENSITY (1–100) sets how many steps Mutate changes, from one step to the whole line. A changed note moves to a near note of the scale (farther at higher intensity), so the line stays related to the one you had. Mutate leaves the volumes, effects and instrument changes you added by hand on the rows it doesn’t change, and Original (O) puts back the phrase as it was when the panel opened.']],
   [540, '9 Nov', ['…chains on the bottom panel: lines now join Track In, the modules and Chain Out, drawn from the patch’s real cables in the skin’s accent color, and the blocks spread out a little when there’s room. MOD: Ctrl/⌘+arrows on TARGET step through the target list.']],
   [539, '9 Nov', ['New screen: MOD, between FX and PROJECT. Four LFOs a track, one a row: pick a target, then SHAPE, RATE and DEPTH. Right-click an effect parameter on the FX screen (or its value on the FX bar) → Add LFO… puts one on it, and a ~ marks the parameters an LFO moves. Alt+7 is MOD (PROJECT: its tab, or SHIFT+▶ from MOD).']],
