@@ -185,7 +185,7 @@ const blockMuted = (Sx, y, t) => {
 };
 function freshPerf(){ return {sc:Array.from({length:PERF_SCENES}, (_, i) => ({n:'', v:{}})), xa:0, xb:1, xf:0,
   mac:Array.from({length:PERF_MACROS}, (_, i) => ({n:'M' + (i + 1), v:0, tg:[]})), lk:{}, lfo:{}}; }
-function tgtOk(id){ return typeof id === 'string' && /^(vol|pan|cut|res|dec):\d+$|^fx:\d+:\d+:\d+$/.test(id); }
+function tgtOk(id){ return typeof id === 'string' && /^(vol|pan|cut|res|dec|env|atk|sus|rel):\d+$|^fx:\d+:\d+:\d+$/.test(id); }
 const perfOf = (Sx = S) => Sx.perf || (Sx.perf = freshPerf());
 function tgtParse(id){ const a = String(id).split(':'); return {k:a[0], t:+a[1], s:a[2] != null ? +a[2] : -1, p:a[3] != null ? +a[3] : -1}; }
 function tgtFx(g, Sx = S){ const A = g.t >= MT ? Sx.mfx : Sx.tfx[g.t], f = A && A[g.s]; if (!f || !TFX[f.type]) return null; const q = TFX[f.type].ps[g.p]; return q && (!isPumpT(f.type) || q.lfo) ? {f, q} : null; }
@@ -194,7 +194,9 @@ function tgtOwn(id, Sx = S){
   if (g.k === 'vol') return g.t < NT ? Sx.mix[g.t].vol : 255;
   if (g.k === 'pan') return g.t < NT ? Sx.mix[g.t].pan : 128;
   if (g.k === 'fx'){ const x = tgtFx(g, Sx); return x ? clamp(Math.round((x.f[x.q.k] - x.q.min) / ((x.q.max - x.q.min) || 1) * 255), 0, 255) : 0; }
-  return g.k === 'res' ? 0 : 255;   // cut / dec: open; res: none
+  // cut / dec: open (255); res: none (0). env / atk / sus / rel (live engines, 10 Nov): 0. Only the OFFSET from the engine's own value reaches the engine
+  // (makeSeq's `eng` event: o = value - centre), so no centre is needed: 0 makes an LFO's o the plain swing (+/- depth / 2, never clamped at the bottom).
+  return g.k === 'cut' || g.k === 'dec' ? 255 : 0;
 }
 function perfResolve(st, Sx = S){
   const P = perfOf(Sx), out = new Map(), A = P.sc[P.xa] ? P.sc[P.xa].v : {}, B = P.sc[P.xb] ? P.sc[P.xb].v : {}, x = clamp(st.xf, 0, 255) / 255;
@@ -206,6 +208,7 @@ const perfLive = {xf:0, mac:new Array(PERF_MACROS).fill(null), fill:false, pno:n
 function perfLiveInit(){ const P = perfOf(); perfLive.xf = P.xf; perfLive.mac = P.mac.map(m => m.v); perfLive.init = true; }
 function tgtEvs(id, v, at, pno){
   const g = tgtParse(id), own = v == null;
+  if (g.k === 'env' || g.k === 'atk' || g.k === 'sus' || g.k === 'rel') return [];   // live engines only: makeSeq's `eng` event carries them (from PF.sent and the LFOs); nothing for the notes (PF.pno)
   if (g.k === 'cut' || g.k === 'res' || g.k === 'dec'){ const o = pno.get(g.t) || {}; if (own) delete o[g.k]; else o[g.k] = v; pno.set(g.t, o); return []; }
   if (g.k === 'vol') return g.t < NT ? [{type:'tva', t:at, track:g.t, v:own ? S.mix[g.t].vol : v}] : [];
   if (g.k === 'pan') return g.t < NT ? [{type:'tpn', t:at, track:g.t, v:own ? S.mix[g.t].pan : v}] : [];
@@ -418,13 +421,39 @@ function makeSeq(S, mode, o){
       const g = cmdV(r0(T, mode === 'phrase' ? o.phrase : (!T.empty && chRow ? chRow[0] : -1)), GGRI);
       if (g != null) api.grv = ngrv = grvOf(g, api.tks); }
     // TRACK LFO of track t for the span [t0, t0 + dur) (own row, or for an idle track the time to the next step): see below.
-    const lfoEvs = (t, t0, dur) => { const La = PFS.lfo[t]; if (Array.isArray(La)) for (let i = 0; i < La.length; i++){ const L = La[i]; if (!L || !tgtOk(L.id)) continue;
+    /* ENGINE TARGETS (10 Nov; docs/mod/ENGINE-TARGETS-DESIGN.md): the commands CUT / RES / ATK / DEC / REL and the MOD targets cut res env atk dec sus rel of a
+       track reach its live engines as one `eng` event: {type:'eng', track, t, c:{cut,res,dec,atk,rel} (the command's byte, -1 = none), o:{cut,res,env,atk,dec,sus,rel}
+       (signed byte offsets, +-255)}. The sequencer cannot know whether a pad is live (the core has no kit), so it sends it for every track with something to say
+       (a command in force, an LFO, a scene value) and the player drops it where the track has no live node; a song with none of these sends none.
+       o = the value unclamped - its centre (the command's byte when one is in force, else the target's own: tgtOwn), so an LFO swings both ways round it; a scene,
+       macro or lock value on the target (PF.sent) is an offset from tgtOwn while no command is in force. An LFO gives ne points a step (4 live, 2 in renders),
+       sent every step; otherwise one event at the step's start, only when c or o changed since the last one (T.eng; none yet = the defaults, so a state in force
+       at the first step goes out at once, and one that returns to the defaults sends the defaults). PF.pno (the sampled pads) is written as before. */
+    const ENGK = ['cut', 'res', 'env', 'atk', 'dec', 'sus', 'rel'], R3 = x => Math.round(x * 1000) / 1000;
+    const engCmd = (T, k) => k === 'cut' ? T.cut != null : k === 'res' ? !!T.rsg : k === 'dec' ? T.dec != null : k === 'atk' ? T.cAtk != null : k === 'rel' ? T.cRel != null : false;
+    const engEmit = (u, t0, dur, ne, pts) => {
+      const T = tr[u], c = {cut:T.cut != null ? T.cut : -1, res:T.rsg ? T.res | 0 : -1, dec:T.dec != null ? T.dec : -1, atk:T.cAtk != null ? T.cAtk : -1, rel:T.cRel != null ? T.cRel : -1}, o0 = {};
+      for (const k of ENGK){ const id = k + ':' + u; o0[k] = engCmd(T, k) || !PF.sent.has(id) ? 0 : PF.sent.get(id) - tgtOwn(id, S); }
+      const np = pts ? ne : 1, os = []; let last = T.eng != null ? T.eng : '-1,-1,-1,-1,-1|0,0,0,0,0,0,0', changed = false;
+      for (let p = 0; p < np; p++){ const o = {}; for (const k of ENGK) o[k] = R3(clamp(o0[k] + (pts && pts[k] ? pts[k][p] : 0), -255, 255));
+        const key = c.cut + ',' + c.res + ',' + c.dec + ',' + c.atk + ',' + c.rel + '|' + o.cut + ',' + o.res + ',' + o.env + ',' + o.atk + ',' + o.dec + ',' + o.sus + ',' + o.rel;
+        os.push(o); if (key !== last) changed = true; last = key; }
+      if (!changed) return;
+      for (let p = 0; p < np; p++) evs.push({type:'eng', t:t0 + dur * p / np, track:u, c:Object.assign({}, c), o:os[p]});
+      T.eng = last;
+    };
+    const lfoEvs = (t, t0, dur) => { const La = PFS.lfo[t], ne = PL ? Math.min(4, api.tks) : 2, EP = new Map();
+      if (Array.isArray(La)) for (let i = 0; i < La.length; i++){ const L = La[i]; if (!L || !tgtOk(L.id)) continue;
         let dup = false; for (let j = 0; j < i; j++) if (La[j] && La[j].id === L.id){ dup = true; break; } if (dup) continue;
         const g = tgtParse(L.id), fl = g.k === 'cut' || g.k === 'res' || g.k === 'dec', n = fl ? 1 : PL ? Math.min(4, api.tks) : 2;
         const c = PF.sent.has(L.id) ? PF.sent.get(L.id) : tgtOwn(L.id, S);
-        for (let k = 0; k < n; k++){ const tt = t0 + dur * k / n; let v = c;
-          for (let j = i; j < La.length; j++){ const M = La[j]; if (!M || M.id !== L.id) continue; const bt = (api.bt + (tt - t0) * api.bpm / 60) / (PLFO_RATES[M.rt] || 1), cyc = Math.floor(bt); v += lfoAt(M.sh, bt - cyc, cyc) * M.dp / 2; }
-          evs.push(...tgtEvs(L.id, clamp(Math.round(v), 0, 255), tt, PF.pno)); } } };
+        const sw = (tt, v = 0) => { for (let j = i; j < La.length; j++){ const M = La[j]; if (!M || M.id !== L.id) continue; const bt = (api.bt + (tt - t0) * api.bpm / 60) / (PLFO_RATES[M.rt] || 1), cyc = Math.floor(bt); v += lfoAt(M.sh, bt - cyc, cyc) * M.dp / 2; } return v; };
+        if (!(g.k === 'env' || g.k === 'atk' || g.k === 'sus' || g.k === 'rel')) for (let k = 0; k < n; k++){ const tt = t0 + dur * k / n;
+          evs.push(...tgtEvs(L.id, clamp(Math.round(sw(tt, c)), 0, 255), tt, PF.pno)); }
+        if (ENGK.includes(g.k) && g.t < NT){ let E = EP.get(g.t); if (!E) EP.set(g.t, E = {}); E[g.k] = []; for (let k = 0; k < ne; k++) E[g.k].push(sw(t0 + dur * k / ne)); } }
+      if (t < NT && !EP.has(t)) EP.set(t, null);
+      for (const [u, pts] of EP) engEmit(u, t0, dur, ne, pts);
+    };
     const lfoRan = [];   // the tracks whose own row ran this step (their LFO went out with it)
     for (let t = 0; t <= MT; t++){
       const T = tr[t]; if (!T.on || T.rel > rel0 + 1e-9) continue;
@@ -486,7 +515,7 @@ function makeSeq(S, mode, o){
         if (fx.SCA != null) T.scl = {scale:Math.min(SCALES.length - 1, fx.SCA & 15), sroot:(fx.SCA >> 4) % 12};
         if (fx.SCG != null) gscl = {scale:Math.min(SCALES.length - 1, fx.SCG & 15), sroot:(fx.SCG >> 4) % 12};
         if (fx.CUT != null) T.cut = fx.CUT >= 255 ? null : fx.CUT;
-        if (fx.RES != null) T.res = fx.RES;
+        if (fx.RES != null){ T.res = fx.RES; T.rsg = true; }   // rsg: a RES command has been given (the live engines' cRes is -1 until then)
         if (fx.DEC != null) T.dec = fx.DEC >= 255 ? null : fx.DEC;
         if (fx.ATK != null) T.cAtk = fx.ATK >= 255 ? null : fx.ATK;
         if (fx.REL != null) T.cRel = fx.REL >= 255 ? null : fx.REL;
@@ -608,7 +637,7 @@ function makeSeq(S, mode, o){
       // macro or own), in time with the song; a filter target (cut / res / dec) once a row, for the notes that start on it.
       // Several LFOs on one target add around its one value (the first LFO of a target leads; the later ones are summed into its points).
       lfoEvs(t, t0, dur); lfoRan[t] = true;
-      if (muted){ evs.length = ev0; if (!T.mut) evs.push({type:'off', t:t0, track:t}); delete pos[t].sc; pos[t].off = true; }   // entering a muted block silences what is ringing
+      if (muted){ evs.length = ev0; if (T.eng != null) T.eng = ''; if (!T.mut) evs.push({type:'off', t:t0, track:t}); delete pos[t].sc; pos[t].off = true; }   // (T.eng '': what the player has is unknown now, the next step sends the state)   // entering a muted block silences what is ringing
       T.mut = muted;
       const L = (mode === 'song' && pid < 0) ? emptyLen() : lenOf(pid);
       // DIR: backwards, ping-pong or random steps; a pass still lasts L steps (T.cnt), so the song keeps its timing. dirGo:
@@ -941,13 +970,18 @@ function fxvMsg(f, slot, ov, bpm){
   const p = new Array(12).fill(0); vals.forEach((v, i) => p[i] = v); return {pset:{slot, p}};
 }
 // One driven parameter: a timeline that takes over from the node's own AudioParam at its first event
+/* ENGINE TARGETS (10 Nov; docs/mod/ENGINE-TARGETS-DESIGN.md): the sequencer's `eng` event {track, t, c, o} (CUT / RES / ATK / DEC / REL and the MOD targets cut res
+   env atk dec sus rel) goes to every live node of the track as twelve override timelines: cCut cRes cDec cAtk cRel (-1 = none) with set, oCut oRes oEnv oAtk oDec oSus oRel
+   (signed offsets) with a ramp from the node's last point. A node that does not declare one never reads it (__tcOv walks the declared params). */
+const ENG_C = {cut:'cCut', res:'cRes', dec:'cDec', atk:'cAtk', rel:'cRel'}, ENG_O = {cut:'oCut', res:'oRes', env:'oEnv', atk:'oAtk', dec:'oDec', sus:'oSus', rel:'oRel'};
+const ENG_DEF = new Map([...Object.values(ENG_C).map(n => [n, -1]), ...Object.values(ENG_O).map(n => [n, 0])]);
 function tcParam(ov, k, t){ let A = ov.p.get(k); if (!A){ A = new Auto(0); A.from = t; ov.p.set(k, A); } return A; }
 
 const POLY = 4, FXP_CORE = ['sw0', 'sw1', 'sw2', 'sw3', 'sw4', 'sw5', 'sw6', 'sw7', 'flx', 'gat', 'rtg'];
 class ThunderCore extends AudioWorkletProcessor {
   constructor(){
     super();
-    this.seq = null; this.LEAD = 0.25; this.kv = []; this.vs = []; this.alive = new Set(); this.ended = false; this.lnodes = new Map(); this.voxG = new Map(); this.fxTouched = new Set(); this.fxOv = new Map();   // fxOv: FXV's moved controls, 'track:slot' → {key: value}
+    this.seq = null; this.LEAD = 0.25; this.kv = []; this.vs = []; this.alive = new Set(); this.ended = false; this.lnodes = new Map(); this.engSt = new Array(NT).fill(null); this.engL = new Array(NT).fill(null); this.voxG = new Map(); this.fxTouched = new Set(); this.fxOv = new Map();   // fxOv: FXV's moved controls, 'track:slot' → {key: value}
     this.clk = new Auto(0); this.clkOn = false; this.clkBase = 0;   // the beat clock (output NT): beat + 1 while playing, 0 stopped
     this.mixReset();
     this.port.onmessage = e => { try { this.msg(e.data || {}); } catch(err){ this.port.postMessage({op:'error', where:(e.data && e.data.op) || '?', message:String(err && err.stack || err)}); } };
@@ -970,6 +1004,7 @@ class ThunderCore extends AudioWorkletProcessor {
     while (c.seq.alive() && c.g++ < 4096){
       const r = c.seq.step(), p = r.pos && r.pos[c.rs.ref];
       if (p && (p.row > c.rs.row || (p.row === c.rs.row && p.step >= c.rs.step))){ c.first = r; c.done = true; return; }
+      for (const e of r.evs) if (e.type === 'eng') (c.eng || (c.eng = new Map())).set(e.track, e);   // ENGINE TARGETS: the state the silent steps left
       if (ms != null && Date.now() - t0 >= ms) return;
     }
     c.done = true;
@@ -1038,6 +1073,21 @@ class ThunderCore extends AudioWorkletProcessor {
     else { const fg = trackGain(m && m.vol != null ? m.vol : 224), g = trackGain(ev.v); A.target(fg > 1e-6 ? g / fg : 0, at, 0.004); }
     return true;
   }
+  // ENGINE TARGETS: remember the track's state (a node that starts a note later takes it in liveStart) and set it on the track's nodes
+  engEv(ev){
+    const t = ev.track; if (t == null || t < 0 || t >= NT) return;
+    const st = {c:ev.c || {}, o:ev.o || {}}, at = Math.max(ev.t, currentTime);
+    let def = true; for (const k in ENG_C) if (!(st.c[k] < 0)) def = false; for (const k in ENG_O) if (st.o[k]) def = false;
+    this.engSt[t] = def ? null : st;
+    const Ls = this.engL[t]; if (!Ls) return;
+    for (const L of Ls){ if (tcNodes().get(L.key) !== L.proc){ Ls.delete(L); continue; } if (def && !L.engOn) continue; this.engPut(L, st, at, true); }
+  }
+  engPut(L, st, at, ramp){
+    const ov = tcOver(L.proc), rp = ramp && L.engOn; ov.until = Infinity;
+    for (const k in ENG_C){ const v = st.c[k]; if (typeof v === 'number' && isFinite(v)) tcParam(ov, ENG_C[k], at).set(v, at); }
+    for (const k in ENG_O){ const v = st.o[k]; if (typeof v === 'number' && isFinite(v)){ const A = tcParam(ov, ENG_O[k], at); if (rp) A.lin(v, at); else A.set(v, at); } }
+    L.engOn = true;
+  }
   mixOut(outputs, N, dt){
     const G = outputs[NT + 1], P = outputs[NT + 2], M = outputs[NT + 3];
     if (G) for (let t = 0; t < G.length; t++) this.mixFill(G[t], this.mg[t], 1, N, dt);
@@ -1056,6 +1106,8 @@ class ThunderCore extends AudioWorkletProcessor {
       if (!(c && c.key === this.chaseKey(d))) c = {key:null, rs:d.rs, g:0, first:null, done:false, seq:makeSeq(S, d.mode || 'song', Object.assign({}, d.o || {}, {live:true}))};
       if (!c.done) this.chaseRun(c, null);
       seq = c.seq; const first = c.first;
+      if (c.eng) for (const e of c.eng.values()) this.engEv(Object.assign({}, e, {t:d.t0}));   // the steps run silently: the live engines' state they left, now (then the step it stopped on, below)
+      if (first) for (const e of first.evs) if (e.type === 'eng') this.engEv(Object.assign({}, e, {t:e.t + (d.t0 - first.t)}));
       if (first){ const dt = d.t0 - first.t; seq.base += dt; seq.time += dt; if (seq.btT != null) seq.btT += dt; }
       else seq.time = d.t0; }
     else { this.chase = null; seq = makeSeq(S, d.mode || 'song', Object.assign({}, d.o || {}, {live:true})); seq.time = d.t0; }
@@ -1285,6 +1337,7 @@ class ThunderCore extends AudioWorkletProcessor {
       if (!this.clkOn){ this.clkOn = true; this.clkBase = Math.floor(ev.b / 16) * 16; A.set(ev.b - this.clkBase + 1, at); return true; }
       const v = ev.b - this.clkBase; A.lin(v + 1, at); if (v >= 16){ this.clkBase += 16; A.set(v - 16 + 1, at); } return true; }
     if (ev.type === 'stp'){ for (let k = 0; k <= NT; k++) if (ev.all || k === ev.track){ for (const v of this.T(k)) this.kill(v, ev.t, 0.004); this.T(k).length = 0; } return false; }
+    if (ev.type === 'eng'){ this.engEv(ev); return false; }   // (false: the page's player sets its own params from it too: the same values)
     if (ev.type === 'tvl' || ev.type === 'tva' || ev.type === 'tpn' || ev.type === 'mvol') return this.mixEv(ev);
     if (ev.type === 'off' && ev.track != null){ const T = this.T(ev.track);
       if (ev.cols){ for (let k = T.length - 1; k >= 0; k--) if (ev.cols.includes(T[k].col)){ this.kill(T[k], ev.t, this.relTc(T[k])); T.splice(k, 1); } return false; }
@@ -1300,11 +1353,11 @@ class ThunderCore extends AudioWorkletProcessor {
   // on those nodes from then aren't held shut by the core's gates
   release(at){ for (const proc of tcNodes().values()) if (proc && proc.__ov) proc.__ov.until = Math.min(proc.__ov.until, at); }
   stopAll(at){ for (const v of this.alive) this.kill(v, at, 0.004, true); for (const T of this.vs) if (T) T.length = 0;
-    for (const L of this.lnodes.values()){ if (L.cur) this.kill(L.cur, at); if (L.lanes) for (const q of L.lanes) if (q.cur) this.kill(q.cur, at); L.sylN = 0;
+    for (const L of this.lnodes.values()){ if (L.cur) this.kill(L.cur, at); if (L.lanes) for (const q of L.lanes) if (q.cur) this.kill(q.cur, at); L.sylN = 0; L.engOn = false;
       const ov = L.proc.__ov; if (!ov) continue;   // and whatever is still booked on it: gates shut now, no note after this
-      for (const [k, A] of ov.p){ if (/^(gate|g\d)$/.test(k)){ A.cancel(at); A.set(0, at); } else if (/^(trig|t\d)$/.test(k)) A.cancel(at); }
+      for (const [k, A] of ov.p){ if (/^(gate|g\d)$/.test(k)){ A.cancel(at); A.set(0, at); } else if (/^(trig|t\d)$/.test(k)) A.cancel(at); else if (ENG_DEF.has(k)){ A.cancel(at); A.set(ENG_DEF.get(k), at); } }   // ENGINE TARGETS: the twelve back to their defaults
       ov.until = at + 4; }   // a live note lets go; its release rings, then the page has the node back
-    this.voxG.clear();
+    this.voxG.clear(); this.engSt.fill(null);
     // the effect switches go back to the slots' own (−1), as the page's resetSeq does, then the page has the params again
     for (const key of this.fxTouched){ const proc = tcNodes().get(key); if (!proc || !proc.__ov) continue; const ov = proc.__ov;
       for (const A of ov.p.values()){ A.cancel(at); A.set(-1, at); } ov.until = at + 0.5; }   // FXO… (fx:) and BYP b1–b15 (chn:)
@@ -1318,8 +1371,10 @@ class ThunderCore extends AudioWorkletProcessor {
   lnode(t, pad, j){
     const k = this.kv[pad], lk = k && k.lk; if (!lk) return null;
     const key = t + ':' + pad + ':' + lk.kind + (j ? ':' + j : ''), proc = tcNodes().get(key); if (!proc) return null;
-    let L = this.lnodes.get(key); if (!L || L.proc !== proc){ L = {key, proc, pad, kind:lk.kind, vox:!!lk.vox, ps:!!lk.ps, n:1e6 + Math.floor(Math.random() * 1e5) * 10, lastOn:-1, cur:null, sylN:0, took:false};
+    let L = this.lnodes.get(key); if (!L || L.proc !== proc){ const old = L; L = {key, proc, pad, kind:lk.kind, vox:!!lk.vox, ps:!!lk.ps, n:1e6 + Math.floor(Math.random() * 1e5) * 10, lastOn:-1, cur:null, sylN:0, took:false};
       if (L.ps) L.lanes = [0, 1, 2, 3].map(q => ({L, lane:q, n:L.n + q * 1e5, lastOn:-1, cur:null}));
+      if (old) for (const A of this.engL) if (A) A.delete(old);
+      (this.engL[t] || (this.engL[t] = new Set())).add(L);   // ENGINE TARGETS: the track's live nodes
       this.lnodes.set(key, L); }
     return L;
   }
@@ -1363,6 +1418,7 @@ class ThunderCore extends AudioWorkletProcessor {
     let gain = ev.gain;
     if (L.ps){ const vc = ev.vc != null && ev.vc >= 0 ? ev.vc : -1, hit = (this.kv[L.pad].lk.vel) || 100, V = P('vel'); V.cancel(t); V.set(Math.max(1, Math.min(127, Math.round((vc >= 0 ? 127 : hit) * (ev.vel != null ? ev.vel : 1)))), t);
       if (vc >= 0){ const c = curve(vc); gain = c > 1e-4 ? ev.gain / c : 0; } }
+    { const es = this.engSt[ev.track]; if (es) this.engPut(L, es, t, false); }   // the track's commands and LFOs as they are now
     P('leg').set(leg, t); P('gate').set(1, t); B.n += 1; P('trig').set(B.n, t);
     ov.g.set(gain, t); ov.pn.set(Math.max(-1, Math.min(1, (ev.pan - 128) / 127)), t);
     if (ev.wob != null && L.kind === 'bass'){ const W = P('wob'); W.set(ev.wob, t); }

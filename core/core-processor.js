@@ -226,13 +226,18 @@ function fxvMsg(f, slot, ov, bpm){
   const p = new Array(12).fill(0); vals.forEach((v, i) => p[i] = v); return {pset:{slot, p}};
 }
 // One driven parameter: a timeline that takes over from the node's own AudioParam at its first event
+/* ENGINE TARGETS (10 Nov; docs/mod/ENGINE-TARGETS-DESIGN.md): the sequencer's `eng` event {track, t, c, o} (CUT / RES / ATK / DEC / REL and the MOD targets cut res
+   env atk dec sus rel) goes to every live node of the track as twelve override timelines: cCut cRes cDec cAtk cRel (-1 = none) with set, oCut oRes oEnv oAtk oDec oSus oRel
+   (signed offsets) with a ramp from the node's last point. A node that does not declare one never reads it (__tcOv walks the declared params). */
+const ENG_C = {cut:'cCut', res:'cRes', dec:'cDec', atk:'cAtk', rel:'cRel'}, ENG_O = {cut:'oCut', res:'oRes', env:'oEnv', atk:'oAtk', dec:'oDec', sus:'oSus', rel:'oRel'};
+const ENG_DEF = new Map([...Object.values(ENG_C).map(n => [n, -1]), ...Object.values(ENG_O).map(n => [n, 0])]);
 function tcParam(ov, k, t){ let A = ov.p.get(k); if (!A){ A = new Auto(0); A.from = t; ov.p.set(k, A); } return A; }
 
 const POLY = 4, FXP_CORE = ['sw0', 'sw1', 'sw2', 'sw3', 'sw4', 'sw5', 'sw6', 'sw7', 'flx', 'gat', 'rtg'];
 class ThunderCore extends AudioWorkletProcessor {
   constructor(){
     super();
-    this.seq = null; this.LEAD = 0.25; this.kv = []; this.vs = []; this.alive = new Set(); this.ended = false; this.lnodes = new Map(); this.voxG = new Map(); this.fxTouched = new Set(); this.fxOv = new Map();   // fxOv: FXV's moved controls, 'track:slot' → {key: value}
+    this.seq = null; this.LEAD = 0.25; this.kv = []; this.vs = []; this.alive = new Set(); this.ended = false; this.lnodes = new Map(); this.engSt = new Array(NT).fill(null); this.engL = new Array(NT).fill(null); this.voxG = new Map(); this.fxTouched = new Set(); this.fxOv = new Map();   // fxOv: FXV's moved controls, 'track:slot' → {key: value}
     this.clk = new Auto(0); this.clkOn = false; this.clkBase = 0;   // the beat clock (output NT): beat + 1 while playing, 0 stopped
     this.mixReset();
     this.port.onmessage = e => { try { this.msg(e.data || {}); } catch(err){ this.port.postMessage({op:'error', where:(e.data && e.data.op) || '?', message:String(err && err.stack || err)}); } };
@@ -255,6 +260,7 @@ class ThunderCore extends AudioWorkletProcessor {
     while (c.seq.alive() && c.g++ < 4096){
       const r = c.seq.step(), p = r.pos && r.pos[c.rs.ref];
       if (p && (p.row > c.rs.row || (p.row === c.rs.row && p.step >= c.rs.step))){ c.first = r; c.done = true; return; }
+      for (const e of r.evs) if (e.type === 'eng') (c.eng || (c.eng = new Map())).set(e.track, e);   // ENGINE TARGETS: the state the silent steps left
       if (ms != null && Date.now() - t0 >= ms) return;
     }
     c.done = true;
@@ -323,6 +329,21 @@ class ThunderCore extends AudioWorkletProcessor {
     else { const fg = trackGain(m && m.vol != null ? m.vol : 224), g = trackGain(ev.v); A.target(fg > 1e-6 ? g / fg : 0, at, 0.004); }
     return true;
   }
+  // ENGINE TARGETS: remember the track's state (a node that starts a note later takes it in liveStart) and set it on the track's nodes
+  engEv(ev){
+    const t = ev.track; if (t == null || t < 0 || t >= NT) return;
+    const st = {c:ev.c || {}, o:ev.o || {}}, at = Math.max(ev.t, currentTime);
+    let def = true; for (const k in ENG_C) if (!(st.c[k] < 0)) def = false; for (const k in ENG_O) if (st.o[k]) def = false;
+    this.engSt[t] = def ? null : st;
+    const Ls = this.engL[t]; if (!Ls) return;
+    for (const L of Ls){ if (tcNodes().get(L.key) !== L.proc){ Ls.delete(L); continue; } if (def && !L.engOn) continue; this.engPut(L, st, at, true); }
+  }
+  engPut(L, st, at, ramp){
+    const ov = tcOver(L.proc), rp = ramp && L.engOn; ov.until = Infinity;
+    for (const k in ENG_C){ const v = st.c[k]; if (typeof v === 'number' && isFinite(v)) tcParam(ov, ENG_C[k], at).set(v, at); }
+    for (const k in ENG_O){ const v = st.o[k]; if (typeof v === 'number' && isFinite(v)){ const A = tcParam(ov, ENG_O[k], at); if (rp) A.lin(v, at); else A.set(v, at); } }
+    L.engOn = true;
+  }
   mixOut(outputs, N, dt){
     const G = outputs[NT + 1], P = outputs[NT + 2], M = outputs[NT + 3];
     if (G) for (let t = 0; t < G.length; t++) this.mixFill(G[t], this.mg[t], 1, N, dt);
@@ -341,6 +362,8 @@ class ThunderCore extends AudioWorkletProcessor {
       if (!(c && c.key === this.chaseKey(d))) c = {key:null, rs:d.rs, g:0, first:null, done:false, seq:makeSeq(S, d.mode || 'song', Object.assign({}, d.o || {}, {live:true}))};
       if (!c.done) this.chaseRun(c, null);
       seq = c.seq; const first = c.first;
+      if (c.eng) for (const e of c.eng.values()) this.engEv(Object.assign({}, e, {t:d.t0}));   // the steps run silently: the live engines' state they left, now (then the step it stopped on, below)
+      if (first) for (const e of first.evs) if (e.type === 'eng') this.engEv(Object.assign({}, e, {t:e.t + (d.t0 - first.t)}));
       if (first){ const dt = d.t0 - first.t; seq.base += dt; seq.time += dt; if (seq.btT != null) seq.btT += dt; }
       else seq.time = d.t0; }
     else { this.chase = null; seq = makeSeq(S, d.mode || 'song', Object.assign({}, d.o || {}, {live:true})); seq.time = d.t0; }
@@ -570,6 +593,7 @@ class ThunderCore extends AudioWorkletProcessor {
       if (!this.clkOn){ this.clkOn = true; this.clkBase = Math.floor(ev.b / 16) * 16; A.set(ev.b - this.clkBase + 1, at); return true; }
       const v = ev.b - this.clkBase; A.lin(v + 1, at); if (v >= 16){ this.clkBase += 16; A.set(v - 16 + 1, at); } return true; }
     if (ev.type === 'stp'){ for (let k = 0; k <= NT; k++) if (ev.all || k === ev.track){ for (const v of this.T(k)) this.kill(v, ev.t, 0.004); this.T(k).length = 0; } return false; }
+    if (ev.type === 'eng'){ this.engEv(ev); return false; }   // (false: the page's player sets its own params from it too: the same values)
     if (ev.type === 'tvl' || ev.type === 'tva' || ev.type === 'tpn' || ev.type === 'mvol') return this.mixEv(ev);
     if (ev.type === 'off' && ev.track != null){ const T = this.T(ev.track);
       if (ev.cols){ for (let k = T.length - 1; k >= 0; k--) if (ev.cols.includes(T[k].col)){ this.kill(T[k], ev.t, this.relTc(T[k])); T.splice(k, 1); } return false; }
@@ -585,11 +609,11 @@ class ThunderCore extends AudioWorkletProcessor {
   // on those nodes from then aren't held shut by the core's gates
   release(at){ for (const proc of tcNodes().values()) if (proc && proc.__ov) proc.__ov.until = Math.min(proc.__ov.until, at); }
   stopAll(at){ for (const v of this.alive) this.kill(v, at, 0.004, true); for (const T of this.vs) if (T) T.length = 0;
-    for (const L of this.lnodes.values()){ if (L.cur) this.kill(L.cur, at); if (L.lanes) for (const q of L.lanes) if (q.cur) this.kill(q.cur, at); L.sylN = 0;
+    for (const L of this.lnodes.values()){ if (L.cur) this.kill(L.cur, at); if (L.lanes) for (const q of L.lanes) if (q.cur) this.kill(q.cur, at); L.sylN = 0; L.engOn = false;
       const ov = L.proc.__ov; if (!ov) continue;   // and whatever is still booked on it: gates shut now, no note after this
-      for (const [k, A] of ov.p){ if (/^(gate|g\d)$/.test(k)){ A.cancel(at); A.set(0, at); } else if (/^(trig|t\d)$/.test(k)) A.cancel(at); }
+      for (const [k, A] of ov.p){ if (/^(gate|g\d)$/.test(k)){ A.cancel(at); A.set(0, at); } else if (/^(trig|t\d)$/.test(k)) A.cancel(at); else if (ENG_DEF.has(k)){ A.cancel(at); A.set(ENG_DEF.get(k), at); } }   // ENGINE TARGETS: the twelve back to their defaults
       ov.until = at + 4; }   // a live note lets go; its release rings, then the page has the node back
-    this.voxG.clear();
+    this.voxG.clear(); this.engSt.fill(null);
     // the effect switches go back to the slots' own (−1), as the page's resetSeq does, then the page has the params again
     for (const key of this.fxTouched){ const proc = tcNodes().get(key); if (!proc || !proc.__ov) continue; const ov = proc.__ov;
       for (const A of ov.p.values()){ A.cancel(at); A.set(-1, at); } ov.until = at + 0.5; }   // FXO… (fx:) and BYP b1–b15 (chn:)
@@ -603,8 +627,10 @@ class ThunderCore extends AudioWorkletProcessor {
   lnode(t, pad, j){
     const k = this.kv[pad], lk = k && k.lk; if (!lk) return null;
     const key = t + ':' + pad + ':' + lk.kind + (j ? ':' + j : ''), proc = tcNodes().get(key); if (!proc) return null;
-    let L = this.lnodes.get(key); if (!L || L.proc !== proc){ L = {key, proc, pad, kind:lk.kind, vox:!!lk.vox, ps:!!lk.ps, n:1e6 + Math.floor(Math.random() * 1e5) * 10, lastOn:-1, cur:null, sylN:0, took:false};
+    let L = this.lnodes.get(key); if (!L || L.proc !== proc){ const old = L; L = {key, proc, pad, kind:lk.kind, vox:!!lk.vox, ps:!!lk.ps, n:1e6 + Math.floor(Math.random() * 1e5) * 10, lastOn:-1, cur:null, sylN:0, took:false};
       if (L.ps) L.lanes = [0, 1, 2, 3].map(q => ({L, lane:q, n:L.n + q * 1e5, lastOn:-1, cur:null}));
+      if (old) for (const A of this.engL) if (A) A.delete(old);
+      (this.engL[t] || (this.engL[t] = new Set())).add(L);   // ENGINE TARGETS: the track's live nodes
       this.lnodes.set(key, L); }
     return L;
   }
@@ -648,6 +674,7 @@ class ThunderCore extends AudioWorkletProcessor {
     let gain = ev.gain;
     if (L.ps){ const vc = ev.vc != null && ev.vc >= 0 ? ev.vc : -1, hit = (this.kv[L.pad].lk.vel) || 100, V = P('vel'); V.cancel(t); V.set(Math.max(1, Math.min(127, Math.round((vc >= 0 ? 127 : hit) * (ev.vel != null ? ev.vel : 1)))), t);
       if (vc >= 0){ const c = curve(vc); gain = c > 1e-4 ? ev.gain / c : 0; } }
+    { const es = this.engSt[ev.track]; if (es) this.engPut(L, es, t, false); }   // the track's commands and LFOs as they are now
     P('leg').set(leg, t); P('gate').set(1, t); B.n += 1; P('trig').set(B.n, t);
     ov.g.set(gain, t); ov.pn.set(Math.max(-1, Math.min(1, (ev.pan - 128) / 127)), t);
     if (ev.wob != null && L.kind === 'bass'){ const W = P('wob'); W.set(ev.wob, t); }
