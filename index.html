@@ -2837,7 +2837,7 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
       <div class="btnrow"><label class="cb" title="On Mobile, the waves and chains editors are hidden and the tracker uses PAD input. Tick Show chains or Show waves to keep one. Kits and songs still play with their layers and effects, so files sound the same. Turn this off to edit those patches on Desktop (Thunder Plus). Saved for this browser."><input type="checkbox" id="ckMobile">Mobile (Thunder)</label></div>
       <div class="btnrow" id="mobEdRow"><label class="cb" title="Shows the chains editor on Mobile (a big screen like the unfolded Fold has room for it). Off: the song's chains effects still play."><input type="checkbox" id="ckMobCh">Show chains on Mobile</label><label class="cb" title="Shows the waves editor on Mobile. Off: the kit's waves layers still play."><input type="checkbox" id="ckMobWv">Show waves on Mobile</label></div>
       <h3>Playing</h3>
-      <div class="btnrow"><label class="cb" title="While the song plays, the screen doesn't time out by itself (the power button still turns it off). Also on the tracker's PROJECT screen."><input type="checkbox" id="ckWake">Keep screen on while playing</label><label class="cb" title="While the song plays, Android shows a playback notification so the song keeps going when you switch apps. Also on the tracker's PROJECT screen."><input type="checkbox" id="ckBgPlay">Background play</label></div>
+      <div class="btnrow"><label class="cb" title="While the song plays, the screen doesn't time out by itself (the power button still turns it off). Also on the tracker's PROJECT screen."><input type="checkbox" id="ckWake">Keep screen on while playing</label><label class="cb" title="While the song plays, Android shows a playback notification so the song keeps going when you switch apps. OFF: with the screen off playback breaks up and the volume keys move the ringer. Also on the tracker's PROJECT screen."><input type="checkbox" id="ckBgPlay">Background play</label></div>
       <h3>Updates &amp; help</h3>
       <div class="btnrow"><button type="button" id="updBtn">Check for update</button><button type="button" id="helpBtn2">Help &amp; keys</button><span class="lbl setbuildL" id="appBuild"></span></div>
       <div class="btnrow" id="installRow" hidden><button type="button" id="installBtn" hidden>Install app</button><span class="lbl" id="installMsg"></span></div>
@@ -8240,7 +8240,7 @@ $('ckMobCh').addEventListener('change', e => setMobEd('chains', e.target.checked
 mqUnfolded.addEventListener('change', () => { if (!isMobile()) return; applyPlatform(); if (noEdFor(view)) setView('synth'); });   // folding / unfolding: the chains tab comes and goes
 // KEEP SCREEN ON / BACKGROUND PLAY here too (stability pass: they were only on the PROJECT screen); ticked from their settings each time the panel shows
 { const w = $('ckWake'), b = $('ckBgPlay'), sync = () => { try { w.checked = !!wlOn; b.checked = !!bgOn; } catch(e){} };
-  w.addEventListener('change', () => { setWlOn(w.checked); draw(); }); b.addEventListener('change', () => { setBgOn(b.checked); draw(); });
+  w.addEventListener('change', () => { setWlOn(w.checked); draw(); }); b.addEventListener('change', () => { setBgOn(b.checked, true); draw(); });
   new MutationObserver(sync).observe($('pApp'), {attributes:true, attributeFilter:['hidden']}); sync(); }
 $('ckMobWv').addEventListener('change', e => setMobEd('waves', e.target.checked));
 // Per-slot render state follows the slot count (grows when a voice per track is on); slotAt pads or
@@ -22894,7 +22894,25 @@ function bgHooks(){
   const go = () => { if (BG_RESTART && bgRst.wait && bgEl && bgEl.paused && tp.on && bgOn) bgTry('back in the app'); };
   try { document.addEventListener('visibilitychange', () => { if (!document.hidden) go(); }); document.addEventListener('pointerdown', go, {capture:true, passive:true}); } catch(e){}
 }
-function setBgOn(on){ bgOn = !!on; try { localStorage.setItem('thunderplus-bgplay-v1', bgOn ? '1' : '0'); } catch(e){} bgPlay(bgOn && tp.on); }
+function setBgOn(on, byHand){   // byHand: the owner flipped the switch (Settings / tracker PROJECT), not code such as a reset
+  const was = bgOn; bgOn = !!on; try { localStorage.setItem('thunderplus-bgplay-v1', bgOn ? '1' : '0'); } catch(e){} bgPlay(bgOn && tp.on);
+  if (byHand && was && !bgOn && bgAndroid) try { toast('Background play off: with the screen off, playback will break up. For testing only.', 6000); } catch(e){}
+}
+/* BGPLAY GUARD (10 Nov): Background play left OFF cost a day of debugging (with it off Android does not treat the page as a media player:
+   hidden playback is throttled, the audio clock runs away, the volume keys move the ringer). Android only: playing + hidden with it off is
+   logged to the playback report, and on return a toast offers "Turn on", once per page load. Turning it off by hand also toasts (setBgOn). */
+var bgHidOff = false, bgWarned = false;
+function bgGuardHide(){
+  if (!bgAndroid || bgOn || !tp.on) return;
+  bgHidOff = true; try { pbLog('hidden while playing with Background play OFF: Android will throttle the audio · ' + pbState()); } catch(e){}
+}
+function bgGuardShow(){
+  if (!bgHidOff) return; bgHidOff = false;
+  if (!bgAndroid || bgOn || bgWarned) return; bgWarned = true;
+  try { toastAct('Background play is off, so playback breaks up when the screen is off or the app is in the background.', 'Turn on',
+    () => { setBgOn(true); try { $('ckBgPlay').checked = true; } catch(e){} }); } catch(e){}   // setBgOn(true) starts the element when a song is playing
+}
+try { document.addEventListener('visibilitychange', () => { if (document.hidden) bgGuardHide(); else bgGuardShow(); }); } catch(e){}
 function bgClip(){
   const sr = 8000, n = sr * 8, b = new ArrayBuffer(44 + n * 2), v = new DataView(b);
   const w = (o, t) => { for (let i = 0; i < t.length; i++) v.setUint8(o + i, t.charCodeAt(i)); };
@@ -24789,8 +24807,8 @@ function projRows(){
     {l:'› UPDATE APP', sec:'App', gap:true, act:() => checkUpdate(true), info:() => 'Reloads with the newest version (your song and kit are kept). The app also checks by itself when it opens'},
     {l:'KEEP SCREEN ON', ck:'While the song plays, the screen doesn’t time out', get:() => wlOn ? 1 : 0, set:v => setWlOn(!!v), min:0, max:1, tog:true, d:1, fmt:onOff,
       info:() => 'While the song plays, the phone doesn’t turn the screen off by itself (the power button still does). On phones a screen timing out mid-song upset the audio-thread sequencer'},
-    {l:'BACKGROUND PLAY', ck:'Keep playing when you switch apps', get:() => bgOn ? 1 : 0, set:v => setBgOn(!!v), min:0, max:1, tog:true, d:1, fmt:onOff,
-      info:() => 'While the song plays, Android shows a play / stop notification so the song keeps going when you switch apps. OFF: no notification.'},
+    {l:'BACKGROUND PLAY', ck:'Keep playing when you switch apps', get:() => bgOn ? 1 : 0, set:v => setBgOn(!!v, true), min:0, max:1, tog:true, d:1, fmt:onOff,
+      info:() => 'While the song plays, Android shows a play / stop notification so the song keeps going when you switch apps. OFF: no notification, and with the screen off playback breaks up and the volume keys move the ringer.'},
   ];
 }
 /* MOD SCREEN (owner, 9 Nov): the current track's LFOs (up to PLFO_MAX, S.perf.lfo[track]), one a row: TARGET, SHAPE, RATE, DEPTH.
