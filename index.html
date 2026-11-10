@@ -14682,7 +14682,7 @@ async function smbOpen(row){
 function smbStop(){ if (SMB.prev){ try { SMB.prev.stop(); } catch(e){} SMB.prev = null; } }
 async function smbAudition(i){
   const row = smbRows()[i]; if (!row) return; smbStop();
-  try { const o = await smbOpen(row); if (!o || SMB.sel !== i || !SMB.ui) return; const src = ctx.createBufferSource(); src.buffer = o.buf; src.connect(master); src.start(); SMB.prev = src; }
+  try { const o = await smbOpen(row); if (!o || SMB.sel !== i || !SMB.ui) return; audio(); const src = ctx.createBufferSource(); src.buffer = o.buf; src.connect(master); src.start(); SMB.prev = src; }
   catch(e){ toastErr('Couldn’t read ' + row.name + '.'); }
 }
 async function smbLoad(i){
@@ -21670,8 +21670,8 @@ function tStart(mode, o){
   // LIVE WARM-UP: the first PLAY of a session starts the audio engine; with live engine pads in the kit it waits (once, at
   // most 600 ms) for their worklets, so their nodes can be made before the first notes instead of on them
   // 10 Nov: and for the effect and chains modules' handlers still to run (playWaitFor), so rtAllFx is not 1-4 bars into the song
-  if (!(o && o._warm) && !tp.on){ rtInit(); const live = !bassOK.has(ctx) && (wkLazy() ? wkLiveWanted() : kit.voices.some((v, i) => v && isLivePad(i))), pend = playWaitFor(o); if (live || pend){ if (warmTok) return; const oo = Object.assign({}, o, {_warm:true}), tok = warmTok = {};
-    Promise.race([pend ? Promise.all(live ? [bassReady(ctx), ...pend] : pend) : bassReady(ctx), new Promise(r => setTimeout(r, pend ? FIRST_PLAY_WAIT_MS : 600))]).then(() => { if (warmTok === tok){ warmTok = null; if (!tp.on) tStart(mode, oo); } }); return; } }
+  if (!(o && o._warm) && !tp.on){ const slept = !!ctx && bgSus && ctx.state !== 'running'; rtInit(); const live = !bassOK.has(ctx) && (wkLazy() ? wkLiveWanted() : kit.voices.some((v, i) => v && isLivePad(i))), pend = playWaitFor(o), wake = slept ? ctx.resume().catch(() => {}) : null; if (live || pend || wake){ if (warmTok) return; const oo = Object.assign({}, o, {_warm:true}), tok = warmTok = {};
+    Promise.race([Promise.all([...(live ? [bassReady(ctx)] : []), ...(pend || []), ...(wake ? [wake] : [])]), new Promise(r => setTimeout(r, pend ? FIRST_PLAY_WAIT_MS : 600))]).then(() => { if (warmTok === tok){ warmTok = null; if (!tp.on) tStart(mode, oo); } }); return; } }
   if (typeof varPrefetch === 'function') varPrefetch();   // MUT / GEN
   if (mode === 'song' && loopPat && !(o && o.loop)){ o = Object.assign({}, o, {loop:{v:'pat', y0:o.row, y1:o.row}}); patRow = o.row; patCur = cs.song.y; }   // LOOP: the pattern
   const wasOn = tp.on;   // REC: no count-in when PLAY jumps somewhere else mid-song
@@ -21807,23 +21807,45 @@ var rkKick = null;   // RUNAWAY KICK: {at, rate} while the engine is paused by r
 var bgSusT = 0, bgSus = false, lastSnd = 0;   // var, not let: audio() calls bgArm() and may run before this line has
 /* ON SCREEN (9 Nov, owner): with LOW POWER DISPLAY on, it also sleeps with the app showing, after 30 s of silence. audio() wakes it
    on the next note; the clock stands still while asleep, so that note starts a moment late rather than being cut. */
-function bgWait(){ return document.hidden ? 20000 : 30000; }
-function bgArm(){ lastSnd = performance.now(); if ((document.hidden || lpOn) && !bgSusT) bgSusT = setTimeout(bgIdle, bgWait()); }
+/* IDLE SLEEP (10 Nov, battery audit finding 2): with the app showing, the song stopped and nothing sounded for IDLE_SLEEP_S (phones and
+   tablets) or IDLE_SLEEP_DESK_S (computers) the engine is suspended too: an awake, silent engine costs 370-450 ms of audio thread
+   per second. It uses the same bgIdle and the same exclusions as the sleeps above, plus what a showing app also has to keep awake
+   (idleHold) and a silent master (idleQuiet). audio() wakes it on the next sound exactly as after the hidden sleep; bgSus is set the
+   same way, so devRecover / audioInterrupted treat it as deliberate. IDLE_SLEEP = false turns it off (Low power and hidden: as before). */
+var IDLE_SLEEP = true, IDLE_SLEEP_S = 90, IDLE_SLEEP_DESK_S = 300, idleQT = 0;   // (var: audio() runs bgArm() early; the two times are not const so a test can shorten them)
+function bgWait(){ return document.hidden ? 20000 : lpOn ? 30000 : (seqHandHere() ? IDLE_SLEEP_S : IDLE_SLEEP_DESK_S) * 1000; }
+function bgArm(){ lastSnd = performance.now(); idleQT = 0; if ((document.hidden || lpOn || IDLE_SLEEP) && !bgSusT) bgSusT = setTimeout(bgIdle, bgWait()); }
+// what a SHOWING app keeps awake besides what bgIdle already refuses: a recording or monitoring, the native helper starting, MIDI clock out,
+// Link, a first-PLAY warm-up, a kick or a device recovery in flight, the waves / chains screens, playheads still travelling. A throw: awake.
+function idleHold(){ try { return !!((typeof RCD !== 'undefined' && (RCD.on || RCD.sync || RCD.mon)) || IOH.state === 'starting' || midi.clk.some(Boolean) || lk.on
+  || warmTok || rkBusy() || DR.busy || view === 'waves' || view === 'chains' || sndPH.length); } catch(e){ return true; } }
+// the master's own analysers (no new node): is anything above -80 dB reaching the output? A tail (reverb, delay) that has not ended says no.
+function idleQuiet(){ try { const A = rt && rt.man; if (!A) return true; const b = idleQuiet.b || (idleQuiet.b = new Float32Array(4096));
+  for (const a of A){ const n = Math.min(b.length, a.fftSize); a.getFloatTimeDomainData(b); for (let i = 0; i < n; i++) if (b[i] > 1e-4 || b[i] < -1e-4) return false; } return true; } catch(e){ return true; } }
 function bgIdle(){
   bgSusT = 0;
-  if ((!document.hidden && !lpOn) || !ctx || ctx.state !== 'running') return;
+  const showing = !document.hidden && !lpOn;   // the on-screen sleep (IDLE SLEEP)
+  if ((showing && !IDLE_SLEEP) || !ctx) return;
+  if (ctx.state !== 'running'){ if (showing && !bgSus && ctx.state !== 'closed') bgSusT = setTimeout(bgIdle, bgWait()); return; }   // (being resumed just now: look again later)
   const midiIn = !!(midi.access && midi.access.inputs && midi.access.inputs.size);
   const busy = tp.on || rendering || midi.clkIn || midiIn || midiHeld.size || kb.held.size || synHeld.some(Boolean)
-    || (typeof RCD !== 'undefined' && (RCD.stream || RCD.io)) || padSrcs.some(s => s && s.size);   // (a sample can run for 5 minutes)
+    || (typeof RCD !== 'undefined' && (RCD.stream || RCD.io)) || padSrcs.some(s => s && s.size)   // (a sample can run for 5 minutes)
+    || (showing && idleHold());
   const left = Math.max(lastSnd, audioWake) + bgWait() - performance.now();
-  if (busy || left > 0){ bgSusT = setTimeout(bgIdle, busy ? bgWait() : left + 50); return; }
-  bgSus = true; ctx.suspend().catch(() => { bgSus = false; });
+  if (busy || left > 0){ idleQT = 0; bgSusT = setTimeout(bgIdle, busy ? bgWait() : left + 50); return; }
+  if (showing){   // two quiet readings 5 s apart: a tail that cannot be told to have ended keeps it awake
+    const now = performance.now();
+    if (!idleQuiet()){ idleQT = 0; bgSusT = setTimeout(bgIdle, 5000); return; }
+    if (!idleQT){ idleQT = now; bgSusT = setTimeout(bgIdle, 5000); return; }
+    try { pbLog('engine asleep after ' + Math.round((now - Math.max(lastSnd, audioWake)) / 1000) + ' s idle \u00b7 ' + pbState()); } catch(e){}
+  }
+  idleQT = 0; bgSus = true; ctx.suspend().catch(() => { bgSus = false; });
 }
 document.addEventListener('visibilitychange', () => {
   clearTimeout(bgSusT); bgSusT = 0;
   if (document.hidden){ if (ctx) bgSusT = setTimeout(bgIdle, 20000); return; }
   if (bgSus){ bgSus = false; if (ctx && ctx.state !== 'running' && ctx.state !== 'closed') ctx.resume().catch(() => {}); }   // (10 Nov: 'interrupted' too)
-  if (lpOn && ctx) bgSusT = setTimeout(bgIdle, bgWait());
+  if ((lpOn || IDLE_SLEEP) && ctx) bgSusT = setTimeout(bgIdle, bgWait());
 });
 /* DEVICE RECOVERY (10 Nov): the output goes away or changes (interface unplugged, the system switches its default, the computer
    sleeps and wakes) and nothing reopened it: silent until a reload. devRecover(why) is the one place that puts it right, from
@@ -23590,7 +23612,7 @@ function lpSkin(on){
   let w = lpPrev; if (!w) try { w = localStorage.getItem(LP_SKIN_K) || ''; } catch(e){} if (w) applySkin(w);
 }
 // (10 Nov: setLowPower resumes an 'interrupted' context too, like audio())
-function setLowPower(on){ if (!!on !== lpOn) lpSkin(!!on); lpOn = !!on; lpNext = 0; lpPend = false; clearTimeout(bgSusT); bgSusT = 0; if (lpOn && ctx) bgSusT = setTimeout(bgIdle, bgWait()); else if (!lpOn && bgSus && !document.hidden){ bgSus = false; if (ctx && ctx.state !== 'running' && ctx.state !== 'closed') ctx.resume().catch(() => {}); } try { localStorage.setItem('thunderplus-lowpower-v1', on ? '1' : '0'); } catch(e){} }
+function setLowPower(on){ if (!!on !== lpOn) lpSkin(!!on); lpOn = !!on; lpNext = 0; lpPend = false; clearTimeout(bgSusT); bgSusT = 0; if (!lpOn && bgSus && !document.hidden){ bgSus = false; if (ctx && ctx.state !== 'running' && ctx.state !== 'closed') ctx.resume().catch(() => {}); } if ((lpOn || IDLE_SLEEP) && ctx) bgSusT = setTimeout(bgIdle, bgWait()); try { localStorage.setItem('thunderplus-lowpower-v1', on ? '1' : '0'); } catch(e){} }
 function setPhOff(v){ phOff = clamp(Math.round((v | 0) / 5) * 5, -100, 300); try { localStorage.setItem('thunderplus-phoff-v1', String(phOff)); } catch(e){} }
 const curKey = () => [tv, cs.song.x, cs.song.y, cs.phrase.y, cs.sect.y, cPhrase, cSect, cTrack].join(',');
 // Pads mode: ALT + arrows move around the Song grid, in the phrase editor (phraseGrid) and on the Song screen (songGridDir).
@@ -31346,7 +31368,7 @@ function cpuMeter(){
   const now = performance.now(); if (now - cpu.t < 500) return; cpu.t = now;
   const b = $('tCpu'); if (!b) return;
   const fx = fxLoads().reduce((a, x) => a + x[1], 0), cap = cpu.cap && now - cpu.cap.t < 3000 ? cpu.cap : null, pr = cpu.probe && now - cpu.probe.t < 1500 ? cpu.probe : null;
-  const v = !ctx ? null : cap ? cap.avg : pr ? pr.load : fx;
+  const v = !ctx ? null : bgSus && ctx.state !== 'running' ? 0 : cap ? cap.avg : pr ? pr.load : fx;   // (asleep: idle, not the last reading)
   const txt = v == null ? '0%' : Math.round(v * 100) + '%', wid = v == null ? '0' : Math.min(100, v * 100).toFixed(0) + '%';
   const drop = now - glitch.t < 3000;   // a dropout in the last 3 s turns the meter red
   const warn = v != null && v > 0.5, hot = v != null && (v > 0.8 || (cap && cap.under > 0) || drop);
@@ -34081,6 +34103,8 @@ if (new URLSearchParams(location.search).has('pbshow')){ try {
 function coreTfx(){ const o = {}; for (const k in TFX) o[k] = {pump:!!TFX[k].pump, mod:!!TFX[k].mod, cv:TFX[k].cv || null, ps:(TFX[k].ps || []).map(q => ({k:q.k, min:q.min, max:q.max}))}; return o; }
 function coreVars(){ return {vtrk, NSLOT, TFX:coreTfx()}; }
 if (new URLSearchParams(location.search).has('seqtest')) window.__seqTest = {
+  idleSleep(m, d){ IDLE_SLEEP_S = m; IDLE_SLEEP_DESK_S = d; if (ctx && ctx.state === 'running'){ clearTimeout(bgSusT); bgSusT = setTimeout(bgIdle, bgWait()); } return {wait:bgWait(), hand:seqHandHere()}; },   // IDLE SLEEP test hook: shorter times
+  idleState(){ return {state:ctx ? ctx.state : null, bgSus, armed:!!bgSusT}; },
   async load(text, name){ FIRST_SONG = false; await loadProjText(text, name || 'test.thunder'); return {name:S.name, bpm:S.bpm, nt:NT}; },
   run(mode, maxRows, opt){
     opt = opt || {};
