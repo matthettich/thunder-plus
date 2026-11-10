@@ -3320,7 +3320,7 @@ function startEngine(maxVoices){
 }
 vSel.addEventListener('change', () => {
   const nv = +vSel.value; doc.voice.maxVoices = nv; store.dirty = true; store.save();
-  if (lazy && !bridge && !engGoing) return;   // (the engine has not started yet: it starts with this number)
+  if (lazy && !bridge) return;   // (the engine has not started yet: it starts with this number)
   toast('Restarting the sound with ' + nv + ' voice' + (nv === 1 ? '' : 's') + '…');
   const old = bridge; bridge = null; if (old) old.dispose();
   startEngine(nv).then(() => bridge && bridge.resume());
