@@ -24,6 +24,11 @@
      {op:'self', gen, why, t}  the WATCHDOG let go of the song at audio time t (why: 'deaf' or 'clock <ratio>')  ·
      {op:'error', where, message} */
 
+/* RESUME_SPREAD: a RESUME's silent replay up to the step the song stopped on (up to 4096 steps, 260-650 ms at song row 60+) is
+   no longer run inside the PLAY message. The page sends {op:'prep'} before its own replay; the core builds the sequencer then
+   and replays a millisecond's worth of steps in each block, so the work is done by the time PLAY arrives (what is left is run
+   there, as before). The result is the same steps in the same order, so the same sequencer. false: PLAY replays it all, as before. */
+const RESUME_SPREAD = true, CHASE_MS = 1;
 const CORE_V = 7;   // the message set's version: index.html's CORE_WANT must match (3: patch sync; 4: the mix outputs NT+1..NT+3; 5: FXV, BYP, tempo; 6: SoundFonts; 7: hold / held, the exact STOP)
 const coreNum = v => Math.round(v * 1e6) / 1e6;
 const corePlain = e => { const o = {}; for (const k of Object.keys(e).sort()){ const v = e[k];
@@ -224,7 +229,34 @@ class ThunderCore extends AudioWorkletProcessor {
     this.port.onmessage = e => { try { this.msg(e.data || {}); } catch(err){ this.port.postMessage({op:'error', where:(e.data && e.data.op) || '?', message:String(err && err.stack || err)}); } };
     this.port.postMessage({op:'ready', v:CORE_V});
   }
+  /* A prepared replay (prep) stays good only while nothing the sequencer reads has changed: any message but these drops it, and
+     PLAY then replays on its own. (vars, lxp and kit arrive with every PLAY: they drop it only when they carry a different value.) */
+  chaseKeep(d){
+    const o = d.op;
+    if (o === 'prep' || o === 'play' || o === 'lead' || o === 'ack' || o === 'stats' || o === 'sig' || o === 'dbg') return true;
+    if (o === 'vars') return !d.vars || (!('vtrk' in d.vars) || d.vars.vtrk === vtrk) && (!('NSLOT' in d.vars) || d.vars.NSLOT === NSLOT) && !d.vars.TFX;
+    if (o === 'lxp') return (d.st | 0) === lxp.st;
+    if (o === 'kit') return JSON.stringify(d.kv || []) === JSON.stringify(this.kv);
+    return false;
+  }
+  chaseKey(d){ return JSON.stringify([d.mode || 'song', d.o || {}, d.rs.ref, d.rs.row, d.rs.step]); }
+  // The silent run up to the RESUME step, in steps of the same loop PLAY always ran: ms = a time budget, null = to the end
+  chaseRun(c, ms){
+    const t0 = Date.now();
+    while (c.seq.alive() && c.g++ < 4096){
+      const r = c.seq.step(), p = r.pos && r.pos[c.rs.ref];
+      if (p && (p.row > c.rs.row || (p.row === c.rs.row && p.step >= c.rs.step))){ c.first = r; c.done = true; return; }
+      if (ms != null && Date.now() - t0 >= ms) return;
+    }
+    c.done = true;
+  }
+  prep(d){
+    this.chase = null;
+    if (!RESUME_SPREAD || !d.rs || !S || this.seq) return;   // (a song still playing here would have its performance state cleared by the new sequencer)
+    this.chase = {key:this.chaseKey(d), rs:d.rs, g:0, first:null, done:false, seq:makeSeq(S, d.mode || 'song', Object.assign({}, d.o || {}, {live:true}))};
+  }
   msg(d){
+    if (this.chase && !this.chaseKeep(d)) this.chase = null;
     switch (d.op){
       case 'load': S = d.S; if (d.vars){ if ('vtrk' in d.vars) vtrk = d.vars.vtrk; if ('NSLOT' in d.vars) NSLOT = d.vars.NSLOT; if (d.vars.TFX) TFX = d.vars.TFX; } busPlanH = null; busPlanVal = null; return;
       case 'song': { if (!S){ S = d.S; return; } for (const k of Object.keys(S)) if (!(k in d.S)) delete S[k]; Object.assign(S, d.S); busPlanH = null; busPlanVal = null; return; }   // in place: the running sequencer holds this object
@@ -246,6 +278,7 @@ class ThunderCore extends AudioWorkletProcessor {
           for (let n = 0; sq.alive() && n < (d.max || 20000); n++){ const r = sq.step(); out.push({t:coreNum(r.t), evs:r.evs.map(corePlain)}); }
           return out; });
         this.port.postMessage({op:'test', id:d.id, rows}); return; }
+      case 'prep': return this.prep(d);
       case 'play': return this.play(d);
       case 'hold': this.hold = true; return;   // EXACT STOP (6 Nov): stop at the next pattern edge, tell the page {op:'held', t, pos}
       case 'stop': { this.seq = null; const at = d.at == null ? currentTime : d.at; this.stopAll(at); this.clkOn = false; this.clk.cancel(at); this.clk.set(0, at);
@@ -291,13 +324,17 @@ class ThunderCore extends AudioWorkletProcessor {
   play(d){
     const ms0 = Date.now(), at0 = currentTime;   // PLAYBACK REPORT: how late this PLAY reached the audio thread, and how long it took
     this.stopAll(currentTime); this.mixReset(); this.clkOn = false; this.clk.cancel(currentTime); this.clk.set(0, currentTime);
-    const seq = makeSeq(S, d.mode || 'song', Object.assign({}, d.o || {}, {live:true}));
     // RESUME: run silently up to the step the song stopped on; the page played that step, the core carries on after it
-    if (d.rs){ let g = 0, first = null;
-      while (seq.alive() && g++ < 4096){ const r = seq.step(), p = r.pos && r.pos[d.rs.ref]; if (p && (p.row > d.rs.row || (p.row === d.rs.row && p.step >= d.rs.step))){ first = r; break; } }
+    // (prepared by 'prep', block by block, when the page sent it in time: what is left runs here)
+    let seq;
+    if (d.rs){
+      let c = this.chase; this.chase = null;
+      if (!(c && c.key === this.chaseKey(d))) c = {key:null, rs:d.rs, g:0, first:null, done:false, seq:makeSeq(S, d.mode || 'song', Object.assign({}, d.o || {}, {live:true}))};
+      if (!c.done) this.chaseRun(c, null);
+      seq = c.seq; const first = c.first;
       if (first){ const dt = d.t0 - first.t; seq.base += dt; seq.time += dt; if (seq.btT != null) seq.btT += dt; }
       else seq.time = d.t0; }
-    else seq.time = d.t0;
+    else { this.chase = null; seq = makeSeq(S, d.mode || 'song', Object.assign({}, d.o || {}, {live:true})); seq.time = d.t0; }
     this.seq = seq; this.ended = false; this.gen = d.gen | 0; this.hold = false; this.lr = null; this.ls = null;
     // WATCHDOG (phones; owner, 7 Nov, Fold, screen on: stutter, faster, slower, then it played on after STOP)
     this.watch = !!d.watch; this.ackT = currentTime; this.ckW = Date.now(); this.ckA = currentTime; this.ckBad = 0;
@@ -633,6 +670,7 @@ class ThunderCore extends AudioWorkletProcessor {
   }
   process1(inputs, outputs){
     this.watchdog();
+    if (this.chase && !this.chase.done) this.chaseRun(this.chase, CHASE_MS);   // a prepared RESUME replay, a millisecond a block
     // 1. step the song up to LEAD ahead: the core books its own notes, the rows go up for the page's part
     const s = this.seq;
     if (s){
