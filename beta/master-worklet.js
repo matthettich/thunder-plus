@@ -227,8 +227,8 @@ class Limiter {
   tpPeak(h){
     // Catmull-Rom between h[1] and h[2] at 1/4, 1/2, 3/4 (a 4x oversampled estimate of intersample peaks)
     let m = Math.max(Math.abs(h[1]), Math.abs(h[2]));
-    for (const t of [.25, .5, .75]){
-      const t2 = t * t, t3 = t2 * t;
+    for (let q = 1; q < 4; q++){   // (no array literal here: this runs twice a sample and an array a call fed the scavenger)
+      const t = q * .25, t2 = t * t, t3 = t2 * t;
       const v = 0.5 * ((2 * h[1]) + (-h[0] + h[2]) * t + (2 * h[0] - 5 * h[1] + 4 * h[2] - h[3]) * t2 + (-h[0] + 3 * h[1] - 3 * h[2] + h[3]) * t3);
       if (Math.abs(v) > m) m = Math.abs(v);
     }
@@ -304,9 +304,12 @@ class MasterProcessor extends AudioWorkletProcessor {
     this.port.onmessage = e => { const d = e.data || {}; if (d.set) this.apply(d.set); if (d.resetPeak) this.tpMax = 0; if (d.dispose) this.dead = true; };
   }
   apply(s){
-    if (s.sup){ this.on.sup = !!s.sup.on; this.sup.set(s.sup); }
-    if (s.comp){ this.on.comp = !!s.comp.on; this.comp.set(s.comp); }
-    if (s.lim){ this.on.lim = !!s.lim.on; this.lim.set(s.lim); }
+    // A NaN / Infinity setting (or a compressor ratio of 0 or less) would poison a stage's state for good, so such a value is
+    // ignored and the stage keeps its previous one. Finite settings go through unchanged.
+    const fin = o => { const r = {}; for (const k in o){ const v = o[k]; if (typeof v !== 'number' || (v - v) === 0) r[k] = v; } return r; };
+    if (s.sup){ this.on.sup = !!s.sup.on; const u = fin(s.sup); if (!(u.lo > 0)) delete u.lo; if (!(u.hi > 0)) delete u.hi; this.sup.set(u); }   // (lo / hi go through log2 in setFocus: zero or less is kept out too)
+    if (s.comp){ this.on.comp = !!s.comp.on; const c = fin(s.comp); if (!(c.ratio > 0)) delete c.ratio; this.comp.set(c); }
+    if (s.lim){ this.on.lim = !!s.lim.on; this.lim.set(fin(s.lim)); }
   }
   process(inputs, outputs){
     if (this.dead) return false;   // replaced by a new chain: let the browser collect this node
@@ -315,7 +318,9 @@ class MasterProcessor extends AudioWorkletProcessor {
     const a = inp && inp[0], b = inp && (inp[1] || inp[0]);
     const t0 = Date.now();
     if (a){ L.set(a); R.set(b); } else { L.fill(0); R.fill(0); }
-    let ip = 0; for (let i = 0; i < n; i++){ const v = Math.max(Math.abs(L[i]), Math.abs(R[i])); if (v > ip) ip = v; }
+    // One NaN or Infinity sample would poison the compressor's gain and the suppressor's spectrum for good (and a block of it
+    // would reach the output), so a sample outside (-64, 64) or not a number is replaced by silence, in this same loop.
+    let ip = 0; for (let i = 0; i < n; i++){ let x = L[i], y = R[i]; if (!(x > -64 && x < 64)) L[i] = x = 0; if (!(y > -64 && y < 64)) R[i] = y = 0; const v = Math.max(Math.abs(x), Math.abs(y)); if (v > ip) ip = v; }
     if (this.meters) this.inLu.process(L, R, n);
     if (this.on.sup) this.sup.process(L, R, n);
     if (this.on.comp){ this.comp.process(L, R, n); }
