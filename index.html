@@ -14053,7 +14053,7 @@ $('audOut').addEventListener('change', async e => {
     try { await ctx.setSinkId(id); toast('Playing through ' + (id ? name : 'the system default') + '.'); }
     catch(err){ toastErr('Couldn’t switch to that output' + (err && err.message ? ': ' + err.message : '.')); }
   } else if (sinkOk) toast('Saved. It plays through ' + (id ? name : 'the system default') + ' from the first sound.');
-  audStatus();
+  audStatus(); try { const w = wvApi(); if (w && w.sinkChanged) w.sinkChanged(); } catch(e){}
 });
 $('audNames').addEventListener('click', async () => {
   // Browsers only name output devices once the page has been allowed a microphone; it's closed again at once.
