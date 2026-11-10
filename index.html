@@ -20664,9 +20664,15 @@ function makePlayer(ac, out, getBuf, live){
     if (ev.type === 'tempo'){ tempoTo(ev); return; }
     if (ev.type === 'beat'){
       const o = clock.offset, at = Math.max(ev.t, ac.currentTime);
-      if (!clk.on){ clk.on = true; clk.base = Math.floor(ev.b / 16) * 16; o.setValueAtTime(ev.b - clk.base, at); return; }
-      const v = ev.b - clk.base; o.linearRampToValueAtTime(v, at);
+      if (!clk.on){ clk.on = true; clk.base = Math.floor(ev.b / 16) * 16; o.setValueAtTime(ev.b - clk.base, at); clk.lt = at; clk.lv = ev.b - clk.base; PB.rsGap = 0; return; }
+      const v = ev.b - clk.base;
+      // HOLD KEEPS THE TEMPO (11 Nov, HOLD_CLK_FLAT): rsHold moved this beat on by d, so the ramp from the last beat took d longer, the clock's slope
+      // fell, and the effects' modules (Simple delay, ...) read that as a slower tempo: their delay TIME glided (pitching). The clock now waits
+      // flat for the d, then ramps at the song's own slope. (clkSpb treats a flat clock as stalled and keeps the tempo it had.)
+      if (HOLD_CLK_FLAT && PB.rsGap > 0 && clk.lt != null){ const g = Math.min(PB.rsGap, at - clk.lt - 1e-4); PB.rsGap = 0; if (g > 1e-4) o.setValueAtTime(clk.lv, clk.lt + g); }
+      o.linearRampToValueAtTime(v, at);
       if (v >= 16){ clk.base += 16; o.setValueAtTime(v - 16, at); }
+      clk.lt = at; clk.lv = v >= 16 ? v - 16 : v;
       return;
     }
     // FXO / FLX / GAT / RTG: automation on the track's (or the master's) effect node.
@@ -21843,6 +21849,7 @@ function pump(){
    no outLat here (a first version with a drift threshold held every step of a 0.2 s clock and stopped the song).
    Phones and tablets only, the Page sequencer, and not while anything else owns the timing (rsScope). RESYNC: kill switch. */
 const RESYNC = true;
+const HOLD_CLK_FLAT = true;   // kill switch: a hold waits the effects' beat clock flat instead of slowing it (Simple delay time kept; see play() 'beat')
 // (Lead, 10 Nov: only with a worklet module loaded on the context (wkUsed): the owner's phone held 1:1 for 45 s with none, so a song
 // without them is never touched. RS_CREEP 0.09, not 0.04: with ticks up to 60 ms apart and step times off by 30 ms the lower edge is
 // misread by more than 0.04, and each false hold is a small pause in a healthy song (8 in 30 s simulated; 1 at 0.09).)
@@ -21866,7 +21873,7 @@ function rsTick(s){
 // Everything that holds a time on the audio clock for the song moves on by d, as the moved-on rule does for the sequencer. Not the
 // notes already booked (tp.q, the voices, MIDI sent): they were given to the engine.
 function rsHold(s, d){
-  s.base += d; s.time += d; if (s.btT != null) s.btT += d;
+  s.base += d; s.time += d; if (s.btT != null) s.btT += d; PB.rsGap = (PB.rsGap || 0) + d;   // (rsGap: the effects' beat clock waits flat for d, HOLD_CLK_FLAT)
   tp.t0 += d; if (tp.st) tp.st += d; stgT0 += d;   // LEFT timer, step flash, the stage's beat
   if (mx.beat) mx.beat = Object.assign({}, mx.beat, {t:mx.beat.t + d}); if (mx.t0 != null) mx.t0 += d;   // the beat clock: metronome, MIDI LFOs
   for (const L of mx.lfo) if (L){ if (L.t != null) L.t += d; L.trig = L.trig.map(x => x + d); }
@@ -22481,6 +22488,32 @@ function countIn(t0, bars, bpm){
 var bgOn = (() => { try { return localStorage.getItem('thunderplus-bgplay-v1') !== '0'; } catch(e){ return true; } })();
 var bgEl = null, bgHandlers = false;
 var bgAndroid = /Android/i.test(navigator.userAgent);   // var: tStop() may run before this line
+/* BG_RESTART (11 Nov): Android may pause the element when another app takes audio focus, and nothing started it again, so the page
+   lost its "media player" standing and could be frozen with the screen off. When the element pauses or ends while the song plays and
+   BACKGROUND PLAY is on, and it was not the app's own pause (bgSelfT) nor the user's (a Media Session pause / stop: bgUserT, which stops
+   the song), it is started again: at once, and if that is refused or it stops again within 2 s, once more after 1 s, then on the next
+   return to the app or touch. At most BG_RESTART_MAX starts per PLAY, each logged with its outcome. Kill switch: BG_RESTART. */
+const BG_RESTART = true, BG_RESTART_MAX = 3;
+var bgSelfT = 0, bgUserT = 0, bgRst = {run:false, n:0, last:0, wait:false, hooks:false};
+function bgOwnPause(){ bgSelfT = performance.now(); try { if (bgEl && !bgEl.paused) bgEl.pause(); } catch(e){} }
+function bgTry(why){
+  if (!bgEl || !bgOn || !tp.on || !bgEl.paused || bgRst.n >= BG_RESTART_MAX) return;
+  const n = ++bgRst.n; bgRst.last = performance.now(); bgRst.wait = false;
+  const fail = e => { pbLog('background play restart ' + n + ' (' + why + ') refused: ' + (e && e.name || e) + ' · ' + pbState()); if (!bgRst.again){ bgRst.again = true; setTimeout(() => { bgRst.again = false; if (bgEl && bgEl.paused) bgTry('1 s retry'); }, 1000); } bgRst.wait = true; };
+  try { const p = bgEl.play(); if (p && p.then) p.then(() => pbLog('background play restart ' + n + ' (' + why + ') ok'), fail); else pbLog('background play restart ' + n + ' (' + why + ') ok'); } catch(e){ fail(e); }
+}
+function bgSysPause(){   // the element's 'pause' / 'ended'
+  if (!BG_RESTART || !bgOn || !bgAndroid || !tp.on || !bgEl) return;
+  const now = performance.now(); if (now - bgSelfT < 1000 || now - bgUserT < 2000) return;   // the app's own, or a Media Session pause / stop
+  pbLog('background play paused by the system · ' + pbState());
+  if (bgRst.last && now - bgRst.last < 2000){ bgRst.wait = true; return; }   // stopped again within 2 s: next return to the app or touch
+  bgTry('at once');
+}
+function bgHooks(){
+  if (bgRst.hooks) return; bgRst.hooks = true;
+  const go = () => { if (BG_RESTART && bgRst.wait && bgEl && bgEl.paused && tp.on && bgOn) bgTry('back in the app'); };
+  try { document.addEventListener('visibilitychange', () => { if (!document.hidden) go(); }); document.addEventListener('pointerdown', go, {capture:true, passive:true}); } catch(e){}
+}
 function setBgOn(on){ bgOn = !!on; try { localStorage.setItem('thunderplus-bgplay-v1', bgOn ? '1' : '0'); } catch(e){} bgPlay(bgOn && tp.on); }
 function bgClip(){
   const sr = 8000, n = sr * 8, b = new ArrayBuffer(44 + n * 2), v = new DataView(b);
@@ -22495,7 +22528,7 @@ function bgPlay(on){
   if (on && !bgOn) on = false;
   if (ms) try {
     if (on && !bgHandlers){ bgHandlers = true;
-      const stop = () => { if (tp.on) tStop(); };
+      const stop = () => { bgUserT = performance.now(); if (tp.on) tStop(); };   // (bgUserT: a real request, not to be undone by BG_RESTART)
       ms.setActionHandler('play', () => { if (!tp.on) playCtx(); });
       ms.setActionHandler('pause', stop); ms.setActionHandler('stop', stop); }
     if (on) ms.metadata = new MediaMetadata({title:S.name || 'Song', artist:'Thunder Plus',
@@ -22504,9 +22537,10 @@ function bgPlay(on){
   } catch(e){}
   if (!bgAndroid) return;
   if (on){
-    if (!bgEl){ bgEl = new Audio(bgClip()); bgEl.loop = true; bgEl.preload = 'auto'; }
+    if (!bgEl){ bgEl = new Audio(bgClip()); bgEl.loop = true; bgEl.preload = 'auto'; bgEl.addEventListener('pause', bgSysPause); bgEl.addEventListener('ended', bgSysPause); bgHooks(); }
+    if (!bgRst.run){ bgRst.run = true; bgRst.n = 0; bgRst.last = 0; bgRst.wait = false; }   // a new PLAY: three restarts again
     try { const p = bgEl.play(); if (p && p.catch) p.catch(() => {}); } catch(e){}
-  } else if (bgEl && !bgEl.paused) bgEl.pause();
+  } else { bgRst.run = false; bgRst.wait = false; if (bgEl && !bgEl.paused) bgOwnPause(); }
 }
 /* ===== END BACKGROUND PLAY ===== */
 /* KEEP SCREEN ON (owner, 6 Nov, Fold: "when the screen is just turned off, nothing bad happens, but when it turns off on its
