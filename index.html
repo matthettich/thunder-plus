@@ -27551,7 +27551,7 @@ function stageCanvas(force){
   if (k === 'preview') return stagePreview();
   if (k === 'piano') return stagePiano(force);
   if (k === 'wave') return stageWave();
-  if (k === 'spec') return stageSpec();
+  if (k === 'spec') return stageSpec(force);
   if (k === 'chain') return stageChain();
 }
 // Sect: the phrase under the cursor as a little piano roll, time running down like the tracker.
@@ -27625,8 +27625,15 @@ function stageWave(){
     if (mx < mn) continue; g.fillRect(x, H / 2 - mx * H * .46, 1, Math.max(dpr, (mx - mn) * H * .46)); }
 }
 // Mixer: the master's spectrum, drawn like the bottom panel's scope.
-function stageSpec(){
-  const X = stgCtx(); if (!X) return; const {g, W, H, dpr} = X; $('tStagePhT').textContent = 'MASTER · 20 Hz – 20 kHz';
+function stageSpec(force){
+  // BATTERY: stopped (nothing live to show), the panel is a still picture: draw it once and skip until something it shows changes
+  // (live again, a forced layout, the skin or theme, the box size, zoom / dpr). Live, it redraws every tick as before.
+  const an0 = specAnalyser(), live0 = !!an0 && (tp.on || performance.now() - audioWake < 1500);
+  if (!live0){
+    const de = document.documentElement, st = $('tStage').style, sig = 'idle|' + !!an0 + '|' + de.getAttribute('data-skin') + '|' + de.className + '|' + document.body.className + '|' + st.width + '|' + st.height + '|' + (devicePixelRatio || 1) + '|' + innerWidth + 'x' + innerHeight;
+    if (!force && sig === stgSig) return; stgSig = sig;
+  } else stgSig = '';
+  const X = stgCtx(); if (!X) { stgSig = ''; return; } const {g, W, H, dpr} = X; { const t = 'MASTER · 20 Hz – 20 kHz', e = $('tStagePhT'); if (e.textContent !== t) e.textContent = t; }
   g.clearRect(0, 0, W, H); g.strokeStyle = X.dim; g.lineWidth = dpr; g.strokeRect(.5, .5, W - 1, H - 1);
   const xOf = f => Math.log(f / 20) / Math.log(1000) * W, TOP = -12, BOT = -96, yOf = db => (TOP - db) / (TOP - BOT) * H;
   [100, 1000, 10000].forEach(f => { const x = xOf(f); g.beginPath(); g.moveTo(x, 0); g.lineTo(x, H); g.stroke(); g.fillStyle = X.mid; g.font = `${10 * dpr}px ${X.font}`; g.fillText(f >= 1000 ? f / 1000 + 'k' : f, x + 3 * dpr, H - 5 * dpr); });
