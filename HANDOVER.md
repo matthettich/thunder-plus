@@ -593,7 +593,7 @@ Start a session by asking for results. Fix on `beta`. Web beta: https://matthett
 - [ ] **Phone, Arrange:** after a pad press it holds its page 4 s (FOLLOW on) or a minute (FOLLOW off).
 - [ ] **Phone, pad keys:** a slow press never acts twice.
 - [ ] **Folded:** Tracker | Synth shows both words; File rows are taller with no Ctrl shortcuts; "Help & keys" is the last File row (under a "Help" header: keep the header?); the top bar is about 6 px taller: OK?; FX opens on SLOT 1 the first time after a song loads, then wherever the cursor was left (TRACK included); Settings has a pinned Done; pop-up messages (toasts) appear just below the tab strip; Settings › Screen › POP-UP MESSAGES off hides them except the 41 marked as problems (couldn't save, storage full, render failed, audio interrupted…): any you miss, or any that still get in the way?; stars, Arrange zoom, PIN and Settings switches are easier to hit (not measured: say if any still miss).
-- [ ] **Decide: bigger cells on touch.** Owner said yes as a setting (10 Nov); not built. The Mixer can't: it must show all 20 rows without scrolling (`fitCheck`), cells are text about 6×14 px at 360 px wide, and MIXER SIZE is the existing control. Arrange / Song can, by forcing `arrSize()`'s zoom to at least 28×24 px on touch (cells measure 14.8×16 px today). Build the Arrange half alone as the setting? Owner declined wider header Play / CPU.
+- [ ] **Build 550, Settings › Screen › BIGGER CELLS ON TOUCH** (off by default): folded, Arrange cells go from about 15×16 to 28×26 px and the grid scrolls sideways (about 225 px for a full row of tracks); playhead, selection and bus bars line up; the zoom buttons work on top; Off brings your own zoom back. Unfolded the cells are already bigger, so nothing changes. Not the Mixer (MIXER SIZE in View) and not the classic text Song grid. Owner declined wider header Play / CPU.
 
 **Build 546 (phone): the song is held when the clock leaps**
 - [ ] **Your normal song with effects**, Page sequencer: PLAY, screen off 20–30 s, back, STOP, Copy playback report. By ear: does it keep its tempo now (gaps are expected, rushing is not)? The report's `page ticks …` lines end with `held N× (S s)`.
@@ -685,6 +685,10 @@ Suggested order: N0 → N1 → N2 (phone cured) → N4 with N3 alongside → N5 
   the edge `R.t0`, "waiting…" while armed), `rcdClk` / `rcdFmt` / `rcdFreeSecs`, a 250 ms timer only while recording; the
   final length stays until the next take. recorder-check covers FREE, PATTERN, Stop, next take and closing mid-take.
 
+
+## 10 Nov (midday): bigger cells on touch (build 550)
+
+Owner: "let's do bigger cells on touch" (Arrange / Song only, as a setting). `bigCellsOn` / `setBigCells` (`thunderplus-bigcells-v1`, Settings › Screen, default off). On touch (`!arrDeskZ()`) `arrSize()` raises the zoom to `28 / cwFit` (`arrBigFloor`) and the row height to at least 24; the zoom the user chose is kept in `arrBigPre` and comes back when the switch goes off (`arrZoomDone` saves that one). Headless: 360 px 14.8×16 → 28×26, 884 px and desktop unchanged, no page overflow, cursor box equals a cell's, Off restores exactly. Not checked: pinch gestures, the outline boxes numerically, the row in the Settings sheet by tapping. Sonnet agent, diff read by the lead.
 
 ## 10 Nov (later morning): the port work plan; recorder settings key (build 549)
 
