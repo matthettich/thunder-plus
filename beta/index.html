@@ -22283,6 +22283,7 @@ function pumpRun(){
   // 10 Nov, HOLD THE SONG (see PHONE RESYNC): before the moved-on rule on purpose, which then only sees what a stall left behind.
   if (RESYNC && s.alive() && s.base != null) rsTick(s); else PB.rsA = null;
   if (RUNKICK) rkTick();   // (also on a tick where rsTick returned early)
+  if (RUNKICK && rkBusy()) return;   // (10 Nov, the owner's Fold: the clock leapt 22-38 s at the moment of the kick's suspend. While the engine is paused nothing is booked and the moved-on rule below must not run: it moved the song on by the leap, and at the resume rsTick held it by the same leap again, so the next row lay that many seconds ahead: silence until STOP. rsTick alone takes the leap, once, when the engine runs again.)
   if (s.alive() && s.time < ctx.currentTime - (COARSE && !document.hidden ? Math.max(0.15, outLat + 0.05) : 0.5) && s.base != null){ const d = ctx.currentTime + 0.08 - s.time; if (PB.pg){ PB.pg.re++; PB.pg.skip += d; } s.base += d; s.time += d; if (s.btT != null) s.btT += d; }
   // Schedule 250 ms ahead, so a busy moment on the UI thread can't make notes late (it was 150 ms on a computer).
   // Tracker edits and mutes reach notes after that; pads, keys, previews and STOP are immediate. With the app in the
@@ -23822,7 +23823,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 556;
+const BUILD = 557;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD + (location.pathname.includes('/beta/') ? ' · beta' : '');
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -33252,6 +33253,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [557, '10 Nov', ['Phone: after the engine was paused to break a runaway clock (the RUNAWAY KICK experiment), the song went silent until STOP: it had been moved on twice. Fixed.']],
   [556, '10 Nov', ['MOD: every band of …pump EQ, BAND, WIDE and HEAT can be an LFO target (the band selected when you choose Add LFO…), and Add LFO… is in the …pump windows\' right-click menu.', 'MOD: the master out level is a target (after the limiter).', 'Rendered songs now use the same LFO resolution as live playback.']],
   [555, '10 Nov', ['The commands CUT, RES, ATK, DEC and REL now reach the live synths\' own filter and envelope while a note is held (bass, acid, machine, vox and the …pump live synths): CUT on the same scale as on sampled pads, FF = the pad\'s own knob.', 'MOD on live synths: an LFO on CUT, RES or DEC now sweeps a held note both ways around the knob, and four new targets, ENV (filter envelope), ATK, SUS and REL, appear on tracks that play a live synth.', 'Starting a song from a later row applies the CUT / RES / ATK / DEC / REL commands already in force to the live synths.']],
   [554, '10 Nov', ['MOD: …pump effect knobs can be LFO targets (Add LFO… on the knob; per-band EQ rows not yet).', 'Saving also waits for, and asks about, song-preset samples and impulse responses that are missing.', 'The playback report gives the average and peak level of each play, so two settings can be compared.']],
