@@ -22420,6 +22420,32 @@ function countIn(t0, bars, bpm){
 var bgOn = (() => { try { return localStorage.getItem('thunderplus-bgplay-v1') !== '0'; } catch(e){ return true; } })();
 var bgEl = null, bgHandlers = false;
 var bgAndroid = /Android/i.test(navigator.userAgent);   // var: tStop() may run before this line
+/* BG_RESTART (11 Nov): Android may pause the element when another app takes audio focus, and nothing started it again, so the page
+   lost its "media player" standing and could be frozen with the screen off. When the element pauses or ends while the song plays and
+   BACKGROUND PLAY is on, and it was not the app's own pause (bgSelfT) nor the user's (a Media Session pause / stop: bgUserT, which stops
+   the song), it is started again: at once, and if that is refused or it stops again within 2 s, once more after 1 s, then on the next
+   return to the app or touch. At most BG_RESTART_MAX starts per PLAY, each logged with its outcome. Kill switch: BG_RESTART. */
+const BG_RESTART = true, BG_RESTART_MAX = 3;
+var bgSelfT = 0, bgUserT = 0, bgRst = {run:false, n:0, last:0, wait:false, hooks:false};
+function bgOwnPause(){ bgSelfT = performance.now(); try { if (bgEl && !bgEl.paused) bgEl.pause(); } catch(e){} }
+function bgTry(why){
+  if (!bgEl || !bgOn || !tp.on || !bgEl.paused || bgRst.n >= BG_RESTART_MAX) return;
+  const n = ++bgRst.n; bgRst.last = performance.now(); bgRst.wait = false;
+  const fail = e => { pbLog('background play restart ' + n + ' (' + why + ') refused: ' + (e && e.name || e) + ' · ' + pbState()); if (!bgRst.again){ bgRst.again = true; setTimeout(() => { bgRst.again = false; if (bgEl && bgEl.paused) bgTry('1 s retry'); }, 1000); } bgRst.wait = true; };
+  try { const p = bgEl.play(); if (p && p.then) p.then(() => pbLog('background play restart ' + n + ' (' + why + ') ok'), fail); else pbLog('background play restart ' + n + ' (' + why + ') ok'); } catch(e){ fail(e); }
+}
+function bgSysPause(){   // the element's 'pause' / 'ended'
+  if (!BG_RESTART || !bgOn || !bgAndroid || !tp.on || !bgEl) return;
+  const now = performance.now(); if (now - bgSelfT < 1000 || now - bgUserT < 2000) return;   // the app's own, or a Media Session pause / stop
+  pbLog('background play paused by the system · ' + pbState());
+  if (bgRst.last && now - bgRst.last < 2000){ bgRst.wait = true; return; }   // stopped again within 2 s: next return to the app or touch
+  bgTry('at once');
+}
+function bgHooks(){
+  if (bgRst.hooks) return; bgRst.hooks = true;
+  const go = () => { if (BG_RESTART && bgRst.wait && bgEl && bgEl.paused && tp.on && bgOn) bgTry('back in the app'); };
+  try { document.addEventListener('visibilitychange', () => { if (!document.hidden) go(); }); document.addEventListener('pointerdown', go, {capture:true, passive:true}); } catch(e){}
+}
 function setBgOn(on){ bgOn = !!on; try { localStorage.setItem('thunderplus-bgplay-v1', bgOn ? '1' : '0'); } catch(e){} bgPlay(bgOn && tp.on); }
 function bgClip(){
   const sr = 8000, n = sr * 8, b = new ArrayBuffer(44 + n * 2), v = new DataView(b);
@@ -22434,7 +22460,7 @@ function bgPlay(on){
   if (on && !bgOn) on = false;
   if (ms) try {
     if (on && !bgHandlers){ bgHandlers = true;
-      const stop = () => { if (tp.on) tStop(); };
+      const stop = () => { bgUserT = performance.now(); if (tp.on) tStop(); };   // (bgUserT: a real request, not to be undone by BG_RESTART)
       ms.setActionHandler('play', () => { if (!tp.on) playCtx(); });
       ms.setActionHandler('pause', stop); ms.setActionHandler('stop', stop); }
     if (on) ms.metadata = new MediaMetadata({title:S.name || 'Song', artist:'Thunder Plus',
@@ -22443,9 +22469,10 @@ function bgPlay(on){
   } catch(e){}
   if (!bgAndroid) return;
   if (on){
-    if (!bgEl){ bgEl = new Audio(bgClip()); bgEl.loop = true; bgEl.preload = 'auto'; }
+    if (!bgEl){ bgEl = new Audio(bgClip()); bgEl.loop = true; bgEl.preload = 'auto'; bgEl.addEventListener('pause', bgSysPause); bgEl.addEventListener('ended', bgSysPause); bgHooks(); }
+    if (!bgRst.run){ bgRst.run = true; bgRst.n = 0; bgRst.last = 0; bgRst.wait = false; }   // a new PLAY: three restarts again
     try { const p = bgEl.play(); if (p && p.catch) p.catch(() => {}); } catch(e){}
-  } else if (bgEl && !bgEl.paused) bgEl.pause();
+  } else { bgRst.run = false; bgRst.wait = false; if (bgEl && !bgEl.paused) bgOwnPause(); }
 }
 /* ===== END BACKGROUND PLAY ===== */
 /* KEEP SCREEN ON (owner, 6 Nov, Fold: "when the screen is just turned off, nothing bad happens, but when it turns off on its
