@@ -21638,7 +21638,7 @@ function tStart(mode, o){
   // RESUME: run the sequencer silently up to the step it stopped on (keeping the effect commands it passes). That step has
   // then been worked out already: its events are moved to play now, and the sequencer's clock with them.
   let rsFirst = null, rsFx = null;
-  if (resume && (pz.step > 0 || rzH)){ rsFx = new Map(); let g = 0;
+  if (resume && (pz.step > 0 || rzH)){ rsFx = new Map(); let g = 0; corePrep(mode, o, {ref:pz.ref, row:pz.row, step:pz.step});
     while (seq.alive() && g++ < 4096){
       const r = seq.step(), p = r.pos && r.pos[pz.ref];
       if (p && (p.row > pz.row || (p.row === pz.row && p.step >= pz.step))){ rsFirst = r; break; }
@@ -21908,7 +21908,7 @@ function padBlink(e){
 // Phones and tablets (10 Nov): the audio-thread sequencer's module (a second thread) loads only when the owner picked it there
 // (aset.corePick, set in Settings); the saved default 'core' plays on the Page sequencer on such a device.
 function coreWanted(){ return aset.core === 'core' && (!wkLazy() || !!aset.corePick); }   // (a declaration: the Settings row reads it at load)
-const CORE_REV = '1uvz725';
+const CORE_REV = '198luua';
 const CORE_WANT = 7;   // the core's message set this page speaks (core-processor.js CORE_V); an older core is not used
 const CORE_URL = () => 'core/seq-core.js?v=' + BUILD + '-' + CORE_REV;
 const core = {node:null, ready:false, loading:null, gen:0, sent:new Map(), sT:0, tally:new Map(), mir:null};   // mir: what the core's song holds, as JSON per part (coreDiff)   // tally: events by who played them (test hook)
@@ -22019,13 +22019,22 @@ document.addEventListener('visibilitychange', coreLead);
 // After an edit: the song again (in place, so the running sequencer reads it), at most every 40 ms
 function coreSong(){ if (!tp.core || !core.mir || core.sT) return;   // only while the core plays (BATTERY): PLAY syncs the rest
   core.sT = setTimeout(() => { core.sT = 0; const ops = coreOps(coreDiff()); if (ops.length) corePost({op:'patch', ops}); }, 100); }
+const coreO = o => { const oo = {}; for (const k of ['row', 'loop', 'once', 'only', 'track', 'phrase', 'sect']) if (o && o[k] != null) oo[k] = o[k]; return oo; };
+/* RESUME_PREP: a RESUME's replay up to the step the song stopped on was run in the core's PLAY message (the audio thread, up
+   to 4096 steps in one go). The core is told first, before this page's own replay, and runs its copy a millisecond a block
+   meanwhile (core-processor.js RESUME_SPREAD); PLAY then finds it done, or finishes it as before. false: as before. */
+const RESUME_PREP = true;
+function corePrep(mode, o, rs){
+  if (!RESUME_PREP || !coreWanted() || !core.ready || core.bad || (o && o.page)) return;
+  try { coreSyncAll(); corePost({op:'prep', mode, o:coreO(o), rs}); } catch(e){ tpLog('core prep', e); }
+}
 function coreStart(mode, o, t0, rs){
   coreSyncAll();
   rt.pl.clkReset(ctx.currentTime);   // the core's clock takes over (a RESUME step played here may have started this one)
   if (perfLive.init) corePost({op:'perf', xf:perfLive.xf, mac:perfLive.mac, fill:perfLive.fill});
   // FIX (UI sweep, 4 Nov): track, phrase and sect too. Without them PLAY on a phrase or a sect (Shift+Space, F6, the Phrase
   // screen's PLAY) threw in the core (makeSeq: tr[undefined]), so nothing played on the audio thread, the default sequencer.
-  const oo = {}; for (const k of ['row', 'loop', 'once', 'only', 'track', 'phrase', 'sect']) if (o && o[k] != null) oo[k] = o[k];
+  const oo = coreO(o);
   // FIRST NOTES (stability pass): the page is busiest just after PLAY (the start-up, the first draws), so the core's first rows
   // reached it up to 250 ms after they were booked and live-engine notes went missing; the core books 0.6 s ahead for the
   // first 1.5 s, then the usual (coreLead)
