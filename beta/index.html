@@ -21644,19 +21644,66 @@ function pump(){
   try { pumpRun(); }
   catch(e){ console.error(e); try { tStop(); } catch(e2){} toast('Playback stopped: ' + ((e && e.message) || 'something went wrong') + '.', 5000); }
 }
+/* PHONE RESYNC (10 Nov; owner's Fold, Chrome with AudioWorklet modules loaded): Chrome renders more audio than the device plays, so
+   ctx.currentTime runs ahead of real time in bursts and for many seconds at 1.2× to 2.3× (61.7 s of clock in 40.4 s of wall during
+   a song; +4 s, +7 s, +32 s in a second) and the Page sequencer, booking against that clock, rushed the song with pieces missing.
+   We can't stop Chrome doing it; this keeps the SONG at real-time speed. Each tick: o = clock − wall. A clock that moves in whole
+   buffers (about 0.2 s here) but averages 1× makes o saw inside a band whose lower and upper edges stay put; racing lifts both.
+   The last 0.6 s of o is kept: lo = its lowest, hi = its highest (not counting this tick). base and top are the two edges, learned
+   0.4 s after PLAY. A tick whose o is more than RS_LEAP over top is a leap: the song is held by the excess at once, in this tick, so
+   nothing is booked for it. If lo has crept more than RS_CREEP over base (racing in steps too small for that), the song is held by
+   the creep. A clock behind real time (underruns) only moves base and top down. A hold moves the whole timeline on (rsHold), so
+   nothing is skipped; what is already booked can't be taken back. adj is the sum of the holds: each sample is stored as o − adj,
+   the clock as it would have been had the song been held all along (a creep also lowers the samples still in the window). The band is measured, not assumed, so
+   no outLat here (a first version with a drift threshold held every step of a 0.2 s clock and stopped the song).
+   Phones and tablets only, the Page sequencer, and not while anything else owns the timing (rsScope). RESYNC: kill switch. */
+const RESYNC = true;
+// (Lead, 10 Nov: only with a worklet module loaded on the context (wkUsed): the owner's phone held 1:1 for 45 s with none, so a song
+// without them is never touched. RS_CREEP 0.09, not 0.04: with ticks up to 60 ms apart and step times off by 30 ms the lower edge is
+// misread by more than 0.04, and each false hold is a small pause in a healthy song (8 in 30 s simulated; 1 at 0.09).)
+const RS_W = 0.6, RS_FULL = 0.4, RS_LEAP = 0.06, RS_CREEP = 0.09;   // window and learning time (s); how far over the upper edge is a leap, and over the lower edge a creep (s)
+const rsScope = () => seqHandHere() && wkUsed(ctx).size > 0 && !RCD.sync && !RCD.on && !rec.on && !lkLive() && !clkWanted() && !midi.clkIn && !mx.slave && tp.stopAt == null;   // (as seqHandover: take-ups and Link / MIDI clock keep their own timing)
+function rsTick(s){
+  if (!tp.on || tp.core || !ctx || !rsScope()){ PB.rsA = null; return; }
+  PB.rsN = (PB.rsN || 0) + 1;   // (test hook: how often this ran)
+  const w = performance.now() / 1000, o = ctx.currentTime - w; let A = PB.rsA;
+  if (!A || A.seq !== s || ctx.state !== 'running' || w - A.wl > 1) A = PB.rsA = {seq:s, wl:w, T:new Float64Array(128), O:new Float64Array(128), n:0, h:0, adj:0, ready:false, base:0, top:0};   // PLAY, not running, or the page itself was frozen (the moved-on rule's): learn again
+  A.wl = w;
+  const T = A.T, O = A.O; while (A.n && w - T[(A.h - A.n) & 127] > RS_W) A.n--;
+  let lo = Infinity, hi = -Infinity; for (let k = 1; k <= A.n; k++){ const v = O[(A.h - k) & 127]; if (v < lo) lo = v; if (v > hi) hi = v; }
+  const full = A.n > 0 && w - T[(A.h - A.n) & 127] >= RS_FULL;
+  if (!A.ready){ if (full){ A.ready = true; A.base = lo; A.top = hi; } }
+  else if (o - A.adj > A.top + RS_LEAP){ const d = o - A.adj - A.top; A.adj += d; rsHold(s, d); }   // a leap
+  else if (A.n && lo < A.base){ A.base = lo; if (full && hi < A.top) A.top = hi; }   // a clock behind: the band moves down
+  else if (full && lo > A.base + RS_CREEP){ const d = lo - A.base; A.adj += d; rsHold(s, d); for (let k = 1; k <= A.n; k++) O[(A.h - k) & 127] -= d; }   // racing in small steps: the window is as it would have been without the rise
+  T[A.h] = w; O[A.h] = o - A.adj; A.h = (A.h + 1) & 127; if (A.n < 127) A.n++; }
+// Everything that holds a time on the audio clock for the song moves on by d, as the moved-on rule does for the sequencer. Not the
+// notes already booked (tp.q, the voices, MIDI sent): they were given to the engine.
+function rsHold(s, d){
+  s.base += d; s.time += d; if (s.btT != null) s.btT += d;
+  tp.t0 += d; if (tp.st) tp.st += d; stgT0 += d;   // LEFT timer, step flash, the stage's beat
+  if (mx.beat) mx.beat = Object.assign({}, mx.beat, {t:mx.beat.t + d}); if (mx.t0 != null) mx.t0 += d;   // the beat clock: metronome, MIDI LFOs
+  for (const L of mx.lfo) if (L){ if (L.t != null) L.t += d; L.trig = L.trig.map(x => x + d); }
+  for (const P of mx.pend) if (P) for (const x of P){ x.t += d; if (isFinite(x.end)) x.end += d; }   // ARP returns
+  for (const r of mx.ccr){ r.t0 += d; r.t1 += d; r.at += d; } for (const x of mx.echo) x.t += d;
+  tp.rsUntil = performance.now() + 4000;   // a short look-ahead for a few seconds, even hidden
+  const P = PB.pg; if (P){ P.rs++; P.rsS += d; }
+  const nw = performance.now(); if (nw - (PB.rsLogT || 0) > 1000){ PB.rsLogT = nw; pbLog(`held the song: audio clock leapt +${d.toFixed(2)} s`); } }
 // One pump tick. An error here used to repeat every 25 ms with the screen showing PLAYING over silence; pump() stops.
 function pumpRun(){
   if (!tp.on) return;
   if (tp.stopAt != null && ctx.currentTime >= tp.stopAt - 0.005) return tStop();   // EXACT STOP: its time has come
   if (tp.core) return corePump();   // THUNDER CORE: the audio thread steps the song; this tick only books MIDI clock, LFOs, clicks
   audioWake = performance.now();
-  { const P = PB.pg || (PB.pg = {n:0, gap:0, lead:9, re:0, skip:0, w:0}), w = Date.now() / 1000; if (P.w){ P.gap = Math.max(P.gap, w - P.w); if (w - P.w > 0.4) pbLog(`stall ${(w - P.w).toFixed(2)} s · last touch or key ${((performance.now() - workT) / 1000).toFixed(1)} s ago · ${tv} ${apF || ''} · ` + pbState()); } P.w = w; P.n++; if (tp.seq.alive()) P.lead = Math.min(P.lead, tp.seq.time - ctx.currentTime); }
+  { const P = PB.pg || (PB.pg = {n:0, gap:0, lead:9, re:0, skip:0, rs:0, rsS:0, w:0}), w = Date.now() / 1000; if (P.w){ P.gap = Math.max(P.gap, w - P.w); if (w - P.w > 0.4) pbLog(`stall ${(w - P.w).toFixed(2)} s · last touch or key ${((performance.now() - workT) / 1000).toFixed(1)} s ago · ${tv} ${apF || ''} · ` + pbState()); } P.w = w; P.n++; if (tp.seq.alive()) P.lead = Math.min(P.lead, tp.seq.time - ctx.currentTime); }
   if ((view !== 'tracker' || document.hidden) && tp.q.length > 96) tp.q.splice(0, tp.q.length - 96);   // nothing drains the play positions while the synth is open (or the app is hidden: no frames)
   const s = tp.seq; let n = 0;
   // The page was stopped for a while (a frozen tab, a long pause, a system dialog): rather than playing every row
   // missed in that time at once, move the timeline on so the song continues from where it was.
   // On a touch screen it moves on sooner (8 Nov): a stall of 0.7 s played nine overdue notes at once, heard as the song rushing and clicking. Not while hidden: the system runs a hidden page in bursts, and each move would be a gap.
   const outLat = Math.min(0.6, (ctx.baseLatency || 0) + (ctx.outputLatency || 0));   // (9 Nov, owner: Safest stuttered most) the audio clock moves in steps of the output buffer: under Safest one step passed 0.15 s, so a healthy song kept being moved on, and a 0.25 s lead was thin
+  // 10 Nov, HOLD THE SONG (see PHONE RESYNC): before the moved-on rule on purpose, which then only sees what a stall left behind.
+  if (RESYNC && s.alive() && s.base != null) rsTick(s); else PB.rsA = null;
   if (s.alive() && s.time < ctx.currentTime - (COARSE && !document.hidden ? Math.max(0.15, outLat + 0.05) : 0.5) && s.base != null){ const d = ctx.currentTime + 0.08 - s.time; if (PB.pg){ PB.pg.re++; PB.pg.skip += d; } s.base += d; s.time += d; if (s.btT != null) s.btT += d; }
   // Schedule 250 ms ahead, so a busy moment on the UI thread can't make notes late (it was 150 ms on a computer).
   // Tracker edits and mutes reach notes after that; pads, keys, previews and STOP are immediate. With the app in the
@@ -21665,7 +21712,7 @@ function pumpRun(){
   // SCREEN OFF (owner, 6 Nov, Fold: "as the screen is turning off, the cpu spikes"): the jump from 0.25 to 1.2 s booked a
   // second of notes (and built their voices) in one tick, just as the phone lowers its clocks. It now grows over about a
   // second (0.75 s of lead per second); coming back, it drops at once as before.
-  const want = document.hidden ? 1.2 : Math.max(0.25, outLat + 0.1), nowP = performance.now(), dtP = tp.aheadT ? Math.min(2, (nowP - tp.aheadT) / 1000) : 0; tp.aheadT = nowP;
+  const want = document.hidden && !(tp.rsUntil > performance.now()) ? 1.2 : Math.max(0.25, outLat + 0.1), nowP = performance.now(), dtP = tp.aheadT ? Math.min(2, (nowP - tp.aheadT) / 1000) : 0; tp.aheadT = nowP;   // (10 Nov: for 4 s after the song was held, the short look-ahead even hidden: less booked ahead of a clock that is leaping)
   const ahead = tp.ahead = want <= (tp.ahead || 0.25) ? want : Math.min(want, (tp.ahead || 0.25) + 0.75 * dtP);
   while (tp.stopAt == null && s.alive() && s.time < ctx.currentTime + ahead && n++ < (document.hidden ? 256 : 64)){
     const r = s.step(); if (rcdGateEdge(r)) break; for (const e of r.evs){ if (moEv(e)) continue; playEv(e); } tp.q.push({t:r.t, pos:r.pos, bpm:s.bpm, tks:r.tks, line:r.line}); rcdStep(tp.q[tp.q.length - 1]);
@@ -21835,7 +21882,7 @@ const PB = {handT0:0, handW:0, ck:null, ckBad:0, stopT:0, log:[], n:0, late:0, d
 function pbLog(s){ try { PB.log.push((performance.now() / 1000).toFixed(2) + ' ' + s); if (PB.log.length > 400) PB.log.splice(0, 100); } catch(e){} }
 const pbState = () => `ctx ${ctx ? ctx.state + ' t=' + ctx.currentTime.toFixed(2) : '-'} on=${tp.on ? 1 : 0} core=${tp.core ? 1 : 0} seq=${aset.core} hidden=${document.hidden ? 1 : 0} wall=${(Date.now() / 1000 % 100000).toFixed(2)}`;
 // BACKGROUND TIMING (8 Nov): how the Page sequencer's tick fared since the screen last changed: the longest wait between ticks (wall clock), how close the song came to running out, and any jumps forward
-const pbPg = () => { const P = PB.pg; PB.pg = null; return P ? ` · page ticks ${P.n}, longest gap ${P.gap.toFixed(2)} s, least lead ${P.lead.toFixed(2)} s, moved on ${P.re}× (${P.skip.toFixed(2)} s)` : ''; };
+const pbPg = () => { const P = PB.pg; PB.pg = null; return P ? ` · page ticks ${P.n}, longest gap ${P.gap.toFixed(2)} s, least lead ${P.lead.toFixed(2)} s, moved on ${P.re}× (${P.skip.toFixed(2)} s), held ${P.rs || 0}× (${(P.rsS || 0).toFixed(2)} s)` : ''; };
 // (10 Nov: the 529 report showed the clock racing with the song stopped and the screen off, where this log had already gone quiet.
 // It now also runs while the app is hidden with the engine running, and for 10 s after it comes back.)
 function pbCkOn(){ if (!ctx) return false; const n = performance.now(); return tp.on || n - PB.stopT <= 5000 || (ctx.state === 'running' && (document.hidden || n - (PB.visT || -1e9) <= 10000)); }
@@ -22039,7 +22086,7 @@ function tStop(quiet){
   G('stop cursor', () => {
   stopP = !quiet && stopToPlayhead() && tp.on && tp.pos && tp.pos.some(Boolean) ? {P:tp.pos.map(q => q && Object.assign({}, q)), mode:tp.mode} : null;
   home = !quiet && tp.on && !stopToPlayhead() ? fpHome : null; });   // (9 Nov, owner: with ON STOP at STAYS it still ended up at the playback spot: FOLLOW had carried it there)
-  tp.timer = 0; tp.on = false; fpMem = null; fpHome = null; tp.q = []; tp.pos = null; tp.snd = null; tp.stopAt = null; tp.ahead = tp.aheadT = 0;
+  tp.timer = 0; tp.on = false; fpMem = null; fpHome = null; tp.q = []; tp.pos = null; tp.snd = null; tp.stopAt = null; tp.ahead = tp.aheadT = 0; tp.rsUntil = 0; PB.rsA = null;
   // HAND-OVER (seqHandover): the core and the voices already booked keep sounding until the page sequencer's first step
   if (tp.core){ tp.core = false; core.gen++; if (!handing) G('core', () => { coreWire(false); try { core.node.port.postMessage({op:'stop', at:ctx.currentTime}); } catch(e){} }); }
   else if (coreWanted() && !core.ready && ctx) setTimeout(() => { try { if (!tp.on) coreLoad(); } catch(e){} }, 400);
@@ -23142,7 +23189,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 545;
+const BUILD = 546;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD + (location.pathname.includes('/beta/') ? ' · beta' : '');
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -32535,6 +32582,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [546, '10 Nov', ['On phones and tablets, when a song uses effects or live engines and the phone’s audio clock leaps ahead, the song is now held at its real tempo, so it no longer rushes. Pieces of sound can still drop out while that happens. The playback report counts how often the song was held.']],
   [545, '10 Nov', ['On phones and tablets the audio engine now loads its extra audio-thread parts only when a song uses effects, chains, live engines or the audio-thread sequencer, which keeps the phone’s audio clock steady for songs that don’t. The playback report lists which parts are loaded. On a phone the Sequencer setting plays on the Page until you pick Audio thread yourself.', 'Stability: one bad note no longer stops the song, STOP always finishes cleanly, PLAY then a quick STOP no longer starts the song, audio resumes after an interruption, effect and tempo changes no longer land after STOP, MIDI notes are not cut when a phone hands the song over at screen-off, and the spectrum view survives Reset audio engine. MUT variations of pads with samples are much quicker to prepare. The audio-thread sequencer and the safety limiter make far less work for the audio thread, mastering recovers from a bad sample, and the Bass engine no longer breaks after a big upward pitch jump.']],
   [544, '10 Nov', ['(Testing) A Worklets setting in Settings › Audio (On, or Off for a phone clock test), the playback report now logs the audio clock while the app is hidden and any slow work while the song plays, and a MUT or GEN variation no longer rebuilds its sound for every note while it renders.']],
   [543, '9 Nov', ['MOD: each LFO now has a small scope that draws its real shape (depth sets the height) with a dot that moves along it in time with the song while it plays. Two or more LFOs on the same target also get a scope of their sum. Wide screens put the scopes under the rows; a folded phone puts a small one beside each row. They stand still with LOW POWER DISPLAY on, and cost nothing on other screens.']],
