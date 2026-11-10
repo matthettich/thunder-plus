@@ -6,6 +6,46 @@ less capable model (Opus), that calls on Fable for the heavy work. **Nothing her
 Facts this plan is cut from: [`ENGINE-INVENTORY.md`](ENGINE-INVENTORY.md) (what there is to port, units U01–U37),
 [`BRIDGE-TODAY.md`](BRIDGE-TODAY.md) (today's messages), [`CORE-BRIDGE.md`](CORE-BRIDGE.md) (the new contract).
 
+## 0. Start here (a session that has never seen this project)
+
+**What this is, in four lines.** Thunder Plus is the owner's music app: one big web page (`index.html`) that is a
+tracker, synths and effects, used on a Galaxy Z Fold 6 and on Mac / Windows (an Electron shell). On the phone, Chrome's
+audio clock misbehaves whenever an effect is loaded, and no patch can fix it. The port moves the sound engine into one
+C++ library that the same interface talks to from thin native apps. The interface is not rewritten.
+
+**Lines the owner can paste to start a session:**
+- Manager (Opus): "Pull thunder-plus. Read docs/port/WORKPLAN.md sections 0 to 3 and its status table, then act as the
+  manager for the next unfinished task. Follow the session loop in section 0."
+- Audio lead (Fable): "Pull thunder-plus, branch native, and clear the For Fable list in docs/port/WORKPLAN.md."
+- To begin the port at all: "start the native spike" (stage N0; nothing before that phrase).
+
+**Read, in this order, and no more than this before acting:** (1) this file, sections 0–3 and 7; (2) the stage you
+are on in section 4; (3) for a unit, its row in `ENGINE-INVENTORY.md` "Suggested port units" and the rows it names;
+(4) `CORE-BRIDGE.md` only if the task touches the bridge. `HANDOVER.md`'s To-do section has the owner's standing
+decisions about the app itself; the strategy document is background, not instructions.
+
+**The manager's session loop (one task or one unit per session, started fresh):**
+1. `git fetch origin && git checkout native && git merge origin/beta` (N0 task A1 creates `native`; before that, work
+   from `beta`). Run `npm test`: it must pass before anything else. If the merge conflicts, stop and report: nothing
+   on `native` should touch the app's files.
+2. Read the status table (section 7). Take the first task that is not done and whose prerequisites are done. Never
+   start a stage whose previous stage has not exited.
+3. If the task is marked **F** (Fable designs or builds): do not attempt it. Spawn a Fable agent with the brief, or add
+   it to section 9 and tell the owner. Stop there for that task; pick another only if it does not depend on it.
+4. Otherwise write the brief from the template (section 6; the N0 briefs are already written in section 10), spawn
+   one Sonnet worker in its own worktree, and wait. One worker per unit; at most two units at a time, and only when
+   they touch different folders.
+5. When the worker reports: run the gate command yourself. PASS: open the PR into `native`, comment
+   `@coderabbitai review`, and if the task is **F-review**, get the Fable review (as in step 3) before merging. FAIL:
+   send the worker back once with the gate's output; a second fail goes to section 9 with what differs.
+6. Merge only when the gate passes, CodeRabbit's real findings are fixed, and any F-review is done.
+7. Update the status table, add one dated line to `HANDOVER.md` on `beta` (what landed, what is next, what waits on
+   the owner), and stop. Do not roll into the next task in the same session.
+
+**When to stop and ask the owner (and nothing else needs asking):** a stage exit; a gate that Fable says is wrong;
+anything needing money, an account or a device (section 11); a choice listed as open in section 12; any wish to
+change a file outside `native/`.
+
 ## 1. The one rule that protects the owner's music
 
 **The web app on `beta` / `main` keeps working exactly as it does, the whole time.** The owner makes music with it.
@@ -172,8 +212,8 @@ you could not port and why.
 
 | Stage | State | Notes |
 |---|---|---|
-| N0 | not started: waiting for the owner's "start the native spike" | |
-| N1 | not started | U01 may start early on `beta` if the owner wants better engine tests now |
+| N0 | not started: waiting for the owner's "start the native spike" | A1 ☐ A2 ☐ A5 ☐ A3 ☐ A4 ☐ A7 ☐ A6 ☐ (tick each with its PR number) |
+| N1 | not started | Steps 1–11 of section 4; list each unit here with its PR as it lands. U01 may start early on `beta` if the owner wants better engine tests now |
 | N2 | not started | |
 | N3 | not started | |
 | N4 | not started | |
@@ -193,6 +233,136 @@ you could not port and why.
   6,150 of them in the …chains / …waves block whose 28 effects N1 also needs. Re-estimate after N1 step 3, from
   the real time the first five units took.
 
-## 9. For Fable (items waiting for the audio lead)
+## 10. Stage N0, written out (so the first sessions need no design work)
+
+Builds happen in GitHub Actions, not in the session's sandbox (no Android SDK there, and package installs may be
+blocked): a task is "built" when its CI job is green and its artefact is attached. Folder layout from A1:
+
+```
+native/
+  CMakeLists.txt            top-level; options THUNDER_BUILD_TESTS, THUNDER_WITH_LXR (off)
+  core/include/thunder/     public C API (core.h): create, destroy, process(float** out, int frames), post(msg), poll(evt)
+  core/src/                 the core; one folder per unit as they land (seq/, voice/, mix/, master/, fx/, engines/ …)
+  core/third_party/         pinned upstreams (miniaudio and libremidi are reused from io/vendor by path, not copied)
+  tests/                    C++ tests, RESULTS-N0.md, CENSUS.md, checklists
+  tools/                    parity.sh, rt-check.sh, render-compare.sh, census.mjs
+  android/                  Gradle project (app/, src/main/cpp/ JNI glue, assets/ filled by a copy step from the repo root)
+  desktop/  ios/            empty until N4 / N6
+```
+
+The core's public surface is a small **C** API (not C++ classes) so Kotlin / Swift / wasm bind to it the same way:
+`thunder_create(sample_rate, max_block)`, `thunder_process(core, out_l, out_r, frames)`, `thunder_post(core, bytes, len)`
+(a command, JSON as UTF-8 for N0), `thunder_poll(core, buf, cap)` (next event or 0), `thunder_put(core, id, meta,
+data, frames)`, `thunder_destroy(core)`. `thunder_process` is the only function called on the audio thread.
+
+**A1. Branch and skeleton** (Sonnet, about 30 tool calls). Create `native` from `beta`. Add the layout above with a
+`thunder_core` static library whose `thunder_process` writes silence, one test that calls it, and
+`.github/workflows/native.yml` running CMake configure, build and `ctest` on `ubuntu-latest` for pushes to `native`
+and PRs into it. Gate: the workflow is green. Do not touch any existing workflow.
+
+**A2. CI targets** (Sonnet, about 50). Extend `native.yml`: wasm with wasi-sdk (copy how `dsp/build.sh` gets and
+calls it; output `thunder_core.wasm` as an artefact, not committed), Windows x64 (MSVC), macOS universal (arm64 +
+x86_64), Android arm64-v8a (the runner's preinstalled NDK through CMake's Android toolchain file). Gate: four green
+jobs with artefacts. If a runner lacks a tool, install it in the job with a pinned version; never vendor a toolchain
+into the repo.
+
+**A5. Real-time harness and clock logger** (**Fable**; before A3 so A3 can use it). In `native/core/src/rt/`: a
+debug allocator hook (replace global `operator new` / `malloc` in the test binary; a thread-local "in audio callback"
+flag makes any allocation abort with a message), `native/tools/rt-check.sh` that runs a test rendering 60 s through
+`thunder_process` with the flag set, and a clock logger in the core: counts frames rendered, takes the host's
+monotonic time at each callback, and once a second emits `clock {f, wallNs, sr, under}` (CORE-BRIDGE section 4).
+Gate: `rt-check.sh` prints PASS on the test core and FAIL when a deliberate allocation is compiled in
+(`-DTHUNDER_RT_SELFTEST=1`).
+
+**A3. Android shell v0** (Sonnet, about 90; Fable reviews the audio callback and service). `native/android/`:
+- Kotlin, one activity, minSdk 29, target the current SDK; a `WebView` with JavaScript and DOM storage on, loading
+  `https://appassets.androidplatform.net/index.html` through `WebViewAssetLoader` (the repo's `index.html`, `chains/`,
+  `waves/`, `core/`, `dsp` wasm, `fonts/`, `icons/`, `sounds/`, `wavetables/`, `pump/`, `lxr/`, `*.js` copied into
+  assets by a Gradle task: copy, never move or edit). The service worker and "install" prompt are irrelevant here;
+  leave the page as it is.
+- Audio: miniaudio (the single header already in `io/vendor`) with the AAudio backend, device opened at the device's
+  native rate, float output; the data callback calls `thunder_process` and nothing else.
+- The N0 test core: holds one mono sample (a short click generated at start-up, no file), a 16-step pattern, a tempo
+  set by `{"t":"bpm","v":120}`, started and stopped by `{"t":"play"}` / `{"t":"stop"}`; it schedules hits on its own
+  frame counter. This proves "sequenced from native code"; it is thrown away in N1.
+- A foreground service (type `mediaPlayback`) with a notification started on play and stopped on stop, so playback
+  survives screen-off and backgrounding; `WAKE_LOCK` is not needed for audio, do not add it.
+- A debug overlay in the native layer (not in the page) showing the last ten `clock` lines and total underruns, with
+  a "Copy" button.
+- CI: a job that assembles the debug APK and attaches it to a GitHub pre-release tagged `native-n0-<run>`.
+Gate: the APK installs on a BrowserStack Android 14+ device, the page loads, and tapping the overlay's Play makes the
+click pattern audible (BrowserStack session video / audio capture noted in the report). The real gate is A6.
+
+**A4. Bridge transport proof** (Sonnet, about 60). In the same app: inject `window.thunderCore` (CORE-BRIDGE section
+2) from Kotlin. `send` / `on` over a `WebMessagePort` pair (`WebViewCompat.postWebMessage`), JSON strings in N0.
+A test page under `native/android/app/src/debug/assets/bridge-test.html` (not the app's page) that: sends 60
+messages a second for 5 minutes and counts echoes and their round-trip time; then `put`s a 53 MB Float32Array by
+(a) `WebMessageCompat` ArrayBuffer if `WebViewFeature.WEB_MESSAGE_ARRAY_BUFFER` is supported, (b) writing chunks to a
+file through a `WebViewAssetLoader` POST handler or `addWebMessageListener`, timing both. Gate:
+`native/tests/RESULTS-N0.md` holds a table (messages sent / received / lost, median and worst round trip, seconds per
+path for the buffer, device model, WebView version). Fable picks the path and updates CORE-BRIDGE section 6.
+
+**A7. Usage census** (Sonnet, about 40; needs the owner's songs, section 11). `native/tools/census.mjs`: Node, no
+dependencies; reads every `.thunder` under a folder given on the command line and counts per song and in total:
+engines and layer oscillator types used by pads (`kit.voices[]`), track and master effect types (`S.tfx`, `S.mfx`),
+pump types, whether …chains / …waves patches are present and their module types, tracker commands (`FXC` codes) in
+the phrases, SoundFont use, sample count and total sample seconds. Field names are in ENGINE-INVENTORY section 8;
+where a field is uncertain, print the raw key so nothing is silently skipped. Gate: `native/tests/CENSUS.md` with the
+totals table sorted by use; a unit test on `sounds/ELECTRO.thunder`. The songs themselves are not committed.
+
+**A6. The owner's test** (owner, about 20 minutes). Install the APK from the pre-release link (Android asks once to
+allow installs from the browser). In the app: Play on the overlay. Five minutes with the screen on, five with it off,
+five with another app in front. Copy the overlay's log and paste it to the manager. Pass: every `clock` line reads
+frames / sample-rate within ±0.1 % of the wall time elapsed, and underruns stay at 0 after the first second. Also
+note by ear: no rushing, no gaps. The manager records the numbers in `RESULTS-N0.md` and asks for go / stop.
+
+Order: A1 → A2 → A5 → A3 → A4, with A7 any time after A1. A6 last.
+
+## 11. What the port needs from the owner, and when
+
+| When | Needed | Why |
+|---|---|---|
+| Before A7 | A folder of the owner's own `.thunder` songs, attached to a chat or put in a private location the session can read | The census orders the work by what the owner actually uses; N1 and N2 exits name "the owner's songs" |
+| A6 | 20 minutes with the Fold; installing an APK from a GitHub link | The go / no-go measurement |
+| Before U03 | How to bring in `matthettich/pump` (submodule suggested) and the session given access to that repo | pump's C++ is compiled in, not ported |
+| N1 exit | Listen to three songs with Settings › Audio › Engine: Native core (test) on, desktop web copy | Sound parity by ear, after the numbers pass |
+| N2 | The Fold with a USB MIDI interface for H2; a battery comparison (same song, web app vs native, an hour each) | Things no emulator shows |
+| N4 start | Apple Developer Program membership ($99 a year) | Signed, self-updating Mac app; required for iOS |
+| N4 | A Mac and the Windows PC with the audio interface, for the checklist | Driver and device behaviour |
+| Optional | Google Play account ($25 once) only if the app should be in the store | Not needed for APKs from GitHub |
+
+## 12. Decisions: settled, and open with the default a session uses until the owner says otherwise
+
+| Decision | State | Value / default |
+|---|---|---|
+| The web app stays fully working during the port | **Settled** (owner, 10 Nov) | `native` branch, `native/` folders only |
+| A plan a less capable manager can run, Fable for heavy work | **Settled** (owner, 10 Nov) | Sections 0 and 2 |
+| pump: compile its C++ in, do not port, do not load the VST files | **Settled** (10 Nov) | U03, U18 |
+| Linux native build | **Settled** (owner, Nov: low priority) | CI builds the core on Linux for tests only; no Linux shell |
+| ASIO on Windows | **Settled** (owner, Nov) | Not unless free to use; WASAPI shared and exclusive |
+| Licensing | **Settled** | Permissive only in the core; anything with limits removable (LXR optional) |
+| Go ahead at all | Open | Nothing starts before "start the native spike"; after N0, a second explicit go |
+| Android before desktop | Open | Default: Android first (N2 before N4); swapping costs nothing, both wait on N1 |
+| Framework | Open | Default: miniaudio + libremidi + system web views (option A); JUCE only if A's glue fails in N0 |
+| Keep the web copy afterwards | Open | Default: yes, as demo, development copy and fallback |
+| iOS | Open | Default: not before Android and Mac are settled |
+| MOD's remaining engine-side steps | Open | Default: no new engine features on `beta` once N1 step 3 starts; build them in N3 |
+| How `matthettich/pump` comes in | Open | Default: git submodule pinned to a commit |
+| Distribution on Android | Open | Default: signed APK on GitHub Releases, no Play Store |
+
+## 13. What can go wrong, and what the manager does
+
+| Sign | Do |
+|---|---|
+| A worker's output passes its own tests but the gate fails | The gate wins. Send back once; then section 9 |
+| A parity gate fails by a tiny, constant amount (denormals, `float` vs `double`, a different `sin`) | Section 9: Fable decides whether the tolerance or the port is wrong. Never loosen a tolerance yourself |
+| `git merge origin/beta` conflicts on `native` | Something edited the app's files on `native`: stop, report, do not resolve by hand |
+| `npm test` fails on `native` after the merge | The failure came from `beta` or from a rule-breaking change: stop and report |
+| A unit turns out much bigger than "one session" | Split it in the status table into a, b, c with a gate each; do not let one worker run long |
+| The JS behaves in a way that looks wrong | Port it as it is, list it under "Bugs still open" in `HANDOVER.md` on `beta`, carry on |
+| N0's clock test fails on the Fold | Stop the port. Record the numbers. The decision returns to the owner and Fable |
+| CI minutes or a missing runner tool block a build | Report; do not move builds into the session's sandbox |
+
+## 9. For Fable (items waiting for the audio lead; kept last in the file so it is easy to find)
 
 - (none yet)
