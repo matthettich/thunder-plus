@@ -21964,7 +21964,7 @@ function tStop(quiet){
   else if (aset.core === 'core' && !core.ready && ctx) setTimeout(() => { try { if (!tp.on) coreLoad(); } catch(e){} }, 400);
   if (rt && !handing) rt.pl.stopAll(ctx.currentTime);
   fxcTL.m.clear(); fxcTL.beats.length = 0;   // FX BAR: STOP puts the switches back (resetSeq)
-  moStop();
+  if (!handing || mx.clk.on) moStop();   // 10 Nov: a hand-over keeps the MIDI notes sounding (moStop's All Notes Off cut them; moStart resets what the restart needs; with clock out on, the old Stop + Start)
   try { metStop(); recEndTake(); clearTimeout(rec.cntT); rec.cnt = 0; recBtn(); } catch(e){}   // REC: clicks booked ahead stop, the take is one undo step
   songBtn();
   chainsTempo();

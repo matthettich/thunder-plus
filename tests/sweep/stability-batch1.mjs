@@ -48,4 +48,27 @@ if (want('F3')){   // a context that reports 'interrupted' is resumed, and PLAY 
   add('F3 PLAY with the state stuck: still on at 1 s, stopped by 3.5 s with the toast', r.onAt1 && !r.onAt35 && r.msgs.some(m => /interrupted/i.test(m)), JSON.stringify(r));
   await A.close();
 }
+// a Pixel 7 as the app sees one (the hand-over is for phones)
+const PIXEL = { userAgent: 'Mozilla/5.0 (Linux; Android 14; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Mobile Safari/537.36', isMobile: true, hasTouch: true, viewport: { width: 412, height: 915 } };
+// a MIDI output that records what is sent; every instrument plays out of it
+const MIDIRIG = `const log = []; midi.access = {outputs:new Map([['o1', {send:b => log.push(Array.from(b)), native:false}]]), inputs:new Map()}; midi.outIds[0] = 'o1';
+  S.insts.forEach(I => { if (I){ I.mo = 1; I.mch = 0; I.mpt = 0; } }); window.__midiLog = log;`;
+const nOff = `window.__midiLog.filter(m => (m[0] & 0xF0) === 0xB0 && m[1] === 123).length`;
+if (want('F4')){   // the hand-over to the page sequencer must not cut the MIDI notes that are sounding
+  let A, r;
+  for (let attempt = 0; attempt < 4; attempt++){   // (a loaded machine can make the core's own watchdog let go of the song: try again)
+    A = await fresh({ page: PIXEL });
+    r = await A.run(MIDIRIG + `aset.core = 'core'; rtInit(); coreLoad(); for (let i = 0; i < 60 && !core.ready; i++) await new Promise(r => setTimeout(r, 100));
+    tStart('song', {row:0}); for (let i = 0; i < 50 && !tp.core; i++) await new Promise(r => setTimeout(r, 100)); await new Promise(r => setTimeout(r, 1500)); const core0 = !!tp.core, bad = core.bad, on0 = tp.on, held0 = mx.held.reduce((a, H) => a + (H ? H.length : 0), 0), notes = log.filter(m => (m[0] & 0xF0) === 0x90).length;
+    log.length = 0; let rel = 0, stp = 0; const oR = moRelease, oS = moStop; moRelease = function(){ rel++; return oR.apply(this, arguments); }; moStop = function(){ stp++; return oS.apply(this, arguments); };
+    Object.defineProperty(document, 'hidden', {configurable:true, get: () => true}); document.dispatchEvent(new Event('visibilitychange'));
+    const handed = !tp.core && tp.on, anoOff = ${nOff}, relCalls = rel, stopCalls = stp, pending = log.length; await new Promise(r => setTimeout(r, 800)); const stillOn = tp.on;
+    log.length = 0; Object.defineProperty(document, 'hidden', {configurable:true, get: () => false}); moRelease = oR; moStop = oS; tStop();
+    const stopOff = ${nOff}; return {core0, bad, on0, held0, notes, handed, anoOff, relCalls, stopCalls, pending, stillOn, stopOff};`);
+    if (r.core0 && !r.bad && r.handed && r.held0 > 0){ break; } await A.close();
+  }
+  add('F4 hand-over: moStop / moRelease are not run, no All Notes Off goes out', r.core0 && r.handed && r.held0 > 0 && r.anoOff === 0 && r.relCalls === 0 && r.stopCalls === 0 && r.stillOn, JSON.stringify(r));
+  add('F4 a normal STOP still sends All Notes Off', r.stopOff > 0, JSON.stringify(r));
+  await A.close();
+}
 process.exit(table(rows) ? 1 : 0);
