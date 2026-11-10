@@ -4969,6 +4969,23 @@ const OP = { patch:'patch', add:'add', remove:'remove', connect:'connect', disco
    Only inside an AudioWorklet. Loaded as a plain <script> on a page, the engine
    above is all there is: ChainsEngine, wasmInit, MODULES. */
 if (typeof AudioWorkletProcessor !== 'undefined'){
+/* ANY BLOCK LENGTH (10 Nov): Chrome is adding a render size hint, so a block need not be 128 frames. tcChunks runs one (a function of the code
+   written for at most B frames) over a longer block in chunks of at most B, on views of the same buffers (no copy). Thunder
+   Core's parameter overrides are made once for the whole block, then off for the chunks, and its post gain / pan runs once at
+   the end. A block longer than 4096 fails soft: silence, and one {failed:'block size N'} to the page. (A block of 128 or less
+   never comes here: it takes the old path unchanged.) */
+function tcChunks(self, ins, outs, P, B, one){
+  const N = outs[0][0].length;
+  if (N > 4096){ for (const g of outs) for (const c of g) c.fill(0); if (!self.__bsFail){ self.__bsFail = 1; self.port.postMessage({failed:'block size ' + N}); } return true; }
+  if (self.__ov && globalThis.__tcOv) P = globalThis.__tcOv(self, P, N);
+  const ov = self.__ov; self.__ov = null; let ok = true;   // (read after: __tcOv lets go of an expired override)
+  try { for (let a = 0; a < N && ok; a += B){ const e = Math.min(a + B, N), v = c => c.subarray(a, e), Q = {};
+      for (const k in P){ const A = P[k]; Q[k] = A.length > 1 ? v(A) : A; }
+      ok = one.call(self, ins.map(g => g.map(v)), outs.map(g => g.map(v)), Q) !== false; } }
+  finally { self.__ov = ov; }
+  if (ok && ov && globalThis.__tcPost) globalThis.__tcPost(self, outs[0]);
+  return ok;
+}
 class ChainsProcessor extends AudioWorkletProcessor {
   constructor(options){
     super();
@@ -4991,10 +5008,11 @@ class ChainsProcessor extends AudioWorkletProcessor {
     catch (err){ this.port.postMessage({ target:TARGET, op:OP.error, value:{ op:m.op, message:String(err?.message || err) } }); }
   }
   /* Standalone, every chain bus plays through the speakers; in Thunder each bus is its own track return. */
-  process(_ins, outs){
+  process(_ins, outs){ return outs[0][0].length <= BLOCK ? this.p1(_ins, outs) : tcChunks(this, _ins, outs, undefined, BLOCK, this.p1); }   // (any block length: p1 is for at most BLOCK frames)
+  p1(_ins, outs){
     const e = this.engine;
     { const sc = _ins && _ins[1]; e.setSidechain(sc && sc[0], sc && (sc[1] || sc[0]), BLOCK); }
-    try { e.process(BLOCK); }
+    try { e.process(outs[0][0].length); }
     catch (err){ e.busesL.fill(0); e.busesR.fill(0); if ((this._blocks & 255) === 0) this.port.postMessage({ target:TARGET, op:OP.error, value:{ op:'process', message:String(err?.message || err) } }); }
     // SENDS: standalone, a Sidechain In hears the sends of the block before (as in ...Thunder Plus, one block late).
     if (!e._sendPrev){ e._sendPrev = new Float32Array(NSEND * BLOCK); e.sendIn = Array.from({length:NSEND}, (_, n) => e._sendPrev.subarray(n * BLOCK, (n + 1) * BLOCK)); }
@@ -5003,9 +5021,9 @@ class ChainsProcessor extends AudioWorkletProcessor {
     L.fill(0); if (R !== L) R.fill(0);
     for (const k of e._bwl){
       const o = k * BLOCK;
-      for (let i = 0; i < BLOCK; i++){ L[i] += e.busesL[o + i]; if (R !== L) R[i] += e.busesR[o + i]; }
+      for (let i = 0; i < L.length; i++){ L[i] += e.busesL[o + i]; if (R !== L) R[i] += e.busesR[o + i]; }
     }
-    for (let i = 0; i < BLOCK; i++){ L[i] = soft(L[i]); if (R !== L) R[i] = soft(R[i]); }
+    for (let i = 0; i < L.length; i++){ L[i] = soft(L[i]); if (R !== L) R[i] = soft(R[i]); }
     if (e.telemetryOn && (++this._blocks % 12) === 0) this.port.postMessage({ target:TARGET, op:OP.meter, value:e.telemetry() });
     else if (!e.telemetryOn) this._blocks++;
     return true;
@@ -5072,7 +5090,8 @@ class ThunderChains extends AudioWorkletProcessor {
     }
     catch (err){ this.port.postMessage({ target:'chains-host', op:OP.error, value:{ op:m.op, message:String(err?.message || err) } }); }
   }
-  process(ins, outs, params){
+  process(ins, outs, params){ return outs[0][0].length <= BLOCK ? this.p1(ins, outs, params) : tcChunks(this, ins, outs, params, BLOCK, this.p1); }   // (any block length: p1 is for at most BLOCK frames)
+  p1(ins, outs, params){
     if (this._dead) return false;
     const e = this.engine, i = ins[0], o = outs[0], n = o[0].length;
     if (this.__q && this.__q.length){ const q = this.__q, due = currentTime + 64 / sampleRate; while (q.length && q[0][0] <= due) this._recv(q.shift()[1]); }   // THUNDER CORE: tempo at its time
@@ -5095,7 +5114,7 @@ class ThunderChains extends AudioWorkletProcessor {
     { const tk = ins[2]; e.taps = tk && tk.length ? tk : null; }   // SOURCE: the tracks' own sounds (Sidechain In set to a track)
     // SENDS: input 3 carries every chain's Sidechain Out sends (one channel per send), a block late.
     { const sd = ins[3]; for (let k = 0; k < NSEND; k++) this._sendCh[k] = sd && sd[k] ? sd[k] : null; e.sendIn = this._sendCh; }
-    try { e.process(BLOCK); }
+    try { e.process(n); }
     catch (err){ e.busesL.fill(0); e.busesR.fill(0); if ((this._blocks & 255) === 0) this.port.postMessage({ target:'chains-host', op:OP.error, value:{ op:'process', message:String(err?.message || err) } }); }
     // Return this track's bus (the sum of its Chain Out modules) downstream.
     const bL = e.busesL.subarray(this.track * BLOCK, this.track * BLOCK + n);

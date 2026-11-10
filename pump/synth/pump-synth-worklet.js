@@ -37,6 +37,23 @@ function psynX(){   // __psynMod: the page's compiled module (WASM_PRECOMPILE); 
   try { const x = new WebAssembly.Instance(g.__psynMod || new WebAssembly.Module(g.__psynBytes), WASI).exports; if (x._initialize) x._initialize(); g.__psynX = x; return x; }
   catch (e){ g.__psynFailed = true; return null; }
 }
+/* ANY BLOCK LENGTH (10 Nov): Chrome is adding a render size hint, so a block need not be 128 frames. tcChunks runs one (a function of the code
+   written for at most B frames) over a longer block in chunks of at most B, on views of the same buffers (no copy). Thunder
+   Core's parameter overrides are made once for the whole block, then off for the chunks, and its post gain / pan runs once at
+   the end. A block longer than 4096 fails soft: silence, and one {failed:'block size N'} to the page. (A block of 128 or less
+   never comes here: it takes the old path unchanged.) */
+function tcChunks(self, ins, outs, P, B, one){
+  const N = outs[0][0].length;
+  if (N > 4096){ for (const g of outs) for (const c of g) c.fill(0); if (!self.__bsFail){ self.__bsFail = 1; self.port.postMessage({failed:'block size ' + N}); } return true; }
+  if (self.__ov && globalThis.__tcOv) P = globalThis.__tcOv(self, P, N);
+  const ov = self.__ov; self.__ov = null; let ok = true;   // (read after: __tcOv lets go of an expired override)
+  try { for (let a = 0; a < N && ok; a += B){ const e = Math.min(a + B, N), v = c => c.subarray(a, e), Q = {};
+      for (const k in P){ const A = P[k]; Q[k] = A.length > 1 ? v(A) : A; }
+      ok = one.call(self, ins.map(g => g.map(v)), outs.map(g => g.map(v)), Q) !== false; } }
+  finally { self.__ov = ov; }
+  if (ok && ov && globalThis.__tcPost) globalThis.__tcPost(self, outs[0]);
+  return ok;
+}
 class PsynProc extends AudioWorkletProcessor {
   static get parameterDescriptors(){
     const d = [];
@@ -103,7 +120,8 @@ class PsynProc extends AudioWorkletProcessor {
   semis(r){ return (+this.p.tune || 0) + 12 * Math.log2(r > 1e-6 ? r : 1e-6); }
   bendOf(r, note){ const b = this.nb + this.semis(r) - note, k = Math.max(-1, Math.min(1, b / this.range)); return Math.max(0, Math.min(16383, Math.round(8192 + k * 8191))); }
   bend(X, i, r, note){ const v = this.bendOf(r, note); if (v !== this.sent){ X.psyn_midi(this.h, i, 0xE0, v & 127, v >> 7); this.sent = v; } }
-  process(ins, outs, P){
+  process(ins, outs, P){ return outs[0][0].length <= 128 ? this.p1(ins, outs, P) : tcChunks(this, ins, outs, P, 128, this.p1); }   // (any block length: p1 is for at most 128 frames)
+  p1(ins, outs, P){
     if (this.__ov && globalThis.__tcOv) P = globalThis.__tcOv(this, P, outs[0][0].length);   // THUNDER CORE drives this node (core-processor.js)
     const X = psynX(), o = outs[0], L = o[0], R = o[1] || o[0], n = L.length;
     if (this.dead){ if (X && this.h >= 0) X.psyn_free(this.h); this.h = -1; return false; }
