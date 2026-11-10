@@ -8806,9 +8806,11 @@ function toast(msg, ms, sev){ const t = $('toast'); let top = 2000;
   toastShow(msg, dur, long); }
 // PHONE (body.mob): just below the screen-tab strip (#tTabs, else the top bar), measured each time, so it never covers either (owner, 10 Nov)
 function toastPlace(t){
-  if (!document.body.classList.contains('mob')){ t.style.top = t.style.bottom = ''; return; }
-  let b = 0; for (const el of [document.querySelector('.top'), $('tTabs')]){ if (el && el.offsetHeight) b = Math.max(b, el.getBoundingClientRect().bottom); }
-  t.style.bottom = 'auto'; t.style.top = Math.round(b + 3) + 'px';
+  try {
+    if (!document.body.classList.contains('mob')){ t.style.top = t.style.bottom = ''; return; }
+    let b = 0; for (const el of [document.querySelector('.top'), $('tTabs')]){ if (el && el.offsetHeight) b = Math.max(b, el.getBoundingClientRect().bottom); }
+    t.style.bottom = 'auto'; t.style.top = Math.round(b + 3) + 'px';
+  } catch(e){}
 }
 function toastShow(msg, dur, long){
   const t = $('toast'); t.textContent = msg; t.hidden = false; toastPlace(t); clearTimeout(tt); toastLong = long;
