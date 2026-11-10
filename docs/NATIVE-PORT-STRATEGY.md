@@ -185,7 +185,9 @@ swap with no rework: both wait on N1.
 ## 6. Opening songs across devices
 
 - **One format, already true:** the same `.thunder` file opens on every host. The core reads it through the same
-  code everywhere, so a song cannot sound different because of where it was opened.
+  code everywhere, so what every device can play sounds the same wherever it is opened. The exceptions are the things a device cannot do
+  (next point): a desktop plugin that was not frozen is silent on the phone, and multi-channel routing folds down to the
+  main outputs.
 - **Things one device can't do are carried, never dropped:** a desktop plugin on a track is kept untouched in the file;
   on the phone the track shows "desktop plugin" and plays its frozen / rendered audio if the owner froze it on the
   desktop. Multi-channel routing falls back to the main outputs. The same rule as today's Mobile setup hiding …chains.

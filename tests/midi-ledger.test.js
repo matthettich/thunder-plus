@@ -57,6 +57,8 @@ test('ledger: a port with clear() has it called first; the visible path goes thr
   assert.equal(V.sent.length, 0, 'visible: held back in the outbox'); assert.equal(V.api.MOB.q.length, 1); assert.equal(V.api.MOLED.length, 0, 'not ledgered');
   V.api.msend(on(61), 1.03, false, 0); assert.equal(V.sent.length, 1, 'visible and within 60 ms: sent as before'); assert.equal(V.sent[0].ts, 1030); assert.equal(V.api.MOLED.length, 0);
   V.api.moledCut(); assert.equal(V.sent.length, 1, 'STOP with an empty ledger sends nothing extra');
-  const C = rig(true); for (let i = 0; i < 400; i++) C.api.msend(on(i % 128), 1.5 + i / 1000, false, 0); assert.ok(C.api.MOLED.length <= 256, 'capped');
+  const C = rig(true); for (let i = 0; i < 400; i++) C.api.msend(on(i % 128), 1.5 + i / 1000, false, 0); assert.equal(C.api.MOLED.length, 400, 'a busy song is far under the cap: nothing dropped');
+  C.sent.length = 0; C.api.moledCut(); for (let i = 0; i < 400; i++) assert.ok(C.sent.some(x => x.b[0] === 0x80 && x.b[1] === i % 128 && Math.abs(x.ts - (1500 + i + 1)) < 0.001), 'note ' + i + ' released 1 ms after its start');
+  const X = rig(true); for (let i = 0; i < 5000; i++) X.api.msend(on(i % 128), 1.5 + i / 10000, false, 0); assert.ok(X.api.MOLED.length <= 4096, 'capped');
   const N = rig(true); N.port.native = true; N.api.msend(on(60), 1.5, false, 0); assert.equal(N.api.MOLED.length, 0, 'the native helper (clear()) is not ledgered');
 });

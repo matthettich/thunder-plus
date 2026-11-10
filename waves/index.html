@@ -3318,27 +3318,33 @@ function startEngine(maxVoices){
   return WavesBridge.standalone({ maxVoices, quality: doc.quality || 'full', transport: doc.transport }).then(wireBridge)
     .catch(err => toast('The sound engine couldn’t start: ' + (err && err.message || err), 6000));
 }
+// LAZY ENGINE: a note starts it; notes that come while it starts wait here (offs too, so a key let go early is not left sounding).
+// engStart is the one way the embedded engine starts or restarts: while it runs (engGoing) nothing starts another, and a voice
+// count changed meanwhile is applied when it finishes.
+let engGoing = false; const evQ = [];
+function engStart(nv){
+  engGoing = true;
+  return startEngine(nv).then(() => {
+    const want = (doc.voice && doc.voice.maxVoices) || 8;
+    if (bridge && want !== nv){ const old = bridge; bridge = null; old.dispose(); return engStart(want); }
+    const q = evQ.splice(0); engGoing = false;
+    if (!bridge) return;   // (it could not start: the toast said so; the next note tries again)
+    if (napping()){ bridge.ctx.suspend().catch(() => {}); return; }   // (the screen was left meanwhile)
+    bridge.resume(); for (const [o, p, v] of q) { if (o) bridge.noteOn(p, v); else bridge.noteOff(p); } });
+}
 vSel.addEventListener('change', () => {
   const nv = +vSel.value; doc.voice.maxVoices = nv; store.dirty = true; store.save();
-  if (lazy && !bridge) return;   // (the engine has not started yet: it starts with this number)
+  if (lazy && !bridge) return;   // (not started yet: it starts with this number; starting: engStart applies it when it finishes)
   toast('Restarting the sound with ' + nv + ' voice' + (nv === 1 ? '' : 's') + '…');
   const old = bridge; bridge = null; if (old) old.dispose();
-  startEngine(nv).then(() => bridge && bridge.resume());
+  if (lazy) engStart(nv); else startEngine(nv).then(() => bridge && bridge.resume());
 });
 if (!lazy) startEngine((doc.voice && doc.voice.maxVoices) || 8);
-// LAZY ENGINE: a note starts it; notes that come while it starts wait here (offs too, so a key let go early is not left sounding).
-let engGoing = false; const evQ = [];
 function engNote(on, pitch, vel){
-  if (bridge){ if (on) bridge.noteOn(pitch, vel); else bridge.noteOff(pitch); return; }
+  if (bridge){ if (on){ if (napping()) return; bridge.noteOn(pitch, vel); } else bridge.noteOff(pitch); return; }   // (napping: the context is suspended, a note-on would wait in the port and burst out on resume)
   if (!lazy || (!on && !engGoing)) return;
   evQ.push([on, pitch, vel]);
-  if (on && !engGoing){ engGoing = true;
-    startEngine((doc.voice && doc.voice.maxVoices) || 8).then(() => {
-      const q = evQ.splice(0); engGoing = false;
-      if (!bridge) return;   // (it could not start: the toast said so; the next note tries again)
-      if (napping()){ bridge.ctx.suspend().catch(() => {}); return; }   // (the screen was left meanwhile)
-      bridge.resume(); for (const [o, p, v] of q) { if (o) bridge.noteOn(p, v); else bridge.noteOff(p); } });
-  }
+  if (on && !engGoing) engStart((doc.voice && doc.voice.maxVoices) || 8);
 }
 function unlockAudio(){ if (bridge){ bridge.resume(); removeEventListener('pointerdown', unlockAudio, true); removeEventListener('keydown', unlockAudio, true); } }
 addEventListener('pointerdown', unlockAudio, true);

@@ -15978,7 +15978,7 @@ document.addEventListener('visibilitychange', () => { if (document.hidden && MOB
    way is remembered (port, channel, note, time); moRelease (STOP, panic, OUTPUT / PORT / CH changes) sends each one still ahead its
    note-off 1 ms after its own start (a blip, not its full length), then All Notes Off now and again after the last of them. The
    native helper has clear() and is not ledgered. MOLED_ON = false: nothing is remembered or sent (the old behaviour). */
-const MOLED_ON = true, MOLED_MAX = 256, MOLED = [];
+const MOLED_ON = true, MOLED_MAX = 4096, MOLED = [];   // (the cap is far above what 1.2 s of song can book: an entry dropped at the cap would lose its own note-off and sound until the last All Notes Off)
 function moledPrune(now){ let j = 0; for (const x of MOLED) if (x.at > now) MOLED[j++] = x; MOLED.length = j; }
 function moledNote(o, b, ts, now){
   moledPrune(now);
