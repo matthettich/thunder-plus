@@ -115,6 +115,11 @@ body.mob .deskmenu{display:none}
 .gset{width:min(400px, calc(100vw - 20px)); max-height:calc(100vh - 80px); overflow-y:auto; overscroll-behavior:contain}
 @supports (height: 1dvh){ .gset{max-height:calc(100dvh - 80px)} }
 .gsetbody{padding:0}
+/* DONE (owner, 10 Nov): a Close in the Settings sheet that stays in view while it scrolls. Touch / Mobile setup only: a desktop dropdown is left as it was. */
+.gsethead{display:none}
+body.mob .gsethead{display:flex; justify-content:flex-end; position:sticky; top:-4px; z-index:3; margin:-4px -4px 0; padding:4px; background:var(--panel); border-bottom:1px solid var(--line)}
+@media (pointer:coarse){ .gsethead{display:flex; justify-content:flex-end; position:sticky; top:-4px; z-index:3; margin:-4px -4px 0; padding:4px; background:var(--panel); border-bottom:1px solid var(--line)} }
+.gsethead button{min-height:40px; min-width:72px; font-weight:600}
 .gset .gsec{padding:8px 8px 10px; display:grid; gap:8px}
 .gset .gsec + .gsec{border-top:1px solid var(--line)}
 .gset .gsec[hidden]{display:none}
@@ -2805,6 +2810,7 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
     <div class="phlbody" id="phlBody"></div>
   </div>
   <div class="setmenu gset" id="gset" hidden role="dialog" aria-label="Settings">
+    <div class="gsethead" id="gsetHead"><button type="button" id="gsetDone" aria-label="Close Settings">Done</button></div>
     <div class="gsetbody" id="gsetBody"><div class="gsec" id="gsecProj" hidden></div><div class="gsec" id="gsecScreen" hidden></div><div class="gsec" id="gsecPatch" hidden></div></div>
   </div>
   </div>
@@ -13693,6 +13699,7 @@ const gsetPress = (mode, btn) => gsetOpen() && gsetBtn === btn ? gsetToggle(fals
 for (const [id] of GLOBAL_SECS){ const s = $(id); if (s){ s.hidden = true; s.classList.add('gsec'); $('gsetBody').append(s); } }
 for (const id of INNER_SECS){ const s = $(id); if (s) $('gsetBody').append(s); }   // parked here; buildProj / buildScreen place them
 $('bSet').addEventListener('click', () => gsetPress('set', $('bSet')));
+$('gsetDone').addEventListener('click', () => gsetToggle(false));   // same as tapping the gear again
 $('bView').addEventListener('click', () => gsetPress('view', $('bView')));
 $('bAud').addEventListener('click', () => gsetPress('aud', $('bAud')));
 // Settings sliders are locked so scrolling the menu, or a stray tap on a slider's track, can't change a setting.
