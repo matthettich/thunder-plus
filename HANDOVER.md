@@ -525,7 +525,7 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0) and `link/` (Ableton
 
 ### Where things stand (10 Nov, 15:10: READ THIS FIRST; it supersedes older lines below where they disagree)
 
-**Web beta: build 561** (https://matthettich.github.io/thunder-plus/beta/). `main` and the desktop app are far behind (desktop v1.3.4-beta.2 = build 541): nothing since build 541 is on the desktop; a desktop beta from `beta` only when the owner asks. Every PR into `beta` now runs `npm test` and the sequencer goldens in GitHub Actions (`tests.yml`).
+**Web beta: build 562** (https://matthettich.github.io/thunder-plus/beta/). `main` and the desktop app are far behind (desktop v1.3.4-beta.2 = build 541): nothing since build 541 is on the desktop; a desktop beta from `beta` only when the owner asks. Every PR into `beta` now runs `npm test` and the sequencer goldens in GitHub Actions (`tests.yml`).
 
 **Owner's direction (10 Nov afternoon):** keep working on AUDIO STABILITY of the web app; the native port is PARKED ("especially if we can lower the priority of a port"). He will test when he has time ("it's been hard for me to have the time to review"): do not block on him; queue tests in the punch list.
 
@@ -540,7 +540,7 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0) and `link/` (Ableton
 
 **Queued work that needs no owner input (do in this order; delegate to Sonnet, lead reviews audio):**
 1. (`fix/worklet-robustness` is MERGED as build 561, see the 10 Nov entry; `test/soak` still to review. A new owner choice came out of it: chains / waves Flex pattern SCRATCH has depth 0.125 there and 0.105 in the track effect, and Step gate with Pattern CV at 0 plays the custom steps there; unifying the copies changes old chains patches, so it waits for his word.) Was: review and merge what was running at 15:10: `fix/worklet-robustness` (block sizes other than 128, pump-synth wasm guard, chains' Flex / Step gate copies) and `test/soak` (`tests/sweep/soak.mjs` + `docs/audits/2026-11-10-soak.md`); then fix what the soak finds (leaks, growth, stalls over 10 minutes).
-1a. From the soak test (merged; see the 10 Nov entry): stop `draw()` re-assigning unchanged text (`#tTitle`, `#tInfo`, readouts); then a 20-minute page-vs-core sequencer A/B on a quiet machine (the core showed more dropouts; unproven).
+1a. From the soak test: (`#tTitle`, `#tInfo`, `#tState` done in build 562; the `<output>` readouts and Mixer spans still churn.) Then a 20-minute page-vs-core sequencer A/B on a quiet machine (the core showed more dropouts; unproven).
 2. Smoothing, ONLY if the owner hears steps: the effect host ramps a modulated value toward its next point per block, scoped to pitch / cutoff-type parameters (lead designs; about one session).
 3. Left from the memory pass: per-block garbage in the chains / waves hosts and some modules (generated / shared text), `rvMix`, `__tcOv`'s per-block objects, pump-synth worklet's `at` closure.
 4. Battery finding 3: `clocked` effect worklets and the master / chains / core with silence shortcuts while stopped (audio review).
@@ -612,6 +612,10 @@ The owner's top priority to add is the MOD screen. Work down the list; ask befor
 ### Owner's punch list (owner, 9 Nov: will test these later; keep it current)
 
 Start a session by asking for results. Fix on `beta`. (10 Nov, 15:10: the web beta is build 560; the build numbers in the rest of this paragraph are older.) Web beta: https://matthettich.github.io/thunder-plus/beta/ (build 547 as of 10 Nov morning, 548 once its PR merges; the night of 9–10 Nov shipped 544–547, see the four "10 Nov" entries below. Decisions the lead made that night for the owner to confirm or reverse: on a phone the saved Sequencer default plays on the Page unless Audio thread is picked on that device; on a phone the safety limiter is its stand-in until another worklet loads; the resync only runs with a worklet loaded and its margins are untested on a device). Desktop: v1.3.4-beta.2 (build 541, no feed view or scopes); further desktop betas on hold until the owner asks.
+
+**Build 562** (chains / waves effects unified with the track effects)
+- [ ] Computer: open a chains patch and a waves patch that use Flex and Step gate (one with Step gate on its own custom steps, one with something patched into Pattern). Pass: they play; Flex SCRATCH may be a little shallower, anything else that sounds wrong is a bug.
+- [ ] Phone: while a song plays, the tracker's title, info line and PLAYING / STOPPED state still update when you move or switch view.
 
 **Build 561** (sturdier audio; nothing should sound different)
 - [ ] Phone and computer: play two or three songs you know well (one with …pump synths, one with a chains or waves track). Pass: they sound as before; no "stopped working" toast.
@@ -784,6 +788,10 @@ Suggested order: N0 → N1 → N2 (phone cured) → N4 with N3 alongside → N5 
   the edge `R.t0`, "waiting…" while armed), `rcdClk` / `rcdFmt` / `rcdFreeSecs`, a 250 ms timer only while recording; the
   final length stays until the next take. recorder-check covers FREE, PATTERN, Stop, next take and closing mid-take.
 
+
+## 10 Nov (evening): chains / waves take Flex, Step gate, Retrigger from index.html (build 562)
+
+Owner (15:40): "Unify, it's ok if the chains sound different … and waves too." Sonnet agent, lead checked. `tools/make-fx-cores.mjs` cuts `clkSpb`, `FlexCore`, `StepGateCore`, `RetrigCore` out of `index.html` into a BEGIN/END GENERATED region of `chains/chains-worklet.js` and `waves/waves-worklet.js` (`--check`; `tests/fx-cores.test.js`). **After changing one of those in index.html, run it** (like `make-core.mjs`). The old copies were an older 17-pattern Flex: the worklets now carry the full 256-pattern core, but the modules still reach patterns 0–16 only (exposing more = a module change). Step gate: the module sends `|| 16` so Pattern CV 0 still means the custom steps (the core reads 0 as "gate open"). Lead ran patterns 0–16 of both through the generated code: finite, each acts. Also in 562: `draw()` assigns `#tTitle` / `#tInfo` / `#tState` only when changed (soak finding 1).
 
 ## 10 Nov (late afternoon): soak test (test only; no leak found)
 
