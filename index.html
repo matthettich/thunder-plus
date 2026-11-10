@@ -19932,6 +19932,11 @@ function makeSeq(S, mode, o){
   const once = !!o.once, tr = []; let loop = o.loop || null;
   // BUS FX ONLY (owner, 22 Oct): the tracks that are buses when PLAY starts play their commands, not their notes; a track
   // that becomes a bus while it plays keeps its notes until PLAY starts again.
+  // LFOs that can be heard (owner, 10 Nov): null = every track's; a phrase, a sect or BUS PLAY play one set of tracks, so only
+  // their LFOs, those of the buses they feed (even through other buses) and the master's run.
+  let hearT = null;
+  if (mode !== 'song' || o.only){ hearT = new Set(mode === 'song' ? o.only : [o.track]); const w = [...hearT], tg = busPlan().targets;
+    while (w.length) for (const b of tg.get(w.pop()) || []) if (!hearT.has(b)){ hearT.add(b); w.push(b); } }
   const busT = new Set(); for (let t = 0; t < NT; t++) if (isBusT(t)) busT.add(t);   // loop: {y0,y1} rows to cycle; api.setLoop swaps it while playing
   const fresh = () => ({on:false, empty:false, row:0, cr:0, step:0, inst:0, rate:1, tsp:0, next:-1, last:null, rnl:{}, rnlNote:0, nth:new Map(), arc:{mode:0, spd:1},
     rel:0, g:0, grv:null, dir:0, pp:1, cnt:0, r0:0});   // dir/pp/cnt: DIR's play direction, ping-pong heading, steps played this pass; r0: when it entered its song row
@@ -20108,6 +20113,15 @@ function makeSeq(S, mode, o){
       const cid = mode === 'phrase' ? -1 : sectId(T, t), ch = cid >= 0 ? S.chains[cid] : null, chRow = ch ? ch[T.cr] : null;
       const g = cmdV(r0(T, mode === 'phrase' ? o.phrase : (!T.empty && chRow ? chRow[0] : -1)), GGRI);
       if (g != null) api.grv = ngrv = grvOf(g, api.tks); }
+    // TRACK LFO of track t for the span [t0, t0 + dur) (own row, or for an idle track the time to the next step): see below.
+    const lfoEvs = (t, t0, dur) => { const La = PFS.lfo[t]; if (Array.isArray(La)) for (let i = 0; i < La.length; i++){ const L = La[i]; if (!L || !tgtOk(L.id)) continue;
+        let dup = false; for (let j = 0; j < i; j++) if (La[j] && La[j].id === L.id){ dup = true; break; } if (dup) continue;
+        const g = tgtParse(L.id), fl = g.k === 'cut' || g.k === 'res' || g.k === 'dec', n = fl ? 1 : PL ? Math.min(4, api.tks) : 2;
+        const c = PF.sent.has(L.id) ? PF.sent.get(L.id) : tgtOwn(L.id, S);
+        for (let k = 0; k < n; k++){ const tt = t0 + dur * k / n; let v = c;
+          for (let j = i; j < La.length; j++){ const M = La[j]; if (!M || M.id !== L.id) continue; const bt = (api.bt + (tt - t0) * api.bpm / 60) / (PLFO_RATES[M.rt] || 1), cyc = Math.floor(bt); v += lfoAt(M.sh, bt - cyc, cyc) * M.dp / 2; }
+          evs.push(...tgtEvs(L.id, clamp(Math.round(v), 0, 255), tt, PF.pno)); } } };
+    const lfoRan = [];   // the tracks whose own row ran this step (their LFO went out with it)
     for (let t = 0; t <= MT; t++){
       const T = tr[t]; if (!T.on || T.rel > rel0 + 1e-9) continue;
       const cid = mode === 'phrase' ? -1 : sectId(T, t), ch = cid >= 0 ? S.chains[cid] : null, chRow = ch ? ch[T.cr] : null;
@@ -20289,13 +20303,7 @@ function makeSeq(S, mode, o){
       // TRACK LFO (owner, 1 Nov; Perform → LFO): a few points a row (2 in a render) around the target's value now (its scene,
       // macro or own), in time with the song; a filter target (cut / res / dec) once a row, for the notes that start on it.
       // Several LFOs on one target add around its one value (the first LFO of a target leads; the later ones are summed into its points).
-      { const La = PFS.lfo[t]; if (Array.isArray(La)) for (let i = 0; i < La.length; i++){ const L = La[i]; if (!L || !tgtOk(L.id)) continue;
-          let dup = false; for (let j = 0; j < i; j++) if (La[j] && La[j].id === L.id){ dup = true; break; } if (dup) continue;
-          const g = tgtParse(L.id), fl = g.k === 'cut' || g.k === 'res' || g.k === 'dec', n = fl ? 1 : PL ? Math.min(4, api.tks) : 2;
-          const c = PF.sent.has(L.id) ? PF.sent.get(L.id) : tgtOwn(L.id, S);
-          for (let k = 0; k < n; k++){ const tt = t0 + dur * k / n; let v = c;
-            for (let j = i; j < La.length; j++){ const M = La[j]; if (!M || M.id !== L.id) continue; const bt = (api.bt + (tt - t0) * api.bpm / 60) / (PLFO_RATES[M.rt] || 1), cyc = Math.floor(bt); v += lfoAt(M.sh, bt - cyc, cyc) * M.dp / 2; }
-            evs.push(...tgtEvs(L.id, clamp(Math.round(v), 0, 255), tt, PF.pno)); } } }
+      lfoEvs(t, t0, dur); lfoRan[t] = true;
       if (muted){ evs.length = ev0; if (!T.mut) evs.push({type:'off', t:t0, track:t}); delete pos[t].sc; pos[t].off = true; }   // entering a muted block silences what is ringing
       T.mut = muted;
       const L = (mode === 'song' && pid < 0) ? emptyLen() : lenOf(pid);
@@ -20327,9 +20335,20 @@ function makeSeq(S, mode, o){
     }
     // TPO or TIC on this row: tell the player, so tempo-synced chains modules follow (live and in renders).
     if (pdl) for (const T of tr) if (T.on) T.rel += pdl;   // PDL: the whole song waits
+    let nx = Infinity; for (const T of tr) if (T.on && T.rel < nx) nx = T.rel;
+    /* LFOs ALWAYS RUN (owner, 10 Nov): a track with no pattern on this song row (or the master with no MST cell) still moves its
+       LFOs, one step at a time from this step to the next, on the song's beat clock (api.bt) so the phase never restarts. A muted
+       block (on the song row of the first track due this step) stays still. Only what can be heard: in a phrase, a sect or BUS PLAY, the tracks playing, the
+       buses they feed (hearT) and the master. A track on its own clock (an LPB or groove of its own) sends its LFO with its rows. */
+    let nl = nx; if (nl === Infinity) for (let t = 0; t <= MT; t++) if (lfoRan[t] && tr[t].rel < nl) nl = tr[t].rel;   // the song's last step: to where its tracks stopped
+    if (nl !== Infinity){ const dI = api.base + nl - t0, ld = mode === 'song' ? pos.find(Boolean) : null;
+      for (let t = 0; t <= MT; t++){
+        if (lfoRan[t] || tr[t].on || !(t < (S.ntr || 16) || t === MT)) continue;
+        const La = PFS.lfo[t]; if (!Array.isArray(La) || !La.length || (hearT && t < MT && !hearT.has(t))) continue;
+        if (ld && t < MT && blockMuted(S, ld.row, t)) continue;
+        lfoEvs(t, t0, dI); } }
     if (nb !== api.bpm || api.tks !== tks0) evs.push({type:'tempo', t:t0, bpm:nb, tks:api.tks});
     api.bpm = nb; api.grv = ngrv;
-    let nx = Infinity; for (const T of tr) if (T.on && T.rel < nx) nx = T.rel;
     api.time = api.base + (nx === Infinity ? rel0 : nx);
     return {t:t0, evs, pos, tks:api.tks, line:60 / api.bpm / (S.lpb || 4)};
   };
@@ -21983,7 +22002,7 @@ function padBlink(e){
 // Phones and tablets (10 Nov): the audio-thread sequencer's module (a second thread) loads only when the owner picked it there
 // (aset.corePick, set in Settings); the saved default 'core' plays on the Page sequencer on such a device.
 function coreWanted(){ return aset.core === 'core' && (!wkLazy() || !!aset.corePick); }   // (a declaration: the Settings row reads it at load)
-const CORE_REV = '198luua';
+const CORE_REV = '44fr4c';
 const CORE_WANT = 7;   // the core's message set this page speaks (core-processor.js CORE_V); an older core is not used
 const CORE_URL = () => 'core/seq-core.js?v=' + BUILD + '-' + CORE_REV;
 const core = {node:null, ready:false, loading:null, gen:0, sent:new Map(), sT:0, tally:new Map(), mir:null};   // mir: what the core's song holds, as JSON per part (coreDiff)   // tally: events by who played them (test hook)
