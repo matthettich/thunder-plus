@@ -10683,6 +10683,18 @@ function shapeData(src, sr, tw){
 }
 // An AudioBuffer for a note with MUT / GEN and / or CUT / RES / DEC on context ac: offline renders (exports) make it here
 // and now; live, a variation renders in the Worker and the pad plays meanwhile (shaped by CUT / DEC all the same).
+/* The AudioBuffers varBuf hands out are only a cache of VAR.map's data (a miss makes the same buffer again). It was capped by
+   count (256) whatever the size: long shaped samples held hundreds of MB. Now also by bytes: 64 MB on a phone / tablet
+   (seqHandHere, the app's device test), 256 MB on a computer. Least recently used go first, never the newest entry. Evicting is
+   safe while a note sounds or a render is pending: a playing AudioBufferSourceNode keeps its own reference to its buffer, and a
+   pending render (VAR.pend) is keyed in VAR.map, not here. */
+const VARBUF_MAX = 256, VARBUF_MAX_BYTES_PHONE = 64e6, VARBUF_MAX_BYTES_PC = 256e6;
+let varBufCap = 0;
+const VARBUF_MAX_BYTES = () => varBufCap || (varBufCap = (typeof seqHandHere === 'function' && seqHandHere()) ? VARBUF_MAX_BYTES_PHONE : VARBUF_MAX_BYTES_PC);
+function varBufTrim(M, maxBytes){
+  const cap = maxBytes || VARBUF_MAX_BYTES(); let bytes = 0; for (const e of M.values()) bytes += e.n || 0;
+  while (M.size > 1 && (M.size > VARBUF_MAX || bytes > cap)){ const k0 = M.keys().next().value, e0 = M.get(k0); M.delete(k0); bytes -= e0.n || 0; }
+}
 function varBuf(ev, ac){
   const sr = ac.sampleRate, live = ac === ctx, I0 = S.insts[ev.ii];
   if (I0 && ((I0.slc | 0) > 1 || I0.sync)) return null;   // sliced / synced: the pad as it is
@@ -10707,7 +10719,8 @@ function varBuf(ev, ac){
   }
   let M = VAR.bufs.get(ac); if (!M){ M = new Map(); VAR.bufs.set(ac, M); }
   const bk = key + (ev.rev ? ':r' : ''); let e = M.get(bk);
-  if (!e || e.d !== rec.data){ const d = ev.rev ? rec.data.slice().reverse() : rec.data, b = ac.createBuffer(1, d.length, rec.sr); b.copyToChannel(d, 0); e = {d:rec.data, b}; M.set(bk, e); if (M.size > 256) M.delete(M.keys().next().value); }
+  if (!e || e.d !== rec.data){ const d = ev.rev ? rec.data.slice().reverse() : rec.data, b = ac.createBuffer(1, d.length, rec.sr); b.copyToChannel(d, 0); e = {d:rec.data, b, n:d.length * 4}; M.delete(bk); M.set(bk, e); varBufTrim(M); }
+  else { M.delete(bk); M.set(bk, e); }   // most recent last (least recently used goes first)
   return e.b;
 }
 // Render a variation in the background (the Worker), once.
