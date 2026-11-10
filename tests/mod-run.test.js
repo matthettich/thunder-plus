@@ -30,7 +30,7 @@ function mkSong({ cells, lfo = {}, smute = [], chainPatch = null, chainOn = null
   if (chainPatch){ S.chainPatch = chainPatch; S.chainOn = chainOn; }
   return S;
 }
-/* Play it through core `ctx` (sim: a render's two points a row; live: four) and give back every event. */
+/* Play it through core `ctx` (sim: a render, four points a row like live since 11 Nov; live: four) and give back every event. */
 function play(ctx, S, mode, o = {}, steps = 64){
   ctx.__S = S; vm.runInContext('S = __S;', ctx);
   const sq = ctx.makeSeq(S, mode, Object.assign({ row: 0, once: true, sim: true }, o)), evs = [];
@@ -56,7 +56,7 @@ test('a song with no LFOs: the old sequencer and the new one send the same event
 test('an LFO on a master effect with no MST cell: fxp events on every step, following the shape', () => {
   const S = mkSong({ cells: { 1: [0, 1, 2, 3] }, lfo: { [MT]: [{ id: 'fx:32:0:0', sh: 0, rt: 5, dp: 100 }] } });
   const ev = of(play(NEW, S, 'song'), 'fxp', MT);
-  assert.equal(ev.length, 16 * 2, '2 points a step in a render, 16 steps');
+  assert.equal(ev.length, 16 * 4, '4 points a step in a render (as live), 16 steps');
   const times = ev.map(e => e.t); assert.ok(times.every((x, i) => i === 0 || x > times[i - 1]), 'in time order');
   ev.forEach(e => { assert.equal(e.slot, 0); assert.equal(e.pi, 0); assert.equal(e.v, sineAt(e.t, 128, 5, 100), 'follows the sine at t=' + e.t); });
   const vs = ev.map(e => e.v); assert.ok(Math.max(...vs) >= 128 + 49 && Math.min(...vs) <= 128 - 49, 'swings about 128 by dp/2 = 50');
@@ -68,11 +68,11 @@ test('an LFO on a master effect with no MST cell: fxp events on every step, foll
 test('an LFO on a track idle on song rows 2 and 3: events on every step, the phase runs on from the song', () => {
   const S = mkSong({ cells: { 0: [0, 1], 1: [0, 1, 2, 3] }, lfo: { 0: [{ id: 'vol:0', sh: 0, rt: 5, dp: 100 }] } });
   const ev = of(play(NEW, S, 'song'), 'tva', 0);
-  assert.equal(ev.length, 32, 'every one of the 16 steps: the 8 of its own rows and the 8 idle');
+  assert.equal(ev.length, 64, 'every one of the 16 steps (4 points each, as live): the 8 of its own rows and the 8 idle');
   assert.ok(ev.some(e => e.t >= 1.0) && ev.some(e => e.t < 1.0));
   ev.forEach(e => assert.equal(e.v, sineAt(e.t, 128, 5, 100), 'the song\'s clock, never restarted: t=' + e.t));
-  const gaps = ev.slice(1).map((e, i) => e.t - ev[i].t); assert.ok(gaps.every(g => Math.abs(g - 0.0625) < 1e-9), 'an even 2 points a step across the hand-over at 1.0 s');
-  for (const sh of [1, 2, 3, 4]){ const E = of(play(NEW, mkSong({ cells: { 0: [0, 1], 1: [0, 1, 2, 3] }, lfo: { 0: [{ id: 'vol:0', sh, rt: 4, dp: 80 }] } }), 'song'), 'tva', 0); assert.equal(E.length, 32, 'shape ' + sh); }
+  const gaps = ev.slice(1).map((e, i) => e.t - ev[i].t); assert.ok(gaps.every(g => Math.abs(g - 0.03125) < 1e-9), 'an even 4 points a step across the hand-over at 1.0 s');
+  for (const sh of [1, 2, 3, 4]){ const E = of(play(NEW, mkSong({ cells: { 0: [0, 1], 1: [0, 1, 2, 3] }, lfo: { 0: [{ id: 'vol:0', sh, rt: 4, dp: 80 }] } }), 'song'), 'tva', 0); assert.equal(E.length, 64, 'shape ' + sh); }
 });
 
 test('a muted block\'s LFO stays still; an unmuted idle row moves again', () => {
@@ -80,16 +80,16 @@ test('a muted block\'s LFO stays still; an unmuted idle row moves again', () => 
   const all = [0, 1, 2, 3].map(y => [y, 0]);
   let evs = play(NEW, mkSong({ cells: { 0: [0, 1], 1: [0, 1, 2, 3] }, lfo, smute: all }), 'song');
   assert.equal(of(evs, 'tva', 0).length, 0, 'muted on its rows and on the idle rows after');
-  assert.equal(of(evs, 'fxp', MT).length, 32, 'the master has no block to mute');
+  assert.equal(of(evs, 'fxp', MT).length, 64, 'the master has no block to mute');
   evs = play(NEW, mkSong({ cells: { 0: [0, 1], 1: [0, 1, 2, 3] }, lfo, smute: [[0, 0], [1, 0]] }), 'song');
-  const ev = of(evs, 'tva', 0); assert.equal(ev.length, 16, 'only the idle rows 2 and 3'); assert.ok(ev.every(e => e.t >= 1.0 - 1e-9));
+  const ev = of(evs, 'tva', 0); assert.equal(ev.length, 32, 'only the idle rows 2 and 3'); assert.ok(ev.every(e => e.t >= 1.0 - 1e-9));
 });
 
 test('an LFO on a bus effect while only another track plays', () => {
   const lfo = { 3: [{ id: 'fx:3:0:0', sh: 0, rt: 5, dp: 100 }], 2: [{ id: 'vol:2', sh: 0, rt: 5, dp: 100 }], [MT]: [{ id: 'fx:32:0:0', sh: 0, rt: 5, dp: 100 }] };
   const cells = { 1: [0, 1, 2, 3] };
   let evs = play(NEW, mkSong({ cells, lfo }), 'song');
-  assert.equal(of(evs, 'fxp', 3).length, 32, 'song: everything plays, so does track 4\'s FX');
+  assert.equal(of(evs, 'fxp', 3).length, 64, 'song: everything plays, so does track 4\'s FX');
   // one pattern on its own plays track 2 (index 1) only: what is not heard does not move, the master does
   evs = play(NEW, mkSong({ cells, lfo }), 'sect', { track: 1, sect: 0 });
   assert.equal(of(evs, 'fxp', 3).length, 0, 'not fed by the track: still'); assert.equal(of(evs, 'tva', 2).length, 0);
@@ -103,12 +103,12 @@ test('an LFO on a bus effect while only another track plays', () => {
   assert.ok(of(evs, 'fxp', 3).length > 0 && of(evs, 'fxp', MT).length > 0 && of(evs, 'tva', 2).length === 0, 'BUS PLAY of track 2: its bus and the master');
 });
 
-test('points a step: 4 live, 2 in a render, 1 for cut / res / dec, none without LFOs', () => {
+test('points a step: 4 live, 4 in a render (LFO_PTS_RENDER_*), 1 for cut / res / dec, none without LFOs', () => {
   const lfo = { 0: [{ id: 'vol:0', sh: 0, rt: 5, dp: 100 }], [MT]: [{ id: 'fx:32:0:0', sh: 2, rt: 4, dp: 60 }] };
   const cells = { 0: [0], 1: [0, 1, 2, 3] };   // track 1 sets the 16 steps; track 0 is idle from step 4
   const sim = play(NEW, mkSong({ cells, lfo }), 'song'), live = play(NEW, mkSong({ cells, lfo }), 'song', { live: true, sim: false, once: true });
-  assert.equal(of(sim, 'tva', 0).length, 32); assert.equal(of(live, 'tva', 0).length, 16 * 4, '4 a step live (ticks 6: min(4, 6))');
-  assert.equal(of(sim, 'fxp', MT).length, 32); assert.equal(of(live, 'fxp', MT).length, 64);
+  assert.equal(of(sim, 'tva', 0).length, 16 * 4, '4 a step in a render too'); assert.equal(of(live, 'tva', 0).length, 16 * 4, '4 a step live (ticks 6: min(4, 6))');
+  assert.equal(of(sim, 'fxp', MT).length, 64, 'an effect target in a render: 4 a step as live (renders match live)'); assert.equal(of(live, 'fxp', MT).length, 64);
   const none = play(NEW, mkSong({ cells }), 'song'); assert.equal(none.filter(e => e.type === 'tva' || e.type === 'fxp' || e.type === 'tpn').length, 0, 'no LFOs: no automation at all');
   assert.equal(of(none, 'beat').length, 16, 'one beat event a step, as ever');
   // a filter target is one value a step, kept for the next note (nothing is sent: PF.pno), also on an idle track
