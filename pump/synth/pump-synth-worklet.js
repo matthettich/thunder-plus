@@ -120,7 +120,26 @@ class PsynProc extends AudioWorkletProcessor {
   semis(r){ return (+this.p.tune || 0) + 12 * Math.log2(r > 1e-6 ? r : 1e-6); }
   bendOf(r, note){ const b = this.nb + this.semis(r) - note, k = Math.max(-1, Math.min(1, b / this.range)); return Math.max(0, Math.min(16383, Math.round(8192 + k * 8191))); }
   bend(X, i, r, note){ const v = this.bendOf(r, note); if (v !== this.sent){ X.psyn_midi(this.h, i, 0xE0, v & 127, v >> 7); this.sent = v; } }
-  process(ins, outs, P){ return outs[0][0].length <= 128 ? this.p1(ins, outs, P) : tcChunks(this, ins, outs, P, 128, this.p1); }   // (any block length: p1 is for at most 128 frames)
+  /* GUARDED (10 Nov): a wasm trap (or any throw) in a block would leave process() for good (Chrome then stops calling the node: the
+     synth silent for ever), and a NaN / Infinity in the engine's output would go into the mix. So: a throw → this block is silent,
+     the instance is marked failed (it never calls the wasm again, outputs silence) and the page gets one {failed:'pump-synth: ' + message}
+     (psNode toasts it once). A non-finite sample is found by the loop that already runs over every sample of every block (one add
+     per sample, no extra pass): the block is zeroed, the engine is freed and made afresh from the pad's settings (open(), on the
+     next block), and {nan:count} goes to the page; the 8th reset marks it failed. Valid output is untouched. */
+  process(ins, outs, P){
+    if (this.failed){ if (this.dead) return false; for (const c of outs[0]) c.fill(0); return true; }
+    try { return outs[0][0].length <= 128 ? this.p1(ins, outs, P) : tcChunks(this, ins, outs, P, 128, this.p1); }   // (any block length: p1 is for at most 128 frames)
+    catch (e){ return this.fail(outs, e && e.message != null ? e.message : e); }
+  }
+  fail(outs, why){ this.failed = true; for (const c of outs[0]) c.fill(0); try { this.port.postMessage({failed:'pump-synth: ' + why}); } catch (e2){} return true; }
+  badBlock(X, outs, L, R){   // the output had a NaN or an Infinity
+    L.fill(0); if (R !== L) R.fill(0);
+    try { X.psyn_free(this.h); } catch (e){}
+    this.h = -1; this.modOn = false; this.quiet = 0; for (const ln of this.lane){ ln.note = -1; ln.lg = false; }   // (made afresh by open(): a held gate starts its note again)
+    this.nBad = (this.nBad || 0) + 1; try { this.port.postMessage({nan:this.nBad}); } catch (e2){}
+    if (this.nBad >= 8) this.fail(outs, 'the output was not finite (8 resets)');
+    return true;
+  }
   p1(ins, outs, P){
     if (this.__ov && globalThis.__tcOv) P = globalThis.__tcOv(this, P, outs[0][0].length);   // THUNDER CORE drives this node (core-processor.js)
     const X = psynX(), o = outs[0], L = o[0], R = o[1] || o[0], n = L.length;
@@ -175,12 +194,13 @@ class PsynProc extends AudioWorkletProcessor {
     if (!held && !any && this.quiet > sampleRate){ L.fill(0); if (R !== L) R.fill(0); return true; }
     X.psyn_process(this.h, n);
     const oL = new Float32Array(X.memory.buffer, X.psyn_out(0), n), oR = new Float32Array(X.memory.buffer, X.psyn_out(1), n);
-    let pk = 0;
+    let pk = 0, sm = 0;
     // the pad's Level and Drive, as the render applies them (finish() in pump-synth-engine.js), and the trim
     const tr = this.trim * Math.pow(10, (+this.p.level || 0) / 20), dv = +this.p.drive || 0, dr = dv > 0.001 ? 1 + dv * dv * 10 : 0, dn = dr ? 1 / Math.tanh(dr) : 1;
     for (let i = 0; i < n; i++){
       let a = oL[i] * tr, b = oR[i] * tr; if (dr){ a = Math.tanh(a * dr) * dn; b = Math.tanh(b * dr) * dn; }
-      L[i] = a; if (R !== L) R[i] = b; const m = (a < 0 ? -a : a) + (b < 0 ? -b : b); if (m > pk) pk = m; }
+      L[i] = a; if (R !== L) R[i] = b; const m = (a < 0 ? -a : a) + (b < 0 ? -b : b); if (m > pk) pk = m; sm += m; }
+    if (!(sm - sm === 0)) return this.badBlock(X, outs, L, R);   // (a NaN or Infinity anywhere makes the sum one)
     this.quiet = held || pk > 2e-5 ? 0 : this.quiet + n;
     this.ms += Date.now() - t0; this.fr += n;
     if (this.__ov && globalThis.__tcPost) globalThis.__tcPost(this, outs[0]);

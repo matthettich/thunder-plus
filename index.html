@@ -20670,7 +20670,9 @@ function makePlayer(ac, out, getBuf, live, mo){   // mo: the master OUT gain (af
       psSent.add(ac);
       const g = ac.createGain(), pn = ac.createStereoPanner(), P = k => node.parameters.get(k);
       node.connect(g); g.connect(pn); pn.connect(buses[t].inp);
-      node.load = 0; node.port.onmessage = e => { const d = e.data; if (d && typeof d.load === 'number') node.load = node.load * 0.6 + d.load * 0.4; };
+      node.load = 0; node.port.onmessage = e => { const d = e.data; if (d && typeof d.load === 'number') node.load = node.load * 0.6 + d.load * 0.4;
+        else if (d && d.failed && !node.psFailed){ node.psFailed = true; tpLog('pump synth live node', new Error(d.failed)); toastErr('A …pump synth stopped working and is silent until the page is reloaded.'); }   // (a wasm trap: the node is silent from now on)
+        else if (d && d.nan && !node.psNan){ node.psNan = true; tpLog('pump synth live node', new Error('its output was not finite: the engine was reset')); } };
       const lanes = [0, 1, 2, 3].map(j => ({node, g, pn, pad, kind, ps:true, lane:j, rate:P('r' + j), gate:P('g' + j), trig:P('t' + j), leg:P('l' + j), vel:P('v' + j), n:0, lastOn:-1, cur:null}));
       const b = lanes[0]; b.lanes = lanes; b.fileRef = frzSample(V); b.bpm = P('bpm'); if (b.bpm) b.bpm.value = bpmNow;   // the song's tempo (WOB's wobble; tempoTo moves it)
       bassN.set(key, b); if (live) bassLive.add(b);
@@ -21691,7 +21693,7 @@ class XP_${name} extends AudioWorkletProcessor {
 registerProcessor('thunder-${name}', XP_${name});`;
 let bassURL = null; const bassLoad = new WeakMap(), bassOK = new WeakSet(), bassLive = new Set();
 // …PUMP SYNTHS live: their worklet, loaded with the others; psSent: the contexts whose audio thread has the wasm's bytes
-const PSYN_WK = 'pump/synth/pump-synth-worklet.js?v=10', psOK = new WeakSet(), psSent = new WeakSet();
+const PSYN_WK = 'pump/synth/pump-synth-worklet.js?v=11', psOK = new WeakSet(), psSent = new WeakSet();
 // …WAVES LIVE: the waves worklet in the tracker's own context (thunder-wlive); wlSent: the contexts that have the wasm
 const WAVES_WK = 'waves/waves-worklet.js?v=35', wlOK = new WeakSet(), wlSent = new WeakSet();
 /* BATTERY (8 Nov, Fold): a bookkeeping timer that only does something in one situation (playing, the screen visible, one
