@@ -4919,7 +4919,7 @@ class BassCore {
     for (let k = 1; k <= N; k++){
       const s0 = aA[k], s1 = aT[k]; aA[k] = s1;
       if (s0 === 0 && s1 === 0) continue;
-      const fk = f * k * (1 + st * k * k), inc = fk / sr, dA = (s1 - s0) * inv, pl = this.panL[k], pr = this.panR[k];
+      const fk = f * k * (1 + st * k * k), inc = Math.min(fk, nyq) / sr, dA = (s1 - s0) * inv, pl = this.panL[k], pr = this.panR[k];   // (a partial still fading out after a big upward pitch jump can be above Nyquist: an increment of 1 or more ran the phase off the table)
       let ph = phA[k], amp = s0;
       if (det){
         const incB = inc * det; let phb = phB[k];
