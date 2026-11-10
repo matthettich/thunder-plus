@@ -18477,6 +18477,11 @@ const PumpFX = window.PumpFX = (() => {
     // in order, for the windows' CHAIN menu
     slots(t){ const A = arr(t) || []; const out = []; A.forEach((f, k) => { if (f && isPumpT(f.type)){ const ty = TFX[f.type].pump; out.push({k, type:ty, name:pumpFx(ty).name, on:f.on !== false}); } }); return out; },
     trackName(t){ if (t >= NT) return 'MASTER'; const n = tName(t); return 'TRACK ' + d2(t + 1) + (isBusT(t) ? ' BUS' : '') + (n ? ' · ' + n : ''); },
+    // MOD (10 Nov): Add LFO… in a window's right-click menu. lfoId: the target id of a parameter (by its symbol) of the slot, '' when it is not one
+    // (a switch, a choice, a row the FX screen does not have); addLfo: the FX screen's own handler (it opens MOD on the new LFO).
+    lfoId(t, k, sym){ const A = arr(t), f = A && A[k]; if (!f || !isPumpT(f.type)) return ''; const D = TFX[f.type], i = D.pd.findIndex(p => p.s === sym); if (i < 0) return '';
+      const r = D.ps.findIndex(q => q.lfo && (q.pb ? q.pb.includes(i) : q.pi === i)), q = D.ps[r]; return r < 0 ? '' : 'fx:' + (t >= NT ? MT : t) + ':' + k + ':' + r + (q.pb ? ':' + q.pb.indexOf(i) : ''); },
+    addLfo(id){ lfoAdd(id); },
     ownsKey:null, backHook:null,
     _notifyAll(src){ for (let t = 0; t <= NT; t++) notify(t, src); },
     // for the app
@@ -34514,7 +34519,7 @@ if (new URLSearchParams(location.search).has('seqtest')) window.__seqTest = {
      is the shared window kit (sets PumpFX.openHook); multiband.js what BAND, WIDE and HEAT share (load it before them);
      one file per plugin (docs/PUMP-FX.md, "The pop-up kit"). A type without a file says its window comes later. Add new
      ones here, in sw.js FILES, with ?v= like these. -->
-<script src="pump/ui/kit.js?v=9"></script>
+<script src="pump/ui/kit.js?v=10"></script>
 <script src="pump/ui/eq.js?v=2"></script>
 <script src="pump/ui/comp.js?v=1"></script>
 <script src="pump/ui/limit.js?v=1"></script>

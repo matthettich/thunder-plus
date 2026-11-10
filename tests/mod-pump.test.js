@@ -292,3 +292,15 @@ test('bands: a four-part pump LFO behaves as before (the COMP ratio row, no band
   const i = rowOf('comp', 'p_ratio'), S = song('comp'); S.perf.lfo[2] = [{ id: `fx:2:0:${i}`, sh: 0, rt: 5, dp: 100 }]; withSong(S);
   const ev = play(NEW(), S).filter(e => e.type === 'fxp'); assert.ok(ev.length > 0); ev.forEach(e => assert.ok(!('b' in e), 'no band key on a non-banded event'));
 });
+
+test('pump windows: PumpFX.lfoId maps a parameter symbol to its target id (the band from the symbol); kit.js adds the menu entry', () => {
+  const S = withSong(eqSong()), fr = bandRow('eq', 'b#_freq'), og = rowOf('eq', 'p_out_gain');
+  const m = cut(/    lfoId\(t, k, sym\)\{[\s\S]*?\n(?=    addLfo\(id\))/, 'PumpFX.lfoId');
+  run('var arr = t => t >= NT ? S.mfx : (S.tfx && S.tfx[t]);'); const lfoId = run('({' + m.replace(/,\s*$/, '') + '}).lfoId', { MT });
+  assert.equal(lfoId(2, 0, 'b3_freq'), `fx:2:0:${fr}:2`); assert.equal(lfoId(2, 0, 'b1_freq'), `fx:2:0:${fr}:0`); assert.equal(lfoId(2, 0, 'out_gain'), `fx:2:0:${og}`);
+  assert.equal(lfoId(2, 0, 'b3_shape'), '', 'a selector'); assert.equal(lfoId(2, 0, 'b3_used'), '', 'a switch'); assert.equal(lfoId(2, 0, 'nope'), ''); assert.equal(lfoId(2, 1, 'b3_freq'), '', 'empty slot');
+  assert.equal(lfoId(32, 0, 'out_gain'), `fx:32:0:${og}`, 'the master');
+  S.tfx[2][0] = run("pumpFresh('comp')"); assert.equal(lfoId(2, 0, 'b3_freq'), '', 'the slot is a COMP now');
+  assert.match(lfoId(2, 0, 'ratio'), /^fx:2:0:\d+$/);
+  const kit = H.read('pump/ui/kit.js'); assert.match(kit, /'Type a value…', \.\.\.\(lid \? \['Add LFO…'\] : \[\]\)\]/); assert.match(kit, /FX\.addLfo\(lid\)/);
+});

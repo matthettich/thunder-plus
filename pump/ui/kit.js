@@ -718,7 +718,9 @@ class Win {
         // Type a value; on a touch screen a double-tap or a long press still types one
         const dflt = () => { const p = this.spec(c.sym); this.setGesture(c.sym, this.h.defaultOf ? this.h.defaultOf(c.sym) : p.def); };
         if (btn === 2){ clearTimeout(this.lpT); const vr = c.valueRect();
-          this.openMenu(vr, ['#' + String(this.spec(c.sym).n || c.label || '').toUpperCase(), 'Reset to default', 'Type a value…'], -1, i => { if (i === 1) dflt(); else if (i === 2) this.openTextEntry(c.sym, vr, this.ringFor(c)); }); return; }
+          // MOD (10 Nov): Add LFO… when the app can modulate this parameter (PumpFX.lfoId: its target id, a band's own symbol names the band)
+          const lid = FX.lfoId ? FX.lfoId(this.t, this.k, c.sym) : '';
+          this.openMenu(vr, ['#' + String(this.spec(c.sym).n || c.label || '').toUpperCase(), 'Reset to default', 'Type a value…', ...(lid ? ['Add LFO…'] : [])], -1, i => { if (i === 1) dflt(); else if (i === 2) this.openTextEntry(c.sym, vr, this.ringFor(c)); else if (i === 3 && lid){ FX.addLfo(lid); this.close(); } }); return; }
         if (dbl && btn === 0){ clearTimeout(this.lpT); if (touch) this.openTextEntry(c.sym, c.valueRect(), this.ringFor(c)); else dflt(); return; }
         if ((m.cmd || m.alt) && btn === 0){ dflt(); return; }
       }
