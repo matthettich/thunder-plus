@@ -7982,7 +7982,7 @@ class PitchFxCore {
     let y = 0; const C = this.cb[ch];
     for (let k = 0; k < 4; k++){ const c = C[k], L = Math.max(16, Math.min(c.b.length, Math.floor((this.cbn[k] + ch * this.spread) * (0.45 + size * 1.7) * this.sr / 44100)));
       if (c.i >= L) c.i = 0; const o = c.b[c.i]; c.f = o * (1 - damp) + c.f * damp; c.b[c.i] = x + c.f * fb; c.i++; y += o; }
-    for (const a of this.ap[ch]){ const L = a.b.length - 8; if (a.i >= L) a.i = 0; const o = a.b[a.i]; a.b[a.i] = y + o * 0.5; a.i++; y = o - y * 0.5; }
+    const AP = this.ap[ch]; for (let q = 0; q < AP.length; q++){ const a = AP[q], L = a.b.length - 8; if (a.i >= L) a.i = 0; const o = a.b[a.i]; a.b[a.i] = y + o * 0.5; a.i++; y = o - y * 0.5; }
     return y * 0.25;
   }
   process(Lb, Rb, n, p){
@@ -10683,6 +10683,18 @@ function shapeData(src, sr, tw){
 }
 // An AudioBuffer for a note with MUT / GEN and / or CUT / RES / DEC on context ac: offline renders (exports) make it here
 // and now; live, a variation renders in the Worker and the pad plays meanwhile (shaped by CUT / DEC all the same).
+/* The AudioBuffers varBuf hands out are only a cache of VAR.map's data (a miss makes the same buffer again). It was capped by
+   count (256) whatever the size: long shaped samples held hundreds of MB. Now also by bytes: 64 MB on a phone / tablet
+   (seqHandHere, the app's device test), 256 MB on a computer. Least recently used go first, never the newest entry. Evicting is
+   safe while a note sounds or a render is pending: a playing AudioBufferSourceNode keeps its own reference to its buffer, and a
+   pending render (VAR.pend) is keyed in VAR.map, not here. */
+const VARBUF_MAX = 256, VARBUF_MAX_BYTES_PHONE = 64e6, VARBUF_MAX_BYTES_PC = 256e6;
+let varBufCap = 0;
+const VARBUF_MAX_BYTES = () => varBufCap || (varBufCap = (typeof seqHandHere === 'function' && seqHandHere()) ? VARBUF_MAX_BYTES_PHONE : VARBUF_MAX_BYTES_PC);
+function varBufTrim(M, maxBytes){
+  const cap = maxBytes || VARBUF_MAX_BYTES(); let bytes = 0; for (const e of M.values()) bytes += e.n || 0;
+  while (M.size > 1 && (M.size > VARBUF_MAX || bytes > cap)){ const k0 = M.keys().next().value, e0 = M.get(k0); M.delete(k0); bytes -= e0.n || 0; }
+}
 function varBuf(ev, ac){
   const sr = ac.sampleRate, live = ac === ctx, I0 = S.insts[ev.ii];
   if (I0 && ((I0.slc | 0) > 1 || I0.sync)) return null;   // sliced / synced: the pad as it is
@@ -10707,7 +10719,8 @@ function varBuf(ev, ac){
   }
   let M = VAR.bufs.get(ac); if (!M){ M = new Map(); VAR.bufs.set(ac, M); }
   const bk = key + (ev.rev ? ':r' : ''); let e = M.get(bk);
-  if (!e || e.d !== rec.data){ const d = ev.rev ? rec.data.slice().reverse() : rec.data, b = ac.createBuffer(1, d.length, rec.sr); b.copyToChannel(d, 0); e = {d:rec.data, b}; M.set(bk, e); if (M.size > 256) M.delete(M.keys().next().value); }
+  if (!e || e.d !== rec.data){ const d = ev.rev ? rec.data.slice().reverse() : rec.data, b = ac.createBuffer(1, d.length, rec.sr); b.copyToChannel(d, 0); e = {d:rec.data, b, n:d.length * 4}; M.delete(bk); M.set(bk, e); varBufTrim(M); }
+  else { M.delete(bk); M.set(bk, e); }   // most recent last (least recently used goes first)
   return e.b;
 }
 // Render a variation in the background (the Worker), once.
@@ -18587,6 +18600,7 @@ class ThunderFx extends AudioWorkletProcessor {
       else if (e.data && e.data.phold){ const q = e.data.phold, P = globalThis.__pumpX, sl = this.slots.find(x => x.key === q.key && x.pu !== undefined); if (P && sl) try { P.pump_hold(sl.pu, q.kind | 0, +q.a || 0, +q.b || 0, +q.c || 0, +q.d || 0); } catch (err){} }
       else this.set(e.data); };
   }
+  sub(A, n){ return n === A.length ? A : A.subarray(0, n); }   // the whole buffer when the block fills it: a view object per call was garbage
   pk(n){ const L = this.L, R = this.R; let p = 0; for (let k = 0; k < n; k++){ const a = L[k] < 0 ? -L[k] : L[k], b = R[k] < 0 ? -R[k] : R[k]; if (a > p) p = a; if (b > p) p = b; } return p < 8 ? p : 8; }
   setTap(list){ this.tapIdx.fill(-1); (Array.isArray(list) ? list : []).forEach((t, i) => { if (t >= 0 && t < 128) this.tapIdx[t] = i; }); }
   // …PUMP: the pump mastering effects (pump.wasm: their plugins' own DSP), one module instance for this audio thread
@@ -18744,7 +18758,7 @@ class ThunderFx extends AudioWorkletProcessor {
     catch (e){ s.dead = true; this.port.postMessage({failed:s.key}); return; }   // crashed: bypassed from now on
     const oL = io.out.out, oR = io.out.outR || oL;
     if (hotBad(oL, oR, n)){ try { if (s.def.destroy) s.def.destroy(s.st); s.st = s.def.create(sampleRate); } catch (e){ s.dead = true; } return; }   // went bad: start it afresh, pass this block
-    L.set(oL.subarray(0, n)); R.set(oR.subarray(0, n)); hotClip(L, R, n);
+    L.set(this.sub(oL, n)); R.set(this.sub(oR, n)); hotClip(L, R, n);
   }
   slotRun(s, n, tr){
     const x = this.x;
@@ -18838,7 +18852,7 @@ class ThunderFx extends AudioWorkletProcessor {
       // …PUMP: each pump slot's latency, when it changes (the FX screen warns on buses: nothing compensates it)
       const P = globalThis.__pumpX; if (P){ const lat = []; for (const s of this.slots) if (s.pu !== undefined && s.pu >= 0) lat.push([s.slot, s.key, P.pump_latency(s.pu)]);
         const k = JSON.stringify(lat); if (k !== this.platS){ this.platS = k; this.port.postMessage({plat:lat}); } } }
-    o[0].set(this.L.subarray(0, n)); if (o[1]) o[1].set(this.R.subarray(0, n));
+    o[0].set(this.sub(this.L, n)); if (o[1]) o[1].set(this.sub(this.R, n));
     let op = 0; for (let k = 0; k < n; k++){ const v = this.L[k] < 0 ? -this.L[k] : this.L[k], w = this.R[k] < 0 ? -this.R[k] : this.R[k]; if (v > op) op = v; if (w > op) op = w; }
     this.idle = ip < 1e-7 && op < 1e-6 ? this.idle + n : 0;
     return true;
@@ -21282,19 +21296,19 @@ class BassProc extends AudioWorkletProcessor {
     if (this.__ov && globalThis.__tcOv) P = globalThis.__tcOv(this, P, outs[0][0].length);   // THUNDER CORE drives this node (core-processor.js)
     const o = outs[0], L = o[0], R = o[1] || o[0], n = L.length, rate = P.rate, gate = P.gate, trig = P.trig, leg = P.leg, c = this.c;
     c.bpm = P.bpm[0]; c.wob = P.wob[0];
-    const rt = i => rate.length > 1 ? rate[i] : rate[0], t0 = Date.now();
+    const t0 = Date.now();   // (no closure per block: the rate is read inline)
     let s = 0;
     for (let i = 0; i < n; i++){
       const tg = trig.length > 1 ? trig[i] : trig[0], ga = (gate.length > 1 ? gate[i] : gate[0]) >= 0.5;
       if (tg !== this.lt || ga !== this.lg){
-        if (i > s){ c.render(L, R, s, i, rt(s)); s = i; }
+        if (i > s){ c.render(L, R, s, i, rate.length > 1 ? rate[s] : rate[0]); s = i; }
         if (tg !== this.lt && ga) c.on((leg.length > 1 ? leg[i] : leg[0]) >= 0.5);
         else if (ga && !this.lg) c.on(false);
         else if (!ga && this.lg) c.off();
         this.lt = tg; this.lg = ga;
       }
     }
-    c.render(L, R, s, n, rt(s));
+    c.render(L, R, s, n, rate.length > 1 ? rate[s] : rate[0]);
     this.ms += Date.now() - t0; this.fr += n;
     if (this.__ov && globalThis.__tcPost) globalThis.__tcPost(this, outs[0]);
     if (this.fr >= sampleRate / 2){ this.port.postMessage({load:this.ms / (this.fr / sampleRate * 1000)}); this.ms = 0; this.fr = 0; }
@@ -21305,6 +21319,7 @@ registerProcessor('thunder-bass', BassProc);`;
 /* The voice engine, live: like the bass, every note is AudioParam automation. syl is the syllable this note
    sings (the player counts notes per track and voice); same = a slide, which keeps the syllable it's on. */
 const VOX_PROC = `
+function vxAt(A, i){ return A.length > 1 ? A[i] : A[0]; }   // (a function of the module: no closure per block)
 class VoxProc extends AudioWorkletProcessor {
   static get parameterDescriptors(){ return [
     {name:'rate', defaultValue:1, minValue:0, maxValue:256, automationRate:'a-rate'},
@@ -21319,19 +21334,19 @@ class VoxProc extends AudioWorkletProcessor {
     if (this.dead) return false;
     if (this.__ov && globalThis.__tcOv) P = globalThis.__tcOv(this, P, outs[0][0].length);   // THUNDER CORE drives this node (core-processor.js)
     const o = outs[0], L = o[0], R = o[1] || o[0], n = L.length, c = this.c, rate = P.rate, gate = P.gate, trig = P.trig, leg = P.leg, syl = P.syl, same = P.same;
-    const at = (A, i) => A.length > 1 ? A[i] : A[0], t0 = Date.now();
+    const t0 = Date.now();
     let s = 0;
     for (let i = 0; i < n; i++){
-      const tg = at(trig, i), ga = at(gate, i) >= 0.5;
+      const tg = vxAt(trig, i), ga = vxAt(gate, i) >= 0.5;
       if (tg !== this.lt || ga !== this.lg){
-        if (i > s){ c.render(L, R, s, i, at(rate, s)); s = i; }
-        if (tg !== this.lt && ga) c.on(at(leg, i) >= 0.5, Math.round(at(syl, i)), at(same, i) >= 0.5);
-        else if (ga && !this.lg) c.on(false, Math.round(at(syl, i)), false);
+        if (i > s){ c.render(L, R, s, i, vxAt(rate, s)); s = i; }
+        if (tg !== this.lt && ga) c.on(vxAt(leg, i) >= 0.5, Math.round(vxAt(syl, i)), vxAt(same, i) >= 0.5);
+        else if (ga && !this.lg) c.on(false, Math.round(vxAt(syl, i)), false);
         else if (!ga && this.lg) c.off();
         this.lt = tg; this.lg = ga;
       }
     }
-    c.render(L, R, s, n, at(rate, s));
+    c.render(L, R, s, n, vxAt(rate, s));
     this.ms += Date.now() - t0; this.fr += n;
     if (this.__ov && globalThis.__tcPost) globalThis.__tcPost(this, outs[0]);
     if (this.fr >= sampleRate / 2){ this.port.postMessage({load:this.ms / (this.fr / sampleRate * 1000)}); this.ms = 0; this.fr = 0; }
@@ -22002,7 +22017,7 @@ function padBlink(e){
 // Phones and tablets (10 Nov): the audio-thread sequencer's module (a second thread) loads only when the owner picked it there
 // (aset.corePick, set in Settings); the saved default 'core' plays on the Page sequencer on such a device.
 function coreWanted(){ return aset.core === 'core' && (!wkLazy() || !!aset.corePick); }   // (a declaration: the Settings row reads it at load)
-const CORE_REV = '44fr4c';
+const CORE_REV = 'aigv0e';
 const CORE_WANT = 7;   // the core's message set this page speaks (core-processor.js CORE_V); an older core is not used
 const CORE_URL = () => 'core/seq-core.js?v=' + BUILD + '-' + CORE_REV;
 const core = {node:null, ready:false, loading:null, gen:0, sent:new Map(), sT:0, tally:new Map(), mir:null};   // mir: what the core's song holds, as JSON per part (coreDiff)   // tally: events by who played them (test hook)
