@@ -71,4 +71,15 @@ if (want('F4')){   // the hand-over to the page sequencer must not cut the MIDI 
   add('F4 a normal STOP still sends All Notes Off', r.stopOff > 0, JSON.stringify(r));
   await A.close();
 }
+if (want('F5')){   // an effect change booked ahead must not land after STOP's restore
+  const A = await fresh();
+  const r = await A.run(`const t = 0; S.tfx[t] = [Object.assign({type:'eq', on:true}, ...TFX.eq.ps.map(q => ({[q.k]:q.d != null ? q.d : q.min})))]; rtInit(); for (let i = 0; i < 100 && !rt.fxOk; i++) await new Promise(r => setTimeout(r, 100)); rtFx(t); await new Promise(r => setTimeout(r, 500));
+    const got = [], o = MessagePort.prototype.postMessage; MessagePort.prototype.postMessage = function(m){ if (m && m.pset) got.push(JSON.stringify(m.pset)); return o.apply(this, arguments); };
+    rt.pl.play({type:'fxp', t:ctx.currentTime + 0.2, track:t, slot:0, pi:0, v:255});   // the song's value, booked 0.2 s ahead
+    rt.pl.stopAll(ctx.currentTime); await new Promise(r => setTimeout(r, 500)); MessagePort.prototype.postMessage = o;
+    return {got, ps: TFX.eq.ps.length};`);
+  const restored = r.got.length >= 1 && r.got[r.got.length - 1] === r.got[0];
+  add('F5 FXV booked 0.2 s ahead, then STOP: the last message to the effect is the restore', restored && r.got.length === 1, JSON.stringify(r));
+  await A.close();
+}
 process.exit(table(rows) ? 1 : 0);

@@ -20472,6 +20472,7 @@ function makePlayer(ac, out, getBuf, live){
   // A tempo change from the song (TPO / TIC) goes to every chains node at its time: live by timer (the
   // sequencer runs a little ahead), in an offline render by suspending the render at that moment.
   const tempoAt = new Map();
+  let seqGen = 0;   // 10 Nov: resetSeq (STOP) bumps it; a timer booked before it (atTime, tempoTo: the look-ahead, 0.25 s and 1.2 s hidden) then does nothing, so it can't undo the restore
   // Something to do at time t on the audio side: live by timer, in an offline render by suspending it there (as tempoTo).
   function atTime(t, f){
     const O = window.OfflineAudioContext || window.webkitOfflineAudioContext;
@@ -20481,7 +20482,7 @@ function makePlayer(ac, out, getBuf, live){
       if (tempoAt.has(at)){ tempoAt.get(at).push(f); return; }
       const list = [f]; tempoAt.set(at, list);
       try { ac.suspend(at).then(() => { for (const g of list) g(); return ac.resume(); }).catch(() => {}); } catch(e){ f(); }
-    } else setTimeout(f, Math.max(0, (t - ac.currentTime) * 1000));
+    } else { const g = seqGen; setTimeout(() => { if (g === seqGen) f(); }, Math.max(0, (t - ac.currentTime) * 1000)); }
   }
   // FXV (owner, 30 Oct): a parameter of one effect slot, set from the song. The slot's other settings stay; the changes add
   // up per slot (fxOv) and go back to the slot's own when the song stops (resetSeq). pump slots don't take it.
@@ -20521,7 +20522,7 @@ function makePlayer(ac, out, getBuf, live){
       if (tempoAt.has(at)){ tempoAt.get(at).push(send); return; }
       const list = [send]; tempoAt.set(at, list);
       try { ac.suspend(at).then(() => { for (const f of list) f(); return ac.resume(); }).catch(() => {}); } catch(e){ send(); }
-    } else setTimeout(send, Math.max(0, (ev.t - ac.currentTime) * 1000));
+    } else { const g = seqGen; setTimeout(() => { if (g === seqGen) send(); }, Math.max(0, (ev.t - ac.currentTime) * 1000)); }
   }
   function play(ev){
     if (MIDI_ONLY_EV.has(ev.type)) return;
@@ -20728,6 +20729,7 @@ function makePlayer(ac, out, getBuf, live){
   }
   // Stopping puts every sequenced effect switch, pattern and the master level back to their settings.
   function resetSeq(at){
+    seqGen++;   // 10 Nov: timers booked ahead by atTime / tempoTo are void from here (the restore below books its own after this)
     fxcPend.clear();
     clk.on = false; try { clock.offset.cancelScheduledValues(at); clock.offset.setValueAtTime(-1, at); } catch(e){}
     for (const n of [...buses.map(b => b && b.fx), mfx]) if (n && n.parameters) for (const k of FXP){ const q = n.parameters.get(k); if (q) try { q.cancelScheduledValues(at); q.setValueAtTime(-1, at); } catch(e){} }
