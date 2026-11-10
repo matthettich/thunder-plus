@@ -1283,6 +1283,9 @@ body.mob .top .kitname{width:auto; flex:1 1 90px; min-width:64px; max-width:220p
 /* FIX (sweep, 4 Nov): on a phone's narrow screen (the Fold's cover screen) with waves and chains shown, the four screen tabs
    pushed ⚙ and CPU off the side (the page scrolled sideways). There the tabs give way and scroll inside themselves. */
 @media (max-width:520px){ body.mob .top #segView{flex:0 1 auto; min-width:0; overflow-x:auto; scrollbar-width:none} body.mob .top #segView::-webkit-scrollbar{display:none} body.mob .top #segView button{padding-inline:8px} }
+/* (10 Nov) Tracker | Synth keeps both words on a phone (360-412 px clipped "Synth" to "Synt"): with two buttons the switch never shrinks or scrolls, the rest of the bar gives way (gap 6 -> 4 px). Waves / Chains still scroll it. */
+@media (max-width:520px){ body.mob .top #segView:not(:has(button:nth-child(3))){flex:none; overflow:visible} }
+@media (max-width:420px){ body.mob .top{gap:4px} }
 body.mob .top .brand{flex-shrink:1; min-width:0; overflow:hidden}
 /* With the chains tab showing (unfolded, or ticked) the tabs are one longer: the name shrinks so the whole title bar stays on one line, unclipped (owner, 8 Nov). */
 body.mob:not(.noch) .top .brand{font-size:15px; letter-spacing:.03em; margin-right:0}
@@ -23358,7 +23361,7 @@ let arrHandT = -1e9, arrActT = -1e9, arrTouchT = -1e9, workT = -1e9;
 const FOLLOW_HOLD = 4000;   // (9 Nov, owner: follow pulled the cursor while editing) for this long after a key or a press on the grid or pad, nothing moves the cursor or the open phrase
 const ARR_IDLE = 60000;
 window.addEventListener('keydown', e => { if (e.key !== ' ' && !/^(Shift|Control|Alt|Meta|AltGraph|CapsLock)$/.test(e.key)) arrActT = workT = performance.now(); }, true);
-window.addEventListener('pointerdown', e => { const q = e.target && e.target.closest; if (q && e.target.closest('[data-b="play"],[data-b="loop"],[data-b="stop"]')) return; if (q && (e.target.closest('#tPad') || e.target.closest('#tArr') || grid.contains(e.target))) workT = performance.now(); }, true);
+window.addEventListener('pointerdown', e => { const q = e.target && e.target.closest; if (q && e.target.closest('[data-b="play"],[data-b="loop"],[data-b="stop"]')) return; if (q && (e.target.closest('#tPad') || e.target.closest('#tArr') || grid.contains(e.target))) workT = performance.now(); if (q && e.target.closest('#tPad')) arrActT = workT; }, true);   // (10 Nov) on a phone the pad is the keyboard: a pad press holds Arrange's paging like a key does
 $('tArr').addEventListener('pointerdown', () => { arrActT = arrTouchT = performance.now(); }, true);
 function arrFollowPage(own){
   const now = performance.now();
@@ -31138,8 +31141,8 @@ document.querySelectorAll('#trk .k[data-b]').forEach(k => {
   const b = k.dataset.b, ptrs = new Set();
   k.addEventListener('pointerdown', e => { e.preventDefault(); try { k.setPointerCapture(e.pointerId); } catch(_){} ptrs.add(e.pointerId); k._pd = true; if (!(b in held)) k.classList.add('dn'); press(b); });
   const up = e => { if (!ptrs.delete(e.pointerId)) return; if (!(b in held)) k.classList.remove('dn'); release(b); };
-  k.addEventListener('pointerup', up); k.addEventListener('pointercancel', up);
-  k.addEventListener('click', () => { const pd = k._pd; k._pd = false; if (pd && b === 'save') return;   /* (SAVE already ran on the press: a long hold must not save twice) */
+  k.addEventListener('pointerup', up); k.addEventListener('pointercancel', e => { k._pd = false; up(e); });
+  k.addEventListener('click', () => { const pd = k._pd; k._pd = false; if (pd) return;   /* (a click that follows its own pointerdown never runs the key again, however slow: SAVE 9 Nov, every pad key 10 Nov) */
     if (!ptrJust()){ press(b, true); release(b, true); } });
 });
 $('trk').addEventListener('contextmenu', e => e.preventDefault());
