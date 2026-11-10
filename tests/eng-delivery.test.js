@@ -51,10 +51,11 @@ test('(a) no commands and no engine LFOs: the old sequencer and the new one send
   const shapes = [{ cells: { 0: [0, 1, 2, 3], 1: [0, 1], 2: [1, 2] } }, { cells: { 4: [0, 1, 2, 3], 0: [2, 3] }, fx: { 1: [['VOL', 99]] } },
     { cells: { 1: [0, 1, 2, 3], 5: [0] }, lfo: { 1: [{ id: 'vol:1', sh: 0, rt: 5, dp: 100 }, { id: 'pan:5', sh: 2, rt: 3, dp: 60 }] } }];
   let n = 0, total = 0;
-  for (const sh of shapes) for (const [mode, o] of [['song', {}], ['song', { live: true, once: false }], ['song', { only: new Set([1]) }], ['sect', { track: 1, sect: 0 }], ['phrase', { track: 1, phrase: 0 }]]){
+  for (const sh of shapes) for (const [mode, o] of [['song', {}], ['song', { live: true, sim: false, once: false }], ['song', { only: new Set([1]) }], ['sect', { track: 1, sect: 0 }], ['phrase', { track: 1, phrase: 0 }]]){
+    if (sh.lfo && o.sim !== false) continue;   // (11 Nov: a render's vol / pan LFOs have 4 points a step like live now, the old core's 2: by design)
     const a = play(old, mkSong(sh), mode, o, 80), b = play(NEW, mkSong(sh), mode, o, 80);
     total += a.length; assert.deepEqual(b, a, mode + ' ' + JSON.stringify(o)); assert.equal(eng(b).length, 0); n++; }
-  assert.equal(n, 15); assert.ok(total > 300);
+  assert.equal(n, 11); assert.ok(total > 300);
 });
 
 test('(b) CUT 40 sends one eng with c.cut = 0x40, CUT FF later c.cut = -1; RES only after a RES command; ATK / DEC / REL likewise', () => {
@@ -72,9 +73,9 @@ test('(b) CUT 40 sends one eng with c.cut = 0x40, CUT FF later c.cut = -1; RES o
   assert.equal(eng(play(NEW, mkSong({ cells: { 1: [0, 1] }, fx: { 0: [['CUT', 0x30]] } }), 'song', REND), 1).length, 1, 'a state that holds sends once');
 });
 
-test('(c) an LFO on cut:t: 4 eng a step live, 2 in a render; o.cut follows the shape about 0 (not clamped); a CUT 60 changes c only', () => {
+test('(c) an LFO on cut:t: 4 eng a step live and in a render; o.cut follows the shape about 0 (not clamped); a CUT 60 changes c only', () => {
   const lfo = { 1: [{ id: 'cut:1', sh: 0, rt: 5, dp: 200 }] };
-  for (const [o, per] of [[LIVE, 4], [REND, 2]]){
+  for (const [o, per] of [[LIVE, 4], [REND, 4]]){
     const E = eng(play(NEW, mkSong({ cells: { 1: [0, 1, 2, 3] }, lfo }), 'song', o), 1);
     assert.equal(E.length, 16 * per, per + ' a step, 16 steps');
     E.forEach(e => { near(e.o.cut, swing(e.t, 5, 200), 'o.cut at ' + e.t); assert.deepEqual(e.c, DEF_C); for (const k of ['res', 'env', 'atk', 'dec', 'sus', 'rel']) assert.equal(e.o[k], 0); });
@@ -91,7 +92,7 @@ test('(c) an LFO on cut:t: 4 eng a step live, 2 in a render; o.cut follows the s
 
 test('(d) the same on env, atk, sus and rel; res and dec too', () => {
   for (const k of ['env', 'atk', 'sus', 'rel', 'res', 'dec']){
-    for (const [o, per] of [[LIVE, 4], [REND, 2]]){
+    for (const [o, per] of [[LIVE, 4], [REND, 4]]){
       const E = eng(play(NEW, mkSong({ cells: { 1: [0, 1, 2, 3] }, lfo: { 1: [{ id: k + ':1', sh: 1, rt: 5, dp: 160 }] } }), 'song', o), 1);
       assert.equal(E.length, 16 * per, k);
       E.forEach(e => { const bt = e.t * 2 / RATES[5], ph = bt - Math.floor(bt), tri = (ph < 0.5 ? ph * 4 - 1 : 3 - ph * 4) * 80; near(e.o[k], tri, k + ' at ' + e.t);
