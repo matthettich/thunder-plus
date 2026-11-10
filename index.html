@@ -3450,7 +3450,7 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
 </div>
 <div class="toast" id="toast" role="status" aria-live="polite" title="Tap to dismiss" hidden></div>
 
-<script src="waves/waves-worklet.js?v=35"></script>
+<script src="waves/waves-worklet.js?v=36"></script>
 <!-- LXR ENGINES (23 Oct 2026): the LXR-02 firmware's drum voices, GPL-3.0, all of it in lxr/. Optional: without the folder
      this fails quietly and the app has no Firmware engines. The render Worker loads the same file (LXR_JS below). -->
 <script src="lxr/lxr-engine.js?v=2"></script>
@@ -8430,7 +8430,7 @@ self.onmessage = async e => {
       if (m.op === 'done') j.ok({data:m.data, data2:m.data2 || null, st:m.st}); else j.no(new Error(m.err));
     };
     w.onerror = e => { e.preventDefault && e.preventDefault(); rwDown(); };
-    w.postMessage({op:'init', pl:plMod, tx:txMod, lx:lxMod || null, ps:psMod || null, wv:new URL('waves/waves-worklet.js?v=35', location.href).href});
+    w.postMessage({op:'init', pl:plMod, tx:txMod, lx:lxMod || null, ps:psMod || null, wv:new URL('waves/waves-worklet.js?v=36', location.href).href});
     PW.w = w;
   } catch(e){ PW.w = null; }
 }
@@ -18946,7 +18946,7 @@ function chainsReady(ac){
     chnLoaded.set(ac, (async () => {
       await tfxLoad; await tfxModLoad; if (!chnBin() || !ac.audioWorklet || !window.AudioWorkletNode) return false;
       if (!chnURL){
-        const src = await (await fetch('chains/chains-worklet.js?v=45')).text();
+        const src = await (await fetch('chains/chains-worklet.js?v=46')).text();
         chnURL = URL.createObjectURL(new Blob([src], {type:'application/javascript'}));
       }
       wkNote(ac, 'chains'); await ac.audioWorklet.addModule(chnURL);
@@ -21695,7 +21695,7 @@ let bassURL = null; const bassLoad = new WeakMap(), bassOK = new WeakSet(), bass
 // …PUMP SYNTHS live: their worklet, loaded with the others; psSent: the contexts whose audio thread has the wasm's bytes
 const PSYN_WK = 'pump/synth/pump-synth-worklet.js?v=11', psOK = new WeakSet(), psSent = new WeakSet();
 // …WAVES LIVE: the waves worklet in the tracker's own context (thunder-wlive); wlSent: the contexts that have the wasm
-const WAVES_WK = 'waves/waves-worklet.js?v=35', wlOK = new WeakSet(), wlSent = new WeakSet();
+const WAVES_WK = 'waves/waves-worklet.js?v=36', wlOK = new WeakSet(), wlSent = new WeakSet();
 /* BATTERY (8 Nov, Fold): a bookkeeping timer that only does something in one situation (playing, the screen visible, one
    screen open) had been waking the phone 2 to 16 times a second for nothing. idleTick(fn, fast, busy, slow) calls fn every
    `fast` ms while busy() says so and every `slow` ms otherwise (fn runs either way, so its own reset-when-idle code still
