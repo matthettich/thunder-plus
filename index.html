@@ -21288,7 +21288,7 @@ const isLivePad = i => isSyn(i) && (isBassV(kit.voices[i]) || isVoxV(kit.voices[
 const liveX = v => !!(v && XENG[v.engine] && XENG[v.engine].live);
 // A bass voice was edited: the live nodes playing it hear the change at once.
 function bassPush(i){ const v = kit.voices[i], vx = isVoxV(v), lx = liveX(v); if (!isBassV(v) && !vx && !lx) return; const kind = vx ? 'vox' : lx ? v.engine : 'bass', p = vx ? voxParams(v) : lx ? xParams(v) : bassParams(v); for (const b of bassLive) if (b.pad === i && b.kind === kind) try { const fs = lx ? frzSample(v) : null; if (b.lanes && fs !== (b.fileRef || null)){ b.fileRef = fs; b.node.port.postMessage({set:p, file:fs ? {d:fs.data, sr:fs.sr} : {d:null}}); } else b.node.port.postMessage({set:p}); } catch(e){} }   // FREEZE FILE: the sound only when it changed
-const MW_URL = 'master-worklet.js?v=5', mwLoad = new WeakMap();
+const MW_URL = 'master-worklet.js?v=6', mwLoad = new WeakMap();
 function mwReady(ac){ if (!mwLoad.has(ac)){ const go = ac.audioWorklet && !wkOff(ac), pr = go ? ac.audioWorklet.addModule(MW_URL).then(() => true, () => false) : Promise.resolve(false); mwLoad.set(ac, pr); if (go) wkNote(ac, 'master'); } return mwLoad.get(ac); }
 const mstSet = M => ({sup:M.sup, comp:M.comp, lim:M.lim});
 const mstNeedsWk = M => M.sup.on || M.comp.on || M.lim.on;
@@ -21689,7 +21689,7 @@ function padBlink(e){
 // Phones and tablets (10 Nov): the audio-thread sequencer's module (a second thread) loads only when the owner picked it there
 // (aset.corePick, set in Settings); the saved default 'core' plays on the Page sequencer on such a device.
 function coreWanted(){ return aset.core === 'core' && (!wkLazy() || !!aset.corePick); }   // (a declaration: the Settings row reads it at load)
-const CORE_REV = '37iagj';
+const CORE_REV = '1uvz725';
 const CORE_WANT = 7;   // the core's message set this page speaks (core-processor.js CORE_V); an older core is not used
 const CORE_URL = () => 'core/seq-core.js?v=' + BUILD + '-' + CORE_REV;
 const core = {node:null, ready:false, loading:null, gen:0, sent:new Map(), sT:0, tally:new Map(), mir:null};   // mir: what the core's song holds, as JSON per part (coreDiff)   // tally: events by who played them (test hook)
