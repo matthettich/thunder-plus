@@ -18,7 +18,7 @@ Caveat on this environment: headless audio is slow and a few runs lost the brows
 | 8 | Arrange pages again after the 4 s hold: keyboard key | 9 Nov: phone bug list (529) | FIXED | Desktop, ArrowDown while playing, playhead far past the page: first page at 5.3 s (FOLLOW ON) and 4.3 s (FOLLOW PATTERN) after the key; not before (c2.mjs). |
 | 9 | Arrange pages after the hold: tap in Arrange, selecting patterns doesn't fight | 9 Nov: phone bug list (529) / 9 Nov: what to test on the phone (530) #6 | FIXED | Phone, tap a block in Arrange: no paging until 4.3-4.8 s (FOLLOW ON), 9 s sample (FOLLOW PATTERN). |
 | 10 | Arrange pages after the hold when the last input was a PAD press (the phone's keys) | 9 Nov: phone bug list (529) / 9 Nov: what to test on the phone (530) #6 | NOT FIXED | Pad ▼ then Arrange pages after about 1.4 s (ON), 1.3 s (PATTERN), 2.1 s (OFF); keyboard on desktop honours 4 s / 60 s. See NOT FIXED #1. |
-| 11 | FOLLOW OFF keeps its minute (keyboard) | 9 Nov: phone bug list (529) | FIXED | Desktop FOLLOW OFF: no paging for 18 s after ArrowDown. (Phone pad: see the NOT FIXED item.) |
+| 11 | FOLLOW OFF keeps its minute (keyboard) | 9 Nov: phone bug list (529) | PARTLY TESTED | Desktop FOLLOW OFF: no paging for 18 s after ArrowDown (the full minute was not waited out). (Phone pad: see the NOT FIXED item.) |
 | 12 | curToPlay clears the .pg flag so the cursor isn't hidden after stopping | 9 Nov: phone bug list (529) | UNTESTED | cs.*.pg not read after a stop; only cursor position checked. |
 | 13 | PHRASE ON STOP = STAYS keeps the cursor and phrase | 9 Nov: phone bug list (529) / 9 Nov: what to test on the phone (530) #7 | FIXED | FOLLOW PATTERN carried cPhrase to 5 while playing; STOP: cPhrase 0, row 3 as before (i1.mjs). |
 | 14 | ARRANGE ON STOP = STAYS keeps the Song cursor and view | 9 Nov: phone bug list (529) / 9 Nov: what to test on the phone (530) #7 | FIXED | Song screen, FOLLOW ON and PATTERN, long song: after STOP y and top back to their pre-PLAY values (y 1/4, top 0) (c1.mjs). |
@@ -53,7 +53,7 @@ Caveat on this environment: headless audio is slow and a few runs lost the brows
 | 43 | M.PAT on Arrange mutes / unmutes the block | 9 Nov: phone bug list (529) / 9 Nov: what to test on the phone (530) | FIXED | Song screen: block muted true, again false. |
 | 44 | RET and RTG are labelled note repeat and FX stutter; no duplicate retrigger commands | 9 Nov: phone bug list (529) | FIXED | Command help: RET 'Note repeat…', RTG 'FX stutter…'; the 78 command names are unique. |
 | 45 | New songs start with mastering off; the master FX screen lists CALM, COMP, TONE | 9 Nov: phone bug list (529) | FIXED | New song: pEQ, pCALM, pCOMP, pTONE, pMASTER present and off; master FX screenshot k4_mfx.png shows their windows. |
-| 46 | Chains tab always shown unfolded | 9 Nov: phone bug list (529) | FIXED | 720 px: Tracker | Synth | Chains; 412: Tracker | Synth. |
+| 46 | Chains tab always shown unfolded | 9 Nov: phone bug list (529) | FIXED | 720 px: Tracker \| Synth \| Chains; 412: Tracker \| Synth. |
 | 47 | Synth pads scroll on a phone | 9 Nov: phone bug list (529) | FIXED | Pads panel scrollHeight 180 > clientHeight 125, overflow auto. |
 | 48 | Messages at the top on phones | 9 Nov: phone bug list (529) | FIXED | Toast appears over the top bar (e1_fold_solo.png). |
 | 49 | Wider resize grip | 9 Nov: phone bug list (529) / 9 Nov: what to test on the phone (530) | UNTESTED | .dkgrip measured 0x0 on the screens tried. |

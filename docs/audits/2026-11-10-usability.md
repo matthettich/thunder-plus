@@ -1,7 +1,9 @@
 # Thunder Plus usability audit, step 4 (beta, build 544)
 
 Walked headless Chromium at 369x800 touch, 800x900 touch, 1440x900 mouse and 1920x1080 mouse, on a clone of `beta`.
-Screenshots: `/tmp/claude-0/-home-claude/d264eb71-4c3c-5584-8350-19d577ccaae5/scratchpad/step4/shots/` (prefix `fold-` 369, `unf-` 800, `mac-` 1440, `win-` 1920). Line numbers are `index.html` at build 544.
+Note (lead, 10 Nov): the screenshots were in the audit session's temporary folder and were not kept, so retake one before acting on a finding. Before working the quick-win list below: leave out its items that the "needs the owner's decision" list also asks about (Help placement, the Settings Done button, toast placement) until he answers, and where the 40 px rule fixes only a target's height (Play, CPU, the FX tab are also narrow) treat the width as a layout decision.
+
+Screenshots (gone): `/tmp/claude-0/-home-claude/d264eb71-4c3c-5584-8350-19d577ccaae5/scratchpad/step4/shots/` (prefix `fold-` 369, `unf-` 800, `mac-` 1440, `win-` 1920). Line numbers are `index.html` at build 544.
 
 **Not covered or not trustworthy (read this first)**
 - The sandbox was under heavy load from other processes (load average 35-50, one OOM kill), so some taps and clicks timed out in my harness. Every finding below was seen in a screenshot or a DOM read, not inferred from a timeout.
