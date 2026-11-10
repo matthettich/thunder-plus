@@ -23788,7 +23788,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 554;
+const BUILD = 555;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD + (location.pathname.includes('/beta/') ? ' · beta' : '');
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -33218,6 +33218,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [555, '10 Nov', ['The commands CUT, RES, ATK, DEC and REL now reach the live synths\' own filter and envelope while a note is held (bass, acid, machine, vox and the …pump live synths): CUT on the same scale as on sampled pads, FF = the pad\'s own knob.', 'MOD on live synths: an LFO on CUT, RES or DEC now sweeps a held note both ways around the knob, and four new targets, ENV (filter envelope), ATK, SUS and REL, appear on tracks that play a live synth.', 'Starting a song from a later row applies the CUT / RES / ATK / DEC / REL commands already in force to the live synths.']],
   [554, '10 Nov', ['MOD: …pump effect knobs can be LFO targets (Add LFO… on the knob; per-band EQ rows not yet).', 'Saving also waits for, and asks about, song-preset samples and impulse responses that are missing.', 'The playback report gives the average and peak level of each play, so two settings can be compared.']],
   [553, '10 Nov', ['MOD: LFOs now run whenever the song plays, on any track, bus or the master, even when that track has no pattern on the current row (an LFO on a master effect used to stand still). A muted block still stops its LFO.', 'Battery: with nothing playing, the sound engine now goes to sleep after 90 seconds on a phone (5 minutes on a computer) and wakes on the next sound.', 'Fewer clicks under load: the audio engine creates far less memory garbage while playing, and long shaped samples no longer pile up in memory.']],
   [552, '10 Nov', ['Saving a project, sharing it or exporting a kit now waits for samples that are still loading, and asks before writing a file without a sample\'s audio.', 'If your audio output is unplugged or the computer wakes from sleep, the app reopens the sound: it plays on the system default and returns to your output when it is back. Reset audio engine re-applies the output too, and …waves follows it.', 'Phone: synced delays no longer bend in pitch while the song is being held in time; background play is started again if Android pauses it.', 'Smoother first use of effects, and no freeze when resuming late in a long song (computer, Audio thread sequencer).']],
