@@ -307,7 +307,7 @@ class MasterProcessor extends AudioWorkletProcessor {
     // A NaN / Infinity setting (or a compressor ratio of 0 or less) would poison a stage's state for good, so such a value is
     // ignored and the stage keeps its previous one. Finite settings go through unchanged.
     const fin = o => { const r = {}; for (const k in o){ const v = o[k]; if (typeof v !== 'number' || (v - v) === 0) r[k] = v; } return r; };
-    if (s.sup){ this.on.sup = !!s.sup.on; this.sup.set(fin(s.sup)); }
+    if (s.sup){ this.on.sup = !!s.sup.on; const u = fin(s.sup); if (!(u.lo > 0)) delete u.lo; if (!(u.hi > 0)) delete u.hi; this.sup.set(u); }   // (lo / hi go through log2 in setFocus: zero or less is kept out too)
     if (s.comp){ this.on.comp = !!s.comp.on; const c = fin(s.comp); if (!(c.ratio > 0)) delete c.ratio; this.comp.set(c); }
     if (s.lim){ this.on.lim = !!s.lim.on; this.lim.set(fin(s.lim)); }
   }
