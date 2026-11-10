@@ -8361,7 +8361,8 @@ function audio(){
     try { if (ctx.renderCapacity){ ctx.renderCapacity.addEventListener('update', e => { cpu.cap = {avg:e.averageLoad, peak:e.peakLoad, under:e.underrunRatio, t:performance.now()}; }); ctx.renderCapacity.start({updateInterval:0.5}); } else if (!wkLazy()) cpuProbe(ctx); } catch(e){}   // no renderCapacity: time the audio thread (phones: when the first other module loads, wkHook)
     master = ctx.createGain(); master.gain.value = clamp(aset.vol, 0, 100) / 100; master.connect(ctx.destination);
     if (!wkLazy()) try { mwReady(ctx); } catch(e){ tpLog('safety limiter did not start', e); }   // (phones: the stand-in until another module loads, safeLim)   // the safety limiter's worklet, loading before the first note needs it
-    ctx.addEventListener && ctx.addEventListener('statechange', () => { try { pbLog('engine ' + ctx.state + ' · ' + pbState()); } catch(e){} audStatus(); if (typeof audioInterrupted === 'function') audioInterrupted(); });
+    ctx.addEventListener && ctx.addEventListener('statechange', () => { try { pbLog('engine ' + ctx.state + ' · ' + pbState()); } catch(e){} audStatus(); if (typeof audioInterrupted === 'function') audioInterrupted(); try { devOnState(); } catch(e){} });
+    try { ctx.addEventListener('sinkchange', () => { try { pbLog('engine output changed · ' + pbState()); devRecover('sinkchange'); } catch(e){} }); } catch(e){}   // (DEVICE RECOVERY)
     prerender();   // ensure() re-renders only the pads whose rate differs from this context's
   }
   if (ctx.state !== 'running' && ctx.state !== 'closed' && !rkKick){ bgSus = false; ctx.resume().catch(() => {}); }   // (RUNAWAY KICK: not while its short pause runs) (10 Nov: not only 'suspended': newer Chrome reports 'interrupted' after a call or a device switch)
@@ -13400,6 +13401,22 @@ async function resolveSamples(){
     try { if (S && S.presets && JSON.stringify(S.presets).includes('"b64"')){ await Promise.all(presetsByRef(S.presets)); saveS(); } } catch(e){ tpLog('could not move preset samples out of the song', e); }
   } finally { smpResolving = false; }
 }
+// SAVE SAFETY: a file must not be written without the audio of a sample the user still has. smpToJSON writes only a {ref}
+// for a layer whose audio has not arrived from IndexedDB yet (right for the localStorage autosave, wrong for a file).
+// smpNoAudio counts those layers; smpSaveGate waits (capped) for the load, then asks before an incomplete file is written.
+function smpNoAudio(){ let n = 0; for (const v of kit.voices) for (const L of v.layers) if (L.sample && L.sample.id && !L.sample.data) n++; return n; }
+async function smpSaveGate(capMs, quiet){
+  const wait = ms => new Promise(r => setTimeout(r, ms)), end = Date.now() + (capMs || 10000);
+  while (smpNoAudio() && Date.now() < end){
+    if (smpResolving) await wait(100); else await Promise.race([resolveSamples(), wait(Math.max(1, end - Date.now()))]);
+    if (!smpResolving && smpNoAudio()) break;   // the lookup finished and these are not in this browser's storage
+  }
+  const n = smpNoAudio(); if (!n) return true;
+  if (quiet) return !smpResolving;   // (a backup waits only for samples still loading; ones that are gone for good must not stop backups for ever)
+  const what = n + (n > 1 ? ' samples' : ' sample');
+  return await askYes(smpResolving ? {title:what + ' not loaded yet', body:what + (n > 1 ? ' have' : ' has') + ' not finished loading, so the file would be saved without ' + (n > 1 ? 'them' : 'it') + '. Wait a moment and save again, or save anyway.'}
+    : {title:what + ' could not be found', body:what + (n > 1 ? ' were' : ' was') + ' not found in this browser’s storage: the file would be saved without ' + (n > 1 ? 'them' : 'it') + '. Save anyway?'}, 'Save anyway');
+}
 // Drops stored samples the kit no longer uses (only from this app's own store). Samples the saved kit and song still
 // name count as used (another tab may have saved them), and nothing is dropped while another tab of the app is open:
 // a second tab loading a kit used to delete the first tab's samples from under it.
@@ -14052,7 +14069,7 @@ $('audOut').addEventListener('change', async e => {
     try { await ctx.setSinkId(id); toast('Playing through ' + (id ? name : 'the system default') + '.'); }
     catch(err){ toastErr('Couldn’t switch to that output' + (err && err.message ? ': ' + err.message : '.')); }
   } else if (sinkOk) toast('Saved. It plays through ' + (id ? name : 'the system default') + ' from the first sound.');
-  audStatus();
+  audStatus(); try { const w = wvApi(); if (w && w.sinkChanged) w.sinkChanged(); } catch(e){}
 });
 $('audNames').addEventListener('click', async () => {
   // Browsers only name output devices once the page has been allowed a microphone; it's closed again at once.
@@ -14119,7 +14136,7 @@ $('audDefaults').addEventListener('click', async () => {
   toast('Audio settings are back to their defaults.');
 });
 $('audReport').addEventListener('click', () => pbCopy());
-if (navigator.mediaDevices && navigator.mediaDevices.addEventListener) navigator.mediaDevices.addEventListener('devicechange', () => { if (!$('pAudio').hidden) audRefresh(); });
+if (navigator.mediaDevices && navigator.mediaDevices.addEventListener) navigator.mediaDevices.addEventListener('devicechange', () => { if (!$('pAudio').hidden) audRefresh(); try { devRecover('devicechange'); } catch(e){} });
 /* ---------- skins (the Seeds set) ---------- */
 const SKINS = [
   {id:'auto', name:'Pastel (follows your system)', base:'pastel', dots:['#d6dbe4', '#dce7f6', '#f5eec6', '#f6dae3']},
@@ -14288,7 +14305,7 @@ for (const sk of SKINS){
   b.append(d, el('span', null, sk.name)); b.addEventListener('click', () => applySkin(sk.id)); $('skins').append(b);
 }
 applySkin(skin);
-$('bSaveKit').addEventListener('click', () => deliver(kitBase() + '.json', new Blob([JSON.stringify(kitToJSON(false))], {type:'application/json'})));
+$('bSaveKit').addEventListener('click', async () => { if (!await smpSaveGate()) return; deliver(kitBase() + '.json', new Blob([JSON.stringify(kitToJSON(false))], {type:'application/json'})); });
 $('bLoadKit').addEventListener('click', () => $('kitIn').click());
 // A kit slot per track (off by default: the classic 16 slots). On, slots 9+ follow the song's tracks.
 $('ckVtrk').checked = vtrk;
@@ -16924,7 +16941,9 @@ let plFailed = false;
   // …PUMP SYNTHS: pump/synth/pump-synth.wasm, compiled here and handed to the render Worker (as LXR's is)
   const psP = typeof PsynCore !== 'undefined' ? PsynCore.load('pump/synth/pump-synth.wasm?v=7').catch(e => { tpLog('pump synths wasm (the pump engines will be silent)', e); return null; }) : Promise.resolve(null);
   // …PUMP: the pump mastering effects (pump/pump.wasm), fetched alongside; effect nodes that asked for it get it now
-  bytes(PUMP_WASM).then(b => { pumpWasmBytes = b; for (const n of pumpWait) try { n.port.postMessage({pumpBytes:b}); } catch(e){} pumpWait.clear(); pumpToChains(b);
+  bytes(PUMP_WASM).then(async b => {
+    if (WASM_PRECOMPILE) try { pumpWasmMod = await WebAssembly.compile(b); } catch(e){ pumpWasmMod = null; }   // compiled here, before any node gets it (they pass sound until it arrives, as before)
+    pumpWasmBytes = b; for (const n of pumpWait) try { n.port.postMessage(pumpWasmMod ? {pumpModule:pumpWasmMod} : {pumpBytes:b}); } catch(e){} pumpWait.clear(); pumpToChains(b);
     return WebAssembly.instantiate(b, imp).then(r => { pumpMain = r.instance.exports; if (pumpMain._initialize) pumpMain._initialize(); try { if (typeof rt !== 'undefined' && rt && rt.pl) rt.pl.pdcSync(); } catch(e){} }); }).catch(e => { if (PM) console.warn('pump effects', e); });
   const [plB, txB] = await Promise.all([bytes(WASM_DSP).catch(e => { tpLog('wasm fetch (dsp)', e); return null; }), bytes(WASM_TFX).catch(e => { tpLog('wasm fetch (effects)', e); return null; })]);
   tfxBytes = txB || false; tfxLoadDone();
@@ -16935,9 +16954,10 @@ let plFailed = false;
   } catch(e){ plFailed = true; plMod = null; tpLog('wasm init (dsp: Plaits / Elements will be silent)', e); }
   try {
     if (!txB) throw new Error('no tfx wasm');
-    txMod = await WebAssembly.compile(txB);
+    txMod = await WebAssembly.compile(txB); if (WASM_PRECOMPILE) tfxMod = txMod;
     TX = await WebAssembly.instantiate(txMod, imp); if (TX.exports._initialize) TX.exports._initialize();
-  } catch(e){ txMod = null; tpLog('wasm init (effects: the wasm effects will be bypassed)', e); }
+  } catch(e){ txMod = null; tfxMod = null; tpLog('wasm init (effects: the wasm effects will be bypassed)', e); }
+  tfxModDone();
   try {
     if (globalThis.WavesDSP && plMod && txMod){ WavesDSP.wasmInit({dspModule:plMod, tfxModule:txMod}); WV.ready = true; }
     if (plMod) globalThis.__wlMods = {dsp:plMod, tfx:txMod};   // …WAVES LIVE: its nodes get the compiled modules
@@ -18540,8 +18560,9 @@ class ThunderFx extends AudioWorkletProcessor {
     const op = o.processorOptions || {};
     const __op = op; if (__op.cid){ this.__cid = __op.cid; (globalThis.__tcNodes || (globalThis.__tcNodes = new Map())).set(__op.cid, this); }   // THUNDER CORE: FXO / FLX / GAT / RTG from the audio thread
     if (op.irs !== undefined) globalThis.__thunderIR = op.irs;   // the song's impulse responses (Convolution reverb), for this whole audio thread
-    if (!globalThis.__tfxMod) globalThis.__tfxMod = new WebAssembly.Module(op.bytes);
+    if (!globalThis.__tfxMod) globalThis.__tfxMod = op.module || new WebAssembly.Module(op.bytes);   // op.module: compiled on the page (WASM_PRECOMPILE)
     if (op.pump && !globalThis.__pumpBytes) globalThis.__pumpBytes = op.pump;   // …PUMP: pump.wasm, compiled when a pump slot first needs it
+    if (op.pumpModule && !globalThis.__pumpMod) globalThis.__pumpMod = op.pumpModule;   // (or the module the page compiled)
     this.ptel = new Map(); this.platS = '';   // …PUMP: the pump slots whose full telemetry a pop-up wants (key → {back, rp}); the latencies last reported
     const z = () => 0;
     this.x = new WebAssembly.Instance(globalThis.__tfxMod, {wasi_snapshot_preview1:{fd_close:z, fd_seek:z, fd_write:z, proc_exit:z}}).exports;
@@ -18559,7 +18580,7 @@ class ThunderFx extends AudioWorkletProcessor {
         const c = this.tapIdx[v - 9]; return (c >= 0 && this.taps && this.taps[c]) || this.zero; }};
     this.set(op.chain || []);
     this.port.onmessage = e => { if (e.data === null){ this.dead = true; for (const s of this.slots) this.drop(s); this.slots = []; } else if (e.data && e.data.irs !== undefined) globalThis.__thunderIR = e.data.irs; else if (e.data && e.data.tapmap) this.setTap(e.data.tapmap); else if (e.data && e.data.tel !== undefined) this.tel = !!e.data.tel; else if (e.data && e.data.lvl !== undefined){ this.lvl = !!e.data.lvl; this.lvlN = 0; this.lvlP = new Float32Array(8); }
-      else if (e.data && e.data.pumpBytes){ if (!globalThis.__pumpBytes) globalThis.__pumpBytes = e.data.pumpBytes; this.pumpAsked = false; this.set(this.chain || []); }
+      else if (e.data && (e.data.pumpBytes || e.data.pumpModule)){ if (e.data.pumpModule && !globalThis.__pumpMod) globalThis.__pumpMod = e.data.pumpModule; if (e.data.pumpBytes && !globalThis.__pumpBytes) globalThis.__pumpBytes = e.data.pumpBytes; this.pumpAsked = false; this.set(this.chain || []); }
       else if (e.data && e.data.ptel){ const q = e.data.ptel; if (q.on) this.ptel.set(q.key, {back:Math.max(0, Math.min(32768, q.back | 0)), rp:[]}); else this.ptel.delete(q.key); }
       else if (e.data && e.data.pset){ const q = e.data.pset, ch = (this.chain || []).map(c => c && c.slot === q.slot ? Object.assign({}, c, q.p ? {p:q.p} : {}, q.mp ? {mp:q.mp} : {}, q.pv ? {pv:q.pv} : {}) : c); this.set(ch); }   // FXV: one slot's settings for now (the chain's own come back with the next full set)
       else if (e.data && e.data.pmidi){ const q = this.pq || (this.pq = []); for (const m of e.data.pmidi) q.push(m); q.sort((a, b) => a[1] - b[1]); }   // …PUMP CREATIVE: [slot, at (s), status, d1, d2]
@@ -18570,10 +18591,10 @@ class ThunderFx extends AudioWorkletProcessor {
   setTap(list){ this.tapIdx.fill(-1); (Array.isArray(list) ? list : []).forEach((t, i) => { if (t >= 0 && t < 128) this.tapIdx[t] = i; }); }
   // …PUMP: the pump mastering effects (pump.wasm: their plugins' own DSP), one module instance for this audio thread
   pumpX(){
-    const g = globalThis; if (g.__pumpX) return g.__pumpX; if (!g.__pumpBytes) return null;
-    try { const z = () => 0, m = new WebAssembly.Module(g.__pumpBytes);
+    const g = globalThis; if (g.__pumpX) return g.__pumpX; if (!g.__pumpMod && !g.__pumpBytes) return null;
+    try { const z = () => 0, m = g.__pumpMod || new WebAssembly.Module(g.__pumpBytes);
       const x = new WebAssembly.Instance(m, {wasi_snapshot_preview1:{fd_close:z, fd_seek:z, fd_write:z, proc_exit:z}}).exports;
-      if (x._initialize) x._initialize(); g.__pumpX = x; return x; } catch (e){ g.__pumpBytes = null; return null; }
+      if (x._initialize) x._initialize(); g.__pumpX = x; return x; } catch (e){ g.__pumpBytes = null; g.__pumpMod = null; return null; }
   }
   pumpIO(P){ if (this.pbuf !== P.memory.buffer){ this.pbuf = P.memory.buffer; this.pIO = [0, 1, 2, 3].map(c => new Float32Array(this.pbuf, P.pump_io(c), 128)); } return this.pIO; }
   pumpNew(P, s){
@@ -18826,12 +18847,18 @@ class ThunderFx extends AudioWorkletProcessor {
 registerProcessor('thunder-tfx', ThunderFx);
 `;
 let tfxBytes = null, tfxURL = null;
+/* WASM_PRECOMPILE: tfx / pump / pump-synth wasm are compiled once on this page and the WebAssembly.Module goes to the audio
+   threads (as waves live's does); the worklet then only instantiates. false: the bytes are sent and compiled on the audio thread, as before. */
+const WASM_PRECOMPILE = true;
+let tfxMod = null, pumpWasmMod = null;   // the compiled modules (null: not compiled, or it failed: the bytes go instead)
+let tfxModDone = null; const tfxModLoad = new Promise(r => { tfxModDone = r; });   // settled once the page's compile of tfx.wasm has finished (or failed)
 let tfxLoadDone = null; const tfxLoad = new Promise(r => { tfxLoadDone = r; });   // settled by the wasm loader (fetched, or failed)
 const tfxLoaded = new WeakMap();
 /* chains host: one thunder-chains node per track (chains/chains-worklet.js).
    Loaded lazily per AudioContext, reusing the same tfx.wasm bytes as the track FX. */
 let chnURL = null;
 const chnLoaded = new WeakMap();
+const tfxModOpt = () => tfxMod || null, pumpModOpt = () => pumpWasmMod || null;   // the page-compiled modules (null with WASM_PRECOMPILE off, or when a compile failed)
 function chnBin(){
   const b = tfxBin();   // chains FX are the same tfx.wasm build as the track FX
   return b || null;
@@ -18840,9 +18867,9 @@ function chainsReady(ac){
   if (wkOff(ac)) return Promise.resolve(false);   // WORKLETS OFF (test)
   if (!chnLoaded.has(ac)){
     chnLoaded.set(ac, (async () => {
-      await tfxLoad; if (!chnBin() || !ac.audioWorklet || !window.AudioWorkletNode) return false;
+      await tfxLoad; await tfxModLoad; if (!chnBin() || !ac.audioWorklet || !window.AudioWorkletNode) return false;
       if (!chnURL){
-        const src = await (await fetch('chains/chains-worklet.js?v=43')).text();
+        const src = await (await fetch('chains/chains-worklet.js?v=44')).text();
         chnURL = URL.createObjectURL(new Blob([src], {type:'application/javascript'}));
       }
       wkNote(ac, 'chains'); await ac.audioWorklet.addModule(chnURL);
@@ -18995,9 +19022,9 @@ function chainsNode(ac, track, patch, tempo, cid){
   // Sidechain Outs, one channel per send. 'max' so the inputs arrive with all their channels.
   const n = new AudioWorkletNode(ac, 'thunder-chains', {numberOfInputs:6, numberOfOutputs:2, outputChannelCount:[2, 8], channelCount:2,
     channelCountMode:'max', channelInterpretation:'speakers',
-    processorOptions:{cid:cid || null, bytes:chnBin(), pump:pumpBin() || null, track, patch, quality:'full', transport:{tempo:tempo || S.bpm || 120, lpb:S.lpb || 4, ticks:S.ticks || TICKS, playing:tp.on}, irs:irsOpt(ac),
+    processorOptions:Object.assign({cid:cid || null, track, patch, quality:'full', transport:{tempo:tempo || S.bpm || 120, lpb:S.lpb || 4, ticks:S.ticks || TICKS, playing:tp.on}, irs:irsOpt(ac),
       // BUS and SOURCE maps from the start (later changes go as messages): an offline render can finish before a message arrives.
-      busMap:(busPlan().feeds.get(track) || []).slice(0, 32), tapMap:chnTapList(patch)}});
+      busMap:(busPlan().feeds.get(track) || []).slice(0, 32), tapMap:chnTapList(patch)}, tfxModOpt() ? {tfxModule:tfxModOpt()} : {bytes:chnBin()}, pumpModOpt() ? {pumpModule:pumpModOpt()} : {pump:pumpBin() || null})});
   n.load = 0;
   // 2048 samples (~45 ms) per look, read every 60 ms, so short hits (hats, clicks) still show on the meters.
   n.an = ac.createAnalyser(); n.an.fftSize = 2048;   // hears the chains return: the chain screen's Chain Out meters
@@ -19096,7 +19123,7 @@ function tfxReady(ac){
   if (wkOff(ac)) return Promise.resolve(false);   // WORKLETS OFF (test)
   if (!tfxLoaded.has(ac)){
     tfxLoaded.set(ac, (async () => {
-      await tfxLoad; if (!tfxBin() || !ac.audioWorklet || !window.AudioWorkletNode) return false;
+      await tfxLoad; await tfxModLoad; if (!tfxBin() || !ac.audioWorklet || !window.AudioWorkletNode) return false;
       await chainsReady(ac);   // the chains engine publishes the shared modules (ChainsDSP) in the audio thread, for the MODFX slots
       if (!tfxURL) tfxURL = URL.createObjectURL(new Blob([rvMix.toString() + '\n' + DegradeCore.toString() + '\n' + VSampCore.toString() + '\n' + ResonCore.toString() + '\n' + PitchFxCore.toString() + '\n' + clkSpb.toString() + '\n' + FlexCore.toString() + '\n' + StepGateCore.toString() + '\n' + RetrigCore.toString() + '\n' + beatLock.toString() + '\n' + bkHash.toString() + '\n' + GrainsCore.toString() + '\n' + ScrambleCore.toString() + '\n' + GlitchCore.toString() + '\n' + TFX_SRC], {type:'application/javascript'}));
       wkNote(ac, 'tfx'); await ac.audioWorklet.addModule(tfxURL);
@@ -19152,12 +19179,12 @@ function tfxNode(ac, chain, cid){
   // Inputs: 0 the track, 1 (SOURCE) the picked tracks' own sounds, one channel each ('tapmap'), 2 (SENDS) the Sidechain Out sends.
   const pb = pumpBin() && !pumpSent.has(ac) ? pumpBin() : null; if (pb) pumpSent.add(ac);
   const n = new AudioWorkletNode(ac, 'thunder-tfx', {numberOfInputs:3, numberOfOutputs:1, outputChannelCount:[2], channelCount:2,
-    channelCountMode:'max', channelInterpretation:'speakers', processorOptions:{bytes:tfxBin(), chain, irs:irsOpt(ac), tapMap:keyTrackList(), pump:pb, cid:cid || null}});   // irs: this audio thread's copy of the song's impulse responses
+    channelCountMode:'max', channelInterpretation:'speakers', processorOptions:Object.assign({chain, irs:irsOpt(ac), tapMap:keyTrackList(), cid:cid || null}, tfxModOpt() ? {module:tfxModOpt()} : {bytes:tfxBin()}, pb ? (pumpModOpt() ? {pumpModule:pumpModOpt()} : {pump:pb}) : {pump:null})});   // irs: this audio thread's copy of the song's impulse responses
   n.load = 0; n.port.onmessage = e => { const d = e.data; if (!d) return;
     if (typeof d.load === 'number') n.load = n.load * 0.6 + d.load * 0.4;
     if (d.dyn) fxDynIn(n, d.dyn);
     if (d.lvl){ n.lvl = d.lvl; n.lvlT = performance.now(); }   // FX BAR: each slot's level out (fxLvlSet)
-    if (d.needPump){ if (pumpBin()) n.port.postMessage({pumpBytes:pumpBin()}); else pumpWait.add(n); }
+    if (d.needPump){ if (pumpBin()) n.port.postMessage(pumpModOpt() ? {pumpModule:pumpModOpt()} : {pumpBytes:pumpBin()}); else pumpWait.add(n); }
     if (d.pump) PumpFX._feed(n, d.pump);
     if (d.pst) PumpFX._pst(n, d.pst);   // …PUMP STATE: the plugin changed its own (MASTER learned)
     if (d.plat){ n.plat = d.plat; PumpFX._lat(n, d.plat); }
@@ -20478,7 +20505,7 @@ function makePlayer(ac, out, getBuf, live){
     if (!sp || !by || !psOK.has(ac) || (ac === ctx && (psLive.off || aset.psLive === 'render'))) return null;   // (Settings → Audio → Live engines)
     try {
       const node = new AudioWorkletNode(ac, 'thunder-psyn', {numberOfInputs:0, numberOfOutputs:1, outputChannelCount:[2],
-        processorOptions:Object.assign({p:xParams(V), cid:live ? key : null}, sp, psSent.has(ac) ? {} : {bytes:by}, frzSample(V) ? {file:{d:frzSample(V).data, sr:frzSample(V).sr}} : {})});
+        processorOptions:Object.assign({p:xParams(V), cid:live ? key : null}, sp, psSent.has(ac) ? {} : (WASM_PRECOMPILE && PsynCore.module() ? {module:PsynCore.module()} : {bytes:by}), frzSample(V) ? {file:{d:frzSample(V).data, sr:frzSample(V).sr}} : {})});
       psSent.add(ac);
       const g = ac.createGain(), pn = ac.createStereoPanner(), P = k => node.parameters.get(k);
       node.connect(g); g.connect(pn); pn.connect(buses[t].inp);
@@ -20647,9 +20674,15 @@ function makePlayer(ac, out, getBuf, live){
     if (ev.type === 'tempo'){ tempoTo(ev); return; }
     if (ev.type === 'beat'){
       const o = clock.offset, at = Math.max(ev.t, ac.currentTime);
-      if (!clk.on){ clk.on = true; clk.base = Math.floor(ev.b / 16) * 16; o.setValueAtTime(ev.b - clk.base, at); return; }
-      const v = ev.b - clk.base; o.linearRampToValueAtTime(v, at);
+      if (!clk.on){ clk.on = true; clk.base = Math.floor(ev.b / 16) * 16; o.setValueAtTime(ev.b - clk.base, at); clk.lt = at; clk.lv = ev.b - clk.base; PB.rsGap = 0; return; }
+      const v = ev.b - clk.base;
+      // HOLD KEEPS THE TEMPO (10 Nov, HOLD_CLK_FLAT): rsHold moved this beat on by d, so the ramp from the last beat took d longer, the clock's slope
+      // fell, and the effects' modules (Simple delay, ...) read that as a slower tempo: their delay TIME glided (pitching). The clock now waits
+      // flat for the d, then ramps at the song's own slope. (clkSpb treats a flat clock as stalled and keeps the tempo it had.)
+      if (HOLD_CLK_FLAT && PB.rsGap > 0 && clk.lt != null){ const g = Math.min(PB.rsGap, at - clk.lt - 1e-4); PB.rsGap = 0; if (g > 1e-4) o.setValueAtTime(clk.lv, clk.lt + g); }
+      o.linearRampToValueAtTime(v, at);
       if (v >= 16){ clk.base += 16; o.setValueAtTime(v - 16, at); }
+      clk.lt = at; clk.lv = v >= 16 ? v - 16 : v;
       return;
     }
     // FXO / FLX / GAT / RTG: automation on the track's (or the master's) effect node.
@@ -21142,6 +21175,7 @@ function resetAudio(quiet){
   // THE RECORDER'S MONITOR follows the new master (it stayed on the old one: monitoring went silent after a reset with Record a sample open)
   if (RCD.mon){ try { RCD.mon.disconnect(); RCD.mon.connect(master); } catch(e){} }
   rtInit(); if (ctx.state !== 'running' && ctx.resume) ctx.resume();
+  try { devRecover('reset audio engine'); } catch(e){}   // (DEVICE RECOVERY) last: reopen the output choice
   if (!quiet) toast('Audio engine reset: every note and effect cleared.');
 }
 /* The track effects and chains modules, once per live graph (rt.fxAsk / rt.chnAsk). tfx loads chains first (the shared MODFX modules),
@@ -21322,7 +21356,7 @@ class XP_${name} extends AudioWorkletProcessor {
 registerProcessor('thunder-${name}', XP_${name});`;
 let bassURL = null; const bassLoad = new WeakMap(), bassOK = new WeakSet(), bassLive = new Set();
 // …PUMP SYNTHS live: their worklet, loaded with the others; psSent: the contexts whose audio thread has the wasm's bytes
-const PSYN_WK = 'pump/synth/pump-synth-worklet.js?v=7', psOK = new WeakSet(), psSent = new WeakSet();
+const PSYN_WK = 'pump/synth/pump-synth-worklet.js?v=8', psOK = new WeakSet(), psSent = new WeakSet();
 // …WAVES LIVE: the waves worklet in the tracker's own context (thunder-wlive); wlSent: the contexts that have the wasm
 const WAVES_WK = 'waves/waves-worklet.js?v=34', wlOK = new WeakSet(), wlSent = new WeakSet();
 /* BATTERY (8 Nov, Fold): a bookkeeping timer that only does something in one situation (playing, the screen visible, one
@@ -21628,7 +21662,7 @@ function tStart(mode, o){
   // RESUME: run the sequencer silently up to the step it stopped on (keeping the effect commands it passes). That step has
   // then been worked out already: its events are moved to play now, and the sequencer's clock with them.
   let rsFirst = null, rsFx = null;
-  if (resume && (pz.step > 0 || rzH)){ rsFx = new Map(); let g = 0;
+  if (resume && (pz.step > 0 || rzH)){ rsFx = new Map(); let g = 0; corePrep(mode, o, {ref:pz.ref, row:pz.row, step:pz.step});
     while (seq.alive() && g++ < 4096){
       const r = seq.step(), p = r.pos && r.pos[pz.ref];
       if (p && (p.row > pz.row || (p.row === pz.row && p.step >= pz.step))){ rsFirst = r; break; }
@@ -21757,6 +21791,56 @@ document.addEventListener('visibilitychange', () => {
   if (bgSus){ bgSus = false; if (ctx && ctx.state !== 'running' && ctx.state !== 'closed') ctx.resume().catch(() => {}); }   // (10 Nov: 'interrupted' too)
   if (lpOn && ctx) bgSusT = setTimeout(bgIdle, bgWait());
 });
+/* DEVICE RECOVERY (10 Nov): the output goes away or changes (interface unplugged, the system switches its default, the computer
+   sleeps and wakes) and nothing reopened it: silent until a reload. devRecover(why) is the one place that puts it right, from
+   'devicechange', a context that stopped by itself, the context's 'sinkchange', a wake (a jump in the clock, the desktop app's
+   power event), the window coming back, and Reset audio engine. It resumes a stopped context (never while the app is asleep on
+   purpose: bgSus, or while a runaway kick is in flight: rkBusy) and, if the chosen output is no longer there, plays on the system
+   default WITHOUT forgetting the choice (aset.sink stays; it switches back when the device returns). At most one run per 500 ms,
+   and a second one 1 s after (devices settle). With nothing wrong (running, no chosen output) it returns before logging.
+   DEV_RECOVER = false turns all of it off. Recorder inputs and the native helper are not touched. */
+const DEV_RECOVER = true;
+const DR = {t:0, T:0, busy:false, fb:null, names:{}, wall:0};   // fb: {id, label} while the chosen output is gone and we play on the default
+const devSink = () => DR.fb ? '' : (aset.sink || '');   // the output the engine should be on (the waves editor's frame asks too)
+async function devRecover(why, again){
+  if (!DEV_RECOVER || !ctx || ctx.state === 'closed' || DR.busy) return;
+  try {
+    if (DR.fb && DR.fb.id !== aset.sink) DR.fb = null;   // the choice was changed meanwhile
+    const sinkOk2 = !!(sinkOk && ctx.setSinkId), st = ctx.state, stuck = st === 'suspended' || st === 'interrupted';
+    if (!again && (st === 'running' || (stuck && bgSus)) && !(sinkOk2 && (aset.sink || DR.fb))) return;   // nothing to look at
+    if (rkBusy()) return;   // (RUNAWAY KICK: its short pause; the next trigger tries again)
+    const now = performance.now();
+    if (!again){ if (now - DR.t < 500) return; DR.t = now; clearTimeout(DR.T); DR.T = setTimeout(() => devRecover(why + ' (settled)', true), 1000); }
+    if (stuck) pbLog('device: ' + why + ' · ' + pbState());   // (only when something is wrong: a focus with a chosen output must not fill the report)
+    DR.busy = true; let changed = false;
+    if (stuck && !bgSus){ try { ctx.resume().catch(() => {}); changed = true; } catch(e){} }
+    if (sinkOk2 && (aset.sink || DR.fb) && navigator.mediaDevices && navigator.mediaDevices.enumerateDevices){
+      let outs = []; try { outs = (await navigator.mediaDevices.enumerateDevices()).filter(d => d.kind === 'audiooutput' && d.deviceId); } catch(e){}
+      outs.forEach(d => { if (d.label) DR.names[d.deviceId] = d.label; });
+      if (outs.length && ctx && ctx.state !== 'closed' && !rkBusy() && aset.sink){   // (an empty list: can't tell, leave it)
+        const id = aset.sink, here = outs.some(d => d.deviceId === id), label = () => DR.names[id] || 'saved output';
+        if (!here && !(DR.fb && DR.fb.id === id)){
+          try { await ctx.setSinkId(''); DR.fb = {id, label:label()}; changed = true; toastErr('The audio output “' + DR.fb.label + '” is gone: playing on the system default.'); }
+          catch(e){ pbLog('device: could not fall back to the default · ' + (e && e.message)); }
+        } else if (here && DR.fb && DR.fb.id === id){
+          try { await ctx.setSinkId(id); const l = DR.fb.label; DR.fb = null; changed = true; toast('Audio output “' + l + '” is back.'); }
+          catch(e){ pbLog('device: could not switch back to the output · ' + (e && e.message)); }
+        } else if (here && !DR.fb && typeof ctx.sinkId === 'string' && ctx.sinkId !== id){   // (it was not there when the engine started, now it is)
+          try { await ctx.setSinkId(id); changed = true; } catch(e){ pbLog('device: could not open the saved output · ' + (e && e.message)); }
+        }
+      }
+    }
+    if (changed){ pbLog('device: done · ' + pbState() + ' sink=' + (DR.fb ? 'default (saved output gone)' : (typeof ctx.sinkId === 'string' ? ctx.sinkId || 'default' : '?'))); try { audStatus(); } catch(e){} try { const a = wvApi(); if (a && a.sinkChanged) a.sinkChanged(); } catch(e){} }
+  } catch(e){ try { pbLog('device: failed · ' + (e && e.message)); } catch(e2){} }
+  finally { DR.busy = false; }
+}
+// the context stopped by itself (not the app's own sleep, not a kick), with the screen showing: also when nothing is playing (audioInterrupted above is for the song)
+function devOnState(){ if (ctx && (ctx.state === 'suspended' || ctx.state === 'interrupted') && !bgSus && !document.hidden) devRecover('engine ' + ctx.state); }
+document.addEventListener('visibilitychange', () => { if (!document.hidden) devRecover('screen back'); });
+window.addEventListener('focus', () => devRecover('window focus'));
+// a wake without the shell's help: the wall clock jumped by more than 5 s between two ticks, both with the app showing
+idleTick(() => { const w = Date.now(), p = DR.wall; DR.wall = document.hidden ? 0 : w; if (p && !document.hidden && w - p > 5000) devRecover('woke from sleep'); }, 2000, () => !document.hidden, 5000);
+{ const P = window.thunderDesktop && window.thunderDesktop.power; if (P) try { P.on(why => devRecover('system ' + (why === 'unlock-screen' ? 'unlock' : 'resume'))); } catch(e){} }
 function pump(){
   try { pumpRun(); }
   catch(e){ console.error(e); try { tStop(); } catch(e2){} toastErr('Playback stopped: ' + ((e && e.message) || 'something went wrong') + '.', 5000); }
@@ -21775,6 +21859,7 @@ function pump(){
    no outLat here (a first version with a drift threshold held every step of a 0.2 s clock and stopped the song).
    Phones and tablets only, the Page sequencer, and not while anything else owns the timing (rsScope). RESYNC: kill switch. */
 const RESYNC = true;
+const HOLD_CLK_FLAT = true;   // kill switch: a hold waits the effects' beat clock flat instead of slowing it (Simple delay time kept; see play() 'beat')
 // (Lead, 10 Nov: only with a worklet module loaded on the context (wkUsed): the owner's phone held 1:1 for 45 s with none, so a song
 // without them is never touched. RS_CREEP 0.09, not 0.04: with ticks up to 60 ms apart and step times off by 30 ms the lower edge is
 // misread by more than 0.04, and each false hold is a small pause in a healthy song (8 in 30 s simulated; 1 at 0.09).)
@@ -21798,7 +21883,7 @@ function rsTick(s){
 // Everything that holds a time on the audio clock for the song moves on by d, as the moved-on rule does for the sequencer. Not the
 // notes already booked (tp.q, the voices, MIDI sent): they were given to the engine.
 function rsHold(s, d){
-  s.base += d; s.time += d; if (s.btT != null) s.btT += d;
+  s.base += d; s.time += d; if (s.btT != null) s.btT += d; PB.rsGap = (PB.rsGap || 0) + d;   // (rsGap: the effects' beat clock waits flat for d, HOLD_CLK_FLAT)
   tp.t0 += d; if (tp.st) tp.st += d; stgT0 += d;   // LEFT timer, step flash, the stage's beat
   if (mx.beat) mx.beat = Object.assign({}, mx.beat, {t:mx.beat.t + d}); if (mx.t0 != null) mx.t0 += d;   // the beat clock: metronome, MIDI LFOs
   for (const L of mx.lfo) if (L){ if (L.t != null) L.t += d; L.trig = L.trig.map(x => x + d); }
@@ -21898,7 +21983,7 @@ function padBlink(e){
 // Phones and tablets (10 Nov): the audio-thread sequencer's module (a second thread) loads only when the owner picked it there
 // (aset.corePick, set in Settings); the saved default 'core' plays on the Page sequencer on such a device.
 function coreWanted(){ return aset.core === 'core' && (!wkLazy() || !!aset.corePick); }   // (a declaration: the Settings row reads it at load)
-const CORE_REV = '1uvz725';
+const CORE_REV = '198luua';
 const CORE_WANT = 7;   // the core's message set this page speaks (core-processor.js CORE_V); an older core is not used
 const CORE_URL = () => 'core/seq-core.js?v=' + BUILD + '-' + CORE_REV;
 const core = {node:null, ready:false, loading:null, gen:0, sent:new Map(), sT:0, tally:new Map(), mir:null};   // mir: what the core's song holds, as JSON per part (coreDiff)   // tally: events by who played them (test hook)
@@ -22009,13 +22094,22 @@ document.addEventListener('visibilitychange', coreLead);
 // After an edit: the song again (in place, so the running sequencer reads it), at most every 40 ms
 function coreSong(){ if (!tp.core || !core.mir || core.sT) return;   // only while the core plays (BATTERY): PLAY syncs the rest
   core.sT = setTimeout(() => { core.sT = 0; const ops = coreOps(coreDiff()); if (ops.length) corePost({op:'patch', ops}); }, 100); }
+const coreO = o => { const oo = {}; for (const k of ['row', 'loop', 'once', 'only', 'track', 'phrase', 'sect']) if (o && o[k] != null) oo[k] = o[k]; return oo; };
+/* RESUME_PREP: a RESUME's replay up to the step the song stopped on was run in the core's PLAY message (the audio thread, up
+   to 4096 steps in one go). The core is told first, before this page's own replay, and runs its copy a millisecond a block
+   meanwhile (core-processor.js RESUME_SPREAD); PLAY then finds it done, or finishes it as before. false: as before. */
+const RESUME_PREP = true;
+function corePrep(mode, o, rs){
+  if (!RESUME_PREP || !coreWanted() || !core.ready || core.bad || (o && o.page)) return;
+  try { coreSyncAll(); corePost({op:'prep', mode, o:coreO(o), rs}); } catch(e){ tpLog('core prep', e); }
+}
 function coreStart(mode, o, t0, rs){
   coreSyncAll();
   rt.pl.clkReset(ctx.currentTime);   // the core's clock takes over (a RESUME step played here may have started this one)
   if (perfLive.init) corePost({op:'perf', xf:perfLive.xf, mac:perfLive.mac, fill:perfLive.fill});
   // FIX (UI sweep, 4 Nov): track, phrase and sect too. Without them PLAY on a phrase or a sect (Shift+Space, F6, the Phrase
   // screen's PLAY) threw in the core (makeSeq: tr[undefined]), so nothing played on the audio thread, the default sequencer.
-  const oo = {}; for (const k of ['row', 'loop', 'once', 'only', 'track', 'phrase', 'sect']) if (o && o[k] != null) oo[k] = o[k];
+  const oo = coreO(o);
   // FIRST NOTES (stability pass): the page is busiest just after PLAY (the start-up, the first draws), so the core's first rows
   // reached it up to 250 ms after they were booked and live-engine notes went missing; the core books 0.6 s ahead for the
   // first 1.5 s, then the usual (coreLead)
@@ -22413,6 +22507,32 @@ function countIn(t0, bars, bpm){
 var bgOn = (() => { try { return localStorage.getItem('thunderplus-bgplay-v1') !== '0'; } catch(e){ return true; } })();
 var bgEl = null, bgHandlers = false;
 var bgAndroid = /Android/i.test(navigator.userAgent);   // var: tStop() may run before this line
+/* BG_RESTART (10 Nov): Android may pause the element when another app takes audio focus, and nothing started it again, so the page
+   lost its "media player" standing and could be frozen with the screen off. When the element pauses or ends while the song plays and
+   BACKGROUND PLAY is on, and it was not the app's own pause (bgSelfT) nor the user's (a Media Session pause / stop: bgUserT, which stops
+   the song), it is started again: at once, and if that is refused or it stops again within 2 s, once more after 1 s, then on the next
+   return to the app or touch. At most BG_RESTART_MAX starts per PLAY, each logged with its outcome. Kill switch: BG_RESTART. */
+const BG_RESTART = true, BG_RESTART_MAX = 3;
+var bgSelfT = 0, bgUserT = 0, bgRst = {run:false, n:0, last:0, wait:false, hooks:false};
+function bgOwnPause(){ bgSelfT = performance.now(); try { if (bgEl && !bgEl.paused) bgEl.pause(); } catch(e){} }
+function bgTry(why){
+  if (!bgEl || !bgOn || !tp.on || !bgEl.paused || bgRst.n >= BG_RESTART_MAX) return;
+  const n = ++bgRst.n; bgRst.last = performance.now(); bgRst.wait = false;
+  const fail = e => { pbLog('background play restart ' + n + ' (' + why + ') refused: ' + (e && e.name || e) + ' · ' + pbState()); if (!bgRst.again){ bgRst.again = true; setTimeout(() => { bgRst.again = false; if (bgEl && bgEl.paused) bgTry('1 s retry'); }, 1000); } bgRst.wait = true; };
+  try { const p = bgEl.play(); if (p && p.then) p.then(() => pbLog('background play restart ' + n + ' (' + why + ') ok'), fail); else pbLog('background play restart ' + n + ' (' + why + ') ok'); } catch(e){ fail(e); }
+}
+function bgSysPause(){   // the element's 'pause' / 'ended'
+  if (!BG_RESTART || !bgOn || !bgAndroid || !tp.on || !bgEl) return;
+  const now = performance.now(); if (now - bgSelfT < 1000 || now - bgUserT < 2000) return;   // the app's own, or a Media Session pause / stop
+  pbLog('background play paused by the system · ' + pbState());
+  if (bgRst.last && now - bgRst.last < 2000){ bgRst.wait = true; return; }   // stopped again within 2 s: next return to the app or touch
+  bgTry('at once');
+}
+function bgHooks(){
+  if (bgRst.hooks) return; bgRst.hooks = true;
+  const go = () => { if (BG_RESTART && bgRst.wait && bgEl && bgEl.paused && tp.on && bgOn) bgTry('back in the app'); };
+  try { document.addEventListener('visibilitychange', () => { if (!document.hidden) go(); }); document.addEventListener('pointerdown', go, {capture:true, passive:true}); } catch(e){}
+}
 function setBgOn(on){ bgOn = !!on; try { localStorage.setItem('thunderplus-bgplay-v1', bgOn ? '1' : '0'); } catch(e){} bgPlay(bgOn && tp.on); }
 function bgClip(){
   const sr = 8000, n = sr * 8, b = new ArrayBuffer(44 + n * 2), v = new DataView(b);
@@ -22427,7 +22547,7 @@ function bgPlay(on){
   if (on && !bgOn) on = false;
   if (ms) try {
     if (on && !bgHandlers){ bgHandlers = true;
-      const stop = () => { if (tp.on) tStop(); };
+      const stop = () => { bgUserT = performance.now(); if (tp.on) tStop(); };   // (bgUserT: a real request, not to be undone by BG_RESTART)
       ms.setActionHandler('play', () => { if (!tp.on) playCtx(); });
       ms.setActionHandler('pause', stop); ms.setActionHandler('stop', stop); }
     if (on) ms.metadata = new MediaMetadata({title:S.name || 'Song', artist:'Thunder Plus',
@@ -22436,9 +22556,10 @@ function bgPlay(on){
   } catch(e){}
   if (!bgAndroid) return;
   if (on){
-    if (!bgEl){ bgEl = new Audio(bgClip()); bgEl.loop = true; bgEl.preload = 'auto'; }
+    if (!bgEl){ bgEl = new Audio(bgClip()); bgEl.loop = true; bgEl.preload = 'auto'; bgEl.addEventListener('pause', bgSysPause); bgEl.addEventListener('ended', bgSysPause); bgHooks(); }
+    if (!bgRst.run){ bgRst.run = true; bgRst.n = 0; bgRst.last = 0; bgRst.wait = false; }   // a new PLAY: three restarts again
     try { const p = bgEl.play(); if (p && p.catch) p.catch(() => {}); } catch(e){}
-  } else if (bgEl && !bgEl.paused) bgEl.pause();
+  } else { bgRst.run = false; bgRst.wait = false; if (bgEl && !bgEl.paused) bgOwnPause(); }
 }
 /* ===== END BACKGROUND PLAY ===== */
 /* KEEP SCREEN ON (owner, 6 Nov, Fold: "when the screen is just turned off, nothing bad happens, but when it turns off on its
@@ -22784,6 +22905,7 @@ const projName = () => `${safe(S.name || 'Song')}.thunder`;
 const canShareProj = () => !inAI && !!(navigator.canShare && window.File) && (() => { try { return navigator.canShare({files:[new File(['{}'], 'a.json', {type:'application/json'})]}); } catch(e){ return false; } })();
 async function shareProj(){
   flushS(); await presetSmpFill();
+  if (!await smpSaveGate()) return;
   const f = new File([projBlob()], projName(), {type:'application/json'});
   try { await navigator.share({files:[f], title:S.name || 'Thunder project'}); }
   catch(e){ if (e && e.name === 'AbortError') return; await deliver(f.name, projBlob()); toastErr('Sharing didn’t work here, so the project was saved to your downloads instead.'); }
@@ -22872,6 +22994,7 @@ async function saveProj(as){
   if (saving) return false; saving = true;
   try {
     flushS(); await presetSmpFill();
+    if (!await smpSaveGate()) return false;
     if (DESK){
       if (!as && projPath){ const r = await DESK.save(projPath, projText()); if (r && r.ok){ setDirty(false); projSet(projPath, null); toast('Saved ' + projLabel()); return true; }
         toastErr('Couldn’t save to ' + projLabel() + (r && r.error ? ': ' + r.error : '') + '. Choose where to save it.', 5000); }
@@ -22948,6 +23071,7 @@ const BK_N = 10, BK_MS = 180000;
 async function backupNow(force){
   if (!bkDirty && !force) return;
   try { bkDirty = false; flushS(); await presetSmpFill();
+    if (!await smpSaveGate(10000, true)){ bkDirty = true; return; }   // a backup without its samples is skipped; the next one is tried in 3 minutes
     const text = projText(), idx = (await kvGet('bkIndex')) || [], k = 'bk' + Date.now();
     await kvSet(k, text); idx.unshift({k, at:Date.now(), name:S.name || 'Song', kb:Math.round(text.length / 1024)});
     while (idx.length > BK_N){ const o = idx.pop(); await kvDel(o.k); }
@@ -23344,7 +23468,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 551;
+const BUILD = 552;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD + (location.pathname.includes('/beta/') ? ' · beta' : '');
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -32774,6 +32898,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [552, '10 Nov', ['Saving a project, sharing it or exporting a kit now waits for samples that are still loading, and asks before writing a file without a sample\'s audio.', 'If your audio output is unplugged or the computer wakes from sleep, the app reopens the sound: it plays on the system default and returns to your output when it is back. Reset audio engine re-applies the output too, and …waves follows it.', 'Phone: synced delays no longer bend in pitch while the song is being held in time; background play is started again if Android pauses it.', 'Smoother first use of effects, and no freeze when resuming late in a long song (computer, Audio thread sequencer).']],
   [551, '10 Nov', ['Settings › Audio › Reset audio settings puts every audio test setting back to its default (songs, kits, output, level and MIDI setup are kept).', 'Phone experiment, RUNAWAY KICK (TEST), on by default: when the audio clock runs several times too fast for over a second (screen off, effects loaded), the engine is paused for a moment to try to break it. The playback report says what happened.']],
   [550, '10 Nov', ['New in Settings › Screen: BIGGER CELLS ON TOUCH (off by default) makes Arrange and Song cells at least 28×24 px on a touch screen; the grid then scrolls sideways.']],
   [549, '10 Nov', ['Record a sample keeps its input, mode and latency settings: changing the REC or metronome settings no longer resets them.']],

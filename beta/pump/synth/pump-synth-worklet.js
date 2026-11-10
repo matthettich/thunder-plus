@@ -15,9 +15,9 @@
  */
 const LANES = 4;
 const WASI = {wasi_snapshot_preview1:{fd_close:() => 0, fd_seek:() => 0, fd_write:() => 0, proc_exit:() => 0}};
-function psynX(){
-  const g = globalThis; if (g.__psynX) return g.__psynX; if (!g.__psynBytes || g.__psynFailed) return null;
-  try { const x = new WebAssembly.Instance(new WebAssembly.Module(g.__psynBytes), WASI).exports; if (x._initialize) x._initialize(); g.__psynX = x; return x; }
+function psynX(){   // __psynMod: the page's compiled module (WASM_PRECOMPILE); else the bytes are compiled here
+  const g = globalThis; if (g.__psynX) return g.__psynX; if ((!g.__psynMod && !g.__psynBytes) || g.__psynFailed) return null;
+  try { const x = new WebAssembly.Instance(g.__psynMod || new WebAssembly.Module(g.__psynBytes), WASI).exports; if (x._initialize) x._initialize(); g.__psynX = x; return x; }
   catch (e){ g.__psynFailed = true; return null; }
 }
 class PsynProc extends AudioWorkletProcessor {
@@ -37,6 +37,7 @@ class PsynProc extends AudioWorkletProcessor {
     const op = o.processorOptions || {};
     const __op = op; if (__op.cid){ this.__cid = __op.cid; (globalThis.__tcNodes || (globalThis.__tcNodes = new Map())).set(__op.cid, this); }
     if (op.bytes && !globalThis.__psynBytes) globalThis.__psynBytes = op.bytes;
+    if (op.module && !globalThis.__psynMod) globalThis.__psynMod = op.module;   // the page's compiled module (WASM_PRECOMPILE)
     this.type = op.type | 0; this.syms = op.syms || []; this.fixed = op.fixed || {}; this.p = op.p || {}; this.trim = op.trim || 1;   // trim: as the render's (POLY +3.5 dB)
     this.nb = op.nb || 60;   // the MIDI note C-4 plays (60; a drum kit's first drum)
     this.range = op.range || (this.type === 2 ? 12 : 24);   // the bend range the instance is set to (COIL's Bend goes to 12, ORBIT's is ±2)
