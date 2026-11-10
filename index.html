@@ -31138,8 +31138,8 @@ document.querySelectorAll('#trk .k[data-b]').forEach(k => {
   const b = k.dataset.b, ptrs = new Set();
   k.addEventListener('pointerdown', e => { e.preventDefault(); try { k.setPointerCapture(e.pointerId); } catch(_){} ptrs.add(e.pointerId); k._pd = true; if (!(b in held)) k.classList.add('dn'); press(b); });
   const up = e => { if (!ptrs.delete(e.pointerId)) return; if (!(b in held)) k.classList.remove('dn'); release(b); };
-  k.addEventListener('pointerup', up); k.addEventListener('pointercancel', up);
-  k.addEventListener('click', () => { const pd = k._pd; k._pd = false; if (pd && b === 'save') return;   /* (SAVE already ran on the press: a long hold must not save twice) */
+  k.addEventListener('pointerup', up); k.addEventListener('pointercancel', e => { k._pd = false; up(e); });
+  k.addEventListener('click', () => { const pd = k._pd; k._pd = false; if (pd) return;   /* (a click that follows its own pointerdown never runs the key again, however slow: SAVE 9 Nov, every pad key 10 Nov) */
     if (!ptrJust()){ press(b, true); release(b, true); } });
 });
 $('trk').addEventListener('contextmenu', e => e.preventDefault());

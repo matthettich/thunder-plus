@@ -7,3 +7,8 @@ test('a pad press sets arrActT (holds Arrange paging) as well as workT', () => {
   // the keyboard rule is unchanged and the grid / Arrange presses still do not set arrActT
   assert.match(src, /arrActT = workT = performance\.now\(\); \}, true\);/);
 });
+test('a pad key click that follows its own pointerdown never fires again', () => {
+  assert.match(src, /k\.addEventListener\('click', \(\) => \{ const pd = k\._pd; k\._pd = false; if \(pd\) return;/);
+  assert.doesNotMatch(src, /if \(pd && b === 'save'\) return;/);
+  assert.match(src, /k\.addEventListener\('pointercancel', e => \{ k\._pd = false; up\(e\); \}\)/);
+});
