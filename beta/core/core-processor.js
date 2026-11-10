@@ -316,10 +316,12 @@ class ThunderCore extends AudioWorkletProcessor {
      track's VOL / mute / solo; NT + 2, one per track, a pan offset (target − the mixer's pan) added to its StereoPanner's
      pan; NT + 3, the master's level offset (target − its knob) added to the master gain. The page plugs a channel in when
      the first such command for it arrives and stops touching that param itself; STOP unplugs them all. */
-  mixReset(){ this.mg = new Array(NT).fill(null); this.mp = new Array(NT).fill(null); this.mm = null; }
+  mixReset(){ this.mg = new Array(NT).fill(null); this.mp = new Array(NT).fill(null); this.mm = null; this.mo = null; }
   mixEv(ev){
     const at = Math.max(ev.t, currentTime);
     if (ev.type === 'mvol'){ const A = this.mm || (this.mm = new Auto(0)); A.hold(at); A.lin(curve(ev.v) - curve(S && S.master != null ? S.master : 255), at + 0.004); return true; }
+    // MOD vol:MT (10 Nov): the master OUT fader (after the limiter). Output NT + 4: its offset (target − S.mout's gain) is added to the OUT gain; the 4 ms glide of TVA
+    if (ev.type === 'mout'){ const A = this.mo || (this.mo = new Auto(0)); A.target(curve(ev.v) - curve(S && S.mout != null ? S.mout : 255), at, 0.004); return true; }
     const t = ev.track; if (t == null || t < 0 || t >= NT) return false;
     const m = S && S.mix && S.mix[t];
     if (ev.type === 'tpn'){ const A = this.mp[t] || (this.mp[t] = new Auto(0)), P = v => Math.max(-1, Math.min(1, (v - 128) / 127));
@@ -345,10 +347,11 @@ class ThunderCore extends AudioWorkletProcessor {
     L.engOn = true;
   }
   mixOut(outputs, N, dt){
-    const G = outputs[NT + 1], P = outputs[NT + 2], M = outputs[NT + 3];
+    const G = outputs[NT + 1], P = outputs[NT + 2], M = outputs[NT + 3], O = outputs[NT + 4];
     if (G) for (let t = 0; t < G.length; t++) this.mixFill(G[t], this.mg[t], 1, N, dt);
     if (P) for (let t = 0; t < P.length; t++) this.mixFill(P[t], this.mp[t], 0, N, dt);
     if (M) this.mixFill(M[0], this.mm, 0, N, dt);
+    if (O) this.mixFill(O[0], this.mo, 0, N, dt);
   }
   mixFill(C, A, d, N, dt){ if (!C) return; if (!A){ C.fill(d); return; } A.prune(currentTime); const c = A.constFrom(currentTime); if (c != null){ C.fill(c); return; } for (let i = 0; i < N; i++) C[i] = A.at(currentTime + i * dt); }   // (a method: no closure per block)
   play(d){
@@ -567,8 +570,8 @@ class ThunderCore extends AudioWorkletProcessor {
       const proc = tcNodes().get('fx:' + ev.track), A = S && (ev.track >= NT ? S.mfx : S.tfx && S.tfx[ev.track]), f = A && A[ev.slot];
       if (!proc || !f || !TFX[f.type]) return false;
       if (TFX[f.type].pump){
-        const D = TFX[f.type], q = D.ps[ev.pi]; if (!D.pd || !q || !q.lfo) return false;
-        const key = ev.track + ':' + ev.slot, ov = Object.assign({}, this.fxOv.get(key)); ov[q.k] = q.min + Math.round((q.max - q.min) * ev.v / 255);
+        const D = TFX[f.type], q = D.ps[ev.pi]; if (!D.pd || !q || !q.lfo || (q.pb && !(ev.b >= 0 && ev.b < q.pb.length))) return false;   // a banded row (q.pb) needs its band
+        const key = ev.track + ':' + ev.slot, ov = Object.assign({}, this.fxOv.get(key)); ov[q.pb ? D.pd[q.pb[ev.b]].s : q.k] = q.min + Math.round((q.max - q.min) * ev.v / 255);
         this.fxOv.set(key, ov); tcAt(proc, Math.max(ev.t, currentTime), {pset:{slot:ev.slot, pv:pumpPv(D, f, ov)}}); return true;
       }
       if (!fxvMap(TFX[f.type], f.type)) return false;
@@ -594,7 +597,7 @@ class ThunderCore extends AudioWorkletProcessor {
       const v = ev.b - this.clkBase; A.lin(v + 1, at); if (v >= 16){ this.clkBase += 16; A.set(v - 16 + 1, at); } return true; }
     if (ev.type === 'stp'){ for (let k = 0; k <= NT; k++) if (ev.all || k === ev.track){ for (const v of this.T(k)) this.kill(v, ev.t, 0.004); this.T(k).length = 0; } return false; }
     if (ev.type === 'eng'){ this.engEv(ev); return false; }   // (false: the page's player sets its own params from it too: the same values)
-    if (ev.type === 'tvl' || ev.type === 'tva' || ev.type === 'tpn' || ev.type === 'mvol') return this.mixEv(ev);
+    if (ev.type === 'tvl' || ev.type === 'tva' || ev.type === 'tpn' || ev.type === 'mvol' || ev.type === 'mout') return this.mixEv(ev);
     if (ev.type === 'off' && ev.track != null){ const T = this.T(ev.track);
       if (ev.cols){ for (let k = T.length - 1; k >= 0; k--) if (ev.cols.includes(T[k].col)){ this.kill(T[k], ev.t, this.relTc(T[k])); T.splice(k, 1); } return false; }
       for (const v of T) this.kill(v, ev.t, this.relTc(v)); T.length = 0; return false; }
