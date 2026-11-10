@@ -29,6 +29,30 @@ Listening is still the only test of how it sounds.
 When a change to the sound is intended, review it, then accept it with `npm run test:golden:update` and commit the golden diff.
 Never update goldens to make a failing run pass without knowing why it changed.
 
+## Engine goldens
+
+`engine-golden.test.js` (renderer: `tools/engine-golden.js`) renders every factory voice and preset of the JavaScript sound
+engines in Node, at 48 kHz, exactly as the app's pad render does (`renderVoice`, one render at the pad's own pitch; drum voices
+with no hold, synth voices held 1 s), and compares a SHA-256 of the float bits plus peak, RMS and the RMS of 8 time slices with
+`tests/golden/engines.json`. It covers the preset sheet's factory voices (drum kits, drum types, synth groups, engine presets),
+the layer presets, every layer oscillator type, every engine's own presets (Bass, Blip, Vox, Acid, Machine, Tone, Modal, Swarm,
+Drift, Piano, EP, Organ, Table, Breath, Strings, FM drum, Wind, Phase, Partials, Skin, Chip, Vector, Scanned, Resynth, Bytebeat),
+the starter kit and the voices of `sounds/ELECTRO.thunder`.
+
+It does **not** cover (listed in the golden's `notCovered`): the wasm engines (…pump synths, which `pump-synth.test.js` hashes
+already; LXR; the Plaits / Elements layers), waves layers and waves live, SoundFont, sample / grains / pwm layers and imported
+wavetables or analyses, the live (worklet) paths, effects, the sequencer and the mixer. A voice that renders differently
+twice in one process is listed in `notDeterministic` and skipped.
+
+`npm test` renders a fixed subset (every 6th voice, all layer types, the first preset of each engine) so it adds about 20 s, but
+it checks the whole list of names: a voice that disappears or appears without the golden being updated fails. `ENGINE_GOLDEN=all
+npm test` renders and compares every voice. The golden records the Node version; a different version is named in the failure
+message, since `Math.sin` / `Math.pow` can differ in the last bit between versions.
+
+To update on purpose: `UPDATE_GOLDEN=1 node --test tests/engine-golden.test.js` (or `UPDATE_GOLDEN=1 npm test`) and commit the diff.
+**Never update to make a failing test pass unless the change in sound is intended**: the failure message gives the old and new
+peak and RMS (and the dB difference) so you can tell a tiny numeric drift from a real change.
+
 ## Things worth knowing
 
 - `chains/` is the source of truth for the **shared** blocks; `tools/sync-shared.py` copies them into `waves/`. A test fails if

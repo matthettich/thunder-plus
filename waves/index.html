@@ -2975,6 +2975,7 @@ const pnameEl = document.getElementById('pname');
     window.wavesEmbed = {
       pause(){ if (store){ clearTimeout(store._timer); if (store.dirty) store.save(); } held.forEach(p => engNote(false, p)); held.clear(); if (lazy) napScreen = true; if (bridge) bridge.ctx.suspend().catch(() => {}); },
       resume(){ if (lazy) napScreen = false; if (bridge && !napHidden) bridge.resume(); },
+      sinkChanged(){ followSink(); },   // the app's output device changed (or came back): follow it
       /* ONE UNDO: the app's undo or redo put another version of this patch in the song; show it here (no reload). */
       setDoc(d){ if (!store) return; clearTimeout(store._timer); store.undo.length = 0; store.redo.length = 0;
         store._restore(JSON.stringify(normalize(d ? JSON.parse(JSON.stringify(d)) : blankDoc()))); clearTimeout(store._timer); store.dirty = false; },
@@ -3305,8 +3306,11 @@ tSel.value = (doc.transport && doc.transport.tempo) || 120;
 tSel.addEventListener('change', () => { const v = clamp(parseFloat(tSel.value) || 120, 20, 300); tSel.value = v; doc.transport.tempo = v; if (bridge) bridge.setTransport({ tempo:v }); store.touch(); });
 tSel.addEventListener('keydown', e => e.stopPropagation());
 qSel.addEventListener('change', () => { doc.quality = qSel.value; if (bridge) bridge.setQuality(qSel.value); store.touch(); });
+// OUTPUT DEVICE (10 Nov): inside Thunder Plus the engine plays through the output chosen in the app's Audio settings (host: thunderWaves.sink()).
+function followSink(){ try { if (!EMBED || !TW || !TW.sink || !bridge || !bridge.ctx || !bridge.ctx.setSinkId) return; const id = TW.sink() || ''; if (bridge.ctx.sinkId !== id) bridge.ctx.setSinkId(id).catch(() => {}); } catch (e) {} }
 function wireBridge(b){
   bridge = b;
+  followSink();
   b.telemetry(true);
   b.on('meter', onMeter);
   b.on('shed', s => toast(s.recovered ? 'CPU is free again: ' + s.voices + ' voices, ' + s.quality + ' quality.' : s.step === 3 ? 'The CPU is overloaded: notes were cut.' : 'The CPU is busy: dropped to ' + s.voices + ' voices' + (s.quality === 'draft' ? ', draft quality.' : '.')));

@@ -12,5 +12,8 @@
   `native/` only, never in the app's own files). A question about it gets an answer from those, nothing built. Start stage N0 (and only N0)
   only when the owner says so in words, such as "start the native spike".
 - Entries dated before 8 Nov 2026 are in `docs/HANDOVER-ARCHIVE.md`.
+- **The owner's running test list is "Owner's punch list" in `HANDOVER.md`.** Every build adds its tests there as tickable items
+  (which device, what a pass looks like); an item leaves only when the owner reports a result (then it is ticked or becomes a bug
+  entry). "Give me my test checklist" means: read that section and make a Claude Doc grouped by phone, computer and hardware.
 - Day-to-day work goes on the `beta` branch; `main` only by merging `beta` when the owner asks. Keep `HANDOVER.md` up to
   date at the end of a session.
