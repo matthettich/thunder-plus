@@ -23189,7 +23189,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 546;
+const BUILD = 547;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD + (location.pathname.includes('/beta/') ? ' · beta' : '');
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -23548,14 +23548,19 @@ const mstShared = new Set();   // phrases already warned about this session
 let mstUniqIn = false;
 // UNIQUE PER TRACK (owner, 3 Nov: "make a unique pattern if copying from one track to another, I'll probably mess that up
 // all the time… Maybe we make it a setting"): with SX.uniq on (the default) a block also gets its own copy when another
-// TRACK already uses it. The same block down its own track (repeats) stays shared.
+// TRACK already uses it. The same block down its own track (repeats) stays shared. 10 Nov: and only the first time (below).
+let uniqVac = [];   // 10 Nov, owner: [row, track, cid] of cells a move has just emptied; they still count as "this track held it"
 function blockMixed(cid, x, y){
-  const isM = x === MT, uq = !isM && SX.uniq;
+  // 10 Nov, owner: only the FIRST time a block comes onto a track is copied. A block this track already holds (in another
+  // row) can be repeated or moved up and down it with no copy, even if another track also holds it.
+  const isM = x === MT, uq = !isM && SX.uniq; let other = false, here = false;
   for (let r = 0; r < 256; r++){ const row = S.song[r]; if (!row) continue;
     if (isM){ for (let t = 0; t < MT; t++) if (row[t] === cid) return true; }
     else { if (row[MT] === cid && r !== y) return true;
-      if (uq) for (let t = 0; t < MT; t++) if (t !== x && row[t] === cid) return true; } }
-  return false;
+      if (uq){ if (r !== y && row[x] === cid) here = true;
+        for (let t = 0; t < MT; t++) if (t !== x && row[t] === cid) other = true; } } }
+  if (!here && uq && uniqVac.some(q => q[1] === x && q[2] === cid)) here = true;
+  return other && !here;
 }
 const blockOnMst = cid => S.song.some(r => r && r[MT] === cid);
 function mstUniq(src){   // newBlock's copy (a new sect and new phrases), without moving the cursor or saying anything
@@ -24056,7 +24061,7 @@ function projRows(){
       info:() => 'With SECTIONS on: the SECT lane also shows in Arrange beside the phrase (it takes a little of Arrange’s width), so section names are there while you edit. Off: only on the Song screen'},
     {l:'ROW COLOR IN PATTERN', ck:'Pattern view: right-click a row number to color the song row', get:() => SX.pvcol ? 1 : 0, set:v => sxSet('pvcol', !!v), min:0, max:1, tog:true, d:1, fmt:onOff,
       info:() => 'In Pattern view, right-click a row number (or SONG ROW in its bar) to color this pattern’s song row, the same as right-clicking the row number in Arrange; SONG ROW then shows in that color. Off: the right-click menu as usual'},
-    {l:'UNIQUE PER TRACK', ck:'A block put on another track gets its own copy', get:() => SX.uniq ? 1 : 0, set:v => sxSet('uniq', !!v), min:0, max:1, tog:true, d:1, fmt:onOff,
+    {l:'UNIQUE PER TRACK', ck:'A pattern brought onto a track that doesn’t have it yet gets its own copy. Moving or repeating a pattern on its own track never copies.', get:() => SX.uniq ? 1 : 0, set:v => sxSet('uniq', !!v), min:0, max:1, tog:true, d:1, fmt:onOff,
       info:() => 'ON: a block pasted, cloned, dragged or typed onto a track when another track already uses it gets its own copy (new phrase numbers), so editing one never changes the other; the same block down its own track still repeats. OFF: tracks can share blocks, as before. The master column always keeps its own'},
     {l:'LOOP DRAG', ck:'Song: drag the row numbers to loop', get:() => SX.loop ? 1 : 0, set:v => sxSet('loop', !!v), min:0, max:1, tog:true, d:1, fmt:onOff,
       info:() => 'Drag down the Song screen’s row numbers to loop those rows (PLAY on this screen loops them; LOOP SEL turns it off). A tap still plays from that row'},
@@ -31348,10 +31353,11 @@ function mselApply(m, copy){
   const r = m.r, dx = m.dx, dy = m.dy; if (!dx && !dy) return draw();
   const D = [], mu = [];
   for (let y = r.y0; y <= r.y1; y++){ const row = [], mr = []; for (let x = r.x0; x <= r.x1; x++){ row.push(getCell(tv, x, y)); mr.push(tv === 'song' && x !== MT && blockMuted(S, y, x)); } D.push(row); mu.push(mr); }
-  if (!copy) for (let y = r.y0; y <= r.y1; y++) for (let x = r.x0; x <= r.x1; x++) setCell(tv, x, y, kindAt(tv, x) === 'tsp' ? 0 : -1);
-  const d = dims(tv);
-  D.forEach((row, j) => row.forEach((v, i) => { const x = r.x0 + i + dx, y = r.y0 + j + dy; if (y < 0 || y >= d.h || x < 0 || (x >= d.w && x !== MT)) return;
-    setCell(tv, x, y, v); if (tv === 'song' && x !== MT && v >= 0) setBlockMute(y, x, !!mu[j][i]); }));
+  const vac = [];   // a move empties its cells first, then writes: UNIQUE PER TRACK must still see that this track held the block (10 Nov, owner)
+  if (!copy) for (let y = r.y0; y <= r.y1; y++) for (let x = r.x0; x <= r.x1; x++){ if (tv === 'song' && x !== MT){ const v0 = S.song[y][x]; if (v0 >= 0) vac.push([y, x, v0]); } setCell(tv, x, y, kindAt(tv, x) === 'tsp' ? 0 : -1); }
+  const d = dims(tv); uniqVac = vac;
+  try { D.forEach((row, j) => row.forEach((v, i) => { const x = r.x0 + i + dx, y = r.y0 + j + dy; if (y < 0 || y >= d.h || x < 0 || (x >= d.w && x !== MT)) return;
+    setCell(tv, x, y, v); if (tv === 'song' && x !== MT && v >= 0) setBlockMute(y, x, !!mu[j][i]); })); } finally { uniqVac = []; }
   saveS(); draw();
   const n = m.line ? (r.y1 - r.y0 + 1) + ' line' + (r.y1 > r.y0 ? 's' : '') : mselN(r) + ' cells';
   toast(`${copy ? 'Copied' : 'Moved'} ${n} · ${keyHint('mod+Z')} undoes it`);
@@ -32582,6 +32588,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [547, '10 Nov', ['Unique per track now applies only the first time a pattern comes onto a track. A pattern the track already has can be repeated or moved up and down it with no new copies, and moving a selection to another track copies only when the pattern also stays behind on its old track.']],
   [546, '10 Nov', ['On phones and tablets, when a song uses effects or live engines and the phone’s audio clock leaps ahead, the song is now held at its real tempo, so it no longer rushes. Pieces of sound can still drop out while that happens. The playback report counts how often the song was held.']],
   [545, '10 Nov', ['On phones and tablets the audio engine now loads its extra audio-thread parts only when a song uses effects, chains, live engines or the audio-thread sequencer, which keeps the phone’s audio clock steady for songs that don’t. The playback report lists which parts are loaded. On a phone the Sequencer setting plays on the Page until you pick Audio thread yourself.', 'Stability: one bad note no longer stops the song, STOP always finishes cleanly, PLAY then a quick STOP no longer starts the song, audio resumes after an interruption, effect and tempo changes no longer land after STOP, MIDI notes are not cut when a phone hands the song over at screen-off, and the spectrum view survives Reset audio engine. MUT variations of pads with samples are much quicker to prepare. The audio-thread sequencer and the safety limiter make far less work for the audio thread, mastering recovers from a bad sample, and the Bass engine no longer breaks after a big upward pitch jump.']],
   [544, '10 Nov', ['(Testing) A Worklets setting in Settings › Audio (On, or Off for a phone clock test), the playback report now logs the audio clock while the app is hidden and any slow work while the song plays, and a MUT or GEN variation no longer rebuilds its sound for every note while it renders.']],
