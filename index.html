@@ -115,6 +115,11 @@ body.mob .deskmenu{display:none}
 .gset{width:min(400px, calc(100vw - 20px)); max-height:calc(100vh - 80px); overflow-y:auto; overscroll-behavior:contain}
 @supports (height: 1dvh){ .gset{max-height:calc(100dvh - 80px)} }
 .gsetbody{padding:0}
+/* DONE (owner, 10 Nov): a Close in the Settings sheet that stays in view while it scrolls. Touch / Mobile setup only: a desktop dropdown is left as it was. */
+.gsethead{display:none}
+body.mob .gsethead{display:flex; justify-content:flex-end; position:sticky; top:-4px; z-index:3; margin:-4px -4px 0; padding:4px; background:var(--panel); border-bottom:1px solid var(--line)}
+@media (pointer:coarse){ .gsethead{display:flex; justify-content:flex-end; position:sticky; top:-4px; z-index:3; margin:-4px -4px 0; padding:4px; background:var(--panel); border-bottom:1px solid var(--line)} }
+.gsethead button{min-height:40px; min-width:72px; font-weight:600}
 .gset .gsec{padding:8px 8px 10px; display:grid; gap:8px}
 .gset .gsec + .gsec{border-top:1px solid var(--line)}
 .gset .gsec[hidden]{display:none}
@@ -730,7 +735,8 @@ body.mlearn .row.mtarget input[type=range]{outline:3px solid var(--pl); outline-
 .ask .askmsg{white-space:pre-wrap; line-height:1.4; font-size:var(--fs-4); color:var(--muted)}
 body.dropping::after{content:''; position:fixed; inset:6px; border:3px dashed var(--ink); border-radius:12px; pointer-events:none; z-index:90; opacity:.5}   /* FILE DROP */
 .pad.droptgt{outline:3px dashed var(--ink); outline-offset:2px}
-#bFile.dirty::before{content:'•'; color:var(--rec, #e0564a); font-weight:800; margin-right:4px}   /* FILE SAFETY: unsaved changes */
+#bFile.dirty::before{content:'•'; color:var(--rec, #e0564a); font-weight:800; margin-right:4px}
+body.mob #bFile.dirty{position:relative} body.mob #bFile.dirty::before{position:absolute; top:1px; right:4px; margin:0; line-height:1}   /* on the phone the dot sits on the corner: inline it widened File and squeezed Tracker | Synth (U10) */   /* FILE SAFETY: unsaved changes */
 /* TRACK NAMES: the colour swatches in the track dialog, and the colour on a named track's number, meter and title */
 .ask .askswatch{display:flex; flex-wrap:wrap; gap:8px; margin:10px 0 4px}
 .ask .askswatch button{width:30px; height:30px; min-height:0; padding:0; border-radius:50%; border:2px solid var(--line); background:var(--sw, transparent)}
@@ -818,7 +824,7 @@ body.dropping::after{content:''; position:fixed; inset:6px; border:3px dashed va
 .welcome h2{margin:0 0 10px; font-size:var(--fs-5)}
 .welcome ol{margin:0; padding-left:1.3em; line-height:1.5; font-size:var(--fs-4)} .welcome li+li{margin-top:6px}
 .welcome kbd{font:inherit; font-weight:600; padding:0 5px; border:1px solid var(--line); border-radius:3px; background:var(--panel)}
-.welcome .wfoot{margin-top:14px; display:flex; justify-content:space-between; align-items:center; gap:10px; font-size:var(--fs-3); color:var(--muted)}
+.welcome .wfoot{margin-top:14px; flex-wrap:wrap; display:flex; justify-content:space-between; align-items:center; gap:10px; font-size:var(--fs-3); color:var(--muted)}
 .welcome .wfoot button{min-height:34px; white-space:nowrap}
 /* The preset browser: a sheet with the categories as rows that open and close (one open at a time), This song and
    Recent first, a search box, ▶ to hear a preset before taking it, Save and Import as buttons. The same sheet
@@ -1000,6 +1006,8 @@ body.dropping::after{content:''; position:fixed; inset:6px; border:3px dashed va
   .dkh{height:32px} .dkh .dkt, .dkh .dkx, .dkh .dksolo{height:28px}
   .dkh .dkx{width:36px}
   .sxmenu button, .askitem, .setmenu button{min-height:40px}
+  .gfile .fitem{min-height:40px}   /* beats .gfile .fitem{min-height:30px} above, which came later in the sheet (U5) */
+  .gfile .fitem kbd:not(.mcar){display:none}   /* no Ctrl+ shortcuts on a touch screen */
   .tarrh{width:32px; left:-16px}
 }
 .mfbar::before{content:''; position:absolute; left:0; right:0; top:-5px; bottom:-5px}   /* an easier grab than 3 px */
@@ -1283,6 +1291,9 @@ body.mob .top .kitname{width:auto; flex:1 1 90px; min-width:64px; max-width:220p
 /* FIX (sweep, 4 Nov): on a phone's narrow screen (the Fold's cover screen) with waves and chains shown, the four screen tabs
    pushed ⚙ and CPU off the side (the page scrolled sideways). There the tabs give way and scroll inside themselves. */
 @media (max-width:520px){ body.mob .top #segView{flex:0 1 auto; min-width:0; overflow-x:auto; scrollbar-width:none} body.mob .top #segView::-webkit-scrollbar{display:none} body.mob .top #segView button{padding-inline:8px} }
+/* (10 Nov) Tracker | Synth keeps both words on a phone (360-412 px clipped "Synth" to "Synt"): with two buttons the switch never shrinks or scrolls, the rest of the bar gives way (gap 6 -> 4 px). Waves / Chains still scroll it. */
+@media (max-width:520px){ body.mob .top #segView:not(:has(button:nth-child(3))){flex:none; overflow:visible} }
+@media (max-width:420px){ body.mob .top{gap:4px} }
 body.mob .top .brand{flex-shrink:1; min-width:0; overflow:hidden}
 /* With the chains tab showing (unfolded, or ticked) the tabs are one longer: the name shrinks so the whole title bar stays on one line, unclipped (owner, 8 Nov). */
 body.mob:not(.noch) .top .brand{font-size:15px; letter-spacing:.03em; margin-right:0}
@@ -1303,7 +1314,7 @@ body.mob .top #tLen{min-height:34px; padding:0 8px; align-self:auto}
 #tSong.on .tl.alt{visibility:visible}
 .tcpu{border:0; border-left:1px solid var(--line); min-height:36px; padding:0 10px; font-size:var(--fs-3); font-weight:600; letter-spacing:.04em; flex:none; white-space:nowrap;
   font-variant-numeric:tabular-nums; position:relative; min-width:84px; text-align:left; background:var(--ttl)}
-.tcpu i{position:absolute; left:0; bottom:0; height:4px; width:0; background:var(--ink); transition:width .3s}
+.tcpu i{position:absolute; left:0; bottom:0; height:4px; width:0; background:var(--ink)}
 .tcpu.warn i{background:var(--pl)}
 .tcpu.hot{color:var(--rec)} .tcpu.hot i{background:var(--rec)}
 .tpad{display:flex; justify-content:space-between; align-items:center; gap:16px; flex:1}
@@ -2653,6 +2664,17 @@ body.mob .dogs.idle .bob{animation-iteration-count:9} body.mob .dogs.idle .tail{
 :root[data-skinbase="term"] .tagrid b.f.p, :root[data-skinbase="term"] .tagrid b.f.p[style]{background:transparent; color:var(--mx); box-shadow:inset 0 0 0 2px var(--mx)}
 :root:is([data-skin="rainbow"],[data-skin="rainbowdyn"]) .tagrid b.f.p{background:#fff!important; color:oklch(.45 .16 var(--rbh)); box-shadow:inset 0 0 0 2px oklch(.62 .16 var(--rbh))}
 :root:is([data-skin="rainbow"],[data-skin="rainbowdyn"]) .tagrid b:not(.f){--rbh:calc((var(--ci, 0) + var(--ri, 0)) * 30deg + 10deg + var(--rbo, 0deg)); background:oklch(.94 .03 var(--rbh))}
+/* TOUCH TARGETS (usability audit U4): heights and hit areas only, on a touch screen; the looks stay, desktop is untouched. The Tracker | Synth switch is left alone. */
+@media (pointer:coarse){
+  .top .tsong, .top .tcpu, .ttabs button, #bFile, #bEdit, #bView, #bAud, .top #bSet, .top #bHelp{min-height:40px}
+  .pfav, #tArr .tahd .azb{position:relative}
+  .pfav::before{content:''; position:absolute; left:-4px; right:-4px; top:50%; height:40px; transform:translateY(-50%)}
+  #tArr .tahd .azb::before{content:''; position:absolute; inset:-8px}
+  #tArr .tahd .appin, #apStrip .appin{position:relative}
+  #tArr .tahd .appin::before, #apStrip .appin::before{content:''; position:absolute; left:0; right:0; top:50%; height:40px; transform:translateY(-50%)}
+  .gset label.cb{min-height:40px}
+  .gset :is(#audReset, #audReport){min-height:40px}
+}
 </style>
 <style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}</style>
 <style>
@@ -2788,6 +2810,7 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
     <div class="phlbody" id="phlBody"></div>
   </div>
   <div class="setmenu gset" id="gset" hidden role="dialog" aria-label="Settings">
+    <div class="gsethead" id="gsetHead"><button type="button" id="gsetDone" aria-label="Close Settings">Done</button></div>
     <div class="gsetbody" id="gsetBody"><div class="gsec" id="gsecProj" hidden></div><div class="gsec" id="gsecScreen" hidden></div><div class="gsec" id="gsecPatch" hidden></div></div>
   </div>
   </div>
@@ -2925,7 +2948,7 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
       <div class="vrow vttl"><span class="ttl" id="vNum">Pad 1</span><span class="vmeter" id="vMeter" title="Level of what you play here (pads, keys, MIDI), −48 to +6 dB. The line is 0 dB: past it the bar turns red and the safety limiter (Project → LIMITER) is holding the peaks down." aria-hidden="true"><i></i><b></b></span></div>
       <div class="vrow vid"><input id="vName" type="text" aria-label="Pad name" spellcheck="false"><button class="sm play" id="vPlay" title="Play this pad (Space)"><svg class="ic" aria-hidden="true"><use href="#ic-play"/></svg>Play</button></div>
       <div class="vrow vact">
-        <button type="button" id="vPre" class="sm presel" title="Presets: factory sounds and your own, saved in this song.">Presets…</button>
+        <button type="button" id="vPre" class="sm presel" title="Presets: factory sounds and your own, saved in this song.">Pad presets…</button>
         <span class="grp" role="group" aria-label="Make"><button class="sm" id="vRand">Random</button><button class="sm" id="vInit">Init</button></span>
         <span class="grp" role="group" aria-label="Clipboard"><button class="sm" id="vCopy">Copy</button><button class="sm" id="vPaste">Paste</button></span>
       </div>
@@ -8766,7 +8789,14 @@ const toastQ = []; let toastLong = false, toastQuick = null;
 // toastOnce: a notice that only needs reading once on this device (key: what it is about)
 function toastOnce(key, msg, ms){ const K = 'thunderplus-seen-' + key; try { if (localStorage.getItem(K)) return; localStorage.setItem(K, '1'); } catch(e){} toast(msg, ms); }
 setTimeout(() => { try { $('toast').addEventListener('click', () => toastNext()); } catch(e){} }, 0);
-function toast(msg, ms){ const t = $('toast'); let top = 2000;
+// POP-UP MESSAGES setting (owner, 10 Nov): Settings › Screen. Off hides ordinary toasts; toastErr() (3rd argument 'err') is for a failure or
+// possible lost work (couldn’t save, storage full, audio / MIDI failing, needs a newer browser…) and always shows.
+const TOK = 'thunderplus-toasts-v1';
+let toastsOn = (() => { try { return localStorage.getItem(TOK) !== '0'; } catch(e){ return true; } })();
+function setToastsOn(on){ toastsOn = !!on; try { localStorage.setItem(TOK, on ? '1' : '0'); } catch(e){} if (!toastsOn){ try { const t = $('toast'); if (t && !t.hidden && !toastLong) toastNext(); } catch(e){} } }
+const toastErr = (msg, ms) => toast(msg, ms, 'err');
+function toast(msg, ms, sev){ const t = $('toast'); let top = 2000;
+  if (!toastsOn && sev !== 'err') return;
   if (busNote){ msg = msg ? msg + ' · ' + busNote : busNote; busNote = ''; top = 4500; }   // BUS: the one-time note rides along
   msg = String(msg == null ? '' : msg);
   // an error with no time of its own stays up long enough to read (audit B3: "Couldn’t save…" went in 2 s)
@@ -8774,8 +8804,16 @@ function toast(msg, ms){ const t = $('toast'); let top = 2000;
   const dur = typeof ms === 'number' && ms > 0 ? clamp(ms, 1000, 12000) : err ? clamp(2500 + msg.length * 30, 4000, 8000) : clamp(1000 + msg.length * 20, 1300, top), long = dur >= 4000;
   if (toastLong && !t.hidden){ if (long){ if (toastQ.length < 3) toastQ.push([msg, dur]); } else toastQuick = [msg, dur]; return; }
   toastShow(msg, dur, long); }
+// PHONE (body.mob): just below the screen-tab strip (#tTabs, else the top bar), measured each time, so it never covers either (owner, 10 Nov)
+function toastPlace(t){
+  try {
+    if (!document.body.classList.contains('mob')){ t.style.top = t.style.bottom = ''; return; }
+    let b = 0; for (const el of [document.querySelector('.top'), $('tTabs')]){ if (el && el.offsetHeight) b = Math.max(b, el.getBoundingClientRect().bottom); }
+    t.style.bottom = 'auto'; t.style.top = Math.round(b + 3) + 'px';
+  } catch(e){}
+}
 function toastShow(msg, dur, long){
-  const t = $('toast'); t.textContent = msg; t.hidden = false; clearTimeout(tt); toastLong = long;
+  const t = $('toast'); t.textContent = msg; t.hidden = false; toastPlace(t); clearTimeout(tt); toastLong = long;
   tt = setTimeout(toastNext, dur); }
 function toastNext(){
   const t = $('toast'); clearTimeout(tt); t.hidden = true; toastLong = false;
@@ -11291,7 +11329,7 @@ function preStep(kind, d){
 }
 function preLabels(){
   for (const [id, kind] of [['bassPre', 'bass'], ['blipPre', 'blip'], ['voxPre', 'vox'], ['xPre', 'x']]){ const b = $(id + 'Btn'); if (!b) continue;
-    const [L] = preSpec(kind), i = preAt.get(preKey(kind)), t = i != null && L[i] ? L[i][0] : 'Presets…'; if (b.textContent !== t){ b.textContent = t; b.title = i != null ? 'Preset: ' + t + ' (tap for the list)' : 'Presets for this engine'; } }
+    const [L] = preSpec(kind), i = preAt.get(preKey(kind)), t = i != null && L[i] ? L[i][0] : 'Engine presets…'; if (b.textContent !== t){ b.textContent = t; b.title = i != null ? 'Preset: ' + t + ' (tap for the list)' : 'Presets for this engine'; } }
 }
 let pbOpen = null, pbPreview = null;
 function stopPreview(){ if (pbPreview){ try { pbPreview.stop(); } catch(e){} pbPreview = null; } }
@@ -11303,7 +11341,7 @@ async function previewVoice(v, btn){
     try { data = (await renderAsync(v, sr, hold, false)).data; } catch(e){ data = renderVoice(v, sr, null, hold); }
     if (!data || !data.length) return;
     stopPreview(); const b = ctx.createBuffer(1, data.length, sr); b.copyToChannel(data, 0); const src = ctx.createBufferSource(); src.buffer = b; src.connect(master); src.start(); pbPreview = src; src.onended = () => { if (pbPreview === src) pbPreview = null; };
-  } catch(e){ toast('Couldn’t preview that preset.'); } finally { if (btn) btn.classList.remove('busy'); }
+  } catch(e){ toastErr('Couldn’t preview that preset.'); } finally { if (btn) btn.classList.remove('busy'); }
 }
 function presetSheet(kind){
   if (pbOpen) pbOpen();
@@ -11328,7 +11366,7 @@ function presetSheet(kind){
     const it = el('div', 'pit'), pn = el('button', 'pn', e.name), pp = el('button', 'pp'); pn.type = pp.type = 'button'; pn.title = 'Use this preset';
     pp.innerHTML = '<svg class="ic" aria-hidden="true" style="width:12px;height:12px;fill:currentColor"><use href="#ic-play"/></svg>'; pp.title = 'Preview this preset'; pp.setAttribute('aria-label', 'Preview ' + e.name);
     pn.addEventListener('click', () => { if (early()) return; recentPresets.add(rkind, e.key); done(); e.apply(); });
-    pp.addEventListener('click', () => { if (e.prev) return e.prev(pp); try { previewVoice(e.make(), pp); } catch(err){ toast('Couldn’t preview that preset.'); } });
+    pp.addEventListener('click', () => { if (e.prev) return e.prev(pp); try { previewVoice(e.make(), pp); } catch(err){ toastErr('Couldn’t preview that preset.'); } });
     it.append(pn, pp);
     if (e.fid) it.append(favBtn('p:' + rkind, e.fid, e.name, () => { G = presetEntries(kind); const fo = G[0] && G[0][0] === 'Favorites'; if (fo !== hadFav){ openCat += fo ? 1 : -1; hadFav = fo; } render(); }));   // FAVOURITES
     if (e.own != null){ const px = el('button', 'px', '✕'); px.type = 'button'; px.title = 'Delete this preset'; px.setAttribute('aria-label', 'Delete ' + e.name);
@@ -11363,7 +11401,7 @@ function presetSheet(kind){
   // under the finger, so the sheet took a preset and closed at once — the Piano / EP / Organ lists are tall enough to
   // reach the card header.)
   if (ENGINE_PRESET_SHEET) for (const [id, kind] of [['bassPre', 'bass'], ['blipPre', 'blip'], ['voxPre', 'vox'], ['xPre', 'x']]){ const sel = $(id); if (!sel) continue;
-    const b = el('button', 'sm presel engpre', 'Presets…'); b.type = 'button'; b.id = id + 'Btn'; b.title = 'Presets for this engine'; b.setAttribute('aria-haspopup', 'dialog');
+    const b = el('button', 'sm presel engpre', 'Engine presets…'); b.type = 'button'; b.id = id + 'Btn'; b.title = 'Presets for this engine'; b.setAttribute('aria-haspopup', 'dialog');
     sel.hidden = true; b.addEventListener('click', () => presetSheet(kind));
     // PRESET STEP (owner, 24 Oct): ◀ ▶ either side step through this engine's presets (wrapping), as the engine's ◀ ▶ do
     const arr = (d, t, lab) => { const a = el('button', 'sm engstep', t); a.type = 'button'; a.title = lab; a.setAttribute('aria-label', lab); a.addEventListener('click', () => preStep(kind, d)); return a; };
@@ -11518,7 +11556,7 @@ function sfLoad(id){
     if (!bytes) throw new Error('SoundFont “' + id + '” isn’t on this device. Load it on the Synth page (Engine: SoundFont).');
     const f = parseSF(bytes); f.id = id; SF.fonts.set(id, f);
     return f;
-  })().catch(e => { SF.loading.delete(id); toast(e.message || 'SoundFont failed to load.', 6000); return null; }));
+  })().catch(e => { SF.loading.delete(id); toastErr(e.message || 'SoundFont failed to load.', 6000); return null; }));
   return SF.loading.get(id);
 }
 // Sample data, decoded once per font and sample: {d:Float32Array, sr, ls, le} (loop in frames of d).
@@ -12273,7 +12311,7 @@ function rsPanel(){
           await new Promise(r => setTimeout(r, 30));   // let the toast show before the analysis holds the page
           const w = V(); w.rsData = ResynthCore.analyse(mono, buf.sampleRate, {name:file.name.replace(/\.[^.]+$/, '').slice(0, 40)});
           changed(cur); rsPanel(); toast('Resynth: ' + rsLabel(w.rsData));
-        } catch(e){ toast('That file couldn’t be read as audio.', 5000); } });
+        } catch(e){ toastErr('That file couldn’t be read as audio.', 5000); } });
       inp.click(); });
     const demo = el('button', 'sm', 'Use the built-in pluck'); demo.type = 'button';
     demo.addEventListener('click', () => { const w = V(); w.rsData = ResynthCore.demoRs(48000); changed(cur); rsPanel(); });
@@ -12425,7 +12463,7 @@ function wtPanel(){
           if (!wt){ toast('That file is silent, so there’s no wavetable to make.', 5000); return; }
           const w = V(); w.wtData = wt; if (!w.table) w.table = normX('table', null); w.table.table = 4;
           changed(cur); refreshAll(); toast('Table: ' + wtLabel(wt));
-        } catch(e){ toast('That file couldn’t be read as audio.', 5000); } });
+        } catch(e){ toastErr('That file couldn’t be read as audio.', 5000); } });
       inp.click(); });
     const clr = el('button', 'sm', 'Remove'); clr.type = 'button'; clr.id = 'wtClr';
     clr.addEventListener('click', () => { const w = V(); delete w.wtData; if (w.table && Math.round(w.table.table) === 4) w.table.table = 0; changed(cur); refreshAll(); });
@@ -12438,7 +12476,7 @@ function wtPanel(){
       try {
         const wt = await wtStarter(id), w = V(); w.wtData = wt; if (!w.table) w.table = normX('table', null); w.table.table = 4;
         changed(cur); refreshAll(); toast('Table: ' + wtLabel(wt));
-      } catch(e){ toast('Couldn’t load that table (offline?).', 5000); } });
+      } catch(e){ toastErr('Couldn’t load that table (offline?).', 5000); } });
     const row = el('div', 'btnrow'); row.append(ld, pick, clr); box.append(row, info); host.prepend(box);
   }
   $('wtClr').hidden = !v.wtData;
@@ -12468,7 +12506,7 @@ function frzPanel(){
           const L = freshLayer({on:false, type:'sample'}); L.sample = {data:mono, sr:buf.sampleRate, name:file.name.replace(/\.[^.]+$/, '').slice(0, 40)}; w.layers[li] = L;
           XEV().source = 0; changed(cur); for (const r of xRows) r.refresh(); frzPanel();
           toast('Freeze: ' + file.name + (buf.length > n ? ' (its first 20 s)' : '') + ' · SOURCE is File · ROOT is the note it plays at');
-        } catch(e){ toast('That file couldn’t be read as audio.', 5000); } });
+        } catch(e){ toastErr('That file couldn’t be read as audio.', 5000); } });
       inp.click(); });
     const row = el('div', 'btnrow'); row.append(ld); box.append(row, info); host.prepend(box);
   }
@@ -12794,7 +12832,7 @@ $('fxAdd').addEventListener('change', e => {
   const t = e.target.value; e.target.value = ''; if (!t) return;
   const v = V(); v.fx = v.fx || []; if (v.fx.length >= 6) return toast('Up to 6 effects per pad.');
   e.target.blur();
-  v.fx.push(freshFx(t)); if (!fxReady(v.fx[v.fx.length - 1])) toast(plFailed ? 'Effects couldn’t load in this view. They work in the installed app.' : 'Effects are still loading.');
+  v.fx.push(freshFx(t)); if (!fxReady(v.fx[v.fx.length - 1])) toastErr(plFailed ? 'Effects couldn’t load in this view. They work in the installed app.' : 'Effects are still loading.');
   renderFx(); changed();
 });
 const tailRow = makeRow({l:'Tail', min:0, max:8, c:'half', d:2, f:v => v.toFixed(1) + ' s'}, 'tail', V, {idp:'fx', noTrack:true, on:() => changed()});
@@ -12810,7 +12848,7 @@ function renderFx(){
     const mk = (label, fn, aria) => { const b = el('button', 'sm', label); b.type = 'button'; if (aria) b.setAttribute('aria-label', aria); b.addEventListener('click', fn); head.append(b); return b; };
     // ‹ › page this slot through the effects, in the + Add effect menu's order (the new one starts at its defaults)
     const pg = (dir, kb) => { const ks = fxOrder(), i = ks.indexOf(f.type), t = ks[(i + dir + ks.length) % ks.length];
-      const nf = freshFx(t); nf.on = f.on; v.fx[idx] = nf; if (!fxReady(nf)) toast(plFailed ? 'Effects couldn’t load in this view. They work in the installed app.' : 'Effects are still loading.');
+      const nf = freshFx(t); nf.on = f.on; v.fx[idx] = nf; if (!fxReady(nf)) toastErr(plFailed ? 'Effects couldn’t load in this view. They work in the installed app.' : 'Effects are still loading.');
       renderFx(); changed(); const b = $('fxList').children[idx]; const q = b && b.querySelector(kb ? '.fxhead .n' : dir < 0 ? '.fxpg.l' : '.fxpg.r'); if (q) q.focus({preventScroll:true}); };
     const pl = mk('', () => pg(-1), 'Previous effect'), nm = el('span', 'n', d.name), pr = mk('', () => pg(1), 'Next effect');
     pl.innerHTML = ico('left'); pr.innerHTML = ico('right'); pl.className = 'sm fxpg l'; pr.className = 'sm fxpg r';
@@ -13344,7 +13382,7 @@ async function resolveSamples(){
     }
     refreshAll();
     if (borrowed) save();   // samples read from Thunder's old store are copied into this app's own
-    if (missing) toast(missing + (missing > 1 ? ' samples' : ' sample') + ' couldn’t be found in this browser’s storage. Load the kit or project file to get them back.', 6000);
+    if (missing) toastErr(missing + (missing > 1 ? ' samples' : ' sample') + ' couldn’t be found in this browser’s storage. Load the kit or project file to get them back.', 6000);
     else { smpTidy(); if (!borrowed && typeof thunderTidy === 'function') setTimeout(thunderTidy, 3000); }
     // A kit saved before samples moved to IndexedDB still has them inside localStorage: move them now.
     try { if ((localStorage.getItem(KEY) || '').includes('"b64"')) save(); } catch(e){}
@@ -13394,7 +13432,7 @@ function save(){
   }
   if (!storeWrite(KEY, JSON.stringify(kitToJSON(false)))){
     // Too big with the audio inside: keep the settings at least, and say so (the samples are gone after a reload).
-    if (storeWrite(KEY, JSON.stringify(kitToJSON(true))) && typeof toast === 'function') toast('Storage is full: the kit was saved without its samples. Export a kit or project file to keep them.');
+    if (storeWrite(KEY, JSON.stringify(kitToJSON(true))) && typeof toast === 'function') toastErr('Storage is full: the kit was saved without its samples. Export a kit or project file to keep them.');
   }
 }
 function loadSaved(){ try { const s = localStorage.getItem(KEY) || localStorage.getItem(OLD_KEY); return s ? kitFromJSON(JSON.parse(s)) : null; } catch(e){ console.warn('Couldn’t load the saved kit', e); return null; } }
@@ -13495,8 +13533,8 @@ async function writeOut(to, filename, blob){
   if (to.ai) return deliverAI(filename, blob);
   if (to.path){ const r = await DESK.outWrite(to.path, await blob.arrayBuffer());
     if (r && r.ok){ const nm = r.path.split(/[\\/]/).pop(); toastAct('Saved ' + nm + ' in ' + r.path.slice(0, r.path.length - nm.length - 1), 'Show', () => DESK.outShow(r.path)); }
-    else toast('Couldn’t save it: ' + ((r && r.error) || 'unknown error')); return; }
-  if (to.h){ try { const w = await to.h.createWritable(); await w.write(blob); await w.close(); toast('Saved ' + (to.h.name || filename)); } catch(e){ toast('Couldn’t save it: ' + ((e && e.message) || e)); } return; }
+    else toastErr('Couldn’t save it: ' + ((r && r.error) || 'unknown error')); return; }
+  if (to.h){ try { const w = await to.h.createWritable(); await w.write(blob); await w.close(); toast('Saved ' + (to.h.name || filename)); } catch(e){ toastErr('Couldn’t save it: ' + ((e && e.message) || e)); } return; }
   const url = URL.createObjectURL(blob), a = document.createElement('a');
   a.href = url; a.download = filename; document.body.append(a); a.click(); a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 5000); toast('Saved ' + filename + ' to your Downloads folder', 4000);
@@ -13534,9 +13572,9 @@ let passProg = null;   // pass() reports how far its render has got here (0–1)
 async function deliverAI(filename, blob){
   if (inAI){
     let dl = null; try { dl = await window.claude.use('downloads'); } catch(e){}
-    if (!dl){ toast('Saving files isn’t available in this view.'); return; }
+    if (!dl){ toastErr('Saving files isn’t available in this view.'); return; }
     try { await dl.save({filename, data:blob}); toast('Saved ' + filename); }
-    catch(e){ if (e && e.code === 'declined') return; toast(e && e.code === 'rate_limited' ? 'A save is already waiting for you.' : 'Couldn’t save: ' + ((e && e.message) || 'unknown error')); }
+    catch(e){ if (e && e.code === 'declined') return; toastErr(e && e.code === 'rate_limited' ? 'A save is already waiting for you.' : 'Couldn’t save: ' + ((e && e.message) || 'unknown error')); }
     return;
   }
   const url = URL.createObjectURL(blob), a = document.createElement('a');
@@ -13553,7 +13591,7 @@ $('bExKit').addEventListener('click', () => { const fs = []; for (let i = 0; i <
 const canShare = !inAI && !!(navigator.canShare && window.File) && (() => { try { return navigator.canShare({files:[new File([new Uint8Array(4)], 'a.wav', {type:'audio/wav'})]}); } catch(e){ return false; } })();
 async function share(files){
   try { await navigator.share({files, title:'Thunder'}); }
-  catch(e){ if (e && e.name !== 'AbortError') toast('Sharing didn’t work here. Use Save instead.'); }
+  catch(e){ if (e && e.name !== 'AbortError') toastErr('Sharing didn’t work here. Use Save instead.'); }
 }
 if (canShare){
   $('bShPad').hidden = false; $('bShKit').hidden = false;
@@ -13676,6 +13714,7 @@ const gsetPress = (mode, btn) => gsetOpen() && gsetBtn === btn ? gsetToggle(fals
 for (const [id] of GLOBAL_SECS){ const s = $(id); if (s){ s.hidden = true; s.classList.add('gsec'); $('gsetBody').append(s); } }
 for (const id of INNER_SECS){ const s = $(id); if (s) $('gsetBody').append(s); }   // parked here; buildProj / buildScreen place them
 $('bSet').addEventListener('click', () => gsetPress('set', $('bSet')));
+$('gsetDone').addEventListener('click', () => gsetToggle(false));   // same as tapping the gear again
 $('bView').addEventListener('click', () => gsetPress('view', $('bView')));
 $('bAud').addEventListener('click', () => gsetPress('aud', $('bAud')));
 // Settings sliders are locked so scrolling the menu, or a stray tap on a slider's track, can't change a setting.
@@ -13790,7 +13829,9 @@ function fileItems(){
       {l:'Clear all kit slots', f:clearKit, ask:'kit'},
       null,
       {l:(vtrk ? '✓ ' : '') + 'A kit slot per track', f:() => { setVtrk(!vtrk); try { $('ckVtrk').checked = vtrk; } catch(e){} }}]},   // (from ⚙'s Kit, 2 Nov)
-    ...(deskUpdApi ? [{h:'App'}, {l:'Check for updates…' + (deskUpd && deskUpd.version ? ' (you have ' + deskUpd.version + ')' : ''), f:() => deskUpdApi.check()}] : [])
+    ...(deskUpdApi ? [{h:'App'}, {l:'Check for updates…' + (deskUpd && deskUpd.version ? ' (you have ' + deskUpd.version + ')' : ''), f:() => deskUpdApi.check()}] : []),
+    // HELP when folded: the top bar's ? is hidden at 480 px and under, so Help is the LAST row here (usability audit U1; owner: at the bottom)
+    ...(window.matchMedia && matchMedia('(max-width:480px)').matches ? [{h:'Help'}, {l:'Help & keys', f:() => showHelp()}] : [])
   ];
 }
 /* ---------- DESKTOP APP UPDATES (electron/preload.js → window.thunderDesktop) ----------
@@ -13999,7 +14040,7 @@ $('audOut').addEventListener('change', async e => {
   aset.sink = id; asetSave();
   if (ctx && ctx.setSinkId){
     try { await ctx.setSinkId(id); toast('Playing through ' + (id ? name : 'the system default') + '.'); }
-    catch(err){ toast('Couldn’t switch to that output' + (err && err.message ? ': ' + err.message : '.')); }
+    catch(err){ toastErr('Couldn’t switch to that output' + (err && err.message ? ': ' + err.message : '.')); }
   } else if (sinkOk) toast('Saved. It plays through ' + (id ? name : 'the system default') + ' from the first sound.');
   audStatus();
 });
@@ -14282,7 +14323,7 @@ async function loadAudioInto(f, pad){
     assignSample(pad, d, b.sampleRate, f.name.replace(/\.[^.]+$/, '').slice(0, 24), d2);
     toast(`Loaded ${f.name} into pad ${hx(pad)}, layer ${kit.voices[pad].sel + 1}` + (d2 ? ', stereo' : '') + (b.length > n ? ` (first ${SMP_MAX} s)` : ''));
     playFresh(pad);
-  } catch(err){ toast('Couldn’t read that audio file.'); }
+  } catch(err){ toastErr('Couldn’t read that audio file.'); }
 }
 /* ===SMP EDIT START=== (5 Nov) Pure sample edits for the recorder's take editor, {data, data2, sr} in, a new one out.
    Written as its own module with tests (tests/smp-edit.test.js cuts this part out of index.html). */
@@ -14529,7 +14570,7 @@ function smbAdd(S){
   let ok = false; for (const n of [SMB_MAX, 10, 3, 1]){ try { localStorage.setItem(SMB_K, JSON.stringify(a.slice(0, n))); ok = true; break; } catch(e){} }
   SMB_MEM = ok ? null : a; if (!ok) tpLog('RECENT could not be saved (storage full): kept for this session only');
   smpHeld.set(S.id, S);   // (so a RECENT row loads from memory even if the store write below is slow or fails; the minute-by-minute prune lets it go once no pad names it)
-  try { smpPut(S).catch(e => { tpLog('could not store the sample for RECENT', e); toast('This sample is too big for the browser’s storage: RECENT will only have it until the app closes.', 7000); }); } catch(e){}
+  try { smpPut(S).catch(e => { tpLog('could not store the sample for RECENT', e); toastErr('This sample is too big for the browser’s storage: RECENT will only have it until the app closes.', 7000); }); } catch(e){}
 }
 const smbDb = () => idbOpen('thunderplus-browser');   // (its store is called 'smp' too: idbOpen makes that one; here it holds the folder handle)
 async function smbKv(k, v){ try { const db = await smbDb(); return await new Promise(res => { const tx = db.transaction('smp', v === undefined ? 'readonly' : 'readwrite'), st = tx.objectStore('smp');
@@ -14539,7 +14580,7 @@ async function smbPerm(ask){ const d = SMB.dir; if (!d) return (SMB.perm = '');
   try { let p = await d.queryPermission({mode:'read'}); if (p !== 'granted' && ask) p = await d.requestPermission({mode:'read'}); return (SMB.perm = p); } catch(e){ return (SMB.perm = 'denied'); } }
 async function smbPickDir(){
   try { const d = await window.showDirectoryPicker({id:'thunder-samples', mode:'read'}); SMB.dir = d; SMB.files = null; await smbKv('folder', d); SMB.perm = 'granted'; smbScan(); }
-  catch(e){ if (e && e.name !== 'AbortError') toast('Couldn’t open that folder.'); }
+  catch(e){ if (e && e.name !== 'AbortError') toastErr('Couldn’t open that folder.'); }
 }
 // Every audio file under the folder (subfolders too, up to 8 deep and 20,000 files), sorted by path
 async function smbScan(){
@@ -14581,12 +14622,12 @@ function smbStop(){ if (SMB.prev){ try { SMB.prev.stop(); } catch(e){} SMB.prev 
 async function smbAudition(i){
   const row = smbRows()[i]; if (!row) return; smbStop();
   try { const o = await smbOpen(row); if (!o || SMB.sel !== i || !SMB.ui) return; const src = ctx.createBufferSource(); src.buffer = o.buf; src.connect(master); src.start(); SMB.prev = src; }
-  catch(e){ toast('Couldn’t read ' + row.name + '.'); }
+  catch(e){ toastErr('Couldn’t read ' + row.name + '.'); }
 }
 async function smbLoad(i){
   const row = smbRows()[i]; if (!row) return; const pad = SMB.ui ? +SMB.ui.padS.value : cur;
   try { const o = await smbOpen(row); if (!o) return toast(`${row.name} is no longer in this app’s sample store.`); smbStop(); o.load(pad); }
-  catch(e){ toast('Couldn’t read ' + row.name + '.'); }
+  catch(e){ toastErr('Couldn’t read ' + row.name + '.'); }
 }
 function smbUi(){
   const U = SMB.ui; if (!U) return;
@@ -14721,13 +14762,13 @@ async function rcdOpen1(){
     } catch(e){ tpLog('native input', e); rcdCloseIo(); Object.assign(RCD, {node:null, mon:null}); RCD.ioWhy = String((e && e.message) || e); }
     // NO SILENT FALLBACK: with Engine Native and the helper there, a failed open says why and records nothing (the browser's input
     // would have quietly given only inputs 1–2). Without the helper at all, the browser's input is used, as the window says.
-    if (IOH.state === 'ready'){ RCD.note = 'Native input: ' + (RCD.ioWhy || 'it didn’t open') + '. Try again, or pick Engine Browser.'; toast(RCD.note, 6000); return false; }
+    if (IOH.state === 'ready'){ RCD.note = 'Native input: ' + (RCD.ioWhy || 'it didn’t open') + '. Try again, or pick Engine Browser.'; toastErr(RCD.note, 6000); return false; }
   }
-  const md = navigator.mediaDevices; if (!md || !md.getUserMedia){ toast('This browser can’t record audio.'); return false; }
+  const md = navigator.mediaDevices; if (!md || !md.getUserMedia){ toastErr('This browser can’t record audio.'); return false; }
   const base = {echoCancellation:false, noiseSuppression:false, autoGainControl:false, channelCount:{ideal:32}};   // INPUTS: every channel it has
   let s = null;
   if (rcdSet.input){ try { s = await md.getUserMedia({audio:Object.assign({}, base, {deviceId:{exact:rcdSet.input}})}); } catch(e){} }
-  if (!s){ try { s = await md.getUserMedia({audio:base}); } catch(e){ toast(e && e.name === 'NotAllowedError' ? 'Recording needs permission to use an audio input.' : 'Couldn’t open an audio input.', 5000); return false; } }
+  if (!s){ try { s = await md.getUserMedia({audio:base}); } catch(e){ toastErr(e && e.name === 'NotAllowedError' ? 'Recording needs permission to use an audio input.' : 'Couldn’t open an audio input.', 5000); return false; } }
   if (gone()){ s.getTracks().forEach(t => t.stop()); return false; }   // (closed while the browser asked: CodeRabbit)
   try {
     if (RCD.mod !== ctx){ wkNote(ctx, 'rec'); await ctx.audioWorklet.addModule(URL.createObjectURL(new Blob([RCD_WORKLET], {type:'application/javascript'}))); RCD.mod = ctx; }
@@ -14741,7 +14782,7 @@ async function rcdOpen1(){
     rcdSet.nchs[rcdSet.input || ''] = nch; rcdSave(); rcdRoute(); if (RCD.ui && RCD.ui.fillCh) RCD.ui.fillCh();
     tr && tr.addEventListener('ended', () => { toast('The audio input went away.'); rcdAbort(); rcdClose(); rcdUi(); });
     return true;
-  } catch(e){ s.getTracks().forEach(t => t.stop()); tpLog('recorder', e); toast('Couldn’t start recording here.'); return false; }
+  } catch(e){ s.getTracks().forEach(t => t.stop()); tpLog('recorder', e); toastErr('Couldn’t start recording here.'); return false; }
 }
 function rcdClose(){ RCD.gen = (RCD.gen | 0) + 1; rcdCloseIo();   // (gen: an open still in flight sees it was closed meanwhile)
   try { if (RCD.src) RCD.src.disconnect(); if (RCD.spl) RCD.spl.disconnect(); if (RCD.mrg) RCD.mrg.disconnect(); if (RCD.mon) RCD.mon.disconnect(); if (RCD.node){ RCD.node.port.onmessage = null; } } catch(e){}
@@ -15317,7 +15358,7 @@ async function rcdPanel(pad, opts){
       const room = SMP_MAX * T.sr - T.data.length; if (room <= 0) return toast(`It’s already ${SMP_MAX} s, the longest a sample can be.`);
       if (d.length > room){ d = d.slice(0, room); if (d2) d2 = d2.slice(0, room); toast(`Joined the first ${(room / T.sr).toFixed(1)} s of it (a sample can be ${SMP_MAX} s).`); }
       rcdEdit(T => seConcat(T, {data:d, data2:d2, sr:T.sr})); RCD.view = null; rcdUi(); toast('Joined ' + f.name + ' onto the end.'); }
-    catch(e){ toast('Couldn’t read that audio file.'); } });
+    catch(e){ toastErr('Couldn’t read that audio file.'); } });
   op('Append file…', () => apIn.click(), 'Join another sample onto the end');
   edit.append(ops);
   const padS = el('select'); for (let k = 0; k < kit.voices.length; k++) padS.append(new Option(hx(k) + ' ' + (kit.voices[k].name || ''), k)); padS.value = pad;
@@ -15586,7 +15627,7 @@ addEventListener('drop', async e => {
     if (/\.(wav|wave|aif|aiff|flac|mp3|ogg|oga|m4a|aac|opus|webm)$/.test(nm) || /^audio\//.test(f.type)){ await loadAudioInto(f, pad); if (pd) pad = Math.min(pad + 1, nslots() - 1); continue; }
     if (/\.midi?$/.test(nm)){ importMidiFile(f); continue; }
     if (/\.(thunder|json)$/.test(nm)){
-      let j = null; try { j = JSON.parse(await f.text()); } catch(err){ toast('Couldn’t read ' + f.name + '.'); continue; }
+      let j = null; try { j = JSON.parse(await f.text()); } catch(err){ toastErr('Couldn’t read ' + f.name + '.'); continue; }
       if (j && (j.app === 'thunder-project' || j.song || j.app === 'thunder-song')){
         if (!await okToLeave('opening ' + f.name)) continue;
         const path = DESK && DESK.pathOf ? DESK.pathOf(f) : '';
@@ -15596,7 +15637,7 @@ addEventListener('drop', async e => {
       if (j && (j.voices || j.layers || j.presets)){ importPresetsFile(f); continue; }
       toast(f.name + ' isn’t a project, kit, preset or chains file.'); continue;
     }
-    toast('Can’t use ' + f.name + ' here: drop audio, a .thunder project, a kit or a .mid file.');
+    toastErr('Can’t use ' + f.name + ' here: drop audio, a .thunder project, a kit or a .mid file.');
   }
 });
 
@@ -15924,7 +15965,7 @@ function msend(bytes, t, early, p){
   const o = midiOut(p); if (!o || !ctx) return;
   const at = t == null ? 0 : a2p(t + moFxLat()) - (early ? mLatOf(p) : 0), now = performance.now();
   if (!o.native && at - now > MOB_AHEAD && !document.hidden) return mobPut(o, bytes, at);   // (NATIVE MIDI: the helper's queue is cleared on STOP itself)
-  try { o.send(bytes, Math.max(now, at)); } catch(e){}
+  try { const ts = Math.max(now, at); o.send(bytes, ts); if (MOLED_ON && document.hidden && !o.native) moledNote(o, bytes, ts, now); } catch(e){}
 }
 /* FX LATENCY (owner, 7 Nov: MIDI early; "midi and audio seem to align if I move the synth/audio up two lines"). Everything
    Thunder plays reaches the speaker later than the time it is booked for by the lookahead on the way out: the mastering
@@ -15949,10 +15990,34 @@ function mobPut(o, b, at){
   q.splice(lo, 0, {o, b, at}); if (!MOB.tm) MOB.tm = setInterval(mobFlush, 15); }
 function mobFlush(all){
   const q = MOB.q, now = performance.now(), lim = all === true ? Infinity : now + MOB_AHEAD; let i = 0;
-  while (i < q.length && q[i].at <= lim){ const x = q[i++]; try { x.o.send(x.b, Math.max(now, x.at)); } catch(e){} }
+  if (MOLED.length) moledPrune(now);
+  while (i < q.length && q[i].at <= lim){ const x = q[i++]; try { const ts = Math.max(now, x.at); x.o.send(x.b, ts); if (MOLED_ON && all === true && !x.o.native) moledNote(x.o, x.b, ts, now); } catch(e){} }   // (all: the page is hiding, what waited goes out ahead of time, so it is ledgered too)
   if (i) q.splice(0, i); if (!q.length && MOB.tm){ clearInterval(MOB.tm); MOB.tm = 0; } }
 function mobDrop(){ MOB.q.length = 0; if (MOB.tm){ clearInterval(MOB.tm); MOB.tm = 0; } }
 document.addEventListener('visibilitychange', () => { if (document.hidden && MOB.q.length) mobFlush(true); });
+/* HIDDEN-PAGE LEDGER (10 Nov, audio review): hidden, msend hands notes straight to the port with timestamps up to ~1.2 s ahead (timers
+   are throttled, so the outbox cannot feed them), and Web MIDI cannot recall them: notes sounded after STOP. Every note-on sent that
+   way is remembered (port, channel, note, time); moRelease (STOP, panic, OUTPUT / PORT / CH changes) sends each one still ahead its
+   note-off 1 ms after its own start (a blip, not its full length), then All Notes Off now and again after the last of them. The
+   native helper has clear() and is not ledgered. MOLED_ON = false: nothing is remembered or sent (the old behaviour). */
+const MOLED_ON = true, MOLED_MAX = 4096, MOLED = [];   // (the cap is far above what 1.2 s of song can book: an entry dropped at the cap would lose its own note-off and sound until the last All Notes Off)
+function moledPrune(now){ let j = 0; for (const x of MOLED) if (x.at > now) MOLED[j++] = x; MOLED.length = j; }
+function moledNote(o, b, ts, now){
+  moledPrune(now);
+  if ((b[0] & 0xF0) !== 0x90 || !(b[2] > 0) || !(ts > now)) return;   // only note-ons that are still ahead (clock, CC, program are not ledgered)
+  if (MOLED.length >= MOLED_MAX) MOLED.shift();
+  MOLED.push({o, ch:b[0] & 15, n:b[1], at:ts});
+}
+function moledCut(){
+  if (!MOLED.length) return;
+  moledPrune(performance.now()); if (!MOLED.length) return;
+  const chs = new Map(); let end = 0;
+  for (const o of new Set(MOLED.map(x => x.o))) try { if (typeof o.clear === 'function') o.clear(); } catch(e){}   // (Chrome has none: then the note-offs do it)
+  for (const x of MOLED){ try { x.o.send([0x80 | x.ch, x.n, 0], x.at + 1); } catch(e){} end = Math.max(end, x.at + 1);
+    if (!chs.has(x.o)) chs.set(x.o, new Set()); chs.get(x.o).add(x.ch); }
+  for (const [o, cs] of chs) for (const ch of cs) try { o.send([0xB0 | ch, 123, 0]); o.send([0xB0 | ch, 123, 0], end + 1); } catch(e){}   // All Notes Off: now, and after the last booked note
+  MOLED.length = 0;
+}
 const msendClk = (bytes, t) => { for (const p of clkPorts()) msend(bytes, t, false, p); };
 const moEnd = e => Math.min(e.cut != null ? e.cut : Infinity, e.rel != null ? e.rel : Infinity);
 function offOne(h, at){ if (h.end <= at) return; msend([0x80 | h.ch, h.n, 0], Math.max(at, h.t + 0.001), true, h.p); h.end = at; }
@@ -16288,6 +16353,7 @@ function moLfo(s){
 function moRelease(){
   const now = ctx ? ctx.currentTime : 0, cleared = new Set();
   if (!tp.on) mobDrop();   // OUTBOX: the notes still waiting never go
+  if (MOLED_ON) try { moledCut(); } catch(e){}   // HIDDEN-PAGE LEDGER: the notes handed to the port ahead of time
   if (!tp.on) for (let p = 0; p < NPORT; p++){ const o = midiOut(p); if (!o || cleared.has(o)) continue; cleared.add(o);
     try { if (typeof o.clear === 'function') o.clear(); } catch(e){} }   // drop what was booked ahead (not every browser can)
   for (const H of mx.held) if (H) for (const h of H) if (h.end > now){
@@ -16621,7 +16687,7 @@ function nmLost(){
   if (IOH.port){ try { IOH.port.onmessage = null; IOH.port.close(); } catch(e){} }
   iohPend.forEach(r => r(null)); iohPend.clear();
   Object.assign(IOH, {state:'off', port:null, midi:false, clk:null, clkT:0});
-  toast('The desktop app’s MIDI connection stopped. Reconnecting.', 5000);
+  toastErr('The desktop app’s MIDI connection stopped. Reconnecting.', 5000);
   connectMidi();
 }
 function nmClose(){ const acc = NM.acc; if (!acc) return; NM.acc = null; clearInterval(NM.scanT); clearInterval(NM.clkT); IOH.onMidi = null;
@@ -18928,7 +18994,7 @@ function chainsNode(ac, track, patch, tempo, cid){
     }
     if (d.op === 'shed' && d.value) toast(d.value.recovered ? 'chains: CPU is free again, back to full quality.' : 'chains is busy: dropped to draft quality.', 5000);
     if (d.op === 'resample' && d.value) resampleIn(d.value);
-    if (d.op === 'error' && d.value) toast('chains: ' + (d.value.message || d.value.op), 5000);
+    if (d.op === 'error' && d.value) toastErr('chains: ' + (d.value.message || d.value.op), 5000);
   };
   n._sent = patch ? chnClone(patch) : null;   // the patch this node already has
   return n;   // the processorOptions above load the initial patch; later changes go as diffs
@@ -19064,7 +19130,7 @@ function tfxNode(ac, chain, cid){
     if (d.pump) PumpFX._feed(n, d.pump);
     if (d.pst) PumpFX._pst(n, d.pst);   // …PUMP STATE: the plugin changed its own (MASTER learned)
     if (d.plat){ n.plat = d.plat; PumpFX._lat(n, d.plat); }
-    if (d.failed){ const t = String(d.failed).split(':')[1], F = TFX[t]; toast((F ? F.long.replace(/^based on /, '') : 'An effect') + ' stopped working and was bypassed. Change its settings to restart it.'); } };
+    if (d.failed){ const t = String(d.failed).split(':')[1], F = TFX[t]; toastErr((F ? F.long.replace(/^based on /, '') : 'An effect') + ' stopped working and was bypassed. Change its settings to restart it.'); } };
   // FIX (sweep, 4 Nov): a node that can't start at all (the browser out of memory for its DSP, seen after many renders in a
   // small-memory browser) passed its track through dry with no word; now it says so, once per audio context.
   n.onprocessorerror = () => { if (tfxErrAc.has(ac)) return; tfxErrAc.add(ac);
@@ -19359,7 +19425,7 @@ const flxCap = v => S && S.flxOld ? Math.min(16, v) : Math.min(255, v);
 // ELECTRO: the demo project (song and kit), on File ▾ too, for a device that already had a song when it arrived.
 async function loadElectro(){
   try { const r = await fetch('sounds/ELECTRO.thunder?v=2'); if (!r.ok) throw new Error(r.status); await loadProjText(await r.text(), 'ELECTRO.thunder'); }
-  catch(e){ toast('Couldn’t load ELECTRO: ' + ((e && e.message) || e) + '.'); }
+  catch(e){ toastErr('Couldn’t load ELECTRO: ' + ((e && e.message) || e) + '.'); }
 }
 function demoSong(){
   const S = freshSong(); S.name = 'Starter beat'; S.lpb = 4;   // written in 16ths (new songs are LPB 8)
@@ -19444,7 +19510,7 @@ function undoStep(dir){
     to.push({k:'K', j:kitUndoJSON()});
     undo.busy = true; try { const k = kitFromJSON(JSON.parse(e.j));
       for (const v of k.voices) for (const L of v.layers) if (L.sample && !L.sample.data){ const h = smpHeld.get(L.sample.id); if (h && h.data) L.sample = h; }
-      setKit(k, true); } catch(err){ toast('Couldn’t put the kit back.'); } finally { undo.busy = false; }
+      setKit(k, true); } catch(err){ toastErr('Couldn’t put the kit back.'); } finally { undo.busy = false; }
     draw(); return toast(`${dir < 0 ? 'Undo' : 'Redo'}: kit ${kit.name || ''}`.trim());
   }
   if (e.k === 'W'){   // ONE UNDO (27 Oct, Phase 2): a waves patch edit; the editor shows the patch put back
@@ -19502,7 +19568,7 @@ function flushKit(){
 addEventListener('pagehide', () => { flushS(); flushKit(); saveCur(); });
 // Another tab of the app saved the song or kit: say so once (the last tab to save wins).
 let tabWarned = false;
-addEventListener('storage', e => { if (!tabWarned && (e.key === TK || e.key === KEY) && e.newValue !== null){ tabWarned = true; toast('Thunder Plus is open in another tab too. The last tab to save wins, so use just one tab.', 6000); } });
+addEventListener('storage', e => { if (!tabWarned && (e.key === TK || e.key === KEY) && e.newValue !== null){ tabWarned = true; toastErr('Thunder Plus is open in another tab too. The last tab to save wins, so use just one tab.', 6000); } });
 document.addEventListener('visibilitychange', () => { if (document.hidden){ flushS(); flushKit(); saveCur(); } });
 // A phrase opened from an empty song block is placed in that block once it has a note (see nav()).
 let pendPlace = null;
@@ -21051,12 +21117,29 @@ function resetAudio(quiet){
    so asking for tfx asks for chains too. */
 function rtTfxLoad(){
   if (!rt || rt.fxAsk) return; rt.fxAsk = true;
-  tfxReady(ctx).then(ok => { if (!rt) return; rt.fxOk = ok; rtAllFx(); if (!ok && !NOWK && (S.tfx.some(fxCount) || fxCount(S.mfx))) toast('Track effects need a newer browser here.'); });
+  rtPending(tfxReady(ctx).then(ok => { if (!rt) return; rt.fxOk = ok; rtAllFx(); if (!ok && !NOWK && (S.tfx.some(fxCount) || fxCount(S.mfx))) toastErr('Track effects need a newer browser here.'); }));
   rtChnLoad();
 }
 function rtChnLoad(){
   if (!rt || rt.chnAsk) return; rt.chnAsk = true;
-  chainsReady(ctx).then(ok => { if (!rt) return; rt.chnOk = ok; if (ok){ chnSync.add(ctx); rtAllFx(); } else if ((S.chainOn || []).some(Boolean) && !NOWK) toast('chains needs a newer browser here.'); });
+  rtPending(chainsReady(ctx).then(ok => { if (!rt) return; rt.chnOk = ok; if (ok){ chnSync.add(ctx); rtAllFx(); } else if ((S.chainOn || []).some(Boolean) && !NOWK) toastErr('chains needs a newer browser here.'); }));
+}
+/* FIRST PLAY WAITS FOR THE EFFECT MODULES (10 Nov, audio review): the `.then` handlers above run rtAllFx (every track's chain and effect
+   nodes, 0.5 s of main thread) the moment the tfx / chains modules arrive, which on a PLAY as the first touch was 1-4 bars into the
+   song. rtPending keeps each handler's promise on rt.pend until it has run; tStart waits for them, once, with the live warm-up's wait
+   (FIRST_PLAY_WAIT_MS in all). Set FIRST_PLAY_WAIT false for the old behaviour (nothing tracked, no wait). */
+const FIRST_PLAY_WAIT = true, FIRST_PLAY_WAIT_MS = 900;
+function rtPending(p){
+  if (!FIRST_PLAY_WAIT || !rt || !rt.pend) return p;
+  const set = rt.pend, q = p.then(() => {}, () => {}).then(() => { set.delete(q); }); set.add(q); return p;   // (q never rejects: a throwing handler must not stop PLAY)
+}
+// The promises PLAY waits for, or null (the usual PLAY: nothing pending, no extra tick). Not for a start that is synced to something:
+// Link (a peer's start has its own time), an external MIDI clock, a take being recorded, REC's count-in, and the phones' audio-thread
+// hand-over (wkLazy: those load only what the song uses, and a hand-over carries on at an exact step).
+function playWaitFor(o){
+  if (!rt || !rt.pend || !rt.pend.size) return null;
+  if (wkLazy() || (o && (o.rz || o.page)) || mx.slave || mx.inRun || RCD.starting || rec.on || (lk && (lk.pend || lkLive()))) return null;
+  return [...rt.pend];
 }
 // Phones (10 Nov): load them when track t (NT: the master) has an effect slot filled (on or off: FXO can switch it on) or a chain
 // feeds it. Every way an effect or chain comes into use reaches rtFx(t) (fxChanged, rtAllFx after a song, undo or kit load,
@@ -21081,7 +21164,7 @@ function rtInit(){
   if (!rt){
     // mo: the master OUT fader (GAIN STAGING, 27 Oct), after mastering and the safety limiter, before the device's level
     const out = ctx.createGain(), mo = ctx.createGain(), lim = safeLim(ctx, mo); mo.gain.value = curve(S.mout == null ? 255 : S.mout); mo.connect(master);
-    rt = {out, mo, lim, mfx:null, fxOk:false, chnOk:false, pl:makePlayer(ctx, out, rtBuf, true), mlv:[0, 0], mpk:[0, 0], mpt:[0, 0]}; rtRoute(); rt.pl.applyMix(); mstSync(); if (wkLazy()) wkLiveEnsure(); else bassReady(ctx).then(ok => { if (ok) liveWarmSoon(200); });
+    rt = {out, mo, lim, mfx:null, fxOk:false, chnOk:false, pend:new Set(), pl:makePlayer(ctx, out, rtBuf, true), mlv:[0, 0], mpk:[0, 0], mpt:[0, 0]}; rtRoute(); rt.pl.applyMix(); mstSync(); if (wkLazy()) wkLiveEnsure(); else bassReady(ctx).then(ok => { if (ok) liveWarmSoon(200); });
     // the master meter listens to everything going out, synth pads included
     const sp = ctx.createChannelSplitter(2); rt.man = [ctx.createAnalyser(), ctx.createAnalyser()];
     master.connect(sp); rt.man.forEach((a, i) => { a.fftSize = 1024; sp.connect(a, i); });
@@ -21487,8 +21570,9 @@ let warmTok = null;   // 10 Nov: the booked first-PLAY warm-up (tStart); STOP cl
 function tStart(mode, o){
   // LIVE WARM-UP: the first PLAY of a session starts the audio engine; with live engine pads in the kit it waits (once, at
   // most 600 ms) for their worklets, so their nodes can be made before the first notes instead of on them
-  if (!(o && o._warm) && !tp.on){ rtInit(); if (!bassOK.has(ctx) && (wkLazy() ? wkLiveWanted() : kit.voices.some((v, i) => v && isLivePad(i)))){ if (warmTok) return; const oo = Object.assign({}, o, {_warm:true}), tok = warmTok = {};
-    Promise.race([bassReady(ctx), new Promise(r => setTimeout(r, 600))]).then(() => { if (warmTok === tok){ warmTok = null; if (!tp.on) tStart(mode, oo); } }); return; } }
+  // 10 Nov: and for the effect and chains modules' handlers still to run (playWaitFor), so rtAllFx is not 1-4 bars into the song
+  if (!(o && o._warm) && !tp.on){ rtInit(); const live = !bassOK.has(ctx) && (wkLazy() ? wkLiveWanted() : kit.voices.some((v, i) => v && isLivePad(i))), pend = playWaitFor(o); if (live || pend){ if (warmTok) return; const oo = Object.assign({}, o, {_warm:true}), tok = warmTok = {};
+    Promise.race([pend ? Promise.all(live ? [bassReady(ctx), ...pend] : pend) : bassReady(ctx), new Promise(r => setTimeout(r, pend ? FIRST_PLAY_WAIT_MS : 600))]).then(() => { if (warmTok === tok){ warmTok = null; if (!tp.on) tStart(mode, oo); } }); return; } }
   if (typeof varPrefetch === 'function') varPrefetch();   // MUT / GEN
   if (mode === 'song' && loopPat && !(o && o.loop)){ o = Object.assign({}, o, {loop:{v:'pat', y0:o.row, y1:o.row}}); patRow = o.row; patCur = cs.song.y; }   // LOOP: the pattern
   const wasOn = tp.on;   // REC: no count-in when PLAY jumps somewhere else mid-song
@@ -21610,7 +21694,7 @@ function audioInterrupted(){
   if (!ctx || !tp.on) return;
   if (ctx.state === 'running'){ clearTimeout(intT); intT = 0; return; }
   try { ctx.resume().catch(() => {}); } catch(e){}
-  if (!intT) intT = setTimeout(() => { intT = 0; if (tp.on && ctx && ctx.state !== 'running'){ tStop(); toast('Audio was interrupted: press PLAY to continue.', 4000); } }, 2500);
+  if (!intT) intT = setTimeout(() => { intT = 0; if (tp.on && ctx && ctx.state !== 'running'){ tStop(); toastErr('Audio was interrupted: press PLAY to continue.', 4000); } }, 2500);
 }
 document.addEventListener('visibilitychange', () => { if (!document.hidden) audioInterrupted(); });
 /* BATTERY (27 Oct): once the first sound started the engine, the AudioContext ran for as long as the app stayed open: its
@@ -21642,7 +21726,7 @@ document.addEventListener('visibilitychange', () => {
 });
 function pump(){
   try { pumpRun(); }
-  catch(e){ console.error(e); try { tStop(); } catch(e2){} toast('Playback stopped: ' + ((e && e.message) || 'something went wrong') + '.', 5000); }
+  catch(e){ console.error(e); try { tStop(); } catch(e2){} toastErr('Playback stopped: ' + ((e && e.message) || 'something went wrong') + '.', 5000); }
 }
 /* PHONE RESYNC (10 Nov; owner's Fold, Chrome with AudioWorklet modules loaded): Chrome renders more audio than the device plays, so
    ctx.currentTime runs ahead of real time in bursts and for many seconds at 1.2× to 2.3× (61.7 s of clock in 40.4 s of wall during
@@ -21754,7 +21838,7 @@ function coreLoad(){
     const n = new AudioWorkletNode(ctx, 'thunder-core', {numberOfInputs:0, numberOfOutputs:NT + 4, outputChannelCount:[...new Array(NT).fill(2), 1, NT, NT, 1]});   // + the mix outputs (coreMixT)
     n.port.onmessage = e => { try { coreMsg(e.data || {}); } catch(err){ tpLog('core message', err); } };
     core.node = n; core.ready = true; core.sent.clear(); coreSyncAll(); return true;
-  }, err => { tpLog('core load', err); core.loading = null; toast('The audio-thread sequencer didn’t load on this device, so playback is using the Page sequencer.', 3500); return false; });
+  }, err => { tpLog('core load', err); core.loading = null; toastErr('The audio-thread sequencer didn’t load on this device, so playback is using the Page sequencer.', 3500); return false; });
   return core.loading;
 }
 // The core's outputs into the tracks (and the beat clock). STOP unplugs them at once (owner, Fold: a stop took 10 s while
@@ -21984,7 +22068,7 @@ async function pbCopy(){
   const head = `Thunder Plus build ${BUILD} · ${navigator.userAgent}\nlatency ${ctx ? Math.round((ctx.baseLatency || 0) * 1000) + ' + ' + Math.round((ctx.outputLatency || 0) * 1000) + ' ms · heard ' + Math.round(heardLat() * 1000) + ' ms' : '-'} · worklets ${NOWK ? 'OFF (test)' : ctx && wkUsed(ctx).size ? [...wkUsed(ctx)].join(', ') : 'none'} · ${pbState()}\n`;
   const txt = head + PB.log.join('\n');
   try { await navigator.clipboard.writeText(txt); toast('Playback report copied: paste it into the chat.', 3500); }
-  catch(e){ try { await deliver('thunder-playback-report.txt', new Blob([txt], {type:'text/plain'})); } catch(e2){ toast('Couldn’t copy the report here.'); } }
+  catch(e){ try { await deliver('thunder-playback-report.txt', new Blob([txt], {type:'text/plain'})); } catch(e2){ toastErr('Couldn’t copy the report here.'); } }
 }
 document.addEventListener('visibilitychange', () => pbLog((document.hidden ? 'screen off / hidden · ' : 'screen on / visible · ') + pbState() + pbPg()));
 function coreMsg(d){
@@ -22374,7 +22458,7 @@ async function pass(evs, keep, N, sr, getB, lim, masterFx){
   let mNode = null;
   if (ok && masterFx && fxAny(S.mfx)){ const m = mNode = tfxNode(oc, tfxChain(S.mfx, sr, S.bpm)); out.connect(m); head = m; }
   let mLim = false;
-  if (useM){ const wkOk = mstNeedsWk(M) ? await mwReady(oc) : true; const ch = mstChain(oc, M, false); head.connect(ch.input); head = ch.output; mLim = !!(ch.wk && M.lim.on); if (!wkOk && mstNeedsWk(M)) toast('Mastering effects couldn’t load for this render; EQ only.'); }
+  if (useM){ const wkOk = mstNeedsWk(M) ? await mwReady(oc) : true; const ch = mstChain(oc, M, false); head.connect(ch.input); head = ch.output; mLim = !!(ch.wk && M.lim.on); if (!wkOk && mstNeedsWk(M)) toastErr('Mastering effects couldn’t load for this render; EQ only.'); }
   if (lim && !mLim){
     let wk = null; if (await mwReady(oc)) try { wk = safeWk(oc); } catch(e){ wk = null; }
     if (wk){ head.connect(wk); wk.connect(mo); lat += safeLatency(sr); }   // its lookahead delays the mix: trimmed below
@@ -22491,7 +22575,7 @@ async function renderOut(stems){
     if (stems) await writeOut(to, fname, zipBlob(files));
     else if (inAI) await writeOut(to, `${base} mix.zip`, zipBlob(files));
     else await writeOut(to, files[0].name, new Blob([files[0].data], {type:'audio/wav'}));
-  } catch(err){ if (err && err.message === RENDER_CANCEL) toast('Render canceled: nothing was saved.'); else toast('Render failed: ' + ((err && err.message) || err)); }
+  } catch(err){ if (err && err.message === RENDER_CANCEL) toast('Render canceled: nothing was saved.'); else toastErr('Render failed: ' + ((err && err.message) || err)); }
   finally { rendering = false; passProg = null; rprog.close(); draw(); }
 }
 /* ===== RENDER PART (21 Oct): render a phrase selection (or the whole phrase), or song rows (the selection, else the
@@ -22600,14 +22684,14 @@ async function renderPart(dest){
       if (cand.length){ ins = cand[0]; S.insts[ins].pad = pad; saveS(); } }
     draw();
     toast(`Rendered ${part.label} (${secs} s) into slot ${hx(pad)}` + (ins >= 0 ? ` · instrument ${hx(ins)} plays it` : ''), 6000);
-  } catch(err){ toast('Render failed: ' + ((err && err.message) || err)); }
+  } catch(err){ toastErr('Render failed: ' + ((err && err.message) || err)); }
   finally { rendering = false; draw(); }
 }
 /* ===== RENDER PART end ===== */
 async function shareLast(){
   if (!lastR) return toast('Render something first.');
   try { await navigator.share({files:lastR.map(f => new File([f.data], f.name, {type:'audio/wav'})), title:'Thunder'}); }
-  catch(e){ if (e && e.name !== 'AbortError') toast('Sharing didn’t work here. The render was saved to your downloads.'); }
+  catch(e){ if (e && e.name !== 'AbortError') toastErr('Sharing didn’t work here. The render was saved to your downloads.'); }
 }
 const canFS = !inAI && typeof window.showSaveFilePicker === 'function';
 // Chrome Android (132+) has the file pickers now, but its `types` filter is MIME-based and hides a custom
@@ -22631,7 +22715,7 @@ async function shareProj(){
   flushS(); await presetSmpFill();
   const f = new File([projBlob()], projName(), {type:'application/json'});
   try { await navigator.share({files:[f], title:S.name || 'Thunder project'}); }
-  catch(e){ if (e && e.name === 'AbortError') return; await deliver(f.name, projBlob()); toast('Sharing didn’t work here, so the project was saved to your downloads instead.'); }
+  catch(e){ if (e && e.name === 'AbortError') return; await deliver(f.name, projBlob()); toastErr('Sharing didn’t work here, so the project was saved to your downloads instead.'); }
 }
 async function writeTo(h){ const w = await h.createWritable(); await w.write(projBlob()); await w.close(); }
 // The browser's file permission: asked again after a restart (a click or Ctrl/⌘+S counts as the go-ahead).
@@ -22701,7 +22785,7 @@ async function defSongSave(){
   const ok = await askYes({title:'Save as default song?', body:'New song will start from this song (its tracks, buses, chains, effects, mixer, tempo and phrases) on this device. The kit stays separate.' + (defSongTxt() ? ' It replaces your current default.' : '')}, 'Save as default');
   if (!ok) return;
   try { localStorage.setItem(DSK, JSON.stringify(songOut(S))); toast('Saved as the default song: New song starts from it.', 3000); }
-  catch(e){ toast('Couldn’t save the default song: this device’s storage is full.', 4000); }
+  catch(e){ toastErr('Couldn’t save the default song: this device’s storage is full.', 4000); }
 }
 async function defSongForget(){
   const ok = await askYes({title:'Forget the default song?', body:'New song starts from the blank song again.'}, 'Forget');
@@ -22719,8 +22803,8 @@ async function saveProj(as){
     flushS(); await presetSmpFill();
     if (DESK){
       if (!as && projPath){ const r = await DESK.save(projPath, projText()); if (r && r.ok){ setDirty(false); projSet(projPath, null); toast('Saved ' + projLabel()); return true; }
-        toast('Couldn’t save to ' + projLabel() + (r && r.error ? ': ' + r.error : '') + '. Choose where to save it.', 5000); }
-      const r = await DESK.saveAs(projName(), projText(), projPath || ''); if (!r || !r.ok) { if (r && r.error) toast('Couldn’t save: ' + r.error); return false; }
+        toastErr('Couldn’t save to ' + projLabel() + (r && r.error ? ': ' + r.error : '') + '. Choose where to save it.', 5000); }
+      const r = await DESK.saveAs(projName(), projText(), projPath || ''); if (!r || !r.ok) { if (r && r.error) toastErr('Couldn’t save: ' + r.error); return false; }
       setDirty(false); projSet(r.path, null); toast('Saved ' + projLabel()); return true;
     }
     if (!as && projFile){
@@ -22730,7 +22814,7 @@ async function saveProj(as){
     if (canFS){
       try { const h = await window.showSaveFilePicker(Object.assign({suggestedName:projName()}, isAndroid ? {} : {types:PJT})); await writeTo(h); setDirty(false); projSet(null, h); toast('Saved ' + h.name); return true; }
       // FIX (sweep, 4 Nov): when the picker itself fails (not Cancel), the song still gets saved, as a download
-      catch(e){ if (e && e.name === 'AbortError') return false; toast('Couldn’t save there (' + ((e && e.message) || e) + '), so it went to your downloads.', 6000);
+      catch(e){ if (e && e.name === 'AbortError') return false; toastErr('Couldn’t save there (' + ((e && e.message) || e) + '), so it went to your downloads.', 6000);
         await deliver(projName(), projBlob()); setDirty(false); return true; }
     }
     if (as){ const n = await askText({title:'Save project as', body:'The song is renamed and saved to your downloads.'}, S.name, 40, 'Save'); if (n == null) return false; S.name = n.trim().slice(0, 40) || 'Song'; saveS(); draw(); }
@@ -22744,7 +22828,7 @@ async function loadProjText(text, name, where){
     const j = JSON.parse(text);
     if (!j || (!j.song && j.app !== 'thunder-song')) throw new Error('This file isn’t a Thunder project.');
     // VERSION: a file saved by a newer build may use things this one doesn't have yet. It still opens; the user is told to update.
-    if (typeof j.build === 'number' && j.build > BUILD) toast(`Saved by a newer version of Thunder Plus. Some things may not play as they should. Update the app.`, 9000);
+    if (typeof j.build === 'number' && j.build > BUILD) toastErr(`Saved by a newer version of Thunder Plus. Some things may not play as they should. Update the app.`, 9000);
     if (j.kit){ const k = kitFromJSON(j.kit); if (!await kitReplaceOk(k, 'Open this project?')) return false; setKit(k); }
     const ns = normSong(j.app === 'thunder-song' ? j : j.song); if (ns.presets) try { presetsByRef(ns.presets); } catch(e){ tpLog('could not move preset samples out of the loaded song', e); }
     setSong(ns, 'Loaded ' + (j.song && j.song.name || name));
@@ -22759,10 +22843,10 @@ async function loadProjText(text, name, where){
 async function loadProjFile(f, h){ return loadProjText(await f.text(), f.name, h ? {h} : null); }
 async function openProj(){
   if (!await okToLeave('opening another project')) return;
-  if (DESK){ const r = await DESK.open(); if (r && r.text != null) loadProjText(r.text, r.name, {path:r.path}); else if (r && r.error) toast('Couldn’t open it: ' + r.error); return; }
+  if (DESK){ const r = await DESK.open(); if (r && r.text != null) loadProjText(r.text, r.name, {path:r.path}); else if (r && r.error) toastErr('Couldn’t open it: ' + r.error); return; }
   if (canFS && !isAndroid && typeof window.showOpenFilePicker === 'function'){
     try { const [h] = await window.showOpenFilePicker({types:PJT}); await loadProjFile(await h.getFile(), h); }
-    catch(e){ if (e && e.name !== 'AbortError') toast('Couldn’t open that file.'); }
+    catch(e){ if (e && e.name !== 'AbortError') toastErr('Couldn’t open that file.'); }
     return;
   }
   // Android's picker filters by MIME type, and a custom .thunder often arrives as application/octet-stream
@@ -22784,9 +22868,9 @@ async function openRecent(){
   if (k < 0) return; const e = recentL[k];
   if (!await okToLeave('opening ' + e.name)) return;
   if (e.path && DESK){ const r = await DESK.read(e.path); if (r && r.text != null) return loadProjText(r.text, r.name, {path:r.path});
-    recentL.splice(k, 1); kvSet('recent', recentL); return toast('Couldn’t open ' + e.name + (r && r.error ? ': ' + r.error : '') + '. It was taken off the list.', 5000); }
-  if (e.h){ if (!await fsPerm(e.h, false)) return toast('The browser didn’t allow opening ' + e.name + '.');
-    try { return await loadProjFile(await e.h.getFile(), e.h); } catch(err){ recentL.splice(k, 1); kvSet('recent', recentL); return toast('Couldn’t open ' + e.name + ': it may have moved. It was taken off the list.', 5000); } }
+    recentL.splice(k, 1); kvSet('recent', recentL); return toastErr('Couldn’t open ' + e.name + (r && r.error ? ': ' + r.error : '') + '. It was taken off the list.', 5000); }
+  if (e.h){ if (!await fsPerm(e.h, false)) return toastErr('The browser didn’t allow opening ' + e.name + '.');
+    try { return await loadProjFile(await e.h.getFile(), e.h); } catch(err){ recentL.splice(k, 1); kvSet('recent', recentL); return toastErr('Couldn’t open ' + e.name + ': it may have moved. It was taken off the list.', 5000); } }
 }
 // BACKUPS: song + kit, every 3 minutes while something changed (and before anything replaces the song), the last 10.
 const BK_N = 10, BK_MS = 180000;
@@ -22807,14 +22891,14 @@ async function restoreBackup(){
   const k = await askPick({title:'Restore a backup', body:'Song and kit as they were. The newest is first.'}, idx.map(e => `${e.name} · ${new Date(e.at).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})} (${ago(e.at)})`));
   if (k < 0) return;
   if (!await okToLeave('restoring the backup')) return;
-  const text = await kvGet(idx[k].k); if (!text) return toast('That backup couldn’t be read.');
+  const text = await kvGet(idx[k].k); if (!text) return toastErr('That backup couldn’t be read.');
   if (await loadProjText(text, idx[k].name, {dirty:true})) toast('Restored the backup of ' + idx[k].name + ' from ' + ago(idx[k].at) + '. Save it to keep it in a file.', 5000);
 }
 // DESKTOP APP: closing the window asks first when there are unsaved changes; a .thunder file opened from the desktop
 // (double-click, or dropped on the app's icon) arrives here by path.
 if (DESK_APP){
   try { DESK_APP.onCloseAsk(async () => { DESK_APP.closeAck(); let ok = true; try { ok = await okToLeave('closing the app'); } catch(e){} DESK_APP.closeReply(ok); }); } catch(e){}
-  try { DESK_APP.onOpenPath(async p => { if (!await okToLeave('opening ' + String(p).split(/[\\/]/).pop())) return; const r = await DESK.read(p); if (r && r.text != null) loadProjText(r.text, r.name, {path:r.path}); else toast('Couldn’t open ' + p + (r && r.error ? ': ' + r.error : '')); }); } catch(e){}
+  try { DESK_APP.onOpenPath(async p => { if (!await okToLeave('opening ' + String(p).split(/[\\/]/).pop())) return; const r = await DESK.read(p); if (r && r.text != null) loadProjText(r.text, r.name, {path:r.path}); else toastErr('Couldn’t open ' + p + (r && r.error ? ': ' + r.error : '')); }); } catch(e){}
   try { DESK_APP.ready(); } catch(e){}
 }
 setTimeout(dirtyShow, 0);
@@ -22944,7 +23028,7 @@ function parseSmf(buf){
 }
 async function importMidiFile(f){
   try { recEndTake(); } catch(e){}
-  let m; try { m = parseSmf(await f.arrayBuffer()); } catch(e){ return toast('Couldn’t read that MIDI file' + (e && e.message ? ': ' + e.message : '') + '.', 5000); }
+  let m; try { m = parseSmf(await f.arrayBuffer()); } catch(e){ return toastErr('Couldn’t read that MIDI file' + (e && e.message ? ': ' + e.message : '') + '.', 5000); }
   if (!m.tracks.length) return toast('That MIDI file has no notes.');
   const t0 = tv === 'song' ? Math.min(cs.song.x, ntr() - 1) : Math.min(cTrack, ntr() - 1), y0 = cs.song.y;
   const L = clamp(S.dlen || 16, 1, PROWS), lpb = S.lpb || 4, stepK = m.ppq / lpb, tks = S.ticks || TICKS;
@@ -23011,7 +23095,7 @@ async function thunderImport(asked){
   const tk = lsGet(T_KIT), ts = lsGet(T_SONG); if (!tk && !ts) return toast('No Thunder work saved in this browser.');
   let kitJ = null, songJ = null;
   try { if (tk) kitJ = kitFromJSON(JSON.parse(tk)); if (ts) songJ = normSong(JSON.parse(ts)); }
-  catch(e){ try { console.warn('Thunder saved work read failed', e); } catch(_){} return toast('Couldn’t read Thunder’s saved work.'); }
+  catch(e){ try { console.warn('Thunder saved work read failed', e); } catch(_){} return toastErr('Couldn’t read Thunder’s saved work.'); }
   if (!asked){
     const what = [songJ && `song “${songJ.name || 'Song'}”`, kitJ && `kit “${kitJ.name || 'Kit'}”`].filter(Boolean).join(' and ');
     if (!await askYes({title:'Open Thunder’s saved work?', body:`Thunder is now part of Thunder Plus (Settings → App → Mobile). Its ${what} can still be found in this browser.\n\nYour current song “${S.name || 'Song'}” and kit “${kit.name || 'Kit'}” are saved to a project file first. You can also do this later from File.`}, 'Open')){
@@ -23069,7 +23153,7 @@ function phraseToCursor(){
   if (x >= MT || (typeof isBusT === 'function' && isBusT(x))) return;
   if (cid >= 0){ const p = firstPhrase(cid); cSect = cid; if (p >= 0) cPhrase = p; return; }
   const fp = freePhrase(); if (fp < 0) return; cPhrase = fp; cs.phrase.y = 0; pendPlace = {x, y, p:fp}; }
-function resetCursors(){ cSect = cPhrase = cInst = cTrack = cFxT = cFxS = 0; for (const k in cs) Object.assign(cs[k], {x:0, y:0, top:0}); selA = null; }
+function resetCursors(){ fxOpenedOnce = false; cSect = cPhrase = cInst = cTrack = cFxT = cFxS = 0; for (const k in cs) Object.assign(cs[k], {x:0, y:0, top:0}); selA = null; }
 // A song's pattern numbering starts at 00. last.sect/last.phrase are the last sect/phrase NUMBER placed, and
 // they seed the first empty cell you type into — so a new song used to inherit the old song's number (a new
 // song began at 06 after the last one ended at 05). They are song-scoped, so reset them with the song.
@@ -23117,7 +23201,7 @@ async function irsLoad(k){
       S.irs = (S.irs || []).slice(0, 4); while (S.irs.length < 4) S.irs.push(null);
       S.irs[k] = {name, sr, len:+(n / sr).toFixed(2), L:mk(0), R:buf.numberOfChannels > 1 ? mk(1) : null};
       saveS(); irsPublish(); buildProj(); toast('Song IR ' + (k + 1) + ': ' + name + ' (' + S.irs[k].len + ' s' + (S.irs[k].R ? ', stereo' : '') + '). To use it, set a Convolution reverb’s Type to Song IR ' + (k + 1) + '.');
-    } catch(e){ toast('That file couldn’t be read as audio.', 5000); } });
+    } catch(e){ toastErr('That file couldn’t be read as audio.', 5000); } });
   inp.click();
 }
 function irsUI(sec){
@@ -23189,7 +23273,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 547;
+const BUILD = 548;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD + (location.pathname.includes('/beta/') ? ' · beta' : '');
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -23358,7 +23442,7 @@ let arrHandT = -1e9, arrActT = -1e9, arrTouchT = -1e9, workT = -1e9;
 const FOLLOW_HOLD = 4000;   // (9 Nov, owner: follow pulled the cursor while editing) for this long after a key or a press on the grid or pad, nothing moves the cursor or the open phrase
 const ARR_IDLE = 60000;
 window.addEventListener('keydown', e => { if (e.key !== ' ' && !/^(Shift|Control|Alt|Meta|AltGraph|CapsLock)$/.test(e.key)) arrActT = workT = performance.now(); }, true);
-window.addEventListener('pointerdown', e => { const q = e.target && e.target.closest; if (q && e.target.closest('[data-b="play"],[data-b="loop"],[data-b="stop"]')) return; if (q && (e.target.closest('#tPad') || e.target.closest('#tArr') || grid.contains(e.target))) workT = performance.now(); }, true);
+window.addEventListener('pointerdown', e => { const q = e.target && e.target.closest; if (q && e.target.closest('[data-b="play"],[data-b="loop"],[data-b="stop"]')) return; if (q && (e.target.closest('#tPad') || e.target.closest('#tArr') || grid.contains(e.target))) workT = performance.now(); if (q && e.target.closest('#tPad')) arrActT = workT; }, true);   // (10 Nov) on a phone the pad is the keyboard: a pad press holds Arrange's paging like a key does
 $('tArr').addEventListener('pointerdown', () => { arrActT = arrTouchT = performance.now(); }, true);
 function arrFollowPage(own){
   const now = performance.now();
@@ -23515,6 +23599,7 @@ function setTScale(v){ tScale = clamp(Math.round(v / 10) * 10, 60, 200); try { l
 function setMixScale(v){ mixScale = clamp(Math.round(v / 10) * 10, 60, 200); try { localStorage.setItem(MSK, String(mixScale)); } catch(e){} fit(); draw(); }
 function setArr(m){ arrMode = m; try { localStorage.setItem(ARK, String(m)); } catch(e){} arrBody(); arrSig = ''; draw(); fit(); draw(); }
 const cs = {song:{x:0, y:0, top:0}, sect:{x:0, y:0}, phrase:{x:0, y:0, top:0}, inst:{x:0, y:0}, mixer:{x:0, y:0}, fx:{x:0, y:0}, mod:{x:0, y:0}, project:{x:0, y:0}};
+let fxOpenedOnce = false;   // not saved: has FX been opened since the session / the last new song or load
 let cSect = 0, cPhrase = 0, cInst = 0, cTrack = 0, cFxT = 0, cFxS = 0, lastFxType = 'eq', selA = null, clip = null;
 const last = {sect:0, phrase:0, note:ROOT, vol:255, inst:0, fxc:0, fxv:0};
 // Has an instrument been chosen yet (typed, changed, picked up, or picked on INST)? Until then EDIT on a note keeps the row's own.
@@ -23913,7 +23998,7 @@ async function fxPresetSave(t, k){
 const FXU_K = 'thunderplus-fxuser-v1';
 let fxUser = (() => { try { return normFxPre(JSON.parse(localStorage.getItem(FXU_K) || '{}')); } catch(e){ return {}; } })();
 function fxUserList(type){ const L = fxUser && fxUser[type]; return Array.isArray(L) ? L : []; }
-function fxUserPut(type, name, v){ fxUser[type] = fxUserList(type).filter(p => p.name !== name).concat([{name, v}]); try { localStorage.setItem(FXU_K, JSON.stringify(fxUser)); } catch(e){ toast('My presets couldn’t be saved on this device (storage full?): the preset is in the song.'); } }
+function fxUserPut(type, name, v){ fxUser[type] = fxUserList(type).filter(p => p.name !== name).concat([{name, v}]); try { localStorage.setItem(FXU_K, JSON.stringify(fxUser)); } catch(e){ toastErr('My presets couldn’t be saved on this device (storage full?): the preset is in the song.'); } }
 function normFxPre(j){
   const o = {}; if (!j || typeof j !== 'object') return o;
   for (const type of Object.keys(j)) if (TFX[type] && !TFX[type].pump && Array.isArray(j[type]))
@@ -23923,7 +24008,7 @@ function normFxPre(j){
 // EQ WINDOW (owner, 30 Oct): the track's pump EQ in its pop-up window; with none yet, one goes in the first free slot.
 function eqWindow(t){
   const A = t >= NT ? S.mfx : S.tfx[t]; if (!A) return;
-  const key = PUMP_KEY('eq'); if (!TFX[key]) return toast('pump EQ isn’t available here.');
+  const key = PUMP_KEY('eq'); if (!TFX[key]) return toastErr('pump EQ isn’t available here.');
   let k = A.findIndex(f => f && f.type === key);
   if (k < 0){ k = A.findIndex(f => !f); if (k < 0) return toast((t >= NT ? 'The master' : 'Track ' + d2(t + 1)) + ' has no free FX slot for an EQ.', 4000);
     A[k] = freshTfx(key); fxChanged(t); saveS(); draw(); toast('Added pump EQ to slot ' + (k + 1) + ' of ' + (t >= NT ? 'the master' : 'track ' + d2(t + 1))); }
@@ -24078,6 +24163,8 @@ function projRows(){
       info:() => 'Every instrument and the pad it plays (long names are cut short). In the side panel; without it, in PAD mode between the arrows and the buttons when there is room. Tap one to open it on INST'},
     {l:'PATTERN VIEW', ck:'Pattern view on the Phrase screen', get:() => pvOn ? 1 : 0, set:v => setPv(!!v), min:0, max:1, tog:true, d:1, fmt:v => v ? 'ON' : 'OFF',   // PATTERN VIEW
       info:() => 'ON: the Phrase screen gets PHRASE | PATTERN buttons (the choice stays until you switch). PATTERN shows every track’s phrase for one song row side by side, and the open track is edited in place. Wide screens only (computer, or Fold when unfolded). OFF: no PHRASE | PATTERN buttons.'},
+    {l:'POP-UP MESSAGES', ck:'Show pop-up messages', get:() => toastsOn ? 1 : 0, set:v => setToastsOn(!!v), min:0, max:1, tog:true, d:1, fmt:onOff,
+      info:() => 'ON: the small messages that say what just happened. OFF: they stay hidden, except the ones that report a failure or work that may be lost (couldn’t save, storage full, audio or MIDI trouble)'},
     {l:'KEY HINTS', ck:'Show key hints under the screens', get:() => keyHints ? 1 : 0, set:v => setKeyHints(!!v), min:0, max:1, tog:true, d:1, fmt:onOff,
       info:() => 'ON: the line of keys under each screen and the tips under Arrange. OFF: more room for the phrase and the arrangement; the line describing the command or value under the cursor stays'},
     {l:'MENU HELP', ck:'Show explanations in menus', get:() => menuHelpOn() ? 1 : 0, set:v => setMenuHelp(!!v), min:0, max:1, tog:true, d:0, fmt:onOff,
@@ -25450,6 +25537,9 @@ function toggleBlockMute(y, t){
 let instViaTrk = false;   // Inst was opened from Song, Sect or Phrase (go: Mixer and FX then follow the song track)
 function go(v){
   fxpClose();
+  // FX opens with the cursor on SLOT 1, where EDIT adds an effect (it did nothing on the TRACK row; usability audit U2), but only the FIRST time
+  // in a session (and after a new song / load, resetCursors); after that it returns to wherever the cursor was left, TRACK row included (owner).
+  if (v === 'fx' && tv !== 'fx'){ if (!fxOpenedOnce && cs.fx.y === 0) cs.fx.y = 1; fxOpenedOnce = true; }
   if (v === 'sect' && !sectsOn) v = 'phrase';
   // Opening a phrase from the Song screen always resolves to that block's own phrase, whether the SECT page
   // is shown or hidden: an empty block gets its phrase made first, so you never land on the previous phrase.
@@ -27167,8 +27257,8 @@ function draw(){
   const selB = $('tCmd').querySelector('[data-c=sel]'); if (selB) selB.classList.toggle('on', !!selA);
   $('tState').innerHTML = tp.on ? ico('play') + 'PLAYING ' + VNAME[tp.mode] : rendering ? ico('render') + 'RENDERING' : ico('stop') + 'STOPPED';
   $('tBpm').textContent = (tp.on ? tp.bpm : S.bpm) + ' BPM · ' + (tp.on ? tp.tks : S.ticks || TICKS) + ' TICKS' + (S.swing > 50 ? ' · SWING ' + S.swing + '%' : '');
-  document.querySelectorAll('#tMeters .mtr').forEach((m, t) => { m.classList.toggle('mu', !audible(t)); m.classList.toggle('so', !!(S.mix[t] && S.mix[t].solo)); m.hidden = t >= ntr();
-    const c = tCol(t), tip = trkTip(t) + ' · tap mutes' + (COARSE_PT ? '' : ', right-click solos, double-click names'); if (m.title !== tip) m.title = tip; m.classList.toggle('tcl', !!c); if (c) m.style.setProperty('--tc', c); });
+  document.querySelectorAll('#tMeters .mtr').forEach((m, t) => { m.classList.toggle('mu', !audible(t)); m.classList.toggle('so', !!(S.mix[t] && S.mix[t].solo)); { const hd = t >= ntr(); if (m.hidden !== hd) m.hidden = hd; }   // BATTERY: write only what differs
+    const c = tCol(t), tip = trkTip(t) + ' · tap mutes' + (COARSE_PT ? '' : ', right-click solos, double-click names'); if (m.title !== tip) m.title = tip; m.classList.toggle('tcl', !!c); if (c && m._tc !== c){ m._tc = c; m.style.setProperty('--tc', c); } });
   paintMeters();
   instList();
   apAfterDraw();   // ARRANGE PAGING: focus look, phrase follow, song strip
@@ -27215,8 +27305,11 @@ function mixFaders(){
     const t = mixL + i, a = meterEls[i].getBoundingClientRect(), z = meterEls[(MH - 1) * mixN + i].getBoundingClientRect(), b = host.children[i];
     const top = a.top + oy, bot = z.bottom + oy, rowH = (bot - top) / MH, d = volDb(S.mix[t].vol);
     const y = mfY(d, top, bot, rowH);
-    Object.assign(b.style, {left:(a.left + ox - 2).toFixed(1) + 'px', width:(a.width + 4).toFixed(1) + 'px', top:(y - 1.5).toFixed(1) + 'px'});
-    b.dataset.t = t; b.dataset.top = top; b.dataset.bot = bot; b.title = 'Track ' + d2(t + 1) + ' · VOL ' + hx(S.mix[t].vol) + ' · ' + dB(trackGain(S.mix[t].vol)) + ' · the fader, after chains and the FX (TRIM is above, before them) · drag to change, double-click for 0 dB';
+    // BATTERY: this runs on every redraw while playing; write an attribute only when its value differs from the last one written
+    const L1 = (a.left + ox - 2).toFixed(1) + 'px', W1 = (a.width + 4).toFixed(1) + 'px', T1 = (y - 1.5).toFixed(1) + 'px';
+    if (b._mfL !== L1 || b._mfW !== W1 || b._mfT !== T1){ b._mfL = L1; b._mfW = W1; b._mfT = T1; Object.assign(b.style, {left:L1, width:W1, top:T1}); }
+    if (b.dataset.t !== String(t)) b.dataset.t = t; if (b.dataset.top !== String(top)) b.dataset.top = top; if (b.dataset.bot !== String(bot)) b.dataset.bot = bot;
+    const ttl = 'Track ' + d2(t + 1) + ' · VOL ' + hx(S.mix[t].vol) + ' · ' + dB(trackGain(S.mix[t].vol)) + ' · the fader, after chains and the FX (TRIM is above, before them) · drag to change, double-click for 0 dB'; if (b.title !== ttl) b.title = ttl;
     b.classList.toggle('mu', !!S.mix[t].mute); b.classList.toggle('cur', mixFv() && t === cs.mixer.x);
   }
   mixOutBar();
@@ -27315,10 +27408,10 @@ function paintMeters(){
   const bs = rt ? rt.pl.buses : null;
   if (trimEls.length){ const now = performance.now(), lit = trimEls.map((e, i) => { const b = bs && bs[mixL + i], p = b && now - (b.iseen || 0) < 1000 ? b.ipk : 0; return p >= 0.891 ? 2 : p >= 0.5 ? 1 : 0; });
     const sig = lit.join(''); if (sig !== trimLit){ trimLit = sig; trimEls.forEach((e, i) => { e.classList.toggle('ih', lit[i] === 1); e.classList.toggle('ic', lit[i] === 2); }); } }   // GAIN STAGING: the TRIM light
-  document.querySelectorAll('#tMeters .mtr i').forEach((e, t) => { e.style.height = (bs ? lvl(bs[t].lv) * 100 : 0).toFixed(1) + '%'; });
+  document.querySelectorAll('#tMeters .mtr i').forEach((e, t) => { const h = (bs ? lvl(bs[t].lv) * 100 : 0).toFixed(1) + '%'; if (e._h !== h){ e._h = h; e.style.height = h; } });   // BATTERY: only a changed height is written
   // Track meters: element k * mixN + i is line k (from the top) of the i-th track on screen.
   meterEls.forEach((e, i) => { const k = Math.floor(i / mixN), t = mixL + i % mixN, f = (bs ? lvl(bs[t].lv) : 0) * MH * 8 - (MH - 1 - k) * 8;
-    const ch = BLK[clamp(Math.round(f), 0, 8)]; e.textContent = ch + ch; });
+    const ch = BLK[clamp(Math.round(f), 0, 8)], tx = ch + ch; if (e.textContent !== tx) e.textContent = tx; });
   // Master: a horizontal bar per side, −48 to 0 dB in MW cells, plus the peak in dB.
   if (masterEls.length === 10){
     const cut = mcutOn = mCut(); for (const k of [0, 5]){ const ln = masterEls[k].closest('.ln'); if (ln && ln.classList.contains('mcut') !== cut) ln.classList.toggle('mcut', cut); }   // MASTER CUT FLASH
@@ -27327,9 +27420,9 @@ function paintMeters(){
       const m = rt && rt.mlv ? rt.mlv[s] : 0, f = lvl(m) * MW, base = s * 5;
       zones.forEach(([a, b], z) => { let t = ''; for (let i = a; i < b; i++){ const x = f - i; t += x >= 1 ? '█' : x > 0 ? HB[Math.round(x * 8)] : ''; }
         const e = masterEls[base + z]; if (e.textContent !== t){ e.textContent = t; e.style.width = 'calc(' + t.length + ' * var(--chw, 1ch))'; } });   // as wide as its cells (see .mt)
-      masterEls[base + 3].textContent = '·'.repeat(Math.max(0, MW - Math.ceil(f)));
+      { const e3 = masterEls[base + 3], t3 = '·'.repeat(Math.max(0, MW - Math.ceil(f))); if (e3.textContent !== t3) e3.textContent = t3; }
       const pk = rt && rt.mpk ? rt.mpk[s] : 0;
-      masterEls[base + 4].textContent = pk > 0.00002 ? (20 * Math.log10(pk)).toFixed(1).padStart(5) + (pk >= 0.999 ? ' CLIP' : '') : '  −∞';
+      { const e4 = masterEls[base + 4], t4 = pk > 0.00002 ? (20 * Math.log10(pk)).toFixed(1).padStart(5) + (pk >= 0.999 ? ' CLIP' : '') : '  −∞'; if (e4.textContent !== t4) e4.textContent = t4; }
     });
   }
 }
@@ -27551,7 +27644,7 @@ function stageCanvas(force){
   if (k === 'preview') return stagePreview();
   if (k === 'piano') return stagePiano(force);
   if (k === 'wave') return stageWave();
-  if (k === 'spec') return stageSpec();
+  if (k === 'spec') return stageSpec(force);
   if (k === 'chain') return stageChain();
 }
 // Sect: the phrase under the cursor as a little piano roll, time running down like the tracker.
@@ -27625,8 +27718,15 @@ function stageWave(){
     if (mx < mn) continue; g.fillRect(x, H / 2 - mx * H * .46, 1, Math.max(dpr, (mx - mn) * H * .46)); }
 }
 // Mixer: the master's spectrum, drawn like the bottom panel's scope.
-function stageSpec(){
-  const X = stgCtx(); if (!X) return; const {g, W, H, dpr} = X; $('tStagePhT').textContent = 'MASTER · 20 Hz – 20 kHz';
+function stageSpec(force){
+  // BATTERY: stopped (nothing live to show), the panel is a still picture: draw it once and skip until something it shows changes
+  // (live again, a forced layout, the skin or theme, the box size, zoom / dpr). Live, it redraws every tick as before.
+  const an0 = specAnalyser(), live0 = !!an0 && (tp.on || performance.now() - audioWake < 1500);
+  if (!live0){
+    const de = document.documentElement, st = $('tStage').style, sig = 'idle|' + !!an0 + '|' + de.getAttribute('data-skin') + '|' + de.className + '|' + document.body.className + '|' + st.width + '|' + st.height + '|' + (devicePixelRatio || 1) + '|' + innerWidth + 'x' + innerHeight;
+    if (!force && sig === stgSig) return; stgSig = sig;
+  } else stgSig = '';
+  const X = stgCtx(); if (!X) { stgSig = ''; return; } const {g, W, H, dpr} = X; { const t = 'MASTER · 20 Hz – 20 kHz', e = $('tStagePhT'); if (e.textContent !== t) e.textContent = t; }
   g.clearRect(0, 0, W, H); g.strokeStyle = X.dim; g.lineWidth = dpr; g.strokeRect(.5, .5, W - 1, H - 1);
   const xOf = f => Math.log(f / 20) / Math.log(1000) * W, TOP = -12, BOT = -96, yOf = db => (TOP - db) / (TOP - BOT) * H;
   [100, 1000, 10000].forEach(f => { const x = xOf(f); g.beginPath(); g.moveTo(x, 0); g.lineTo(x, H); g.stroke(); g.fillStyle = X.mid; g.font = `${10 * dpr}px ${X.font}`; g.fillText(f >= 1000 ? f / 1000 + 'k' : f, x + 3 * dpr, H - 5 * dpr); });
@@ -31008,12 +31108,17 @@ function cpuMeter(){
   const b = $('tCpu'); if (!b) return;
   const fx = fxLoads().reduce((a, x) => a + x[1], 0), cap = cpu.cap && now - cpu.cap.t < 3000 ? cpu.cap : null, pr = cpu.probe && now - cpu.probe.t < 1500 ? cpu.probe : null;
   const v = !ctx ? null : cap ? cap.avg : pr ? pr.load : fx;
-  { const sp = b.querySelector('span'); let w = sp.querySelector('.cpuw'); if (!w){ w = document.createElement('em'); w.className = 'cpuw'; w.textContent = 'CPU '; } sp.textContent = v == null ? '0%' : Math.round(v * 100) + '%'; sp.prepend(w); b.title = 'Audio load (CPU) · click for details'; }   // the "CPU " word hides on the cover screen
-  b.querySelector('i').style.width = v == null ? '0' : Math.min(100, v * 100).toFixed(0) + '%';
+  const txt = v == null ? '0%' : Math.round(v * 100) + '%', wid = v == null ? '0' : Math.min(100, v * 100).toFixed(0) + '%';
   const drop = now - glitch.t < 3000;   // a dropout in the last 3 s turns the meter red
-  b.classList.toggle('warn', v != null && v > 0.5); b.classList.toggle('hot', v != null && (v > 0.8 || (cap && cap.under > 0) || drop));
-  b.title = (cap ? 'Whole audio engine (Chrome’s render capacity), not just the effects.' : pr ? 'Whole audio engine: how much of the available time it uses for every sound, effect and voice. Over 100% means it can’t keep up.' : 'The time the audio engine’s own processing takes: track and master effects, chains and bass voices (this browser doesn’t report the total audio load).')
+  const warn = v != null && v > 0.5, hot = v != null && (v > 0.8 || (cap && cap.under > 0) || drop);
+  const ttl = (cap ? 'Whole audio engine (Chrome’s render capacity), not just the effects.' : pr ? 'Whole audio engine: how much of the available time it uses for every sound, effect and voice. Over 100% means it can’t keep up.' : 'The time the audio engine’s own processing takes: track and master effects, chains and bass voices (this browser doesn’t report the total audio load).')
     + (glitch.n ? ' Dropouts since the sound started: ' + glitch.n + '.' : '');
+  // BATTERY: touch the DOM only when something shown changed (a rewrite every 500 ms kept the page restyling while idle)
+  const key = txt + '|' + wid + '|' + warn + '|' + hot + '|' + ttl; if (b._cpuKey === key) return; b._cpuKey = key;
+  const sp = b.querySelector('span'); let w = sp.querySelector('.cpuw'); if (!w){ w = document.createElement('em'); w.className = 'cpuw'; w.textContent = 'CPU '; }
+  sp.textContent = txt; sp.prepend(w);   // the "CPU " word hides on the cover screen
+  b.querySelector('i').style.width = wid;
+  b.classList.toggle('warn', warn); b.classList.toggle('hot', hot); b.title = ttl;
 }
 idleTick(() => { if (view !== 'tracker' && !document.hidden) cpuMeter(); }, 500, () => view !== 'tracker' && !document.hidden, 2000);   // BATTERY: the tracker's own frame loop updates it there
 // chains screen meters: sample each routed track's chains return and push it into the frame.
@@ -31138,8 +31243,8 @@ document.querySelectorAll('#trk .k[data-b]').forEach(k => {
   const b = k.dataset.b, ptrs = new Set();
   k.addEventListener('pointerdown', e => { e.preventDefault(); try { k.setPointerCapture(e.pointerId); } catch(_){} ptrs.add(e.pointerId); k._pd = true; if (!(b in held)) k.classList.add('dn'); press(b); });
   const up = e => { if (!ptrs.delete(e.pointerId)) return; if (!(b in held)) k.classList.remove('dn'); release(b); };
-  k.addEventListener('pointerup', up); k.addEventListener('pointercancel', up);
-  k.addEventListener('click', () => { const pd = k._pd; k._pd = false; if (pd && b === 'save') return;   /* (SAVE already ran on the press: a long hold must not save twice) */
+  k.addEventListener('pointerup', up); k.addEventListener('pointercancel', e => { k._pd = false; up(e); });
+  k.addEventListener('click', () => { const pd = k._pd; k._pd = false; if (pd) return;   /* (a click that follows its own pointerdown never runs the key again, however slow: SAVE 9 Nov, every pad key 10 Nov) */
     if (!ptrJust()){ press(b, true); release(b, true); } });
 });
 $('trk').addEventListener('contextmenu', e => e.preventDefault());
@@ -32588,6 +32693,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [548, '10 Nov', ['The first PLAY of a session waits a moment (under a second) for the effects to finish loading, so the song no longer stumbles in its first bars.', 'MIDI notes booked ahead while the app is hidden are cut short on STOP instead of playing out (Web MIDI; drum gear that ignores note-off can still sound them).', '…waves inside Thunder Plus starts its own sound engine only when you first play a note there, and sleeps when you leave the screen.', 'Less work while idle: the CPU meter, the Mixer meters and faders and the Mixer spectrum only redraw when something changed (the CPU bar now steps).', 'Phone: a pad press holds Arrange\'s paging like a key does; pad keys no longer fire twice on a slow press; Tracker | Synth fits when folded; File rows are taller and Help & keys is at the bottom of File when folded; FX opens on SLOT 1 the first time, then where you left it; Settings has a Done button; pop-up messages sit below the tabs and can be turned off in Settings › Screen (problems still show); bigger touch targets in the header and tabs.', 'The preset buttons read Pad presets… and Engine presets….']],
   [547, '10 Nov', ['Unique per track now applies only the first time a pattern comes onto a track. A pattern the track already has can be repeated or moved up and down it with no new copies, and moving a selection to another track copies only when the pattern also stays behind on its old track.']],
   [546, '10 Nov', ['On phones and tablets, when a song uses effects or live engines and the phone’s audio clock leaps ahead, the song is now held at its real tempo, so it no longer rushes. Pieces of sound can still drop out while that happens. The playback report counts how often the song was held.']],
   [545, '10 Nov', ['On phones and tablets the audio engine now loads its extra audio-thread parts only when a song uses effects, chains, live engines or the audio-thread sequencer, which keeps the phone’s audio clock steady for songs that don’t. The playback report lists which parts are loaded. On a phone the Sequencer setting plays on the Page until you pick Audio thread yourself.', 'Stability: one bad note no longer stops the song, STOP always finishes cleanly, PLAY then a quick STOP no longer starts the song, audio resumes after an interruption, effect and tempo changes no longer land after STOP, MIDI notes are not cut when a phone hands the song over at screen-off, and the spectrum view survives Reset audio engine. MUT variations of pads with samples are much quicker to prepare. The audio-thread sequencer and the safety limiter make far less work for the audio thread, mastering recovers from a bad sample, and the Bass engine no longer breaks after a big upward pitch jump.']],
@@ -33687,7 +33793,7 @@ if ('launchQueue' in window) try {
     try {
       await openProjectFile(await h.getFile());
       if (list.length > 1) toast('Opened ' + h.name + '. Only one project can be open at a time.', 6000);
-    } catch(e){ toast('Couldn’t open that project: ' + ((e && e.message) || e)); }
+    } catch(e){ toastErr('Couldn’t open that project: ' + ((e && e.message) || e)); }
   });
 } catch(e){ tpLog('opening files from the device did not start', e); }
 async function openSharedProject(){
@@ -33698,11 +33804,11 @@ async function openSharedProject(){
     const c = await caches.open('thunder-share');
     const key = new URL('__thunder-share-project', location.href).href;
     const r = await c.match(key);
-    if (!r){ if (q.get('shared') === '1') toast('That shared project couldn’t be read. Share it again, or save it and use File ▾ → LOAD PROJECT.', 7000); return; }
+    if (!r){ if (q.get('shared') === '1') toastErr('That shared project couldn’t be read. Share it again, or save it and use File ▾ → LOAD PROJECT.', 7000); return; }
     await c.delete(key);
     const name = decodeURIComponent(r.headers.get('x-name') || 'Shared project.thunder');
     await openProjectFile(new File([await r.blob()], name, {type:r.headers.get('content-type') || 'application/octet-stream'}));
-  } catch(e){ tpLog('the shared project could not be opened', e); toast('That shared project couldn’t be read. Save it and use File ▾ → LOAD PROJECT.', 7000); }
+  } catch(e){ tpLog('the shared project could not be opened', e); toastErr('That shared project couldn’t be read. Save it and use File ▾ → LOAD PROJECT.', 7000); }
 }
 if (new URLSearchParams(location.search).has('shared')) setTimeout(openSharedProject, 0);
 else if (FIRST_SONG) setTimeout(async () => {
