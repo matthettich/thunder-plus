@@ -131,4 +131,23 @@ if (want('F8')){   // MUT through renderVoice: the shared samples render as the 
   const ok = !r.setup && r.grid.same && r.grid.worst === 0 && r.float.same && r.float.worst < 2e-5 && r.grid.lensKept && r.float.lensKept;
   add('F8 MUT renders: bit-identical on 16-bit-grid samples, under 2e-5 on float samples', ok, JSON.stringify(r));
 }
+if (want('F9')){   // FIRST PLAY WAITS FOR THE EFFECT MODULES' HANDLERS (FIRST_PLAY_WAIT): capped, STOP cancels, later PLAYs start at once
+  const A = await fresh();
+  const r = await A.run(`const W = ms => new Promise(r => setTimeout(r, ms)); rtInit(); bassOK.add(ctx); await Promise.all([...rt.pend]); await W(300);   // (the real loaders settled first; the live-engine warm-up is not the thing under test)
+    const hold = ms => { const q = new Promise(r => setTimeout(r, ms)).then(() => rt.pend.delete(q)); rt.pend.add(q); return q; };
+    let vp = 0; const oV = varPrefetch; varPrefetch = function(){ if (!vp) vp = performance.now(); return oV.apply(this, arguments); };   // (the first call is when the wait ended: tStart's own work after it is slow on a small machine)
+    const out = {on: typeof FIRST_PLAY_WAIT !== 'undefined' && FIRST_PLAY_WAIT, cap: FIRST_PLAY_WAIT_MS};
+    rt.pend.clear(); hold(400); const t0 = performance.now(); tStart('song', {row:0}); out.syncNow = tp.on; await W(200); out.at200 = tp.on;
+    while (!tp.on && performance.now() - t0 < 8000) await W(10); out.startedMs = Math.round(vp - t0); tStop(true); vp = 0;
+    rt.pend.clear(); hold(5000); vp = 0; tStart('song', {row:0}); tStart('song', {row:0}); await W(100); out.twice = tp.on; stopKey(); await W(1200); out.afterStop = tp.on; rt.pend.clear();
+    vp = 0; hold(60000); const t1 = performance.now(); tStart('song', {row:0}); while (!tp.on && performance.now() - t1 < 8000) await W(10); out.cappedMs = Math.round(vp - t1); tStop(true); rt.pend.clear();
+    tStart('song', {row:0}); out.laterSync = tp.on; tStop(true);
+    rt.pend.clear(); hold(300); mx.slave = true; tStart('song', {row:0}); out.slaveSync = tp.on; mx.slave = false; tStop(true); rt.pend.clear();
+    return out;`);
+  add('F9 first PLAY with a handler pending: waits for it (not at 200 ms, on by ~400-700 ms), never at once', r.on && !r.syncNow && !r.at200 && r.startedMs >= 380 && r.startedMs < 1000, JSON.stringify(r));
+  add('F9 a second PLAY does not double-start; STOP inside the wait leaves the song stopped', !r.twice && !r.afterStop, JSON.stringify(r));
+  add('F9 a handler that never finishes: the cap (900 ms) starts the song', r.cappedMs >= 880 && r.cappedMs < 1500, JSON.stringify(r));
+  add('F9 nothing pending (later PLAYs) and a synced start (MIDI clock) start synchronously', r.laterSync && r.slaveSync, JSON.stringify(r));
+  await A.close();
+}
 process.exit(table(rows) ? 1 : 0);

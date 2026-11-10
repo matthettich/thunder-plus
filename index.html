@@ -15943,7 +15943,7 @@ function msend(bytes, t, early, p){
   const o = midiOut(p); if (!o || !ctx) return;
   const at = t == null ? 0 : a2p(t + moFxLat()) - (early ? mLatOf(p) : 0), now = performance.now();
   if (!o.native && at - now > MOB_AHEAD && !document.hidden) return mobPut(o, bytes, at);   // (NATIVE MIDI: the helper's queue is cleared on STOP itself)
-  try { o.send(bytes, Math.max(now, at)); } catch(e){}
+  try { const ts = Math.max(now, at); o.send(bytes, ts); if (MOLED_ON && document.hidden && !o.native) moledNote(o, bytes, ts, now); } catch(e){}
 }
 /* FX LATENCY (owner, 7 Nov: MIDI early; "midi and audio seem to align if I move the synth/audio up two lines"). Everything
    Thunder plays reaches the speaker later than the time it is booked for by the lookahead on the way out: the mastering
@@ -15968,10 +15968,34 @@ function mobPut(o, b, at){
   q.splice(lo, 0, {o, b, at}); if (!MOB.tm) MOB.tm = setInterval(mobFlush, 15); }
 function mobFlush(all){
   const q = MOB.q, now = performance.now(), lim = all === true ? Infinity : now + MOB_AHEAD; let i = 0;
+  if (MOLED.length) moledPrune(now);
   while (i < q.length && q[i].at <= lim){ const x = q[i++]; try { x.o.send(x.b, Math.max(now, x.at)); } catch(e){} }
   if (i) q.splice(0, i); if (!q.length && MOB.tm){ clearInterval(MOB.tm); MOB.tm = 0; } }
 function mobDrop(){ MOB.q.length = 0; if (MOB.tm){ clearInterval(MOB.tm); MOB.tm = 0; } }
 document.addEventListener('visibilitychange', () => { if (document.hidden && MOB.q.length) mobFlush(true); });
+/* HIDDEN-PAGE LEDGER (10 Nov, audio review): hidden, msend hands notes straight to the port with timestamps up to ~1.2 s ahead (timers
+   are throttled, so the outbox cannot feed them), and Web MIDI cannot recall them: notes sounded after STOP. Every note-on sent that
+   way is remembered (port, channel, note, time); moRelease (STOP, panic, OUTPUT / PORT / CH changes) sends each one still ahead its
+   note-off 1 ms after its own start (a blip, not its full length), then All Notes Off now and again after the last of them. The
+   native helper has clear() and is not ledgered. MOLED_ON = false: nothing is remembered or sent (the old behaviour). */
+const MOLED_ON = true, MOLED_MAX = 256, MOLED = [];
+function moledPrune(now){ let j = 0; for (const x of MOLED) if (x.at > now) MOLED[j++] = x; MOLED.length = j; }
+function moledNote(o, b, ts, now){
+  moledPrune(now);
+  if ((b[0] & 0xF0) !== 0x90 || !(b[2] > 0) || !(ts > now)) return;   // only note-ons that are still ahead (clock, CC, program are not ledgered)
+  if (MOLED.length >= MOLED_MAX) MOLED.shift();
+  MOLED.push({o, ch:b[0] & 15, n:b[1], at:ts});
+}
+function moledCut(){
+  if (!MOLED.length) return;
+  moledPrune(performance.now()); if (!MOLED.length) return;
+  const chs = new Map(); let end = 0;
+  for (const o of new Set(MOLED.map(x => x.o))) try { if (typeof o.clear === 'function') o.clear(); } catch(e){}   // (Chrome has none: then the note-offs do it)
+  for (const x of MOLED){ try { x.o.send([0x80 | x.ch, x.n, 0], x.at + 1); } catch(e){} end = Math.max(end, x.at + 1);
+    if (!chs.has(x.o)) chs.set(x.o, new Set()); chs.get(x.o).add(x.ch); }
+  for (const [o, cs] of chs) for (const ch of cs) try { o.send([0xB0 | ch, 123, 0]); o.send([0xB0 | ch, 123, 0], end + 1); } catch(e){}   // All Notes Off: now, and after the last booked note
+  MOLED.length = 0;
+}
 const msendClk = (bytes, t) => { for (const p of clkPorts()) msend(bytes, t, false, p); };
 const moEnd = e => Math.min(e.cut != null ? e.cut : Infinity, e.rel != null ? e.rel : Infinity);
 function offOne(h, at){ if (h.end <= at) return; msend([0x80 | h.ch, h.n, 0], Math.max(at, h.t + 0.001), true, h.p); h.end = at; }
@@ -16307,6 +16331,7 @@ function moLfo(s){
 function moRelease(){
   const now = ctx ? ctx.currentTime : 0, cleared = new Set();
   if (!tp.on) mobDrop();   // OUTBOX: the notes still waiting never go
+  if (MOLED_ON) try { moledCut(); } catch(e){}   // HIDDEN-PAGE LEDGER: the notes handed to the port ahead of time
   if (!tp.on) for (let p = 0; p < NPORT; p++){ const o = midiOut(p); if (!o || cleared.has(o)) continue; cleared.add(o);
     try { if (typeof o.clear === 'function') o.clear(); } catch(e){} }   // drop what was booked ahead (not every browser can)
   for (const H of mx.held) if (H) for (const h of H) if (h.end > now){
@@ -21070,12 +21095,29 @@ function resetAudio(quiet){
    so asking for tfx asks for chains too. */
 function rtTfxLoad(){
   if (!rt || rt.fxAsk) return; rt.fxAsk = true;
-  tfxReady(ctx).then(ok => { if (!rt) return; rt.fxOk = ok; rtAllFx(); if (!ok && !NOWK && (S.tfx.some(fxCount) || fxCount(S.mfx))) toast('Track effects need a newer browser here.'); });
+  rtPending(tfxReady(ctx).then(ok => { if (!rt) return; rt.fxOk = ok; rtAllFx(); if (!ok && !NOWK && (S.tfx.some(fxCount) || fxCount(S.mfx))) toast('Track effects need a newer browser here.'); }));
   rtChnLoad();
 }
 function rtChnLoad(){
   if (!rt || rt.chnAsk) return; rt.chnAsk = true;
-  chainsReady(ctx).then(ok => { if (!rt) return; rt.chnOk = ok; if (ok){ chnSync.add(ctx); rtAllFx(); } else if ((S.chainOn || []).some(Boolean) && !NOWK) toast('chains needs a newer browser here.'); });
+  rtPending(chainsReady(ctx).then(ok => { if (!rt) return; rt.chnOk = ok; if (ok){ chnSync.add(ctx); rtAllFx(); } else if ((S.chainOn || []).some(Boolean) && !NOWK) toast('chains needs a newer browser here.'); }));
+}
+/* FIRST PLAY WAITS FOR THE EFFECT MODULES (10 Nov, audio review): the `.then` handlers above run rtAllFx (every track's chain and effect
+   nodes, 0.5 s of main thread) the moment the tfx / chains modules arrive, which on a PLAY as the first touch was 1-4 bars into the
+   song. rtPending keeps each handler's promise on rt.pend until it has run; tStart waits for them, once, with the live warm-up's wait
+   (FIRST_PLAY_WAIT_MS in all). Set FIRST_PLAY_WAIT false for the old behaviour (nothing tracked, no wait). */
+const FIRST_PLAY_WAIT = true, FIRST_PLAY_WAIT_MS = 900;
+function rtPending(p){
+  if (!FIRST_PLAY_WAIT || !rt || !rt.pend) return p;
+  const set = rt.pend, q = p.then(() => {}, () => {}).then(() => { set.delete(q); }); set.add(q); return p;   // (q never rejects: a throwing handler must not stop PLAY)
+}
+// The promises PLAY waits for, or null (the usual PLAY: nothing pending, no extra tick). Not for a start that is synced to something:
+// Link (a peer's start has its own time), an external MIDI clock, a take being recorded, REC's count-in, and the phones' audio-thread
+// hand-over (wkLazy: those load only what the song uses, and a hand-over carries on at an exact step).
+function playWaitFor(o){
+  if (!rt || !rt.pend || !rt.pend.size) return null;
+  if (wkLazy() || (o && (o.rz || o.page)) || mx.slave || mx.inRun || RCD.starting || rec.on || (lk && (lk.pend || lkLive()))) return null;
+  return [...rt.pend];
 }
 // Phones (10 Nov): load them when track t (NT: the master) has an effect slot filled (on or off: FXO can switch it on) or a chain
 // feeds it. Every way an effect or chain comes into use reaches rtFx(t) (fxChanged, rtAllFx after a song, undo or kit load,
@@ -21100,7 +21142,7 @@ function rtInit(){
   if (!rt){
     // mo: the master OUT fader (GAIN STAGING, 27 Oct), after mastering and the safety limiter, before the device's level
     const out = ctx.createGain(), mo = ctx.createGain(), lim = safeLim(ctx, mo); mo.gain.value = curve(S.mout == null ? 255 : S.mout); mo.connect(master);
-    rt = {out, mo, lim, mfx:null, fxOk:false, chnOk:false, pl:makePlayer(ctx, out, rtBuf, true), mlv:[0, 0], mpk:[0, 0], mpt:[0, 0]}; rtRoute(); rt.pl.applyMix(); mstSync(); if (wkLazy()) wkLiveEnsure(); else bassReady(ctx).then(ok => { if (ok) liveWarmSoon(200); });
+    rt = {out, mo, lim, mfx:null, fxOk:false, chnOk:false, pend:new Set(), pl:makePlayer(ctx, out, rtBuf, true), mlv:[0, 0], mpk:[0, 0], mpt:[0, 0]}; rtRoute(); rt.pl.applyMix(); mstSync(); if (wkLazy()) wkLiveEnsure(); else bassReady(ctx).then(ok => { if (ok) liveWarmSoon(200); });
     // the master meter listens to everything going out, synth pads included
     const sp = ctx.createChannelSplitter(2); rt.man = [ctx.createAnalyser(), ctx.createAnalyser()];
     master.connect(sp); rt.man.forEach((a, i) => { a.fftSize = 1024; sp.connect(a, i); });
@@ -21506,8 +21548,9 @@ let warmTok = null;   // 10 Nov: the booked first-PLAY warm-up (tStart); STOP cl
 function tStart(mode, o){
   // LIVE WARM-UP: the first PLAY of a session starts the audio engine; with live engine pads in the kit it waits (once, at
   // most 600 ms) for their worklets, so their nodes can be made before the first notes instead of on them
-  if (!(o && o._warm) && !tp.on){ rtInit(); if (!bassOK.has(ctx) && (wkLazy() ? wkLiveWanted() : kit.voices.some((v, i) => v && isLivePad(i)))){ if (warmTok) return; const oo = Object.assign({}, o, {_warm:true}), tok = warmTok = {};
-    Promise.race([bassReady(ctx), new Promise(r => setTimeout(r, 600))]).then(() => { if (warmTok === tok){ warmTok = null; if (!tp.on) tStart(mode, oo); } }); return; } }
+  // 10 Nov: and for the effect and chains modules' handlers still to run (playWaitFor), so rtAllFx is not 1-4 bars into the song
+  if (!(o && o._warm) && !tp.on){ rtInit(); const live = !bassOK.has(ctx) && (wkLazy() ? wkLiveWanted() : kit.voices.some((v, i) => v && isLivePad(i))), pend = playWaitFor(o); if (live || pend){ if (warmTok) return; const oo = Object.assign({}, o, {_warm:true}), tok = warmTok = {};
+    Promise.race([pend ? Promise.all(live ? [bassReady(ctx), ...pend] : pend) : bassReady(ctx), new Promise(r => setTimeout(r, pend ? FIRST_PLAY_WAIT_MS : 600))]).then(() => { if (warmTok === tok){ warmTok = null; if (!tp.on) tStart(mode, oo); } }); return; } }
   if (typeof varPrefetch === 'function') varPrefetch();   // MUT / GEN
   if (mode === 'song' && loopPat && !(o && o.loop)){ o = Object.assign({}, o, {loop:{v:'pat', y0:o.row, y1:o.row}}); patRow = o.row; patCur = cs.song.y; }   // LOOP: the pattern
   const wasOn = tp.on;   // REC: no count-in when PLAY jumps somewhere else mid-song
