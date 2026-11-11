@@ -1433,6 +1433,8 @@ body.asong .tagrid .rn, body.asong .tath{font-size:var(--fs-2)}
 /* SECTIONS LANE WIDTH (owner, 21 Oct: on the phone the empty lane and its long label pushed the song grid off centre): --sxw is
    set by sxLaneSize() from the longest section name (narrow while there are none), at most 88px (60px under 900px). */
 body.sxsecs .tarr{padding-left:calc(var(--sxw, 88px) + 4px)}   /* (beside Phrase too, with SECTIONS BESIDE PHRASE) */
+/* (owner, 11 Nov: with SECT on, the Song grid "looks a little skewed" to the right) The Song screen gets the lane's width again on the right, at most 48px, so the grid sits centred. Not beside Phrase: no room to give there. */
+body.asong.sxsecs .tarr{padding-right:min(calc(var(--sxw, 88px) + 4px), 48px)}
 .sxlane{position:absolute; left:0; top:0; bottom:0; width:var(--sxw, 88px); z-index:3}
 .sxlane[hidden]{display:none}
 .sxlane .sxlh{position:absolute; left:4px; font:700 var(--fs-1)/16px var(--mono); letter-spacing:.06em; color:var(--ar-dim)}
@@ -23996,7 +23998,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 564;
+const BUILD = 565;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD + (location.pathname.includes('/beta/') ? ' · beta' : '');
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -33425,6 +33427,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [565, '11 Nov', ['Song screen: with the SECT lane showing, the grid gets matching space on its right, so it sits centred, not pushed to the right.']],
   [564, '11 Nov', ['Phone: with the phone folded, the Tracker button lines up with SONG at the left edge. The word Thunder leaves the title bar when there is no room for the whole word (it showed as "Thunde" unfolded) and comes back when there is.']],
   [563, '11 Nov', ['Lighter on the phone: while a song plays the screen no longer rewrites text that has not changed, the audio thread makes far less garbage (chains, waves, pump synths), and the master and Flex / Step gate effects rest when the song is stopped and silent. Nothing should sound different.', 'Vox: REL now gives a real release tail (the voice was cut after 4 ms whatever REL said). Vox sounds with a long REL ring on longer than before.', 'Reset audio engine now checks its own result: if the engine is stuck or the sound comes out far too late, it offers to reload the app. Your song and kit are saved first and come back.', 'Touch: bigger Close / Done buttons on sheets; picking an engine on the Synth page scrolls its editor into view; hints no longer talk about right-click.', 'Hints show your own key (Ctrl on Windows, ⌘ on a Mac). Clearer BPM / LPB while playing, Stop on pink paper and the POLY label in the IDM and 909 skins.']],
   [562, '10 Nov', ['Chains and waves: Flex, Step gate and Retrigger are now the very same code as the track effects (one source, checked by a test). Old chains / waves patches that use Flex may sound a little different (SCRATCH is slightly shallower). Step gate keeps its custom steps.', 'While a song plays, the tracker no longer rewrites its title, info line and play state when they have not changed (less background work, mostly felt on the phone).']],
