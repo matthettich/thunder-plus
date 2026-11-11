@@ -11256,6 +11256,15 @@ async function importPresetsFile(f){
 // browser sheet as pad and layer presets. Set it to false to get their native <select> dropdowns back (the selects
 // are still filled and wired; the sheet just takes the tap when this is true).
 const ENGINE_PRESET_SHEET = true;
+// U6 (usability audit): on a touch screen the new engine's editor can sit far below the pad area, so a pick looked like nothing
+// happened. After a pick from the sheet, scroll the (visible) engine card to the top of the Synth page. Mouse: left alone.
+function engShowEditor(){
+  if (!(isMobile() || matchMedia('(pointer:coarse)').matches)) return;
+  requestAnimationFrame(() => { try {
+    const c = ['bassCard', 'blipCard', 'xCard', 'voxCard', 'layerCard'].map(i => document.getElementById(i)).find(e => e && !e.hidden && e.offsetParent);
+    if (c) c.scrollIntoView({block:'start', behavior:'smooth'});
+  } catch(_){} });
+}
 function engineSheet(){
   if (pbOpen) pbOpen();
   const curK = isBassV(V()) ? 'bass' : isVoxV(V()) ? 'vox' : isBlipV(V()) ? 'blip' : isXEngV(V()) ? V().engine : 'layers';
@@ -11271,7 +11280,7 @@ function engineSheet(){
   const key = e => { if (e.key === 'Escape'){ e.preventDefault(); e.stopPropagation(); done(); } else if (e.target === q) e.stopPropagation(); };
   const row = ([k, name, about]) => {
     const it = el('div', 'pit' + (k === curK ? ' cur' : '')), pn = el('button', 'pn eng'); pn.type = 'button'; pn.append(document.createTextNode(name), el('small', null, about));
-    pn.addEventListener('click', () => { if (early()) return; done(); if (k !== curK) setEngine(k); });
+    pn.addEventListener('click', () => { if (early()) return; done(); if (k !== curK){ setEngine(k); engShowEditor(); } });
     it.append(pn, favBtn('eng', k, name, () => { const was = openCat >= 0 ? render.G[openCat] && render.G[openCat][0] : null; render(); const i = render.G.findIndex(g => g[0] === was); if (i !== openCat && was){ openCat = i; render(); } })); return it;
   };
   const render = () => {
