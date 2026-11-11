@@ -507,3 +507,19 @@ test('U16: under-contrast text in IDM, IDM pink & green, IDM pink paper and 909 
   assert.match(css, /tr909"\] :is\(\.tagp b\.gp, \.tgrid span\.pvh\.gp\)\{color:var\(--mxon\)\}/, 'POLY labels on the 909');
   assert.ok(!/background/.test(css.replace(/\/\*[\s\S]*?\*\//g, '')), 'colour only: no background is changed');
 });
+
+// (11 Nov, build 564) The title bar: the name is hidden when it does not fit; folded, the bar starts at the screen edge.
+test('title bar: brandFit hides a clipped name on Mobile only, and the bar loses its left padding when the name is gone', () => {
+  const src = require('fs').readFileSync(require('path').join(__dirname, '..', 'index.html'), 'utf8');
+  const m = src.match(/function brandFit\(\)\{[\s\S]*?\n\}/); assert.ok(m, 'brandFit exists');
+  const mk = (mob, cw, sw) => { const cls = new Set(); const b = { clientWidth: cw, scrollWidth: sw, classList: { add: c => cls.add(c), remove: c => cls.delete(c), contains: c => cls.has(c) } };
+    const document = { querySelector: () => b, body: { classList: { contains: c => c === 'mob' && mob } } };
+    new Function('document', m[0] + '; brandFit();')(document); return cls.has('bhide'); };
+  assert.strictEqual(mk(true, 69, 78), true, 'clipped on Mobile: hidden');
+  assert.strictEqual(mk(true, 78, 78), false, 'fits: shown');
+  assert.strictEqual(mk(false, 69, 78), false, 'desktop layout: left alone');
+  assert.strictEqual(mk(true, 0, 0), false, 'already display:none (folded): no class');
+  assert.match(src, /body\.mob \.top \.brand\.bhide\{display:none\}/);
+  assert.match(src, /body\.mob \.top:has\(\.brand\.bhide\)\{padding-left:0\}/);
+  assert.match(src, /@media \(max-width:480px\)\{ body\.mob \.top\{padding-left:0\}/);
+});
