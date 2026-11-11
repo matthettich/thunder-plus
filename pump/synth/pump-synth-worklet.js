@@ -32,6 +32,11 @@ const TMAP = {
 };
 const CUT_K = 18000 / 30, ENV_D = 4 / 0.008, COMMIT_EVERY = 1;   // COMMIT_EVERY: a modulated value is committed at most every Nth quantum
 const clamp = (v, lo, hi) => v < lo ? lo : v > hi ? hi : v;
+// per-block helpers made once (a closure `at` (now psAt), a closure in modRead / lane.some and the lane parameters' names ('t' + j …) were rebuilt every block)
+const psAt = (A, i) => A.length > 1 ? A[i] : A[0];
+const LN_R = [], LN_G = [], LN_T = [], LN_L = [], LN_V = [];
+for (let j = 0; j < LANES; j++){ LN_R.push('r' + j); LN_G.push('g' + j); LN_T.push('t' + j); LN_L.push('l' + j); LN_V.push('v' + j); }
+function modG(P, k, d){ const a = P[k]; const v = a ? a[0] : d; return typeof v === 'number' && v === v ? v : d; }   // modRead's reader of a k-rate value
 function psynX(){   // __psynMod: the page's compiled module (WASM_PRECOMPILE); else the bytes are compiled here
   const g = globalThis; if (g.__psynX) return g.__psynX; if ((!g.__psynMod && !g.__psynBytes) || g.__psynFailed) return null;
   try { const x = new WebAssembly.Instance(g.__psynMod || new WebAssembly.Module(g.__psynBytes), WASI).exports; if (x._initialize) x._initialize(); g.__psynX = x; return x; }
@@ -93,23 +98,28 @@ class PsynProc extends AudioWorkletProcessor {
   own(i){ const sy = this.tm[TARGETS[i]][0], f = this.fixed[sy], v = f != null ? f : this.p[sy]; return typeof v === 'number' && isFinite(v) ? v : NaN; }
   // read the twelve k-rate parameters (once a quantum); fills this.ef with the effective values (section 3) and returns true when any is off its default
   modRead(P){
-    const g = (k, d) => { const a = P[k]; const v = a ? a[0] : d; return typeof v === 'number' && v === v ? v : d; };
-    const cCut = g('cCut', -1), cRes = g('cRes', -1), cDec = g('cDec', -1), cAtk = g('cAtk', -1), cRel = g('cRel', -1);
-    const oCut = g('oCut', 0), oRes = g('oRes', 0), oEnv = g('oEnv', 0), oAtk = g('oAtk', 0), oDec = g('oDec', 0), oSus = g('oSus', 0), oRel = g('oRel', 0);
+    const cCut = modG(P, 'cCut', -1), cRes = modG(P, 'cRes', -1), cDec = modG(P, 'cDec', -1), cAtk = modG(P, 'cAtk', -1), cRel = modG(P, 'cRel', -1);
+    const oCut = modG(P, 'oCut', 0), oRes = modG(P, 'oRes', 0), oEnv = modG(P, 'oEnv', 0), oAtk = modG(P, 'oAtk', 0), oDec = modG(P, 'oDec', 0), oSus = modG(P, 'oSus', 0), oRel = modG(P, 'oRel', 0);
     const ef = this.ef, ix = this.ix; ef.fill(NaN);
     if (!(cCut >= 0 || cRes >= 0 || cDec >= 0 || cAtk >= 0 || cRel >= 0 || oCut !== 0 || oRes !== 0 || oEnv !== 0 || oAtk !== 0 || oDec !== 0 || oSus !== 0 || oRel !== 0)) return false;
-    const tm = this.tm, T = (i, c, o) => {   // seconds-based envelope time (stored as ms)
-      if (ix[i] < 0 || (c < 0 && o === 0)) return; const own = this.own(i), m = tm[TARGETS[i]]; if (own !== own) return;
-      const u = m[3] || 1000, base = c < 0 ? own / u : 0.008 * Math.pow(ENV_D, Math.min(c, 254) / 254);
-      ef[i] = clamp(base * Math.pow(ENV_D, o / 254), m[1] / u, m[2] / u) * u; };
+    const tm = this.tm;
     if (ix[0] >= 0 && (cCut >= 0 || oCut !== 0)){ const own = this.own(0), m = tm.cut; if (own === own || cCut >= 0){ const base = cCut < 0 ? own : 30 * Math.pow(CUT_K, cCut / 255); ef[0] = clamp(base * Math.pow(CUT_K, oCut / 255), m[1], m[2]); } }
     if (ix[1] >= 0 && (cRes >= 0 || oRes !== 0)){ const own = this.own(1), m = tm.res, span = m[2] - m[1]; if (own === own || cRes >= 0){ const b = cRes < 0 ? (own - m[1]) / span : cRes / 255; ef[1] = m[1] + clamp(b + oRes / 255, 0, 1) * span; } }
     if (ix[2] >= 0 && oEnv !== 0){ const own = this.own(2), m = tm.env; if (own === own) ef[2] = clamp(own + (oEnv / 255) * (m[2] - m[1]), m[1], m[2]); }
-    T(3, cAtk, oAtk); T(4, cDec, oDec);
+    this.modT(3, cAtk, oAtk); this.modT(4, cDec, oDec);
     if (ix[5] >= 0 && oSus !== 0){ const own = this.own(5), m = tm.sus, span = m[2] - m[1]; if (own === own) ef[5] = m[1] + clamp((own - m[1]) / span + oSus / 255, 0, 1) * span; }
-    T(6, cRel, oRel);
+    this.modT(6, cRel, oRel);
     return true;
   }
+  // seconds-based envelope time (stored as ms) for target i (a method: it was a closure made every block)
+  modT(i, c, o){
+    const ix = this.ix, tm = this.tm, ef = this.ef;
+    if (ix[i] < 0 || (c < 0 && o === 0)) return; const own = this.own(i), m = tm[TARGETS[i]]; if (own !== own) return;
+    const u = m[3] || 1000, base = c < 0 ? own / u : 0.008 * Math.pow(ENV_D, Math.min(c, 254) / 254);
+    ef[i] = clamp(base * Math.pow(ENV_D, o / 254), m[1] / u, m[2] / u) * u;
+  }
+  // the staged-values view of the wasm memory, kept (remade when the memory grew or the handle moved it): a new Float32Array on every commit while MOD moves a value was garbage
+  vv(X){ const b = X.memory.buffer, q = X.psyn_values(this.h), n = this.syms.length; let v = this.vw; if (!v || v.buffer !== b || v.byteOffset !== q || v.length !== n) v = this.vw = new Float32Array(b, q, n); return v; }
   modDiff(){ const a = this.ef, b = this.last; for (let i = 0; i < 7; i++){ const x = a[i], y = b[i]; if (x !== y && (x === x || y === y)) return true; } return false; }
   open(X){
     const st = new Float32Array(X.memory.buffer, X.psyn_stage(), 512);
@@ -154,23 +164,22 @@ class PsynProc extends AudioWorkletProcessor {
     if (mo || this.modOn){
       // the effective values go over the pad's own in the staged array (this.p stays the source); one commit when they change, one more with the plain values when the modulation ends
       const ch = this.dirty || this.modOn !== mo || (this.modDiff() && ++this.mq >= COMMIT_EVERY);
-      if (ch){ const v = new Float32Array(X.memory.buffer, X.psyn_values(this.h), this.syms.length); this.values(v);
+      if (ch){ const v = this.vv(X); this.values(v);
         for (let i = 0; i < 7; i++) if (this.ix[i] >= 0 && this.ef[i] === this.ef[i]) v[this.ix[i]] = this.ef[i];
         X.psyn_commit(this.h); this.dirty = false; this.mq = 0; this.last.set(this.ef); }
       this.modOn = mo;
-    } else if (this.dirty){ const v = new Float32Array(X.memory.buffer, X.psyn_values(this.h), this.syms.length); this.values(v); X.psyn_commit(this.h); this.dirty = false; }
-    const at = (A, i) => A.length > 1 ? A[i] : A[0];
+    } else if (this.dirty){ const v = this.vv(X); this.values(v); X.psyn_commit(this.h); this.dirty = false; }
     let any = false, bfrom = 0;   // bfrom: where the bend lane's note started in this block (bend before it is the old note's)
     for (let j = 0; j < LANES; j++){
-      const ln = this.lane[j], T = P['t' + j], G = P['g' + j];
+      const ln = this.lane[j], T = P[LN_T[j]], G = P[LN_G[j]];
       // nothing changes in this block on this lane (both constant and as before): skip the per-sample scan
       if (T.length === 1 && G.length === 1 && T[0] === ln.lt && (G[0] >= 0.5) === ln.lg) continue;
       for (let i = 0; i < n; i++){
-        const tg = at(T, i), ga = at(G, i) >= 0.5;
+        const tg = psAt(T, i), ga = psAt(G, i) >= 0.5;
         if (tg === ln.lt && ga === ln.lg) continue;
-        const r = at(P['r' + j], i);
+        const r = psAt(P[LN_R[j]], i);
         if ((tg !== ln.lt && ga) || (ga && !ln.lg)){
-          const leg = tg !== ln.lt && ln.lg && at(P['l' + j], i) >= 0.5, note = Math.max(0, Math.min(127, this.nb + Math.round(this.semis(r)))), vel = Math.max(1, Math.min(127, Math.round(at(P['v' + j], i))));
+          const leg = tg !== ln.lt && ln.lg && psAt(P[LN_L[j]], i) >= 0.5, note = Math.max(0, Math.min(127, this.nb + Math.round(this.semis(r)))), vel = Math.max(1, Math.min(127, Math.round(psAt(P[LN_V[j]], i))));
           const old = ln.note;
           if (old >= 0 && !leg) X.psyn_midi(this.h, i, 0x80, old, 0);
           this.bl = j; bfrom = i; this.bend(X, i, r, note);
@@ -183,17 +192,19 @@ class PsynProc extends AudioWorkletProcessor {
     }
     // pitch between notes: the last-played lane's rate as bend, every 32 samples (COIL retunes its springs on each
     // bend, so it gets one a block and only for a change worth hearing)
-    const bl = this.lane[this.bl], rr = P['r' + this.bl];
+    const bl = this.lane[this.bl], rr = P[LN_R[this.bl]];
     if (bl.note >= 0){
-      if (this.type === 2){ const v = this.bendOf(at(rr, bfrom), bl.note); if (Math.abs(v - this.sent) > 6){ X.psyn_midi(this.h, bfrom, 0xE0, v & 127, v >> 7); this.sent = v; } }
+      if (this.type === 2){ const v = this.bendOf(psAt(rr, bfrom), bl.note); if (Math.abs(v - this.sent) > 6){ X.psyn_midi(this.h, bfrom, 0xE0, v & 127, v >> 7); this.sent = v; } }
       else if (rr.length > 1) for (let i = bfrom; i < n; i += 32) this.bend(X, i, rr[i], bl.note);
       else this.bend(X, bfrom, rr[0], bl.note);
     }
     // asleep: no note held and the output silent for a second (a phone's battery): skip the engine until a note comes
-    const held = this.lane.some(l => l.note >= 0);
+    let held = false; for (let j = 0; j < LANES; j++) if (this.lane[j].note >= 0){ held = true; break; }   // (a loop: .some(closure) made a function every block)
     if (!held && !any && this.quiet > sampleRate){ L.fill(0); if (R !== L) R.fill(0); return true; }
     X.psyn_process(this.h, n);
-    const oL = new Float32Array(X.memory.buffer, X.psyn_out(0), n), oR = new Float32Array(X.memory.buffer, X.psyn_out(1), n);
+    // (the two output views are kept, remade when the memory grew or the block length changed: two new typed arrays every block otherwise)
+    let oL = this.oL, oR = this.oR; { const b = X.memory.buffer, q0 = X.psyn_out(0), q1 = X.psyn_out(1);
+      if (!oL || oL.buffer !== b || oL.byteOffset !== q0 || oL.length !== n || oR.byteOffset !== q1){ oL = this.oL = new Float32Array(b, q0, n); oR = this.oR = new Float32Array(b, q1, n); } }
     let pk = 0, sm = 0;
     // the pad's Level and Drive, as the render applies them (finish() in pump-synth-engine.js), and the trim
     const tr = this.trim * Math.pow(10, (+this.p.level || 0) / 20), dv = +this.p.drive || 0, dr = dv > 0.001 ? 1 + dv * dv * 10 : 0, dn = dr ? 1 / Math.tanh(dr) : 1;

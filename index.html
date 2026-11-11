@@ -4067,7 +4067,7 @@ const khzf = v => v.toFixed(1) + ' kHz', hzf = v => Math.round(v) + ' Hz', pcf =
    50 % a real middle (dry −3 dB, tail −6 dB), 100 % the tail alone. Room and Space used to keep the dry full while the tail
    reached full by 50 %, and Galactic's own mix was 1−(1−m)³. A function declaration, so the track-FX worklet gets it by
    toString(). Returns [dry gain, wet gain]. */
-function rvMix(m){ const a = (m < 0 ? 0 : m > 1 ? 1 : m) * Math.PI / 2, s = Math.sin(a); return [Math.cos(a), s * s]; }
+function rvMix(m, o){ const a = (m < 0 ? 0 : m > 1 ? 1 : m) * Math.PI / 2, s = Math.sin(a); if (o){ o[0] = Math.cos(a); o[1] = s * s; return o; } return [Math.cos(a), s * s]; }   // with o (a two-slot array the caller keeps) no array is made: per-block callers pass one
 const wetPct = v => Math.round(v * 100) + '% wet';
 const wetDry = v => `W ${Math.round(Math.min(1, v * 2) * 100)} · D ${Math.round(Math.min(1, 2 - v * 2) * 100)}`;
 const sq01 = v => Math.sqrt(Math.max(0, Math.min(1, v)));
@@ -7966,7 +7966,7 @@ class PitchFxCore {
     this.ap = [0, 1].map(() => ap.map(n => ({b:new Float32Array(Math.ceil(n * sr / 44100) + 8), i:0})));
     this.lp = [0, 0]; this.fbS = [0, 0]; this.step = 0; this.cnt = 0; this.wph = 0; this.tsm = 0; this.rev = 0;
   }
-  static get ARP(){ return [0, 4, 7, 12, 7, 4]; }
+  static get ARP(){ return PitchFxCore._arp || (PitchFxCore._arp = [0, 4, 7, 12, 7, 4]); }   // (one array: the delay's arp mode read it every sample)
   static defaults(){ return {kind:0, mode:0, time:380, fb:0.45, pitch:12, pitch2:-12, tone:0.6, size:0.6, wow:0.2, mix:0.4}; }
   shift(s, x, ratio, win){   // one sample through pitch shifter s
     const b = s.b, N = 8192; b[s.w] = x;
@@ -7986,7 +7986,7 @@ class PitchFxCore {
     return y * 0.25;
   }
   process(Lb, Rb, n, p){
-    const sr = this.sr, mix = p.mix, rv = rvMix(mix), dry = p.kind | 0 ? rv[0] : 1 - mix * 0.5, wgm = rv[1], r1 = Math.pow(2, p.pitch / 12), r2 = Math.pow(2, p.pitch2 / 12), win = sr * 0.06;
+    const sr = this.sr, mix = p.mix, rv = rvMix(mix, this.rvo || (this.rvo = [0, 0])), dry = p.kind | 0 ? rv[0] : 1 - mix * 0.5, wgm = rv[1], r1 = Math.pow(2, p.pitch / 12), r2 = Math.pow(2, p.pitch2 / 12), win = sr * 0.06;
     const tc = 1 - Math.exp(-2 * Math.PI * (500 + p.tone * p.tone * 12000) / sr), mode = p.mode | 0, D = this.D;
     if (p.kind | 0){   // reverb
       // Size tops out at a ~7 s tail (it was 0.97, ~14 s), and the shimmer loop is scaled to stay under unity (measured: it rose at 0.45 of the old value, decays at 0.4): with large
@@ -17551,39 +17551,48 @@ class FlexCore {
   }
   // FLY's names, 00–FF (the flx param plays FLY v as 256 + v)
   static get NAMES2(){ if (FlexCore._N2) return FlexCore._N2; const T = FlexCore.SPEC(), N = ['OFF']; for (let v = 1; v < 256; v++) N[v] = T[256 + v] ? T[256 + v].n : 'OFF'; return (FlexCore._N2 = N); }
+  // Per-sample helpers, once (ext() / pat() run for every sample of a playing pattern: a closure or an array literal made in them was audio-thread garbage).
+  static cs(p, C){ return Math.floor(p / C + 1e-9) * C; }
+  static lr(v, t){ return v[0] + (v[1] - v[0]) * t; }
+  static eon(o, N, j){ return ((((j + o.rot) % N) * o.k) % N) < o.k; }
+  static get K(){ return FlexCore._K || (FlexCore._K = {tup:[0, 0, 1, 2, 3], mrr:['mute', 'rep', 'rat'], skp:['stuck', 'jump', 'drop', 'prev'], ste:[1/2, 1/3, 1/4, 1/6, 1/8, 1/12, 1/16],
+    tx4:['crush', 'lp', 'hp', 'chop'], tx3:['crush', 'lp', 'hp'], cp:[0.5, 0.75, 1.5, 2], p13:[0, 1, 2, 3, 4, 5, 2, 7, 8, 9, 10, 11, 8, 13, 6, 15]}); }
+  // the Flex filter's coefficients for cutoff f, into o (made once; they were a new array every 8 samples) and one sample through a filter stage (it was a closure made for every sample)
+  svc(o, f, nyq){ const gg = Math.tan(Math.PI * Math.min(nyq, f) / this.sr), kk = 1.1, a1 = 1 / (1 + gg * (gg + kk)); if (typeof o !== 'object') o = [0, 0, 0]; o[0] = a1; o[1] = gg * a1; o[2] = gg * gg * a1; return o; }
+  svf(fs, x, j, c, hi){ const v3 = x - fs[j + 1], v1 = c[0] * fs[j] + c[1] * v3, v2 = fs[j + 1] + c[1] * fs[j] + c[2] * v3; fs[j] = 2 * v1 - fs[j]; fs[j + 1] = 2 * v2 - fs[j + 1]; return hi ? x - 1.1 * v1 - v2 : v2; }
   static hh(a, b, c){ let h = Math.imul((a | 0) * 73856093 ^ (b | 0) * 19349663 ^ (c | 0) * 83492791, 2654435761) >>> 0; h ^= h >>> 15; h = Math.imul(h, 2246822519) >>> 0; h = (h ^ (h >>> 13)) >>> 0; return h / 4294967296; }
   // 17–255: sets this.pg (gain), this.plp / this.php (filter, 0–1; 1 / 0 = open), this.pcr / this.pbt (hold, bits; 1 / 0 = clean); returns the read position
   ext(k, p, bar){
     const o = (this.T || (this.T = FlexCore.SPEC()))[k]; let r = p, g = 1, lp = 1, hp = 0, cr = 1, bt = 0;
-    if (o){ const cs = C => Math.floor(p / C + 1e-9) * C;
+    if (o){
       switch (o.f){
         case 'roll': if (p >= o.s) r = o.s + (p - o.s) % o.L; break;
-        case 'stut': { const c = cs(o.C); r = c + (p - c) % o.L; } break;
+        case 'stut': { const c = FlexCore.cs(p, o.C); r = c + (p - c) % o.L; } break;
         case 'build': { let s = null; for (const q of o.sg) if (p >= q[0]) s = q; if (s) r = s[0] + (p - s[0]) % s[1]; } break;
-        case 'rev': { const C = o.C, c = cs(C), i = Math.round(c / C), u = p - c;
+        case 'rev': { const C = o.C, c = FlexCore.cs(p, C), i = Math.round(c / C), u = p - c;
           const on = o.m === 'all' || o.m === 'half' || (o.m === 'alt' && (i & 1)) || (o.m === 'last' && c >= 3 - 1e-9) || (o.m === 'rnd' && FlexCore.hh(i, k, 5) < 0.5);
           if (on) r = c - (o.m === 'half' ? u / 2 : u); } break;
         case 'down': if (p >= o.a){ const c = o.a + Math.floor((p - o.a) / o.C + 1e-9) * o.C; r = c + (p - c) * o.s; } break;
-        case 'up': { const C = o.C, c = cs(C), i = Math.round(c / C);
+        case 'up': { const C = o.C, c = FlexCore.cs(p, C), i = Math.round(c / C);
           if (!o.m || (o.m === 'last' && c >= 3 - 1e-9) || (o.m === 'alt' && (i & 1))) r = c - C * (o.s - 1) + (p - c) * o.s; } break;
-        case 'stop': { const a = o.C ? cs(o.C) : o.a, W = o.C || o.b - o.a;
+        case 'stop': { const a = o.C ? FlexCore.cs(p, o.C) : o.a, W = o.C || o.b - o.a;
           if (p >= a){ const u = Math.min(p - a, W); r = a + u - u * u / (2 * W); if (u > W * 0.85) g = Math.max(0, (W - u) / (W * 0.15)); } } break;
-        case 'start': { const a = o.C ? cs(o.C) : o.a, W = o.C || o.b - o.a;
+        case 'start': { const a = o.C ? FlexCore.cs(p, o.C) : o.a, W = o.C || o.b - o.a;
           // FLX CHECK 2 (5 Nov, owner: "FLX 76 sort of feels broken … flx lags"): the spin-up read the half-length before it
           // at 0 → 1× speed, so it never caught up: the rest of the bar (76 TAPE START BEAT 1, 77 HALF BAR) played straight
           // but 1/8 or a 1/4 late, and the EVERY versions only ever played the tail of the beat before. Now speed 4t − 3t²
           // (0 → peak 1.33× → 1×): it starts from the spin-up's own downbeat, never reads ahead (r ≤ p) and lands on the grid.
           if (p >= a && p < a + W){ const u = p - a, t = u / W; r = a + W * t * t * (2 - t); g = Math.min(1, u / (W * 0.2)); } } break;
         case 'wow': r = p - o.d * (1 - Math.cos(2 * Math.PI * p / o.T)) / 2 - (o.d2 ? o.d2 * (1 - Math.cos(2 * Math.PI * p / o.T2)) / 2 : 0); break;
-        case 'scr': { const C = o.C, c = cs(C), u = (p - c) / C; r = c - C * o.d + C * o.d * (1 - Math.cos(2 * Math.PI * o.k * u)) / 2;
+        case 'scr': { const C = o.C, c = FlexCore.cs(p, C), u = (p - c) / C; r = c - C * o.d + C * o.d * (1 - Math.cos(2 * Math.PI * o.k * u)) / 2;
           if (o.gt === 1) g = Math.sin(2 * Math.PI * o.k * u) >= 0 ? 1 : 0; else if (o.gt === 2) g = (p * 16) % 1 < 0.5 ? 1 : 0; } break;
         case 'gate': g = (p / o.g) % 2 < 1 ? 1 : 0; break;
         case 'pump': { const u = (p % o.C) / o.C; g = Math.min(1, u * 3); } break;
         case 'swell': g = (p % o.C) / o.C; break;
         case 'fade': g = 1 - p / 4; break;
         case 'mask': g = (o.m >> (15 - Math.min(15, Math.floor(p * 4)))) & 1; break;
-        case 'filt': { const t = o.a ? Math.max(0, (p - o.a) / (4 - o.a)) : p / 4, L = (v, t) => v[0] + (v[1] - v[0]) * t;
-          if (o.lp) lp = L(o.lp, t); if (o.hp) hp = L(o.hp, t);
+        case 'filt': { const t = o.a ? Math.max(0, (p - o.a) / (4 - o.a)) : p / 4;
+          if (o.lp) lp = FlexCore.lr(o.lp, t); if (o.hp) hp = FlexCore.lr(o.hp, t);
           if (o.lpw) lp = o.lpw[1] + o.lpw[2] * Math.cos(2 * Math.PI * p * o.lpw[0]);
           if (o.hpw) hp = Math.max(0, o.hpw[1] - o.hpw[2] * Math.cos(2 * Math.PI * p));
           if (o.bw){ hp = 0.05 + 0.7 * t; lp = hp + 0.25; }
@@ -17591,13 +17600,13 @@ class FlexCore {
         case 'crush': { let on = true;
           if (o.beats) on = o.beats.includes(Math.floor(p)); if (o.alt) on = Math.floor(p / o.alt) & 1; if (o.a) on = p >= o.a;
           if (on){ cr = o.hs ? o.hs[0] + (o.hs[1] - o.hs[0]) * p / 4 : o.h || 1; bt = o.b || 0; if (o.lp) lp = o.lp; } } break;
-        case 'echo': { const c = cs(o.C), n = Math.floor((p - c) / o.L + 1e-9); r = c + (p - c) - n * o.L; g = Math.pow(o.k, n); } break;
+        case 'echo': { const c = FlexCore.cs(p, o.C), n = Math.floor((p - c) / o.L + 1e-9); r = c + (p - c) - n * o.L; g = Math.pow(o.k, n); } break;
         case 'jug': { const G = o.G, per = Math.round(4 / G), s = Math.min(per - 1, Math.floor(p / G + 1e-9)), u = p - s * G;
           if (FlexCore.hh(o.seed, s, 11) < o.c){ let src = s - 1 - Math.floor(FlexCore.hh(o.seed, s, 23) * (per - 1)); const rv = FlexCore.hh(o.seed, s, 31) < o.rv;
             r = src * G + (rv ? G - u : u); } } break;
-        case 'swing': { const C = o.C, c = cs(C), u = (p - c) / C, h = 0.5 + o.a;
+        case 'swing': { const C = o.C, c = FlexCore.cs(p, C), u = (p - c) / C, h = 0.5 + o.a;
           r = c + C * (u < h ? u * 0.5 / h : 0.5 + (u - h) * 0.5 / (1 - h)); } break;
-        case 'tup': { const C = o.C, c = cs(C), u = (p - c) / C, j = Math.min(o.q - 1, Math.floor(u * o.q + 1e-9)), sj = o.q === 5 ? [0, 0, 1, 2, 3][j] : j;   // FLX CHECK 2: was [0,1,2,3,3]: notes 2–4 read ahead (clamped: mostly straight with jumps); now the downbeat doubles and 2–4 land late, as a quintuplet does
+        case 'tup': { const C = o.C, c = FlexCore.cs(p, C), u = (p - c) / C, j = Math.min(o.q - 1, Math.floor(u * o.q + 1e-9)), sj = o.q === 5 ? FlexCore.K.tup[j] : j;   // FLX CHECK 2: was [0,1,2,3,3]: notes 2–4 read ahead (clamped: mostly straight with jumps); now the downbeat doubles and 2–4 land late, as a quintuplet does
           r = c + C * (sj / 4 + (u - j / o.q)); } break;
         case 'drunk': { const s = Math.floor(p * 4); r = p - FlexCore.hh(bar & 3, s, 41) * 0.06; } break;
         case 'lag': r = (p % 1) >= 0.5 ? p - 1/16 : p; break;
@@ -17608,22 +17617,22 @@ class FlexCore {
         // ===== FLY (5 Nov): k 257–511. Each reads only what has played (r ≤ p); see the notes by SPEC's FLY families.
         case 'proll': if (p >= o.a){ const n = Math.floor((p - o.a) / o.L + 1e-9), u = p - o.a - n * o.L;   // repeat n: speed ≤ n + 1 keeps it behind now
           if (n > 0) r = o.a + u * Math.min(n + 1, Math.max(0.25, Math.pow(2, n * o.s / 12))); } break;
-        case 'euc': { const N = o.N, step = 4 / N, s = Math.min(N - 1, Math.floor(p / step + 1e-9)), on = j => ((((j + o.rot) % N) * o.k) % N) < o.k;
-          if (!o.h) g = on(s) ? 1 : 0;
-          else if (!on(s)){ let j = s - 1; while (j >= 0 && !on(j)) j--; if (j >= 0){ const c0 = j * step; r = c0 + (p - c0) % step; } } } break;
+        case 'euc': { const N = o.N, step = 4 / N, s = Math.min(N - 1, Math.floor(p / step + 1e-9));
+          if (!o.h) g = FlexCore.eon(o, N, s) ? 1 : 0;
+          else if (!FlexCore.eon(o, N, s)){ let j = s - 1; while (j >= 0 && !FlexCore.eon(o, N, j)) j--; if (j >= 0){ const c0 = j * step; r = c0 + (p - c0) % step; } } } break;
         case 'prob': { const G = o.G, s = Math.floor(p / G + 1e-9), c0 = s * G, u = p - c0, B = bar & 255;
-          if (FlexCore.hh(k, s, B * 13 + 1) < o.c){ let op = o.op; if (op === 'any') op = ['mute', 'rep', 'rat'][Math.floor(FlexCore.hh(k, s, B * 13 + 2) * 3)];
+          if (FlexCore.hh(k, s, B * 13 + 1) < o.c){ let op = o.op; if (op === 'any') op = FlexCore.K.mrr[Math.floor(FlexCore.hh(k, s, B * 13 + 2) * 3)];
             if (op === 'mute') g = 0; else if (op === 'rep') r = p - G; else r = c0 + u % (G / (o.x || 2 + Math.floor(FlexCore.hh(k, s, B * 13 + 3) * 3))); } } break;
         case 'spitch': { const G = o.G, s = Math.floor(p / G + 1e-9), c0 = s * G, u = p - c0, B = o.nb ? bar & 255 : 0;
           if (FlexCore.hh(k, s, B * 17 + 1) < o.c){ const sp = o.S[Math.floor(FlexCore.hh(k, s, B * 17 + 2) * o.S.length)]; r = sp > 1 ? c0 - G * (sp - 1) + u * sp : c0 + u * sp; } } break;
-        case 'frz': { let a, b; if (o.C){ const c = cs(o.C); a = c + o.h * o.C; b = c + o.C; } else { a = o.a; b = o.b; }
+        case 'frz': { let a, b; if (o.C){ const c = FlexCore.cs(p, o.C); a = c + o.h * o.C; b = c + o.C; } else { a = o.a; b = o.b; }
           if (p >= a && p < b && (o.pr >= 1 || FlexCore.hh(k, Math.round(a * 64), bar & 255) < o.pr)){ const u = p - a, w = o.sw ? o.w * (1 - o.sw * u / (b - a)) : o.w;
             r = a + Math.floor(u / w + 1e-9) * w * o.rho + u % w; } } break;
         case 'skip': { const G = o.G, s = Math.floor(p / G + 1e-9), c0 = s * G, u = p - c0, B = o.nb ? bar & 255 : 0;
-          if (FlexCore.hh(k, s, B * 19 + 1) < o.d){ const op = o.only || ['stuck', 'jump', 'drop', 'prev'][Math.floor(FlexCore.hh(k, s, B * 19 + 2) * 4)];
+          if (FlexCore.hh(k, s, B * 19 + 1) < o.d){ const op = o.only || FlexCore.K.skp[Math.floor(FlexCore.hh(k, s, B * 19 + 2) * 4)];
             if (op === 'stuck') r = c0 + u % (G / 8); else if (op === 'jump') r = p - G * (1 + Math.floor(FlexCore.hh(k, s, B * 19 + 3) * 3)) / 2;
             else if (op === 'drop') g = u < G * 0.35 ? 0 : 1; else r = c0 - G / 4 + u % (G / 4); } } break;
-        case 'bnc': { const a = o.C ? cs(o.C) : o.a, b = o.C ? a + o.C : 4;
+        case 'bnc': { const a = o.C ? FlexCore.cs(p, o.C) : o.a, b = o.C ? a + o.C : 4;
           if (p >= a && p < b){ const x = p - a, q = o.q, Lm = 1 / 128; let n, c;   // repeat n lasts L0·qⁿ (q < 1 faster, > 1 slower)
             if (q > 1){ n = Math.floor(Math.log(1 + x * (q - 1) / o.L0) / Math.log(q) + 1e-9); c = o.L0 * (Math.pow(q, n) - 1) / (q - 1); }
             else { const nm = Math.max(0, Math.ceil(Math.log(Lm / o.L0) / Math.log(q))), Sm = o.L0 * (1 - Math.pow(q, nm)) / (1 - q);
@@ -17637,14 +17646,14 @@ class FlexCore {
           if (FlexCore.hh(k, s, key * 7 + 11) < o.c){ const src = s - 1 - Math.floor(FlexCore.hh(k, s, key * 7 + 23) * (per - 1)), rv = FlexCore.hh(k, s, key * 7 + 31) < o.rv;
             r = src * G + (rv ? G - u : u); } } break;
         case 'sted': { const G = o.G, s = Math.floor(p / G + 1e-9), c0 = s * G, u = p - c0, B = o.nb ? bar & 255 : 0;
-          if (FlexCore.hh(k, s, B * 23 + 1) < o.d){ const Lr = G * [1/2, 1/3, 1/4, 1/6, 1/8, 1/12, 1/16][Math.floor(FlexCore.hh(k, s, B * 23 + 2) * 7)], n = Math.floor(u / Lr + 1e-9), v = u - n * Lr;
+          if (FlexCore.hh(k, s, B * 23 + 1) < o.d){ const Lr = G * FlexCore.K.ste[Math.floor(FlexCore.hh(k, s, B * 23 + 2) * 7)], n = Math.floor(u / Lr + 1e-9), v = u - n * Lr;
             r = c0 + v * (o.s && n > 0 ? Math.min(n + 1, Math.max(0.25, Math.pow(2, n * o.s / 12))) : 1);
             if (o.fd) g = Math.pow(o.fd, n); if (o.gt) g = v < Lr / 2 ? 1 : 0; } } break;
         case 'poly': if (p >= o.a){ const x = p - o.a, n = Math.floor(x / o.M + 1e-9), u = x - n * o.M; r = o.a + (o.pp && (n & 1) ? o.M - u : u); } break;
         case 'warp': { const G = o.G, s = Math.floor(p / G + 1e-9), c0 = s * G, u = p - c0, K = o.k;
           const up = o.d === 'UP' ? true : o.d === 'DOWN' ? false : o.d === 'ZIGZAG' ? !(s & 1) : FlexCore.hh(k, s, (bar & 255) * 29 + 1) < 0.5;
           r = up ? c0 + (1 - K) * u + K * u * u / G : c0 - K * G / 4 + (1 + K) * u - K * u * u / G; } break;   // up: slow → fast, lands on the grid; down: fast → slow
-        case 'rroll': if (o.m === 'rew'){ const a = o.C ? cs(o.C) + o.h * o.C : o.a, b = o.C ? cs(o.C) + o.C : 4;
+        case 'rroll': if (o.m === 'rew'){ const a = o.C ? FlexCore.cs(p, o.C) + o.h * o.C : o.a, b = o.C ? FlexCore.cs(p, o.C) + o.C : 4;
             if (p >= a && p < b){ r = a - o.k * (p - a); g = Math.min(1, (b - p) / ((b - a) * 0.1)); } }
           else if (p >= o.a){ const L = o.L, n = Math.floor((p - o.a) / L + 1e-9), u = p - o.a - n * L;
             if (n > 0){ const sp = o.s ? Math.max(0.25, Math.pow(2, n * o.s / 12)) : 1; r = o.m === 'rev' || (n & 1) ? o.a + L - u * sp : o.a + u;
@@ -17653,12 +17662,12 @@ class FlexCore {
           r = FlexCore.hh(k, j, B * 31 + 2) < o.rv ? p - off + w - 2 * u : p - off; if (o.gap && FlexCore.hh(k, j, B * 31 + 3) < o.gap) g = 0; } break;
         case 'tex': { const G = o.G, s = Math.floor(p / G + 1e-9), u = p - s * G, B = o.nb ? bar & 255 : 0;
           if (FlexCore.hh(k, s, B * 37 + 1) < o.d){ const h2 = FlexCore.hh(k, s, B * 37 + 2), h3 = FlexCore.hh(k, s, B * 37 + 3);
-            const op = o.set === 'all' ? ['crush', 'lp', 'hp', 'chop'][Math.floor(h2 * 4)] : o.set === 'cf' ? ['crush', 'lp', 'hp'][Math.floor(h2 * 3)] : o.set === 'filt' ? (h2 < 0.5 ? 'lp' : 'hp') : o.set;
+            const op = o.set === 'all' ? FlexCore.K.tx4[Math.floor(h2 * 4)] : o.set === 'cf' ? FlexCore.K.tx3[Math.floor(h2 * 3)] : o.set === 'filt' ? (h2 < 0.5 ? 'lp' : 'hp') : o.set;
             if (op === 'crush'){ cr = 3 + Math.floor(h3 * 22); bt = h3 < 0.5 ? 4 + Math.floor(h3 * 8) : 0; } else if (op === 'lp') lp = 0.2 + h3 * 0.35; else if (op === 'hp') hp = 0.5 + h3 * 0.3;
             else g = u < G * (0.25 + h3 * 0.4) ? 1 : 0; } } break;
         case 'chaos2': { const G = o.G, s = Math.floor(p / G + 1e-9), c0 = s * G, u = p - c0, B = o.nb ? (o.slow ? (bar >> 1) & 1 : bar & 255) : 0;
           if (FlexCore.hh(k, s, B * 41 + 1) < o.d){ const op = Math.floor(FlexCore.hh(k, s, B * 41 + 2) * 8), h3 = FlexCore.hh(k, s, B * 41 + 3);
-            if (op === 0){ const sp = [0.5, 0.75, 1.5, 2][Math.floor(h3 * 4)]; r = sp > 1 ? c0 - G * (sp - 1) + u * sp : c0 + u * sp; }   // pitch
+            if (op === 0){ const sp = FlexCore.K.cp[Math.floor(h3 * 4)]; r = sp > 1 ? c0 - G * (sp - 1) + u * sp : c0 + u * sp; }   // pitch
             else if (op === 1) r = c0 + u % (G / 8);            // freeze
             else if (op === 2) r = p - G / 2;                   // skip back
             else if (op === 3) r = c0 - u;                      // the slice before, backwards
@@ -17686,7 +17695,7 @@ class FlexCore {
       case 10: { const b = Math.floor(p * 2) / 2; u = (p - b) * 2; r = b + 0.105 * (1 - Math.cos(2 * Math.PI * u)); } break;
       case 11: g = p % 0.25 < 0.125 ? 1 : 0; break;
       case 12: g = (0xB6B6 >> (15 - Math.floor(p * 4))) & 1; break;
-      case 13: { const s = Math.floor(p * 4); r = [0, 1, 2, 3, 4, 5, 2, 7, 8, 9, 10, 11, 8, 13, 6, 15][s] * 0.25 + p % 0.25; } break;
+      case 13: { const s = Math.floor(p * 4); r = FlexCore.K.p13[s] * 0.25 + p % 0.25; } break;
       case 14: if (p >= 2) r = p - 2; break;
       case 15: r = Math.floor(p) - 1 + 2 * (p % 1); break;
       case 16: { const s = Math.floor(p * 4); let h = Math.imul((bar & 3) * 31 + s * 17 + 7, 2654435761) >>> 0; h ^= h >>> 13; h = h % 11; r = (s - (h < 4 ? 0 : h - 3)) * 0.25 + p % 0.25; } break;
@@ -17735,11 +17744,9 @@ class FlexCore {
       if (bt > 0){ const qz = Math.pow(2, bt - 1); yl = Math.round(yl * qz) / qz; yr = Math.round(yr * qz) / qz; }
       this.slp += (lp - this.slp) * fsk; this.shp += (hp - this.shp) * fsk;
       if (this.slp < 0.995 || this.shp > 0.005){
-        if (!(this.fk++ & 7)){ const sv = f => { const gg = Math.tan(Math.PI * Math.min(nyq, f) / this.sr), kk = 1.1, a1 = 1 / (1 + gg * (gg + kk)); return [a1, gg * a1, gg * gg * a1]; };
-          this.fa = sv(40 * Math.pow(2, this.slp * 9)); this.fb = sv(20 * Math.pow(2, this.shp * 9)); }
-        const svf = (x, j, c, hi) => { const v3 = x - fs[j + 1], v1 = c[0] * fs[j] + c[1] * v3, v2 = fs[j + 1] + c[1] * fs[j] + c[2] * v3; fs[j] = 2 * v1 - fs[j]; fs[j + 1] = 2 * v2 - fs[j + 1]; return hi ? x - 1.1 * v1 - v2 : v2; };
-        if (this.slp < 0.995){ yl = svf(yl, 0, this.fa, false); yr = svf(yr, 2, this.fa, false); }
-        if (this.shp > 0.005){ yl = svf(yl, 4, this.fb, true); yr = svf(yr, 6, this.fb, true); }
+        if (!(this.fk++ & 7)){ this.fa = this.svc(this.fa, 40 * Math.pow(2, this.slp * 9), nyq); this.fb = this.svc(this.fb, 20 * Math.pow(2, this.shp * 9), nyq); }
+        if (this.slp < 0.995){ yl = this.svf(fs, yl, 0, this.fa, false); yr = this.svf(fs, yr, 2, this.fa, false); }
+        if (this.shp > 0.005){ yl = this.svf(fs, yl, 4, this.fb, true); yr = this.svf(fs, yr, 6, this.fb, true); }
       } else if (fs[0] || fs[1] || fs[4]) fs.fill(0);
       L[i] += (yl * this.g - L[i]) * mix; R[i] += (yr * this.g - R[i]) * mix;
       this.w = w + 1 >= N ? 0 : w + 1;
@@ -17750,15 +17757,16 @@ class FlexCore {
    step 1 = the top bit); 1–15 are built in. */
 class StepGateCore {
   constructor(sr){ this.sr = sr; this.g = 1; }
-  static get PATS(){ return ['', 'xxxxxxxxxxxxxxxx', 'x.x.x.x.x.x.x.x.', '.x.x.x.x.x.x.x.x', 'x..x..x.x..x..x.', 'xx.xx.x.xx.xx.x.', 'x.xxx.x.x.xxx.xx', 'xxx.xxx.xxx.x.x.',
-    'x...x...x...x...', '..x...x...x...x.', 'x.x..x.x.x..x.x.', 'xxxx....xxxx....', 'xxxxxxxx........', 'x.xx.x.xx.xx.x.x', 'xx..xx..xx..x.x.', 'x..x.x..x..x.xx.']; }
+  static get PATS(){ return StepGateCore._P || (StepGateCore._P = ['', 'xxxxxxxxxxxxxxxx', 'x.x.x.x.x.x.x.x.', '.x.x.x.x.x.x.x.x', 'x..x..x.x..x..x.', 'xx.xx.x.xx.xx.x.', 'x.xxx.x.x.xxx.xx', 'xxx.xxx.xxx.x.x.',
+    'x...x...x...x...', '..x...x...x...x.', 'x.x..x.x.x..x.x.', 'xxxx....xxxx....', 'xxxxxxxx........', 'x.xx.x.xx.xx.x.x', 'xx..xx..xx..x.x.', 'x..x.x..x..x.xx.']); }   // (one array: process() read it every block)
+  static get SB(){ return StepGateCore._SB || (StepGateCore._SB = [0.5, 0.25, 0.125, 1 / 6, 1 / 3]); }
   static get NAMES(){ return ['CUSTOM', 'EVERY STEP', '8THS', 'OFFBEATS', '3-3-2', 'GALLOP', 'BROKEN', 'TRIPLE', 'QUARTERS', 'OFF 8THS', 'SYNCOPATE', 'HALF ON', 'FIRST HALF', 'DENSE', 'PAIRS', 'TRESILLO']; }
   static mask(s){ let m = 0; for (let j = 0; j < 16; j++) if (s[j] === 'x') m |= 1 << (15 - j); return m; }
   process(L, R, n, dp, tr){
     // tr.gat: −1 the slot's own (PATTERN, or waiting with STARTS ON GAT), 0 GAT 00 (off: the gate opens), 1–15 a pattern, 16 CUSTOM
     const g = tr && tr.gat >= 0 ? Math.round(tr.gat) : -1, bp = tr && tr.bp, wait = g === 0 || (g < 0 && dp.wait && !(tr && tr.sw > 0.5)), live = !wait && !!(bp && bp.length > 1), pi = g > 0 ? (g >= 16 ? 0 : g) : dp.pat | 0;
     const mask = pi === 0 ? ((dp.m1 & 255) << 8) | (dp.m2 & 255) : StepGateCore.mask(StepGateCore.PATS[pi]);
-    const sb = [0.5, 0.25, 0.125, 1 / 6, 1 / 3][dp.div | 0] || 0.25, len = dp.len, lo = 1 - dp.depth, tc = 1 - Math.exp(-1 / (this.sr * Math.max(0.0003, dp.smooth / 1000)));
+    const sb = StepGateCore.SB[dp.div | 0] || 0.25, len = dp.len, lo = 1 - dp.depth, tc = 1 - Math.exp(-1 / (this.sr * Math.max(0.0003, dp.smooth / 1000)));
     for (let i = 0; i < n; i++){
       const q = bp ? (live ? bp[i] : bp[0]) : -1; let tg = 1;
       if (live && q >= 0){ const sp = q / sb, st = Math.floor(sp + 1e-6), fr = sp - st, idx = ((st % 16) + 16) % 16; tg = ((mask >> (15 - idx)) & 1) && fr < len ? 1 : lo; }
@@ -22343,7 +22351,7 @@ function padBlink(e){
 // Phones and tablets (10 Nov): the audio-thread sequencer's module (a second thread) loads only when the owner picked it there
 // (aset.corePick, set in Settings); the saved default 'core' plays on the Page sequencer on such a device.
 function coreWanted(){ return aset.core === 'core' && (!wkLazy() || !!aset.corePick); }   // (a declaration: the Settings row reads it at load)
-const CORE_REV = '4wmvnw';
+const CORE_REV = '14fw8sq';
 const CORE_WANT = 7;   // the core's message set this page speaks (core-processor.js CORE_V); an older core is not used
 const CORE_URL = () => 'core/seq-core.js?v=' + BUILD + '-' + CORE_REV;
 const core = {node:null, ready:false, loading:null, gen:0, sent:new Map(), sT:0, tally:new Map(), mir:null};   // mir: what the core's song holds, as JSON per part (coreDiff)   // tally: events by who played them (test hook)
