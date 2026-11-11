@@ -57,6 +57,11 @@ class Auto {
   cancel(t){ this.ev = this.ev.filter(e => e.t < t); }
   // The value from time t on, when nothing moves it any more (a constant), else null: the sampler's fast path
   constFrom(t){ const A = this.ev; if (!A.length) return this.v0; const e = A[A.length - 1]; return e.t <= t && (e.k === 0 || e.k === 1) ? e.v : null; }
+  // The value over the whole block [t, t1], when nothing moves it inside the block, else null (11 Nov, profile: constFrom only says
+  // "constant" once the LAST event is over, and the sequencer books events 0.25 s ahead, so the fast paths almost never ran
+  // while a song played: gains, pans and rates were worked out per sample). Only set / ramp-end points before t count; a target
+  // or curve before t, an event inside the block, or a ramp still running to a later point: null (the per-sample path).
+  constBlk(t, t1){ const A = this.ev; let v = this.v0, i = 0; for (; i < A.length && A[i].t <= t; i++){ const e = A[i]; if (e.k > 1) return null; v = e.v; } if (i < A.length){ const e = A[i]; if (e.t <= t1 || e.k === 1) return null; } return v; }
   hold(t){ const v = this.at(t); this.cancel(t); this.set(v, t); }
   // Drop what is over by time t (the beat clock gets an event a step for as long as the song plays)
   // Every block (owner, Fold: it sped up and glitched after playing a while: the lists grew to ~50 events each, and each
@@ -123,8 +128,9 @@ globalThis.__tcOv = (proc, P, n) => {
   for (const k in P){ const A = ov.p.get(k); if (!A){ Q[k] = P[k]; continue; }
     A.prune(currentTime);
     const src = P[k], b = ov.buf.get(k) && ov.buf.get(k).length === n ? ov.buf.get(k) : (ov.buf.set(k, new Float32Array(n)), ov.buf.get(k));
-    const c = A.from > currentTime + n * dt ? null : A.constFrom(currentTime);
-    if (A.from <= currentTime && c != null){ const a1 = O1[k] || (O1[k] = [0]); a1[0] = c; Q[k] = a1; continue; }
+    const c = A.from > currentTime + n * dt ? null : A.constBlk(currentTime, currentTime + n * dt);
+    // (fround: where the old test said "not constant" the value went through the Float32 block; keep the very same number)
+    if (A.from <= currentTime && c != null){ const a1 = O1[k] || (O1[k] = [0]); a1[0] = A.constFrom(currentTime) != null ? c : Math.fround(c); Q[k] = a1; continue; }
     for (let i = 0; i < n; i++){ const t = currentTime + i * dt; b[i] = t < A.from ? (src.length > 1 ? src[i] : src[0]) : A.at(t); }
     Q[k] = b; }
   for (const k in Q) if (!(k in P)) delete Q[k];
@@ -133,7 +139,12 @@ globalThis.__tcOv = (proc, P, n) => {
 globalThis.__tcPost = (proc, o) => {
   const ov = proc.__ov; if (!ov || !ov.post || !o || !o[0]) return; const L = o[0], R = o[1] || null, n = L.length, dt = 1 / sampleRate;
   ov.g.prune(currentTime); ov.pn.prune(currentTime);
-  const gc = ov.g.constFrom(currentTime), pc = ov.pn.constFrom(currentTime);
+  const gc = ov.g.constBlk(currentTime, currentTime + n * dt), pc = ov.pn.constBlk(currentTime, currentTime + n * dt);
+  // Gain and pan both still for this block, stereo: the same sums with the pan's cos / sin worked out once, not per sample
+  if (gc != null && pc != null && R){
+    if (pc <= 0){ const x = (pc + 1) * Math.PI / 2, cx = Math.cos(x), sx = Math.sin(x); for (let i = 0; i < n; i++){ const l = L[i] * gc, r = R[i] * gc; L[i] = l + r * cx; R[i] = r * sx; } }
+    else { const x = pc * Math.PI / 2, cx = Math.cos(x), sx = Math.sin(x); for (let i = 0; i < n; i++){ const l = L[i] * gc, r = R[i] * gc; L[i] = l * cx; R[i] = r + l * sx; } }
+    return; }
   for (let i = 0; i < n; i++){
     const t = currentTime + i * dt, g = gc != null ? gc : ov.g.at(t), p = pc != null ? pc : ov.pn.at(t);
     const l = L[i] * g, r = (R ? R[i] : L[i]) * g;
@@ -356,7 +367,7 @@ class ThunderCore extends AudioWorkletProcessor {
     if (M) this.mixFill(M[0], this.mm, 0, N, dt);
     if (O) this.mixFill(O[0], this.mo, 0, N, dt);
   }
-  mixFill(C, A, d, N, dt){ if (!C) return; if (!A){ C.fill(d); return; } A.prune(currentTime); const c = A.constFrom(currentTime); if (c != null){ C.fill(c); return; } for (let i = 0; i < N; i++) C[i] = A.at(currentTime + i * dt); }   // (a method: no closure per block)
+  mixFill(C, A, d, N, dt){ if (!C) return; if (!A){ C.fill(d); return; } A.prune(currentTime); const c = A.constBlk(currentTime, currentTime + N * dt); if (c != null){ C.fill(c); return; } for (let i = 0; i < N; i++) C[i] = A.at(currentTime + i * dt); }   // (a method: no closure per block)
   play(d){
     const ms0 = Date.now(), at0 = currentTime;   // PLAYBACK REPORT: how late this PLAY reached the audio thread, and how long it took
     this.stopAll(currentTime); this.mixReset(); this.clkOn = false; this.clk.cancel(currentTime); this.clk.set(0, currentTime);
@@ -751,7 +762,7 @@ class ThunderCore extends AudioWorkletProcessor {
       if (v.sf){ this.sfRun(v, out, N); if (v.ended){ this.alive.delete(v); const T = this.vs[v.track]; if (T){ const q = T.indexOf(v); if (q >= 0) T.splice(q, 1); } } continue; }   // SOUNDFONTS
       const L = out[0], R = out[1] || out[0], D = v.data, RD = v.rd, len = RD ? RD.N : D.length, inc0 = v.sr / sr;
       // FAST PATH (the usual case: a note that is just playing): gain, fade, pan and pitch don't move in this block
-      const gc = v.trm ? null : v.g.constFrom(tb0), fc = v.f.constFrom(tb0), pc = v.apn ? null : v.pn.constFrom(tb0), rc = v.r.constFrom(tb0);
+      const gc = v.trm ? null : v.g.constBlk(tb0, tb1), fc = v.f.constBlk(tb0, tb1), pc = v.apn ? null : v.pn.constBlk(tb0, tb1), rc = v.r.constBlk(tb0, tb1);
       if (gc != null && fc != null && pc != null && rc != null && v.t0 <= tb0 && v.end >= tb1){
         const k = gc * fc, a = (pc + 1) * Math.PI / 4, kl = k * Math.cos(a), kr = k * Math.sin(a), inc = rc * inc0; let p = v.pos;
         if (RD){ const st = !RD.tw && v.data2, [ll, rl, lr, rr] = st ? stBal(pc) : ZERO4;   // REVERSED / SHAPED (Rd): the same, read through the reader
