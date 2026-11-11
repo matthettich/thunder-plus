@@ -7,9 +7,9 @@ const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/ja
 export const sleep = ms => new Promise(r => setTimeout(r, ms));
 export function serve(overrides = {}) {   // overrides: { '/core/seq-core.js': '/abs/path/to/a/changed/copy.js' }: a changed copy is served in place of the repo's file; the repo is never edited
   const srv = http.createServer((q, r) => { let p = decodeURIComponent(new URL(q.url, 'http://x').pathname); if (p.endsWith('/')) p += 'index.html';
-    const f = overrides[p] || path.normalize(path.join(ROOT, p)); if (!overrides[p] && !f.startsWith(ROOT)) { r.writeHead(404); return r.end(); }
+    const f = overrides[p] || path.normalize(path.join(ROOT, p)); if (!overrides[p] && f !== ROOT && !f.startsWith(ROOT + path.sep)) { r.writeHead(404); return r.end(); }
     fs.readFile(f, (e, d) => { if (e) { r.writeHead(404); return r.end(); } r.writeHead(200, { 'content-type': TYPES[path.extname(f)] || 'application/octet-stream' }); r.end(d); }); });
-  return new Promise(ok => srv.listen(0, () => ok({ srv, port: srv.address().port })));
+  return new Promise(ok => srv.listen(0, '127.0.0.1', () => ok({ srv, port: srv.address().port })));
 }
 export async function launch(extra = []) {
   const bin = '/opt/pw-browsers/chromium-1243/real/chrome-linux64/chrome', dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cpchrome-'));
