@@ -179,6 +179,8 @@ class Compressor {
     this.hpOn = (this.p.hpf || 0) > 15;
   }
   hpOne(st, x){ const h = this.hc; const y = h.b0 * x + h.b1 * st.x1 + h.b2 * st.x2 - h.a1 * st.y1 - h.a2 * st.y2; st.x2 = st.x1; st.x1 = x; st.y2 = st.y1; st.y1 = y; return y; }
+  // SILENCE SHORTCUT: its detector filter is dead and its gain reduction is gone (below 1e-12 dB)
+  quiet(){ if (!(this.gr > -1e-12)) return false; for (let c = 0; c < 2; c++){ const h = this.hp[c]; if (!(Math.abs(h.x1) < 1e-20 && Math.abs(h.x2) < 1e-20 && Math.abs(h.y1) < 1e-20 && Math.abs(h.y2) < 1e-20)) return false; } return true; }
   curve(x){   // static curve: dB in → dB of gain change (≤ 0), soft knee
     const {thr, ratio, knee} = this.p, s = 1 - 1 / ratio, o = x - thr;
     if (knee > 0 && Math.abs(o) <= knee / 2) return -s * (o + knee / 2) * (o + knee / 2) / (2 * knee);
@@ -227,8 +229,8 @@ class Limiter {
   tpPeak(h){
     // Catmull-Rom between h[1] and h[2] at 1/4, 1/2, 3/4 (a 4x oversampled estimate of intersample peaks)
     let m = Math.max(Math.abs(h[1]), Math.abs(h[2]));
-    for (const t of [.25, .5, .75]){
-      const t2 = t * t, t3 = t2 * t;
+    for (let q = 1; q < 4; q++){   // (no array literal here: this runs twice a sample and an array a call fed the scavenger)
+      const t = q * .25, t2 = t * t, t3 = t2 * t;
       const v = 0.5 * ((2 * h[1]) + (-h[0] + h[2]) * t + (2 * h[0] - 5 * h[1] + 4 * h[2] - h[3]) * t2 + (-h[0] + 3 * h[1] - 3 * h[2] + h[3]) * t3);
       if (Math.abs(v) > m) m = Math.abs(v);
     }
@@ -288,6 +290,9 @@ class Loudness {
       if (++this.cnt >= this.blk){ this.hist[this.hi] = this.acc / this.cnt; this.hi = (this.hi + 1) % 30; this.filled = Math.min(30, this.filled + 1); this.acc = 0; this.cnt = 0; }
     }
   }
+  // SILENCE SHORTCUT: the filters' states are dead (below -400 dB), so exact silence adds nothing: only the 100 ms block clock runs on
+  quiet(){ for (let c = 0; c < 2; c++) for (let k = 0; k < 2; k++){ const s = this.st[c][k]; if (!(Math.abs(s.x1) < 1e-20 && Math.abs(s.x2) < 1e-20 && Math.abs(s.y1) < 1e-20 && Math.abs(s.y2) < 1e-20)) return false; } return true; }
+  skip(n){ while (n > 0){ const t = Math.min(n, this.blk - this.cnt); this.cnt += t; n -= t; if (this.cnt >= this.blk){ this.hist[this.hi] = this.acc / this.cnt; this.hi = (this.hi + 1) % 30; this.filled = Math.min(30, this.filled + 1); this.acc = 0; this.cnt = 0; } } }
   shortTerm(){ if (!this.filled) return -Infinity; let s = 0; for (let i = 0; i < this.filled; i++) s += this.hist[i]; const ms = s / this.filled; return ms > 0 ? -0.691 + 10 * Math.log10(ms) : -Infinity; }
 }
 
@@ -299,14 +304,17 @@ class MasterProcessor extends AudioWorkletProcessor {
     this.inLu = new Loudness(sampleRate); this.outLu = new Loudness(sampleRate);
     this.on = {sup:false, comp:false, lim:false}; this.meters = o.meters !== false;
     this.L = new Float32Array(128); this.R = new Float32Array(128);
-    this.inPk = 0; this.outPk = 0; this.tpMax = 0; this.compGr = 0; this.n = 0;
+    this.inPk = 0; this.outPk = 0; this.tpMax = 0; this.compGr = 0; this.n = 0; this.zr = 0; this.sk = 0;
     if (o.set) this.apply(o.set);
     this.port.onmessage = e => { const d = e.data || {}; if (d.set) this.apply(d.set); if (d.resetPeak) this.tpMax = 0; if (d.dispose) this.dead = true; };
   }
   apply(s){
-    if (s.sup){ this.on.sup = !!s.sup.on; this.sup.set(s.sup); }
-    if (s.comp){ this.on.comp = !!s.comp.on; this.comp.set(s.comp); }
-    if (s.lim){ this.on.lim = !!s.lim.on; this.lim.set(s.lim); }
+    // A NaN / Infinity setting (or a compressor ratio of 0 or less) would poison a stage's state for good, so such a value is
+    // ignored and the stage keeps its previous one. Finite settings go through unchanged.
+    const fin = o => { const r = {}; for (const k in o){ const v = o[k]; if (typeof v !== 'number' || (v - v) === 0) r[k] = v; } return r; };
+    if (s.sup){ this.on.sup = !!s.sup.on; const u = fin(s.sup); if (!(u.lo > 0)) delete u.lo; if (!(u.hi > 0)) delete u.hi; this.sup.set(u); }   // (lo / hi go through log2 in setFocus: zero or less is kept out too)
+    if (s.comp){ this.on.comp = !!s.comp.on; const c = fin(s.comp); if (!(c.ratio > 0)) delete c.ratio; this.comp.set(c); }
+    if (s.lim){ const was = this.on.lim; this.on.lim = !!s.lim.on; this.lim.set(fin(s.lim)); if (this.on.lim && !was) this.zr = 0; }   // (review: a limiter switched on must run its lookahead empty before the silence shortcut may freeze it)
   }
   process(inputs, outputs){
     if (this.dead) return false;   // replaced by a new chain: let the browser collect this node
@@ -315,21 +323,35 @@ class MasterProcessor extends AudioWorkletProcessor {
     const a = inp && inp[0], b = inp && (inp[1] || inp[0]);
     const t0 = Date.now();
     if (a){ L.set(a); R.set(b); } else { L.fill(0); R.fill(0); }
-    let ip = 0; for (let i = 0; i < n; i++){ const v = Math.max(Math.abs(L[i]), Math.abs(R[i])); if (v > ip) ip = v; }
+    // One NaN or Infinity sample would poison the compressor's gain and the suppressor's spectrum for good (and a block of it
+    // would reach the output), so a sample outside (-64, 64) or not a number is replaced by silence, in this same loop.
+    // SILENCE SHORTCUT (a stopped song, nothing playing): input exactly zero for longer than the limiter's lookahead, and every stage's tail dead
+    // (limiter gain back at 1, compressor reduction gone, meter filters dead, no suppressor): the output is silence, so skip the sample loops.
+    // Wakes in the very block a sample arrives. Stage states are within 1e-9 of rest then, not bit-for-bit: a float32 rounding at most.
+    let sil = false;
+    if (a && this.zr >= this.lim.L + 8 && !this.on.sup && (!this.on.lim || this.lim.env > 1 - 1e-9) && (!this.on.comp || this.comp.quiet()) && (!this.meters || (this.inLu.quiet() && this.outLu.quiet()))){
+      sil = true; for (let i = 0; i < n; i++) if (a[i] !== 0 || b[i] !== 0) { sil = false; break; }
+    }
+    let ip = 0, op = 0;
+    if (sil){ this.sk++; out[0].fill(0); if (out[1]) out[1].fill(0); this.zr += n; if (this.on.comp) this.comp.load *= Math.pow(1 - 0.00002, n); if (this.meters){ this.inLu.skip(n); this.outLu.skip(n); } }
+    else {
+    for (let i = 0; i < n; i++){ let x = L[i], y = R[i]; if (!(x > -64 && x < 64)) L[i] = x = 0; if (!(y > -64 && y < 64)) R[i] = y = 0; const v = Math.max(Math.abs(x), Math.abs(y)); if (v > ip) ip = v; }
     if (this.meters) this.inLu.process(L, R, n);
     if (this.on.sup) this.sup.process(L, R, n);
     if (this.on.comp){ this.comp.process(L, R, n); }
     if (this.on.lim) this.lim.process(L, R, n);
-    let op = 0; for (let i = 0; i < n; i++){ const v = Math.max(Math.abs(L[i]), Math.abs(R[i])); if (v > op) op = v; }
+    for (let i = 0; i < n; i++){ const v = Math.max(Math.abs(L[i]), Math.abs(R[i])); if (v > op) op = v; }
     out[0].set(L); if (out[1]) out[1].set(R);
+    this.zr = ip === 0 ? this.zr + n : 0;   // (the zero run the shortcut waits for: the limiter's lookahead must be empty)
+    }
     // Its share of real time, averaged over half a second (Date.now() is coarse), for the CPU meter.
     this.ms = (this.ms || 0) + Date.now() - t0; this.fr = (this.fr || 0) + n;
     if (this.fr >= sampleRate / 2){ this.load = this.ms / (this.fr / sampleRate * 1000); this.ms = 0; this.fr = 0; }
     if (this.meters){
-      this.outLu.process(L, R, n);
+      if (!sil) this.outLu.process(L, R, n);
       this.inPk = Math.max(this.inPk, ip); this.outPk = Math.max(this.outPk, op); this.tpMax = Math.max(this.tpMax, op);
       this.compGr = Math.min(this.compGr, this.on.comp ? this.comp.gr : 0);
-      if (++this.n >= Math.round(sampleRate / 128 / 20)){
+      if ((this.n += n / 128) >= Math.round(sampleRate / 128 / 20)){
         this.n = 0;
         this.port.postMessage({meter:{inPk:this.inPk, outPk:this.outPk, tp:this.tpMax, inLu:this.inLu.shortTerm(), outLu:this.outLu.shortTerm(),
           load:this.load || 0, comp:this.compGr, compIn:this.on.comp ? this.comp.detMax : -200, lim:this.on.lim ? linToDb(this.lim.grMin) : 0, sup:this.on.sup ? this.sup.bands(48) : null}});

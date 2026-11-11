@@ -6,7 +6,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="chains">
-<title>…chains</title>
+<title>chains</title>
 <link rel="manifest" href="./manifest.webmanifest">
 <link rel="icon" href="./icons/icon-192.png">
 <link rel="apple-touch-icon" href="./icons/icon-192.png">
@@ -15,7 +15,7 @@
 @font-face{font-family:Jost;src:url('./fonts/Jost-500.woff') format('woff');font-weight:500;font-display:swap}
 @font-face{font-family:Jost;src:url('./fonts/Jost-600.woff') format('woff');font-weight:600;font-display:swap}
 @font-face{font-family:Jost;src:url('./fonts/Jost-700.woff') format('woff');font-weight:700;font-display:swap}
-/* ═══ …chains skin: the Minimal skin of ...Seeds (white, square, line art) ═══ */
+/* ═══ chains skin: the Minimal skin of Seeds (white, square, line art) ═══ */
 :root{
   --bench:#ffffff; --panel:#ffffff; --panel-2:#f3f3f3; --edge:#111111; --ink:#111111; --muted:#555555; --track:#e6e6e6;
   --side:#efefef; --frame:#efefef; --glass:#050607;
@@ -41,7 +41,7 @@ button{cursor:pointer}
 .bar h1{font-size:19px; font-weight:600; margin:0 6px 0 0; letter-spacing:-.01em}
 .bar .spacer{flex:1}
 .embed .bar h1{display:none}
-/* a control that is in …Thunder Plus's bottom panel: a small dot before its name */
+/* a control that is in Thunder Plus's bottom panel: a small dot before its name */
 .row.indeck > .lbl::before{content:''; display:inline-block; width:6px; height:6px; margin:0 5px 1px 0; border-radius:50%; background:var(--mod, #8a63d8); vertical-align:middle}
 .embed .setwrap{display:none}   /* File/Settings live in the app's top bar when embedded */
 .embed #cpuv{display:none}   /* the app's top bar owns the CPU readout */
@@ -91,7 +91,7 @@ button{cursor:pointer}
 .ctxitem:disabled{opacity:.4}
 
 /* ---------- layout ---------- */
-/* The bar under the patch: the same darker grey as the tracker's control bar in ...Thunder Plus. */
+/* The bar under the patch: the same darker grey as the tracker's control bar in Thunder Plus. */
 .split{display:grid; grid-template-columns:38px minmax(0,1fr); min-height:0; border-bottom:10px solid color-mix(in srgb, var(--side) 84%, #000)}
 .split > *{border-bottom:1px solid #111}
 
@@ -299,7 +299,7 @@ document.addEventListener('contextmenu', e => { if (e.cancelable && !(e.target.c
 </head><body>
 
 <div class="bar">
-    <h1>…chains</h1>
+    <h1>chains</h1>
   <input id="pname" class="pname" aria-label="Patch name" maxlength="60" spellcheck="false">
   <span class="vsep" aria-hidden="true"></span>
   <div class="setwrap"><button class="tb" id="filebtn" aria-haspopup="true">File ▾</button>
@@ -320,16 +320,16 @@ document.addEventListener('contextmenu', e => { if (e.cancelable && !(e.target.c
     <div class="setmenu" id="setmenu" hidden>
       <div class="setsec">
         <label class="setrow"><input type="checkbox" id="settips"><span><b>Show tips</b><br><span class="setsub">The help note in the corner of the patch.</span></span></label>
-        <label class="setrow"><input type="checkbox" id="setkeys" hidden><span hidden><b>On-screen keys</b><br><span class="setsub">Not used in …chains.</span></span></label>
+        <label class="setrow"><input type="checkbox" id="setkeys" hidden><span hidden><b>On-screen keys</b><br><span class="setsub">Not used in chains.</span></span></label>
       </div>
       <div class="setsec">
         <div class="sethead">Sound</div>
         <label class="setsel"><span>Quality</span><select id="setquality"><option value="full">Full quality</option><option value="draft">Draft (lighter on the CPU)</option></select></label>
         <label class="setsel"><span>Tempo</span><span><input type="number" id="settempo" class="numsmall" min="20" max="300" step="0.1"> BPM</span></label>
-        <div class="setsub">Tempo drives synced LFOs and delays. When the CPU gets too busy, …chains drops to draft quality by itself.</div>
+        <div class="setsub">Tempo drives synced LFOs and delays. When the CPU gets too busy, chains drops to draft quality by itself.</div>
         <div class="sethead">MIDI</div>
         <label class="setsel"><span>Controller</span><select id="setmidiin"><option value="all">All connected MIDI inputs</option></select></label>
-        <div class="setsub" id="setmidiinfo">CC from this controller controls …chains sliders (MIDI learn).</div>
+        <div class="setsub" id="setmidiinfo">CC from this controller controls chains sliders (MIDI learn).</div>
       </div>
       <div class="setsec">
         <div class="sethead">Backups</div>
@@ -338,7 +338,7 @@ document.addEventListener('contextmenu', e => { if (e.cancelable && !(e.target.c
       </div>
     </div>
   </div>
-  <button class="tb" id="helpbtn" title="How to use …chains, and every module explained">Help</button>
+  <button class="tb" id="helpbtn" title="How to use chains, and every module explained">Help</button>
   <input type="file" id="fileload" accept=".json,application/json" hidden>
   <div class="spacer"></div>
   <span class="fps" id="cpuv" title="How busy the sound engine is">CPU –</span>
@@ -369,15 +369,15 @@ document.addEventListener('contextmenu', e => { if (e.cancelable && !(e.target.c
 <div class="learnbar" id="learnbar" hidden><span id="learntext"></span><button class="tb" id="learndone">Done</button></div>
 <div class="ctxmenu" id="ctxmenu" hidden role="menu"></div>
 <script type="module">
-/* ═══ …chains ═══
-   A patch page like …waves (the Patch page of ...Seeds, Minimal skin): module list on the
+/* ═══ chains ═══
+   A patch page like waves (the Patch page of Seeds, Minimal skin): module list on the
    left, modules with jacks on the edges, straight colored cables, right-click menu, lasso,
    pan and zoom. The sound engine lives in chains-worklet.js; this page only edits the patch
    document and sends changes to it through ChainsBridge.
    Phase 1 is UI-only: Track In modules are silence standalone; the host wires
    tracker audio in Phase 2. */
 // CHAN_COUNT: the tracks a patch can address (as the engine, 128 since 20 Oct). TRK_N: how many the pickers list, the
-// host app's track count (...Thunder Plus says, thunderChains.tracks), else 32. NSEND: Sidechain Out's sends.
+// host app's track count (Thunder Plus says, thunderChains.tracks), else 32. NSEND: Sidechain Out's sends.
 const PROTOCOL = 2, TARGET = 'chains', CHAN_COUNT = 128, NSEND = 8;
 const TRK_N = (() => { try { const w = window.parent !== window && window.parent.thunderChains; return w && w.tracks > 0 ? Math.min(CHAN_COUNT, w.tracks | 0) : 32; } catch (e) { return 32; } })();
 const trackOpts = () => Array.from({length:TRK_N}, (_, i) => [i + 1, 'Track ' + (i + 1)]);
@@ -402,9 +402,9 @@ const MIXP = { mix:{l:'Mix', f:wet} };
 
 /* ===SHARED EDITOR START===
    The same in chains/index.html and waves/index.html: the editor side of the shared modules (see the SHARED MODULES
-   block in the worklets). Edit it here, in …chains, and run tools/sync-shared.py to copy it into …waves. */
+   block in the worklets). Edit it here, in chains, and run tools/sync-shared.py to copy it into waves. */
 // SOURCE (21 Oct): what a compressor, gate or envelope filter listens to (sck): Self, Send 1–8 (a Sidechain Out) or a
-// track's own sound. …waves has no tracks or sends (TRK_N isn't defined there), so it lists only Self.
+// track's own sound. waves has no tracks or sends (TRK_N isn't defined there), so it lists only Self.
 const SCK_OPTS = self => [[0, self], ...(typeof TRK_N === 'number' ? [...Array.from({length:8}, (_, k) => [k + 1, 'Send ' + (k + 1)]), ...Array.from({length:TRK_N}, (_, k) => [k + 9, 'Track ' + (k + 1)])] : [])];
 const SCK_P = [0,0,136,1];
 const SHARED_FAMILY = {};
@@ -508,7 +508,7 @@ const SHARED_ABOUT = {
   ott:'Multiband squash: splits the sound into low, mid and high and pushes each toward the same level, lifting quiet detail and pressing loud parts down, the hyped OTT sound. Depth sets how much.',
   fshift:'Frequency shifter: moves every partial by the same number of Hz (unlike pitch shift), so sounds go inharmonic, metallic or barber-pole with Feedback.',
   vinyl:'Vinyl (based on Airwindows ToVinyl4): the low end narrowed and filtered as a record lathe needs, the top limited, and groove wear.',
-  dub:'Dub tape (based on Airwindows Dubly): the encode/decode squash of an old tape noise reducer, for dense, colourful dub-style saturation.',
+  dub:'Dub tape (based on Airwindows Dubly): the encode/decode squash of an old tape noise reducer, for dense, colorful dub-style saturation.',
   cab:'Speaker cab (based on Airwindows Cabs): guitar and bass cabinet models with room sound and off-axis tone.',
   tube:'Tube (based on Airwindows Tube2): warm tube-style saturation; Tube adds the asymmetric character.',
   flanger:'Flanger (based on DaisySP): a short modulated delay with feedback, from gentle jet sweeps to metallic swooshes.',
@@ -527,14 +527,14 @@ const SHARED_ABOUT = {
   envfol:'Turns sound into modulation: the louder the input, the higher the output. Attack and Release set how quickly it follows; Gate level sets where its gate output turns on. Patch the output into any slider’s modulation jack (a filter’s cutoff, say) and the sound drives it.',
   gateex:'Turns sound into a gate: on while the input stays above Threshold, off when it falls (Hysteresis stops it chattering). Env is a smoothed version. Use it to trigger envelopes, clocks or Sample & Hold from audio.',
   pitchtrk:'Tracks the pitch of a monophonic sound (a voice, a bass line, a whistle) more steadily than Pitch Follow, and gives it as Pitch (glides) and Note (snapped to the nearest semitone), both 0.5 = A4 and one octave = 0.125, plus Gate while it hears a pitch, Trig on each new note and Env, the level. Patch Note into an oscillator\u2019s pitch to double a voice, Trig into an envelope, or Pitch into a filter so it follows the singer. Transpose shifts both.',
-  pitchfol:'Follows the pitch of a monophonic sound and outputs it as modulation (0.5 = A4, one octave = 0.125), plus a voiced Gate. Best on simple tones. Patch it into an oscillator’s pitch on …waves, or into a Quantizer here.',
+  pitchfol:'Follows the pitch of a monophonic sound and outputs it as modulation (0.5 = A4, one octave = 0.125), plus a voiced Gate. Best on simple tones. Patch it into an oscillator’s pitch on waves, or into a Quantizer here.',
   slew:'Slows a modulation signal down, with separate Rise and Fall times. Smooths stepped or jittery control voltages.',
   snh:'Sample & Hold: takes a snapshot of the input on a Trigger rising edge (or at Rate) and holds it; Noise outputs a matching random step. Patch a stepped sequence into a filter for classic sample-and-hold sweeps.',
   quant:'Snaps a pitch modulation signal to the nearest note of a Scale (pitch CV: 0.5 = A4). Transpose shifts it in semitones; Depth scales the output.',
   blades:'A multimode filter that can be gentle or driven. Cutoff, Resonance and Drive, Mode picks low-pass, band-pass, high-pass or notch, and Slope picks 2-pole or 4-pole (steeper). Patch modulation into Cutoff for sweeps; a resonance CV jack is on the slider too.',
   meta:'Takes two sounds and combines them. Crossfade blends In and Mod, Ring mod multiplies them (bell-like sums), Wave fold bends In through a sine shaper (Amount sets the folding), and Comparator flips In’s sign with Mod — audio-rate logic. Mix sets the dry/wet.',
   phaser:'Sweeps notches through the sound: Stages sets how deep the notches are, Rate (or Sync to tempo) sweeps them, Depth and Feedback set how far and how sharp, and a CV input drives the sweep too.',
-  width:'Sets the stereo width from mono (0%) through normal (100%) to extra-wide (200%) with a mid/side control. Bass mono collapses the low end to the centre so wide sounds keep their punch. In R is optional.',
+  width:'Sets the stereo width from mono (0%) through normal (100%) to extra-wide (200%) with a mid/side control. Bass mono collapses the low end to the center so wide sounds keep their punch. In R is optional.',
   pingpong:'A stereo delay that bounces left to right. Sync to tempo picks a Division (1/16…1 bar), or turn Sync off and set Time. Repeats, Tone and Mix shape it. In R is optional.',
 };
 /* New modules (Oct 2026): utilities, reverbs, chorus, ring mod and rhythm. */
@@ -545,7 +545,7 @@ Object.assign(SHARED_MODULES, {
     ui:{ input:{l:'Input', f:db}, ceil:{l:'Ceiling', f:db}, rel:{l:'Release', f:secs} }, display:'dyn',
     about:'Limiter: a peak limiter with a 2 ms look-ahead, so nothing gets past Ceiling. Input pushes the sound into it for more loudness; Release sets how fast it lets go. The display shows the curve (Input up to Ceiling), the levels in and out and the gain reduction.' }, STEREO),
   utility:Object.assign({ label:'Utility', scope:'mono', params:{ gain:[0,-60,24,.1], pan:[0,-1,1,.01], mono:[0,0,1,1], flip:[0,0,3,1], mute:[0,0,1,1] },
-    ui:{ gain:{l:'Gain', f:v => v <= -59.9 ? '−∞ dB' : db(v)}, pan:{l:'Pan', f:v => Math.abs(v) < .005 ? 'Centre' : (v < 0 ? 'L ' : 'R ') + Math.round(Math.abs(v) * 100)},
+    ui:{ gain:{l:'Gain', f:v => v <= -59.9 ? '−∞ dB' : db(v)}, pan:{l:'Pan', f:v => Math.abs(v) < .005 ? 'Center' : (v < 0 ? 'L ' : 'R ') + Math.round(Math.abs(v) * 100)},
       mono:{l:'Stereo', c:opts(['Stereo','Mono'])}, flip:{l:'Polarity', c:opts(['Normal','Flip left','Flip right','Flip both'])}, mute:{l:'Mute', c:opts(['Sound on','Muted'])} },
     about:'Utility: gain (smoothed, so moving it never clicks), pan, mono, polarity flip and mute, for anywhere in a patch.' }, STEREO),
   ringmod:{ label:'Ring mod', scope:'mono', inputs:{ in:'audio', inR:'audio', car:'audio', freq:'cv' }, outputs:{ out:'audio', outR:'audio' },
@@ -642,8 +642,8 @@ Object.assign(SHARED_MODULES, {
     params:lifeParams(), display:'life',
     ui:Object.assign(hideKeys(['b0', 'b1', 'b2', 'b3', 'b4', 'b5', 'b6', 'b7']), {
       w:{l:'Width', f:v => Math.round(v) + ' steps'}, div:{l:'Step', c:opts(STEP_NAMES)}, gens:{l:'Loop', f:v => v < 0.5 ? 'Evolve' : Math.round(v) + ' gens'},
-      trig:{l:'Fire on', c:opts(['Alive', 'Born'])}, rule:{l:'Rule', c:opts(['Life', 'HighLife', 'Seeds', 'Maze', 'Day & Night'])}, rot:{l:'Colours', f:v => '+' + Math.round(v)}, len:{l:'Gate length', f:pct} }),
-    about:'Life: a Game of Life sequencer. Draw cells on the grid (tap or drag; Clear, Random and Glider help). A playhead sweeps the columns, one per Step at the song tempo (or one per pulse on Clock), and every live cell in its column fires the gate of its row: patch the coloured outputs 1–8 into a Blip drum. After each sweep the cells live one generation, so the rhythm changes as patterns grow, move and die. Loop brings your drawing back every N generations (Evolve never does), Fire on Born plays only new cells, Rule picks the world, Colours turns which row feeds which output. Any fires on every hit; Count is how many cells are in the column.' }
+      trig:{l:'Fire on', c:opts(['Alive', 'Born'])}, rule:{l:'Rule', c:opts(['Life', 'HighLife', 'Seeds', 'Maze', 'Day & Night'])}, rot:{l:'Colors', f:v => '+' + Math.round(v)}, len:{l:'Gate length', f:pct} }),
+    about:'Life: a Game of Life sequencer. Draw cells on the grid (tap or drag; Clear, Random and Glider help). A playhead sweeps the columns, one per Step at the song tempo (or one per pulse on Clock), and every live cell in its column fires the gate of its row: patch the colored outputs 1–8 into a Blip drum. After each sweep the cells live one generation, so the rhythm changes as patterns grow, move and die. Loop brings your drawing back every N generations (Evolve never does), Fire on Born plays only new cells, Rule picks the world, Colors turns which row feeds which output. Any fires on every hit; Count is how many cells are in the column.' }
 });
 SHARED_MODULES.reson = { label:'Resonator', scope:'mono', inputs:{ in:'audio', inR:'audio', note:'cv' }, outputs:{ out:'audio', outR:'audio' },
   params:{ note:[48, 24, 96, 1], chord:[3, 0, 11, 1], mode:[0, 0, 1, 1], decay:[.5, 0, 1, .01], bright:[.6, 0, 1, .01], spread:[.5, 0, 1, .01], mix:[.5, 0, 1, .01] },
@@ -653,9 +653,9 @@ SHARED_MODULES.reson = { label:'Resonator', scope:'mono', inputs:{ in:'audio', i
   about:'Resonator: up to five tuned resonators ringing at Note and a Chord above it (octaves, fifths, major, minor, sevenths, fourths, harmonics…), so drums, noise or a voice ring out in harmony. String rings with every harmonic, Tube only the odd ones (hollow, like a pipe). Decay sets how long they ring, Bright how much top end survives, Spread places the voices across the stereo field. Patch a pitch CV into Note to play it (a Sequencer, Steps, Pitch Follow…); the Note knob then transposes it (C3 = as played).' };
 SHARED_MODULES.degrade = Object.assign({ label:'Degrade', scope:'mono', params:{ bits:[24, 1, 24, .1], rate:[1, 0, 1, .001], noise:[.15, 0, 1, .01], color:[.3, 0, 1, .01], follow:[.6, 0, 1, .01], dry:[0, 0, 1, .01], wet:[1, 0, 1, .01] },
   ui:{ bits:{l:'Bits', f:v => v >= 23.5 ? 'Off' : v.toFixed(1) + ' bit'}, rate:{l:'Rate', f:v => v >= .999 ? 'Off' : khz(300 * Math.pow(160, v))},
-    noise:{l:'Noise', f:v => v < .005 ? 'Off' : (20 * Math.log10(v * v * .25)).toFixed(1) + ' dB'}, color:{l:'Colour', f:v => v < .02 ? 'White' : v > .98 ? 'Dark' : pct(v) + ' dark'},
+    noise:{l:'Noise', f:v => v < .005 ? 'Off' : (20 * Math.log10(v * v * .25)).toFixed(1) + ' dB'}, color:{l:'Color', f:v => v < .02 ? 'White' : v > .98 ? 'Dark' : pct(v) + ' dark'},
     follow:{l:'Follow', f:pct}, dry:{l:'Dry', f:pct}, wet:{l:'Wet', f:pct} },
-  about:'Degrade: lo-fi in one box, after the classic tracker lofi plugins. Bits crushes (24 is off), Rate lowers the sample rate (the top is off), and Noise adds a floor of hiss, from a whisper up to −12 dB: Colour darkens it from white, and Follow makes it track the sound, so it breathes with the notes and silence stays clean. A little Noise on a soft sine helps it stand out in a mix. Dry and Wet are separate.' }, STEREO);
+  about:'Degrade: lo-fi in one box, after the classic tracker lofi plugins. Bits crushes (24 is off), Rate lowers the sample rate (the top is off), and Noise adds a floor of hiss, from a whisper up to −12 dB: Color darkens it from white, and Follow makes it track the sound, so it breathes with the notes and silence stays clean. A little Noise on a soft sine helps it stand out in a mix. Dry and Wet are separate.' }, STEREO);
 Object.assign(SHARED_PORT_LABEL, { t1:'1', t2:'2', t3:'3', t4:'4', t5:'5', t6:'6', t7:'7', t8:'8', g1:'1', g2:'2', g3:'3', g4:'4', g5:'5', g6:'6', g7:'7', g8:'8', any:'Any', count:'Count' });
 SHARED_PALETTE.push(['Drums', [['blipdrum', 'Blip drum (8 voices)']], 'audio']);
 SHARED_PALETTE.find(g => g[0] === 'Rhythm and logic')[1].unshift(['life', 'Life (Game of Life)']);
@@ -730,7 +730,7 @@ function drawLife(n){
   g.fillStyle = cs.getPropertyValue('--muted') || '#888'; g.font = '10px sans-serif'; if (live) g.fillText('gen ' + S.gen, Wd - 44, H - 3);
 }
 // Redraw the bars and grids a few times a second (edits from sliders, menus and undo show up too).
-setInterval(() => { for (const n of nodes.values()) if (n.show && (n.show.kind === 'bars' || n.show.kind === 'life') && n.el.isConnected){
+setInterval(() => { if (napping()) return; for (const n of nodes.values()) if (n.show && (n.show.kind === 'bars' || n.show.kind === 'life') && n.el.isConnected){
   if (n.show.kind === 'bars'){ for (let i = 0; i < 8; i++) n.show.lit[i] *= .8; drawBars(n); } else drawLife(n); } }, 90);
 /* ── For chains/index.html, inside the SHARED EDITOR block (after the existing Object.assign(SHARED_MODULES, …)
    calls, before "The bar editor (Blip drum) and the grid (Life)"). Uses only helpers already in that block or just
@@ -766,7 +766,7 @@ SHARED_PALETTE.find(g => g[0] === 'Reverbs')[1].push(['convolve', 'Convolution r
 
 /* Editor entries for chains/index.html, to paste inside the SHARED EDITOR block (after the existing
    `SHARED_PALETTE.find(g => g[0] === 'Rhythm and logic')…` line is a good place). Uses only names that block (or the
-   page above it, in both …chains and …waves) already defines: opts, pct, spct, secs, hz, cents, whole, wet, MIXP,
+   page above it, in both chains and waves) already defines: opts, pct, spct, secs, hz, cents, whole, wet, MIXP,
    STEREO, PP_NAMES, NOTE_NAMES. Params are identical to the worklet's. (Then run tools/sync-shared.py.) */
 
 /* Pitch correct, vowel filter, rotary speaker, granular delay, reverse echo and envelope filter (Oct 2026). */
@@ -816,7 +816,7 @@ Object.assign(SHARED_PORT_LABEL, { vowel:'Vowel', fast:'Fast', pitch:'Pitch', ga
 SHARED_PALETTE.push(['Voice and filters', [['autotune', 'Pitch correct'], ['vowel', 'Vowel filter'], ['envfilt', 'Envelope filter (auto-wah)']], 'audio']);
 SHARED_PALETTE.find(g => g[0] === 'Effects')[1].push(['rotary', 'Rotary speaker'], ['gdelay', 'Granular delay'], ['reverse', 'Reverse echo']);
 
-/* ═══ Bytebeat + Chaos: editor entries for …chains / …waves (Oct 2026) ═══
+/* ═══ Bytebeat + Chaos: editor entries for chains / waves (Oct 2026) ═══
    Paste into chains/index.html inside the ===SHARED EDITOR=== block, after the Blip drum / Life additions (anywhere
    after SHARED_FAMILY, SHARED_PORT_LABEL and SHARED_PALETTE exist; before `function mergeShared`), then run
    tools/sync-shared.py. Parameters, inputs and outputs match modules.js exactly. BB_NAMES must list the formulas in
@@ -830,7 +830,7 @@ Object.assign(SHARED_MODULES, {
     params:{ formula:[0,0,15,1], rate:[8000,1000,32000,1], a:[128,0,255,1], b:[128,0,255,1], c:[128,0,255,1], mode:[0,0,2,1], smooth:[0,0,1,.01], level:[.7,0,1,.01] },
     ui:{ formula:{l:'Formula', c:opts(BB_NAMES)}, rate:{l:'Rate', f:khz}, a:{l:'a', f:whole}, b:{l:'b', f:whole}, c:{l:'c', f:whole},
       mode:{l:'Mode', c:opts(['8-bit', 'Signed 8-bit', 'Linear'])}, smooth:{l:'Smooth', f:v => v < .005 ? 'Off' : pct(v)}, level:{l:'Level', f:pct} },
-    about:'Bytebeat: music from one line of integer maths, the 2011 discovery that a formula of a counter t (like t*(t>>5|t>>8)), played as 8-bit samples, makes melodies and rhythms. Pick one of sixteen formulas; Rate is its clock (8 kHz is the classic sound), and a cable in Pitch plays it from a sequencer (0.5 = A4). The knobs a, b and c are numbers the formula reads (0–255): on Arp machine, Pulse chord, Modulo bass, Pipe drone, Hiss beat, Sine tune, Triangle bass and Hash noise they change the tune or the texture. Mode: 8-bit is the classic, Signed 8-bit is harsher, Linear suits the sine and triangle ones. Smooth takes the edge off the steps. Reset (and PLAY) starts the formula from the beginning. Write your own formulas on a pad in …Thunder Plus (the Bytebeat engine).' },
+    about:'Bytebeat: music from one line of integer maths, the 2011 discovery that a formula of a counter t (like t*(t>>5|t>>8)), played as 8-bit samples, makes melodies and rhythms. Pick one of sixteen formulas; Rate is its clock (8 kHz is the classic sound), and a cable in Pitch plays it from a sequencer (0.5 = A4). The knobs a, b and c are numbers the formula reads (0–255): on Arp machine, Pulse chord, Modulo bass, Pipe drone, Hiss beat, Sine tune, Triangle bass and Hash noise they change the tune or the texture. Mode: 8-bit is the classic, Signed 8-bit is harsher, Linear suits the sine and triangle ones. Smooth takes the edge off the steps. Reset (and PLAY) starts the formula from the beginning. Write your own formulas on a pad in Thunder Plus (the Bytebeat engine).' },
   chaos:{ label:'Chaos', scope:'mono', inputs:{ rate:'cv', reset:'gate' }, outputs:{ x:'cv', y:'cv', z:'cv', out:'audio', trig:'gate' },
     params:{ model:[0,0,6,1], rate:[.35,0,1,.001], chaos:[.6,0,1,.01], smooth:[0,0,1,.01], level:[.8,0,1,.01] },
     ui:{ model:{l:'Model', c:opts(CHAOS_MODELS)}, rate:{l:'Rate', f:chaosHz}, chaos:{l:'Chaos', f:pct}, smooth:{l:'Smooth', f:v => v < .005 ? 'Off' : pct(v)}, level:{l:'Level', f:pct} },
@@ -838,19 +838,19 @@ Object.assign(SHARED_MODULES, {
 });
 Object.assign(SHARED_FAMILY, { bytebeat:'gen', chaos:'mod' });
 Object.assign(SHARED_PORT_LABEL, { x:'X', y:'Y', z:'Z', rate:'Rate' });
-// Sound sources: …waves has this group (its own VCO, FM…); …chains gets it made (an audio group, before Control).
+// Sound sources: waves has this group (its own VCO, FM…); chains gets it made (an audio group, before Control).
 SHARED_PALETTE.push(['Sound sources', [['bytebeat', 'Bytebeat']], 'audio']);
 // Chaos: with the modulation sources (both editors already have the group; GROUP_FAM marks it 'mod').
 SHARED_PALETTE.push(['Modulation sources', [['chaos', 'Chaos (Lorenz, Rössler…)']], 'control']);
 /* Notes for the integrator:
-   - …chains has no 'Sound sources' group: mergeShared makes it before §Control, and its family falls back to 'afx'
+   - chains has no 'Sound sources' group: mergeShared makes it before §Control, and its family falls back to 'afx'
      for the group colour unless 'Sound sources':'gen' is added to the fallback map inside mergeShared
      ({ 'Reverbs':'afx', … , 'Sound sources':'gen' }); the module's own colour comes from SHARED_FAMILY (gen) either way.
    - PORT_LABEL in each editor already has pitch, reset, out; mergeShared copies x/y/z/rate in (it never overrides). */
 
 /* Random generator and Function generator (based on Mutable Instruments Marbles and Tides 2, MIT). Goes in the SHARED
    EDITOR block of chains/index.html, anywhere after SHARED_PALETTE and SHARED_PORT_LABEL are made (e.g. just after the
-   Life / Blip drum lines), then tools/sync-shared.py copies it into …waves. Parameters match MarblesM and TidesM in the
+   Life / Blip drum lines), then tools/sync-shared.py copies it into waves. Parameters match MarblesM and TidesM in the
    worklet exactly. */
 const MARBLES_RATES = ['÷4', '÷3', '÷2', '×2/3', '×1', '×3/2', '×2', '×3', '×4'];
 const TIDES_RATIO_NAMES = ['÷16', '÷8', '÷6', '÷4', '÷3', '÷2', '×2/3', '×3/4', '×4/5', '×1', '×5/4', '×4/3', '×3/2', '×2', '×3', '×4', '×6', '×8', '×16'];
@@ -893,7 +893,7 @@ Object.assign(SHARED_FAMILY, { marbles:'mod', tides:'mod' });
 Object.assign(SHARED_PORT_LABEL, { xclock:'X clock', dejavu:'Déjà vu', x1:'X1', x2:'X2', x3:'X3', y:'Y', out1:'Out 1', out2:'Out 2', out3:'Out 3', out4:'Out 4' });
 SHARED_PALETTE.push(['Modulation sources', [['marbles', 'Random generator'], ['tides', 'Function generator']], 'control']);
 
-/* Optional, …chains only (outside the shared block, in PORT_TIP): t1–t3 share their labels with Blip drum's inputs
+/* Optional, chains only (outside the shared block, in PORT_TIP): t1–t3 share their labels with Blip drum's inputs
    ('1', '2', '3' in SHARED_PORT_LABEL), so give the Random generator's gates their own names and tips there:
   marbles:{ t1:{ l:'t1', t:'Random gate 1 (Model and Bias decide when it fires)' }, t2:{ l:'t2', t:'The clock: a gate on every tick' },
             t3:{ l:'t3', t:'Random gate 3 (the other side of the coin toss)' } },
@@ -1081,7 +1081,7 @@ const MODULE_USE = {
   scin:'Set Source to the kick’s track, then patch Duck into a VCA’s CV on a pad for a pump, or Envelope into a filter’s Cutoff jack so the filter opens on every kick.',
   scout:'In the drum chain, patch the drums into a Sidechain Out on Send 1. In the pad’s chain, a Sidechain In on Send 1 → the SC of a compressor makes the drums duck the pad.',
   resample:'Put it after a chain you like, set Bars to 2 and Record to Armed while the song plays: the next two bars land in a pad, sliced and ready to chop.',
-  out:'The last module of every patch: patch your VCA (or its effects) into In L and In R. In …Thunder, Output picks which Waves In it plays on.',
+  out:'The last module of every patch: patch your VCA (or its effects) into In L and In R. In Thunder, Output picks which Waves In it plays on.',
   hostIn:'Start each voice here: Pitch → an oscillator’s Pitch, Gate → an ADSR’s Gate, and Velocity into a VCA’s Gain jack so harder notes play louder.',
   seq:'Set eight notes, turn Run on and you hear a bass line without a keyboard (it plays through Host In). Set a step to Rest for space.',
   string:'Host In Pitch and Gate in, Decay long and Position near the bridge for a twangy pluck; raise Mute for palm-muted chugs.',
@@ -1131,7 +1131,7 @@ const MODULE_USE = {
   crush:'On drums: Downsample around 40%, Bits 8 and Mix 50% add crunchy grit while keeping the punch.',
   lofi:'On a drum break: Rate down a bit and Bits around 10 for gritty, old-sampler crunch; raise Hardness for more bite.',
   degrade:'On a clean synth: Bits 12, Rate a little down, and some Noise with Follow on, for a sampled-from-tape tracker feel.',
-  tape:'On a drum bus or the mix: Input a little up, some Head bump and gentle Flutter for warm, analog-sounding tape colour.',
+  tape:'On a drum bus or the mix: Input a little up, some Head bump and gentle Flutter for warm, analog-sounding tape color.',
   vinyl:'On a clean sample or mix: Groove wear a little up and High limit down for an old-record feel.',
   dub:'On a drum or dub bus: Amount around 50% for dense, saturated tape squash.',
   // modulation effects
@@ -1361,9 +1361,9 @@ const dynDb = d => d <= -90 ? '−∞' : (d > .05 ? '+' : d < -.05 ? '−' : '')
 function buildDyn(n, box, kind){
   const cv = h('canvas', {class:'dyncv'}), lv = kind === 'dynlv';
   box.append(cv);
-  box.title = lv ? 'The last 2.5 s: grey, the level going in; teal, what comes out. The number is how much louder (+) or quieter (−) it comes out.'
+  box.title = lv ? 'The last 2.5 s: gray, the level going in; teal, what comes out. The number is how much louder (+) or quieter (−) it comes out.'
     : 'Left: the transfer curve, level in (across) to level out (up), from these settings; dashed, the threshold; the dot, the sound now. '
-      + 'Right: the last 2.5 s: grey, the level it hears; teal, what comes out; orange from the top, the gain reduction (its peak in dB above).';
+      + 'Right: the last 2.5 s: gray, the level it hears; teal, what comes out; orange from the top, the gain reduction (its peak in dB above).';
   const i = h('i'), v = h('span', {text:'—'}), tr = h('div', {class:'tr'}, i); i.style.transform = 'scaleX(0)';
   const mini = h('div', {class:'shw dmini' + (lv ? '' : ' gr'), title: lv ? 'Level out, and the change from the level in' : 'Gain reduction'},
     h('div', {class:'ch'}, h('span', {text: lv ? 'OUT' : 'GR'}), tr, v));
@@ -1391,7 +1391,7 @@ function dynSchedule(){
     for (const n of nodes.values()){ const S = n.show; if (!S || !S.dirty || (S.kind !== 'dyn' && S.kind !== 'dynlv')) continue; S.dirty = false; if (n.el.isConnected && !n.m.collapsed) drawDyn(n); } });
 }
 // A setting moved (the curve), or the module was unfolded: draw again even with no sound coming in.
-setInterval(() => { for (const n of nodes.values()){ const S = n.show; if (!S || (S.kind !== 'dyn' && S.kind !== 'dynlv')) continue;
+setInterval(() => { if (napping()) return; for (const n of nodes.values()){ const S = n.show; if (!S || (S.kind !== 'dyn' && S.kind !== 'dynlv')) continue;
   if (n.m.collapsed || !n.el.isConnected){ S.sig = ''; continue; }
   const f = DYN[n.m.type], sig = (f ? JSON.stringify(f(n.m.params)) : 'lv') + S.cv.clientWidth;
   if (sig !== S.sig){ S.sig = sig; drawDyn(n); } } }, 150);
@@ -1485,7 +1485,7 @@ function drawDyn(n){
 /* STEREO (owner, 19 Oct): VCF, VCA, Sidechain Comp, Blades, Meta and Phaser got In R / Out R. A patch made before
    (st2 not set) gets their right side patched once, wherever the left side is: a cable from X's Out to one of them
    gains X's Out R → its In R, and one from their Out to a module with an In R gains Out R → In R (when that In R is
-   free). Run once per patch (st2), from normalize. Shared with …waves (only Blades, Meta and Phaser match there). */
+   free). Run once per patch (st2), from normalize. Shared with waves (only Blades, Meta and Phaser match there). */
 function chainsStereoUp(d){
   if (!d || d.st2 || !Array.isArray(d.modules) || !Array.isArray(d.cables)) return d;
   const NEW = new Set(['vcf', 'vca', 'sccomp', 'blades', 'meta', 'phaser']), type = new Map(d.modules.map(m => [m && m.id, m && m.type]));
@@ -1520,7 +1520,7 @@ function trackInStereoUp(d){
 
 /* Mixers: Inputs picks how many channels show, 1 to 16 (old patches open with 4). The rest hide, with their cables. */
 const MIXN = 16, MIXT = new Set(['mixer', 'smixer']);
-const panTxt = v => Math.abs(v) < .005 ? 'Centre' : (v < 0 ? 'L ' : 'R ') + Math.round(Math.abs(v) * 100);
+const panTxt = v => Math.abs(v) < .005 ? 'Center' : (v < 0 ? 'L ' : 'R ') + Math.round(Math.abs(v) * 100);
 function mixDef(label, scope, stereo){
   const inputs = {}, params = { chans:[4,1,MIXN,1] };
   const ui = { chans:{ l:'Inputs', c:Array.from({ length:MIXN }, (_, i) => [i + 1, String(i + 1)]), fixed:true } };
@@ -1630,10 +1630,10 @@ const MODULES = {
 };
 Object.assign(MODULES, SHARED_MODULES);
 /* ===PUMP EDITOR START=== (written by tools/pump-chains.mjs from pump/pump-meta.js: edit that, not this)
-   The …pump creative effects' editor entries (their DSP: chains-worklet.js, PUMP MODULES). Each sits in the palette group
-   of its kind, beside …chains' own. */
+   The pump creative effects' editor entries (their DSP: chains-worklet.js, PUMP MODULES). Each sits in the palette group
+   of its kind, beside chains' own. */
 const PUMP_EDIT = {"ptube":{"label":"pump TUBE","long":"Tube Distortion","ps":[["mode",0,"v",0,5,"lin",1,1,1],["drive",1,"v",0,36,"lin",1,12,0.036],["bias",2,"v",-100,100,"lin",1,0,0.2],["sag",3,"v",0,100,"lin",1,25,0.1],["voltage",4,"v",0,100,"lin",1,100,0.1],["stages",5,"v",1,3,"lin",1,1,1],["focus",6,"v",0,3,"lin",1,0,1],["low_cut",7,"n",10,1000,"log",1,0,0.001],["tone",8,"v",-100,100,"lin",1,0,0.2],["high_cut",9,"n",1000,22000,"log",1,1,0.001],["mix",10,"v",0,100,"lin",1,100,0.1],["out_gain",11,"v",-24,24,"lin",1,0,0.048],["auto_gain",12,"v",0,1,"lin",1,1,1],["oversampling",13,"v",0,3,"lin",1,2,1]],"ui":{"mode":{"l":"Circuit","u":"","ch":["Glow","Triode","Pentode","Push-Pull","Starve","Fuzz"],"mn":0,"fl":3},"drive":{"l":"Drive","u":"dB","ch":null,"mn":0,"fl":1},"bias":{"l":"Bias","u":"%","ch":null,"mn":-100,"fl":1},"sag":{"l":"Sag","u":"%","ch":null,"mn":0,"fl":1},"voltage":{"l":"Voltage","u":"%","ch":null,"mn":0,"fl":1},"stages":{"l":"Stages","u":"","ch":null,"mn":1,"fl":2},"focus":{"l":"Focus","u":"","ch":["Full","Low","Mid","High"],"mn":0,"fl":3},"low_cut":{"l":"Low Cut","u":"Hz","ch":null,"mn":10,"fl":1},"tone":{"l":"Tone","u":"%","ch":null,"mn":-100,"fl":1},"high_cut":{"l":"High Cut","u":"Hz","ch":null,"mn":1000,"fl":1},"mix":{"l":"Mix","u":"%","ch":null,"mn":0,"fl":1},"out_gain":{"l":"Output","u":"dB","ch":null,"mn":-24,"fl":1},"auto_gain":{"l":"Auto Gain","u":"","ch":null,"mn":0,"fl":5},"oversampling":{"l":"Oversampling","u":"","ch":["1x","2x","4x","8x"],"mn":0,"fl":2}},"group":"Drive and lo-fi"},"psnap":{"label":"pump SNAP","long":"Transient Shaper","ps":[["attack",0,"v",-100,100,"lin",1,0,0.2],["sustain",1,"v",-100,100,"lin",1,0,0.2],["attack_time",2,"n",1,100,"log",1,0.5,0.001],["release",3,"n",20,2000,"log",1,0.5,0.001],["link",4,"v",0,100,"lin",1,100,0.1],["focus",5,"v",0,3,"lin",1,0,1],["band",6,"v",0,2,"lin",1,0,1],["crossover",7,"n",40,8000,"log",1,0.3458799,0.001],["lookahead",8,"v",0,5,"lin",1,0,0.005],["clip",9,"v",0,1,"lin",1,0,1],["ceiling",10,"v",-12,0,"lin",1,-1,0.012],["mix",12,"v",0,100,"lin",1,100,0.1],["out_gain",13,"v",-24,24,"lin",1,0,0.048]],"ui":{"attack":{"l":"Attack","u":"%","ch":null,"mn":-100,"fl":1},"sustain":{"l":"Sustain","u":"%","ch":null,"mn":-100,"fl":1},"attack_time":{"l":"Time","u":"ms","ch":null,"mn":1,"fl":1},"release":{"l":"Release","u":"ms","ch":null,"mn":20,"fl":1},"link":{"l":"Link","u":"%","ch":null,"mn":0,"fl":1},"focus":{"l":"Focus","u":"","ch":["Full","Low","Mid","High"],"mn":0,"fl":3},"band":{"l":"Band","u":"","ch":["Full","Low","High"],"mn":0,"fl":3},"crossover":{"l":"Crossover","u":"Hz","ch":null,"mn":40,"fl":1},"lookahead":{"l":"Lookahead","u":"ms","ch":null,"mn":0,"fl":0},"clip":{"l":"Clip","u":"","ch":null,"mn":0,"fl":5},"ceiling":{"l":"Ceiling","u":"dB","ch":null,"mn":-12,"fl":1},"mix":{"l":"Mix","u":"%","ch":null,"mn":0,"fl":1},"out_gain":{"l":"Output","u":"dB","ch":null,"mn":-24,"fl":1}},"group":"Dynamics"},"pgate":{"label":"pump GATE","long":"Sequenced Gate","ps":[["steps",0,"v",1,32,"lin",1,16,1],["rate",1,"v",0,17,"lin",1,5,1],["swing",2,"v",0,75,"lin",1,0,0.075],["length",3,"v",5,100,"lin",1,75,0.095],["attack",4,"n",0,50,"pow",3,0.2714418,0.001],["release",5,"n",0,500,"pow",3,0.3419952,0.001],["smooth",6,"v",0,100,"lin",1,0,0.1],["depth",7,"v",0,100,"lin",1,100,0.1],["mode",8,"v",0,2,"lin",1,0,1],["filter_low",9,"n",20,5000,"log",1,0.4574385,0.001],["filter_high",10,"n",200,20000,"log",1,1,0.001],["resonance",11,"v",0,100,"lin",1,25,0.1],["stereo_offset",12,"v",0,16,"lin",1,0,1],["mix",13,"v",0,100,"lin",1,100,0.1],["out_gain",14,"v",-24,24,"lin",1,0,0.048],["step01",16,"v",0,100,"lin",1,100,0.1],["step02",17,"v",0,100,"lin",1,0,0.1],["step03",18,"v",0,100,"lin",1,100,0.1],["step04",19,"v",0,100,"lin",1,100,0.1],["step05",20,"v",0,100,"lin",1,100,0.1],["step06",21,"v",0,100,"lin",1,0,0.1],["step07",22,"v",0,100,"lin",1,100,0.1],["step08",23,"v",0,100,"lin",1,0,0.1],["step09",24,"v",0,100,"lin",1,100,0.1],["step10",25,"v",0,100,"lin",1,100,0.1],["step11",26,"v",0,100,"lin",1,0,0.1],["step12",27,"v",0,100,"lin",1,100,0.1],["step13",28,"v",0,100,"lin",1,100,0.1],["step14",29,"v",0,100,"lin",1,0,0.1],["step15",30,"v",0,100,"lin",1,100,0.1],["step16",31,"v",0,100,"lin",1,100,0.1],["step17",32,"v",0,100,"lin",1,100,0.1],["step18",33,"v",0,100,"lin",1,0,0.1],["step19",34,"v",0,100,"lin",1,100,0.1],["step20",35,"v",0,100,"lin",1,100,0.1],["step21",36,"v",0,100,"lin",1,100,0.1],["step22",37,"v",0,100,"lin",1,0,0.1],["step23",38,"v",0,100,"lin",1,100,0.1],["step24",39,"v",0,100,"lin",1,0,0.1],["step25",40,"v",0,100,"lin",1,100,0.1],["step26",41,"v",0,100,"lin",1,100,0.1],["step27",42,"v",0,100,"lin",1,0,0.1],["step28",43,"v",0,100,"lin",1,100,0.1],["step29",44,"v",0,100,"lin",1,100,0.1],["step30",45,"v",0,100,"lin",1,0,0.1],["step31",46,"v",0,100,"lin",1,100,0.1],["step32",47,"v",0,100,"lin",1,100,0.1]],"ui":{"steps":{"l":"Steps","u":"","ch":null,"mn":1,"fl":3},"rate":{"l":"Rate","u":"","ch":["1/64","1/32T","1/32","1/32D","1/16T","1/16","1/16D","1/8T","1/8","1/8D","1/4T","1/4","1/4D","1/2T","1/2","1/2D","1/1","2/1"],"mn":0,"fl":3},"swing":{"l":"Swing","u":"%","ch":null,"mn":0,"fl":1},"length":{"l":"Length","u":"%","ch":null,"mn":5,"fl":1},"attack":{"l":"Attack","u":"ms","ch":null,"mn":0,"fl":1},"release":{"l":"Release","u":"ms","ch":null,"mn":0,"fl":1},"smooth":{"l":"Smooth","u":"%","ch":null,"mn":0,"fl":1},"depth":{"l":"Depth","u":"%","ch":null,"mn":0,"fl":1},"mode":{"l":"Mode","u":"","ch":["Volume","Filter","Both"],"mn":0,"fl":3},"filter_low":{"l":"Low","u":"Hz","ch":null,"mn":20,"fl":1},"filter_high":{"l":"High","u":"Hz","ch":null,"mn":200,"fl":1},"resonance":{"l":"Reso","u":"%","ch":null,"mn":0,"fl":1},"stereo_offset":{"l":"Offset","u":"","ch":null,"mn":0,"fl":3},"mix":{"l":"Mix","u":"%","ch":null,"mn":0,"fl":1},"out_gain":{"l":"Output","u":"dB","ch":null,"mn":-24,"fl":1},"step01":{"l":"Step 1","u":"%","ch":null,"mn":0,"fl":1},"step02":{"l":"Step 2","u":"%","ch":null,"mn":0,"fl":1},"step03":{"l":"Step 3","u":"%","ch":null,"mn":0,"fl":1},"step04":{"l":"Step 4","u":"%","ch":null,"mn":0,"fl":1},"step05":{"l":"Step 5","u":"%","ch":null,"mn":0,"fl":1},"step06":{"l":"Step 6","u":"%","ch":null,"mn":0,"fl":1},"step07":{"l":"Step 7","u":"%","ch":null,"mn":0,"fl":1},"step08":{"l":"Step 8","u":"%","ch":null,"mn":0,"fl":1},"step09":{"l":"Step 9","u":"%","ch":null,"mn":0,"fl":1},"step10":{"l":"Step 10","u":"%","ch":null,"mn":0,"fl":1},"step11":{"l":"Step 11","u":"%","ch":null,"mn":0,"fl":1},"step12":{"l":"Step 12","u":"%","ch":null,"mn":0,"fl":1},"step13":{"l":"Step 13","u":"%","ch":null,"mn":0,"fl":1},"step14":{"l":"Step 14","u":"%","ch":null,"mn":0,"fl":1},"step15":{"l":"Step 15","u":"%","ch":null,"mn":0,"fl":1},"step16":{"l":"Step 16","u":"%","ch":null,"mn":0,"fl":1},"step17":{"l":"Step 17","u":"%","ch":null,"mn":0,"fl":1},"step18":{"l":"Step 18","u":"%","ch":null,"mn":0,"fl":1},"step19":{"l":"Step 19","u":"%","ch":null,"mn":0,"fl":1},"step20":{"l":"Step 20","u":"%","ch":null,"mn":0,"fl":1},"step21":{"l":"Step 21","u":"%","ch":null,"mn":0,"fl":1},"step22":{"l":"Step 22","u":"%","ch":null,"mn":0,"fl":1},"step23":{"l":"Step 23","u":"%","ch":null,"mn":0,"fl":1},"step24":{"l":"Step 24","u":"%","ch":null,"mn":0,"fl":1},"step25":{"l":"Step 25","u":"%","ch":null,"mn":0,"fl":1},"step26":{"l":"Step 26","u":"%","ch":null,"mn":0,"fl":1},"step27":{"l":"Step 27","u":"%","ch":null,"mn":0,"fl":1},"step28":{"l":"Step 28","u":"%","ch":null,"mn":0,"fl":1},"step29":{"l":"Step 29","u":"%","ch":null,"mn":0,"fl":1},"step30":{"l":"Step 30","u":"%","ch":null,"mn":0,"fl":1},"step31":{"l":"Step 31","u":"%","ch":null,"mn":0,"fl":1},"step32":{"l":"Step 32","u":"%","ch":null,"mn":0,"fl":1}},"group":"Rhythmic effects"},"pecho":{"label":"pump ECHO","long":"Delay","ps":[["mode",0,"v",0,4,"lin",1,0,1],["time_l",1,"n",1,4000,"log",1,0.7492851,0.001],["time_r",2,"n",1,4000,"log",1,0.7981714,0.001],["sync",3,"v",0,1,"lin",1,1,1],["note_l",4,"v",0,17,"lin",1,11,1],["note_r",5,"v",0,17,"lin",1,12,1],["link",6,"v",0,1,"lin",1,0,1],["feedback",7,"v",0,120,"lin",1,35,0.12],["stereo",8,"v",0,2,"lin",1,0,1],["width",9,"v",0,100,"lin",1,100,0.1],["mod_depth",10,"v",0,100,"lin",1,0,0.1],["mod_rate",11,"n",0.05,10,"log",1,0.5232961,0.001],["age",12,"v",0,100,"lin",1,0,0.1],["drive",13,"v",0,24,"lin",1,0,0.024],["low_cut",14,"n",10,2000,"log",1,0,0.001],["high_cut",15,"n",1000,22000,"log",1,1,0.001],["diffuse",16,"v",0,100,"lin",1,0,0.1],["duck",17,"v",0,100,"lin",1,0,0.1],["freeze",18,"v",0,1,"lin",1,0,1],["pitch",19,"v",-24,24,"lin",1,12,1],["fine",20,"v",-100,100,"lin",1,0,0.2],["pitch_mode",21,"v",0,1,"lin",1,0,1],["mix",22,"v",0,100,"lin",1,30,0.1],["out_gain",23,"v",-24,24,"lin",1,0,0.048]],"ui":{"mode":{"l":"Mode","u":"","ch":["Digital","Tape","BBD","Pitch","Reverse"],"mn":0,"fl":3},"time_l":{"l":"Time L","u":"ms","ch":null,"mn":1,"fl":1},"time_r":{"l":"Time R","u":"ms","ch":null,"mn":1,"fl":1},"sync":{"l":"Sync","u":"","ch":null,"mn":0,"fl":5},"note_l":{"l":"Note L","u":"","ch":["1/64","1/32T","1/32","1/32D","1/16T","1/16","1/16D","1/8T","1/8","1/8D","1/4T","1/4","1/4D","1/2T","1/2","1/2D","1/1","2/1"],"mn":0,"fl":3},"note_r":{"l":"Note R","u":"","ch":["1/64","1/32T","1/32","1/32D","1/16T","1/16","1/16D","1/8T","1/8","1/8D","1/4T","1/4","1/4D","1/2T","1/2","1/2D","1/1","2/1"],"mn":0,"fl":3},"link":{"l":"Link","u":"","ch":null,"mn":0,"fl":5},"feedback":{"l":"Feedback","u":"%","ch":null,"mn":0,"fl":1},"stereo":{"l":"Stereo","u":"","ch":["Stereo","Ping-Pong","Wide"],"mn":0,"fl":3},"width":{"l":"Width","u":"%","ch":null,"mn":0,"fl":1},"mod_depth":{"l":"Mod","u":"%","ch":null,"mn":0,"fl":1},"mod_rate":{"l":"Rate","u":"Hz","ch":null,"mn":0.0500000007,"fl":1},"age":{"l":"Age","u":"%","ch":null,"mn":0,"fl":1},"drive":{"l":"Drive","u":"dB","ch":null,"mn":0,"fl":1},"low_cut":{"l":"Low Cut","u":"Hz","ch":null,"mn":10,"fl":1},"high_cut":{"l":"High Cut","u":"Hz","ch":null,"mn":1000,"fl":1},"diffuse":{"l":"Diffuse","u":"%","ch":null,"mn":0,"fl":1},"duck":{"l":"Duck","u":"%","ch":null,"mn":0,"fl":1},"freeze":{"l":"Freeze","u":"","ch":null,"mn":0,"fl":5},"pitch":{"l":"Pitch","u":"","ch":null,"mn":-24,"fl":3},"fine":{"l":"Fine","u":"","ch":null,"mn":-100,"fl":1},"pitch_mode":{"l":"Pitch Mode","u":"","ch":["Once","Climb"],"mn":0,"fl":3},"mix":{"l":"Mix","u":"%","ch":null,"mn":0,"fl":1},"out_gain":{"l":"Output","u":"dB","ch":null,"mn":-24,"fl":1}},"group":"Delays"},"pspring":{"label":"pump SPRING","long":"Spring Reverb","ps":[["model",0,"v",0,5,"lin",1,0,1],["dwell",1,"v",0,100,"lin",1,50,0.1],["decay",2,"n",0.3,8,"log",1,0.6457496,0.001],["tension",3,"v",-100,100,"lin",1,0,0.2],["drip",4,"v",0,100,"lin",1,50,0.1],["tone",5,"v",-100,100,"lin",1,0,0.2],["low_cut",6,"n",20,1000,"log",1,0.4114081,0.001],["pre_delay",7,"n",0,250,"pow",2,0,0.001],["wobble",8,"v",0,100,"lin",1,15,0.1],["width",9,"v",0,100,"lin",1,70,0.1],["grit",10,"v",0,100,"lin",1,35,0.1],["mix",11,"v",0,100,"lin",1,30,0.1],["out_gain",12,"v",-24,24,"lin",1,0,0.048]],"ui":{"model":{"l":"Model","u":"","ch":["Two-spring tank","Three-spring tank","Short tank","Long tank","Digital","Lo-fi digital"],"mn":0,"fl":3},"dwell":{"l":"Dwell","u":"%","ch":null,"mn":0,"fl":1},"decay":{"l":"Decay","u":"s","ch":null,"mn":0.300000012,"fl":1},"tension":{"l":"Tension","u":"%","ch":null,"mn":-100,"fl":1},"drip":{"l":"Drip","u":"%","ch":null,"mn":0,"fl":1},"tone":{"l":"Tone","u":"%","ch":null,"mn":-100,"fl":1},"low_cut":{"l":"Low Cut","u":"Hz","ch":null,"mn":20,"fl":1},"pre_delay":{"l":"Pre-Delay","u":"ms","ch":null,"mn":0,"fl":1},"wobble":{"l":"Wobble","u":"%","ch":null,"mn":0,"fl":1},"width":{"l":"Width","u":"%","ch":null,"mn":0,"fl":1},"grit":{"l":"Grit","u":"%","ch":null,"mn":0,"fl":1},"mix":{"l":"Mix","u":"%","ch":null,"mn":0,"fl":1},"out_gain":{"l":"Output","u":"dB","ch":null,"mn":-24,"fl":1}},"group":"Reverbs"},"pverb":{"label":"pump VERB","long":"Reverb","ps":[["mode",0,"v",0,11,"lin",1,0,1],["predelay",1,"n",0,500,"pow",2,0.2,0.001],["predelay_sync",2,"v",0,1,"lin",1,0,1],["predelay_note",3,"v",0,12,"lin",1,2,1],["size",4,"v",0,100,"lin",1,50,0.1],["decay",5,"n",0.1,30,"log",1,0.5419285,0.001],["diffusion",6,"v",0,100,"lin",1,80,0.1],["early_late",7,"v",-100,100,"lin",1,0,0.2],["bass_mult",8,"n",0.5,2,"log",1,0.6315172,0.001],["crossover",9,"n",50,2000,"log",1,0.673621,0.001],["high_damp",10,"v",0.1,1,"lin",1,0.55,0.0009],["damp_freq",11,"n",1000,20000,"log",1,0.598104,0.001],["low_cut",12,"n",10,1000,"log",1,0,0.001],["high_cut",13,"n",1000,22000,"log",1,1,0.001],["mod_depth",14,"v",0,100,"lin",1,40,0.1],["mod_rate",15,"n",0.05,5,"log",1,0.573064,0.001],["width",16,"v",0,150,"lin",1,100,0.15],["age",17,"v",0,100,"lin",1,35,0.1],["env_time",18,"n",50,1500,"log",1,0.5457778,0.001],["shimmer_pitch",19,"v",-24,24,"lin",1,12,1],["shimmer_amount",20,"v",0,100,"lin",1,50,0.1],["duck",21,"v",0,100,"lin",1,0,0.1],["freeze",22,"v",0,1,"lin",1,0,1],["mix",23,"v",0,100,"lin",1,30,0.1],["out_gain",24,"v",-24,24,"lin",1,0,0.048]],"ui":{"mode":{"l":"Mode","u":"","ch":["Hall","Room","Chamber","Plate","Vintage Hall","Vintage Plate","Classic Hall","Classic Plate","90s Rack","Gated","Reverse","Shimmer"],"mn":0,"fl":3},"predelay":{"l":"Pre-Delay","u":"ms","ch":null,"mn":0,"fl":1},"predelay_sync":{"l":"Sync","u":"","ch":null,"mn":0,"fl":5},"predelay_note":{"l":"Note","u":"","ch":["1/64","1/32T","1/32","1/32D","1/16T","1/16","1/16D","1/8T","1/8","1/8D","1/4T","1/4","1/4D"],"mn":0,"fl":3},"size":{"l":"Size","u":"%","ch":null,"mn":0,"fl":1},"decay":{"l":"Decay","u":"s","ch":null,"mn":0.100000001,"fl":1},"diffusion":{"l":"Diffusion","u":"%","ch":null,"mn":0,"fl":1},"early_late":{"l":"Early/Late","u":"%","ch":null,"mn":-100,"fl":1},"bass_mult":{"l":"Bass Mult","u":"","ch":null,"mn":0.5,"fl":1},"crossover":{"l":"Crossover","u":"Hz","ch":null,"mn":50,"fl":1},"high_damp":{"l":"High Damp","u":"","ch":null,"mn":0.100000001,"fl":1},"damp_freq":{"l":"Damp Freq","u":"Hz","ch":null,"mn":1000,"fl":1},"low_cut":{"l":"Low Cut","u":"Hz","ch":null,"mn":10,"fl":1},"high_cut":{"l":"High Cut","u":"Hz","ch":null,"mn":1000,"fl":1},"mod_depth":{"l":"Mod Depth","u":"%","ch":null,"mn":0,"fl":1},"mod_rate":{"l":"Mod Rate","u":"Hz","ch":null,"mn":0.0500000007,"fl":1},"width":{"l":"Width","u":"%","ch":null,"mn":0,"fl":1},"age":{"l":"Age","u":"%","ch":null,"mn":0,"fl":1},"env_time":{"l":"Time","u":"ms","ch":null,"mn":50,"fl":1},"shimmer_pitch":{"l":"Pitch","u":"","ch":null,"mn":-24,"fl":3},"shimmer_amount":{"l":"Amount","u":"%","ch":null,"mn":0,"fl":1},"duck":{"l":"Duck","u":"%","ch":null,"mn":0,"fl":1},"freeze":{"l":"Freeze","u":"","ch":null,"mn":0,"fl":5},"mix":{"l":"Mix","u":"%","ch":null,"mn":0,"fl":1},"out_gain":{"l":"Output","u":"dB","ch":null,"mn":-24,"fl":1}},"group":"Reverbs"},"pgrain":{"label":"pump GRAIN","long":"Granular","ps":[["position",0,"n",0,4000,"pow",2.5,0.329877,0.001],["size",1,"n",5,1000,"log",1,0.5998232,0.001],["density",2,"n",1,100,"log",1,0.5395906,0.001],["spray",3,"v",0,100,"lin",1,10,0.1],["sync",4,"v",0,1,"lin",1,0,1],["division",5,"v",0,17,"lin",1,5,1],["envelope",6,"v",0,4,"lin",1,0,1],["reverse",7,"v",0,100,"lin",1,0,0.1],["stereo",8,"v",0,100,"lin",1,40,0.1],["pitch",9,"v",-24,24,"lin",1,0,1],["pitch_spread",10,"n",0,24,"pow",2,0,0.001],["quantize",11,"v",0,6,"lin",1,0,1],["feedback",12,"v",0,100,"lin",1,0,0.1],["filter",13,"v",0,3,"lin",1,0,1],["cutoff",14,"n",20,20000,"log",1,0.6666667,0.001],["resonance",15,"v",0,100,"lin",1,20,0.1],["space",16,"v",0,100,"lin",1,25,0.1],["motion_rate",17,"n",0.02,10,"log",1,0.406418,0.001],["motion_depth",18,"v",0,100,"lin",1,20,0.1],["morph_x",19,"v",-100,100,"lin",1,0,0.2],["morph_y",20,"v",-100,100,"lin",1,0,0.2],["freeze",21,"v",0,1,"lin",1,0,1],["mix",22,"v",0,100,"lin",1,50,0.1],["out_gain",23,"v",-24,24,"lin",1,0,0.048]],"ui":{"position":{"l":"Position","u":"ms","ch":null,"mn":0,"fl":1},"size":{"l":"Size","u":"ms","ch":null,"mn":5,"fl":1},"density":{"l":"Density","u":"","ch":null,"mn":1,"fl":1},"spray":{"l":"Spray","u":"%","ch":null,"mn":0,"fl":1},"sync":{"l":"Sync","u":"","ch":null,"mn":0,"fl":5},"division":{"l":"Division","u":"","ch":["1/64","1/32T","1/32","1/32D","1/16T","1/16","1/16D","1/8T","1/8","1/8D","1/4T","1/4","1/4D","1/2T","1/2","1/2D","1/1","2/1"],"mn":0,"fl":3},"envelope":{"l":"Envelope","u":"","ch":["Smooth","Soft","Percussive","Swell","Square"],"mn":0,"fl":3},"reverse":{"l":"Reverse","u":"%","ch":null,"mn":0,"fl":1},"stereo":{"l":"Stereo","u":"%","ch":null,"mn":0,"fl":1},"pitch":{"l":"Pitch","u":"","ch":null,"mn":-24,"fl":3},"pitch_spread":{"l":"Spread","u":"","ch":null,"mn":0,"fl":1},"quantize":{"l":"Quantize","u":"","ch":["Off","Chromatic","Major","Minor","Pentatonic","Octaves","Fifths"],"mn":0,"fl":3},"feedback":{"l":"Feedback","u":"%","ch":null,"mn":0,"fl":1},"filter":{"l":"Filter","u":"","ch":["Off","Low Pass","Band Pass","High Pass"],"mn":0,"fl":3},"cutoff":{"l":"Cutoff","u":"Hz","ch":null,"mn":20,"fl":1},"resonance":{"l":"Reso","u":"%","ch":null,"mn":0,"fl":1},"space":{"l":"Space","u":"%","ch":null,"mn":0,"fl":1},"motion_rate":{"l":"Rate","u":"Hz","ch":null,"mn":0.0199999996,"fl":1},"motion_depth":{"l":"Depth","u":"%","ch":null,"mn":0,"fl":1},"morph_x":{"l":"Morph X","u":"%","ch":null,"mn":-100,"fl":1},"morph_y":{"l":"Morph Y","u":"%","ch":null,"mn":-100,"fl":1},"freeze":{"l":"Freeze","u":"","ch":null,"mn":0,"fl":5},"mix":{"l":"Mix","u":"%","ch":null,"mn":0,"fl":1},"out_gain":{"l":"Output","u":"dB","ch":null,"mn":-24,"fl":1}},"group":"Granular and spectral"},"pvox":{"label":"pump VOX","long":"Vocoder","ps":[["engine",34,"v",0,1,"lin",1,0,1],["mode",0,"v",0,3,"lin",1,0,1],["route",1,"v",0,3,"lin",1,3,1],["bands",2,"v",0,6,"lin",1,2,1],["formant",11,"v",-12,12,"lin",1,0,0.024],["attack",12,"n",0.5,100,"log",1,0.3924721,0.001],["release",13,"n",5,1000,"log",1,0.4689992,0.001],["source",20,"v",0,2,"lin",1,0,1],["wave",21,"v",0,4,"lin",1,0,1],["octave",22,"v",-2,2,"lin",1,0,1],["chord",23,"v",0,6,"lin",1,0,1],["key",24,"v",0,11,"lin",1,0,1],["scale",25,"v",0,14,"lin",1,1,1],["ensemble",29,"v",0,100,"lin",1,0,0.1],["voice_dry",30,"v",0,100,"lin",1,0,0.1],["carrier_dry",31,"v",0,100,"lin",1,0,0.1],["fx_pitch",36,"v",-24,24,"lin",1,0,0.048],["fx_formant",37,"v",-12,12,"lin",1,0,0.024],["fx_robot_on",46,"v",0,1,"lin",1,0,1],["fx_char_on",54,"v",0,1,"lin",1,0,1],["fx_filter",55,"v",0,4,"lin",1,0,1],["fx_mix",61,"v",0,100,"lin",1,100,0.1],["out_gain",32,"v",-24,24,"lin",1,0,0.048]],"ui":{"engine":{"l":"Engine","u":"","ch":["Vocoder","Voice FX"],"mn":0,"fl":2},"mode":{"l":"Mode","u":"","ch":["Classic","Spectral","Talkbox","Convolve"],"mn":0,"fl":2},"route":{"l":"Routing","u":"","ch":["Synth carrier","Sidechain carrier","Sidechain voice","Split L/R"],"mn":0,"fl":2},"bands":{"l":"Bands","u":"","ch":["8","12","16","20","24","32","40"],"mn":0,"fl":3},"formant":{"l":"Formant","u":"","ch":null,"mn":-12,"fl":1},"attack":{"l":"Attack","u":"ms","ch":null,"mn":0.5,"fl":1},"release":{"l":"Release","u":"ms","ch":null,"mn":5,"fl":1},"source":{"l":"Source","u":"","ch":["Auto","MIDI","Follow"],"mn":0,"fl":3},"wave":{"l":"Wave","u":"","ch":["Saw","Square","Super","Buzz","Noise"],"mn":0,"fl":3},"octave":{"l":"Octave","u":"","ch":null,"mn":-2,"fl":3},"chord":{"l":"Chord","u":"","ch":["Off","Octave","Fifth","Triad","Seventh","Sus","Stack"],"mn":0,"fl":3},"key":{"l":"Key","u":"","ch":["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"],"mn":0,"fl":3},"scale":{"l":"Scale","u":"","ch":["Exact","Chromatic","Major","Minor","Harmonic Minor","Melodic Minor","Dorian","Phrygian","Lydian","Mixolydian","Locrian","Major Pentatonic","Minor Pentatonic","Blues","Whole Tone"],"mn":0,"fl":3},"ensemble":{"l":"Ensemble","u":"%","ch":null,"mn":0,"fl":1},"voice_dry":{"l":"Voice","u":"%","ch":null,"mn":0,"fl":1},"carrier_dry":{"l":"Carrier","u":"%","ch":null,"mn":0,"fl":1},"fx_pitch":{"l":"Pitch","u":"","ch":null,"mn":-24,"fl":1},"fx_formant":{"l":"Formant","u":"","ch":null,"mn":-12,"fl":1},"fx_robot_on":{"l":"Robot","u":"","ch":null,"mn":0,"fl":5},"fx_char_on":{"l":"Character","u":"","ch":null,"mn":0,"fl":5},"fx_filter":{"l":"Filter","u":"","ch":["Off","Radio","Phone","Megaphone","Walkie"],"mn":0,"fl":3},"fx_mix":{"l":"Mix","u":"%","ch":null,"mn":0,"fl":1},"out_gain":{"l":"Output","u":"dB","ch":null,"mn":-24,"fl":1}},"group":"Pitch and voice"},"ptune":{"label":"pump TUNE","long":"Pitch Correction","ps":[["mode",0,"v",0,1,"lin",1,0,1],["key",1,"v",0,11,"lin",1,0,1],["scale",2,"v",0,13,"lin",1,0,1],["midi",3,"v",0,2,"lin",1,0,1],["range",4,"v",0,2,"lin",1,1,1],["retune",5,"n",0,400,"pow",2,0.2236068,0.001],["amount",6,"v",0,100,"lin",1,100,0.1],["humanize",7,"v",0,100,"lin",1,0,0.1],["flex",8,"v",0,100,"lin",1,0,0.1],["vib_depth",9,"v",0,100,"lin",1,0,0.1],["vib_rate",10,"v",2,9,"lin",1,5.5,0.007],["transpose",11,"v",-24,24,"lin",1,0,1],["formant",12,"v",-12,12,"lin",1,0,0.024],["formant_follow",13,"v",0,1,"lin",1,0,1],["harm_mode",14,"v",0,2,"lin",1,0,1],["h1",15,"v",-12,12,"lin",1,2,1],["h2",16,"v",-12,12,"lin",1,-3,1],["h3",17,"v",-12,12,"lin",1,4,1],["h4",18,"v",-12,12,"lin",1,7,1],["h1_level",19,"v",0,100,"lin",1,70,0.1],["h2_level",20,"v",0,100,"lin",1,60,0.1],["h3_level",21,"v",0,100,"lin",1,0,0.1],["h4_level",22,"v",0,100,"lin",1,0,0.1],["h1_pan",23,"v",-100,100,"lin",1,-45,0.2],["h2_pan",24,"v",-100,100,"lin",1,45,0.2],["h3_pan",25,"v",-100,100,"lin",1,-80,0.2],["h4_pan",26,"v",-100,100,"lin",1,80,0.2],["harm_formant",27,"v",-12,12,"lin",1,0,0.024],["harm_humanize",28,"v",0,100,"lin",1,30,0.1],["lead",29,"v",0,100,"lin",1,100,0.1],["harm_level",30,"v",-24,12,"lin",1,0,0.036],["out_gain",31,"v",-24,24,"lin",1,0,0.048]],"ui":{"mode":{"l":"Mode","u":"","ch":["Live","Graph"],"mn":0,"fl":3},"key":{"l":"Key","u":"","ch":["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"],"mn":0,"fl":3},"scale":{"l":"Scale","u":"","ch":["Chromatic","Major","Minor","Harmonic Minor","Melodic Minor","Dorian","Phrygian","Lydian","Mixolydian","Locrian","Major Pentatonic","Minor Pentatonic","Blues","Whole Tone"],"mn":0,"fl":3},"midi":{"l":"MIDI","u":"","ch":["Off","Lead notes","Harmony notes"],"mn":0,"fl":3},"range":{"l":"Range","u":"","ch":["High","Mid","Low"],"mn":0,"fl":2},"retune":{"l":"Retune","u":"ms","ch":null,"mn":0,"fl":1},"amount":{"l":"Amount","u":"%","ch":null,"mn":0,"fl":1},"humanize":{"l":"Humanize","u":"%","ch":null,"mn":0,"fl":1},"flex":{"l":"Flex","u":"","ch":null,"mn":0,"fl":1},"vib_depth":{"l":"Vibrato","u":"","ch":null,"mn":0,"fl":1},"vib_rate":{"l":"Rate","u":"Hz","ch":null,"mn":2,"fl":1},"transpose":{"l":"Transpose","u":"","ch":null,"mn":-24,"fl":3},"formant":{"l":"Formant","u":"","ch":null,"mn":-12,"fl":1},"formant_follow":{"l":"Follow","u":"","ch":null,"mn":0,"fl":5},"harm_mode":{"l":"Harmony","u":"","ch":["Off","Scale","Fixed"],"mn":0,"fl":3},"h1":{"l":"Harmony 1","u":"","ch":null,"mn":-12,"fl":3},"h2":{"l":"Harmony 2","u":"","ch":null,"mn":-12,"fl":3},"h3":{"l":"Harmony 3","u":"","ch":null,"mn":-12,"fl":3},"h4":{"l":"Harmony 4","u":"","ch":null,"mn":-12,"fl":3},"h1_level":{"l":"Level","u":"%","ch":null,"mn":0,"fl":1},"h2_level":{"l":"Level","u":"%","ch":null,"mn":0,"fl":1},"h3_level":{"l":"Level","u":"%","ch":null,"mn":0,"fl":1},"h4_level":{"l":"Level","u":"%","ch":null,"mn":0,"fl":1},"h1_pan":{"l":"Pan","u":"","ch":null,"mn":-100,"fl":1},"h2_pan":{"l":"Pan","u":"","ch":null,"mn":-100,"fl":1},"h3_pan":{"l":"Pan","u":"","ch":null,"mn":-100,"fl":1},"h4_pan":{"l":"Pan","u":"","ch":null,"mn":-100,"fl":1},"harm_formant":{"l":"Formant","u":"","ch":null,"mn":-12,"fl":1},"harm_humanize":{"l":"Humanize","u":"%","ch":null,"mn":0,"fl":1},"lead":{"l":"Lead","u":"%","ch":null,"mn":0,"fl":1},"harm_level":{"l":"Harmony","u":"dB","ch":null,"mn":-24,"fl":1},"out_gain":{"l":"Output","u":"dB","ch":null,"mn":-24,"fl":1}},"group":"Pitch and voice"},"pcrush":{"label":"pump CRUSH","long":"Lo-Fi Degrader","ps":[["mode",0,"v",0,6,"lin",1,1,1],["drive",1,"v",0,24,"lin",1,0,0.024],["bits",2,"v",1,24,"lin",1,12,0.023],["rate",3,"n",200,48000,"log",1,0.8884132,0.001],["jitter",4,"v",0,100,"lin",1,0,0.1],["order",5,"v",0,1,"lin",1,0,1],["wow",6,"v",0,100,"lin",1,0,0.1],["flutter",7,"v",0,100,"lin",1,0,0.1],["hiss",8,"v",0,100,"lin",1,0,0.1],["crackle",9,"v",0,100,"lin",1,0,0.1],["dropout",10,"v",0,100,"lin",1,0,0.1],["age",11,"v",0,100,"lin",1,0,0.1],["low_cut",12,"n",10,1000,"log",1,0,0.001],["high_cut",13,"n",1000,22000,"log",1,1,0.001],["mix",14,"v",0,100,"lin",1,100,0.1],["out_gain",15,"v",-24,24,"lin",1,0,0.048]],"ui":{"mode":{"l":"Voicing","u":"","ch":["Clean","Grit 12","Hi-fi 12","Dark 12","Companded 8","Toy","Phone"],"mn":0,"fl":3},"drive":{"l":"Drive","u":"dB","ch":null,"mn":0,"fl":1},"bits":{"l":"Bits","u":"","ch":null,"mn":1,"fl":1},"rate":{"l":"Rate","u":"Hz","ch":null,"mn":200,"fl":1},"jitter":{"l":"Jitter","u":"%","ch":null,"mn":0,"fl":1},"order":{"l":"Media","u":"","ch":["After","Before"],"mn":0,"fl":3},"wow":{"l":"Wow","u":"%","ch":null,"mn":0,"fl":1},"flutter":{"l":"Flutter","u":"%","ch":null,"mn":0,"fl":1},"hiss":{"l":"Hiss","u":"%","ch":null,"mn":0,"fl":1},"crackle":{"l":"Crackle","u":"%","ch":null,"mn":0,"fl":1},"dropout":{"l":"Dropouts","u":"%","ch":null,"mn":0,"fl":1},"age":{"l":"Age","u":"%","ch":null,"mn":0,"fl":1},"low_cut":{"l":"Low Cut","u":"Hz","ch":null,"mn":10,"fl":1},"high_cut":{"l":"High Cut","u":"Hz","ch":null,"mn":1000,"fl":1},"mix":{"l":"Mix","u":"%","ch":null,"mn":0,"fl":1},"out_gain":{"l":"Output","u":"dB","ch":null,"mn":-24,"fl":1}},"group":"Drive and lo-fi"},"pswirl":{"label":"pump SWIRL","long":"Modulation","ps":[["mode",0,"v",0,5,"lin",1,1,1],["variant",1,"v",0,3,"lin",1,0,1],["rate",2,"n",0.02,12,"log",1,0.5031908,0.001],["sync",3,"v",0,1,"lin",1,0,1],["division",4,"v",0,17,"lin",1,16,1],["depth",5,"v",0,100,"lin",1,60,0.1],["manual",6,"v",0,100,"lin",1,45,0.1],["feedback",7,"v",-95,95,"lin",1,0,0.19],["spread",8,"v",0,180,"lin",1,90,0.18],["tone",9,"n",1000,20000,"log",1,1,0.001],["warmth",10,"v",0,100,"lin",1,30,0.1],["mix",11,"v",0,100,"lin",1,50,0.1],["out_gain",12,"v",-24,24,"lin",1,0,0.048]],"ui":{"mode":{"l":"Type","u":"","ch":["Ensemble","Analog","Rack","Flanger","Phaser","Lamp"],"mn":0,"fl":3},"variant":{"l":"Variant","u":"","ch":["1","2","3","4"],"mn":0,"fl":3},"rate":{"l":"Rate","u":"Hz","ch":null,"mn":0.0199999996,"fl":1},"sync":{"l":"Sync","u":"","ch":null,"mn":0,"fl":5},"division":{"l":"Division","u":"","ch":["1/64","1/32T","1/32","1/32D","1/16T","1/16","1/16D","1/8T","1/8","1/8D","1/4T","1/4","1/4D","1/2T","1/2","1/2D","1/1","2/1"],"mn":0,"fl":3},"depth":{"l":"Depth","u":"%","ch":null,"mn":0,"fl":1},"manual":{"l":"Manual","u":"%","ch":null,"mn":0,"fl":1},"feedback":{"l":"Feedback","u":"%","ch":null,"mn":-95,"fl":1},"spread":{"l":"Spread","u":"","ch":null,"mn":0,"fl":1},"tone":{"l":"Tone","u":"Hz","ch":null,"mn":1000,"fl":1},"warmth":{"l":"Warmth","u":"%","ch":null,"mn":0,"fl":1},"mix":{"l":"Mix","u":"%","ch":null,"mn":0,"fl":1},"out_gain":{"l":"Output","u":"dB","ch":null,"mn":-24,"fl":1}},"group":"Modulation effects"},"pstutter":{"label":"pump STUTTER","long":"Beat Repeat","ps":[["trigger",0,"v",0,1,"lin",1,0,1],["interval",1,"v",0,17,"lin",1,16,1],["chance",2,"v",0,100,"lin",1,35,0.1],["length",3,"v",0,17,"lin",1,11,1],["grid",4,"v",0,17,"lin",1,5,1],["gate",5,"v",5,100,"lin",1,100,0.095],["pitch",6,"v",-12,12,"lin",1,0,0.024],["decay",7,"v",0,100,"lin",1,0,0.1],["filter",8,"v",-100,100,"lin",1,0,0.2],["variation",9,"v",0,100,"lin",1,0,0.1],["tape",10,"v",10,100,"lin",1,100,0.09],["mix",11,"v",0,100,"lin",1,100,0.1],["out_gain",12,"v",-24,24,"lin",1,0,0.048],["use_repeat",14,"v",0,1,"lin",1,1,1],["use_roll",15,"v",0,1,"lin",1,1,1],["use_reverse",16,"v",0,1,"lin",1,1,1],["use_tape",17,"v",0,1,"lin",1,1,1],["use_half",18,"v",0,1,"lin",1,0,1],["use_shuffle",19,"v",0,1,"lin",1,0,1],["use_gate",20,"v",0,1,"lin",1,0,1],["use_glitch",21,"v",0,1,"lin",1,0,1],["pattern_on",22,"v",0,1,"lin",1,0,1],["pattern",23,"v",0,12,"lin",1,1,1],["pattern_step",24,"v",0,17,"lin",1,5,1]],"ui":{"trigger":{"l":"Trigger","u":"","ch":["Auto","Manual"],"mn":0,"fl":3},"interval":{"l":"Interval","u":"","ch":["1/64","1/32T","1/32","1/32D","1/16T","1/16","1/16D","1/8T","1/8","1/8D","1/4T","1/4","1/4D","1/2T","1/2","1/2D","1/1","2/1"],"mn":0,"fl":3},"chance":{"l":"Chance","u":"%","ch":null,"mn":0,"fl":1},"length":{"l":"Length","u":"","ch":["1/64","1/32T","1/32","1/32D","1/16T","1/16","1/16D","1/8T","1/8","1/8D","1/4T","1/4","1/4D","1/2T","1/2","1/2D","1/1","2/1"],"mn":0,"fl":3},"grid":{"l":"Grid","u":"","ch":["1/64","1/32T","1/32","1/32D","1/16T","1/16","1/16D","1/8T","1/8","1/8D","1/4T","1/4","1/4D","1/2T","1/2","1/2D","1/1","2/1"],"mn":0,"fl":3},"gate":{"l":"Gate","u":"%","ch":null,"mn":5,"fl":1},"pitch":{"l":"Pitch","u":"","ch":null,"mn":-12,"fl":1},"decay":{"l":"Decay","u":"%","ch":null,"mn":0,"fl":1},"filter":{"l":"Filter","u":"%","ch":null,"mn":-100,"fl":1},"variation":{"l":"Variation","u":"%","ch":null,"mn":0,"fl":1},"tape":{"l":"Tape","u":"%","ch":null,"mn":10,"fl":1},"mix":{"l":"Mix","u":"%","ch":null,"mn":0,"fl":1},"out_gain":{"l":"Output","u":"dB","ch":null,"mn":-24,"fl":1},"use_repeat":{"l":"REPEAT","u":"","ch":null,"mn":0,"fl":5},"use_roll":{"l":"ROLL","u":"","ch":null,"mn":0,"fl":5},"use_reverse":{"l":"REVERSE","u":"","ch":null,"mn":0,"fl":5},"use_tape":{"l":"TAPE STOP","u":"","ch":null,"mn":0,"fl":5},"use_half":{"l":"HALF","u":"","ch":null,"mn":0,"fl":5},"use_shuffle":{"l":"SHUFFLE","u":"","ch":null,"mn":0,"fl":5},"use_gate":{"l":"GATE","u":"","ch":null,"mn":0,"fl":5},"use_glitch":{"l":"GLITCH","u":"","ch":null,"mn":0,"fl":5},"pattern_on":{"l":"Pattern","u":"","ch":null,"mn":0,"fl":5},"pattern":{"l":"Pattern","u":"","ch":["Empty","Build-up","End-of-bar roll","3-3-2 stutter","Reverse offbeats","Half-time back half","Tape stop drop","Glitch funk","Melodic repeats","Gate the bar","Shuffle chop","Fill","User"],"mn":0,"fl":3},"pattern_step":{"l":"Step","u":"","ch":["1/64","1/32T","1/32","1/32D","1/16T","1/16","1/16D","1/8T","1/8","1/8D","1/4T","1/4","1/4D","1/2T","1/2","1/2D","1/1","2/1"],"mn":0,"fl":3}},"group":"Rhythmic effects"},"ptwang":{"label":"pump TWANG","long":"Spring Resonator","ps":[["model",0,"v",0,5,"lin",1,0,1],["tension",1,"v",-100,100,"lin",1,0,0.2],["drip",2,"v",0,100,"lin",1,50,0.1],["decay",3,"n",0.1,15,"log",1,0.6424087,0.001],["release",4,"n",0.02,8,"log",1,0.5676738,0.001],["harmonic",5,"v",0,100,"lin",1,40,0.1],["spread",6,"v",0,100,"lin",1,10,0.1],["wobble",7,"v",0,100,"lin",1,15,0.1],["tone",8,"v",-100,100,"lin",1,0,0.2],["grit",9,"v",0,100,"lin",1,35,0.1],["tuning",10,"v",0,2,"lin",1,0,1],["root",11,"v",0,11,"lin",1,9,1],["chord",12,"v",0,11,"lin",1,2,1],["octave",13,"v",-2,2,"lin",1,0,1],["drive",14,"v",0,100,"lin",1,50,0.1],["tank",15,"v",0,100,"lin",1,0,0.1],["width",16,"v",0,100,"lin",1,70,0.1],["mix",17,"v",0,100,"lin",1,50,0.1],["volume",18,"v",-24,12,"lin",1,0,0.036]],"ui":{"model":{"l":"Model","u":"","ch":["Two-spring","Three-spring","Short tank","Long tank","Digital","Lo-fi digital"],"mn":0,"fl":3},"tension":{"l":"Tension","u":"%","ch":null,"mn":-100,"fl":1},"drip":{"l":"Drip","u":"%","ch":null,"mn":0,"fl":1},"decay":{"l":"Decay","u":"s","ch":null,"mn":0.100000001,"fl":1},"release":{"l":"Release","u":"s","ch":null,"mn":0.0199999996,"fl":1},"harmonic":{"l":"Harmonic","u":"%","ch":null,"mn":0,"fl":1},"spread":{"l":"Spread","u":"%","ch":null,"mn":0,"fl":1},"wobble":{"l":"Wobble","u":"%","ch":null,"mn":0,"fl":1},"tone":{"l":"Tone","u":"%","ch":null,"mn":-100,"fl":1},"grit":{"l":"Grit","u":"%","ch":null,"mn":0,"fl":1},"tuning":{"l":"Tuning","u":"","ch":["Chord","MIDI","MIDI latch"],"mn":0,"fl":3},"root":{"l":"Root","u":"","ch":["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"],"mn":0,"fl":3},"chord":{"l":"Chord","u":"","ch":["Single","Octave","Fifth","Power","Major","Minor","Sus4","Maj7","Min7","Dom7","Sus2","Fifths stack"],"mn":0,"fl":3},"octave":{"l":"Oct","u":"","ch":null,"mn":-2,"fl":3},"drive":{"l":"Drive","u":"%","ch":null,"mn":0,"fl":1},"tank":{"l":"Tank","u":"%","ch":null,"mn":0,"fl":1},"width":{"l":"Width","u":"%","ch":null,"mn":0,"fl":1},"mix":{"l":"Mix","u":"%","ch":null,"mn":0,"fl":1},"volume":{"l":"Output","u":"dB","ch":null,"mn":-24,"fl":1}},"group":"Resonators"}};
-const PUMP_ABOUT = {"ptube":"pump TUBE (tube distortion), the …pump plugin’s own sound. Creative tube distortion: six circuits from glow to fuzz, with bias, sag, starved voltage and up to three stages.","psnap":"pump SNAP (transient shaper), the …pump plugin’s own sound. Level-independent transient shaper: boost or cut attack and sustain, with a focused detector, band split, lookahead and a soft clipper.","pgate":"pump GATE (sequenced gate), the …pump plugin’s own sound. Tempo-synced step gate: up to 32 steps with swing, envelope, smoothing, a resonant filter mode and stereo offset.","pecho":"pump ECHO (delay), the …pump plugin’s own sound. Character delay: digital, tape, bucket-brigade, pitch and reverse echoes, tempo sync, ping-pong, ducking and freeze.","pspring":"pump SPRING (spring reverb), the …pump plugin’s own sound. Spring reverb: dispersive two- and three-spring tanks that drip and crash, and a cheap early-digital spring that crunches.","pverb":"pump VERB (reverb), the …pump plugin’s own sound. Algorithmic reverb: smooth modern halls, rooms, chambers and plates, grainy late-70s and lush 80s digital, a 90s rack, gated, reverse and shimmer.","pgrain":"pump GRAIN (granular), the …pump plugin’s own sound. Real-time granular effect: clouds, glitches and pitched shimmer from the last seconds of input, with freeze, feedback, filter, space and XY morphing.","pvox":"pump VOX (vocoder), the …pump plugin’s own sound. Vocoder: classic band vocoder, spectral, talkbox and convolution modes, with a built-in carrier synth that plays MIDI or follows your voice; and Voice FX: pitch, formant, grit, robot and character. Here it starts on Split L/R: patch the carrier (a synth) into In L and the voice into In R.","ptune":"pump TUNE (pitch correction), the …pump plugin’s own sound. Pitch correction for a solo voice: live key/scale or MIDI correction, a graph to capture and edit notes, up to four harmonies, formant shift.","pcrush":"pump CRUSH (lo-fi degrader), the …pump plugin’s own sound. Lo-fi degrader: vintage sampler voicings, bit and sample-rate reduction, and worn media: wow, flutter, hiss, crackle, dropouts and age.","pswirl":"pump SWIRL (modulation), the …pump plugin’s own sound. Chorus, flanger and phaser: stereo ensemble, bucket-brigade and rack choruses, tape and through-zero flanging, all-pass and lamp phasers; tempo sync.","pstutter":"pump STUTTER (beat repeat), the …pump plugin’s own sound. Tempo-locked repeats, rolls, reverses, tape stops, half speed, slice shuffles, gates and glitches: by chance on the beat, from pads or from MIDI notes.","ptwang":"pump TWANG (spring resonator), the …pump plugin’s own sound. Tuned spring resonator: SPRING's springs tuned to a chord or to MIDI notes, rung by the audio you feed them, from clanging metal to clean strings."};
+const PUMP_ABOUT = {"ptube":"pump TUBE (tube distortion), the pump plugin’s own sound. Creative tube distortion: six circuits from glow to fuzz, with bias, sag, starved voltage and up to three stages.","psnap":"pump SNAP (transient shaper), the pump plugin’s own sound. Level-independent transient shaper: boost or cut attack and sustain, with a focused detector, band split, lookahead and a soft clipper.","pgate":"pump GATE (sequenced gate), the pump plugin’s own sound. Tempo-synced step gate: up to 32 steps with swing, envelope, smoothing, a resonant filter mode and stereo offset.","pecho":"pump ECHO (delay), the pump plugin’s own sound. Character delay: digital, tape, bucket-brigade, pitch and reverse echoes, tempo sync, ping-pong, ducking and freeze.","pspring":"pump SPRING (spring reverb), the pump plugin’s own sound. Spring reverb: dispersive two- and three-spring tanks that drip and crash, and a cheap early-digital spring that crunches.","pverb":"pump VERB (reverb), the pump plugin’s own sound. Algorithmic reverb: smooth modern halls, rooms, chambers and plates, grainy late-70s and lush 80s digital, a 90s rack, gated, reverse and shimmer.","pgrain":"pump GRAIN (granular), the pump plugin’s own sound. Real-time granular effect: clouds, glitches and pitched shimmer from the last seconds of input, with freeze, feedback, filter, space and XY morphing.","pvox":"pump VOX (vocoder), the pump plugin’s own sound. Vocoder: classic band vocoder, spectral, talkbox and convolution modes, with a built-in carrier synth that plays MIDI or follows your voice; and Voice FX: pitch, formant, grit, robot and character. Here it starts on Split L/R: patch the carrier (a synth) into In L and the voice into In R.","ptune":"pump TUNE (pitch correction), the pump plugin’s own sound. Pitch correction for a solo voice: live key/scale or MIDI correction, a graph to capture and edit notes, up to four harmonies, formant shift.","pcrush":"pump CRUSH (lo-fi degrader), the pump plugin’s own sound. Lo-fi degrader: vintage sampler voicings, bit and sample-rate reduction, and worn media: wow, flutter, hiss, crackle, dropouts and age.","pswirl":"pump SWIRL (modulation), the pump plugin’s own sound. Chorus, flanger and phaser: stereo ensemble, bucket-brigade and rack choruses, tape and through-zero flanging, all-pass and lamp phasers; tempo sync.","pstutter":"pump STUTTER (beat repeat), the pump plugin’s own sound. Tempo-locked repeats, rolls, reverses, tape stops, half speed, slice shuffles, gates and glitches: by chance on the beat, from pads or from MIDI notes.","ptwang":"pump TWANG (spring resonator), the pump plugin’s own sound. Tuned spring resonator: SPRING's springs tuned to a chord or to MIDI notes, rung by the audio you feed them, from clanging metal to clean strings."};
 function pumpTxt(q, u){
   return v => {
     if (u.ch){ const s = u.ch[Math.round(v - u.mn)]; return s != null ? s : String(v); }
@@ -1669,7 +1669,7 @@ for (const [t, d] of Object.entries(MODULES)){
 const plabel = (t, k) => (MODULES[t].ui[k] || {}).l || k;
 const fmtOf = (t, k) => (MODULES[t].ui[k] || {}).f || (v => (+v).toFixed(2));
 const choicesOf = (t, k) => (MODULES[t].ui[k] || {}).c || null;
-/* ---------- the bottom panel (…Thunder Plus): controls mapped out of this patch ----------
+/* ---------- the bottom panel (Thunder Plus): controls mapped out of this patch ----------
    Right-click a control (or a module) → Add to the bottom panel. The list lives in the patch (doc.deck), so it saves with
    the song; each entry carries what the app needs to draw the control without this editor open: the module's and the
    control's names, the range, the choices, and how the value reads (a named format, or the text at 33 points across the
@@ -1690,7 +1690,7 @@ function deckChange(fn){
 }
 function markDeck(){ for (const n of nodes.values()) for (const k in n.ctl){ const r = n.ctl[k].row; if (r) r.classList.toggle('indeck', deckHas(n.m.id, k)); } }
 
-/* Families give each module its edge color, as in ...Seeds. */
+/* Families give each module its edge color, as in Seeds. */
 const FAMILY = { trackIn:'aout',
   resample:'util', vcf:'util', vca:'util', mixer:'util', smixer:'util', lfo:'mod', adsr:'mod', random:'mod', atten:'mod', chainOut:'aout' };
 Object.assign(FAMILY, SHARED_FAMILY);
@@ -1705,10 +1705,10 @@ const PORT_LABEL = { pitch:'Pitch', gate:'Gate', vel:'Velocity', fm:'FM', out:'O
 };
 for (let k = 1; k <= MIXN; k++){ PORT_LABEL['in' + k] = 'In ' + k; PORT_LABEL['in' + k + 'R'] = 'In ' + k + ' R'; }
 const NOTES = {
-  trackIn: m => 'Tracker track ' + (m.params.track | 0) + ' in (stereo). Standalone this is silence; in …Thunder Plus it carries that track’s sound.',
-  chainOut: m => 'Returns to tracker track ' + (m.params.track | 0) + ' (stereo, after Level). In …Thunder Plus the Mixer sends it back through that track and anything after it.'
+  trackIn: m => 'Tracker track ' + (m.params.track | 0) + ' in (stereo). Standalone this is silence; in Thunder Plus it carries that track’s sound.',
+  chainOut: m => 'Returns to tracker track ' + (m.params.track | 0) + ' (stereo, after Level). In Thunder Plus the Mixer sends it back through that track and anything after it.'
 };
-for (const t in MODULES) if (MODULES[t].fx && !NOTES[t]) NOTES[t] = () => WASM_OK.tfx ? null : 'Couldn’t load the effects code (dsp/tfx.wasm), so this passes sound through unchanged.';
+for (const t in MODULES) if (MODULES[t].fx && !NOTES[t]) NOTES[t] = () => WASM_OK.tfx ? null : 'Couldn’t load the effects. This module passes sound through unchanged.';
 NOTES.rings = NOTES.rings || NOTES.eq; NOTES.clouds = NOTES.clouds || NOTES.eq;
 let WASM_OK = { tfx:true };
 
@@ -1748,10 +1748,11 @@ function askDialog(msg, opts){
 const typing = e => e.target && e.target.closest && e.target.closest('input:not([type=range]):not([type=checkbox]), select, textarea, [contenteditable="true"]');
 const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
 const newId = p => (p || 'm') + Date.now().toString(36) + Math.floor(Math.random() * 1296).toString(36);
-/* Inside …Thunder Plus the editor runs in a frame: the patch lives in Thunder's song (window.parent.thunderChains),
-   and everything else is saved under its own names so it never mixes with the standalone …chains. */
+/* Inside Thunder Plus the editor runs in a frame: the patch lives in Thunder's song (window.parent.thunderChains),
+   and everything else is saved under its own names so it never mixes with the standalone chains. */
 const TW = (() => { try { return window.parent !== window && window.parent.thunderChains || null; } catch (e) { return null; } })();
 const EMBED = !!TW, KP = EMBED ? 'thunderplus.chains.' : 'chains.';
+const napping = () => false;   // (the shared editor's timers ask; only waves, embedded, ever naps them: it has its own engine)
 /* A save or load that fails is reported (console only) instead of vanishing. Inside Thunder Plus it goes to the page's own
    tpLog, so everything is read from one place (window.tpLogs there); on its own it prints here, once per message. */
 const tpLog = (() => { const seen = new Set(); return (where, err) => { try {
@@ -1759,14 +1760,14 @@ const tpLog = (() => { const seen = new Set(); return (where, err) => { try {
   const msg = String(err && err.message || err), key = where + '|' + msg; if (seen.has(key) || seen.size >= 100) return; seen.add(key); console.warn('[chains] ' + where + ': ' + msg);
 } catch (_) { /* the logger must never throw */ } }; })();
 
-/* VIEW KEYS (owner, 22 Oct): inside ...Thunder Plus, Alt+0 the synth, Alt+1–7 the tracker's screens, Alt+8 …waves, Alt+9
-   …chains and Alt+` back to the last view work from here too: this page has the keys while it shows, so it passes them on. */
+/* VIEW KEYS (owner, 22 Oct): inside Thunder Plus, Alt+0 the synth, Alt+1–7 the tracker's screens, Alt+8 waves, Alt+9
+   chains and Alt+` back to the last view work from here too: this page has the keys while it shows, so it passes them on. */
 if (EMBED) window.addEventListener('keydown', e => {
   if (!e.altKey || e.ctrlKey || e.metaKey || e.shiftKey || e.repeat || !/^(Digit[0-9]|Backquote)$/.test(e.code) || !TW.viewKey) return;
   const t = e.target; if (t && t.closest && t.closest('input:not([type=range]):not([type=checkbox]), textarea, [contenteditable="true"]')) return;
   e.preventDefault(); e.stopPropagation(); TW.viewKey(e.code);
 }, true);
-/* APP KEYS (Thunder Plus owner, 27 Oct, Phase 2): inside …Thunder Plus the app's keys work here as on every screen:
+/* APP KEYS (Thunder Plus owner, 27 Oct, Phase 2): inside Thunder Plus the app's keys work here as on every screen:
    F2–F9 (screens, transport, REC), Ctrl/⌘+S (Shift: Save as), Ctrl/⌘+O and Ctrl/⌘+N act on the PROJECT (Space already plays the song, below). The patch's own Save / Open / New are in the app's File menu.
    Ctrl/⌘+Z is the song's undo too (ONE UNDO). */
 if (EMBED) window.addEventListener('keydown', e => {
@@ -1835,7 +1836,7 @@ class PatchStore {
   importFrom(file){
     return file.text().then(txt => {
       const d = JSON.parse(txt);
-      if (d.format !== 'chains.patch' && d.format !== 'waves.patch') throw new Error('That file isn’t a …chains patch.');
+      if (d.format !== 'chains.patch' && d.format !== 'waves.patch') throw new Error('That file isn’t a chains patch.');
       this.snapshot(); this._restore(JSON.stringify(d));
     });
   }
@@ -1927,14 +1928,14 @@ class ChainsBridge {
     this._on = { ready:[], meter:[], shed:[], error:[] };
     this.port.onmessage = e => this._recv(e.data);
   }
-  /* The effects code from ...Thunder (tfx.wasm). A worklet can't fetch, so the page does. */
+  /* The effects code from Thunder (tfx.wasm). A worklet can't fetch, so the page does. */
   static wasm(){
     const get = u => fetch(u).then(r => r.ok ? r.arrayBuffer() : null).catch(() => null);
-    return ChainsBridge._wasm || (ChainsBridge._wasm = Promise.all([get('./dsp/tfx.wasm'), get('../pump/pump.wasm?v=6')]));   // PUMP MODULES: …pump's effects
+    return ChainsBridge._wasm || (ChainsBridge._wasm = Promise.all([get('./dsp/tfx.wasm'), get('../pump/pump.wasm?v=6')]));   // PUMP MODULES: pump's effects
   }
   static standalone(opts){
     opts = opts || {};
-    const url = opts.url || './chains-worklet.js?v=43';
+    const url = opts.url || './chains-worklet.js?v=47';
     const ctx = new (window.AudioContext || window.webkitAudioContext)({ latencyHint:'interactive' });
     return Promise.all([ctx.audioWorklet.addModule(url), ChainsBridge.wasm()]).then(([, [tfxBytes, pumpBytes]]) => {
       const node = new AudioWorkletNode(ctx, 'chains', {
@@ -1950,7 +1951,7 @@ class ChainsBridge {
   _recv(m){
     if (!m || (m.target && m.target !== TARGET)) return;
     if (m.op === 'ready'){
-      if (m.value.protocol !== PROTOCOL){ this._emit('error', { message:'Stale engine: bump CACHE in sw.js and reload.' }); return; }
+      if (m.value.protocol !== PROTOCOL){ this._emit('error', { message:'The sound engine is out of date. Reload the page to update it.' }); return; }
       this._ready = true;
       for (const q of this._queue) this.port.postMessage(q);
       this._queue.length = 0; this._emit('ready', m.value);
@@ -2013,7 +2014,7 @@ function normalize(d){
   d.format = 'chains.patch';
   d.modules = d.modules || []; d.cables = d.cables || []; d.groups = d.groups || []; d.custom = d.custom || [];
   // SOURCE (21 Oct): an older patch's Sidechain In (src: a track, snd: a send) and Source (source: Self or the old mixer bus)
-  // become one Source (sck). ...Thunder Plus converts its songs first (the bus becomes the track that fed it); here the bus
+  // become one Source (sck). Thunder Plus converts its songs first (the bus becomes the track that fed it); here the bus
   // becomes Self (Off on a Sidechain In).
   for (const m of d.modules){
     if (!m || !m.params || typeof m.params.sck === 'number' || !MODULES[m.type] || !MODULES[m.type].params.sck) continue;
@@ -2060,7 +2061,7 @@ const PORT_TIP = {
   scin:{ out:{ l:'Audio', t:'Sidechain audio — what Source picks (a track’s own sound, or a send). Patch into any audio input.' },
          env:{ l:'Envelope', t:'Sidechain envelope — rises as the sidechain hits, as a control voltage. Patch into a CV jack to open something on each hit (a cutoff…).' },
          duck:{ l:'Duck', t:'Sidechain duck — 1 while the sidechain is quiet, dipping on each hit. Patch into a VCA’s CV to duck a sound (the classic pump).' } },
-  sccomp:{ sc:{ t:'Sidechain input — patch a signal here to duck by it (it always wins), or leave it unpatched and pick Source. The light flashes with the sidechain it hears.' } },
+  sccomp:{ sc:{ t:'Sidechain input: a cable here always wins. Patch any signal to duck by it, or leave it unpatched to use Source. The light flashes with the sidechain it hears.' } },
   buscomp:{ sc:{ t:'Sidechain input — a cable here always wins: patch a Sidechain In (set to a track or a send) to duck by it. Unpatched: Source (Self, a track or a send).' } },
   glue:{ sc:{ t:'Sidechain input — a cable here always wins: patch a Sidechain In (set to a track or a send) to duck by it. Unpatched: Source (Self, a track or a send).' } },
   scout:{ in:{ t:'What to send: Send (1–8) carries it to every Sidechain In set to that send, in this chain or another track’s.' } },
@@ -2116,8 +2117,8 @@ function routeTrackChange(n, v){
   // after their own faders, and its fader and effects level them all. Back on a Track In's track, it's an insert again.
   const bus = !ins.some(m => (m.params.track | 0) === N);
   if (!bus && outs.some(m => m !== n.m && !m.bus && (m.params.track | 0) === N)){ toast('Track ' + N + ' already has a chain, so this one stays on track ' + old + '.'); return { reject:true }; }
-  if (bus && !n.m.bus) toast('Chain Out to track ' + N + ': a bus. The tracks whose Track In feed it now play through track ' + N + ', after their own faders; track ' + N + '’s fader and effects level them all.', 6000);
-  if (!bus && n.m.bus) toast('Chain Out back on track ' + N + ': an insert again.');
+  if (bus && !n.m.bus) toast('Chain Out is now a bus on track ' + N + '. The tracks feeding it play through track ' + N + ' after their own faders. Track ' + N + '’s fader and effects level them all.', 6000);
+  if (!bus && n.m.bus) toast('Chain Out is back on track ' + N + ' as an insert.');
   n.m.bus = bus ? 1 : 0;
   return { v:N };
 }
@@ -2125,7 +2126,7 @@ function alignChainTracks(quiet){
   const { ins, outs } = chainTrackLists();
   if (ins.length !== 1) return;   // with several Track Ins, pairing is up to the user
   const N = ins[0].params.track | 0;
-  for (const o of outs) if (!o.bus && (o.params.track | 0) !== N){ applyChainTrack(o, N); if (!quiet) toast('Chain Out follows the Track In — track ' + N + '.'); }   // a bus keeps its track
+  for (const o of outs) if (!o.bus && (o.params.track | 0) !== N){ applyChainTrack(o, N); if (!quiet) toast('Chain Out now follows the Track In on track ' + N + '.'); }   // a bus keeps its track
 }
 function setParam(n, key, v, fromUser){
   if (key === 'track' && (n.m.type === 'trackIn' || n.m.type === 'chainOut')){
@@ -2392,7 +2393,7 @@ function applyPreset(n, name, vals){
 function paintPre(n){
   if (!n.preBtn) return; const nm = n.m.pre;
   n.preBtn.firstChild.textContent = nm ? nm + (n.m.preEd ? ' (edited)' : '') : '—';
-  n.preBtn.title = nm ? 'Preset: ' + nm + (n.m.preEd ? ', changed since' : '') + '. Click for presets, Default, or to save yours.' : 'Presets: pick one, go back to Default, or save this module’s settings as yours';
+  n.preBtn.title = nm ? 'Preset: ' + nm + (n.m.preEd ? ' (changed since it was applied)' : '') + '. Click for presets, Default, or to save yours.' : 'Presets: pick one, go back to Default, or save this module’s settings as yours';
 }
 function preMenu(n, btn){
   const t = n.m.type, def = MODULES[t], r = btn.getBoundingClientRect(), fac = PRESETS[t] || [], mine = preUserOf(t), cur = n.m.pre, mark = s => (s === cur && !n.m.preEd ? '✓ ' : '') + s;
@@ -2404,7 +2405,7 @@ function preMenu(n, btn){
     const nm = nm0 && nm0.trim().slice(0, 40); if (!nm) return;
     const vals = {}; for (const k in def.params) if (!PRE_SKIP.has(k)) vals[k] = n.m.params[k];
     const list = preUserOf(t).filter(x => x[0] !== nm); list.push([nm, vals]); list.sort((a, b) => a[0].localeCompare(b[0])); preUserSet(t, list);
-    n.m.pre = nm; delete n.m.preEd; paintPre(n); store.touch(); toast('Saved “' + nm + '”: it’s in every ' + def.label + '’s Preset list.');
+    n.m.pre = nm; delete n.m.preEd; paintPre(n); store.touch(); toast('Saved “' + nm + '”. It now shows in every ' + def.label + ' preset list.');
   }]);
   if (mine.length) items.push(['Delete one of yours…', () => showMenu(r.left, r.bottom + 2, mine.map(([nm]) => ['Delete “' + nm + '”', () => {
     preUserSet(t, preUserOf(t).filter(x => x[0] !== nm)); for (const x of nodes.values()) if (x.m.type === t && x.m.pre === nm) paintPre(x); toast('Deleted the preset “' + nm + '”.'); }]))]);
@@ -2476,7 +2477,7 @@ function buildNode(m){
     const ch = choicesOf(m.type, k);
     kids.push(ch ? choice(n, k, ch) : slider(n, k, def.params[k]));
   }
-  // Track In: what the track sends into the chain. Chain Out: what comes back out of it (in …Thunder Plus, from the song).
+  // Track In: what the track sends into the chain. Chain Out: what comes back out of it (in Thunder Plus, from the song).
   if (m.type === 'chainOut' || m.type === 'trackIn'){ n.meter = h('span'); const io = m.type === 'trackIn' ? 'IN' : 'OUT';
     kids.push(h('div', {class:'iom', title:(io === 'IN' ? 'Level the track sends into this chain' : 'Level coming out of this chain') + ' (track ' + ((m.params.track | 0) || 1) + ')'},
       h('b', {text:io}), h('div', {class:'prog'}, n.meter))); }
@@ -3161,13 +3162,13 @@ ws.addEventListener('contextmenu', e => {
   const el = e.target.closest('.node'), id = el && el.dataset.id;
   if (id && !selected.has(id)){ clearSel(); setSel(id, true); }
   const sel = [...selected], n = sel.length, items = [];
-  // Inside …Thunder Plus: put a control, or all of a module's, in the bottom panel (it shows them for the track whose chain they're in).
+  // Inside Thunder Plus: put a control, or all of a module's, in the bottom panel (it shows them for the track whose chain they're in).
   if (EMBED && id && nodes.has(id)){
     const nd = nodes.get(id), m = nd.m, row = e.target.closest('.row[data-key]'), key = row && row.dataset.id === id ? row.dataset.key : null, title = m.label || MODULES[m.type].label;
     if (key && m.params[key] != null){
       const lab = plabel(m.type, key);
       if (deckHas(id, key)) items.push(['Remove “' + lab + '” from the bottom panel', () => deckChange(L => { const i = L.findIndex(d => d.id === id && d.p === key); if (i >= 0) L.splice(i, 1); })]);
-      else items.push(['Add “' + lab + '” to the bottom panel', () => { deckChange(L => L.push(deckDesc(m, key))); toast('“' + lab + '” is in the bottom panel’s …chains section.'); }]);
+      else items.push(['Add “' + lab + '” to the bottom panel', () => { deckChange(L => L.push(deckDesc(m, key))); toast('“' + lab + '” is in the bottom panel’s chains section.'); }]);
     }
     const ks = deckKeys(m), missing = ks.filter(k => !deckHas(id, k));
     if (missing.length) items.push(['Add all of ' + title + '’s controls to the bottom panel', () => { deckChange(L => { for (const k of missing) L.push(deckDesc(m, k)); }); toast(title + ': ' + missing.length + ' controls in the bottom panel.'); }]);
@@ -3216,7 +3217,7 @@ const PALETTE = [
 ];
 const GROUP_FAM = { 'Track I/O':'aout', 'Filters and amps':'util', 'Effects':'afx', 'More effects':'afx', 'Modulation sources':'mod',
   'Audio followers':'mod', 'CV utilities':'util', 'Stereo':'afx', 'Sidechain':'afx' };
-/* ===PUMP PALETTE=== */ PALETTE.push(['…pump', Object.entries(PUMP_EDIT).map(([k, e]) => [k, e.label + ' · ' + e.long])]); GROUP_FAM['…pump'] = 'afx'; /* ===PUMP PALETTE END=== */
+/* ===PUMP PALETTE=== */ PALETTE.push(['pump', Object.entries(PUMP_EDIT).map(([k, e]) => [k, e.label + ' · ' + e.long])]); GROUP_FAM['pump'] = 'afx'; /* ===PUMP PALETTE END=== */
 mergeShared(PALETTE, GROUP_FAM, PORT_LABEL);
 organizePalette(PALETTE, GROUP_FAM);
 const isSection = g => g.startsWith('§');
@@ -3292,7 +3293,7 @@ function renderQuick(){
     grid.append(h('div', {class:'pwrap'}, paletteItem(t, LABELS[t], true), un));
   }
   quickEl.replaceChildren(
-    h('div', {class:'qhead'}, h('span', {class:'qt', text:'Quick access'}), h('span', {class:'qhint', text:'★ a module below to add it here'})),
+    h('div', {class:'qhead'}, h('span', {class:'qt', text:'Quick access'}), h('span', {class:'qhint', text:'Star a module below to add it here.'})),
     pstate.quick.length ? grid : h('div', {class:'qempty', text:'Nothing here yet. Star any module below to keep it handy.'}));
   for (const [key, st] of Object.entries(stars)){
     const t = key.replace(/:all$/, ''), on = pstate.quick.includes(t);
@@ -3414,7 +3415,7 @@ document.getElementById('fimpmods').addEventListener('click', () => pickFile('cu
 const pnameEl = document.getElementById('pname');
 {
   if (EMBED){
-    // …Thunder Plus shows this page as its "…chains" screen: it pauses the sound when you switch away and saves into the song.
+    // Thunder Plus shows this page as its "chains" screen: it pauses the sound when you switch away and saves into the song.
     window.chainsEmbed = {
       pause(){ if (store){ clearTimeout(store._timer); if (store.dirty) store.save(); } if (bridge) bridge.ctx.suspend().catch(() => {}); },   // store/bridge: not there yet if the screen is left at once
       resume(){ if (bridge) bridge.resume(); try { paintChainOff(); } catch (e) {} },
@@ -3445,7 +3446,7 @@ const pnameEl = document.getElementById('pname');
       },
       backups(){ return PatchStore.backups().slice().reverse().map((b, i) => { let n = 'Untitled'; try { n = (JSON.parse(b.p).meta || {}).name || n; } catch(e){} return { i, t:b.t, name:n }; }); },
       restoreBackup(i){ const all = PatchStore.backups(), b = all[all.length - 1 - i]; if (!b) return; store.snapshot(); store._restore(JSON.stringify(normalize(JSON.parse(b.p)))); toast('Restored a backup.'); },
-      /* Transport: Space in …chains starts/stops the song, same as the tracker. */
+      /* Transport: Space in chains starts/stops the song, same as the tracker. */
       play(){ if (TW && TW.play) TW.play(); },
       playing(){ return !!(TW && TW.playing && TW.playing()); },
       /* The app shows the whole patch after the Mixer added Track In / Chain Out pairs (no closer than 100%). False until
@@ -3460,7 +3461,7 @@ const pnameEl = document.getElementById('pname');
       deckSet(list){ doc.deck = Array.isArray(list) ? list.slice() : []; markDeck(); store.touch(); },
       /* Exact value text for the panel while this editor is open. */
       fmt(id, key, v){ const n = nodes.get(id); if (!n) return null; try { return String(fmtOf(n.m.type, key)(v)); } catch (e){ return null; } },
-      /* Show (centre and select) a module, from the panel's "Show in …chains". */
+      /* Show (centre and select) a module, from the panel's "Show in chains". */
       reveal(id){ const n = nodes.get(id); if (!n) return false; clearSel(); setSel(id, true);
         const v = view(), r = ws.getBoundingClientRect(), m = n.m; v.x = r.width / 2 - (m.pos[0] + 105) * v.zoom; v.y = r.height / 2 - (m.pos[1] + 55) * v.zoom; applyPan(); return true; },
       /* Host meters: one peak per tracker track (the chains return). Track In and Chain Out
@@ -3535,11 +3536,11 @@ document.getElementById('hintx').addEventListener('click', () => { hint.hidden =
 // Each module type's description: the Help page's cards and the ? on each module's title bar (with SHARED_ABOUT and the
 // modules' own about for the shared ones).
 const PAGE_ABOUT = {
-  trackIn:'Your tracker track, in stereo. Pick the track; in …Thunder Plus it carries that track’s sound. On its own it is silence — patch it through effects into a Chain Out. With its Chain Out on the same track it is an insert (the sound before the track’s own effects and fader). Into a Chain Out on another track it is a bus send: the track is heard after its own effects, fader and pan, and plays through that bus (several Track Ins into a mixer, a compressor, then Chain Out to a free track make a group bus). Bus send: Before its fader takes the track after its effects but before its fader and pan, so its fader no longer changes what the bus hears (a reverb or monitor send); mute and solo still silence it.',
+  trackIn:'Your tracker track, in stereo. Pick the track; in Thunder Plus it carries that track’s sound. On its own it is silence — patch it through effects into a Chain Out. With its Chain Out on the same track it is an insert (the sound before the track’s own effects and fader). Into a Chain Out on another track it is a bus send: the track is heard after its own effects, fader and pan, and plays through that bus (several Track Ins into a mixer, a compressor, then Chain Out to a free track make a group bus). Bus send: Before its fader takes the track after its effects but before its fader and pan, so its fader no longer changes what the bus hears (a reverb or monitor send); mute and solo still silence it.',
   vcf:'A filter. Low-pass softens, band-pass keeps the middle, high-pass thins. Patch an envelope into Cutoff for classic sweeps.',
   vca:'An amplifier. Patch an envelope into CV so notes start and stop (with nothing in CV it stays open); Gain sets the loudness.',
   mixer:'Mixes up to 16 sounds, each with its own level, plus a master level. Inputs sets how many channels it shows (4 to start).',
-  smixer:'Mixes up to 16 stereo sounds into a stereo out: each pair (In 1 and In 1 R…) has a level and a pan, plus a master level. Inputs sets how many pairs it shows (4 to start). Patch only In 1 for a mono source; centre pan leaves a stereo source untouched.',
+  smixer:'Mixes up to 16 stereo sounds into a stereo out: each pair (In 1 and In 1 R…) has a level and a pan, plus a master level. Inputs sets how many pairs it shows (4 to start). Patch only In 1 for a mono source; center pan leaves a stereo source untouched.',
   eq:'Airwindows EQ: treble, mid and bass with their frequencies, plus low-pass and high-pass filters.',
   comp:'Airwindows Pressure4: a compressor. Pressure sets how hard it works; Mix blends in the dry sound for parallel compression.',
   saturation:'Airwindows Density: warm saturation and drive.',
@@ -3555,7 +3556,7 @@ const PAGE_ABOUT = {
   repeat:'Repeat: beat repeat. While Hold is on (or Gate is high) it loops the slice that just played, one note value long; Decay fades each pass and Pitch drops it. Reverse plays the slice backwards; Tape stop slows the sound to a halt.',
   vocoder:'A vocoder: the sound you patch into In L is the carrier, and In R is the modulator that shapes it (leave In R unpatched and it uses In for both). Mode picks the band count — Talkbox and the 4…64 band banks split the carrier into bands that the modulator’s levels open and close, or Spectral cross-synthesises them with an FFT. Resonance sharpens the bands, Attack and Release set how fast the levels follow, Mix blends the vocoded sound with the dry carrier, and Level sets the output.',
   scin:'Sidechain In: brings a sidechain into this chain. Source picks what it listens to: a send (Send 1–8, what a Sidechain Out sends) or one track’s own sound, before its effects and fader, so even a muted “ghost” kick drives it. The meter shows what it hears (IN) and the envelope (ENV), before you patch it anywhere. Out is the sound (Level sets how loud), Envelope rises with each hit (to open a filter) and Duck dips with it (into a VCA’s CV, to pump a sound). Sensitivity sets how hard the hits push them (raise it for a quiet kick) and Release how fast they recover. Or just drop a Sidechain Comp after this track’s sound.',
-  scout:'Sidechain Out: sends what you patch into it to Send 1–8. Any Sidechain In with its Send set to that number hears it, in this chain or in another track’s (in …Thunder Plus a block later, about 3 ms). So a drum bus made here can duck the pads on another track: Sidechain Out → Send 1 here, and there Sidechain In (Send 1) → the SC of a compressor.',
+  scout:'Sidechain Out: sends what you patch into it to Send 1–8. Any Sidechain In with its Send set to that number hears it, in this chain or in another track’s (in Thunder Plus, about 3 ms later). So a drum bus made here can duck the pads on another track: Sidechain Out → Send 1 here, and there Sidechain In (Send 1) → the SC of a compressor.',
   sccomp:'Sidechain Comp: ducks its In by the sidechain — whatever is patched into SC, or what Source picks (another track or a send), so a kick on another track can pump this one. Threshold, Ratio, Attack, Release, Makeup and Mix. With Source on Self and nothing in SC it compresses its own input.',
   lfo:'A slow oscillator for wobbles and sweeps. Depth sets how far it moves a slider; Sync to tempo follows the tempo. Reset restarts its cycle.',
   adsr:'An envelope for shaping effects: patch a gate into it and its output into a slider’s modulation jack.',
@@ -3572,16 +3573,16 @@ function helpDoc(){
   const ABOUT = PAGE_ABOUT;
   const guide = [
     ['Patching', 'Drag from an output jack (right edge) to an input jack (left edge). Teal cables carry sound, purple dashed cables carry modulation and pink dashed cables carry gates. Every slider has a small purple jack on its left for modulation. Drag a patched input to move its cable, or drop it on empty space to unplug. Double-click a cable to remove it. Hold Option (Alt on Windows) and click while drawing a cable to bend it, or Option-drag an existing cable.'],
-    ['Modulation', 'Patch any signal into a slider’s small purple jack and it moves that slider: the slider sets the centre, and the signal swings it across its range. The value turns purple and a mark shows where the slider really is. Use the Depth slider on an LFO or envelope, or an Attenuverter, to make the swing smaller.'],
+    ['Modulation', 'Patch any signal into a slider’s small purple jack and it moves that slider: the slider sets the center, and the signal swings it across its range. The value turns purple and a mark shows where the slider really is. Use the Depth slider on an LFO or envelope, or an Attenuverter, to make the swing smaller.'],
     ['Sound as modulation', 'Audio can drive anything a control voltage can. Patch a sound into Envelope Follow to make it swell a filter or level, into Gate Extract to fire envelopes and clocks from hits, or into Pitch Follow to track a monophonic melody. Then shape it with Slew (to smooth it), Sample & Hold (to step it) or Quantizer (to snap it to a scale).'],
     ['Tracks', 'Each track has its own Track In and Chain Out. In the Mixer, turning a track’s CHN on adds that track’s pair (wired straight through, in a column below everything else) without leaving the Mixer, so every track gets its own chain and toggling one never disturbs another; the next time you come here, the patch is fitted so you see them all. If that track already has a chain, switching its CHN on just runs it through that chain again. The output always follows its own input — set the Track In and its Chain Out moves with it, and a Chain Out can’t be pointed elsewhere. Picking a track that is already used also jumps to and highlights the existing chain. A track takes one pair; control (cv/gate) inputs are not limited.'],
     ['Moving around', 'Scroll with two fingers or turn the mouse wheel to pan (Shift+wheel sideways); with a mouse a middle-button drag pans too, and on a touch screen dragging the background does. Pinch or Ctrl/⌘+wheel zooms; the zoom buttons are in the top bar (click the percentage to type one, Fit shows everything).'],
     ['Modules', 'Open the Modules list on the left. Click a module to add it to the middle of the view, or drag it onto the patch. Star a module to keep it in Quick access. Drag a module by its title bar; double-click the title bar to collapse it. Double-click a slider to reset it, or its value to type one.'],
     ['Selecting and the right-click menu', 'As in Max: click a module to select it, Shift-click to add it or take it out, Shift-drag on the background for a selection box (a plain drag there moves the view to it). Delete or Backspace removes the selection. Hold Option (Alt on Windows) and drag a module’s title bar to copy it (or the selection) and drop the copy where you let go; Option-click opens its help; Ctrl/⌘-click works a module without selecting it. Right-click to group them, copy, duplicate, delete, or make a custom module that you can add again from the list.'],
     ['Presets', 'Effects and sound sources have a Preset row at the top. Pick a factory preset (it sets every control: the ones it names, the rest back to their defaults), Default, or one of yours; Undo takes it back. Save as a preset keeps the module’s settings on this device under a name, for every patch; Delete one of yours removes one. The row keeps the preset’s name and says “edited” once you move a control.'],
-    ['Bypass', 'BYP on an effect’s title bar passes its dry sound (its number, 1–F, is what the tracker’s BYP command switches from a phrase: BYP 31 bypasses module 3 on that track, BYP 20 brings module 2 back).'],
+    ['Bypass', 'BYP on an effect’s title bar passes its dry sound. In a phrase, the tracker’s BYP command switches it by its number (1–F): BYP 31 bypasses module 3 on that track, BYP 20 brings module 2 back.'],
     ['MIDI learn', 'Press MIDI learn, click a slider, then move a knob on your controller. Press Delete to clear the slider’s mapping, and Done when you’re finished.'],
-    ['Saving', 'Your patch saves itself as you work. File → Save downloads it as a .chains.json file; Open loads one (…waves patches open too, keeping their effects). Settings → Backups holds earlier versions.']
+    ['Saving', 'Your patch saves itself as you work. File → Save downloads it as a .chains.json file; Open loads one (waves patches open too, keeping their effects). Settings → Backups holds earlier versions.']
   ];
   const groups = PALETTE.filter(([g]) => !isSection(g)).map(([g, items]) => '<div class="mgroup"><h3>' + esc(g) + '</h3><div class="mgrid">' + items.map(([t]) => {
     const d = MODULES[t], ed = EDGE[famOf(t)];
@@ -3602,13 +3603,13 @@ function helpDoc(){
     '.io{display:flex; flex-wrap:wrap; gap:5px 10px; align-items:center; font-size:12.5px; margin-top:4px} .io b{font-size:12px; min-width:62px}' +
     '.pt{display:inline-flex; align-items:center; gap:5px; background:#fff; border:1.5px solid #111; padding:1px 7px} .pt i{width:9px; height:9px; border-radius:50%; display:inline-block}' +
     '@media (max-width:700px){ body{grid-template-columns:1fr} nav{display:none} main{padding:16px} }' +
-    '</style></head><body><nav><h1>…chains Help</h1>' + guide.map(([t], i) => '<a href="#g' + i + '">' + esc(t) + '</a>').join('') +
+    '</style></head><body><nav><h1>chains Help</h1>' + guide.map(([t], i) => '<a href="#g' + i + '">' + esc(t) + '</a>').join('') +
     '</nav><main><div class="guide">' + guide.map(([t, b], i) => '<h2 id="g' + i + '">' + esc(t) + '</h2><p>' + esc(b) + '</p>').join('') + '</div>' + groups + '</main></body></html>';
 }
 function openHelp(){
   let ov = document.getElementById('helpov');
   if (!ov){
-    ov = h('div', {class:'helpov', id:'helpov'}, h('iframe', {title:'…chains Help'}), h('button', {class:'tb helpx', text:'Close help', onclick: () => ov.hidden = true}));
+    ov = h('div', {class:'helpov', id:'helpov'}, h('iframe', {title:'chains Help'}), h('button', {class:'tb helpx', text:'Close help', onclick: () => ov.hidden = true}));
     document.body.append(ov);
     ov.querySelector('iframe').srcdoc = helpDoc();
   }
@@ -3635,7 +3636,7 @@ function onMeter(m){
   const el = document.getElementById('cpuv'), p = Math.round(m.load * 100);
   el.textContent = 'CPU ' + p + '%' + (m.quality === 'draft' ? ' · draft' : '');
   el.className = 'fps ' + (m.load < .5 ? 'good' : m.load <= .8 ? 'ok' : 'low');
-  // The label must say which engine this is: in …Thunder this page's engine is the preview only.
+  // The label must say which engine this is: in Thunder this page's engine is the preview only.
   el.title = EMBED
     ? 'Preview engine only (the silent test tone and the patch’s own output). The song’s real CPU load is the meter in the Tracker top bar — its tooltip names the breakdown. When the song plays, levels here are the tracker audio.'
     : (m.load < .5 ? 'Plenty of room' : m.load <= .8 ? 'Getting busy' : 'Overloaded: try Draft quality or fewer heavy effects.');
@@ -3651,10 +3652,10 @@ function onMeter(m){
   for (const n of nodes.values()) if (n.meter) n.meter.style.transform = 'scaleX(' + Math.min(1, busPeaks[((n.m.params.track | 0) || 1) - 1] || 0) + ')';
 }
 
-/* Modulated sliders, as in ...Seeds: a cable in a slider's purple jack turns its value purple and bold, and a
+/* Modulated sliders, as in Seeds: a cable in a slider's purple jack turns its value purple and bold, and a
    purple mark under the slider shows the live position the LFO (or any control) is moving it to. A cabled slider
    is marked straight away, at its own value, until the engine reports live values (audio not started yet, or
-   …chains in …Thunder Plus before a track runs through it). */
+   chains in Thunder Plus before a track runs through it). */
 let modded = new Map(), modSeen = 0;
 function paintMods(list){
   const now = new Map();
@@ -3697,7 +3698,7 @@ function paintHostCpu(){
   el.className = 'fps ' + (v == null ? '' : v < .5 ? 'good' : v <= .8 ? 'ok' : 'low');
   el.title = 'The song’s CPU load — the same value as the Tracker’s top-bar meter, not this page.';
 }
-/* Jack meters: [id, 'in'|'out', port, peak] from the engine (the song's, inside …Thunder Plus), each one falling
+/* Jack meters: [id, 'in'|'out', port, peak] from the engine (the song's, inside Thunder Plus), each one falling
    back smoothly when it goes quiet or stops arriving. */
 let jackSeen = 0;
 function paintJacks(list){
@@ -3767,7 +3768,7 @@ window.addEventListener('keydown', e => {
   }
 });
 
-/* …chains has no note input: no keyboard playing and no on-screen keys. */
+/* chains has no note input: no keyboard playing and no on-screen keys. */
 let midiOk = false;
 function paintKeys(){ const kb = document.getElementById('setkeys'); if (kb) kb.checked = false; }
 
@@ -3818,7 +3819,7 @@ function startEngine(){
   return ChainsBridge.standalone({ quality: doc.quality || 'full', transport: doc.transport }).then(wireBridge)
     .catch(err => toast('The sound engine couldn’t start: ' + (err && err.message || err), 6000));
 }
-// Embedded (…Thunder): the host owns the audio, so don't start a second, silent engine here —
+// Embedded (Thunder): the host owns the audio, so don't start a second, silent engine here —
 // it wasted CPU and made this page's meter disagree with the Tracker's. Standalone keeps it.
 if (!EMBED) startEngine();
 function unlockAudio(){ if (bridge){ bridge.resume(); removeEventListener('pointerdown', unlockAudio, true); removeEventListener('keydown', unlockAudio, true); } }
@@ -3841,7 +3842,7 @@ midi = new ChainsMidi({
   onDevices: list => {
     midiSel.replaceChildren(h('option', {value:'all', text:'All connected MIDI inputs'}), ...list.map(i => h('option', {value: i.id, text: i.name})));
     midiSel.value = list.some(i => i.id === midi.selected) ? midi.selected : 'all';
-    document.getElementById('setmidiinfo').textContent = list.length ? 'CC from this controller controls …chains sliders (MIDI learn).' : 'No MIDI controller is connected.';
+    document.getElementById('setmidiinfo').textContent = list.length ? 'CC from this controller controls chains sliders (MIDI learn).' : 'No MIDI controller is connected.';
   }
 });
 midiSel.addEventListener('change', () => { midi.selected = midiSel.value; });

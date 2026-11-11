@@ -30,12 +30,12 @@ test('perform: targets, own values, labels and the song fields survive a save an
   assert.equal(c.tgtOwn('fx:1:0:0'), 64); assert.equal(c.tgtOwn('fx:1:0:1'), 128, 'MID 50 of 0–100 is 80 hex');
   assert.equal(c.tgtOwn('cut:0'), 255); assert.equal(c.tgtOwn('res:0'), 0);
   assert.match(c.tgtLabel('fx:1:0:1'), /TRACK 02 · FX1 EQ MID/);
-  const P = c.S.perf; P.sc[2] = { n: 'drop', v: { 'vol:0': 10, 'bogus': 3 } }; P.mac[1].tg.push({ id: 'pan:1', lo: 20, hi: 300 }); P.lk[2] = ['dec:2', null, 'x', null]; P.lfo[1] = { id: 'pan:1', sh: 9, rt: 99, dp: 80 };
+  const P = c.S.perf; P.sc[2] = { n: 'drop', v: { 'vol:0': 10, 'bogus': 3 } }; P.mac[1].tg.push({ id: 'pan:1', lo: 20, hi: 300 }); P.lk[2] = ['dec:2', null, 'x', null]; P.lfo[1] = [{ id: 'pan:1', sh: 9, rt: 99, dp: 80 }];
   const back = c.normPerf(JSON.parse(JSON.stringify(P)));
   assert.deepEqual(JSON.parse(JSON.stringify(back.sc[2])), { n: 'drop', v: { 'vol:0': 10 } }, 'an unknown target is dropped');
   assert.equal(back.mac[1].tg[0].hi, 255, 'values clamp to FF');
   assert.deepEqual(JSON.parse(JSON.stringify(back.lk[2])), ['dec:2', null, null, null]);
-  assert.equal(back.lfo[1].sh, c.PLFO_SHAPES.length - 1); assert.equal(back.lfo[1].rt, c.PLFO_RATES.length - 1);
+  assert.equal(back.lfo[1][0].sh, c.PLFO_SHAPES.length - 1); assert.equal(back.lfo[1][0].rt, c.PLFO_RATES.length - 1);
   assert.equal(c.normPerf(null).sc.length, 16); assert.equal(c.normParts('x').length, 16);
 });
 
@@ -97,4 +97,40 @@ test('bus groups: every source takes its bus’s colour, a send too (5 Nov: send
   assert.equal(g.get(3), '#111111'); assert.equal(g.get(5), '#222222');
   assert.equal(g.get(0), '#111111', 'a pure source: its bus’s colour');
   assert.equal(g.get(1), '#111111', 'a send: its bus’s colour (drawn striped)');
+});
+
+test('perform: a track holds up to four LFOs; the old single object still loads', () => {
+  const c = perfCtx(), J = o => JSON.parse(JSON.stringify(o)), L = (id, o) => Object.assign({ id, sh: 1, rt: 2, dp: 90 }, o);
+  assert.equal(c.PLFO_MAX, 4);
+  let b = c.normPerf({ lfo: { 1: { id: 'pan:1', sh: 2, rt: 4, dp: 70 } } });
+  assert.deepEqual(J(b.lfo[1]), [{ id: 'pan:1', sh: 2, rt: 4, dp: 70 }], 'the old object is a one-entry array');
+  b = c.normPerf({ lfo: { 0: Array.from({ length: 7 }, (_, i) => L('vol:' + (i % 4))) } });
+  assert.equal(b.lfo[0].length, 4, 'capped at four');
+  b = c.normPerf({ lfo: { 0: [L('bogus'), null, 5, L('vol:0'), { sh: 1 }, L('cut:1')], 1: [L('bogus')], 2: [], 3: { id: 'x' } } });
+  assert.deepEqual(J(b.lfo[0].map(l => l.id)), ['vol:0', 'cut:1'], 'bad entries dropped');
+  assert.ok(!(1 in b.lfo) && !(2 in b.lfo) && !(3 in b.lfo), 'no empty array is stored');
+  const a = c.normPerf({ lfo: { 2: [L('vol:2'), L('vol:2', { sh: 4, rt: 99, dp: 999 })] } }), again = c.normPerf(J(a));
+  assert.deepEqual(J(again.lfo), J(a.lfo), 'round trip'); assert.equal(a.lfo[2][1].rt, c.PLFO_RATES.length - 1); assert.equal(a.lfo[2][1].dp, 255);
+});
+
+test('perform: the sequencer (index.html and the audio-thread core) plays every LFO of a track', () => {
+  for (const f of ['index.html', 'core/seq-core.js']){
+    const t = H.read(f), i = t.indexOf('const La = PFS.lfo[t]'); assert.ok(i > 0, f + ': iterates the LFO array');
+    const blk = t.slice(i, i + 1500);
+    assert.match(blk, /Array\.isArray\(La\)/); assert.match(blk, /j < La\.length/, f + ': sums every LFO on a target'); assert.match(blk, /v \+= lfoAt\(M\.sh/, f + ': adds, not overwrites');
+    assert.doesNotMatch(t, /PFS\.lfo\[t\];\s*if \(L && /, f + ': no single-object reader left');
+  }
+});
+
+test('MOD screen: sits between FX and PROJECT in the tab order, and the Alt+digit keys reach all eight screens', () => {
+  const m = src.match(/VIEWS = (\[[^\]]*\])/); assert.ok(m, 'VIEWS not found');
+  const V = JSON.parse(m[1].replace(/'/g, '"'));
+  assert.deepEqual(V.slice(-3), ['fx', 'mod', 'project'], 'VIEWS order: …fx, mod, project');
+  assert.equal(V.length, 8);
+  assert.match(src, /VNAME = \{[^}]*mod:'MOD'/); assert.match(src, /\[data-v="mod"\]\{--tc:#/);
+  assert.equal((src.match(/\^Digit\[1-8\]\$\/\.test\(e\.code\)\)[^}]{0,80}go\(VIEWS/g) || []).length, 2, 'the two Alt+digit tests');
+  assert.equal((src.match(/\/\^Digit\(\[1-8\]\)\$\//g) || []).length, 1, 'viewKey');
+  assert.ok(!/Digit\[1-7\]|Digit\(\[1-7\]\)/.test(src), 'no Alt+digit test still stops at 7');
+  assert.match(src, /dir === 'right' && \(tv === 'inst' \|\| tv === 'mixer' \|\| tv === 'fx' \|\| tv === 'mod'\)/, 'SHIFT+▶ walks FX → MOD → PROJECT');
+  assert.match(src, /dir === 'left' && \(tv === 'mixer' \|\| tv === 'fx' \|\| tv === 'mod' \|\| tv === 'project'\)/, 'SHIFT+◀ walks back');
 });
