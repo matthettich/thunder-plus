@@ -8694,6 +8694,11 @@ function changed(i = cur, light){
 /* ---------- UI helpers ---------- */
 const ico = (n, c = 'ic') => `<svg class="${c}" aria-hidden="true"><use href="#ic-${n}"/></svg>`;
 function el(tag, cls, txt){ const e = document.createElement(tag); if (cls) e.className = cls; if (txt != null) e.textContent = txt; return e; }
+// REDRAW CHURN (10 Nov soak): assigning textContent replaces the node's text node every time, even with the same string, and the redraws
+// that run while a song plays (draw, the deck, the readouts) did it 500 times a second: garbage for the GC, worst on a phone. setText writes only
+// when the node does not already read exactly `s` (it compares the node itself, not a cache, so any other writer can still change it, and a
+// node that holds something else, such as a value box's input, is overwritten as before).
+function setText(e, s){ s = String(s); const f = e.firstChild; if (f ? f.nodeType === 3 && f === e.lastChild && f.data === s : s === '') return; e.textContent = s; }
 // Type a value into a row's value box (double-click or double-tap). Entries accept the unit shown next to
 // the slider (Hz, kHz, ms, s, %, semitones, dB) or the bare number; the entry is clamped to the row's range
 // and applied through row.refresh(), so it behaves exactly like dragging its slider.
@@ -8742,9 +8747,9 @@ function makeRow(def, key, getObj, opts = {}){
   r.append(lab, inp, out);
   const reset = () => { if (row.def.d == null) return; getObj()[key] = row.def.d; row.refresh(); (opts.on || (() => changed(cur, true)))(); };
   const row = {def, key, getObj, r, lab, inp, out, fmt:opts.fmt,
-    refresh(){ const o = getObj(); const v = o[key]; inp.value = Math.round(toPos(this.def, v) * 1000); out.textContent = (this.fmt || this.def.f || pct)(v); }};
+    refresh(){ const o = getObj(); const v = o[key]; inp.value = Math.round(toPos(this.def, v) * 1000); setText(out, (this.fmt || this.def.f || pct)(v)); }};
   inp.addEventListener('input', () => { const o = getObj(); o[key] = fromPos(row.def, inp.value / 1000);
-    out.textContent = (row.fmt || row.def.f || pct)(o[key]); (opts.on || (() => changed(cur, true)))(); });
+    setText(out, (row.fmt || row.def.f || pct)(o[key])); (opts.on || (() => changed(cur, true)))(); });
   out.title = 'Double-click to reset · right-click to type a value';
   const typeBox = () => rowTypeBox(row, opts);
   out.addEventListener('dblclick', e => { e.stopPropagation(); reset(); });   // ONE RULE (3 Nov): double-click resets everywhere; Type a value… is in the right-click menu
@@ -24424,7 +24429,7 @@ function fxPaneFit(rebuilt){
 function fxPaneCue(){
   const pane = grid.querySelector('.fxpane'), cue = grid.querySelector('.fxcue'); if (!pane || !cue) return;
   const up = pane.scrollTop > 1, down = pane.scrollTop + pane.clientHeight < pane.scrollHeight - 2;
-  cue.textContent = up && down ? '▲ slots above · ▼ more slots below' : down ? '▼ more slots below · scroll the list' : up ? '▲ slots above' : '';
+  setText(cue, up && down ? '▲ slots above · ▼ more slots below' : down ? '▼ more slots below · scroll the list' : up ? '▲ slots above' : '');
 }
 /* FX PRESETS (owner, 30 Oct): every effect on the FX screen has a › PRESET row: INIT (its defaults), the factory presets
    below and the song's own (› SAVE AS PRESET… keeps the slot's settings under a name, in the song, for that effect type).
@@ -26053,9 +26058,9 @@ document.querySelectorAll('#tClk .tce').forEach(b => {
     if (last && now - last < 450){ last = null; clkEdit(b); } else last = now; });
 });
 function drawPat(){
-  const id = rowsId(); $('tRowsP').textContent = 'ROWS'; $('tRowsV').title = 'Rows in phrase ' + hp(id) + ' · tap to type a number'; $('tRowsN').textContent = plen(id);
+  const id = rowsId(); setText($('tRowsP'), 'ROWS'); $('tRowsV').title = 'Rows in phrase ' + hp(id) + ' · tap to type a number'; setText($('tRowsN'), plen(id));
   const live = tp.on, tk = live ? tp.tks : (S.ticks || TICKS);
-  if (!$('tClk').querySelector('input')){ $('tClkB').textContent = live ? tp.bpm : S.bpm; $('tClkT').textContent = S.lpb || 4; }
+  if (!$('tClk').querySelector('input')){ setText($('tClkB'), live ? tp.bpm : S.bpm); setText($('tClkT'), S.lpb || 4); }
   $('tClk').classList.toggle('live', live);
   const D = $('tDots'), n = Math.min(tk, 16);
   if (D.childElementCount !== n) D.innerHTML = '<i></i>'.repeat(n);
@@ -26530,7 +26535,7 @@ function applyCmdOrder(){
   for (const a in by){ by[a].innerHTML = (mini && CMD_MINI_LAB[a]) || (inMode === 'pad' && CMD_PAD_SHORT[a]) || lab[a]; if (!mini) by[a].title = tip[a]; }
   if (by.rrow) by.rrow.hidden = inMode === 'pad';   // (PAD's phone row is full; REMOVE is in KEYS mode's row and bar)
   cmdTipKey = '';
-  const sb = by.song; if (sb){ sb.textContent = cmdSongLab(); sb.classList.toggle('on', tp.on); }
+  const sb = by.song; if (sb){ setText(sb, cmdSongLab()); sb.classList.toggle('on', tp.on); }
   if (typeof cmdBarState === 'function') cmdBarState();
 }
 const cmdHome = $('tCmd').parentNode, cmdHomeNext = $('tCmd').nextElementSibling, cmdTag = el('span', 'cmtag');
@@ -27827,7 +27832,7 @@ function draw(){
   deckDraw(); if (relayout || stgReq !== stageWant()) stageLayout();
   if (stgKindNow === 'peek') stagePeek();   // SONG EXTRAS: the peek follows the cursor
   drawPat();
-  $('tOct').hidden = !km; $('tOctN').textContent = kOct; if (patMode !== km){ patMode = km; patFit(); }
+  $('tOct').hidden = !km; setText($('tOctN'), kOct); if (patMode !== km){ patMode = km; patFit(); }
   if (km) drawKeypad();
   document.querySelectorAll('#tTabs button').forEach(b => b.classList.toggle('on', b.dataset.v === tv));
   document.querySelectorAll('#tMap [data-v]').forEach(b => b.classList.toggle('on', b.dataset.v === tv));
@@ -27836,12 +27841,12 @@ function draw(){
   syncLoop();   // before the labels below, so they show the range that is actually looping
   const tLoopTop = $('tLoopTop'); if (tLoopTop) tLoopTop.classList.toggle('on', loopSel);
   topSelVis();
-  const tLoop = $('tLoop'); if (tLoop){ tLoop.classList.toggle('on', loopPat); const n = $('tLoopN'); if (n) n.textContent = loopPat ? (tp.on && tp.loopV === 'pat' && patRow >= 0 ? rS(patRow, 3) : 'ON') : 'OFF'; }
-  const tLs = $('tLoopSel'); if (tLs){ tLs.classList.toggle('on', loopSel); const n = $('tLoopSelN'); if (n) n.textContent = loopSel ? (loopArm ? hx(loopArm.y0) + '–' + hx(loopArm.y1) : 'ARM') : 'OFF'; }
+  const tLoop = $('tLoop'); if (tLoop){ tLoop.classList.toggle('on', loopPat); const n = $('tLoopN'); if (n) setText(n, loopPat ? (tp.on && tp.loopV === 'pat' && patRow >= 0 ? rS(patRow, 3) : 'ON') : 'OFF'); }
+  const tLs = $('tLoopSel'); if (tLs){ tLs.classList.toggle('on', loopSel); const n = $('tLoopSelN'); if (n) setText(n, loopSel ? (loopArm ? hx(loopArm.y0) + '–' + hx(loopArm.y1) : 'ARM') : 'OFF'); }
   // KEYS mode with the COMMAND BAR on: the thin bar; otherwise the COMMANDS row (both modes) as before.
   { const mini = cmdMini(), show = mini || cmdOn; if ($('tCmd').classList.contains('cmini') !== mini) applyCmdOrder();
     $('tCmd').hidden = !show; document.body.classList.toggle('cmdv', show && !mini); cmdTips(); }
-  const sb = $('tCmd').querySelector('[data-c=song]'); if (sb){ sb.textContent = cmdSongLab(); sb.classList.toggle('on', tp.on); }
+  const sb = $('tCmd').querySelector('[data-c=song]'); if (sb){ setText(sb, cmdSongLab()); sb.classList.toggle('on', tp.on); }
   const onSong = tv === 'song';
   { const seq = ['song', ...(sectsOn ? ['sect'] : []), 'phrase', 'inst', 'mixer', 'fx', 'mod', 'project'];
     const TCV = {song:'#dbe6f8', sect:'#e9e0f8', phrase:'#d8f0e2', inst:'#fbe2d2', mixer:'#f6edc8', fx:'#f8dce8', mod:'#ebdcf6', project:'#d5eef2'};
@@ -27856,7 +27861,7 @@ function draw(){
   $('tCmd').querySelectorAll('[data-c=uniq],[data-c=clone],[data-c=cldn],[data-c=mpat]').forEach(b => b.hidden = !onSong); $('tCmd').classList.toggle('song', onSong);    // CLN's narrow-screen hiding is in the CSS (.tcmd)
   const selB = $('tCmd').querySelector('[data-c=sel]'); if (selB) selB.classList.toggle('on', !!selA);
   { const e = $('tState'), h = tp.on ? ico('play') + 'PLAYING ' + VNAME[tp.mode] : rendering ? ico('render') + 'RENDERING' : ico('stop') + 'STOPPED'; if (e._h !== h){ e._h = h; e.innerHTML = h; } }
-  $('tBpm').textContent = (tp.on ? tp.bpm : S.bpm) + ' BPM · ' + (tp.on ? tp.tks : S.ticks || TICKS) + ' TICKS' + (S.swing > 50 ? ' · SWING ' + S.swing + '%' : '');
+  setText($('tBpm'), (tp.on ? tp.bpm : S.bpm) + ' BPM · ' + (tp.on ? tp.tks : S.ticks || TICKS) + ' TICKS' + (S.swing > 50 ? ' · SWING ' + S.swing + '%' : ''));
   document.querySelectorAll('#tMeters .mtr').forEach((m, t) => { m.classList.toggle('mu', !audible(t)); m.classList.toggle('so', !!(S.mix[t] && S.mix[t].solo)); { const hd = t >= ntr(); if (m.hidden !== hd) m.hidden = hd; }   // BATTERY: write only what differs
     const c = tCol(t), tip = trkTip(t) + ' · tap mutes' + (COARSE_PT ? '' : ', right-click solos, double-click names'); if (m.title !== tip) m.title = tip; m.classList.toggle('tcl', !!c); if (c && m._tc !== c){ m._tc = c; m.style.setProperty('--tc', c); } });
   paintMeters();
@@ -29095,7 +29100,7 @@ function deckStrip(){
   const anySolo = S.mix.some(m => m.solo); $('dkSolo').hidden = !anySolo || !deckShown();
   if (!deckShown() || !deck.strip) return;
   const mst = dkMst(), t = dkTrack(), m = mst ? {vol:S.mout == null ? 255 : S.mout, pan:128} : S.mix[t], poly = !mst && t >= polyFrom();
-  $('dkStripT').textContent = mst ? 'MASTER OUT' : `${trkLab(t)}${trkKind(t)}`;
+  setText($('dkStripT'), mst ? 'MASTER OUT' : `${trkLab(t)}${trkKind(t)}`);
   $('dkStripB').classList.toggle('gm', !mst && !poly); $('dkStripB').classList.toggle('gp', poly); $('dkStripB').classList.toggle('gx', mst);
   stPan.disabled = mst; $('stMute').hidden = $('stSolo').hidden = mst;   // FOCUS TRACK: the master's strip is its level only
   const fy = stPos(m.vol); stVol.querySelector('.stcap').style.bottom = fy + 'px'; stVol.querySelector('.stfill').style.height = Math.max(0, fy - 8) + 'px';
@@ -29104,8 +29109,8 @@ function deckStrip(){
   // FIX (sweep, 4 Nov): only while the pan is being dragged. It kept focus after a drag, so a track change, Undo or the
   // Mixer left it showing the old pan, and the next drag or wheel step started from that (the pan jumped).
   if (!stPan.matches(':active')) stPan.value = m.pan;
-  $('stVolV').textContent = dB(gain).replace(/^(\d)/, '+$1');
-  $('stPanV').textContent = mst ? '—' : m.pan === 128 ? 'C' : m.pan < 128 ? 'L' + Math.round((128 - m.pan) / 128 * 100) : 'R' + Math.round((m.pan - 128) / 127 * 100);
+  setText($('stVolV'), dB(gain).replace(/^(\d)/, '+$1'));
+  setText($('stPanV'), mst ? '—' : m.pan === 128 ? 'C' : m.pan < 128 ? 'L' + Math.round((128 - m.pan) / 128 * 100) : 'R' + Math.round((m.pan - 128) / 127 * 100));
   const mu = $('stMute'), so = $('stSolo'); mu.classList.toggle('on', !!m.mute); so.classList.toggle('on', !!m.solo);
   mu.setAttribute('aria-pressed', String(!!m.mute)); so.setAttribute('aria-pressed', String(!!m.solo));
   stVol.setAttribute('aria-label', mst ? 'Master out' : 'Track volume'); stVol.title = mst ? 'Master OUT: the master fader, after the limiter · drag · double-click for 0 dB' : 'Volume: drag · double-click for 0 dB · +6 dB at the top';
@@ -29261,7 +29266,7 @@ function deckInst(){
   if (!deckShown() || !deck.inst || dkSec('inst').hidden) return;   // BUS: hidden on a bus track
   dkInst = dkInstNow();
   const I = S.insts[dkInst], pad = I.pad, v = kit.voices[pad], sig = dkInst + ':' + pad + ':' + nslots() + (isBassV(v) && isSyn(pad) ? ':bass' : isVoxV(v) && isSyn(pad) ? ':vox' : isBlipV(v) ? ':blip' : isXEngV(v) ? ':' + v.engine : '');
-  $('dkInstT').textContent = `INST ${hx(dkInst)} · ${hx(pad)} ${(v && v.name) || 'Pad ' + (pad + 1)}`;
+  setText($('dkInstT'), `INST ${hx(dkInst)} · ${hx(pad)} ${(v && v.name) || 'Pad ' + (pad + 1)}`);
   if (sig !== dkInstSig){
     dkInstSig = sig; const box = $('dkInstRows'); box.replaceChildren(); dkInstRows = [];
     if (!v){ box.append(el('p', 'note', 'This instrument’s pad is empty.')); return; }
@@ -29307,7 +29312,7 @@ function deckFx(){
   // The master's effects when the FX target is the master (the MST column, or the FX screen on the master).
   const mst = dkMst(), t = mst ? NT : dkTrack(), FA = () => (mst ? S.mfx : S.tfx[dkTrack()]) || [], A = FA();
   const sig = t + ':' + A.map(f => f ? f.type + (f.on ? 1 : 0) : '-').join(',') + ':' + dkFxSel;
-  $('dkFxT').textContent = mst ? 'FX · MASTER' : `FX · TRACK ${d2(t + 1)}`;
+  setText($('dkFxT'), mst ? 'FX · MASTER' : `FX · TRACK ${d2(t + 1)}`);
   if (sig !== dkFxSig){
     dkFxSig = sig; const sl = $('dkFxSlots'), box = $('dkFxRows'); sl.replaceChildren(); box.replaceChildren(); dkFxRows = [];
     if (!A[dkFxSel]) { const k = A.findIndex(Boolean); if (k >= 0){ dkFxSel = k; dkFxSig = ''; return deckFx(); } }
@@ -29362,7 +29367,7 @@ addEventListener('keydown', e => { if (dkFbKey(e)){ e.preventDefault(); e.stopIm
 addEventListener('pointerdown', e => { if (dkFbFoc && !(e.target.closest && e.target.closest('#dkFxBar .fr'))){ dkFbFoc = false; const b = $('dkFxBar'); if (b) b.classList.remove('kfoc'); } }, true);
 function deckFxBar(){
   const mst = dkMst(), t = mst ? NT : dkTrack(), FA = () => (mst ? S.mfx : S.tfx[dkTrack()]) || [], A = FA();
-  $('dkFxT').textContent = mst ? 'FX · MASTER' : `FX · TRACK ${d2(t + 1)}`;
+  setText($('dkFxT'), mst ? 'FX · MASTER' : `FX · TRACK ${d2(t + 1)}`);
   let bar = $('dkFxBar');
   if (!bar){ bar = el('div', 'dkfxbar'); bar.id = 'dkFxBar'; $('dkFxSlots').parentElement.append(bar); dkFbSig = ''; }
   $('dkFxSlots').hidden = $('dkFxRows').hidden = true;
@@ -30450,8 +30455,8 @@ function deckChains(){
   const byId = new Map(((d && d.modules) || []).map(m => [m.id, m]));
   const live = L.filter(x => x && byId.has(x.id) && byId.get(x.id).params && typeof byId.get(x.id).params[x.p] === 'number');
   const here = live.filter(x => act.has(x.id)), elsewhere = live.length - here.length;
-  $('dkChnT').textContent = feed ? '…CHAINS · FEEDS OUT · TRACK ' + d2(feed.outT + 1) : '…CHAINS · TRACK ' + d2(t + 1);
-  $('dkChnI').textContent = here.length ? here.length + ' control' + (here.length === 1 ? '' : 's') + (elsewhere ? ' · ' + elsewhere + ' on other tracks' : '') : '';
+  setText($('dkChnT'), feed ? '…CHAINS · FEEDS OUT · TRACK ' + d2(feed.outT + 1) : '…CHAINS · TRACK ' + d2(t + 1));
+  setText($('dkChnI'), here.length ? here.length + ' control' + (here.length === 1 ? '' : 's') + (elsewhere ? ' · ' + elsewhere + ' on other tracks' : '') : '');
   const sig = t + '|' + (act.size ? [...act].join(',') : '-') + '|' + here.map(x => x.id + '.' + x.p).join(',') + '|' + live.length + (deck.fxbar && !here.length ? '|rail ' + dkChnRailSig(t, feed ? feed.act : act, feed) : '');
   if (sig !== dkChnSig){
     dkChnSig = sig; dkChnT = t; const box = $('dkChnRows'); box.replaceChildren(); dkChnRows = [];
@@ -30840,7 +30845,7 @@ function drawArr0(PH){
   if (ms && selA && selA.v === 'song'){ const r = selRect(); for (let y = r.y0; y <= r.y1; y++) for (let t = r.x0; t <= r.x1; t++) mark(y, t, 'sl'); }
   if (ms) for (const p of sxPicks) mark(p.y, p.t, 'sl');
   const nm = mutedCount();
-  $('tArrSub').textContent = (ms ? S.name + ' · ' : '') + (lastR + 1) + (lastR ? ' rows' : ' row') + (nm ? ` · ${nm} muted` : '') + (arrZoom > 1 ? ` · ${+arrZoom.toFixed(1)}×` : '');
+  setText($('tArrSub'), (ms ? S.name + ' · ' : '') + (lastR + 1) + (lastR ? ' rows' : ' row') + (nm ? ` · ${nm} muted` : '') + (arrZoom > 1 ? ` · ${+arrZoom.toFixed(1)}×` : ''));
   { const lb = arrEl.querySelector('.tahl b'); if (lb && lb.textContent !== (ms ? 'SONG' : 'ARRANGE')) lb.textContent = ms ? 'SONG' : 'ARRANGE'; }
   // As the Song screen the grid holds whole rows only (the space left over sits under the boxes), so it never ends on half a row.
   if (ms){ const pitch = (arrRowH() || arRH + 2) * 1.04, avail = arrAvail(), rows = Math.max(2, Math.floor((avail - 3) / pitch)), hg = Math.min(avail, Math.round(3 + rows * pitch)) + 'px';   // (×1.04: the gap every 4 rows)
