@@ -449,3 +449,61 @@ test('Phrase ◀ ▶ step one column at a time (no skipped INST / FX value / cho
     assert.equal(run1(cols, cols[i], -1), cols[Math.max(i - 1, 0)], 'left from ' + cols[i]);
   }
 });
+
+/* ───────── usability audit leftovers (10 Nov): U4 sheet buttons, U6, U12, U14, U15, U16 ───────── */
+test('U4: sheet Close / Done buttons are at least 40 px tall on a touch screen', () => {
+  const html = H.read('index.html');
+  const blk = html.match(/@media \(pointer:coarse\)\{\n  \.top \.tsong[\s\S]*?\n\}\n/);
+  assert.ok(blk, 'the TOUCH TARGETS block moved');
+  for (const sel of ['.pbs .phd button', '.pbs .pft button', '.pbs .btnrow button', '.pbs .smbfoot button', '.phlhd button']) assert.ok(blk[0].includes(sel), sel + ' is in the coarse block');
+  assert.match(blk[0], /\.phlhd button\{min-height:40px\}\n\}\n$/, 'the sheet buttons get min-height 40px');
+  assert.match(html, /\.gsethead button\{min-height:40px/, 'the Settings Done stays 40 px');
+});
+
+test('U6: picking an engine on touch scrolls its editor into view; a mouse is left alone', () => {
+  const html = H.read('index.html');
+  assert.match(html, /if \(k !== curK\)\{ setEngine\(k\); engShowEditor\(\); \}/, 'the engine sheet calls engShowEditor after setEngine');
+  const fn = cut('index.html', /function touchUi\(\)[^\n]*\nfunction engShowEditor\(\)\{[\s\S]*?\n\}\n/, 'touchUi and engShowEditor');
+  let scrolled = 0, coarse = true;
+  const card = { hidden: false, offsetParent: {}, scrollIntoView(o) { scrolled++; assert.equal(o.block, 'start'); } };
+  const mk = () => run(fn + '\nthis.go = engShowEditor;', { isMobile: () => false, matchMedia: () => ({ matches: coarse }),
+    requestAnimationFrame: f => f(), document: { getElementById: id => id === 'blipCard' ? card : null } });
+  mk().go(); assert.equal(scrolled, 1, 'touch: scrolled to the visible engine card');
+  coarse = false; mk().go(); assert.equal(scrolled, 1, 'mouse: no scroll');
+});
+
+test('U12: the right-click wording in two settings is for the mouse only', () => {
+  const html = H.read('index.html');
+  for (const l of ['SONG MOUSE', 'ROW COLOR IN PATTERN']) {
+    const m = html.match(new RegExp("\\{l:'" + l + "', get ck\\(\\)\\{ return touchUi\\(\\) \\? '([^']*)' : '([^']*)'; \\}"));
+    assert.ok(m, l + ' has a touch and a mouse label');
+    assert.ok(!/right-click/i.test(m[1]), l + ': the touch label has no right-click'); assert.ok(/right-click/i.test(m[2]), l + ': the mouse label keeps it');
+  }
+  assert.match(html, /info:\(\) => touchUi\(\) \? 'In Pattern view, press and hold/, 'ROW COLOR IN PATTERN info');
+});
+
+test('U14: a picker row with no description has no second line', () => {
+  assert.match(H.read('index.html'), /if \(gn\) b\.append\(el\('small', null, gn\)\)/, 'perfPick adds the small line only when there is a group name');
+});
+
+test('U15: hints show the platform key (MODK), never the literal "Ctrl/⌘", in script strings', () => {
+  const html = H.read('index.html'), i0 = html.indexOf('/* ===ENGINE START=== */'), i1 = html.indexOf('<script src="pump/ui/kit.js');
+  assert.ok(i0 > 0 && i1 > i0);
+  assert.match(html, /const MODK = \/Mac\|iPhone\|iPad\/\.test\(navigator\.platform\) \? '⌘' : 'Ctrl';/);
+  // a literal "Ctrl/⌘" may stay in comments, the What's new entries and the static Help page (before the script), nowhere else
+  const live = html.slice(i0, i1).split('\n').filter(l => l.includes('Ctrl/⌘') && !/^\s*(\/\/|\/\*|\*|-|\[\d+, '|'pump windows)/.test(l))
+    .filter(l => !/^\s{2,}[^'"`]*$/.test(l) && /['"`][^'"`]*Ctrl\/⌘[^'"`]*['"`]/.test(l.replace(/\/\/.*$/, '')));
+  assert.deepEqual(live.map(l => l.trim().slice(0, 80)), [], 'these still show Ctrl/⌘ to the user');
+  const m = run("const MODK = /Mac|iPhone|iPad/.test(navigator.platform) ? '⌘' : 'Ctrl'; this.v = MODK;", { navigator: { platform: 'MacIntel' } });
+  assert.equal(m.v, '⌘'); assert.equal(run("const MODK = /Mac|iPhone|iPad/.test(navigator.platform) ? '⌘' : 'Ctrl'; this.v = MODK;", { navigator: { platform: 'Win32' } }).v, 'Ctrl');
+});
+
+test('U16: under-contrast text in IDM, IDM pink & green, IDM pink paper and 909 gets a darker colour; backgrounds are untouched', () => {
+  const html = H.read('index.html'), at = html.indexOf('/* CONTRAST (usability audit U16)'); assert.ok(at > 0, 'the U16 block');
+  const css = html.slice(at, html.indexOf('</style>', at));
+  assert.match(css, /\.tclk\.live b\{color:var\(--mx\)\}/, 'BPM / LPB while playing');
+  assert.match(css, /idmpink"\]\.tpon[^{]*\{color:#0a1a12!important\}/, 'Stop on pink paper');
+  assert.match(css, /\.stgph\{color:var\(--ts-rn\)\}/, 'the stage label');
+  assert.match(css, /tr909"\] :is\(\.tagp b\.gp, \.tgrid span\.pvh\.gp\)\{color:var\(--mxon\)\}/, 'POLY labels on the 909');
+  assert.ok(!/background/.test(css.replace(/\/\*[\s\S]*?\*\//g, '')), 'colour only: no background is changed');
+});
