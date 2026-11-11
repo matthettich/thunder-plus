@@ -489,13 +489,13 @@ test('U14: a picker row with no description has no second line', () => {
 test('U15: hints show the platform key (MODK), never the literal "Ctrl/⌘", in script strings', () => {
   const html = H.read('index.html'), i0 = html.indexOf('/* ===ENGINE START=== */'), i1 = html.indexOf('<script src="pump/ui/kit.js');
   assert.ok(i0 > 0 && i1 > i0);
-  assert.match(html, /const MODK = \/Mac\|iPhone\|iPad\/\.test\(navigator\.platform\) \? '⌘' : 'Ctrl';/);
+  const decl = cut('index.html', /const MODK = [^\n]*;/, 'MODK');   // the page's own line, run as shipped
   // a literal "Ctrl/⌘" may stay in comments, the What's new entries and the static Help page (before the script), nowhere else
   const live = html.slice(i0, i1).split('\n').filter(l => l.includes('Ctrl/⌘') && !/^\s*(\/\/|\/\*|\*|-|\[\d+, '|'pump windows)/.test(l))
     .filter(l => !/^\s{2,}[^'"`]*$/.test(l) && /['"`][^'"`]*Ctrl\/⌘[^'"`]*['"`]/.test(l.replace(/\/\/.*$/, '')));
   assert.deepEqual(live.map(l => l.trim().slice(0, 80)), [], 'these still show Ctrl/⌘ to the user');
-  const m = run("const MODK = /Mac|iPhone|iPad/.test(navigator.platform) ? '⌘' : 'Ctrl'; this.v = MODK;", { navigator: { platform: 'MacIntel' } });
-  assert.equal(m.v, '⌘'); assert.equal(run("const MODK = /Mac|iPhone|iPad/.test(navigator.platform) ? '⌘' : 'Ctrl'; this.v = MODK;", { navigator: { platform: 'Win32' } }).v, 'Ctrl');
+  const m = run(decl + ' this.v = MODK;', { navigator: { platform: 'MacIntel' } });
+  assert.equal(m.v, '⌘'); assert.equal(run(decl + ' this.v = MODK;', { navigator: { platform: 'Win32' } }).v, 'Ctrl'); assert.equal(run(decl + ' this.v = MODK;', {}).v, 'Ctrl', 'no navigator (the engine golden harness): Ctrl');
 });
 
 test('U16: under-contrast text in IDM, IDM pink & green, IDM pink paper and 909 gets a darker colour; backgrounds are untouched', () => {

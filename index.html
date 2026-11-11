@@ -3476,7 +3476,7 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
 <script>
 /* ===ENGINE START=== */
 // The platform's own modifier in hints and tips (U15): ⌘ on a Mac / iPad, Ctrl elsewhere. (MACK, further down, is the same test.)
-const MODK = /Mac|iPhone|iPad/.test(navigator.platform) ? '⌘' : 'Ctrl';
+const MODK = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform) ? '⌘' : 'Ctrl';
 const BASE = 65.40639; // C2
 const NOTE = ['C','C♯','D','D♯','E','F','F♯','G','G♯','A','A♯','B'];
 const TS = 4096, SIN = new Float32Array(TS + 1);
