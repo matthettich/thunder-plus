@@ -338,6 +338,9 @@ const u = v => clamp(v, 0, 1);
 // wetAt (REVERB MIX, 24 Oct): the index in map()'s list of a reverb's own wet/dry control. The reverb is then run fully
 // wet and blended here with rvMix's curve, so every reverb's Mix feels the same (see rvMix).
 function effect(type, id, params, map, cost, wetAt){
+  // map() makes a new array every call and runs every block; it reads only the declared params, the sample rate and the song's tempo / start
+  // counter, so its 12 numbers are kept (st.pc) and map() is called again only when one of those changed (a modulated param still does each block).
+  const keys = Object.keys(params), nk = keys.length;
   return {
     type, scope:'mono', cost: cost || 1, effect:true,
     inputs:{ in:'audio', inR:'audio' }, outputs:{ out:'audio', outR:'audio' }, params,
@@ -350,7 +353,12 @@ function effect(type, id, params, map, cost, wetAt){
       // Views into the wasm memory are kept on the state (remade only when the memory grew or the handle changed):
       // five new typed arrays per effect per block were steady garbage on the audio thread.
       if (st.buf !== buf || st.vh !== st.h){ st.buf = buf; st.vh = st.h; st.P = new Float32Array(buf, x.tfx_params(st.h), 12); st.L = new Float32Array(buf, x.tfx_l(), 128); st.R = new Float32Array(buf, x.tfx_r(), 128); }
-      const P = st.P, L = st.L, R = st.R; P.fill(0); P.set(map(io.p, ctx));
+      const P = st.P, L = st.L, R = st.R; P.fill(0);
+      const pc = st.pc || (st.pc = new Float32Array(12)), pk = st.pk || (st.pk = new Float64Array(nk + 3)), pp = io.p, tr = ctx.transport, tt = tr ? tr.tempo : 0, ts = tr ? tr.startN || 0 : 0;
+      let hit = st.pv === 1 && pk[nk] === ctx.sr && pk[nk + 1] === tt && pk[nk + 2] === ts;
+      for (let k = 0; hit && k < nk; k++) if (pk[k] !== pp[keys[k]]) hit = false;
+      if (hit) P.set(pc);
+      else { P.set(map(pp, ctx)); pc.set(P); for (let k = 0; k < nk; k++) pk[k] = pp[keys[k]]; pk[nk] = ctx.sr; pk[nk + 1] = tt; pk[nk + 2] = ts; st.pv = 1; }
       const wm = wetAt == null ? -1 : P[wetAt]; if (wm >= 0) P[wetAt] = 1;   // REVERB MIX: fully wet in, blended below
       // The wasm only checks its output. A NaN or infinity on the way IN hangs the tape delay for good and leaves
       // twenty other effects silent, so bad or absurd samples are zeroed here first.
@@ -363,8 +371,8 @@ function effect(type, id, params, map, cost, wetAt){
       const L2 = st.L, R2 = st.R;
       let bad = false; for (let i = 0; i < ctx.block; i++){ const a = L2[i], b = R2[i]; if (!(a > -1e4 && a < 1e4 && b > -1e4 && b < 1e4)){ bad = true; break; } }
       if (bad){ try { x.tfx_free(st.h); st.h = x.tfx_new(id, ctx.sr); } catch (e){ st.h = -1; } io.out.out.fill(0); io.out.outR.fill(0); return; }   // its state went bad: start it afresh
-      if (wm >= 0){ const [dg, wg] = rvMix(wm), oL = io.out.out, oR = io.out.outR; for (let i = 0; i < ctx.block; i++){ oL[i] = L0[i] * dg + L2[i] * wg; oR[i] = R0[i] * dg + R2[i] * wg; } return; }
-      io.out.out.set(L2.subarray(0, ctx.block)); io.out.outR.set(R2.subarray(0, ctx.block));
+      if (wm >= 0){ const [dg, wg] = rvMix(wm, RVO), oL = io.out.out, oR = io.out.outR; for (let i = 0; i < ctx.block; i++){ oL[i] = L0[i] * dg + L2[i] * wg; oR[i] = R0[i] * dg + R2[i] * wg; } return; }
+      cpTo(io.out.out, 0, L2, 0, ctx.block); cpTo(io.out.outR, 0, R2, 0, ctx.block);
     }
   };
 }
@@ -518,7 +526,11 @@ const SCK_TOP = 136;
    reverb), so a low setting already sounded drenched and 50 % was nowhere near halfway. Now the dry falls as an equal-power
    fade, cos(πm/2), and the tail rises as sin²(πm/2): 10 % is a touch (−32 dB), 35 % about −11 dB, 50 % a real middle
    (dry −3 dB, tail −6 dB), 100 % the tail alone. Returns [dry gain, wet gain]. */
-const rvMix = m => { const a = (m < 0 ? 0 : m > 1 ? 1 : m) * Math.PI / 2, s = Math.sin(a); return [Math.cos(a), s * s]; };
+// rvMix(m, o): with o (a two-slot array the caller keeps) the pair goes into o and o comes back, so a block makes no array; without o a fresh pair (as before).
+const rvMix = (m, o) => { const a = (m < 0 ? 0 : m > 1 ? 1 : m) * Math.PI / 2, s = Math.sin(a); if (o){ o[0] = Math.cos(a); o[1] = s * s; return o; } return [Math.cos(a), s * s]; };
+const RVO = [0, 0];   // the modules' shared scratch for rvMix (each reads it at once, in the same call)
+// cpTo: dst[d0 + i] = src[s0 + i] for n samples (what `dst.set(src.subarray(s0, s0 + n), d0)` did, without making a view every block)
+function cpTo(dst, d0, src, s0, n){ for (let i = 0; i < n; i++) dst[d0 + i] = src[s0 + i]; }
 
 /* Mutable Instruments Beads (MIT): time, size, pitch, shape, density, feedback, blend, reverb + media. */
 // Beads divides by zero with Freeze on and Size at exactly 1, which traps the whole wasm module. Cap it just under.
@@ -757,6 +769,22 @@ const Quant = {
 /* ── Phase 2: filters, shapers and stereo effects (all original DSP) ────────── */
 
 /* Dual (2/4-pole) multimode filter with drive. Cutoff follows the VCF's mapping so the % reads the same. */
+// one side through one pair of stages (state z); the cutoff and resonance are worked out once a sample for both
+// (module-level, not a closure made in process() every block: audio-thread garbage)
+function bladeSide(z, xin, a1, a2, a3, k, mode, four, dr, norm){
+  const x = Math.tanh(xin * dr) / norm;
+  const v3 = x - z.ic2, v1 = a1 * z.ic1 + a2 * v3, v2 = z.ic2 + a2 * z.ic1 + a3 * v3;
+  z.ic1 = 2 * v1 - z.ic1; z.ic2 = 2 * v2 - z.ic2;
+  let y = mode === 0 ? v2 : mode === 1 ? v1 : mode === 2 ? (x - k * v1 - v2) : (x - k * v1);
+  if (four){
+    const x2 = mode === 1 ? v1 : v2;
+    const u3 = x2 - z.jc2, u1 = a1 * z.jc1 + a2 * u3, u2 = z.jc2 + a2 * z.jc1 + a3 * u3;
+    z.jc1 = 2 * u1 - z.jc1; z.jc2 = 2 * u2 - z.jc2;
+    y = mode === 0 ? u2 : mode === 1 ? u1 : mode === 2 ? (x2 - k * u1 - u2) : (x2 - k * u1);
+  }
+  return y;
+}
+function bladeGuard(z){ if (!(Math.abs(z.ic1) < 1e4 && Math.abs(z.ic2) < 1e4 && Math.abs(z.jc1) < 1e4 && Math.abs(z.jc2) < 1e4)){ z.ic1 = z.ic2 = z.jc1 = z.jc2 = 0; } }
 const Blades = {
   type:'blades', scope:'mono', cost:1.2,
   inputs:{ in:'audio', inR:'audio', cutoff:'cv', res:'cv' }, outputs:{ out:'audio', outR:'audio' },   // stereo (owner, 19 Oct): In R optional
@@ -764,32 +792,25 @@ const Blades = {
   create:() => ({ ic1:0, ic2:0, jc1:0, jc2:0, R:{ ic1:0, ic2:0, jc1:0, jc2:0 } }),
   process(st, io, ctx){
     const mode = io.p.mode | 0, four = (io.p.slope | 0) >= 4, dr = 1 + io.p.drive * 6, norm = Math.tanh(dr) || 1, XR = inR(io), oR = io.out.outR;
-    // one side through one pair of stages (state z); the cutoff and resonance are worked out once a sample for both
-    const side = (z, xin, a1, a2, a3, k) => {
-      const x = Math.tanh(xin * dr) / norm;
-      const v3 = x - z.ic2, v1 = a1 * z.ic1 + a2 * v3, v2 = z.ic2 + a2 * z.ic1 + a3 * v3;
-      z.ic1 = 2 * v1 - z.ic1; z.ic2 = 2 * v2 - z.ic2;
-      let y = mode === 0 ? v2 : mode === 1 ? v1 : mode === 2 ? (x - k * v1 - v2) : (x - k * v1);
-      if (four){
-        const x2 = mode === 1 ? v1 : v2;
-        const u3 = x2 - z.jc2, u1 = a1 * z.jc1 + a2 * u3, u2 = z.jc2 + a2 * z.jc1 + a3 * u3;
-        z.jc1 = 2 * u1 - z.jc1; z.jc2 = 2 * u2 - z.jc2;
-        y = mode === 0 ? u2 : mode === 1 ? u1 : mode === 2 ? (x2 - k * u1 - u2) : (x2 - k * u1);
-      }
-      return y;
-    };
     for (let i = 0; i < ctx.block; i++){
       const fc = Math.min(.49, (.01 + Math.pow(10, (io.p.cutoff + io.in.cutoff[i]) * 3) * .004) * 44100 / ctx.sr);
       const g = Math.tan(Math.PI * fc), k = 2 - 2 * Math.min(clamp(io.p.res + io.in.res[i], 0, 1), .98);
       const a1 = 1 / (1 + g * (g + k)), a2 = g * a1, a3 = g * a2;
-      io.out.out[i] = side(st, io.in.in[i], a1, a2, a3, k);   // TPT state-variable stages
-      oR[i] = side(st.R, XR[i], a1, a2, a3, k);
+      io.out.out[i] = bladeSide(st, io.in.in[i], a1, a2, a3, k, mode, four, dr, norm);   // TPT state-variable stages
+      oR[i] = bladeSide(st.R, XR[i], a1, a2, a3, k, mode, four, dr, norm);
     }
-    for (const z of [st, st.R]) if (!(Math.abs(z.ic1) < 1e4 && Math.abs(z.ic2) < 1e4 && Math.abs(z.jc1) < 1e4 && Math.abs(z.jc2) < 1e4)){ z.ic1 = z.ic2 = z.jc1 = z.jc2 = 0; }
+    bladeGuard(st); bladeGuard(st.R);
   }
 };
 
 /* Meta-modulator (Warps-style): crossfade, ring mod, wave fold or comparator between In and Mod. */
+// (module-level, not a closure made in process() every block: audio-thread garbage)
+function metaF(mode, a, x, m){
+  return mode === 0 ? x * (1 - a) + m * a              // crossfade
+    : mode === 1 ? x * ((1 - a) + a * m * 1.4142)      // ring mod
+    : mode === 2 ? Math.sin(x * (1 + a * 7) * Math.PI) // wave fold (sine shaper)
+    : x * (m >= 0 ? 1 : -1);                           // comparator (mod flips sign)
+}
 const Meta = {
   type:'meta', scope:'mono', cost:.3,
   inputs:{ in:'audio', inR:'audio', mod:'audio' }, outputs:{ out:'audio', outR:'audio' },   // stereo (owner, 19 Oct): In R optional, one Mod
@@ -797,13 +818,9 @@ const Meta = {
   create:() => ({}),
   process(st, io, ctx){
     const mode = io.p.mode | 0, a = io.p.amount, mx = io.p.mix, XR = inR(io), oR = io.out.outR;
-    const f = (x, m) => mode === 0 ? x * (1 - a) + m * a              // crossfade
-      : mode === 1 ? x * ((1 - a) + a * m * 1.4142)                    // ring mod
-      : mode === 2 ? Math.sin(x * (1 + a * 7) * Math.PI)               // wave fold (sine shaper)
-      : x * (m >= 0 ? 1 : -1);                                         // comparator (mod flips sign)
     for (let i = 0; i < ctx.block; i++){
       const m = io.in.mod[i], x = io.in.in[i], xr = XR[i];
-      io.out.out[i] = x + (f(x, m) - x) * mx; oR[i] = xr + (f(xr, m) - xr) * mx;
+      io.out.out[i] = x + (metaF(mode, a, x, m) - x) * mx; oR[i] = xr + (metaF(mode, a, xr, m) - xr) * mx;
     }
   }
 };
@@ -985,6 +1002,10 @@ const Utility = {
   }
 };
 
+/* Audio-thread garbage (10 Nov): helpers that were closures made inside process() every block, now module-level functions
+   taking what they closed over; the arithmetic is the same. ringRd: a linearly interpolated read `d` samples behind the write head. */
+function ringRd(st, B, N, d){ const r = st.w - d, ri = Math.floor(r), fr = r - ri, a = B[((ri % N) + N) % N], b = B[(((ri + 1) % N) + N) % N]; return a + (b - a) * fr; }
+const rmOsc = (w, ph) => w === 0 ? sinT(ph) : w === 1 ? 1 - 4 * Math.abs(ph - .5) : w === 2 ? (ph < .5 ? 1 : -1) : 0;   // Ring mod's carrier shapes
 /* Ring mod: multiplies the sound by a carrier, its own oscillator (Freq, 5 Hz–5 kHz; the Freq input adds ±4
    octaves) or whatever is patched into Carrier. Spread offsets the right side's phase; Shape squares the carrier up. */
 const RingMod = {
@@ -996,7 +1017,6 @@ const RingMod = {
     const L = io.in.in, R = inR(io), oL = io.out.out, oR = io.out.outR, ext = linked(io, 'car'), fcv = linked(io, 'freq'), p = io.p;
     const base = 5 * Math.pow(1000, p.freq) * Math.pow(2, p.fine / 12), w = p.wave | 0, sp = p.spread * .25, mx = p.mix;
     const dr = 1 + p.shape * 12, nd = Math.tanh(dr);
-    const osc = ph => w === 0 ? sinT(ph) : w === 1 ? 1 - 4 * Math.abs(ph - .5) : w === 2 ? (ph < .5 ? 1 : -1) : 0;
     for (let i = 0; i < ctx.block; i++){
       let c1, c2;
       if (ext){ c1 = c2 = io.in.car[i]; }
@@ -1004,7 +1024,7 @@ const RingMod = {
         const f = base * (fcv ? Math.pow(2, clamp(io.in.freq[i], -1, 1) * 4) : 1);
         const ph0 = st.ph; st.ph += f / ctx.sr; if (st.ph >= 1){ st.ph -= Math.floor(st.ph); if (w === 3){ st.n1 = st.nr() * 2 - 1; } }
         if (w === 3){ if ((ph0 + sp) % 1 > (st.ph + sp) % 1) st.n2 = st.nr() * 2 - 1; c1 = st.n1; c2 = sp ? st.n2 : st.n1; }
-        else { c1 = osc(st.ph); const q = st.ph + sp; c2 = osc(q - Math.floor(q)); }
+        else { c1 = rmOsc(w, st.ph); const q = st.ph + sp; c2 = rmOsc(w, q - Math.floor(q)); }
         if (dr > 1){ c1 = Math.tanh(c1 * dr) / nd; c2 = Math.tanh(c2 * dr) / nd; }
       }
       oL[i] = L[i] * (1 - mx + c1 * mx); oR[i] = R[i] * (1 - mx + c2 * mx);
@@ -1027,7 +1047,7 @@ const Spring = {
   process(st, io, ctx){
     const p = io.p, sr = ctx.sr, L = io.in.in, R = inR(io), oL = io.out.out, oR = io.out.outR;
     const g = .55 + p.decay * .43, a = .3 + p.chirp * .45, kl = 1 - Math.exp(-2 * Math.PI * (1500 * Math.pow(6, p.tone)) / sr);
-    const kh = 1 - Math.exp(-2 * Math.PI * 140 / sr), kp = 1 - Math.exp(-2 * Math.PI * 900 / sr), drip = p.drip * 3, mx = p.mix, [dg, wg] = rvMix(mx);
+    const kh = 1 - Math.exp(-2 * Math.PI * 140 / sr), kp = 1 - Math.exp(-2 * Math.PI * 900 / sr), drip = p.drip * 3, mx = p.mix, [dg, wg] = rvMix(mx, RVO);
     const base = (.028 + p.length * .05) * sr;
     for (let c = 0; c < 2; c++){
       const s = st.s[c], X = c ? R : L, O = c ? oR : oL, D = s.d, N = D.length, len = base * (c ? 1.13 : 1);
@@ -1080,7 +1100,7 @@ const Plate = {
     return st;
   },
   process(st, io, ctx){
-    const p = io.p, s = st.s, L = io.in.in, R = inR(io), oL = io.out.out, oR = io.out.outR, mx = p.mix, [dg, wg] = rvMix(mx);
+    const p = io.p, s = st.s, L = io.in.in, R = inR(io), oL = io.out.out, oR = io.out.outR, mx = p.mix, [dg, wg] = rvMix(mx, RVO);
     const sz = p.size, dec = p.decay, dd2 = clamp(dec + .15, .25, .5), kd = 1 - p.damp * .9, sc = s * sz;
     const pre = Math.min(st.pre.n - 1, Math.round(p.pre * ctx.sr) + 1), exc = p.mod * 16 * s;
     const ind = st.ind, ik = st.indK, A1 = st.ap1, D1 = st.dl1, A2 = st.ap2, D2 = st.dl2;
@@ -1135,7 +1155,6 @@ const Ensemble = {
     const [hz0, dep0, voices] = ENS[clamp(p.mode | 0, 0, 3)], hz = hz0 * Math.pow(2, (p.rate - .5) * 4), dep = dep0 * p.depth * 2;
     const ctr = (voices === 3 ? .012 : .0035) * sr, sw = (voices === 3 ? .004 : .0019) * sr * dep / .5;
     const kt = 1 - Math.exp(-2 * Math.PI * (2000 * Math.pow(8, p.tone)) / sr), mx = p.mix;
-    const rd = d => { const r = st.w - d, ri = Math.floor(r), fr = r - ri, a = B[((ri % N) + N) % N], b = B[(((ri + 1) % N) + N) % N]; return a + (b - a) * fr; };
     for (let i = 0; i < ctx.block; i++){
       const m = (L[i] + R[i]) * .5; B[st.w] = m;
       st.ph += hz / sr; if (st.ph >= 1) st.ph -= 1;
@@ -1143,11 +1162,11 @@ const Ensemble = {
       if (voices === 3){
         st.vib += 6.3 / sr; if (st.vib >= 1) st.vib -= 1;
         const v = sinT(st.vib) * .08;
-        const a = rd(ctr + sw * (sinT(st.ph) + v)), b = rd(ctr + sw * (sinT(st.ph + 1 / 3) + v)), c = rd(ctr + sw * (sinT(st.ph + 2 / 3) + v));
+        const a = ringRd(st, B, N, ctr + sw * (sinT(st.ph) + v)), b = ringRd(st, B, N, ctr + sw * (sinT(st.ph + 1 / 3) + v)), c = ringRd(st, B, N, ctr + sw * (sinT(st.ph + 2 / 3) + v));
         wl = a * .7 + b * .45 + c * .15; wr = c * .7 + b * .45 + a * .15;
       } else {
         const tri = 1 - 4 * Math.abs(st.ph - .5);   // triangle, as the originals
-        wl = rd(ctr + sw * tri); wr = rd(ctr - sw * tri);
+        wl = ringRd(st, B, N, ctr + sw * tri); wr = ringRd(st, B, N, ctr - sw * tri);
       }
       st.lp[0] += (wl - st.lp[0]) * kt; st.lp[1] += (wr - st.lp[1]) * kt;
       oL[i] = L[i] * (1 - mx * .5) + st.lp[0] * mx; oR[i] = R[i] * (1 - mx * .5) + st.lp[1] * mx;
@@ -1201,6 +1220,9 @@ const Divider = {
 /* Euclidean: spreads Hits as evenly as possible over Steps (rotated by Rotate), one step per note value at the
    song tempo, or per pulse on Clock in. Gate fires on the hits; Accent on the first hit of each cycle.
    Restarts from step 1 when the song starts. */
+// (module-level; these were closures made in process() every block)
+function eucHit(k, rot, S, H){ const j = (((k - rot) % S) + S) % S; return H > 0 && ((j * H) % S) < H; }
+function eucFirst(k, rot, S, H){ for (let j = 0; j < S; j++) if (eucHit(j, rot, S, H)) return j === ((k % S) + S) % S; return false; }
 const Euclid = {
   type:'euclid', scope:'mono', cost:.02,
   inputs:{ clock:'gate', reset:'gate' }, outputs:{ gate:'gate', accent:'gate' },
@@ -1208,8 +1230,6 @@ const Euclid = {
   create:() => ({ step:-1, ph:1, lc:0, lr:0, sn:undefined }),
   process(st, io, ctx){
     const p = io.p, S = Math.max(1, p.steps | 0), H = clamp(p.hits | 0, 0, S), rot = p.rot | 0, ck = linked(io, 'clock');
-    const hit = k => { const j = (((k - rot) % S) + S) % S; return H > 0 && ((j * H) % S) < H; };
-    const first = k => { for (let j = 0; j < S; j++) if (hit(j)) return j === ((k % S) + S) % S; return false; };
     if (restarted(st, ctx)){ st.step = -1; st.ph = 1; }
     const inc = (ctx.transport.tempo || 120) / 60 / divBeats(p.div) / ctx.sr;
     for (let i = 0; i < ctx.block; i++){
@@ -1217,8 +1237,8 @@ const Euclid = {
       let on;
       if (ck){ const c = io.in.clock[i] >= .5; if (c && !st.lc) st.step = (st.step + 1) % S; st.lc = c; on = c; }
       else { st.ph += inc; if (st.ph >= 1){ st.ph -= Math.floor(st.ph); st.step = (st.step + 1) % S; } on = st.ph < p.len; }
-      const h = st.step >= 0 && on && hit(st.step);
-      io.out.gate[i] = h ? 1 : 0; io.out.accent[i] = h && first(st.step) ? 1 : 0;
+      const h = st.step >= 0 && on && eucHit(st.step, rot, S, H);
+      io.out.gate[i] = h ? 1 : 0; io.out.accent[i] = h && eucFirst(st.step, rot, S, H) ? 1 : 0;
     }
   }
 };
@@ -1237,14 +1257,13 @@ const Dimension = {
     const p = io.p, sr = ctx.sr, L = io.in.in, R = inR(io), oL = io.out.out, oR = io.out.outR, B = st.b, N = B.length;
     const [hz, ms] = DIM_MODES[clamp(p.mode | 0, 0, 3)], ctr = .0042 * sr, sw = ms * .001 * sr * .5, wd = p.width;
     const kt = 1 - Math.exp(-2 * Math.PI * (2500 * Math.pow(4, p.tone)) / sr);
-    const rd = d => { const r = st.w - d, ri = Math.floor(r), fr = r - ri, a = B[((ri % N) + N) % N], b = B[(((ri + 1) % N) + N) % N]; return a + (b - a) * fr; };
     for (let i = 0; i < ctx.block; i++){
       const m = (L[i] + R[i]) * .5; B[st.w] = m;
       st.ph += hz / sr; if (st.ph >= 1) st.ph -= 1;
       const tri = 1 - 4 * Math.abs(st.ph - .5);
       // two poles of filtering each, as the chips' clock filters round off the top
-      st.l1 += (rd(ctr + sw * tri) - st.l1) * kt; st.m1 += (st.l1 - st.m1) * kt;
-      st.l2 += (rd(ctr - sw * tri) - st.l2) * kt; st.m2 += (st.l2 - st.m2) * kt;
+      st.l1 += (ringRd(st, B, N, ctr + sw * tri) - st.l1) * kt; st.m1 += (st.l1 - st.m1) * kt;
+      st.l2 += (ringRd(st, B, N, ctr - sw * tri) - st.l2) * kt; st.m2 += (st.l2 - st.m2) * kt;
       oL[i] = L[i] + (st.m1 - st.m2 * .4) * wd * .7; oR[i] = R[i] + (st.m2 - st.m1 * .4) * wd * .7;
       st.w = st.w + 1 === N ? 0 : st.w + 1;
     }
@@ -1293,6 +1312,18 @@ const BBD = {
    thickening double) and Delay. Each voice reads the input through a delay that drifts at the new speed; when
    it runs out of room it jumps, choosing the jump whose waveform lines up best with what is playing (so the
    pitch stays true, not just the speed) and crossfading into it. Window trades smoothness (long) for tightness. */
+// Harmonizer's helpers (module-level; they were closures made in process() every block, and `vs` was four arrays a block)
+function harmVoice(o, oct, lv, pan){ const a = (clamp(pan, -1, 1) + 1) * Math.PI / 4; o[0] = Math.pow(2, oct); o[1] = lv * Math.cos(a) * Math.SQRT2; o[2] = lv * Math.sin(a) * Math.SQRT2; }
+function harmAt(st, B, N, d){ let x = st.w - ((d + .5) | 0); if (x < 0) x += N; return B[x]; }
+// the jump (by about half a window, refined over one period's worth of lags) that best matches the recent waveform
+function harmScore(st, B, N, d, dn, step){ let c = 0, e = 1e-9; for (let j = 0; j < 384; j += step){ const y = harmAt(st, B, N, dn + j); c += harmAt(st, B, N, d + j) * y; e += y * y; } return c / Math.sqrt(e); }
+function harmBest(st, B, N, W, PER, d, dir){
+  const L0 = Math.round(W * .5); let bl = L0, bv = -Infinity;
+  for (let L = L0; L < L0 + PER; L += 6){ const v = harmScore(st, B, N, d, d + dir * L, 12); if (v > bv){ bv = v; bl = L; } }   // coarse
+  const c0 = bl; bv = -Infinity;
+  for (let L = c0 - 5; L <= c0 + 5; L++){ const v = harmScore(st, B, N, d, d + dir * L, 3); if (v > bv){ bv = v; bl = L; } }   // fine
+  return d + dir * bl;
+}
 const HARM_INT = [-24, -19, -12, -7, -5, -4, -3, 0, 3, 4, 5, 7, 9, 12, 19, 24];
 const Harmonizer = {
   type:'harm', scope:'mono', cost:.2,
@@ -1302,19 +1333,8 @@ const Harmonizer = {
   process(st, io, ctx){
     const p = io.p, sr = ctx.sr, L = io.in.in, R = inR(io), oL = io.out.out, oR = io.out.outR, B = st.b, N = B.length;
     const W = (.02 + p.win * .08) * sr, pre = p.delay * sr + 2, dt = p.detune / 1200, F = Math.max(64, Math.min(W / 3, .012 * sr)), PER = Math.round(.02 * sr);
-    const rd = d => { const r = st.w - d, ri = Math.floor(r), fr = r - ri, a = B[((ri % N) + N) % N], b = B[(((ri + 1) % N) + N) % N]; return a + (b - a) * fr; };
-    const at = d => { let x = st.w - ((d + .5) | 0); if (x < 0) x += N; return B[x]; };
-    const vs = [[HARM_INT[clamp(p.v1 | 0, 0, 15)] / 12 + dt, p.lv1, p.pan1], [HARM_INT[clamp(p.v2 | 0, 0, 15)] / 12 - dt, p.lv2, p.pan2]].map(([oct, lv, pan]) => {
-      const a = (clamp(pan, -1, 1) + 1) * Math.PI / 4; return [Math.pow(2, oct), lv * Math.cos(a) * Math.SQRT2, lv * Math.sin(a) * Math.SQRT2]; });
-    // the jump (by about half a window, refined over one period's worth of lags) that best matches the recent waveform
-    const score = (d, dn, step) => { let c = 0, e = 1e-9; for (let j = 0; j < 384; j += step){ const y = at(dn + j); c += at(d + j) * y; e += y * y; } return c / Math.sqrt(e); };
-    const best = (d, dir) => {
-      const L0 = Math.round(W * .5); let bl = L0, bv = -Infinity;
-      for (let L = L0; L < L0 + PER; L += 6){ const v = score(d, d + dir * L, 12); if (v > bv){ bv = v; bl = L; } }   // coarse
-      const c0 = bl; bv = -Infinity;
-      for (let L = c0 - 5; L <= c0 + 5; L++){ const v = score(d, d + dir * L, 3); if (v > bv){ bv = v; bl = L; } }   // fine
-      return d + dir * bl;
-    };
+    const vs = st.vs || (st.vs = [[0, 0, 0], [0, 0, 0]]);   // the two voices' [ratio, left gain, right gain], refilled each block (kept: no arrays made per block)
+    harmVoice(vs[0], HARM_INT[clamp(p.v1 | 0, 0, 15)] / 12 + dt, p.lv1, p.pan1); harmVoice(vs[1], HARM_INT[clamp(p.v2 | 0, 0, 15)] / 12 - dt, p.lv2, p.pan2);
     for (let i = 0; i < ctx.block; i++){
       B[st.w] = (L[i] + R[i]) * .5;
       let yl = L[i] * p.dry, yr = R[i] * p.dry;
@@ -1325,11 +1345,11 @@ const Harmonizer = {
         if (v.d < 0){ v.d = (lo + hi) * .5; v.f = 1; }
         v.d += 1 - ratio; if (v.f < 1) v.o += 1 - ratio;
         if (v.f >= 1){
-          if (ratio > 1 && v.d < lo){ v.o = v.d; v.d = best(v.d, 1); v.f = 0; }
-          else if (ratio < 1 && v.d > hi){ v.o = v.d; v.d = best(v.d, -1); v.f = 0; }
+          if (ratio > 1 && v.d < lo){ v.o = v.d; v.d = harmBest(st, B, N, W, PER, v.d, 1); v.f = 0; }
+          else if (ratio < 1 && v.d > hi){ v.o = v.d; v.d = harmBest(st, B, N, W, PER, v.d, -1); v.f = 0; }
         }
-        let s = rd(v.d);
-        if (v.f < 1){ const q = v.f * Math.PI / 2; s = s * Math.sin(q) + rd(v.o) * Math.cos(q); v.f += 1 / F; }
+        let s = ringRd(st, B, N, v.d);
+        if (v.f < 1){ const q = v.f * Math.PI / 2; s = s * Math.sin(q) + ringRd(st, B, N, v.o) * Math.cos(q); v.f += 1 / F; }
         yl += s * gl; yr += s * gr;
       }
       oL[i] = yl; oR[i] = yr;
@@ -1461,6 +1481,15 @@ const lifeParams = () => {
   for (let y = 0; y < 8; y++) P['b' + y] = [glider[y], 0, 65535, 1];
   return P;
 };
+// Life's per-block names and its step (module-level: a string made and a closure built in process() every block were audio-thread garbage)
+const LIFE_B = ['b0', 'b1', 'b2', 'b3', 'b4', 'b5', 'b6', 'b7'], LIFE_G = ['g1', 'g2', 'g3', 'g4', 'g5', 'g6', 'g7', 'g8'];
+function lifeStep(st, p, W){
+  st.x++;
+  if (st.x >= W){ st.x = 0; if ((p.gens | 0) > 0 && st.gen + 1 >= (p.gens | 0)) Life.load(st, p); else Life.next(st, p); }
+  let f = 0, c = 0;
+  for (let y = 0; y < 8; y++){ const a = (st.cur[y] >> st.x) & 1, b = (st.prev[y] >> st.x) & 1; c += a; if (p.trig >= .5 ? a && !b : a) f |= 1 << ((y + (p.rot | 0)) % 8); }
+  st.fire = f; st.cnt = c;
+}
 const Life = {
   type:'life', scope:'mono', cost:.02,
   inputs:{ clock:'gate', reset:'gate' }, outputs:{ g1:'gate', g2:'gate', g3:'gate', g4:'gate', g5:'gate', g6:'gate', g7:'gate', g8:'gate', any:'gate', count:'cv' },
@@ -1480,24 +1509,17 @@ const Life = {
   process(st, io, ctx){
     const p = io.p, W = clamp(p.w | 0, 4, 16), ck = linked(io, 'clock');
     const SG = st.sg || (st.sg = new Int32Array(8).fill(-1)); let ch = false;
-    for (let y = 0; y < 8; y++){ const v = p['b' + y] | 0; if (v !== SG[y]){ SG[y] = v; ch = true; } }
+    for (let y = 0; y < 8; y++){ const v = p[LIFE_B[y]] | 0; if (v !== SG[y]){ SG[y] = v; ch = true; } }
     if (ch) Life.load(st, p);   // the drawn grid changed: start from it
     if (restarted(st, ctx)){ Life.load(st, p); st.x = -1; st.ph = 1; }
     const inc = (ctx.transport.tempo || 120) / 60 / divBeats(p.div) / ctx.sr, o = io.out, G = st.G || (st.G = []);
-    for (let k = 0; k < 8; k++) G[k] = o['g' + (k + 1)];
+    for (let k = 0; k < 8; k++) G[k] = o[LIFE_G[k]];
     const ANY = o.any, CNT = o.count, RS = io.in.reset, CK = io.in.clock;
-    const step = () => {
-      st.x++;
-      if (st.x >= W){ st.x = 0; if ((p.gens | 0) > 0 && st.gen + 1 >= (p.gens | 0)) Life.load(st, p); else Life.next(st, p); }
-      let f = 0, c = 0;
-      for (let y = 0; y < 8; y++){ const a = (st.cur[y] >> st.x) & 1, b = (st.prev[y] >> st.x) & 1; c += a; if (p.trig >= .5 ? a && !b : a) f |= 1 << ((y + (p.rot | 0)) % 8); }
-      st.fire = f; st.cnt = c;
-    };
     for (let i = 0; i < ctx.block; i++){
       const r = RS[i] >= .5; if (r && !st.lr){ Life.load(st, p); st.x = -1; st.ph = 1; } st.lr = r;
       let on;
-      if (ck){ const c = CK[i] >= .5; if (c && !st.lc) step(); st.lc = c; on = c; }
-      else { st.ph += inc; if (st.ph >= 1){ st.ph -= Math.floor(st.ph); step(); } on = st.ph < p.len; }
+      if (ck){ const c = CK[i] >= .5; if (c && !st.lc) lifeStep(st, p, W); st.lc = c; on = c; }
+      else { st.ph += inc; if (st.ph >= 1){ st.ph -= Math.floor(st.ph); lifeStep(st, p, W); } on = st.ph < p.len; }
       const f = on ? st.fire : 0;
       for (let k = 0; k < 8; k++) G[k][i] = (f >> k) & 1;
       ANY[i] = f ? 1 : 0; CNT[i] = st.cnt / 8;
@@ -1626,7 +1648,7 @@ class PitchFxCore {
     this.ap = [0, 1].map(() => ap.map(n => ({b:new Float32Array(Math.ceil(n * sr / 44100) + 8), i:0})));
     this.lp = [0, 0]; this.fbS = [0, 0]; this.step = 0; this.cnt = 0; this.wph = 0; this.tsm = 0; this.rev = 0;
   }
-  static get ARP(){ return [0, 4, 7, 12, 7, 4]; }
+  static get ARP(){ return PitchFxCore._arp || (PitchFxCore._arp = [0, 4, 7, 12, 7, 4]); }   // (one array: the delay's arp mode read it every sample)
   static defaults(){ return {kind:0, mode:0, time:380, fb:0.45, pitch:12, pitch2:-12, tone:0.6, size:0.6, wow:0.2, mix:0.4}; }
   shift(s, x, ratio, win){   // one sample through pitch shifter s
     const b = s.b, N = 8192; b[s.w] = x;
@@ -1646,7 +1668,7 @@ class PitchFxCore {
     return y * 0.25;
   }
   process(Lb, Rb, n, p){
-    const sr = this.sr, mix = p.mix, rv = rvMix(mix), dry = p.kind | 0 ? rv[0] : 1 - mix * 0.5, wgm = rv[1], r1 = Math.pow(2, p.pitch / 12), r2 = Math.pow(2, p.pitch2 / 12), win = sr * 0.06;
+    const sr = this.sr, mix = p.mix, rv = rvMix(mix, this.rvo || (this.rvo = [0, 0])), dry = p.kind | 0 ? rv[0] : 1 - mix * 0.5, wgm = rv[1], r1 = Math.pow(2, p.pitch / 12), r2 = Math.pow(2, p.pitch2 / 12), win = sr * 0.06;
     const tc = 1 - Math.exp(-2 * Math.PI * (500 + p.tone * p.tone * 12000) / sr), mode = p.mode | 0, D = this.D;
     if (p.kind | 0){   // reverb
       // Size tops out at a ~7 s tail (it was 0.97, ~14 s), and the shimmer loop is scaled to stay under unity (measured: it rose at 0.45 of the old value, decays at 0.4): with large
@@ -1869,39 +1891,48 @@ class FlexCore {
   }
   // FLY's names, 00–FF (the flx param plays FLY v as 256 + v)
   static get NAMES2(){ if (FlexCore._N2) return FlexCore._N2; const T = FlexCore.SPEC(), N = ['OFF']; for (let v = 1; v < 256; v++) N[v] = T[256 + v] ? T[256 + v].n : 'OFF'; return (FlexCore._N2 = N); }
+  // Per-sample helpers, once (ext() / pat() run for every sample of a playing pattern: a closure or an array literal made in them was audio-thread garbage).
+  static cs(p, C){ return Math.floor(p / C + 1e-9) * C; }
+  static lr(v, t){ return v[0] + (v[1] - v[0]) * t; }
+  static eon(o, N, j){ return ((((j + o.rot) % N) * o.k) % N) < o.k; }
+  static get K(){ return FlexCore._K || (FlexCore._K = {tup:[0, 0, 1, 2, 3], mrr:['mute', 'rep', 'rat'], skp:['stuck', 'jump', 'drop', 'prev'], ste:[1/2, 1/3, 1/4, 1/6, 1/8, 1/12, 1/16],
+    tx4:['crush', 'lp', 'hp', 'chop'], tx3:['crush', 'lp', 'hp'], cp:[0.5, 0.75, 1.5, 2], p13:[0, 1, 2, 3, 4, 5, 2, 7, 8, 9, 10, 11, 8, 13, 6, 15]}); }
+  // the Flex filter's coefficients for cutoff f, into o (made once; they were a new array every 8 samples) and one sample through a filter stage (it was a closure made for every sample)
+  svc(o, f, nyq){ const gg = Math.tan(Math.PI * Math.min(nyq, f) / this.sr), kk = 1.1, a1 = 1 / (1 + gg * (gg + kk)); if (typeof o !== 'object') o = [0, 0, 0]; o[0] = a1; o[1] = gg * a1; o[2] = gg * gg * a1; return o; }
+  svf(fs, x, j, c, hi){ const v3 = x - fs[j + 1], v1 = c[0] * fs[j] + c[1] * v3, v2 = fs[j + 1] + c[1] * fs[j] + c[2] * v3; fs[j] = 2 * v1 - fs[j]; fs[j + 1] = 2 * v2 - fs[j + 1]; return hi ? x - 1.1 * v1 - v2 : v2; }
   static hh(a, b, c){ let h = Math.imul((a | 0) * 73856093 ^ (b | 0) * 19349663 ^ (c | 0) * 83492791, 2654435761) >>> 0; h ^= h >>> 15; h = Math.imul(h, 2246822519) >>> 0; h = (h ^ (h >>> 13)) >>> 0; return h / 4294967296; }
   // 17–255: sets this.pg (gain), this.plp / this.php (filter, 0–1; 1 / 0 = open), this.pcr / this.pbt (hold, bits; 1 / 0 = clean); returns the read position
   ext(k, p, bar){
     const o = (this.T || (this.T = FlexCore.SPEC()))[k]; let r = p, g = 1, lp = 1, hp = 0, cr = 1, bt = 0;
-    if (o){ const cs = C => Math.floor(p / C + 1e-9) * C;
+    if (o){
       switch (o.f){
         case 'roll': if (p >= o.s) r = o.s + (p - o.s) % o.L; break;
-        case 'stut': { const c = cs(o.C); r = c + (p - c) % o.L; } break;
+        case 'stut': { const c = FlexCore.cs(p, o.C); r = c + (p - c) % o.L; } break;
         case 'build': { let s = null; for (const q of o.sg) if (p >= q[0]) s = q; if (s) r = s[0] + (p - s[0]) % s[1]; } break;
-        case 'rev': { const C = o.C, c = cs(C), i = Math.round(c / C), u = p - c;
+        case 'rev': { const C = o.C, c = FlexCore.cs(p, C), i = Math.round(c / C), u = p - c;
           const on = o.m === 'all' || o.m === 'half' || (o.m === 'alt' && (i & 1)) || (o.m === 'last' && c >= 3 - 1e-9) || (o.m === 'rnd' && FlexCore.hh(i, k, 5) < 0.5);
           if (on) r = c - (o.m === 'half' ? u / 2 : u); } break;
         case 'down': if (p >= o.a){ const c = o.a + Math.floor((p - o.a) / o.C + 1e-9) * o.C; r = c + (p - c) * o.s; } break;
-        case 'up': { const C = o.C, c = cs(C), i = Math.round(c / C);
+        case 'up': { const C = o.C, c = FlexCore.cs(p, C), i = Math.round(c / C);
           if (!o.m || (o.m === 'last' && c >= 3 - 1e-9) || (o.m === 'alt' && (i & 1))) r = c - C * (o.s - 1) + (p - c) * o.s; } break;
-        case 'stop': { const a = o.C ? cs(o.C) : o.a, W = o.C || o.b - o.a;
+        case 'stop': { const a = o.C ? FlexCore.cs(p, o.C) : o.a, W = o.C || o.b - o.a;
           if (p >= a){ const u = Math.min(p - a, W); r = a + u - u * u / (2 * W); if (u > W * 0.85) g = Math.max(0, (W - u) / (W * 0.15)); } } break;
-        case 'start': { const a = o.C ? cs(o.C) : o.a, W = o.C || o.b - o.a;
+        case 'start': { const a = o.C ? FlexCore.cs(p, o.C) : o.a, W = o.C || o.b - o.a;
           // FLX CHECK 2 (5 Nov, owner: "FLX 76 sort of feels broken … flx lags"): the spin-up read the half-length before it
           // at 0 → 1× speed, so it never caught up: the rest of the bar (76 TAPE START BEAT 1, 77 HALF BAR) played straight
           // but 1/8 or a 1/4 late, and the EVERY versions only ever played the tail of the beat before. Now speed 4t − 3t²
           // (0 → peak 1.33× → 1×): it starts from the spin-up's own downbeat, never reads ahead (r ≤ p) and lands on the grid.
           if (p >= a && p < a + W){ const u = p - a, t = u / W; r = a + W * t * t * (2 - t); g = Math.min(1, u / (W * 0.2)); } } break;
         case 'wow': r = p - o.d * (1 - Math.cos(2 * Math.PI * p / o.T)) / 2 - (o.d2 ? o.d2 * (1 - Math.cos(2 * Math.PI * p / o.T2)) / 2 : 0); break;
-        case 'scr': { const C = o.C, c = cs(C), u = (p - c) / C; r = c - C * o.d + C * o.d * (1 - Math.cos(2 * Math.PI * o.k * u)) / 2;
+        case 'scr': { const C = o.C, c = FlexCore.cs(p, C), u = (p - c) / C; r = c - C * o.d + C * o.d * (1 - Math.cos(2 * Math.PI * o.k * u)) / 2;
           if (o.gt === 1) g = Math.sin(2 * Math.PI * o.k * u) >= 0 ? 1 : 0; else if (o.gt === 2) g = (p * 16) % 1 < 0.5 ? 1 : 0; } break;
         case 'gate': g = (p / o.g) % 2 < 1 ? 1 : 0; break;
         case 'pump': { const u = (p % o.C) / o.C; g = Math.min(1, u * 3); } break;
         case 'swell': g = (p % o.C) / o.C; break;
         case 'fade': g = 1 - p / 4; break;
         case 'mask': g = (o.m >> (15 - Math.min(15, Math.floor(p * 4)))) & 1; break;
-        case 'filt': { const t = o.a ? Math.max(0, (p - o.a) / (4 - o.a)) : p / 4, L = (v, t) => v[0] + (v[1] - v[0]) * t;
-          if (o.lp) lp = L(o.lp, t); if (o.hp) hp = L(o.hp, t);
+        case 'filt': { const t = o.a ? Math.max(0, (p - o.a) / (4 - o.a)) : p / 4;
+          if (o.lp) lp = FlexCore.lr(o.lp, t); if (o.hp) hp = FlexCore.lr(o.hp, t);
           if (o.lpw) lp = o.lpw[1] + o.lpw[2] * Math.cos(2 * Math.PI * p * o.lpw[0]);
           if (o.hpw) hp = Math.max(0, o.hpw[1] - o.hpw[2] * Math.cos(2 * Math.PI * p));
           if (o.bw){ hp = 0.05 + 0.7 * t; lp = hp + 0.25; }
@@ -1909,13 +1940,13 @@ class FlexCore {
         case 'crush': { let on = true;
           if (o.beats) on = o.beats.includes(Math.floor(p)); if (o.alt) on = Math.floor(p / o.alt) & 1; if (o.a) on = p >= o.a;
           if (on){ cr = o.hs ? o.hs[0] + (o.hs[1] - o.hs[0]) * p / 4 : o.h || 1; bt = o.b || 0; if (o.lp) lp = o.lp; } } break;
-        case 'echo': { const c = cs(o.C), n = Math.floor((p - c) / o.L + 1e-9); r = c + (p - c) - n * o.L; g = Math.pow(o.k, n); } break;
+        case 'echo': { const c = FlexCore.cs(p, o.C), n = Math.floor((p - c) / o.L + 1e-9); r = c + (p - c) - n * o.L; g = Math.pow(o.k, n); } break;
         case 'jug': { const G = o.G, per = Math.round(4 / G), s = Math.min(per - 1, Math.floor(p / G + 1e-9)), u = p - s * G;
           if (FlexCore.hh(o.seed, s, 11) < o.c){ let src = s - 1 - Math.floor(FlexCore.hh(o.seed, s, 23) * (per - 1)); const rv = FlexCore.hh(o.seed, s, 31) < o.rv;
             r = src * G + (rv ? G - u : u); } } break;
-        case 'swing': { const C = o.C, c = cs(C), u = (p - c) / C, h = 0.5 + o.a;
+        case 'swing': { const C = o.C, c = FlexCore.cs(p, C), u = (p - c) / C, h = 0.5 + o.a;
           r = c + C * (u < h ? u * 0.5 / h : 0.5 + (u - h) * 0.5 / (1 - h)); } break;
-        case 'tup': { const C = o.C, c = cs(C), u = (p - c) / C, j = Math.min(o.q - 1, Math.floor(u * o.q + 1e-9)), sj = o.q === 5 ? [0, 0, 1, 2, 3][j] : j;   // FLX CHECK 2: was [0,1,2,3,3]: notes 2–4 read ahead (clamped: mostly straight with jumps); now the downbeat doubles and 2–4 land late, as a quintuplet does
+        case 'tup': { const C = o.C, c = FlexCore.cs(p, C), u = (p - c) / C, j = Math.min(o.q - 1, Math.floor(u * o.q + 1e-9)), sj = o.q === 5 ? FlexCore.K.tup[j] : j;   // FLX CHECK 2: was [0,1,2,3,3]: notes 2–4 read ahead (clamped: mostly straight with jumps); now the downbeat doubles and 2–4 land late, as a quintuplet does
           r = c + C * (sj / 4 + (u - j / o.q)); } break;
         case 'drunk': { const s = Math.floor(p * 4); r = p - FlexCore.hh(bar & 3, s, 41) * 0.06; } break;
         case 'lag': r = (p % 1) >= 0.5 ? p - 1/16 : p; break;
@@ -1926,22 +1957,22 @@ class FlexCore {
         // ===== FLY (5 Nov): k 257–511. Each reads only what has played (r ≤ p); see the notes by SPEC's FLY families.
         case 'proll': if (p >= o.a){ const n = Math.floor((p - o.a) / o.L + 1e-9), u = p - o.a - n * o.L;   // repeat n: speed ≤ n + 1 keeps it behind now
           if (n > 0) r = o.a + u * Math.min(n + 1, Math.max(0.25, Math.pow(2, n * o.s / 12))); } break;
-        case 'euc': { const N = o.N, step = 4 / N, s = Math.min(N - 1, Math.floor(p / step + 1e-9)), on = j => ((((j + o.rot) % N) * o.k) % N) < o.k;
-          if (!o.h) g = on(s) ? 1 : 0;
-          else if (!on(s)){ let j = s - 1; while (j >= 0 && !on(j)) j--; if (j >= 0){ const c0 = j * step; r = c0 + (p - c0) % step; } } } break;
+        case 'euc': { const N = o.N, step = 4 / N, s = Math.min(N - 1, Math.floor(p / step + 1e-9));
+          if (!o.h) g = FlexCore.eon(o, N, s) ? 1 : 0;
+          else if (!FlexCore.eon(o, N, s)){ let j = s - 1; while (j >= 0 && !FlexCore.eon(o, N, j)) j--; if (j >= 0){ const c0 = j * step; r = c0 + (p - c0) % step; } } } break;
         case 'prob': { const G = o.G, s = Math.floor(p / G + 1e-9), c0 = s * G, u = p - c0, B = bar & 255;
-          if (FlexCore.hh(k, s, B * 13 + 1) < o.c){ let op = o.op; if (op === 'any') op = ['mute', 'rep', 'rat'][Math.floor(FlexCore.hh(k, s, B * 13 + 2) * 3)];
+          if (FlexCore.hh(k, s, B * 13 + 1) < o.c){ let op = o.op; if (op === 'any') op = FlexCore.K.mrr[Math.floor(FlexCore.hh(k, s, B * 13 + 2) * 3)];
             if (op === 'mute') g = 0; else if (op === 'rep') r = p - G; else r = c0 + u % (G / (o.x || 2 + Math.floor(FlexCore.hh(k, s, B * 13 + 3) * 3))); } } break;
         case 'spitch': { const G = o.G, s = Math.floor(p / G + 1e-9), c0 = s * G, u = p - c0, B = o.nb ? bar & 255 : 0;
           if (FlexCore.hh(k, s, B * 17 + 1) < o.c){ const sp = o.S[Math.floor(FlexCore.hh(k, s, B * 17 + 2) * o.S.length)]; r = sp > 1 ? c0 - G * (sp - 1) + u * sp : c0 + u * sp; } } break;
-        case 'frz': { let a, b; if (o.C){ const c = cs(o.C); a = c + o.h * o.C; b = c + o.C; } else { a = o.a; b = o.b; }
+        case 'frz': { let a, b; if (o.C){ const c = FlexCore.cs(p, o.C); a = c + o.h * o.C; b = c + o.C; } else { a = o.a; b = o.b; }
           if (p >= a && p < b && (o.pr >= 1 || FlexCore.hh(k, Math.round(a * 64), bar & 255) < o.pr)){ const u = p - a, w = o.sw ? o.w * (1 - o.sw * u / (b - a)) : o.w;
             r = a + Math.floor(u / w + 1e-9) * w * o.rho + u % w; } } break;
         case 'skip': { const G = o.G, s = Math.floor(p / G + 1e-9), c0 = s * G, u = p - c0, B = o.nb ? bar & 255 : 0;
-          if (FlexCore.hh(k, s, B * 19 + 1) < o.d){ const op = o.only || ['stuck', 'jump', 'drop', 'prev'][Math.floor(FlexCore.hh(k, s, B * 19 + 2) * 4)];
+          if (FlexCore.hh(k, s, B * 19 + 1) < o.d){ const op = o.only || FlexCore.K.skp[Math.floor(FlexCore.hh(k, s, B * 19 + 2) * 4)];
             if (op === 'stuck') r = c0 + u % (G / 8); else if (op === 'jump') r = p - G * (1 + Math.floor(FlexCore.hh(k, s, B * 19 + 3) * 3)) / 2;
             else if (op === 'drop') g = u < G * 0.35 ? 0 : 1; else r = c0 - G / 4 + u % (G / 4); } } break;
-        case 'bnc': { const a = o.C ? cs(o.C) : o.a, b = o.C ? a + o.C : 4;
+        case 'bnc': { const a = o.C ? FlexCore.cs(p, o.C) : o.a, b = o.C ? a + o.C : 4;
           if (p >= a && p < b){ const x = p - a, q = o.q, Lm = 1 / 128; let n, c;   // repeat n lasts L0·qⁿ (q < 1 faster, > 1 slower)
             if (q > 1){ n = Math.floor(Math.log(1 + x * (q - 1) / o.L0) / Math.log(q) + 1e-9); c = o.L0 * (Math.pow(q, n) - 1) / (q - 1); }
             else { const nm = Math.max(0, Math.ceil(Math.log(Lm / o.L0) / Math.log(q))), Sm = o.L0 * (1 - Math.pow(q, nm)) / (1 - q);
@@ -1955,14 +1986,14 @@ class FlexCore {
           if (FlexCore.hh(k, s, key * 7 + 11) < o.c){ const src = s - 1 - Math.floor(FlexCore.hh(k, s, key * 7 + 23) * (per - 1)), rv = FlexCore.hh(k, s, key * 7 + 31) < o.rv;
             r = src * G + (rv ? G - u : u); } } break;
         case 'sted': { const G = o.G, s = Math.floor(p / G + 1e-9), c0 = s * G, u = p - c0, B = o.nb ? bar & 255 : 0;
-          if (FlexCore.hh(k, s, B * 23 + 1) < o.d){ const Lr = G * [1/2, 1/3, 1/4, 1/6, 1/8, 1/12, 1/16][Math.floor(FlexCore.hh(k, s, B * 23 + 2) * 7)], n = Math.floor(u / Lr + 1e-9), v = u - n * Lr;
+          if (FlexCore.hh(k, s, B * 23 + 1) < o.d){ const Lr = G * FlexCore.K.ste[Math.floor(FlexCore.hh(k, s, B * 23 + 2) * 7)], n = Math.floor(u / Lr + 1e-9), v = u - n * Lr;
             r = c0 + v * (o.s && n > 0 ? Math.min(n + 1, Math.max(0.25, Math.pow(2, n * o.s / 12))) : 1);
             if (o.fd) g = Math.pow(o.fd, n); if (o.gt) g = v < Lr / 2 ? 1 : 0; } } break;
         case 'poly': if (p >= o.a){ const x = p - o.a, n = Math.floor(x / o.M + 1e-9), u = x - n * o.M; r = o.a + (o.pp && (n & 1) ? o.M - u : u); } break;
         case 'warp': { const G = o.G, s = Math.floor(p / G + 1e-9), c0 = s * G, u = p - c0, K = o.k;
           const up = o.d === 'UP' ? true : o.d === 'DOWN' ? false : o.d === 'ZIGZAG' ? !(s & 1) : FlexCore.hh(k, s, (bar & 255) * 29 + 1) < 0.5;
           r = up ? c0 + (1 - K) * u + K * u * u / G : c0 - K * G / 4 + (1 + K) * u - K * u * u / G; } break;   // up: slow → fast, lands on the grid; down: fast → slow
-        case 'rroll': if (o.m === 'rew'){ const a = o.C ? cs(o.C) + o.h * o.C : o.a, b = o.C ? cs(o.C) + o.C : 4;
+        case 'rroll': if (o.m === 'rew'){ const a = o.C ? FlexCore.cs(p, o.C) + o.h * o.C : o.a, b = o.C ? FlexCore.cs(p, o.C) + o.C : 4;
             if (p >= a && p < b){ r = a - o.k * (p - a); g = Math.min(1, (b - p) / ((b - a) * 0.1)); } }
           else if (p >= o.a){ const L = o.L, n = Math.floor((p - o.a) / L + 1e-9), u = p - o.a - n * L;
             if (n > 0){ const sp = o.s ? Math.max(0.25, Math.pow(2, n * o.s / 12)) : 1; r = o.m === 'rev' || (n & 1) ? o.a + L - u * sp : o.a + u;
@@ -1971,12 +2002,12 @@ class FlexCore {
           r = FlexCore.hh(k, j, B * 31 + 2) < o.rv ? p - off + w - 2 * u : p - off; if (o.gap && FlexCore.hh(k, j, B * 31 + 3) < o.gap) g = 0; } break;
         case 'tex': { const G = o.G, s = Math.floor(p / G + 1e-9), u = p - s * G, B = o.nb ? bar & 255 : 0;
           if (FlexCore.hh(k, s, B * 37 + 1) < o.d){ const h2 = FlexCore.hh(k, s, B * 37 + 2), h3 = FlexCore.hh(k, s, B * 37 + 3);
-            const op = o.set === 'all' ? ['crush', 'lp', 'hp', 'chop'][Math.floor(h2 * 4)] : o.set === 'cf' ? ['crush', 'lp', 'hp'][Math.floor(h2 * 3)] : o.set === 'filt' ? (h2 < 0.5 ? 'lp' : 'hp') : o.set;
+            const op = o.set === 'all' ? FlexCore.K.tx4[Math.floor(h2 * 4)] : o.set === 'cf' ? FlexCore.K.tx3[Math.floor(h2 * 3)] : o.set === 'filt' ? (h2 < 0.5 ? 'lp' : 'hp') : o.set;
             if (op === 'crush'){ cr = 3 + Math.floor(h3 * 22); bt = h3 < 0.5 ? 4 + Math.floor(h3 * 8) : 0; } else if (op === 'lp') lp = 0.2 + h3 * 0.35; else if (op === 'hp') hp = 0.5 + h3 * 0.3;
             else g = u < G * (0.25 + h3 * 0.4) ? 1 : 0; } } break;
         case 'chaos2': { const G = o.G, s = Math.floor(p / G + 1e-9), c0 = s * G, u = p - c0, B = o.nb ? (o.slow ? (bar >> 1) & 1 : bar & 255) : 0;
           if (FlexCore.hh(k, s, B * 41 + 1) < o.d){ const op = Math.floor(FlexCore.hh(k, s, B * 41 + 2) * 8), h3 = FlexCore.hh(k, s, B * 41 + 3);
-            if (op === 0){ const sp = [0.5, 0.75, 1.5, 2][Math.floor(h3 * 4)]; r = sp > 1 ? c0 - G * (sp - 1) + u * sp : c0 + u * sp; }   // pitch
+            if (op === 0){ const sp = FlexCore.K.cp[Math.floor(h3 * 4)]; r = sp > 1 ? c0 - G * (sp - 1) + u * sp : c0 + u * sp; }   // pitch
             else if (op === 1) r = c0 + u % (G / 8);            // freeze
             else if (op === 2) r = p - G / 2;                   // skip back
             else if (op === 3) r = c0 - u;                      // the slice before, backwards
@@ -2004,7 +2035,7 @@ class FlexCore {
       case 10: { const b = Math.floor(p * 2) / 2; u = (p - b) * 2; r = b + 0.105 * (1 - Math.cos(2 * Math.PI * u)); } break;
       case 11: g = p % 0.25 < 0.125 ? 1 : 0; break;
       case 12: g = (0xB6B6 >> (15 - Math.floor(p * 4))) & 1; break;
-      case 13: { const s = Math.floor(p * 4); r = [0, 1, 2, 3, 4, 5, 2, 7, 8, 9, 10, 11, 8, 13, 6, 15][s] * 0.25 + p % 0.25; } break;
+      case 13: { const s = Math.floor(p * 4); r = FlexCore.K.p13[s] * 0.25 + p % 0.25; } break;
       case 14: if (p >= 2) r = p - 2; break;
       case 15: r = Math.floor(p) - 1 + 2 * (p % 1); break;
       case 16: { const s = Math.floor(p * 4); let h = Math.imul((bar & 3) * 31 + s * 17 + 7, 2654435761) >>> 0; h ^= h >>> 13; h = h % 11; r = (s - (h < 4 ? 0 : h - 3)) * 0.25 + p % 0.25; } break;
@@ -2053,11 +2084,9 @@ class FlexCore {
       if (bt > 0){ const qz = Math.pow(2, bt - 1); yl = Math.round(yl * qz) / qz; yr = Math.round(yr * qz) / qz; }
       this.slp += (lp - this.slp) * fsk; this.shp += (hp - this.shp) * fsk;
       if (this.slp < 0.995 || this.shp > 0.005){
-        if (!(this.fk++ & 7)){ const sv = f => { const gg = Math.tan(Math.PI * Math.min(nyq, f) / this.sr), kk = 1.1, a1 = 1 / (1 + gg * (gg + kk)); return [a1, gg * a1, gg * gg * a1]; };
-          this.fa = sv(40 * Math.pow(2, this.slp * 9)); this.fb = sv(20 * Math.pow(2, this.shp * 9)); }
-        const svf = (x, j, c, hi) => { const v3 = x - fs[j + 1], v1 = c[0] * fs[j] + c[1] * v3, v2 = fs[j + 1] + c[1] * fs[j] + c[2] * v3; fs[j] = 2 * v1 - fs[j]; fs[j + 1] = 2 * v2 - fs[j + 1]; return hi ? x - 1.1 * v1 - v2 : v2; };
-        if (this.slp < 0.995){ yl = svf(yl, 0, this.fa, false); yr = svf(yr, 2, this.fa, false); }
-        if (this.shp > 0.005){ yl = svf(yl, 4, this.fb, true); yr = svf(yr, 6, this.fb, true); }
+        if (!(this.fk++ & 7)){ this.fa = this.svc(this.fa, 40 * Math.pow(2, this.slp * 9), nyq); this.fb = this.svc(this.fb, 20 * Math.pow(2, this.shp * 9), nyq); }
+        if (this.slp < 0.995){ yl = this.svf(fs, yl, 0, this.fa, false); yr = this.svf(fs, yr, 2, this.fa, false); }
+        if (this.shp > 0.005){ yl = this.svf(fs, yl, 4, this.fb, true); yr = this.svf(fs, yr, 6, this.fb, true); }
       } else if (fs[0] || fs[1] || fs[4]) fs.fill(0);
       L[i] += (yl * this.g - L[i]) * mix; R[i] += (yr * this.g - R[i]) * mix;
       this.w = w + 1 >= N ? 0 : w + 1;
@@ -2068,15 +2097,16 @@ class FlexCore {
    step 1 = the top bit); 1–15 are built in. */
 class StepGateCore {
   constructor(sr){ this.sr = sr; this.g = 1; }
-  static get PATS(){ return ['', 'xxxxxxxxxxxxxxxx', 'x.x.x.x.x.x.x.x.', '.x.x.x.x.x.x.x.x', 'x..x..x.x..x..x.', 'xx.xx.x.xx.xx.x.', 'x.xxx.x.x.xxx.xx', 'xxx.xxx.xxx.x.x.',
-    'x...x...x...x...', '..x...x...x...x.', 'x.x..x.x.x..x.x.', 'xxxx....xxxx....', 'xxxxxxxx........', 'x.xx.x.xx.xx.x.x', 'xx..xx..xx..x.x.', 'x..x.x..x..x.xx.']; }
+  static get PATS(){ return StepGateCore._P || (StepGateCore._P = ['', 'xxxxxxxxxxxxxxxx', 'x.x.x.x.x.x.x.x.', '.x.x.x.x.x.x.x.x', 'x..x..x.x..x..x.', 'xx.xx.x.xx.xx.x.', 'x.xxx.x.x.xxx.xx', 'xxx.xxx.xxx.x.x.',
+    'x...x...x...x...', '..x...x...x...x.', 'x.x..x.x.x..x.x.', 'xxxx....xxxx....', 'xxxxxxxx........', 'x.xx.x.xx.xx.x.x', 'xx..xx..xx..x.x.', 'x..x.x..x..x.xx.']); }   // (one array: process() read it every block)
+  static get SB(){ return StepGateCore._SB || (StepGateCore._SB = [0.5, 0.25, 0.125, 1 / 6, 1 / 3]); }
   static get NAMES(){ return ['CUSTOM', 'EVERY STEP', '8THS', 'OFFBEATS', '3-3-2', 'GALLOP', 'BROKEN', 'TRIPLE', 'QUARTERS', 'OFF 8THS', 'SYNCOPATE', 'HALF ON', 'FIRST HALF', 'DENSE', 'PAIRS', 'TRESILLO']; }
   static mask(s){ let m = 0; for (let j = 0; j < 16; j++) if (s[j] === 'x') m |= 1 << (15 - j); return m; }
   process(L, R, n, dp, tr){
     // tr.gat: −1 the slot's own (PATTERN, or waiting with STARTS ON GAT), 0 GAT 00 (off: the gate opens), 1–15 a pattern, 16 CUSTOM
     const g = tr && tr.gat >= 0 ? Math.round(tr.gat) : -1, bp = tr && tr.bp, wait = g === 0 || (g < 0 && dp.wait && !(tr && tr.sw > 0.5)), live = !wait && !!(bp && bp.length > 1), pi = g > 0 ? (g >= 16 ? 0 : g) : dp.pat | 0;
     const mask = pi === 0 ? ((dp.m1 & 255) << 8) | (dp.m2 & 255) : StepGateCore.mask(StepGateCore.PATS[pi]);
-    const sb = [0.5, 0.25, 0.125, 1 / 6, 1 / 3][dp.div | 0] || 0.25, len = dp.len, lo = 1 - dp.depth, tc = 1 - Math.exp(-1 / (this.sr * Math.max(0.0003, dp.smooth / 1000)));
+    const sb = StepGateCore.SB[dp.div | 0] || 0.25, len = dp.len, lo = 1 - dp.depth, tc = 1 - Math.exp(-1 / (this.sr * Math.max(0.0003, dp.smooth / 1000)));
     for (let i = 0; i < n; i++){
       const q = bp ? (live ? bp[i] : bp[0]) : -1; let tg = 1;
       if (live && q >= 0){ const sp = q / sb, st = Math.floor(sp + 1e-6), fr = sp - st, idx = ((st % 16) + 16) % 16; tg = ((mask >> (15 - idx)) & 1) && fr < len ? 1 : lo; }
@@ -4287,12 +4317,12 @@ function modsClose(st){
 const modsSilence = io => { for (const k in io.out) io.out[k].fill(0); };
 /* A steady clock at the song tempo (high for the first half of each note value), for when nothing is patched to Clock.
    st.ck < 0: start a new pulse now (made, or the song started). A rising edge on rs (Reset) starts one too. */
-function modsClock(st, IN, n, hz, sr, rs){
-  const inc = hz / sr;
+function modsClock(st, IN, n, hz, sr, rs, off){   // off: write from IN[off] (Tides gave a view of IN from 128)
+  const inc = hz / sr, o = off | 0;
   if (st.ck < 0) st.ck = 0;
   for (let i = 0; i < n; i++){
     if (rs){ const r = rs[i] > .5; if (r && !st.rk) st.ck = 0; st.rk = r; }
-    IN[i] = st.ck < .5 ? 1 : 0; st.ck += inc; if (st.ck >= 1) st.ck -= Math.floor(st.ck);
+    IN[o + i] = st.ck < .5 ? 1 : 0; st.ck += inc; if (st.ck >= 1) st.ck -= Math.floor(st.ck);
   }
 }
 
@@ -4324,13 +4354,13 @@ const MarblesM = {
     P[9] = p.tdv; P[10] = p.xdv; P[11] = p.spread; P[12] = p.xbias; P[13] = p.steps; P[14] = p.scale; P[15] = p.xrange; P[16] = p.xmode;
     P[17] = p.xclk; P[18] = p.yrange; P[19] = p.ydiv; P[20] = p.yspread; P[21] = p.ybias; P[22] = p.ysteps; P[23] = p.oct; P[24] = p.xout;
     P[28] = linked(io, 'xclock') ? 1 : 0; P[29] = rs || st.fresh ? 1 : 0; st.fresh = false;
-    if (linked(io, 'clock')) IN.set(io.in.clock.subarray(0, n), 0);
+    if (linked(io, 'clock')) cpTo(IN, 0, io.in.clock, 0, n);
     else modsClock(st, IN, n, (ctx.transport.tempo || 120) / 60 / divBeats(p.div), ctx.sr, io.in.reset);
-    IN.set(io.in.reset.subarray(0, n), 128); IN.set(io.in.xclock.subarray(0, n), 256); IN.set(io.in.dejavu.subarray(0, n), 384);
+    cpTo(IN, 128, io.in.reset, 0, n); cpTo(IN, 256, io.in.xclock, 0, n); cpTo(IN, 384, io.in.dejavu, 0, n);
     if (!modsRun(st, x, n)){ modsSilence(io); return; }
     const o = io.out;
-    o.t1.set(OUT.subarray(0, n)); o.t2.set(OUT.subarray(128, 128 + n)); o.t3.set(OUT.subarray(256, 256 + n));
-    o.x1.set(OUT.subarray(384, 384 + n)); o.x2.set(OUT.subarray(512, 512 + n)); o.x3.set(OUT.subarray(640, 640 + n)); o.y.set(OUT.subarray(768, 768 + n));
+    cpTo(o.t1, 0, OUT, 0, n); cpTo(o.t2, 0, OUT, 128, n); cpTo(o.t3, 0, OUT, 256, n);
+    cpTo(o.x1, 0, OUT, 384, n); cpTo(o.x2, 0, OUT, 512, n); cpTo(o.x3, 0, OUT, 640, n); cpTo(o.y, 0, OUT, 768, n);
   }
 };
 
@@ -4363,13 +4393,13 @@ const TidesM = {
     const P = st.P, IN = MODS_RT.IN, OUT = MODS_RT.OUT;
     P[0] = p.mode; P[1] = p.output; P[2] = p.range; P[3] = p.freq; P[4] = p.shape; P[5] = p.slope; P[6] = p.smooth; P[7] = p.shift;
     P[8] = linked(io, 'pitch') ? 1 : 0; P[9] = linked(io, 'trig') ? 1 : 0; P[10] = clk || sync ? 1 : 0; P[11] = p.ratio; P[12] = rs ? 1 : 0;
-    IN.set(io.in.trig.subarray(0, n), 0);
-    if (sync) modsClock(st, IN.subarray(128), n, (ctx.transport.tempo || 120) / 60 / divBeats(p.div), ctx.sr);
-    else IN.set(io.in.clock.subarray(0, n), 128);
-    IN.set(io.in.pitch.subarray(0, n), 256);
+    cpTo(IN, 0, io.in.trig, 0, n);
+    if (sync) modsClock(st, IN, n, (ctx.transport.tempo || 120) / 60 / divBeats(p.div), ctx.sr, undefined, 128);   // (writes IN from index 128: no view)
+    else cpTo(IN, 128, io.in.clock, 0, n);
+    cpTo(IN, 256, io.in.pitch, 0, n);
     if (!modsRun(st, x, n)){ modsSilence(io); return; }
     const o = io.out;
-    o.out1.set(OUT.subarray(0, n)); o.out2.set(OUT.subarray(128, 128 + n)); o.out3.set(OUT.subarray(256, 256 + n)); o.out4.set(OUT.subarray(384, 384 + n));
+    cpTo(o.out1, 0, OUT, 0, n); cpTo(o.out2, 0, OUT, 128, n); cpTo(o.out3, 0, OUT, 256, n); cpTo(o.out4, 0, OUT, 384, n);
   }
 };
 
@@ -4808,9 +4838,10 @@ class VoicePool {
 }
 
 /* A cable into "p:name" modulates that parameter instead of feeding an input. */
+const NO_CABLES = [];   // a module with no cable in: nothing to make per block
 const isParamPort = p => typeof p === 'string' && p.startsWith('p:');
 class Graph {
-  constructor(){ this.mods = new Map(); this.cables = []; this.order = []; this.inc = new Map(); }
+  constructor(){ this.mods = new Map(); this.cables = []; this.order = []; this.inc = new Map(); this.ver = 0; }
   add(id, def, inst){ this.mods.set(id, { id, def, inst, poly:false }); this.compile(); }
   remove(id){ this.mods.delete(id); this.cables = this.cables.filter(c => c.a[0] !== id && c.b[0] !== id); this.compile(); }
   connect(a, b){
@@ -4829,7 +4860,7 @@ class Graph {
     const q = [...indeg].filter(([, d]) => d === 0).map(([k]) => k), order = [];
     while (q.length){ const k = q.shift(); order.push(k); for (const n of adj.get(k)){ indeg.set(n, indeg.get(n) - 1); if (indeg.get(n) === 0) q.push(n); } }
     for (const k of this.mods.keys()) if (!order.includes(k)) order.push(k);
-    this.order = order;
+    this.order = order; this.ver++;   // (ver: what _gather checks to know the cables changed)
     // A module runs once per voice when something polyphonic (Host In, or a module fed by it) feeds it.
     for (const id of order){
       const m = this.mods.get(id), s = m.def.scope;
@@ -4860,9 +4891,10 @@ class WavesEngine {
     this.busesL = new Float32Array(BUS_COUNT * BLOCK); this.busesR = new Float32Array(BUS_COUNT * BLOCK);
     this.load = 0; this.telemetryOn = false;
     this._ios = new Map(); this._states = new Map();
-    this._busy = 0; this._frames = 0;
+    this._busy = 0; this._frames = 0; this._bvL = []; this._bvR = [];
     this._ctx = { sr:sampleRate, block:BLOCK, quality:this.quality, transport:this.transport, notes:this.voices.rows, voice:0, engine:this,
-      busL:k => this.busesL.subarray(k * BLOCK, (k + 1) * BLOCK), busR:k => this.busesR.subarray(k * BLOCK, (k + 1) * BLOCK) };
+      // kept views of the buses, made once per slot (a module asks every block: a new subarray each time was steady garbage)
+      busL:k => this._bvL[k] || (this._bvL[k] = this.busesL.subarray(k * BLOCK, (k + 1) * BLOCK)), busR:k => this._bvR[k] || (this._bvR[k] = this.busesR.subarray(k * BLOCK, (k + 1) * BLOCK)) };
   }
   addModule(id, type, o = {}){
     const def = MODULES[type]; if (!def) return;
@@ -4930,8 +4962,10 @@ class WavesEngine {
     this.only = keep;
   }
 
+  // The Map key of a module (v < 0) or of one of its voices: the string is made once per module and voice and kept on m (m.id + '#' + v was a new string, several times a block, for every module).
+  _key(m, v){ if (v < 0) return m.id; const K = m.kv || (m.kv = []); return K[v] || (K[v] = m.id + '#' + v); }
   _bufs(m, v){
-    const key = m.id + (v >= 0 ? '#' + v : '');
+    const key = this._key(m, v);
     let io = this._ios.get(key);
     if (!io){
       io = { in:{}, out:{}, base:m.inst.params, p:m.inst.params, pm:null, linked:new Set(), poly:m.poly, mods:null };
@@ -4942,7 +4976,7 @@ class WavesEngine {
     return io;
   }
   _state(m, v){
-    const key = m.id + (v >= 0 ? '#' + v : '');
+    const key = this._key(m, v);
     let s = this._states.get(key);
     if (!s){ s = { st:m.def.create(this.sr), def:m.def, poly:m.poly }; this._states.set(key, s); }
     return s.st;
@@ -4950,7 +4984,7 @@ class WavesEngine {
   /* Sum every cable into this module's inputs, and work out its modulated parameters. */
   _gather(m, io, v){
     for (const k in io.in) io.in[k].fill(0);
-    io.linked.clear();
+    if (io.lkVer !== this.graph.ver){ io.linked.clear(); io.lkVer = this.graph.ver; }   // (Set.clear() makes a new table: it ran every block; the ports below are added again each block, so the set is exactly the patched ones)
     let mods = null;
     // Modulation buffers live on io (io.mb, one per parameter, kept; io.mo, the set in use), so no array or object is
     // made per block: that garbage (one per modulated parameter per block) is what paused the audio thread on phones.
@@ -4958,12 +4992,12 @@ class WavesEngine {
     if (io.moVer !== this.graph.cables.length){ for (const k in io.mo) delete io.mo[k]; io.moVer = this.graph.cables.length; }   // the cables changed: start the set over
     else for (const k in io.mo) io.mo[k].fill(0);
     const N = this.voices.max;
-    for (const c of this.graph.inc.get(m.id) || []){
+    for (const c of this.graph.inc.get(m.id) || NO_CABLES){
       const src = this.graph.mods.get(c.a[0]); if (!src) continue;
       const port = c.b[1], param = isParamPort(port);
       let dst;
       if (param){
-        const k = port.slice(2); if (!(k in m.def.params)) continue;
+        const k = c.pk || (c.pk = port.slice(2)); if (!(k in m.def.params)) continue;   // (the name is cut once per cable, not every block)
         mods = mods || io.mo; dst = mods[k] || (mods[k] = io.mb[k] || (io.mb[k] = new Float32Array(BLOCK)));
       } else { dst = io.in[port]; if (!dst) continue; io.linked.add(port); }
       const kind = src.def.outputs[c.a[1]];
@@ -5201,6 +5235,9 @@ try { registerProcessor('waves', WavesProcessor); } catch (_) {}   // (loaded tw
    notes: a lane's pitch is the pad's (C-4 = the patch's C-2, as a …waves layer renders) moved by 12 log2 r, followed every
    block, so slides, bends and arpeggios move it. THUNDER CORE drives it like the others (cid, __tcOv, __tcPost). */
 const WL_LANES = 4;
+// the lane parameters' names and the a-rate read, made once (per block: five strings a lane and a closure otherwise)
+const WL_T = ['t0', 't1', 't2', 't3'], WL_G = ['g0', 'g1', 'g2', 'g3'], WL_L = ['l0', 'l1', 'l2', 'l3'], WL_R = ['r0', 'r1', 'r2', 'r3'], WL_V = ['v0', 'v1', 'v2', 'v3'];
+const wlAt = (A, i) => A.length > 1 ? A[i] : A[0];
 class WavesLiveProc extends AudioWorkletProcessor {
   static get parameterDescriptors(){
     const d = [];
@@ -5238,18 +5275,17 @@ class WavesLiveProc extends AudioWorkletProcessor {
     if (this.dead){ try { e.dispose(); } catch (_) {} return false; }
     const t0 = Date.now();
     const bpm = P.bpm ? P.bpm[0] : 120; if (bpm !== this.bpm){ e.setTransport({ tempo:bpm }); this.bpm = bpm; }
-    const at = (A, i) => A.length > 1 ? A[i] : A[0];
     let any = false;
     for (let j = 0; j < WL_LANES; j++){
-      const ln = this.lane[j], T = P['t' + j], G = P['g' + j];
+      const ln = this.lane[j], T = P[WL_T[j]], G = P[WL_G[j]];
       if (!(T.length === 1 && G.length === 1 && T[0] === ln.lt && (G[0] >= 0.5) === ln.lg)){
         // notes land on the block (the engine runs a block at a time): the first change in it counts
         for (let i = 0; i < n; i++){
-          const tg = at(T, i), ga = at(G, i) >= 0.5;
+          const tg = wlAt(T, i), ga = wlAt(G, i) >= 0.5;
           if (tg === ln.lt && ga === ln.lg) continue;
           if ((tg !== ln.lt && ga) || (ga && !ln.lg)){
-            const leg = tg !== ln.lt && ln.lg && at(P['l' + j], i) >= 0.5 && ln.row >= 0 && V.rows[ln.row].gate;
-            const pt = this.pitch(at(P['r' + j], i)), vel = Math.max(1, Math.min(127, at(P['v' + j], i))) / 127;
+            const leg = tg !== ln.lt && ln.lg && wlAt(P[WL_L[j]], i) >= 0.5 && ln.row >= 0 && V.rows[ln.row].gate;
+            const pt = this.pitch(wlAt(P[WL_R[j]], i)), vel = Math.max(1, Math.min(127, wlAt(P[WL_V[j]], i))) / 127;
             if (leg){ const rw = V.rows[ln.row]; rw.pitch = pt; }
             else {
               if (ln.row >= 0){ const rw = V.rows[ln.row]; if (rw.gate && rw.lane === j){ rw.gate = 0; rw.offAt = V.now; } }
@@ -5262,9 +5298,9 @@ class WavesLiveProc extends AudioWorkletProcessor {
         }
       }
       // the pitch between notes: the lane's rate at the end of the block (slides, bends, vibrato)
-      if (ln.row >= 0){ const rw = V.rows[ln.row]; if (rw.gate && rw.lane === j){ const rr = P['r' + j]; rw.pitch = this.pitch(rr[rr.length - 1]); } }
+      if (ln.row >= 0){ const rw = V.rows[ln.row]; if (rw.gate && rw.lane === j){ const rr = P[WL_R[j]]; rw.pitch = this.pitch(rr[rr.length - 1]); } }
     }
-    const held = this.lane.some(l => l.row >= 0 && V.rows[l.row].gate);
+    let held = false; for (let j = 0; j < WL_LANES; j++){ const l = this.lane[j]; if (l.row >= 0 && V.rows[l.row].gate){ held = true; break; } }   // (a loop: .some(closure) made a function every block)
     if (!held && !any && this.quiet > sampleRate * 2){ L.fill(0); if (R !== L) R.fill(0); return true; }
     try { e.process(n); } catch (_) { e.busesL.fill(0); e.busesR.fill(0); }
     const bus = this.busOf(), off = (bus - 1) * BLOCK;
