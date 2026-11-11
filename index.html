@@ -18819,6 +18819,7 @@ class ThunderFx extends AudioWorkletProcessor {
     }
     for (const s of old) this.drop(s);
     this.slots = next; this.idle = 0; this.clocked = next.some(s => (s.js && ((s.jt >= 93 && s.jt <= 95) || (s.jt >= 100 && s.jt <= 102))) || s.clk);
+    this.chard = next.some(s => s.clk || (s.js && (s.jt === 93 || (s.jt >= 100 && s.jt <= 102))));   // clocked by more than Flex / Step gate (Retrigger, Grains, Scramble, Glitch, a clocked module): those keep running while stopped
   }
   modRun(s, n){
     if (s.dead) return;
@@ -18868,7 +18869,8 @@ class ThunderFx extends AudioWorkletProcessor {
     // bp (the beat clock) is an a-rate ramp whenever the song plays, so "bp.length < 2" kept every track-FX node awake
     // for the whole song. Only a tempo-locked slot (Flex / Step gate / Retrigger) needs to hear the clock while silent.
     if (this.pq && this.pq.length){ const old = currentTime - 1; while (this.pq.length && this.pq[0][1] < old) this.pq.shift(); if (this.pq.length) this.idle = 0; }   // …PUMP CREATIVE: notes due wake it (stale ones are dropped)
-    if (ip < 1e-7 && this.idle >= sampleRate && !this.clocked){ o[0].fill(0); if (o[1]) o[1].fill(0); this.fr += n; if (this.fr >= sampleRate / 2){ this.port.postMessage({load:this.ms / (this.fr / sampleRate * 1000)}); this.ms = 0; this.fr = 0; } return true; }
+    // A node clocked only by Flex / Step gate sleeps too while the clock is stopped and it has been silent for longer than Flex's 13 s ring (the ring is then all silence, so waking it changes nothing).
+    if (ip < 1e-7 && this.idle >= sampleRate && (!this.clocked || (!this.chard && this.idle >= sampleRate * 14 && !(bp[0] >= 0 && bp[bp.length - 1] >= 0)))){ o[0].fill(0); if (o[1]) o[1].fill(0); this.fr += n; if (this.fr >= sampleRate / 2){ this.port.postMessage({load:this.ms / (this.fr / sampleRate * 1000)}); this.ms = 0; this.fr = 0; } return true; }
     if (i && i.length){ L.set(i[0]); R.set(i[1] || i[0]); } else { L.fill(0); R.fill(0); }
     // A NaN or infinity reaching the wasm hangs the tape delay for good and leaves many effects silent: zero those samples.
     // (sweep, 4 Nov) a loud but real sample (8 to 64, up to +36 dB) is clipped to ±8 rather than silenced: it was heard as a dropout
