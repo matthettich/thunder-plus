@@ -51,7 +51,7 @@ globalThis.__e2e = {
     Sx.perf = {sc:[], mac:[], lk:{}, xa:0, xb:1, xf:0, lfo:{}};
     const ch = p => Array.from({length:16}, (_, k) => k ? [-1, 0] : [p, 0]);
     spec.tracks.forEach((T, k) => {
-      cur = T.slot; setEngine('layers'); if (T.eng && T.eng !== 'layers') setEngine(T.eng); if (T.set) Object.assign(V()[T.eng === 'bass' ? 'bass' : T.eng === 'vox' ? 'vox' : T.eng] || V(), T.set);
+      cur = T.slot; setEngine('layers'); if (T.eng && T.eng !== 'layers') setEngine(T.eng); V().level = 0;   /* (11 Nov) setEngine gives a pad's first use of an engine -6 dB (ENGINE_LEVEL): the first render read 6 dB under its repeats */ if (T.set) Object.assign(V()[T.eng === 'bass' ? 'bass' : T.eng === 'vox' ? 'vox' : T.eng] || V(), T.set);
       V().len = T.len || 4; refreshAll();
       Sx.insts[k] = Object.assign({}, Sx.insts[0], {pad:T.slot});
       Sx.chains[k] = ch(k); const P = Sx.phrases[k] = freshPhrase();
@@ -210,8 +210,8 @@ globalThis.__live = {
   // sample the twelve params of every live node every 'every' ms for 'ms'
   async sample(ms, every){ const o = [], t0 = performance.now(); while (performance.now() - t0 < ms){ o.push({w:performance.now() - t0, c:ctx.currentTime, s:this.snap()}); await new Promise(r => setTimeout(r, every)); } return o; },
   stop(){ tStop(true); },
-  // a tap on rt.out (the mix before the master chain): the samples of the left channel from now on (a ScriptProcessor). NOT on master: the master chain
-  // limiter / clipper makes harmonics of a bass note that fill the 2 kHz+ band (a floor of ~1.3e-3 at any cutoff) and hide the filter (found 10 Nov)
+  // a tap on rt.out (the mix before the master chain): the samples of the left channel from now on (a ScriptProcessor). before the master, so the filter is read without the master's gain changes.
+  // (11 Nov: the ~1.3e-3 floor in the 2 kHz+ band is the bass engine's own harmonics, already there at the bass node; the master only scales it: docs/audits/2026-11-11-audio-questions.md)
   tapOn(){ const sp = ctx.createScriptProcessor(2048, 2, 2), z = ctx.createGain(); z.gain.value = 0; this.chunks = []; sp.onaudioprocess = e => { this.chunks.push(new Float32Array(e.inputBuffer.getChannelData(0))); }; this.src = rt.out; this.src.connect(sp); sp.connect(z); z.connect(ctx.destination); this.sp = sp; this.z = z; },
   tapOff(){ try { this.src.disconnect(this.sp); this.sp.disconnect(); this.z.disconnect(); } catch(e){} this.sp.onaudioprocess = null; let n = 0; for (const c of this.chunks) n += c.length; const d = new Float32Array(n); let o = 0; for (const c of this.chunks){ d.set(c, o); o += c.length; } this.chunks = []; return d; },
   // the 2 kHz high band of a captured buffer in n slices of dt s from the first sound

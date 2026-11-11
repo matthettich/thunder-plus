@@ -5280,7 +5280,7 @@ thunder:TH AH N D ER|seeds:S IY D Z|yes:Y EH S|ok:OW K EY|okay:OW K EY`;
       case 'burst': t.an = P.ba != null ? P.ba : P.t === 'P' || P.t === 'C' ? 0.7 : 0.45; t.av = P.t === 'B' || P.t === 'J' ? 0.25 : 0; t.nf = P.bf || 2000; t.nb = P.bb || 2500; break;
       case 'fric': { const F = P.t === 'C' ? PH.SH : P.t === 'J' ? PH.ZH : P; t.an = F.fa || 0.4; t.av = F.av || 0; t.nf = F.nf || 4000; t.nb = F.nb || 3000; break; }
       case 'asp': t.ah = 0.26; break;   // 0.42 before 18 Oct: the puff after P, T, K and the H were as loud as the vowel
-      case 'end': this.envT = 0; break;
+      case 'end': this.envT = 0; t.av = this.k.av; break;   // (11 Nov: voicing was zeroed here, so REL faded a source already silent after 4 ms: no tail at any REL)
     }
     if (this.go){ for (const k of ['f1', 'f2', 'f3', 'nf', 'nb']) this.k[k] = t[k]; this.go = false; }
   }
