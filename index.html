@@ -2677,6 +2677,15 @@ body.mob .dogs.idle .bob{animation-iteration-count:9} body.mob .dogs.idle .tail{
   /* sheet Close / Done (U4, leftover): the picker sheets' header buttons, the phrase list, the sample browser and recorder foot, the ask / generator Done */
   .pbs .phd button, .pbs .pft button, .pbs .btnrow button, .pbs .smbfoot button, .phlhd button{min-height:40px}
 }
+/* CONTRAST (usability audit U16): text under 4.5:1 in IDM, IDM pink & green, IDM pink paper and the 909. Only the colour of that text changes;
+   the skins' backgrounds, accents and the playing cue (the lit dots, the pink / orange PLAY button) stay. */
+:root:is([data-skin="idm"],[data-skin="idmpg"],[data-skin="idmpink"],[data-skin="tr909"]) .tclk.live b{color:var(--mx)}   /* BPM / LPB while playing: was the accent on pale */
+:root[data-skin="idmpink"].tpon :is(#tSong.on, #tPad .k[data-b="play"], .tcmd button[data-c=song]):not(#zz):not(#zz):not(#zz){color:#0a1a12!important}   /* was white on hot pink, 3.4:1 (as IDM pink & green already has dark) */
+:root[data-skin="idmpink"].tpon :is(#tSong.on, #tPad .k[data-b="play"], .tcmd button[data-c=song]) *:not(#zz):not(#zz){color:#0a1a12!important}
+:root:is([data-skin="idm"],[data-skin="idmpg"],[data-skin="idmpink"],[data-skin="tr909"]) .stgph{color:var(--ts-rn)}   /* the stage label: dim was 1.5:1 */
+:root:is([data-skin="idm"],[data-skin="idmpg"]) :is(.tagp b.gp, .tgrid span.pvh.gp){color:var(--mx)}   /* POLY labels on the poly colour */
+:root[data-skin="idmpink"] :is(.tagp b.gp, .tgrid span.pvh.gp){color:#0a1a12}
+:root[data-skin="tr909"] :is(.tagp b.gp, .tgrid span.pvh.gp){color:var(--mxon)}
 </style>
 <style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}</style>
 <style>
