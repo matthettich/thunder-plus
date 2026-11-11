@@ -812,7 +812,7 @@ class Auto {
   lin(v, t){ this.ins({k:1, t, v}); }
   target(v, t, tc){ this.ins({k:2, t, v, tc:Math.max(1e-5, tc)}); }
   curve(fn, t, d){ this.ins({k:3, t, d, fn}); }
-  cancel(t){ this.ev = this.ev.filter(e => e.t < t); }
+  cancel(t){ const A = this.ev; let w = 0; for (let q = 0; q < A.length; q++){ const e = A[q]; if (e.t < t) A[w++] = e; } A.length = w; }   // (in place: no new array per call)
   // The value from time t on, when nothing moves it any more (a constant), else null: the sampler's fast path
   constFrom(t){ const A = this.ev; if (!A.length) return this.v0; const e = A[A.length - 1]; return e.t <= t && (e.k === 0 || e.k === 1) ? e.v : null; }
   // The value over the whole block [t, t1], when nothing moves it inside the block, else null (11 Nov, profile: constFrom only says
@@ -841,11 +841,21 @@ class Auto {
     // so the beat clock (one 'beat' ramp a row) sat at the row's value at each block start and sawed inside it: Flex,
     // Step gate, Retrigger and every tempo-locked effect on the Audio thread sequencer heard a staircase, and ramps on live
     // engines (level fades, glides) crawled. Keep the point where it was.
-    if (!hs && !cur && i < A.length && A[i].k === 1){ this.v0 = v; this.ev = [{k:0, t:pt, v}].concat(A.slice(i)); return; }
-    const now = cur ? cur.fn(t) : hs ? so + (sf - so) * Math.exp(-(t - sT) / sc) : v, head = [{k:0, t, v:now}];
-    if (hs) head.push({k:2, t, v:so, tc:sc});
-    if (cur) head.push(cur);
-    this.v0 = now; this.ev = head.concat(A.slice(i));
+    // The new list is head (1 to 3 events) + A[i..], made in place (no head / slice / concat arrays). The consumed events A[0..i-1] are
+    // plain objects only this list holds (ins gets a fresh one each time): one of the {k,t,v} shape is rewritten for the head's k:0, one
+    // k:2 for its target; a curve in progress (cur) is the same object moved. The scalars above were read before anything is rewritten.
+    const n = A.length; let H0 = null, H1 = null, now = v, h = 1;
+    if (!(!hs && !cur && i < n && A[i].k === 1)){ now = cur ? cur.fn(t) : hs ? so + (sf - so) * Math.exp(-(t - sT) / sc) : v; pt = t; h = 1 + (hs ? 1 : 0) + (cur ? 1 : 0); }
+    for (let q = 0; q < i; q++){ const e = A[q]; if (e.k <= 1){ if (!H0) H0 = e; } else if (e.k === 2){ if (!H1) H1 = e; } }
+    if (H0){ H0.k = 0; H0.t = pt; H0.v = now; } else H0 = {k:0, t:pt, v:now};
+    if (hs){ if (H1){ H1.t = t; H1.v = so; H1.tc = sc; } else H1 = {k:2, t, v:so, tc:sc}; }
+    if (h <= i){ let w = 0; A[w++] = H0; if (hs) A[w++] = H1; if (cur) A[w++] = cur;
+      for (let q = i; q < n; q++) A[w++] = A[q];
+      A.length = w; }
+    else { for (let z = i; z < h; z++) A.push(null);
+      for (let q = n - 1; q >= i; q--) A[h + q - i] = A[q];
+      let w = 0; A[w++] = H0; if (hs) A[w++] = H1; if (cur) A[w++] = cur; }
+    this.v0 = now;
   }
   at(t){
     // No closure and no per-call object (this runs per sample on the audio thread): a target in progress lives in scalars:
@@ -861,6 +871,23 @@ class Auto {
     }
     return hs ? so + (sf - so) * Math.exp(-(t - sT) / sc) : v;
   }
+  // C[i] = at(t0 + i * dt) for i0 <= i < N, in one call: the same arithmetic as at() line for line (the tests compare them by Object.is). A call per
+  // sample handed each time and each value back as a new heap number (the beat clock and the mixer lanes run this every block).
+  fill(C, t0, dt, N, i0 = 0){
+    const A = this.ev, nE = A.length;
+    for (let i = i0; i < N; i++){
+      const t = t0 + i * dt;
+      let v = this.v0, pt = 0, hs = false, sf = 0, sT = 0, so = 0, sc = 1, r = 0, done = false;
+      for (let q = 0; q < nE; q++){ const e = A[q];
+        if (e.k === 1){ if (t < e.t){ const a = hs ? so + (sf - so) * Math.exp(-(pt - sT) / sc) : v; r = e.t > pt ? a + (e.v - a) * (t - pt) / (e.t - pt) : e.v; done = true; break; } v = e.v; hs = false; pt = e.t; continue; }
+        if (t < e.t){ r = hs ? so + (sf - so) * Math.exp(-(t - sT) / sc) : v; done = true; break; }
+        if (e.k === 0){ v = e.v; hs = false; pt = e.t; }
+        else if (e.k === 2){ sf = hs ? so + (sf - so) * Math.exp(-(e.t - sT) / sc) : v; hs = true; sT = e.t; so = e.v; sc = e.tc; pt = e.t; }
+        else if (e.k === 3){ if (t < e.t + e.d){ r = e.fn(t); done = true; break; } v = e.fn(e.t + e.d); hs = false; pt = e.t + e.d; }
+      }
+      C[i] = done ? r : hs ? so + (sf - so) * Math.exp(-(t - sT) / sc) : v;
+    }
+  }
 }
 
 /* LIVE ENGINES (phase 2c): the bass, voice, acid / machine and …pump synth nodes are processors in this same audio-thread
@@ -872,7 +899,7 @@ class Auto {
 // STEREO SAMPLES (5 Nov): the StereoPannerNode's law for a stereo input (Web Audio spec), as [L→L, R→L, L→R, R→R]:
 // panned left the right channel folds into the left, panned right the left into the right; centred, each stays put.
 // stBal runs per SAMPLE on a stereo pad whose pan or gain is moving: it fills one shared array (no array per call). Callers
-// read the four numbers at once ([ll, rl, lr, rr] = stBal(p)) and never keep it. ZERO4: the "no balance" row, never written.
+// read the four numbers by index (B[0] to B[3]; no destructuring: it makes an iterator) and never keep it. ZERO4: the "no balance" row, never written.
 const SBAL = [0, 0, 0, 0], ZERO4 = [0, 0, 0, 0];
 function stBal(pan){ const o = SBAL; if (pan <= 0){ const a = (pan + 1) * Math.PI / 2; o[0] = 1; o[1] = Math.cos(a); o[2] = 0; o[3] = Math.sin(a); return o; } const a = pan * Math.PI / 2; o[0] = Math.cos(a); o[1] = 0; o[2] = Math.sin(a); o[3] = 1; return o; }
 const tcNodes = () => globalThis.__tcNodes || (globalThis.__tcNodes = new Map());
@@ -889,7 +916,9 @@ globalThis.__tcOv = (proc, P, n) => {
     const c = A.from > currentTime + n * dt ? null : A.constBlk(currentTime, currentTime + n * dt);
     // (fround: where the old test said "not constant" the value went through the Float32 block; keep the very same number)
     if (A.from <= currentTime && c != null){ const a1 = O1[k] || (O1[k] = [0]); a1[0] = A.constFrom(currentTime) != null ? c : Math.fround(c); Q[k] = a1; continue; }
-    for (let i = 0; i < n; i++){ const t = currentTime + i * dt; b[i] = t < A.from ? (src.length > 1 ? src[i] : src[0]) : A.at(t); }
+    // (t grows with i, so the samples before A.from are a run at the start: the page's own values there, then the timeline in one call)
+    let i = 0; for (; i < n && currentTime + i * dt < A.from; i++) b[i] = src.length > 1 ? src[i] : src[0];
+    A.fill(b, currentTime, dt, n, i);
     Q[k] = b; }
   for (const k in Q) if (!(k in P)) delete Q[k];
   return Q;
@@ -1125,7 +1154,7 @@ class ThunderCore extends AudioWorkletProcessor {
     if (M) this.mixFill(M[0], this.mm, 0, N, dt);
     if (O) this.mixFill(O[0], this.mo, 0, N, dt);
   }
-  mixFill(C, A, d, N, dt){ if (!C) return; if (!A){ C.fill(d); return; } A.prune(currentTime); const c = A.constBlk(currentTime, currentTime + N * dt); if (c != null){ C.fill(c); return; } for (let i = 0; i < N; i++) C[i] = A.at(currentTime + i * dt); }   // (a method: no closure per block)
+  mixFill(C, A, d, N, dt){ if (!C) return; if (!A){ C.fill(d); return; } A.prune(currentTime); const c = A.constBlk(currentTime, currentTime + N * dt); if (c != null){ C.fill(c); return; } A.fill(C, currentTime, dt, N); }   // (a method: no closure per block)
   play(d){
     const ms0 = Date.now(), at0 = currentTime;   // PLAYBACK REPORT: how late this PLAY reached the audio thread, and how long it took
     this.stopAll(currentTime); this.mixReset(); this.clkOn = false; this.clk.cancel(currentTime); this.clk.set(0, currentTime);
@@ -1495,7 +1524,7 @@ class ThunderCore extends AudioWorkletProcessor {
       // The audio thread itself was held up (a screenshot, the system busy): rather than racing through the rows it missed
       // (owner, Fold: "the speed increased"), the song moves on from now, as the page's pump does.
       if (s.alive() && s.base != null && s.time < currentTime - 0.03){ this.skips = (this.skips || 0) + 1; const d = currentTime + 0.02 - s.time; s.base += d; s.time += d; if (s.btT != null) s.btT += d; }
-      const rows = []; let n = 0, held = null;
+      let rows = null, n = 0, held = null;   // (rows: made at the first step of the block; most blocks step nothing, so no array)
       while (s.alive() && s.time < currentTime + this.LEAD && n++ < 3){   // at most 3 steps a block: a longer LEAD (screen off) fills over a few blocks, not in one burst that overruns it
         const r = s.step();
         // EXACT STOP (6 Nov): the pattern edge (a new song row, or the same one again) is where a held STOP ends the song:
@@ -1504,15 +1533,16 @@ class ThunderCore extends AudioWorkletProcessor {
           if (row >= 0){ const edge = this.lr != null && (row !== this.lr || st < this.ls); this.lr = row; this.ls = st;
             if (edge && this.hold){ held = {t:r.t, pos:r.pos}; this.hold = false; this.seq = null; this.stopAll(r.t); this.clkOn = false; this.clk.cancel(r.t); this.clk.set(0, r.t); break; } } }
         for (const e of r.evs) if (this.ev(e)) e.core = true;
+        if (!rows) rows = [];
         rows.push({t:r.t, evs:r.evs, pos:r.pos, tks:r.tks, line:r.line, bpm:s.bpm});
       }
-      if (rows.length) this.port.postMessage({op:'rows', gen:this.gen, rows, time:s.time, bpm:s.bpm, tks:s.tks, base:s.base, btT:s.btT, alive:s.alive(), skips:this.skips || 0});
+      if (rows) this.port.postMessage({op:'rows', gen:this.gen, rows, time:s.time, bpm:s.bpm, tks:s.tks, base:s.base, btT:s.btT, alive:s.alive(), skips:this.skips || 0});
       if (held) this.port.postMessage({op:'held', gen:this.gen, t:held.t, pos:held.pos});
       if (!held && !s.alive() && !this.ended){ this.ended = true; this.port.postMessage({op:'end', gen:this.gen, time:s.time}); }
     }
     // 2. sound the voices into their tracks' outputs
     const N = (outputs[0] && outputs[0][0] && outputs[0][0].length) || 128, sr = sampleRate, dt = 1 / sr;
-    { const C = outputs[NT] && outputs[NT][0]; if (C){ const A = this.clk; A.prune(currentTime); if (!A.ev.length && A.v0 === 0) C.fill(0); else for (let i = 0; i < N; i++) C[i] = A.at(currentTime + i * dt); } }
+    { const C = outputs[NT] && outputs[NT][0]; if (C){ const A = this.clk; A.prune(currentTime); if (!A.ev.length && A.v0 === 0) C.fill(0); else A.fill(C, currentTime, dt, N); } }
     this.mixOut(outputs, N, dt);
     const tb0 = currentTime, tb1 = currentTime + N * dt;
     for (const v of this.alive){
@@ -1523,12 +1553,12 @@ class ThunderCore extends AudioWorkletProcessor {
       const gc = v.trm ? null : v.g.constBlk(tb0, tb1), fc = v.f.constBlk(tb0, tb1), pc = v.apn ? null : v.pn.constBlk(tb0, tb1), rc = v.r.constBlk(tb0, tb1);
       if (gc != null && fc != null && pc != null && rc != null && v.t0 <= tb0 && v.end >= tb1){
         const k = gc * fc, a = (pc + 1) * Math.PI / 4, kl = k * Math.cos(a), kr = k * Math.sin(a), inc = rc * inc0; let p = v.pos;
-        if (RD){ const st = !RD.tw && v.data2, [ll, rl, lr, rr] = st ? stBal(pc) : ZERO4;   // REVERSED / SHAPED (Rd): the same, read through the reader
+        if (RD){ const st = !RD.tw && v.data2, B4 = st ? stBal(pc) : ZERO4, ll = B4[0], rl = B4[1], lr = B4[2], rr = B4[3];   // REVERSED / SHAPED (Rd): the same, read through the reader
           for (let i = 0; i < N; i++){ if (p >= len - 1){ v.ended = true; break; } const j = p | 0, f = p - j, d0 = RD.at(0, j), x = d0 + (RD.at(0, j + 1) - d0) * f;
             if (st){ const e0 = RD.at(1, j), y = e0 + (RD.at(1, j + 1) - e0) * f; L[i] += (x * ll + y * rl) * k; R[i] += (x * lr + y * rr) * k; }
             else { L[i] += x * kl; R[i] += x * kr; }
             p += inc; } }
-        else if (v.data2){ const D2 = v.data2, [ll, rl, lr, rr] = stBal(pc);   // a stereo pad: the StereoPannerNode's balance law, as the page plays it
+        else if (v.data2){ const D2 = v.data2, B4 = stBal(pc), ll = B4[0], rl = B4[1], lr = B4[2], rr = B4[3];   // a stereo pad: the StereoPannerNode's balance law, as the page plays it
           for (let i = 0; i < N; i++){ if (p >= len - 1){ v.ended = true; break; } const j = p | 0, f = p - j, x = D[j] + (D[j + 1] - D[j]) * f, y = D2[j] + (D2[j + 1] - D2[j]) * f;
             L[i] += (x * ll + y * rl) * k; R[i] += (x * lr + y * rr) * k; p += inc; } }
         else for (let i = 0; i < N; i++){ if (p >= len - 1){ v.ended = true; break; } const j = p | 0, x = D[j] + (D[j + 1] - D[j]) * (p - j); L[i] += x * kl; R[i] += x * kr; p += inc; }
@@ -1545,7 +1575,7 @@ class ThunderCore extends AudioWorkletProcessor {
         let g = v.g.at(t); if (v.trm) g += v.trm.d * Math.sin(2 * Math.PI * v.trm.hz * (t - v.trm.t));
         let pan = v.pn.at(t); if (v.apn) pan = Math.max(-1, Math.min(1, pan + v.apn.d * Math.sin(2 * Math.PI * v.apn.hz * (t - v.apn.t))));
         const gf = g * v.f.at(t);
-        if (D2){ const e0 = RD ? RD.at(1, j) : D2[j], e1 = RD ? RD.at(1, j + 1) : D2[j + 1], y2 = e0 + (e1 - e0) * (p - j), [ll, rl, lr, rr] = stBal(pan); L[i] += (x * ll + y2 * rl) * gf; R[i] += (x * lr + y2 * rr) * gf; }
+        if (D2){ const e0 = RD ? RD.at(1, j) : D2[j], e1 = RD ? RD.at(1, j + 1) : D2[j + 1], y2 = e0 + (e1 - e0) * (p - j), B4 = stBal(pan); L[i] += (x * B4[0] + y2 * B4[1]) * gf; R[i] += (x * B4[2] + y2 * B4[3]) * gf; }
         else { const y = x * gf, a = (pan + 1) * Math.PI / 4;   // StereoPannerNode, mono in: equal power
           L[i] += y * Math.cos(a); R[i] += y * Math.sin(a); }
         v.pos += v.r.at(t) * inc0;
