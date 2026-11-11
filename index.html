@@ -21464,7 +21464,9 @@ async function audReloadSafe(){
     if (RCD.take && !await askYes({title:'Take not on a pad', body:'The take in Record a sample is not on a pad yet; a reload would lose it.'}, 'Reload anyway')) return false;
     try { tStop(true); } catch(e){}
     if (sdbOk && smpStored){   // every sample's audio into IndexedDB first: save() does that after the reload would have started
-      const left = () => { const p = []; for (const v of kit.voices) for (const L of v.layers) if (L.sample && L.sample.data && !smpStored.has(L.sample.id)) p.push(L.sample); return p; };
+      const left = () => { const p = []; for (const v of kit.voices) for (const L of v.layers) if (L.sample && L.sample.data && !smpStored.has(L.sample.id)) p.push(L.sample);
+        for (const e of S.irs || []) if (e) for (const c of [e.L, e.R]) if (c && c.ref && IRDATA.has(c.ref) && !smpStored.has(c.ref)) p.push({id:c.ref, name:e.name, sr:e.sr, data:IRDATA.get(c.ref)});   // (review: the song's impulse responses live in the same store; the song file keeps only their refs)
+        return p; };
       const p = left();
       if (p.length) await Promise.race([Promise.all(p.map(s => smpPut(s))).catch(() => {}), wait8()]);
       if (left().length && !await askYes({title:'Samples not stored yet', body:'Some sample audio could not be written to this browser’s storage in time; a reload would lose it. Save the project to a file first, or reload anyway.'}, 'Reload anyway')) return false;
@@ -21473,6 +21475,7 @@ async function audReloadSafe(){
     const okK = storeWrite(KEY, JSON.stringify(kitToJSON(sdbOk && smpStored ? 'ref' : false))), okS = storeWrite(TK, JSON.stringify(songOut(S)));
     if (!(okK && okS)){ toastErr('Couldn’t save the song here (storage is full), so the app was not reloaded. Save the project to a file first (File ▾ › Save).', 7000); return false; }
     try { saveCur(); asetSave(); } catch(e){}
+    if (RCD.on || RCD.sync || rendering){ toastErr('A recording or render started meanwhile, so the app was not reloaded.', 5000); return false; }   // (review: the waits above let one start)
     try { sessionStorage.setItem('thunderplus-audreload-v1', String(Date.now())); } catch(e){}
     try { pbLog('reloading the app to restart the audio engine · ' + pbState()); } catch(e){}
     applyUpdate();
