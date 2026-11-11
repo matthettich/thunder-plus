@@ -1108,7 +1108,7 @@ class ThunderCore extends AudioWorkletProcessor {
       case 'sig': { const j = JSON.stringify(S); let h = 0; for (let i = 0; i < j.length; i++) h = (h * 31 + j.charCodeAt(i)) | 0; this.port.postMessage({op:'sig', len:j.length, h}); return; }
       case 'dbg': this.noSampler = !!d.noSampler; return;   // measuring: the page plays every note (the core only sequences)
       case 'die': this.release(currentTime); this.dead = true; this.seq = null; this.alive.clear(); return;   // the page let this core go (Reset audio engine)
-      case 'ack': this.ackT = currentTime; return;   // WATCHDOG: the page read our rows
+      case 'ack': this.ackT = currentTime; this.ackW = -1; return;   // WATCHDOG: the page read our rows (nothing waits for it now)
       case 'lead': this.LEAD = Math.max(0.05, Math.min(2, +d.s || 0.25)); return;
     }
   }
@@ -1173,7 +1173,7 @@ class ThunderCore extends AudioWorkletProcessor {
     else { this.chase = null; seq = makeSeq(S, d.mode || 'song', Object.assign({}, d.o || {}, {live:true})); seq.time = d.t0; }
     this.seq = seq; this.ended = false; this.gen = d.gen | 0; this.hold = false; this.lr = null; this.ls = null;
     // WATCHDOG (phones; owner, 7 Nov, Fold, screen on: stutter, faster, slower, then it played on after STOP)
-    this.watch = !!d.watch; this.ackT = currentTime; this.ckW = Date.now(); this.ckA = currentTime; this.ckBad = 0;
+    this.watch = !!d.watch; this.ackT = currentTime; this.ackW = -1; this.ckW = Date.now(); this.ckA = currentTime; this.ckBad = 0;
     this.port.postMessage({op:'started', gen:this.gen, late:at0 - d.t0, ms:Date.now() - ms0});
   }
 
@@ -1500,14 +1500,16 @@ class ThunderCore extends AudioWorkletProcessor {
      re-sent or not, waits behind the rendering, while the core keeps driving the live engines (the poly tracks), which
      unplugging the core doesn't silence. So the core watches itself and lets go on its own:
      - CLOCK: audio time ÷ wall time outside 0.8–1.25 over two 1-second windows running;
-     - DEAF: the page hasn't acknowledged a row for 3 s of audio time (it can't hear us, or we can't hear it: a STOP may be
-       stuck behind us, or the page dropped this core).
+     - DEAF: rows we sent have waited 3 s of audio time for the page's acknowledgement (it can't hear us, or we can't hear it: a
+       STOP may be stuck behind us, or the page dropped this core). Counted from the oldest batch still waiting (ackW), not from
+       the last acknowledgement (11 Nov, review): a song whose rows are more than 3 s apart (a very slow tempo, a long PDL) sends
+       nothing to acknowledge in between, and the core let go of it though the page was fine.
      Letting go is a hand-over stop: every voice and booked note ends now, and the live engines go back to the page's own
      params at once (silent when stopped; the page sequencer's notes when it carries on). The page is told ('self'). */
   watchdog(){
     const s = this.seq; if (!s || !this.watch) return false;
     let why = null;
-    if (currentTime - (this.ackT || 0) > 3) why = 'deaf';
+    if (this.ackW >= 0 && currentTime - this.ackW > 3) why = 'deaf';
     else { const w = Date.now(); if (w - this.ckW >= 1000){ const r = (currentTime - this.ckA) / ((w - this.ckW) / 1000); this.ckW = w; this.ckA = currentTime;
       if (r < 0.8 || r > 1.25){ if (++this.ckBad >= 2) why = 'clock ' + r.toFixed(2); } else this.ckBad = 0; } }
     if (!why) return false;
@@ -1536,6 +1538,7 @@ class ThunderCore extends AudioWorkletProcessor {
         if (!rows) rows = [];
         rows.push({t:r.t, evs:r.evs, pos:r.pos, tks:r.tks, line:r.line, bpm:s.bpm});
       }
+      if (rows && !(this.ackW >= 0)) this.ackW = currentTime;   // WATCHDOG: the oldest batch the page has not acknowledged yet
       if (rows) this.port.postMessage({op:'rows', gen:this.gen, rows, time:s.time, bpm:s.bpm, tks:s.tks, base:s.base, btT:s.btT, alive:s.alive(), skips:this.skips || 0});
       if (held) this.port.postMessage({op:'held', gen:this.gen, t:held.t, pos:held.pos});
       if (!held && !s.alive() && !this.ended){ this.ended = true; this.port.postMessage({op:'end', gen:this.gen, time:s.time}); }
