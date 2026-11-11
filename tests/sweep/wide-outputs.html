@@ -1,0 +1,12 @@
+<!doctype html><meta charset=utf-8><title>wide outputs</title>
+<script>
+// what does an AudioWorkletNode with many outputs cost per render quantum when its process() does nothing? (wide-outputs.mjs)
+const NT = 32;
+window.start = async (K, connectAll) => {
+  const ctx = new AudioContext(); await ctx.audioWorklet.addModule('wide-outputs-worklet.js');
+  const oc = K === 1 ? [2] : [...new Array(NT).fill(2), 1, NT, NT, 1, 1];
+  const n = new AudioWorkletNode(ctx, 'noop', { numberOfInputs: 0, numberOfOutputs: K, outputChannelCount: oc });
+  n.connect(ctx.destination, 0); if (connectAll) for (let i = 1; i < Math.min(K, 12); i++) { const g = ctx.createGain(); n.connect(g, i); g.connect(ctx.destination); }
+  await ctx.resume(); window.ctx = ctx; return ctx.state;
+};
+</script>
