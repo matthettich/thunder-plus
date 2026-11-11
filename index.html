@@ -2674,7 +2674,18 @@ body.mob .dogs.idle .bob{animation-iteration-count:9} body.mob .dogs.idle .tail{
   #tArr .tahd .appin::before, #apStrip .appin::before{content:''; position:absolute; left:0; right:0; top:50%; height:40px; transform:translateY(-50%)}
   .gset label.cb{min-height:40px}
   .gset :is(#audReset, #audReport, #audDefaults){min-height:40px}
+  /* sheet Close / Done (U4, leftover): the picker sheets' header buttons, the phrase list, the sample browser and recorder foot, the ask / generator Done */
+  .pbs .phd button, .pbs .pft button, .pbs .btnrow button, .pbs .smbfoot button, .phlhd button{min-height:40px}
 }
+/* CONTRAST (usability audit U16): text under 4.5:1 in IDM, IDM pink & green, IDM pink paper and the 909. Only the colour of that text changes;
+   the skins' backgrounds, accents and the playing cue (the lit dots, the pink / orange PLAY button) stay. */
+:root:is([data-skin="idm"],[data-skin="idmpg"],[data-skin="idmpink"],[data-skin="tr909"]) .tclk.live b{color:var(--mx)}   /* BPM / LPB while playing: was the accent on pale */
+:root[data-skin="idmpink"].tpon :is(#tSong.on, #tPad .k[data-b="play"], .tcmd button[data-c=song]):not(#zz):not(#zz):not(#zz){color:#0a1a12!important}   /* was white on hot pink, 3.4:1 (as IDM pink & green already has dark) */
+:root[data-skin="idmpink"].tpon :is(#tSong.on, #tPad .k[data-b="play"], .tcmd button[data-c=song]) *:not(#zz):not(#zz){color:#0a1a12!important}
+:root:is([data-skin="idm"],[data-skin="idmpg"],[data-skin="idmpink"],[data-skin="tr909"]) .stgph{color:var(--ts-rn)}   /* the stage label: dim was 1.5:1 */
+:root:is([data-skin="idm"],[data-skin="idmpg"]) :is(.tagp b.gp, .tgrid span.pvh.gp){color:var(--mx)}   /* POLY labels on the poly colour */
+:root[data-skin="idmpink"] :is(.tagp b.gp, .tgrid span.pvh.gp){color:#0a1a12}
+:root[data-skin="tr909"] :is(.tagp b.gp, .tgrid span.pvh.gp){color:var(--mxon)}
 </style>
 <style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}</style>
 <style>
@@ -3464,6 +3475,8 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
 <script src="pump/pump-meta.js?v=6"></script>
 <script>
 /* ===ENGINE START=== */
+// The platform's own modifier in hints and tips (U15): ⌘ on a Mac / iPad, Ctrl elsewhere. (MACK, further down, is the same test.)
+const MODK = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform) ? '⌘' : 'Ctrl';
 const BASE = 65.40639; // C2
 const NOTE = ['C','C♯','D','D♯','E','F','F♯','G','G♯','A','A♯','B'];
 const TS = 4096, SIN = new Float32Array(TS + 1);
@@ -8773,7 +8786,7 @@ function makeRow(def, key, getObj, opts = {}){
       {l:'Reset to default', f:reset, off:row.def.d == null}, {l:'Type a value…', f:typeBox},
       {l:'Learn a MIDI knob for it', f:() => { setLearn(true); midi.target = -1; midi.ccTarget = inp.id; renderPads(); ccBadges(); midiStatus(`${rowLabel(inp.id)}: turn a knob on the controller.`); }},
       ...(opts.menu ? [null, ...opts.menu()] : [])]); });
-  inp.title = 'Drag to change (Shift: finer, Ctrl/⌘: coarser) · double-click or Alt-click to reset · right-click: menu';
+  inp.title = 'Drag to change (Shift: finer, ' + MODK + ': coarser) · double-click or Alt-click to reset · right-click: menu';
   if (!opts.noTrack) rows.push(row);
   return row;
 }
@@ -11259,6 +11272,17 @@ async function importPresetsFile(f){
 // browser sheet as pad and layer presets. Set it to false to get their native <select> dropdowns back (the selects
 // are still filled and wired; the sheet just takes the tap when this is true).
 const ENGINE_PRESET_SHEET = true;
+// U6 (usability audit): on a touch screen the new engine's editor can sit far below the pad area, so a pick looked like nothing
+// happened. After a pick from the sheet, scroll the (visible) engine card to the top of the Synth page. Mouse: left alone.
+// A touch screen (or the Mobile setup): hint and settings text then leaves the mouse out (U12).
+function touchUi(){ return isMobile() || matchMedia('(pointer:coarse)').matches; }
+function engShowEditor(){
+  if (!touchUi()) return;
+  requestAnimationFrame(() => { try {
+    const c = ['bassCard', 'blipCard', 'xCard', 'voxCard', 'layerCard'].map(i => document.getElementById(i)).find(e => e && !e.hidden && e.offsetParent);
+    if (c) c.scrollIntoView({block:'start', behavior:'smooth'});
+  } catch(_){} });
+}
 function engineSheet(){
   if (pbOpen) pbOpen();
   const curK = isBassV(V()) ? 'bass' : isVoxV(V()) ? 'vox' : isBlipV(V()) ? 'blip' : isXEngV(V()) ? V().engine : 'layers';
@@ -11274,7 +11298,7 @@ function engineSheet(){
   const key = e => { if (e.key === 'Escape'){ e.preventDefault(); e.stopPropagation(); done(); } else if (e.target === q) e.stopPropagation(); };
   const row = ([k, name, about]) => {
     const it = el('div', 'pit' + (k === curK ? ' cur' : '')), pn = el('button', 'pn eng'); pn.type = 'button'; pn.append(document.createTextNode(name), el('small', null, about));
-    pn.addEventListener('click', () => { if (early()) return; done(); if (k !== curK) setEngine(k); });
+    pn.addEventListener('click', () => { if (early()) return; done(); if (k !== curK){ setEngine(k); engShowEditor(); } });
     it.append(pn, favBtn('eng', k, name, () => { const was = openCat >= 0 ? render.G[openCat] && render.G[openCat][0] : null; render(); const i = render.G.findIndex(g => g[0] === was); if (i !== openCat && was){ openCat = i; render(); } })); return it;
   };
   const render = () => {
@@ -12571,7 +12595,7 @@ async function kitToSlots(){
   });
   syncHeld(); buildPads(); refreshAll(); slots.forEach(sl => changed(sl)); kitUndoBase(); save(); try { draw(); } catch(e){}   // kitUndoBase: the slots' own undo steps start here, so one undo is the whole kit
   const ins = slots.map(sl => S.insts.findIndex(I => I.pad === sl));
-  toast(names.map((d, i) => d + ' ' + hx(slots[i]) + (ins[i] >= 0 && ins[i] !== slots[i] ? ' (inst ' + hx(ins[i]) + ')' : '')).join(' · ') + ' · Ctrl/⌘+Z puts it back', 9000);
+  toast(names.map((d, i) => d + ' ' + hx(slots[i]) + (ins[i] >= 0 && ins[i] !== slots[i] ? ' (inst ' + hx(ins[i]) + ')' : '')).join(' · ') + ' · ' + MODK + '+Z puts it back', 9000);
 }
 function xKitVis(){ const d = Math.round(XEV().kd || 0); for (const sc of $('xSecs').children) if (sc.dataset && sc.dataset.kd != null) sc.hidden = +sc.dataset.kd !== d; }
 const rsLabel = d => (d.name || 'Sample') + ' · ' + (d.pitched ? 'pitched, ' + hz(d.f0) : 'unpitched') + ' · ' + (d.np || 0) + ' partials';
@@ -15150,7 +15174,7 @@ function rcdApply(E){
   if (L.mode !== 'ADSR' && Math.abs((L.hold || 0) - oldMs) < 2) L.hold = Math.min(SMP_MAX * 1000, Math.round(n / T.sr * 1000));   // a Hold that was the sample's length follows it
   v.len = Math.max(v.len, Math.min(SMP_MAX, n / T.sr + 0.1));
   smbAdd(S2); if (E.pad !== cur) select(E.pad); changed(E.pad); refreshAll();
-  toast(`Applied to pad ${hx(E.pad)}, layer ${E.li + 1} (${(n / T.sr).toFixed(2)} s). Ctrl/⌘+Z on the Synth page takes it back.`, 4500);
+  toast(`Applied to pad ${hx(E.pad)}, layer ${E.li + 1} (${(n / T.sr).toFixed(2)} s). ${MODK}+Z on the Synth page takes it back.`, 4500);
   playFresh(E.pad);
 }
 let rcdPrev = null;
@@ -15411,7 +15435,7 @@ async function rcdPanel(pad, opts){
   const ms = x => Math.round(x * RCD.take.sr / 1000);
   const tb = (t, f, tip, cls) => { const b = el('button', cls || null, t); b.type = 'button'; b.title = tip; b.addEventListener('click', f); return b; };
   const playB = tb('▶ Play', rcdPlay, 'Play the selection, or from the cursor, or the whole take (Space plays the song)', 'recplay');
-  const undoB = tb('Undo', () => { if (!RCD.undo.length) return; RCD.take = RCD.undo.pop(); RCD.sel = null; rcdUi(); }, 'Undo the last edit (Ctrl/⌘+Z)');
+  const undoB = tb('Undo', () => { if (!RCD.undo.length) return; RCD.take = RCD.undo.pop(); RCD.sel = null; rcdUi(); }, 'Undo the last edit (' + MODK + '+Z)');
   // OCTAVE (owner, 6 Nov): the note keys play the take chromatically (rcdKeyOn); this is the app's octave (kOct), so it
   // stays the same here and in the tracker. Z plays C-<oct>; C-4 is the take as recorded. Numpad / and * move it too.
   const octW = el('div', 'recoct'), octN = el('b'), octSay = () => { octN.textContent = kOct; };
@@ -24684,13 +24708,13 @@ function moveFx(dx, dy, h){
 }
 function projRows(){
   return [
-    {l:'› SAVE', sec:'Project file', act:() => saveProj(false), info:() => (projLabel() ? 'Saves over ' + projLabel() : 'Saves the song and kit as one .thunder file') + (projDirty ? ' · unsaved changes' : '') + ' · Ctrl/⌘+S'},
-    {l:'› SAVE AS', act:() => saveProj(true), info:() => 'Saves to a new file, keeping the old one · Shift+Ctrl/⌘+S'},
-    {l:'› LOAD PROJECT', act:openProj, info:() => 'Load a project file (song and kit) · Ctrl/⌘+O'},
+    {l:'› SAVE', sec:'Project file', act:() => saveProj(false), info:() => (projLabel() ? 'Saves over ' + projLabel() : 'Saves the song and kit as one .thunder file') + (projDirty ? ' · unsaved changes' : '') + ' · ' + MODK + '+S'},
+    {l:'› SAVE AS', act:() => saveProj(true), info:() => 'Saves to a new file, keeping the old one · Shift+' + MODK + '+S'},
+    {l:'› LOAD PROJECT', act:openProj, info:() => 'Load a project file (song and kit) · ' + MODK + '+O'},
     ...(noChains() ? [] : [{l:'› EXPORT CHAINS', act:exportChains, info:() => 'Save the chains patch (lives in the song) as its own .chains.json file'},
     {l:'› IMPORT CHAINS', act:() => $('chainsIn').click(), info:() => 'Load a .chains.json file into this song (waves patches work too, keeping their effects)'}]),
     ...(canShareProj() ? [{l:'› SHARE PROJECT', act:shareProj, info:() => 'Send the project file (song and kit) to Drive, email, a chat or your other device, then open it there with LOAD PROJECT'}] : []),
-    {l:'› NEW SONG', dbl:true, act:newSong, info:() => 'Clears the song, keeps the kit. Tap EDIT twice · Ctrl/⌘+N'},
+    {l:'› NEW SONG', dbl:true, act:newSong, info:() => 'Clears the song, keeps the kit. Tap EDIT twice · ' + MODK + '+N'},
     {l:'› LOAD DEMO', dbl:true, act:guardLeave('loading the demo song', () => { setSong(demoSong(), 'Loaded the starter beat.'); setDirty(false); }), info:() => 'Replaces the song with the starter beat. Tap EDIT twice'},
     {l:'› LOAD ELECTRO', dbl:true, act:guardLeave('loading ELECTRO', loadElectro), info:() => 'Opens the ELECTRO demo project (song and kit). Tap EDIT twice'},
     {l:'INPUT', sec:'Input', gap:true, get:() => inMode === 'keys' ? 1 : 0, set:v => setInput(v ? 'keys' : 'pad'), min:0, max:1, tog:true, d:0, fmt:v => v ? 'KEYS' : 'PAD', info:() => 'PAD: on-screen d-pad and four keys; the keyboard still types notes and hex (Z = ALT, X = EDIT, Alt+arrows page). KEYS: type notes and hex, with an on-screen keypad on touch screens'},
@@ -24742,14 +24766,14 @@ function projRows(){
     {l:'CLASSIC SONG', ck:'Show classic Song screen', get:() => songGrid ? 1 : 0, set:v => setSongGrid(!!v), min:0, max:1, tog:true, d:0, fmt:v => v ? 'SHOWN' : 'HIDDEN',
       info:() => 'HIDDEN (the default): the Song screen is Arrange, full width on any screen, with every Song key, pad command and the master column. SHOWN brings back the text grid, with Arrange beside it as before. The song is the same either way'},
     // SONG EXTRAS (each one off = the Song screen as it was before them)
-    {l:'SONG MOUSE', ck:'Song: drag to select, move, copy; right-click menu', get:() => SX.mouse ? 1 : 0, set:v => sxSet('mouse', !!v), min:0, max:1, tog:true, d:1, fmt:onOff,
-      info:() => 'With a mouse on the Song screen: drag across empty cells to select, drag a block or the selection to move it, Alt-drag to copy it, right-click for a menu (copy, paste, clone, mute, loop, open, name a section, clear). Off: clicks only, as before'},
+    {l:'SONG MOUSE', get ck(){ return touchUi() ? 'Song: drag to select, move, copy (mouse and pen)' : 'Song: drag to select, move, copy; right-click menu'; }, get:() => SX.mouse ? 1 : 0, set:v => sxSet('mouse', !!v), min:0, max:1, tog:true, d:1, fmt:onOff,
+      info:() => touchUi() ? 'With a mouse or pen on the Song screen: drag across empty cells to select, drag a block or the selection to move it, Alt-drag to copy it. A finger taps and holds as usual. Off: clicks only, as before' : 'With a mouse on the Song screen: drag across empty cells to select, drag a block or the selection to move it, Alt-drag to copy it, right-click for a menu (copy, paste, clone, mute, loop, open, name a section, clear). Off: clicks only, as before'},
     {l:'SECTIONS', ck:'Song: section names beside the rows', get:() => SX.secs ? 1 : 0, set:v => sxSet('secs', !!v), min:0, max:1, tog:true, d:1, fmt:onOff,
       info:() => 'The SECT lane left of the row numbers names runs of rows (INTRO, DROP…): tap the + on the cursor’s row (or tap the empty lane, double-click it, right-click a block) to name the section from that row; click a name to go there; hold or right-click a name to rename, loop or remove it. The lane is only as wide as its names. Needs a wide screen. Off hides the lane; the names stay in the song'},
     {l:'SECTIONS BESIDE PHRASE', ck:'Arrange beside the phrase: the SECT lane too', get:() => SX.side ? 1 : 0, set:v => sxSet('side', !!v), min:0, max:1, tog:true, d:0, fmt:onOff,
       info:() => 'With SECTIONS on: the SECT lane also shows in Arrange beside the phrase (it takes a little of Arrange’s width), so section names are there while you edit. Off: only on the Song screen'},
-    {l:'ROW COLOR IN PATTERN', ck:'Pattern view: right-click a row number to color the song row', get:() => SX.pvcol ? 1 : 0, set:v => sxSet('pvcol', !!v), min:0, max:1, tog:true, d:1, fmt:onOff,
-      info:() => 'In Pattern view, right-click a row number (or SONG ROW in its bar) to color this pattern’s song row, the same as right-clicking the row number in Arrange; SONG ROW then shows in that color. Off: the right-click menu as usual'},
+    {l:'ROW COLOR IN PATTERN', get ck(){ return touchUi() ? 'Pattern view: press and hold a row number to color the song row' : 'Pattern view: right-click a row number to color the song row'; }, get:() => SX.pvcol ? 1 : 0, set:v => sxSet('pvcol', !!v), min:0, max:1, tog:true, d:1, fmt:onOff,
+      info:() => touchUi() ? 'In Pattern view, press and hold a row number (or SONG ROW in its bar) to color this pattern’s song row; SONG ROW then shows in that color. Off: the usual menu opens instead' : 'In Pattern view, right-click a row number (or SONG ROW in its bar) to color this pattern’s song row, the same as right-clicking the row number in Arrange; SONG ROW then shows in that color. Off: the right-click menu as usual'},
     {l:'UNIQUE PER TRACK', ck:'A pattern brought onto a track that doesn’t have it yet gets its own copy. Moving or repeating a pattern on its own track never copies.', get:() => SX.uniq ? 1 : 0, set:v => sxSet('uniq', !!v), min:0, max:1, tog:true, d:1, fmt:onOff,
       info:() => 'ON: a block pasted, cloned, dragged or typed onto a track when another track already uses it gets its own copy (new phrase numbers), so editing one never changes the other; the same block down its own track still repeats. OFF: tracks can share blocks, as before. The master column always keeps its own'},
     {l:'LOOP DRAG', ck:'Song: drag the row numbers to loop', get:() => SX.loop ? 1 : 0, set:v => sxSet('loop', !!v), min:0, max:1, tog:true, d:1, fmt:onOff,
@@ -24808,7 +24832,7 @@ function projRows(){
     {l:'PATTERN LEN', get:() => S.dlen || 16, set:v => setDefLen(v), min:1, max:PROWS, big:4, d:16, fmt:v => v + (v === 1 ? ' row' : ' rows') + ' · new phrases', info:() => 'How many rows a new phrase starts with (empty phrases follow it too). Setting a phrase’s ROWS (at the right of the tab bar) or its LEN line changes this to match'},
     {l:'› ALL PHRASES TO ' + (S.dlen || 16), dbl:true, act:() => { for (let i = 0; i < NPH; i++) S.plen[i] = S.dlen || 16; saveS(); draw(); toast(`Every phrase now plays ${S.dlen || 16} rows. Notes past that are kept, just not played.`); },
       info:() => `Sets every phrase, used or not, to ${S.dlen || 16} rows. Rows past the end keep their notes. Tap EDIT twice`},
-    ...(S.flxOld ? [{l:'FLX 11–FF', opts:true, get:() => 0, set:v => { if (v){ delete S.flxOld; saveS(); toast('FLX 11–FF now play the new Flex patterns (Ctrl/⌘+Z undoes it).'); } }, min:0, max:1, d:0, fmt:v => v ? 'NEW' : 'AS PATTERN 10',
+    ...(S.flxOld ? [{l:'FLX 11–FF', opts:true, get:() => 0, set:v => { if (v){ delete S.flxOld; saveS(); toast('FLX 11–FF now play the new Flex patterns (' + MODK + '+Z undoes it).'); } }, min:0, max:1, d:0, fmt:v => v ? 'NEW' : 'AS PATTERN 10',
       info:() => 'FLX 11–FF all play pattern 10 in this song. NEW: they play the 256 Flex patterns.'}] : []),
     {l:'SWING', get:() => S.swing, set:v => S.swing = v, min:50, max:75, big:5, d:50, fmt:v => v + '%', info:() => 'MPC swing amount: 50% is straight; higher pushes the off-beat of each pair later. 66–67% is the triplet feel'},
     {l:'SCALE', opts:true, get:() => S.scale | 0, set:v => S.scale = v, min:0, max:SCALES.length - 1, d:0, fmt:v => SCALES[v][0],
@@ -25927,7 +25951,7 @@ function selectAll(){
   selA = {x:x0 === c.x ? x1 : x0, y:0, v:tv}; c.y = h - 1; draw();
   toast(`Column selected · ${ak} again: ${tv === 'phrase' ? 'the whole phrase' : 'every line'}`);
 }
-const pasteKey = () => inMode === 'keys' ? 'Ctrl/⌘+V' : 'SHIFT+EDIT';
+const pasteKey = () => inMode === 'keys' ? MODK + '+V' : 'SHIFT+EDIT';
 // Delete on a selection: its cells cleared, the clipboard left alone (as the Song screen's Delete has done since 19 Oct).
 function clearSel(){
   const r = selRect(); let n = 0;
@@ -25977,7 +26001,7 @@ function copyHere(cut){
 function paste(){
   if (edBlock()) return;   // EDIT MODE off
   if (clip && clip.picks) return tv === 'song' ? pastePicks() : toast('Picked cells paste on the Song screen.');
-  if (!clip) return toast('Nothing copied yet. ' + (inMode === 'keys' ? 'Ctrl/⌘+Shift+▲▼ selects lines, Shift+arrows cells.' : 'SHIFT+ALT starts a selection.'));
+  if (!clip) return toast('Nothing copied yet. ' + (inMode === 'keys' ? MODK + '+Shift+▲▼ selects lines, Shift+arrows cells.' : 'SHIFT+ALT starts a selection.'));
   if (clip.v !== tv) return toast('That was copied in ' + VNAME[clip.v] + '. Paste it there.');
   if (clip.uniq && tv === 'song') return pasteClone();   // CLONE: a unique copy at the cursor
   const c = cs[tv], dm = dims(tv), x0 = clip.line ? 0 : tv === 'song' ? c.x : clip.x0;
@@ -26486,10 +26510,10 @@ const cmdMini = () => inMode === 'keys' && cmdBar;
 const CMDS = [['b:-16', '−−', 'Change the value down a lot (EDIT+▼)'], ['b:-1', '−', 'Change the value down (EDIT+◀)'], ['b:1', '+', 'Change the value up (EDIT+▶)'],
   ['b:16', '++', 'Change the value up a lot (EDIT+▲)'], ['prev', '‹', 'Previous: the block above in the song; the previous sect, phrase, instrument or FX track elsewhere (ALT+▲ on the song, ALT+◀ elsewhere)'], ['next', '›', 'Next: the block below in the song; the next sect, phrase, instrument or FX track elsewhere (ALT+▼ on the song, ALT+▶ elsewhere)'],
   ['clr', 'CLEAR', 'Clear (ALT+EDIT)'], ['rrow', 'REMOVE', 'Remove these rows: the selected rows (or the cursor’s row) are deleted and the rows below move up. Phrase, Pattern view, Sect and Song.'], ['sel', 'SELECT', 'Start or cancel a selection (SHIFT+ALT)'],
-  ['uniq', 'UNIQ', 'Make unique: each selected block (or picked cells) gets new phrases, in place'], ['clone', 'CLN', 'Clone: copies the block (or the selected blocks); PASTE then puts a unique copy with new numbers at the cursor (Ctrl/⌘+Alt+C)'],
-  ['cldn', 'CLN↓', 'Clone the block (or selected blocks) into new, unique numbers on a new row below; the rows below move down (Ctrl/⌘+Shift+C)'], ['copy', 'COPY', 'Copy the selection, or what is under the cursor (a note comes with its instrument) (ALT)'],
+  ['uniq', 'UNIQ', 'Make unique: each selected block (or picked cells) gets new phrases, in place'], ['clone', 'CLN', 'Clone: copies the block (or the selected blocks); PASTE then puts a unique copy with new numbers at the cursor (' + MODK + '+Alt+C)'],
+  ['cldn', 'CLN↓', 'Clone the block (or selected blocks) into new, unique numbers on a new row below; the rows below move down (' + MODK + '+Shift+C)'], ['copy', 'COPY', 'Copy the selection, or what is under the cursor (a note comes with its instrument) (ALT)'],
   ['cut', 'CUT', 'Cut the selection, or what is under the cursor (ALT+EDIT)'], ['paste', 'PASTE', 'Paste (SHIFT+EDIT)'],
-  ['undo', 'UNDO', 'Undo the last change to the song (Ctrl/⌘+Z)'], ['redo', 'REDO', 'Redo (Ctrl/⌘+Y)'], ['song', '▶', 'Play the song from the cursor row, or stop it (PLAY)'],
+  ['undo', 'UNDO', 'Undo the last change to the song (' + MODK + '+Z)'], ['redo', 'REDO', 'Redo (' + MODK + '+Y)'], ['song', '▶', 'Play the song from the cursor row, or stop it (PLAY)'],
   ['mpat', 'M.PAT', 'Mute or unmute the pattern block under the cursor, or every block in the selection (as Alt+click, M on the Song). The track’s own MUTE is on the pad and in the Mixer']];   // MUTE PATTERN (owner, 8 Nov): Arrange only
 function cmdAction(a){
   fxpClose();
@@ -27397,7 +27421,7 @@ function info(){
   const c = cs[tv];
   if (selA){
     const r = selRect(), n = r.y1 - r.y0 + 1, what = selA.line ? `${n} LINE${n > 1 ? 'S' : ''} ${hx(r.y0)}–${hx(r.y1)}` : 'SELECTING';
-    return inMode === 'keys' ? `${what} · Shift+${selA.line ? '▲▼' : 'arrows'} grow · Ctrl/⌘+C copy · Ctrl/⌘+X cut · Ctrl/⌘+V paste over · Esc cancel`
+    return inMode === 'keys' ? `${what} · Shift+${selA.line ? '▲▼' : 'arrows'} grow · ${MODK}+C copy · ${MODK}+X cut · ${MODK}+V paste over · Esc cancel`
       : `${what} · arrows extend · ALT copies · ALT+EDIT cuts · SHIFT+ALT cancels`;
   }
   if (tv === 'song' && c.x === MT){ const v = S.song[c.y][MT];
@@ -29408,7 +29432,7 @@ function deckFxBar(){
         const show = x => q.names ? (q.names[x] ?? String(x)) : (q.tpl || q.band) ? q.fmt(x, getF()) : q.fmt(x);
         const set = x => { const g = getF(); if (!g) return; x = clamp(Math.round(x), q.min, q.max); if (x === g[q.k]) return; g[q.k] = x; if (isPumpT(g.type)) delete g.pname; fxChanged(mst ? NT : dkTrack()); v.textContent = show(x); };
         r._fbSet = d => { const g = getF(); if (g) set(g[q.k] + d); };
-        v.title = q.l + ': drag up or down (Shift: fine, Ctrl/⌘: coarse) · rest on it and use the wheel · double-click: type a value · Alt-click: default · right-click: menu';
+        v.title = q.l + ': drag up or down (Shift: fine, ' + MODK + ': coarse) · rest on it and use the wheel · double-click: type a value · Alt-click: default · right-click: menu';
         // ONE RULE (mouse audit, 3 Nov): a drag adds to the value from where it is, Shift a tenth and Ctrl/⌘ held four
         // times, read on every move (no jump when either changes); Alt / ⌘-click and double-click reset; right-click: Reset /
         // Type a value; the wheel takes it once the mouse rests on it (and with Alt, or while held, as before).
