@@ -65,3 +65,12 @@ series are timing, so they are only ever a NOTE. Raw samples go to `tests/sweep/
 file again with `--rescore=<file>`. `--phone` is touch + Mobile setup + a 412 x 915 window + a 4x CPU throttle: it is not a phone's
 audio stack. Run it on a quiet machine, one browser at a time; on a shared one read the trends, not the numbers. Report:
 [`docs/audits/2026-11-10-soak.md`](../../docs/audits/2026-11-10-soak.md).
+
+## Redraw churn (`redraw-churn.mjs`)
+
+`node tests/sweep/redraw-churn.mjs [--secs=5] [--screens=song,phrase,mixer,fx,inst,project] [--top=12] [--json]` plays `sounds/ELECTRO.thunder` in
+headless Chrome and, per tracker screen, counts the DOM writes the page makes in a few seconds (a MutationObserver on the page) and how many of
+them leave the value as it was (a text node replaced by the same text, an attribute set to what it was). The redraw paths that run while a song
+plays should write only what changed (`setText`, 10 Nov; `tests/redraw-churn.test.js`). About 1 minute for six screens. After the change the
+same-value text / node writes are 0 on every screen (before: 1,100 to 2,100 in 5 s); same-value attribute writes (`hidden`, `title`, `aria-*`)
+remain and are not counted as garbage (an identical attribute is not stored again).
