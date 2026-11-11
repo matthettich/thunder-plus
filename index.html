@@ -2950,7 +2950,7 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
       <div class="segrow" id="noWkRow" title="For testing a phone whose audio clock runs fast. Off (test): track effects, chains, live engines and the audio-thread sequencer are silent or unused, and the safety limiter uses its simpler stand-in. Changes when the app reloads."><span>Worklets</span><div class="seg" id="segNoWk"></div></div>
       <div class="btnrow" id="audRestartRow" hidden><span class="lbl">Takes effect when audio restarts (the app reloads; your song and kit are kept)</span><button id="audRestart" class="on">Apply (reload)</button></div>
       <div class="segrow" id="rkRow" title="Phone, Page sequencer: when the audio clock runs several times too fast for over a second, pause the engine for a moment to break it. An experiment: Off restores the old behaviour."><span>RUNAWAY KICK (TEST)</span><div class="seg" id="segRk"></div></div>
-      <div class="audrow audfoot"><button class="sm" id="audReset" title="Clears stuck notes and effects: stops playback and rebuilds every sound and effect from scratch. Your song and kit are untouched.">Reset audio engine</button> <button class="sm" id="audReport" title="Copies a short playback log (screen on or off, sequencer state, how late the rows came, what still sounded after STOP) to paste into a bug report.">Copy playback report</button> <button class="sm" id="audDefaults" title="Puts every audio setting on this device back to its default: Latency, Rate, Latency comp, Live engines, Sequencer, Worklets, Runaway kick, Keep screen on, Background play and Low power display. Songs, kits and your MIDI setup are kept.">Reset audio settings</button></div>
+      <div class="audrow audfoot"><button class="sm" id="audReset" title="Clears stuck notes and effects: stops playback and rebuilds every sound and effect from scratch. Your song and kit are untouched. If the engine is stuck or the output is very late, it offers to reload the app (your song is saved first).">Reset audio engine</button> <button class="sm" id="audReport" title="Copies a short playback log (screen on or off, sequencer state, how late the rows came, what still sounded after STOP) to paste into a bug report.">Copy playback report</button> <button class="sm" id="audDefaults" title="Puts every audio setting on this device back to its default: Latency, Rate, Latency comp, Live engines, Sequencer, Worklets, Runaway kick, Keep screen on, Background play and Low power display. Songs, kits and your MIDI setup are kept.">Reset audio settings</button></div>
     </div>
   </section>
 
@@ -14178,7 +14178,7 @@ function psLiveNote(){
 }
 psLiveNote();
 $('audRestart').addEventListener('click', () => { try { save(); } catch(e){ tpLog('save before restart failed', e); } applyUpdate(); });
-$('audReset').addEventListener('click', () => resetAudio());
+$('audReset').addEventListener('click', () => { resetAudio(); audStuckCheck().catch(e => tpLog('reset audio engine check failed', e)); });   // (RELOAD OFFER: when the context is stuck or the delay is far too high)
 // RESET AUDIO SETTINGS: every per-device audio switch back to its default (the per-device ones outside aset: Keep screen on, Background play, Low power
 // display). If Latency, Rate or Worklets then differ from what the running audio was made with, it reloads exactly as Apply (reload) does (the song is
 // saved first); otherwise it re-applies in place.
@@ -21405,6 +21405,72 @@ function resetAudio(quiet){
   try { devRecover('reset audio engine'); } catch(e){}   // (DEVICE RECOVERY) last: reopen the output choice
   if (!quiet) toast('Audio engine reset: every note and effect cleared.');
 }
+/* RELOAD OFFER (11 Nov, queued item 9): Reset audio engine cannot make a new AudioContext (about 300 places hold `ctx` or nodes made on
+   it: the master chain, the core, chains / waves / pump hosts, the recorder and I/O helper, the cpu probe, per-context module caches
+   and every live voice), so a stuck stream (the context will not run) or the roughly 390 ms output delay that follows a runaway
+   cannot be cured in place. After the reset the button now checks for those two states and offers "Reload the app"; the reload
+   first writes the song and kit to storage and CHECKS the writes (applyUpdate does not), and the song comes back after it.
+   AUD_RELOAD false = the button behaves as before. */
+const AUD_RELOAD = true, AUD_SLOW = 0.3, AUD_GAP = 0.2;
+var audReloading = false;
+// What the context reports and what the output timestamp measures, right now (seconds).
+function audMeasure(){
+  const o = {state:ctx ? ctx.state : 'none', base:ctx ? ctx.baseLatency || 0 : 0, out:ctx ? ctx.outputLatency || 0 : 0, heard:0, lat:aLive ? aLive.lat : 'interactive'};
+  try { const ts = ctx && ctx.state === 'running' && ctx.getOutputTimestamp ? ctx.getOutputTimestamp() : null;
+    if (ts && ts.contextTime > 0 && ts.performanceTime > 0) o.heard = Math.max(0, ctx.currentTime - (ts.contextTime + (performance.now() - ts.performanceTime) / 1000)); } catch(e){}
+  return o;
+}
+// null = healthy (or not something a reload cures), else {why, msg}. A context that is not running after a resume is stuck. An output
+// delay of 0.3 s or more on a low-latency setting, or a measured delay 0.2 s past what the context reports, is the post-runaway state
+// (43 ms before, 390 ms after, twice, on the Fold); a 'playback' hint legitimately sits higher, so only the measured gap counts there.
+function audStuckVerdict(m){
+  if (!m || m.state === 'none') return null;
+  if (m.state !== 'running') return {why:'stuck', msg:'The audio engine is “' + m.state + '” and will not start.'};
+  const rep = (m.base || 0) + (m.out || 0), d = Math.max(rep, m.heard || 0), ms = Math.round(d * 1000);
+  if (m.heard >= AUD_SLOW && m.heard - rep >= AUD_GAP) return {why:'delay', msg:'The sound reaches the speaker about ' + ms + ' ms late (the engine reports ' + Math.round(rep * 1000) + ' ms), so pads and the playhead will feel late.'};
+  if (m.lat !== 'playback' && rep >= AUD_SLOW) return {why:'delay', msg:'The audio output delay is about ' + ms + ' ms (about 40 ms is normal), so pads and the playhead will feel late. Bluetooth speakers do this too: then choose Not now.'};
+  return null;
+}
+// Settings → Audio → Reset audio engine's second half: wait for the context to run, measure, and offer the reload.
+async function audStuckCheck(){
+  if (!AUD_RELOAD || !ctx) return null;
+  const wait = ms => new Promise(r => setTimeout(r, ms));
+  for (let i = 0; i < 20 && ctx && ctx.state !== 'running'; i++) await wait(100);
+  if (!ctx) return null;
+  if (ctx.state === 'running') await wait(500);   // the output figures settle after a resume
+  const m = audMeasure(), v = audStuckVerdict(m);
+  try { pbLog('reset audio engine check: ' + (v ? v.why : 'fine') + ' · state ' + m.state + ' · reported ' + Math.round((m.base + m.out) * 1000) + ' ms · measured ' + Math.round(m.heard * 1000) + ' ms'); } catch(e){}
+  if (!v) return null;
+  if (await askYes({title:'Reload the app?', body:v.msg + ' Reset audio engine cannot fix this; only a reload does. Your song and kit are saved first and come back after it.'}, 'Reload the app')) await audReloadSafe();
+  return v;
+}
+// Stop, save everything to this browser's storage (checked), then reload as applyUpdate does. Returns false, and leaves the app as it was,
+// whenever something could be lost. Nothing is written to a project file: the autosave is what comes back, as after any reload.
+async function audReloadSafe(){
+  if (audReloading) return false; audReloading = true;
+  try {
+    if (RCD.on || RCD.sync){ toastErr('Stop the recording first: a reload now would lose the take.', 5000); return false; }
+    if (rendering){ toastErr('A render is running: let it finish, then reload.', 5000); return false; }
+    if (RCD.take && !await askYes({title:'Take not on a pad', body:'The take in Record a sample is not on a pad yet; a reload would lose it.'}, 'Reload anyway')) return false;
+    try { tStop(true); } catch(e){}
+    if (sdbOk && smpStored){   // every sample's audio into IndexedDB first: save() does that after the reload would have started
+      const left = () => { const p = []; for (const v of kit.voices) for (const L of v.layers) if (L.sample && L.sample.data && !smpStored.has(L.sample.id)) p.push(L.sample); return p; };
+      const p = left();
+      if (p.length) await Promise.race([Promise.all(p.map(s => smpPut(s))).catch(() => {}), wait8()]);
+      if (left().length && !await askYes({title:'Samples not stored yet', body:'Some sample audio could not be written to this browser’s storage in time; a reload would lose it. Save the project to a file first, or reload anyway.'}, 'Reload anyway')) return false;
+    }
+    try { flushKit(); } catch(e){}   // (the waves editor's pending edit)
+    const okK = storeWrite(KEY, JSON.stringify(kitToJSON(sdbOk && smpStored ? 'ref' : false))), okS = storeWrite(TK, JSON.stringify(songOut(S)));
+    if (!(okK && okS)){ toastErr('Couldn’t save the song here (storage is full), so the app was not reloaded. Save the project to a file first (File ▾ › Save).', 7000); return false; }
+    try { saveCur(); asetSave(); } catch(e){}
+    try { sessionStorage.setItem('thunderplus-audreload-v1', String(Date.now())); } catch(e){}
+    try { pbLog('reloading the app to restart the audio engine · ' + pbState()); } catch(e){}
+    applyUpdate();
+    return true;
+  } finally { audReloading = false; }
+  function wait8(){ return new Promise(r => setTimeout(r, 8000)); }
+}
+/* end RELOAD OFFER */
 /* The track effects and chains modules, once per live graph (rt.fxAsk / rt.chnAsk). tfx loads chains first (the shared MODFX modules),
    so asking for tfx asks for chains too. */
 function rtTfxLoad(){
@@ -34367,6 +34433,8 @@ function applyUpdate(){ try { flushS(); flushKit(); saveCur(); } catch(e){ tpLog
   // the desktop shell reloads its own window: location.reload() hits main.js's will-navigate guard, which cancels every navigation ("Apply (reload) button did nothing")
   try { if (DESK_APP && DESK_APP.reload){ DESK_APP.reload(); return; } } catch(e){ tpLog('desktop reload failed, using location.reload', e); }
   location.reload(); }
+// RELOAD OFFER: the app reloaded to restart the audio engine (audReloadSafe): say the song is back
+try { const t = +sessionStorage.getItem('thunderplus-audreload-v1'); if (t){ sessionStorage.removeItem('thunderplus-audreload-v1'); if (Date.now() - t < 60000) setTimeout(() => { try { toast('Reloaded to restart the audio engine. Your song is back; audio starts at your first PLAY or pad.', 5000); } catch(e){} }, 1000); } } catch(e){}
 /* FIX (27 Oct, audit B8): a browser tab with unsaved project changes asks before it closes or reloads (F5, Ctrl+R, the tab's
    ✕). The song and kit are always kept in the browser; this is about the project file. The desktop app asks its own way,
    and the app's own reloads (an update) don't ask. */
