@@ -16,6 +16,9 @@ const H = require('./helpers');
 const BASE = '90ab6b8';
 let old = null;
 try { old = execFileSync('git', ['show', BASE + ':index.html'], { cwd: path.resolve(__dirname, '..'), encoding: 'utf8', maxBuffer: 1 << 28, stdio: ['ignore', 'pipe', 'ignore'] }); } catch (e) { old = null; }
+// (11 Nov, build 563) Vox REL fix: the 'end' segment keeps its voicing. The old build gets that one line too, so the comparison still guards everything else.
+if (old) old = old.replace("case 'end': this.envT = 0; break;", "case 'end': this.envT = 0; t.av = this.k.av; break;");
+
 
 function classText(html, name) {
   const a = html.indexOf('\nclass ' + name + ' {') + 1; assert.ok(a > 0, name);
