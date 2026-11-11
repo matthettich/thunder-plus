@@ -11258,8 +11258,10 @@ async function importPresetsFile(f){
 const ENGINE_PRESET_SHEET = true;
 // U6 (usability audit): on a touch screen the new engine's editor can sit far below the pad area, so a pick looked like nothing
 // happened. After a pick from the sheet, scroll the (visible) engine card to the top of the Synth page. Mouse: left alone.
+// A touch screen (or the Mobile setup): hint and settings text then leaves the mouse out (U12).
+function touchUi(){ return isMobile() || matchMedia('(pointer:coarse)').matches; }
 function engShowEditor(){
-  if (!(isMobile() || matchMedia('(pointer:coarse)').matches)) return;
+  if (!touchUi()) return;
   requestAnimationFrame(() => { try {
     const c = ['bassCard', 'blipCard', 'xCard', 'voxCard', 'layerCard'].map(i => document.getElementById(i)).find(e => e && !e.hidden && e.offsetParent);
     if (c) c.scrollIntoView({block:'start', behavior:'smooth'});
@@ -24748,14 +24750,14 @@ function projRows(){
     {l:'CLASSIC SONG', ck:'Show classic Song screen', get:() => songGrid ? 1 : 0, set:v => setSongGrid(!!v), min:0, max:1, tog:true, d:0, fmt:v => v ? 'SHOWN' : 'HIDDEN',
       info:() => 'HIDDEN (the default): the Song screen is Arrange, full width on any screen, with every Song key, pad command and the master column. SHOWN brings back the text grid, with Arrange beside it as before. The song is the same either way'},
     // SONG EXTRAS (each one off = the Song screen as it was before them)
-    {l:'SONG MOUSE', ck:'Song: drag to select, move, copy; right-click menu', get:() => SX.mouse ? 1 : 0, set:v => sxSet('mouse', !!v), min:0, max:1, tog:true, d:1, fmt:onOff,
-      info:() => 'With a mouse on the Song screen: drag across empty cells to select, drag a block or the selection to move it, Alt-drag to copy it, right-click for a menu (copy, paste, clone, mute, loop, open, name a section, clear). Off: clicks only, as before'},
+    {l:'SONG MOUSE', get ck(){ return touchUi() ? 'Song: drag to select, move, copy (mouse and pen)' : 'Song: drag to select, move, copy; right-click menu'; }, get:() => SX.mouse ? 1 : 0, set:v => sxSet('mouse', !!v), min:0, max:1, tog:true, d:1, fmt:onOff,
+      info:() => touchUi() ? 'With a mouse or pen on the Song screen: drag across empty cells to select, drag a block or the selection to move it, Alt-drag to copy it. A finger taps and holds as usual. Off: clicks only, as before' : 'With a mouse on the Song screen: drag across empty cells to select, drag a block or the selection to move it, Alt-drag to copy it, right-click for a menu (copy, paste, clone, mute, loop, open, name a section, clear). Off: clicks only, as before'},
     {l:'SECTIONS', ck:'Song: section names beside the rows', get:() => SX.secs ? 1 : 0, set:v => sxSet('secs', !!v), min:0, max:1, tog:true, d:1, fmt:onOff,
       info:() => 'The SECT lane left of the row numbers names runs of rows (INTRO, DROP…): tap the + on the cursor’s row (or tap the empty lane, double-click it, right-click a block) to name the section from that row; click a name to go there; hold or right-click a name to rename, loop or remove it. The lane is only as wide as its names. Needs a wide screen. Off hides the lane; the names stay in the song'},
     {l:'SECTIONS BESIDE PHRASE', ck:'Arrange beside the phrase: the SECT lane too', get:() => SX.side ? 1 : 0, set:v => sxSet('side', !!v), min:0, max:1, tog:true, d:0, fmt:onOff,
       info:() => 'With SECTIONS on: the SECT lane also shows in Arrange beside the phrase (it takes a little of Arrange’s width), so section names are there while you edit. Off: only on the Song screen'},
-    {l:'ROW COLOR IN PATTERN', ck:'Pattern view: right-click a row number to color the song row', get:() => SX.pvcol ? 1 : 0, set:v => sxSet('pvcol', !!v), min:0, max:1, tog:true, d:1, fmt:onOff,
-      info:() => 'In Pattern view, right-click a row number (or SONG ROW in its bar) to color this pattern’s song row, the same as right-clicking the row number in Arrange; SONG ROW then shows in that color. Off: the right-click menu as usual'},
+    {l:'ROW COLOR IN PATTERN', get ck(){ return touchUi() ? 'Pattern view: press and hold a row number to color the song row' : 'Pattern view: right-click a row number to color the song row'; }, get:() => SX.pvcol ? 1 : 0, set:v => sxSet('pvcol', !!v), min:0, max:1, tog:true, d:1, fmt:onOff,
+      info:() => touchUi() ? 'In Pattern view, press and hold a row number (or SONG ROW in its bar) to color this pattern’s song row; SONG ROW then shows in that color. Off: the usual menu opens instead' : 'In Pattern view, right-click a row number (or SONG ROW in its bar) to color this pattern’s song row, the same as right-clicking the row number in Arrange; SONG ROW then shows in that color. Off: the right-click menu as usual'},
     {l:'UNIQUE PER TRACK', ck:'A pattern brought onto a track that doesn’t have it yet gets its own copy. Moving or repeating a pattern on its own track never copies.', get:() => SX.uniq ? 1 : 0, set:v => sxSet('uniq', !!v), min:0, max:1, tog:true, d:1, fmt:onOff,
       info:() => 'ON: a block pasted, cloned, dragged or typed onto a track when another track already uses it gets its own copy (new phrase numbers), so editing one never changes the other; the same block down its own track still repeats. OFF: tracks can share blocks, as before. The master column always keeps its own'},
     {l:'LOOP DRAG', ck:'Song: drag the row numbers to loop', get:() => SX.loop ? 1 : 0, set:v => sxSet('loop', !!v), min:0, max:1, tog:true, d:1, fmt:onOff,
