@@ -22469,7 +22469,7 @@ function padBlink(e){
 // Phones and tablets (10 Nov): the audio-thread sequencer's module (a second thread) loads only when the owner picked it there
 // (aset.corePick, set in Settings); the saved default 'core' plays on the Page sequencer on such a device.
 function coreWanted(){ return aset.core === 'core' && (!wkLazy() || !!aset.corePick); }   // (a declaration: the Settings row reads it at load)
-const CORE_REV = 'c3zmp6';
+const CORE_REV = '1tsfaqo';
 const CORE_WANT = 7;   // the core's message set this page speaks (core-processor.js CORE_V); an older core is not used
 const CORE_URL = () => 'core/seq-core.js?v=' + BUILD + '-' + CORE_REV;
 const core = {node:null, ready:false, loading:null, gen:0, sent:new Map(), sT:0, tally:new Map(), mir:null};   // mir: what the core's song holds, as JSON per part (coreDiff)   // tally: events by who played them (test hook)
@@ -23998,7 +23998,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 566;
+const BUILD = 567;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD + (location.pathname.includes('/beta/') ? ' · beta' : '');
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -33427,6 +33427,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [567, '11 Nov', ['Audio-thread sequencer: it makes about half as much throw-away memory while playing, so the browser stops to tidy up half as often (fewer of the rare long hiccups). The sound is the same, number for number.', 'Phone, Audio-thread sequencer: a very slow song (rows more than 3 seconds apart) no longer stops itself.']],
   [566, '11 Nov', ['Audio-thread sequencer: much lighter while a song plays. Volume, pan and pitch that are not moving are no longer worked out for every single sample (they were, whenever more notes were queued up ahead). About half the sequencer core\'s own work is gone; the sound is the same, number for number.']],
   [565, '11 Nov', ['Song screen: with the SECT lane showing, the grid gets matching space on its right, so it sits centred, not pushed to the right.']],
   [564, '11 Nov', ['Phone: with the phone folded, the Tracker button lines up with SONG at the left edge. The word Thunder leaves the title bar when there is no room for the whole word (it showed as "Thunde" unfolded) and comes back when there is.']],
