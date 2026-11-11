@@ -876,7 +876,7 @@ globalThis.__tcOv = (proc, P, n) => {
   const ov = proc.__ov; if (!ov) return P;
   if (currentTime > ov.until){ proc.__ov = null; return P; }   // released (the core stopped a while ago): the page's params again
   // The result object and the one-number arrays are kept on the override and refilled every block (they were new each block);
-  // every key of P is written below on each call, so nothing stale is left in Q.
+  // every key of P is written below on each call; a key P no longer has is dropped (a node's params don't change, so this loop deletes nothing in a song).
   const Q = ov.Q || (ov.Q = {}), O1 = ov.O1 || (ov.O1 = {}), dt = 1 / sampleRate;
   for (const k in P){ const A = ov.p.get(k); if (!A){ Q[k] = P[k]; continue; }
     A.prune(currentTime);
@@ -885,6 +885,7 @@ globalThis.__tcOv = (proc, P, n) => {
     if (A.from <= currentTime && c != null){ const a1 = O1[k] || (O1[k] = [0]); a1[0] = c; Q[k] = a1; continue; }
     for (let i = 0; i < n; i++){ const t = currentTime + i * dt; b[i] = t < A.from ? (src.length > 1 ? src[i] : src[0]) : A.at(t); }
     Q[k] = b; }
+  for (const k in Q) if (!(k in P)) delete Q[k];
   return Q;
 };
 globalThis.__tcPost = (proc, o) => {
