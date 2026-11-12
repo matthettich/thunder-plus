@@ -620,6 +620,10 @@ The owner's top priority to add is the MOD screen. Work down the list; ask befor
 
 Start a session by asking for results. Fix on `beta`. (10 Nov, 15:10: the web beta is build 560; the build numbers in the rest of this paragraph are older.) Web beta: https://matthettich.github.io/thunder-plus/beta/ (build 547 as of 10 Nov morning, 548 once its PR merges; the night of 9–10 Nov shipped 544–547, see the four "10 Nov" entries below. Decisions the lead made that night for the owner to confirm or reverse: on a phone the saved Sequencer default plays on the Page unless Audio thread is picked on that device; on a phone the safety limiter is its stand-in until another worklet loads; the resync only runs with a worklet loaded and its margins are untested on a device). Desktop: v1.3.4-beta.2 (build 541, no feed view or scopes); further desktop betas on hold until the owner asks.
 
+**Build 568** (Low power hot pink / mustard skins)
+- [ ] Phone (Fold, OLED): Settings, pick Low power (hot pink), then Low power (mustard). In daylight check each is readable: the tracker (note / instrument / volume / FX columns each a different colour, cursor, playhead), Song / Arrange (blocks, bus headers), Mixer, the pads (MUTE / SOLO / LOOP / PLAY), and the Settings switches. Pass: no blue, cyan, purple or violet anywhere; background pure black. Say which colours are hard to read.
+- [ ] Phone: on Low power (hot pink) or (mustard), turn Low power display ON: the skin stays. Turn it OFF: you are back on the skin you had before (not left on pink / mustard).
+
 **Build 567** (audio-thread sequencer: less garbage)
 - [ ] Same test as build 566 (computer, Audio thread sequencer, a busy song for 5 minutes): sounds exactly as before; beat-locked effects (Flex, Step gate, Retrigger) and fades / glides on live engines in time.
 
@@ -823,6 +827,14 @@ Suggested order: N0 → N1 → N2 (phone cured) → N4 with N3 alongside → N5 
   the edge `R.t0`, "waiting…" while armed), `rcdClk` / `rcdFmt` / `rcdFreeSecs`, a 250 ms timer only while recording; the
   final length stays until the next take. recorder-check covers FREE, PATTERN, Stop, next take and closing mid-take.
 
+
+## 11 Nov: Low power hot pink and mustard skins (build 568)
+
+Owner: two colour variants of Low power (black) for OLED battery saving, with no plum / purple / violet / blue / cyan anywhere (a Sonnet agent, branch `feat/lowpower-pink`).
+- `lowpowerpink` ("Low power (hot pink)") and `lowpowermustard` ("Low power (mustard)"): the whole LOW POWER (black) block copied per skin with its colours mapped (Low power's own rules untouched), `[data-skin]` of both added after `lowpower` in every dark-skin list (10 list lines each; `--mxbus` cyan in the matrix list is overridden by the new blocks, which come later), two SKINS entries. Pink leads in the first (text, cursor mustard), mustard leads in the second (cursor and solo / inst pink). Poly orange `#FF8C1A` (the spec's `#FF8C42` was too close to coral), master coral `#FF6A55`, bus / `.v` / selection rose `#FF6FA5`, red `#FF3B30`.
+- Found and fixed: bus colours (`BUS_COLORS` blue, green, violet, set inline as `--bus1..8` and `--bgc`) leaked blue into the Song group headers and Phrase bus bands; both new skins override them (`!important`) with warm colours. Low power (black) still shows the bus colours, as before.
+- Contrast on #000 (all text 4.5:1 or better): pink #FF2D78 5.90, mustard #D4A017 8.84, dim #917323 4.68 (the spec's #8A6D1F was 4.29, lightened), #A8862A 6.11, #C9A33A 8.78, orange #FF8C1A 9.02, coral #FF6A55 7.44, rose #FF6FA5 8.07, red #FF3B30 5.92, cursor #E0B020 10.40 (black text on it), white on playhead #4a3a08 11.05 / #4a0d22 15.31. Dark outline #3d2f0c is 1.61 (decoration, like the old #3a3a3a).
+- `lpSkin()`: `LP_SKINS = ['lowpower','lowpowerpink','lowpowermustard']`; Low power display ON while on any of them keeps it, OFF restores the earlier skin when on any of them. Build 568 (`BUILD`, `sw.js` cache, `CHANGES`).
 
 ## 11 Nov: the core's per-block garbage (build 567); the wide node measured and LEFT (owner's decision)
 
