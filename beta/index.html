@@ -1712,7 +1712,7 @@ body.sdesk .dock:not(.vtrk) .pads .pad:nth-child(17)::before{content:'More slots
 /* BUS COLOURS (5 Nov): each bus and the tracks feeding it in that bus's Arrange colour (--busN, set from BUS_COLORS);
    a send is the same colour in stripes */
 .bc1{--bc:var(--bus1)} .bc2{--bc:var(--bus2)} .bc3{--bc:var(--bus3)} .bc4{--bc:var(--bus4)} .bc5{--bc:var(--bus5)} .bc6{--bc:var(--bus6)} .bc7{--bc:var(--bus7)} .bc8{--bc:var(--bus8)}
-:root:is([data-skin="matrix"],[data-skin="bwterm"],[data-skin="lowpower"],[data-skin="espresso"]){--mxbus:#4fd8eb} :root[data-skin="matrixlight"]{--mxbus:#0a7f95}
+:root:is([data-skin="matrix"],[data-skin="bwterm"],[data-skin="lowpower"],[data-skin="lowpowerpink"],[data-skin="lowpowermustard"],[data-skin="espresso"]){--mxbus:#4fd8eb} :root[data-skin="matrixlight"]{--mxbus:#0a7f95}
 :root[data-skin="night"]{--mxbus:#ff7ab6} :root[data-skin="midnight"]{--mxbus:#ffc857}
 :root[data-skin="ocean"]{--mxbus:#7a4fc9} :root[data-skin="miami"]{--mxbus:#5b5be0} :root:is([data-skin="tomato"],[data-skin="desert"]){--mxbus:#2f6fd6}
 :root[data-skin="winter"]{--mxbus:#c0568f}
@@ -2114,7 +2114,7 @@ body.mob .dogs.idle .bob{animation-iteration-count:9} body.mob .dogs.idle .tail{
 @keyframes dkBreath{0%,100%{transform:scaleY(1)} 50%{transform:scaleY(1.025)}}
 @keyframes dkWag{0%,100%{transform:rotate(0deg)} 50%{transform:rotate(-10deg)}}
 @media (prefers-reduced-motion: reduce){ .dogs .bob, .dogs .tail{animation:none!important} }
-:root:is([data-skin="matrix"],[data-skin="bwterm"],[data-skin="lowpower"],[data-skin="night"],[data-skin="espresso"],[data-skin="midnight"],[data-skin="matrixlight"],[data-skin="haring"],[data-skin="idm"],[data-skin="idmpink"],[data-skin="idmpg"],[data-skin="vice"],[data-skin="te"],[data-skin="opuntia"],[data-skin="mpc"],[data-skin="nord"],[data-skin="tr808"],[data-skin="tr909"],[data-skin="sp202"],[data-skin="wes"],[data-skin="m8"],[data-skin="calcwatch"],[data-skin="bauhaus"],[data-skin="swiss"],[data-skin="destijl"],[data-skin="memphis"],[data-skin="valentine"],[data-skin="eames"],[data-skin="vignelli"],[data-skin="bondi"],[data-skin="dx7"],[data-skin="lcdgreen"]) .dogs{--dk-pink:var(--mxsoft)}
+:root:is([data-skin="matrix"],[data-skin="bwterm"],[data-skin="lowpower"],[data-skin="lowpowerpink"],[data-skin="lowpowermustard"],[data-skin="night"],[data-skin="espresso"],[data-skin="midnight"],[data-skin="matrixlight"],[data-skin="haring"],[data-skin="idm"],[data-skin="idmpink"],[data-skin="idmpg"],[data-skin="vice"],[data-skin="te"],[data-skin="opuntia"],[data-skin="mpc"],[data-skin="nord"],[data-skin="tr808"],[data-skin="tr909"],[data-skin="sp202"],[data-skin="wes"],[data-skin="m8"],[data-skin="calcwatch"],[data-skin="bauhaus"],[data-skin="swiss"],[data-skin="destijl"],[data-skin="memphis"],[data-skin="valentine"],[data-skin="eames"],[data-skin="vignelli"],[data-skin="bondi"],[data-skin="dx7"],[data-skin="lcdgreen"]) .dogs{--dk-pink:var(--mxsoft)}
 /* DRUM (the phrase stage's DANCE · DRUM · KEYS): the pittie behind a drum kit with sticks, the husky on bongos. The kit
    only shows in .drum; arms rest over their drums (CSS variables) and strike with dogsHit(); no hops or breathing. */
 .dogs .kit{display:none}
@@ -2522,10 +2522,10 @@ body.mob .dogs.idle .bob{animation-iteration-count:9} body.mob .dogs.idle .tail{
    second panel tone, so the app's menus read as their own strip above the SONG / PHRASE… row, and the screen tabs are
    plain words with the open one underlined. Only the bar's own buttons change (the menus that open from it keep the skin's
    colours); a pressed button stays filled. Dark Simple skins, Pastel and Minimal are unchanged. */
-:root[data-skinbase="term"]:not([data-skin="matrix"],[data-skin="bwterm"],[data-skin="lowpower"],[data-skin="night"],[data-skin="espresso"],[data-skin="midnight"],[data-skin="matrixlight"],[data-skin="haring"],[data-skin="idm"],[data-skin="idmpink"],[data-skin="idmpg"],[data-skin="vice"],[data-skin="te"],[data-skin="opuntia"],[data-skin="mpc"],[data-skin="nord"],[data-skin="tr808"],[data-skin="tr909"],[data-skin="sp202"],[data-skin="wes"],[data-skin="m8"],[data-skin="calcwatch"],[data-skin="bauhaus"],[data-skin="swiss"],[data-skin="destijl"],[data-skin="memphis"],[data-skin="valentine"],[data-skin="eames"],[data-skin="vignelli"],[data-skin="bondi"],[data-skin="dx7"],[data-skin="lcdgreen"]) .top{background:var(--mxpanel2)}
-:root[data-skinbase="term"]:not([data-skin="matrix"],[data-skin="bwterm"],[data-skin="lowpower"],[data-skin="night"],[data-skin="espresso"],[data-skin="midnight"],[data-skin="matrixlight"],[data-skin="haring"],[data-skin="idm"],[data-skin="idmpink"],[data-skin="idmpg"],[data-skin="vice"],[data-skin="te"],[data-skin="opuntia"],[data-skin="mpc"],[data-skin="nord"],[data-skin="tr808"],[data-skin="tr909"],[data-skin="sp202"],[data-skin="wes"],[data-skin="m8"],[data-skin="calcwatch"],[data-skin="bauhaus"],[data-skin="swiss"],[data-skin="destijl"],[data-skin="memphis"],[data-skin="valentine"],[data-skin="eames"],[data-skin="vignelli"],[data-skin="bondi"],[data-skin="dx7"],[data-skin="lcdgreen"]) :is(.top, .top > .seg, .top > .setwrap) > :is(button:not(#bUpd):not(.on), .kitname):not(#zz){background:var(--mxpanel2)}
-:root[data-skinbase="term"]:not([data-skin="matrix"],[data-skin="bwterm"],[data-skin="lowpower"],[data-skin="night"],[data-skin="espresso"],[data-skin="midnight"],[data-skin="matrixlight"],[data-skin="haring"],[data-skin="idm"],[data-skin="idmpink"],[data-skin="idmpg"],[data-skin="vice"],[data-skin="te"],[data-skin="opuntia"],[data-skin="mpc"],[data-skin="nord"],[data-skin="tr808"],[data-skin="tr909"],[data-skin="sp202"],[data-skin="wes"],[data-skin="m8"],[data-skin="calcwatch"],[data-skin="bauhaus"],[data-skin="swiss"],[data-skin="destijl"],[data-skin="memphis"],[data-skin="valentine"],[data-skin="eames"],[data-skin="vignelli"],[data-skin="bondi"],[data-skin="dx7"],[data-skin="lcdgreen"]) .ttabs button[data-v]:not(#zz){border-color:transparent; background:transparent; box-shadow:none}
-:root[data-skinbase="term"]:not([data-skin="matrix"],[data-skin="bwterm"],[data-skin="lowpower"],[data-skin="night"],[data-skin="espresso"],[data-skin="midnight"],[data-skin="matrixlight"],[data-skin="haring"],[data-skin="idm"],[data-skin="idmpink"],[data-skin="idmpg"],[data-skin="vice"],[data-skin="te"],[data-skin="opuntia"],[data-skin="mpc"],[data-skin="nord"],[data-skin="tr808"],[data-skin="tr909"],[data-skin="sp202"],[data-skin="wes"],[data-skin="m8"],[data-skin="calcwatch"],[data-skin="bauhaus"],[data-skin="swiss"],[data-skin="destijl"],[data-skin="memphis"],[data-skin="valentine"],[data-skin="eames"],[data-skin="vignelli"],[data-skin="bondi"],[data-skin="dx7"],[data-skin="lcdgreen"]) .ttabs button[data-v].on:not(#zz){background:transparent!important; color:var(--mx)!important; box-shadow:inset 0 -4px 0 var(--mx)!important; font-weight:700}
+:root[data-skinbase="term"]:not([data-skin="matrix"],[data-skin="bwterm"],[data-skin="lowpower"],[data-skin="lowpowerpink"],[data-skin="lowpowermustard"],[data-skin="night"],[data-skin="espresso"],[data-skin="midnight"],[data-skin="matrixlight"],[data-skin="haring"],[data-skin="idm"],[data-skin="idmpink"],[data-skin="idmpg"],[data-skin="vice"],[data-skin="te"],[data-skin="opuntia"],[data-skin="mpc"],[data-skin="nord"],[data-skin="tr808"],[data-skin="tr909"],[data-skin="sp202"],[data-skin="wes"],[data-skin="m8"],[data-skin="calcwatch"],[data-skin="bauhaus"],[data-skin="swiss"],[data-skin="destijl"],[data-skin="memphis"],[data-skin="valentine"],[data-skin="eames"],[data-skin="vignelli"],[data-skin="bondi"],[data-skin="dx7"],[data-skin="lcdgreen"]) .top{background:var(--mxpanel2)}
+:root[data-skinbase="term"]:not([data-skin="matrix"],[data-skin="bwterm"],[data-skin="lowpower"],[data-skin="lowpowerpink"],[data-skin="lowpowermustard"],[data-skin="night"],[data-skin="espresso"],[data-skin="midnight"],[data-skin="matrixlight"],[data-skin="haring"],[data-skin="idm"],[data-skin="idmpink"],[data-skin="idmpg"],[data-skin="vice"],[data-skin="te"],[data-skin="opuntia"],[data-skin="mpc"],[data-skin="nord"],[data-skin="tr808"],[data-skin="tr909"],[data-skin="sp202"],[data-skin="wes"],[data-skin="m8"],[data-skin="calcwatch"],[data-skin="bauhaus"],[data-skin="swiss"],[data-skin="destijl"],[data-skin="memphis"],[data-skin="valentine"],[data-skin="eames"],[data-skin="vignelli"],[data-skin="bondi"],[data-skin="dx7"],[data-skin="lcdgreen"]) :is(.top, .top > .seg, .top > .setwrap) > :is(button:not(#bUpd):not(.on), .kitname):not(#zz){background:var(--mxpanel2)}
+:root[data-skinbase="term"]:not([data-skin="matrix"],[data-skin="bwterm"],[data-skin="lowpower"],[data-skin="lowpowerpink"],[data-skin="lowpowermustard"],[data-skin="night"],[data-skin="espresso"],[data-skin="midnight"],[data-skin="matrixlight"],[data-skin="haring"],[data-skin="idm"],[data-skin="idmpink"],[data-skin="idmpg"],[data-skin="vice"],[data-skin="te"],[data-skin="opuntia"],[data-skin="mpc"],[data-skin="nord"],[data-skin="tr808"],[data-skin="tr909"],[data-skin="sp202"],[data-skin="wes"],[data-skin="m8"],[data-skin="calcwatch"],[data-skin="bauhaus"],[data-skin="swiss"],[data-skin="destijl"],[data-skin="memphis"],[data-skin="valentine"],[data-skin="eames"],[data-skin="vignelli"],[data-skin="bondi"],[data-skin="dx7"],[data-skin="lcdgreen"]) .ttabs button[data-v]:not(#zz){border-color:transparent; background:transparent; box-shadow:none}
+:root[data-skinbase="term"]:not([data-skin="matrix"],[data-skin="bwterm"],[data-skin="lowpower"],[data-skin="lowpowerpink"],[data-skin="lowpowermustard"],[data-skin="night"],[data-skin="espresso"],[data-skin="midnight"],[data-skin="matrixlight"],[data-skin="haring"],[data-skin="idm"],[data-skin="idmpink"],[data-skin="idmpg"],[data-skin="vice"],[data-skin="te"],[data-skin="opuntia"],[data-skin="mpc"],[data-skin="nord"],[data-skin="tr808"],[data-skin="tr909"],[data-skin="sp202"],[data-skin="wes"],[data-skin="m8"],[data-skin="calcwatch"],[data-skin="bauhaus"],[data-skin="swiss"],[data-skin="destijl"],[data-skin="memphis"],[data-skin="valentine"],[data-skin="eames"],[data-skin="vignelli"],[data-skin="bondi"],[data-skin="dx7"],[data-skin="lcdgreen"]) .ttabs button[data-v].on:not(#zz){background:transparent!important; color:var(--mx)!important; box-shadow:inset 0 -4px 0 var(--mx)!important; font-weight:700}
 /* SKIN TITLE BARS (owner, 3 Nov: "using the 909 skin … the light grey/white title bars look odd"): the term base gave the
    title bars --side, i.e. --mxpanel, which in most light skins is a paler, near-white tint of the case (909 #e0e2e3 on
    #cfd2d4, IDM #f2f1ec on #e9e8e3), so every head read as a white chip pasted on. They now take the skin's second panel
@@ -2578,7 +2578,7 @@ body.mob .dogs.idle .bob{animation-iteration-count:9} body.mob .dogs.idle .tail{
 :root[data-skin="greywhite"]{--mxmst:#c9b7f2}
 :root[data-skin="contrast"]{--mxmst:#d6331f; --mxmston:#ffffff}
 :root[data-skinbase="term"] .tdeck{--tk-mono:var(--mx); --tk-poly:var(--mxpoly); --scfill:color-mix(in srgb, var(--mx) 45%, var(--mxbg))}
-:root:is([data-skin="matrix"],[data-skin="bwterm"],[data-skin="lowpower"],[data-skin="night"],[data-skin="espresso"],[data-skin="midnight"],[data-skin="matrixlight"],[data-skin="haring"],[data-skin="idm"],[data-skin="idmpink"],[data-skin="idmpg"],[data-skin="vice"],[data-skin="te"],[data-skin="opuntia"],[data-skin="mpc"],[data-skin="nord"],[data-skin="tr808"],[data-skin="tr909"],[data-skin="sp202"],[data-skin="wes"],[data-skin="m8"],[data-skin="calcwatch"],[data-skin="bauhaus"],[data-skin="swiss"],[data-skin="destijl"],[data-skin="memphis"],[data-skin="valentine"],[data-skin="eames"],[data-skin="vignelli"],[data-skin="bondi"],[data-skin="dx7"],[data-skin="lcdgreen"]) .tdeck{--stpink:var(--mx)}
+:root:is([data-skin="matrix"],[data-skin="bwterm"],[data-skin="lowpower"],[data-skin="lowpowerpink"],[data-skin="lowpowermustard"],[data-skin="night"],[data-skin="espresso"],[data-skin="midnight"],[data-skin="matrixlight"],[data-skin="haring"],[data-skin="idm"],[data-skin="idmpink"],[data-skin="idmpg"],[data-skin="vice"],[data-skin="te"],[data-skin="opuntia"],[data-skin="mpc"],[data-skin="nord"],[data-skin="tr808"],[data-skin="tr909"],[data-skin="sp202"],[data-skin="wes"],[data-skin="m8"],[data-skin="calcwatch"],[data-skin="bauhaus"],[data-skin="swiss"],[data-skin="destijl"],[data-skin="memphis"],[data-skin="valentine"],[data-skin="eames"],[data-skin="vignelli"],[data-skin="bondi"],[data-skin="dx7"],[data-skin="lcdgreen"]) .tdeck{--stpink:var(--mx)}
 :root[data-skinbase="term"] :is(#dkScope,#dkInst,#dkChn,#dkFx,#dkStrip){--dkc:var(--mx)} :root[data-skinbase="term"] #dkScope{--dkp:3%} :root[data-skinbase="term"] #dkInst{--dkp:7%} :root[data-skinbase="term"] #dkChn{--dkp:9%} :root[data-skinbase="term"] #dkFx{--dkp:11%} :root[data-skinbase="term"] #dkStrip{--dkp:15%}
 :root[data-skinbase="term"] .dkh .dksolo{background:var(--mxsoft); color:var(--mxon)} :root[data-skinbase="term"] .stms button.so.on{background:var(--mxsoft); color:var(--mxon)}
 :root[data-skinbase="term"] .tarr .tagrid b.gm{--ar-empty:color-mix(in srgb, var(--tk-mono) 22%, var(--mxbg))} :root[data-skinbase="term"] .tarr .tagrid b.gp{--ar-empty:color-mix(in srgb, var(--tk-poly) 18%, var(--mxbg))}
@@ -2586,7 +2586,7 @@ body.mob .dogs.idle .bob{animation-iteration-count:9} body.mob .dogs.idle .tail{
    could go grey (plum: green into pink gave #d2d0d2). Light skins mix it with white so the hue stays; the dark skins
    (near-neutral backgrounds) keep mixing with theirs. */
 :root[data-skinbase="term"] .tarr .tagrid b.gp{--ar-empty:color-mix(in srgb, var(--tk-poly) 35%, #ffffff)}
-:root:is([data-skin="matrix"],[data-skin="bwterm"],[data-skin="lowpower"],[data-skin="night"],[data-skin="espresso"],[data-skin="midnight"],[data-skin="matrixlight"],[data-skin="haring"],[data-skin="idm"],[data-skin="idmpink"],[data-skin="idmpg"],[data-skin="vice"],[data-skin="te"],[data-skin="opuntia"],[data-skin="mpc"],[data-skin="nord"],[data-skin="tr808"],[data-skin="tr909"],[data-skin="sp202"],[data-skin="wes"],[data-skin="m8"],[data-skin="calcwatch"],[data-skin="bauhaus"],[data-skin="swiss"],[data-skin="destijl"],[data-skin="memphis"],[data-skin="valentine"],[data-skin="eames"],[data-skin="vignelli"],[data-skin="bondi"],[data-skin="dx7"],[data-skin="lcdgreen"]) .tarr .tagrid b.gp{--ar-empty:color-mix(in srgb, var(--tk-poly) 22%, var(--mxbg))}
+:root:is([data-skin="matrix"],[data-skin="bwterm"],[data-skin="lowpower"],[data-skin="lowpowerpink"],[data-skin="lowpowermustard"],[data-skin="night"],[data-skin="espresso"],[data-skin="midnight"],[data-skin="matrixlight"],[data-skin="haring"],[data-skin="idm"],[data-skin="idmpink"],[data-skin="idmpg"],[data-skin="vice"],[data-skin="te"],[data-skin="opuntia"],[data-skin="mpc"],[data-skin="nord"],[data-skin="tr808"],[data-skin="tr909"],[data-skin="sp202"],[data-skin="wes"],[data-skin="m8"],[data-skin="calcwatch"],[data-skin="bauhaus"],[data-skin="swiss"],[data-skin="destijl"],[data-skin="memphis"],[data-skin="valentine"],[data-skin="eames"],[data-skin="vignelli"],[data-skin="bondi"],[data-skin="dx7"],[data-skin="lcdgreen"]) .tarr .tagrid b.gp{--ar-empty:color-mix(in srgb, var(--tk-poly) 22%, var(--mxbg))}
 :root[data-skinbase="term"] .tagrid b.f[style]{background:color-mix(in srgb, var(--mx) var(--ibp, 100%), var(--mxsoft)); color:var(--mxon)} :root[data-skinbase="term"] .tagrid b.f{text-shadow:none; box-shadow:0 0 8px var(--mxglowc)}
 :root[data-skinbase="term"] .tscr .nbl, :root[data-skinbase="term"] .tscr .nbr{color:var(--mx2)}
 :root[data-skinbase="term"] ::selection{background:var(--mx); color:var(--mxon)}
@@ -2641,6 +2641,111 @@ body.mob .dogs.idle .bob{animation-iteration-count:9} body.mob .dogs.idle .tail{
 :root[data-skin="lowpower"] #tPad #kSolo:not(#zz){background:#000!important; color:#5fe08e!important; border:1px solid #23a45c!important}
 :root[data-skin="lowpower"] #tPad #kLoop.on:not(#zz):not(#zz){background:#1f9d5c!important; color:#000000!important; border:1px solid #1f9d5c!important}
 :root[data-skin="lowpower"] :is(#tPad .k.lt,#tPad #kPlay.on):not(#zz){background:#7ee787; color:#000000; border-color:#7ee787}
+/* LOW POWER PINK / MUSTARD (owner, 11 Nov, OLED battery saving): colour variants of Low power (black) above, same structure (pure #000 everywhere,
+   1px outlines, no glow, blur or animation) with the grey / green / cyan / violet / blue swapped for hot pink + mustard with orange, coral and
+   rose for the other tracker columns. NO blue, cyan, purple or violet anywhere in these two (owner's rule). Pink leads in "lowpowerpink",
+   mustard leads in "lowpowermustard". Every text colour is 4.5:1 or better on black (measured, see HANDOVER 11 Nov). The two blocks below are
+   the Low power block copied with its colours mapped (the Low power rules are untouched), plus [data-skin] added to the same dark-skin lists.
+   To remove: these two blocks, their two SKINS entries, the LP_SKINS helper in lpSkin(), and the two ids added after
+   [data-skin="lowpower"] in the dark-skin lists (grep lowpowerpink / lowpowermustard). */
+:root[data-skin="lowpowerpink"]{--mx:#FF2D78; --mx2:#D4A017; --mxdim:#917323; --mxbg:#000000; --mxpanel:#000000; --mxpanel2:#000000; --mxon:#000000;
+  --mxsoft:#D4A017; --mxpoly:#FF8C1A; --mxglowc:transparent; --mxscan:transparent; --mxred:#FF3B30; --mxcur:#E0B020; --mxcuron:#000000; --mxline:#917323; --mxbus:#FF6FA5;
+  --font:"JetBrains Mono",ui-monospace,Menlo,monospace; --mono:"JetBrains Mono",ui-monospace,Menlo,monospace; color-scheme:dark}
+:root[data-skin="lowpowerpink"] *{text-shadow:none!important; backdrop-filter:none!important; -webkit-backdrop-filter:none!important}
+:root[data-skin="lowpowerpink"] :is(.tscr,.tscr[data-ts]){--ts-rn:#C9A33A; --ts-inst:#D4A017; --ts-fx:#FF6A55; --ts-vol:#FF8C1A; --ts-th:#D4A017; --ts-dim:#A8862A; --ts-line:#917323;
+  --ts-sel:#3a0d1f; --ts-pl-bg:#4a3a08; --ts-pl:#ffffff; --ts-hint:#D4A017; --ts-info:#D4A017; --ts-mute:#FF3B30; --ts-solo:#D4A017; --tk-mono:#FF2D78; --tk-poly:#FF8C1A; --tk-mst:#FF6A55}
+:root[data-skin="lowpowerpink"] .tscr .v{color:#FF6FA5}
+:root[data-skin="lowpowerpink"] .tscr .e{color:#A8862A}
+:root[data-skin="lowpowerpink"] .tscr .tgrid, :root[data-skin="lowpowerpink"] .tscr .tgrid span{font-weight:700}
+:root[data-skin="lowpowerpink"] .tscr .sel{outline:1px solid #FF6FA5; outline-offset:-1px}
+:root[data-skin="lowpowerpink"] .tscr .cur, :root[data-skin="lowpowerpink"] .tscr :is(.e,.cn,.cv,.ci,.cf,.v,.mt).cur{background:#E0B020; color:#000000; outline:2px solid #ffffff; outline-offset:-2px}
+:root[data-skin="lowpowerpink"] .tscr :is(.e,.cn,.cv,.ci,.cf,.v,.mt).pl:not(.cur){color:#ffffff}
+:root[data-skin="lowpowerpink"] .pads .pad .pm, :root[data-skin="lowpowerpink"] .pads .pad.syn b::after{color:#D4A017!important}
+:root[data-skin="lowpowerpink"] .gset :is(input.msw1,label.cb input[type=checkbox]){background:#000; border-color:#917323}
+:root[data-skin="lowpowerpink"] .gset :is(input.msw1,label.cb input[type=checkbox])::before{background:#917323}
+:root[data-skin="lowpowerpink"] .gset :is(input.msw1,label.cb input[type=checkbox]):checked{background:#000; border-color:#D4A017}
+:root[data-skin="lowpowerpink"] .gset :is(input.msw1,label.cb input[type=checkbox]):checked::before{background:#D4A017}
+:root[data-skin="lowpowerpink"] #apStrip .apsr b:not(.p):not(.m):not(#zz){background:#000!important; box-shadow:inset 0 0 0 1px #3d2f0c}
+:root[data-skin="lowpowerpink"] #apStrip .apsr b.f:not(.p):not(#zz){color:var(--tk); box-shadow:inset 0 0 0 1px var(--tk)}
+:root[data-skin="lowpowerpink"] #apStrip .apsr b.p:not(#zz){background:#4a3a08!important; color:#ffffff}
+/* SONG / ARRANGE: blocks are outlines in their group's colour (white mono, cyan poly, amber master, violet bus), not fills; the cursor block is the one fill */
+:root[data-skin="lowpowerpink"] .tarr{--tkc:#FF2D78}
+:root[data-skin="lowpowerpink"] .tagrid b.gp, :root[data-skin="lowpowerpink"] .tagp b.gp, :root[data-skin="lowpowerpink"] .tgbox.gp b{--tkc:#FF8C1A}
+:root[data-skin="lowpowerpink"] .tagrid b.gx, :root[data-skin="lowpowerpink"] .tagp b.gx, :root[data-skin="lowpowerpink"] .tgbox.gx b{--tkc:#FF6A55}
+:root[data-skin="lowpowerpink"] .tagrid b.bg{--tkc:#FF6FA5}
+:root[data-skin="lowpowerpink"] :is(.tagp b,.tgbox b){background:#000!important; color:var(--tkc,#FF2D78)!important; box-shadow:inset 0 0 0 1px var(--tkc,#FF2D78)!important; font-weight:700}
+:root[data-skin="lowpowerpink"] .tagrid b.f:is(.gm,.gp,.gx,.bg,.bus):not(#zz){background:#000!important; background-image:none!important; color:var(--tkc,#FF2D78)!important; box-shadow:inset 0 0 0 1px var(--tkc,#FF2D78)!important; text-shadow:none}
+:root[data-skin="lowpowerpink"] .tagrid b.f.p:is(.gm,.gp,.gx,.bg,.bus):not(#zz), :root[data-skin="lowpowerpink"] .tagrid b.f.p[style]:not(#zz){background:#4a3a08!important; background-image:none!important; color:#ffffff!important; box-shadow:inset 0 0 0 2px #D4A017!important}
+:root[data-skin="lowpowerpink"] .tarr .tagrid b:is(.gm,.gp,.gx):not(.f):not(.p):not(.m):not(.c):not(#zz){--ar-empty:#000000; background:#000000!important; background-image:none!important; box-shadow:inset 0 0 0 1px #3d2f0c!important}
+:root[data-skin="lowpowerpink"] .tagrid b.o:not(#zz){background:#000!important; color:#FF3B30!important; box-shadow:inset 0 0 0 1px #FF3B30!important}
+:root[data-skin="lowpowerpink"] .tagrid b.c:not(#zz), :root[data-skin="lowpowerpink"] .tagrid b.f.c:is(.gm,.gp,.gx,.bg,.bus):not(#zz){background:#E0B020!important; background-image:none!important; color:#000000!important; box-shadow:inset 0 0 0 2px #ffffff!important}
+:root[data-skin="lowpowerpink"] :is(button,select,input[type=text],input[type=number],textarea,.lcell,.layercard,.fxcard,.voicecard,.setmenu,.mstwin){background:#000; color:#FF2D78; border-color:#917323; border-width:1px}
+:root[data-skin="lowpowerpink"] :is(button.on,.seg button.on,.ttabs button.on,.ttabs button[data-v].on,.tmap button[data-v].on,#bFile.on,.top #bSet.on){
+  background:#242424!important; color:#ffffff!important; border-color:#FF2D78; box-shadow:inset 0 0 0 1px #FF2D78; font-weight:700}
+:root[data-skin="lowpowerpink"] #tDeck .dkh .dkt:not(.mstb){background:#000; color:#FF2D78; border-color:#917323}
+:root[data-skin="lowpowerpink"] :is(.tcmd button,.tkp .kp,.pads .pad){background:#000; color:#FF2D78; border:1px solid #917323; box-shadow:none}
+:root[data-skin="lowpowerpink"] :is(.tcmd button.dn,.tkp .kp.dn,.pads .pad.hit,.pads .pad.hit.hit){background:#2c2c2c!important; color:#ffffff!important; border-color:#ffffff; box-shadow:inset 0 0 0 1px #ffffff}
+:root[data-skin="lowpowerpink"] :is(.tcmd button.on,.tkp .kp.on,.tkp .kp.blk){background:#242424; color:#ffffff; border-color:#FF2D78}
+:root[data-skin="lowpowerpink"] #tPad .k:not(#zz){background:#000; color:#FF2D78; border:1px solid #917323; font-weight:700; box-shadow:none}
+:root[data-skin="lowpowerpink"] :is(#tPad .k.dn,#tPad .k.on):not(#zz){background:#2c2c2c; color:#ffffff; border-color:#ffffff; box-shadow:inset 0 0 0 1px #ffffff}
+/* the pad's MUTE / SOLO / LOOP / PLAY: the global rules paint MUTE pink and SOLO green as fills (!important); here they are black keys with
+   their colour as outline and label, and lit (.lt, LOOP on, PLAY on) keeps its fill, with a label that reads on it */
+:root[data-skin="lowpowerpink"] #tPad #kMute:not(#zz){background:#000!important; color:#FF6FA5!important; border:1px solid #FF3B30!important}
+:root[data-skin="lowpowerpink"] #tPad #kSolo:not(#zz){background:#000!important; color:#D4A017!important; border:1px solid #D4A017!important}
+:root[data-skin="lowpowerpink"] #tPad #kLoop.on:not(#zz):not(#zz){background:#D4A017!important; color:#000000!important; border:1px solid #D4A017!important}
+:root[data-skin="lowpowerpink"] :is(#tPad .k.lt,#tPad #kPlay.on):not(#zz){background:#D4A017; color:#000000; border-color:#D4A017}
+/* bus colours (BUS_COLORS: blue, green, violet...) are set inline as --bgc; here every bus takes rose (owner: no blue / purple) */
+:root[data-skin="lowpowerpink"] [style*="--bgc"]{--bgc:#FF6FA5!important}
+:root[data-skin="lowpowerpink"]{--bus1:#FF6FA5!important; --bus2:#FF8C1A!important; --bus3:#D4A017!important; --bus4:#FF6A55!important; --bus5:#FF3B30!important; --bus6:#C9A33A!important; --bus7:#E0B020!important; --bus8:#FF2D78!important;}  /* the bus colours are set inline on the root (BUS_COLORS): no blue / green-blue / violet here */
+:root[data-skin="lowpowermustard"]{--mx:#D4A017; --mx2:#FF2D78; --mxdim:#917323; --mxbg:#000000; --mxpanel:#000000; --mxpanel2:#000000; --mxon:#000000;
+  --mxsoft:#FF2D78; --mxpoly:#FF8C1A; --mxglowc:transparent; --mxscan:transparent; --mxred:#FF3B30; --mxcur:#FF2D78; --mxcuron:#000000; --mxline:#917323; --mxbus:#FF6FA5;
+  --font:"JetBrains Mono",ui-monospace,Menlo,monospace; --mono:"JetBrains Mono",ui-monospace,Menlo,monospace; color-scheme:dark}
+:root[data-skin="lowpowermustard"] *{text-shadow:none!important; backdrop-filter:none!important; -webkit-backdrop-filter:none!important}
+:root[data-skin="lowpowermustard"] :is(.tscr,.tscr[data-ts]){--ts-rn:#C9A33A; --ts-inst:#FF2D78; --ts-fx:#FF6A55; --ts-vol:#FF8C1A; --ts-th:#FF2D78; --ts-dim:#A8862A; --ts-line:#917323;
+  --ts-sel:#3a0d1f; --ts-pl-bg:#4a0d22; --ts-pl:#ffffff; --ts-hint:#FF2D78; --ts-info:#FF2D78; --ts-mute:#FF3B30; --ts-solo:#FF2D78; --tk-mono:#D4A017; --tk-poly:#FF8C1A; --tk-mst:#FF6A55}
+:root[data-skin="lowpowermustard"] .tscr .v{color:#FF6FA5}
+:root[data-skin="lowpowermustard"] .tscr .e{color:#A8862A}
+:root[data-skin="lowpowermustard"] .tscr .tgrid, :root[data-skin="lowpowermustard"] .tscr .tgrid span{font-weight:700}
+:root[data-skin="lowpowermustard"] .tscr .sel{outline:1px solid #FF6FA5; outline-offset:-1px}
+:root[data-skin="lowpowermustard"] .tscr .cur, :root[data-skin="lowpowermustard"] .tscr :is(.e,.cn,.cv,.ci,.cf,.v,.mt).cur{background:#FF2D78; color:#000000; outline:2px solid #ffffff; outline-offset:-2px}
+:root[data-skin="lowpowermustard"] .tscr :is(.e,.cn,.cv,.ci,.cf,.v,.mt).pl:not(.cur){color:#ffffff}
+:root[data-skin="lowpowermustard"] .pads .pad .pm, :root[data-skin="lowpowermustard"] .pads .pad.syn b::after{color:#FF2D78!important}
+:root[data-skin="lowpowermustard"] .gset :is(input.msw1,label.cb input[type=checkbox]){background:#000; border-color:#917323}
+:root[data-skin="lowpowermustard"] .gset :is(input.msw1,label.cb input[type=checkbox])::before{background:#917323}
+:root[data-skin="lowpowermustard"] .gset :is(input.msw1,label.cb input[type=checkbox]):checked{background:#000; border-color:#FF2D78}
+:root[data-skin="lowpowermustard"] .gset :is(input.msw1,label.cb input[type=checkbox]):checked::before{background:#FF2D78}
+:root[data-skin="lowpowermustard"] #apStrip .apsr b:not(.p):not(.m):not(#zz){background:#000!important; box-shadow:inset 0 0 0 1px #3d2f0c}
+:root[data-skin="lowpowermustard"] #apStrip .apsr b.f:not(.p):not(#zz){color:var(--tk); box-shadow:inset 0 0 0 1px var(--tk)}
+:root[data-skin="lowpowermustard"] #apStrip .apsr b.p:not(#zz){background:#4a0d22!important; color:#ffffff}
+/* SONG / ARRANGE: blocks are outlines in their group's colour (white mono, cyan poly, amber master, violet bus), not fills; the cursor block is the one fill */
+:root[data-skin="lowpowermustard"] .tarr{--tkc:#D4A017}
+:root[data-skin="lowpowermustard"] .tagrid b.gp, :root[data-skin="lowpowermustard"] .tagp b.gp, :root[data-skin="lowpowermustard"] .tgbox.gp b{--tkc:#FF8C1A}
+:root[data-skin="lowpowermustard"] .tagrid b.gx, :root[data-skin="lowpowermustard"] .tagp b.gx, :root[data-skin="lowpowermustard"] .tgbox.gx b{--tkc:#FF6A55}
+:root[data-skin="lowpowermustard"] .tagrid b.bg{--tkc:#FF6FA5}
+:root[data-skin="lowpowermustard"] :is(.tagp b,.tgbox b){background:#000!important; color:var(--tkc,#D4A017)!important; box-shadow:inset 0 0 0 1px var(--tkc,#D4A017)!important; font-weight:700}
+:root[data-skin="lowpowermustard"] .tagrid b.f:is(.gm,.gp,.gx,.bg,.bus):not(#zz){background:#000!important; background-image:none!important; color:var(--tkc,#D4A017)!important; box-shadow:inset 0 0 0 1px var(--tkc,#D4A017)!important; text-shadow:none}
+:root[data-skin="lowpowermustard"] .tagrid b.f.p:is(.gm,.gp,.gx,.bg,.bus):not(#zz), :root[data-skin="lowpowermustard"] .tagrid b.f.p[style]:not(#zz){background:#4a0d22!important; background-image:none!important; color:#ffffff!important; box-shadow:inset 0 0 0 2px #FF2D78!important}
+:root[data-skin="lowpowermustard"] .tarr .tagrid b:is(.gm,.gp,.gx):not(.f):not(.p):not(.m):not(.c):not(#zz){--ar-empty:#000000; background:#000000!important; background-image:none!important; box-shadow:inset 0 0 0 1px #3d2f0c!important}
+:root[data-skin="lowpowermustard"] .tagrid b.o:not(#zz){background:#000!important; color:#FF3B30!important; box-shadow:inset 0 0 0 1px #FF3B30!important}
+:root[data-skin="lowpowermustard"] .tagrid b.c:not(#zz), :root[data-skin="lowpowermustard"] .tagrid b.f.c:is(.gm,.gp,.gx,.bg,.bus):not(#zz){background:#FF2D78!important; background-image:none!important; color:#000000!important; box-shadow:inset 0 0 0 2px #ffffff!important}
+:root[data-skin="lowpowermustard"] :is(button,select,input[type=text],input[type=number],textarea,.lcell,.layercard,.fxcard,.voicecard,.setmenu,.mstwin){background:#000; color:#D4A017; border-color:#917323; border-width:1px}
+:root[data-skin="lowpowermustard"] :is(button.on,.seg button.on,.ttabs button.on,.ttabs button[data-v].on,.tmap button[data-v].on,#bFile.on,.top #bSet.on){
+  background:#242424!important; color:#ffffff!important; border-color:#D4A017; box-shadow:inset 0 0 0 1px #D4A017; font-weight:700}
+:root[data-skin="lowpowermustard"] #tDeck .dkh .dkt:not(.mstb){background:#000; color:#D4A017; border-color:#917323}
+:root[data-skin="lowpowermustard"] :is(.tcmd button,.tkp .kp,.pads .pad){background:#000; color:#D4A017; border:1px solid #917323; box-shadow:none}
+:root[data-skin="lowpowermustard"] :is(.tcmd button.dn,.tkp .kp.dn,.pads .pad.hit,.pads .pad.hit.hit){background:#2c2c2c!important; color:#ffffff!important; border-color:#ffffff; box-shadow:inset 0 0 0 1px #ffffff}
+:root[data-skin="lowpowermustard"] :is(.tcmd button.on,.tkp .kp.on,.tkp .kp.blk){background:#242424; color:#ffffff; border-color:#D4A017}
+:root[data-skin="lowpowermustard"] #tPad .k:not(#zz){background:#000; color:#D4A017; border:1px solid #917323; font-weight:700; box-shadow:none}
+:root[data-skin="lowpowermustard"] :is(#tPad .k.dn,#tPad .k.on):not(#zz){background:#2c2c2c; color:#ffffff; border-color:#ffffff; box-shadow:inset 0 0 0 1px #ffffff}
+/* the pad's MUTE / SOLO / LOOP / PLAY: the global rules paint MUTE pink and SOLO green as fills (!important); here they are black keys with
+   their colour as outline and label, and lit (.lt, LOOP on, PLAY on) keeps its fill, with a label that reads on it */
+:root[data-skin="lowpowermustard"] #tPad #kMute:not(#zz){background:#000!important; color:#FF6FA5!important; border:1px solid #FF3B30!important}
+:root[data-skin="lowpowermustard"] #tPad #kSolo:not(#zz){background:#000!important; color:#FF2D78!important; border:1px solid #FF2D78!important}
+:root[data-skin="lowpowermustard"] #tPad #kLoop.on:not(#zz):not(#zz){background:#FF2D78!important; color:#000000!important; border:1px solid #FF2D78!important}
+:root[data-skin="lowpowermustard"] :is(#tPad .k.lt,#tPad #kPlay.on):not(#zz){background:#FF2D78; color:#000000; border-color:#FF2D78}
+/* bus colours (BUS_COLORS: blue, green, violet...) are set inline as --bgc; here every bus takes rose (owner: no blue / purple) */
+:root[data-skin="lowpowermustard"] [style*="--bgc"]{--bgc:#FF6FA5!important}
+:root[data-skin="lowpowermustard"]{--bus1:#FF6FA5!important; --bus2:#FF8C1A!important; --bus3:#D4A017!important; --bus4:#FF6A55!important; --bus5:#FF3B30!important; --bus6:#C9A33A!important; --bus7:#E0B020!important; --bus8:#FF2D78!important;}  /* the bus colours are set inline on the root (BUS_COLORS): no blue / green-blue / violet here */
 /* Simple rainbow dynamic: the same, with the whole page turning slowly round the colour wheel (see rbWheel()). */
 /* Simple rainbow: Simple grey's look, but every button, key, tab, pad, meter and tracker entry takes its own colour.
    --ci is an element's place among its siblings and --ri a tracker line's number, both 0–11; the hue is (ci + ri) × 30°,
@@ -14250,6 +14355,8 @@ const SKINS = [
   {id:'lcdgreen', name:'Pea-green LCD', base:'term', dots:['#9bbc0f', '#0f380f', '#306230', '#8bac0f']},
   {id:'bwterm', name:'Simple black', base:'term', dots:['#000000', '#ffffff', '#5a5a5a', '#9a9a9a']},
   {id:'lowpower', name:'Low power (black)', base:'term', dots:['#000000', '#f2f2f2', '#ffb454', '#6fd8ff']},
+  {id:'lowpowerpink', name:'Low power (hot pink)', base:'term', dots:['#000000', '#FF2D78', '#D4A017', '#FF8C1A']},
+  {id:'lowpowermustard', name:'Low power (mustard)', base:'term', dots:['#000000', '#D4A017', '#FF2D78', '#FF8C1A']},
   {id:'bwlight', name:'Simple white', base:'term', dots:['#ffffff', '#000000', '#a6a6a6', '#6b6b6b']},
   {id:'mustard', name:'Simple mustard', base:'term', dots:['#e3d9f6', '#a37800', '#f2cf63', '#6f55bf']},
   {id:'sage', name:'Simple sage', base:'term', dots:['#e2ecdc', '#2f5d3a', '#8fb88f', '#a3612c']},
@@ -23998,7 +24105,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 567;
+const BUILD = 568;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD + (location.pathname.includes('/beta/') ? ' · beta' : '');
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -24080,9 +24187,10 @@ var lpHold = last => lpOn && tp.on && performance.now() - last < LP_GATE;   // a
 // (9 Nov, owner) turning it on picks the Low power skin; turning it off goes back to the skin you had. Any skin can still be chosen while it's on.
 const LP_SKIN_K = 'thunderplus-lowpower-skin-v1';
 var lpPrev = '';
+const LP_SKINS = ['lowpower', 'lowpowerpink', 'lowpowermustard'];   // (11 Nov, owner) the pink and mustard colour variants count as Low power skins too
 function lpSkin(on){
-  if (on){ if (skin !== 'lowpower'){ lpPrev = skin; try { localStorage.setItem(LP_SKIN_K, skin); } catch(e){} applySkin('lowpower'); } else { lpPrev = ''; try { localStorage.removeItem(LP_SKIN_K); } catch(e){} } return; }
-  if (skin !== 'lowpower') return;
+  if (on){ if (!LP_SKINS.includes(skin)){ lpPrev = skin; try { localStorage.setItem(LP_SKIN_K, skin); } catch(e){} applySkin('lowpower'); } else { lpPrev = ''; try { localStorage.removeItem(LP_SKIN_K); } catch(e){} } return; }
+  if (!LP_SKINS.includes(skin)) return;
   let w = lpPrev; if (!w) try { w = localStorage.getItem(LP_SKIN_K) || ''; } catch(e){} if (w) applySkin(w);
 }
 // (10 Nov: setLowPower resumes an 'interrupted' context too, like audio())
@@ -33427,6 +33535,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [568, '11 Nov', ['Two new skins for OLED screens: Low power (hot pink) and Low power (mustard). Same pure black and thin outlines as Low power (black), in pink and mustard with orange and rose. Turning Low power display on while on one of them keeps it; turning it off goes back to the skin you had before.']],
   [567, '11 Nov', ['Audio-thread sequencer: it makes about half as much throw-away memory while playing, so the browser stops to tidy up half as often (fewer of the rare long hiccups). The sound is the same, number for number.', 'Phone, Audio-thread sequencer: a very slow song (rows more than 3 seconds apart) no longer stops itself.']],
   [566, '11 Nov', ['Audio-thread sequencer: much lighter while a song plays. Volume, pan and pitch that are not moving are no longer worked out for every single sample (they were, whenever more notes were queued up ahead). About half the sequencer core\'s own work is gone; the sound is the same, number for number.']],
   [565, '11 Nov', ['Song screen: with the SECT lane showing, the grid gets matching space on its right, so it sits centred, not pushed to the right.']],
