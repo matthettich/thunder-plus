@@ -2966,7 +2966,7 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
   </div>
   <button type="button" class="tsong" id="tLoopTop" aria-label="Loop the selection" title="Loop the selection: stays on, and PLAY loops the selected rows (Shift+Alt+L)" hidden>Loop</button>
   <button type="button" class="tsong" id="tKeyTrans" aria-label="Key transpose" title="Transpose lock: while it is on, ▲ up / ▼ down transposes the selection a semitone and plays its first note (Esc or a tap turns it off)" hidden>Transpose ▲▼</button>
-  <button type="button" class="tsong" id="tSong" aria-label="Play this screen, or stop" title="Play this screen (on Phrase, the phrase), or stop" hidden><span class="tl"><svg class="ic" aria-hidden="true"><use href="#ic-play"/></svg>Play</span><span class="tl alt" aria-hidden="true"><svg class="ic" aria-hidden="true"><use href="#ic-stop"/></svg>Stop</span></button>
+  <button type="button" class="tsong" id="tSong" aria-label="Play the song, or stop" title="Play the whole song from the cursor's song row, or stop" hidden><span class="tl"><svg class="ic" aria-hidden="true"><use href="#ic-play"/></svg>Play</span><span class="tl alt" aria-hidden="true"><svg class="ic" aria-hidden="true"><use href="#ic-stop"/></svg>Stop</span></button>
   <button type="button" class="tcpu" id="tCpu" aria-label="Audio load"><span><em class="cpuw">CPU </em>0%</span><i></i></button>
   <button type="button" id="bHelp" aria-label="Help and keys (?)" title="Help and keys (? or F1)">?</button>
 </div>
@@ -24196,7 +24196,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 571;
+const BUILD = 572;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD + (location.pathname.includes('/beta/') ? ' · beta' : '');
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -33303,7 +33303,8 @@ $('tKp').addEventListener('pointerdown', e => {
 });
 $('tKp').addEventListener('click', e => { const b = e.target.closest('button[data-a]'); if (b && !ptrJust() && !b.disabled) kpAction(b.dataset.a); });
 // The control bar's Play (owner, 9 Nov): this screen, one tap, as the pad's SHIFT+PLAY is two; the pad's PLAY has the song.
-$('tSong').addEventListener('click', () => { apRun(() => { if (view === 'tracker') playCtx(); else if (tp.on) tStopUser(); else tStart('song', {row:songRow()}); }, []); songBtn(); });
+// (12 Nov, owner: "the play button in the upper section, near the CPU meter, should play the whole song, not just the track"; supersedes 9 Nov's "plays this screen") the SONG from the cursor's song row on every screen, or stop
+$('tSong').addEventListener('click', () => { apRun(() => { if (tp.on) tStopUser(); else tStart('song', {row:songRow()}); }, []); songBtn(); });
 $('tLoopTop').addEventListener('click', () => toggleLoop());
 $('tKeyTrans').addEventListener('click', () => toggleKeyTrans());
 const HINTK = {
@@ -33770,6 +33771,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [572, '12 Nov', ['The Play button at the top (by the CPU meter) plays the whole song on every screen, not just the open phrase.']],
   [571, '12 Nov', ['Fixed: notes typed into a new pattern opened from an empty Arrange cell (SHIFT+\u25b6) could end up in a phrase that was on no block, so they vanished from the screen when the song played. A phrase with notes is now always put on the song.', 'Pattern view: every track\u2019s column shows its own playing row, so a track that HOPs or plays another pattern still has a playhead.', 'Rendering a song now includes blocks after a gap in a track, and tracks that come in on a later row.', 'When playback moves between the audio-thread and page sequencers, or resumes, each track carries on from its own row.', 'SHIFT+\u25bc from the Song / Arrange opens the block\u2019s phrase on a computer too (PAD mode).']],
   [570, '12 Nov', ['The control bar\u2019s Play is now LOOP play (LOOP lights; press LOOP while it plays to carry on as normal play); the pad\u2019s PLAY and Space play plain.', 'The song now wraps once for every track: a track that runs out of blocks waits and all start again together, so tracks no longer drift onto different rows. A track with a gap comes back after the gap.', 'An effect switched off by a command stays off through later patterns and when the song comes round; only STOP resets it.', 'M.PAT (and Alt-click) can mute a block on the master column: its commands are skipped, the master\u2019s sound is untouched.', 'INS: a new control bar button and Edit menu command insert an empty row below the cursor.', 'SHIFT+\u25bc from Arrange opens the block\u2019s phrase (Mobile).', 'The Mixer\u2019s MASTERING ON / OFF is now AUTO MASTER ON / OFF.', 'Clone down no longer leaves an empty row when a bus refuses the clone.', 'A change waiting to be autosaved is written before PLAY starts.']],
   [569, '12 Nov', ['Arrange: moving the cursor with the arrows while a song plays no longer bogs the page down, and holding an arrow no longer lets the playhead pull the view or the cursor back.', 'STOP right after moving the cursor leaves it where you put it.', 'GEN on the Song / Arrange opens the block\u2019s phrase and the generators; on an empty cell it makes a new pattern first.', 'SEMI + / \u2212 (Alt+, Alt+.) on the Song / Arrange transpose every selected pattern once, or the one under the cursor.', 'The pad\u2019s SOLO or MUTE tapped twice quickly clears every solo and mute; soloed and muted tracks are easier to see.', 'Notes can no longer be pasted, dragged or duplicated onto a bus track.', 'Low power skins: the cursor and selected blocks stand out in Arrange.']],
