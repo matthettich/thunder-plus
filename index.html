@@ -19895,13 +19895,20 @@ addEventListener('storage', e => { if (!tabWarned && (e.key === TK || e.key === 
 document.addEventListener('visibilitychange', () => { if (document.hidden){ flushS(); flushKit(); saveCur(); } });
 // A phrase opened from an empty song block is placed in that block once it has a note (see nav()).
 let pendPlace = null;
+// NEVER DROPPED SILENTLY (12 Nov, owner's lost notes: "they vanished while it was open"): this used to forget a pending phrase that already had notes when the cursor's
+// phrase had changed or the cell had been filled, leaving notes in a phrase that is on no block (not on the song, so not played and not shown by a block's cursor). An
+// untouched pending phrase is still just forgotten when it is no longer the open one; one WITH notes always ends on the song: on its own cell, else the first free row of its
+// track (from its row down, then from the top), and a toast says so. Already on the song through another path: nothing more to do (a second block would double it).
 function placePending(){
   const q = pendPlace; if (!q) return;
-  if (q.p !== cPhrase){ pendPlace = null; return; }   // (only the phrase being edited: review, 7 Nov, a stale one doubled a block)
-  if (!S.song[q.y] || S.song[q.y][q.x] >= 0){ pendPlace = null; return; }
-  if (isEmptyPhrase(S.phrases[q.p])) return;
-  pendPlace = null; setSongPhrase(q.x, q.y, q.p);
-  toast(`Phrase ${hp(q.p)} is on the song: row ${rS(q.y, 3)}, track ${d2(q.x + 1)}.`);
+  if (isEmptyPhrase(S.phrases[q.p])){ if (q.p !== cPhrase || !S.song[q.y] || S.song[q.y][q.x] >= 0) pendPlace = null; return; }   // (nothing typed yet: stays pending while it is the open one on a free cell)
+  pendPlace = null;
+  if (S.song.some(r => r && r.some(v => v >= 0 && S.chains[v] && S.chains[v].some(c => c[0] === q.p)))) return;
+  const free = y => !!S.song[y] && S.song[y][q.x] < 0; let y = free(q.y) ? q.y : -1;
+  for (let i = 1; y < 0 && i <= 256; i++){ const yy = (q.y + i) % 256; if (free(yy)) y = yy; }
+  if (y < 0) return toastErr(`Phrase ${hp(q.p)} has notes but track ${d2(q.x + 1)} has no free song row, so it is not on the song. Put it on a row yourself.`, 8000);
+  setSongPhrase(q.x, y, q.p);
+  toast(y === q.y ? `Phrase ${hp(q.p)} is on the song: row ${rS(y, 3)}, track ${d2(q.x + 1)}.` : `Phrase ${hp(q.p)} is on the song at row ${rS(y, 3)}, track ${d2(q.x + 1)}: row ${rS(q.y, 3)} was taken.`, 5000);
 }
 // An instrument past the song's ni put into a phrase (typed, recorded, imported, pasted) makes it a 64-instrument song.
 const niOf = Sx => clamp((Sx && Sx.ni) | 0 || 16, 16, NI);
@@ -24108,7 +24115,7 @@ function irsUI(sec){
   }
   sec.append(box);
 }
-function setSong(s, msg){ tStop(true); tp.paused = null; irsAdopt(s); S = s; setTimeout(() => { try { irsResolve(); } catch(e){ tpLog('could not load the song’s impulse responses', e); } }, 0); swingNote(); scNote(); setTimeout(mstSync, 0); try { projSet(null, null); } catch(e){ projFile = null; } resetCursors(); last.sect = last.phrase = 0; phraseToCursor(); CH.doc = S.chainPatch || null; chainsDropFrame(); if (rt){ rt.pl.buses.forEach(b => { if (b && b.chn) b.chn._sent = null; }); rtAllFx(); rtRoute(); rt.pl.applyMix(); } saveS(); draw(); if (msg) toast(msg); try { PumpFX._notifyAll('load'); } catch(e){} }
+function setSong(s, msg){ tStop(true); tp.paused = null; pendPlace = null;   /* (12 Nov: a phrase waiting in the old song must not follow into the new one) */ irsAdopt(s); S = s; setTimeout(() => { try { irsResolve(); } catch(e){ tpLog('could not load the song’s impulse responses', e); } }, 0); swingNote(); scNote(); setTimeout(mstSync, 0); try { projSet(null, null); } catch(e){ projFile = null; } resetCursors(); last.sect = last.phrase = 0; phraseToCursor(); CH.doc = S.chainPatch || null; chainsDropFrame(); if (rt){ rt.pl.buses.forEach(b => { if (b && b.chn) b.chn._sent = null; }); rtAllFx(); rtRoute(); rt.pl.applyMix(); } saveS(); draw(); if (msg) toast(msg); try { PumpFX._notifyAll('load'); } catch(e){} }
 
 /* ---------- views ---------- */
 const MID = ['song', 'sect', 'phrase', 'inst'], VIEWS = ['song', 'sect', 'phrase', 'inst', 'mixer', 'fx', 'mod', 'project'], GRIDV = new Set(['song', 'sect', 'phrase']);
@@ -26568,7 +26575,10 @@ function nav(dir){
   if (!MID.includes(tv)) return;
   if (dir === 'left'){ const M = midList(), i = M.indexOf(tv); return i > 0 ? go(M[i - 1]) : null; }
   // On an empty cell, still change screen: show the sect or phrase that was last open.
-  if (tv === 'song' && !sectsOn){ cTrack = cs.song.x; const x = cs.song.x, y = cs.song.y, e = S.song[y][x] < 0; go('phrase'); if (!e) return null;
+  // NOTES LOST AFTER SHIFT+▶ (12 Nov, owner: "they vanished while it was open"; reproduced): on Arrange / the Song screen go('phrase') makes an empty cell's block itself (newBlock),
+  // so the fresh phrase made below was waiting for a cell that was already filled; placePending dropped it silently at the first note and the notes sat in a phrase on no
+  // block. The song then played the block's own empty phrase, and FOLLOW ON / PATTERN switched the screen to it when PLAY was pressed: the notes "vanished". goNoNew: no block yet.
+  if (tv === 'song' && !sectsOn){ cTrack = cs.song.x; const x = cs.song.x, y = cs.song.y, e = S.song[y][x] < 0; goNoNew = e; try { go('phrase'); } finally { goNoNew = false; } if (!e) return null;
     // An empty block opens a fresh phrase (not the last one open, which belongs to another block: notes typed
     // there used to land somewhere else). It goes on the song in this block as soon as it has a note.
     const fp = freePhrase(); if (fp < 0) return toast(`Empty block: showing phrase ${hp(cPhrase)}, the last one open (no free phrases left).`);
