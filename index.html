@@ -22565,12 +22565,20 @@ var playWallT = 0, playWasOn = false;
 // the background and nothing audible is playing (a MIDI-only song driving the MPC with the screen off, a muted
 // master), which stalled the sequencer and MIDI clock. A Worker's timer keeps its rate. Page timer as the fallback.
 let pumpW = null;
+/* SCREEN COST (13 Nov): what the screen and the page sequencer take of the page's time, for the CPU panel (cpuRank): the milliseconds spent in draw() and in the page
+   sequencer's tick, added up over a second (two performance.now reads each; nothing else is measured, and nothing from the audio thread). A figure not refreshed for
+   2.5 s reads as nothing (no draws, or no ticks). The share is of the page's own time (a different budget from the audio engine's percentage). */
+const scrT = {draw:{ms:0, n:0, t:0, pub:null}, seq:{ms:0, n:0, t:0, pub:null}};
+function scrAdd(k, ms){ const a = scrT[k], now = performance.now(); if (!a.t) a.t = now; a.ms += ms; a.n++; const w = now - a.t;
+  if (w >= 1000){ a.pub = {t:now, ms:a.ms / w, n:a.n * 1000 / w}; a.ms = 0; a.n = 0; a.t = now; } }
+const scrRead = k => { const a = scrT[k]; return a.pub ? (performance.now() - a.pub.t < 2500 ? a.pub : {t:a.pub.t, ms:0, n:0}) : null; };
+function pumpTimed(){ const t0 = performance.now(); try { pump(); } finally { scrAdd('seq', performance.now() - t0); } }
 function pumpTimer(){
   try {
     if (!pumpW) pumpW = new Worker(URL.createObjectURL(new Blob(["let t=0;onmessage=e=>{clearInterval(t);if(e.data>0)t=setInterval(()=>postMessage(0),e.data)}"], {type:'text/javascript'})));
-    pumpW.onmessage = () => pump(); pumpW.postMessage(25);
+    pumpW.onmessage = pumpTimed; pumpW.postMessage(25);
     return {stop(){ try { pumpW.postMessage(0); pumpW.onmessage = null; } catch(e){} }};
-  } catch(e){ const h = setInterval(pump, 25); return {stop(){ clearInterval(h); }}; }
+  } catch(e){ const h = setInterval(pumpTimed, 25); return {stop(){ clearInterval(h); }}; }
 }
 // Audio interrupted (a call, headphones switching, the system taking the output) while the song runs: resume
 // when the browser lets us; if it stays stopped, stop the transport rather than booking notes against a frozen clock.
@@ -28279,7 +28287,7 @@ function litRows(prLit){
 }
 function draw(){
   if (arrSoon && !arrFast){ cancelAnimationFrame(arrSoon); arrSoon = 0; }   // a full draw this frame already shows the cursor's move
-  if (!busPlan.m.on){ busPlan.m.on = true; busPlan.m.v = null; try { return draw(); } finally { busPlan.m.on = false; busPlan.m.v = null; } }   // (13 Nov) the bus plan is worked out once for the whole redraw, not per cell (busPlan, above)
+  if (!busPlan.m.on){ busPlan.m.on = true; busPlan.m.v = null; const t0 = performance.now(); try { return draw(); } finally { busPlan.m.on = false; busPlan.m.v = null; scrAdd('draw', performance.now() - t0); } }   // (13 Nov) the bus plan is worked out once for the whole redraw, not per cell (busPlan, above)
   if (view !== 'tracker') return;
   document.body.classList.toggle('tvph', tv === 'phrase');   // EDIT OFF looks apply to the Phrase screen
   if (apHold){ apDirty = true; return; }   // ARRANGE PAGING: a song command run for Arrange draws once, at its end
@@ -32518,7 +32526,12 @@ function cpuRank(m){
   else if (big && !big.part && big.v >= 0.3) tip = 'Try: fewer voices at once, or fewer busy tracks (no single effect stands out).';
   else if (total != null && total > 0.9) tip = 'Try: ' + (big && big.part ? big.name + ' is the heaviest part; bypass or simplify it, or play fewer voices at once.' : 'fewer voices at once, or fewer busy tracks.');   // (review) overloaded with no single part standing out: never "plenty of headroom"
   else tip = 'Nothing to fix: plenty of headroom.';
-  return {head, list:top, keep, tip, bad:!!(d || (total != null && total > 1))};
+  // THE SCREEN (13 Nov): drawing and the page sequencer, as a share of the page's own time: not part of the audio engine's percentage
+  const sc = m.screen || null, sq = m.seqPage || null, screen = [];
+  if (sc) screen.push({name:'Screen drawing', share:pct(sc.ms) + ' of the page’s time', extra:sc.n >= 0.5 ? Math.round(sc.n) + ' draws a second' : ''});
+  if (sq) screen.push({name:'Sequencer (page)', share:pct(sq.ms) + ' of the page’s time', extra:''});
+  if (tip === 'Nothing to fix: plenty of headroom.' && sc && sc.ms >= 0.3 && !m.lowPower) tip = 'Try: Low power mode (Settings): drawing the screen takes ' + pct(sc.ms) + ' of the page’s time.';
+  return {head, list:top, keep, tip, screen, screenHead:screen.length ? 'The screen (the page’s own time, a separate budget: do not add it to the audio engine above)' : '', bad:!!(d || (total != null && total > 1))};
 }
 function cpuMeasured(){
   const now = performance.now(), cap = cpu.cap && now - cpu.cap.t < 3000 ? cpu.cap : null, pr = cpu.probe && now - cpu.probe.t < 1500 ? cpu.probe : null;
@@ -32529,25 +32542,26 @@ function cpuMeasured(){
   const inMin = a => a.filter(t => now - (t.t || t) < 60000);
   const ev = inMin(PB.ev), stl = inMin(PB.stalls), dr = inMin(glitch.ts);
   return {total:cap ? cap.avg : pr ? pr.load : null, peak:cap ? cap.peak : null, parts, drops:dr.length, late:ev.length, worstLate:ev.reduce((a, e) => Math.max(a, e.late), 0), stalls:stl.length,
-    playing:!!tp.on, engine:!!ctx, latency:latOf(), lowPower:!!lpOn};
+    playing:!!tp.on, engine:!!ctx, latency:latOf(), lowPower:!!lpOn, screen:tp.on ? scrRead('draw') : null, seqPage:tp.on && !tp.core ? scrRead('seq') : null};
 }
 let cpuPanel = null;
 function cpuClose(){ if (!cpuPanel) return; clearInterval(cpuPanel.iv); document.removeEventListener('keydown', cpuPanel.key, true); cpuPanel.wrap.remove(); cpuPanel = null; }
 function cpuFill(){
   const P = cpuPanel; if (!P) return; const r = cpuRank(cpuMeasured());
-  const key = JSON.stringify([r.head, r.list.map(x => [x.name, x.share]), r.keep, r.tip]); if (P.key2 === key) return; P.key2 = key;   // no layout work when nothing shown changed
+  const key = JSON.stringify([r.head, r.list.map(x => [x.name, x.share]), r.screen.map(x => [x.name, x.share, x.extra]), r.keep, r.tip]); if (P.key2 === key) return; P.key2 = key;   // no layout work when nothing shown changed
   P.head.textContent = 'What is using the most right now'; P.sub.textContent = r.head;
   P.list.replaceChildren(...(r.list.length ? r.list.map(x => { const li = el('div', 'cpurow'); li.append(el('span', null, x.name), el('b', null, x.share)); return li; }) : [el('div', 'cpuNone', tp.on ? 'Nothing measurable is running.' : 'Nothing is running. Press play to see what the song uses.')]));
+  P.scr.replaceChildren(...(r.screen.length ? [el('div', 'cpuNone', r.screenHead), ...r.screen.map(x => { const li = el('div', 'cpurow'); li.append(el('span', null, x.name + (x.extra ? ' · ' + x.extra : '')), el('b', null, x.share)); return li; })] : []));
   P.keep.textContent = r.keep; P.keep.classList.toggle('bad', r.bad); P.tip.textContent = r.tip;
 }
 $('tCpu').addEventListener('click', () => {
   if (cpuPanel) return cpuClose(); if (askOpen) askOpen(null);
   const wrap = el('div', 'ask'), box = el('div', 'askbox cpubox'); wrap.setAttribute('role', 'dialog'); wrap.setAttribute('aria-label', 'What is using the CPU');
-  const P = {wrap, head:el('div', 'asktitle'), sub:el('div', 'askmsg cpusub'), list:el('div', 'cpulist'), keep:el('div', 'cpukeep'), tip:el('div', 'cputip')};
+  const P = {wrap, head:el('div', 'asktitle'), sub:el('div', 'askmsg cpusub'), list:el('div', 'cpulist'), scr:el('div', 'cpulist'), keep:el('div', 'cpukeep'), tip:el('div', 'cputip')};
   const row = el('div', 'btnrow'), rep = el('button', null, 'Copy playback report'), rst = el('button', null, 'Reset audio engine'), cl = el('button', 'ok', 'Close'); for (const b of [rep, rst, cl]) b.type = 'button';
   rep.title = 'A short log of what playback did, to paste into a bug report'; rst.title = $('audReset').title;
   rep.addEventListener('click', () => pbCopy()); rst.addEventListener('click', () => { cpuClose(); $('audReset').click(); }); cl.addEventListener('click', cpuClose);
-  row.append(rep, rst, cl); box.append(P.head, P.sub, P.list, P.keep, P.tip, row); wrap.append(box);
+  row.append(rep, rst, cl); box.append(P.head, P.sub, P.list, P.scr, P.keep, P.tip, row); wrap.append(box);
   P.key = e => { e.stopPropagation(); if (e.key === 'Escape'){ e.preventDefault(); cpuClose(); } else if (!(e.target && e.target.closest && e.target.closest('.ask'))) e.preventDefault(); };
   const t0 = performance.now(); wrap.addEventListener('pointerdown', e => { if (e.target === wrap && performance.now() - t0 > 400){ e.preventDefault(); cpuClose(); } });
   document.addEventListener('keydown', P.key, true); document.body.append(wrap); cpuPanel = P; cpuFill(); P.iv = setInterval(cpuFill, 500); setTimeout(() => cl.focus(), 0);   // (a 2 Hz timer that lives only while the panel is open)
