@@ -20343,10 +20343,12 @@ function makeSeq(S, mode, o){
     if (R && R.row === o.row) for (let t = 0; t <= MT; t++){ const q = o.at[t], T = tr[t];
       if (!q || t === o.atRef || !(q.row >= 0 && q.row < 256) || q.row === R.row || !(t < (S.ntr || 16) || t === MT)) continue;
       Object.assign(T, fresh(), {row:q.row}); const cid = S.song[q.row] ? S.song[q.row][t] : -1, c = cid >= 0 ? S.chains[cid] : null; if (!c) continue;
-      let cr = 0; for (let k = 0; k < c.length; k++) if (c[k] && c[k][0] === q.phrase && q.phrase >= 0){ cr = k; break; }
-      const pid = c[cr] ? c[cr][0] : -1, line = 60 / api.bpm / (api.lpb || plpbOf(S, pid)), d = (q.step | 0) - (R.step | 0);
+      // (review) the chain row it was on (q.cr) when that row still holds its phrase, else the first row with that phrase (a chain can hold a phrase twice)
+      let cr = 0; if (q.cr >= 0 && c[q.cr] && c[q.cr][0] === q.phrase && q.phrase >= 0) cr = q.cr; else for (let k = 0; k < c.length; k++) if (c[k] && c[k][0] === q.phrase && q.phrase >= 0){ cr = k; break; }
+      // (review) by time, not by step counts: phrases can have different lines per beat, so each side's steps are turned into seconds first
+      const pid = c[cr] ? c[cr][0] : -1, line = 60 / api.bpm / (api.lpb || plpbOf(S, pid)), lineR = 60 / api.bpm / (api.lpb || plpbOf(S, R.phrase)), dt = (q.step | 0) * line - (R.step | 0) * lineR, d = Math.round(dt / line);
       T.on = true; T.cr = cr;
-      if (d >= 0 && d < lenOf(pid)){ T.step = T.g = T.cnt = d; T.r0 = -d * line; } else if (d < 0) T.rel = T.r0 = -d * line;
+      if (dt >= -1e-9 && d < lenOf(pid)){ T.step = T.g = T.cnt = d; T.r0 = -d * line; } else if (dt < 0) T.rel = T.r0 = -dt;
       settle(T, t); } }
   api.alive = () => tr.some(T => T.on);
   api.setLoop = l => { loop = l || null; };
@@ -22664,7 +22666,7 @@ function padBlink(e){
 // Phones and tablets (10 Nov): the audio-thread sequencer's module (a second thread) loads only when the owner picked it there
 // (aset.corePick, set in Settings); the saved default 'core' plays on the Page sequencer on such a device.
 function coreWanted(){ return aset.core === 'core' && (!wkLazy() || !!aset.corePick); }   // (a declaration: the Settings row reads it at load)
-const CORE_REV = '12r2kf8';
+const CORE_REV = '1dll47d';
 const CORE_WANT = 7;   // the core's message set this page speaks (core-processor.js CORE_V); an older core is not used
 const CORE_URL = () => 'core/seq-core.js?v=' + BUILD + '-' + CORE_REV;
 const core = {node:null, ready:false, loading:null, gen:0, sent:new Map(), sT:0, tally:new Map(), mir:null};   // mir: what the core's song holds, as JSON per part (coreDiff)   // tally: events by who played them (test hook)
@@ -22914,7 +22916,7 @@ function pbClock(){ if (!tp.on || !tp.core || !ctx || core.bad || ctx.state !== 
 // plays until the app reloads. self: the core already stopped itself (and gave the live engines back) at audio time selfT.
 function coreFail(self){
   core.bad = true; let row = -1, ref = -1; (tp.pos || []).forEach((q, i) => { if (q && i !== MT && q.row > row){ row = q.row; ref = i; } }); if (row < 0) for (const q of tp.pos || []) if (q && q.row > row) row = q.row;
-  const at = ref >= 0 ? tp.pos.map(q => q && {row:q.row, phrase:q.phrase, step:0}) : null;   // (12 Nov) each track on its own row (the song restarts at the top of the furthest row, so no steps)
+  const at = ref >= 0 ? tp.pos.map(q => q && {row:q.row, phrase:q.phrase, cr:q.cr, step:0}) : null;   // (12 Nov) each track on its own row (the song restarts at the top of the furthest row, so no steps)
   const mode = tp.mode;
   pbLog('switched to the page sequencer from row ' + row + (self ? ' (the audio-thread sequencer stopped itself: ' + self.why + ')' : '')); try { tStop(true); } catch(e){} try { coreDrop(); } catch(e){}
   if (row >= 0 && mode === 'song') tStart('song', at ? {row, at, atRef:ref} : {row});

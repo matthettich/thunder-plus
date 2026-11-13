@@ -333,10 +333,12 @@ function makeSeq(S, mode, o){
     if (R && R.row === o.row) for (let t = 0; t <= MT; t++){ const q = o.at[t], T = tr[t];
       if (!q || t === o.atRef || !(q.row >= 0 && q.row < 256) || q.row === R.row || !(t < (S.ntr || 16) || t === MT)) continue;
       Object.assign(T, fresh(), {row:q.row}); const cid = S.song[q.row] ? S.song[q.row][t] : -1, c = cid >= 0 ? S.chains[cid] : null; if (!c) continue;
-      let cr = 0; for (let k = 0; k < c.length; k++) if (c[k] && c[k][0] === q.phrase && q.phrase >= 0){ cr = k; break; }
-      const pid = c[cr] ? c[cr][0] : -1, line = 60 / api.bpm / (api.lpb || plpbOf(S, pid)), d = (q.step | 0) - (R.step | 0);
+      // (review) the chain row it was on (q.cr) when that row still holds its phrase, else the first row with that phrase (a chain can hold a phrase twice)
+      let cr = 0; if (q.cr >= 0 && c[q.cr] && c[q.cr][0] === q.phrase && q.phrase >= 0) cr = q.cr; else for (let k = 0; k < c.length; k++) if (c[k] && c[k][0] === q.phrase && q.phrase >= 0){ cr = k; break; }
+      // (review) by time, not by step counts: phrases can have different lines per beat, so each side's steps are turned into seconds first
+      const pid = c[cr] ? c[cr][0] : -1, line = 60 / api.bpm / (api.lpb || plpbOf(S, pid)), lineR = 60 / api.bpm / (api.lpb || plpbOf(S, R.phrase)), dt = (q.step | 0) * line - (R.step | 0) * lineR, d = Math.round(dt / line);
       T.on = true; T.cr = cr;
-      if (d >= 0 && d < lenOf(pid)){ T.step = T.g = T.cnt = d; T.r0 = -d * line; } else if (d < 0) T.rel = T.r0 = -d * line;
+      if (dt >= -1e-9 && d < lenOf(pid)){ T.step = T.g = T.cnt = d; T.r0 = -d * line; } else if (dt < 0) T.rel = T.r0 = -dt;
       settle(T, t); } }
   api.alive = () => tr.some(T => T.on);
   api.setLoop = l => { loop = l || null; };
