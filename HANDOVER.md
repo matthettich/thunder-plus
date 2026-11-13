@@ -620,6 +620,9 @@ The owner's top priority to add is the MOD screen. Work down the list; ask befor
 
 Start a session by asking for results. Fix on `beta`. (10 Nov, 15:10: the web beta is build 560; the build numbers in the rest of this paragraph are older.) Web beta: https://matthettich.github.io/thunder-plus/beta/ (build 547 as of 10 Nov morning, 548 once its PR merges; the night of 9–10 Nov shipped 544–547, see the four "10 Nov" entries below. Decisions the lead made that night for the owner to confirm or reverse: on a phone the saved Sequencer default plays on the Page unless Audio thread is picked on that device; on a phone the safety limiter is its stand-in until another worklet loads; the resync only runs with a worklet loaded and its margins are untested on a device). Desktop: v1.3.4-beta.2 (build 541, no feed view or scopes); further desktop betas on hold until the owner asks.
 
+**Build 572** (top-bar Play plays the song)
+- [ ] Any device: on Phrase, Mixer and FX, press the Play button at the top by the CPU meter. Pass: the whole song plays from the cursor's song row (not just the open phrase); pressed again it stops. The three plays are now: top bar = song, control bar = loop play, pad PLAY / Space = this screen's plain play.
+
 **Build 571** (lost notes found and fixed; per-track playhead; renders with gaps; each track on its own row at a hand-over)
 - [ ] Phone, Mobile setup: new song, SHIFT+▶ on the empty Arrange cell, type notes, PLAY with FOLLOW ON for more than 5 s. Pass: the notes stay on screen, are on song row 000 and play. (This was the lost-notes bug.)
 - [ ] Phone or computer, Pattern view: PLAY with the cursor on one track while another track HOPs or plays a different pattern. Pass: that track's column shows its own moving band (FOLLOW off / PATTERN / ON); the bands clear on STOP. Say whether the band is easy enough to tell from the cursor row's tint.
@@ -855,6 +858,10 @@ Suggested order: N0 → N1 → N2 (phone cured) → N4 with N3 alongside → N5 
   the edge `R.t0`, "waiting…" while armed), `rcdClk` / `rcdFmt` / `rcdFreeSecs`, a 250 ms timer only while recording; the
   final length stays until the next take. recorder-check covers FREE, PATTERN, Stop, next take and closing mid-take.
 
+
+## 12 Nov (late): top-bar Play plays the song (build 572)
+
+Build 571 (PR #101) merged after two CodeRabbit fixes in `o.at` (the recorded chain row `cr` is restored; tracks are lined up by time, not step counts, since phrases can differ in lines per beat). Owner: "The play button in the upper section, that is near the CPU meter should play the whole song, not just the track": `#tSong` now always does `tStart('song', {row:songRow()})` or stops (supersedes 9 Nov's "plays this screen", build 538); label and title updated; `tests/play-keys.test.js`. Lead, direct.
 
 ## 12 Nov (night): THE LOST NOTES found; per-track playhead; renders with gaps; each track on its own row (build 571)
 
