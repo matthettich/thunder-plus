@@ -30,3 +30,7 @@ test('wiring: the control bar button runs it, the pad PLAY and Space do not, dra
   assert.doesNotMatch(src.match(/function playKey\(shift\)\{[^\n]*/)[0], /playPatLoop/);
   assert.match(src, /<symbol id="ic-loopplay"/); assert.match(src, /function cmdSongSet\(sb\)/);   // (build 573) the icon: a play sign inside a loop assert.match(src, /'Loop play the song, or stop'/); assert.match(src, /\['song', '▶↻', 'Loop play/);
 });
+test('the icon survives applyCmdOrder (its label loop wrote the plain text over it while dataset.lk still said "written"), thin bar icon sized in .cmini', () => {
+  assert.match(src, /const sb = by\.song; if \(sb\)\{ delete sb\.dataset\.lk; cmdSongSet\(sb\);/);
+  assert.match(src, /\.cmini \.ic\.iclp\{width:1\.7em;/);
+});

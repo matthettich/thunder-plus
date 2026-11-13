@@ -55,6 +55,7 @@ body{user-select:none; -webkit-user-select:none; -webkit-touch-callout:none}
 .ic{width:1.05em; height:1.05em; flex:none; display:inline-block; vertical-align:-.17em; fill:none; stroke:currentColor; stroke-width:2; stroke-linejoin:miter; stroke-linecap:square; overflow:visible}
 .tl .ic, .tstat .ic{margin-right:.4em}
 .ic.iclp{width:1.45em; height:1.45em; vertical-align:-.36em; stroke-linecap:round; stroke-linejoin:round}   /* LOOP PLAY (12 Nov, owner: a play sign inside a loop, his pick of three mock-ups) */
+.cmini .ic.iclp{width:1.7em; height:1.7em; vertical-align:-.42em; margin:-.5em 0}   /* the thin bar: bigger so the triangle reads, with negative margins so it does not make the button taller than its neighbours (12 Nov) */
 .k .ick{width:1.35em; height:1.35em; stroke-width:1.8}
 .setg.ic{stroke-width:1.7}
 [hidden]{display:none!important}
@@ -26960,7 +26961,7 @@ function applyCmdOrder(){
   for (const a in by){ by[a].innerHTML = (mini && CMD_MINI_LAB[a]) || (inMode === 'pad' && CMD_PAD_SHORT[a]) || lab[a]; if (!mini) by[a].title = tip[a]; }
   if (by.rrow) by.rrow.hidden = inMode === 'pad';   // (PAD's phone row is full; REMOVE is in KEYS mode's row and bar)
   cmdTipKey = '';
-  const sb = by.song; if (sb){ cmdSongSet(sb); sb.classList.toggle('on', tp.on); }
+  const sb = by.song; if (sb){ delete sb.dataset.lk; cmdSongSet(sb); sb.classList.toggle('on', tp.on); }   // (12 Nov: the loop above just wrote the plain label over the icon: forget the cached key so cmdSongSet puts it back, also after a mode / bar-width / skin change)
   if (typeof cmdBarState === 'function') cmdBarState();
 }
 const cmdHome = $('tCmd').parentNode, cmdHomeNext = $('tCmd').nextElementSibling, cmdTag = el('span', 'cmtag');
