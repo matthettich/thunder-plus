@@ -24471,6 +24471,17 @@ const busTrack = t => t >= 0 && t < NT && isBusT(t);
 const hasNotes = p => !!p && p.some(r => { for (let x = 0; x <= IC; x++) if (r[x] >= 0) return true; return false; });
 const busFxView = () => busTrack(cTrack) && !hasNotes(S.phrases[cPhrase]);
 function busSay(t = cTrack){ toast(`Track ${d2(t + 1)} is a bus: FX commands only, no notes (right-click → Make it a normal track).`, 4500); return true; }
+/* NO NOTES INTO A BUS (12 Nov, owner: a bus takes commands only, but a paste or a drag could still put notes on one). busNo(t, id): the song cell (track t, block id) would put a block
+   that has notes (notes, volume or instrument) on a bus: refused, remembered, and said once (busRefFlush, a tick later, so a paste that left several out names them all).
+   Nothing is stripped from a song that already has notes on a bus; a refusal writes nothing, so it leaves no undo step. */
+let busRef = null, busRefT = 0, busRefNotes = 0;
+const busNotesIn = id => { const c = id >= 0 ? S.chains[id] : null; return !!c && c.some(r => r && r[0] >= 0 && hasNotes(S.phrases[r[0]])); };
+function busRefQ(){ clearTimeout(busRefT); busRefT = setTimeout(busRefFlush, 0); }
+function busNo(t, id){ if (!(id >= 0 && t >= 0 && t < NT && busTrack(t) && busNotesIn(id))) return false; (busRef || (busRef = new Set())).add(id); busRefQ(); return true; }
+function busNoteNo(){ busRefNotes++; busRefQ(); return true; }   // a phrase cell with a note, volume or instrument for a bus phrase
+function busRefFlush(){ const ids = busRef ? [...busRef] : [], nn = busRefNotes; busRef = null; busRefNotes = 0; if (!ids.length && !nn) return;
+  const nm = ids.map(i => hp(songShown(i))).join(', ');
+  toast(ids.length ? (ids.length === 1 ? `Pattern ${nm} has notes` : `Patterns ${nm} have notes`) + ' · a bus track takes commands only' : 'A bus track takes commands, not notes · nothing pasted', 4500); }
 const pCols = () => mstView() || busFxView() ? [6, 7, 8, 9, 10, 11] : polyView() ? [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11] : [0, 4, 5, 6, 7, 8, 9, 10, 11];
 const kindAt = (v, x) => v === 'song' ? 'sect' : v === 'sect' ? (x ? 'tsp' : 'phrase') : PK[x];
 function getCell(v, x, y){
@@ -24534,6 +24545,8 @@ function mstShareWarn(p){
     : `Phrase ${hp(p)} also plays in the master column. There, VOL is the whole song’s level and FLX / FXO the master’s effects. UNIQ on this block (Song or Arrange) gives the track its own copy.`, 7000), 60);
 }
 function setCell(v, x, y, val){
+  if (v === 'song' && x < NT && val >= 0 && busNo(x, val)) return false;   // NO NOTES INTO A BUS (12 Nov, owner): no write, no undo step
+  if (v === 'phrase' && val >= 0 && x < FX0 && busTrack(cTrack) && busNoteNo()) return false;
   if (v === 'song'){
     if (val >= 0 && !mstUniqIn && S.song[y][x] !== val && blockMixed(val, x, y)){
       mstUniqIn = true; try { const nc = mstUniq(val); if (nc >= 0){ const was = val; val = nc;
@@ -25600,6 +25613,7 @@ const busHinted = new Set();
 function busHint(t){ if (busHinted.has(t) || !isBusT(t)) return; busHinted.add(t);
   busNote = `track ${d2(t + 1)} is a ${busOf(t)}: FX commands only, no notes`; queueMicrotask(() => { if (busNote) toast(''); }); }
 function newBlock(c, src){
+  if (src >= 0 && c && c.x < NT && busNo(c.x, src)) return;   // NO NOTES INTO A BUS (12 Nov, owner): a copy of a pattern with notes
   if (c && c.x < NT) busHint(c.x);
   let cid, pid;
   if (src >= 0){
@@ -25697,7 +25711,7 @@ function pastePicks(){
   const c = cs.song, u0 = sxU(c.x), n0 = ntr(); let n = 0, out = 0;
   for (const p of clip.picks){ const y = c.y + p.dy, u = u0 + p.du, t = sxT(u);
     if (p.id < 0) continue; if (y > 255 || u > n0 || (u === n0 && t !== MT)){ out++; continue; }
-    setCell('song', t, y, p.id); if (t !== MT && t < NT) setBlockMute(y, t, !!p.mu); n++; }
+    if (setCell('song', t, y, p.id) === false) continue; if (t !== MT && t < NT) setBlockMute(y, t, !!p.mu); n++; }
   saveS(); draw();
   toast(out ? `Pasted ${n} blocks · ${out} past the end were left out` : `Pasted ${n} block${n === 1 ? '' : 's'}`);
 }
@@ -25750,7 +25764,7 @@ function dupTrack(notes, tAt){
   const mst = tAt != null ? tAt === MT : tv === 'mixer' ? onMstCell() : tv === 'fx' || tv === 'mod' ? cFxT >= NT : cTrack === MT;
   if (mst) return toast('The master can’t be duplicated.');
   let t = tAt != null ? tAt : dkTrack(), PF = polyFrom(), poly = t >= PF, end = poly ? ntr() : PF;
-  const free = () => { for (let u = t + 1; u < end; u++) if (S.song.every(row => row[u] < 0)) return u; return -1; };
+  const free = () => { for (let u = t + 1; u < end; u++) if (S.song.every(row => row[u] < 0) && !(notes && busTrack(u))) return u; return -1; };   // (12 Nov, owner: with notes, never onto a bus)
   let to = free(), grew = false;
   // MORE TRACKS (owner, 4 Nov: "create a track of the type you're trying to duplicate rather than ask where to go"; "ok if it
   // created a mono and poly track"): with no empty track of its kind to the right, TRACKS goes up by two (one mono, one poly,
@@ -26248,11 +26262,11 @@ function paste(){
   // Pasting over a selection starts at its top row.
   const y0 = selA ? selRect().y0 : c.y; selA = null;
   if (y0 < 0) return toast('Move to a row first.');
-  let n = 0; const fxOnly = tv === 'phrase' && busTrack(cTrack); let cut = 0;   // BUS FX ONLY: a paste keeps its FX columns
+  let n = 0, put = 0; const fxOnly = tv === 'phrase' && busTrack(cTrack); let cut = 0;   // BUS FX ONLY: a paste keeps its FX columns
   const colAt = i => { if (tv !== 'song') return x0 + i; const u = sxU(x0) + i, n0 = ntr(); return u === n0 ? MT : u < n0 ? u : -1; };   // SONG: by screen column, the master after the last track
-  clip.d.forEach((row, j) => { const y = y0 + j; if (y < dm.h) n++; row.forEach((val, i) => { const x = colAt(i); if (val !== undefined && x >= 0 && (x < dm.w || (tv === 'song' && x === MT)) && y < dm.h){ if (fxOnly && x < FX0){ if (val >= 0) cut++; return; } setCell(tv, x, y, val);
+  clip.d.forEach((row, j) => { const y = y0 + j; if (y < dm.h) n++; row.forEach((val, i) => { const x = colAt(i); if (val !== undefined && x >= 0 && (x < dm.w || (tv === 'song' && x === MT)) && y < dm.h){ if (fxOnly && x < FX0){ if (val >= 0) cut++; return; } if (setCell(tv, x, y, val) === false) return; put++;
     if (tv === 'song' && val >= 0 && x !== MT && x < NT) setBlockMute(y, x, !!(clip.mu && clip.mu[j] && clip.mu[j][i])); } }); });   // MUTED BLOCKS COPY
-  if (cut) return (toast(`Pasted the FX columns only: track ${d2(cTrack + 1)} is a bus.`), draw());
+  if (cut) return (toast(put ? 'Notes left out · this is a bus track' : 'A bus track takes commands, not notes · nothing pasted'), draw());   // (12 Nov, owner: a notes-only paste changes nothing)
   toast(clip.line ? `Pasted ${n} line${n > 1 ? 's' : ''}` + (n < clip.d.length ? ` (${clip.d.length - n} past the end were left out)` : '') : 'Pasted'); draw();
 }
 // The phrase's LEN / LPB line sits above row 0 (y = -2): ▲ from row 0 reaches it, ▼ goes back.
@@ -26884,7 +26898,7 @@ function genToPhrase(){
   tv = 'song'; go('phrase');
   return false;
 }
-function genRefuse(t){ return ''; }   // (a track that takes no generated notes: a bus, item 8)
+function genRefuse(t){ return t >= 0 && t < NT && busTrack(t) ? `Track ${d2(t + 1)} is a bus · generators write notes, a bus takes commands only` : ''; }   // (a track that takes no generated notes: a bus, 12 Nov)
 function genMenu(fromKeys){
   // (the phrase opens first; Arrange beside it may scroll to the block, and a scroll of its grid closes menus, so the menu opens two frames later)
   if (tv === 'song' && view === 'tracker'){ if (!genToPhrase()) requestAnimationFrame(() => requestAnimationFrame(() => { if (tv === 'phrase') genMenuOpen(fromKeys); })); return; }
@@ -31616,7 +31630,7 @@ function sxApply(d){
   if (!d.du && !d.dy) return;
   const p = sxDrop(d); if (p.err) return toast(p.err);
   const r = d.r, src = [];
-  for (let y = r.y0; y <= r.y1; y++) for (const t of p.cols){ const v = S.song[y][t]; if (v >= 0) src.push([t, y, v, t !== MT && blockMuted(S, y, t)]); }
+  for (let y = r.y0; y <= r.y1; y++) for (const t of p.cols){ const v = S.song[y][t]; if (v >= 0 && !(t !== MT && busNo(sxT(sxU(t) + d.du), v))) src.push([t, y, v, t !== MT && blockMuted(S, y, t)]); }   // (12 Nov, owner: a block with notes stays out of a bus)
   if (!src.length) return toast('Nothing to move: the selection is empty.');
   if (!d.copy) for (const [t, y] of src){ S.song[y][t] = -1; if (t !== MT) setBlockMute(y, t, false); }
   for (const [t, y, v, mu] of src){ const nt = sxT(sxU(t) + d.du), ny = y + d.dy; S.song[ny][nt] = v; if (nt !== MT) setBlockMute(ny, nt, !!mu); }
@@ -32274,7 +32288,8 @@ function pasteMix(){
   clip.d.forEach((row, j) => row.forEach((val, i) => { const x = colAt(i), y = y0 + j;
     if (val === undefined || x < 0 || (x >= dm.w && !(tv === 'song' && x === MT)) || y >= dm.h || (fxOnly && x < FX0)) return;
     const empty = kindAt(tv, x) === 'tsp' ? !getCell(tv, x, y) : getCell(tv, x, y) < 0, has = kindAt(tv, x) === 'tsp' ? !!val : val >= 0;
-    if (empty && has){ setCell(tv, x, y, val); n++; } }));
+    if (empty && has){ if (setCell(tv, x, y, val) !== false) n++; } }));
+  if (fxOnly && clip.d.some((row, j) => row.some((val, i) => { const x = colAt(i); return x >= 0 && x < FX0 && val >= 0; }))) return toast(n ? 'Notes left out · this is a bus track' : 'A bus track takes commands, not notes · nothing pasted');
   toast(n ? `Mix-pasted ${n} cell${n > 1 ? 's' : ''} into the empty ones` : 'Mix-paste: every cell it would fill already has something.'); draw();
 }
 /* ===== SELECTION TOOLS end ===== */
@@ -32384,10 +32399,11 @@ function mselApply(m, copy){
   const r = m.r, dx = m.dx, dy = m.dy; if (!dx && !dy) return draw();
   const D = [], mu = [];
   for (let y = r.y0; y <= r.y1; y++){ const row = [], mr = []; for (let x = r.x0; x <= r.x1; x++){ row.push(getCell(tv, x, y)); mr.push(tv === 'song' && x !== MT && blockMuted(S, y, x)); } D.push(row); mu.push(mr); }
+  const bad = (x, y, v) => tv === 'song' ? x !== MT && x < NT && v >= 0 && busNo(x, v) : tv === 'phrase' && v >= 0 && x < FX0 && busTrack(cTrack) && busNoteNo();   // NO NOTES INTO A BUS (12 Nov): refused cells stay where they were
   const vac = [];   // a move empties its cells first, then writes: UNIQUE PER TRACK must still see that this track held the block (10 Nov, owner)
-  if (!copy) for (let y = r.y0; y <= r.y1; y++) for (let x = r.x0; x <= r.x1; x++){ if (tv === 'song' && x !== MT){ const v0 = S.song[y][x]; if (v0 >= 0) vac.push([y, x, v0]); } setCell(tv, x, y, kindAt(tv, x) === 'tsp' ? 0 : -1); }
+  if (!copy) for (let y = r.y0; y <= r.y1; y++) for (let x = r.x0; x <= r.x1; x++){ if (tv === 'song' && x !== MT){ const v0 = S.song[y][x]; if (v0 >= 0) vac.push([y, x, v0]); } if (bad(x + dx, y + dy, D[y - r.y0][x - r.x0])) continue; setCell(tv, x, y, kindAt(tv, x) === 'tsp' ? 0 : -1); }
   const d = dims(tv); uniqVac = vac;
-  try { D.forEach((row, j) => row.forEach((v, i) => { const x = r.x0 + i + dx, y = r.y0 + j + dy; if (y < 0 || y >= d.h || x < 0 || (x >= d.w && x !== MT)) return;
+  try { D.forEach((row, j) => row.forEach((v, i) => { const x = r.x0 + i + dx, y = r.y0 + j + dy; if (y < 0 || y >= d.h || x < 0 || (x >= d.w && x !== MT) || bad(x, y, v)) return;
     setCell(tv, x, y, v); if (tv === 'song' && x !== MT && v >= 0) setBlockMute(y, x, !!mu[j][i]); })); } finally { uniqVac = []; }
   saveS(); draw();
   const n = m.line ? (r.y1 - r.y0 + 1) + ' line' + (r.y1 > r.y0 ? 's' : '') : mselN(r) + ' cells';

@@ -10,7 +10,7 @@ assert.ok(m, 'could not find genToPhrase(): the code moved, this test needs upda
 function rig({ x = 2, y = 5, cell = 7, sects = false, free = true, refuse = '' } = {}) {
   const log = { toast: [], arrNew: [], go: [] };
   const song = []; for (let r = 0; r < 256; r++) song.push(new Array(9).fill(-1)); song[y][x < 8 ? x : 0] = x < 8 ? cell : -1;
-  const c = { S: { song }, cs: { song: { x, y } }, MT: 8, sectsOn: sects, tv: 'song', toast: (t) => log.toast.push(t),
+  const c = { NT: 16, busTrack: t => t === 3, d2: n => String(n).padStart(2, '0'), S: { song }, cs: { song: { x, y } }, MT: 8, sectsOn: sects, tv: 'song', toast: (t) => log.toast.push(t),
     arrNewAt: (yy, t) => { log.arrNew.push([yy, t]); if (free) song[yy][t] = 40; }, go: (v) => { log.go.push([v, c.tv]); c.tv = v; } };
   vm.createContext(c); vm.runInContext(m[0] + (refuse ? `\ngenRefuse = () => ${JSON.stringify(refuse)};` : '') + '\nthis.genToPhrase = genToPhrase;', c);
   return { c, log };
@@ -35,4 +35,7 @@ test('wiring: the GEN menu (pad GEN and Ctrl/⌘+G) and Alt+B go through it on t
   assert.match(src, /function acidLine\(\)\{\n  if \(tv === 'song' && view === 'tracker' && genToPhrase\(\)\) return;/, 'Alt+B (acidLine) does the same');
   assert.match(src, /if \(b === 'gen'\)\{ clearTimeout\(rep\); genMenu\(\); return; \}/);
   assert.match(src, /e\.code === 'KeyG'\)\{ e\.preventDefault\(\); if \(!e\.repeat\) genMenu\(true\); return true; \}/);
+});
+test('GEN on a bus track\'s block (item 8): refused with a toast, nothing opened or made', () => {
+  const r = rig({ x: 3, cell: -1 }); assert.equal(r.c.genToPhrase(), true); assert.match(r.log.toast[0], /Track 04 is a bus/); assert.equal(r.log.arrNew.length, 0); assert.equal(r.log.go.length, 0);
 });
