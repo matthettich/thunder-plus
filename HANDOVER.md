@@ -489,8 +489,9 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0) and `link/` (Ableton
    `copy-app.js`, a section in `THIRD_PARTY_NOTICES.md`, and a line in item 1. Never non-commercial code at all (the
    original Sonic Potions LXR firmware is non-commercial; the LXR-02 code in `lxr/` is Erica's GPL release).
 3. **Names in the UI** (trademarks; a "based on X" credit can stay):
-   - layer / oscillator names `Plaits`, `Elements`, `FM Genesis`, `FM SoundBlaster` (the oscillator table near the top
-     of the engine block); pad effects `Clouds`, `Rings`, `Beads`; the `Plaits` section title. Later additions already
+   - layer / oscillator names ~~`Plaits`~~ (done in build 578: "Macro osc"), ~~`Elements`~~ (done in build 578: "Resonator"),
+     `FM Genesis`, `FM SoundBlaster` (the oscillator table near the top
+     of the engine block); pad effects `Clouds`, `Rings`, `Beads`; ~~the `Plaits` section title~~ (done in build 578). Later additions already
      use generic names (Cross-mod, Space reverb, Lo-fi…) with credits in `FX_CREDIT`.
    - drum kits and presets: "CR-78- / 808- / 606- / 909- / 707- / 727- / 505-style" (and the one "Roland" in the kit
      notes), "(808-ish)", "(Nord-ish)", "House organ (M1 style)", and the "MPC swing" labels.
@@ -537,7 +538,20 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0) and `link/` (Ableton
 6. **`tcChunks` without allocation** (described in `docs/audits/2026-11-13-draw-pass.md`; only matters if a browser ever delivers blocks over 128 frames: low priority).
 7. Then the older list: "Feature priority" and "Longer-term priority" below (MOD expansion, automation lanes, …), still under the feature freeze except what the owner asks for.
 
-**Waiting on the owner:** (a) **Synth-mode UX updates: the owner audited the Synth page in another checkout (13 Nov) and is writing the plan; he will bring it to a NEW chat, not this session**; (b) LP.SEL on the pad ("I will think about pad placement"; a mock put it between LOOP and ALT); (c) **native apps: "we will decide if we push forward with native tomorrow" (said 12 Nov)**: nothing started, the plan is under "Native port" below; (d) two experiments that would explain the phone's clock hiccups: 2 minutes untouched vs tapping every 10 to 15 s, and plugged in vs on battery (the report records battery since 573); (e) on Safest sounding quieter: the app's output level is identical (−14.8 dB RMS both ways), so try the phone's Dolby Atmos / equaliser off.
+**Waiting on the owner:** (a) (Synth-mode UX: built as build 578 on branch `synth-ux`, PR into `beta`; see the 13 Nov (afternoon) entry.) **Synth-mode UX updates: the owner audited the Synth page in another checkout (13 Nov) and is writing the plan; he will bring it to a NEW chat, not this session**; (b) LP.SEL on the pad ("I will think about pad placement"; a mock put it between LOOP and ALT); (c) **native apps: "we will decide if we push forward with native tomorrow" (said 12 Nov)**: nothing started, the plan is under "Native port" below; (d) two experiments that would explain the phone's clock hiccups: 2 minutes untouched vs tapping every 10 to 15 s, and plugged in vs on battery (the report records battery since 573); (e) on Safest sounding quieter: the app's output level is identical (−14.8 dB RMS both ways), so try the phone's Dolby Atmos / equaliser off.
+
+### …waves and …chains UX (owner, 13 Nov: approved as an exception to the feature freeze; start after the Synth page PR)
+
+The owner's audit (60 findings, a collapsed-module design, his eight decisions, and a map of summing inputs and feedback loops) is in the repo as `docs/audits/2026-11-13-waves-chains-ux.md`. Read its "For the agent picking this up" and "Owner decisions" first; the decisions override the suggestions above them. Five passes, in this order, each on its own branch with a PR into `beta`; lower-cost agents build, the lead reviews every diff:
+- [ ] **Pass 1, look and feel (three PRs). STOP after pass 1 until the owner has seen it.**
+  - [ ] 1a Collapsed modules: the Compact state (C1, C2, C3, C6, C7, C8), collapse all / expand all (C4), the touch trigger (C5), the label fix (C9). Mini comes after he has tried Compact. The summary's key list stays easy to change per module (decision 2).
+  - [ ] 1b Signal kinds and cables: gate's own jack shape and dash (M9, U1), the selection outline off the signal colours (U1), cable hover / selected states and visible bend handles (D6, D9).
+  - [ ] 1c Wording and type: U3, U5 to U10, T11.
+  - Rules for pass 1: no audio code (nothing in `chains-worklet.js` / `waves-worklet.js`; goldens and cache-busters unchanged); old patches load unchanged (`collapsed:true` opens as Compact); colours through the variables at the top of each editor's CSS, `termFrameCss` extended for any new one; every editor change in both `chains/index.html` and `waves/index.html`, `python3 tools/sync-shared.py` after the shared block; before / after screenshots of both editors at 1440 x 900, 800 x 700 and 344 x 780 in the white theme, IDM pink & green and 909; checks added to the punch list.
+- [ ] **Pass 2, fixes:** D2, D3, D4, T1, T2, T3, T5 (delete on touch asks first, decision 8), T10, U2, H1 to H4.
+- [ ] **Pass 3, phone:** T4, T6, T7, T8, T9, T12 to T14, the Play / Edit switch (M10). Chains first; waves on the phone is an option if it can be made to fit (decision 7).
+- [ ] **Pass 4, desktop feel:** D1, D5 (wheel after the pointer rests, decision 3), D7, D8, D10, M4, summing inputs M3 (editor only, see the map; until then a second cable replaces with a toast and Undo), M5, M8, M11, U4, U11.
+- [ ] **Pass 5, structure:** module widths M1 (decision 6), feedback M2 (wanted; about a day; its level guard is **for audio review**; plan it with the native port's graph runners), M6, M7, M8, M12.
 
 ### Where things stand (10 Nov, 15:10: READ THIS FIRST; it supersedes older lines below where they disagree)
 
@@ -634,6 +648,20 @@ The owner's top priority to add is the MOD screen. Work down the list; ask befor
 ### Owner's punch list (owner, 9 Nov: will test these later; keep it current)
 
 Start a session by asking for results. Fix on `beta`. (10 Nov, 15:10: the web beta is build 560; the build numbers in the rest of this paragraph are older.) Web beta: https://matthettich.github.io/thunder-plus/beta/ (build 547 as of 10 Nov morning, 548 once its PR merges; the night of 9–10 Nov shipped 544–547, see the four "10 Nov" entries below. Decisions the lead made that night for the owner to confirm or reverse: on a phone the saved Sequencer default plays on the Page unless Audio thread is picked on that device; on a phone the safety limiter is its stand-in until another worklet loads; the resync only runs with a worklet loaded and its margins are untested on a device). Desktop: v1.3.4-beta.2 (build 541, no feed view or scopes); further desktop betas on hold until the owner asks.
+
+**Build 578** (Synth page UX: audition, layout, skin colour, one control style, names; branch `synth-ux`)
+- [ ] Phone and computer, Audition by ear: move a slider on a drum pad, then on a synth pad. After a short pause you hear the new sound, and during a long drag it keeps playing along. Does the repeat rate feel right, and should Audition be on by default? (The Audition button beside Play turns it off.)
+- [ ] Phone and computer, a song playing: is Audition in the way? Say if it should stay quiet while the song plays.
+- [ ] Phone and computer: select a different pad. The waveform and the "in use" line change to the new pad; "rendering…" shows only briefly, if at all.
+- [ ] Phone and computer: the engine picker is reachable without scrolling, with the Pad / Sequence / Tuning folds closed and open. The three folds remember whether they were open after a reload.
+- [ ] Folded phone (360 wide): labels read in full on a few engines (Layers, Bass, Machine, Drift, Blip); sliders are wide enough to use; no value is cut off.
+- [ ] Phone and computer: the Synth page takes the skin's colour in IDM pink & green and in IDM, and in one Low power skin.
+- [ ] Phone: the buttons on the Synth page are comfortable to hit with a thumb.
+- [ ] Phone, and computer with the keyboard: the pickers (layer type, LFO shape, Add effect) open a list, pick, and close. On the computer, arrow keys step the value and Enter / Space opens the list.
+- [ ] Phone and computer: two-state rows (Loop, Reverse, Freeze…) are two buttons; right-click on one offers no "Type a value…".
+- [ ] Computer at 1280 wide: the top bar is one row on the Synth and Tracker views, with everything still there.
+- [ ] Folded phone with Waves and Chains shown (Settings → App): the tabs read Tracker, Synth, Waves, Chains in full and do not scroll.
+- [ ] Phone and computer: names read right: Pad (drum and synth), Cutoff, Macro osc and Resonator (the old Plaits and Elements layer types), kHz and ct.
 
 **Build 577** (Top of the song button; Arrange panel no longer stalls the page while playing)
 - [ ] Phone: tap the small |◁ in Arrange's top-left corner, above the row numbers: the cursor and Arrange go to row 000 on the same track, while playing too, and nothing starts or stops; the view does not get pulled straight back to the playhead. Try it on the Song screen and in Arrange beside Phrase, in IDM and a Low power skin. Is it big enough to hit? (Tap target 32 to 36 px, glyph 14 px.)
@@ -908,6 +936,17 @@ Suggested order: N0 → N1 → N2 (phone cured) → N4 with N3 alongside → N5 
   the edge `R.t0`, "waiting…" while armed), `rcdClk` / `rcdFmt` / `rcdFreeSecs`, a 250 ms timer only while recording; the
   final length stays until the next take. recorder-check covers FREE, PATTERN, Stop, next take and closing mid-take.
 
+
+## 13 Nov (afternoon): Synth page UX: audition, layout, skin colour, one control style, names (build 578)
+
+Built from the owner's audit of the Synth page ("Thunder Plus synth page audit (build 575)"), on branch `synth-ux`, for a PR into `beta`. Only the audit's short list was available to the builders, not its full 75-item list.
+- **Phase A, layout.** The engine picker is at the top; Drive, Gate, Max len and Choke fold into "Pad", and Sequence and Tuning fold too (`makeFold`, one object in localStorage key `thunderplus-synfold-v1`). One label column, `--lblw` (104 px), where a label that does not fit wraps instead of ending in "…"; wider sliders.
+- **Phase B, colour, touch, pickers.** The Synth page takes the skin's accent (`--acc` on `--acc-on`, the tracker cursor's colours). Touch targets are bigger on touch screens. `makePick` replaced the native selects with one picker: a button that opens `askSheet`'s list; the real `<select>` stays, hidden, and stays the source of truth. `twoStateRow` draws a 0/1 row as two buttons (the slider stays, hidden). The Digital layer's "Loop" became a two-state button.
+- **Audition.** An edit on the Synth page plays the pad once its fresh render lands: `audition()`, `audFire()`, `audSet()`; the Audition button beside Play; key `thunderplus-audition-v1`. `AUD_WAIT` 140 ms, `AUD_MAX` 420 ms (a long drag plays along at that rate).
+- **Phase C, names, units, small fixes.** Strings only; no key, id, saved field or preset name changed. One name, "Pad", for drum and synth slots (title, aria-labels, "This pad", toasts, "More pads", Pad pitch / filter / amp / play, "Pad presets"); "Slots" stays for the count row, "Voice" for the singing engine, "Instrument" for the tracker. Layer type `plaits` shows as **Macro osc** and `elements` as **Resonator**, family tag "Macro", the credit ("Macro osc: based on Plaits by Mutable Instruments (MIT)", likewise Elements) in the family tag's tooltip (`LAYER_CREDIT`), in the layer's readout and in `THIRD_PARTY_NOTICES.md`. Cutoff rows read "Cutoff" / "HP cutoff" / "Resonance" (labels only; the MOD destinations too). Hz and kHz everywhere (the `hz` helper), "ct" for cents, plain "C4" for the Octave rows. Tap-or-click text on the Sound view. Top bar: one row at 1280 (level meter and kit name shrink first). Folded phone: the four screen tabs read in full without scrolling; "Pad presets…" stays on one line; a two-state row's right-click menu has no "Type a value…".
+- **Tests.** `tests/synth-layout.test.js`; `tests/sweep/audition.mjs`; `tests/sweep/synth-pickers.mjs` (Macro osc model, waves bus, starter wavetable, Add effect, an effect's long list, tuning preset: each through the picker and directly on the hidden select, same field, label follows, one audition); `tests/sweep/synth-shots.mjs` (screenshots at the owner's sizes). The saved kit of ELECTRO is byte-identical before and after the naming changes (`kitToJSON(false)`).
+- **Decisions the lead made, for the owner to confirm:** Audition is on by default; `AUD_WAIT` 140 ms / `AUD_MAX` 420 ms; "Resonator" instead of the approved "Modal" because an engine named Modal already exists; the Digital layer's "Loop" became a two-state button.
+- **Not verified.** Nobody has listened to Audition. No real phone: everything was checked in headless Chrome at 360, 412 and 884 wide. The SoundFont selects were not exercised by `synth-pickers.mjs` (they need a font). The pump and LXR engines' row labels live in `pump/synth/pump-synth-meta.js` and `lxr/lxr-engine.js` and were not renamed. The Sound view's "in use" line is cut at the right edge on a 360 / 412 wide phone (it was already a one-line, clipped strip). Still to rename from the trademark list: FM Genesis, FM SoundBlaster, Clouds, Rings, Beads.
 
 ## 13 Nov (midday): Top of the song button; what stalled Pattern view (build 577)
 
