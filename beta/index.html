@@ -47,6 +47,9 @@ body{user-select:none; -webkit-user-select:none; -webkit-touch-callout:none}
      bar, the mastering / Help / preset windows' heads) take these, so each skin can set them once. Here: the side
      colour, as before; the term skins derive their own (SKIN TITLE BARS, after the term base). */
   --ttl:var(--side); --ttl-ink:var(--ink); --ttl-mut:var(--muted);
+  /* SYNTH UX B (13 Nov): the Synth page's accent: what the tracker cursor is filled with, and the text on it. The term skins take
+     the cursor's own variables (below); Minimal and Pastel have no accent of their own (their tracker cursor is ink on paper), so there it is ink. */
+  --acc:var(--ink); --acc-on:var(--inv);
   --font:Futura,"Futura PT",Jost,"Century Gothic","Avenir Next",system-ui,sans-serif;
   color-scheme:light;
 }
@@ -92,7 +95,9 @@ body.mob .deskmenu{display:none}
 #bUpd{min-height:34px; padding:0 12px; font-size:var(--fs-3); font-weight:700; letter-spacing:.04em; white-space:nowrap; background:var(--pl); color:var(--inv); border:1px solid var(--ink)}
 #bUpd[hidden]{display:none}
 /* Desktop widths under 1440px: the top bar's buttons sit a little closer, so Edit ▾ (and Update) keep it on one line. */
-@media (min-width:900px) and (max-width:1440px){ body .top{gap:6px} #bFile, #bEdit, #bView, #bAud, .top #bSet, #bUpd, .top #tKeyTrans{padding:0 8px} }
+@media (min-width:900px) and (max-width:1440px){ body .top{gap:6px} #bFile, #bEdit, #bView, #bAud, .top #bSet, #bUpd, .top #tKeyTrans{padding:0 8px}
+  /* SYNTH UX C (13 Nov): one row at 1280: the level meter and the kit name give up width first (the buttons keep theirs) */
+  body:not(.mob) .top .hmeter{flex:1 1 100px; min-width:80px} body:not(.mob) .top .kitname{width:92px} }
 #bFile.on, #bEdit.on, #bView.on, #bAud.on, .top #bSet.on{background:var(--ink); color:var(--inv); border-color:var(--ink)}
 .top #bSet .setg{width:18px; height:18px}
 .top #bSet .setx{font-size:var(--fs-3)}
@@ -408,14 +413,15 @@ body:not(.nowv) .wvMobNote{display:none}
 .vrow.vid input{flex:1 1 auto; min-width:0}
 .vrow.vid .play{display:inline-flex; align-items:center; gap:5px; background:var(--ink); color:var(--inv); border-color:var(--ink); font-weight:600; padding-inline:12px}
 .vrow.vid .play .ic{width:12px; height:12px; fill:currentColor}
-.vrow.vact .presel{flex:1 1 auto; min-width:0; max-width:none}
+.vrow.vact{flex-wrap:wrap}   /* SYNTH UX C: the buttons wrap between themselves; "Pad presets…" stays on one line */
+.vrow.vact .presel{flex:1 1 auto; min-width:0; max-width:none; white-space:nowrap}
 .vrow .grp{display:inline-flex; flex:none} .vrow .grp button{margin:0} .vrow .grp button+button{border-left:0}
 .vrow.vttl{margin-bottom:-2px}   /* the pad's number and kind on a line of its own, over the name and the buttons */
 .vrow.vkit{flex-wrap:wrap; row-gap:6px}   /* SLOTS and this slot's kind, at the top */
 .vrow.vkit .vel{color:var(--muted); font-size:var(--fs-2); letter-spacing:.04em; text-transform:uppercase}
 .vrow.vkit .kslotn{min-width:44px; font-variant-numeric:tabular-nums; font-weight:600}
 .vrow.vkit .lbl{color:var(--muted); font-size:var(--fs-2)}
-@media (min-width:700px){ .vbar{flex-direction:row; flex-wrap:wrap; align-items:center} .vrow.vttl, .vrow.vkit{flex:1 1 100%} .vrow.vid{flex:1 1 0; min-width:260px} .vrow.vact{flex:0 1 auto; justify-content:flex-end} .vrow.vact .presel{flex:0 1 220px} }
+@media (min-width:700px){ .vbar{flex-direction:row; flex-wrap:wrap; align-items:center} .vrow.vttl, .vrow.vkit{flex:1 1 100%} .vbar>.vengine{order:1; flex:1 1 100%} .vrow.vid{flex:1 1 0; min-width:260px} .vrow.vact{flex:0 1 auto; justify-content:flex-end} .vrow.vact .presel{flex:0 1 220px} }
 .ttl{font-weight:600; font-size:var(--fs-5); white-space:nowrap}
 .lbl{color:var(--muted)}
 .pbody{display:flex; flex-direction:column; gap:10px; padding-top:8px}
@@ -423,7 +429,15 @@ body:not(.nowv) .wvMobNote{display:none}
 .note{color:var(--muted); font-size:var(--fs-3); line-height:1.45; margin:0; max-width:68ch}
 
 .row{display:grid; grid-template-columns:70px minmax(0,1fr) 64px; align-items:center; gap:6px; font-size:var(--fs-3); min-height:30px}
-@media (min-width:1100px){ .sec .row{grid-template-columns:96px minmax(0,1fr) 60px} }   /* fit and finish, 2 Nov: Noise filter, Tone level… were cut to 'Noise fi…' on a computer */
+/* SYNTH UX A (13 Nov): one label column on the Synth page at every width (it was 70, and 96 on a computer): 104px, and a label that does not fit wraps to a second line instead of ending in '…'
+   (Noise filter, Tone level, Period quantize…). The tracker deck's and Settings' rows keep their own. */
+:root{--lblw:104px}
+:is(#main, #synRight) .row{grid-template-columns:var(--lblw) minmax(0,1fr) 64px}
+:is(#main, #synRight) .row label{white-space:normal; overflow:visible; text-overflow:clip; overflow-wrap:anywhere; line-height:1.15}
+:is(#main, #synRight) .segrow>span{width:var(--lblw); white-space:normal; overflow-wrap:anywhere; line-height:1.15}
+:is(#main, #synRight) .selrow{grid-template-columns:var(--lblw) minmax(0,1fr)}
+:is(#main, #synRight) .selrow>span{white-space:normal; overflow-wrap:anywhere; line-height:1.15}
+:is(#main, #synRight) .readout{padding-left:calc(var(--lblw) + 6px)}
 .row label{color:var(--muted); user-select:none; -webkit-user-select:none; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; cursor:default}
 .row output{text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap}
 .row output:hover{background:var(--panel2)}
@@ -452,11 +466,28 @@ body:not(.nowv) .wvMobNote{display:none}
 
 /* monitor screen (Seeds' black main view) */
 .screen{flex:none; background:var(--screen); border-bottom:1px solid var(--line); position:relative}
-.wave{width:100%; height:150px; display:block; cursor:pointer}
+.wave{width:100%; height:84px; display:block; cursor:pointer}   /* SYNTH UX A (13 Nov): 150 → 84 (64 on a phone): the sound-shaping controls sit higher */
 .wmeta .inuse{font-weight:700}
 .wmeta{display:flex; gap:14px; flex-wrap:nowrap; overflow:hidden; white-space:nowrap; height:1.3em; line-height:1.3; font-size:var(--fs-3); color:#4a4257; font-variant-numeric:tabular-nums}   /* one line always: an extra note (a hot pad) used to wrap and shift the page when changing pads */
 .wmeta span{flex:none} .wmeta span.ov{flex:1 1 auto; min-width:0; overflow:hidden; text-overflow:ellipsis}
-.vrows{display:grid; grid-template-columns:repeat(auto-fit,minmax(250px,1fr)); gap:0 22px; padding-top:4px}
+.vrows{display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,322px),1fr)); gap:0 22px; padding-top:4px}
+/* SYNTH UX A (13 Nov): folds on the Synth page (Pad, Sequence, Tuning): a button header (▸ / ▾, aria-expanded), like the tracker deck's;
+   closed, it shows a one-line summary of what is inside. Open / closed is kept per device (thunderplus-synfold-v1). */
+.fold{min-width:0}
+.fold>h3.fh, .sec h3.fh{margin:0; font-size:var(--fs-4); font-weight:600; display:block}
+.sec h3.fh::before{display:none}
+.foldh{display:flex; align-items:baseline; justify-content:flex-start; gap:8px; width:100%; min-height:34px; padding:4px 0; border:0; background:none; box-shadow:none; text-align:left; font-weight:600; font-size:var(--fs-4); color:var(--ink)}
+.foldh:not(#zz):not(#zz), .foldh:not(#zz):not(#zz):hover{background:none; border:0; box-shadow:none}   /* (beats the skins' button rules, as the dock's swatches do) */
+@media (max-width:600px){ .foldh{flex-wrap:wrap} .foldh .fsum{flex:1 1 100%; padding-left:calc(1em + 8px)} }
+.foldh .fgl{flex:none; width:1em; color:var(--muted); text-align:center}
+.foldh .ftl{flex:none}
+.foldh .fsum{flex:1 1 auto; min-width:0; font-weight:400; font-size:var(--fs-3); color:var(--muted); font-variant-numeric:tabular-nums; line-height:1.25}
+.fold.open>.fh .fsum{display:none}
+.foldb[hidden]{display:none}
+.padfold{border-top:1px solid var(--line); margin-top:2px}
+.sec.fold.wide{grid-column:1 / -1}
+.sec.fold>.foldb.secs{padding:0 0 4px; gap:0 22px; overflow:visible}
+.sec.fold .foldb .sec{border:0; padding:4px 0 0}
 
 /* layer list, like the Seeds module palette items */
 .strip{display:grid; grid-template-columns:repeat(8,minmax(0,1fr)); gap:6px}
@@ -489,7 +520,7 @@ body:not(.nowv) .wvMobNote{display:none}
 .voxsyl span{border:1px solid var(--line); padding:1px 5px; white-space:nowrap}
 .voxsyl span b{color:var(--ink); font-weight:600; margin-right:4px}
 .voxsyl span.w{margin-left:6px}
-.vengine{display:flex; align-items:center; gap:10px; padding:2px 0 4px; flex-wrap:wrap}
+.vengine{display:flex; align-items:center; gap:10px 10px; padding:0; flex-wrap:wrap; min-width:0}
 .vengine .vel{font-size:var(--fs-3); color:var(--muted); min-width:64px}
 .vengine .lbl{font-size:var(--fs-3); color:var(--muted); flex:1 1 100%; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; height:1.3em; line-height:1.3}   /* one line, whatever the engine says */
 /* Narrow screens: the engine buttons flowed by text width into three uneven rows (6 / 5 / 2 with a stub). An equal
@@ -503,7 +534,7 @@ body:not(.nowv) .wvMobNote{display:none}
 .bassviz canvas{position:absolute; inset:0; width:100%; height:100%; display:block}
 .bassvr{position:absolute; right:10px; top:6px; font:var(--fs-2)/1.2 var(--mono, monospace); color:var(--muted); pointer-events:none}
 .basscard .selrow{display:flex; align-items:center; gap:8px; margin:4px 0}
-.basscard .selrow>span{font-size:var(--fs-3); color:var(--muted); min-width:74px}
+.basscard .selrow>span{font-size:var(--fs-3); color:var(--muted); width:var(--lblw); flex:none; white-space:normal; overflow-wrap:anywhere; line-height:1.15}
 .basscard .selrow select{flex:1; min-width:0}
 .basscard .note{font-size:var(--fs-3); color:var(--muted); margin:6px 0 0}
 /* The engine card's footnote sits in the grid after the sections: give it a full row, their inset (the text lines up
@@ -592,8 +623,9 @@ body:not(.nowv) .wvMobNote{display:none}
 /* Every section (Source, Pitch, Amp, Filter, the voice's and the engines') sits in its own box with a gap around it, so
    they all match however many fit on a row. (They used to share hairlines, which left a section alone on its row
    half-boxed.) */
-.secs{display:grid; grid-template-columns:repeat(auto-fit,minmax(230px,1fr)); gap:10px; padding:10px; overflow:hidden}
+.secs{display:grid; grid-template-columns:repeat(auto-fill,minmax(min(100%,322px),1fr)); gap:10px; padding:10px; overflow:hidden}   /* SYNTH UX A: a section is never narrower than 322px, so a slider track keeps ~120px or more (label 104 + value 64 + gaps + the section's padding); 1fr shares the rest */
 .sec{min-width:0; position:relative; padding:9px 12px 8px; border:1px solid var(--line)}
+@media (max-width:600px){ #main .cardwrap{padding-inline:8px} #main .secs:not(.foldb){padding:8px 6px} #main .sec{padding:8px 8px 6px} #main .sec.fold .foldb .sec{padding:4px 0 0} }   /* SYNTH UX A: on a phone the sliders take the width the frames were using (a track is ~120px at 360) */
 /* the voice card's sections come in named groups (Voice, Envelopes, LFOs & modulation, Tuning), ruled off from each other */
 .secgrp+.secgrp{border-top:1px solid var(--line)}
 .secgh{font-size:var(--fs-3); font-weight:600; letter-spacing:.04em; text-transform:uppercase; color:var(--muted); padding:9px 12px 0}
@@ -662,7 +694,7 @@ body.mlearn .row.mtarget input[type=range]{outline:3px solid var(--pl); outline-
   .top{flex-wrap:nowrap}
   .top .sp{display:none}
   .top button{padding-inline:8px}
-  .wave{height:120px}
+  .wave{height:64px}
     .toast{bottom:calc(150px + env(safe-area-inset-bottom,0px))}
 }
 /* Fit and finish (2 Nov): on a computer messages come in under the top bar, off the FX bar and the grid's bottom */
@@ -1327,6 +1359,9 @@ body.mob .top .kitname{width:auto; flex:1 1 90px; min-width:64px; max-width:220p
 /* (10 Nov) Tracker | Synth keeps both words on a phone (360-412 px clipped "Synth" to "Synt"): with two buttons the switch never shrinks or scrolls, the rest of the bar gives way (gap 6 -> 4 px). Waves / Chains still scroll it. */
 @media (max-width:520px){ body.mob .top #segView:not(:has(button:nth-child(3))){flex:none; overflow:visible} }
 @media (max-width:420px){ body.mob .top{gap:4px} }
+/* SYNTH UX C (13 Nov): with Waves and Chains shown (4 tabs) on the folded phone (360-412 px) every label reads in full and the tabs do not scroll inside themselves: a step down in size, tighter padding. */
+@media (max-width:520px){ body.mob .top #segView:has(button:nth-child(4)){overflow:visible; flex:none} body.mob .top #segView:has(button:nth-child(4)) button{padding-inline:3px!important; letter-spacing:-.02em; font-size:11px} }
+@media (max-width:380px){ body.mob .top #segView:has(button:nth-child(4)) button{font-size:10.5px} }
 body.mob .top .brand{flex-shrink:1; min-width:0; overflow:hidden}
 /* (owner, 11 Nov) The name leaves the title bar when the bar has no room for the whole word (the Fold unfolded showed "Thunde"): brandFit()
    measures it. And with no name showing (folded, or hidden by brandFit) the bar starts at the screen edge, so Tracker lines up with SONG below it. */
@@ -1697,7 +1732,7 @@ body.sdesk>#synRight{grid-column:3; grid-row:2; min-height:0; overflow-y:auto; o
 body.sdesk #synRight .cardwrap{padding:12px 12px 0 !important} body.sdesk #synRight .cardwrap:last-child{padding-bottom:16px !important}
 /* One height for every engine (owner, 19 Oct). It used to grow into the room left when an engine's controls sat in the
    right column, which threw the Engine ◀ ▶ buttons ~400px down the page while stepping through engines. */
-body.sdesk .wave{height:120px}
+body.sdesk .wave{height:84px}
 body.sdesk .pads{grid-template-columns:minmax(0,1fr); gap:7px; padding-right:4px}
 body.sdesk .pads .pad{height:auto; min-height:36px; flex-direction:row; align-items:center; justify-content:flex-start; gap:10px; padding:5px 10px;
   box-shadow:3px 3px 0 0 #fff, 3px 3px 0 1.5px var(--line)}
@@ -1711,7 +1746,7 @@ body.sdesk .pads::before{content:'Drums'; padding:0 2px}
 body.sdesk .pads .pad:nth-child(9), body.sdesk .pads .pad:nth-child(17){margin-top:22px; position:relative; overflow:visible}
 body.sdesk .pads .pad:nth-child(9)::before{content:'Synths'; position:absolute; left:2px; top:-22px}
 body.sdesk .pads .pad:nth-child(17)::before{content:'Track pads'; position:absolute; left:2px; top:-22px}
-body.sdesk .dock:not(.vtrk) .pads .pad:nth-child(17)::before{content:'More slots'}   /* SLOTS past 16 (the drums / synths split above is by position; each slot's own kind shows as SYN) */
+body.sdesk .dock:not(.vtrk) .pads .pad:nth-child(17)::before{content:'More pads'}   /* SLOTS past 16 (the drums / synths split above is by position; each slot's own kind shows as SYN) */
 @media (max-width:600px){ .pads{gap:9px 8px} }
 /* Mono and poly tracks: a gentle outline around each track's column in Song and Mixer (and the phrase's notes):
    pink for the one-note-at-a-time tracks, green for the polyphonic (chord) tracks. */
@@ -2550,6 +2585,9 @@ body.mob .dogs.idle .bob{animation-iteration-count:9} body.mob .dogs.idle .tail{
 :root[data-skin="matrix"]{--mxcur:#00e5ff; --mxcuron:#000000} :root[data-skin="matrixlight"]{--mxcur:#0062d6; --mxcuron:#ffffff}
 :root[data-skin="winter"]{--mxcur:#2f8fd8; --mxcuron:#ffffff}
 :root[data-skin="monotone"] .tscr{--ts-cur-bg:#2f6fe0; --ts-cur:#ffffff}
+:root[data-skin="monotone"]{--acc:#2f6fe0; --acc-on:#ffffff}
+:root[data-skin="idmpink"]{--acc-on:#0a1a12}   /* the tracker's own pair is 4.4:1; the dark green of its other fixes (CONTRAST U16) is 4.8:1 */   /* (as its tracker cursor) */
+:root[data-skinbase="term"]{--acc:var(--mxcur, var(--mxpoly)); --acc-on:var(--mxcuron, var(--mxon))}   /* the same two the tracker cursor takes (--ts-cur-bg / --ts-cur on .tscr) */
 :root[data-skinbase="term"]{
   --bench:var(--mxbg); --panel:var(--mxbg); --panel2:var(--mxpanel2); --side:var(--mxpanel); --ink:var(--mx); --muted:var(--mx2);
   --track:var(--mxpanel2); --inv:var(--mxon); --voice:var(--mxpanel); --line:var(--mx); --screen:var(--mxbg); --screen-ink:var(--mx); --screen-line:var(--mxdim);
@@ -2872,6 +2910,60 @@ body.mob .dogs.idle .bob{animation-iteration-count:9} body.mob .dogs.idle .tail{
 :root[data-skin="idmpink"] :is(.tagp b.gp, .tgrid span.pvh.gp){color:#0a1a12}
 :root[data-skin="tr909"] :is(.tagp b.gp, .tgrid span.pvh.gp){color:var(--mxon)}
 </style>
+<style>
+/* SYNTH UX B (13 Nov): the Synth page takes the skin's accent (--acc on --acc-on: what fills the tracker cursor), keeps its touch targets
+   at 40 px on a touch screen, and has one control style (the picker button, two-state rows as two buttons, no frame inside a frame).
+   Last in the sheet and prefixed :root:root, so the skins' own pad / cell / button rules (some !important) do not need a rule each. */
+/* the picker (makePick): a button with the current choice and a ▾; the real <select> stays behind it, hidden */
+.pkw{display:contents}
+select.pkhid{position:absolute; width:1px; height:1px; min-height:0; margin:0; padding:0; border:0; opacity:0; overflow:hidden; clip:rect(0 0 0 0); pointer-events:none}
+.pickbtn{display:inline-flex; align-items:center; justify-content:space-between; gap:8px; min-width:0; max-width:100%; text-align:left; font-weight:400}
+.pickbtn[hidden]{display:none}
+.pickbtn .pkl{flex:1 1 auto; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.pickbtn .pkc{flex:none; color:var(--muted); font-size:.9em}
+.selrow .pickbtn{width:100%} .segrow .pickbtn{flex:1 1 0} .btnrow .pickbtn{flex:0 1 auto; min-width:8em} .layercard>header .pickbtn{min-width:9.5em; max-width:46vw}
+@media (max-width:480px){ .layercard>header .pickbtn{min-width:0} }
+.ask .askhead{font-size:var(--fs-2); font-weight:600; letter-spacing:.06em; text-transform:uppercase; color:var(--muted); padding:8px 2px 0}
+.ask .askitem.on{background:var(--ink); color:var(--inv)} .ask .askitem.on::after{content:' ✓'}
+/* a row that is a switch: its two names as buttons (twoStateRow); the slider stays in the row, hidden */
+.row.two>:is(input,output){display:none}
+.row.two>.seg{grid-column:2 / -1; justify-self:start}
+/* the accent: selected pad and layer, section squares, the thumb, On states, the keyboard ring */
+:root:root .pads .pad.sel:not(.hit){background:var(--acc); color:var(--acc-on); border-color:var(--acc)}
+:root:root .pads .pad.sel:not(.hit) :is(.pm, .p1 span){color:var(--acc-on)!important}
+:root:root .pads .pad.sel.syn:not(.hit) b::after{color:var(--acc-on)!important}
+:root:root .lcell.sel{background:var(--acc); color:var(--acc-on)}
+:root:root .lcell.sel :is(.tn, .l1 b){color:var(--acc-on)}
+:root:root .lcell.sel .lv{background:color-mix(in srgb, var(--acc-on) 30%, transparent)}
+:root:root .lcell.sel .lv i{background:var(--acc-on)}
+:root:root .lcell.sel .tog{border-color:var(--acc-on); background:transparent}
+:root:root .lcell.sel .tog.on{background:var(--acc-on)} :root:root .lcell.sel .tog.on::after{border-color:var(--acc)}
+.lcell .tog.on{background:var(--acc)} .lcell .tog.on::after{border-color:var(--acc-on)}
+.lcell.off{border-style:solid; opacity:.55} .lcell.sel.off{opacity:.8}   /* off: solid and faded, not dashed */
+:root:root :is(.sec h3, .voicecard .sec h3, .sectabs button)::before{background:var(--acc)}
+:root:root .fold.open>.fh .fgl{color:var(--acc)}
+:root:root :is(#main, #synRight) input[type=range]{accent-color:var(--acc)}
+@media (pointer:fine){
+  :root:root :is(#main, #synRight) input[type=range]::-webkit-slider-thumb, :root:root :is(#main, #synRight) input[type=range]:hover::-webkit-slider-thumb{background:var(--acc)}
+  :root:root :is(#main, #synRight) input[type=range]::-moz-range-thumb, :root:root :is(#main, #synRight) input[type=range]::-moz-range-progress{background:var(--acc)}
+}
+:root:root:root:root :is(#main, #synRight) :is(#lOn.on, #vAud.on, .fxhead button.on){background:var(--acc)!important; color:var(--acc-on)!important; border-color:var(--acc)}
+:root:root :is(#main, #synRight) :is(button, input, textarea, [tabindex]):focus-visible{outline:2px solid var(--acc); outline-offset:2px}
+/* no frame inside a frame: in the 3.5 px cards the sections are ruled off from each other, not boxed */
+:is(.layercard, .voicecard, .sndcard) .sec{border:0; border-top:1px solid var(--line); padding-inline:4px}
+:is(.layercard, .voicecard, .sndcard) .secs{gap:0 22px; padding:0 10px 4px}
+:is(.layercard, .voicecard, .sndcard) .secs.tabbed .sec{border-top:0}
+:is(.layercard, .voicecard, .sndcard) .sec.fold .foldb .sec{border:0}
+/* touch (Mobile setup or a coarse pointer): 40 px to the finger; the mouse sizes above stay */
+@media (pointer:coarse){
+  :is(#main, #synRight) :is(button, .seg button, .pickbtn, .foldh, .sectabs button){min-height:40px}
+  :is(#main, #synRight) :is(.engstep, .fxpg){min-width:40px}
+  .lcell .tog::before{content:''; position:absolute; inset:-11px}
+}
+body.mob :is(#main, #synRight) :is(button, .seg button, .pickbtn, .foldh, .sectabs button){min-height:40px}
+body.mob :is(#main, #synRight) :is(.engstep, .fxpg){min-width:40px}
+body.mob .lcell .tog::before{content:''; position:absolute; inset:-11px}
+</style>
 <style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}</style>
 <style>
 /* ===== ARRANGE PAGING (settings ARRANGE FOCUS and SONG STRIP; to remove: delete this <style> block, the JS block of the
@@ -3143,9 +3235,10 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
 
   <section class="band voice">
     <div class="bar vbar">
-      <div class="vrow vkit" id="vKit"><span class="vel">Slots</span><span class="grp" role="group" aria-label="How many slots the kit has"><button type="button" class="sm" id="kSlotDn" aria-label="Fewer slots" title="8 fewer slots (the ones taken away keep their sound: more slots bring it back)">−</button><button type="button" class="sm kslotn" id="kSlotN" title="How many slots (pads) the kit has, 16 to 64. Tap to type a number">16</button><button type="button" class="sm" id="kSlotUp" aria-label="More slots" title="8 more slots">+</button></span><span class="vel">This slot</span><div class="seg" id="vKindSeg" role="group" aria-label="How this slot plays"></div><span class="lbl" id="vKindLbl"></span></div>
+      <div class="vrow vkit" id="vKit"><span class="vel">Slots</span><span class="grp" role="group" aria-label="How many slots the kit has"><button type="button" class="sm" id="kSlotDn" aria-label="Fewer slots" title="8 fewer slots (the ones taken away keep their sound: more slots bring it back)">−</button><button type="button" class="sm kslotn" id="kSlotN" title="How many slots (pads) the kit has, 16 to 64. Tap to type a number">16</button><button type="button" class="sm" id="kSlotUp" aria-label="More slots" title="8 more slots">+</button></span><span class="vel">This pad</span><div class="seg" id="vKindSeg" role="group" aria-label="How this pad plays"></div><span class="lbl" id="vKindLbl"></span></div>
       <div class="vrow vttl"><span class="ttl" id="vNum">Pad 1</span><span class="vmeter" id="vMeter" title="Level of what you play here (pads, keys, MIDI), −48 to +6 dB. The line is 0 dB: past it the bar turns red and the safety limiter (Project → LIMITER) is holding the peaks down." aria-hidden="true"><i></i><b></b></span></div>
-      <div class="vrow vid"><input id="vName" type="text" aria-label="Pad name" spellcheck="false"><button class="sm play" id="vPlay" title="Play this pad (Space)"><svg class="ic" aria-hidden="true"><use href="#ic-play"/></svg>Play</button></div>
+      <div class="vrow vid"><input id="vName" type="text" aria-label="Pad name" spellcheck="false"><button class="sm play" id="vPlay" title="Play this pad (Shift+Space)"><svg class="ic" aria-hidden="true"><use href="#ic-play"/></svg>Play</button><button type="button" class="sm" id="vAud" aria-pressed="true" title="Audition: play this pad after each change you make to it, so you hear the edit. Turn it off to edit in silence.">Audition</button></div>
+      <div class="vengine" id="vEngine" hidden><span class="vel">Engine</span><div class="seg" id="vEngSeg"></div><span class="lbl" id="vEngLbl"></span></div>   <!-- SYNTH UX A: the engine picker sits right under the name row, above the waveform -->
       <div class="vrow vact">
         <button type="button" id="vPre" class="sm presel" title="Presets: factory sounds and your own, saved in this song.">Pad presets…</button>
         <span class="grp" role="group" aria-label="Make"><button class="sm" id="vRand">Random</button><button class="sm" id="vInit">Init</button></span>
@@ -3153,11 +3246,10 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
       </div>
     </div>
   </section>
-  <div class="screen"><canvas class="wave" id="wave" aria-label="Rendered waveform, tap to play"></canvas></div>
+  <div class="screen"><canvas class="wave" id="wave" aria-label="Rendered waveform, tap or click to play"></canvas></div>
   <section class="band voice">
     <div class="wmeta" id="wMeta"></div>
     <div class="vrows" id="vRows"></div>
-    <div class="vengine" id="vEngine" hidden><span class="vel">Engine</span><div class="seg" id="vEngSeg"></div><span class="lbl" id="vEngLbl"></span></div>
   </section>
 
   <div class="cardwrap" id="bassWrap" hidden>
@@ -3276,10 +3368,10 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
   <div class="cardwrap" style="padding-top:0" id="voiceWrap">
   <section class="voicecard" id="voiceCard">
     <header>
-      <span class="ttl">Voice pitch, filter &amp; amp</span>
+      <span class="ttl">Pad pitch, filter &amp; amp</span>
       <span class="lbl">shapes every layer at once</span>
     </header>
-    <div class="secgrp"><div class="secgh">Voice</div><div class="secs" id="voiceSecs"></div></div>
+    <div class="secgrp"><div class="secgh">Pad</div><div class="secs" id="voiceSecs"></div></div>
     <div class="secgrp"><div class="secgh">Envelopes</div><div class="secs" id="voiceEnvSecs"></div></div>
     <div class="secgrp"><div class="secgh">LFOs &amp; modulation</div><div class="secs" id="voiceModSecs"></div></div>
     <div class="secgrp"><div class="secgh">Tuning</div><div class="secs" id="voiceTuneSecs"></div></div>
@@ -3292,9 +3384,9 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
   <section class="sndcard" id="sndCard" aria-label="Sound view">
     <header>
       <span class="ttl" id="sndTtl">Sound</span>
-      <span class="lbl">time across, pitch up · tap to play</span>
+      <span class="lbl">time across, pitch up · tap or click to play</span>
     </header>
-    <div class="sndspec"><canvas id="sndSpec" aria-label="Spectrogram of the pad's sound: time across, 20 Hz to 20 kHz up. A line runs across it while it plays. Tap to play"></canvas></div>
+    <div class="sndspec"><canvas id="sndSpec" aria-label="Spectrogram of the pad's sound: time across, 20 Hz to 20 kHz up. A line runs across it while it plays. Tap or click to play"></canvas></div>
     <div class="sndscope"><canvas id="sndScope" aria-label="Scope: the output's waveform while anything plays"></canvas><span class="sndtag">Output</span></div>
   </section>
   </div>
@@ -3644,7 +3736,7 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
 <tr><td>Playhead offset</td><td>Settings → Screen: moves the playhead to match what you hear (+ later, for Bluetooth or a slow screen; − earlier)</td></tr>
 <tr><td>Playback report</td><td>Settings → Audio → Copy playback report: a short log of what playback did, to paste into a bug report</td></tr>
 <tr><td>Input engine</td><td>Desktop app: Record a sample → Engine Native records from every input of an audio interface; Browser uses the browser’s own input (inputs 1–2)</td></tr></table></section>
-    <section id="hSynth"><h2>Synth page</h2><table><tr><td><kbd>Z</kbd>–<kbd>/</kbd> · <kbd>Q</kbd>–<kbd>P</kbd></td><td>Play the selected pad chromatically; C-4 is its own pitch. On a synth slot (9–16) notes hold while the keys are down, so you can play chords</td></tr><tr><td><kbd>−</kbd> <kbd>=</kbd></td><td>Octave down / up</td></tr><tr><td><kbd>Shift</kbd> <kbd>1</kbd>–<kbd>8</kbd> or <kbd>◀</kbd> <kbd>▶</kbd></td><td>Pick a pad (◀▶ go through all 16 slots; on a computer, where they are a list down the left, ▲▼ do too)</td></tr><tr><td><kbd>Shift</kbd> <kbd>Space</kbd></td><td>Play the pad as it is (<kbd>Space</kbd> plays or stops the song, as everywhere)</td></tr><tr><td><kbd>Alt</kbd> <kbd>1</kbd>–<kbd>7</kbd></td><td>Jump into a tracker screen</td></tr><tr><td><kbd>F2</kbd>–<kbd>F9</kbd></td><td>As in the tracker: F2–F4 Phrase, Mixer, Inst; F5 the song from the top, F6 the pad, F7 the song from the cursor, F8 stop, F9 REC</td></tr><tr><td><kbd>Alt</kbd> <kbd>8</kbd> · <kbd>9</kbd> · <kbd>0</kbd> · <kbd>`</kbd></td><td>waves · chains · the synth · back to the last view (these and Alt+1–7 work from waves and chains too)</td></tr></table><p><b>Presets</b>: the list beside the pad name loads a whole sound. It starts with one group per drum type (Kicks, Snares, Claps &amp; snaps, Rims &amp; sticks, Closed hats, Open hats, Cymbals, Toms, Hand drums, Shakers &amp; tambourines, Cowbells, blocks &amp; metal), gathering every drum the app has from its own designs, the drum engines and the classic and acoustic kits; then IDM and glitch hits, basses, pads, chords, keys, leads and each engine's sounds. The search box finds any of them by name. <b>＋ Save this as a preset…</b> keeps the pad in this song's own list, at the top; it travels in the project file. The <b>Layer presets</b> list in the layer card swaps just the selected layer (a snare's noise, a clicky pitch sweep…) and keeps it at the right pitch on any pad. File ▾ → <b>Export song presets…</b> / <b>Import presets…</b> moves them between songs and devices; Save kit / Load kit moves every pad at once. <b>Drum kits…</b> (File ▾, or ⚙ Settings → Kit) puts a CR-78-, 808-, 606-, 909-, 707-, 727- or 505-style kit, or a clean acoustic kit (Funk, Studio, Jazz), on pads 1–8 and keeps the synth slots; every sound of each kit is also in the Presets list, filed under its type (808 Kick under Kicks). <b>Funk breaks…</b> (File ▾) loads one of twelve original breaks, with swing, ghost notes and a laid-back snare, as a new song with its acoustic kit, or adds its four bars to this song. <b>Breaks to chop</b> (File ▾) has the fourteen breaks of pump BREAK, rendered by its own kit with room and tape, as a one-bar loop in a slot, cut into 16 slices (C-4 plays slice 1) and synced to the tempo, ready to re-sequence. <b>Acid line…</b> (Edit ▾ or right-click on a phrase) writes a random bass line into the phrase the way pump ACID does — scale, root, density, accents, slides and octave jumps; Roll (R) again or Mutate (M) a few steps. Turn on only the lanes you want changed — for an Acid pad (accents are volume FF, slides PSL).</p><p><b>Voice pitch, filter &amp; amp</b> (in the card under the pad name) shape the whole voice at once, across every layer: a pitch envelope, a low-pass filter with its own envelope, and an amp envelope. Each envelope has an Amount slider setting how far it is applied. The layer card's Filter and Amp sections still shape only the selected layer.</p><p><b>Mod matrix</b> (Voice card): 3 LFOs (rate, shape, depth), 3 envelopes (A/D/S/R) and a 32-step sequencer, each routed to one destination — <b>pitch, level, low-pass cutoff or high-pass cutoff</b> — with a signed amount, applied across all of the voice's layers. Every amount starts at zero. Turn it up and sweep a filter, wobble the pitch, or shape the level. <b>Mod envelopes</b> has a <b>Reset to defaults</b> button that puts the pitch, amp and the three mod envelopes back to their factory values.</p><p><b>Voice play</b>: Glide slides the pitch from the last note; Mono + Legato retunes the sounding note instead of retriggering. <b>Tuning (song)</b> is a cents offset per pitch class (Equal, Just, Pythagorean and Meantone presets or your own), applied to live playing and the tracker. The <b>Wavetable</b> oscillator (Position/Formant) and its Bend/Unison/Spread/Sub/Noise sit in the layer card when that type is picked.</p><p><b>Engine</b> (synth slots): Layers is the layer synth above; <b>Bass</b> swaps in the bass engine and <b>Voice</b> a singing voice that sings typed lyrics, and <b>Blip</b> (on any pad) a minimal electronic drum (see Bass, Voice and Blip engine on the Start tab). <b>Acid</b> is a mono bass-line synth (saw or square into a squelchy ladder filter): a note with a volume of C0 or more is <b>accented</b>, and PSL <b>slides</b>. <b>Machine</b> is a mono synth with seven machines (Dual VCO, Chip, FM+, Swarm, Ensemble, Noise, Additive), each with its own A, B and C, then high- and low-pass filters, an amp envelope and an LFO. Both play live in the tracker. <b>Tone drum</b> is a modeled drum (a tone with a pitch bend or an inharmonic spectrum, filtered noise with a sweep, a click, distortion), and <b>Modal</b> a struck, plucked, bowed or blown object (bar, marimba, vibes, glock, bell, gong, membrane, glass, string, tube, wood, plate). <b>Piano</b> is a modeled struck string (hammer hardness, strike point, two or three detuned strings, string stiffness, soundboard, dampers and a sustain pedal); <b>Tine EP</b> a suitcase-style electric piano (tine and tone bar, a growling pickup you set with Bark, the hammer's bell, tremolo); <b>Organ</b> a tonewheel organ with nine drawbars, percussion, key click, a rotary speaker and Pluck, which with the <b>House organ (M1 style)</b> preset gives the classic 90s house organ. <b>SoundFont</b> plays any .sf2 / .sf3 file you load, or <b>General MIDI</b> (FluidR3 Mono, MIT, downloaded once, 24 MB): pick the preset from the list (bank 128 is the drum kits); the tracker plays it key by key from the font (C-4 is middle C, C-2 the GM kick), with the font's own envelopes, filters and loops. <b>Swarm</b> is a cloud of up to 48 detuned oscillators, each drifting on its own (Cohesion makes them drift together), with Scatter onto octaves, fifths or chords, Bloom (voices fade in one by one), Shimmer, a morphing wave, a resonant filter with its own envelope and an ADSR; it holds for as long as the tracker note. <b>Drift</b> is a two-line analog pad synth laid out like the big 1970s CS-series polysynths (two oscillator lines per voice, a high-pass and a low-pass with their own envelope, up to four drifting unison voices) followed by a tape stage — <b>Wow</b> and <b>Flutter</b> on the pitch, chorus, saturation, <b>Age</b> (worn top and bottom, the odd dropout) and hiss — for warm, wobbly, faded pads; its presets are in the pad Presets list under Drift (tape pads). <b>pump</b> (group in the engine list) has the pump plugins' instruments with their own sound and presets: <b>Mono</b> (three oscillators, four filters), <b>Poly</b> (two oscillators, poly-mod, unison, chorus) and <b>Coil</b> (tuned springs kicked by the note). Each renders a note like the other engines (<b>Hit</b> is how hard it is played), and each has a <b>live</b> twin that plays the plugin in the tracker note by note, with the VOL column as velocity, slides and bends as pitch bend, and glide (Coil live also sets how many <b>Voices</b> ring at once, 1–16). A live version shares its settings with the rendered one. If the device can’t keep up, it plays the rendered sound instead and says so (Settings → Audio → Live engines). On a <b>poly track</b> (9–16) a Voice pad sings chords: notes that start together sing the same syllable in harmony. Notes side by side in different columns sing together; a new note in the same column takes over that column's singer. In <b>⚙ Settings</b>: <b>Audio</b> (output, level, latency and <b>Reset audio engine</b>, which clears a stuck note or effect), <b>Project</b> (song, input, <b>Render &amp; export</b> — WAVs for Koala and SunVox — and <b>Mastering</b>), <b>Screen</b> (the tracker's screen and arrange settings, and the <b>Skin</b>), then <b>Kit</b>, <b>MIDI</b> connects a controller (notes not mapped to a pad play the selected synth slot, held until note-off) and App.</p><h2>Files and rendering</h2><p><b>File ▾</b> holds Save, Save As and Open, plus Render song (a stereo WAV, through the mastering chain when it is on) and Render stems (a zip with the mix and one WAV per track, without mastering), plus New song, Load demo song, kit save and load, and sharing. In desktop Chrome and Edge, Save writes straight back to the file you opened or last saved; other browsers download a copy, and Save As asks for a name first. The song also saves itself in the browser as you work.</p><p>More detail in the <a href="https://github.com/matthettich/thunder-plus#readme" target="_blank" rel="noopener">README on GitHub</a>.</p></section>
+    <section id="hSynth"><h2>Synth page</h2><table><tr><td><kbd>Z</kbd>–<kbd>/</kbd> · <kbd>Q</kbd>–<kbd>P</kbd></td><td>Play the selected pad chromatically; C-4 is its own pitch. On a synth slot (9–16) notes hold while the keys are down, so you can play chords</td></tr><tr><td><kbd>−</kbd> <kbd>=</kbd></td><td>Octave down / up</td></tr><tr><td><kbd>Shift</kbd> <kbd>1</kbd>–<kbd>8</kbd> or <kbd>◀</kbd> <kbd>▶</kbd></td><td>Pick a pad (◀▶ go through all 16 slots; on a computer, where they are a list down the left, ▲▼ do too)</td></tr><tr><td><kbd>Shift</kbd> <kbd>Space</kbd></td><td>Play the pad as it is (<kbd>Space</kbd> plays or stops the song, as everywhere)</td></tr><tr><td><kbd>Alt</kbd> <kbd>1</kbd>–<kbd>7</kbd></td><td>Jump into a tracker screen</td></tr><tr><td><kbd>F2</kbd>–<kbd>F9</kbd></td><td>As in the tracker: F2–F4 Phrase, Mixer, Inst; F5 the song from the top, F6 the pad, F7 the song from the cursor, F8 stop, F9 REC</td></tr><tr><td><kbd>Alt</kbd> <kbd>8</kbd> · <kbd>9</kbd> · <kbd>0</kbd> · <kbd>`</kbd></td><td>waves · chains · the synth · back to the last view (these and Alt+1–7 work from waves and chains too)</td></tr></table><p><b>Presets</b>: the list beside the pad name loads a whole sound. It starts with one group per drum type (Kicks, Snares, Claps &amp; snaps, Rims &amp; sticks, Closed hats, Open hats, Cymbals, Toms, Hand drums, Shakers &amp; tambourines, Cowbells, blocks &amp; metal), gathering every drum the app has from its own designs, the drum engines and the classic and acoustic kits; then IDM and glitch hits, basses, pads, chords, keys, leads and each engine's sounds. The search box finds any of them by name. <b>＋ Save this as a preset…</b> keeps the pad in this song's own list, at the top; it travels in the project file. The <b>Layer presets</b> list in the layer card swaps just the selected layer (a snare's noise, a clicky pitch sweep…) and keeps it at the right pitch on any pad. File ▾ → <b>Export song presets…</b> / <b>Import presets…</b> moves them between songs and devices; Save kit / Load kit moves every pad at once. <b>Drum kits…</b> (File ▾, or ⚙ Settings → Kit) puts a CR-78-, 808-, 606-, 909-, 707-, 727- or 505-style kit, or a clean acoustic kit (Funk, Studio, Jazz), on pads 1–8 and keeps the synth slots; every sound of each kit is also in the Presets list, filed under its type (808 Kick under Kicks). <b>Funk breaks…</b> (File ▾) loads one of twelve original breaks, with swing, ghost notes and a laid-back snare, as a new song with its acoustic kit, or adds its four bars to this song. <b>Breaks to chop</b> (File ▾) has the fourteen breaks of pump BREAK, rendered by its own kit with room and tape, as a one-bar loop in a slot, cut into 16 slices (C-4 plays slice 1) and synced to the tempo, ready to re-sequence. <b>Acid line…</b> (Edit ▾ or right-click on a phrase) writes a random bass line into the phrase the way pump ACID does — scale, root, density, accents, slides and octave jumps; Roll (R) again or Mutate (M) a few steps. Turn on only the lanes you want changed — for an Acid pad (accents are volume FF, slides PSL).</p><p><b>Pad pitch, filter &amp; amp</b> (in the card under the pad name) shape the whole pad at once, across every layer: a pitch envelope, a low-pass filter with its own envelope, and an amp envelope. Each envelope has an Amount slider setting how far it is applied. The layer card's Filter and Amp sections still shape only the selected layer.</p><p><b>Mod matrix</b> (Pad card): 3 LFOs (rate, shape, depth), 3 envelopes (Attack / Decay / Sustain / Release) and a 32-step sequencer, each routed to one destination — <b>pitch, level, low-pass cutoff or high-pass cutoff</b> — with a signed amount, applied across all of the voice's layers. Every amount starts at zero. Turn it up and sweep a filter, wobble the pitch, or shape the level. <b>Mod envelopes</b> has a <b>Reset to defaults</b> button that puts the pitch, amp and the three mod envelopes back to their factory values.</p><p><b>Pad play</b>: Glide slides the pitch from the last note; Mono + Legato retunes the sounding note instead of retriggering. <b>Tuning (song)</b> is a cents offset per pitch class (Equal, Just, Pythagorean and Meantone presets or your own), applied to live playing and the tracker. The <b>Wavetable</b> oscillator (Position/Formant) and its Bend/Unison/Spread/Sub/Noise sit in the layer card when that type is picked.</p><p><b>Engine</b> (synth slots): Layers is the layer synth above; <b>Bass</b> swaps in the bass engine and <b>Voice</b> a singing voice that sings typed lyrics, and <b>Blip</b> (on any pad) a minimal electronic drum (see Bass, Voice and Blip engine on the Start tab). <b>Acid</b> is a mono bass-line synth (saw or square into a squelchy ladder filter): a note with a volume of C0 or more is <b>accented</b>, and PSL <b>slides</b>. <b>Machine</b> is a mono synth with seven machines (Dual VCO, Chip, FM+, Swarm, Ensemble, Noise, Additive), each with its own A, B and C, then high- and low-pass filters, an amp envelope and an LFO. Both play live in the tracker. <b>Tone drum</b> is a modeled drum (a tone with a pitch bend or an inharmonic spectrum, filtered noise with a sweep, a click, distortion), and <b>Modal</b> a struck, plucked, bowed or blown object (bar, marimba, vibes, glock, bell, gong, membrane, glass, string, tube, wood, plate). <b>Piano</b> is a modeled struck string (hammer hardness, strike point, two or three detuned strings, string stiffness, soundboard, dampers and a sustain pedal); <b>Tine EP</b> a suitcase-style electric piano (tine and tone bar, a growling pickup you set with Bark, the hammer's bell, tremolo); <b>Organ</b> a tonewheel organ with nine drawbars, percussion, key click, a rotary speaker and Pluck, which with the <b>House organ (M1 style)</b> preset gives the classic 90s house organ. <b>SoundFont</b> plays any .sf2 / .sf3 file you load, or <b>General MIDI</b> (FluidR3 Mono, MIT, downloaded once, 24 MB): pick the preset from the list (bank 128 is the drum kits); the tracker plays it key by key from the font (C-4 is middle C, C-2 the GM kick), with the font's own envelopes, filters and loops. <b>Swarm</b> is a cloud of up to 48 detuned oscillators, each drifting on its own (Cohesion makes them drift together), with Scatter onto octaves, fifths or chords, Bloom (voices fade in one by one), Shimmer, a morphing wave, a resonant filter with its own envelope and an ADSR; it holds for as long as the tracker note. <b>Drift</b> is a two-line analog pad synth laid out like the big 1970s CS-series polysynths (two oscillator lines per voice, a high-pass and a low-pass with their own envelope, up to four drifting unison voices) followed by a tape stage — <b>Wow</b> and <b>Flutter</b> on the pitch, chorus, saturation, <b>Age</b> (worn top and bottom, the odd dropout) and hiss — for warm, wobbly, faded pads; its presets are in the pad Presets list under Drift (tape pads). <b>pump</b> (group in the engine list) has the pump plugins' instruments with their own sound and presets: <b>Mono</b> (three oscillators, four filters), <b>Poly</b> (two oscillators, poly-mod, unison, chorus) and <b>Coil</b> (tuned springs kicked by the note). Each renders a note like the other engines (<b>Hit</b> is how hard it is played), and each has a <b>live</b> twin that plays the plugin in the tracker note by note, with the VOL column as velocity, slides and bends as pitch bend, and glide (Coil live also sets how many <b>Voices</b> ring at once, 1–16). A live version shares its settings with the rendered one. If the device can’t keep up, it plays the rendered sound instead and says so (Settings → Audio → Live engines). On a <b>poly track</b> (9–16) a Voice pad sings chords: notes that start together sing the same syllable in harmony. Notes side by side in different columns sing together; a new note in the same column takes over that column's singer. In <b>⚙ Settings</b>: <b>Audio</b> (output, level, latency and <b>Reset audio engine</b>, which clears a stuck note or effect), <b>Project</b> (song, input, <b>Render &amp; export</b> — WAVs for Koala and SunVox — and <b>Mastering</b>), <b>Screen</b> (the tracker's screen and arrange settings, and the <b>Skin</b>), then <b>Kit</b>, <b>MIDI</b> connects a controller (notes not mapped to a pad play the selected synth slot, held until note-off) and App.</p><h2>Files and rendering</h2><p><b>File ▾</b> holds Save, Save As and Open, plus Render song (a stereo WAV, through the mastering chain when it is on) and Render stems (a zip with the mix and one WAV per track, without mastering), plus New song, Load demo song, kit save and load, and sharing. In desktop Chrome and Edge, Save writes straight back to the file you opened or last saved; other browsers download a copy, and Save As asks for a name first. The song also saves itself in the browser as you work.</p><p>More detail in the <a href="https://github.com/matthettich/thunder-plus#readme" target="_blank" rel="noopener">README on GitHub</a>.</p></section>
   </div></div>
 </div>
 <div class="toast" id="toast" role="status" aria-live="polite" title="Tap to dismiss" hidden></div>
@@ -3786,15 +3878,17 @@ const TYPES = [
   {id:'dust',    name:'Crackle',      fam:'noise', a:'Density', b:'Tone',   fa:pct, fb:pct},
   {id:'grit',    name:'S&H noise',    fam:'noise', a:'Smooth',  b:'Clock',  fa:pct, fb:v=>'×'+Math.round(Math.pow(2,v*6)*4)},
   {id:'chaos',   name:'Chaos',        fam:'noise', a:'Model',   b:'Chaos',  fa:chaosOscName, fb:pct},
-  {id:'plaits',  name:'Plaits',       fam:'pl',    a:'',        b:'',       fa:pct, fb:pct},
-  {id:'elements',name:'Elements',     fam:'pl',    a:'',        b:'',       fa:pct, fb:pct},
+  {id:'plaits',  name:'Macro osc',    fam:'pl',    a:'',        b:'',       fa:pct, fb:pct},
+  {id:'elements',name:'Resonator',     fam:'pl',    a:'',        b:'',       fa:pct, fb:pct},
   {id:'sample',  name:'Sample',       fam:'smp',   a:'Start',   b:'Reverse',fa:pct, fb:v=>v<0.5?'Off':'On'},
   {id:'grains',  name:'Grains',       fam:'smp',   a:'Position',b:'Size',   fa:pct, fb:v=>Math.round(grainMs(v))+' ms'},
   {id:'pwm',     name:'PWM sampler',  fam:'smp',   a:'Clock',   b:'Mode',   fa:v=>pwmClock(v).toFixed(1)+' kHz', fb:v=>PWM_MODES[pwmMode(v)]},
 ];
 TYPES.push({id:'waves', name:'waves patch', fam:'wv', a:'', b:'', fa:pct, fb:pct});
 const TYPE = Object.fromEntries(TYPES.map(t => [t.id, t]));
-const FAMS = {std:'Standard', fm:'FM', add:'Additive', noise:'Noise', pl:'Mutable Instruments', wv:'waves', smp:'Sample'};
+/* The two layer types built on Mutable Instruments code have generic names in the UI; the credit shows as the family tag's tooltip. */
+const LAYER_CREDIT = {plaits:'Macro osc: based on Plaits by Mutable Instruments (MIT)', elements:'Resonator: based on Elements by Mutable Instruments (MIT)'};
+const FAMS = {std:'Standard', fm:'FM', add:'Additive', noise:'Noise', pl:'Macro', wv:'waves', smp:'Sample'};
 
 /* Mutable Instruments Plaits, Rings, Clouds and Elements (MIT, Emilie Gillet), Airwindows Density and
    ToTape6 (MIT, Chris Johnson) and DaisySP chorus and decimator (MIT, Electrosmith), compiled into one
@@ -8255,7 +8349,7 @@ const KEY = 'thunderplus-kit-v1', OLD_KEY = 'thunder-kit-v1';
 /* ---------- parameter definitions ---------- */
 const st = v => (v > 0 ? '+' : '') + (Math.round(v * 10) / 10) + ' st';
 const ms = v => v < 10 ? v.toFixed(1) + ' ms' : v < 1000 ? Math.round(v) + ' ms' : (v / 1000).toFixed(2) + ' s';
-const hz = v => v < 1000 ? Math.round(v) + ' Hz' : (v / 1000).toFixed(v < 10000 ? 2 : 1) + ' k';
+const hz = v => v < 1000 ? Math.round(v) + ' Hz' : (v / 1000).toFixed(v < 10000 ? 2 : 1) + ' kHz';
 const oct = v => (v > 0 ? '+' : '') + (v * 8).toFixed(1) + ' oct';
 const P = {
   level:{l:'Level', min:0, max:1, c:'lin', d:0.8, f:pct},
@@ -8268,11 +8362,11 @@ const P = {
   dec:{l:'Decay', min:1, max:6000, c:'log', d:300, f:ms},
   sus:{l:'Sustain', min:0, max:1, c:'lin', d:0.6, f:pct},
   rel:{l:'Release', min:1, max:6000, c:'log', d:150, f:ms},
-  lpCut:{l:'LP cut', min:20, max:20000, c:'log', d:20000, f:v => v >= 19900 ? 'Open' : hz(v)},
-  lpRes:{l:'LP res', min:0, max:1, c:'lin', d:0, f:pct},
+  lpCut:{l:'Cutoff', min:20, max:20000, c:'log', d:20000, f:v => v >= 19900 ? 'Open' : hz(v)},
+  lpRes:{l:'Resonance', min:0, max:1, c:'lin', d:0, f:pct},
   lpEnv:{l:'LP env', min:-1, max:1, c:'lin', d:0, f:oct},
-  hpCut:{l:'HP cut', min:20, max:20000, c:'log', d:20, f:v => v <= 20.5 ? 'Open' : hz(v)},
-  hpRes:{l:'HP res', min:0, max:1, c:'lin', d:0, f:pct},
+  hpCut:{l:'HP cutoff', min:20, max:20000, c:'log', d:20, f:v => v <= 20.5 ? 'Open' : hz(v)},
+  hpRes:{l:'HP resonance', min:0, max:1, c:'lin', d:0, f:pct},
   hpEnv:{l:'HP env', min:-1, max:1, c:'lin', d:0, f:oct},
   fAtk:{l:'F attack', min:0.1, max:2000, c:'log', d:0.5, f:ms},
   fDec:{l:'F decay', min:1, max:6000, c:'log', d:200, f:ms},
@@ -8320,8 +8414,8 @@ const VP = {
 const VGP = {
   gPAmt:{l:'Amount', min:-48, max:48, c:'half', d:0, f:st},
   gPDec:{l:'Pitch time', min:1, max:2000, c:'log', d:60, f:ms},
-  gLpCut:{l:'VCF cut', min:20, max:20000, c:'log', d:20000, f:v => v >= 19900 ? 'Open' : hz(v)},
-  gLpRes:{l:'VCF res', min:0, max:1, c:'lin', d:0, f:pct},
+  gLpCut:{l:'Cutoff', min:20, max:20000, c:'log', d:20000, f:v => v >= 19900 ? 'Open' : hz(v)},
+  gLpRes:{l:'Resonance', min:0, max:1, c:'lin', d:0, f:pct},
   gLpEnv:{l:'Amount', min:-1, max:1, c:'lin', d:0, f:oct},
   gFAtk:{l:'VCF attack', min:0.1, max:2000, c:'log', d:0.5, f:ms},
   gFDec:{l:'VCF decay', min:1, max:6000, c:'log', d:200, f:ms},
@@ -8343,7 +8437,7 @@ const VM = {
   r4amt:{l:'Env 1 amount', min:-1, max:1, c:'lin', d:0, f:spctF}, r5amt:{l:'Env 2 amount', min:-1, max:1, c:'lin', d:0, f:spctF}, r6amt:{l:'Env 3 amount', min:-1, max:1, c:'lin', d:0, f:spctF},
   r7amt:{l:'Seq amount', min:-1, max:1, c:'lin', d:0, f:spctF},
 };
-const MOD_DESTS = ['Off', 'Pitch', 'Level', 'LP cutoff', 'HP cutoff'];
+const MOD_DESTS = ['Off', 'Pitch', 'Level', 'Cutoff', 'HP cutoff'];
 const MOD_SRC = [['r1', 'LFO 1'], ['r2', 'LFO 2'], ['r3', 'LFO 3'], ['r4', 'Env 1'], ['r5', 'Env 2'], ['r6', 'Env 3'], ['r7', 'Seq']];
 const toPos = (d, v) => d.c === 'log' || d.c === 'logf' ? Math.log(v / d.min) / Math.log(d.max / d.min)
   : d.c === 'sq' ? Math.sqrt(Math.max(0, (v - d.min) / (d.max - d.min))) : (v - d.min) / (d.max - d.min);
@@ -8670,20 +8764,54 @@ function bgRender(i){
   renderAsync(v, sr, isSyn(i) ? v.len : 0, true).then(r => {
     pend[i] = false;
     if (kit.voices[i] !== v || (padRev[i] || 0) !== r0){ if (stale(i)) bgRender(i); return; }   // another kit, or rendered here meanwhile
-    if (dirty[i] || padSR() !== sr || padBpm(i) !== tb){ dirty[i] = true; bgRender(i); return; }   // edited meanwhile: go again
+    if (dirty[i] || padSR() !== sr || padBpm(i) !== tb){
+      // AUDITION: a drag that outruns the renderer (a phone) is still heard: this render is a moment of that drag, so
+      // when an audition is waiting on this pad it is installed and played, and the renderer goes again for the rest
+      if (audWait.has(i) && padSR() === sr && padBpm(i) === tb){
+        install(i, {sr, bpm:tb, data:r.data, data2:r.data2 || null, st:new Map(r.st.map(([k, pk]) => [v.fx[k], pk]))});
+        audWait.delete(i); playOnRender.delete(i);
+        if (i === cur && view === 'synth'){ try { drawWave(); } catch(e){} try { play(i); } catch(e){} }
+      }
+      dirty[i] = true; bgRender(i); return; }   // edited meanwhile: go again
     install(i, {sr, bpm:tb, data:r.data, data2:r.data2 || null, st:new Map(r.st.map(([k, pk]) => [v.fx[k], pk]))});
     rendered(i);
   }, () => { pend[i] = false; if (kit.voices[i] === v){ dirty[i] = true; ensure(i); rendered(i); } });
 }
 // A fresh render arrived for pad i: show it if it's the one on screen.
-function rendered(i){ if (i === cur && view === 'synth'){ try { drawWave(); } catch(e){} } if (playOnRender.delete(i)) try { play(i); } catch(e){} }
+function rendered(i){ if (i === cur && view === 'synth'){ try { drawWave(); } catch(e){} } audWait.delete(i); if (playOnRender.delete(i)) try { play(i); } catch(e){} }
 // Play a pad once its render is current: after Random (or any edit) the cached render is still the old sound, so
 // playing at once played what you just replaced. If the Worker is on it, wait for it; otherwise render here and play.
 const playOnRender = new Set();
 function playFresh(i){
+  clearTimeout(audT); audT = 0; audWait.delete(i);   // AUDITION: this play covers the edit that asked for it (Random, a preset)
   const v = kit.voices[i]; if (!v) return;
   if (PW.ready && rwCan(v) && (stale(i) || slotAt(pend, i))){ playOnRender.add(i); bgRender(i); } else play(i);
 }
+// AUDITION (13 Nov; owner: "to hear those changes as progress is made is my main priority"): on the Synth page an edit
+// to the pad on screen plays it once the render with that edit has landed (playFresh), so the ear follows the hand
+// without a trip to the pad. A pause of AUD_WAIT ms in a drag plays it; a drag that never pauses still plays about
+// every AUD_MAX ms. Off with the Audition button by Play (kept per device). Never before the first touch or key
+// (start-up edits are not the player's), and never over a note the player is holding on that slot.
+const AUD_K = 'thunderplus-audition-v1', AUD_WAIT = 140, AUD_MAX = 420;
+let audOn = (() => { try { return localStorage.getItem(AUD_K) !== '0'; } catch(e){ return true; } })(), audT = 0, audT0 = 0, audI = -1;
+const audWait = new Set();     // pads whose queued play (playOnRender) was asked for by an audition, not by the player
+const heldLive = [];           // per slot: the notes the player is holding right now (keys, MIDI, a held pad)
+function audDrop(){ clearTimeout(audT); audT = 0; for (const i of audWait) playOnRender.delete(i); audWait.clear(); }
+function audition(i){
+  if (!audOn || view !== 'synth' || i !== cur) return;
+  audI = i;
+  try { if (navigator.userActivation && !navigator.userActivation.hasBeenActive) return; } catch(e){}
+  const now = performance.now(); if (!audT) audT0 = now;
+  clearTimeout(audT); audT = setTimeout(audFire, Math.max(0, Math.min(AUD_WAIT, audT0 + AUD_MAX - now)));
+}
+function audFire(){
+  audT = 0; const i = audI;
+  if (!audOn || view !== 'synth' || i !== cur || !kit.voices[i]) return;   // the pad that was edited, and only while it is still the one on screen
+  if (heldLive[i] && heldLive[i].size) return;   // held keys or MIDI notes (any of them, on a polyphonic pad): leave them sounding
+  try { playFresh(i); if (playOnRender.has(i)) audWait.add(i); } catch(e){}
+}
+function audSet(on){ audOn = !!on; if (!audOn) audDrop(); try { localStorage.setItem(AUD_K, audOn ? '1' : '0'); } catch(e){} audUpd(); }
+function audUpd(){ const b = $('vAud'); if (!b) return; b.classList.toggle('on', audOn); b.setAttribute('aria-pressed', audOn ? 'true' : 'false'); }
 // The pad on screen: drawn now from what there is, brought up to date in the background.
 function showCur(){ if (PW.ready && (stale(cur) || slotAt(pend, cur))){ bgRender(cur); drawWave(); } else { ensure(cur); drawWave(); } }   // bgRender does nothing while a job is out
 
@@ -8776,7 +8904,7 @@ function padTrack(i, src, g){ let s = padSrcs[i]; if (!s) s = padSrcs[i] = new S
 function hushPad(i){
   const s = padSrcs[i]; if (!s || !ctx) return; const t = ctx.currentTime;
   for (const o of s){ try { o.g.gain.cancelScheduledValues(t); o.g.gain.setValueAtTime(o.g.gain.value, t); o.g.gain.setTargetAtTime(0, t, 0.008); o.src.stop(t + 0.06); } catch(e){} }
-  s.clear(); if (synHeld[i]){ synHeld[i].done = true; synHeld[i] = null; } if (playing[i]) playing[i] = null;
+  s.clear(); if (synHeld[i]){ synHeld[i].done = true; synHeld[i] = null; } if (playing[i]) playing[i] = null; if (heldLive[i]) heldLive[i].clear();
 }
 function stopVoice(i){
   const p = playing[i]; if (!p) return; playing[i] = null;
@@ -8814,11 +8942,12 @@ function holdNote(i, semis, vel = 1){
   if (from != null){ src.playbackRate.setValueAtTime(from, t); src.playbackRate.linearRampToValueAtTime(r, t + gl); } else src.playbackRate.value = r;
   g.gain.value = vel;
   src.connect(g); g.connect(padOut()); src.start(); padTrack(i, src, g); flash(i); vuHit(i, r, vel); synMeterOn();
-  const h = {src, g, i, rate:r, vel, done:false}; synHeld[i] = h; return h;
+  const h = {src, g, i, rate:r, vel, done:false}; synHeld[i] = h; (heldLive[i] || (heldLive[i] = new Set())).add(h); src.addEventListener('ended', () => { if (heldLive[i]) heldLive[i].delete(h); }); return h;
 }
 function releaseNote(h, at){
   if (!h || h.done) return; h.done = true;
   if (synHeld[h.i] === h) synHeld[h.i] = null;
+  if (heldLive[h.i]) heldLive[h.i].delete(h);
   const t = Math.max(at || 0, ctx.currentTime), rel = relOf(kit.voices[h.i]);
   try { h.g.gain.cancelScheduledValues(t); h.g.gain.setValueAtTime(h.g.gain.value, t); h.g.gain.setTargetAtTime(0, t, rel / 4.6); h.src.stop(t + rel * 1.6 + 0.05); } catch(e){}
 }
@@ -8889,7 +9018,7 @@ addEventListener('pointerdown', e => {
   if (a.matches && a.matches('textarea, [contenteditable], input:not([type=range]):not([type=checkbox]):not([type=radio]):not([type=button])')) a.blur();
 }, true);
 function typing(e){ const t = e.target; if (window.PumpFX && PumpFX.ownsKey) try { if (PumpFX.ownsKey(e)) return true; } catch(_){}   // …PUMP: a pop-up window's own keys
-  return !!(t && t.matches && t.matches('input:not([type=range]):not([type=checkbox]):not([type=radio]):not([type=button]):not([type=file]),textarea,select,[contenteditable]') && t.getClientRects().length); }
+  return !!(t && t.matches && t.matches('input:not([type=range]):not([type=checkbox]):not([type=radio]):not([type=button]):not([type=file]),textarea,select,.pickbtn,[contenteditable]') && t.getClientRects().length); }
 /* ---------- change handling ---------- */
 let rTimer = 0, sTimer = 0;
 function changed(i = cur, light){
@@ -8898,6 +9027,7 @@ function changed(i = cur, light){
   try { bassPush(i); } catch(e){}
   clearTimeout(rTimer); rTimer = setTimeout(showCur, 45);
   clearTimeout(sTimer); sTimer = setTimeout(save, 900);
+  try { audition(i); } catch(e){}
   if (!light){ renderStrip(); renderPads(); }
 }
 
@@ -8980,7 +9110,8 @@ function makeRow(def, key, getObj, opts = {}){
   // menu (FIX 27 Oct, audit M3: the panel added a second menu, a dialog, under this one).
   r.addEventListener('contextmenu', e => { if (e.target.closest('input[type=text]') || typeof sxMenu !== 'function') return; e.preventDefault(); e._valMenu = true;
     sxMenu(e.clientX, e.clientY, String(row.def.l || key).toUpperCase(), [
-      {l:'Reset to default', f:reset, off:row.def.d == null}, {l:'Type a value…', f:typeBox},
+      {l:'Reset to default', f:reset, off:row.def.d == null}, ...(r.classList.contains('two') ? [] : [{l:'Type a value…', f:typeBox}]),   // a two-state row (twoStateRow): two buttons, nothing to type
+     
       {l:'Learn a MIDI knob for it', f:() => { setLearn(true); midi.target = -1; midi.ccTarget = inp.id; renderPads(); ccBadges(); midiStatus(`${rowLabel(inp.id)}: turn a knob on the controller.`); }},
       ...(opts.menu ? [null, ...opts.menu()] : [])]); });
   inp.title = 'Drag to change (Shift: finer, ' + MODK + ': coarser) · double-click or Alt-click to reset · right-click: menu';
@@ -8999,6 +9130,20 @@ function makeCk(box, get, set){
   const upd = () => { box.checked = !!get(); };
   box.addEventListener('change', () => { set(box.checked); upd(); });
   upd(); return upd;
+}
+// SYNTH UX B (13 Nov): a row that is really a switch (min 0, max 1, whole steps: Reverse, Freeze, Loop, Mix law…) shows its two
+// value names as a segmented control, named by the row's own formatter (f(0), f(1)). The slider stays in the row (hidden), so
+// the row's id, its value, a MIDI knob learned on it, Reset (double-click on the label) and refresh() all work as before; the
+// segment writes the same 0 / 1 into the same field and runs the same handler (`on`) the slider did.
+const twoOf = def => !!def && def.min === 0 && def.max === 1 && def.c === 'int' && typeof def.f === 'function';
+function twoStateRow(row, on){
+  const d = row.def, cap = t => { t = String(t); return t.charAt(0).toUpperCase() + t.slice(1); };
+  const host = el('div', 'seg'); host.setAttribute('role', 'group'); host.setAttribute('aria-label', d.l);
+  row.r.classList.add('two'); row.r.insertBefore(host, row.inp);
+  const upd = makeSeg(host, [[0, cap(d.f(0))], [1, cap(d.f(1))]], () => (+row.getObj()[row.key] >= 0.5 ? 1 : 0), v => { row.getObj()[row.key] = v; row.refresh(); on(); });
+  const rf = row.refresh; row.refresh = function(){ rf.call(this); upd(); };
+  row.inp.addEventListener('input', upd);   // a MIDI knob moves the (hidden) slider; the segment follows
+  row.seg = upd; return row;
 }
 let tt = 0, busNote = '';   // busNote: BUS, the one-time note on a bus track (busHint)
 /* TOASTS (27 Oct, audit B3). toast(msg) is a quick confirmation: ~1.3 s, longer text up to 2 s, and the next one replaces
@@ -9066,7 +9211,10 @@ function askSheet(msg, opts){
       sw.cols.forEach((c, i) => { const b = el('button', c ? null : 'none'); b.type = 'button'; b.setAttribute('role', 'radio'); b.title = b.ariaLabel = sw.names[i]; if (c) b.style.setProperty('--sw', c);
         b.addEventListener('click', () => { sw.sel = i; paint(); }); row.append(b); });
       paint(); box.append(row); }
-    if (opts.list){ const ul = el('div', 'asklist'); opts.list.forEach((label, i) => { const b = el('button', 'askitem', label); b.type = 'button'; b.addEventListener('click', () => done(i)); ul.append(b); }); box.append(ul); }
+    // opts.list entries are labels (a click resolves with the label's index) or {head:'Group'} (a caption, not a choice, not counted); opts.cur: the index to mark as the current one (SYNTH UX B, makePick)
+    if (opts.list){ const ul = el('div', 'asklist'); let n = 0;
+      opts.list.forEach(label => { if (label && typeof label === 'object' && label.head != null){ ul.append(el('div', 'askhead', label.head)); return; }
+        const i = n++, b = el('button', 'askitem' + (i === opts.cur ? ' on' : ''), label); b.type = 'button'; if (i === opts.cur) b.setAttribute('aria-current', 'true'); b.addEventListener('click', () => done(i)); ul.append(b); }); box.append(ul); }
     const row = el('div', 'btnrow'), no = el('button', null, opts.no || 'Cancel'), ok = el('button', 'ok', opts.ok || 'OK'); no.type = ok.type = 'button'; row.append(no); if (!opts.list) row.append(ok); box.append(row); wrap.append(box);
     const done = v => { if (askOpen !== done) return; askOpen = null; wrap.remove(); document.removeEventListener('keydown', key, true); res(v); };
     // Every key stays in the dialog (Space, letters and Delete used to reach the tracker behind it: play, notes, clear).
@@ -9090,24 +9238,100 @@ function askSheet(msg, opts){
     document.body.append(wrap);
     // A list ("Save changes?": Save, Don't save) focuses its first choice, so Enter picks it; with nothing focused Enter
     // used to mean Cancel (audit B13). (`ok` isn't shown in a list.)
-    setTimeout(() => { if (inp){ inp.focus(); inp.select(); } else if (opts.list){ const f = box.querySelector('.askitem'); if (f) f.focus(); } else ok.focus(); }, 0);
+    setTimeout(() => { if (inp){ inp.focus(); inp.select(); } else if (opts.list){ const f = box.querySelector('.askitem.on') || box.querySelector('.askitem'); if (f){ f.focus(); try { f.scrollIntoView({block:'center'}); } catch(e){} } } else ok.focus(); }, 0);
   });
 }
 const askText = (msg, def, max, ok) => askSheet(msg, {text:def == null ? '' : String(def), max, ok});
 const askYes = (msg, ok) => askSheet(msg, {ok}).then(v => v === true);
 const askPick = (msg, list) => askSheet(msg, {list}).then(v => typeof v === 'number' ? v : -1);
 
+/* ---------- one picker for the Synth page (SYNTH UX B, 13 Nov) ----------
+   makePick(select, {label, title, noStep, skipEmpty}) turns a native <select> into the app's own control: a button that shows the
+   current choice with a ▾ and opens askSheet's list (the current item marked, group names as captions). The real <select> stays
+   in the DOM, visually hidden (tabindex -1, aria-hidden), and stays the one source of truth: picking sets its selectedIndex and
+   fires a real 'change' event, so every listener, every `sel.value = …` refresh and every test keeps working as before. The
+   button follows the select: its options (a MutationObserver), its value (.value / .selectedIndex writes are wrapped), disabled
+   and hidden. Keyboard: Enter / Space open the list; ▲ ▼ step the value without opening, as a native select does (noStep: not
+   for "+ Add effect", where a step would add an effect). skipEmpty: the "" option is the placeholder, not a choice (Add effect,
+   Starter tables…). Returns a wrapper (display:contents) holding both: put it where the select was (an attached select is
+   swapped in place). */
+function makePick(sel, o = {}){
+  if (sel._pk) return sel._pk.wrap;
+  const name = o.label || sel.getAttribute('aria-label') || '';
+  const btn = el('button', 'sm pickbtn'), lab = el('span', 'pkl'), car = el('span', 'pkc', '▾');
+  btn.type = 'button'; btn.setAttribute('aria-haspopup', 'dialog'); car.setAttribute('aria-hidden', 'true'); btn.append(lab, car);
+  if (sel.title) btn.title = sel.title;
+  sel.classList.add('pkhid'); sel.tabIndex = -1; sel.setAttribute('aria-hidden', 'true');
+  const wrap = el('span', 'pkw'), par = sel.parentNode; if (par) par.replaceChild(wrap, sel); wrap.append(btn, sel);
+  const sync = () => {
+    const op = sel.options[sel.selectedIndex], t = op ? op.textContent : '';
+    if (lab.textContent !== t) lab.textContent = t;
+    btn.setAttribute('aria-label', (name ? name + ': ' : '') + t);
+    btn.disabled = sel.disabled; btn.hidden = sel.hidden || sel.style.display === 'none';
+  };
+  // the choices: options in order, an <optgroup> as a caption over its options; map[i] = the option's index in the select
+  const entries = () => { const L = [], map = [], add = op => { if (op.disabled || (o.skipEmpty && op.value === '')) return; map.push(op.index); L.push(op.textContent); };
+    for (const c of sel.children){ if (c.tagName === 'OPTGROUP'){ if (c.label) L.push({head:c.label}); for (const op of c.children) add(op); } else add(c); } return {L, map}; };
+  const choose = idx => { if (idx === sel.selectedIndex) return; sel.selectedIndex = idx; sync(); sel.dispatchEvent(new Event('change', {bubbles:true})); };
+  let viaKey = false;
+  const open = async () => {
+    sync(); if (btn.disabled) return;
+    const {L, map} = entries(), r = await askSheet(o.title || name || 'Choose', {list:L, cur:map.indexOf(sel.selectedIndex)});
+    if (typeof r === 'number' && map[r] != null) choose(map[r]);
+    if (viaKey) btn.focus();   // a pick with the mouse or a finger lets go of the keys (audit K7); one from the keyboard keeps them
+  };
+  btn.addEventListener('click', e => { viaKey = e.detail === 0; open(); });
+  btn.addEventListener('keydown', e => {
+    if (o.noStep || (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') || e.altKey || e.ctrlKey || e.metaKey) return;
+    e.preventDefault(); e.stopPropagation(); sync();
+    const {map} = entries(), k = map.indexOf(sel.selectedIndex), n = map[Math.max(0, Math.min(map.length - 1, (k < 0 ? 0 : k) + (e.key === 'ArrowDown' ? 1 : -1)))];
+    if (n != null) choose(n);
+  });
+  btn.addEventListener('pointerenter', sync); btn.addEventListener('focus', sync);
+  // the code that fills or sets the select: options coming and going, and .value / .selectedIndex written directly
+  new MutationObserver(sync).observe(sel, {childList:true, subtree:true, characterData:true, attributes:true, attributeFilter:['disabled', 'hidden', 'style', 'label']});
+  for (const k of ['value', 'selectedIndex']){ const d = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, k);
+    Object.defineProperty(sel, k, {configurable:true, get(){ return d.get.call(this); }, set(v){ d.set.call(this, v); sync(); }}); }
+  sel._pk = {wrap, btn, sync}; sync();
+  return wrap;
+}
+
+/* ---------- Synth page folds (SYNTH UX A, 13 Nov) ----------
+   Pad (Drive, Gate, Max len, Choke), Sequence and Tuning (song) are closed until opened; one object in localStorage keeps each
+   one's open / closed per device. The header is a real button (▸ / ▾, aria-expanded) inside a heading, like the tracker deck's
+   folds; closed, fold.sum(text) shows a one-line summary of what is inside. The controls inside stay in the page (ids, MIDI learn). */
+const SYNFOLD_KEY = 'thunderplus-synfold-v1';
+const synFoldSt = (() => { try { const j = JSON.parse(localStorage.getItem(SYNFOLD_KEY)); return j && typeof j === 'object' && !Array.isArray(j) ? j : {}; } catch(e){ return {}; } })();
+function makeFold(id, title, o = {}){
+  const box = el('div', 'fold' + (o.cls ? ' ' + o.cls : '')), h = el('h3', 'fh'), b = el('button', 'foldh'); b.type = 'button';
+  const gl = el('span', 'fgl'), sm = el('span', 'fsum'); gl.setAttribute('aria-hidden', 'true');
+  b.append(gl, el('span', 'ftl', title), sm); h.append(b);
+  const body = el('div', 'foldb' + (o.bodyCls ? ' ' + o.bodyCls : '')); body.id = 'fold_' + id; b.setAttribute('aria-controls', body.id);
+  box.append(h, body);
+  const set = (open, keep) => { box.classList.toggle('open', open); body.hidden = !open; b.setAttribute('aria-expanded', open ? 'true' : 'false'); gl.textContent = open ? '▾' : '▸';
+    if (keep){ synFoldSt[id] = open ? 1 : 0; try { localStorage.setItem(SYNFOLD_KEY, JSON.stringify(synFoldSt)); } catch(e){} } };
+  b.addEventListener('click', () => set(!box.classList.contains('open'), true));
+  set(!!synFoldSt[id], false);
+  return {box, body, btn:b, sum:t => { sm.textContent = t; }};
+}
+
 /* ---------- voice card ---------- */
 const vRows = [];
-for (const k of ['level','tune','drive','gate','len']) { const r = makeRow(VP[k], k, V, {idp:'v'}); $('vRows').append(r.r); vRows.push(r); }
-const chokeRow = el('div', 'segrow'); chokeRow.append(el('span', null, 'Choke')); const chokeSeg = el('div', 'seg'); chokeRow.append(chokeSeg); $('vRows').append(chokeRow);
+// Level and Tune stay in sight; Drive, Gate, Max len and Choke are the "Pad" fold (closed by default), its header summing them up.
+const padFold = makeFold('pad', 'Pad', {cls:'padfold', bodyCls:'vrows'});
+function padSum(){ try { const v = V(); padFold.sum('Drive ' + VP.drive.f(v.drive || 0) + ' · Gate ' + VP.gate.f(v.gate) + ' · Max len ' + VP.len.f(v.len) + ' · Choke ' + (v.choke ? v.choke : 'off')); } catch(e){} }
+for (const k of ['level','tune','drive','gate','len']) { const r = makeRow(VP[k], k, V, {idp:'v'}); (k === 'level' || k === 'tune' ? $('vRows') : padFold.body).append(r.r); vRows.push(r);
+  if (k !== 'level' && k !== 'tune'){ const rf = r.refresh; r.refresh = function(){ rf.call(this); padSum(); }; r.inp.addEventListener('input', padSum); } }   // refresh: a reset, a typed value, a new pad; input: the slider, and a MIDI knob
+$('vRows').after(padFold.box);   // (a sibling, not a grid item: a full-width item would keep every auto-fit column open)
+const chokeRow = el('div', 'segrow'); chokeRow.append(el('span', null, 'Choke')); const chokeSeg = el('div', 'seg'); chokeRow.append(chokeSeg); padFold.body.append(chokeRow);
 // FIX (27 Oct, audit B1): these, a new kit (setKit), the slot changes (kitStep) and waves edits (wavesChanged) now mark the
 // project unsaved, as every other edit does; "Save changes?" missed them and the project file kept the old kit.
 const markKit = () => { try { markChange(); } catch(e){} };
-const updChoke = makeSeg(chokeSeg, [[0,'Off'],[1,'1'],[2,'2'],[3,'3'],[4,'4']], () => V().choke, v => { V().choke = v; markKit(); save(); });
+const updChoke = makeSeg(chokeSeg, [[0,'Off'],[1,'1'],[2,'2'],[3,'3'],[4,'4']], () => V().choke, v => { V().choke = v; markKit(); save(); padSum(); });
 $('vName').addEventListener('input', e => { V().name = e.target.value; markKit(); renderPads(); clearTimeout(sTimer); sTimer = setTimeout(save, 900); });
 $('kitName').addEventListener('input', e => { kit.name = e.target.value; markKit(); clearTimeout(sTimer); sTimer = setTimeout(save, 900); });
 $('vPlay').addEventListener('click', () => play(cur));
+$('vAud').addEventListener('click', () => audSet(!audOn)); audUpd();
 $('wave').addEventListener('pointerdown', () => play(cur));
 $('vRand').addEventListener('click', () => { randVoice(V()); afterVoiceSwap(); playFresh(cur); });
 $('vInit').addEventListener('click', () => { const n = V().name; kit.voices[cur] = mkVoice(n, [{type:'sine'}]); afterVoiceSwap(); });
@@ -9161,7 +9385,7 @@ function setSlotKind(i, held){
   while (kit.held.length <= i) kit.held.push(null);
   kit.held[i] = !!held; syncHeld(); dirty[i] = true; cache[i] = null;
   changed(i); buildPads(); refreshAll(); slotsUI();
-  toast(`Slot ${hx(i)} is ${held ? 'HELD now: it sounds until a note-off (up to Max len), like a synth' : 'ONE-SHOT now: it plays its whole sound, like a drum'}.`, 4000);
+  toast(`Pad ${hx(i)} is ${held ? 'HELD now: it sounds until a note-off (up to Max len), like a synth' : 'ONE-SHOT now: it plays its whole sound, like a drum'}.`, 4000);
 }
 const updKind = makeSeg($('vKindSeg'), [[false, 'One-shot'], [true, 'Held']], () => isSyn(cur), v => setSlotKind(cur, v));
 function slotsUI(){
@@ -9185,6 +9409,7 @@ for (const [fk, fname] of Object.entries(FAMS)){
   for (const t of TYPES.filter(t => t.fam === fk)){ const o = document.createElement('option'); o.value = t.id; o.textContent = t.name; g.append(o); }
   sel.append(g);
 }
+makePick(sel);   // SYNTH UX B: the app's own picker in front of the (hidden, still authoritative) select
 sel.addEventListener('change', () => { const L = Lc(), was = L.type; L.type = sel.value; L.on = true;
   if (L.type === 'elements' && was !== 'elements'){ Object.assign(L, {mode:'AHD', atk:0.5, hold:0, dec:Math.max(L.dec, 4000), pAmt:0}); if (L.tune === 0) L.tune = 12; }
   if (L.type === 'waves' && was !== 'waves'){ Object.assign(L, {mode:'AHD', atk:0.5, hold:8000, dec:2000, pAmt:0, wBus:L.wBus || 1}); if (L.tune === 0) L.tune = 24; }
@@ -9206,16 +9431,21 @@ function section(title, keys, extra){
 }
 let ampModeUpd, plStrikeUpd, plAuxUpd;
 const srcRows = section('Source', ['a','b','level','delay','burst','spacing']);
-const plRows = section('Plaits', ['pHarm','pTim','pMor','pDecay','pLpg','pTimEnv','pMorEnv','pFm'], s => {
+// SYNTH UX B (13 Nov): where Source's second control is a switch (Sample: Reverse; Digital: Loop) it shows as two buttons, not a slider.
+// Same field (the layer's b, 0 or 1) and the same handler (changed()); the slider stays in the page, hidden (its id, MIDI learn, Reset).
+const TWO_B = {sample:['Off', 'On'], lfsr:['Long', 'Short']};
+const bTwo = (() => { const r = el('div', 'row two'), lab = el('label', null, 'Reverse'), host = el('div', 'seg'); host.setAttribute('role', 'group');
+  r.append(lab, host); r.hidden = true; srcRows.b.r.after(r); return {r, lab, host, kind:'', upd:() => {}}; })();
+const plRows = section('Macro osc', ['pHarm','pTim','pMor','pDecay','pLpg','pTimEnv','pMorEnv','pFm'], s => {
   const first = s.children[1];
   const er = el('div', 'selrow'); er.append(el('span', null, 'Model'));
-  const es = document.createElement('select'); es.id = 'plEng'; es.setAttribute('aria-label', 'Plaits model');
+  const es = document.createElement('select'); es.id = 'plEng'; es.setAttribute('aria-label', 'Macro osc model');
   [['Synth models 1', 0], ['Synth models 2', 8], ['Noise and percussion', 16]].forEach(([g, o]) => {
     const og = document.createElement('optgroup'); og.label = g;
     for (let k = o; k < o + 8; k++){ const op = document.createElement('option'); op.value = k; op.textContent = PL_NAMES[k]; og.append(op); }
     es.append(og); });
   es.addEventListener('change', () => { Lc().pEng = +es.value; changed(); });
-  er.append(es); s.insertBefore(er, first);
+  er.append(makePick(es)); s.insertBefore(er, first);
   const tr = el('div', 'segrow'); tr.append(el('span', null, 'Trigger')); const tg = el('div', 'seg'); tr.append(tg); s.insertBefore(tr, first);
   plStrikeUpd = makeSeg(tg, [[true,'Strike'],[false,'Drone']], () => Lc().pStrike, v => { Lc().pStrike = v; refreshLayer(); changed(); });
   const orow = el('div', 'segrow'); orow.append(el('span', null, 'Output')); const og = el('div', 'seg'); orow.append(og); s.insertBefore(orow, first);
@@ -9244,7 +9474,7 @@ section('waves', [], s => {
   const bs = document.createElement('select'); bs.id = 'wvBus'; bs.setAttribute('aria-label', 'waves output');
   for (let k = 1; k <= 8; k++){ const o = document.createElement('option'); o.value = k; o.textContent = 'Waves In ' + k; bs.append(o); }
   bs.addEventListener('change', () => { Lc().wBus = +bs.value; changed(); });
-  br.append(bs); s.append(br);
+  br.append(makePick(bs)); s.append(br);
   const b = el('button', 'wvEdit', 'Edit the waves patch'); b.type = 'button'; b.addEventListener('click', openWaves); s.append(b);
   s.append(el('p', 'note wvMobNote', 'Plays the kit’s waves patch. To change the patch, tick Settings → App → Show waves on Mobile.'));
   const st = el('div', 'readout'); st.id = 'wvStat'; st.style.paddingLeft = '0'; s.append(st);
@@ -9255,7 +9485,7 @@ function wvStatus(){
   const on = outs.some(m => (m.params && m.params.slot || 1) === (L.wBus | 0));
   return !d ? 'No waves patch yet. Press Edit to make one; the layer plays what its Out module sends to this output.'
     : !on ? 'Nothing in the patch plays on Waves In ' + (L.wBus | 0) + '. Patch an Out module set to it.'
-    : 'Plays the patch’s Waves In ' + (L.wBus | 0) + ' for one note, held for the pad’s Gate. Tune 0 st plays middle C (C4) into Host In.' + (WV.ready ? '' : ' Loading Plaits and effects…');
+    : 'Plays the patch’s Waves In ' + (L.wBus | 0) + ' for one note, held for the pad’s Gate. Tune 0 st plays middle C (C4) into Host In.' + (WV.ready ? '' : ' Loading the macro osc and effects…');
 }
 let elModelUpd;
 section('Exciter', ['eContour','eStrike','eMallet','eStrikeT','eBow','eBowT','eBlow','eFlow','eBlowT','eStrength']);
@@ -9264,7 +9494,7 @@ section('Resonator', ['eGeo','eBright','eDamp','ePos','eSpace'], s => {
   const first = s.children[1];
   const mr = el('div', 'segrow'); mr.append(el('span', null, 'Model')); const mg = el('div', 'seg'); mr.append(mg); s.insertBefore(mr, first);
   elModelUpd = makeSeg(mg, [[0,'Modal'],[1,'String'],[2,'Strings']], () => Lc().eModel, v => { Lc().eModel = v; changed(); });
-  const st = el('div', 'readout'); st.style.paddingLeft = '0'; st.textContent = 'Elements plays while the pad’s Gate is held. Contour shapes the exciter envelope; Space adds its reverb.'; s.append(st);
+  const st = el('div', 'readout'); st.style.paddingLeft = '0'; st.textContent = 'Resonator plays while the pad’s Gate is held. Contour shapes the exciter envelope; Space adds its reverb. Based on Elements by Mutable Instruments (MIT).'; s.append(st);
 });
 const elResSec = secs.lastChild;
 const pitchRows = section('Pitch', ['tune','fine','pAmt','pDec'], s => { const ro = el('div', 'readout'); ro.id = 'pitchRO'; s.append(ro); });
@@ -9282,7 +9512,7 @@ section('Filter', ['lpCut','lpRes','lpEnv','hpCut','hpRes','hpEnv','fAtk','fDec'
    it live (wobble locked to the tempo, held notes keep wobbling); the pads, the waveform and anything else
    play its rendered note. Settings live in V().bass; the voice's Level, Tune and Drive apply too. */
 const BU = {
-  oct:{l:'Octave', min:-3, max:2, c:'int', d:0, f:v => v ? (v > 0 ? '+' : '−') + Math.abs(v) + ' oct' : 'C2 at C-4'},
+  oct:{l:'Octave', min:-3, max:2, c:'int', d:0, f:v => v ? (v > 0 ? '+' : '−') + Math.abs(v) + ' oct' : 'C2'},
   shape:{l:'Shape', min:0, max:1, c:'lin', d:0, f:v => v <= 0.02 ? 'Saw' : v < 0.49 ? 'Saw › square' : v <= 0.51 ? 'Square' : v < 0.98 ? 'Square › tri' : 'Triangle'},
   parts:{l:'Partials', min:1, max:64, c:'int', d:48, f:v => v === 1 ? '1 (sine)' : String(v)},
   tilt:{l:'Bright', min:-1, max:1, c:'lin', d:0, f:v => (v > 0 ? '+' : '') + Math.round(v * 100) + '%'},
@@ -9465,12 +9695,12 @@ function bassRandom(){
       const r = el('div', 'selrow'); r.append(el('span', null, 'Rate'));
       const sel = document.createElement('select'); sel.id = 'bassRate'; sel.setAttribute('aria-label', 'Wobble rate');
       BASS_DIVN.forEach((n, i) => { const o = document.createElement('option'); o.value = i; o.textContent = n; sel.append(o); });
-      sel.addEventListener('change', () => { BV().wRate = +sel.value; bassEdit(); }); r.append(sel); s.append(r);
+      sel.addEventListener('change', () => { BV().wRate = +sel.value; bassEdit(); }); r.append(makePick(sel)); s.append(r);
       bassSegs.push(() => { sel.value = BV().wRate | 0; });
       const r2 = el('div', 'selrow'); r2.append(el('span', null, 'Shape'));
       const sh = document.createElement('select'); sh.id = 'bassShape'; sh.setAttribute('aria-label', 'Wobble shape');
       BASS_SHAPES.forEach((n, i) => { const o = document.createElement('option'); o.value = i; o.textContent = n; sh.append(o); });
-      sh.addEventListener('change', () => { BV().wShape = +sh.value; bassEdit(); }); r2.append(sh); s.append(r2);
+      sh.addEventListener('change', () => { BV().wShape = +sh.value; bassEdit(); }); r2.append(makePick(sh)); s.append(r2);
       bassSegs.push(() => { sh.value = BV().wShape | 0; });
       seg(s, 'Restart', [[1, 'Each note'], [0, 'Free']], 'wRetrig');
     }
@@ -9569,7 +9799,7 @@ function blipRandom(){
    Synth slots can run the voice engine (VoxCore): Synth → Engine: Voice. Type lyrics; the tracker sings a syllable
    per note, live. The pads (and exports) sing the whole line. Settings live in V().vox; Level, Tune, Drive apply. */
 const VU = {
-  oct:{l:'Octave', min:-2, max:1, c:'int', d:0, f:v => v ? (v > 0 ? '+' : '−') + Math.abs(v) + ' oct' : 'C4 at C-4'},
+  oct:{l:'Octave', min:-2, max:1, c:'int', d:0, f:v => v ? (v > 0 ? '+' : '−') + Math.abs(v) + ' oct' : 'C4'},
   form:{l:'Size', min:-1, max:1, c:'lin', d:0, f:v => Math.abs(v) < 0.02 ? 'Normal' : (v < 0 ? 'Bigger ' : 'Smaller ') + Math.round(Math.abs(v) * 100) + '%'},
   robot:{l:'Robot', min:0, max:1, c:'lin', d:0.6, f:pct},
   voice:{l:'Voice', min:0, max:1, c:'lin', d:1, f:v => v < 0.02 ? 'Whisper' : pct(v)},
@@ -11605,7 +11835,7 @@ function presetSheet(kind){
   if (pbOpen) pbOpen();
   if (kind === 'layer' && V().engine && V().engine !== 'layers') return toast('Layer presets are for the Layers engine.');
   const song = kind === 'voice' || kind === 'layer', eng = song ? null : enginePresetEntries(kind), rkind = song ? kind : eng.rk;
-  const title = kind === 'voice' ? 'Presets' : kind === 'layer' ? 'Layer presets' : eng.title;
+  const title = kind === 'voice' ? 'Pad presets' : kind === 'layer' ? 'Layer presets' : eng.title;
   const wrap = el('div', 'pbs'), box = el('div', 'pbox'); wrap.setAttribute('role', 'dialog'); wrap.setAttribute('aria-modal', 'true'); wrap.setAttribute('aria-label', title);
   const hd = el('div', 'phd'), ttl = el('b', null, title), q = el('input'), close = el('button', 'sm', 'Close'); close.type = 'button';
   q.type = 'search'; q.placeholder = 'Search…'; q.spellcheck = false; q.setAttribute('aria-label', 'Search presets'); hd.append(ttl, q, close);
@@ -11922,7 +12152,7 @@ const XUI = {
     note:'Plays the song’s waves patch live (Waves at the top), its notes going to the patch’s voices: the Bus picks which of the patch’s Out buses this pad hears. Hit is how hard a note with no volume plays; the VOL column is the velocity. A poly track plays up to four notes. Edits to the patch are heard at once.',
     pre:[['Init', {}]]},
   acid:{title:'Acid', tag:'saw/square · ladder · accent · slide', rows:{
-      oct:{l:'Octave', min:-1, max:3, c:'int', d:1, f:v => 'C' + (2 + Math.round(v)) + ' at C-4'},
+      oct:{l:'Octave', min:-1, max:3, c:'int', d:1, f:v => 'C' + (2 + Math.round(v))},
       wave:{l:'Wave', min:0, max:1, c:'lin', d:0, f:v => v < 0.03 ? 'Saw' : v > 0.97 ? 'Square' : 'Saw ' + Math.round((1 - v) * 100) + '%'},
       pw:{l:'Pulse width', min:0, max:1, c:'lin', d:0.5, f:pct}, sub:{l:'Sub', min:0, max:1, c:'lin', d:0, f:pct}, noise:{l:'Noise', min:0, max:1, c:'lin', d:0, f:pct},
       cut:{l:'Cutoff', min:40, max:6000, c:'log', d:380, f:hz}, res:{l:'Resonance', min:0, max:1.05, c:'lin', d:0.72, f:pct},
@@ -11959,14 +12189,14 @@ const XUI = {
       ['Wow siren', {cut:350, res:1, envAmt:1, dec:800, key:0.5, sat:0.5, ampDec:1800, sus:0.7}]]},
   mach:{title:'Machine', tag:'machines · HP/LP · LFO', rows:{
       machine:{l:'Machine', min:0, max:6, c:'int', d:0, f:nameOf(MachCore.MACHINES)},
-      oct:{l:'Octave', min:-1, max:3, c:'int', d:2, f:v => 'C' + (2 + Math.round(v)) + ' at C-4'},
+      oct:{l:'Octave', min:-1, max:3, c:'int', d:2, f:v => 'C' + (2 + Math.round(v))},
       a:{l:'A', min:0, max:1, c:'lin', d:0.3, f:pct}, b:{l:'B', min:0, max:1, c:'lin', d:0.5, f:pct}, c:{l:'C', min:0, max:1, c:'lin', d:0.4, f:pct},
       det:{l:'Detune', min:0, max:1, c:'lin', d:0.25, f:pct},
-      hp:{l:'High-pass', min:20, max:4000, c:'log', d:30, f:hz}, lp:{l:'Low-pass', min:60, max:16000, c:'log', d:3500, f:hz}, res:{l:'Resonance', min:0, max:1, c:'lin', d:0.25, f:pct},
+      hp:{l:'HP cutoff', min:20, max:4000, c:'log', d:30, f:hz}, lp:{l:'Cutoff', min:60, max:16000, c:'log', d:3500, f:hz}, res:{l:'Resonance', min:0, max:1, c:'lin', d:0.25, f:pct},
       fenv:{l:'Filter env', min:0, max:1, c:'lin', d:0.35, f:pct}, fdec:{l:'Filter decay', min:10, max:3000, c:'log', d:350, f:ms},
       atk:{l:'Attack', min:0.5, max:2000, c:'log', d:3, f:ms}, dec:{l:'Decay', min:1, max:4000, c:'log', d:500, f:ms}, sus:{l:'Sustain', min:0, max:1, c:'lin', d:0.7, f:pct}, rel:{l:'Release', min:1, max:4000, c:'log', d:220, f:ms},
       lfoRate:{l:'LFO rate', min:0.05, max:20, c:'log', d:4, f:v => v.toFixed(2) + ' Hz'}, lfoDepth:{l:'LFO depth', min:0, max:1, c:'lin', d:0, f:pct},
-      lfoDest:{l:'LFO to', min:0, max:3, c:'int', d:0, f:nameOf(['Pitch', 'Low-pass', 'A', 'Level'])}, glide:{l:'Glide', min:0, max:600, c:'sq', d:0, f:v => v < 0.5 ? 'Off' : ms(v)}},
+      lfoDest:{l:'LFO to', min:0, max:3, c:'int', d:0, f:nameOf(['Pitch', 'Cutoff', 'A', 'Level'])}, glide:{l:'Glide', min:0, max:600, c:'sq', d:0, f:v => v < 0.5 ? 'Off' : ms(v)}},
     secs:[['Machine', ['machine', 'oct', 'a', 'b', 'c', 'det']], ['Filters', ['hp', 'lp', 'res', 'fenv', 'fdec']], ['Amp', ['atk', 'dec', 'sus', 'rel', 'glide']], ['LFO', ['lfoRate', 'lfoDepth', 'lfoDest']]],
     note:'A, B and C do something different on each machine. Dual VCO: A saw→pulse, B 2nd osc level, C its interval. Chip: A pulse width, B wave, C ring mod. FM+: A ratio, B index, C feedback. Swarm: A spread, B voices, C sub. Ensemble: A chord, B detune, C saw→square. Noise: A width, B color, C pitched. Additive: A partials, B odd/even, C brightness.',
     pre:[['Init', {}], ['Dual saw lead', {machine:0, a:0, b:0.8, c:0, det:0.6, lp:5000, res:0.2}], ['Sync-ish brass', {machine:0, a:0.4, b:0.7, c:0.5, lp:1800, fenv:0.6, fdec:250, res:0.35}],
@@ -11996,7 +12226,7 @@ const XUI = {
       ['Clap-ish', {tLev:0, nType:1, nFreq:1300, nRes:0.4, nDec:240, nLev:0.9, nSweep:0.3}], ['Zap tom', {wave:3, pitch:300, bend:36, bendT:60, tdec:180, dist:0.3, nLev:0}],
       ['Resonant ping', {tLev:0.3, nType:3, nFreq:900, nRes:0.95, nDec:400, nLev:0.6}], ['Dirty kick', {wave:0, pitch:48, bend:30, bendT:40, tdec:550, dist:0.6, click:0.5, nLev:0}]]},
   modal:{title:'Modal', tag:'material · exciter · modes', rows:{
-      mat:{l:'Material', min:0, max:11, c:'int', d:0, f:nameOf(ModalCore.MATERIALS)}, oct:{l:'Octave', min:-1, max:4, c:'int', d:2, f:v => 'C' + (2 + Math.round(v)) + ' at C-4'},
+      mat:{l:'Material', min:0, max:11, c:'int', d:0, f:nameOf(ModalCore.MATERIALS)}, oct:{l:'Octave', min:-1, max:4, c:'int', d:2, f:v => 'C' + (2 + Math.round(v))},
       exc:{l:'Exciter', min:0, max:4, c:'int', d:0, f:nameOf(ModalCore.EXCITERS)}, hard:{l:'Hardness', min:0, max:1, c:'lin', d:0.55, f:pct},
       bow:{l:'Bow / breath', min:0, max:1, c:'lin', d:0.6, f:pct}, noise:{l:'Noise', min:0, max:1, c:'lin', d:0, f:pct},
       modes:{l:'Modes', min:1, max:24, c:'int', d:16, f:v => String(Math.round(v))}, bright:{l:'Brightness', min:0, max:1, c:'lin', d:0.6, f:pct},
@@ -12020,11 +12250,11 @@ const XUI = {
       ['Cymbal plate', {mat:11, oct:3, exc:0, hard:1, dec:1.2, bright:0.9, inharm:0.8, modes:24}],
       ['Muted marimba bass', {mat:1, oct:0, exc:0, hard:0.3, dec:0.45, bright:0.3, pos:0.3}]]},
   piano:{title:'Piano', tag:'struck strings · hammer · soundboard', rows:{
-      oct:{l:'Octave', min:-1, max:4, c:'int', d:2, f:v => 'C' + (2 + Math.round(v)) + ' at C-4'},
+      oct:{l:'Octave', min:-1, max:4, c:'int', d:2, f:v => 'C' + (2 + Math.round(v))},
       hard:{l:'Hammer', min:0, max:1, c:'lin', d:0.55, f:v => v < 0.33 ? 'Soft ' + pct(v) : v < 0.7 ? 'Medium ' + pct(v) : 'Hard ' + pct(v)},
       bright:{l:'Brightness', min:0, max:1, c:'lin', d:0.55, f:pct}, pos:{l:'Strike point', min:0.03, max:0.3, c:'lin', d:0.12, f:pct},
       dec:{l:'Sustain time', min:0.2, max:3, c:'log', d:1, f:v => '×' + v.toFixed(2)}, strings:{l:'Strings', min:1, max:3, c:'int', d:3, f:v => String(Math.round(v))},
-      det:{l:'Unison detune', min:0, max:1, c:'lin', d:0.35, f:v => Math.round(v * v * 6 * 10) / 10 + ' cents'}, inharm:{l:'String stiffness', min:0, max:1, c:'lin', d:0.4, f:pct},
+      det:{l:'Unison detune', min:0, max:1, c:'lin', d:0.35, f:v => Math.round(v * v * 6 * 10) / 10 + ' ct'}, inharm:{l:'String stiffness', min:0, max:1, c:'lin', d:0.4, f:pct},
       thump:{l:'Hammer thump', min:0, max:1, c:'lin', d:0.35, f:pct}, body:{l:'Soundboard', min:0, max:1, c:'lin', d:0.4, f:pct},
       rel:{l:'Dampers', min:2, max:2000, c:'log', d:180, f:ms}, pedal:{l:'Sustain pedal', min:0, max:1, c:'int', d:0, f:v => v ? 'Down' : 'Up'}},
     secs:[['Piano', ['oct', 'hard', 'bright', 'pos', 'dec']], ['Strings', ['strings', 'det', 'inharm']], ['Body & dampers', ['thump', 'body', 'rel', 'pedal']]],
@@ -12039,7 +12269,7 @@ const XUI = {
       ['Ballad grand', {hard:0.35, bright:0.4, dec:1.8, body:0.6, thump:0.4, rel:400, pedal:1}],
       ['Dark felt pad', {hard:0.1, bright:0.15, dec:2.5, pedal:1, body:0.7, det:0.5, rel:800}]]},
   ep:{title:'Tine EP', tag:'tine · pickup bark · bell · tremolo', rows:{
-      oct:{l:'Octave', min:-1, max:4, c:'int', d:2, f:v => 'C' + (2 + Math.round(v)) + ' at C-4'},
+      oct:{l:'Octave', min:-1, max:4, c:'int', d:2, f:v => 'C' + (2 + Math.round(v))},
       hard:{l:'Hammer', min:0, max:1, c:'lin', d:0.5, f:pct}, bark:{l:'Bark', min:0, max:1, c:'lin', d:0.45, f:pct}, bell:{l:'Bell', min:0, max:1, c:'lin', d:0.4, f:pct},
       dec:{l:'Sustain time', min:0.2, max:3, c:'log', d:1, f:v => '×' + v.toFixed(2)}, tone:{l:'Tone', min:0, max:1, c:'lin', d:0.6, f:pct},
       trem:{l:'Tremolo', min:0, max:1, c:'lin', d:0, f:pct}, tremRate:{l:'Tremolo rate', min:0.5, max:12, c:'log', d:4.5, f:v => v.toFixed(2) + ' Hz'},
@@ -12056,7 +12286,7 @@ const XUI = {
       ['Crystal tines', {oct:3, hard:0.7, bark:0.05, bell:1, tone:0.95, dec:1.4}],
       ['Tape EP', {hard:0.4, bark:0.5, tone:0.3, trem:0.25, tremRate:1.5, dec:1.5}, {drive:0.15}]]},
   organ:{title:'Organ', tag:'drawbars · percussion · click · rotary', rows:{
-      oct:{l:'Octave', min:-1, max:4, c:'int', d:2, f:v => 'C' + (2 + Math.round(v)) + ' at C-4'},
+      oct:{l:'Octave', min:-1, max:4, c:'int', d:2, f:v => 'C' + (2 + Math.round(v))},
       d1:{l:"16′", min:0, max:8, c:'int', d:8, f:v => String(Math.round(v))},
       d2:{l:"5⅓′", min:0, max:8, c:'int', d:8, f:v => String(Math.round(v))},
       d3:{l:"8′", min:0, max:8, c:'int', d:8, f:v => String(Math.round(v))},
@@ -12098,7 +12328,7 @@ const XUI = {
       ['Alto sax', {bank:0, prog:65}], ['Flute', {bank:0, prog:73}], ['Square lead', {bank:0, prog:80}], ['Warm pad', {bank:0, prog:89}], ['Standard drum kit', {bank:128, prog:0}],
       ['TR-808 kit', {bank:128, prog:25}], ['Electronic kit', {bank:128, prog:24}], ['Jazz kit', {bank:128, prog:32}]]},
   table:{title:'Table', tag:'wavetables · warp · unison', rows:{
-      oct:{l:'Octave', min:-1, max:4, c:'int', d:2, f:v => 'C' + (2 + Math.round(v)) + ' at C-4'},
+      oct:{l:'Octave', min:-1, max:4, c:'int', d:2, f:v => 'C' + (2 + Math.round(v))},
       table:{l:'Table', min:0, max:4, c:'int', d:0, f:v => TableCore.TABLES[Math.max(0, Math.min(4, Math.round(v)))]},
       pos:{l:'Position', min:0, max:1, c:'lin', d:0, f:pct}, warp:{l:'Warp', min:0, max:1, c:'lin', d:0, f:pct},
       pmod:{l:'Position env', min:-1, max:1, c:'lin', d:0, f:pct}, pdec:{l:'Env decay', min:10, max:6000, c:'log', d:400, f:ms},
@@ -12135,7 +12365,7 @@ const XUI = {
       bands:{l:'Bands', min:1, max:8, c:'int', d:4, f:v => String(Math.round(v))}, freq:{l:'Frequency', min:60, max:16000, c:'log', d:3000, f:hz},
       spread:{l:'Spacing', min:0, max:1, c:'lin', d:0.3, f:pct}, metal:{l:'Metal', min:0, max:1, c:'lin', d:0.5, f:pct}, q:{l:'Ring', min:0, max:1, c:'lin', d:0.5, f:pct},
       body:{l:'Resonator mix', min:0, max:1, c:'lin', d:0.6, f:pct}, key:{l:'Key follow', min:0, max:1, c:'lin', d:0, f:pct},
-      hp:{l:'High-pass', min:10, max:8000, c:'log', d:200, f:hz}, lp:{l:'Low-pass', min:200, max:20000, c:'log', d:14000, f:hz},
+      hp:{l:'HP cutoff', min:10, max:8000, c:'log', d:200, f:hz}, lp:{l:'Cutoff', min:200, max:20000, c:'log', d:14000, f:hz},
       fenv:{l:'Env amount', min:-1, max:1, c:'lin', d:0, f:pct}, fdec:{l:'Env decay', min:5, max:4000, c:'log', d:200, f:ms},
       sweep:{l:'Sweep', min:-1, max:1, c:'lin', d:0, f:pct}, wind:{l:'Wind', min:0, max:1, c:'lin', d:0, f:pct},
       atk:{l:'Attack', min:0.5, max:6000, c:'log', d:1, f:ms}, dec:{l:'Decay', min:1, max:8000, c:'log', d:200, f:ms}, sus:{l:'Sustain', min:0, max:1, c:'lin', d:0, f:pct}, rel:{l:'Release', min:1, max:8000, c:'log', d:80, f:ms}},
@@ -12154,7 +12384,7 @@ const XUI = {
       ['Static', {color:0.8, body:0, hp:2000, lp:12000, sus:1, rel:50, grain:0.3, grate:300}],
       ['Noise kick', {color:0.1, bands:1, freq:70, q:0.9, body:1, hp:20, lp:2000, fenv:-1, fdec:80, dec:220, rel:40}]]},
   strings:{title:'Strings', tag:'plucked ensemble · strum · body', rows:{
-      oct:{l:'Octave', min:-1, max:4, c:'int', d:2, f:v => 'C' + (2 + Math.round(v)) + ' at C-4'},
+      oct:{l:'Octave', min:-1, max:4, c:'int', d:2, f:v => 'C' + (2 + Math.round(v))},
       voices:{l:'Strings', min:1, max:6, c:'int', d:1, f:v => String(Math.round(v))},
       chord:{l:'Voicing', min:0, max:8, c:'int', d:0, f:v => StringsCore.CHORDS[Math.max(0, Math.min(8, Math.round(v)))]},
       strum:{l:'Strum', min:0, max:400, c:'sq', d:25, f:ms}, down:{l:'Direction', min:0, max:1, c:'int', d:0, f:v => v >= 0.5 ? 'down' : 'up'},
@@ -12207,7 +12437,7 @@ const XUI = {
       ['Sub boom', {pitch:40, bend:20, bendT:200, r1:1, i1:0.15, idec1:400, i2:0, dec:1500, curve:0.4, tone:0.3, click:0.1}]]},
   wind:{title:'Wind', tag:'reed · jet · bow · physical', rows:{
       model:{l:'Model', min:0, max:2, c:'int', d:0, f:v => WindCore.MODELS[Math.max(0, Math.min(2, Math.round(v)))]},
-      oct:{l:'Octave', min:0, max:4, c:'int', d:2, f:v => 'C' + (2 + Math.round(v)) + ' at C-4'},
+      oct:{l:'Octave', min:0, max:4, c:'int', d:2, f:v => 'C' + (2 + Math.round(v))},
       breath:{l:'Breath', min:0, max:1, c:'lin', d:0.6, f:pct}, noise:{l:'Breath noise', min:0, max:1, c:'lin', d:0.15, f:pct},
       stiff:{l:'Stiffness', min:0, max:1, c:'lin', d:0.5, f:pct}, pos:{l:'Position', min:0, max:1, c:'lin', d:0.3, f:pct}, damp:{l:'Damping', min:0, max:1, c:'lin', d:0.5, f:pct},
       body:{l:'Body', min:0, max:1, c:'lin', d:0.3, f:pct},
@@ -12233,7 +12463,7 @@ const XUI = {
       ['Reed pad', {model:0, oct:2, breath:0.5, stiff:0.4, damp:0.5, noise:0.1, vib:0.3, vrate:3, atk:600, rel:900, body:0.6}],
       ['Bowed sub', {model:2, oct:0, breath:0.75, stiff:0.5, pos:0.4, damp:0.6, body:0.9, vib:0.05, atk:150, rel:400}]]},
   phase:{title:'Phase', tag:'phase distortion · DCW · resonance', rows:{
-      oct:{l:'Octave', min:-1, max:4, c:'int', d:2, f:v => 'C' + (2 + Math.round(v)) + ' at C-4'},
+      oct:{l:'Octave', min:-1, max:4, c:'int', d:2, f:v => 'C' + (2 + Math.round(v))},
       wave:{l:'Wave 1', min:0, max:7, c:'int', d:0, f:v => PhaseCore.WAVES[Math.max(0, Math.min(7, Math.round(v)))]},
       wave2:{l:'Wave 2', min:0, max:7, c:'int', d:1, f:v => PhaseCore.WAVES[Math.max(0, Math.min(7, Math.round(v)))]},
       mix:{l:'Mix 1↔2', min:0, max:1, c:'lin', d:0, f:pct}, det:{l:'Detune', min:0, max:1, c:'lin', d:0.1, f:pct}, ring:{l:'Ring mod', min:0, max:1, c:'lin', d:0, f:pct},
@@ -12261,7 +12491,7 @@ const XUI = {
       ['Saw lead', {oct:2, wave:0, wave2:0, det:0.2, dcw:0.6, datk:3, ddec:400, dsus:0.7, atk:5, sus:0.9, rel:150}],
       ['Synth harp', {oct:3, wave:4, wave2:3, mix:0.5, dcw:0.9, ddec:80, dsus:0.1, dec:900, sus:0, rel:300, key:0.4}]]},
   partials:{title:'Partials', tag:'additive · 256 harmonics · morph', rows:{
-      oct:{l:'Octave', min:-1, max:4, c:'int', d:2, f:v => 'C' + (2 + Math.round(v)) + ' at C-4'},
+      oct:{l:'Octave', min:-1, max:4, c:'int', d:2, f:v => 'C' + (2 + Math.round(v))},
       count:{l:'Partials', min:1, max:256, c:'sq', d:64, f:v => String(Math.round(v))},
       tilt:{l:'Tilt', min:0, max:1, c:'lin', d:0.5, f:v => 'dark ' + Math.round(v * 100) + '%'}, comb:{l:'Odd / even', min:-1, max:1, c:'lin', d:0, f:v => v > 0.02 ? 'odd ' + Math.round(v * 100) + '%' : v < -0.02 ? 'even ' + Math.round(-v * 100) + '%' : 'all'},
       fmt:{l:'Formant', min:100, max:8000, c:'log', d:1200, f:hz}, fwidth:{l:'Formant width', min:0, max:1, c:'lin', d:0.4, f:pct}, famt:{l:'Formant amount', min:0, max:1, c:'lin', d:0, f:pct},
@@ -12311,7 +12541,7 @@ const XUI = {
       ['Frame drum', {pitch:120, size:0.6, tension:0.1, dec:1200, damp:0.2, hard:0.3, pos:0.6, shell:0.2}],
       ['Snare-less snare', {pitch:200, size:0.35, tension:0.4, tenT:20, dec:250, damp:0.8, hard:1, pos:0.5, noise:0.6, shell:0.7, shellF:0.8}]]},
   chip:{title:'Chip', tag:'8-bit · duty · arp · LFSR', rows:{
-      oct:{l:'Octave', min:0, max:5, c:'int', d:3, f:v => 'C' + (2 + Math.round(v)) + ' at C-4'},
+      oct:{l:'Octave', min:0, max:5, c:'int', d:3, f:v => 'C' + (2 + Math.round(v))},
       wave:{l:'Wave', min:0, max:2, c:'int', d:0, f:v => ChipCore.WAVES[Math.max(0, Math.min(2, Math.round(v)))]},
       duty:{l:'Duty', min:0, max:3, c:'int', d:1, f:v => ['12.5%', '25%', '50%', '75%'][Math.max(0, Math.min(3, Math.round(v)))]}, sweep:{l:'Duty sweep', min:0, max:1, c:'lin', d:0, f:pct},
       chord:{l:'Arp chord', min:0, max:8, c:'int', d:0, f:v => ChipCore.CHORDS[Math.max(0, Math.min(8, Math.round(v)))]}, arp:{l:'Arp speed', min:1, max:8, c:'int', d:1, f:v => Math.round(v) + ' fr'},
@@ -12333,7 +12563,7 @@ const XUI = {
       ['Pitch drop kick', {oct:1, wave:1, slide:-1, atk:0, dec:12, sus:0, rel:1}],
       ['Vibrato lead', {oct:3, duty:0, vib:0.8, vrate:5, dec:20, sus:0.7, rel:4}]]},
   vector:{title:'Vector', tag:'four waves · joystick · wave sequence', rows:{
-      oct:{l:'Octave', min:-1, max:4, c:'int', d:2, f:v => 'C' + (2 + Math.round(v)) + ' at C-4'},
+      oct:{l:'Octave', min:-1, max:4, c:'int', d:2, f:v => 'C' + (2 + Math.round(v))},
       mode:{l:'Mode', min:0, max:1, c:'int', d:0, f:nameOf(['Vector', 'Wave sequence'])},
       wa:{l:'Wave A', min:0, max:17, c:'int', d:2, f:nameOf(VectorCore.WAVES)}, wb:{l:'Wave B', min:0, max:17, c:'int', d:9, f:nameOf(VectorCore.WAVES)},
       wc:{l:'Wave C', min:0, max:17, c:'int', d:15, f:nameOf(VectorCore.WAVES)}, wd:{l:'Wave D', min:0, max:17, c:'int', d:7, f:nameOf(VectorCore.WAVES)},
@@ -12359,7 +12589,7 @@ const XUI = {
       xfade:{l:'Crossfade', min:0, max:1, c:'lin', d:0.3, f:pct},
       sloop:{l:'Loop', min:0, max:1, c:'int', d:1, f:v => v >= 0.5 ? 'on' : 'off'}, lstart:{l:'Loop from', min:1, max:16, c:'int', d:1, f:v => 'step ' + Math.round(v)},
       sgate:{l:'Step gate', min:0, max:1, c:'lin', d:0, f:pct}, sfenv:{l:'Step filter', min:0, max:1, c:'lin', d:0, f:pct},
-      unison:{l:'Unison', min:1, max:7, c:'int', d:1, f:v => String(Math.round(v))}, det:{l:'Detune', min:0, max:1, c:'lin', d:0.25, f:v => '±' + Math.round(v * v * 50) + ' cents'},
+      unison:{l:'Unison', min:1, max:7, c:'int', d:1, f:v => String(Math.round(v))}, det:{l:'Detune', min:0, max:1, c:'lin', d:0.25, f:v => '±' + Math.round(v * v * 50) + ' ct'},
       spread:{l:'Spread', min:0, max:1, c:'lin', d:0, f:pct},
       cut:{l:'Cutoff', min:40, max:20000, c:'log', d:8000, f:hz}, res:{l:'Resonance', min:0, max:1, c:'lin', d:0.15, f:pct},
       fenv:{l:'Filter env', min:-1, max:1, c:'lin', d:0.2, f:v => (v > 0 ? '+' : '') + Math.round(v * 100) + '%'}, fdec:{l:'Filter decay', min:10, max:6000, c:'log', d:500, f:ms},
@@ -12391,7 +12621,7 @@ const XUI = {
       ['Wide dark pad', {oct:1, wa:6, wb:9, wc:10, wd:0, lx:0.35, ly:0.3, lrate:0.08, unison:6, det:0.35, spread:0.7, cut:2200, res:0.15, fenv:0, atk:1100, dec:3000, sus:0.9, rel:3000}],
       ['Wave seq pluck', {oct:2, mode:1, steps:4, s1:16, s2:2, s3:13, s4:3, sdiv:9, xfade:0.05, sgate:0.6, unison:2, det:0.15, cut:3200, res:0.3, fenv:0.5, fdec:200, sfenv:0.4, atk:1, dec:500, sus:0.3, rel:150}]]},
   scanned:{title:'Scanned', tag:'a ring of masses, scanned as a wave', rows:{
-      oct:{l:'Octave', min:-1, max:4, c:'int', d:2, f:v => 'C' + (2 + Math.round(v)) + ' at C-4'},
+      oct:{l:'Octave', min:-1, max:4, c:'int', d:2, f:v => 'C' + (2 + Math.round(v))},
       masses:{l:'Masses', min:16, max:128, c:'int', d:64, f:v => String(Math.round(v))}, ends:{l:'Shape', min:0, max:1, c:'int', d:0, f:nameOf(ScannedCore.ENDS)},
       stiff:{l:'Stiffness', min:0, max:1, c:'lin', d:0.4, f:pct}, center:{l:'Centering', min:0, max:1, c:'lin', d:0.15, f:pct},
       damp:{l:'Damping', min:0, max:1, c:'lin', d:0.35, f:pct}, smooth:{l:'Smoothing', min:0, max:1, c:'lin', d:0.3, f:pct},
@@ -12426,7 +12656,7 @@ const XUI = {
       ['Resonant pluck', {oct:2, masses:56, exc:0, pos:0.12, width:0.15, stiff:0.6, damp:0.45, smooth:0.5, keep:0, urate:220, cut:3500, res:0.5, fenv:0.6, fdec:200, atk:1, dec:700, sus:0, rel:300}],
       ['Dark thrum', {oct:0, masses:64, exc:2, pos:0.5, width:0.7, stiff:0.2, center:0.4, damp:0.25, smooth:0.8, urate:60, keep:0.8, cut:1200, res:0.2, fenv:0, atk:50, dec:2000, sus:0.9, rel:400}]]},
   resynth:{title:'Resynth', tag:'a sample rebuilt from its partials', rows:{
-      oct:{l:'Octave', min:-1, max:4, c:'int', d:2, f:v => 'C' + (2 + Math.round(v)) + ' at C-4'},
+      oct:{l:'Octave', min:-1, max:4, c:'int', d:2, f:v => 'C' + (2 + Math.round(v))},
       orig:{l:'Pitch', min:0, max:1, c:'int', d:0, f:nameOf(['Keyed (Octave)', 'Original'])},
       parts:{l:'Partials', min:1, max:128, c:'int', d:64, f:v => String(Math.round(v))},
       speed:{l:'Speed', min:0.1, max:4, c:'log', d:1, f:v => v.toFixed(2) + '×'}, pos:{l:'Position', min:0, max:1, c:'lin', d:0, f:pct},
@@ -12451,7 +12681,7 @@ const XUI = {
       ['Squeezed', {stretch:-0.5, parts:64, noise:0.3, speed:0.7}],
       ['Frozen bell drone', {oct:1, freeze:1, pos:0.02, stretch:0.35, parts:64, noise:0, atk:1200, sus:1, rel:3000}]]},
   bytebeat:{title:'Bytebeat', tag:'one-line formulas · 8-bit · a b c', rows:{
-      oct:{l:'Octave', min:-1, max:4, c:'int', d:2, f:v => 'C' + (2 + Math.round(v)) + ' at C-4'},
+      oct:{l:'Octave', min:-1, max:4, c:'int', d:2, f:v => 'C' + (2 + Math.round(v))},
       rate:{l:'Clock', min:1000, max:48000, c:'log', d:8000, f:hz},
       track:{l:'Pitch tracking', min:0, max:1, c:'lin', d:1, f:v => v < 0.01 ? 'off (fixed clock)' : pct(v)},
       a:{l:'a', min:0, max:255, c:'int', d:128, f:v => String(Math.round(v))},
@@ -12491,12 +12721,12 @@ const XUI = {
       ['Metal clang', {rate:16000, bits:5, smooth:0.1, dec:200, sus:0.2, rel:40}, null, '(t*(t>>9&7)|t>>3)^(t>>6)'],
       ['Sub rumble', {rate:6000, smooth:0.5, bits:6, dec:500, sus:0.8, rel:80}, null, 't*(t>>14&7|1)&(t>>6)']]},
   swarm:{title:'Swarm', tag:'oscillator cloud · drift · bloom', rows:{
-      oct:{l:'Octave', min:-1, max:4, c:'int', d:2, f:v => 'C' + (2 + Math.round(v)) + ' at C-4'},
+      oct:{l:'Octave', min:-1, max:4, c:'int', d:2, f:v => 'C' + (2 + Math.round(v))},
       voices:{l:'Voices', min:1, max:48, c:'int', d:16, f:v => String(Math.round(v))},
       wave:{l:'Wave', min:0, max:3, c:'lin', d:0, f:v => { const i = Math.min(2, Math.floor(v)), f = v - i; return f < 0.03 ? SwarmCore.WAVES[i] : f > 0.97 ? SwarmCore.WAVES[i + 1] : wvAb(SwarmCore.WAVES[i]) + '→' + wvAb(SwarmCore.WAVES[i + 1]) + ' ' + Math.round(f * 100) + '%'; }},   // short names while between two (owner, 2 Nov: the long ones ran into the next box)
       sub:{l:'Sub', min:0, max:1, c:'lin', d:0, f:pct},
-      spread:{l:'Spread', min:0, max:1, c:'lin', d:0.35, f:v => '±' + Math.round(v * v * 120) + ' cents'},
-      drift:{l:'Drift', min:0, max:1, c:'lin', d:0.3, f:v => '±' + Math.round(v * v * 80) + ' cents'},
+      spread:{l:'Spread', min:0, max:1, c:'lin', d:0.35, f:v => '±' + Math.round(v * v * 120) + ' ct'},
+      drift:{l:'Drift', min:0, max:1, c:'lin', d:0.3, f:v => '±' + Math.round(v * v * 80) + ' ct'},
       rate:{l:'Drift rate', min:0.02, max:12, c:'log', d:0.4, f:v => v.toFixed(2) + ' Hz'},
       cohes:{l:'Cohesion', min:0, max:1, c:'lin', d:0.3, f:pct},
       scatter:{l:'Scatter', min:0, max:1, c:'lin', d:0, f:pct},
@@ -12526,29 +12756,29 @@ const XUI = {
       ['Pluck swarm', {oct:2, voices:10, spread:0.25, drift:0.15, cut:2500, res:0.3, fenv:0.7, fdec:300, atk:1, dec:600, sus:0, rel:250}],
       ['Sub choir', {oct:0, voices:20, wave:2, sub:0.5, spread:0.3, drift:0.3, scatter:0.3, cut:1400, atk:500, sus:0.9, rel:2000}]]},
   drift:{title:'Drift', tag:'two-line analog poly · tape wow & flutter · haze', rows:{
-      oct:{l:'Octave', min:-1, max:4, c:'int', d:2, f:v => 'C' + (2 + Math.round(v)) + ' at C-4'},
+      oct:{l:'Octave', min:-1, max:4, c:'int', d:2, f:v => 'C' + (2 + Math.round(v))},
       aSaw:{l:'I saw', min:0, max:1, c:'lin', d:0.8, f:pct}, aPulse:{l:'I pulse', min:0, max:1, c:'lin', d:0, f:pct},
       sub:{l:'Sub', min:0, max:1, c:'lin', d:0, f:pct}, noise:{l:'Noise', min:0, max:1, c:'lin', d:0, f:pct},
       bSaw:{l:'II saw', min:0, max:1, c:'lin', d:0, f:pct}, bPulse:{l:'II pulse', min:0, max:1, c:'lin', d:0.6, f:pct},
       bSemi:{l:'II interval', min:-24, max:24, c:'int', d:0, f:v => (v > 0 ? '+' : v < 0 ? '−' : '') + Math.abs(Math.round(v)) + ' st'},
-      detune:{l:'II detune', min:0, max:50, c:'lin', d:7, f:v => '+' + Math.round(v) + ' cents'},
+      detune:{l:'II detune', min:0, max:50, c:'lin', d:7, f:v => '+' + Math.round(v) + ' ct'},
       ring:{l:'Ring mod', min:0, max:1, c:'lin', d:0, f:pct},
       pw:{l:'Pulse width', min:0.05, max:0.5, c:'lin', d:0.5, f:pct}, pwm:{l:'PWM', min:0, max:1, c:'lin', d:0.35, f:pct},
       pwmRate:{l:'PWM rate', min:0.05, max:10, c:'log', d:0.7, f:v => v.toFixed(2) + ' Hz'},
       voices:{l:'Voices', min:1, max:4, c:'int', d:2, f:v => String(Math.round(v))},
-      spread:{l:'Spread', min:0, max:1, c:'lin', d:0.3, f:v => '±' + Math.round(v * v * 25) + ' cents'},
-      drift:{l:'Drift', min:0, max:1, c:'lin', d:0.35, f:v => '±' + Math.round(v * v * 30) + ' cents'},
-      hp:{l:'High-pass', min:20, max:2000, c:'log', d:40, f:hz}, hpRes:{l:'HP res', min:0, max:1, c:'lin', d:0, f:pct},
-      cut:{l:'Low-pass', min:40, max:16000, c:'log', d:1800, f:hz}, res:{l:'LP res', min:0, max:1, c:'lin', d:0.15, f:pct},
+      spread:{l:'Spread', min:0, max:1, c:'lin', d:0.3, f:v => '±' + Math.round(v * v * 25) + ' ct'},
+      drift:{l:'Drift', min:0, max:1, c:'lin', d:0.35, f:v => '±' + Math.round(v * v * 30) + ' ct'},
+      hp:{l:'HP cutoff', min:20, max:2000, c:'log', d:40, f:hz}, hpRes:{l:'HP resonance', min:0, max:1, c:'lin', d:0, f:pct},
+      cut:{l:'Cutoff', min:40, max:16000, c:'log', d:1800, f:hz}, res:{l:'Resonance', min:0, max:1, c:'lin', d:0.15, f:pct},
       fenv:{l:'Filter env', min:-1, max:1, c:'lin', d:0.25, f:v => (v > 0 ? '+' : '') + Math.round(v * 100) + '%'},
       fatk:{l:'Filter attack', min:0.5, max:6000, c:'log', d:400, f:ms}, fdec:{l:'Filter decay', min:10, max:8000, c:'log', d:1500, f:ms},
       fsus:{l:'Filter sustain', min:0, max:1, c:'lin', d:0.4, f:pct}, key:{l:'Key follow', min:0, max:1, c:'lin', d:0.5, f:pct},
       atk:{l:'Attack', min:0.5, max:6000, c:'log', d:600, f:ms}, dec:{l:'Decay', min:1, max:8000, c:'log', d:1500, f:ms}, sus:{l:'Sustain', min:0, max:1, c:'lin', d:0.85, f:pct}, rel:{l:'Release', min:1, max:8000, c:'log', d:1800, f:ms},
-      vib:{l:'Vibrato', min:0, max:60, c:'lin', d:0, f:v => v < 0.5 ? 'Off' : '±' + Math.round(v) + ' cents'},
+      vib:{l:'Vibrato', min:0, max:60, c:'lin', d:0, f:v => v < 0.5 ? 'Off' : '±' + Math.round(v) + ' ct'},
       vibRate:{l:'Vib rate', min:0.5, max:10, c:'log', d:5, f:v => v.toFixed(2) + ' Hz'}, vibDelay:{l:'Vib delay', min:0, max:3000, c:'sq', d:600, f:ms},
-      wow:{l:'Wow', min:0, max:1, c:'lin', d:0.35, f:v => v < 0.01 ? 'Off' : '±' + (v * v * 35).toFixed(1) + ' cents'},
+      wow:{l:'Wow', min:0, max:1, c:'lin', d:0.35, f:v => v < 0.01 ? 'Off' : '±' + (v * v * 35).toFixed(1) + ' ct'},
       wowRate:{l:'Wow rate', min:0.05, max:3, c:'log', d:0.55, f:v => v.toFixed(2) + ' Hz'},
-      flutter:{l:'Flutter', min:0, max:1, c:'lin', d:0.25, f:v => v < 0.01 ? 'Off' : '±' + (v * v * 9).toFixed(1) + ' cents'},
+      flutter:{l:'Flutter', min:0, max:1, c:'lin', d:0.25, f:v => v < 0.01 ? 'Off' : '±' + (v * v * 9).toFixed(1) + ' ct'},
       chorus:{l:'Chorus', min:0, max:1, c:'lin', d:0.35, f:pct}, sat:{l:'Saturation', min:0, max:1, c:'lin', d:0.3, f:pct},
       age:{l:'Age', min:0, max:1, c:'lin', d:0.3, f:pct}, hiss:{l:'Hiss', min:0, max:1, c:'lin', d:0.15, f:v => v < 0.002 ? 'Off' : Math.round(-62 + v * 34) + ' dB'}},
     secs:[['Line I', ['oct', 'aSaw', 'aPulse', 'sub', 'noise']], ['Line II', ['bSaw', 'bPulse', 'bSemi', 'detune', 'ring']], ['Pulse & voices', ['pw', 'pwm', 'pwmRate', 'voices', 'spread', 'drift']],
@@ -12641,7 +12871,7 @@ async function sfPanel(force){
   rm.addEventListener('click', async () => { const id = V().sfFont || GM_FONT.id;
     if (!await askYes({title:'Remove this SoundFont?', body:'It is deleted from this device. Pads that use it go silent until it is loaded again.'}, 'Remove')) return;
     await sfDelete(id); if (id !== GM_FONT.id){ V().sfFont = GM_FONT.id; changed(cur); } sfPanel(true); });
-  const row1 = el('div', 'btnrow'); row1.append(fs); const row2 = el('div', 'btnrow'); row2.append(ps); const row3 = el('div', 'btnrow'); row3.append(ld, rm);
+  const row1 = el('div', 'btnrow'); row1.append(makePick(fs)); const row2 = el('div', 'btnrow'); row2.append(makePick(ps)); const row3 = el('div', 'btnrow'); row3.append(ld, rm);
   box.append(row1, row2, row3);
   if (!font) box.append(el('p', 'note', 'Loading… General MIDI comes from FluidR3 Mono GM (MIT license).'));
 }
@@ -12852,7 +13082,7 @@ function wtPanel(){
         const wt = await wtStarter(id), w = V(); w.wtData = wt; if (!w.table) w.table = normX('table', null); w.table.table = 4;
         changed(cur); refreshAll(); toast('Table: ' + wtLabel(wt));
       } catch(e){ toastErr('Couldn’t load that table (offline?).', 5000); } });
-    const row = el('div', 'btnrow'); row.append(ld, pick, clr); box.append(row, info); host.prepend(box);
+    const row = el('div', 'btnrow'); row.append(ld, makePick(pick, {skipEmpty:true}), clr); box.append(row, info); host.prepend(box);
   }
   $('wtClr').hidden = !v.wtData;
   $('wtInfo').textContent = v.wtData ? wtLabel(v.wtData) + (v.table && Math.round(v.table.table) === 4 ? '' : '. Set Table to Loaded to play it.')
@@ -12928,7 +13158,8 @@ function xBuild(){
   for (const [title, keys, kd] of U.secs){
     const sc = el('div', 'sec'); sc.append(el('h3', null, title)); host.append(sc);
     if (kd != null) sc.dataset.kd = kd;   // …PUMP DRUM MACHINES: one drum's page, shown when it is the pad's Drum (xKitVis)
-    for (const key of keys){ const r = makeRow(U.rows[key], key, XEV, {idp:'x' + k, noTrack:true, on:() => { changed(cur, true); if (key === 'kd'){ xKitVis(); renderPads(); bassUI(); } }}); sc.append(r.r); xRows.push(r); }
+    for (const key of keys){ const on = () => { changed(cur, true); if (key === 'kd'){ xKitVis(); renderPads(); bassUI(); } };
+      const r = makeRow(U.rows[key], key, XEV, {idp:'x' + k, noTrack:true, on}); if (twoOf(U.rows[key])) twoStateRow(r, on); sc.append(r.r); xRows.push(r); }
   }
   xKitVis();
   if (U.rows && U.rows.kd){   // KIT TO SLOTS: on a drum machine's Drum section
@@ -13023,11 +13254,11 @@ function refreshVoiceGlobals(){
 (function buildVoiceGlobals(){
   const host = $('voiceSecs');
   const vsec = t => { const s = el('div', 'sec'); s.append(el('h3', null, t)); host.append(s); return s; };
-  const ps = vsec('Voice pitch');
+  const ps = vsec('Pad pitch');
   for (const k of ['gPAmt','gPDec']){ const r = makeRow(VGP[k], k, V, {idp:'vg'}); ps.append(r.r); vgRows.push(r); }
-  const fs = vsec('Voice low-pass');
+  const fs = vsec('Pad filter');
   for (const k of ['gLpCut','gLpRes','gLpEnv','gFAtk','gFDec']){ const r = makeRow(VGP[k], k, V, {idp:'vg'}); fs.append(r.r); vgRows.push(r); }
-  const as = vsec('Voice amp');
+  const as = vsec('Pad amp');
   const onR = el('div', 'segrow'); onR.append(el('span', null, 'Envelope')); const onG = el('div', 'seg'); onR.append(onG); as.append(onR);
   vAmpOnUpd = makeSeg(onG, [[false,'Off'],[true,'On']], () => !!V().gAmpOn, x => { V().gAmpOn = x; refreshVoiceGlobals(); changed(); });
   const shR = el('div', 'segrow'); shR.append(el('span', null, 'Shape')); const shG = el('div', 'seg'); shR.append(shG); as.append(shR);
@@ -13039,7 +13270,7 @@ function refreshVoiceGlobals(){
 
 /* ---------- voice play (glide / legato / mono) ---------- */
 (function buildVoicePlay(){
-  const host = $('voiceSecs'), s = el('div', 'sec'); s.append(el('h3', null, 'Voice play')); host.append(s);
+  const host = $('voiceSecs'), s = el('div', 'sec'); s.append(el('h3', null, 'Pad play')); host.append(s);
   const mr = el('div', 'segrow'); mr.append(el('span', null, 'Mode')); const mg = el('div', 'seg'); mr.append(mg); s.append(mr);
   vmSelUpd.push(makeSeg(mg, [[0, 'Poly'], [1, 'Mono']], () => V().mono ? 1 : 0, x => { V().mono = !!x; changed(); }));
   const lr = el('div', 'segrow'); lr.append(el('span', null, 'Legato')); const lg = el('div', 'seg'); lr.append(lg); s.append(lr);
@@ -13055,21 +13286,27 @@ const TUNE_SETS = {
   Pythagorean: [0,13.7,3.9,5.9,7.8,-1.9,1.9,-7.8,5.9,-3.9,13.7,1.9],
   'Meantone': [0,-24,-7,-10,-14,-3,-17,-20,3,-21,-10,-7],
 };
-const tuneUI = [];
+const tuneRows = [];   // the 12 cents sliders (makeRow, so double-click / Alt-click / right-click work: SYNTH UX A, item 7)
+let tuneFold = null;
+const tuneCt = c => (c > 0 ? '+' : '') + c.toFixed(0) + ' ct';
+function tuneSum(){ if (!tuneFold) return; const n = (S.tune || []).filter(c => Math.abs(c) >= 0.5).length; tuneFold.sum(n ? n + ' of 12 notes detuned' : 'Equal temperament, no notes detuned'); }
 function applyTune(name){ const t = TUNE_SETS[name]; if (!t) return; S.tune = t.slice(); refreshTune(); saveS(); changed(); }
-function refreshTune(){ if (!S.tune) S.tune = new Array(12).fill(0); for (const u of tuneUI){ const c = S.tune[u.pc] || 0; u.inp.value = String(c); u.out.textContent = (c > 0 ? '+' : '') + c.toFixed(0) + ' ct'; } }
+function refreshTune(){ if (!S.tune) S.tune = new Array(12).fill(0); for (const r of tuneRows) r.refresh(); tuneSum(); }
 (function buildTuning(){
-  const host = $('voiceTuneSecs'), s = el('div', 'sec'); s.append(el('h3', null, 'Tuning (song) · C – F')); host.append(s);
+  const host = $('voiceTuneSecs');
+  tuneFold = makeFold('tuning', 'Tuning (song)', {cls:'sec wide', bodyCls:'secs'}); host.append(tuneFold.box);   // both halves fold as one
+  const s = el('div', 'sec'); s.append(el('h3', null, 'C – F')); tuneFold.body.append(s);
   const pr = el('div', 'segrow'); pr.append(el('span', null, 'Preset')); const pg = document.createElement('select'); pg.setAttribute('aria-label', 'Tuning preset');
   Object.keys(TUNE_SETS).forEach(n => { const o = document.createElement('option'); o.value = n; o.textContent = n; pg.append(o); });
-  pg.addEventListener('change', () => applyTune(pg.value)); pr.append(pg); s.append(pr);
-  const s2 = el('div', 'sec'); s2.append(el('h3', null, 'F♯ – B')); host.append(s2);   // two columns of six, side by side when there is room
+  pg.addEventListener('change', () => applyTune(pg.value)); pr.append(makePick(pg)); s.append(pr);
+  const s2 = el('div', 'sec'); s2.append(el('h3', null, 'F♯ – B')); tuneFold.body.append(s2);   // two columns of six, side by side when there is room
+  const tuneObj = () => S.tune || (S.tune = new Array(12).fill(0));
   for (let pc = 0; pc < 12; pc++){
-    const row = el('div', 'row'); row.append(el('label', null, NOTE[pc]));
-    const inp = document.createElement('input'); inp.type = 'range'; inp.min = '-100'; inp.max = '100'; inp.step = '1'; inp.setAttribute('aria-label', NOTE[pc] + ' tuning');
-    const out = el('output');
-    inp.addEventListener('input', () => { S.tune[pc] = +inp.value; out.textContent = (+inp.value > 0 ? '+' : '') + (+inp.value).toFixed(0) + ' ct'; saveS(); changed(); });
-    row.append(inp, out); (pc < 6 ? s : s2).append(row); tuneUI.push({ inp, out, pc });
+    // makeRow: the slider writes S.tune[pc]; the handler after it is exactly what the plain input did (save the song, then changed()).
+    const r = makeRow({l:NOTE[pc], min:-100, max:100, c:'int', d:0, f:tuneCt}, pc, tuneObj, {idp:'tn', noTrack:true, on:() => { saveS(); changed(); }});
+    r.inp.setAttribute('aria-label', NOTE[pc] + ' tuning'); r.inp.addEventListener('input', tuneSum);
+    const rf = r.refresh; r.refresh = function(){ rf.call(this); tuneSum(); };
+    (pc < 6 ? s : s2).append(r.r); tuneRows.push(r);
   }
 })();
 
@@ -13087,7 +13324,7 @@ function modSelect(host, label, key){
   const s = document.createElement('select'); s.setAttribute('aria-label', label + ' destination');
   MOD_DESTS.forEach((d, i) => { const o = document.createElement('option'); o.value = i; o.textContent = d; s.append(o); });
   s.addEventListener('change', () => { V()[key + 'dst'] = +s.value; changed(); });
-  r.append(s); host.append(r);
+  r.append(makePick(s)); host.append(r);
   vmSelUpd.push(() => { s.value = String(V()[key + 'dst'] | 0); });
 }
 (function buildVoiceMod(){
@@ -13101,30 +13338,32 @@ function modSelect(host, label, key){
     const sy = document.createElement('select'); sy.setAttribute('aria-label', 'LFO ' + i + ' sync'); sy.title = 'Free runs at the rate below; a note value locks the LFO to the song tempo';
     SYNC_NAMES.forEach((n, k) => { const o = document.createElement('option'); o.value = k; o.textContent = k ? 'Sync ' + n : 'Free rate'; sy.append(o); });
     sy.addEventListener('change', () => { V()['lfo' + i + 'Sync'] = +sy.value; changed(); });
-    r.classList.add('lforow'); r.append(s, sy); ls.append(r); vmSelUpd.push(() => { s.value = String(V()['lfo' + i + 'Shape'] | 0); sy.value = String(V()['lfo' + i + 'Sync'] | 0); });
+    r.classList.add('lforow'); r.append(makePick(s), makePick(sy)); ls.append(r); vmSelUpd.push(() => { s.value = String(V()['lfo' + i + 'Shape'] | 0); sy.value = String(V()['lfo' + i + 'Sync'] | 0); });
     for (const k of ['lfo' + i + 'Rate', 'lfo' + i + 'Depth']){ const rr = makeRow(VM[k], k, V, {idp:'vg'}); ls.append(rr.r); vgRows.push(rr); }
   }
   let es;
   for (let i = 1; i <= 3; i++){ es = vsec('Envelope ' + i, 'voiceEnvSecs'); for (const k of ['env' + i + 'A', 'env' + i + 'D', 'env' + i + 'S', 'env' + i + 'R']){ const rr = makeRow(VM[k], k, V, {idp:'vg'}); es.append(rr.r); vgRows.push(rr); } }
   { const row = el('div', 'segrow'); const b = el('button', 'sm', 'Reset to defaults'); b.type = 'button'; b.title = 'Put every voice envelope (pitch, amp and the three mod envelopes) back to its factory values';
     b.setAttribute('aria-label', 'Reset envelopes to defaults'); b.addEventListener('click', () => resetVoiceEnvelopes()); row.append(b); es.append(row); }
-  const ss = vsec('Sequence', 'voiceModSecs');
+  const seqFold = makeFold('seq', 'Sequence', {cls:'sec'}); $('voiceModSecs').append(seqFold.box); const ss = seqFold.body;   // SYNTH UX A: closed until opened
+  const seqSum = () => { const v = V(), steps = Array.isArray(v.seq) ? v.seq : [], k = v.seqSync | 0; seqFold.sum('Step ' + (k ? SYNC_NAMES[k] + ' (tempo)' : 'free (Seq rate)') + ' · ' + steps.filter(x => +x !== 0).length + ' of 32 steps set'); };
   { const r = el('div', 'segrow'); r.append(el('span', null, 'Step length')); const sy = document.createElement('select'); sy.setAttribute('aria-label', 'Sequence sync');
     SYNC_NAMES.slice(0, 6).forEach((n, k) => { const o = document.createElement('option'); o.value = k; o.textContent = k ? n + ' (tempo)' : 'Free (Seq rate)'; sy.append(o); });
-    sy.addEventListener('change', () => { V().seqSync = +sy.value; changed(); }); r.append(sy); ss.append(r); vmSelUpd.push(() => { sy.value = String(V().seqSync | 0); }); }
+    sy.addEventListener('change', () => { V().seqSync = +sy.value; seqSum(); changed(); }); r.append(makePick(sy)); ss.append(r); vmSelUpd.push(() => { sy.value = String(V().seqSync | 0); }); }
   for (const k of ['seqRate', 'seqDepth']){ const rr = makeRow(VM[k], k, V, {idp:'vg'}); ss.append(rr.r); vgRows.push(rr); }
   const grid = el('div', 'stepgrid'), stepEls = [];
   for (let i = 0; i < 32; i++){
     const inp = document.createElement('input'); inp.type = 'range'; inp.min = '-1'; inp.max = '1'; inp.step = '0.01'; inp.value = '0'; inp.setAttribute('aria-label', 'Step ' + (i + 1));
-    inp.addEventListener('input', () => { const v = V(); if (!Array.isArray(v.seq)) v.seq = new Array(32).fill(0); v.seq[i] = +inp.value; changed(); });
-    inp.addEventListener('dblclick', () => { const v = V(); if (!Array.isArray(v.seq)) v.seq = new Array(32).fill(0); v.seq[i] = 0; inp.value = '0'; changed(); });
+    inp.addEventListener('input', () => { const v = V(); if (!Array.isArray(v.seq)) v.seq = new Array(32).fill(0); v.seq[i] = +inp.value; seqSum(); changed(); });
+    const stepReset = () => { const v = V(); if (!Array.isArray(v.seq)) v.seq = new Array(32).fill(0); v.seq[i] = 0; inp.value = '0'; seqSum(); changed(); };
+    inp.addEventListener('dblclick', stepReset); inp._reset = stepReset;   // Alt-click and the right-click Reset (sldReset) use _reset
     grid.append(inp); stepEls.push(inp);
   }
   ss.append(grid);
   const st = el('div', 'readout', '32 steps, played at Seq rate and scaled by Seq depth.'); st.style.paddingLeft = '0'; ss.append(st);
   const ms = vsec('Matrix', 'voiceModSecs');
   for (const [key, label] of MOD_SRC){ modSelect(ms, label, key); const rr = makeRow(VM[key + 'amt'], key + 'amt', V, {idp:'vg'}); ms.append(rr.r); vgRows.push(rr); }
-  vmSelUpd.push(() => { const v = V(), steps = Array.isArray(v.seq) ? v.seq : []; for (let i = 0; i < 32; i++) stepEls[i].value = String(steps[i] || 0); });
+  vmSelUpd.push(() => { const v = V(), steps = Array.isArray(v.seq) ? v.seq : []; for (let i = 0; i < 32; i++) stepEls[i].value = String(steps[i] || 0); seqSum(); });
 })();
 
 function pitchReadout(){
@@ -13141,8 +13380,8 @@ function refreshLayer(){
   $('lTitle').textContent = 'Layer ' + (v.sel + 1);
   sel.value = L.type;
   const on = $('lOn'); on.textContent = L.on ? 'On' : 'Off'; on.classList.toggle('on', L.on); on.setAttribute('aria-pressed', L.on);
-  $('lFam').textContent = T.fam === 'pl' ? 'Mutable' : FAMS[T.fam];   // short tag so the header row never wraps for Plaits
-  $('lFam').title = FAMS[T.fam];
+  $('lFam').textContent = T.fam === 'pl' ? 'Macro' : FAMS[T.fam];   // short tag so the header row never wraps
+  $('lFam').title = LAYER_CREDIT[L.type] || FAMS[T.fam];
   srcRows.a.lab.textContent = T.a; srcRows.a.fmt = T.fa;
   srcRows.b.lab.textContent = T.b; srcRows.b.fmt = T.fb;
   const adsr = L.mode === 'ADSR';
@@ -13152,6 +13391,10 @@ function refreshLayer(){
   const isEl = L.type === 'elements';
   const isWv = L.type === 'waves';
   plSec.hidden = !isPl; elExSec.hidden = elResSec.hidden = !isEl; srcRows.a.r.hidden = srcRows.b.r.hidden = isPl || isEl || isWv;
+  { const two = TWO_B[L.type]; srcRows.b.r.hidden = srcRows.b.r.hidden || !!two; bTwo.r.hidden = !two;
+    if (two){ bTwo.lab.textContent = T.b; bTwo.host.setAttribute('aria-label', T.b);
+      if (bTwo.kind !== L.type){ bTwo.kind = L.type; bTwo.upd = makeSeg(bTwo.host, [[0, two[0]], [1, two[1]]], () => Lc().b < 0.5 ? 0 : 1, v => { Lc().b = v; srcRows.b.refresh(); changed(); }); }
+      bTwo.upd(); } }
   wtSec.hidden = L.type !== 'wavetable'; vintSec.hidden = L.type !== 'sample'; lpSec.hidden = L.type !== 'sample'; $('bEditSmp').hidden = !(L.type === 'sample' && L.sample && L.sample.data);
   wvSec.hidden = !isWv;
   if (isWv){ $('wvBus').value = String(L.wBus || 1); $('wvStat').textContent = wvStatus(); }
@@ -13159,8 +13402,8 @@ function refreshLayer(){
   if (isPl){
     $('plEng').value = String(L.pEng | 0); plStrikeUpd(); plAuxUpd();
     plRows.pDecay.r.hidden = plRows.pLpg.r.hidden = plRows.pTimEnv.r.hidden = plRows.pMorEnv.r.hidden = plRows.pFm.r.hidden = !L.pStrike;
-    $('plStat').textContent = PL ? (L.pStrike ? 'Strike triggers the model and holds it for the pad’s Gate time, using Plaits’ own envelope and low-pass gate.' : 'Drone runs the model continuously; the Amp envelope shapes it.')
-      : (plFailed ? 'Plaits couldn’t load in this view. It works in the installed app.' : 'Loading Plaits…');
+    $('plStat').textContent = PL ? (L.pStrike ? 'Strike triggers the model and holds it for the pad’s Gate time, using the macro osc’s own envelope and low-pass gate.' : 'Drone runs the model continuously; the Amp envelope shapes it.') + ' Based on Plaits by Mutable Instruments (MIT).'
+      : (plFailed ? 'The macro osc couldn’t load in this view. It works in the installed app.' : 'Loading the macro osc…');
   }
   ampModeUpd();
   for (const r of rows) if (r.getObj === Lc) r.refresh();
@@ -13203,6 +13446,7 @@ const FX_GROUPS = ['Dynamics and EQ', 'Filters', 'Drive and lo-fi', 'Modulation'
     $('fxAdd').append(og);
   }
   for (const ks of groups.values()) for (const k of ks){ const o = document.createElement('option'); o.value = k; o.textContent = FX[k].name; $('fxAdd').append(o); } }
+makePick($('fxAdd'), {skipEmpty:true, noStep:true});   // SYNTH UX B: "+ Add effect" is a button that opens the list (grouped), not a native drop-down
 $('fxAdd').addEventListener('change', e => {
   const t = e.target.value; e.target.value = ''; if (!t) return;
   const v = V(); v.fx = v.fx || []; if (v.fx.length >= 6) return toast('Up to 6 effects per pad.');
@@ -13215,7 +13459,7 @@ $('fxTail').append(tailRow.r);
 const fxOrder = () => [...$('fxAdd').querySelectorAll('option')].map(o => o.value).filter(Boolean);
 function renderFx(){
   const v = V(), list = $('fxList'); v.fx = v.fx || []; list.innerHTML = ''; vuEls = [];
-  $('fxTitle').textContent = 'Effects · ' + (isSyn(cur) ? 'Synth ' : 'Pad ') + hx(cur);
+  $('fxTitle').textContent = 'Effects · Pad ' + hx(cur);
   $('fxEmpty').hidden = v.fx.length > 0; $('fxTail').hidden = v.fx.length === 0; tailRow.refresh();
   v.fx.forEach((f, idx) => {
     const d = FX[f.type]; if (!d) return;
@@ -13243,7 +13487,7 @@ function renderFx(){
       if (opts.length > 6){   // a long list (types, patterns, keys) is a menu, not a row of buttons
         const se = document.createElement('select'); se.className = 'fxsel'; se.setAttribute('aria-label', label);
         for (const [v, t] of opts){ const o = document.createElement('option'); o.value = String(v); o.textContent = t; se.append(o); }
-        se.value = String(f[key]); se.addEventListener('change', () => { f[key] = +se.value; changed(); }); sr.append(se);
+        se.value = String(f[key]); se.addEventListener('change', () => { f[key] = +se.value; changed(); }); sr.append(makePick(se));
       } else { const sg = el('div', 'seg'); sr.append(sg); makeSeg(sg, opts, () => f[key], val => { f[key] = val; changed(); }); }
     }
     for (const key in d.rows){
@@ -13332,11 +13576,11 @@ function renderPads(){
     p.classList.toggle('sel', i === cur);
     p.classList.toggle('learn', midi.learn && midi.target !== i);
     p.classList.toggle('learning', midi.learn && midi.target === i);
-    p.setAttribute('aria-label', `${isSyn(i) ? 'Synth' : 'Pad'} ${hx(i)}, ${v.name}`);
+    p.setAttribute('aria-label', `Pad ${hx(i)}, ${v.name}${isSyn(i) ? ', synth' : ''}`);
   });
 }
 function flash(i){ audioWake = performance.now(); const p = padEls[i].p; p.classList.add('hit'); setTimeout(() => p.classList.remove('hit'), 90); }
-function select(i){ if (i === cur) return; cur = i; refreshAll(); }
+function select(i){ if (i === cur) return; audDrop(); cur = i; refreshAll(); }   // audDrop: an audition waiting on the pad before must not play this one
 const padHeld = [];
 function padPress(i, held){
   // select first: a pad that fails to sound (no audio yet, a render error) is still picked for editing
@@ -13346,9 +13590,9 @@ function padPress(i, held){
 }
 function refreshAll(){
   try { slotsUI(); } catch(e){}   // SLOTS and this slot's kind
-  $('vNum').textContent = (isSyn(cur) ? 'Synth ' : 'Pad ') + hx(cur);
+  $('vNum').textContent = 'Pad ' + hx(cur);
   $('vName').value = V().name; $('kitName').value = kit.name;
-  vRows.forEach(r => r.refresh()); updChoke();
+  vRows.forEach(r => r.refresh()); updChoke(); padSum();
   refreshVoiceGlobals(); refreshTune();
   refreshLayer(); renderPads(); renderFx(); try { preLabels(); } catch(e){}
   bassUI();
@@ -13422,9 +13666,14 @@ function drawWave(){
   const dpr = window.devicePixelRatio || 1, w = Math.max(10, cv.clientWidth), h = cv.clientHeight || 150;
   cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr);
   const g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, w, h);
-  const c = cache[cur]; if (!c) return;
-  const d = c.data, mid = h / 2, E = waveEnv(c), pk = E.pk;
+  const c = cache[cur], meta = $('wMeta');
+  // IN USE (31 Oct): which tracks play this pad's sound (through which instruments)
+  const inUse = () => { try { const u = padUses(cur); const sp = el('span', u.length ? 'inuse' : null, u.length ? 'in use: ' + u.map(x => 'TRK ' + trkList(x.tracks) + ' (inst ' + hx(x.i) + ')').join(' · ') : 'not in the song');
+    sp.title = u.length ? 'This sound plays on ' + u.map(x => 'track ' + trkList(x.tracks) + ' through instrument ' + hx(x.i)).join(', ') + '. Changing it changes it there.' : 'No instrument in the song plays this pad'; meta.append(sp); } catch(e){} };
   g.fillStyle = cssv('--screen'); g.fillRect(0, 0, w, h);
+  // STALE WAVE (13 Nov): a pad with no render yet left the pad before's time, peak and "in use" under an empty box
+  if (!c){ meta.innerHTML = ''; meta.append(el('span', null, 'rendering…')); inUse(); return; }
+  const d = c.data, mid = h / 2, E = waveEnv(c), pk = E.pk;
   g.fillStyle = cssv('--screen-line'); g.fillRect(0, mid, w, 1);
   g.fillStyle = cssv('--screen-ink');
   const per = WENV / w;
@@ -13435,13 +13684,11 @@ function drawWave(){
     g.fillRect(x, y1, 1, Math.max(1, y2 - y1));
   }
   const db = pk > 0 ? 20 * Math.log10(pk) : -Infinity;
-  const meta = $('wMeta'); meta.innerHTML = '';
+  meta.innerHTML = '';
   meta.append(el('span', null, (d.length / c.sr).toFixed(3) + ' s'), el('span', null, 'peak ' + (isFinite(db) ? db.toFixed(1) + ' dB' : 'silent')));
   if (pk > 1) meta.append(el('span', 'ov', 'over 0 dB, normalized on export'));
-  meta.append(el('span', null, 'tap to play'));
-  // IN USE (31 Oct): which tracks play this pad's sound (through which instruments)
-  try { const u = padUses(cur); const sp = el('span', u.length ? 'inuse' : null, u.length ? 'in use: ' + u.map(x => 'TRK ' + trkList(x.tracks) + ' (inst ' + hx(x.i) + ')').join(' · ') : 'not in the song');
-    sp.title = u.length ? 'This sound plays on ' + u.map(x => 'track ' + trkList(x.tracks) + ' through instrument ' + hx(x.i)).join(', ') + '. Changing it changes it there.' : 'No instrument in the song plays this pad'; meta.append(sp); } catch(e){}
+  meta.append(el('span', null, (touchUi() ? 'tap' : 'click') + ' to play'));
+  inUse();
 }
 window.addEventListener('resize', () => drawWave());
 
@@ -13470,7 +13717,7 @@ function sndVis(){
   const w = $('sndWrap'); if (!w) return;
   const v = kit && kit.voices ? kit.voices[cur] : null;
   const show = document.body.classList.contains('sdesk') && !!v && (isBassV(v) || isVoxV(v) || isBlipV(v) || isXEngV(v));
-  $('sndTtl').textContent = 'Sound · ' + (isSyn(cur) ? 'Synth ' : 'Pad ') + hx(cur);
+  $('sndTtl').textContent = 'Sound · Pad ' + hx(cur);
   if (w.hidden !== !show){ w.hidden = !show; if (!show && sndPH) sndPH.length = 0; }
   if (show) sndSoon();
 }
@@ -24433,7 +24680,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 577;
+const BUILD = 578;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD + (location.pathname.includes('/beta/') ? ' · beta' : '');
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -34240,6 +34487,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [578, '13 Nov', ['The Synth page plays the pad as you edit it, so you hear each change (the Audition button beside Play turns it off).', 'The engine picker is at the top of the page. Drive, Gate, Max len and Choke fold into \u201cPad\u201d, and Sequence and Tuning fold too.', 'Labels are no longer cut off and the sliders are wider. The page takes the skin\u2019s colour, and buttons are bigger on touch.', 'One style of picker everywhere on the page, and two-state rows are buttons.', 'One set of names: Pad, Cutoff, Macro osc and Resonator (what the Plaits and Elements layer types were called); frequencies read in Hz and kHz, tuning in ct.', 'The top bar stays on one row on a 1280 pixel screen, and Chains shows in full on the folded phone.']],
   [577, '13 Nov', ['New: a Top of the song button in Arrange\u2019s top-left corner, above the row numbers (also Edit \u2192 Top of the song). It never starts or stops playback.', 'Smoother with the Arrange panel open while a song plays: the browser no longer re-works the whole page for each playhead mark (in emulation, stalls in Pattern view fell from about 55 to about 10 per 10 s).']],
   [576, '13 Nov', ['New setting, Settings \u2192 Screen \u2192 Meters while playing: Smooth (as before), Light (about 10 a second) or Off. On a phone the Mixer does far less screen work on Light or Off.', 'A quick second tap on PLAY no longer jumps to the top of the song: it just plays from the cursor.', 'Control bar: MUTE PAT, LOOP SEL and CLN \u2193 are two-line labels that fit at large text sizes; the COMMANDS heading is gone (one more row on a folded phone).']],
   [575, '13 Nov', ['Much less screen work while a song plays: the playhead now moves in place and the Mixer, Inst, FX, MOD and Project screens no longer redraw on every row (measured in emulation: drawing time down by 80 to 95 % on those screens, Pattern view by about 85 %). On touch screens the playhead draws at most 20 times a second.', 'Tap the CPU meter: a new section, The screen, shows how much of the page\u2019s time goes on drawing and on the page sequencer.', 'The playback report\u2019s voice count after STOP no longer keeps one per live engine.']],
