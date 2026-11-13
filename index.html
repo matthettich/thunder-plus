@@ -19409,8 +19409,10 @@ function busGroups(){
 const SEND_COLOR = '#7a8a00';   // (no longer used: sends take their bus's colour, striped)
 // A send: heard on its own and through a bus (its own Chain Out kept), not a bus itself.
 // A long draw asks about buses once per block and track, and busPlan re-hashes the patch each time: during drawArr it's asked once (8 Nov)
-let busMemoOn = false, busMemoV = null;
-const busPlanM = () => busMemoOn ? (busMemoV || (busMemoV = busPlan())) : busPlan();
+// (13 Nov) While draw() / drawArr() run the patch cannot change, but busPlan hashes the whole patch on every call and a redraw asks per cell (~10 % of a
+// Pattern view / Mixer redraw): the page wraps it to answer once per redraw (busPlan.m.on). The sequencer core's copy of busPlan (core/seq-core.js) is the unwrapped one.
+busPlan = (() => { const raw = busPlan, m = {on:false, v:null}, f = function(){ return m.on ? (m.v || (m.v = raw())) : raw(); }; f.m = m; return f; })();
+const busPlanM = () => busPlan();
 const isSendT = t => { const P = busPlanM(); return t >= 0 && t < NT && P.targets.has(t) && !P.pure.has(t) && !P.feeds.has(t); };
 // BUS COLOURS as CSS (--bus1 …): the Mixer and Pattern view use the same colours as Arrange's BUS GROUPS
 try { BUS_COLORS.forEach((c, i) => document.documentElement.style.setProperty('--bus' + (i + 1), c)); } catch(e){}
@@ -28270,8 +28272,14 @@ function phShownGo(){
   const s = phShown; if (!s || s.p !== cPhrase || !pvHas(s.y, s.x, cPhrase)) return false;
   cs.song.x = s.x; cs.song.y = s.y; cTrack = s.x; return true;
 }
+function litRows(prLit){
+  if (prLit || gridLit.length){ for (const e of gridLit) e.classList.remove('pl', 'plr'); gridLit = [];
+    if (prLit) for (const y of prLit){ const e = grid.querySelector(`span.rn[data-r="${y}"]`); if (e){ e.classList.add('pl'); gridLit.push(e);
+      const ln = e.closest('.ln'); if (ln){ ln.classList.add('plr'); gridLit.push(ln); } } } }
+}
 function draw(){
   if (arrSoon && !arrFast){ cancelAnimationFrame(arrSoon); arrSoon = 0; }   // a full draw this frame already shows the cursor's move
+  if (!busPlan.m.on){ busPlan.m.on = true; busPlan.m.v = null; try { return draw(); } finally { busPlan.m.on = false; busPlan.m.v = null; } }   // (13 Nov) the bus plan is worked out once for the whole redraw, not per cell (busPlan, above)
   if (view !== 'tracker') return;
   document.body.classList.toggle('tvph', tv === 'phrase');   // EDIT OFF looks apply to the Phrase screen
   if (apHold){ apDirty = true; return; }   // ARRANGE PAGING: a song command run for Arrange draws once, at its end
@@ -28457,9 +28465,7 @@ function draw(){
   pvBusFrame(rebuilt);
   modScSync(rebuilt);   // MOD: the LFO scopes (nothing on any other screen)
   // The playing line: its row number lit, and the whole line inverted, like Arrange's playing blocks (owner, 19 Oct).
-  if (prLit || gridLit.length){ for (const e of gridLit) e.classList.remove('pl', 'plr'); gridLit = [];
-    if (prLit) for (const y of prLit){ const e = grid.querySelector(`span.rn[data-r="${y}"]`); if (e){ e.classList.add('pl'); gridLit.push(e);
-      const ln = e.closest('.ln'); if (ln){ ln.classList.add('plr'); gridLit.push(ln); } } } }
+  litRows(prLit);
   if (tv === 'phrase' && pvActive()) pvPlayMark(tp.on ? tp.pos : null); else if (pvLit.size) pvPlayMark(null);   // PER-TRACK PLAYHEAD (Pattern view): only while playing (the gutter's mark keeps RESUME's stopped spot; the bands go on STOP)
   const ph = pset ? pset.map(spanH).join('') : ''; if (ph !== psetHTML){ psetHTML = ph; $('tPset').innerHTML = ph; }
   // Song and Phrase page their own rows; the list screens (Inst, FX, Project) can be taller than the
@@ -31441,7 +31447,14 @@ function phraseTracks(){
       for (const r of c) if (r && r[0] >= 0){ let set = m.get(r[0]); if (!set) m.set(r[0], set = new Set()); set.add(t); } } }
   return m;
 }
-function instTracks(i, PT = phraseTracks()){
+let useMemo = null;   // (13 Nov) the Inst screen asked for these on every redraw (a scan of every phrase for every instrument: ~20 % of an Inst redraw on the Fold); songVer goes up on every edit
+const useM = () => useMemo && useMemo.v === songVer && useMemo.S === S ? useMemo : (useMemo = {v:songVer, S, PT:null, tr:new Map(), pu:new Map()});
+function instTracks(i, PT){
+  // (memo only while a redraw runs: the callers that decide something, a free instrument or the cursor's track, always scan)
+  if (PT === undefined && busPlan.m.on){ const M = useM(); let r = M.tr.get(i); if (!r){ r = instTracks0(i, M.PT || (M.PT = phraseTracks())); M.tr.set(i, r); } return r.slice(); }
+  return instTracks0(i, PT === undefined ? phraseTracks() : PT);
+}
+function instTracks0(i, PT){
   const out = new Set();
   for (const [pid, ts] of PT){ const p = S.phrases[pid]; if (!p) continue; const L = Math.min(plen(pid), p.length); let hit = false;
     for (let y = 0; y < L && !hit; y++){ const r = p[y]; if (r[IC] === i) hit = true; else for (let m = FX0; m < RW; m += 2) if (FXC[r[m]] === 'INS' && r[m + 1] === i){ hit = true; break; } }
@@ -31449,8 +31462,14 @@ function instTracks(i, PT = phraseTracks()){
   return [...out].sort((a, b) => a - b);
 }
 // Every instrument on pad `pad` that the song plays: [{i, tracks}]
-function padUses(pad){ const PT = phraseTracks(), out = [];
-  for (let i = 0; i < NI; i++){ const I = S.insts[i]; if (!I || I.pad !== pad) continue; const ts = instTracks(i, PT); if (ts.length) out.push({i, tracks:ts}); }
+function padUses(pad){ if (!busPlan.m.on) return padUses0(pad);
+  const M = useM(); let r = M.pu.get(pad);
+  if (!r){ const PT = M.PT || (M.PT = phraseTracks()); r = [];
+    for (let i = 0; i < NI; i++){ const I = S.insts[i]; if (!I || I.pad !== pad) continue; const ts = instTracks0(i, PT); if (ts.length) r.push({i, tracks:ts}); }
+    M.pu.set(pad, r); }
+  return r.map(u => ({i:u.i, tracks:u.tracks.slice()})); }
+function padUses0(pad){ const PT = phraseTracks(), out = [];
+  for (let i = 0; i < NI; i++){ const I = S.insts[i]; if (!I || I.pad !== pad) continue; const ts = instTracks0(i, PT); if (ts.length) out.push({i, tracks:ts}); }
   return out; }
 const trkList = ts => ts.map(t => d2(t + 1)).join(' ');
 // Instrument colours: spread round the wheel so neighbouring numbers differ; the terminal skins use shades of their one colour.
@@ -31462,7 +31481,7 @@ let playDraw = false, arrPlayT = 0;
 function drawArr(PH){
   if (!arrShown()) return;
   if (playDraw && COARSE){ const t = performance.now(); if (t - arrPlayT < 240) return; arrPlayT = t; }
-  busMemoOn = true; try { drawArr0(PH); } finally { busMemoOn = false; busMemoV = null; }
+  const was = busPlan.m.on; busPlan.m.on = true; try { drawArr0(PH); } finally { if (!was){ busPlan.m.on = false; busPlan.m.v = null; } }
 }
 function drawArr0(PH){
   arrEl.classList.toggle('dk', tScreen === 'dark');
@@ -32542,6 +32561,37 @@ let rafT = 0;
 const frameIdle = () => !tp.on && !rendering && performance.now() - audioWake > 1500 && !(HM.lv[0] >= 0.004 || HM.lv[1] >= 0.004);
 // BATTERY (8 Nov): hidden and not playing, the loop parks (no timer at all); the screen coming back wakes it (visibilitychange,
 // near the end of the file). The idle check is 5 a second, not 10.
+/* PLAYHEAD REDRAWS (13 Nov; owner: CPU still high on the Fold, Mixer and Pattern view worst). A redraw caused only by the playhead used to run all of draw()
+   on every row (17 a second): the grid text built again, the layout measured again, ~13 ms (4x throttle) on the Mixer, ~25 on Pattern view, and then the browser
+   painted it. Most of it showed nothing new. Now (the page sequencer and the core alike, this is display only):
+   - playTick: when what the screen shows has not changed since the last full redraw the frame made (the cursors, the phrase, the tempo...: plStamp), the
+     playhead is moved in place: the playing-row marks (Sect, Phrase, Pattern view's gutter and per-track bands) and Arrange's blocks (drawArr, which has its own
+     rate on a touch screen); the Mixer, Inst, FX, MOD and Project show nothing of the playhead, so nothing is drawn for a row. Song and Arrange as the Song screen
+     (their grid text carries the playing row) and every screen with a selection, a drag, Arrange focus or paging in progress take the full redraw as before.
+   - A full redraw still runs when the stamp differs (the cursor or page moved: FOLLOW, an edit that moved it) and at least every PL_BEAT ms, so anything that
+     changed without its own redraw is picked up within half a second. Anything the user does draws at once (it never comes through here), and STOP / PLAY draw.
+   - On a touch screen (COARSE) the playhead's drawing, either kind, runs at most every PL_MIN ms (about 20 a second): the frame that would draw sooner owes it
+     (plOwed) and does it on the first frame past the gap, with the newest position (the sequence is drained every frame regardless). */
+const PL_BEAT = 500, PL_MIN = 50;
+let plBase = null, plOwed = false, plLast = 0;
+const plStamp = () => [tv, view, JSON.stringify(cs), cTrack, cPhrase, cSect, tp.mode, tp.bpm, tp.tks, patRow, loopPat, followMode, scr.style.fontSize, tScale, vpW, arrW, sideOn, inlOn, stage, arrMode, apF, spOn, pvMode, pvFx, pvFold, inMode, ntr()].join('|');
+function playTick(){
+  const now = performance.now();
+  if (COARSE && now - plLast < PL_MIN){ plOwed = true; return; }
+  plOwed = false; plLast = now;
+  if (!playLite(now)){ playDraw = true; try { draw(); } finally { playDraw = false; } plBase = {t:now, sig:plStamp()}; }
+}
+function playLite(now){
+  if (!plBase || now - plBase.t > PL_BEAT || view !== 'tracker' || apHold || apF || selA || sdrag || drag || arrFast || arrSoon) return false;
+  if (!(tv === 'sect' || tv === 'phrase' || tv === 'inst' || tv === 'mixer' || tv === 'fx' || tv === 'mod' || tv === 'project')) return false;
+  if (plStamp() !== plBase.sig) return false;
+  const P = tp.on ? tp.pos : null, rows = test => { const q = new Set(); if (P) P.forEach(p => { const r = p && test(p); if (r != null) q.add(r); }); return q; };
+  if (tv === 'sect') litRows(rows(p => tp.mode !== 'phrase' && p.sect === cSect ? p.cr : null));
+  else if (tv === 'phrase'){ litRows(rows(q => q.phrase === cPhrase ? q.step : null)); if (pvActive()) pvPlayMark(P); else if (pvLit.size) pvPlayMark(null); }
+  playDraw = true; try { drawArr(playhead()); } finally { playDraw = false; }   // Arrange's blocks (the panel beside the screen): on a touch screen about four times a second (drawArr)
+  if (apReady) apStrip(apStripOk());   // the song strip beside a folded phone's phrase shows the playing row
+  return true;
+}
 function frameWake(){ idleWake(); if (raf === -1){ clearTimeout(rafT); raf = 0; } if (!raf && view === 'tracker') frame(); }
 function frame(){
   raf = 0; if (view !== 'tracker') return;
@@ -32561,8 +32611,8 @@ function frame(){
       // the song's timer starts again when the song wraps back up (owner, 31 Oct: it stayed at 0:00 after the first time through)
       if (tp.mode === 'song'){ let mx = -1; e.pos.forEach((q, i) => { if (q && i !== MT && q.row > mx) mx = q.row; });
         if (mx >= 0){ if ((tp.hiRow != null && mx !== tp.hiRow) || (tp.loopV && e.pos.some((q, i) => q && i !== MT && q.step === 0) && e.t - tp.t0 > 0.05)){ tp.row0 = mx; tp.t0 = e.t; tp.lenTot = null; } tp.hiRow = mx; } } }
-    if (!tp.seq.alive() && !tp.q.length && ctx.currentTime > tp.seq.time + 0.3) tStop(); else if (ch || lpPend){ if (lpSkip) lpPend = true; else { lpPend = false; followPlay(); playDraw = true; try { draw(); } finally { playDraw = false; } } }
-  }
+    if (!tp.seq.alive() && !tp.q.length && ctx.currentTime > tp.seq.time + 0.3) tStop(); else if (ch || lpPend || plOwed){ if (lpSkip) lpPend = true; else { lpPend = false; followPlay(); playTick(); } }
+  } else { plOwed = false; plBase = null; }
   if (lpSkip) return;
   tickDots(); tickLen(); modScTick();
   cpuMeter();
@@ -34737,7 +34787,8 @@ try { const o = JSON.parse(localStorage.getItem(PVUK) || '{}') || {}; if ('m' in
 function pvSave(){ try { localStorage.setItem(PVUK, JSON.stringify({m:pvMode, fx:pvFx, fold:pvFold})); } catch(e){} }
 function setPv(on){ pvOn = !!on; try { localStorage.setItem(PVK, pvOn ? '1' : '0'); } catch(e){} draw(); }
 // It needs width: the computer and the unfolded Fold. On the folded phone the buttons are hidden and Phrase is as before.
-const pvRoom = () => innerWidth >= 600 && !spOn;   // SIMPLE PHRASE: the plain phrase only
+let vpW = innerWidth; addEventListener('resize', () => { vpW = innerWidth; });   // (13 Nov) read once per resize: pvActive() runs dozens of times a redraw and innerWidth can force a layout on a phone
+const pvRoom = () => vpW >= 600 && !spOn;   // SIMPLE PHRASE: the plain phrase only
 const pvActive = () => pvOn && pvMode && view === 'tracker' && tv === 'phrase' && pvRoom() && (cTrack < ntr() || cTrack === MT);
 // Text size: sized to show about PVW characters across (the phrase is sized for 52), but no smaller than 11px, and tall
 // enough for its three header lines and 16 rows.
