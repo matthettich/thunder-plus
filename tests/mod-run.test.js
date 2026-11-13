@@ -47,7 +47,9 @@ test('a song with no LFOs: the old sequencer and the new one send the same event
   catch (e){ t.skip('git history to ' + BASE + ' is not here'); return; }
   const shapes = [{ cells: { 0: [0, 1, 2, 3], 1: [0, 1], 2: [1, 2] } }, { cells: { 4: [0, 1, 2, 3], 0: [2, 3] } }, { cells: { 1: [0, 1, 2, 3], 5: [0] } }];
   let n = 0, total = 0;
-  for (const sh of shapes) for (const [mode, o] of [['song', {}], ['song', { live: true, once: false }], ['song', { only: new Set([1]) }], ['sect', { track: 1, sect: 0 }], ['phrase', { track: 1, phrase: 0 }]]){
+  // (12 Nov) the live case is compared as one pass (once): from build 570 a song wraps once for all its tracks and sends no 'fxreset' at a wrap
+  // (owner's decisions; tests/song-wrap.test.js, tests/fx-persist.test.js), so a looping play no longer matches the old sequencer by design.
+  for (const sh of shapes) for (const [mode, o] of [['song', {}], ['song', { live: true, once: true }], ['song', { only: new Set([1]) }], ['sect', { track: 1, sect: 0 }], ['phrase', { track: 1, phrase: 0 }]]){
     const a = play(old, mkSong(sh), mode, o, 80), b = play(NEW, mkSong(sh), mode, o, 80);
     total += a.length; assert.deepEqual(b, a, mode + ' ' + JSON.stringify(o)); n++; }
   assert.equal(n, 15); assert.ok(total > 500, 'the songs produced events (' + total + ')');

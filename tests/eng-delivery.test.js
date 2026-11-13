@@ -51,7 +51,9 @@ test('(a) no commands and no engine LFOs: the old sequencer and the new one send
   const shapes = [{ cells: { 0: [0, 1, 2, 3], 1: [0, 1], 2: [1, 2] } }, { cells: { 4: [0, 1, 2, 3], 0: [2, 3] }, fx: { 1: [['VOL', 99]] } },
     { cells: { 1: [0, 1, 2, 3], 5: [0] }, lfo: { 1: [{ id: 'vol:1', sh: 0, rt: 5, dp: 100 }, { id: 'pan:5', sh: 2, rt: 3, dp: 60 }] } }];
   let n = 0, total = 0;
-  for (const sh of shapes) for (const [mode, o] of [['song', {}], ['song', { live: true, sim: false, once: false }], ['song', { only: new Set([1]) }], ['sect', { track: 1, sect: 0 }], ['phrase', { track: 1, phrase: 0 }]]){
+  // (12 Nov) the live case is compared as one pass (once): from build 570 a song wraps once for all its tracks and sends no 'fxreset' at a wrap
+  // (owner's decisions; tests/song-wrap.test.js, tests/fx-persist.test.js), so a looping play no longer matches the old sequencer by design.
+  for (const sh of shapes) for (const [mode, o] of [['song', {}], ['song', { live: true, sim: false, once: true }], ['song', { only: new Set([1]) }], ['sect', { track: 1, sect: 0 }], ['phrase', { track: 1, phrase: 0 }]]){
     if (sh.lfo && o.sim !== false) continue;   // (11 Nov: a render's vol / pan LFOs have 4 points a step like live now, the old core's 2: by design)
     const a = play(old, mkSong(sh), mode, o, 80), b = play(NEW, mkSong(sh), mode, o, 80);
     total += a.length; assert.deepEqual(b, a, mode + ' ' + JSON.stringify(o)); assert.equal(eng(b).length, 0); n++; }

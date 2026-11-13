@@ -54,14 +54,12 @@ test('an unmuted block still runs its commands (the same song, no mute)', () => 
   assert.ok(evs.some(e => e.type === 'fxc' && e.p === 'sw0'));
   assert.ok(evs.some(e => e.type === 'tempo' && e.bpm === 90));
 });
-test('ITEM 5: masterBlockMuted(S, y) skips the master column\'s commands for that row (inert while the helper does not exist)', () => {
+test('a muted MASTER block (S.smuteM, the screen\'s masterBlockMuted) runs none of its commands; the next row\'s master block plays', () => {
   const S = song([{ t: 0, y: 0, cmds: [] }, { t: 0, y: 1, cmds: [] }, { t: MT, y: 0, cmds: [['FLX', 5]] }, { t: MT, y: 1, cmds: [['GAT', 3]] }]);
   const none = play(S, { once: true }, 40).evs.filter(e => e.track === MT && (e.type === 'fxc' || e.type === 'mvol'));
-  assert.ok(none.some(e => e.p === 'flx') && none.some(e => e.p === 'gat'), 'no helper: the master plays as before');
-  vm.runInContext('var masterBlockMuted = (S, y) => y === 0;', ctx);   // the UI branch's helper: row 0's master block is muted
-  try {
-    const m = play(S, { once: true }, 40).evs.filter(e => e.track === MT && (e.type === 'fxc' || e.type === 'mvol' || e.type === 'off'));
-    assert.ok(!m.some(e => e.p === 'flx' || e.type === 'off'), 'row 0 master block: its commands do not execute, and no note-off is sent to the master');
-    assert.ok(m.some(e => e.p === 'gat'), 'row 1 master block still plays');
-  } finally { vm.runInContext('masterBlockMuted = undefined; delete globalThis.masterBlockMuted;', ctx); }
+  assert.ok(none.some(e => e.p === 'flx') && none.some(e => e.p === 'gat'), 'nothing muted: the master plays as before');
+  S.smuteM = [0];
+  const m = play(S, { once: true }, 40).evs.filter(e => e.track === MT && (e.type === 'fxc' || e.type === 'mvol' || e.type === 'off'));
+  assert.ok(!m.some(e => e.p === 'flx' || e.type === 'off'), 'row 0 master block: its commands do not execute, and no note-off is sent to the master');
+  assert.ok(m.some(e => e.p === 'gat'), 'row 1 master block still plays');
 });
