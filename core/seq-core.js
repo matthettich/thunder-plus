@@ -256,7 +256,7 @@ function makeSeq(S, mode, o){
     while (w.length) for (const b of tg.get(w.pop()) || []) if (!hearT.has(b)){ hearT.add(b); w.push(b); } }
   const busT = new Set(); for (let t = 0; t < NT; t++) if (isBusT(t)) busT.add(t);   // loop: {y0,y1} rows to cycle; api.setLoop swaps it while playing
   const fresh = () => ({on:false, empty:false, row:0, cr:0, step:0, inst:0, rate:1, tsp:0, next:-1, last:null, rnl:{}, rnlNote:0, nth:new Map(), arc:{mode:0, spd:1},
-    rel:0, g:0, grv:null, dir:0, pp:1, cnt:0, r0:0});   // dir/pp/cnt: DIR's play direction, ping-pong heading, steps played this pass; r0: when it entered its song row
+    rel:0, g:0, grv:null, dir:0, pp:1, cnt:0, r0:0, wr:0});   // dir/pp/cnt: DIR's play direction, ping-pong heading, steps played this pass; r0: when it entered its song row
   for (let t = 0; t <= MT; t++) tr.push(fresh());
   const api = {time:0, bpm:S.bpm, tks:clamp(S.ticks || TICKS, 1, 32), grv:null, base:null, bt:0, btT:null};
   // PERFORM: live play shares the panel's state (perfLive: a crossfader move is heard at once, and XFD / MAC move the panel);
@@ -298,9 +298,12 @@ function makeSeq(S, mode, o){
           while (S.song[f][t] < 0){ f++; if (f > loop.y1) f = loop.y0; if (f === T.row){ T.on = false; return; } }
           T.row = f; T.cr = 0;
         } else {
-          let r = Math.min(T.row, 256) - 1; while (r >= 0 && S.song[r][t] >= 0) r--;
-          T.row = r + 1; T.cr = 0;
-          if (T.row > 255 || S.song[T.row][t] < 0){ T.on = false; return; }
+          // ONE WRAP FOR THE WHOLE SONG (owner, 12 Nov: "looping around to the beginning sometimes jumps to a random section"; OK'd the change).
+          // A track that runs into an empty cell used to go back to the top of ITS OWN run of blocks (M8's way), so a track whose blocks start at
+          // row 4 played rows 4-7 against the others' 0-3 from the second pass on, and a track with a gap looped its first blocks for ever. Now
+          // it waits (wr: the empty row it stopped on, + 1): wake() brings it back when the song reaches a later row where it has a block, and
+          // when every track is waiting the song starts again from one row for all of them (songWrap, in step).
+          T.on = false; T.wr = Math.min(T.row, 256) + 1; return;
         }
       }
       const cid = sectId(T, t), c = cid >= 0 ? S.chains[cid] : null, cRow = c ? c[T.cr] : null;
@@ -338,6 +341,7 @@ function makeSeq(S, mode, o){
       const T = tr[t]; if (T.on || !(t < (S.ntr || 16) || t === MT) || (o.only && !o.only.has(t))) continue;
       const cid = S.song[y][t], c = cid >= 0 ? S.chains[cid] : null, p = c && c[0] ? c[0][0] : -1;
       if (p < 0 || (loop && (y < loop.y0 || y > loop.y1))) continue;
+      if (T.wr && y < T.wr) continue;   // (12 Nov) it ran ahead of this row and has played it: it waits for a row past the one it stopped on
       const line = 60 / api.bpm / (api.lpb || plpbOf(S, p)), st = Math.max(0, Math.ceil((rel - L.r0) / line - 1e-6));
       if (st >= lenOf(p)) continue;   // past its end on this row: it starts with the next row
       Object.assign(T, fresh(), {on:true, row:y, cr:0, step:st, g:st, cnt:st, r0:L.r0, rel:L.r0 + st * line});
@@ -395,7 +399,7 @@ function makeSeq(S, mode, o){
         const cid = sectId(T, t), ch = cid >= 0 ? S.chains[cid] : null, chRow = ch ? ch[T.cr] : null, r = r0(T, chRow ? chRow[0] : -1); if (!r) continue;
         for (let k = FX0; k + 1 < RW; k += 2){ if (r[k] === ENDI){ jc = {end:true}; break; } if (r[k] === JMPI){ jc = {to:clamp(r[k + 1], 0, 255), from:T.row}; break; } } }
       if (jc){
-        if (jc.end || (once && jc.to <= jc.from)) for (const T of tr) T.on = false;
+        if (jc.end || (once && jc.to <= jc.from)) for (const T of tr){ T.on = false; T.wr = 0; }   // (wr: an END is an end, not a wrap)
         else { const y = jc.to; for (let t = 0; t <= MT; t++){ const T = tr[t]; Object.assign(T, fresh()); T.row = y; T.rel = rel0; T.r0 = rel0;
             if ((t < (S.ntr || 16) || t === MT) && S.song[y] && S.song[y][t] >= 0 && (!o.only || o.only.has(t))){ T.on = true; settle(T, t); } } } } }
     const t0 = api.base + rel0, evs = [], pos = new Array(NT + 1).fill(null), {amt:sw, beat:swB} = swingOf();
@@ -686,6 +690,13 @@ function makeSeq(S, mode, o){
       if (newRow) T.r0 = T.rel;   // LIVE SONG EDITS: the song row starts here (what a waking track lines up with)
     }
     // TPO or TIC on this row: tell the player, so tempo-synced chains modules follow (live and in renders).
+    // ONE WRAP FOR THE WHOLE SONG (12 Nov, see settle): every track has run off its blocks, so they all start again together, at the moment the
+    // last one ended, from the top of the run of song rows that hold a block on any track (an entirely empty row still divides sections, as
+    // an empty cell divided a track's before). Tracks with no block there wait for wake(). Not a render (once), not under LOOP.
+    if (mode === 'song' && !loop && !once){ let any = false, w = 0, re = -Infinity; for (const T of tr){ if (T.on){ any = true; break; } if (T.wr){ if (T.wr > w) w = T.wr; if (T.rel > re) re = T.rel; } }
+      if (!any && w){ const ok = t => (t < (S.ntr || 16) || t === MT) && (!o.only || o.only.has(t)), has = y => { const r = S.song[y]; if (!r) return false; for (let t = 0; t <= MT; t++) if (ok(t) && r[t] >= 0) return true; return false; };
+        let y = clamp(w - 2, 0, 255); while (y > 0 && has(y - 1)) y--;
+        for (let t = 0; t <= MT; t++){ const T = tr[t]; Object.assign(T, fresh()); T.row = y; T.rel = re; T.r0 = re; if (ok(t) && S.song[y][t] >= 0){ T.on = true; settle(T, t); } } } }
     if (pdl) for (const T of tr) if (T.on) T.rel += pdl;   // PDL: the whole song waits
     let nx = Infinity; for (const T of tr) if (T.on && T.rel < nx) nx = T.rel;
     /* LFOs ALWAYS RUN (owner, 10 Nov): a track with no pattern on this song row (or the master with no MST cell) still moves its
