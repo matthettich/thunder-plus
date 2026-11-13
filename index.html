@@ -1193,7 +1193,14 @@ body:not(.legon) .tside .tlegend{display:none}
 .tcmd.cmini button:hover, :root[data-skinbase] .tcmd.cmini button:not(#zz):hover{background:color-mix(in srgb, var(--ink) 14%, transparent)}
 .tcmd.cmini button:is(.on,.dn), :root[data-skinbase] .tcmd.cmini button:is(.on,.dn):not(#zz){background:var(--ink)!important; color:var(--inv)}
 .tcmd.cmini button.off, :root[data-skinbase] .tcmd.cmini button.off:not(#zz){opacity:.32; pointer-events:none}
-.tcmd button[hidden]{display:none} .tcmd button[data-c=song]{font-size:var(--fs-5)} .tcmd.cpad :is([data-c=undo],[data-c=redo]){font-size:20px; font-weight:500; line-height:1} .tcmd :is([data-c=prev],[data-c=next]){font-size:24px; font-weight:500; line-height:1}
+.tcmd button[hidden]{display:none}
+/* CONTROL BAR LABELS FIT (13 Nov, owner: "m.pat and lp.sel both get cutoff by their outlines… Cln down is tight, we could put the arrow below cln"): a label of the big bar never overflows its button.
+   Each button is a size container (its width comes from the grid, not from its text) and the label's font is the smaller of the bar's size and what the widest line of it
+   (--n characters, set with the label) needs at 0.74 em a character; MUTE / PAT (M.PAT), LOOP / SEL (LP.SEL) and CLN / ↓ (CLN↓) are two lines. The thin bar (.cmini) is content-sized and untouched. */
+.tcmd:not(.cmini) button{container-type:inline-size}
+.tcmd:not(.cmini) button .cl{display:block; text-align:center; line-height:1.05; font-size:min(1em, calc(96cqw / (.74 * var(--n, 4))))}
+.tcmd:not(.cmini) button .cl.two{font-size:min(.84em, calc(96cqw / (.74 * var(--n, 4)))); line-height:1}
+.tcmd:not(.cmini) button .cl.two i{display:block; font-style:normal} .tcmd button[data-c=song]{font-size:var(--fs-5)} .tcmd.cpad :is([data-c=undo],[data-c=redo]){font-size:20px; font-weight:500; line-height:1} .tcmd :is([data-c=prev],[data-c=next]){font-size:24px; font-weight:500; line-height:1}
 /* (owner, 9 Nov) PAD mode on a small screen: no ▶ in COMMANDS, the pad's PLAY right below it plays the song (and the Song screen loses a third row). */
 @media (max-width:699px){ .tcmd.cpad:not(.cmini) button[data-c=song]{display:none} }
 /* (12 Nov, owner) INS on a folded phone's Song row: 14 buttons already fill its two rows and a 15th would make a third, so INS leaves that one row; it stays on Phrase and Sect, and Song has it in the right-click menu and Edit ▾. */
@@ -1647,12 +1654,11 @@ body.arrsmall .tarr.zoomed :is(.tagrid .rn, .tath>:first-child), body.arrsmall .
 .tkp{gap:10px; padding-right:4px}
 /* Two panels under the screen that read as two things: the command row (top) is a light strip with a dark rule
    and a label, the nav pad (bottom) a darker block. The d-pad keeps its square, thumb-sized keys. */
-.tcmd{background:color-mix(in srgb, var(--panel) 70%, var(--side)); border-top:2px solid var(--ink); border-bottom:0; position:relative; padding-top:18px}
+.tcmd{background:color-mix(in srgb, var(--panel) 70%, var(--side)); border-top:2px solid var(--ink); border-bottom:0; position:relative}   /* (13 Nov, owner: "I don't think the command bar needs the 'commands' label") the COMMANDS label and its 8 px of room are gone; the bar is named for screen readers (aria-label on #tCmd) */
 .lforow{display:flex; gap:6px; align-items:center; min-width:0} .lforow select{flex:1 1 0; min-width:0; width:auto}
-.tcmd::before{content:'COMMANDS'; position:absolute; left:16px; top:3px; font-size:var(--fs-1); font-weight:700; letter-spacing:.12em; color:var(--muted)}
 .tctl{background:color-mix(in srgb, var(--side) 62%, #000); border-top:1px solid var(--ink)}
 .tcmd:not([hidden]) + .tctl{border-top:1px solid var(--ink)}
-@media (max-width:480px){ .tcmd::before{left:10px} .tcmd button{font-size:var(--fs-2); letter-spacing:0} }
+@media (max-width:480px){ .tcmd button{font-size:var(--fs-2); letter-spacing:0} }
 .kpr{gap:10px 9px}
 .kpc{gap:10px; height:calc(var(--k) * 1.95 + 16px)}
 .pads{gap:10px 10px; padding-right:4px}
@@ -2585,7 +2591,6 @@ body.mob .dogs.idle .bob{animation-iteration-count:9} body.mob .dogs.idle .tail{
   box-shadow:1px 1px 0 0 var(--mxbg), 1px 1px 0 1.5px var(--mxdim), 0 0 16px var(--mxglowc)}
 :root[data-skinbase="term"] :is(.tcmd button.on,.tkp .kp.on,.tkp .kp.blk){background:var(--mxpanel2); color:var(--mx)}
 :root[data-skinbase="term"] :is(.pads .pad .pm,.pads .pad.syn b::after){color:var(--mx2)}
-:root[data-skinbase="term"] .tcmd::before{color:var(--mx2)}
 /* PAD-mode nav pad: the keys that are pastel in the other skins are solid; pressed or on turns them back */
 :root[data-skinbase="term"] #tPad .k{background:var(--mx); color:var(--mxon); border-color:var(--mxline, var(--mx)); text-shadow:none;
   box-shadow:4px 4px 0 0 var(--mxbg), 4px 4px 0 1.5px var(--mxdim), 0 0 12px -2px var(--mxglowc)}
@@ -3113,7 +3118,7 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
       <div class="segrow" id="noWkRow" title="For testing a phone whose audio clock runs fast. Off (test): track effects, chains, live engines and the audio-thread sequencer are silent or unused, and the safety limiter uses its simpler stand-in. Changes when the app reloads."><span>Worklets</span><div class="seg" id="segNoWk"></div></div>
       <div class="btnrow" id="audRestartRow" hidden><span class="lbl">Takes effect when audio restarts (the app reloads; your song and kit are kept)</span><button id="audRestart" class="on">Apply (reload)</button></div>
       <div class="segrow" id="rkRow" title="Phone, Page sequencer: when the audio clock runs several times too fast for over a second, pause the engine for a moment to break it. An experiment: Off restores the old behaviour."><span>RUNAWAY KICK (TEST)</span><div class="seg" id="segRk"></div></div>
-      <div class="audrow audfoot"><button class="sm" id="audReset" title="Clears stuck notes and effects: stops playback and rebuilds every sound and effect from scratch. Your song and kit are untouched. If the engine is stuck or the output is very late, it offers to reload the app (your song is saved first).">Reset audio engine</button> <button class="sm" id="audReport" title="Copies a short playback log (screen on or off, sequencer state, how late the rows came, what still sounded after STOP) to paste into a bug report.">Copy playback report</button> <button class="sm" id="audDefaults" title="Puts every audio setting on this device back to its default: Latency, Rate, Latency comp, Live engines, Sequencer, Worklets, Runaway kick, Keep screen on, Background play and Low power display. Songs, kits and your MIDI setup are kept.">Reset audio settings</button></div>
+      <div class="audrow audfoot"><button class="sm" id="audReset" title="Clears stuck notes and effects: stops playback and rebuilds every sound and effect from scratch. Your song and kit are untouched. If the engine is stuck or the output is very late, it offers to reload the app (your song is saved first).">Reset audio engine</button> <button class="sm" id="audReport" title="Copies a short playback log (screen on or off, sequencer state, how late the rows came, what still sounded after STOP) to paste into a bug report.">Copy playback report</button> <button class="sm" id="audDefaults" title="Puts every audio setting on this device back to its default: Latency, Rate, Latency comp, Live engines, Sequencer, Worklets, Runaway kick, Keep screen on, Background play, Low power display and Meters. Songs, kits and your MIDI setup are kept.">Reset audio settings</button></div>
     </div>
   </section>
 
@@ -3462,7 +3467,7 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
       </dl>
     </aside>
   </div>
-  <div class="tcmd" id="tCmd" hidden></div>
+  <div class="tcmd" id="tCmd" role="toolbar" aria-label="Commands" hidden></div>
   <div class="tctl">
     <div class="tdeck" id="tDeck" hidden>
       <div class="dkgrip" id="dkGrip" role="separator" aria-orientation="horizontal" aria-label="Drag to resize the panel" title="Drag to resize · double-click: default height"></div>
@@ -8733,7 +8738,9 @@ const smPos = a => a <= 0 ? 0 : Math.max(0, Math.min(1, (20 * Math.log10(a) + 48
 function synMeterOn(){ smOnT = performance.now(); if (!smRaf) smRaf = requestAnimationFrame(synMeterFrame); sndWake(); }
 function synMeterFrame(){
   smRaf = 0; const m = $('vMeter'); if (!m) return;
+  if (meterBlank('syn', () => { m.firstElementChild.style.transform = 'scaleX(0)'; m.lastElementChild.style.left = '0'; m.classList.remove('over'); smLv = smPk = 0; })) return;   // METERS: OFF while playing: empty once, then parked (mtrWake at STOP)
   const a = padLevel(), now = performance.now();
+  if (tp.on && !meterDue(now, synMeterFrame.t || 0, 0)){ smRaf = requestAnimationFrame(synMeterFrame); return; } synMeterFrame.t = now;
   smLv = Math.max(a, smLv * 0.86);
   if (a >= smPk || now - smPkT > 1500){ smPk = a; smPkT = now; }
   if (m.offsetWidth){ m.firstElementChild.style.transform = 'scaleX(' + smPos(smLv).toFixed(3) + ')'; m.lastElementChild.style.left = (smPos(smPk) * 100).toFixed(1) + '%'; m.classList.toggle('over', smPk > 1); }
@@ -8815,6 +8822,8 @@ let vuRaf = 0, vuEls = [];
 function vuHit(i, rate, vel, mono){ sndHit(i, ctx.currentTime, rate, mono); const c = slotAt(cache, i); if (!c) return; slotAt(hits, i); if (!hits[i]) hits[i] = []; if (mono) hits[i].length = 0; hits[i].push({t0:ctx.currentTime, rate, vel, c}); if (hits[i].length > 8) hits[i].shift(); if (!vuRaf) vuRaf = requestAnimationFrame(vuFrame); }
 function vuFrame(){
   vuRaf = 0; if (!ctx) return;
+  if (meterBlank('vu', () => { for (const m of vuEls){ m.lv = m.pk = 0; m._w = '0.0%'; m.bar.style.width = '0.0%'; m.bar.className = ''; m.txt.textContent = '−∞'; } })) return;   // METERS: OFF: empty once, then parked (mtrWake at STOP)
+  if (tp.on && !meterDue(performance.now(), vuFrame.t || 0, 0)){ vuRaf = requestAnimationFrame(vuFrame); return; } vuFrame.t = performance.now();
   const now = ctx.currentTime, H = slotAt(hits, cur) || []; let live = false;
   for (let i = 0; i < nslots(); i++){ slotAt(hits, i); hits[i] = (hits[i] || []).filter(h => (now - h.t0) * h.rate * h.c.sr < h.c.data.length + h.c.sr * 0.3); }
   for (const m of vuEls){
@@ -8824,9 +8833,8 @@ function vuFrame(){
     m.lv = Math.max(pk, m.lv * 0.88); if (m.lv < 0.0005) m.lv = 0;
     if (pk >= m.pk || now - m.pt > 1.2){ m.pk = pk; m.pt = now; }
     const db = m.lv > 0 ? 20 * Math.log10(m.lv) : -99, w = Math.max(0, Math.min(1, (db + 48) / 48));
-    m.bar.style.width = (w * 100).toFixed(1) + '%';
-    m.bar.className = db > -1 ? 'clip' : db > -6 ? 'hot' : db > -12 ? 'warm' : '';
-    m.txt.textContent = m.pk > 0.00002 ? (20 * Math.log10(m.pk)).toFixed(1) : '−∞';
+    const wd = (w * 100).toFixed(1) + '%', cl = db > -1 ? 'clip' : db > -6 ? 'hot' : db > -12 ? 'warm' : '', tx = m.pk > 0.00002 ? (20 * Math.log10(m.pk)).toFixed(1) : '−∞';   // (METERS: only a changed value is written)
+    if (m._w !== wd){ m._w = wd; m.bar.style.width = wd; } if (m.bar.className !== cl) m.bar.className = cl; if (m.txt.textContent !== tx) m.txt.textContent = tx;
     if (m.lv > 0) live = true;
   }
   if (live || hits.some(h => h.length)) vuRaf = requestAnimationFrame(vuFrame);
@@ -12947,7 +12955,7 @@ function bassVizKick(){ if (!bvRaf) bvRaf = requestAnimationFrame(bassViz); }
 function bassViz(){
   bvRaf = 0; if (document.hidden) return;   // BATTERY: parked while hidden; the screen coming back kicks it (visibilitychange, end of file)
   const cv = $('bassCv'); if (!cv || $('bassWrap').hidden || view === 'tracker' || !isBassV(V())) return;
-  if (lpHold(bassViz.t || 0)){ bvRaf = requestAnimationFrame(bassViz); return; } bassViz.t = performance.now();
+  if (meterBlank('bass', () => cv.getContext('2d').clearRect(0, 0, cv.width, cv.height))) return; /* METERS: OFF: empty once, then parked (mtrWake at STOP) */ if (lpHold(bassViz.t || 0)){ bvRaf = requestAnimationFrame(bassViz); return; } bassViz.t = performance.now();
   const dpr = devicePixelRatio || 1, W = cv.clientWidth, H = cv.clientHeight; if (!W || !H) return;
   if (cv.width !== Math.round(W * dpr)){ cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); }
   const g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, H);
@@ -13552,7 +13560,7 @@ function sndColours(){
 function sndSoon(){ if (!sndQ) sndQ = requestAnimationFrame(() => { sndQ = 0; if (!sndOn()) return; sndColours(); sndSpecPaint(); sndScopePaint(false); sndWake(); }); }
 function sndWake(){ if (!sndRaf && sndOn()) sndRaf = requestAnimationFrame(sndFrame); }
 function sndFrame(){
-  sndRaf = 0; if (!sndOn() || document.hidden) return; if (lpHold(sndFrame.t || 0)){ sndRaf = requestAnimationFrame(sndFrame); return; } sndFrame.t = performance.now(); if (!sndCol) sndColours();   // BATTERY: parked while hidden (sndWake on return)
+  sndRaf = 0; if (!sndOn() || document.hidden) return; if (!sndCol) sndColours(); if (meterBlank('snd', () => sndScopePaint(false))) return; /* METERS: OFF: empty once, then parked (mtrWake at STOP) */ if (lpHold(sndFrame.t || 0)){ sndRaf = requestAnimationFrame(sndFrame); return; } sndFrame.t = performance.now();   // BATTERY: parked while hidden (sndWake on return)
   const t = ctx ? ctx.currentTime - heardLat() : 0;
   for (let i = sndPH.length - 1; i >= 0; i--) if (t > sndPH[i].end) sndPH.splice(i, 1);
   const live = !!ctx && (tp.on || performance.now() - audioWake < 1500 || sndPH.length > 0);
@@ -14480,7 +14488,7 @@ $('audDefaults').addEventListener('click', async () => {
   if (!await askYes({title:'Reset audio settings', body:'Put every audio setting back to its default? Songs, kits and your MIDI setup are kept.'}, 'Reset')) return;
   const hadCore = coreWanted();
   audResetAset(aset); asetSave();
-  try { setWlOn(true); setBgOn(true); if (lpOn) setLowPower(false); } catch(e){ tpLog('reset audio: screen / background / low power failed', e); }
+  try { setWlOn(true); setBgOn(true); if (lpOn) setLowPower(false); if (mtrMode !== 'smooth') setMeters('smooth'); } catch(e){ tpLog('reset audio: screen / background / low power failed', e); }
   try { rkOn = true; localStorage.removeItem('thunderplus-runkick-v1'); updRk(); } catch(e){}   // RUNAWAY KICK (TEST): on is its default
   if ((ctx && aLive && (aLive.lat !== latOf() || aLive.rate !== aset.rate)) || NOWK !== !!aset.noWk){
     try { save(); } catch(e){ tpLog('save before restart failed', e); } applyUpdate(); return; }
@@ -21905,7 +21913,7 @@ function rtInit(){
   if (!rt){
     // mo: the master OUT fader (GAIN STAGING, 27 Oct), after mastering and the safety limiter, before the device's level
     const out = ctx.createGain(), mo = ctx.createGain(), lim = safeLim(ctx, mo); mo.gain.value = curve(S.mout == null ? 255 : S.mout); mo.connect(master);
-    rt = {out, mo, lim, mfx:null, fxOk:false, chnOk:false, pend:new Set(), pl:makePlayer(ctx, out, rtBuf, true, mo), mlv:[0, 0], mpk:[0, 0], mpt:[0, 0]}; rtRoute(); rt.pl.applyMix(); mstSync(); if (wkLazy()) wkLiveEnsure(); else bassReady(ctx).then(ok => { if (ok) liveWarmSoon(200); });
+    rt = {out, mo, lim, mfx:null, fxOk:false, chnOk:false, pend:new Set(), pl:makePlayer(ctx, out, rtBuf, true, mo), mlv:[0, 0], mlA:[0, 0], mpk:[0, 0], mpt:[0, 0]}; rtRoute(); rt.pl.applyMix(); mstSync(); if (wkLazy()) wkLiveEnsure(); else bassReady(ctx).then(ok => { if (ok) liveWarmSoon(200); });
     // the master meter listens to everything going out, synth pads included
     const sp = ctx.createChannelSplitter(2); rt.man = [ctx.createAnalyser(), ctx.createAnalyser()];
     master.connect(sp); rt.man.forEach((a, i) => { a.fftSize = 1024; sp.connect(a, i); });
@@ -22559,10 +22567,8 @@ function chaseFx(row, at){ for (const e of chaseEvs(row, at)) rt.pl.play(e); }
 let napOn = null;   // APP NAP (5 Nov): the desktop app is told when the song plays, so macOS doesn't nap it in the background
 function songBtn(){ document.documentElement.classList.toggle('tpon', !!tp.on);
   { const on = !!tp.on, D = window.thunderDesktop; if (on !== napOn && D && D.app && D.app.playing){ napOn = on; try { D.app.playing(on); } catch(e){} } }   // PLAYING: skins can light the play buttons (IDM: neon pink)
-  if (tp.on && !playWasOn) playWallT = performance.now(); playWasOn = !!tp.on;   // (12 Nov) when this play began: STOP twice (the pad) goes to the top only for a cursor you have not touched since
   const b = $('tSong'); if (!b) return; b.hidden = false; b.classList.toggle('on', tp.on);
 }
-var playWallT = 0, playWasOn = false;
 // The pump's 25 ms tick comes from a Worker: a page timer is slowed to once a second (or frozen) when the app is in
 // the background and nothing audible is playing (a MIDI-only song driving the MPC with the screen off, a muted
 // master), which stalled the sequencer and MIDI clock. A Worker's timer keeps its rate. Page timer as the fallback.
@@ -23131,7 +23137,7 @@ function pbSum(){ const now = performance.now(); if (now - PB.t < 2000) return; 
   PB.n = PB.late = PB.drop = PB.ahead = 0; }
 function pbAfterStop(){ PB.stopT = performance.now(); pbLvStop(); pbLog('STOP · ' + pbState()); for (const ms of [1000, 3000]) setTimeout(() => pbLog(`${ms / 1000} s after STOP: level ${pbLevel()} · voices ${rt && rt.pl.aliveN ? rt.pl.aliveN() : '?'} · stray rows ${PB.stray} · ` + pbState()), ms); }
 async function pbCopy(){
-  const head = `Thunder Plus build ${BUILD} · ${navigator.userAgent}\nlatency ${ctx ? Math.round((ctx.baseLatency || 0) * 1000) + ' + ' + Math.round((ctx.outputLatency || 0) * 1000) + ' ms · heard ' + Math.round(heardLat() * 1000) + ' ms' : '-'} · worklets ${NOWK ? 'OFF (test)' : ctx && wkUsed(ctx).size ? [...wkUsed(ctx)].join(', ') : 'none'} · ${pbState()}${PB.lvDone ? '\nlevel over the last play: ' + PB.lvDone : ''}\nsettings: background play ${bgOn ? 'on' : 'OFF'} · keep screen on ${wlOn ? 'on' : 'off'} · low power ${lpOn ? 'on' : 'off'} · latency ${latOf()} · runaway kick ${rkOn ? 'on' : 'off'}${(() => { try { const t = pwFmt(pwState(), true); return t ? ' · ' + t : ''; } catch(e){ return ''; } })()}${bgAndroid && !bgOn ? ' · NOTE: with Background play off Android does not treat the app as a media player (hidden playback is throttled, volume keys move the ringer)' : ''}\n`;   // (10 Nov: a report from a phone with Background play left off after a test read like an engine fault)
+  const head = `Thunder Plus build ${BUILD} · ${navigator.userAgent}\nlatency ${ctx ? Math.round((ctx.baseLatency || 0) * 1000) + ' + ' + Math.round((ctx.outputLatency || 0) * 1000) + ' ms · heard ' + Math.round(heardLat() * 1000) + ' ms' : '-'} · worklets ${NOWK ? 'OFF (test)' : ctx && wkUsed(ctx).size ? [...wkUsed(ctx)].join(', ') : 'none'} · ${pbState()}${PB.lvDone ? '\nlevel over the last play: ' + PB.lvDone : ''}\nsettings: background play ${bgOn ? 'on' : 'OFF'} · keep screen on ${wlOn ? 'on' : 'off'} · low power ${lpOn ? 'on' : 'off'} · meters ${mtrMode} · latency ${latOf()} · runaway kick ${rkOn ? 'on' : 'off'}${(() => { try { const t = pwFmt(pwState(), true); return t ? ' · ' + t : ''; } catch(e){ return ''; } })()}${bgAndroid && !bgOn ? ' · NOTE: with Background play off Android does not treat the app as a media player (hidden playback is throttled, volume keys move the ringer)' : ''}\n`;   // (10 Nov: a report from a phone with Background play left off after a test read like an engine fault)
   const txt = head + PB.log.join('\n');
   try { await navigator.clipboard.writeText(txt); toast('Playback report copied: paste it into the chat.', 3500); }
   catch(e){ try { await deliver('thunder-playback-report.txt', new Blob([txt], {type:'text/plain'})); } catch(e2){ toastErr('Couldn’t copy the report here.'); } }
@@ -23212,8 +23218,6 @@ function panic(){
     for (let ch = 0; ch < 16; ch++){ msend([0xB0 | ch, 64, 0], null, false, p); msend([0xB0 | ch, 120, 0], null, false, p); msend([0xB0 | ch, 123, 0], null, false, p); } } } catch(e){ tpLog('panic: MIDI out', e); }
   toast('Panic: every note let go' + (ports ? ' (and All Notes Off on ' + ports + ' MIDI port' + (ports > 1 ? 's' : '') + ')' : '') + '.', 3000);
 }
-let stopTapT = 0;
-function toTop(){ tp.paused = null; cs.song.y = 0; cs.song.top = 0; try { draw(); } catch(e){} toast('Back to the top of the song.', 1500); }
 function tStop(quiet){
   warmTok = null;   // 10 Nov: a STOP (or a restart) cancels a first PLAY still warming up
   // 10 Nov (audit): a throw in one step used to leave PLAYING over silence with no timer, or the Android background stream and the
@@ -23236,7 +23240,7 @@ function tStop(quiet){
   G('stop cursor', () => {
   stopP = !quiet && stopToPlayhead() && tp.on && tp.pos && tp.pos.some(Boolean) ? {P:tp.pos.map(q => q && Object.assign({}, q)), mode:tp.mode} : null;
   home = !quiet && tp.on && !stopToPlayhead() && fpHome && fpHome.t >= workT && fpHome.t >= arrHandT ? fpHome : null; });   // (12 Nov, owner: PLAY from the pad, ▼ / scroll down, STOP before row 2 jumped the cursor back to the top) fpHome is the cursor as FOLLOW first noted it, and is only noted again 4 s after your last key, press or scroll: a place you moved to after that note stands, only an untouched cursor goes back   // (9 Nov, owner: with ON STOP at STAYS it still ended up at the playback spot: FOLLOW had carried it there)
-  tp.timer = 0; tp.on = false; fpMem = null; fpHome = null; tp.q = []; tp.pos = null; tp.snd = null; tp.stopAt = null; tp.ahead = tp.aheadT = 0; tp.rsUntil = 0; PB.rsA = null; G('runaway kick', rkReset);
+  tp.timer = 0; tp.on = false; if (mtrMode === 'off') setTimeout(mtrWake, 0); fpMem = null; fpHome = null; tp.q = []; tp.pos = null; tp.snd = null; tp.stopAt = null; tp.ahead = tp.aheadT = 0; tp.rsUntil = 0; PB.rsA = null; G('runaway kick', rkReset);
   // HAND-OVER (seqHandover): the core and the voices already booked keep sounding until the page sequencer's first step
   if (tp.core){ tp.core = false; core.gen++; if (!handing) G('core', () => { coreWire(false); try { core.node.port.postMessage({op:'stop', at:ctx.currentTime}); } catch(e){} }); }
   else if (coreWanted() && !core.ready && ctx) setTimeout(() => { try { if (!tp.on) coreLoad(); } catch(e){} }, 400);
@@ -24409,7 +24413,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 575;
+const BUILD = 576;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD + (location.pathname.includes('/beta/') ? ' · beta' : '');
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -24444,7 +24448,7 @@ let resumeOn = (() => { try { return localStorage.getItem(RSK) === '1'; } catch(
 /* STOP CURSOR (owner, 3 Nov: "I like having the edit cursor separate from the playback, but I keep expecting to be able to
    stop playback and to edit the patterns playback stopped on"). Settings → STOP CURSOR, this device: THERE (the default)
    puts the edit cursor where the song stopped (its song row, the cursor's track's phrase and step); STAYS leaves it.
-   STOP twice still goes to the top, RESUME still carries on from the spot. Alt+G (any time) puts the cursor on the playhead.
+   RESUME still carries on from the spot (STOP twice no longer goes to the top: removed 13 Nov, owner). Alt+G (any time) puts the cursor on the playhead.
    STAYS IS THE DEFAULT (owner, 3 Nov: "stopping playback shouldn't drop the edit cursor where the playback ends"): a new
    key (v2), so every device starts on STAYS; THERE is still in Settings, Alt+G still jumps. */
 const STOPCUR_K = 'thunderplus-stopcur-v2';
@@ -24487,7 +24491,27 @@ var phOff = (() => { try { return clamp(parseInt(localStorage.getItem('thunderpl
 // (lpOn in frame, hmDraw, sndFrame, bassViz, mwLoop) and the LOW POWER DISPLAY row in Settings.
 var lpOn = (() => { try { return localStorage.getItem('thunderplus-lowpower-v1') === '1'; } catch(e){ return false; } })(), lpNext = 0, lpPend = false;
 var LP_MS = 1000 / 24, LP_GATE = 38;
-var lpHold = last => lpOn && tp.on && performance.now() - last < LP_GATE;   // a meter or animation asks: is it too soon to draw again?
+// METERS (13 Nov, owner: "Can we make #1 a setting"; M.RATE): how often the level meters and the other playing-time marks are PAINTED while a song plays. SMOOTH (default, as
+// before) | LIGHT (about 10 a second) | OFF WHILE PLAYING (meters hold empty, back at STOP). Only the painting waits: the analysers are still read at their own rate (the
+// peak and clip latches, the playback report's level, the limiter and every audio thing are untouched), a value painted at the lower rate is the highest seen since the
+// last paint, and a write happens only when the shown value changed. One shared gate, used by every meter loop: meterDue(now, last, base). Independent of Low power
+// (where that paints less, the slower of the two wins). To remove: this block, the METERS row in Settings and the meterDue / meterHold calls.
+var MTR_K = 'thunderplus-meters-v1', MTR_MODES = ['smooth', 'light', 'off'], MTR_LIGHT_MS = 92;   // 92: on a 60 or 120 Hz screen the next frame lands at 100 ms, so about 10 a second
+var mtrMode = (() => { try { const v = localStorage.getItem(MTR_K); return MTR_MODES.includes(v) ? v : 'smooth'; } catch(e){ return 'smooth'; } })();
+var meterHold = () => mtrMode === 'off' && !!tp.on;   // meters hold empty (a level meter or scope: not the playhead's marks)
+var meterGap = (base, soft) => !tp.on ? (base || 0) : Math.max(base || 0, lpOn ? LP_GATE : 0, mtrMode === 'smooth' ? 0 : MTR_LIGHT_MS, !soft && mtrMode === 'off' ? Infinity : 0);   // soft: a mark that is not a level meter (it keeps LIGHT's rate when METERS is OFF)
+var meterDue = (now, last, base, soft) => now - last >= meterGap(base, soft);
+var lpHold = last => tp.on && !meterDue(performance.now(), last, 0);   // a meter or animation asks: is it too soon to draw again? (Low power and METERS)
+var mtrB = {};   // which parked loops have been painted empty for this OFF hold
+// OFF parks a meter loop: it is painted empty ONCE first (fn), then nothing is written until the hold ends. True while held (the caller returns).
+var meterBlank = (k, fn) => { if (!meterHold()){ mtrB[k] = false; return false; } if (!mtrB[k]){ mtrB[k] = true; try { fn(); } catch(e){} } return true; };
+var mtrBlank = false;   // the Mixer's and the header's meters were painted empty for this play (METERS: OFF)
+function setMeters(v){
+  mtrMode = MTR_MODES.includes(v) ? v : 'smooth'; try { localStorage.setItem(MTR_K, mtrMode); } catch(e){}
+  mtrBlank = false; mtrB = {}; try { HM.drawn = ''; HM.held = false; } catch(e){} try { paintMeters(); } catch(e){} try { mtrWake(); } catch(e){}
+}
+// the loops that park under OFF are started again here (STOP, or another choice)
+function mtrWake(){ try { sndWake(); bassVizKick(); if (!vuRaf && typeof vuEls !== 'undefined' && vuEls.length) vuRaf = requestAnimationFrame(vuFrame); if (smLv > 0.0005 || smPk > 0.0005) synMeterOn(); if (typeof mwOpenNow !== 'undefined' && mwOpenNow && !mwRaf) mwRaf = requestAnimationFrame(mwLoop); } catch(e){} }
 // (9 Nov, owner) turning it on picks the Low power skin; turning it off goes back to the skin you had. Any skin can still be chosen while it's on.
 const LP_SKIN_K = 'thunderplus-lowpower-skin-v1';
 var lpPrev = '';
@@ -25343,6 +25367,8 @@ function projRows(){
       info:() => 'Moves the playhead to match what you hear, on this device: + later (Bluetooth headphones, a slow screen), − earlier. The app already allows for the output latency it is told about'},
     {l:'LOW POWER DISPLAY', ck:'Low power display (saves battery): the picture is a little less smooth, and the audio engine sleeps after 30 s of silence, so the first note after that can start a moment late', get:() => lpOn ? 1 : 0, set:v => setLowPower(!!v), min:0, max:1, tog:true, d:0, fmt:onOff,   // LOW POWER DISPLAY
       info:() => 'ON: while a song plays, the screen redraws about 24 times a second instead of at the screen’s full rate. It also switches to the Low power (black) skin, and back when turned off. The audio engine also sleeps after 30 s of silence and wakes on the next note, which can start a moment late. That saves battery; the picture is a little less smooth, and the sound is unchanged. OFF (the default): as before. This device only'},
+    {l:'METERS WHILE PLAYING', segs:true, get:() => MTR_MODES.indexOf(mtrMode), set:v => setMeters(MTR_MODES[v]), min:0, max:2, d:0, fmt:v => ['SMOOTH', 'LIGHT', 'OFF'][v] || 'SMOOTH',   // METERS (M.RATE)
+      info:() => 'How often the level meters and the other moving marks are drawn while a song plays: the Mixer, the top bar’s meters, the FX bar, the master window, the spectrum. SMOOTH (the default): as before. LIGHT: about 10 times a second, less drawing and less battery; a short peak still shows. OFF: the meters stay empty while a song plays and come back when it stops; the sound, the peak and CLIP checks and the playback report are unchanged. Separate from LOW POWER DISPLAY (with both on, the slower one wins). This device only'},
     {l:'FOLLOW', segs:true, get:() => followMode, set:v => setFollow(v), min:0, max:2, d:0, fmt:v => ['OFF', 'PATTERN', 'ON'][v] || 'OFF',
       info:() => 'While the song plays. ON: Song and Phrase scroll with the playhead, and Phrase (and Sect) switch to what the cursor’s track is playing. PATTERN: Phrase (and Sect) switch to what the cursor’s track is playing and Arrange turns its pages with the song, but the phrase’s rows stay where you put them. OFF: the screen stays where you put it, except that Arrange still turns its pages when the playhead runs off it. While you work in Arrange it waits until you’ve left it alone for a minute. The cursor stays on its row in every mode, so you can edit while it plays'},
     {l:'TAB', segs:true, get:() => tabTracks ? 1 : 0, set:v => setTabTracks(!!v), min:0, max:1, d:1, fmt:v => v ? 'TRACKS' : 'COLUMNS',
@@ -26312,7 +26338,7 @@ let lsW = null;
 function lpSelRestore(){ if (!lsW) return; const w = lsW; lsW = null; loopSel = w.was; loopArm = w.arm; }
 function lpSelPlay(){
   if (tp.on){ tStopUser(); return; }   // the restore is in draw(), which tStop runs
-  if (tv !== 'song') return toast('LP.SEL loops the selected rows on Arrange.');
+  if (tv !== 'song') return toast('LOOP SEL loops the selected rows on Arrange.');
   const r = sxRect(), rows = !!r && r.y1 > r.y0;
   lsW = {was:loopSel, arm:loopArm, seen:false};
   if (rows){ if (!loopSel) toggleLoop(); playCtx(); }   // LOOP SEL's own path: arms the selected rows, then plays them
@@ -27089,12 +27115,7 @@ function press(b, fromKey){
     keyVis(); return;
   }
   if (b === 'play'){
-    // STOP tapped twice (owner, 31 Oct): the second tap, within 450 ms of the stop, plays nothing and puts the song back to
-    // its top (the cursor on row 00, RESUME's stopped spot forgotten), so the next PLAY starts the song from the beginning.
-    // (12 Nov, owner: "pressing play a second time can jump the cursor to the top": it was this, STOP then PLAY inside 450 ms, with the cursor on track 9 where he was working in Arrange.) A place you chose by hand stands: the second tap goes to the top
-    // only when Arrange does not have the keys and no key / pad press / click on the grid has moved anything since this play began; otherwise it is a plain PLAY.
-    if (!tp.on && performance.now() - stopTapT < 450){ stopTapT = 0; if (!(apReady && apF) && Math.max(workT, arrActT, arrHandT) < playWallT){ toTop(); return; } }
-    if (tp.on) stopTapT = performance.now();
+    // (13 Nov, owner: "Remove that shortcut!"; supersedes 31 Oct and build 573's narrowing) a second PLAY tap after a stop is always a plain PLAY from the cursor, whatever the timing; it never moves the cursor.
     if (mod('shift')){ used.shift = true; takeLatch(); playKey(true); } else playKey(false); return; }
   // LOOP is a sticky toggle, not a held key: a tap flips it (the pattern loop; LOOP SEL is in the tab bar on a computer).
   if (b === 'loop'){ toggleLoopPat(); clearTimeout(rep); return; }
@@ -27148,9 +27169,9 @@ const CMDS = [['b:-16', '−−', 'Change the value down a lot (EDIT+▼)'], ['b
   ['cldn', 'CLN↓', 'Clone the block (or selected blocks) into new, unique numbers on a new row below; the rows below move down (' + MODK + '+Shift+C)'], ['copy', 'COPY', 'Copy the selection, or what is under the cursor (a note comes with its instrument) (ALT)'],
   ['cut', 'CUT', 'Cut the selection, or what is under the cursor (ALT+EDIT)'], ['paste', 'PASTE', 'Paste (SHIFT+EDIT)'],
   ['undo', 'UNDO', 'Undo the last change to the song (' + MODK + '+Z)'], ['redo', 'REDO', 'Redo (' + MODK + '+Y)'], ['song', '▶↻', 'Loop play (12 Nov): turns LOOP on and plays the song from the cursor row, repeating its row; press LOOP while it plays to carry on as normal play, or this again to stop (' + MODK + '+Space). The pad’s PLAY and Space play plain'],
-  ['lpsel', 'LP.SEL', 'Loops the selected rows of the song (every track): select rows on Arrange, then this plays them round and round; again to stop. With nothing selected it loops the cursor’s row, as loop play does (12 Nov)'],
+  ['lpsel', 'LOOP SEL', 'Loops the selected rows of the song (every track): select rows on Arrange, then this plays them round and round; again to stop. With nothing selected it loops the cursor’s row, as loop play does (12 Nov)'],
   ['ins', 'INS', 'Insert an empty row below the cursor’s row; the rows below move down (the whole song row on the Song, the phrase’s row on Phrase and Sect). ' + MODK + '+Alt+Enter'],
-  ['mpat', 'M.PAT', 'Mute or unmute the pattern block under the cursor, or every block in the selection (as Alt+click, M on the Song). The track’s own MUTE is on the pad and in the Mixer']];   // MUTE PATTERN (owner, 8 Nov): Arrange only
+  ['mpat', 'MUTE PAT', 'Mute or unmute the pattern block under the cursor, or every block in the selection (as Alt+click, M on the Song). The track’s own MUTE is on the pad and in the Mixer']];   // MUTE PATTERN (owner, 8 Nov): Arrange only
 function cmdAction(a){
   fxpClose();
   takeLatch();
@@ -27174,7 +27195,7 @@ function cmdAction(a){
   if (c === 'uniq') return makeUnique();
   if (c === 'clone') return cloneHere();
   if (c === 'cldn') return cloneDown();
-  if (c === 'mpat'){ if (tv !== 'song') return toast('M.PAT mutes blocks on Arrange.'); const r = sxRect(); if (r) return sxMuteRect(r); if (sxPicks.length) return sxMuteCells(sxPicks.map(p => [p.y, p.t])); return toggleBlockMute(cs.song.y, cs.song.x); }
+  if (c === 'mpat'){ if (tv !== 'song') return toast('MUTE PAT mutes blocks on Arrange.'); const r = sxRect(); if (r) return sxMuteRect(r); if (sxPicks.length) return sxMuteCells(sxPicks.map(p => [p.y, p.t])); return toggleBlockMute(cs.song.y, cs.song.x); }
   if (c === 'lpsel') return lpSelPlay();
   if (c === 'song') return playPatLoop();   // (12 Nov, owner) the control bar's ▶ is LOOP play; the pad's PLAY and Space play plain
 }
@@ -27183,9 +27204,12 @@ for (const [a, t, lbl] of CMDS){ const b = el('button'); b.innerHTML = t; b.type
 // the original order. The buttons are moved, not rebuilt, so the tap handlers stay attached.
 const CMD_PAD_ORDER = ['b:-16', 'b:-1', 'b:1', 'b:16', 'prev', 'next', 'sel', 'uniq', 'clone', 'cldn', 'mpat', 'copy', 'cut', 'paste', 'clr', 'ins', 'undo', 'redo', 'lpsel', 'song'];
 const CMD_PAD_SHORT = {clr:'CLR', sel:'SEL', paste:'PST', undo:'↶', redo:'↷'};
+// CONTROL BAR LABELS (13 Nov, owner): two-line labels with whole words: M.PAT = MUTE / PAT, LP.SEL = LOOP / SEL, CLN↓ = CLN / ↓ (the arrow under CLN). Every other big-bar label is one span that shrinks to fit (CSS .cl).
+const CMD_TWO = {mpat:['MUTE', 'PAT'], lpsel:['LOOP', 'SEL'], cldn:['CLN', '↓']};
+const cmdLab = (a, t) => CMD_TWO[a] ? `<span class="cl two" style="--n:${Math.max(...CMD_TWO[a].map(x => x.length))}">${CMD_TWO[a].map(x => `<i>${x}</i>`).join('')}</span>` : /^[\w↓]/.test(t) && !/</.test(t) ? `<span class="cl" style="--n:${t.length}">${t}</span>` : t;
 // COMMAND BAR: the Edit menu's order (undo · clipboard · select · clones · value · previous / next · play) and words.
 const CMD_MINI_ORDER = ['undo', 'redo', 'cut', 'copy', 'paste', 'clr', 'rrow', 'ins', 'sel', 'uniq', 'clone', 'cldn', 'mpat', 'b:-16', 'b:-1', 'b:1', 'b:16', 'prev', 'next', 'lpsel', 'song'];
-const CMD_MINI_LAB = {undo:'UNDO', redo:'REDO', cut:'CUT', copy:'COPY', paste:'PASTE', clr:'CLEAR', rrow:'REMOVE', ins:'INSERT', sel:'SELECT', clone:'CLONE', cldn:'CLONE↓', mpat:'MUTE PAT', 'b:-16':'−−', 'b:-1':'−', 'b:1':'+', 'b:16':'++', prev:'‹ PREV', next:'NEXT ›'};
+const CMD_MINI_LAB = {undo:'UNDO', redo:'REDO', cut:'CUT', copy:'COPY', paste:'PASTE', clr:'CLEAR', rrow:'REMOVE', ins:'INSERT', sel:'SELECT', clone:'CLONE', cldn:'CLONE↓', mpat:'MUTE PAT', lpsel:'LOOP SEL', 'b:-16':'−−', 'b:-1':'−', 'b:1':'+', 'b:16':'++', prev:'‹ PREV', next:'NEXT ›'};
 const cmdSongLab = () => cmdMini() ? (tp.on ? '■ STOP' : 'LOOP') : tp.on ? '■' : '';   // the words beside the icon (stopped: the loop play icon, cmdSongSet)
 // LOOP PLAY ICON (12 Nov, owner: "I don't really like the way the loop play button looks… a play sign inside of a loop"; he picked the single circular
 // loop): stopped, the button shows the icon (and the word LOOP on the thin bar); playing, the stop mark as before. Written only when it changes.
@@ -27198,7 +27222,7 @@ function applyCmdOrder(){
   // PAD mode packs more into a phone-width row, so the long words get short forms that fit inside the buttons.
   host.classList.toggle('cpad', inMode === 'pad'); host.classList.toggle('cmini', mini);
   const lab = Object.fromEntries(CMDS.map(c => [c[0], c[1]])), tip = Object.fromEntries(CMDS.map(c => [c[0], c[2]]));
-  for (const a in by){ by[a].innerHTML = (mini && CMD_MINI_LAB[a]) || (inMode === 'pad' && CMD_PAD_SHORT[a]) || lab[a]; if (!mini) by[a].title = tip[a]; }
+  for (const a in by){ const t = (mini && CMD_MINI_LAB[a]) || (inMode === 'pad' && CMD_PAD_SHORT[a]) || lab[a]; by[a].innerHTML = mini ? t : cmdLab(a, t); if (!mini) by[a].title = tip[a]; }
   if (by.rrow) by.rrow.hidden = inMode === 'pad';   // (PAD's phone row is full; REMOVE is in KEYS mode's row and bar)
   cmdTipKey = '';
   const sb = by.song; if (sb){ delete sb.dataset.lk; cmdSongSet(sb); sb.classList.toggle('on', tp.on); }   // (12 Nov: the loop above just wrote the plain label over the icon: forget the cached key so cmdSongSet puts it back, also after a mode / bar-width / skin change)
@@ -27365,7 +27389,7 @@ function cmdItems(full){
     {h:'Play'},
     ...(full ? [{a:'loopp', l:'Loop the pattern', k:keyHint('alt+L'), f:toggleLoopPat}, {a:'loops', l:'Loop the selection', k:keyHint('shift+alt+L'), f:toggleLoop},
       {a:'prow', l:'Play the row (every track)', k:keyHint('alt+Enter'), f:() => playRowKey(true), off:tv !== 'phrase'}, {a:'follow', l:followMode ? 'Follow off' : 'Follow on', k:keyHint('mod+shift+F'), f:followKey}] : []),
-    it('lpsel', 'LP.SEL: loop the selected rows (nothing selected: the cursor’s row)', '', {off:!onSong}),   // (12 Nov, owner) beside loop play on the control bar
+    it('lpsel', 'LOOP SEL: loop the selected rows (nothing selected: the cursor’s row)', '', {off:!onSong}),   // (12 Nov, owner) beside loop play on the control bar
     ...(tp.on ? [] : [{a:'splay', l:'Play the song from the cursor row', k:keyHint(ks ? 'Space' : 'shift+Space'), f:() => tStart('song', {row:songRow()})}]),   // FIX (1 Nov, audit #1): KEYS mode plays the song on Space
     it('song', tp.on ? 'Stop the song' : 'Loop play the song from the cursor row (turns LOOP on)', 'mod+Space')   // (12 Nov, owner) the control bar's ▶ is loop play
   ];
@@ -28715,26 +28739,29 @@ grid.addEventListener('contextmenu', e => { const b = e.target.closest && e.targ
   else { const t = +b.dataset.t; valMenu(e, 'Track ' + d2(t + 1) + ' VOL', {reset:() => mfReset(t), type:() => mfType(t)}); } }, true);
 let mcutOn = false;   // MASTER CUT FLASH: what the Mixer's master meter last showed
 function paintMeters(){
-  const bs = rt ? rt.pl.buses : null;
+  const hold = meterHold(), bs = rt && !hold ? rt.pl.buses : null;   // METERS: OFF while playing: painted empty
+  const lv = b => b.lvA > b.lv ? b.lvA : b.lv;   // the highest since the last paint (LIGHT), which is the latest at SMOOTH
   if (trimEls.length){ const now = performance.now(), lit = trimEls.map((e, i) => { const b = bs && bs[mixL + i], p = b && now - (b.iseen || 0) < 1000 ? b.ipk : 0; return p >= 0.891 ? 2 : p >= 0.5 ? 1 : 0; });
     const sig = lit.join(''); if (sig !== trimLit){ trimLit = sig; trimEls.forEach((e, i) => { e.classList.toggle('ih', lit[i] === 1); e.classList.toggle('ic', lit[i] === 2); }); } }   // GAIN STAGING: the TRIM light
-  document.querySelectorAll('#tMeters .mtr i').forEach((e, t) => { const h = (bs ? lvl(bs[t].lv) * 100 : 0).toFixed(1) + '%'; if (e._h !== h){ e._h = h; e.style.height = h; } });   // BATTERY: only a changed height is written
+  document.querySelectorAll('#tMeters .mtr i').forEach((e, t) => { const h = Math.round(bs ? lvl(lv(bs[t])) * 100 : 0) + '%'; if (e._h !== h){ e._h = h; e.style.height = h; } });   // BATTERY: only a changed height is written (METERS: whole per cent, finer than the bar's pixels)
   // Track meters: element k * mixN + i is line k (from the top) of the i-th track on screen.
-  meterEls.forEach((e, i) => { const k = Math.floor(i / mixN), t = mixL + i % mixN, f = (bs ? lvl(bs[t].lv) : 0) * MH * 8 - (MH - 1 - k) * 8;
+  meterEls.forEach((e, i) => { const k = Math.floor(i / mixN), t = mixL + i % mixN, f = (bs ? lvl(lv(bs[t])) : 0) * MH * 8 - (MH - 1 - k) * 8;
     const ch = BLK[clamp(Math.round(f), 0, 8)], tx = ch + ch; if (e.textContent !== tx) e.textContent = tx; });
   // Master: a horizontal bar per side, −48 to 0 dB in MW cells, plus the peak in dB.
   if (masterEls.length === 10){
     const cut = mcutOn = mCut(); for (const k of [0, 5]){ const ln = masterEls[k].closest('.ln'); if (ln && ln.classList.contains('mcut') !== cut) ln.classList.toggle('mcut', cut); }   // MASTER CUT FLASH
     const HB = ' ▏▎▍▌▋▊▉█', zones = [[0, 27], [27, 34], [34, MW]];
     [0, 1].forEach(s => {
-      const m = rt && rt.mlv ? rt.mlv[s] : 0, f = lvl(m) * MW, base = s * 5;
+      const m = rt && rt.mlv && !hold ? Math.max(rt.mlv[s], rt.mlA ? rt.mlA[s] : 0) : 0, f = lvl(m) * MW, base = s * 5;
       zones.forEach(([a, b], z) => { let t = ''; for (let i = a; i < b; i++){ const x = f - i; t += x >= 1 ? '█' : x > 0 ? HB[Math.round(x * 8)] : ''; }
         const e = masterEls[base + z]; if (e.textContent !== t){ e.textContent = t; e.style.width = 'calc(' + t.length + ' * var(--chw, 1ch))'; } });   // as wide as its cells (see .mt)
       { const e3 = masterEls[base + 3], t3 = '·'.repeat(Math.max(0, MW - Math.ceil(f))); if (e3.textContent !== t3) e3.textContent = t3; }
-      const pk = rt && rt.mpk ? rt.mpk[s] : 0;
+      const pk = rt && rt.mpk && !hold ? rt.mpk[s] : 0;
       { const e4 = masterEls[base + 4], t4 = pk > 0.00002 ? (20 * Math.log10(pk)).toFixed(1).padStart(5) + (pk >= 0.999 ? ' CLIP' : '') : '  −∞'; if (e4.textContent !== t4) e4.textContent = t4; }
     });
   }
+  if (bs) for (const b of bs) b.lvA = b.lv;   // the next paint starts from what is now
+  if (rt && rt.mlA && rt.mlv && !hold){ rt.mlA[0] = rt.mlv[0]; rt.mlA[1] = rt.mlv[1]; }
 }
 /* ---------- the stage beside the tracker grid (big screens) ---------- */
 // BY SCREEN (default): the dogs on Song and Project, and something useful on the others — Sect: the phrase under
@@ -28828,10 +28855,10 @@ function stageTick(now){
   // FX DYNAMICS: the shown track's effects report their levels while the stage shows its chain; ~30 frames a second then
   const chn = stgKindNow === 'chain' && !$('tStage').hidden, ft = cFxT >= NT ? -1 : Math.min(cFxT, ntr() - 1);
   fxTelSet(chn ? fxDynNodeOf(ft) : dkBarTelNode);   // FX BAR: otherwise the bottom bar's track, when it shows a dynamics slot
-  if (chn && now - stgFrameT > 33){ const A = ft < 0 ? S.mfx : S.tfx[ft] || []; if (A.some(f => f && fxStageLive(f.type))){ stgFrameT = now; stageCanvas(false); } }
+  if (chn && meterDue(now, stgFrameT, 34, true)){ const A = ft < 0 ? S.mfx : S.tfx[ft] || []; if (A.some(f => f && fxStageLive(f.type))){ stgFrameT = now; stageCanvas(false); } }
   if (stgOn !== !!tp.on){ stgOn = !!tp.on; if (stgKindNow === 'dogs' || stgKindNow === 'drum') dogsState(); else if (stgKindNow) stageCanvas(true); }
   if (!stgKindNow || $('tStage').hidden) return;
-  if (stgKindNow === 'piano' || stgKindNow === 'spec'){ if (now - stgFrameT > 45){ stgFrameT = now; stageCanvas(false); } return; }
+  if (stgKindNow === 'piano' || stgKindNow === 'spec'){ if (stgKindNow === 'spec' && meterBlank('stg', () => stageCanvas(true))) return; if (meterDue(now, stgFrameT, 46, stgKindNow === 'piano')){ stgFrameT = now; stageCanvas(false); } return; }   // METERS: the piano's lit notes are marks (OFF keeps LIGHT's rate); the spectrum is a meter
   if ((stgKindNow !== 'dogs' && stgKindNow !== 'drum') || !tp.on || !ctx) return;
   const lat = heardLat(), t = ctx.currentTime - lat, bpm = tp.bpm || S.bpm;
   if (bpm !== stgBpm){ const b = (t - stgT0) * stgBpm / 60; stgBpm = bpm; stgT0 = t - b * 60 / bpm; }
@@ -29031,7 +29058,7 @@ function stageWave(){
 function stageSpec(force){
   // BATTERY: stopped (nothing live to show), the panel is a still picture: draw it once and skip until something it shows changes
   // (live again, a forced layout, the skin or theme, the box size, zoom / dpr). Live, it redraws every tick as before.
-  const an0 = specAnalyser(), live0 = !!an0 && (tp.on || performance.now() - audioWake < 1500);
+  const an0 = specAnalyser(), live0 = !!an0 && !meterHold() && (tp.on || performance.now() - audioWake < 1500);
   if (!live0){
     const de = document.documentElement, st = $('tStage').style, sig = 'idle|' + !!an0 + '|' + de.getAttribute('data-skin') + '|' + de.className + '|' + document.body.className + '|' + st.width + '|' + st.height + '|' + (devicePixelRatio || 1) + '|' + innerWidth + 'x' + innerHeight;
     if (!force && sig === stgSig) return; stgSig = sig;
@@ -29042,7 +29069,7 @@ function stageSpec(force){
   [100, 1000, 10000].forEach(f => { const x = xOf(f); g.beginPath(); g.moveTo(x, 0); g.lineTo(x, H); g.stroke(); g.fillStyle = X.mid; g.font = `${10 * dpr}px ${X.font}`; g.fillText(f >= 1000 ? f / 1000 + 'k' : f, x + 3 * dpr, H - 5 * dpr); });
   // Fit and finish (2 Nov): level lines, and a word while nothing plays, so the stopped panel isn't a blank box
   g.save(); g.setLineDash([2 * dpr, 4 * dpr]); g.globalAlpha = 0.5; for (const db of [-24, -48, -72]){ const y = yOf(db); g.beginPath(); g.moveTo(0, y); g.lineTo(W, y); g.stroke(); g.fillStyle = X.mid; g.font = `${9 * dpr}px ${X.font}`; g.fillText(db + ' dB', 4 * dpr, y - 3 * dpr); } g.restore();
-  const an = specAnalyser(); if (!an || !(tp.on || performance.now() - audioWake < 1500)){
+  const an = specAnalyser(); if (!an || meterHold() || !(tp.on || performance.now() - audioWake < 1500)){
     g.fillStyle = X.mid; g.font = `600 ${11 * dpr}px ${X.font}`; g.textAlign = 'center'; g.fillText('SPECTRUM · PLAY TO SEE IT', W / 2, H / 2); g.textAlign = 'left'; return; }
   an.getFloatFrequencyData(dkSpec); const sr = ctx.sampleRate, N = dkSpec.length;
   g.beginPath(); g.moveTo(0, H);
@@ -29381,7 +29408,7 @@ function mwGrid(g, G, C, gains){
   if (gains) for (const d of [-12, -6, 0, 6, 12]){ const y = Math.round(G.y(d)) + .5; g.strokeStyle = d ? C.line : C.muted; g.beginPath(); g.moveTo(0, y); g.lineTo(G.W, y); g.stroke(); g.fillText((d > 0 ? '+' : '') + d, 4 * G.dpr, y - 3 * G.dpr); }
 }
 function mwSpectrum(g, G, C, top, bot){
-  const an = specAnalyser(); if (!an || !(tp.on || performance.now() - audioWake < 1500)) return;
+  const an = specAnalyser(); if (!an || meterHold() || !(tp.on || performance.now() - audioWake < 1500)) return;
   an.getFloatFrequencyData(dkSpec); const sr = ctx.sampleRate, N = dkSpec.length, yOf = db => clamp((top - db) / (top - bot), 0, 1) * G.H;
   g.beginPath(); g.moveTo(0, G.H);
   for (let x = 0; x <= G.W; x += 3 * G.dpr){ const f0 = G.f(x), f1 = G.f(x + 3 * G.dpr), b0 = Math.max(1, Math.floor(f0 / (sr / 2) * N)), b1 = Math.min(N - 1, Math.max(b0, Math.ceil(f1 / (sr / 2) * N)));
@@ -29463,7 +29490,7 @@ function mwSupDraw(){
   g.clearRect(0, 0, G.W, G.H);
   g.fillStyle = C.line; g.globalAlpha = .55; g.fillRect(0, 0, G.x(M.lo), G.H); g.fillRect(G.x(M.hi), 0, G.W - G.x(M.hi), G.H); g.globalAlpha = 1;
   mwSpectrum(g, G, C, -10, -100); mwGrid(g, G, C, false);
-  const red = mstMeter && mstMeter.sup; if (red && M.on){ const n = red.length; g.fillStyle = C.ink; for (let i = 0; i < n; i++){ const h = red[i] / 20 * G.H * .6; if (h > .5) g.fillRect(i / n * G.W + 1, 0, G.W / n - 2, h); } }
+  const red = mstMeter && !meterHold() && mstMeter.sup; if (red && M.on){ const n = red.length; g.fillStyle = C.ink; for (let i = 0; i < n; i++){ const h = red[i] / 20 * G.H * .6; if (h > .5) g.fillRect(i / n * G.W + 1, 0, G.W / n - 2, h); } }
   g.strokeStyle = C.ink; g.lineWidth = 2 * G.dpr; for (const f of [M.lo, M.hi]){ const x = Math.round(G.x(f)) + .5; g.beginPath(); g.moveTo(x, 0); g.lineTo(x, G.H); g.stroke(); }
   g.fillStyle = C.muted; g.font = `${10 * G.dpr}px ${C.font}`; g.fillText('reduction ↓  · drag the lines to set the range', 6 * G.dpr, G.H - 18 * G.dpr);
 }
@@ -29482,7 +29509,7 @@ function mwSupDraw(){
 const mwComp = {lv:-200, gr:0, grHold:0, holdT:0, hist:new Float32Array(150), hi:0};
 function mwCompDraw(){
   const c = $('mwCompC'), G = mwGeo(c), g = c.getContext('2d'), C = mwColors(); if (!G.W) return; const M = S.mst.comp, d1 = G.dpr;
-  const m = mstMeter, live = !!(m && M.on && S.mst.on && (tp.on || performance.now() - audioWake < 1500)), K = mwComp;
+  const m = mstMeter, live = !!(m && M.on && S.mst.on && !meterHold() && (tp.on || performance.now() - audioWake < 1500)), K = mwComp;
   // the readings, with ballistics (this runs ~30 times a second)
   const lvNow = live && Number.isFinite(m.compIn) ? m.compIn : -200, grNow = live ? Math.min(0, m.comp || 0) : 0;
   K.lv = lvNow > K.lv ? lvNow : Math.max(lvNow, K.lv - 0.7); K.gr = grNow < K.gr ? grNow : Math.min(0, K.gr + 0.6);
@@ -29540,8 +29567,10 @@ function mwLimDraw(){
 function mwLoop(){
   if (!mwOpenNow) return;
   if (document.hidden && !tp.on) return;   // BATTERY: parked while hidden and not playing (visibilitychange restarts it)
+  if (meterBlank('mw', () => { $('mwChain').querySelectorAll('.mwst .gr').forEach(g => { g.textContent = ''; }); $('mwRead').innerHTML = '<span>IN <b>—</b> LUFS</span><span>OUT <b>—</b> LUFS</span><span>PEAK <b>—</b> dB</span>'; mwLimHist.fill(0);
+    if (mwSel === 'eq') mwEqDraw(); else if (mwSel === 'sup') mwSupDraw(); else if (mwSel === 'comp') mwCompDraw(); else mwLimDraw(); })){ mwRaf = 0; return; }   // METERS: OFF while playing: readouts and curves painted without the levels, then parked (mtrWake at STOP)
   mwRaf = requestAnimationFrame(mwLoop);
-  const now = performance.now(); if (now - (mwLoop.t || 0) < (lpOn && tp.on ? LP_GATE : 33)) return; mwLoop.t = now;
+  const now = performance.now(); if (!meterDue(now, mwLoop.t || 0, 33)) return; mwLoop.t = now;   // METERS: OFF holds it (the loop idles; mtrWake / the next frame at STOP)
   const m = mstMeter, live = !!(m && S.mst.on && (tp.on || now - audioWake < 1500));
   // chain readouts
   $('mwChain').querySelectorAll('.mwst').forEach(b => { const k = b.dataset.k, gr = b.querySelector('.gr');
@@ -29823,7 +29852,7 @@ function deckStrip(){
 }
 // The strip's meter is stereo: the shown track's bus (after its pan) is split into left and right, each with its
 // own analyser, re-attached when the shown track changes. Peaks fall back smoothly, like the other meters.
-let dkSt = null; const dkStBuf = new Float32Array(512); let dkStT = 0;
+let dkSt = null; const dkStBuf = new Float32Array(512); let dkStT = 0, dkStP = 0;
 function deckMetersPaint(){}
 function deckStripMeter(now){
   try { deckFxBarMeters(); } catch(e){}   // FX BAR: the slots' meters, with the strip's
@@ -29836,11 +29865,15 @@ function deckStripMeter(now){
       const sp = ctx.createChannelSplitter(2), a = [ctx.createAnalyser(), ctx.createAnalyser()]; a.forEach((x, i) => { x.fftSize = 512; sp.connect(x, i); });
       node(t).connect(sp); dkSt = {t, sp, a, lv:[0, 0]}; } catch(e){ dkSt = null; return; }
   }
-  const dk = Math.pow(0.86, Math.max(0.5, dt) * 0.12), quiet = !(tp.on || now - audioWake < 1500);
+  const dk = Math.pow(0.86, Math.max(0.5, dt) * 0.12), quiet = !(tp.on || now - audioWake < 1500), hold = meterHold();
+  if (hold){ if (!dkSt.held){ dkSt.held = true; dkSt.lv[0] = dkSt.lv[1] = 0; dkSt.pa = [0, 0]; for (const b of bars){ b.style.setProperty('--lv', '0%'); b.classList.remove('clip'); b._lv = '0%'; b._cl = false; } } return; }   // METERS: OFF while playing: empty, not read
+  dkSt.held = false; if (!dkSt.pa) dkSt.pa = [0, 0];
   dkSt.a.forEach((x, i) => { let p = 0;
     if (!quiet){ x.getFloatTimeDomainData(dkStBuf); for (let k = 0; k < dkStBuf.length; k++){ const v = dkStBuf[k] < 0 ? -dkStBuf[k] : dkStBuf[k]; if (v > p) p = v; } }
-    const nl = Math.max(p, dkSt.lv[i] * dk); dkSt.lv[i] = nl < 0.0005 ? 0 : nl;
-    bars[i].style.setProperty('--lv', (lvl(dkSt.lv[i]) * 100).toFixed(1) + '%'); bars[i].classList.toggle('clip', dkSt.lv[i] >= 0.999); });
+    const nl = Math.max(p, dkSt.lv[i] * dk); dkSt.lv[i] = nl < 0.0005 ? 0 : nl; if (dkSt.lv[i] > dkSt.pa[i]) dkSt.pa[i] = dkSt.lv[i]; });   // pa: the highest since the last paint
+  if (!meterDue(now, dkStP, 0)) return; dkStP = now;
+  dkSt.a.forEach((x, i) => { const wv = (lvl(dkSt.pa[i]) * 100).toFixed(1) + '%', cl = dkSt.pa[i] >= 0.999; dkSt.pa[i] = dkSt.lv[i];   // (a changed value only)
+    if (bars[i]._lv !== wv){ bars[i]._lv = wv; bars[i].style.setProperty('--lv', wv); } if (bars[i]._cl !== cl){ bars[i]._cl = cl; bars[i].classList.toggle('clip', cl); } });
 }
 // Scope: the master's spectrum, drawn as Quite Noise draws its Shape graph — 20 Hz to 20 kHz across, faint
 // lines at 100, 1k and 10k, a dashed reference at −48 dB, and the spectrum filled in the section's colour.
@@ -29859,7 +29892,7 @@ function mCut(){
   const want = curve(S.master == null ? 255 : S.master);
   return want > 0 && rt.out.gain.value < want * 0.708;
 }
-const HM = {m:null, an:null, buf:null, lv:[0, 0], pk:[0, 0], pt:[0, 0], clip:false, t:0, drawn:''};
+const HM = {m:null, an:null, buf:null, lv:[0, 0], la:[0, 0], pk:[0, 0], pt:[0, 0], clip:false, t:0, pT:0, drawn:'', held:false, heldClip:false};   // la: the highest level since the last paint (METERS)
 function hmAttach(){
   if (HM.m === master || !ctx || !master) return !!HM.an;
   try { const sp = ctx.createChannelSplitter(2); HM.an = [ctx.createAnalyser(), ctx.createAnalyser()]; master.connect(sp);
@@ -29888,17 +29921,25 @@ function hmDraw(now){
   const live = hmAttach(), dk = Math.pow(10, -20 * dt / 20);   // falls 20 dB a second
   for (let s = 0; s < 2; s++){
     let p = 0; if (live){ HM.an[s].getFloatTimeDomainData(HM.buf); for (let i = 0; i < HM.buf.length; i++){ const v = HM.buf[i] < 0 ? -HM.buf[i] : HM.buf[i]; if (v > p) p = v; } }
-    HM.lv[s] = Math.max(p, HM.lv[s] * dk);
+    HM.lv[s] = Math.max(p, HM.lv[s] * dk); if (HM.lv[s] > HM.la[s]) HM.la[s] = HM.lv[s];
     if (p >= HM.pk[s]){ HM.pk[s] = p; HM.pt[s] = now; } else if (now - HM.pt[s] > 1000) HM.pk[s] = Math.max(p, HM.pk[s] * dk);   // held a second, then falls
     if (p >= 0.999) HM.clip = true;
   }
   if (!c || !c.offsetParent) return;
+  // METERS: the levels above are read at their own rate (peak, CLIP latch, quiet check); only the painting waits. OFF while playing: empty bars, and a CLIP that latches is still shown (once).
+  const hold = meterHold();
+  if (hold){ if (HM.held && HM.heldClip === HM.clip) return; HM.held = true; HM.heldClip = HM.clip; }
+  else { HM.held = false; if (!meterDue(now, HM.pT, 0)) return; }
+  if (!HM.lvs){ HM.lvs = [0, 0]; HM.zero = [0, 0]; }   // lvs: the accumulated maximum as it was when this paint began (HM.la is reset below, before the bars are drawn)
+  if (!hold){ HM.lvs[0] = HM.la[0]; HM.lvs[1] = HM.la[1]; }
+  const LV = hold ? HM.zero : HM.lvs, PK = hold ? HM.zero : HM.pk;
   const r = c.getBoundingClientRect(), dpr = Math.min(2, devicePixelRatio || 1), W = Math.round(r.width * dpr), H = Math.round(r.height * dpr); if (!W || !H) return;
-  const cut = mCut(), blink = cut && Math.floor(now / 400) % 2 === 0;
+  const cut = !hold && mCut(), blink = cut && Math.floor(now / 400) % 2 === 0;
   if (cut !== !!HM.cut){ HM.cut = cut; if (HM.tip == null) HM.tip = c.title; c.title = cut ? 'The master is turned down by a VOL command on the master track' : HM.tip; }
   // Labelled (fit and finish, 2 Nov): L / R at the left, a dB scale under the bars, the held peak in dB at the right
-  const pkMax = Math.max(HM.pk[0], HM.pk[1]), pkTxt = pkMax > 0.0001 ? (Math.round(40 * Math.log10(pkMax)) / 2).toFixed(1) : '-inf';
-  const pos = g => lvl(g), key = [W, H, HM.clip, cut, blink, pkTxt, ...HM.lv.map(v => (pos(v) * W) | 0), ...HM.pk.map(v => (pos(v) * W) | 0)].join(',');
+  const pkMax = Math.max(PK[0], PK[1]), pkTxt = pkMax > 0.0001 ? (Math.round(40 * Math.log10(pkMax)) / 2).toFixed(1) : '-inf';
+  const pos = g => lvl(g), key = [W, H, HM.clip, cut, blink, pkTxt, ...LV.map(v => (pos(v) * W) | 0), ...PK.map(v => (pos(v) * W) | 0)].join(',');
+  HM.pT = now; HM.la[0] = HM.lv[0]; HM.la[1] = HM.lv[1];
   if (key === HM.drawn) return; HM.drawn = key;   // nothing moved: no redraw (silence costs nothing)
   if (c.width !== W || c.height !== H){ c.width = W; c.height = H; }
   const g = c.getContext('2d');
@@ -29922,11 +29963,11 @@ function hmDraw(now){
   }
   g.clearRect(0, 0, W, H); g.drawImage(HM.bg, 0, 0);
   for (let s = 0; s < 2; s++){
-    const y = y0 + s * (bh + gap), x = pos(HM.lv[s]) * BW;
+    const y = y0 + s * (bh + gap), x = pos(LV[s]) * BW;
     if (blink){ g.globalAlpha = 0.7; g.fillStyle = '#e8a33a'; g.fillRect(lx, y, BW, bh); g.globalAlpha = 1; }   // MASTER CUT FLASH
     g.fillStyle = ink; g.fillRect(lx, y, Math.min(x, amber), bh);
     if (x > amber){ g.fillStyle = '#e8a33a'; g.fillRect(lx + amber, y, x - amber, bh); }
-    const px = Math.min(BW - dpr, pos(HM.pk[s]) * BW); if (HM.pk[s] > 0.004){ g.fillStyle = HM.pk[s] >= 0.999 ? '#e5484d' : ink; g.fillRect(lx + px, y, Math.max(1, dpr * 1.5), bh); }
+    const px = Math.min(BW - dpr, pos(PK[s]) * BW); if (PK[s] > 0.004){ g.fillStyle = PK[s] >= 0.999 ? '#e5484d' : ink; g.fillRect(lx + px, y, Math.max(1, dpr * 1.5), bh); }
   }
   if (HM.clip){ g.fillStyle = '#e5484d'; g.fillRect(lx + BW - Math.round(4 * dpr), y0, Math.round(4 * dpr), bh * 2 + gap); }
   g.font = `600 ${Math.round(11 * dpr)}px ${ff}`; g.textBaseline = 'middle'; g.textAlign = 'right'; g.fillStyle = HM.clip ? '#e5484d' : ink; g.globalAlpha = pkMax > 0.0001 ? 1 : 0.45;
@@ -29939,10 +29980,10 @@ function specAnalyser(){
   if (dkAn && dkAnM !== master){ try { dkAnM.disconnect(dkAn); } catch(e){} dkAn = dkAnM = null; }
   if (!dkAn && rt && ctx){ try { dkAn = ctx.createAnalyser(); dkAn.fftSize = 4096; dkAn.smoothingTimeConstant = 0.8; master.connect(dkAn); dkAnM = master; dkSpec = new Float32Array(dkAn.frequencyBinCount); } catch(e){ dkAn = null; } } return dkAn; }
 function deckScope(now){
-  if (!deckShown() || !deck.scope || deck.fxbar || now - dkScopeT < 50) return; dkScopeT = now;
+  if (!deckShown() || !deck.scope || deck.fxbar) return; const held = meterHold(); if (held ? mtrB.scope : !meterDue(now, dkScopeT, 50)) return; mtrB.scope = held; dkScopeT = now;   // METERS: OFF paints the grid without the spectrum once, then holds
   const c = $('dkScopeC'), r = c.getBoundingClientRect(), dpr = Math.min(2, devicePixelRatio || 1); if (!r.width || !r.height) return;
   if (c.width !== Math.round(r.width * dpr) || c.height !== Math.round(r.height * dpr)){ c.width = Math.round(r.width * dpr); c.height = Math.round(r.height * dpr); dkScopeIdle = false; }
-  const live = !!(rt && ctx && (tp.on || now - audioWake < 1500)); if (!live && dkScopeIdle) return; dkScopeIdle = !live;
+  const live = !held && !!(rt && ctx && (tp.on || now - audioWake < 1500)); if (!live && dkScopeIdle) return; dkScopeIdle = !live;
   if (live) specAnalyser();
   const W = c.width, H = c.height, g = c.getContext('2d'), st = getComputedStyle($('tDeck'));
   const line = st.getPropertyValue('--track').trim() || '#e6e6e6', muted = st.getPropertyValue('--muted').trim() || '#555', fill = st.getPropertyValue('--scfill').trim() || '#f4a9c4';
@@ -30181,9 +30222,15 @@ function deckFxBarMeters(){
   const bar = $('dkFxBar'); if (!bar || !deck.fxbar || !deckShown() || !deck.fx){ fxLvlSet(null); dkBarTelNode = null; return; }
   const mst = dkMst(), t = mst ? NT : dkTrack(), node = fxDynNodeOf(mst ? -1 : t), A = (mst ? S.mfx : S.tfx[t]) || []; fxLvlSet(node);
   dkBarTelNode = A.some(f => f && isFxDyn(f.type)) ? node : null;
-  const now = performance.now();
-  for (const c of bar.children){ const i = c.querySelector('.fm i'); if (!i) continue; const k = +c.dataset.k; let lv = 0; try { lv = typeof fxSlotLevel === 'function' ? fxSlotLevel(t, k) : 0; } catch(e){} i.style.width = Math.round(clamp(lv, 0, 1) * 100) + '%';
-    if (now - c._q < 33) continue; c._q = now; c._h[c._w] = lv; c._w = (c._w + 1) % c._h.length;
+  const now = performance.now(), hold = meterHold();
+  if (hold) meterBlank('fxbar', () => bar.querySelectorAll('canvas').forEach(cv => cv.getContext('2d').clearRect(0, 0, cv.width, cv.height))); else mtrB.fxbar = false;
+  for (const c of bar.children){ const i = c.querySelector('.fm i'); if (!i) continue; const k = +c.dataset.k; let lv = c._lv0 || 0;
+    if (hold){ lv = 0; c._lm = 0; }
+    else { let cur = 0; try { cur = typeof fxSlotLevel === 'function' ? fxSlotLevel(t, k) : 0; } catch(e){}
+      if (mtrMode === 'smooth'){ lv = c._lv0 = cur; }
+      else { if (!(c._lm >= cur)) c._lm = cur; if (meterDue(now, c._w2 || 0, 0)){ c._w2 = now; lv = c._lv0 = c._lm; c._lm = cur; } else lv = c._lv0 || 0; } }   // LIGHT: sampled every frame, the highest since the last paint is painted
+    const wd = Math.round(clamp(lv, 0, 1) * 100) + '%'; if (i._w !== wd){ i._w = wd; i.style.width = wd; }   // METERS: a changed width only (empty and not read while OFF plays)
+    if (hold || !meterDue(now, c._q || 0, 33)) continue; c._q = now; c._h[c._w] = lv; c._w = (c._w + 1) % c._h.length;
     try { dkFxViz(c, A[k], k, node, now); } catch(e){}
     if (c._spr) try { if (c._spr.kind) dkAnim(c, A[k], now, lv); else dkSpring(c, A[k], now, lv); } catch(e){} }
 }
@@ -32385,7 +32432,7 @@ function sxStageSwitch(kind){
 $('tStageSw').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; sxSet('peek', b.dataset.k === 'peek'); sxPkSig = ''; });
 /* ===== SONG EXTRAS end ===== */
 
-let raf = 0, mScanT = 0, audioWake = 0;
+let raf = 0, mScanT = 0, audioWake = 0, mDirty = false, mPaintT = 0;
 const mbuf = new Float32Array(512), mbuf2 = new Float32Array(1024);
 // CPU meter: the browser's own audio load where it reports one (Chrome's renderCapacity), otherwise
 // the time the track effects take, which is most of what the tracker adds.
@@ -32640,22 +32687,24 @@ function frame(){
   if (rt && (tp.on || mt - audioWake < 1500) && mt - mScanT >= 33){
     const dk = Math.pow(0.86, Math.max(0.5, mt - mScanT) * 0.12);   // 0.86 per 8.3ms frame, in real time
     mScanT = mt;
-    let any = false;
-    for (let t = 0; t < ntr(); t++){ const b = rt.pl.buses[t]; b.an.getFloatTimeDomainData(mbuf);
+    const hold = meterHold();   // METERS: OFF while playing: the track meters and the TRIM light are only painted, so they are not read; the master is (its peak and CLIP)
+    if (!hold) for (let t = 0; t < ntr(); t++){ const b = rt.pl.buses[t]; b.an.getFloatTimeDomainData(mbuf);
       let p = 0; for (let i = 0; i < mbuf.length; i++){ const a = mbuf[i] < 0 ? -mbuf[i] : mbuf[i]; if (a > p) p = a; }
-      const nl = Math.max(p, b.lv * dk), v = nl < 0.002 ? 0 : nl; if (v !== b.lv){ any = true; b.lv = v; } }
+      const nl = Math.max(p, b.lv * dk), v = nl < 0.002 ? 0 : nl; if (v !== b.lv){ mDirty = true; b.lv = v; } if (!(b.lvA >= v)) b.lvA = v; }   // lvA: the highest since the last paint (METERS: LIGHT paints it, not the latest)
     // GAIN STAGING: the Mixer's TRIM light, from what the shown tracks send in (after TRIM): the peak held 0.6 s, then falling
-    if (tv === 'mixer' && trimEls.length) for (let i = 0; i < mixN; i++){ const b = rt.pl.buses[mixL + i]; if (!b || !b.ai) continue; b.ai.getFloatTimeDomainData(mbuf);
+    if (!hold && tv === 'mixer' && trimEls.length) for (let i = 0; i < mixN; i++){ const b = rt.pl.buses[mixL + i]; if (!b || !b.ai) continue; b.ai.getFloatTimeDomainData(mbuf);
       let p = 0; for (let k = 0; k < mbuf.length; k++){ const a = mbuf[k] < 0 ? -mbuf[k] : mbuf[k]; if (a > p) p = a; }
       const was = b.ipk;
       if (p >= b.ipk){ b.ipk = p; b.ipt = mt; } else if (mt - b.ipt > 600){ b.ipk = Math.max(p, b.ipk * dk); if (b.ipk < 0.0005) b.ipk = 0; }
-      b.iseen = mt; if (b.ipk !== was) any = true; }
+      b.iseen = mt; if (b.ipk !== was) mDirty = true; }
     if (rt.man){ const now = mt;
       rt.man.forEach((a, s) => { a.getFloatTimeDomainData(mbuf2);
         let p = 0; for (let i = 0; i < mbuf2.length; i++){ const v = mbuf2[i] < 0 ? -mbuf2[i] : mbuf2[i]; if (v > p) p = v; }
-        const nl = Math.max(p, rt.mlv[s] * dk), v = nl < 0.0002 ? 0 : nl; if (v !== rt.mlv[s]){ any = true; rt.mlv[s] = v; }
-        if (p >= rt.mpk[s] || now - rt.mpt[s] > 1500){ if (p !== rt.mpk[s]) any = true; rt.mpk[s] = p; rt.mpt[s] = now; } }); }
-    if (any || (masterEls.length === 10 && mCut() !== mcutOn)){ paintMeters(); deckMetersPaint(); }   // a cut can start or end in a silent stretch
+        const nl = Math.max(p, rt.mlv[s] * dk), v = nl < 0.0002 ? 0 : nl; if (v !== rt.mlv[s]){ mDirty = true; rt.mlv[s] = v; } if (!(rt.mlA[s] >= v)) rt.mlA[s] = v;
+        if (p >= rt.mpk[s] || now - rt.mpt[s] > 1500){ if (p !== rt.mpk[s]) mDirty = true; rt.mpk[s] = p; rt.mpt[s] = now; } }); }
+    if (hold){ if (!mtrBlank){ mtrBlank = true; paintMeters(); deckMetersPaint(); } }   // empty once, then nothing is written until STOP
+    else { mtrBlank = false;
+      if ((mDirty || (masterEls.length === 10 && mCut() !== mcutOn)) && meterDue(mt, mPaintT, 0)){ mDirty = false; mPaintT = mt; paintMeters(); deckMetersPaint(); } }   // a cut can start or end in a silent stretch
   }
   deckScope(mt); deckStripMeter(mt); stageTick(mt);
 }
@@ -34140,6 +34189,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [576, '13 Nov', ['New setting, Settings \u2192 Screen \u2192 Meters while playing: Smooth (as before), Light (about 10 a second) or Off. On a phone the Mixer does far less screen work on Light or Off.', 'A quick second tap on PLAY no longer jumps to the top of the song: it just plays from the cursor.', 'Control bar: MUTE PAT, LOOP SEL and CLN \u2193 are two-line labels that fit at large text sizes; the COMMANDS heading is gone (one more row on a folded phone).']],
   [575, '13 Nov', ['Much less screen work while a song plays: the playhead now moves in place and the Mixer, Inst, FX, MOD and Project screens no longer redraw on every row (measured in emulation: drawing time down by 80 to 95 % on those screens, Pattern view by about 85 %). On touch screens the playhead draws at most 20 times a second.', 'Tap the CPU meter: a new section, The screen, shows how much of the page\u2019s time goes on drawing and on the page sequencer.', 'The playback report\u2019s voice count after STOP no longer keeps one per live engine.']],
   [574, '13 Nov', ['New effect: Lite reverb, a very light room / plate reverb that costs about a fifth to a tenth of the other reverbs (Size, Decay, Tone, Pre-delay, Mix; six presets). It sleeps when nothing is going through it.', 'More synth presets: 20 new Acid presets, 7 Bass, and 4 to 6 each for sixteen other synth engines.']],
   [573, '12 Nov', ['The control bar\u2019s loop play button has a new icon: a play sign inside a loop.', 'LP.SEL, beside it, loops the selected song rows (or the cursor\u2019s row).', 'ALT+arrows between patterns no longer fights the playhead: the pattern you went to stays open and in view while you work.', 'A second PLAY tap no longer jumps the cursor to the top while you are working.', 'Mobile, pad mode: the TRANSP buttons are gone (SEMI on the pad does the same) and BPM, LPB, ROWS and REC sit in the tab row, leaving more room for the phrase and song.', 'Tap the CPU meter: a plain list of what is using the most, whether the phone is keeping up, and one thing to try.', 'The phone\u2019s media notification shows the song\u2019s real name and the app\u2019s icon.', 'The audio thread sequencer comes back by itself after a clock hiccup, once the clock has been steady; before, it stayed off until a reload.', 'The playback report records battery level and charging.']],

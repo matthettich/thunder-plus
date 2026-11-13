@@ -27,14 +27,14 @@ test('pressed again while playing: it stops, and LOOP SEL goes back to what it w
   const c = rig({ sel: { y0: 4, y1: 7 } }); c.go(); assert.equal(c.loopSel, true); c.log.length = 0; c.go(); assert.deepEqual(c.log, ['stop']);
   c.get().seen = true; c.restore(); assert.equal(c.loopSel, false, 'LOOP SEL as before'); assert.equal(c.loopArm, null); assert.equal(c.get(), null);
 });
-test('not on Arrange: it says so and starts nothing', () => { const c = rig({ tvv: 'phrase', sel: { y0: 1, y1: 4 } }); c.go(); assert.ok(!c.tp.on); assert.match(c.log[0], /^toast:LP\.SEL loops the selected rows on Arrange/); });
+test('not on Arrange: it says so and starts nothing', () => { const c = rig({ tvv: 'phrase', sel: { y0: 1, y1: 4 } }); c.go(); assert.ok(!c.tp.on); assert.match(c.log[0], /^toast:LOOP SEL loops the selected rows on Arrange/); });
 test('wiring: the button, its action, the bar orders, draw()', () => {
-  assert.match(src, /\['lpsel', 'LP\.SEL', 'Loops the selected rows of the song/);
+  assert.match(src, /\['lpsel', 'LOOP SEL', 'Loops the selected rows of the song/);
   assert.match(src, /if \(c === 'lpsel'\) return lpSelPlay\(\);/);
   assert.match(src, /'redo', 'lpsel', 'song'\];/, 'pad order: right beside loop play'); assert.match(src, /'prev', 'next', 'lpsel', 'song'\];/, 'COMMAND BAR order');
   assert.match(src, /if \(lsW\)\{ if \(tp\.on\) lsW\.seen = true; else if \(lsW\.seen\) lpSelRestore\(\); \}/);
   assert.match(src, /lb\.hidden = !vis; lb\.classList\.toggle\('on', !!lsW && tp\.on\)/);
-  assert.match(src, /it\('lpsel', 'LP\.SEL: loop the selected rows[^\n]*\{off:!onSong\}/, 'Edit ▾');
+  assert.match(src, /it\('lpsel', 'LOOP SEL: loop the selected rows[^\n]*\{off:!onSong\}/, 'Edit ▾');
   assert.match(src, /new Set\(\['mixp', 'dup', 'tname', 'unbus', 'lpsel'\]\)/, 'Arrange block right-click');
 });
 test('folded: not on the row under 700 px; wider windows get a column more where it shows', () => {

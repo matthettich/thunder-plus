@@ -524,6 +524,21 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0) and `link/` (Ableton
 
 ## To-do (owner's list: keep it current; newest dated entries below have the details)
 
+### Where things stand (13 Nov, morning: READ THIS FIRST; it supersedes the 10 Nov block below where they disagree)
+
+**Web beta is build 575.** Builds 569 to 575 (12 to 13 Nov, the dated entries below) came from the owner's phone testing: Arrange cursor and follow fixes, one song wrap for all tracks, effect state that persists, master block mute, loop play / LP.SEL / INS, the lost-notes fix, per-track playhead, renders with gaps, the core coming back after a clock hiccup, the Mobile header, the CPU panel, Lite reverb, 111 presets, and the draw pass (playhead redraws in place). **None of 569 to 575 has been verified on a real phone; nobody has listened to Lite reverb or the new presets.** The owner's test items are in the punch list.
+
+**Next work, in order (the owner: stability, efficiency and battery first; "if you have to make a decision, weigh … a solution that would port to a native app easily"; best guess and tell him):**
+1. **Pattern view's long tasks while playing** (57 to 69 per 10 s at 4x, the same with every meter off, so not the meters: measure what they are; Sonnet, display only). The Meters setting shipped in 576 (Mixer: 56 → 24 Light / 6 Off).
+2. **First PLAY stall (audio review, lead):** at 4x the press handler runs about 446 ms (`rtInit` 256 ms) and a second `tStart` pass after the worklet hand-over holds the thread about 1.5 s; his phone showed a 130 ms long frame and a first note 53 ms late. The fix is in the audio start (warm the engine before the first PLAY), not the draw.
+3. **Song / Arrange playing-row mark in place** (it still takes the full `draw()` per row; Sonnet, display only).
+4. **Idle timers:** three 200 ms timers run while stopped (the frame loop, the header meter, a generic idle runner); let them sleep (small battery gain).
+5. **CPU panel:** per-engine cost of drum and synth voices is still not measured, so "what is using the most" is incomplete there (needs audio-thread measuring: lead decides how).
+6. **`tcChunks` without allocation** (described in `docs/audits/2026-11-13-draw-pass.md`; only matters if a browser ever delivers blocks over 128 frames: low priority).
+7. Then the older list: "Feature priority" and "Longer-term priority" below (MOD expansion, automation lanes, …), still under the feature freeze except what the owner asks for.
+
+**Waiting on the owner:** (a) the Synth page GUI audit he ran in another checkout on 13 Nov ("the audit is done"): findings not received yet; whether he wants a one-tap way to the top of the song on the phone now that the double tap is gone; (b) LP.SEL on the pad ("I will think about pad placement"; a mock put it between LOOP and ALT); (c) **native apps: "we will decide if we push forward with native tomorrow" (said 12 Nov)**: nothing started, the plan is under "Native port" below; (d) two experiments that would explain the phone's clock hiccups: 2 minutes untouched vs tapping every 10 to 15 s, and plugged in vs on battery (the report records battery since 573); (e) on Safest sounding quieter: the app's output level is identical (−14.8 dB RMS both ways), so try the phone's Dolby Atmos / equaliser off.
+
 ### Where things stand (10 Nov, 15:10: READ THIS FIRST; it supersedes older lines below where they disagree)
 
 **11 Nov update, builds 563–567 (567: the core's per-block garbage; the wide node left by the owner's decision; 564: title bar touch-ups; 565: Song grid centred with SECT; 566: the core sequencer profiled and its fast paths fixed, see the 11 Nov entries): read this before the 10 Nov lines below, which it supersedes where they disagree.** Owner (10 Nov, 22:49): "do the queue and push a full desktop app after"; had "a really stable seeming few minutes" on the phone after Background play went back on; interests while building: stability, usability, efficiency and battery on mobile, and a simple move between platforms (phone, Mac, Windows, maybe a tablet or Android hardware). "Fable can fix anything challenging for less capable agents without my input": the lead decides and reports. Queue status after build 563 (see the 11 Nov entry):
@@ -619,6 +634,11 @@ The owner's top priority to add is the MOD screen. Work down the list; ask befor
 ### Owner's punch list (owner, 9 Nov: will test these later; keep it current)
 
 Start a session by asking for results. Fix on `beta`. (10 Nov, 15:10: the web beta is build 560; the build numbers in the rest of this paragraph are older.) Web beta: https://matthettich.github.io/thunder-plus/beta/ (build 547 as of 10 Nov morning, 548 once its PR merges; the night of 9–10 Nov shipped 544–547, see the four "10 Nov" entries below. Decisions the lead made that night for the owner to confirm or reverse: on a phone the saved Sequencer default plays on the Page unless Audio thread is picked on that device; on a phone the safety limiter is its stand-in until another worklet loads; the resync only runs with a worklet loaded and its margins are untested on a device). Desktop: v1.3.4-beta.2 (build 541, no feed view or scopes); further desktop betas on hold until the owner asks.
+
+**Build 576** (Meters setting; the double-tap-to-top shortcut removed; control bar labels)
+- [ ] Phone, ELECTRO playing, Settings → Screen → Meters while playing: Light: the Mixer's meters step about 10 times a second and a drum hit still shows; Off: they stay empty and come back at STOP (a CLIP still shows once); Smooth: as before. Does the phone run cooler on the Mixer with Light or Off?
+- [ ] Phone: stop a song and tap PLAY again at once: it plays from the cursor; the cursor never jumps to the top. (There is now no one-tap way to the top on the phone: hold ▲, or tap the first Arrange block. Say if you want one.)
+- [ ] Phone unfolded, pad mode, Song / Arrange, Android font size at its largest: MUTE / PAT, LOOP / SEL and CLN / ↓ read in full; no COMMANDS heading; folded shows one more Arrange row. UNIQ and COPY are drawn a little smaller than CUT and PST at large text: say if that looks wrong.
 
 **Build 575** (less screen work while playing; The screen in the CPU panel)
 - [ ] Phone, a song playing, on the Mixer, Inst, FX, MOD and Project in turn: everything looks as before (meters move, values right), and nothing is stale after a tap or an edit. A value that a pattern command changes while playing (track volume / pan, an effect switch) may now show up to half a second late on those screens: say if that bothers you.
@@ -829,12 +849,15 @@ Start a session by asking for results. Fix on `beta`. (10 Nov, 15:10: the web be
 
 ### Bugs still open
 
-- **Phone audio clock runs fast while playing** (biggest one; cause unknown): "8 Nov, end of session". A resync is sketched there; build it only if the toggle test's log shows it can help.
-- **Stutter that stops under LOOP:** Arrange redraw ruled out in emulation; next suspect is sounds prepared the first time a pattern plays.
-- **Quieter output after switching to Safest:** not found; needs a report from a run that sounds quiet.
-- **Notes after Stop:** looks like buffer plus effect tails, not measured on a device. (MIDI notes booked ahead while hidden: cut on STOP since build 548.)
+- **Phone audio clock dips, then runs fast for about 5 s** (biggest one; cause unknown): the owner's Balanced report of 12 Nov (build 572; "12 Nov (night, 2)" entry) shows it twice, after a screen-on and 39 s into a play with no touch for 43 s; it recovers by itself. A starved audio thread catching up. Since 573 the core comes back afterwards. Wanted from the owner: untouched vs tapping, plugged in vs battery. Older notes: "8 Nov, end of session".
+- **"Clock instability when the song looped round"** (owner, 12 Nov): not reproduced in emulation (`docs/audits/2026-11-12-wrap-clock.md`); probably the item above. The older "stutter that stops under LOOP" suspect (sounds prepared the first time a pattern plays) was measured: buffer builds cost 1.5 to 16.5 ms at 4x per pad on the page sequencer and recur into pass 2.
+- **Quieter output on Safest:** NOT the app (levels identical in his two reports); the phone's output path is the suspect (unverified). "heard" latency on Safest is 546 ms against 75 ms, which is why it feels worse to play. After a screen-off and wake the output latency read 43 → 190 ms and stayed.
+- **First PLAY stall** (see "Where things stand", item 2).
+- **Notes after Stop:** no evidence either way; the report's "voices 1 / 2" was a counting artefact, fixed in 575.
+- **Mixer / Pattern view long tasks while playing:** paint of the meters and bands (about 64 per 10 s at 4x after the draw pass); the meter-rate setting is the answer chosen.
+- **Hand-over and RESUME with tracks of different lengths:** since 571 each track restarts on its own row (`o.at`); exact only when lines per beat match; not run on a device.
 - **Mobile setting found off once** (8 Nov): cause unknown; look at storage if it recurs.
-- Bug reports: the owner resubmits the Synth-page → Song-screen issue if they can reproduce it (note removed 2 Nov).
+- Test-suite notes: `tests/waves.test.js` golden hashes depend on render order in the shared wasm instance; `effects.mjs`'s two "master: … default chain" checks fail on an untouched base; a heap-sampling test can fail once when the machine is busy (rerun it alone).
 
 ### Native port: Mac, Windows, Android, iOS as a stretch (owner, 10 Nov: asked for the strategy; **plan only, waiting on the owner's go**)
 
@@ -881,6 +904,13 @@ Suggested order: N0 → N1 → N2 (phone cured) → N4 with N3 alongside → N5 
   the edge `R.t0`, "waiting…" while armed), `rcdClk` / `rcdFmt` / `rcdFreeSecs`, a 250 ms timer only while recording; the
   final length stays until the next take. recorder-check covers FREE, PATTERN, Stop, next take and closing mid-take.
 
+
+## 13 Nov (morning): Meters setting; the double-tap shortcut removed; control bar labels (build 576)
+
+Build 575 (PR #105) merged after eight minor CodeRabbit findings, mostly in the measuring scripts (the wrap write-up's "never worse" claim reworded; the CPU panel counts playhead-only updates). Owner (morning): on the meters "Can we make #1 a setting"; on the double tap "Remove that shortcut!"; "m.pat and lp.sel both get cutoff by their outlines"; "Cln down is tight, we could put the arrow below cln"; "I don't think the command bar needs the 'commands' label". He also pulled the repo elsewhere for a GUI audit of the Synth page ("the audit is done"; findings not received yet). A Sonnet agent on `feat/meter-rate`; the lead looked at the labels.
+- **Meters while playing** (Settings → Screen; `thunderplus-meters-v1`, per device, reset by "Reset audio settings"; default SMOOTH everywhere): LIGHT paints at most every 92 ms and shows the highest value since the last paint; OFF paints empty once and holds until STOP (a CLIP latch still shows once; per-track meters and the TRIM light are not read at all, the master is). Only the paint is gated: analysers, CLIP, master peak, `pbLevel`, the limiter are read as before. Independent of Low power (the slower wins). Not gated: the CPU meter (2 a second), playhead marks, Arrange, the dogs. **Mixer at 4x, long tasks per 10 s: 56 before, 40 Smooth, 24 Light, 6 Off (one run each: noisy).** **Pattern view does not move (57 to 69 whatever the meters do): its long tasks are NOT the meters, as the 575 entry guessed; that is the next thing to measure.** `tests/meter-rate.test.js`; `draw-pass.mjs --meters=`.
+- **The second-PLAY-goes-to-the-top shortcut is gone** (only the pad's PLAY had it; `toTop`, `stopTapT`, `playWallT`, `playWasOn` removed; supersedes 31 Oct and build 573's narrowing). STOP while stopped still panics and never moves the cursor. Ways to the top now: Home (KEYS mode), Ctrl/⌘+Home, hold pad ▲, tap the first Arrange block; **no one-tap way on the phone** (nothing added; the owner was told).
+- **Control bar:** on the unfolded Song screen (buttons 40.5 px wide) M.PAT, LP.SEL, CLN↓, COPY and UNIQ overflowed at 120 to 130 % text (the owner's phone draws text about 18 % larger than headless Chrome). Each big-bar button is now a size container whose label takes the smaller of the bar's size and what its widest line needs; MUTE over PAT (was M.PAT), LOOP over SEL (was LP.SEL) and CLN over ↓ are two lines; ids, titles, aria-labels unchanged; toasts, the Edit menu and the thin bar say MUTE PAT / LOOP SEL. The COMMANDS heading (a CSS `::before`) is removed with its 18 px; `#tCmd` has `role="toolbar"` and an aria-label. Folded gains a row (Arrange 16 → 17, phrase 18 → 19). `tests/cmd-bar-labels.test.js`.
 
 ## 13 Nov (before dawn): the draw pass: playhead redraws in place; the wrap-clock measurement; voices after STOP (build 575)
 
