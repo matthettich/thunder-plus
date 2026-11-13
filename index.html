@@ -2729,6 +2729,21 @@ body.mob .dogs.idle .bob{animation-iteration-count:9} body.mob .dogs.idle .tail{
 :root[data-skin="lowpowermustard"] .tarr .tagrid b:is(.gm,.gp,.gx):not(.f):not(.p):not(.m):not(.c):not(#zz){--ar-empty:#000000; background:#000000!important; background-image:none!important; box-shadow:inset 0 0 0 1px #3d2f0c!important}
 :root[data-skin="lowpowermustard"] .tagrid b.o:not(#zz){background:#000!important; color:#FF3B30!important; box-shadow:inset 0 0 0 1px #FF3B30!important}
 :root[data-skin="lowpowermustard"] .tagrid b.c:not(#zz), :root[data-skin="lowpowermustard"] .tagrid b.f.c:is(.gm,.gp,.gx,.bg,.bus):not(#zz){background:#FF2D78!important; background-image:none!important; color:#000000!important; box-shadow:inset 0 0 0 2px #ffffff!important}
+/* LOW POWER ARRANGE: WHAT IS SELECTED, WHERE THE CURSOR IS (12 Nov, owner: "On the low power skins, we should have an easier time seeing what is selected on arrange"). Selected blocks (b.sl: a
+   selection or picked blocks) had no look at all here: the rules above set box-shadow / background with !important, which beat the base .sl. Now, in each skin's own accent family (no violet,
+   blue or cyan in the pink and mustard ones), true black behind, no glow, no animation, no layout shift (outline and inset box-shadow only):
+   - CURSOR b.c: the bright fill as before, but ringed black inside and white outside (the white ring was on the fill, 1.9:1 on the gold), so it reads on a filled, a muted or an empty cell;
+     playing under it adds a second white ring inside (white = playing in these skins, as the playing row's number is).
+   - SELECTED b.sl: a dark tint of the skin's selection colour, a dashed 2 px outline in it and white text: a dashed line, which nothing else in Arrange has, on a tint, not the cursor's solid ring on a fill.
+   - PLAYING b.p keeps its ring (its own hue: green / gold / pink); selected and playing shows both. Muted blocks keep their strike-through under all of these.
+   --lpsl: selection colour, --lpslbg: its tint, --lpcur: cursor fill, --lppl / --lppbg: the playing ring and tint. */
+:root[data-skin="lowpower"]{--lpsl:#ffffff; --lpslbg:#2e2e2e; --lpcur:#ffe14d; --lppl:#7ee787; --lppbg:#0d5c2c}
+:root[data-skin="lowpowerpink"]{--lpsl:#FF2D78; --lpslbg:#3d0f24; --lpcur:#E0B020; --lppl:#D4A017; --lppbg:#4a3a08}
+:root[data-skin="lowpowermustard"]{--lpsl:#FFD34D; --lpslbg:#3d3008; --lpcur:#FF2D78; --lppl:#FF2D78; --lppbg:#4a0d22}
+:root:is([data-skin="lowpower"],[data-skin="lowpowerpink"],[data-skin="lowpowermustard"]) .tarr .tagrid b.sl:not(#zz):not(#zz){background:var(--lpslbg)!important; background-image:none!important; color:#ffffff!important; box-shadow:inset 0 0 0 1px var(--lpsl)!important; outline:2px dashed var(--lpsl); outline-offset:-1px}
+:root:is([data-skin="lowpower"],[data-skin="lowpowerpink"],[data-skin="lowpowermustard"]) .tarr .tagrid b.sl.p:not(#zz):not(#zz){background:var(--lppbg)!important; box-shadow:inset 0 0 0 2px var(--lppl)!important}
+:root:is([data-skin="lowpower"],[data-skin="lowpowerpink"],[data-skin="lowpowermustard"]) .tarr .tagrid b.c:not(#zz):not(#zz):not(#zz){background:var(--lpcur)!important; background-image:none!important; color:#000000!important; box-shadow:inset 0 0 0 2px #000000!important; outline:2px solid #ffffff; outline-offset:0}
+:root:is([data-skin="lowpower"],[data-skin="lowpowerpink"],[data-skin="lowpowermustard"]) .tarr .tagrid b.c.p:not(#zz):not(#zz):not(#zz){box-shadow:inset 0 0 0 2px #000000, inset 0 0 0 4px #ffffff!important}
 :root[data-skin="lowpowermustard"] :is(button,select,input[type=text],input[type=number],textarea,.lcell,.layercard,.fxcard,.voicecard,.setmenu,.mstwin){background:#000; color:#D4A017; border-color:#917323; border-width:1px}
 :root[data-skin="lowpowermustard"] :is(button.on,.seg button.on,.ttabs button.on,.ttabs button[data-v].on,.tmap button[data-v].on,#bFile.on,.top #bSet.on){
   background:#242424!important; color:#ffffff!important; border-color:#D4A017; box-shadow:inset 0 0 0 1px #D4A017; font-weight:700}
