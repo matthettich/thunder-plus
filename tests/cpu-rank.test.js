@@ -43,3 +43,24 @@ test('overloaded with no single heavy part and no dropouts counted: a suggestion
   const r = rank({ ...base, total: 1.12, parts: [{ name: 'A', v: 0.28 }, { name: 'B', v: 0.28 }, { name: 'C', v: 0.28 }, { name: 'D', v: 0.28 }] });
   assert.match(r.tip, /^Try: /); assert.doesNotMatch(r.tip, /headroom/);
 });
+test('THE SCREEN (13 Nov): drawing and the page sequencer are their own short section, a share of the page’s time, never added to the audio list', () => {
+  assert.deepEqual(rank(base).screen, []); assert.equal(rank(base).screenHead, '');
+  const r = rank({ ...base, screen: { ms: 0.126, n: 17.4 }, seqPage: { ms: 0.004, n: 40 } });
+  assert.deepEqual(r.screen.map(x => [x.name, x.share, x.extra]), [['Screen drawing', '13% of the page’s time', '17 screen updates a second'], ['Sequencer (page)', '<1% of the page’s time', '']]);
+  assert.match(r.screenHead, /separate budget/); assert.doesNotMatch(r.list.map(x => x.name).join(), /Screen/);
+  assert.equal(r.head, 'Audio engine: 40% of its time');
+});
+test('a heavy screen with nothing else wrong suggests Low power mode (not when it is on)', () => {
+  assert.match(rank({ ...base, total: 0.1, screen: { ms: 0.45, n: 17 } }).tip, /Low power mode \(Settings\): drawing the screen takes 45%/);
+  assert.equal(rank({ ...base, total: 0.1, screen: { ms: 0.45, n: 17 }, lowPower: true }).tip, 'Nothing to fix: plenty of headroom.');
+  assert.equal(rank({ ...base, total: 0.1, screen: { ms: 0.05, n: 17 } }).tip, 'Nothing to fix: plenty of headroom.');
+});
+test('the screen figure is two clock reads around draw(), added up per second; a stale figure reads as nothing', () => {
+  assert.match(src, /const t0 = performance\.now\(\); try \{ return draw\(\); \} finally \{ busPlan\.m\.on = false; busPlan\.m\.v = null; scrAdd\('draw', performance\.now\(\) - t0\); \}/);
+  assert.match(src, /pumpW\.onmessage = pumpTimed/);
+  const f = src.match(/const scrT = [\s\S]*?const scrRead = [^\n]*\n/); assert.ok(f);
+  const c = vm.createContext({ performance: { now: () => c.t }, t: 0 }); vm.runInContext(f[0] + '\nthis.add = scrAdd; this.read = scrRead;', c);
+  assert.equal(c.read('draw'), null); c.t = 10; c.add('draw', 5); c.t = 600; c.add('draw', 5); c.t = 1100; c.add('draw', 10);
+  const r = JSON.parse(JSON.stringify(c.read('draw'))); assert.ok(Math.abs(r.ms - 20 / 1090) < 1e-9 && Math.abs(r.n - 3000 / 1090) < 1e-9, JSON.stringify(r));
+  c.t = 4000; assert.equal(c.read('draw').ms, 0);
+});
