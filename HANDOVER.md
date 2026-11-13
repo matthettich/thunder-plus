@@ -524,6 +524,21 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0) and `link/` (Ableton
 
 ## To-do (owner's list: keep it current; newest dated entries below have the details)
 
+### Where things stand (13 Nov, morning: READ THIS FIRST; it supersedes the 10 Nov block below where they disagree)
+
+**Web beta is build 575.** Builds 569 to 575 (12 to 13 Nov, the dated entries below) came from the owner's phone testing: Arrange cursor and follow fixes, one song wrap for all tracks, effect state that persists, master block mute, loop play / LP.SEL / INS, the lost-notes fix, per-track playhead, renders with gaps, the core coming back after a clock hiccup, the Mobile header, the CPU panel, Lite reverb, 111 presets, and the draw pass (playhead redraws in place). **None of 569 to 575 has been verified on a real phone; nobody has listened to Lite reverb or the new presets.** The owner's test items are in the punch list.
+
+**Next work, in order (the owner: stability, efficiency and battery first; "if you have to make a decision, weigh … a solution that would port to a native app easily"; best guess and tell him):**
+1. **Meter rate as a setting** (owner, 13 Nov: "Can we make #1 a setting"): the remaining long tasks on Mixer and Pattern view while playing are the browser painting the 30 Hz meters and bands. In progress (build 576).
+2. **First PLAY stall (audio review, lead):** at 4x the press handler runs about 446 ms (`rtInit` 256 ms) and a second `tStart` pass after the worklet hand-over holds the thread about 1.5 s; his phone showed a 130 ms long frame and a first note 53 ms late. The fix is in the audio start (warm the engine before the first PLAY), not the draw.
+3. **Song / Arrange playing-row mark in place** (it still takes the full `draw()` per row; Sonnet, display only).
+4. **Idle timers:** three 200 ms timers run while stopped (the frame loop, the header meter, a generic idle runner); let them sleep (small battery gain).
+5. **CPU panel:** per-engine cost of drum and synth voices is still not measured, so "what is using the most" is incomplete there (needs audio-thread measuring: lead decides how).
+6. **`tcChunks` without allocation** (described in `docs/audits/2026-11-13-draw-pass.md`; only matters if a browser ever delivers blocks over 128 frames: low priority).
+7. Then the older list: "Feature priority" and "Longer-term priority" below (MOD expansion, automation lanes, …), still under the feature freeze except what the owner asks for.
+
+**Waiting on the owner:** (a) the double-tap-PLAY-goes-to-the-top gesture: keep it limited as in build 573, or remove it; (b) LP.SEL on the pad ("I will think about pad placement"; a mock put it between LOOP and ALT); (c) **native apps: "we will decide if we push forward with native tomorrow" (said 12 Nov)**: nothing started, the plan is under "Native port" below; (d) two experiments that would explain the phone's clock hiccups: 2 minutes untouched vs tapping every 10 to 15 s, and plugged in vs on battery (the report records battery since 573); (e) on Safest sounding quieter: the app's output level is identical (−14.8 dB RMS both ways), so try the phone's Dolby Atmos / equaliser off.
+
 ### Where things stand (10 Nov, 15:10: READ THIS FIRST; it supersedes older lines below where they disagree)
 
 **11 Nov update, builds 563–567 (567: the core's per-block garbage; the wide node left by the owner's decision; 564: title bar touch-ups; 565: Song grid centred with SECT; 566: the core sequencer profiled and its fast paths fixed, see the 11 Nov entries): read this before the 10 Nov lines below, which it supersedes where they disagree.** Owner (10 Nov, 22:49): "do the queue and push a full desktop app after"; had "a really stable seeming few minutes" on the phone after Background play went back on; interests while building: stability, usability, efficiency and battery on mobile, and a simple move between platforms (phone, Mac, Windows, maybe a tablet or Android hardware). "Fable can fix anything challenging for less capable agents without my input": the lead decides and reports. Queue status after build 563 (see the 11 Nov entry):
@@ -829,12 +844,15 @@ Start a session by asking for results. Fix on `beta`. (10 Nov, 15:10: the web be
 
 ### Bugs still open
 
-- **Phone audio clock runs fast while playing** (biggest one; cause unknown): "8 Nov, end of session". A resync is sketched there; build it only if the toggle test's log shows it can help.
-- **Stutter that stops under LOOP:** Arrange redraw ruled out in emulation; next suspect is sounds prepared the first time a pattern plays.
-- **Quieter output after switching to Safest:** not found; needs a report from a run that sounds quiet.
-- **Notes after Stop:** looks like buffer plus effect tails, not measured on a device. (MIDI notes booked ahead while hidden: cut on STOP since build 548.)
+- **Phone audio clock dips, then runs fast for about 5 s** (biggest one; cause unknown): the owner's Balanced report of 12 Nov (build 572; "12 Nov (night, 2)" entry) shows it twice, after a screen-on and 39 s into a play with no touch for 43 s; it recovers by itself. A starved audio thread catching up. Since 573 the core comes back afterwards. Wanted from the owner: untouched vs tapping, plugged in vs battery. Older notes: "8 Nov, end of session".
+- **"Clock instability when the song looped round"** (owner, 12 Nov): not reproduced in emulation (`docs/audits/2026-11-12-wrap-clock.md`); probably the item above. The older "stutter that stops under LOOP" suspect (sounds prepared the first time a pattern plays) was measured: buffer builds cost 1.5 to 16.5 ms at 4x per pad on the page sequencer and recur into pass 2.
+- **Quieter output on Safest:** NOT the app (levels identical in his two reports); the phone's output path is the suspect (unverified). "heard" latency on Safest is 546 ms against 75 ms, which is why it feels worse to play. After a screen-off and wake the output latency read 43 → 190 ms and stayed.
+- **First PLAY stall** (see "Where things stand", item 2).
+- **Notes after Stop:** no evidence either way; the report's "voices 1 / 2" was a counting artefact, fixed in 575.
+- **Mixer / Pattern view long tasks while playing:** paint of the meters and bands (about 64 per 10 s at 4x after the draw pass); the meter-rate setting is the answer chosen.
+- **Hand-over and RESUME with tracks of different lengths:** since 571 each track restarts on its own row (`o.at`); exact only when lines per beat match; not run on a device.
 - **Mobile setting found off once** (8 Nov): cause unknown; look at storage if it recurs.
-- Bug reports: the owner resubmits the Synth-page → Song-screen issue if they can reproduce it (note removed 2 Nov).
+- Test-suite notes: `tests/waves.test.js` golden hashes depend on render order in the shared wasm instance; `effects.mjs`'s two "master: … default chain" checks fail on an untouched base; a heap-sampling test can fail once when the machine is busy (rerun it alone).
 
 ### Native port: Mac, Windows, Android, iOS as a stretch (owner, 10 Nov: asked for the strategy; **plan only, waiting on the owner's go**)
 
