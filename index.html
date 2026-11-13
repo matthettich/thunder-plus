@@ -1194,9 +1194,11 @@ body:not(.legon) .tside .tlegend{display:none}
 .tcmd button[hidden]{display:none} .tcmd button[data-c=song]{font-size:var(--fs-5)} .tcmd.cpad :is([data-c=undo],[data-c=redo]){font-size:20px; font-weight:500; line-height:1} .tcmd :is([data-c=prev],[data-c=next]){font-size:24px; font-weight:500; line-height:1}
 /* (owner, 9 Nov) PAD mode on a small screen: no ▶ in COMMANDS, the pad's PLAY right below it plays the song (and the Song screen loses a third row). */
 @media (max-width:699px){ .tcmd.cpad:not(.cmini) button[data-c=song]{display:none} }
+/* (12 Nov, owner) INS on a folded phone's Song row: 14 buttons already fill its two rows and a 15th would make a third, so INS leaves that one row; it stays on Phrase and Sect, and Song has it in the right-click menu and Edit ▾. */
+@media (max-width:699px){ .tcmd.cpad.song:not(.cmini) button[data-c=ins]{display:none} }
 /* One row on wide screens. */
 @media (min-width:700px){
-  .tcmd{grid-template-columns:repeat(14,minmax(0,1fr))} .tcmd.song{grid-template-columns:repeat(15,minmax(0,1fr))}
+  .tcmd{grid-template-columns:repeat(15,minmax(0,1fr))} .tcmd.song{grid-template-columns:repeat(16,minmax(0,1fr))}   /* (12 Nov, owner) +1 for INS */
 }
 /* NO CLN ON A NARROW ROW (owner, 1 Nov): below 1000 px (phones, the Fold unfolded) the big COMMANDS row leaves CLN out, so
    the Song screen has 14 buttons like the others and ▶ stays on its row (a 15th wrapped onto a second row and shrank the
@@ -1205,7 +1207,7 @@ body:not(.legon) .tside .tlegend{display:none}
 .tcmd:not(.cmini) button[data-c=clone]{display:none}
 /* M.PAT (owner, 8 Nov): Arrange's one more button: the Song screen's row is 15 columns from 700 px (it was 14, full), 16 from 1000 px with CLN */
 @media (min-width:1000px){
-  .tcmd.song{grid-template-columns:repeat(16,minmax(0,1fr))}
+  .tcmd.song{grid-template-columns:repeat(17,minmax(0,1fr))}
   .tcmd.song:not(.cmini) button[data-c=clone]:not([hidden]){display:inline-flex}
 }
 /* ▶ (play the song) always sits in the last column, on whichever row it lands: never alone at the left of a row. */
@@ -25829,6 +25831,26 @@ function songRowInsert(){
   if (!songRowsInsert(cs.song.y, 1)) return toast('The last song row has blocks, so nothing can move down.');
   saveS(); draw(); toast(`Inserted row ${rS(cs.song.y, 3)} · the rows below moved down`);
 }
+// INS / INSERT ROW BELOW (12 Nov, owner: "Add an 'ins' button to the control bar that inserts an empty row below it and drops the rest of the rows down one. Add menu
+// command for the same on desktop."): the row BELOW the cursor's, the cursor stays on its row. (Insert and Ctrl/⌘+Shift+Enter above put the empty row AT the cursor.)
+// Song / Arrange: a whole song row, every track and the master, with its block mutes, sections, row colours and loop mark (songRowsInsert); refused when the
+// last song row has blocks. Phrase, Pattern view and Sect: rowOp('insert') one row down, so its rules hold (the cursor's track's phrase, within its LEN: the row
+// pushed past the end goes). One saveS, so one undo step; a playing song hears it as any row edit does.
+function insRowBelow(){
+  if (onPset()) return;
+  if (tv === 'song'){
+    const c = cs.song, at = c.y + 1;
+    if (at >= 256 || !songRowsInsert(at, 1)) return toast('The song is full: its last row has blocks, so nothing can move down.');
+    saveS(); draw(); return toast(`Inserted an empty row below ${rS(c.y, 3)} · the rows below moved down`);
+  }
+  if (tv !== 'phrase' && tv !== 'sect') return toast('INS works on the Song, Sect and Phrase screens.');
+  if (selA && selA.v === tv) return toast('INS inserts below the cursor’s row: drop the selection first (Esc).');
+  if (edBlock()) return;
+  const c = cs[tv], A = rowsArr(tv), L = Math.min(A.length, tv === 'phrase' ? plen(cPhrase) : A.length);
+  if (c.y + 1 >= L) return toast('That’s the last row: there is no row below it.');
+  c.y++; rowOp('insert'); c.y--; draw();
+  toast(`Inserted an empty row below ${hx(c.y)} · the rows below moved down`);
+}
 // rr: the rows to remove ({y0, y1}), when the caller already has them (the right-click menu: owner, 2 Nov, "Remove these
 // rows" on 00–07 removed one row, because the menu moved the cursor to the first row and the selection shrank with it).
 function songRowRemove(rr){
@@ -26791,6 +26813,7 @@ const CMDS = [['b:-16', '−−', 'Change the value down a lot (EDIT+▼)'], ['b
   ['cldn', 'CLN↓', 'Clone the block (or selected blocks) into new, unique numbers on a new row below; the rows below move down (' + MODK + '+Shift+C)'], ['copy', 'COPY', 'Copy the selection, or what is under the cursor (a note comes with its instrument) (ALT)'],
   ['cut', 'CUT', 'Cut the selection, or what is under the cursor (ALT+EDIT)'], ['paste', 'PASTE', 'Paste (SHIFT+EDIT)'],
   ['undo', 'UNDO', 'Undo the last change to the song (' + MODK + '+Z)'], ['redo', 'REDO', 'Redo (' + MODK + '+Y)'], ['song', '▶↻', 'Loop play (12 Nov): turns LOOP on and plays the song from the cursor row, repeating its row; press LOOP while it plays to carry on as normal play, or this again to stop (' + MODK + '+Space). The pad’s PLAY and Space play plain'],
+  ['ins', 'INS', 'Insert an empty row below the cursor’s row; the rows below move down (the whole song row on the Song, the phrase’s row on Phrase and Sect). ' + MODK + '+Alt+Enter'],
   ['mpat', 'M.PAT', 'Mute or unmute the pattern block under the cursor, or every block in the selection (as Alt+click, M on the Song). The track’s own MUTE is on the pad and in the Mixer']];   // MUTE PATTERN (owner, 8 Nov): Arrange only
 function cmdAction(a){
   fxpClose();
@@ -26806,6 +26829,7 @@ function cmdAction(a){
   }
   if (c === 'clr') return del();
   if (c === 'rrow') return rowsRemove();
+  if (c === 'ins') return insRowBelow();
   if (c === 'rmv') return tv === 'song' ? songDelete(songCells(), true) : undefined;
   if (c === 'sel') return toggleSel();
   if (c === 'copy' || c === 'cut') return copyHere(c === 'cut');
@@ -26820,11 +26844,11 @@ function cmdAction(a){
 for (const [a, t, lbl] of CMDS){ const b = el('button'); b.innerHTML = t; b.type = 'button'; b.dataset.c = a; b.setAttribute('aria-label', lbl); b.title = lbl; $('tCmd').append(b); if (a === 'song') b.setAttribute('aria-label', 'Loop play the song, or stop'); }
 // In PAD mode CLEAR moves between PASTE and UNDO, so a thumb can reach it on a phone; KEYS mode keeps
 // the original order. The buttons are moved, not rebuilt, so the tap handlers stay attached.
-const CMD_PAD_ORDER = ['b:-16', 'b:-1', 'b:1', 'b:16', 'prev', 'next', 'sel', 'uniq', 'clone', 'cldn', 'mpat', 'copy', 'cut', 'paste', 'clr', 'undo', 'redo', 'song'];
+const CMD_PAD_ORDER = ['b:-16', 'b:-1', 'b:1', 'b:16', 'prev', 'next', 'sel', 'uniq', 'clone', 'cldn', 'mpat', 'copy', 'cut', 'paste', 'clr', 'ins', 'undo', 'redo', 'song'];
 const CMD_PAD_SHORT = {clr:'CLR', sel:'SEL', paste:'PST', undo:'↶', redo:'↷'};
 // COMMAND BAR: the Edit menu's order (undo · clipboard · select · clones · value · previous / next · play) and words.
-const CMD_MINI_ORDER = ['undo', 'redo', 'cut', 'copy', 'paste', 'clr', 'rrow', 'sel', 'uniq', 'clone', 'cldn', 'mpat', 'b:-16', 'b:-1', 'b:1', 'b:16', 'prev', 'next', 'song'];
-const CMD_MINI_LAB = {undo:'UNDO', redo:'REDO', cut:'CUT', copy:'COPY', paste:'PASTE', clr:'CLEAR', rrow:'REMOVE', sel:'SELECT', clone:'CLONE', cldn:'CLONE↓', mpat:'MUTE PAT', 'b:-16':'−−', 'b:-1':'−', 'b:1':'+', 'b:16':'++', prev:'‹ PREV', next:'NEXT ›'};
+const CMD_MINI_ORDER = ['undo', 'redo', 'cut', 'copy', 'paste', 'clr', 'rrow', 'ins', 'sel', 'uniq', 'clone', 'cldn', 'mpat', 'b:-16', 'b:-1', 'b:1', 'b:16', 'prev', 'next', 'song'];
+const CMD_MINI_LAB = {undo:'UNDO', redo:'REDO', cut:'CUT', copy:'COPY', paste:'PASTE', clr:'CLEAR', rrow:'REMOVE', ins:'INSERT', sel:'SELECT', clone:'CLONE', cldn:'CLONE↓', mpat:'MUTE PAT', 'b:-16':'−−', 'b:-1':'−', 'b:1':'+', 'b:16':'++', prev:'‹ PREV', next:'NEXT ›'};
 const cmdSongLab = () => cmdMini() ? (tp.on ? '■ STOP' : '▶ LOOP') : tp.on ? '■' : '▶↻';   // (12 Nov, owner) loop play: the loop mark beside ▶ tells it from the pad's PLAY
 function applyCmdOrder(){
   const host = $('tCmd'), by = {}, mini = cmdMini();
@@ -26972,7 +26996,8 @@ function cmdItems(full){
     {a:'all', l:'Select all (again: wider)', k:keyHint('mod+A'), f:selectAll, off:!grid || onPset()},
     ...(onSong || full ? [it('rmv', 'Remove from song (keep the phrase)', '', {off:!onSong})] : []),
     // ROWS (1 Nov, audit K10): Insert and Ctrl/⌘+Backspace in the menu, for keyboards with no Insert key
-    ...(full ? [{h:'Rows'}, onSong ? {a:'rins', l:'Insert a song row (rows below move down)', k:keyHint('mod+shift+Enter'), f:songRowInsert}
+    ...(full ? [{h:'Rows'}] : []), it('ins', 'Insert row below (rows below move down)', 'mod+alt+Enter', {off:!rowsOk || !!(selA && !onSong)}),   // (12 Nov, owner) INS on the command bar; the right-click menus take it from here too
+    ...(full ? [onSong ? {a:'rins', l:'Insert a song row (rows below move down)', k:keyHint('mod+shift+Enter'), f:songRowInsert}
         : {a:'rins', l:'Insert a row', k:keyHint('mod+Enter'), f:() => rowOp('insert'), off:!rowsOk || !!selA},
       onSong ? {a:'rmrow', l:'Remove the song row (rows below move up)', k:keyHint('mod+shift+Backspace'), f:songRowRemove}
         : selA ? {a:'rrow', l:'Remove these rows (rows below move up)', k:'', f:rowsRemove, off:!rowsOk} : {a:'rdel', l:'Remove the row (rows below move up)', k:keyHint('mod+Backspace'), f:() => rowOp('remove'), off:!rowsOk}] : []),
@@ -31832,6 +31857,7 @@ function sxCtx(y, t){
   if (SX.secs) items.push({l:songSecAt(r.y0) && songSecAt(r.y0).y === r.y0 ? 'Rename the section here…' : 'Name a section from row ' + rS(r.y0, 3) + '…', f:() => sxSecEdit(r.y0)});
   items.push(null, {l:'Remove from song (keep the phrase)', f:() => sxClearRect(r, true), off:!n}, {l:'Delete (the phrase too)', k:ks ? 'Del' : '', f:() => sxClearRect(r, false), off:!n},
     {l:r.y1 > r.y0 ? 'Remove these rows (the rows below move up)' : 'Remove row ' + rS(r.y0, 3) + ' (the rows below move up)', f:() => { const rr = {y0:r.y0, y1:r.y1}; songRowRemove(rr); sxPicks = []; }});   // REMOVE ROW (owner, 27 Oct; the range passed: 2 Nov)
+  items.push({l:'Insert row below ' + rS(r.y1, 3) + ' (the rows below move down)', k:ks ? keyHint('mod+alt+Enter') : '', f:() => { cs.song.y = r.y1; sxPicks = []; insRowBelow(); }});   // INSERT ROW BELOW (12 Nov, owner: INS): below the last row of the block or range under the pointer
   // RIGHT-CLICK (menu audit, 2 Nov): only what acts on the block or rows under the pointer; Undo / Redo, selecting, value
   // steps, navigation and play stay on their keys and in Edit ▾.
   const C = cmdItems(), want = new Set(['mixp', 'dup', 'tname', 'unbus']);
@@ -33029,6 +33055,7 @@ function keysDown(e, pad){
     if (lo === 'b'){ if (!e.repeat) toggleSel(); return true; }   // (held, it flipped the selection on and off)
     // TRACKER KEYS (3 Nov): Ctrl/⌘+Enter inserts a row (Macs have no Insert; on Song one column, as Insert);
     // Ctrl/⌘+Shift+Enter a whole song row. Ctrl/⌘+Home / End: the first / last song row.
+    if (k === 'Enter' && e.altKey && !e.shiftKey){ if (!e.repeat) insRowBelow(); return true; }   // (12 Nov, owner) Ctrl/⌘+Alt+Enter: insert a row below (INS); it was free
     if (k === 'Enter' && !e.altKey){ if (e.repeat && e.shiftKey) return true;
       if (e.shiftKey){ songRowInsert(); return true; }
       if (!GRIDV.has(tv) || onPset()) return toast('Insert row works on the Song, Sect and Phrase screens.'), true;
