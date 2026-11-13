@@ -20302,7 +20302,7 @@ function makeSeq(S, mode, o){
     if (mode === 'phrase') return;
     for (let n = 0; n < 4200; n++){
       if (mode === 'song' && (sectId(T, t) < 0 || (loop && (T.row > loop.y1 || T.row < loop.y0)))){
-        if (once){ T.on = false; return; }
+        if (once){ T.on = false; T.wr = Math.min(T.row, 256) + 1; return; }   // (wr: wake() may bring it back at a later row, never on one it has played)
         if (loop){
           if (T.row > loop.y1 || T.row < loop.y0){ T.row = loop.y0; T.cr = 0; }
           let f = T.row;
@@ -20335,6 +20335,19 @@ function makeSeq(S, mode, o){
   if (mode === 'song'){ for (let t = 0; t <= MT; t++){ const T = tr[t]; T.row = loop ? clamp(o.row, loop.y0, loop.y1) : o.row; if ((t < (S.ntr || 16) || t === MT) && S.song[T.row][t] >= 0 && (!o.only || o.only.has(t))){ T.on = true; settle(T, t); } } }   // o.only: BUS PLAY's tracks
   else if (mode === 'sect'){ const T = tr[o.track]; T.on = true; if (loop) T.cr = loop.y0; settle(T, o.track); }
   else { const T = tr[o.track]; T.on = true; if (loop) T.step = loop.y0; settle(T, o.track); }
+  // EACH TRACK WHERE IT WAS (12 Nov, owner: "please fix"; found with the wrap bug): a hand-over to the page sequencer, a core that is let go and
+  // RESUME started every track on the reference track's song row, so a track that had run ahead (its patterns are shorter) jumped back. o.at is
+  // the positions the song had ({row, phrase, step} per track, tp.pos), o.atRef the reference track (it starts at the top of o.row, as before).
+  // A track that was on another row starts on ITS row, as far into it as it was against the reference: d lines in (d >= 0), or -d lines later.
+  if (mode === 'song' && o.at && !loop && !o.only){ const R = o.at[o.atRef];
+    if (R && R.row === o.row) for (let t = 0; t <= MT; t++){ const q = o.at[t], T = tr[t];
+      if (!q || t === o.atRef || !(q.row >= 0 && q.row < 256) || q.row === R.row || !(t < (S.ntr || 16) || t === MT)) continue;
+      Object.assign(T, fresh(), {row:q.row}); const cid = S.song[q.row] ? S.song[q.row][t] : -1, c = cid >= 0 ? S.chains[cid] : null; if (!c) continue;
+      let cr = 0; for (let k = 0; k < c.length; k++) if (c[k] && c[k][0] === q.phrase && q.phrase >= 0){ cr = k; break; }
+      const pid = c[cr] ? c[cr][0] : -1, line = 60 / api.bpm / (api.lpb || plpbOf(S, pid)), d = (q.step | 0) - (R.step | 0);
+      T.on = true; T.cr = cr;
+      if (d >= 0 && d < lenOf(pid)){ T.step = T.g = T.cnt = d; T.r0 = -d * line; } else if (d < 0) T.rel = T.r0 = -d * line;
+      settle(T, t); } }
   api.alive = () => tr.some(T => T.on);
   api.setLoop = l => { loop = l || null; };
   /* LIVE SONG EDITS (owner, 24 Oct: notes typed into a track while the SONG plays never sounded when that track had no
@@ -20343,7 +20356,9 @@ function makeSeq(S, mode, o){
      block joins them, lined up with that row's start (a lead track's r0), from the next line of its phrase. Its notes
      then play as the playhead crosses them. Renders and BUS PLAY's set of tracks are as before. Phrases and blocks already
      playing were always read live (S), so edits to them were heard (250 ms ahead of the playhead). */
-  const wakeOk = mode === 'song' && !once && !!o.live;
+  // RENDERS TOO (12 Nov, owner: "please fix"): a render (once) stopped a track for good at its first empty cell and never started a track with no
+  // block on the first row, so blocks after a gap, and tracks that come in later, were missing from rendered songs. They wake now as in live play.
+  const wakeOk = mode === 'song' && (once || !!o.live);
   function wake(rel){
     let L = null; for (let t = 0; t <= MT; t++){ const T = tr[t]; if (T.on && !T.empty){ L = T; break; } }
     if (!L) return;
@@ -22289,7 +22304,7 @@ function tStart(mode, o){
   // HAND-OVER (o.rz): carry on at that exact step, whatever RESUME is set to (seqHandover)
   const pz0 = tp.paused; tp.paused = null; const rzH = !!(o && o.rz), pz = rzH ? o.rz : pz0;
   const resume = mode === 'song' && pz && S.song[pz.row] && S.song[pz.row][pz.ref] >= 0 && (rzH || (resumeOn && !wasOn && !(o && o.loop) && pz.key === curKey()));
-  if (resume) o = Object.assign({}, o, {row:pz.row});
+  if (resume) o = Object.assign({}, o, {row:pz.row, at:pz.pos || null, atRef:pz.ref});   // (12 Nov) at: each track where it was (makeSeq)
   const r = rtInit(); if (wkLazy()) for (let t = 0; t <= NT; t++) wkFxAsk(t);   // phones: the effects a pattern command may use (a command typed since the last touch)
   const seq = makeSeq(S, mode, Object.assign({}, o, {live:true}));   // live: chops never render on this thread (ensurePlay)
   if (!seq.alive()){ toast(mode === 'song' ? `Row ${rS(o.row, 3)} is empty. Put a sect on it, or move to a row that has some.` : 'Nothing to play here yet.'); draw(); return; }
@@ -22649,7 +22664,7 @@ function padBlink(e){
 // Phones and tablets (10 Nov): the audio-thread sequencer's module (a second thread) loads only when the owner picked it there
 // (aset.corePick, set in Settings); the saved default 'core' plays on the Page sequencer on such a device.
 function coreWanted(){ return aset.core === 'core' && (!wkLazy() || !!aset.corePick); }   // (a declaration: the Settings row reads it at load)
-const CORE_REV = '6ajz7z';
+const CORE_REV = '12r2kf8';
 const CORE_WANT = 7;   // the core's message set this page speaks (core-processor.js CORE_V); an older core is not used
 const CORE_URL = () => 'core/seq-core.js?v=' + BUILD + '-' + CORE_REV;
 const core = {node:null, ready:false, loading:null, gen:0, sent:new Map(), sT:0, tally:new Map(), mir:null};   // mir: what the core's song holds, as JSON per part (coreDiff)   // tally: events by who played them (test hook)
@@ -22876,7 +22891,7 @@ function seqHandover(){
   let q = null; for (const e of tp.q) if (e.pos && (!q || e.t > q.t)) q = e;   // the last step the core booked
   const P = q ? q.pos : tp.pos; if (!P) return false;
   const ref = P.findIndex((p, i) => p && p.row >= 0 && i !== MT); if (ref < 0) return false;
-  const rz = {ref, row:P[ref].row, step:P[ref].step}, rzT = q ? q.t : null, t0 = ctx.currentTime, w0 = performance.now();
+  const rz = {ref, row:P[ref].row, step:P[ref].step, pos:P}, rzT = q ? q.t : null, t0 = ctx.currentTime, w0 = performance.now();
   handing = {}; try { tStop(true); tStart('song', {row:rz.row, rz, rzT, page:true}); } finally { handing = null; }
   // the core plays on up to the page's first step, then stops there and is unplugged
   const T0 = tp.q[0] ? tp.q[0].t : ctx.currentTime; PB.handT0 = T0; PB.handW = performance.now();
@@ -22898,10 +22913,11 @@ function pbClock(){ if (!tp.on || !tp.core || !ctx || core.bad || ctx.state !== 
 // The core is let go (the clock watch here, or its own WATCHDOG): the song carries on from its row on the page sequencer, which
 // plays until the app reloads. self: the core already stopped itself (and gave the live engines back) at audio time selfT.
 function coreFail(self){
-  core.bad = true; let row = -1; for (const q of tp.pos || []) if (q && q.row > row) row = q.row;
+  core.bad = true; let row = -1, ref = -1; (tp.pos || []).forEach((q, i) => { if (q && i !== MT && q.row > row){ row = q.row; ref = i; } }); if (row < 0) for (const q of tp.pos || []) if (q && q.row > row) row = q.row;
+  const at = ref >= 0 ? tp.pos.map(q => q && {row:q.row, phrase:q.phrase, step:0}) : null;   // (12 Nov) each track on its own row (the song restarts at the top of the furthest row, so no steps)
   const mode = tp.mode;
   pbLog('switched to the page sequencer from row ' + row + (self ? ' (the audio-thread sequencer stopped itself: ' + self.why + ')' : '')); try { tStop(true); } catch(e){} try { coreDrop(); } catch(e){}
-  if (row >= 0 && mode === 'song') tStart('song', {row});
+  if (row >= 0 && mode === 'song') tStart('song', at ? {row, at, atRef:ref} : {row});
   const moved = row >= 0 && mode === 'song';
   const went = moved ? 'the song moved to the Page sequencer until you reload the app.' : 'playback stopped. PLAY uses the Page sequencer until you reload the app.';
   toast((self && self.why === 'deaf' ? 'The audio thread fell behind, so ' : 'The audio clock went out of step, so ') + went, 5000); }
@@ -24178,7 +24194,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 570;
+const BUILD = 571;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD + (location.pathname.includes('/beta/') ? ' · beta' : '');
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -33752,6 +33768,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [571, '12 Nov', ['Fixed: notes typed into a new pattern opened from an empty Arrange cell (SHIFT+\u25b6) could end up in a phrase that was on no block, so they vanished from the screen when the song played. A phrase with notes is now always put on the song.', 'Pattern view: every track\u2019s column shows its own playing row, so a track that HOPs or plays another pattern still has a playhead.', 'Rendering a song now includes blocks after a gap in a track, and tracks that come in on a later row.', 'When playback moves between the audio-thread and page sequencers, or resumes, each track carries on from its own row.', 'SHIFT+\u25bc from the Song / Arrange opens the block\u2019s phrase on a computer too (PAD mode).']],
   [570, '12 Nov', ['The control bar\u2019s Play is now LOOP play (LOOP lights; press LOOP while it plays to carry on as normal play); the pad\u2019s PLAY and Space play plain.', 'The song now wraps once for every track: a track that runs out of blocks waits and all start again together, so tracks no longer drift onto different rows. A track with a gap comes back after the gap.', 'An effect switched off by a command stays off through later patterns and when the song comes round; only STOP resets it.', 'M.PAT (and Alt-click) can mute a block on the master column: its commands are skipped, the master\u2019s sound is untouched.', 'INS: a new control bar button and Edit menu command insert an empty row below the cursor.', 'SHIFT+\u25bc from Arrange opens the block\u2019s phrase (Mobile).', 'The Mixer\u2019s MASTERING ON / OFF is now AUTO MASTER ON / OFF.', 'Clone down no longer leaves an empty row when a bus refuses the clone.', 'A change waiting to be autosaved is written before PLAY starts.']],
   [569, '12 Nov', ['Arrange: moving the cursor with the arrows while a song plays no longer bogs the page down, and holding an arrow no longer lets the playhead pull the view or the cursor back.', 'STOP right after moving the cursor leaves it where you put it.', 'GEN on the Song / Arrange opens the block\u2019s phrase and the generators; on an empty cell it makes a new pattern first.', 'SEMI + / \u2212 (Alt+, Alt+.) on the Song / Arrange transpose every selected pattern once, or the one under the cursor.', 'The pad\u2019s SOLO or MUTE tapped twice quickly clears every solo and mute; soloed and muted tracks are easier to see.', 'Notes can no longer be pasted, dragged or duplicated onto a bus track.', 'Low power skins: the cursor and selected blocks stand out in Arrange.']],
   [568, '11 Nov', ['Two new skins for OLED screens: Low power (hot pink) and Low power (mustard). Same pure black and thin outlines as Low power (black), in pink and mustard with orange and rose. Turning Low power display on while on one of them keeps it; turning it off goes back to the skin you had before.']],
