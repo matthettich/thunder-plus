@@ -1549,6 +1549,16 @@ body.arrleft .tbody > .tarr .tarrh::after{left:4px}
 body.arrsmall .tagp{grid-template-columns:18px var(--arcols, repeat(8,minmax(0,1fr)) 4px repeat(8,minmax(0,1fr))); gap:1px; padding:0 6px}
 body.arrsmall .tagp b{padding:0 3px; letter-spacing:.04em}
 .tath{flex:none; font-size:var(--fs-1); color:var(--ar-dim); padding-bottom:3px; border-bottom:1px solid var(--ar-line)}
+/* TO TOP (13 Nov, owner: "Let's do the corner button"): the empty corner above the row numbers, between MONO / POLY and the track
+   numbers. A zero-height row holds it, so no header changes height and the track columns don't move; the target is 32 × 36 (the
+   corner's width, the two header rows and 4 px of the line above), the glyph 14 px, quiet like − ○ +. It is outside the scrolling
+   grid and the zoomed header, so it stays put. */
+.tatop{flex:none; height:0; position:relative; z-index:3}
+#tArr .tatop button{position:absolute; left:0; top:-17px; width:32px; height:36px; min-width:0; min-height:0; padding:0; margin:0; border:0; border-radius:6px; background:transparent; box-shadow:none;
+  color:var(--ar-dim); display:flex; align-items:center; justify-content:center; letter-spacing:0; cursor:pointer; -webkit-tap-highlight-color:transparent; touch-action:manipulation}
+#tArr .tatop button .ic{width:14px; height:14px; margin:0; vertical-align:baseline; display:block}
+#tArr .tatop button:active{background:var(--ar-line); color:var(--ar-ink); transform:none}
+body.arrsmall #tArr .tatop button{width:26px} body.asong #tArr .tatop button{width:36px}   /* the Song screen's corner is wider (the section lane sits beside it) */
 .tath i{font-style:normal; text-align:center; line-height:16px}   /* a label now: tracks are muted in the Mixer, not here */
 .tath i.mu{color:var(--ar-mu); text-decoration:line-through}
 .tath i[data-t]{cursor:pointer} .tath i.so{background:var(--ar-pl); color:var(--ar-pl-ink, #3d2c00); border-radius:3px}
@@ -1706,6 +1716,10 @@ body.sdesk .dock:not(.vtrk) .pads .pad:nth-child(17)::before{content:'More slots
 /* Song and Mixer: one box around all the mono tracks and one around all the poly tracks, each with its label. */
 .tgrid{position:relative}
 .tgrid.grp{padding-top:1.15em}
+#tScr .tgtop{position:absolute; z-index:3; display:flex; align-items:center; justify-content:center; padding:0; margin:0; min-width:0; min-height:0; border:0; border-radius:6px; background:transparent; box-shadow:none; color:var(--ts-dim, var(--muted)); cursor:pointer; touch-action:manipulation; -webkit-tap-highlight-color:transparent}
+#tScr .tgtop[hidden]{display:none}
+#tScr .tgtop .ic{width:16px; height:16px; margin:0; vertical-align:baseline; display:block}
+#tScr .tgtop:active{background:color-mix(in srgb, var(--ts-dim, #888) 35%, transparent); color:var(--ts-ink, var(--ink))}
 .tgbox{position:absolute; pointer-events:none; border:2px solid var(--tk); border-radius:3px; z-index:0}
 .tgbox.gm{--tk:var(--tk-mono)} .tgbox.gp{--tk:var(--tk-poly)} .tgbox.gx{--tk:var(--tk-mst)}
 .tgbox b{position:absolute; left:6px; top:0; transform:translateY(-100%); font:600 .62em/1.35 var(--mono); letter-spacing:.08em;
@@ -2950,6 +2964,7 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
   <symbol id="ic-save" viewBox="0 0 24 24"><path d="M4 4 H17.5 L20 6.5 V20 H4Z M7.5 4 V9 H16 V4 M7.5 20 V13.5 H16.5 V20"/></symbol>
   <symbol id="ic-loopplay" viewBox="0 0 24 24"><path d="M17.79 5.11A9 9 0 1 1 7.5 4.21M4.35 3.66 7.5 4.21 6.41 7.22"/><path d="M10 8.4 16 12 10 15.6Z" fill="currentColor" stroke-width="1"/></symbol>
   <symbol id="ic-stop" viewBox="0 0 24 24"><rect x="5.5" y="5.5" width="13" height="13"/></symbol>
+  <symbol id="ic-totop" viewBox="0 0 24 24"><path d="M5.5 5 V19 M19 5.5 L9 12 L19 18.5Z"/></symbol>
   <symbol id="ic-close" viewBox="0 0 24 24"><path d="M6 6 L18 18 M18 6 L6 18"/></symbol>
   <symbol id="ic-folder" viewBox="0 0 24 24"><path d="M3 6.5 V18.5 H21 V8.5 H11.5 L9.5 6.5 Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></symbol>
   <symbol id="ic-gear" viewBox="0 0 24 24"><path d="M9.49 4.72 L9.71 2.06 L14.29 2.06 L14.51 4.72 L15.38 5.08 L17.41 3.35 L20.65 6.59 L18.92 8.62 L19.28 9.49 L21.94 9.71 L21.94 14.29 L19.28 14.51 L18.92 15.38 L20.65 17.41 L17.41 20.65 L15.38 18.92 L14.51 19.28 L14.29 21.94 L9.71 21.94 L9.49 19.28 L8.62 18.92 L6.59 20.65 L3.35 17.41 L5.08 15.38 L4.72 14.51 L2.06 14.29 L2.06 9.71 L4.72 9.49 L5.08 8.62 L3.35 6.59 L6.59 3.35 L8.62 5.08Z"/><circle cx="12" cy="12" r="3.4"/></symbol>
@@ -3385,6 +3400,7 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
       <div class="tarrh" id="tArrH" role="separator" aria-orientation="vertical" aria-label="Drag to resize the arrange panel" title="Drag to resize · double-tap: big / normal"></div>
       <div class="tahd"><span class="tahl"><button type="button" class="azb" id="tArrZo" aria-label="Zoom out" title="Zoom out (or pinch)">−</button><b>ARRANGE</b></span><button type="button" class="azb" id="tArrZf" aria-label="Zoom to fit" title="Fit every track in the panel"><svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="5.5" fill="none" stroke="currentColor" stroke-width="1.6"/></svg></button><span class="tahr"><span id="tArrSub"></span><button type="button" class="azb" id="tArrZi" aria-label="Zoom in" title="Zoom in: bigger blocks (or pinch)">+</button></span></div>
       <div class="tagp" id="tArrGp" aria-hidden="true"></div>
+      <div class="tatop"><button type="button" id="tArrTop" aria-label="Top of the song" title="Top of the song"><svg class="ic" aria-hidden="true"><use href="#ic-totop"/></svg></button></div>
       <div class="tath" id="tArrTh"></div>
       <div class="tagrid" id="tArrGrid"></div>
       <div class="tafoot"><span class="tafx">TAP: GO · tap a block to go there, twice to open its phrase · HOLD: mute or unmute that block (the phrase stays) · PINCH or + −: resize blocks, swipe sideways across tracks · ○: fit them all again · tap a row number to play from there</span></div>
@@ -24607,6 +24623,8 @@ window.addEventListener('pointerdown', e => { const q = e.target && e.target.clo
 $('tArr').addEventListener('pointerdown', () => { arrActT = arrTouchT = performance.now(); }, true);
 // ONE QUESTION FOR EVERY HOLD (12 Nov): "have the user's hands been on it for ms?" asks the clocks it is given; the follow and paging paths below all go through it.
 const handsOn = (ms, ...ts) => performance.now() - Math.max(...ts) < ms;
+// ...and the one that says "yes, they are": every clock those holds read (a key or press on the grid or pad, Arrange's own, a scroll of it, an ALT move), for a move the user makes that no key or pointerdown on the grid announces (the TO TOP button, Edit ▾)
+const markHands = () => { workT = arrActT = arrHandT = arrTouchT = navT = performance.now(); };
 // (12 Nov, owner: "when editing a phrase with phrase in focus and using the alt button to navigate up between editing patterns, the playhead and cursor fight each other for visibility. Cursor should be able to move past the playhead this way, and stay in focus.")
 // navT: the last ALT + arrow move around the Song grid (optDir, grid). Arrange beside the phrase WITHOUT the keys was held off only by arrHandT / arrTouchT, which a pad press never sets, so every ALT+▲ put Arrange's rows where the cursor was
 // and the very next redraw the playhead put them back: the cursor's row flipped in and out of view. It holds like Arrange's own work does: 4 s with FOLLOW on, the owner's minute (3 Nov) with FOLLOW OFF.
@@ -26527,6 +26545,18 @@ function songEndKey(last){
     cs.song.x = cTrack; cs.song.y = y; cSect = cid; cPhrase = ph; selA = null; go1(y); return draw(); }
   const c = cs[tv]; if (c){ c.y = last ? dims(tv).h - 1 : 0; draw(); }
 }
+// TO TOP (13 Nov, owner: "Let's do the corner button"; the second-PLAY shortcut went in build 576): the button in Arrange's top-left
+// corner and Edit ▾ → Top of the song. The song cursor goes to row 000 on its own track, Arrange's view to the top; it counts as hands
+// on the screen (markHands) so FOLLOW / paging don't pull the view back, and it never starts or stops playback. On the Song screen
+// it is Ctrl/⌘+Home's songEndKey itself (which drops a selection, as that key does), so the two cannot drift; beside another
+// screen the cursor moves as the wheel's does (arrCursorMoved), a selection stays.
+function songToTop(){
+  const c = cs.song; markHands(); arrUserT = -1e9; c.pg = false;
+  if (tv === 'song'){ c.top = 0; return songEndKey(false); }
+  c.y = 0; arrCursorMoved(c, 0);
+  c.top = 0; c.pg = false; draw();
+}
+$('tArrTop').addEventListener('click', e => { e.preventDefault(); songToTop(); });
 // A line selection (selA.line) always spans every column, so it copies whole rows.
 function selRect(){ const c = cs[tv], ln = selA.line; return {x0:ln ? 0 : Math.min(selA.x, c.x), x1:ln ? dims(tv).w - 1 : Math.max(selA.x, c.x), y0:Math.min(selA.y, c.y), y1:Math.max(selA.y, c.y)}; }
 // Shift+arrows in KEYS mode select cells from the cursor, as in a spreadsheet (owner, 22 Oct; until then Shift+▲▼ took
@@ -27386,6 +27416,7 @@ function cmdItems(full){
     ...(onSong && !full ? [] : [val('b:16', 'Value up a lot', '▲', {off:onSong})]), val('b:1', 'Value up', '▶'), val('b:-1', 'Value down', '◀'), ...(onSong && !full ? [] : [val('b:-16', 'Value down a lot', '▼', {off:onSong})]),
     {h:'Move'},
     it('prev', 'Previous ' + (CMD_NOUN[tv] || ''), onSong ? '' : '['), it('next', 'Next ' + (CMD_NOUN[tv] || ''), onSong ? '' : ']'),
+    {a:'top', l:'Top of the song', k:keyHint('mod+Home'), f:songToTop},   // (13 Nov) as the corner button in Arrange
     {h:'Play'},
     ...(full ? [{a:'loopp', l:'Loop the pattern', k:keyHint('alt+L'), f:toggleLoopPat}, {a:'loops', l:'Loop the selection', k:keyHint('shift+alt+L'), f:toggleLoop},
       {a:'prow', l:'Play the row (every track)', k:keyHint('alt+Enter'), f:() => playRowKey(true), off:tv !== 'phrase'}, {a:'follow', l:followMode ? 'Follow off' : 'Follow on', k:keyHint('mod+shift+F'), f:followKey}] : []),
@@ -28245,6 +28276,7 @@ let hKey = '';
 // Built from the header cells (gt) and the bottom row (gb) of each group that is on screen.
 function groupBoxes(){
   grid.querySelectorAll('.tgbox').forEach(b => b.remove());   // the grid is only rebuilt when its text changed
+  gridTopBtn();
   if (!(tv === 'song' || tv === 'mixer')) return;
   const g = grid.getBoundingClientRect(), fs = parseFloat(getComputedStyle(grid).fontSize) || 14, padX = fs * .3, padY = fs * .12;
   for (const k of ['gm', 'gp', 'gx']){
@@ -28258,6 +28290,18 @@ function groupBoxes(){
     box.append(el('b', null, k === 'gx' ? 'MST' : (k === 'gm' ? 'MONO ' : 'POLY ') + d2(first) + (last > first ? '–' + d2(last) : '')));
     grid.append(box);
   }
+}
+// TO TOP on the classic Song grid (13 Nov): the corner left of the track numbers (where the row numbers' column sits), a button laid over
+// it as a sibling of the grid (the grid's own press handlers would take it for a cell), placed from the first track number's box.
+function gridTopBtn(){
+  let b = $('tGridTop');
+  const h = tv === 'song' && view === 'tracker' && songGrid ? grid.querySelector('span.gt') : null;
+  if (!h){ if (b) b.hidden = true; return; }
+  if (!b){ b = el('button', 'tgtop'); b.id = 'tGridTop'; b.type = 'button'; b.title = b.ariaLabel = 'Top of the song';
+    b.innerHTML = '<svg class="ic" aria-hidden="true"><use href="#ic-totop"/></svg>'; b.addEventListener('click', e => { e.preventDefault(); songToTop(); }); scr.append(b); }
+  const r = h.getBoundingClientRect(), g = grid.getBoundingClientRect(), a = scr.getBoundingClientRect(); if (!(r.width > 0)) { b.hidden = true; return; }
+  b.hidden = false;
+  b.style.cssText = `left:${(g.left - a.left).toFixed(1)}px;top:${(r.bottom - 36 - a.top).toFixed(1)}px;width:${Math.max(30, r.left - g.left - 2).toFixed(1)}px;height:36px`;
 }
 let gridHTML = '', psetHTML = '';
 // BUS FRAME: a frame down each bus column in Pattern view, from its header cell's left edge to its right one and from the
@@ -31843,15 +31887,18 @@ arrGrid.addEventListener('wheel', e => {
   if (Math.abs(dy) >= 50){ n = Math.sign(dy); arrWAcc = 0; } else { arrWAcc += dy; n = Math.trunc(arrWAcc / 100); if (!n) return; arrWAcc -= n * 100; }
   const c = cs.song, y = clamp(c.y + n, 0, 255); if (y === c.y) return;
   c.y = y; arrUserT = -1e9; c.pg = false; arrHandT = performance.now();
-  // Beside the Phrase screen the phrase moves with it (owner, 31 Oct: stopped, the wheel couldn't move there: the shown
-  // song row is the open phrase's, so it was pulled back): Pattern view opens this track's pattern on the new row (an empty
-  // cell too, as Shift+Alt+▲▼ do); the plain phrase editor the block's phrase there.
+  arrCursorMoved(c, y);
+  draw();
+}, {passive:false});
+// Beside the Phrase screen the phrase moves with it (owner, 31 Oct: stopped, the wheel couldn't move there: the shown
+// song row is the open phrase's, so it was pulled back): Pattern view opens this track's pattern on the new row (an empty
+// cell too, as Shift+Alt+▲▼ do); the plain phrase editor the block's phrase there. Used by the wheel and the TO TOP button (songToTop).
+function arrCursorMoved(c, y){
   if (tv === 'phrase' && !(apReady && apF === 'arr')){ if (typeof pvActive === 'function' && pvActive()){ try { pvGo(cTrack, y, cs.phrase.x, null); } catch(_){} } else { apLastKey = ''; try { apFollow(); } catch(_){} } }
   else if (apReady && apF === 'arr' && typeof apFollow === 'function') apFollow();
   if (tv === 'song' || (apReady && apF)) { try { apTop(); } catch(_){} }
   else { try { arrKeepRow(c, Math.max(2, arrRows())); } catch(_){} }
-  draw();
-}, {passive:false});
+}
 arrGrid.addEventListener('wheel', e => {
   if (!e.ctrlKey) return; e.preventDefault();
   const cx = e.clientX - arrGrid.getBoundingClientRect().left, dy = e.deltaMode === 1 ? e.deltaY * 33 : e.deltaY;   // lines → px
@@ -33110,7 +33157,7 @@ function cmdCtx(e){
 scr.addEventListener('contextmenu', cmdCtx);
 scr.addEventListener('wheel', () => sxMenuClose(), {passive:true});
 scr.addEventListener('pointerdown', e => {
-  if (sdrag || drag || (e.button && e.button > 0) || e.target.closest('[data-x],[data-r],#fxPick,#tArr,.sxsw,.sxpk')) return;   // #tArr: Arrange as the Song screen has its own touch; .sxsw/.sxpk: SONG EXTRAS' buttons in the stage
+  if (sdrag || drag || (e.button && e.button > 0) || e.target.closest('[data-x],[data-r],#fxPick,#tArr,.sxsw,.sxpk,#tGridTop')) return;   // #tGridTop: TO TOP in the classic grid's corner (a swipe's pointer capture took its click); #tArr: Arrange as the Song screen has its own touch; .sxsw/.sxpk: SONG EXTRAS' buttons in the stage
   startScroll(e);
 });
 let sdragPend = 0;
