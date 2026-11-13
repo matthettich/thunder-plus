@@ -1157,6 +1157,11 @@ body:not(.legon) .tside .tlegend{display:none}
    Each reads on the light and dark skins alike (white and lime are bright in all of them; the rings carry the colour). */
 #tPad #kMute.lt:not(#zz):not(#zz):not(#zz){background:#fff !important; color:#e0006e !important; border:4px solid #ff2e93 !important; box-shadow:4px 4px 0 0 #ff2e93 !important; font-weight:800}
 #tPad #kSolo.lt:not(#zz):not(#zz):not(#zz){background:#d4ff2a !important; color:#0b2a10 !important; border:4px solid #0b5a1c !important; box-shadow:4px 4px 0 0 #0b5a1c !important; font-weight:800}
+/* SOLO / MUTE marks (12 Nov, owner: hard to see what is soloed or muted): soloed = a solid block, muted = struck through, on the Song header, Mixer, Arrange and the Phrase title; the pad keys ring while ANY track is set */
+.tscr .th.so{background:var(--ts-solo); color:var(--ts-bg); font-weight:800}
+.mtr.so .mn{background:var(--ink); color:var(--panel); border-radius:2px; font-weight:800; text-decoration:none}
+#tSub.msS::after{content:' · SOLO'; font-weight:800} #tSub.msM::after{content:' · MUTED'; font-weight:800}
+#tPad #kMute.any:not(.lt):not(#zz):not(#zz), #tPad #kSolo.any:not(.lt):not(#zz):not(#zz){outline:3px solid currentColor; outline-offset:-5px}
 /* LOOP and PLAY when engaged (owner, 9 Nov): lit the same way as MUTE and SOLO, each its own colour, on every skin */
 #tPad #kLoop.on:not(#zz):not(#zz):not(#zz){background:#7cecff !important; color:#06384a !important; border:4px solid #0a6a8c !important; box-shadow:4px 4px 0 0 #0a6a8c !important; font-weight:800; text-shadow:none !important}
 #tPad #kPlay.on:not(#zz):not(#zz):not(#zz), .tcmd button[data-c=song].on:not(#zz):not(#zz):not(#zz):not(#zz):not(#zz){background:#ffc23d !important; color:#3a2200 !important; border:4px solid #a85f00 !important; box-shadow:4px 4px 0 0 #a85f00 !important; font-weight:800; text-shadow:none !important}
@@ -1527,7 +1532,8 @@ body.arrsmall .tagp b{padding:0 3px; letter-spacing:.04em}
 .tagrid .rn.pl{background:var(--ar-pl); color:var(--ar-pl-ink); border-radius:2px}
  .tagrid b{display:block; position:relative; height:var(--arh,16px); line-height:var(--arh,16px); font-size:var(--arf,9px); font-weight:600; text-align:center; border-radius:2px; background:var(--ar-empty); color:transparent; cursor:pointer}
 /* Each block owns its whole cell and the gap around it, so a touch near an edge still lands on the block. */
-.tagrid b::before{content:''; position:absolute; inset:-1px; border-radius:2px}
+/* (12 Nov, owner: Arrange lagged a song playing while the cursor moved) the 1px hit area that sat here (b::before, inset:-1px) was clipped by the block's own overflow:hidden, so a touch in the gap landed
+   on the row either way (checked with elementFromPoint, same answers with it off); 1500 of them doubled the browser's compositing work (Layerize) each time a block's class changed. */
 /* While a block is held, show the mute "charging" so the hold is not an invisible gesture. */
 /* BUS OUTLINE (owner, 3 Nov): every cell of a bus track has a hairline outline a pixel out from it, in the grid's ink, so a
    bus stands out filled or empty (its darker tint alone was lost under filled blocks). The cursor, playing and drop outlines win. */
@@ -2728,6 +2734,21 @@ body.mob .dogs.idle .bob{animation-iteration-count:9} body.mob .dogs.idle .tail{
 :root[data-skin="lowpowermustard"] .tarr .tagrid b:is(.gm,.gp,.gx):not(.f):not(.p):not(.m):not(.c):not(#zz){--ar-empty:#000000; background:#000000!important; background-image:none!important; box-shadow:inset 0 0 0 1px #3d2f0c!important}
 :root[data-skin="lowpowermustard"] .tagrid b.o:not(#zz){background:#000!important; color:#FF3B30!important; box-shadow:inset 0 0 0 1px #FF3B30!important}
 :root[data-skin="lowpowermustard"] .tagrid b.c:not(#zz), :root[data-skin="lowpowermustard"] .tagrid b.f.c:is(.gm,.gp,.gx,.bg,.bus):not(#zz){background:#FF2D78!important; background-image:none!important; color:#000000!important; box-shadow:inset 0 0 0 2px #ffffff!important}
+/* LOW POWER ARRANGE: WHAT IS SELECTED, WHERE THE CURSOR IS (12 Nov, owner: "On the low power skins, we should have an easier time seeing what is selected on arrange"). Selected blocks (b.sl: a
+   selection or picked blocks) had no look at all here: the rules above set box-shadow / background with !important, which beat the base .sl. Now, in each skin's own accent family (no violet,
+   blue or cyan in the pink and mustard ones), true black behind, no glow, no animation, no layout shift (outline and inset box-shadow only):
+   - CURSOR b.c: the bright fill as before, but ringed black inside and white outside (the white ring was on the fill, 1.9:1 on the gold), so it reads on a filled, a muted or an empty cell;
+     playing under it adds a second white ring inside (white = playing in these skins, as the playing row's number is).
+   - SELECTED b.sl: a dark tint of the skin's selection colour, a dashed 2 px outline in it and white text: a dashed line, which nothing else in Arrange has, on a tint, not the cursor's solid ring on a fill.
+   - PLAYING b.p keeps its ring (its own hue: green / gold / pink); selected and playing shows both. Muted blocks keep their strike-through under all of these.
+   --lpsl: selection colour, --lpslbg: its tint, --lpcur: cursor fill, --lppl / --lppbg: the playing ring and tint. */
+:root[data-skin="lowpower"]{--lpsl:#ffffff; --lpslbg:#2e2e2e; --lpcur:#ffe14d; --lppl:#7ee787; --lppbg:#0d5c2c}
+:root[data-skin="lowpowerpink"]{--lpsl:#FF2D78; --lpslbg:#3d0f24; --lpcur:#E0B020; --lppl:#D4A017; --lppbg:#4a3a08}
+:root[data-skin="lowpowermustard"]{--lpsl:#FFD34D; --lpslbg:#3d3008; --lpcur:#FF2D78; --lppl:#FF2D78; --lppbg:#4a0d22}
+:root:is([data-skin="lowpower"],[data-skin="lowpowerpink"],[data-skin="lowpowermustard"]) .tarr .tagrid b.sl:not(#zz):not(#zz){background:var(--lpslbg)!important; background-image:none!important; color:#ffffff!important; box-shadow:inset 0 0 0 1px var(--lpsl)!important; outline:2px dashed var(--lpsl); outline-offset:-1px}
+:root:is([data-skin="lowpower"],[data-skin="lowpowerpink"],[data-skin="lowpowermustard"]) .tarr .tagrid b.sl.p:not(#zz):not(#zz){background:var(--lppbg)!important; box-shadow:inset 0 0 0 2px var(--lppl)!important}
+:root:is([data-skin="lowpower"],[data-skin="lowpowerpink"],[data-skin="lowpowermustard"]) .tarr .tagrid b.c:not(#zz):not(#zz):not(#zz){background:var(--lpcur)!important; background-image:none!important; color:#000000!important; box-shadow:inset 0 0 0 2px #000000!important; outline:2px solid #ffffff; outline-offset:0}
+:root:is([data-skin="lowpower"],[data-skin="lowpowerpink"],[data-skin="lowpowermustard"]) .tarr .tagrid b.c.p:not(#zz):not(#zz):not(#zz){box-shadow:inset 0 0 0 2px #000000, inset 0 0 0 4px #ffffff!important}
 :root[data-skin="lowpowermustard"] :is(button,select,input[type=text],input[type=number],textarea,.lcell,.layercard,.fxcard,.voicecard,.setmenu,.mstwin){background:#000; color:#D4A017; border-color:#917323; border-width:1px}
 :root[data-skin="lowpowermustard"] :is(button.on,.seg button.on,.ttabs button.on,.ttabs button[data-v].on,.tmap button[data-v].on,#bFile.on,.top #bSet.on){
   background:#242424!important; color:#ffffff!important; border-color:#D4A017; box-shadow:inset 0 0 0 1px #D4A017; font-weight:700}
@@ -3356,7 +3377,7 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
         <dt>PLAY</dt><dd>play the song · SHIFT+PLAY this screen, which loops the selected rows when LOOP SEL is on</dd>
         <dt>LP. SEL</dt><dd>loop the selection (sticky); PLAY then loops it</dd>
         <dt>ALT + arrows</dt><dd>go to the nearest block that way: up / down the track, left / right along the row (Song and Phrase; PATTERN NAV in Settings)</dd>
-        <dt>SEMI + −</dt><dd>transpose the phrase selection a semitone at once</dd>
+        <dt>SEMI + −</dt><dd>transpose the phrase selection a semitone at once; on the Song / Arrange, the selected blocks (or the one under the cursor): every pattern in them once, even a pattern shared with other blocks</dd>
         <dt>GEN</dt><dd>the generators (Acid line, Euclidean fill…) for the phrase</dd>
         <dt>◀ ▶ (FX screen)</dt><dd>open the slot's controls · back to the slot list (a sideways swipe too)</dd>
         <dt>Sticky keys</dt><dd>tap SHIFT or ALT alone and it stays lit for the next button</dd>
@@ -3406,7 +3427,7 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
         <dt>Alt+L</dt><dd>loop the pattern on/off: the song repeats the row it is on (LOOP in the tab bar)</dd>
         <dt>Shift+Alt+L</dt><dd>loop the selection on/off (LOOP SEL beside it, on a computer)</dd>
         <dt>TRANSPOSE ▲▼</dt><dd>top bar: arm it, then ▲/▼ transposes the selection (Esc cancels)</dd>
-        <dt>Alt+, Alt+.</dt><dd>transpose the phrase selection down / up a semitone (works on any cell)</dd>
+        <dt>Alt+, Alt+.</dt><dd>transpose the phrase selection down / up a semitone (works on any cell); on the Song / Arrange the selected and picked blocks, else the block under the cursor (Shift+Alt for an octave). It edits the patterns themselves, so other blocks playing the same pattern change too: the message says how many</dd>
         <dt>◀ ▶ on FX</dt><dd>open the slot's controls · back to the slot list</dd>
       </dl>
     </aside>
@@ -3447,8 +3468,8 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
     </div>
     <div class="tinl tinlp" id="tInlPad" hidden aria-label="Instruments and their pads"></div>
     <div class="keys wide">
-      <span class="ksp" aria-hidden="true"></span><button type="button" class="k kw" data-b="solo" id="kSolo" title="Solo this track; tap again to un-solo">SOLO</button><button type="button" class="k kw" data-b="xposeUp" title="Transpose the phrase selection up a semitone">SEMI +</button><button type="button" class="k kw" data-b="xposeDn" title="Transpose the phrase selection down a semitone">SEMI −</button><button type="button" class="k kw" data-b="shift">SHIFT</button><button type="button" class="k kw" data-b="play" id="kPlay">PLAY</button>
-      <button type="button" class="k kw" data-b="save" id="kSave" title="Save song" aria-label="Save song"><svg class="ic ick" aria-hidden="true"><use href="#ic-save"/></svg></button><button type="button" class="k kw" data-b="mute" id="kMute" title="Mute this track; tap again to unmute">MUTE</button><button type="button" class="k kw" data-b="gen" id="kGen" title="Generate: make a pattern for this phrase, such as an Acid line or Euclidean fill…">GEN</button><button type="button" class="k kw" data-b="loop" id="kLoop" title="Loop the pattern: the song repeats the row it is on until you turn it off (Alt+L in KEYS mode)">LOOP</button><button type="button" class="k kw" data-b="opt">ALT</button><button type="button" class="k kw" data-b="edit">EDIT</button>
+      <span class="ksp" aria-hidden="true"></span><button type="button" class="k kw" data-b="solo" id="kSolo" title="Solo this track; tap again to un-solo; tapped twice quickly it clears every solo and mute">SOLO</button><button type="button" class="k kw" data-b="xposeUp" title="Transpose the phrase selection up a semitone (on the Song / Arrange: the selected blocks, or the one under the cursor)">SEMI +</button><button type="button" class="k kw" data-b="xposeDn" title="Transpose the phrase selection down a semitone (on the Song / Arrange: the selected blocks, or the one under the cursor)">SEMI −</button><button type="button" class="k kw" data-b="shift">SHIFT</button><button type="button" class="k kw" data-b="play" id="kPlay">PLAY</button>
+      <button type="button" class="k kw" data-b="save" id="kSave" title="Save song" aria-label="Save song"><svg class="ic ick" aria-hidden="true"><use href="#ic-save"/></svg></button><button type="button" class="k kw" data-b="mute" id="kMute" title="Mute this track; tap again to unmute; tapped twice quickly it clears every solo and mute">MUTE</button><button type="button" class="k kw" data-b="gen" id="kGen" title="Generate: make a pattern for this phrase, such as an Acid line or Euclidean fill…">GEN</button><button type="button" class="k kw" data-b="loop" id="kLoop" title="Loop the pattern: the song repeats the row it is on until you turn it off (Alt+L in KEYS mode)">LOOP</button><button type="button" class="k kw" data-b="opt">ALT</button><button type="button" class="k kw" data-b="edit">EDIT</button>
     </div>
     </div>
   </div>
@@ -22942,7 +22963,7 @@ function tStop(quiet){
   let stopP = null, home = null;
   G('stop cursor', () => {
   stopP = !quiet && stopToPlayhead() && tp.on && tp.pos && tp.pos.some(Boolean) ? {P:tp.pos.map(q => q && Object.assign({}, q)), mode:tp.mode} : null;
-  home = !quiet && tp.on && !stopToPlayhead() ? fpHome : null; });   // (9 Nov, owner: with ON STOP at STAYS it still ended up at the playback spot: FOLLOW had carried it there)
+  home = !quiet && tp.on && !stopToPlayhead() && fpHome && fpHome.t >= workT && fpHome.t >= arrHandT ? fpHome : null; });   // (12 Nov, owner: PLAY from the pad, ▼ / scroll down, STOP before row 2 jumped the cursor back to the top) fpHome is the cursor as FOLLOW first noted it, and is only noted again 4 s after your last key, press or scroll: a place you moved to after that note stands, only an untouched cursor goes back   // (9 Nov, owner: with ON STOP at STAYS it still ended up at the playback spot: FOLLOW had carried it there)
   tp.timer = 0; tp.on = false; fpMem = null; fpHome = null; tp.q = []; tp.pos = null; tp.snd = null; tp.stopAt = null; tp.ahead = tp.aheadT = 0; tp.rsUntil = 0; PB.rsA = null; G('runaway kick', rkReset);
   // HAND-OVER (seqHandover): the core and the voices already booked keep sounding until the page sequencer's first step
   if (tp.core){ tp.core = false; core.gen++; if (!handing) G('core', () => { coreWire(false); try { core.node.port.postMessage({op:'stop', at:ctx.currentTime}); } catch(e){} }); }
@@ -24105,7 +24126,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 568;
+const BUILD = 569;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD + (location.pathname.includes('/beta/') ? ' · beta' : '');
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -24227,7 +24248,7 @@ function followPlay(){
   // (owner, 2 Nov: after selecting rows, Arrange stopped paging even with FOLLOW on: this used to return before paging).
   if (selA){ arrFollowPage(own); return; }
   if (performance.now() - workT < FOLLOW_HOLD){ arrFollowPage(own); return; }
-  if (!fpHome || workT > fpHome.t) fpHome = {t:performance.now(), y:cs.song.y, top:cs.song.top, p:cPhrase, s:cSect, py:cs.phrase.y, ptop:cs.phrase.top};   // EDITING: it catches up when you've let go (a change made meanwhile still shows then)
+  if (!fpHome || workT > fpHome.t || arrHandT > fpHome.t) fpHome = {t:performance.now(), y:cs.song.y, top:cs.song.top, p:cPhrase, s:cSect, py:cs.phrase.y, ptop:cs.phrase.top};   // EDITING: it catches up when you've let go (a change made meanwhile still shows then)
   if (followMode === 1){   // FOLLOW PATTERN: only which phrase / sect is shown follows the cursor's track; nothing scrolls
     // ON A CHANGE ONLY (owner, 7 Nov: "a single phrase on a track, I can't move the cursor off of that phrase"): it jumps when
     // what the track plays changes, not on every step, so with one phrase (or one block) playing you can move away from it.
@@ -24450,6 +24471,17 @@ const busTrack = t => t >= 0 && t < NT && isBusT(t);
 const hasNotes = p => !!p && p.some(r => { for (let x = 0; x <= IC; x++) if (r[x] >= 0) return true; return false; });
 const busFxView = () => busTrack(cTrack) && !hasNotes(S.phrases[cPhrase]);
 function busSay(t = cTrack){ toast(`Track ${d2(t + 1)} is a bus: FX commands only, no notes (right-click → Make it a normal track).`, 4500); return true; }
+/* NO NOTES INTO A BUS (12 Nov, owner: a bus takes commands only, but a paste or a drag could still put notes on one). busNo(t, id): the song cell (track t, block id) would put a block
+   that has notes (notes, volume or instrument) on a bus: refused, remembered, and said once (busRefFlush, a tick later, so a paste that left several out names them all).
+   Nothing is stripped from a song that already has notes on a bus; a refusal writes nothing, so it leaves no undo step. */
+let busRef = null, busRefT = 0, busRefNotes = 0;
+const busNotesIn = id => { const c = id >= 0 ? S.chains[id] : null; return !!c && c.some(r => r && r[0] >= 0 && hasNotes(S.phrases[r[0]])); };
+function busRefQ(){ clearTimeout(busRefT); busRefT = setTimeout(busRefFlush, 0); }
+function busNo(t, id){ if (!(id >= 0 && t >= 0 && t < NT && busTrack(t) && busNotesIn(id))) return false; (busRef || (busRef = new Set())).add(id); busRefQ(); return true; }
+function busNoteNo(){ busRefNotes++; busRefQ(); return true; }   // a phrase cell with a note, volume or instrument for a bus phrase
+function busRefFlush(){ const ids = busRef ? [...busRef] : [], nn = busRefNotes; busRef = null; busRefNotes = 0; if (!ids.length && !nn) return;
+  const nm = ids.map(i => hp(songShown(i))).join(', ');
+  toast(ids.length ? (ids.length === 1 ? `Pattern ${nm} has notes` : `Patterns ${nm} have notes`) + ' · a bus track takes commands only' : 'A bus track takes commands, not notes · nothing pasted', 4500); }
 const pCols = () => mstView() || busFxView() ? [6, 7, 8, 9, 10, 11] : polyView() ? [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11] : [0, 4, 5, 6, 7, 8, 9, 10, 11];
 const kindAt = (v, x) => v === 'song' ? 'sect' : v === 'sect' ? (x ? 'tsp' : 'phrase') : PK[x];
 function getCell(v, x, y){
@@ -24513,6 +24545,8 @@ function mstShareWarn(p){
     : `Phrase ${hp(p)} also plays in the master column. There, VOL is the whole song’s level and FLX / FXO the master’s effects. UNIQ on this block (Song or Arrange) gives the track its own copy.`, 7000), 60);
 }
 function setCell(v, x, y, val){
+  if (v === 'song' && x < NT && val >= 0 && busNo(x, val)) return false;   // NO NOTES INTO A BUS (12 Nov, owner): no write, no undo step
+  if (v === 'phrase' && val >= 0 && x < FX0 && busTrack(cTrack) && busNoteNo()) return false;
   if (v === 'song'){
     if (val >= 0 && !mstUniqIn && S.song[y][x] !== val && blockMixed(val, x, y)){
       mstUniqIn = true; try { const nc = mstUniq(val); if (nc >= 0){ const was = val; val = nc;
@@ -25579,6 +25613,7 @@ const busHinted = new Set();
 function busHint(t){ if (busHinted.has(t) || !isBusT(t)) return; busHinted.add(t);
   busNote = `track ${d2(t + 1)} is a ${busOf(t)}: FX commands only, no notes`; queueMicrotask(() => { if (busNote) toast(''); }); }
 function newBlock(c, src){
+  if (src >= 0 && c && c.x < NT && busNo(c.x, src)) return;   // NO NOTES INTO A BUS (12 Nov, owner): a copy of a pattern with notes
   if (c && c.x < NT) busHint(c.x);
   let cid, pid;
   if (src >= 0){
@@ -25676,7 +25711,7 @@ function pastePicks(){
   const c = cs.song, u0 = sxU(c.x), n0 = ntr(); let n = 0, out = 0;
   for (const p of clip.picks){ const y = c.y + p.dy, u = u0 + p.du, t = sxT(u);
     if (p.id < 0) continue; if (y > 255 || u > n0 || (u === n0 && t !== MT)){ out++; continue; }
-    setCell('song', t, y, p.id); if (t !== MT && t < NT) setBlockMute(y, t, !!p.mu); n++; }
+    if (setCell('song', t, y, p.id) === false) continue; if (t !== MT && t < NT) setBlockMute(y, t, !!p.mu); n++; }
   saveS(); draw();
   toast(out ? `Pasted ${n} blocks · ${out} past the end were left out` : `Pasted ${n} block${n === 1 ? '' : 's'}`);
 }
@@ -25729,7 +25764,7 @@ function dupTrack(notes, tAt){
   const mst = tAt != null ? tAt === MT : tv === 'mixer' ? onMstCell() : tv === 'fx' || tv === 'mod' ? cFxT >= NT : cTrack === MT;
   if (mst) return toast('The master can’t be duplicated.');
   let t = tAt != null ? tAt : dkTrack(), PF = polyFrom(), poly = t >= PF, end = poly ? ntr() : PF;
-  const free = () => { for (let u = t + 1; u < end; u++) if (S.song.every(row => row[u] < 0)) return u; return -1; };
+  const free = () => { for (let u = t + 1; u < end; u++) if (S.song.every(row => row[u] < 0) && !(notes && busTrack(u))) return u; return -1; };   // (12 Nov, owner: with notes, never onto a bus)
   let to = free(), grew = false;
   // MORE TRACKS (owner, 4 Nov: "create a track of the type you're trying to duplicate rather than ask where to go"; "ok if it
   // created a mono and poly track"): with no empty track of its kind to the right, TRACKS goes up by two (one mono, one poly,
@@ -25949,6 +25984,14 @@ function playPatLoop(){
 // MUTE AND SOLO CLEAR EACH OTHER (owner, 8 Nov): muting a soloed track un-solos it, soloing a muted one unmutes it.
 function setMute(m, v){ m.mute = !!v; if (m.mute) m.solo = false; }
 function setSolo(m, v){ m.solo = !!v; if (m.solo) m.mute = false; }
+// CLEAR SOLO AND MUTE (12 Nov): every track's solo and mute off (the per-block mutes, S.smute, are not touched); pre: how many tracks had one before the gesture began. One mixChanged, as a solo or mute press.
+let msTap = {b:'', t:0, pre:0};
+function clearSoloMute(pre){
+  let n = 0; for (const m of S.mix) if (m.solo || m.mute){ m.solo = m.mute = false; n++; }
+  if (n){ mixChanged(); draw(); }
+  if (pre == null) pre = n;
+  toast(pre ? `Solo and mute cleared · ${pre} track${pre > 1 ? 's' : ''}` : 'Solo and mute cleared · nothing was set', 1800);
+}
 function muteKey(trackOnly){
   if (trackOnly !== true && tv === 'song' && sxPicks.length) return sxMuteCells(sxPicks.map(p => [p.y, p.t]));   // picked cells
   const mst = tv === 'song' ? cs.song.x === MT : tv === 'mixer' ? onMstCell() : tv === 'fx' || tv === 'mod' ? cFxT >= NT : cTrack === MT;
@@ -26056,24 +26099,30 @@ function xposeScope(){
     return {parts:[{p:cPhrase, y0:0, y1:plen(cPhrase) - 1, cols:own}], where:'phrase ' + hp(cPhrase)};
   }
   if (tv === 'song'){
-    const cells = selA && selA.v === 'song' ? songCells() : [[cs.song.y, cs.song.x]], by = new Map();
+    // (12 Nov, owner: "in arrangement mode, select patterns and use the transpose keys on every pattern selected") the selected blocks AND the picked ones (sxPicks), else the block under the cursor; each pattern once
+    const cells = (selA && selA.v === 'song' ? songCells() : sxPicks.length ? [] : [[cs.song.y, cs.song.x]]).concat(sxPicks.map(q => [q.y, q.t])), by = new Map(), seen = new Set(cells.map(c => c[0] + ':' + c[1]));
     for (const [y, t] of cells){ if (t === MT) continue; const cid = S.song[y] ? S.song[y][t] : -1; if (cid < 0) continue;
       for (const q of S.chains[cid] || []){ const p = q[0]; if (p < 0 || !S.phrases[p]) continue; const cols = isPolyT(t) ? NOTE_COLS : [0], o = by.get(p);
         if (!o || cols.length > o.cols.length) by.set(p, {p, y0:0, y1:plen(p) - 1, cols}); } }
     if (!by.size){ toast('No block here to transpose.'); return null; }
-    return {parts:[...by.values()], where:by.size > 1 ? by.size + ' phrases' : 'phrase ' + hp([...by.keys()][0])};
+    // "also used elsewhere": a block outside these cells plays the same pattern, so it changes too (the pattern itself is edited, as in the phrase)
+    let also = 0; { const out = new Set(); for (let y = 0; y < 256; y++) for (let t = 0; t <= MT; t++){ if (seen.has(y + ':' + t)) continue; const cid = S.song[y] ? S.song[y][t] : -1; if (cid >= 0) for (const q of S.chains[cid] || []) if (by.has(q[0])) out.add(q[0]); } also = out; }
+    return {parts:[...by.values()], where:by.size > 1 ? by.size + ' phrases' : 'phrase ' + hp([...by.keys()][0]), song:true, also};
   }
   toast('Transpose works on a phrase, or on blocks on the Song.'); return null;
 }
-function transposeSel(d, needSel){
-  if (needSel && !(selA && selA.v === tv)) return toast(`Select rows first (or ${keyHint('alt+,')} / ${keyHint('alt+.')} for the whole ${tv === 'song' ? 'block' : 'phrase'}).`);
+function transposeSel(d, needSel, songOk){
+  // songOk (the pad's SEMI keys, 12 Nov): on the Song / Arrange they work without a selection too, on the block under the cursor
+  if (needSel && !(selA && selA.v === tv) && !(tv === 'song' && (songOk || sxPicks.length))) return toast(`Select rows first (or ${keyHint('alt+,')} / ${keyHint('alt+.')} for the whole ${tv === 'song' ? 'block' : 'phrase'}).`);
   const sc = xposeScope(); if (!sc) return;
-  let moved = 0;
+  let moved = 0; const per = new Map();
   for (const q of sc.parts){ const P = S.phrases[q.p]; if (!P) continue;
     for (let y = q.y0; y <= Math.min(q.y1, P.length - 1); y++){ const row = P[y]; if (!row) continue;
-      for (const x of q.cols){ const v = row[x]; if (v >= 0 && v < 120){ const nv = clamp(v + d, 0, 119); if (nv !== v){ row[x] = nv; moved++; } } } } }
+      for (const x of q.cols){ const v = row[x]; if (v >= 0 && v < 120){ const nv = clamp(v + d, 0, 119); if (nv !== v){ row[x] = nv; moved++; per.set(q.p, (per.get(q.p) || 0) + 1); } } } } }
   if (!moved) return toast('Nothing to transpose: no notes in ' + sc.where + '.');
-  saveS(); draw();
+  saveS(); draw();   // ONE undo step for all of it (saveS), the selection stays; a playing song is told as for a phrase (saveS → coreSong)
+  if (sc.song){ const n = per.size, el = [...per.keys()].filter(p => sc.also.has(p)).length;   // (12 Nov) the Song / Arrange: patterns, not notes, and the ones other blocks play too
+    return toast(`Transposed ${n} pattern${n > 1 ? 's' : ''} ${d > 0 ? '+' : '−'}${Math.abs(d)}` + (el ? ` · ${el} ${el > 1 ? 'are' : 'is'} also used elsewhere` : ''), el ? 3000 : 1800); }
   const a = Math.abs(d);
   toast(`Transposed ${moved} note${moved > 1 ? 's' : ''} in ${sc.where} ${d > 0 ? 'up' : 'down'} ${a === 12 ? 'an octave' : a === 1 ? 'a semitone' : a + ' semitones'}`);
 }
@@ -26213,11 +26262,11 @@ function paste(){
   // Pasting over a selection starts at its top row.
   const y0 = selA ? selRect().y0 : c.y; selA = null;
   if (y0 < 0) return toast('Move to a row first.');
-  let n = 0; const fxOnly = tv === 'phrase' && busTrack(cTrack); let cut = 0;   // BUS FX ONLY: a paste keeps its FX columns
+  let n = 0, put = 0; const fxOnly = tv === 'phrase' && busTrack(cTrack); let cut = 0;   // BUS FX ONLY: a paste keeps its FX columns
   const colAt = i => { if (tv !== 'song') return x0 + i; const u = sxU(x0) + i, n0 = ntr(); return u === n0 ? MT : u < n0 ? u : -1; };   // SONG: by screen column, the master after the last track
-  clip.d.forEach((row, j) => { const y = y0 + j; if (y < dm.h) n++; row.forEach((val, i) => { const x = colAt(i); if (val !== undefined && x >= 0 && (x < dm.w || (tv === 'song' && x === MT)) && y < dm.h){ if (fxOnly && x < FX0){ if (val >= 0) cut++; return; } setCell(tv, x, y, val);
+  clip.d.forEach((row, j) => { const y = y0 + j; if (y < dm.h) n++; row.forEach((val, i) => { const x = colAt(i); if (val !== undefined && x >= 0 && (x < dm.w || (tv === 'song' && x === MT)) && y < dm.h){ if (fxOnly && x < FX0){ if (val >= 0) cut++; return; } if (setCell(tv, x, y, val) === false) return; put++;
     if (tv === 'song' && val >= 0 && x !== MT && x < NT) setBlockMute(y, x, !!(clip.mu && clip.mu[j] && clip.mu[j][i])); } }); });   // MUTED BLOCKS COPY
-  if (cut) return (toast(`Pasted the FX columns only: track ${d2(cTrack + 1)} is a bus.`), draw());
+  if (cut) return (toast(put ? 'Notes left out · this is a bus track' : 'A bus track takes commands, not notes · nothing pasted'), draw());   // (12 Nov, owner: a notes-only paste changes nothing)
   toast(clip.line ? `Pasted ${n} line${n > 1 ? 's' : ''}` + (n < clip.d.length ? ` (${clip.d.length - n} past the end were left out)` : '') : 'Pasted'); draw();
 }
 // The phrase's LEN / LPB line sits above row 0 (y = -2): ▲ from row 0 reaches it, ▼ goes back.
@@ -26225,7 +26274,7 @@ const onPset = () => tv === 'phrase' && cs.phrase.y === -2;
 // Mixer: the cursor is on the MASTERING cell (master row, second cell).
 const onMstCell = () => tv === 'mixer' && cs.mixer.y === 7;   // any of MASTER, MASTERING, OUT (27 Oct: it was MASTERING only, so / on MASTER muted the last track)
 function move(dx, dy){
-  const c = cs[tv], d = dims(tv);
+  const c = cs[tv], d = dims(tv), pg0 = !!c.pg, x0 = c.x, y0 = c.y;
   if (tv === 'song' || tv === 'phrase') c.pg = false;   // EDIT WHILE FOLLOWING: a move shows the cursor again
   if (tv === 'fx') return moveFx(dx, dy, d.h);
   if (tv === 'phrase' && c.y === -2){ if (dy > 0){ c.y = 0; c.x = mstView() || busFxView() ? FX0 : 0; } else c.x = clamp(c.x + dx, 0, 1); return draw(); }
@@ -26249,6 +26298,15 @@ function move(dx, dy){
   else if (!(tv === 'song' && c.x === MT) && !(tv === 'phrase' && dx)) c.x = clamp(c.x + dx, 0, d.w - 1);   // (the phrase already stepped through its columns above: a second plain step skipped every other one) FOCUS TRACK (24 Oct): ▲▼ on the master column stay on it (they jumped to the last track)
   const wasY = c.y; c.y = clamp(c.y + dy, 0, d.h - 1);
   if (tv === 'mixer' && c.y === 7 && wasY !== 7) c.mx = 0;
+  // ARRANGE (12 Nov, owner: ▲ held in Arrange while a song plays on the audio thread lagged the playback): a held arrow that can't go on (▲ at row 0, the usual end of a long ▲)
+  // changes nothing, so it draws nothing; a move that does change the cursor redraws without rebuilding the blocks (drawArr0, arrFast), and while a song plays that
+  // redraw waits for the frame loop's own (one a frame, not one per press and one per row step)
+  if (tv === 'song' && asongOn() && !apHold && !apSong){
+    if (c.x === x0 && c.y === y0 && !pg0) return;
+    if (tp.on && !arrSoon){ arrSoon = requestAnimationFrame(() => { arrSoon = 0; arrFast = true; try { draw(); } finally { arrFast = false; } }); return; }
+    if (arrSoon) return;
+    arrFast = true; try { draw(); } finally { arrFast = false; } return;
+  }
   draw();
 }
 function psetGet(x){ return x === 0 ? plen(cPhrase) : (S.plpb[cPhrase] || 0); }
@@ -26658,6 +26716,7 @@ function press(b, fromKey){
   if (fxp.open){ clearTimeout(rep); if (b !== 'play'){ fxpPad(b);   // a held ▲ or ▼ runs through the list (owner, 8 Nov)
       if (!fromKey && (b === 'up' || b === 'down')) rep = setTimeout(function r(){ if (!fxp.open) return; fxpPad(b); rep = setTimeout(r, 70); }, 330);
       return; } fxpClose(); }
+  if (b !== 'mute' && b !== 'solo') msTap.b = '';   // another pad key in between: the next MUTE / SOLO is a first tap again
   if (b in held){
     held[b] = true; used[b] = false;
     if ((b === 'opt' && mod('shift')) || (b === 'shift' && mod('opt'))){ used.shift = used.opt = true; takeLatch(); toggleSel(); }
@@ -26674,14 +26733,18 @@ function press(b, fromKey){
   // LOOP is a sticky toggle, not a held key: a tap flips it (the pattern loop; LOOP SEL is in the tab bar on a computer).
   if (b === 'loop'){ toggleLoopPat(); clearTimeout(rep); return; }
   if (b === 'save'){ clearTimeout(rep); saveProj(false); return; }   // SAVE (owner, 8 Nov): the same Save song as the File menu and Ctrl/⌘+S (a tap, not a key held)
-  if (b === 'mute' || b === 'solo'){ clearTimeout(rep); b === 'mute' ? muteKey(true) : soloKey(); return; }   // MUTE / SOLO (owner, 8 Nov): a tap latches, a second tap undoes it
+  // MUTE / SOLO (owner, 8 Nov): a tap latches, a second tap undoes it. (12 Nov, owner: "a way to clear all solo and mute, maybe a quick double tap on the button") a second tap on the same one
+  // within 350 ms, with no other pad press between, clears every track's solo AND mute (either button); the first tap still acts at once, so a single tap is as it was
+  if (b === 'mute' || b === 'solo'){ clearTimeout(rep); const now = performance.now();
+    if (msTap.b === b && now - msTap.t < 350){ const pre = msTap.pre; msTap = {b:'', t:0, pre:0}; return clearSoloMute(pre); }
+    msTap = {b, t:now, pre:S.mix.filter(m => m.solo || m.mute).length}; b === 'mute' ? muteKey(true) : soloKey(); return; }
   if (b === 'gen'){ clearTimeout(rep); genMenu(); return; }   // GEN (owner, 6 Nov): the generators, under SEMI + beside LOOP
-  if (b === 'xposeUp'){ transposeSel(1, true); clearTimeout(rep); return; }
-  if (b === 'xposeDn'){ transposeSel(-1, true); clearTimeout(rep); return; }
+  if (b === 'xposeUp'){ transposeSel(1, true, true); clearTimeout(rep); return; }
+  if (b === 'xposeDn'){ transposeSel(-1, true, true); clearTimeout(rep); return; }
   const l = takeLatch();
   dirPress(b, l);
   clearTimeout(rep);
-  if (!fromKey) rep = setTimeout(function r(){ dirPress(b, l); rep = setTimeout(r, 70); }, 330);
+  if (!fromKey) rep = setTimeout(function r(){ workT = arrActT = performance.now(); dirPress(b, l); rep = setTimeout(r, 70); }, 330);   // (12 Nov, owner: ▼ held in Arrange while playing, the cursor ran off the bottom) only the first press started FOLLOW's and Arrange's 4 s hold, so after it the playhead paged the view back (FOLLOW ON) or FOLLOW PATTERN pulled the cursor to the playhead: every repeat of a held arrow is hands-on again, as a tap is (the window's pointerdown)
 }
 function release(b, fromKey){
   if (b === 'save'){ clearTimeout(rep); return; }
@@ -26818,7 +26881,30 @@ function keyHint(s){
 // GENERATORS (owner, 2 Nov: "call that generators", findable from a right-click in the phrase or pattern editor): the
 // pattern writers, in their own group of Edit ▾ and the right-click menu, before Tools.
 // GEN key (PAD mode): the Generators menu (Acid line, Euclidean fill…) over the key; off the Phrase screen they say why
+// GEN FROM THE SONG / ARRANGE (12 Nov, owner: "pressing GEN from the arrangement window should kick us over into the phrase under the cursor, not tell us to navigate
+// there"; on an empty cell: "make a new pattern"): on a block it opens that block's phrase on its track, as a second tap on it does; on an empty cell it makes a
+// new empty pattern first (arrNewAt: the double-click's path, so UNIQUE PER TRACK and its 'New pattern' toast, one undo step), then opens it. The menu opens on the
+// phrase. True when it stopped with a toast (the master column, sections on, no free pattern, a bus that takes no notes).
+function genToPhrase(){
+  const x = cs.song.x, y = cs.song.y, row = S.song[y];
+  if (!row) return true;
+  if (x === MT){ toast('The master track takes commands, not generated notes · pick a track’s block.', 2200); return true; }
+  const why = genRefuse(x); if (why){ toast(why, 2600); return true; }
+  if (row[x] < 0){
+    if (sectsOn){ toast('Sections are on: put a block here first (EDIT×2), then GEN.', 2200); return true; }
+    arrNewAt(y, x);
+    if (!(S.song[y][x] >= 0)) return true;   // newBlock already said why (no free sects or phrases)
+  }
+  tv = 'song'; go('phrase');
+  return false;
+}
+function genRefuse(t){ return t >= 0 && t < NT && busTrack(t) ? `Track ${d2(t + 1)} is a bus · generators write notes, a bus takes commands only` : ''; }   // (a track that takes no generated notes: a bus, 12 Nov)
 function genMenu(fromKeys){
+  // (the phrase opens first; Arrange beside it may scroll to the block, and a scroll of its grid closes menus, so the menu opens two frames later)
+  if (tv === 'song' && view === 'tracker'){ if (!genToPhrase()) requestAnimationFrame(() => requestAnimationFrame(() => { if (tv === 'phrase') genMenuOpen(fromKeys); })); return; }
+  genMenuOpen(fromKeys);
+}
+function genMenuOpen(fromKeys){
   const b = $('kGen'), kr = b ? b.getBoundingClientRect() : null, onKey = !fromKeys && kr && kr.width;
   // Ctrl/⌘+G (7 Nov), or no GEN key on screen: just under the cursor's cell, else the middle of the screen
   const cu = onKey ? null : $('tGrid').querySelector('.cur'), cr = cu && cu.getBoundingClientRect();
@@ -26890,7 +26976,8 @@ function cmdItems(full){
     ...(trk || full ? [{a:'dup', l:'Duplicate the track (no notes)', k:trk ? keyHint('mod+D') : '', f:() => dupKey(false), off:!trk},
       {a:'dupn', l:'Duplicate the track with its patterns', k:keyHint('mod+alt+D'), f:() => dupKey(true), off:!trk}] : []),
     ...(full ? [{a:'newph', l:'New phrase on the next empty track', k:keyHint('alt+T'), f:newPhraseRight},
-      {a:'mute', l:'Mute / unmute this track', k:'/', f:muteKey}, {a:'solo', l:'Solo / unsolo this track', k:keyHint('mod+/'), f:() => soloKey(false)}] : []),
+      {a:'mute', l:'Mute / unmute this track', k:'/', f:muteKey}, {a:'solo', l:'Solo / unsolo this track', k:keyHint('mod+/'), f:() => soloKey(false)},
+      {a:'clrms', l:'Clear all solo and mute (every track)', k:'', f:() => clearSoloMute(), off:!S.mix.some(m => m.solo || m.mute)}] : []),   // (12 Nov, owner) the pad's SOLO or MUTE tapped twice does the same
     ...(['song', 'phrase', 'mixer', 'fx'].includes(tv) || full ? [{a:'tname', l:'Name this track…', k:'', f:nameTrackHere, off:!['song', 'phrase', 'mixer', 'fx'].includes(tv)}] : []),
     {h:'Make'},
     {a:'newmidi', l:'New MIDI instrument', k:'', f:newMidiInst},   // MIDI INSTRUMENTS EASIER TO FIND (5 Nov)
@@ -27505,6 +27592,7 @@ function songKey(skipPh){
   return {root:best.root, scale:best.minor ? 0 : 6, name:ROOTS[best.root] + (best.minor ? ' minor' : ' major'), from:'the notes on track' + (tl.length > 1 ? 's ' : ' ') + tn, c:best.c};
 }
 function acidLine(){
+  if (tv === 'song' && view === 'tracker' && genToPhrase()) return;   // (12 Nov, owner) Alt+B on the Song / Arrange opens the block's phrase first, as GEN does
   if (view !== 'tracker' || tv !== 'phrase' || mstView()) return toast('Open a phrase first: Acid line writes a bass line into it.');
   if (busTrack(cTrack)) return busSay();
   // FIX (sweep, 4 Nov): an empty phrase is only put in the song when GENERATE writes into it, not when the panel opens
@@ -27818,6 +27906,7 @@ function phShownGo(){
   cs.song.x = s.x; cs.song.y = s.y; cTrack = s.x; return true;
 }
 function draw(){
+  if (arrSoon && !arrFast){ cancelAnimationFrame(arrSoon); arrSoon = 0; }   // a full draw this frame already shows the cursor's move
   if (view !== 'tracker') return;
   document.body.classList.toggle('tvph', tv === 'phrase');   // EDIT OFF looks apply to the Phrase screen
   if (apHold){ apDirty = true; return; }   // ARRANGE PAGING: a song command run for Arrange draws once, at its end
@@ -27825,7 +27914,9 @@ function draw(){
   if (arrPlace()) scheduleRefit(false);   // Arrange moved into (or out of) the Song screen: size the text again next frame
   if (spSync()) fit();   // SIMPLE PHRASE: on or off for this screen, so the phrase is sized again (and Arrange hides)
   pvSync();   // PATTERN VIEW: its buttons and bar, and the text size when it turns on or off
-  { const m = S.mix[dkTrack()], a = $('kMute'), b = $('kSolo'); if (a) a.classList.toggle('lt', !!(m && m.mute)); if (b) b.classList.toggle('lt', !!(m && m.solo)); }   // the pad's MUTE / SOLO show this track's state
+  { const m = S.mix[dkTrack()], a = $('kMute'), b = $('kSolo'); if (a) a.classList.toggle('lt', !!(m && m.mute)); if (b) b.classList.toggle('lt', !!(m && m.solo)); }
+  { const mu = S.mix.some(x => x && x.mute), so = S.mix.some(x => x && x.solo), a = $('kMute'), b = $('kSolo'); if (a) a.classList.toggle('any', mu); if (b) b.classList.toggle('any', so);   // (12 Nov, owner: the pad's MUTE / SOLO also light while ANY track is muted / soloed, a ring, the fill stays for this track)
+    const E = $('tSub'), cm = S.mix[cTrack]; if (E){ E.classList.toggle('msS', tv === 'phrase' && !!(cm && cm.solo)); E.classList.toggle('msM', tv === 'phrase' && !!(cm && cm.mute && !cm.solo)); } }   // the pad's MUTE / SOLO show this track's state
   phStageSwitch();   // DANCE · DRUM · KEYS · HIDE on the title line
   if (selA && selA.v !== tv) selA = null;
   // The FX target follows the track being edited: moving to another phrase (or block) moves the FX panel and the FX
@@ -30771,6 +30862,7 @@ function dkMoreDue(){ if (!dkMoreRaf) dkMoreRaf = requestAnimationFrame(dkMore);
 // A tap on an ARRANGE block goes to it (a second tap opens its phrase); holding one mutes or unmutes just
 // that block. A tap can never mute, and the track-number row is a label, so a slip cannot silence a track.
 let arrLit = [], arrSig = '', arrTap = {t:0, k:''}, arrCurY = -1;
+let arrFast = false, arrFastKey = '', arrFastN = 0, arrFastR = -1, arrSoon = 0;   // (12 Nov) a cursor move redraws Arrange without rebuilding its blocks; while a song plays, one redraw a frame
 // ARRANGE zoom (see "ARRANGE zoom" below).
 // ARR_ZOOM_BTNS: the − ○ + in the arrange header (○ = fit). Set it to false to take them away (pinch and Ctrl+wheel stay).
 const ARR_ZOOM_BTNS = true;
@@ -31009,11 +31101,15 @@ function drawArr0(PH){
   const NA = ntr(), ms = asongOn(), mx = ms || arrSideMst();   // ms: Arrange is the Song screen; mx: it shows the master column
   sxLaneSize();   // SONG EXTRAS: the section lane's width, before anything is measured
   const arRH = arrSize();
-  let lastR = -1; for (let y = 255; y >= 0; y--) if (S.song[y].some(v => v >= 0)){ lastR = y; break; }
+  // (12 Nov, owner: scrolling Arrange while a song plays lagged it) a cursor move can't change the song: it keeps the blocks built by the last full draw (the
+  // string below is ~100 KB and its compare cost ~5 ms a press on a phone) while nothing that sizes them changed and the cursor's row is inside them
+  const fkey = NA + ':' + ms + ':' + mx + ':' + arRH + ':' + polyFrom(), fast = arrFast && arrSig && fkey === arrFastKey && arrFastN >= Math.max(cs.song.y + 1, (cs.song.top || 0) + 40);
+  let lastR = fast ? arrFastR : -1; if (!fast) for (let y = 255; y >= 0; y--) if (S.song[y].some(v => v >= 0)){ lastR = y; break; }
   // (owner, 31 Oct) a steady length, so the scrollbar's thumb doesn't shrink under the mouse as it is dragged: the song and
   // 32 empty rows past its end (at least 64), more only when the cursor or the view goes further
-  const N = clamp(Math.max(lastR + 33, 64, cs.song.y + 1, (cs.song.top || 0) + 40), 1, 256);   // room to line up with the Song screen's top row
+  const N = fast ? arrFastN : clamp(Math.max(lastR + 33, 64, cs.song.y + 1, (cs.song.top || 0) + 40), 1, 256);   // room to line up with the Song screen's top row
   const play = PH || new Array(NT).fill(-1);   // the shared playhead, so Arrange lights the same rows as Song
+  if (!fast){
   const anySolo = S.mix.some(m => m.solo);
   let h = '';
   const PFg = polyFrom();   // each block carries its track's group, so the mono and poly sections take their colours
@@ -31062,6 +31158,8 @@ function drawArr0(PH){
     arrSig = sig; arrGrid.innerHTML = h; $('tArrTh').innerHTML = th; $('tArrGp').innerHTML = gp;
     arrLit = [];
   }
+  arrFastKey = fkey; arrFastN = N; arrFastR = lastR;
+  }
   // The playhead is lit in place, so the blocks are only rebuilt when the song changes, never under a finger mid-press.
   for (const e of arrLit) e.classList.remove('p', 'pl'); arrLit = [];
   play.forEach((y, t) => { if (y < 0) return; const row = arrGrid.children[y]; if (!row) return;
@@ -31077,7 +31175,7 @@ function drawArr0(PH){
   setText($('tArrSub'), (ms ? S.name + ' · ' : '') + (lastR + 1) + (lastR ? ' rows' : ' row') + (nm ? ` · ${nm} muted` : '') + (arrZoom > 1 ? ` · ${+arrZoom.toFixed(1)}×` : ''));
   { const lb = arrEl.querySelector('.tahl b'); if (lb && lb.textContent !== (ms ? 'SONG' : 'ARRANGE')) lb.textContent = ms ? 'SONG' : 'ARRANGE'; }
   // As the Song screen the grid holds whole rows only (the space left over sits under the boxes), so it never ends on half a row.
-  if (ms){ const pitch = (arrRowH() || arRH + 2) * 1.04, avail = arrAvail(), rows = Math.max(2, Math.floor((avail - 3) / pitch)), hg = Math.min(avail, Math.round(3 + rows * pitch)) + 'px';   // (×1.04: the gap every 4 rows)
+  if (fast){} else if (ms){ const pitch = (arrRowH() || arRH + 2) * 1.04, avail = arrAvail(), rows = Math.max(2, Math.floor((avail - 3) / pitch)), hg = Math.min(avail, Math.round(3 + rows * pitch)) + 'px';   // (×1.04: the gap every 4 rows)
     if (arrGrid.style.height !== hg) arrGrid.style.height = hg; }
   else if (arrGrid.style.height) arrGrid.style.height = '';
   arrSbw(); arrAlign(); arrFollowX(); arrBoxes();
@@ -31532,7 +31630,8 @@ function sxApply(d){
   if (!d.du && !d.dy) return;
   const p = sxDrop(d); if (p.err) return toast(p.err);
   const r = d.r, src = [];
-  for (let y = r.y0; y <= r.y1; y++) for (const t of p.cols){ const v = S.song[y][t]; if (v >= 0) src.push([t, y, v, t !== MT && blockMuted(S, y, t)]); }
+  let ref = 0; for (let y = r.y0; y <= r.y1; y++) for (const t of p.cols){ const v = S.song[y][t]; if (v < 0) continue; if (t !== MT && busNo(sxT(sxU(t) + d.du), v)){ ref++; continue; } src.push([t, y, v, t !== MT && blockMuted(S, y, t)]); }   // (12 Nov, owner: a block with notes stays out of a bus)
+  if (ref && !d.copy) return;   // (12 Nov, review) a MOVE with a refused block changes nothing: the block kept back sat where a neighbour was about to land and was overwritten (busNo has said why). A copy leaves its sources, so the rest still copies
   if (!src.length) return toast('Nothing to move: the selection is empty.');
   if (!d.copy) for (const [t, y] of src){ S.song[y][t] = -1; if (t !== MT) setBlockMute(y, t, false); }
   for (const [t, y, v, mu] of src){ const nt = sxT(sxU(t) + d.du), ny = y + d.dy; S.song[ny][nt] = v; if (nt !== MT) setBlockMute(ny, nt, !!mu); }
@@ -32190,7 +32289,8 @@ function pasteMix(){
   clip.d.forEach((row, j) => row.forEach((val, i) => { const x = colAt(i), y = y0 + j;
     if (val === undefined || x < 0 || (x >= dm.w && !(tv === 'song' && x === MT)) || y >= dm.h || (fxOnly && x < FX0)) return;
     const empty = kindAt(tv, x) === 'tsp' ? !getCell(tv, x, y) : getCell(tv, x, y) < 0, has = kindAt(tv, x) === 'tsp' ? !!val : val >= 0;
-    if (empty && has){ setCell(tv, x, y, val); n++; } }));
+    if (empty && has){ if (setCell(tv, x, y, val) !== false) n++; } }));
+  if (fxOnly && clip.d.some((row, j) => row.some((val, i) => { const x = colAt(i); return x >= 0 && x < FX0 && val >= 0; }))) return (toast(n ? 'Notes left out · this is a bus track' : 'A bus track takes commands, not notes · nothing pasted'), draw());   // (12 Nov, review: the FX cells it did write were not drawn)
   toast(n ? `Mix-pasted ${n} cell${n > 1 ? 's' : ''} into the empty ones` : 'Mix-paste: every cell it would fill already has something.'); draw();
 }
 /* ===== SELECTION TOOLS end ===== */
@@ -32300,10 +32400,12 @@ function mselApply(m, copy){
   const r = m.r, dx = m.dx, dy = m.dy; if (!dx && !dy) return draw();
   const D = [], mu = [];
   for (let y = r.y0; y <= r.y1; y++){ const row = [], mr = []; for (let x = r.x0; x <= r.x1; x++){ row.push(getCell(tv, x, y)); mr.push(tv === 'song' && x !== MT && blockMuted(S, y, x)); } D.push(row); mu.push(mr); }
+  const bad = (x, y, v) => tv === 'song' ? x !== MT && x < NT && v >= 0 && busNo(x, v) : tv === 'phrase' && v >= 0 && x < FX0 && busTrack(cTrack) && busNoteNo();   // NO NOTES INTO A BUS (12 Nov): refused cells stay where they were
+  if (!copy && D.some((row, j) => row.some((v, i) => bad(r.x0 + i + dx, r.y0 + j + dy, v)))) return draw();   // (12 Nov, review) a MOVE with a refused cell changes nothing: the cell kept back was overwritten by its neighbour's move (the toast has said why). A copy leaves its sources
   const vac = [];   // a move empties its cells first, then writes: UNIQUE PER TRACK must still see that this track held the block (10 Nov, owner)
-  if (!copy) for (let y = r.y0; y <= r.y1; y++) for (let x = r.x0; x <= r.x1; x++){ if (tv === 'song' && x !== MT){ const v0 = S.song[y][x]; if (v0 >= 0) vac.push([y, x, v0]); } setCell(tv, x, y, kindAt(tv, x) === 'tsp' ? 0 : -1); }
+  if (!copy) for (let y = r.y0; y <= r.y1; y++) for (let x = r.x0; x <= r.x1; x++){ if (tv === 'song' && x !== MT){ const v0 = S.song[y][x]; if (v0 >= 0) vac.push([y, x, v0]); } if (bad(x + dx, y + dy, D[y - r.y0][x - r.x0])) continue; setCell(tv, x, y, kindAt(tv, x) === 'tsp' ? 0 : -1); }
   const d = dims(tv); uniqVac = vac;
-  try { D.forEach((row, j) => row.forEach((v, i) => { const x = r.x0 + i + dx, y = r.y0 + j + dy; if (y < 0 || y >= d.h || x < 0 || (x >= d.w && x !== MT)) return;
+  try { D.forEach((row, j) => row.forEach((v, i) => { const x = r.x0 + i + dx, y = r.y0 + j + dy; if (y < 0 || y >= d.h || x < 0 || (x >= d.w && x !== MT) || bad(x, y, v)) return;
     setCell(tv, x, y, v); if (tv === 'song' && x !== MT && v >= 0) setBlockMute(y, x, !!mu[j][i]); })); } finally { uniqVac = []; }
   saveS(); draw();
   const n = m.line ? (r.y1 - r.y0 + 1) + ' line' + (r.y1 > r.y0 ? 's' : '') : mselN(r) + ' cells';
@@ -33535,6 +33637,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [569, '12 Nov', ['Arrange: moving the cursor with the arrows while a song plays no longer bogs the page down, and holding an arrow no longer lets the playhead pull the view or the cursor back.', 'STOP right after moving the cursor leaves it where you put it.', 'GEN on the Song / Arrange opens the block\u2019s phrase and the generators; on an empty cell it makes a new pattern first.', 'SEMI + / \u2212 (Alt+, Alt+.) on the Song / Arrange transpose every selected pattern once, or the one under the cursor.', 'The pad\u2019s SOLO or MUTE tapped twice quickly clears every solo and mute; soloed and muted tracks are easier to see.', 'Notes can no longer be pasted, dragged or duplicated onto a bus track.', 'Low power skins: the cursor and selected blocks stand out in Arrange.']],
   [568, '11 Nov', ['Two new skins for OLED screens: Low power (hot pink) and Low power (mustard). Same pure black and thin outlines as Low power (black), in pink and mustard with orange and rose. Turning Low power display on while on one of them keeps it; turning it off goes back to the skin you had before.']],
   [567, '11 Nov', ['Audio-thread sequencer: it makes about half as much throw-away memory while playing, so the browser stops to tidy up half as often (fewer of the rare long hiccups). The sound is the same, number for number.', 'Phone, Audio-thread sequencer: a very slow song (rows more than 3 seconds apart) no longer stops itself.']],
   [566, '11 Nov', ['Audio-thread sequencer: much lighter while a song plays. Volume, pan and pitch that are not moving are no longer worked out for every single sample (they were, whenever more notes were queued up ahead). About half the sequencer core\'s own work is gone; the sound is the same, number for number.']],
