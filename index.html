@@ -25802,6 +25802,11 @@ function cloneDown(){
   const h = r.y1 - r.y0 + 1, d0 = r.y1 + 1, src = [];
   for (let y = r.y0; y <= r.y1; y++) for (let x = r.x0; x <= r.x1; x++){ const v = getCell('song', x, y); if (v >= 0) src.push([x, y, v]); }
   if (!src.length) return toast(sel ? 'Nothing to clone in the selection.' : 'Move onto a filled block to clone it down.');
+  // EMPTY ROW AFTER CLONE DOWN (12 Nov, owner: "Pressing clone down multiple times eventually inserts an empty row"): a block with notes on a bus is refused by newBlock
+  // (build 569, busNo), but the row for its clone had already been inserted: a whole empty row, every track, and the cursor moved onto it. The refused cells now leave src
+  // first (busNo says so once, a tick later), so nothing is inserted for them; and if no clone at all gets written (no free sects) the inserted rows come out again.
+  for (let i = src.length - 1; i >= 0; i--) if (src[i][0] < NT && busNo(src[i][0], src[i][2])) src.splice(i, 1);
+  if (!src.length) return;
   if (d0 + h > 256) return toast('No room below: the song ends at row ' + rS(255, 3) + '.');
   // INSERTS (owner, 27 Oct): new song rows go in below for the clones, and the rows below move down. ONLY WHEN NEEDED
   // (owner, 2 Nov): when every cell the clones land on is empty, they are written there and nothing moves; rows go in only
@@ -25813,6 +25818,7 @@ function cloneDown(){
     const p = {x, y:d0 + y - r.y0}; newBlock(p, v);
     const id = getCell('song', p.x, p.y); if (id < 0) break; made++; lastId = id;
   }
+  if (!made){ if (clash) songRowsRemove(d0, h); return; }   // nothing written: take the rows we put in out again (newBlock has said why)
   if (sel){ selA.y += h; c.y += h; } else c.y = d0;
   saveS(); draw();
   if (made < src.length) return toast(`Cloned ${made} of ${src.length}: no free sects or phrases left.`);
