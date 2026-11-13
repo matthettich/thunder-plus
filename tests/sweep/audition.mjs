@@ -27,6 +27,23 @@ try {
   await app(page, "setView('tracker')"); await drag('r_vdrive', [520], 0); await wait(900);
   p = await plays(); say(p.length === 0, `not on the Synth page: silent (${p.length})`);
   await app(page, "setView('synth')");
+  // review round 1 (13 Nov): the edited pad keeps its identity; off cancels a queued play; held notes; a slow renderer
+  await plays();
+  await drag('r_vdrive', [530], 0); await app(page, 'select(cur === 2 ? 1 : 2)'); await wait(1200);
+  p = await plays(); say(p.length === 0, `edit, then another pad within the wait: neither pad plays (${p.length})`);
+  await app(page, 'select(8)'); await wait(600); await plays();
+  const hn = await app(page, "(() => { const a = holdNote(8, 0, 1), b = holdNote(8, 7, 1); releaseNote(b); return heldLive[8].size; })()"); await wait(200); await plays();
+  await app(page, "(() => { changed(8, true); })()"); await wait(1200);
+  p = await plays(); say(hn === 1 && p.length === 0, `two held notes, one let go: the other still blocks audition (held ${hn}, plays ${p.length})`);
+  await app(page, "(() => { for (const h of [...heldLive[8]]) releaseNote(h); })()"); await wait(900); await plays();
+  // a renderer slower than the drag: every job takes 500 ms, edits every 60 ms for 2.4 s
+  await app(page, "(() => { window.__ra = renderAsync; renderAsync = function(){ const a = arguments, t = this; return new Promise(r => setTimeout(r, 500)).then(() => window.__ra.apply(t, a)); }; })()");
+  await drag('r_vlevel', Array.from({length: 40}, (_, k) => 300 + k * 5), 60); 
+  p = await plays(); say(p.length >= 2, `a drag that outruns the renderer is heard during the drag (${p.length} plays before it ends)`);
+  await wait(2500); p = await plays(); say(p.length >= 1 && !p[p.length - 1].stale, `…and the last play is the final render (${p.length} more)`);
+  await drag('r_vlevel', [640], 0); await wait(250); await page.click('#vAud'); await wait(1800);
+  p = await plays(); say(p.length === 0, `Audition turned off while a play waits on a render: silent (${p.length})`);
+  await page.click('#vAud'); await app(page, "(() => { renderAsync = window.__ra; })()"); await wait(800); await app(page, 'select(0)'); await wait(600);
   // STALE WAVE: a pad with no render
   const meta = await page.evaluate(() => window.__seqTest.ev("(() => { const j = cur === 3 ? 4 : 3; cache[j] = null; dirty[j] = true; const bg = bgRender; cur = j; drawWave(); return $('wMeta').textContent; })()"));
   say(/rendering/.test(meta) && !/peak/.test(meta), `a pad with no render yet: "${meta}"`);

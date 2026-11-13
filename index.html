@@ -8764,18 +8764,26 @@ function bgRender(i){
   renderAsync(v, sr, isSyn(i) ? v.len : 0, true).then(r => {
     pend[i] = false;
     if (kit.voices[i] !== v || (padRev[i] || 0) !== r0){ if (stale(i)) bgRender(i); return; }   // another kit, or rendered here meanwhile
-    if (dirty[i] || padSR() !== sr || padBpm(i) !== tb){ dirty[i] = true; bgRender(i); return; }   // edited meanwhile: go again
+    if (dirty[i] || padSR() !== sr || padBpm(i) !== tb){
+      // AUDITION: a drag that outruns the renderer (a phone) is still heard: this render is a moment of that drag, so
+      // when an audition is waiting on this pad it is installed and played, and the renderer goes again for the rest
+      if (audWait.has(i) && padSR() === sr && padBpm(i) === tb){
+        install(i, {sr, bpm:tb, data:r.data, data2:r.data2 || null, st:new Map(r.st.map(([k, pk]) => [v.fx[k], pk]))});
+        audWait.delete(i); playOnRender.delete(i);
+        if (i === cur && view === 'synth'){ try { drawWave(); } catch(e){} try { play(i); } catch(e){} }
+      }
+      dirty[i] = true; bgRender(i); return; }   // edited meanwhile: go again
     install(i, {sr, bpm:tb, data:r.data, data2:r.data2 || null, st:new Map(r.st.map(([k, pk]) => [v.fx[k], pk]))});
     rendered(i);
   }, () => { pend[i] = false; if (kit.voices[i] === v){ dirty[i] = true; ensure(i); rendered(i); } });
 }
 // A fresh render arrived for pad i: show it if it's the one on screen.
-function rendered(i){ if (i === cur && view === 'synth'){ try { drawWave(); } catch(e){} } if (playOnRender.delete(i)) try { play(i); } catch(e){} }
+function rendered(i){ if (i === cur && view === 'synth'){ try { drawWave(); } catch(e){} } audWait.delete(i); if (playOnRender.delete(i)) try { play(i); } catch(e){} }
 // Play a pad once its render is current: after Random (or any edit) the cached render is still the old sound, so
 // playing at once played what you just replaced. If the Worker is on it, wait for it; otherwise render here and play.
 const playOnRender = new Set();
 function playFresh(i){
-  clearTimeout(audT); audT = 0;   // AUDITION: this play covers the edit that asked for it (Random, a preset)
+  clearTimeout(audT); audT = 0; audWait.delete(i);   // AUDITION: this play covers the edit that asked for it (Random, a preset)
   const v = kit.voices[i]; if (!v) return;
   if (PW.ready && rwCan(v) && (stale(i) || slotAt(pend, i))){ playOnRender.add(i); bgRender(i); } else play(i);
 }
@@ -8785,20 +8793,24 @@ function playFresh(i){
 // every AUD_MAX ms. Off with the Audition button by Play (kept per device). Never before the first touch or key
 // (start-up edits are not the player's), and never over a note the player is holding on that slot.
 const AUD_K = 'thunderplus-audition-v1', AUD_WAIT = 140, AUD_MAX = 420;
-let audOn = (() => { try { return localStorage.getItem(AUD_K) !== '0'; } catch(e){ return true; } })(), audT = 0, audT0 = 0;
+let audOn = (() => { try { return localStorage.getItem(AUD_K) !== '0'; } catch(e){ return true; } })(), audT = 0, audT0 = 0, audI = -1;
+const audWait = new Set();     // pads whose queued play (playOnRender) was asked for by an audition, not by the player
+const heldLive = [];           // per slot: the notes the player is holding right now (keys, MIDI, a held pad)
+function audDrop(){ clearTimeout(audT); audT = 0; for (const i of audWait) playOnRender.delete(i); audWait.clear(); }
 function audition(i){
   if (!audOn || view !== 'synth' || i !== cur) return;
+  audI = i;
   try { if (navigator.userActivation && !navigator.userActivation.hasBeenActive) return; } catch(e){}
   const now = performance.now(); if (!audT) audT0 = now;
   clearTimeout(audT); audT = setTimeout(audFire, Math.max(0, Math.min(AUD_WAIT, audT0 + AUD_MAX - now)));
 }
 function audFire(){
-  audT = 0; const i = cur;
-  if (!audOn || view !== 'synth' || !kit.voices[i]) return;
-  const h = synHeld[i]; if (h && !h.done && playing[i] !== h) return;   // a held key or MIDI note: leave it sounding
-  try { playFresh(i); } catch(e){}
+  audT = 0; const i = audI;
+  if (!audOn || view !== 'synth' || i !== cur || !kit.voices[i]) return;   // the pad that was edited, and only while it is still the one on screen
+  if (heldLive[i] && heldLive[i].size) return;   // held keys or MIDI notes (any of them, on a polyphonic pad): leave them sounding
+  try { playFresh(i); if (playOnRender.has(i)) audWait.add(i); } catch(e){}
 }
-function audSet(on){ audOn = !!on; if (!audOn){ clearTimeout(audT); audT = 0; } try { localStorage.setItem(AUD_K, audOn ? '1' : '0'); } catch(e){} audUpd(); }
+function audSet(on){ audOn = !!on; if (!audOn) audDrop(); try { localStorage.setItem(AUD_K, audOn ? '1' : '0'); } catch(e){} audUpd(); }
 function audUpd(){ const b = $('vAud'); if (!b) return; b.classList.toggle('on', audOn); b.setAttribute('aria-pressed', audOn ? 'true' : 'false'); }
 // The pad on screen: drawn now from what there is, brought up to date in the background.
 function showCur(){ if (PW.ready && (stale(cur) || slotAt(pend, cur))){ bgRender(cur); drawWave(); } else { ensure(cur); drawWave(); } }   // bgRender does nothing while a job is out
@@ -8892,7 +8904,7 @@ function padTrack(i, src, g){ let s = padSrcs[i]; if (!s) s = padSrcs[i] = new S
 function hushPad(i){
   const s = padSrcs[i]; if (!s || !ctx) return; const t = ctx.currentTime;
   for (const o of s){ try { o.g.gain.cancelScheduledValues(t); o.g.gain.setValueAtTime(o.g.gain.value, t); o.g.gain.setTargetAtTime(0, t, 0.008); o.src.stop(t + 0.06); } catch(e){} }
-  s.clear(); if (synHeld[i]){ synHeld[i].done = true; synHeld[i] = null; } if (playing[i]) playing[i] = null;
+  s.clear(); if (synHeld[i]){ synHeld[i].done = true; synHeld[i] = null; } if (playing[i]) playing[i] = null; if (heldLive[i]) heldLive[i].clear();
 }
 function stopVoice(i){
   const p = playing[i]; if (!p) return; playing[i] = null;
@@ -8930,11 +8942,12 @@ function holdNote(i, semis, vel = 1){
   if (from != null){ src.playbackRate.setValueAtTime(from, t); src.playbackRate.linearRampToValueAtTime(r, t + gl); } else src.playbackRate.value = r;
   g.gain.value = vel;
   src.connect(g); g.connect(padOut()); src.start(); padTrack(i, src, g); flash(i); vuHit(i, r, vel); synMeterOn();
-  const h = {src, g, i, rate:r, vel, done:false}; synHeld[i] = h; return h;
+  const h = {src, g, i, rate:r, vel, done:false}; synHeld[i] = h; (heldLive[i] || (heldLive[i] = new Set())).add(h); src.addEventListener('ended', () => { if (heldLive[i]) heldLive[i].delete(h); }); return h;
 }
 function releaseNote(h, at){
   if (!h || h.done) return; h.done = true;
   if (synHeld[h.i] === h) synHeld[h.i] = null;
+  if (heldLive[h.i]) heldLive[h.i].delete(h);
   const t = Math.max(at || 0, ctx.currentTime), rel = relOf(kit.voices[h.i]);
   try { h.g.gain.cancelScheduledValues(t); h.g.gain.setValueAtTime(h.g.gain.value, t); h.g.gain.setTargetAtTime(0, t, rel / 4.6); h.src.stop(t + rel * 1.6 + 0.05); } catch(e){}
 }
@@ -13567,7 +13580,7 @@ function renderPads(){
   });
 }
 function flash(i){ audioWake = performance.now(); const p = padEls[i].p; p.classList.add('hit'); setTimeout(() => p.classList.remove('hit'), 90); }
-function select(i){ if (i === cur) return; cur = i; refreshAll(); }
+function select(i){ if (i === cur) return; audDrop(); cur = i; refreshAll(); }   // audDrop: an audition waiting on the pad before must not play this one
 const padHeld = [];
 function padPress(i, held){
   // select first: a pad that fails to sound (no audio yet, a render error) is still picked for editing
