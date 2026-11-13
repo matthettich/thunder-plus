@@ -15,7 +15,7 @@ test('mobile header: TRANSP hides only in body.mob.inpad, and the pad SEMI keys 
 });
 
 let PW = process.env.PLAYWRIGHT || ['/opt/npm-tools/node_modules/playwright/index.mjs', '/opt/node-tools/node_modules/playwright/index.mjs'].find(f => fs.existsSync(f));
-test('mobile header: in a real page TRANSP is hidden in Mobile PAD only, the group sits in the tab row, nothing scrolls', { skip: !PW || !fs.existsSync('/usr/bin/google-chrome') && 'no Playwright / Chrome here' }, async () => {
+test('mobile header: in a real page TRANSP is hidden in Mobile PAD only, the group sits in the tab row, nothing scrolls', { skip: !process.env.TP_BROWSER_TESTS ? 'opt-in: TP_BROWSER_TESTS=1 (boots Chrome several times, about a minute; kept out of npm test so it stays quick and steady)' : !PW || !fs.existsSync('/usr/bin/google-chrome') && 'no Playwright / Chrome here' }, async () => {
   process.env.PLAYWRIGHT = PW;
   const { boot, app } = await import('./sweep/ui-lib.mjs');
   const vis = id => app0.page.evaluate(i => { const e = document.getElementById(i); return !!(e && e.offsetParent); }, id);
