@@ -26691,7 +26691,7 @@ function press(b, fromKey){
   const l = takeLatch();
   dirPress(b, l);
   clearTimeout(rep);
-  if (!fromKey) rep = setTimeout(function r(){ dirPress(b, l); rep = setTimeout(r, 70); }, 330);
+  if (!fromKey) rep = setTimeout(function r(){ workT = arrActT = performance.now(); dirPress(b, l); rep = setTimeout(r, 70); }, 330);   // (12 Nov, owner: ▼ held in Arrange while playing, the cursor ran off the bottom) only the first press started FOLLOW's and Arrange's 4 s hold, so after it the playhead paged the view back (FOLLOW ON) or FOLLOW PATTERN pulled the cursor to the playhead: every repeat of a held arrow is hands-on again, as a tap is (the window's pointerdown)
 }
 function release(b, fromKey){
   if (b === 'save'){ clearTimeout(rep); return; }
