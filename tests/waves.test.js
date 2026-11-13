@@ -64,7 +64,9 @@ function renderModule(D, type, over) {
 }
 const finite = a => { for (const v of a) if (!Number.isFinite(v)) return false; return true; };
 const energy = a => { let e = 0; for (const v of a) e += v * v; return e; };
-const SKIP = new Set(['hostIn', 'out']);
+// lverb (Lite reverb) is not rendered here: its golden hashes are in chains-modules.json and tests/lverb.test.js tests the shared code (and checks the waves copy is identical).
+// Rendering it here would also move every later module's hash: the hashes depend on how many renders came before them in this one wasm instance (found 12 Nov).
+const SKIP = new Set(['hostIn', 'out', 'lverb']);
 /* Modules that are silent in this harness, and why. A silent hash proves "unchanged", not "working", so the list is explicit. */
 const NEEDS_OWN_INPUT = new Set(['beads', 'mixer']);   // beads: a texture source that needs its own trigger/input; mixer: needs in1..in16, not `in`
 

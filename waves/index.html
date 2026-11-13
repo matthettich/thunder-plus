@@ -543,6 +543,9 @@ Object.assign(SHARED_MODULES, {
   plate:Object.assign({ label:'Plate reverb', scope:'mono', params:{ size:[.7,.2,1,.01], decay:[.6,0,.97,.01], damp:[.4,0,1,.01], pre:[.01,0,.25,.001], mod:[.3,0,1,.01], mix:[.3,0,1,.01] },
     ui:Object.assign({ size:{l:'Size', f:pct}, decay:{l:'Decay', f:pct}, damp:{l:'Damping', f:pct}, pre:{l:'Pre-delay', f:secs}, mod:{l:'Motion', f:pct} }, MIXP),
     about:'Plate reverb: the bright, dense studio plate (the classic figure-eight tank design). Size scales it, Decay sets its length, Damping darkens the tail, Pre-delay holds it back from the dry sound and Motion gently moves it.' }, STEREO),
+  lverb:Object.assign({ label:'Lite reverb', scope:'mono', params:{ size:[.5,0,1,.01], decay:[.5,0,1,.01], tone:[.6,0,1,.01], pre:[0,0,.1,.001], mix:[.3,0,1,.01] },
+    ui:Object.assign({ size:{l:'Size', f:pct}, decay:{l:'Decay', f:v => (.2 * Math.pow(60, v)).toFixed(1) + ' s'}, tone:{l:'Tone', f:pct}, pre:{l:'Pre-delay', f:secs} }, MIXP),
+    about:'Lite reverb: a very cheap room and plate-ish reverb (a small four-line feedback network) for using on many tracks at once. Size is the room, Decay the length of the tail (RT60), Tone how bright it stays, Pre-delay holds it back from the dry sound. It does no work at all while it is silent.' }, STEREO),
   ensemble:Object.assign({ label:'Ensemble', scope:'mono', params:{ mode:[0,0,3,1], rate:[.5,0,1,.01], depth:[.5,0,1,.01], tone:[.7,0,1,.01], mix:[.5,0,1,.01] },
     ui:Object.assign({ mode:{l:'Mode', c:opts(['Ensemble','Classic I','Classic II','Classic I+II'])}, rate:{l:'Rate', f:spct}, depth:{l:'Depth', f:pct}, tone:{l:'Tone', f:pct} }, MIXP),
     about:'Ensemble: a lush chorus. Ensemble spreads three voices around the stereo field with a little shimmer, like a string machine; Classic I, II and I+II are the wide two-speed chorus of 80s polysynths. Rate and Depth scale whichever you pick.' }, STEREO),
@@ -575,7 +578,7 @@ Object.assign(SHARED_MODULES, {
       detune:{l:'Detune', f:v => '±' + v.toFixed(1) + ' ct'}, delay:{l:'Delay', f:secs}, win:{l:'Window', f:pct}, dry:{l:'Dry', f:pct} },
     about:'Harmonizer: up to two pitch-shifted copies of the sound at fixed intervals (a third, fifth, octave…), each with its own level and pan. Voice 2 starts silent: turn up Level 2 for a three-part stack (a major triad with the defaults). Detune spreads the two voices apart (set both to Unison with a little Detune and Delay for a wide double). Window: longer is smoother, shorter is tighter on drums. Dry sets the original.' }, STEREO)
 });
-Object.assign(SHARED_FAMILY, { meter:'util', limiter:'util', utility:'util', ringmod:'afx', spring:'afx', plate:'afx', ensemble:'afx',
+Object.assign(SHARED_FAMILY, { meter:'util', limiter:'util', utility:'util', ringmod:'afx', spring:'afx', plate:'afx', lverb:'afx', ensemble:'afx',
   reson:'afx', degrade:'afx', blipdrum:'gen', life:'mod', dimension:'afx', bbd:'afx', harm:'afx', phaser:'afx', width:'afx', pingpong:'afx', blades:'util', meta:'afx', math:'mod', logic:'mod', divider:'mod', euclid:'mod',
   envfol:'mod', gateex:'mod', pitchfol:'mod', pitchtrk:'mod', slew:'util', snh:'util', quant:'util' });
 const SHARED_PORT_LABEL = { note:'Note', trig:'Trig', env:'Env', car:'Carrier', freq:'Freq', a:'A', b:'B', sum:'A+B', diff:'A−B', mul:'A×B', min:'Min', max:'Max',
@@ -584,7 +587,7 @@ const SHARED_PORT_LABEL = { note:'Note', trig:'Trig', env:'Env', car:'Carrier', 
    A module already in the palette is left where it is. */
 const SHARED_PALETTE = [
   ['Effects', [['reson','Resonator (chord)'],['degrade','Degrade (lo-fi)'],['dimension','Dimension (stereo chorus)'],['bbd','BBD delay'],['harm','Harmonizer'],['ringmod','Ring mod'],['ensemble','Ensemble chorus'],['phaser','Phaser'],['pingpong','Ping-pong delay'],['meta','Meta modulator'],['beads','Beads']], 'audio'],
-  ['Reverbs', [['spring','Spring reverb'],['plate','Plate reverb'],['room','Room reverb'],['space','Space reverb']], 'audio'],
+  ['Reverbs', [['spring','Spring reverb'],['plate','Plate reverb'],['lverb','Lite reverb'],['room','Room reverb'],['space','Space reverb']], 'audio'],
   ['More effects', [['comb','Comb resonator'],['transient','Transient shaper'],['tgate','Trance gate'],['ott','Multiband squash'],['fshift','Frequency shifter'],['vinyl','Vinyl'],['dub','Dub tape'],['cab','Speaker cab'],['tube','Tube'],['flanger','Flanger'],['tremolo','Tremolo'],['odrive','Overdrive'],['folder','Wavefolder'],['autowah','Auto-wah'],['pshift','Pitch shifter'],['ladder','Ladder filter'],['xmod','Cross-mod'],['lofi','Lo-fi'],['drive','Drive'],['air','Air']], 'audio'],
   ['Filters and amps', [['blades','Blades filter']], 'audio'],
   ['Utilities', [['meter','Meter (VU)'],['limiter','Limiter'],['utility','Utility (gain, pan)']], 'audio'],
@@ -1015,7 +1018,7 @@ const PAL_LAYOUT = [
   ['Drive and lo-fi', '#d23c3c', ['saturation', 'odrive', 'drive', 'tube', 'folder', 'cab', 'crush', 'lofi', 'degrade', 'tape', 'vinyl', 'dub']],
   ['Modulation effects', '#c04ab8', ['chorus', 'ensemble', 'dimension', 'flanger', 'phaser', 'tremolo', 'autopan', 'rotary', 'ringmod', 'xmod', 'fshift', 'meta']],
   ['Delays', '#3a8ee0', ['sdelay', 'delay', 'pingpong', 'bbd', 'gdelay', 'pdelay', 'reverse']],
-  ['Reverbs', '#4a55c8', ['reverb', 'room', 'plate', 'spring', 'space', 'preverb', 'convolve']],
+  ['Reverbs', '#4a55c8', ['reverb', 'room', 'plate', 'lverb', 'spring', 'space', 'preverb', 'convolve']],
   ['Resonators', '#8a9a1a', ['comb', 'reson', 'rings']],
   ['Pitch and voice', '#e0609a', ['pshift', 'harm', 'autotune', 'vocoder']],
   ['Granular and spectral', '#9a6ad6', ['clouds', 'beads', 'spectral', 'stretch']],
@@ -1143,6 +1146,7 @@ const MODULE_USE = {
   reverb:'On a pad: Size large, Mix around 30% for a huge, lush wash; lower Brightness so it sits behind the dry sound.',
   room:'On drums or an instrument that sounds too dry: Size small, Wet around 15% to place it in a believable room.',
   plate:'On a snare or vocal: Decay around 1.5 s, Pre-delay 20 ms, a little Damping and Mix 20% for the classic bright studio plate.',
+  lverb:'On several tracks at once: Size and Decay low for a small room, Mix around 20%. It is the cheapest reverb here, and silent it costs almost nothing.',
   spring:'On a guitar or a dub snare: Chirp up, Decay around 2 s, Mix 30% for the boingy surf and dub spring sound.',
   space:'On a pad, pluck or ambient lead: Size and Decay high, Modulation up, Low cut on, Mix 35% for a vast, shimmering hall.',
   preverb:'On a pad or guitar: Mode Shimmer, Pitch +12, Mix 40% for a glowing tail that keeps rising.',
