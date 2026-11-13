@@ -1242,6 +1242,102 @@ const Plate = {
   }
 };
 
+/* Lite reverb: a very cheap room / plate-ish reverb, written to cost a small fraction of the others and to port to C++
+   unchanged (plain float math, power-of-two ring buffers, integer delays, no per-sample sin / exp / pow, no allocation
+   after create()).  Structure: mono sum → pre-delay → 2 Schroeder all-passes (diffusion) → a 4-line feedback delay
+   network (Householder mix y = x − ½Σx, which is orthogonal, so the loop only ever loses energy through the per-line
+   gain g < 1 and the per-line one-pole damping) → decorrelated stereo taps (L = r0+r1−r2−r3, R = r0−r1+r2−r3).
+   - Size scales the 4 prime-ish base lengths (made odd, so no two share a factor 2); Decay is the low-frequency RT60 (0.2 s … 12 s; damping shortens the highs, so the broadband T20-measured RT60 is about 0.75 of it),
+     g_i = exp(−6.9078·len_i / (sr·RT60)); Tone is the damping cutoff (1.2 kHz … 14 kHz); Pre is the pre-delay (≤ 100 ms).
+   - Per block (not per sample): targets are recomputed only when a knob or the sample rate changed (the exp / pow live
+     there), g / damping / mix glide to them (one-pole, 4 blocks), and a changed delay length is crossfaded across that
+     block from the old read position to the new one, so moving Size or Pre never clicks (and costs nothing otherwise).
+   - Denormals: ±1e-18 alternating (no DC) is injected into every line, so nothing decays into the denormal range; no
+     per-sample branch for it.  The input is guarded (±8, NaN → 0); the wet output is clamped to ±4; state that goes
+     non-finite or huge at the end of a block is cleared.
+   - Silence: when the input has been below −140 dB and the wet output below −90 dB for two passes of the longest line,
+     the buffers are cleared once and the module only copies the dry sound (plus a peak scan of the input) until sound
+     returns.  Any block length works (the ramp is over ctx.block). */
+const LV = { base:[1423, 1709, 2017, 2411], ap:[142, 107], apg:.6, tail:3.2e-5, wake:1e-7 };   // line lengths at 48 kHz, Size 1; the all-passes; −90 dB; −140 dB
+const lvPow2 = n => { let p = 256; while (p < n) p <<= 1; return p; };
+const Lverb = {
+  type:'lverb', scope:'mono', cost:.06,
+  inputs:{ in:'audio', inR:'audio' }, outputs:{ out:'audio', outR:'audio' },
+  params:{ size:[.5,0,1,.01], decay:[.5,0,1,.01], tone:[.6,0,1,.01], pre:[0,0,.1,.001], mix:[.3,0,1,.01] },
+  create(sr){
+    const k = Math.max(sr, 96000) / 48000, n = lvPow2(Math.ceil(2411 * k) + 8), pn = lvPow2(Math.ceil(.1 * Math.max(sr, 96000)) + 8), an = lvPow2(Math.ceil(142 * k) + 8);
+    return { sr:0, ps:-1, pd:-1, pt:-1, pp:-1, m:n - 1, pm:pn - 1, am:an - 1, w:0, pw:0, aw:0, B:[0, 1, 2, 3].map(() => new Float32Array(n)), P:new Float32Array(pn), A:[new Float32Array(an), new Float32Array(an)],
+      len:new Int32Array(4), lenT:new Int32Array(4), g:new Float64Array(4), gT:new Float64Array(4), lp:new Float64Array(4), kd:.5, kdT:.5, pre:0, preT:0, apk:new Int32Array(2),
+      dg:1, wg:0, q:0, qmax:0, asleep:false, init:false };
+  },
+  process(st, io, ctx){
+    const p = io.p, L = io.in.in, R = inR(io), oL = io.out.out, oR = io.out.outR, N = ctx.block, sr = ctx.sr, m = st.m, pm = st.pm, am = st.am;
+    const [dgT, wgT] = rvMix(p.mix, RVO);
+    // ── targets: only when a knob or the sample rate changed
+    if (p.size !== st.ps || p.decay !== st.pd || p.tone !== st.pt || p.pre !== st.pp || sr !== st.sr){
+      const k = sr / 48000, sc = (.15 + .85 * clamp(p.size, 0, 1)) * k, rt = .2 * Math.pow(60, clamp(p.decay, 0, 1)), lim = m - 2;
+      for (let i = 0; i < 4; i++){
+        const l = Math.min(lim, (Math.round(LV.base[i] * sc) | 1)); st.lenT[i] = l;
+        st.gT[i] = Math.min(.9995, Math.exp(-6.9078 * l / (sr * rt)));   // −60 dB after RT60 seconds
+      }
+      st.kdT = 1 - Math.exp(-6.2832 * 1200 * Math.pow(11.7, clamp(p.tone, 0, 1)) / sr);
+      st.preT = Math.min(pm - 2, Math.round(clamp(p.pre, 0, .1) * sr));
+      if (sr !== st.sr){ st.apk[0] = Math.round(LV.ap[0] * k); st.apk[1] = Math.round(LV.ap[1] * k); }
+      st.qmax = 2 * st.lenT[3] + st.preT;
+      st.ps = p.size; st.pd = p.decay; st.pt = p.tone; st.pp = p.pre; st.sr = sr;
+      if (!st.init){ st.init = true; st.len.set(st.lenT); st.g.set(st.gT); st.kd = st.kdT; st.pre = st.preT; st.dg = dgT; st.wg = wgT; }
+    }
+    // ── glide the few coefficients, per block
+    st.dg += (dgT - st.dg) * .35; st.wg += (wgT - st.wg) * .35;
+    const B = st.B, B0 = B[0], B1 = B[1], B2 = B[2], B3 = B[3], PB = st.P, A0 = st.A[0], A1 = st.A[1], lp = st.lp, g = st.g, len = st.len, lenT = st.lenT;
+    const dg = st.dg, wg = st.wg;
+    if (st.asleep){   // nothing in the tank: copy the dry sound, wake when sound returns
+      let pk = 0; for (let i = 0; i < N; i++){ let a = L[i], b = R[i]; a = a > -8 && a < 8 ? a : 0; b = b > -8 && b < 8 ? b : 0; oL[i] = a * dg; oR[i] = b * dg; const x = (a < 0 ? -a : a) + (b < 0 ? -b : b); if (x > pk) pk = x; }
+      if (pk >= LV.wake) st.asleep = false;   // sound: wake, and run this block again below with the tank (cleared) and the sound
+      else return;
+    }
+    for (let i = 0; i < 4; i++) g[i] += (st.gT[i] - g[i]) * .35;
+    st.kd += (st.kdT - st.kd) * .35;
+    const g0 = g[0], g1 = g[1], g2 = g[2], g3 = g[3], kd = st.kd, k0 = st.apk[0], k1 = st.apk[1], ag = LV.apg;
+    // a changed length is read at its old and new position across this block (fd), the pre-delay likewise
+    const o0 = len[0], o1 = len[1], o2 = len[2], o3 = len[3], n0 = lenT[0], n1 = lenT[1], n2 = lenT[2], n3 = lenT[3], po = st.pre, pn = st.preT;
+    const fd = o0 !== n0 || o1 !== n1 || o2 !== n2 || o3 !== n3 || po !== pn, iN = 1 / N;
+    let w = st.w, pw = st.pw, aw = st.aw, lp0 = lp[0], lp1 = lp[1], lp2 = lp[2], lp3 = lp[3], dn = 1e-18, ipk = 0, opk = 0;
+    for (let i = 0; i < N; i++){
+      let dl = L[i], dr = R[i]; dl = dl > -8 && dl < 8 ? dl : 0; dr = dr > -8 && dr < 8 ? dr : 0;   // guarded: NaN / Infinity / huge → 0 (±8 kept)
+      const a = (dl + dr) * .5, aa = a < 0 ? -a : a; if (aa > ipk) ipk = aa;
+      PB[pw & pm] = a;
+      let x = PB[(pw - pn) & pm], r0 = B0[(w - n0) & m], r1 = B1[(w - n1) & m], r2 = B2[(w - n2) & m], r3 = B3[(w - n3) & m];
+      if (fd){   // fade from the old read positions to the new ones
+        const u = (i + 1) * iN, v = 1 - u;
+        x = x * u + PB[(pw - po) & pm] * v; r0 = r0 * u + B0[(w - o0) & m] * v; r1 = r1 * u + B1[(w - o1) & m] * v;
+        r2 = r2 * u + B2[(w - o2) & m] * v; r3 = r3 * u + B3[(w - o3) & m] * v;
+      }
+      pw++;
+      // input diffusion: two Schroeder all-passes (y = −g·x + d; d ← x + g·y)
+      let y = -ag * x + A0[(aw - k0) & am]; A0[aw & am] = x + ag * y; x = y;
+      y = -ag * x + A1[(aw - k1) & am]; A1[aw & am] = x + ag * y; x = y;
+      aw++;
+      // Householder mix, line gain, one-pole damping, back into the line with the input and the denormal guard
+      const s = (r0 + r1 + r2 + r3) * .5, inj = x * .5 + dn; dn = -dn;
+      lp0 += ((r0 - s) * g0 - lp0) * kd; lp1 += ((r1 - s) * g1 - lp1) * kd; lp2 += ((r2 - s) * g2 - lp2) * kd; lp3 += ((r3 - s) * g3 - lp3) * kd;
+      B0[w & m] = lp0 + inj; B1[w & m] = lp1 + inj; B2[w & m] = lp2 + inj; B3[w & m] = lp3 + inj; w++;
+      // decorrelated stereo taps (orthogonal combinations of the four lines), clamped
+      let yl = (r0 + r1 - r2 - r3) * .75, yr = (r0 - r1 + r2 - r3) * .75;
+      yl = yl > 4 ? 4 : yl < -4 ? -4 : yl; yr = yr > 4 ? 4 : yr < -4 ? -4 : yr;
+      const al = yl < 0 ? -yl : yl, ar = yr < 0 ? -yr : yr; if (al > opk) opk = al; if (ar > opk) opk = ar;
+      oL[i] = dl * dg + yl * wg; oR[i] = dr * dg + yr * wg;   // REVERB MIX
+    }
+    st.w = w & m; st.pw = pw & pm; st.aw = aw & am; lp[0] = lp0; lp[1] = lp1; lp[2] = lp2; lp[3] = lp3;
+    len.set(lenT); st.pre = pn;
+    if (!(lp0 > -1e3 && lp0 < 1e3 && lp1 > -1e3 && lp1 < 1e3 && lp2 > -1e3 && lp2 < 1e3 && lp3 > -1e3 && lp3 < 1e3)){   // went bad: start clean
+      lp.fill(0); B0.fill(0); B1.fill(0); B2.fill(0); B3.fill(0); PB.fill(0); A0.fill(0); A1.fill(0); st.q = 0; return;
+    }
+    st.q = ipk < LV.wake && opk < LV.tail ? st.q + N : 0;
+    if (st.q >= st.qmax){ lp.fill(0); B0.fill(0); B1.fill(0); B2.fill(0); B3.fill(0); PB.fill(0); A0.fill(0); A1.fill(0); st.q = 0; st.asleep = true; }
+  }
+};
+
 /* Ensemble: a lush chorus. Ensemble runs three voices around the stereo field with a little fast shimmer;
    Classic I, II and I+II are the two-speed bucket-brigade chorus of 80s polysynths. Rate and Depth scale it. */
 const ENS = [[.6, .5, 3], [.513, .35, 2], [.863, .35, 2], [9.75, .12, 2]];
@@ -4855,7 +4951,7 @@ const SHARED_MODULES = { beads:Beads,
   flanger:FlangerFx, tremolo:TremoloFx, odrive:OdriveFx, folder:FolderFx, autowah:AutowahFx, pshift:PshiftFx, ladder:LadderFx, xmod:XmodFx, space:SpaceFx, lofi:LofiFx, drive:DriveFx, air:AirFx, room:RoomFx,
   comb:CombFx, transient:TransientFx, tgate:TgateFx, ott:OttFx, fshift:FshiftFx, vinyl:VinylFx, dub:DubFx, cab:CabFx, tube:TubeFx,
   envfol:EnvFol, gateex:GateEx, pitchfol:PitchFol, pitchtrk:PitchTrk, slew:Slew, snh:SampleHold, quant:Quant, blades:Blades, meta:Meta, phaser:Phaser, width:Width, pingpong:PingPong,
-  meter:Meter, limiter:Limiter, utility:Utility, ringmod:RingMod, spring:Spring, plate:Plate, ensemble:Ensemble, math:MathM, logic:Logic, divider:Divider, euclid:Euclid,
+  meter:Meter, limiter:Limiter, utility:Utility, ringmod:RingMod, spring:Spring, plate:Plate, lverb:Lverb, ensemble:Ensemble, math:MathM, logic:Logic, divider:Divider, euclid:Euclid,
   dimension:Dimension, bbd:BBD, harm:Harmonizer, blipdrum:BlipDrum, life:Life, degrade:Degrade, reson:Reson,
   flex:FlexM, sgate:StepGateM, retrig:RetrigM, pdelay:PDelayM, preverb:PReverbM,
   spectral:Spectral, stretch:XStretch, convolve:Convolve,

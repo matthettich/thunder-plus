@@ -4404,6 +4404,12 @@ const MODFX = {
     ['pre', 'Pre-delay', 'lin', 0, 0.25, 0.01, v => Math.round(v * 1000) + ' ms'],
     ['mod', 'Motion', 'lin', 0, 1, 0.3, v => Math.round(v * 100) + '%'],
     ['mix', 'Mix', 'lin', 0, 1, 0.3, v => Math.round(v * 100) + '% wet']]},
+  lverb:{name:'Lite reverb', short:'LITE', long:'Lite reverb: a very cheap room / plate reverb, a four-line feedback network that costs a fraction of the others and sleeps when silent (Thunder original)', tail:true, pad:true, track:true, group:'Reverbs', credit:'Thunder original', ps:[
+    ['size', 'Size', 'lin', 0, 1, 0.5, v => Math.round(v * 100) + '%'],
+    ['decay', 'Decay', 'lin', 0, 1, 0.5, v => (0.2 * Math.pow(60, v)).toFixed(1) + ' s'],
+    ['tone', 'Tone', 'lin', 0, 1, 0.6, v => Math.round(v * 100) + '%'],
+    ['pre', 'Pre-delay', 'lin', 0, 0.1, 0, v => Math.round(v * 1000) + ' ms'],
+    ['mix', 'Mix', 'lin', 0, 1, 0.3, v => Math.round(v * 100) + '% wet']]},
   ensemble:{name:'Ensemble chorus', short:'ENSM', long:'Ensemble: a lush three-voice string-machine chorus, or the wide two-speed chorus of 80s polysynths (Thunder original)', tail:false, pad:true, track:true, group:'Modulation', credit:'Thunder original', ps:[
     ['mode', 'Mode', 'opt', 0, 3, 0, ['Ensemble', 'Classic I', 'Classic II', 'Classic I+II']],
     ['rate', 'Rate', 'lin', 0, 1, 0.5, v => (v > .5 ? '+' : '') + Math.round((v - .5) * 200) + '%'],
@@ -18739,7 +18745,7 @@ function pumpLatTxt(t, k){
 // each group (FXT_FIRST), then the rest in the old order. The slot picker shows the group names as headings; a slot
 // keeps its effect by name, so the order can change freely.
 const FXT_FIRST = ['pstrip', 'compressor', 'pcomp', 'limiter', 'ngate', 'eq', 'peq', 'filter', 'cut', 'drive', 'odrive', 'density', 'chorus', 'flanger', 'phaser', 'tremolo', 'autopan',
-  'sdelay', 'delay', 'room', 'plate', 'reverb', 'pshift', 'pump', 'utility', 'width'];
+  'sdelay', 'delay', 'room', 'plate', 'lverb', 'reverb', 'pshift', 'pump', 'utility', 'width'];
 const fxtGroup = k => (MODFX[k] && MODFX[k].group) || FX_GROUP[k] || 'More';
 const FXT_LIST = (() => {
   const all = ['eq', 'comp', 'reverb', 'delay', 'pdelay', 'preverb', 'density', 'tape', 'chorus', 'crush', 'degrade', 'reson', 'rings', 'clouds', 'beads', 'flanger', 'phaser', 'tremolo', 'odrive', 'folder', 'autowah', 'pshift', 'ladder', 'xmod', 'space', 'lofi', 'drive', 'air', 'room', 'comb', 'transient', 'tgate', 'sgate', 'flex', 'retrig', 'grains', 'scramble', 'glitch', 'ott', 'fshift', 'vinyl', 'dub', 'cab', 'tube', 'vsamp',
@@ -24940,6 +24946,7 @@ const FX_FACTORY_MORE = {
   vinyl:[['Clean master', {mlow:40, slow:60, hlim:40, wear:30}], ['Club vinyl', {mlow:90, slow:110, hlim:90, wear:110}], ['Thrift store', {mlow:120, slow:140, hlim:140, wear:200}]],
   dub:[['Light tape', {amt:70}], ['Dub thick', {amt:180}], ['Saturated', {amt:240}], ['Parallel dub', {amt:220, mix:140}]],
   tube:[['Gentle glow', {input:110, tube:100}], ['Bass tube', {input:170, tube:180}], ['Crushed', {input:240, tube:250}]],
+  lverb:[['Small room', {size:60, decay:50, tone:140, mix:70}], ['Lite plate', {size:130, decay:120, tone:200, pre:25, mix:90}], ['Dark hall', {size:215, decay:180, tone:70, pre:75, mix:90}], ['Tight ambience', {size:30, decay:25, tone:170, mix:50}], ['Long wash', {size:255, decay:230, tone:100, pre:100, mix:115}], ['Acid bounce', {size:90, decay:100, tone:150, pre:30, mix:80}]],
   spring:[['Surf', {decay:170, chirp:220, drip:220, mix:110}], ['Dark spring', {decay:180, tone:70, drip:120, mix:100}], ['Long tank', {decay:240, length:200, mix:120}]],
   ensemble:[['String machine', {mode:0, rate:120, depth:160, mix:150}], ['Classic I', {mode:1, depth:140, mix:128}], ['Classic I+II', {mode:3, depth:170, tone:150, mix:150}]],
   dimension:[['Subtle', {mode:0, width:150}], ['Wide', {mode:2, width:200}], ['Widest', {mode:3, width:240, tone:170}]],
@@ -30887,7 +30894,7 @@ const DKC_LAB = {adsr:'ADSR', air:'Air', atten:'Attenuverter', autotune:'Pitch c
   resample:'Resample', retrig:'Retrigger', reverb:'Reverb', reverse:'Reverse echo', ringmod:'Ring mod', rings:'Rings', room:'Room reverb', rotary:'Rotary', saturation:'Saturation',
   sccomp:'SC comp', scin:'Sidechain In', scout:'Sidechain Out', sgate:'Step gate', slew:'Slew', snh:'Sample & hold', space:'Space reverb', steps:'Steps', tape:'Tape',
   tgate:'Trance gate', tides:'Function gen', transient:'Transient', tremolo:'Tremolo', tube:'Tube', vca:'VCA', vcf:'VCF', vinyl:'Vinyl', vocoder:'Vocoder', vowel:'Vowel filter',
-  width:'Width', xmod:'Cross-mod', mixer:'Mixer', smixer:'Stereo mixer', spring:'Spring reverb', plate:'Plate reverb', ensemble:'Ensemble', dimension:'Dimension',
+  width:'Width', xmod:'Cross-mod', mixer:'Mixer', smixer:'Stereo mixer', spring:'Spring reverb', plate:'Plate reverb', lverb:'Lite reverb', ensemble:'Ensemble', dimension:'Dimension',
   harm:'Harmonizer', spectral:'Spectral', stretch:'Stretch', convolve:'Convolution', sdelay:'Simple delay', filter:'Filter', cut:'Low / high cut', compressor:'Compressor',
   buscomp:'Bus comp', glue:'Glue comp', ngate:'Noise gate', autopan:'Auto-pan', pump:'Pump', limiter:'Limiter', utility:'Utility'};
 const dkcLab = m => m.label || DKC_LAB[m.type] || (MODFX[m.type] && MODFX[m.type].name) || (TFX[m.type] && TFX[m.type].long) || (String(m.type).startsWith('pump') ? 'pump ' + String(m.type).slice(4).toUpperCase() : String(m.type));
