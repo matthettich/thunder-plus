@@ -19,7 +19,7 @@ function rig({ tv = 'phrase', clip = null, cursor = { x: 0, y: 0 } } = {}) {
     busPlan: () => ({ feeds: new Set([BUS]) }), isBusT: t => t === BUS, busTrack: t => t >= 0 && t < NT && t === BUS, sectsOn: false, firstPhrase: id => (c.S.chains[id] || [[-1]])[0][0], hp: n => n.toString(16).toUpperCase().padStart(2, '0'),
     songShown: v => c.firstPhrase(v), toast: t => log.toast.push(t), saveS: () => { log.saves++; }, draw: () => {}, edBlock: () => false, inMode: 'keys', d2: n => String(n).padStart(2, '0'),
     dims: v => v === 'song' ? { w: 17, h: 256 } : { w: 12, h: 32 }, kindAt: () => 'cell', getCell: (v, x, y) => v === 'song' ? c.S.song[y][x] : c.S.phrases[c.cPhrase][y][x], sxU: x => x, sxT: u => u, ntr: () => NT,
-    setBlockMute: () => {}, blockMuted: () => false, selRect: () => ({ y0: 0 }), clamp: (v, a, b) => Math.max(a, Math.min(b, v)), VNAME: { phrase: 'Phrase', song: 'Song' }, MODK: '', mstUniqIn: false, mstShareWarn: () => {}, rS: n => n, mselN: () => 1, keyHint: s => s, uniqVac: [] };
+    setBlockMute: () => {}, blockMuted: () => false, bmu: () => false, selRect: () => ({ y0: 0 }), clamp: (v, a, b) => Math.max(a, Math.min(b, v)), VNAME: { phrase: 'Phrase', song: 'Song' }, MODK: '', mstUniqIn: false, mstShareWarn: () => {}, rS: n => n, mselN: () => 1, keyHint: s => s, uniqVac: [] };
   c.S.phrases[0] = blank();
   vm.createContext(c);
   vm.runInContext('var hasNotes = p => !!p && p.some(r => { for (let x = 0; x <= IC; x++) if (r[x] >= 0) return true; return false; });\n' + guard + '\n' + setCellHead + '\n' + paste + '\n' + pasteMix + '\n' + pastePicks + '\n' + mselApply +

@@ -19687,6 +19687,7 @@ function normSong(j){
   if (j.chainPatch && typeof j.chainPatch === 'object' && (j.chainPatch.format === 'chains.patch' || j.chainPatch.format === 'waves.patch')) S.chainPatch = j.chainPatch;
   if (Array.isArray(j.irs)) S.irs = j.irs.slice(0, 4).map(e => e && typeof e === 'object' && e.L && typeof e.L === 'object' ? {name:String(e.name || 'IR').slice(0, 40), sr:clamp(int(e.sr, 48000), 8000, 192000), len:+e.len || 0, L:e.L, R:e.R && typeof e.R === 'object' ? e.R : null} : null);
   if (Array.isArray(j.smute)) j.smute.slice(0, 256).forEach((v, i) => S.smute[i] = int(v, 0) | 0);
+  if (Array.isArray(j.smuteM)){ const M = [...new Set(j.smuteM.map(v => int(v, -1)).filter(v => v >= 0 && v < 256))].sort((a, b) => a - b); if (M.length) S.smuteM = M; }   // MASTER-COLUMN BLOCK MUTES (12 Nov)
   // Tracks 33 and up (only with NT > 32): their mute words, kept for the tracks this version has.
   if (NT > 32 && Array.isArray(j.smuteX)){ const W = Math.ceil((NT - 32) / 32);
     const X = j.smuteX.slice(0, 256).map(w => Array.isArray(w) && w.some(v => int(v, 0)) ? w.slice(0, W).map(v => int(v, 0) | 0) : null);
@@ -19962,7 +19963,21 @@ const blockMuted = (Sx, y, t) => {
   if (t < 32) return !!((Sx.smute[y] >> t) & 1);
   const w = Sx.smuteX && Sx.smuteX[y]; return !!(w && (w[(t - 32) >> 5] >> ((t - 32) & 31)) & 1);
 };
+// MASTER-COLUMN BLOCK MUTES (12 Nov, owner: "Make m.pat mute patterns on master column. Not the sound, just disable the pattern inside of the column."): the master column (MT)
+// has no bit in smute (bit 32 does not exist in a 32-bit word, and MT moves if NT grows), so its muted song rows are S.smuteM: a sorted array of row numbers, absent
+// when none (songs without a muted master block are saved exactly as before; an older build ignores the key and plays the master phrase, as it always did). The sequencer
+// is NOT changed by this build: blockMuted() still answers false for MT, so playback ignores it. The sequencer agent: where makeSeq skips a muted block (`muted = mode ===
+// 'song' && t < MT && blockMuted(S, T.row, t)`, and the loop-edge copy of it) call masterBlockMuted(S, T.row) for t === MT, and copy this function into core/seq-core.js.
+const masterBlockMuted = (Sx, y) => !!(Sx && Array.isArray(Sx.smuteM) && Sx.smuteM.indexOf(y) >= 0);
+const bmu = (y, t) => t === MT ? masterBlockMuted(S, y) : blockMuted(S, y, t);   // either kind of column, for the screens
+function setMasterBlockMute(y, on){
+  if (!(y >= 0 && y < 256)) return;
+  const A = Array.isArray(S.smuteM) ? S.smuteM : [], i = A.indexOf(y);
+  if (on && i < 0) A.push(y); else if (!on && i >= 0) A.splice(i, 1);
+  A.sort((a, b) => a - b); if (A.length) S.smuteM = A; else delete S.smuteM;
+}
 function setBlockMute(y, t, on){
+  if (t === MT) return setMasterBlockMute(y, on);
   if (!(y >= 0 && y < 256 && t >= 0 && t < MT)) return;
   if (t < 32){ if (on) S.smute[y] |= 1 << t; else S.smute[y] &= ~(1 << t); return; }
   const k = (t - 32) >> 5, b = 1 << ((t - 32) & 31);
@@ -19976,10 +19991,12 @@ function setBlockMute(y, t, on){
 }
 // Song rows moved as a whole (DUPLICATE inserts rows): the mutes go with them.
 function smuteInsertRows(at, h){
+  if (S.smuteM){ S.smuteM = S.smuteM.map(y => y >= at ? y + h : y).filter(y => y < 256); if (!S.smuteM.length) delete S.smuteM; }
   S.smute.splice(at, 0, ...new Array(h).fill(0)); S.smute.length = 256;
   if (S.smuteX){ S.smuteX.splice(at, 0, ...new Array(h).fill(null)); S.smuteX.length = 256; if (!S.smuteX.some(Boolean)) delete S.smuteX; }
 }
 function smuteRemoveRows(at, h){
+  if (S.smuteM){ S.smuteM = S.smuteM.filter(y => y < at || y >= at + h).map(y => y >= at + h ? y - h : y); if (!S.smuteM.length) delete S.smuteM; }
   S.smute.splice(at, h); while (S.smute.length < 256) S.smute.push(0);
   if (S.smuteX){ S.smuteX.splice(at, h); while (S.smuteX.length < 256) S.smuteX.push(null); if (!S.smuteX.some(Boolean)) delete S.smuteX; }
 }
@@ -20005,6 +20022,7 @@ function songRowsRemove(at, h){
 function mutedCount(){
   const pop = m => { let a = 0; for (; m; m &= m - 1) a++; return a; };
   let n = S.smute.reduce((a, m) => a + pop(m), 0);
+  if (S.smuteM) n += S.smuteM.length;
   if (S.smuteX) for (const w of S.smuteX) if (w) for (const m of w) n += pop(m);
   return n;
 }
@@ -24554,7 +24572,7 @@ function setCell(v, x, y, val){
       mstUniqIn = true; try { const nc = mstUniq(val); if (nc >= 0){ const was = val; val = nc;
         setTimeout(() => toast(x === MT ? `Block ${hp(songShown(was))} is also on tracks, so the master column got its own copy, ${hp(songShown(nc))}. Its VOL and FLX can’t reach the tracks.`
           : `Block ${hp(songShown(was))} is also used ${blockOnMst(was) ? 'in the master column' : 'on another track'}, so this track got its own copy, ${hp(songShown(nc))}` + (blockOnMst(was) ? '.' : ' (Settings → UNIQUE PER TRACK).'), 5000), 60); } } finally { mstUniqIn = false; } }
-    S.song[y][x] = val; if (val < 0 && x < MT) setBlockMute(y, x, false); }
+    S.song[y][x] = val; if (val < 0 && x <= MT) setBlockMute(y, x, false); }
   else if (v === 'sect'){ sectRowEdit(cSect, y)[x] = val; }
   else { if (!S.phrases[cPhrase]) S.phrases[cPhrase] = freshPhrase(); S.phrases[cPhrase][y][x] = val; if (val >= 0) mstShareWarn(cPhrase); }
   saveS();
@@ -25713,7 +25731,7 @@ function pastePicks(){
   const c = cs.song, u0 = sxU(c.x), n0 = ntr(); let n = 0, out = 0;
   for (const p of clip.picks){ const y = c.y + p.dy, u = u0 + p.du, t = sxT(u);
     if (p.id < 0) continue; if (y > 255 || u > n0 || (u === n0 && t !== MT)){ out++; continue; }
-    if (setCell('song', t, y, p.id) === false) continue; if (t !== MT && t < NT) setBlockMute(y, t, !!p.mu); n++; }
+    if (setCell('song', t, y, p.id) === false) continue; if (t === MT || t < NT) setBlockMute(y, t, !!p.mu); n++; }
   saveS(); draw();
   toast(out ? `Pasted ${n} blocks · ${out} past the end were left out` : `Pasted ${n} block${n === 1 ? '' : 's'}`);
 }
@@ -25722,7 +25740,7 @@ function pasteClone(){
   let want = 0, made = 0, last = -1;
   clip.d.forEach((row, j) => row.forEach((v, i) => {
     const x = x0 + i, y = y0 + j; if (v < 0 || y > 255 || (x >= ntr() && x !== MT)) return;
-    want++; newBlock({x, y}, v); const id = getCell('song', x, y); if (id >= 0 && id !== v){ made++; last = id; if (x !== MT && x < NT) setBlockMute(y, x, !!(clip.mu && clip.mu[j] && clip.mu[j][i])); } }));
+    want++; newBlock({x, y}, v); const id = getCell('song', x, y); if (id >= 0 && id !== v){ made++; last = id; if (x === MT || x < NT) setBlockMute(y, x, !!(clip.mu && clip.mu[j] && clip.mu[j][i])); } }));
   saveS(); draw();
   if (!want) return toast('Nothing to paste here.');
   if (made < want) return toast(`Pasted ${made} of ${want} clones: no free sects or phrases left.`);
@@ -25746,7 +25764,7 @@ function dupPattern(){
   const c = cs.song, pk = sxPicks.length > 0, sel = !pk && selA && selA.v === 'song';
   const r = pk ? {y0:Math.min(...sxPicks.map(q => q.y)), y1:Math.max(...sxPicks.map(q => q.y))} : sel ? selRect() : {y0:c.y, y1:c.y}, h = r.y1 - r.y0 + 1, at = r.y1 + 1;
   const src = [];
-  for (let y = r.y0; y <= r.y1; y++) for (let x = 0; x <= MT; x++){ if (x >= ntr() && x !== MT) continue; const v = S.song[y][x]; if (v >= 0) src.push([x, y, v, blockMuted(S, y, x)]); }
+  for (let y = r.y0; y <= r.y1; y++) for (let x = 0; x <= MT; x++){ if (x >= ntr() && x !== MT) continue; const v = S.song[y][x]; if (v >= 0) src.push([x, y, v, bmu(y, x)]); }
   if (!src.length) return toast(h > 1 ? 'Nothing on those rows to duplicate.' : 'Nothing on this row to duplicate.');
   if (!songRowsInsert(at, h)) return toast(`No room: the song’s last ${h > 1 ? h + ' rows aren’t' : 'row isn’t'} empty.`);
   let made = 0, last = -1;
@@ -25781,7 +25799,7 @@ function dupTrack(notes, tAt){
   S.tfx[to] = clone(S.tfx[t] || freshChainFx());
   let want = 0, made = 0;
   if (notes) for (let y = 0; y < 256; y++){ const v = S.song[y][t]; if (v < 0) continue; want++; newBlock({x:to, y}, v);
-    const id = S.song[y][to]; if (id >= 0 && id !== v){ made++; if (blockMuted(S, y, t)) setBlockMute(y, to, true); } }
+    const id = S.song[y][to]; if (id >= 0 && id !== v){ made++; if (bmu(y, t)) setBlockMute(y, to, true); } }
   mixChanged(); rtFx(to);
   // The cursor goes to the new track, as in Renoise.
   if (tv === 'mixer') cs.mixer.x = to;
@@ -25932,8 +25950,8 @@ function rowOp(op){
     else { col.splice(c.y, 1); col.push(-1); }
     col.forEach((v, y) => S.song[y][c.x] = v);
     // block mutes move with their blocks (the master column has no mute bits)
-    if (c.x < MT){
-      const mb = S.smute.map((m, y) => blockMuted(S, y, c.x));
+    if (c.x <= MT){   // (12 Nov: the master column's too)
+      const mb = S.smute.map((m, y) => bmu(y, c.x));
       if (op === 'clear') mb[c.y] = false;
       else if (op === 'insert'){ mb.splice(c.y, 0, false); mb.length = 256; }
       else { mb.splice(c.y, 1); mb.push(false); }
@@ -26252,7 +26270,7 @@ function clearSel(){
   toast(`Cleared ${line ? rows + ' line' + (rows > 1 ? 's' : '') : n + ' cell' + (n > 1 ? 's' : '')} · ${keyHint('mod+Z') || 'Undo'} brings ${(line ? rows : n) === 1 ? 'it' : 'them'} back`); draw();
 }
 // MUTED BLOCKS COPY (owner, 31 Oct): song copies keep each block's mute (clip.mu, parallel to clip.d), and pastes put it back.
-const songMu = (x, y) => x !== MT && x < NT && blockMuted(S, y, x);
+const songMu = (x, y) => (x === MT || x < NT) && bmu(y, x);
 function copySel(cut){
   const r = selRect(), d = [], line = !!selA.line;
   // SONG (owner, 30 Oct): the columns as they sit on screen (the tracks in use, then the master), not the raw numbers 0–32,
@@ -26302,7 +26320,7 @@ function paste(){
   let n = 0, put = 0; const fxOnly = tv === 'phrase' && busTrack(cTrack); let cut = 0;   // BUS FX ONLY: a paste keeps its FX columns
   const colAt = i => { if (tv !== 'song') return x0 + i; const u = sxU(x0) + i, n0 = ntr(); return u === n0 ? MT : u < n0 ? u : -1; };   // SONG: by screen column, the master after the last track
   clip.d.forEach((row, j) => { const y = y0 + j; if (y < dm.h) n++; row.forEach((val, i) => { const x = colAt(i); if (val !== undefined && x >= 0 && (x < dm.w || (tv === 'song' && x === MT)) && y < dm.h){ if (fxOnly && x < FX0){ if (val >= 0) cut++; return; } if (setCell(tv, x, y, val) === false) return; put++;
-    if (tv === 'song' && val >= 0 && x !== MT && x < NT) setBlockMute(y, x, !!(clip.mu && clip.mu[j] && clip.mu[j][i])); } }); });   // MUTED BLOCKS COPY
+    if (tv === 'song' && val >= 0 && (x === MT || x < NT)) setBlockMute(y, x, !!(clip.mu && clip.mu[j] && clip.mu[j][i])); } }); });   // MUTED BLOCKS COPY
   if (cut) return (toast(put ? 'Notes left out · this is a bus track' : 'A bus track takes commands, not notes · nothing pasted'), draw());   // (12 Nov, owner: a notes-only paste changes nothing)
   toast(clip.line ? `Pasted ${n} line${n > 1 ? 's' : ''}` + (n < clip.d.length ? ` (${clip.d.length - n} past the end were left out)` : '') : 'Pasted'); draw();
 }
@@ -26459,10 +26477,9 @@ function tickDots(){
 function psetSet(x, v){ if (x === 0){ const n = clamp(v, 1, PROWS); S.plen[cPhrase] = n; setDefLen(n); } else S.plpb[cPhrase] = clamp(v, 0, 16); saveS(); draw(); }   // LEN also sets PATTERN LEN, as ROWS does
 // Mutes or unmutes one song block (Alt-click, a long press in ARRANGE, or M on the song in KEYS mode).
 function toggleBlockMute(y, t){
-  if (t === MT) return toast('The master column can’t be muted.');
   if (y < 0 || y > 255 || S.song[y][t] < 0) return toast('Nothing there to mute.');
-  setBlockMute(y, t, !blockMuted(S, y, t)); saveS(); draw();
-  toast((blockMuted(S, y, t) ? 'Muted' : 'Unmuted') + ` row ${rS(y, 3)} · track ${d2(t + 1)}`);
+  setBlockMute(y, t, !bmu(y, t)); saveS(); draw();   // (12 Nov, owner: the master column's blocks too; the sound is not muted yet, the sequencer is to skip the master phrase)
+  toast((bmu(y, t) ? 'Muted' : 'Unmuted') + ` row ${rS(y, 3)} · ${t === MT ? 'master' : 'track ' + d2(t + 1)}`);
 }
 let instViaTrk = false;   // Inst was opened from Song, Sect or Phrase (go: Mixer and FX then follow the song track)
 function go(v){
@@ -31201,8 +31218,8 @@ function drawArr0(PH){
       if (!audible(t)) cls += ' tm';   // (3 Nov: as heard: a soloed track plays even when muted)
       h += `<b class="${cls.trim()}"${sty} data-y="${y}" data-t="${t}">${lab}</b>`;
     }
-    if (mx){ const v = S.song[y][MT];   // the master column: commands only, never muted
-      h += `<span></span><b class="gx${v < 0 ? '' : isEmptySect(S.chains[v]) || !sectHasData(v) ? ' z' : sectMstOff(v) ? ' o' : ' f'}" data-y="${y}" data-t="${MT}">${v < 0 ? '' : hp(songShown(v))}</b>`; }
+    if (mx){ const v = S.song[y][MT];   // the master column: commands only; a muted block (12 Nov) is drawn as the others are
+      h += `<span></span><b class="gx${v < 0 ? '' : masterBlockMuted(S, y) ? ' m' : isEmptySect(S.chains[v]) || !sectHasData(v) ? ' z' : sectMstOff(v) ? ' o' : ' f'}" data-y="${y}" data-t="${MT}">${v < 0 ? '' : hp(songShown(v))}</b>`; }
     h += '</div>';
   }
   const PF = polyFrom();
@@ -31488,7 +31505,7 @@ arrGrid.addEventListener('mousedown', e => { if (e.button === 1) e.preventDefaul
 arrGrid.addEventListener('pointerdown', e => {
   if (e.button !== 1) return;
   const b = e.target.closest('b[data-y]'); if (!b) return; e.preventDefault(); e.stopImmediatePropagation();
-  const y = +b.dataset.y, t = +b.dataset.t, go = () => { const r = sxRect(); if (r && sxIn(r, y, t)) sxMuteRect(r); else if (S.song[y][t] >= 0 && t !== MT) toggleBlockMute(y, t); };
+  const y = +b.dataset.y, t = +b.dataset.t, go = () => { const r = sxRect(); if (r && sxIn(r, y, t)) sxMuteRect(r); else if (S.song[y][t] >= 0) toggleBlockMute(y, t); };
   if (sxSide()) apRun(go, []); else go();
 }, true);
 arrGrid.addEventListener('pointerdown', e => {
@@ -31690,10 +31707,10 @@ function sxApply(d){
   if (!d.du && !d.dy) return;
   const p = sxDrop(d); if (p.err) return toast(p.err);
   const r = d.r, src = [];
-  for (let y = r.y0; y <= r.y1; y++) for (const t of p.cols){ const v = S.song[y][t]; if (v >= 0 && !(t !== MT && busNo(sxT(sxU(t) + d.du), v))) src.push([t, y, v, t !== MT && blockMuted(S, y, t)]); }   // (12 Nov, owner: a block with notes stays out of a bus)
+  for (let y = r.y0; y <= r.y1; y++) for (const t of p.cols){ const v = S.song[y][t]; if (v >= 0 && !(t !== MT && busNo(sxT(sxU(t) + d.du), v))) src.push([t, y, v, bmu(y, t)]); }   // (12 Nov, owner: a block with notes stays out of a bus)
   if (!src.length) return toast('Nothing to move: the selection is empty.');
-  if (!d.copy) for (const [t, y] of src){ S.song[y][t] = -1; if (t !== MT) setBlockMute(y, t, false); }
-  for (const [t, y, v, mu] of src){ const nt = sxT(sxU(t) + d.du), ny = y + d.dy; S.song[ny][nt] = v; if (nt !== MT) setBlockMute(ny, nt, !!mu); }
+  if (!d.copy) for (const [t, y] of src){ S.song[y][t] = -1; setBlockMute(y, t, false); }
+  for (const [t, y, v, mu] of src){ const nt = sxT(sxU(t) + d.du), ny = y + d.dy; S.song[ny][nt] = v; setBlockMute(ny, nt, !!mu); }
   const x0 = sxT(p.u0), x1 = sxT(p.u1);
   selA = {x:x0, y:r.y0 + d.dy, v:'song'}; cs.song.x = x1; cs.song.y = r.y1 + d.dy; cTrack = x1 === MT ? cTrack : x1;
   saveS(); draw();
@@ -31789,15 +31806,15 @@ window.addEventListener('keydown', e => {
 }, true);
 addEventListener('resize', sxMenuClose); arrGrid.addEventListener('scroll', sxMenuClose, {passive:true});
 function sxMuteRect(r){
-  const cols = sxCols(r).filter(t => t !== MT), cells = [];
+  const cols = sxCols(r), cells = [];
   for (let y = r.y0; y <= r.y1; y++) for (const t of cols) if (S.song[y][t] >= 0) cells.push([y, t]);
   sxMuteCells(cells);
 }
 // Mutes or unmutes the filled blocks among these cells (all muted → unmute, otherwise mute).
 function sxMuteCells(all){
-  const cells = all.filter(([y, t]) => t !== MT && S.song[y] && S.song[y][t] >= 0);
+  const cells = all.filter(([y, t]) => S.song[y] && S.song[y][t] >= 0);
   if (!cells.length) return toast('Nothing to mute here.');
-  const mute = cells.some(([y, t]) => !blockMuted(S, y, t));
+  const mute = cells.some(([y, t]) => !bmu(y, t));
   for (const [y, t] of cells) setBlockMute(y, t, mute);
   saveS(); draw(); toast(`${mute ? 'Muted' : 'Unmuted'} ${cells.length} block${cells.length > 1 ? 's' : ''}`);
 }
@@ -31871,7 +31888,7 @@ function sxCtx(y, t){
     // DUPLICATE TRACK (owner, 3 Nov: "a right click option to duplicate a track, including the patterns/phrases in it"):
     // into the next empty track of its kind, every block as a unique copy (dupTrack with notes)
     {l:'Duplicate this track with its patterns', f:() => dupTrack(true, t), off:t === MT},
-    {l:'Mute / unmute', k:ks ? 'M' : '', f:() => sxMuteRect(r), off:!n || (t === MT && !multi)},
+    {l:'Mute / unmute', k:ks ? 'M' : '', f:() => sxMuteRect(r), off:!n},
     {l:'Loop these rows', f:() => sxLoopRows(r.y0, r.y1), off:r.y1 <= r.y0},
     {l:'Open the phrase', k:ks ? keyHint('alt+→') : '', f:sxOpen, off:multi || !filled},
     {l:multi ? 'Color these blocks…' : 'Color this block…', f:() => sxColour(r), off:!n},
@@ -32459,13 +32476,13 @@ function mselEnd(e){
 function mselApply(m, copy){
   const r = m.r, dx = m.dx, dy = m.dy; if (!dx && !dy) return draw();
   const D = [], mu = [];
-  for (let y = r.y0; y <= r.y1; y++){ const row = [], mr = []; for (let x = r.x0; x <= r.x1; x++){ row.push(getCell(tv, x, y)); mr.push(tv === 'song' && x !== MT && blockMuted(S, y, x)); } D.push(row); mu.push(mr); }
+  for (let y = r.y0; y <= r.y1; y++){ const row = [], mr = []; for (let x = r.x0; x <= r.x1; x++){ row.push(getCell(tv, x, y)); mr.push(tv === 'song' && bmu(y, x)); } D.push(row); mu.push(mr); }
   const bad = (x, y, v) => tv === 'song' ? x !== MT && x < NT && v >= 0 && busNo(x, v) : tv === 'phrase' && v >= 0 && x < FX0 && busTrack(cTrack) && busNoteNo();   // NO NOTES INTO A BUS (12 Nov): refused cells stay where they were
   const vac = [];   // a move empties its cells first, then writes: UNIQUE PER TRACK must still see that this track held the block (10 Nov, owner)
   if (!copy) for (let y = r.y0; y <= r.y1; y++) for (let x = r.x0; x <= r.x1; x++){ if (tv === 'song' && x !== MT){ const v0 = S.song[y][x]; if (v0 >= 0) vac.push([y, x, v0]); } if (bad(x + dx, y + dy, D[y - r.y0][x - r.x0])) continue; setCell(tv, x, y, kindAt(tv, x) === 'tsp' ? 0 : -1); }
   const d = dims(tv); uniqVac = vac;
   try { D.forEach((row, j) => row.forEach((v, i) => { const x = r.x0 + i + dx, y = r.y0 + j + dy; if (y < 0 || y >= d.h || x < 0 || (x >= d.w && x !== MT) || bad(x, y, v)) return;
-    setCell(tv, x, y, v); if (tv === 'song' && x !== MT && v >= 0) setBlockMute(y, x, !!mu[j][i]); })); } finally { uniqVac = []; }
+    setCell(tv, x, y, v); if (tv === 'song' && v >= 0) setBlockMute(y, x, !!mu[j][i]); })); } finally { uniqVac = []; }
   saveS(); draw();
   const n = m.line ? (r.y1 - r.y0 + 1) + ' line' + (r.y1 > r.y0 ? 's' : '') : mselN(r) + ' cells';
   toast(`${copy ? 'Copied' : 'Moved'} ${n} · ${keyHint('mod+Z')} undoes it`);
@@ -33539,7 +33556,7 @@ function apStrip(want){
   const cell = (y, t) => {
     const v = S.song[y][t]; let cls = (t === MT ? 'gx' : t < PF ? 'gm' : 'gp') + (isBusT(t) ? ' bus' : ''), lab = '';
     if (v >= 0){ const ph = firstPhrase(v); lab = t === MT ? hp(songShown(v)) : sectsOn || ph < 0 ? hp(v) : hp(ph);
-      cls += t !== MT && blockMuted(S, y, t) ? ' m' : ' f'; if (PH && PH[t] === y) cls += ' p'; }
+      cls += bmu(y, t) ? ' m' : ' f'; if (PH && PH[t] === y) cls += ' p'; }
     if (sr && y >= sr.y0 && y <= sr.y1 && t >= sr.x0 && t <= sr.x1) cls += ' sl';
     if (t === c.x && y === c.y) cls += ' c';
     return `<b class="${cls}" data-y="${y}" data-t="${t}">${lab}</b>`;
