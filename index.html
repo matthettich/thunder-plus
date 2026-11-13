@@ -23060,8 +23060,7 @@ function corePump(){
 /* PANIC (27 Oct, audit B18): Stop when already stopped (F8 again) lets go of everything still sounding: the voices, and on
    every MIDI port and channel All Sound Off, All Notes Off and the sustain pedal up (a stop only sent All Notes Off on the
    channels the song used). Effect tails ring on; Settings → Audio → Reset audio engine clears those too. */
-function stopKey(){ if (tp.on) return tStop(); const warm = !!warmTok; warmTok = null; if (warm){ try { lpRestore(); lpSelRestore(); } catch(e){} }   // (review) a STOP inside the first PLAY's warm-up: loop play / LP.SEL never began, so LOOP and LOOP SEL go back as they were
-  panic(); if (warm) try { draw(); } catch(e){} }   // (10 Nov: warmTok: a STOP inside the first PLAY's warm-up cancels it)
+function stopKey(){ if (tp.on) return tStop(); const warm = !!warmTok; warmTok = null; if (warm){ try { lpRestore(); lpSelRestore(); } catch(e){} } panic(); if (warm) try { draw(); } catch(e){} }   // (10 Nov: warmTok: a STOP inside the first PLAY's warm-up cancels it; 12 Nov, review: loop play / LP.SEL never began then, so LOOP and LOOP SEL go back as they were)   // (10 Nov: warmTok: a STOP inside the first PLAY's warm-up cancels it)
 function panic(){
   try { if (rt && ctx) rt.pl.stopAll(ctx.currentTime); } catch(e){}
   try { moRelease(); } catch(e){}
