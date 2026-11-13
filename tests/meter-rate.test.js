@@ -78,3 +78,45 @@ test('Settings has the METERS row beside LOW POWER DISPLAY, three choices, defau
   assert.ok(src.indexOf("{l:'METERS WHILE PLAYING'") > src.indexOf("{l:'LOW POWER DISPLAY'") && src.indexOf("{l:'METERS WHILE PLAYING'") < src.indexOf("{l:'FOLLOW', segs"));
   assert.match(src, /if \(mtrMode !== 'smooth'\) setMeters\('smooth'\)/);
 });
+
+// ---- build 576 review ----
+test('review 1: every meter loop the gate parks paints itself empty once first (meterBlank), then writes nothing until the hold ends', () => {
+  const c = { tp: { on: true }, lpOn: false, LP_GATE: 38, localStorage: { getItem: () => 'off', setItem() {} }, HM: {}, paintMeters() {}, mtrWake() {} };
+  vm.createContext(c); vm.runInContext(cut(/var MTR_K = [\s\S]*?var mtrBlank = false;/) + '\nthis.n = 0; this.blank = () => meterBlank("k", () => this.n++);', c);
+  assert.equal(c.blank(), true); assert.equal(c.blank(), true); assert.equal(c.n, 1, 'painted empty once, then parked');
+  c.tp.on = false; assert.equal(c.blank(), false, 'stopped: not held'); c.tp.on = true; c.blank(); assert.equal(c.n, 2, 'a new hold paints empty again');
+  // each loop that returns early under OFF goes through meterBlank
+  for (const [fn, key] of [['synMeterFrame', 'syn'], ['vuFrame', 'vu'], ['sndFrame', 'snd'], ['bassViz', 'bass'], ['mwLoop', 'mw']]) assert.match(cut(new RegExp('function ' + fn + '\\([^)]*\\)\\{[\\s\\S]*?\\n\\}\\n')), new RegExp("meterBlank\\('" + key + "'"), fn);
+  assert.match(src, /meterBlank\('stg', \(\) => stageCanvas\(true\)\)/, 'stage spectrum: the idle picture once');
+  assert.match(src, /held \? mtrB\.scope : !meterDue\(now, dkScopeT, 50\)/, 'deck scope: the grid once'); assert.match(src, /meterBlank\('fxbar'/, 'FX bar viz canvases cleared once');
+  const syn = cut(/function synMeterFrame\(\)\{[\s\S]*?\n\}\n/); assert.match(syn, /scaleX\(0\)[^\n]*left = '0'[^\n]*remove\('over'\)/);
+  // no loop is parked by a bare meterHold() return any more
+  for (const fn of ['synMeterFrame', 'vuFrame', 'mwLoop']) assert.doesNotMatch(cut(new RegExp('function ' + fn + '\\([^)]*\\)\\{[\\s\\S]*?\\n\\}\\n')), /if \(meterHold\(\)\)/);
+});
+test('review 2: the header paints the maximum since the last paint (a snapshot), and the cache key and the bars use the same numbers', () => {
+  const hm = cut(/function hmDraw\(now\)\{[\s\S]*?\n\}\n/);
+  assert.match(hm, /HM\.lvs\[0\] = HM\.la\[0\]; HM\.lvs\[1\] = HM\.la\[1\]/); assert.match(hm, /const LV = hold \? HM\.zero : HM\.lvs/);
+  assert.ok(hm.indexOf('HM.lvs[0] = HM.la[0]') < hm.indexOf('HM.la[0] = HM.lv[0]'), 'snapshot before the reset');
+  assert.doesNotMatch(hm.slice(hm.indexOf('HM.la[1] = HM.lv[1];') + 20), /HM\.la\b/, 'nothing after the reset reads the accumulator');
+  assert.doesNotMatch(hm, /\? \[0, 0\] :/, 'no array made per paint');
+  // behaviour of the three lines: a peak between paints survives the reset
+  const c = { HM: { la: [0.9, 0.8], lv: [0.1, 0.1] } }; vm.createContext(c);
+  vm.runInContext('const hold = false; if (!HM.lvs){ HM.lvs = [0, 0]; HM.zero = [0, 0]; } if (!hold){ HM.lvs[0] = HM.la[0]; HM.lvs[1] = HM.la[1]; } const LV = hold ? HM.zero : HM.lvs; HM.la[0] = HM.lv[0]; HM.la[1] = HM.lv[1]; this.LV = LV;', c);
+  assert.deepEqual([...c.LV], [0.9, 0.8]); assert.deepEqual([...c.HM.la], [0.1, 0.1]);
+});
+test('review 3: the FX bar at LIGHT samples every frame and paints the highest slot level since the last paint', () => {
+  let now = 0, level = 0; const w = { style: {}, _w: undefined };
+  const c = { performance: { now: () => now }, clamp: (v, a, b) => Math.min(b, Math.max(a, v)), mtrMode: 'light', mtrB: {}, tp: { on: true }, lpOn: false, LP_GATE: 38, NT: 32, S: { tfx: [[]], mfx: [] }, deck: { fxbar: true, fx: true },
+    $: () => bar, deckShown: () => true, dkMst: () => false, dkTrack: () => 0, fxDynNodeOf: () => null, fxLvlSet() {}, isFxDyn: () => false, fxSlotLevel: () => level, dkFxViz() {}, dkAnim() {}, dkSpring() {} };
+  const col = { dataset: { k: '0' }, _h: new Float32Array(8), _w: 0, querySelector: s => (s === '.fm i' ? w : null) }, bar = { children: [col], querySelectorAll: () => [] };
+  vm.createContext(c);
+  vm.runInContext(cut(/var MTR_K = [\s\S]*?var meterDue = [^\n]*\n/).replace(/var mtrMode = [^\n]*\n/, '') + cut(/function deckFxBarMeters\(\)\{[\s\S]*?\n\}\n/) + '\nthis.run = deckFxBarMeters;', c);
+  vm.runInContext('var meterHold = () => false; var meterBlank = (k, f) => false;', c);
+  now = 1000; level = 0.1; c.run();             // a paint is due: 10 %
+  now = 1016; level = 0.9; c.run();             // a transient between paints
+  now = 1033; level = 0.1; c.run();             // back down, still before the next paint
+  assert.equal(w.style.width, '10%', 'nothing painted yet at 33 ms');
+  now = 1100; level = 0.1; c.run(); assert.equal(w.style.width, '90%', 'the transient is painted');
+  now = 1200; c.run(); assert.equal(w.style.width, '10%', 'and the maximum starts again');
+  c.mtrMode = 'smooth'; now = 1216; level = 0.5; c.run(); assert.equal(w.style.width, '50%', 'SMOOTH paints every frame as before');
+});

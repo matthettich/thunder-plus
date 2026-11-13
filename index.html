@@ -8738,7 +8738,7 @@ const smPos = a => a <= 0 ? 0 : Math.max(0, Math.min(1, (20 * Math.log10(a) + 48
 function synMeterOn(){ smOnT = performance.now(); if (!smRaf) smRaf = requestAnimationFrame(synMeterFrame); sndWake(); }
 function synMeterFrame(){
   smRaf = 0; const m = $('vMeter'); if (!m) return;
-  if (meterHold()) return;   // METERS: OFF while playing parks it (mtrWake at STOP)
+  if (meterBlank('syn', () => { m.firstElementChild.style.transform = 'scaleX(0)'; m.lastElementChild.style.left = '0'; m.classList.remove('over'); smLv = smPk = 0; })) return;   // METERS: OFF while playing: empty once, then parked (mtrWake at STOP)
   const a = padLevel(), now = performance.now();
   if (tp.on && !meterDue(now, synMeterFrame.t || 0, 0)){ smRaf = requestAnimationFrame(synMeterFrame); return; } synMeterFrame.t = now;
   smLv = Math.max(a, smLv * 0.86);
@@ -8822,7 +8822,7 @@ let vuRaf = 0, vuEls = [];
 function vuHit(i, rate, vel, mono){ sndHit(i, ctx.currentTime, rate, mono); const c = slotAt(cache, i); if (!c) return; slotAt(hits, i); if (!hits[i]) hits[i] = []; if (mono) hits[i].length = 0; hits[i].push({t0:ctx.currentTime, rate, vel, c}); if (hits[i].length > 8) hits[i].shift(); if (!vuRaf) vuRaf = requestAnimationFrame(vuFrame); }
 function vuFrame(){
   vuRaf = 0; if (!ctx) return;
-  if (meterHold()) return;   // METERS: OFF while playing parks it (mtrWake at STOP)
+  if (meterBlank('vu', () => { for (const m of vuEls){ m.lv = m.pk = 0; m._w = '0.0%'; m.bar.style.width = '0.0%'; m.bar.className = ''; m.txt.textContent = '−∞'; } })) return;   // METERS: OFF: empty once, then parked (mtrWake at STOP)
   if (tp.on && !meterDue(performance.now(), vuFrame.t || 0, 0)){ vuRaf = requestAnimationFrame(vuFrame); return; } vuFrame.t = performance.now();
   const now = ctx.currentTime, H = slotAt(hits, cur) || []; let live = false;
   for (let i = 0; i < nslots(); i++){ slotAt(hits, i); hits[i] = (hits[i] || []).filter(h => (now - h.t0) * h.rate * h.c.sr < h.c.data.length + h.c.sr * 0.3); }
@@ -12955,7 +12955,7 @@ function bassVizKick(){ if (!bvRaf) bvRaf = requestAnimationFrame(bassViz); }
 function bassViz(){
   bvRaf = 0; if (document.hidden) return;   // BATTERY: parked while hidden; the screen coming back kicks it (visibilitychange, end of file)
   const cv = $('bassCv'); if (!cv || $('bassWrap').hidden || view === 'tracker' || !isBassV(V())) return;
-  if (lpHold(bassViz.t || 0)){ if (!meterHold()) bvRaf = requestAnimationFrame(bassViz); return; }   /* METERS: OFF parks it (mtrWake at STOP) */ bassViz.t = performance.now();
+  if (meterBlank('bass', () => cv.getContext('2d').clearRect(0, 0, cv.width, cv.height))) return; /* METERS: OFF: empty once, then parked (mtrWake at STOP) */ if (lpHold(bassViz.t || 0)){ bvRaf = requestAnimationFrame(bassViz); return; } bassViz.t = performance.now();
   const dpr = devicePixelRatio || 1, W = cv.clientWidth, H = cv.clientHeight; if (!W || !H) return;
   if (cv.width !== Math.round(W * dpr)){ cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); }
   const g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, H);
@@ -13560,7 +13560,7 @@ function sndColours(){
 function sndSoon(){ if (!sndQ) sndQ = requestAnimationFrame(() => { sndQ = 0; if (!sndOn()) return; sndColours(); sndSpecPaint(); sndScopePaint(false); sndWake(); }); }
 function sndWake(){ if (!sndRaf && sndOn()) sndRaf = requestAnimationFrame(sndFrame); }
 function sndFrame(){
-  sndRaf = 0; if (!sndOn() || document.hidden) return; if (lpHold(sndFrame.t || 0)){ if (!meterHold()) sndRaf = requestAnimationFrame(sndFrame); return; }   /* METERS: OFF parks it (mtrWake at STOP) */ sndFrame.t = performance.now(); if (!sndCol) sndColours();   // BATTERY: parked while hidden (sndWake on return)
+  sndRaf = 0; if (!sndOn() || document.hidden) return; if (!sndCol) sndColours(); if (meterBlank('snd', () => sndScopePaint(false))) return; /* METERS: OFF: empty once, then parked (mtrWake at STOP) */ if (lpHold(sndFrame.t || 0)){ sndRaf = requestAnimationFrame(sndFrame); return; } sndFrame.t = performance.now();   // BATTERY: parked while hidden (sndWake on return)
   const t = ctx ? ctx.currentTime - heardLat() : 0;
   for (let i = sndPH.length - 1; i >= 0; i--) if (t > sndPH[i].end) sndPH.splice(i, 1);
   const live = !!ctx && (tp.on || performance.now() - audioWake < 1500 || sndPH.length > 0);
@@ -24502,10 +24502,13 @@ var meterHold = () => mtrMode === 'off' && !!tp.on;   // meters hold empty (a le
 var meterGap = (base, soft) => !tp.on ? (base || 0) : Math.max(base || 0, lpOn ? LP_GATE : 0, mtrMode === 'smooth' ? 0 : MTR_LIGHT_MS, !soft && mtrMode === 'off' ? Infinity : 0);   // soft: a mark that is not a level meter (it keeps LIGHT's rate when METERS is OFF)
 var meterDue = (now, last, base, soft) => now - last >= meterGap(base, soft);
 var lpHold = last => tp.on && !meterDue(performance.now(), last, 0);   // a meter or animation asks: is it too soon to draw again? (Low power and METERS)
+var mtrB = {};   // which parked loops have been painted empty for this OFF hold
+// OFF parks a meter loop: it is painted empty ONCE first (fn), then nothing is written until the hold ends. True while held (the caller returns).
+var meterBlank = (k, fn) => { if (!meterHold()){ mtrB[k] = false; return false; } if (!mtrB[k]){ mtrB[k] = true; try { fn(); } catch(e){} } return true; };
 var mtrBlank = false;   // the Mixer's and the header's meters were painted empty for this play (METERS: OFF)
 function setMeters(v){
   mtrMode = MTR_MODES.includes(v) ? v : 'smooth'; try { localStorage.setItem(MTR_K, mtrMode); } catch(e){}
-  mtrBlank = false; try { HM.drawn = ''; HM.held = false; } catch(e){} try { paintMeters(); } catch(e){} try { mtrWake(); } catch(e){}
+  mtrBlank = false; mtrB = {}; try { HM.drawn = ''; HM.held = false; } catch(e){} try { paintMeters(); } catch(e){} try { mtrWake(); } catch(e){}
 }
 // the loops that park under OFF are started again here (STOP, or another choice)
 function mtrWake(){ try { sndWake(); bassVizKick(); if (!vuRaf && typeof vuEls !== 'undefined' && vuEls.length) vuRaf = requestAnimationFrame(vuFrame); if (smLv > 0.0005 || smPk > 0.0005) synMeterOn(); if (typeof mwOpenNow !== 'undefined' && mwOpenNow && !mwRaf) mwRaf = requestAnimationFrame(mwLoop); } catch(e){} }
@@ -28852,10 +28855,10 @@ function stageTick(now){
   // FX DYNAMICS: the shown track's effects report their levels while the stage shows its chain; ~30 frames a second then
   const chn = stgKindNow === 'chain' && !$('tStage').hidden, ft = cFxT >= NT ? -1 : Math.min(cFxT, ntr() - 1);
   fxTelSet(chn ? fxDynNodeOf(ft) : dkBarTelNode);   // FX BAR: otherwise the bottom bar's track, when it shows a dynamics slot
-  if (chn && meterDue(now, stgFrameT, 34) && !meterHold()){ const A = ft < 0 ? S.mfx : S.tfx[ft] || []; if (A.some(f => f && fxStageLive(f.type))){ stgFrameT = now; stageCanvas(false); } }
+  if (chn && meterDue(now, stgFrameT, 34, true)){ const A = ft < 0 ? S.mfx : S.tfx[ft] || []; if (A.some(f => f && fxStageLive(f.type))){ stgFrameT = now; stageCanvas(false); } }
   if (stgOn !== !!tp.on){ stgOn = !!tp.on; if (stgKindNow === 'dogs' || stgKindNow === 'drum') dogsState(); else if (stgKindNow) stageCanvas(true); }
   if (!stgKindNow || $('tStage').hidden) return;
-  if (stgKindNow === 'piano' || stgKindNow === 'spec'){ if (meterDue(now, stgFrameT, 46, stgKindNow === 'piano') && !(stgKindNow === 'spec' && meterHold())){ stgFrameT = now; stageCanvas(false); } return; }   // METERS: the piano's lit notes are marks (OFF keeps LIGHT's rate); the spectrum is a meter
+  if (stgKindNow === 'piano' || stgKindNow === 'spec'){ if (stgKindNow === 'spec' && meterBlank('stg', () => stageCanvas(true))) return; if (meterDue(now, stgFrameT, 46, stgKindNow === 'piano')){ stgFrameT = now; stageCanvas(false); } return; }   // METERS: the piano's lit notes are marks (OFF keeps LIGHT's rate); the spectrum is a meter
   if ((stgKindNow !== 'dogs' && stgKindNow !== 'drum') || !tp.on || !ctx) return;
   const lat = heardLat(), t = ctx.currentTime - lat, bpm = tp.bpm || S.bpm;
   if (bpm !== stgBpm){ const b = (t - stgT0) * stgBpm / 60; stgBpm = bpm; stgT0 = t - b * 60 / bpm; }
@@ -29055,7 +29058,7 @@ function stageWave(){
 function stageSpec(force){
   // BATTERY: stopped (nothing live to show), the panel is a still picture: draw it once and skip until something it shows changes
   // (live again, a forced layout, the skin or theme, the box size, zoom / dpr). Live, it redraws every tick as before.
-  const an0 = specAnalyser(), live0 = !!an0 && (tp.on || performance.now() - audioWake < 1500);
+  const an0 = specAnalyser(), live0 = !!an0 && !meterHold() && (tp.on || performance.now() - audioWake < 1500);
   if (!live0){
     const de = document.documentElement, st = $('tStage').style, sig = 'idle|' + !!an0 + '|' + de.getAttribute('data-skin') + '|' + de.className + '|' + document.body.className + '|' + st.width + '|' + st.height + '|' + (devicePixelRatio || 1) + '|' + innerWidth + 'x' + innerHeight;
     if (!force && sig === stgSig) return; stgSig = sig;
@@ -29066,7 +29069,7 @@ function stageSpec(force){
   [100, 1000, 10000].forEach(f => { const x = xOf(f); g.beginPath(); g.moveTo(x, 0); g.lineTo(x, H); g.stroke(); g.fillStyle = X.mid; g.font = `${10 * dpr}px ${X.font}`; g.fillText(f >= 1000 ? f / 1000 + 'k' : f, x + 3 * dpr, H - 5 * dpr); });
   // Fit and finish (2 Nov): level lines, and a word while nothing plays, so the stopped panel isn't a blank box
   g.save(); g.setLineDash([2 * dpr, 4 * dpr]); g.globalAlpha = 0.5; for (const db of [-24, -48, -72]){ const y = yOf(db); g.beginPath(); g.moveTo(0, y); g.lineTo(W, y); g.stroke(); g.fillStyle = X.mid; g.font = `${9 * dpr}px ${X.font}`; g.fillText(db + ' dB', 4 * dpr, y - 3 * dpr); } g.restore();
-  const an = specAnalyser(); if (!an || !(tp.on || performance.now() - audioWake < 1500)){
+  const an = specAnalyser(); if (!an || meterHold() || !(tp.on || performance.now() - audioWake < 1500)){
     g.fillStyle = X.mid; g.font = `600 ${11 * dpr}px ${X.font}`; g.textAlign = 'center'; g.fillText('SPECTRUM · PLAY TO SEE IT', W / 2, H / 2); g.textAlign = 'left'; return; }
   an.getFloatFrequencyData(dkSpec); const sr = ctx.sampleRate, N = dkSpec.length;
   g.beginPath(); g.moveTo(0, H);
@@ -29405,7 +29408,7 @@ function mwGrid(g, G, C, gains){
   if (gains) for (const d of [-12, -6, 0, 6, 12]){ const y = Math.round(G.y(d)) + .5; g.strokeStyle = d ? C.line : C.muted; g.beginPath(); g.moveTo(0, y); g.lineTo(G.W, y); g.stroke(); g.fillText((d > 0 ? '+' : '') + d, 4 * G.dpr, y - 3 * G.dpr); }
 }
 function mwSpectrum(g, G, C, top, bot){
-  const an = specAnalyser(); if (!an || !(tp.on || performance.now() - audioWake < 1500)) return;
+  const an = specAnalyser(); if (!an || meterHold() || !(tp.on || performance.now() - audioWake < 1500)) return;
   an.getFloatFrequencyData(dkSpec); const sr = ctx.sampleRate, N = dkSpec.length, yOf = db => clamp((top - db) / (top - bot), 0, 1) * G.H;
   g.beginPath(); g.moveTo(0, G.H);
   for (let x = 0; x <= G.W; x += 3 * G.dpr){ const f0 = G.f(x), f1 = G.f(x + 3 * G.dpr), b0 = Math.max(1, Math.floor(f0 / (sr / 2) * N)), b1 = Math.min(N - 1, Math.max(b0, Math.ceil(f1 / (sr / 2) * N)));
@@ -29487,7 +29490,7 @@ function mwSupDraw(){
   g.clearRect(0, 0, G.W, G.H);
   g.fillStyle = C.line; g.globalAlpha = .55; g.fillRect(0, 0, G.x(M.lo), G.H); g.fillRect(G.x(M.hi), 0, G.W - G.x(M.hi), G.H); g.globalAlpha = 1;
   mwSpectrum(g, G, C, -10, -100); mwGrid(g, G, C, false);
-  const red = mstMeter && mstMeter.sup; if (red && M.on){ const n = red.length; g.fillStyle = C.ink; for (let i = 0; i < n; i++){ const h = red[i] / 20 * G.H * .6; if (h > .5) g.fillRect(i / n * G.W + 1, 0, G.W / n - 2, h); } }
+  const red = mstMeter && !meterHold() && mstMeter.sup; if (red && M.on){ const n = red.length; g.fillStyle = C.ink; for (let i = 0; i < n; i++){ const h = red[i] / 20 * G.H * .6; if (h > .5) g.fillRect(i / n * G.W + 1, 0, G.W / n - 2, h); } }
   g.strokeStyle = C.ink; g.lineWidth = 2 * G.dpr; for (const f of [M.lo, M.hi]){ const x = Math.round(G.x(f)) + .5; g.beginPath(); g.moveTo(x, 0); g.lineTo(x, G.H); g.stroke(); }
   g.fillStyle = C.muted; g.font = `${10 * G.dpr}px ${C.font}`; g.fillText('reduction ↓  · drag the lines to set the range', 6 * G.dpr, G.H - 18 * G.dpr);
 }
@@ -29506,7 +29509,7 @@ function mwSupDraw(){
 const mwComp = {lv:-200, gr:0, grHold:0, holdT:0, hist:new Float32Array(150), hi:0};
 function mwCompDraw(){
   const c = $('mwCompC'), G = mwGeo(c), g = c.getContext('2d'), C = mwColors(); if (!G.W) return; const M = S.mst.comp, d1 = G.dpr;
-  const m = mstMeter, live = !!(m && M.on && S.mst.on && (tp.on || performance.now() - audioWake < 1500)), K = mwComp;
+  const m = mstMeter, live = !!(m && M.on && S.mst.on && !meterHold() && (tp.on || performance.now() - audioWake < 1500)), K = mwComp;
   // the readings, with ballistics (this runs ~30 times a second)
   const lvNow = live && Number.isFinite(m.compIn) ? m.compIn : -200, grNow = live ? Math.min(0, m.comp || 0) : 0;
   K.lv = lvNow > K.lv ? lvNow : Math.max(lvNow, K.lv - 0.7); K.gr = grNow < K.gr ? grNow : Math.min(0, K.gr + 0.6);
@@ -29564,7 +29567,8 @@ function mwLimDraw(){
 function mwLoop(){
   if (!mwOpenNow) return;
   if (document.hidden && !tp.on) return;   // BATTERY: parked while hidden and not playing (visibilitychange restarts it)
-  if (meterHold()){ mwRaf = 0; return; }   // METERS: OFF while playing holds it (mtrWake at STOP)
+  if (meterBlank('mw', () => { $('mwChain').querySelectorAll('.mwst .gr').forEach(g => { g.textContent = ''; }); $('mwRead').innerHTML = '<span>IN <b>—</b> LUFS</span><span>OUT <b>—</b> LUFS</span><span>PEAK <b>—</b> dB</span>'; mwLimHist.fill(0);
+    if (mwSel === 'eq') mwEqDraw(); else if (mwSel === 'sup') mwSupDraw(); else if (mwSel === 'comp') mwCompDraw(); else mwLimDraw(); })){ mwRaf = 0; return; }   // METERS: OFF while playing: readouts and curves painted without the levels, then parked (mtrWake at STOP)
   mwRaf = requestAnimationFrame(mwLoop);
   const now = performance.now(); if (!meterDue(now, mwLoop.t || 0, 33)) return; mwLoop.t = now;   // METERS: OFF holds it (the loop idles; mtrWake / the next frame at STOP)
   const m = mstMeter, live = !!(m && S.mst.on && (tp.on || now - audioWake < 1500));
@@ -29926,7 +29930,9 @@ function hmDraw(now){
   const hold = meterHold();
   if (hold){ if (HM.held && HM.heldClip === HM.clip) return; HM.held = true; HM.heldClip = HM.clip; }
   else { HM.held = false; if (!meterDue(now, HM.pT, 0)) return; }
-  const LV = hold ? [0, 0] : HM.la, PK = hold ? [0, 0] : HM.pk;
+  if (!HM.lvs){ HM.lvs = [0, 0]; HM.zero = [0, 0]; }   // lvs: the accumulated maximum as it was when this paint began (HM.la is reset below, before the bars are drawn)
+  if (!hold){ HM.lvs[0] = HM.la[0]; HM.lvs[1] = HM.la[1]; }
+  const LV = hold ? HM.zero : HM.lvs, PK = hold ? HM.zero : HM.pk;
   const r = c.getBoundingClientRect(), dpr = Math.min(2, devicePixelRatio || 1), W = Math.round(r.width * dpr), H = Math.round(r.height * dpr); if (!W || !H) return;
   const cut = !hold && mCut(), blink = cut && Math.floor(now / 400) % 2 === 0;
   if (cut !== !!HM.cut){ HM.cut = cut; if (HM.tip == null) HM.tip = c.title; c.title = cut ? 'The master is turned down by a VOL command on the master track' : HM.tip; }
@@ -29974,10 +29980,10 @@ function specAnalyser(){
   if (dkAn && dkAnM !== master){ try { dkAnM.disconnect(dkAn); } catch(e){} dkAn = dkAnM = null; }
   if (!dkAn && rt && ctx){ try { dkAn = ctx.createAnalyser(); dkAn.fftSize = 4096; dkAn.smoothingTimeConstant = 0.8; master.connect(dkAn); dkAnM = master; dkSpec = new Float32Array(dkAn.frequencyBinCount); } catch(e){ dkAn = null; } } return dkAn; }
 function deckScope(now){
-  if (!deckShown() || !deck.scope || deck.fxbar || !meterDue(now, dkScopeT, 50) || meterHold()) return; dkScopeT = now;   // METERS
+  if (!deckShown() || !deck.scope || deck.fxbar) return; const held = meterHold(); if (held ? mtrB.scope : !meterDue(now, dkScopeT, 50)) return; mtrB.scope = held; dkScopeT = now;   // METERS: OFF paints the grid without the spectrum once, then holds
   const c = $('dkScopeC'), r = c.getBoundingClientRect(), dpr = Math.min(2, devicePixelRatio || 1); if (!r.width || !r.height) return;
   if (c.width !== Math.round(r.width * dpr) || c.height !== Math.round(r.height * dpr)){ c.width = Math.round(r.width * dpr); c.height = Math.round(r.height * dpr); dkScopeIdle = false; }
-  const live = !!(rt && ctx && (tp.on || now - audioWake < 1500)); if (!live && dkScopeIdle) return; dkScopeIdle = !live;
+  const live = !held && !!(rt && ctx && (tp.on || now - audioWake < 1500)); if (!live && dkScopeIdle) return; dkScopeIdle = !live;
   if (live) specAnalyser();
   const W = c.width, H = c.height, g = c.getContext('2d'), st = getComputedStyle($('tDeck'));
   const line = st.getPropertyValue('--track').trim() || '#e6e6e6', muted = st.getPropertyValue('--muted').trim() || '#555', fill = st.getPropertyValue('--scfill').trim() || '#f4a9c4';
@@ -30217,8 +30223,12 @@ function deckFxBarMeters(){
   const mst = dkMst(), t = mst ? NT : dkTrack(), node = fxDynNodeOf(mst ? -1 : t), A = (mst ? S.mfx : S.tfx[t]) || []; fxLvlSet(node);
   dkBarTelNode = A.some(f => f && isFxDyn(f.type)) ? node : null;
   const now = performance.now(), hold = meterHold();
+  if (hold) meterBlank('fxbar', () => bar.querySelectorAll('canvas').forEach(cv => cv.getContext('2d').clearRect(0, 0, cv.width, cv.height))); else mtrB.fxbar = false;
   for (const c of bar.children){ const i = c.querySelector('.fm i'); if (!i) continue; const k = +c.dataset.k; let lv = c._lv0 || 0;
-    if (hold) lv = 0; else if (mtrMode === 'smooth' || meterDue(now, c._w2 || 0, 0)){ c._w2 = now; try { lv = typeof fxSlotLevel === 'function' ? fxSlotLevel(t, k) : 0; } catch(e){ lv = 0; } c._lv0 = lv; }
+    if (hold){ lv = 0; c._lm = 0; }
+    else { let cur = 0; try { cur = typeof fxSlotLevel === 'function' ? fxSlotLevel(t, k) : 0; } catch(e){}
+      if (mtrMode === 'smooth'){ lv = c._lv0 = cur; }
+      else { if (!(c._lm >= cur)) c._lm = cur; if (meterDue(now, c._w2 || 0, 0)){ c._w2 = now; lv = c._lv0 = c._lm; c._lm = cur; } else lv = c._lv0 || 0; } }   // LIGHT: sampled every frame, the highest since the last paint is painted
     const wd = Math.round(clamp(lv, 0, 1) * 100) + '%'; if (i._w !== wd){ i._w = wd; i.style.width = wd; }   // METERS: a changed width only (empty and not read while OFF plays)
     if (hold || !meterDue(now, c._q || 0, 33)) continue; c._q = now; c._h[c._w] = lv; c._w = (c._w + 1) % c._h.length;
     try { dkFxViz(c, A[k], k, node, now); } catch(e){}
