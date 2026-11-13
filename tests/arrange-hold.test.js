@@ -33,3 +33,29 @@ test('the window listeners that start the hold on a tap and on a key are still t
   assert.match(src, /window\.addEventListener\('pointerdown', e => \{[^\n]*e\.target\.closest\('#tPad'\)\) arrActT = workT;/);
   assert.match(src, /window\.addEventListener\('keydown', e => \{ if \(e\.key !== ' ' [^\n]*arrActT = workT = performance\.now\(\); \}, true\);/);
 });
+
+/* ───────── STOP right after you moved: the cursor stays where you put it (12 Nov, owner: "If I press play from pads mode, scroll down, and press stop before the
+   playhead has progressed to row 2, the cursor jumps back to the top row in arrange") ───────── */
+// fpHome is "where the cursor was before FOLLOW first moved it" (9 Nov, ON STOP = STAYS). It is noted at the first step after PLAY and again 4 s after your last
+// key, press or scroll, so a STOP sooner than that restored a note made before you moved. Now it only counts if it is newer than your last move.
+const hm = src.match(/home = (!quiet && tp\.on && !stopToPlayhead\(\) && [^;]*? \? fpHome : null);/);
+assert.ok(hm, 'could not find the STOP CURSOR line in tStop');
+const homeOf = vm.runInNewContext('(quiet, tp, stopToPlayhead, fpHome, workT, arrHandT) => ' + hm[1]);
+const note = t => ({ t, y: 0, top: 0 });
+test('STOP at STAYS: a cursor you moved after FOLLOW noted it stays; an untouched one goes back to the note', () => {
+  const on = { on: true }, stays = () => false;
+  assert.ok(homeOf(false, on, stays, note(100), -1e9, -1e9), 'untouched: restored');
+  assert.ok(!homeOf(false, on, stays, note(100), 200, -1e9), 'a pad press or key after the note: no restore (workT)');
+  assert.ok(!homeOf(false, on, stays, note(100), -1e9, 200), 'a scroll after the note: no restore (arrHandT)');
+  assert.ok(homeOf(false, on, stays, note(300), 200, 250), 'noted again after the last move: restored (the 9 Nov case: FOLLOW carried it away)');
+  assert.ok(!homeOf(false, on, stays, null, 0, 0), 'FOLLOW OFF never noted one');
+});
+test('STOP at the playhead setting, a quiet stop, and a stop that was not playing never use it', () => {
+  const on = { on: true };
+  assert.ok(!homeOf(false, on, () => true, note(100), -1e9, -1e9), 'ON STOP = playhead goes to the playing row instead (stopP)');
+  assert.ok(!homeOf(true, on, () => false, note(100), -1e9, -1e9), 'quiet');
+  assert.ok(!homeOf(false, { on: false }, () => false, note(100), -1e9, -1e9), 'not playing');
+});
+test('followPlay notes the cursor again after a scroll as well as after a key or press', () => {
+  assert.match(src, /if \(!fpHome \|\| workT > fpHome\.t \|\| arrHandT > fpHome\.t\) fpHome = \{t:performance\.now\(\), y:cs\.song\.y, top:cs\.song\.top,/);
+});

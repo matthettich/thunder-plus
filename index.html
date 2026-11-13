@@ -22943,7 +22943,7 @@ function tStop(quiet){
   let stopP = null, home = null;
   G('stop cursor', () => {
   stopP = !quiet && stopToPlayhead() && tp.on && tp.pos && tp.pos.some(Boolean) ? {P:tp.pos.map(q => q && Object.assign({}, q)), mode:tp.mode} : null;
-  home = !quiet && tp.on && !stopToPlayhead() ? fpHome : null; });   // (9 Nov, owner: with ON STOP at STAYS it still ended up at the playback spot: FOLLOW had carried it there)
+  home = !quiet && tp.on && !stopToPlayhead() && fpHome && fpHome.t >= workT && fpHome.t >= arrHandT ? fpHome : null; });   // (12 Nov, owner: PLAY from the pad, ▼ / scroll down, STOP before row 2 jumped the cursor back to the top) fpHome is the cursor as FOLLOW first noted it, and is only noted again 4 s after your last key, press or scroll: a place you moved to after that note stands, only an untouched cursor goes back   // (9 Nov, owner: with ON STOP at STAYS it still ended up at the playback spot: FOLLOW had carried it there)
   tp.timer = 0; tp.on = false; fpMem = null; fpHome = null; tp.q = []; tp.pos = null; tp.snd = null; tp.stopAt = null; tp.ahead = tp.aheadT = 0; tp.rsUntil = 0; PB.rsA = null; G('runaway kick', rkReset);
   // HAND-OVER (seqHandover): the core and the voices already booked keep sounding until the page sequencer's first step
   if (tp.core){ tp.core = false; core.gen++; if (!handing) G('core', () => { coreWire(false); try { core.node.port.postMessage({op:'stop', at:ctx.currentTime}); } catch(e){} }); }
@@ -24228,7 +24228,7 @@ function followPlay(){
   // (owner, 2 Nov: after selecting rows, Arrange stopped paging even with FOLLOW on: this used to return before paging).
   if (selA){ arrFollowPage(own); return; }
   if (performance.now() - workT < FOLLOW_HOLD){ arrFollowPage(own); return; }
-  if (!fpHome || workT > fpHome.t) fpHome = {t:performance.now(), y:cs.song.y, top:cs.song.top, p:cPhrase, s:cSect, py:cs.phrase.y, ptop:cs.phrase.top};   // EDITING: it catches up when you've let go (a change made meanwhile still shows then)
+  if (!fpHome || workT > fpHome.t || arrHandT > fpHome.t) fpHome = {t:performance.now(), y:cs.song.y, top:cs.song.top, p:cPhrase, s:cSect, py:cs.phrase.y, ptop:cs.phrase.top};   // EDITING: it catches up when you've let go (a change made meanwhile still shows then)
   if (followMode === 1){   // FOLLOW PATTERN: only which phrase / sect is shown follows the cursor's track; nothing scrolls
     // ON A CHANGE ONLY (owner, 7 Nov: "a single phrase on a track, I can't move the cursor off of that phrase"): it jumps when
     // what the track plays changes, not on every step, so with one phrase (or one block) playing you can move away from it.
