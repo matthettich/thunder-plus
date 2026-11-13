@@ -22562,10 +22562,8 @@ function chaseFx(row, at){ for (const e of chaseEvs(row, at)) rt.pl.play(e); }
 let napOn = null;   // APP NAP (5 Nov): the desktop app is told when the song plays, so macOS doesn't nap it in the background
 function songBtn(){ document.documentElement.classList.toggle('tpon', !!tp.on);
   { const on = !!tp.on, D = window.thunderDesktop; if (on !== napOn && D && D.app && D.app.playing){ napOn = on; try { D.app.playing(on); } catch(e){} } }   // PLAYING: skins can light the play buttons (IDM: neon pink)
-  if (tp.on && !playWasOn) playWallT = performance.now(); playWasOn = !!tp.on;   // (12 Nov) when this play began: STOP twice (the pad) goes to the top only for a cursor you have not touched since
   const b = $('tSong'); if (!b) return; b.hidden = false; b.classList.toggle('on', tp.on);
 }
-var playWallT = 0, playWasOn = false;
 // The pump's 25 ms tick comes from a Worker: a page timer is slowed to once a second (or frozen) when the app is in
 // the background and nothing audible is playing (a MIDI-only song driving the MPC with the screen off, a muted
 // master), which stalled the sequencer and MIDI clock. A Worker's timer keeps its rate. Page timer as the fallback.
@@ -23215,8 +23213,6 @@ function panic(){
     for (let ch = 0; ch < 16; ch++){ msend([0xB0 | ch, 64, 0], null, false, p); msend([0xB0 | ch, 120, 0], null, false, p); msend([0xB0 | ch, 123, 0], null, false, p); } } } catch(e){ tpLog('panic: MIDI out', e); }
   toast('Panic: every note let go' + (ports ? ' (and All Notes Off on ' + ports + ' MIDI port' + (ports > 1 ? 's' : '') + ')' : '') + '.', 3000);
 }
-let stopTapT = 0;
-function toTop(){ tp.paused = null; cs.song.y = 0; cs.song.top = 0; try { draw(); } catch(e){} toast('Back to the top of the song.', 1500); }
 function tStop(quiet){
   warmTok = null;   // 10 Nov: a STOP (or a restart) cancels a first PLAY still warming up
   // 10 Nov (audit): a throw in one step used to leave PLAYING over silence with no timer, or the Android background stream and the
@@ -24447,7 +24443,7 @@ let resumeOn = (() => { try { return localStorage.getItem(RSK) === '1'; } catch(
 /* STOP CURSOR (owner, 3 Nov: "I like having the edit cursor separate from the playback, but I keep expecting to be able to
    stop playback and to edit the patterns playback stopped on"). Settings → STOP CURSOR, this device: THERE (the default)
    puts the edit cursor where the song stopped (its song row, the cursor's track's phrase and step); STAYS leaves it.
-   STOP twice still goes to the top, RESUME still carries on from the spot. Alt+G (any time) puts the cursor on the playhead.
+   RESUME still carries on from the spot (STOP twice no longer goes to the top: removed 13 Nov, owner). Alt+G (any time) puts the cursor on the playhead.
    STAYS IS THE DEFAULT (owner, 3 Nov: "stopping playback shouldn't drop the edit cursor where the playback ends"): a new
    key (v2), so every device starts on STAYS; THERE is still in Settings, Alt+G still jumps. */
 const STOPCUR_K = 'thunderplus-stopcur-v2';
@@ -27111,12 +27107,7 @@ function press(b, fromKey){
     keyVis(); return;
   }
   if (b === 'play'){
-    // STOP tapped twice (owner, 31 Oct): the second tap, within 450 ms of the stop, plays nothing and puts the song back to
-    // its top (the cursor on row 00, RESUME's stopped spot forgotten), so the next PLAY starts the song from the beginning.
-    // (12 Nov, owner: "pressing play a second time can jump the cursor to the top": it was this, STOP then PLAY inside 450 ms, with the cursor on track 9 where he was working in Arrange.) A place you chose by hand stands: the second tap goes to the top
-    // only when Arrange does not have the keys and no key / pad press / click on the grid has moved anything since this play began; otherwise it is a plain PLAY.
-    if (!tp.on && performance.now() - stopTapT < 450){ stopTapT = 0; if (!(apReady && apF) && Math.max(workT, arrActT, arrHandT) < playWallT){ toTop(); return; } }
-    if (tp.on) stopTapT = performance.now();
+    // (13 Nov, owner: "Remove that shortcut!"; supersedes 31 Oct and build 573's narrowing) a second PLAY tap after a stop is always a plain PLAY from the cursor, whatever the timing; it never moves the cursor.
     if (mod('shift')){ used.shift = true; takeLatch(); playKey(true); } else playKey(false); return; }
   // LOOP is a sticky toggle, not a held key: a tap flips it (the pattern loop; LOOP SEL is in the tab bar on a computer).
   if (b === 'loop'){ toggleLoopPat(); clearTimeout(rep); return; }
