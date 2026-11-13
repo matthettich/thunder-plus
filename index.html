@@ -26828,7 +26828,30 @@ function keyHint(s){
 // GENERATORS (owner, 2 Nov: "call that generators", findable from a right-click in the phrase or pattern editor): the
 // pattern writers, in their own group of Edit ▾ and the right-click menu, before Tools.
 // GEN key (PAD mode): the Generators menu (Acid line, Euclidean fill…) over the key; off the Phrase screen they say why
+// GEN FROM THE SONG / ARRANGE (12 Nov, owner: "pressing GEN from the arrangement window should kick us over into the phrase under the cursor, not tell us to navigate
+// there"; on an empty cell: "make a new pattern"): on a block it opens that block's phrase on its track, as a second tap on it does; on an empty cell it makes a
+// new empty pattern first (arrNewAt: the double-click's path, so UNIQUE PER TRACK and its 'New pattern' toast, one undo step), then opens it. The menu opens on the
+// phrase. True when it stopped with a toast (the master column, sections on, no free pattern, a bus that takes no notes).
+function genToPhrase(){
+  const x = cs.song.x, y = cs.song.y, row = S.song[y];
+  if (!row) return true;
+  if (x === MT){ toast('The master track takes commands, not generated notes · pick a track’s block.', 2200); return true; }
+  const why = genRefuse(x); if (why){ toast(why, 2600); return true; }
+  if (row[x] < 0){
+    if (sectsOn){ toast('Sections are on: put a block here first (EDIT×2), then GEN.', 2200); return true; }
+    arrNewAt(y, x);
+    if (!(S.song[y][x] >= 0)) return true;   // newBlock already said why (no free sects or phrases)
+  }
+  tv = 'song'; go('phrase');
+  return false;
+}
+function genRefuse(t){ return ''; }   // (a track that takes no generated notes: a bus, item 8)
 function genMenu(fromKeys){
+  // (the phrase opens first; Arrange beside it may scroll to the block, and a scroll of its grid closes menus, so the menu opens two frames later)
+  if (tv === 'song' && view === 'tracker'){ if (!genToPhrase()) requestAnimationFrame(() => requestAnimationFrame(() => { if (tv === 'phrase') genMenuOpen(fromKeys); })); return; }
+  genMenuOpen(fromKeys);
+}
+function genMenuOpen(fromKeys){
   const b = $('kGen'), kr = b ? b.getBoundingClientRect() : null, onKey = !fromKeys && kr && kr.width;
   // Ctrl/⌘+G (7 Nov), or no GEN key on screen: just under the cursor's cell, else the middle of the screen
   const cu = onKey ? null : $('tGrid').querySelector('.cur'), cr = cu && cu.getBoundingClientRect();
@@ -27515,6 +27538,7 @@ function songKey(skipPh){
   return {root:best.root, scale:best.minor ? 0 : 6, name:ROOTS[best.root] + (best.minor ? ' minor' : ' major'), from:'the notes on track' + (tl.length > 1 ? 's ' : ' ') + tn, c:best.c};
 }
 function acidLine(){
+  if (tv === 'song' && view === 'tracker' && genToPhrase()) return;   // (12 Nov, owner) Alt+B on the Song / Arrange opens the block's phrase first, as GEN does
   if (view !== 'tracker' || tv !== 'phrase' || mstView()) return toast('Open a phrase first: Acid line writes a bass line into it.');
   if (busTrack(cTrack)) return busSay();
   // FIX (sweep, 4 Nov): an empty phrase is only put in the song when GENERATE writes into it, not when the panel opens
