@@ -1813,6 +1813,10 @@ body.sdesk .dock:not(.vtrk) .pads .pad:nth-child(17)::before{content:'More slots
 .tgrid.pvon span.sel{background:var(--pv-sel); color:var(--ts-ink)}
 .tgrid span.pvnow:not(.cur):not(.sel):not(.pl){background-image:linear-gradient(color-mix(in srgb, var(--ts-cur-bg) 13%, transparent), color-mix(in srgb, var(--ts-cur-bg) 13%, transparent))}
 .tgrid span.pvdim{opacity:.45}
+/* PER-TRACK PLAYHEAD (12 Nov, owner: "Hop command in pattern view cannot show playhead for that pattern"): each track's column lights the row that track is playing, when
+   the phrase the column shows is the phrase it plays (pvPlayMark). A band in the skin's own ink, well under the cursor's solid cell; no animation, no colour of its own,
+   so the Low power skins stay black and grey. */
+.tgrid.pvon span.pvpl:not(.cur):not(.sel){background-image:linear-gradient(color-mix(in srgb, var(--ts-ink) 24%, transparent), color-mix(in srgb, var(--ts-ink) 24%, transparent))}
 .tgrid span.pvmore{text-decoration:underline dotted; text-underline-offset:.2em}
 /* ===== end PATTERN VIEW ===== */
 
@@ -28193,7 +28197,7 @@ function draw(){
   const gl = L.map(ln => '<div class="ln' + (ln.b4 ? ' b4' : '') + (ln.wrap ? ' wrap' : '') + (ln.fxsel ? ' fxsel' : '') + '">' + ln.map(spanH).join('') + '</div>');
   if (tv === 'fx' && fxA != null && fxB != null){ gl.splice(fxB, 0, '</div><div class="ln fxcue"></div>'); gl.splice(fxA, 0, '<div class="fxpane">'); }
   const gh = gl.join('');
-  const rebuilt = gh !== gridHTML; if (rebuilt){ gridHTML = gh; grid.innerHTML = gh; gridLit = []; }
+  const rebuilt = gh !== gridHTML; if (rebuilt){ gridHTML = gh; grid.innerHTML = gh; gridLit = []; pvLit.clear(); pvSp.clear(); pvLnEls = null; }
   if (tv === 'fx') fxPaneFit(rebuilt);   // unchanged screens (most redraws while playing) skip the rebuild
   pvBusFrame(rebuilt);
   modScSync(rebuilt);   // MOD: the LFO scopes (nothing on any other screen)
@@ -28201,6 +28205,7 @@ function draw(){
   if (prLit || gridLit.length){ for (const e of gridLit) e.classList.remove('pl', 'plr'); gridLit = [];
     if (prLit) for (const y of prLit){ const e = grid.querySelector(`span.rn[data-r="${y}"]`); if (e){ e.classList.add('pl'); gridLit.push(e);
       const ln = e.closest('.ln'); if (ln){ ln.classList.add('plr'); gridLit.push(ln); } } } }
+  if (tv === 'phrase' && pvActive()) pvPlayMark(tp.on ? tp.pos : null); else if (pvLit.size) pvPlayMark(null);   // PER-TRACK PLAYHEAD (Pattern view): only while playing (the gutter's mark keeps RESUME's stopped spot; the bands go on STOP)
   const ph = pset ? pset.map(spanH).join('') : ''; if (ph !== psetHTML){ psetHTML = ph; $('tPset').innerHTML = ph; }
   // Song and Phrase page their own rows; the list screens (Inst, FX, Project) can be taller than the
   // screen, so keep the cursor's line in view.
@@ -34563,6 +34568,20 @@ function pvFollow(P, own){   // the song row follows; the cursor keeps its track
 // A tap on another track opens its phrase there; on the open track it moves the cursor (only the cursor's own cell, and
 // the row numbers, are left to gridDown: dragging the cursor's cell changes its value, a row number selects lines).
 let pvMap = [];
+// PER-TRACK PLAYHEAD (12 Nov, owner: "Hop command in pattern view cannot show playhead for that pattern"): the row gutter's mark (prLit) follows only the phrases that are the open
+// one, so a track that HOPped (or plays another phrase) showed nothing in its own column. Each track's column now lights the row that track plays (tp.pos[t] = {row, phrase,
+// step}) when the phrase the column shows is the phrase it plays, wherever the cursor is, whatever FOLLOW is. Marked in place after the grid is built (class toggles on the
+// column's spans, found by pvtN; no rebuild, no layout read), and only when a (track, row) pair changed; STOP clears them (P is null then).
+var pvLay = null, pvLit = new Map(), pvSp = new Map(), pvLnEls = null;   // var: draw() can run before this line. pvLit: (track * 512 + row) -> its lit spans; pvSp: the spans found, kept until the grid is rebuilt
+function pvPlayMark(P){
+  const lay = P ? pvLay : null, want = [];
+  if (lay) for (const g of lay.cols){ const q = P[g.t]; if (q && q.phrase === g.ph && q.step != null && q.step >= lay.top && q.step < lay.top + lay.n && q.step < g.len) want.push(g.t * 512 + q.step); }
+  for (const [k, els] of pvLit) if (want.indexOf(k) < 0){ for (const e of els) e.classList.remove('pvpl'); pvLit.delete(k); }
+  for (const k of want){ if (pvLit.has(k)) continue;
+    let els = pvSp.get(k);
+    if (!els){ if (!pvLnEls) pvLnEls = grid.querySelectorAll(':scope > .ln'); const ln = pvLnEls[3 + (k % 512 - lay.top)]; els = ln ? [...ln.querySelectorAll('.pvt' + (k >> 9))] : []; pvSp.set(k, els); }
+    for (const e of els) e.classList.add('pvpl'); pvLit.set(k, els); }
+}
 // PATTERN VIEW + MOUSE (21 Oct): a track's band (its number and name over the columns): Alt-click mutes it, right-click solos
 // it, a double-click names it. A plain click still opens that track (below).
 // FIX (UI sweep, 4 Nov): the open track's own band (.pvhc) has no map entry (a tap on it does nothing), so its Alt-click,
@@ -34673,6 +34692,7 @@ function pvLines(c, L, cc, rsel, playRows){
   if (c.y >= 0 && !(c.pg && followOn && tp.on)){ c.pg = false; if (c.y < c.top) c.top = c.y; if (c.y > c.top + VR - 1) c.top = c.y - VR + 1; }   // (c.pg: EDIT WHILE FOLLOWING)
   c.top = clamp(c.top, 0, Math.max(0, rowsN - VR));
   const CG = G.find(g => g.cur); if (c.y >= 0 && !CG.C.includes(c.x)) c.x = pvNear(CG.C, c.x);
+  pvLay = {top:c.top, n:Math.max(0, Math.min(rowsN, c.top + VR) - c.top), cols:G.filter(g => !g.fold && g.ph >= 0).map(g => ({t:g.t, ph:g.ph, len:g.len}))};   // PER-TRACK PLAYHEAD: what each column shows
   // Lines are made of spans only, so a tap finds its track by position: pvMap[line][span] = {t, x, y} (null: not another track).
   const map = pvMap = [], rnW = rS(0).length, curLen = plen(cPhrase);
   let ln = null, lm = null;
@@ -34701,7 +34721,7 @@ function pvLines(c, L, cc, rsel, playRows){
   // {t, y, g, c0}: the run starts c0 characters into track group g). The cursor's cell stays a span of its own, the phrase
   // editor's data-x / data-y cell, so dragging it still changes its value (gridDown).
   const cells = (g, y, C) => {   // C: [[x, text, cls], …] in column order; the space between two columns joins the run before it
-    const tint = (g.cur ? ' pvc' + pvTk(g.t) : '') + (g.bus ? ' pvbus' + busCls(g.t) : feedsBus(g.t) ? ' pvfeed' + busCls(g.t) : ''), i0 = ln.length;   // BUS: its own colour down its columns; a track feeding one, a lighter wash of it
+    const tint = ' pvt' + g.t + (g.cur ? ' pvc' + pvTk(g.t) : '') + (g.bus ? ' pvbus' + busCls(g.t) : feedsBus(g.t) ? ' pvfeed' + busCls(g.t) : ''), i0 = ln.length;   // BUS: its own colour down its columns; a track feeding one, a lighter wash of it
     let run = null, pos = 0;
     const flush = () => { if (run) put(run.t, run.cls || 'pvsp' + tint, {t:g.t, y:y >= 0 ? y : null, g, c0:run.c0}); run = null; };
     C.forEach(([x, s, cls], j) => {
