@@ -20,7 +20,7 @@
   --bench:#ffffff; --panel:#ffffff; --panel-2:#f3f3f3; --edge:#111111; --ink:#111111; --muted:#555555; --track:#e6e6e6;
   --side:#efefef; --frame:#efefef; --glass:#050607;
   --video:#e3962a; --audio:#22958d; --audio-dark:#16625d; --mod:#7a58c8; --mod-dark:#4b318e; --gate:#c93d78; --gate-dark:#86214c; --rec:#cc3a2c;
-  --selc:#ff3d8b;
+  --selc:#111111;   /* the selection mark (module outline, cable halo): a neutral ink, never audio / control / gate (13 Nov, audit U1); skins set it */
   --font:Futura, "Futura PT", Jost, "Century Gothic", "Avenir Next", system-ui, sans-serif;
   color-scheme:light; box-sizing:border-box;
   padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
@@ -154,9 +154,21 @@ button{cursor:pointer}
 svg.cables{position:absolute; left:0; top:0; width:1px; height:1px; overflow:visible; pointer-events:none; z-index:1000000}
 svg.cables .cln{stroke-width:2.5px; stroke-linecap:square; stroke-linejoin:miter}
 svg.cables .cln.ctl{stroke-width:2px; stroke-dasharray:6 4}
-svg.cables .hit{cursor:pointer}
-svg.cables rect.bend{fill:var(--panel); stroke:var(--ink); stroke-width:1.5; pointer-events:none; opacity:0; cursor:move}
-body.alting svg.cables rect.bend{opacity:1; pointer-events:all}
+/* SIGNAL KINDS (13 Nov, audit M9, U1): told apart without hue. Audio is a solid line and a round jack, control a dashed line and a
+   round jack, gate a dotted line (round dots) and a diamond jack. */
+svg.cables .cln.gate{stroke-width:3px; stroke-linecap:round; stroke-dasharray:.1 7}
+/* CABLE STATES (13 Nov, audit D6, D9): hover and selected are CSS only (nothing runs per frame). The wide invisible .hit line is the halo;
+   its width is 14 screen pixels at any zoom (--iz is 1 / zoom, written when the zoom changes: Chrome's hit test ignores non-scaling strokes). */
+svg.cables .hit{cursor:pointer; stroke-width:calc(14px * var(--iz, 1))}
+svg.cables g:hover > .hit{stroke:var(--selc); stroke-opacity:.16}
+svg.cables g.sel > .hit{stroke:var(--selc); stroke-opacity:.32}
+svg.cables g:hover > .cln, svg.cables g.sel > .cln{stroke-width:4px}
+svg.cables g:hover > .cln.ctl, svg.cables g.sel > .cln.ctl{stroke-width:3.5px}
+svg.cables g:hover > .cln.gate, svg.cables g.sel > .cln.gate{stroke-width:4.5px}
+svg.cables g.dim{opacity:.3}   /* a module is selected: the cables that do not touch it step back */
+svg.cables rect.bend{fill:var(--panel); stroke:var(--ink); stroke-width:1.5; vector-effect:non-scaling-stroke; pointer-events:none; opacity:0; cursor:move;
+  transform-box:fill-box; transform-origin:center; transform:scale(var(--hs, 1))}   /* --hs keeps a handle about 12 px across when zoomed out */
+svg.cables g:hover > rect.bend, svg.cables g.sel > rect.bend, body.alting svg.cables rect.bend{opacity:1; pointer-events:all}
 
 .node{position:absolute; width:250px; background:var(--panel); border:3.5px solid var(--edge); user-select:none; -webkit-user-select:none; cursor:default}
 .node > header{display:flex; align-items:center; gap:8px; padding:7px 8px 7px 12px; cursor:grab; border-bottom:2px solid var(--edge); touch-action:none}
@@ -177,9 +189,40 @@ body.alting svg.cables rect.bend{opacity:1; pointer-events:all}
 .node.collapsed > header .fold svg{transform:rotate(-90deg)}
 .node.collapsed > .body{display:none}
 .node.collapsed > .ports{border-bottom:0}
+/* COMPACT (13 Nov, audit C1 to C9): what a collapsed module shows. Colours come from the variables at the top. */
+.node.collapsed{min-height:64px}
+.node.collapsed > header{padding:4px 8px 2px 12px; border-bottom:0}
+.node.collapsed > header .x{width:22px; height:22px}
+.csum{display:none}
+.node.collapsed > .csum{display:flex; align-items:center; gap:6px; position:relative; padding:2px 12px 5px; font-size:12px; line-height:16px; min-height:22px}
+.cs-t{flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--ink)}
+.cs-l{color:var(--muted)}
+.cs-i + .cs-i::before{content:' · '; color:var(--muted); white-space:pre}
+.cs-i.modded .cs-v{color:var(--mod); font-weight:600}
+.cs-m{display:flex; align-items:center; gap:5px; flex:none}
+.cs-m:empty{display:none}
+.mk{font-style:normal; font-size:10.5px; font-weight:700; line-height:1; letter-spacing:.04em; color:var(--muted)}
+.mk.dk{width:6px; height:6px; border-radius:50%; background:var(--mod)}
+.mk.cc{color:var(--gate)}
+button.mk.more{border:1px solid var(--muted); background:none; padding:2px 5px; min-height:0}
+button.mk.more:hover{color:var(--ink); border-color:var(--ink)}
+.clvl{position:absolute; left:0; right:0; bottom:0; height:3px; background:color-mix(in srgb, var(--edge) 14%, transparent); overflow:hidden}
+.clvl b{display:block; height:100%; background:var(--audio); transform:scaleX(0); transform-origin:left}
+.node.collapsed > .ports{padding:2px 0 4px; border-bottom:0; gap:8px}
+.node.collapsed > .ports.none, .node:not(.collapsed) > .ports.synth{display:none}
+.node.collapsed .ins, .node.collapsed .outs{grid-auto-flow:column; grid-template-rows:repeat(2, auto); gap:2px 24px}   /* two rows, then a new column */
+.node.collapsed .port{height:20px; gap:5px; font-size:12px}
+.node.collapsed .port.free{display:none}
+.node.collapsed .port > .pl{min-width:0; max-width:56px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.node.collapsed .jack{transform:scale(.85)}
+.node.collapsed .jack[data-kind="gate"]{transform:rotate(45deg) scale(.85)}
+.port.stub > .pl{color:var(--mod)}
+.node:not(.collapsed) .port.stub{display:none}
+.node.collapsed.dense .port > .pl{display:none}
+@media (pointer: coarse){ .node > header .fold{position:relative} .node > header .fold::before{content:''; position:absolute; inset:-9px -10px} }
 @media (prefers-reduced-motion: reduce){ .node > header .fold svg{transition:none} }
 .node.selected{outline:3px solid var(--selc) !important; outline-offset:3px}
-.node.selected > header{background:color-mix(in srgb, var(--panel-2) 70%, var(--selc) 30%) !important}
+.node.selected > header{background:color-mix(in srgb, var(--panel-2) 84%, var(--selc) 16%) !important}   /* (13 Nov: 16%, the neutral selection mark would read as greyed out at 30%) */
 .node.selected::after{content:''; position:absolute; inset:0; background:var(--selc); opacity:.07; pointer-events:none}
 
 .ports{display:flex; justify-content:space-between; gap:10px; padding:7px 0; border-bottom:2px solid var(--edge)}
@@ -193,6 +236,9 @@ body.alting svg.cables rect.bend{opacity:1; pointer-events:all}
 .jack[data-kind="audio"]{--k:var(--audio)}
 .jack[data-kind="mod"]{--k:var(--mod)}
 .jack[data-kind="gate"]{--k:var(--gate)}
+/* GATE JACK (13 Nov, audit M9, U1): a diamond (a rotated square: the ring and target glow follow it, the centre stays put for the cables) */
+.jack[data-kind="gate"]{width:15px; height:15px; margin:2.5px; border-radius:2px; transform:rotate(45deg);
+  background:radial-gradient(circle, var(--glass) 0 3px, #4a4f57 3.5px 5px, var(--k) 5.5px)}
 .jack.small{width:16px; height:16px; position:absolute; left:-20px; top:50%; margin-top:-8px;
   background:radial-gradient(circle, var(--glass) 0 3px, #4a4f57 3.5px 4.5px, var(--k) 5px)}
 .jack.target{box-shadow:0 0 0 2px var(--panel), 0 0 0 5px var(--k)}
@@ -276,8 +322,8 @@ body.learning .row.sl{outline:1px dashed var(--muted); outline-offset:3px}
 /* ---------- touch screens and narrow windows ---------- */
 @media (pointer: coarse){
   .port{height:32px} .ins, .outs{gap:8px}
-  .jack{position:relative} .jack::before{content:''; position:absolute; inset:-9px; border-radius:50%}
-  svg.cables .hit{stroke-width:26px}
+  .jack{position:relative} .jack::before{content:''; position:absolute; inset:-9px; border-radius:50%} .jack[data-kind="gate"]::before{inset:-11px}
+  svg.cables .hit{stroke-width:calc(26px * var(--iz, 1))}
   .tb, .btn{min-height:42px}
   select, input{font-size:16px}
   input[type=range]{height:34px}
@@ -360,7 +406,7 @@ document.addEventListener('contextmenu', e => { if (e.cancelable && !(e.target.c
     <div id="groups"></div>
     <svg class="cables" id="cables" xmlns="http://www.w3.org/2000/svg"></svg>
   </div>
-  <div class="hint" id="hint"><span>Drag from an output jack to an input jack to patch (on a touch screen you can also tap one jack, then the other; double-tap a cable to remove it). Every slider has a small purple jack on its left: patch an LFO, envelope or any other signal into it to move that slider. Drag a patched input to move its cable, or drop it on empty space to unplug. Hold Option (Alt on Windows) and click while drawing a cable to bend it, or Option-drag an existing cable. Double-click a cable to remove it, or a module’s title bar to collapse it. Drag the background or scroll with two fingers to pan, and pinch to zoom. Shift-click or Shift-drag to select modules, then right-click to group them. Start with a Track In (your tracker track) and end with a Chain Out back to the same track.</span><button id="hintx" aria-label="Hide tips">×</button></div>
+  <div class="hint" id="hint"><span>Drag from an output jack to an input jack to patch (on a touch screen you can also tap one jack, then the other; double-tap a cable to remove it). Every slider has a small purple jack on its left: patch an LFO, envelope or any other signal into it to move that slider. Drag a patched input to move its cable, or drop it on empty space to unplug. Hold Option (Alt on Windows) and click while drawing a cable to bend it, or Option-drag an existing cable. Click a cable to select it (Delete removes it, and its bend handles show: drag one to move the bend), double-click it to remove it, or a module’s title bar to collapse it. Gate cables are dotted and gate jacks are diamonds. Drag the background or scroll with two fingers to pan, and pinch to zoom. Shift-click or Shift-drag to select modules, then right-click to group them. Start with a Track In (your tracker track) and end with a Chain Out back to the same track.</span><button id="hintx" aria-label="Hide tips">×</button></div>
   <div class="lasso" id="lasso" hidden></div>
   <div class="emptylbl" id="emptylbl" aria-hidden="true" hidden></div>
   <div class="toast" id="toast" hidden></div>
@@ -1504,6 +1550,23 @@ function chainsStereoUp(d){
   d.cables.push(...add); d.st2 = 1;
   return d;
 }
+/* SUMMARY KEYS (owner decision 2, 13 Nov: "as a test; keep the key list easy to change per module").
+   What a collapsed (Compact) module shows under its title: up to three values. Unless a module is listed here, or its
+   definition has a key:[...] list, it is the module's FIRST SELECT plus its FIRST TWO SLIDERS, in the order of its params.
+   To choose others, add a line, for example:   delay:['time', 'regen', 'mix'],
+   Names are param keys; one that does not exist, is hidden or is not shown (a mixer channel above Inputs) is skipped. */
+const SUMMARY_KEYS = {
+  // type:['paramKey', 'paramKey', 'paramKey'],
+};
+const SUMMARY_DEFAULT = { selects:1, sliders:2 };
+function summaryKeys(m){
+  const def = MODULES[m.type]; if (!def) return [];
+  const ok = k => k in def.params && k[0] !== '_' && !(def.ui[k] || {}).hide && mixShown(m, k);
+  const own = def.key || SUMMARY_KEYS[m.type];
+  if (own) return own.filter(ok).slice(0, 3);
+  const keys = Object.keys(def.params).filter(ok), sel = keys.filter(k => choicesOf(m.type, k)), sl = keys.filter(k => !choicesOf(m.type, k));
+  return [...sel.slice(0, SUMMARY_DEFAULT.selects), ...sl.slice(0, SUMMARY_DEFAULT.sliders)];
+}
 /* ===SHARED EDITOR END=== */
 /* TRACK IN STEREO (owner, 20 Oct): the starter patch sent only Track In's left side into its first effect, so the track
    reached the chain as its left channel, played as mono. A patch made before (ti2 not set) gets, once, for each Track In
@@ -1692,7 +1755,13 @@ function deckChange(fn){
   store.snapshot(); doc.deck = (doc.deck || []).slice(); fn(doc.deck); store.touch(); store.save();
   markDeck(); if (EMBED && TW && TW.deck) TW.deck();
 }
-function markDeck(){ for (const n of nodes.values()) for (const k in n.ctl){ const r = n.ctl[k].row; if (r) r.classList.toggle('indeck', deckHas(n.m.id, k)); } }
+function markDeck(){
+  const cnt = new Map(); for (const d of doc.deck || []) cnt.set(d.id, (cnt.get(d.id) || 0) + 1);
+  for (const n of nodes.values()){
+    for (const k in n.ctl){ const r = n.ctl[k].row; if (r) r.classList.toggle('indeck', deckHas(n.m.id, k)); }
+    const c = cnt.get(n.m.id) | 0; if (n.nDeck !== c){ n.nDeck = c; paintMarks(n); }   // COMPACT: the dot on the summary line
+  }
+}
 
 /* Families give each module its edge color, as in Seeds. */
 const FAMILY = { trackIn:'aout',
@@ -2089,8 +2158,9 @@ function portEl(n, port, kind, dir){
   const j = makeJack(n, port, KIND[kind] || 'mod', dir), pt = portTip(n.m.type, port);
   // A thin level meter beside every jack: what comes out of an output, what arrives at a patched input.
   const pm = h('i', {class:'pm', 'data-kind': KIND[kind] || 'mod', 'aria-hidden':'true'}, h('b'));
-  (n.pms || (n.pms = {}))[dir + ':' + port] = { el:pm.firstChild, v:0, shown:-1 };
-  const row = h('div', {class:'port'}, j, pm, h('span', {text: (pt && pt.l) || portName(n.m.type, port, dir)}));
+  (n.pms || (n.pms = {}))[dir + ':' + port] = { el:pm.firstChild, v:0, shown:-1, aud: dir === 'out' && KIND[kind] === 'audio' };
+  const row = h('div', {class:'port'}, j, pm, h('span', {class:'pl', text: (pt && pt.l) || portName(n.m.type, port, dir)}));
+  (n.portRows || (n.portRows = {}))[dir + ':' + port] = row;   // COMPACT hides the ones with no cable
   // SC LED (owner, 19 Oct): a light beside an SC input that flashes with the sidechain the module hears (a cable into
   // SC, or the track or send its Source picks), so you can see the sidechain at work.
   if (dir === 'in' && port === 'sc'){ const led = h('i', {class:'scled', 'aria-hidden':'true', title:'Lights with the sidechain this module hears'}); row.append(led); n.scLed = { el:led, v:0, shown:-1 }; }
@@ -2150,6 +2220,7 @@ function setParam(n, key, v, fromUser){
   if (key === 'chans' && MIXT.has(n.m.type)){ mixResize(n); return; }
   const c = n.ctl[key]; if (c && !fromUser) c.show();
   if (IO_KEY[n.m.type] === key) ioTitle(n);
+  if (n.m.collapsed) paintSum(n);
   store.touch();
 }
 // A mixer's Inputs changed: cables into channels that are now hidden come out, their controls leave the bottom panel,
@@ -2175,7 +2246,7 @@ function slider(n, key, spec){
   const [def, min, max, step] = spec, fmt = fmtOf(n.m.type, key), label = plabel(n.m.type, key);
   const out = h('span', {class:'val', title:'Double-click or double-tap to type a value'}), mark = h('span', {class:'mark', hidden:true});
   const inp = h('input', {type:'range', min, max, step, 'aria-label': label});
-  const show = () => { inp.value = n.m.params[key]; if (!out.querySelector('input') && !r.classList.contains('modded')) out.textContent = fmt(+n.m.params[key]); };
+  const show = () => { inp.value = n.m.params[key]; if (!out.querySelector('input') && !r.classList.contains('modded')) out.textContent = fmt(+n.m.params[key]); if (n.m.collapsed) paintSum(n); };
   n.ctl[key] = { show, range:{min, max, step} };
   const typeBox = () => {
     if (out.querySelector('input')) return;
@@ -2247,7 +2318,7 @@ function slider(n, key, spec){
 function choice(n, key, options){
   const label = plabel(n.m.type, key);
   const sel = h('select', {'aria-label': label}, options.map(([v, t]) => h('option', {value: v, text: t})));
-  const show = () => { sel.value = String(Math.round(n.m.params[key])); };
+  const show = () => { sel.value = String(Math.round(n.m.params[key])); if (n.m.collapsed) paintSum(n); };
   n.ctl[key] = { show, range:{min: options[0][0], max: options[options.length - 1][0], step:1} };
   sel.addEventListener('pointerdown', () => store.snapshot());
   // A Track In's track list marks (and greys out) the tracks other Track Ins already use, refreshed as it opens.
@@ -2266,14 +2337,12 @@ function choice(n, key, options){
   show();
   return r;
 }
-// FOLDED I/O (owner, 3 Nov): a collapsed Track In / Chain Out / Sidechain In / Out shows what it is connected to in its
-// title ("Track In · Track 5"), so a folded patch still reads; unfolded the control below says it.
+// FOLDED I/O (owner, 3 Nov; moved 13 Nov): a collapsed Track In / Chain Out / Sidechain In / Out shows what it is connected to on its
+// summary line ("Track 5 · Level 100%"), so a folded patch still reads; it used to be added to the title, which was cut off.
 const IO_KEY = { trackIn:'track', chainOut:'track', scin:'sck', scout:'snd' };
 function ioTitle(n){
-  if (!n.tEl) return; const base = n.m.label || MODULES[n.m.type].label, k = IO_KEY[n.m.type];
-  let t = base;
-  if (k && n.m.collapsed){ const c = choicesOf(n.m.type, k), v = n.m.params[k], o = c && c.find(x => x[0] === v); if (o) t += ' · ' + o[1]; }
-  if (n.tEl.textContent !== t) n.tEl.textContent = t;
+  if (!n.tEl) return; const t = n.m.label || MODULES[n.m.type].label;
+  if (n.tEl.textContent !== t) n.tEl.textContent = t;   // C6 (13 Nov): the track is on the summary line (its first select), not in the title
 }
 function paintNote(n){
   ioTitle(n);
@@ -2462,6 +2531,7 @@ function buildNode(m){
   const def = MODULES[m.type]; if (!def) return null;
   const n = { m, jacks:{}, ctl:{} };
   const title = m.label || def.label;
+  n.title = title;
   const fold = h('button', {class:'fold', 'aria-label':'Collapse ' + title, 'aria-expanded':'true', title:'Collapse (or double-click the title bar)'});
   fold.innerHTML = FOLD_SVG;
   fold.addEventListener('click', () => { store.snapshot(); setCollapsed(n, !m.collapsed); });
@@ -2471,9 +2541,10 @@ function buildNode(m){
     h('button', {class:'x', 'aria-label':'Remove ' + title, title:'Remove', text:'×', onclick: () => { store.snapshot(); removeModule(m.id); }}));
   for (const k in def.params) if (m.params[k] == null) m.params[k] = def.params[k][0];
   const ins = Object.keys(def.inputs).filter(p => mixShown(m, p)), outs = Object.keys(def.outputs);
-  const ports = (ins.length || outs.length) ? h('div', {class:'ports'},
-    h('div', {class:'ins'}, ins.map(p => portEl(n, p, def.inputs[p], 'in'))),
+  const ports = (ins.length || outs.length || Object.keys(def.params).length) ? h('div', {class:'ports' + (ins.length || outs.length ? '' : ' synth')},
+    (n.insEl = h('div', {class:'ins'}, ins.map(p => portEl(n, p, def.inputs[p], 'in')))),
     h('div', {class:'outs'}, outs.map(p => portEl(n, p, def.outputs[p], 'out')))) : null;
+  n.portsEl = ports;
   const kids = [], pre = presetRow(n); if (pre) kids.push(pre);   // PRESETS
   for (const k in def.params){
     if (m.params[k] == null) m.params[k] = def.params[k][0];
@@ -2489,13 +2560,14 @@ function buildNode(m){
   if (def.display) kids.push(buildShow(n));
   if (NOTES[m.type]){ n.note = h('div', {class:'status'}); kids.push(n.note); }
   const body = h('div', {class:'body'}, kids);
-  n.el = catStyle(h('div', {class:'node fam-' + famOf(m.type), 'data-id': m.id}, head, ports, n.mini || null, body), m.type);   // n.mini: a folded dynamics module's meter
+  buildSummary(n);   // COMPACT: the collapsed look
+  n.el = catStyle(h('div', {class:'node fam-' + famOf(m.type), 'data-id': m.id}, head, n.sum, ports, n.mini || null, body), m.type);   // n.mini: a folded dynamics module's meter
   n.head = head;
   n.el.style.left = m.pos[0] + 'px'; n.el.style.top = m.pos[1] + 'px';
   n.el.style.zIndex = ++zTop;
   paintNote(n);
   n.el.addEventListener('pointerdown', e => { if (e.button === 1 && e.pointerType === 'mouse') return; e.stopPropagation(); n.el.style.zIndex = ++zTop; if (MAC && e.ctrlKey && e.pointerType === 'mouse') return; maxBodyDown(e, n); });   // middle: the canvas pans; Mac Ctrl+click: the menu (3 Nov)
-  head.addEventListener('dblclick', e => { if (e.target.closest('button')) return; store.snapshot(); setCollapsed(n, !m.collapsed); });
+  head.addEventListener('dblclick', e => { if (e.target.closest('button')) return; foldToggle(n); });
   head.addEventListener('pointerdown', e => {
     if (e.target.closest('button') || e.button !== 0 || (MAC && e.ctrlKey && e.pointerType === 'mouse')) return;   // left button only (3 Nov: a middle-drag moved it)
     e.preventDefault();
@@ -2519,7 +2591,7 @@ function buildNode(m){
     nodeDragging = v => { extra[0] -= v[0]; extra[1] -= v[1]; place(); };
     let pend = 0;
     const mv = ev => { lastEv = ev; autoPanAt(ev); markScene(); if (!pend) pend = requestAnimationFrame(() => { pend = 0; place(); }); };
-    const up = ev => { if (ev) lastEv = ev; if (pend){ cancelAnimationFrame(pend); pend = 0; } place(); nodeDragging = null; autoPanV = [0, 0]; head.removeEventListener('pointermove', mv); head.removeEventListener('pointerup', up); head.removeEventListener('pointercancel', up); if (moved) store.touch(); };
+    const up = ev => { if (ev) lastEv = ev; if (pend){ cancelAnimationFrame(pend); pend = 0; } place(); nodeDragging = null; autoPanV = [0, 0]; head.removeEventListener('pointermove', mv); head.removeEventListener('pointerup', up); head.removeEventListener('pointercancel', up); if (!moved && ev && ev.type === 'pointerup' && ev.pointerType === 'touch') headTap(n, ev); if (moved) store.touch(); };
     head.addEventListener('pointermove', mv); head.addEventListener('pointerup', up); head.addEventListener('pointercancel', up);
   });
   if (m.collapsed) setCollapsed(n, true, true);
@@ -2528,13 +2600,139 @@ function buildNode(m){
   nodes.set(m.id, n);
   return n;
 }
+/* ----- COMPACT: how a collapsed module looks (owner audit, 13 Nov: C1 to C9) -----
+   Collapsing keeps the title bar and shows, under it: a summary line with the module's key values (summaryKeys: its first
+   select and first two sliders unless SUMMARY_KEYS or the module's own key:[…] says otherwise), the ports that have a cable
+   (the others are hidden; "+N" says how many, a click opens the module), one labelled stub per modulated parameter, a thin
+   level strip, and the MIDI / bottom-panel marks. The saved state is still m.collapsed (true = Compact), so old patches
+   open as they were and nothing new is written into the patch. Text is written only when it changes. */
+function foldLabel(n){
+  const c = n.m.collapsed, t = n.title;
+  n.foldBtn.setAttribute('aria-label', (c ? 'Expand ' : 'Collapse ') + t);
+  n.foldBtn.title = (c ? 'Expand' : 'Collapse') + ' (or double-click the title bar)';
+}
 function setCollapsed(n, c, quiet){
   n.m.collapsed = !!c;
   n.el.classList.toggle('collapsed', n.m.collapsed);
-  n.foldBtn.setAttribute('aria-expanded', String(!n.m.collapsed)); ioTitle(n);
+  n.foldBtn.setAttribute('aria-expanded', String(!n.m.collapsed)); foldLabel(n);
+  if (n.m.collapsed){ if (n.lvl) n.lvl.shown = -1; n.mkKey = null; compactApply(n, cableUse(n.m.id).get(n.m.id)); }
   if (!quiet) store.touch();
   markScene();
 }
+// A title-bar double-click and a double-tap can both arrive for one gesture: only the first counts.
+function foldToggle(n){
+  const now = performance.now(); if (n.foldT && now - n.foldT < 500) return; n.foldT = now;
+  store.snapshot(); setCollapsed(n, !n.m.collapsed);
+}
+// Touch: the browser does not reliably turn a double-tap on the title bar into a double-click, so count it here.
+function headTap(n, ev){
+  const now = performance.now(), t = n.headTap;
+  if (t && now - t.t < 450 && Math.hypot(ev.clientX - t.x, ev.clientY - t.y) < 30){ n.headTap = null; foldToggle(n); }
+  else n.headTap = { t:now, x:ev.clientX, y:ev.clientY };
+}
+function buildSummary(n){
+  const m = n.m, def = MODULES[m.type];
+  n.sumIt = summaryKeys(m).map(k => {
+    const ch = choicesOf(m.type, k), v = h('span', {class:'cs-v'}), l = h('span', {class:'cs-l', text: plabel(m.type, k) + ' '});
+    return { k, ch, fmt: ch ? null : fmtOf(m.type, k), el: h('span', {class:'cs-i'}, l, v), l, v, t:null, mod:false };   // a select reads by itself ("Sine", "Track 5") unless its value is only a number ("4": then "Inputs 4")
+  });
+  n.sumM = h('span', {class:'cs-m'});
+  const kids = [h('span', {class:'cs-t'}, n.sumIt.map(i => i.el)), n.sumM];
+  if (n.meter || Object.values(def.outputs).some(k => KIND[k] === 'audio')){ n.lvl = { el: h('b'), shown:-1 }; kids.push(h('span', {class:'clvl', 'aria-hidden':'true'}, n.lvl.el)); }
+  n.sum = h('div', {class:'csum'}, kids);
+}
+// The summary line: each key value as its control would read it (a modulated one at its live value, in the modulation colour).
+function paintSum(n){
+  if (!n.sumIt || !n.m.collapsed) return;
+  for (const it of n.sumIt){
+    const live = n.live && it.k in n.live ? n.live[it.k] : null, v = live != null ? live : +n.m.params[it.k];
+    let t; if (it.ch){ const o = it.ch.find(q => q[0] === Math.round(v)); t = o ? o[1] : String(Math.round(v)); } else { try { t = String(it.fmt(v)); } catch (e){ t = ''; } }
+    if (t !== it.t){ it.t = t; it.v.textContent = t; if (it.ch) it.l.hidden = !/^[-\d.%\s]*$/.test(t); }
+    const mod = live != null; if (mod !== it.mod){ it.mod = mod; it.el.classList.toggle('modded', mod); }
+  }
+}
+// Marks on the summary line: bottom-panel dot, MIDI-mapped, and how many unpatched ports are hidden.
+function paintMarks(n){
+  if (!n.sumM || !n.m.collapsed) return;
+  const k = (n.nDeck | 0) + '|' + (n.nMidi | 0) + '|' + (n.nFree | 0); if (k === n.mkKey) return; n.mkKey = k;
+  const kids = [];
+  if (n.nDeck) kids.push(h('i', {class:'mk dk', title: n.nDeck + (n.nDeck === 1 ? ' control is' : ' controls are') + ' in the bottom panel'}));
+  if (n.nMidi) kids.push(h('i', {class:'mk cc', text:'CC', title: n.nMidi + (n.nMidi === 1 ? ' control is' : ' controls are') + ' mapped to MIDI'}));
+  if (n.nFree) kids.push(h('button', {class:'mk more', text:'+' + n.nFree, 'aria-label': n.nFree + ' unpatched ports hidden: expand ' + n.title,
+    title: n.nFree + (n.nFree === 1 ? ' unpatched port is' : ' unpatched ports are') + ' hidden. Click to open the module and patch ' + (n.nFree === 1 ? 'it' : 'them') + '.',
+    onclick: () => { store.snapshot(); setCollapsed(n, false); }}));
+  n.sumM.replaceChildren(...kids);
+}
+function setLvl(n, v){
+  const L = n.lvl; if (!L || !n.m.collapsed) return;
+  const w = Math.round(Math.min(1, v) * 40) / 40; if (w !== L.shown){ L.shown = w; L.el.style.transform = 'scaleX(' + w + ')'; }
+}
+function meterSet(n, v){ v = Math.min(1, v); n.meter.style.transform = 'scaleX(' + v + ')'; if (n.lvl) setLvl(n, v); }
+// Which of each module's ports have a cable, and which of its parameters are modulated (one scan of the cables).
+function cableUse(only){
+  const U = new Map(), get = id => { let u = U.get(id); if (!u){ u = { used:new Set(), mods:[] }; U.set(id, u); } return u; };
+  for (const c of doc.cables){
+    if (!c || !c.from || !c.to) continue;
+    if (!only || c.from[0] === only) get(c.from[0]).used.add('out:' + c.from[1]);
+    if (!only || c.to[0] === only){ const u = get(c.to[0]), p = c.to[1]; if (typeof p === 'string' && p.startsWith('p:')){ if (!u.mods.includes(p.slice(2))) u.mods.push(p.slice(2)); } else u.used.add('in:' + p); }
+  }
+  return U;
+}
+function stubJack(n, k){
+  const port = 'p:' + k, j = h('span', {class:'jack', 'data-id': n.m.id, 'data-port': port, 'data-dir':'in', 'data-kind':'mod', title: plabel(n.m.type, k) + ' modulation input'});
+  j.addEventListener('pointerdown', e => { if (e.button !== 0 || (MAC && e.ctrlKey && e.pointerType !== 'touch')) return; onJackDown(e, j); });
+  return j;
+}
+function compactApply(n, u){
+  if (!n.m.collapsed || !n.sum) return;
+  const used = u ? u.used : new Set(), mods = (u ? u.mods : []).filter(k => n.jacks['in:p:' + k]);
+  let free = 0, nin = 0, nout = 0;
+  for (const key in n.portRows){
+    const row = n.portRows[key], on = used.has(key);
+    if (row._free !== !on){ row._free = !on; row.classList.toggle('free', !on); }
+    if (!on) free++; else if (key.startsWith('in:')) nin++; else nout++;
+  }
+  const sk = mods.join(',');
+  if (sk !== n.stubKey && n.insEl){
+    n.stubKey = sk;
+    for (const r of n.stubRows || []) r.remove();
+    n.stubs = {};
+    n.stubRows = mods.map(k => { const j = stubJack(n, k), row = h('div', {class:'port stub', title: plabel(n.m.type, k) + ' modulation input'}, j, h('span', {class:'pl', text: plabel(n.m.type, k)}));
+      row.addEventListener('pointerdown', e => { if (e.target !== j && e.button === 0 && !(MAC && e.ctrlKey && e.pointerType !== 'touch')) onJackDown(e, j); });
+      n.stubs[k] = j; return row; });
+    n.insEl.append(...n.stubRows);
+  }
+  const left = nin + mods.length;
+  n.el.classList.toggle('dense', left > 4 || nout > 4);   // too many to label: names stay in the jack tooltips
+  if (n.portsEl) n.portsEl.classList.toggle('none', left + nout === 0);
+  n.nFree = free; paintMarks(n); paintSum(n);
+}
+function compactAll(){
+  let any = false; for (const n of nodes.values()) if (n.m.collapsed){ any = true; break; }
+  if (!any) return;
+  const U = cableUse();
+  for (const n of nodes.values()) if (n.m.collapsed) compactApply(n, U.get(n.m.id));
+}
+function compactMidi(){
+  const cnt = new Map(); if (learn) for (const cc in learn.map){ const t = learn.map[cc]; if (t) cnt.set(t.id, (cnt.get(t.id) || 0) + 1); }
+  for (const n of nodes.values()){ const c = cnt.get(n.m.id) | 0; if (n.nMidi !== c){ n.nMidi = c; paintMarks(n); } }
+}
+// COLLAPSE ALL / EXPAND ALL (C4): one undo step; the module menu, the background menu and Alt+C.
+function setAllCollapsed(c, ids){
+  const list = (ids ? ids.map(id => nodes.get(id)) : [...nodes.values()]).filter(n => n && n.m.collapsed !== c);
+  if (!list.length) return 0;
+  store.snapshot();
+  for (const n of list) setCollapsed(n, c, true);
+  store.touch(); markScene();
+  return list.length;
+}
+window.addEventListener('keydown', e => {
+  if (!e.altKey || e.ctrlKey || e.metaKey || e.shiftKey || e.code !== 'KeyC' || e.repeat || typing(e)) return;
+  if ((learn && learn.on) || document.querySelector('.dlgov') || !ctx.hidden) return;
+  e.preventDefault();
+  const open = [...nodes.values()].some(n => !n.m.collapsed), k = setAllCollapsed(open);
+  if (k) toast((open ? 'Collapsed ' : 'Expanded ') + k + (k === 1 ? ' module' : ' modules') + ' (Alt+C does the reverse, ' + MOD + '+Z undoes it).');
+});
 function renderAll(){
   for (const n of nodes.values()) n.el.remove();
   nodes.clear();
@@ -2614,18 +2812,42 @@ window.addEventListener('keydown', e => {
   e.preventDefault(); store.snapshot(); const ids = [...selected]; for (const x of ids) removeModule(x); clearSel();
   toast(ids.length === 1 ? 'Module removed (Undo brings it back).' : ids.length + ' modules removed (Undo brings them back).');
 });
-function setSel(id, on){ const n = nodes.get(id); on ? selected.add(id) : selected.delete(id); if (n) n.el.classList.toggle('selected', on); }
-function clearSel(){ for (const id of selected){ const n = nodes.get(id); if (n) n.el.classList.remove('selected'); } selected.clear(); }
+function setSel(id, on){ const n = nodes.get(id); on ? selected.add(id) : selected.delete(id); if (on) clearCableSel(); relDirty = true; if (n) n.el.classList.toggle('selected', on); }
+function clearSel(){ for (const id of selected){ const n = nodes.get(id); if (n) n.el.classList.remove('selected'); } selected.clear(); relDirty = true; }
 
 /* ----- cables ----- */
 const cableEls = new Map();
+/* CABLE SELECTION (13 Nov, audit D6, D9): a click on a cable selects it (Delete removes it, Escape or a click on the background lets go);
+   a selected cable and a hovered one show their bend handles. Cables and modules are never selected together. */
+let selCable = null, relDirty = false, hsZ = 0;
+function clearCableSel(){ if (!selCable) return; const el = cableEls.get(selCable); if (el) el.g.classList.remove('sel'); selCable = null; }
+function selectCable(c){
+  if (selCable === c) return;
+  clearCableSel(); if (selected.size) clearSel();
+  const el = cableEls.get(c); if (!el) return;
+  selCable = c; el.g.classList.add('sel');
+}
+// A module is selected: the cables that do not touch it step back (set on a selection change, never per frame).
+function paintRel(){
+  relDirty = false; const any = selected.size > 0;
+  for (const [c, el] of cableEls){ const dim = any && !selected.has(c.from[0]) && !selected.has(c.to[0]); if (el.dim !== dim){ el.dim = dim; el.g.classList.toggle('dim', dim); } }
+}
+window.addEventListener('keydown', e => {
+  if (!selCable) return;
+  if (e.key === 'Escape'){ clearCableSel(); return; }
+  if ((e.key !== 'Delete' && e.key !== 'Backspace') || e.ctrlKey || e.metaKey || e.altKey || typing(e)) return;
+  if ((learn && learn.on) || document.querySelector('.dlgov')) return;
+  const c = selCable; clearCableSel(); e.preventDefault();
+  if (!doc.cables.includes(c)) return;
+  store.snapshot(); disconnect(c); toast('Cable removed (Undo brings it back).');
+});
 function cableKind(c){
   const src = modById(c.from[0]); const k = src && MODULES[src.type] && MODULES[src.type].outputs[c.from[1]];
   return KIND[k] || 'mod';
 }
 function cableGroup(kind){
   const g = svgEl('g', {});
-  const line = svgEl('path', {class:'cln' + (isCtl(kind) ? ' ctl' : ''), fill:'none', stroke: CABLE[kind][0]});
+  const line = svgEl('path', {class:'cln' + (isCtl(kind) ? ' ctl' : '') + (kind === 'gate' ? ' gate' : ''), fill:'none', stroke: CABLE[kind][0]});
   g.append(line);
   const ends = [0, 1].map(() => { const c = svgEl('circle', {r:3.5, fill: CABLE[kind][1]}); g.append(c); return c; });
   return { g, line, ends, kind };
@@ -2644,11 +2866,13 @@ function paintChainOff(){
 }
 function syncCableEls(){
   for (const [c, el] of cableEls) if (!doc.cables.includes(c)){ el.g.remove(); cableEls.delete(c); }
+  if (selCable && !cableEls.has(selCable)) selCable = null;   // its cable is gone (removed, or an undo built the patch again)
+  relDirty = true;
   for (const c of doc.cables){
     if (cableEls.has(c)) continue;
     const el = cableGroup(cableKind(c));
     const hit = svgEl('path', {fill:'none', stroke:'transparent', 'stroke-width':16, 'pointer-events':'stroke', class:'hit'});
-    const title = svgEl('title', {}); title.textContent = 'Double-click or right-click to remove'; hit.append(title);
+    const title = svgEl('title', {}); title.textContent = 'Click to select (Delete removes it), double-click or right-click to remove'; hit.append(title);
     hit._cable = c;   // the right-click menu's "Remove cable" (3 Nov)
     hit.addEventListener('pointerdown', ev => {
       if (ev.button !== 0 || (MAC && ev.ctrlKey && ev.pointerType !== 'touch')) return;   // a right-click (Ctrl+click on a Mac) is the menu
@@ -2656,6 +2880,7 @@ function syncCableEls(){
       // A cable lying over a jack shouldn't block it: pass the press through to the jack.
       const jack = document.elementsFromPoint(ev.clientX, ev.clientY).find(x => x.classList && x.classList.contains('jack'));
       if (jack){ onJackDown(ev, jack); return; }
+      selectCable(c);
       if (ev.altKey){ ev.preventDefault(); cableBendAt(ev, c); return; }
       if (ev.pointerType === 'touch'){
         const now = performance.now(), lt = hit._tap;
@@ -2667,7 +2892,7 @@ function syncCableEls(){
     el.g.append(hit); el.hit = hit;
     svg.append(el.g); cableEls.set(c, el);
   }
-  markScene();
+  compactAll(); markScene();
 }
 function jackPos(id, dir, port, wr){
   const n = nodes.get(id); if (!n) return null;
@@ -2675,8 +2900,10 @@ function jackPos(id, dir, port, wr){
   if (!el) return null;
   const z = view().zoom;
   let r = el.getBoundingClientRect();
-  // Slider jacks are hidden while a module is collapsed: plug their cables into the title bar instead.
-  if (!r.width){ const hr = n.head.getBoundingClientRect(); return { x:(hr.left - wr.left) / z, y:(hr.top + hr.height / 2 - wr.top) / z }; }
+  // COMPACT: a collapsed module hides its slider jacks, so a modulation cable ends on that parameter's stub (its name beside it).
+  if (!r.width && dir === 'in' && n.stubs && port.startsWith('p:') && n.stubs[port.slice(2)]) r = n.stubs[port.slice(2)].getBoundingClientRect();
+  // A port that is hidden anyway (no cable should be on it): the title bar's edge, left for an input and right for an output.
+  if (!r.width){ const hr = n.head.getBoundingClientRect(); return { x:((dir === 'in' ? hr.left : hr.right) - wr.left) / z, y:(hr.top + hr.height / 2 - wr.top) / z }; }
   return { x:(r.left + r.width / 2 - wr.left) / z, y:(r.top + r.height / 2 - wr.top) / z };
 }
 function cablePath(a, b, pts){
@@ -2795,28 +3022,28 @@ function snapBend(d, P, shift){
   if (shift || Math.abs(ang - near) < 0.2) return [Math.round(prev[0] + Math.cos(near) * L), Math.round(prev[1] + Math.sin(near) * L)];
   return P;
 }
-// Square handles on each bend point; they show while Option/Alt is held.
+// Square handles on each bend point; they show on a hovered or selected cable (and while Option/Alt is held).
 function syncHandles(el, c){
   const pts = c.pts || [];
   el.hdl = el.hdl || [];
   while (el.hdl.length > pts.length) el.hdl.pop().remove();
   while (el.hdl.length < pts.length){
     const r = svgEl('rect', {class:'bend', width:10, height:10});
-    r.addEventListener('pointerdown', ev => bendDrag(ev, c, () => el.hdl.indexOf(r)));
+    r.addEventListener('pointerdown', ev => { if (ev.button !== 0) return; selectCable(c); bendDrag(ev, c, () => el.hdl.indexOf(r), true); });   // a plain click on a handle only selects (no undo step unless it moves)
     el.g.append(r); el.hdl.push(r);
   }
   el.hdl.forEach((r, i) => { r.setAttribute('x', pts[i][0] - 5); r.setAttribute('y', pts[i][1] - 5); });
 }
 // Drag a bend point. Option/Alt-click a point without moving it to remove it.
-function bendDrag(ev, c, idx){
+function bendDrag(ev, c, idx, lazy){
   ev.stopPropagation(); ev.preventDefault();
-  const i = idx(), sx = ev.clientX, sy = ev.clientY; let moved = false;
-  store.snapshot();
-  const mv = e => { if (Math.hypot(e.clientX - sx, e.clientY - sy) > 3) moved = true; if (moved) c.pts[i] = worldPt(e); };
+  const i = idx(), sx = ev.clientX, sy = ev.clientY; let moved = false, snapped = !lazy;
+  if (!lazy) store.snapshot();
+  const mv = e => { if (Math.hypot(e.clientX - sx, e.clientY - sy) > 3) moved = true; if (moved){ if (!snapped){ snapped = true; store.snapshot(); } c.pts[i] = worldPt(e); } };
   const up = e => {
     window.removeEventListener('pointermove', mv); window.removeEventListener('pointerup', up);
-    if (!moved && e.altKey){ c.pts.splice(i, 1); if (!c.pts.length) delete c.pts; }
-    store.touch();
+    if (!moved && e.altKey){ if (!snapped) store.snapshot(); c.pts.splice(i, 1); if (!c.pts.length) delete c.pts; snapped = true; }
+    if (snapped) store.touch();
   };
   window.addEventListener('pointermove', mv); window.addEventListener('pointerup', up);
 }
@@ -2862,6 +3089,7 @@ function applyPan(){
   const v = view();
   world.style.transform = `translate(${v.x}px, ${v.y}px) scale(${v.zoom})`;
   zoomVal.textContent = Math.round(v.zoom * 100) + '%';
+  if (v.zoom !== hsZ){ hsZ = v.zoom; svg.style.setProperty('--iz', (1 / v.zoom).toFixed(4)); svg.style.setProperty('--hs', Math.max(1, 1.2 / v.zoom).toFixed(3)); }   // hit width and bend handles keep their screen size (only when the zoom changed)
 }
 // Jump the view to a track's Track In / Chain Out pair and highlight it. Used when a track is picked that
 // already has a chain, so the existing one is shown instead of the selection just being refused.
@@ -2969,7 +3197,7 @@ ws.addEventListener('pointerdown', e => {
     mv(e); ws.addEventListener('pointermove', mv); ws.addEventListener('pointerup', up); ws.addEventListener('pointercancel', up);
     return;
   }
-  if (e.pointerType !== 'mouse' || e.button === 0) clearSel();   // (a middle-button pan keeps the selection)
+  if (e.pointerType !== 'mouse' || e.button === 0){ clearSel(); clearCableSel(); }   // (a middle-button pan keeps the selection)
   if (touches.size > 1) return;
   ws.setPointerCapture(e.pointerId); ws.classList.add('panning');
   // Pan by each step's movement, not from where the finger first landed: after a pinch (a second finger came and
@@ -3189,6 +3417,14 @@ ws.addEventListener('contextmenu', e => {
   if (clip) items.push(['Paste (' + MOD + '+V)', () => pasteClip()]);
   if (n) items.push(['Delete ' + (n === 1 ? 'module' : n + ' modules'), () => { store.snapshot(); for (const x of sel) removeModule(x); clearSel(); }]);
   items.push(['Select all', () => { for (const k of nodes.keys()) setSel(k, true); }]);
+  { // COLLAPSE ALL / EXPAND ALL (C4), each one undo step
+    const all = [...nodes.values()], open = all.filter(x => !x.m.collapsed).length, shut = all.length - open, picked = sel.map(x => nodes.get(x)).filter(Boolean);
+    const say = (k, c) => toast((c ? 'Collapsed ' : 'Expanded ') + k + (k === 1 ? ' module' : ' modules') + ' (' + MOD + '+Z undoes it).');
+    if (picked.some(x => !x.m.collapsed)) items.push(['Collapse ' + (picked.length === 1 ? 'this module' : 'selected modules'), () => say(setAllCollapsed(true, sel), true)]);
+    else if (picked.length && picked.some(x => x.m.collapsed)) items.push(['Expand ' + (picked.length === 1 ? 'this module' : 'selected modules'), () => say(setAllCollapsed(false, sel), false)]);
+    if (open) items.push(['Collapse all modules (Alt+C)', () => say(setAllCollapsed(true), true)]);
+    if (shut) items.push(['Expand all modules' + (open ? '' : ' (Alt+C)'), () => say(setAllCollapsed(false), false)]);
+  }
   if (!id) items.push(['Tidy up', () => tidy()]);
   if (!id) items.push(['Patch background color…', () => pickPatchBg()]);
   if (!id && doc.view.bg) items.push(['Reset background color', () => { store.snapshot(); delete doc.view.bg; ws.style.backgroundColor = ''; store.touch(); }]);
@@ -3576,8 +3812,11 @@ function helpDoc(){
   const EDGE = { afx:'#b24fb0', mod:'#c99a00', aout:'#3f6fb5', util:'#e07a2e' };
   const KC = { audio:'#22958d', mod:'#7a58c8', gate:'#c93d78' };
   const ABOUT = PAGE_ABOUT;
+  // The signal kinds, drawn the way the patch draws them: told apart by line and jack shape as well as colour.
+  const legend = '<div class="legend"><b>Signal kinds</b>' + [['audio', 'Sound', 'solid line, round jack', '2.5', ''], ['mod', 'Control', 'dashed line, round jack', '2', ' stroke-dasharray="6 4"'], ['gate', 'Gate', 'dotted line, diamond jack', '3', ' stroke-dasharray="0.1 7" stroke-linecap="round"']]
+    .map(([k, l, d, w, da]) => '<span class="lg"><svg width="46" height="14" viewBox="0 0 46 14"><path d="M2 7H44" fill="none" stroke="' + KC[k] + '" stroke-width="' + w + '"' + da + '/></svg><i class="jk ' + (k === 'gate' ? 'g' : '') + '" style="background:' + KC[k] + '"></i>' + esc(l + ': ' + d) + '</span>').join('') + '</div>';
   const guide = [
-    ['Patching', 'Drag from an output jack (right edge) to an input jack (left edge). Teal cables carry sound, purple dashed cables carry modulation and pink dashed cables carry gates. Every slider has a small purple jack on its left for modulation. Drag a patched input to move its cable, or drop it on empty space to unplug. Double-click a cable to remove it. Hold Option (Alt on Windows) and click while drawing a cable to bend it, or Option-drag an existing cable.'],
+    ['Patching', 'Drag from an output jack (right edge) to an input jack (left edge). Teal solid cables carry sound, purple dashed cables carry modulation and pink dotted cables carry gates; gate jacks are diamonds, the others round. Every slider has a small purple jack on its left for modulation. Drag a patched input to move its cable, or drop it on empty space to unplug. Click a cable to select it: Delete removes it, Escape lets go, and its bend handles show (drag one to move the bend, Option-click one to remove it). Double-click a cable to remove it. Hold Option (Alt on Windows) and click while drawing a cable to bend it, or Option-drag an existing cable.'],
     ['Modulation', 'Patch any signal into a slider’s small purple jack and it moves that slider: the slider sets the center, and the signal swings it across its range. The value turns purple and a mark shows where the slider really is. Use the Depth slider on an LFO or envelope, or an Attenuverter, to make the swing smaller.'],
     ['Sound as modulation', 'Audio can drive anything a control voltage can. Patch a sound into Envelope Follow to make it swell a filter or level, into Gate Extract to fire envelopes and clocks from hits, or into Pitch Follow to track a monophonic melody. Then shape it with Slew (to smooth it), Sample & Hold (to step it) or Quantizer (to snap it to a scale).'],
     ['Tracks', 'Each track has its own Track In and Chain Out. In the Mixer, turning a track’s CHN on adds that track’s pair (wired straight through, in a column below everything else) without leaving the Mixer, so every track gets its own chain and toggling one never disturbs another; the next time you come here, the patch is fitted so you see them all. If that track already has a chain, switching its CHN on just runs it through that chain again. The output always follows its own input — set the Track In and its Chain Out moves with it, and a Chain Out can’t be pointed elsewhere. Picking a track that is already used also jumps to and highlights the existing chain. A track takes one pair; control (cv/gate) inputs are not limited.'],
@@ -3591,7 +3830,7 @@ function helpDoc(){
   ];
   const groups = PALETTE.filter(([g]) => !isSection(g)).map(([g, items]) => '<div class="mgroup"><h3>' + esc(g) + '</h3><div class="mgrid">' + items.map(([t]) => {
     const d = MODULES[t], ed = EDGE[famOf(t)];
-    const io = (lbl, o) => Object.keys(o).length ? '<div class="io"><b>' + lbl + '</b>' + Object.entries(o).map(([p, k]) => '<span class="pt"><i style="background:' + KC[KIND[k]] + '"></i>' + esc((PORT_LABEL[p] || p) + ((p + 'R') in o ? ' L' : '')) + '</span>').join('') + '</div>' : '';
+    const io = (lbl, o) => Object.keys(o).length ? '<div class="io"><b>' + lbl + '</b>' + Object.entries(o).map(([p, k]) => '<span class="pt"><i' + (KIND[k] === 'gate' ? ' class="g"' : '') + ' style="background:' + KC[KIND[k]] + '"></i>' + esc((PORT_LABEL[p] || p) + ((p + 'R') in o ? ' L' : '')) + '</span>').join('') + '</div>' : '';
     return '<div class="mcard" style="--ed:' + ed + '"><h4>' + esc(d.label) + '</h4><p>' + esc(ABOUT[t] || SHARED_ABOUT[t] || d.about || '') + '</p>' + io('Inputs', d.inputs) + io('Outputs', d.outputs) + '</div>';
   }).join('') + '</div></div>').join('');
   return '<!doctype html><html><head><meta charset="utf-8"><style>' +
@@ -3606,10 +3845,12 @@ function helpDoc(){
     '.mgrid{display:grid; grid-template-columns:repeat(auto-fill, minmax(290px, 1fr)); gap:14px} .mcard{background:#fff; border:3.5px solid var(--ed); padding:12px 14px}' +
     '.mcard h4{margin:0 0 6px; font-size:16.5px; font-weight:600; border-bottom:2px solid var(--ed); padding-bottom:6px} .mcard p{margin:0 0 8px; font-size:14px; line-height:1.5}' +
     '.io{display:flex; flex-wrap:wrap; gap:5px 10px; align-items:center; font-size:12.5px; margin-top:4px} .io b{font-size:12px; min-width:62px}' +
-    '.pt{display:inline-flex; align-items:center; gap:5px; background:#fff; border:1.5px solid #111; padding:1px 7px} .pt i{width:9px; height:9px; border-radius:50%; display:inline-block}' +
+    '.pt{display:inline-flex; align-items:center; gap:5px; background:#fff; border:1.5px solid #111; padding:1px 7px} .pt i{width:9px; height:9px; border-radius:50%; display:inline-block} .pt i.g{width:8px; height:8px; border-radius:1px; transform:rotate(45deg)}' +
+    '.legend{display:flex; flex-wrap:wrap; gap:8px 22px; align-items:center; background:#fff; border:3px solid #111; padding:10px 18px; margin-bottom:14px; font-size:14px} .lg{display:inline-flex; align-items:center; gap:7px}' +
+    '.jk{width:12px; height:12px; border-radius:50%; display:inline-block; flex:none} .jk.g{width:10px; height:10px; border-radius:1px; transform:rotate(45deg)}' +
     '@media (max-width:700px){ body{grid-template-columns:1fr} nav{display:none} main{padding:16px} }' +
     '</style></head><body><nav><h1>chains Help</h1>' + guide.map(([t], i) => '<a href="#g' + i + '">' + esc(t) + '</a>').join('') +
-    '</nav><main><div class="guide">' + guide.map(([t, b], i) => '<h2 id="g' + i + '">' + esc(t) + '</h2><p>' + esc(b) + '</p>').join('') + '</div>' + groups + '</main></body></html>';
+    '</nav><main>' + legend + '<div class="guide">' + guide.map(([t, b], i) => '<h2 id="g' + i + '">' + esc(t) + '</h2><p>' + esc(b) + '</p>').join('') + '</div>' + groups + '</main></body></html>';
 }
 function openHelp(){
   let ov = document.getElementById('helpov');
@@ -3654,7 +3895,7 @@ function onMeter(m){
   for (let k = 0; k < TRK_N; k++){ busPeaks[k] = m.buses[k] || 0; if (meterBars[k]) meterBars[k].style.transform = 'scaleX(' + Math.min(1, busPeaks[k]) + ')'; }
   paintMods(m.mods || []); paintShows(m.shows); if (m.jacks) paintJacks(m.jacks); if (Array.isArray(m.byp)) setLiveByp(m.byp);
   if (m.wasm && (m.wasm.tfx !== WASM_OK.tfx)){ WASM_OK = m.wasm; for (const n of nodes.values()) paintNote(n); }
-  for (const n of nodes.values()) if (n.meter) n.meter.style.transform = 'scaleX(' + Math.min(1, busPeaks[((n.m.params.track | 0) || 1) - 1] || 0) + ')';
+  for (const n of nodes.values()) if (n.meter) meterSet(n, busPeaks[((n.m.params.track | 0) || 1) - 1] || 0);
 }
 
 /* Modulated sliders, as in Seeds: a cable in a slider's purple jack turns its value purple and bold, and a
@@ -3663,11 +3904,12 @@ function onMeter(m){
    chains in Thunder Plus before a track runs through it). */
 let modded = new Map(), modSeen = 0;
 function paintMods(list){
-  const now = new Map();
+  const now = new Map(), dirty = new Set();
   const paint = (id, k, v) => {
     const n = nodes.get(id), c = n && n.ctl[k]; if (!c || !c.row) return;
     now.set(id + '\u0000' + k, c);
     c.row.classList.add('modded');
+    c.node = n; c.key = k; (n.live || (n.live = {}))[k] = v; if (n.m.collapsed) dirty.add(n);   // COMPACT: the summary shows the live value
     if (c.out){
       const [, mn, mx] = MODULES[n.m.type].params[k];
       if (!c.out.querySelector('input')) c.out.textContent = c.fmt(v);
@@ -3685,9 +3927,11 @@ function paintMods(list){
   for (const [key, c] of modded) if (!now.has(key)){
     c.row.classList.remove('modded');
     if (c.mark) c.mark.hidden = true; if (c.tag) c.tag.hidden = true;
+    if (c.node && c.node.live){ delete c.node.live[c.key]; dirty.add(c.node); }
     c.show();
   }
   modded = now;
+  for (const n of dirty) paintSum(n);
 }
 
 // No live values for a moment (engine paused or not routed): keep cabled sliders marked, and unmark unplugged ones.
@@ -3714,11 +3958,14 @@ function paintJacks(list){
       if (a !== L.shown){ L.shown = a; L.el.classList.toggle('on', a > 0); L.el.style.setProperty('--a', a); } L.v *= .6; }
     if (n.show && n.show.kind === 'scin' && n.show.seen && performance.now() - n.show.seen > 400){ n.show.seen = 0; scinPaint(n.show, -120, 0, performance.now()); }   // stopped: fall back
     if (!n.pms) continue;
+    let lv = 0;
     for (const k in n.pms){
       const q = n.pms[k], w = Math.round(Math.min(1, q.v) * 40) / 40;
+      if (q.aud && q.v > lv) lv = q.v;
       if (w !== q.shown){ q.shown = w; q.el.style.transform = 'scaleY(' + w + ')'; }
       q.v *= .6;
     }
+    if (n.lvl && !n.meter) setLvl(n, lv);   // COMPACT: the level strip
   }
 }
 setInterval(() => { if (doc && Date.now() - jackSeen > 250) paintJacks(null); }, 120);
@@ -3731,7 +3978,7 @@ function paintHostMeters(){
   for (const n of nodes.values()){
     if (!n.meter) continue;
     const k = clamp((n.m.params.track | 0) - 1, 0, CHAN_COUNT - 1), src = n.m.type === 'trackIn' && hostPeaksIn ? hostPeaksIn : hostPeaks;
-    n.meter.style.transform = 'scaleX(' + Math.min(1, src[k] || 0) + ')';
+    meterSet(n, src[k] || 0);
   }
   // The bus strip: the tracker audio wins over the preview engine's own buses.
   for (let k = 0; k < TRK_N; k++){
@@ -3756,6 +4003,7 @@ function armLearn(n, key, el){
   learnText.textContent = 'Now move a knob or fader on your controller. Press Delete to clear this mapping.';
 }
 function markMapped(){
+  compactMidi();
   document.querySelectorAll('.row.sl.mapped').forEach(x => { x.classList.remove('mapped'); x.removeAttribute('title'); });
   if (!learn) return;
   for (const cc in learn.map){
@@ -3792,6 +4040,7 @@ if (firstRun) requestAnimationFrame(() => fitAll());
 
 function loop(){
   autoPanStep();
+  if (relDirty) paintRel();
   // Cables redraw every frame only while a drag, auto-pan or pan/zoom is live; otherwise a slow
   // safety pass. The host meter/CPU labels repaint at their own data rate (~telemetry), not per frame.
   const now = performance.now();
