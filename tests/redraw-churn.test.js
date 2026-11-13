@@ -40,7 +40,7 @@ const drawTxt = src.slice(idx, src.indexOf('\n}\n', idx));
 const guarded = [
   [drawTxt, /\$\('tTitle'\)/, 'tTitle'], [drawTxt, /\$\('tInfo'\)/, 'tInfo'], [drawTxt, /\$\('tState'\)/, 'tState'],
   [drawTxt, /setText\(\$\('tBpm'\)/, 'tBpm'], [drawTxt, /setText\(\$\('tOctN'\)/, 'tOctN'], [drawTxt, /setText\(n, loopPat/, 'tLoopN'], [drawTxt, /setText\(n, loopSel/, 'tLoopSelN'],
-  [drawTxt, /setText\(sb, cmdSongLab/, 'the SONG command button'],
+  [drawTxt, /cmdSongSet\(sb\)/, 'the SONG command button'],
 ];
 for (const [t, re, what] of guarded) test('draw(): ' + what + ' is not written when unchanged', () => assert.match(t, re));
 test('draw(): tTitle, tInfo and tState still compare before they write (build 562)', () => {

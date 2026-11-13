@@ -54,6 +54,8 @@ body{user-select:none; -webkit-user-select:none; -webkit-touch-callout:none}
 /* icons: drawn in the text colour with 2px lines (outline shapes), sized to the text around them */
 .ic{width:1.05em; height:1.05em; flex:none; display:inline-block; vertical-align:-.17em; fill:none; stroke:currentColor; stroke-width:2; stroke-linejoin:miter; stroke-linecap:square; overflow:visible}
 .tl .ic, .tstat .ic{margin-right:.4em}
+.ic.iclp{width:1.45em; height:1.45em; vertical-align:-.36em; stroke-linecap:round; stroke-linejoin:round}   /* LOOP PLAY (12 Nov, owner: a play sign inside a loop, his pick of three mock-ups) */
+.cmini .ic.iclp{width:1.7em; height:1.7em; vertical-align:-.42em; margin:-.5em 0}   /* the thin bar: bigger so the triangle reads, with negative margins so it does not make the button taller than its neighbours (12 Nov) */
 .k .ick{width:1.35em; height:1.35em; stroke-width:1.8}
 .setg.ic{stroke-width:1.7}
 [hidden]{display:none!important}
@@ -1210,6 +1212,11 @@ body:not(.legon) .tside .tlegend{display:none}
   .tcmd.song{grid-template-columns:repeat(17,minmax(0,1fr))}
   .tcmd.song:not(.cmini) button[data-c=clone]:not([hidden]){display:inline-flex}
 }
+/* LP.SEL (12 Nov, owner: next to loop play; "It can disappear on folded"): one more column where it shows (Song, Arrange holding the keys); under 700 px it is not on the row (Edit ▾ and the Arrange right-click menu have it) */
+@media (min-width:700px){ .tcmd.lps{grid-template-columns:repeat(16,minmax(0,1fr))} .tcmd.song.lps{grid-template-columns:repeat(17,minmax(0,1fr))} }
+@media (min-width:1000px){ .tcmd.song.lps{grid-template-columns:repeat(18,minmax(0,1fr))} }
+@media (max-width:699px){ .tcmd:not(.cmini) button[data-c=lpsel]{display:none} }
+.tcmd:not(.cmini) button[data-c=lpsel]{grid-column:-3 / -2; font-size:var(--fs-2)}
 /* ▶ (play the song) always sits in the last column, on whichever row it lands: never alone at the left of a row. */
 .tcmd:not(.cmini) button[data-c=song]{grid-column:-2 / -1}
 body.trkv.cmdv .toast{bottom:calc(var(--k) * 3.3 + 60px + env(safe-area-inset-bottom,0px))}
@@ -1272,6 +1279,18 @@ body.mob #tLoopSel{display:none}   /* the phone has LOOP (the pattern) only; LOO
    shorter level meter, the song button as ▷ / ■ alone, the CPU as a bare percentage. So the tabs and the strip can share
    one line on the Fold unfolded. */
 body.mob #tLoop, body.mob #tMet{display:none}
+/* MOBILE HEADER (12 Nov, owner: "do the transpose buttons at the top … do the same thing as the semi buttons in the pad section? If so … hide the transpose
+   buttons so we can fit the bpm and lpb next to the rows and rec settings and then move all of that up (next to project - can be shortened to 'proj')"):
+   Mobile + PAD input only (body.inpad, set by padHdr()): the pad's SEMI − / + do what TRANSP − / + do, so TRANSP goes; and BPM, LPB, the ticks, ROWS and REC
+   share the tab row (patFit(): when the tabs can't keep their words beside them, .tcompact shortens PROJECT to PROJ and tightens the tabs; still too wide, .wrap2
+   puts the group on its own line, as on the folded phone). KEYS input keeps TRANSP: there it is the on-screen way. */
+body.mob.inpad #tXposeDn, body.mob.inpad #tXposeUp{display:none}
+body.mob.inpad .tpat .trows button, body.mob.inpad .tpat .tclk{min-height:40px}
+body.mob.inpad .tclk .tce{padding:8px 2px}   /* a bigger target for the tempo / LPB numbers */
+.ttabbar.tcompact .ttabs button{padding:0 6px; letter-spacing:.01em}
+.ttabbar.tcompact .ttabs button[data-v=project]{font-size:0}
+.ttabbar.tcompact .ttabs button[data-v=project]::before{content:'PROJ'; font-size:var(--fs-4); letter-spacing:.01em}
+@media (max-width:600px){ .ttabbar.tcompact .ttabs button[data-v=project]::before{font-size:var(--fs-3)} }
 body.mob .top #tLen{flex:none; align-self:center; min-height:0; margin:0 2px}
 body.mob:not(.trkv) .top #tLen{display:none}
 body.mob .top .hmeter{flex:0 1 110px; min-width:60px}
@@ -1329,6 +1348,10 @@ body.mob .top #tLen{min-height:34px; padding:0 8px; align-self:auto}
 .tcpu i{position:absolute; left:0; bottom:0; height:4px; width:0; background:var(--ink)}
 .tcpu.warn i{background:var(--pl)}
 .tcpu.hot{color:var(--rec)} .tcpu.hot i{background:var(--rec)}
+.cpubox{min-width:min(420px,92vw); max-width:92vw; text-align:left} .cpusub{color:var(--muted)} .cpulist{display:flex; flex-direction:column; margin:6px 0}
+.cpurow{display:flex; justify-content:space-between; gap:12px; padding:6px 0; border-bottom:1px solid var(--line); font-size:var(--fs-4)} .cpurow b{font-variant-numeric:tabular-nums; white-space:nowrap} .cpuNone{padding:6px 0; color:var(--muted)}
+.cpukeep{margin:8px 0 4px; font-weight:600} .cpukeep.bad{color:var(--rec)} .cputip{margin:4px 0 10px}
+.cpubox .btnrow{flex-wrap:wrap; gap:6px} .cpubox .btnrow button{min-height:40px}
 .tpad{display:flex; justify-content:space-between; align-items:center; gap:16px; flex:1}
 .tkp{flex:1; min-width:0; display:flex; flex-direction:column; gap:5px}
 .kpr{display:grid; grid-template-columns:repeat(var(--n),minmax(0,1fr)); gap:5px}
@@ -2920,6 +2943,7 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
 <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false"><defs>
   <symbol id="ic-play" viewBox="0 0 24 24"><path d="M7 4.5 L19.5 12 L7 19.5Z"/></symbol>
   <symbol id="ic-save" viewBox="0 0 24 24"><path d="M4 4 H17.5 L20 6.5 V20 H4Z M7.5 4 V9 H16 V4 M7.5 20 V13.5 H16.5 V20"/></symbol>
+  <symbol id="ic-loopplay" viewBox="0 0 24 24"><path d="M17.79 5.11A9 9 0 1 1 7.5 4.21M4.35 3.66 7.5 4.21 6.41 7.22"/><path d="M10 8.4 16 12 10 15.6Z" fill="currentColor" stroke-width="1"/></symbol>
   <symbol id="ic-stop" viewBox="0 0 24 24"><rect x="5.5" y="5.5" width="13" height="13"/></symbol>
   <symbol id="ic-close" viewBox="0 0 24 24"><path d="M6 6 L18 18 M18 6 L6 18"/></symbol>
   <symbol id="ic-folder" viewBox="0 0 24 24"><path d="M3 6.5 V18.5 H21 V8.5 H11.5 L9.5 6.5 Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></symbol>
@@ -3429,7 +3453,7 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
         <dt>Space</dt><dd id="tLegSpace">play this screen · Shift+Space the song · with Loop on, Space loops the selected rows</dd>
         <dt>/ or \</dt><dd>mute or unmute the track you're on (the whole track, as the mixer's M; M on the Song mutes one block)</dd>
         <dt>Ctrl/⌘ / or \</dt><dd>solo the track you're on (again: unsolo it) · Ctrl/⌘+Shift+/ (or \) clears every solo</dd>
-        <dt>Ctrl+Space</dt><dd>loop play, as the control bar’s ▶↻: turns LOOP on and plays the song row, every track, looped; LOOP pressed while it plays carries on as normal play; again stops and puts LOOP back as it was (⌘+Space works too if Spotlight isn't on it)</dd>
+        <dt>Ctrl+Space</dt><dd>loop play, as the control bar’s loop play button (a play sign inside a loop): turns LOOP on and plays the song row, every track, looped; LOOP pressed while it plays carries on as normal play; again stops and puts LOOP back as it was (⌘+Space works too if Spotlight isn't on it)</dd>
         <dt>Alt+L</dt><dd>loop the pattern on/off: the song repeats the row it is on (LOOP in the tab bar)</dd>
         <dt>Shift+Alt+L</dt><dd>loop the selection on/off (LOOP SEL beside it, on a computer)</dd>
         <dt>TRANSPOSE ▲▼</dt><dd>top bar: arm it, then ▲/▼ transposes the selection (Esc cancels)</dd>
@@ -22353,6 +22377,7 @@ function tStart(mode, o){
   tp.core = false;
   if (coreWanted() && core.ready && !core.bad && !(o && o.page)) coreStart(mode, o, t0start, rsFirst ? {ref:pz.ref, row:pz.row, step:pz.step} : null);
   rkReset(); pbLog('PLAY ' + mode + ' · ' + pbState()); pbLvReset(); setTimeout(() => { if (tp.on) pbLog(`4 s into PLAY: level ${pbLevel()}`); }, 4000);   // (9 Nov: to compare Latency settings)   // not loaded yet: this PLAY as before, the core loads at STOP
+  try { if (pwB) pwStep = Math.floor(pwB.level * 20); const pw = pwFmt(pwState(), true); if (pw) pbLog(pw); } catch(e){}   // POWER STATE in the report
   if (lkp) lkStarted(lkp);   // ABLETON LINK: Link's exact tempo; ours tells the session
   tp.timer = pumpTimer(); pump(); if (!handing) draw(); songBtn(); chainsTempo(); if (typeof frameWake === 'function') frameWake();   // (a hand-over happens out of view: no draw, which was most of its time)
   bgPlay(true);   // BACKGROUND PLAY
@@ -22399,8 +22424,10 @@ function chaseFx(row, at){ for (const e of chaseEvs(row, at)) rt.pl.play(e); }
 let napOn = null;   // APP NAP (5 Nov): the desktop app is told when the song plays, so macOS doesn't nap it in the background
 function songBtn(){ document.documentElement.classList.toggle('tpon', !!tp.on);
   { const on = !!tp.on, D = window.thunderDesktop; if (on !== napOn && D && D.app && D.app.playing){ napOn = on; try { D.app.playing(on); } catch(e){} } }   // PLAYING: skins can light the play buttons (IDM: neon pink)
+  if (tp.on && !playWasOn) playWallT = performance.now(); playWasOn = !!tp.on;   // (12 Nov) when this play began: STOP twice (the pad) goes to the top only for a cursor you have not touched since
   const b = $('tSong'); if (!b) return; b.hidden = false; b.classList.toggle('on', tp.on);
 }
+var playWallT = 0, playWasOn = false;
 // The pump's 25 ms tick comes from a Worker: a page timer is slowed to once a second (or frozen) when the app is in
 // the background and nothing audible is playing (a MIDI-only song driving the MPC with the screen off, a muted
 // master), which stalled the sequencer and MIDI clock. A Worker's timer keeps its rate. Page timer as the fallback.
@@ -22811,8 +22838,22 @@ function coreStart(mode, o, t0, rs){
    state, a 2-second summary of the core's rows while playing (how many, how late or early, notes dropped as late, the
    core's catch-up skips), rows still arriving after STOP (and the STOP sent again then), and the level and live voices 1 and
    3 seconds after a STOP. */
-const PB = {handT0:0, handW:0, ck:null, ckBad:0, stopT:0, log:[], n:0, late:0, drop:0, ahead:0, stray:0, strayT:0, skips:0, t:0, rk:{sum:0, hot:0, win:0, n:0, last:-1e9, watch:null}};
+const PB = {ev:[], stalls:[], handT0:0, handW:0, ck:null, ckBad:0, stopT:0, log:[], n:0, late:0, drop:0, ahead:0, stray:0, strayT:0, skips:0, t:0, rk:{sum:0, hot:0, win:0, n:0, last:-1e9, watch:null}};
 function pbLog(s){ try { PB.log.push((performance.now() / 1000).toFixed(2) + ' ' + s); if (PB.log.length > 400) PB.log.splice(0, 100); } catch(e){} }
+/* POWER STATE IN THE REPORT (12 Nov, owner: "does the app really perform better plugged in?"): battery level and charging (navigator.getBattery, where the browser has it),
+   plus what else bears on throttling that needs no permission: cores, device memory, data saver, reduced motion. Written at each PLAY and, while playing, when charging
+   changes or the level crosses a 5% step; the header's settings line carries the current value. Only event listeners while stopped; nothing on the audio thread. */
+function pwFmt(st, full){
+  const b = st && typeof st.level === 'number' && isFinite(st.level) ? `battery ${Math.round(st.level * 100)}% · ${st.charging ? 'charging' : 'on battery'}` : '';
+  const x = [];
+  if (full && st){ if (st.cores) x.push(st.cores + ' cores'); if (st.mem) x.push(st.mem + ' GB memory'); if (st.saveData != null) x.push('data saver ' + (st.saveData ? 'on' : 'off')); if (st.reduced != null) x.push('reduced motion ' + (st.reduced ? 'on' : 'off')); }
+  const t = [b, ...x].filter(Boolean).join(' · '); return t ? (b ? 'power: ' : 'device: ') + t : '';
+}
+let pwB = null, pwStep = -1;
+function pwState(){ let c = null, rm = null; try { c = navigator.connection; } catch(e){} try { rm = matchMedia('(prefers-reduced-motion: reduce)').matches; } catch(e){}
+  return {level:pwB ? pwB.level : null, charging:pwB ? pwB.charging : null, cores:navigator.hardwareConcurrency || 0, mem:navigator.deviceMemory || 0, saveData:c && typeof c.saveData === 'boolean' ? c.saveData : null, reduced:rm}; }
+function pwNote(why){ if (!tp.on || !pwB) return; const st = Math.floor(pwB.level * 20); if (why === 'level' && st === pwStep) return; pwStep = st; const t = pwFmt(pwState(), false); if (t) pbLog(t); }
+try { if (navigator.getBattery) navigator.getBattery().then(b => { pwB = b; b.addEventListener('chargingchange', () => pwNote('charging')); b.addEventListener('levelchange', () => pwNote('level')); }, () => {}); } catch(e){}
 const pbState = () => `ctx ${ctx ? ctx.state + ' t=' + ctx.currentTime.toFixed(2) : '-'} on=${tp.on ? 1 : 0} core=${tp.core ? 1 : 0} seq=${aset.core} hidden=${document.hidden ? 1 : 0} wall=${(Date.now() / 1000 % 100000).toFixed(2)}`;
 // BACKGROUND TIMING (8 Nov): how the Page sequencer's tick fared since the screen last changed: the longest wait between ticks (wall clock), how close the song came to running out, and any jumps forward
 const pbPg = () => { const P = PB.pg; PB.pg = null; return P ? ` · page ticks ${P.n}, longest gap ${P.gap.toFixed(2)} s, least lead ${P.lead.toFixed(2)} s, moved on ${P.re}× (${P.skip.toFixed(2)} s), held ${P.rs || 0}× (${(P.rsS || 0).toFixed(2)} s), kicked ${PB.rk.n}×` : ''; };
@@ -22834,7 +22875,7 @@ document.addEventListener('visibilitychange', () => { if (!document.hidden) PB.v
     ensure = W('pad render on the page', ensure, a => `pad ${a[0] + 1}`);
   } catch(e){ tpLog('slow-work timing not installed', e); }
   let last = 0;
-  try { new PerformanceObserver(l => { if (!tp.on) return; for (const e of l.getEntries()){ const n = performance.now(); if (e.duration < 120 || n - last < 250) continue; last = n;
+  try { new PerformanceObserver(l => { if (!tp.on) return; for (const e of l.getEntries()){ const n = performance.now(); if (e.duration < 120) continue; PB.stalls.push({t:n, d:e.duration}); if (PB.stalls.length > 60) PB.stalls.shift(); if (n - last < 250) continue; last = n;
       const sc = (e.scripts || []).slice().sort((p, q) => q.duration - p.duration).slice(0, 3).map(q => `${String(q.sourceFunctionName || q.invoker || '?').slice(0, 40)} ${q.duration | 0}`).join(', ');
       pbLog(`long frame ${e.duration | 0} ms (blocked ${e.blockingDuration | 0}) · row ${tp.hiRow}${sc ? ' · ' + sc : ''}`); } }).observe({type:'long-animation-frame'}); } catch(e){} }
 // CLOCK DETAIL (8 Nov): on the Fold the audio clock runs ahead of real time while playing. Once a second, while playing and for 5 s after STOP, a line goes in the
@@ -22915,21 +22956,39 @@ function pbClock(){ if (!tp.on || !tp.core || !ctx || core.bad || ctx.state !== 
 // The core is let go (the clock watch here, or its own WATCHDOG): the song carries on from its row on the page sequencer, which
 // plays until the app reloads. self: the core already stopped itself (and gave the live engines back) at audio time selfT.
 function coreFail(self){
-  core.bad = true; let row = -1, ref = -1; (tp.pos || []).forEach((q, i) => { if (q && i !== MT && q.row > row){ row = q.row; ref = i; } }); if (row < 0) for (const q of tp.pos || []) if (q && q.row > row) row = q.row;
+  core.bad = true; core.badN = (core.badN || 0) + 1; core.hk = null; core.okN = 0; let row = -1, ref = -1; (tp.pos || []).forEach((q, i) => { if (q && i !== MT && q.row > row){ row = q.row; ref = i; } }); if (row < 0) for (const q of tp.pos || []) if (q && q.row > row) row = q.row;
   const at = ref >= 0 ? tp.pos.map(q => q && {row:q.row, phrase:q.phrase, cr:q.cr, step:0}) : null;   // (12 Nov) each track on its own row (the song restarts at the top of the furthest row, so no steps)
   const mode = tp.mode;
   pbLog('switched to the page sequencer from row ' + row + (self ? ' (the audio-thread sequencer stopped itself: ' + self.why + ')' : '')); try { tStop(true); } catch(e){} try { coreDrop(); } catch(e){}
   if (row >= 0 && mode === 'song') tStart('song', at ? {row, at, atRef:ref} : {row});
   const moved = row >= 0 && mode === 'song';
-  const went = moved ? 'the song moved to the Page sequencer until you reload the app.' : 'playback stopped. PLAY uses the Page sequencer until you reload the app.';
+  const back = core.badN < CORE_BAD_MAX ? 'The audio thread sequencer comes back once the clock has been steady for a while.' : 'PLAY uses the Page sequencer until you reload the app.';
+  const went = (moved ? 'the song moved to the Page sequencer. ' : 'playback stopped. ') + back;
   toast((self && self.why === 'deaf' ? 'The audio thread fell behind, so ' : 'The audio clock went out of step, so ') + went, 5000); }
-idleTick(() => { try { pbClock(); } catch(e){} }, 2000, () => tp.on, 4000);   // BATTERY: every 2 s while playing (hidden too), a slow reset check otherwise
+/* THE CORE COMES BACK (12 Nov, owner's Balanced report, build 572: the phone's audio clock dipped to 0.83x and caught up at 1.4x for about
+   5 s, twice in ten minutes, and was steady again each time; the watchdog rightly let go of the song, but the audio thread sequencer then
+   stayed off until a reload, so the rest of the session ran on the Page sequencer). While it is off, the audio clock is compared with the
+   real one as pbClock does; after CORE_OK_N steady readings running (about 10 s within 3 %) the core is allowed again from the NEXT PLAY (the
+   song that is playing stays on the Page sequencer: no second switch mid-song). The third failure in a session keeps it off until a reload,
+   as before (6 Nov: a clock that stays wrong). Page-side only; the watchdog and its limits are unchanged. */
+const CORE_BAD_MAX = 3, CORE_OK_N = 5;
+function coreHealStep(c, w, a){   // pure: c {hk:{w,a}|null, okN}; true when the clock has been steady long enough
+  const h = c.hk; c.hk = {w, a}; if (!h || w - h.w < 1.5) return false;
+  const r = (a - h.a) / (w - h.w); c.okN = r > 0.97 && r < 1.03 ? (c.okN || 0) + 1 : 0;
+  return c.okN >= CORE_OK_N; }
+function coreHeal(){ if (!core.bad || (core.badN || 0) >= CORE_BAD_MAX) return;
+  if (!ctx || ctx.state !== 'running'){ core.hk = null; core.okN = 0; return; }
+  if (!coreHealStep(core, performance.now() / 1000, ctx.currentTime)) return;
+  core.bad = false; core.hk = null; core.okN = 0; pbLog('audio clock steady again: the audio thread sequencer is back from the next PLAY (let go ' + core.badN + '× this session)');
+  if (!tp.on && coreWanted() && !core.ready) try { coreLoad(); } catch(e){} }
+idleTick(() => { try { pbClock(); } catch(e){} try { coreHeal(); } catch(e){} }, 2000, () => tp.on, 4000);   // BATTERY: every 2 s while playing (hidden too), a slow reset check otherwise
 function pbSum(){ const now = performance.now(); if (now - PB.t < 2000) return; PB.t = now;
   if (PB.n) pbLog(`rows ${PB.n} · latest note ${(PB.late * 1000).toFixed(0)} ms late · dropped ${PB.drop} · ahead ${(PB.ahead * 1000).toFixed(0)} ms · core skips ${PB.skips} · voices ${rt && rt.pl.aliveN ? rt.pl.aliveN() : '?'}`);
+  if (PB.late >= 0.05 || PB.drop){ PB.ev.push({t:now, late:PB.late, drop:PB.drop}); if (PB.ev.length > 60) PB.ev.shift(); }   // CPU PANEL (12 Nov): late or dropped notes, kept for its last-minute line
   PB.n = PB.late = PB.drop = PB.ahead = 0; }
 function pbAfterStop(){ PB.stopT = performance.now(); pbLvStop(); pbLog('STOP · ' + pbState()); for (const ms of [1000, 3000]) setTimeout(() => pbLog(`${ms / 1000} s after STOP: level ${pbLevel()} · voices ${rt && rt.pl.aliveN ? rt.pl.aliveN() : '?'} · stray rows ${PB.stray} · ` + pbState()), ms); }
 async function pbCopy(){
-  const head = `Thunder Plus build ${BUILD} · ${navigator.userAgent}\nlatency ${ctx ? Math.round((ctx.baseLatency || 0) * 1000) + ' + ' + Math.round((ctx.outputLatency || 0) * 1000) + ' ms · heard ' + Math.round(heardLat() * 1000) + ' ms' : '-'} · worklets ${NOWK ? 'OFF (test)' : ctx && wkUsed(ctx).size ? [...wkUsed(ctx)].join(', ') : 'none'} · ${pbState()}${PB.lvDone ? '\nlevel over the last play: ' + PB.lvDone : ''}\nsettings: background play ${bgOn ? 'on' : 'OFF'} · keep screen on ${wlOn ? 'on' : 'off'} · low power ${lpOn ? 'on' : 'off'} · latency ${latOf()} · runaway kick ${rkOn ? 'on' : 'off'}${bgAndroid && !bgOn ? ' · NOTE: with Background play off Android does not treat the app as a media player (hidden playback is throttled, volume keys move the ringer)' : ''}\n`;   // (10 Nov: a report from a phone with Background play left off after a test read like an engine fault)
+  const head = `Thunder Plus build ${BUILD} · ${navigator.userAgent}\nlatency ${ctx ? Math.round((ctx.baseLatency || 0) * 1000) + ' + ' + Math.round((ctx.outputLatency || 0) * 1000) + ' ms · heard ' + Math.round(heardLat() * 1000) + ' ms' : '-'} · worklets ${NOWK ? 'OFF (test)' : ctx && wkUsed(ctx).size ? [...wkUsed(ctx)].join(', ') : 'none'} · ${pbState()}${PB.lvDone ? '\nlevel over the last play: ' + PB.lvDone : ''}\nsettings: background play ${bgOn ? 'on' : 'OFF'} · keep screen on ${wlOn ? 'on' : 'off'} · low power ${lpOn ? 'on' : 'off'} · latency ${latOf()} · runaway kick ${rkOn ? 'on' : 'off'}${(() => { try { const t = pwFmt(pwState(), true); return t ? ' · ' + t : ''; } catch(e){ return ''; } })()}${bgAndroid && !bgOn ? ' · NOTE: with Background play off Android does not treat the app as a media player (hidden playback is throttled, volume keys move the ringer)' : ''}\n`;   // (10 Nov: a report from a phone with Background play left off after a test read like an engine fault)
   const txt = head + PB.log.join('\n');
   try { await navigator.clipboard.writeText(txt); toast('Playback report copied: paste it into the chat.', 3500); }
   catch(e){ try { await deliver('thunder-playback-report.txt', new Blob([txt], {type:'text/plain'})); } catch(e2){ toastErr('Couldn’t copy the report here.'); } }
@@ -23001,7 +23060,7 @@ function corePump(){
 /* PANIC (27 Oct, audit B18): Stop when already stopped (F8 again) lets go of everything still sounding: the voices, and on
    every MIDI port and channel All Sound Off, All Notes Off and the sustain pedal up (a stop only sent All Notes Off on the
    channels the song used). Effect tails ring on; Settings → Audio → Reset audio engine clears those too. */
-function stopKey(){ if (tp.on) return tStop(); warmTok = null; panic(); }   // (10 Nov: warmTok: a STOP inside the first PLAY's warm-up cancels it)
+function stopKey(){ if (tp.on) return tStop(); const warm = !!warmTok; warmTok = null; if (warm){ try { lpRestore(); lpSelRestore(); } catch(e){} } panic(); if (warm) try { draw(); } catch(e){} }   // (10 Nov: warmTok: a STOP inside the first PLAY's warm-up cancels it; 12 Nov, review: loop play / LP.SEL never began then, so LOOP and LOOP SEL go back as they were)   // (10 Nov: warmTok: a STOP inside the first PLAY's warm-up cancels it)
 function panic(){
   try { if (rt && ctx) rt.pl.stopAll(ctx.currentTime); } catch(e){}
   try { moRelease(); } catch(e){}
@@ -23269,6 +23328,17 @@ function bgClip(){
 function msLog(t){ if (MS_ACTIVE) try { pbLog('media session: ' + t); } catch(e){} }
 function msEl(){ try { const m = navigator.mediaSession; return 'paused=' + bgEl.paused + ' muted=' + bgEl.muted + ' vol=' + bgEl.volume + ' dur=' + Math.round(bgEl.duration || 0) + 's session=' + (m && m.playbackState); } catch(e){ return '?'; } }
 function msHook(el){ try { ['playing', 'pause', 'ended', 'volumechange', 'error'].forEach(t => el.addEventListener(t, () => msLog('element ' + t + ' · ' + msEl()))); } catch(e){} }
+/* THE NOTIFICATION'S TITLE (12 Nov, owner: "always displays the chrome icon and 'song 1' even if the name is different"): the name the app shows for the open
+   song: the project file's name (opened or saved as a file, without .thunder) else the song's own name; set again when that changes while playing (rename, save as, open, new),
+   never on a redraw. Artwork: the app's own icons, resolved against the page, so beta/ and stable/ find their own copy. (Chrome may still badge the notification with its small icon.) */
+let msTitleNow = null;
+function msTitle(){ let f = ''; try { f = (typeof projLabel === 'function' && projLabel() || '').replace(/\.(thunder|json)$/i, ''); } catch(e){} return f || S.name || 'Song'; }
+function msIcon(p, sizes){ let u = p; try { u = new URL(p, location.href).href; } catch(e){} return {src:u, sizes, type:'image/png'}; }
+function msMeta(force){
+  const ms = navigator.mediaSession; if (!ms || !bgOn || (!force && !tp.on)) return;
+  const t = msTitle(); if (!force && t === msTitleNow) return; msTitleNow = t;
+  try { ms.metadata = new MediaMetadata({title:t, artist:'Thunder Plus', artwork:[msIcon('icons/plus-icon-192.png?v=3', '192x192'), msIcon('icons/plus-icon-512.png?v=3', '512x512')]}); if (!force) msLog('title now "' + t + '"'); } catch(e){}
+}
 function bgPlay(on){
   const ms = navigator.mediaSession;
   if (on && !bgOn) on = false;
@@ -23277,10 +23347,9 @@ function bgPlay(on){
       const stop = () => { bgUserT = performance.now(); if (tp.on) tStop(); };   // (bgUserT: a real request, not to be undone by BG_RESTART)
       ms.setActionHandler('play', () => { if (!tp.on) playCtx(); });
       ms.setActionHandler('pause', stop); ms.setActionHandler('stop', stop); }
-    if (on) ms.metadata = new MediaMetadata({title:S.name || 'Song', artist:'Thunder Plus',
-      artwork:[{src:'icons/plus-icon-192.png?v=3', sizes:'192x192', type:'image/png'}, {src:'icons/plus-icon-512.png?v=3', sizes:'512x512', type:'image/png'}]});
+    if (on) msMeta(true);
     if (on || bgHandlers) ms.playbackState = on ? 'playing' : 'paused';
-    if (MS_ACTIVE && (on || bgHandlers)) msLog((on ? 'session set: playing, title "' + (S.name || 'Song') + '"' : 'session set: paused') + ' · state ' + ms.playbackState);
+    if (MS_ACTIVE && (on || bgHandlers)) msLog((on ? 'session set: playing, title "' + msTitle() + '"' : 'session set: paused') + ' · state ' + ms.playbackState);
   } catch(e){}
   if (!bgAndroid) return;
   if (on){
@@ -23661,6 +23730,7 @@ function projSet(path, handle){
   try { if (DESK){ if (projPath) localStorage.setItem(PPK, projPath); else localStorage.removeItem(PPK); } } catch(e){}
   if (!DESK && canFS) kvSet('cur', projFile || null);
   if (projPath || projFile) recentAdd({name:projLabel(), path:projPath, h:projFile});
+  try { msMeta(); } catch(e){}   // the notification's title follows the file
 }
 // Unsaved changes: set by every song or sound edit (markChange, from saveS and changed), cleared by a save or an open.
 // Edits in the first moments after start-up (conversions, the saved song settling) don't count.
@@ -23739,7 +23809,7 @@ async function saveProj(as){
       catch(e){ if (e && e.name === 'AbortError') return false; toastErr('Couldn’t save there (' + ((e && e.message) || e) + '), so it went to your downloads.', 6000);
         await deliver(projName(), projBlob()); setDirty(false); return true; }
     }
-    if (as){ const n = await askText({title:'Save project as', body:'The song is renamed and saved to your downloads.'}, S.name, 40, 'Save'); if (n == null) return false; S.name = n.trim().slice(0, 40) || 'Song'; saveS(); draw(); }
+    if (as){ const n = await askText({title:'Save project as', body:'The song is renamed and saved to your downloads.'}, S.name, 40, 'Save'); if (n == null) return false; S.name = n.trim().slice(0, 40) || 'Song'; saveS(); draw(); msMeta(); }
     await deliver(projName(), projBlob()); setDirty(false); return true;
   } finally { saving = false; }
 }
@@ -24196,7 +24266,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 572;
+const BUILD = 573;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD + (location.pathname.includes('/beta/') ? ' · beta' : '');
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -24368,14 +24438,23 @@ const ARR_IDLE = 60000;
 window.addEventListener('keydown', e => { if (e.key !== ' ' && !/^(Shift|Control|Alt|Meta|AltGraph|CapsLock)$/.test(e.key)) arrActT = workT = performance.now(); }, true);
 window.addEventListener('pointerdown', e => { const q = e.target && e.target.closest; if (q && e.target.closest('[data-b="play"],[data-b="loop"],[data-b="stop"]')) return; if (q && (e.target.closest('#tPad') || e.target.closest('#tArr') || grid.contains(e.target))) workT = performance.now(); if (q && e.target.closest('#tPad')) arrActT = workT; }, true);   // (10 Nov) on a phone the pad is the keyboard: a pad press holds Arrange's paging like a key does
 $('tArr').addEventListener('pointerdown', () => { arrActT = arrTouchT = performance.now(); }, true);
+// ONE QUESTION FOR EVERY HOLD (12 Nov): "have the user's hands been on it for ms?" asks the clocks it is given; the follow and paging paths below all go through it.
+const handsOn = (ms, ...ts) => performance.now() - Math.max(...ts) < ms;
+// (12 Nov, owner: "when editing a phrase with phrase in focus and using the alt button to navigate up between editing patterns, the playhead and cursor fight each other for visibility. Cursor should be able to move past the playhead this way, and stay in focus.")
+// navT: the last ALT + arrow move around the Song grid (optDir, grid). Arrange beside the phrase WITHOUT the keys was held off only by arrHandT / arrTouchT, which a pad press never sets, so every ALT+▲ put Arrange's rows where the cursor was
+// and the very next redraw the playhead put them back: the cursor's row flipped in and out of view. It holds like Arrange's own work does: 4 s with FOLLOW on, the owner's minute (3 Nov) with FOLLOW OFF.
+let navT = -1e9;
 function arrFollowPage(own){
-  const now = performance.now();
-  if (now - Math.max(arrHandT, arrTouchT) < FOLLOW_HOLD) return;   // (9 Nov, owner: tapping blocks made the view fight itself)
+  if (handsOn(FOLLOW_HOLD, arrHandT, arrTouchT)) return;   // (9 Nov, owner: tapping blocks made the view fight itself)
   // A follow mode that's on pages again after the short hold; FOLLOW OFF keeps the owner's minute (3 Nov)
-  if ((apF === 'arr' || asongOn()) && now - Math.max(arrActT, arrHandT) < (followMode ? FOLLOW_HOLD : ARR_IDLE)) return;
+  if ((apF === 'arr' || asongOn()) && handsOn(followMode ? FOLLOW_HOLD : ARR_IDLE, arrActT, arrHandT)) return;
+  if (handsOn(followMode ? FOLLOW_HOLD : ARR_IDLE, navT)) return;
   try { if (tp.mode === 'song' && own && own.row >= 0 && (asongOn() || (tv !== 'song' && apPanel()))){
     const VR = Math.max(2, arrRows()), top = cs.song.top || 0;
-    if (own.row < top || own.row > top + VR - 1){ cs.song.top = clamp(own.row, 0, Math.max(0, 256 - VR)); cs.song.pg = true; } } } catch(e){}
+    if (own.row < top || own.row > top + VR - 1){
+      // The cursor's row stays in view when both fit (12 Nov): the page starts at the higher of the two rows, so the playhead does not hide the cursor the user moved past it
+      const cy = cs.song.y, both = tv !== 'song' && cy >= 0 && cy !== own.row && Math.abs(cy - own.row) < VR;
+      cs.song.top = clamp(both ? Math.min(cy, own.row) : own.row, 0, Math.max(0, 256 - VR)); cs.song.pg = true; } } } catch(e){}
 }
 // TRACKS (Song): how many tracks this song uses (8–32, but 24 at most with a voice per track, so every
 // track keeps its own voice within 40 kit voices). Song and Mixer show as many as fit and scroll sideways.
@@ -25132,7 +25211,7 @@ function projRows(){
       info:() => 'The same for Arrange (the Song screen, or Arrange holding the keys beside the phrase): where its cursor goes when you stop the song. STAYS: where you left it. PLAYHEAD: the song row where the song stopped, on your track. Alt+G puts the cursor on the playhead at any time'},
     {l:'NEIGHBORS', ck:'View neighboring phrases', get:() => nbOn ? 1 : 0, set:v => setNb(!!v), min:0, max:1, tog:true, d:0, fmt:onOff,
       info:() => 'In Phrase, a faint copy of the notes the tracks either side play at the same song row: the track to the left in violet before the notes, the track to the right in mustard after them. A poly track shows its whole chord: all four notes when there is room (unfolded, desktop), otherwise one letter per voice (capital = natural, small = sharp, so CEGa is C E G A#; · is an empty voice, × a note off). Only to look at; they can’t be edited'},
-    {l:'NAME', sec:'Song', gap:true, show:() => S.name, tap:async () => { const n = await askText({title:'Rename the song'}, S.name, 40, 'Rename'); if (n != null){ S.name = n.trim().slice(0, 40) || 'Song'; saveS(); draw(); } }, info:() => 'EDIT renames the song'},
+    {l:'NAME', sec:'Song', gap:true, show:() => S.name, tap:async () => { const n = await askText({title:'Rename the song'}, S.name, 40, 'Rename'); if (n != null){ S.name = n.trim().slice(0, 40) || 'Song'; saveS(); draw(); msMeta(); } }, info:() => 'EDIT renames the song'},
     {l:'TRACKS', get:() => ntr(), set:v => setNtr(v), min:8, max:NT, big:8, d:16, fmt:v => v + ' tracks',
       info:() => `How many tracks this song uses, 8 to ${vtrk ? 24 : NT} with ${vtrk ? 'a voice per track (one voice each)' : 'the shared 16 voices'}. Song and Mixer show as many as fit and scroll sideways (arrows, or swipe left and right). Tracks past this number are hidden and silent; their notes are kept`},
     {l:'TEMPO', get:() => S.bpm, set:v => { S.bpm = v; if (tp.on && tp.seq) tp.seq.bpm = v; lkTempoOut(v); }, min:40, max:300, big:10, d:120, fmt:v => v + ' BPM', after:() => { rtAllFx(); chainsTempo(); }, info:() => 'Beats per minute, 4 steps to a beat. Track delays follow it'},
@@ -26081,6 +26160,21 @@ function playPatLoop(){
   tStart('song', {row:r && r.some(v => v >= 0) ? cs.song.y : songRow()});
   if (tp.on) lpW.seen = true; else if (!warmTok){ lpRestore(); draw(); }   // (the first PLAY of a session waits for the engine: warmTok; a refused start puts LOOP back at once)
 }
+// LP.SEL (12 Nov, owner: "add a lp.sel button to the command bar that loops the selection in arrange mode. Can be next to the loop play button"; "It can disappear on folded"): next to loop play on the control bar. With rows selected on
+// Arrange (the Song screen, or Arrange holding the keys beside Phrase) it is LOOP SEL's own path: LOOP SEL turned on from the selection (toggleLoop arms the rows), then playCtx plays the song looping them, every track; nothing new in
+// the sequencer. With no selection (lead's decision: or one row) it is loop play on the cursor's row (playPatLoop) and says how to select more. Pressed while it plays, it stops. LOOP SEL goes back to what it was when the song stops, as LOOP does
+// after loop play (lpW). lsW: {was, arm: LOOP SEL and its armed rows before, seen: tp.on has been true since}. If the selection changes while it plays, draw()'s syncLoop follows it only on the Song screen itself (selA is then Arrange's); beside Phrase the running loop keeps its rows.
+let lsW = null;
+function lpSelRestore(){ if (!lsW) return; const w = lsW; lsW = null; loopSel = w.was; loopArm = w.arm; }
+function lpSelPlay(){
+  if (tp.on){ tStopUser(); return; }   // the restore is in draw(), which tStop runs
+  if (tv !== 'song') return toast('LP.SEL loops the selected rows on Arrange.');
+  const r = sxRect(), rows = !!r && r.y1 > r.y0;
+  lsW = {was:loopSel, arm:loopArm, seen:false};
+  if (rows){ if (!loopSel) toggleLoop(); playCtx(); }   // LOOP SEL's own path: arms the selected rows, then plays them
+  else { playPatLoop(); toast(`Looping row ${rS(cs.song.y, 3)}: select 2 or more rows for a longer loop`, 2400); }
+  if (tp.on) lsW.seen = true; else if (!warmTok){ lpSelRestore(); draw(); }
+}
 // Ctrl/⌘+/ (owner, 20 Oct: Renoise's solo key): the track being worked on, as the bottom panel's track strip picks it (dkTrack:
 // the song cursor's track on Song and with Arrange holding the keys, the mixer's, FX's, else the phrase's). Solo adds up, as
 // the mixer's S does; all: clear every solo (as the deck's SOLO button).
@@ -26627,6 +26721,7 @@ function songViewRows(){
   return Math.max(2, v);
 }
 function optDir(dir, grid){
+  if (grid) navT = performance.now();   // (12 Nov, owner: ALT+arrows vs the playhead) the pad's / keyboard's ALT + arrow: working in the Song grid
   const d = dir === 'right' || dir === 'up' ? 1 : -1, big = dir === 'up' || dir === 'down';
   // ONE MEANING (owner, 7 Nov): ▲ is above / earlier on every screen, as on Phrase and Song: a lower number in a list (▲ was the
   // next number on Sect, Inst and FX); ◀ is earlier, ▶ later. dn: the step in number for this key.
@@ -26669,7 +26764,7 @@ function phraseGrid(dir){
   let p = cid >= 0 ? firstPhrase(cid) : -1;
   if (p >= 0){ cSect = cid; pendPlace = null; }
   else { const fp = freePhrase(); if (fp < 0){ toast('No free phrases left.'); return true; } p = fp; pendPlace = {x, y, p:fp}; }
-  cs.song.x = x; cs.song.y = y; cTrack = x; cPhrase = p; selA = null;
+  cs.song.x = x; cs.song.y = y; cTrack = x; cPhrase = p; selA = null; cs.song.pg = cs.phrase.pg = false;   // (12 Nov) the playhead's page no longer hides the cursor you moved
   if (cs.phrase.y >= 0) cs.phrase.y = clamp(cs.phrase.y, 0, plen(p) - 1);
   const VR = songViewRows(), top = cs.song.top || 0;
   if (y < top) cs.song.top = y; else if (y > top + VR - 1) cs.song.top = y - VR + 1;
@@ -26852,7 +26947,9 @@ function press(b, fromKey){
   if (b === 'play'){
     // STOP tapped twice (owner, 31 Oct): the second tap, within 450 ms of the stop, plays nothing and puts the song back to
     // its top (the cursor on row 00, RESUME's stopped spot forgotten), so the next PLAY starts the song from the beginning.
-    if (!tp.on && performance.now() - stopTapT < 450){ stopTapT = 0; toTop(); return; }
+    // (12 Nov, owner: "pressing play a second time can jump the cursor to the top": it was this, STOP then PLAY inside 450 ms, with the cursor on track 9 where he was working in Arrange.) A place you chose by hand stands: the second tap goes to the top
+    // only when Arrange does not have the keys and no key / pad press / click on the grid has moved anything since this play began; otherwise it is a plain PLAY.
+    if (!tp.on && performance.now() - stopTapT < 450){ stopTapT = 0; if (!(apReady && apF) && Math.max(workT, arrActT, arrHandT) < playWallT){ toTop(); return; } }
     if (tp.on) stopTapT = performance.now();
     if (mod('shift')){ used.shift = true; takeLatch(); playKey(true); } else playKey(false); return; }
   // LOOP is a sticky toggle, not a held key: a tap flips it (the pattern loop; LOOP SEL is in the tab bar on a computer).
@@ -26907,6 +27004,7 @@ const CMDS = [['b:-16', '−−', 'Change the value down a lot (EDIT+▼)'], ['b
   ['cldn', 'CLN↓', 'Clone the block (or selected blocks) into new, unique numbers on a new row below; the rows below move down (' + MODK + '+Shift+C)'], ['copy', 'COPY', 'Copy the selection, or what is under the cursor (a note comes with its instrument) (ALT)'],
   ['cut', 'CUT', 'Cut the selection, or what is under the cursor (ALT+EDIT)'], ['paste', 'PASTE', 'Paste (SHIFT+EDIT)'],
   ['undo', 'UNDO', 'Undo the last change to the song (' + MODK + '+Z)'], ['redo', 'REDO', 'Redo (' + MODK + '+Y)'], ['song', '▶↻', 'Loop play (12 Nov): turns LOOP on and plays the song from the cursor row, repeating its row; press LOOP while it plays to carry on as normal play, or this again to stop (' + MODK + '+Space). The pad’s PLAY and Space play plain'],
+  ['lpsel', 'LP.SEL', 'Loops the selected rows of the song (every track): select rows on Arrange, then this plays them round and round; again to stop. With nothing selected it loops the cursor’s row, as loop play does (12 Nov)'],
   ['ins', 'INS', 'Insert an empty row below the cursor’s row; the rows below move down (the whole song row on the Song, the phrase’s row on Phrase and Sect). ' + MODK + '+Alt+Enter'],
   ['mpat', 'M.PAT', 'Mute or unmute the pattern block under the cursor, or every block in the selection (as Alt+click, M on the Song). The track’s own MUTE is on the pad and in the Mixer']];   // MUTE PATTERN (owner, 8 Nov): Arrange only
 function cmdAction(a){
@@ -26933,17 +27031,22 @@ function cmdAction(a){
   if (c === 'clone') return cloneHere();
   if (c === 'cldn') return cloneDown();
   if (c === 'mpat'){ if (tv !== 'song') return toast('M.PAT mutes blocks on Arrange.'); const r = sxRect(); if (r) return sxMuteRect(r); if (sxPicks.length) return sxMuteCells(sxPicks.map(p => [p.y, p.t])); return toggleBlockMute(cs.song.y, cs.song.x); }
+  if (c === 'lpsel') return lpSelPlay();
   if (c === 'song') return playPatLoop();   // (12 Nov, owner) the control bar's ▶ is LOOP play; the pad's PLAY and Space play plain
 }
 for (const [a, t, lbl] of CMDS){ const b = el('button'); b.innerHTML = t; b.type = 'button'; b.dataset.c = a; b.setAttribute('aria-label', lbl); b.title = lbl; $('tCmd').append(b); if (a === 'song') b.setAttribute('aria-label', 'Loop play the song, or stop'); }
 // In PAD mode CLEAR moves between PASTE and UNDO, so a thumb can reach it on a phone; KEYS mode keeps
 // the original order. The buttons are moved, not rebuilt, so the tap handlers stay attached.
-const CMD_PAD_ORDER = ['b:-16', 'b:-1', 'b:1', 'b:16', 'prev', 'next', 'sel', 'uniq', 'clone', 'cldn', 'mpat', 'copy', 'cut', 'paste', 'clr', 'ins', 'undo', 'redo', 'song'];
+const CMD_PAD_ORDER = ['b:-16', 'b:-1', 'b:1', 'b:16', 'prev', 'next', 'sel', 'uniq', 'clone', 'cldn', 'mpat', 'copy', 'cut', 'paste', 'clr', 'ins', 'undo', 'redo', 'lpsel', 'song'];
 const CMD_PAD_SHORT = {clr:'CLR', sel:'SEL', paste:'PST', undo:'↶', redo:'↷'};
 // COMMAND BAR: the Edit menu's order (undo · clipboard · select · clones · value · previous / next · play) and words.
-const CMD_MINI_ORDER = ['undo', 'redo', 'cut', 'copy', 'paste', 'clr', 'rrow', 'ins', 'sel', 'uniq', 'clone', 'cldn', 'mpat', 'b:-16', 'b:-1', 'b:1', 'b:16', 'prev', 'next', 'song'];
+const CMD_MINI_ORDER = ['undo', 'redo', 'cut', 'copy', 'paste', 'clr', 'rrow', 'ins', 'sel', 'uniq', 'clone', 'cldn', 'mpat', 'b:-16', 'b:-1', 'b:1', 'b:16', 'prev', 'next', 'lpsel', 'song'];
 const CMD_MINI_LAB = {undo:'UNDO', redo:'REDO', cut:'CUT', copy:'COPY', paste:'PASTE', clr:'CLEAR', rrow:'REMOVE', ins:'INSERT', sel:'SELECT', clone:'CLONE', cldn:'CLONE↓', mpat:'MUTE PAT', 'b:-16':'−−', 'b:-1':'−', 'b:1':'+', 'b:16':'++', prev:'‹ PREV', next:'NEXT ›'};
-const cmdSongLab = () => cmdMini() ? (tp.on ? '■ STOP' : '▶ LOOP') : tp.on ? '■' : '▶↻';   // (12 Nov, owner) loop play: the loop mark beside ▶ tells it from the pad's PLAY
+const cmdSongLab = () => cmdMini() ? (tp.on ? '■ STOP' : 'LOOP') : tp.on ? '■' : '';   // the words beside the icon (stopped: the loop play icon, cmdSongSet)
+// LOOP PLAY ICON (12 Nov, owner: "I don't really like the way the loop play button looks… a play sign inside of a loop"; he picked the single circular
+// loop): stopped, the button shows the icon (and the word LOOP on the thin bar); playing, the stop mark as before. Written only when it changes.
+function cmdSongSet(sb){ const k = (tp.on ? 'on' : 'off') + (cmdMini() ? 'm' : ''); if (sb.dataset.lk === k) return; sb.dataset.lk = k;
+  if (tp.on) sb.textContent = cmdSongLab(); else sb.innerHTML = '<svg class="ic iclp" aria-hidden="true"><use href="#ic-loopplay"/></svg>' + (cmdMini() ? ' LOOP' : ''); }
 function applyCmdOrder(){
   const host = $('tCmd'), by = {}, mini = cmdMini();
   host.querySelectorAll('button[data-c]').forEach(b => by[b.dataset.c] = b);
@@ -26954,7 +27057,7 @@ function applyCmdOrder(){
   for (const a in by){ by[a].innerHTML = (mini && CMD_MINI_LAB[a]) || (inMode === 'pad' && CMD_PAD_SHORT[a]) || lab[a]; if (!mini) by[a].title = tip[a]; }
   if (by.rrow) by.rrow.hidden = inMode === 'pad';   // (PAD's phone row is full; REMOVE is in KEYS mode's row and bar)
   cmdTipKey = '';
-  const sb = by.song; if (sb){ setText(sb, cmdSongLab()); sb.classList.toggle('on', tp.on); }
+  const sb = by.song; if (sb){ delete sb.dataset.lk; cmdSongSet(sb); sb.classList.toggle('on', tp.on); }   // (12 Nov: the loop above just wrote the plain label over the icon: forget the cached key so cmdSongSet puts it back, also after a mode / bar-width / skin change)
   if (typeof cmdBarState === 'function') cmdBarState();
 }
 const cmdHome = $('tCmd').parentNode, cmdHomeNext = $('tCmd').nextElementSibling, cmdTag = el('span', 'cmtag');
@@ -26970,7 +27073,7 @@ function cmdBarState(){
   const clipOk = !!clip && clip.v === v, canUndo = undo.past.length > 0 || undo.pend || vUndo.t.some(Boolean);
   bar.querySelectorAll('button[data-c]').forEach(b => { const c = b.dataset.c;
     if (c === 'b:-16' || c === 'b:16') b.hidden = false;   // the big steps work on every screen (the Song's: ±16 phrase numbers)
-    const off = c === 'cut' || c === 'copy' || c === 'sel' ? !grid : c === 'paste' ? !(grid && clipOk) : c === 'undo' ? !canUndo : c === 'redo' ? !undo.future.length : false;
+    const off = c === 'cut' || c === 'copy' || c === 'sel' ? !grid : c === 'paste' ? !(grid && clipOk) : c === 'undo' ? !canUndo : c === 'redo' ? !undo.future.length : c === 'lpsel' ? v !== 'song' : false;
     if (b.classList.contains('off') !== off){ b.classList.toggle('off', off); b.setAttribute('aria-disabled', String(off)); } });
 }
 // The bar's tooltips say what each button does here and its key (from cmdItems), so the keys are easy to learn.
@@ -27118,6 +27221,7 @@ function cmdItems(full){
     {h:'Play'},
     ...(full ? [{a:'loopp', l:'Loop the pattern', k:keyHint('alt+L'), f:toggleLoopPat}, {a:'loops', l:'Loop the selection', k:keyHint('shift+alt+L'), f:toggleLoop},
       {a:'prow', l:'Play the row (every track)', k:keyHint('alt+Enter'), f:() => playRowKey(true), off:tv !== 'phrase'}, {a:'follow', l:followMode ? 'Follow off' : 'Follow on', k:keyHint('mod+shift+F'), f:followKey}] : []),
+    it('lpsel', 'LP.SEL: loop the selected rows (nothing selected: the cursor’s row)', '', {off:!onSong}),   // (12 Nov, owner) beside loop play on the control bar
     ...(tp.on ? [] : [{a:'splay', l:'Play the song from the cursor row', k:keyHint(ks ? 'Space' : 'shift+Space'), f:() => tStart('song', {row:songRow()})}]),   // FIX (1 Nov, audit #1): KEYS mode plays the song on Space
     it('song', tp.on ? 'Stop the song' : 'Loop play the song from the cursor row (turns LOOP on)', 'mod+Space')   // (12 Nov, owner) the control bar's ▶ is loop play
   ];
@@ -28287,6 +28391,7 @@ function draw(){
   document.querySelectorAll('#tTabs button').forEach(b => b.classList.toggle('on', b.dataset.v === tv));
   document.querySelectorAll('#tMap [data-v]').forEach(b => b.classList.toggle('on', b.dataset.v === tv));
   if (lpW){ if (tp.on) lpW.seen = true; else if (lpW.seen) lpRestore(); }   // LOOP PLAY ended: LOOP back as it was
+  if (lsW){ if (tp.on) lsW.seen = true; else if (lsW.seen) lpSelRestore(); }   // LP.SEL ended: LOOP SEL back as it was
   $('kPlay').classList.toggle('on', tp.on);
   keyVis();
   syncLoop();   // before the labels below, so they show the range that is actually looping
@@ -28297,8 +28402,9 @@ function draw(){
   // KEYS mode with the COMMAND BAR on: the thin bar; otherwise the COMMANDS row (both modes) as before.
   { const mini = cmdMini(), show = mini || cmdOn; if ($('tCmd').classList.contains('cmini') !== mini) applyCmdOrder();
     $('tCmd').hidden = !show; document.body.classList.toggle('cmdv', show && !mini); cmdTips(); }
-  const sb = $('tCmd').querySelector('[data-c=song]'); if (sb){ setText(sb, cmdSongLab()); sb.classList.toggle('on', tp.on); }
+  const sb = $('tCmd').querySelector('[data-c=song]'); if (sb){ cmdSongSet(sb); sb.classList.toggle('on', tp.on); }
   const onSong = tv === 'song';
+  { const lb = $('tCmd').querySelector('[data-c=lpsel]'), arrK = !!(typeof apReady !== 'undefined' && apReady && apF === 'arr'), vis = onSong || arrK; if (lb){ lb.hidden = !vis; lb.classList.toggle('on', !!lsW && tp.on); } $('tCmd').classList.toggle('lps', vis); }   // LP.SEL: where a song selection can exist (Song, Arrange holding the keys)
   { const seq = ['song', ...(sectsOn ? ['sect'] : []), 'phrase', 'inst', 'mixer', 'fx', 'mod', 'project'];
     const TCV = {song:'#dbe6f8', sect:'#e9e0f8', phrase:'#d8f0e2', inst:'#fbe2d2', mixer:'#f6edc8', fx:'#f8dce8', mod:'#ebdcf6', project:'#d5eef2'};
     let i = 0; $('tCmd').querySelectorAll('button[data-c]').forEach(b => { const on = !(onSong ? b.dataset.c === 'b:-16' || b.dataset.c === 'b:16' : b.dataset.c === 'clone' || b.dataset.c === 'cldn');
@@ -31956,7 +32062,7 @@ function sxCtx(y, t){
   items.push({l:'Insert row below ' + rS(r.y1, 3) + ' (the rows below move down)', k:ks ? keyHint('mod+alt+Enter') : '', f:() => { cs.song.y = r.y1; sxPicks = []; insRowBelow(); }});   // INSERT ROW BELOW (12 Nov, owner: INS): below the last row of the block or range under the pointer
   // RIGHT-CLICK (menu audit, 2 Nov): only what acts on the block or rows under the pointer; Undo / Redo, selecting, value
   // steps, navigation and play stay on their keys and in Edit ▾.
-  const C = cmdItems(), want = new Set(['mixp', 'dup', 'tname', 'unbus']);
+  const C = cmdItems(), want = new Set(['mixp', 'dup', 'tname', 'unbus', 'lpsel']);
   items.push(null, ...C.filter(x => x && want.has(x.a)));
   return {title, items:menuTidy(items)};
 }
@@ -32141,6 +32247,8 @@ function globalCpuValue(){
    (AudioContext.playbackStats) that count is used; otherwise the audio clock is compared with the page clock
    (getOutputTimestamp): when the audio thread falls behind, the audio clock slips back against real time. */
 const glitch = {n:0, t:-1e9, off:null, base:null};
+glitch.ts = [];   // CPU PANEL (12 Nov): when each dropout came (the last minute's count)
+function glitchAdd(k){ const now = performance.now(); for (let i = 0; i < Math.min(k, 20); i++) glitch.ts.push(now); if (glitch.ts.length > 60) glitch.ts.splice(0, glitch.ts.length - 60); }
 // BATTERY (8 Nov): the scan is for a song playing or a sound just made; with nothing sounding it drops to a slow check (below).
 // The count is rebased when it comes back from such a quiet stretch (a stall while silent is not a dropout), but never over a
 // stretch of PLAYBACK (a song playing with the screen off still has its dropouts counted when the screen comes back).
@@ -32151,7 +32259,7 @@ function glitchScan(){
   if (ps && typeof ps.underrunEvents === 'number'){
     if (glitch.base == null) glitch.base = ps.underrunEvents;
     else if (rb) glitch.base = ps.underrunEvents - glitch.n;
-    const k = ps.underrunEvents - glitch.base; if (k > glitch.n){ glitch.n = k; glitch.t = performance.now(); dropNote(); }
+    const k = ps.underrunEvents - glitch.base; if (k > glitch.n){ glitchAdd(k - glitch.n); glitch.n = k; glitch.t = performance.now(); dropNote(); }
     return;
   }
   if (!ctx.getOutputTimestamp) return;
@@ -32159,7 +32267,7 @@ function glitchScan(){
   const off = ts.performanceTime - ts.contextTime * 1000;
   if (glitch.off == null){ glitch.off = off; return; }
   const d = off - glitch.off;
-  if (d > 12){ glitch.n++; glitch.t = performance.now(); glitch.off = off; dropNote(); }
+  if (d > 12){ glitchAdd(1); glitch.n++; glitch.t = performance.now(); glitch.off = off; dropNote(); }
   else if (d < -12) glitch.off = off;          // a resume or a clock re-sync: start again from here
   else glitch.off += d * 0.05;                 // follow the two clocks' slow drift
 }
@@ -32230,13 +32338,68 @@ idleTick(() => {
   const byp = new Set(); for (let t = 0; t < ntr(); t++){ const c = rt.pl.buses[t] && rt.pl.buses[t].chn; if (c && c.byp && c.modsT > fresh) for (const id of c.byp) byp.add(id); }
   if (any || chMeterWanted){ const api = chApi(); if (api && api.meters) api.meters({ peaks:out, peaksIn:inp, load:globalCpuValue(), mods, shows, jacks, byp:[...byp] }); }
 }, 60, () => view === 'chains' && !document.hidden, 1500);   // BATTERY: 16 wake-ups a second only while the chains screen is open (setView wakes it)
+/* WHAT IS USING THE MOST CPU (12 Nov, owner: "tapping the CPU meter is confusing and oddly worded"; it should answer "what's using the most for CPU").
+   cpuRank(m) is pure: measured numbers in, the ranked list, the keep-up sentence and the one thing to try out. Everything in m is something the app already measures:
+   the audio engine's total (the browser's render capacity, or the timing probe), each part's own processing time (track effects, chains, master, bass voices: a share of real
+   time, as the meter), dropouts and late / dropped notes in the last minute, long screen stalls (>= 120 ms) in the last minute. The share of screen drawing, the sequencer
+   and the voices of a drum / synth engine are NOT measured, so they are not ranked; "everything else" is the total minus the parts, shown only where a total is reported. */
+function cpuRank(m){
+  const pct = v => v < 0.005 ? '<1%' : Math.round(v * 100) + '%', parts = (m.parts || []).filter(x => x.v >= 0.005).map(x => ({name:x.name, v:x.v, part:true}));
+  const sum = parts.reduce((a, x) => a + x.v, 0), total = typeof m.total === 'number' ? m.total : null, list = parts.slice();
+  if (total != null && total - sum >= 0.02) list.push({name:'Everything else in the audio engine (drums, synth voices, mixing)', v:total - sum, part:false});
+  list.sort((a, b) => b.v - a.v); const top = list.slice(0, 5).map(x => ({name:x.name, share:pct(x.v), v:x.v, part:x.part}));
+  const head = total != null ? 'Audio engine: ' + pct(total) + ' of its time' + (m.peak != null && m.peak - total >= 0.05 ? ', peak ' + pct(m.peak) : '') : 'This browser doesn’t report the whole audio engine, so only the parts below are counted.';
+  const d = m.drops | 0, l = m.late | 0, st = m.stalls | 0, s = (n, w) => n + ' ' + w + (n === 1 ? '' : 's');
+  let keep;
+  if (total != null && total > 1) keep = 'Not keeping up: the audio engine is over 100%.';
+  else if (d) keep = 'Not keeping up: ' + s(d, 'dropout') + ' in the last minute' + (l ? ' and ' + s(l, 'late note') : '') + '.';
+  else if (l) keep = 'Mostly keeping up: ' + s(l, 'late note') + ' in the last minute (worst ' + Math.round((m.worstLate || 0) * 1000) + ' ms), no dropouts.';
+  else if (!m.playing && !m.engine) keep = 'The audio engine has not started yet.';
+  else keep = (m.playing ? 'Keeping up: no' : 'Nothing playing. No') + ' dropouts or late notes in the last minute' + (st ? ', but ' + s(st, 'screen stall') + ' (the screen froze for over 0.1 s)' : '') + '.';
+  let tip;
+  const big = top[0];
+  if (d && m.latency === 'interactive') tip = 'Try: Settings → Audio → Latency → Balanced, for a bigger audio buffer.';
+  else if (d && m.latency === 'balanced') tip = 'Try: Settings → Audio → Latency → Safest, for the biggest audio buffer.';
+  else if (d && big && big.part && big.v >= 0.1) tip = 'Try: ' + big.name + ' is the heaviest part; bypass or simplify it.';
+  else if (d) tip = 'Try: Reset audio engine below, then play again.';
+  else if (st >= 3 && !m.lowPower) tip = 'Try: Low power mode (Settings): the screen froze ' + st + ' times in the last minute.';
+  else if (big && big.part && big.v >= 0.15 && (total == null || big.v >= total * 0.4)) tip = 'Try: ' + big.name + ' uses the most (' + big.share + '); bypass or simplify it.';
+  else if (big && !big.part && big.v >= 0.3) tip = 'Try: fewer voices at once, or fewer busy tracks (no single effect stands out).';
+  else if (total != null && total > 0.9) tip = 'Try: ' + (big && big.part ? big.name + ' is the heaviest part; bypass or simplify it, or play fewer voices at once.' : 'fewer voices at once, or fewer busy tracks.');   // (review) overloaded with no single part standing out: never "plenty of headroom"
+  else tip = 'Nothing to fix: plenty of headroom.';
+  return {head, list:top, keep, tip, bad:!!(d || (total != null && total > 1))};
+}
+function cpuMeasured(){
+  const now = performance.now(), cap = cpu.cap && now - cpu.cap.t < 3000 ? cpu.cap : null, pr = cpu.probe && now - cpu.probe.t < 1500 ? cpu.probe : null;
+  const tn = t => { const nm = S.mix && S.mix[t] && S.mix[t].nm; return 'Track ' + d2(t + 1) + (nm ? ' ' + nm : ''); }, parts = [];
+  if (rt){ rt.pl.buses.forEach((b, t) => { if (t >= NT) return; if (b.fx && b.fx.load) parts.push({name:'Effects · ' + tn(t), v:b.fx.load}); if (b.chn && b.chn.load) parts.push({name:'Chains · ' + tn(t), v:b.chn.load}); });
+    if (rt.mfx && rt.mfx.load) parts.push({name:'Master effects', v:rt.mfx.load}); if (rt.mst && rt.mst.wk && mstMeter && mstMeter.load) parts.push({name:'Master dynamics', v:mstMeter.load}); }
+  let bl = 0; for (const b of bassLive) bl += (b.node && b.node.load) || 0; if (bl) parts.push({name:'Bass voices', v:bl});
+  const inMin = a => a.filter(t => now - (t.t || t) < 60000);
+  const ev = inMin(PB.ev), stl = inMin(PB.stalls), dr = inMin(glitch.ts);
+  return {total:cap ? cap.avg : pr ? pr.load : null, peak:cap ? cap.peak : null, parts, drops:dr.length, late:ev.length, worstLate:ev.reduce((a, e) => Math.max(a, e.late), 0), stalls:stl.length,
+    playing:!!tp.on, engine:!!ctx, latency:latOf(), lowPower:!!lpOn};
+}
+let cpuPanel = null;
+function cpuClose(){ if (!cpuPanel) return; clearInterval(cpuPanel.iv); document.removeEventListener('keydown', cpuPanel.key, true); cpuPanel.wrap.remove(); cpuPanel = null; }
+function cpuFill(){
+  const P = cpuPanel; if (!P) return; const r = cpuRank(cpuMeasured());
+  const key = JSON.stringify([r.head, r.list.map(x => [x.name, x.share]), r.keep, r.tip]); if (P.key2 === key) return; P.key2 = key;   // no layout work when nothing shown changed
+  P.head.textContent = 'What is using the most right now'; P.sub.textContent = r.head;
+  P.list.replaceChildren(...(r.list.length ? r.list.map(x => { const li = el('div', 'cpurow'); li.append(el('span', null, x.name), el('b', null, x.share)); return li; }) : [el('div', 'cpuNone', tp.on ? 'Nothing measurable is running.' : 'Nothing is running. Press play to see what the song uses.')]));
+  P.keep.textContent = r.keep; P.keep.classList.toggle('bad', r.bad); P.tip.textContent = r.tip;
+}
 $('tCpu').addEventListener('click', () => {
-  const cap = cpu.cap, L = fxLoads().filter(x => x[1] > 0.0005).sort((a, b) => b[1] - a[1]);
-  const fx = L.length ? 'By part: ' + L.map(([n, v]) => `${n} ${(v * 100).toFixed(1)}%`).join(' · ') : 'No track effects running.';
-  if (!ctx) return toast('Play something first; the meter starts with the sound.');
-  toast((cap ? `Audio load ${Math.round(cap.avg * 100)}%, peak ${Math.round(cap.peak * 100)}%` + (cap.under > 0 ? `, ${(cap.under * 100).toFixed(1)}% dropouts` : '') + '. '
-    : `The audio engine’s processing uses ${Math.round(L.reduce((a, x) => a + x[1], 0) * 100)}% of real time. This browser can’t report the total audio load, so that is what the meter shows. `)
-    + fx + (glitch.n ? ` · ${glitch.n} dropout${glitch.n === 1 ? '' : 's'} since the sound started` + (latOf() === 'interactive' ? ' (Settings → Audio → Latency: Balanced gives more headroom).' : '.') : ' · No dropouts.'));
+  if (cpuPanel) return cpuClose(); if (askOpen) askOpen(null);
+  const wrap = el('div', 'ask'), box = el('div', 'askbox cpubox'); wrap.setAttribute('role', 'dialog'); wrap.setAttribute('aria-label', 'What is using the CPU');
+  const P = {wrap, head:el('div', 'asktitle'), sub:el('div', 'askmsg cpusub'), list:el('div', 'cpulist'), keep:el('div', 'cpukeep'), tip:el('div', 'cputip')};
+  const row = el('div', 'btnrow'), rep = el('button', null, 'Copy playback report'), rst = el('button', null, 'Reset audio engine'), cl = el('button', 'ok', 'Close'); for (const b of [rep, rst, cl]) b.type = 'button';
+  rep.title = 'A short log of what playback did, to paste into a bug report'; rst.title = $('audReset').title;
+  rep.addEventListener('click', () => pbCopy()); rst.addEventListener('click', () => { cpuClose(); $('audReset').click(); }); cl.addEventListener('click', cpuClose);
+  row.append(rep, rst, cl); box.append(P.head, P.sub, P.list, P.keep, P.tip, row); wrap.append(box);
+  P.key = e => { e.stopPropagation(); if (e.key === 'Escape'){ e.preventDefault(); cpuClose(); } else if (!(e.target && e.target.closest && e.target.closest('.ask'))) e.preventDefault(); };
+  const t0 = performance.now(); wrap.addEventListener('pointerdown', e => { if (e.target === wrap && performance.now() - t0 > 400){ e.preventDefault(); cpuClose(); } });
+  document.addEventListener('keydown', P.key, true); document.body.append(wrap); cpuPanel = P; cpuFill(); P.iv = setInterval(cpuFill, 500); setTimeout(() => cl.focus(), 0);   // (a 2 Hz timer that lives only while the panel is open)
 });
 // Stopped, nothing sounding and no live display (deck scope, meters): the loop drops to 10 Hz on a timer instead
 // of a callback every display frame (120 a second on the Fold, for nothing). tStart() and the pads wake it.
@@ -32299,7 +32462,7 @@ function frame(){
 }
 
 /* ---------- building the screen ---------- */
-VIEWS.forEach(v => { const b = el('button', null, VNAME[v]); b.type = 'button'; b.dataset.v = v; b.addEventListener('click', () => go(v)); $('tTabs').append(b); });
+VIEWS.forEach(v => { const b = el('button', null, VNAME[v]); b.type = 'button'; b.dataset.v = v; if (v === 'project'){ b.setAttribute('aria-label', 'Project'); b.title = 'Project'; } b.addEventListener('click', () => go(v)); $('tTabs').append(b); });   // (PROJ when the tab row is tight: aria-label keeps the full word)
 $('tMap').querySelectorAll('[data-v]').forEach(b => b.addEventListener('click', () => go(b.dataset.v)));
 for (let t = 0; t < NT; t++){
   const m = el('button', 'mtr'); m.type = 'button'; m.setAttribute('aria-label', 'Mute track ' + (t + 1));
@@ -32979,8 +33142,13 @@ function patFit(){
   bar.classList.remove('fitsel', 'fitxp');
   const tb = bar.parentNode, tabs = tb && tb.querySelector('.ttabs');
   if (tb && tabs && tb.classList.contains('ttabbar')){
-    if (innerWidth <= 600) tb.classList.remove('wrap2');   // a phone's own rule already makes two lines
-    else if (!tb.classList.contains('wrap2')){ if (tabs.scrollWidth > tabs.clientWidth + 1){ tbNeed = tabs.scrollWidth + [...tb.children].filter(c => c !== tabs).reduce((a, c) => a + c.offsetWidth, 0); tb.classList.add('wrap2'); } }
+    const tight = () => tabs.scrollWidth > tabs.clientWidth + 1;
+    if (document.body.classList.contains('mob') && inMode === 'pad' && innerWidth > 600){   // MOBILE HEADER (12 Nov): tabs + tempo / rows / REC on one line; PROJ, then tighter tabs, then two lines
+      tb.classList.remove('wrap2', 'tcompact');
+      if (tight()){ tb.classList.add('tcompact'); if (tight()){ tb.classList.remove('tcompact'); tb.classList.add('wrap2'); } }
+    }
+    else if (innerWidth <= 600){ tb.classList.remove('wrap2', 'tcompact'); if (document.body.classList.contains('mob') && inMode === 'pad' && tight()) tb.classList.add('tcompact'); }   // (a folded phone: its tabs get PROJ only when they would scroll)   // a phone's own rule already makes two lines
+    else if (!tb.classList.contains('wrap2')){ tb.classList.remove('tcompact'); if (tabs.scrollWidth > tabs.clientWidth + 1){ tbNeed = tabs.scrollWidth + [...tb.children].filter(c => c !== tabs).reduce((a, c) => a + c.offsetWidth, 0); tb.classList.add('wrap2'); } }
     else if (tb.clientWidth >= tbNeed + 2) tb.classList.remove('wrap2');
   }
   if (bar.scrollWidth <= bar.clientWidth + 1) return;
@@ -33130,8 +33298,10 @@ $('tOctDn').addEventListener('click', () => setOct(kOct - 1));
 $('tOctUp').addEventListener('click', () => setOct(kOct + 1));
 $('tOctV').addEventListener('click', () => setOct(4));
 function setOct(o){ kOct = clamp(o, 0, 8); toast('Octave ' + kOct + (view === 'synth' ? ' · Z plays C-' + kOct : '')); kpSig = ''; draw(); }
+function padHdr(){ document.body.classList.toggle('inpad', inMode === 'pad'); }   // MOBILE HEADER: body.mob.inpad hides TRANSP and merges the tempo / rows / REC strip into the tab row
+padHdr();
 function setInput(m){
-  inMode = m === 'keys' ? 'keys' : 'pad'; try { localStorage.setItem(IK, inMode); } catch(e){}
+  inMode = m === 'keys' ? 'keys' : 'pad'; try { localStorage.setItem(IK, inMode); } catch(e){} padHdr();
   releaseAll(); kpSig = ''; applyCmdOrder(); draw(); fit(); draw();
 }
 // Keyboard in KEYS mode. Returns true when the key was used.
@@ -33771,6 +33941,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [573, '12 Nov', ['The control bar\u2019s loop play button has a new icon: a play sign inside a loop.', 'LP.SEL, beside it, loops the selected song rows (or the cursor\u2019s row).', 'ALT+arrows between patterns no longer fights the playhead: the pattern you went to stays open and in view while you work.', 'A second PLAY tap no longer jumps the cursor to the top while you are working.', 'Mobile, pad mode: the TRANSP buttons are gone (SEMI on the pad does the same) and BPM, LPB, ROWS and REC sit in the tab row, leaving more room for the phrase and song.', 'Tap the CPU meter: a plain list of what is using the most, whether the phone is keeping up, and one thing to try.', 'The phone\u2019s media notification shows the song\u2019s real name and the app\u2019s icon.', 'The audio thread sequencer comes back by itself after a clock hiccup, once the clock has been steady; before, it stayed off until a reload.', 'The playback report records battery level and charging.']],
   [572, '12 Nov', ['The Play button at the top (by the CPU meter) plays the whole song on every screen, not just the open phrase.']],
   [571, '12 Nov', ['Fixed: notes typed into a new pattern opened from an empty Arrange cell (SHIFT+\u25b6) could end up in a phrase that was on no block, so they vanished from the screen when the song played. A phrase with notes is now always put on the song.', 'Pattern view: every track\u2019s column shows its own playing row, so a track that HOPs or plays another pattern still has a playhead.', 'Rendering a song now includes blocks after a gap in a track, and tracks that come in on a later row.', 'When playback moves between the audio-thread and page sequencers, or resumes, each track carries on from its own row.', 'SHIFT+\u25bc from the Song / Arrange opens the block\u2019s phrase on a computer too (PAD mode).']],
   [570, '12 Nov', ['The control bar\u2019s Play is now LOOP play (LOOP lights; press LOOP while it plays to carry on as normal play); the pad\u2019s PLAY and Space play plain.', 'The song now wraps once for every track: a track that runs out of blocks waits and all start again together, so tracks no longer drift onto different rows. A track with a gap comes back after the gap.', 'An effect switched off by a command stays off through later patterns and when the song comes round; only STOP resets it.', 'M.PAT (and Alt-click) can mute a block on the master column: its commands are skipped, the master\u2019s sound is untouched.', 'INS: a new control bar button and Edit menu command insert an empty row below the cursor.', 'SHIFT+\u25bc from Arrange opens the block\u2019s phrase (Mobile).', 'The Mixer\u2019s MASTERING ON / OFF is now AUTO MASTER ON / OFF.', 'Clone down no longer leaves an empty row when a bus refuses the clone.', 'A change waiting to be autosaved is written before PLAY starts.']],
@@ -34276,7 +34447,7 @@ function tsetRow(r){
   }
   if (r.show){ // NAME
     const c = el('div', 'tsc'), inp = el('input'); inp.type = 'text'; inp.value = r.show(); inp.maxLength = 40; inp.spellcheck = false; inp.setAttribute('aria-label', tsetLabel(r.l));
-    inp.addEventListener('change', () => { S.name = inp.value.trim().slice(0, 40) || 'Song'; inp.value = S.name; saveS(); draw(); });
+    inp.addEventListener('change', () => { S.name = inp.value.trim().slice(0, 40) || 'Song'; inp.value = S.name; saveS(); draw(); msMeta(); });
     c.append(inp); row.append(lab(), c, inf); return row;
   }
   if (r.ck || (r.tog && r.fmt === onOff)){
@@ -34566,7 +34737,7 @@ function pvGo(t, y, x, prow){
   if (cid >= 0){ ensureSectPhrase(cid); p = pvPhraseIn(cid, k); }
   if (p >= 0){ cSect = cid; pendPlace = null; }
   else { const fp = freePhrase(); if (fp < 0){ toast('No free phrases left.'); return false; } p = fp; pendPlace = {x:t, y, p:fp}; }
-  cTrack = t; cPhrase = p; cs.song.x = t; cs.song.y = y; selA = null;
+  cTrack = t; cPhrase = p; cs.song.x = t; cs.song.y = y; selA = null; cs.song.pg = false;   // (12 Nov) as phraseGrid
   const VR = songViewRows(), top = cs.song.top || 0;   // ARRANGE keeps the row in view
   if (y < top) cs.song.top = y; else if (y > top + VR - 1) cs.song.top = y - VR + 1;
   cs.song.top = clamp(cs.song.top, 0, 256 - VR);

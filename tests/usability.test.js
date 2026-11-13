@@ -83,7 +83,7 @@ test('panic (B18): Stop while playing stops; Stop again lets every note go and s
   const blk = cut('index.html', /function stopKey\(\)\{[^\n]*\nfunction panic\(\)\{[\s\S]*?\n\}\n/, 'stopKey and panic');
   const log = { stop: 0, all: 0, mo: 0, sent: [], toast: [] };
   const c = run(blk + '\nthis.stopKey = stopKey;', { tp: { on: true }, tStop: () => log.stop++, ctx: { currentTime: 0 }, rt: { pl: { stopAll: () => log.all++ } },
-    moRelease: () => log.mo++, NPORT: 4, midiOut: p => p === 0 || p === 2, msend: (m, t, x, p) => log.sent.push([p, ...m]), toast: (m, ms) => log.toast.push([m, ms]), tpLog() {} });
+    moRelease: () => log.mo++, NPORT: 4, midiOut: p => p === 0 || p === 2, msend: (m, t, x, p) => log.sent.push([p, ...m]), toast: (m, ms) => log.toast.push([m, ms]), tpLog() {}, warmTok: null, lpRestore() {}, lpSelRestore() {}, draw() {} });
   c.stopKey(); assert.equal(log.stop, 1); assert.equal(log.sent.length, 0, 'playing: just stops');
   c.tp.on = false; c.stopKey();
   assert.equal(log.all, 1, 'the synths let go'); assert.equal(log.mo, 1, 'held MIDI notes too');
