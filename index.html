@@ -31630,7 +31630,8 @@ function sxApply(d){
   if (!d.du && !d.dy) return;
   const p = sxDrop(d); if (p.err) return toast(p.err);
   const r = d.r, src = [];
-  for (let y = r.y0; y <= r.y1; y++) for (const t of p.cols){ const v = S.song[y][t]; if (v >= 0 && !(t !== MT && busNo(sxT(sxU(t) + d.du), v))) src.push([t, y, v, t !== MT && blockMuted(S, y, t)]); }   // (12 Nov, owner: a block with notes stays out of a bus)
+  let ref = 0; for (let y = r.y0; y <= r.y1; y++) for (const t of p.cols){ const v = S.song[y][t]; if (v < 0) continue; if (t !== MT && busNo(sxT(sxU(t) + d.du), v)){ ref++; continue; } src.push([t, y, v, t !== MT && blockMuted(S, y, t)]); }   // (12 Nov, owner: a block with notes stays out of a bus)
+  if (ref && !d.copy) return;   // (12 Nov, review) a MOVE with a refused block changes nothing: the block kept back sat where a neighbour was about to land and was overwritten (busNo has said why). A copy leaves its sources, so the rest still copies
   if (!src.length) return toast('Nothing to move: the selection is empty.');
   if (!d.copy) for (const [t, y] of src){ S.song[y][t] = -1; if (t !== MT) setBlockMute(y, t, false); }
   for (const [t, y, v, mu] of src){ const nt = sxT(sxU(t) + d.du), ny = y + d.dy; S.song[ny][nt] = v; if (nt !== MT) setBlockMute(ny, nt, !!mu); }
@@ -32289,7 +32290,7 @@ function pasteMix(){
     if (val === undefined || x < 0 || (x >= dm.w && !(tv === 'song' && x === MT)) || y >= dm.h || (fxOnly && x < FX0)) return;
     const empty = kindAt(tv, x) === 'tsp' ? !getCell(tv, x, y) : getCell(tv, x, y) < 0, has = kindAt(tv, x) === 'tsp' ? !!val : val >= 0;
     if (empty && has){ if (setCell(tv, x, y, val) !== false) n++; } }));
-  if (fxOnly && clip.d.some((row, j) => row.some((val, i) => { const x = colAt(i); return x >= 0 && x < FX0 && val >= 0; }))) return toast(n ? 'Notes left out · this is a bus track' : 'A bus track takes commands, not notes · nothing pasted');
+  if (fxOnly && clip.d.some((row, j) => row.some((val, i) => { const x = colAt(i); return x >= 0 && x < FX0 && val >= 0; }))) return (toast(n ? 'Notes left out · this is a bus track' : 'A bus track takes commands, not notes · nothing pasted'), draw());   // (12 Nov, review: the FX cells it did write were not drawn)
   toast(n ? `Mix-pasted ${n} cell${n > 1 ? 's' : ''} into the empty ones` : 'Mix-paste: every cell it would fill already has something.'); draw();
 }
 /* ===== SELECTION TOOLS end ===== */
@@ -32400,6 +32401,7 @@ function mselApply(m, copy){
   const D = [], mu = [];
   for (let y = r.y0; y <= r.y1; y++){ const row = [], mr = []; for (let x = r.x0; x <= r.x1; x++){ row.push(getCell(tv, x, y)); mr.push(tv === 'song' && x !== MT && blockMuted(S, y, x)); } D.push(row); mu.push(mr); }
   const bad = (x, y, v) => tv === 'song' ? x !== MT && x < NT && v >= 0 && busNo(x, v) : tv === 'phrase' && v >= 0 && x < FX0 && busTrack(cTrack) && busNoteNo();   // NO NOTES INTO A BUS (12 Nov): refused cells stay where they were
+  if (!copy && D.some((row, j) => row.some((v, i) => bad(r.x0 + i + dx, r.y0 + j + dy, v)))) return draw();   // (12 Nov, review) a MOVE with a refused cell changes nothing: the cell kept back was overwritten by its neighbour's move (the toast has said why). A copy leaves its sources
   const vac = [];   // a move empties its cells first, then writes: UNIQUE PER TRACK must still see that this track held the block (10 Nov, owner)
   if (!copy) for (let y = r.y0; y <= r.y1; y++) for (let x = r.x0; x <= r.x1; x++){ if (tv === 'song' && x !== MT){ const v0 = S.song[y][x]; if (v0 >= 0) vac.push([y, x, v0]); } if (bad(x + dx, y + dy, D[y - r.y0][x - r.x0])) continue; setCell(tv, x, y, kindAt(tv, x) === 'tsp' ? 0 : -1); }
   const d = dims(tv); uniqVac = vac;

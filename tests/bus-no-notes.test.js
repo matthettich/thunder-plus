@@ -66,6 +66,12 @@ test('drag a selection (move): a block refused by the bus stays where it was', (
   r.c.mselApply({ r: { x0: 2, x1: 2, y0: 0, y1: 0 }, dx: 1, dy: 0 }, false); r.flush();
   assert.equal(r.c.S.song[0][2], 1); assert.equal(r.c.S.song[0][3], -1);
 });
+test('drag two blocks (move) where one is refused by the bus: nothing moves, the refused block is not overwritten by its neighbour (12 Nov, review)', () => {
+  const r = rig({ tv: 'song' }); r.chain(1, 1, [[0, 0, 48]]); r.chain(3, 3, []); r.c.S.song[0][1] = 3; r.c.S.song[0][2] = 1;
+  r.c.mselApply({ r: { x0: 1, x1: 2, y0: 0, y1: 0 }, dx: 1, dy: 0 }, false); r.flush();
+  assert.equal(r.c.S.song[0][1], 3); assert.equal(r.c.S.song[0][2], 1); assert.equal(r.c.S.song[0][3], -1);
+  assert.match(src, /if \(ref && !d\.copy\) return;/);
+});
 test('hooks: Arrange drag/Alt-drag, clones (CLN, duplicate, paste clone) and Duplicate Track go through the guard; generators refuse a bus', () => {
   assert.match(src, /busNo\(sxT\(sxU\(t\) \+ d\.du\), v\)/);
   assert.match(src, /function newBlock\(c, src\)\{\n  if \(src >= 0 && c && c\.x < NT && busNo\(c\.x, src\)\) return;/);
