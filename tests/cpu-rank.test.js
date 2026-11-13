@@ -39,3 +39,7 @@ test('the tip follows from what is measured', () => {
 test('the panel costs nothing closed: its timer exists only while it is open', () => {
   assert.match(src, /cpuPanel = P; cpuFill\(\); P\.iv = setInterval\(cpuFill, 500\)/); assert.match(src, /function cpuClose\(\)\{ if \(!cpuPanel\) return; clearInterval\(cpuPanel\.iv\)/);
 });
+test('overloaded with no single heavy part and no dropouts counted: a suggestion, never "plenty of headroom" (review)', () => {
+  const r = rank({ ...base, total: 1.12, parts: [{ name: 'A', v: 0.28 }, { name: 'B', v: 0.28 }, { name: 'C', v: 0.28 }, { name: 'D', v: 0.28 }] });
+  assert.match(r.tip, /^Try: /); assert.doesNotMatch(r.tip, /headroom/);
+});

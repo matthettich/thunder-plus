@@ -23060,7 +23060,8 @@ function corePump(){
 /* PANIC (27 Oct, audit B18): Stop when already stopped (F8 again) lets go of everything still sounding: the voices, and on
    every MIDI port and channel All Sound Off, All Notes Off and the sustain pedal up (a stop only sent All Notes Off on the
    channels the song used). Effect tails ring on; Settings → Audio → Reset audio engine clears those too. */
-function stopKey(){ if (tp.on) return tStop(); warmTok = null; panic(); }   // (10 Nov: warmTok: a STOP inside the first PLAY's warm-up cancels it)
+function stopKey(){ if (tp.on) return tStop(); const warm = !!warmTok; warmTok = null; if (warm){ try { lpRestore(); lpSelRestore(); } catch(e){} }   // (review) a STOP inside the first PLAY's warm-up: loop play / LP.SEL never began, so LOOP and LOOP SEL go back as they were
+  panic(); if (warm) try { draw(); } catch(e){} }   // (10 Nov: warmTok: a STOP inside the first PLAY's warm-up cancels it)
 function panic(){
   try { if (rt && ctx) rt.pl.stopAll(ctx.currentTime); } catch(e){}
   try { moRelease(); } catch(e){}
@@ -32365,6 +32366,7 @@ function cpuRank(m){
   else if (st >= 3 && !m.lowPower) tip = 'Try: Low power mode (Settings): the screen froze ' + st + ' times in the last minute.';
   else if (big && big.part && big.v >= 0.15 && (total == null || big.v >= total * 0.4)) tip = 'Try: ' + big.name + ' uses the most (' + big.share + '); bypass or simplify it.';
   else if (big && !big.part && big.v >= 0.3) tip = 'Try: fewer voices at once, or fewer busy tracks (no single effect stands out).';
+  else if (total != null && total > 0.9) tip = 'Try: ' + (big && big.part ? big.name + ' is the heaviest part; bypass or simplify it, or play fewer voices at once.' : 'fewer voices at once, or fewer busy tracks.');   // (review) overloaded with no single part standing out: never "plenty of headroom"
   else tip = 'Nothing to fix: plenty of headroom.';
   return {head, list:top, keep, tip, bad:!!(d || (total != null && total > 1))};
 }
