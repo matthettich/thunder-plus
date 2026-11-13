@@ -32530,7 +32530,7 @@ function cpuRank(m){
   else tip = 'Nothing to fix: plenty of headroom.';
   // THE SCREEN (13 Nov): drawing and the page sequencer, as a share of the page's own time: not part of the audio engine's percentage
   const sc = m.screen || null, sq = m.seqPage || null, screen = [];
-  if (sc) screen.push({name:'Screen drawing', share:pct(sc.ms) + ' of the page’s time', extra:sc.n >= 0.5 ? Math.round(sc.n) + ' draws a second' : ''});
+  if (sc) screen.push({name:'Screen drawing', share:pct(sc.ms) + ' of the page’s time', extra:sc.n >= 0.5 ? Math.round(sc.n) + ' screen updates a second' : ''});
   if (sq) screen.push({name:'Sequencer (page)', share:pct(sq.ms) + ' of the page’s time', extra:''});
   if (tip === 'Nothing to fix: plenty of headroom.' && sc && sc.ms >= 0.3 && !m.lowPower) tip = 'Try: Low power mode (Settings): drawing the screen takes ' + pct(sc.ms) + ' of the page’s time.';
   return {head, list:top, keep, tip, screen, screenHead:screen.length ? 'The screen (the page’s own time, a separate budget: do not add it to the audio engine above)' : '', bad:!!(d || (total != null && total > 1))};
@@ -32595,7 +32595,8 @@ function playTick(){
   const now = performance.now();
   if (COARSE && now - plLast < PL_MIN){ plOwed = true; return; }
   plOwed = false; plLast = now;
-  if (!playLite(now)){ playDraw = true; try { draw(); } finally { playDraw = false; } plBase = {t:now, sig:plStamp()}; }
+  if (playLite(now)) scrAdd('draw', performance.now() - now);   // the playhead-only update is a screen update too: counted in the CPU panel's figure (a full draw() counts itself, once)
+  else { playDraw = true; try { draw(); } finally { playDraw = false; } plBase = {t:now, sig:plStamp()}; }
 }
 function playLite(now){
   if (!plBase || now - plBase.t > PL_BEAT || view !== 'tracker' || apHold || apF || selA || sdrag || drag || arrFast || arrSoon) return false;

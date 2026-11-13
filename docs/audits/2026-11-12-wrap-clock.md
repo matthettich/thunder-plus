@@ -12,7 +12,7 @@ wrap restarts all tracks together (no `fxreset`), 571 `pvPlayMark`. What does ti
 
 ## Verdict
 
-**Not reproduced.** Across 31 runs the first wrap was never worse than wraps 2 to 4. Where timing broke, it broke at the
+**Not reproduced.** Across 31 runs there was no consistent first-wrap regression: the owner's symptom did not appear, and in most runs the first wrap's lead, late events and long tasks were no worse than wraps 2 to 4. Two exceptions, both in the size of the longest long task only (lead and late events unaffected): core, Song, 4x, 8 rows, wrap 1 had a 131 ms longest task against 86 / 52 / 88 ms at wraps 2 to 4, and core Pattern view, 4x, 8 rows, 349 ms at wrap 1 against 254 ms pooled over wraps 2+. Where timing broke, it broke at the
 same heavy mid-song section on every pass (or on every redraw-heavy screen on every pass), not at the wrap. The core's own
 counters (late notes, skips, worst lateness) stayed at zero in every run. Nothing here confirms or rules out a phone-only
 cause (real audio device, real CPU, Android scheduling).
@@ -50,6 +50,8 @@ Not measured, and why it matters:
 Segments: pass k = wrap k + 1 s to wrap k+1 - 1 s; wrap k = due time +-1 s.
 
 ## Per-pass results (representative runs; full tables via `node tests/sweep/wrap-report.mjs <file>`)
+
+> Computed before the 13 Nov report fix (tests/sweep/wrap-report.mjs): counter increments between a segment's first sample and the one before it (underruns, underrun ms, glitch, skips) were attributed to no segment, and the task / script / layout / style percentages were divided by the whole segment's length instead of the time between the two metric reads. Edge increments are under-counted and those percentages are approximate. The raw wrap-*.json files were not kept, so the affected cells (underruns, glitch, skips, task / script / layout / style %) cannot be regenerated here; treat them as unverified. Lead, late events, long tasks, clock rate and step errors do not use the changed code and stand.
 
 ### Page sequencer, Song, FOLLOW on, 6x, 8 rows, open (quiet machine)
 
@@ -117,7 +119,7 @@ Pooled groups from `wrap-report.mjs --pool`. Selected lines (full list: `wrap-re
 
 Per-wrap long tasks (n / max ms) in a few runs: page song 4x s8, 1/53, 0/0, 1/53, 5/94 for wraps 1 to 4; page mixer 4x s8,
 11/103, 13/138, 15/217, 17/205 (rising, so later wraps are worse); core song 4x s8, 6/131, 4/86, 1/52, 5/88; page song 1x, 0 at
-every wrap. Wrap 1 was not worse than wraps 2 to 4 in any run, and in the mixer run the trend is the other way round.
+every wrap. Wrap 1 shows no consistent regression against wraps 2 to 4: the exceptions are the core Song run (131 ms against 86 / 52 / 88) and core Pattern view (349 ms against 254 ms pooled); in the page Mixer run the trend is the other way round (later wraps worse).
 
 Clock against wall: the audio clock rate is 1.00 in every segment (1 s windows 0.99 to 1.01 on short songs; 0.91 to 1.09
 and 0.95 to 1.04 only in contended full-song passes). Step errors at wraps are 1 to 9 ms, equal to the rest of the song. In the
@@ -135,7 +137,7 @@ Because the symptom did not reproduce, these are ranked by size of the measured 
    0 late events, so this needs a heavy screen or a slow device to bite. Fix location: page-side display (throttle or skip
    redraws while playing, bound per-frame cost). Core mode is unaffected for audio (core lead stays at 247 ms) but the page cursor and
    row display go late.
-2. **Heavy mid-song section drives audio-thread underruns that fall with pass number.** Core full runs: 272, 73, 46, 14
+2. **Heavy mid-song section drives audio-thread underruns that fall with pass number.** Core full runs (computed before the report fix; edge increments under-counted, so each count is a lower bound, unverified): 272, 73, 46, 14
    underrun events in passes 1 to 4 (578, 176, 7 in the profiled run); audio-thread CPU is roughly 10 percent higher in pass 1
    than pass 2 for the same section, uniformly across functions (cold JIT or first-touch memory; cause not determined).
    Page full run was reversed (21, 21, 183), and contention (others 28 to 48 percent) confounds both, so this is a weak signal. It does match

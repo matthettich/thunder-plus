@@ -53,7 +53,8 @@ export function analyse(R) {
     // offset ct - pn: how far it wandered inside the segment (the band the phone resync watches)
     const OF = K.map(c => (c[1] * 1000 - c[0])); if (OF.length) { const m = OF.reduce((a, b) => a + b, 0) / OF.length; o.offRange = Math.max(...OF) - Math.min(...OF); }
     // playback counters: deltas over the segment (500 ms samples)
-    const A = M.filter(m => inRange(m.a.pn, s)).map(m => m.a), d = k => A.length > 1 && A[0][k] != null && A[A.length - 1][k] != null ? A[A.length - 1][k] - A[0][k] : null;
+    // (13 Nov report fix) an increment between two samples belongs to the segment holding the LATER sample: the baseline is the last sample before the segment
+    const pre = M.filter(m => m.a.pn < s.a).slice(-1).map(m => m.a), A = pre.concat(M.filter(m => inRange(m.a.pn, s)).map(m => m.a)), d = k => A.length > 1 && A[0][k] != null && A[A.length - 1][k] != null ? A[A.length - 1][k] - A[0][k] : null;
     o.underruns = d('psEv'); o.underrunMs = d('psDur') != null ? d('psDur') * 1000 : null; o.glitch = d('glitch');
     o.pgGap = A.length ? Math.max(...A.map(a => a.pg ? a.pg.gap : 0)) : null; o.pgRe = A.length > 1 && A[0].pg && A[A.length - 1].pg ? A[A.length - 1].pg.re - A[0].pg.re : null; o.pgRs = A.length > 1 && A[0].pg && A[A.length - 1].pg ? A[A.length - 1].pg.rs - A[0].pg.rs : null;
     o.pbLateMax = null; const PBr = R.pb.filter(p => inRange(p[0], s)); o.pbDrop = PBr.reduce((a, p) => a + p[3], 0); o.pbLateMax = PBr.length ? Math.max(...PBr.map(p => p[2])) * 1000 : null; o.pbAheadMin = null;
@@ -61,7 +62,8 @@ export function analyse(R) {
     // the page's own functions over 1.5 ms
     const SL = R.slow.filter(x => inRange(x[0], s)), by = {}; for (const x of SL) { const b = by[x[1]] || (by[x[1]] = { n: 0, ms: 0, max: 0 }); b.n++; b.ms += x[2]; if (x[2] > b.max) b.max = x[2]; } o.slow = by;
     { const Mm = M.filter(m => inRange(m.a.pn, s)); if (Mm.length > 1 && Mm[0].chromeCpu != null) { const a = Mm[0], b = Mm[Mm.length - 1], dw = b.wallS - a.wallS; if (a.aCpu != null && b.aCpu != null) { o.audioPct = (b.aCpu - a.aCpu) / dw * 100; o.mainCpuPct = (b.mCpu - a.mCpu) / dw * 100; } o.machBusy = Mm.reduce((x, m) => x + m.busy, 0) / Mm.length; o.chromePct = (b.chromeCpu - a.chromeCpu) / dw / (R.machine.cpus || 2) * 100; o.otherPct = Math.max(0, o.machBusy - o.chromePct); } }
-    const mm = M.filter(m => inRange(m.a.pn, s)).map(m => m.m); if (mm.length > 1) { const a = mm[0], b = mm[mm.length - 1], w = s.b - s.a; o.taskPct = (b.task - a.task) / ((s.b - s.a) / 1000) * 100; o.scriptPct = (b.script - a.script) / ((s.b - s.a) / 1000) * 100; o.layoutPct = (b.layout - a.layout) / ((s.b - s.a) / 1000) * 100; o.stylePct = (b.style - a.style) / ((s.b - s.a) / 1000) * 100; o.heapMB = b.heap / 1e6; }
+    const mmS = M.filter(m => m.a.pn < s.a).slice(-1).concat(M.filter(m => inRange(m.a.pn, s))); if (mmS.length > 1) { const a = mmS[0].m, b = mmS[mmS.length - 1].m, el = (mmS[mmS.length - 1].a.pn - mmS[0].a.pn) / 1000;   // (13 Nov report fix) divided by the time between the two metric reads, not the segment's length
+      o.taskPct = (b.task - a.task) / el * 100; o.scriptPct = (b.script - a.script) / el * 100; o.layoutPct = (b.layout - a.layout) / el * 100; o.stylePct = (b.style - a.style) / el * 100; o.heapMB = b.heap / 1e6; }
     return o;
   });
   // row boundaries: the window [due - 200 ms, due + 600 ms] of every boundary, by pass (first-time patterns are the boundaries of pass 1)

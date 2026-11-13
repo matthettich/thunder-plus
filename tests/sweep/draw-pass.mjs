@@ -78,7 +78,7 @@ for (const sc of SCREENS) {
     ltN: lt.length, ltMs: lt.reduce((a, x) => a + x[1], 0), ltMax: lt.reduce((a, x) => Math.max(a, x[1]), 0),
     layoutN: m1.LayoutCount - m0.LayoutCount, styleN: m1.RecalcStyleCount - m0.RecalcStyleCount, layoutMs: (m1.LayoutDuration - m0.LayoutDuration) * 1000, styleMs: (m1.RecalcStyleDuration - m0.RecalcStyleDuration) * 1000,
     scriptMs: (m1.ScriptDuration - m0.ScriptDuration) * 1000, taskMs: (m1.TaskDuration - m0.TaskDuration) * 1000, leadMin: D.leadMin, lead5: D.lead5, leadN: D.leadN, late: D.late, row: D.row, mo: D.mo,
-    core: c1 && { late: c1.late - (c0 ? c0.late : 0), lead: c1.lead, worst: c1.worst },
+    core: c1 && c0 ? { late: c1.late, lead: c1.lead, worst: c1.worst } : null,   // (the core's stats read resets its late counter: c1.late is already the window's count; c0 is read to clear the warm-up's)
     kids: Object.fromEntries(Object.entries(D.fn).filter(([k, v]) => v.n && k !== 'draw').map(([k, v]) => [k, { n: v.n, ms: +v.tot.toFixed(1), max: +v.max.toFixed(1) }])) };
   result.screens[sc] = r;
   if (TRACE){ const by = {}; for (const e of traceEv){ if (e.ph === 'X' && e.dur != null && e.name !== 'RunTask' || (e.ph === 'X' && e.name === 'RunTask')){ const b = by[e.name] || (by[e.name] = [0, 0]); b[0] += e.dur / 1000; b[1]++; } }

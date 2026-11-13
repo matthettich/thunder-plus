@@ -26,6 +26,8 @@ import { ROOT, sleep, serve, launch, machine, threads } from './cdp-lib.mjs';
 const arg = (k, d) => { const a = process.argv.find(x => x.startsWith('--' + k + '=')); return a ? a.slice(k.length + 3) : d; };
 const SEQ = arg('seq', 'core'), SCREEN = arg('screen', 'song'), FOLLOW = arg('follow', 'on'), THR = +arg('throttle', 4), SONG = arg('song', 's8'), LOOP = arg('loop', ''), PASSES = +arg('passes', 5);
 const SIZE = arg('size', 'open'), PROF = arg('prof', 'none'), START = +arg('start', 0), TAG = arg('tag', `${SEQ}-${SCREEN}-${FOLLOW}-x${THR}-${SONG}${LOOP ? '-loop' + LOOP : ''}-${SIZE}${PROF !== 'none' ? '-' + PROF : ''}`);
+// Wraps are found by a row number that decreases (the simulation and the run): a one-row song or a one-row LOOP never decreases, so it is refused up front.
+{ const rows = LOOP ? +LOOP.split('-')[1] - +LOOP.split('-')[0] + 1 : SONG === 'full' ? 56 : +SONG.slice(1); if (!(rows >= 2)) { console.error(`wrap-clock: wraps are detected by the row number going down, so the song or loop needs at least two rows (got ${rows}: --song=${SONG}${LOOP ? ' --loop=' + LOOP : ''})`); process.exit(2); } }
 const OUT = path.join(ROOT, 'tests/sweep/out'); fs.mkdirSync(OUT, { recursive: true });
 let PREBUSY = null;   // wait (up to 90 s) for a quiet machine; if it never is, go on and record how busy it was
 const ABORT = arg('abort', SONG === 'full' ? '0' : '1') === '1';   // abort (exit 3) when something else keeps the machine busy during the run: it is rerun later

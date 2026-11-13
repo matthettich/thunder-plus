@@ -1,4 +1,4 @@
-// IDLE WAKE-UPS (13 Nov 2026): what keeps running while the song is STOPPED and the app sits idle (battery). Counts timer, interval, rAF and observer callbacks
+// IDLE WAKE-UPS (13 Nov 2026): what keeps running while the song is STOPPED and the app sits idle (battery). Counts timer, interval, rAF and Resize / Mutation / Intersection / Performance observer callbacks
 // in 10 s by call site, plus main-thread task time (CDP). Fold profile as draw-pass.mjs. node tests/sweep/idle-wake.mjs [--throttle=1] [--screen=song] [--secs=10]
 import { ROOT, sleep, serve, launch } from './cdp-lib.mjs';
 const arg = (k, d) => { const a = process.argv.find(x => x.startsWith('--' + k + '=')); return a ? a.slice(k.length + 3) : d; };
@@ -13,6 +13,7 @@ await P('Emulation.setDeviceMetricsOverride', { width: 884, height: 1020, device
 await P('Page.addScriptToEvaluateOnNewDocument', { source: `(() => { try { localStorage.setItem('thunderplus-platform-v1', 'mobile'); } catch(e){}
   const Z = window.__iw = {on: false, c: {}}, site = () => { const l = (new Error().stack || '').split('\\n'); for (let i = 3; i < l.length; i++){ const m = /index\\.html[^:]*:(\\d+):/.exec(l[i]); if (m) return m[1]; } return '?'; };
   const wrap = (obj, name, kind) => { const o = obj[name]; obj[name] = function(f, ...a){ const s = kind + '@' + site(); if (typeof f === 'function'){ const g = f; f = function(...x){ if (Z.on) Z.c[s] = (Z.c[s] || 0) + 1; return g.apply(this, x); }; } return o.call(this, f, ...a); }; };
+  for (const N of ['ResizeObserver', 'MutationObserver', 'IntersectionObserver', 'PerformanceObserver']) { const O = window[N]; if (!O) continue; window[N] = class extends O { constructor(f, ...a) { const s = N + '@' + site(); super(function(...x) { if (Z.on) Z.c[s] = (Z.c[s] || 0) + 1; return f.apply(this, x); }, ...a); } }; }
   wrap(window, 'setTimeout', 'timeout'); wrap(window, 'setInterval', 'interval'); wrap(window, 'requestAnimationFrame', 'raf'); })();` });
 await P('Page.navigate', { url: `http://localhost:${port}/index.html?seqtest=1` });
 for (let i = 0; i < 200; i++) { if (await ev('!!window.__seqTest').catch(() => false)) break; await sleep(300); }

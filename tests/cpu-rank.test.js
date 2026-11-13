@@ -46,7 +46,7 @@ test('overloaded with no single heavy part and no dropouts counted: a suggestion
 test('THE SCREEN (13 Nov): drawing and the page sequencer are their own short section, a share of the page’s time, never added to the audio list', () => {
   assert.deepEqual(rank(base).screen, []); assert.equal(rank(base).screenHead, '');
   const r = rank({ ...base, screen: { ms: 0.126, n: 17.4 }, seqPage: { ms: 0.004, n: 40 } });
-  assert.deepEqual(r.screen.map(x => [x.name, x.share, x.extra]), [['Screen drawing', '13% of the page’s time', '17 draws a second'], ['Sequencer (page)', '<1% of the page’s time', '']]);
+  assert.deepEqual(r.screen.map(x => [x.name, x.share, x.extra]), [['Screen drawing', '13% of the page’s time', '17 screen updates a second'], ['Sequencer (page)', '<1% of the page’s time', '']]);
   assert.match(r.screenHead, /separate budget/); assert.doesNotMatch(r.list.map(x => x.name).join(), /Screen/);
   assert.equal(r.head, 'Audio engine: 40% of its time');
 });

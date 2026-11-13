@@ -25,13 +25,13 @@ function rig(o = {}) {
   const log = [];
   const c = { performance: { now: () => c.t }, t: 1000, view: 'tracker', apHold: false, apF: null, selA: null, sdrag: null, drag: null, arrFast: false, arrSoon: 0, tv: 'mixer', COARSE: true,
     cs: { a: 1 }, tp: { on: true, pos: [], mode: 'song', bpm: 120, tks: 6 }, cTrack: 0, cPhrase: 0, cSect: 0, patRow: -1, loopPat: false, followMode: 2, scr: { style: { fontSize: '14px' } }, tScale: 100, vpW: 900, arrW: 0, sideOn: true, inlOn: true, stage: 'off', arrMode: 1, spOn: false, pvMode: true, pvFx: false, pvFold: true, inMode: 'pad', ntr: () => 8,
-    playDraw: false, apReady: false, apStrip() { log.push('strip'); }, apStripOk: () => false, drawArr() { log.push('arr'); }, playhead: () => null, pvActive: () => false, pvPlayMark() { log.push('pvmark'); }, pvLit: new Set(), litRows(r) { log.push('lit'); }, draw() { log.push('draw'); }, log, ...o };
+    playDraw: false, scrAdd() { log.push('count'); }, apReady: false, apStrip() { log.push('strip'); }, apStripOk: () => false, drawArr() { log.push('arr'); }, playhead: () => null, pvActive: () => false, pvPlayMark() { log.push('pvmark'); }, pvLit: new Set(), litRows(r) { log.push('lit'); }, draw() { log.push('draw'); }, log, ...o };
   vm.createContext(c);
   vm.runInContext(cut(/const PL_BEAT = 500[\s\S]*?\nfunction frameWake\(\)/).replace(/function frameWake\(\)$/, '') + '\nthis.tick = playTick; this.base = () => plBase; this.owed = () => plOwed;', c);
   return c;
 }
 test('first tick is a full draw and records the baseline; the next on a screen that shows nothing of the playhead draws nothing', () => {
-  const c = rig(); c.tick(); assert.deepEqual(c.log, ['draw']); c.t += 60; c.log.length = 0; c.tick(); assert.deepEqual(c.log, ['arr']);
+  const c = rig(); c.tick(); assert.deepEqual(c.log, ['draw']); c.t += 60; c.log.length = 0; c.tick(); assert.deepEqual(c.log, ['arr', 'count']);
 });
 test('a moved cursor, a tempo change, a selection or Arrange focus take the full draw; so does a baseline older than PL_BEAT', () => {
   const c = rig(); c.tick(); c.log.length = 0;
@@ -40,18 +40,23 @@ test('a moved cursor, a tempo change, a selection or Arrange focus take the full
   c.t += 60; c.selA = {}; c.tick(); assert.deepEqual(c.log, ['draw']); c.selA = null; c.log.length = 0;
   c.t += 60; c.apF = 'arr'; c.tick(); assert.deepEqual(c.log, ['draw']); c.apF = null; c.log.length = 0;
   c.t += 60; c.tick(); assert.deepEqual(c.log, ['draw'], 'the stamp changed back: one more full draw'); c.log.length = 0;
-  c.t += 60; c.tick(); assert.deepEqual(c.log, ['arr']); c.log.length = 0;
+  c.t += 60; c.tick(); assert.deepEqual(c.log, ['arr', 'count']); c.log.length = 0;
   c.t += 600; c.tick(); assert.deepEqual(c.log, ['draw'], 'heartbeat');
 });
 test('Song / Arrange (their text carries the playing row) always take the full draw', () => {
   const c = rig({ tv: 'song' }); c.tick(); c.t += 60; c.log.length = 0; c.tick(); assert.deepEqual(c.log, ['draw']);
 });
 test('Phrase and Sect move the playing-row marks in place; Pattern view also its per-track bands', () => {
-  const c = rig({ tv: 'phrase', pvActive: () => true }); c.tick(); c.t += 60; c.log.length = 0; c.tick(); assert.deepEqual(c.log, ['lit', 'pvmark', 'arr']);
-  const d = rig({ tv: 'sect' }); d.tick(); d.t += 60; d.log.length = 0; d.tick(); assert.deepEqual(d.log, ['lit', 'arr']);
+  const c = rig({ tv: 'phrase', pvActive: () => true }); c.tick(); c.t += 60; c.log.length = 0; c.tick(); assert.deepEqual(c.log, ['lit', 'pvmark', 'arr', 'count']);
+  const d = rig({ tv: 'sect' }); d.tick(); d.t += 60; d.log.length = 0; d.tick(); assert.deepEqual(d.log, ['lit', 'arr', 'count']);
 });
 test('touch screens: no playhead drawing closer than PL_MIN; the frame owes it and pays on the next one past the gap; a desktop is not capped', () => {
   const c = rig(); c.tick(); c.log.length = 0; c.t += 10; c.tick(); assert.deepEqual(c.log, []); assert.equal(c.owed(), true);
-  c.t += 45; c.tick(); assert.deepEqual(c.log, ['arr']); assert.equal(c.owed(), false);
-  const d = rig({ COARSE: false }); d.tick(); d.log.length = 0; d.t += 5; d.tick(); assert.deepEqual(d.log, ['arr']);
+  c.t += 45; c.tick(); assert.deepEqual(c.log, ['arr', 'count']); assert.equal(c.owed(), false);
+  const d = rig({ COARSE: false }); d.tick(); d.log.length = 0; d.t += 5; d.tick(); assert.deepEqual(d.log, ['arr', 'count']);
+});
+
+test('the playhead-only update is timed into the CPU panel\'s screen figure; a full redraw is counted once (by draw() itself)', () => {
+  assert.match(src, /if \(playLite\(now\)\) scrAdd\('draw', performance\.now\(\) - now\);/);
+  const body = cut(/function playTick\(\)\{[\s\S]*?\n\}\n/); assert.equal((body.match(/scrAdd\(/g) || []).length, 1, 'only the playLite branch adds; draw() adds its own');
 });
