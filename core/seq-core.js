@@ -292,7 +292,7 @@ function makeSeq(S, mode, o){
     if (mode === 'phrase') return;
     for (let n = 0; n < 4200; n++){
       if (mode === 'song' && (sectId(T, t) < 0 || (loop && (T.row > loop.y1 || T.row < loop.y0)))){
-        if (once){ T.on = false; return; }
+        if (once){ T.on = false; T.wr = Math.min(T.row, 256) + 1; return; }   // (wr: wake() may bring it back at a later row, never on one it has played)
         if (loop){
           if (T.row > loop.y1 || T.row < loop.y0){ T.row = loop.y0; T.cr = 0; }
           let f = T.row;
@@ -325,6 +325,19 @@ function makeSeq(S, mode, o){
   if (mode === 'song'){ for (let t = 0; t <= MT; t++){ const T = tr[t]; T.row = loop ? clamp(o.row, loop.y0, loop.y1) : o.row; if ((t < (S.ntr || 16) || t === MT) && S.song[T.row][t] >= 0 && (!o.only || o.only.has(t))){ T.on = true; settle(T, t); } } }   // o.only: BUS PLAY's tracks
   else if (mode === 'sect'){ const T = tr[o.track]; T.on = true; if (loop) T.cr = loop.y0; settle(T, o.track); }
   else { const T = tr[o.track]; T.on = true; if (loop) T.step = loop.y0; settle(T, o.track); }
+  // EACH TRACK WHERE IT WAS (12 Nov, owner: "please fix"; found with the wrap bug): a hand-over to the page sequencer, a core that is let go and
+  // RESUME started every track on the reference track's song row, so a track that had run ahead (its patterns are shorter) jumped back. o.at is
+  // the positions the song had ({row, phrase, step} per track, tp.pos), o.atRef the reference track (it starts at the top of o.row, as before).
+  // A track that was on another row starts on ITS row, as far into it as it was against the reference: d lines in (d >= 0), or -d lines later.
+  if (mode === 'song' && o.at && !loop && !o.only){ const R = o.at[o.atRef];
+    if (R && R.row === o.row) for (let t = 0; t <= MT; t++){ const q = o.at[t], T = tr[t];
+      if (!q || t === o.atRef || !(q.row >= 0 && q.row < 256) || q.row === R.row || !(t < (S.ntr || 16) || t === MT)) continue;
+      Object.assign(T, fresh(), {row:q.row}); const cid = S.song[q.row] ? S.song[q.row][t] : -1, c = cid >= 0 ? S.chains[cid] : null; if (!c) continue;
+      let cr = 0; for (let k = 0; k < c.length; k++) if (c[k] && c[k][0] === q.phrase && q.phrase >= 0){ cr = k; break; }
+      const pid = c[cr] ? c[cr][0] : -1, line = 60 / api.bpm / (api.lpb || plpbOf(S, pid)), d = (q.step | 0) - (R.step | 0);
+      T.on = true; T.cr = cr;
+      if (d >= 0 && d < lenOf(pid)){ T.step = T.g = T.cnt = d; T.r0 = -d * line; } else if (d < 0) T.rel = T.r0 = -d * line;
+      settle(T, t); } }
   api.alive = () => tr.some(T => T.on);
   api.setLoop = l => { loop = l || null; };
   /* LIVE SONG EDITS (owner, 24 Oct: notes typed into a track while the SONG plays never sounded when that track had no
@@ -333,7 +346,9 @@ function makeSeq(S, mode, o){
      block joins them, lined up with that row's start (a lead track's r0), from the next line of its phrase. Its notes
      then play as the playhead crosses them. Renders and BUS PLAY's set of tracks are as before. Phrases and blocks already
      playing were always read live (S), so edits to them were heard (250 ms ahead of the playhead). */
-  const wakeOk = mode === 'song' && !once && !!o.live;
+  // RENDERS TOO (12 Nov, owner: "please fix"): a render (once) stopped a track for good at its first empty cell and never started a track with no
+  // block on the first row, so blocks after a gap, and tracks that come in later, were missing from rendered songs. They wake now as in live play.
+  const wakeOk = mode === 'song' && (once || !!o.live);
   function wake(rel){
     let L = null; for (let t = 0; t <= MT; t++){ const T = tr[t]; if (T.on && !T.empty){ L = T; break; } }
     if (!L) return;

@@ -58,3 +58,18 @@ test('a render (once) and LOOP are as before', () => {
   assert.deepEqual(notes(play(S, { once: true }, 40).evs, 0), [0, 0.5]);
   const lp = play(S, { once: false, loop: { y0: 1, y1: 1 }, row: 1 }, 12).evs; assert.deepEqual(notes(lp, 1).slice(0, 3), [0, 0.5, 1]);
 });
+test('a render (once) brings a track back after a gap and starts a track that comes in later (12 Nov)', () => {
+  const S = song([B(0, 0), B(0, 1), B(0, 2), B(1, 0), B(1, 2), B(2, 1)]);
+  const { evs } = play(S, { once: true }, 40);
+  assert.deepEqual(notes(evs, 0), [0, 0.5, 1]); assert.deepEqual(notes(evs, 1), [0, 1]); assert.deepEqual(notes(evs, 2), [0.5]);
+});
+test('o.at: a track that was on another row starts on its own row, as far in as it was against the reference (hand-over, RESUME)', () => {
+  const S = song([B(0, 0), B(0, 1), B(0, 2), B(0, 3), B(1, 0), B(1, 1), B(1, 2), B(1, 3)]);
+  const at = n => { const A = new Array(NT + 1).fill(null); A[0] = { row: 1, phrase: 1, step: 2 }; A[1] = n; return A; };
+  let r = play(S, { once: true, row: 1, atRef: 0, at: at({ row: 2, phrase: 6, step: 3 }) }, 6).evs;   // one line further in than the reference
+  assert.deepEqual(notes(r, 0).slice(0, 2), [0, 0.5]); assert.deepEqual(notes(r, 1).slice(0, 1), [0.375], 'row 2 from its line 1: its own note is past, row 3 starts 3 lines on');
+  r = play(S, { once: true, row: 1, atRef: 0, at: at({ row: 2, phrase: 6, step: 1 }) }, 6).evs;   // one line behind: its row starts a line later
+  assert.deepEqual(notes(r, 1).slice(0, 2), [0.125, 0.625]);
+  r = play(S, { once: true, row: 1, atRef: 0, at: at({ row: 1, phrase: 5, step: 0 }) }, 6).evs;   // on the reference's row: as before
+  assert.deepEqual(notes(r, 1).slice(0, 2), [0, 0.5]);
+});
