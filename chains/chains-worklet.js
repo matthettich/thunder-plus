@@ -1272,7 +1272,7 @@ const Lverb = {
   },
   process(st, io, ctx){
     const p = io.p, L = io.in.in, R = inR(io), oL = io.out.out, oR = io.out.outR, N = ctx.block, sr = ctx.sr, m = st.m, pm = st.pm, am = st.am;
-    const [dgT, wgT] = rvMix(p.mix, RVO);
+    const mxg = rvMix(p.mix, RVO), dgT = mxg[0], wgT = mxg[1];   // (by index: destructuring an array goes through its iterator)
     // ── targets: only when a knob or the sample rate changed
     if (p.size !== st.ps || p.decay !== st.pd || p.tone !== st.pt || p.pre !== st.pp || sr !== st.sr){
       const k = sr / 48000, sc = (.15 + .85 * clamp(p.size, 0, 1)) * k, rt = .2 * Math.pow(60, clamp(p.decay, 0, 1)), lim = m - 2;
