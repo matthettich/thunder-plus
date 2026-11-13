@@ -3260,7 +3260,7 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
       <button type="button" class="tlen" id="tLen" title="Song length. LEFT: time from the playhead to the end (or from the cursor, when stopped). Tap to show TO instead: the time up to the playhead.">LEFT 0:00</button>
       <span class="trows" id="tRecBar" role="group" aria-label="Record and metronome"><button type="button" id="tRec" class="rv rec" aria-pressed="false" aria-label="Record" title="REC: a MIDI keyboard, or the computer keys while playing, writes notes into the phrase. Stopped: notes go at the cursor, which moves down on release. Playing: notes land on the step they were played on, in the track under the cursor (F9 or Alt+R)."><small>REC</small><b id="tRecN">OFF</b></button><button type="button" id="tMet" class="rv" aria-pressed="false" aria-label="Metronome" title="Metronome: a click on every beat, higher on the bar. Set when it plays, its level and the count-in in Settings → Record &amp; play (Alt+M)"><small>CLICK</small><b id="tMetN">REC</b></button></span>
       <span class="trows toct" id="tOct" role="group" aria-label="Octave for note entry" hidden><button type="button" id="tOctDn" aria-label="Octave down">−</button><button type="button" id="tOctV" class="rv" aria-label="Octave, tap to reset to 4" title="Octave for typed and keypad notes (− and = on a keyboard). Tap to reset to 4."><small>OCT</small><b id="tOctN">4</b></button><button type="button" id="tOctUp" aria-label="Octave up">+</button></span>
-      <span class="trows" id="tSelBar" role="group" aria-label="Loop, and transpose the selection"><button type="button" id="tLoop" class="rv" aria-label="Loop the pattern" title="Loop the pattern: the song repeats the row it is on until you turn it off or move to another row. A phrase played on its own always repeats. Alt+L turns it on or off. Ctrl+Space turns it on and plays the pattern."><small>LOOP</small><b id="tLoopN">OFF</b></button><button type="button" id="tLoopSel" class="rv" aria-label="Loop the selection" title="Loop the selection: stays on, and PLAY loops the selected rows (Shift+Alt+L)"><small>LOOP SEL</small><b id="tLoopSelN">OFF</b></button><button type="button" id="tXposeDn" class="rv" aria-label="Transpose selection down a semitone" title="Transpose the selection down a semitone (Alt+,)"><small>TRANSP</small><b>−</b></button><button type="button" id="tXposeUp" class="rv" aria-label="Transpose selection up a semitone" title="Transpose the selection up a semitone (Alt+.)"><small>TRANSP</small><b>+</b></button></span>
+      <span class="trows" id="tSelBar" role="group" aria-label="Loop, and transpose the selection"><button type="button" id="tLoop" class="rv" aria-label="Loop the pattern" title="Loop the pattern: the song repeats the row it is on until you turn it off or move to another row. A phrase played on its own always repeats. Alt+L turns it on or off. Ctrl+Space, or the command bar’s ▶↻, turns it on and plays the pattern; press this while that plays to carry on as normal play."><small>LOOP</small><b id="tLoopN">OFF</b></button><button type="button" id="tLoopSel" class="rv" aria-label="Loop the selection" title="Loop the selection: stays on, and PLAY loops the selected rows (Shift+Alt+L)"><small>LOOP SEL</small><b id="tLoopSelN">OFF</b></button><button type="button" id="tXposeDn" class="rv" aria-label="Transpose selection down a semitone" title="Transpose the selection down a semitone (Alt+,)"><small>TRANSP</small><b>−</b></button><button type="button" id="tXposeUp" class="rv" aria-label="Transpose selection up a semitone" title="Transpose the selection up a semitone (Alt+.)"><small>TRANSP</small><b>+</b></button></span>
     </div></div>
   <div class="tbody">
     <div class="tscr" id="tScr">
@@ -3423,7 +3423,7 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
         <dt>Space</dt><dd id="tLegSpace">play this screen · Shift+Space the song · with Loop on, Space loops the selected rows</dd>
         <dt>/ or \</dt><dd>mute or unmute the track you're on (the whole track, as the mixer's M; M on the Song mutes one block)</dd>
         <dt>Ctrl/⌘ / or \</dt><dd>solo the track you're on (again: unsolo it) · Ctrl/⌘+Shift+/ (or \) clears every solo</dd>
-        <dt>Ctrl+Space</dt><dd>play just this pattern (the song row, every track), looped: turns LOOP on and plays; again stops and turns LOOP off (⌘+Space works too if Spotlight isn't on it)</dd>
+        <dt>Ctrl+Space</dt><dd>loop play, as the control bar’s ▶↻: turns LOOP on and plays the song row, every track, looped; LOOP pressed while it plays carries on as normal play; again stops and puts LOOP back as it was (⌘+Space works too if Spotlight isn't on it)</dd>
         <dt>Alt+L</dt><dd>loop the pattern on/off: the song repeats the row it is on (LOOP in the tab bar)</dd>
         <dt>Shift+Alt+L</dt><dd>loop the selection on/off (LOOP SEL beside it, on a computer)</dd>
         <dt>TRANSPOSE ▲▼</dt><dd>top bar: arm it, then ▲/▼ transposes the selection (Esc cancels)</dd>
@@ -25970,11 +25970,20 @@ function toggleLoopPat(){
 // Ctrl/⌘+Space (owner, 20 Oct): play just this pattern, round and round. LOOP goes on (if it was off) and the song plays
 // from the cursor's row, every track, repeating that row; pressed again it stops, like Space. LOOP stays on (Alt+L turns it off).
 // Ctrl+Space on a Mac too: macOS keeps ⌘+Space for Spotlight unless that shortcut has been moved.
+// LOOP PLAY (12 Nov, owner: "cmd bar should be loop Play", "highlight the loop button so loop play can turn into normal play"; lead: LOOP goes back
+// to what it was): the control bar's ▶ (and Ctrl/⌘+Space) is this; the pad's PLAY and Space stay plain. It turns LOOP on, so every LOOP button is lit while it
+// plays; a LOOP press then turns it off and the song plays on (syncLoop's setLoop(null): the loop is only a limit on the rows, nothing restarts). Whatever
+// stops it (this button, STOP, Space, the song ending) puts LOOP back as it was before, by the check at the top of draw() (lpW). This SUPERSEDES the 30 Oct
+// rule ("stopping turns LOOP off too"), which is the same unless LOOP was already on before the loop play.
+let lpW = null;   // {was: LOOP before, seen: tp.on has been true since}
+function lpRestore(){ if (!lpW) return; const was = lpW.was; lpW = null; if (loopPat !== was){ loopPat = was; if (was){ patRow = -1; patCur = cs.song.y; } } }
 function playPatLoop(){
-  if (tp.on){ tStopUser(); if (loopPat) toggleLoopPat(); return; }   // (owner, 30 Oct) stopping turns LOOP off too, so the next plain PLAY plays on
+  if (tp.on){ tStopUser(); return; }   // the restore is in draw(), which tStop runs
+  lpW = {was:loopPat, seen:false};
   if (!loopPat) toggleLoopPat();
   const r = S.song[cs.song.y];
   tStart('song', {row:r && r.some(v => v >= 0) ? cs.song.y : songRow()});
+  if (tp.on) lpW.seen = true; else if (!warmTok){ lpRestore(); draw(); }   // (the first PLAY of a session waits for the engine: warmTok; a refused start puts LOOP back at once)
 }
 // Ctrl/⌘+/ (owner, 20 Oct: Renoise's solo key): the track being worked on, as the bottom panel's track strip picks it (dkTrack:
 // the song cursor's track on Song and with Arrange holding the keys, the mixer's, FX's, else the phrase's). Solo adds up, as
@@ -26781,7 +26790,7 @@ const CMDS = [['b:-16', '−−', 'Change the value down a lot (EDIT+▼)'], ['b
   ['uniq', 'UNIQ', 'Make unique: each selected block (or picked cells) gets new phrases, in place'], ['clone', 'CLN', 'Clone: copies the block (or the selected blocks); PASTE then puts a unique copy with new numbers at the cursor (' + MODK + '+Alt+C)'],
   ['cldn', 'CLN↓', 'Clone the block (or selected blocks) into new, unique numbers on a new row below; the rows below move down (' + MODK + '+Shift+C)'], ['copy', 'COPY', 'Copy the selection, or what is under the cursor (a note comes with its instrument) (ALT)'],
   ['cut', 'CUT', 'Cut the selection, or what is under the cursor (ALT+EDIT)'], ['paste', 'PASTE', 'Paste (SHIFT+EDIT)'],
-  ['undo', 'UNDO', 'Undo the last change to the song (' + MODK + '+Z)'], ['redo', 'REDO', 'Redo (' + MODK + '+Y)'], ['song', '▶', 'Play the song from the cursor row, or stop it (PLAY)'],
+  ['undo', 'UNDO', 'Undo the last change to the song (' + MODK + '+Z)'], ['redo', 'REDO', 'Redo (' + MODK + '+Y)'], ['song', '▶↻', 'Loop play (12 Nov): turns LOOP on and plays the song from the cursor row, repeating its row; press LOOP while it plays to carry on as normal play, or this again to stop (' + MODK + '+Space). The pad’s PLAY and Space play plain'],
   ['mpat', 'M.PAT', 'Mute or unmute the pattern block under the cursor, or every block in the selection (as Alt+click, M on the Song). The track’s own MUTE is on the pad and in the Mixer']];   // MUTE PATTERN (owner, 8 Nov): Arrange only
 function cmdAction(a){
   fxpClose();
@@ -26806,9 +26815,9 @@ function cmdAction(a){
   if (c === 'clone') return cloneHere();
   if (c === 'cldn') return cloneDown();
   if (c === 'mpat'){ if (tv !== 'song') return toast('M.PAT mutes blocks on Arrange.'); const r = sxRect(); if (r) return sxMuteRect(r); if (sxPicks.length) return sxMuteCells(sxPicks.map(p => [p.y, p.t])); return toggleBlockMute(cs.song.y, cs.song.x); }
-  if (c === 'song'){ if (tp.on) tStopUser(); else tStart('song', {row:songRow()}); }
+  if (c === 'song') return playPatLoop();   // (12 Nov, owner) the control bar's ▶ is LOOP play; the pad's PLAY and Space play plain
 }
-for (const [a, t, lbl] of CMDS){ const b = el('button'); b.innerHTML = t; b.type = 'button'; b.dataset.c = a; b.setAttribute('aria-label', lbl); b.title = lbl; $('tCmd').append(b); }
+for (const [a, t, lbl] of CMDS){ const b = el('button'); b.innerHTML = t; b.type = 'button'; b.dataset.c = a; b.setAttribute('aria-label', lbl); b.title = lbl; $('tCmd').append(b); if (a === 'song') b.setAttribute('aria-label', 'Loop play the song, or stop'); }
 // In PAD mode CLEAR moves between PASTE and UNDO, so a thumb can reach it on a phone; KEYS mode keeps
 // the original order. The buttons are moved, not rebuilt, so the tap handlers stay attached.
 const CMD_PAD_ORDER = ['b:-16', 'b:-1', 'b:1', 'b:16', 'prev', 'next', 'sel', 'uniq', 'clone', 'cldn', 'mpat', 'copy', 'cut', 'paste', 'clr', 'undo', 'redo', 'song'];
@@ -26816,7 +26825,7 @@ const CMD_PAD_SHORT = {clr:'CLR', sel:'SEL', paste:'PST', undo:'↶', redo:'↷'
 // COMMAND BAR: the Edit menu's order (undo · clipboard · select · clones · value · previous / next · play) and words.
 const CMD_MINI_ORDER = ['undo', 'redo', 'cut', 'copy', 'paste', 'clr', 'rrow', 'sel', 'uniq', 'clone', 'cldn', 'mpat', 'b:-16', 'b:-1', 'b:1', 'b:16', 'prev', 'next', 'song'];
 const CMD_MINI_LAB = {undo:'UNDO', redo:'REDO', cut:'CUT', copy:'COPY', paste:'PASTE', clr:'CLEAR', rrow:'REMOVE', sel:'SELECT', clone:'CLONE', cldn:'CLONE↓', mpat:'MUTE PAT', 'b:-16':'−−', 'b:-1':'−', 'b:1':'+', 'b:16':'++', prev:'‹ PREV', next:'NEXT ›'};
-const cmdSongLab = () => cmdMini() ? (tp.on ? '■ STOP' : '▶ SONG') : tp.on ? '■' : '▶';
+const cmdSongLab = () => cmdMini() ? (tp.on ? '■ STOP' : '▶ LOOP') : tp.on ? '■' : '▶↻';   // (12 Nov, owner) loop play: the loop mark beside ▶ tells it from the pad's PLAY
 function applyCmdOrder(){
   const host = $('tCmd'), by = {}, mini = cmdMini();
   host.querySelectorAll('button[data-c]').forEach(b => by[b.dataset.c] = b);
@@ -26990,7 +26999,8 @@ function cmdItems(full){
     {h:'Play'},
     ...(full ? [{a:'loopp', l:'Loop the pattern', k:keyHint('alt+L'), f:toggleLoopPat}, {a:'loops', l:'Loop the selection', k:keyHint('shift+alt+L'), f:toggleLoop},
       {a:'prow', l:'Play the row (every track)', k:keyHint('alt+Enter'), f:() => playRowKey(true), off:tv !== 'phrase'}, {a:'follow', l:followMode ? 'Follow off' : 'Follow on', k:keyHint('mod+shift+F'), f:followKey}] : []),
-    it('song', tp.on ? 'Stop the song' : 'Play the song from the cursor row', ks ? 'Space' : 'shift+Space')   // FIX (1 Nov, audit #1): KEYS mode plays the song on Space
+    ...(tp.on ? [] : [{a:'splay', l:'Play the song from the cursor row', k:keyHint(ks ? 'Space' : 'shift+Space'), f:() => tStart('song', {row:songRow()})}]),   // FIX (1 Nov, audit #1): KEYS mode plays the song on Space
+    it('song', tp.on ? 'Stop the song' : 'Loop play the song from the cursor row (turns LOOP on)', 'mod+Space')   // (12 Nov, owner) the control bar's ▶ is loop play
   ];
 }
 // No rule at the start or end, and never two in a row (after items are left out).
@@ -28156,6 +28166,7 @@ function draw(){
   if (km) drawKeypad();
   document.querySelectorAll('#tTabs button').forEach(b => b.classList.toggle('on', b.dataset.v === tv));
   document.querySelectorAll('#tMap [data-v]').forEach(b => b.classList.toggle('on', b.dataset.v === tv));
+  if (lpW){ if (tp.on) lpW.seen = true; else if (lpW.seen) lpRestore(); }   // LOOP PLAY ended: LOOP back as it was
   $('kPlay').classList.toggle('on', tp.on);
   keyVis();
   syncLoop();   // before the labels below, so they show the range that is actually looping
