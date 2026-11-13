@@ -1157,6 +1157,11 @@ body:not(.legon) .tside .tlegend{display:none}
    Each reads on the light and dark skins alike (white and lime are bright in all of them; the rings carry the colour). */
 #tPad #kMute.lt:not(#zz):not(#zz):not(#zz){background:#fff !important; color:#e0006e !important; border:4px solid #ff2e93 !important; box-shadow:4px 4px 0 0 #ff2e93 !important; font-weight:800}
 #tPad #kSolo.lt:not(#zz):not(#zz):not(#zz){background:#d4ff2a !important; color:#0b2a10 !important; border:4px solid #0b5a1c !important; box-shadow:4px 4px 0 0 #0b5a1c !important; font-weight:800}
+/* SOLO / MUTE marks (12 Nov, owner: hard to see what is soloed or muted): soloed = a solid block, muted = struck through, on the Song header, Mixer, Arrange and the Phrase title; the pad keys ring while ANY track is set */
+.tscr .th.so{background:var(--ts-solo); color:var(--ts-bg); font-weight:800}
+.mtr.so .mn{background:var(--ink); color:var(--panel); border-radius:2px; font-weight:800; text-decoration:none}
+#tSub.msS::after{content:' · SOLO'; font-weight:800} #tSub.msM::after{content:' · MUTED'; font-weight:800}
+#tPad #kMute.any:not(.lt):not(#zz):not(#zz), #tPad #kSolo.any:not(.lt):not(#zz):not(#zz){outline:3px solid currentColor; outline-offset:-5px}
 /* LOOP and PLAY when engaged (owner, 9 Nov): lit the same way as MUTE and SOLO, each its own colour, on every skin */
 #tPad #kLoop.on:not(#zz):not(#zz):not(#zz){background:#7cecff !important; color:#06384a !important; border:4px solid #0a6a8c !important; box-shadow:4px 4px 0 0 #0a6a8c !important; font-weight:800; text-shadow:none !important}
 #tPad #kPlay.on:not(#zz):not(#zz):not(#zz), .tcmd button[data-c=song].on:not(#zz):not(#zz):not(#zz):not(#zz):not(#zz){background:#ffc23d !important; color:#3a2200 !important; border:4px solid #a85f00 !important; box-shadow:4px 4px 0 0 #a85f00 !important; font-weight:800; text-shadow:none !important}
@@ -3463,8 +3468,8 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
     </div>
     <div class="tinl tinlp" id="tInlPad" hidden aria-label="Instruments and their pads"></div>
     <div class="keys wide">
-      <span class="ksp" aria-hidden="true"></span><button type="button" class="k kw" data-b="solo" id="kSolo" title="Solo this track; tap again to un-solo">SOLO</button><button type="button" class="k kw" data-b="xposeUp" title="Transpose the phrase selection up a semitone (on the Song / Arrange: the selected blocks, or the one under the cursor)">SEMI +</button><button type="button" class="k kw" data-b="xposeDn" title="Transpose the phrase selection down a semitone (on the Song / Arrange: the selected blocks, or the one under the cursor)">SEMI −</button><button type="button" class="k kw" data-b="shift">SHIFT</button><button type="button" class="k kw" data-b="play" id="kPlay">PLAY</button>
-      <button type="button" class="k kw" data-b="save" id="kSave" title="Save song" aria-label="Save song"><svg class="ic ick" aria-hidden="true"><use href="#ic-save"/></svg></button><button type="button" class="k kw" data-b="mute" id="kMute" title="Mute this track; tap again to unmute">MUTE</button><button type="button" class="k kw" data-b="gen" id="kGen" title="Generate: make a pattern for this phrase, such as an Acid line or Euclidean fill…">GEN</button><button type="button" class="k kw" data-b="loop" id="kLoop" title="Loop the pattern: the song repeats the row it is on until you turn it off (Alt+L in KEYS mode)">LOOP</button><button type="button" class="k kw" data-b="opt">ALT</button><button type="button" class="k kw" data-b="edit">EDIT</button>
+      <span class="ksp" aria-hidden="true"></span><button type="button" class="k kw" data-b="solo" id="kSolo" title="Solo this track; tap again to un-solo; tapped twice quickly it clears every solo and mute">SOLO</button><button type="button" class="k kw" data-b="xposeUp" title="Transpose the phrase selection up a semitone (on the Song / Arrange: the selected blocks, or the one under the cursor)">SEMI +</button><button type="button" class="k kw" data-b="xposeDn" title="Transpose the phrase selection down a semitone (on the Song / Arrange: the selected blocks, or the one under the cursor)">SEMI −</button><button type="button" class="k kw" data-b="shift">SHIFT</button><button type="button" class="k kw" data-b="play" id="kPlay">PLAY</button>
+      <button type="button" class="k kw" data-b="save" id="kSave" title="Save song" aria-label="Save song"><svg class="ic ick" aria-hidden="true"><use href="#ic-save"/></svg></button><button type="button" class="k kw" data-b="mute" id="kMute" title="Mute this track; tap again to unmute; tapped twice quickly it clears every solo and mute">MUTE</button><button type="button" class="k kw" data-b="gen" id="kGen" title="Generate: make a pattern for this phrase, such as an Acid line or Euclidean fill…">GEN</button><button type="button" class="k kw" data-b="loop" id="kLoop" title="Loop the pattern: the song repeats the row it is on until you turn it off (Alt+L in KEYS mode)">LOOP</button><button type="button" class="k kw" data-b="opt">ALT</button><button type="button" class="k kw" data-b="edit">EDIT</button>
     </div>
     </div>
   </div>
@@ -25965,6 +25970,14 @@ function playPatLoop(){
 // MUTE AND SOLO CLEAR EACH OTHER (owner, 8 Nov): muting a soloed track un-solos it, soloing a muted one unmutes it.
 function setMute(m, v){ m.mute = !!v; if (m.mute) m.solo = false; }
 function setSolo(m, v){ m.solo = !!v; if (m.solo) m.mute = false; }
+// CLEAR SOLO AND MUTE (12 Nov): every track's solo and mute off (the per-block mutes, S.smute, are not touched); pre: how many tracks had one before the gesture began. One mixChanged, as a solo or mute press.
+let msTap = {b:'', t:0, pre:0};
+function clearSoloMute(pre){
+  let n = 0; for (const m of S.mix) if (m.solo || m.mute){ m.solo = m.mute = false; n++; }
+  if (n){ mixChanged(); draw(); }
+  if (pre == null) pre = n;
+  toast(pre ? `Solo and mute cleared · ${pre} track${pre > 1 ? 's' : ''}` : 'Solo and mute cleared · nothing was set', 1800);
+}
 function muteKey(trackOnly){
   if (trackOnly !== true && tv === 'song' && sxPicks.length) return sxMuteCells(sxPicks.map(p => [p.y, p.t]));   // picked cells
   const mst = tv === 'song' ? cs.song.x === MT : tv === 'mixer' ? onMstCell() : tv === 'fx' || tv === 'mod' ? cFxT >= NT : cTrack === MT;
@@ -26689,6 +26702,7 @@ function press(b, fromKey){
   if (fxp.open){ clearTimeout(rep); if (b !== 'play'){ fxpPad(b);   // a held ▲ or ▼ runs through the list (owner, 8 Nov)
       if (!fromKey && (b === 'up' || b === 'down')) rep = setTimeout(function r(){ if (!fxp.open) return; fxpPad(b); rep = setTimeout(r, 70); }, 330);
       return; } fxpClose(); }
+  if (b !== 'mute' && b !== 'solo') msTap.b = '';   // another pad key in between: the next MUTE / SOLO is a first tap again
   if (b in held){
     held[b] = true; used[b] = false;
     if ((b === 'opt' && mod('shift')) || (b === 'shift' && mod('opt'))){ used.shift = used.opt = true; takeLatch(); toggleSel(); }
@@ -26705,7 +26719,11 @@ function press(b, fromKey){
   // LOOP is a sticky toggle, not a held key: a tap flips it (the pattern loop; LOOP SEL is in the tab bar on a computer).
   if (b === 'loop'){ toggleLoopPat(); clearTimeout(rep); return; }
   if (b === 'save'){ clearTimeout(rep); saveProj(false); return; }   // SAVE (owner, 8 Nov): the same Save song as the File menu and Ctrl/⌘+S (a tap, not a key held)
-  if (b === 'mute' || b === 'solo'){ clearTimeout(rep); b === 'mute' ? muteKey(true) : soloKey(); return; }   // MUTE / SOLO (owner, 8 Nov): a tap latches, a second tap undoes it
+  // MUTE / SOLO (owner, 8 Nov): a tap latches, a second tap undoes it. (12 Nov, owner: "a way to clear all solo and mute, maybe a quick double tap on the button") a second tap on the same one
+  // within 350 ms, with no other pad press between, clears every track's solo AND mute (either button); the first tap still acts at once, so a single tap is as it was
+  if (b === 'mute' || b === 'solo'){ clearTimeout(rep); const now = performance.now();
+    if (msTap.b === b && now - msTap.t < 350){ const pre = msTap.pre; msTap = {b:'', t:0, pre:0}; return clearSoloMute(pre); }
+    msTap = {b, t:now, pre:S.mix.filter(m => m.solo || m.mute).length}; b === 'mute' ? muteKey(true) : soloKey(); return; }
   if (b === 'gen'){ clearTimeout(rep); genMenu(); return; }   // GEN (owner, 6 Nov): the generators, under SEMI + beside LOOP
   if (b === 'xposeUp'){ transposeSel(1, true, true); clearTimeout(rep); return; }
   if (b === 'xposeDn'){ transposeSel(-1, true, true); clearTimeout(rep); return; }
@@ -26944,7 +26962,8 @@ function cmdItems(full){
     ...(trk || full ? [{a:'dup', l:'Duplicate the track (no notes)', k:trk ? keyHint('mod+D') : '', f:() => dupKey(false), off:!trk},
       {a:'dupn', l:'Duplicate the track with its patterns', k:keyHint('mod+alt+D'), f:() => dupKey(true), off:!trk}] : []),
     ...(full ? [{a:'newph', l:'New phrase on the next empty track', k:keyHint('alt+T'), f:newPhraseRight},
-      {a:'mute', l:'Mute / unmute this track', k:'/', f:muteKey}, {a:'solo', l:'Solo / unsolo this track', k:keyHint('mod+/'), f:() => soloKey(false)}] : []),
+      {a:'mute', l:'Mute / unmute this track', k:'/', f:muteKey}, {a:'solo', l:'Solo / unsolo this track', k:keyHint('mod+/'), f:() => soloKey(false)},
+      {a:'clrms', l:'Clear all solo and mute (every track)', k:'', f:() => clearSoloMute(), off:!S.mix.some(m => m.solo || m.mute)}] : []),   // (12 Nov, owner) the pad's SOLO or MUTE tapped twice does the same
     ...(['song', 'phrase', 'mixer', 'fx'].includes(tv) || full ? [{a:'tname', l:'Name this track…', k:'', f:nameTrackHere, off:!['song', 'phrase', 'mixer', 'fx'].includes(tv)}] : []),
     {h:'Make'},
     {a:'newmidi', l:'New MIDI instrument', k:'', f:newMidiInst},   // MIDI INSTRUMENTS EASIER TO FIND (5 Nov)
@@ -27881,7 +27900,9 @@ function draw(){
   if (arrPlace()) scheduleRefit(false);   // Arrange moved into (or out of) the Song screen: size the text again next frame
   if (spSync()) fit();   // SIMPLE PHRASE: on or off for this screen, so the phrase is sized again (and Arrange hides)
   pvSync();   // PATTERN VIEW: its buttons and bar, and the text size when it turns on or off
-  { const m = S.mix[dkTrack()], a = $('kMute'), b = $('kSolo'); if (a) a.classList.toggle('lt', !!(m && m.mute)); if (b) b.classList.toggle('lt', !!(m && m.solo)); }   // the pad's MUTE / SOLO show this track's state
+  { const m = S.mix[dkTrack()], a = $('kMute'), b = $('kSolo'); if (a) a.classList.toggle('lt', !!(m && m.mute)); if (b) b.classList.toggle('lt', !!(m && m.solo)); }
+  { const mu = S.mix.some(x => x && x.mute), so = S.mix.some(x => x && x.solo), a = $('kMute'), b = $('kSolo'); if (a) a.classList.toggle('any', mu); if (b) b.classList.toggle('any', so);   // (12 Nov, owner: the pad's MUTE / SOLO also light while ANY track is muted / soloed, a ring, the fill stays for this track)
+    const E = $('tSub'), cm = S.mix[cTrack]; if (E){ E.classList.toggle('msS', tv === 'phrase' && !!(cm && cm.solo)); E.classList.toggle('msM', tv === 'phrase' && !!(cm && cm.mute && !cm.solo)); } }   // the pad's MUTE / SOLO show this track's state
   phStageSwitch();   // DANCE · DRUM · KEYS · HIDE on the title line
   if (selA && selA.v !== tv) selA = null;
   // The FX target follows the track being edited: moving to another phrase (or block) moves the FX panel and the FX

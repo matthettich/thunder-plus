@@ -432,7 +432,7 @@ test('Mobile: SHIFT+▲ goes to Arrange from every screen', () => {
 test('the pad has latching MUTE and SOLO', () => {
   const src = H.read('index.html');
   assert.match(src, /data-b="mute" id="kMute"/); assert.match(src, /data-b="solo" id="kSolo"/);
-  assert.match(src, /if \(b === 'mute' \|\| b === 'solo'\)\{ clearTimeout\(rep\); b === 'mute' \? muteKey\(true\) : soloKey\(\); return; \}/);
+  assert.match(src, /if \(b === 'mute' \|\| b === 'solo'\)\{ clearTimeout\(rep\); [\s\S]{0,300}b === 'mute' \? muteKey\(true\) : soloKey\(\); return; \}/);
 });
 
 test('Phrase ◀ ▶ step one column at a time (no skipped INST / FX value / chord columns)', () => {

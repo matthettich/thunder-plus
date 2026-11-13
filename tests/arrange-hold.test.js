@@ -11,7 +11,7 @@ assert.ok(m, 'could not find press(): the code moved, this test needs updating')
 
 function rig() {
   const timers = [], log = { dir: [], hold: [] }; let now = 1000;
-  const c = { fxp: { open: false }, held: { shift: false, opt: false, edit: false }, used: {}, latch: { shift: false, opt: false }, workT: -1e9, arrActT: -1e9, rep: 0,
+  const c = { fxp: { open: false }, held: { shift: false, opt: false, edit: false }, used: {}, latch: { shift: false, opt: false }, workT: -1e9, arrActT: -1e9, rep: 0, msTap: { b: '', t: 0, pre: 0 },
     performance: { now: () => now }, setTimeout: (f, ms) => { timers.push({ f, ms }); return timers.length; }, clearTimeout() {}, takeLatch: () => ({ shift: false, opt: false }),
     dirPress: (b) => { log.dir.push(b); log.hold.push([c.workT, c.arrActT]); }, stopTapT: 0, tp: { on: false }, mod: () => false };
   vm.createContext(c); vm.runInContext(m[0].replace(/\nfunction release$/, '') + '\nthis.press = press;', c);
