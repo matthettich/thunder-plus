@@ -1562,7 +1562,11 @@ body.arrsmall #tArr .tatop button{width:26px} body.asong #tArr .tatop button{wid
 .tath i{font-style:normal; text-align:center; line-height:16px}   /* a label now: tracks are muted in the Mixer, not here */
 .tath i.mu{color:var(--ar-mu); text-decoration:line-through}
 .tath i[data-t]{cursor:pointer} .tath i.so{background:var(--ar-pl); color:var(--ar-pl-ink, #3d2c00); border-radius:3px}
-.tagrid{flex:1; min-height:0; overflow-y:auto; overscroll-behavior:contain; padding:3px 0 8px; touch-action:pan-y}
+/* OWN STACKING CONTEXT (13 Nov; Pattern view stalled while a song played: docs/audits/2026-11-13-draw-pass.md): Arrange's ~1500 blocks, the cursor's and the playing blocks (position:relative; z-index:1) among them,
+   took part in the page's one stacking context, so every frame that repainted anything (the playing-row marks beside the phrase) cost the browser's Layerize about 12 ms at 4x CPU, which made each such frame
+   a long task. isolation:isolate gives the grid its own: nothing moves or clips (the grid already clips its overflow, and z-index 1 only ever ordered blocks among themselves); Pattern view 54 to 70 ->
+   10 to 16 long tasks per 10 s, Phrase 21 to 41 -> 1 to 8, Song 10 -> 0 to 2. */
+.tagrid{flex:1; min-height:0; overflow-y:auto; overscroll-behavior:contain; padding:3px 0 8px; touch-action:pan-y; isolation:isolate}
 .tagrid .ar{margin-bottom:2px}
 /* EVERY 4 ROWS (owner, 2 Nov): a thin ink line, with even room above and below, over rows 4, 8, 12… so the song reads
    in groups of four patterns (option C of three; it was a grey bar tight against the row above) */
