@@ -48,7 +48,7 @@ test('the button, its label and its wiring are in place', () => {
   assert.match(src, /<symbol id="ic-totop" viewBox="0 0 24 24"><path d="[^"]+"\/><\/symbol>/, 'an outline icon in the sprite, no emoji');
   assert.match(src, /\$\('tArrTop'\)\.addEventListener\('click', e => \{ e\.preventDefault\(\); songToTop\(\); \}\);/);
   assert.match(src, /b\.addEventListener\('click', e => \{ e\.preventDefault\(\); songToTop\(\); \}\); scr\.append\(b\);/, 'the classic Song grid\'s corner');
-  assert.match(src, /\{a:'top', l:'Top of the song', k:keyHint\('mod\+Home'\), f:songToTop\}/, 'Edit ▾ → Move shows Ctrl/⌘+Home');
+  assert.match(src, /\{a:'top', l:'Top of the song', k:onSong \|\| \(typeof apReady !== 'undefined' && apReady && apF === 'arr'\) \? keyHint\('mod\+Home'\) : '', f:songToTop\}/, 'Edit ▾ → Move shows Ctrl/⌘+Home only where the key does the same');
   assert.match(src, /,#tGridTop'\)\) return;/, 'the classic grid\'s swipe handler leaves the button\'s own click alone');
 });
 test('the corner button takes no room: zero-height row, 36 px target, the header\'s ink, no new colours', () => {
@@ -62,4 +62,16 @@ test('markHands sets every clock the follow / paging holds read', () => {
 });
 test('the wheel still uses the same cursor-moved code (one place for "the phrase follows")', () => {
   assert.match(src, /c\.y = y; arrUserT = -1e9; c\.pg = false; arrHandT = performance\.now\(\);\n  arrCursorMoved\(c, y\);\n  draw\(\);/);
+});
+
+test('the Edit entry\'s shortcut hint: shown on the Song screen and with Arrange holding the keys, blank elsewhere (Ctrl/⌘+Home there is that screen\'s own first row)', () => {
+  const em = src.match(/\{a:'top', l:'Top of the song', k:([^\n]*?), f:songToTop\}/); assert.ok(em, 'could not find the entry'); const expr = em[1];
+  const hint = vm.runInNewContext('(onSong, apReady, apF, keyHint) => ' + expr);
+  const kh = s => 'HINT(' + s + ')';
+  assert.equal(hint(true, false, null, kh), 'HINT(mod+Home)', 'Song screen');
+  assert.equal(hint(false, true, 'arr', kh), 'HINT(mod+Home)', 'Arrange holding the keys beside another screen');
+  for (const [ap, f] of [[false, null], [true, null], [true, 'strip'], [false, 'arr']]) assert.equal(hint(false, ap, f, kh), '', `Mixer / Phrase / Inst... with Arrange unfocused (apReady ${ap}, apF ${f})`);
+  // what the key does is untouched: songEndKey's own branches are as before
+  assert.match(src, /if \(\(k === 'Home' \|\| k === 'End'\) && !e\.altKey && !e\.shiftKey\)\{ songEndKey\(k === 'End'\); return true; \}/);
+  assert.match(src, /const c = cs\[tv\]; if \(c\)\{ c\.y = last \? dims\(tv\)\.h - 1 : 0; draw\(\); \}/, 'other screens: their own first row');
 });

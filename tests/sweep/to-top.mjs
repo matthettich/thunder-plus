@@ -88,6 +88,6 @@ for (const L of LAYOUTS) {
     }
     const errs = takeErrors(errors); T.add(id('no page errors'), !errs.length, errs.join(' / ').slice(0, 200));
   } catch (e) { T.add(id('threw'), false, e.message.split('\n')[0]); }
-  await B.close();
+  finally { await B.close(); }   // (the `continue`s above skip the line after the try)
 }
 const f = T.print(); process.exit(f ? 1 : 0);

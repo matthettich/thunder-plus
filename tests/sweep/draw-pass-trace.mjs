@@ -26,12 +26,15 @@ for (const t of long) totL.push(...kids(t)); for (const t of tasks) totA.push(..
 const show = (title, L) => { console.log('-- ' + title); for (const [k, v] of sum(L).slice(0, 22)) console.log(`${v[0].toFixed(0).padStart(7)} ms  ${String(v[1]).padStart(5)} x  ${k}`); };
 show('inside the long tasks, top-level children (inclusive)', totL); show('all tasks, top-level children (inclusive)', totA);
 // what is in a task that is not a KIND child: time with no child = script that the trace did not cut out, or idle gaps inside the task
-// nested: Recalculate Style / Layout / GC are mostly INSIDE the rAF callback (a DOM read after a write forces them), so count them wherever they sit in a long task
+// nested: Recalculate Style / Layout are mostly INSIDE the rAF callback (a DOM read after a write forces them). "Forced inside rAF" counts only the events that lie within the time range of a
+// rAF callback of a long task; style / layout after the callback (the frame's own pipeline) or inside a timer or event handler are not subtracted from the callback's script time.
 const inTask = (t, name) => M.filter(e => e.name === name && e.ts >= t.ts && e.ts + e.dur <= t.ts + t.dur + 1);
 const nest = name => long.reduce((a, t) => a + inTask(t, name).reduce((b, e) => b + e.dur, 0), 0) / 1000, nestN = name => long.reduce((a, t) => a + inTask(t, name).length, 0);
-console.log('-- nested anywhere inside the long tasks (ms / runs): ' + ['UpdateLayoutTree', 'Layout', 'PrePaint', 'Paint', 'Layerize', 'Commit', 'HitTest', 'MinorGC', 'MajorGC'].map(n => `${n} ${nest(n).toFixed(0)}/${nestN(n)}`).join(' | '));
-const rafMs = long.reduce((a, t) => a + kids(t).filter(e => e.name === 'FireAnimationFrame').reduce((b, e) => b + e.dur, 0), 0) / 1000;
-console.log(`   rAF callbacks ${rafMs.toFixed(0)} ms: of which Recalculate Style ${nest('UpdateLayoutTree').toFixed(0)} + Layout ${nest('Layout').toFixed(0)} forced inside, the rest is script ${(rafMs - nest('UpdateLayoutTree') - nest('Layout')).toFixed(0)} ms`);
+console.log('-- anywhere inside the long tasks (ms / runs): ' + ['UpdateLayoutTree', 'Layout', 'PrePaint', 'Paint', 'Layerize', 'Commit', 'HitTest', 'MinorGC', 'MajorGC'].map(n => `${n} ${nest(n).toFixed(0)}/${nestN(n)}`).join(' | '));
+const rafs = long.flatMap(t => kids(t).filter(e => e.name === 'FireAnimationFrame')), rafMs = rafs.reduce((a, e) => a + e.dur, 0) / 1000;
+const inRaf = name => M.filter(e => e.name === name && rafs.some(r => e.ts >= r.ts && e.ts + e.dur <= r.ts + r.dur + 1)).reduce((a, e) => a + e.dur, 0) / 1000;
+const rafStyle = inRaf('UpdateLayoutTree'), rafLayout = inRaf('Layout');
+console.log(`   rAF callbacks ${rafMs.toFixed(0)} ms: of which Recalculate Style ${rafStyle.toFixed(0)} + Layout ${rafLayout.toFixed(0)} forced inside the callbacks, the rest is script ${Math.max(0, rafMs - rafStyle - rafLayout).toFixed(0)} ms`);
 // who forced it: the top app frame of the stack recorded on Recalculate Style / Layout (blank when the browser did it at the frame's end)
 const topf = e => { const st = (e.args && ((e.args.beginData && e.args.beginData.stackTrace) || (e.args.data && e.args.data.stackTrace))) || []; const a = st.find(x => /index\.html/.test(x.url || '')) || st[0]; return a ? `${a.functionName || '(anon)'} :${a.lineNumber}` : '(no script: the browser, at the end of the frame)'; };
 for (const nm of ['UpdateLayoutTree', 'Layout']) { const m = new Map(); for (const t of long) for (const e of inTask(t, nm)) { const k = topf(e), o = m.get(k) || [0, 0, 0]; o[0] += e.dur / 1000; o[1]++; o[2] = Math.max(o[2], e.args.elementCount || 0); m.set(k, o); }
@@ -65,8 +68,10 @@ for (const t of w) { console.log(`\n== long task ${(t.dur / 1000).toFixed(0)} ms
     // each long task by its main cost: the app function (below frame / playTick) with the most inclusive time in that task, and the tasks' durations
     const prim = new Map(), durs = []; for (const k of long) { const m = new Map(); for (const s of S) { if (s.t < k.ts || s.t >= k.ts + k.dur) continue; const seen = new Set(); for (let id = s.id; id; id = par.get(id)) { const n = nm(id); if (/index\.html/.test(n) && !/^(frame|playTick|\(anon\)|playLite) /.test(n) && !seen.has(n)) { seen.add(n); m.set(n, (m.get(n) || 0) + s.dt / 1000); } } }
       const top = [...m].sort((a, b) => b[1] - a[1])[0], key = top ? top[0].replace(/ index\.html:\d+/, '') : '(none: native or other thread work)', o = prim.get(key) || [0, 0]; o[0]++; o[1] += k.dur / 1000; prim.set(key, o); durs.push(k.dur / 1000); }
+    if (!durs.length) console.log(`   no long tasks matched (none >= ${MIN} ms): no per-task breakdown`); else {
     durs.sort((a, b) => a - b); console.log(`   long task lengths (ms): min ${durs[0].toFixed(0)}, median ${durs[durs.length >> 1].toFixed(0)}, p90 ${durs[Math.floor(durs.length * .9)].toFixed(0)}, max ${durs[durs.length - 1].toFixed(0)}`);
     console.log('   long tasks by their main app function (count / total ms of those tasks)'); for (const [k, v] of [...prim].sort((a, b) => b[1][1] - a[1][1])) console.log(`${String(v[0]).padStart(7)} x ${v[1].toFixed(0).padStart(6)} ms  ${k}`);
+    }
     // who calls the native work: the nearest app function above each native leaf, and the lines of the busiest app functions (positionTicks, 500 us per tick)
     const near = new Map(); for (const s of S) { if (!inLong(s)) continue; const n = P.nodes.get(s.id), cf = n && n.callFrame; if (!cf || /index\.html/.test(cf.url || '')) continue; let a = par.get(s.id); while (a && !/index\.html/.test((P.nodes.get(a).callFrame || {}).url || '')) a = par.get(a); const k = nm(s.id) + '  <-  ' + (a ? nm(a) : '(no app frame)'); near.set(k, (near.get(k) || 0) + s.dt / 1000); }
     console.log('   native leaves and the app function that called them'); for (const [k, v] of [...near].sort((a, b) => b[1] - a[1]).slice(0, 14)) console.log(`${v.toFixed(0).padStart(7)} ms  ${k}`);

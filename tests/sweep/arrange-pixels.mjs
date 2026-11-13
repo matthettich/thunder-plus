@@ -8,7 +8,14 @@ import fs from 'fs'; import path from 'path';
 import { boot, app, ROOT } from './ui-lib.mjs';
 const arg = (k, d) => { const a = process.argv.find(x => x.startsWith('--' + k + '=')); return a ? a.slice(k.length + 3) : d; };
 const cmp = arg('compare', '');
-if (cmp) { const [a, b] = cmp.split(','); let n = 0; for (const f of fs.readdirSync(a).filter(f => f.endsWith('.png') && !f.endsWith('-full.png')).sort()) { if (!fs.existsSync(path.join(b, f)) || !fs.readFileSync(path.join(a, f)).equals(fs.readFileSync(path.join(b, f)))) { console.log('DIFF ' + f); n++; } } console.log(n + ' differ'); process.exit(n ? 1 : 0); }
+if (cmp) { const [a, b] = cmp.split(','), list = d => fs.existsSync(d) ? fs.readdirSync(d).filter(f => f.endsWith('.png') && !f.endsWith('-full.png')).sort() : [];
+  const A = list(a), B = list(b); let n = 0;
+  if (!A.length || !B.length) { console.log(`FAIL: need screenshots in both directories (${a}: ${A.length}, ${b}: ${B.length})`); process.exit(2); }
+  for (const f of A) if (!B.includes(f)) { console.log('MISSING in ' + b + ': ' + f); n++; }
+  for (const f of B) if (!A.includes(f)) { console.log('EXTRA in ' + b + ': ' + f); n++; }
+  if (n) { console.log(`FAIL: the file sets differ (${n}); not comparing bytes`); process.exit(1); }
+  for (const f of A) if (!fs.readFileSync(path.join(a, f)).equals(fs.readFileSync(path.join(b, f)))) { console.log('DIFF ' + f); n++; }
+  console.log(`${A.length} files compared, ${n} differ`); process.exit(n ? 1 : 0); }
 const ELECTRO = fs.readFileSync(path.join(ROOT, 'sounds/ELECTRO.thunder'), 'utf8');
 const outd = arg('out', '/tmp/arrange-pixels'), CSS = arg('css', ''); fs.mkdirSync(outd, { recursive: true });
 const SKINS = ['idm', 'idmpink', 'idmpg', 'tr909', 'lowpower', 'lowpowermustard', 'lowpowerpink', 'rainbow', 'mpc'];

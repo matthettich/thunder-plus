@@ -27420,7 +27420,7 @@ function cmdItems(full){
     ...(onSong && !full ? [] : [val('b:16', 'Value up a lot', '▲', {off:onSong})]), val('b:1', 'Value up', '▶'), val('b:-1', 'Value down', '◀'), ...(onSong && !full ? [] : [val('b:-16', 'Value down a lot', '▼', {off:onSong})]),
     {h:'Move'},
     it('prev', 'Previous ' + (CMD_NOUN[tv] || ''), onSong ? '' : '['), it('next', 'Next ' + (CMD_NOUN[tv] || ''), onSong ? '' : ']'),
-    {a:'top', l:'Top of the song', k:keyHint('mod+Home'), f:songToTop},   // (13 Nov) as the corner button in Arrange
+    {a:'top', l:'Top of the song', k:onSong || (typeof apReady !== 'undefined' && apReady && apF === 'arr') ? keyHint('mod+Home') : '', f:songToTop},   // (13 Nov) as the corner button in Arrange. The key is shown only where it does the same: on the Song screen and with Arrange holding the keys (elsewhere Ctrl/⌘+Home goes to that screen's own first row)
     {h:'Play'},
     ...(full ? [{a:'loopp', l:'Loop the pattern', k:keyHint('alt+L'), f:toggleLoopPat}, {a:'loops', l:'Loop the selection', k:keyHint('shift+alt+L'), f:toggleLoop},
       {a:'prow', l:'Play the row (every track)', k:keyHint('alt+Enter'), f:() => playRowKey(true), off:tv !== 'phrase'}, {a:'follow', l:followMode ? 'Follow off' : 'Follow on', k:keyHint('mod+shift+F'), f:followKey}] : []),
