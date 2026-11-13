@@ -1,8 +1,9 @@
 // DRAW PASS (13 Nov 2026): what the screen costs while a song plays. Report: docs/audits/2026-11-13-draw-pass.md.
 // Measurement only: the instrumentation is injected into the page at run time through __seqTest.ev (the app is not edited).
 //
+//   (--trace=1 sums the trace by event name; --trace=2 also saves the raw events: tests/sweep/draw-pass-trace.mjs reads them)
 //   node tests/sweep/draw-pass.mjs --seq=page|core --size=open|cover --throttle=1|4|6 [--screens=song,phrase,pv,sect,inst,mixer,fx,mod,project]
-//        [--secs=10] [--warm=3] [--tag=name] [--prefix=before-] [--meters=smooth|light|off]
+//        [--secs=10] [--warm=3] [--tag=name] [--prefix=before-] [--meters=smooth|light|off] [--arr=0|1|2] [--follow=0|1|2] [--pre=js] [--trace=1|2 [--v8prof=1] [--inval=1] [--stack=1]]   (each of the last three slows the page a lot: use them one at a time)
 //
 //   One run = one Chrome (Fold profile as wrap-clock.mjs: touch, Android UA, Mobile setup, DPR 2.5, 884x1020 or 412x915), ELECTRO from row 0 restarted for
 //   each screen; 3 s to settle, then a 10 s window. Per screen: draw() inclusive ms and calls (wrapped here, top level only), the inclusive ms of its heavy
@@ -19,7 +20,7 @@ const OUT = path.join(ROOT, 'tests/sweep/out'); fs.mkdirSync(OUT, { recursive: t
 const songText = fs.readFileSync(path.join(ROOT, 'sounds/ELECTRO.thunder'), 'utf8');
 const { srv, port } = await serve(); const C = await launch(); const { send } = C;
 const LAYERS = arg('layers', '0') === '1', layerSet = { layers: [] }; C.on(d => { if (d.method === 'LayerTree.layerTreeDidChange' && d.params.layers) layerSet.layers = d.params.layers; });
-const TRACE = arg('trace', '0') === '1', traceEv = []; C.on(d => { if (d.method === 'Tracing.dataCollected') traceEv.push(...d.params.value); });
+const TRACE = arg('trace', '0') !== '0', TRACE_RAW = arg('trace', '0') === '2', traceEv = []; C.on(d => { if (d.method === 'Tracing.dataCollected') traceEv.push(...d.params.value); });
 const { targetInfos } = await send('Target.getTargets'); const pt = targetInfos.find(t => t.type === 'page');
 const { sessionId: S } = await send('Target.attachToTarget', { targetId: pt.targetId, flatten: true });
 const P = (m, p) => send(m, p, S);
@@ -43,6 +44,9 @@ await ev(`window.__seqTest.load(${JSON.stringify(songText)}, 'ELECTRO.thunder')`
 const coreOK = await ev(`window.__seqTest.coreOn(${SEQ === 'core'})`); if (SEQ === 'core' && !coreOK) throw new Error('core did not load');
 await app(`setFollow(2); setView('tracker'); setSects(true); return 1;`);
 if (METERS) await app(`setMeters(${JSON.stringify(METERS)}); return 1;`);
+const ARR = arg('arr', ''), PRE = arg('pre', ''), FOLLOW = arg('follow', '2');   // --arr=0|1|2: Arrange panel off / auto / on (setArr); --pre=js: run after each screen is set up (an A/B switch: e.g. pvPlayMark = () => {}); --follow=0|1|2
+if (ARR !== '') await app(`setArr(${+ARR}); return 1;`);
+if (FOLLOW !== '2') await app(`setFollow(${+FOLLOW}); return 1;`);
 // the instrumentation: wrappers that add up inclusive ms (a call inside a call of the same function counts once)
 await app(`
 const Z = window.__dp = {fn: {}, lead: [], on: false};
@@ -59,7 +63,7 @@ const SET = { song: `go('song');`, phrase: `go('phrase'); pvSetMode(false);`, pv
 if (THR > 1) await P('Emulation.setCPUThrottlingRate', { rate: THR });
 for (const sc of SCREENS) {
   await app(`if (tp.on) tStop(); window.__dp.lead.length = 0; return 1;`); await sleep(400);
-  const info = await app(`${SET[sc]} cs.song.y = 0; cs.song.top = 0; draw(); return {tv, view, pv: pvActive(), asong: asongOn(), w: innerWidth, h: innerHeight, arrMode, sects: sectsOn};`); await sleep(500);
+  const info = await app(`${SET[sc]} cs.song.y = 0; cs.song.top = 0; draw(); ${PRE ? PRE + ';' : ''} return {tv, view, pv: pvActive(), asong: asongOn(), w: innerWidth, h: innerHeight, arrMode, sects: sectsOn};`); await sleep(500);
   await app(`tStart('song', {row:0}); return 1;`); await sleep(WARM * 1000);
   const m0 = await metricsNow(); const t0 = await ev('performance.now()');
   const c0 = SEQ === 'core' ? await ev('window.__seqTest.coreStats()').catch(() => null) : null;
@@ -67,7 +71,7 @@ for (const sc of SCREENS) {
   if (PROF){ await P('Profiler.enable'); await P('Profiler.setSamplingInterval', { interval: 500 }); await P('Profiler.start'); }
   if (LAYERS){ await P('LayerTree.enable'); await sleep(1500); const L = layerSet.layers, reasons = {}; for (const l of L.slice(0, 200)){ try { const q = await P('LayerTree.compositingReasons', { layerId: l.layerId }); for (const x of q.compositingReasonIds || q.compositingReasons || []) reasons[x] = (reasons[x] || 0) + 1; } catch(e){} }
     console.log(`  LAYERS ${sc}: ${L.length} layers; paint counts total ${L.reduce((a, l) => a + (l.paintCount || 0), 0)}; sizes ` + L.slice(0, 12).map(l => (l.width | 0) + 'x' + (l.height | 0)).join(' ') + ' reasons ' + JSON.stringify(reasons)); await P('LayerTree.disable'); }
-  if (TRACE){ traceEv.length = 0; await P('Tracing.start', { categories: 'devtools.timeline,disabled-by-default-devtools.timeline', transferMode: 'ReportEvents' }); }
+  if (TRACE){ traceEv.length = 0; await P('Tracing.start', { categories: 'devtools.timeline,disabled-by-default-devtools.timeline' + (arg('v8prof', '0') === '1' ? ',disabled-by-default-v8.cpu_profiler' : '') + (arg('inval', '0') === '1' ? ',disabled-by-default-devtools.timeline.invalidationTracking' : '') + (arg('stack', '0') === '1' ? ',disabled-by-default-devtools.timeline.stack' : ''), transferMode: 'ReportEvents' }); }
   await sleep(SECS * 1000);
   if (TRACE){ const done = new Promise(ok => C.on(d => { if (d.method === 'Tracing.tracingComplete') ok(); })); await P('Tracing.end'); await done; }
   let prof = null; if (PROF){ prof = (await P('Profiler.stop')).profile; }
@@ -82,6 +86,7 @@ for (const sc of SCREENS) {
     core: c1 && c0 ? { late: c1.late, lead: c1.lead, worst: c1.worst } : null,   // (the core's stats read resets its late counter: c1.late is already the window's count; c0 is read to clear the warm-up's)
     kids: Object.fromEntries(Object.entries(D.fn).filter(([k, v]) => v.n && k !== 'draw').map(([k, v]) => [k, { n: v.n, ms: +v.tot.toFixed(1), max: +v.max.toFixed(1) }])) };
   result.screens[sc] = r;
+  if (TRACE_RAW) fs.writeFileSync(path.join(OUT, `draw-${arg('prefix', '')}${TAG}-${sc}.trace.json`), JSON.stringify(traceEv));   // --trace=2: the raw events, for draw-pass-trace.mjs
   if (TRACE){ const by = {}; for (const e of traceEv){ if (e.ph === 'X' && e.dur != null && e.name !== 'RunTask' || (e.ph === 'X' && e.name === 'RunTask')){ const b = by[e.name] || (by[e.name] = [0, 0]); b[0] += e.dur / 1000; b[1]++; } }
     const top = Object.entries(by).filter(([k]) => /^(Layout|UpdateLayoutTree|PrePaint|Paint|Layerize|Commit|RunTask|FunctionCall|FireAnimationFrame|EventDispatch|TimerFire|HitTest|IntersectObserverController::computeIntersections|UpdateLayer|CompositeLayers|ScheduleStyleRecalculation|ParseHTML|MajorGC|MinorGC|V8\.GC.*|RunMicrotasks|v8.callFunction|ResourceFetch|HandlePostMessage|FireIdleCallback)$/.test(k)).sort((a, b) => b[1][0] - a[1][0]);
     r.trace = Object.fromEntries(top.map(([k, v]) => [k, [+v[0].toFixed(0), v[1]]])); console.log('  TRACE ' + sc + ': ' + top.map(([k, v]) => k + ' ' + v[0].toFixed(0) + 'ms/' + v[1]).join(' | ')); }
