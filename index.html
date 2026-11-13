@@ -24433,7 +24433,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 576;
+const BUILD = 577;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD + (location.pathname.includes('/beta/') ? ' · beta' : '');
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -34240,6 +34240,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [577, '13 Nov', ['New: a Top of the song button in Arrange\u2019s top-left corner, above the row numbers (also Edit \u2192 Top of the song). It never starts or stops playback.', 'Smoother with the Arrange panel open while a song plays: the browser no longer re-works the whole page for each playhead mark (in emulation, stalls in Pattern view fell from about 55 to about 10 per 10 s).']],
   [576, '13 Nov', ['New setting, Settings \u2192 Screen \u2192 Meters while playing: Smooth (as before), Light (about 10 a second) or Off. On a phone the Mixer does far less screen work on Light or Off.', 'A quick second tap on PLAY no longer jumps to the top of the song: it just plays from the cursor.', 'Control bar: MUTE PAT, LOOP SEL and CLN \u2193 are two-line labels that fit at large text sizes; the COMMANDS heading is gone (one more row on a folded phone).']],
   [575, '13 Nov', ['Much less screen work while a song plays: the playhead now moves in place and the Mixer, Inst, FX, MOD and Project screens no longer redraw on every row (measured in emulation: drawing time down by 80 to 95 % on those screens, Pattern view by about 85 %). On touch screens the playhead draws at most 20 times a second.', 'Tap the CPU meter: a new section, The screen, shows how much of the page\u2019s time goes on drawing and on the page sequencer.', 'The playback report\u2019s voice count after STOP no longer keeps one per live engine.']],
   [574, '13 Nov', ['New effect: Lite reverb, a very light room / plate reverb that costs about a fifth to a tenth of the other reverbs (Size, Decay, Tone, Pre-delay, Mix; six presets). It sleeps when nothing is going through it.', 'More synth presets: 20 new Acid presets, 7 Bass, and 4 to 6 each for sixteen other synth engines.']],
