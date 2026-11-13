@@ -20341,7 +20341,7 @@ function makeSeq(S, mode, o){
       const T = tr[t]; if (T.on || !(t < (S.ntr || 16) || t === MT) || (o.only && !o.only.has(t))) continue;
       const cid = S.song[y][t], c = cid >= 0 ? S.chains[cid] : null, p = c && c[0] ? c[0][0] : -1;
       if (p < 0 || (loop && (y < loop.y0 || y > loop.y1))) continue;
-      if (T.wr && y < T.wr) continue;   // (12 Nov) it ran ahead of this row and has played it: it waits for a row past the one it stopped on
+      if (!loop && T.wr && y < T.wr) continue;   // (12 Nov) it ran ahead of this row and has played it: it waits for a row past the one it stopped on (not under a LOOP set meanwhile: its rows come round again, review)
       const line = 60 / api.bpm / (api.lpb || plpbOf(S, p)), st = Math.max(0, Math.ceil((rel - L.r0) / line - 1e-6));
       if (st >= lenOf(p)) continue;   // past its end on this row: it starts with the next row
       Object.assign(T, fresh(), {on:true, row:y, cr:0, step:st, g:st, cnt:st, r0:L.r0, rel:L.r0 + st * line});
@@ -20696,7 +20696,8 @@ function makeSeq(S, mode, o){
     if (mode === 'song' && !loop && !once){ let any = false, w = 0, re = -Infinity; for (const T of tr){ if (T.on){ any = true; break; } if (T.wr){ if (T.wr > w) w = T.wr; if (T.rel > re) re = T.rel; } }
       if (!any && w){ const ok = t => (t < (S.ntr || 16) || t === MT) && (!o.only || o.only.has(t)), has = y => { const r = S.song[y]; if (!r) return false; for (let t = 0; t <= MT; t++) if (ok(t) && r[t] >= 0) return true; return false; };
         let y = clamp(w - 2, 0, 255); while (y > 0 && has(y - 1)) y--;
-        for (let t = 0; t <= MT; t++){ const T = tr[t]; Object.assign(T, fresh()); T.row = y; T.rel = re; T.r0 = re; if (ok(t) && S.song[y][t] >= 0){ T.on = true; settle(T, t); } } } }
+        // (review) only where it is in the song is reset: what its commands set (NTH counts, the instrument, TSP, ARC, DIR...) carries over the wrap, as it did when a track went back on its own
+        for (let t = 0; t <= MT; t++){ const T = tr[t]; T.on = false; T.empty = false; T.wr = 0; T.row = y; T.cr = 0; T.step = 0; T.next = -1; T.cnt = 0; T.g = 0; T.rel = re; T.r0 = re; if (ok(t) && S.song[y][t] >= 0){ T.on = true; settle(T, t); } } } }
     if (pdl) for (const T of tr) if (T.on) T.rel += pdl;   // PDL: the whole song waits
     let nx = Infinity; for (const T of tr) if (T.on && T.rel < nx) nx = T.rel;
     /* LFOs ALWAYS RUN (owner, 10 Nov): a track with no pattern on this song row (or the master with no MST cell) still moves its
@@ -22637,7 +22638,7 @@ function padBlink(e){
 // Phones and tablets (10 Nov): the audio-thread sequencer's module (a second thread) loads only when the owner picked it there
 // (aset.corePick, set in Settings); the saved default 'core' plays on the Page sequencer on such a device.
 function coreWanted(){ return aset.core === 'core' && (!wkLazy() || !!aset.corePick); }   // (a declaration: the Settings row reads it at load)
-const CORE_REV = '1grxwxe';
+const CORE_REV = '6ajz7z';
 const CORE_WANT = 7;   // the core's message set this page speaks (core-processor.js CORE_V); an older core is not used
 const CORE_URL = () => 'core/seq-core.js?v=' + BUILD + '-' + CORE_REV;
 const core = {node:null, ready:false, loading:null, gen:0, sent:new Map(), sT:0, tally:new Map(), mir:null};   // mir: what the core's song holds, as JSON per part (coreDiff)   // tally: events by who played them (test hook)

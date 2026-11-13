@@ -58,3 +58,16 @@ test('a render (once) and LOOP are as before', () => {
   assert.deepEqual(notes(play(S, { once: true }, 40).evs, 0), [0, 0.5]);
   const lp = play(S, { once: false, loop: { y0: 1, y1: 1 }, row: 1 }, 12).evs; assert.deepEqual(notes(lp, 1).slice(0, 3), [0, 0.5, 1]);
 });
+test('a wrap keeps what a track\'s commands set (review): an NTH count carries over, so the note plays on alternate passes', () => {
+  const S = song([{ t: 0, y: 0, cmds: [['NTH', 0x22]] }]);
+  const n = notes(play(S, { once: false, live: true }, 24).evs, 0);
+  assert.ok(n.length >= 2 && n.length <= 4, 'about every second pass of 6 (' + n.join() + ')');
+});
+test('a track waiting when a LOOP is set rejoins the loop (review)', () => {
+  const S = song([B(0, 0), B(0, 1), B(1, 0)]);
+  ctx.__S = JSON.parse(JSON.stringify(S)); vm.runInContext('S = __S;', ctx);
+  const sq = ctx.makeSeq(ctx.__S, 'song', { row: 0, once: false, live: true, sim: true }), ev = [];
+  for (let i = 0; i < 5; i++) sq.step();   // track 1 has run off its one block and waits; track 0 is on row 1
+  sq.setLoop({ y0: 0, y1: 0 }); for (let i = 0; i < 16; i++) ev.push(...sq.step().evs);
+  assert.ok(ev.some(e => e.type === 'note' && e.track === 1), 'track 1 plays again inside the loop');
+});
