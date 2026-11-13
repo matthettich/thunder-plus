@@ -19,7 +19,11 @@ test('Pattern view: pvGo takes the song cell (it also handles an empty one)', ()
 test('an empty cell opens a fresh phrase that waits in pendPlace, and makes no pattern', () => {
   const c = rig({ cell: -1 }); c.navDownToPhrase(); assert.equal(c.cPhrase, 20); assert.equal(c.pendPlace.x, 2); assert.equal(c.pendPlace.y, 7); assert.equal(c.pendPlace.p, 20); assert.match(c.log[1], /new phrase 20/);
 });
-test('wiring: mobile only, Song and Sect, before the old Mixer line; go() honours goNoNew', () => {
-  assert.match(src, /if \(dir === 'down' && isMobile\(\) && \(tv === 'song' \|\| tv === 'sect'\)\) return navDownToPhrase\(\);\n  if \(dir === 'down'\) return tv === 'project'/);
+test('wiring: every setup (desktop too), Song and Sect, before the old Mixer line; go() honours goNoNew', () => {
+  assert.match(src, /if \(dir === 'down' && \(tv === 'song' \|\| tv === 'sect'\)\) return navDownToPhrase\(\);[^\n]*\n  if \(dir === 'down'\) return tv === 'project'/);
   assert.match(src, /&& !sectsOn && !goNoNew\) newBlock\(/);
+});
+test('desktop: no isMobile() gate on the SHIFT+▼ line; Mobile ▲ keeps its own gate', () => {
+  assert.doesNotMatch(src, /dir === 'down' && isMobile\(\)/);
+  assert.match(src, /if \(dir === 'up' && isMobile\(\)\)/);
 });
