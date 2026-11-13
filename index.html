@@ -9087,7 +9087,7 @@ function instFit(){
     I.pad = want; I.kf = isSyn(want) ? 1 : 0; ch = true; }
   if (!ch) return;
   if (!undo.pend) undo.cur = JSON.stringify(S);   // part of the kit change, not a song edit of its own
-  clearTimeout(sT); sT = setTimeout(() => storeWrite(TK, JSON.stringify(songOut(S))), 600); songVer++;
+  clearTimeout(sT); sPend = true; sT = setTimeout(() => { sPend = false; storeWrite(TK, JSON.stringify(songOut(S))); }, 600); songVer++;
 }
 function setSlotKind(i, held){
   if (vtrk) return toast('A kit slot per track is on (Settings → Kit): mono tracks get drums, poly tracks synths.', 4000);
@@ -19766,7 +19766,7 @@ let FIRST_SONG = false;
 let S = (() => { try { const s = localStorage.getItem(TK) || localStorage.getItem('thunder-song-v1'); if (!s) FIRST_SONG = true; return s ? normSong(JSON.parse(s)) : demoSong(); } catch(e){ return demoSong(); } })();
 setTimeout(() => { try { irsResolve(); } catch(e){ tpLog('could not load the song’s impulse responses', e); } }, 0);   // the song's impulse responses (Convolution reverb), from IndexedDB
 setTimeout(() => { if (swingConv || scConv) try { saveS(); } catch(e){ tpLog('could not save the converted song', e); } swingNote(); scNote(); }, 0);   // an older saved song was converted: save the new numbers, say so
-let sT = 0;
+let sT = 0, sPend = false;   // sPend (12 Nov): a change is waiting for its autosave (the 600 ms timer has not run yet)
 // Undo: every saved change keeps the state before it (up to 200 steps). Changes made by one key or tap
 // (a paste, a cut, a note plus its instrument) settle at the end of that event, so they undo as one step.
 const undo = {past:[], future:[], cur:JSON.stringify(S), busy:false, pend:false};
@@ -19870,7 +19870,7 @@ addEventListener('keydown', e => {
   const k = e.key.toLowerCase(); if (k !== 'z' && k !== 'y') return;
   e.preventDefault(); undoStep(k === 'y' || e.shiftKey ? 1 : -1);
 });
-function flushS(){ clearTimeout(sT); storeWrite(TK, JSON.stringify(songOut(S))); }
+function flushS(){ clearTimeout(sT); sPend = false; storeWrite(TK, JSON.stringify(songOut(S))); }
 // The song as it is saved (storage and project files). With 32 tracks (NT, today) it is the song itself, exactly as always.
 // With more, each row keeps tracks 1–32 and the master where every version reads them (33 numbers) and tracks 33 and up go
 // in songX[row] (null when empty), so an older version (or Thunder Perform's deck) still opens the song, without those
@@ -19905,7 +19905,7 @@ const niOf = Sx => clamp((Sx && Sx.ni) | 0 || 16, 16, NI);
 function niUp(i){ if (S.ni < NI && i >= S.ni){ S.ni = NI; try { toast(`This song uses ${NI} instruments. INS above 0F plays its own instrument.`, 5000); } catch(e){} } }
 function niScan(){ if (S.ni >= NI) return; for (const ph of S.phrases) if (ph) for (const r of ph) if (r[IC] >= S.ni) return niUp(r[IC]); }
 function saveS(){ try { markChange(); } catch(e){} try { coreSong(); } catch(e){}   // FILE SAFETY: unsaved changes
-  if (pendPlace) queueMicrotask(placePending); try { niScan(); } catch(e){} snap(); clearTimeout(sT); sT = setTimeout(() => storeWrite(TK, JSON.stringify(songOut(S))), 600);
+  if (pendPlace) queueMicrotask(placePending); try { niScan(); } catch(e){} snap(); clearTimeout(sT); sPend = true; sT = setTimeout(() => { sPend = false; storeWrite(TK, JSON.stringify(songOut(S))); }, 600);
   try { songVer++; songBeatsSoon(); } catch(e){} try { liveWarmSoon(); } catch(e){} }   // the song changed: MIDI song positions are worked out again (just after, with clock on)
 const isEmptySect = c => !c || c.every(r => r[0] < 0);
 // EMPTY BLOCKS (owner, 31 Oct): Arrange shows a block whose phrases hold nothing (no notes, no commands) striped, so the
@@ -20341,11 +20341,13 @@ function makeSeq(S, mode, o){
     return n;
   }
   // The row a track is about to play, and the value of a TIC command on it (null when there is none).
-  // MUTED BLOCKS (owner, 12 Nov: "I could still hear fx from a pattern that was muted"): a muted song block runs its rows (timing carries on) but
-  // none of its row executes: no notes and no commands (effects, TPO, TIC, GRV / GGR, PDL, JMP, END). r0 is where every command is read from.
-  // The master column (MT) has block mutes too once the UI's masterBlockMuted(S, y) exists (until then it is false and the master plays as before).
+  // MUTED BLOCKS. A muted TRACK block is as it was: its notes and effect commands are dropped (the step's events are thrown away below), but the
+  // commands that steer the song still run (TPO, TIC, GRV / GGR, PDL, JMP, END, HOP), so muting a block never changes where the song goes or how
+  // long it takes (lead, 12 Nov: an agent's first version dropped those too; a muted block with a HOP or JMP would then have moved the song).
+  // MASTER COLUMN (owner, 12 Nov: "make M.PAT mute patterns on master column. Not the sound, just disable the pattern"): a muted master block reads
+  // no row at all, so none of its commands run; its rows still count. masterBlockMuted(S, y) is the UI's; until it exists this is false.
   const mutedAt = (t, y) => mode === 'song' && (t < MT ? blockMuted(S, y, t) : (typeof masterBlockMuted === 'function' && !!masterBlockMuted(S, y)));
-  const r0 = (T, pid) => { const ph = pid >= 0 ? S.phrases[pid] : null; if (!ph) return null; if (mode === 'song' && mutedAt(tr.indexOf(T), T.row)) return null; return ph[T.step]; };
+  const r0 = (T, pid) => { const ph = pid >= 0 ? S.phrases[pid] : null; if (!ph) return null; if (T === tr[MT] && mutedAt(MT, T.row)) return null; return ph[T.step]; };
   const ENDI = FXC.indexOf('END'), JMPI = FXC.indexOf('JMP');
   const TICI = FXC.indexOf('TIC');
   const ticCmd = r => { let v = null; for (let k = FX0; k < RW; k += 2) if (r[k] === TICI) v = Math.max(0, r[k + 1]); return v; };
@@ -22227,6 +22229,10 @@ let fxRestartN = 0;
 const songRow = () => { const y0 = cs.song.y; for (let y = y0; y < 256; y++){ const r = S.song[y]; if (r && r.some(v => v >= 0)) return y; } return 0; };
 let warmTok = null;   // 10 Nov: the booked first-PLAY warm-up (tStart); STOP clears it, so a STOP inside the window is not followed by the song
 function tStart(mode, o){
+  // SAVE BEFORE PLAY (12 Nov, owner: new song, notes typed into a new pattern, PLAY hung and afterwards the notes were gone): the autosave runs 600 ms
+  // after the last change, and the first PLAY can stall the page for a second or two (the audio engine starting); if the page is killed or reloaded
+  // in that stall, the last notes were never written. A change still waiting is written now, before anything heavy starts. (Not reproduced: a guard.)
+  if (sPend && !tp.on && !(o && o._warm)) try { flushS(); } catch(e){}
   // LIVE WARM-UP: the first PLAY of a session starts the audio engine; with live engine pads in the kit it waits (once, at
   // most 600 ms) for their worklets, so their nodes can be made before the first notes instead of on them
   // 10 Nov: and for the effect and chains modules' handlers still to run (playWaitFor), so rtAllFx is not 1-4 bars into the song
@@ -22600,7 +22606,7 @@ function padBlink(e){
 // Phones and tablets (10 Nov): the audio-thread sequencer's module (a second thread) loads only when the owner picked it there
 // (aset.corePick, set in Settings); the saved default 'core' plays on the Page sequencer on such a device.
 function coreWanted(){ return aset.core === 'core' && (!wkLazy() || !!aset.corePick); }   // (a declaration: the Settings row reads it at load)
-const CORE_REV = '3fmuwq';
+const CORE_REV = 'z2t322';
 const CORE_WANT = 7;   // the core's message set this page speaks (core-processor.js CORE_V); an older core is not used
 const CORE_URL = () => 'core/seq-core.js?v=' + BUILD + '-' + CORE_REV;
 const core = {node:null, ready:false, loading:null, gen:0, sent:new Map(), sT:0, tally:new Map(), mir:null};   // mir: what the core's song holds, as JSON per part (coreDiff)   // tally: events by who played them (test hook)

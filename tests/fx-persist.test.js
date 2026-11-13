@@ -1,7 +1,8 @@
 // EFFECT COMMAND STATE (owner, 12 Nov): "A pattern effect that has been turned off or 00'd should persist as off if patterns below it are played
 // without crossing the fx command" and "I could still hear fx from a pattern that was muted in the arrangement window". Decision (owner: "Changes to
 // old songs are ok"): the state a command sets persists across patterns and song wraps and only STOP resets it (no 'fxreset' while a song plays),
-// and a muted block's commands do not execute at all (effects, tempo, groove, ticks, jumps), on both sequencers.
+// a muted TRACK block drops its notes and effect commands but still runs the commands that steer the song (tempo, groove, jumps, END), and a
+// muted MASTER block (masterBlockMuted) runs none of its commands. Both sequencers.
 // No browser: makeSeq is read from core/seq-core.js (generated from index.html; tests/core.test.js keeps them equal).
 'use strict';
 const test = require('node:test'), assert = require('node:assert/strict'), vm = require('vm');
@@ -35,18 +36,17 @@ test('the master column wrapping on its own does not reset the master effects ei
   const { evs } = play(S, { once: false }, 60);
   assert.deepEqual(evs.filter(e => e.type === 'fxreset'), []);
 });
-test('a muted block\'s commands do not execute: no effect events, no tempo change', () => {
+test('a muted TRACK block: its notes and effect commands are dropped, but the commands that steer the song still run (tempo here)', () => {
   const S = song([{ t: 0, y: 0, cmds: [] }, { t: 0, y: 1, cmds: [['FXO', 0x10], ['TPO', 90]] }, { t: 0, y: 2, cmds: [] }], [[1, 0]]);
   const { evs, bpm } = play(S, { once: true }, 40);
-  assert.deepEqual(evs.filter(e => e.type === 'fxc'), []);
-  assert.deepEqual(evs.filter(e => e.type === 'tempo'), [], 'TPO in a muted block does not change the tempo');
-  assert.equal(bpm, 120);
+  assert.deepEqual(evs.filter(e => e.type === 'fxc'), [], 'no effect command from the muted block');
+  assert.equal(bpm, 90, 'TPO in a muted block still sets the tempo: muting never changes how the song runs');
   assert.equal(evs.filter(e => e.type === 'note' && e.track === 0).length, 2, 'rows 0 and 2 still play their notes; the muted row\'s is dropped');
 });
-test('a muted block\'s JMP / END do not execute', () => {
-  const S = song([{ t: 0, y: 0, cmds: [] }, { t: 0, y: 1, cmds: [['END', 0]] }, { t: 0, y: 2, cmds: [] }], [[1, 0]]);
-  const { evs } = play(S, { once: true }, 60);
-  assert.equal(evs.filter(e => e.type === 'note').length, 2, 'the song ran on through the muted END to row 2');
+test('a muted TRACK block\'s END still ends the song (the song goes where it went before the mute)', () => {
+  const S = song([{ t: 0, y: 0, cmds: [] }, { t: 0, y: 1, cmds: [['END', 0]] }, { t: 0, y: 2, cmds: [] }]), M = JSON.parse(JSON.stringify(S)); M.smute[1] |= 1;
+  const a = play(S, { once: true }, 60).evs.filter(e => e.type === 'note').length, b = play(M, { once: true }, 60).evs.filter(e => e.type === 'note').length;
+  assert.equal(a - b <= 1 && a >= b, true, 'muted: at most the muted row\'s own note is missing; row 2 is reached or not exactly as unmuted (' + a + ' vs ' + b + ')');
 });
 test('an unmuted block still runs its commands (the same song, no mute)', () => {
   const S = song([{ t: 0, y: 0, cmds: [] }, { t: 0, y: 1, cmds: [['FXO', 0x10], ['TPO', 90]] }, { t: 0, y: 2, cmds: [] }]);

@@ -361,11 +361,13 @@ function makeSeq(S, mode, o){
     return n;
   }
   // The row a track is about to play, and the value of a TIC command on it (null when there is none).
-  // MUTED BLOCKS (owner, 12 Nov: "I could still hear fx from a pattern that was muted"): a muted song block runs its rows (timing carries on) but
-  // none of its row executes: no notes and no commands (effects, TPO, TIC, GRV / GGR, PDL, JMP, END). r0 is where every command is read from.
-  // The master column (MT) has block mutes too once the UI's masterBlockMuted(S, y) exists (until then it is false and the master plays as before).
+  // MUTED BLOCKS. A muted TRACK block is as it was: its notes and effect commands are dropped (the step's events are thrown away below), but the
+  // commands that steer the song still run (TPO, TIC, GRV / GGR, PDL, JMP, END, HOP), so muting a block never changes where the song goes or how
+  // long it takes (lead, 12 Nov: an agent's first version dropped those too; a muted block with a HOP or JMP would then have moved the song).
+  // MASTER COLUMN (owner, 12 Nov: "make M.PAT mute patterns on master column. Not the sound, just disable the pattern"): a muted master block reads
+  // no row at all, so none of its commands run; its rows still count. masterBlockMuted(S, y) is the UI's; until it exists this is false.
   const mutedAt = (t, y) => mode === 'song' && (t < MT ? blockMuted(S, y, t) : (typeof masterBlockMuted === 'function' && !!masterBlockMuted(S, y)));
-  const r0 = (T, pid) => { const ph = pid >= 0 ? S.phrases[pid] : null; if (!ph) return null; if (mode === 'song' && mutedAt(tr.indexOf(T), T.row)) return null; return ph[T.step]; };
+  const r0 = (T, pid) => { const ph = pid >= 0 ? S.phrases[pid] : null; if (!ph) return null; if (T === tr[MT] && mutedAt(MT, T.row)) return null; return ph[T.step]; };
   const ENDI = FXC.indexOf('END'), JMPI = FXC.indexOf('JMP');
   const TICI = FXC.indexOf('TIC');
   const ticCmd = r => { let v = null; for (let k = FX0; k < RW; k += 2) if (r[k] === TICI) v = Math.max(0, r[k + 1]); return v; };
