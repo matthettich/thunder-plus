@@ -1527,7 +1527,8 @@ body.arrsmall .tagp b{padding:0 3px; letter-spacing:.04em}
 .tagrid .rn.pl{background:var(--ar-pl); color:var(--ar-pl-ink); border-radius:2px}
  .tagrid b{display:block; position:relative; height:var(--arh,16px); line-height:var(--arh,16px); font-size:var(--arf,9px); font-weight:600; text-align:center; border-radius:2px; background:var(--ar-empty); color:transparent; cursor:pointer}
 /* Each block owns its whole cell and the gap around it, so a touch near an edge still lands on the block. */
-.tagrid b::before{content:''; position:absolute; inset:-1px; border-radius:2px}
+/* (12 Nov, owner: Arrange lagged a song playing while the cursor moved) the 1px hit area that sat here (b::before, inset:-1px) was clipped by the block's own overflow:hidden, so a touch in the gap landed
+   on the row either way (checked with elementFromPoint, same answers with it off); 1500 of them doubled the browser's compositing work (Layerize) each time a block's class changed. */
 /* While a block is held, show the mute "charging" so the hold is not an invisible gesture. */
 /* BUS OUTLINE (owner, 3 Nov): every cell of a bus track has a hairline outline a pixel out from it, in the grid's ink, so a
    bus stands out filled or empty (its darker tint alone was lost under filled blocks). The cursor, playing and drop outlines win. */
@@ -26225,7 +26226,7 @@ const onPset = () => tv === 'phrase' && cs.phrase.y === -2;
 // Mixer: the cursor is on the MASTERING cell (master row, second cell).
 const onMstCell = () => tv === 'mixer' && cs.mixer.y === 7;   // any of MASTER, MASTERING, OUT (27 Oct: it was MASTERING only, so / on MASTER muted the last track)
 function move(dx, dy){
-  const c = cs[tv], d = dims(tv);
+  const c = cs[tv], d = dims(tv), pg0 = !!c.pg, x0 = c.x, y0 = c.y;
   if (tv === 'song' || tv === 'phrase') c.pg = false;   // EDIT WHILE FOLLOWING: a move shows the cursor again
   if (tv === 'fx') return moveFx(dx, dy, d.h);
   if (tv === 'phrase' && c.y === -2){ if (dy > 0){ c.y = 0; c.x = mstView() || busFxView() ? FX0 : 0; } else c.x = clamp(c.x + dx, 0, 1); return draw(); }
@@ -26249,6 +26250,15 @@ function move(dx, dy){
   else if (!(tv === 'song' && c.x === MT) && !(tv === 'phrase' && dx)) c.x = clamp(c.x + dx, 0, d.w - 1);   // (the phrase already stepped through its columns above: a second plain step skipped every other one) FOCUS TRACK (24 Oct): ▲▼ on the master column stay on it (they jumped to the last track)
   const wasY = c.y; c.y = clamp(c.y + dy, 0, d.h - 1);
   if (tv === 'mixer' && c.y === 7 && wasY !== 7) c.mx = 0;
+  // ARRANGE (12 Nov, owner: ▲ held in Arrange while a song plays on the audio thread lagged the playback): a held arrow that can't go on (▲ at row 0, the usual end of a long ▲)
+  // changes nothing, so it draws nothing; a move that does change the cursor redraws without rebuilding the blocks (drawArr0, arrFast), and while a song plays that
+  // redraw waits for the frame loop's own (one a frame, not one per press and one per row step)
+  if (tv === 'song' && asongOn() && !apHold && !apSong){
+    if (c.x === x0 && c.y === y0 && !pg0) return;
+    if (tp.on && !arrSoon){ arrSoon = requestAnimationFrame(() => { arrSoon = 0; arrFast = true; try { draw(); } finally { arrFast = false; } }); return; }
+    if (arrSoon) return;
+    arrFast = true; try { draw(); } finally { arrFast = false; } return;
+  }
   draw();
 }
 function psetGet(x){ return x === 0 ? plen(cPhrase) : (S.plpb[cPhrase] || 0); }
@@ -27818,6 +27828,7 @@ function phShownGo(){
   cs.song.x = s.x; cs.song.y = s.y; cTrack = s.x; return true;
 }
 function draw(){
+  if (arrSoon && !arrFast){ cancelAnimationFrame(arrSoon); arrSoon = 0; }   // a full draw this frame already shows the cursor's move
   if (view !== 'tracker') return;
   document.body.classList.toggle('tvph', tv === 'phrase');   // EDIT OFF looks apply to the Phrase screen
   if (apHold){ apDirty = true; return; }   // ARRANGE PAGING: a song command run for Arrange draws once, at its end
@@ -30771,6 +30782,7 @@ function dkMoreDue(){ if (!dkMoreRaf) dkMoreRaf = requestAnimationFrame(dkMore);
 // A tap on an ARRANGE block goes to it (a second tap opens its phrase); holding one mutes or unmutes just
 // that block. A tap can never mute, and the track-number row is a label, so a slip cannot silence a track.
 let arrLit = [], arrSig = '', arrTap = {t:0, k:''}, arrCurY = -1;
+let arrFast = false, arrFastKey = '', arrFastN = 0, arrFastR = -1, arrSoon = 0;   // (12 Nov) a cursor move redraws Arrange without rebuilding its blocks; while a song plays, one redraw a frame
 // ARRANGE zoom (see "ARRANGE zoom" below).
 // ARR_ZOOM_BTNS: the − ○ + in the arrange header (○ = fit). Set it to false to take them away (pinch and Ctrl+wheel stay).
 const ARR_ZOOM_BTNS = true;
@@ -31009,11 +31021,15 @@ function drawArr0(PH){
   const NA = ntr(), ms = asongOn(), mx = ms || arrSideMst();   // ms: Arrange is the Song screen; mx: it shows the master column
   sxLaneSize();   // SONG EXTRAS: the section lane's width, before anything is measured
   const arRH = arrSize();
-  let lastR = -1; for (let y = 255; y >= 0; y--) if (S.song[y].some(v => v >= 0)){ lastR = y; break; }
+  // (12 Nov, owner: scrolling Arrange while a song plays lagged it) a cursor move can't change the song: it keeps the blocks built by the last full draw (the
+  // string below is ~100 KB and its compare cost ~5 ms a press on a phone) while nothing that sizes them changed and the cursor's row is inside them
+  const fkey = NA + ':' + ms + ':' + mx + ':' + arRH + ':' + polyFrom(), fast = arrFast && arrSig && fkey === arrFastKey && arrFastN >= Math.max(cs.song.y + 1, (cs.song.top || 0) + 40);
+  let lastR = fast ? arrFastR : -1; if (!fast) for (let y = 255; y >= 0; y--) if (S.song[y].some(v => v >= 0)){ lastR = y; break; }
   // (owner, 31 Oct) a steady length, so the scrollbar's thumb doesn't shrink under the mouse as it is dragged: the song and
   // 32 empty rows past its end (at least 64), more only when the cursor or the view goes further
-  const N = clamp(Math.max(lastR + 33, 64, cs.song.y + 1, (cs.song.top || 0) + 40), 1, 256);   // room to line up with the Song screen's top row
+  const N = fast ? arrFastN : clamp(Math.max(lastR + 33, 64, cs.song.y + 1, (cs.song.top || 0) + 40), 1, 256);   // room to line up with the Song screen's top row
   const play = PH || new Array(NT).fill(-1);   // the shared playhead, so Arrange lights the same rows as Song
+  if (!fast){
   const anySolo = S.mix.some(m => m.solo);
   let h = '';
   const PFg = polyFrom();   // each block carries its track's group, so the mono and poly sections take their colours
@@ -31062,6 +31078,8 @@ function drawArr0(PH){
     arrSig = sig; arrGrid.innerHTML = h; $('tArrTh').innerHTML = th; $('tArrGp').innerHTML = gp;
     arrLit = [];
   }
+  arrFastKey = fkey; arrFastN = N; arrFastR = lastR;
+  }
   // The playhead is lit in place, so the blocks are only rebuilt when the song changes, never under a finger mid-press.
   for (const e of arrLit) e.classList.remove('p', 'pl'); arrLit = [];
   play.forEach((y, t) => { if (y < 0) return; const row = arrGrid.children[y]; if (!row) return;
@@ -31077,7 +31095,7 @@ function drawArr0(PH){
   setText($('tArrSub'), (ms ? S.name + ' · ' : '') + (lastR + 1) + (lastR ? ' rows' : ' row') + (nm ? ` · ${nm} muted` : '') + (arrZoom > 1 ? ` · ${+arrZoom.toFixed(1)}×` : ''));
   { const lb = arrEl.querySelector('.tahl b'); if (lb && lb.textContent !== (ms ? 'SONG' : 'ARRANGE')) lb.textContent = ms ? 'SONG' : 'ARRANGE'; }
   // As the Song screen the grid holds whole rows only (the space left over sits under the boxes), so it never ends on half a row.
-  if (ms){ const pitch = (arrRowH() || arRH + 2) * 1.04, avail = arrAvail(), rows = Math.max(2, Math.floor((avail - 3) / pitch)), hg = Math.min(avail, Math.round(3 + rows * pitch)) + 'px';   // (×1.04: the gap every 4 rows)
+  if (fast){} else if (ms){ const pitch = (arrRowH() || arRH + 2) * 1.04, avail = arrAvail(), rows = Math.max(2, Math.floor((avail - 3) / pitch)), hg = Math.min(avail, Math.round(3 + rows * pitch)) + 'px';   // (×1.04: the gap every 4 rows)
     if (arrGrid.style.height !== hg) arrGrid.style.height = hg; }
   else if (arrGrid.style.height) arrGrid.style.height = '';
   arrSbw(); arrAlign(); arrFollowX(); arrBoxes();
