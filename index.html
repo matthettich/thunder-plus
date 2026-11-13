@@ -1274,6 +1274,18 @@ body.mob #tLoopSel{display:none}   /* the phone has LOOP (the pattern) only; LOO
    shorter level meter, the song button as ▷ / ■ alone, the CPU as a bare percentage. So the tabs and the strip can share
    one line on the Fold unfolded. */
 body.mob #tLoop, body.mob #tMet{display:none}
+/* MOBILE HEADER (12 Nov, owner: "do the transpose buttons at the top … do the same thing as the semi buttons in the pad section? If so … hide the transpose
+   buttons so we can fit the bpm and lpb next to the rows and rec settings and then move all of that up (next to project - can be shortened to 'proj')"):
+   Mobile + PAD input only (body.inpad, set by padHdr()): the pad's SEMI − / + do what TRANSP − / + do, so TRANSP goes; and BPM, LPB, the ticks, ROWS and REC
+   share the tab row (patFit(): when the tabs can't keep their words beside them, .tcompact shortens PROJECT to PROJ and tightens the tabs; still too wide, .wrap2
+   puts the group on its own line, as on the folded phone). KEYS input keeps TRANSP: there it is the on-screen way. */
+body.mob.inpad #tXposeDn, body.mob.inpad #tXposeUp{display:none}
+body.mob.inpad .tpat .trows button, body.mob.inpad .tpat .tclk{min-height:40px}
+body.mob.inpad .tclk .tce{padding:8px 2px}   /* a bigger target for the tempo / LPB numbers */
+.ttabbar.tcompact .ttabs button{padding:0 6px; letter-spacing:.01em}
+.ttabbar.tcompact .ttabs button[data-v=project]{font-size:0}
+.ttabbar.tcompact .ttabs button[data-v=project]::before{content:'PROJ'; font-size:var(--fs-4); letter-spacing:.01em}
+@media (max-width:600px){ .ttabbar.tcompact .ttabs button[data-v=project]::before{font-size:var(--fs-3)} }
 body.mob .top #tLen{flex:none; align-self:center; min-height:0; margin:0 2px}
 body.mob:not(.trkv) .top #tLen{display:none}
 body.mob .top .hmeter{flex:0 1 110px; min-width:60px}
@@ -32310,7 +32322,7 @@ function frame(){
 }
 
 /* ---------- building the screen ---------- */
-VIEWS.forEach(v => { const b = el('button', null, VNAME[v]); b.type = 'button'; b.dataset.v = v; b.addEventListener('click', () => go(v)); $('tTabs').append(b); });
+VIEWS.forEach(v => { const b = el('button', null, VNAME[v]); b.type = 'button'; b.dataset.v = v; if (v === 'project'){ b.setAttribute('aria-label', 'Project'); b.title = 'Project'; } b.addEventListener('click', () => go(v)); $('tTabs').append(b); });   // (PROJ when the tab row is tight: aria-label keeps the full word)
 $('tMap').querySelectorAll('[data-v]').forEach(b => b.addEventListener('click', () => go(b.dataset.v)));
 for (let t = 0; t < NT; t++){
   const m = el('button', 'mtr'); m.type = 'button'; m.setAttribute('aria-label', 'Mute track ' + (t + 1));
@@ -32990,8 +33002,13 @@ function patFit(){
   bar.classList.remove('fitsel', 'fitxp');
   const tb = bar.parentNode, tabs = tb && tb.querySelector('.ttabs');
   if (tb && tabs && tb.classList.contains('ttabbar')){
-    if (innerWidth <= 600) tb.classList.remove('wrap2');   // a phone's own rule already makes two lines
-    else if (!tb.classList.contains('wrap2')){ if (tabs.scrollWidth > tabs.clientWidth + 1){ tbNeed = tabs.scrollWidth + [...tb.children].filter(c => c !== tabs).reduce((a, c) => a + c.offsetWidth, 0); tb.classList.add('wrap2'); } }
+    const tight = () => tabs.scrollWidth > tabs.clientWidth + 1;
+    if (document.body.classList.contains('mob') && inMode === 'pad' && innerWidth > 600){   // MOBILE HEADER (12 Nov): tabs + tempo / rows / REC on one line; PROJ, then tighter tabs, then two lines
+      tb.classList.remove('wrap2', 'tcompact');
+      if (tight()){ tb.classList.add('tcompact'); if (tight()){ tb.classList.remove('tcompact'); tb.classList.add('wrap2'); } }
+    }
+    else if (innerWidth <= 600){ tb.classList.remove('wrap2', 'tcompact'); if (document.body.classList.contains('mob') && inMode === 'pad' && tight()) tb.classList.add('tcompact'); }   // (a folded phone: its tabs get PROJ only when they would scroll)   // a phone's own rule already makes two lines
+    else if (!tb.classList.contains('wrap2')){ tb.classList.remove('tcompact'); if (tabs.scrollWidth > tabs.clientWidth + 1){ tbNeed = tabs.scrollWidth + [...tb.children].filter(c => c !== tabs).reduce((a, c) => a + c.offsetWidth, 0); tb.classList.add('wrap2'); } }
     else if (tb.clientWidth >= tbNeed + 2) tb.classList.remove('wrap2');
   }
   if (bar.scrollWidth <= bar.clientWidth + 1) return;
@@ -33141,8 +33158,10 @@ $('tOctDn').addEventListener('click', () => setOct(kOct - 1));
 $('tOctUp').addEventListener('click', () => setOct(kOct + 1));
 $('tOctV').addEventListener('click', () => setOct(4));
 function setOct(o){ kOct = clamp(o, 0, 8); toast('Octave ' + kOct + (view === 'synth' ? ' · Z plays C-' + kOct : '')); kpSig = ''; draw(); }
+function padHdr(){ document.body.classList.toggle('inpad', inMode === 'pad'); }   // MOBILE HEADER: body.mob.inpad hides TRANSP and merges the tempo / rows / REC strip into the tab row
+padHdr();
 function setInput(m){
-  inMode = m === 'keys' ? 'keys' : 'pad'; try { localStorage.setItem(IK, inMode); } catch(e){}
+  inMode = m === 'keys' ? 'keys' : 'pad'; try { localStorage.setItem(IK, inMode); } catch(e){} padHdr();
   releaseAll(); kpSig = ''; applyCmdOrder(); draw(); fit(); draw();
 }
 // Keyboard in KEYS mode. Returns true when the key was used.
