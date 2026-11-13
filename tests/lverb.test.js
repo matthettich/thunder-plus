@@ -78,7 +78,7 @@ test('lverb: a very long tail is not cut off early, and the shortcut stays off w
 test('lverb: deterministic: the same input and settings give the same samples', () => {
   const sig = H.testSignal(128 * 400), f = i => sig[i], over = { size: .7, decay: .6, tone: .4, pre: .02, mix: .5 };
   const a = run(over, f, 400), b = run(over, f, 400); assert.ok(bits(a.L, b.L) && bits(a.R, b.R));
-  assert.notEqual(H.hashFloats([a.L, a.R]), H.hashFloats([run(Object.assign({}, over, { size: .71 }), f, 400).L]));
+  const c2 = run(Object.assign({}, over, { size: .71 }), f, 400); assert.notEqual(H.hashFloats([a.L, a.R]), H.hashFloats([c2.L, c2.R]), 'Size changes the sound (both channels compared)');
 });
 
 test('lverb: moving every knob while it plays stays finite and click-free (no jump bigger than the signal moves anyway)', () => {

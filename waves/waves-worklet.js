@@ -1193,7 +1193,7 @@ const Lverb = {
     const dg = st.dg, wg = st.wg;
     if (st.asleep){   // nothing in the tank: copy the dry sound, wake when sound returns
       let pk = 0; for (let i = 0; i < N; i++){ let a = L[i], b = R[i]; a = a > -8 && a < 8 ? a : 0; b = b > -8 && b < 8 ? b : 0; oL[i] = a * dg; oR[i] = b * dg; const x = (a < 0 ? -a : a) + (b < 0 ? -b : b); if (x > pk) pk = x; }
-      if (pk >= LV.wake) st.asleep = false;   // sound: wake, and run this block again below with the tank (cleared) and the sound
+      if (pk >= LV.wake){ st.asleep = false; len.set(lenT); st.pre = st.preT; }   // sound: wake, and run this block again below with the tank (cleared) and the sound; a Size or Pre changed while asleep applies at once (review: nothing to crossfade from, and the old Pre let the first block through early)
       else return;
     }
     for (let i = 0; i < 4; i++) g[i] += (st.gT[i] - g[i]) * .35;
