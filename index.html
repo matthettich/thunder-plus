@@ -3372,7 +3372,7 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
         <dt>PLAY</dt><dd>play the song · SHIFT+PLAY this screen, which loops the selected rows when LOOP SEL is on</dd>
         <dt>LP. SEL</dt><dd>loop the selection (sticky); PLAY then loops it</dd>
         <dt>ALT + arrows</dt><dd>go to the nearest block that way: up / down the track, left / right along the row (Song and Phrase; PATTERN NAV in Settings)</dd>
-        <dt>SEMI + −</dt><dd>transpose the phrase selection a semitone at once</dd>
+        <dt>SEMI + −</dt><dd>transpose the phrase selection a semitone at once; on the Song / Arrange, the selected blocks (or the one under the cursor): every pattern in them once, even a pattern shared with other blocks</dd>
         <dt>GEN</dt><dd>the generators (Acid line, Euclidean fill…) for the phrase</dd>
         <dt>◀ ▶ (FX screen)</dt><dd>open the slot's controls · back to the slot list (a sideways swipe too)</dd>
         <dt>Sticky keys</dt><dd>tap SHIFT or ALT alone and it stays lit for the next button</dd>
@@ -3422,7 +3422,7 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
         <dt>Alt+L</dt><dd>loop the pattern on/off: the song repeats the row it is on (LOOP in the tab bar)</dd>
         <dt>Shift+Alt+L</dt><dd>loop the selection on/off (LOOP SEL beside it, on a computer)</dd>
         <dt>TRANSPOSE ▲▼</dt><dd>top bar: arm it, then ▲/▼ transposes the selection (Esc cancels)</dd>
-        <dt>Alt+, Alt+.</dt><dd>transpose the phrase selection down / up a semitone (works on any cell)</dd>
+        <dt>Alt+, Alt+.</dt><dd>transpose the phrase selection down / up a semitone (works on any cell); on the Song / Arrange the selected and picked blocks, else the block under the cursor (Shift+Alt for an octave). It edits the patterns themselves, so other blocks playing the same pattern change too: the message says how many</dd>
         <dt>◀ ▶ on FX</dt><dd>open the slot's controls · back to the slot list</dd>
       </dl>
     </aside>
@@ -3463,7 +3463,7 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
     </div>
     <div class="tinl tinlp" id="tInlPad" hidden aria-label="Instruments and their pads"></div>
     <div class="keys wide">
-      <span class="ksp" aria-hidden="true"></span><button type="button" class="k kw" data-b="solo" id="kSolo" title="Solo this track; tap again to un-solo">SOLO</button><button type="button" class="k kw" data-b="xposeUp" title="Transpose the phrase selection up a semitone">SEMI +</button><button type="button" class="k kw" data-b="xposeDn" title="Transpose the phrase selection down a semitone">SEMI −</button><button type="button" class="k kw" data-b="shift">SHIFT</button><button type="button" class="k kw" data-b="play" id="kPlay">PLAY</button>
+      <span class="ksp" aria-hidden="true"></span><button type="button" class="k kw" data-b="solo" id="kSolo" title="Solo this track; tap again to un-solo">SOLO</button><button type="button" class="k kw" data-b="xposeUp" title="Transpose the phrase selection up a semitone (on the Song / Arrange: the selected blocks, or the one under the cursor)">SEMI +</button><button type="button" class="k kw" data-b="xposeDn" title="Transpose the phrase selection down a semitone (on the Song / Arrange: the selected blocks, or the one under the cursor)">SEMI −</button><button type="button" class="k kw" data-b="shift">SHIFT</button><button type="button" class="k kw" data-b="play" id="kPlay">PLAY</button>
       <button type="button" class="k kw" data-b="save" id="kSave" title="Save song" aria-label="Save song"><svg class="ic ick" aria-hidden="true"><use href="#ic-save"/></svg></button><button type="button" class="k kw" data-b="mute" id="kMute" title="Mute this track; tap again to unmute">MUTE</button><button type="button" class="k kw" data-b="gen" id="kGen" title="Generate: make a pattern for this phrase, such as an Acid line or Euclidean fill…">GEN</button><button type="button" class="k kw" data-b="loop" id="kLoop" title="Loop the pattern: the song repeats the row it is on until you turn it off (Alt+L in KEYS mode)">LOOP</button><button type="button" class="k kw" data-b="opt">ALT</button><button type="button" class="k kw" data-b="edit">EDIT</button>
     </div>
     </div>
@@ -26072,24 +26072,30 @@ function xposeScope(){
     return {parts:[{p:cPhrase, y0:0, y1:plen(cPhrase) - 1, cols:own}], where:'phrase ' + hp(cPhrase)};
   }
   if (tv === 'song'){
-    const cells = selA && selA.v === 'song' ? songCells() : [[cs.song.y, cs.song.x]], by = new Map();
+    // (12 Nov, owner: "in arrangement mode, select patterns and use the transpose keys on every pattern selected") the selected blocks AND the picked ones (sxPicks), else the block under the cursor; each pattern once
+    const cells = (selA && selA.v === 'song' ? songCells() : sxPicks.length ? [] : [[cs.song.y, cs.song.x]]).concat(sxPicks.map(q => [q.y, q.t])), by = new Map(), seen = new Set(cells.map(c => c[0] + ':' + c[1]));
     for (const [y, t] of cells){ if (t === MT) continue; const cid = S.song[y] ? S.song[y][t] : -1; if (cid < 0) continue;
       for (const q of S.chains[cid] || []){ const p = q[0]; if (p < 0 || !S.phrases[p]) continue; const cols = isPolyT(t) ? NOTE_COLS : [0], o = by.get(p);
         if (!o || cols.length > o.cols.length) by.set(p, {p, y0:0, y1:plen(p) - 1, cols}); } }
     if (!by.size){ toast('No block here to transpose.'); return null; }
-    return {parts:[...by.values()], where:by.size > 1 ? by.size + ' phrases' : 'phrase ' + hp([...by.keys()][0])};
+    // "also used elsewhere": a block outside these cells plays the same pattern, so it changes too (the pattern itself is edited, as in the phrase)
+    let also = 0; { const out = new Set(); for (let y = 0; y < 256; y++) for (let t = 0; t <= MT; t++){ if (seen.has(y + ':' + t)) continue; const cid = S.song[y] ? S.song[y][t] : -1; if (cid >= 0) for (const q of S.chains[cid] || []) if (by.has(q[0])) out.add(q[0]); } also = out; }
+    return {parts:[...by.values()], where:by.size > 1 ? by.size + ' phrases' : 'phrase ' + hp([...by.keys()][0]), song:true, also};
   }
   toast('Transpose works on a phrase, or on blocks on the Song.'); return null;
 }
-function transposeSel(d, needSel){
-  if (needSel && !(selA && selA.v === tv)) return toast(`Select rows first (or ${keyHint('alt+,')} / ${keyHint('alt+.')} for the whole ${tv === 'song' ? 'block' : 'phrase'}).`);
+function transposeSel(d, needSel, songOk){
+  // songOk (the pad's SEMI keys, 12 Nov): on the Song / Arrange they work without a selection too, on the block under the cursor
+  if (needSel && !(selA && selA.v === tv) && !(tv === 'song' && (songOk || sxPicks.length))) return toast(`Select rows first (or ${keyHint('alt+,')} / ${keyHint('alt+.')} for the whole ${tv === 'song' ? 'block' : 'phrase'}).`);
   const sc = xposeScope(); if (!sc) return;
-  let moved = 0;
+  let moved = 0; const per = new Map();
   for (const q of sc.parts){ const P = S.phrases[q.p]; if (!P) continue;
     for (let y = q.y0; y <= Math.min(q.y1, P.length - 1); y++){ const row = P[y]; if (!row) continue;
-      for (const x of q.cols){ const v = row[x]; if (v >= 0 && v < 120){ const nv = clamp(v + d, 0, 119); if (nv !== v){ row[x] = nv; moved++; } } } } }
+      for (const x of q.cols){ const v = row[x]; if (v >= 0 && v < 120){ const nv = clamp(v + d, 0, 119); if (nv !== v){ row[x] = nv; moved++; per.set(q.p, (per.get(q.p) || 0) + 1); } } } } }
   if (!moved) return toast('Nothing to transpose: no notes in ' + sc.where + '.');
-  saveS(); draw();
+  saveS(); draw();   // ONE undo step for all of it (saveS), the selection stays; a playing song is told as for a phrase (saveS → coreSong)
+  if (sc.song){ const n = per.size, el = [...per.keys()].filter(p => sc.also.has(p)).length;   // (12 Nov) the Song / Arrange: patterns, not notes, and the ones other blocks play too
+    return toast(`Transposed ${n} pattern${n > 1 ? 's' : ''} ${d > 0 ? '+' : '−'}${Math.abs(d)}` + (el ? ` · ${el} ${el > 1 ? 'are' : 'is'} also used elsewhere` : ''), el ? 3000 : 1800); }
   const a = Math.abs(d);
   toast(`Transposed ${moved} note${moved > 1 ? 's' : ''} in ${sc.where} ${d > 0 ? 'up' : 'down'} ${a === 12 ? 'an octave' : a === 1 ? 'a semitone' : a + ' semitones'}`);
 }
@@ -26701,8 +26707,8 @@ function press(b, fromKey){
   if (b === 'save'){ clearTimeout(rep); saveProj(false); return; }   // SAVE (owner, 8 Nov): the same Save song as the File menu and Ctrl/⌘+S (a tap, not a key held)
   if (b === 'mute' || b === 'solo'){ clearTimeout(rep); b === 'mute' ? muteKey(true) : soloKey(); return; }   // MUTE / SOLO (owner, 8 Nov): a tap latches, a second tap undoes it
   if (b === 'gen'){ clearTimeout(rep); genMenu(); return; }   // GEN (owner, 6 Nov): the generators, under SEMI + beside LOOP
-  if (b === 'xposeUp'){ transposeSel(1, true); clearTimeout(rep); return; }
-  if (b === 'xposeDn'){ transposeSel(-1, true); clearTimeout(rep); return; }
+  if (b === 'xposeUp'){ transposeSel(1, true, true); clearTimeout(rep); return; }
+  if (b === 'xposeDn'){ transposeSel(-1, true, true); clearTimeout(rep); return; }
   const l = takeLatch();
   dirPress(b, l);
   clearTimeout(rep);
