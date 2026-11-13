@@ -620,6 +620,9 @@ The owner's top priority to add is the MOD screen. Work down the list; ask befor
 
 Start a session by asking for results. Fix on `beta`. (10 Nov, 15:10: the web beta is build 560; the build numbers in the rest of this paragraph are older.) Web beta: https://matthettich.github.io/thunder-plus/beta/ (build 547 as of 10 Nov morning, 548 once its PR merges; the night of 9–10 Nov shipped 544–547, see the four "10 Nov" entries below. Decisions the lead made that night for the owner to confirm or reverse: on a phone the saved Sequencer default plays on the Page unless Audio thread is picked on that device; on a phone the safety limiter is its stand-in until another worklet loads; the resync only runs with a worklet loaded and its margins are untested on a device). Desktop: v1.3.4-beta.2 (build 541, no feed view or scopes); further desktop betas on hold until the owner asks.
 
+**Build 573** (loop play icon)
+- [ ] Phone unfolded and computer, each skin you use: the control bar's loop play button shows a play sign inside a circular loop (with the word LOOP on the thin bar); while playing it shows the stop mark. Pass: it reads clearly at that size and lights like the other buttons.
+
 **Build 572** (top-bar Play plays the song)
 - [ ] Any device: on Phrase, Mixer and FX, press the Play button at the top by the CPU meter. Pass: the whole song plays from the cursor's song row (not just the open phrase); pressed again it stops. The three plays are now: top bar = song, control bar = loop play, pad PLAY / Space = this screen's plain play.
 
@@ -858,6 +861,10 @@ Suggested order: N0 → N1 → N2 (phone cured) → N4 with N3 alongside → N5 
   the edge `R.t0`, "waiting…" while armed), `rcdClk` / `rcdFmt` / `rcdFreeSecs`, a 250 ms timer only while recording; the
   final length stays until the next take. recorder-check covers FREE, PATTERN, Stop, next take and closing mid-take.
 
+
+## 12 Nov (late): loop play icon (build 573)
+
+Owner: "I don't really like the way the loop play button in the command/control bar looks - can we mock one up that is a play sign inside of a loop?" Three inline mock-ups; he picked A, the single circular loop. `#ic-loopplay` in the icon sprite, `.ic.iclp`, `cmdSongSet(sb)` (innerHTML only when the play state or bar width class changes); the text `▶↻` is gone from the button (the `cmdDefs` entry keeps it as the first label before the first draw). Lead, direct.
 
 ## 12 Nov (late): top-bar Play plays the song (build 572)
 

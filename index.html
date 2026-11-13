@@ -54,6 +54,7 @@ body{user-select:none; -webkit-user-select:none; -webkit-touch-callout:none}
 /* icons: drawn in the text colour with 2px lines (outline shapes), sized to the text around them */
 .ic{width:1.05em; height:1.05em; flex:none; display:inline-block; vertical-align:-.17em; fill:none; stroke:currentColor; stroke-width:2; stroke-linejoin:miter; stroke-linecap:square; overflow:visible}
 .tl .ic, .tstat .ic{margin-right:.4em}
+.ic.iclp{width:1.45em; height:1.45em; vertical-align:-.36em; stroke-linecap:round; stroke-linejoin:round}   /* LOOP PLAY (12 Nov, owner: a play sign inside a loop, his pick of three mock-ups) */
 .k .ick{width:1.35em; height:1.35em; stroke-width:1.8}
 .setg.ic{stroke-width:1.7}
 [hidden]{display:none!important}
@@ -2920,6 +2921,7 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
 <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false"><defs>
   <symbol id="ic-play" viewBox="0 0 24 24"><path d="M7 4.5 L19.5 12 L7 19.5Z"/></symbol>
   <symbol id="ic-save" viewBox="0 0 24 24"><path d="M4 4 H17.5 L20 6.5 V20 H4Z M7.5 4 V9 H16 V4 M7.5 20 V13.5 H16.5 V20"/></symbol>
+  <symbol id="ic-loopplay" viewBox="0 0 24 24"><path d="M17.79 5.11A9 9 0 1 1 7.5 4.21M4.35 3.66 7.5 4.21 6.41 7.22"/><path d="M10 8.4 16 12 10 15.6Z" fill="currentColor" stroke-width="1"/></symbol>
   <symbol id="ic-stop" viewBox="0 0 24 24"><rect x="5.5" y="5.5" width="13" height="13"/></symbol>
   <symbol id="ic-close" viewBox="0 0 24 24"><path d="M6 6 L18 18 M18 6 L6 18"/></symbol>
   <symbol id="ic-folder" viewBox="0 0 24 24"><path d="M3 6.5 V18.5 H21 V8.5 H11.5 L9.5 6.5 Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></symbol>
@@ -3429,7 +3431,7 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
         <dt>Space</dt><dd id="tLegSpace">play this screen · Shift+Space the song · with Loop on, Space loops the selected rows</dd>
         <dt>/ or \</dt><dd>mute or unmute the track you're on (the whole track, as the mixer's M; M on the Song mutes one block)</dd>
         <dt>Ctrl/⌘ / or \</dt><dd>solo the track you're on (again: unsolo it) · Ctrl/⌘+Shift+/ (or \) clears every solo</dd>
-        <dt>Ctrl+Space</dt><dd>loop play, as the control bar’s ▶↻: turns LOOP on and plays the song row, every track, looped; LOOP pressed while it plays carries on as normal play; again stops and puts LOOP back as it was (⌘+Space works too if Spotlight isn't on it)</dd>
+        <dt>Ctrl+Space</dt><dd>loop play, as the control bar’s loop play button (a play sign inside a loop): turns LOOP on and plays the song row, every track, looped; LOOP pressed while it plays carries on as normal play; again stops and puts LOOP back as it was (⌘+Space works too if Spotlight isn't on it)</dd>
         <dt>Alt+L</dt><dd>loop the pattern on/off: the song repeats the row it is on (LOOP in the tab bar)</dd>
         <dt>Shift+Alt+L</dt><dd>loop the selection on/off (LOOP SEL beside it, on a computer)</dd>
         <dt>TRANSPOSE ▲▼</dt><dd>top bar: arm it, then ▲/▼ transposes the selection (Esc cancels)</dd>
@@ -24196,7 +24198,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 572;
+const BUILD = 573;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD + (location.pathname.includes('/beta/') ? ' · beta' : '');
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -26943,7 +26945,11 @@ const CMD_PAD_SHORT = {clr:'CLR', sel:'SEL', paste:'PST', undo:'↶', redo:'↷'
 // COMMAND BAR: the Edit menu's order (undo · clipboard · select · clones · value · previous / next · play) and words.
 const CMD_MINI_ORDER = ['undo', 'redo', 'cut', 'copy', 'paste', 'clr', 'rrow', 'ins', 'sel', 'uniq', 'clone', 'cldn', 'mpat', 'b:-16', 'b:-1', 'b:1', 'b:16', 'prev', 'next', 'song'];
 const CMD_MINI_LAB = {undo:'UNDO', redo:'REDO', cut:'CUT', copy:'COPY', paste:'PASTE', clr:'CLEAR', rrow:'REMOVE', ins:'INSERT', sel:'SELECT', clone:'CLONE', cldn:'CLONE↓', mpat:'MUTE PAT', 'b:-16':'−−', 'b:-1':'−', 'b:1':'+', 'b:16':'++', prev:'‹ PREV', next:'NEXT ›'};
-const cmdSongLab = () => cmdMini() ? (tp.on ? '■ STOP' : '▶ LOOP') : tp.on ? '■' : '▶↻';   // (12 Nov, owner) loop play: the loop mark beside ▶ tells it from the pad's PLAY
+const cmdSongLab = () => cmdMini() ? (tp.on ? '■ STOP' : 'LOOP') : tp.on ? '■' : '';   // the words beside the icon (stopped: the loop play icon, cmdSongSet)
+// LOOP PLAY ICON (12 Nov, owner: "I don't really like the way the loop play button looks… a play sign inside of a loop"; he picked the single circular
+// loop): stopped, the button shows the icon (and the word LOOP on the thin bar); playing, the stop mark as before. Written only when it changes.
+function cmdSongSet(sb){ const k = (tp.on ? 'on' : 'off') + (cmdMini() ? 'm' : ''); if (sb.dataset.lk === k) return; sb.dataset.lk = k;
+  if (tp.on) sb.textContent = cmdSongLab(); else sb.innerHTML = '<svg class="ic iclp" aria-hidden="true"><use href="#ic-loopplay"/></svg>' + (cmdMini() ? ' LOOP' : ''); }
 function applyCmdOrder(){
   const host = $('tCmd'), by = {}, mini = cmdMini();
   host.querySelectorAll('button[data-c]').forEach(b => by[b.dataset.c] = b);
@@ -26954,7 +26960,7 @@ function applyCmdOrder(){
   for (const a in by){ by[a].innerHTML = (mini && CMD_MINI_LAB[a]) || (inMode === 'pad' && CMD_PAD_SHORT[a]) || lab[a]; if (!mini) by[a].title = tip[a]; }
   if (by.rrow) by.rrow.hidden = inMode === 'pad';   // (PAD's phone row is full; REMOVE is in KEYS mode's row and bar)
   cmdTipKey = '';
-  const sb = by.song; if (sb){ setText(sb, cmdSongLab()); sb.classList.toggle('on', tp.on); }
+  const sb = by.song; if (sb){ cmdSongSet(sb); sb.classList.toggle('on', tp.on); }
   if (typeof cmdBarState === 'function') cmdBarState();
 }
 const cmdHome = $('tCmd').parentNode, cmdHomeNext = $('tCmd').nextElementSibling, cmdTag = el('span', 'cmtag');
@@ -28297,7 +28303,7 @@ function draw(){
   // KEYS mode with the COMMAND BAR on: the thin bar; otherwise the COMMANDS row (both modes) as before.
   { const mini = cmdMini(), show = mini || cmdOn; if ($('tCmd').classList.contains('cmini') !== mini) applyCmdOrder();
     $('tCmd').hidden = !show; document.body.classList.toggle('cmdv', show && !mini); cmdTips(); }
-  const sb = $('tCmd').querySelector('[data-c=song]'); if (sb){ setText(sb, cmdSongLab()); sb.classList.toggle('on', tp.on); }
+  const sb = $('tCmd').querySelector('[data-c=song]'); if (sb){ cmdSongSet(sb); sb.classList.toggle('on', tp.on); }
   const onSong = tv === 'song';
   { const seq = ['song', ...(sectsOn ? ['sect'] : []), 'phrase', 'inst', 'mixer', 'fx', 'mod', 'project'];
     const TCV = {song:'#dbe6f8', sect:'#e9e0f8', phrase:'#d8f0e2', inst:'#fbe2d2', mixer:'#f6edc8', fx:'#f8dce8', mod:'#ebdcf6', project:'#d5eef2'};
@@ -33771,6 +33777,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [573, '12 Nov', ['The control bar\u2019s loop play button has a new icon: a play sign inside a loop.']],
   [572, '12 Nov', ['The Play button at the top (by the CPU meter) plays the whole song on every screen, not just the open phrase.']],
   [571, '12 Nov', ['Fixed: notes typed into a new pattern opened from an empty Arrange cell (SHIFT+\u25b6) could end up in a phrase that was on no block, so they vanished from the screen when the song played. A phrase with notes is now always put on the song.', 'Pattern view: every track\u2019s column shows its own playing row, so a track that HOPs or plays another pattern still has a playhead.', 'Rendering a song now includes blocks after a gap in a track, and tracks that come in on a later row.', 'When playback moves between the audio-thread and page sequencers, or resumes, each track carries on from its own row.', 'SHIFT+\u25bc from the Song / Arrange opens the block\u2019s phrase on a computer too (PAD mode).']],
   [570, '12 Nov', ['The control bar\u2019s Play is now LOOP play (LOOP lights; press LOOP while it plays to carry on as normal play); the pad\u2019s PLAY and Space play plain.', 'The song now wraps once for every track: a track that runs out of blocks waits and all start again together, so tracks no longer drift onto different rows. A track with a gap comes back after the gap.', 'An effect switched off by a command stays off through later patterns and when the song comes round; only STOP resets it.', 'M.PAT (and Alt-click) can mute a block on the master column: its commands are skipped, the master\u2019s sound is untouched.', 'INS: a new control bar button and Edit menu command insert an empty row below the cursor.', 'SHIFT+\u25bc from Arrange opens the block\u2019s phrase (Mobile).', 'The Mixer\u2019s MASTERING ON / OFF is now AUTO MASTER ON / OFF.', 'Clone down no longer leaves an empty row when a bus refuses the clone.', 'A change waiting to be autosaved is written before PLAY starts.']],

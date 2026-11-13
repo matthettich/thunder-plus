@@ -28,5 +28,5 @@ test('wiring: the control bar button runs it, the pad PLAY and Space do not, dra
   assert.match(src, /if \(lpW\)\{ if \(tp\.on\) lpW\.seen = true; else if \(lpW\.seen\) lpRestore\(\); \}/);
   assert.match(src, /function playKey\(shift\)\{[^\n]*tStart\('song', \{row:songRow\(\)\}\)/);
   assert.doesNotMatch(src.match(/function playKey\(shift\)\{[^\n]*/)[0], /playPatLoop/);
-  assert.match(src, /'▶ LOOP'/); assert.match(src, /'Loop play the song, or stop'/); assert.match(src, /\['song', '▶↻', 'Loop play/);
+  assert.match(src, /<symbol id="ic-loopplay"/); assert.match(src, /function cmdSongSet\(sb\)/);   // (build 573) the icon: a play sign inside a loop assert.match(src, /'Loop play the song, or stop'/); assert.match(src, /\['song', '▶↻', 'Loop play/);
 });
