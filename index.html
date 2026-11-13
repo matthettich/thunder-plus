@@ -21508,7 +21508,9 @@ function makePlayer(ac, out, getBuf, live, mo){   // mo: the master OUT gain (af
     const kv = kit.voices[ev.pad], ck = kv ? kv.choke : 0;
     if (ck) for (let k = 0; k < NT; k++) if (k !== ev.track) for (const v of vs[k]) if (v.choke === ck) kill(v, ev.t);
   }
-  function stopAll(at){ resetSeq(at); for (const v of alive) kill(v, at); for (const T of vs) T.length = 0; for (const b of bassN.values()) if (b.vox) b.sylN = 0; voxG.clear(); }   // lyrics start over
+  // (13 Nov, owner's Balanced report: "1 s after STOP … voices 1", then 2) a live engine's note never 'ends' (its node plays on; kill only lets the gate go), so it
+  // stayed in `alive` until that engine's next note: the report counted one 'voice' per live engine that had played, for good. Let go at a STOP, it is forgotten here.
+  function stopAll(at){ resetSeq(at); for (const v of alive){ kill(v, at); if (v.bass) alive.delete(v); } for (const T of vs) T.length = 0; for (const b of bassN.values()) if (b.vox) b.sylN = 0; voxG.clear(); }   // lyrics start over
   function applyMix(filter){
     const at = ac.currentTime;
     buses.forEach((b, t) => {
