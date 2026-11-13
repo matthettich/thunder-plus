@@ -300,7 +300,6 @@ function makeSeq(S, mode, o){
         } else {
           let r = Math.min(T.row, 256) - 1; while (r >= 0 && S.song[r][t] >= 0) r--;
           T.row = r + 1; T.cr = 0;
-          (api.wrapT || (api.wrapT = new Set())).add(t);   // SONG LOOP: its effect switches start again (next step)
           if (T.row > 255 || S.song[T.row][t] < 0){ T.on = false; return; }
         }
       }
@@ -362,7 +361,11 @@ function makeSeq(S, mode, o){
     return n;
   }
   // The row a track is about to play, and the value of a TIC command on it (null when there is none).
-  const r0 = (T, pid) => { const ph = pid >= 0 ? S.phrases[pid] : null; return ph ? ph[T.step] : null; };
+  // MUTED BLOCKS (owner, 12 Nov: "I could still hear fx from a pattern that was muted"): a muted song block runs its rows (timing carries on) but
+  // none of its row executes: no notes and no commands (effects, TPO, TIC, GRV / GGR, PDL, JMP, END). r0 is where every command is read from.
+  // The master column (MT) has block mutes too once the UI's masterBlockMuted(S, y) exists (until then it is false and the master plays as before).
+  const mutedAt = (t, y) => mode === 'song' && (t < MT ? blockMuted(S, y, t) : (typeof masterBlockMuted === 'function' && !!masterBlockMuted(S, y)));
+  const r0 = (T, pid) => { const ph = pid >= 0 ? S.phrases[pid] : null; if (!ph) return null; if (mode === 'song' && mutedAt(tr.indexOf(T), T.row)) return null; return ph[T.step]; };
   const ENDI = FXC.indexOf('END'), JMPI = FXC.indexOf('JMP');
   const TICI = FXC.indexOf('TIC');
   const ticCmd = r => { let v = null; for (let k = FX0; k < RW; k += 2) if (r[k] === TICI) v = Math.max(0, r[k + 1]); return v; };
@@ -399,10 +402,10 @@ function makeSeq(S, mode, o){
     if (api.btT == null){ api.btT = t0; api.bt = 0; } else { api.bt += (t0 - api.btT) * api.bpm / 60; api.btT = t0; }
     evs.push({type:'beat', t:t0, b:api.bt});
     if (perfFirst){ perfFirst = false; perfDiff(evs, t0); }   // PERFORM: the scenes and macros from the start
-    // SONG LOOP (owner, 31 Oct: an FXO 00 near the end left the master's effects off when the song came round, so its FLX
-    // did nothing): a track (or the master column) that goes back to the top of its block starts with its effect switches,
-    // patterns and gate as a fresh PLAY does; the commands on that first row then apply as usual (they come after).
-    if (api.wrapT && api.wrapT.size){ for (const t of api.wrapT) evs.push({type:'fxreset', t:t0, track:t}); api.wrapT.clear(); }
+    // EFFECT STATE PERSISTS (owner, 12 Nov: "an effect turned off or 00'd should persist as off if patterns below it are played without
+    // crossing the fx command"; old songs may change): a song wrap no longer sends 'fxreset' (it did, for each track that went back to the
+    // top of its block, since 31 Oct). What a command set holds through later patterns, wraps and LOOPs until another command changes it;
+    // only STOP puts the switches back (resetSeq in the player, the core's own stop).
     // FXO / FLX / GAT / RTG (any track, and the master column) and the master column's VOL: automation for the player.
     const fxEvs = (t, fx, at, line) => {
       // FXO XY (owner, 31 Oct): X 1–8 one slot, 9 every slot; Y 0 off, 1 on, 2–F on for Y rows then back as set. FXO 0Y puts
@@ -490,8 +493,8 @@ function makeSeq(S, mode, o){
       const ctsp = !T.empty && chRow ? chRow[1] : 0;
       pos[t] = {row:T.row, cr:T.cr, step:T.step, sect:cid, phrase:pid};
       // A muted song block still runs its rows (so tempo and timing carry on) but its notes are dropped.
-      const muted = mode === 'song' && t < MT && blockMuted(S, T.row, t), ev0 = evs.length;
-      const ph = pid >= 0 ? S.phrases[pid] : null, r = ph ? ph[T.step] : null;
+      const muted = mutedAt(t, T.row), ev0 = evs.length;
+      const ph = pid >= 0 ? S.phrases[pid] : null, r = r0(T, pid);
       let hop = -1;
       if (r){
         // Read the three FX columns left to right. REP repeats the track's last command; RND and RNL
@@ -651,7 +654,7 @@ function makeSeq(S, mode, o){
       // macro or own), in time with the song; a filter target (cut / res / dec) once a row, for the notes that start on it.
       // Several LFOs on one target add around its one value (the first LFO of a target leads; the later ones are summed into its points).
       lfoEvs(t, t0, dur); lfoRan[t] = true;
-      if (muted){ evs.length = ev0; if (T.eng != null) T.eng = ''; if (!T.mut) evs.push({type:'off', t:t0, track:t}); delete pos[t].sc; pos[t].off = true; }   // (T.eng '': what the player has is unknown now, the next step sends the state)   // entering a muted block silences what is ringing
+      if (muted){ evs.length = ev0; if (T.eng != null) T.eng = ''; if (!T.mut && t < MT) evs.push({type:'off', t:t0, track:t}); delete pos[t].sc; pos[t].off = true; }   // (T.eng '': what the player has is unknown now, the next step sends the state)   // entering a muted block silences what is ringing
       T.mut = muted;
       const L = (mode === 'song' && pid < 0) ? emptyLen() : lenOf(pid);
       // DIR: backwards, ping-pong or random steps; a pass still lasts L steps (T.cnt), so the song keeps its timing. dirGo:
