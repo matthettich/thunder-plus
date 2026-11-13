@@ -3624,7 +3624,7 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
 </div>
 <div class="toast" id="toast" role="status" aria-live="polite" title="Tap to dismiss" hidden></div>
 
-<script src="waves/waves-worklet.js?v=37"></script>
+<script src="waves/waves-worklet.js?v=38"></script>
 <!-- LXR ENGINES (23 Oct 2026): the LXR-02 firmware's drum voices, GPL-3.0, all of it in lxr/. Optional: without the folder
      this fails quietly and the app has no Firmware engines. The render Worker loads the same file (LXR_JS below). -->
 <script src="lxr/lxr-engine.js?v=2"></script>
@@ -8612,7 +8612,7 @@ self.onmessage = async e => {
       if (m.op === 'done') j.ok({data:m.data, data2:m.data2 || null, st:m.st}); else j.no(new Error(m.err));
     };
     w.onerror = e => { e.preventDefault && e.preventDefault(); rwDown(); };
-    w.postMessage({op:'init', pl:plMod, tx:txMod, lx:lxMod || null, ps:psMod || null, wv:new URL('waves/waves-worklet.js?v=37', location.href).href});
+    w.postMessage({op:'init', pl:plMod, tx:txMod, lx:lxMod || null, ps:psMod || null, wv:new URL('waves/waves-worklet.js?v=38', location.href).href});
     PW.w = w;
   } catch(e){ PW.w = null; }
 }
@@ -19292,7 +19292,7 @@ function chainsReady(ac){
     chnLoaded.set(ac, (async () => {
       await tfxLoad; await tfxModLoad; if (!chnBin() || !ac.audioWorklet || !window.AudioWorkletNode) return false;
       if (!chnURL){
-        const src = await (await fetch('chains/chains-worklet.js?v=47')).text();
+        const src = await (await fetch('chains/chains-worklet.js?v=48')).text();
         chnURL = URL.createObjectURL(new Blob([src], {type:'application/javascript'}));
       }
       wkNote(ac, 'chains'); await ac.audioWorklet.addModule(chnURL);
@@ -22169,7 +22169,7 @@ let bassURL = null; const bassLoad = new WeakMap(), bassOK = new WeakSet(), bass
 // …PUMP SYNTHS live: their worklet, loaded with the others; psSent: the contexts whose audio thread has the wasm's bytes
 const PSYN_WK = 'pump/synth/pump-synth-worklet.js?v=12', psOK = new WeakSet(), psSent = new WeakSet();
 // …WAVES LIVE: the waves worklet in the tracker's own context (thunder-wlive); wlSent: the contexts that have the wasm
-const WAVES_WK = 'waves/waves-worklet.js?v=37', wlOK = new WeakSet(), wlSent = new WeakSet();
+const WAVES_WK = 'waves/waves-worklet.js?v=38', wlOK = new WeakSet(), wlSent = new WeakSet();
 /* BATTERY (8 Nov, Fold): a bookkeeping timer that only does something in one situation (playing, the screen visible, one
    screen open) had been waking the phone 2 to 16 times a second for nothing. idleTick(fn, fast, busy, slow) calls fn every
    `fast` ms while busy() says so and every `slow` ms otherwise (fn runs either way, so its own reset-when-idle code still
@@ -24397,7 +24397,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 573;
+const BUILD = 574;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD + (location.pathname.includes('/beta/') ? ' · beta' : '');
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -34073,6 +34073,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [574, '13 Nov', ['New effect: Lite reverb, a very light room / plate reverb that costs about a fifth to a tenth of the other reverbs (Size, Decay, Tone, Pre-delay, Mix; six presets). It sleeps when nothing is going through it.', 'More synth presets: 20 new Acid presets, 7 Bass, and 4 to 6 each for sixteen other synth engines.']],
   [573, '12 Nov', ['The control bar\u2019s loop play button has a new icon: a play sign inside a loop.', 'LP.SEL, beside it, loops the selected song rows (or the cursor\u2019s row).', 'ALT+arrows between patterns no longer fights the playhead: the pattern you went to stays open and in view while you work.', 'A second PLAY tap no longer jumps the cursor to the top while you are working.', 'Mobile, pad mode: the TRANSP buttons are gone (SEMI on the pad does the same) and BPM, LPB, ROWS and REC sit in the tab row, leaving more room for the phrase and song.', 'Tap the CPU meter: a plain list of what is using the most, whether the phone is keeping up, and one thing to try.', 'The phone\u2019s media notification shows the song\u2019s real name and the app\u2019s icon.', 'The audio thread sequencer comes back by itself after a clock hiccup, once the clock has been steady; before, it stayed off until a reload.', 'The playback report records battery level and charging.']],
   [572, '12 Nov', ['The Play button at the top (by the CPU meter) plays the whole song on every screen, not just the open phrase.']],
   [571, '12 Nov', ['Fixed: notes typed into a new pattern opened from an empty Arrange cell (SHIFT+\u25b6) could end up in a phrase that was on no block, so they vanished from the screen when the song played. A phrase with notes is now always put on the song.', 'Pattern view: every track\u2019s column shows its own playing row, so a track that HOPs or plays another pattern still has a playhead.', 'Rendering a song now includes blocks after a gap in a track, and tracks that come in on a later row.', 'When playback moves between the audio-thread and page sequencers, or resumes, each track carries on from its own row.', 'SHIFT+\u25bc from the Song / Arrange opens the block\u2019s phrase on a computer too (PAD mode).']],
