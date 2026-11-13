@@ -34,3 +34,25 @@ test('synth layout: one 104px label column on the Synth page, labels wrap instea
   assert.match(src, /\.secs\{display:grid; grid-template-columns:repeat\(auto-fill,minmax\(min\(100%,322px\),1fr\)\)/);
   assert.match(src, /\.dkrows \.row|\.dkcg \.row|\.row\{display:grid; grid-template-columns:70px minmax\(0,1fr\) 64px/, 'the plain .row keeps its 70px for the deck and Settings');
 });
+
+// SYNTH UX, Phase B (13 Nov): skin accent, 40 px on touch, one control style.
+test('synth B: the accent variables exist, follow the tracker cursor, and the selected pad and layer use them', () => {
+  assert.match(src, /--acc:var\(--ink\); --acc-on:var\(--inv\);/, 'a default for the skins without an accent');
+  assert.match(src, /:root\[data-skinbase="term"\]\{--acc:var\(--mxcur, var\(--mxpoly\)\); --acc-on:var\(--mxcuron, var\(--mxon\)\)\}/, 'the term skins take the cursor colours');
+  assert.match(src, /:root:root \.pads \.pad\.sel:not\(\.hit\)\{background:var\(--acc\); color:var\(--acc-on\)/, '.pad.sel');
+  assert.match(src, /:root:root \.lcell\.sel\{background:var\(--acc\)/, '.lcell.sel');
+  assert.match(src, /\.lcell\.off\{border-style:solid; opacity:\.55\}/, 'an off layer is solid, not dashed');
+});
+
+test('synth B: 40 px buttons and 40 px arrows on touch only', () => {
+  assert.match(src, /@media \(pointer:coarse\)\{\n  :is\(#main, #synRight\) :is\(button, \.seg button, \.pickbtn, \.foldh, \.sectabs button\)\{min-height:40px\}\n  :is\(#main, #synRight\) :is\(\.engstep, \.fxpg\)\{min-width:40px\}/);
+  assert.match(src, /body\.mob :is\(#main, #synRight\) :is\(button, \.seg button, \.pickbtn, \.foldh, \.sectabs button\)\{min-height:40px\}/);
+});
+
+test('synth B: one picker for the Synth page selects, two-state rows as segments', () => {
+  assert.match(src, /function makePick\(sel, o = \{\}\)/);
+  assert.match(src, /new Event\('change', \{bubbles:true\}\)/, 'a real change event on pick');
+  for (const id of ["makePick(sel);", "makePick\\(\\$\\('fxAdd'\\)", "makePick\\(es\\)", "makePick\\(bs\\)", "makePick\\(pick, \\{skipEmpty:true\\}\\)", "makePick\\(fs\\)", "makePick\\(ps\\)", "makePick\\(pg\\)", "makePick\\(sh\\)", "makePick\\(se\\)", "makePick\\(sy\\)"]) assert.match(src, new RegExp(id.replace(/[();]/g, m => m === ';' ? ';' : '\\' + m).replace(/\\\\/g, '\\')), id);
+  assert.match(src, /function twoStateRow\(row, on\)/);
+  assert.match(src, /if \(twoOf\(U\.rows\[key\]\)\) twoStateRow\(r, on\)/, 'xBuild');
+});

@@ -8,7 +8,7 @@ const SIZES = [['1920', 1920, 1080], ['1440', 1440, 900], ['1280', 1280, 800], [
 for (const [n, width, height, mobile] of SIZES) {
   const B = await boot({ width, height, mobile: !!mobile });
   try {
-    if (skin) await app(B.page, `(() => { try { localStorage.setItem(SKK, ${JSON.stringify(skin)}); applySkin(); } catch(e){ return String(e); } })()`);
+    if (skin) await app(B.page, `(() => { try { localStorage.setItem(SKK, ${JSON.stringify(skin)}); applySkin(${JSON.stringify(skin)}); } catch(e){ return String(e); } })()`);
     await app(B.page, `(() => { setView('synth'); select(${+pad}); })()`); await B.page.waitForTimeout(1200);
     const h = await B.page.evaluate(() => { const m = document.getElementById('main'); return { doc: document.documentElement.scrollHeight, main: m ? m.scrollHeight : 0, eng: (() => { const e = document.getElementById('vEngBtn') || document.getElementById('vEngine'); return e ? Math.round(e.getBoundingClientRect().top) : null; })() }; });
     await B.page.screenshot({ path: path.join(out, `synth-${tag}-${n}.png`) });
