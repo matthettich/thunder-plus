@@ -38,12 +38,12 @@ button{cursor:pointer}
 /* ---------- top bar ---------- */
 .bar{display:flex; flex-wrap:wrap; align-items:center; gap:8px; padding:9px 12px; background:var(--panel);
   border-bottom:1px solid var(--edge); white-space:nowrap; position:relative; z-index:6}
-.bar h1{font-size:19px; font-weight:600; margin:0 6px 0 0; letter-spacing:-.01em}
+.bar h1{font-size:17px; font-weight:600; margin:0 6px 0 0; letter-spacing:-.01em}
 .bar .spacer{flex:1}
 .embed .bar h1{display:none}
 .embed .setwrap{display:none}   /* File/Settings live in the app's top bar when embedded */
 .embed #cpuv{display:none}   /* the app's top bar owns the CPU readout */
-.pname{width:140px; padding:5px 8px; border:1px solid transparent; background:transparent; font-size:15px; font-weight:500}
+.pname{width:140px; padding:5px 8px; border:1px solid transparent; background:transparent; font-size:14px; font-weight:500}
 .pname:hover{border-color:var(--edge)}
 .pname:focus{border-color:var(--muted); background:var(--panel-2); outline:none}
 .vsep{width:1px; align-self:stretch; background:var(--edge); margin:0 2px}
@@ -52,8 +52,9 @@ button{cursor:pointer}
 .tb.on{background:#111; color:#fff; border-color:#111}
 .tb.small{padding:3px 9px; font-size:12.5px}
 .tb:disabled{opacity:.4; cursor:default}
-.fps{font-size:13px; font-variant-numeric:tabular-nums; padding:6px 9px; border:1px solid var(--edge); color:var(--muted); line-height:1.2; white-space:nowrap}
-.fps.good{color:#2e9e5b; border-color:#2e9e5b} .fps.ok{color:#c99a00; border-color:#c99a00} .fps.low{color:var(--rec); border-color:var(--rec)}
+.fps{font-size:12.5px; font-variant-numeric:tabular-nums; padding:6px 9px; border:1px solid var(--edge); color:var(--muted); line-height:1.2; white-space:nowrap}
+/* U8 (13 Nov): the readout's green, amber and red are mixed with the skin's ink, so they keep 4.5 : 1 on a white page and on a dark skin alike (the amber was 2.6 : 1) */
+.fps.good{--c:color-mix(in srgb, #1f8a4c 55%, var(--ink)); color:var(--c); border-color:var(--c)} .fps.ok{--c:color-mix(in srgb, #b07a00 45%, var(--ink)); color:var(--c); border-color:var(--c)} .fps.low{--c:color-mix(in srgb, var(--rec) 60%, var(--ink)); color:var(--c); border-color:var(--c)}
 .meters{display:inline-flex; align-items:center; gap:3px; padding:6px 8px}
 .meters .b{width:12px; height:9px; background:var(--track); position:relative; overflow:hidden}
 .meters .b i{position:absolute; inset:0; transform-origin:left; background:var(--audio); transform:scaleX(0)}
@@ -70,20 +71,20 @@ button{cursor:pointer}
 .fitem{display:flex; justify-content:space-between; align-items:center; gap:12px; border:0; background:none; padding:7px 10px; font-size:14px; text-align:left; color:var(--ink)}
 .fitem:hover:not(:disabled){background:var(--panel-2)}
 .fitem:disabled{opacity:.4}
-.fitem kbd{font:inherit; font-size:12px; color:var(--muted)}
+.fitem kbd{font:inherit; font-size:12.5px; color:var(--muted)}
 .setsec{padding:8px 8px 10px; display:grid; gap:10px}
 .setsec + .setsec{border-top:1px solid var(--edge)}
 .sethead{font-weight:600; font-size:14px}
 .setrow{display:grid; grid-template-columns:auto 1fr; gap:10px; align-items:start; font-size:14px; cursor:pointer}
 .setrow input{margin-top:3px; width:16px; height:16px; accent-color:var(--ink)}
 .setsub{font-size:12.5px; color:var(--muted); font-weight:400}
-.setsel{display:grid; grid-template-columns:78px 1fr; gap:8px; align-items:center; font-size:13.5px}
+.setsel{display:grid; grid-template-columns:78px 1fr; gap:8px; align-items:center; font-size:14px}
 .bklist{display:grid; gap:5px}
 .bkrow{display:grid; grid-template-columns:1fr auto; gap:8px; align-items:center; font-size:12.5px}
 .bkrow .btn{padding:3px 9px; font-size:12.5px}
 .ctxmenu .qainp{margin:2px 2px 6px; padding:6px 8px; font:inherit; min-width:240px}   /* QUICK ADD */
 .ctxmenu .qalist{display:grid; min-height:0} .ctxmenu .ctxitem.qa1{font-weight:600}
-.ctxmenu{position:fixed; z-index:2000000; min-width:220px; padding:4px; background:var(--panel); border:1px solid #111; display:grid}
+.ctxmenu{position:fixed; z-index:2000000; min-width:220px; padding:4px; background:var(--panel); border:1px solid #111; display:grid; max-height:calc(100vh - 16px); overflow-y:auto; overscroll-behavior:contain}
 .ctxitem{border:0; background:none; text-align:left; padding:7px 12px; font-size:14px}
 .ctxitem:hover{background:var(--panel-2)}
 .ctxitem:disabled{opacity:.4}
@@ -105,17 +106,17 @@ button{cursor:pointer}
 .palette{position:absolute; left:38px; top:0; bottom:0; width:300px; display:grid; grid-template-rows:auto minmax(0,1fr); min-height:0;
   background:var(--side); border-right:1px solid var(--edge); box-shadow:8px 0 24px rgba(0,0,0,.18); user-select:none; -webkit-user-select:none}
 .palette > header{display:flex; align-items:center; justify-content:space-between; gap:10px; padding:8px 12px; border-bottom:1px solid var(--edge)}
-.palette > header span:first-child{font-weight:600; font-size:15px}
+.palette > header span:first-child{font-weight:600; font-size:14px}
 .dresize{position:absolute; top:0; bottom:0; width:8px; cursor:col-resize; z-index:5}
 .drawer.collapsed .dresize{display:none}
 .plist{overflow-y:auto; overscroll-behavior:contain; padding:8px 10px 12px}
 .quick{padding:10px 10px 12px; margin:-8px -10px 8px; border-bottom:1px solid var(--edge); background:var(--side)}
 .qhead{display:flex; justify-content:space-between; align-items:baseline; gap:10px; margin:0 2px 8px}
-.qt{font-weight:600; font-size:14.5px}
+.qt{font-weight:600; font-size:14px}
 .qhint{color:var(--muted); font-size:12.5px}
 .qgrid{display:grid; grid-template-columns:repeat(auto-fill, minmax(130px, 1fr)); gap:6px}
-.qempty{color:var(--muted); font-size:13px; padding:4px 2px}
-.psection{margin:16px 2px 6px; font-size:12px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:var(--muted); border-bottom:1px solid var(--edge); padding-bottom:4px}
+.qempty{color:var(--muted); font-size:12.5px; padding:4px 2px}
+.psection{margin:16px 2px 6px; font-size:12.5px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:var(--muted); border-bottom:1px solid var(--edge); padding-bottom:4px}
 .pgroup{display:flex; align-items:center; gap:8px; width:100%; margin:4px 0; padding:8px 8px; border:2.5px solid var(--edge); background:#fff; color:var(--ink); font-size:14px; font-weight:600; text-align:left}
 .pgroup.tinted{background:color-mix(in srgb, #fff 64%, var(--edge) 36%)}
 .pgroup.tinted:hover{background:color-mix(in srgb, #fff 50%, var(--edge) 50%)}
@@ -123,14 +124,14 @@ button{cursor:pointer}
 .pgroup.allgrp:hover{background:#e1e4e9}
 .pgroup .chev{width:8px; height:8px; border-right:2px solid var(--ink); border-bottom:2px solid var(--ink); transform:rotate(-45deg); transition:transform .15s; margin:0 4px 0 2px; flex:none; opacity:.7}
 .pgroup.open .chev{transform:rotate(45deg)}
-.pgroup .pcount{margin-left:auto; color:var(--muted); font-size:12.5px; font-weight:400}
+.pgroup .pcount{margin-left:auto; color:var(--ink); font-size:12.5px; font-weight:400}   /* (U8: the muted grey was 4.3 : 1 on a tinted group header) */
 .pgrid{display:grid; grid-template-columns:repeat(auto-fill, minmax(150px, 1fr)); gap:4px; padding:2px 0 8px}
 .pwrap{position:relative; display:grid}
 .pwrap .pitem{padding-right:30px}
 .pitem{display:flex; align-items:center; gap:9px; width:100%; text-align:left; padding:8px 10px; border:2.5px solid var(--edge); background:#fff; color:var(--ink); touch-action:pan-y; cursor:grab}
 .pitem:hover{background:var(--panel-2)}
-.pitem.big{padding:11px 30px 11px 12px; font-size:15px; font-weight:500}
-.pstar,.qx{position:absolute; right:4px; top:50%; transform:translateY(-50%); width:24px; height:24px; padding:0; border:0; background:none; color:var(--muted); font-size:15px; line-height:24px; text-align:center}
+.pitem.big{padding:11px 30px 11px 12px; font-size:14px; font-weight:500}
+.pstar,.qx{position:absolute; right:4px; top:50%; transform:translateY(-50%); width:24px; height:24px; padding:0; border:0; background:none; color:var(--muted); font-size:14px; line-height:24px; text-align:center}
 .pstar{opacity:.35}
 .pwrap:hover .pstar, .pstar:focus-visible, .pstar.on{opacity:1}
 .pstar.on{color:#d79b16}
@@ -169,9 +170,9 @@ svg.cables rect.bend{fill:var(--panel); stroke:var(--ink); stroke-width:1.5; vec
 svg.cables g:hover > rect.bend, svg.cables g.sel > rect.bend, body.alting svg.cables rect.bend{opacity:1; pointer-events:all}
 
 .node{position:absolute; width:250px; background:var(--panel); border:3.5px solid var(--edge); user-select:none; -webkit-user-select:none; cursor:default}
-.node > header{display:flex; align-items:center; gap:8px; padding:7px 8px 7px 12px; cursor:grab; border-bottom:2px solid var(--edge); touch-action:none}
-.node > header .t{flex:1; font-weight:600; font-size:17px; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
-.node > header .x{border:0; background:none; color:var(--muted); font-size:19px; line-height:1; width:26px; height:26px; flex:none}
+.node > header{display:flex; align-items:center; gap:4px; padding:7px 8px 7px 12px; cursor:grab; border-bottom:2px solid var(--edge); touch-action:none}
+.node > header .t{flex:1; font-weight:600; font-size:17px; line-height:1.15; min-width:0; overflow-wrap:break-word; hyphens:auto}   /* U7 (13 Nov): a long name wraps to a second line, never "Tape de…"; in a wide monospace skin a very long word is hyphenated, not cut */
+.node > header .x{border:0; background:none; color:var(--muted); font-size:17px; line-height:1; width:26px; height:26px; flex:none}
 .node > header .x:hover{background:var(--panel-2); color:var(--ink)}
 .node > header .fold{border:0; background:none; color:var(--muted); width:20px; height:22px; margin-left:-6px; padding:0; display:grid; place-items:center; flex:none}
 .node > header .fold:hover{background:var(--panel-2); color:var(--ink)}
@@ -184,14 +185,14 @@ svg.cables g:hover > rect.bend, svg.cables g.sel > rect.bend, body.alting svg.ca
 .node.collapsed > header{padding:4px 8px 2px 12px; border-bottom:0}
 .node.collapsed > header .x{width:22px; height:22px}
 .csum{display:none}
-.node.collapsed > .csum{display:flex; align-items:center; gap:6px; position:relative; padding:2px 12px 5px; font-size:12px; line-height:16px; min-height:22px}
+.node.collapsed > .csum{display:flex; align-items:center; gap:6px; position:relative; padding:2px 12px 5px; font-size:12.5px; line-height:16px; min-height:22px}
 .cs-t{flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--ink)}
 .cs-l{color:var(--muted)}
 .cs-i + .cs-i::before{content:' · '; color:var(--muted); white-space:pre}
 .cs-i.modded .cs-v{color:var(--mod); font-weight:600}
 .cs-m{display:flex; align-items:center; gap:5px; flex:none}
 .cs-m:empty{display:none}
-.mk{font-style:normal; font-size:10.5px; font-weight:700; line-height:1; letter-spacing:.04em; color:var(--muted)}
+.mk{font-style:normal; font-size:11px; font-weight:700; line-height:1; letter-spacing:.04em; color:var(--muted)}
 .mk.dk{width:6px; height:6px; border-radius:50%; background:var(--mod)}
 .mk.cc{color:var(--gate)}
 button.mk.more{border:1px solid var(--muted); background:none; padding:2px 5px; min-height:0}
@@ -201,7 +202,7 @@ button.mk.more:hover{color:var(--ink); border-color:var(--ink)}
 .node.collapsed > .ports{padding:2px 0 4px; border-bottom:0; gap:8px}
 .node.collapsed > .ports.none, .node:not(.collapsed) > .ports.synth{display:none}
 .node.collapsed .ins, .node.collapsed .outs{grid-auto-flow:column; grid-template-rows:repeat(2, auto); gap:2px 24px}   /* two rows, then a new column */
-.node.collapsed .port{height:20px; gap:5px; font-size:12px}
+.node.collapsed .port{height:20px; gap:5px; font-size:12.5px}
 .node.collapsed .port.free{display:none}
 .node.collapsed .port > .pl{min-width:0; max-width:56px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
 .node.collapsed .jack{transform:scale(.85)}
@@ -217,7 +218,7 @@ button.mk.more:hover{color:var(--ink); border-color:var(--ink)}
 
 .ports{display:flex; justify-content:space-between; gap:10px; padding:7px 0; border-bottom:2px solid var(--edge)}
 .ins,.outs{display:grid; gap:4px; align-content:start}
-.port{display:flex; align-items:center; gap:7px; height:24px; color:var(--muted); font-size:13px}
+.port{display:flex; align-items:center; gap:7px; height:24px; color:var(--muted); font-size:12.5px}
 .ins .port{margin-left:-10px}
 .outs .port{margin-right:-10px; flex-direction:row-reverse}
 .jack{width:20px; height:20px; border-radius:50%; flex:none; cursor:crosshair; touch-action:none;
@@ -237,18 +238,18 @@ button.mk.more:hover{color:var(--ink); border-color:var(--ink)}
 .port .pm[data-kind="mod"] b{background:var(--mod)} .port .pm[data-kind="gate"] b{background:var(--gate)}
 
 .body{display:grid; gap:9px; padding:10px 12px 12px}
-.row{display:grid; grid-template-columns:70px 1fr 64px; align-items:center; gap:8px; font-size:12.5px; letter-spacing:-.01em; min-height:24px; position:relative}
+.row{display:grid; grid-template-columns:70px minmax(0,1fr) minmax(64px,max-content); align-items:center; gap:8px; font-size:12.5px; letter-spacing:-.01em; min-height:24px; position:relative}
 .row.wide{grid-template-columns:70px 1fr}
 .row > span:first-child{color:var(--muted); line-height:1.15; overflow-wrap:anywhere; hyphens:auto}
-.row .val{text-align:right; font-variant-numeric:tabular-nums; cursor:text}
+.row .val{text-align:right; font-variant-numeric:tabular-nums; cursor:text; white-space:nowrap}
 .rng{position:relative; display:grid; align-items:center}
 .mark{position:absolute; bottom:-5px; width:3px; height:6px; margin-left:-1.5px; border-radius:1px; background:var(--mod); pointer-events:none}
 .row.modded .val{color:var(--mod); font-weight:600}
 .cmval{position:absolute; right:24px; top:50%; transform:translateY(-50%); font-size:11px; font-weight:600; background:var(--mod); color:#fff; padding:1px 7px; pointer-events:none; max-width:60%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
-.numsmall{width:90px; padding:4px 6px; border:1px solid #111; background:#fff; font-size:13px}
-.valedit{width:100%; padding:1px 4px; font-size:13px; text-align:right; background:var(--panel); border:1px solid var(--muted); color:var(--ink)}
+.numsmall{width:90px; padding:4px 6px; border:1px solid #111; background:#fff; font-size:12.5px}
+.valedit{width:100%; padding:1px 4px; font-size:12.5px; text-align:right; background:var(--panel); border:1px solid var(--muted); color:var(--ink)}
 input[type=range]{width:100%; accent-color:#111; margin:0}
-select{width:100%; padding:4px 6px; background:#fff; border:1px solid #111; font-size:13px; min-width:0}
+select{width:100%; padding:4px 6px; background:#fff; border:1px solid #111; font-size:12.5px; min-width:0}
 .btn{padding:6px 10px; border:1px solid #111; background:#fff; font-weight:500}
 .btn:hover{border-color:var(--muted)}
 .status{font-size:12.5px; color:var(--muted); white-space:pre-line; min-height:1.2em; overflow-wrap:anywhere}
@@ -261,15 +262,15 @@ body.learning .row.sl{outline:1px dashed var(--muted); outline-offset:3px}
 .row.sl.armed{outline:2px solid var(--gate) !important; outline-offset:3px}
 .row.sl.mapped > .lbl::after{content:" •"; color:var(--gate); font-weight:700}
 .learnbar{position:fixed; left:50%; top:64px; transform:translateX(-50%); z-index:1000002; display:flex; gap:12px; align-items:center;
-  max-width:calc(100% - 24px); padding:8px 8px 8px 14px; background:var(--gate); color:#fff; font-size:13.5px}
+  max-width:calc(100% - 24px); padding:8px 8px 8px 14px; background:var(--gate); color:#fff; font-size:14px}
 .learnbar .tb{background:rgba(255,255,255,.18); border-color:rgba(255,255,255,.4); color:#fff}
 
 /* groups drawn on the patch */
 .decor{position:absolute; z-index:1; user-select:none; -webkit-user-select:none}
 .decor.box{border:2px solid; pointer-events:none}
 .decor.box > *{pointer-events:auto}
-.decor.box .dtext{padding:6px 36px 6px 10px; font-weight:600; font-size:15px; cursor:move; display:block; min-height:31px; color:#1f2328; overflow:hidden; white-space:nowrap; text-overflow:ellipsis}
-.dx{position:absolute; top:4px; right:4px; width:23px; height:23px; padding:0; border:0; background:rgba(20,22,26,.6); color:#fff; font-size:16px; line-height:23px; text-align:center; opacity:0; transition:opacity .12s; z-index:1}
+.decor.box .dtext{padding:6px 36px 6px 10px; font-weight:600; font-size:14px; cursor:move; display:block; min-height:31px; color:#1f2328; overflow:hidden; white-space:nowrap; text-overflow:ellipsis}
+.dx{position:absolute; top:4px; right:4px; width:23px; height:23px; padding:0; border:0; background:rgba(20,22,26,.6); color:#fff; font-size:17px; line-height:23px; text-align:center; opacity:0; transition:opacity .12s; z-index:1}
 .decor:hover .dx, .dx:focus-visible{opacity:1}
 .dx:hover{background:var(--rec)}
 @media (hover: none){ .dx{opacity:1} }
@@ -277,25 +278,33 @@ body.learning .row.sl{outline:1px dashed var(--muted); outline-offset:3px}
 .lasso{position:absolute; border:1.5px dashed var(--video); background:rgba(227,150,42,.08); z-index:1000002; pointer-events:none}
 .hint{position:absolute; left:12px; bottom:12px; max-width:min(62ch, calc(100% - 200px)); padding:7px 10px;
   font-size:12.5px; color:var(--muted); background:var(--panel); border:1px solid #111; z-index:1000001; display:flex; gap:10px; align-items:start}
-.hint button{border:0; background:none; color:var(--muted); font-size:16px; line-height:1; padding:0}
+.hint button{border:0; background:none; color:var(--muted); font-size:17px; line-height:1; padding:0}
 /* The tip box never blocks the patch under it (jacks at the bottom of a module sat beneath it): only its close button takes touches. */
 .hint{pointer-events:none; opacity:.92} .hint button{pointer-events:auto}
-@media (pointer: coarse){ .hint button{min-width:36px; min-height:36px; font-size:20px} }
+/* T11 (13 Nov, audit): on a touch screen the tip is a short touch-only note (no Option, right-click or Shift), open on the first visit and a small "Tips" button after that */
+.hint .tipt, .hint .hintpill{display:none}
+@media (pointer: coarse){
+  .hint .tipm{display:none} .hint .tipt{display:block}
+  .hint{top:10px; bottom:auto; left:10px; max-width:min(46ch, calc(100% - 24px))}   /* the top: waves' on-screen keys sit along the bottom */
+  .hint.min{padding:0; border:0; background:none; opacity:1} .hint.min .tipt, .hint.min #hintx{display:none}
+  .hint.min .hintpill{display:block; min-width:56px; min-height:40px; padding:0 12px; border:1px solid #111; background:var(--panel); color:var(--ink); font-weight:600}
+}
+@media (pointer: coarse){ .hint button{min-width:36px; min-height:36px; font-size:17px} }
 .toast{position:absolute; left:50%; top:14px; transform:translateX(-50%); background:var(--ink); color:var(--panel);
-  padding:7px 12px; font-size:13px; z-index:1000002; pointer-events:none; max-width:90%}
+  padding:7px 12px; font-size:12.5px; z-index:1000002; pointer-events:none; max-width:90%}
 .emptylbl{position:absolute; left:50%; top:50%; transform:translate(-50%, -50%); z-index:0; pointer-events:none; font-family:var(--font); font-weight:700; font-size:clamp(34px, 6vw, 76px); letter-spacing:.02em; white-space:nowrap}
 .dock{position:absolute; right:10px; display:grid; gap:6px; justify-items:end; z-index:1000001}
 .dock.bottom{bottom:10px}
-.dockport{display:flex; align-items:center; gap:8px; padding:4px 5px 4px 10px; background:var(--panel); border:1px solid #111; font-size:13px; color:var(--ink); user-select:none; -webkit-user-select:none}
+.dockport{display:flex; align-items:center; gap:8px; padding:4px 5px 4px 10px; background:var(--panel); border:1px solid #111; font-size:12.5px; color:var(--ink); user-select:none; -webkit-user-select:none}
 .touchkeys{display:flex; gap:3px}
-.touchkeys button{font-size:12px; padding:6px 0; width:30px; border:1px solid #111; background:#fff; touch-action:none}
+.touchkeys button{font-size:12.5px; padding:6px 0; width:30px; border:1px solid #111; background:#fff; touch-action:none}
 .touchkeys button.on{background:#111; color:#fff}
 
 /* dialogs and help */
 .dlgov{position:fixed; inset:0; z-index:4000000; background:rgba(0,0,0,.28); display:grid; place-items:center}
 .dlg{background:var(--panel); border:1px solid #111; padding:18px 20px; width:min(420px, 92vw); display:grid; gap:12px}
-.dlg p{margin:0; font-size:15px; line-height:1.45}
-.dlginput{font-size:15px; padding:7px 9px; border:1px solid var(--edge); background:var(--panel-2); color:var(--ink)}
+.dlg p{margin:0; font-size:14px; line-height:1.45}
+.dlginput{font-size:14px; padding:7px 9px; border:1px solid var(--edge); background:var(--panel-2); color:var(--ink)}
 .dlgbtns{display:flex; justify-content:flex-end; gap:8px}
 .helpov{position:fixed; inset:24px; z-index:3000000; background:#ececec; border:3px solid #111; box-shadow:0 20px 60px rgba(0,0,0,.35)}
 .helpov iframe{width:100%; height:100%; border:0; display:block}
@@ -307,12 +316,12 @@ body.learning .row.sl{outline:1px dashed var(--muted); outline-offset:3px}
   .jack{position:relative} .jack::before{content:''; position:absolute; inset:-9px; border-radius:50%} .jack[data-kind="gate"]::before{inset:-11px}
   svg.cables .hit{stroke-width:calc(26px * var(--iz, 1))}
   .tb, .btn{min-height:42px}
-  select, input{font-size:16px}
+  select, input{font-size:17px}
   input[type=range]{height:34px}
   .row{min-height:40px}
   .touchkeys button{min-height:42px; width:34px}
 }
-@media (max-width: 1340px){ .bar .zoomctl #zoomfit, .bar .vsep{display:none} .bar h1{font-size:17px} .bar .pname{width:96px; font-size:14px} .bar .fps{font-size:12px; padding:5px 6px} }
+@media (max-width: 1340px){ .bar .zoomctl #zoomfit, .bar .vsep{display:none} .bar h1{font-size:17px} .bar .pname{width:96px; font-size:14px} .bar .fps{font-size:12.5px; padding:5px 6px} }
 @media (max-width: 760px){ .bar .meters, #vcount{display:none} .hint{max-width:calc(100% - 24px)} }
 /* An instrument, not a web page: no text selection, no long-press callout and no browser pinch-zoom anywhere.
    Chrome's tap-to-search sheet (the Google search that slid up from the bottom) only opens on selectable text,
@@ -373,7 +382,7 @@ document.addEventListener('contextmenu', e => { if (e.cancelable && !(e.target.c
   <div class="spacer"></div>
   <span class="fps" id="cpuv" title="How busy the sound engine is">CPU –</span>
   <span class="fps" id="vcount" title="Notes sounding now">0 voices</span>
-  <span class="fps meters" id="meters" title="Out 1–8"></span>
+  <span class="fps meters" id="meters" title="Waves In 1–8"></span>
   <button class="tb" id="midilearn">MIDI learn</button>
   <div class="zoomctl"><button class="tb" id="zoomout" aria-label="Zoom out">−</button><button class="tb" id="zoomval" title="Click to type a zoom level">100%</button><button class="tb" id="zoomin" aria-label="Zoom in">+</button><button class="tb" id="zoomfit">Fit</button></div>
 </div>
@@ -391,7 +400,7 @@ document.addEventListener('contextmenu', e => { if (e.cancelable && !(e.target.c
     <div id="groups"></div>
     <svg class="cables" id="cables" xmlns="http://www.w3.org/2000/svg"></svg>
   </div>
-  <div class="hint" id="hint"><span>Drag from an output jack to an input jack to patch (on a touch screen you can also tap one jack, then the other; double-tap a cable to remove it). Every slider has a small purple jack on its left: patch an LFO, envelope or any other signal into it to move that slider. Drag a patched input to move its cable, or drop it on empty space to unplug. Hold Option (Alt on Windows) and click while drawing a cable to bend it, or Option-drag an existing cable. Click a cable to select it (Delete removes it, and its bend handles show: drag one to move the bend), double-click it to remove it, or a module’s title bar to collapse it. Gate cables are dotted and gate jacks are diamonds. Drag the background or scroll with two fingers to pan, and pinch to zoom. Shift-click or Shift-drag to select modules, then right-click to group them. Play notes on your computer keyboard: Z to M and Q to P, with - and = for octaves.</span><button id="hintx" aria-label="Hide tips">×</button></div>
+  <div class="hint" id="hint"><span class="tipm">Drag from an output jack to an input jack to patch (on a touch screen you can also tap one jack, then the other; double-tap a cable to remove it). Every slider has a small purple jack on its left: patch an LFO, envelope or any other signal into it to move that slider. Drag a patched input to move its cable, or drop it on empty space to unplug. Hold Option (Alt on Windows) and click while drawing a cable to bend it, or Option-drag an existing cable. Click a cable to select it (Delete removes it, and its bend handles show: drag one to move the bend), double-click it to remove it, or a module’s title bar to collapse it. Gate cables are dotted and gate jacks are diamonds. Drag the background or scroll with two fingers to pan, and pinch to zoom. Shift-click or Shift-drag to select modules, then right-click to group them. Play notes on your computer keyboard: Z to M and Q to P, with - and = for octaves.</span><span class="tipt">Tap a jack, then another jack, to patch. Tap a cable to select it; double-tap it to remove it. Drag the background to pan and pinch to zoom. Tap the arrow on a title bar to fold a module.</span><button id="hintx" aria-label="Hide tips">×</button><button id="hintpill" class="hintpill" aria-label="Show tips" aria-expanded="false">Tips</button></div>
   <div class="dock bottom" id="dockbot"><div class="dockport" id="keysdock" hidden><span>Keys</span><span class="touchkeys" id="touchkeys"></span></div></div>
   <div class="lasso" id="lasso" hidden></div>
   <div class="emptylbl" id="emptylbl" aria-hidden="true" hidden></div>
@@ -492,21 +501,21 @@ const SHARED_MODULES = {
     ui:{ air:{l:'Air', f:v => (v >= .5 ? '+' : '') + Math.round((v - .5) * 200) + '%'}, gnd:{l:'Ground', f:v => (v >= .5 ? '+' : '') + Math.round((v - .5) * 200) + '%'} } },
   room:{ label:'Room reverb', fx:true, params:{ size:[0.5,0,1,.01], sustain:[0.5,0,1,.01], mulch:[0.5,0,1,.01], wet:[0.35,0,1,.01] },
     ui:{ size:{l:'Size', f:v => Math.round(v * 100) + '%'}, sustain:{l:'Sustain', f:v => Math.round(v * 100) + '%'}, mulch:{l:'Mulch', f:v => Math.round(v * 100) + '%'}, wet:{l:'Wet', f:v => Math.round(v * 100) + '%'} } },
-  envfol:{ label:'Envelope Follow', scope:'mono', inputs:{ in:'audio' }, outputs:{ out:'cv', gate:'gate' },
+  envfol:{ label:'Envelope follow', scope:'mono', inputs:{ in:'audio' }, outputs:{ out:'cv', gate:'gate' },
     params:{ atk:[.01,0,1,.001], rel:[.15,0,2,.001], gain:[2,0,16,.01], thr:[.3,0,1,.001], mode:[0,0,1,1] },
     ui:{ atk:{l:'Attack', f:secs}, rel:{l:'Release', f:secs}, gain:{l:'Gain', f:times}, thr:{l:'Gate level', f:pct}, mode:{l:'Detect', c:opts(['Peak','Squared'])} } },
-  gateex:{ label:'Gate Extract', scope:'mono', inputs:{ in:'audio' }, outputs:{ out:'gate', env:'cv' },
+  gateex:{ label:'Gate extract', scope:'mono', inputs:{ in:'audio' }, outputs:{ out:'gate', env:'cv' },
     params:{ thr:[.1,0,1,.001], hyst:[.25,0,1,.01], rel:[.05,0,1,.001] },
     ui:{ thr:{l:'Threshold', f:pct}, hyst:{l:'Hysteresis', f:pct}, rel:{l:'Release', f:secs} } },
-  pitchfol:{ label:'Pitch Follow', scope:'mono', inputs:{ in:'audio' }, outputs:{ out:'cv', gate:'gate' },
+  pitchfol:{ label:'Pitch follow', scope:'mono', inputs:{ in:'audio' }, outputs:{ out:'cv', gate:'gate' },
     params:{ thr:[.02,0,1,.001], glide:[.05,0,.5,.001], depth:[1,0,1,.01], min:[60,40,500,1], max:[1400,100,4000,1] },
     ui:{ thr:{l:'Threshold', f:pct}, glide:{l:'Glide', f:secs}, depth:{l:'Depth', f:pct}, min:{l:'Min', f:hz}, max:{l:'Max', f:hz} } },
-  pitchtrk:{ label:'Pitch Track', scope:'mono', inputs:{ in:'audio' }, outputs:{ out:'cv', note:'cv', gate:'gate', trig:'gate', env:'cv' },
+  pitchtrk:{ label:'Pitch track', scope:'mono', inputs:{ in:'audio' }, outputs:{ out:'cv', note:'cv', gate:'gate', trig:'gate', env:'cv' },
     params:{ sens:[.15,.03,.5,.01], thr:[.02,0,1,.001], glide:[.03,0,.5,.001], trans:[0,-24,24,1], min:[60,30,500,1], max:[1200,100,3000,1], depth:[1,0,1,.01] },
     ui:{ sens:{l:'Sensitivity', f:pct}, thr:{l:'Threshold', f:pct}, glide:{l:'Glide', f:secs}, trans:{l:'Transpose', f:v => (v > 0 ? '+' : '') + Math.round(v) + ' st'}, min:{l:'Lowest', f:hz}, max:{l:'Highest', f:hz}, depth:{l:'Depth', f:pct} } },
   slew:{ label:'Slew limiter', scope:'mono', inputs:{ in:'cv' }, outputs:{ out:'cv' },
     params:{ up:[.05,0,1,.001], dn:[.05,0,1,.001] }, ui:{ up:{l:'Rise', f:secs}, dn:{l:'Fall', f:secs} } },
-  snh:{ label:'Sample & Hold', scope:'mono', inputs:{ in:'cv', trig:'gate' }, outputs:{ out:'cv', noise:'cv' },
+  snh:{ label:'Sample & hold', scope:'mono', inputs:{ in:'cv', trig:'gate' }, outputs:{ out:'cv', noise:'cv' },
     params:{ rate:[4,.05,40,.01], smooth:[0,0,1,.01], depth:[1,0,1,.01] },
     ui:{ rate:{l:'Rate', f:hz}, smooth:{l:'Smooth', f:pct}, depth:{l:'Depth', f:pct} } },
   quant:{ label:'Quantizer', scope:'mono', inputs:{ in:'cv' }, outputs:{ out:'cv' },
@@ -555,15 +564,15 @@ const SHARED_ABOUT = {
   air:'Air (based on Airwindows Air3): lifts (or cuts) the very top end with Air and the low body with Ground.',
   room:'Room reverb (based on Airwindows Verbity2): a natural room or hall; Mulch darkens and thickens it.',
   envfol:'Turns sound into modulation: the louder the input, the higher the output. Attack and Release set how quickly it follows; Gate level sets where its gate output turns on. Patch the output into any slider’s modulation jack (a filter’s cutoff, say) and the sound drives it.',
-  gateex:'Turns sound into a gate: on while the input stays above Threshold, off when it falls (Hysteresis stops it chattering). Env is a smoothed version. Use it to trigger envelopes, clocks or Sample & Hold from audio.',
-  pitchtrk:'Tracks the pitch of a monophonic sound (a voice, a bass line, a whistle) more steadily than Pitch Follow, and gives it as Pitch (glides) and Note (snapped to the nearest semitone), both 0.5 = A4 and one octave = 0.125, plus Gate while it hears a pitch, Trig on each new note and Env, the level. Patch Note into an oscillator\u2019s pitch to double a voice, Trig into an envelope, or Pitch into a filter so it follows the singer. Transpose shifts both.',
+  gateex:'Turns sound into a gate: on while the input stays above Threshold, off when it falls (Hysteresis stops it chattering). Env is a smoothed version. Use it to trigger envelopes, clocks or Sample & hold from audio.',
+  pitchtrk:'Tracks the pitch of a monophonic sound (a voice, a bass line, a whistle) more steadily than Pitch follow, and gives it as Pitch (glides) and Note (snapped to the nearest semitone), both 0.5 = A4 and one octave = 0.125, plus Gate while it hears a pitch, Trig on each new note and Env, the level. Patch Note into an oscillator\u2019s pitch to double a voice, Trig into an envelope, or Pitch into a filter so it follows the singer. Transpose shifts both.',
   pitchfol:'Follows the pitch of a monophonic sound and outputs it as modulation (0.5 = A4, one octave = 0.125), plus a voiced Gate. Best on simple tones. Patch it into an oscillator’s pitch on waves, or into a Quantizer here.',
-  slew:'Slows a modulation signal down, with separate Rise and Fall times. Smooths stepped or jittery control voltages.',
-  snh:'Sample & Hold: takes a snapshot of the input on a Trigger rising edge (or at Rate) and holds it; Noise outputs a matching random step. Patch a stepped sequence into a filter for classic sample-and-hold sweeps.',
-  quant:'Snaps a pitch modulation signal to the nearest note of a Scale (pitch CV: 0.5 = A4). Transpose shifts it in semitones; Depth scales the output.',
-  blades:'A multimode filter that can be gentle or driven. Cutoff, Resonance and Drive, Mode picks low-pass, band-pass, high-pass or notch, and Slope picks 2-pole or 4-pole (steeper). Patch modulation into Cutoff for sweeps; a resonance CV jack is on the slider too.',
+  slew:'Slows a modulation signal down, with separate Rise and Fall times. Smooths stepped or jittery control signals.',
+  snh:'Sample & hold: takes a snapshot of the input on a Trigger rising edge (or at Rate) and holds it; Noise outputs a matching random step. Patch a stepped sequence into a filter for classic sample-and-hold sweeps.',
+  quant:'Snaps a pitch modulation signal to the nearest note of a Scale (pitch control: 0.5 = A4). Transpose shifts it in semitones; Depth scales the output.',
+  blades:'A multimode filter that can be gentle or driven. Cutoff, Resonance and Drive, Mode picks low-pass, band-pass, high-pass or notch, and Slope picks 2-pole or 4-pole (steeper). Patch modulation into Cutoff for sweeps; a resonance control jack is on the slider too.',
   meta:'Takes two sounds and combines them. Crossfade blends In and Mod, Ring mod multiplies them (bell-like sums), Wave fold bends In through a sine shaper (Amount sets the folding), and Comparator flips In’s sign with Mod — audio-rate logic. Mix sets the dry/wet.',
-  phaser:'Sweeps notches through the sound: Stages sets how deep the notches are, Rate (or Sync to tempo) sweeps them, Depth and Feedback set how far and how sharp, and a CV input drives the sweep too.',
+  phaser:'Sweeps notches through the sound: Stages sets how deep the notches are, Rate (or Sync to tempo) sweeps them, Depth and Feedback set how far and how sharp, and a control input drives the sweep too.',
   width:'Sets the stereo width from mono (0%) through normal (100%) to extra-wide (200%) with a mid/side control. Bass mono collapses the low end to the center so wide sounds keep their punch. In R is optional.',
   pingpong:'A stereo delay that bounces left to right. Sync to tempo picks a Division (1/16…1 bar), or turn Sync off and set Time. Repeats, Tone and Mix shape it. In R is optional.',
 };
@@ -597,7 +606,7 @@ Object.assign(SHARED_MODULES, {
     about:'Ensemble: a lush chorus. Ensemble spreads three voices around the stereo field with a little shimmer, like a string machine; Classic I, II and I+II are the wide two-speed chorus of 80s polysynths. Rate and Depth scale whichever you pick.' }, STEREO),
   math:{ label:'Math', scope:'mono', inputs:{ a:'cv', b:'cv' }, outputs:{ sum:'cv', diff:'cv', mul:'cv', min:'cv', max:'cv' },
     params:{ ka:[0,-1,1,.01], kb:[0,-1,1,.01] }, ui:{ ka:{l:'A', f:v => v.toFixed(2)}, kb:{l:'B', f:v => v.toFixed(2)} },
-    about:'Math: A and B (each input plus its knob, so a knob alone is a fixed value) give A+B, A−B, A×B, the smaller and the larger. Multiply an LFO by an envelope, offset a CV, or combine two modulators.' },
+    about:'Math: A and B (each input plus its knob, so a knob alone is a fixed value) give A+B, A−B, A×B, the smaller and the larger. Multiply an LFO by an envelope, offset a control signal, or combine two modulators.' },
   logic:{ label:'Logic', scope:'mono', inputs:{ a:'gate', b:'gate' }, outputs:{ and:'gate', or:'gate', xor:'gate', not:'gate' },
     params:{ thr:[.5,.05,.95,.01] }, ui:{ thr:{l:'Threshold', f:pct} },
     about:'Logic: two gates in, AND, OR, XOR and NOT A out. Combine rhythms: AND keeps the hits two patterns share, XOR the ones they don’t.' },
@@ -628,18 +637,20 @@ Object.assign(SHARED_FAMILY, { meter:'util', limiter:'util', utility:'util', rin
   reson:'afx', degrade:'afx', blipdrum:'gen', life:'mod', dimension:'afx', bbd:'afx', harm:'afx', phaser:'afx', width:'afx', pingpong:'afx', blades:'util', meta:'afx', math:'mod', logic:'mod', divider:'mod', euclid:'mod',
   envfol:'mod', gateex:'mod', pitchfol:'mod', pitchtrk:'mod', slew:'util', snh:'util', quant:'util' });
 const SHARED_PORT_LABEL = { note:'Note', trig:'Trig', env:'Env', car:'Carrier', freq:'Freq', a:'A', b:'B', sum:'A+B', diff:'A−B', mul:'A×B', min:'Min', max:'Max',
-  and:'AND', or:'OR', xor:'XOR', not:'NOT A', d2:'÷2', d4:'÷4', d8:'÷8', n:'÷N', accent:'Accent', time:'Time' };
+  and:'AND', or:'OR', xor:'XOR', not:'NOT A', d2:'÷2', d4:'÷4', d8:'÷8', n:'÷N', accent:'Accent', time:'Time',
+  // U3 (13 Nov): ports that showed their raw key (Blades res, Meta mod, Flex and Step gate pat, Sample & hold noise, Clock ramp and bar)
+  res:'Resonance', mod:'Modulator', pat:'Pattern', noise:'Noise', ramp:'Ramp', bar:'Bar' };
 /* Palette groups: added to an existing group of the same name, or made (audio groups before Control, the rest at the end).
    A module already in the palette is left where it is. */
 const SHARED_PALETTE = [
-  ['Effects', [['reson','Resonator (chord)'],['degrade','Degrade (lo-fi)'],['dimension','Dimension (stereo chorus)'],['bbd','BBD delay'],['harm','Harmonizer'],['ringmod','Ring mod'],['ensemble','Ensemble chorus'],['phaser','Phaser'],['pingpong','Ping-pong delay'],['meta','Meta modulator'],['beads','Beads']], 'audio'],
+  ['Effects', [['reson','Resonator'],['degrade','Degrade'],['dimension','Dimension'],['bbd','BBD delay'],['harm','Harmonizer'],['ringmod','Ring mod'],['ensemble','Ensemble'],['phaser','Phaser'],['pingpong','Ping-pong delay'],['meta','Meta modulator'],['beads','Beads']], 'audio'],
   ['Reverbs', [['spring','Spring reverb'],['plate','Plate reverb'],['lverb','Lite reverb'],['room','Room reverb'],['space','Space reverb']], 'audio'],
   ['More effects', [['comb','Comb resonator'],['transient','Transient shaper'],['tgate','Trance gate'],['ott','Multiband squash'],['fshift','Frequency shifter'],['vinyl','Vinyl'],['dub','Dub tape'],['cab','Speaker cab'],['tube','Tube'],['flanger','Flanger'],['tremolo','Tremolo'],['odrive','Overdrive'],['folder','Wavefolder'],['autowah','Auto-wah'],['pshift','Pitch shifter'],['ladder','Ladder filter'],['xmod','Cross-mod'],['lofi','Lo-fi'],['drive','Drive'],['air','Air']], 'audio'],
   ['Filters and amps', [['blades','Blades filter']], 'audio'],
-  ['Utilities', [['meter','Meter (VU)'],['limiter','Limiter'],['utility','Utility (gain, pan)']], 'audio'],
+  ['Utilities', [['meter','Meter'],['limiter','Limiter'],['utility','Utility']], 'audio'],
   ['Stereo', [['width','Width']], 'audio'],
-  ['Audio followers', [['envfol','Envelope Follow'],['gateex','Gate Extract'],['pitchfol','Pitch Follow'],['pitchtrk','Pitch Track']], 'control'],
-  ['CV utilities', [['slew','Slew limiter'],['snh','Sample & Hold'],['quant','Quantizer'],['math','Math']], 'control'],
+  ['Audio followers', [['envfol','Envelope follow'],['gateex','Gate extract'],['pitchfol','Pitch follow'],['pitchtrk','Pitch track']], 'control'],
+  ['Control utilities', [['slew','Slew limiter'],['snh','Sample & hold'],['quant','Quantizer'],['math','Math']], 'control'],
   ['Rhythm and logic', [['euclid','Euclidean'],['divider','Clock divider'],['logic','Logic']], 'control']
 ];
 /* Blip drum and Life: their parameters match the worklet's exactly (same tables). */
@@ -683,15 +694,15 @@ SHARED_MODULES.reson = { label:'Resonator', scope:'mono', inputs:{ in:'audio', i
   ui:{ note:{l:'Note', f:v => NOTE_NAMES[((Math.round(v) % 12) + 12) % 12] + (Math.floor(Math.round(v) / 12) - 1)},
     chord:{l:'Chord', c:opts(['Unison', 'Octaves', 'Fifths', 'Major', 'Minor', 'Sus4', 'Major 7', 'Minor 7', 'Dominant 7', 'Fourths', 'Harmonics', 'Cluster'])},
     mode:{l:'Type', c:opts(['String', 'Tube'])}, decay:{l:'Decay', f:pct}, bright:{l:'Bright', f:pct}, spread:{l:'Spread', f:pct}, mix:{l:'Mix', f:wet} },
-  about:'Resonator: up to five tuned resonators ringing at Note and a Chord above it (octaves, fifths, major, minor, sevenths, fourths, harmonics…), so drums, noise or a voice ring out in harmony. String rings with every harmonic, Tube only the odd ones (hollow, like a pipe). Decay sets how long they ring, Bright how much top end survives, Spread places the voices across the stereo field. Patch a pitch CV into Note to play it (a Sequencer, Steps, Pitch Follow…); the Note knob then transposes it (C3 = as played).' };
+  about:'Resonator: up to five tuned resonators ringing at Note and a Chord above it (octaves, fifths, major, minor, sevenths, fourths, harmonics…), so drums, noise or a voice ring out in harmony. String rings with every harmonic, Tube only the odd ones (hollow, like a pipe). Decay sets how long they ring, Bright how much top end survives, Spread places the voices across the stereo field. Patch a pitch control into Note to play it (a Sequencer, Steps, Pitch follow…); the Note knob then transposes it (C3 = as played).' };
 SHARED_MODULES.degrade = Object.assign({ label:'Degrade', scope:'mono', params:{ bits:[24, 1, 24, .1], rate:[1, 0, 1, .001], noise:[.15, 0, 1, .01], color:[.3, 0, 1, .01], follow:[.6, 0, 1, .01], dry:[0, 0, 1, .01], wet:[1, 0, 1, .01] },
   ui:{ bits:{l:'Bits', f:v => v >= 23.5 ? 'Off' : v.toFixed(1) + ' bit'}, rate:{l:'Rate', f:v => v >= .999 ? 'Off' : khz(300 * Math.pow(160, v))},
     noise:{l:'Noise', f:v => v < .005 ? 'Off' : (20 * Math.log10(v * v * .25)).toFixed(1) + ' dB'}, color:{l:'Color', f:v => v < .02 ? 'White' : v > .98 ? 'Dark' : pct(v) + ' dark'},
     follow:{l:'Follow', f:pct}, dry:{l:'Dry', f:pct}, wet:{l:'Wet', f:pct} },
   about:'Degrade: lo-fi in one box, after the classic tracker lofi plugins. Bits crushes (24 is off), Rate lowers the sample rate (the top is off), and Noise adds a floor of hiss, from a whisper up to −12 dB: Color darkens it from white, and Follow makes it track the sound, so it breathes with the notes and silence stays clean. A little Noise on a soft sine helps it stand out in a mix. Dry and Wet are separate.' }, STEREO);
 Object.assign(SHARED_PORT_LABEL, { t1:'1', t2:'2', t3:'3', t4:'4', t5:'5', t6:'6', t7:'7', t8:'8', g1:'1', g2:'2', g3:'3', g4:'4', g5:'5', g6:'6', g7:'7', g8:'8', any:'Any', count:'Count' });
-SHARED_PALETTE.push(['Drums', [['blipdrum', 'Blip drum (8 voices)']], 'audio']);
-SHARED_PALETTE.find(g => g[0] === 'Rhythm and logic')[1].unshift(['life', 'Life (Game of Life)']);
+SHARED_PALETTE.push(['Drums', [['blipdrum', 'Blip drum']], 'audio']);
+SHARED_PALETTE.find(g => g[0] === 'Rhythm and logic')[1].unshift(['life', 'Life']);
 
 /* The bar editor (Blip drum) and the grid (Life). */
 const bdNorm = (r, v) => { const [, mn, mx] = BD_DEF[r]; return BD_LOG[r] ? Math.log(v / mn) / Math.log(mx / mn) : (v - mn) / (mx - mn); };
@@ -760,7 +771,7 @@ function drawLife(n){
     }
   }
   if (live && S.x >= 0 && S.x < W){ g.fillStyle = '#fff'; g.globalAlpha = .28; g.fillRect(S.x * cw, 0, cw, H); g.globalAlpha = 1; }
-  g.fillStyle = cs.getPropertyValue('--muted') || '#888'; g.font = '10px sans-serif'; if (live) g.fillText('gen ' + S.gen, Wd - 44, H - 3);
+  g.fillStyle = cs.getPropertyValue('--muted') || '#888'; g.font = '11px sans-serif'; if (live) g.fillText('gen ' + S.gen, Wd - 44, H - 3);
 }
 // Redraw the bars and grids a few times a second (edits from sliders, menus and undo show up too).
 setInterval(() => { if (napping()) return; for (const n of nodes.values()) if (n.show && (n.show.kind === 'bars' || n.show.kind === 'life') && n.el.isConnected){
@@ -794,7 +805,7 @@ Object.assign(SHARED_MODULES, {
 });
 Object.assign(SHARED_FAMILY, { spectral:'afx', stretch:'afx', convolve:'afx' });
 // Palette: Spectral and Extreme stretch join "Effects"; Convolution reverb joins "Reverbs".
-SHARED_PALETTE.find(g => g[0] === 'Effects')[1].push(['spectral', 'Spectral (FFT)'], ['stretch', 'Extreme stretch']);
+SHARED_PALETTE.find(g => g[0] === 'Effects')[1].push(['spectral', 'Spectral'], ['stretch', 'Extreme stretch']);
 SHARED_PALETTE.find(g => g[0] === 'Reverbs')[1].push(['convolve', 'Convolution reverb']);
 
 /* Editor entries for chains/index.html, to paste inside the SHARED EDITOR block (after the existing
@@ -809,14 +820,14 @@ Object.assign(SHARED_MODULES, {
     params:{ key:[0,0,11,1], scale:[0,0,8,1], speed:[.025,0,.4,.001], humanize:[0,0,1,.01], trans:[0,-12,12,1], mix:[1,0,1,.01] },
     ui:Object.assign({ key:{l:'Key', c:opts(NOTE_NAMES)}, scale:{l:'Scale', c:opts(PC_SCALE_NAMES)},
       speed:{l:'Speed', f:v => v < .0005 ? 'Snap (0 ms)' : secs(v)}, humanize:{l:'Humanize', f:pct}, trans:{l:'Transpose', f:semis} }, MIXP),
-    about:'Pitch correct: tunes a solo voice or instrument (one note at a time) to the nearest note of Key and Scale. Speed is how fast it pulls each note in tune: Snap (0 ms) jumps straight there for the hard, stepped robot-voice effect; 20–50 ms is a tight modern vocal; a few hundred ms only nudges, for a natural sound. Humanize leaves held notes more freedom, so vibrato and natural drift survive while the note still lands in tune. Transpose moves the tuned voice up or down. Breaths, consonants and quiet passages go through untouched. Patch a pitch CV (a sequencer, Steps, a keyboard) into Note to set the notes yourself: the voice then sings whatever you play. Pitch outputs the pitch it hears as CV (0.5 = A4) and Gate is high while it hears a note.' },
+    about:'Pitch correct: tunes a solo voice or instrument (one note at a time) to the nearest note of Key and Scale. Speed is how fast it pulls each note in tune: Snap (0 ms) jumps straight there for the hard, stepped robot-voice effect; 20–50 ms is a tight modern vocal; a few hundred ms only nudges, for a natural sound. Humanize leaves held notes more freedom, so vibrato and natural drift survive while the note still lands in tune. Transpose moves the tuned voice up or down. Breaths, consonants and quiet passages go through untouched. Patch a pitch control (a sequencer, Steps, a keyboard) into Note to set the notes yourself: the voice then sings whatever you play. Pitch outputs the pitch it hears as a control signal (0.5 = A4) and Gate is high while it hears a note.' },
   vowel:{ label:'Vowel filter', scope:'mono', inputs:{ in:'audio', inR:'audio', vowel:'cv' }, outputs:{ out:'audio', outR:'audio' },
     params:{ vowel:[0,0,4,.01], voice:[0,0,2,.01], shift:[0,-1,1,.01], res:[.5,0,1,.01], rate:[.5,.05,10,.01], depth:[0,0,1,.01], env:[0,-1,1,.01], drive:[0,0,1,.01], mix:[1,0,1,.01] },
     ui:Object.assign({ vowel:{l:'Vowel', f:v => { const i = Math.round(v); return Math.abs(v - i) < .08 ? 'AEIOU'[i] : 'AEIOU'[Math.floor(v)] + '→' + 'AEIOU'[Math.min(4, Math.floor(v) + 1)]; }},
       voice:{l:'Voice', f:v => v < .15 ? 'Man' : v > 1.85 ? 'Child' : Math.abs(v - 1) < .15 ? 'Woman' : v.toFixed(2)},
       shift:{l:'Shift', f:v => (v > 0 ? '+' : '') + Math.round(v * 12) + ' st'}, res:{l:'Resonance', f:pct}, rate:{l:'LFO rate', f:hz}, depth:{l:'LFO depth', f:pct},
       env:{l:'Env', f:spct}, drive:{l:'Drive', f:pct} }, MIXP),
-    about:'Vowel filter: makes any sound “talk”. Three resonant peaks sit where a voice’s formants are for the vowel A, E, I, O or U (from the classic Peterson & Barney measurements), and Vowel morphs smoothly between them. Voice picks a man’s, a woman’s or a child’s mouth, Shift moves every formant up or down, and Resonance makes the peaks sharper and more vocal. The LFO sweeps the vowel by itself (“wah-yah-yow”), Env moves it with how loud you play (negative goes the other way) and the Vowel input adds a CV on top. Drive gives thin sounds more harmonics to shape. Rich sounds work best: saws, pads, noise, drums.' },
+    about:'Vowel filter: makes any sound “talk”. Three resonant peaks sit where a voice’s formants are for the vowel A, E, I, O or U (from the classic Peterson & Barney measurements), and Vowel morphs smoothly between them. Voice picks a man’s, a woman’s or a child’s mouth, Shift moves every formant up or down, and Resonance makes the peaks sharper and more vocal. The LFO sweeps the vowel by itself (“wah-yah-yow”), Env moves it with how loud you play (negative goes the other way) and the Vowel input adds a control signal on top. Drive gives thin sounds more harmonics to shape. Rich sounds work best: saws, pads, noise, drums.' },
   rotary:{ label:'Rotary speaker', scope:'mono', inputs:{ in:'audio', inR:'audio', fast:'gate' }, outputs:{ out:'audio', outR:'audio' },
     params:{ speed:[1,0,2,1], accel:[.5,0,1,.01], drive:[.2,0,1,.01], balance:[0,-1,1,.01], spread:[.8,0,1,.01], mix:[1,0,1,.01] },
     ui:Object.assign({ speed:{l:'Speed', c:opts(['Stop', 'Slow', 'Fast'])}, accel:{l:'Accel', f:pct}, drive:{l:'Drive', f:pct},
@@ -846,7 +857,7 @@ Object.assign(SHARED_MODULES, {
 });
 Object.assign(SHARED_FAMILY, { autotune:'afx', vowel:'afx', rotary:'afx', gdelay:'afx', reverse:'afx', envfilt:'afx' });
 Object.assign(SHARED_PORT_LABEL, { vowel:'Vowel', fast:'Fast', pitch:'Pitch', gate:'Gate', sc:'SC' });
-SHARED_PALETTE.push(['Voice and filters', [['autotune', 'Pitch correct'], ['vowel', 'Vowel filter'], ['envfilt', 'Envelope filter (auto-wah)']], 'audio']);
+SHARED_PALETTE.push(['Voice and filters', [['autotune', 'Pitch correct'], ['vowel', 'Vowel filter'], ['envfilt', 'Envelope filter']], 'audio']);
 SHARED_PALETTE.find(g => g[0] === 'Effects')[1].push(['rotary', 'Rotary speaker'], ['gdelay', 'Granular delay'], ['reverse', 'Reverse echo']);
 
 /* ═══ Bytebeat + Chaos: editor entries for chains / waves (Oct 2026) ═══
@@ -867,14 +878,14 @@ Object.assign(SHARED_MODULES, {
   chaos:{ label:'Chaos', scope:'mono', inputs:{ rate:'cv', reset:'gate' }, outputs:{ x:'cv', y:'cv', z:'cv', out:'audio', trig:'gate' },
     params:{ model:[0,0,6,1], rate:[.35,0,1,.001], chaos:[.6,0,1,.01], smooth:[0,0,1,.01], level:[.8,0,1,.01] },
     ui:{ model:{l:'Model', c:opts(CHAOS_MODELS)}, rate:{l:'Rate', f:chaosHz}, chaos:{l:'Chaos', f:pct}, smooth:{l:'Smooth', f:v => v < .005 ? 'Off' : pct(v)}, level:{l:'Level', f:pct} },
-    about:'Chaos: a chaotic system (the Lorenz butterfly, Rössler, Chua’s double scroll, Thomas, a forced Duffing spring, and the Logistic and Hénon maps) that never quite repeats. Slow (Rate below a few Hz) it is a modulation source that wanders but stays in its shape: patch X, Y and Z (about ±1 each) into anything. Fast (Rate in the hundreds of Hz) Out is a gritty, unstable oscillator with a pitch near Rate (X, or Z for Lorenz, whose X flips from lobe to lobe). Chaos goes from an orderly loop (low) to full chaos (high); some models jump between lobes, so X swings from side to side. Trig fires each time X crosses zero going up: a rhythm that drifts. Smooth rounds everything off. Rate CV adds ±4 octaves; Reset starts it again from the same point.' }
+    about:'Chaos: a chaotic system (the Lorenz butterfly, Rössler, Chua’s double scroll, Thomas, a forced Duffing spring, and the Logistic and Hénon maps) that never quite repeats. Slow (Rate below a few Hz) it is a modulation source that wanders but stays in its shape: patch X, Y and Z (about ±1 each) into anything. Fast (Rate in the hundreds of Hz) Out is a gritty, unstable oscillator with a pitch near Rate (X, or Z for Lorenz, whose X flips from lobe to lobe). Chaos goes from an orderly loop (low) to full chaos (high); some models jump between lobes, so X swings from side to side. Trig fires each time X crosses zero going up: a rhythm that drifts. Smooth rounds everything off. The Rate input adds ±4 octaves; Reset starts it again from the same point.' }
 });
 Object.assign(SHARED_FAMILY, { bytebeat:'gen', chaos:'mod' });
 Object.assign(SHARED_PORT_LABEL, { x:'X', y:'Y', z:'Z', rate:'Rate' });
 // Sound sources: waves has this group (its own VCO, FM…); chains gets it made (an audio group, before Control).
 SHARED_PALETTE.push(['Sound sources', [['bytebeat', 'Bytebeat']], 'audio']);
 // Chaos: with the modulation sources (both editors already have the group; GROUP_FAM marks it 'mod').
-SHARED_PALETTE.push(['Modulation sources', [['chaos', 'Chaos (Lorenz, Rössler…)']], 'control']);
+SHARED_PALETTE.push(['Modulation sources', [['chaos', 'Chaos']], 'control']);
 /* Notes for the integrator:
    - chains has no 'Sound sources' group: mergeShared makes it before §Control, and its family falls back to 'afx'
      for the group colour unless 'Sound sources':'gen' is added to the fallback map inside mergeShared
@@ -906,11 +917,11 @@ Object.assign(SHARED_MODULES, {
       glen:{l:'Gate length', f:pct}, grand:{l:'Length random', f:pct},
       tdv:{l:'T déjà vu', c:opts(['Off', 'On', 'Locked'])}, xdv:{l:'X déjà vu', c:opts(['Off', 'On', 'Locked'])},
       xmode:{l:'X mode', c:opts(['Identical', 'Bump', 'Tilt'])}, xclk:{l:'X clock', c:opts(['t1, t2, t3', 'All on t1', 'All on t2', 'All on t3'])},
-      xout:{l:'X out', c:opts(['Pitch', 'CV'])},
+      xout:{l:'X out', c:opts(['Pitch', 'Control'])},
       ydiv:{l:'Y rate', c:opts(['÷64', '÷48', '÷32', '÷24', '÷16', '÷12', '÷8', '÷6', '÷4', '÷3', '÷2', '÷1'])},
       yspread:{l:'Y spread', f:pct}, ybias:{l:'Y bias', f:pct}, ysteps:{l:'Y steps', f:mbSteps},
       yrange:{l:'Y range', c:opts(['0…+2 V', '0…+5 V', '±5 V'])} },
-    about:'Random generator (based on Mutable Instruments Marbles): random gates and random voltages that can repeat. It ticks once per Step at the song tempo, times Rate (or on each pulse at Clock, which Rate then divides or multiplies), and starts over when the song starts and on Reset. t2 fires on every tick; Model and Bias decide how t1 and t3 share the ticks (a coin toss, clusters, drum patterns, a divider, Markov…), Jitter pushes them off the grid and Gate length sets their length. X1–X3 take a new value on t1, t2 and t3 (X clock or the X clock input changes that): Spread and X bias shape the odds, Steps glides between values to the left and snaps them to Scale to the right (further right, only the strongest notes). Déjà vu at 0 is always new; at the middle it loops the last Loop length values, rhythm and notes; above it shuffles the loop. X out as Pitch: 1 V per octave, 0.125 an octave with 0 V = C4 (A4 is 0.5), shifted by X octave; as CV: −1…1. Y is a slower random voltage, every Y-rate ticks of t2.' },
+    about:'Random generator (based on Mutable Instruments Marbles): random gates and random voltages that can repeat. It ticks once per Step at the song tempo, times Rate (or on each pulse at Clock, which Rate then divides or multiplies), and starts over when the song starts and on Reset. t2 fires on every tick; Model and Bias decide how t1 and t3 share the ticks (a coin toss, clusters, drum patterns, a divider, Markov…), Jitter pushes them off the grid and Gate length sets their length. X1–X3 take a new value on t1, t2 and t3 (X clock or the X clock input changes that): Spread and X bias shape the odds, Steps glides between values to the left and snaps them to Scale to the right (further right, only the strongest notes). Déjà vu at 0 is always new; at the middle it loops the last Loop length values, rhythm and notes; above it shuffles the loop. X out as Pitch: 1 V per octave, 0.125 an octave with 0 V = C4 (A4 is 0.5), shifted by X octave; as control: −1…1. Y is a slower random voltage, every Y-rate ticks of t2.' },
   tides:{ label:'Function generator', scope:'mono', inputs:{ trig:'gate', clock:'gate', pitch:'cv' },
     outputs:{ out1:'cv', out2:'cv', out3:'cv', out4:'cv' },
     params:{ mode:[1,0,2,1], output:[0,0,3,1], range:[0,0,1,1], freq:[-105.38,-192,36,.01], shape:[.5,0,1,.01], slope:[.5,0,1,.01],
@@ -966,9 +977,9 @@ Object.assign(SHARED_MODULES, {
     about:'Pitch reverb: Shimmer feeds the tail back through a pitch shifter so it climbs into a glowing wash; Pitched is the reverb of the shifted sound; Dual adds two intervals to the tail (Pitch and Pitch 2).' }
 });
 Object.assign(SHARED_FAMILY, { flex:'afx', sgate:'afx', retrig:'afx', pdelay:'afx', preverb:'afx' });
-SHARED_PALETTE.push(['Rhythmic effects', [['flex', 'Flex (beat re-sequencer)'], ['sgate', 'Step gate'], ['retrig', 'Retrigger (stutter)']], 'audio']);
+SHARED_PALETTE.push(['Rhythmic effects', [['flex', 'Flex'], ['sgate', 'Step gate'], ['retrig', 'Retrigger']], 'audio']);
 SHARED_PALETTE.find(g => g[0] === 'Effects')[1].push(['pdelay', 'Pitch delay']);
-SHARED_PALETTE.find(g => g[0] === 'Reverbs')[1].push(['preverb', 'Pitch reverb (shimmer)']);
+SHARED_PALETTE.find(g => g[0] === 'Reverbs')[1].push(['preverb', 'Pitch reverb']);
 
 /* Basic studio effects (Oct 2026): Simple delay, Filter, Low and high cut, Classic compressor, Noise gate, Auto-pan, Pump */
 const SD_NAMES = ['1/32', '1/16T', '1/16', '1/16D', '1/8T', '1/8', '1/8D', '1/4T', '1/4', '1/4D', '1/2', '1 bar'];
@@ -1011,25 +1022,25 @@ Object.assign(SHARED_MODULES, {
       release:{l:'Release', f:v => Math.round(v * 100) + '% of the step'}, curve:{l:'Curve', f:pct} },
     about:'Pump: the “sidechain” duck without a sidechain. On every quarter note (or Every) the level drops by Depth and comes back over Release, a share of the step; Curve goes from a straight line to a fast early recovery. The pumping of a kick-ducked pad or bass, locked to the song.' }, STEREO)
 });
-/* Bus Comp and Glue Comp (20 Oct): stereo bus compressors with a sidechain input. */
+/* Bus comp and Glue comp (20 Oct): stereo bus compressors with a sidechain input. */
 const BC_RELN = ['0.1 s', '0.3 s', '0.6 s', '1.2 s', 'Auto'], BC_HPFN = ['Off', '60 Hz', '90 Hz', '150 Hz', '250 Hz'];
 Object.assign(SHARED_MODULES, {
-  buscomp:Object.assign({ label:'Bus Comp', scope:'mono',
+  buscomp:Object.assign({ label:'Bus comp', scope:'mono',
     params:{ thresh:[-12,-40,0,.1], ratio:[1,0,2,1], attack:[4,0,5,1], release:[4,0,4,1], makeup:[0,0,20,.1], schpf:[0,0,4,1], sck:SCK_P, mix:[1,0,1,.01] },
     ui:Object.assign({ thresh:{l:'Threshold', f:db}, ratio:{l:'Ratio', c:opts(['2:1', '4:1', '10:1'])}, attack:{l:'Attack', c:opts(['0.1 ms', '0.3 ms', '1 ms', '3 ms', '10 ms', '30 ms'])},
       release:{l:'Release', c:opts(BC_RELN)}, makeup:{l:'Makeup', f:db}, schpf:{l:'SC high-pass', c:opts(BC_HPFN)}, sck:{l:'Source', fixed:true, c:SCK_OPTS('Self')} }, MIXP), display:'dyn',
-    about:'Bus Comp: the punchy console bus compressor for a group or the mix, both sides together. Ratio 2, 4 or 10:1, Attack and Release in the classic steps (Auto release follows the music: quick after a hit, slower while it holds), Makeup to bring the level back. SC high-pass keeps the lows out of what it listens to, so a kick or bass doesn’t pump everything. It listens to its own sound, or Source: another track’s own sound or a send (one bus ducking another); a cable into SC always wins. Mix for parallel compression; the meter shows the gain reduction.' }, SC_IO),
-  glue:Object.assign({ label:'Glue Comp', scope:'mono',
+    about:'Bus comp: the punchy console bus compressor for a group or the mix, both sides together. Ratio 2, 4 or 10:1, Attack and Release in the classic steps (Auto release follows the music: quick after a hit, slower while it holds), Makeup to bring the level back. SC high-pass keeps the lows out of what it listens to, so a kick or bass doesn’t pump everything. It listens to its own sound, or Source: another track’s own sound or a send (one bus ducking another); a cable into SC always wins. Mix for parallel compression; the meter shows the gain reduction.' }, SC_IO),
+  glue:Object.assign({ label:'Glue comp', scope:'mono',
     params:{ thresh:[-15,-40,0,.1], ratio:[2,1,10,.1], attack:[.01,.0001,.03,.0001], release:[.3,.05,1.5,.01], auto:[1,0,1,1], knee:[8,0,18,.1],
       range:[20,1,40,.5], makeup:[0,0,20,.1], clip:[0,0,1,1], schpf:[0,0,4,1], sck:SCK_P, mix:[1,0,1,.01] },
     ui:Object.assign({ thresh:{l:'Threshold', f:db}, ratio:{l:'Ratio', f:v => v.toFixed(1) + ':1'}, attack:{l:'Attack', f:v => v < .01 ? (v * 1000).toFixed(1) + ' ms' : secs(v)},
       release:{l:'Release', f:secs}, auto:{l:'Auto release', c:opts(['Off (use Release)', 'On'])}, knee:{l:'Knee', f:v => v.toFixed(1) + ' dB'},
       range:{l:'Range', f:v => '−' + v.toFixed(1) + ' dB at most'}, makeup:{l:'Makeup', f:db}, clip:{l:'Soft clip', c:opts(['Off', 'On'])},
       schpf:{l:'SC high-pass', c:opts(BC_HPFN)}, sck:{l:'Source', fixed:true, c:SCK_OPTS('Self')} }, MIXP), display:'dyn',
-    about:'Glue Comp: the smooth bus compressor that makes a group sound like one performance. It listens to the average level (not each peak), with a wide Knee, so it eases in; Range caps how far it ever turns down, Auto release follows the music, and Soft clip rounds off the loudest peaks after Makeup. SC high-pass, Source and the SC input work as on the Bus Comp. Mix blends in the dry sound.' }, SC_IO)
+    about:'Glue comp: the smooth bus compressor that makes a group sound like one performance. It listens to the average level (not each peak), with a wide Knee, so it eases in; Range caps how far it ever turns down, Auto release follows the music, and Soft clip rounds off the loudest peaks after Makeup. SC high-pass, Source and the SC input work as on the Bus comp. Mix blends in the dry sound.' }, SC_IO)
 });
 Object.assign(SHARED_FAMILY, { sdelay:'afx', filter:'afx', cut:'afx', compressor:'util', ngate:'util', autopan:'afx', pump:'afx', buscomp:'util', glue:'util' });
-SHARED_PALETTE.push(['Basic effects', [['sdelay', 'Simple delay'], ['filter', 'Filter'], ['cut', 'Low and high cut'], ['compressor', 'Compressor'], ['buscomp', 'Bus Comp'], ['glue', 'Glue Comp'], ['ngate', 'Noise gate'], ['autopan', 'Auto-pan'], ['pump', 'Pump (ducking)']], 'audio']);
+SHARED_PALETTE.push(['Basic effects', [['sdelay', 'Simple delay'], ['filter', 'Filter'], ['cut', 'Low and high cut'], ['compressor', 'Compressor'], ['buscomp', 'Bus comp'], ['glue', 'Glue comp'], ['ngate', 'Noise gate'], ['autopan', 'Auto-pan'], ['pump', 'Pump (ducking)']], 'audio']);
 function mergeShared(palette, groupFam, portLabel){
   const have = new Set(); for (const [, items] of palette) for (const [t] of items) have.add(t);
   for (const [g, items, where] of SHARED_PALETTE){
@@ -1042,7 +1053,7 @@ function mergeShared(palette, groupFam, portLabel){
       if (where === 'audio' && ctl >= 0) palette.splice(ctl, 0, row); else palette.push(row);
     }
     row[1].push(...add);
-    if (groupFam && !groupFam[g]) groupFam[g] = { 'Reverbs':'afx', 'Utilities':'util', 'Rhythm and logic':'mod', 'More effects':'afx', 'Audio followers':'mod', 'CV utilities':'util', 'Stereo':'afx',
+    if (groupFam && !groupFam[g]) groupFam[g] = { 'Reverbs':'afx', 'Utilities':'util', 'Rhythm and logic':'mod', 'More effects':'afx', 'Audio followers':'mod', 'Control utilities':'util', 'Stereo':'afx',
       'Sound sources':'gen', 'Voice and filters':'afx', 'Rhythmic effects':'afx', 'Modulation sources':'mod' }[g] || 'afx';
   }
   if (portLabel) for (const k in SHARED_PORT_LABEL) if (!(k in portLabel)) portLabel[k] = SHARED_PORT_LABEL[k];
@@ -1073,10 +1084,14 @@ const PAL_LAYOUT = [
   ['Notes and MIDI', '#a0703a', ['hostIn', 'seq']],
   ['Modulation sources', '#6e4fc0', ['lfo', 'adsr', 'tides', 'random', 'marbles', 'chaos', 'steps']],
   ['Clocks and rhythm', '#8c5a8c', ['clock', 'divider', 'euclid', 'logic', 'life']],
-  ['Audio → CV', '#4f6f9f', ['envfol', 'gateex', 'pitchfol', 'pitchtrk']],
-  ['CV utilities', '#9a8fb8', ['atten', 'math', 'slew', 'snh', 'quant']]
+  ['Audio to control', '#4f6f9f', ['envfol', 'gateex', 'pitchfol', 'pitchtrk']],
+  ['Control utilities', '#9a8fb8', ['atten', 'math', 'slew', 'snh', 'quant']]
 ];
 const PAL_COLOR = { More:'#888888' }, CAT_COLOR = {};
+// ONE NAME PER MODULE (13 Nov, audit U6): the list, the title bar and Help all read the module's own name. What the list used to add in
+// brackets after a name ("Resonator (chord)") is this tooltip text now.
+const PAL_HINT = { blipdrum:'8 voices', chaos:'Lorenz, Rössler…', degrade:'lo-fi', dimension:'stereo chorus', ensemble:'chorus', envfilt:'auto-wah', flex:'beat re-sequencer', life:'Game of Life',
+  meter:'VU', preverb:'shimmer', repeat:'beat repeat', resample:'record to a pad', reson:'chord', retrig:'stutter', spectral:'FFT', string:'pluck', utility:'gain, pan' };
 // Rebuild the merged palette (in place) in PAL_LAYOUT's order; group families too, for anything still keyed on them.
 function organizePalette(palette, groupFam){
   const label = new Map(); for (const [, items] of palette) for (const [t, l] of items || []) if (!label.has(t)) label.set(t, l);
@@ -1088,7 +1103,7 @@ function organizePalette(palette, groupFam){
     if (sec){ out.push(sec); sec = null; }
     items.forEach(([t]) => { used.add(t); CAT_COLOR[t] = col; });
     PAL_COLOR[g] = col; out.push([g, items]);
-    if (groupFam) groupFam[g] = /^(Notes|Modulation sources|Clocks|Audio →|CV)/.test(g) ? 'mod' : 'afx';
+    if (groupFam) groupFam[g] = /^(Notes|Modulation sources|Clocks|Audio to control|Control utilities)/.test(g) ? 'mod' : 'afx';
   }
   const rest = [...label].filter(([t]) => !used.has(t));
   if (rest.length){ rest.forEach(([t]) => CAT_COLOR[t] = PAL_COLOR.More); out.push(['More', rest]); if (groupFam) groupFam.More = 'util'; }
@@ -1110,15 +1125,15 @@ const catStyle = (el, type) => { const c = CAT_COLOR[type]; if (c){ el.classList
 const MODULE_USE = {
   // in and out, sources
   trackIn:'Set Track to your drums’ track, patch Out L and Out R through a Room reverb into a Chain Out on the same track, and the drums play through that reverb.',
-  chainOut:'For a drum group: Track Ins for the kick, snare and hats → a Mixer → a Glue Comp → a Chain Out on a free track. That track’s fader now turns the whole kit up and down.',
-  scin:'Set Source to the kick’s track, then patch Duck into a VCA’s CV on a pad for a pump, or Envelope into a filter’s Cutoff jack so the filter opens on every kick.',
+  chainOut:'For a drum group: Track Ins for the kick, snare and hats → a Mixer → a Glue comp → a Chain Out on a free track. That track’s fader now turns the whole kit up and down.',
+  scin:'Set Source to the kick’s track, then patch Duck into a VCA’s Control on a pad for a pump, or Envelope into a filter’s Cutoff jack so the filter opens on every kick.',
   scout:'In the drum chain, patch the drums into a Sidechain Out on Send 1. In the pad’s chain, a Sidechain In on Send 1 → the SC of a compressor makes the drums duck the pad.',
   resample:'Put it after a chain you like, set Bars to 2 and Record to Armed while the song plays: the next two bars land in a pad, sliced and ready to chop.',
   out:'The last module of every patch: patch your VCA (or its effects) into In L and In R. In Thunder, Output picks which Waves In it plays on.',
   hostIn:'Start each voice here: Pitch → an oscillator’s Pitch, Gate → an ADSR’s Gate, and Velocity into a VCA’s Gain jack so harder notes play louder.',
   seq:'Set eight notes, turn Run on and you hear a bass line without a keyboard (it plays through Host In). Set a step to Rest for space.',
   string:'Host In Pitch and Gate in, Decay long and Position near the bridge for a twangy pluck; raise Mute for palm-muted chugs.',
-  vco:'Wave saw, Host In Pitch into Pitch, then a VCF and a VCA with an ADSR on its CV: the classic subtractive synth voice.',
+  vco:'Wave saw, Host In Pitch into Pitch, then a VCF and a VCA with an ADSR on its Control: the classic subtractive synth voice.',
   fm:'Model 2-operator, Ratio 2, and an envelope into the Index jack: each note starts bright and metallic and mellows, for FM bells and basses.',
   additive:'Model bell, Host In Pitch and Gate in, into a VCA with a short envelope: struck bell and mallet tones.',
   noise:'White noise through a band-pass VCF and a VCA with a short envelope makes hi-hats and snares; pink noise through a slowly swept filter makes wind or surf.',
@@ -1129,7 +1144,7 @@ const MODULE_USE = {
   // mix and level
   mixer:'Combine two oscillators or a few effect returns into one cable before a filter. Set Inputs to the number you need.',
   smixer:'Mix a stereo dry sound and a stereo reverb or delay return, pan them, and send the result on to Chain Out.',
-  vca:'Patch an ADSR’s Out into CV and the sound starts and stops with each note. With no cable in CV it stays open.',
+  vca:'Patch an ADSR’s Out into Control and the sound starts and stops with each note. With no cable in Control it stays open.',
   utility:'Flip Polarity when two layered samples cancel each other, set Stereo to mono to check a mix, or Mute a branch while you patch.',
   width:'On a pad: Width 150% with Bass mono on, so it spreads wide while the low end stays solid in the middle.',
   meter:'Put one before and one after an effect to check it isn’t changing the level or clipping, and use Trim to match them.',
@@ -1219,8 +1234,8 @@ const MODULE_USE = {
   retrig:'Patch a gate (Steps, a Euclidean or a square LFO) into Trig with Mode While Trig is high, Rate 1/16 and Pitch falling, for stuttered rolls.',
   flex:'On a drum loop with the song playing: pick a Pattern (a stutter, a reverse, a tape stop) for a one-bar fill, or patch a sequencer into Pattern to change it every bar.',
   // modulation sources
-  lfo:'Sync on, a slow Rate and Shape sine into a filter’s Cutoff jack for a sweep, or a square into a VCA’s CV for a choppy tremolo.',
-  adsr:'Patch a gate (a Clock, a Euclidean or Host In) into Gate and Out into a slider’s jack: on a VCA’s CV it shapes each note’s level, on a filter’s Cutoff each note’s sweep.',
+  lfo:'Sync on, a slow Rate and Shape sine into a filter’s Cutoff jack for a sweep, or a square into a VCA’s Control for a choppy tremolo.',
+  adsr:'Patch a gate (a Clock, a Euclidean or Host In) into Gate and Out into a slider’s jack: on a VCA’s Control it shapes each note’s level, on a filter’s Cutoff each note’s sweep.',
   tides:'Mode AD with a gate into Trig and Out 1 into a VCA or filter for a snappy envelope. Mode Looping is an LFO with four related outputs.',
   random:'A clock into Clock (or set Rate), Smooth off and Out into a filter’s Cutoff jack for random steps; turn Smooth up for a slow, drifting wander.',
   marbles:'Patch t1 and t3 into two drum voices and x1 through a Quantizer into a pitch, for a melody and rhythm that write themselves. Raise Déjà vu to make them repeat.',
@@ -1237,7 +1252,7 @@ const MODULE_USE = {
   gateex:'Patch a drum loop into In and Out into an ADSR’s Gate: every hit fires the envelope, so a synth or filter follows the beat.',
   pitchfol:'Patch a whistle or a simple melody into In, then Out through a Quantizer into an oscillator’s pitch to double it with a synth.',
   pitchtrk:'Patch a sung line into In, Note into an oscillator’s pitch and Trig into an envelope: a synth that plays along with the voice.',
-  // CV utilities
+  // Control utilities
   atten:'Between an LFO and a filter’s Cutoff jack: Amount 30% for a gentle wobble, or negative so the LFO sweeps the other way.',
   math:'Multiply an LFO (A) by an envelope (B) and use the × output: the wobble only happens while the note is held.',
   slew:'After Steps or a Random going to a pitch or cutoff: Rise and Fall around 100 ms turn hard jumps into smooth glides.',
@@ -1247,11 +1262,11 @@ const MODULE_USE = {
 const modAbout = t => (typeof PAGE_ABOUT !== 'undefined' && PAGE_ABOUT[t]) || SHARED_ABOUT[t] || (MODULES[t] && MODULES[t].about) || '';
 const modUse = t => (typeof PAGE_USE !== 'undefined' && PAGE_USE[t]) || MODULE_USE[t] || '';
 {
-  const css = `.node > header .mq{border:0; background:none; color:var(--muted); font-size:15px; font-weight:700; line-height:1; width:20px; height:24px; padding:0; flex:none; margin-right:-4px}
+  const css = `.node > header .mq{border:0; background:none; color:var(--muted); font-size:14px; font-weight:700; line-height:1; width:20px; height:24px; padding:0; flex:none; margin-right:-4px}
 .node > header .mq:hover, .node > header .mq[aria-expanded="true"]{background:var(--panel-2); color:var(--ink)}
 .mhelp{position:fixed; z-index:2000001; width:min(320px, calc(100vw - 16px)); max-height:min(60vh, 420px); overflow:auto; box-sizing:border-box; padding:10px 12px 12px;
-  background:var(--panel); color:var(--ink); border:3px solid var(--cat, var(--edge)); box-shadow:0 6px 24px rgba(0,0,0,.25); font-size:13.5px; line-height:1.42; user-select:text; -webkit-user-select:text}
-.mhelp h4{margin:0 0 5px; font-size:15px; font-weight:600}
+  background:var(--panel); color:var(--ink); border:3px solid var(--cat, var(--edge)); box-shadow:0 6px 24px rgba(0,0,0,.25); font-size:14px; line-height:1.42; user-select:text; -webkit-user-select:text}
+.mhelp h4{margin:0 0 5px; font-size:14px; font-weight:600}
 .mhelp p{margin:0}
 .mhelp .use{margin-top:8px; padding-top:8px; border-top:1px solid color-mix(in srgb, var(--ink) 18%, transparent)}
 .mhelp .use b{display:block; font-size:11px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:var(--muted); margin-bottom:2px}`;
@@ -1296,7 +1311,7 @@ window.addEventListener('wheel', e => { if (mhelpBtnOn && !(mhelpEl && mhelpEl.c
 /* Displays: a Meter's bars and a Limiter's gain reduction, drawn from the engine's telemetry (shows). */
 {
   const css = `.shw{display:grid; gap:4px; padding:2px 0}
-.shw .ch{display:grid; grid-template-columns:12px 1fr 52px; align-items:center; gap:6px; font-size:11.5px; color:var(--muted); font-variant-numeric:tabular-nums}
+.shw .ch{display:grid; grid-template-columns:12px 1fr 52px; align-items:center; gap:6px; font-size:11px; color:var(--muted); font-variant-numeric:tabular-nums}
 .shw .tr{position:relative; height:8px; border-radius:2px; background:var(--glass, #111); overflow:hidden}
 .shw .tr i{position:absolute; left:0; top:0; bottom:0; width:100%; transform-origin:left; transform:scaleX(0); background:var(--audio)}
 .shw .tr b{position:absolute; top:0; bottom:0; width:2px; margin-left:-1px; background:var(--ink, #fff); left:0}
@@ -1468,7 +1483,7 @@ function drawDyn(n){
     g.stroke();
     const L = S.cur[1];
     if (L > DYN_LO){ const px = X(L), py = at(L); g.fillStyle = C.gr; g.globalAlpha = .28; g.beginPath(); g.arc(px, py, 6.5, 0, 7); g.fill(); g.globalAlpha = 1; g.beginPath(); g.arc(px, py, 3.2, 0, 7); g.fill(); }
-    g.font = '600 9px ' + C.font; g.textBaseline = 'top'; g.fillStyle = F(.55);
+    g.font = '600 11px ' + C.font; g.textBaseline = 'top'; g.fillStyle = F(.8);
     const tl = 'T ' + dynDb(c.thr); g.fillText(tl, Math.min(tx + 3, x0 + s - g.measureText(tl).width - 3), y0 + 3);
     g.strokeStyle = F(.22); g.lineWidth = 1; g.strokeRect(x0 + .5, y0 + .5, s - 1, s - 1);
   }
@@ -1505,18 +1520,18 @@ function drawDyn(n){
   }
   g.restore();
   // ---- the numbers: the reduction (or the change) top left, the levels in and out at the bottom
-  g.textBaseline = 'top'; g.font = '700 11.5px ' + C.font;
+  g.textBaseline = 'top'; g.font = '700 11px ' + C.font;
   const red = S.hold[0], on = lv ? S.cur[1] > -80 : red < -.05, rt = lv ? (on ? 'Δ ' + dynDb(red) + ' dB' : 'Δ —') : 'GR ' + dynDb(red) + ' dB';
   { const w = g.measureText(rt).width; g.fillStyle = C.bg; g.globalAlpha = .75; g.fillRect(hx + 2, hy + 2, w + 6, 15); g.globalAlpha = 1;
-    g.fillStyle = on ? (lv ? C.audio : C.gr) : F(.45); g.fillText(rt, hx + 5, hy + 3); }
-  g.font = '600 9px ' + C.font; g.textBaseline = 'bottom';
+    g.fillStyle = on ? (lv ? C.audio : C.gr) : F(.7); g.fillText(rt, hx + 5, hy + 3); }
+  g.font = '600 11px ' + C.font; g.textBaseline = 'bottom';
   const it = 'IN ' + dynDb(S.hold[1]), ot = 'OUT ' + dynDb(S.hold[2]), iw = g.measureText(it).width, ow = g.measureText(ot).width;
-  g.fillStyle = C.bg; g.globalAlpha = .7; g.fillRect(hx + 1, hy + hh - 13, iw + 6, 12); g.fillRect(hx + hw - ow - 7, hy + hh - 13, ow + 6, 12); g.globalAlpha = 1;
-  g.fillStyle = F(.7); g.fillText(it, hx + 4, hy + hh - 2);
+  g.fillStyle = C.bg; g.globalAlpha = .7; g.fillRect(hx + 1, hy + hh - 16, iw + 6, 15); g.fillRect(hx + hw - ow - 7, hy + hh - 16, ow + 6, 15); g.globalAlpha = 1;
+  g.fillStyle = F(.85); g.fillText(it, hx + 4, hy + hh - 2);
   g.fillStyle = C.audio; g.fillText(ot, hx + hw - ow - 4, hy + hh - 2);
   g.strokeStyle = F(.22); g.lineWidth = 1; g.strokeRect(hx + .5, hy + .5, hw - 1, hh - 1);
 }
-/* STEREO (owner, 19 Oct): VCF, VCA, Sidechain Comp, Blades, Meta and Phaser got In R / Out R. A patch made before
+/* STEREO (owner, 19 Oct): VCF, VCA, Sidechain comp, Blades, Meta and Phaser got In R / Out R. A patch made before
    (st2 not set) gets their right side patched once, wherever the left side is: a cable from X's Out to one of them
    gains X's Out R → its In R, and one from their Out to a module with an In R gains Out R → In R (when that In R is
    free). Run once per patch (st2), from normalize. Shared with waves (only Blades, Meta and Phaser match there). */
@@ -1613,7 +1628,7 @@ const MODULES = {
     ui:{ treble:{l:'Treble', f:v => db(v * 24 - 12)}, mid:{l:'Mid', f:v => db(v * 24 - 12)}, bass:{l:'Bass', f:v => db(v * 24 - 12)},
       tfreq:{l:'Treble freq', f:v => khz((v * v * 15 + 1) * 1000)}, bfreq:{l:'Bass freq', f:v => khz(v * v * 1570 + 30)},
       lowpass:{l:'Low-pass', f:v => khz((v * v * 15 + 1) * 1000)}, hipass:{l:'High-pass', f:v => v > 0 ? khz(v * v * 1570 + 30) : 'Off'}, out:{l:'Output', f:v => db(v * 36 - 18)} } },
-  comp:{ label:'Compressor', fx:true, display:'dynlv', params:{ press:[.4,0,1,.01], speed:[.2,0,1,.01], mew:[1,0,1,.01], out:[1,0,1,.01], mix:[1,0,1,.01] },
+  comp:{ label:'Simple compressor', fx:true, display:'dynlv', params:{ press:[.4,0,1,.01], speed:[.2,0,1,.01], mew:[1,0,1,.01], out:[1,0,1,.01], mix:[1,0,1,.01] },
     ui:Object.assign({ press:{l:'Pressure', f:v => v > 0 ? pct(v) : 'Off'}, speed:{l:'Speed', f:pct}, mew:{l:'Mewiness', f:v => (v * 2 - 1).toFixed(2)}, out:{l:'Output', f:pct} }, MIXP) },
   saturation:{ label:'Saturation', fx:true, params:{ drive:[.4,0,1,.01], hipass:[0,0,1,.01], out:[.8,0,1,.01], mix:[1,0,1,.01] },
     ui:Object.assign({ drive:{l:'Drive', f:pct}, hipass:{l:'High-pass', f:pct}, out:{l:'Output', f:pct} }, MIXP) },
@@ -1668,10 +1683,12 @@ Object.assign(FAMILY, SHARED_FAMILY);
 const famOf = t => FAMILY[t] || (MODULES[t] && MODULES[t].fx ? 'afx' : 'gen');
 /* Cable kinds: audio (teal), modulation (purple, dashed), gate (pink, dashed). */
 const KIND = { audio:'audio', cv:'mod', gate:'gate' };
+// The word the interface uses for each signal kind (13 Nov, audit U5): audio, control, gate. The data says cv and the css says mod; the user reads these.
+const KIND_WORD = { audio:'audio', mod:'control', gate:'gate' };
 const DOT = t => ({ hostIn:'gate', seq:'gate', lfo:'mod', adsr:'mod', random:'mod', atten:'mod' }[t] || 'audio');
 const CABLE = { audio:['#22958d','#16625d'], mod:['#7a58c8','#4b318e'], gate:['#c93d78','#86214c'] };
 const isCtl = k => k === 'mod' || k === 'gate';
-const PORT_LABEL = { pitch:'Pitch', gate:'Gate', vel:'Velocity', fm:'FM', out:'Out', outR:'Out R', reset:'Reset', in:'In', inR:'In R', cv:'CV',
+const PORT_LABEL = { pitch:'Pitch', gate:'Gate', vel:'Velocity', fm:'FM', out:'Out', outR:'Out R', reset:'Reset', in:'In', inR:'In R', cv:'Control',
   cutoff:'Cutoff', timbre:'Timbre', morph:'Morph', harmonics:'Harmonics', aux:'Aux', index:'Index', strength:'Strength', clock:'Clock',
 };
 for (let k = 1; k <= MIXN; k++) PORT_LABEL['in' + k] = 'In ' + k;
@@ -2033,7 +2050,7 @@ function portName(type, port, dir){
 }
 function makeJack(n, port, kind, dir, small){
   const j = h('span', {class: small ? 'jack small' : 'jack', 'data-id': n.m.id, 'data-port': port, 'data-dir': dir, 'data-kind': kind,
-    title: small ? plabel(n.m.type, port.slice(2)) + ' modulation input' : portName(n.m.type, port, dir) + (dir === 'in' ? ' input' : ' output')});
+    title: small ? plabel(n.m.type, port.slice(2)) + ' modulation: ' + KIND_WORD[kind] + ' input' : portName(n.m.type, port, dir) + ': ' + KIND_WORD[kind] + (dir === 'in' ? ' input' : ' output')});
   n.jacks[dir + ':' + port] = j;
   j.addEventListener('pointerdown', e => { if (e.button !== 0 || (MAC && e.ctrlKey && e.pointerType !== 'touch')) return; onJackDown(e, j); });   // left button only (3 Nov: a right or middle click started a cable)
   return j;
@@ -2308,7 +2325,7 @@ function cableUse(only){
   return U;
 }
 function stubJack(n, k){
-  const port = 'p:' + k, j = h('span', {class:'jack', 'data-id': n.m.id, 'data-port': port, 'data-dir':'in', 'data-kind':'mod', title: plabel(n.m.type, k) + ' modulation input'});
+  const port = 'p:' + k, j = h('span', {class:'jack', 'data-id': n.m.id, 'data-port': port, 'data-dir':'in', 'data-kind':'mod', title: plabel(n.m.type, k) + ' modulation: ' + KIND_WORD.mod + ' input'});
   j.addEventListener('pointerdown', e => { if (e.button !== 0 || (MAC && e.ctrlKey && e.pointerType !== 'touch')) return; onJackDown(e, j); });
   return j;
 }
@@ -2924,7 +2941,7 @@ function showMenu(x, y, items){
   ctx.replaceChildren(...items.map(([label, fn, dis]) => { const b = h('button', {class:'ctxitem', text: label}); if (dis) b.disabled = true; b.addEventListener('click', () => { hideMenu(); fn(); }); return b; }));
   ctx.hidden = false;
   const r = ctx.getBoundingClientRect();
-  ctx.style.left = Math.min(x, window.innerWidth - r.width - 8) + 'px'; ctx.style.top = Math.min(y, window.innerHeight - r.height - 8) + 'px';
+  ctx.style.left = Math.max(8, Math.min(x, window.innerWidth - r.width - 8)) + 'px'; ctx.style.top = Math.max(8, Math.min(y, window.innerHeight - r.height - 8)) + 'px';   // (U10) never off the top: a tall menu scrolls
 }
 function hideMenu(){ ctx.hidden = true; }
 /* QUICK ADD (21 Oct): double-click an empty spot of the patch, type a few letters of a module's name, then Enter (or a
@@ -2940,7 +2957,7 @@ ws.addEventListener('dblclick', e => {
   let shown = [];
   const add = t => { hideMenu(); addItem(t, wx - 20, wy - 16); };
   const render = () => { const q = inp.value.trim().toLowerCase();
-    shown = (q ? list.filter(([t, l]) => l.toLowerCase().includes(q) || t.toLowerCase().includes(q)) : list).slice(0, 14);
+    shown = (q ? list.filter(([t, l]) => l.toLowerCase().includes(q) || t.toLowerCase().includes(q) || (PAL_HINT[t] || '').toLowerCase().includes(q)) : list).slice(0, 14);
     box.replaceChildren(...(shown.length ? shown.map(([t, l], i) => { const b = h('button', {class:'ctxitem' + (i === 0 ? ' qa1' : ''), text:l}); b.addEventListener('click', () => add(t)); return b; })
       : [h('div', {class:'ctxhead', text:'No module by that name'})])); };
   inp.addEventListener('input', render);
@@ -3002,9 +3019,9 @@ const plist = document.getElementById('plist'), palette = document.getElementByI
 const drawer = document.getElementById('drawer'), dtoggle = document.getElementById('dtoggle');
 const PALETTE = [
   ['§Sound', []],
-  ['Sound sources', [['string','String (pluck)'],['vco','VCO'],['fm','FM'],['additive','Additive'],['noise','Noise'],['plaits','Plaits'],['elements','Elements']]],
+  ['Sound sources', [['string','String'],['vco','VCO'],['fm','FM'],['additive','Additive'],['noise','Noise'],['plaits','Plaits'],['elements','Elements']]],
   ['Filters and amps', [['vcf','VCF'],['vca','VCA'],['mixer','Mixer']]],
-  ['Effects', [['eq','EQ'],['comp','Compressor'],['saturation','Saturation'],['tape','Tape'],['chorus','Chorus'],['crush','Bitcrush'],['delay','Tape delay'],['reverb','Reverb'],['rings','Rings'],['clouds','Clouds']]],
+  ['Effects', [['eq','EQ'],['comp','Simple compressor'],['saturation','Saturation'],['tape','Tape'],['chorus','Chorus'],['crush','Bitcrush'],['delay','Tape delay'],['reverb','Reverb'],['rings','Rings'],['clouds','Clouds']]],
   ['Output', [['out','Out']]],
   ['§Control', []],
   ['Notes and MIDI', [['hostIn','Host In'],['seq','Sequencer']]],
@@ -3027,7 +3044,7 @@ function paletteItem(type, label, big){
   const kind = custom ? 'mod' : DOT(type);
   const sw = () => h('span', {class:'sw', style:'--k:var(--' + kind + ')'});
   const famCls = custom ? ' fam-grp' : ' fam-' + famOf(type);
-  const b = catStyle(h('button', {class:'pitem' + famCls + (big ? ' big' : ''), 'data-type': type, title:'Click to add, or drag onto the patch'}, sw(), label), type);
+  const b = catStyle(h('button', {class:'pitem' + famCls + (big ? ' big' : ''), 'data-type': type, title:(PAL_HINT[type] ? label + ' (' + PAL_HINT[type] + '). ' : '') + 'Click to add, or drag onto the patch'}, sw(), label), type);
   // Click adds to the middle of the view; dragging places it where you drop.
   b.addEventListener('pointerdown', e => {
     if (e.button !== 0) return;
@@ -3280,7 +3297,12 @@ function renderBackups(){
 const hint = document.getElementById('hint'), tipsBox = document.getElementById('settips');
 hint.hidden = settings.tips === false; tipsBox.checked = settings.tips !== false;
 tipsBox.addEventListener('change', () => { settings.tips = tipsBox.checked; saveSettings(); hint.hidden = !settings.tips; });
-document.getElementById('hintx').addEventListener('click', () => { hint.hidden = true; settings.tips = false; saveSettings(); tipsBox.checked = false; });
+// T11: with a touch screen the note starts open once, then shows as a small Tips button; × folds it back to that button (Settings, Show tips, still turns it off)
+{ const coarse = matchMedia('(pointer: coarse)'), pill = document.getElementById('hintpill');
+  const tipOpen = o => { hint.classList.toggle('min', !o); pill.setAttribute('aria-expanded', String(o)); };
+  if (coarse.matches){ const first = !settings.tipSeen; if (first && settings.tips !== false){ settings.tipSeen = true; saveSettings(); } tipOpen(first); }
+  pill.addEventListener('click', () => tipOpen(true));
+  document.getElementById('hintx').addEventListener('click', () => { if (coarse.matches){ tipOpen(false); return; } hint.hidden = true; settings.tips = false; saveSettings(); tipsBox.checked = false; }); }
 const keysBox = document.getElementById('setkeys');
 keysBox.addEventListener('change', () => { settings.keys = keysBox.checked; saveSettings(); paintKeys(); });
 
@@ -3297,7 +3319,7 @@ const PAGE_ABOUT = {
   plaits:'A macro oscillator with 24 sound engines (Mutable Instruments Plaits, as in Thunder). Patch a Gate to strike its built-in envelope and low-pass gate; without one it drones. Harmonics, Timbre and Morph change the sound.',
   elements:'Mutable Instruments Elements: a modal voice where a bow, a breath and a mallet excite a resonator. Patch Pitch and Gate from Host In.',
   vcf:'A filter. Low-pass softens, band-pass keeps the middle, high-pass thins. Patch an envelope into Cutoff for classic sweeps.',
-  vca:'An amplifier. Patch an envelope into CV so notes start and stop (with nothing in CV it stays open); Gain sets the loudness.',
+  vca:'An amplifier. Patch an envelope into Control so notes start and stop (with nothing in Control it stays open); Gain sets the loudness.',
   mixer:'Mixes up to 16 sounds, each with its own level, plus a master level. Inputs sets how many channels it shows (4 to start).',
   eq:'Airwindows EQ: treble, mid and bass with their frequencies, plus low-pass and high-pass filters.',
   comp:'Airwindows Pressure4: a compressor. Pressure sets how hard it works; Mix blends in the dry sound for parallel compression.',
@@ -3322,10 +3344,10 @@ function helpDoc(){
   const KC = { audio:'#22958d', mod:'#7a58c8', gate:'#c93d78' };
   const ABOUT = PAGE_ABOUT;
   // The signal kinds, drawn the way the patch draws them: told apart by line and jack shape as well as colour.
-  const legend = '<div class="legend"><b>Signal kinds</b>' + [['audio', 'Sound', 'solid line, round jack', '2.5', ''], ['mod', 'Control', 'dashed line, round jack', '2', ' stroke-dasharray="6 4"'], ['gate', 'Gate', 'dotted line, diamond jack', '3', ' stroke-dasharray="0.1 7" stroke-linecap="round"']]
+  const legend = '<div class="legend"><b>Signal kinds</b>' + [['audio', 'Audio', 'solid line, round jack', '2.5', ''], ['mod', 'Control', 'dashed line, round jack', '2', ' stroke-dasharray="6 4"'], ['gate', 'Gate', 'dotted line, diamond jack', '3', ' stroke-dasharray="0.1 7" stroke-linecap="round"']]
     .map(([k, l, d, w, da]) => '<span class="lg"><svg width="46" height="14" viewBox="0 0 46 14"><path d="M2 7H44" fill="none" stroke="' + KC[k] + '" stroke-width="' + w + '"' + da + '/></svg><i class="jk ' + (k === 'gate' ? 'g' : '') + '" style="background:' + KC[k] + '"></i>' + esc(l + ': ' + d) + '</span>').join('') + '</div>';
   const guide = [
-    ['Patching', 'Drag from an output jack (right edge) to an input jack (left edge). Teal solid cables carry sound, purple dashed cables carry modulation and pink dotted cables carry gates; gate jacks are diamonds, the others round. Every slider has a small purple jack on its left for modulation. Drag a patched input to move its cable, or drop it on empty space to unplug. Click a cable to select it: Delete removes it, Escape lets go, and its bend handles show (drag one to move the bend, Option-click one to remove it). Double-click a cable to remove it. Hold Option (Alt on Windows) and click while drawing a cable to bend it, or Option-drag an existing cable.'],
+    ['Patching', 'Drag from an output jack (right edge) to an input jack (left edge). Teal solid cables carry audio, purple dashed cables carry control signals and pink dotted cables carry gates; gate jacks are diamonds, the others round. Every slider has a small purple jack on its left for modulation. Drag a patched input to move its cable, or drop it on empty space to unplug. Click a cable to select it: Delete removes it, Escape lets go, and its bend handles show (drag one to move the bend, Option-click one to remove it). Double-click a cable to remove it. Hold Option (Alt on Windows) and click while drawing a cable to bend it, or Option-drag an existing cable.'],
     ['Modulation', 'Patch any signal into a slider’s small purple jack and it moves that slider: the slider sets the center, and the signal swings it across its range. The value turns purple and a mark shows where the slider really is. Use the Depth slider on an LFO or envelope, or an Attenuverter, to make the swing smaller.'],
     ['Polyphony', 'Host In runs once for every voice, and so does anything it feeds; everything else (effects, LFOs, Out) runs once. Put effects after the voices, before Out.'],
     ['Moving around', 'Scroll with two fingers or turn the mouse wheel to pan (Shift+wheel sideways); with a mouse a middle-button drag pans too, and on a touch screen dragging the background does. Pinch or Ctrl/⌘+wheel zooms; the zoom buttons are in the top bar (click the percentage to type one, Fit shows everything).'],
@@ -3336,7 +3358,7 @@ function helpDoc(){
     ['Saving', 'Your patch saves itself as you work. File → Save downloads it as a file; Open loads one. Settings → Backups holds earlier versions.']
   ];
   const groups = PALETTE.filter(([g]) => !isSection(g)).map(([g, items]) => '<div class="mgroup"><h3>' + esc(g) + '</h3><div class="mgrid">' + items.map(([t]) => {
-    const d = MODULES[t], ed = EDGE[famOf(t)];
+    const d = MODULES[t], ed = CAT_COLOR[t] || EDGE[famOf(t)];   // U9 (13 Nov): the card wears the module's own category colour, as the module on the patch does
     const io = (lbl, o) => Object.keys(o).length ? '<div class="io"><b>' + lbl + '</b>' + Object.entries(o).map(([p, k]) => '<span class="pt"><i' + (KIND[k] === 'gate' ? ' class="g"' : '') + ' style="background:' + KC[KIND[k]] + '"></i>' + esc((PORT_LABEL[p] || p) + ((p + 'R') in o ? ' L' : '')) + '</span>').join('') + '</div>' : '';
     return '<div class="mcard" style="--ed:' + ed + '"><h4>' + esc(d.label) + '</h4><p>' + esc(ABOUT[t] || SHARED_ABOUT[t] || d.about || '') + '</p>' + io('Inputs', d.inputs) + io('Outputs', d.outputs) + '</div>';
   }).join('') + '</div></div>').join('');
@@ -3347,11 +3369,11 @@ function helpDoc(){
     'nav{background:#cfcfd3; border-right:3px solid #111; padding:18px 14px; overflow-y:auto; height:100vh}' +
     'nav h1{font-size:22px; margin:0 0 12px; font-weight:600} nav a{display:block; color:#111; text-decoration:none; padding:5px 8px; font-size:14px; border-left:3px solid transparent}' +
     'nav a:hover{background:#e4e4e7; border-left-color:#111} main{overflow-y:auto; height:100vh; padding:26px 34px 60px}' +
-    '.guide{background:#fff; border:3px solid #111; padding:4px 24px 10px; margin-bottom:22px} .guide h2{font-size:20px; margin:22px 0 8px; font-weight:600}' +
-    '.guide p{font-size:15px; line-height:1.55; max-width:78ch} .mgroup h3{font-size:19px; margin:28px 0 12px; font-weight:600; border-bottom:3px solid #111; padding-bottom:6px}' +
-    '.mgrid{display:grid; grid-template-columns:repeat(auto-fill, minmax(290px, 1fr)); gap:14px} .mcard{background:#fff; border:3.5px solid var(--ed); padding:12px 14px}' +
-    '.mcard h4{margin:0 0 6px; font-size:16.5px; font-weight:600; border-bottom:2px solid var(--ed); padding-bottom:6px} .mcard p{margin:0 0 8px; font-size:14px; line-height:1.5}' +
-    '.io{display:flex; flex-wrap:wrap; gap:5px 10px; align-items:center; font-size:12.5px; margin-top:4px} .io b{font-size:12px; min-width:62px}' +
+    '.guide{background:#fff; border:3px solid #111; padding:4px 24px 10px; margin-bottom:22px} .guide h2{font-size:17px; margin:22px 0 8px; font-weight:600}' +
+    '.guide p{font-size:14px; line-height:1.55; max-width:78ch} .mgroup h3{font-size:17px; margin:28px 0 12px; font-weight:600; border-bottom:3px solid #111; padding-bottom:6px}' +
+    '.mgrid{display:grid; grid-template-columns:repeat(auto-fill, minmax(290px, 1fr)); gap:14px} .mcard{background:color-mix(in srgb, #fff 88%, var(--ed) 12%); border:3.5px solid var(--ed); padding:12px 14px}' +
+    '.mcard h4{margin:0 0 6px; font-size:17px; font-weight:600; border-bottom:2px solid var(--ed); padding-bottom:6px} .mcard p{margin:0 0 8px; font-size:14px; line-height:1.5}' +
+    '.io{display:flex; flex-wrap:wrap; gap:5px 10px; align-items:center; font-size:12.5px; margin-top:4px} .io b{font-size:12.5px; min-width:62px}' +
     '.pt{display:inline-flex; align-items:center; gap:5px; background:#fff; border:1.5px solid #111; padding:1px 7px} .pt i{width:9px; height:9px; border-radius:50%; display:inline-block} .pt i.g{width:8px; height:8px; border-radius:1px; transform:rotate(45deg)}' +
     '.legend{display:flex; flex-wrap:wrap; gap:8px 22px; align-items:center; background:#fff; border:3px solid #111; padding:10px 18px; margin-bottom:14px; font-size:14px} .lg{display:inline-flex; align-items:center; gap:7px}' +
     '.jk{width:12px; height:12px; border-radius:50%; display:inline-block; flex:none} .jk.g{width:10px; height:10px; border-radius:1px; transform:rotate(45deg)}' +
@@ -3382,7 +3404,7 @@ window.addEventListener('keydown', e => { const ov = document.getElementById('he
 const meterBars = [];
 {
   const host = document.getElementById('meters');
-  for (let k = 0; k < BUS_COUNT; k++){ const b = h('span', {class:'b', title:'Out ' + (k + 1) + ' / Waves In ' + (k + 1)}, h('i')); host.append(b); meterBars.push(b.firstChild); }
+  for (let k = 0; k < BUS_COUNT; k++){ const b = h('span', {class:'b', title:'Waves In ' + (k + 1)}, h('i')); host.append(b); meterBars.push(b.firstChild); }
 }
 /* Jack meters: [id, 'in'|'out', port, peak] from the engine, each one falling back smoothly when it goes quiet. */
 let jackSeen = 0;
