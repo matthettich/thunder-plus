@@ -22367,7 +22367,7 @@ function tStart(mode, o){
   if (mode === 'song' && (o.row | 0) > 0) try { chaseFx(o.row | 0, seq.time); } catch(e){ tpLog('chase', e); }   // CHASE: the effect commands before the start row
   tp.core = false;
   if (coreWanted() && core.ready && !core.bad && !(o && o.page)) coreStart(mode, o, t0start, rsFirst ? {ref:pz.ref, row:pz.row, step:pz.step} : null);
-  rkReset(); pbLog('PLAY ' + mode + ' · ' + pbState()); pbLvReset(); setTimeout(() => { if (tp.on) pbLog(`4 s into PLAY: level ${pbLevel()}`); }, 4000);   // (9 Nov: to compare Latency settings)   // not loaded yet: this PLAY as before, the core loads at STOP
+  rkReset(); pbLog('PLAY ' + mode + ' · ' + pbState()); try { if (pwB) pwStep = Math.floor(pwB.level * 20); const pw = pwFmt(pwState(), true); if (pw) pbLog(pw); } catch(e){} pbLvReset(); setTimeout(() => { if (tp.on) pbLog(`4 s into PLAY: level ${pbLevel()}`); }, 4000);   // (9 Nov: to compare Latency settings)   // not loaded yet: this PLAY as before, the core loads at STOP
   if (lkp) lkStarted(lkp);   // ABLETON LINK: Link's exact tempo; ours tells the session
   tp.timer = pumpTimer(); pump(); if (!handing) draw(); songBtn(); chainsTempo(); if (typeof frameWake === 'function') frameWake();   // (a hand-over happens out of view: no draw, which was most of its time)
   bgPlay(true);   // BACKGROUND PLAY
@@ -22830,6 +22830,20 @@ function coreStart(mode, o, t0, rs){
    3 seconds after a STOP. */
 const PB = {handT0:0, handW:0, ck:null, ckBad:0, stopT:0, log:[], n:0, late:0, drop:0, ahead:0, stray:0, strayT:0, skips:0, t:0, rk:{sum:0, hot:0, win:0, n:0, last:-1e9, watch:null}};
 function pbLog(s){ try { PB.log.push((performance.now() / 1000).toFixed(2) + ' ' + s); if (PB.log.length > 400) PB.log.splice(0, 100); } catch(e){} }
+/* POWER STATE IN THE REPORT (12 Nov, owner: "does the app really perform better plugged in?"): battery level and charging (navigator.getBattery, where the browser has it),
+   plus what else bears on throttling that needs no permission: cores, device memory, data saver, reduced motion. Written at each PLAY and, while playing, when charging
+   changes or the level crosses a 5% step; the header's settings line carries the current value. Only event listeners while stopped; nothing on the audio thread. */
+function pwFmt(st, full){
+  const b = st && typeof st.level === 'number' && isFinite(st.level) ? `battery ${Math.round(st.level * 100)}% · ${st.charging ? 'charging' : 'on battery'}` : '';
+  const x = [];
+  if (full && st){ if (st.cores) x.push(st.cores + ' cores'); if (st.mem) x.push(st.mem + ' GB memory'); if (st.saveData != null) x.push('data saver ' + (st.saveData ? 'on' : 'off')); if (st.reduced != null) x.push('reduced motion ' + (st.reduced ? 'on' : 'off')); }
+  const t = [b, ...x].filter(Boolean).join(' · '); return t ? (b ? 'power: ' : 'device: ') + t : '';
+}
+let pwB = null, pwStep = -1;
+function pwState(){ let c = null, rm = null; try { c = navigator.connection; } catch(e){} try { rm = matchMedia('(prefers-reduced-motion: reduce)').matches; } catch(e){}
+  return {level:pwB ? pwB.level : null, charging:pwB ? pwB.charging : null, cores:navigator.hardwareConcurrency || 0, mem:navigator.deviceMemory || 0, saveData:c && typeof c.saveData === 'boolean' ? c.saveData : null, reduced:rm}; }
+function pwNote(why){ if (!tp.on || !pwB) return; const st = Math.floor(pwB.level * 20); if (why === 'level' && st === pwStep) return; pwStep = st; const t = pwFmt(pwState(), false); if (t) pbLog(t); }
+try { if (navigator.getBattery) navigator.getBattery().then(b => { pwB = b; b.addEventListener('chargingchange', () => pwNote('charging')); b.addEventListener('levelchange', () => pwNote('level')); }, () => {}); } catch(e){}
 const pbState = () => `ctx ${ctx ? ctx.state + ' t=' + ctx.currentTime.toFixed(2) : '-'} on=${tp.on ? 1 : 0} core=${tp.core ? 1 : 0} seq=${aset.core} hidden=${document.hidden ? 1 : 0} wall=${(Date.now() / 1000 % 100000).toFixed(2)}`;
 // BACKGROUND TIMING (8 Nov): how the Page sequencer's tick fared since the screen last changed: the longest wait between ticks (wall clock), how close the song came to running out, and any jumps forward
 const pbPg = () => { const P = PB.pg; PB.pg = null; return P ? ` · page ticks ${P.n}, longest gap ${P.gap.toFixed(2)} s, least lead ${P.lead.toFixed(2)} s, moved on ${P.re}× (${P.skip.toFixed(2)} s), held ${P.rs || 0}× (${(P.rsS || 0).toFixed(2)} s), kicked ${PB.rk.n}×` : ''; };
@@ -22946,7 +22960,7 @@ function pbSum(){ const now = performance.now(); if (now - PB.t < 2000) return; 
   PB.n = PB.late = PB.drop = PB.ahead = 0; }
 function pbAfterStop(){ PB.stopT = performance.now(); pbLvStop(); pbLog('STOP · ' + pbState()); for (const ms of [1000, 3000]) setTimeout(() => pbLog(`${ms / 1000} s after STOP: level ${pbLevel()} · voices ${rt && rt.pl.aliveN ? rt.pl.aliveN() : '?'} · stray rows ${PB.stray} · ` + pbState()), ms); }
 async function pbCopy(){
-  const head = `Thunder Plus build ${BUILD} · ${navigator.userAgent}\nlatency ${ctx ? Math.round((ctx.baseLatency || 0) * 1000) + ' + ' + Math.round((ctx.outputLatency || 0) * 1000) + ' ms · heard ' + Math.round(heardLat() * 1000) + ' ms' : '-'} · worklets ${NOWK ? 'OFF (test)' : ctx && wkUsed(ctx).size ? [...wkUsed(ctx)].join(', ') : 'none'} · ${pbState()}${PB.lvDone ? '\nlevel over the last play: ' + PB.lvDone : ''}\nsettings: background play ${bgOn ? 'on' : 'OFF'} · keep screen on ${wlOn ? 'on' : 'off'} · low power ${lpOn ? 'on' : 'off'} · latency ${latOf()} · runaway kick ${rkOn ? 'on' : 'off'}${bgAndroid && !bgOn ? ' · NOTE: with Background play off Android does not treat the app as a media player (hidden playback is throttled, volume keys move the ringer)' : ''}\n`;   // (10 Nov: a report from a phone with Background play left off after a test read like an engine fault)
+  const head = `Thunder Plus build ${BUILD} · ${navigator.userAgent}\nlatency ${ctx ? Math.round((ctx.baseLatency || 0) * 1000) + ' + ' + Math.round((ctx.outputLatency || 0) * 1000) + ' ms · heard ' + Math.round(heardLat() * 1000) + ' ms' : '-'} · worklets ${NOWK ? 'OFF (test)' : ctx && wkUsed(ctx).size ? [...wkUsed(ctx)].join(', ') : 'none'} · ${pbState()}${PB.lvDone ? '\nlevel over the last play: ' + PB.lvDone : ''}\nsettings: background play ${bgOn ? 'on' : 'OFF'} · keep screen on ${wlOn ? 'on' : 'off'} · low power ${lpOn ? 'on' : 'off'} · latency ${latOf()} · runaway kick ${rkOn ? 'on' : 'off'}${(() => { try { const t = pwFmt(pwState(), true); return t ? ' · ' + t : ''; } catch(e){ return ''; } })()}${bgAndroid && !bgOn ? ' · NOTE: with Background play off Android does not treat the app as a media player (hidden playback is throttled, volume keys move the ringer)' : ''}\n`;   // (10 Nov: a report from a phone with Background play left off after a test read like an engine fault)
   const txt = head + PB.log.join('\n');
   try { await navigator.clipboard.writeText(txt); toast('Playback report copied: paste it into the chat.', 3500); }
   catch(e){ try { await deliver('thunder-playback-report.txt', new Blob([txt], {type:'text/plain'})); } catch(e2){ toastErr('Couldn’t copy the report here.'); } }
