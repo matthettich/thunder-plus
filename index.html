@@ -22956,15 +22956,32 @@ function pbClock(){ if (!tp.on || !tp.core || !ctx || core.bad || ctx.state !== 
 // The core is let go (the clock watch here, or its own WATCHDOG): the song carries on from its row on the page sequencer, which
 // plays until the app reloads. self: the core already stopped itself (and gave the live engines back) at audio time selfT.
 function coreFail(self){
-  core.bad = true; let row = -1, ref = -1; (tp.pos || []).forEach((q, i) => { if (q && i !== MT && q.row > row){ row = q.row; ref = i; } }); if (row < 0) for (const q of tp.pos || []) if (q && q.row > row) row = q.row;
+  core.bad = true; core.badN = (core.badN || 0) + 1; core.hk = null; core.okN = 0; let row = -1, ref = -1; (tp.pos || []).forEach((q, i) => { if (q && i !== MT && q.row > row){ row = q.row; ref = i; } }); if (row < 0) for (const q of tp.pos || []) if (q && q.row > row) row = q.row;
   const at = ref >= 0 ? tp.pos.map(q => q && {row:q.row, phrase:q.phrase, cr:q.cr, step:0}) : null;   // (12 Nov) each track on its own row (the song restarts at the top of the furthest row, so no steps)
   const mode = tp.mode;
   pbLog('switched to the page sequencer from row ' + row + (self ? ' (the audio-thread sequencer stopped itself: ' + self.why + ')' : '')); try { tStop(true); } catch(e){} try { coreDrop(); } catch(e){}
   if (row >= 0 && mode === 'song') tStart('song', at ? {row, at, atRef:ref} : {row});
   const moved = row >= 0 && mode === 'song';
-  const went = moved ? 'the song moved to the Page sequencer until you reload the app.' : 'playback stopped. PLAY uses the Page sequencer until you reload the app.';
+  const back = core.badN < CORE_BAD_MAX ? 'The audio thread sequencer comes back once the clock has been steady for a while.' : 'PLAY uses the Page sequencer until you reload the app.';
+  const went = (moved ? 'the song moved to the Page sequencer. ' : 'playback stopped. ') + back;
   toast((self && self.why === 'deaf' ? 'The audio thread fell behind, so ' : 'The audio clock went out of step, so ') + went, 5000); }
-idleTick(() => { try { pbClock(); } catch(e){} }, 2000, () => tp.on, 4000);   // BATTERY: every 2 s while playing (hidden too), a slow reset check otherwise
+/* THE CORE COMES BACK (12 Nov, owner's Balanced report, build 572: the phone's audio clock dipped to 0.83x and caught up at 1.4x for about
+   5 s, twice in ten minutes, and was steady again each time; the watchdog rightly let go of the song, but the audio thread sequencer then
+   stayed off until a reload, so the rest of the session ran on the Page sequencer). While it is off, the audio clock is compared with the
+   real one as pbClock does; after CORE_OK_N steady readings running (about 10 s within 3 %) the core is allowed again from the NEXT PLAY (the
+   song that is playing stays on the Page sequencer: no second switch mid-song). The third failure in a session keeps it off until a reload,
+   as before (6 Nov: a clock that stays wrong). Page-side only; the watchdog and its limits are unchanged. */
+const CORE_BAD_MAX = 3, CORE_OK_N = 5;
+function coreHealStep(c, w, a){   // pure: c {hk:{w,a}|null, okN}; true when the clock has been steady long enough
+  const h = c.hk; c.hk = {w, a}; if (!h || w - h.w < 1.5) return false;
+  const r = (a - h.a) / (w - h.w); c.okN = r > 0.97 && r < 1.03 ? (c.okN || 0) + 1 : 0;
+  return c.okN >= CORE_OK_N; }
+function coreHeal(){ if (!core.bad || (core.badN || 0) >= CORE_BAD_MAX) return;
+  if (!ctx || ctx.state !== 'running'){ core.hk = null; core.okN = 0; return; }
+  if (!coreHealStep(core, performance.now() / 1000, ctx.currentTime)) return;
+  core.bad = false; core.hk = null; core.okN = 0; pbLog('audio clock steady again: the audio thread sequencer is back from the next PLAY (let go ' + core.badN + '× this session)');
+  if (!tp.on && coreWanted() && !core.ready) try { coreLoad(); } catch(e){} }
+idleTick(() => { try { pbClock(); } catch(e){} try { coreHeal(); } catch(e){} }, 2000, () => tp.on, 4000);   // BATTERY: every 2 s while playing (hidden too), a slow reset check otherwise
 function pbSum(){ const now = performance.now(); if (now - PB.t < 2000) return; PB.t = now;
   if (PB.n) pbLog(`rows ${PB.n} · latest note ${(PB.late * 1000).toFixed(0)} ms late · dropped ${PB.drop} · ahead ${(PB.ahead * 1000).toFixed(0)} ms · core skips ${PB.skips} · voices ${rt && rt.pl.aliveN ? rt.pl.aliveN() : '?'}`);
   if (PB.late >= 0.05 || PB.drop){ PB.ev.push({t:now, late:PB.late, drop:PB.drop}); if (PB.ev.length > 60) PB.ev.shift(); }   // CPU PANEL (12 Nov): late or dropped notes, kept for its last-minute line
