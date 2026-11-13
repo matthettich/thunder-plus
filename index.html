@@ -3483,7 +3483,7 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
 <div class="mstwin" id="mstWin" hidden role="dialog" aria-modal="true" aria-label="Mastering">
   <div class="mwhead">
     <b>MASTERING</b>
-    <button type="button" class="mwon" id="mwOn" aria-pressed="false" title="Mastering on the master bus (renders include it)">OFF</button>
+    <button type="button" class="mwon" id="mwOn" aria-pressed="false" title="Auto master on the master bus (renders include it)" aria-label="Auto master">OFF</button>
     <div class="mwchain" id="mwChain" role="tablist" aria-label="Mastering chain"></div>
     <div class="mwread" id="mwRead" aria-live="off"></div>
     <button type="button" class="mwpump" id="mwPump" title="Use the pump mastering chain for this song: pEQ → CALM → COMP → TONE → MASTER (the auto master) in the master’s last five FX slots, as new songs do. The current chain is switched off. Undo takes it all back.">SWITCH TO …PUMP</button>
@@ -3536,7 +3536,7 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
 <p>Each track runs <b>TRIM → chains → its FX → VOL (with mute and solo) → pan</b>. <b>TRIM</b> is the Mixer's first row: the track's input gain, 80 = 0 dB, from −18 to +18 dB, set before the chain and effects hear it. It lights yellow under the value when the signal going in runs hot (above −6 dB) and red near full scale (above −1 dB): chains has no limiter of its own. <b>VOL</b> is the fader: the bar on each track's meter (drag it, Shift for fine, double-click for 0 dB; from the keyboard, ▼ from the SC row lands on it, then Ctrl/⌘+◀▶ ±1, ▲▼ ±16) and the bottom panel's slider. On the master row, <b>MASTER</b> is the drive into the limiter (the master phrase's VOL moves it), then FX, MASTERING and <b>OUT</b>: the master fader, after the limiter, FF = 0 dB and never a boost. Its bar stands on the L / R meter (drag it sideways) and the bottom panel's master strip is OUT too. Renders and stems go through all of them as you hear them, except that with Project → <b>NORMALIZE</b> on, the rendered file is raised to just under 0 dB, so OUT doesn't change its level there (MASTER still drives the limiter). Turning a track's <b>CHN</b> on or off fades between the chain and the dry sound over 20 ms, so it doesn't click.</p>
 <p><b>Buses and PRE sends.</b> A Track In patched into a Chain Out on another track feeds that bus after its fader and pan. Set the Track In's <b>Bus send</b> to <b>Before its fader</b> and the bus hears it after its chain and effects but before VOL and pan, so pulling the fader down leaves the send alone (a reverb or monitor send). Mute and solo still silence it.</p>
 <h3>Mastering</h3>
-<p><b>Settings → Master → Open mastering…</b> (or the <b>MASTERING</b> cell on the Mixer's master row: ▶ from the master level, then EDIT; or › MASTERING on the FX screen's master) puts a chain on the master bus: <b>EQ → Suppress → Compress → Limit</b>. Each has its own switch; the readouts show short-term loudness in and out (LUFS) and the highest peak. <b>EQ</b>: drag a point (left/right is frequency, up/down is gain), shift-drag or scroll for width, double-click empty space to add a bell, double-click a point to switch it off; the band row sets exact values. <b>Suppress</b> turns down resonances that stick out of the spectrum (Depth, Sharpness, Selectivity, Speed; drag the lines to set its range; Delta plays only what it removes). <b>Compress</b> is a glue compressor (its sidechain high-pass keeps the bass from pumping it). <b>Limit</b> catches every peak at the Ceiling, between samples too. Renders of the song include the chain and keep its ceiling; stems don't.</p>
+<p><b>Settings → Master → Open mastering…</b> (or the <b>AUTO MASTER</b> cell on the Mixer's master row: ▶ from the master level, then EDIT; or › MASTERING on the FX screen's master) puts a chain on the master bus: <b>EQ → Suppress → Compress → Limit</b>. Each has its own switch; the readouts show short-term loudness in and out (LUFS) and the highest peak. <b>EQ</b>: drag a point (left/right is frequency, up/down is gain), shift-drag or scroll for width, double-click empty space to add a bell, double-click a point to switch it off; the band row sets exact values. <b>Suppress</b> turns down resonances that stick out of the spectrum (Depth, Sharpness, Selectivity, Speed; drag the lines to set its range; Delta plays only what it removes). <b>Compress</b> is a glue compressor (its sidechain high-pass keeps the bass from pumping it). <b>Limit</b> catches every peak at the Ceiling, between samples too. Renders of the song include the chain and keep its ceiling; stems don't.</p>
 <h3>pump effects</h3>
 <p>The nine <b>pump</b> mastering plugins run on <b>bus tracks and the master</b>, and <b>EQ</b> on any track too (FX picker → <b>Mastering (pump)</b>; › EQ WINDOW on the FX screen opens it): <b>EQ</b> (24 bands, cuts to 96 dB/oct or Brickwall, dynamic bands, zero latency or linear phase), <b>COMP</b>, <b>LIMIT</b> (true peak, loudness targets), <b>CALM</b> (resonance suppressor), <b>TONE</b> (tonal balance), <b>BAND</b> (multiband dynamics), <b>WIDE</b> (stereo imager), <b>HEAT</b> (saturator) and <b>METER</b> (loudness). They are the plugins' own DSP, so a setting sounds as it does in the VST3 / CLAP plugin. The slot shows the main settings as hex rows (EQ, BAND, WIDE and HEAT pick a <b>BAND</b> first); <b>› PRESET</b> has the plugin's presets and <b>› OPEN</b> its full window, which works like the plugin: drag, Shift-drag for fine, double-click to type, Ctrl-click to reset, A/B, and Alt held to listen to a band or a range. A slot's ACTIVE is the plugin's bypass. CALM, TONE, LIMIT and linear-phase EQ add latency: renders of the master line it up, but on a bus that track plays late against the others.</p>
 <h3>Settings</h3>
@@ -24908,7 +24908,7 @@ function fxRows(){
     info:v => v ? `Slot ${k + 1} runs ${TFX[FLk(k)[v - 1]].long}. EDIT lists the effects, EDIT+arrows steps through them, ▶ opens its controls, ALT+EDIT removes it` : `Empty. EDIT lists the effects to pick one; EDIT+arrows steps through them. Slots run top to bottom`});
   const k = cFxS, f = A[k];
   const addT = () => fxtOk(t, lastFxType) ? lastFxType : 'eq';
-  if (!f){ rows.push({l:'› ADD TO SLOT ' + (k + 1), gap:true, act:() => { A[k] = freshTfx(addT()); fxChanged(t); draw(); }, info:() => `Puts ${TFX[addT()].long} in slot ${k + 1}`}); return (t >= NT ? rows.concat([{l:'› MASTERING', gap:true, act:() => openMst(), info:() => 'EQ, resonance suppressor, compressor and limiter on the master bus (' + (S.mst.on ? 'on' : 'off') + ')'}]) : rows).concat([eqRow], t >= NT ? mstWinRows() : []); }
+  if (!f){ rows.push({l:'› ADD TO SLOT ' + (k + 1), gap:true, act:() => { A[k] = freshTfx(addT()); fxChanged(t); draw(); }, info:() => `Puts ${TFX[addT()].long} in slot ${k + 1}`}); return (t >= NT ? rows.concat([{l:'› MASTERING', gap:true, act:() => openMst(), info:() => 'EQ, resonance suppressor, compressor and limiter on the master bus (auto master ' + (S.mst.on ? 'on' : 'off') + ')'}]) : rows).concat([eqRow], t >= NT ? mstWinRows() : []); }
   rows.push({l:'ACTIVE', gap:true, desc:TFX[f.type].long, tog:true, get:() => f.on ? 1 : 0, set:v => { f.on = !!v; fxChanged(t); }, min:0, max:1, d:1, fmt:v => onOff(v) + `  slot ${k + 1} ` + TFX[f.type].n,
     info:() => `Slot ${k + 1}: ${TFX[f.type].long}. ` + (TFX[f.type].about ? TFX[f.type].about + ' ' + (pumpLatTxt(t, k) ? pumpLatTxt(t, k)[0].toUpperCase() + pumpLatTxt(t, k).slice(1) + '. ' : '') : '') + 'OFF bypasses it'});
   const PU = TFX[f.type].pump;   // …PUMP: a pump effect's boxes (fmt sees the slot: it shows the exact value), its presets and OPEN
@@ -24932,7 +24932,7 @@ function fxRows(){
     }
     if (PU === 'meter') rows.push({l:'› RESET', act:() => { PumpFX.set(t, k, {reset:(f.pump.reset | 0) + 1}, {live:true, keepPreset:true}); toast('pump METER: loudness reset.'); }, info:() => 'Starts the loudness measurement again (integrated, LRA, maxima)'});
   }
-  return (t >= NT ? rows.concat([{l:'› MASTERING', gap:true, act:() => openMst(), info:() => 'EQ, resonance suppressor, compressor and limiter on the master bus (' + (S.mst.on ? 'on' : 'off') + ')'}]) : rows).concat([eqRow], t >= NT ? mstWinRows() : []);
+  return (t >= NT ? rows.concat([{l:'› MASTERING', gap:true, act:() => openMst(), info:() => 'EQ, resonance suppressor, compressor and limiter on the master bus (auto master ' + (S.mst.on ? 'on' : 'off') + ')'}]) : rows).concat([eqRow], t >= NT ? mstWinRows() : []);
 }
 // The FX screen is two regions: the slot list (TRACK + SLOT 1–4) and the controls of one slot
 // (ACTIVE + its parameters). ▶ (or a sideways swipe right) opens the slot under the cursor; ◀ (or a
@@ -25910,7 +25910,7 @@ function del(){
     if (tv === 'phrase' && k === 'note'){ const r = S.phrases[cPhrase] && S.phrases[cPhrase][c.y]; if (r && r.slice(0, NCOL).every(n => n < 0)) r[IC] = -1; }
     return draw();
   }
-  if (tv === 'mixer'){ if (c.y === 5) return fxDelLast(onMstCell() ? NT : c.x); if (c.y === 4){ setChainOn(c.x, false); return draw(); } if (c.y === 7 && c.mx === 1) return toast('Mastering: EDIT opens it · EDIT+◀ turns it off, EDIT+▶ on'); if (c.y === 7 && c.mx === 2){ S.mout = 255; moApply(); } else if (c.y === 7){ S.master = 255; rtRoute(); } else { const m = S.mix[c.x], f = freshMix(); if (mixFv()) m.vol = TRK_UNITY; else if (c.y === 0) m.trim = f.trim; else if (c.y === 1) m.pan = f.pan; else if (c.y === 2) m.mute = false; else if (c.y === 3) m.solo = false; } mixChanged(); return draw(); }
+  if (tv === 'mixer'){ if (c.y === 5) return fxDelLast(onMstCell() ? NT : c.x); if (c.y === 4){ setChainOn(c.x, false); return draw(); } if (c.y === 7 && c.mx === 1) return toast('Auto master: EDIT opens it · EDIT+◀ turns it off, EDIT+▶ on'); if (c.y === 7 && c.mx === 2){ S.mout = 255; moApply(); } else if (c.y === 7){ S.master = 255; rtRoute(); } else { const m = S.mix[c.x], f = freshMix(); if (mixFv()) m.vol = TRK_UNITY; else if (c.y === 0) m.trim = f.trim; else if (c.y === 1) m.pan = f.pan; else if (c.y === 2) m.mute = false; else if (c.y === 3) m.solo = false; } mixChanged(); return draw(); }
   const r = rowsOf(tv)[c.y]; if (r && r.get && r.d != null){ r.set(r.d); if (r.after) r.after(); saveS(); draw(); }
 }
 // Whole rows: clear a row, insert a blank one (rows below move down), or remove one (rows below move up).
@@ -27796,7 +27796,7 @@ function info(){
     return ci < 0 || !FXC[ci] ? 'No command · EDIT adds one' : `${FXC[ci]} ${h2(vv)} · ` + (cTrack === MT && FXC[ci] === 'VOL' ? `Master level ${dB(curve(Math.max(0, vv)))} from here on (back to the Mixer’s MASTER when it stops)` : cTrack === MT && /^(FXO|FLX|GAT|RTG)$/.test(FXC[ci]) ? FXI[FXC[ci]](Math.max(0, vv)).replace(/this track's/g, 'the master’s') + ' · on the master bus' : FXI[FXC[ci]](Math.max(0, vv)));
   }
   if (tv === 'mixer'){
-    if (c.y === 7 && c.mx === 1) return 'Mastering ' + (S.mst.on ? 'on' : 'off') + ' · ' + mstChainTxt() + ' · EDIT opens it · EDIT+◀▶ off / on';
+    if (c.y === 7 && c.mx === 1) return 'Auto master ' + (S.mst.on ? 'on' : 'off') + ' · ' + mstChainTxt() + ' · EDIT opens it · EDIT+◀▶ off / on';
     if (c.y === 7 && c.mx === 2){ const mo = S.mout == null ? 255 : S.mout; return 'Master OUT ' + hx(mo) + ' · ' + dB(curve(mo)) + ' · the master fader, after the limiter (no boost: FF is 0 dB) · drag its bar on the meter · ALT+EDIT 0 dB'; }   // GAIN STAGING
     if (c.y === 7) return 'Master ' + dB(curve(S.master)) + ' into ' + (S.mst.on && S.mst.lim && S.mst.lim.on ? 'mastering’s limiter' : S.limiter ? 'the limiter' : 'OUT (no limiter)') + (fxCount(S.mfx) ? ' · FX ' + fxList(S.mfx) : '') + ' · SHIFT+▶ master effects · ▶▶ OUT, the fader after it';
     if (c.y === 4){
@@ -28103,13 +28103,13 @@ function draw(){
       L.push(ml);
     }
     const mn = fxCount(S.mfx);
-    // The master row in signal order: MASTER (the drive into the limiter) → FX → MASTERING → OUT (GAIN STAGING, 27 Oct: the
+    // The master row in signal order: MASTER (the drive into the limiter) → FX → AUTO MASTER (was MASTERING; 12 Nov, owner) → OUT (GAIN STAGING, 27 Oct: the
     // master fader, after the limiter; its bar is on the L / R meter). ◀▶ move MASTER (mx 0), MASTERING (1), OUT (2).
     // The row is hex only, with two-space gaps (the dB are in the tips and the info line): with OUT and the dB labels it was
     // the Mixer's widest line, and on a phone the fit shrank every line's text to make room for it (review, 27 Oct).
     const mxc = c.y === 7 ? c.mx || 0 : -1, mo = S.mout == null ? 255 : S.mout;
     L.push([{t:'MASTER ', cls:'lb'}, {t:hx(S.master), cls:'v' + (mxc === 0 ? ' cur' : ''), x:0, y:7, title:'MASTER ' + dB(curve(S.master)) + ': the drive into the limiter'}, '  ', {t:mn ? 'FX ' + fxShort(S.mfx) : 'FX --', cls:mn ? 'cf' : 'e', title:mn ? 'Master FX: ' + fxList(S.mfx) : ''}, '  ',
-      {t:'MASTERING ' + (mstOn() ? 'ON' : 'OFF'), cls:'mstc' + (mstOn() ? ' on' : '') + (mxc === 1 ? ' cur' : ''), x:1, y:7}, '  ',
+      {t:'AUTO MASTER ' + (mstOn() ? 'ON' : 'OFF'), cls:'mstc' + (mstOn() ? ' on' : '') + (mxc === 1 ? ' cur' : ''), x:1, y:7}, '  ',
       {t:'OUT ', cls:'lb', title:'Master OUT: the master fader, after the limiter (FF = 0 dB, no boost). Its bar is on the meter below'}, {t:hx(mo), cls:'v' + (mxc === 2 ? ' cur' : ''), x:2, y:7, title:'OUT ' + dB(curve(mo))}]);
     for (const ch of ['L', 'R']) L.push([{t:ch + '   ', cls:'lb'}, {t:'', cls:'mm m1'}, {t:'', cls:'mm m2'}, {t:'', cls:'mm m3'}, {t:'', cls:'mm e'}, ' ', {t:'', cls:'mm lb'}]);
   } else if (tv === 'mod'){
@@ -28984,7 +28984,7 @@ $('mwX').addEventListener('click', closeMst);
 $('mwPump').addEventListener('click', () => mstToPump());   // SWITCH TO …PUMP
 document.addEventListener('keydown', e => { if (mwOpenNow && e.key === 'Escape' && !typing(e)){ e.preventDefault(); e.stopPropagation(); closeMst(); } }, true);
 $('mwOn').addEventListener('click', () => { S.mst.on = !S.mst.on; if (S.mst.on && !S.mst.eq.on && !mstNeedsWk(S.mst)) S.mst.eq.on = true; mstChanged(); mwBuild();
-  toast(S.mst.on ? 'Mastering on. Renders of the song include it.' : 'Mastering off: the master bus as before.'); });
+  toast(S.mst.on ? 'Auto master on. Renders of the song include it.' : 'Auto master off: the master bus as before.'); });
 // The chain: each stage's switch, its name (shows its editor) and how hard it's working.
 function mwChain(){
   const box = $('mwChain'); if (!box) return; box.replaceChildren();
@@ -28994,7 +28994,7 @@ function mwChain(){
     const b = el('div', 'mwst' + (stageOn(k) ? ' on' : '') + (mwSel === k ? ' sel' : '')); b.setAttribute('role', 'tab'); b.setAttribute('aria-selected', String(mwSel === k)); b.dataset.k = k;
     const sw = el('button', 'sw'); sw.type = 'button'; sw.title = (stageOn(k) ? 'Switch off ' : 'Switch on ') + n.toLowerCase(); sw.setAttribute('aria-label', sw.title);
     sw.addEventListener('click', e => { e.stopPropagation(); if (k === 'eq') S.mst.eq.on = !S.mst.eq.on; else S.mst[k].on = !S.mst[k].on;
-      if (stageOn(k)){ mwSel = k; if (!S.mst.on){ S.mst.on = true; toast('Mastering on.'); } } mstChanged(); mwBuild(); });
+      if (stageOn(k)){ mwSel = k; if (!S.mst.on){ S.mst.on = true; toast('Auto master on.'); } } mstChanged(); mwBuild(); });
     b.append(sw, el('span', 'nm', n), el('span', 'gr')); b.addEventListener('click', () => { mwSel = k; mwBuild(); });
     box.append(b);
   });
