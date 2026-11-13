@@ -3145,7 +3145,7 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
     <div class="bar vbar">
       <div class="vrow vkit" id="vKit"><span class="vel">Slots</span><span class="grp" role="group" aria-label="How many slots the kit has"><button type="button" class="sm" id="kSlotDn" aria-label="Fewer slots" title="8 fewer slots (the ones taken away keep their sound: more slots bring it back)">−</button><button type="button" class="sm kslotn" id="kSlotN" title="How many slots (pads) the kit has, 16 to 64. Tap to type a number">16</button><button type="button" class="sm" id="kSlotUp" aria-label="More slots" title="8 more slots">+</button></span><span class="vel">This slot</span><div class="seg" id="vKindSeg" role="group" aria-label="How this slot plays"></div><span class="lbl" id="vKindLbl"></span></div>
       <div class="vrow vttl"><span class="ttl" id="vNum">Pad 1</span><span class="vmeter" id="vMeter" title="Level of what you play here (pads, keys, MIDI), −48 to +6 dB. The line is 0 dB: past it the bar turns red and the safety limiter (Project → LIMITER) is holding the peaks down." aria-hidden="true"><i></i><b></b></span></div>
-      <div class="vrow vid"><input id="vName" type="text" aria-label="Pad name" spellcheck="false"><button class="sm play" id="vPlay" title="Play this pad (Space)"><svg class="ic" aria-hidden="true"><use href="#ic-play"/></svg>Play</button></div>
+      <div class="vrow vid"><input id="vName" type="text" aria-label="Pad name" spellcheck="false"><button class="sm play" id="vPlay" title="Play this pad (Shift+Space)"><svg class="ic" aria-hidden="true"><use href="#ic-play"/></svg>Play</button><button type="button" class="sm" id="vAud" aria-pressed="true" title="Audition: play this pad after each change you make to it, so you hear the edit. Turn it off to edit in silence.">Audition</button></div>
       <div class="vrow vact">
         <button type="button" id="vPre" class="sm presel" title="Presets: factory sounds and your own, saved in this song.">Pad presets…</button>
         <span class="grp" role="group" aria-label="Make"><button class="sm" id="vRand">Random</button><button class="sm" id="vInit">Init</button></span>
@@ -8681,9 +8681,31 @@ function rendered(i){ if (i === cur && view === 'synth'){ try { drawWave(); } ca
 // playing at once played what you just replaced. If the Worker is on it, wait for it; otherwise render here and play.
 const playOnRender = new Set();
 function playFresh(i){
+  clearTimeout(audT); audT = 0;   // AUDITION: this play covers the edit that asked for it (Random, a preset)
   const v = kit.voices[i]; if (!v) return;
   if (PW.ready && rwCan(v) && (stale(i) || slotAt(pend, i))){ playOnRender.add(i); bgRender(i); } else play(i);
 }
+// AUDITION (13 Nov; owner: "to hear those changes as progress is made is my main priority"): on the Synth page an edit
+// to the pad on screen plays it once the render with that edit has landed (playFresh), so the ear follows the hand
+// without a trip to the pad. A pause of AUD_WAIT ms in a drag plays it; a drag that never pauses still plays about
+// every AUD_MAX ms. Off with the Audition button by Play (kept per device). Never before the first touch or key
+// (start-up edits are not the player's), and never over a note the player is holding on that slot.
+const AUD_K = 'thunderplus-audition-v1', AUD_WAIT = 140, AUD_MAX = 420;
+let audOn = (() => { try { return localStorage.getItem(AUD_K) !== '0'; } catch(e){ return true; } })(), audT = 0, audT0 = 0;
+function audition(i){
+  if (!audOn || view !== 'synth' || i !== cur) return;
+  try { if (navigator.userActivation && !navigator.userActivation.hasBeenActive) return; } catch(e){}
+  const now = performance.now(); if (!audT) audT0 = now;
+  clearTimeout(audT); audT = setTimeout(audFire, Math.max(0, Math.min(AUD_WAIT, audT0 + AUD_MAX - now)));
+}
+function audFire(){
+  audT = 0; const i = cur;
+  if (!audOn || view !== 'synth' || !kit.voices[i]) return;
+  const h = synHeld[i]; if (h && !h.done && playing[i] !== h) return;   // a held key or MIDI note: leave it sounding
+  try { playFresh(i); } catch(e){}
+}
+function audSet(on){ audOn = !!on; if (!audOn){ clearTimeout(audT); audT = 0; } try { localStorage.setItem(AUD_K, audOn ? '1' : '0'); } catch(e){} audUpd(); }
+function audUpd(){ const b = $('vAud'); if (!b) return; b.classList.toggle('on', audOn); b.setAttribute('aria-pressed', audOn ? 'true' : 'false'); }
 // The pad on screen: drawn now from what there is, brought up to date in the background.
 function showCur(){ if (PW.ready && (stale(cur) || slotAt(pend, cur))){ bgRender(cur); drawWave(); } else { ensure(cur); drawWave(); } }   // bgRender does nothing while a job is out
 
@@ -8898,6 +8920,7 @@ function changed(i = cur, light){
   try { bassPush(i); } catch(e){}
   clearTimeout(rTimer); rTimer = setTimeout(showCur, 45);
   clearTimeout(sTimer); sTimer = setTimeout(save, 900);
+  try { audition(i); } catch(e){}
   if (!light){ renderStrip(); renderPads(); }
 }
 
@@ -9108,6 +9131,7 @@ const updChoke = makeSeg(chokeSeg, [[0,'Off'],[1,'1'],[2,'2'],[3,'3'],[4,'4']], 
 $('vName').addEventListener('input', e => { V().name = e.target.value; markKit(); renderPads(); clearTimeout(sTimer); sTimer = setTimeout(save, 900); });
 $('kitName').addEventListener('input', e => { kit.name = e.target.value; markKit(); clearTimeout(sTimer); sTimer = setTimeout(save, 900); });
 $('vPlay').addEventListener('click', () => play(cur));
+$('vAud').addEventListener('click', () => audSet(!audOn)); audUpd();
 $('wave').addEventListener('pointerdown', () => play(cur));
 $('vRand').addEventListener('click', () => { randVoice(V()); afterVoiceSwap(); playFresh(cur); });
 $('vInit').addEventListener('click', () => { const n = V().name; kit.voices[cur] = mkVoice(n, [{type:'sine'}]); afterVoiceSwap(); });
@@ -13422,9 +13446,14 @@ function drawWave(){
   const dpr = window.devicePixelRatio || 1, w = Math.max(10, cv.clientWidth), h = cv.clientHeight || 150;
   cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr);
   const g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, w, h);
-  const c = cache[cur]; if (!c) return;
-  const d = c.data, mid = h / 2, E = waveEnv(c), pk = E.pk;
+  const c = cache[cur], meta = $('wMeta');
+  // IN USE (31 Oct): which tracks play this pad's sound (through which instruments)
+  const inUse = () => { try { const u = padUses(cur); const sp = el('span', u.length ? 'inuse' : null, u.length ? 'in use: ' + u.map(x => 'TRK ' + trkList(x.tracks) + ' (inst ' + hx(x.i) + ')').join(' · ') : 'not in the song');
+    sp.title = u.length ? 'This sound plays on ' + u.map(x => 'track ' + trkList(x.tracks) + ' through instrument ' + hx(x.i)).join(', ') + '. Changing it changes it there.' : 'No instrument in the song plays this pad'; meta.append(sp); } catch(e){} };
   g.fillStyle = cssv('--screen'); g.fillRect(0, 0, w, h);
+  // STALE WAVE (13 Nov): a pad with no render yet left the pad before's time, peak and "in use" under an empty box
+  if (!c){ meta.innerHTML = ''; meta.append(el('span', null, 'rendering…')); inUse(); return; }
+  const d = c.data, mid = h / 2, E = waveEnv(c), pk = E.pk;
   g.fillStyle = cssv('--screen-line'); g.fillRect(0, mid, w, 1);
   g.fillStyle = cssv('--screen-ink');
   const per = WENV / w;
@@ -13435,13 +13464,11 @@ function drawWave(){
     g.fillRect(x, y1, 1, Math.max(1, y2 - y1));
   }
   const db = pk > 0 ? 20 * Math.log10(pk) : -Infinity;
-  const meta = $('wMeta'); meta.innerHTML = '';
+  meta.innerHTML = '';
   meta.append(el('span', null, (d.length / c.sr).toFixed(3) + ' s'), el('span', null, 'peak ' + (isFinite(db) ? db.toFixed(1) + ' dB' : 'silent')));
   if (pk > 1) meta.append(el('span', 'ov', 'over 0 dB, normalized on export'));
-  meta.append(el('span', null, 'tap to play'));
-  // IN USE (31 Oct): which tracks play this pad's sound (through which instruments)
-  try { const u = padUses(cur); const sp = el('span', u.length ? 'inuse' : null, u.length ? 'in use: ' + u.map(x => 'TRK ' + trkList(x.tracks) + ' (inst ' + hx(x.i) + ')').join(' · ') : 'not in the song');
-    sp.title = u.length ? 'This sound plays on ' + u.map(x => 'track ' + trkList(x.tracks) + ' through instrument ' + hx(x.i)).join(', ') + '. Changing it changes it there.' : 'No instrument in the song plays this pad'; meta.append(sp); } catch(e){}
+  meta.append(el('span', null, (touchUi() ? 'tap' : 'click') + ' to play'));
+  inUse();
 }
 window.addEventListener('resize', () => drawWave());
 
