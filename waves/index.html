@@ -20,7 +20,7 @@
   --bench:#ffffff; --panel:#ffffff; --panel-2:#f3f3f3; --edge:#111111; --ink:#111111; --muted:#555555; --track:#e6e6e6;
   --side:#efefef; --frame:#efefef; --glass:#050607;
   --video:#e3962a; --audio:#22958d; --audio-dark:#16625d; --mod:#7a58c8; --mod-dark:#4b318e; --gate:#c93d78; --gate-dark:#86214c; --rec:#cc3a2c;
-  --selc:#ff3d8b;
+  --selc:#111111;   /* the selection mark (module outline, cable halo): a neutral ink, never audio / control / gate (13 Nov, audit U1); skins set it */
   --font:Futura, "Futura PT", Jost, "Century Gothic", "Avenir Next", system-ui, sans-serif;
   color-scheme:light; box-sizing:border-box;
   padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
@@ -152,9 +152,21 @@ button{cursor:pointer}
 svg.cables{position:absolute; left:0; top:0; width:1px; height:1px; overflow:visible; pointer-events:none; z-index:1000000}
 svg.cables .cln{stroke-width:2.5px; stroke-linecap:square; stroke-linejoin:miter}
 svg.cables .cln.ctl{stroke-width:2px; stroke-dasharray:6 4}
-svg.cables .hit{cursor:pointer}
-svg.cables rect.bend{fill:var(--panel); stroke:var(--ink); stroke-width:1.5; pointer-events:none; opacity:0; cursor:move}
-body.alting svg.cables rect.bend{opacity:1; pointer-events:all}
+/* SIGNAL KINDS (13 Nov, audit M9, U1): told apart without hue. Audio is a solid line and a round jack, control a dashed line and a
+   round jack, gate a dotted line (round dots) and a diamond jack. */
+svg.cables .cln.gate{stroke-width:3px; stroke-linecap:round; stroke-dasharray:.1 7}
+/* CABLE STATES (13 Nov, audit D6, D9): hover and selected are CSS only (nothing runs per frame). The wide invisible .hit line is the halo;
+   its width is 14 screen pixels at any zoom (--iz is 1 / zoom, written when the zoom changes: Chrome's hit test ignores non-scaling strokes). */
+svg.cables .hit{cursor:pointer; stroke-width:calc(14px * var(--iz, 1))}
+svg.cables g:hover > .hit{stroke:var(--selc); stroke-opacity:.16}
+svg.cables g.sel > .hit{stroke:var(--selc); stroke-opacity:.32}
+svg.cables g:hover > .cln, svg.cables g.sel > .cln{stroke-width:4px}
+svg.cables g:hover > .cln.ctl, svg.cables g.sel > .cln.ctl{stroke-width:3.5px}
+svg.cables g:hover > .cln.gate, svg.cables g.sel > .cln.gate{stroke-width:4.5px}
+svg.cables g.dim{opacity:.3}   /* a module is selected: the cables that do not touch it step back */
+svg.cables rect.bend{fill:var(--panel); stroke:var(--ink); stroke-width:1.5; vector-effect:non-scaling-stroke; pointer-events:none; opacity:0; cursor:move;
+  transform-box:fill-box; transform-origin:center; transform:scale(var(--hs, 1))}   /* --hs keeps a handle about 12 px across when zoomed out */
+svg.cables g:hover > rect.bend, svg.cables g.sel > rect.bend, body.alting svg.cables rect.bend{opacity:1; pointer-events:all}
 
 .node{position:absolute; width:250px; background:var(--panel); border:3.5px solid var(--edge); user-select:none; -webkit-user-select:none; cursor:default}
 .node > header{display:flex; align-items:center; gap:8px; padding:7px 8px 7px 12px; cursor:grab; border-bottom:2px solid var(--edge); touch-action:none}
@@ -193,13 +205,14 @@ button.mk.more:hover{color:var(--ink); border-color:var(--ink)}
 .node.collapsed .port.free{display:none}
 .node.collapsed .port > .pl{min-width:0; max-width:56px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
 .node.collapsed .jack{transform:scale(.85)}
+.node.collapsed .jack[data-kind="gate"]{transform:rotate(45deg) scale(.85)}
 .port.stub > .pl{color:var(--mod)}
 .node:not(.collapsed) .port.stub{display:none}
 .node.collapsed.dense .port > .pl{display:none}
 @media (pointer: coarse){ .node > header .fold{position:relative} .node > header .fold::before{content:''; position:absolute; inset:-9px -10px} }
 @media (prefers-reduced-motion: reduce){ .node > header .fold svg{transition:none} }
 .node.selected{outline:3px solid var(--selc) !important; outline-offset:3px}
-.node.selected > header{background:color-mix(in srgb, var(--panel-2) 70%, var(--selc) 30%) !important}
+.node.selected > header{background:color-mix(in srgb, var(--panel-2) 84%, var(--selc) 16%) !important}   /* (13 Nov: 16%, the neutral selection mark would read as greyed out at 30%) */
 .node.selected::after{content:''; position:absolute; inset:0; background:var(--selc); opacity:.07; pointer-events:none}
 
 .ports{display:flex; justify-content:space-between; gap:10px; padding:7px 0; border-bottom:2px solid var(--edge)}
@@ -213,6 +226,9 @@ button.mk.more:hover{color:var(--ink); border-color:var(--ink)}
 .jack[data-kind="audio"]{--k:var(--audio)}
 .jack[data-kind="mod"]{--k:var(--mod)}
 .jack[data-kind="gate"]{--k:var(--gate)}
+/* GATE JACK (13 Nov, audit M9, U1): a diamond (a rotated square: the ring and target glow follow it, the centre stays put for the cables) */
+.jack[data-kind="gate"]{width:15px; height:15px; margin:2.5px; border-radius:2px; transform:rotate(45deg);
+  background:radial-gradient(circle, var(--glass) 0 3px, #4a4f57 3.5px 5px, var(--k) 5.5px)}
 .jack.small{width:16px; height:16px; position:absolute; left:-20px; top:50%; margin-top:-8px;
   background:radial-gradient(circle, var(--glass) 0 3px, #4a4f57 3.5px 4.5px, var(--k) 5px)}
 .jack.target{box-shadow:0 0 0 2px var(--panel), 0 0 0 5px var(--k)}
@@ -288,8 +304,8 @@ body.learning .row.sl{outline:1px dashed var(--muted); outline-offset:3px}
 /* ---------- touch screens and narrow windows ---------- */
 @media (pointer: coarse){
   .port{height:32px} .ins, .outs{gap:8px}
-  .jack{position:relative} .jack::before{content:''; position:absolute; inset:-9px; border-radius:50%}
-  svg.cables .hit{stroke-width:26px}
+  .jack{position:relative} .jack::before{content:''; position:absolute; inset:-9px; border-radius:50%} .jack[data-kind="gate"]::before{inset:-11px}
+  svg.cables .hit{stroke-width:calc(26px * var(--iz, 1))}
   .tb, .btn{min-height:42px}
   select, input{font-size:16px}
   input[type=range]{height:34px}
@@ -375,7 +391,7 @@ document.addEventListener('contextmenu', e => { if (e.cancelable && !(e.target.c
     <div id="groups"></div>
     <svg class="cables" id="cables" xmlns="http://www.w3.org/2000/svg"></svg>
   </div>
-  <div class="hint" id="hint"><span>Drag from an output jack to an input jack to patch (on a touch screen you can also tap one jack, then the other; double-tap a cable to remove it). Every slider has a small purple jack on its left: patch an LFO, envelope or any other signal into it to move that slider. Drag a patched input to move its cable, or drop it on empty space to unplug. Hold Option (Alt on Windows) and click while drawing a cable to bend it, or Option-drag an existing cable. Double-click a cable to remove it, or a module’s title bar to collapse it. Drag the background or scroll with two fingers to pan, and pinch to zoom. Shift-click or Shift-drag to select modules, then right-click to group them. Play notes on your computer keyboard: Z to M and Q to P, with - and = for octaves.</span><button id="hintx" aria-label="Hide tips">×</button></div>
+  <div class="hint" id="hint"><span>Drag from an output jack to an input jack to patch (on a touch screen you can also tap one jack, then the other; double-tap a cable to remove it). Every slider has a small purple jack on its left: patch an LFO, envelope or any other signal into it to move that slider. Drag a patched input to move its cable, or drop it on empty space to unplug. Hold Option (Alt on Windows) and click while drawing a cable to bend it, or Option-drag an existing cable. Click a cable to select it (Delete removes it, and its bend handles show: drag one to move the bend), double-click it to remove it, or a module’s title bar to collapse it. Gate cables are dotted and gate jacks are diamonds. Drag the background or scroll with two fingers to pan, and pinch to zoom. Shift-click or Shift-drag to select modules, then right-click to group them. Play notes on your computer keyboard: Z to M and Q to P, with - and = for octaves.</span><button id="hintx" aria-label="Hide tips">×</button></div>
   <div class="dock bottom" id="dockbot"><div class="dockport" id="keysdock" hidden><span>Keys</span><span class="touchkeys" id="touchkeys"></span></div></div>
   <div class="lasso" id="lasso" hidden></div>
   <div class="emptylbl" id="emptylbl" aria-hidden="true" hidden></div>
@@ -2413,29 +2429,55 @@ window.addEventListener('keydown', e => {
   e.preventDefault(); store.snapshot(); const ids = [...selected]; for (const x of ids) removeModule(x); clearSel();
   toast(ids.length === 1 ? 'Module removed (Undo brings it back).' : ids.length + ' modules removed (Undo brings them back).');
 });
-function setSel(id, on){ const n = nodes.get(id); on ? selected.add(id) : selected.delete(id); if (n) n.el.classList.toggle('selected', on); }
-function clearSel(){ for (const id of selected){ const n = nodes.get(id); if (n) n.el.classList.remove('selected'); } selected.clear(); }
+function setSel(id, on){ const n = nodes.get(id); on ? selected.add(id) : selected.delete(id); if (on) clearCableSel(); relDirty = true; if (n) n.el.classList.toggle('selected', on); }
+function clearSel(){ for (const id of selected){ const n = nodes.get(id); if (n) n.el.classList.remove('selected'); } selected.clear(); relDirty = true; }
 
 /* ----- cables ----- */
 const cableEls = new Map();
+/* CABLE SELECTION (13 Nov, audit D6, D9): a click on a cable selects it (Delete removes it, Escape or a click on the background lets go);
+   a selected cable and a hovered one show their bend handles. Cables and modules are never selected together. */
+let selCable = null, relDirty = false, hsZ = 0;
+function clearCableSel(){ if (!selCable) return; const el = cableEls.get(selCable); if (el) el.g.classList.remove('sel'); selCable = null; }
+function selectCable(c){
+  if (selCable === c) return;
+  clearCableSel(); if (selected.size) clearSel();
+  const el = cableEls.get(c); if (!el) return;
+  selCable = c; el.g.classList.add('sel');
+}
+// A module is selected: the cables that do not touch it step back (set on a selection change, never per frame).
+function paintRel(){
+  relDirty = false; const any = selected.size > 0;
+  for (const [c, el] of cableEls){ const dim = any && !selected.has(c.from[0]) && !selected.has(c.to[0]); if (el.dim !== dim){ el.dim = dim; el.g.classList.toggle('dim', dim); } }
+}
+window.addEventListener('keydown', e => {
+  if (!selCable) return;
+  if (e.key === 'Escape'){ clearCableSel(); return; }
+  if ((e.key !== 'Delete' && e.key !== 'Backspace') || e.ctrlKey || e.metaKey || e.altKey || typing(e)) return;
+  if ((learn && learn.on) || document.querySelector('.dlgov')) return;
+  const c = selCable; clearCableSel(); e.preventDefault();
+  if (!doc.cables.includes(c)) return;
+  store.snapshot(); disconnect(c); toast('Cable removed (Undo brings it back).');
+});
 function cableKind(c){
   const src = modById(c.from[0]); const k = src && MODULES[src.type] && MODULES[src.type].outputs[c.from[1]];
   return KIND[k] || 'mod';
 }
 function cableGroup(kind){
   const g = svgEl('g', {});
-  const line = svgEl('path', {class:'cln' + (isCtl(kind) ? ' ctl' : ''), fill:'none', stroke: CABLE[kind][0]});
+  const line = svgEl('path', {class:'cln' + (isCtl(kind) ? ' ctl' : '') + (kind === 'gate' ? ' gate' : ''), fill:'none', stroke: CABLE[kind][0]});
   g.append(line);
   const ends = [0, 1].map(() => { const c = svgEl('circle', {r:3.5, fill: CABLE[kind][1]}); g.append(c); return c; });
   return { g, line, ends, kind };
 }
 function syncCableEls(){
   for (const [c, el] of cableEls) if (!doc.cables.includes(c)){ el.g.remove(); cableEls.delete(c); }
+  if (selCable && !cableEls.has(selCable)) selCable = null;   // its cable is gone (removed, or an undo built the patch again)
+  relDirty = true;
   for (const c of doc.cables){
     if (cableEls.has(c)) continue;
     const el = cableGroup(cableKind(c));
     const hit = svgEl('path', {fill:'none', stroke:'transparent', 'stroke-width':16, 'pointer-events':'stroke', class:'hit'});
-    const title = svgEl('title', {}); title.textContent = 'Double-click or right-click to remove'; hit.append(title);
+    const title = svgEl('title', {}); title.textContent = 'Click to select (Delete removes it), double-click or right-click to remove'; hit.append(title);
     hit._cable = c;   // the right-click menu's "Remove cable" (3 Nov)
     hit.addEventListener('pointerdown', ev => {
       if (ev.button !== 0 || (MAC && ev.ctrlKey && ev.pointerType !== 'touch')) return;   // a right-click (Ctrl+click on a Mac) is the menu
@@ -2443,6 +2485,7 @@ function syncCableEls(){
       // A cable lying over a jack shouldn't block it: pass the press through to the jack.
       const jack = document.elementsFromPoint(ev.clientX, ev.clientY).find(x => x.classList && x.classList.contains('jack'));
       if (jack){ onJackDown(ev, jack); return; }
+      selectCable(c);
       if (ev.altKey){ ev.preventDefault(); cableBendAt(ev, c); return; }
       if (ev.pointerType === 'touch'){
         const now = performance.now(), lt = hit._tap;
@@ -2582,28 +2625,28 @@ function snapBend(d, P, shift){
   if (shift || Math.abs(ang - near) < 0.2) return [Math.round(prev[0] + Math.cos(near) * L), Math.round(prev[1] + Math.sin(near) * L)];
   return P;
 }
-// Square handles on each bend point; they show while Option/Alt is held.
+// Square handles on each bend point; they show on a hovered or selected cable (and while Option/Alt is held).
 function syncHandles(el, c){
   const pts = c.pts || [];
   el.hdl = el.hdl || [];
   while (el.hdl.length > pts.length) el.hdl.pop().remove();
   while (el.hdl.length < pts.length){
     const r = svgEl('rect', {class:'bend', width:10, height:10});
-    r.addEventListener('pointerdown', ev => bendDrag(ev, c, () => el.hdl.indexOf(r)));
+    r.addEventListener('pointerdown', ev => { if (ev.button !== 0) return; selectCable(c); bendDrag(ev, c, () => el.hdl.indexOf(r), true); });   // a plain click on a handle only selects (no undo step unless it moves)
     el.g.append(r); el.hdl.push(r);
   }
   el.hdl.forEach((r, i) => { r.setAttribute('x', pts[i][0] - 5); r.setAttribute('y', pts[i][1] - 5); });
 }
 // Drag a bend point. Option/Alt-click a point without moving it to remove it.
-function bendDrag(ev, c, idx){
+function bendDrag(ev, c, idx, lazy){
   ev.stopPropagation(); ev.preventDefault();
-  const i = idx(), sx = ev.clientX, sy = ev.clientY; let moved = false;
-  store.snapshot();
-  const mv = e => { if (Math.hypot(e.clientX - sx, e.clientY - sy) > 3) moved = true; if (moved) c.pts[i] = worldPt(e); };
+  const i = idx(), sx = ev.clientX, sy = ev.clientY; let moved = false, snapped = !lazy;
+  if (!lazy) store.snapshot();
+  const mv = e => { if (Math.hypot(e.clientX - sx, e.clientY - sy) > 3) moved = true; if (moved){ if (!snapped){ snapped = true; store.snapshot(); } c.pts[i] = worldPt(e); } };
   const up = e => {
     window.removeEventListener('pointermove', mv); window.removeEventListener('pointerup', up);
-    if (!moved && e.altKey){ c.pts.splice(i, 1); if (!c.pts.length) delete c.pts; }
-    store.touch();
+    if (!moved && e.altKey){ if (!snapped) store.snapshot(); c.pts.splice(i, 1); if (!c.pts.length) delete c.pts; snapped = true; }
+    if (snapped) store.touch();
   };
   window.addEventListener('pointermove', mv); window.addEventListener('pointerup', up);
 }
@@ -2649,6 +2692,7 @@ function applyPan(){
   const v = view();
   world.style.transform = `translate(${v.x}px, ${v.y}px) scale(${v.zoom})`;
   zoomVal.textContent = Math.round(v.zoom * 100) + '%';
+  if (v.zoom !== hsZ){ hsZ = v.zoom; svg.style.setProperty('--iz', (1 / v.zoom).toFixed(4)); svg.style.setProperty('--hs', Math.max(1, 1.2 / v.zoom).toFixed(3)); }   // hit width and bend handles keep their screen size (only when the zoom changed)
 }
 // Zoom so the point under (cx, cy) stays put.
 function zoomAt(cx, cy, z){
@@ -2744,7 +2788,7 @@ ws.addEventListener('pointerdown', e => {
     mv(e); ws.addEventListener('pointermove', mv); ws.addEventListener('pointerup', up); ws.addEventListener('pointercancel', up);
     return;
   }
-  if (e.pointerType !== 'mouse' || e.button === 0) clearSel();   // (a middle-button pan keeps the selection)
+  if (e.pointerType !== 'mouse' || e.button === 0){ clearSel(); clearCableSel(); }   // (a middle-button pan keeps the selection)
   if (touches.size > 1) return;
   ws.setPointerCapture(e.pointerId); ws.classList.add('panning');
   // Pan by each step's movement, not from where the finger first landed: after a pinch (a second finger came and
@@ -3277,8 +3321,11 @@ function helpDoc(){
   const EDGE = { midi:'#b8865a', gen:'#139a9a', afx:'#b24fb0', mod:'#c99a00', aout:'#3f6fb5', util:'#e07a2e' };
   const KC = { audio:'#22958d', mod:'#7a58c8', gate:'#c93d78' };
   const ABOUT = PAGE_ABOUT;
+  // The signal kinds, drawn the way the patch draws them: told apart by line and jack shape as well as colour.
+  const legend = '<div class="legend"><b>Signal kinds</b>' + [['audio', 'Sound', 'solid line, round jack', '2.5', ''], ['mod', 'Control', 'dashed line, round jack', '2', ' stroke-dasharray="6 4"'], ['gate', 'Gate', 'dotted line, diamond jack', '3', ' stroke-dasharray="0.1 7" stroke-linecap="round"']]
+    .map(([k, l, d, w, da]) => '<span class="lg"><svg width="46" height="14" viewBox="0 0 46 14"><path d="M2 7H44" fill="none" stroke="' + KC[k] + '" stroke-width="' + w + '"' + da + '/></svg><i class="jk ' + (k === 'gate' ? 'g' : '') + '" style="background:' + KC[k] + '"></i>' + esc(l + ': ' + d) + '</span>').join('') + '</div>';
   const guide = [
-    ['Patching', 'Drag from an output jack (right edge) to an input jack (left edge). Teal cables carry sound, purple dashed cables carry modulation and pink dashed cables carry gates. Every slider has a small purple jack on its left for modulation. Drag a patched input to move its cable, or drop it on empty space to unplug. Double-click a cable to remove it. Hold Option (Alt on Windows) and click while drawing a cable to bend it, or Option-drag an existing cable.'],
+    ['Patching', 'Drag from an output jack (right edge) to an input jack (left edge). Teal solid cables carry sound, purple dashed cables carry modulation and pink dotted cables carry gates; gate jacks are diamonds, the others round. Every slider has a small purple jack on its left for modulation. Drag a patched input to move its cable, or drop it on empty space to unplug. Click a cable to select it: Delete removes it, Escape lets go, and its bend handles show (drag one to move the bend, Option-click one to remove it). Double-click a cable to remove it. Hold Option (Alt on Windows) and click while drawing a cable to bend it, or Option-drag an existing cable.'],
     ['Modulation', 'Patch any signal into a slider’s small purple jack and it moves that slider: the slider sets the center, and the signal swings it across its range. The value turns purple and a mark shows where the slider really is. Use the Depth slider on an LFO or envelope, or an Attenuverter, to make the swing smaller.'],
     ['Polyphony', 'Host In runs once for every voice, and so does anything it feeds; everything else (effects, LFOs, Out) runs once. Put effects after the voices, before Out.'],
     ['Moving around', 'Scroll with two fingers or turn the mouse wheel to pan (Shift+wheel sideways); with a mouse a middle-button drag pans too, and on a touch screen dragging the background does. Pinch or Ctrl/⌘+wheel zooms; the zoom buttons are in the top bar (click the percentage to type one, Fit shows everything).'],
@@ -3290,7 +3337,7 @@ function helpDoc(){
   ];
   const groups = PALETTE.filter(([g]) => !isSection(g)).map(([g, items]) => '<div class="mgroup"><h3>' + esc(g) + '</h3><div class="mgrid">' + items.map(([t]) => {
     const d = MODULES[t], ed = EDGE[famOf(t)];
-    const io = (lbl, o) => Object.keys(o).length ? '<div class="io"><b>' + lbl + '</b>' + Object.entries(o).map(([p, k]) => '<span class="pt"><i style="background:' + KC[KIND[k]] + '"></i>' + esc((PORT_LABEL[p] || p) + ((p + 'R') in o ? ' L' : '')) + '</span>').join('') + '</div>' : '';
+    const io = (lbl, o) => Object.keys(o).length ? '<div class="io"><b>' + lbl + '</b>' + Object.entries(o).map(([p, k]) => '<span class="pt"><i' + (KIND[k] === 'gate' ? ' class="g"' : '') + ' style="background:' + KC[KIND[k]] + '"></i>' + esc((PORT_LABEL[p] || p) + ((p + 'R') in o ? ' L' : '')) + '</span>').join('') + '</div>' : '';
     return '<div class="mcard" style="--ed:' + ed + '"><h4>' + esc(d.label) + '</h4><p>' + esc(ABOUT[t] || SHARED_ABOUT[t] || d.about || '') + '</p>' + io('Inputs', d.inputs) + io('Outputs', d.outputs) + '</div>';
   }).join('') + '</div></div>').join('');
   return '<!doctype html><html><head><meta charset="utf-8"><style>' +
@@ -3305,10 +3352,12 @@ function helpDoc(){
     '.mgrid{display:grid; grid-template-columns:repeat(auto-fill, minmax(290px, 1fr)); gap:14px} .mcard{background:#fff; border:3.5px solid var(--ed); padding:12px 14px}' +
     '.mcard h4{margin:0 0 6px; font-size:16.5px; font-weight:600; border-bottom:2px solid var(--ed); padding-bottom:6px} .mcard p{margin:0 0 8px; font-size:14px; line-height:1.5}' +
     '.io{display:flex; flex-wrap:wrap; gap:5px 10px; align-items:center; font-size:12.5px; margin-top:4px} .io b{font-size:12px; min-width:62px}' +
-    '.pt{display:inline-flex; align-items:center; gap:5px; background:#fff; border:1.5px solid #111; padding:1px 7px} .pt i{width:9px; height:9px; border-radius:50%; display:inline-block}' +
+    '.pt{display:inline-flex; align-items:center; gap:5px; background:#fff; border:1.5px solid #111; padding:1px 7px} .pt i{width:9px; height:9px; border-radius:50%; display:inline-block} .pt i.g{width:8px; height:8px; border-radius:1px; transform:rotate(45deg)}' +
+    '.legend{display:flex; flex-wrap:wrap; gap:8px 22px; align-items:center; background:#fff; border:3px solid #111; padding:10px 18px; margin-bottom:14px; font-size:14px} .lg{display:inline-flex; align-items:center; gap:7px}' +
+    '.jk{width:12px; height:12px; border-radius:50%; display:inline-block; flex:none} .jk.g{width:10px; height:10px; border-radius:1px; transform:rotate(45deg)}' +
     '@media (max-width:700px){ body{grid-template-columns:1fr} nav{display:none} main{padding:16px} }' +
     '</style></head><body><nav><h1>waves Help</h1>' + guide.map(([t], i) => '<a href="#g' + i + '">' + esc(t) + '</a>').join('') +
-    '</nav><main><div class="guide">' + guide.map(([t, b], i) => '<h2 id="g' + i + '">' + esc(t) + '</h2><p>' + esc(b) + '</p>').join('') + '</div>' + groups + '</main></body></html>';
+    '</nav><main>' + legend + '<div class="guide">' + guide.map(([t, b], i) => '<h2 id="g' + i + '">' + esc(t) + '</h2><p>' + esc(b) + '</p>').join('') + '</div>' + groups + '</main></body></html>';
 }
 function openHelp(){
   let ov = document.getElementById('helpov');
@@ -3488,6 +3537,7 @@ if (firstRun) requestAnimationFrame(() => fitAll());
 
 function loop(){
   autoPanStep();
+  if (relDirty) paintRel();
   // Redraw the cables every frame while a drag, auto-pan or pan/zoom is live, then back off to a
   // slow safety pass — an idle patch was re-measuring every jack 60–120×/s for nothing.
   const now = performance.now();
