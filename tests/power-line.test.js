@@ -18,6 +18,6 @@ test('power line: the full form adds what the browser exposes, and leaves out wh
   assert.equal(f({ level: null }, false), '');
 });
 test('power line: wired in at PLAY, in the header settings line, and only listeners while stopped', () => {
-  assert.match(src, /pbLog\('PLAY ' \+ mode[^\n]*pwFmt\(pwState\(\), true\)/); assert.match(src, /runaway kick \$\{rkOn \? 'on' : 'off'\}\$\{\(\(\) => \{ try \{ const t = pwFmt/);
+  assert.match(src, /pbLog\('PLAY ' \+ mode[\s\S]{0,600}?pwFmt\(pwState\(\), true\)/); assert.match(src, /runaway kick \$\{rkOn \? 'on' : 'off'\}\$\{\(\(\) => \{ try \{ const t = pwFmt/);
   assert.match(src, /function pwNote\(why\)\{ if \(!tp\.on \|\| !pwB\) return;/, 'a battery event while stopped does nothing');
 });

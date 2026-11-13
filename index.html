@@ -1343,6 +1343,10 @@ body.mob .top #tLen{min-height:34px; padding:0 8px; align-self:auto}
 .tcpu i{position:absolute; left:0; bottom:0; height:4px; width:0; background:var(--ink)}
 .tcpu.warn i{background:var(--pl)}
 .tcpu.hot{color:var(--rec)} .tcpu.hot i{background:var(--rec)}
+.cpubox{min-width:min(420px,92vw); max-width:92vw; text-align:left} .cpusub{color:var(--muted)} .cpulist{display:flex; flex-direction:column; margin:6px 0}
+.cpurow{display:flex; justify-content:space-between; gap:12px; padding:6px 0; border-bottom:1px solid var(--line); font-size:var(--fs-4)} .cpurow b{font-variant-numeric:tabular-nums; white-space:nowrap} .cpuNone{padding:6px 0; color:var(--muted)}
+.cpukeep{margin:8px 0 4px; font-weight:600} .cpukeep.bad{color:var(--rec)} .cputip{margin:4px 0 10px}
+.cpubox .btnrow{flex-wrap:wrap; gap:6px} .cpubox .btnrow button{min-height:40px}
 .tpad{display:flex; justify-content:space-between; align-items:center; gap:16px; flex:1}
 .tkp{flex:1; min-width:0; display:flex; flex-direction:column; gap:5px}
 .kpr{display:grid; grid-template-columns:repeat(var(--n),minmax(0,1fr)); gap:5px}
@@ -22367,7 +22371,8 @@ function tStart(mode, o){
   if (mode === 'song' && (o.row | 0) > 0) try { chaseFx(o.row | 0, seq.time); } catch(e){ tpLog('chase', e); }   // CHASE: the effect commands before the start row
   tp.core = false;
   if (coreWanted() && core.ready && !core.bad && !(o && o.page)) coreStart(mode, o, t0start, rsFirst ? {ref:pz.ref, row:pz.row, step:pz.step} : null);
-  rkReset(); pbLog('PLAY ' + mode + ' · ' + pbState()); try { if (pwB) pwStep = Math.floor(pwB.level * 20); const pw = pwFmt(pwState(), true); if (pw) pbLog(pw); } catch(e){} pbLvReset(); setTimeout(() => { if (tp.on) pbLog(`4 s into PLAY: level ${pbLevel()}`); }, 4000);   // (9 Nov: to compare Latency settings)   // not loaded yet: this PLAY as before, the core loads at STOP
+  rkReset(); pbLog('PLAY ' + mode + ' · ' + pbState()); pbLvReset(); setTimeout(() => { if (tp.on) pbLog(`4 s into PLAY: level ${pbLevel()}`); }, 4000);   // (9 Nov: to compare Latency settings)   // not loaded yet: this PLAY as before, the core loads at STOP
+  try { if (pwB) pwStep = Math.floor(pwB.level * 20); const pw = pwFmt(pwState(), true); if (pw) pbLog(pw); } catch(e){}   // POWER STATE in the report
   if (lkp) lkStarted(lkp);   // ABLETON LINK: Link's exact tempo; ours tells the session
   tp.timer = pumpTimer(); pump(); if (!handing) draw(); songBtn(); chainsTempo(); if (typeof frameWake === 'function') frameWake();   // (a hand-over happens out of view: no draw, which was most of its time)
   bgPlay(true);   // BACKGROUND PLAY
@@ -22828,7 +22833,7 @@ function coreStart(mode, o, t0, rs){
    state, a 2-second summary of the core's rows while playing (how many, how late or early, notes dropped as late, the
    core's catch-up skips), rows still arriving after STOP (and the STOP sent again then), and the level and live voices 1 and
    3 seconds after a STOP. */
-const PB = {handT0:0, handW:0, ck:null, ckBad:0, stopT:0, log:[], n:0, late:0, drop:0, ahead:0, stray:0, strayT:0, skips:0, t:0, rk:{sum:0, hot:0, win:0, n:0, last:-1e9, watch:null}};
+const PB = {ev:[], stalls:[], handT0:0, handW:0, ck:null, ckBad:0, stopT:0, log:[], n:0, late:0, drop:0, ahead:0, stray:0, strayT:0, skips:0, t:0, rk:{sum:0, hot:0, win:0, n:0, last:-1e9, watch:null}};
 function pbLog(s){ try { PB.log.push((performance.now() / 1000).toFixed(2) + ' ' + s); if (PB.log.length > 400) PB.log.splice(0, 100); } catch(e){} }
 /* POWER STATE IN THE REPORT (12 Nov, owner: "does the app really perform better plugged in?"): battery level and charging (navigator.getBattery, where the browser has it),
    plus what else bears on throttling that needs no permission: cores, device memory, data saver, reduced motion. Written at each PLAY and, while playing, when charging
@@ -22865,7 +22870,7 @@ document.addEventListener('visibilitychange', () => { if (!document.hidden) PB.v
     ensure = W('pad render on the page', ensure, a => `pad ${a[0] + 1}`);
   } catch(e){ tpLog('slow-work timing not installed', e); }
   let last = 0;
-  try { new PerformanceObserver(l => { if (!tp.on) return; for (const e of l.getEntries()){ const n = performance.now(); if (e.duration < 120 || n - last < 250) continue; last = n;
+  try { new PerformanceObserver(l => { if (!tp.on) return; for (const e of l.getEntries()){ const n = performance.now(); if (e.duration < 120) continue; PB.stalls.push({t:n, d:e.duration}); if (PB.stalls.length > 60) PB.stalls.shift(); if (n - last < 250) continue; last = n;
       const sc = (e.scripts || []).slice().sort((p, q) => q.duration - p.duration).slice(0, 3).map(q => `${String(q.sourceFunctionName || q.invoker || '?').slice(0, 40)} ${q.duration | 0}`).join(', ');
       pbLog(`long frame ${e.duration | 0} ms (blocked ${e.blockingDuration | 0}) · row ${tp.hiRow}${sc ? ' · ' + sc : ''}`); } }).observe({type:'long-animation-frame'}); } catch(e){} }
 // CLOCK DETAIL (8 Nov): on the Fold the audio clock runs ahead of real time while playing. Once a second, while playing and for 5 s after STOP, a line goes in the
@@ -22957,6 +22962,7 @@ function coreFail(self){
 idleTick(() => { try { pbClock(); } catch(e){} }, 2000, () => tp.on, 4000);   // BATTERY: every 2 s while playing (hidden too), a slow reset check otherwise
 function pbSum(){ const now = performance.now(); if (now - PB.t < 2000) return; PB.t = now;
   if (PB.n) pbLog(`rows ${PB.n} · latest note ${(PB.late * 1000).toFixed(0)} ms late · dropped ${PB.drop} · ahead ${(PB.ahead * 1000).toFixed(0)} ms · core skips ${PB.skips} · voices ${rt && rt.pl.aliveN ? rt.pl.aliveN() : '?'}`);
+  if (PB.late >= 0.05 || PB.drop){ PB.ev.push({t:now, late:PB.late, drop:PB.drop}); if (PB.ev.length > 60) PB.ev.shift(); }   // CPU PANEL (12 Nov): late or dropped notes, kept for its last-minute line
   PB.n = PB.late = PB.drop = PB.ahead = 0; }
 function pbAfterStop(){ PB.stopT = performance.now(); pbLvStop(); pbLog('STOP · ' + pbState()); for (const ms of [1000, 3000]) setTimeout(() => pbLog(`${ms / 1000} s after STOP: level ${pbLevel()} · voices ${rt && rt.pl.aliveN ? rt.pl.aliveN() : '?'} · stray rows ${PB.stray} · ` + pbState()), ms); }
 async function pbCopy(){
@@ -32189,6 +32195,8 @@ function globalCpuValue(){
    (AudioContext.playbackStats) that count is used; otherwise the audio clock is compared with the page clock
    (getOutputTimestamp): when the audio thread falls behind, the audio clock slips back against real time. */
 const glitch = {n:0, t:-1e9, off:null, base:null};
+glitch.ts = [];   // CPU PANEL (12 Nov): when each dropout came (the last minute's count)
+function glitchAdd(k){ const now = performance.now(); for (let i = 0; i < Math.min(k, 20); i++) glitch.ts.push(now); if (glitch.ts.length > 60) glitch.ts.splice(0, glitch.ts.length - 60); }
 // BATTERY (8 Nov): the scan is for a song playing or a sound just made; with nothing sounding it drops to a slow check (below).
 // The count is rebased when it comes back from such a quiet stretch (a stall while silent is not a dropout), but never over a
 // stretch of PLAYBACK (a song playing with the screen off still has its dropouts counted when the screen comes back).
@@ -32199,7 +32207,7 @@ function glitchScan(){
   if (ps && typeof ps.underrunEvents === 'number'){
     if (glitch.base == null) glitch.base = ps.underrunEvents;
     else if (rb) glitch.base = ps.underrunEvents - glitch.n;
-    const k = ps.underrunEvents - glitch.base; if (k > glitch.n){ glitch.n = k; glitch.t = performance.now(); dropNote(); }
+    const k = ps.underrunEvents - glitch.base; if (k > glitch.n){ glitchAdd(k - glitch.n); glitch.n = k; glitch.t = performance.now(); dropNote(); }
     return;
   }
   if (!ctx.getOutputTimestamp) return;
@@ -32207,7 +32215,7 @@ function glitchScan(){
   const off = ts.performanceTime - ts.contextTime * 1000;
   if (glitch.off == null){ glitch.off = off; return; }
   const d = off - glitch.off;
-  if (d > 12){ glitch.n++; glitch.t = performance.now(); glitch.off = off; dropNote(); }
+  if (d > 12){ glitchAdd(1); glitch.n++; glitch.t = performance.now(); glitch.off = off; dropNote(); }
   else if (d < -12) glitch.off = off;          // a resume or a clock re-sync: start again from here
   else glitch.off += d * 0.05;                 // follow the two clocks' slow drift
 }
@@ -32278,13 +32286,67 @@ idleTick(() => {
   const byp = new Set(); for (let t = 0; t < ntr(); t++){ const c = rt.pl.buses[t] && rt.pl.buses[t].chn; if (c && c.byp && c.modsT > fresh) for (const id of c.byp) byp.add(id); }
   if (any || chMeterWanted){ const api = chApi(); if (api && api.meters) api.meters({ peaks:out, peaksIn:inp, load:globalCpuValue(), mods, shows, jacks, byp:[...byp] }); }
 }, 60, () => view === 'chains' && !document.hidden, 1500);   // BATTERY: 16 wake-ups a second only while the chains screen is open (setView wakes it)
+/* WHAT IS USING THE MOST CPU (12 Nov, owner: "tapping the CPU meter is confusing and oddly worded"; it should answer "what's using the most for CPU").
+   cpuRank(m) is pure: measured numbers in, the ranked list, the keep-up sentence and the one thing to try out. Everything in m is something the app already measures:
+   the audio engine's total (the browser's render capacity, or the timing probe), each part's own processing time (track effects, chains, master, bass voices: a share of real
+   time, as the meter), dropouts and late / dropped notes in the last minute, long screen stalls (>= 120 ms) in the last minute. The share of screen drawing, the sequencer
+   and the voices of a drum / synth engine are NOT measured, so they are not ranked; "everything else" is the total minus the parts, shown only where a total is reported. */
+function cpuRank(m){
+  const pct = v => v < 0.005 ? '<1%' : Math.round(v * 100) + '%', parts = (m.parts || []).filter(x => x.v >= 0.005).map(x => ({name:x.name, v:x.v, part:true}));
+  const sum = parts.reduce((a, x) => a + x.v, 0), total = typeof m.total === 'number' ? m.total : null, list = parts.slice();
+  if (total != null && total - sum >= 0.02) list.push({name:'Everything else in the audio engine (drums, synth voices, mixing)', v:total - sum, part:false});
+  list.sort((a, b) => b.v - a.v); const top = list.slice(0, 5).map(x => ({name:x.name, share:pct(x.v), v:x.v, part:x.part}));
+  const head = total != null ? 'Audio engine: ' + pct(total) + ' of its time' + (m.peak != null && m.peak - total >= 0.05 ? ', peak ' + pct(m.peak) : '') : 'This browser doesn’t report the whole audio engine, so only the parts below are counted.';
+  const d = m.drops | 0, l = m.late | 0, st = m.stalls | 0, s = (n, w) => n + ' ' + w + (n === 1 ? '' : 's');
+  let keep;
+  if (total != null && total > 1) keep = 'Not keeping up: the audio engine is over 100%.';
+  else if (d) keep = 'Not keeping up: ' + s(d, 'dropout') + ' in the last minute' + (l ? ' and ' + s(l, 'late note') : '') + '.';
+  else if (l) keep = 'Mostly keeping up: ' + s(l, 'late note') + ' in the last minute (worst ' + Math.round((m.worstLate || 0) * 1000) + ' ms), no dropouts.';
+  else if (!m.playing && !m.engine) keep = 'The audio engine has not started yet.';
+  else keep = (m.playing ? 'Keeping up: no' : 'Nothing playing. No') + ' dropouts or late notes in the last minute' + (st ? ', but ' + s(st, 'screen stall') + ' (the screen froze for over 0.1 s)' : '') + '.';
+  let tip;
+  const big = top[0];
+  if (d && m.latency === 'interactive') tip = 'Try: Settings → Audio → Latency → Balanced, for a bigger audio buffer.';
+  else if (d && m.latency === 'balanced') tip = 'Try: Settings → Audio → Latency → Safest, for the biggest audio buffer.';
+  else if (d && big && big.part && big.v >= 0.1) tip = 'Try: ' + big.name + ' is the heaviest part; bypass or simplify it.';
+  else if (d) tip = 'Try: Reset audio engine below, then play again.';
+  else if (st >= 3 && !m.lowPower) tip = 'Try: Low power mode (Settings): the screen froze ' + st + ' times in the last minute.';
+  else if (big && big.part && big.v >= 0.15 && (total == null || big.v >= total * 0.4)) tip = 'Try: ' + big.name + ' uses the most (' + big.share + '); bypass or simplify it.';
+  else if (big && !big.part && big.v >= 0.3) tip = 'Try: fewer voices at once, or fewer busy tracks (no single effect stands out).';
+  else tip = 'Nothing to fix: plenty of headroom.';
+  return {head, list:top, keep, tip, bad:!!(d || (total != null && total > 1))};
+}
+function cpuMeasured(){
+  const now = performance.now(), cap = cpu.cap && now - cpu.cap.t < 3000 ? cpu.cap : null, pr = cpu.probe && now - cpu.probe.t < 1500 ? cpu.probe : null;
+  const tn = t => { const nm = S.mix && S.mix[t] && S.mix[t].nm; return 'Track ' + d2(t + 1) + (nm ? ' ' + nm : ''); }, parts = [];
+  if (rt){ rt.pl.buses.forEach((b, t) => { if (t >= NT) return; if (b.fx && b.fx.load) parts.push({name:'Effects · ' + tn(t), v:b.fx.load}); if (b.chn && b.chn.load) parts.push({name:'Chains · ' + tn(t), v:b.chn.load}); });
+    if (rt.mfx && rt.mfx.load) parts.push({name:'Master effects', v:rt.mfx.load}); if (rt.mst && rt.mst.wk && mstMeter && mstMeter.load) parts.push({name:'Master dynamics', v:mstMeter.load}); }
+  let bl = 0; for (const b of bassLive) bl += (b.node && b.node.load) || 0; if (bl) parts.push({name:'Bass voices', v:bl});
+  const inMin = a => a.filter(t => now - (t.t || t) < 60000);
+  const ev = inMin(PB.ev), stl = inMin(PB.stalls), dr = inMin(glitch.ts);
+  return {total:cap ? cap.avg : pr ? pr.load : null, peak:cap ? cap.peak : null, parts, drops:dr.length, late:ev.length, worstLate:ev.reduce((a, e) => Math.max(a, e.late), 0), stalls:stl.length,
+    playing:!!tp.on, engine:!!ctx, latency:latOf(), lowPower:!!lpOn};
+}
+let cpuPanel = null;
+function cpuClose(){ if (!cpuPanel) return; clearInterval(cpuPanel.iv); document.removeEventListener('keydown', cpuPanel.key, true); cpuPanel.wrap.remove(); cpuPanel = null; }
+function cpuFill(){
+  const P = cpuPanel; if (!P) return; const r = cpuRank(cpuMeasured());
+  const key = JSON.stringify([r.head, r.list.map(x => [x.name, x.share]), r.keep, r.tip]); if (P.key2 === key) return; P.key2 = key;   // no layout work when nothing shown changed
+  P.head.textContent = 'What is using the most right now'; P.sub.textContent = r.head;
+  P.list.replaceChildren(...(r.list.length ? r.list.map(x => { const li = el('div', 'cpurow'); li.append(el('span', null, x.name), el('b', null, x.share)); return li; }) : [el('div', 'cpuNone', tp.on ? 'Nothing measurable is running.' : 'Nothing is running. Press play to see what the song uses.')]));
+  P.keep.textContent = r.keep; P.keep.classList.toggle('bad', r.bad); P.tip.textContent = r.tip;
+}
 $('tCpu').addEventListener('click', () => {
-  const cap = cpu.cap, L = fxLoads().filter(x => x[1] > 0.0005).sort((a, b) => b[1] - a[1]);
-  const fx = L.length ? 'By part: ' + L.map(([n, v]) => `${n} ${(v * 100).toFixed(1)}%`).join(' · ') : 'No track effects running.';
-  if (!ctx) return toast('Play something first; the meter starts with the sound.');
-  toast((cap ? `Audio load ${Math.round(cap.avg * 100)}%, peak ${Math.round(cap.peak * 100)}%` + (cap.under > 0 ? `, ${(cap.under * 100).toFixed(1)}% dropouts` : '') + '. '
-    : `The audio engine’s processing uses ${Math.round(L.reduce((a, x) => a + x[1], 0) * 100)}% of real time. This browser can’t report the total audio load, so that is what the meter shows. `)
-    + fx + (glitch.n ? ` · ${glitch.n} dropout${glitch.n === 1 ? '' : 's'} since the sound started` + (latOf() === 'interactive' ? ' (Settings → Audio → Latency: Balanced gives more headroom).' : '.') : ' · No dropouts.'));
+  if (cpuPanel) return cpuClose(); if (askOpen) askOpen(null);
+  const wrap = el('div', 'ask'), box = el('div', 'askbox cpubox'); wrap.setAttribute('role', 'dialog'); wrap.setAttribute('aria-label', 'What is using the CPU');
+  const P = {wrap, head:el('div', 'asktitle'), sub:el('div', 'askmsg cpusub'), list:el('div', 'cpulist'), keep:el('div', 'cpukeep'), tip:el('div', 'cputip')};
+  const row = el('div', 'btnrow'), rep = el('button', null, 'Copy playback report'), rst = el('button', null, 'Reset audio engine'), cl = el('button', 'ok', 'Close'); for (const b of [rep, rst, cl]) b.type = 'button';
+  rep.title = 'A short log of what playback did, to paste into a bug report'; rst.title = $('audReset').title;
+  rep.addEventListener('click', () => pbCopy()); rst.addEventListener('click', () => { cpuClose(); $('audReset').click(); }); cl.addEventListener('click', cpuClose);
+  row.append(rep, rst, cl); box.append(P.head, P.sub, P.list, P.keep, P.tip, row); wrap.append(box);
+  P.key = e => { e.stopPropagation(); if (e.key === 'Escape'){ e.preventDefault(); cpuClose(); } else if (!(e.target && e.target.closest && e.target.closest('.ask'))) e.preventDefault(); };
+  const t0 = performance.now(); wrap.addEventListener('pointerdown', e => { if (e.target === wrap && performance.now() - t0 > 400){ e.preventDefault(); cpuClose(); } });
+  document.addEventListener('keydown', P.key, true); document.body.append(wrap); cpuPanel = P; cpuFill(); P.iv = setInterval(cpuFill, 500); setTimeout(() => cl.focus(), 0);   // (a 2 Hz timer that lives only while the panel is open)
 });
 // Stopped, nothing sounding and no live display (deck scope, meters): the loop drops to 10 Hz on a timer instead
 // of a callback every display frame (120 a second on the Fold, for nothing). tStart() and the pads wake it.
