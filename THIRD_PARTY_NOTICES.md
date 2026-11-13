@@ -12,7 +12,7 @@ generator…); each one's source is credited below and in the app.
 https://github.com/pichenettes/eurorack. Copyright Emilie Gillet.
 "Mutable Instruments", "Plaits", "Rings", "Clouds", "Beads", "Elements", "Warps", "Marbles" and "Tides" are names of
 Mutable Instruments' products; ...Thunder is not affiliated with or endorsed by Mutable Instruments. Warps is the app's
-Cross-mod effect. Marbles is the …chains/…waves Random generator and Tides (2) the Function generator (`dsp/mods/`); the
+Cross-mod effect. In the app Plaits is the Macro osc layer type ("Macro osc: based on Plaits by Mutable Instruments (MIT)") and Elements is the Resonator layer type ("Resonator: based on Elements by Mutable Instruments (MIT)"). Marbles is the …chains/…waves Random generator and Tides (2) the Function generator (`dsp/mods/`); the
 build script makes two small patches to them (sample-rate-independent time constants in Marbles' clock follower, and a
 restart for Tides' clock follower).
 
