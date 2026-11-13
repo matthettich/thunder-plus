@@ -1212,6 +1212,11 @@ body:not(.legon) .tside .tlegend{display:none}
   .tcmd.song{grid-template-columns:repeat(17,minmax(0,1fr))}
   .tcmd.song:not(.cmini) button[data-c=clone]:not([hidden]){display:inline-flex}
 }
+/* LP.SEL (12 Nov, owner: next to loop play; "It can disappear on folded"): one more column where it shows (Song, Arrange holding the keys); under 700 px it is not on the row (Edit ▾ and the Arrange right-click menu have it) */
+@media (min-width:700px){ .tcmd.lps{grid-template-columns:repeat(16,minmax(0,1fr))} .tcmd.song.lps{grid-template-columns:repeat(17,minmax(0,1fr))} }
+@media (min-width:1000px){ .tcmd.song.lps{grid-template-columns:repeat(18,minmax(0,1fr))} }
+@media (max-width:699px){ .tcmd:not(.cmini) button[data-c=lpsel]{display:none} }
+.tcmd:not(.cmini) button[data-c=lpsel]{grid-column:-3 / -2; font-size:var(--fs-2)}
 /* ▶ (play the song) always sits in the last column, on whichever row it lands: never alone at the left of a row. */
 .tcmd:not(.cmini) button[data-c=song]{grid-column:-2 / -1}
 body.trkv.cmdv .toast{bottom:calc(var(--k) * 3.3 + 60px + env(safe-area-inset-bottom,0px))}
@@ -26095,6 +26100,21 @@ function playPatLoop(){
   tStart('song', {row:r && r.some(v => v >= 0) ? cs.song.y : songRow()});
   if (tp.on) lpW.seen = true; else if (!warmTok){ lpRestore(); draw(); }   // (the first PLAY of a session waits for the engine: warmTok; a refused start puts LOOP back at once)
 }
+// LP.SEL (12 Nov, owner: "add a lp.sel button to the command bar that loops the selection in arrange mode. Can be next to the loop play button"; "It can disappear on folded"): next to loop play on the control bar. With rows selected on
+// Arrange (the Song screen, or Arrange holding the keys beside Phrase) it is LOOP SEL's own path: LOOP SEL turned on from the selection (toggleLoop arms the rows), then playCtx plays the song looping them, every track; nothing new in
+// the sequencer. With no selection (lead's decision: or one row) it is loop play on the cursor's row (playPatLoop) and says how to select more. Pressed while it plays, it stops. LOOP SEL goes back to what it was when the song stops, as LOOP does
+// after loop play (lpW). lsW: {was, arm: LOOP SEL and its armed rows before, seen: tp.on has been true since}. If the selection changes while it plays, draw()'s syncLoop follows it only on the Song screen itself (selA is then Arrange's); beside Phrase the running loop keeps its rows.
+let lsW = null;
+function lpSelRestore(){ if (!lsW) return; const w = lsW; lsW = null; loopSel = w.was; loopArm = w.arm; }
+function lpSelPlay(){
+  if (tp.on){ tStopUser(); return; }   // the restore is in draw(), which tStop runs
+  if (tv !== 'song') return toast('LP.SEL loops the selected rows on Arrange.');
+  const r = sxRect(), rows = !!r && r.y1 > r.y0;
+  lsW = {was:loopSel, arm:loopArm, seen:false};
+  if (rows){ if (!loopSel) toggleLoop(); playCtx(); }   // LOOP SEL's own path: arms the selected rows, then plays them
+  else { playPatLoop(); toast(`Looping row ${rS(cs.song.y, 3)}: select 2 or more rows for a longer loop`, 2400); }
+  if (tp.on) lsW.seen = true; else if (!warmTok){ lpSelRestore(); draw(); }
+}
 // Ctrl/⌘+/ (owner, 20 Oct: Renoise's solo key): the track being worked on, as the bottom panel's track strip picks it (dkTrack:
 // the song cursor's track on Song and with Arrange holding the keys, the mixer's, FX's, else the phrase's). Solo adds up, as
 // the mixer's S does; all: clear every solo (as the deck's SOLO button).
@@ -26924,6 +26944,7 @@ const CMDS = [['b:-16', '−−', 'Change the value down a lot (EDIT+▼)'], ['b
   ['cldn', 'CLN↓', 'Clone the block (or selected blocks) into new, unique numbers on a new row below; the rows below move down (' + MODK + '+Shift+C)'], ['copy', 'COPY', 'Copy the selection, or what is under the cursor (a note comes with its instrument) (ALT)'],
   ['cut', 'CUT', 'Cut the selection, or what is under the cursor (ALT+EDIT)'], ['paste', 'PASTE', 'Paste (SHIFT+EDIT)'],
   ['undo', 'UNDO', 'Undo the last change to the song (' + MODK + '+Z)'], ['redo', 'REDO', 'Redo (' + MODK + '+Y)'], ['song', '▶↻', 'Loop play (12 Nov): turns LOOP on and plays the song from the cursor row, repeating its row; press LOOP while it plays to carry on as normal play, or this again to stop (' + MODK + '+Space). The pad’s PLAY and Space play plain'],
+  ['lpsel', 'LP.SEL', 'Loops the selected rows of the song (every track): select rows on Arrange, then this plays them round and round; again to stop. With nothing selected it loops the cursor’s row, as loop play does (12 Nov)'],
   ['ins', 'INS', 'Insert an empty row below the cursor’s row; the rows below move down (the whole song row on the Song, the phrase’s row on Phrase and Sect). ' + MODK + '+Alt+Enter'],
   ['mpat', 'M.PAT', 'Mute or unmute the pattern block under the cursor, or every block in the selection (as Alt+click, M on the Song). The track’s own MUTE is on the pad and in the Mixer']];   // MUTE PATTERN (owner, 8 Nov): Arrange only
 function cmdAction(a){
@@ -26950,15 +26971,16 @@ function cmdAction(a){
   if (c === 'clone') return cloneHere();
   if (c === 'cldn') return cloneDown();
   if (c === 'mpat'){ if (tv !== 'song') return toast('M.PAT mutes blocks on Arrange.'); const r = sxRect(); if (r) return sxMuteRect(r); if (sxPicks.length) return sxMuteCells(sxPicks.map(p => [p.y, p.t])); return toggleBlockMute(cs.song.y, cs.song.x); }
+  if (c === 'lpsel') return lpSelPlay();
   if (c === 'song') return playPatLoop();   // (12 Nov, owner) the control bar's ▶ is LOOP play; the pad's PLAY and Space play plain
 }
 for (const [a, t, lbl] of CMDS){ const b = el('button'); b.innerHTML = t; b.type = 'button'; b.dataset.c = a; b.setAttribute('aria-label', lbl); b.title = lbl; $('tCmd').append(b); if (a === 'song') b.setAttribute('aria-label', 'Loop play the song, or stop'); }
 // In PAD mode CLEAR moves between PASTE and UNDO, so a thumb can reach it on a phone; KEYS mode keeps
 // the original order. The buttons are moved, not rebuilt, so the tap handlers stay attached.
-const CMD_PAD_ORDER = ['b:-16', 'b:-1', 'b:1', 'b:16', 'prev', 'next', 'sel', 'uniq', 'clone', 'cldn', 'mpat', 'copy', 'cut', 'paste', 'clr', 'ins', 'undo', 'redo', 'song'];
+const CMD_PAD_ORDER = ['b:-16', 'b:-1', 'b:1', 'b:16', 'prev', 'next', 'sel', 'uniq', 'clone', 'cldn', 'mpat', 'copy', 'cut', 'paste', 'clr', 'ins', 'undo', 'redo', 'lpsel', 'song'];
 const CMD_PAD_SHORT = {clr:'CLR', sel:'SEL', paste:'PST', undo:'↶', redo:'↷'};
 // COMMAND BAR: the Edit menu's order (undo · clipboard · select · clones · value · previous / next · play) and words.
-const CMD_MINI_ORDER = ['undo', 'redo', 'cut', 'copy', 'paste', 'clr', 'rrow', 'ins', 'sel', 'uniq', 'clone', 'cldn', 'mpat', 'b:-16', 'b:-1', 'b:1', 'b:16', 'prev', 'next', 'song'];
+const CMD_MINI_ORDER = ['undo', 'redo', 'cut', 'copy', 'paste', 'clr', 'rrow', 'ins', 'sel', 'uniq', 'clone', 'cldn', 'mpat', 'b:-16', 'b:-1', 'b:1', 'b:16', 'prev', 'next', 'lpsel', 'song'];
 const CMD_MINI_LAB = {undo:'UNDO', redo:'REDO', cut:'CUT', copy:'COPY', paste:'PASTE', clr:'CLEAR', rrow:'REMOVE', ins:'INSERT', sel:'SELECT', clone:'CLONE', cldn:'CLONE↓', mpat:'MUTE PAT', 'b:-16':'−−', 'b:-1':'−', 'b:1':'+', 'b:16':'++', prev:'‹ PREV', next:'NEXT ›'};
 const cmdSongLab = () => cmdMini() ? (tp.on ? '■ STOP' : 'LOOP') : tp.on ? '■' : '';   // the words beside the icon (stopped: the loop play icon, cmdSongSet)
 // LOOP PLAY ICON (12 Nov, owner: "I don't really like the way the loop play button looks… a play sign inside of a loop"; he picked the single circular
@@ -26991,7 +27013,7 @@ function cmdBarState(){
   const clipOk = !!clip && clip.v === v, canUndo = undo.past.length > 0 || undo.pend || vUndo.t.some(Boolean);
   bar.querySelectorAll('button[data-c]').forEach(b => { const c = b.dataset.c;
     if (c === 'b:-16' || c === 'b:16') b.hidden = false;   // the big steps work on every screen (the Song's: ±16 phrase numbers)
-    const off = c === 'cut' || c === 'copy' || c === 'sel' ? !grid : c === 'paste' ? !(grid && clipOk) : c === 'undo' ? !canUndo : c === 'redo' ? !undo.future.length : false;
+    const off = c === 'cut' || c === 'copy' || c === 'sel' ? !grid : c === 'paste' ? !(grid && clipOk) : c === 'undo' ? !canUndo : c === 'redo' ? !undo.future.length : c === 'lpsel' ? v !== 'song' : false;
     if (b.classList.contains('off') !== off){ b.classList.toggle('off', off); b.setAttribute('aria-disabled', String(off)); } });
 }
 // The bar's tooltips say what each button does here and its key (from cmdItems), so the keys are easy to learn.
@@ -27139,6 +27161,7 @@ function cmdItems(full){
     {h:'Play'},
     ...(full ? [{a:'loopp', l:'Loop the pattern', k:keyHint('alt+L'), f:toggleLoopPat}, {a:'loops', l:'Loop the selection', k:keyHint('shift+alt+L'), f:toggleLoop},
       {a:'prow', l:'Play the row (every track)', k:keyHint('alt+Enter'), f:() => playRowKey(true), off:tv !== 'phrase'}, {a:'follow', l:followMode ? 'Follow off' : 'Follow on', k:keyHint('mod+shift+F'), f:followKey}] : []),
+    it('lpsel', 'LP.SEL: loop the selected rows (nothing selected: the cursor’s row)', '', {off:!onSong}),   // (12 Nov, owner) beside loop play on the control bar
     ...(tp.on ? [] : [{a:'splay', l:'Play the song from the cursor row', k:keyHint(ks ? 'Space' : 'shift+Space'), f:() => tStart('song', {row:songRow()})}]),   // FIX (1 Nov, audit #1): KEYS mode plays the song on Space
     it('song', tp.on ? 'Stop the song' : 'Loop play the song from the cursor row (turns LOOP on)', 'mod+Space')   // (12 Nov, owner) the control bar's ▶ is loop play
   ];
@@ -28308,6 +28331,7 @@ function draw(){
   document.querySelectorAll('#tTabs button').forEach(b => b.classList.toggle('on', b.dataset.v === tv));
   document.querySelectorAll('#tMap [data-v]').forEach(b => b.classList.toggle('on', b.dataset.v === tv));
   if (lpW){ if (tp.on) lpW.seen = true; else if (lpW.seen) lpRestore(); }   // LOOP PLAY ended: LOOP back as it was
+  if (lsW){ if (tp.on) lsW.seen = true; else if (lsW.seen) lpSelRestore(); }   // LP.SEL ended: LOOP SEL back as it was
   $('kPlay').classList.toggle('on', tp.on);
   keyVis();
   syncLoop();   // before the labels below, so they show the range that is actually looping
@@ -28320,6 +28344,7 @@ function draw(){
     $('tCmd').hidden = !show; document.body.classList.toggle('cmdv', show && !mini); cmdTips(); }
   const sb = $('tCmd').querySelector('[data-c=song]'); if (sb){ cmdSongSet(sb); sb.classList.toggle('on', tp.on); }
   const onSong = tv === 'song';
+  { const lb = $('tCmd').querySelector('[data-c=lpsel]'), arrK = !!(typeof apReady !== 'undefined' && apReady && apF === 'arr'), vis = onSong || arrK; if (lb){ lb.hidden = !vis; lb.classList.toggle('on', !!lsW && tp.on); } $('tCmd').classList.toggle('lps', vis); }   // LP.SEL: where a song selection can exist (Song, Arrange holding the keys)
   { const seq = ['song', ...(sectsOn ? ['sect'] : []), 'phrase', 'inst', 'mixer', 'fx', 'mod', 'project'];
     const TCV = {song:'#dbe6f8', sect:'#e9e0f8', phrase:'#d8f0e2', inst:'#fbe2d2', mixer:'#f6edc8', fx:'#f8dce8', mod:'#ebdcf6', project:'#d5eef2'};
     let i = 0; $('tCmd').querySelectorAll('button[data-c]').forEach(b => { const on = !(onSong ? b.dataset.c === 'b:-16' || b.dataset.c === 'b:16' : b.dataset.c === 'clone' || b.dataset.c === 'cldn');
@@ -31977,7 +32002,7 @@ function sxCtx(y, t){
   items.push({l:'Insert row below ' + rS(r.y1, 3) + ' (the rows below move down)', k:ks ? keyHint('mod+alt+Enter') : '', f:() => { cs.song.y = r.y1; sxPicks = []; insRowBelow(); }});   // INSERT ROW BELOW (12 Nov, owner: INS): below the last row of the block or range under the pointer
   // RIGHT-CLICK (menu audit, 2 Nov): only what acts on the block or rows under the pointer; Undo / Redo, selecting, value
   // steps, navigation and play stay on their keys and in Edit ▾.
-  const C = cmdItems(), want = new Set(['mixp', 'dup', 'tname', 'unbus']);
+  const C = cmdItems(), want = new Set(['mixp', 'dup', 'tname', 'unbus', 'lpsel']);
   items.push(null, ...C.filter(x => x && want.has(x.a)));
   return {title, items:menuTidy(items)};
 }
