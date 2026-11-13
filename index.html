@@ -24373,14 +24373,23 @@ const ARR_IDLE = 60000;
 window.addEventListener('keydown', e => { if (e.key !== ' ' && !/^(Shift|Control|Alt|Meta|AltGraph|CapsLock)$/.test(e.key)) arrActT = workT = performance.now(); }, true);
 window.addEventListener('pointerdown', e => { const q = e.target && e.target.closest; if (q && e.target.closest('[data-b="play"],[data-b="loop"],[data-b="stop"]')) return; if (q && (e.target.closest('#tPad') || e.target.closest('#tArr') || grid.contains(e.target))) workT = performance.now(); if (q && e.target.closest('#tPad')) arrActT = workT; }, true);   // (10 Nov) on a phone the pad is the keyboard: a pad press holds Arrange's paging like a key does
 $('tArr').addEventListener('pointerdown', () => { arrActT = arrTouchT = performance.now(); }, true);
+// ONE QUESTION FOR EVERY HOLD (12 Nov): "have the user's hands been on it for ms?" asks the clocks it is given; the follow and paging paths below all go through it.
+const handsOn = (ms, ...ts) => performance.now() - Math.max(...ts) < ms;
+// (12 Nov, owner: "when editing a phrase with phrase in focus and using the alt button to navigate up between editing patterns, the playhead and cursor fight each other for visibility. Cursor should be able to move past the playhead this way, and stay in focus.")
+// navT: the last ALT + arrow move around the Song grid (optDir, grid). Arrange beside the phrase WITHOUT the keys was held off only by arrHandT / arrTouchT, which a pad press never sets, so every ALT+▲ put Arrange's rows where the cursor was
+// and the very next redraw the playhead put them back: the cursor's row flipped in and out of view. It holds like Arrange's own work does: 4 s with FOLLOW on, the owner's minute (3 Nov) with FOLLOW OFF.
+let navT = -1e9;
 function arrFollowPage(own){
-  const now = performance.now();
-  if (now - Math.max(arrHandT, arrTouchT) < FOLLOW_HOLD) return;   // (9 Nov, owner: tapping blocks made the view fight itself)
+  if (handsOn(FOLLOW_HOLD, arrHandT, arrTouchT)) return;   // (9 Nov, owner: tapping blocks made the view fight itself)
   // A follow mode that's on pages again after the short hold; FOLLOW OFF keeps the owner's minute (3 Nov)
-  if ((apF === 'arr' || asongOn()) && now - Math.max(arrActT, arrHandT) < (followMode ? FOLLOW_HOLD : ARR_IDLE)) return;
+  if ((apF === 'arr' || asongOn()) && handsOn(followMode ? FOLLOW_HOLD : ARR_IDLE, arrActT, arrHandT)) return;
+  if (handsOn(followMode ? FOLLOW_HOLD : ARR_IDLE, navT)) return;
   try { if (tp.mode === 'song' && own && own.row >= 0 && (asongOn() || (tv !== 'song' && apPanel()))){
     const VR = Math.max(2, arrRows()), top = cs.song.top || 0;
-    if (own.row < top || own.row > top + VR - 1){ cs.song.top = clamp(own.row, 0, Math.max(0, 256 - VR)); cs.song.pg = true; } } } catch(e){}
+    if (own.row < top || own.row > top + VR - 1){
+      // The cursor's row stays in view when both fit (12 Nov): the page starts at the higher of the two rows, so the playhead does not hide the cursor the user moved past it
+      const cy = cs.song.y, both = tv !== 'song' && cy >= 0 && cy !== own.row && Math.abs(cy - own.row) < VR;
+      cs.song.top = clamp(both ? Math.min(cy, own.row) : own.row, 0, Math.max(0, 256 - VR)); cs.song.pg = true; } } } catch(e){}
 }
 // TRACKS (Song): how many tracks this song uses (8–32, but 24 at most with a voice per track, so every
 // track keeps its own voice within 40 kit voices). Song and Mixer show as many as fit and scroll sideways.
@@ -26632,6 +26641,7 @@ function songViewRows(){
   return Math.max(2, v);
 }
 function optDir(dir, grid){
+  if (grid) navT = performance.now();   // (12 Nov, owner: ALT+arrows vs the playhead) the pad's / keyboard's ALT + arrow: working in the Song grid
   const d = dir === 'right' || dir === 'up' ? 1 : -1, big = dir === 'up' || dir === 'down';
   // ONE MEANING (owner, 7 Nov): ▲ is above / earlier on every screen, as on Phrase and Song: a lower number in a list (▲ was the
   // next number on Sect, Inst and FX); ◀ is earlier, ▶ later. dn: the step in number for this key.
@@ -26674,7 +26684,7 @@ function phraseGrid(dir){
   let p = cid >= 0 ? firstPhrase(cid) : -1;
   if (p >= 0){ cSect = cid; pendPlace = null; }
   else { const fp = freePhrase(); if (fp < 0){ toast('No free phrases left.'); return true; } p = fp; pendPlace = {x, y, p:fp}; }
-  cs.song.x = x; cs.song.y = y; cTrack = x; cPhrase = p; selA = null;
+  cs.song.x = x; cs.song.y = y; cTrack = x; cPhrase = p; selA = null; cs.song.pg = cs.phrase.pg = false;   // (12 Nov) the playhead's page no longer hides the cursor you moved
   if (cs.phrase.y >= 0) cs.phrase.y = clamp(cs.phrase.y, 0, plen(p) - 1);
   const VR = songViewRows(), top = cs.song.top || 0;
   if (y < top) cs.song.top = y; else if (y > top + VR - 1) cs.song.top = y - VR + 1;
@@ -34578,7 +34588,7 @@ function pvGo(t, y, x, prow){
   if (cid >= 0){ ensureSectPhrase(cid); p = pvPhraseIn(cid, k); }
   if (p >= 0){ cSect = cid; pendPlace = null; }
   else { const fp = freePhrase(); if (fp < 0){ toast('No free phrases left.'); return false; } p = fp; pendPlace = {x:t, y, p:fp}; }
-  cTrack = t; cPhrase = p; cs.song.x = t; cs.song.y = y; selA = null;
+  cTrack = t; cPhrase = p; cs.song.x = t; cs.song.y = y; selA = null; cs.song.pg = false;   // (12 Nov) as phraseGrid
   const VR = songViewRows(), top = cs.song.top || 0;   // ARRANGE keeps the row in view
   if (y < top) cs.song.top = y; else if (y > top + VR - 1) cs.song.top = y - VR + 1;
   cs.song.top = clamp(cs.song.top, 0, 256 - VR);
