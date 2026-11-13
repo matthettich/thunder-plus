@@ -7,7 +7,7 @@ const cut = re => { const m = src.match(re); assert.ok(m, 'not found: ' + re); r
 
 test('busPlan is asked once per redraw: draw() and drawArr() turn the memo on, the core copy of busPlan is untouched', () => {
   assert.match(src, /busPlan = \(\(\) => \{ const raw = busPlan, m = \{on:false, v:null\}/);
-  assert.match(src, /if \(!busPlan\.m\.on\)\{ busPlan\.m\.on = true; busPlan\.m\.v = null; try \{ return draw\(\); \} finally/);
+  assert.match(src, /if \(!busPlan\.m\.on\)\{ busPlan\.m\.on = true; busPlan\.m\.v = null; const t0 = performance\.now\(\); try \{ return draw\(\); \} finally/);
   assert.match(src, /const was = busPlan\.m\.on; busPlan\.m\.on = true; try \{ drawArr0\(PH\); \} finally \{ if \(!was\)/);
   const f = cut(/function busPlan\(\)\{[\s\S]*?\n\}\n/); assert.doesNotMatch(f, /\.m\b/, 'busPlan itself (copied into core/seq-core.js) must not know the memo');
 });
