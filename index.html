@@ -23286,6 +23286,17 @@ function bgClip(){
 function msLog(t){ if (MS_ACTIVE) try { pbLog('media session: ' + t); } catch(e){} }
 function msEl(){ try { const m = navigator.mediaSession; return 'paused=' + bgEl.paused + ' muted=' + bgEl.muted + ' vol=' + bgEl.volume + ' dur=' + Math.round(bgEl.duration || 0) + 's session=' + (m && m.playbackState); } catch(e){ return '?'; } }
 function msHook(el){ try { ['playing', 'pause', 'ended', 'volumechange', 'error'].forEach(t => el.addEventListener(t, () => msLog('element ' + t + ' · ' + msEl()))); } catch(e){} }
+/* THE NOTIFICATION'S TITLE (12 Nov, owner: "always displays the chrome icon and 'song 1' even if the name is different"): the name the app shows for the open
+   song: the project file's name (opened or saved as a file, without .thunder) else the song's own name; set again when that changes while playing (rename, save as, open, new),
+   never on a redraw. Artwork: the app's own icons, resolved against the page, so beta/ and stable/ find their own copy. (Chrome may still badge the notification with its small icon.) */
+let msTitleNow = null;
+function msTitle(){ let f = ''; try { f = (typeof projLabel === 'function' && projLabel() || '').replace(/\.(thunder|json)$/i, ''); } catch(e){} return f || S.name || 'Song'; }
+function msIcon(p, sizes){ let u = p; try { u = new URL(p, location.href).href; } catch(e){} return {src:u, sizes, type:'image/png'}; }
+function msMeta(force){
+  const ms = navigator.mediaSession; if (!ms || !bgOn || (!force && !tp.on)) return;
+  const t = msTitle(); if (!force && t === msTitleNow) return; msTitleNow = t;
+  try { ms.metadata = new MediaMetadata({title:t, artist:'Thunder Plus', artwork:[msIcon('icons/plus-icon-192.png?v=3', '192x192'), msIcon('icons/plus-icon-512.png?v=3', '512x512')]}); if (!force) msLog('title now "' + t + '"'); } catch(e){}
+}
 function bgPlay(on){
   const ms = navigator.mediaSession;
   if (on && !bgOn) on = false;
@@ -23294,10 +23305,9 @@ function bgPlay(on){
       const stop = () => { bgUserT = performance.now(); if (tp.on) tStop(); };   // (bgUserT: a real request, not to be undone by BG_RESTART)
       ms.setActionHandler('play', () => { if (!tp.on) playCtx(); });
       ms.setActionHandler('pause', stop); ms.setActionHandler('stop', stop); }
-    if (on) ms.metadata = new MediaMetadata({title:S.name || 'Song', artist:'Thunder Plus',
-      artwork:[{src:'icons/plus-icon-192.png?v=3', sizes:'192x192', type:'image/png'}, {src:'icons/plus-icon-512.png?v=3', sizes:'512x512', type:'image/png'}]});
+    if (on) msMeta(true);
     if (on || bgHandlers) ms.playbackState = on ? 'playing' : 'paused';
-    if (MS_ACTIVE && (on || bgHandlers)) msLog((on ? 'session set: playing, title "' + (S.name || 'Song') + '"' : 'session set: paused') + ' · state ' + ms.playbackState);
+    if (MS_ACTIVE && (on || bgHandlers)) msLog((on ? 'session set: playing, title "' + msTitle() + '"' : 'session set: paused') + ' · state ' + ms.playbackState);
   } catch(e){}
   if (!bgAndroid) return;
   if (on){
@@ -23678,6 +23688,7 @@ function projSet(path, handle){
   try { if (DESK){ if (projPath) localStorage.setItem(PPK, projPath); else localStorage.removeItem(PPK); } } catch(e){}
   if (!DESK && canFS) kvSet('cur', projFile || null);
   if (projPath || projFile) recentAdd({name:projLabel(), path:projPath, h:projFile});
+  try { msMeta(); } catch(e){}   // the notification's title follows the file
 }
 // Unsaved changes: set by every song or sound edit (markChange, from saveS and changed), cleared by a save or an open.
 // Edits in the first moments after start-up (conversions, the saved song settling) don't count.
@@ -23756,7 +23767,7 @@ async function saveProj(as){
       catch(e){ if (e && e.name === 'AbortError') return false; toastErr('Couldn’t save there (' + ((e && e.message) || e) + '), so it went to your downloads.', 6000);
         await deliver(projName(), projBlob()); setDirty(false); return true; }
     }
-    if (as){ const n = await askText({title:'Save project as', body:'The song is renamed and saved to your downloads.'}, S.name, 40, 'Save'); if (n == null) return false; S.name = n.trim().slice(0, 40) || 'Song'; saveS(); draw(); }
+    if (as){ const n = await askText({title:'Save project as', body:'The song is renamed and saved to your downloads.'}, S.name, 40, 'Save'); if (n == null) return false; S.name = n.trim().slice(0, 40) || 'Song'; saveS(); draw(); msMeta(); }
     await deliver(projName(), projBlob()); setDirty(false); return true;
   } finally { saving = false; }
 }
@@ -25149,7 +25160,7 @@ function projRows(){
       info:() => 'The same for Arrange (the Song screen, or Arrange holding the keys beside the phrase): where its cursor goes when you stop the song. STAYS: where you left it. PLAYHEAD: the song row where the song stopped, on your track. Alt+G puts the cursor on the playhead at any time'},
     {l:'NEIGHBORS', ck:'View neighboring phrases', get:() => nbOn ? 1 : 0, set:v => setNb(!!v), min:0, max:1, tog:true, d:0, fmt:onOff,
       info:() => 'In Phrase, a faint copy of the notes the tracks either side play at the same song row: the track to the left in violet before the notes, the track to the right in mustard after them. A poly track shows its whole chord: all four notes when there is room (unfolded, desktop), otherwise one letter per voice (capital = natural, small = sharp, so CEGa is C E G A#; · is an empty voice, × a note off). Only to look at; they can’t be edited'},
-    {l:'NAME', sec:'Song', gap:true, show:() => S.name, tap:async () => { const n = await askText({title:'Rename the song'}, S.name, 40, 'Rename'); if (n != null){ S.name = n.trim().slice(0, 40) || 'Song'; saveS(); draw(); } }, info:() => 'EDIT renames the song'},
+    {l:'NAME', sec:'Song', gap:true, show:() => S.name, tap:async () => { const n = await askText({title:'Rename the song'}, S.name, 40, 'Rename'); if (n != null){ S.name = n.trim().slice(0, 40) || 'Song'; saveS(); draw(); msMeta(); } }, info:() => 'EDIT renames the song'},
     {l:'TRACKS', get:() => ntr(), set:v => setNtr(v), min:8, max:NT, big:8, d:16, fmt:v => v + ' tracks',
       info:() => `How many tracks this song uses, 8 to ${vtrk ? 24 : NT} with ${vtrk ? 'a voice per track (one voice each)' : 'the shared 16 voices'}. Song and Mixer show as many as fit and scroll sideways (arrows, or swipe left and right). Tracks past this number are hidden and silent; their notes are kept`},
     {l:'TEMPO', get:() => S.bpm, set:v => { S.bpm = v; if (tp.on && tp.seq) tp.seq.bpm = v; lkTempoOut(v); }, min:40, max:300, big:10, d:120, fmt:v => v + ' BPM', after:() => { rtAllFx(); chainsTempo(); }, info:() => 'Beats per minute, 4 steps to a beat. Track delays follow it'},
@@ -34307,7 +34318,7 @@ function tsetRow(r){
   }
   if (r.show){ // NAME
     const c = el('div', 'tsc'), inp = el('input'); inp.type = 'text'; inp.value = r.show(); inp.maxLength = 40; inp.spellcheck = false; inp.setAttribute('aria-label', tsetLabel(r.l));
-    inp.addEventListener('change', () => { S.name = inp.value.trim().slice(0, 40) || 'Song'; inp.value = S.name; saveS(); draw(); });
+    inp.addEventListener('change', () => { S.name = inp.value.trim().slice(0, 40) || 'Song'; inp.value = S.name; saveS(); draw(); msMeta(); });
     c.append(inp); row.append(lab(), c, inf); return row;
   }
   if (r.ck || (r.tog && r.fmt === onOff)){
