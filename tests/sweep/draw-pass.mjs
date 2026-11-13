@@ -2,7 +2,7 @@
 // Measurement only: the instrumentation is injected into the page at run time through __seqTest.ev (the app is not edited).
 //
 //   node tests/sweep/draw-pass.mjs --seq=page|core --size=open|cover --throttle=1|4|6 [--screens=song,phrase,pv,sect,inst,mixer,fx,mod,project]
-//        [--secs=10] [--warm=3] [--tag=name] [--prefix=before-]
+//        [--secs=10] [--warm=3] [--tag=name] [--prefix=before-] [--meters=smooth|light|off]
 //
 //   One run = one Chrome (Fold profile as wrap-clock.mjs: touch, Android UA, Mobile setup, DPR 2.5, 884x1020 or 412x915), ELECTRO from row 0 restarted for
 //   each screen; 3 s to settle, then a 10 s window. Per screen: draw() inclusive ms and calls (wrapped here, top level only), the inclusive ms of its heavy
@@ -13,7 +13,7 @@ import fs from 'fs'; import path from 'path';
 import { ROOT, sleep, serve, launch } from './cdp-lib.mjs';
 const arg = (k, d) => { const a = process.argv.find(x => x.startsWith('--' + k + '=')); return a ? a.slice(k.length + 3) : d; };
 const SEQ = arg('seq', 'page'), SIZE = arg('size', 'open'), THR = +arg('throttle', 4), SECS = +arg('secs', 10), WARM = +arg('warm', 3);
-const PROF = arg('prof', '0') === '1';
+const PROF = arg('prof', '0') === '1', METERS = arg('meters', '');   // METERS (13 Nov): smooth | light | off: Settings -> METERS for the run
 const SCREENS = arg('screens', 'song,phrase,pv,sect,inst,mixer,fx,mod,project').split(','), TAG = arg('tag', `${SEQ}-${SIZE}-x${THR}`);
 const OUT = path.join(ROOT, 'tests/sweep/out'); fs.mkdirSync(OUT, { recursive: true });
 const songText = fs.readFileSync(path.join(ROOT, 'sounds/ELECTRO.thunder'), 'utf8');
@@ -42,6 +42,7 @@ await sleep(800);
 await ev(`window.__seqTest.load(${JSON.stringify(songText)}, 'ELECTRO.thunder')`); await sleep(500);
 const coreOK = await ev(`window.__seqTest.coreOn(${SEQ === 'core'})`); if (SEQ === 'core' && !coreOK) throw new Error('core did not load');
 await app(`setFollow(2); setView('tracker'); setSects(true); return 1;`);
+if (METERS) await app(`setMeters(${JSON.stringify(METERS)}); return 1;`);
 // the instrumentation: wrappers that add up inclusive ms (a call inside a call of the same function counts once)
 await app(`
 const Z = window.__dp = {fn: {}, lead: [], on: false};

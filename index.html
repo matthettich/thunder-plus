@@ -3113,7 +3113,7 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
       <div class="segrow" id="noWkRow" title="For testing a phone whose audio clock runs fast. Off (test): track effects, chains, live engines and the audio-thread sequencer are silent or unused, and the safety limiter uses its simpler stand-in. Changes when the app reloads."><span>Worklets</span><div class="seg" id="segNoWk"></div></div>
       <div class="btnrow" id="audRestartRow" hidden><span class="lbl">Takes effect when audio restarts (the app reloads; your song and kit are kept)</span><button id="audRestart" class="on">Apply (reload)</button></div>
       <div class="segrow" id="rkRow" title="Phone, Page sequencer: when the audio clock runs several times too fast for over a second, pause the engine for a moment to break it. An experiment: Off restores the old behaviour."><span>RUNAWAY KICK (TEST)</span><div class="seg" id="segRk"></div></div>
-      <div class="audrow audfoot"><button class="sm" id="audReset" title="Clears stuck notes and effects: stops playback and rebuilds every sound and effect from scratch. Your song and kit are untouched. If the engine is stuck or the output is very late, it offers to reload the app (your song is saved first).">Reset audio engine</button> <button class="sm" id="audReport" title="Copies a short playback log (screen on or off, sequencer state, how late the rows came, what still sounded after STOP) to paste into a bug report.">Copy playback report</button> <button class="sm" id="audDefaults" title="Puts every audio setting on this device back to its default: Latency, Rate, Latency comp, Live engines, Sequencer, Worklets, Runaway kick, Keep screen on, Background play and Low power display. Songs, kits and your MIDI setup are kept.">Reset audio settings</button></div>
+      <div class="audrow audfoot"><button class="sm" id="audReset" title="Clears stuck notes and effects: stops playback and rebuilds every sound and effect from scratch. Your song and kit are untouched. If the engine is stuck or the output is very late, it offers to reload the app (your song is saved first).">Reset audio engine</button> <button class="sm" id="audReport" title="Copies a short playback log (screen on or off, sequencer state, how late the rows came, what still sounded after STOP) to paste into a bug report.">Copy playback report</button> <button class="sm" id="audDefaults" title="Puts every audio setting on this device back to its default: Latency, Rate, Latency comp, Live engines, Sequencer, Worklets, Runaway kick, Keep screen on, Background play, Low power display and Meters. Songs, kits and your MIDI setup are kept.">Reset audio settings</button></div>
     </div>
   </section>
 
@@ -8733,7 +8733,9 @@ const smPos = a => a <= 0 ? 0 : Math.max(0, Math.min(1, (20 * Math.log10(a) + 48
 function synMeterOn(){ smOnT = performance.now(); if (!smRaf) smRaf = requestAnimationFrame(synMeterFrame); sndWake(); }
 function synMeterFrame(){
   smRaf = 0; const m = $('vMeter'); if (!m) return;
+  if (meterHold()) return;   // METERS: OFF while playing parks it (mtrWake at STOP)
   const a = padLevel(), now = performance.now();
+  if (tp.on && !meterDue(now, synMeterFrame.t || 0, 0)){ smRaf = requestAnimationFrame(synMeterFrame); return; } synMeterFrame.t = now;
   smLv = Math.max(a, smLv * 0.86);
   if (a >= smPk || now - smPkT > 1500){ smPk = a; smPkT = now; }
   if (m.offsetWidth){ m.firstElementChild.style.transform = 'scaleX(' + smPos(smLv).toFixed(3) + ')'; m.lastElementChild.style.left = (smPos(smPk) * 100).toFixed(1) + '%'; m.classList.toggle('over', smPk > 1); }
@@ -8815,6 +8817,8 @@ let vuRaf = 0, vuEls = [];
 function vuHit(i, rate, vel, mono){ sndHit(i, ctx.currentTime, rate, mono); const c = slotAt(cache, i); if (!c) return; slotAt(hits, i); if (!hits[i]) hits[i] = []; if (mono) hits[i].length = 0; hits[i].push({t0:ctx.currentTime, rate, vel, c}); if (hits[i].length > 8) hits[i].shift(); if (!vuRaf) vuRaf = requestAnimationFrame(vuFrame); }
 function vuFrame(){
   vuRaf = 0; if (!ctx) return;
+  if (meterHold()) return;   // METERS: OFF while playing parks it (mtrWake at STOP)
+  if (tp.on && !meterDue(performance.now(), vuFrame.t || 0, 0)){ vuRaf = requestAnimationFrame(vuFrame); return; } vuFrame.t = performance.now();
   const now = ctx.currentTime, H = slotAt(hits, cur) || []; let live = false;
   for (let i = 0; i < nslots(); i++){ slotAt(hits, i); hits[i] = (hits[i] || []).filter(h => (now - h.t0) * h.rate * h.c.sr < h.c.data.length + h.c.sr * 0.3); }
   for (const m of vuEls){
@@ -8824,9 +8828,8 @@ function vuFrame(){
     m.lv = Math.max(pk, m.lv * 0.88); if (m.lv < 0.0005) m.lv = 0;
     if (pk >= m.pk || now - m.pt > 1.2){ m.pk = pk; m.pt = now; }
     const db = m.lv > 0 ? 20 * Math.log10(m.lv) : -99, w = Math.max(0, Math.min(1, (db + 48) / 48));
-    m.bar.style.width = (w * 100).toFixed(1) + '%';
-    m.bar.className = db > -1 ? 'clip' : db > -6 ? 'hot' : db > -12 ? 'warm' : '';
-    m.txt.textContent = m.pk > 0.00002 ? (20 * Math.log10(m.pk)).toFixed(1) : '−∞';
+    const wd = (w * 100).toFixed(1) + '%', cl = db > -1 ? 'clip' : db > -6 ? 'hot' : db > -12 ? 'warm' : '', tx = m.pk > 0.00002 ? (20 * Math.log10(m.pk)).toFixed(1) : '−∞';   // (METERS: only a changed value is written)
+    if (m._w !== wd){ m._w = wd; m.bar.style.width = wd; } if (m.bar.className !== cl) m.bar.className = cl; if (m.txt.textContent !== tx) m.txt.textContent = tx;
     if (m.lv > 0) live = true;
   }
   if (live || hits.some(h => h.length)) vuRaf = requestAnimationFrame(vuFrame);
@@ -12947,7 +12950,7 @@ function bassVizKick(){ if (!bvRaf) bvRaf = requestAnimationFrame(bassViz); }
 function bassViz(){
   bvRaf = 0; if (document.hidden) return;   // BATTERY: parked while hidden; the screen coming back kicks it (visibilitychange, end of file)
   const cv = $('bassCv'); if (!cv || $('bassWrap').hidden || view === 'tracker' || !isBassV(V())) return;
-  if (lpHold(bassViz.t || 0)){ bvRaf = requestAnimationFrame(bassViz); return; } bassViz.t = performance.now();
+  if (lpHold(bassViz.t || 0)){ if (!meterHold()) bvRaf = requestAnimationFrame(bassViz); return; }   /* METERS: OFF parks it (mtrWake at STOP) */ bassViz.t = performance.now();
   const dpr = devicePixelRatio || 1, W = cv.clientWidth, H = cv.clientHeight; if (!W || !H) return;
   if (cv.width !== Math.round(W * dpr)){ cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); }
   const g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, H);
@@ -13552,7 +13555,7 @@ function sndColours(){
 function sndSoon(){ if (!sndQ) sndQ = requestAnimationFrame(() => { sndQ = 0; if (!sndOn()) return; sndColours(); sndSpecPaint(); sndScopePaint(false); sndWake(); }); }
 function sndWake(){ if (!sndRaf && sndOn()) sndRaf = requestAnimationFrame(sndFrame); }
 function sndFrame(){
-  sndRaf = 0; if (!sndOn() || document.hidden) return; if (lpHold(sndFrame.t || 0)){ sndRaf = requestAnimationFrame(sndFrame); return; } sndFrame.t = performance.now(); if (!sndCol) sndColours();   // BATTERY: parked while hidden (sndWake on return)
+  sndRaf = 0; if (!sndOn() || document.hidden) return; if (lpHold(sndFrame.t || 0)){ if (!meterHold()) sndRaf = requestAnimationFrame(sndFrame); return; }   /* METERS: OFF parks it (mtrWake at STOP) */ sndFrame.t = performance.now(); if (!sndCol) sndColours();   // BATTERY: parked while hidden (sndWake on return)
   const t = ctx ? ctx.currentTime - heardLat() : 0;
   for (let i = sndPH.length - 1; i >= 0; i--) if (t > sndPH[i].end) sndPH.splice(i, 1);
   const live = !!ctx && (tp.on || performance.now() - audioWake < 1500 || sndPH.length > 0);
@@ -14480,7 +14483,7 @@ $('audDefaults').addEventListener('click', async () => {
   if (!await askYes({title:'Reset audio settings', body:'Put every audio setting back to its default? Songs, kits and your MIDI setup are kept.'}, 'Reset')) return;
   const hadCore = coreWanted();
   audResetAset(aset); asetSave();
-  try { setWlOn(true); setBgOn(true); if (lpOn) setLowPower(false); } catch(e){ tpLog('reset audio: screen / background / low power failed', e); }
+  try { setWlOn(true); setBgOn(true); if (lpOn) setLowPower(false); if (mtrMode !== 'smooth') setMeters('smooth'); } catch(e){ tpLog('reset audio: screen / background / low power failed', e); }
   try { rkOn = true; localStorage.removeItem('thunderplus-runkick-v1'); updRk(); } catch(e){}   // RUNAWAY KICK (TEST): on is its default
   if ((ctx && aLive && (aLive.lat !== latOf() || aLive.rate !== aset.rate)) || NOWK !== !!aset.noWk){
     try { save(); } catch(e){ tpLog('save before restart failed', e); } applyUpdate(); return; }
@@ -21905,7 +21908,7 @@ function rtInit(){
   if (!rt){
     // mo: the master OUT fader (GAIN STAGING, 27 Oct), after mastering and the safety limiter, before the device's level
     const out = ctx.createGain(), mo = ctx.createGain(), lim = safeLim(ctx, mo); mo.gain.value = curve(S.mout == null ? 255 : S.mout); mo.connect(master);
-    rt = {out, mo, lim, mfx:null, fxOk:false, chnOk:false, pend:new Set(), pl:makePlayer(ctx, out, rtBuf, true, mo), mlv:[0, 0], mpk:[0, 0], mpt:[0, 0]}; rtRoute(); rt.pl.applyMix(); mstSync(); if (wkLazy()) wkLiveEnsure(); else bassReady(ctx).then(ok => { if (ok) liveWarmSoon(200); });
+    rt = {out, mo, lim, mfx:null, fxOk:false, chnOk:false, pend:new Set(), pl:makePlayer(ctx, out, rtBuf, true, mo), mlv:[0, 0], mlA:[0, 0], mpk:[0, 0], mpt:[0, 0]}; rtRoute(); rt.pl.applyMix(); mstSync(); if (wkLazy()) wkLiveEnsure(); else bassReady(ctx).then(ok => { if (ok) liveWarmSoon(200); });
     // the master meter listens to everything going out, synth pads included
     const sp = ctx.createChannelSplitter(2); rt.man = [ctx.createAnalyser(), ctx.createAnalyser()];
     master.connect(sp); rt.man.forEach((a, i) => { a.fftSize = 1024; sp.connect(a, i); });
@@ -23131,7 +23134,7 @@ function pbSum(){ const now = performance.now(); if (now - PB.t < 2000) return; 
   PB.n = PB.late = PB.drop = PB.ahead = 0; }
 function pbAfterStop(){ PB.stopT = performance.now(); pbLvStop(); pbLog('STOP · ' + pbState()); for (const ms of [1000, 3000]) setTimeout(() => pbLog(`${ms / 1000} s after STOP: level ${pbLevel()} · voices ${rt && rt.pl.aliveN ? rt.pl.aliveN() : '?'} · stray rows ${PB.stray} · ` + pbState()), ms); }
 async function pbCopy(){
-  const head = `Thunder Plus build ${BUILD} · ${navigator.userAgent}\nlatency ${ctx ? Math.round((ctx.baseLatency || 0) * 1000) + ' + ' + Math.round((ctx.outputLatency || 0) * 1000) + ' ms · heard ' + Math.round(heardLat() * 1000) + ' ms' : '-'} · worklets ${NOWK ? 'OFF (test)' : ctx && wkUsed(ctx).size ? [...wkUsed(ctx)].join(', ') : 'none'} · ${pbState()}${PB.lvDone ? '\nlevel over the last play: ' + PB.lvDone : ''}\nsettings: background play ${bgOn ? 'on' : 'OFF'} · keep screen on ${wlOn ? 'on' : 'off'} · low power ${lpOn ? 'on' : 'off'} · latency ${latOf()} · runaway kick ${rkOn ? 'on' : 'off'}${(() => { try { const t = pwFmt(pwState(), true); return t ? ' · ' + t : ''; } catch(e){ return ''; } })()}${bgAndroid && !bgOn ? ' · NOTE: with Background play off Android does not treat the app as a media player (hidden playback is throttled, volume keys move the ringer)' : ''}\n`;   // (10 Nov: a report from a phone with Background play left off after a test read like an engine fault)
+  const head = `Thunder Plus build ${BUILD} · ${navigator.userAgent}\nlatency ${ctx ? Math.round((ctx.baseLatency || 0) * 1000) + ' + ' + Math.round((ctx.outputLatency || 0) * 1000) + ' ms · heard ' + Math.round(heardLat() * 1000) + ' ms' : '-'} · worklets ${NOWK ? 'OFF (test)' : ctx && wkUsed(ctx).size ? [...wkUsed(ctx)].join(', ') : 'none'} · ${pbState()}${PB.lvDone ? '\nlevel over the last play: ' + PB.lvDone : ''}\nsettings: background play ${bgOn ? 'on' : 'OFF'} · keep screen on ${wlOn ? 'on' : 'off'} · low power ${lpOn ? 'on' : 'off'} · meters ${mtrMode} · latency ${latOf()} · runaway kick ${rkOn ? 'on' : 'off'}${(() => { try { const t = pwFmt(pwState(), true); return t ? ' · ' + t : ''; } catch(e){ return ''; } })()}${bgAndroid && !bgOn ? ' · NOTE: with Background play off Android does not treat the app as a media player (hidden playback is throttled, volume keys move the ringer)' : ''}\n`;   // (10 Nov: a report from a phone with Background play left off after a test read like an engine fault)
   const txt = head + PB.log.join('\n');
   try { await navigator.clipboard.writeText(txt); toast('Playback report copied: paste it into the chat.', 3500); }
   catch(e){ try { await deliver('thunder-playback-report.txt', new Blob([txt], {type:'text/plain'})); } catch(e2){ toastErr('Couldn’t copy the report here.'); } }
@@ -23236,7 +23239,7 @@ function tStop(quiet){
   G('stop cursor', () => {
   stopP = !quiet && stopToPlayhead() && tp.on && tp.pos && tp.pos.some(Boolean) ? {P:tp.pos.map(q => q && Object.assign({}, q)), mode:tp.mode} : null;
   home = !quiet && tp.on && !stopToPlayhead() && fpHome && fpHome.t >= workT && fpHome.t >= arrHandT ? fpHome : null; });   // (12 Nov, owner: PLAY from the pad, ▼ / scroll down, STOP before row 2 jumped the cursor back to the top) fpHome is the cursor as FOLLOW first noted it, and is only noted again 4 s after your last key, press or scroll: a place you moved to after that note stands, only an untouched cursor goes back   // (9 Nov, owner: with ON STOP at STAYS it still ended up at the playback spot: FOLLOW had carried it there)
-  tp.timer = 0; tp.on = false; fpMem = null; fpHome = null; tp.q = []; tp.pos = null; tp.snd = null; tp.stopAt = null; tp.ahead = tp.aheadT = 0; tp.rsUntil = 0; PB.rsA = null; G('runaway kick', rkReset);
+  tp.timer = 0; tp.on = false; if (mtrMode === 'off') setTimeout(mtrWake, 0); fpMem = null; fpHome = null; tp.q = []; tp.pos = null; tp.snd = null; tp.stopAt = null; tp.ahead = tp.aheadT = 0; tp.rsUntil = 0; PB.rsA = null; G('runaway kick', rkReset);
   // HAND-OVER (seqHandover): the core and the voices already booked keep sounding until the page sequencer's first step
   if (tp.core){ tp.core = false; core.gen++; if (!handing) G('core', () => { coreWire(false); try { core.node.port.postMessage({op:'stop', at:ctx.currentTime}); } catch(e){} }); }
   else if (coreWanted() && !core.ready && ctx) setTimeout(() => { try { if (!tp.on) coreLoad(); } catch(e){} }, 400);
@@ -24487,7 +24490,24 @@ var phOff = (() => { try { return clamp(parseInt(localStorage.getItem('thunderpl
 // (lpOn in frame, hmDraw, sndFrame, bassViz, mwLoop) and the LOW POWER DISPLAY row in Settings.
 var lpOn = (() => { try { return localStorage.getItem('thunderplus-lowpower-v1') === '1'; } catch(e){ return false; } })(), lpNext = 0, lpPend = false;
 var LP_MS = 1000 / 24, LP_GATE = 38;
-var lpHold = last => lpOn && tp.on && performance.now() - last < LP_GATE;   // a meter or animation asks: is it too soon to draw again?
+// METERS (13 Nov, owner: "Can we make #1 a setting"; M.RATE): how often the level meters and the other playing-time marks are PAINTED while a song plays. SMOOTH (default, as
+// before) | LIGHT (about 10 a second) | OFF WHILE PLAYING (meters hold empty, back at STOP). Only the painting waits: the analysers are still read at their own rate (the
+// peak and clip latches, the playback report's level, the limiter and every audio thing are untouched), a value painted at the lower rate is the highest seen since the
+// last paint, and a write happens only when the shown value changed. One shared gate, used by every meter loop: meterDue(now, last, base). Independent of Low power
+// (where that paints less, the slower of the two wins). To remove: this block, the METERS row in Settings and the meterDue / meterHold calls.
+var MTR_K = 'thunderplus-meters-v1', MTR_MODES = ['smooth', 'light', 'off'], MTR_LIGHT_MS = 92;   // 92: on a 60 or 120 Hz screen the next frame lands at 100 ms, so about 10 a second
+var mtrMode = (() => { try { const v = localStorage.getItem(MTR_K); return MTR_MODES.includes(v) ? v : 'smooth'; } catch(e){ return 'smooth'; } })();
+var meterHold = () => mtrMode === 'off' && !!tp.on;   // meters hold empty (a level meter or scope: not the playhead's marks)
+var meterGap = (base, soft) => !tp.on ? (base || 0) : Math.max(base || 0, lpOn ? LP_GATE : 0, mtrMode === 'smooth' ? 0 : MTR_LIGHT_MS, !soft && mtrMode === 'off' ? Infinity : 0);   // soft: a mark that is not a level meter (it keeps LIGHT's rate when METERS is OFF)
+var meterDue = (now, last, base, soft) => now - last >= meterGap(base, soft);
+var lpHold = last => tp.on && !meterDue(performance.now(), last, 0);   // a meter or animation asks: is it too soon to draw again? (Low power and METERS)
+var mtrBlank = false;   // the Mixer's and the header's meters were painted empty for this play (METERS: OFF)
+function setMeters(v){
+  mtrMode = MTR_MODES.includes(v) ? v : 'smooth'; try { localStorage.setItem(MTR_K, mtrMode); } catch(e){}
+  mtrBlank = false; try { HM.drawn = ''; HM.held = false; } catch(e){} try { paintMeters(); } catch(e){} try { mtrWake(); } catch(e){}
+}
+// the loops that park under OFF are started again here (STOP, or another choice)
+function mtrWake(){ try { sndWake(); bassVizKick(); if (!vuRaf && typeof vuEls !== 'undefined' && vuEls.length) vuRaf = requestAnimationFrame(vuFrame); if (smLv > 0.0005 || smPk > 0.0005) synMeterOn(); if (typeof mwOpenNow !== 'undefined' && mwOpenNow && !mwRaf) mwRaf = requestAnimationFrame(mwLoop); } catch(e){} }
 // (9 Nov, owner) turning it on picks the Low power skin; turning it off goes back to the skin you had. Any skin can still be chosen while it's on.
 const LP_SKIN_K = 'thunderplus-lowpower-skin-v1';
 var lpPrev = '';
@@ -25343,6 +25363,8 @@ function projRows(){
       info:() => 'Moves the playhead to match what you hear, on this device: + later (Bluetooth headphones, a slow screen), − earlier. The app already allows for the output latency it is told about'},
     {l:'LOW POWER DISPLAY', ck:'Low power display (saves battery): the picture is a little less smooth, and the audio engine sleeps after 30 s of silence, so the first note after that can start a moment late', get:() => lpOn ? 1 : 0, set:v => setLowPower(!!v), min:0, max:1, tog:true, d:0, fmt:onOff,   // LOW POWER DISPLAY
       info:() => 'ON: while a song plays, the screen redraws about 24 times a second instead of at the screen’s full rate. It also switches to the Low power (black) skin, and back when turned off. The audio engine also sleeps after 30 s of silence and wakes on the next note, which can start a moment late. That saves battery; the picture is a little less smooth, and the sound is unchanged. OFF (the default): as before. This device only'},
+    {l:'METERS WHILE PLAYING', segs:true, get:() => MTR_MODES.indexOf(mtrMode), set:v => setMeters(MTR_MODES[v]), min:0, max:2, d:0, fmt:v => ['SMOOTH', 'LIGHT', 'OFF'][v] || 'SMOOTH',   // METERS (M.RATE)
+      info:() => 'How often the level meters and the other moving marks are drawn while a song plays: the Mixer, the top bar’s meters, the FX bar, the master window, the spectrum. SMOOTH (the default): as before. LIGHT: about 10 times a second, less drawing and less battery; a short peak still shows. OFF: the meters stay empty while a song plays and come back when it stops; the sound, the peak and CLIP checks and the playback report are unchanged. Separate from LOW POWER DISPLAY (with both on, the slower one wins). This device only'},
     {l:'FOLLOW', segs:true, get:() => followMode, set:v => setFollow(v), min:0, max:2, d:0, fmt:v => ['OFF', 'PATTERN', 'ON'][v] || 'OFF',
       info:() => 'While the song plays. ON: Song and Phrase scroll with the playhead, and Phrase (and Sect) switch to what the cursor’s track is playing. PATTERN: Phrase (and Sect) switch to what the cursor’s track is playing and Arrange turns its pages with the song, but the phrase’s rows stay where you put them. OFF: the screen stays where you put it, except that Arrange still turns its pages when the playhead runs off it. While you work in Arrange it waits until you’ve left it alone for a minute. The cursor stays on its row in every mode, so you can edit while it plays'},
     {l:'TAB', segs:true, get:() => tabTracks ? 1 : 0, set:v => setTabTracks(!!v), min:0, max:1, d:1, fmt:v => v ? 'TRACKS' : 'COLUMNS',
@@ -28715,26 +28737,29 @@ grid.addEventListener('contextmenu', e => { const b = e.target.closest && e.targ
   else { const t = +b.dataset.t; valMenu(e, 'Track ' + d2(t + 1) + ' VOL', {reset:() => mfReset(t), type:() => mfType(t)}); } }, true);
 let mcutOn = false;   // MASTER CUT FLASH: what the Mixer's master meter last showed
 function paintMeters(){
-  const bs = rt ? rt.pl.buses : null;
+  const hold = meterHold(), bs = rt && !hold ? rt.pl.buses : null;   // METERS: OFF while playing: painted empty
+  const lv = b => b.lvA > b.lv ? b.lvA : b.lv;   // the highest since the last paint (LIGHT), which is the latest at SMOOTH
   if (trimEls.length){ const now = performance.now(), lit = trimEls.map((e, i) => { const b = bs && bs[mixL + i], p = b && now - (b.iseen || 0) < 1000 ? b.ipk : 0; return p >= 0.891 ? 2 : p >= 0.5 ? 1 : 0; });
     const sig = lit.join(''); if (sig !== trimLit){ trimLit = sig; trimEls.forEach((e, i) => { e.classList.toggle('ih', lit[i] === 1); e.classList.toggle('ic', lit[i] === 2); }); } }   // GAIN STAGING: the TRIM light
-  document.querySelectorAll('#tMeters .mtr i').forEach((e, t) => { const h = (bs ? lvl(bs[t].lv) * 100 : 0).toFixed(1) + '%'; if (e._h !== h){ e._h = h; e.style.height = h; } });   // BATTERY: only a changed height is written
+  document.querySelectorAll('#tMeters .mtr i').forEach((e, t) => { const h = Math.round(bs ? lvl(lv(bs[t])) * 100 : 0) + '%'; if (e._h !== h){ e._h = h; e.style.height = h; } });   // BATTERY: only a changed height is written (METERS: whole per cent, finer than the bar's pixels)
   // Track meters: element k * mixN + i is line k (from the top) of the i-th track on screen.
-  meterEls.forEach((e, i) => { const k = Math.floor(i / mixN), t = mixL + i % mixN, f = (bs ? lvl(bs[t].lv) : 0) * MH * 8 - (MH - 1 - k) * 8;
+  meterEls.forEach((e, i) => { const k = Math.floor(i / mixN), t = mixL + i % mixN, f = (bs ? lvl(lv(bs[t])) : 0) * MH * 8 - (MH - 1 - k) * 8;
     const ch = BLK[clamp(Math.round(f), 0, 8)], tx = ch + ch; if (e.textContent !== tx) e.textContent = tx; });
   // Master: a horizontal bar per side, −48 to 0 dB in MW cells, plus the peak in dB.
   if (masterEls.length === 10){
     const cut = mcutOn = mCut(); for (const k of [0, 5]){ const ln = masterEls[k].closest('.ln'); if (ln && ln.classList.contains('mcut') !== cut) ln.classList.toggle('mcut', cut); }   // MASTER CUT FLASH
     const HB = ' ▏▎▍▌▋▊▉█', zones = [[0, 27], [27, 34], [34, MW]];
     [0, 1].forEach(s => {
-      const m = rt && rt.mlv ? rt.mlv[s] : 0, f = lvl(m) * MW, base = s * 5;
+      const m = rt && rt.mlv && !hold ? Math.max(rt.mlv[s], rt.mlA ? rt.mlA[s] : 0) : 0, f = lvl(m) * MW, base = s * 5;
       zones.forEach(([a, b], z) => { let t = ''; for (let i = a; i < b; i++){ const x = f - i; t += x >= 1 ? '█' : x > 0 ? HB[Math.round(x * 8)] : ''; }
         const e = masterEls[base + z]; if (e.textContent !== t){ e.textContent = t; e.style.width = 'calc(' + t.length + ' * var(--chw, 1ch))'; } });   // as wide as its cells (see .mt)
       { const e3 = masterEls[base + 3], t3 = '·'.repeat(Math.max(0, MW - Math.ceil(f))); if (e3.textContent !== t3) e3.textContent = t3; }
-      const pk = rt && rt.mpk ? rt.mpk[s] : 0;
+      const pk = rt && rt.mpk && !hold ? rt.mpk[s] : 0;
       { const e4 = masterEls[base + 4], t4 = pk > 0.00002 ? (20 * Math.log10(pk)).toFixed(1).padStart(5) + (pk >= 0.999 ? ' CLIP' : '') : '  −∞'; if (e4.textContent !== t4) e4.textContent = t4; }
     });
   }
+  if (bs) for (const b of bs) b.lvA = b.lv;   // the next paint starts from what is now
+  if (rt && rt.mlA && rt.mlv && !hold){ rt.mlA[0] = rt.mlv[0]; rt.mlA[1] = rt.mlv[1]; }
 }
 /* ---------- the stage beside the tracker grid (big screens) ---------- */
 // BY SCREEN (default): the dogs on Song and Project, and something useful on the others — Sect: the phrase under
@@ -28828,10 +28853,10 @@ function stageTick(now){
   // FX DYNAMICS: the shown track's effects report their levels while the stage shows its chain; ~30 frames a second then
   const chn = stgKindNow === 'chain' && !$('tStage').hidden, ft = cFxT >= NT ? -1 : Math.min(cFxT, ntr() - 1);
   fxTelSet(chn ? fxDynNodeOf(ft) : dkBarTelNode);   // FX BAR: otherwise the bottom bar's track, when it shows a dynamics slot
-  if (chn && now - stgFrameT > 33){ const A = ft < 0 ? S.mfx : S.tfx[ft] || []; if (A.some(f => f && fxStageLive(f.type))){ stgFrameT = now; stageCanvas(false); } }
+  if (chn && meterDue(now, stgFrameT, 34) && !meterHold()){ const A = ft < 0 ? S.mfx : S.tfx[ft] || []; if (A.some(f => f && fxStageLive(f.type))){ stgFrameT = now; stageCanvas(false); } }
   if (stgOn !== !!tp.on){ stgOn = !!tp.on; if (stgKindNow === 'dogs' || stgKindNow === 'drum') dogsState(); else if (stgKindNow) stageCanvas(true); }
   if (!stgKindNow || $('tStage').hidden) return;
-  if (stgKindNow === 'piano' || stgKindNow === 'spec'){ if (now - stgFrameT > 45){ stgFrameT = now; stageCanvas(false); } return; }
+  if (stgKindNow === 'piano' || stgKindNow === 'spec'){ if (meterDue(now, stgFrameT, 46, stgKindNow === 'piano') && !(stgKindNow === 'spec' && meterHold())){ stgFrameT = now; stageCanvas(false); } return; }   // METERS: the piano's lit notes are marks (OFF keeps LIGHT's rate); the spectrum is a meter
   if ((stgKindNow !== 'dogs' && stgKindNow !== 'drum') || !tp.on || !ctx) return;
   const lat = heardLat(), t = ctx.currentTime - lat, bpm = tp.bpm || S.bpm;
   if (bpm !== stgBpm){ const b = (t - stgT0) * stgBpm / 60; stgBpm = bpm; stgT0 = t - b * 60 / bpm; }
@@ -29540,8 +29565,9 @@ function mwLimDraw(){
 function mwLoop(){
   if (!mwOpenNow) return;
   if (document.hidden && !tp.on) return;   // BATTERY: parked while hidden and not playing (visibilitychange restarts it)
+  if (meterHold()){ mwRaf = 0; return; }   // METERS: OFF while playing holds it (mtrWake at STOP)
   mwRaf = requestAnimationFrame(mwLoop);
-  const now = performance.now(); if (now - (mwLoop.t || 0) < (lpOn && tp.on ? LP_GATE : 33)) return; mwLoop.t = now;
+  const now = performance.now(); if (!meterDue(now, mwLoop.t || 0, 33)) return; mwLoop.t = now;   // METERS: OFF holds it (the loop idles; mtrWake / the next frame at STOP)
   const m = mstMeter, live = !!(m && S.mst.on && (tp.on || now - audioWake < 1500));
   // chain readouts
   $('mwChain').querySelectorAll('.mwst').forEach(b => { const k = b.dataset.k, gr = b.querySelector('.gr');
@@ -29823,7 +29849,7 @@ function deckStrip(){
 }
 // The strip's meter is stereo: the shown track's bus (after its pan) is split into left and right, each with its
 // own analyser, re-attached when the shown track changes. Peaks fall back smoothly, like the other meters.
-let dkSt = null; const dkStBuf = new Float32Array(512); let dkStT = 0;
+let dkSt = null; const dkStBuf = new Float32Array(512); let dkStT = 0, dkStP = 0;
 function deckMetersPaint(){}
 function deckStripMeter(now){
   try { deckFxBarMeters(); } catch(e){}   // FX BAR: the slots' meters, with the strip's
@@ -29836,11 +29862,15 @@ function deckStripMeter(now){
       const sp = ctx.createChannelSplitter(2), a = [ctx.createAnalyser(), ctx.createAnalyser()]; a.forEach((x, i) => { x.fftSize = 512; sp.connect(x, i); });
       node(t).connect(sp); dkSt = {t, sp, a, lv:[0, 0]}; } catch(e){ dkSt = null; return; }
   }
-  const dk = Math.pow(0.86, Math.max(0.5, dt) * 0.12), quiet = !(tp.on || now - audioWake < 1500);
+  const dk = Math.pow(0.86, Math.max(0.5, dt) * 0.12), quiet = !(tp.on || now - audioWake < 1500), hold = meterHold();
+  if (hold){ if (!dkSt.held){ dkSt.held = true; dkSt.lv[0] = dkSt.lv[1] = 0; dkSt.pa = [0, 0]; for (const b of bars){ b.style.setProperty('--lv', '0%'); b.classList.remove('clip'); b._lv = '0%'; b._cl = false; } } return; }   // METERS: OFF while playing: empty, not read
+  dkSt.held = false; if (!dkSt.pa) dkSt.pa = [0, 0];
   dkSt.a.forEach((x, i) => { let p = 0;
     if (!quiet){ x.getFloatTimeDomainData(dkStBuf); for (let k = 0; k < dkStBuf.length; k++){ const v = dkStBuf[k] < 0 ? -dkStBuf[k] : dkStBuf[k]; if (v > p) p = v; } }
-    const nl = Math.max(p, dkSt.lv[i] * dk); dkSt.lv[i] = nl < 0.0005 ? 0 : nl;
-    bars[i].style.setProperty('--lv', (lvl(dkSt.lv[i]) * 100).toFixed(1) + '%'); bars[i].classList.toggle('clip', dkSt.lv[i] >= 0.999); });
+    const nl = Math.max(p, dkSt.lv[i] * dk); dkSt.lv[i] = nl < 0.0005 ? 0 : nl; if (dkSt.lv[i] > dkSt.pa[i]) dkSt.pa[i] = dkSt.lv[i]; });   // pa: the highest since the last paint
+  if (!meterDue(now, dkStP, 0)) return; dkStP = now;
+  dkSt.a.forEach((x, i) => { const wv = (lvl(dkSt.pa[i]) * 100).toFixed(1) + '%', cl = dkSt.pa[i] >= 0.999; dkSt.pa[i] = dkSt.lv[i];   // (a changed value only)
+    if (bars[i]._lv !== wv){ bars[i]._lv = wv; bars[i].style.setProperty('--lv', wv); } if (bars[i]._cl !== cl){ bars[i]._cl = cl; bars[i].classList.toggle('clip', cl); } });
 }
 // Scope: the master's spectrum, drawn as Quite Noise draws its Shape graph — 20 Hz to 20 kHz across, faint
 // lines at 100, 1k and 10k, a dashed reference at −48 dB, and the spectrum filled in the section's colour.
@@ -29859,7 +29889,7 @@ function mCut(){
   const want = curve(S.master == null ? 255 : S.master);
   return want > 0 && rt.out.gain.value < want * 0.708;
 }
-const HM = {m:null, an:null, buf:null, lv:[0, 0], pk:[0, 0], pt:[0, 0], clip:false, t:0, drawn:''};
+const HM = {m:null, an:null, buf:null, lv:[0, 0], la:[0, 0], pk:[0, 0], pt:[0, 0], clip:false, t:0, pT:0, drawn:'', held:false, heldClip:false};   // la: the highest level since the last paint (METERS)
 function hmAttach(){
   if (HM.m === master || !ctx || !master) return !!HM.an;
   try { const sp = ctx.createChannelSplitter(2); HM.an = [ctx.createAnalyser(), ctx.createAnalyser()]; master.connect(sp);
@@ -29888,17 +29918,23 @@ function hmDraw(now){
   const live = hmAttach(), dk = Math.pow(10, -20 * dt / 20);   // falls 20 dB a second
   for (let s = 0; s < 2; s++){
     let p = 0; if (live){ HM.an[s].getFloatTimeDomainData(HM.buf); for (let i = 0; i < HM.buf.length; i++){ const v = HM.buf[i] < 0 ? -HM.buf[i] : HM.buf[i]; if (v > p) p = v; } }
-    HM.lv[s] = Math.max(p, HM.lv[s] * dk);
+    HM.lv[s] = Math.max(p, HM.lv[s] * dk); if (HM.lv[s] > HM.la[s]) HM.la[s] = HM.lv[s];
     if (p >= HM.pk[s]){ HM.pk[s] = p; HM.pt[s] = now; } else if (now - HM.pt[s] > 1000) HM.pk[s] = Math.max(p, HM.pk[s] * dk);   // held a second, then falls
     if (p >= 0.999) HM.clip = true;
   }
   if (!c || !c.offsetParent) return;
+  // METERS: the levels above are read at their own rate (peak, CLIP latch, quiet check); only the painting waits. OFF while playing: empty bars, and a CLIP that latches is still shown (once).
+  const hold = meterHold();
+  if (hold){ if (HM.held && HM.heldClip === HM.clip) return; HM.held = true; HM.heldClip = HM.clip; }
+  else { HM.held = false; if (!meterDue(now, HM.pT, 0)) return; }
+  const LV = hold ? [0, 0] : HM.la, PK = hold ? [0, 0] : HM.pk;
   const r = c.getBoundingClientRect(), dpr = Math.min(2, devicePixelRatio || 1), W = Math.round(r.width * dpr), H = Math.round(r.height * dpr); if (!W || !H) return;
-  const cut = mCut(), blink = cut && Math.floor(now / 400) % 2 === 0;
+  const cut = !hold && mCut(), blink = cut && Math.floor(now / 400) % 2 === 0;
   if (cut !== !!HM.cut){ HM.cut = cut; if (HM.tip == null) HM.tip = c.title; c.title = cut ? 'The master is turned down by a VOL command on the master track' : HM.tip; }
   // Labelled (fit and finish, 2 Nov): L / R at the left, a dB scale under the bars, the held peak in dB at the right
-  const pkMax = Math.max(HM.pk[0], HM.pk[1]), pkTxt = pkMax > 0.0001 ? (Math.round(40 * Math.log10(pkMax)) / 2).toFixed(1) : '-inf';
-  const pos = g => lvl(g), key = [W, H, HM.clip, cut, blink, pkTxt, ...HM.lv.map(v => (pos(v) * W) | 0), ...HM.pk.map(v => (pos(v) * W) | 0)].join(',');
+  const pkMax = Math.max(PK[0], PK[1]), pkTxt = pkMax > 0.0001 ? (Math.round(40 * Math.log10(pkMax)) / 2).toFixed(1) : '-inf';
+  const pos = g => lvl(g), key = [W, H, HM.clip, cut, blink, pkTxt, ...LV.map(v => (pos(v) * W) | 0), ...PK.map(v => (pos(v) * W) | 0)].join(',');
+  HM.pT = now; HM.la[0] = HM.lv[0]; HM.la[1] = HM.lv[1];
   if (key === HM.drawn) return; HM.drawn = key;   // nothing moved: no redraw (silence costs nothing)
   if (c.width !== W || c.height !== H){ c.width = W; c.height = H; }
   const g = c.getContext('2d');
@@ -29922,11 +29958,11 @@ function hmDraw(now){
   }
   g.clearRect(0, 0, W, H); g.drawImage(HM.bg, 0, 0);
   for (let s = 0; s < 2; s++){
-    const y = y0 + s * (bh + gap), x = pos(HM.lv[s]) * BW;
+    const y = y0 + s * (bh + gap), x = pos(LV[s]) * BW;
     if (blink){ g.globalAlpha = 0.7; g.fillStyle = '#e8a33a'; g.fillRect(lx, y, BW, bh); g.globalAlpha = 1; }   // MASTER CUT FLASH
     g.fillStyle = ink; g.fillRect(lx, y, Math.min(x, amber), bh);
     if (x > amber){ g.fillStyle = '#e8a33a'; g.fillRect(lx + amber, y, x - amber, bh); }
-    const px = Math.min(BW - dpr, pos(HM.pk[s]) * BW); if (HM.pk[s] > 0.004){ g.fillStyle = HM.pk[s] >= 0.999 ? '#e5484d' : ink; g.fillRect(lx + px, y, Math.max(1, dpr * 1.5), bh); }
+    const px = Math.min(BW - dpr, pos(PK[s]) * BW); if (PK[s] > 0.004){ g.fillStyle = PK[s] >= 0.999 ? '#e5484d' : ink; g.fillRect(lx + px, y, Math.max(1, dpr * 1.5), bh); }
   }
   if (HM.clip){ g.fillStyle = '#e5484d'; g.fillRect(lx + BW - Math.round(4 * dpr), y0, Math.round(4 * dpr), bh * 2 + gap); }
   g.font = `600 ${Math.round(11 * dpr)}px ${ff}`; g.textBaseline = 'middle'; g.textAlign = 'right'; g.fillStyle = HM.clip ? '#e5484d' : ink; g.globalAlpha = pkMax > 0.0001 ? 1 : 0.45;
@@ -29939,7 +29975,7 @@ function specAnalyser(){
   if (dkAn && dkAnM !== master){ try { dkAnM.disconnect(dkAn); } catch(e){} dkAn = dkAnM = null; }
   if (!dkAn && rt && ctx){ try { dkAn = ctx.createAnalyser(); dkAn.fftSize = 4096; dkAn.smoothingTimeConstant = 0.8; master.connect(dkAn); dkAnM = master; dkSpec = new Float32Array(dkAn.frequencyBinCount); } catch(e){ dkAn = null; } } return dkAn; }
 function deckScope(now){
-  if (!deckShown() || !deck.scope || deck.fxbar || now - dkScopeT < 50) return; dkScopeT = now;
+  if (!deckShown() || !deck.scope || deck.fxbar || !meterDue(now, dkScopeT, 50) || meterHold()) return; dkScopeT = now;   // METERS
   const c = $('dkScopeC'), r = c.getBoundingClientRect(), dpr = Math.min(2, devicePixelRatio || 1); if (!r.width || !r.height) return;
   if (c.width !== Math.round(r.width * dpr) || c.height !== Math.round(r.height * dpr)){ c.width = Math.round(r.width * dpr); c.height = Math.round(r.height * dpr); dkScopeIdle = false; }
   const live = !!(rt && ctx && (tp.on || now - audioWake < 1500)); if (!live && dkScopeIdle) return; dkScopeIdle = !live;
@@ -30181,9 +30217,11 @@ function deckFxBarMeters(){
   const bar = $('dkFxBar'); if (!bar || !deck.fxbar || !deckShown() || !deck.fx){ fxLvlSet(null); dkBarTelNode = null; return; }
   const mst = dkMst(), t = mst ? NT : dkTrack(), node = fxDynNodeOf(mst ? -1 : t), A = (mst ? S.mfx : S.tfx[t]) || []; fxLvlSet(node);
   dkBarTelNode = A.some(f => f && isFxDyn(f.type)) ? node : null;
-  const now = performance.now();
-  for (const c of bar.children){ const i = c.querySelector('.fm i'); if (!i) continue; const k = +c.dataset.k; let lv = 0; try { lv = typeof fxSlotLevel === 'function' ? fxSlotLevel(t, k) : 0; } catch(e){} i.style.width = Math.round(clamp(lv, 0, 1) * 100) + '%';
-    if (now - c._q < 33) continue; c._q = now; c._h[c._w] = lv; c._w = (c._w + 1) % c._h.length;
+  const now = performance.now(), hold = meterHold();
+  for (const c of bar.children){ const i = c.querySelector('.fm i'); if (!i) continue; const k = +c.dataset.k; let lv = c._lv0 || 0;
+    if (hold) lv = 0; else if (mtrMode === 'smooth' || meterDue(now, c._w2 || 0, 0)){ c._w2 = now; try { lv = typeof fxSlotLevel === 'function' ? fxSlotLevel(t, k) : 0; } catch(e){ lv = 0; } c._lv0 = lv; }
+    const wd = Math.round(clamp(lv, 0, 1) * 100) + '%'; if (i._w !== wd){ i._w = wd; i.style.width = wd; }   // METERS: a changed width only (empty and not read while OFF plays)
+    if (hold || !meterDue(now, c._q || 0, 33)) continue; c._q = now; c._h[c._w] = lv; c._w = (c._w + 1) % c._h.length;
     try { dkFxViz(c, A[k], k, node, now); } catch(e){}
     if (c._spr) try { if (c._spr.kind) dkAnim(c, A[k], now, lv); else dkSpring(c, A[k], now, lv); } catch(e){} }
 }
@@ -32385,7 +32423,7 @@ function sxStageSwitch(kind){
 $('tStageSw').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; sxSet('peek', b.dataset.k === 'peek'); sxPkSig = ''; });
 /* ===== SONG EXTRAS end ===== */
 
-let raf = 0, mScanT = 0, audioWake = 0;
+let raf = 0, mScanT = 0, audioWake = 0, mDirty = false, mPaintT = 0;
 const mbuf = new Float32Array(512), mbuf2 = new Float32Array(1024);
 // CPU meter: the browser's own audio load where it reports one (Chrome's renderCapacity), otherwise
 // the time the track effects take, which is most of what the tracker adds.
@@ -32640,22 +32678,24 @@ function frame(){
   if (rt && (tp.on || mt - audioWake < 1500) && mt - mScanT >= 33){
     const dk = Math.pow(0.86, Math.max(0.5, mt - mScanT) * 0.12);   // 0.86 per 8.3ms frame, in real time
     mScanT = mt;
-    let any = false;
-    for (let t = 0; t < ntr(); t++){ const b = rt.pl.buses[t]; b.an.getFloatTimeDomainData(mbuf);
+    const hold = meterHold();   // METERS: OFF while playing: the track meters and the TRIM light are only painted, so they are not read; the master is (its peak and CLIP)
+    if (!hold) for (let t = 0; t < ntr(); t++){ const b = rt.pl.buses[t]; b.an.getFloatTimeDomainData(mbuf);
       let p = 0; for (let i = 0; i < mbuf.length; i++){ const a = mbuf[i] < 0 ? -mbuf[i] : mbuf[i]; if (a > p) p = a; }
-      const nl = Math.max(p, b.lv * dk), v = nl < 0.002 ? 0 : nl; if (v !== b.lv){ any = true; b.lv = v; } }
+      const nl = Math.max(p, b.lv * dk), v = nl < 0.002 ? 0 : nl; if (v !== b.lv){ mDirty = true; b.lv = v; } if (!(b.lvA >= v)) b.lvA = v; }   // lvA: the highest since the last paint (METERS: LIGHT paints it, not the latest)
     // GAIN STAGING: the Mixer's TRIM light, from what the shown tracks send in (after TRIM): the peak held 0.6 s, then falling
-    if (tv === 'mixer' && trimEls.length) for (let i = 0; i < mixN; i++){ const b = rt.pl.buses[mixL + i]; if (!b || !b.ai) continue; b.ai.getFloatTimeDomainData(mbuf);
+    if (!hold && tv === 'mixer' && trimEls.length) for (let i = 0; i < mixN; i++){ const b = rt.pl.buses[mixL + i]; if (!b || !b.ai) continue; b.ai.getFloatTimeDomainData(mbuf);
       let p = 0; for (let k = 0; k < mbuf.length; k++){ const a = mbuf[k] < 0 ? -mbuf[k] : mbuf[k]; if (a > p) p = a; }
       const was = b.ipk;
       if (p >= b.ipk){ b.ipk = p; b.ipt = mt; } else if (mt - b.ipt > 600){ b.ipk = Math.max(p, b.ipk * dk); if (b.ipk < 0.0005) b.ipk = 0; }
-      b.iseen = mt; if (b.ipk !== was) any = true; }
+      b.iseen = mt; if (b.ipk !== was) mDirty = true; }
     if (rt.man){ const now = mt;
       rt.man.forEach((a, s) => { a.getFloatTimeDomainData(mbuf2);
         let p = 0; for (let i = 0; i < mbuf2.length; i++){ const v = mbuf2[i] < 0 ? -mbuf2[i] : mbuf2[i]; if (v > p) p = v; }
-        const nl = Math.max(p, rt.mlv[s] * dk), v = nl < 0.0002 ? 0 : nl; if (v !== rt.mlv[s]){ any = true; rt.mlv[s] = v; }
-        if (p >= rt.mpk[s] || now - rt.mpt[s] > 1500){ if (p !== rt.mpk[s]) any = true; rt.mpk[s] = p; rt.mpt[s] = now; } }); }
-    if (any || (masterEls.length === 10 && mCut() !== mcutOn)){ paintMeters(); deckMetersPaint(); }   // a cut can start or end in a silent stretch
+        const nl = Math.max(p, rt.mlv[s] * dk), v = nl < 0.0002 ? 0 : nl; if (v !== rt.mlv[s]){ mDirty = true; rt.mlv[s] = v; } if (!(rt.mlA[s] >= v)) rt.mlA[s] = v;
+        if (p >= rt.mpk[s] || now - rt.mpt[s] > 1500){ if (p !== rt.mpk[s]) mDirty = true; rt.mpk[s] = p; rt.mpt[s] = now; } }); }
+    if (hold){ if (!mtrBlank){ mtrBlank = true; paintMeters(); deckMetersPaint(); } }   // empty once, then nothing is written until STOP
+    else { mtrBlank = false;
+      if ((mDirty || (masterEls.length === 10 && mCut() !== mcutOn)) && meterDue(mt, mPaintT, 0)){ mDirty = false; mPaintT = mt; paintMeters(); deckMetersPaint(); } }   // a cut can start or end in a silent stretch
   }
   deckScope(mt); deckStripMeter(mt); stageTick(mt);
 }
