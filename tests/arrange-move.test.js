@@ -44,7 +44,7 @@ test('move: Arrange beside another screen (apHold) and the other screens keep th
 test('draw: a full draw cancels the frame booked by a move; drawArr0 keeps its blocks only for arrFast and a matching key', () => {
   assert.match(src, /function draw\(\)\{\n  if \(arrSoon && !arrFast\)\{ cancelAnimationFrame\(arrSoon\); arrSoon = 0; \}/);
   assert.match(src, /fast = arrFast && arrSig && fkey === arrFastKey && arrFastN >= Math\.max\(cs\.song\.y \+ 1, \(cs\.song\.top \|\| 0\) \+ 40\)/, 'a rebuild is forced when the cursor goes past the built rows, the sizes change or arrSig is cleared');
-  assert.match(src, /if \(fast\)\{\} else if \(ms\)\{ const pitch/, 'the height is not read back on a cursor-only draw');
+  assert.match(src, /if \(fast\)\{\} else if \(ms\)\{ const avail/, 'the height is not read back on a cursor-only draw');
 });
 test('CSS: the blocks have no b::before (it was clipped by their own overflow:hidden and doubled the compositing cost of every repaint)', () => {
   assert.doesNotMatch(src, /\.tagrid b::before\{/);
