@@ -25022,6 +25022,25 @@ function ntrPerm(n0, n1){
   const P = mono.concat(poly, spare, free.slice(k));   // P[new] = old
   return P.length === NT ? P : null;
 }
+// PERFORM follows the tracks too (owner, 14 Nov: two new tracks left his LFOs on the old numbers). Every target id, lock and LFO
+// names a track by number, so each one is renamed with tN. A number from the master (MT = NT) up stays: that is the master.
+function perfRemap(P, tN){
+  const rid = id => { if (typeof id !== 'string') return id; const a = id.split(':'), t = +a[1]; if (a[1] == null || a[1] === '' || !(t >= 0 && t < NT)) return id; a[1] = String(tN(t)); return a.join(':'); };
+  const rkeys = o => { if (!o || typeof o !== 'object') return o; const r = {}; for (const k in o){ const t = +k; r[k !== '' && t >= 0 && t < NT ? tN(t) : k] = o[k]; } return r; };
+  const pf = S.perf;
+  if (pf && typeof pf === 'object'){
+    if (Array.isArray(pf.sc)) for (const sc of pf.sc) if (sc && sc.v){ const r = {}; for (const k in sc.v) r[rid(k)] = sc.v[k]; sc.v = r; }
+    if (Array.isArray(pf.mac)) for (const m of pf.mac) if (m && Array.isArray(m.tg)) for (const g of m.tg) if (g) g.id = rid(g.id);
+    if (pf.lk){ pf.lk = rkeys(pf.lk); for (const k in pf.lk) if (Array.isArray(pf.lk[k])) pf.lk[k] = pf.lk[k].map(rid); }
+    if (pf.lfo){ pf.lfo = rkeys(pf.lfo); for (const k in pf.lfo) if (Array.isArray(pf.lfo[k])) for (const L of pf.lfo[k]) if (L) L.id = rid(L.id); }
+  }
+  if (Array.isArray(S.parts)) for (const p of S.parts){ if (!p) continue;
+    if (Array.isArray(p.mix)){ const c = p.mix.slice(0, NT), nm = [];   // a short list leaves the later tracks as the song has them: fill with the song's own (S.mix is already moved)
+      for (let t = 0; t < NT; t++){ const o = P[t], m = S.mix[t]; nm.push(c[o] != null ? c[o] : [m ? m.vol : 224, m ? m.pan : 128]); }
+      p.mix = nm; }
+    if (p.fx && typeof p.fx === 'object'){ const r = {}; for (const k in p.fx){ const a = k.split(':'), t = +a[0]; if (t >= 0 && t < NT) a[0] = String(tN(t)); r[a.join(':')] = p.fx[k]; } p.fx = r; } }
+  try { perfLive.sent.clear(); perfLive.pno.clear(); } catch(e){}
+}
 function ntrRemap(P){
   const inv = new Array(NT); P.forEach((o, i) => inv[o] = i);
   const tN = t => t >= 0 && t < NT ? inv[t] : t;
@@ -25029,6 +25048,7 @@ function ntrRemap(P){
   if (S.smute) for (let y = 0; y < S.smute.length; y++){ const w = S.smute[y] | 0; if (!w) continue; let v = 0; for (let t = 0; t < 32 && t < NT; t++) if (w & (1 << P[t])) v |= 1 << t; S.smute[y] = v; }
   const perm = A => { if (!A) return; const c = A.slice(0, NT); for (let t = 0; t < NT; t++) A[t] = c[P[t]]; };
   perm(S.mix); perm(S.tfx); perm(S.chainOn);
+  perfRemap(P, tN);
   const sck = v => { const t = sckTrack(v); return t >= 0 && t < NT ? tN(t) + SCK_SEND + 1 : v; };
   const slots = A => (A || []).forEach(f => { if (f && f.sck != null && +f.sck > SCK_SEND) f.sck = sck(+f.sck); });
   for (let t = 0; t < NT; t++) slots(S.tfx[t]); slots(S.mfx);
