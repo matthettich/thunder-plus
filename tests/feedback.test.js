@@ -185,3 +185,14 @@ test('both worklets carry the same guard and the same ordering rule', () => {
   assert.ok(cut(c).length > 100); assert.equal(cut(c), cut(w));
   for (const s of [c, w]) assert.ok(s.includes('if (c.fb) continue;'), 'compile leaves feedback cables out of the sort');
 });
+
+test('release: build 589 is announced, the cache and both worklet versions moved on', () => {
+  const root = H.read('index.html'), sw = H.read('sw.js');
+  assert.match(root, /\[589, '14 Nov', \[/);
+  const b = +/const BUILD = (\d+);/.exec(root)[1]; assert.ok(b >= 589); assert.ok(sw.includes('thunderplus-v' + b));
+  const cv = /chains-worklet\.js\?v=(\d+)/.exec(sw)[1], wv = /waves-worklet\.js\?v=(\d+)/.exec(sw)[1];
+  assert.ok(+cv >= 49 && +wv >= 39);
+  for (const m of root.matchAll(/chains-worklet\.js\?v=(\d+)/g)) assert.equal(m[1], cv);
+  for (const m of root.matchAll(/waves-worklet\.js\?v=(\d+)/g)) assert.equal(m[1], wv);
+  assert.ok(H.read('chains/index.html').includes('chains-worklet.js?v=' + cv)); assert.ok(H.read('waves/index.html').includes('waves-worklet.js?v=' + wv));
+});

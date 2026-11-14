@@ -104,9 +104,6 @@ test('the new CSS uses the editors\' variables, not literal colours, for the Min
   }
 });
 
-test('release notes: build 588 is announced, the service worker cache is v588', () => {
-  const root = H.read('index.html'), sw = H.read('sw.js');
-  assert.match(root, /const BUILD = 588;/);
-  assert.match(root, /\[588, '14 Nov', \[/);
-  assert.match(sw, /thunderplus-v588/);
+test('release notes: build 588 is announced', () => {
+  assert.match(H.read('index.html'), /\[588, '14 Nov', \[/);
 });

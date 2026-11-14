@@ -3741,7 +3741,7 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
 </div>
 <div class="toast" id="toast" role="status" aria-live="polite" title="Tap to dismiss" hidden></div>
 
-<script src="waves/waves-worklet.js?v=38"></script>
+<script src="waves/waves-worklet.js?v=39"></script>
 <!-- LXR ENGINES (23 Oct 2026): the LXR-02 firmware's drum voices, GPL-3.0, all of it in lxr/. Optional: without the folder
      this fails quietly and the app has no Firmware engines. The render Worker loads the same file (LXR_JS below). -->
 <script src="lxr/lxr-engine.js?v=2"></script>
@@ -8731,7 +8731,7 @@ self.onmessage = async e => {
       if (m.op === 'done') j.ok({data:m.data, data2:m.data2 || null, st:m.st}); else j.no(new Error(m.err));
     };
     w.onerror = e => { e.preventDefault && e.preventDefault(); rwDown(); };
-    w.postMessage({op:'init', pl:plMod, tx:txMod, lx:lxMod || null, ps:psMod || null, wv:new URL('waves/waves-worklet.js?v=38', location.href).href});
+    w.postMessage({op:'init', pl:plMod, tx:txMod, lx:lxMod || null, ps:psMod || null, wv:new URL('waves/waves-worklet.js?v=39', location.href).href});
     PW.w = w;
   } catch(e){ PW.w = null; }
 }
@@ -19571,7 +19571,7 @@ function chainsReady(ac){
     chnLoaded.set(ac, (async () => {
       await tfxLoad; await tfxModLoad; if (!chnBin() || !ac.audioWorklet || !window.AudioWorkletNode) return false;
       if (!chnURL){
-        const src = await (await fetch('chains/chains-worklet.js?v=48')).text();
+        const src = await (await fetch('chains/chains-worklet.js?v=49')).text();
         chnURL = URL.createObjectURL(new Blob([src], {type:'application/javascript'}));
       }
       wkNote(ac, 'chains'); await ac.audioWorklet.addModule(chnURL);
@@ -22452,7 +22452,7 @@ let bassURL = null; const bassLoad = new WeakMap(), bassOK = new WeakSet(), bass
 // …PUMP SYNTHS live: their worklet, loaded with the others; psSent: the contexts whose audio thread has the wasm's bytes
 const PSYN_WK = 'pump/synth/pump-synth-worklet.js?v=12', psOK = new WeakSet(), psSent = new WeakSet();
 // …WAVES LIVE: the waves worklet in the tracker's own context (thunder-wlive); wlSent: the contexts that have the wasm
-const WAVES_WK = 'waves/waves-worklet.js?v=38', wlOK = new WeakSet(), wlSent = new WeakSet();
+const WAVES_WK = 'waves/waves-worklet.js?v=39', wlOK = new WeakSet(), wlSent = new WeakSet();
 /* BATTERY (8 Nov, Fold): a bookkeeping timer that only does something in one situation (playing, the screen visible, one
    screen open) had been waking the phone 2 to 16 times a second for nothing. idleTick(fn, fast, busy, slow) calls fn every
    `fast` ms while busy() says so and every `slow` ms otherwise (fn runs either way, so its own reset-when-idle code still
@@ -24684,7 +24684,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 588;
+const BUILD = 589;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD + (location.pathname.includes('/beta/') ? ' · beta' : '');
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -34491,6 +34491,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [589, '14 Nov', ['\u2026waves and \u2026chains: feedback loops. A cable that closes a loop used to be refused; now it is allowed, and so is patching a module into itself. The cable that closes the loop is drawn as a long dash and a dot with a small \u201c1 blk\u201d tag: what it carries arrives one block late (128 samples, about 3 ms). A loop cannot run away: a signal inside the normal range passes through that cable untouched, and anything louder is bent smoothly towards a ceiling (about +6 dB). Turn loop gain up carefully all the same. Patches without a loop sound exactly as before.']],
   [588, '14 Nov', ['\u2026waves and \u2026chains: a module can now fold to Mini, a one-line title bar with its cables on the edges, as well as to Compact. Shift+click the chevron, press and hold it on a phone, use the module menu, or press Alt+Shift+C to take every module to Mini; the plain chevron and Alt+C work as before.', 'Some modules are narrower now (Attenuverter, Random, Quantizer, Logic, Math, Slew limiter, Sample & hold, Clock divider, Gate extract), so a busy patch fits more on screen. The \u201cAbout this module\u201d entry moved into the module menu.', 'A group has a chevron: click it and the whole group folds to one block that keeps the cables going in and out. The group box follows its modules when you move, nudge, fold or remove them. Old patches open as they were.', 'Touch: a long press that opens a menu no longer picks the first item when your finger lifts.']],
   [587, '14 Nov', ['\u2026waves and \u2026chains feel more like a desktop program. The mouse wheel over a slider now turns it, but only once the pointer has rested on it for a moment, and never while you are panning or zooming. Right-click a slider for Reset, Type a value and MIDI learn; hold Alt and click to reset it.', 'Two cables into one input now add together instead of the new one replacing the old one, and hovering a cable shows what is on it (level, gate, or the value it carries). Modules snap to a grid as you drag (the background menu turns that off).', 'New keys: A (or N in Chains) adds a module, F fits the view, Shift+F zooms to the picked modules, Ctrl+A picks all, Ctrl+G groups, arrows nudge, Enter renames, Esc lets go. Right-click gives Rename, Align, Space evenly, Tidy up by signal flow and Add a comment. The module list has a search box.', 'In Chains you can save your own presets and they travel with the patch. Tab now steps from module to module, and buttons and cables have names for screen readers. Folding a long module no longer works in Play, and Alt+E during a drag lets go of the module.']],
   [586, '13 Nov', ['\u2026waves and \u2026chains on the phone: a Play / Edit switch in the top bar. In Play the patch can be played with one thumb (sliders, buttons, keys) and nothing can be moved, deleted or rewired; a one-finger drag pans. Edit works as before, and each editor remembers its mode.', 'The top bar is one row on a phone: name, Play / Edit, add, undo, Fit and a \u2026 menu that holds File, Settings, Help, MIDI learn, Select and zoom. Sliders move from where they are (sideways drag; up or down pans), and one tap on a number types it.', 'Hold a finger on a module, cable, slider or empty space for its menu (including Delete, which asks first, Add a bend and Add a module here); a Select button picks several modules by touch. Two fingers pan and zoom from anywhere. Long modules fold into sections.', '\u2026waves has a full octave of on-screen keys with octave buttons that fit a phone. The tip no longer opens by itself on a touch screen (the Tips button stays), Fit shows the whole patch at any width, and typed values accept 1e3 again.']],
