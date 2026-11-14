@@ -339,7 +339,7 @@ body.learning .row.sl{outline:1px dashed var(--muted); outline-offset:3px}
 }
 @media (pointer: coarse){
   .hint .tipm{display:none} .hint .tipt{display:block}
-  .hint{top:10px; bottom:auto; left:10px; max-width:min(46ch, calc(100% - 24px))}   /* the top: waves' on-screen keys sit along the bottom */
+  .hint{bottom:10px; top:auto; left:10px; max-width:min(46ch, calc(100% - 24px))}   /* the Tips button sits bottom left (13 Nov: at the top it covered the first module's title bar) */
   .hint.min{padding:0; border:0; background:none; opacity:1} .hint.min .tipt, .hint.min #hintx{display:none}
   .hint.min .hintpill{display:block; min-width:56px; min-height:40px; padding:0 12px; border:1px solid #111; background:var(--panel); color:var(--ink); font-weight:600}
 }
@@ -375,6 +375,58 @@ body.learning .row.sl{outline:1px dashed var(--muted); outline-offset:3px}
 @media (max-width: 520px){ .bar #zoomval{display:none} }
 @media (max-width: 1340px){ .bar .vsep{display:none} .bar h1{font-size:17px} .bar .pname{width:96px; font-size:14px} .bar .fps{font-size:12.5px; padding:5px 6px} }
 @media (max-width: 760px){ .bar .meters{display:none} .hint{max-width:calc(100% - 24px)} }
+/* ═══ PASS 3 (13 Nov 2026, "Phone": audit M10, T4, T6, T7, T8, T9, T12, T14) ═══ */
+/* PLAY / EDIT (M10): two buttons in the bar; the one that is on is filled (the skins' own .on look, so it reads in every skin). In Play the patch also wears a
+   frame and a PLAY tag in the skin's ink, and what cannot be done there is dimmed. Colours are the editors' variables only. */
+.modesw{display:inline-flex; flex:none; border:1px solid var(--edge)}
+.modesw .tb{border:0; padding:6px 12px; font-weight:600; min-width:50px; justify-content:center}
+.modesw .tb + .tb{border-left:1px solid var(--edge)}
+.modesw .tb:not(.on){background:var(--panel); color:var(--ink)}
+body.play .ws::before{content:''; position:absolute; inset:0; border:4px solid var(--ink); z-index:1000001; pointer-events:none}
+body.play .ws::after{content:'PLAY'; position:absolute; right:4px; top:4px; z-index:1000001; padding:2px 8px; background:var(--ink); color:var(--panel); font-size:11px; font-weight:700; letter-spacing:.12em; pointer-events:none}
+body.play .node > header{cursor:default}
+body.play .node > header :is(.x, .fold){opacity:.28}
+body.play .jack{opacity:.45; cursor:default}
+body.play svg.cables .hit, body.play svg.cables rect.bend{pointer-events:none !important}
+body.play .decor.box > *{pointer-events:none}
+body.play .dtoggle{opacity:.45}
+body.play #pall{opacity:.45}
+/* SELECT (T8): a button for touch (and in the overflow menu): while on, a tap on a module picks it, a drag on the background draws a box */
+.barsel{display:none}
+@media (pointer: coarse){ .barsel{display:inline-flex} }
+body.selmode .ws{cursor:crosshair}
+/* A MODULE'S SECTIONS (T14): a long module is cut into folding sections; the first is open */
+.sec{display:grid; gap:9px}
+.sechd{display:flex; align-items:center; gap:8px; width:100%; min-height:30px; padding:5px 8px; border:1px solid var(--edge); background:var(--panel-2); color:var(--ink); font-size:12.5px; font-weight:600; text-align:left}
+.sechd .sect{flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.sechd .secm{flex:none; font-size:11px; font-weight:700; color:var(--mod)} .sechd .secm:empty{display:none}
+.secchev{flex:none; width:7px; height:7px; margin:-3px 2px 0 2px; border-right:2px solid var(--ink); border-bottom:2px solid var(--ink); transform:rotate(45deg)}
+.sec.shut .secchev{margin:0 3px 0 -1px; transform:rotate(-45deg)}
+.secbody{display:grid; gap:9px}
+.sec.shut > .secbody{display:none}
+@media (pointer: coarse){ .sechd{min-height:40px} .row .val{padding:10px 0 10px 10px; margin:-10px 0; cursor:pointer} }   /* (T9: the readout is a bigger target for the one tap that types) */
+/* THE BAR ON A NARROW SCREEN (T12): one row, name, mode, add, undo, Fit and one overflow button; everything else (File, Settings, Help, MIDI learn, Select, zoom - and the
+   CPU readout) is moved into the overflow menu by the script, element and handlers intact, and back when the window is wide again */
+.baradd, .barundo, .morewrap{display:none}
+.morepop{position:absolute; right:6px; top:calc(100% + 4px); width:min(340px, calc(100vw - 12px)); max-height:calc(100vh - 80px); overflow-y:auto; z-index:2000001; display:grid; gap:6px; padding:8px; white-space:normal; background:var(--panel); border:1px solid var(--edge)}
+.morepop[hidden]{display:none}
+.morepop > .tb, .morepop > .setwrap > .tb{width:100%; justify-content:flex-start}
+.morepop .setwrap{position:static}
+.morepop .setmenu{position:static; width:auto; max-height:none; margin-top:4px; box-shadow:none}
+.morepop .zrow{display:flex; gap:6px} .morepop .zrow .tb{flex:1; justify-content:center}
+.morepop .fps{justify-self:start}
+.bar .tb svg{display:block; flex:none}
+@media (max-width: 640px){
+  .bar{flex-wrap:nowrap; gap:6px; padding:6px 8px; min-width:0; z-index:30}   /* (z-index: the overflow menu opens over the module-list strip; the body is a grid: without this the bar would keep the width its name field wants and push the buttons off the screen) */
+  .bar h1, .bar .vsep, .bar .spacer{display:none}
+  .bar .pname{flex:1 1 40px; width:auto; min-width:0; padding:5px 6px}
+  .baradd, .barundo, .morewrap{display:inline-flex}
+  .embed .barundo{display:none}
+  .bar .tb{padding:6px 9px; min-width:36px; justify-content:center}
+  .modesw .tb{padding:6px 8px; min-width:40px}
+  .bar .zoomctl .tb{padding:6px 9px; min-width:36px}
+}
+@media (min-width: 641px) and (max-width: 1340px){ .modesw .tb{padding:5px 8px; min-width:0} .bar .pname{width:84px} }
 /* An instrument, not a web page: no text selection, no long-press callout and no browser pinch-zoom anywhere.
    Chrome's tap-to-search sheet (the Google search that slid up from the bottom) only opens on selectable text,
    so this stops it on every screen, not just the tracker grid. Fields stay editable. */
@@ -392,6 +444,7 @@ document.addEventListener('contextmenu', e => { if (e.cancelable && !(e.target.c
     <h1>chains</h1>
   <input id="pname" class="pname" aria-label="Patch name" maxlength="60" spellcheck="false">
   <span class="vsep" aria-hidden="true"></span>
+  <div class="modesw" role="group" aria-label="Play or Edit"><button class="tb" id="modeplay" data-m="play" aria-pressed="false" title="Play: touches and clicks play the patch (sliders, selects, keys); nothing on a module moves, opens a menu, is rewired or removed, and a drag anywhere else pans (Alt+E)">Play</button><button class="tb on" id="modeedit" data-m="edit" aria-pressed="true" title="Edit: change the patch (Alt+E)">Edit</button></div>
   <div class="setwrap"><button class="tb" id="filebtn" aria-haspopup="true">File ▾</button>
     <div class="setmenu filemenu" id="filemenu" hidden role="menu">
       <button class="fitem" id="fnew"><span>New</span><kbd data-k="N"></kbd></button>
@@ -433,7 +486,12 @@ document.addEventListener('contextmenu', e => { if (e.cancelable && !(e.target.c
   <span class="fps" id="cpuv" title="How busy the sound engine is">CPU –</span>
   <span class="fps meters" id="meters" title="Chain 1–32"></span>
   <button class="tb" id="midilearn">MIDI learn</button>
+  <button class="tb barsel" id="selbtn" aria-pressed="false" title="Select: while on, tap modules to pick several and drag the background for a box (then hold a module for Group, Copy, Delete)">Select</button>
+  <button class="tb baradd" id="baradd" aria-label="Add a module" title="Add a module (the module list)"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2v12M2 8h12" fill="none" stroke="currentColor" stroke-width="2"/></svg></button>
+  <button class="tb barundo" id="barundo" aria-label="Undo" title="Undo"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M5.5 3 2 6.5 5.5 10M2.5 6.5h6.5a4 4 0 010 8H6" fill="none" stroke="currentColor" stroke-width="1.8"/></svg></button>
   <div class="zoomctl"><button class="tb" id="zoomout" aria-label="Zoom out">−</button><button class="tb" id="zoomval" title="Click to type a zoom level">100%</button><button class="tb" id="zoomin" aria-label="Zoom in">+</button><button class="tb" id="zoomfit">Fit</button></div>
+  <div class="morewrap"><button class="tb" id="morebtn" aria-haspopup="true" aria-expanded="false" aria-label="More" title="More: File, Settings, Help, MIDI learn, zoom"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><circle cx="3" cy="8" r="1.7" fill="currentColor"/><circle cx="8" cy="8" r="1.7" fill="currentColor"/><circle cx="13" cy="8" r="1.7" fill="currentColor"/></svg></button></div>
+  <div class="morepop" id="morepop" hidden></div>
 </div>
 
 <div class="split" id="split">
@@ -450,7 +508,7 @@ document.addEventListener('contextmenu', e => { if (e.cancelable && !(e.target.c
     <svg class="cables under" id="cablehits" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"></svg>
     <svg class="cables" id="cables" xmlns="http://www.w3.org/2000/svg"></svg>
   </div>
-  <div class="hint" id="hint"><span class="tipm">Drag from an output jack to an input jack to patch (on a touch screen you can also tap one jack, then the other; double-tap a cable to remove it). Every slider has a small purple jack on its left: patch an LFO, envelope or any other signal into it to move that slider. Drag a patched input to move its cable, or drop it on empty space to unplug. Hold Option (Alt on Windows) and click while drawing a cable to bend it, or Option-drag an existing cable. Click a cable to select it (Delete removes it, and its bend handles show: drag one to move the bend), double-click it to remove it, or a module’s title bar to collapse it. Gate cables are dotted and gate jacks are diamonds. Drag the background or scroll with two fingers to pan, and pinch to zoom. Shift-click or Shift-drag to select modules, then right-click to group them. Start with a Track In (your tracker track) and end with a Chain Out back to the same track.</span><button id="hintmore" class="hintmore" aria-expanded="false" aria-controls="hint">More</button><span class="tipt">Tap a jack, then another jack, to patch. Tap a cable to select it; double-tap it to remove it. Drag the background to pan and pinch to zoom. Tap the arrow on a title bar to fold a module.</span><button id="hintx" aria-label="Hide tips">×</button><button id="hintpill" class="hintpill" aria-label="Show tips" aria-expanded="false">Tips</button></div>
+  <div class="hint" id="hint"><span class="tipm">Drag from an output jack to an input jack to patch (on a touch screen you can also tap one jack, then the other; double-tap a cable to remove it). Every slider has a small purple jack on its left: patch an LFO, envelope or any other signal into it to move that slider. Drag a patched input to move its cable, or drop it on empty space to unplug. Hold Option (Alt on Windows) and click while drawing a cable to bend it, or Option-drag an existing cable. Click a cable to select it (Delete removes it, and its bend handles show: drag one to move the bend), double-click it to remove it, or a module’s title bar to collapse it. Gate cables are dotted and gate jacks are diamonds. Drag the background or scroll with two fingers to pan, and pinch to zoom. Shift-click or Shift-drag to select modules, then right-click to group them. Alt+E switches Play and Edit. Start with a Track In (your tracker track) and end with a Chain Out back to the same track.</span><button id="hintmore" class="hintmore" aria-expanded="false" aria-controls="hint">More</button><span class="tipt">Tap a jack, then another jack, to patch. Tap a cable to select it; double-tap it to remove it. Drag the background to pan and pinch to zoom. Tap the arrow on a title bar to fold a module. Hold a module, a cable, a slider or the background for its menu. Drag a slider sideways to change it (drag away up or down for fine steps), tap its value to type one. Play locks the patch so you can play it; Select picks several modules.</span><button id="hintx" aria-label="Hide tips">×</button><button id="hintpill" class="hintpill" aria-label="Show tips" aria-expanded="false">Tips</button></div>
   <div class="lasso" id="lasso" hidden></div>
   <div class="emptylbl" id="emptylbl" aria-hidden="true" hidden></div>
   <div class="toast" id="toast" hidden></div>
@@ -490,13 +548,13 @@ const opts = names => names.map((t, i) => [i, t]);
 /* TYPED VALUES (13 Nov, audit D2): a value typed into a readout lands on the value the readout then shows. typedToParam searches the
    parameter's range for the value whose formatted text (fmt) carries the typed number: a typed 6 into "2.5 kHz" is 6 kHz, "-12" into
    "-3.0 dB" is -12 dB, "40" into "25%" is 40%, "1.5 s" into "250 ms" is 1500 ms. A number with no unit is in the unit the readout
-   showed when the box opened; a unit typed (k, kHz, Hz, ms, s, %, dB, st, ct) wins. Returns null when the readout is not a number
+   showed when the box opened; a unit typed (k, kHz, Hz, ms, s, %, dB, st, ct) wins; scientific notation (1e3, 2.5e-1) counts as a number. Returns null when the readout is not a number
    (notes, names): the caller then uses the raw parameter. A readout that rounds shows one text over a stretch of values: the middle of
    the stretch is taken (its ends when the stretch touches the range's end), so "6" in a dB readout is 6.0 and not 5.95. */
 function typedToParam(fmt, min, max, step, shown, typed){
   const UN = { khz:1000, k:1000, hz:1, ms:1, s:1000, '%':1, db:1, st:1, ct:1 };
   const rd = txt => {
-    const m = /^\s*([+\-−×]*)\s*(\d+(?:[.,]\d+)?|[.,]\d+)\s*(khz|hz|ms|s(?![a-z])|%|db|st|ct|k(?![a-z]))?/i.exec(String(txt).replace(/−/g, '-'));
+    const m = /^\s*([+\-−×]*)\s*(\d+(?:[.,]\d+)?(?:e[+\-]?\d+)?|[.,]\d+(?:e[+\-]?\d+)?)\s*(khz|hz|ms|s(?![a-z])|%|db|st|ct|k(?![a-z]))?/i.exec(String(txt).replace(/−/g, '-'));
     if (!m) return null;
     return { n: (m[1].includes('-') ? -1 : 1) * parseFloat(m[2].replace(',', '.')), u: m[3] ? m[3].toLowerCase() : null };
   };
@@ -1676,6 +1734,89 @@ function summaryKeys(m){
   for (const k of sl) if (pick.length < SUMMARY_DEFAULT.sliders && !pick.includes(k)) pick.push(k);
   return [...sel.slice(0, SUMMARY_DEFAULT.selects), ...pick];
 }
+/* ── PASS 3 (13 Nov 2026, "Phone": audit M10, T6, T7, T14): editor helpers shared by chains and waves ── */
+// PLAY / EDIT (M10). In Play a touch or a click plays the patch (sliders, selects, buttons, readouts, keys) and nothing on a module moves,
+// opens a menu or goes: a drag on anything that is not one of these controls pans. The editor's own copies of the handlers ask playMode.
+let playMode = false, selMode = false, touchSlideAbort = null;
+// what keeps working in Play (and what a finger never pans from): the controls; the close and fold buttons of a title bar and the preset button are not
+const PLAY_CTL = 'input, select, textarea, button:not(.x):not(.fold):not(.presel), canvas, .val, .valedit, .knob, .ctl';
+const isFinger = e => !!e && (e.pointerType === 'touch' || e.pointerType === 'pen');
+// a press on a title-bar button, the module list or a menu item that would change the patch, while in Play: nothing happens but this line
+function playBlocked(){ if (!playMode) return false; toast('Play mode: tap Edit to change the patch.'); return true; }
+// LONG PRESS (T6): a finger held 500 ms on a module, a cable (or its bend handle), a slider or the background opens its menu, as a right-click does
+// (the browser's own long-press menu is not reliable). It gives up when the finger moves more than 8 screen px (the same 8 px as a drag), lifts,
+// or a second finger lands, and it never fires in Play.
+const LP_MS = 500, LP_SLOP = 8, TOUCH_SLIDE_PX = 8;
+let lpState = null, lpFiredAt = -1e9;
+const lpCancel = () => { if (lpState){ clearTimeout(lpState.t); lpState = null; } };
+window.addEventListener('pointerdown', e => {
+  lpCancel();
+  if (!isFinger(e) || !e.isPrimary || playMode || !ws.contains(e.target) || !e.target.closest) return;
+  const t = e.target;
+  if (t.closest('.jack, select, textarea, .valedit, button, .hint, .dock, .val, canvas, .dlgov')) return;
+  const kind = t.closest('.bend') ? 'bend' : t.closest('.hit') ? 'cable' : t.closest('.node') ? 'node' : 'bg';
+  lpState = { x:e.clientX, y:e.clientY, id:e.pointerId, target:t, kind, t:setTimeout(() => {
+    const s = lpState; lpState = null; if (!s || playMode) return;
+    lpFiredAt = performance.now();
+    if (touchSlideAbort) touchSlideAbort();   // a slider the finger rests on: its drag stops (no value moved yet)
+    for (const n of nodes.values()) n.headTap = null;
+    try { if (navigator.vibrate) navigator.vibrate(12); } catch (_) {}
+    ctxMenu(s.target, s.x, s.y, { touch:true });
+  }, LP_MS) };
+}, true);
+window.addEventListener('pointermove', e => { if (lpState && e.pointerId === lpState.id && Math.hypot(e.clientX - lpState.x, e.clientY - lpState.y) > LP_SLOP) lpCancel(); }, true);
+window.addEventListener('pointerup', e => { if (lpState && e.pointerId === lpState.id) lpCancel(); }, true);
+window.addEventListener('pointercancel', e => { if (lpState && e.pointerId === lpState.id) lpCancel(); }, true);
+// LONG MODULES (T14): a module with many controls (pump GATE has 47 sliders) is cut into sections, each with a title bar of its own that folds it.
+// The first is open, the others shut. Which are open is view state (view.sec, optional in the saved patch: { moduleId: bit mask of the open
+// sections }); a build without this reads the patch as before. A shut section hides its rows (and their modulation jacks: a cable into one
+// ends at the section's title bar).
+const SEC_MIN = 16, SEC_CHUNK = 12;
+function secPlan(type, keys, lab){
+  if (keys.length <= SEC_MIN || MIXT.has(type)) return null;
+  const num = k => { const m = /^(.*?)(\d+)$/.exec(k); return m ? [m[1], +m[2]] : null; };
+  const out = []; let plain = [];
+  const pieces = (list, size) => { const n = Math.ceil(list.length / size), per = Math.ceil(list.length / n); return Array.from({ length:n }, (_, i) => list.slice(i * per, (i + 1) * per)); };
+  const tail = s => { const m = /(\d+)\s*$/.exec(s); return m ? m[1] : ''; };
+  const flush = () => { if (!plain.length) return;
+    for (const p of plain.length <= SEC_MIN ? [plain] : pieces(plain, SEC_CHUNK)) out.push({ title: out.length ? lab(p[0]) + (p.length > 1 ? ' – ' + lab(p[p.length - 1]) : '') : 'Main', keys:p });
+    plain = []; };
+  for (let i = 0; i < keys.length;){
+    const a = num(keys[i]); let j = i + 1;
+    if (a) while (j < keys.length){ const b = num(keys[j]); if (b && b[0] === a[0] && b[1] === num(keys[j - 1])[1] + 1) j++; else break; }
+    if (a && j - i >= 4){
+      flush();
+      for (const p of pieces(keys.slice(i, j), 16)){ const f = lab(p[0]), l = lab(p[p.length - 1]); out.push({ title: f.replace(/\s*\d+\s*$/, '') + ' ' + (tail(f) || num(p[0])[1]) + '–' + (tail(l) || num(p[p.length - 1])[1]), keys:p }); }
+      i = j;
+    } else { plain.push(keys[i]); i++; }
+  }
+  flush();
+  return out.length > 1 ? out : null;
+}
+const secMask = id => { const s = view().sec, m = s && s[id]; return typeof m === 'number' ? m : 1; };
+function secWrap(n, rows, plan){
+  n.secs = plan.map((p, i) => {
+    const open = !!((secMask(n.m.id) >> i) & 1);
+    const hd = h('button', { class:'sechd', 'aria-expanded':String(open), title:'Show or hide these controls' }, h('i', { class:'secchev', 'aria-hidden':'true' }), h('span', { class:'sect', text:p.title }), h('span', { class:'secm' }));
+    const box = h('div', { class:'sec' + (open ? '' : ' shut'), 'data-i':String(i) }, hd, h('div', { class:'secbody' }, p.keys.map(k => rows.get(k))));
+    hd.addEventListener('click', () => {
+      const v = view(), nxt = secMask(n.m.id) ^ (1 << i), on = !!((nxt >> i) & 1);
+      (v.sec || (v.sec = {}))[n.m.id] = nxt;
+      box.classList.toggle('shut', !on); hd.setAttribute('aria-expanded', String(on)); markScene(); store.touch();
+    });
+    return { box, hd, keys:p.keys, mk:hd.lastChild, shown:'' };
+  });
+  return n.secs.map(s => s.box);
+}
+// the modulated controls inside each section, said on its title bar (written only when the text changes)
+function secMarks(){
+  let any = false; for (const n of nodes.values()) if (n.secs){ any = true; break; } if (!any) return;
+  const U = cableUse();
+  for (const n of nodes.values()) if (n.secs){ const u = U.get(n.m.id), mods = u ? u.mods : [];
+    for (const s of n.secs){ const c = s.keys.filter(k => mods.includes(k)).length, t = c ? c + ' mod' : ''; if (s.shown !== t){ s.shown = t; s.mk.textContent = t; } } }
+}
+// where a cable into a control inside a shut section ends: the left edge of that section's title bar
+const secHeadOf = el => { const b = el.closest && el.closest('.secbody'); return b && b.previousElementSibling; };
 /* ===SHARED EDITOR END=== */
 /* TRACK IN STEREO (owner, 20 Oct): the starter patch sent only Track In's left side into its first effect, so the track
    reached the chain as its left channel, played as mono. A patch made before (ti2 not set) gets, once, for each Track In
@@ -2355,7 +2496,7 @@ function rebuildNode(id){
 }
 function slider(n, key, spec){
   const [def, min, max, step] = spec, fmt = fmtOf(n.m.type, key), label = plabel(n.m.type, key);
-  const out = h('span', {class:'val', title:'Double-click or double-tap to type a value'}), mark = h('span', {class:'mark', hidden:true});
+  const out = h('span', {class:'val', title:'Tap (or double-click) to type a value'}), mark = h('span', {class:'mark', hidden:true});
   const inp = h('input', {type:'range', min, max, step, 'aria-label': label});
   const show = () => { inp.value = n.m.params[key]; if (!out.querySelector('input') && !r.classList.contains('modded')) out.textContent = fmt(+n.m.params[key]); if (n.m.collapsed) paintSum(n); };
   n.ctl[key] = { show, range:{min, max, step} };
@@ -2380,14 +2521,13 @@ function slider(n, key, spec){
     ed.addEventListener('pointerdown', ev => ev.stopPropagation());
   };
   out.addEventListener('dblclick', e => { e.stopPropagation(); typeBox(); });
-  // Touch screens: double-tap the value (tap, lift, tap) to type one, as with double-click on desktop.
-  let lastValTap = null;
+  // Touch screens (T9, 13 Nov): ONE tap on the value opens the type box (the readout is small and the double-tap was hard to land); a finger that moves
+  // more than 10 px, or rests longer than 600 ms, is not a tap.
+  let valDown = null;
+  out.addEventListener('pointerdown', e => { valDown = e.pointerType === 'touch' && e.isPrimary ? { x:e.clientX, y:e.clientY, t:performance.now() } : null; });
   out.addEventListener('pointerup', e => {
-    if (e.pointerType === 'touch' && e.isPrimary && !out.querySelector('input')){
-      const now = performance.now(), cx = e.clientX, cy = e.clientY;
-      if (lastValTap && now - lastValTap.t < 450 && Math.hypot(cx - lastValTap.x, cy - lastValTap.y) < 30){ lastValTap = null; typeBox(); }
-      else lastValTap = {t:now, x:cx, y:cy};
-    }
+    const d = valDown; valDown = null;
+    if (d && e.pointerType === 'touch' && !out.querySelector('input') && Math.hypot(e.clientX - d.x, e.clientY - d.y) < 10 && performance.now() - d.t < 600) typeBox();
   });
   // ONE UNDO STEP PER DRAG (13 Nov, audit D3): the snapshot is taken on the first real change, not on the press, so a click that moves
   // nothing leaves no step and one drag is one step (it used to push a step at every press, and each was a step of the song's undo)
@@ -2397,9 +2537,45 @@ function slider(n, key, spec){
   // a drag moves the value from where it is (no jump to the click), Shift is fine (a tenth), holding Ctrl/⌘ takes big steps,
   // Alt/⌥- or Ctrl/⌘-click resets (Ctrl+click on a Mac is the right-click menu). Touch keeps the plain slider.
   const reset = () => { if (+n.m.params[key] !== +def) store.snapshot(); setParam(n, key, def); inp.value = n.m.params[key]; show(); };
+  // TOUCH SLIDER (T7, 13 Nov): a finger moves the value from where it is (no jump to the finger), by the width of the slider, like the mouse. The first
+  // 8 screen px decide it: mostly sideways (|dx| >= |dy|) is the slider; mostly up or down hands the finger to the patch, which pans (so a slider never
+  // fights scrolling or the Play-mode pan). FINE: once it is a slider drag, a finger more than 40 px above or below the slider moves it a tenth as far
+  // (Shift on a mouse). A short tap does nothing; a second tap within 450 ms resets it; a second finger or a long press stops the drag.
+  let lastSlideTap = null;
+  const touchSlide = e => {
+    const id = e.pointerId, x0 = e.clientX, y0 = e.clientY, w = Math.max(40, inp.getBoundingClientRect().width), lo = +min, hi = +max, st = +step || 0;
+    let mode = null, lastX = x0, v = +inp.value;
+    const stop = () => { window.removeEventListener('pointermove', mv, true); window.removeEventListener('pointerup', end, true); window.removeEventListener('pointercancel', end, true); inp.classList.remove('drag'); snapped = false; if (touchSlideAbort === abort) touchSlideAbort = null; };
+    const abort = () => { mode = 'abort'; stop(); };
+    const mv = ev => {
+      if (ev.pointerId !== id || mode === 'abort' || mode === 'pan') return;
+      if (!mode){
+        const dx = ev.clientX - x0, dy = ev.clientY - y0;
+        if (Math.hypot(dx, dy) < TOUCH_SLIDE_PX) return;
+        if (Math.abs(dx) >= Math.abs(dy)){ mode = 'slide'; lastX = ev.clientX; inp.classList.add('drag'); }
+        else { mode = 'pan'; stop(); startPan(id, x0, y0); return; }
+      }
+      const dx = ev.clientX - lastX; lastX = ev.clientX;
+      v = Math.max(lo, Math.min(hi, v + dx / w * (hi - lo) * (Math.abs(ev.clientY - y0) > 40 ? 0.1 : 1)));
+      const q = st ? Math.max(lo, Math.min(hi, lo + Math.round((v - lo) / st) * st)) : v;
+      if (q !== +inp.value){ inp.value = q; inp.dispatchEvent(new Event('input', {bubbles:true})); }
+    };
+    const end = ev => {
+      if (ev.pointerId !== id) return;
+      const was = mode; stop();
+      if (!was && ev.type === 'pointerup'){
+        const now = performance.now();
+        if (lastSlideTap && now - lastSlideTap.t < 450 && Math.hypot(ev.clientX - lastSlideTap.x, ev.clientY - lastSlideTap.y) < 30){ lastSlideTap = null; reset(); }
+        else lastSlideTap = { t:now, x:ev.clientX, y:ev.clientY };
+      }
+    };
+    touchSlideAbort = abort;
+    window.addEventListener('pointermove', mv, true); window.addEventListener('pointerup', end, true); window.addEventListener('pointercancel', end, true);
+  };
+  inp.addEventListener('touchstart', ev => ev.preventDefault(), { passive:false });   // (the browser's own thumb would jump to the finger)
   inp.addEventListener('pointerdown', e => {
     snapped = false; armLearn(n, key, r);
-    if (e.pointerType === 'touch') return;
+    if (e.pointerType === 'touch'){ if (e.isPrimary) touchSlide(e); return; }
     if (e.button !== 0 || (MAC && e.ctrlKey)){ if (e.button === 0) e.preventDefault(); return; }
     e.preventDefault(); e.stopPropagation();
     if (e.altKey || (MAC ? e.metaKey : e.ctrlKey)){ reset(); return; }
@@ -2418,10 +2594,10 @@ function slider(n, key, spec){
   });
   inp.addEventListener('input', () => { snapOnce(); setParam(n, key, +inp.value, true); out.textContent = fmt(+inp.value); });
   inp.addEventListener('dblclick', reset);
-  inp.title = 'Drag to change (Shift: fine) · double-click or Alt-click to reset';
+  inp.title = 'Drag to change (Shift: fine) · double-click or Alt-click to reset · on a touch screen: drag sideways (drag up or down away from it for fine steps), double-tap to reset';
   const r = h('div', {class:'row sl' + (MIXT.has(n.m.type) && /^p\d+$/.test(key) ? ' pan' : ''), 'data-jackhost':'', 'data-id': n.m.id, 'data-key': key},   // MIXER PAN: drawn lighter
     makeJack(n, 'p:' + key, 'mod', 'in', true), h('span', {class:'lbl', text: label}), h('div', {class:'rng'}, inp, mark), out);
-  n.ctl[key].row = r; n.ctl[key].out = out; n.ctl[key].mark = mark; n.ctl[key].fmt = fmt;
+  n.ctl[key].row = r; n.ctl[key].out = out; n.ctl[key].mark = mark; n.ctl[key].fmt = fmt; n.ctl[key].reset = reset; n.ctl[key].typeBox = typeBox;   // (the long-press menu's Reset and Type a value)
   r.addEventListener('pointerdown', e => { if (learn && learn.on && !e.target.closest('.jack')) armLearn(n, key, r); });
   show();
   return r;
@@ -2650,11 +2826,11 @@ function buildNode(m){
   n.title = title;
   const fold = h('button', {class:'fold', 'aria-label':'Collapse ' + title, 'aria-expanded':'true', title:'Collapse (or double-click the title bar)'});
   fold.innerHTML = FOLD_SVG;
-  fold.addEventListener('click', () => { store.snapshot(); setCollapsed(n, !m.collapsed); });
+  fold.addEventListener('click', () => { if (playBlocked()) return; store.snapshot(); setCollapsed(n, !m.collapsed); });
   n.foldBtn = fold;
   if (bypOk(def)) n.byp = h('button', {class:'byp', 'aria-label':'Bypass ' + title, text:'BYP', onclick: () => { store.snapshot(); setParam(n, '_byp', ((m.params._byp) || 0) >= .5 ? 0 : 1); paintByp(); }});
   const head = h('header', {title:'Double-click to collapse or expand'}, fold, (n.tEl = h('span', {class:'t', text: title})), n.byp || null, mhelpBtn(m.type, title),
-    h('button', {class:'x', 'aria-label':'Remove ' + title, title:'Remove', text:'×', onclick: ev => { if (ev && (ev.pointerType === 'touch' || ev.pointerType === 'pen')) askRemove(m.id, title); else { store.snapshot(); removeModule(m.id); } }}));   // T5 (13 Nov): a finger asks first (a thumb lands on the close button too easily); a mouse removes at once, Undo brings it back
+    h('button', {class:'x', 'aria-label':'Remove ' + title, title:'Remove', text:'×', onclick: ev => { if (playBlocked()) return; if (ev && (ev.pointerType === 'touch' || ev.pointerType === 'pen')) askRemove(m.id, title); else { store.snapshot(); removeModule(m.id); } }}));   // T5 (13 Nov): a finger asks first (a thumb lands on the close button too easily); a mouse removes at once, Undo brings it back
   for (const k in def.params) if (m.params[k] == null) m.params[k] = def.params[k][0];
   const ins = Object.keys(def.inputs).filter(p => mixShown(m, p)), outs = Object.keys(def.outputs);
   const ports = (ins.length || outs.length || Object.keys(def.params).length) ? h('div', {class:'ports' + (ins.length || outs.length ? '' : ' synth')},
@@ -2662,13 +2838,16 @@ function buildNode(m){
     (n.outsEl = h('div', {class:'outs'}, outs.map(p => portEl(n, p, def.outputs[p], 'out'))))) : null;
   n.portsEl = ports;
   const kids = [], pre = presetRow(n); if (pre) kids.push(pre);   // PRESETS
+  const rowEls = new Map();
   for (const k in def.params){
     if (m.params[k] == null) m.params[k] = def.params[k][0];
     if ((def.ui[k] || {}).hide) continue;   // edited by the module's own display (bars, a grid)
     if (!mixShown(m, k)) continue;          // a mixer channel above its Inputs
     const ch = choicesOf(m.type, k);
-    kids.push(ch ? choice(n, k, ch) : slider(n, k, def.params[k]));
+    const row = ch ? choice(n, k, ch) : slider(n, k, def.params[k]); rowEls.set(k, row); kids.push(row);
   }
+  { const plan = secPlan(m.type, [...rowEls.keys()], k => plabel(m.type, k));   // T14: a long module is cut into sections (the first open)
+    if (plan){ const at = kids.indexOf(rowEls.values().next().value); kids.splice(at, rowEls.size, ...secWrap(n, rowEls, plan)); } }
   // Track In: what the track sends into the chain. Chain Out: what comes back out of it (in Thunder Plus, from the song).
   if (m.type === 'chainOut' || m.type === 'trackIn'){ n.meter = h('span'); const io = m.type === 'trackIn' ? 'IN' : 'OUT';
     kids.push(h('div', {class:'iom', title:(io === 'IN' ? 'Level the track sends into this chain' : 'Level coming out of this chain') + ' (track ' + ((m.params.track | 0) || 1) + ')'},
@@ -2683,33 +2862,36 @@ function buildNode(m){
   n.el.style.left = m.pos[0] + 'px'; n.el.style.top = m.pos[1] + 'px';
   n.el.style.zIndex = ++zTop;
   paintNote(n);
-  n.el.addEventListener('pointerdown', e => { if (e.button === 1 && e.pointerType === 'mouse') return; e.stopPropagation(); n.el.style.zIndex = ++zTop; if (MAC && e.ctrlKey && e.pointerType === 'mouse') return; maxBodyDown(e, n); });   // middle: the canvas pans; Mac Ctrl+click: the menu (3 Nov)
-  head.addEventListener('dblclick', e => { if (e.target.closest('button')) return; foldToggle(n); });
+  n.el.addEventListener('pointerdown', e => { if (e.button === 1 && e.pointerType === 'mouse') return; if (playMode && !(e.target.closest && e.target.closest(PLAY_CTL))) return;   /* PLAY: a press that is not on a control goes on to the background, which pans */
+    e.stopPropagation(); n.el.style.zIndex = ++zTop; if (MAC && e.ctrlKey && e.pointerType === 'mouse') return; maxBodyDown(e, n); });   // middle: the canvas pans; Mac Ctrl+click: the menu (3 Nov)
+  head.addEventListener('dblclick', e => { if (playMode || e.target.closest('button')) return; foldToggle(n); });
   head.addEventListener('pointerdown', e => {
-    if (e.target.closest('button') || e.button !== 0 || (MAC && e.ctrlKey && e.pointerType === 'mouse')) return;   // left button only (3 Nov: a middle-drag moved it)
+    if (playMode || e.target.closest('button') || e.button !== 0 || (MAC && e.ctrlKey && e.pointerType === 'mouse')) return;   // (PLAY: the title bar does not move or select the module: a drag pans) left button only (3 Nov: a middle-drag moved it)
+    if (e.pointerType === 'touch' && !e.isPrimary){ if (nodeDragging && nodeDragging.still && nodeDragging.still()) nodeDragging.stop(); return; }   // T4: a second finger on a title bar is a pinch, not a second drag
     e.preventDefault();
     if (maxOperate(e)) return;   // MAX: Ctrl/⌘-click works the module, never selects or moves it
     if (e.altKey && maxHelpPend(e, n)) return;   // MAX: Alt-click (no drag) opens its help; Alt-drag still copies
-    if (e.shiftKey){ setSel(m.id, !selected.has(m.id)); return; }
+    if (e.shiftKey || selMode){ setSel(m.id, !selected.has(m.id)); return; }   // (T8: the Select button makes a plain tap do what Shift-click does)
     if (!selected.has(m.id)){ clearSel(); setSel(m.id, true); }
-    head.setPointerCapture(e.pointerId);
+    head.setPointerCapture(e.pointerId); const tDown = performance.now();
     // Dragging a selected module moves the whole selection.
     const group = [...selected].map(id => nodes.get(id)).filter(Boolean);
     // Alt/Option-drag carries a copy instead (made once the mouse really moves), leaving the originals where they are.
     const sx = e.clientX, sy = e.clientY, dup = e.altKey, thr = e.pointerType === 'touch' || e.pointerType === 'pen' ? 8 : dup ? 4 : 3;   // T10 (13 Nov): the title bar moves the module only after 8 screen px on a touch screen, 3 with a mouse (a tap with a little jitter used to nudge it and add an undo step)
     let start = group.map(g => [g, g.m.pos[0], g.m.pos[1]]);
-    let extra = [0, 0], lastEv = e, moved = false;
+    let extra = [0, 0], lastEv = e, moved = false, stopped = false;
     const place = () => {
       const z = view().zoom, dx = (lastEv.clientX - sx - extra[0]) / z, dy = (lastEv.clientY - sy - extra[1]) / z;
+      if (stopped) return;
       if (!moved && Math.hypot(dx, dy) * z > thr){ moved = true; store.snapshot(); if (dup) start = dupForDrag(group); }
       if (!moved) return;
       for (const [g, ox, oy] of start){ g.m.pos = [Math.round(ox + dx), Math.round(oy + dy)]; g.el.style.left = g.m.pos[0] + 'px'; g.el.style.top = g.m.pos[1] + 'px'; }
     };
-    nodeDragging = v => { extra[0] -= v[0]; extra[1] -= v[1]; place(); };
+    nodeDragging = v => { extra[0] -= v[0]; extra[1] -= v[1]; place(); }; nodeDragging.still = () => !moved; nodeDragging.stop = () => { stopped = true; };
     let pend = 0;
     const mv = ev => { lastEv = ev; if (moved || Math.hypot(ev.clientX - sx, ev.clientY - sy) > thr) autoPanAt(ev); markScene();   // (a press near the window's edge does not start the auto-pan until it is a real drag)
  if (!pend) pend = requestAnimationFrame(() => { pend = 0; place(); }); };
-    const up = ev => { if (ev) lastEv = ev; if (pend){ cancelAnimationFrame(pend); pend = 0; } place(); nodeDragging = null; autoPanV = [0, 0]; head.removeEventListener('pointermove', mv); head.removeEventListener('pointerup', up); head.removeEventListener('pointercancel', up); if (!moved && ev && ev.type === 'pointerup' && ev.pointerType === 'touch') headTap(n, ev); if (moved) store.touch(); };
+    const up = ev => { if (ev) lastEv = ev; if (pend){ cancelAnimationFrame(pend); pend = 0; } place(); nodeDragging = null; autoPanV = [0, 0]; head.removeEventListener('pointermove', mv); head.removeEventListener('pointerup', up); head.removeEventListener('pointercancel', up); if (!moved && ev && ev.type === 'pointerup' && ev.pointerType === 'touch' && lpFiredAt < tDown) headTap(n, ev); if (moved) store.touch(); };
     head.addEventListener('pointermove', mv); head.addEventListener('pointerup', up); head.addEventListener('pointercancel', up);
   });
   if (m.collapsed) setCollapsed(n, true, true);
@@ -2886,7 +3068,7 @@ function setAllCollapsed(c, ids){
   return list.length;
 }
 window.addEventListener('keydown', e => {
-  if (!e.altKey || e.ctrlKey || e.metaKey || e.shiftKey || e.code !== 'KeyC' || e.repeat || typing(e)) return;
+  if (!e.altKey || e.ctrlKey || e.metaKey || e.shiftKey || e.code !== 'KeyC' || e.repeat || typing(e) || playMode) return;
   if ((learn && learn.on) || document.querySelector('.dlgov') || !ctx.hidden) return;
   e.preventDefault();
   const open = [...nodes.values()].some(n => !n.m.collapsed), k = setAllCollapsed(open);
@@ -2936,6 +3118,12 @@ function removeModule(id){
 function askRemove(id, title){
   askDialog('Remove “' + title + '”? Undo brings it back.', { ok:'Remove' }).then(yes => { if (yes && nodes.has(id)){ store.snapshot(); removeModule(id); } });
 }
+// the same question for a selection of several (the menu's Delete on a finger or pen; one undo step)
+function askRemoveMany(ids){
+  const list = ids.filter(id => nodes.has(id));
+  if (list.length < 2) return list.length ? askRemove(list[0], (nodes.get(list[0]).m.label || MODULES[nodes.get(list[0]).m.type].label)) : undefined;
+  askDialog('Remove ' + list.length + ' modules? Undo brings them back.', { ok:'Remove' }).then(yes => { const live = list.filter(id => nodes.has(id)); if (yes && live.length){ store.snapshot(); for (const id of live) removeModule(id); clearSel(); } });
+}
 function addAtCenter(type){
   const v = view();
   const x = Math.round((-v.x + ws.clientWidth / 2) / v.zoom - 125 + (Math.random() * 80 - 40));
@@ -2943,6 +3131,7 @@ function addAtCenter(type){
   addItem(type, x, y);
 }
 function addItem(type, x, y){
+  if (playBlocked()) return;
   store.snapshot();
   if (type.startsWith('c:')){ const ids = addCustom(type.slice(2), [x, y]); clearSel(); ids.forEach(id => setSel(id, true)); afterAdd(ids); return; }
   const m = addModule(type, x, y); if (m){ clearSel(); setSel(m.id, true); afterAdd([m.id]); }
@@ -2971,7 +3160,7 @@ const maxOperate = e => e.pointerType === 'mouse' && (MAC ? e.metaKey : e.ctrlKe
 function maxBodyDown(e, n){
   if (e.button !== 0 || (n.head && n.head.contains(e.target)) || e.target.closest('input, select, textarea, button, .jack, .row, .hit, [contenteditable], canvas, svg, .knob, .ctl') || maxOperate(e)) return;   // (the title bar has its own)
   if (e.altKey){ maxHelp(n); return; }
-  if (e.shiftKey) setSel(n.m.id, !selected.has(n.m.id));
+  if (e.shiftKey || selMode) setSel(n.m.id, !selected.has(n.m.id));
   else if (!selected.has(n.m.id)){ clearSel(); setSel(n.m.id, true); }
 }
 function maxHelp(n){ const b = n.head && n.head.querySelector('.mq'); if (b) b.click(); }
@@ -2983,7 +3172,7 @@ function maxHelpPend(e, n){
   return false;
 }
 window.addEventListener('keydown', e => {
-  if ((e.key !== 'Delete' && e.key !== 'Backspace') || e.ctrlKey || e.metaKey || e.altKey || typing(e) || !selected.size) return;
+  if ((e.key !== 'Delete' && e.key !== 'Backspace') || e.ctrlKey || e.metaKey || e.altKey || typing(e) || !selected.size || playMode) return;
   if ((learn && learn.on) || document.querySelector('.dlgov')) return;
   e.preventDefault(); store.snapshot(); const ids = [...selected]; for (const x of ids) removeModule(x); clearSel();
   toast(ids.length === 1 ? 'Module removed (Undo brings it back).' : ids.length + ' modules removed (Undo brings them back).');
@@ -3070,7 +3259,7 @@ function syncCableEls(){
     hit.addEventListener('mouseenter', () => el.g.classList.add('hov')); hit.addEventListener('mouseleave', () => el.g.classList.remove('hov'));
     svg.append(el.g); cableEls.set(c, el);
   }
-  compactAll(); markScene();
+  compactAll(); secMarks(); markScene();
 }
 function jackPos(id, dir, port, wr){
   const n = nodes.get(id); if (!n) return null;
@@ -3081,6 +3270,7 @@ function jackPos(id, dir, port, wr){
   // COMPACT: a collapsed module hides its slider jacks, so a modulation cable ends on that parameter's stub (its name beside it).
   if (!r.width && dir === 'in' && n.stubs && port.startsWith('p:') && n.stubs[port.slice(2)]) r = n.stubs[port.slice(2)].getBoundingClientRect();
   // A port that is hidden anyway (no cable should be on it): the title bar's edge, left for an input and right for an output.
+  if (!r.width && dir === 'in'){ const sh = secHeadOf(el), sr = sh && sh.getBoundingClientRect(); if (sr && sr.width) return { x:(sr.left - wr.left) / z, y:(sr.top + sr.height / 2 - wr.top) / z }; }   // T14: a control inside a shut section: the section's title bar
   if (!r.width){ const hr = n.head.getBoundingClientRect(); return { x:((dir === 'in' ? hr.left : hr.right) - wr.left) / z, y:(hr.top + hr.height / 2 - wr.top) / z }; }
   return { x:(r.left + r.width / 2 - wr.left) / z, y:(r.top + r.height / 2 - wr.top) / z };
 }
@@ -3136,6 +3326,7 @@ function disconnect(c, quiet){
 /* ----- patching by dragging between jacks ----- */
 let drag = null;
 function onJackDown(e, jack){
+  if (playMode) return;   // PLAY: a jack is not a control; the press goes on to the background, which pans
   e.stopPropagation(); e.preventDefault();
   if (drag) return; // already drawing a cable: this click finishes it
   let anchor = { id: jack.dataset.id, port: jack.dataset.port, dir: jack.dataset.dir, kind: jack.dataset.kind };
@@ -3211,7 +3402,7 @@ function syncHandles(el, c){
   while (el.hdl.length < pts.length){
     const r = svgEl('rect', {class:'bend', width:10, height:10});
     r.addEventListener('pointerdown', ev => { if (ev.button !== 0) return; selectCable(c); bendDrag(ev, c, () => el.hdl.indexOf(r), true); });   // a plain click on a handle only selects (no undo step unless it moves)
-    el.g.append(r); el.hdl.push(r);
+    r._cable = c; r._el = el; el.g.append(r); el.hdl.push(r);
   }
   el.hdl.forEach((r, i) => { r.setAttribute('x', pts[i][0] - 5); r.setAttribute('y', pts[i][1] - 5); });
 }
@@ -3243,6 +3434,13 @@ function cableBendAt(ev, c){
   c.pts = c.pts || []; c.pts.splice(best, 0, P);
   bendDrag(ev, c, () => best);
 }
+// A bend where a long press landed (T8; the mouse's Option-drag makes one and drags it on)
+function addBendAt(c, P){
+  const wr = world.getBoundingClientRect(), a = jackPos(c.from[0], 'out', c.from[1], wr), b = jackPos(c.to[0], 'in', c.to[1], wr); if (!a || !b) return;
+  const poly = [[a.x, a.y], ...(c.pts || []), [b.x, b.y]]; let best = 0, bd = Infinity;
+  for (let k = 0; k < poly.length - 1; k++){ const [x1, y1] = poly[k], [x2, y2] = poly[k + 1], L2 = (x2 - x1) ** 2 + (y2 - y1) ** 2 || 1, t = Math.max(0, Math.min(1, ((P[0] - x1) * (x2 - x1) + (P[1] - y1) * (y2 - y1)) / L2)), d = Math.hypot(P[0] - (x1 + t * (x2 - x1)), P[1] - (y1 + t * (y2 - y1))); if (d < bd){ bd = d; best = k; } }
+  store.snapshot(); c.pts = c.pts || []; c.pts.splice(best, 0, P); store.touch(); toast('Bend added: drag its square handle.');
+}
 window.addEventListener('keydown', e => { if (e.key === 'Alt') document.body.classList.add('alting'); });
 window.addEventListener('keyup', e => { if (e.key === 'Alt') document.body.classList.remove('alting'); });
 window.addEventListener('blur', () => document.body.classList.remove('alting'));
@@ -3262,7 +3460,7 @@ function autoPanStep(){
 
 /* ----- pan and zoom ----- */
 const zoomVal = document.getElementById('zoomval');
-const ZMIN = 0.25, ZMAX = 2.5;
+const ZMIN = 0.25, ZMAX = 2.5, FIT_MIN = 0.1;
 let sceneHot = 0, cableLast = 0, hostLast = 0;
 function markScene(){ sceneHot = performance.now() + 300; }
 function applyPan(){
@@ -3288,7 +3486,7 @@ function focusChainTrack(N){
 // Zoom so the point under (cx, cy) stays put.
 function zoomAt(cx, cy, z){
   const v = view();
-  z = Math.max(ZMIN, Math.min(ZMAX, z));
+  z = Math.max(Math.min(ZMIN, v.zoom), Math.min(ZMAX, z));   // (a view that Fit left below the floor can zoom in from there, and never jumps up to it)
   const r = ws.getBoundingClientRect(), mx = cx - r.left, my = cy - r.top;
   const wx = (mx - v.x) / v.zoom, wy = (my - v.y) / v.zoom;
   v.zoom = z; v.x = mx - wx * z; v.y = my - wy * z;
@@ -3330,7 +3528,7 @@ function fitAll(maxZ = 1.5){
   for (const g of doc.groups){ x0 = Math.min(x0, g.bounds[0]); y0 = Math.min(y0, g.bounds[1]); x1 = Math.max(x1, g.bounds[0] + g.bounds[2]); y1 = Math.max(y1, g.bounds[1] + g.bounds[3]); }
   const hb = document.getElementById('hint'), pad = 40, hintH = hb && !hb.hidden && !matchMedia('(pointer: coarse)').matches ? Math.max(0, ws.getBoundingClientRect().bottom - hb.getBoundingClientRect().top + 8) : 0;   // the tip box sits bottom-left on a mouse: leave room under the patch for it
   const W = ws.clientWidth - pad * 2, H = ws.clientHeight - pad - Math.max(pad, hintH), v = view();
-  v.zoom = Math.max(ZMIN, Math.min(maxZ, W / (x1 - x0), H / (y1 - y0)));
+  v.zoom = Math.max(FIT_MIN, Math.min(maxZ, W / (x1 - x0), H / (y1 - y0)));   // FIT_MIN: Fit shows the whole patch even where that is below the 25% zoom floor (a long patch on a phone)
   v.x = pad + (W - (x1 - x0) * v.zoom) / 2 - x0 * v.zoom; v.y = pad + (H - (y1 - y0) * v.zoom) / 2 - y0 * v.zoom;
   applyPan(); store.touch();
 }
@@ -3355,7 +3553,7 @@ function openView(force){
   const pad = 12, fz = Math.min((W - 2 * pad) / (x1 - x0), (H - 2 * pad) / (y1 - y0));
   if (fz >= READ_ZOOM){ v.zoom = Math.min(1, fz); v.x = (W - (x1 - x0) * v.zoom) / 2 - x0 * v.zoom; v.y = (H - (y1 - y0) * v.zoom) / 2 - y0 * v.zoom; }   // the whole patch is readable: show it
   else {
-    const hb = document.getElementById('hint'), top = hb && !hb.hidden && matchMedia('(pointer: coarse)').matches ? Math.max(pad, hb.getBoundingClientRect().bottom - ws.getBoundingClientRect().top + 8) : pad;
+    const top = pad;   // (the Tips button is at the bottom left now: nothing to leave room for at the top)
     v.zoom = READ_ZOOM; const fw = first.el.offsetWidth * v.zoom;
     v.x = fw <= W - 2 * pad ? (W - fw) / 2 - first.m.pos[0] * v.zoom : pad - first.m.pos[0] * v.zoom;
     v.y = top - first.m.pos[1] * v.zoom;
@@ -3370,12 +3568,13 @@ const touches = new Map(); let pinch = null;
 const ctlTouch = new Set();   // fingers that landed on a control: they work the control, never pinch the view
 ws.addEventListener('pointerdown', e => { if (e.pointerType !== 'touch') return; if (e.isPrimary){ touches.clear(); ctlTouch.clear(); pinch = null; }
   touches.set(e.pointerId, [e.clientX, e.clientY]);
-  if (e.target.closest && e.target.closest('input, select, textarea, button, .jack, .row.sl, .hit')) ctlTouch.add(e.pointerId); }, true);
+  if (!e.isPrimary && touchSlideAbort) touchSlideAbort(); }, true);   // T4 (13 Nov): two fingers pan and zoom from anywhere, rows and controls included (a finger on a control used to block it); a slider drag in progress stops when the second finger lands
 addEventListener('blur', () => { touches.clear(); ctlTouch.clear(); pinch = null; }); document.addEventListener('visibilitychange', () => { touches.clear(); ctlTouch.clear(); pinch = null; });
 window.addEventListener('pointermove', e => {
   if (!touches.has(e.pointerId)) return;
   touches.set(e.pointerId, [e.clientX, e.clientY]);
-  if (touches.size !== 2 || drag || nodeDragging || ctlTouch.size) { pinch = null; return; }
+  if (nodeDragging && touches.size === 2 && nodeDragging.still && nodeDragging.still()) nodeDragging.stop();   // T4: a second finger on a title bar that has not moved yet turns the touch into a pinch
+  if (touches.size !== 2 || drag || (nodeDragging && !nodeDragging.still()) || ctlTouch.size) { pinch = null; return; }
   const [[ax, ay], [bx, by]] = [...touches.values()], d = Math.hypot(bx - ax, by - ay), cx = (ax + bx) / 2, cy = (ay + by) / 2;
   if (!pinch){ pinch = { d, cx, cy }; return; }
   const v = view(); v.x += cx - pinch.cx; v.y += cy - pinch.cy;
@@ -3386,7 +3585,7 @@ window.addEventListener('pointerup', touchEnd, true); window.addEventListener('p
 
 ws.addEventListener('pointerdown', e => {
   if (drag) return;
-  if (e.button !== 1 && e.target.closest('.node, .hint, .hit, .decor, .dock, .bend')) return;   // a middle-drag pans over anything (3 Nov)
+  if (e.button !== 1 && e.target.closest('.node, .hint, .hit, .decor, .dock, .bend') && !(playMode && !e.target.closest(PLAY_CTL + ', .hint, .dock'))) return;   // a middle-drag pans over anything (3 Nov); PLAY: a press on anything that is not a control pans
   if (e.button === 2 || (MAC && e.ctrlKey && e.pointerType === 'mouse')) return;   // the menu (Ctrl+click on a Mac, 3 Nov)
   // MAX (Thunder Plus owner, 27 Oct, Phase 2): with a mouse, a drag on the background draws a selection box, as in Max's
   // edit mode (it replaces the selection; with Shift it adds). The wheel or a two-finger swipe pans, and so does a
@@ -3394,7 +3593,7 @@ ws.addEventListener('pointerdown', e => {
   // BACKGROUND DRAG PANS (Thunder Plus owner, 3 Nov: "if I click the background, it just tries to select"): a plain drag on
   // the background moves the view, as a touch drag and a middle-drag do, and the click clears the selection; Shift-drag
   // draws the selection box (adding to the selection).
-  const box = e.button === 0 && e.shiftKey;
+  const box = e.button === 0 && (e.shiftKey || selMode) && !playMode;   // (T8: with Select on, a plain drag draws the box)
   if (box){
     const lasso = document.getElementById('lasso'), r0 = ws.getBoundingClientRect(), sx = e.clientX, sy = e.clientY;
     ws.setPointerCapture(e.pointerId); lasso.hidden = false;
@@ -3410,19 +3609,24 @@ ws.addEventListener('pointerdown', e => {
     return;
   }
   if (e.pointerType !== 'mouse' || e.button === 0){ clearSel(); clearCableSel(); }   // (a middle-button pan keeps the selection)
+  startPan(e.pointerId, e.clientX, e.clientY);
+});
+// One finger or the mouse moves the view. Also where a slider hands a mostly vertical drag over (T7).
+function startPan(pid, sx, sy){
   if (touches.size > 1) return;
-  ws.setPointerCapture(e.pointerId); ws.classList.add('panning');
+  try { ws.setPointerCapture(pid); } catch (_) {} ws.classList.add('panning');
   // Pan by each step's movement, not from where the finger first landed: after a pinch (a second finger came and
   // went) the old origin belonged to another zoom, and the view used to jump there as the last finger moved on.
-  let lx = e.clientX, ly = e.clientY;
+  let lx = sx, ly = sy;
   const mv = ev => {
+    if (ev.pointerId !== pid) return;
     const dx = ev.clientX - lx, dy = ev.clientY - ly; lx = ev.clientX; ly = ev.clientY;
     if (pinch || touches.size > 1) return;
     view().x += dx; view().y += dy; applyPan();
   };
   const up = () => { ws.removeEventListener('pointermove', mv); ws.removeEventListener('pointerup', up); ws.removeEventListener('pointercancel', up); ws.classList.remove('panning'); store.touch(); };
   ws.addEventListener('pointermove', mv); ws.addEventListener('pointerup', up); ws.addEventListener('pointercancel', up);
-});
+}
 
 /* ----- groups: colored boxes around modules ----- */
 const hexA = (hex, a) => { const v = parseInt(hex.slice(1), 16); return `rgba(${v >> 16},${(v >> 8) & 255},${v & 255},${a})`; };
@@ -3576,7 +3780,13 @@ ws.addEventListener('dblclick', e => {
   const under = document.elementFromPoint(e.clientX, e.clientY);
   if (!under || !ws.contains(under) || under.closest('.node, .hint, .hit, .decor, .dock, .bend, button, input, select, textarea')) return;
   e.preventDefault();
-  const [wx, wy] = worldPt(e);
+  if (playMode) return;
+  quickAddAt(e.clientX, e.clientY);
+});
+// QUICK ADD: also from the long-press menu on the background (T8)
+function quickAddAt(cx, cy){
+  if (playBlocked()) return;
+  const [wx, wy] = worldPt({ clientX:cx, clientY:cy });
   const all = PALETTE.filter(([g]) => !isSection(g)).flatMap(([, items]) => items).concat(((doc && doc.custom) || []).map(c => ['c:' + c.id, c.name + ' (custom)']));
   const seen = new Set(), list = all.filter(([t]) => !seen.has(t) && seen.add(t)).sort((a, b) => a[1].localeCompare(b[1]));
   const inp = h('input', {class:'qainp', type:'text', placeholder:'Find a module…', 'aria-label':'Find a module'}), box = h('div', {class:'qalist'});
@@ -3590,9 +3800,9 @@ ws.addEventListener('dblclick', e => {
   inp.addEventListener('keydown', ev => { ev.stopPropagation(); if (ev.key === 'Enter'){ ev.preventDefault(); if (shown[0]) add(shown[0][0]); } else if (ev.key === 'Escape'){ ev.preventDefault(); hideMenu(); } });
   ctx.replaceChildren(inp, box); render(); ctx.hidden = false;
   const r = ctx.getBoundingClientRect();
-  ctx.style.left = Math.max(8, Math.min(e.clientX, window.innerWidth - r.width - 8)) + 'px'; ctx.style.top = Math.max(8, Math.min(e.clientY, window.innerHeight - 380)) + 'px';
+  ctx.style.left = Math.max(8, Math.min(cx, window.innerWidth - r.width - 8)) + 'px'; ctx.style.top = Math.max(8, Math.min(cy, window.innerHeight - 380)) + 'px';
   setTimeout(() => inp.focus(), 0);
-});
+}
 window.addEventListener('keydown', e => {
   if (e.key !== 'Escape') return;
   hideMenu();
@@ -3602,15 +3812,30 @@ window.addEventListener('pointerdown', e => { if (!ctx.hidden && !ctx.contains(e
 ws.addEventListener('mousedown', e => { if (e.button === 1) e.preventDefault(); });   // a middle-drag pans: no autoscroll cursor (3 Nov)
 ws.addEventListener('contextmenu', e => {
   e.preventDefault();
+  if (playMode || performance.now() - lpFiredAt < 1500) return;   // PLAY: no menus; a long press that already opened one (the browser's own contextmenu follows it)
+  ctxMenu(e.target, e.clientX, e.clientY, { touch: isFinger(e) || !!(e.sourceCapabilities && e.sourceCapabilities.firesTouchEvents) });
+});
+// The module / cable / background menu: a right-click, or a long press (o.touch: the extra touch items, and Delete asks first).
+function ctxMenu(target, x, y, o = {}){
   // A CABLE (mouse audit, 3 Nov): right-click it to remove it (double-click still does); it had no menu of its own.
-  const hc = e.target.closest && e.target.closest('.hit'), cab = hc && hc._cable;
-  if (cab && doc.cables.includes(cab)){ showMenu(e.clientX, e.clientY, [['Remove cable', () => { if (!doc.cables.includes(cab)) return; store.snapshot(); disconnect(cab); toast('Cable removed.'); }]]); return; }
-  const el = e.target.closest('.node'), id = el && el.dataset.id;
-  if (id && !selected.has(id)){ clearSel(); setSel(id, true); }
+  const hc = target.closest && target.closest('.hit'), cab = hc && hc._cable;
+  if (cab && doc.cables.includes(cab)){
+    const its = [['Remove cable', () => { if (!doc.cables.includes(cab)) return; store.snapshot(); disconnect(cab); toast('Cable removed.'); }]];
+    if (o.touch) its.unshift(['Add a bend here', () => { if (doc.cables.includes(cab)){ selectCable(cab); addBendAt(cab, worldPt({ clientX:x, clientY:y })); } }]);   // T8: the bend a mouse makes with Option-drag
+    showMenu(x, y, its); return; }
+  const hb = target.closest && target.closest('.bend');
+  if (hb && hb._cable && doc.cables.includes(hb._cable)){ const c = hb._cable, i = hb._el.hdl.indexOf(hb); showMenu(x, y, [['Remove this bend', () => { if (!doc.cables.includes(c) || i < 0 || !c.pts) return; store.snapshot(); c.pts.splice(i, 1); if (!c.pts.length) delete c.pts; store.touch(); }]]); return; }
+  const el = target.closest('.node'), id = el && el.dataset.id;
+  if (id && !selected.has(id)){ if (!(o.touch && selMode)) clearSel(); setSel(id, true); }   // (with Select on, a long press adds the module to the selection)
   const sel = [...selected], n = sel.length, items = [];
+  if (o.touch && id && nodes.has(id)){   // T6, T9: on a slider, the value menu first (Reset, Type a value, MIDI learn)
+    const nd = nodes.get(id), row = target.closest('.row[data-key]'), key = row && row.dataset.id === id ? row.dataset.key : null, c = key && nd.ctl[key];
+    if (c && c.reset){ const lab = plabel(nd.m.type, key); items.push(['§' + lab], ['Reset to default', () => c.reset()], ['Type a value…', () => c.typeBox()], ['MIDI learn this slider', () => { if (!learn.on) setLearn(true); armLearn(nd, key, row); }]); }
+  }
+  if (o.touch && !id) items.push(['Add a module here…', () => quickAddAt(x, y)]);   // T8: quick add (a double-click with a mouse)
   // Inside Thunder Plus: put a control, or all of a module's, in the bottom panel (it shows them for the track whose chain they're in).
   if (EMBED && id && nodes.has(id)){
-    const nd = nodes.get(id), m = nd.m, row = e.target.closest('.row[data-key]'), key = row && row.dataset.id === id ? row.dataset.key : null, title = m.label || MODULES[m.type].label;
+    const nd = nodes.get(id), m = nd.m, row = target.closest('.row[data-key]'), key = row && row.dataset.id === id ? row.dataset.key : null, title = m.label || MODULES[m.type].label;
     if (key && m.params[key] != null){
       const lab = plabel(m.type, key);
       if (deckHas(id, key)) items.push(['Remove “' + lab + '” from the bottom panel', () => deckChange(L => { const i = L.findIndex(d => d.id === id && d.p === key); if (i >= 0) L.splice(i, 1); })]);
@@ -3628,7 +3853,7 @@ ws.addEventListener('contextmenu', e => {
   if (n) items.push(['Group ' + (n === 1 ? 'module' : n + ' modules'), () => groupSel()]);
   if (n) items.push(['Copy (' + MOD + '+C)', () => copySel()], ['Duplicate (' + MOD + '+D)', () => { if (copySel(true)) pasteClip(); }]);
   if (clip) items.push(['Paste (' + MOD + '+V)', () => pasteClip()]);
-  if (n) items.push(['Delete ' + (n === 1 ? 'module' : n + ' modules'), () => { store.snapshot(); for (const x of sel) removeModule(x); clearSel(); }]);
+  if (n) items.push(['Delete ' + (n === 1 ? 'module' : n + ' modules'), () => { if (o.touch){ if (n === 1) askRemove(sel[0], (nodes.get(sel[0]).m.label || MODULES[nodes.get(sel[0]).m.type].label)); else askRemoveMany(sel); return; } store.snapshot(); for (const x of sel) removeModule(x); clearSel(); }]);   // a finger or pen asks first, with the question the close button asks
   items.push(['Select all', () => { for (const k of nodes.keys()) setSel(k, true); }]);
   { // COLLAPSE ALL / EXPAND ALL (C4), each one undo step
     const all = [...nodes.values()], open = all.filter(x => !x.m.collapsed).length, shut = all.length - open, picked = sel.map(x => nodes.get(x)).filter(Boolean);
@@ -3641,8 +3866,8 @@ ws.addEventListener('contextmenu', e => {
   if (!id) items.push(['Tidy up', () => tidy()]);
   if (!id) items.push(['Patch background color…', () => pickPatchBg()]);
   if (!id && doc.view.bg) items.push(['Reset background color', () => { store.snapshot(); delete doc.view.bg; ws.style.backgroundColor = ''; store.touch(); }]);
-  showMenu(e.clientX, e.clientY, items);
-});
+  showMenu(x, y, items);
+}
 function pickPatchBg(){
   const inp = h('input', {type:'color', value: doc.view.bg || '#ffffff', style:'position:fixed; left:-40px; top:0; opacity:0'});
   document.body.append(inp);
@@ -3805,7 +4030,7 @@ renderQuick();
 // The module list starts closed; it remembers whether you left it open.
 const setDrawer = open => { drawer.classList.toggle('collapsed', !open); dtoggle.setAttribute('aria-expanded', String(open)); pstate.drawer = open; psave(); };
 setDrawer(!!pstate.drawer);
-dtoggle.addEventListener('click', () => setDrawer(drawer.classList.contains('collapsed')));
+dtoggle.addEventListener('click', () => { if (playBlocked()) return; setDrawer(drawer.classList.contains('collapsed')); });
 // Drag the right edge of the open module list to make it wider or narrower.
 {
   const rz = h('div', {class:'dresize', title:'Drag to resize the module list'}); drawer.append(rz);
@@ -3903,7 +4128,7 @@ const pnameEl = document.getElementById('pname');
       playing(){ return !!(TW && TW.playing && TW.playing()); },
       /* The app shows the whole patch after the Mixer added Track In / Chain Out pairs (no closer than 100%). False until
          the boxes are drawn and the screen has a size. */
-      fit(){ if (!nodes.size || !ws.clientWidth) return false; if (smallWs()) openView(true); else fitAll(1); return true; },   // (T1: on a small screen the whole-patch view is the readable opening one)
+      fit(){ if (!nodes.size || !ws.clientWidth) return false; fitAll(1); return true; },   // (review fix, 13 Nov: the host's fit-after-adding shows the whole patch at any width; only opening a patch uses the readable-zoom rule)
       /* The app jumps to a track's chain (e.g. from the Mixer) by centring and highlighting its pair. */
       focusTrack(N){ return focusChainTrack(Math.max(1, Math.min(TRK_N, N | 0))); },
       /* The bottom panel moved a control (the app has already sent it to the sound): show it here, and keep it in this
@@ -3963,8 +4188,8 @@ window.addEventListener('keydown', e => {
   if (k === 'z' && !e.shiftKey){ e.preventDefault(); undo(); }
   else if ((k === 'z' && e.shiftKey) || k === 'y'){ e.preventDefault(); redo(); }
   else if (k === 'c'){ if (copySel()) e.preventDefault(); }
-  else if (k === 'v' && clip){ e.preventDefault(); pasteClip(); }
-  else if (k === 'd'){ e.preventDefault(); if (copySel(true)) pasteClip(); }
+  else if (k === 'v' && clip && !playMode){ e.preventDefault(); pasteClip(); }
+  else if (k === 'd' && !playMode){ e.preventDefault(); if (copySel(true)) pasteClip(); }
 });
 
 /* settings */
@@ -3984,7 +4209,7 @@ tipsBox.addEventListener('change', () => { settings.tips = tipsBox.checked; save
 // T11: with a touch screen the note starts open once, then shows as a small Tips button; × folds it back to that button (Settings, Show tips, still turns it off)
 { const coarse = matchMedia('(pointer: coarse)'), pill = document.getElementById('hintpill');
   const tipOpen = o => { hint.classList.toggle('min', !o); pill.setAttribute('aria-expanded', String(o)); };
-  if (coarse.matches){ const first = !settings.tipSeen; if (first && settings.tips !== false){ settings.tipSeen = true; saveSettings(); } tipOpen(first); }
+  if (coarse.matches) tipOpen(false);   // (owner, 13 Nov: "the pop up might not be required": on touch the tip never opens by itself; the Tips button opens it, × folds it)
   { const more = document.getElementById('hintmore'); more.addEventListener('click', () => { const o = !hint.classList.contains('more'); hint.classList.toggle('more', o); more.textContent = o ? 'Less' : 'More'; more.setAttribute('aria-expanded', String(o)); }); }
   pill.addEventListener('click', () => { tipOpen(true); document.getElementById('hintx').focus(); });   // the pill is hidden once open: focus moves to the ×
   document.getElementById('hintx').addEventListener('click', () => { if (coarse.matches){ tipOpen(false); pill.focus(); return; } /* the × is hidden once closed: focus moves to the pill */ hint.hidden = true; settings.tips = false; saveSettings(); tipsBox.checked = false; }); }
@@ -4041,6 +4266,8 @@ function helpDoc(){
     ['Audio as control', 'Audio can drive anything a control signal can. Patch audio into Envelope follow to make it swell a filter or level, into Gate extract to fire envelopes and clocks from hits, or into Pitch follow to track a monophonic melody. Then shape it with Slew (to smooth it), Sample & hold (to step it) or Quantizer (to snap it to a scale).'],
     ['Tracks', 'Each track has its own Track In and Chain Out. In the Mixer, turning a track’s CHN on adds that track’s pair (wired straight through, in a column below everything else) without leaving the Mixer, so every track gets its own chain and toggling one never disturbs another; the next time you come here, the patch is fitted so you see them all. If that track already has a chain, switching its CHN on just runs it through that chain again. The output always follows its own input — set the Track In and its Chain Out moves with it, and a Chain Out can’t be pointed elsewhere. Picking a track that is already used also jumps to and highlights the existing chain. A track takes one pair; control and gate inputs are not limited.'],
     ['Moving around', 'Scroll with two fingers or turn the mouse wheel to pan (Shift+wheel sideways); with a mouse a middle-button drag pans too, and on a touch screen dragging the background does. Pinch or Ctrl/⌘+wheel zooms; the zoom buttons are in the top bar (click the percentage to type one, Fit shows everything).'],
+    ['Play and Edit', 'The Play and Edit switch in the top bar (Alt+E on a keyboard) decides what a touch or a click does. In Edit everything works. In Play the patch is locked for playing: sliders, selects, buttons and readouts work, but no module can be moved, selected, folded, removed or given a menu, no cable can be made or removed, and a drag on anything that is not a control moves the view. The patch is framed and tagged PLAY while it is on. The choice is remembered for this editor on this device, not saved in the patch.'],
+    ['On a touch screen', 'Drag a slider sideways to change it from where it is; drag up or down from it to move the view instead; move your finger well above or below the slider while you drag for fine steps; double-tap to reset; tap the value to type a number (1e3 works too). Hold a finger on a module, a cable, a slider or the background to open its menu (on a cable: Add a bend here; on the background: Add a module here). Select (in the top bar, or in its overflow menu on a narrow screen) makes a tap on a module pick it, and a drag on the background draw a box. Two fingers pan and zoom from anywhere. The ⋯ button holds File, Settings, Help, MIDI learn and zoom. A module with many controls is cut into sections: tap a section bar to open or close it.'],
     ['Modules', 'Open the Modules list on the left. Click a module to add it to the middle of the view, or drag it onto the patch. Star a module to keep it in Quick access. Drag a module by its title bar; double-click the title bar to collapse it. Double-click a slider to reset it, or its value to type one.'],
     ['Selecting and the right-click menu', 'As in Max: click a module to select it, Shift-click to add it or take it out, Shift-drag on the background for a selection box (a plain drag there moves the view to it). Delete or Backspace removes the selection. Hold Option (Alt on Windows) and drag a module’s title bar to copy it (or the selection) and drop the copy where you let go; Option-click opens its help; Ctrl/⌘-click works a module without selecting it. Right-click to group them, copy, duplicate, delete, or make a custom module that you can add again from the list.'],
     ['Presets', 'Effects and sound sources have a Preset row at the top. Pick a factory preset (it sets every control: the ones it names, the rest back to their defaults), Default, or one of yours; Undo takes it back. Save as a preset keeps the module’s settings on this device under a name, for every patch; Delete one of yours removes one. The row keeps the preset’s name and says “edited” once you move a control.'],
@@ -4244,6 +4471,58 @@ window.addEventListener('keydown', e => {
 });
 
 /* chains has no note input: no keyboard playing and no on-screen keys. */
+
+/* ═══════════════ PLAY / EDIT, SELECT and the narrow bar (pass 3, 13 Nov 2026: M10, T8, T12) ═══════════════
+   PLAY / EDIT (M10): the switch is in the bar (Alt+E also flips it) and is remembered in this editor's settings (settings.mode), not in the patch. In Play a touch or a
+   click plays the patch (sliders, selects, buttons, readouts, keys); modules cannot be moved, selected, wired, folded, removed or given a menu; the cables, bends,
+   groups and the module list are shut; a one-finger or mouse drag on anything that is not a control pans. The default is Edit. */
+const modeBtns = { play: document.getElementById('modeplay'), edit: document.getElementById('modeedit') };
+function setMode(play, quiet){
+  play = !!play;
+  if (play && !quiet && !playMode) { /* entering Play */ }
+  playMode = play; document.body.classList.toggle('play', play);
+  for (const k in modeBtns){ const on = (k === 'play') === play; modeBtns[k].classList.toggle('on', on); modeBtns[k].setAttribute('aria-pressed', String(on)); }
+  if (play){
+    setSelMode(false, true); hideMenu(); clearSel(); clearCableSel(); lpCancel();
+    if (drag && drag.armed) window.dispatchEvent(new KeyboardEvent('keydown', { key:'Escape' }));
+    if (!drawer.classList.contains('collapsed')) setDrawer(false);
+  }
+  if (!quiet){ settings.mode = play ? 'play' : 'edit'; saveSettings(); toast(play ? 'Play: touch plays the patch; modules and cables are locked. Tap Edit to change them.' : 'Edit: modules, cables and menus work.'); }
+}
+for (const k in modeBtns) modeBtns[k].addEventListener('click', () => setMode(k === 'play'));
+window.addEventListener('keydown', e => {
+  if (!e.altKey || e.ctrlKey || e.metaKey || e.shiftKey || e.code !== 'KeyE' || e.repeat || typing(e) || document.querySelector('.dlgov')) return;
+  e.preventDefault(); setMode(!playMode);
+});
+/* SELECT (T8): a plain tap on a module toggles it in the selection and a drag on the background draws a box, as Shift-click and Shift-drag do with a mouse. */
+const selBtn = document.getElementById('selbtn');
+function setSelMode(on, quiet){
+  on = !!on && !playMode; selMode = on; document.body.classList.toggle('selmode', on);
+  selBtn.classList.toggle('on', on); selBtn.setAttribute('aria-pressed', String(on));
+  if (!quiet) toast(on ? 'Select on: tap modules to pick them, drag the background for a box. Hold a module for Group, Copy or Delete.' : 'Select off.');
+}
+selBtn.addEventListener('click', () => { if (playBlocked()) return; setSelMode(!selMode); });
+/* THE NARROW BAR (T12): at 640 px and below, File, Settings, Help, MIDI learn, Select, the CPU readout and the zoom buttons move into the overflow menu (the same elements, so their handlers and ids stay). */
+{
+  const bar = document.querySelector('.bar'), pop = document.getElementById('morepop'), moreBtn = document.getElementById('morebtn'), mq = matchMedia('(max-width: 640px)');
+  const zrow = h('div', { class:'zrow' });
+  const items = [...bar.querySelectorAll(':scope > .setwrap')].concat(['helpbtn', 'midilearn', 'selbtn', 'cpuv'].map(id => document.getElementById(id)));
+  const zoom = ['zoomout', 'zoomval', 'zoomin'].map(id => document.getElementById(id));
+  const park = el => { if (!el._ph){ el._ph = document.createComment(''); el.before(el._ph); } };
+  const place = narrow => {
+    if (narrow){ for (const el of items){ if (!el) continue; park(el); pop.append(el); } for (const el of zoom){ park(el); zrow.append(el); } pop.append(zrow); }
+    else { for (const el of [...items, ...zoom]){ if (el && el._ph && el._ph.parentNode) el._ph.after(el); } zrow.remove(); setMore(false); }
+  };
+  const setMore = on => { pop.hidden = !on; moreBtn.setAttribute('aria-expanded', String(on)); };
+  moreBtn.addEventListener('click', () => setMore(pop.hidden));
+  window.addEventListener('pointerdown', e => { if (!pop.hidden && !pop.contains(e.target) && !moreBtn.contains(e.target)) setMore(false); }, true);
+  window.addEventListener('keydown', e => { if (e.key === 'Escape') setMore(false); });
+  pop.addEventListener('click', e => { const b = e.target.closest('button'); if (b && !b.closest('.setmenu') && !['filebtn', 'setbtn', 'zoomval', 'zoomout', 'zoomin'].includes(b.id)) setMore(false); });   // a command closes the menu; File and Settings open their own list inside it
+  mq.addEventListener('change', e => place(e.matches)); place(mq.matches);
+  document.getElementById('baradd').addEventListener('click', () => { if (playBlocked()) return; setDrawer(drawer.classList.contains('collapsed')); });
+  document.getElementById('barundo').addEventListener('click', () => { if (canUndo()) undo(); else toast('Nothing to undo.'); });
+}
+setMode(settings.mode === 'play', true);   // (remembered per editor, in its settings; Edit when nothing is stored)
 
 /* ═══════════════ start ═══════════════ */
 doc = normalize(PatchStore.open() || starterDoc());

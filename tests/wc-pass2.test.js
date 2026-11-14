@@ -30,7 +30,7 @@ for (const [ed, src] of Object.entries(ED)) {
     assert.doesNotMatch(src, /Math\.hypot\(dx, dy\) > \(dup \? 4 : 1\)/, 'the 1 px threshold is gone');
   });
   test(ed + ' T5: a finger asks before it removes a module (cancel keeps it, Remove is one undo step); a mouse removes at once; the buttons are 40 px tall', () => {
-    assert.match(src, /onclick: ev => \{ if \(ev && \(ev\.pointerType === 'touch' \|\| ev\.pointerType === 'pen'\)\) askRemove\(m\.id, title\); else \{ store\.snapshot\(\); removeModule\(m\.id\); \} \}/);
+    assert.match(src, /onclick: ev => \{ if \(playBlocked\(\)\) return; if \(ev && \(ev\.pointerType === 'touch' \|\| ev\.pointerType === 'pen'\)\) askRemove\(m\.id, title\); else \{ store\.snapshot\(\); removeModule\(m\.id\); \} \}/);
     const a = fn(src, 'askRemove');
     assert.match(a, /askDialog\('Remove “' \+ title \+ '”\? Undo brings it back\.', \{ ok:'Remove' \}\)/);
     assert.match(a, /if \(yes && nodes\.has\(id\)\)\{ store\.snapshot\(\); removeModule\(id\); \}/, 'the snapshot is taken after the answer: Cancel leaves no step');

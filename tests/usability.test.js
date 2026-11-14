@@ -212,9 +212,9 @@ test('Phase 2 editors: modules take Max/MSP edit-mode gestures', () => {
     const w = H.read(f);
     assert.match(w, /if \(maxOperate\(e\)\) return;   \/\/ MAX: Ctrl\/⌘-click works the module/, f + ': Ctrl/⌘-click never selects');
     assert.match(w, /if \(e\.altKey && maxHelpPend\(e, n\)\) return;/, f + ': Alt-click opens help (Alt-drag copies)');
-    assert.match(w, /const box = e\.button === 0 && e\.shiftKey;\n  if \(box\)\{/, f + ': a Shift-drag on the background is a selection box (a plain drag pans, 3 Nov)');
+    assert.match(w, /const box = e\.button === 0 && \(e\.shiftKey \|\| selMode\) && !playMode;[^\n]*\n  if \(box\)\{/, f + ': a Shift-drag on the background is a selection box (a plain drag pans, 3 Nov)');
     assert.match(w, /if \(\(e\.key !== 'Delete' && e\.key !== 'Backspace'\)[^\n]*\n[^\n]*\n  e\.preventDefault\(\); store\.snapshot\(\); const ids = \[\.\.\.selected\]; for \(const x of ids\) removeModule\(x\);/, f + ': Delete removes the selection');
-    assert.match(w, /n\.el\.addEventListener\('pointerdown', e => \{ if \(e\.button === 1 && e\.pointerType === 'mouse'\) return; e\.stopPropagation\(\); n\.el\.style\.zIndex = \+\+zTop; if \(MAC && e\.ctrlKey && e\.pointerType === 'mouse'\) return; maxBodyDown\(e, n\); \}\);/, f + ': a click on a module selects it');
+    assert.match(w, /n\.el\.addEventListener\('pointerdown', e => \{ if \(e\.button === 1 && e\.pointerType === 'mouse'\) return; if \(playMode && !\(e\.target\.closest && e\.target\.closest\(PLAY_CTL\)\)\) return;[^\n]*\n[^\n]*e\.stopPropagation\(\); n\.el\.style\.zIndex = \+\+zTop; if \(MAC && e\.ctrlKey && e\.pointerType === 'mouse'\) return; maxBodyDown\(e, n\); \}\);/, f + ': a click on a module selects it');
   }
 });
 
@@ -300,7 +300,7 @@ test('mouse audit (3 Nov): Mac Ctrl+click is the menu, middle-click mutes, top m
   assert.match(src, /input:not\(\[type=range\]\)/, 'no browser menu on sliders');
   for (const f of ['waves/index.html', 'chains/index.html']) {
     const w = H.read(f);
-    assert.match(w, /ONE SLIDER \(mouse audit, 3 Nov[\s\S]{0,900}if \(e\.altKey \|\| \(MAC \? e\.metaKey : e\.ctrlKey\)\)\{ reset\(\); return; \}[\s\S]{0,800}ev\.shiftKey \? 0\.1/, f + ': the host slider rule');
+    assert.match(w, /ONE SLIDER \(mouse audit, 3 Nov[\s\S]{0,5000}if \(e\.altKey \|\| \(MAC \? e\.metaKey : e\.ctrlKey\)\)\{ reset\(\); return; \}[\s\S]{0,2500}ev\.shiftKey \? 0\.1/, f + ': the host slider rule');
     assert.match(w, /if \(ev\.pointerType === 'mouse' && ev\.buttons === 0 && !drag\.drawing && !drag\.armed\)/, f + ': a cable let go outside ends');
     assert.match(w, /\['Remove cable', \(\) =>/, f + ': Remove cable');
   }
