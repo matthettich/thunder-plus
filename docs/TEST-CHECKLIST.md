@@ -1,6 +1,6 @@
 # Thunder Plus test checklist, by priority
 
-> Snapshot of the owner's Claude Doc "Thunder Plus test checklist, by priority" (https://claude.ai/artifact/LrzQ18ur18Fc5gkvxmQDbK), exported 14 Nov 2026 with his ticks as of that morning.
+> Snapshot of the owner's Claude Doc "Thunder Plus test checklist, by priority" (https://claude.ai/artifact/LrzQ18ur18Fc5gkvxmQDbK), exported 14 Nov 2026 with his ticks as of midday.
 > The live list is the Claude Doc; the source of every item is "Owner's punch list" in HANDOVER.md (build numbers are in brackets).
 > Re-export this file when the doc changes.
 
@@ -22,7 +22,7 @@ If something fails, tell Claude the build number and what happened; tick an item
 
 | Section | Open items | Mostly on | Why it matters |
 | --- | --- | --- | --- |
-| 1. Do these first | 40 | Phone and computer | Lost work or sound, and the re-checks of your last fixes |
+| 1. Do these first | 45 | Phone and computer | Lost work or sound, and the re-checks of your last fixes |
 | 2. Really worth trying | 33 | Phone | Everyday features nobody has tried on a real device |
 | 3. If you have time | 47 | Phone, then gear | Secondary features, by-ear comparisons and hardware |
 | 4. Safe to skip unless something looks wrong | 55 | Mixed | Cosmetic, older, or already covered by automated tests |
@@ -61,6 +61,14 @@ If something fails, tell Claude the build number and what happened; tick an item
 - [ ] Computer: right-click the background, Add a comment here; right-click a module, Rename. Save, reload: both are still there. (587)
 - [ ] Computer: hold the pointer over a cable: a small label says what it connects and its level. (587)
 - [ ] Computer, …chains: save a custom preset on a module, save the project, open it on another device or browser: the preset is there. (587)
+
+### New in build 588: small modules, Mini, groups
+
+- [ ] Computer: collapse a whole patch to Mini (Alt+Shift+C, or Shift+click a module's arrow): each module becomes a one-line bar. Can you still tell the modules apart and follow the cables? Click a bar to open it. (588)
+- [ ] Phone: press and hold a module's arrow: it goes to Mini. Is that easy to find, or would you want it somewhere more obvious? (588)
+- [ ] Computer: the small utility modules (Attenuverter, Math, Logic, Quantizer, Random, Slew limiter, Sample & hold) are narrower now. Anything cramped or hard to read? Their ? button moved into the module menu. (588)
+- [ ] Computer: put a few modules in a group, then drag one of them: the group's box follows. Fold the group: it becomes one block that says how many modules and cables it holds. (588)
+- [ ] Computer: an old patch with collapsed modules and groups opens looking the same as before. (588)
 
 ### Re-check the fixes from your feedback
 
