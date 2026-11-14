@@ -19,7 +19,7 @@ for (const [name, D] of [['chains', chainsD()], ['waves', wavesD()]]) {
   test(name + ': Scope is a probe with no outputs; show() is one reused list of plain numbers', () => {
     const m = D.MODULES.scope; assert.equal(m.probe, true); assert.deepEqual(Object.keys(m.outputs), []); assert.deepEqual(Object.keys(m.inputs), ['a', 'b', 'trig']);
     const S = scope(D, {}), v1 = S.run({ a: sine(100) }, 20), v2 = S.run({ a: sine(100) }, 20);
-    assert.equal(v1, v2, 'the same list each time: nothing made per telemetry'); assert.equal(v1.length, 2 + W * 4); assert.ok(Array.isArray(v1)); for (const x of v1) assert.equal(typeof x, 'number');
+    assert.equal(v1, v2, 'the same list each time: nothing made per telemetry'); assert.equal(v1.length, 3 + W * 4); assert.equal(v1[2 + W * 4], .02, 'the Time the picture was taken at comes with it'); assert.ok(Array.isArray(v1)); for (const x of v1) assert.equal(typeof x, 'number');
     assert.doesNotThrow(() => JSON.stringify(v1)); assert.doesNotMatch(m.process.toString(), /new |\.slice\(|\.map\(/);
   });
   test(name + ': a sweep is Time long and each column holds the lowest and highest sample of its slice', () => {
@@ -48,6 +48,21 @@ for (const [name, D] of [['chains', chainsD()], ['waves', wavesD()]]) {
   });
 }
 
+test('Time changed in the middle of a sweep starts the sweep over; a frozen picture keeps the Time it was taken at', () => {
+  for (const D of [chainsD(), wavesD()]) {
+    const S = scope(D, { time: .02, trig: 0 }); let v = S.run({ a: i => i / 48000 }, 20); const seq = v[0]; assert.equal(v[2 + W * 4], .02);
+    S.run({ a: i => i / 48000 }, 1); S.p.time = .1; v = S.run({ a: i => i / 48000 }, 20); assert.equal(v[0], seq + (v[0] > seq ? v[0] - seq : 0)); assert.equal(v[2 + W * 4], .02, 'no new picture yet: still the old one, with its own Time');
+    v = S.run({ a: i => i / 48000 }, 30); assert.equal(v[2 + W * 4], .1); const c0 = v[2], c127 = v[2 + 127 * 4]; assert.ok(Math.abs((c127 - c0) - .1 * 127 / 128) < .004, 'the whole picture is on the new time scale (' + (c127 - c0) + ')');
+    S.p.freeze = 1; S.p.time = 1; v = S.run({ a: () => 0 }, 20); assert.equal(v[2 + W * 4], .1, 'frozen: the Time it shows is the picture\'s');
+  }
+});
+test('waves engine: a Scope does not run while nothing is watching', () => {
+  const D = wavesD(), E = new D.WavesEngine(SR, { voices: 2, quality: 'full', transport: { tempo: 120, lpb: 4, ticks: 6, playing: true } });
+  E.loadPatch({ modules: [{ id: 'h', type: 'hostIn', scope: 'poly', params: { transpose: 0 } }, { id: 'v', type: 'vco', scope: 'poly', params: { wave: 1, tune: 0, fine: 0 } }, { id: 's', type: 'scope', scope: 'mono', params: { time: .005, trig: 0, level: 0, freeze: 0, zoom: 1 } }, { id: 'o', type: 'out', scope: 'mono', params: { slot: 1, level: 1 } }],
+    cables: [{ from: ['h', 'pitch'], to: ['v', 'pitch'] }, { from: ['v', 'out'], to: ['s', 'a'] }, { from: ['v', 'out'], to: ['o', 'in'] }] });
+  E.noteOn(60, 1); for (let b = 0; b < 30; b++) E.process(N); assert.equal(E._states.get('s'), undefined, 'telemetry off: it was never run');
+  E.handleMessage({ op: 'telemetry', value: true }); for (let b = 0; b < 30; b++) E.process(N); const st = E._states.get('s'); assert.ok(st && st.st.seq >= 1);
+});
 test('chains engine: an unpatched-output Scope runs with what feeds it while the editor watches, and is left out when it does not', () => {
   const D = chainsD(), E = new D.ChainsEngine(SR, { focus: 0, quality: 'full', transport: { tempo: 120, lpb: 4, ticks: 6, playing: true } });
   const m = (id, type, params) => ({ id, type, scope: 'mono', params });

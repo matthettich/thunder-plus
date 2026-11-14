@@ -1549,23 +1549,24 @@ const FlipFlop = {
 };
 
 /* SCOPE (14 Nov, module queue): draws what is on its inputs. Nothing comes out of it; it only watches, and it only runs
-   while the editor is open (it is a probe: see ChainsEngine._active). A and B are two traces on the same time base.
+   while the editor is watching (it is a probe: see ChainsEngine._active; the …waves engine skips probes while telemetry is off). A and B are two traces on the same time base.
    One sweep is Time long and is kept as SCOPE_W columns, each the lowest and highest sample in its slice of time, so a
    fast signal shows as a band, never as a lie. Trigger: Free (sweep after sweep), Rising (a sweep starts when A climbs
    through Level, so a steady wave stands still; after two sweeps with no trigger it sweeps anyway) or Gate (when the
    Trig input goes high). Freeze keeps the last picture. show(): [sweep number, B patched (1 / 0), then lowA, highA,
-   lowB, highB for each column], numbers to 3 places. */
+   lowB, highB for each column, then the Time the picture was taken at], numbers to 3 places. */
 const SCOPE_W = 128;
 const Scope = {
   type:'scope', scope:'mono', cost:.05, probe:true,
   inputs:{ a:'audio', b:'audio', trig:'gate' }, outputs:{},
   params:{ time:[.02,.001,2,.001], trig:[1,0,2,1], level:[0,-1,1,.01], freeze:[0,0,1,1], zoom:[1,.25,16,.25] },
   create:() => ({ back:new Float32Array(SCOPE_W * 4), front:new Float32Array(SCOPE_W * 4), col:0, n:0, run:0, wait:0, la:0, lt:0, seq:0, hasB:0,
-    lo:1e9, hi:-1e9, lob:1e9, hib:-1e9, out:new Array(2 + SCOPE_W * 4).fill(0) }),
+    lo:1e9, hi:-1e9, lob:1e9, hib:-1e9, tm:0, shown:0, out:new Array(3 + SCOPE_W * 4).fill(0) }),
   process(st, io, ctx){
     const p = io.p, A = io.in.a, B = io.in.b, T = io.in.trig, mode = p.trig | 0, lvl = p.level;
     const per = Math.max(1, p.time * ctx.sr / SCOPE_W), limit = Math.max(1, p.time * ctx.sr * 2);
     st.hasB = io.linked && io.linked.has('b') ? 1 : 0;
+    if (st.tm !== p.time){ st.tm = p.time; st.run = 0; st.wait = 0; }   // Time changed: a sweep under way is dropped, so one picture never holds two time scales
     if (p.freeze >= .5){ st.run = 0; st.wait = 0; st.la = A[ctx.block - 1]; st.lt = T[ctx.block - 1] >= .5 ? 1 : 0; return; }
     for (let i = 0; i < ctx.block; i++){
       const a = A[i], t = T[i] >= .5 ? 1 : 0;
@@ -1580,7 +1581,7 @@ const Scope = {
         if (++st.n >= per * (st.col + 1)){
           const k = st.col * 4, K = st.back; K[k] = st.lo; K[k + 1] = st.hi; K[k + 2] = st.lob; K[k + 3] = st.hib;
           st.lo = st.lob = 1e9; st.hi = st.hib = -1e9;
-          if (++st.col >= SCOPE_W){ const x = st.front; st.front = st.back; st.back = x; st.seq++; st.run = 0; }
+          if (++st.col >= SCOPE_W){ const x = st.front; st.front = st.back; st.back = x; st.seq++; st.run = 0; st.shown = st.tm; }
         }
       }
     }
@@ -1588,6 +1589,7 @@ const Scope = {
   show(st){
     const o = st.out, F = st.front; o[0] = st.seq; o[1] = st.hasB;
     for (let i = 0; i < SCOPE_W * 4; i++){ const v = F[i]; o[2 + i] = v === v && v > -1e6 && v < 1e6 ? Math.round(v * 1000) / 1000 : 0; }
+    o[2 + SCOPE_W * 4] = st.shown;   // the Time this picture was taken at (the slider may have moved since, or the picture be frozen)
     return o;
   }
 };

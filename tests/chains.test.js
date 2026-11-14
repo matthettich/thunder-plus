@@ -28,7 +28,7 @@ function renderModule(E, M, type, over) {
   const probe = m.probe === true; if (probe) { cab.push({ from: ['a', 'out'], to: ['b', 'a'] }, { from: ['a', 'outR'], to: ['b', 'b'] }); }
   E.loadPatch({ modules: [{ id: 'a', type: 'trackIn', scope: 'mono', params: { track: 1 } }, { id: 'b', type, scope: 'mono', params }, { id: 'c', type: 'chainOut', scope: 'mono', params: { track: 1, level: 1 } }], cables: cab });
   if (probe) E.handleMessage({ op: 'telemetry', value: true });
-  const ports = probe ? ['show'] : Object.keys(m.outputs || {}), rec = {}; for (const p of ports) rec[p] = new Float32Array(probe ? 2 + 512 : 128 * BLOCKS);
+  const ports = probe ? ['show'] : Object.keys(m.outputs || {}), rec = {}; for (const p of ports) rec[p] = new Float32Array(probe ? 3 + 512 : 128 * BLOCKS);
   const sig = H.testSignal(128 * BLOCKS), L = new Float32Array(128 * BLOCKS), R = new Float32Array(128 * BLOCKS);
   for (let b = 0; b < BLOCKS; b++) {
     const s = sig.subarray(b * 128, (b + 1) * 128); E.setTrackInputs(s, s); E.process(128);

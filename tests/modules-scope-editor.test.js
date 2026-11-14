@@ -109,7 +109,7 @@ test('the Scope paints in a real page, keeps moving on Free, and Freeze stops it
       assert.ok(s.w >= 250 && s.h >= 100, ed + ': the canvas has a size ' + s.w + 'x' + s.h);
       // centre line + the two ±1 lines alone are about 3 x width pixels; the traces add far more
       assert.ok(s.n > 3 * s.w * 2 * 1.2, ed + ': the traces are painted, not only the grid (' + s.n + ' pixels)');
-      const a = await snap(); await page.waitForTimeout(450); const b = await snap();
+      const a = await snap(); let b = a; for (const t1 = Date.now(); Date.now() - t1 < 2500 && b.url === a.url;){ await page.waitForTimeout(150); b = await snap(); }   // a 500 ms sweep plus the telemetry's delay: wait for a new picture, not a fixed time
       assert.notEqual(a.url, b.url, ed + ': the picture moves while Trigger is Free');
       await page.evaluate(() => { const r = [...document.querySelectorAll('.node[data-id="s"] .row')].find(x => /Freeze/.test(x.textContent)); const sel = r && r.querySelector('select'); sel.value = '1'; sel.dispatchEvent(new Event('change', { bubbles: true })); });
       await page.waitForTimeout(700); const f1 = await snap(); await page.waitForTimeout(600); const f2 = await snap();

@@ -359,7 +359,7 @@
  "clock @default": "c31a5998",
  "clock @stressed": "1123d201",
  "clock @switches-on": "cf1d0de1",
- "scope @default": "702c2df7",
- "scope @stressed": "f9e6a548",
- "scope @switches-on": "f9e6a548"
+ "scope @default": "d6003f4f",
+ "scope @stressed": "435db1c8",
+ "scope @switches-on": "435db1c8"
 }

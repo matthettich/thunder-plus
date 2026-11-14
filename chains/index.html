@@ -1722,7 +1722,7 @@ function drawScope(n){
     const y = Math.round(Y(+p.level)) + .5; g.strokeStyle = C.ink; g.lineWidth = 1.5; g.beginPath(); g.moveTo(0, y); g.lineTo(7, y); g.stroke();
     g.fillStyle = C.ink; g.beginPath(); g.moveTo(7, y - 3.5); g.lineTo(11, y); g.lineTo(7, y + 3.5); g.closePath(); g.fill();
   }
-  const txt = secs(+p.time || .02) + (pp == null ? '' : '   pk-pk ' + pp.toFixed(2)) + (zoom !== 1 ? '   ×' + zoom : '') + (+p.freeze >= .5 ? '   frozen' : '');
+  const txt = secs((d && +d[2 + SCOPE_W * 4]) || +p.time || .02) + (pp == null ? '' : '   pk-pk ' + pp.toFixed(2)) + (zoom !== 1 ? '   ×' + zoom : '') + (+p.freeze >= .5 ? '   frozen' : '');
   g.font = '11px ' + C.font; g.textBaseline = 'top'; const tw = g.measureText(txt).width;
   g.globalAlpha = .8; g.fillStyle = C.bg; g.fillRect(14, 3, tw + 8, 15); g.globalAlpha = 1; g.fillStyle = C.ink; g.fillText(txt, 18, 5);
 }
