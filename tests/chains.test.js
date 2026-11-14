@@ -83,7 +83,7 @@ test('chains: every module renders finite audio and matches its golden hash (def
 test('chains: modules that generate or process a signal are not silent', () => {
   const { E, D } = engine(), dead = [];
   // Modules that legitimately output nothing without an external trigger or a patched side input are named, with the reason.
-  const NEEDS_TRIGGER = new Set(['beads', 'blipdrum', 'scout', 'scin', 'mixer', 'smixer', 'divider', 'euclid', 'logic', 'gateex', 'clock', 'life', 'marbles', 'steps', 'envfol', 'pitchfol', 'pitchtrk', 'adsr', 'atten', 'math', 'rect', 'switch', 'xfade', 'quant', 'slew', 'snh', 'random', 'tides', 'meta', 'reverse']);
+  const NEEDS_TRIGGER = new Set(['beads', 'blipdrum', 'scout', 'scin', 'mixer', 'smixer', 'divider', 'euclid', 'logic', 'gateex', 'clock', 'life', 'marbles', 'steps', 'envfol', 'pitchfol', 'pitchtrk', 'adsr', 'atten', 'math', 'rect', 'switch', 'xfade', 'clkmul', 'chance', 'counter', 'stepsw', 'burst', 'gatedly', 'flipflop', 'quant', 'slew', 'snh', 'random', 'tides', 'meta', 'reverse']);
   for (const type of Object.keys(D.MODULES).sort()) {
     const m = D.MODULES[type]; if (!m || !m.process || SKIP.has(type) || NEEDS_TRIGGER.has(type)) continue;
     const r = renderModule(E, D.MODULES, type, stress(m)); if (!Object.keys(m.outputs || {}).length) continue;

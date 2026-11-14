@@ -842,10 +842,41 @@ Object.assign(SHARED_MODULES, {
   divider:{ label:'Clock divider', scope:'mono', inputs:{ clock:'gate', reset:'gate' }, outputs:{ d2:'gate', d4:'gate', d8:'gate', n:'gate' },
     params:{ n:[3,1,32,1] }, ui:{ n:{l:'N', f:v => '÷' + Math.round(v)} },
     about:'Clock divider: counts the pulses on Clock and fires every 2nd, 4th, 8th and Nth one. Reset starts counting again.' },
+  // Clock and trigger tools (14 Nov, module queue group 2): params identical to the worklet's; tests/modules-clock-editor.test.js compares.
+  clkmul:{ label:'Clock multiplier', scope:'mono', inputs:{ clock:'gate', reset:'gate' }, outputs:{ out:'gate' },
+    params:{ mul:[2,1,16,1], width:[.5,.05,.95,.01] }, ui:{ mul:{l:'Times', f:v => '×' + Math.round(v)}, width:{l:'Gate length', f:pct} },
+    about:'Clock multiplier: makes Times pulses for every pulse that comes in, evenly spaced, so ×3 on a quarter-note clock gives triplets. It measures the gap between the last two pulses, so after a tempo change it catches up one pulse late; until it has seen two pulses it simply passes the clock through. Gate length is how long each pulse stays high. Reset makes it forget the tempo.' },
+  chance:{ label:'Chance gate', scope:'mono', inputs:{ in:'gate', reset:'gate' }, outputs:{ out:'gate', other:'gate' },
+    params:{ prob:[.5,0,1,.01], seed:[1,0,999,1] }, ui:{ prob:{l:'Chance', f:pct}, seed:{l:'Seed', f:v => v < 1 ? 'Random' : String(Math.round(v))} },
+    about:'Chance gate: every pulse that comes in goes either to Out or to Other, never both, and Chance is how often it goes to Out. Use Out to thin a rhythm out, and Other for the pulses it dropped. The same Seed gives the same run of hits every time, starting again when the song starts or at Reset, so a render matches what you heard. Seed 0 is different every time.' },
+  counter:{ label:'Counter', scope:'mono', inputs:{ clock:'gate', reset:'gate' }, outputs:{ step:'cv', end:'gate' },
+    params:{ steps:[8,1,64,1], mode:[0,0,2,1] }, ui:{ steps:{l:'Steps', f:whole}, mode:{l:'Direction', c:opts(['Up', 'Down', 'Up and down'])} },
+    about:'Counter: counts the pulses on Clock. Step is a staircase from 0 to 1 across Steps counts (through Scale / map or into a slider’s jack it becomes a rising or falling staircase). End is high on the last count of each round, to reset another counter or start something. Direction counts Up, Down, or Up and down. Reset, and the start of the song, go back to the beginning.' },
+  stepsw:{ label:'Step switch', scope:'mono', inputs:{ i1:'audio', i2:'audio', i3:'audio', i4:'audio', clock:'gate', reset:'gate' }, outputs:{ out:'audio' },
+    params:{ steps:[4,2,4,1], fade:[.005,0,.1,.001] }, ui:{ steps:{l:'Steps', f:whole}, fade:{l:'Fade', f:secs} },
+    about:'Step switch: up to four sounds in, one at a time out. Each pulse on Clock moves on to the next sound, and Reset goes back to the first. Steps is how many of the inputs it goes round (2 to 4). Fade is a short crossfade at each change so it does not click (0 is instant, for control signals).' },
+  burst:{ label:'Burst', scope:'mono', inputs:{ trig:'gate' }, outputs:{ out:'gate', level:'cv' },
+    params:{ count:[4,1,32,1], time:[.06,.005,1,.001], bend:[0,-1,1,.01], width:[.5,.05,.95,.01] },
+    ui:{ count:{l:'Count', f:whole}, time:{l:'Time', f:secs}, bend:{l:'Bend', f:v => Math.abs(v) < .005 ? 'even' : (v > 0 ? 'closer ' : 'wider ') + Math.round(Math.abs(v) * 100) + '%'}, width:{l:'Gate length', f:pct} },
+    about:'Burst: one pulse in makes a quick run of pulses, a ratchet or a roll. Count is how many, Time is the gap between the first two. Bend pulls the pulses closer together as the run goes (like a bouncing ball) or spreads them wider. Level falls from full to nothing across the run, for a roll that fades out; Gate length is how long each pulse stays high. A new pulse in starts the run again.' },
+  gatedly:{ label:'Gate delay', scope:'mono', inputs:{ in:'gate' }, outputs:{ out:'gate' },
+    params:{ delay:[.1,0,2,.001], length:[0,0,2,.001] }, ui:{ delay:{l:'Delay', f:secs}, length:{l:'Length', f:v => v < .0005 ? 'As it came' : secs(v)} },
+    about:'Gate delay: the gate comes out Delay later, up to 2 seconds: a flam, or a second sound a moment behind the first. Length at 0 keeps the gate as long as it came in; above 0, every delayed gate lasts that long (a short trigger from a long gate, or the other way round).' },
+  flipflop:{ label:'Flip-flop', scope:'mono', inputs:{ toggle:'gate', set:'gate', reset:'gate' }, outputs:{ q:'gate', nq:'gate' }, params:{}, ui:{},
+    about:'Flip-flop: each pulse on Toggle turns Q over (on, off, on…): a gate at half the speed, or a switch that stays where you leave it. Set turns it on and Reset turns it off. Not Q is the opposite of Q. It starts off whenever the song starts.' },
   euclid:{ label:'Euclidean', scope:'mono', inputs:{ clock:'gate', reset:'gate' }, outputs:{ gate:'gate', accent:'gate' },
     params:{ steps:[16,1,32,1], hits:[5,0,32,1], rot:[0,0,31,1], div:[3,0,9,1], len:[.5,.05,.95,.01] },
     ui:{ steps:{l:'Steps', f:whole}, hits:{l:'Hits', f:whole}, rot:{l:'Rotate', f:whole}, div:{l:'Step', c:opts(STEP_NAMES)}, len:{l:'Length', f:pct} },
-    about:'Euclidean: spreads Hits as evenly as possible across Steps (the rhythm behind many world grooves), turned by Rotate. It steps once per Step at the song tempo, or on each pulse at Clock. Accent fires on the first hit of each cycle. Restarts when the song starts.' }
+    about:'Euclidean: spreads Hits as evenly as possible across Steps (the rhythm behind many world grooves), turned by Rotate. It steps once per Step at the song tempo, or on each pulse at Clock. Accent fires on the first hit of each cycle. Restarts when the song starts.' },
+  // Steps and Clock moved here from …chains' own list (14 Nov): …waves has them too, one definition for both editors.
+  steps:{ label:'Steps', scope:'mono', inputs:{ clock:'gate', reset:'gate' }, outputs:{ out:'cv', gate:'gate' },
+    params:{ div:[3,0,9,1], len:[8,1,8,1], glide:[0,0,1,.01], depth:[1,0,1,.01], s1:[0,-1,1,.01], s2:[0,-1,1,.01], s3:[0,-1,1,.01], s4:[0,-1,1,.01], s5:[0,-1,1,.01], s6:[0,-1,1,.01], s7:[0,-1,1,.01], s8:[0,-1,1,.01] },
+    ui:{ div:{l:'Step', c:opts(['1/64','1/32','1/16T','1/16','1/8T','1/8','1/4','1/2','1 bar','2 bars'])}, len:{l:'Length', f:v => v + ' steps'}, glide:{l:'Glide', f:v => Math.round(v * 100) + '%'}, depth:{l:'Depth', f:v => Math.round(v * 100) + '%'}, s1:{l:'Step 1', f:v => (v > 0 ? '+' : '') + Math.round(v * 100) + '%'}, s2:{l:'Step 2', f:v => (v > 0 ? '+' : '') + Math.round(v * 100) + '%'}, s3:{l:'Step 3', f:v => (v > 0 ? '+' : '') + Math.round(v * 100) + '%'}, s4:{l:'Step 4', f:v => (v > 0 ? '+' : '') + Math.round(v * 100) + '%'}, s5:{l:'Step 5', f:v => (v > 0 ? '+' : '') + Math.round(v * 100) + '%'}, s6:{l:'Step 6', f:v => (v > 0 ? '+' : '') + Math.round(v * 100) + '%'}, s7:{l:'Step 7', f:v => (v > 0 ? '+' : '') + Math.round(v * 100) + '%'}, s8:{l:'Step 8', f:v => (v > 0 ? '+' : '') + Math.round(v * 100) + '%'} },
+    about:'Steps: an 8-step sequence of control values, one step per note value at the song tempo (or advanced by Clock in). Gate fires on every step; Glide slides between them. Restarts from step 1 when the song starts.' },
+  clock:{ label:'Clock', scope:'mono', inputs:{ reset:'gate' }, outputs:{ gate:'gate', ramp:'cv', bar:'cv' },
+    params:{ div:[3,0,9,1], swing:[0,0,.75,.01], width:[.5,.05,.95,.01], bars:[1,1,16,1] },
+    ui:{ div:{l:'Every', c:opts(['1/64','1/32','1/16T','1/16','1/8T','1/8','1/4','1/2','1 bar','2 bars'])}, swing:{l:'Swing', f:v => Math.round(v * 100) + '%'}, width:{l:'Gate length', f:v => Math.round(v * 100) + '%'}, bars:{l:'Bar ramp', f:v => v + (v > 1 ? ' bars' : ' bar')} },
+    about:'Clock: a gate every note value at the song tempo, with Swing on every second one. Ramp rises from 0 to 1 across each step and Bar across 1–16 bars: patch either into a slider to sweep it in time (Clouds or Beads position, a filter, a Repeat’s Hold).' },
 });
 const INT_NAMES = ['−2 oct', '−10th', '−oct', '−5th', '−4th', '−maj 3rd', '−min 3rd', 'Unison', '+min 3rd', '+maj 3rd', '+4th', '+5th', '+6th', '+oct', '+10th', '+2 oct'];
 Object.assign(SHARED_MODULES, {
@@ -865,9 +896,10 @@ Object.assign(SHARED_MODULES, {
 Object.assign(SHARED_FAMILY, { meter:'util', limiter:'util', utility:'util', ringmod:'afx', spring:'afx', plate:'afx', lverb:'afx', ensemble:'afx',
   reson:'afx', degrade:'afx', blipdrum:'gen', life:'mod', dimension:'afx', bbd:'afx', harm:'afx', phaser:'afx', width:'afx', pingpong:'afx', blades:'util', meta:'afx', math:'mod', logic:'mod', divider:'mod', euclid:'mod',
   rect:'mod', scale:'mod', compare:'mod', const:'mod', switch:'util', xfade:'util',
+  clkmul:'mod', chance:'mod', counter:'mod', stepsw:'util', burst:'mod', gatedly:'mod', flipflop:'mod',   // (Steps and Clock stay out: …chains has always drawn them in the default family)
   envfol:'mod', gateex:'mod', pitchfol:'mod', pitchtrk:'mod', slew:'util', snh:'util', quant:'util' });
 const SHARED_PORT_LABEL = { note:'Note', trig:'Trig', env:'Env', car:'Carrier', freq:'Freq', a:'A', b:'B', sum:'A+B', diff:'A−B', mul:'A×B', min:'Min', max:'Max',
-  and:'AND', or:'OR', xor:'XOR', not:'NOT A', gt:'A > B', lt:'A < B', inv:'Invert', abs:'Absolute', pos:'Positive', neg:'Negative', sel:'Select', d2:'÷2', d4:'÷4', d8:'÷8', n:'÷N', accent:'Accent', time:'Time',
+  and:'AND', or:'OR', xor:'XOR', not:'NOT A', gt:'A > B', lt:'A < B', inv:'Invert', abs:'Absolute', pos:'Positive', neg:'Negative', sel:'Select', step:'Step', end:'End', other:'Other', level:'Level', toggle:'Toggle', set:'Set', q:'Q', nq:'Not Q', i1:'1', i2:'2', i3:'3', i4:'4', d2:'÷2', d4:'÷4', d8:'÷8', n:'÷N', accent:'Accent', time:'Time',
   // U3 (13 Nov): ports that showed their raw key (Blades res, Meta mod, Flex and Step gate pat, Sample & hold noise, Clock ramp and bar)
   res:'Resonance', mod:'Modulator', pat:'Pattern', noise:'Noise', ramp:'Ramp', bar:'Bar' };
 /* Palette groups: added to an existing group of the same name, or made (audio groups before Control, the rest at the end).
@@ -881,7 +913,7 @@ const SHARED_PALETTE = [
   ['Stereo', [['width','Width']], 'audio'],
   ['Audio followers', [['envfol','Envelope follow'],['gateex','Gate extract'],['pitchfol','Pitch follow'],['pitchtrk','Pitch track']], 'control'],
   ['Control utilities', [['slew','Slew limiter'],['snh','Sample & hold'],['quant','Quantizer'],['math','Math'],['const','Constant'],['rect','Invert / rectify'],['scale','Scale / map'],['compare','Comparator'],['switch','Switch'],['xfade','Crossfade']], 'control'],
-  ['Rhythm and logic', [['euclid','Euclidean'],['divider','Clock divider'],['logic','Logic']], 'control']
+  ['Rhythm and logic', [['euclid','Euclidean'],['divider','Clock divider'],['clkmul','Clock multiplier'],['chance','Chance gate'],['counter','Counter'],['stepsw','Step switch'],['burst','Burst'],['gatedly','Gate delay'],['flipflop','Flip-flop'],['logic','Logic']], 'control']
 ];
 /* Blip drum and Life: their parameters match the worklet's exactly (same tables). */
 const BD_ROWS = ['p', 'k', 'f', 'm', 'n', 'd', 'a', 'x'];
@@ -1117,6 +1149,7 @@ Object.assign(SHARED_PORT_LABEL, { x:'X', y:'Y', z:'Z', rate:'Rate' });
 SHARED_PALETTE.push(['Sound sources', [['bytebeat', 'Bytebeat']], 'audio']);
 // Chaos: with the modulation sources (both editors already have the group; GROUP_FAM marks it 'mod').
 SHARED_PALETTE.push(['Modulation sources', [['chaos', 'Chaos']], 'control']);
+SHARED_PALETTE.push(['Modulation sources', [['steps', 'Steps'], ['clock', 'Clock']], 'control']);   // (from …chains' own list, 14 Nov; PAL_LAYOUT puts Clock under Clocks and rhythm)
 /* Notes for the integrator:
    - chains has no 'Sound sources' group: mergeShared makes it before §Control, and its family falls back to 'afx'
      for the group colour unless 'Sound sources':'gen' is added to the fallback map inside mergeShared
@@ -1314,14 +1347,14 @@ const PAL_LAYOUT = [
   ['§Control'],
   ['Notes and MIDI', '#a0703a', ['hostIn', 'seq']],
   ['Modulation sources', '#6e4fc0', ['lfo', 'adsr', 'tides', 'random', 'marbles', 'chaos', 'steps']],
-  ['Clocks and rhythm', '#8c5a8c', ['clock', 'divider', 'euclid', 'logic', 'life']],
+  ['Clocks and rhythm', '#8c5a8c', ['clock', 'divider', 'clkmul', 'chance', 'counter', 'stepsw', 'burst', 'gatedly', 'flipflop', 'euclid', 'logic', 'life']],
   ['Audio to control', '#4f6f9f', ['envfol', 'gateex', 'pitchfol', 'pitchtrk']],
   ['Control utilities', '#9a8fb8', ['atten', 'math', 'const', 'rect', 'scale', 'compare', 'switch', 'xfade', 'slew', 'snh', 'quant']]
 ];
 const PAL_COLOR = { More:'#888888' }, CAT_COLOR = {};
 // ONE NAME PER MODULE (13 Nov, audit U6): the list, the title bar and Help all read the module's own name. What the list used to add in
 // brackets after a name ("Resonator (chord)") is this tooltip text now.
-const PAL_HINT = { blipdrum:'8 voices', chaos:'Lorenz, Rössler…', degrade:'lo-fi', dimension:'stereo chorus', ensemble:'chorus', envfilt:'auto-wah', flex:'beat re-sequencer', life:'Game of Life', compare:'gate from a level', const:'fixed value', rect:'abs, flip', scale:'map a range', switch:'A or B', xfade:'A to B',
+const PAL_HINT = { blipdrum:'8 voices', chaos:'Lorenz, Rössler…', degrade:'lo-fi', dimension:'stereo chorus', ensemble:'chorus', envfilt:'auto-wah', flex:'beat re-sequencer', life:'Game of Life', compare:'gate from a level', const:'fixed value', clkmul:'×2, ×3…', chance:'random thinning', counter:'staircase', stepsw:'rotate 4 sounds', burst:'ratchet', gatedly:'flam', flipflop:'toggle', rect:'abs, flip', scale:'map a range', switch:'A or B', xfade:'A to B',
   meter:'VU', preverb:'shimmer', repeat:'beat repeat', resample:'record to a pad', reson:'chord', retrig:'stutter', spectral:'FFT', string:'pluck', utility:'gain, pan' };
 // Rebuild the merged palette (in place) in PAL_LAYOUT's order; group families too, for anything still keyed on them.
 function organizePalette(palette, groupFam){
@@ -1492,6 +1525,13 @@ const MODULE_USE = {
   compare:'Envelope follow’s Out into A, Level 0.30: A > B is a gate that fires on every loud hit, to trigger an ADSR or a Sample & hold.',
   switch:'Dry on A, a reverb’s output on B, and a Clock divider’s ÷4 into Select: every fourth beat the sound jumps to the reverb.',
   xfade:'Dry on A, an effect’s output on B, a slow LFO into Mix: the effect breathes in and out of the dry sound.',
+  clkmul:'A Clock at 1/4 into Clock and Times ×3: three even pulses per beat, triplets against the beat, into a Blip drum.',
+  chance:'After a Euclidean’s Gate: Chance 70% thins the pattern out, and Other plays a second sound on the hits that were dropped.',
+  counter:'A Clock into Clock, Step through Scale / map into a filter’s Cutoff jack: Steps 8 is a rising staircase that starts over every eight beats.',
+  stepsw:'Four sounds on 1 to 4 and a Clock divider’s ÷4 into Clock: the sound changes every fourth beat and goes round all four.',
+  burst:'A kick’s gate into Trig, Out into a snare’s trigger: every kick fires a roll of four fast hits; turn Bend up and the roll tightens.',
+  gatedly:'A drum’s gate into In, Out into a second drum’s trigger with Delay 30 ms: a flam, the second hit just behind the first.',
+  flipflop:'A Clock’s beat into Toggle and Q into a Switch’s Select: two sounds that take turns, one beat each.',
   slew:'After Steps or a Random going to a pitch or cutoff: Rise and Fall around 100 ms turn hard jumps into smooth glides.',
   snh:'Noise or an LFO into In, a clock into Trig, and Out into a filter’s Cutoff jack: the classic stepped “computer” filter.',
   quant:'After a Random or LFO going to an oscillator’s pitch, Scale minor pentatonic: random melodies that always stay in key.',
@@ -1798,6 +1838,7 @@ const SUMMARY_KEYS = {
   mixer:['level', 'l1'],    // the master level first (its label is "Master"), then the first channel's level
   smixer:['level', 'l1'],
   scale:['olo', 'ohi', 'clip'], xfade:['mix', 'curve'],   // Scale / map: where it lands, Crossfade: the mix first
+  clkmul:['mul', 'width'], chance:['prob', 'seed'], counter:['mode', 'steps'], stepsw:['fade', 'steps'], burst:['count', 'time'], gatedly:['delay'],   // Scale / map: where it lands, Crossfade: the mix first
 };
 const SUMMARY_FIRST = ['Mix', 'Wet', 'Master', 'Level', 'Output', 'Gain', 'Makeup'];
 const SUMMARY_DEFAULT = { selects:1, sliders:2 };
@@ -1824,6 +1865,7 @@ const NARROW_S = 168, NARROW_M = 190;   // the two small sizes: S for a one-word
 const MODULE_WIDTH = {
   atten:NARROW_S, random:NARROW_S, quant:NARROW_S, logic:NARROW_S, math:NARROW_S,   // Attenuverter, Random, Quantizer, Logic, Math
   const:NARROW_S, rect:NARROW_M, scale:216, compare:216, switch:NARROW_S, xfade:NARROW_M,   // Constant, Invert / rectify, Scale / map, Comparator, Switch, Crossfade
+  clkmul:216, chance:216, counter:NARROW_S, stepsw:NARROW_M, burst:216, gatedly:NARROW_M, flipflop:NARROW_S,   // Clock multiplier, Chance gate, Counter, Step switch, Burst, Gate delay, Flip-flop
   slew:NARROW_M, snh:NARROW_M, divider:NARROW_M, gateex:NARROW_M,   // Slew limiter, Sample & hold, Clock divider, Gate extract
 };
 function widthOf(type){ const d = MODULES[type], w = d && d.w != null ? d.w : MODULE_WIDTH[type]; return typeof w === 'number' && w >= 150 && w <= 600 ? Math.round(w) : NODE_W; }
@@ -2225,12 +2267,6 @@ const MODULES = {
     ui:{ mode:{l:'Mode', c:opts(['Granular','Stretch','Loop delay','Spectral'])}, lofi:{l:'Quality', c:opts(['Hi-fi','Lo-fi'])}, freeze:{l:'Freeze', c:opts(['Off','On'])},
       pos:{l:'Position', f:pct}, size:{l:'Size', f:pct}, pitch:{l:'Pitch', f:semis}, density:{l:'Density', f:pct}, texture:{l:'Texture', f:pct},
       blend:{l:'Blend', f:wet}, fb:{l:'Feedback', f:pct}, verb:{l:'Reverb', f:pct}, spread:{l:'Spread', f:pct} } },
-  steps:{ label:'Steps', inputs:{ clock:'gate', reset:'gate' }, outputs:{ out:'cv', gate:'gate' },
-    params:{ div:[3,0,9,1], len:[8,1,8,1], glide:[0,0,1,.01], depth:[1,0,1,.01], s1:[0,-1,1,.01], s2:[0,-1,1,.01], s3:[0,-1,1,.01], s4:[0,-1,1,.01], s5:[0,-1,1,.01], s6:[0,-1,1,.01], s7:[0,-1,1,.01], s8:[0,-1,1,.01] },
-    ui:{ div:{l:'Step', c:opts(['1/64','1/32','1/16T','1/16','1/8T','1/8','1/4','1/2','1 bar','2 bars'])}, len:{l:'Length', f:v => v + ' steps'}, glide:{l:'Glide', f:v => Math.round(v * 100) + '%'}, depth:{l:'Depth', f:v => Math.round(v * 100) + '%'}, s1:{l:'Step 1', f:v => (v > 0 ? '+' : '') + Math.round(v * 100) + '%'}, s2:{l:'Step 2', f:v => (v > 0 ? '+' : '') + Math.round(v * 100) + '%'}, s3:{l:'Step 3', f:v => (v > 0 ? '+' : '') + Math.round(v * 100) + '%'}, s4:{l:'Step 4', f:v => (v > 0 ? '+' : '') + Math.round(v * 100) + '%'}, s5:{l:'Step 5', f:v => (v > 0 ? '+' : '') + Math.round(v * 100) + '%'}, s6:{l:'Step 6', f:v => (v > 0 ? '+' : '') + Math.round(v * 100) + '%'}, s7:{l:'Step 7', f:v => (v > 0 ? '+' : '') + Math.round(v * 100) + '%'}, s8:{l:'Step 8', f:v => (v > 0 ? '+' : '') + Math.round(v * 100) + '%'} } },
-  clock:{ label:'Clock', inputs:{ reset:'gate' }, outputs:{ gate:'gate', ramp:'cv', bar:'cv' },
-    params:{ div:[3,0,9,1], swing:[0,0,.75,.01], width:[.5,.05,.95,.01], bars:[1,1,16,1] },
-    ui:{ div:{l:'Every', c:opts(['1/64','1/32','1/16T','1/16','1/8T','1/8','1/4','1/2','1 bar','2 bars'])}, swing:{l:'Swing', f:v => Math.round(v * 100) + '%'}, width:{l:'Gate length', f:v => Math.round(v * 100) + '%'}, bars:{l:'Bar ramp', f:v => v + (v > 1 ? ' bars' : ' bar')} } },
   repeat:{ label:'Repeat', inputs:{ in:'audio', inR:'audio', gate:'gate' }, outputs:{ out:'audio', outR:'audio' },
     params:{ hold:[0,0,1,1], mode:[0,0,2,1], div:[3,0,9,1], decay:[0,0,1,.01], pitch:[0,-12,0,.1], mix:[1,0,1,.01] },
     ui:{ hold:{l:'Hold', c:opts(['Off','On'])}, mode:{l:'Mode', c:opts(['Repeat','Reverse','Tape stop'])}, div:{l:'Slice', c:opts(['1/64','1/32','1/16T','1/16','1/8T','1/8','1/4','1/2','1 bar','2 bars'])},
@@ -2588,7 +2624,7 @@ class ChainsBridge {
   }
   static standalone(opts){
     opts = opts || {};
-    const url = opts.url || './chains-worklet.js?v=50';
+    const url = opts.url || './chains-worklet.js?v=51';
     const ctx = new (window.AudioContext || window.webkitAudioContext)({ latencyHint:'interactive' });
     return Promise.all([ctx.audioWorklet.addModule(url), ChainsBridge.wasm()]).then(([, [tfxBytes, pumpBytes]]) => {
       const node = new AudioWorkletNode(ctx, 'chains', {
@@ -4414,7 +4450,7 @@ const PALETTE = [
   ['Stereo', [['width','Width']]],
   ['Sidechain', [['scin','Sidechain In'],['scout','Sidechain Out'],['sccomp','Sidechain comp'],['buscomp','Bus comp'],['glue','Glue comp']]],
   ['§Control', []],
-  ['Modulation sources', [['lfo','LFO'],['adsr','ADSR'],['random','Random'],['atten','Attenuverter'],['steps','Steps'],['clock','Clock']]],
+  ['Modulation sources', [['lfo','LFO'],['adsr','ADSR'],['random','Random'],['atten','Attenuverter']]],
   ['§Audio to control', []],
   ['Audio followers', [['envfol','Envelope follow'],['gateex','Gate extract'],['pitchfol','Pitch follow'],['pitchtrk','Pitch track']]],
   ['Control utilities', [['slew','Slew limiter'],['snh','Sample & hold'],['quant','Quantizer']]]
@@ -4772,8 +4808,6 @@ const PAGE_ABOUT = {
   reverb:'Airwindows Galactic: a huge, lush reverb.',
   rings:'Mutable Instruments Rings: sound in excites a resonator tuned to Note (plus the Pitch input).',
   clouds:'Mutable Instruments Clouds: granular textures, time stretch, looping delay and spectral blur. Freeze holds what it heard.',
-  steps:'Steps: an 8-step sequence of control values, one step per note value at the song tempo (or advanced by Clock in). Gate fires on every step; Glide slides between them. Restarts from step 1 when the song starts.',
-  clock:'Clock: a gate every note value at the song tempo, with Swing on every second one. Ramp rises from 0 to 1 across each step and Bar across 1–16 bars: patch either into a slider to sweep it in time (Clouds or Beads position, a filter, a Repeat’s Hold).',
   repeat:'Repeat: beat repeat. While Hold is on (or Gate is high) it loops the slice that just played, one note value long; Decay fades each pass and Pitch drops it. Reverse plays the slice backwards; Tape stop slows the sound to a halt.',
   vocoder:'A vocoder: the sound you patch into In L is the carrier, and In R is the modulator that shapes it (leave In R unpatched and it uses In for both). Mode picks the band count — Talkbox and the 4…64 band banks split the carrier into bands that the modulator’s levels open and close, or Spectral cross-synthesises them with an FFT. Resonance sharpens the bands, Attack and Release set how fast the levels follow, Mix blends the vocoded sound with the dry carrier, and Level sets the output.',
   scin:'Sidechain In: brings a sidechain into this chain. Source picks what it listens to: a send (Send 1–8, what a Sidechain Out sends) or one track’s own sound, before its effects and fader, so even a muted “ghost” kick drives it. The meter shows what it hears (IN) and the envelope (ENV), before you patch it anywhere. Out is the sound (Level sets how loud), Envelope rises with each hit (to open a filter) and Duck dips with it (into a VCA’s Control, to pump a sound). Sensitivity sets how hard the hits push them (raise it for a quiet kick) and Release how fast they recover. Or just drop a Sidechain comp after this track’s sound.',
@@ -4808,6 +4842,7 @@ function helpDoc(){
     ['Modulation', 'Patch any signal into a slider’s small purple jack and it moves that slider: the slider sets the center, and the signal swings it across its range. The value turns purple and a mark shows where the slider really is. Use the Depth slider on an LFO or envelope, or an Attenuverter, to make the swing smaller.'],
     ['Audio as control', 'Audio can drive anything a control signal can. Patch audio into Envelope follow to make it swell a filter or level, into Gate extract to fire envelopes and clocks from hits, or into Pitch follow to track a monophonic melody. Then shape it with Slew (to smooth it), Sample & hold (to step it) or Quantizer (to snap it to a scale).'],
     ['Basic operations', 'Add, subtract, multiply, smaller and larger are the outputs of Math (A+B, A−B, A×B, Min, Max). AND, OR, XOR and NOT are the outputs of Logic. Invert / rectify flips a control signal or folds it to positive. Scale / map stretches one range onto another (an LFO from −1..1 to 0..1, say). Comparator turns a control signal into a gate. Constant is a steady value. Switch chooses between two sounds on a gate, and Crossfade blends them. All of them are in the Control utilities group of the Modules list.'],
+    ['Clocks and triggers', 'Clocks and rhythm in the Modules list has the pulse tools. Clock makes the pulses and Steps plays a row of values; both follow the song’s tempo, and Reset restarts them. Clock divider and Clock multiplier slow a clock down or speed it up (×3 for triplets). Counter counts pulses, and its Step output is a staircase. Chance gate lets pulses through by chance (the same Seed gives the same pattern every time), Burst turns one pulse into a quick roll, Gate delay moves a gate later for a flam, Flip-flop turns a pulse into on and off, and Step switch passes four sounds in turn.'],
     ['Tracks', 'Each track has its own Track In and Chain Out. In the Mixer, turning a track’s CHN on adds that track’s pair (wired straight through, in a column below everything else) without leaving the Mixer, so every track gets its own chain and toggling one never disturbs another; the next time you come here, the patch is fitted so you see them all. If that track already has a chain, switching its CHN on just runs it through that chain again. The output always follows its own input — set the Track In and its Chain Out moves with it, and a Chain Out can’t be pointed elsewhere. Picking a track that is already used also jumps to and highlights the existing chain. A track takes one pair; control and gate inputs are not limited.'],
     ['Moving around', 'Scroll with two fingers or turn the mouse wheel to pan (Shift+wheel sideways); with a mouse a middle-button drag pans too, and on a touch screen dragging the background does. Rest the pointer on a slider for a moment (it gets an outline) and the wheel changes that slider instead, Shift+wheel in fine steps. Pinch or Ctrl/⌘+wheel zooms; the zoom buttons are in the top bar (click the percentage to type one, Fit shows everything).'],
     ['Play and Edit', 'The Play and Edit switch in the top bar (Alt+E on a keyboard) decides what a touch or a click does. In Edit everything works. In Play the patch is locked for playing: sliders, selects, buttons and readouts work, but no module can be moved, selected, folded, removed or given a menu, no cable can be made or removed, and a drag on anything that is not a control moves the view. The patch is framed and tagged PLAY while it is on. The choice is remembered for this editor on this device, not saved in the patch.'],
