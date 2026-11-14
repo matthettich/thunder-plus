@@ -593,6 +593,11 @@ Found while building pass 4:
 - (lead, 14 Nov) The module right-click menu in the editors has grown to 15 entries (custom module, group, zoom, four aligns, two spacings, copy, duplicate, delete, select all, two collapses). I would group Align / Space into one "Arrange" submenu and put a rule between the groups. Not done.
 - (lead, 14 Nov) `tests/sweep/audition.mjs`'s "two held notes" check is timing-sensitive: it failed once while other sweeps were running and passes alone. I would make it wait on the engine's state instead of fixed delays. Not done.
 
+Found while building the module queue (builds 591–592):
+- …waves does not count song starts (see the build 592 entry): clocks and seeded chance do not restart at PLAY there.
+- The editors' own `scope` for the new shared modules says 'mono' while the engines say 'poly'; only the engine's is used, but the two should agree.
+- Clock's Compact summary is clipped at its default width (was so before).
+
 Found while building feedback loops (build 589):
 - A feedback cable's detour runs under the modules it passes (through their bodies when they are tall). Would route it under the tallest module of the loop.
 - The "1 blk" tag scales with the zoom; on a phone zoomed out it is too small to read. Would keep it at a fixed screen size.
@@ -702,6 +707,15 @@ The owner's top priority to add is the MOD screen. Work down the list; ask befor
 **The owner's checklist by importance (13 Nov):** he works from a Claude Doc, "Thunder Plus test checklist, by priority" (https://claude.ai/artifact/LrzQ18ur18Fc5gkvxmQDbK), ordered: 1 Do these first, 2 Really worth trying, 3 If you have time, 4 Safe to skip, Parked, Set aside, Done. A snapshot with his ticks is `docs/TEST-CHECKLIST.md`: re-export it whenever the doc changes, and add each new build's checks to the doc's section 1 as well as here. He said the two "decides" groups (native apps; smoothing / Worklets / clock experiments) are parked and block nothing. "Close the skip list" from him means: close section 4's items as not tested.
 
 Start a session by asking for results. Fix on `beta`. (10 Nov, 15:10: the web beta is build 560; the build numbers in the rest of this paragraph are older.) Web beta: https://matthettich.github.io/thunder-plus/beta/ (build 547 as of 10 Nov morning, 548 once its PR merges; the night of 9–10 Nov shipped 544–547, see the four "10 Nov" entries below. Decisions the lead made that night for the owner to confirm or reverse: on a phone the saved Sequencer default plays on the Page unless Audio thread is picked on that device; on a phone the safety limiter is its stand-in until another worklet loads; the resync only runs with a worklet loaded and its margins are untested on a device). Desktop: v1.3.4-beta.2 (build 541, no feed view or scopes); further desktop betas on hold until the owner asks.
+
+**Build 592** (module queue, group 2: clock and trigger tools; branch `feat/modules-clock`)
+- [ ] **By ear, Chance gate (this is the seeded chance you asked about):** a Clock into In, Out to a drum, Seed 7, Chance 50%. Play twice from the start: the same hits both times. Render the song: the render has those hits too. Seed 0: different on every play. Other carries the pulses that did not pass (patch it to a second drum: the two never hit together).
+- [ ] **By ear:** Clock → Clock multiplier ×3 → a drum: three even hits a beat; change the tempo: it catches up one pulse late.
+- [ ] **By ear:** a kick's gate into Burst (Count 4, Bend up) → a snare: a roll that tightens; Level into the snare's volume: it fades. Gate delay at about 30 ms to a second drum: a flam.
+- [ ] Counter's Step through Scale / map into a filter's cutoff: an 8-step staircase that starts over; Direction Up and down: it comes back the way it went. Flip-flop's Q into a Switch's Select: two sounds take turns.
+- [ ] Step switch: four different sources in, a Clock: they take turns, no clicks (Fade 5 ms).
+- [ ] An old …chains patch with Steps and Clock looks and plays as before. …waves: Steps and Clock are in the Modules list now and follow the song's tempo.
+- [ ] Phone: add the seven, Compact and Mini: readable, nothing cut off ("Times ×3", "Seed Random").
 
 **Build 591** (module queue, group 1: control maths; branch `feat/modules-maths`)
 - [ ] Computer, …chains: Modules list, Control utilities: Math, Constant, Invert / rectify, Scale / map, Comparator, Switch, Crossfade, in that order, each with a one-line hint.
@@ -1128,6 +1142,15 @@ Suggested order: N0 → N1 → N2 (phone cured) → N4 with N3 alongside → N5 
   the edge `R.t0`, "waiting…" while armed), `rcdClk` / `rcdFmt` / `rcdFreeSecs`, a 250 ms timer only while recording; the
   final length stays until the next take. recorder-check covers FREE, PATTERN, Stop, next take and closing mid-take.
 
+
+## 14 Nov (module queue, group 2: clock and trigger tools; build 592)
+
+Branch `feat/modules-clock`. The lead wrote the engine and its tests, a Sonnet agent the editor side; the lead reviewed.
+- **New, shared block (both editors; worklets `?v=51` / `?v=41`), all scope `'poly'`, all on the rising edge at 0.5:** `clkmul` Clock multiplier (measures the last two pulses; passes the clock until it has a tempo; no extra pulses when the clock slows), `chance` Chance gate (**seeded**: xorshift from Seed, restarted at Reset, when Seed changes and on a song start (`restarted`); Seed 0 takes a number from the engine's counter the first time it runs; Out / Other split every pulse), `counter` Counter (Step 0..1 staircase over 1–64 counts, Up / Down / Up and down, End gate), `stepsw` Step switch (2–4 inputs, Fade), `burst` Burst (Count, Time, Bend ±3 octaves of spacing across the run, Level 1→0), `gatedly` Gate delay (a byte-a-sample line of 2 s; Length 0 keeps the gate's own length), `flipflop` Flip-flop (Toggle, Set, Reset; Q, Not Q).
+- **Steps and Clock** moved into the shared blocks (engine and editor), unchanged, so …waves has them; …chains checked identical before / after in a browser.
+- **Rough edge found (not fixed, an engine behaviour change):** …waves' `setTransport` does not count song starts (`transport.startN`), so in …waves "starts again when the song starts" never fires for Clock, Steps, Counter, Flip-flop or the Chance gate's seed: they free-run there and only Reset restarts them. …chains counts starts. Making …waves count them would also restart the existing shared modules that read `startN` (Step gate and others) at each play, which changes how old …waves patches behave: **for the owner to decide**. It matters for "the render matches what I heard" with a Chance gate inside a …waves instrument.
+- **Tests:** `tests/modules-clock.test.js` (exact pulse positions, the seed repeating after Reset and on a second play, both worklets, one patch through each engine), `tests/modules-clock-editor.test.js`. Goldens: only added lines.
+- **Compact keys** for Counter / Step switch / Gate delay were chosen round a `tests/wc-wording.test.js` rule that takes any `['moduleId', 'word']` pair for a palette entry (`['steps','fade']` tripped it); the rule could be narrowed instead.
 
 ## 14 Nov (module queue, group 1: control maths; build 591)
 
