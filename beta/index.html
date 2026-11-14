@@ -3747,7 +3747,7 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
 </div>
 <div class="toast" id="toast" role="status" aria-live="polite" title="Tap to dismiss" hidden></div>
 
-<script src="waves/waves-worklet.js?v=43"></script>
+<script src="waves/waves-worklet.js?v=44"></script>
 <!-- LXR ENGINES (23 Oct 2026): the LXR-02 firmware's drum voices, GPL-3.0, all of it in lxr/. Optional: without the folder
      this fails quietly and the app has no Firmware engines. The render Worker loads the same file (LXR_JS below). -->
 <script src="lxr/lxr-engine.js?v=2"></script>
@@ -8737,7 +8737,7 @@ self.onmessage = async e => {
       if (m.op === 'done') j.ok({data:m.data, data2:m.data2 || null, st:m.st}); else j.no(new Error(m.err));
     };
     w.onerror = e => { e.preventDefault && e.preventDefault(); rwDown(); };
-    w.postMessage({op:'init', pl:plMod, tx:txMod, lx:lxMod || null, ps:psMod || null, wv:new URL('waves/waves-worklet.js?v=43', location.href).href});
+    w.postMessage({op:'init', pl:plMod, tx:txMod, lx:lxMod || null, ps:psMod || null, wv:new URL('waves/waves-worklet.js?v=44', location.href).href});
     PW.w = w;
   } catch(e){ PW.w = null; }
 }
@@ -19577,7 +19577,7 @@ function chainsReady(ac){
     chnLoaded.set(ac, (async () => {
       await tfxLoad; await tfxModLoad; if (!chnBin() || !ac.audioWorklet || !window.AudioWorkletNode) return false;
       if (!chnURL){
-        const src = await (await fetch('chains/chains-worklet.js?v=54')).text();
+        const src = await (await fetch('chains/chains-worklet.js?v=55')).text();
         chnURL = URL.createObjectURL(new Blob([src], {type:'application/javascript'}));
       }
       wkNote(ac, 'chains'); await ac.audioWorklet.addModule(chnURL);
@@ -22458,7 +22458,7 @@ let bassURL = null; const bassLoad = new WeakMap(), bassOK = new WeakSet(), bass
 // …PUMP SYNTHS live: their worklet, loaded with the others; psSent: the contexts whose audio thread has the wasm's bytes
 const PSYN_WK = 'pump/synth/pump-synth-worklet.js?v=12', psOK = new WeakSet(), psSent = new WeakSet();
 // …WAVES LIVE: the waves worklet in the tracker's own context (thunder-wlive); wlSent: the contexts that have the wasm
-const WAVES_WK = 'waves/waves-worklet.js?v=43', wlOK = new WeakSet(), wlSent = new WeakSet();
+const WAVES_WK = 'waves/waves-worklet.js?v=44', wlOK = new WeakSet(), wlSent = new WeakSet();
 /* BATTERY (8 Nov, Fold): a bookkeeping timer that only does something in one situation (playing, the screen visible, one
    screen open) had been waking the phone 2 to 16 times a second for nothing. idleTick(fn, fast, busy, slow) calls fn every
    `fast` ms while busy() says so and every `slow` ms otherwise (fn runs either way, so its own reset-when-idle code still
@@ -24699,7 +24699,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 595;
+const BUILD = 596;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD + (location.pathname.includes('/beta/') ? ' · beta' : '');
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -34506,6 +34506,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [596, '14 Nov', ['…waves and …chains: a Delay line (Modules, Building blocks). A bare delay from one sample to two seconds whose feedback is inside it and exact to the sample, so short times ring at a pitch you can tune (1000 ÷ the time in ms: 2 ms rings at 500 Hz): combs and plucked strings from a burst of noise. Longer times echo, and an LFO into its Time input makes a chorus or flanger. Out is only the delayed sound; mix it with the dry yourself. Feedback stops at 99% and is limited inside, so it cannot run away.']],
   [595, '14 Nov', ['…chains fix: opening a song or patch whose …chains patch had exactly as many modules and cables as the one loaded before could leave part of it switched off (a Track In that was unpatched before and patched now stayed silent, so the whole chain was silent) until the patch was edited. Each loaded patch now starts clean.']],
   [594, '14 Nov', ['…waves and …chains: four building blocks (Modules, Building blocks). One-pole filter (the gentlest filter, with a Low and a High output; also a smoother for control signals), Allpass (Phase: the stage a phaser is made of; Echo: the short diffusing delay reverbs are made of), DC blocker (brings a signal back round zero) and Mid / side (Encode, treat the middle and the sides differently, Decode).', '…chains: an Oscillator (sine, triangle, saw, square, from 0.1 Hz to the top, with FM and Sync) and Noise (white, pink, brown) under Sound sources, so a patch can make sound and control waves of its own.']],
   [593, '14 Nov', ['…waves and …chains: a Scope (Modules, next to Meter). Patch a signal into A, and a second into B if you like: it draws them on one time base, each as the band between its lowest and highest point, so a fast signal reads as a band and a slow one as a line. Trigger on Rising holds a steady wave still; Freeze keeps the picture; Zoom magnifies it. It only runs while the editor is open, so it costs nothing while a song plays with the editor closed.']],
