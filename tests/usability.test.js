@@ -83,7 +83,7 @@ test('panic (B18): Stop while playing stops; Stop again lets every note go and s
   const blk = cut('index.html', /function stopKey\(\)\{[^\n]*\nfunction panic\(\)\{[\s\S]*?\n\}\n/, 'stopKey and panic');
   const log = { stop: 0, all: 0, mo: 0, sent: [], toast: [] };
   const c = run(blk + '\nthis.stopKey = stopKey;', { tp: { on: true }, tStop: () => log.stop++, ctx: { currentTime: 0 }, rt: { pl: { stopAll: () => log.all++ } },
-    moRelease: () => log.mo++, NPORT: 4, midiOut: p => p === 0 || p === 2, msend: (m, t, x, p) => log.sent.push([p, ...m]), toast: (m, ms) => log.toast.push([m, ms]), tpLog() {} });
+    moRelease: () => log.mo++, NPORT: 4, midiOut: p => p === 0 || p === 2, msend: (m, t, x, p) => log.sent.push([p, ...m]), toast: (m, ms) => log.toast.push([m, ms]), tpLog() {}, warmTok: null, lpRestore() {}, lpSelRestore() {}, draw() {} });
   c.stopKey(); assert.equal(log.stop, 1); assert.equal(log.sent.length, 0, 'playing: just stops');
   c.tp.on = false; c.stopKey();
   assert.equal(log.all, 1, 'the synths let go'); assert.equal(log.mo, 1, 'held MIDI notes too');
@@ -212,9 +212,9 @@ test('Phase 2 editors: modules take Max/MSP edit-mode gestures', () => {
     const w = H.read(f);
     assert.match(w, /if \(maxOperate\(e\)\) return;   \/\/ MAX: Ctrl\/⌘-click works the module/, f + ': Ctrl/⌘-click never selects');
     assert.match(w, /if \(e\.altKey && maxHelpPend\(e, n\)\) return;/, f + ': Alt-click opens help (Alt-drag copies)');
-    assert.match(w, /const box = e\.button === 0 && e\.shiftKey;\n  if \(box\)\{/, f + ': a Shift-drag on the background is a selection box (a plain drag pans, 3 Nov)');
+    assert.match(w, /const box = e\.button === 0 && \(e\.shiftKey \|\| selMode\) && !playMode;[^\n]*\n  if \(box\)\{/, f + ': a Shift-drag on the background is a selection box (a plain drag pans, 3 Nov)');
     assert.match(w, /if \(\(e\.key !== 'Delete' && e\.key !== 'Backspace'\)[^\n]*\n[^\n]*\n  e\.preventDefault\(\); store\.snapshot\(\); const ids = \[\.\.\.selected\]; for \(const x of ids\) removeModule\(x\);/, f + ': Delete removes the selection');
-    assert.match(w, /n\.el\.addEventListener\('pointerdown', e => \{ if \(e\.button === 1 && e\.pointerType === 'mouse'\) return; e\.stopPropagation\(\); n\.el\.style\.zIndex = \+\+zTop; if \(MAC && e\.ctrlKey && e\.pointerType === 'mouse'\) return; maxBodyDown\(e, n\); \}\);/, f + ': a click on a module selects it');
+    assert.match(w, /n\.el\.addEventListener\('pointerdown', e => \{ if \(e\.button === 1 && e\.pointerType === 'mouse'\) return; if \(playMode && !\(e\.target\.closest && e\.target\.closest\(PLAY_CTL\)\)\) return;[^\n]*\n[^\n]*e\.stopPropagation\(\); n\.el\.style\.zIndex = \+\+zTop; if \(MAC && e\.ctrlKey && e\.pointerType === 'mouse'\) return; maxBodyDown\(e, n\); \}\);/, f + ': a click on a module selects it');
   }
 });
 
@@ -300,7 +300,7 @@ test('mouse audit (3 Nov): Mac Ctrl+click is the menu, middle-click mutes, top m
   assert.match(src, /input:not\(\[type=range\]\)/, 'no browser menu on sliders');
   for (const f of ['waves/index.html', 'chains/index.html']) {
     const w = H.read(f);
-    assert.match(w, /ONE SLIDER \(mouse audit, 3 Nov[\s\S]{0,900}if \(e\.altKey \|\| \(MAC \? e\.metaKey : e\.ctrlKey\)\)\{ reset\(\); return; \}[\s\S]{0,800}ev\.shiftKey \? 0\.1/, f + ': the host slider rule');
+    assert.match(w, /ONE SLIDER \(mouse audit, 3 Nov[\s\S]{0,5000}if \(e\.altKey\)\{ reset\(\); return; \}[\s\S]{0,2500}ev\.shiftKey \? 0\.1/, f + ': the host slider rule');
     assert.match(w, /if \(ev\.pointerType === 'mouse' && ev\.buttons === 0 && !drag\.drawing && !drag\.armed\)/, f + ': a cable let go outside ends');
     assert.match(w, /\['Remove cable', \(\) =>/, f + ': Remove cable');
   }
@@ -432,7 +432,7 @@ test('Mobile: SHIFT+▲ goes to Arrange from every screen', () => {
 test('the pad has latching MUTE and SOLO', () => {
   const src = H.read('index.html');
   assert.match(src, /data-b="mute" id="kMute"/); assert.match(src, /data-b="solo" id="kSolo"/);
-  assert.match(src, /if \(b === 'mute' \|\| b === 'solo'\)\{ clearTimeout\(rep\); b === 'mute' \? muteKey\(true\) : soloKey\(\); return; \}/);
+  assert.match(src, /if \(b === 'mute' \|\| b === 'solo'\)\{ clearTimeout\(rep\); [\s\S]{0,300}b === 'mute' \? muteKey\(true\) : soloKey\(\); return; \}/);
 });
 
 test('Phrase ◀ ▶ step one column at a time (no skipped INST / FX value / chord columns)', () => {
@@ -506,4 +506,20 @@ test('U16: under-contrast text in IDM, IDM pink & green, IDM pink paper and 909 
   assert.match(css, /\.stgph\{color:var\(--ts-rn\)\}/, 'the stage label');
   assert.match(css, /tr909"\] :is\(\.tagp b\.gp, \.tgrid span\.pvh\.gp\)\{color:var\(--mxon\)\}/, 'POLY labels on the 909');
   assert.ok(!/background/.test(css.replace(/\/\*[\s\S]*?\*\//g, '')), 'colour only: no background is changed');
+});
+
+// (11 Nov, build 564) The title bar: the name is hidden when it does not fit; folded, the bar starts at the screen edge.
+test('title bar: brandFit hides a clipped name on Mobile only, and the bar loses its left padding when the name is gone', () => {
+  const src = require('fs').readFileSync(require('path').join(__dirname, '..', 'index.html'), 'utf8');
+  const m = src.match(/function brandFit\(\)\{[\s\S]*?\n\}/); assert.ok(m, 'brandFit exists');
+  const mk = (mob, cw, sw) => { const cls = new Set(); const b = { clientWidth: cw, scrollWidth: sw, classList: { add: c => cls.add(c), remove: c => cls.delete(c), contains: c => cls.has(c) } };
+    const document = { querySelector: () => b, body: { classList: { contains: c => c === 'mob' && mob } } };
+    new Function('document', m[0] + '; brandFit();')(document); return cls.has('bhide'); };
+  assert.strictEqual(mk(true, 69, 78), true, 'clipped on Mobile: hidden');
+  assert.strictEqual(mk(true, 78, 78), false, 'fits: shown');
+  assert.strictEqual(mk(false, 69, 78), false, 'desktop layout: left alone');
+  assert.strictEqual(mk(true, 0, 0), false, 'already display:none (folded): no class');
+  assert.match(src, /body\.mob \.top \.brand\.bhide\{display:none\}/);
+  assert.match(src, /body\.mob \.top:has\(\.brand\.bhide\)\{padding-left:0\}/);
+  assert.match(src, /@media \(max-width:480px\)\{ body\.mob \.top\{padding-left:0\}/);
 });

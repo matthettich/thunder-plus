@@ -1142,6 +1142,102 @@ const Plate = {
   }
 };
 
+/* Lite reverb: a very cheap room / plate-ish reverb, written to cost a small fraction of the others and to port to C++
+   unchanged (plain float math, power-of-two ring buffers, integer delays, no per-sample sin / exp / pow, no allocation
+   after create()).  Structure: mono sum → pre-delay → 2 Schroeder all-passes (diffusion) → a 4-line feedback delay
+   network (Householder mix y = x − ½Σx, which is orthogonal, so the loop only ever loses energy through the per-line
+   gain g < 1 and the per-line one-pole damping) → decorrelated stereo taps (L = r0+r1−r2−r3, R = r0−r1+r2−r3).
+   - Size scales the 4 prime-ish base lengths (made odd, so no two share a factor 2); Decay is the low-frequency RT60 (0.2 s … 12 s; damping shortens the highs, so the broadband T20-measured RT60 is about 0.75 of it),
+     g_i = exp(−6.9078·len_i / (sr·RT60)); Tone is the damping cutoff (1.2 kHz … 14 kHz); Pre is the pre-delay (≤ 100 ms).
+   - Per block (not per sample): targets are recomputed only when a knob or the sample rate changed (the exp / pow live
+     there), g / damping / mix glide to them (one-pole, 4 blocks), and a changed delay length is crossfaded across that
+     block from the old read position to the new one, so moving Size or Pre never clicks (and costs nothing otherwise).
+   - Denormals: ±1e-18 alternating (no DC) is injected into every line, so nothing decays into the denormal range; no
+     per-sample branch for it.  The input is guarded (±8, NaN → 0); the wet output is clamped to ±4; state that goes
+     non-finite or huge at the end of a block is cleared.
+   - Silence: when the input has been below −140 dB and the wet output below −90 dB for two passes of the longest line,
+     the buffers are cleared once and the module only copies the dry sound (plus a peak scan of the input) until sound
+     returns.  Any block length works (the ramp is over ctx.block). */
+const LV = { base:[1423, 1709, 2017, 2411], ap:[142, 107], apg:.6, tail:3.2e-5, wake:1e-7 };   // line lengths at 48 kHz, Size 1; the all-passes; −90 dB; −140 dB
+const lvPow2 = n => { let p = 256; while (p < n) p <<= 1; return p; };
+const Lverb = {
+  type:'lverb', scope:'mono', cost:.06,
+  inputs:{ in:'audio', inR:'audio' }, outputs:{ out:'audio', outR:'audio' },
+  params:{ size:[.5,0,1,.01], decay:[.5,0,1,.01], tone:[.6,0,1,.01], pre:[0,0,.1,.001], mix:[.3,0,1,.01] },
+  create(sr){
+    const k = Math.max(sr, 96000) / 48000, n = lvPow2(Math.ceil(2411 * k) + 8), pn = lvPow2(Math.ceil(.1 * Math.max(sr, 96000)) + 8), an = lvPow2(Math.ceil(142 * k) + 8);
+    return { sr:0, ps:-1, pd:-1, pt:-1, pp:-1, m:n - 1, pm:pn - 1, am:an - 1, w:0, pw:0, aw:0, B:[0, 1, 2, 3].map(() => new Float32Array(n)), P:new Float32Array(pn), A:[new Float32Array(an), new Float32Array(an)],
+      len:new Int32Array(4), lenT:new Int32Array(4), g:new Float64Array(4), gT:new Float64Array(4), lp:new Float64Array(4), kd:.5, kdT:.5, pre:0, preT:0, apk:new Int32Array(2),
+      dg:1, wg:0, q:0, qmax:0, asleep:false, init:false };
+  },
+  process(st, io, ctx){
+    const p = io.p, L = io.in.in, R = inR(io), oL = io.out.out, oR = io.out.outR, N = ctx.block, sr = ctx.sr, m = st.m, pm = st.pm, am = st.am;
+    const mxg = rvMix(p.mix, RVO), dgT = mxg[0], wgT = mxg[1];   // (by index: destructuring an array goes through its iterator)
+    // ── targets: only when a knob or the sample rate changed
+    if (p.size !== st.ps || p.decay !== st.pd || p.tone !== st.pt || p.pre !== st.pp || sr !== st.sr){
+      const k = sr / 48000, sc = (.15 + .85 * clamp(p.size, 0, 1)) * k, rt = .2 * Math.pow(60, clamp(p.decay, 0, 1)), lim = m - 2;
+      for (let i = 0; i < 4; i++){
+        const l = Math.min(lim, (Math.round(LV.base[i] * sc) | 1)); st.lenT[i] = l;
+        st.gT[i] = Math.min(.9995, Math.exp(-6.9078 * l / (sr * rt)));   // −60 dB after RT60 seconds
+      }
+      st.kdT = 1 - Math.exp(-6.2832 * 1200 * Math.pow(11.7, clamp(p.tone, 0, 1)) / sr);
+      st.preT = Math.min(pm - 2, Math.round(clamp(p.pre, 0, .1) * sr));
+      if (sr !== st.sr){ st.apk[0] = Math.round(LV.ap[0] * k); st.apk[1] = Math.round(LV.ap[1] * k); }
+      st.qmax = 2 * st.lenT[3] + st.preT;
+      st.ps = p.size; st.pd = p.decay; st.pt = p.tone; st.pp = p.pre; st.sr = sr;
+      if (!st.init){ st.init = true; st.len.set(st.lenT); st.g.set(st.gT); st.kd = st.kdT; st.pre = st.preT; st.dg = dgT; st.wg = wgT; }
+    }
+    // ── glide the few coefficients, per block
+    st.dg += (dgT - st.dg) * .35; st.wg += (wgT - st.wg) * .35;
+    const B = st.B, B0 = B[0], B1 = B[1], B2 = B[2], B3 = B[3], PB = st.P, A0 = st.A[0], A1 = st.A[1], lp = st.lp, g = st.g, len = st.len, lenT = st.lenT;
+    const dg = st.dg, wg = st.wg;
+    if (st.asleep){   // nothing in the tank: copy the dry sound, wake when sound returns
+      let pk = 0; for (let i = 0; i < N; i++){ let a = L[i], b = R[i]; a = a > -8 && a < 8 ? a : 0; b = b > -8 && b < 8 ? b : 0; oL[i] = a * dg; oR[i] = b * dg; const x = (a < 0 ? -a : a) + (b < 0 ? -b : b); if (x > pk) pk = x; }
+      if (pk >= LV.wake){ st.asleep = false; len.set(lenT); st.pre = st.preT; }   // sound: wake, and run this block again below with the tank (cleared) and the sound; a Size or Pre changed while asleep applies at once (review: nothing to crossfade from, and the old Pre let the first block through early)
+      else return;
+    }
+    for (let i = 0; i < 4; i++) g[i] += (st.gT[i] - g[i]) * .35;
+    st.kd += (st.kdT - st.kd) * .35;
+    const g0 = g[0], g1 = g[1], g2 = g[2], g3 = g[3], kd = st.kd, k0 = st.apk[0], k1 = st.apk[1], ag = LV.apg;
+    // a changed length is read at its old and new position across this block (fd), the pre-delay likewise
+    const o0 = len[0], o1 = len[1], o2 = len[2], o3 = len[3], n0 = lenT[0], n1 = lenT[1], n2 = lenT[2], n3 = lenT[3], po = st.pre, pn = st.preT;
+    const fd = o0 !== n0 || o1 !== n1 || o2 !== n2 || o3 !== n3 || po !== pn, iN = 1 / N;
+    let w = st.w, pw = st.pw, aw = st.aw, lp0 = lp[0], lp1 = lp[1], lp2 = lp[2], lp3 = lp[3], dn = 1e-18, ipk = 0, opk = 0;
+    for (let i = 0; i < N; i++){
+      let dl = L[i], dr = R[i]; dl = dl > -8 && dl < 8 ? dl : 0; dr = dr > -8 && dr < 8 ? dr : 0;   // guarded: NaN / Infinity / huge → 0 (±8 kept)
+      const a = (dl + dr) * .5, aa = a < 0 ? -a : a; if (aa > ipk) ipk = aa;
+      PB[pw & pm] = a;
+      let x = PB[(pw - pn) & pm], r0 = B0[(w - n0) & m], r1 = B1[(w - n1) & m], r2 = B2[(w - n2) & m], r3 = B3[(w - n3) & m];
+      if (fd){   // fade from the old read positions to the new ones
+        const u = (i + 1) * iN, v = 1 - u;
+        x = x * u + PB[(pw - po) & pm] * v; r0 = r0 * u + B0[(w - o0) & m] * v; r1 = r1 * u + B1[(w - o1) & m] * v;
+        r2 = r2 * u + B2[(w - o2) & m] * v; r3 = r3 * u + B3[(w - o3) & m] * v;
+      }
+      pw++;
+      // input diffusion: two Schroeder all-passes (y = −g·x + d; d ← x + g·y)
+      let y = -ag * x + A0[(aw - k0) & am]; A0[aw & am] = x + ag * y; x = y;
+      y = -ag * x + A1[(aw - k1) & am]; A1[aw & am] = x + ag * y; x = y;
+      aw++;
+      // Householder mix, line gain, one-pole damping, back into the line with the input and the denormal guard
+      const s = (r0 + r1 + r2 + r3) * .5, inj = x * .5 + dn; dn = -dn;
+      lp0 += ((r0 - s) * g0 - lp0) * kd; lp1 += ((r1 - s) * g1 - lp1) * kd; lp2 += ((r2 - s) * g2 - lp2) * kd; lp3 += ((r3 - s) * g3 - lp3) * kd;
+      B0[w & m] = lp0 + inj; B1[w & m] = lp1 + inj; B2[w & m] = lp2 + inj; B3[w & m] = lp3 + inj; w++;
+      // decorrelated stereo taps (orthogonal combinations of the four lines), clamped
+      let yl = (r0 + r1 - r2 - r3) * .75, yr = (r0 - r1 + r2 - r3) * .75;
+      yl = yl > 4 ? 4 : yl < -4 ? -4 : yl; yr = yr > 4 ? 4 : yr < -4 ? -4 : yr;
+      const al = yl < 0 ? -yl : yl, ar = yr < 0 ? -yr : yr; if (al > opk) opk = al; if (ar > opk) opk = ar;
+      oL[i] = dl * dg + yl * wg; oR[i] = dr * dg + yr * wg;   // REVERB MIX
+    }
+    st.w = w & m; st.pw = pw & pm; st.aw = aw & am; lp[0] = lp0; lp[1] = lp1; lp[2] = lp2; lp[3] = lp3;
+    len.set(lenT); st.pre = pn;
+    if (!(lp0 > -1e3 && lp0 < 1e3 && lp1 > -1e3 && lp1 < 1e3 && lp2 > -1e3 && lp2 < 1e3 && lp3 > -1e3 && lp3 < 1e3)){   // went bad: start clean
+      lp.fill(0); B0.fill(0); B1.fill(0); B2.fill(0); B3.fill(0); PB.fill(0); A0.fill(0); A1.fill(0); st.q = 0; return;
+    }
+    st.q = ipk < LV.wake && opk < LV.tail ? st.q + N : 0;
+    if (st.q >= st.qmax){ lp.fill(0); B0.fill(0); B1.fill(0); B2.fill(0); B3.fill(0); PB.fill(0); A0.fill(0); A1.fill(0); st.q = 0; st.asleep = true; }
+  }
+};
+
 /* Ensemble: a lush chorus. Ensemble runs three voices around the stereo field with a little fast shimmer;
    Classic I, II and I+II are the two-speed bucket-brigade chorus of 80s polysynths. Rate and Depth scale it. */
 const ENS = [[.6, .5, 3], [.513, .35, 2], [.863, .35, 2], [9.75, .12, 2]];
@@ -4755,7 +4851,7 @@ const SHARED_MODULES = { beads:Beads,
   flanger:FlangerFx, tremolo:TremoloFx, odrive:OdriveFx, folder:FolderFx, autowah:AutowahFx, pshift:PshiftFx, ladder:LadderFx, xmod:XmodFx, space:SpaceFx, lofi:LofiFx, drive:DriveFx, air:AirFx, room:RoomFx,
   comb:CombFx, transient:TransientFx, tgate:TgateFx, ott:OttFx, fshift:FshiftFx, vinyl:VinylFx, dub:DubFx, cab:CabFx, tube:TubeFx,
   envfol:EnvFol, gateex:GateEx, pitchfol:PitchFol, pitchtrk:PitchTrk, slew:Slew, snh:SampleHold, quant:Quant, blades:Blades, meta:Meta, phaser:Phaser, width:Width, pingpong:PingPong,
-  meter:Meter, limiter:Limiter, utility:Utility, ringmod:RingMod, spring:Spring, plate:Plate, ensemble:Ensemble, math:MathM, logic:Logic, divider:Divider, euclid:Euclid,
+  meter:Meter, limiter:Limiter, utility:Utility, ringmod:RingMod, spring:Spring, plate:Plate, lverb:Lverb, ensemble:Ensemble, math:MathM, logic:Logic, divider:Divider, euclid:Euclid,
   dimension:Dimension, bbd:BBD, harm:Harmonizer, blipdrum:BlipDrum, life:Life, degrade:Degrade, reson:Reson,
   flex:FlexM, sgate:StepGateM, retrig:RetrigM, pdelay:PDelayM, preverb:PReverbM,
   spectral:Spectral, stretch:XStretch, convolve:Convolve,
@@ -4840,14 +4936,30 @@ class VoicePool {
 /* A cable into "p:name" modulates that parameter instead of feeding an input. */
 const NO_CABLES = [];   // a module with no cable in: nothing to make per block
 const isParamPort = p => typeof p === 'string' && p.startsWith('p:');
+/* FEEDBACK: a cable marked fb closes a loop. It is left out of the run order, so the module it feeds runs before the
+   module it comes from and hears that module's previous block (one block late: 128 samples). What arrives through it is
+   guarded: a sample inside -1..1 passes untouched; a louder one is bent smoothly towards a ceiling of 2 (so a loop with
+   gain above 1 settles there, it cannot grow without end); a value that is not a number becomes silence. */
+function fbAdd(dst, b, g){
+  for (let i = 0; i < BLOCK; i++){
+    let x = b[i] * g;
+    if (!(x > -1 && x < 1)){
+      if (x !== x || x === Infinity || x === -Infinity) x = 0;
+      else if (x < 0) x = -1 - Math.tanh(-x - 1); else x = 1 + Math.tanh(x - 1);
+    }
+    dst[i] += x;
+  }
+}
 class Graph {
   constructor(){ this.mods = new Map(); this.cables = []; this.order = []; this.inc = new Map(); this.ver = 0; }
   add(id, def, inst){ this.mods.set(id, { id, def, inst, poly:false }); this.compile(); }
   remove(id){ this.mods.delete(id); this.cables = this.cables.filter(c => c.a[0] !== id && c.b[0] !== id); this.compile(); }
-  connect(a, b){
+  connect(a, b, fb){
     if (!this.mods.has(a[0]) || !this.mods.has(b[0])) return;
-    if (this.cables.some(c => c.a[0] === a[0] && c.a[1] === a[1] && c.b[0] === b[0] && c.b[1] === b[1])) return;
-    this.cables.push({ a, b }); this.compile();
+    fb = fb === true;
+    const old = this.cables.find(c => c.a[0] === a[0] && c.a[1] === a[1] && c.b[0] === b[0] && c.b[1] === b[1]);
+    if (old){ if (!!old.fb !== fb){ old.fb = fb; this.compile(); } return; }   // the same cable again: only its feedback mark can change
+    this.cables.push(fb ? { a, b, fb:true } : { a, b }); this.compile();
   }
   disconnect(a, b){ this.cables = this.cables.filter(c => !(c.a[0] === a[0] && c.a[1] === a[1] && c.b[0] === b[0] && c.b[1] === b[1])); this.compile(); }
   compile(){
@@ -4855,7 +4967,9 @@ class Graph {
     this.inc = new Map([...this.mods.keys()].map(k => [k, []]));
     for (const c of this.cables){
       if (!adj.has(c.a[0]) || !adj.has(c.b[0])) continue;
-      adj.get(c.a[0]).push(c.b[0]); indeg.set(c.b[0], indeg.get(c.b[0]) + 1); this.inc.get(c.b[0]).push(c);
+      this.inc.get(c.b[0]).push(c);
+      if (c.fb) continue;   // FEEDBACK: heard (it is in inc), but it does not decide who runs first
+      adj.get(c.a[0]).push(c.b[0]); indeg.set(c.b[0], indeg.get(c.b[0]) + 1);
     }
     const q = [...indeg].filter(([, d]) => d === 0).map(([k]) => k), order = [];
     while (q.length){ const k = q.shift(); order.push(k); for (const n of adj.get(k)){ indeg.set(n, indeg.get(n) - 1); if (indeg.get(n) === 0) q.push(n); } }
@@ -4864,7 +4978,7 @@ class Graph {
     // A module runs once per voice when something polyphonic (Host In, or a module fed by it) feeds it.
     for (const id of order){
       const m = this.mods.get(id), s = m.def.scope;
-      m.poly = s === 'root' ? true : s === 'mono' ? false : this.inc.get(id).some(c => { const src = this.mods.get(c.a[0]); return src && src.poly; });
+      m.poly = s === 'root' ? true : s === 'mono' ? false : this.inc.get(id).some(c => { const src = this.mods.get(c.a[0]); return !c.fb && src && src.poly; });   // (FEEDBACK: a feedback cable does not make its target per-voice)
     }
     // A poly module's "exit" outputs: audio that leaves the voice for a mono module (the bus, a mono effect). Those are
     // what the engine listens to when deciding that a released voice has gone silent (its own oscillator never does).
@@ -4905,7 +5019,7 @@ class WavesEngine {
     this._sync();
   }
   removeModule(id){ this._drop(id); this.graph.remove(id); this._sync(); }
-  connect(a, b){ this.graph.connect(a, b); this._sync(); }
+  connect(a, b, fb){ this.graph.connect(a, b, fb); this._sync(); }
   disconnect(a, b){ this.graph.disconnect(a, b); this._sync(); }
   setParam(id, name, v){ const m = this.graph.mods.get(id); if (m && typeof v === 'number'){ m.inst.params[name] = v; if (name === 'slot') this._cullDirty = true; } }
   setParams(list){ for (const [id, name, v] of list) this.setParam(id, name, v); }
@@ -4927,7 +5041,7 @@ class WavesEngine {
   loadPatch(doc){
     this._reset(); this.graph = new Graph(); this._cullDirty = true;
     for (const m of doc.modules || []) this.addModule(m.id, m.type, m);
-    for (const c of doc.cables || []) this.connect(c.from, c.to);
+    for (const c of doc.cables || []) this.connect(c.from, c.to, c.fb === true);
     for (const c of stereoUpCables(doc)) this.connect(c.from, c.to);   // STEREO: an older patch's right sides (the editor saves them)
     if (doc.transport) this.setTransport(doc.transport);
     return { modules:(doc.modules || []).length, cables:(doc.cables || []).length };
@@ -5001,7 +5115,17 @@ class WavesEngine {
         mods = mods || io.mo; dst = mods[k] || (mods[k] = io.mb[k] || (io.mb[k] = new Float32Array(BLOCK)));
       } else { dst = io.in[port]; if (!dst) continue; io.linked.add(port); }
       const kind = src.def.outputs[c.a[1]];
-      if (v >= 0 && src.poly){ const b = this._bufs(src, v).out[c.a[1]]; if (b) for (let i = 0; i < BLOCK; i++) dst[i] += b[i]; }
+      if (c.fb){   // FEEDBACK: the same four cases as below, each through the guard
+        if (v >= 0 && src.poly){ const b = this._bufs(src, v).out[c.a[1]]; if (b) fbAdd(dst, b, 1); }
+        else if (v >= 0){ const b = this._bufs(src, -1).out[c.a[1]]; if (b) fbAdd(dst, b, kind === 'audio' ? 1 / N : 1); }
+        else if (src.poly){   // the voices are summed first, so the ceiling holds for the cable as a whole, not per voice
+          const s = this._fbS || (this._fbS = new Float32Array(BLOCK)); s.fill(0);
+          for (let vv = 0; vv < N; vv++){ const b = this._bufs(src, vv).out[c.a[1]]; if (b) for (let i = 0; i < BLOCK; i++) s[i] += b[i]; }
+          fbAdd(dst, s, 1);
+        }
+        else { const b = this._bufs(src, -1).out[c.a[1]]; if (b) fbAdd(dst, b, 1); }
+      }
+      else if (v >= 0 && src.poly){ const b = this._bufs(src, v).out[c.a[1]]; if (b) for (let i = 0; i < BLOCK; i++) dst[i] += b[i]; }
       else if (v >= 0){ // mono into a voice: control is shared, audio is split between the voices so the sum stays the same
         const b = this._bufs(src, -1).out[c.a[1]]; const g = kind === 'audio' ? 1 / N : 1;
         if (b) for (let i = 0; i < BLOCK; i++) dst[i] += b[i] * g;
@@ -5147,7 +5271,7 @@ class WavesEngine {
       case 'patch': return this.loadPatch(m.value);
       case 'add': return this.addModule(m.id, m.type, m);
       case 'remove': return this.removeModule(m.id);
-      case 'connect': return this.connect(m.a, m.b);
+      case 'connect': return this.connect(m.a, m.b, m.fb === true);
       case 'disconnect': return this.disconnect(m.a, m.b);
       case 'param': return this.setParam(m.id, m.name, m.value);
       case 'params': return this.setParams(m.list);
@@ -5318,6 +5442,6 @@ class WavesLiveProc extends AudioWorkletProcessor {
 }
 try { registerProcessor('thunder-wlive', WavesLiveProc); } catch (_) {}
 } else if (typeof globalThis !== 'undefined'){
-  globalThis.WavesDSP = { WavesEngine, wasmInit, modsPrepare, MODULES, WASM, BUS_COUNT };
+  globalThis.WavesDSP = { WavesEngine, wasmInit, modsPrepare, MODULES, WASM, BUS_COUNT, fbAdd };
 }
 })();

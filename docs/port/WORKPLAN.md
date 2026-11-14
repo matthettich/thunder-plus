@@ -182,6 +182,8 @@ U22–U25 (engine foundation and layer types), U26–U27 (bass, vox, acid, machi
 (rendered-only engines), U30 …waves engine, U31 …chains engine, U32 SoundFont player (decoder licence check first),
 U33 pump synths and LXR glue, the rest of U34 (pad renders in the core), U36 Link / recording / inputs.
 Sonnet builds each; **F-review** on U26, U30, U31, U36 (live paths and graph runners). Order inside by the census.
+**Feedback cables (web build 589):** a cable with `fb:true` is left out of the graph sort and read one block late through the guard `fbAdd` (untouched in −1..1, `1 + tanh(|x| − 1)` above, non-finite → 0); the C++ graph runners must do exactly the same (`tests/feedback.test.js` is the reference).
+
 **N3 exit:** U01's goldens pass for every factory voice from the C++ core; no JS DSP is loaded when the switch is on;
 `caps.engines` and `caps.fx` list everything; then, and only with the owner's word, the switch becomes the default on
 the web copy and the JS engine is deleted in a separate PR.

@@ -282,7 +282,11 @@ function tcOvRun(src, n) {
 }
 test('__tcOv: the override result is the same numbers every block as build 562, and its result object / one-number arrays are kept', { skip: skip2 || !OLD.core && 'no base' }, () => {
   const o = tcOvRun(OLD.core, 128), n = tcOvRun(H.read('core/seq-core.js'), 128);
-  assert.deepEqual(n.seen, o.seen);
+  // (11 Nov, build 566: constBlk) a parameter that is still for the block now comes as ONE number where build 562 gave 128 equal ones
+  // (the AudioParam rule: one value stands for the block). Compared as the 128 values either way; the numbers must be the same bits.
+  const wide = a => Array.isArray(a) && a.length === 1 ? Array(128).fill(a[0]) : a;
+  assert.deepEqual(n.seen.map(wide), o.seen.map(wide));
+  assert.ok(n.seen.filter(a => Array.isArray(a) && a.length === 1).length > o.seen.filter(a => Array.isArray(a) && a.length === 1).length, 'more blocks take the one-number path than before');
   assert.ok(o.Qs.size > 100 && n.Qs.size === 1, 'one result object (was ' + o.Qs.size + ' of them): ' + n.Qs.size);
   assert.ok(n.ones.size <= 3, 'the constant is the same array while it is constant');
   const n2 = tcOvRun(H.read('core/seq-core.js'), 256); assert.equal(n2.seen[0].length, 256);

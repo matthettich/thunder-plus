@@ -8,7 +8,9 @@ const src = H.read('index.html');
 const m = src.match(/var bgOn = [\s\S]*?\/\* ===== END BACKGROUND PLAY/); assert.ok(m, 'could not find the BACKGROUND PLAY block; this test needs updating');
 assert.match(m[0], /const MS_ACTIVE = true,/, 'MS_ACTIVE kill switch present and on');
 
+let proj = { label: '' };
 function rig({ active = true } = {}) {
+  proj = { label: '' };
   const log = [], blobs = [], els = [], ms = { handlers: {}, metadata: null, playbackState: 'none', setActionHandler(k, f) { this.handlers[k] = f; } };
   class FakeAudio {
     constructor() { this.paused = true; this.muted = false; this.volume = 1; this.duration = 8; this.L = {}; els.push(this); }
@@ -18,9 +20,9 @@ function rig({ active = true } = {}) {
   }
   const tp = { on: true };
   const code = active ? m[0] : m[0].replace('const MS_ACTIVE = true', 'const MS_ACTIVE = false');
-  const ctx = vm.createContext({ Math, Promise, console, performance: { now: () => 5000 }, Audio: FakeAudio, URL: { createObjectURL: b => (blobs.push(b), 'blob:x') },
+  const ctx = vm.createContext({ Math, Promise, console, performance: { now: () => 5000 }, Audio: FakeAudio, URL: Object.assign(function (p, base) { this.href = new globalThis.URL(p, base).href; }, { createObjectURL: b => (blobs.push(b), 'blob:x') }),
     Blob: function (parts) { this.parts = parts; }, ArrayBuffer, DataView, localStorage: { getItem: () => '1', setItem() {} },
-    navigator: { userAgent: 'Android', mediaSession: ms }, MediaMetadata: function (o) { Object.assign(this, o); }, S: { name: 'My Song' }, tp,
+    navigator: { userAgent: 'Android', mediaSession: ms }, MediaMetadata: function (o) { Object.assign(this, o); }, S: { name: 'My Song' }, tp, location: { href: 'https://x.example/beta/index.html' }, projLabel: () => proj.label,
     tStop: () => { tp.on = false; ctx.bgPlay(false); }, playCtx() {}, pbLog: s => log.push(s), pbState: () => 'state', setTimeout: () => 0,
     document: { hidden: false, addEventListener() {} } });
   vm.runInContext(code.replace(/\/\* ===== END BACKGROUND PLAY$/, ''), ctx);
@@ -58,4 +60,15 @@ test('kill switch false: old +-1 bit clip and no "media session:" lines', async 
   const R = rig({ active: false }); R.ctx.bgPlay(true); await R.flush();
   const v = new DataView(R.blobs[0].parts[0]); let peak = 0; for (let i = 0; i < 64000; i++) peak = Math.max(peak, Math.abs(v.getInt16(44 + i * 2, true)));
   assert.equal(peak, 1); assert.equal(msLines(R).length, 0); assert.equal(R.ms.playbackState, 'playing');
+});
+
+test('notification title (12 Nov): the project file name, else the song name; set again on a rename / save as / open while playing, not on every call; artwork is absolute, 192 + 512 PNG', async () => {
+  const R = rig(); R.ctx.bgPlay(true); await R.flush();
+  assert.equal(R.ms.metadata.title, 'My Song', 'no file: the song name'); assert.equal(R.ms.metadata.artist, 'Thunder Plus');
+  assert.equal(JSON.stringify(R.ms.metadata.artwork.map(a => [a.sizes, a.type, /^https:\/\/x\.example\/beta\/icons\/plus-icon-(192|512)\.png/.test(a.src)])), JSON.stringify([['192x192', 'image/png', true], ['512x512', 'image/png', true]]));
+  proj.label = 'Night Drive.thunder'; R.log.length = 0; R.ctx.msMeta(); assert.equal(R.ms.metadata.title, 'Night Drive', 'opened / saved as a file: its name, without .thunder');
+  assert.match(msLines(R).join('\n'), /title now "Night Drive"/);
+  const o = R.ms.metadata; R.log.length = 0; R.ctx.msMeta(); assert.equal(R.ms.metadata, o, 'unchanged: no new metadata'); assert.equal(msLines(R).length, 0);
+  proj.label = ''; R.ctx.S.name = 'Renamed'; R.ctx.msMeta(); assert.equal(R.ms.metadata.title, 'Renamed', 'a new song / rename: the song name');
+  R.tp.on = false; R.ctx.S.name = 'Later'; R.ctx.msMeta(); assert.equal(R.ms.metadata.title, 'Renamed', 'not playing: nothing is touched');
 });
