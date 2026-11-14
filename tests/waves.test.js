@@ -72,7 +72,7 @@ const energy = a => { let e = 0; for (const v of a) e += v * v; return e; };
 // Rendering it here would also move every later module's hash: the hashes depend on how many renders came before them in this one wasm instance (found 12 Nov).
 const SKIP = new Set(['hostIn', 'out', 'lverb']);
 /* Modules that are silent in this harness, and why. A silent hash proves "unchanged", not "working", so the list is explicit. */
-const NEEDS_OWN_INPUT = new Set(['beads', 'mixer', 'compare', 'rect', 'clkmul', 'chance', 'burst', 'gatedly', 'flipflop']);   // beads: a texture source that needs its own trigger/input; mixer: needs in1..in16, not `in`; compare, rect: control maths that need a control signal patched in (their gates and halves are 0 on the harness's input); clkmul, chance, burst, gatedly, flipflop: gate tools that need a pulse patched in (the default input holds no gate)
+const NEEDS_OWN_INPUT = new Set(['beads', 'mixer', 'compare', 'rect', 'clkmul', 'chance', 'burst', 'gatedly', 'flipflop', 'dline']);   // dline: the stressed Time (1.4 s) is longer than the 1.07 s render, so it is silent (tests/modules-delay.test.js tests its sound); beads: a texture source that needs its own trigger/input; mixer: needs in1..in16, not `in`; compare, rect: control maths that need a control signal patched in (their gates and halves are 0 on the harness's input); clkmul, chance, burst, gatedly, flipflop: gate tools that need a pulse patched in (the default input holds no gate)
 
 test('waves: the engine loads and exposes its public surface', () => {
   const { D } = engine({ wasm: false });
@@ -88,7 +88,7 @@ test('waves: every module renders finite audio and matches its golden hash (defa
   const { D } = engine(), actual = {}, bad = [];
   // The hashes depend on how many renders came before them in this one wasm instance (see SKIP below), so a module added later is
   // rendered after all the existing ones (LATE, in this order): that way no existing hash moves. Add new modules to LATE, not into the sorted run.
-  const LATE = ['compare', 'const', 'rect', 'scale', 'switch', 'xfade', 'clkmul', 'chance', 'counter', 'stepsw', 'burst', 'gatedly', 'flipflop', 'steps', 'clock', 'scope', 'onepole', 'allpass', 'dcblock', 'midside'];
+  const LATE = ['compare', 'const', 'rect', 'scale', 'switch', 'xfade', 'clkmul', 'chance', 'counter', 'stepsw', 'burst', 'gatedly', 'flipflop', 'steps', 'clock', 'scope', 'onepole', 'allpass', 'dcblock', 'midside', 'dline'];
   for (const type of Object.keys(D.MODULES).filter(t => !LATE.includes(t)).sort().concat(LATE)) {
     const m = D.MODULES[type]; if (!m || !m.process || SKIP.has(type)) continue;
     const d = renderModule(D, type), s = renderModule(D, type, stress(m)), w = renderModule(D, type, switchesOn(m));

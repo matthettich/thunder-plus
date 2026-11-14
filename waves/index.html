@@ -892,6 +892,8 @@ Object.assign(SHARED_MODULES, {
       detune:{l:'Detune', f:v => '±' + v.toFixed(1) + ' ct'}, delay:{l:'Delay', f:secs}, win:{l:'Window', f:pct}, dry:{l:'Dry', f:pct} },
     about:'Harmonizer: up to two pitch-shifted copies of the sound at fixed intervals (a third, fifth, octave…), each with its own level and pan. Voice 2 starts silent: turn up Level 2 for a three-part stack (a major triad with the defaults). Detune spreads the two voices apart (set both to Unison with a little Detune and Delay for a wide double). Window: longer is smoother, shorter is tighter on drums. Dry sets the original.' }, STEREO)
 });
+// Delay line's Time: ms below 100, whole ms above, seconds from 1000; under 20 ms it adds the pitch it rings at (1000 / ms). A formatter sees only its own value, so Feedback is not consulted.
+const dlTime = v => v >= 1000 ? (v / 1000).toFixed(2) + ' s' : v >= 100 ? Math.round(v) + ' ms' : v < 20 && v >= .1 ? v.toFixed(1) + ' ms (' + khz(1000 / v) + ')' : v.toFixed(1) + ' ms';
 // Audio building blocks (14 Nov, module queue): params identical to the worklet's; tests/modules-blocks-editor.test.js compares. One channel each.
 // `plabels` names a module's own jacks (portName reads it), for Mid / side, whose jacks mean different things in Encode and Decode.
 Object.assign(SHARED_MODULES, {
@@ -908,9 +910,14 @@ Object.assign(SHARED_MODULES, {
   midside:{ label:'Mid / side', scope:'mono', inputs:{ in:'audio', inR:'audio' }, outputs:{ out:'audio', outR:'audio' },
     plabels:{ in:'L / Mid', inR:'R / Side', out:'Mid / L', outR:'Side / R' },
     params:{ mode:[0,0,1,1] }, ui:{ mode:{l:'Mode', c:opts(['Encode', 'Decode'])} },
-    about:'Mid / side: Encode turns left and right into Mid (what both sides share, the centre) and Side (what is different, the width). Decode turns Mid and Side back into left and right, exactly. Encode, treat the two differently, then Decode: Side turned up widens the sound, an EQ on Mid alone shapes the centre. In Encode the jacks are L and R in, Mid and Side out; in Decode they are Mid and Side in, L and R out. With only L patched in Encode, the sound is treated as mono (no Side).' }
+    about:'Mid / side: Encode turns left and right into Mid (what both sides share, the centre) and Side (what is different, the width). Decode turns Mid and Side back into left and right, exactly. Encode, treat the two differently, then Decode: Side turned up widens the sound, an EQ on Mid alone shapes the centre. In Encode the jacks are L and R in, Mid and Side out; in Decode they are Mid and Side in, L and R out. With only L patched in Encode, the sound is treated as mono (no Side).' },
+  dline:{ label:'Delay line', scope:'mono', inputs:{ in:'audio', tmod:'cv' }, outputs:{ out:'audio' },
+    params:{ time:[10,0,2000,.1], fine:[0,-1,1,.001], fb:[0,-.99,.99,.01], damp:[0,0,1,.01], depth:[0,0,50,.1] },
+    plabels:{ tmod:'Time' },
+    ui:{ time:{l:'Time', f:dlTime}, fine:{l:'Fine', f:v => (v > 0 ? '+' : '') + v.toFixed(3) + ' ms'}, fb:{l:'Feedback', f:spct}, damp:{l:'Damp', f:pct}, depth:{l:'Mod depth', f:v => v.toFixed(1) + ' ms'} },
+    about:'Delay line: a bare delay, from one sample to two seconds. Out is only the delayed sound, with none of the dry, so mix it with the dry yourself (a Crossfade, or a Mixer). Short times with Feedback ring at a pitch: 1000 ÷ Time in ms is the pitch in Hz, so 2 ms rings at 500 Hz, and Fine tunes it to the note you want. That is a comb filter, and with a burst of Noise in, Feedback high and a little Damp it is a plucked string. Longer times are echoes: Feedback is how many repeats, negative turns each repeat over, Damp dulls each one. An LFO into the Time jack with a little Mod depth (Mod depth is how many ms the jack moves the delay at full swing) is a chorus or a flanger. Feedback stops at 99% and the sound inside the loop is limited, so it can get loud but cannot run away. A feedback cable is not the same thing: a cable loop is one block (about 3 ms) late, so it can only echo; the loop inside this module is exact to the sample, so it can be tuned. One channel: patch two for stereo.' }
 });
-Object.assign(SHARED_FAMILY, { onepole:'afx', allpass:'afx', dcblock:'afx', midside:'afx' });
+Object.assign(SHARED_FAMILY, { onepole:'afx', allpass:'afx', dcblock:'afx', midside:'afx', dline:'afx' });
 Object.assign(SHARED_FAMILY, { meter:'util', scope:'util', limiter:'util', utility:'util', ringmod:'afx', spring:'afx', plate:'afx', lverb:'afx', ensemble:'afx',
   reson:'afx', degrade:'afx', blipdrum:'gen', life:'mod', dimension:'afx', bbd:'afx', harm:'afx', phaser:'afx', width:'afx', pingpong:'afx', blades:'util', meta:'afx', math:'mod', logic:'mod', divider:'mod', euclid:'mod',
   rect:'mod', scale:'mod', compare:'mod', const:'mod', switch:'util', xfade:'util',
@@ -934,7 +941,7 @@ const SHARED_PALETTE = [
   ['Rhythm and logic', [['euclid','Euclidean'],['divider','Clock divider'],['clkmul','Clock multiplier'],['chance','Chance gate'],['counter','Counter'],['stepsw','Step switch'],['burst','Burst'],['gatedly','Gate delay'],['flipflop','Flip-flop'],['logic','Logic']], 'control']
 ];
 Object.assign(SHARED_PORT_LABEL, { lp:'Low', hp:'High' });   // (One-pole filter's two outputs; Building blocks, 14 Nov)
-SHARED_PALETTE.push(['Building blocks', [['onepole','One-pole filter'],['allpass','Allpass'],['dcblock','DC blocker'],['midside','Mid / side']], 'audio']);
+SHARED_PALETTE.push(['Building blocks', [['onepole','One-pole filter'],['allpass','Allpass'],['dline','Delay line'],['dcblock','DC blocker'],['midside','Mid / side']], 'audio']);
 /* Blip drum and Life: their parameters match the worklet's exactly (same tables). */
 const BD_ROWS = ['p', 'k', 'f', 'm', 'n', 'd', 'a', 'x'];
 const BD_NAMES = ['Pitch', 'Kick', 'FM', 'Ring', 'Noise', 'Decay', 'Level', 'Filter'];
@@ -1356,7 +1363,7 @@ const PAL_LAYOUT = [
   ['Dynamics', '#e07a2e', ['compressor', 'buscomp', 'glue', 'comp', 'sccomp', 'limiter', 'ngate', 'ott', 'transient']],
   ['§Effects'],
   ['Filters and EQ', '#2e9e4f', ['filter', 'cut', 'eq', 'air', 'vcf', 'ladder', 'blades', 'autowah', 'envfilt', 'vowel']],
-  ['Building blocks', '#5f8f6f', ['onepole', 'allpass', 'dcblock', 'midside']],
+  ['Building blocks', '#5f8f6f', ['onepole', 'allpass', 'dline', 'dcblock', 'midside']],
   ['Drive and lo-fi', '#d23c3c', ['saturation', 'odrive', 'drive', 'tube', 'folder', 'cab', 'crush', 'lofi', 'degrade', 'tape', 'vinyl', 'dub']],
   ['Modulation effects', '#c04ab8', ['chorus', 'ensemble', 'dimension', 'flanger', 'phaser', 'tremolo', 'autopan', 'rotary', 'ringmod', 'xmod', 'fshift', 'meta']],
   ['Delays', '#3a8ee0', ['sdelay', 'delay', 'pingpong', 'bbd', 'gdelay', 'pdelay', 'reverse']],
@@ -1375,7 +1382,7 @@ const PAL_LAYOUT = [
 const PAL_COLOR = { More:'#888888' }, CAT_COLOR = {};
 // ONE NAME PER MODULE (13 Nov, audit U6): the list, the title bar and Help all read the module's own name. What the list used to add in
 // brackets after a name ("Resonator (chord)") is this tooltip text now.
-const PAL_HINT = { onepole:'6 dB/oct', allpass:'phaser, diffuser', dcblock:'remove offset', midside:'centre / sides', osc:'tone, LFO, FM', wnoise:'white, pink, brown', blipdrum:'8 voices', chaos:'Lorenz, Rössler…', degrade:'lo-fi', dimension:'stereo chorus', ensemble:'chorus', envfilt:'auto-wah', flex:'beat re-sequencer', life:'Game of Life', compare:'gate from a level', const:'fixed value', clkmul:'×2, ×3…', chance:'random thinning', counter:'staircase', stepsw:'rotate 4 sounds', burst:'ratchet', gatedly:'flam', flipflop:'toggle', rect:'abs, flip', scale:'map a range', switch:'A or B', xfade:'A to B',
+const PAL_HINT = { onepole:'6 dB/oct', allpass:'phaser, diffuser', dline:'comb, echo', dcblock:'remove offset', midside:'centre / sides', osc:'tone, LFO, FM', wnoise:'white, pink, brown', blipdrum:'8 voices', chaos:'Lorenz, Rössler…', degrade:'lo-fi', dimension:'stereo chorus', ensemble:'chorus', envfilt:'auto-wah', flex:'beat re-sequencer', life:'Game of Life', compare:'gate from a level', const:'fixed value', clkmul:'×2, ×3…', chance:'random thinning', counter:'staircase', stepsw:'rotate 4 sounds', burst:'ratchet', gatedly:'flam', flipflop:'toggle', rect:'abs, flip', scale:'map a range', switch:'A or B', xfade:'A to B',
   meter:'VU', scope:'see a signal', preverb:'shimmer', repeat:'beat repeat', resample:'record to a pad', reson:'chord', retrig:'stutter', spectral:'FFT', string:'pluck', utility:'gain, pan' };
 // Rebuild the merged palette (in place) in PAL_LAYOUT's order; group families too, for anything still keyed on them.
 function organizePalette(palette, groupFam){
@@ -1551,6 +1558,7 @@ const MODULE_USE = {
   allpass:'A phaser: four Allpass in a row (Phase), one LFO into every Freq jack, and the last one on B of a Crossfade with the dry sound on A. Or three in Echo (5, 8 and 13 ms) to smear a drum hit into a soft tail.',
   dcblock:'Right after Invert / rectify or a Wavefolder and before the Chain Out: any steady offset is gone, so the next effect keeps its headroom.',
   midside:'Encode, then Side (R / Side out) through a Utility with its gain raised and into a second Mid / side set to Decode, Mid straight across: a wider image that leaves the centre alone.',
+  dline:'A plucked string: a short burst of Noise (a Noise through a VCA with a very short ADSR) into In, Time 4.5 ms (about 220 Hz), Feedback 95%, Damp 20%, and take Out. Or an echo: Time 350 ms, Feedback 40%, Out into B of a Crossfade with the dry on A.',
   osc:'Two Oscillators: the second at 5 Hz into the first one’s FM jack with FM depth 5% is a vibrato; the second at 440 Hz with FM depth 30% is bell-like FM. Sync from a Clock restarts the tone on every beat.',
   wnoise:'White Noise into a Filter set to band-pass and a VCA with a short ADSR on its Control: a hi-hat. Pink through a slowly swept filter is wind or surf.',
   clkmul:'A Clock at 1/4 into Clock and Times ×3: three even pulses per beat, triplets against the beat, into a Blip drum.',
@@ -1935,7 +1943,7 @@ const SUMMARY_KEYS = {
   mixer:['level', 'l1'],    // the master level first (its label is "Master"), then the first channel's level
   smixer:['level', 'l1'],
   scale:['olo', 'ohi', 'clip'], xfade:['mix', 'curve'],   // Scale / map: where it lands, Crossfade: the mix first
-  onepole:['freq'], allpass:['mode', 'freq'], dcblock:['freq'], midside:['mode'], osc:['wave', 'freq'], wnoise:['color', 'level'],
+  onepole:['freq'], allpass:['mode', 'freq'], dline:['time', 'fb'], dcblock:['freq'], midside:['mode'], osc:['wave', 'freq'], wnoise:['color', 'level'],
   scope:['time', 'trig'], clkmul:['mul', 'width'], chance:['prob', 'seed'], counter:['mode', 'steps'], stepsw:['fade', 'steps'], burst:['count', 'time'], gatedly:['delay'],   // Scale / map: where it lands, Crossfade: the mix first
 };
 const SUMMARY_FIRST = ['Mix', 'Wet', 'Master', 'Level', 'Output', 'Gain', 'Makeup'];
@@ -1963,7 +1971,7 @@ const NARROW_S = 168, NARROW_M = 190;   // the two small sizes: S for a one-word
 const MODULE_WIDTH = {
   atten:NARROW_S, random:NARROW_S, quant:NARROW_S, logic:NARROW_S, math:NARROW_S,   // Attenuverter, Random, Quantizer, Logic, Math
   const:NARROW_S, rect:NARROW_M, scale:216, compare:216, switch:NARROW_S, xfade:NARROW_M,   // Constant, Invert / rectify, Scale / map, Comparator, Switch, Crossfade
-  onepole:NARROW_M, allpass:216, dcblock:216, midside:216,
+  onepole:NARROW_M, allpass:216, dline:232, dcblock:216, midside:216,
   scope:300, clkmul:216, chance:216, counter:NARROW_S, stepsw:NARROW_M, burst:216, gatedly:NARROW_M, flipflop:NARROW_S,   // Clock multiplier, Chance gate, Counter, Step switch, Burst, Gate delay, Flip-flop
   slew:NARROW_M, snh:NARROW_M, divider:NARROW_M, gateex:NARROW_M,   // Slew limiter, Sample & hold, Clock divider, Gate extract
 };
@@ -4480,7 +4488,7 @@ function helpDoc(){
     ['Basic operations', 'Add, subtract, multiply, smaller and larger are the outputs of Math (A+B, A−B, A×B, Min, Max). AND, OR, XOR and NOT are the outputs of Logic. Invert / rectify flips a control signal or folds it to positive. Scale / map stretches one range onto another (an LFO from −1..1 to 0..1, say). Comparator turns a control signal into a gate. Constant is a steady value. Switch chooses between two sounds on a gate, and Crossfade blends them. All of them are in the Control utilities group of the Modules list, and when a voice feeds one it runs once for each voice.'],
     ['Clocks and triggers', 'Clocks and rhythm in the Modules list has the pulse tools. Clock makes the pulses and Steps plays a row of values; both follow the song’s tempo, and Reset restarts them. Clock divider and Clock multiplier slow a clock down or speed it up (×3 for triplets). Counter counts pulses, and its Step output is a staircase. Chance gate lets pulses through by chance (the same Seed gives the same pattern every time), Burst turns one pulse into a quick roll, Gate delay moves a gate later for a flam, Flip-flop turns a pulse into on and off, and Step switch passes four sounds in turn.'],
     ['Seeing signals', 'Meter (in Mix and level in the Modules list) shows how loud a sound is and Scope draws a signal as it moves, with a sound or an LFO patched into A and a second signal such as an envelope into B so you can watch them together, Trigger on Rising to hold a steady wave still and Freeze to keep the picture, and both only work while this editor is open.'],
-    ['Building blocks', 'Building blocks in the Modules list are the small parts bigger effects are made of, each one channel (patch two for stereo). One-pole filter is the gentlest tone control, and it smooths a control signal. Allpass turns the phase (four in a row, mixed with the dry sound, make a phaser) or, in Echo, makes the short echoes a reverb is built from. DC blocker takes a steady offset out of a signal. Mid / side splits left and right into centre and width, so you can treat them differently, and puts them back.'],
+    ['Building blocks', 'Building blocks in the Modules list are the small parts bigger effects are made of, each one channel (patch two for stereo). One-pole filter is the gentlest tone control, and it smooths a control signal. Allpass turns the phase (four in a row, mixed with the dry sound, make a phaser) or, in Echo, makes the short echoes a reverb is built from. Delay line is a bare delay from one sample to two seconds with exact feedback of its own: short it rings at a pitch (a comb, a plucked string), long it echoes, and you mix it with the dry sound yourself. DC blocker takes a steady offset out of a signal. Mid / side splits left and right into centre and width, so you can treat them differently, and puts them back.'],
     ['Polyphony', 'Host In runs once for every voice, and so does anything it feeds; everything else (effects, LFOs, Out) runs once. Put effects after the voices, before Out.'],
     ['Moving around', 'Scroll with two fingers or turn the mouse wheel to pan (Shift+wheel sideways); with a mouse a middle-button drag pans too, and on a touch screen dragging the background does. Rest the pointer on a slider for a moment (it gets an outline) and the wheel changes that slider instead, Shift+wheel in fine steps. Pinch or Ctrl/⌘+wheel zooms; the zoom buttons are in the top bar (click the percentage to type one, Fit shows everything).'],
     ['Play and Edit', 'The Play and Edit switch in the top bar (Alt+E on a keyboard) decides what a touch or a click does. In Edit everything works. In Play the patch is locked for playing: sliders, selects, buttons and readouts work, but no module can be moved, selected, folded, removed or given a menu, no cable can be made or removed, and a drag on anything that is not a control moves the view. The patch is framed and tagged PLAY while it is on. The choice is remembered for this editor on this device, not saved in the patch.'],

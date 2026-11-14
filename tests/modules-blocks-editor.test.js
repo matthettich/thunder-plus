@@ -62,8 +62,8 @@ for (const ed of ['chains', 'waves']) {
   }
   test(ed + ': Building blocks follows Filters and EQ in the layout, in order, and the palette group is made', () => {
     const lay = /\['Filters and EQ', '#[0-9a-f]{6}', \[[^\]]*\]\],\n  \['Building blocks', '#[0-9a-f]{6}', \[([^\]]*)\]\]/.exec(src); assert.ok(lay, 'Building blocks right after Filters and EQ');
-    assert.deepEqual(lay[1].split(',').map(s => s.trim().replace(/'/g, '')), SHARED);
-    assert.match(src, /SHARED_PALETTE\.push\(\['Building blocks', \[\['onepole','One-pole filter'\],\['allpass','Allpass'\],\['dcblock','DC blocker'\],\['midside','Mid \/ side'\]\], 'audio'\]\)/);
+    assert.deepEqual(lay[1].split(',').map(s => s.trim().replace(/'/g, '')), ['onepole', 'allpass', 'dline', 'dcblock', 'midside']);   // Delay line joined after Allpass (tests/modules-delay-editor.test.js)
+    assert.match(src, /SHARED_PALETTE\.push\(\['Building blocks', \[\['onepole','One-pole filter'\],\['allpass','Allpass'\],\['dline','Delay line'\],\['dcblock','DC blocker'\],\['midside','Mid \/ side'\]\], 'audio'\]\)/);
   });
   test(ed + ': Mid / side names its own jacks; One-pole its two outputs; the Help paragraph names the four', () => {
     assert.match(entry(src, 'midside'), /plabels:\{ in:'L \/ Mid', inR:'R \/ Side', out:'Mid \/ L', outR:'Side \/ R' \}/);
