@@ -5044,14 +5044,30 @@ const MODULES = { ...SHARED_MODULES, ...PUMP_MODULES, trackIn:TrackIn,
 
 /* A cable into "p:name" modulates that parameter instead of feeding an input. */
 const isParamPort = p => typeof p === 'string' && p.startsWith('p:');
+/* FEEDBACK: a cable marked fb closes a loop. It is left out of the run order, so the module it feeds runs before the
+   module it comes from and hears that module's previous block (one block late: 128 samples). What arrives through it is
+   guarded: a sample inside -1..1 passes untouched; a louder one is bent smoothly towards a ceiling of 2 (so a loop with
+   gain above 1 settles there, it cannot grow without end); a value that is not a number becomes silence. */
+function fbAdd(dst, b, g){
+  for (let i = 0; i < BLOCK; i++){
+    let x = b[i] * g;
+    if (!(x > -1 && x < 1)){
+      if (x !== x || x === Infinity || x === -Infinity) x = 0;
+      else if (x < 0) x = -1 - Math.tanh(-x - 1); else x = 1 + Math.tanh(x - 1);
+    }
+    dst[i] += x;
+  }
+}
 class Graph {
   constructor(){ this.mods = new Map(); this.cables = []; this.order = []; this.inc = new Map(); this.ver = 0; }
   add(id, def, inst){ this.mods.set(id, { id, def, inst }); this.compile(); }
   remove(id){ this.mods.delete(id); this.cables = this.cables.filter(c => c.a[0] !== id && c.b[0] !== id); this.compile(); }
-  connect(a, b){
+  connect(a, b, fb){
     if (!this.mods.has(a[0]) || !this.mods.has(b[0])) return;
-    if (this.cables.some(c => c.a[0] === a[0] && c.a[1] === a[1] && c.b[0] === b[0] && c.b[1] === b[1])) return;
-    this.cables.push({ a, b }); this.compile();
+    fb = fb === true;
+    const old = this.cables.find(c => c.a[0] === a[0] && c.a[1] === a[1] && c.b[0] === b[0] && c.b[1] === b[1]);
+    if (old){ if (!!old.fb !== fb){ old.fb = fb; this.compile(); } return; }   // the same cable again: only its feedback mark can change
+    this.cables.push(fb ? { a, b, fb:true } : { a, b }); this.compile();
   }
   disconnect(a, b){ this.cables = this.cables.filter(c => !(c.a[0] === a[0] && c.a[1] === a[1] && c.b[0] === b[0] && c.b[1] === b[1])); this.compile(); }
   compile(){
@@ -5059,7 +5075,9 @@ class Graph {
     this.inc = new Map([...this.mods.keys()].map(k => [k, []]));
     for (const c of this.cables){
       if (!adj.has(c.a[0]) || !adj.has(c.b[0])) continue;
-      adj.get(c.a[0]).push(c.b[0]); indeg.set(c.b[0], indeg.get(c.b[0]) + 1); this.inc.get(c.b[0]).push(c);
+      this.inc.get(c.b[0]).push(c);
+      if (c.fb) continue;   // FEEDBACK: heard (it is in inc), but it does not decide who runs first
+      adj.get(c.a[0]).push(c.b[0]); indeg.set(c.b[0], indeg.get(c.b[0]) + 1);
     }
     const q = [...indeg].filter(([, d]) => d === 0).map(([k]) => k), order = [];
     while (q.length){ const k = q.shift(); order.push(k); for (const n of adj.get(k)){ indeg.set(n, indeg.get(n) - 1); if (indeg.get(n) === 0) q.push(n); } }
@@ -5131,7 +5149,7 @@ class ChainsEngine {
     this._sync();
   }
   removeModule(id){ this._drop(id); this.graph.remove(id); this._sync(); }
-  connect(a, b){ this.graph.connect(a, b); this._sync(); }
+  connect(a, b, fb){ this.graph.connect(a, b, fb); this._sync(); }
   disconnect(a, b){ this.graph.disconnect(a, b); this._sync(); }
   setParam(id, name, v){ const m = this.graph.mods.get(id); if (m && typeof v === 'number'){ m.inst.params[name] = v; if (name === 'track') this._actKey = -1; if (name === '_bn') this._bnKey = -1; } }
   /* BYPASS: module id → its number (1–15): its own _bn, else the lowest free one, in patch order. */
@@ -5193,7 +5211,7 @@ class ChainsEngine {
   loadPatch(doc){
     this._reset(); this.graph = new Graph();
     for (const m of doc.modules || []) this.addModule(m.id, m.type, m);
-    for (const c of doc.cables || []) this.connect(c.from, c.to);
+    for (const c of doc.cables || []) this.connect(c.from, c.to, c.fb === true);
     for (const c of stereoUpCables(doc)) this.connect(c.from, c.to);   // STEREO: an older patch's right sides (the editor saves them)
     for (const c of trackInStereoCables(doc)) this.connect(c.from, c.to);   // TRACK IN STEREO: the same for a Track In's right side
     if (doc.transport) this.setTransport(doc.transport);
@@ -5253,7 +5271,7 @@ class ChainsEngine {
         mods = mods || io.mo; dst = mods[k] || (mods[k] = io.mb[k] || (io.mb[k] = new Float32Array(BLOCK)));
       } else { dst = io.in[port]; if (!dst) continue; io.linked.add(port); }
       const b = this._bufs(src).out[c.a[1]];
-      if (b) for (let i = 0; i < BLOCK; i++) dst[i] += b[i];
+      if (b){ if (c.fb) fbAdd(dst, b, 1); else for (let i = 0; i < BLOCK; i++) dst[i] += b[i]; }
     }
     // Modulated parameters: the slider's value plus the cable's value across the slider's whole range (as in ...Seeds).
     if (mods){
@@ -5348,7 +5366,7 @@ class ChainsEngine {
       case 'patch': return this.loadPatch(m.value);
       case 'add': return this.addModule(m.id, m.type, m);
       case 'remove': return this.removeModule(m.id);
-      case 'connect': return this.connect(m.a, m.b);
+      case 'connect': return this.connect(m.a, m.b, m.fb === true);
       case 'disconnect': return this.disconnect(m.a, m.b);
       case 'param': return this.setParam(m.id, m.name, m.value);
       case 'params': return this.setParams(m.list);
@@ -5534,5 +5552,5 @@ registerProcessor('thunder-chains', ThunderChains);
 }
 /* Also published inside the audio thread: ...Thunder Plus's track-effect worklet (thunder-tfx, in the same audio context)
    runs the shared modules as track effects through this. */
-if (typeof globalThis !== 'undefined') globalThis.ChainsDSP = { ChainsEngine, wasmInit, modsPrepare, MODULES, WASM, CHAN_COUNT };
+if (typeof globalThis !== 'undefined') globalThis.ChainsDSP = { ChainsEngine, wasmInit, modsPrepare, MODULES, WASM, CHAN_COUNT, fbAdd };
 })();

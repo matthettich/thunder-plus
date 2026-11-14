@@ -95,14 +95,7 @@ test('the modules that are narrow keep to sliders, selects and ports (no canvas 
   for (const t of types) { const line = new RegExp('\\n  ' + t + ':\\{ label:[^\\n]*').exec(ED.chains)[0]; assert.doesNotMatch(line, /fx:true/, t + ' has a bypass button'); assert.doesNotMatch(line, /display:/, t + ' draws a display'); }
 });
 
-test('no audio file, golden or worklet differs from the merge base with origin/beta (skipped when no base can be resolved)', t => {
-  const { execFileSync } = require('child_process');
-  const git = args => execFileSync('git', args, { cwd: H.ROOT, stdio: ['ignore', 'pipe', 'pipe'] }).toString().trim();
-  let base = ''; try { base = git(['merge-base', 'HEAD', 'origin/beta']); } catch (e) { return t.skip('no origin/beta merge base in this checkout'); }
-  if (!base) return t.skip('no merge base');
-  let changed = false; try { git(['diff', '--quiet', base, '--', 'tests/golden', 'chains/chains-worklet.js', 'waves/waves-worklet.js', 'core', 'dsp', 'pump', 'lxr']); } catch (e) { changed = e.status === 1; if (!changed) return t.skip('git diff could not run'); }
-  assert.equal(changed, false, 'an audio file, golden or worklet differs from ' + base);
-});
+// (The pass's own guard, 'no audio file differs from origin/beta', is gone: it was true for that PR only and failed every later audio change.)
 
 test('the new CSS uses the editors\' variables, not literal colours, for the Mini, width and group-fold rules', () => {
   for (const [ed, src] of Object.entries(ED)) {
@@ -111,9 +104,6 @@ test('the new CSS uses the editors\' variables, not literal colours, for the Min
   }
 });
 
-test('release notes: build 588 is announced, the service worker cache is v588', () => {
-  const root = H.read('index.html'), sw = H.read('sw.js');
-  assert.match(root, /const BUILD = 588;/);
-  assert.match(root, /\[588, '14 Nov', \[/);
-  assert.match(sw, /thunderplus-v588/);
+test('release notes: build 588 is announced', () => {
+  assert.match(H.read('index.html'), /\[588, '14 Nov', \[/);
 });

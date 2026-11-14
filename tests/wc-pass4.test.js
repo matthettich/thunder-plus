@@ -69,14 +69,7 @@ test('the shared block is the same in both editors (python3 tools/sync-shared.py
   const cut = s => s.slice(s.indexOf('/* ===SHARED EDITOR START==='), s.indexOf('/* ===SHARED EDITOR END===') + 30);
   assert.equal(cut(ED.chains), cut(ED.waves));
 });
-test('no audio file, golden or worklet differs from the merge base with origin/beta (skipped when no base can be resolved)', t => {
-  const { execFileSync } = require('child_process');
-  const git = args => execFileSync('git', args, { cwd: H.ROOT, stdio: ['ignore', 'pipe', 'pipe'] }).toString().trim();
-  let base = ''; try { base = git(['merge-base', 'HEAD', 'origin/beta']); } catch (e) { return t.skip('no origin/beta merge base in this checkout'); }
-  if (!base) return t.skip('no merge base');
-  let changed = false; try { git(['diff', '--quiet', base, '--', 'tests/golden', 'chains/chains-worklet.js', 'waves/waves-worklet.js', 'core', 'dsp', 'pump', 'lxr']); } catch (e) { changed = e.status === 1; if (!changed) return t.skip('git diff could not run'); }
-  assert.equal(changed, false, 'an audio file, golden or worklet differs from ' + base);
-});
+// (The pass's own guard, 'no audio file differs from origin/beta', is gone: it was true for that PR only and failed every later audio change.)
 test('chains engine (read, not changed): two cables into one input equal the sum of the two signals', () => {
   const BYTES = new Uint8Array(fs.readFileSync(path.join(H.ROOT, 'chains/dsp/tfx.wasm')));
   const run = cables => {
