@@ -181,6 +181,18 @@ svg.cables rect.bend{fill:var(--panel); stroke:var(--ink); stroke-width:1.5; vec
 svg.cables g:hover > rect.bend, svg.cables g.sel > rect.bend, body.alting svg.cables rect.bend{opacity:1; pointer-events:all}
 
 .node{position:absolute; width:250px; background:var(--panel); border:3.5px solid var(--edge); user-select:none; -webkit-user-select:none; cursor:default}
+/* WIDTHS (pass 5, M1): a module whose definition declares a width (widthOf) is .nwd; under 250 px it is .nar, the narrow form: a lighter title bar (no ?, a smaller title; About is in the module menu),
+   the slider rows stacked (label and value above, the slider the full width below) and a select under its label. It is never narrower than its content (min-width:min-content). */
+.node.nwd{width:var(--mw); min-width:min-content}
+.node.nwd .cs-t{contain:inline-size}   /* the summary line is cut with an ellipsis: its text must not set the module's least width */
+.node.nar > header .t{font-size:14px}
+.node.nar > header .mq{display:none}
+.node.nar > .body{padding:8px 10px 10px; gap:7px}
+.node.nar .row.sl{grid-template-columns:minmax(0,1fr) auto; grid-template-areas:"l v" "r r"; gap:2px 8px}
+.node.nar .row.sl > .lbl{grid-area:l} .node.nar .row.sl > .rng{grid-area:r} .node.nar .row.sl > .val{grid-area:v; min-width:0}
+.node.nar .row.wide.sl{grid-template-columns:minmax(0,1fr); grid-template-areas:none; gap:2px}
+.node.nar .row.wide.sl > .lbl{grid-area:auto}
+.node.nwd > header .t{min-width:min-content}   /* the title's longest word is part of the module's least width (a flex item with a zero basis would otherwise count for nothing) */
 .node > header{display:flex; align-items:center; gap:4px; padding:7px 8px 7px 12px; cursor:grab; border-bottom:2px solid var(--edge); touch-action:none}
 .node > header .t{flex:1; font-weight:600; font-size:17px; line-height:1.15; min-width:0; overflow-wrap:normal; hyphens:manual}   /* review fix (13 Nov): a title breaks only between words */
 /* a single word longer than the line (Convolution, Compressor in a monospace skin): first the BYP button takes less padding (tt1), then the title a little less letter-spacing (tt2); only past both may it break inside the word (tt3). Set by titleFit() */
@@ -248,6 +260,13 @@ button.mk.more:hover{color:var(--ink); border-color:var(--ink)}
   .node > header button.byp{height:40px; min-width:40px}
 }
 @media (prefers-reduced-motion: reduce){ .node > header .fold svg{transition:none} }
+/* MINI (pass 5): the title bar alone (about 42 px high; every cable ends on its left or right edge). The summary, ports, stubs, dynamics meter and body are all hidden; the help button
+   moves into the module menu to leave the title room. A Mini module keeps its width (declared, or 250 px) so a tidied patch stays in columns. */
+.node.collapsed.mini{min-height:0}
+.node.collapsed.mini > :not(header){display:none !important}
+.node.collapsed.mini > header{padding:6px 8px 6px 12px; border-bottom:0}
+.node.collapsed.mini > header .mq{display:none}
+.node.mini.bypassed > header .t{opacity:.55}
 .node.selected{outline:3px solid var(--selc) !important; outline-offset:3px}
 .node.selected > header{background:color-mix(in srgb, var(--panel-2) 84%, var(--selc) 16%) !important}   /* (13 Nov: 16%, the neutral selection mark would read as greyed out at 30%) */
 .node.selected::after{content:''; position:absolute; inset:0; background:var(--selc); opacity:.07; pointer-events:none}
@@ -320,6 +339,16 @@ body.learning .row.sl{outline:1px dashed var(--muted); outline-offset:3px}
 .dx{position:absolute; top:4px; right:4px; width:23px; height:23px; padding:0; border:0; background:rgba(20,22,26,.6); color:#fff; font-size:17px; line-height:23px; text-align:center; opacity:0; transition:opacity .12s; z-index:1}
 .decor:hover .dx, .dx:focus-visible{opacity:1}
 .dx:hover{background:var(--rec)}
+/* GROUP FOLD (pass 5, M6): a chevron at the left of a group's label; a collapsed group is one block, its modules hidden */
+.decor.box .dtext{padding-left:30px}
+.dfold{position:absolute; left:4px; top:5px; width:22px; height:22px; padding:0; border:0; background:none; color:var(--ink); display:grid; place-items:center; z-index:1; cursor:pointer}
+.dfold:hover{background:color-mix(in srgb, var(--ink) 14%, transparent)}
+.dfold svg{transition:transform .15s} .decor.gcol .dfold svg{transform:rotate(-90deg)}
+.dsum{display:none; padding:2px 10px 0 30px; font-size:12.5px; color:var(--ink)}
+.decor.gcol{pointer-events:auto; box-shadow:0 1px 3px color-mix(in srgb, var(--ink) 30%, transparent)} .decor.gcol .dsum{display:block}
+.node.ghid{display:none}
+@media (pointer: coarse){ .dfold{width:36px; height:36px; left:0; top:0} .decor.box .dtext{padding-left:40px} .dsum{padding-left:40px} }
+@media (prefers-reduced-motion: reduce){ .dfold svg{transition:none} }
 @media (hover: none){ .dx{opacity:1} }
 
 .lasso{position:absolute; border:1.5px dashed var(--video); background:rgba(227,150,42,.08); z-index:1000002; pointer-events:none}
@@ -1749,6 +1778,20 @@ function summaryKeys(m){
   for (const k of sl) if (pick.length < SUMMARY_DEFAULT.sliders && !pick.includes(k)) pick.push(k);
   return [...sel.slice(0, SUMMARY_DEFAULT.selects), ...pick];
 }
+/* ── PASS 5 (14 Nov 2026, "Structure": audit M1, Mini, M6): editor helpers shared by chains and waves ── */
+/* MODULE WIDTHS (M1, owner decision 6: "modules of different widths: yes"). Every module is NODE_W (250 px) wide unless its definition says otherwise: a
+   module definition may carry w:<px>, or a line in MODULE_WIDTH below does (the definition wins; both are read by widthOf, 150 to 600 px). A module narrower than
+   250 px gets the narrow form (class .nar: a lighter title bar without the ?, the slider rows stacked label-over-slider so the slider keeps its length);
+   one wider than 250 px just has more room. Nothing is saved per module: the width belongs to the module's type, so an old patch opens the same unless
+   its module's definition now declares another width. A module never gets narrower than its content (CSS min-width:min-content). To make a module small,
+   add a line here (its type and a width): the new math and logic modules declare theirs the same way. */
+const NODE_W = 250;
+const NARROW_S = 168, NARROW_M = 190;   // the two small sizes: S for a one-word title, M for a two-word one
+const MODULE_WIDTH = {
+  atten:NARROW_S, random:NARROW_S, quant:NARROW_S, logic:NARROW_S, math:NARROW_S,   // Attenuverter, Random, Quantizer, Logic, Math
+  slew:NARROW_M, snh:NARROW_M, divider:NARROW_M, gateex:NARROW_M,   // Slew limiter, Sample & hold, Clock divider, Gate extract
+};
+function widthOf(type){ const d = MODULES[type], w = d && d.w != null ? d.w : MODULE_WIDTH[type]; return typeof w === 'number' && w >= 150 && w <= 600 ? Math.round(w) : NODE_W; }
 /* ── PASS 3 (13 Nov 2026, "Phone": audit M10, T6, T7, T14): editor helpers shared by chains and waves ── */
 // PLAY / EDIT (M10). In Play a touch or a click plays the patch (sliders, selects, buttons, readouts, keys) and nothing on a module moves,
 // opens a menu or goes: a drag on anything that is not one of these controls pans. The editor's own copies of the handlers ask playMode.
@@ -1843,7 +1886,9 @@ const snapV = v => snapOn ? Math.round(v / GRID) * GRID : v;
 // Ctrl/Cmd+wheel zoom, a pinch, a drag on the background or a module, a cable being drawn) it never changes a value: the slider that slides under a still pointer
 // has not been rested on. Shift is fine (a tenth); Ctrl/Cmd+wheel stays the zoom here. One burst of wheel steps is one undo step.
 const WHEEL_REST = 350;
-let wheelR = { el:null, at:0, v:null, on:null, t:0 }, wheelPanAt = -1e9, wheelChT = 0;
+let wheelR = { el:null, at:0, v:null, on:null, t:0 }, wheelPanAt = -1e9;
+const wheelChT = new Map();   // slider -> the timer of its own pending 'change' (one per slider: wheeling B must not cancel A's)
+function wheelFlush(except){ for (const [s, t] of [...wheelChT]){ if (s === except) continue; clearTimeout(t); wheelChT.delete(s); if (s.isConnected) s.dispatchEvent(new Event('change', { bubbles:true })); } }
 const wheelSlider = t => t && t.closest ? t.closest('.row.sl input[type=range]') : null;
 function wheelSee(sl){
   if (sl === wheelR.el) return;
@@ -1871,7 +1916,8 @@ window.addEventListener('wheel', e => {
   wheelR.v = Math.max(lo, Math.min(hi, wheelR.v - Math.max(-1.5, Math.min(1.5, dy / 100)) * per));
   const q = st ? Math.max(lo, Math.min(hi, lo + Math.round((wheelR.v - lo) / st) * st)) : wheelR.v;
   if (q !== +sl.value){ sl.value = q; sl.dispatchEvent(new Event('input', { bubbles:true })); }
-  clearTimeout(wheelChT); wheelChT = setTimeout(() => sl.dispatchEvent(new Event('change', { bubbles:true })), 500);   // (ends the undo step, as the end of a drag does)
+  wheelFlush(sl); clearTimeout(wheelChT.get(sl));
+  wheelChT.set(sl, setTimeout(() => { wheelChT.delete(sl); sl.dispatchEvent(new Event('change', { bubbles:true })); }, 500));   // (ends the undo step, as the end of a drag does; the wheel moving to another slider ends this one's at once)
 }, { capture:true, passive:false });
 // A CABLE'S VALUE ON HOVER (M8): the pointer on a cable shows what it carries, from the level telemetry the jack meters already get (paintJacks): no new
 // message from the engine. Nothing is written to the page while no cable is hovered; while one is, the text is rewritten only when it changes.
@@ -1925,7 +1971,7 @@ function alignSel(kind){
   else if (kind === 'bottom'){ const y = Math.max(...ns.map(n => n.m.pos[1] + H(n))); for (const n of ns) set(n, n.m.pos[0], y - H(n)); }
   else if (kind === 'dist-h'){ const s = ns.slice().sort((a, b) => a.m.pos[0] - b.m.pos[0]), x0 = s[0].m.pos[0], x1 = s[s.length - 1].m.pos[0] + W(s[s.length - 1]), gap = (x1 - x0 - s.reduce((t, n) => t + W(n), 0)) / (s.length - 1); let x = x0; for (const n of s){ set(n, x, n.m.pos[1]); x += W(n) + gap; } }
   else if (kind === 'dist-v'){ const s = ns.slice().sort((a, b) => a.m.pos[1] - b.m.pos[1]), y0 = s[0].m.pos[1], y1 = s[s.length - 1].m.pos[1] + H(s[s.length - 1]), gap = (y1 - y0 - s.reduce((t, n) => t + H(n), 0)) / (s.length - 1); let y = y0; for (const n of s){ set(n, n.m.pos[0], y); y += H(n) + gap; } }
-  markScene(); store.touch(); return true;
+  groupsFollow(ns.map(n => n.m.id)); markScene(); store.touch(); return true;
 }
 // TIDY UP (M11): modules in columns by signal flow (a module sits one column right of the furthest module that feeds it; its column is ordered by where its
 // inputs are), unpatched modules in a last column, all on the grid. Groups are kept: each group's box is drawn again around its modules. One undo step.
@@ -2032,21 +2078,24 @@ function quickAddKey(){
   if (x == null){ x = r.left + r.width / 2; y = r.top + r.height / 3; }
   quickAddAt(x, y);
 }
+// LETTER SHORTCUTS match the letter the key types (e.key), so they agree with what Help prints on AZERTY, Dvorak and the like. With Alt held a Mac types another
+// character (Option+C is "ç"): there, and only when the key is not a plain letter, the physical position (e.code) stands in. Note keys (waves) stay physical.
+const letterKey = e => { const k = e.key; if (k && /^[a-zA-Z]$/.test(k)) return k.toLowerCase(); const m = /^Key([A-Z])$/.exec(e.code || ''); return e.altKey && m ? m[1].toLowerCase() : ''; };
 window.addEventListener('keydown', e => {
   if (typing(e) || document.querySelector('.dlgov') || (learn && learn.on)) return;
-  const t = e.target, inCtl = !!(t && t.closest && t.closest('input, select, textarea, [contenteditable="true"]')), mod = e.ctrlKey || e.metaKey, c = e.code;
+  const t = e.target, inCtl = !!(t && t.closest && t.closest('input, select, textarea, [contenteditable="true"]')), mod = e.ctrlKey || e.metaKey, c = e.code, ks = letterKey(e);
   if (mod && !e.altKey){
     if (inCtl) return;
-    if (!e.shiftKey && c === 'KeyA'){ e.preventDefault(); if (!playMode) for (const k of nodes.keys()) setSel(k, true); return; }
-    if (!e.shiftKey && c === 'KeyG'){ e.preventDefault(); if (!playMode && selected.size) groupSel(); return; }
+    if (!e.shiftKey && ks === 'a'){ e.preventDefault(); if (!playMode) for (const k of nodes.keys()) setSel(k, true); return; }
+    if (!e.shiftKey && ks === 'g'){ e.preventDefault(); if (!playMode && selected.size) groupSel(); return; }
     if (c === 'Equal' || c === 'NumpadAdd' || e.key === '+' || e.key === '='){ e.preventDefault(); zoomCenter(view().zoom * 1.2); return; }
     if (c === 'Minus' || c === 'NumpadSubtract' || e.key === '-'){ e.preventDefault(); zoomCenter(view().zoom / 1.2); return; }
     if (c === 'Digit0' || c === 'Numpad0'){ e.preventDefault(); zoomCenter(1); return; }
     return;
   }
   if (e.altKey || inCtl) return;
-  if (c === 'KeyF' && !mod){ e.preventDefault(); if (e.shiftKey) zoomToSel(); else fitAll(); return; }
-  if (!e.shiftKey && (c === 'KeyA' || (c === 'KeyN' && typeof K_LOW === 'undefined')) && !e.repeat){ e.preventDefault(); quickAddKey(); return; }
+  if (ks === 'f' && !mod){ e.preventDefault(); if (e.shiftKey) zoomToSel(); else fitAll(); return; }
+  if (!e.shiftKey && (ks === 'a' || (ks === 'n' && typeof K_LOW === 'undefined')) && !e.repeat){ e.preventDefault(); quickAddKey(); return; }
   if (e.key === 'Escape' && !e.shiftKey){ if (!escBusy() && selected.size) clearSel(); return; }
   if (/^Arrow(Left|Right|Up|Down)$/.test(e.key)){
     if (playMode || !selected.size || !ctx.hidden) return;
@@ -2054,7 +2103,7 @@ window.addEventListener('keydown', e => {
     const s = e.shiftKey ? 1 : GRID, dx = e.key === 'ArrowLeft' ? -s : e.key === 'ArrowRight' ? s : 0, dy = e.key === 'ArrowUp' ? -s : e.key === 'ArrowDown' ? s : 0, now = performance.now();
     if (now - nudgeAt > 800) store.snapshot(); nudgeAt = now;
     for (const id of selected){ const n = nodes.get(id); if (!n) continue; n.m.pos = [n.m.pos[0] + dx, n.m.pos[1] + dy]; n.el.style.left = n.m.pos[0] + 'px'; n.el.style.top = n.m.pos[1] + 'px'; }
-    markScene(); store.touch(); return;
+    groupsFollow([...selected]); markScene(); store.touch(); return;
   }
   if (e.key === 'Enter' && !e.shiftKey && !e.repeat && selected.size === 1 && !playMode && !(t && t.closest && t.closest('button, a, summary')) && ctx.hidden){ e.preventDefault(); renameModule([...selected][0]); return; }
 });
@@ -2644,7 +2693,7 @@ function portName(type, port, dir){
 }
 function makeJack(n, port, kind, dir, small){
   const pt = portTip(n.m.type, port);
-  const j = h('span', {class: small ? 'jack small' : 'jack', 'data-id': n.m.id, 'data-port': port, 'data-dir': dir, 'data-kind': kind, role:'button', 'aria-label': (dir === 'in' ? 'Input ' : 'Output ') + (small ? plabel(n.m.type, port.slice(2)) + ' modulation' : portName(n.m.type, port, dir)),
+  const j = h('span', {class: small ? 'jack small' : 'jack', 'data-id': n.m.id, 'data-port': port, 'data-dir': dir, 'data-kind': kind, role:'img', 'aria-label': (dir === 'in' ? 'Input ' : 'Output ') + (small ? plabel(n.m.type, port.slice(2)) + ' modulation' : portName(n.m.type, port, dir)),
     title: pt ? pt.t + ' (' + KIND_WORD[kind] + ')' : small ? plabel(n.m.type, port.slice(2)) + ' modulation: ' + KIND_WORD[kind] + ' input' : portName(n.m.type, port, dir) + ': ' + KIND_WORD[kind] + (dir === 'in' ? ' input' : ' output')});
   n.jacks[dir + ':' + port] = j;
   j.addEventListener('pointerdown', e => { if (e.button !== 0 || (MAC && e.ctrlKey && e.pointerType !== 'touch')) return; onJackDown(e, j); });   // left button only (3 Nov: a right or middle click started a cable)
@@ -2735,7 +2784,7 @@ function mixResize(n){
 function rebuildNode(id){
   const o = nodes.get(id); if (!o) return;
   o.el.remove(); nodes.delete(id);
-  buildNode(o.m);
+  buildNode(o.m); applyGroupHides();
   syncCableEls(); markMapped(); markDeck(); markScene(); paintChainOff();
 }
 function slider(n, key, spec){
@@ -3076,7 +3125,17 @@ function buildNode(m){
   n.title = title;
   const fold = h('button', {class:'fold', 'aria-label':'Collapse ' + title, 'aria-expanded':'true', title:'Collapse (or double-click the title bar)'});
   fold.innerHTML = FOLD_SVG;
-  fold.addEventListener('click', () => { if (playBlocked()) return; store.snapshot(); setCollapsed(n, !m.collapsed); });
+  fold.addEventListener('click', ev => {
+    if (fold._lp){ fold._lp = false; return; }   // the click that ends a long press (it already did its work)
+    if (playBlocked()) return; store.snapshot();
+    const v = viewOf(m);
+    setView(n, ev.shiftKey ? (v === 'mini' ? 'compact' : 'mini') : v === 'open' ? 'compact' : 'open');   // click: Open <-> Compact (a Mini one opens); Shift+click: Mini <-> Compact
+  });
+  fold.addEventListener('pointerdown', ev => {   // a finger held on the chevron for half a second: Mini (a mouse uses Shift+click)
+    if (!isFinger(ev) || playMode) return;
+    clearTimeout(fold._lpt); fold._lpt = setTimeout(() => { fold._lp = true; setTimeout(() => { fold._lp = false; }, 900); store.snapshot(); setView(n, viewOf(m) === 'mini' ? 'compact' : 'mini'); try { if (navigator.vibrate) navigator.vibrate(12); } catch (_) {} }, LP_MS);
+  });
+  for (const t of ['pointerup', 'pointercancel', 'pointerleave']) fold.addEventListener(t, () => clearTimeout(fold._lpt));
   n.foldBtn = fold;
   if (bypOk(def)) n.byp = h('button', {class:'byp', 'aria-label':'Bypass ' + title, text:'BYP', onclick: () => { store.snapshot(); setParam(n, '_byp', ((m.params._byp) || 0) >= .5 ? 0 : 1); paintByp(); }});
   const head = h('header', {title:'Double-click to collapse or expand'}, fold, (n.tEl = h('span', {class:'t', text: title})), n.byp || null, mhelpBtn(m.type, title),
@@ -3108,6 +3167,7 @@ function buildNode(m){
   buildSummary(n);   // COMPACT: the collapsed look
   n.stubEl = h('div', {class:'cstubs'});   // COMPACT: the modulation stubs
   n.el = catStyle(h('div', {class:'node fam-' + famOf(m.type), 'data-id': m.id, tabindex:'0', role:'group', 'aria-label': title}, head, n.sum, ports, n.stubEl, n.mini || null, body), m.type);   // n.mini: a folded dynamics module's meter
+  { const w = widthOf(m.type); if (w !== NODE_W){ n.el.classList.add('nwd'); n.el.style.setProperty('--mw', w + 'px'); if (w < NODE_W) n.el.classList.add('nar'); } }   // M1: a width of its own (narrow form under 250 px)
   n.el.addEventListener('focus', () => { if (!playMode && n.el.matches(':focus-visible') && !(selected.size === 1 && selected.has(m.id))){ clearSel(); setSel(m.id, true); } });   // U11: Tab onto a module picks it (a mouse click does not go through here)
   n.head = head; titleFit.watch(n.tEl);
   n.el.style.left = m.pos[0] + 'px'; n.el.style.top = m.pos[1] + 'px';
@@ -3139,6 +3199,7 @@ function buildNode(m){
       // M11 (14 Nov): the dragged module lands on the 10 px grid and the others in the selection keep their distance from it
       const an = start.find(q => q[0] === n) || start[0], sx2 = snapOn && an ? snapV(an[1] + dx) - an[1] : dx, sy2 = snapOn && an ? snapV(an[2] + dy) - an[2] : dy;
       for (const [g, ox, oy] of start){ g.m.pos = [Math.round(ox + sx2), Math.round(oy + sy2)]; g.el.style.left = g.m.pos[0] + 'px'; g.el.style.top = g.m.pos[1] + 'px'; }
+      groupsFollow(start.map(q => q[0].m.id));   // M6: a group's box follows its modules
     };
     nodeDragging = v => { extra[0] -= v[0]; extra[1] -= v[1]; place(); }; nodeDragging.still = () => !moved; nodeDragging.stop = () => { stopped = true; };
     let pend = 0;
@@ -3147,7 +3208,7 @@ function buildNode(m){
     const up = ev => { if (ev) lastEv = ev; if (pend){ cancelAnimationFrame(pend); pend = 0; } place(); nodeDragging = null; autoPanV = [0, 0]; head.removeEventListener('pointermove', mv); head.removeEventListener('pointerup', up); head.removeEventListener('pointercancel', up); if (!moved && ev && ev.type === 'pointerup' && ev.pointerType === 'touch' && lpFiredAt < tDown) headTap(n, ev); if (moved) store.touch(); };
     head.addEventListener('pointermove', mv); head.addEventListener('pointerup', up); head.addEventListener('pointercancel', up);
   });
-  if (m.collapsed) setCollapsed(n, true, true);
+  if (m.collapsed) setView(n, viewOf(m), true);
   if (selected.has(m.id)) n.el.classList.add('selected');
   world.append(n.el);
   if (m.collapsed) compactFit(n);   // (needs the module on the page to measure)
@@ -3161,20 +3222,28 @@ function buildNode(m){
    level strip, and the MIDI / bottom-panel marks. The saved state is still m.collapsed (true = Compact), so old patches
    open as they were and nothing new is written into the patch. Text is written only when it changes. */
 function foldLabel(n){
-  const c = n.m.collapsed, t = n.title;
-  n.foldBtn.setAttribute('aria-label', (c ? 'Expand ' : 'Collapse ') + t);
-  n.foldBtn.title = (c ? 'Expand' : 'Collapse') + ' (or double-click the title bar)';
+  const v = viewOf(n.m), t = n.title;
+  n.foldBtn.setAttribute('aria-label', (v === 'open' ? 'Collapse ' : 'Expand ') + t + (v === 'mini' ? ' (now Mini)' : ''));
+  n.foldBtn.title = (v === 'open' ? 'Collapse' : 'Expand') + ' (or double-click the title bar). ' + (v === 'mini' ? 'Shift+click: Compact. ' : 'Shift+click or hold: Mini (the title bar alone). ');
 }
-function setCollapsed(n, c, quiet){
-  n.m.collapsed = !!c;
-  n.el.classList.toggle('collapsed', n.m.collapsed);
-  n.foldBtn.setAttribute('aria-expanded', String(!n.m.collapsed)); foldLabel(n);
+// THE THREE STATES (pass 5, Mini): Open; Compact (collapsed:true, the default fold); Mini (collapsed:true and view:'mini': the title bar alone). A patch with collapsed:true
+// and no view, or a view this build does not know, is Compact; Open and Compact write no view, so only a Mini module adds a field (build 587 ignores it and shows Compact).
+const viewOf = m => !m.collapsed ? 'open' : m.view === 'mini' ? 'mini' : 'compact';
+function setView(n, v, quiet){
+  const m = n.m, was = viewOf(m);
+  m.collapsed = v !== 'open';
+  if (v === 'mini') m.view = 'mini'; else delete m.view;
+  n.el.classList.toggle('collapsed', m.collapsed); n.el.classList.toggle('mini', v === 'mini');
+  n.foldBtn.setAttribute('aria-expanded', String(!m.collapsed)); foldLabel(n);
   n.fitKey = null;
-  if (n.m.collapsed){ if (n.lvl) n.lvl.shown = -1; n.mkKey = null; compactApply(n, cableUse(n.m.id).get(n.m.id)); }
+  if (m.collapsed){ if (n.lvl) n.lvl.shown = -1; n.mkKey = null; compactApply(n, cableUse(m.id).get(m.id)); }
   else { n.el.style.width = ''; n.el.style.removeProperty('--cr'); n.el.style.removeProperty('--sc'); }   // open again: the normal width (the wider width while collapsed is only drawn, never saved)
-  if (!quiet) store.touch();
+  groupsFollow([m.id]);   // M6: its group's box is drawn round it again
+  if (!quiet && was !== v) store.touch();
   markScene();
 }
+// (the old two-state call: true folds an open module to Compact and leaves a Mini one alone; false opens it)
+function setCollapsed(n, c, quiet){ setView(n, c ? (viewOf(n.m) === 'mini' ? 'mini' : 'compact') : 'open', quiet); }
 // A title-bar double-click and a double-tap can both arrive for one gesture: only the first counts.
 function foldToggle(n){
   const now = performance.now(); if (n.foldT && now - n.foldT < 500) return; n.foldT = now;
@@ -3259,6 +3328,11 @@ function compactApply(n, u){
     n.stubEl.append(...n.stubRows);
   }
   n.nIn = nin; n.nOut = nout;
+  if (n.m.view === 'mini'){   // MINI: every cable ends on the title bar's edge (inputs left, outputs right); where on the edge follows the port's order, so cables do not pile up on one point
+    const ks = { in:[], out:[] }; for (const key in n.portRows) if (used.has(key)) ks[key.startsWith('in:') ? 'in' : 'out'].push(key);
+    for (const k of mods) ks.in.push('in:p:' + k);
+    n.mIdx = {}; for (const d of ['in', 'out']) ks[d].forEach((k, i) => { n.mIdx[k] = [i, ks[d].length]; });
+  } else n.mIdx = null;
   n.el.classList.toggle('dense', nin > 4 || nout > 4);   // too many audio ports to label: their names stay in the jack tooltips (a modulation stub always keeps its name)
   if (n.portsEl) n.portsEl.classList.toggle('none', nin + nout === 0);
   n.nFree = free; paintMarks(n); paintSum(n); compactFit(n);
@@ -3274,6 +3348,7 @@ function compactFit(n){
   const el = n.el, key = n.nIn + '|' + n.nOut + '|' + n.stubKey + '|' + (el.classList.contains('dense') ? 1 : 0);
   if (key === n.fitKey) return; n.fitKey = key;
   el.style.width = '';
+  if (n.m.view === 'mini'){ el.style.removeProperty('--cr'); el.style.removeProperty('--sc'); return; }   // MINI: the module's own width, the title bar alone
   const base = el.offsetWidth, bw = el.offsetWidth - el.clientWidth, cap = Math.max(base, COMPACT_W.cap), px = v => parseFloat(v) || 0;
   let need = base, rows = 2;
   if (n.portsEl && n.insEl && n.outsEl && n.nIn + n.nOut){
@@ -3320,13 +3395,28 @@ function setAllCollapsed(c, ids){
   store.touch(); markScene();
   return list.length;
 }
+// Alt+Shift+C (Mini): every module to Mini, or, when all already are, every module open again. One undo step.
+function setAllMini(ids){
+  const list = (ids ? ids.map(id => nodes.get(id)) : [...nodes.values()]).filter(n => n && viewOf(n.m) !== 'mini');
+  if (!list.length) return 0;
+  store.snapshot();
+  for (const n of list) setView(n, 'mini', true);
+  store.touch(); markScene();
+  return list.length;
+}
 window.addEventListener('keydown', e => {
-  if (!e.altKey || e.ctrlKey || e.metaKey || e.shiftKey || e.code !== 'KeyC' || e.repeat || typing(e) || playMode) return;
+  if (!e.altKey || e.ctrlKey || e.metaKey || letterKey(e) !== 'c' || e.repeat || typing(e) || playMode) return;
   if ((learn && learn.on) || document.querySelector('.dlgov') || !ctx.hidden) return;
   e.preventDefault();
+  if (e.shiftKey){
+    const k = setAllMini() || setAllCollapsed(false);
+    if (k) toast((k === 1 ? '1 module' : k + ' modules') + ' changed (Alt+Shift+C again reverses it, ' + MOD + '+Z undoes it).');
+    return;
+  }
   const open = [...nodes.values()].some(n => !n.m.collapsed), k = setAllCollapsed(open);
   if (k) toast((open ? 'Collapsed ' : 'Expanded ') + k + (k === 1 ? ' module' : ' modules') + ' (Alt+C does the reverse, ' + MOD + '+Z undoes it).');
 });
+
 function renderAll(){
   for (const n of nodes.values()) n.el.remove();
   nodes.clear();
@@ -3362,9 +3452,11 @@ function removeModule(id){
   doc.cables = doc.cables.filter(c => c.from[0] !== id && c.to[0] !== id);
   doc.modules = doc.modules.filter(m => m.id !== id);
   for (const g of doc.groups) g.modules = (g.modules || []).filter(x => x !== id);
+  const gBefore = doc.groups.length; doc.groups = doc.groups.filter(g => (g.modules || []).length);   // M6: a group with no modules left goes
   if (bridge) bridge.removeModule(id);
   else if (EMBED && TW && TW.mod) TW.mod({ op:'remove', id });   // the remove op also drops its cables
   if (n){ n.el.remove(); if (n.tEl) titleFit.drop(n.tEl); } nodes.delete(id); selected.delete(id);
+  if (doc.groups.length !== gBefore) renderGroups(); else groupsFollow();
   syncCableEls(); store.touch(); paintByp(); paintChainOff();
 }
 // Touch: removing a module asks first (T5, 13 Nov; the owner's decision 8). Cancel changes nothing; Remove is one undo step.
@@ -3379,7 +3471,7 @@ function askRemoveMany(ids){
 }
 function addAtCenter(type){
   const v = view();
-  const x = Math.round((-v.x + ws.clientWidth / 2) / v.zoom - 125 + (Math.random() * 80 - 40));
+  const x = Math.round((-v.x + ws.clientWidth / 2) / v.zoom - widthOf(type) / 2 + (Math.random() * 80 - 40));
   const y = Math.round((-v.y + ws.clientHeight / 2) / v.zoom - 120 + (Math.random() * 80 - 40));
   addItem(type, x, y);
 }
@@ -3431,7 +3523,7 @@ window.addEventListener('keydown', e => {
   e.preventDefault(); store.snapshot(); const ids = [...selected]; for (const x of ids) removeModule(x); clearSel();
   toast(ids.length === 1 ? 'Module removed (Undo brings it back).' : ids.length + ' modules removed (Undo brings them back).');
 });
-function setSel(id, on){ const n = nodes.get(id); on ? selected.add(id) : selected.delete(id); if (on) clearCableSel(); relDirty = true; if (n) n.el.classList.toggle('selected', on); }
+function setSel(id, on){ const n = nodes.get(id); if (on && n && n.gcol) return; on ? selected.add(id) : selected.delete(id); if (on) clearCableSel(); relDirty = true; if (n) n.el.classList.toggle('selected', on); }
 function clearSel(){ for (const id of selected){ const n = nodes.get(id); if (n) n.el.classList.remove('selected'); } selected.clear(); relDirty = true; }
 
 /* ----- cables ----- */
@@ -3513,10 +3605,11 @@ function syncCableEls(){
     hit.addEventListener('mouseenter', () => el.g.classList.add('hov')); hit.addEventListener('mouseleave', () => el.g.classList.remove('hov')); hit.addEventListener('mouseenter', ev => cabHover(c, ev)); hit.addEventListener('mousemove', ev => cabPlace(ev)); hit.addEventListener('mouseleave', () => cabHover(null));   // M8: the value readout
     svg.append(el.g); cableEls.set(c, el);
   }
-  compactAll(); secMarks(); markScene();
+  compactAll(); secMarks(); groupBlocks(); markScene();
 }
 function jackPos(id, dir, port, wr){
   const n = nodes.get(id); if (!n) return null;
+  if (n.gcol) return gcolPos(n, dir, port, wr);   // M6: in a collapsed group, the block's edge
   const el = n.jacks[dir + ':' + port];
   if (!el) return null;
   const z = view().zoom;
@@ -3525,6 +3618,10 @@ function jackPos(id, dir, port, wr){
   if (!r.width && dir === 'in' && n.stubs && port.startsWith('p:') && n.stubs[port.slice(2)]) r = n.stubs[port.slice(2)].getBoundingClientRect();
   // A port that is hidden anyway (no cable should be on it): the title bar's edge, left for an input and right for an output.
   if (!r.width && dir === 'in'){ const sh = secHeadOf(el), sr = sh && sh.getBoundingClientRect(); if (sr && sr.width) return { x:(sr.left - wr.left) / z, y:(sr.top + sr.height / 2 - wr.top) / z }; }   // T14: a control inside a shut section: the section's title bar
+  if (!r.width && n.m.view === 'mini'){   // MINI: the module's left or right edge, along the title bar by the port's place among the patched ones
+    const nr = n.el.getBoundingClientRect(), hr = n.head.getBoundingClientRect(), mi = n.mIdx && n.mIdx[dir + ':' + port], f = mi ? .2 + .6 * (mi[0] + 1) / (mi[1] + 1) : .5;
+    return { x:((dir === 'in' ? nr.left : nr.right) - wr.left) / z, y:(hr.top + hr.height * f - wr.top) / z };
+  }
   if (!r.width){ const hr = n.head.getBoundingClientRect(); return { x:((dir === 'in' ? hr.left : hr.right) - wr.left) / z, y:(hr.top + hr.height / 2 - wr.top) / z }; }
   return { x:(r.left + r.width / 2 - wr.left) / z, y:(r.top + r.height / 2 - wr.top) / z };
 }
@@ -3541,9 +3638,12 @@ function placeCable(el, a, b, pts, c){
 }
 function drawCables(){
   const wr = world.getBoundingClientRect();
+  gxNow = groupCross();
   for (const [c, el] of cableEls){
     const a = jackPos(c.from[0], 'out', c.from[1], wr), b = jackPos(c.to[0], 'in', c.to[1], wr);
-    const show = !!(a && b); if (el.shown !== show){ el.shown = show; el.g.style.display = show ? '' : 'none'; if (el.gh) el.gh.style.display = show ? '' : 'none'; }
+    let show = !!(a && b);
+    if (show && gxNow){ const na = nodes.get(c.from[0]), nb = nodes.get(c.to[0]); if (na && nb && na.gcol && na.gcol === nb.gcol) show = false; }   // inside a collapsed group: not drawn
+    if (el.shown !== show){ el.shown = show; el.g.style.display = show ? '' : 'none'; if (el.gh) el.gh.style.display = show ? '' : 'none'; }
     if (show) placeCable(el, a, b, c.pts, c);
   }
   if (drag){
@@ -3890,15 +3990,78 @@ function startPan(pid, sx, sy){
 
 /* ----- groups: colored boxes around modules ----- */
 const hexA = (hex, a) => { const v = parseInt(hex.slice(1), 16); return `rgba(${v >> 16},${(v >> 8) & 255},${v & 255},${a})`; };
+/* GROUPS (pass 5, M6). A group is a coloured box round some modules. It FOLLOWS its members: when one is dragged, nudged, aligned, folded or removed the box is drawn round
+   the members again (groupsFollow); a patch is not touched on load (the stored box is used until a member changes). Its stored collapsed flag is honoured: a collapsed group is
+   ONE block (its modules are hidden, still in the patch and still running) with only the cables that cross its boundary, ending on its left (inputs) and right (outputs) edge. */
+const gBox = new WeakMap();   // a group -> its box on the page (kept out of the patch)
+let gxNow = null;             // while cables are drawn: for each collapsed group, which of its ends are crossed by a cable
+function groupBounds(g){
+  const ms = (g.modules || []).map(id => nodes.get(id)).filter(n => n && !n.gcol); if (!ms.length) return null;
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  for (const n of ms){ x0 = Math.min(x0, n.m.pos[0]); y0 = Math.min(y0, n.m.pos[1]); x1 = Math.max(x1, n.m.pos[0] + n.el.offsetWidth); y1 = Math.max(y1, n.m.pos[1] + n.el.offsetHeight); }
+  return [x0 - 24, y0 - 54, x1 - x0 + 48, y1 - y0 + 78];
+}
+function groupsFollow(ids){
+  const set = ids ? new Set(ids) : null;
+  for (const g of doc.groups){
+    if (g.collapsed || !(g.modules || []).some(id => !set || set.has(id))) continue;
+    const b = groupBounds(g), box = gBox.get(g); if (!b) continue;
+    if (!Array.isArray(g.bounds) || b.some((v, i) => v !== g.bounds[i])){ g.bounds = b; if (box) Object.assign(box.style, { left:b[0] + 'px', top:b[1] + 'px', width:b[2] + 'px', height:b[3] + 'px' }); }
+  }
+}
+function groupCross(){
+  if (!doc.groups.some(g => g.collapsed)) return null;
+  const M = new Map(); for (const g of doc.groups) if (g.collapsed) M.set(g, { in:new Map(), out:new Map(), r:null });
+  for (const c of doc.cables){
+    if (!c || !c.from || !c.to) continue;
+    const a = nodes.get(c.from[0]), b = nodes.get(c.to[0]), ga = a && a.gcol, gb = b && b.gcol;
+    if (ga && ga === gb) continue;   // inside the group: not drawn
+    if (ga && M.has(ga)){ const k = c.from[0] + '|' + c.from[1], q = M.get(ga).out; if (!q.has(k)) q.set(k, q.size); }
+    if (gb && M.has(gb)){ const k = c.to[0] + '|' + c.to[1], q = M.get(gb).in; if (!q.has(k)) q.set(k, q.size); }
+  }
+  return M;
+}
+// a hidden module's end of a cable: on the block's edge, spread down it by the order of the ends that cross
+function gcolPos(n, dir, port, wr){
+  const g = n.gcol, G = gxNow && gxNow.get(g), box = gBox.get(g); if (!G || !box) return null;
+  const r = G.r || (G.r = box.getBoundingClientRect()), q = G[dir], i = q.get(n.m.id + '|' + port), z = view().zoom;
+  const f = i == null ? .5 : .18 + .64 * (i + 1) / (q.size + 1);
+  return { x:((dir === 'in' ? r.left : r.right) - wr.left) / z, y:(r.top + r.height * f - wr.top) / z };
+}
+function applyGroupHides(){
+  const hid = new Map(); for (const g of doc.groups) if (g.collapsed) for (const id of g.modules || []) hid.set(id, g);
+  for (const n of nodes.values()){
+    const g = hid.get(n.m.id) || null;
+    if ((n.gcol || null) !== g){ n.gcol = g; n.el.classList.toggle('ghid', !!g); if (g && selected.has(n.m.id)) setSel(n.m.id, false); }
+  }
+  markScene();
+}
+function groupBlock(g){
+  const box = gBox.get(g); if (!box) return;
+  box.classList.toggle('gcol', !!g.collapsed);
+  const fold = box.querySelector('.dfold'), sum = box.querySelector('.dsum');
+  if (fold){ fold.setAttribute('aria-expanded', String(!g.collapsed)); fold.setAttribute('aria-label', (g.collapsed ? 'Expand group ' : 'Collapse group ') + g.name); fold.title = g.collapsed ? 'Show the modules of this group' : 'Collapse this group into one block (its cables that leave the group stay)'; }
+  if (g.collapsed){
+    const M = groupCross(), G = M && M.get(g), nin = G ? G.in.size : 0, nout = G ? G.out.size : 0, nm = (g.modules || []).filter(id => nodes.has(id)).length;
+    const t = nm + (nm === 1 ? ' module' : ' modules') + ' · ' + nin + ' in · ' + nout + ' out'; if (sum && sum.textContent !== t) sum.textContent = t;
+    Object.assign(box.style, { left:g.bounds[0] + 'px', top:g.bounds[1] + 'px', width:'220px', height:Math.max(66, 44 + 14 * Math.max(nin, nout)) + 'px' });
+  } else Object.assign(box.style, { left:g.bounds[0] + 'px', top:g.bounds[1] + 'px', width:g.bounds[2] + 'px', height:g.bounds[3] + 'px' });
+}
+function groupBlocks(){ let any = false; for (const g of doc.groups) if (g.collapsed){ groupBlock(g); any = true; } return any; }
 function renderGroups(){
   groupsEl.replaceChildren(...doc.groups.map(g => {
     const label = h('span', {class:'dtext', text: g.name, title:'Drag to move the group. Double-click to rename.'});
     label.style.background = hexA(g.color, .35);
+    const fold = h('button', {class:'dfold', 'aria-expanded':'true'}); fold.innerHTML = FOLD_SVG;
+    const sum = h('div', {class:'dsum'});
     const x = h('button', {class:'dx', text:'×', title:'Remove the group (its modules stay)', 'aria-label':'Remove group'});
-    const box = h('div', {class:'decor box'}, label, x);
-    Object.assign(box.style, { left:g.bounds[0] + 'px', top:g.bounds[1] + 'px', width:g.bounds[2] + 'px', height:g.bounds[3] + 'px', borderColor:g.color, background:hexA(g.color, .08) });
+    const box = h('div', {class:'decor box' + (g.collapsed ? ' gcol' : '')}, fold, label, sum, x);
+    gBox.set(g, box);
+    Object.assign(box.style, { left:g.bounds[0] + 'px', top:g.bounds[1] + 'px', width:g.bounds[2] + 'px', height:g.bounds[3] + 'px', borderColor:g.color, background:hexA(g.color, g.collapsed ? .2 : .08) });
     x.addEventListener('pointerdown', e => e.stopPropagation());
+    fold.addEventListener('pointerdown', e => e.stopPropagation());
     x.addEventListener('click', () => { store.snapshot(); doc.groups = doc.groups.filter(q => q !== g); renderGroups(); store.touch(); });
+    fold.addEventListener('click', () => { if (playBlocked()) return; store.snapshot(); g.collapsed = !g.collapsed; renderGroups(); store.touch(); });
     label.addEventListener('dblclick', async () => { const nm = await askDialog('Name this group:', { input:g.name, ok:'Rename' }); if (nm && nm.trim()){ store.snapshot(); g.name = nm.trim(); renderGroups(); } });
     label.addEventListener('pointerdown', e => {
       if (e.button !== 0) return;
@@ -3907,15 +4070,18 @@ function renderGroups(){
       let moved = false;
       const mv = ev => {
         const z = view().zoom, dx = Math.round((ev.clientX - sx) / z), dy = Math.round((ev.clientY - sy) / z);
-        if (!moved && (dx || dy)){ moved = true; store.snapshot(); }
+        if (!moved && (dx || dy)){ if (playBlocked()) return; moved = true; store.snapshot(); }
+        if (!moved) return;
         g.bounds[0] = b0[0] + dx; g.bounds[1] = b0[1] + dy; box.style.left = g.bounds[0] + 'px'; box.style.top = g.bounds[1] + 'px';
         members.forEach((n, i) => { n.m.pos = [p0[i][0] + dx, p0[i][1] + dy]; n.el.style.left = n.m.pos[0] + 'px'; n.el.style.top = n.m.pos[1] + 'px'; });
+        markScene();
       };
       const up = () => { label.removeEventListener('pointermove', mv); label.removeEventListener('pointerup', up); if (moved) store.touch(); };
       label.addEventListener('pointermove', mv); label.addEventListener('pointerup', up);
     });
     return box;
   }));
+  applyGroupHides(); groupBlocks();
 }
 const GROUP_COLORS = ['#8a73c9', '#139a9a', '#c99a00', '#b24fb0', '#3f6fb5', '#2e9e5b'];
 function groupSel(){
@@ -3934,7 +4100,7 @@ function captureCustom(name, ids){
   if (!picked.length) return null;
   const ox = Math.min(...picked.map(m => m.pos[0])), oy = Math.min(...picked.map(m => m.pos[1]));
   const map = new Map(picked.map((m, i) => [m.id, 'c' + i]));
-  const mods = picked.map(m => ({ id:map.get(m.id), type:m.type, scope:m.scope, pos:[m.pos[0] - ox, m.pos[1] - oy], collapsed:!!m.collapsed, params:Object.assign({}, m.params) }));
+  const mods = picked.map(m => ({ id:map.get(m.id), type:m.type, scope:m.scope, pos:[m.pos[0] - ox, m.pos[1] - oy], collapsed:!!m.collapsed, ...(m.collapsed && m.view === 'mini' ? { view:'mini' } : {}), params:Object.assign({}, m.params) }));
   const cables = doc.cables.filter(c => inside.has(c.from[0]) && inside.has(c.to[0]))
     .map(c => ({ from:[map.get(c.from[0]), c.from[1]], to:[map.get(c.to[0]), c.to[1]], bend:0 }));
   store.snapshot();
@@ -3999,7 +4165,7 @@ function copySel(quiet){
   const ox = Math.min(...picked.map(m => m.pos[0])), oy = Math.min(...picked.map(m => m.pos[1]));
   const ids = new Set(picked.map(m => m.id));
   clip = { ox, oy, graph:{
-    modules: picked.map(m => ({ id:m.id, type:m.type, scope:m.scope, pos:[m.pos[0] - ox, m.pos[1] - oy], collapsed:!!m.collapsed, params:Object.assign({}, m.params) })),
+    modules: picked.map(m => ({ id:m.id, type:m.type, scope:m.scope, pos:[m.pos[0] - ox, m.pos[1] - oy], collapsed:!!m.collapsed, ...(m.collapsed && m.view === 'mini' ? { view:'mini' } : {}), params:Object.assign({}, m.params) })),
     cables: doc.cables.filter(c => ids.has(c.from[0]) && ids.has(c.to[0])).map(c => ({ from:c.from.slice(), to:c.to.slice(), pts:c.pts && c.pts.map(p => [p[0] - ox, p[1] - oy]) })) } };
   if (!quiet) toast(picked.length === 1 ? 'Copied 1 module.' : 'Copied ' + picked.length + ' modules.');
   return true;
@@ -4016,7 +4182,7 @@ function pasteClip(){
 const ctx = document.getElementById('ctxmenu');
 function showMenu(x, y, items){
   ctx.replaceChildren(...items.map(([label, fn, dis]) => { if (label[0] === '§') return h('div', {class:'ctxhead', text: label.slice(1)});   // a section heading
-    const b = h('button', {class:'ctxitem', role:'menuitem', text: label}); if (dis) b.disabled = true; b.addEventListener('click', () => { hideMenu(); fn(); }); return b; }));
+    const b = h('button', {class:'ctxitem', role:'menuitem', text: label}); if (dis) b.disabled = true; b.addEventListener('click', e => { if (menuTouchAt && e.isTrusted) return; hideMenu(); fn(); }); return b; }));
   ctx.hidden = false;
   const r = ctx.getBoundingClientRect();
   ctx.style.left = Math.max(8, Math.min(x, window.innerWidth - r.width - 8)) + 'px'; ctx.style.top = Math.max(8, Math.min(y, window.innerHeight - r.height - 8)) + 'px';   // (U10) never off the top: a tall menu scrolls
@@ -4065,7 +4231,11 @@ ws.addEventListener('contextmenu', e => {
   ctxMenu(e.target, e.clientX, e.clientY, { touch: isFinger(e) || !!(e.sourceCapabilities && e.sourceCapabilities.firesTouchEvents) });
 });
 // The module / cable / background menu: a right-click, or a long press (o.touch: the extra touch items, and Delete asks first).
+// A menu a long press just opened sits under the finger: the lift that ends the press must not choose the item beneath it (some touch screens click on lift).
+let menuTouchAt = false;   // a menu opened by a long press: the finger that opened it may still be down; its lift must not pick an item. Cleared by the next press inside the menu.
+ctx.addEventListener('pointerdown', () => { menuTouchAt = false; }, true);
 function ctxMenu(target, x, y, o = {}){
+  menuTouchAt = !!o.touch;
   // A CABLE (mouse audit, 3 Nov): right-click it to remove it (double-click still does); it had no menu of its own.
   const hc = target.closest && target.closest('.hit'), cab = hc && hc._cable;
   if (cab && doc.cables.includes(cab)){
@@ -4100,6 +4270,7 @@ function ctxMenu(target, x, y, o = {}){
     const def = captureCustom(nm.trim(), sel); if (def) toast('“' + def.name + '” is in the module list under Custom.');
   }]);
   if (n === 1) items.push(['Rename module… (Enter)', () => renameModule(sel[0])]);
+  if (n === 1 && nodes.get(sel[0])) items.push(['About this module', () => { const q = nodes.get(sel[0]); if (q) mhelpShow(q.head, q.m.type, q.title, true); }]);   // (narrow and Mini modules have no ? button)
   if (n) items.push(['Group ' + (n === 1 ? 'module' : n + ' modules') + ' (' + MOD + '+G)', () => groupSel()], ['Zoom to ' + these + ' (Shift+F)', () => zoomToSel()]);
   if (n >= 2) items.push(['Align left edges', () => alignSel('left')], ['Align right edges', () => alignSel('right')], ['Align tops', () => alignSel('top')], ['Align bottoms', () => alignSel('bottom')]);
   if (n >= 3) items.push(['Space evenly across', () => alignSel('dist-h')], ['Space evenly down', () => alignSel('dist-v')]);
@@ -4112,7 +4283,9 @@ function ctxMenu(target, x, y, o = {}){
     const say = (k, c) => toast((c ? 'Collapsed ' : 'Expanded ') + k + (k === 1 ? ' module' : ' modules') + ' (' + MOD + '+Z undoes it).');
     if (picked.some(x => !x.m.collapsed)) items.push(['Collapse ' + (picked.length === 1 ? 'this module' : 'selected modules'), () => say(setAllCollapsed(true, sel), true)]);
     else if (picked.length && picked.some(x => x.m.collapsed)) items.push(['Expand ' + (picked.length === 1 ? 'this module' : 'selected modules'), () => say(setAllCollapsed(false, sel), false)]);
+    if (picked.some(x => viewOf(x.m) !== 'mini')) items.push(['Mini ' + (picked.length === 1 ? 'this module' : 'selected modules') + ' (title bar only)', () => { const k = setAllMini(sel); toast('Mini: ' + k + (k === 1 ? ' module' : ' modules') + ' (' + MOD + '+Z undoes it).'); }]);
     if (open) items.push(['Collapse all modules (Alt+C)', () => say(setAllCollapsed(true), true)]);
+    if (all.length > all.filter(x => viewOf(x.m) === 'mini').length) items.push(['Mini all modules (Alt+Shift+C)', () => { const k = setAllMini(); toast('Mini: ' + k + (k === 1 ? ' module' : ' modules') + ' (' + MOD + '+Z undoes it).'); }]);
     if (shut) items.push(['Expand all modules' + (open ? '' : ' (Alt+C)'), () => say(setAllCollapsed(false), false)]);
   }
   if (!id) items.push(['Add a comment here', () => addNote(...worldPt({ clientX:x, clientY:y }))], ['Fit all modules (F)', () => fitAll()], ['Tidy up (by signal flow)', () => tidy()], ['Snap to grid: ' + (snapOn ? 'on (turn off)' : 'off (turn on)'), () => { snapOn = !snapOn; settings.snap = snapOn; saveSettings(); toast(snapOn ? 'Snap to grid on: modules land on a 10 px grid.' : 'Snap to grid off.'); }]);
@@ -4528,8 +4701,9 @@ function helpDoc(){
   const guide = [
     ['Patching', 'Drag from an output jack (right edge) to an input jack (left edge). Teal solid cables carry audio, purple dashed cables carry control signals and pink dotted cables carry gates; gate jacks are diamonds, the others round. Every slider has a small purple jack on its left for modulation. Drag a patched input to move its cable, or drop it on empty space to unplug. Click a cable to select it: Delete removes it, Escape lets go, and its bend handles show (drag one to move the bend, Option-click one to remove it). Double-click a cable to remove it. Hold Option (Alt on Windows) and click while drawing a cable to bend it, or Option-drag an existing cable.'],
     ['Summing and reading cables', 'A second cable into an input adds to the first: the signals are summed (two equal signals come out 6 dB louder, with no automatic level trim). To replace a cable, drag the old one off first; dragging from a patched input picks up its newest cable. Rest the pointer on a cable to read what it carries: the two ends and, while the sound engine runs, its level (audio in dB, control as a number, gates on or off).'],
-    ['Keys', 'A or N opens Find a module under the pointer (or beside the picked module): type a few letters, Enter adds it, Esc closes it. F fits the whole patch and Shift+F zooms to the picked modules. Ctrl/⌘+A picks every module, Ctrl/⌘+G groups the picked ones, Ctrl/⌘ with = and - zooms, Ctrl/⌘+0 goes back to 100%. Arrow keys move the picked modules 10 px (Shift: 1 px), Enter renames the picked one, Esc lets go of them, Delete removes them. Alt+C collapses or expands every module, Alt+E switches Play and Edit, Ctrl/⌘+Z undoes. Tab walks through the modules and their controls: a module you Tab onto is picked, so the arrows move it. These keys do nothing while you type in a box, and the ones that change the patch do nothing in Play.'],
+    ['Keys', 'A or N opens Find a module under the pointer (or beside the picked module): type a few letters, Enter adds it, Esc closes it. F fits the whole patch and Shift+F zooms to the picked modules. Ctrl/⌘+A picks every module, Ctrl/⌘+G groups the picked ones, Ctrl/⌘ with = and - zooms, Ctrl/⌘+0 goes back to 100%. Arrow keys move the picked modules 10 px (Shift: 1 px), Enter renames the picked one, Esc lets go of them, Delete removes them. Alt+C collapses or expands every module, Alt+Shift+C takes them all to Mini, Alt+E switches Play and Edit, Ctrl/⌘+Z undoes. Tab walks through the modules and their controls: a module you Tab onto is picked, so the arrows move it. These keys do nothing while you type in a box, and the ones that change the patch do nothing in Play.'],
     ['Comments, names and layout', 'Right-click the background and choose Add a comment here (or type “comment” in Find a module) for a plain text note you can type into, move by its top edge and remove with its x; a comment is saved with the patch. Right-click a module and choose Rename module to give it a name of your own (empty goes back to the usual one). With two or more modules picked, the menu aligns their edges; with three, it spaces them evenly. Modules snap to a 10 px grid as you drag; the background menu turns that off. Tidy up lays the modules out in columns by signal flow and keeps your groups.'],
+    ['Folding, Mini, widths and groups', 'The chevron folds a module to Compact (its key values, the ports that have a cable and a stub for each modulated control) and opens it again; a double-click on the title bar does the same. Shift+click the chevron, or hold it on a touch screen, shrinks it to Mini: the title bar alone, with every cable ending on its left (inputs) or right (outputs) edge. Shift+click again goes back to Compact; a plain click opens it. Alt+C folds or opens every module, Alt+Shift+C takes every module to Mini or opens them all, and the right-click menus list the same. Small utility modules (Attenuverter, Math, Logic and the like) are drawn narrower than the rest; their About card is in the right-click menu. The arrow on a group\u2019s label collapses the group into one block: its modules keep running, only the cables that cross the group stay drawn, and unfolding puts everything back. A group\u2019s box follows its modules when you move, fold or remove them. None of this works in Play.'],
     ['Modulation', 'Patch any signal into a slider’s small purple jack and it moves that slider: the slider sets the center, and the signal swings it across its range. The value turns purple and a mark shows where the slider really is. Use the Depth slider on an LFO or envelope, or an Attenuverter, to make the swing smaller.'],
     ['Audio as control', 'Audio can drive anything a control signal can. Patch audio into Envelope follow to make it swell a filter or level, into Gate extract to fire envelopes and clocks from hits, or into Pitch follow to track a monophonic melody. Then shape it with Slew (to smooth it), Sample & hold (to step it) or Quantizer (to snap it to a scale).'],
     ['Tracks', 'Each track has its own Track In and Chain Out. In the Mixer, turning a track’s CHN on adds that track’s pair (wired straight through, in a column below everything else) without leaving the Mixer, so every track gets its own chain and toggling one never disturbs another; the next time you come here, the patch is fitted so you see them all. If that track already has a chain, switching its CHN on just runs it through that chain again. The output always follows its own input — set the Track In and its Chain Out moves with it, and a Chain Out can’t be pointed elsewhere. Picking a track that is already used also jumps to and highlights the existing chain. A track takes one pair; control and gate inputs are not limited.'],
@@ -4761,7 +4935,7 @@ function setMode(play, quiet){
 }
 for (const k in modeBtns) modeBtns[k].addEventListener('click', () => setMode(k === 'play'));
 window.addEventListener('keydown', e => {
-  if (!e.altKey || e.ctrlKey || e.metaKey || e.shiftKey || e.code !== 'KeyE' || e.repeat || typing(e) || document.querySelector('.dlgov')) return;
+  if (!e.altKey || e.ctrlKey || e.metaKey || e.shiftKey || letterKey(e) !== 'e' || e.repeat || typing(e) || document.querySelector('.dlgov')) return;
   e.preventDefault(); setMode(!playMode);
 });
 /* SELECT (T8): a plain tap on a module toggles it in the selection and a drag on the background draws a box, as Shift-click and Shift-drag do with a mouse. */

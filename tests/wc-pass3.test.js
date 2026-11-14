@@ -11,7 +11,7 @@ for (const [ed, src] of Object.entries(ED)) {
     assert.match(src, /id="modeplay"/); assert.match(src, /id="modeedit"/);
     assert.match(src, /const PLAY_CTL = /); assert.match(src, /function playBlocked\(\)/);
     assert.match(src, /settings\.mode/); assert.match(src, /setMode\(settings\.mode === 'play', true\)/);
-    assert.match(src, /e\.code !== 'KeyE'/);
+    assert.match(src, /letterKey\(e\) !== 'e'/);
     assert.match(src, /body\.play \.ws::before/); assert.match(src, /body\.play \.ws::after/);
     assert.doesNotMatch(src, /doc\.mode|doc\.play/, 'the mode is not a patch field');
   });

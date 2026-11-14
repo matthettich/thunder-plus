@@ -2,7 +2,7 @@
 // Both editors, standalone, with REAL touch events (CDP Input.dispatchTouchEvent) in a mobile context, and a mouse context for "unchanged". Prints PASS / FAIL.
 //   node tests/sweep/wc-pass3.mjs             all of it
 //   node tests/sweep/wc-pass3.mjs fu m10 ...   sections: fu (follow-ups a-d) m10 t4 t6 t7 t8 t9 t12 t13 t14 old mouse
-//   OLD_ROOT=/path/to/a/checkout  or  OLD_REF=<commit> (default e67adc2, the build 585 merge commit; fetched if absent, the comparisons print SKIP if it cannot be had): the previous build, for "unchanged" and "loads in 585"
+//   OLD_ROOT=/path/to/a/checkout  or  OLD_REF=<commit> (default e67adc29f2283e3b5230cd9b1d6b323a30d34306, the build 585 merge commit; fetched if absent, the comparisons print SKIP if it cannot be had): the previous build, for "unchanged" and "loads in 585"
 //   SHOTS=/dir node tests/sweep/wc-pass3.mjs shots    before / after screenshots for the owner
 import fs from 'fs'; import os from 'os'; import path from 'path'; import { execSync } from 'child_process';
 import { boot, app, Table, ROOT, serveDir, listenLoopback } from './ui-lib.mjs';
@@ -61,7 +61,7 @@ async function bootEd(w, h, mob) { const B = await boot({ width: w, height: h, m
 const done = (errors, tag) => { const errs = errors.splice(0).filter(e => !NOISE.test(e)); ok(`${tag}: no page errors`, errs.length === 0, errs.slice(0, 3).join(' | ')); };
 
 // ---- the previous build: a fixed older commit, never HEAD (after the merge HEAD is this build, and the comparison would be with itself) ----
-const BASE585 = 'e67adc2';   // the build 585 merge commit
+const BASE585 = 'e67adc29f2283e3b5230cd9b1d6b323a30d34306';   // the build 585 merge commit
 async function oldBuild() {
   let dir = process.env.OLD_ROOT;
   if (!dir) { const ref = process.env.OLD_REF || BASE585; dir = fs.mkdtempSync(path.join(os.tmpdir(), 'wc-pass3-old-'));
@@ -594,7 +594,7 @@ async function t13() {
 // ================= T14: long modules =================
 async function t14(ed, OLD) {
   const long = SPEC[ed].long;
-  const mk = (o = {}) => { const d = SPEC[ed].doc({ view: { x: 12, y: 12, zoom: 1, ui: 2, nw: 1 }, cables: o.cables || [] }); d.modules = [P('L1', long, 0, 0), P('s1', 'delay', 420, 0)].concat(o.extra || []); if (o.sec) d.view.sec = o.sec; return d; };
+  const mk = (o = {}) => { const d = SPEC[ed].doc({ view: { x: 12, y: 12, zoom: 1, ui: 2, nw: 1 }, cables: o.cables || [] }); d.modules = [P('L1', long, 0, 0), P('s1', 'delay', 420, 0, { time: 0.62, regen: 0.71, tone: 0.33, mix: 0.43 })].concat(o.extra || []);   /* s1 has explicit non-default values (defaults .375 / .38 / .5 / .25), so the round-trip comparison compares something */ if (o.sec) d.view.sec = o.sec; return d; };
   const B = await bootEd(344, 780, true); const { page, errors, base } = B; const tag = `${ed} T14`;
   try {
     await loadDoc(page, base, ed, mk(), { settings: { tips: false } });
