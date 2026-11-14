@@ -7,7 +7,7 @@
 //   the tip box on touch and with a mouse (T11), and a patch saved by the previous build loading unchanged, and the other way round.
 //   node tests/sweep/wc-wording.mjs      (OLD_ROOT=/path to a checkout of the previous build, or OLD_REF=<commit>: default 602e083, build 580)
 import http from 'http'; import fs from 'fs'; import os from 'os'; import path from 'path'; import { execSync } from 'child_process';
-import { boot, app, Table, ROOT } from './ui-lib.mjs';
+import { boot, app, Table, ROOT, serveDir, listenLoopback } from './ui-lib.mjs';
 
 const T = new Table('wc-wording');
 const ok = (name, cond, note = '') => { T.add(name, !!cond, note); console.log((cond ? 'ok   ' : 'FAIL ') + name + (note ? '  ' + String(note).slice(0, 400) : '')); };
@@ -33,7 +33,7 @@ const HELP = `(() => {
   const contrast = el => { const chain = []; for (let e = el; e; e = e.parentElement) chain.unshift(e);
     let bg = [255, 255, 255, 1], op = 1; for (const e of chain) { const cs = getComputedStyle(e); bg = over(parse(cs.backgroundColor), bg); op *= parseFloat(cs.opacity); }
     const cs = getComputedStyle(el), fg = parse(cs.color); fg[3] *= op; return ratio(over(fg, bg), bg); };
-  window.__w = { parse, contrast, shown, hasText, ratio,
+  window.__w = { parse, over, contrast, shown, hasText, ratio,
     // the smallest font and the set of sizes of every element that carries text
     fonts: (root, skip) => { const sizes = {}; let min = 99, who = ''; for (const el of root.querySelectorAll('*')) { if (!hasText(el) || !shown(el) || (skip && el.closest(skip))) continue; const s = parseFloat(getComputedStyle(el).fontSize); sizes[s] = (sizes[s] || 0) + 1; if (s < min) { min = s; who = el.tagName.toLowerCase() + '.' + el.className + ' "' + el.textContent.trim().slice(0, 20) + '"'; } } return { min, who, sizes: Object.keys(sizes).map(Number).sort((a, b) => a - b) }; },
     worst: (root, sel, skip) => { let w = 99, who = ''; for (const el of root.querySelectorAll(sel)) { if (!hasText(el) || !shown(el) || (skip && el.closest(skip))) continue; const r = contrast(el); if (r < w) { w = r; who = el.className + ' "' + el.textContent.trim().slice(0, 18) + '"'; } } return w === 99 ? null : { r: +w.toFixed(2), who }; },
@@ -49,6 +49,8 @@ async function skinCss() {
   return out;
 }
 
+const TIPCLEAR = `(() => { document.getElementById('zoomfit').click(); return new Promise(r => setTimeout(() => { const h = document.getElementById('hint').getBoundingClientRect();
+  r({ hint: [h.width, h.height].map(Math.round), hit: [...document.querySelectorAll('.node')].filter(n => { const b = n.getBoundingClientRect(); return b.left < h.right && b.right > h.left && b.top < h.bottom && b.bottom > h.top; }).length, n: document.querySelectorAll('.node').length }); }, 500)); })()`;   // T11 mouse: after Fit no module is under the tip box
 // every module of the palette on one patch, in a grid
 const doc = (ed, types, collapsed = false) => ({ format: ed + '.patch', meta: { name: 'wc wording' }, view: { x: 10, y: 10, zoom: .4, ui: 2 }, voice: { maxVoices: 8 }, st2: 1, ti2: 1,
   modules: types.map((t, i) => ({ id: 'm' + i, type: t, scope: 'mono', pos: [(i % 10) * 290, Math.floor(i / 10) * 520], collapsed, params: {} })), cables: [], groups: [], custom: [], transport: { tempo: 120 } });
@@ -68,7 +70,7 @@ const paletteOf = page => page.evaluate(() => { if (document.getElementById('dra
   return [...document.querySelectorAll('.plist .pgroup.tinted + .pgrid .pitem')].map(b => [b.dataset.type, b.textContent.trim(), b.title]); });
 
 async function run(ed, CSS, OLD) {
-  const B = await boot({ width: 1440, height: 900, query: '' }); const { page, errors } = B; const base = `http://localhost:${B.port}`;
+  const B = await boot({ width: 1440, height: 900, query: '' }); const { page, errors } = B; const base = `http://127.0.0.1:${B.port}`;
   try {
     // ============ the palette, names, kinds ============
     await load(page, base, ed, null);
@@ -118,17 +120,20 @@ async function run(ed, CSS, OLD) {
     if (wv) ok(`waves U5: the bus meters say Waves In, as the Out module does (${wv.m}; ${wv.b[0]})`, /^Waves In 1/.test(wv.m) && wv.b.every((t, i) => t === 'Waves In ' + (i + 1)) && !/Out 1/.test(wv.m + wv.b.join('')));
 
     // ============ U7: nothing cut (open, Compact; 1440 mouse) ============
-    const fit = () => S(page, `(() => { const o = { title: [], word: [], val: [], port: [], valsOut: [] };
+    const fit = () => S(page, `(() => { const o = { title: [], word: [], brk: [], val: [], port: [], valsOut: [] };
       const cvs = document.createElement('canvas').getContext('2d');
       for (const n of document.querySelectorAll('.node')) { const t = n.querySelector('header .t'), name = t.textContent, cs = getComputedStyle(t);
         if (t.scrollWidth > t.clientWidth + 0.5 || Math.round(t.getBoundingClientRect().height / parseFloat(cs.lineHeight)) > 2) o.title.push(name);
-        cvs.font = cs.fontWeight + ' ' + cs.fontSize + ' ' + cs.fontFamily; const w = Math.max(...name.split(/\\s+/).map(x => cvs.measureText(x).width)); if (w > t.clientWidth) o.word.push(name + ' ' + Math.round(w) + '>' + t.clientWidth);
+        cvs.font = cs.fontWeight + ' ' + cs.fontSize + ' ' + cs.fontFamily; const w = Math.max(...name.split(/\\s+/).map(x => cvs.measureText(x).width)); if (w > t.clientWidth + 1) o.word.push(name + ' ' + Math.round(w) + '>' + t.clientWidth);
+        // a title breaks only between words: the line boxes of each word's own range must share one top (a word split over two lines has two)
+        { const tn = [...t.childNodes].find(c => c.nodeType === 3); if (tn) { const re = /\\S+/g; let m; while ((m = re.exec(tn.data))) { const rg = document.createRange(); rg.setStart(tn, m.index); rg.setEnd(tn, m.index + m[0].length);
+          const tops = new Set([...rg.getClientRects()].filter(r => r.width > 0).map(r => Math.round(r.top / 4))); if (tops.size > 1) o.brk.push(name + ' | ' + m[0]); } } }
         const nr = n.getBoundingClientRect();
         for (const v of n.querySelectorAll('.row .val')) { if (!__w.shown(v)) continue; if (v.scrollWidth > v.clientWidth + 0.5 || v.getBoundingClientRect().right > nr.right + 0.5) o.val.push(name + ': ' + v.textContent); }
         for (const p of n.querySelectorAll('.port .pl')) { if (!__w.shown(p)) continue; if (p.scrollWidth > p.clientWidth + 0.5) o.port.push(name + ': ' + p.textContent); } }
       return o; })()`);
     const o1 = await fit();
-    ok(`${ed} U7: open: every title reads in full (${titles.length} modules; ≤ 2 lines, no word broken)`, !o1.title.length && !o1.word.length, JSON.stringify([...o1.title, ...o1.word].slice(0, 5)));
+    ok(`${ed} U7: open: every title reads in full (${titles.length} modules; ≤ 2 lines, no word broken)`, !o1.title.length && !o1.word.length && !o1.brk.length, JSON.stringify([...o1.title, ...o1.word, ...o1.brk].slice(0, 5)));
     ok(`${ed} U7: open: no value readout is cut or leaves its module`, !o1.val.length, JSON.stringify(o1.val.slice(0, 5)));
     ok(`${ed} U7: open: no port label is cut`, !o1.port.length, JSON.stringify(o1.port.slice(0, 5)));
     // the readouts at both ends of every slider
@@ -141,7 +146,7 @@ async function run(ed, CSS, OLD) {
     await page.evaluate(() => document.querySelectorAll('.node > header .fold').forEach(b => { if (!b.closest('.node').classList.contains('collapsed')) b.click(); })); await sleep(page, 800);
     ok(`${ed}: every module is Compact now`, (await page.$$('.node.collapsed')).length === types.length);
     const o2 = await fit();
-    ok(`${ed} U7: Compact: every title reads in full`, !o2.title.length && !o2.word.length, JSON.stringify([...o2.title, ...o2.word].slice(0, 5)));
+    ok(`${ed} U7: Compact: every title reads in full`, !o2.title.length && !o2.word.length && !o2.brk.length, JSON.stringify([...o2.title, ...o2.word, ...o2.brk].slice(0, 5)));
     ok(`${ed} U7: Compact: no port label is cut`, !o2.port.length, JSON.stringify(o2.port.slice(0, 6)));
     const csum = await S(page, `(() => { const bad = []; for (const n of document.querySelectorAll('.node.collapsed')) for (const e of n.querySelectorAll('.cs-v, .cs-l')) { if (__w.shown(e) && e.scrollWidth > e.clientWidth + .5) bad.push(n.querySelector('header .t').textContent + ': ' + e.textContent); } return bad; })()`);
     ok(`${ed} U7: Compact: the summary values are whole (a long summary is cut as a whole at its end, never inside a value)`, !csum.length, JSON.stringify(csum.slice(0, 4)));
@@ -153,9 +158,20 @@ async function run(ed, CSS, OLD) {
     ok(`${ed} U8: Help: smallest text ${fh.min} px; ${fh.sizes.length} sizes: ${fh.sizes.join(', ')}`, fh.min >= FLOOR && fh.sizes.length <= MAX_SIZES);
     await page.keyboard.press('Escape'); await sleep(page, 200);
 
+    // ============ U7 in every theme: every title breaks only between words, open and Compact ============
+    for (const [name, id] of SKINS) {
+      await load(page, base, ed, doc(ed, types, false), id ? CSS[id] : null);
+      const t1 = await fit();
+      ok(`${ed} U7: ${name}: open: titles whole, no word split over two lines (${titles.length} modules)`, !t1.title.length && !t1.word.length && !t1.brk.length, JSON.stringify([...t1.title, ...t1.word, ...t1.brk].slice(0, 5)));
+      await page.evaluate(() => document.querySelectorAll('.node > header .fold').forEach(b => { if (!b.closest('.node').classList.contains('collapsed')) b.click(); })); await sleep(page, 800);
+      const t2 = await fit();
+      ok(`${ed} U7: ${name}: Compact: titles whole, no word split over two lines`, !t2.title.length && !t2.word.length && !t2.brk.length, JSON.stringify([...t2.title, ...t2.word, ...t2.brk].slice(0, 5)));
+    }
+
     // ============ U8 / U9: contrast in the four themes ============
     for (const [name, id] of SKINS) {
       await load(page, base, ed, doc(ed, ['delay', 'compressor', 'lfo', 'math', 'euclid', ed === 'chains' ? 'chainOut' : 'out', 'scin'].filter(t => types.includes(t)).concat(['pingpong', 'transient']).filter(t => types.includes(t)).filter((t, i, a) => a.indexOf(t) === i), false), id ? CSS[id] : null, { tips: true });
+      { const tc = await page.evaluate(TIPCLEAR); ok(`${ed} T11: ${name}, 1440 x 900: after Fit no module is under the tip box (${tc.hint.join(' x ')} px, ${tc.n} modules)`, tc.hit === 0 && tc.hint[1] <= 80, JSON.stringify(tc)); }
       // one of them Compact, one bypassed is left out (a bypassed module is dimmed on purpose)
       await page.evaluate(() => { const f = document.querySelectorAll('.node > header .fold'); if (f[2]) f[2].click(); }); await sleep(page, 400);
       await page.evaluate(() => { document.getElementById('dtoggle').click(); document.querySelectorAll('.pgroup:not(.open)').forEach(b => b.click()); }); await sleep(page, 300);
@@ -171,7 +187,7 @@ async function run(ed, CSS, OLD) {
       // Help cards in the colour of the module (U9) and their text
       await page.click('#helpbtn'); await sleep(page, 500);
       const hc = await page.evaluate(`(() => { ${HELP}; const d = document.querySelector('#helpov iframe').contentDocument, win = d.defaultView; const cards = [...d.querySelectorAll('.mcard')]; const cols = cards.map(c => win.getComputedStyle(c).borderTopColor);
-        const worst = (sel) => { let w = 99, who = ''; for (const el of d.querySelectorAll(sel)) { if (![...el.childNodes].some(n => n.nodeType === 3 && n.textContent.trim())) continue; const chain = []; for (let e = el; e; e = e.parentElement) chain.unshift(e); let bg = [255, 255, 255, 1]; for (const e of chain) bg = __w.parse(win.getComputedStyle(e).backgroundColor) && (() => { const f = __w.parse(win.getComputedStyle(e).backgroundColor); const a = f[3] + bg[3] * (1 - f[3]); return a ? [(f[0] * f[3] + bg[0] * bg[3] * (1 - f[3])) / a, (f[1] * f[3] + bg[1] * bg[3] * (1 - f[3])) / a, (f[2] * f[3] + bg[2] * bg[3] * (1 - f[3])) / a, a] : bg; })(); const r = __w.ratio(__w.parse(win.getComputedStyle(el).color), bg); if (r < w) { w = r; who = el.className + ' ' + el.textContent.slice(0, 14); } } return { r: +w.toFixed(2), who }; };
+        const worst = (sel) => { let w = 99, who = ''; for (const el of d.querySelectorAll(sel)) { if (![...el.childNodes].some(n => n.nodeType === 3 && n.textContent.trim())) continue; const chain = []; for (let e = el; e; e = e.parentElement) chain.unshift(e); let bg = [255, 255, 255, 1]; for (const e of chain) bg = __w.parse(win.getComputedStyle(e).backgroundColor) && (() => { const f = __w.parse(win.getComputedStyle(e).backgroundColor); const a = f[3] + bg[3] * (1 - f[3]); return a ? [(f[0] * f[3] + bg[0] * bg[3] * (1 - f[3])) / a, (f[1] * f[3] + bg[1] * bg[3] * (1 - f[3])) / a, (f[2] * f[3] + bg[2] * bg[3] * (1 - f[3])) / a, a] : bg; })(); const fg = __w.parse(win.getComputedStyle(el).color); for (const e of chain) fg[3] *= parseFloat(win.getComputedStyle(e).opacity); const r = __w.ratio(__w.over(fg, bg), bg); if (r < w) { w = r; who = el.className + ' ' + el.textContent.slice(0, 14); } } return { r: +w.toFixed(2), who }; };
         return { n: cards.length, cols: [...new Set(cols)].length, h4: worst('.mcard h4'), p: worst('.mcard p'), io: worst('.io b, .pt'), nav: worst('nav a'), legend: worst('.legend') }; })()`);
       ok(`${ed} U9: ${name}: Help card text ≥ ${RATIO} : 1 (card title ${hc.h4.r}, text ${hc.p.r}, ports ${hc.io.r}, nav ${hc.nav.r}, legend ${hc.legend.r})`, [hc.h4, hc.p, hc.io, hc.nav, hc.legend].every(x => x.r >= RATIO), JSON.stringify(hc));
       if (name === 'white') {
@@ -230,13 +246,13 @@ async function run(ed, CSS, OLD) {
   await B.close();
 
   // ============ touch, 344 x 780: titles, values, the tip box, the menus ============
-  const M = await boot({ width: 344, height: 780, mobile: true, query: '' }); const mp = M.page, mb = `http://localhost:${M.port}`;
+  const M = await boot({ width: 344, height: 780, mobile: true, query: '' }); const mp = M.page, mb = `http://127.0.0.1:${M.port}`;
   try {
     await load(mp, mb, ed, null); const pal2 = await paletteOf(mp); const types2 = pal2.map(p => p[0]);
     await load(mp, mb, ed, doc(ed, types2));
     const m1 = await S(mp, `(() => { const o = { title: [], word: [], val: [] }; const cvs = document.createElement('canvas').getContext('2d');
       for (const n of document.querySelectorAll('.node')) { const t = n.querySelector('header .t'), name = t.textContent, cs = getComputedStyle(t); if (t.scrollWidth > t.clientWidth + .5 || Math.round(t.getBoundingClientRect().height / parseFloat(getComputedStyle(t).lineHeight)) > 2) o.title.push(name);
-        cvs.font = cs.fontWeight + ' ' + cs.fontSize + ' ' + cs.fontFamily; const w = Math.max(...name.split(/\\s+/).map(x => cvs.measureText(x).width)); if (w > t.clientWidth) o.word.push(name);
+        cvs.font = cs.fontWeight + ' ' + cs.fontSize + ' ' + cs.fontFamily; const w = Math.max(...name.split(/\\s+/).map(x => cvs.measureText(x).width)); if (w > t.clientWidth + 1) o.word.push(name);
         const nr = n.getBoundingClientRect(); for (const v of n.querySelectorAll('.row .val')) if (__w.shown(v) && (v.scrollWidth > v.clientWidth + .5 || v.getBoundingClientRect().right > nr.right + .5)) o.val.push(name + ': ' + v.textContent); } return o; })()`);
     ok(`${ed} U7: touch 344: titles whole and no value cut (open)`, !m1.title.length && !m1.word.length && !m1.val.length, JSON.stringify(m1).slice(0, 300));
     await mp.evaluate(() => document.querySelectorAll('.node > header .fold').forEach(b => b.click())); await sleep(mp, 800);
@@ -288,13 +304,18 @@ async function run(ed, CSS, OLD) {
   await M.close();
 
   // ============ desktop: the tip box with a mouse (T11 leaves it alone), the menu at 800 x 700 (U10) ============
-  const D = await boot({ width: 800, height: 700, query: '' }); const dp = D.page, db = `http://localhost:${D.port}`;
+  const D = await boot({ width: 800, height: 700, query: '' }); const dp = D.page, db = `http://127.0.0.1:${D.port}`;
   try {
     await load(dp, db, ed, doc(ed, ['vca', 'lfo', 'delay', 'adsr', 'vcf']), null, { tips: true });
     const tip = await dp.evaluate(() => { const h = document.getElementById('hint'), v = e => { const b = e.getBoundingClientRect(); return b.width > 0 && b.height > 0; }; return { long: v(h.querySelector('.tipm')), short: v(h.querySelector('.tipt')), pill: v(document.getElementById('hintpill')), min: h.classList.contains('min'), text: h.querySelector('.tipm').textContent }; });
     ok(`${ed} T11: with a mouse the full note is shown as before (and no Tips button)`, tip.long && !tip.short && !tip.pill && !tip.min && /Option/.test(tip.text) && /right-click to group/.test(tip.text), JSON.stringify(tip).slice(0, 200));
     await dp.click('#hintx'); await sleep(dp, 200);
     ok(`${ed} T11: with a mouse × still turns tips off (as before)`, await dp.evaluate(k => document.getElementById('hint').hidden && JSON.parse(localStorage.getItem(k)).tips === false, ed + '.settings'));
+    await load(dp, db, ed, doc(ed, ['vca', 'lfo', 'delay', 'adsr', 'vcf', 'convolve']), null, { tips: true });
+    { const tc = await dp.evaluate(TIPCLEAR); ok(`${ed} T11: 800 x 700: after Fit no module is under the tip box (${tc.hint.join(' x ')} px, ${tc.n} modules)`, tc.hit === 0 && tc.hint[1] <= 80, JSON.stringify(tc)); }
+    await dp.click('#hintmore'); const more = await dp.evaluate(() => { const h = document.getElementById('hint'); return { open: h.classList.contains('more'), h: Math.round(h.getBoundingClientRect().height), label: document.getElementById('hintmore').textContent }; });
+    ok(`${ed} T11: More shows the whole note (${more.h} px tall, button reads ${more.label})`, more.open && more.h > 80 && more.label === 'Less', JSON.stringify(more));
+    await load(dp, db, ed, doc(ed, ['vca', 'lfo', 'delay', 'adsr', 'vcf']), null, { tips: true });
     const dm = async (x, y) => { await dp.evaluate(([x, y]) => document.querySelector('.node > header .t').dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: x, clientY: y })), [x, y]); await sleep(dp, 200);
       return dp.evaluate(() => { const c = document.getElementById('ctxmenu'), r = c.getBoundingClientRect(), cs = getComputedStyle(c); return { hidden: c.hidden, top: Math.round(r.top), bottom: Math.round(r.bottom), left: Math.round(r.left), right: Math.round(r.right), vh: innerHeight, vw: innerWidth, oy: cs.overflowY, mh: cs.maxHeight, n: c.children.length, scroll: c.scrollHeight, client: c.clientHeight }; }); };
     const d1 = await dm(790, 690);
@@ -322,10 +343,9 @@ async function oldBuild() {
   if (!dir) { const ref = process.env.OLD_REF || '602e083'; dir = fs.mkdtempSync(path.join(os.tmpdir(), 'wc-old-'));
     try { execSync(`git -C ${JSON.stringify(ROOT)} archive ${ref} chains waves | tar -x -C ${JSON.stringify(dir)}`, { stdio: 'pipe' }); } catch (e) { return null; } }
   const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.woff': 'font/woff', '.png': 'image/png', '.webmanifest': 'application/manifest+json' };
-  const srv = http.createServer((q, r) => { let p = decodeURIComponent(new URL(q.url, 'http://x').pathname); if (p.endsWith('/')) p += 'index.html'; const f = path.join(dir, p);
-    fs.readFile(f, (e, d) => { if (e) { r.writeHead(404); return r.end(); } r.writeHead(200, { 'content-type': TYPES[path.extname(f)] || 'application/octet-stream' }); r.end(d); }); });
-  await new Promise(o => srv.listen(0, o));
-  return { base: `http://localhost:${srv.address().port}`, close: () => srv.close() };
+  const srv = serveDir(dir, TYPES);
+  await listenLoopback(srv);
+  return { base: `http://127.0.0.1:${srv.address().port}`, close: () => srv.close() };
 }
 
 const CSS = await skinCss();

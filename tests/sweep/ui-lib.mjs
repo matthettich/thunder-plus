@@ -7,15 +7,26 @@ const PW = process.env.PLAYWRIGHT || ['/opt/npm-tools/node_modules/playwright/in
 const CHROME = process.env.CHROME || ['/usr/bin/google-chrome', '/usr/bin/chromium', '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', 'C:/Program Files/Google/Chrome/Application/chrome.exe'].find(f => fs.existsSync(f));
 const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/javascript', '.wasm': 'application/wasm', '.json': 'application/json', '.woff': 'font/woff', '.woff2': 'font/woff2', '.png': 'image/png', '.svg': 'image/svg+xml', '.css': 'text/css', '.webmanifest': 'application/manifest+json', '.wav': 'audio/wav' };
 
+// A static file server for a directory: loopback only (never reachable from the network), and a request is served only if the
+// decoded path, resolved, is inside `root` (so no ../ and no sibling directory that merely starts with the same letters);
+// a path that does not decode is a 400, one outside the root is a 403.
+export function serveDir(root, types = TYPES) {
+  const base = path.resolve(root) + path.sep;
+  return http.createServer((q, r) => {
+    let p; try { p = decodeURIComponent(new URL(q.url, 'http://x').pathname); } catch (e) { r.writeHead(400); return r.end(); }
+    if (p.endsWith('/')) p += 'index.html';
+    const f = path.resolve(base, '.' + path.sep + p.replace(/^\/+/, ''));
+    if (p.includes('\0') || !f.startsWith(base)) { r.writeHead(403); return r.end(); }
+    fs.readFile(f, (e, d) => { if (e) { r.writeHead(404); return r.end(); } r.writeHead(200, { 'content-type': types[path.extname(f)] || 'application/octet-stream' }); r.end(d); });
+  });
+}
+export const listenLoopback = srv => new Promise(ok => srv.listen(0, '127.0.0.1', ok));
+
 export async function boot({ width = 1600, height = 1000, query = '?seqtest=1', storage = null, mobile = false } = {}) {
   if (!PW) throw new Error('playwright not found (set PLAYWRIGHT)');
   const { chromium } = await import(pathToFileURL(PW).href);
-  const srv = http.createServer((q, r) => {
-    let p = decodeURIComponent(new URL(q.url, 'http://x').pathname); if (p.endsWith('/')) p += 'index.html';
-    const f = path.normalize(path.join(ROOT, p)); if (!f.startsWith(ROOT)) { r.writeHead(404); return r.end(); }
-    fs.readFile(f, (e, d) => { if (e) { r.writeHead(404); return r.end(); } r.writeHead(200, { 'content-type': TYPES[path.extname(f)] || 'application/octet-stream' }); r.end(d); });
-  });
-  await new Promise(ok => srv.listen(0, ok));
+  const srv = serveDir(ROOT, TYPES);
+  await listenLoopback(srv);
   const port = srv.address().port;
   const browser = await chromium.launch({ ...(CHROME ? { executablePath: CHROME } : {}), args: ['--autoplay-policy=no-user-gesture-required'] });
   const ctx = await browser.newContext({ viewport: { width, height }, ...(mobile ? { hasTouch: true, isMobile: true, deviceScaleFactor: 2 } : {}) });
@@ -24,7 +35,7 @@ export async function boot({ width = 1600, height = 1000, query = '?seqtest=1', 
   page.on('pageerror', e => errors.push('pageerror: ' + e.message));
   page.on('console', m => { if (m.type() === 'error' || m.type() === 'warning') errors.push(m.type() + ': ' + m.text()); });
   page.on('dialog', d => d.dismiss().catch(() => {}));
-  const url = `http://localhost:${port}/index.html${query}`;
+  const url = `http://127.0.0.1:${port}/index.html${query}`;
   if (storage) { await page.goto(url); await page.evaluate(s => { for (const k in s) localStorage.setItem(k, s[k]); }, storage); }
   await page.goto(url);
   await page.waitForFunction(() => document.readyState === 'complete', null, { timeout: 30000 });

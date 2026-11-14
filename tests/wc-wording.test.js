@@ -35,7 +35,7 @@ for (const [ed, src] of Object.entries(ED)) {
   });
   test(ed + ' U7: a title wraps instead of being cut, the value column grows to its readout', () => {
     const t = rule(src, '.node > header .t{');
-    assert.doesNotMatch(t, /text-overflow|white-space:nowrap|overflow:hidden/); assert.match(t, /overflow-wrap:break-word/); assert.match(t, /hyphens:auto/); assert.match(t, /line-height:1\.15/);
+    assert.doesNotMatch(t, /text-overflow|white-space:nowrap|overflow:hidden/); assert.match(t, /overflow-wrap:normal/); assert.match(t, /hyphens:manual/, 'a title breaks only between words (review fix, build 582)'); assert.match(src, /\.node > header\.tt1 \.byp\{padding:0 3px\} \.node > header\.tt2 \.t\{letter-spacing:-\.04em\} \.node > header\.tt3 \.t\{overflow-wrap:break-word\}/, 'a word longer than the line tightens BYP, then the letter-spacing, before it may break'); assert.match(t, /line-height:1\.15/);
     assert.match(rule(src, '.node > header{'), /gap:4px/, 'room for a long word beside BYP, ? and ×');
     assert.match(src, /\.row\{display:grid; grid-template-columns:70px minmax\(0,1fr\) minmax\(64px,max-content\);/);
     assert.match(rule(src, '.row .val{'), /white-space:nowrap/);
@@ -57,8 +57,9 @@ for (const [ed, src] of Object.entries(ED)) {
     assert.match(src, /\.hint\.min\{padding:0; border:0; background:none; opacity:1\} \.hint\.min \.tipt, \.hint\.min #hintx\{display:none\}/);
     assert.match(src, /\.hint \.tipt, \.hint \.hintpill\{display:none\}/);
     const js = block(src, '// T11: with a touch screen', 'tipsBox.checked = false; }); }');
+    assert.match(js, /pill\.addEventListener\('click', \(\) => \{ tipOpen\(true\); document\.getElementById\('hintx'\)\.focus\(\); \}\);/, 'focus follows the control: × after opening, Tips after folding');
     assert.match(js, /settings\.tipSeen = true; saveSettings\(\);/, 'the first visit is remembered in the settings (no patch field, no new key)');
-    assert.match(js, /if \(coarse\.matches\)\{ tipOpen\(false\); return; \} hint\.hidden = true; settings\.tips = false;/, '× folds on touch and switches tips off with a mouse, as before');
+    assert.match(js, /if \(coarse\.matches\)\{ tipOpen\(false\); pill\.focus\(\); return; \}[^\n]*hint\.hidden = true; settings\.tips = false;/, '× folds on touch and switches tips off with a mouse, as before');
   });
   test(ed + ' U9: a Help card takes the module\'s category colour and a tint of it', () => {
     assert.match(src, /const d = MODULES\[t\], ed = CAT_COLOR\[t\] \|\| EDGE\[famOf\(t\)\];/);
