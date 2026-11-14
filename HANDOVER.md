@@ -708,6 +708,9 @@ The owner's top priority to add is the MOD screen. Work down the list; ask befor
 
 Start a session by asking for results. Fix on `beta`. (10 Nov, 15:10: the web beta is build 560; the build numbers in the rest of this paragraph are older.) Web beta: https://matthettich.github.io/thunder-plus/beta/ (build 547 as of 10 Nov morning, 548 once its PR merges; the night of 9–10 Nov shipped 544–547, see the four "10 Nov" entries below. Decisions the lead made that night for the owner to confirm or reverse: on a phone the saved Sequencer default plays on the Page unless Audio thread is picked on that device; on a phone the safety limiter is its stand-in until another worklet loads; the resync only runs with a worklet loaded and its margins are untested on a device). Desktop: v1.3.4-beta.2 (build 541, no feed view or scopes); further desktop betas on hold until the owner asks.
 
+**Build 595** (…chains: a loaded patch inherited the last one's run list; branch `fix/chains-loadpatch-runlist`)
+- [ ] If you ever opened a song and a track that goes through …chains was silent until you touched the patch: that was this. Nothing to test on purpose; tell me if a …chains track is ever silent after opening a song or switching patches again.
+
 **Build 594** (module queue: audio building blocks; an oscillator and noise in …chains; branch `feat/modules-blocks`)
 - [ ] **By ear, a phaser:** four Allpass (Phase) in a row, one LFO into every Freq jack, the last one's Out on a Crossfade's B with the dry sound on A at 50%: a phaser sweep.
 - [ ] **By ear, diffusion:** three Allpass in Echo (Time 5, 8, 13 ms, Gain 0.5 to 0.7) on a drum hit: the hit smears into a soft tail; a held tone keeps its pitch and level.
@@ -1159,6 +1162,13 @@ Suggested order: N0 → N1 → N2 (phone cured) → N4 with N3 alongside → N5 
   the edge `R.t0`, "waiting…" while armed), `rcdClk` / `rcdFmt` / `rcdFreeSecs`, a 250 ms timer only while recording; the
   final length stays until the next take. recorder-check covers FREE, PATTERN, Stop, next take and closing mid-take.
 
+
+## 14 Nov (…chains: a loaded patch inherited the previous patch's run list; build 595)
+
+Branch `fix/chains-loadpatch-runlist`, by the lead (audio engine). Found by the Sonnet agent doing the Delay line's editor side: its golden render came out silent when it followed a clock module's in the same engine.
+- **Cause:** `ChainsEngine._active()` (which modules this node runs) and `_bnMap()` (bypass numbers) are cached against `graph.ver * 4096 + mods.size`. `loadPatch` made a `new Graph()`, whose `ver` starts at 0 again, so a patch with as many modules and cables as the one before it produced the same key and the OLD run list was kept: a Track In that was not cabled in the old patch and is cabled in the new one did not run, and the chain was silent until any edit bumped `ver`. Real in the app (the per-track nodes take new patches through `loadPatch`), though it needs two same-sized patches in a row with different wiring.
+- **Fix (chains worklet `?v=54`):** `loadPatch` and `dispose` carry the change count on (`ver + 1`) and clear both cache keys. …waves is not affected (its cull is marked dirty by `loadPatch`, and its other caches live on objects the reset drops).
+- **Goldens unchanged:** no existing module's golden render happened to follow a same-sized patch with other wiring. `tests/chains-loadpatch.test.js` fails on the old code three ways.
 
 ## 14 Nov (module queue: audio building blocks, Oscillator and Noise for …chains; build 594)
 
