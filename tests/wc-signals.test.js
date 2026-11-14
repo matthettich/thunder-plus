@@ -77,7 +77,7 @@ for (const [ed, src] of Object.entries(ED)) {
   test(ed + ': the help explains the signal kinds in words and in a drawn legend', () => {
     assert.match(src, /pink dotted cables carry gates; gate jacks are diamonds, the others round/);
     assert.match(src, /Click a cable to select it: Delete removes it, Escape lets go/);
-    assert.match(fn(src, 'helpDoc'), /const legend = '<div class="legend"><b>Signal kinds<\/b>'/);
+    assert.match(fn(src, 'helpDoc'), /const legend = '<div class="legend"><b>Signal kinds<\/b><div class="lgrows">'/);   // (round 2: the heading on its own line, three rows on one grid)
     assert.match(src, /'<\/nav><main>' \+ legend \+ '<div class="guide">'/);
     assert.match(src, /\.pt i\.g\{[^}]*rotate\(45deg\)/);
     assert.match(src, /Gate cables are dotted and gate jacks are diamonds\./, 'the tip box says it too');

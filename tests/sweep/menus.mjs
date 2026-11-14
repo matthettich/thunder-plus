@@ -88,7 +88,7 @@ const SKIP = [
 ];
 const skipWhy = t => (SKIP.find(([r]) => r.test(t)) || [])[1];
 // Items that replace the song: reload ELECTRO afterwards so later items have something to act on.
-const RELOAD = /^(New song|Demo song|ELECTRO|Funk breaks|Breaks to chop|Restore a backup|Open|Clear unused phrases|Delete|Remove|Cut)/;
+const RELOAD = /^(New project|Demo project|ELECTRO|Funk breaks|Breaks to chop|Restore a backup|Open|Clear unused phrases|Delete|Remove|Cut)/;
 
 async function sweepMenu(label, btnSel, hostSel, opts = {}) {
   await closeAll();
@@ -109,7 +109,7 @@ async function sweepMenu(label, btnSel, hostSel, opts = {}) {
     // A confirm (askYes) on a song-replacing item: accept it, so the action runs.
     const ok = page.locator('.ask:not(.rprog):not(.acidask) .btnrow button.ok');
     let accepted = false;
-    if (await ok.isVisible().catch(() => false) && /^(New song|Factory drums|Clear all kit|Demo song|Clear unused)/.test(it.t)) { await ok.click(); accepted = true; await page.waitForTimeout(400); }
+    if (await ok.isVisible().catch(() => false) && /^(New project|Factory drums|Clear all kit|Demo project|Clear unused)/.test(it.t)) { await ok.click(); accepted = true; await page.waitForTimeout(400); }
     const b = await snap();
     const did = [];
     for (const k of ['S', 'kit', 'view', 'tv', 'follow', 'vtrk', 'mute', 'dlg', 'sel', 'loop', 'clip', 'cur', 'undo', 'picks', 'body', 'skin', 'fs']) if (a[k] !== b[k]) did.push(k + (k === 'dlg' ? '=' + b.dlg.slice(0, 40) : ''));
