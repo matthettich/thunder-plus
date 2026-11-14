@@ -24684,7 +24684,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 584;
+const BUILD = 585;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD + (location.pathname.includes('/beta/') ? ' · beta' : '');
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -34491,6 +34491,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [585, '13 Nov', ['\u2026waves and \u2026chains: a patch now opens readable on the phone (80% or more, starting at its first module) instead of shrunk to fit; Fit is there at every width, and the module list closes after you add a module and leaves a strip of the patch beside it.', 'On a touch screen the title-bar buttons are bigger and removing a module asks first (Undo still brings it back); a tap on a title bar no longer nudges the module.', 'A value you type into a readout lands on that value (6 into a kHz readout is 6 kHz, -12 into dB is -12 dB), one slider drag is one undo step, and a cable no longer takes a click meant for a slider or button under it.', 'Waves: Voices and On-screen keys are in the Patch tab of the Settings menu.']],
   [584, '13 Nov', ['\u2026waves and \u2026chains: double-clicking or double-tapping a cable removes it without also opening Find a module; a cable dropped on a jack near the window\u2019s edge connects the first time (the patch no longer slides away under it); every entry in Help opens its own section instead of a second editor, and the Signal kinds legend is a tidy list.', 'The File menu starts with New project (also in the Waves and Chains views); Undo and Redo are in the Edit menu only (a phone, which has no Edit menu, keeps them in File).', 'A saved file is called a project everywhere: New project, Demo project, default project and the save questions; \u201csong\u201d stays for the music itself.']],
   [583, '13 Nov', ['\u2026waves and \u2026chains: a collapsed module now grows wider to hold its cables, so a Stereo mixer with many inputs patched is no longer cut off and nothing sticks out of its frame.', 'Modulation inputs of a collapsed module sit on the left, under the audio inputs, each with its name.', 'Collapsed modules show their wet/dry Mix and level first (the mixers show their Master level), then the usual values.']],
   [582, '13 Nov', ['Synth page: the Sample layer\u2019s Reverse and the Digital layer\u2019s Loop buttons now reset with a double-click on the name, have the right-click menu (Reset, Learn a MIDI knob), and follow a MIDI knob learned on them.', '\u2026chains and \u2026waves: a collapsed Sidechain Out shows its send level; module titles such as \u201cConvolution reverb\u201d break between words only, never inside one; on a mouse the tip box is two lines with a More button and no longer sits over the modules after Fit. Tips controls keep keyboard focus, and the value you type into a slider no longer widens its column.']],
@@ -35119,6 +35120,14 @@ function buildPatch(){
   cb.addEventListener('change', () => a.setPatchSetting('tips', cb.checked));
   tips.append(cb, document.createTextNode('Show tips'));
   box.append(row('Quality', q), row('Tempo', tp), tips);
+  if (s.voices != null){   // Waves only (13 Nov, audit U2): its Settings menu is hidden inside the app, so Voices and On-screen keys are here
+    const vs = el('select'); for (let i = 1; i <= 16; i++) vs.append(new Option(i + (i === 1 ? ' voice' : ' voices'), String(i))); vs.value = String(s.voices);
+    vs.addEventListener('change', () => a.setPatchSetting('voices', vs.value));
+    const ks = el('label', 'cb'), kb = el('input'); kb.type = 'checkbox'; kb.checked = !!s.keys;
+    kb.addEventListener('change', () => a.setPatchSetting('keys', kb.checked));
+    ks.append(kb, document.createTextNode('On-screen keys'));
+    box.append(row('Voices', vs), ks);
+  }
   const d = el('select');
   const devs = s.midiDevices || [];
   if (devs.length) for (const dev of devs) d.append(new Option(dev.name, dev.id)); else d.append(new Option('All connected MIDI inputs', 'all'));

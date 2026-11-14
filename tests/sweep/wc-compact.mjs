@@ -240,7 +240,7 @@ async function run(ed) {
     const hp = await mp.evaluate(() => { const r = document.querySelector('.node[data-id="m3"] > header .t').getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2, vis: r.bottom < innerHeight && r.top > 0 }; });
     if (!hp.vis) { await mp.evaluate(() => document.querySelector('.node[data-id="m3"]').scrollIntoView()); }
     // bring the module into view: pan the patch with the view-fit button if there is one, else the zoom field
-    await mp.evaluate(() => { const f = document.getElementById('zoomfit'); if (f && f.offsetWidth) f.click(); });
+    if (!hp.vis) await mp.evaluate(() => { const f = document.getElementById('zoomfit'); if (f && f.offsetWidth) f.click(); });   // (13 Nov, pass 2: Fit is now there at every width, so it is used only when the module is not already on screen)
     await sleep(mp, 400);
     const p2 = await mp.evaluate(() => { const r = document.querySelector('.node[data-id="m3"] > header .t').getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2, w: r.width, vis: r.bottom < innerHeight && r.top > 0 && r.left > 0 && r.left < innerWidth }; });
     if (p2.vis) {

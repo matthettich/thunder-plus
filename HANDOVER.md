@@ -548,7 +548,7 @@ The owner's audit (60 findings, a collapsed-module design, his eight decisions, 
   - [x] 1b (build 580, PR #110) Signal kinds and cables: gate's own jack shape and dash (M9, U1), the selection outline off the signal colours (U1), cable hover / selected states and visible bend handles (D6, D9).
   - [x] 1c (build 581, PR #111; review fixes build 582) Wording and type: U3, U5 to U10, T11.
   - Rules for pass 1: no audio code (nothing in `chains-worklet.js` / `waves-worklet.js`; goldens and cache-busters unchanged); old patches load unchanged (`collapsed:true` opens as Compact); colours through the variables at the top of each editor's CSS, `termFrameCss` extended for any new one; every editor change in both `chains/index.html` and `waves/index.html`, `python3 tools/sync-shared.py` after the shared block; before / after screenshots of both editors at 1440 x 900, 800 x 700 and 344 x 780 in the white theme, IDM pink & green and 909; checks added to the punch list.
-- [ ] **Pass 2, fixes:** D2, D3, D4, T1, T2, T3, T5 (delete on touch asks first, decision 8), T10, U2, H1 to H4.
+- [x] **Pass 2, fixes:** D2, D3, D4, T1, T2, T3, T5 (delete on touch asks first, decision 8), T10, U2, H1 to H4. (build 585; waiting for the owner to look: STOP here before pass 3.) Not done or only partly: D4 has no modifier-key variant; the title-bar menu's "Delete module" on touch still deletes at once (only the x button asks); H2 is partly done (the embed `settings()` and chains' hidden key code are removed; see the 13 Nov pass 2 entry).
 - [ ] **Pass 3, phone:** T4, T6, T7, T8, T9, T12 to T14, the Play / Edit switch (M10). Chains first; waves on the phone is an option if it can be made to fit (decision 7).
 - [ ] **Pass 4, desktop feel:** D1, D5 (wheel after the pointer rests, decision 3), D7, D8, D10, M4, summing inputs M3 (editor only, see the map; until then a second cable replaces with a toast and Undo), M5, M8, M11, U4, U11.
 - [ ] **Pass 5, structure:** module widths M1 (decision 6), feedback M2 (wanted; about a day; its level guard is **for audio review**; plan it with the native port's graph runners), M6, M7, M8, M12.
@@ -650,6 +650,16 @@ The owner's top priority to add is the MOD screen. Work down the list; ask befor
 **The owner's checklist by importance (13 Nov):** he works from a Claude Doc, "Thunder Plus test checklist, by priority" (https://claude.ai/artifact/LrzQ18ur18Fc5gkvxmQDbK), ordered: 1 Do these first, 2 Really worth trying, 3 If you have time, 4 Safe to skip, Parked, Set aside, Done. A snapshot with his ticks is `docs/TEST-CHECKLIST.md`: re-export it whenever the doc changes, and add each new build's checks to the doc's section 1 as well as here. He said the two "decides" groups (native apps; smoothing / Worklets / clock experiments) are parked and block nothing. "Close the skip list" from him means: close section 4's items as not tested.
 
 Start a session by asking for results. Fix on `beta`. (10 Nov, 15:10: the web beta is build 560; the build numbers in the rest of this paragraph are older.) Web beta: https://matthettich.github.io/thunder-plus/beta/ (build 547 as of 10 Nov morning, 548 once its PR merges; the night of 9–10 Nov shipped 544–547, see the four "10 Nov" entries below. Decisions the lead made that night for the owner to confirm or reverse: on a phone the saved Sequencer default plays on the Page unless Audio thread is picked on that device; on a phone the safety limiter is its stand-in until another worklet loads; the resync only runs with a worklet loaded and its margins are untested on a device). Desktop: v1.3.4-beta.2 (build 541, no feed view or scopes); further desktop betas on hold until the owner asks.
+
+**Build 585** (pass 2 of the UX audit: fixes; branch `wc-pass2`; waiting for the owner to look)
+- [ ] Phone folded (Fold cover and inner screen), …chains and …waves: open a patch. It opens at a readable size (about 80%), not tiny, and the first module is in view.
+- [ ] Phone: Fit is reachable in the top bar (the percentage label is hidden on a narrow screen). Tap Fit: the patch fits.
+- [ ] Phone: open the module list ("Modules"), tap a module to add it. The list closes and the new module is in view.
+- [ ] Phone: tap the x on a module title bar. It asks "Remove ...?" first; Cancel keeps it; Remove deletes it and Undo brings it back.
+- [ ] Phone: tap (do not drag) a module title bar. The module does not move a little.
+- [ ] Type a value into three sliders (e.g. a delay time "250ms", an EQ gain, a compressor threshold): the value lands where typed, with its unit.
+- [ ] Computer and phone: one slider drag, then Undo once: the slider is back where it started (one drag = one undo step). Same for a dropdown change.
+- [ ] Anything from U2 (Voices and On-screen keys on the Waves patch tab) or D4 (hover and select a cable: the wider invisible hit area) that you can see: say if it looks or feels wrong.
 
 **Build 584** (the owner's test feedback on 580 and 581: cables, Help, File and Edit menus; branch `wc-round2`)
 - [ ] Computer, …chains and …waves: double-click a cable. It goes (Edit → Undo brings it back) and **no "Find a module" box opens**. Then double-click empty background: the box still opens.
@@ -1003,6 +1013,24 @@ Suggested order: N0 → N1 → N2 (phone cured) → N4 with N3 alongside → N5 
   the edge `R.t0`, "waiting…" while armed), `rcdClk` / `rcdFmt` / `rcdFreeSecs`, a 250 ms timer only while recording; the
   final length stays until the next take. recorder-check covers FREE, PATTERN, Stop, next take and closing mid-take.
 
+
+## 13 Nov (…waves / …chains pass 2: fixes; build 585)
+
+Branch `wc-pass2` (from `beta` at build 584), not committed. Files: `chains/index.html`, `waves/index.html` (the SHARED EDITOR block synced with `tools/sync-shared.py`; `typedToParam` sits above the block and is copied by hand), root `index.html` (BUILD 585, CHANGES, Patch tab Voices / keys rows), `sw.js` v585. No audio code, goldens or worklets touched.
+- **T1 opens readable:** fixed in `openView()` (both): a fresh patch or a saved view below 80% (50% when saved on a narrow screen) opens at 80% (`READ_ZOOM`) on the first module; a saved readable view is kept. Chains `fit()` host API uses it when the editor is small. Opening zoom before / after: 344 and 412 wide 25% / 80%, 884 wide 62% / 80%, 1440 wide 107% / 107%.
+- **T2 Fit reachable:** fixed in CSS (`.bar #zoomval` hidden at 520 px or less; the `#zoomfit` hide removed).
+- **T3 module list:** fixed: palette `max-width`, `.dresize` hidden at 760 px or less, `afterAdd()` closes the drawer on narrow screens and pans the new module into view.
+- **T5 touch buttons and delete:** fixed in the coarse CSS block (32 to 40 x 40 px) and the header close `onclick` (touch / pen ask via `askRemove`; owner decision 8). The menu "Delete module" on touch is NOT confirmed (not done).
+- **T10 tap nudges a module:** fixed in the header drag: threshold 8 px for touch / pen, and the autopan guard only when moved.
+- **D2 / D3 typed values:** fixed: `typedToParam` (unit-aware, snapshot only if changed) used by the slider type box and double-click.
+- **D3 one drag, one undo:** fixed in `slider()` (`snapOnce`) and `choice()` (snapshot on change).
+- **D4 cable hit area:** fixed: `svg.cables.under#cablehits` with wide invisible paths and a `hov` class. Modifier keys: not done.
+- **U2:** waves host patch tab got Voices and On-screen keys (`patchSettings`, `setPatchSetting`, `buildPatch()`); chains has none (no notes).
+- **H1** service-worker script removed from both editors; **H2** `settings()` removed from both embed APIs, chains' hidden `#setkeys` / `paintKeys` / `midiOk` removed; **H3** cancelled `border-radius` rules removed (look unchanged); **H4** chains Space handler guarded with `!EMBED`.
+- **Tests:** new `tests/sweep/wc-pass2.mjs` (227 checks; includes old-format load and "saved here loads in 584" through a temporary worktree of HEAD, and no page errors) and `tests/wc-pass2.test.js` (22 source guards). `wc-round2.mjs` now uses `OUT` and fails a first-attempt connection on a missing jack (at least 10 real drags); `wc-signals.mjs` and `wc-compact.mjs` adjusted. The strengthened first-try check passed everywhere, so the owner's "first connection fails" is not reproduced.
+- **Decisions to confirm:** first module = leftmost; 80% floor; 1000 px and 760 px thresholds; touch button widths 32 to 40 (not all 40) so titles such as "Compressor" stay whole at 344; saved readable views are kept.
+- **Not verified:** a real touch device and the Fold; host-embedded T1 / T3.
+- **Notes for pass 3:** the touch title bar is crowded at 250 px; the hint pill covers the first module's title on opening; quick-add by double-click does not open on a module.
 
 ## 13 Nov (owner's results on pass 1b, 1c and the Synth page; build 584)
 

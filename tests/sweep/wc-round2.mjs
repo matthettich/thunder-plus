@@ -4,13 +4,14 @@
 // item 5 in the host in the Tracker, Synth, Waves and Chains views. Prints PASS / FAIL.
 //   node tests/sweep/wc-round2.mjs
 import fs from 'fs'; import path from 'path';
-import { boot, app, Table, ROOT } from './ui-lib.mjs';
+import { boot, app, Table, ROOT, OUT } from './ui-lib.mjs';
 
 const T = new Table('wc-round2');
 const ok = (name, cond, note = '') => { T.add(name, !!cond, note); console.log((cond ? 'PASS ' : 'FAIL ') + name + (note ? '  ' + note : '')); };
 const NOISE = /bad HTTP response code \(404\)|MIDI|requestMIDIAccess|AudioContext was not allowed|favicon|Failed to load resource|ServiceWorker|sw\.js|autoplay/i;
 const sleep = (page, ms) => page.waitForTimeout(ms);
-const SHOTS = '/home/claude/work/shots/round2'; fs.mkdirSync(SHOTS, { recursive: true });
+const SHOTS = process.env.OUT || OUT;   // (the sweeps' usual output directory; created only by the modes that take screenshots)
+const shotsDir = () => { fs.mkdirSync(SHOTS, { recursive: true }); return SHOTS; };
 
 const P = (id, type, x, y, params = {}) => ({ id, type, scope: 'mono', pos: [x, y], collapsed: false, params });
 const C = (a, ap, b, bp) => ({ from: [a, ap], to: [b, bp], bend: 0 });
@@ -28,12 +29,25 @@ const jackBox = (page, id, port, dir) => page.evaluate(([id, port, dir]) => { co
 const nCables = page => page.evaluate(() => document.querySelectorAll('svg.cables g path.hit').length);
 const quickAddOpen = page => page.evaluate(() => { const m = document.getElementById('ctxmenu'); return !!(m && !m.hidden && m.querySelector('.qainp')); });
 // a point on cable 0 that really hits it
-const cablePoint = page => page.evaluate(() => { const g = [...document.querySelectorAll('svg.cables g')].find(g => g.querySelector('path.hit')), p = g.querySelector('path.cln'), hit = g.querySelector('path.hit'), L = p.getTotalLength(), m = p.getScreenCTM();
+const cablePoint = page => page.evaluate(() => { const p = document.querySelector('svg.cables:not(.under) g path.cln'), hit = document.querySelector('svg.cables.under g path.hit'), L = p.getTotalLength(), m = p.getScreenCTM();
   for (const t of [.5, .45, .55, .4, .6, .35, .65]) { const q = p.getPointAtLength(L * t), x = m.a * q.x + m.c * q.y + m.e, y = m.b * q.x + m.d * q.y + m.f; if (document.elementFromPoint(x, y) === hit) return { x, y }; } return null; });
 async function loadDoc(page, base, ed, doc) {
   await page.goto(`${base}/${ed}/index.html`); await page.evaluate(([k, d]) => { localStorage.clear(); localStorage.setItem(k, JSON.stringify(d)); localStorage.setItem('thunderplus.' + (k.split('.')[0]) + '.settings', '{"tips":false}'); }, [SPEC[ed].key, doc]);
   await page.goto(`${base}/${ed}/index.html`); await page.waitForSelector('.node', { timeout: 20000 }); await sleep(page, 700);
   await page.evaluate(() => { const h = document.getElementById('hint'); if (h) h.hidden = true; });
+}
+
+// scroll the canvas with the wheel (it pans) until all the given jacks are inside the window's middle part; false if they never get there
+async function bringIntoView(page, jacks) {
+  for (let i = 0; i < 8; i++) {
+    const bs = []; for (const [id, port, dir] of jacks) { const b = await jackBox(page, id, port, dir); if (!b) return false; bs.push(b); }
+    if (bs.every(b => b.y >= 100 && b.y <= 800 && b.x >= 60 && b.x <= 1360)) return true;
+    const cx = bs.reduce((s, b) => s + b.x, 0) / bs.length, cy = bs.reduce((s, b) => s + b.y, 0) / bs.length;
+    const bg = await page.evaluate(() => { for (const [x, y] of [[1420, 450], [20, 450], [700, 880], [700, 40], [1400, 120], [1400, 800]]) { const e = document.elementFromPoint(x, y); if (e && (e.id === 'ws' || e.id === 'world' || e.tagName === 'svg')) return [x, y]; } return null; });
+    if (!bg) return false;
+    await page.mouse.move(bg[0], bg[1]); await page.mouse.wheel(Math.max(-500, Math.min(500, cx - 720)), Math.max(-500, Math.min(500, cy - 450))); await sleep(page, 250);
+  }
+  return false;
 }
 
 // ================= items 1 and 2: cables, in each editor on its own page =================
@@ -70,19 +84,23 @@ async function cables(ed) {
     // ---- 2. the first attempt to patch an LFO to a mixer's slider connects ----
     const drag = async (page, from, to, hold = 0) => { await page.mouse.move(from.x, from.y); await page.mouse.down(); for (let i = 1; i <= 10; i++) { await page.mouse.move(from.x + (to.x - from.x) * i / 10, from.y + (to.y - from.y) * i / 10); await sleep(page, 16); } if (hold) await sleep(page, hold); await page.mouse.up(); await sleep(page, 150); };
     const tgts = ed === 'chains' ? ['p:p1', 'p:l2'] : ['p:level', 'p:l1'];
+    let real = 0, skipped = 0;
     for (const Z of [0.5, 1, 1.5]) {
       let pass = 0, tries = 0;
       for (const fresh of [true, false]) for (let rep = 0; rep < 1; rep++) for (const t of tgts) {
         await loadDoc(p2, base3, ed, spec.doc({ zoom: Z, mixer: !fresh, noCable: true, y: 20 }));
-        if (fresh) { await p2.evaluate(() => { document.getElementById('ws').dispatchEvent(new MouseEvent('dblclick', { bubbles: true, clientX: 900, clientY: 150 })); }); await sleep(p2, 200);
+        if (fresh) { await p2.evaluate(() => { document.getElementById('ws').dispatchEvent(new MouseEvent('dblclick', { bubbles: true, clientX: 1150, clientY: 560 })); }); await sleep(p2, 200);
           await p2.keyboard.type(spec.mixName); await p2.keyboard.press('Enter'); await sleep(p2, 500); }
         const mid = await p2.evaluate(() => [...document.querySelectorAll('.node')].map(n => n.dataset.id).find(i => !['m1', 'm2', 'm3'].includes(i)));
+        await bringIntoView(p2, [[mid, t, 'in'], ['m3', 'out', 'out']]);
         const a = await jackBox(p2, 'm3', 'out', 'out'), b = await jackBox(p2, mid, t, 'in'); tries++;
-        if (!a || !b || b.y > 820 || b.y < 80 || b.x > 1380) { pass++; continue; }   // (a jack outside the window is not a first-attempt test: the edge test below covers it)
-        const n0 = await nCables(p2); await drag(p2, a, b); if ((await nCables(p2)) === n0 + 1) pass++; else console.log(`   first attempt failed: ${ed} @${Z} ${fresh ? 'fresh' : 'patched'} ${t}`);
+        if (!a || !b) { console.log(`   MISSING jack: ${ed} @${Z} ${fresh ? 'fresh' : 'patched'} ${t} (source ${!!a}, target ${!!b})`); continue; }   // (a missing jack is a failure: tries counts it, pass does not)
+        if (b.y > 820 || b.y < 80 || b.x > 1380) { tries--; skipped++; console.log(`   skipped (off screen, not counted): ${ed} @${Z} ${fresh ? 'fresh' : 'patched'} ${t}`); continue; }   // (the edge test below covers the jacks near the window's edge)
+        real++; const n0 = await nCables(p2); await drag(p2, a, b); if ((await nCables(p2)) === n0 + 1) pass++; else console.log(`   first attempt failed: ${ed} @${Z} ${fresh ? 'fresh' : 'patched'} ${t}`);
       }
-      ok(`${ed} 2: @${Math.round(Z * 100)}% the first attempt LFO -> mixer slider jacks connects (${pass}/${tries}, fresh and already placed)`, pass === tries);
+      ok(`${ed} 2: @${Math.round(Z * 100)}% the first attempt LFO -> mixer slider jacks connects (${pass}/${tries}, fresh and already placed)`, pass === tries && tries > 0);
     }
+    ok(`${ed} 2: at least 10 real first-attempt drags ran (${real} ran, ${skipped} skipped off screen)`, real >= 10);
     // ten in a row on one fresh module, drag and the same again as a click-then-click is touch only (below)
     await loadDoc(p2, base3, ed, spec.doc({ mixer: true, noCable: true }));
     let ten = 0; const mid = 'm4';
@@ -141,7 +159,7 @@ async function helpLegend(ed) {
         ok(`${tag}: the three texts start at the same x`, new Set(g.rows.map(r => r.tx)).size === 1, g.rows.map(r => r.tx).join(', '));
         ok(`${tag}: the three cable samples have one width and one x; the jacks share one x`, new Set(g.rows.map(r => r.sw)).size === 1 && new Set(g.rows.map(r => r.sx)).size === 1 && new Set(g.rows.map(r => r.jx)).size === 1, JSON.stringify(g.rows.map(r => [r.sw, r.sx, r.jx])));
         ok(`${tag}: each row's sample and text sit on one line`, g.rows.every(r => r.cy < 8), g.rows.map(r => r.cy.toFixed(1)).join(', '));
-        if (where === 'host' && (id === 'minimal' || id === 'idmpg') && ed === 'chains') { const bx = await (await fr.frameElement()).boundingBox(); await page.screenshot({ path: path.join(SHOTS, `help-legend-${ed}-${id === 'minimal' ? 'white' : 'idmpg'}.png`), clip: { x: bx.x, y: bx.y, width: Math.min(bx.width, 1400), height: Math.min(bx.height, 520) } }); }
+        if (where === 'host' && (id === 'minimal' || id === 'idmpg') && ed === 'chains') { const bx = await (await fr.frameElement()).boundingBox(); await page.screenshot({ path: path.join(shotsDir(), `help-legend-${ed}-${id === 'minimal' ? 'white' : 'idmpg'}.png`), clip: { x: bx.x, y: bx.y, width: Math.min(bx.width, 1400), height: Math.min(bx.height, 520) } }); }
       }
     } catch (e) { ok(`${ed} 3: ${where}: ran to the end`, false, e.stack.split('\n').slice(0, 4).join(' | ')); }
     await B.close();
@@ -190,11 +208,11 @@ async function menus() {
       ok(`${view} 5b: the File menu starts with Project, then New project`, file[0] === '#Project' && /^New project/.test(firstItem), file.slice(0, 5).join(' | '));
       ok(`${view} 5b: ...then Open project, Save project, Save project as`, /^Open project/.test(file[2]) && file.some(t => /^Save project\b/.test(t)) && file.some(t => /^Save project as/.test(t)), file.slice(1, 8).join(' | '));
       ok(`${view} 5c: no "song" in the File menu's file items`, !file.some(t => /\b(new|demo|default|open|save)\b[^|]*\bsong\b/i.test(t) && !/Render song/.test(t)), file.filter(t => /song/i.test(t)).join(' | '));
-      if (view === 'chains') await page.screenshot({ path: path.join(SHOTS, 'file-menu-chains.png'), clip: { x: 0, y: 0, width: 1440, height: 640 } });
+      if (view === 'chains') await page.screenshot({ path: path.join(shotsDir(), 'file-menu-chains.png'), clip: { x: 0, y: 0, width: 1440, height: 640 } });
       await page.click('#bEdit'); await sleep(page, 300); const edit = await texts('gedit');
       const u = edit.find(t => /^Undo/.test(t)), r = edit.find(t => /^Redo/.test(t));
       ok(`${view} 5a: the Edit menu has Undo and Redo with their shortcuts`, !!u && !!r && /[⌘Ctrl]/.test(u) && /Z/.test(u) && /Z/.test(r), `${u} | ${r}`);
-      if (view === 'chains') await page.screenshot({ path: path.join(SHOTS, 'edit-menu-chains.png'), clip: { x: 0, y: 0, width: 1440, height: 520 } });
+      if (view === 'chains') await page.screenshot({ path: path.join(shotsDir(), 'edit-menu-chains.png'), clip: { x: 0, y: 0, width: 1440, height: 520 } });
       await page.click('#bEdit'); await sleep(page, 150);
     }
     // New project from the Chains view: asks, then the project is empty
