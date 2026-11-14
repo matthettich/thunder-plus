@@ -299,6 +299,52 @@ const Attenuverter = {
 
 
 /* Steps: an 8-step CV sequence, one step per note value, with a gate out on every step and optional glide. */
+/* SOURCES FOR …CHAINS (14 Nov, module queue; …waves has its own oscillators and Noise). */
+/* Oscillator: a plain tone at Freq, from far below hearing (0.1 Hz: a slow control wave) to the top. FM moves the pitch:
+   with FM depth at 100% the input at 1 is five octaves up, at -1 five down. A pulse on Sync starts the wave again. */
+const OscM = {
+  type:'osc', scope:'mono', cost:.15,
+  inputs:{ fm:'cv', sync:'gate' }, outputs:{ out:'audio' },
+  params:{ wave:[0,0,3,1], freq:[220,.1,20000,.1], fm:[0,0,1,.01], level:[.5,0,1,.01] },
+  create:() => ({ ph:0, ls:0 }),
+  process(st, io, ctx){
+    const F = io.in.fm, S = io.in.sync, O = io.out.out, p = io.p, w = p.wave | 0, f0 = p.freq / ctx.sr, d = p.fm * 5, lv = p.level, fm = d > 0 && linked(io, 'fm');
+    let ph = st.ph, ls = st.ls;
+    for (let i = 0; i < ctx.block; i++){
+      const sy = S[i] >= .5; if (sy && !ls) ph = 0; ls = sy;
+      let dt = fm ? f0 * Math.pow(2, clamp(F[i], -4, 4) * d) : f0; if (!(dt > 0)) dt = 0; else if (dt > .49) dt = .49;
+      let y;
+      if (w === 0) y = Math.sin(6.283185307179586 * ph);
+      else if (w === 1) y = 1 - 4 * Math.abs(ph - .5);   // triangle, starting at its lowest point's rise: -1 at 0, 1 at half way
+      else {
+        const t = ph; let b = 0; if (t < dt){ const u = t / dt; b = u + u - u * u - 1; } else if (t > 1 - dt){ const u = (t - 1) / dt; b = u * u + u + u + 1; }
+        if (w === 2) y = 2 * t - 1 - b;
+        else { let t2 = t + .5; if (t2 >= 1) t2 -= 1; let b2 = 0; if (t2 < dt){ const u = t2 / dt; b2 = u + u - u * u - 1; } else if (t2 > 1 - dt){ const u = (t2 - 1) / dt; b2 = u * u + u + u + 1; } y = (t < .5 ? 1 : -1) + b - b2; }
+      }
+      O[i] = y * lv; ph += dt; if (ph >= 1) ph -= 1;
+    }
+    st.ph = ph; st.ls = ls;
+  }
+};
+/* Noise: White (every frequency alike: hiss), Pink (less top: rain) or Brown (mostly low: a distant roar). */
+const NoiseSrc = {
+  type:'wnoise', scope:'mono', cost:.08,
+  inputs:{}, outputs:{ out:'audio' },
+  params:{ color:[0,0,2,1], level:[.5,0,1,.01] },
+  create:() => ({ s:0, b0:0, b1:0, b2:0, b3:0, b4:0, b5:0, b6:0, br:0 }),
+  process(st, io, ctx){
+    const O = io.out.out, c = io.p.color | 0, lv = io.p.level; let s = st.s || (st.s = nextSeed() || 1);   // (its own run of numbers, taken the first time it sounds)
+    for (let i = 0; i < ctx.block; i++){
+      s ^= s << 13; s >>>= 0; s ^= s >>> 17; s ^= s << 5; s >>>= 0; const w = s / 2147483648 - 1; let y;
+      if (c === 0) y = w;
+      else if (c === 1){ st.b0 = .99886 * st.b0 + w * .0555179; st.b1 = .99332 * st.b1 + w * .0750759; st.b2 = .969 * st.b2 + w * .153852; st.b3 = .8665 * st.b3 + w * .3104856;
+        st.b4 = .55 * st.b4 + w * .5329522; st.b5 = -.7616 * st.b5 - w * .016898; y = (st.b0 + st.b1 + st.b2 + st.b3 + st.b4 + st.b5 + st.b6 + w * .5362) * .11; st.b6 = w * .115926; }
+      else { st.br = (st.br + .02 * w) / 1.02; y = st.br * 3.5; }
+      O[i] = y * lv;
+    }
+    st.s = s;
+  }
+};
 /* (Steps and Clock live in the shared block since 14 Nov, so …waves has them too.) */
 
 /* Repeat: beat repeat, reverse and tape stop. It keeps the last 4 s; while Hold is on (or the Gate input is high)
@@ -1591,6 +1637,73 @@ const Scope = {
     for (let i = 0; i < SCOPE_W * 4; i++){ const v = F[i]; o[2 + i] = v === v && v > -1e6 && v < 1e6 ? Math.round(v * 1000) / 1000 : 0; }
     o[2 + SCOPE_W * 4] = st.shown;   // the Time this picture was taken at (the slider may have moved since, or the picture be frozen)
     return o;
+  }
+};
+
+/* AUDIO BUILDING BLOCKS (14 Nov, module queue): the small parts filters, phasers and reverbs are made of. One channel
+   each (patch two for stereo). 'poly' as the control maths: per voice in …waves when a voice feeds them. */
+/* One-pole filter: the gentlest filter there is (6 dB an octave). Low and High are its two halves; added together they
+   are the input again. Also a smoother for control signals. */
+const OnePole = {
+  type:'onepole', scope:'poly', cost:.03,
+  inputs:{ in:'audio' }, outputs:{ lp:'audio', hp:'audio' },
+  params:{ freq:[1000,5,20000,1] },
+  create:() => ({ y:0 }),
+  process(st, io, ctx){
+    const X = io.in.in, L = io.out.lp, Hh = io.out.hp, k = 1 - Math.exp(-6.283185307179586 * clamp(io.p.freq, 1, ctx.sr * .49) / ctx.sr); let y = st.y;
+    for (let i = 0; i < ctx.block; i++){ const x = X[i]; y += (x - y) * k; L[i] = y; Hh[i] = x - y; }
+    st.y = y === y && (y > 1e-20 || y < -1e-20) && y > -1e6 && y < 1e6 ? y : 0;
+  }
+};
+/* Allpass: every frequency passes at the same level; only the timing changes. Phase: a first-order one that turns the
+   phase round Freq (several in a row, mixed with the dry sound, make a phaser). Echo: a short delay with its own
+   feedback and feedforward (Time, Gain), the diffuser reverbs are built from; it smears a click without colouring a tone. */
+const AllpassM = {
+  type:'allpass', scope:'poly', cost:.05,
+  inputs:{ in:'audio' }, outputs:{ out:'audio' },
+  params:{ mode:[0,0,1,1], freq:[1000,20,20000,1], time:[.01,.0005,.1,.0001], gain:[.5,-.95,.95,.01] },
+  create:sr => ({ x1:0, y1:0, b:new Float32Array(Math.ceil(sr * .1) + 4), w:0 }),
+  process(st, io, ctx){
+    const X = io.in.in, O = io.out.out, p = io.p;
+    if (p.mode < .5){
+      const t = Math.tan(Math.PI * clamp(p.freq, 1, ctx.sr * .49) / ctx.sr), a = (t - 1) / (t + 1); let x1 = st.x1, y1 = st.y1;
+      for (let i = 0; i < ctx.block; i++){ const x = X[i], y = a * x + x1 - a * y1; x1 = x; y1 = y; O[i] = y; }
+      st.x1 = x1; st.y1 = y1 === y1 && (y1 > 1e-20 || y1 < -1e-20) && y1 > -1e6 && y1 < 1e6 ? y1 : 0;
+    } else {
+      const B = st.b, M = B.length, D = clamp(Math.round(p.time * ctx.sr), 1, M - 1), g = clamp(p.gain, -.95, .95); let w = st.w;
+      for (let i = 0; i < ctx.block; i++){
+        let r = w - D; if (r < 0) r += M; const d = B[r]; let v = X[i] + g * d;
+        if (!(v === v && v > -1e6 && v < 1e6)) v = 0; else if (v < 1e-20 && v > -1e-20) v = 0;
+        B[w] = v; O[i] = d - g * v; if (++w >= M) w = 0;
+      }
+      st.w = w;
+    }
+  }
+};
+/* DC blocker: takes out a constant offset (and anything below Freq) so a signal sits round zero again: after a
+   rectifier, a feedback loop or an asymmetric shaper. */
+const DCBlock = {
+  type:'dcblock', scope:'poly', cost:.02,
+  inputs:{ in:'audio' }, outputs:{ out:'audio' },
+  params:{ freq:[10,1,200,1] },
+  create:() => ({ x1:0, y1:0 }),
+  process(st, io, ctx){
+    const X = io.in.in, O = io.out.out, R = 1 - 6.283185307179586 * clamp(io.p.freq, 1, 200) / ctx.sr; let x1 = st.x1, y1 = st.y1;
+    for (let i = 0; i < ctx.block; i++){ const x = X[i], y = x - x1 + R * y1; x1 = x; y1 = y; O[i] = y; }
+    st.x1 = x1 === x1 ? x1 : 0; st.y1 = y1 === y1 && (y1 > 1e-20 || y1 < -1e-20) && y1 > -1e6 && y1 < 1e6 ? y1 : 0;
+  }
+};
+/* Mid / side: Encode turns left and right into mid (what both share) and side (what differs); Decode turns them back.
+   Encode, treat the two differently, Decode: that is how a stereo widener or a mid-only EQ is patched. Exact both ways. */
+const MidSide = {
+  type:'midside', scope:'poly', cost:.02,
+  inputs:{ in:'audio', inR:'audio' }, outputs:{ out:'audio', outR:'audio' },
+  params:{ mode:[0,0,1,1] },
+  create:() => ({}),
+  process(st, io, ctx){
+    const A = io.in.in, B = io.in.inR, O = io.out.out, P = io.out.outR;
+    if (io.p.mode < .5){ const R = io.linked && io.linked.has('inR') ? B : A; for (let i = 0; i < ctx.block; i++){ const l = A[i], r = R[i]; O[i] = (l + r) * .5; P[i] = (l - r) * .5; } }
+    else for (let i = 0; i < ctx.block; i++){ const m = A[i], sd = B[i]; O[i] = m + sd; P[i] = m - sd; }
   }
 };
 
@@ -5237,6 +5350,7 @@ const SHARED_MODULES = { beads:Beads,
   meter:Meter, limiter:Limiter, utility:Utility, ringmod:RingMod, spring:Spring, plate:Plate, lverb:Lverb, ensemble:Ensemble, math:MathM, logic:Logic, divider:Divider, euclid:Euclid,
   rect:Rectify, scale:ScaleMap, compare:Comparator, switch:Switch2, xfade:Crossfade, const:Constant,
   steps:Steps, clock:Clock, clkmul:ClockMul, chance:ChanceGate, counter:Counter, stepsw:StepSwitch, burst:Burst, gatedly:GateDelay, flipflop:FlipFlop, scope:Scope,
+  onepole:OnePole, allpass:AllpassM, dcblock:DCBlock, midside:MidSide,
   dimension:Dimension, bbd:BBD, harm:Harmonizer, blipdrum:BlipDrum, life:Life, degrade:Degrade, reson:Reson,
   flex:FlexM, sgate:StepGateM, retrig:RetrigM, pdelay:PDelayM, preverb:PReverbM,
   spectral:Spectral, stretch:XStretch, convolve:Convolve,
@@ -5323,7 +5437,7 @@ const MODULES = { ...SHARED_MODULES, ...PUMP_MODULES, trackIn:TrackIn,
   flanger:FlangerFx, tremolo:TremoloFx, odrive:OdriveFx, folder:FolderFx, autowah:AutowahFx, pshift:PshiftFx, ladder:LadderFx, xmod:XmodFx, space:SpaceFx, lofi:LofiFx, drive:DriveFx, air:AirFx, room:RoomFx,
   comb:CombFx, transient:TransientFx, tgate:TgateFx, ott:OttFx, fshift:FshiftFx, vinyl:VinylFx, dub:DubFx, cab:CabFx, tube:TubeFx,
   scin:SidechainIn, sccomp:SidechainComp, scout:SidechainOut,
-  lfo:LFO, adsr:ADSR, random:Random, atten:Attenuverter, repeat:Repeat,
+  lfo:LFO, adsr:ADSR, random:Random, atten:Attenuverter, osc:OscM, wnoise:NoiseSrc, repeat:Repeat,
   envfol:EnvFol, gateex:GateEx, pitchfol:PitchFol, pitchtrk:PitchTrk, slew:Slew, snh:SampleHold, quant:Quant,
   blades:Blades, meta:Meta, phaser:Phaser, width:Width, pingpong:PingPong, resample:Resample, chainOut:ChainOut };
 

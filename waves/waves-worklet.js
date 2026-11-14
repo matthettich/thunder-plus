@@ -1536,6 +1536,73 @@ const Scope = {
   }
 };
 
+/* AUDIO BUILDING BLOCKS (14 Nov, module queue): the small parts filters, phasers and reverbs are made of. One channel
+   each (patch two for stereo). 'poly' as the control maths: per voice in …waves when a voice feeds them. */
+/* One-pole filter: the gentlest filter there is (6 dB an octave). Low and High are its two halves; added together they
+   are the input again. Also a smoother for control signals. */
+const OnePole = {
+  type:'onepole', scope:'poly', cost:.03,
+  inputs:{ in:'audio' }, outputs:{ lp:'audio', hp:'audio' },
+  params:{ freq:[1000,5,20000,1] },
+  create:() => ({ y:0 }),
+  process(st, io, ctx){
+    const X = io.in.in, L = io.out.lp, Hh = io.out.hp, k = 1 - Math.exp(-6.283185307179586 * clamp(io.p.freq, 1, ctx.sr * .49) / ctx.sr); let y = st.y;
+    for (let i = 0; i < ctx.block; i++){ const x = X[i]; y += (x - y) * k; L[i] = y; Hh[i] = x - y; }
+    st.y = y === y && (y > 1e-20 || y < -1e-20) && y > -1e6 && y < 1e6 ? y : 0;
+  }
+};
+/* Allpass: every frequency passes at the same level; only the timing changes. Phase: a first-order one that turns the
+   phase round Freq (several in a row, mixed with the dry sound, make a phaser). Echo: a short delay with its own
+   feedback and feedforward (Time, Gain), the diffuser reverbs are built from; it smears a click without colouring a tone. */
+const AllpassM = {
+  type:'allpass', scope:'poly', cost:.05,
+  inputs:{ in:'audio' }, outputs:{ out:'audio' },
+  params:{ mode:[0,0,1,1], freq:[1000,20,20000,1], time:[.01,.0005,.1,.0001], gain:[.5,-.95,.95,.01] },
+  create:sr => ({ x1:0, y1:0, b:new Float32Array(Math.ceil(sr * .1) + 4), w:0 }),
+  process(st, io, ctx){
+    const X = io.in.in, O = io.out.out, p = io.p;
+    if (p.mode < .5){
+      const t = Math.tan(Math.PI * clamp(p.freq, 1, ctx.sr * .49) / ctx.sr), a = (t - 1) / (t + 1); let x1 = st.x1, y1 = st.y1;
+      for (let i = 0; i < ctx.block; i++){ const x = X[i], y = a * x + x1 - a * y1; x1 = x; y1 = y; O[i] = y; }
+      st.x1 = x1; st.y1 = y1 === y1 && (y1 > 1e-20 || y1 < -1e-20) && y1 > -1e6 && y1 < 1e6 ? y1 : 0;
+    } else {
+      const B = st.b, M = B.length, D = clamp(Math.round(p.time * ctx.sr), 1, M - 1), g = clamp(p.gain, -.95, .95); let w = st.w;
+      for (let i = 0; i < ctx.block; i++){
+        let r = w - D; if (r < 0) r += M; const d = B[r]; let v = X[i] + g * d;
+        if (!(v === v && v > -1e6 && v < 1e6)) v = 0; else if (v < 1e-20 && v > -1e-20) v = 0;
+        B[w] = v; O[i] = d - g * v; if (++w >= M) w = 0;
+      }
+      st.w = w;
+    }
+  }
+};
+/* DC blocker: takes out a constant offset (and anything below Freq) so a signal sits round zero again: after a
+   rectifier, a feedback loop or an asymmetric shaper. */
+const DCBlock = {
+  type:'dcblock', scope:'poly', cost:.02,
+  inputs:{ in:'audio' }, outputs:{ out:'audio' },
+  params:{ freq:[10,1,200,1] },
+  create:() => ({ x1:0, y1:0 }),
+  process(st, io, ctx){
+    const X = io.in.in, O = io.out.out, R = 1 - 6.283185307179586 * clamp(io.p.freq, 1, 200) / ctx.sr; let x1 = st.x1, y1 = st.y1;
+    for (let i = 0; i < ctx.block; i++){ const x = X[i], y = x - x1 + R * y1; x1 = x; y1 = y; O[i] = y; }
+    st.x1 = x1 === x1 ? x1 : 0; st.y1 = y1 === y1 && (y1 > 1e-20 || y1 < -1e-20) && y1 > -1e6 && y1 < 1e6 ? y1 : 0;
+  }
+};
+/* Mid / side: Encode turns left and right into mid (what both share) and side (what differs); Decode turns them back.
+   Encode, treat the two differently, Decode: that is how a stereo widener or a mid-only EQ is patched. Exact both ways. */
+const MidSide = {
+  type:'midside', scope:'poly', cost:.02,
+  inputs:{ in:'audio', inR:'audio' }, outputs:{ out:'audio', outR:'audio' },
+  params:{ mode:[0,0,1,1] },
+  create:() => ({}),
+  process(st, io, ctx){
+    const A = io.in.in, B = io.in.inR, O = io.out.out, P = io.out.outR;
+    if (io.p.mode < .5){ const R = io.linked && io.linked.has('inR') ? B : A; for (let i = 0; i < ctx.block; i++){ const l = A[i], r = R[i]; O[i] = (l + r) * .5; P[i] = (l - r) * .5; } }
+    else for (let i = 0; i < ctx.block; i++){ const m = A[i], sd = B[i]; O[i] = m + sd; P[i] = m - sd; }
+  }
+};
+
 /* CONTROL MATHS (14 Nov, the owner's low-level module queue, group 1). Small sample-accurate blocks for control and
    audio alike. They are 'poly' so that in …waves one fed by a voice runs once per voice (in …chains scope means nothing).
    Add, subtract, multiply, min and max are Math's outputs; AND / OR / XOR / NOT are Logic's. */
@@ -5179,6 +5246,7 @@ const SHARED_MODULES = { beads:Beads,
   meter:Meter, limiter:Limiter, utility:Utility, ringmod:RingMod, spring:Spring, plate:Plate, lverb:Lverb, ensemble:Ensemble, math:MathM, logic:Logic, divider:Divider, euclid:Euclid,
   rect:Rectify, scale:ScaleMap, compare:Comparator, switch:Switch2, xfade:Crossfade, const:Constant,
   steps:Steps, clock:Clock, clkmul:ClockMul, chance:ChanceGate, counter:Counter, stepsw:StepSwitch, burst:Burst, gatedly:GateDelay, flipflop:FlipFlop, scope:Scope,
+  onepole:OnePole, allpass:AllpassM, dcblock:DCBlock, midside:MidSide,
   dimension:Dimension, bbd:BBD, harm:Harmonizer, blipdrum:BlipDrum, life:Life, degrade:Degrade, reson:Reson,
   flex:FlexM, sgate:StepGateM, retrig:RetrigM, pdelay:PDelayM, preverb:PReverbM,
   spectral:Spectral, stretch:XStretch, convolve:Convolve,
