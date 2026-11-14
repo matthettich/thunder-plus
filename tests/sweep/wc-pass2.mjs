@@ -275,6 +275,8 @@ async function d2(ed) {
     ok(`${ed} D2: 6 into a kHz readout is 6 kHz, "3.1k" is 3.1 kHz (${eqf[0]} > ${eqf[1]}; ${eqk[1]})`, /^6\.0 kHz$/.test(eqf[1]) && /^3\.1 kHz$/.test(eqk[1]));
     ok(`${ed} D2: "1.2 s" into a milliseconds readout is 1.20 s, and a bare 250 into a seconds readout is 250 ms (${dl[1]}; ${dm[1]})`, dl[1] === '1.20 s' && dm[1] === '250 ms', JSON.stringify([dl, dm]));
     ok(`${ed} D2: -24 into a threshold is -24.0 dB, "40%" is 40%, -7 into a pitch is -7 st (${cmp[1]}; ${pc[1]}; ${st[1]})`, norm(cmp[1]) === '-24.0 dB' && pc[1] === '40%' && norm(st[1]) === '-7 st', JSON.stringify([cmp, pc, st]));
+    const sci = await typeCase('t2', 'tfreq', .4, '1e3 Hz'), sci2 = await typeCase('t1', 'regen', .1, '4e1%'), sci3 = await typeCase('t1', 'regen', .1, '2.5e-1');
+    ok(`${ed} pass 3 c: scientific notation is typed again ("1e3 Hz" is ${sci[1]}, "4e1%" is ${sci2[1]}, "2.5e-1" is 0.25 so ${sci3[1]})`, /^1\.0 kHz$/.test(sci[1]) && sci2[1] === '40%' && sci3[1] === (await typeCase('t1', 'regen', .1, '0.25'))[1], JSON.stringify([sci, sci2, sci3]));
     const errs = errors.splice(0).filter(e => !NOISE.test(e)); ok(`${ed} D2: no page errors`, errs.length === 0, errs.slice(0, 3).join(' | '));
   } catch (e) { ok(`${ed} D2: ran to the end`, false, e.stack.split('\n').slice(0, 4).join(' | ')); }
   await B.close();

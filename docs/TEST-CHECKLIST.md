@@ -1,5 +1,4 @@
 # Thunder Plus test checklist, by priority
-
 > Snapshot of the owner's Claude Doc "Thunder Plus test checklist, by priority" (https://claude.ai/artifact/LrzQ18ur18Fc5gkvxmQDbK), exported 13 Nov 2026 with his ticks as of that evening.
 > The live list is the Claude Doc; the source of every item is "Owner's punch list" in HANDOVER.md (build numbers are in brackets).
 > Re-export this file when the doc changes.
@@ -22,7 +21,7 @@ If something fails, tell Claude the build number and what happened; tick an item
 
 | Section | Open items | Mostly on | Why it matters |
 | --- | --- | --- | --- |
-| 1. Do these first | 16 | Phone and computer | Lost work or sound, and the re-checks of your last fixes |
+| 1. Do these first | 25 | Phone and computer | Lost work or sound, and the re-checks of your last fixes |
 | 2. Really worth trying | 33 | Phone | Everyday features nobody has tried on a real device |
 | 3. If you have time | 47 | Phone, then gear | Secondary features, by-ear comparisons and hardware |
 | 4. Safe to skip unless something looks wrong | 55 | Mixed | Cosmetic, older, or already covered by automated tests |
@@ -43,6 +42,20 @@ If something fails, tell Claude the build number and what happened; tick an item
 - [ ] Computer: Help shows Signal kinds as three tidy rows; choosing "Modules" in Help scrolls to that section and does not open a second editor. (584)
 - [ ] Computer: in Chains and Waves the File menu starts with New project and has no Undo / Redo; Edit has them; the Tracker says "New project" too. (584)
 - [ ] Computer, inside Thunder Plus (chains): MIDI-map a slider and put another in the bottom panel, then collapse the module; a small "CC" and a dot show on its summary line. (579) (could not test MIDI)
+
+### New in build 585: the editors' small fixes (pass 2)
+
+*These decide whether the phone pass for …waves and …chains can start.*
+
+- [ ] Folded phone: open …chains or …waves with a patch in it: it opens big enough to read (about 80%), on the first module, not as a tiny overview. (585)
+- [ ] Folded phone: the Fit button is in the top bar, and the module list closes after you add a module, which is brought into view. (585)
+- [ ] Phone: tap the × on a module: it asks "Remove …?" first; Cancel keeps it; after Remove, Undo brings it back. (585)
+- [ ] Phone: tap a module's title bar without dragging: the module does not move. (585)
+- [ ] Computer: double-click a value and type one (try a delay Time in ms, a filter Cutoff in Hz or kHz, a Mix in %): the value shown is the value you typed. (585)
+- [ ] Computer: drag a slider once, then Undo once: it goes back to where it started in one step. (585)
+- [ ] Computer: a slider or dropdown that sits under a cable still responds to a click. (585)
+- [ ] Computer, Waves view inside Thunder Plus: Voices and On-screen keys can be reached. (585)
+- [ ] Folded phone: the first time you open an editor, does the tip box sitting over the first module's title bar bother you? (585)
 
 ### Could lose work or sound
 

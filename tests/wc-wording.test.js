@@ -58,7 +58,7 @@ for (const [ed, src] of Object.entries(ED)) {
     assert.match(src, /\.hint \.tipt, \.hint \.hintpill\{display:none\}/);
     const js = block(src, '// T11: with a touch screen', 'tipsBox.checked = false; }); }');
     assert.match(js, /pill\.addEventListener\('click', \(\) => \{ tipOpen\(true\); document\.getElementById\('hintx'\)\.focus\(\); \}\);/, 'focus follows the control: × after opening, Tips after folding');
-    assert.match(js, /settings\.tipSeen = true; saveSettings\(\);/, 'the first visit is remembered in the settings (no patch field, no new key)');
+    assert.match(js, /if \(coarse\.matches\) tipOpen\(false\);/, 'pass 3 (owner, 13 Nov): on touch the tip never opens by itself, only the Tips button opens it');
     assert.match(js, /if \(coarse\.matches\)\{ tipOpen\(false\); pill\.focus\(\); return; \}[^\n]*hint\.hidden = true; settings\.tips = false;/, '× folds on touch and switches tips off with a mouse, as before');
   });
   test(ed + ' U9: a Help card takes the module\'s category colour and a tint of it', () => {

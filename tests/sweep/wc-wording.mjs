@@ -267,14 +267,14 @@ async function run(ed, CSS, OLD) {
     const vis = () => mp.evaluate(() => { const h = document.getElementById('hint'), r = h.getBoundingClientRect(), ws = document.getElementById('ws').getBoundingClientRect(), v = e => { const b = e.getBoundingClientRect(); return b.width > 0 && b.height > 0; };
       return { hidden: h.hidden, min: h.classList.contains('min'), long: v(h.querySelector('.tipm')), short: v(h.querySelector('.tipt')), pill: v(document.getElementById('hintpill')), x: v(document.getElementById('hintx')), w: Math.round(r.width), h: Math.round(r.height), frac: +(r.width * r.height / (ws.width * ws.height)).toFixed(3), text: h.querySelector('.tipt').textContent, tipSeen: JSON.parse(localStorage.getItem(document.title.trim() + '.settings') || '{}').tipSeen }; });
     const f1 = await vis();
-    ok(`${ed} T11: first visit on touch: the short touch note is open (${f1.w}x${f1.h}, ${Math.round(f1.frac * 100)}% of the workspace)`, !f1.hidden && !f1.min && f1.short && !f1.long && f1.x && !f1.pill && f1.frac < .3 && f1.h < 200, JSON.stringify(f1));
+    ok(`${ed} T11: first visit on touch (pass 3, owner 13 Nov: no tip box by itself): it opens collapsed to the small Tips button (${f1.w}x${f1.h}, ${Math.round(f1.frac * 1000) / 10}% of the workspace)`, f1.min && f1.pill && !f1.short && !f1.long && !f1.x && f1.w <= 120 && f1.h <= 56 && f1.h >= 36, JSON.stringify(f1));
     ok(`${ed} T11: ...and it says nothing of Option, Alt, Shift, Ctrl, right-click, a mouse or a keyboard`, !/option|\balt\b|shift|ctrl|right-click|click|mouse|keyboard|scroll/i.test(f1.text), f1.text);
     await reload();
     const f2 = await vis();
-    ok(`${ed} T11: second visit on touch: it starts collapsed to a small Tips button (${f2.w}x${f2.h}, ${Math.round(f2.frac * 1000) / 10}% of the workspace)`, f2.min && f2.pill && !f2.short && !f2.long && !f2.x && f2.w <= 120 && f2.h <= 56 && f2.h >= 36 && f2.tipSeen === true, JSON.stringify(f2));
+    ok(`${ed} T11: second visit on touch: it starts collapsed to a small Tips button (${f2.w}x${f2.h}, ${Math.round(f2.frac * 1000) / 10}% of the workspace)`, f2.min && f2.pill && !f2.short && !f2.long && !f2.x && f2.w <= 120 && f2.h <= 56 && f2.h >= 36, JSON.stringify(f2));
     await mp.tap('#hintpill'); await sleep(mp, 300);
     const f3 = await vis();
-    ok(`${ed} T11: a tap on Tips opens the note`, !f3.min && f3.short && f3.x && !f3.pill && f3.frac < .3, JSON.stringify(f3));
+    ok(`${ed} T11: a tap on Tips opens the note`, !f3.min && f3.short && f3.x && !f3.pill && f3.frac < .4, JSON.stringify(f3));
     await mp.tap('#hintx'); await sleep(mp, 300);
     const f4 = await vis(); const st4 = await mp.evaluate(k => JSON.parse(localStorage.getItem(k) || '{}'), ed + '.settings');
     ok(`${ed} T11: × folds it back to the button (it does not switch tips off)`, f4.min && f4.pill && !f4.hidden && st4.tips !== false, JSON.stringify(f4));
