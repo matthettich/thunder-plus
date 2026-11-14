@@ -1295,6 +1295,90 @@ const Logic = {
   }
 };
 
+/* CONTROL MATHS (14 Nov, the owner's low-level module queue, group 1). Small sample-accurate blocks for control and
+   audio alike. They are 'poly' so that in …waves one fed by a voice runs once per voice (in …chains scope means nothing).
+   Add, subtract, multiply, min and max are Math's outputs; AND / OR / XOR / NOT are Logic's. */
+/* Invert / rectify: one signal in → its mirror, its absolute value, and its positive and negative halves (both as positive values). */
+const Rectify = {
+  type:'rect', scope:'poly', cost:.02,
+  inputs:{ in:'cv' }, outputs:{ inv:'cv', abs:'cv', pos:'cv', neg:'cv' },
+  params:{},
+  create:() => ({}),
+  process(st, io, ctx){
+    const X = io.in.in, o = io.out;
+    for (let i = 0; i < ctx.block; i++){ const x = X[i]; o.inv[i] = -x; o.abs[i] = x < 0 ? -x : x; o.pos[i] = x > 0 ? x : 0; o.neg[i] = x < 0 ? -x : 0; }
+  }
+};
+/* Scale / map: the range In low..In high becomes Out low..Out high (a straight line through both points, so swapping
+   the Out ends turns it over). Clip holds the result inside the Out range. In low = In high gives Out low. */
+const ScaleMap = {
+  type:'scale', scope:'poly', cost:.02,
+  inputs:{ in:'cv' }, outputs:{ out:'cv' },
+  params:{ ilo:[-1,-1,1,.01], ihi:[1,-1,1,.01], olo:[0,-1,1,.01], ohi:[1,-1,1,.01], clip:[1,0,1,1] },
+  create:() => ({}),
+  process(st, io, ctx){
+    const p = io.p, X = io.in.in, O = io.out.out, d = p.ihi - p.ilo, k = d > 1e-6 || d < -1e-6 ? (p.ohi - p.olo) / d : 0, a = p.ilo, b = p.olo;
+    const lo = p.olo < p.ohi ? p.olo : p.ohi, hi = p.olo < p.ohi ? p.ohi : p.olo, clip = p.clip >= .5;
+    for (let i = 0; i < ctx.block; i++){ let y = b + (X[i] - a) * k; if (clip){ if (y < lo) y = lo; else if (y > hi) y = hi; } O[i] = y; }
+  }
+};
+/* Comparator: is A above B (plus Level)? Gates A > B and its opposite. Hysteresis is a dead band around the level, so a
+   signal hovering at it does not chatter: the gate goes high above level + half the band and low below level - half. */
+const Comparator = {
+  type:'compare', scope:'poly', cost:.02,
+  inputs:{ a:'cv', b:'cv' }, outputs:{ gt:'gate', lt:'gate' },
+  params:{ thr:[0,-1,1,.01], hyst:[.02,0,.5,.01] },
+  create:() => ({ s:0 }),
+  process(st, io, ctx){
+    const A = io.in.a, B = io.in.b, o = io.out, t = io.p.thr, h = io.p.hyst * .5; let s = st.s;
+    for (let i = 0; i < ctx.block; i++){ const d = A[i] - B[i] - t; if (d > h) s = 1; else if (!(d >= -h) || !(h > 0)) s = 0;   /* below the band, not a number, or no band at all: with Hysteresis 0 it is a plain A > B */ o.gt[i] = s; o.lt[i] = 1 - s; }
+    st.s = s;
+  }
+};
+/* Switch: A or B to Out. The Pick switch chooses; a gate on Select chooses the other one while it is high. Fade is the
+   time the change takes (a short crossfade, so audio does not click; 0 is instant, for control signals). */
+const Switch2 = {
+  type:'switch', scope:'poly', cost:.03,
+  inputs:{ a:'audio', b:'audio', sel:'gate' }, outputs:{ out:'audio' },
+  params:{ pick:[0,0,1,1], fade:[.005,0,.1,.001] },
+  create:() => ({ g:-1 }),
+  process(st, io, ctx){
+    const A = io.in.a, B = io.in.b, S = io.in.sel, O = io.out.out, base = io.p.pick >= .5 ? 1 : 0;
+    const step = io.p.fade > 0 ? 1 / Math.max(1, io.p.fade * ctx.sr) : 1; let g = st.g;
+    if (g < 0) g = (S[0] >= .5 ? 1 - base : base);   // the first block starts where it is, with no fade from A
+    for (let i = 0; i < ctx.block; i++){
+      const want = S[i] >= .5 ? 1 - base : base;
+      if (g < want){ g += step; if (g > want) g = want; } else if (g > want){ g -= step; if (g < want) g = want; }
+      O[i] = g <= 0 ? A[i] : g >= 1 ? B[i] : A[i] + (B[i] - A[i]) * g;
+    }
+    st.g = g;
+  }
+};
+/* Crossfade: a mix of A and B. Mix is the slider plus the Mix input (0..1 moves it from A to B, sample by sample).
+   Curve: Straight adds up to the same level for signals that are alike (and for control); Equal power keeps the loudness of two different sounds even through the middle. */
+const Crossfade = {
+  type:'xfade', scope:'poly', cost:.03,
+  inputs:{ a:'audio', b:'audio', mixin:'cv' }, outputs:{ out:'audio' },
+  params:{ mix:[.5,0,1,.01], curve:[0,0,1,1] },
+  create:() => ({}),
+  process(st, io, ctx){
+    const A = io.in.a, B = io.in.b, C = io.in.mixin, O = io.out.out, m = io.p.mix, eq = io.p.curve >= .5;
+    for (let i = 0; i < ctx.block; i++){
+      let x = m + C[i]; if (!(x > 0)) x = 0; else if (x > 1) x = 1;
+      if (eq){ const t = x * 1.5707963267948966; O[i] = A[i] * Math.cos(t) + B[i] * Math.sin(t); }
+      else O[i] = A[i] + (B[i] - A[i]) * x;
+    }
+  }
+};
+/* Constant: a steady value (Value + Fine), for an offset, a threshold or a fixed level. */
+const Constant = {
+  type:'const', scope:'poly', cost:.01,
+  inputs:{}, outputs:{ out:'cv' },
+  params:{ value:[0,-1,1,.01], fine:[0,-.01,.01,.0001] },
+  create:() => ({}),
+  process(st, io, ctx){ io.out.out.fill(io.p.value + io.p.fine); }
+};
+
 /* Divider: counts Clock in and gates every 2nd, 4th, 8th and Nth pulse (each output stays high for the length of
    the pulse that fired it). Reset starts counting again. */
 const Divider = {
@@ -4852,6 +4936,7 @@ const SHARED_MODULES = { beads:Beads,
   comb:CombFx, transient:TransientFx, tgate:TgateFx, ott:OttFx, fshift:FshiftFx, vinyl:VinylFx, dub:DubFx, cab:CabFx, tube:TubeFx,
   envfol:EnvFol, gateex:GateEx, pitchfol:PitchFol, pitchtrk:PitchTrk, slew:Slew, snh:SampleHold, quant:Quant, blades:Blades, meta:Meta, phaser:Phaser, width:Width, pingpong:PingPong,
   meter:Meter, limiter:Limiter, utility:Utility, ringmod:RingMod, spring:Spring, plate:Plate, lverb:Lverb, ensemble:Ensemble, math:MathM, logic:Logic, divider:Divider, euclid:Euclid,
+  rect:Rectify, scale:ScaleMap, compare:Comparator, switch:Switch2, xfade:Crossfade, const:Constant,
   dimension:Dimension, bbd:BBD, harm:Harmonizer, blipdrum:BlipDrum, life:Life, degrade:Degrade, reson:Reson,
   flex:FlexM, sgate:StepGateM, retrig:RetrigM, pdelay:PDelayM, preverb:PReverbM,
   spectral:Spectral, stretch:XStretch, convolve:Convolve,
