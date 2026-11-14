@@ -300,7 +300,7 @@ test('mouse audit (3 Nov): Mac Ctrl+click is the menu, middle-click mutes, top m
   assert.match(src, /input:not\(\[type=range\]\)/, 'no browser menu on sliders');
   for (const f of ['waves/index.html', 'chains/index.html']) {
     const w = H.read(f);
-    assert.match(w, /ONE SLIDER \(mouse audit, 3 Nov[\s\S]{0,5000}if \(e\.altKey \|\| \(MAC \? e\.metaKey : e\.ctrlKey\)\)\{ reset\(\); return; \}[\s\S]{0,2500}ev\.shiftKey \? 0\.1/, f + ': the host slider rule');
+    assert.match(w, /ONE SLIDER \(mouse audit, 3 Nov[\s\S]{0,5000}if \(e\.altKey\)\{ reset\(\); return; \}[\s\S]{0,2500}ev\.shiftKey \? 0\.1/, f + ': the host slider rule');
     assert.match(w, /if \(ev\.pointerType === 'mouse' && ev\.buttons === 0 && !drag\.drawing && !drag\.armed\)/, f + ': a cable let go outside ends');
     assert.match(w, /\['Remove cable', \(\) =>/, f + ': Remove cable');
   }

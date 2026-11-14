@@ -2,7 +2,7 @@
 // Both editors, standalone, with REAL touch events (CDP Input.dispatchTouchEvent) in a mobile context, and a mouse context for "unchanged". Prints PASS / FAIL.
 //   node tests/sweep/wc-pass3.mjs             all of it
 //   node tests/sweep/wc-pass3.mjs fu m10 ...   sections: fu (follow-ups a-d) m10 t4 t6 t7 t8 t9 t12 t13 t14 old mouse
-//   OLD_ROOT=/path/to/a/checkout  or  OLD_REF=<commit> (default HEAD, build 585 when the working tree holds this pass): the previous build, for "unchanged" and "loads in 585"
+//   OLD_ROOT=/path/to/a/checkout  or  OLD_REF=<commit> (default e67adc2, the build 585 merge commit; fetched if absent, the comparisons print SKIP if it cannot be had): the previous build, for "unchanged" and "loads in 585"
 //   SHOTS=/dir node tests/sweep/wc-pass3.mjs shots    before / after screenshots for the owner
 import fs from 'fs'; import os from 'os'; import path from 'path'; import { execSync } from 'child_process';
 import { boot, app, Table, ROOT, serveDir, listenLoopback } from './ui-lib.mjs';
@@ -60,11 +60,15 @@ async function twoFingers(page, a, b, da, steps = 10) { await tStart(page, [a, b
 async function bootEd(w, h, mob) { const B = await boot({ width: w, height: h, mobile: mob }); B.base = `http://127.0.0.1:${B.port}`; return B; }
 const done = (errors, tag) => { const errs = errors.splice(0).filter(e => !NOISE.test(e)); ok(`${tag}: no page errors`, errs.length === 0, errs.slice(0, 3).join(' | ')); };
 
-// ---- the previous build ----
+// ---- the previous build: a fixed older commit, never HEAD (after the merge HEAD is this build, and the comparison would be with itself) ----
+const BASE585 = 'e67adc2';   // the build 585 merge commit
 async function oldBuild() {
   let dir = process.env.OLD_ROOT;
-  if (!dir) { const ref = process.env.OLD_REF || 'HEAD'; dir = fs.mkdtempSync(path.join(os.tmpdir(), 'wc-pass3-old-'));
-    try { execSync(`git -C ${JSON.stringify(ROOT)} archive ${ref} chains waves | tar -x -C ${JSON.stringify(dir)}`, { stdio: 'pipe' }); } catch (e) { return null; } }
+  if (!dir) { const ref = process.env.OLD_REF || BASE585; dir = fs.mkdtempSync(path.join(os.tmpdir(), 'wc-pass3-old-'));
+    const have = () => { try { execSync(`git -C ${JSON.stringify(ROOT)} cat-file -e ${ref}^{commit}`, { stdio: 'pipe' }); return true; } catch (e) { return false; } };
+    if (!have()) { try { execSync(`git -C ${JSON.stringify(ROOT)} fetch --quiet origin ${ref}`, { stdio: 'pipe', timeout: 60000 }); } catch (e) {} }
+    if (!have()) { console.log(`SKIP the "versus build 585" comparisons: commit ${ref} is not in this checkout and could not be fetched (set OLD_ROOT or OLD_REF)`); return null; }
+    try { execSync(`git -C ${JSON.stringify(ROOT)} archive ${ref} chains waves | tar -x -C ${JSON.stringify(dir)}`, { stdio: 'pipe' }); } catch (e) { console.log(`SKIP the "versus build 585" comparisons: git archive ${ref} failed`); return null; } }
   const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.woff': 'font/woff', '.png': 'image/png', '.webmanifest': 'application/manifest+json', '.json': 'application/json' };
   const srv = serveDir(dir, TYPES); await listenLoopback(srv);
   return { base: `http://127.0.0.1:${srv.address().port}`, dir, close: () => srv.close() };
@@ -209,7 +213,7 @@ async function m10(ed) {
     const h0 = await centre(page, '.node[data-id="t1"] > header .t'); const p0 = await modPos(page, 't1');
     // Edit: a header drag moves the module (as before); a tap on the close button asks
     await drag(page, [h0.x, h0.y], [h0.x + 30, h0.y + 24]); const p1 = await modPos(page, 't1');
-    ok(`${tag}: in Edit a drag on a module's title bar moves the module (${p0} > ${p1})`, Math.abs(p1[0] - p0[0] - 30) < 3 && Math.abs(p1[1] - p0[1] - 24) < 3);
+    ok(`${tag}: in Edit a drag on a module's title bar moves the module (${p0} > ${p1})`, Math.abs(p1[0] - p0[0] - 30) < 6 && Math.abs(p1[1] - p0[1] - 24) < 6);   // pass 4 (M11): the drop snaps to the 10 px grid
     await page.evaluate(() => document.querySelector('.node[data-id="t1"]').style.left = '12px'); await page.evaluate(() => document.querySelector('.node[data-id="t1"]').style.top = '12px');
     // switch to Play with a tap
     const pb = await centre(page, '#modeplay'); await tap(page, pb.x, pb.y);
@@ -336,7 +340,7 @@ async function t6(ed) {
     const sl = await page.evaluate(() => { const r = document.querySelector('.node[data-id="m2"] .row.sl input, .node[data-id="m5"] .row.sl input'); return null; });
     // background
     await hold(page, 380, 620); const bm = await menu();
-    ok(`${tag}: a long press on the background opens its menu, with "Add a module here…" (${bm && bm.slice(0, 3).join(' | ')})`, !!bm && bm.includes('Add a module here…') && bm.includes('Select all'));
+    ok(`${tag}: a long press on the background opens its menu, with "Add a module here…" (${bm && bm.slice(0, 3).join(' | ')})`, !!bm && bm.some(t => t.startsWith('Add a module here…')) && bm.some(t => t.startsWith('Select all')));
     await tap(page, 5, 700); await sleep(page, 200);
     done(errors, tag);
   } catch (e) { ok(`${tag}: ran to the end`, false, e.stack.split('\n').slice(0, 4).join(' | ')); }
@@ -617,9 +621,23 @@ async function t14(ed, OLD) {
     await page.reload(); await page.waitForSelector('.node'); await sleep(page, 800);
     const i2 = await info(); ok(`${tag}: after a reload the same sections are open (${i2.secs.map(s => s.shut ? 'shut' : 'open').join(', ')})`, !i2.secs[0].shut && !i2.secs[1].shut && i2.secs.slice(2).every(s => s.shut));
     // round trip: nothing else in the patch changed
-    const strip = d => { const c = JSON.parse(JSON.stringify(d)); delete c.meta; delete c.view; return JSON.stringify(c); };
+    // modules (id, type, position, every parameter that was set, and the defaults the load adds must be plain numbers / strings), cables (ends, in order) and groups
     const orig = mk(); const norm = await savedDoc(page, ed);
-    ok(`${tag}: modules, cables and groups are the same after the round trip`, strip(norm) === strip(orig) || JSON.stringify(norm.modules.map(m => [m.id, m.type, m.pos])) === JSON.stringify(orig.modules.map(m => [m.id, m.type, m.pos])));
+    const diffs = [];
+    if (norm.modules.length !== orig.modules.length) diffs.push('module count ' + norm.modules.length + ' vs ' + orig.modules.length);
+    for (const m of orig.modules) {
+      const n = norm.modules.find(x => x.id === m.id);
+      if (!n) { diffs.push(m.id + ' missing'); continue; }
+      if (n.type !== m.type) diffs.push(m.id + ' type');
+      if (!n.pos || Math.abs(n.pos[0] - m.pos[0]) > 0.5 || Math.abs(n.pos[1] - m.pos[1]) > 0.5) diffs.push(m.id + ' pos ' + JSON.stringify(n.pos));
+      for (const k of Object.keys(m.params || {})) if (JSON.stringify((n.params || {})[k]) !== JSON.stringify(m.params[k])) diffs.push(m.id + ' param ' + k);
+      for (const [k, v] of Object.entries(n.params || {})) if (!(typeof v === 'number' || typeof v === 'string' || typeof v === 'boolean' || v === null)) diffs.push(m.id + ' default ' + k + ' is ' + typeof v);
+      if (!!n.collapsed !== !!m.collapsed && n.view == null) diffs.push(m.id + ' collapsed');
+    }
+    const cabKey = c => JSON.stringify([c.from, c.to]);
+    if (JSON.stringify(norm.cables.map(cabKey)) !== JSON.stringify(orig.cables.map(cabKey))) diffs.push('cables ' + JSON.stringify(norm.cables.map(cabKey)) + ' vs ' + JSON.stringify(orig.cables.map(cabKey)));
+    if (JSON.stringify(norm.groups || []) !== JSON.stringify(orig.groups || [])) diffs.push('groups');
+    ok(`${tag}: modules (type, position, parameters), cables and groups are the same after the round trip`, diffs.length === 0, diffs.slice(0, 4).join(' | '));
     // a collapsed (compact) long module still reads
     // a cable into a control inside a shut section ends at its section bar
     await loadDoc(page, base, ed, mk({ sec: { L1: 1 }, extra: [P('l2', 'lfo', 0, 900)], cables: [C('l2', 'out', 'L1', 'p:' + (await keyOfSection(page, ed, 2))) ] }), { settings: { tips: false } });
