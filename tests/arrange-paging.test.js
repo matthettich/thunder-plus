@@ -29,6 +29,17 @@ test('a view of under 16 rows uses a quarter of it as the look-ahead and an eigh
   assert.equal(pt(0, 16, 7), 0); assert.equal(pt(0, 16, 8), 6, '16 rows: the full 8 ahead, 2 kept');
   assert.equal(pt(0, 2, 1), 0, 'the smallest view: no thrash');
 });
+test('the last page: one turn goes straight to the page that shows the end (no second turn a few rows on); never past the end', () => {
+  assert.equal(pt(0, 20, 11, 32), 0); assert.equal(pt(0, 20, 12, 32), 12, 'a 32-row phrase in a 20-row view: row 12 turns to the final page'); for (let r = 12; r < 32; r++) assert.equal(pt(12, 20, r, 32), 12, 'row ' + r);
+  assert.equal(pt(77, 23, 92, 256, -1, 103), 81, 'a 104-row song: the last page ends on its last row');
+  assert.equal(pt(58, 23, 73, 256, -1, 103), 71, 'far from the end: the usual 2 rows kept');
+});
+test('turns per pass of a 32-row phrase through a view of 12 to 31 rows: no more than the old rule from 20 rows up (the last page goes straight to the end), at most about twice below that (the look-ahead is half a small view)', () => {
+  for (let VR = 12; VR <= 31; VR++){
+    const run = f => { let top = 0, n = 0; for (let cyc = 0; cyc < 3; cyc++) for (let r = 0; r < 32; r++){ const t = f(top, r); if (t !== top){ n++; top = t; } } return n; };
+    const old = run((top, r) => (r < top || r > top + VR - 1 ? clamp(r, 0, 32 - VR) : top)), now = run((top, r) => pt(top, VR, r, 32));
+    assert.ok(VR >= 20 ? now <= old : now <= old * 2.2, `VR ${VR}: ${now} turns, the old rule ${old}`); }
+});
 test('the playhead above the view (a loop, LP.SEL or song wrap, "Top of the song") puts its row first, as before', () => {
   assert.equal(pt(40, 32, 0), 0); assert.equal(pt(40, 32, 12), 12, 'a loop that starts at row 12: it is the first row'); assert.equal(pt(40, 32, 39), 39);
 });
@@ -37,7 +48,7 @@ test('beyond the view (a jump forward): the playhead lands 4 rows from the top, 
 });
 test('nothing more to come before the wrap: a view that already shows the loop\'s / song\'s last row never turns early', () => {
   assert.equal(pt(0, 32, 28, 256, -1, 20), 0); assert.equal(pt(0, 32, 28, 256, -1, 31), 0, 'the end row is in view');
-  assert.equal(pt(0, 32, 28, 256, -1, 32), 24, 'one row more than the view shows: it turns');
+  assert.equal(pt(0, 32, 28, 256, -1, 32), 1, 'one row more than the view shows: it turns, once, to the page that shows it');
   assert.equal(pt(0, 23, 15, 256, -1, 15), 0, 'a 16-row loop in a 23-row view');
   assert.equal(pt(0, 32, 40, 256, -1, 20), 36, 'off the view it turns whatever the end says');
 });

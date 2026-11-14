@@ -24970,6 +24970,8 @@ function arrWrapRow(){
   for (let y = 255; y >= 0; y--){ const r = S.song[y]; if (r && r.some(v => v >= 0)) return y; }
   return 0;
 }
+  // The last page: when the end is within reach, one turn goes straight to the page that shows it (the playhead already on it), instead of turning again a few rows on
+  if (row >= top){ const lastTop = end - VR + 1; if (lastTop > top && lastTop <= row && lastTop - nt <= ahead) nt = lastTop; }
 function arrFollowPage(own){
   if (handsOn(FOLLOW_HOLD, arrHandT, arrTouchT)) return;   // (9 Nov, owner: tapping blocks made the view fight itself)
   // A follow mode that's on pages again after the short hold; FOLLOW OFF keeps the owner's minute (3 Nov)
