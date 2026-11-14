@@ -54,6 +54,8 @@ for (const [name, D] of BOTH) {
     assert.equal(flips(run(D, 'compare', { hyst: .2 }, { a: wob }, 4).gt), 0);
     // and it does go high and low across the band
     const big = run(D, 'compare', { hyst: .2 }, { a: i => Math.sin(i * .05) }, 4).gt; assert.ok(flips(big) >= 6);
+    const eq = run(D, 'compare', { hyst: 0 }, { a: i => i < 10 ? 1 : 0 }); assert.equal(eq.gt[9], 1); assert.equal(eq.gt[10], 0, 'no band: A back at the level is not above it');
+    const held = run(D, 'compare', { hyst: .2 }, { a: i => i < 10 ? 1 : 0 }); assert.equal(held.gt[100], 1, 'with a band, inside it the gate keeps its state');
     const nan = run(D, 'compare', {}, { a: () => NaN }); for (const v of nan.gt) assert.equal(v, 0);
   });
   test(name + ': Switch, click-free', () => {

@@ -1331,7 +1331,7 @@ const Comparator = {
   create:() => ({ s:0 }),
   process(st, io, ctx){
     const A = io.in.a, B = io.in.b, o = io.out, t = io.p.thr, h = io.p.hyst * .5; let s = st.s;
-    for (let i = 0; i < ctx.block; i++){ const d = A[i] - B[i] - t; if (d > h) s = 1; else if (d < -h || !(d === d)) s = 0; o.gt[i] = s; o.lt[i] = 1 - s; }
+    for (let i = 0; i < ctx.block; i++){ const d = A[i] - B[i] - t; if (d > h) s = 1; else if (!(d >= -h) || !(h > 0)) s = 0;   /* below the band, not a number, or no band at all: with Hysteresis 0 it is a plain A > B */ o.gt[i] = s; o.lt[i] = 1 - s; }
     st.s = s;
   }
 };
