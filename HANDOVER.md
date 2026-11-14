@@ -550,7 +550,7 @@ The owner's audit (60 findings, a collapsed-module design, his eight decisions, 
   - Rules for pass 1: no audio code (nothing in `chains-worklet.js` / `waves-worklet.js`; goldens and cache-busters unchanged); old patches load unchanged (`collapsed:true` opens as Compact); colours through the variables at the top of each editor's CSS, `termFrameCss` extended for any new one; every editor change in both `chains/index.html` and `waves/index.html`, `python3 tools/sync-shared.py` after the shared block; before / after screenshots of both editors at 1440 x 900, 800 x 700 and 344 x 780 in the white theme, IDM pink & green and 909; checks added to the punch list.
 - [x] **Pass 2, fixes:** D2, D3, D4, T1, T2, T3, T5 (delete on touch asks first, decision 8), T10, U2, H1 to H4. (build 585; waiting for the owner to look: STOP here before pass 3.) Not done or only partly: D4 has no modifier-key variant; the title-bar menu's "Delete module" on touch still deletes at once (only the x button asks); H2 is partly done (the embed `settings()` and chains' hidden key code are removed; see the 13 Nov pass 2 entry).
 - [x] **Pass 3, phone:** T4, T6, T7, T8, T9, T12 to T14, the Play / Edit switch (M10). (build 586; waiting for the owner to look: STOP here before pass 4.) Everything was built in both editors; not done or partly: the Play-mode default is Edit even on a touch screen; T13's keys are waves-only; sections (T14) only apply to modules over 16 controls (chains' pump modules, the random generator in both).
-- [ ] **Pass 4, desktop feel:** D1, D5 (wheel after the pointer rests, decision 3), D7, D8, D10, M4, summing inputs M3 (editor only, see the map; until then a second cable replaces with a toast and Undo), M5, M8, M11, U4, U11.
+- [x] **Pass 4, desktop feel (build 587):** D1, D5, D7, D8, D10, M3 (editor only: the engine already sums), M4, M5, M8, M11, U4 (…chains only), U11. Not done: U4 in …waves (it has no Preset row), a minimap, keyboard-only cable patching (Tab reaches modules, not jacks), nested/other items from the map.
 - [ ] **Pass 5, structure:** module widths M1 (decision 6), feedback M2 (wanted; about a day; its level guard is **for audio review**; plan it with the native port's graph runners), M6, M7, M8, M12.
 
 ### Queue after the audit passes (owner, 13 Nov night)
@@ -574,7 +574,14 @@ Found while building pass 3 (one line each: where, what I would do):
 - The Tips button overlaps a module's jacks or a slider's left edge at the bottom left (waves with keys on, any module low on the screen). Would let it sit in the bar's overflow menu instead.
 - The Play / Edit toast covers the top of the first module for a few seconds on a phone; the frame and PLAY tag already say it. Would drop the toast after the first use.
 - tests/sweep/audition.mjs: "two held notes, one let go: the other still blocks audition" fails on `beta` too (checked against a copy of HEAD): not from this pass; the Synth page's audition guard needs a look.
+Found while building pass 4:
+- Fixed: waves' menus did not draw a section heading (the slider menu showed a literal "§Tune"); added the heading and its CSS.
+- Fixed: a stray hidden placeholder jack had no label (now aria-hidden, skipped); the module-list add button is hidden at desktop width so the search is also focused from the dock toggle.
+- Touch menus show keyboard hints such as (A) and Ctrl+A that do not apply on a phone. Would hide hints on `pointer:coarse`.
+- The wheel outline and the cable readout use the editors' own colours; both worth a look in the black theme.
 - The patch name field is about 68 px on a folded phone (name truncates); the overflow menu could hold it, but a name that is visible is useful.
+- (lead, 14 Nov) The module right-click menu in the editors has grown to 15 entries (custom module, group, zoom, four aligns, two spacings, copy, duplicate, delete, select all, two collapses). I would group Align / Space into one "Arrange" submenu and put a rule between the groups. Not done.
+- (lead, 14 Nov) `tests/sweep/audition.mjs`'s "two held notes" check is timing-sensitive: it failed once while other sweeps were running and passes alone. I would make it wait on the engine's state instead of fixed delays. Not done.
 
 ### Where things stand (10 Nov, 15:10: READ THIS FIRST; it supersedes older lines below where they disagree)
 
@@ -673,6 +680,20 @@ The owner's top priority to add is the MOD screen. Work down the list; ask befor
 **The owner's checklist by importance (13 Nov):** he works from a Claude Doc, "Thunder Plus test checklist, by priority" (https://claude.ai/artifact/LrzQ18ur18Fc5gkvxmQDbK), ordered: 1 Do these first, 2 Really worth trying, 3 If you have time, 4 Safe to skip, Parked, Set aside, Done. A snapshot with his ticks is `docs/TEST-CHECKLIST.md`: re-export it whenever the doc changes, and add each new build's checks to the doc's section 1 as well as here. He said the two "decides" groups (native apps; smoothing / Worklets / clock experiments) are parked and block nothing. "Close the skip list" from him means: close section 4's items as not tested.
 
 Start a session by asking for results. Fix on `beta`. (10 Nov, 15:10: the web beta is build 560; the build numbers in the rest of this paragraph are older.) Web beta: https://matthettich.github.io/thunder-plus/beta/ (build 547 as of 10 Nov morning, 548 once its PR merges; the night of 9–10 Nov shipped 544–547, see the four "10 Nov" entries below. Decisions the lead made that night for the owner to confirm or reverse: on a phone the saved Sequencer default plays on the Page unless Audio thread is picked on that device; on a phone the safety limiter is its stand-in until another worklet loads; the resync only runs with a worklet loaded and its margins are untested on a device). Desktop: v1.3.4-beta.2 (build 541, no feed view or scopes); further desktop betas on hold until the owner asks.
+
+**Build 587** (pass 4 of the UX audit: desktop feel; branch `wc-pass4`; waiting for the owner to look)
+- [ ] **Computer, wheel over a slider (decision 3):** …chains or …waves, scroll the wheel over a slider you have just moved the pointer onto: nothing happens for about a third of a second, then it steps the value (Shift = fine). While you scroll to pan the view, or Ctrl/Cmd+scroll to zoom, no slider changes. A slider lit with an outline is one the wheel will turn. Is that calm enough, or does it still fight panning?
+- [ ] Computer: right-click a slider: Reset, Type a value, MIDI learn. Alt+click a slider resets it; Ctrl/Cmd+click no longer does.
+- [ ] Computer: drag a second cable onto an input that already has one: both stay, a toast says they add together. Undo removes only the new one. Pick up from that input: you get the newest cable.
+- [ ] Computer: hover a cable: a small readout names source and destination and shows the level (dB), gate on/off or the modulated value, updating while you hover.
+- [ ] Computer: modules snap to a 10 px grid when dragged; background right-click, "Snap to grid", turns it off.
+- [ ] Computer: keys A (N in …chains) adds a module by typing; F fits; Shift+F zooms to the picked modules; Ctrl/Cmd+A, Ctrl/Cmd+G; arrows nudge (Shift = 1 px); Enter renames; Esc lets go. Any clash with typing, Play or the host?
+- [ ] Computer: right-click with 2+ modules picked: Align and Space evenly; background: Tidy up (by signal flow), Add a comment here. Do comments stay with the patch after Save and reopen?
+- [ ] Computer: the module list has a search box; Enter adds the first match.
+- [ ] …chains: save a custom preset on a module, save the patch, open it on another device: the preset comes along.
+- [ ] Computer: Tab steps module to module (a ring shows only for the keyboard); a mouse click shows no ring. Screen reader: jacks and modules have names.
+- [ ] Play: folding a section of a long module does nothing; Alt+E in the middle of a title-bar drag lets go of the module.
+- [ ] Phone: nothing changed: sliders, long press menus, drag, Play / Edit as in build 586.
 
 **Build 586** (pass 3 of the UX audit: the phone; branch `wc-pass3`; waiting for the owner to look)
 - [ ] **Play / Edit:** Phone folded, …chains and …waves: tap Play in the top bar. In Play, can you play a patch with one thumb without ever moving or deleting a module? Is it obvious which mode you are in (the frame, the PLAY tag, the lit segment)? Drag from a module's title bar: the patch pans. Tap an x, a chevron, a jack: nothing happens. Switch to Edit: everything works as before. Close the page and open it again: it is in the mode you left it in. (Default is Edit; computer: Alt+E switches.)
@@ -1052,6 +1073,33 @@ Suggested order: N0 → N1 → N2 (phone cured) → N4 with N3 alongside → N5 
   the edge `R.t0`, "waiting…" while armed), `rcdClk` / `rcdFmt` / `rcdFreeSecs`, a 250 ms timer only while recording; the
   final length stays until the next take. recorder-check covers FREE, PATTERN, Stop, next take and closing mid-take.
 
+
+## 14 Nov (…waves / …chains pass 4: desktop feel; build 587)
+
+Branch `wc-pass4` (from `beta` at build 586), not committed. Files: `chains/index.html`, `waves/index.html` (SHARED EDITOR block synced with `tools/sync-shared.py`; "PASS 4" block at its end; CSS "PASS 4" block), root `index.html` (BUILD 587, CHANGES), `sw.js` v587, tests `tests/sweep/wc-pass4.mjs`, `tests/wc-pass4.test.js`, `tests/sweep/wc-pass3.mjs` (review fixes). No worklet, `core/`, goldens or `docs/TEST-CHECKLIST.md` touched.
+
+**Review fixes of pass 3.** Section folds are blocked in Play (`playBlocked()`); entering Play ends `nodeDragging` (both editors); `wc-pass3.mjs` compares against the fixed ref `e67adc2` (build 585 merge, fetched if absent, SKIP line if not obtainable) and its round-trip compares params, cables and groups.
+
+**Per finding.**
+- D5 wheel: window `wheel` capture in the shared block. A slider changes only after the pointer has rested on it 350 ms (`WHEEL_REST`), never during a pan or zoom gesture or within 350 ms of one, never with Ctrl/Cmd (zoom), never with touch down. 2% of range per notch, Shift 0.2%; one Undo step after a 500 ms pause. A rested slider shows the `wheelon` outline.
+- D1: the value menu (Reset, Type a value, MIDI learn) opens on right-click as well as long press. D8: only Alt+click resets; Ctrl/Cmd+click no longer does.
+- D7 keys (skipped while typing, in a dialog, in MIDI learn; editing keys skipped in Play): A (N too, chains only: in waves N is a note key) quick add; F fit; Shift+F zoom to selection; Ctrl/Cmd+A select all; Ctrl/Cmd+G group; Ctrl/Cmd + = / - / 0 zoom; arrows nudge 10 px (Shift 1 px); Enter rename; Esc deselect. Already taken and untouched: Space, Shift+Space, Ctrl/Cmd+Z, +S, +N, Alt+C, Alt+E. All listed in Help ("Keys").
+- D10: right-click menu gains Rename module, Group, Zoom to, Align left/right/tops/bottoms (2+), Space evenly across/down (3+); background: Add a module here, Select all, Add a comment here, Fit all, Tidy up (by signal flow, grid-aligned, groups kept), Snap to grid.
+- M3: `connect` no longer removes the old cable; it refuses exact duplicates with a toast and shows "Two cables now feed this input". **No engine change needed**: `_gather` in both worklets already adds every cable into an input buffer (the new engine test in `tests/wc-pass4.test.js` shows two cables equal the sum of the single paths). Picking up from a multi-cable input takes the newest.
+- M4: search box at the top of the module list; Enter adds the first match, Esc clears; focused from the add button on a mouse device only.
+- M5: comments are `doc.notes` `[{id,pos,w,text}]` (optional), module names use `m.label`. Build 586 loads such a patch and ignores both.
+- M8: hover readout on a cable from existing jack telemetry (`n.pms`, `n.live`); rewritten only when its text changes, only while hovering; no new per-frame work.
+- M11: drag and add snap to a 10 px grid (`settings.snap`, device-local; a patch saved with it off is unaffected).
+- U4 (…chains only): custom presets also stored in optional `doc.presets` and merged with the device's; Export/Import custom modules carry them.
+- U11: roles and labels on jacks, modules (`group`, one tab stop each), `#ws` region, toast live region, menu items; a module reached by Tab (`:focus-visible`) is selected; a mouse click shows no ring (`.node:focus:not(:focus-visible)`). Pixels match build 586 apart from live meters.
+
+**Tests.** `tests/sweep/wc-pass4.mjs` (276 checks, 0 FAIL: both editors, 1440x900 and 1280x800, touch spot checks, build 586 comparison via a temporary worktree), `tests/wc-pass4.test.js` (source guards and the engine sum). Screenshots in `/home/claude/work/shots/pass4/`.
+
+**Decisions for the owner.** Snap defaults to on (turn off from the background menu). Ctrl/Cmd+wheel stays zoom. Comments and presets travel in the patch; a patch with them opened in an older build keeps working without them. On touch the menus still show keyboard hints such as (A).
+
+**Not verified.** Screen reader behaviour (only attributes checked); wheel feel on a trackpad with inertia; Mac Ctrl-click paths by hand.
+
+**Notes for pass 5 / quirks.** waves' `_gather` refreshes its modulation buffers only when `io.moVer !== graph.cables.length`, so a same-count cable swap in a modulation input would not refresh them (existing; summing only adds cables, so unaffected). waves has no Preset row, so U4 there needs a design.
 
 ## 13 Nov (…waves / …chains pass 3: phone; build 586)
 

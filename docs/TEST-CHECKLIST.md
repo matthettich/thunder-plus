@@ -1,9 +1,9 @@
 # Thunder Plus test checklist, by priority
-> Snapshot of the owner's Claude Doc "Thunder Plus test checklist, by priority" (https://claude.ai/artifact/LrzQ18ur18Fc5gkvxmQDbK), exported 13 Nov 2026 with his ticks as of that evening.
+> Snapshot of the owner's Claude Doc "Thunder Plus test checklist, by priority" (https://claude.ai/artifact/LrzQ18ur18Fc5gkvxmQDbK), exported 14 Nov 2026 with his ticks as of that morning.
 > The live list is the Claude Doc; the source of every item is "Owner's punch list" in HANDOVER.md (build numbers are in brackets).
 > Re-export this file when the doc changes.
 
-13 Nov 2026 · Matt
+14 Nov 2026 · Matt
 
 ## How to use this list
 
@@ -21,7 +21,7 @@ If something fails, tell Claude the build number and what happened; tick an item
 
 | Section | Open items | Mostly on | Why it matters |
 | --- | --- | --- | --- |
-| 1. Do these first | 25 | Phone and computer | Lost work or sound, and the re-checks of your last fixes |
+| 1. Do these first | 31 | Phone and computer | Lost work or sound, and the re-checks of your last fixes |
 | 2. Really worth trying | 33 | Phone | Everyday features nobody has tried on a real device |
 | 3. If you have time | 47 | Phone, then gear | Secondary features, by-ear comparisons and hardware |
 | 4. Safe to skip unless something looks wrong | 55 | Mixed | Cosmetic, older, or already covered by automated tests |
@@ -30,6 +30,23 @@ If something fails, tell Claude the build number and what happened; tick an item
 
 ## 1. Do these first
 
+### New in build 586: the phone pass
+
+*The phone version of …chains and …waves. Play / Edit is the part most worth your time.*
+
+- [ ] Folded phone: tap Play in the top bar. Can you play a patch with one thumb (sliders, dropdowns, keys) without ever moving, folding or deleting a module? Is it obvious which mode you are in? Should the phone start in Play or in Edit? (586)
+- [ ] Folded phone: drag a slider sideways: it moves from where it was instead of jumping to your finger; slide your finger up or down away from it while dragging for fine control; double-tap resets it. (586)
+- [ ] Folded phone: drag up or down starting on a slider: the patch pans instead of the value changing. Does the sideways-versus-up-down choice feel right? (586)
+- [ ] Folded phone: press and hold a module's title bar: its menu opens (Group, Copy, Duplicate, Delete). Hold a slider: Reset, Type a value, MIDI learn. Hold empty space: Add a module here. (586)
+- [ ] Folded phone: tap a value once: the box to type a number opens, and the number you type is what you get. (586)
+- [ ] Folded phone: the top bar is one row (name, Play / Edit, +, undo, Fit, …), and File, Settings, Help, MIDI learn, Select and zoom are all under the … button. Anything you reach for that is now too far away? (586)
+- [ ] Folded phone: … then Select: tap several modules, or drag a box around them, then move them together. (586)
+- [ ] Folded phone: a very long module (pump GATE in …chains) opens folded into sections; open one section at a time. (586)
+- [ ] Folded phone, …waves: the on-screen keys show a whole octave, and the octave buttons move it up and down. (586)
+- [ ] Folded phone: opening an editor no longer puts a tip box over the patch; the Tips button at the bottom left opens it. (586)
+- [ ] Unfolded phone: the same Play / Edit switch and long-press menus work, and the top bar still shows everything. (586)
+- [ ] Computer: with a mouse nothing above changed how the editors behave; Alt+E switches Play / Edit. (586)
+
 ### Re-check the fixes from your feedback
 
 *These check the fixes made from your 13 Nov results.*
@@ -37,7 +54,6 @@ If something fails, tell Claude the build number and what happened; tick an item
 - [ ] Computer and phone: double-tap or double-click a cable: it is removed and "Find a module" does not open. (584)
 - [ ] Computer: collapse a Stereo mixer with many inputs patched: nothing is cut off and every jack sits inside the frame. (583)
 - [ ] Computer: a modulation cable into a collapsed module ends on the left, below the audio inputs, with the parameter's name beside it. (583)
-- [ ] Computer: collapsed mixers show the master level first; modules with a Mix or Level show those first. Compressors now show Mix and Makeup: would you rather see Threshold and Ratio? (583)
 - [ ] Computer: drag an LFO to the small jack beside a mixer's Pan slider: it connects on the first try. (584)
 - [ ] Computer: Help shows Signal kinds as three tidy rows; choosing "Modules" in Help scrolls to that section and does not open a second editor. (584)
 - [ ] Computer: in Chains and Waves the File menu starts with New project and has no Undo / Redo; Edit has them; the Tracker says "New project" too. (584)
@@ -47,15 +63,10 @@ If something fails, tell Claude the build number and what happened; tick an item
 
 *These decide whether the phone pass for …waves and …chains can start.*
 
-- [ ] Folded phone: open …chains or …waves with a patch in it: it opens big enough to read (about 80%), on the first module, not as a tiny overview. (585)
-- [ ] Folded phone: the Fit button is in the top bar, and the module list closes after you add a module, which is brought into view. (585)
-- [ ] Phone: tap the × on a module: it asks "Remove …?" first; Cancel keeps it; after Remove, Undo brings it back. (585)
-- [ ] Phone: tap a module's title bar without dragging: the module does not move. (585)
 - [ ] Computer: double-click a value and type one (try a delay Time in ms, a filter Cutoff in Hz or kHz, a Mix in %): the value shown is the value you typed. (585)
 - [ ] Computer: drag a slider once, then Undo once: it goes back to where it started in one step. (585)
 - [ ] Computer: a slider or dropdown that sits under a cable still responds to a click. (585)
 - [ ] Computer, Waves view inside Thunder Plus: Voices and On-screen keys can be reached. (585)
-- [ ] Folded phone: the first time you open an editor, does the tip box sitting over the first module's title bar bother you? (585)
 
 ### Could lose work or sound
 
@@ -340,3 +351,12 @@ Two items stay in the list (sections 3 and 4) with a note because only part of t
 
 - [x] Phone and computer: move a slider on a drum pad, then a synth pad; after a short pause you hear the new sound and a long drag keeps playing along. Does the repeat rate feel right, and should Audition be on by default? (578)
 - [x] Phone and computer: with a song playing, is Audition in the way? Say if it should stay quiet while the song plays. (578)
+
+### Build 585 on the phone, and decisions (13 Nov, night)
+
+- [x] Folded phone: open …chains or …waves with a patch in it: it opens big enough to read (about 80%), on the first module, not as a tiny overview. (585)
+- [x] Folded phone: the Fit button is in the top bar, and the module list closes after you add a module, which is brought into view. (585)
+- [x] Phone: tap the × on a module: it asks "Remove …?" first; Cancel keeps it; after Remove, Undo brings it back. (585)
+- [x] Phone: tap a module's title bar without dragging: the module does not move. (585)
+- [x] Folded phone: the first time you open an editor, does the tip box sitting over the first module's title bar bother you? (585)
+- [x] Computer: collapsed mixers show the master level first; modules with a Mix or Level show those first. Compressors now show Mix and Makeup: would you rather see Threshold and Ratio? (583)
