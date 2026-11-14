@@ -75,7 +75,7 @@ test('chains: Noise: three colours, each its own run of numbers, level kept in b
   const w = slope(0), p = slope(1), b = slope(2);
   assert.ok(Math.abs(w.all - 1 / Math.sqrt(3)) < .02, 'white: even between -1 and 1'); assert.ok(p.low / p.all > w.low / w.all * 2, 'pink has more low end than white'); assert.ok(b.low / b.all > p.low / p.all * 1.03, 'brown more still: ' + b.low / b.all + ' against ' + p.low / p.all);
   const a1 = run(C, 'wnoise', { level: 1 }, {}, 2).out, a2 = run(C, 'wnoise', { level: 1 }, {}, 2).out; assert.notDeepEqual(a1, a2, 'two Noise modules are not copies of each other');
-  const q = run(C, 'wnoise', { level: 0 }, {}, 2).out; for (const v of q) assert.equal(v, 0);
+  const q = run(C, 'wnoise', { level: 0 }, {}, 2).out; for (const v of q) assert.ok(v === 0);
 });
 test('chains engine: Oscillator → One-pole → Chain Out sounds without a Track In; waves has no osc / wnoise', () => {
   const E = new C.ChainsEngine(SR, { focus: 0, quality: 'full', transport: { tempo: 120, lpb: 4, ticks: 6, playing: true } }), m = (id, type, params) => ({ id, type, scope: 'mono', params });
