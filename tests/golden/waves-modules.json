@@ -373,5 +373,8 @@
  "dcblock @switches-on": "c5e8973d",
  "midside @default": "3ba261dd",
  "midside @stressed": "3171e9dd",
- "midside @switches-on": "8e712c25"
+ "midside @switches-on": "8e712c25",
+ "dline @default": "489bcb25",
+ "dline @stressed": "3fde1dc5",
+ "dline @switches-on": "3fde1dc5"
 }

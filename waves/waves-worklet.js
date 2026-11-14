@@ -1603,6 +1603,42 @@ const MidSide = {
   }
 };
 
+/* DELAY LINE (14 Nov, module queue): a bare delay, from one sample to two seconds, with its own feedback. Out is only
+   the delayed sound (mix it with the dry yourself). Because the feedback is inside the module it is exact to the sample,
+   which a feedback cable (one block late) is not: at a few milliseconds it rings at a pitch (a comb, a plucked string:
+   1000 / Time in ms = the pitch in Hz), longer it echoes. The Time input moves the delay by up to ± Mod depth, sample by
+   sample (a chorus or flanger from an LFO). Feedback stops at 99%, and inside the loop the sound is limited the way a
+   feedback cable is (untouched inside -1..1, bent towards 2 above), so it cannot run away. Damp dulls each repeat. */
+const DelayLine = {
+  type:'dline', scope:'poly', cost:.12,
+  tail:p => (p.time + p.fine + p.depth) * .001,   // how long after its input stops it may still have something to say (…waves keeps a released voice awake that long)
+  inputs:{ in:'audio', tmod:'cv' }, outputs:{ out:'audio' },
+  params:{ time:[10,0,2000,.1], fine:[0,-1,1,.001], fb:[0,-.99,.99,.01], damp:[0,0,1,.01], depth:[0,0,50,.1] },
+  create(sr){ const N = 1 << Math.ceil(Math.log2(sr * 2.1 + 8)); return { b:new Float32Array(N), M:N - 1, w:0, d:-1, lp:0 }; },
+  process(st, io, ctx){
+    const p = io.p, sr = ctx.sr, X = io.in.in, T = io.in.tmod, O = io.out.out, B = st.b, M = st.M;
+    const want = clamp((p.time + p.fine) * .001 * sr, 1, sr * 2), dep = p.depth * .001 * sr, mod = dep > 0 && linked(io, 'tmod');
+    const fb = clamp(p.fb, -.99, .99), kd = 1 - p.damp * .95, ks = 1 - Math.exp(-1 / (sr * .02));
+    let d = st.d < 0 ? want : st.d, w = st.w, lp = st.lp;
+    for (let i = 0; i < ctx.block; i++){
+      d += (want - d) * ks;   // the slider glides (20 ms), so turning it bends the pitch instead of clicking
+      let dd = mod ? d + clamp(T[i], -1, 1) * dep : d; if (dd < 1) dd = 1; else if (dd > M - 4) dd = M - 4;
+      const pos = w - dd + M + 1, i0 = Math.floor(pos), f = pos - i0;
+      const xm = B[(i0 - 1) & M], x0 = B[i0 & M], x1 = B[(i0 + 1) & M], x2 = B[(i0 + 2) & M];
+      // 4-point Hermite between x0 and x1 (dd >= 1 keeps x1 at or before the newest sample written; x2 may be the one about to be overwritten, the oldest: at 1 sample f is 0 and it has no weight)
+      const c1 = .5 * (x1 - xm), c2 = xm - 2.5 * x0 + 2 * x1 - .5 * x2, c3 = .5 * (x2 - xm) + 1.5 * (x0 - x1);
+      const y = dd < 2 ? x0 + (x1 - x0) * f : ((c3 * f + c2) * f + c1) * f + x0;
+      lp += (y - lp) * kd;
+      let v = X[i] + lp * fb;
+      if (!(v > -1 && v < 1)){ if (v !== v || v === Infinity || v === -Infinity) v = 0; else if (v < 0) v = -1 - Math.tanh(-v - 1); else v = 1 + Math.tanh(v - 1); }
+      else if (v < 1e-20 && v > -1e-20) v = 0;
+      B[w] = v; w = (w + 1) & M;
+      O[i] = y;
+    }
+    st.d = d; st.w = w; st.lp = lp === lp && (lp > 1e-20 || lp < -1e-20) ? lp : 0;
+  }
+};
+
 /* CONTROL MATHS (14 Nov, the owner's low-level module queue, group 1). Small sample-accurate blocks for control and
    audio alike. They are 'poly' so that in …waves one fed by a voice runs once per voice (in …chains scope means nothing).
    Add, subtract, multiply, min and max are Math's outputs; AND / OR / XOR / NOT are Logic's. */
@@ -5246,7 +5282,7 @@ const SHARED_MODULES = { beads:Beads,
   meter:Meter, limiter:Limiter, utility:Utility, ringmod:RingMod, spring:Spring, plate:Plate, lverb:Lverb, ensemble:Ensemble, math:MathM, logic:Logic, divider:Divider, euclid:Euclid,
   rect:Rectify, scale:ScaleMap, compare:Comparator, switch:Switch2, xfade:Crossfade, const:Constant,
   steps:Steps, clock:Clock, clkmul:ClockMul, chance:ChanceGate, counter:Counter, stepsw:StepSwitch, burst:Burst, gatedly:GateDelay, flipflop:FlipFlop, scope:Scope,
-  onepole:OnePole, allpass:AllpassM, dcblock:DCBlock, midside:MidSide,
+  onepole:OnePole, allpass:AllpassM, dcblock:DCBlock, midside:MidSide, dline:DelayLine,
   dimension:Dimension, bbd:BBD, harm:Harmonizer, blipdrum:BlipDrum, life:Life, degrade:Degrade, reson:Reson,
   flex:FlexM, sgate:StepGateM, retrig:RetrigM, pdelay:PDelayM, preverb:PReverbM,
   spectral:Spectral, stretch:XStretch, convolve:Convolve,
@@ -5377,6 +5413,8 @@ class Graph {
     }
     // A poly module's "exit" outputs: audio that leaves the voice for a mono module (the bus, a mono effect). Those are
     // what the engine listens to when deciding that a released voice has gone silent (its own oscillator never does).
+    // TAILS: per-voice modules that can stay silent for a while and then speak (a Delay line before its echo): see _render
+    this.tails = null; for (const m of this.mods.values()) if (m.poly && typeof m.def.tail === 'function') (this.tails || (this.tails = [])).push(m);
     for (const m of this.mods.values()) m.exits = null;
     for (const c of this.cables){ const a = this.mods.get(c.a[0]), b = this.mods.get(c.b[0]); if (!a || !b || !a.poly || b.poly || isParamPort(c.b[1])) continue;
       if (a.def.outputs[c.a[1]] !== 'audio') continue; (a.exits || (a.exits = [])).push(c.a[1]);
@@ -5545,7 +5583,10 @@ class WavesEngine {
     const ctx = this._ctx, meter = this.telemetryOn === true, only = this.only;
     ctx.block = frames; ctx.quality = this.quality; ctx.notes = this.voices.rows; ctx.transport = this.transport;
     this.voices.now += frames;
-    const hold = this.sr * 12, quietFor = this.sr * 0.25;
+    // A released voice sleeps after a quarter second of silence, plus the longest wait any of its modules may still be in (a
+    // Delay line's echo arrives up to 2 s after the note: without this a short note lost its only echo).
+    let tailS = 0; const tails = this.graph.tails; if (tails) for (let k = 0; k < tails.length; k++){ const t = tails[k].def.tail(tails[k].inst.params); if (t > tailS) tailS = t; }
+    const hold = this.sr * 12, quietFor = this.sr * (0.25 + (tailS > 0 ? (tailS < 4 ? tailS : 4) : 0));
     for (let v = 0; v < this.voices.max; v++){
       ctx.voice = v;
       const row = this.voices.rows[v], awake = this.voices.awake(v, hold);
