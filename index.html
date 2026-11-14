@@ -1197,8 +1197,9 @@ body:not(.legon) .tside .tlegend{display:none}
 #tSub.msS::after{content:' · SOLO'; font-weight:800} #tSub.msM::after{content:' · MUTED'; font-weight:800}
 #tPad #kMute.any:not(.lt):not(#zz):not(#zz), #tPad #kSolo.any:not(.lt):not(#zz):not(#zz){outline:3px solid currentColor; outline-offset:-5px}
 /* LOOP and PLAY when engaged (owner, 9 Nov): lit the same way as MUTE and SOLO, each its own colour, on every skin */
+/* (14 Nov, owner: "make the control bar stop button look like the skin") only the PAD's LOOP and PLAY keep their own colours: the control bar's STOP (.tcmd [data-c=song].on) is a plain control-bar button now, lit by the skin's own on state (.tcmd button.on, .cmini's inverted ink, and the skins' PLAYING accent below), flat, with no colour or shadow of its own */
 #tPad #kLoop.on:not(#zz):not(#zz):not(#zz){background:#7cecff !important; color:#06384a !important; border:4px solid #0a6a8c !important; box-shadow:4px 4px 0 0 #0a6a8c !important; font-weight:800; text-shadow:none !important}
-#tPad #kPlay.on:not(#zz):not(#zz):not(#zz), .tcmd button[data-c=song].on:not(#zz):not(#zz):not(#zz):not(#zz):not(#zz){background:#ffc23d !important; color:#3a2200 !important; border:4px solid #a85f00 !important; box-shadow:4px 4px 0 0 #a85f00 !important; font-weight:800; text-shadow:none !important}
+#tPad #kPlay.on:not(#zz):not(#zz):not(#zz){background:#ffc23d !important; color:#3a2200 !important; border:4px solid #a85f00 !important; box-shadow:4px 4px 0 0 #a85f00 !important; font-weight:800; text-shadow:none !important}
 .k.dn,.k.on{background:var(--ink); color:var(--inv)}
 #kPlay.on{background:var(--pl); border-color:var(--line); color:var(--inv)}
 .k.lt{background:var(--pl); color:var(--inv); border-color:var(--line)}
