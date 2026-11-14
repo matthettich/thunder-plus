@@ -69,7 +69,7 @@ for (const [name, D] of BOTH) {
     r = run(D, 'counter', { steps: 4, mode: 1 }, { clock: clk }, 6); assert.deepEqual([0, 1, 2, 3, 4].map(k => at(r, k)), [1, 2 / 3, 1 / 3, 0, 1].map(Math.fround));
     r = run(D, 'counter', { steps: 4, mode: 2 }, { clock: clk }, 6); assert.deepEqual([0, 1, 2, 3, 4, 5, 6, 7].map(k => at(r, k)), [0, 1 / 3, 2 / 3, 1, 2 / 3, 1 / 3, 0, 1 / 3].map(Math.fround));
     r = run(D, 'counter', { steps: 1 }, { clock: clk }, 2); for (const v of r.step) assert.equal(v, 0);
-    r = run(D, 'counter', { steps: 4 }, { clock: clk, reset: i => i === 150 ? 1 : 0 }, 6); assert.equal(at(r, 2), 0, 'Reset, then the next pulse is the first count again'); assert.equal(at(r, 3), 0); assert.equal(at(r, 4), Math.fround(1 / 3));
+    r = run(D, 'counter', { steps: 4 }, { clock: clk, reset: i => i === 150 ? 1 : 0 }, 6); assert.equal(at(r, 2), Math.fround(2 / 3)); assert.equal(r.step[160], 0, 'Reset: back to the start at once'); assert.equal(at(r, 3), 0, 'and the next pulse is the first count again'); assert.equal(at(r, 4), Math.fround(1 / 3));
   });
   test(name + ': Step switch: one input at a time, in order, with a fade that never jumps', () => {
     const ins = { i1: () => .1, i2: () => .2, i3: () => .3, i4: () => .4, clock: pulse(256, 8, 256) };
