@@ -24910,15 +24910,15 @@ function followPlay(){
   // track plays, and the rows scroll a page when the playhead runs off them), but the cursor stays on its row, so you
   // can edit while it plays. c.pg: the rows were paged by the playhead (draw() then doesn't scroll back to the cursor;
   // moving the cursor brings it back into view).
-  const page = (c, row, VR, len) => { if (row < 0) return; const top = c.top || 0; if (row < top || row > top + VR - 1){ c.top = clamp(row, 0, Math.max(0, len - VR)); c.pg = true; } };
-  if (tv === 'song'){ if (tp.mode === 'song' && !asongOn()) page(cs.song, own.row, songRows(), 256); }
+  const page = (c, row, VR, len, end) => { if (row < 0) return; const top = c.top || 0, nt = arrPageTop(top, VR, row, len, -1, end); if (nt !== top){ c.top = nt; c.pg = true; } };   // the same early page turn as Arrange's (arrPageTop)
+  if (tv === 'song'){ if (tp.mode === 'song' && !asongOn()) page(cs.song, own.row, songRows(), 256, arrWrapRow()); }
   else if (tv === 'sect'){ if (tp.mode !== 'phrase' && own.sect >= 0) cSect = own.sect; }
   else if (tv === 'phrase'){
     // The screen stays on the cursor's own track (owner, 30 Oct): when that track isn't playing on this row (an empty cell,
     // a bus with no block), only the rows follow, in Pattern view; the plain phrase editor stays put.
     const mine = P[cTrack];
     const pvr = pvActive() ? pvVR() : Math.max(4, songRows());
-    if (mine && mine.phrase >= 0){ cPhrase = mine.phrase; cs.phrase.y = Math.min(cs.phrase.y, Math.max(0, plen(cPhrase) - 1)); page(cs.phrase, mine.step, pvr, pvActive() ? 256 : plen(cPhrase)); }
+    if (mine && mine.phrase >= 0){ cPhrase = mine.phrase; cs.phrase.y = Math.min(cs.phrase.y, Math.max(0, plen(cPhrase) - 1)); page(cs.phrase, mine.step, pvr, pvActive() ? 256 : plen(cPhrase), plen(cPhrase) - 1); }
     else if (pvActive() && own.step != null) page(cs.phrase, own.step, pvr, 256); }
   if (tv === 'phrase' && tp.mode === 'song' && own.row >= 0 && pvActive() && !(apReady && apF)) pvFollow(P, own);   // PATTERN VIEW: the song row follows too (not the cursor Arrange is moving)
   arrFollowPage(own);
@@ -24945,6 +24945,31 @@ const markHands = () => { workT = arrActT = arrHandT = arrTouchT = navT = perfor
 // navT: the last ALT + arrow move around the Song grid (optDir, grid). Arrange beside the phrase WITHOUT the keys was held off only by arrHandT / arrTouchT, which a pad press never sets, so every ALT+▲ put Arrange's rows where the cursor was
 // and the very next redraw the playhead put them back: the cursor's row flipped in and out of view. It holds like Arrange's own work does: 4 s with FOLLOW on, the owner's minute (3 Nov) with FOLLOW OFF.
 let navT = -1e9;
+/* EARLY PAGING WITH LOOK-AHEAD (14 Nov, owner: "it's difficult to see whole phrases" in Arrange: the page turned only when the playhead had passed the last
+   row, so the next phrase was never in sight). The one rule for every view that pages with the playhead (Arrange; the Song, Phrase and Pattern view rows
+   of followPlay's page()): when the playhead is within ARR_AHEAD rows of the bottom of the view (a quarter of the view when it shows under 16 rows) the view turns
+   ONCE so that the playhead sits ARR_KEEP rows from the top (an eighth of the view if that is smaller, at least one), keeping the rows just played in sight. No
+   scrolling and no centred playhead (that would redraw the grid every row); one page turn is one full draw, as before. A playhead above the view (a loop,
+   LP.SEL or song wrap, a jump back) puts its row first, as before. keep: a row (the cursor's) to keep in view too when the playhead has left the view (12 Nov), or -1.
+   NOT EARLY when the view already shows the last row the playhead reaches before it wraps (end: the loop's last row, or the song's), so a loop that fits the view never turns a page.
+   arrPageTop(top, VR, row, len, keep, end) is pure: the new first row (top itself when nothing turns). len: how many rows there are. */
+const ARR_AHEAD = 8, ARR_KEEP = 4;
+function arrPageTop(top, VR, row, len, keep = -1, end = len - 1){
+  if (!(row >= 0)) return top;
+  VR = Math.max(2, VR | 0); const ahead = VR < 16 ? Math.max(1, VR >> 2) : ARR_AHEAD, kp = Math.min(ARR_KEEP, Math.max(1, VR >> 3));
+  if (row >= top && row < top + VR && (row < top + VR - ahead || end < top + VR)) return top;   // well inside, or nothing more to come before the wrap: nothing turns
+  let nt = row < top ? row : row - kp;
+  if (keep >= 0 && keep !== row && (row < top || row >= top + VR)) nt = Math.min(keep, nt);   // (the cursor holds the page only when the playhead has left the view; an early turn is the playhead's, the owner idle)
+  return clamp(nt, 0, Math.max(0, len - VR));
+}
+// The last song row the playhead reaches before it wraps: the row a pattern loop holds, the last row of a selection loop, or the song's last row with a block. Read from what the display
+// already has (the loop it asked for, the song); nothing here touches the sequencer.
+function arrWrapRow(){
+  if (tp.loopV === 'pat'){ if (patRow >= 0) return patRow; }
+  else if (tp.loopV === 'song' && loopArm && loopArm.v === 'song') return Math.max(loopArm.y0, loopArm.y1);
+  for (let y = 255; y >= 0; y--){ const r = S.song[y]; if (r && r.some(v => v >= 0)) return y; }
+  return 0;
+}
 function arrFollowPage(own){
   if (handsOn(FOLLOW_HOLD, arrHandT, arrTouchT)) return;   // (9 Nov, owner: tapping blocks made the view fight itself)
   // A follow mode that's on pages again after the short hold; FOLLOW OFF keeps the owner's minute (3 Nov)
@@ -24952,10 +24977,9 @@ function arrFollowPage(own){
   if (handsOn(followMode ? FOLLOW_HOLD : ARR_IDLE, navT)) return;
   try { if (tp.mode === 'song' && own && own.row >= 0 && (asongOn() || (tv !== 'song' && apPanel()))){
     const VR = Math.max(2, arrRows()), top = cs.song.top || 0;
-    if (own.row < top || own.row > top + VR - 1){
-      // The cursor's row stays in view when both fit (12 Nov): the page starts at the higher of the two rows, so the playhead does not hide the cursor the user moved past it
-      const cy = cs.song.y, both = tv !== 'song' && cy >= 0 && cy !== own.row && Math.abs(cy - own.row) < VR;
-      cs.song.top = clamp(both ? Math.min(cy, own.row) : own.row, 0, Math.max(0, 256 - VR)); cs.song.pg = true; } } } catch(e){}
+    // The cursor's row stays in view when both fit (12 Nov): the page starts at the higher of the two rows, so the playhead does not hide the cursor the user moved past it
+    const cy = cs.song.y, nt = arrPageTop(top, VR, own.row, 256, tv !== 'song' && cy >= 0 && cy !== own.row && Math.abs(cy - own.row) < VR ? cy : -1, arrWrapRow());
+    if (nt !== top){ cs.song.top = nt; cs.song.pg = true; } } } catch(e){}
 }
 // TRACKS (Song): how many tracks this song uses (8–32, but 24 at most with a voice per track, so every
 // track keeps its own voice within 40 kit voices). Song and Mixer show as many as fit and scroll sideways.
