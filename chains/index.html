@@ -790,6 +790,11 @@ const SHARED_ABOUT = {
 Object.assign(SHARED_MODULES, {
   meter:Object.assign({ label:'Meter', scope:'mono', params:{ trim:[0,-24,24,.1] }, ui:{ trim:{l:'Trim', f:db} }, display:'meter',
     about:'Meter: a stereo level meter you can put between any two modules. The bars show the average (VU) level, the tick the peak, and the numbers the peak in dB (red past 0 dB). Trim raises or lowers the level on the way through.' }, STEREO),
+  // Scope (14 Nov, module queue): params identical to the worklet's; tests/modules-scope-editor.test.js compares. Its picture is drawn by buildScope / drawScope below.
+  scope:{ label:'Scope', scope:'mono', display:'scope', inputs:{ a:'audio', b:'audio', trig:'gate' }, outputs:{},
+    params:{ time:[.02,.001,2,.001], trig:[1,0,2,1], level:[0,-1,1,.01], freeze:[0,0,1,1], zoom:[1,.25,16,.25] },
+    ui:{ time:{l:'Time', f:secs}, trig:{l:'Trigger', c:opts(['Free', 'Rising', 'Gate'])}, level:{l:'Level', f:v => (v > 0 ? '+' : '') + v.toFixed(2)}, freeze:{l:'Freeze', c:opts(['Off', 'On'])}, zoom:{l:'Zoom', f:v => '×' + v} },
+    about:'Scope: draws what is on its inputs, so you can see a signal. A and B are two traces on the same time base, so you can watch two things move together (B is optional); a fast signal shows as a band and a slow one as a line. Time is how long one sweep takes. Trigger decides where a sweep starts: Free sweeps again and again, Rising waits for A to climb through Level so a steady wave holds still, and Gate starts a sweep when a pulse arrives on Trig. Freeze keeps the picture where it is, and Zoom magnifies it up and down. The number in the corner is how far A swings, peak to peak. Nothing comes out of it. It only runs while this editor is open, and it costs nothing while the song plays with the editor closed.' },
   limiter:Object.assign({ label:'Limiter', scope:'mono', params:{ input:[0,0,24,.1], ceil:[-.3,-24,0,.1], rel:[.15,.01,1,.001] },
     ui:{ input:{l:'Input', f:db}, ceil:{l:'Ceiling', f:db}, rel:{l:'Release', f:secs} }, display:'dyn',
     about:'Limiter: a peak limiter with a 2 ms look-ahead, so nothing gets past Ceiling. Input pushes the sound into it for more loudness; Release sets how fast it lets go. The display shows the curve (Input up to Ceiling), the levels in and out and the gain reduction.' }, STEREO),
@@ -893,7 +898,7 @@ Object.assign(SHARED_MODULES, {
       detune:{l:'Detune', f:v => '±' + v.toFixed(1) + ' ct'}, delay:{l:'Delay', f:secs}, win:{l:'Window', f:pct}, dry:{l:'Dry', f:pct} },
     about:'Harmonizer: up to two pitch-shifted copies of the sound at fixed intervals (a third, fifth, octave…), each with its own level and pan. Voice 2 starts silent: turn up Level 2 for a three-part stack (a major triad with the defaults). Detune spreads the two voices apart (set both to Unison with a little Detune and Delay for a wide double). Window: longer is smoother, shorter is tighter on drums. Dry sets the original.' }, STEREO)
 });
-Object.assign(SHARED_FAMILY, { meter:'util', limiter:'util', utility:'util', ringmod:'afx', spring:'afx', plate:'afx', lverb:'afx', ensemble:'afx',
+Object.assign(SHARED_FAMILY, { meter:'util', scope:'util', limiter:'util', utility:'util', ringmod:'afx', spring:'afx', plate:'afx', lverb:'afx', ensemble:'afx',
   reson:'afx', degrade:'afx', blipdrum:'gen', life:'mod', dimension:'afx', bbd:'afx', harm:'afx', phaser:'afx', width:'afx', pingpong:'afx', blades:'util', meta:'afx', math:'mod', logic:'mod', divider:'mod', euclid:'mod',
   rect:'mod', scale:'mod', compare:'mod', const:'mod', switch:'util', xfade:'util',
   clkmul:'mod', chance:'mod', counter:'mod', stepsw:'util', burst:'mod', gatedly:'mod', flipflop:'mod',   // (Steps and Clock stay out: …chains has always drawn them in the default family)
@@ -909,7 +914,7 @@ const SHARED_PALETTE = [
   ['Reverbs', [['spring','Spring reverb'],['plate','Plate reverb'],['lverb','Lite reverb'],['room','Room reverb'],['space','Space reverb']], 'audio'],
   ['More effects', [['comb','Comb resonator'],['transient','Transient shaper'],['tgate','Trance gate'],['ott','Multiband squash'],['fshift','Frequency shifter'],['vinyl','Vinyl'],['dub','Dub tape'],['cab','Speaker cab'],['tube','Tube'],['flanger','Flanger'],['tremolo','Tremolo'],['odrive','Overdrive'],['folder','Wavefolder'],['autowah','Auto-wah'],['pshift','Pitch shifter'],['ladder','Ladder filter'],['xmod','Cross-mod'],['lofi','Lo-fi'],['drive','Drive'],['air','Air']], 'audio'],
   ['Filters and amps', [['blades','Blades filter']], 'audio'],
-  ['Utilities', [['meter','Meter'],['limiter','Limiter'],['utility','Utility']], 'audio'],
+  ['Utilities', [['meter','Meter'],['scope','Scope'],['limiter','Limiter'],['utility','Utility']], 'audio'],
   ['Stereo', [['width','Width']], 'audio'],
   ['Audio followers', [['envfol','Envelope follow'],['gateex','Gate extract'],['pitchfol','Pitch follow'],['pitchtrk','Pitch track']], 'control'],
   ['Control utilities', [['slew','Slew limiter'],['snh','Sample & hold'],['quant','Quantizer'],['math','Math'],['const','Constant'],['rect','Invert / rectify'],['scale','Scale / map'],['compare','Comparator'],['switch','Switch'],['xfade','Crossfade']], 'control'],
@@ -1332,7 +1337,7 @@ const PAL_LAYOUT = [
   ['§Sound'],
   ['Sound sources', '#b8792a', ['string', 'vco', 'fm', 'additive', 'noise', 'plaits', 'elements', 'bytebeat', 'blipdrum']],
   ['§Mix and dynamics'],
-  ['Mix and level', '#7b8794', ['mixer', 'smixer', 'vca', 'utility', 'width', 'meter']],
+  ['Mix and level', '#7b8794', ['mixer', 'smixer', 'vca', 'utility', 'width', 'meter', 'scope']],
   ['Dynamics', '#e07a2e', ['compressor', 'buscomp', 'glue', 'comp', 'sccomp', 'limiter', 'ngate', 'ott', 'transient']],
   ['§Effects'],
   ['Filters and EQ', '#2e9e4f', ['filter', 'cut', 'eq', 'air', 'vcf', 'ladder', 'blades', 'autowah', 'envfilt', 'vowel']],
@@ -1355,7 +1360,7 @@ const PAL_COLOR = { More:'#888888' }, CAT_COLOR = {};
 // ONE NAME PER MODULE (13 Nov, audit U6): the list, the title bar and Help all read the module's own name. What the list used to add in
 // brackets after a name ("Resonator (chord)") is this tooltip text now.
 const PAL_HINT = { blipdrum:'8 voices', chaos:'Lorenz, Rössler…', degrade:'lo-fi', dimension:'stereo chorus', ensemble:'chorus', envfilt:'auto-wah', flex:'beat re-sequencer', life:'Game of Life', compare:'gate from a level', const:'fixed value', clkmul:'×2, ×3…', chance:'random thinning', counter:'staircase', stepsw:'rotate 4 sounds', burst:'ratchet', gatedly:'flam', flipflop:'toggle', rect:'abs, flip', scale:'map a range', switch:'A or B', xfade:'A to B',
-  meter:'VU', preverb:'shimmer', repeat:'beat repeat', resample:'record to a pad', reson:'chord', retrig:'stutter', spectral:'FFT', string:'pluck', utility:'gain, pan' };
+  meter:'VU', scope:'see a signal', preverb:'shimmer', repeat:'beat repeat', resample:'record to a pad', reson:'chord', retrig:'stutter', spectral:'FFT', string:'pluck', utility:'gain, pan' };
 // Rebuild the merged palette (in place) in PAL_LAYOUT's order; group families too, for anything still keyed on them.
 function organizePalette(palette, groupFam){
   const label = new Map(); for (const [, items] of palette) for (const [t, l] of items || []) if (!label.has(t)) label.set(t, l);
@@ -1525,6 +1530,7 @@ const MODULE_USE = {
   compare:'Envelope follow’s Out into A, Level 0.30: A > B is a gate that fires on every loud hit, to trigger an ADSR or a Sample & hold.',
   switch:'Dry on A, a reverb’s output on B, and a Clock divider’s ÷4 into Select: every fourth beat the sound jumps to the reverb.',
   xfade:'Dry on A, an effect’s output on B, a slow LFO into Mix: the effect breathes in and out of the dry sound.',
+  scope:'Patch an LFO into A and the envelope it shapes into B to see both move together.',
   clkmul:'A Clock at 1/4 into Clock and Times ×3: three even pulses per beat, triplets against the beat, into a Blip drum.',
   chance:'After a Euclidean’s Gate: Chance 70% thins the pattern out, and Other plays a second sound on the hits that were dropped.',
   counter:'A Clock into Clock, Step through Scale / map into a filter’s Cutoff jack: Steps 8 is a rising staircase that starts over every eight beats.',
@@ -1601,6 +1607,8 @@ window.addEventListener('wheel', e => { if (mhelpBtnOn && !(mhelpEl && mhelpEl.c
 .shw canvas.lifegrid{width:100%; height:132px; display:block; touch-action:none; cursor:pointer}
 .shw .lifebtns{display:flex; gap:6px; flex-wrap:wrap}
 .shw canvas.dyncv{width:100%; height:116px; display:block}
+.node > .scopebox{display:block; padding:4px 12px 8px} .node.nar > .scopebox{padding:4px 10px 8px}   /* the Scope's screen: above the controls when open, under the title when folded to Compact; Mini hides it with everything else but the title */
+.scopebox canvas.scopecv{width:100%; height:120px; display:block; background:var(--panel-2); border:1px solid color-mix(in srgb, var(--edge) 30%, transparent)}
 .node > .dmini{display:none; padding:6px 12px 8px} .node.collapsed > .dmini{display:grid}
 .dmini .ch{grid-template-columns:28px 1fr 58px}
 .dmini .tr i{background:#3cc8b9}
@@ -1611,6 +1619,7 @@ window.addEventListener('wheel', e => { if (mhelpBtnOn && !(mhelpEl && mhelpEl.c
 const SHOW_LO = -48, SHOW_HI = 3, showPos = d => Math.max(0, Math.min(1, (d - SHOW_LO) / (SHOW_HI - SHOW_LO)));
 function buildShow(n){
   const kind = MODULES[n.m.type].display;
+  if (kind === 'scope') return buildScope(n);
   if (kind === 'dyn' || kind === 'dynlv'){ const box = h('div', {class:'shw dyn'}); buildDyn(n, box, kind); return box; }
   if (kind === 'bars' || kind === 'life'){ const box = h('div', {class:'shw ' + kind}); (kind === 'bars' ? buildBars : buildLife)(n, box); return box; }
   const box = h('div', {class:'shw' + (kind === 'gr' ? ' gr' : '')}), rows = [];
@@ -1641,6 +1650,7 @@ function paintShows(list){
     if (S.kind === 'life'){ S.x = v[0]; S.gen = v[1]; S.live = v.slice(2, 10); continue; }
     if (S.kind === 'dyn' || S.kind === 'dynlv'){ dynPush(n, v, now); continue; }
     if (S.kind === 'scin'){ scinPaint(S, v[0], v[1], now); continue; }
+    if (S.kind === 'scope'){ if (v.length >= 2 + SCOPE_W * 4 && v[0] !== S.seq){ S.seq = v[0]; S.data = v; drawScope(n); } continue; }   // a new picture only when a whole sweep is done
     if (S.kind === 'scout'){ const A = S.rows[0], pk = v[0]; A.i.style.transform = 'scaleX(' + showPos(pk) + ')'; if (pk >= A.hold || now - A.ht > 1500){ A.hold = pk; A.ht = now; }
       A.b.style.left = (showPos(A.hold) * 100) + '%'; A.v.textContent = A.hold <= -90 ? '−∞' : (A.hold > 0 ? '+' : '') + A.hold.toFixed(1); if (n.lvl) setLvl(n, showPos(pk)); continue; }
     if (S.kind === 'meter') for (let c = 0; c < 2; c++){
@@ -1657,6 +1667,71 @@ function paintShows(list){
     }
   }
 }
+/* SCOPE DISPLAY (14 Nov, module queue): the Scope module draws its two inputs. The engine's show() sends
+   [sweep number, B patched (1 / 0), then for each of 128 columns: lowA, highA, lowB, highB] (2 + 512 numbers), and the sweep number changes only
+   when a whole new picture is ready, so the canvas is drawn then (and when its size, the Zoom or a colour changes), not on every report. Each trace is
+   a filled band from the lowest to the highest sample of every column, joined into one shape, at least 1.5 px thick. The screen is the module's own
+   panel colour; the traces are the signal colours (A: audio, B: control), the lines the muted ink: all read from the page's CSS variables, so a skin
+   changes them. No pointer handlers: in Play a drag on it pans the view like a drag on any other display. The canvas sits in n.mini (outside the
+   body) so Compact keeps it, and Mini (everything but the title) hides it. */
+const SCOPE_W = 128;
+function buildScope(n){
+  const cv = h('canvas', {class:'scopecv', role:'img', 'aria-label':'Scope: the signals on A and B'});
+  const box = h('div', {class:'scopebox', title:'The signal on A (and on B, if patched), one sweep across. A fast signal is a band, a slow one a line. The small tick at the left is the Rising trigger level. Top left: the sweep time and how far A swings, peak to peak.'}, cv);
+  n.show = { kind:'scope', cv, data:null, seq:-1, sig:'', col:null, colT:0, seen:0 };
+  n.mini = box;
+  return null;   // (nothing in the body: the box above it is the display)
+}
+function scopeColors(S, now){
+  if (S.col && now - S.colT < 1500) return S.col;
+  const cs = getComputedStyle(S.cv), v = k => cs.getPropertyValue(k).trim() || cs.color;
+  S.col = { a:v('--audio'), b:v('--mod'), ink:v('--ink'), muted:v('--muted'), bg:v('--panel-2'), font:cs.fontFamily || 'sans-serif' }; S.colT = now; return S.col;
+}
+function drawScope(n){
+  const S = n.show, cv = S.cv, W = cv.clientWidth, H = cv.clientHeight; if (!W || !H) return;
+  const dpr = Math.min(3, window.devicePixelRatio || 1), pw = Math.round(W * dpr), ph = Math.round(H * dpr);
+  if (cv.width !== pw || cv.height !== ph){ cv.width = pw; cv.height = ph; }
+  const g = cv.getContext('2d'), C = scopeColors(S, performance.now()), p = n.m.params, zoom = +p.zoom || 1, d = S.data, hasB = !!d && d[1] === 1;
+  g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, H);
+  // vertical scale: at Zoom 1 the screen holds -1.2 to +1.2; Zoom magnifies that
+  const mid = H / 2, unit = (H / 2 - 2) / 1.2 * zoom, Y = v => Math.max(-2, Math.min(H + 2, mid - v * unit));
+  g.lineJoin = 'round'; g.lineCap = 'butt';
+  g.strokeStyle = C.muted; g.lineWidth = 1; g.globalAlpha = .55; g.beginPath(); g.moveTo(0, Math.round(mid) + .5); g.lineTo(W, Math.round(mid) + .5); g.stroke();   // the centre line
+  g.globalAlpha = .25; g.setLineDash([2, 3]); g.beginPath();
+  for (const k of [1, -1]){ const y = mid - k * unit; if (y > 1 && y < H - 1){ g.moveTo(0, Math.round(y) + .5); g.lineTo(W, Math.round(y) + .5); } }   // the +1 and -1 lines
+  g.stroke(); g.setLineDash([]); g.globalAlpha = 1;
+  let pp = null;
+  if (d){
+    const trace = (lo, hi, col, fillA) => {
+      const top = [], bot = [];
+      for (let i = 0; i < SCOPE_W; i++){
+        let yt = Y(d[2 + i * 4 + hi]), yb = Y(d[2 + i * 4 + lo]);
+        if (yb - yt < 1.5){ const m = (yt + yb) / 2; yt = m - .75; yb = m + .75; }   // a slow signal is a line at least 1.5 px thick
+        const x = i / (SCOPE_W - 1) * W; top.push(x, yt); bot.push(x, yb);
+      }
+      g.beginPath(); g.moveTo(top[0], top[1]); for (let i = 2; i < top.length; i += 2) g.lineTo(top[i], top[i + 1]);
+      for (let i = bot.length - 2; i >= 0; i -= 2) g.lineTo(bot[i], bot[i + 1]);
+      g.closePath(); g.fillStyle = col; g.globalAlpha = fillA; g.fill(); g.globalAlpha = 1; g.strokeStyle = col; g.lineWidth = 1; g.stroke();
+    };
+    trace(0, 1, C.a, .5);
+    if (hasB) trace(2, 3, C.b, .3);
+    let lo = 1e9, hi = -1e9; for (let i = 0; i < SCOPE_W; i++){ if (d[2 + i * 4] < lo) lo = d[2 + i * 4]; if (d[3 + i * 4] > hi) hi = d[3 + i * 4]; }
+    pp = hi - lo;
+  }
+  if ((p.trig | 0) === 1){   // the trigger level: a small tick at the left edge
+    const y = Math.round(Y(+p.level)) + .5; g.strokeStyle = C.ink; g.lineWidth = 1.5; g.beginPath(); g.moveTo(0, y); g.lineTo(7, y); g.stroke();
+    g.fillStyle = C.ink; g.beginPath(); g.moveTo(7, y - 3.5); g.lineTo(11, y); g.lineTo(7, y + 3.5); g.closePath(); g.fill();
+  }
+  const txt = secs((d && +d[2 + SCOPE_W * 4]) || +p.time || .02) + (pp == null ? '' : '   pk-pk ' + pp.toFixed(2)) + (zoom !== 1 ? '   ×' + zoom : '') + (+p.freeze >= .5 ? '   frozen' : '');
+  g.font = '11px ' + C.font; g.textBaseline = 'top'; const tw = g.measureText(txt).width;
+  g.globalAlpha = .8; g.fillStyle = C.bg; g.fillRect(14, 3, tw + 8, 15); g.globalAlpha = 1; g.fillStyle = C.ink; g.fillText(txt, 18, 5);
+}
+// A setting moved (Zoom, Time, Trigger), the module was unfolded or resized, or the skin changed: draw the last picture again.
+setInterval(() => { if (napping()) return; const now = performance.now();
+  for (const n of nodes.values()){ const S = n.show; if (!S || S.kind !== 'scope' || !n.el.isConnected) continue;
+    const p = n.m.params, w = S.cv.clientWidth; if (!w){ S.sig = ''; continue; }
+    const C = scopeColors(S, now), sig = [p.zoom, p.time, p.trig, p.level, p.freeze, w, S.cv.clientHeight, window.devicePixelRatio, C.a, C.b, C.bg, C.ink].join('|');
+    if (sig !== S.sig){ S.sig = sig; drawScope(n); } } }, 150);
 /* DYNAMICS DISPLAY (owner, 22 Oct): compressors, the gate and the limiter show what they are doing, as a DAW's compressor
    does. Left, the transfer curve (level in across, level out up), from the module's own Threshold, Ratio, Knee, Range and
    Makeup (the limiter's Input and Ceiling, the gate's Threshold and Range), with the threshold dashed and a dot where the
@@ -1838,7 +1913,7 @@ const SUMMARY_KEYS = {
   mixer:['level', 'l1'],    // the master level first (its label is "Master"), then the first channel's level
   smixer:['level', 'l1'],
   scale:['olo', 'ohi', 'clip'], xfade:['mix', 'curve'],   // Scale / map: where it lands, Crossfade: the mix first
-  clkmul:['mul', 'width'], chance:['prob', 'seed'], counter:['mode', 'steps'], stepsw:['fade', 'steps'], burst:['count', 'time'], gatedly:['delay'],   // Scale / map: where it lands, Crossfade: the mix first
+  scope:['time', 'trig'], clkmul:['mul', 'width'], chance:['prob', 'seed'], counter:['mode', 'steps'], stepsw:['fade', 'steps'], burst:['count', 'time'], gatedly:['delay'],   // Scale / map: where it lands, Crossfade: the mix first
 };
 const SUMMARY_FIRST = ['Mix', 'Wet', 'Master', 'Level', 'Output', 'Gain', 'Makeup'];
 const SUMMARY_DEFAULT = { selects:1, sliders:2 };
@@ -1865,7 +1940,7 @@ const NARROW_S = 168, NARROW_M = 190;   // the two small sizes: S for a one-word
 const MODULE_WIDTH = {
   atten:NARROW_S, random:NARROW_S, quant:NARROW_S, logic:NARROW_S, math:NARROW_S,   // Attenuverter, Random, Quantizer, Logic, Math
   const:NARROW_S, rect:NARROW_M, scale:216, compare:216, switch:NARROW_S, xfade:NARROW_M,   // Constant, Invert / rectify, Scale / map, Comparator, Switch, Crossfade
-  clkmul:216, chance:216, counter:NARROW_S, stepsw:NARROW_M, burst:216, gatedly:NARROW_M, flipflop:NARROW_S,   // Clock multiplier, Chance gate, Counter, Step switch, Burst, Gate delay, Flip-flop
+  scope:300, clkmul:216, chance:216, counter:NARROW_S, stepsw:NARROW_M, burst:216, gatedly:NARROW_M, flipflop:NARROW_S,   // Clock multiplier, Chance gate, Counter, Step switch, Burst, Gate delay, Flip-flop
   slew:NARROW_M, snh:NARROW_M, divider:NARROW_M, gateex:NARROW_M,   // Slew limiter, Sample & hold, Clock divider, Gate extract
 };
 function widthOf(type){ const d = MODULES[type], w = d && d.w != null ? d.w : MODULE_WIDTH[type]; return typeof w === 'number' && w >= 150 && w <= 600 ? Math.round(w) : NODE_W; }
@@ -2624,7 +2699,7 @@ class ChainsBridge {
   }
   static standalone(opts){
     opts = opts || {};
-    const url = opts.url || './chains-worklet.js?v=51';
+    const url = opts.url || './chains-worklet.js?v=52';
     const ctx = new (window.AudioContext || window.webkitAudioContext)({ latencyHint:'interactive' });
     return Promise.all([ctx.audioWorklet.addModule(url), ChainsBridge.wasm()]).then(([, [tfxBytes, pumpBytes]]) => {
       const node = new AudioWorkletNode(ctx, 'chains', {
@@ -4843,6 +4918,7 @@ function helpDoc(){
     ['Audio as control', 'Audio can drive anything a control signal can. Patch audio into Envelope follow to make it swell a filter or level, into Gate extract to fire envelopes and clocks from hits, or into Pitch follow to track a monophonic melody. Then shape it with Slew (to smooth it), Sample & hold (to step it) or Quantizer (to snap it to a scale).'],
     ['Basic operations', 'Add, subtract, multiply, smaller and larger are the outputs of Math (A+B, A−B, A×B, Min, Max). AND, OR, XOR and NOT are the outputs of Logic. Invert / rectify flips a control signal or folds it to positive. Scale / map stretches one range onto another (an LFO from −1..1 to 0..1, say). Comparator turns a control signal into a gate. Constant is a steady value. Switch chooses between two sounds on a gate, and Crossfade blends them. All of them are in the Control utilities group of the Modules list.'],
     ['Clocks and triggers', 'Clocks and rhythm in the Modules list has the pulse tools. Clock makes the pulses and Steps plays a row of values; both follow the song’s tempo, and Reset restarts them. Clock divider and Clock multiplier slow a clock down or speed it up (×3 for triplets). Counter counts pulses, and its Step output is a staircase. Chance gate lets pulses through by chance (the same Seed gives the same pattern every time), Burst turns one pulse into a quick roll, Gate delay moves a gate later for a flam, Flip-flop turns a pulse into on and off, and Step switch passes four sounds in turn.'],
+    ['Seeing signals', 'Meter (in Mix and level in the Modules list) shows how loud a sound is and Scope draws a signal as it moves, with a sound or an LFO patched into A and a second signal such as an envelope into B so you can watch them together, Trigger on Rising to hold a steady wave still and Freeze to keep the picture, and both only work while this editor is open.'],
     ['Tracks', 'Each track has its own Track In and Chain Out. In the Mixer, turning a track’s CHN on adds that track’s pair (wired straight through, in a column below everything else) without leaving the Mixer, so every track gets its own chain and toggling one never disturbs another; the next time you come here, the patch is fitted so you see them all. If that track already has a chain, switching its CHN on just runs it through that chain again. The output always follows its own input — set the Track In and its Chain Out moves with it, and a Chain Out can’t be pointed elsewhere. Picking a track that is already used also jumps to and highlights the existing chain. A track takes one pair; control and gate inputs are not limited.'],
     ['Moving around', 'Scroll with two fingers or turn the mouse wheel to pan (Shift+wheel sideways); with a mouse a middle-button drag pans too, and on a touch screen dragging the background does. Rest the pointer on a slider for a moment (it gets an outline) and the wheel changes that slider instead, Shift+wheel in fine steps. Pinch or Ctrl/⌘+wheel zooms; the zoom buttons are in the top bar (click the percentage to type one, Fit shows everything).'],
     ['Play and Edit', 'The Play and Edit switch in the top bar (Alt+E on a keyboard) decides what a touch or a click does. In Edit everything works. In Play the patch is locked for playing: sliders, selects, buttons and readouts work, but no module can be moved, selected, folded, removed or given a menu, no cable can be made or removed, and a drag on anything that is not a control moves the view. The patch is framed and tagged PLAY while it is on. The choice is remembered for this editor on this device, not saved in the patch.'],

@@ -50,17 +50,21 @@ function patchFor(M, type, params) {
     if (aIn.includes('in')) cab.push({ from: ['g', 'out'], to: ['b', 'in'] }); if (aIn.includes('inR')) cab.push({ from: ['g', 'out'], to: ['b', 'inR'] });
     outs.slice(0, 2).forEach((p, i) => cab.push({ from: ['b', p], to: ['o', ['in', 'inR'][i]] }));
     if (!aIn.length) cab.push({ from: ['g', 'out'], to: ['o', 'in'] });
+    if (m.probe === true) cab.push({ from: ['g', 'out'], to: ['b', 'a'] }, { from: ['e', 'out'], to: ['b', 'b'] });   // a probe (the Scope) watches the voice and its envelope; nothing comes out of it
   }
   return { modules: mods, cables: cab };
 }
 function renderModule(D, type, over) {
   const m = D.MODULES[type], params = Object.assign(defaults(m), over);
   const E = new D.WavesEngine(48000, { maxVoices: 4, quality: 'full', seed: 7, transport: TRANSPORT }); E.loadPatch(patchFor(D.MODULES, type, params));
+  const probe = D.MODULES[type].probe === true; if (probe) E.handleMessage({ op: 'telemetry', value: true });
   const L = new Float32Array(128 * BLOCKS), R = new Float32Array(128 * BLOCKS);
   for (let b = 0; b < BLOCKS; b++) { if (b === 0) { E.noteOn(60, 1); E.noteOn(67, .7); } if (b === 70) E.noteOff(60); E.process(128); L.set(E.bus(1), b * 128); R.set(E.busR(1), b * 128); }
   // Under load the engine sheds to 'draft' quality, which changes the DSP; a golden hash taken then would be wrong.
   if (E.quality !== 'full') throw new Error('engine shed to draft quality while rendering ' + type + ' (machine too slow for a stable hash)');
-  return { L, R };
+  let extra = null;   // a probe's show() list (the Scope has no output): hashed with the sound, so its picture is under a golden too
+  if (probe) { const sh = E.telemetry().shows.find(x => x[0] === 'b'); extra = new Float32Array(sh ? sh[1] : 2 + 512); }
+  return extra ? { L, R, extra } : { L, R };
 }
 const finite = a => { for (const v of a) if (!Number.isFinite(v)) return false; return true; };
 const energy = a => { let e = 0; for (const v of a) e += v * v; return e; };
@@ -84,12 +88,12 @@ test('waves: every module renders finite audio and matches its golden hash (defa
   const { D } = engine(), actual = {}, bad = [];
   // The hashes depend on how many renders came before them in this one wasm instance (see SKIP below), so a module added later is
   // rendered after all the existing ones (LATE, in this order): that way no existing hash moves. Add new modules to LATE, not into the sorted run.
-  const LATE = ['compare', 'const', 'rect', 'scale', 'switch', 'xfade', 'clkmul', 'chance', 'counter', 'stepsw', 'burst', 'gatedly', 'flipflop', 'steps', 'clock'];
+  const LATE = ['compare', 'const', 'rect', 'scale', 'switch', 'xfade', 'clkmul', 'chance', 'counter', 'stepsw', 'burst', 'gatedly', 'flipflop', 'steps', 'clock', 'scope'];
   for (const type of Object.keys(D.MODULES).filter(t => !LATE.includes(t)).sort().concat(LATE)) {
     const m = D.MODULES[type]; if (!m || !m.process || SKIP.has(type)) continue;
     const d = renderModule(D, type), s = renderModule(D, type, stress(m)), w = renderModule(D, type, switchesOn(m));
-    for (const r of [d, s, w]) if (!finite(r.L) || !finite(r.R)) bad.push(type);
-    actual[type + ' @default'] = H.hashFloats([d.L, d.R]); actual[type + ' @stressed'] = H.hashFloats([s.L, s.R]); actual[type + ' @switches-on'] = H.hashFloats([w.L, w.R]);
+    for (const r of [d, s, w]) if (!finite(r.L) || !finite(r.R) || (r.extra && !finite(r.extra))) bad.push(type);
+    actual[type + ' @default'] = H.hashFloats([d.L, d.R].concat(d.extra ? [d.extra] : [])); actual[type + ' @stressed'] = H.hashFloats([s.L, s.R].concat(s.extra ? [s.extra] : [])); actual[type + ' @switches-on'] = H.hashFloats([w.L, w.R].concat(w.extra ? [w.extra] : []));
   }
   assert.deepEqual([...new Set(bad)], [], 'modules producing NaN/Infinity');
   const g = H.golden('waves-modules', actual);

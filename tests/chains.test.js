@@ -24,14 +24,18 @@ function renderModule(E, M, type, over) {
   // control module's golden hash a hash of nothing). So the module's outputs are cabled into the output whatever their kind:
   // the first into its left input, the second into its right (connect() does not restrict port kinds, as in the editor).
   const sink = ['in', 'inR']; outs.slice(0, 2).forEach((p, i) => cab.push({ from: ['b', p], to: ['c', sink[i]] }));
+  // A PROBE (the Scope) has no output to cable: it runs while the editor watches (telemetry on) and what it makes is its show() list, which is recorded as its one "port".
+  const probe = m.probe === true; if (probe) { cab.push({ from: ['a', 'out'], to: ['b', 'a'] }, { from: ['a', 'outR'], to: ['b', 'b'] }); }
   E.loadPatch({ modules: [{ id: 'a', type: 'trackIn', scope: 'mono', params: { track: 1 } }, { id: 'b', type, scope: 'mono', params }, { id: 'c', type: 'chainOut', scope: 'mono', params: { track: 1, level: 1 } }], cables: cab });
-  const ports = Object.keys(m.outputs || {}), rec = {}; for (const p of ports) rec[p] = new Float32Array(128 * BLOCKS);
+  if (probe) E.handleMessage({ op: 'telemetry', value: true });
+  const ports = probe ? ['show'] : Object.keys(m.outputs || {}), rec = {}; for (const p of ports) rec[p] = new Float32Array(probe ? 3 + 512 : 128 * BLOCKS);
   const sig = H.testSignal(128 * BLOCKS), L = new Float32Array(128 * BLOCKS), R = new Float32Array(128 * BLOCKS);
   for (let b = 0; b < BLOCKS; b++) {
     const s = sig.subarray(b * 128, (b + 1) * 128); E.setTrackInputs(s, s); E.process(128);
     L.set(E.bus(1), b * 128); R.set(E.busR(1), b * 128);
-    const io = E._ios.get('b'); if (io) for (const p of ports) rec[p].set(io.out[p], b * 128);
+    const io = E._ios.get('b'); if (io && !probe) for (const p of ports) rec[p].set(io.out[p], b * 128);
   }
+  if (probe){ const sh = E.telemetry().shows.find(x => x[0] === 'b'); if (sh) rec.show.set(sh[1]); E.handleMessage({ op: 'telemetry', value: false }); }
   // Under load the engine sheds to 'draft' quality, which changes the DSP. A golden hash taken then would be wrong, so say so.
   if (E.quality !== 'full') throw new Error('engine shed to draft quality while rendering ' + type + ' (machine too slow for a stable hash)');
   return { L, R, rec, ports };
@@ -83,7 +87,7 @@ test('chains: every module renders finite audio and matches its golden hash (def
 test('chains: modules that generate or process a signal are not silent', () => {
   const { E, D } = engine(), dead = [];
   // Modules that legitimately output nothing without an external trigger or a patched side input are named, with the reason.
-  const NEEDS_TRIGGER = new Set(['beads', 'blipdrum', 'scout', 'scin', 'mixer', 'smixer', 'divider', 'euclid', 'logic', 'gateex', 'clock', 'life', 'marbles', 'steps', 'envfol', 'pitchfol', 'pitchtrk', 'adsr', 'atten', 'math', 'rect', 'switch', 'xfade', 'clkmul', 'chance', 'counter', 'stepsw', 'burst', 'gatedly', 'flipflop', 'quant', 'slew', 'snh', 'random', 'tides', 'meta', 'reverse']);
+  const NEEDS_TRIGGER = new Set(['scope', 'beads', 'blipdrum', 'scout', 'scin', 'mixer', 'smixer', 'divider', 'euclid', 'logic', 'gateex', 'clock', 'life', 'marbles', 'steps', 'envfol', 'pitchfol', 'pitchtrk', 'adsr', 'atten', 'math', 'rect', 'switch', 'xfade', 'clkmul', 'chance', 'counter', 'stepsw', 'burst', 'gatedly', 'flipflop', 'quant', 'slew', 'snh', 'random', 'tides', 'meta', 'reverse']);
   for (const type of Object.keys(D.MODULES).sort()) {
     const m = D.MODULES[type]; if (!m || !m.process || SKIP.has(type) || NEEDS_TRIGGER.has(type)) continue;
     const r = renderModule(E, D.MODULES, type, stress(m)); if (!Object.keys(m.outputs || {}).length) continue;

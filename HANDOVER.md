@@ -708,6 +708,14 @@ The owner's top priority to add is the MOD screen. Work down the list; ask befor
 
 Start a session by asking for results. Fix on `beta`. (10 Nov, 15:10: the web beta is build 560; the build numbers in the rest of this paragraph are older.) Web beta: https://matthettich.github.io/thunder-plus/beta/ (build 547 as of 10 Nov morning, 548 once its PR merges; the night of 9–10 Nov shipped 544–547, see the four "10 Nov" entries below. Decisions the lead made that night for the owner to confirm or reverse: on a phone the saved Sequencer default plays on the Page unless Audio thread is picked on that device; on a phone the safety limiter is its stand-in until another worklet loads; the resync only runs with a worklet loaded and its margins are untested on a device). Desktop: v1.3.4-beta.2 (build 541, no feed view or scopes); further desktop betas on hold until the owner asks.
 
+**Build 593** (module queue: Scope; branch `feat/modules-scope`)
+- [ ] Computer, …chains: Modules → Scope (after Meter). A sine LFO into A, a square LFO into B: a teal sine and a purple square on one screen, "500 ms pk-pk 2.00" in the corner. Trigger on Rising: the picture stands still; Free: it drifts.
+- [ ] Freeze On: the picture stops while the sound carries on; Off: it moves again. Zoom magnifies; the small tick at the left follows Level (Rising only).
+- [ ] An audio signal (a Track In while the song plays) at Time 20 ms: can you read the waveform? At 1 s: the level's outline?
+- [ ] Compact keeps the screen, Mini hides it. Phone, Play mode: a drag across the Scope pans the patch and does nothing else.
+- [ ] Inside Thunder Plus: the …chains screen with a Scope on a Track In while the song plays: it draws; close the …chains screen: the CPU reading does not show the Scope's cost. …waves: it draws once a note has played.
+- [ ] Skins: A and B stay apart and readable in IDM pink & green, 909 and the white theme.
+
 **Build 592** (module queue, group 2: clock and trigger tools; branch `feat/modules-clock`)
 - [ ] **By ear, Chance gate (this is the seeded chance you asked about):** a Clock into In, Out to a drum, Seed 7, Chance 50%. Play twice from the start: the same hits both times. Render the song: the render has those hits too. Seed 0: different on every play. Other carries the pulses that did not pass (patch it to a second drum: the two never hit together).
 - [ ] **By ear:** Clock → Clock multiplier ×3 → a drum: three even hits a beat; change the tempo: it catches up one pulse late.
@@ -1142,6 +1150,15 @@ Suggested order: N0 → N1 → N2 (phone cured) → N4 with N3 alongside → N5 
   the edge `R.t0`, "waiting…" while armed), `rcdClk` / `rcdFmt` / `rcdFreeSecs`, a 250 ms timer only while recording; the
   final length stays until the next take. recorder-check covers FREE, PATTERN, Stop, next take and closing mid-take.
 
+
+## 14 Nov (module queue: Scope; build 593)
+
+Branch `feat/modules-scope`. The lead wrote the engine and its tests, a Sonnet agent the editor side; the lead reviewed.
+- **Engine (shared; worklets `?v=52` / `?v=42`):** `scope`, a **probe** (`probe:true`, no outputs): inputs A, B, Trig; one sweep of Time is kept as 128 columns of lowest / highest sample for each trace; Trigger Free / Rising (through Level; sweeps anyway after two windows with no trigger) / Gate; Freeze; Zoom is display only. `show()` → `[sweep number, B patched, 128 × (lowA, highA, lowB, highB)]` through the existing telemetry (one reused list).
+- **Probes in …chains:** `_active` now also runs a module whose def says `probe:true` (with what feeds it) while telemetry is on, as it did for Sidechain In; with the editor closed a Scope and its sources do not run at all.
+- **Editor:** a 300 px module with a 120 px canvas kept in Compact, hidden in Mini; redraws only when the sweep number changes; colours from `--audio` / `--mod` / `--panel-2` / `--muted` / `--ink`; no pointer handlers on the canvas. Golden builders hash a probe's `show()` list.
+- **Embedded in Thunder Plus (read, not run on a device):** …chains turns telemetry on for the track engines while its screen shows, and the reports reach the editor the way the Meter's do (relay every 60 ms); …waves' page has its own engine with telemetry always on, started by the first note.
+- **Rough edges:** the Time slider is linear from 1 ms to 2 s, so the useful short times are crowded at the left (the editors have no log slider); Freeze is a plain Off / On select; embedded frames only carry the Matrix skin's colours, so an embedded Scope uses the white theme's.
 
 ## 14 Nov (module queue, group 2: clock and trigger tools; build 592)
 
