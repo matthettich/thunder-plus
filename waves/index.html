@@ -814,6 +814,25 @@ Object.assign(SHARED_MODULES, {
   logic:{ label:'Logic', scope:'mono', inputs:{ a:'gate', b:'gate' }, outputs:{ and:'gate', or:'gate', xor:'gate', not:'gate' },
     params:{ thr:[.5,.05,.95,.01] }, ui:{ thr:{l:'Threshold', f:pct} },
     about:'Logic: two gates in, AND, OR, XOR and NOT A out. Combine rhythms: AND keeps the hits two patterns share, XOR the ones they don’t.' },
+  // Control maths (14 Nov, module queue group 1): params identical to the worklet's; tests/modules-maths-editor.test.js compares.
+  const:{ label:'Constant', scope:'mono', inputs:{}, outputs:{ out:'cv' },
+    params:{ value:[0,-1,1,.01], fine:[0,-.01,.01,.0001] }, ui:{ value:{l:'Value', f:v => v.toFixed(2)}, fine:{l:'Fine', f:v => (v > 0 ? '+' : '') + v.toFixed(4)} },
+    about:'Constant: a steady number you set yourself, with Fine for tiny steps. Use it as a fixed threshold, an offset or a set level to patch into anything that takes a control signal.' },
+  rect:{ label:'Invert / rectify', scope:'mono', inputs:{ in:'cv' }, outputs:{ inv:'cv', abs:'cv', pos:'cv', neg:'cv' }, params:{}, ui:{},
+    about:'Invert / rectify: one control signal in. Invert flips it upside down, Absolute folds the negative half up so it is always positive, Positive keeps only the upper half and Negative only the lower half (as positive values).' },
+  scale:{ label:'Scale / map', scope:'mono', inputs:{ in:'cv' }, outputs:{ out:'cv' },
+    params:{ ilo:[-1,-1,1,.01], ihi:[1,-1,1,.01], olo:[0,-1,1,.01], ohi:[1,-1,1,.01], clip:[1,0,1,1] },
+    ui:{ ilo:{l:'In low', f:v => v.toFixed(2)}, ihi:{l:'In high', f:v => v.toFixed(2)}, olo:{l:'Out low', f:v => v.toFixed(2)}, ohi:{l:'Out high', f:v => v.toFixed(2)}, clip:{l:'Clip', c:opts(['Off', 'On'])} },
+    about:'Scale / map: takes the range you set with In low and In high and stretches it to Out low and Out high. Swap the Out ends and it turns upside down. Clip stops the result going outside the Out range.' },
+  compare:{ label:'Comparator', scope:'mono', inputs:{ a:'cv', b:'cv' }, outputs:{ gt:'gate', lt:'gate' },
+    params:{ thr:[0,-1,1,.01], hyst:[.02,0,.5,.01] }, ui:{ thr:{l:'Level', f:v => v.toFixed(2)}, hyst:{l:'Hysteresis', f:pct} },
+    about:'Comparator: turns a control signal into a gate. A > B goes high while A is above B plus Level, A < B is its opposite. With nothing in B it is a plain threshold. Hysteresis is a small dead zone that stops a wobbling signal from chattering on and off.' },
+  switch:{ label:'Switch', scope:'mono', inputs:{ a:'audio', b:'audio', sel:'gate' }, outputs:{ out:'audio' },
+    params:{ pick:[0,0,1,1], fade:[.005,0,.1,.001] }, ui:{ pick:{l:'Pick', c:opts(['A', 'B'])}, fade:{l:'Fade', f:secs} },
+    about:'Switch: sends A or B to Out. Pick chooses one; a gate on Select chooses the other one while it is high. Fade is how long the change takes, a few milliseconds so audio does not click (0 is instant, for control signals).' },
+  xfade:{ label:'Crossfade', scope:'mono', inputs:{ a:'audio', b:'audio', cv:'cv' }, outputs:{ out:'audio' },
+    params:{ mix:[.5,0,1,.01], curve:[0,0,1,1] }, ui:{ mix:{l:'Mix', f:pct}, curve:{l:'Curve', c:opts(['Straight', 'Equal power'])} },
+    about:'Crossfade: blends A and B. Mix is the slider, plus the control input if you patch one (0 is all A, 1 is all B). Straight is right for similar sounds and control signals; Equal power keeps two different sounds at the same loudness through the middle.' },
   divider:{ label:'Clock divider', scope:'mono', inputs:{ clock:'gate', reset:'gate' }, outputs:{ d2:'gate', d4:'gate', d8:'gate', n:'gate' },
     params:{ n:[3,1,32,1] }, ui:{ n:{l:'N', f:v => '÷' + Math.round(v)} },
     about:'Clock divider: counts the pulses on Clock and fires every 2nd, 4th, 8th and Nth one. Reset starts counting again.' },
@@ -839,9 +858,10 @@ Object.assign(SHARED_MODULES, {
 });
 Object.assign(SHARED_FAMILY, { meter:'util', limiter:'util', utility:'util', ringmod:'afx', spring:'afx', plate:'afx', lverb:'afx', ensemble:'afx',
   reson:'afx', degrade:'afx', blipdrum:'gen', life:'mod', dimension:'afx', bbd:'afx', harm:'afx', phaser:'afx', width:'afx', pingpong:'afx', blades:'util', meta:'afx', math:'mod', logic:'mod', divider:'mod', euclid:'mod',
+  rect:'mod', scale:'mod', compare:'mod', const:'mod', switch:'util', xfade:'util',
   envfol:'mod', gateex:'mod', pitchfol:'mod', pitchtrk:'mod', slew:'util', snh:'util', quant:'util' });
 const SHARED_PORT_LABEL = { note:'Note', trig:'Trig', env:'Env', car:'Carrier', freq:'Freq', a:'A', b:'B', sum:'A+B', diff:'A−B', mul:'A×B', min:'Min', max:'Max',
-  and:'AND', or:'OR', xor:'XOR', not:'NOT A', d2:'÷2', d4:'÷4', d8:'÷8', n:'÷N', accent:'Accent', time:'Time',
+  and:'AND', or:'OR', xor:'XOR', not:'NOT A', gt:'A > B', lt:'A < B', inv:'Invert', abs:'Absolute', pos:'Positive', neg:'Negative', sel:'Select', d2:'÷2', d4:'÷4', d8:'÷8', n:'÷N', accent:'Accent', time:'Time',
   // U3 (13 Nov): ports that showed their raw key (Blades res, Meta mod, Flex and Step gate pat, Sample & hold noise, Clock ramp and bar)
   res:'Resonance', mod:'Modulator', pat:'Pattern', noise:'Noise', ramp:'Ramp', bar:'Bar' };
 /* Palette groups: added to an existing group of the same name, or made (audio groups before Control, the rest at the end).
@@ -854,7 +874,7 @@ const SHARED_PALETTE = [
   ['Utilities', [['meter','Meter'],['limiter','Limiter'],['utility','Utility']], 'audio'],
   ['Stereo', [['width','Width']], 'audio'],
   ['Audio followers', [['envfol','Envelope follow'],['gateex','Gate extract'],['pitchfol','Pitch follow'],['pitchtrk','Pitch track']], 'control'],
-  ['Control utilities', [['slew','Slew limiter'],['snh','Sample & hold'],['quant','Quantizer'],['math','Math']], 'control'],
+  ['Control utilities', [['slew','Slew limiter'],['snh','Sample & hold'],['quant','Quantizer'],['math','Math'],['const','Constant'],['rect','Invert / rectify'],['scale','Scale / map'],['compare','Comparator'],['switch','Switch'],['xfade','Crossfade']], 'control'],
   ['Rhythm and logic', [['euclid','Euclidean'],['divider','Clock divider'],['logic','Logic']], 'control']
 ];
 /* Blip drum and Life: their parameters match the worklet's exactly (same tables). */
@@ -1289,12 +1309,12 @@ const PAL_LAYOUT = [
   ['Modulation sources', '#6e4fc0', ['lfo', 'adsr', 'tides', 'random', 'marbles', 'chaos', 'steps']],
   ['Clocks and rhythm', '#8c5a8c', ['clock', 'divider', 'euclid', 'logic', 'life']],
   ['Audio to control', '#4f6f9f', ['envfol', 'gateex', 'pitchfol', 'pitchtrk']],
-  ['Control utilities', '#9a8fb8', ['atten', 'math', 'slew', 'snh', 'quant']]
+  ['Control utilities', '#9a8fb8', ['atten', 'math', 'const', 'rect', 'scale', 'compare', 'switch', 'xfade', 'slew', 'snh', 'quant']]
 ];
 const PAL_COLOR = { More:'#888888' }, CAT_COLOR = {};
 // ONE NAME PER MODULE (13 Nov, audit U6): the list, the title bar and Help all read the module's own name. What the list used to add in
 // brackets after a name ("Resonator (chord)") is this tooltip text now.
-const PAL_HINT = { blipdrum:'8 voices', chaos:'Lorenz, Rössler…', degrade:'lo-fi', dimension:'stereo chorus', ensemble:'chorus', envfilt:'auto-wah', flex:'beat re-sequencer', life:'Game of Life',
+const PAL_HINT = { blipdrum:'8 voices', chaos:'Lorenz, Rössler…', degrade:'lo-fi', dimension:'stereo chorus', ensemble:'chorus', envfilt:'auto-wah', flex:'beat re-sequencer', life:'Game of Life', compare:'gate from a level', const:'fixed value', rect:'abs, flip', scale:'map a range', switch:'A or B', xfade:'A to B',
   meter:'VU', preverb:'shimmer', repeat:'beat repeat', resample:'record to a pad', reson:'chord', retrig:'stutter', spectral:'FFT', string:'pluck', utility:'gain, pan' };
 // Rebuild the merged palette (in place) in PAL_LAYOUT's order; group families too, for anything still keyed on them.
 function organizePalette(palette, groupFam){
@@ -1459,6 +1479,12 @@ const MODULE_USE = {
   // Control utilities
   atten:'Between an LFO and a filter’s Cutoff jack: Amount 30% for a gentle wobble, or negative so the LFO sweeps the other way.',
   math:'Multiply an LFO (A) by an envelope (B) and use the × output: the wobble only happens while the note is held.',
+  const:'Patch it into a Comparator’s B and type the threshold to the hundredth, or into a slider’s purple jack for a fixed offset.',
+  rect:'An Envelope follow into In, then Invert into a pad’s level jack: the slider sets the level and every drum hit pulls it down, so the pad ducks.',
+  scale:'A −1..1 LFO into In and Out into a level jack: the default Out 0..1 gives a tremolo that never goes below silence.',
+  compare:'Envelope follow’s Out into A, Level 0.30: A > B is a gate that fires on every loud hit, to trigger an ADSR or a Sample & hold.',
+  switch:'Dry on A, a reverb’s output on B, and a Clock divider’s ÷4 into Select: every fourth beat the sound jumps to the reverb.',
+  xfade:'Dry on A, an effect’s output on B, a slow LFO into Mix: the effect breathes in and out of the dry sound.',
   slew:'After Steps or a Random going to a pitch or cutoff: Rise and Fall around 100 ms turn hard jumps into smooth glides.',
   snh:'Noise or an LFO into In, a clock into Trig, and Out into a filter’s Cutoff jack: the classic stepped “computer” filter.',
   quant:'After a Random or LFO going to an oscillator’s pitch, Scale minor pentatonic: random melodies that always stay in key.',
@@ -1764,6 +1790,7 @@ function chainsStereoUp(d){
 const SUMMARY_KEYS = {
   mixer:['level', 'l1'],    // the master level first (its label is "Master"), then the first channel's level
   smixer:['level', 'l1'],
+  scale:['olo', 'ohi', 'clip'], xfade:['mix', 'curve'],   // Scale / map: where it lands, Crossfade: the mix first
 };
 const SUMMARY_FIRST = ['Mix', 'Wet', 'Master', 'Level', 'Output', 'Gain', 'Makeup'];
 const SUMMARY_DEFAULT = { selects:1, sliders:2 };
@@ -1789,6 +1816,7 @@ const NODE_W = 250;
 const NARROW_S = 168, NARROW_M = 190;   // the two small sizes: S for a one-word title, M for a two-word one
 const MODULE_WIDTH = {
   atten:NARROW_S, random:NARROW_S, quant:NARROW_S, logic:NARROW_S, math:NARROW_S,   // Attenuverter, Random, Quantizer, Logic, Math
+  const:NARROW_S, rect:NARROW_M, scale:216, compare:216, switch:NARROW_S, xfade:NARROW_M,   // Constant, Invert / rectify, Scale / map, Comparator, Switch, Crossfade
   slew:NARROW_M, snh:NARROW_M, divider:NARROW_M, gateex:NARROW_M,   // Slew limiter, Sample & hold, Clock divider, Gate extract
 };
 function widthOf(type){ const d = MODULES[type], w = d && d.w != null ? d.w : MODULE_WIDTH[type]; return typeof w === 'number' && w >= 150 && w <= 600 ? Math.round(w) : NODE_W; }
@@ -4300,6 +4328,7 @@ function helpDoc(){
     ['Comments, names and layout', 'Right-click the background and choose Add a comment here (or type “comment” in Find a module) for a plain text note you can type into, move by its top edge and remove with its x; a comment is saved with the patch. Right-click a module and choose Rename module to give it a name of your own (empty goes back to the usual one). With two or more modules picked, the menu aligns their edges; with three, it spaces them evenly. Modules snap to a 10 px grid as you drag; the background menu turns that off. Tidy up lays the modules out in columns by signal flow and keeps your groups.'],
     ['Folding, Mini, widths and groups', 'The chevron folds a module to Compact (its key values, the ports that have a cable and a stub for each modulated control) and opens it again; a double-click on the title bar does the same. Shift+click the chevron, or hold it on a touch screen, shrinks it to Mini: the title bar alone, with every cable ending on its left (inputs) or right (outputs) edge. Shift+click again goes back to Compact; a plain click opens it. Alt+C folds or opens every module, Alt+Shift+C takes every module to Mini or opens them all, and the right-click menus list the same. Small utility modules (Attenuverter, Math, Logic and the like) are drawn narrower than the rest; their About card is in the right-click menu. The arrow on a group\u2019s label collapses the group into one block: its modules keep running, only the cables that cross the group stay drawn, and unfolding puts everything back. A group\u2019s box follows its modules when you move, fold or remove them. None of this works in Play.'],
     ['Modulation', 'Patch any signal into a slider’s small purple jack and it moves that slider: the slider sets the center, and the signal swings it across its range. The value turns purple and a mark shows where the slider really is. Use the Depth slider on an LFO or envelope, or an Attenuverter, to make the swing smaller.'],
+    ['Basic operations', 'Add, subtract, multiply, smaller and larger are the outputs of Math (A+B, A−B, A×B, Min, Max). AND, OR, XOR and NOT are the outputs of Logic. Invert / rectify flips a control signal or folds it to positive. Scale / map stretches one range onto another (an LFO from −1..1 to 0..1, say). Comparator turns a control signal into a gate. Constant is a steady value. Switch chooses between two sounds on a gate, and Crossfade blends them. All of them are in the Control utilities group of the Modules list, and when a voice feeds one it runs once for each voice.'],
     ['Polyphony', 'Host In runs once for every voice, and so does anything it feeds; everything else (effects, LFOs, Out) runs once. Put effects after the voices, before Out.'],
     ['Moving around', 'Scroll with two fingers or turn the mouse wheel to pan (Shift+wheel sideways); with a mouse a middle-button drag pans too, and on a touch screen dragging the background does. Rest the pointer on a slider for a moment (it gets an outline) and the wheel changes that slider instead, Shift+wheel in fine steps. Pinch or Ctrl/⌘+wheel zooms; the zoom buttons are in the top bar (click the percentage to type one, Fit shows everything).'],
     ['Play and Edit', 'The Play and Edit switch in the top bar (Alt+E on a keyboard) decides what a touch or a click does. In Edit everything works. In Play the patch is locked for playing: sliders, selects, buttons and readouts work, but no module can be moved, selected, folded, removed or given a menu, no cable can be made or removed, and a drag on anything that is not a control moves the view. The patch is framed and tagged PLAY while it is on. The choice is remembered for this editor on this device, not saved in the patch.'],
