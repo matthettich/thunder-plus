@@ -358,5 +358,8 @@
  "steps @switches-on": "651b9d9e",
  "clock @default": "c31a5998",
  "clock @stressed": "1123d201",
- "clock @switches-on": "cf1d0de1"
+ "clock @switches-on": "cf1d0de1",
+ "scope @default": "702c2df7",
+ "scope @stressed": "f9e6a548",
+ "scope @switches-on": "f9e6a548"
 }
