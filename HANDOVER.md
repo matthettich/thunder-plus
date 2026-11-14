@@ -708,6 +708,13 @@ The owner's top priority to add is the MOD screen. Work down the list; ask befor
 
 Start a session by asking for results. Fix on `beta`. (10 Nov, 15:10: the web beta is build 560; the build numbers in the rest of this paragraph are older.) Web beta: https://matthettich.github.io/thunder-plus/beta/ (build 547 as of 10 Nov morning, 548 once its PR merges; the night of 9–10 Nov shipped 544–547, see the four "10 Nov" entries below. Decisions the lead made that night for the owner to confirm or reverse: on a phone the saved Sequencer default plays on the Page unless Audio thread is picked on that device; on a phone the safety limiter is its stand-in until another worklet loads; the resync only runs with a worklet loaded and its margins are untested on a device). Desktop: v1.3.4-beta.2 (build 541, no feed view or scopes); further desktop betas on hold until the owner asks.
 
+**Build 596** (module queue: Delay line; branch `feat/modules-delay`; **the owner listens**)
+- [ ] **By ear, a plucked string:** a short burst of Noise (a VCA with a short envelope) into a Delay line, Time 4.5 ms, Feedback 95%, Damp 20%: it rings near 220 Hz like a string; Fine retunes it smoothly; more Damp: a duller, shorter note.
+- [ ] **By ear, an echo:** Time 350 ms, Feedback 40%, Out into a Crossfade's B with the dry on A: repeats that fade; negative Feedback turns every other repeat over (a hollower echo).
+- [ ] **By ear, a flanger:** an LFO into the Time jack, Time about 3 ms, Mod depth 2 ms, mixed with the dry: it sweeps. Turning Time while a sound plays bends the pitch, with no clicks.
+- [ ] **By ear, pushed:** Feedback at 99% with a loud sustained sound at a short Time: loud and bent, never exploding, clicking or going silent for good. Too harsh or too tame when pushed?
+- [ ] Looks: Time reads "2.0 ms (500 Hz)" under 20 ms; on the folded phone Compact cuts "Feedback" short when the pitch shows: acceptable?
+
 **Build 595** (…chains: a loaded patch inherited the last one's run list; branch `fix/chains-loadpatch-runlist`)
 - [ ] If you ever opened a song and a track that goes through …chains was silent until you touched the patch: that was this. Nothing to test on purpose; tell me if a …chains track is ever silent after opening a song or switching patches again.
 
@@ -1162,6 +1169,14 @@ Suggested order: N0 → N1 → N2 (phone cured) → N4 with N3 alongside → N5 
   the edge `R.t0`, "waiting…" while armed), `rcdClk` / `rcdFmt` / `rcdFreeSecs`, a 250 ms timer only while recording; the
   final length stays until the next take. recorder-check covers FREE, PATTERN, Stop, next take and closing mid-take.
 
+
+## 14 Nov (module queue: Delay line; build 596)
+
+Branch `feat/modules-delay`. The lead wrote the engine and its tests, a Sonnet agent the editor side; the lead reviewed.
+- **Engine (shared; worklets `?v=55` / `?v=44`; scope `'poly'`):** `dline`: a 2 s line (power-of-two buffer), read with 4-point Hermite interpolation (linear under 2 samples), Time 0–2000 ms + Fine ±1 ms (the knob glides over 20 ms; the Time input does not, it is sample-accurate, ± Mod depth up to 50 ms), **feedback inside the module, exact to the sample**, clamped to ±99% whatever the parameter says, with the feedback cable's guard inside the loop (untouched in −1..1, `1 + tanh(|x| − 1)` above, non-finite → 0) and a one-pole Damp. Out is the delayed sound only.
+- **For his ears:** how the loop sounds pushed is the same question as the feedback cable's guard (build 589); the two numbers are in `DelayLine.process`.
+- **Editor:** in Building blocks after Allpass; Time's readout adds the pitch under 20 ms (a formatter only sees its own value, so it shows whatever Feedback is and does not include Fine).
+- **Goldens:** only added lines; `dline` stays in the silent-allowed lists because its stressed Time (1.4 s) is longer than the 1.07 s render (its default and switches-on renders do sound since the build 595 fix).
 
 ## 14 Nov (…chains: a loaded patch inherited the previous patch's run list; build 595)
 
