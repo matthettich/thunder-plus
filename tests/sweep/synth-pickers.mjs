@@ -60,6 +60,28 @@ try {
   }
   await run('tuning preset', { setup: "(() => { select(0); S.tune = new Array(12).fill(0); refreshTune(); changed(cur); })()",
     sel: "[...document.querySelectorAll('select')].find(s => s.getAttribute('aria-label') === 'Tuning preset')", field: 'JSON.stringify(S.tune)', optText: 'Just' });
+  // SYNTH UX B review (13 Nov): Source's two-state B (Sample: Reverse, Digital: Loop) is a twoStateRow: segment + hidden slider
+  await app(page, "(() => { select(0); const v = V(); v.engine = 'layers'; const L = Lc(); L.type = 'sample'; L.on = true; L.b = 0; refreshLayer(); changed(cur); })()"); await wait(1500); await plays();
+  const seg = page.locator('#r_lb').locator("xpath=../div[contains(@class,'seg')]");
+  say(await seg.count() === 1 && await seg.isVisible() && !await page.locator('#r_lb').isVisible(), 'Sample Reverse: segment shown, slider hidden in the same row');
+  await seg.locator('button', { hasText: 'On' }).click(); await wait(2200);
+  say(await app(page, 'Lc().b') === 1, 'Sample Reverse: the segment writes b = 1');
+  say(await plays() === 1, 'Sample Reverse: the pad auditions once');
+  await page.locator('#r_lb').locator('xpath=../label').dblclick({ force: true }); await wait(300);
+  say(await app(page, 'Lc().b') === 0 && await seg.locator('button.on').textContent() === 'Off', 'Sample Reverse: double-click on the label resets to Off and the segment follows');
+  await seg.locator('button', { hasText: 'On' }).click(); await wait(300);
+  await page.locator('#r_lb').locator('xpath=..').dispatchEvent('contextmenu', { clientX: 300, clientY: 300, bubbles: true, cancelable: true }); await wait(250);
+  const items = await page.evaluate(() => [...document.querySelectorAll('.ask .askitem, .sxmenu *, [role=menuitem]')].map(e => e.textContent.trim()).filter(Boolean).join('|'));
+  say(/Reset to default/.test(items) && /Learn a MIDI knob/.test(items) && !/Type a value/.test(items), `Sample Reverse: right-click menu offers Reset and Learn, no Type a value (${items.slice(0, 120)})`);
+  await page.keyboard.press('Escape'); await wait(150);
+  await app(page, "(() => { const s = document.getElementById('r_lb'); s.value = 0; s.dispatchEvent(new Event('input', {bubbles:true})); })()"); await wait(300);
+  say(await app(page, 'Lc().b') === 0 && await seg.locator('button.on').textContent() === 'Off', 'Sample Reverse: a learned knob moving the hidden slider updates the segment');
+  await app(page, "(() => { const s = document.getElementById('r_lb'); s.value = 1000; s.dispatchEvent(new Event('input', {bubbles:true})); })()"); await wait(300);
+  say(await app(page, 'Lc().b') === 1 && await seg.locator('button.on').textContent() === 'On', 'Sample Reverse: …and back to On');
+  await app(page, "(() => { Lc().type = 'lfsr'; Lc().b = 0; refreshLayer(); })()"); await wait(300);
+  say(await seg.locator('button').allTextContents().then(a => a.join()) === 'Long,Short' && await seg.isVisible(), 'Digital Loop: Long / Short shown');
+  await app(page, "(() => { Lc().type = 'sine'; refreshLayer(); })()"); await wait(200);
+  say(!await seg.isVisible() && await page.locator('#r_lb').isVisible(), 'Another layer type: the ordinary B slider is back');
   say(!B.errors.filter(e => /pageerror/.test(e)).length, 'no page errors ' + B.errors.filter(e => /pageerror/.test(e)).join(' | '));
 } finally { await B.close(); }
 process.exit(failed ? 1 : 0);

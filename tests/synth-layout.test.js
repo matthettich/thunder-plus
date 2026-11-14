@@ -53,6 +53,8 @@ test('synth B: one picker for the Synth page selects, two-state rows as segments
   assert.match(src, /function makePick\(sel, o = \{\}\)/);
   assert.match(src, /new Event\('change', \{bubbles:true\}\)/, 'a real change event on pick');
   for (const id of ["makePick(sel);", "makePick\\(\\$\\('fxAdd'\\)", "makePick\\(es\\)", "makePick\\(bs\\)", "makePick\\(pick, \\{skipEmpty:true\\}\\)", "makePick\\(fs\\)", "makePick\\(ps\\)", "makePick\\(pg\\)", "makePick\\(sh\\)", "makePick\\(se\\)", "makePick\\(sy\\)"]) assert.match(src, new RegExp(id.replace(/[();]/g, m => m === ';' ? ';' : '\\' + m).replace(/\\\\/g, '\\')), id);
-  assert.match(src, /function twoStateRow\(row, on\)/);
+  assert.match(src, /function twoStateRow\(row, on, names\)/);
+  assert.match(src, /twoStateRow\(srcRows\.b, \(\) => changed\(\), TWO_B\.sample\)/, 'Source B (Sample Reverse, Digital Loop) is a twoStateRow, not a second row');
+  assert.doesNotMatch(src, /\bbTwo\b/);
   assert.match(src, /if \(twoOf\(U\.rows\[key\]\)\) twoStateRow\(r, on\)/, 'xBuild');
 });

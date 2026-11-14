@@ -4,7 +4,7 @@
 // step each, the touch double-tap, the chevron label, an old patch with collapsed:true, save then load, no page errors.
 //   node tests/sweep/wc-compact.mjs            (set OLD_ROOT=/path/to/older/checkout to also load a saved patch in that build)
 import http from 'http'; import fs from 'fs'; import path from 'path';
-import { boot, Table, ROOT } from './ui-lib.mjs';
+import { boot, Table, ROOT, serveDir, listenLoopback } from './ui-lib.mjs';
 
 const T = new Table('wc-compact');
 const ok = (name, cond, note = '') => { T.add(name, !!cond, note); console.log((cond ? 'ok   ' : 'FAIL ') + name + (note ? '  ' + note : '')); };
@@ -63,10 +63,12 @@ const collapsedIds = async page => page.evaluate(() => [...document.querySelecto
 const bgPoint = async page => page.evaluate(() => { const r = document.getElementById('ws') ? document.getElementById('ws').getBoundingClientRect() : document.querySelector('.ws').getBoundingClientRect(); return { x: Math.round(r.right - 30), y: Math.round(r.bottom - 30) }; });
 
 // every cable end lies on the box of its own module (a few px of slack for the jack that sits on the edge)
-function endsOnBoxes(s, doc, slack = 3) {
+// (a cable whose `shown` flag is false is hidden and keeps its last path: it fails, unless hiddenOk says hidden is the state expected)
+function endsOnBoxes(s, doc, slack = 3, hiddenOk = false) {
   const bad = [];
   doc.cables.forEach((c, i) => {
     const e = s.cab[i]; if (!e || !e.a || !e.b) { bad.push(`cable ${i} has no path`); return; }
+    if (e.shown === false && !hiddenOk) { bad.push(`cable ${i} is hidden`); return; }
     for (const [pt, id] of [[e.a, c.from[0]], [e.b, c.to[0]]]) {
       const n = s.nodes[id]; if (!n) { bad.push(`no module ${id}`); continue; }
       if (pt[0] < n.l - slack || pt[0] > n.l + n.w + slack || pt[1] < n.t - slack || pt[1] > n.t + n.h + slack) bad.push(`cable ${i} end ${pt.map(Math.round)} off ${id} box ${n.l},${n.t} ${n.w}x${n.h}`);
@@ -77,7 +79,7 @@ function endsOnBoxes(s, doc, slack = 3) {
 
 async function run(ed) {
   const spec = SPEC[ed], doc = spec.doc(), MD = spec.modded;
-  const B = await boot({ width: 1440, height: 900 }); const { page, errors } = B; const base = `http://localhost:${B.port}`;
+  const B = await boot({ width: 1440, height: 900 }); const { page, errors } = B; const base = `http://127.0.0.1:${B.port}`;
   try {
     await load(page, base, ed, doc);
     await page.click('#zoomfit'); await sleep(page, 500); await page.evaluate(m => { window.MD = m; }, MD);
@@ -202,9 +204,7 @@ async function run(ed) {
     await page.reload(); await page.waitForSelector('.node'); await sleep(page, 700);
     ok(`${ed}: load puts the two modules back in Compact`, (await collapsedIds(page)).join() === 'm3,m5' && !!(await sum('m3')).shown && (await sum('m3')).text.length > 0);
     if (process.env.OLD_ROOT) {   // the previous build opens a patch saved by this one
-      const srv = http.createServer((q, r) => { let p = decodeURIComponent(new URL(q.url, 'http://x').pathname); if (p.endsWith('/')) p += 'index.html'; const f = path.join(process.env.OLD_ROOT, p);
-        fs.readFile(f, (e, d) => { if (e) { r.writeHead(404); return r.end(); } r.writeHead(200, { 'content-type': { '.html': 'text/html', '.js': 'text/javascript', '.wasm': 'application/wasm', '.woff': 'font/woff' }[path.extname(f)] || 'application/octet-stream' }); r.end(d); }); });
-      await new Promise(o => srv.listen(0, o)); const ob = `http://localhost:${srv.address().port}`;
+      const srv = serveDir(process.env.OLD_ROOT); await listenLoopback(srv); const ob = `http://127.0.0.1:${srv.address().port}`;
       await page.goto(`${ob}/${ed}/index.html`); await page.evaluate(([k, d]) => { localStorage.clear(); localStorage.setItem(k, JSON.stringify(d)); }, [spec.key, saved]);
       await page.goto(`${ob}/${ed}/index.html`); await page.waitForSelector('.node'); await sleep(page, 700);
       ok(`${ed}: the previous build loads a patch saved by this one`, (await collapsedIds(page)).join() === 'm3,m5' && (await page.$$('.node')).length === doc.modules.length);
@@ -217,6 +217,13 @@ async function run(ed) {
     const oc = await collapsedIds(page), s1 = await sum('m2');
     ok(`${ed}: an old patch with collapsed:true opens as Compact`, oc.join() === 'm2,m4' && s1 && s1.shown && s1.text.length > 0, oc.join() + ' ' + JSON.stringify(s1));
 
+    // review fix (13 Nov): Sidechain Out has no outputs, but a collapsed one still gets the level strip (chains has the module; waves does not)
+    if (ed === 'chains') {
+      await load(page, base, ed, { ...doc, modules: [{ id: 'sc1', type: 'scout', scope: 'mono', pos: [40, 40], collapsed: true, params: {} }], cables: [], groups: [] });
+      const sc = await page.evaluate(() => { const n = document.querySelector('.node[data-id="sc1"]'), c = n && n.querySelector('.csum .clvl'), r = c && c.getBoundingClientRect(); return { node: !!n, strip: !!c, h: r ? Math.round(r.height) : 0, w: r ? Math.round(r.width) : 0 }; });
+      ok(`${ed}: a collapsed Sidechain Out has the level strip (${JSON.stringify(sc)})`, sc.node && sc.strip && sc.h > 0 && sc.w > 20);
+    }
+
     // no page errors
     const errs = errors.splice(0).filter(e => !NOISE.test(e));
     ok(`${ed}: no page errors (desktop)`, errs.length === 0, errs.slice(0, 3).join(' | '));
@@ -224,7 +231,7 @@ async function run(ed) {
   await B.close();
 
   // ---- touch: double-tap on the title bar, the wider chevron, at 344 x 780 ----
-  const M = await boot({ width: 344, height: 780, mobile: true }); const mp = M.page; const mb = `http://localhost:${M.port}`;
+  const M = await boot({ width: 344, height: 780, mobile: true }); const mp = M.page; const mb = `http://127.0.0.1:${M.port}`;
   try {
     const tdoc = spec.doc(); tdoc.modules.find(m => m.id === 'm3').pos = [20, 120];
     await load(mp, mb, ed, tdoc);
@@ -241,9 +248,10 @@ async function run(ed) {
       await mp.touchscreen.tap(p2.x, p2.y); await sleep(mp, 120); await mp.touchscreen.tap(p2.x, p2.y); await sleep(mp, 500);
       ok(`${ed} C5: a second double-tap expands`, !(await collapsedIds(mp)).includes('m3'));
       const hit = await mp.evaluate(() => { const f = document.querySelector('.node[data-id="m3"] > header .fold'), r = f.getBoundingClientRect(), cx = r.left + r.width / 2, cy = r.top + r.height / 2, coarse = matchMedia('(pointer: coarse)').matches;
-        const at = (dx, dy) => { const e = document.elementFromPoint(cx + dx, cy + dy); return !!(e && (e === f || f.contains(e))); };
-        return { coarse, centre: at(0, 0), side: at(-9, 0) && at(9, 0), vert: at(0, -9) && at(0, 9) }; });
-      ok(`${ed} C5: the chevron's touch area is wider than the 20 x 22 px glyph (${JSON.stringify(hit)})`, hit.coarse && hit.centre && hit.side && hit.vert);
+        // the glyph is 20 x 22 layout px; the target must reach 40 x 40: sample 15 px out (outside the glyph, inside the target), scaled by the editor's zoom, and 25 px out (outside the target)
+        const z = r.width / f.offsetWidth, at = (dx, dy) => { const e = document.elementFromPoint(cx + dx * z, cy + dy * z); return !!(e && (e === f || f.contains(e))); };
+        return { coarse, z: +z.toFixed(2), centre: at(0, 0), side: at(-15, 0) && at(15, 0), vert: at(0, -15) && at(0, 15), corner: at(-15, -15) && at(15, 15), beyond: at(-25, 0) || at(25, 0) || at(0, -25) || at(0, 25) }; });
+      ok(`${ed} C5: the chevron's touch target is 40 x 40 px, wider than the 20 x 22 px glyph (${JSON.stringify(hit)})`, hit.coarse && hit.centre && hit.side && hit.vert && hit.corner && !hit.beyond);
     } else ok(`${ed} C5: the title bar of m3 can be reached at 344 px`, false, JSON.stringify(p2));
     const errs = M.errors.splice(0).filter(e => !NOISE.test(e));
     ok(`${ed}: no page errors (344 px touch)`, errs.length === 0, errs.slice(0, 3).join(' | '));

@@ -543,10 +543,10 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0) and `link/` (Ableton
 ### …waves and …chains UX (owner, 13 Nov: approved as an exception to the feature freeze; start after the Synth page PR)
 
 The owner's audit (60 findings, a collapsed-module design, his eight decisions, and a map of summing inputs and feedback loops) is in the repo as `docs/audits/2026-11-13-waves-chains-ux.md`. Read its "For the agent picking this up" and "Owner decisions" first; the decisions override the suggestions above them. Five passes, in this order, each on its own branch with a PR into `beta`; lower-cost agents build, the lead reviews every diff:
-- [ ] **Pass 1, look and feel (three PRs). STOP after pass 1 until the owner has seen it.**
-  - [ ] 1a Collapsed modules: the Compact state (C1, C2, C3, C6, C7, C8), collapse all / expand all (C4), the touch trigger (C5), the label fix (C9). Mini comes after he has tried Compact. The summary's key list stays easy to change per module (decision 2).
-  - [ ] 1b Signal kinds and cables: gate's own jack shape and dash (M9, U1), the selection outline off the signal colours (U1), cable hover / selected states and visible bend handles (D6, D9).
-  - [ ] 1c Wording and type: U3, U5 to U10, T11.
+- [ ] **Pass 1, look and feel (three PRs): BUILT and merged into `beta` 13 Nov; waiting for the owner to look (punch list, Builds 579 to 582). STOP here: do not start pass 2 until he has seen it.** Mini is not built.
+  - [x] 1a (build 579, PR #109) Collapsed modules: the Compact state (C1, C2, C3, C6, C7, C8), collapse all / expand all (C4), the touch trigger (C5), the label fix (C9). Mini comes after he has tried Compact. The summary's key list stays easy to change per module (decision 2).
+  - [x] 1b (build 580, PR #110) Signal kinds and cables: gate's own jack shape and dash (M9, U1), the selection outline off the signal colours (U1), cable hover / selected states and visible bend handles (D6, D9).
+  - [x] 1c (build 581, PR #111; review fixes build 582) Wording and type: U3, U5 to U10, T11.
   - Rules for pass 1: no audio code (nothing in `chains-worklet.js` / `waves-worklet.js`; goldens and cache-busters unchanged); old patches load unchanged (`collapsed:true` opens as Compact); colours through the variables at the top of each editor's CSS, `termFrameCss` extended for any new one; every editor change in both `chains/index.html` and `waves/index.html`, `python3 tools/sync-shared.py` after the shared block; before / after screenshots of both editors at 1440 x 900, 800 x 700 and 344 x 780 in the white theme, IDM pink & green and 909; checks added to the punch list.
 - [ ] **Pass 2, fixes:** D2, D3, D4, T1, T2, T3, T5 (delete on touch asks first, decision 8), T10, U2, H1 to H4.
 - [ ] **Pass 3, phone:** T4, T6, T7, T8, T9, T12 to T14, the Play / Edit switch (M10). Chains first; waves on the phone is an option if it can be made to fit (decision 7).
@@ -648,6 +648,12 @@ The owner's top priority to add is the MOD screen. Work down the list; ask befor
 ### Owner's punch list (owner, 9 Nov: will test these later; keep it current)
 
 Start a session by asking for results. Fix on `beta`. (10 Nov, 15:10: the web beta is build 560; the build numbers in the rest of this paragraph are older.) Web beta: https://matthettich.github.io/thunder-plus/beta/ (build 547 as of 10 Nov morning, 548 once its PR merges; the night of 9–10 Nov shipped 544–547, see the four "10 Nov" entries below. Decisions the lead made that night for the owner to confirm or reverse: on a phone the saved Sequencer default plays on the Page unless Audio thread is picked on that device; on a phone the safety limiter is its stand-in until another worklet loads; the resync only runs with a worklet loaded and its margins are untested on a device). Desktop: v1.3.4-beta.2 (build 541, no feed view or scopes); further desktop betas on hold until the owner asks.
+
+**Build 582** (review fixes for builds 578–581; branch `wc-review-fixes`)
+- [ ] Phone or computer, Synth page, a Sample layer: Source shows Reverse as two buttons (Off / On). Double-click the word Reverse: it goes back to Off. Right-click the row: Reset to default and Learn a MIDI knob (no "Type a value"). Learn a knob on it and turn the knob: the buttons follow. Same on a Digital layer's Loop (Long / Short).
+- [ ] Computer, …chains: collapse a Sidechain Out (Compact) and play drums into it: a thin level strip along the bottom of the module moves with the SEND meter (as it does on other modules).
+- [ ] Computer, …chains and …waves in IDM pink & green and 909: add Convolution reverb and Compressor. The title breaks between words only (never "Convoluti / on"); the BYP button may be a little narrower.
+- [ ] Computer, new patch, 1440 and a small window: the tip box is two lines with a More button (More shows all of it, Less folds it back); press Fit: no module sits under it. On a phone, Tips and × keep keyboard focus (Tab does not jump back to the top).
 
 **Build 581** (…waves / …chains pass 1c: wording and type; branch `wc-wording`)
 - [ ] Computer, …chains and …waves, white theme and IDM pink & green: add a few long-named modules (Convolution reverb, Sidechain comp, Function generator, Transient shaper, Multiband squash) and look at them open and collapsed. Module titles read in full, open and collapsed: a long name goes to a second line, never "Tape de…", and no value on the right ("−18.0 dB", "25% wet") is cut. In IDM pink & green, "Convolution reverb" may break inside its first word (Chrome hyphenates it when it has the dictionary): tell me if that looks wrong.
@@ -970,6 +976,19 @@ Suggested order: N0 → N1 → N2 (phone cured) → N4 with N3 alongside → N5 
   the edge `R.t0`, "waiting…" while armed), `rcdClk` / `rcdFmt` / `rcdFreeSecs`, a 250 ms timer only while recording; the
   final length stays until the next take. recorder-check covers FREE, PATTERN, Stop, next take and closing mid-take.
 
+
+## 13 Nov (night, later): review fixes for builds 578–581 (build 582)
+
+Branch `wc-review-fixes` (from `beta` at build 581). No audio, render, sequencer, worklet, `core/`, `dsp/`, `pump/` or `lxr/` change; golden files untouched.
+- **1. Synth two-state rows.** `twoStateRow(row, on, names)` (root `index.html`) now takes optional names and `row.twoNames()`; Source's B row (`srcRows.b`) is a `twoStateRow` for Sample (Off / On) and Digital (Long / Short) and the separate `bTwo` row is gone, so the id, double-click reset, right-click menu, MIDI learn and the segment following the hidden slider all work. Same field (`Lc().b`) and handler (`changed()`). Checks added to `tests/sweep/synth-pickers.mjs`.
+- **2. Sidechain Out Compact strip** (`buildSummary`, `paintShows`, the strip loop; chains, waves gets the same through the sync). The strip is created for `display === 'scout'` and fed from the SEND value (`showPos(pk)`), via `setLvl` (1/40 steps); the per-frame strip loop skips it.
+- **3. Tips focus** (`tipOpen` block): after the Tips button opens the note focus goes to ×; after × folds it focus goes to Tips. Only from a click.
+- **4. Value editor width** (`slider()` `typeBox`): `.valedit` gets the width of the value cell it replaces.
+- **5. Titles** (`.node > header .t`, `titleFit`): `overflow-wrap:normal; hyphens:manual`; a word longer than the line first narrows BYP's padding (`tt1`), then the title's letter-spacing (`tt2`), and only then may break (`tt3`). `wc-wording.mjs` now checks every title per word (`Range.getClientRects`) in white, idmpg, idm and tr909, open and Compact. (The old canvas check missed it; "Compressor" in the monospace skins was the real case at the default width.)
+- **6. Tip box on a mouse:** two lines plus a More / Less button (`#hintmore`), `fitAll` leaves room under the patch for the box, and in waves the box goes above the on-screen keys when they show. Checked after Fit at 1440 x 900 and 800 x 700.
+- **7. Test servers:** `serveDir` / `listenLoopback` in `tests/sweep/ui-lib.mjs` (127.0.0.1 only, decoded path resolved and kept inside the root, 400 / 403); used by `ui-lib` `boot`, `wc-compact`, `wc-signals`, `wc-wording`.
+- **8, 9, 10. Test checks:** `endsOnBoxes` rejects hidden cables; the chevron check samples 15 px out (scaled by zoom) and 25 px out; the Help contrast composites the colour over its background.
+- **11. Audit doc:** `docs/audits/2026-11-13-waves-chains-ux.md` finding tables rebuilt as Markdown (7 tables; word sequence identical).
 
 ## 13 Nov (night): …waves / …chains pass 1c: wording and type (build 581)
 

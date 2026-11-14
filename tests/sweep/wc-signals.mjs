@@ -5,7 +5,7 @@
 // width at 50%, 100% and 150%, an old patch, save then load, and touch at 344 px.
 //   node tests/sweep/wc-signals.mjs            (OLD_ROOT=/path/to/older/checkout also loads a patch saved by this build in that one)
 import http from 'http'; import fs from 'fs'; import path from 'path';
-import { boot, app, Table } from './ui-lib.mjs';
+import { boot, app, Table, serveDir, listenLoopback } from './ui-lib.mjs';
 
 const T = new Table('wc-signals');
 const ok = (name, cond, note = '') => { T.add(name, !!cond, note); console.log((cond ? 'ok   ' : 'FAIL ') + name + (note ? '  ' + note : '')); };
@@ -71,7 +71,7 @@ const COLOURS = fr => fr.evaluate(() => {
 
 async function run(ed) {
   const spec = SPEC[ed];
-  const B = await boot({ width: 1440, height: 900 }); const { page, errors } = B; const base = `http://localhost:${B.port}`;
+  const B = await boot({ width: 1440, height: 900 }); const { page, errors } = B; const base = `http://127.0.0.1:${B.port}`;
   const loadDoc = async doc => { await page.goto(`${base}/${ed}/index.html`); await page.evaluate(([k, d]) => { localStorage.clear(); localStorage.setItem(k, JSON.stringify(d)); }, [spec.key, doc]);
     await page.goto(`${base}/${ed}/index.html`); await page.waitForSelector('.node', { timeout: 20000 }); await sleep(page, 700);
     await page.evaluate(() => { const h = document.getElementById('hint'); if (h) h.hidden = true; }); };
@@ -218,9 +218,7 @@ async function run(ed) {
     await loadDoc(old);
     ok(`${ed}: an old patch (no bend, no pts, no collapsed, no scope) opens with all its cables and kinds`, (await page.$$('.node')).length === 5 && JSON.stringify(await S(page, '__sig.gs().map(__sig.cabKind)')) === '["audio","gate","mod"]');
     if (process.env.OLD_ROOT && lastDoc) {
-      const srv = http.createServer((q, r) => { let p = decodeURIComponent(new URL(q.url, 'http://x').pathname); if (p.endsWith('/')) p += 'index.html'; const f = path.join(process.env.OLD_ROOT, p);
-        fs.readFile(f, (e, d) => { if (e) { r.writeHead(404); return r.end(); } r.writeHead(200, { 'content-type': { '.html': 'text/html', '.js': 'text/javascript', '.wasm': 'application/wasm', '.woff': 'font/woff' }[path.extname(f)] || 'application/octet-stream' }); r.end(d); }); });
-      await new Promise(o => srv.listen(0, o)); const ob = `http://localhost:${srv.address().port}`;
+      const srv = serveDir(process.env.OLD_ROOT); await listenLoopback(srv); const ob = `http://127.0.0.1:${srv.address().port}`;
       await page.goto(`${ob}/${ed}/index.html`); await page.evaluate(([k, d]) => { localStorage.clear(); localStorage.setItem(k, JSON.stringify(d)); }, [spec.key, lastDoc]);
       await page.goto(`${ob}/${ed}/index.html`); await page.waitForSelector('.node'); await sleep(page, 700);
       ok(`${ed}: the previous build loads a patch saved by this one (cables and bend)`, (await page.$$('.node')).length === 5 && (await page.$$('svg.cables path.cln')).length === 3);
@@ -232,7 +230,7 @@ async function run(ed) {
   await B.close();
 
   // ---- touch, 344 x 780: a tap selects a cable and shows its handle, two taps remove it, the hit zone is wide ----
-  const M = await boot({ width: 344, height: 780, mobile: true }); const mp = M.page; const mb = `http://localhost:${M.port}`;
+  const M = await boot({ width: 344, height: 780, mobile: true }); const mp = M.page; const mb = `http://127.0.0.1:${M.port}`;
   try {
     const d = spec.doc(0.5, 6, 8);
     await mp.goto(`${mb}/${ed}/index.html`); await mp.evaluate(([k, x]) => { localStorage.clear(); localStorage.setItem(k, JSON.stringify(x)); }, [spec.key, d]);

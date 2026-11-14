@@ -173,7 +173,9 @@ svg.cables g:hover > rect.bend, svg.cables g.sel > rect.bend, body.alting svg.ca
 
 .node{position:absolute; width:250px; background:var(--panel); border:3.5px solid var(--edge); user-select:none; -webkit-user-select:none; cursor:default}
 .node > header{display:flex; align-items:center; gap:4px; padding:7px 8px 7px 12px; cursor:grab; border-bottom:2px solid var(--edge); touch-action:none}
-.node > header .t{flex:1; font-weight:600; font-size:17px; line-height:1.15; min-width:0; overflow-wrap:break-word; hyphens:auto}   /* U7 (13 Nov): a long name wraps to a second line, never "Tape de…"; in a wide monospace skin a very long word is hyphenated, not cut */
+.node > header .t{flex:1; font-weight:600; font-size:17px; line-height:1.15; min-width:0; overflow-wrap:normal; hyphens:manual}   /* review fix (13 Nov): a title breaks only between words */
+/* a single word longer than the line (Convolution, Compressor in a monospace skin): first the BYP button takes less padding (tt1), then the title a little less letter-spacing (tt2); only past both may it break inside the word (tt3). Set by titleFit() */
+.node > header.tt1 .byp{padding:0 3px} .node > header.tt2 .t{letter-spacing:-.04em} .node > header.tt3 .t{overflow-wrap:break-word}
 .node > header .x{border:0; background:none; color:var(--muted); font-size:17px; line-height:1; width:26px; height:26px; flex:none}
 .node > header .x:hover{background:var(--panel-2); color:var(--ink)}
 .node > header .byp{flex:none; height:22px; padding:0 6px; border:1px solid var(--muted); border-radius:4px; background:none; color:var(--muted); font-size:11px; font-weight:700; letter-spacing:.06em; line-height:1}
@@ -304,6 +306,13 @@ body.learning .row.sl{outline:1px dashed var(--muted); outline-offset:3px}
 .hint{pointer-events:none; opacity:.92} .hint button{pointer-events:auto}
 /* T11 (13 Nov, audit): on a touch screen the tip is a short touch-only note (no Option, right-click or Shift), open on the first visit and a small "Tips" button after that */
 .hint .tipt, .hint .hintpill{display:none}
+/* TIPS ON A MOUSE (review fix, 13 Nov): two lines of the tip and a More button, so the box stays small and Fit keeps the patch clear of it (fitAll leaves room for its height); More shows all of it */
+.hint .hintmore{display:none}
+@media not all and (pointer: coarse){
+  .hint .tipm{display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; overflow:hidden}
+  .hint.more .tipm{display:block; -webkit-line-clamp:unset; overflow:visible}
+  .hint .hintmore{display:block; flex:none; font-size:12.5px; line-height:1.2; text-decoration:underline; white-space:nowrap; padding:1px 2px; color:var(--ink)}
+}
 @media (pointer: coarse){
   .hint .tipm{display:none} .hint .tipt{display:block}
   .hint{top:10px; bottom:auto; left:10px; max-width:min(46ch, calc(100% - 24px))}   /* the top: waves' on-screen keys sit along the bottom */
@@ -415,7 +424,7 @@ document.addEventListener('contextmenu', e => { if (e.cancelable && !(e.target.c
     <div id="groups"></div>
     <svg class="cables" id="cables" xmlns="http://www.w3.org/2000/svg"></svg>
   </div>
-  <div class="hint" id="hint"><span class="tipm">Drag from an output jack to an input jack to patch (on a touch screen you can also tap one jack, then the other; double-tap a cable to remove it). Every slider has a small purple jack on its left: patch an LFO, envelope or any other signal into it to move that slider. Drag a patched input to move its cable, or drop it on empty space to unplug. Hold Option (Alt on Windows) and click while drawing a cable to bend it, or Option-drag an existing cable. Click a cable to select it (Delete removes it, and its bend handles show: drag one to move the bend), double-click it to remove it, or a module’s title bar to collapse it. Gate cables are dotted and gate jacks are diamonds. Drag the background or scroll with two fingers to pan, and pinch to zoom. Shift-click or Shift-drag to select modules, then right-click to group them. Start with a Track In (your tracker track) and end with a Chain Out back to the same track.</span><span class="tipt">Tap a jack, then another jack, to patch. Tap a cable to select it; double-tap it to remove it. Drag the background to pan and pinch to zoom. Tap the arrow on a title bar to fold a module.</span><button id="hintx" aria-label="Hide tips">×</button><button id="hintpill" class="hintpill" aria-label="Show tips" aria-expanded="false">Tips</button></div>
+  <div class="hint" id="hint"><span class="tipm">Drag from an output jack to an input jack to patch (on a touch screen you can also tap one jack, then the other; double-tap a cable to remove it). Every slider has a small purple jack on its left: patch an LFO, envelope or any other signal into it to move that slider. Drag a patched input to move its cable, or drop it on empty space to unplug. Hold Option (Alt on Windows) and click while drawing a cable to bend it, or Option-drag an existing cable. Click a cable to select it (Delete removes it, and its bend handles show: drag one to move the bend), double-click it to remove it, or a module’s title bar to collapse it. Gate cables are dotted and gate jacks are diamonds. Drag the background or scroll with two fingers to pan, and pinch to zoom. Shift-click or Shift-drag to select modules, then right-click to group them. Start with a Track In (your tracker track) and end with a Chain Out back to the same track.</span><button id="hintmore" class="hintmore" aria-expanded="false" aria-controls="hint">More</button><span class="tipt">Tap a jack, then another jack, to patch. Tap a cable to select it; double-tap it to remove it. Drag the background to pan and pinch to zoom. Tap the arrow on a title bar to fold a module.</span><button id="hintx" aria-label="Hide tips">×</button><button id="hintpill" class="hintpill" aria-label="Show tips" aria-expanded="false">Tips</button></div>
   <div class="lasso" id="lasso" hidden></div>
   <div class="emptylbl" id="emptylbl" aria-hidden="true" hidden></div>
   <div class="toast" id="toast" hidden></div>
@@ -1381,7 +1390,7 @@ function paintShows(list){
     if (S.kind === 'dyn' || S.kind === 'dynlv'){ dynPush(n, v, now); continue; }
     if (S.kind === 'scin'){ scinPaint(S, v[0], v[1], now); continue; }
     if (S.kind === 'scout'){ const A = S.rows[0], pk = v[0]; A.i.style.transform = 'scaleX(' + showPos(pk) + ')'; if (pk >= A.hold || now - A.ht > 1500){ A.hold = pk; A.ht = now; }
-      A.b.style.left = (showPos(A.hold) * 100) + '%'; A.v.textContent = A.hold <= -90 ? '−∞' : (A.hold > 0 ? '+' : '') + A.hold.toFixed(1); continue; }
+      A.b.style.left = (showPos(A.hold) * 100) + '%'; A.v.textContent = A.hold <= -90 ? '−∞' : (A.hold > 0 ? '+' : '') + A.hold.toFixed(1); if (n.lvl) setLvl(n, showPos(pk)); continue; }
     if (S.kind === 'meter') for (let c = 0; c < 2; c++){
       const R = S.rows[c], vu = v[c], pk = v[c + 2];
       R.i.style.transform = 'scaleX(' + showPos(vu) + ')';
@@ -2269,7 +2278,7 @@ function slider(n, key, spec){
     if (out.querySelector('input')) return;
     const shown = fmt(+n.m.params[key]), num = (shown.match(/[-−]?\d+(\.\d+)?/) || [''])[0].replace('−', '-');
     const ed = h('input', {type:'text', class:'valedit', 'aria-label': label + ' value', inputmode:'decimal'});
-    ed.value = num; out.replaceChildren(ed); ed.focus(); ed.select();
+    ed.value = num; ed.style.width = Math.max(48, out.offsetWidth) + 'px'; ed.style.maxWidth = '100%'; out.replaceChildren(ed); ed.focus(); ed.select();   // fixed to the cell it replaces: the typing box can't widen the value column
     let done = false;
     const finish = commit => {
       if (done) return; done = true;
@@ -2544,6 +2553,12 @@ function paintByp(){
   }
 }
 function setLiveByp(list){ liveByp = new Set(Array.isArray(list) ? list : []); liveBypT = performance.now(); paintByp(); }
+// TITLES (review fix, 13 Nov): see .tt1 to .tt3 in the css. Watches each title's box (no per-frame work); the class is added on the next frame, never inside the observer.
+const titleFit = (() => { const todo = new Set(); let raf = 0;
+  const run = () => { raf = 0; for (const t of todo){ const hd = t.parentNode; if (!hd || !t.isConnected) continue;
+    for (const c of ['tt1', 'tt2', 'tt3']){ if (t.scrollWidth <= t.clientWidth + 0.5) break; hd.classList.add(c); } } todo.clear(); };
+  const ro = typeof ResizeObserver === 'function' ? new ResizeObserver(es => { for (const e of es) todo.add(e.target); if (!raf) raf = requestAnimationFrame(run); }) : null;
+  return { watch: t => { if (ro) ro.observe(t); }, drop: t => { if (ro) ro.unobserve(t); todo.delete(t); } }; })();
 function buildNode(m){
   const def = MODULES[m.type]; if (!def) return null;
   const n = { m, jacks:{}, ctl:{} };
@@ -2579,7 +2594,7 @@ function buildNode(m){
   const body = h('div', {class:'body'}, kids);
   buildSummary(n);   // COMPACT: the collapsed look
   n.el = catStyle(h('div', {class:'node fam-' + famOf(m.type), 'data-id': m.id}, head, n.sum, ports, n.mini || null, body), m.type);   // n.mini: a folded dynamics module's meter
-  n.head = head;
+  n.head = head; titleFit.watch(n.tEl);
   n.el.style.left = m.pos[0] + 'px'; n.el.style.top = m.pos[1] + 'px';
   n.el.style.zIndex = ++zTop;
   paintNote(n);
@@ -2655,7 +2670,7 @@ function buildSummary(n){
   });
   n.sumM = h('span', {class:'cs-m'});
   const kids = [h('span', {class:'cs-t'}, n.sumIt.map(i => i.el)), n.sumM];
-  if (n.meter || Object.values(def.outputs).some(k => KIND[k] === 'audio')){ n.lvl = { el: h('b'), shown:-1 }; kids.push(h('span', {class:'clvl', 'aria-hidden':'true'}, n.lvl.el)); }
+  if (n.meter || def.display === 'scout' || Object.values(def.outputs).some(k => KIND[k] === 'audio')){ n.lvl = { el: h('b'), shown:-1 }; kids.push(h('span', {class:'clvl', 'aria-hidden':'true'}, n.lvl.el)); }
   n.sum = h('div', {class:'csum'}, kids);
 }
 // The summary line: each key value as its control would read it (a modulated one at its live value, in the modulation colour).
@@ -2787,7 +2802,7 @@ function removeModule(id){
   for (const g of doc.groups) g.modules = (g.modules || []).filter(x => x !== id);
   if (bridge) bridge.removeModule(id);
   else if (EMBED && TW && TW.mod) TW.mod({ op:'remove', id });   // the remove op also drops its cables
-  if (n) n.el.remove(); nodes.delete(id); selected.delete(id);
+  if (n){ n.el.remove(); if (n.tEl) titleFit.drop(n.tEl); } nodes.delete(id); selected.delete(id);
   syncCableEls(); store.touch(); paintByp(); paintChainOff();
 }
 function addAtCenter(type){
@@ -3163,7 +3178,8 @@ function fitAll(maxZ = 1.5){
   let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
   for (const n of list){ x0 = Math.min(x0, n.m.pos[0]); y0 = Math.min(y0, n.m.pos[1]); x1 = Math.max(x1, n.m.pos[0] + n.el.offsetWidth); y1 = Math.max(y1, n.m.pos[1] + n.el.offsetHeight); }
   for (const g of doc.groups){ x0 = Math.min(x0, g.bounds[0]); y0 = Math.min(y0, g.bounds[1]); x1 = Math.max(x1, g.bounds[0] + g.bounds[2]); y1 = Math.max(y1, g.bounds[1] + g.bounds[3]); }
-  const pad = 40, W = ws.clientWidth - pad * 2, H = ws.clientHeight - pad * 2, v = view();
+  const hb = document.getElementById('hint'), pad = 40, hintH = hb && !hb.hidden && !matchMedia('(pointer: coarse)').matches ? Math.max(0, ws.getBoundingClientRect().bottom - hb.getBoundingClientRect().top + 8) : 0;   // the tip box sits bottom-left on a mouse: leave room under the patch for it
+  const W = ws.clientWidth - pad * 2, H = ws.clientHeight - pad - Math.max(pad, hintH), v = view();
   v.zoom = Math.max(ZMIN, Math.min(maxZ, W / (x1 - x0), H / (y1 - y0)));
   v.x = pad + (W - (x1 - x0) * v.zoom) / 2 - x0 * v.zoom; v.y = pad + (H - (y1 - y0) * v.zoom) / 2 - y0 * v.zoom;
   applyPan(); store.touch();
@@ -3791,8 +3807,9 @@ tipsBox.addEventListener('change', () => { settings.tips = tipsBox.checked; save
 { const coarse = matchMedia('(pointer: coarse)'), pill = document.getElementById('hintpill');
   const tipOpen = o => { hint.classList.toggle('min', !o); pill.setAttribute('aria-expanded', String(o)); };
   if (coarse.matches){ const first = !settings.tipSeen; if (first && settings.tips !== false){ settings.tipSeen = true; saveSettings(); } tipOpen(first); }
-  pill.addEventListener('click', () => tipOpen(true));
-  document.getElementById('hintx').addEventListener('click', () => { if (coarse.matches){ tipOpen(false); return; } hint.hidden = true; settings.tips = false; saveSettings(); tipsBox.checked = false; }); }
+  { const more = document.getElementById('hintmore'); more.addEventListener('click', () => { const o = !hint.classList.contains('more'); hint.classList.toggle('more', o); more.textContent = o ? 'Less' : 'More'; more.setAttribute('aria-expanded', String(o)); }); }
+  pill.addEventListener('click', () => { tipOpen(true); document.getElementById('hintx').focus(); });   // the pill is hidden once open: focus moves to the ×
+  document.getElementById('hintx').addEventListener('click', () => { if (coarse.matches){ tipOpen(false); pill.focus(); return; } /* the × is hidden once closed: focus moves to the pill */ hint.hidden = true; settings.tips = false; saveSettings(); tipsBox.checked = false; }); }
 
 
 /* help */
@@ -3987,7 +4004,7 @@ function paintJacks(list){
       if (w !== q.shown){ q.shown = w; q.el.style.transform = 'scaleY(' + w + ')'; }
       q.v *= .6;
     }
-    if (n.lvl && !n.meter) setLvl(n, lv);   // COMPACT: the level strip
+    if (n.lvl && !n.meter && !(n.show && n.show.kind === 'scout')) setLvl(n, lv);   // COMPACT: the level strip
   }
 }
 setInterval(() => { if (doc && Date.now() - jackSeen > 250) paintJacks(null); }, 120);
