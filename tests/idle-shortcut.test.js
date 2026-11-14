@@ -134,7 +134,8 @@ test('ThunderFx slot nap: silent in and silent out for a second skips the slot; 
   node.slotRun = function (s, n) { runs++; for (let k = 0; k < n; k++) { this.L[k] = this.L[k] + tail; this.R[k] = this.R[k] + tail; } tail *= 0.5; };   // a fake effect: its input plus a tail that halves every block
   const s = { key: 'plate' }, feed = v => { for (let k = 0; k < B; k++) { node.L[k] = v; node.R[k] = -v; } node.slotNap(s, B, null); };
   for (let b = 0; b < 30; b++) feed(0); assert.equal(runs, 30, 'the tail is still above -180 dB: it runs'); assert.ok(!s.zz);
-  for (let b = 0; b < Math.ceil(SR / B) + 2; b++) feed(0); const r0 = runs; assert.equal(s.zz, true, 'a second of nothing in and nothing out: asleep');
+  for (let b = 0; b < Math.ceil(2.5 * SR / B); b++) feed(0); assert.equal(s.zz, undefined === s.zz ? undefined : false, 'two and a half seconds of quiet is not enough: a 2 s delay may still hold an echo'); assert.equal(runs, 30 + Math.ceil(2.5 * SR / B));
+  for (let b = 0; b < Math.ceil(30 * SR / B) + 2; b++) feed(0); const r0 = runs; assert.equal(s.zz, true, 'half a minute of nothing in and nothing out: asleep');
   for (let b = 0; b < 500; b++) { feed(0); assert.equal(node.L[5], 0); assert.equal(node.R[5], 0); } assert.equal(runs, r0, 'skipped, its output exactly silent');
   feed(5e-10); assert.equal(runs, r0, 'still under -180 dB: stays asleep'); feed(1e-6); assert.equal(runs, r0 + 1, 'sound: it runs in that very block'); assert.ok(Math.abs(node.L[5] - 1e-6) < 1e-9); assert.equal(s.zz, false);
   tail = 1; feed(0); const r1 = runs; for (let b = 0; b < 10; b++) feed(.5); assert.equal(runs, r1 + 10, 'with sound going through it always runs');
