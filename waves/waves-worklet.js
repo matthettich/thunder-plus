@@ -5118,7 +5118,11 @@ class WavesEngine {
       if (c.fb){   // FEEDBACK: the same four cases as below, each through the guard
         if (v >= 0 && src.poly){ const b = this._bufs(src, v).out[c.a[1]]; if (b) fbAdd(dst, b, 1); }
         else if (v >= 0){ const b = this._bufs(src, -1).out[c.a[1]]; if (b) fbAdd(dst, b, kind === 'audio' ? 1 / N : 1); }
-        else if (src.poly){ for (let vv = 0; vv < N; vv++){ const b = this._bufs(src, vv).out[c.a[1]]; if (b) fbAdd(dst, b, 1); } }
+        else if (src.poly){   // the voices are summed first, so the ceiling holds for the cable as a whole, not per voice
+          const s = this._fbS || (this._fbS = new Float32Array(BLOCK)); s.fill(0);
+          for (let vv = 0; vv < N; vv++){ const b = this._bufs(src, vv).out[c.a[1]]; if (b) for (let i = 0; i < BLOCK; i++) s[i] += b[i]; }
+          fbAdd(dst, s, 1);
+        }
         else { const b = this._bufs(src, -1).out[c.a[1]]; if (b) fbAdd(dst, b, 1); }
       }
       else if (v >= 0 && src.poly){ const b = this._bufs(src, v).out[c.a[1]]; if (b) for (let i = 0; i < BLOCK; i++) dst[i] += b[i]; }

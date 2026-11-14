@@ -175,6 +175,11 @@ test('waves: a feedback cable does not make its target run per voice', () => {
   E.loadPatch(doc);
   assert.equal(E.graph.mods.get('m').poly, false, 'not per voice through a feedback cable');
   assert.equal(E.graph.mods.get('y').poly, true, 'the loop itself is per voice (x feeds y forwards)');
+  // every voice at 0.9 on that cable: the voices are summed first, then guarded, so the cable as a whole keeps the ceiling
+  const gm = E.graph.mods.get('m'), gx = E.graph.mods.get('x');
+  for (let v = 0; v < E.voices.max; v++) E._bufs(gx, v).out.out.fill(.9);
+  const io = E._bufs(gm, -1); E._gather(gm, io, -1);
+  assert.ok(E.voices.max >= 2 && io.in.in[0] > 1 && io.in.in[0] <= 2, 'summed and held under 2: ' + io.in.in[0]);
   E.loadPatch(Object.assign(doc, { cables: doc.cables.map(c => c.to[0] === 'm' ? { from: c.from, to: c.to } : c) }));
   assert.equal(E.graph.mods.get('m').poly, true, 'the same cable unmarked does');
 });
