@@ -4,13 +4,13 @@
 // step each, the touch double-tap, the chevron label, an old patch with collapsed:true, save then load, no page errors.
 //   node tests/sweep/wc-compact.mjs            (set OLD_ROOT=/path/to/older/checkout to also load a saved patch in that build)
 import http from 'http'; import fs from 'fs'; import path from 'path';
-import { boot, Table, ROOT, serveDir, listenLoopback } from './ui-lib.mjs';
+import { boot, app, Table, ROOT, serveDir, listenLoopback } from './ui-lib.mjs';
 
 const T = new Table('wc-compact');
 const ok = (name, cond, note = '') => { T.add(name, !!cond, note); console.log((cond ? 'ok   ' : 'FAIL ') + name + (note ? '  ' + note : '')); };
 
 // ---- the two test patches: 8 modules, one port-heavy (a mixer with four inputs patched), two with modulation cables in ----
-const P = (id, type, x, y, params = {}) => ({ id, type, scope: 'mono', pos: [x, y], collapsed: false, params });
+const P = (id, type, x, y, params = {}, collapsed = false) => ({ id, type, scope: 'mono', pos: [x, y], collapsed, params });
 const C = (a, ap, b, bp) => ({ from: [a, ap], to: [b, bp], bend: 0 });
 const SPEC = {
   chains: {
@@ -22,7 +22,7 @@ const SPEC = {
       cables: [C('m1', 'out', 'm2', 'in'), C('m1', 'outR', 'm2', 'inR'), C('m2', 'out', 'm3', 'in'), C('m2', 'outR', 'm3', 'inR'),
         C('m3', 'out', 'm4', 'in1'), C('m3', 'outR', 'm4', 'in1R'), C('m2', 'out', 'm4', 'in2'), C('m2', 'outR', 'm4', 'in2R'),
         C('m4', 'out', 'm6', 'in'), C('m4', 'outR', 'm6', 'inR'),
-        C('m5', 'out', 'm2', 'p:time'), C('m5', 'out', 'm2', 'p:mix'), C('m8', 'out', 'm7', 'p:cutoff'), C('m5', 'out', 'm3', 'p:mix')],
+        C('m5', 'out', 'm2', 'p:tone'), C('m5', 'out', 'm2', 'p:mix'), C('m8', 'out', 'm7', 'p:cutoff'), C('m5', 'out', 'm3', 'p:mix')],
       groups: [], custom: [], transport: { tempo: 120 }
     }),
   },
@@ -34,7 +34,7 @@ const SPEC = {
         P('m6', 'out', 990, 40, { slot: 1, level: 1 }), P('m7', 'lfo', 24, 330), P('m8', 'adsr', 24, 560)],
       cables: [C('m1', 'out', 'm2', 'in'), C('m2', 'out', 'm3', 'in'), C('m3', 'out', 'm4', 'in'), C('m1', 'out', 'm5', 'in1'), C('m2', 'out', 'm5', 'in2'),
         C('m3', 'out', 'm5', 'in3'), C('m4', 'out', 'm5', 'in4'), C('m5', 'out', 'm6', 'in'),
-        C('m7', 'out', 'm4', 'p:time'), C('m7', 'out', 'm4', 'p:mix'), C('m8', 'out', 'm3', 'cv'), C('m8', 'out', 'm2', 'p:cutoff')],
+        C('m7', 'out', 'm4', 'p:tone'), C('m7', 'out', 'm4', 'p:mix'), C('m8', 'out', 'm3', 'cv'), C('m8', 'out', 'm2', 'p:cutoff')],
       groups: [], custom: [], transport: { tempo: 120 }
     }),
   },
@@ -98,22 +98,23 @@ async function run(ed) {
     const sum = async id => page.evaluate(i => { const s = document.querySelector(`.node[data-id="${i}"] > .csum`); return s ? { text: s.querySelector('.cs-t').innerText, shown: getComputedStyle(s).display !== 'none', n: s.querySelectorAll('.cs-i').length } : null; }, id);
     const s2 = await sum(MD);
     ok(`${ed} C1: a collapsed module shows its summary (${JSON.stringify(s2 && s2.text)})`, s2 && s2.shown && s2.n >= 2 && /ms|s\b/.test(s2.text));
+    ok(`${ed} C1 (583): the default summary leads with the wet/dry Mix`, /^Mix /.test(s2.text), s2.text);
     // the summary reads the way the sliders do
-    const same = await page.evaluate(i => { const g = k => document.querySelector(`.node[data-id="${i}"] .row[data-key="${k}"] .val`).textContent; return { regen: g('regen'), time: g('time') }; }, MD);
-    ok(`${ed} C1: summary shows the sliders' own readout`, s2.text.includes(same.regen), `${same.regen} in ${s2.text}`);
+    const same = await page.evaluate(i => { const g = k => document.querySelector(`.node[data-id="${i}"] .row[data-key="${k}"] .val`).textContent; return { time: g('time') }; }, MD);
+    ok(`${ed} C1: summary shows the sliders' own readout`, s2.text.includes(same.time), `${same.time} in ${s2.text}`);
 
     // updates when the parameter changes, and is not rewritten when it does not
     const setRange = (id, key, frac) => page.evaluate(([i, k, f]) => { const inp = document.querySelector(`.node[data-id="${i}"] .row[data-key="${k}"] input[type=range]`);
       const lo = +inp.min, hi = +inp.max; inp.value = f === 'same' ? inp.value : lo + (hi - lo) * f; inp.dispatchEvent(new Event('input', { bubbles: true })); return document.querySelector(`.node[data-id="${i}"] .row[data-key="${k}"] .val`).textContent; }, [id, key, frac]);
     await page.evaluate(i => { const s = document.querySelectorAll(`.node[data-id="${i}"] > .csum .cs-i`)[1]; window.__mut = 0; window.__mo = new MutationObserver(l => { window.__mut += l.length; }); window.__mo.observe(s, { subtree: true, childList: true, characterData: true, attributes: true }); }, MD);
-    await setRange(MD, 'tone', .9); await sleep(page, 650);   // not a summary value (and past the 200 ms modulation repaint)
+    await setRange(MD, 'reso', .9); await sleep(page, 650);   // not a summary value (and past the 200 ms modulation repaint)
     const mutOther = await page.evaluate(() => window.__mut);
     ok(`${ed} C1: a parameter outside the summary does not touch it`, mutOther === 0, 'mutations ' + mutOther);
-    const ro = await setRange(MD, 'regen', .77); await sleep(page, 100);
+    const ro = await setRange(MD, 'time', .77); await sleep(page, 100);
     const s2b = await sum(MD), mutChange = await page.evaluate(() => window.__mut);
     ok(`${ed} C1: summary follows a changed parameter (${ro})`, s2b.text.includes(ro) && s2b.text !== s2.text && mutChange > 0, s2b.text);
     await page.evaluate(() => { window.__mut = 0; });
-    await setRange(MD, 'regen', 'same'); await sleep(page, 650);
+    await setRange(MD, 'time', 'same'); await sleep(page, 650);
     ok(`${ed} C1: the same value again writes nothing`, (await page.evaluate(() => window.__mut)) === 0);
     await page.evaluate(() => window.__mo.disconnect());
 
@@ -154,8 +155,9 @@ async function run(ed) {
     const afterAll = await state(page);
     ok(`${ed} C4: cable ends on their boxes (all collapsed)`, endsOnBoxes(afterAll, doc).length === 0, endsOnBoxes(afterAll, doc).join('; '));
     const heights = Object.fromEntries(Object.entries(afterAll.nodes).map(([k, v]) => [k, Math.round(v.h)]));
-    const bad = Object.entries(heights).filter(([, h]) => h < 64 || h > 110);
-    ok(`${ed} C2: collapsed heights are 64 to 110 px`, bad.length === 0, JSON.stringify(heights));
+    const stubCount = Object.fromEntries(doc.modules.map(m => [m.id, new Set(doc.cables.filter(c => c.to[0] === m.id && c.to[1].startsWith('p:')).map(c => c.to[1])).size]));
+    const bad = Object.entries(heights).filter(([k, h]) => h < 64 || h > (stubCount[k] ? 140 : 110));   // (build 583: the modulation stubs have rows of their own under the inputs: up to 140 px with them)
+    ok(`${ed} C2: collapsed heights are 64 to 110 px (140 with modulation stubs)`, bad.length === 0, JSON.stringify(heights));
     await page.keyboard.press('Control+z'); await sleep(page, 400);
     const afterUndo = await collapsedIds(page);
     ok(`${ed} C4: Collapse all is one undo step`, JSON.stringify(afterUndo) === JSON.stringify(before), `${afterUndo.join()} vs ${before.join()}`);
@@ -259,6 +261,128 @@ async function run(ed) {
   await M.close();
 }
 
+// ---- build 583 (owner's first results): a collapsed module grows to fit its patched ports; modulation stubs on the left with names ----
+const G = {
+  chains: { mix: 'smixer', chans: 7, stereo: true, src: 'delay', sink: 'chainOut', sinkIn: ['in', 'inR'], mixOuts: ['out', 'outR'], plain: 'delay', plainIns: ['in', 'inR'] },
+  waves:  { mix: 'mixer', chans: 16, stereo: false, src: 'vco', sink: 'out', sinkIn: ['in'], mixOuts: ['out'], plain: 'delay', plainIns: ['in'] },
+};
+function growDoc(ed, { chans = G[ed].chans, mods = ['l2'], collapsed = true, zoom = 1 } = {}) {
+  const g = G[ed], mx = P('mx', g.mix, 260, 120, { chans }, collapsed), cab = [];
+  const mods0 = [mx, P('src', g.src, 20, 520), P('lf', 'lfo', 20, 120), P('snk', g.sink, 760, 120, g.sink === 'chainOut' ? { track: 1, level: 1 } : { slot: 1, level: 1 }), P('pl', g.plain, 760, 420, {}, collapsed), P('pls', g.src, 20, 760)];
+  for (let i = 1; i <= chans; i++) { cab.push(C('src', 'out', 'mx', 'in' + i)); if (g.stereo) cab.push(C('src', 'outR', 'mx', 'in' + i + 'R')); }
+  g.mixOuts.forEach((o, i) => cab.push(C('mx', o, 'snk', g.sinkIn[Math.min(i, g.sinkIn.length - 1)])));
+  for (const k of mods) cab.push(C('lf', 'out', 'mx', 'p:' + k));
+  g.plainIns.forEach((pi, i) => cab.push(C('pls', i ? 'outR' : 'out', 'pl', pi)));
+  const base = SPEC[ed].doc(); const d = { ...base, modules: mods0, cables: cab, view: { x: 0, y: 0, zoom, ui: 2 } };
+  return d;
+}
+// everything a collapsed module draws, in client pixels, relative to its own frame (inner edge of the border)
+const GPROBE = `((id) => {
+  const n = document.querySelector('.node[data-id="' + id + '"]'), nr = n.getBoundingClientRect(), cs = getComputedStyle(n), z = nr.width / n.offsetWidth;
+  const bl = parseFloat(cs.borderLeftWidth) * z, bt = parseFloat(cs.borderTopWidth) * z, inner = { l: nr.left + bl, r: nr.right - bl, t: nr.top + bt, b: nr.bottom - bt };
+  const jacks = [...n.querySelectorAll('.jack')].map(j => { const r = j.getBoundingClientRect(); return { port: j.dataset.port, dir: j.dataset.dir, stub: !!j.closest('.port.stub'), r: r.width ? { l: r.left, r: r.right, t: r.top, b: r.bottom, cx: r.left + r.width / 2, cy: r.top + r.height / 2 } : null }; }).filter(j => j.r);
+  const stubs = [...n.querySelectorAll('.port.stub')].map(s => { const l = s.querySelector('.pl'), r = l.getBoundingClientRect(); return { text: l.textContent, shown: r.width > 0 && getComputedStyle(l).display !== 'none', clip: l.scrollWidth > l.clientWidth + .5, l: r.left, r: r.right, t: s.getBoundingClientRect().top, b: s.getBoundingClientRect().bottom }; });
+  const sum = n.querySelector(':scope > .csum .cs-t');
+  return { z, w: n.offsetWidth, h: n.offsetHeight, inline: n.style.width, cr: cs.getPropertyValue('--cr').trim(), inner, jacks, stubs, sum: sum ? sum.innerText : null, collapsed: n.classList.contains('collapsed') };
+})`;
+const gp = (page, id) => page.evaluate(`${GPROBE}('${id}')`);
+const inside = (p, slack = .6) => p.jacks.concat(p.stubs.map(s => ({ port: 'stub label ' + s.text, r: { l: s.l, r: s.r, t: s.t, b: s.b } }))).filter(j => !(j.r.l >= p.inner.l - slack && j.r.r <= p.inner.r + slack && j.r.t >= p.inner.t - slack && j.r.b <= p.inner.b + slack)).map(j => `${j.dir || ''}:${j.port} ${Math.round(j.r.l)}-${Math.round(j.r.r)} outside ${Math.round(p.inner.l)}-${Math.round(p.inner.r)}`);
+async function cableEndsOnJacks(page, doc, id) {
+  return page.evaluate(([d, i]) => {
+    const world = document.querySelector('.world'), m = new DOMMatrix(getComputedStyle(world).transform), wr = world.getBoundingClientRect(), bad = [];
+    const gs = [...document.querySelectorAll('svg.cables g')].filter(g => g.querySelector('path.cln'));
+    d.cables.forEach((c, k) => {
+      for (const [end, dir, which] of [[c.from, 'out', 'a'], [c.to, 'in', 'b']]) {
+        if (end[0] !== i) continue;
+        const pts = (gs[k].querySelector('path.cln').getAttribute('d').match(/-?[\d.]+,-?[\d.]+/g) || []).map(s => s.split(',').map(Number)), pt = which === 'a' ? pts[0] : pts[pts.length - 1];
+        let j = document.querySelector('.node[data-id="' + i + '"] .jack[data-dir="' + dir + '"][data-port="' + end[1] + '"]'); let r = j && j.getBoundingClientRect();
+        if (!r || !r.width) { j = document.querySelector('.node[data-id="' + i + '"] .port.stub .jack[data-port="' + end[1] + '"]'); r = j && j.getBoundingClientRect(); }
+        if (!r || !r.width) { bad.push('no jack for ' + end.join('.')); continue; }
+        const cx = (r.left + r.width / 2 - wr.left) / m.a, cy = (r.top + r.height / 2 - wr.top) / m.a;
+        if (Math.hypot(pt[0] - cx, pt[1] - cy) > 1.5) bad.push(end.join('.') + ' end ' + pt.map(Math.round) + ' jack ' + [cx, cy].map(Math.round));
+      }
+    });
+    return bad;
+  }, [doc, id]);
+}
+async function grow(ed) {
+  const g = G[ed], B = await boot({ width: 1440, height: 900 }); const { page, errors } = B; const base = `http://127.0.0.1:${B.port}`;
+  const nIn = g.chans * (g.stereo ? 2 : 1), nOut = g.mixOuts.length;
+  try {
+    // plain module (2 inputs patched, or 1): the width does not change
+    for (const z of [.5, 1, 1.5]) {
+      const d = growDoc(ed, { zoom: z }); await load(page, base, ed, d);
+      const p = await gp(page, 'mx'), pl = await gp(page, 'pl');
+      const tag = `${ed} grow @${Math.round(z * 100)}%`;
+      ok(`${tag}: ${g.mix} with ${nIn} inputs patched is wider than the default (${p.w} px) and under the cap`, p.collapsed && p.w > 250 && p.w <= 500, `w ${p.w}`);
+      const ins = p.jacks.filter(j => j.dir === 'in' && !j.stub), outs = p.jacks.filter(j => j.dir === 'out');
+      ok(`${tag}: all ${nIn} input jacks, ${nOut} output(s) and the stub are drawn (${ins.length} / ${outs.length} / ${p.stubs.length})`, ins.length === nIn && outs.length === nOut && p.stubs.length === 1);
+      ok(`${tag}: every jack, stub and label lies inside the module's frame`, inside(p).length === 0, inside(p).slice(0, 3).join('; '));
+      const mid = (p.inner.l + p.inner.r) / 2;
+      ok(`${tag}: the outputs stand at the right edge inside the frame (gap ${Math.round(p.inner.r - Math.max(...outs.map(o => o.r.r)))} px)`, outs.every(o => o.r.cx > mid) && (p.inner.r - Math.max(...outs.map(o => o.r.r))) <= 16 * p.z && ins.every(j => j.r.cx < Math.min(...outs.map(o => o.r.l))));
+      const st = p.jacks.find(j => j.stub), lowestIn = Math.max(...ins.map(j => j.r.cy));
+      ok(`${tag}: the modulation stub is on the left, below the audio inputs, named "${p.stubs[0] && p.stubs[0].text}"`, st && st.r.cx < mid && st.r.cy > lowestIn && p.stubs[0].shown && p.stubs[0].text.trim().length > 0 && !p.stubs[0].clip, JSON.stringify({ st: st && st.r, mid, lowestIn, s: p.stubs[0] }));
+      ok(`${tag}: the summary starts with the master level (${JSON.stringify(p.sum)})`, /^Master 100%/.test(p.sum || ''));
+      const bad = await cableEndsOnJacks(page, d, 'mx');
+      ok(`${tag}: every cable end is on its jack (${d.cables.filter(c => c.from[0] === 'mx' || c.to[0] === 'mx').length} cables)`, bad.length === 0, bad.slice(0, 3).join('; '));
+      ok(`${tag}: a plain module with ${g.plainIns.length} inputs keeps its width (${pl.w} px) and has nothing outside its frame`, pl.w === 250 && pl.inline === '' && inside(pl).length === 0, JSON.stringify({ w: pl.w, inline: pl.inline, o: inside(pl).slice(0, 2) }));
+    }
+    // expand: the normal width; collapse again: wide again. Nothing new is saved.
+    await load(page, base, ed, growDoc(ed, { collapsed: false }));
+    const o0 = await gp(page, 'mx'); ok(`${ed} grow: open, the module has its normal width (${o0.w} px)`, !o0.collapsed && o0.w === 250 && o0.inline === '');
+    await fold(page, 'mx'); await sleep(page, 300);
+    const c1 = await gp(page, 'mx'); ok(`${ed} grow: collapsing makes it wider (${c1.w} px) and everything fits`, c1.collapsed && c1.w > 250 && inside(c1).length === 0, inside(c1).slice(0, 2).join('; '));
+    ok(`${ed} grow: cable ends on their jacks after collapsing by the chevron`, (await cableEndsOnJacks(page, growDoc(ed, { collapsed: false }), 'mx')).length === 0);
+    await sleep(page, 2200);
+    const saved = await page.evaluate(k => JSON.parse(localStorage.getItem(k)), SPEC[ed].key);
+    ok(`${ed} grow: the saved patch has collapsed:true and no width or other new field`, saved.modules.every(m => Object.keys(m).sort().join() === 'collapsed,id,params,pos,scope,type') && saved.modules.find(m => m.id === 'mx').collapsed === true && !/width/i.test(JSON.stringify(saved)));
+    await page.reload(); await page.waitForSelector('.node'); await sleep(page, 800);
+    const c2 = await gp(page, 'mx'); ok(`${ed} grow: save then load gives the same wide module (${c2.w} px)`, c2.collapsed && c2.w === c1.w && inside(c2).length === 0);
+    await fold(page, 'mx'); await sleep(page, 300);
+    const e1 = await gp(page, 'mx'); ok(`${ed} grow: expanding returns the normal width (${e1.w} px, no inline width)`, !e1.collapsed && e1.w === 250 && e1.inline === '' && e1.cr === '');
+    // a hand-made patch of build 579 to 582 (collapsed:true, nothing else) opens wide
+    const old = growDoc(ed); old.modules.forEach(m => { delete m.view; });
+    await load(page, base, ed, old); const c3 = await gp(page, 'mx');
+    ok(`${ed} grow: an old patch with collapsed:true opens with the wider module (${c3.w} px)`, c3.collapsed && c3.w === c1.w && inside(c3).length === 0);
+    // many modulated parameters: the stubs wrap into rows, all named, all inside
+    const manyK = ['l1', 'l2', 'l3', 'l4', 'l5', ...(g.stereo ? ['p1', 'p2'] : ['l6', 'l7'])];
+    const dm = growDoc(ed, { mods: manyK }); await load(page, base, ed, dm); const pm = await gp(page, 'mx');
+    const rowsTop = new Set(pm.stubs.map(s => Math.round(s.t)));
+    ok(`${ed} grow: ${manyK.length} modulation stubs wrap into ${rowsTop.size} row(s), all named, all inside the frame`, pm.stubs.length === manyK.length && rowsTop.size >= 1 && pm.stubs.every(s => s.shown && s.text.trim() && !s.clip) && inside(pm).length === 0 && (manyK.length < 4 || rowsTop.size >= 2), JSON.stringify({ rows: rowsTop.size, w: pm.w, o: inside(pm).slice(0, 2) }));
+    ok(`${ed} grow: ... and their cables end on them`, (await cableEndsOnJacks(page, dm, 'mx')).length === 0);
+    // the cap: more ports than 500 px hold: more rows, nothing outside
+    if (g.stereo) {
+      const dc = growDoc(ed, { chans: 16, mods: ['l1', 'l2', 'l3', 'l4', 'l5', 'l6'] }); await load(page, base, ed, dc); const pc = await gp(page, 'mx');
+      const ys = new Set(pc.jacks.filter(j => j.dir === 'in' && !j.stub).map(j => Math.round(j.r.cy)));
+      ok(`${ed} grow: at the width cap the ports take more rows (${pc.w} px wide, ${ys.size} rows, --cr ${pc.cr}) and everything is inside`, pc.w <= 500 && pc.w > 400 && ys.size >= 3 && inside(pc).length === 0, JSON.stringify({ w: pc.w, rows: ys.size, o: inside(pc).slice(0, 2) }));
+      ok(`${ed} grow: ... the stubs are named and below the inputs; the cables end on their jacks`, pc.stubs.length === 6 && pc.stubs.every(s => s.shown && s.text.trim()) && Math.min(...pc.stubs.map(s => s.t)) >= Math.max(...pc.jacks.filter(j => j.dir === 'in' && !j.stub).map(j => j.r.cy)) - 1 && (await cableEndsOnJacks(page, dc, 'mx')).length === 0);
+      await fold(page, 'mx'); await sleep(page, 300);
+      const pe = await gp(page, 'mx'); ok(`${ed} grow: ... and expanding it clears the width and the rows`, !pe.collapsed && pe.w === 250 && pe.cr === '');
+    }
+    const errs = errors.splice(0).filter(e => !NOISE.test(e));
+    ok(`${ed} grow: no page errors`, errs.length === 0, errs.slice(0, 3).join(' | '));
+  } catch (e) { ok(`${ed} grow: ran to the end`, false, e.stack.split('\n').slice(0, 3).join(' | ')); }
+  await B.close();
+}
+
 for (const ed of ['chains', 'waves']) await run(ed);
+for (const ed of ['chains', 'waves']) await grow(ed);
+
+// build 583, review fix: a collapsed Sidechain Out's level strip falls to nothing when its telemetry stops (through the host, as Thunder Plus runs it)
+async function scoutStrip() {
+  const storage = { 'thunderplus-platform-v1': 'desktop', 'thunderplus.chains.settings': '{"tips":false}' };
+  const B = await boot({ width: 1440, height: 900, storage }); const { page } = B;
+  try {
+    const d = { format: 'chains.patch', meta: { name: 'scout' }, view: { x: 0, y: 0, zoom: 1, ui: 2 }, st2: 1, ti2: 1, modules: [P('so', 'scout', 100, 100, { snd: 1, level: 1 }, true)], cables: [], groups: [], custom: [], transport: { tempo: 120 } };
+    await app(page, `(setView('chains'), 1)`); await sleep(page, 1200);
+    await app(page, `(CH.frame.contentWindow.chainsEmbed.setDoc(${JSON.stringify(d)}), 1)`); await sleep(page, 800);
+    const fr = page.frames().find(f => f.url().includes('/chains/')), strip = () => fr.evaluate(() => document.querySelector('.node[data-id="so"] .clvl b').style.transform);
+    await app(page, `(CH.frame.contentWindow.chainsEmbed.meters({ peaks: [], shows: [['so', [-6]]] }), 1)`); await sleep(page, 100);
+    const on = await strip(); await sleep(page, 900); const off = await strip();
+    ok(`chains: a collapsed Sidechain Out's strip moves with the send (${on}) and falls to nothing when it stops (${off})`, /scaleX\(0\.[1-9]|scaleX\(1\)/.test(on) && off === 'scaleX(0)');
+  } catch (e) { ok('chains scout strip: ran to the end', false, e.stack.split('\n').slice(0, 3).join(' | ')); }
+  await B.close();
+}
+await scoutStrip();
 const f = T.print();
 process.exit(f ? 1 : 0);

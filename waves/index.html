@@ -201,17 +201,23 @@ button.mk.more{border:1px solid var(--muted); background:none; padding:2px 5px; 
 button.mk.more:hover{color:var(--ink); border-color:var(--ink)}
 .clvl{position:absolute; left:0; right:0; bottom:0; height:3px; background:color-mix(in srgb, var(--edge) 14%, transparent); overflow:hidden}
 .clvl b{display:block; height:100%; background:var(--audio); transform:scaleX(0); transform-origin:left}
-.node.collapsed > .ports{padding:2px 0 4px; border-bottom:0; gap:8px}
+.node.collapsed > .ports{padding:2px 8px 4px; border-bottom:0; gap:12px}
 .node.collapsed > .ports.none, .node:not(.collapsed) > .ports.synth{display:none}
-.node.collapsed .ins, .node.collapsed .outs{grid-auto-flow:column; grid-template-rows:repeat(2, auto); gap:2px 24px}   /* two rows, then a new column */
+.node.collapsed .ins, .node.collapsed .outs{flex:none; grid-auto-flow:column; grid-template-rows:repeat(var(--cr, 2), auto); gap:2px 24px}   /* --cr rows (2; more only at the width cap), then a new column: compactFit() sets it */
+.node.collapsed .ins .port{margin-left:0} .node.collapsed .outs .port{margin-right:0}   /* the jacks sit inside the frame, not on its edge */
+.node.collapsed.dense .ins, .node.collapsed.dense .outs{column-gap:14px}
 .node.collapsed .port{height:20px; gap:5px; font-size:12.5px}
 .node.collapsed .port.free{display:none}
 .node.collapsed .port > .pl{min-width:0; max-width:56px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
 .node.collapsed .jack{transform:scale(.85)}
 .node.collapsed .jack[data-kind="gate"]{transform:rotate(45deg) scale(.85)}
 .port.stub > .pl{color:var(--mod)}
-.node:not(.collapsed) .port.stub{display:none}
-.node.collapsed.dense .port > .pl{display:none}
+.cstubs{display:none}
+.node.collapsed > .cstubs{display:grid; grid-template-columns:repeat(var(--sc, 2), minmax(0, 1fr)); gap:2px 8px; padding:0 8px 6px}   /* the modulation inputs: left, under the audio inputs, names always shown (--sc columns: compactFit()) */
+.node.collapsed > .cstubs:empty{display:none}
+.node.collapsed .cstubs .port{margin:0; min-width:0}
+.node.collapsed .cstubs .port > .pl{max-width:none}   /* ellipsis only when the module is at its width cap and the name is longer than the column */
+.node.collapsed.dense .port:not(.stub) > .pl{display:none}
 @media (pointer: coarse){ .node > header .fold{position:relative} .node > header .fold::before{content:''; position:absolute; inset:-9px -10px} }
 @media (prefers-reduced-motion: reduce){ .node > header .fold svg{transition:none} }
 .node.selected{outline:3px solid var(--selc) !important; outline-offset:3px}
@@ -1559,14 +1565,19 @@ function chainsStereoUp(d){
   d.cables.push(...add); d.st2 = 1;
   return d;
 }
-/* SUMMARY KEYS (owner decision 2, 13 Nov: "as a test; keep the key list easy to change per module").
-   What a collapsed (Compact) module shows under its title: up to three values. Unless a module is listed here, or its
-   definition has a key:[...] list, it is the module's FIRST SELECT plus its FIRST TWO SLIDERS, in the order of its params.
-   To choose others, add a line, for example:   delay:['time', 'regen', 'mix'],
-   Names are param keys; one that does not exist, is hidden or is not shown (a mixer channel above Inputs) is skipped. */
+/* SUMMARY KEYS (owner decision 2, 13 Nov: "as a test; keep the key list easy to change per module"; changed after his first test, build 583).
+   What a collapsed (Compact) module shows under its title: up to three values. The rules, first to last:
+   1. a module's own key:[...] list in its definition, or a line in SUMMARY_KEYS below, wins and is used as written;
+   2. otherwise its FIRST SELECT plus TWO SLIDERS (SUMMARY_DEFAULT), where the two sliders are first any whose label is in
+      SUMMARY_FIRST (wet/dry, then the master / output level; in that order), then the first sliders in the order of the params.
+   To choose others for one module, add a line to SUMMARY_KEYS, for example:   delay:['time', 'regen', 'mix'],
+   To change what goes first everywhere, edit SUMMARY_FIRST (slider LABELS as the module shows them, in priority order).
+   SUMMARY_KEYS names are param keys; one that does not exist, is hidden or is not shown (a mixer channel above Inputs) is skipped. */
 const SUMMARY_KEYS = {
-  // type:['paramKey', 'paramKey', 'paramKey'],
+  mixer:['level', 'l1'],    // the master level first (its label is "Master"), then the first channel's level
+  smixer:['level', 'l1'],
 };
+const SUMMARY_FIRST = ['Mix', 'Wet', 'Master', 'Level', 'Output', 'Gain', 'Makeup'];
 const SUMMARY_DEFAULT = { selects:1, sliders:2 };
 function summaryKeys(m){
   const def = MODULES[m.type]; if (!def) return [];
@@ -1574,7 +1585,10 @@ function summaryKeys(m){
   const own = def.key || SUMMARY_KEYS[m.type];
   if (own) return own.filter(ok).slice(0, 3);
   const keys = Object.keys(def.params).filter(ok), sel = keys.filter(k => choicesOf(m.type, k)), sl = keys.filter(k => !choicesOf(m.type, k));
-  return [...sel.slice(0, SUMMARY_DEFAULT.selects), ...sl.slice(0, SUMMARY_DEFAULT.sliders)];
+  const lab = k => String((def.ui[k] || {}).l || k).toLowerCase(), pick = [];
+  for (const w of SUMMARY_FIRST){ const k = sl.find(q => lab(q) === w.toLowerCase() && !pick.includes(q)); if (k && pick.length < SUMMARY_DEFAULT.sliders) pick.push(k); }
+  for (const k of sl) if (pick.length < SUMMARY_DEFAULT.sliders && !pick.includes(k)) pick.push(k);
+  return [...sel.slice(0, SUMMARY_DEFAULT.selects), ...pick];
 }
 /* ===SHARED EDITOR END=== */
 
@@ -2208,7 +2222,7 @@ function buildNode(m){
   const ins = Object.keys(def.inputs).filter(p => mixShown(m, p)), outs = Object.keys(def.outputs);
   const ports = (ins.length || outs.length || Object.keys(def.params).length) ? h('div', {class:'ports' + (ins.length || outs.length ? '' : ' synth')},
     (n.insEl = h('div', {class:'ins'}, ins.map(p => portEl(n, p, def.inputs[p], 'in')))),
-    h('div', {class:'outs'}, outs.map(p => portEl(n, p, def.outputs[p], 'out')))) : null;
+    (n.outsEl = h('div', {class:'outs'}, outs.map(p => portEl(n, p, def.outputs[p], 'out'))))) : null;
   n.portsEl = ports;
   const kids = [];
   for (const k in def.params){
@@ -2223,7 +2237,8 @@ function buildNode(m){
   if (NOTES[m.type]){ n.note = h('div', {class:'status'}); kids.push(n.note); }
   const body = h('div', {class:'body'}, kids);
   buildSummary(n);   // COMPACT: the collapsed look
-  n.el = catStyle(h('div', {class:'node fam-' + famOf(m.type), 'data-id': m.id}, head, n.sum, ports, n.mini || null, body), m.type);   // n.mini: a folded dynamics module's meter
+  n.stubEl = h('div', {class:'cstubs'});   // COMPACT: the modulation stubs
+  n.el = catStyle(h('div', {class:'node fam-' + famOf(m.type), 'data-id': m.id}, head, n.sum, ports, n.stubEl, n.mini || null, body), m.type);   // n.mini: a folded dynamics module's meter
   n.head = head; titleFit.watch(head.querySelector('.t'));
   n.el.style.left = m.pos[0] + 'px'; n.el.style.top = m.pos[1] + 'px';
   n.el.style.zIndex = ++zTop;
@@ -2259,12 +2274,13 @@ function buildNode(m){
   if (m.collapsed) setCollapsed(n, true, true);
   if (selected.has(m.id)) n.el.classList.add('selected');
   world.append(n.el);
+  if (m.collapsed) compactFit(n);   // (needs the module on the page to measure)
   nodes.set(m.id, n);
   return n;
 }
 /* ----- COMPACT: how a collapsed module looks (owner audit, 13 Nov: C1 to C9) -----
    Collapsing keeps the title bar and shows, under it: a summary line with the module's key values (summaryKeys: its first
-   select and first two sliders unless SUMMARY_KEYS or the module's own key:[…] says otherwise), the ports that have a cable
+   select and two sliders, wet/dry and level first, unless SUMMARY_KEYS or the module's own key:[…] says otherwise), the ports that have a cable
    (the others are hidden; "+N" says how many, a click opens the module), one labelled stub per modulated parameter, a thin
    level strip, and the MIDI / bottom-panel marks. The saved state is still m.collapsed (true = Compact), so old patches
    open as they were and nothing new is written into the patch. Text is written only when it changes. */
@@ -2277,7 +2293,9 @@ function setCollapsed(n, c, quiet){
   n.m.collapsed = !!c;
   n.el.classList.toggle('collapsed', n.m.collapsed);
   n.foldBtn.setAttribute('aria-expanded', String(!n.m.collapsed)); foldLabel(n);
+  n.fitKey = null;
   if (n.m.collapsed){ if (n.lvl) n.lvl.shown = -1; n.mkKey = null; compactApply(n, cableUse(n.m.id).get(n.m.id)); }
+  else { n.el.style.width = ''; n.el.style.removeProperty('--cr'); n.el.style.removeProperty('--sc'); }   // open again: the normal width (the wider width while collapsed is only drawn, never saved)
   if (!quiet) store.touch();
   markScene();
 }
@@ -2355,20 +2373,58 @@ function compactApply(n, u){
     if (!on) free++; else if (key.startsWith('in:')) nin++; else nout++;
   }
   const sk = mods.join(',');
-  if (sk !== n.stubKey && n.insEl){
+  if (sk !== n.stubKey && n.stubEl){
     n.stubKey = sk;
     for (const r of n.stubRows || []) r.remove();
     n.stubs = {};
     n.stubRows = mods.map(k => { const j = stubJack(n, k), row = h('div', {class:'port stub', title: plabel(n.m.type, k) + ' modulation input'}, j, h('span', {class:'pl', text: plabel(n.m.type, k)}));
       row.addEventListener('pointerdown', e => { if (e.target !== j && e.button === 0 && !(MAC && e.ctrlKey && e.pointerType !== 'touch')) onJackDown(e, j); });
       n.stubs[k] = j; return row; });
-    n.insEl.append(...n.stubRows);
+    n.stubEl.append(...n.stubRows);
   }
-  const left = nin + mods.length;
-  n.el.classList.toggle('dense', left > 4 || nout > 4);   // too many to label: names stay in the jack tooltips
-  if (n.portsEl) n.portsEl.classList.toggle('none', left + nout === 0);
-  n.nFree = free; paintMarks(n); paintSum(n);
+  n.nIn = nin; n.nOut = nout;
+  n.el.classList.toggle('dense', nin > 4 || nout > 4);   // too many audio ports to label: their names stay in the jack tooltips (a modulation stub always keeps its name)
+  if (n.portsEl) n.portsEl.classList.toggle('none', nin + nout === 0);
+  n.nFree = free; paintMarks(n); paintSum(n); compactFit(n);
 }
+/* A collapsed module grows to hold its patched ports (13 Nov, owner on build 582: "cut off … could get longer"). The width is only
+   drawn (style.width while collapsed): nothing is saved, and expanding clears it. The inputs stand on the left in rows of two (--cr),
+   the outputs at the right edge inside the frame, the modulation stubs in rows of their own below the inputs, each with its name.
+   Past COMPACT_W.cap the module stops growing and the ports take more rows (--cr), the stub names shorten with an ellipsis. Measured
+   from the page, only when the set of ports changes (not per frame); a skin or font change refits (compactRefit). */
+const COMPACT_W = { cap: 500 };
+function compactFit(n){
+  if (!n.m.collapsed || !n.el.isConnected) return;
+  const el = n.el, key = n.nIn + '|' + n.nOut + '|' + n.stubKey + '|' + (el.classList.contains('dense') ? 1 : 0);
+  if (key === n.fitKey) return; n.fitKey = key;
+  el.style.width = '';
+  const base = el.offsetWidth, bw = el.offsetWidth - el.clientWidth, cap = Math.max(base, COMPACT_W.cap), px = v => parseFloat(v) || 0;
+  let need = base, rows = 2;
+  if (n.portsEl && n.insEl && n.outsEl && n.nIn + n.nOut){
+    const cs = getComputedStyle(n.portsEl), extra = px(cs.paddingLeft) + px(cs.paddingRight) + px(cs.columnGap) + bw;
+    for (;; rows++){
+      el.style.setProperty('--cr', rows);
+      need = n.insEl.offsetWidth + n.outsEl.offsetWidth + extra;
+      if (need <= cap || rows >= 12) break;
+    }
+  }
+  if (rows === 2) el.style.removeProperty('--cr');
+  let nat = 0, pad = 0, gap = 0;
+  const S = n.stubRows || [];
+  if (S.length){
+    const cs = getComputedStyle(n.stubEl); pad = px(cs.paddingLeft) + px(cs.paddingRight); gap = px(cs.columnGap);
+    for (const r of S){ const j = r.querySelector('.jack'), l = r.querySelector('.pl'); nat = Math.max(nat, j.offsetWidth + px(getComputedStyle(r).columnGap) + l.scrollWidth + 1); }
+  }
+  const W = Math.min(cap, Math.ceil(Math.max(base, need, S.length ? nat + pad + bw : 0)));
+  if (W > base) el.style.width = W + 'px';
+  if (S.length) el.style.setProperty('--sc', Math.max(1, Math.min(S.length, Math.floor((W - bw - pad + gap) / (nat + gap)))));
+  else el.style.removeProperty('--sc');
+}
+// A skin or a font arriving after the modules were measured: measure the collapsed ones again.
+{ let t = 0;
+  const again = () => { clearTimeout(t); t = setTimeout(() => { let any = false; for (const n of nodes.values()) if (n.m.collapsed){ n.fitKey = null; compactFit(n); any = true; } if (any) markScene(); }, 120); };
+  if (document.fonts && document.fonts.addEventListener) document.fonts.addEventListener('loadingdone', again);
+  new MutationObserver(again).observe(document.head, { childList:true, subtree:true, characterData:true }); }
 function compactAll(){
   let any = false; for (const n of nodes.values()) if (n.m.collapsed){ any = true; break; }
   if (!any) return;

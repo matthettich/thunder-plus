@@ -58,16 +58,23 @@ test('the Compact summary-key default and override (run on the shared function)'
   const MODULES = {
     delay: { params: { mode: [0, 0, 1, 1], time: [.3, 0, 1, .01], regen: [.4, 0, 1, .01], mix: [.2, 0, 1, .01], _byp: [0, 0, 1, 1] }, ui: { mode: { c: [[0, 'A'], [1, 'B']] } } },
     plain: { params: { a: [0, 0, 1, .1], b: [0, 0, 1, .1], c: [0, 0, 1, .1] }, ui: {} },
+    wet: { params: { sel: [0, 0, 1, 1], a: [0, 0, 1, .1], b: [0, 0, 1, .1], gain: [1, 0, 2, .1], mix: [1, 0, 1, .1], out: [1, 0, 1, .1] }, ui: { sel: { c: [[0, 'p']] }, gain: { l: 'Fold' }, mix: { l: 'Mix' }, out: { l: 'Output' } } },
+    lvl: { params: { a: [0, 0, 1, .1], b: [0, 0, 1, .1], c: [0, 0, 1, .1] }, ui: { c: { l: 'Level' } } },
     hid: { params: { sel: [0, 0, 1, 1], x: [0, 0, 1, .1], y: [0, 0, 1, .1], z: [0, 0, 1, .1] }, ui: { sel: { c: [[0, 'p']] }, x: { hide: true } } },
     own: { key: ['mix', 'nope', 'time', 'regen', 'mode'], params: { mode: [0, 0, 1, 1], time: [.3, 0, 1, .01], regen: [.4, 0, 1, .01], mix: [.2, 0, 1, .01] }, ui: { mode: { c: [[0, 'A']] } } },
   };
   const ctx = vm.createContext({ MODULES, choicesOf: (t, k) => (MODULES[t].ui[k] || {}).c || null, mixShown: () => true });
   vm.runInContext(blk + '\nthis.summaryKeys = summaryKeys; this.SUMMARY_KEYS = SUMMARY_KEYS;', ctx);
   const sk = t => Array.from(ctx.summaryKeys({ type: t, params: {} }));
-  assert.deepEqual(sk('delay'), ['mode', 'time', 'regen'], 'first select, then the first two sliders, skipping _byp');
+  assert.deepEqual(sk('delay'), ['mode', 'mix', 'time'], 'first select, then the two sliders: Mix first (build 583), then the first slider, skipping _byp');
+  assert.deepEqual(sk('wet'), ['sel', 'mix', 'out'], 'Mix, then the output level take the two slider places; a control labelled Fold is not a gain');
+  assert.deepEqual(sk('lvl'), ['c', 'a'], 'a Level slider goes first, then the first slider');
   assert.deepEqual(sk('plain'), ['a', 'b'], 'no select: the first two sliders');
   assert.deepEqual(sk('hid'), ['sel', 'y', 'z'], 'a hidden control is skipped');
   assert.deepEqual(sk('own'), ['mix', 'time', 'regen'], 'a key list on the definition wins, unknown names go, three at most');
+  assert.deepEqual(Array.from(ctx.SUMMARY_KEYS.smixer), ['level', 'l1'], 'the Stereo mixer leads with its master level');
+  assert.deepEqual(Array.from(ctx.SUMMARY_KEYS.mixer), ['level', 'l1'], 'and so does the Mixer');
+  assert.ok(/const SUMMARY_FIRST = \[/.test(blk), 'the preferred labels are one small list');
   ctx.SUMMARY_KEYS.delay = ['mix', 'time'];
   assert.deepEqual(sk('delay'), ['mix', 'time'], 'a line in SUMMARY_KEYS overrides the default');
 });

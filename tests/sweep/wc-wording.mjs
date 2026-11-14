@@ -124,7 +124,7 @@ async function run(ed, CSS, OLD) {
       const cvs = document.createElement('canvas').getContext('2d');
       for (const n of document.querySelectorAll('.node')) { const t = n.querySelector('header .t'), name = t.textContent, cs = getComputedStyle(t);
         if (t.scrollWidth > t.clientWidth + 0.5 || Math.round(t.getBoundingClientRect().height / parseFloat(cs.lineHeight)) > 2) o.title.push(name);
-        cvs.font = cs.fontWeight + ' ' + cs.fontSize + ' ' + cs.fontFamily; const w = Math.max(...name.split(/\\s+/).map(x => cvs.measureText(x).width)); if (w > t.clientWidth + 1) o.word.push(name + ' ' + Math.round(w) + '>' + t.clientWidth);
+        cvs.font = cs.fontWeight + ' ' + cs.fontSize + ' ' + cs.fontFamily; cvs.letterSpacing = cs.letterSpacing === 'normal' ? '0px' : cs.letterSpacing; const w = Math.max(...name.split(/\\s+/).map(x => cvs.measureText(x).width)); if (w > t.clientWidth + 1) o.word.push(name + ' ' + Math.round(w) + '>' + t.clientWidth);
         // a title breaks only between words: the line boxes of each word's own range must share one top (a word split over two lines has two)
         { const tn = [...t.childNodes].find(c => c.nodeType === 3); if (tn) { const re = /\\S+/g; let m; while ((m = re.exec(tn.data))) { const rg = document.createRange(); rg.setStart(tn, m.index); rg.setEnd(tn, m.index + m[0].length);
           const tops = new Set([...rg.getClientRects()].filter(r => r.width > 0).map(r => Math.round(r.top / 4))); if (tops.size > 1) o.brk.push(name + ' | ' + m[0]); } } }
@@ -252,7 +252,7 @@ async function run(ed, CSS, OLD) {
     await load(mp, mb, ed, doc(ed, types2));
     const m1 = await S(mp, `(() => { const o = { title: [], word: [], val: [] }; const cvs = document.createElement('canvas').getContext('2d');
       for (const n of document.querySelectorAll('.node')) { const t = n.querySelector('header .t'), name = t.textContent, cs = getComputedStyle(t); if (t.scrollWidth > t.clientWidth + .5 || Math.round(t.getBoundingClientRect().height / parseFloat(getComputedStyle(t).lineHeight)) > 2) o.title.push(name);
-        cvs.font = cs.fontWeight + ' ' + cs.fontSize + ' ' + cs.fontFamily; const w = Math.max(...name.split(/\\s+/).map(x => cvs.measureText(x).width)); if (w > t.clientWidth + 1) o.word.push(name);
+        cvs.font = cs.fontWeight + ' ' + cs.fontSize + ' ' + cs.fontFamily; cvs.letterSpacing = cs.letterSpacing === 'normal' ? '0px' : cs.letterSpacing; const w = Math.max(...name.split(/\\s+/).map(x => cvs.measureText(x).width)); if (w > t.clientWidth + 1) o.word.push(name);
         const nr = n.getBoundingClientRect(); for (const v of n.querySelectorAll('.row .val')) if (__w.shown(v) && (v.scrollWidth > v.clientWidth + .5 || v.getBoundingClientRect().right > nr.right + .5)) o.val.push(name + ': ' + v.textContent); } return o; })()`);
     ok(`${ed} U7: touch 344: titles whole and no value cut (open)`, !m1.title.length && !m1.word.length && !m1.val.length, JSON.stringify(m1).slice(0, 300));
     await mp.evaluate(() => document.querySelectorAll('.node > header .fold').forEach(b => b.click())); await sleep(mp, 800);
