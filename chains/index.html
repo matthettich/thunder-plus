@@ -2908,6 +2908,7 @@ const cableEls = new Map();
 /* CABLE SELECTION (13 Nov, audit D6, D9): a click on a cable selects it (Delete removes it, Escape or a click on the background lets go);
    a selected cable and a hovered one show their bend handles. Cables and modules are never selected together. */
 let selCable = null, relDirty = false, hsZ = 0;
+let cableDblAt = -1e9;   // when a cable was last removed by a double-click or double-tap: the browser's own dblclick that follows lands on the empty background and must not open Find a module
 function clearCableSel(){ if (!selCable) return; const el = cableEls.get(selCable); if (el) el.g.classList.remove('sel'); selCable = null; }
 function selectCable(c){
   if (selCable === c) return;
@@ -2972,11 +2973,11 @@ function syncCableEls(){
       if (ev.altKey){ ev.preventDefault(); cableBendAt(ev, c); return; }
       if (ev.pointerType === 'touch'){
         const now = performance.now(), lt = hit._tap;
-        if (lt && now - lt.t < 450 && Math.hypot(ev.clientX - lt.x, ev.clientY - lt.y) < 30){ hit._tap = null; store.snapshot(); disconnect(c); toast('Cable removed.'); }
+        if (lt && now - lt.t < 450 && Math.hypot(ev.clientX - lt.x, ev.clientY - lt.y) < 30){ hit._tap = null; cableDblAt = performance.now(); store.snapshot(); disconnect(c); toast('Cable removed.'); }
         else { hit._tap = { t:now, x:ev.clientX, y:ev.clientY }; toast('Double-tap a cable to remove it.'); }
       }
     });
-    hit.addEventListener('dblclick', () => { if (!doc.cables.includes(c)) return; store.snapshot(); disconnect(c); });
+    hit.addEventListener('dblclick', ev => { ev.stopPropagation(); ev.preventDefault(); cableDblAt = performance.now(); if (!doc.cables.includes(c)) return; store.snapshot(); disconnect(c); });   // (round 2, 13 Nov: this gesture ends here; it must not reach the background's quick-add)
     el.g.append(hit); el.hit = hit;
     svg.append(el.g); cableEls.set(c, el);
   }
@@ -3064,7 +3065,10 @@ function onJackDown(e, jack){
     // RELEASED OUTSIDE (3 Nov): a mouse let go outside the editor sent no pointerup here, so the cable stayed and the
     // canvas kept panning at the edge: back with no button down, the drag is cancelled.
     if (ev.pointerType === 'mouse' && ev.buttons === 0 && !drag.drawing && !drag.armed){ up({ type:'pointercancel', manual:true }); return; }
-    drag.x = ev.clientX; drag.y = ev.clientY; drag.shift = ev.shiftKey; autoPanAt(ev); };
+    drag.x = ev.clientX; drag.y = ev.clientY; drag.shift = ev.shiftKey;
+    // ON A JACK THE CANVAS STAYS STILL (round 2, 13 Nov): within 36 px of the window's edge the canvas scrolls, which slid the jack away from a pointer
+    // held on it, so the first drop missed and the second (the canvas had moved by then) hit. Over a jack there is nothing to scroll toward.
+    if (findTarget(ev)) autoPanV = [0, 0]; else autoPanAt(ev); };
   const findTarget = ev => {
     for (const x of document.elementsFromPoint(ev.clientX, ev.clientY)){
       if (!x.closest) continue;
@@ -3449,6 +3453,7 @@ function hideMenu(){ ctx.hidden = true; }
 /* QUICK ADD (21 Oct): double-click an empty spot of the patch, type a few letters of a module's name, then Enter (or a
    click on it in the list) adds it right there. Esc or a click elsewhere closes it. Custom modules are in the list too. */
 ws.addEventListener('dblclick', e => {
+  if (performance.now() - cableDblAt < 400){ e.preventDefault(); return; }   // the second tap / click that removed a cable
   const under = document.elementFromPoint(e.clientX, e.clientY);
   if (!under || !ws.contains(under) || under.closest('.node, .hint, .hit, .decor, .dock, .bend, button, input, select, textarea')) return;
   e.preventDefault();
@@ -3892,7 +3897,7 @@ const PAGE_ABOUT = {
   repeat:'Repeat: beat repeat. While Hold is on (or Gate is high) it loops the slice that just played, one note value long; Decay fades each pass and Pitch drops it. Reverse plays the slice backwards; Tape stop slows the sound to a halt.',
   vocoder:'A vocoder: the sound you patch into In L is the carrier, and In R is the modulator that shapes it (leave In R unpatched and it uses In for both). Mode picks the band count — Talkbox and the 4…64 band banks split the carrier into bands that the modulator’s levels open and close, or Spectral cross-synthesises them with an FFT. Resonance sharpens the bands, Attack and Release set how fast the levels follow, Mix blends the vocoded sound with the dry carrier, and Level sets the output.',
   scin:'Sidechain In: brings a sidechain into this chain. Source picks what it listens to: a send (Send 1–8, what a Sidechain Out sends) or one track’s own sound, before its effects and fader, so even a muted “ghost” kick drives it. The meter shows what it hears (IN) and the envelope (ENV), before you patch it anywhere. Out is the sound (Level sets how loud), Envelope rises with each hit (to open a filter) and Duck dips with it (into a VCA’s Control, to pump a sound). Sensitivity sets how hard the hits push them (raise it for a quiet kick) and Release how fast they recover. Or just drop a Sidechain comp after this track’s sound.',
-  scout:'Sidechain Out: sends what you patch into it to Send 1–8. Any Sidechain In with its Send set to that number hears it, in this chain or in another track’s (in Thunder Plus, about 3 ms later). So a drum bus made here can duck the pads on another track: Sidechain Out → Send 1 here, and there Sidechain In (Send 1) → the SC of a compressor.',
+  scout:'Sidechain Out: sends what you patch into it to Send 1–8. Any Sidechain In with its Send set to that number hears it, in this chain or in another track’s (in Thunder Plus, about 3 ms later). So a drum bus made here can duck the pads on another track: Sidechain Out → Send 1 here, and there Sidechain In (Send 1) → the SC of a compressor. In Thunder Plus a chain only runs on a track that has CHN on in the Mixer and a Chain Out for it, joined by cables to the Sidechain Out (for example Track In to both): without a Chain Out the Sidechain Out sends nothing. The Chain Out is what the track then plays, so patch the sound into it too.',
   sccomp:'Sidechain comp: ducks its In by the sidechain — whatever is patched into SC, or what Source picks (another track or a send), so a kick on another track can pump this one. Threshold, Ratio, Attack, Release, Makeup and Mix. With Source on Self and nothing in SC it compresses its own input.',
   lfo:'A slow oscillator for wobbles and sweeps. Depth sets how far it moves a slider; Sync to tempo follows the tempo. Reset restarts its cycle.',
   adsr:'An envelope for shaping effects: patch a gate into it and its output into a slider’s modulation jack.',
@@ -3902,14 +3907,17 @@ const PAGE_ABOUT = {
   chainOut:'Sends sound back to a tracker track, in stereo if you patch In R. Track picks which track: the same track as its Track In for an insert, or another track to make a bus (that track’s fader and effects then level the bus, and the source tracks play through it). Level sets how loud.',
   adsr:'An envelope for shaping effects: patch a gate into it and its output into a slider’s modulation jack.'
 };
+/* HELP LIST (round 2, 13 Nov): Help is a srcdoc frame, so its base address is this page's: an anchor "#g5" resolved to this page + "#g5" and the
+   frame navigated to a second copy of the editor. A click on a list entry scrolls to its section here instead, and nothing navigates. */
+const HELP_NAV = "document.addEventListener('click', function(e){ var a = e.target.closest && e.target.closest('a'), id = a && (a.getAttribute('href') || ''); if (!a || id.charAt(0) !== '#') return; e.preventDefault(); var t = document.getElementById(id.slice(1)); if (t) t.scrollIntoView({block:'start'}); });";
 function helpDoc(){
   const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;' }[c]));
   const EDGE = { afx:'#b24fb0', mod:'#c99a00', aout:'#3f6fb5', util:'#e07a2e' };
   const KC = { audio:'#22958d', mod:'#7a58c8', gate:'#c93d78' };
   const ABOUT = PAGE_ABOUT;
   // The signal kinds, drawn the way the patch draws them: told apart by line and jack shape as well as colour.
-  const legend = '<div class="legend"><b>Signal kinds</b>' + [['audio', 'Audio', 'solid line, round jack', '2.5', ''], ['mod', 'Control', 'dashed line, round jack', '2', ' stroke-dasharray="6 4"'], ['gate', 'Gate', 'dotted line, diamond jack', '3', ' stroke-dasharray="0.1 7" stroke-linecap="round"']]
-    .map(([k, l, d, w, da]) => '<span class="lg"><svg width="46" height="14" viewBox="0 0 46 14"><path d="M2 7H44" fill="none" stroke="' + KC[k] + '" stroke-width="' + w + '"' + da + '/></svg><i class="jk ' + (k === 'gate' ? 'g' : '') + '" style="background:' + KC[k] + '"></i>' + esc(l + ': ' + d) + '</span>').join('') + '</div>';
+  const legend = '<div class="legend"><b>Signal kinds</b><div class="lgrows">' + [['audio', 'Audio', 'solid line, round jack', '2.5', ''], ['mod', 'Control', 'dashed line, round jack', '2', ' stroke-dasharray="6 4"'], ['gate', 'Gate', 'dotted line, diamond jack', '3', ' stroke-dasharray="0.1 7" stroke-linecap="round"']]
+    .map(([k, l, d, w, da]) => '<div class="lg"><svg width="46" height="14" viewBox="0 0 46 14"><path d="M2 7H44" fill="none" stroke="' + KC[k] + '" stroke-width="' + w + '"' + da + '/></svg><i class="jk ' + (k === 'gate' ? 'g' : '') + '" style="background:' + KC[k] + '"></i><span class="lt"><b>' + esc(l) + '</b>' + esc(': ' + d) + '</span></div>').join('') + '</div></div>';   // round 2: the heading on its own line, then three rows on one grid (sample, jack, text) so every text starts at the same x
   const guide = [
     ['Patching', 'Drag from an output jack (right edge) to an input jack (left edge). Teal solid cables carry audio, purple dashed cables carry control signals and pink dotted cables carry gates; gate jacks are diamonds, the others round. Every slider has a small purple jack on its left for modulation. Drag a patched input to move its cable, or drop it on empty space to unplug. Click a cable to select it: Delete removes it, Escape lets go, and its bend handles show (drag one to move the bend, Option-click one to remove it). Double-click a cable to remove it. Hold Option (Alt on Windows) and click while drawing a cable to bend it, or Option-drag an existing cable.'],
     ['Modulation', 'Patch any signal into a slider’s small purple jack and it moves that slider: the slider sets the center, and the signal swings it across its range. The value turns purple and a mark shows where the slider really is. Use the Depth slider on an LFO or envelope, or an Attenuverter, to make the swing smaller.'],
@@ -3941,11 +3949,12 @@ function helpDoc(){
     '.mcard h4{margin:0 0 6px; font-size:17px; font-weight:600; border-bottom:2px solid var(--ed); padding-bottom:6px} .mcard p{margin:0 0 8px; font-size:14px; line-height:1.5}' +
     '.io{display:flex; flex-wrap:wrap; gap:5px 10px; align-items:center; font-size:12.5px; margin-top:4px} .io b{font-size:12.5px; min-width:62px}' +
     '.pt{display:inline-flex; align-items:center; gap:5px; background:#fff; border:1.5px solid #111; padding:1px 7px} .pt i{width:9px; height:9px; border-radius:50%; display:inline-block} .pt i.g{width:8px; height:8px; border-radius:1px; transform:rotate(45deg)}' +
-    '.legend{display:flex; flex-wrap:wrap; gap:8px 22px; align-items:center; background:#fff; border:3px solid #111; padding:10px 18px; margin-bottom:14px; font-size:14px} .lg{display:inline-flex; align-items:center; gap:7px}' +
+    '.legend{background:#fff; border:3px solid #111; padding:10px 18px 8px; margin-bottom:14px; font-size:14px} .legend > b{display:block; font-size:14px; font-weight:600; margin:0 0 6px}' +
+    '.lgrows{display:grid; grid-template-columns:46px 14px 1fr; column-gap:12px; row-gap:4px; align-items:center} .lg{display:contents} .lg svg{display:block; width:46px; height:14px} .lg .jk{justify-self:center} .lt b{font-weight:600}' +
     '.jk{width:12px; height:12px; border-radius:50%; display:inline-block; flex:none} .jk.g{width:10px; height:10px; border-radius:1px; transform:rotate(45deg)}' +
     '@media (max-width:700px){ body{grid-template-columns:1fr} nav{display:none} main{padding:16px} }' +
     '</style></head><body><nav><h1>chains Help</h1>' + guide.map(([t], i) => '<a href="#g' + i + '">' + esc(t) + '</a>').join('') +
-    '</nav><main>' + legend + '<div class="guide">' + guide.map(([t, b], i) => '<h2 id="g' + i + '">' + esc(t) + '</h2><p>' + esc(b) + '</p>').join('') + '</div>' + groups + '</main></body></html>';
+    '</nav><main>' + legend + '<div class="guide">' + guide.map(([t, b], i) => '<h2 id="g' + i + '">' + esc(t) + '</h2><p>' + esc(b) + '</p>').join('') + '</div>' + groups + '</main><script>' + HELP_NAV + '<\/script></body></html>';
 }
 function openHelp(){
   let ov = document.getElementById('helpov');
