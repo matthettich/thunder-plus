@@ -9163,7 +9163,7 @@ let tt = 0, busNote = '';   // busNote: BUS, the one-time note on a bus track (b
    "saved by a newer build", "couldn't save" and "audio was interrupted" were gone in 2 s). A message given 4 s or more is
    kept: quick ones that arrive meanwhile wait for it (the latest one, shown after), and another long one queues behind
    it (three at most). A click or tap on the toast lets it go and shows the next. Screen readers hear each one (aria-live). */
-const toastQ = []; let toastLong = false, toastQuick = null;
+const toastQ = []; let toastLong = false, toastQuick = null, toastKey = '';   // toastKey: which toastBrief() text is on screen (a new one of that kind replaces it)
 // toastOnce: a notice that only needs reading once on this device (key: what it is about)
 function toastOnce(key, msg, ms){ const K = 'thunderplus-seen-' + key; try { if (localStorage.getItem(K)) return; localStorage.setItem(K, '1'); } catch(e){} toast(msg, ms); }
 setTimeout(() => { try { $('toast').addEventListener('click', () => toastNext()); } catch(e){} }, 0);
@@ -9196,12 +9196,21 @@ function toastPlace(t){
   } catch(e){}
 }
 function toastShow(msg, dur, long){
-  const t = $('toast'); t.textContent = msg; t.hidden = false; toastPlace(t); clearTimeout(tt); toastLong = long;
+  const t = $('toast'); t.textContent = msg; t.hidden = false; toastPlace(t); clearTimeout(tt); toastLong = long; toastKey = '';
   tt = setTimeout(toastNext, dur); }
 function toastNext(){
   const t = $('toast'); clearTimeout(tt); t.hidden = true; toastLong = false;
   const n = toastQ.shift() || toastQuick; if (n === toastQuick) toastQuick = null;
   if (n) toastShow(n[0], n[1], n[1] >= 4000); }
+/* A BRIEF NOTICE (14 Nov, owner: "block x exists on another track … persists way too long"). The block-got-its-own-number and shared-phrase notes were asked for
+   5 to 7 s, which makes a long toast: it is kept, the next quick ones wait for it and further long ones queue behind it (three), so entering a few blocks left
+   it on screen for 15 s or more. toastBrief(key, msg): long enough to read (2.5 to 3.9 s by length), never a long toast (nothing queues, nothing waits), and a
+   new one of the same key replaces the text on screen and restarts the time, so a run of entries shows one note, the latest. The POP-UP MESSAGES setting still applies (it goes through toast()). */
+function toastBrief(key, msg){
+  msg = String(msg == null ? '' : msg); const dur = clamp(1500 + msg.length * 18, 2500, 3900), t = $('toast');
+  if (!toastsOn) return;
+  if (!t.hidden && !toastLong && toastKey === key){ toastShow(msg, dur, false); toastKey = key; return; }
+  toast(msg, dur); if (!t.hidden && !toastLong && t.textContent.indexOf(msg) === 0) toastKey = key; }
 
 /* ---------- in-page prompt / confirm ----------
    The browser's prompt() and confirm() stop the whole page: the 25 ms sequencer pump can't run, so after the dialog
@@ -25180,10 +25189,10 @@ function mstShareWarn(p){
   if (!(k.mst && k.trk.size) && !(cTrack !== MT && others.length)) return; mstShared.add(p);
   const ts = [...k.trk].sort((a, b) => a - b).map(t => d2(t + 1)).join(', ');
   if (!k.mst){ const os = others.map(t => d2(t + 1)).join(', ');
-    setTimeout(() => toast(`Phrase ${hp(p)} also plays on track${others.length > 1 ? 's' : ''} ${os}, so edits here change those too. UNIQ on this block (Song or Arrange) gives this track its own copy.`, 7000), 60); return; }
-  setTimeout(() => toast(cTrack === MT
+    setTimeout(() => toastBrief('share', `Phrase ${hp(p)} also plays on track${others.length > 1 ? 's' : ''} ${os}, so edits here change those too. UNIQ on this block (Song or Arrange) gives this track its own copy.`), 60); return; }
+  setTimeout(() => toastBrief('share', cTrack === MT
     ? `Phrase ${hp(p)} also plays on track${k.trk.size > 1 ? 's' : ''} ${ts}. What you write here changes there too (VOL turns their notes down). UNIQ on the block gives the master its own copy.`
-    : `Phrase ${hp(p)} also plays in the master column. There, VOL is the whole song’s level and FLX / FXO the master’s effects. UNIQ on this block (Song or Arrange) gives the track its own copy.`, 7000), 60);
+    : `Phrase ${hp(p)} also plays in the master column. There, VOL is the whole song’s level and FLX / FXO the master’s effects. UNIQ on this block (Song or Arrange) gives the track its own copy.`), 60);
 }
 function setCell(v, x, y, val){
   if (v === 'song' && x < NT && val >= 0 && busNo(x, val)) return false;   // NO NOTES INTO A BUS (12 Nov, owner): no write, no undo step
@@ -25191,8 +25200,8 @@ function setCell(v, x, y, val){
   if (v === 'song'){
     if (val >= 0 && !mstUniqIn && S.song[y][x] !== val && blockMixed(val, x, y)){
       mstUniqIn = true; try { const nc = mstUniq(val); if (nc >= 0){ const was = val; val = nc;
-        setTimeout(() => toast(x === MT ? `Block ${hp(songShown(was))} is also on tracks, so the master column got its own copy, ${hp(songShown(nc))}. Its VOL and FLX can’t reach the tracks.`
-          : `Block ${hp(songShown(was))} is also used ${blockOnMst(was) ? 'in the master column' : 'on another track'}, so this track got its own copy, ${hp(songShown(nc))}` + (blockOnMst(was) ? '.' : ' (Settings → UNIQUE PER TRACK).'), 5000), 60); } } finally { mstUniqIn = false; } }
+        setTimeout(() => toastBrief('uniq', x === MT ? `Block ${hp(songShown(was))} is also on tracks, so the master column got its own copy, ${hp(songShown(nc))}. Its VOL and FLX can’t reach the tracks.`
+          : `Block ${hp(songShown(was))} is also used ${blockOnMst(was) ? 'in the master column' : 'on another track'}, so this track got its own copy, ${hp(songShown(nc))}` + (blockOnMst(was) ? '.' : ' (Settings → UNIQUE PER TRACK).')), 60); } } finally { mstUniqIn = false; } }
     S.song[y][x] = val; if (val < 0 && x <= MT) setBlockMute(y, x, false); }
   else if (v === 'sect'){ sectRowEdit(cSect, y)[x] = val; }
   else { if (!S.phrases[cPhrase]) S.phrases[cPhrase] = freshPhrase(); S.phrases[cPhrase][y][x] = val; if (val >= 0) mstShareWarn(cPhrase); }
