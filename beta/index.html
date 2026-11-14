@@ -3747,7 +3747,7 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
 </div>
 <div class="toast" id="toast" role="status" aria-live="polite" title="Tap to dismiss" hidden></div>
 
-<script src="waves/waves-worklet.js?v=44"></script>
+<script src="waves/waves-worklet.js?v=45"></script>
 <!-- LXR ENGINES (23 Oct 2026): the LXR-02 firmware's drum voices, GPL-3.0, all of it in lxr/. Optional: without the folder
      this fails quietly and the app has no Firmware engines. The render Worker loads the same file (LXR_JS below). -->
 <script src="lxr/lxr-engine.js?v=2"></script>
@@ -8737,7 +8737,7 @@ self.onmessage = async e => {
       if (m.op === 'done') j.ok({data:m.data, data2:m.data2 || null, st:m.st}); else j.no(new Error(m.err));
     };
     w.onerror = e => { e.preventDefault && e.preventDefault(); rwDown(); };
-    w.postMessage({op:'init', pl:plMod, tx:txMod, lx:lxMod || null, ps:psMod || null, wv:new URL('waves/waves-worklet.js?v=44', location.href).href});
+    w.postMessage({op:'init', pl:plMod, tx:txMod, lx:lxMod || null, ps:psMod || null, wv:new URL('waves/waves-worklet.js?v=45', location.href).href});
     PW.w = w;
   } catch(e){ PW.w = null; }
 }
@@ -17695,11 +17695,12 @@ function chainsChanged(){ CH.doc = S.chainPatch || null; saveS(); chainsPush(); 
    and the song drifting apart. The op shapes are the engine protocol's (add / remove / connect / disconnect). */
 function patchOp(d, op){
   if (!d || !op || !op.op) return;
-  if (op.op === 'add'){ const ms = d.modules = d.modules || []; if (!ms.some(m => m.id === op.id)) ms.push({ id:op.id, type:op.type, params:op.params || {}, pos:op.pos || [0, 0] }); }
+  if (op.op === 'add'){ const ms = d.modules = d.modules || []; if (!ms.some(m => m.id === op.id)){ const nm = { id:op.id, type:op.type, params:op.params || {}, pos:op.pos || [0, 0] }; if (typeof op.text === 'string') nm.text = op.text.slice(0, 200); ms.push(nm); } }   // TEXT: a module's formula (Expression) travels with its add; the engine keeps a string cut to 200 and ignores anything else
   else if (op.op === 'remove'){ if (d.modules) d.modules = d.modules.filter(m => m.id !== op.id); if (d.cables) d.cables = d.cables.filter(c => c.from[0] !== op.id && c.to[0] !== op.id); }
   else if (op.op === 'connect'){ const cs = d.cables = d.cables || [], same = c => c.from[0] === op.a[0] && c.from[1] === op.a[1] && c.to[0] === op.b[0] && c.to[1] === op.b[1]; const ex = cs.find(same); if (!ex) cs.push(op.fb === true ? { from:op.a, to:op.b, fb:true } : { from:op.a, to:op.b }); else if (op.fb === true) ex.fb = true; else delete ex.fb; }   // FEEDBACK: the mark travels with the cable; connecting a cable again with another mark only changes its mark (the engine does the same)
   else if (op.op === 'disconnect'){ if (d.cables) d.cables = d.cables.filter(c => !(c.from[0] === op.a[0] && c.from[1] === op.a[1] && c.to[0] === op.b[0] && c.to[1] === op.b[1])); }
   else if (op.op === 'param'){ const m = (d.modules || []).find(x => x.id === op.id); if (m) (m.params = m.params || {})[op.name] = op.value; }
+  else if (op.op === 'text'){ const m = (d.modules || []).find(x => x.id === op.id); if (m && typeof op.value === 'string') m.text = op.value.slice(0, 200); }   // TEXT: a live change of a module's formula (a value that is not a string is ignored, as the engine does)
 }
 /* A track that gains a Chain Out (a new I/O pair, or a pair moved to it) turns its CHN on in the Mixer, so the chain is
    heard straight away; switching CHN off later still sticks, as only a NEW pair turns it on. This runs on every kind
@@ -19577,7 +19578,7 @@ function chainsReady(ac){
     chnLoaded.set(ac, (async () => {
       await tfxLoad; await tfxModLoad; if (!chnBin() || !ac.audioWorklet || !window.AudioWorkletNode) return false;
       if (!chnURL){
-        const src = await (await fetch('chains/chains-worklet.js?v=55')).text();
+        const src = await (await fetch('chains/chains-worklet.js?v=56')).text();
         chnURL = URL.createObjectURL(new Blob([src], {type:'application/javascript'}));
       }
       wkNote(ac, 'chains'); await ac.audioWorklet.addModule(chnURL);
@@ -19710,12 +19711,15 @@ function chnDiff(prev, next){
   const ops = [];
   const pm = new Map((prev.modules || []).map(m => [m.id, m]));
   const nm = new Map((next.modules || []).map(m => [m.id, m]));
-  for (const [id, m] of nm) if (!pm.has(id)) ops.push({ op:'add', id, type:m.type, params:chnClone(m.params), pos:chnClone(m.pos) });
+  for (const [id, m] of nm) if (!pm.has(id)){ const o = { op:'add', id, type:m.type, params:chnClone(m.params), pos:chnClone(m.pos) }; if (typeof m.text === 'string') o.text = m.text.slice(0, 200); ops.push(o); }   // TEXT: an added module carries its formula
   for (const id of pm.keys()) if (!nm.has(id)) ops.push({ op:'remove', id });
   for (const [id, m] of nm){
     const q = pm.get(id); if (!q) continue;
     const a = q.params || {}, b = m.params || {};
     for (const k in b) if (b[k] !== a[k]) ops.push({ op:'param', id, name:k, value:b[k] });
+    // TEXT: a formula that differs is one 'text' op (the engine's own default stands in when the new module has none: tests/modules-expr-editor.test.js)
+    const ta = typeof q.text === 'string' ? q.text.slice(0, 200) : undefined, tb = typeof m.text === 'string' ? m.text.slice(0, 200) : undefined;
+    if (ta !== tb) ops.push({ op:'text', id, value:tb !== undefined ? tb : 'a * k1' });
   }
   const key = c => c.from[0] + '.' + c.from[1] + '>' + c.to[0] + '.' + c.to[1];
   const pc = new Map((prev.cables || []).map(c => [key(c), c]));
@@ -22458,7 +22462,7 @@ let bassURL = null; const bassLoad = new WeakMap(), bassOK = new WeakSet(), bass
 // …PUMP SYNTHS live: their worklet, loaded with the others; psSent: the contexts whose audio thread has the wasm's bytes
 const PSYN_WK = 'pump/synth/pump-synth-worklet.js?v=12', psOK = new WeakSet(), psSent = new WeakSet();
 // …WAVES LIVE: the waves worklet in the tracker's own context (thunder-wlive); wlSent: the contexts that have the wasm
-const WAVES_WK = 'waves/waves-worklet.js?v=44', wlOK = new WeakSet(), wlSent = new WeakSet();
+const WAVES_WK = 'waves/waves-worklet.js?v=45', wlOK = new WeakSet(), wlSent = new WeakSet();
 /* BATTERY (8 Nov, Fold): a bookkeeping timer that only does something in one situation (playing, the screen visible, one
    screen open) had been waking the phone 2 to 16 times a second for nothing. idleTick(fn, fast, busy, slow) calls fn every
    `fast` ms while busy() says so and every `slow` ms otherwise (fn runs either way, so its own reset-when-idle code still
@@ -24699,7 +24703,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 596;
+const BUILD = 597;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD + (location.pathname.includes('/beta/') ? ' · beta' : '');
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -34506,6 +34510,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [597, '14 Nov', ['…waves and …chains: an Expression module (Modules, Control utilities): type a line of maths and it becomes the sound. It reads four inputs (a, b, c, d), two sliders (k1, k2), time in seconds (t), its own previous output (y, so one line can be a filter or a counter) and a random number (rnd), with the usual operators and functions such as sin, tanh, abs, min, max, clip and mix. An Examples menu has a dozen to start from (ring modulation, soft clip, fold, bit crush, sample and hold …). What you type is only ever read as maths, never run as a program; a mistake is silence with a note saying where; the result is held between −4 and 4.']],
   [596, '14 Nov', ['…waves and …chains: a Delay line (Modules, Building blocks). A bare delay from one sample to two seconds whose feedback is inside it and exact to the sample, so short times ring at a pitch you can tune (1000 ÷ the time in ms: 2 ms rings at 500 Hz): combs and plucked strings from a burst of noise. Longer times echo, and an LFO into its Time input makes a chorus or flanger. Out is only the delayed sound; mix it with the dry yourself. Feedback stops at 99% and is limited inside, so it cannot run away.']],
   [595, '14 Nov', ['…chains fix: opening a song or patch whose …chains patch had exactly as many modules and cables as the one loaded before could leave part of it switched off (a Track In that was unpatched before and patched now stayed silent, so the whole chain was silent) until the patch was edited. Each loaded patch now starts clean.']],
   [594, '14 Nov', ['…waves and …chains: four building blocks (Modules, Building blocks). One-pole filter (the gentlest filter, with a Low and a High output; also a smoother for control signals), Allpass (Phase: the stage a phaser is made of; Echo: the short diffusing delay reverbs are made of), DC blocker (brings a signal back round zero) and Mid / side (Encode, treat the middle and the sides differently, Decode).', '…chains: an Oscillator (sine, triangle, saw, square, from 0.1 Hz to the top, with FM and Sync) and Noise (white, pink, brown) under Sound sources, so a patch can make sound and control waves of its own.']],
