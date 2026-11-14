@@ -299,49 +299,7 @@ const Attenuverter = {
 
 
 /* Steps: an 8-step CV sequence, one step per note value, with a gate out on every step and optional glide. */
-const Steps = {
-  type:'steps', scope:'mono', cost:.05,
-  inputs:{ clock:'gate', reset:'gate' }, outputs:{ out:'cv', gate:'gate' },
-  params:{ div:[3,0,9,1], len:[8,1,8,1], glide:[0,0,1,.01], depth:[1,0,1,.01],
-    s1:[0,-1,1,.01], s2:[0,-1,1,.01], s3:[0,-1,1,.01], s4:[0,-1,1,.01], s5:[0,-1,1,.01], s6:[0,-1,1,.01], s7:[0,-1,1,.01], s8:[0,-1,1,.01] },
-  create:() => ({ ph:0, step:0, y:0, c:0, r:0, sn:-1 }),
-  process(st, io, ctx){
-    const ext = linked(io, 'clock'), hz = ctx.transport.tempo / 60 / divBeats(io.p.div), n = io.p.len | 0 || 8;
-    const k = io.p.glide > 0 ? 1 - Math.exp(-1 / (ctx.sr * io.p.glide * .25 / hz)) : 1;
-    if (restarted(st, ctx)){ st.ph = 0; st.step = 0; }
-    for (let i = 0; i < ctx.block; i++){
-      const rs = io.in.reset[i] > .5; if (rs && !st.r){ st.ph = 0; st.step = 0; } st.r = rs;
-      if (ext){ const g = io.in.clock[i] > .5; if (g && !st.c){ st.step = (st.step + 1) % n; st.ph = 0; } st.c = g; }
-      else { st.ph += hz / ctx.sr; if (st.ph >= 1){ st.ph -= 1; st.step = (st.step + 1) % n; } }
-      if (st.step >= n) st.step = 0;
-      const tgt = io.p['s' + (st.step + 1)] * io.p.depth; st.y += (tgt - st.y) * k;
-      io.out.out[i] = st.y; io.out.gate[i] = ext ? (io.in.clock[i] > .5 ? 1 : 0) : (st.ph < .5 ? 1 : 0);
-    }
-  }
-};
-
-/* Clock: a gate every note value (with swing on every second one) and a ramp that rises 0→1 across each one.
-   The ramp, patched into a slider, scans it in time with the song: the tempo-synced ramp trick. */
-const Clock = {
-  type:'clock', scope:'mono', cost:.03,
-  inputs:{ reset:'gate' }, outputs:{ gate:'gate', ramp:'cv', bar:'cv' },
-  params:{ div:[3,0,9,1], swing:[0,0,.75,.01], width:[.5,.05,.95,.01], bars:[1,1,16,1] },
-  create:() => ({ ph:0, n:0, bp:0, r:0, sn:-1 }),
-  process(st, io, ctx){
-    const beats = divBeats(io.p.div), hz = ctx.transport.tempo / 60 / beats, sw = io.p.swing, w = io.p.width;
-    const barHz = ctx.transport.tempo / 60 / (4 * Math.max(1, io.p.bars | 0));
-    if (restarted(st, ctx)){ st.ph = 0; st.n = 0; st.bp = 0; }
-    for (let i = 0; i < ctx.block; i++){
-      const rs = io.in.reset[i] > .5; if (rs && !st.r){ st.ph = 0; st.n = 0; st.bp = 0; } st.r = rs;
-      st.ph += hz / ctx.sr; if (st.ph >= 1){ st.ph -= 1; st.n ^= 1; }
-      st.bp += barHz / ctx.sr; if (st.bp >= 1) st.bp -= 1;
-      // swing delays every second pulse by up to three quarters of a step
-      const off = st.n ? sw * .5 : 0, q = st.ph - off;
-      io.out.gate[i] = q >= 0 && q < w * (1 - off) ? 1 : 0;
-      io.out.ramp[i] = st.ph; io.out.bar[i] = st.bp;
-    }
-  }
-};
+/* (Steps and Clock live in the shared block since 14 Nov, so …waves has them too.) */
 
 /* Repeat: beat repeat, reverse and tape stop. It keeps the last 4 s; while Hold is on (or the Gate input is high)
    it loops the note-value slice it caught, each pass Decay quieter and Pitch lower, or slows to a stop. */
@@ -1392,6 +1350,196 @@ const Logic = {
   process(st, io, ctx){
     const A = io.in.a, B = io.in.b, o = io.out, t = io.p.thr;
     for (let i = 0; i < ctx.block; i++){ const a = A[i] >= t, b = B[i] >= t; o.and[i] = a && b ? 1 : 0; o.or[i] = a || b ? 1 : 0; o.xor[i] = a !== b ? 1 : 0; o.not[i] = a ? 0 : 1; }
+  }
+};
+
+const Steps = {
+  type:'steps', scope:'mono', cost:.05,
+  inputs:{ clock:'gate', reset:'gate' }, outputs:{ out:'cv', gate:'gate' },
+  params:{ div:[3,0,9,1], len:[8,1,8,1], glide:[0,0,1,.01], depth:[1,0,1,.01],
+    s1:[0,-1,1,.01], s2:[0,-1,1,.01], s3:[0,-1,1,.01], s4:[0,-1,1,.01], s5:[0,-1,1,.01], s6:[0,-1,1,.01], s7:[0,-1,1,.01], s8:[0,-1,1,.01] },
+  create:() => ({ ph:0, step:0, y:0, c:0, r:0, sn:-1 }),
+  process(st, io, ctx){
+    const ext = linked(io, 'clock'), hz = ctx.transport.tempo / 60 / divBeats(io.p.div), n = io.p.len | 0 || 8;
+    const k = io.p.glide > 0 ? 1 - Math.exp(-1 / (ctx.sr * io.p.glide * .25 / hz)) : 1;
+    if (restarted(st, ctx)){ st.ph = 0; st.step = 0; }
+    for (let i = 0; i < ctx.block; i++){
+      const rs = io.in.reset[i] > .5; if (rs && !st.r){ st.ph = 0; st.step = 0; } st.r = rs;
+      if (ext){ const g = io.in.clock[i] > .5; if (g && !st.c){ st.step = (st.step + 1) % n; st.ph = 0; } st.c = g; }
+      else { st.ph += hz / ctx.sr; if (st.ph >= 1){ st.ph -= 1; st.step = (st.step + 1) % n; } }
+      if (st.step >= n) st.step = 0;
+      const tgt = io.p['s' + (st.step + 1)] * io.p.depth; st.y += (tgt - st.y) * k;
+      io.out.out[i] = st.y; io.out.gate[i] = ext ? (io.in.clock[i] > .5 ? 1 : 0) : (st.ph < .5 ? 1 : 0);
+    }
+  }
+};
+
+/* Clock: a gate every note value (with swing on every second one) and a ramp that rises 0→1 across each one.
+   The ramp, patched into a slider, scans it in time with the song: the tempo-synced ramp trick. */
+const Clock = {
+  type:'clock', scope:'mono', cost:.03,
+  inputs:{ reset:'gate' }, outputs:{ gate:'gate', ramp:'cv', bar:'cv' },
+  params:{ div:[3,0,9,1], swing:[0,0,.75,.01], width:[.5,.05,.95,.01], bars:[1,1,16,1] },
+  create:() => ({ ph:0, n:0, bp:0, r:0, sn:-1 }),
+  process(st, io, ctx){
+    const beats = divBeats(io.p.div), hz = ctx.transport.tempo / 60 / beats, sw = io.p.swing, w = io.p.width;
+    const barHz = ctx.transport.tempo / 60 / (4 * Math.max(1, io.p.bars | 0));
+    if (restarted(st, ctx)){ st.ph = 0; st.n = 0; st.bp = 0; }
+    for (let i = 0; i < ctx.block; i++){
+      const rs = io.in.reset[i] > .5; if (rs && !st.r){ st.ph = 0; st.n = 0; st.bp = 0; } st.r = rs;
+      st.ph += hz / ctx.sr; if (st.ph >= 1){ st.ph -= 1; st.n ^= 1; }
+      st.bp += barHz / ctx.sr; if (st.bp >= 1) st.bp -= 1;
+      // swing delays every second pulse by up to three quarters of a step
+      const off = st.n ? sw * .5 : 0, q = st.ph - off;
+      io.out.gate[i] = q >= 0 && q < w * (1 - off) ? 1 : 0;
+      io.out.ramp[i] = st.ph; io.out.bar[i] = st.bp;
+    }
+  }
+};
+
+/* CLOCK AND TRIGGER TOOLS (14 Nov, the owner's low-level module queue, group 2). A gate is high at 0.5 and above; every
+   one acts on the rising edge. 'poly' as the control maths above: per voice in …waves when a voice feeds them. */
+/* Clock multiplier: N evenly spaced pulses for every pulse in. It measures the time between the last two pulses, so it
+   follows a tempo change one pulse late; until it has seen two pulses it passes the clock through. Reset forgets the tempo. */
+const ClockMul = {
+  type:'clkmul', scope:'poly', cost:.03,
+  inputs:{ clock:'gate', reset:'gate' }, outputs:{ out:'gate' },
+  params:{ mul:[2,1,16,1], width:[.5,.05,.95,.01] },
+  create:() => ({ lc:0, lr:0, t:0, per:0, k:0, seen:0 }),
+  process(st, io, ctx){
+    const C = io.in.clock, Rs = io.in.reset, O = io.out.out, M = Math.max(1, io.p.mul | 0), w = io.p.width;
+    for (let i = 0; i < ctx.block; i++){
+      const r = Rs[i] >= .5; if (r && !st.lr){ st.seen = 0; st.per = 0; st.t = 0; } st.lr = r;
+      const c = C[i] >= .5;
+      if (c && !st.lc){ if (st.seen) st.per = st.t; st.seen = 1; st.t = 0; }
+      st.lc = c;
+      if (!st.seen) O[i] = 0;
+      else if (!(st.per > 0)) O[i] = c ? 1 : 0;   // one pulse seen: no tempo yet
+      else { const sub = st.per / M, k = Math.floor(st.t / sub); O[i] = k < M && st.t - k * sub < sub * w ? 1 : 0; }   // (k < M: a late pulse does not get extra ones)
+      st.t++;
+    }
+  }
+};
+/* Chance gate: each pulse in goes to Out with the Chance set, otherwise to Other. Seeded: the same Seed gives the same
+   run of choices every time, starting again at Reset and whenever the song starts, so a render matches what was heard.
+   Seed 0 is different every time. */
+const ChanceGate = {
+  type:'chance', scope:'poly', cost:.02,
+  inputs:{ in:'gate', reset:'gate' }, outputs:{ out:'gate', other:'gate' },
+  params:{ prob:[.5,0,1,.01], seed:[1,0,999,1] },
+  create:() => ({ s:0, sd:-1, lg:0, lr:0, pass:0, sn:-1, free:0 }),
+  process(st, io, ctx){
+    const G = io.in.in, Rs = io.in.reset, o = io.out, p = io.p.prob, sd = io.p.seed | 0;
+    if (restarted(st, ctx) || st.sd !== sd){ st.sd = sd; st.s = sd ? (Math.imul(sd, 2654435761) >>> 0) || 1 : st.free || (st.free = nextSeed() || 1); }   // (Seed 0 takes a number from the engine's counter the first time it is used, not when the module is made)
+    for (let i = 0; i < ctx.block; i++){
+      const r = Rs[i] >= .5; if (r && !st.lr && sd) st.s = (Math.imul(sd, 2654435761) >>> 0) || 1; st.lr = r;
+      const g = G[i] >= .5;
+      if (g && !st.lg){ let s = st.s; s ^= s << 13; s >>>= 0; s ^= s >>> 17; s ^= s << 5; s >>>= 0; st.s = s; if (!sd) st.free = s; st.pass = s / 4294967296 < p ? 1 : 0; }
+      st.lg = g;
+      o.out[i] = g && st.pass ? 1 : 0; o.other[i] = g && !st.pass ? 1 : 0;
+    }
+  }
+};
+/* Counter: counts pulses. Step is a staircase from 0 to 1 over Steps counts (patch it into Scale / map or a slider);
+   End is high during the last count, for chaining another counter or resetting something. Up, Down or Up and down. */
+const Counter = {
+  type:'counter', scope:'poly', cost:.02,
+  inputs:{ clock:'gate', reset:'gate' }, outputs:{ step:'cv', end:'gate' },
+  params:{ steps:[8,1,64,1], mode:[0,0,2,1] },
+  create:() => ({ c:-1, lc:0, lr:0, sn:-1 }),
+  process(st, io, ctx){
+    const C = io.in.clock, Rs = io.in.reset, o = io.out, N = Math.max(1, io.p.steps | 0), mode = io.p.mode | 0, L = mode === 2 && N > 1 ? 2 * N - 2 : N;
+    if (restarted(st, ctx)) st.c = -1;
+    for (let i = 0; i < ctx.block; i++){
+      const r = Rs[i] >= .5; if (r && !st.lr) st.c = -1; st.lr = r;
+      const c = C[i] >= .5; if (c && !st.lc) st.c = (st.c + 1) % L; st.lc = c;
+      const k = st.c < 0 ? 0 : st.c % L, pos = mode === 1 ? N - 1 - k : mode === 2 && k >= N ? L - k : k;
+      o.step[i] = N > 1 ? pos / (N - 1) : 0; o.end[i] = st.c >= 0 && k === L - 1 && c ? 1 : 0;
+    }
+  }
+};
+/* Step switch: up to four inputs, one at a time to Out; each pulse on Clock moves to the next, Reset goes back to the
+   first. Fade is a short crossfade at each change (0 is instant). */
+const StepSwitch = {
+  type:'stepsw', scope:'poly', cost:.04,
+  inputs:{ i1:'audio', i2:'audio', i3:'audio', i4:'audio', clock:'gate', reset:'gate' }, outputs:{ out:'audio' },
+  params:{ steps:[4,2,4,1], fade:[.005,0,.1,.001] },
+  create:() => ({ k:0, from:0, g:1, lc:0, lr:0, sn:-1 }),
+  process(st, io, ctx){
+    const I = io.in, C = I.clock, Rs = I.reset, O = io.out.out, N = clamp(io.p.steps | 0, 2, 4);
+    const step = io.p.fade > 0 ? 1 / Math.max(1, io.p.fade * ctx.sr) : 1;
+    if (restarted(st, ctx) && st.k){ st.from = st.k; st.k = 0; st.g = 0; }
+    if (st.k >= N){ st.k = 0; st.g = 1; }
+    for (let i = 0; i < ctx.block; i++){
+      const r = Rs[i] >= .5, c = C[i] >= .5; let to = st.k;
+      if (r && !st.lr) to = 0; else if (c && !st.lc) to = (st.k + 1) % N;
+      st.lr = r; st.lc = c;
+      if (to !== st.k){ st.from = st.k; st.k = to; st.g = 0; }
+      const k = st.k, x = k === 0 ? I.i1[i] : k === 1 ? I.i2[i] : k === 2 ? I.i3[i] : I.i4[i];
+      if (st.g >= 1) O[i] = x;
+      else { st.g += step; if (st.g > 1) st.g = 1; const f = st.from, y = f === 0 ? I.i1[i] : f === 1 ? I.i2[i] : f === 2 ? I.i3[i] : I.i4[i]; O[i] = y + (x - y) * st.g; }
+    }
+  }
+};
+/* Burst: one pulse in → a run of Count pulses, Time apart. Bend pulls them closer together (above 0) or further apart
+   (below 0) as the run goes on, like a bouncing ball or its opposite. Level falls from 1 to 0 across the run (for a
+   fading roll). A new pulse in starts the run again. */
+const Burst = {
+  type:'burst', scope:'poly', cost:.03,
+  inputs:{ trig:'gate' }, outputs:{ out:'gate', level:'cv' },
+  params:{ count:[4,1,32,1], time:[.06,.005,1,.001], bend:[0,-1,1,.01], width:[.5,.05,.95,.01] },
+  create:() => ({ n:0, t:0, len:0, lt:0, of:0 }),
+  process(st, io, ctx){
+    const T = io.in.trig, o = io.out, N = Math.max(1, io.p.count | 0), base = Math.max(1, io.p.time * ctx.sr), w = io.p.width;
+    const ratio = Math.pow(2, -io.p.bend * 3 / Math.max(1, N - 1));   // by the last pulse the gap is 8 times shorter (Bend 1) or longer (Bend -1)
+    for (let i = 0; i < ctx.block; i++){
+      const g = T[i] >= .5;
+      if (g && !st.lt){ st.n = N; st.of = N; st.t = 0; st.len = base; }
+      st.lt = g;
+      if (st.n > 0){
+        o.out[i] = st.t < st.len * w ? 1 : 0; o.level[i] = st.of > 1 ? (st.n - 1) / (st.of - 1) : 1;
+        if (++st.t >= st.len){ st.t = 0; st.n--; st.len = Math.max(1, st.len * ratio); }
+      } else { o.out[i] = 0; o.level[i] = 0; }
+    }
+  }
+};
+/* Gate delay: the gate comes out Delay later. Length 0 keeps the gate's own length; above 0 every delayed gate lasts
+   that long (a short trigger from a long gate, or the other way round). Up to 2 seconds. */
+const GateDelay = {
+  type:'gatedly', scope:'poly', cost:.03,
+  inputs:{ in:'gate' }, outputs:{ out:'gate' },
+  params:{ delay:[.1,0,2,.001], length:[0,0,2,.001] },
+  create:sr => ({ b:new Uint8Array(Math.ceil(sr * 2) + 2), w:0, lo:0, hold:0 }),
+  process(st, io, ctx){
+    const G = io.in.in, O = io.out.out, B = st.b, M = B.length, d = clamp(Math.round(io.p.delay * ctx.sr), 0, M - 1), L = Math.round(io.p.length * ctx.sr);
+    for (let i = 0; i < ctx.block; i++){
+      B[st.w] = G[i] >= .5 ? 1 : 0;
+      let r = st.w - d; if (r < 0) r += M; const x = B[r];
+      if (++st.w >= M) st.w = 0;
+      if (L > 0){ if (x && !st.lo) st.hold = L; O[i] = st.hold > 0 ? 1 : 0; if (st.hold > 0) st.hold--; }
+      else O[i] = x;
+      st.lo = x;
+    }
+  }
+};
+/* Flip-flop: each pulse on Toggle turns Q over (on, off, on …): a gate at half the speed, or a switch that stays where
+   you leave it. Set turns it on, Reset turns it off. Not Q is its opposite. */
+const FlipFlop = {
+  type:'flipflop', scope:'poly', cost:.02,
+  inputs:{ toggle:'gate', set:'gate', reset:'gate' }, outputs:{ q:'gate', nq:'gate' },
+  params:{},
+  create:() => ({ q:0, lt:0, ls:0, lr:0, sn:-1 }),
+  process(st, io, ctx){
+    const T = io.in.toggle, S = io.in.set, Rs = io.in.reset, o = io.out;
+    if (restarted(st, ctx)) st.q = 0;
+    for (let i = 0; i < ctx.block; i++){
+      const t = T[i] >= .5, s = S[i] >= .5, r = Rs[i] >= .5;
+      if (t && !st.lt) st.q ^= 1;
+      if (s && !st.ls) st.q = 1;
+      if (r && !st.lr) st.q = 0;
+      st.lt = t; st.ls = s; st.lr = r;
+      o.q[i] = st.q; o.nq[i] = 1 - st.q;
+    }
   }
 };
 
@@ -5037,6 +5185,7 @@ const SHARED_MODULES = { beads:Beads,
   envfol:EnvFol, gateex:GateEx, pitchfol:PitchFol, pitchtrk:PitchTrk, slew:Slew, snh:SampleHold, quant:Quant, blades:Blades, meta:Meta, phaser:Phaser, width:Width, pingpong:PingPong,
   meter:Meter, limiter:Limiter, utility:Utility, ringmod:RingMod, spring:Spring, plate:Plate, lverb:Lverb, ensemble:Ensemble, math:MathM, logic:Logic, divider:Divider, euclid:Euclid,
   rect:Rectify, scale:ScaleMap, compare:Comparator, switch:Switch2, xfade:Crossfade, const:Constant,
+  steps:Steps, clock:Clock, clkmul:ClockMul, chance:ChanceGate, counter:Counter, stepsw:StepSwitch, burst:Burst, gatedly:GateDelay, flipflop:FlipFlop,
   dimension:Dimension, bbd:BBD, harm:Harmonizer, blipdrum:BlipDrum, life:Life, degrade:Degrade, reson:Reson,
   flex:FlexM, sgate:StepGateM, retrig:RetrigM, pdelay:PDelayM, preverb:PReverbM,
   spectral:Spectral, stretch:XStretch, convolve:Convolve,
@@ -5123,7 +5272,7 @@ const MODULES = { ...SHARED_MODULES, ...PUMP_MODULES, trackIn:TrackIn,
   flanger:FlangerFx, tremolo:TremoloFx, odrive:OdriveFx, folder:FolderFx, autowah:AutowahFx, pshift:PshiftFx, ladder:LadderFx, xmod:XmodFx, space:SpaceFx, lofi:LofiFx, drive:DriveFx, air:AirFx, room:RoomFx,
   comb:CombFx, transient:TransientFx, tgate:TgateFx, ott:OttFx, fshift:FshiftFx, vinyl:VinylFx, dub:DubFx, cab:CabFx, tube:TubeFx,
   scin:SidechainIn, sccomp:SidechainComp, scout:SidechainOut,
-  lfo:LFO, adsr:ADSR, random:Random, atten:Attenuverter, steps:Steps, clock:Clock, repeat:Repeat,
+  lfo:LFO, adsr:ADSR, random:Random, atten:Attenuverter, repeat:Repeat,
   envfol:EnvFol, gateex:GateEx, pitchfol:PitchFol, pitchtrk:PitchTrk, slew:Slew, snh:SampleHold, quant:Quant,
   blades:Blades, meta:Meta, phaser:Phaser, width:Width, pingpong:PingPong, resample:Resample, chainOut:ChainOut };
 
