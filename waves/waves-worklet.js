@@ -4936,14 +4936,30 @@ class VoicePool {
 /* A cable into "p:name" modulates that parameter instead of feeding an input. */
 const NO_CABLES = [];   // a module with no cable in: nothing to make per block
 const isParamPort = p => typeof p === 'string' && p.startsWith('p:');
+/* FEEDBACK: a cable marked fb closes a loop. It is left out of the run order, so the module it feeds runs before the
+   module it comes from and hears that module's previous block (one block late: 128 samples). What arrives through it is
+   guarded: a sample inside -1..1 passes untouched; a louder one is bent smoothly towards a ceiling of 2 (so a loop with
+   gain above 1 settles there, it cannot grow without end); a value that is not a number becomes silence. */
+function fbAdd(dst, b, g){
+  for (let i = 0; i < BLOCK; i++){
+    let x = b[i] * g;
+    if (!(x > -1 && x < 1)){
+      if (x !== x || x === Infinity || x === -Infinity) x = 0;
+      else if (x < 0) x = -1 - Math.tanh(-x - 1); else x = 1 + Math.tanh(x - 1);
+    }
+    dst[i] += x;
+  }
+}
 class Graph {
   constructor(){ this.mods = new Map(); this.cables = []; this.order = []; this.inc = new Map(); this.ver = 0; }
   add(id, def, inst){ this.mods.set(id, { id, def, inst, poly:false }); this.compile(); }
   remove(id){ this.mods.delete(id); this.cables = this.cables.filter(c => c.a[0] !== id && c.b[0] !== id); this.compile(); }
-  connect(a, b){
+  connect(a, b, fb){
     if (!this.mods.has(a[0]) || !this.mods.has(b[0])) return;
-    if (this.cables.some(c => c.a[0] === a[0] && c.a[1] === a[1] && c.b[0] === b[0] && c.b[1] === b[1])) return;
-    this.cables.push({ a, b }); this.compile();
+    fb = fb === true;
+    const old = this.cables.find(c => c.a[0] === a[0] && c.a[1] === a[1] && c.b[0] === b[0] && c.b[1] === b[1]);
+    if (old){ if (!!old.fb !== fb){ old.fb = fb; this.compile(); } return; }   // the same cable again: only its feedback mark can change
+    this.cables.push(fb ? { a, b, fb:true } : { a, b }); this.compile();
   }
   disconnect(a, b){ this.cables = this.cables.filter(c => !(c.a[0] === a[0] && c.a[1] === a[1] && c.b[0] === b[0] && c.b[1] === b[1])); this.compile(); }
   compile(){
@@ -4951,7 +4967,9 @@ class Graph {
     this.inc = new Map([...this.mods.keys()].map(k => [k, []]));
     for (const c of this.cables){
       if (!adj.has(c.a[0]) || !adj.has(c.b[0])) continue;
-      adj.get(c.a[0]).push(c.b[0]); indeg.set(c.b[0], indeg.get(c.b[0]) + 1); this.inc.get(c.b[0]).push(c);
+      this.inc.get(c.b[0]).push(c);
+      if (c.fb) continue;   // FEEDBACK: heard (it is in inc), but it does not decide who runs first
+      adj.get(c.a[0]).push(c.b[0]); indeg.set(c.b[0], indeg.get(c.b[0]) + 1);
     }
     const q = [...indeg].filter(([, d]) => d === 0).map(([k]) => k), order = [];
     while (q.length){ const k = q.shift(); order.push(k); for (const n of adj.get(k)){ indeg.set(n, indeg.get(n) - 1); if (indeg.get(n) === 0) q.push(n); } }
@@ -4960,7 +4978,7 @@ class Graph {
     // A module runs once per voice when something polyphonic (Host In, or a module fed by it) feeds it.
     for (const id of order){
       const m = this.mods.get(id), s = m.def.scope;
-      m.poly = s === 'root' ? true : s === 'mono' ? false : this.inc.get(id).some(c => { const src = this.mods.get(c.a[0]); return src && src.poly; });
+      m.poly = s === 'root' ? true : s === 'mono' ? false : this.inc.get(id).some(c => { const src = this.mods.get(c.a[0]); return !c.fb && src && src.poly; });   // (FEEDBACK: a feedback cable does not make its target per-voice)
     }
     // A poly module's "exit" outputs: audio that leaves the voice for a mono module (the bus, a mono effect). Those are
     // what the engine listens to when deciding that a released voice has gone silent (its own oscillator never does).
@@ -5001,7 +5019,7 @@ class WavesEngine {
     this._sync();
   }
   removeModule(id){ this._drop(id); this.graph.remove(id); this._sync(); }
-  connect(a, b){ this.graph.connect(a, b); this._sync(); }
+  connect(a, b, fb){ this.graph.connect(a, b, fb); this._sync(); }
   disconnect(a, b){ this.graph.disconnect(a, b); this._sync(); }
   setParam(id, name, v){ const m = this.graph.mods.get(id); if (m && typeof v === 'number'){ m.inst.params[name] = v; if (name === 'slot') this._cullDirty = true; } }
   setParams(list){ for (const [id, name, v] of list) this.setParam(id, name, v); }
@@ -5023,7 +5041,7 @@ class WavesEngine {
   loadPatch(doc){
     this._reset(); this.graph = new Graph(); this._cullDirty = true;
     for (const m of doc.modules || []) this.addModule(m.id, m.type, m);
-    for (const c of doc.cables || []) this.connect(c.from, c.to);
+    for (const c of doc.cables || []) this.connect(c.from, c.to, c.fb === true);
     for (const c of stereoUpCables(doc)) this.connect(c.from, c.to);   // STEREO: an older patch's right sides (the editor saves them)
     if (doc.transport) this.setTransport(doc.transport);
     return { modules:(doc.modules || []).length, cables:(doc.cables || []).length };
@@ -5097,7 +5115,13 @@ class WavesEngine {
         mods = mods || io.mo; dst = mods[k] || (mods[k] = io.mb[k] || (io.mb[k] = new Float32Array(BLOCK)));
       } else { dst = io.in[port]; if (!dst) continue; io.linked.add(port); }
       const kind = src.def.outputs[c.a[1]];
-      if (v >= 0 && src.poly){ const b = this._bufs(src, v).out[c.a[1]]; if (b) for (let i = 0; i < BLOCK; i++) dst[i] += b[i]; }
+      if (c.fb){   // FEEDBACK: the same four cases as below, each through the guard
+        if (v >= 0 && src.poly){ const b = this._bufs(src, v).out[c.a[1]]; if (b) fbAdd(dst, b, 1); }
+        else if (v >= 0){ const b = this._bufs(src, -1).out[c.a[1]]; if (b) fbAdd(dst, b, kind === 'audio' ? 1 / N : 1); }
+        else if (src.poly){ for (let vv = 0; vv < N; vv++){ const b = this._bufs(src, vv).out[c.a[1]]; if (b) fbAdd(dst, b, 1); } }
+        else { const b = this._bufs(src, -1).out[c.a[1]]; if (b) fbAdd(dst, b, 1); }
+      }
+      else if (v >= 0 && src.poly){ const b = this._bufs(src, v).out[c.a[1]]; if (b) for (let i = 0; i < BLOCK; i++) dst[i] += b[i]; }
       else if (v >= 0){ // mono into a voice: control is shared, audio is split between the voices so the sum stays the same
         const b = this._bufs(src, -1).out[c.a[1]]; const g = kind === 'audio' ? 1 / N : 1;
         if (b) for (let i = 0; i < BLOCK; i++) dst[i] += b[i] * g;
@@ -5243,7 +5267,7 @@ class WavesEngine {
       case 'patch': return this.loadPatch(m.value);
       case 'add': return this.addModule(m.id, m.type, m);
       case 'remove': return this.removeModule(m.id);
-      case 'connect': return this.connect(m.a, m.b);
+      case 'connect': return this.connect(m.a, m.b, m.fb === true);
       case 'disconnect': return this.disconnect(m.a, m.b);
       case 'param': return this.setParam(m.id, m.name, m.value);
       case 'params': return this.setParams(m.list);
@@ -5414,6 +5438,6 @@ class WavesLiveProc extends AudioWorkletProcessor {
 }
 try { registerProcessor('thunder-wlive', WavesLiveProc); } catch (_) {}
 } else if (typeof globalThis !== 'undefined'){
-  globalThis.WavesDSP = { WavesEngine, wasmInit, modsPrepare, MODULES, WASM, BUS_COUNT };
+  globalThis.WavesDSP = { WavesEngine, wasmInit, modsPrepare, MODULES, WASM, BUS_COUNT, fbAdd };
 }
 })();
