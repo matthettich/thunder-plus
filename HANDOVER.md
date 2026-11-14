@@ -703,6 +703,14 @@ The owner's top priority to add is the MOD screen. Work down the list; ask befor
 
 Start a session by asking for results. Fix on `beta`. (10 Nov, 15:10: the web beta is build 560; the build numbers in the rest of this paragraph are older.) Web beta: https://matthettich.github.io/thunder-plus/beta/ (build 547 as of 10 Nov morning, 548 once its PR merges; the night of 9–10 Nov shipped 544–547, see the four "10 Nov" entries below. Decisions the lead made that night for the owner to confirm or reverse: on a phone the saved Sequencer default plays on the Page unless Audio thread is picked on that device; on a phone the safety limiter is its stand-in until another worklet loads; the resync only runs with a worklet loaded and its margins are untested on a device). Desktop: v1.3.4-beta.2 (build 541, no feed view or scopes); further desktop betas on hold until the owner asks.
 
+**Build 591** (module queue, group 1: control maths; branch `feat/modules-maths`)
+- [ ] Computer, …chains: Modules list, Control utilities: Math, Constant, Invert / rectify, Scale / map, Comparator, Switch, Crossfade, in that order, each with a one-line hint.
+- [ ] Scale / map: an LFO into In, Out into a slider's jack: by default −1..1 becomes 0..1; swap Out low and Out high and it turns over; Clip off lets it run past the ends.
+- [ ] **By ear:** Envelope follow → Comparator A, Level about 0.30, the "A > B" gate → Switch's Select, the dry sound on A and a delay's output on B: loud hits jump to B with no click (Fade 5 ms). Set Fade to 0: now it may click (that is what 0 is for: control signals).
+- [ ] **By ear:** Crossfade with dry on A, an effect on B and a slow LFO into Mix: it sweeps between them; Curve on Equal power keeps the loudness even through the middle with two different sounds.
+- [ ] …waves: Scale / map or Crossfade fed from a voice (Host In → oscillator), several notes held: each note has its own, nothing stuck or doubled.
+- [ ] Phone: add the six, fold to Compact and Mini: names and values readable, nothing outside the frames.
+
 **Build 590** (the owner's two phone bugs of 14 Nov; branch `fix/phone-chip-and-tabs`)
 - [ ] **Phone (installed app if you use it):** open the `acid` project from Files or "Open with", press PLAY, pull the notification shade down: the title says "acid", not "Song 1". Rename the song while it plays: the title follows. (In a Chrome tab the small Chrome logo stays; the installed app should show Thunder Plus's own icon: which do you see?)
 - [ ] **Folded phone, Mobile mode, Chains shown (three tabs):** Tracker, Synth and Chains all read in full, on a row of their own at the top; nothing scrolls sideways and the gear and PLAY are on screen. Show Waves too (four tabs): the same. Is the extra row acceptable, or would you rather keep one row and lose the LEFT time readout at that width?
@@ -1120,6 +1128,16 @@ Suggested order: N0 → N1 → N2 (phone cured) → N4 with N3 alongside → N5 
   the edge `R.t0`, "waiting…" while armed), `rcdClk` / `rcdFmt` / `rcdFreeSecs`, a 250 ms timer only while recording; the
   final length stays until the next take. recorder-check covers FREE, PATTERN, Stop, next take and closing mid-take.
 
+
+## 14 Nov (module queue, group 1: control maths; build 591)
+
+Branch `feat/modules-maths`. The lead wrote the engine and its tests, a Sonnet agent the editor side; the lead reviewed.
+- **What existed (inventory, 14 Nov):** Math (A, B → sum, diff, mul, min, max; a knob per input), Logic (AND, OR, XOR, NOT of A), Clock divider, Euclid, Slew limiter, Sample & hold, Quantizer, Gate extract, Attenuverter, Random in both editors; Steps, Clock, Vocoder, Repeat in …chains only; oscillators, Noise and the Sequencer in …waves only. So add / multiply / min / max / logic were NOT rebuilt.
+- **New, in the shared block (both editors; worklets `?v=50` / `?v=40`):** `const` Constant (Value + Fine), `rect` Invert / rectify (inv, abs, pos, neg), `scale` Scale / map (In low / high → Out low / high, Clip), `compare` Comparator (A against B + Level, Hysteresis; gates A > B and A < B), `switch` Switch (A / B, Select gate, Fade 0–100 ms), `xfade` Crossfade (A, B, a sample-accurate Mix input `mixin`, Straight / Equal power). All sample-accurate, no allocation in `process`.
+- **Scope `'poly'` (lead's decision):** in …waves they run once per voice when a voice feeds them (the older shared control modules are `'mono'` there and sum the voices; changing those would change old patches, so they are left). In …chains scope means nothing.
+- **Tests:** `tests/modules-maths.test.js` (exact values in both worklets, one patch through each engine), `tests/modules-maths-editor.test.js`. Goldens: 18 hashes added per engine, none changed; in `tests/waves.test.js` the new types render LAST (a `LATE` list) because waves hashes depend on how many renders the shared wasm instance did before them.
+- **Still missing from the queue after this:** group 2 (clock multiplier, seeded probability gate, counter / step switch, burst, gate delay, flip-flop; Steps and Clock into …waves), scope, one-pole / allpass / DC blocker, oscillator and noise in …chains, delay line, expression, Morph.
+- **Checklist doc:** section 1 trimmed 45 → 24 (589 and 590 added at its top; the rest of 585–588 moved to section 2; three gear items to section 3); `docs/TEST-CHECKLIST.md` re-exported.
 
 ## 14 Nov (the owner's two phone bugs; build 590)
 
