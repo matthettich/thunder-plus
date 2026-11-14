@@ -1362,6 +1362,12 @@ body.mob .top .kitname{width:auto; flex:1 1 90px; min-width:64px; max-width:220p
 /* SYNTH UX C (13 Nov): with Waves and Chains shown (4 tabs) on the folded phone (360-412 px) every label reads in full and the tabs do not scroll inside themselves: a step down in size, tighter padding. */
 @media (max-width:520px){ body.mob .top #segView:has(button:nth-child(4)){overflow:visible; flex:none} body.mob .top #segView:has(button:nth-child(4)) button{padding-inline:3px!important; letter-spacing:-.02em; font-size:11px} }
 @media (max-width:380px){ body.mob .top #segView:has(button:nth-child(4)) button{font-size:10.5px} }
+/* TABS ON THEIR OWN ROW (14 Nov, owner: "Tracker | Synth | Chai" on the folded Fold, 3 tabs): Tracker, Synth and Chains / Waves are 150 px (4 tabs: 170) and the rest of the bar (LEFT, File, Settings, PLAY, CPU)
+   is another ~220, more than a 320-460 px screen has: with 3 tabs the switch shrank and scrolled inside itself (Chains cut), with 4 the whole bar ran off the screen (the 360 / 412 check measured the tabs, not the bar).
+   Three or more tabs now take a full row of their own there and share it out, at the normal size; two tabs (Tracker | Synth) stay beside the rest as before. */
+@media (max-width:460px){ body.mob .top{flex-wrap:wrap}
+  body.mob .top #segView:has(button:nth-child(3)){flex:1 1 100%; min-width:0; overflow:visible}
+  body.mob .top #segView:has(button:nth-child(3)) button{flex:1 1 auto; padding-inline:6px!important; letter-spacing:.02em; font-size:var(--fs-3)} }
 body.mob .top .brand{flex-shrink:1; min-width:0; overflow:hidden}
 /* (owner, 11 Nov) The name leaves the title bar when the bar has no room for the whole word (the Fold unfolded showed "Thunde"): brandFit()
    measures it. And with no name showing (folded, or hidden by brandFit) the bar starts at the screen edge, so Tracker lines up with SONG below it. */
@@ -23750,7 +23756,7 @@ function msHook(el){ try { ['playing', 'pause', 'ended', 'volumechange', 'error'
    song: the project file's name (opened or saved as a file, without .thunder) else the song's own name; set again when that changes while playing (rename, save as, open, new),
    never on a redraw. Artwork: the app's own icons, resolved against the page, so beta/ and stable/ find their own copy. (Chrome may still badge the notification with its small icon.) */
 let msTitleNow = null;
-function msTitle(){ let f = ''; try { f = (typeof projLabel === 'function' && projLabel() || '').replace(/\.(thunder|json)$/i, ''); } catch(e){} return f || S.name || 'Song'; }
+function msTitle(){ let f = ''; try { f = (typeof projTitle === 'function' ? projTitle() : typeof projLabel === 'function' && projLabel() || '').replace(/\.(thunder|json)$/i, ''); } catch(e){} return f || S.name || 'Song'; }
 function msIcon(p, sizes){ let u = p; try { u = new URL(p, location.href).href; } catch(e){} return {src:u, sizes, type:'image/png'}; }
 function msMeta(force){
   const ms = navigator.mediaSession; if (!ms || !bgOn || (!force && !tp.on)) return;
@@ -24139,12 +24145,16 @@ async function kvSet(k, v){ try { const db = await kvDb(); await new Promise(res
 async function kvDel(k){ try { const db = await kvDb(); await new Promise(res => { const tx = db.transaction('kv', 'readwrite'); tx.objectStore('kv').delete(k); tx.oncomplete = () => res(); tx.onerror = tx.onabort = () => { kvFail('deleting', k, tx); res(); }; }); } catch(e){ tpLog('deleting "' + k + '" failed', e); } }
 // The project file: a handle (browser) or a path (desktop app). Remembered across restarts.
 let projFile = null, projPath = null;
+// A project opened from a file the app got no handle or path for (Android's file picker, Open with, Share): its file name, kept with the song's own name at the time, so the
+// notification's title and the window title can still say "acid" and not the song's inner default "Song 1"; dropped by projSet, and not used once the song is renamed.
+let projLoose = null;
 const PPK = 'thunderplus-projpath-v1', DTK = 'thunderplus-dirty-v1';
 try { projPath = DESK ? localStorage.getItem(PPK) || null : null; } catch(e){}
-if (!DESK && canFS) kvGet('cur').then(h => { if (h && !projFile) projFile = h; });
+if (!DESK && canFS) kvGet('cur').then(h => { if (h && !projFile){ projFile = h; try { msMeta(); } catch(e){} } });
 const projLabel = () => projPath ? projPath.split(/[\\/]/).pop() : projFile ? projFile.name : '';
+const projTitle = () => projLabel() || (projLoose && projLoose.s === S.name ? projLoose.f : '');
 function projSet(path, handle){
-  projPath = path || null; projFile = handle || null;
+  projPath = path || null; projFile = handle || null; projLoose = null;
   try { if (DESK){ if (projPath) localStorage.setItem(PPK, projPath); else localStorage.removeItem(PPK); } } catch(e){}
   if (!DESK && canFS) kvSet('cur', projFile || null);
   if (projPath || projFile) recentAdd({name:projLabel(), path:projPath, h:projFile});
@@ -24160,7 +24170,7 @@ function setDirty(on){ projDirty = !!on; if (!projDirty) smpNew = false; try { l
 var smpNew = (() => { try { return localStorage.getItem(DTK + '-smp') === '1'; } catch(e){ return false; } })();
 function markSmpNew(){ smpNew = true; try { localStorage.setItem(DTK + '-smp', '1'); } catch(e){} }
 function dirtyShow(){
-  try { const app = isMobile() ? 'Thunder' : 'Thunder Plus', t = (projDirty ? '• ' : '') + (S.name || 'Song') + ' — ' + app; if (document.title !== t) document.title = t;
+  try { const app = isMobile() ? 'Thunder' : 'Thunder Plus', t = (projDirty ? '• ' : '') + ((typeof msTitle === 'function' && msTitle()) || S.name || 'Song') + ' — ' + app; if (document.title !== t) document.title = t;
     const b = $('bFile'); if (b){ b.classList.toggle('dirty', projDirty); b.title = 'File: new, open, save, share, render and export' + (projDirty ? ' · the project has unsaved changes' : ''); } } catch(e){}
 }
 // Before anything replaces the song: true when that's fine (nothing unsaved, it was saved now, or the person chose not to).
@@ -24250,7 +24260,11 @@ async function loadProjText(text, name, where){
     return true;
   } catch(err){ toast(err.message || 'Couldn’t read that project file.'); return false; }
 }
-async function loadProjFile(f, h){ return loadProjText(await f.text(), f.name, h ? {h} : null); }
+async function loadProjFile(f, h){
+  const ok = await loadProjText(await f.text(), f.name, h ? {h} : null);
+  if (ok && !h && f && f.name){ projLoose = {f:String(f.name), s:S.name}; try { msMeta(); dirtyShow(); } catch(e){} }   // no handle: the file's name is all the app has of it
+  return ok;
+}
 async function openProj(){
   if (!await okToLeave('opening another project')) return;
   if (DESK){ const r = await DESK.open(); if (r && r.text != null) loadProjText(r.text, r.name, {path:r.path}); else if (r && r.error) toastErr('Couldn’t open it: ' + r.error); return; }

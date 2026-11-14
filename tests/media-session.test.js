@@ -72,3 +72,26 @@ test('notification title (12 Nov): the project file name, else the song name; se
   proj.label = ''; R.ctx.S.name = 'Renamed'; R.ctx.msMeta(); assert.equal(R.ms.metadata.title, 'Renamed', 'a new song / rename: the song name');
   R.tp.on = false; R.ctx.S.name = 'Later'; R.ctx.msMeta(); assert.equal(R.ms.metadata.title, 'Renamed', 'not playing: nothing is touched');
 });
+
+// 14 Nov (owner, folded Fold 6: the chip said "Song 1" for a project called "acid"): on Android a picked / shared / "Open with" file gives the app no handle or path, so
+// projLabel() was '' and the title fell back to the song's inner default name. loadProjFile now keeps the file's name (projLoose) beside the song's name at that time.
+test('title (14 Nov): a project opened without a file handle shows the file name, not the song\'s inner "Song 1"; follows a rename, a new song, a later play', async () => {
+  const grab = re => { const x = src.match(re); assert.ok(x, 'could not find ' + re); return x[0]; };
+  const R = rig();
+  R.ctx.projLabel = () => proj.label; R.ctx.dirtyShow = () => {};
+  // the real projTitle / loadProjFile / projLoose from index.html; loadProjText stands in for setSong(): a new song, its inner name "Song 1", the file link dropped
+  vm.runInContext('var projLoose = null; var loadProjText = async () => { S = { name: "Song 1" }; projLoose = null; return true; };' + grab(/const projTitle = [^\n]*/) + ';' + grab(/async function loadProjFile\([\s\S]*?\n\}\n/), R.ctx);
+  vm.runInContext('S = { name: "My Song" }', R.ctx);
+  R.ctx.bgPlay(true); assert.equal(R.ms.metadata.title, 'My Song', 'before: the song name');
+  R.tp.on = false; R.ctx.bgPlay(false); R.tp.on = true;
+  const f = { name: 'acid.thunder', text: async () => '{}' };
+  assert.equal(await R.ctx.loadProjFile(f), true);
+  R.ctx.bgPlay(true); assert.equal(R.ms.metadata.title, 'acid', 'opened without a handle: the file name, not "Song 1"');
+  vm.runInContext('S.name = "Renamed"', R.ctx); R.ctx.msMeta(); assert.equal(R.ms.metadata.title, 'Renamed', 'renamed after opening: the new name');
+  vm.runInContext('S.name = "Song 1"', R.ctx); R.ctx.msMeta(); assert.equal(R.ms.metadata.title, 'acid', 'and the file name again if the name is back to what it was');
+  vm.runInContext('projLoose = null', R.ctx); R.ctx.msMeta(); assert.equal(R.ms.metadata.title, 'Song 1', 'new project (projSet drops it): the song name');
+  assert.equal(R.ms.metadata.artist, 'Thunder Plus'); assert.ok(R.ms.metadata.artwork.every(a => /^https:\/\/x\.example\/beta\/icons\/plus-icon-\d+\.png/.test(a.src)), 'the app\'s own icons');
+  // the wiring: every place that opens / replaces / renames refreshes it
+  assert.match(src, /projLoose = null;\n/); assert.match(src, /function projSet\([^)]*\)\{[^}]*projLoose = null/, 'projSet drops it');
+  assert.match(src, /document\.title !== t|msTitle\(\)\) \|\| S\.name/, 'window title uses the same name');
+});
