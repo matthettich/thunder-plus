@@ -5607,9 +5607,13 @@ class ChainsEngine {
   _destroy(s){ try { if (s.def.destroy) s.def.destroy(s.st, this); } catch (e) {} }
   _reset(){ for (const s of this._states.values()) this._destroy(s); this._states.clear(); this._ios.clear(); }
   /* Frees the effects' WebAssembly slots. Call when an engine is thrown away (offline renders). */
-  dispose(){ this._reset(); this.graph = new Graph(); }
+  dispose(){ const ver = this.graph.ver; this._reset(); this.graph = new Graph(); this.graph.ver = ver + 1; this._actKey = -1; this._bnKey = -1; }
   loadPatch(doc){
-    this._reset(); this.graph = new Graph();
+    // A new patch never inherits the last one's run list or bypass numbers: those are kept against the graph's change count
+    // (ver) and its size, and a fresh Graph counts from 0 again, so a patch with as many modules and cables as the one before it
+    // looked unchanged (a Track In that was unpatched before and patched now stayed switched off: the chain was silent). The
+    // count now carries on from the old graph's.
+    const ver = this.graph.ver; this._reset(); this.graph = new Graph(); this.graph.ver = ver + 1; this._actKey = -1; this._bnKey = -1;
     for (const m of doc.modules || []) this.addModule(m.id, m.type, m);
     for (const c of doc.cables || []) this.connect(c.from, c.to, c.fb === true);
     for (const c of stereoUpCables(doc)) this.connect(c.from, c.to);   // STEREO: an older patch's right sides (the editor saves them)
