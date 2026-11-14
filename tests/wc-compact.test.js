@@ -16,14 +16,14 @@ for (const [ed, src] of Object.entries(ED)) {
     assert.match(src, /buildSummary\(n\);/, 'buildNode builds the summary line');
   });
   test(ed + ': an old patch with collapsed:true opens Compact (m.collapsed stays the only saved state; nothing new is written)', () => {
-    assert.match(src, /if \(m\.collapsed\) setCollapsed\(n, true, true\);/);
-    const sc = fn(src, 'setCollapsed');
-    assert.match(sc, /n\.m\.collapsed = !!c;/);
-    assert.doesNotMatch(sc, /\.view\s*=/, 'no new saved field');
-    assert.doesNotMatch(src, /m\.view\s*=\s*'(compact|mini)'/);
+    assert.match(src, /setView\(n, viewOf\(m\), true\);/, 'a patch opens in the state it was saved in (pass 5: viewOf maps legacy collapsed:true to Compact)');
+    const sv = fn(src, 'setView');
+    assert.match(sv, /m\.collapsed = v !== 'open';/);
+    assert.match(sv, /if \(v === 'mini'\) m\.view = 'mini'; else delete m\.view;/, 'view is written only for Mini (an optional field, so build 587 still loads the patch)');
+    assert.doesNotMatch(src, /m\.view\s*=\s*'compact'/);
   });
   test(ed + ': the chevron label flips with the state (C9), a title-bar double-tap is counted by hand (C5), collapse all is one undo step (C4)', () => {
-    assert.match(fn(src, 'foldLabel'), /\(c \? 'Expand ' : 'Collapse '\) \+ t/);
+    assert.match(fn(src, 'foldLabel'), /\(v === 'open' \? 'Collapse ' : 'Expand '\) \+ t/);
     assert.match(src, /headTap\(n, ev\);/);
     assert.match(src, /@media \(pointer: coarse\)\{ \.node > header \.fold\{position:relative\} \.node > header \.fold::before\{content:''; position:absolute; inset:-9px -10px\} \}/);
     const all = fn(src, 'setAllCollapsed');

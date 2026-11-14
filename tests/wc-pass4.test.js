@@ -24,7 +24,7 @@ for (const [ed, src] of Object.entries(ED)) {
   });
   test(ed + ' D7: the keys, each guarded against typing, a dialog, MIDI learn and Play where it edits', () => {
     assert.match(src, /if \(typing\(e\) \|\| document\.querySelector\('\.dlgov'\) \|\| \(learn && learn\.on\)\) return;/);
-    for (const re of [/c === 'KeyA'/, /c === 'KeyG'/, /c === 'KeyF'/, /zoomToSel\(\)/, /Arrow\(Left\|Right\|Up\|Down\)/, /renameModule\(\[\.\.\.selected\]\[0\]\)/, /e\.key === 'Escape'/, /c === 'Digit0'/]) assert.match(src, re);
+    for (const re of [/ks === 'a'/, /ks === 'g'/, /ks === 'f'/, /const letterKey = e =>/, /zoomToSel\(\)/, /Arrow\(Left\|Right\|Up\|Down\)/, /renameModule\(\[\.\.\.selected\]\[0\]\)/, /e\.key === 'Escape'/, /c === 'Digit0'/]) assert.match(src, re);
     assert.match(src, /if \(playMode \|\| !selected\.size \|\| !ctx\.hidden\) return;/, 'arrows never move anything in Play');
     assert.match(src, /typeof K_LOW === 'undefined'/, 'N is a note in waves: only chains takes it');
     assert.match(src, /\['Keys', /, 'the keys are listed in Help');
@@ -56,7 +56,7 @@ for (const [ed, src] of Object.entries(ED)) {
   test(ed + ' U11: roles, labels, one tab stop per module, a live region', () => {
     assert.match(src, /role="region" aria-label="Patch"/); assert.match(src, /role="status" aria-live="polite"/);
     assert.match(src, /tabindex:'0', role:'group', 'aria-label': title/);
-    assert.match(src, /role:'button', 'aria-label': \(dir === 'in' \? 'Input ' : 'Output '\)/);
+    assert.match(src, /role:'img', 'aria-label': \(dir === 'in' \? 'Input ' : 'Output '\)/);
     assert.match(src, /role:'menuitem'/);
     assert.match(src, /n\.el\.matches\(':focus-visible'\)/);
   });
@@ -69,10 +69,13 @@ test('the shared block is the same in both editors (python3 tools/sync-shared.py
   const cut = s => s.slice(s.indexOf('/* ===SHARED EDITOR START==='), s.indexOf('/* ===SHARED EDITOR END===') + 30);
   assert.equal(cut(ED.chains), cut(ED.waves));
 });
-test('no audio file, golden or worklet cache-buster was touched by this pass', () => {
-  const { execSync } = require('child_process');
-  let out = ''; try { out = execSync('git status --porcelain -- tests/golden chains/chains-worklet.js waves/waves-worklet.js core dsp pump lxr', { cwd: H.ROOT }).toString(); } catch (e) { return; }
-  assert.equal(out.trim(), '');
+test('no audio file, golden or worklet differs from the merge base with origin/beta (skipped when no base can be resolved)', t => {
+  const { execFileSync } = require('child_process');
+  const git = args => execFileSync('git', args, { cwd: H.ROOT, stdio: ['ignore', 'pipe', 'pipe'] }).toString().trim();
+  let base = ''; try { base = git(['merge-base', 'HEAD', 'origin/beta']); } catch (e) { return t.skip('no origin/beta merge base in this checkout'); }
+  if (!base) return t.skip('no merge base');
+  let changed = false; try { git(['diff', '--quiet', base, '--', 'tests/golden', 'chains/chains-worklet.js', 'waves/waves-worklet.js', 'core', 'dsp', 'pump', 'lxr']); } catch (e) { changed = e.status === 1; if (!changed) return t.skip('git diff could not run'); }
+  assert.equal(changed, false, 'an audio file, golden or worklet differs from ' + base);
 });
 test('chains engine (read, not changed): two cables into one input equal the sum of the two signals', () => {
   const BYTES = new Uint8Array(fs.readFileSync(path.join(H.ROOT, 'chains/dsp/tfx.wasm')));

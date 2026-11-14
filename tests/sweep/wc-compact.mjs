@@ -214,7 +214,7 @@ async function run(ed) {
     }
 
     // an old patch: collapsed:true and nothing else
-    const old = spec.doc(); old.modules[1].collapsed = true; old.modules[3].collapsed = true; old.modules[1].view = 'mini';
+    const old = spec.doc(); old.modules[1].collapsed = true; old.modules[3].collapsed = true; old.modules[1].view = 'tiny';   // a view this build does not know reads as Compact ('mini' is Mini since pass 5)
     await load(page, base, ed, old);
     const oc = await collapsedIds(page), s1 = await sum('m2');
     ok(`${ed}: an old patch with collapsed:true opens as Compact`, oc.join() === 'm2,m4' && s1 && s1.shown && s1.text.length > 0, oc.join() + ' ' + JSON.stringify(s1));

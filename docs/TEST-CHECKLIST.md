@@ -1,4 +1,5 @@
 # Thunder Plus test checklist, by priority
+
 > Snapshot of the owner's Claude Doc "Thunder Plus test checklist, by priority" (https://claude.ai/artifact/LrzQ18ur18Fc5gkvxmQDbK), exported 14 Nov 2026 with his ticks as of that morning.
 > The live list is the Claude Doc; the source of every item is "Owner's punch list" in HANDOVER.md (build numbers are in brackets).
 > Re-export this file when the doc changes.
@@ -21,7 +22,7 @@ If something fails, tell Claude the build number and what happened; tick an item
 
 | Section | Open items | Mostly on | Why it matters |
 | --- | --- | --- | --- |
-| 1. Do these first | 31 | Phone and computer | Lost work or sound, and the re-checks of your last fixes |
+| 1. Do these first | 40 | Phone and computer | Lost work or sound, and the re-checks of your last fixes |
 | 2. Really worth trying | 33 | Phone | Everyday features nobody has tried on a real device |
 | 3. If you have time | 47 | Phone, then gear | Secondary features, by-ear comparisons and hardware |
 | 4. Safe to skip unless something looks wrong | 55 | Mixed | Cosmetic, older, or already covered by automated tests |
@@ -46,6 +47,20 @@ If something fails, tell Claude the build number and what happened; tick an item
 - [ ] Folded phone: opening an editor no longer puts a tip box over the patch; the Tips button at the bottom left opens it. (586)
 - [ ] Unfolded phone: the same Play / Edit switch and long-press menus work, and the top bar still shows everything. (586)
 - [ ] Computer: with a mouse nothing above changed how the editors behave; Alt+E switches Play / Edit. (586)
+
+### New in build 587: the editors on a computer
+
+*Mouse and keyboard changes in …chains and …waves. The first three change how things you already do behave.*
+
+- [ ] Computer: rest the pointer on a slider for a moment, then turn the mouse wheel: the value changes (hold Shift for fine steps). Scrolling across the patch without stopping on a slider never changes a value. Does the short wait feel right, also on a trackpad? (587)
+- [ ] Computer: Alt+click resets a slider; Ctrl / Cmd+click no longer does. Right-click on a slider opens Reset, Type a value, MIDI learn. Is losing Ctrl / Cmd+click a problem for you? (587)
+- [ ] Computer: plug a second cable into an input that already has one: both now feed it and add together (before, the new one replaced the old). Try two sources into one filter input: it should sound like both. (587)
+- [ ] Computer: modules now snap to a grid when you drag them. Good, or should it be off by default? (Right-click the background to turn it off.) (587)
+- [ ] Computer: press A (or N in …chains), type part of a module's name, Enter: it is added. F fits the patch; Shift+F zooms to what is selected; arrow keys nudge the selection; Ctrl / Cmd+A selects all. (587)
+- [ ] Computer: select three or more modules, right-click: Align, Space evenly, and on the background Tidy up. Do they do what you expect? (587)
+- [ ] Computer: right-click the background, Add a comment here; right-click a module, Rename. Save, reload: both are still there. (587)
+- [ ] Computer: hold the pointer over a cable: a small label says what it connects and its level. (587)
+- [ ] Computer, …chains: save a custom preset on a module, save the project, open it on another device or browser: the preset is there. (587)
 
 ### Re-check the fixes from your feedback
 

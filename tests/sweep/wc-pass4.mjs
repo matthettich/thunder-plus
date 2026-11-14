@@ -1,5 +1,3 @@
-import { execFileSync } from 'node:child_process';
-import require_fs from 'node:fs';
 // …waves / …chains pass 4, "Desktop feel" (14 Nov 2026; docs/audits/2026-11-13-waves-chains-ux.md: D1 D5 D7 D8 D10 M3 M4 M5 M8 M11 U4 U11),
 // plus the four review fixes of pass 3 (r1 section folds blocked in Play, r2 Alt+E ends a title-bar drag; r3 and r4 are in wc-pass3.mjs).
 // Both editors, standalone, with a real mouse and keyboard (playwright) at 1440x900 and 1280x800, and spot checks with touch (mobile:true). Prints PASS / FAIL.
@@ -505,8 +503,8 @@ async function u11(ed, OLD) {
   try {
     await loadDoc(page, base, ed, SPEC[ed].doc());
     const r = await page.evaluate(() => { const j = [...document.querySelectorAll('.jack:not([aria-hidden])')]; const nd = [...document.querySelectorAll('.node')];
-      return { jacks: j.length, bad: (j.find(x => !(x.getAttribute('role') === 'button' && (x.getAttribute('aria-label') || '').length > 3)) || {outerHTML:''}).outerHTML.slice(0,200), jr: j.every(x => x.getAttribute('role') === 'button' && (x.getAttribute('aria-label') || '').length > 3), nodes: nd.length, nr: nd.every(x => x.getAttribute('role') === 'group' && x.tabIndex === 0 && x.getAttribute('aria-label')), toast: document.getElementById('toast').getAttribute('role') + '/' + document.getElementById('toast').getAttribute('aria-live'), ws: document.getElementById('ws').getAttribute('role') + ':' + document.getElementById('ws').getAttribute('aria-label'), menu: document.getElementById('ctxmenu').getAttribute('role'), svg: document.getElementById('cables').getAttribute('aria-hidden'), jtab: j.some(x => x.tabIndex >= 0) }; });
-    ok(`${tag}: every jack has a role and a label (${r.jacks} jacks), every module is a labelled group and one tab stop (${r.nodes}), the canvas is a labelled region (${r.ws}), the toast is a live region (${r.toast})`, r.jr && r.nr && r.toast === 'status/polite' && r.ws === 'region:Patch' && r.menu === 'menu' && !r.jtab, JSON.stringify(r));
+      return { jacks: j.length, bad: (j.find(x => !(x.getAttribute('role') === 'img' && (x.getAttribute('aria-label') || '').length > 3)) || {outerHTML:''}).outerHTML.slice(0,200), jr: j.every(x => x.getAttribute('role') === 'img' && (x.getAttribute('aria-label') || '').length > 3), nodes: nd.length, nr: nd.every(x => x.getAttribute('role') === 'group' && x.tabIndex === 0 && x.getAttribute('aria-label')), toast: document.getElementById('toast').getAttribute('role') + '/' + document.getElementById('toast').getAttribute('aria-live'), ws: document.getElementById('ws').getAttribute('role') + ':' + document.getElementById('ws').getAttribute('aria-label'), menu: document.getElementById('ctxmenu').getAttribute('role'), svg: document.getElementById('cables').getAttribute('aria-hidden'), jtab: j.some(x => x.tabIndex >= 0) }; });
+    ok(`${tag}: every jack has a label and an honest role (img: patching is by pointer, not keyboard) (${r.jacks} jacks), every module is a labelled group and one tab stop (${r.nodes}), the canvas is a labelled region (${r.ws}), the toast is a live region (${r.toast})`, r.jr && r.nr && r.toast === 'status/polite' && r.ws === 'region:Patch' && r.menu === 'menu' && !r.jtab, JSON.stringify(r));
     await page.click('.node[data-id="m2"] > header .t', { button: 'right' }); await sleep(page, 150);
     ok(`${tag}: menu items have the menuitem role`, await page.evaluate(() => [...document.querySelectorAll('#ctxmenu .ctxitem')].every(b => b.getAttribute('role') === 'menuitem')));
     await page.keyboard.press('Escape'); await page.mouse.click(5, 5);
@@ -531,8 +529,15 @@ async function u11(ed, OLD) {
       ok(`${tag}: every module and jack is the same size and place as in build 586`, (await geo(page)) === (await geo(O.page)));
       const shot = async p => (await p.screenshot({ clip: { x: 38, y: 60, width: 1300, height: 800 } })).toString('base64');
       await page.evaluate(() => { document.activeElement && document.activeElement.blur(); }); await page.mouse.click(1330, 870); await O.page.mouse.click(1330, 870); await sleep(page, 300);
-      const sa = await shot(page), sb = await shot(O.page); require_fs.writeFileSync(`/tmp/u11-${ed}-new.png`, Buffer.from(sa, 'base64')); require_fs.writeFileSync(`/tmp/u11-${ed}-old.png`, Buffer.from(sb, 'base64'));
-      let nd = -1; try { nd = +execFileSync('python3', ['-c', `from PIL import Image, ImageChops\nd=ImageChops.difference(Image.open('/tmp/u11-${ed}-new.png').convert('RGB'),Image.open('/tmp/u11-${ed}-old.png').convert('RGB'))\nprint(sum(1 for p in d.getdata() if p!=(0,0,0)))`]).toString().trim(); } catch (_) { nd = sa === sb ? 0 : -1; }
+      const sa = await shot(page), sb = await shot(O.page);
+      // pixel diff inside the page (a canvas), with no helper program and no files outside the page
+      const nd = await page.evaluate(async ([x, y]) => {
+        const load = b64 => new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = 'data:image/png;base64,' + b64; });
+        const px = async b64 => { const i = await load(b64), c = document.createElement('canvas'); c.width = i.width; c.height = i.height; const g = c.getContext('2d'); g.drawImage(i, 0, 0); return g.getImageData(0, 0, i.width, i.height).data; };
+        const A = await px(x), Bd = await px(y); if (A.length !== Bd.length) return -1;
+        let n = 0; for (let i = 0; i < A.length; i += 4) if (A[i] !== Bd[i] || A[i + 1] !== Bd[i + 1] || A[i + 2] !== Bd[i + 2]) n++;
+        return n;
+      }, [sa, sb]);
       ok(`${tag}: the patch looks the same as build 586 (${nd} of 1,040,000 pixels differ: live meters only)`, nd >= 0 && nd < 300);
       await page.click('.node[data-id="m2"] > header .t'); const ring = await page.evaluate(() => document.querySelector('.node[data-id="m2"]').matches(':focus-visible')); ok(`${tag}: a mouse click on a module does not give it the keyboard focus ring (:focus-visible ${ring})`, ring === false);
       await O.close();
