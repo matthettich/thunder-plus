@@ -708,6 +708,11 @@ The owner's top priority to add is the MOD screen. Work down the list; ask befor
 
 Start a session by asking for results. Fix on `beta`. (10 Nov, 15:10: the web beta is build 560; the build numbers in the rest of this paragraph are older.) Web beta: https://matthettich.github.io/thunder-plus/beta/ (build 547 as of 10 Nov morning, 548 once its PR merges; the night of 9–10 Nov shipped 544–547, see the four "10 Nov" entries below. Decisions the lead made that night for the owner to confirm or reverse: on a phone the saved Sequencer default plays on the Page unless Audio thread is picked on that device; on a phone the safety limiter is its stand-in until another worklet loads; the resync only runs with a worklet loaded and its margins are untested on a device). Desktop: v1.3.4-beta.2 (build 541, no feed view or scopes); further desktop betas on hold until the owner asks.
 
+**Build 598** (the owner's three small requests of 14 Nov; branch `fix/stop-button-fx-fader`)
+- [ ] Computer, any skin: press Play on the Pattern screen: the small "■ STOP" at the right of the control bar looks like the other lit control bar buttons (flat, the skin's own playing colour; no amber, no thick border, no shadow) and still stops the song. Try white, an IDM skin and a Low power skin (dark text on a light fill there).
+- [ ] Bottom effects bar, a track's strip: the volume fader's cap is a flat line like the Mixer's, not a round knob; drag, wheel, double-click (0 dB), Shift-fine and the right-click menu work as before. A bus strip and the master strip too.
+- [ ] Poly track, a row with three notes: cursor on any one, Enter (EDIT on the phone): "3 notes picked up"; Enter on an empty row: all three appear in their columns; one Undo removes all three. A row with one note, a mono track and effect columns behave as before; a chord dropped on a mono track writes one note and says why.
+
 **Build 597** (module queue: Expression; branch `feat/modules-expr`)
 - [ ] **By ear:** add an Expression, a sound into A: it passes through (the formula is `a * k1`); K1 at 0.5: half as loud. Examples → Soft clip, raise K1: more drive. Bit crush (K1) and Sine at K1 kHz: a crusher and a pure tone.
 - [ ] **By ear:** change the formula while the song plays (pick another Example): any click or dropout?
@@ -1178,6 +1183,15 @@ Suggested order: N0 → N1 → N2 (phone cured) → N4 with N3 alongside → N5 
   the edge `R.t0`, "waiting…" while armed), `rcdClk` / `rcdFmt` / `rcdFreeSecs`, a 250 ms timer only while recording; the
   final length stays until the next take. recorder-check covers FREE, PATTERN, Stop, next take and closing mid-take.
 
+
+## 14 Nov (the owner's three small requests: Stop button, bottom-bar fader, chord pick-up; build 598)
+
+Branch `fix/stop-button-fx-fader`. A Sonnet agent built it, the lead reviewed. No audio code.
+- **Control bar Stop:** one CSS rule gave the pad's PLAY key and the thin control bar's `■ STOP` (`.tcmd button[data-c=song].on`) the same amber fill, 4 px border and hard shadow; the control bar's Stop is taken out of it and is now lit by the control bar's own "on" state (each skin's playing accent). The pad's PLAY key keeps its amber (his choice of 9 Nov). The Low power skins forced white text on lit buttons, which the thin bar fills light: lit text there is `var(--inv)` (also fixes SELECT and LOOP SEL). Checked in all 66 skins (contrast at least 3:1).
+- **Bottom-bar fader:** `.stcap` (a round 16 px knob) is now a 28 × 3 px bar like the Mixer's `.mfbar` (`--ink` with a `--panel` halo; 4 px on hover / drag). CSS only; behaviour pinned by a test.
+- **Chord pick-up:** `pickUp` / `insertAt` (reached from `editTap`, so Enter and the pad's EDIT): on a poly track a filled note cell picks up every note of the row when there are two or more (pick-up copies, as before; instrument and velocity are per row); the drop writes them to their own columns as one undo step and replaces notes already in those columns; on a mono track only the note that was under the cursor is written, with a toast; typing, recording or a single pick-up forgets the chord.
+- **Tests:** `tests/stop-button-skin.test.js`, `tests/bottom-fader-cap.test.js`, `tests/chord-pickup.test.js`.
+- **Queued from him the same afternoon (not in this build):** "add FX" from the FX bar should open the FX picker once it has paged to the Mixer; Arrange: more zoom-out, and page early with look-ahead (when the playhead is about 8 rows from the bottom, keep a few played rows at the top), not a centred playhead; MOD edits made while the song plays do not reach the audio-thread sequencer until the next PLAY (root cause found, see the next build); effects fed silence get very slow on his Windows PC (see the next build).
 
 ## 14 Nov (module queue: Expression; build 597)
 
