@@ -19455,6 +19455,23 @@ class ThunderFx extends AudioWorkletProcessor {
     if (hotBad(oL, oR, n)){ try { if (s.def.destroy) s.def.destroy(s.st); s.st = s.def.create(sampleRate); } catch (e){ s.dead = true; } return; }   // went bad: start it afresh, pass this block
     L.set(this.sub(oL, n)); R.set(this.sub(oR, n)); hotClip(L, R, n);
   }
+  /* SLOT NAP (14 Nov): an effect with nothing going in (under 1e-9, -180 dB) and nothing left coming out for a second is skipped, its
+     output silence, until something arrives; it then runs in that same block, from the state it stopped in (a tail below -180 dB). Why: a
+     reverb, resonator or delay fed silence lets its memories decay into numbers so small (denormals) that a PC's processor works them
+     out 10 to 20 times slower, for as long as the silence lasts (a phone's does not); the tiny guard added at the node's input does not
+     stop it. With sound going through, nothing changes: the slot runs exactly as before. Not for effects that speak up on their own
+     after a pause (Vinyl's crackle, pump CRUSH's): they always run. */
+  slotNap(s, n, tr){
+    if (s.nn === undefined) s.nn = /vinyl|pcrush/.test(String(s.key));
+    if (s.nn){ this.slotRun(s, n, tr); return; }
+    const L = this.L, R = this.R; let ip = 0;
+    for (let k = 0; k < n; k++){ const a = L[k] < 0 ? -L[k] : L[k], b = R[k] < 0 ? -R[k] : R[k]; if (a > ip) ip = a; if (b > ip) ip = b; }
+    if (s.zz){ if (ip < 1e-9){ for (let k = 0; k < n; k++){ L[k] = 0; R[k] = 0; } return; } s.zz = false; s.zq = 0; }
+    this.slotRun(s, n, tr);
+    if (ip < 1e-9){ let op = 0; for (let k = 0; k < n; k++){ const a = L[k] < 0 ? -L[k] : L[k], b = R[k] < 0 ? -R[k] : R[k]; if (a > op) op = a; if (b > op) op = b; }
+      if (op < 1e-9){ if ((s.zq = (s.zq || 0) + n) >= sampleRate) s.zz = true; } else s.zq = 0; }
+    else s.zq = 0;
+  }
   slotRun(s, n, tr){
     const x = this.x;
     if (s.def){ this.modRun(s, n); return; }
@@ -19494,7 +19511,19 @@ class ThunderFx extends AudioWorkletProcessor {
     // for the whole song. Only a tempo-locked slot (Flex / Step gate / Retrigger) needs to hear the clock while silent.
     if (this.pq && this.pq.length){ const old = currentTime - 1; while (this.pq.length && this.pq[0][1] < old) this.pq.shift(); if (this.pq.length) this.idle = 0; }   // …PUMP CREATIVE: notes due wake it (stale ones are dropped)
     // A node clocked only by Flex / Step gate sleeps too while the clock is stopped and it has been silent for longer than Flex's 13 s ring (the ring is then all silence, so waking it changes nothing).
-    if (ip < 1e-7 && this.idle >= sampleRate && (!this.clocked || (!this.chard && this.idle >= sampleRate * 14 && !(bp[0] >= 0 && bp[bp.length - 1] >= 0)))){ o[0].fill(0); if (o[1]) o[1].fill(0); this.fr += n; if (this.fr >= sampleRate / 2){ this.port.postMessage({load:this.ms / (this.fr / sampleRate * 1000)}); this.ms = 0; this.fr = 0; } return true; }
+    // SLEEP AND THE CLOCKED SLOTS (14 Nov): what a tempo-locked slot asks of the node depends on whether it is ON now (its own switch, or an FXO
+    // holding it). It used to count just by being in the chain, so a switched-OFF Retrigger kept its whole track's effects running on silence
+    // for the entire song, and on a PC their dying tails then became 10 to 20 times dearer (denormals: Chrome's audio thread does not flush
+    // them; measured on the owner's song, pump TWANG 64 -> 1300 µs a block from about 70 s after the sound stopped). ck: 0 nothing clocked is
+    // on (sleep after 1 s of silence); 1 only switched-off slots that keep a ring of the input for when they come on (Flex, Step gate,
+    // Retrigger ...: sleep once the silence is longer than the 13 s ring, clock running or not); 2 Flex / Step gate on (as 1, and only while
+    // the clock is stopped); 3 Retrigger, Grains, Scramble, Glitch or a clocked pump effect on (never: they keep running while stopped).
+    let ck = 0;
+    if (this.clocked) for (const s of this.slots){
+      const c = s.clk ? 3 : s.js ? (s.jt === 93 || (s.jt >= 100 && s.jt <= 102) ? 3 : s.jt === 94 || s.jt === 95 ? 2 : 0) : 0; if (!c) continue;
+      const sv = s.slot >= 0 && s.slot < 8 ? swv[s.slot] : -1, live = (sv < -0.5 ? s.on : sv > 0.5) || (s.pu !== undefined ? s.byp === false : s.g > 0);
+      const w = live ? c : s.js && s.js.feed ? 1 : 0; if (w > ck) ck = w; }
+    if (ip < 1e-7 && this.idle >= sampleRate && (ck === 0 || (ck < 3 && this.idle >= sampleRate * 14 && (ck === 1 || !(bp[0] >= 0 && bp[bp.length - 1] >= 0))))){ o[0].fill(0); if (o[1]) o[1].fill(0); this.fr += n; if (this.fr >= sampleRate / 2){ this.port.postMessage({load:this.ms / (this.fr / sampleRate * 1000)}); this.ms = 0; this.fr = 0; } return true; }
     if (i && i.length){ L.set(i[0]); R.set(i[1] || i[0]); } else { L.fill(0); R.fill(0); }
     // A NaN or infinity reaching the wasm hangs the tape delay for good and leaves many effects silent: zero those samples.
     // (sweep, 4 Nov) a loud but real sample (8 to 64, up to +36 dB) is clipped to ±8 rather than silenced: it was heard as a dropout
@@ -19508,18 +19537,19 @@ class ThunderFx extends AudioWorkletProcessor {
       this.ppq = on ? Math.max(0, bp[n - 1] + (this.cu || 0) - (n - 1) * T.tempo / 60 / sampleRate) : 0;   // …PUMP CREATIVE: the song position (quarter notes) at this block's start
       const tk = inputs[1], sd = inputs[2]; this.taps = tk && tk.length ? tk : null; this.sends = sd && sd.length ? sd : null; }   // SOURCE
     if (!this.dL){ this.dL = new Float32Array(128); this.dR = new Float32Array(128); }
+    const pqOn = !!(this.pq && this.pq.length);   // notes on their way to a pump effect: none of them naps
     for (const s of this.slots){
       // On or off: the slot's own setting, unless an FXO switch is holding it. Changes fade over 5 ms.
       const sv = s.slot >= 0 && s.slot < 8 ? swv[s.slot] : -1, tg = (sv < -0.5 ? s.on : sv > 0.5) ? 1 : 0;
       // …PUMP: on / off is the plugin's own bypass (latency-matched, crossfaded), so the timing never jumps; METER just stops
-      if (s.pu !== undefined){ if (s.byp !== !tg){ s.byp = !tg; s.dirty = true; } if (!(s.bi < 0 && s.byp)) this.slotRun(s, n, tr); if (this.lvl && tg && s.slot >= 0 && s.slot < 8){ const a = this.pk(n); if (a > this.lvlP[s.slot]) this.lvlP[s.slot] = a; } continue; }
+      if (s.pu !== undefined){ if (s.byp !== !tg){ s.byp = !tg; s.dirty = true; s.zq = 0; s.zz = false; } if (!(s.bi < 0 && s.byp)){ if (s.clk || pqOn) this.slotRun(s, n, tr); else this.slotNap(s, n, tr); } if (this.lvl && tg && s.slot >= 0 && s.slot < 8){ const a = this.pk(n); if (a > this.lvlP[s.slot]) this.lvlP[s.slot] = a; } continue; }
       if (s.g === undefined) s.g = tg;
       if (!tg && s.g <= 0){ if (s.js && s.js.feed){ tr.sw = sv; s.js.feed(this.L, this.R, n, tr); } continue; }
       const fade = s.g !== tg; if (fade){ this.dL.set(this.L); this.dR.set(this.R); }
       // FX DYNAMICS: Pressure, Multiband squash and the Transient shaper (wasm) have no reduction to report: their levels in and out
       const lvm = this.tel && !s.def && !s.js && (s.t === 7 || s.t === 26 || s.t === 28);
       if (lvm){ const a = this.pk(n); if (!(s.lip > a)) s.lip = a; }
-      tr.sw = sv; this.slotRun(s, n, tr);
+      tr.sw = sv; if (fade || (s.js && !(s.jt === 96 || s.jt === 97 || s.jt === 98))) this.slotRun(s, n, tr); else this.slotNap(s, n, tr);   // (the tempo-locked cores keep their own time and rings, and the Vintage sampler and Degrade make their own noise: they always run; Pitch delay, Pitch reverb and the Resonator nap like the rest)
       if (lvm){ const a = this.pk(n); if (!(s.lop > a)) s.lop = a; }
       if (fade){ const L = this.L, R = this.R, d = 1 / (sampleRate * 0.005); let g = s.g;
         for (let k = 0; k < n; k++){ g = tg ? Math.min(1, g + d) : Math.max(0, g - d); L[k] = this.dL[k] + (L[k] - this.dL[k]) * g; R[k] = this.dR[k] + (R[k] - this.dR[k]) * g; }
@@ -23125,7 +23155,7 @@ function padBlink(e){
 // Phones and tablets (10 Nov): the audio-thread sequencer's module (a second thread) loads only when the owner picked it there
 // (aset.corePick, set in Settings); the saved default 'core' plays on the Page sequencer on such a device.
 function coreWanted(){ return aset.core === 'core' && (!wkLazy() || !!aset.corePick); }   // (a declaration: the Settings row reads it at load)
-const CORE_REV = '1dll47d';
+const CORE_REV = '1q1bsbi';
 const CORE_WANT = 7;   // the core's message set this page speaks (core-processor.js CORE_V); an older core is not used
 const CORE_URL = () => 'core/seq-core.js?v=' + BUILD + '-' + CORE_REV;
 const core = {node:null, ready:false, loading:null, gen:0, sent:new Map(), sT:0, tally:new Map(), mir:null};   // mir: what the core's song holds, as JSON per part (coreDiff)   // tally: events by who played them (test hook)
