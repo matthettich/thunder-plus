@@ -361,5 +361,17 @@
  "clock @switches-on": "cf1d0de1",
  "scope @default": "d6003f4f",
  "scope @stressed": "435db1c8",
- "scope @switches-on": "435db1c8"
+ "scope @switches-on": "435db1c8",
+ "onepole @default": "5e8f22c5",
+ "onepole @stressed": "c9d9b485",
+ "onepole @switches-on": "1e512b09",
+ "allpass @default": "3cede7ed",
+ "allpass @stressed": "8dcae87d",
+ "allpass @switches-on": "d367a7c5",
+ "dcblock @default": "1a405db5",
+ "dcblock @stressed": "9bbb4179",
+ "dcblock @switches-on": "c5e8973d",
+ "midside @default": "3ba261dd",
+ "midside @stressed": "3171e9dd",
+ "midside @switches-on": "8e712c25"
 }

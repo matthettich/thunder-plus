@@ -88,7 +88,7 @@ test('waves: every module renders finite audio and matches its golden hash (defa
   const { D } = engine(), actual = {}, bad = [];
   // The hashes depend on how many renders came before them in this one wasm instance (see SKIP below), so a module added later is
   // rendered after all the existing ones (LATE, in this order): that way no existing hash moves. Add new modules to LATE, not into the sorted run.
-  const LATE = ['compare', 'const', 'rect', 'scale', 'switch', 'xfade', 'clkmul', 'chance', 'counter', 'stepsw', 'burst', 'gatedly', 'flipflop', 'steps', 'clock', 'scope'];
+  const LATE = ['compare', 'const', 'rect', 'scale', 'switch', 'xfade', 'clkmul', 'chance', 'counter', 'stepsw', 'burst', 'gatedly', 'flipflop', 'steps', 'clock', 'scope', 'onepole', 'allpass', 'dcblock', 'midside'];
   for (const type of Object.keys(D.MODULES).filter(t => !LATE.includes(t)).sort().concat(LATE)) {
     const m = D.MODULES[type]; if (!m || !m.process || SKIP.has(type)) continue;
     const d = renderModule(D, type), s = renderModule(D, type, stress(m)), w = renderModule(D, type, switchesOn(m));
