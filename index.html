@@ -24159,6 +24159,7 @@ function projSet(path, handle){
   if (!DESK && canFS) kvSet('cur', projFile || null);
   if (projPath || projFile) recentAdd({name:projLabel(), path:projPath, h:projFile});
   try { msMeta(); } catch(e){}   // the notification's title follows the file
+  try { dirtyShow(); } catch(e){}   // and so does the window title (Save as: setDirty ran before the file changed)
 }
 // Unsaved changes: set by every song or sound edit (markChange, from saveS and changed), cleared by a save or an open.
 // Edits in the first moments after start-up (conversions, the saved song settling) don't count.

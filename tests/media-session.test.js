@@ -93,5 +93,6 @@ test('title (14 Nov): a project opened without a file handle shows the file name
   assert.equal(R.ms.metadata.artist, 'Thunder Plus'); assert.ok(R.ms.metadata.artwork.every(a => /^https:\/\/x\.example\/beta\/icons\/plus-icon-\d+\.png/.test(a.src)), 'the app\'s own icons');
   // the wiring: every place that opens / replaces / renames refreshes it
   assert.match(src, /projLoose = null;\n/); assert.match(src, /function projSet\([^)]*\)\{[^}]*projLoose = null/, 'projSet drops it');
-  assert.match(src, /document\.title !== t|msTitle\(\)\) \|\| S\.name/, 'window title uses the same name');
+  assert.match(src, /t = \(projDirty \? '• ' : ''\) \+ \(\(typeof msTitle === 'function' && msTitle\(\)\) \|\| S\.name/, 'the window title is worked out from the same name as the notification');
+  assert.match(src, /function projSet\([^)]*\)\{[\s\S]{0,700}?dirtyShow\(\)/, 'projSet refreshes the window title (Save as)');
 });

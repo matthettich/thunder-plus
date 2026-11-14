@@ -366,6 +366,7 @@ clock mapping at that latency (7 Nov (16)). Re-check MIDI timing with Measure…
 
 ## Desktop releases
 
+- **v1.3.5** (14 Nov 2026, a regular release; owner, 14 Nov: "Merge `beta` into `main` and build the desktop app"; PR #120 beta → main at build 589 (CodeRabbit had not finished after 15 minutes and left no comments), Run workflow through the API with version 1.3.5, run 43637300817, succeeded): everything since build 563 (the 12–13 Nov phone fixes, Lite reverb and presets, the Synth page rework, …waves / …chains audit passes 1–5, feedback loops). Installed copies update to it.
 - **v1.3.4** (11 Nov 2026, a regular release; owner, 10 Nov 22:49: "do the queue and push a full desktop app after you do"; PR #92 beta → main at build 563, Run workflow through the API with version 1.3.4, run 42983473062, all three platforms built, 11 assets): everything since build 541 (MOD finished, the 10 Nov stability work, build 563). Installed copies update to it.
 - **v1.3.4-beta.2** (9 Nov 2026, pre-release; owner asked for a beta desktop; Run workflow through the API from `beta` at build 541, run 42700107769): MOD screen, chains rail lines, acid Mutate. **v1.3.4-beta.1**: the same at build 540, without acid Mutate. Owner, 9 Nov: hold further desktop betas for now.
 - **v1.3.3** (8 Nov 2026; owner: update the desktop app at a stopping point; Run workflow through the API with version 1.3.3, from `main` at build 523): builds 517–523 on top of v1.3.2 (`· beta` label, Mobile SHIFT+▲, pad MUTE / SOLO, the review fixes).
