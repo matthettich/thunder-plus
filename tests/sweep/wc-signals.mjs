@@ -32,7 +32,10 @@ const KIND_AT = { audio: 0, gate: 1, mod: 2 };
 const HELP = `(() => {
   if (window.__sig) return;
   const colour = c => { const d = document.createElement('i'); d.style.color = c; document.body.append(d); const v = getComputedStyle(d).color; d.remove(); return v; };
-  const gs = () => [...document.querySelectorAll('svg.cables g')].filter(g => g.querySelector('path.hit'));
+  // D4 (13 Nov): the hit lines are in svg.cables.under, one g per cable in the same order as the drawn cables in svg.cables (a cable being dragged has no hit line and comes after them)
+  const hits = () => [...document.querySelectorAll('svg.cables.under g')];
+  const gs = () => [...document.querySelectorAll('svg.cables:not(.under) g')].filter(g => g.querySelector('path.cln')).slice(0, hits().length);
+  const hitOf = g => hits()[gs().indexOf(g)].querySelector('path.hit');
   window.__sig = {
     colour,
     gs,
@@ -41,12 +44,12 @@ const HELP = `(() => {
     jack: el => { const cs = getComputedStyle(el), m = new DOMMatrix(cs.transform === 'none' ? undefined : cs.transform); return { w: Math.round(el.offsetWidth), br: cs.borderTopLeftRadius, rot: Math.round(Math.atan2(m.b, m.a) * 180 / Math.PI), k: el.dataset.kind }; },
     dash: g => { const cs = getComputedStyle(g.querySelector('path.cln')); return { da: cs.strokeDasharray, cap: cs.strokeLinecap, w: parseFloat(cs.strokeWidth) }; },
     // a point on the cable that really hits it (elementFromPoint is its own .hit), with the unit normal there; screen pixels
-    point: i => { const g = gs()[i]; if (!g) return null; const p = g.querySelector('path.cln'), hit = g.querySelector('path.hit'), L = p.getTotalLength(), m = p.getScreenCTM();
+    point: i => { const g = gs()[i]; if (!g) return null; const p = g.querySelector('path.cln'), hit = hitOf(g), L = p.getTotalLength(), m = p.getScreenCTM();
       const S = q => { const pt = p.getPointAtLength(q); return [m.a * pt.x + m.c * pt.y + m.e, m.b * pt.x + m.d * pt.y + m.f]; };
       for (const t of [.5, .45, .55, .4, .6, .35, .65, .3, .7, .25, .75, .2, .8]) { const [x, y] = S(L * t), [x2, y2] = S(L * t + 2), dx = x2 - x, dy = y2 - y, d = Math.hypot(dx, dy) || 1;
         if (document.elementFromPoint(x, y) === hit && ![...g.querySelectorAll('rect.bend')].some(r => { const b = r.getBoundingClientRect(); return Math.hypot(b.left + b.width / 2 - x, b.top + b.height / 2 - y) < 18; }) && !document.elementsFromPoint(x, y).some(e => e.classList && e.classList.contains('jack'))) return { x, y, nx: -dy / d, ny: dx / d }; }
       return null; },
-    hitAt: (i, x, y) => { const g = gs()[i]; return !!g && document.elementFromPoint(x, y) === g.querySelector('path.hit'); },
+    hitAt: (i, x, y) => { const g = gs()[i]; return !!g && document.elementFromPoint(x, y) === hitOf(g); },
     handleBox: i => { const g = gs()[i], r = g.querySelector('rect.bend'); if (!r) return null; const b = r.getBoundingClientRect(), cs = getComputedStyle(r); return { x: b.left + b.width / 2, y: b.top + b.height / 2, w: b.width, op: +cs.opacity, pe: cs.pointerEvents }; },
     paths: () => gs().map(g => g.querySelector('path.cln').getAttribute('d')),
     zoom: () => new DOMMatrix(getComputedStyle(document.querySelector('.world')).transform).a,
@@ -55,7 +58,7 @@ const HELP = `(() => {
     dimCount: () => gs().filter(g => g.classList.contains('dim')).length,
     stroke: g => getComputedStyle(g.querySelector('path.cln')).strokeWidth,
     // the halo: the alpha of the hit line's stroke colour times its opacity (0 at rest, when it is transparent)
-    halo: g => { const cs = getComputedStyle(g.querySelector('path.hit')), m = /rgba?\\(([^)]+)\\)/.exec(cs.stroke), a = m ? (m[1].split(',').length > 3 ? parseFloat(m[1].split(',')[3]) : 1) : 0; return +(a * parseFloat(cs.strokeOpacity)).toFixed(3); },
+    halo: g => { const cs = getComputedStyle(hitOf(g)), m = /rgba?\\(([^)]+)\\)/.exec(cs.stroke), a = m ? (m[1].split(',').length > 3 ? parseFloat(m[1].split(',')[3]) : 1) : 0; return +(a * parseFloat(cs.strokeOpacity)).toFixed(3); },
   };
 })()`;
 const S = (page, expr) => page.evaluate(`(() => { ${HELP}; return (${expr}); })()`);
@@ -114,7 +117,7 @@ async function run(ed) {
     // the cable being dragged is drawn in its own kind
     const gj = await page.evaluate(() => { const r = document.querySelector('.node[data-id="m3"] .jack[data-dir="out"][data-port="accent"]').getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2, kind: document.querySelector('.node[data-id="m3"] .jack[data-port="accent"]').dataset.kind }; });
     await page.mouse.move(gj.x, gj.y); await page.mouse.down(); await page.mouse.move(gj.x + 150, gj.y + 90, { steps: 6 }); await sleep(page, 120);
-    const dr = await page.evaluate(() => { const gs = [...document.querySelectorAll('svg.cables g')].filter(g => !g.querySelector('path.hit') && g.querySelector('path.cln')); const l = gs[0] && gs[0].querySelector('path.cln'); return l ? { gate: l.classList.contains('gate'), da: getComputedStyle(l).strokeDasharray } : null; });
+    const dr = await page.evaluate(() => { const n = document.querySelectorAll('svg.cables.under g').length, gs = [...document.querySelectorAll('svg.cables:not(.under) g')].filter(g => g.querySelector('path.cln')).slice(n); const l = gs[0] && gs[0].querySelector('path.cln'); return l ? { gate: l.classList.contains('gate'), da: getComputedStyle(l).strokeDasharray } : null; });
     await page.mouse.up(); await sleep(page, 200);
     ok(`${ed} M9: the cable being dragged from a gate jack is dotted like a gate cable (${gj.kind})`, gj.kind === 'gate' && dr && dr.gate && dr.da === cd.gate.da, JSON.stringify(dr));
     ok(`${ed}: ...and dropping it on empty space left the patch as it was`, (await S(page, '__sig.count()')) === 3);
@@ -147,10 +150,10 @@ async function run(ed) {
         await page.mouse.move(1380, 400); await sleep(page, 60);
         const p = pts[i], w0 = await S(page, `__sig.stroke(__sig.gs()[${i}])`), cls0 = await S(page, `__sig.gs()[${i}].getAttribute('class') || ''`);
         await page.mouse.move(p.x, p.y); await sleep(page, 60);
-        const hov = await S(page, `(() => { const g = __sig.gs()[${i}]; return { on: g.matches(':hover'), w: __sig.stroke(g), halo: __sig.halo(g), cls: g.getAttribute('class') || '' }; })()`);
+        const hov = await S(page, `(() => { const g = __sig.gs()[${i}]; return { on: g.matches(':hover, .hov'), w: __sig.stroke(g), halo: __sig.halo(g), cls: g.getAttribute('class') || '' }; })()`);
         await page.mouse.move(p.x + p.nx * 60, p.y + p.ny * 60); await sleep(page, 60);
-        const back = await S(page, `(() => { const g = __sig.gs()[${i}]; return { on: g.matches(':hover'), w: __sig.stroke(g), halo: __sig.halo(g) }; })()`);
-        ok(`${ed} @${z} D6: hovering the ${name} cable thickens it and shows a halo; leaving restores it (${w0} > ${hov.w} > ${back.w})`, hov.on && parseFloat(hov.w) > parseFloat(w0) && +hov.halo > 0 && hov.cls === cls0 && !back.on && back.w === w0 && +back.halo === 0, JSON.stringify({ hov, back }));
+        const back = await S(page, `(() => { const g = __sig.gs()[${i}]; return { on: g.matches(':hover, .hov'), w: __sig.stroke(g), halo: __sig.halo(g) }; })()`);
+        ok(`${ed} @${z} D6: hovering the ${name} cable thickens it and shows a halo; leaving restores it (${w0} > ${hov.w} > ${back.w})`, hov.on && parseFloat(hov.w) > parseFloat(w0) && +hov.halo > 0 && hov.cls.replace(/\bhov\b/, '').trim() === cls0 && !back.on && back.w === w0 && +back.halo === 0, JSON.stringify({ hov, back }));
       }
       // handles: hidden at rest, there on hover (the bent cable), 12 px or more across
       const hp = await S(page, `__sig.handleBox(0)`);
