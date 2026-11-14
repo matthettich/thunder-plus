@@ -1616,6 +1616,17 @@ body.arrsmall #tArr .tatop button{width:26px} body.asong #tArr .tatop button{wid
 .tagrid .ar.q4{margin-top:7px}
 .tagrid .ar.q4::before{content:''; position:absolute; left:8px; right:8px; top:-5px; height:1px; background:var(--ar-ink, #111); opacity:.45; pointer-events:none}
 .tagrid .rn{font-size:var(--fs-1); line-height:var(--arh,16px); color:var(--ar-dim); cursor:pointer}
+/* ARRANGE ZOOM OUT (14 Nov): rows below the fit size; tighter gaps, row numbers and labels that shrink with the row, and under 10 px only every fourth row's number and no label (the block's colour, the cursor, the selection, the playhead and the hatching of a muted block stay) */
+.tarr.arout .tagrid .ar{margin-bottom:1px}
+.tarr.arout .tagrid .ar.q4{margin-top:3px}
+.tarr.arout .tagrid .ar.q4::before{top:-2px}
+body .tarr.arout .tagrid .rn{font-size:var(--arn, 7px)}
+.tarr.arout .tagrid b{border-radius:1px}
+.tarr.arout .tagrid b.z:not(.p):not(.m)::after{inset:1px}
+.tarr.arlow .tagrid .rn:not(.r4):not(.rc):not(.pl){color:transparent}
+.tarr.arlow .tagrid b.p{outline-width:1px}
+.tarr.arlow .tagrid b.sl{box-shadow:inset 0 0 0 1px var(--ar-sel) !important}
+.tarr.arlow .tagrid b.o:not(.p)::after{height:1px; margin-top:0}
 .tagrid .rn.r4{color:var(--ar-ink); font-weight:700}
 .tagrid .rn.pl{background:var(--ar-pl); color:var(--ar-pl-ink); border-radius:2px}
  .tagrid b{display:block; position:relative; height:var(--arh,16px); line-height:var(--arh,16px); font-size:var(--arf,9px); font-weight:600; text-align:center; border-radius:2px; background:var(--ar-empty); color:transparent; cursor:pointer}
@@ -24959,6 +24970,8 @@ function arrPageTop(top, VR, row, len, keep = -1, end = len - 1){
   VR = Math.max(2, VR | 0); const ahead = VR < 16 ? Math.max(1, VR >> 2) : ARR_AHEAD, kp = Math.min(ARR_KEEP, Math.max(1, VR >> 3));
   if (row >= top && row < top + VR && (row < top + VR - ahead || end < top + VR)) return top;   // well inside, or nothing more to come before the wrap: nothing turns
   let nt = row < top ? row : row - kp;
+  // The last page: when the end is within reach, one turn goes straight to the page that shows it (the playhead already on it), instead of turning again a few rows on
+  if (row >= top){ const lastTop = end - VR + 1; if (lastTop > top && lastTop <= row && lastTop - nt <= ahead) nt = lastTop; }
   if (keep >= 0 && keep !== row && (row < top || row >= top + VR)) nt = Math.min(keep, nt);   // (the cursor holds the page only when the playhead has left the view; an early turn is the playhead's, the owner idle)
   return clamp(nt, 0, Math.max(0, len - VR));
 }
@@ -24970,8 +24983,6 @@ function arrWrapRow(){
   for (let y = 255; y >= 0; y--){ const r = S.song[y]; if (r && r.some(v => v >= 0)) return y; }
   return 0;
 }
-  // The last page: when the end is within reach, one turn goes straight to the page that shows it (the playhead already on it), instead of turning again a few rows on
-  if (row >= top){ const lastTop = end - VR + 1; if (lastTop > top && lastTop <= row && lastTop - nt <= ahead) nt = lastTop; }
 function arrFollowPage(own){
   if (handsOn(FOLLOW_HOLD, arrHandT, arrTouchT)) return;   // (9 Nov, owner: tapping blocks made the view fight itself)
   // A follow mode that's on pages again after the short hold; FOLLOW OFF keeps the owner's minute (3 Nov)
@@ -31726,12 +31737,16 @@ let arrFast = false, arrFastKey = '', arrFastN = 0, arrFastR = -1, arrSoon = 0; 
 // ARR_ZOOM_BTNS: the − ○ + in the arrange header (○ = fit). Set it to false to take them away (pinch and Ctrl+wheel stay).
 const ARR_ZOOM_BTNS = true;
 const AZK = 'thunderplus-arrange-zoom-v1', AZ_MAX = 3, AZ_STEPS = [1, 1.5, 2, 2.5, 3];
-let arrZoom = (() => { try { const z = parseFloat(localStorage.getItem(AZK)); return z >= 1 && z <= AZ_MAX ? z : 1; } catch(e){ return 1; } })();
+// ZOOM OUT (14 Nov, owner: "difficult to see whole phrases"): below 1 (fit: every track in the panel, today's smallest) the ROWS get lower, the columns stay at fit, so many more song rows are in view
+// (about 1.5, 2, 2.5, 3 and 4 times as many as at fit). The same saved number (AZK), the same − ○ +, Ctrl+wheel and pinch reach it; never zooming leaves it at 1, as before. AZ_OUT: the − button's steps.
+const AZ_MIN = 0.32, AZ_OUT = [0.8, 0.64, 0.5, 0.4, 0.32], AZ_RH_MIN = 5;
+let arrZoom = (() => { try { const z = parseFloat(localStorage.getItem(AZK)); return z >= AZ_MIN && z <= AZ_MAX ? z : 1; } catch(e){ return 1; } })();
 let arrBigPre = null, arrBigFloor = 0;   // BIGGER CELLS: the zoom the user chose while the cells are raised to the floor; the zoom that makes a cell 28 px
 let arrPinch = null, arrCurX = -1, arrWheelT = 0, arrFitW = 30;
 // On a computer (Desktop, a mouse) zoom is gentler and stops sooner: blocks grow to about 84 px wide at most, in 1.25×
 // steps (Ctrl+wheel about 1.15× a notch), and the song cursor's block stays where it is on screen while zooming.
 const arrDeskZ = () => !document.body.classList.contains('mob') && !matchMedia('(pointer: coarse)').matches;
+const arrZMin = () => bigCellsOn && !arrDeskZ() ? 1 : AZ_MIN;   // BIGGER CELLS (touch) keeps cells from shrinking
 const arrZMax = () => arrDeskZ() ? clamp(84 / Math.max(6, arrFitW), 1.25, AZ_MAX) : Math.max(AZ_MAX, arrBigFloor);
 const arrPtrs = new Set();
 const arrEl = $('tArr'), arrGrid = $('tArrGrid');
@@ -32044,10 +32059,14 @@ function drawArr0(PH){
   if (ms && selA && selA.v === 'song'){ const r = selRect(); for (let y = r.y0; y <= r.y1; y++) for (let t = r.x0; t <= r.x1; t++) mark(y, t, 'sl'); }
   if (ms) for (const p of sxPicks) mark(p.y, p.t, 'sl');
   const nm = mutedCount();
-  setText($('tArrSub'), (ms ? S.name + ' · ' : '') + (lastR + 1) + (lastR ? ' rows' : ' row') + (nm ? ` · ${nm} muted` : '') + (arrZoom > 1 ? ` · ${+arrZoom.toFixed(1)}×` : ''));
+  setText($('tArrSub'), (ms ? S.name + ' · ' : '') + (lastR + 1) + (lastR ? ' rows' : ' row') + (nm ? ` · ${nm} muted` : '') + (arrZoom > 1 ? ` · ${+arrZoom.toFixed(1)}×` : arrZoom < 1 ? ` · ${Math.round(arrZoom * 100)}%` : ''));
   { const lb = arrEl.querySelector('.tahl b'); if (lb && lb.textContent !== (ms ? 'SONG' : 'ARRANGE')) lb.textContent = ms ? 'SONG' : 'ARRANGE'; }
   // As the Song screen the grid holds whole rows only (the space left over sits under the boxes), so it never ends on half a row.
-  if (fast){} else if (ms){ const pitch = (arrRowH() || arRH + 2) * 1.04, avail = arrAvail(), rows = Math.max(2, Math.floor((avail - 3) / pitch)), hg = Math.min(avail, Math.round(3 + rows * pitch)) + 'px';   // (×1.04: the gap every 4 rows)
+  if (fast){} else if (ms){ const avail = arrAvail(); let hg;
+    if (arrZoom < 1 && arrGrid.children.length > 8){   // ZOOM OUT: the rows are measured (the gap every 4 rows is 3 px here), so the last row is whole
+      const t0 = arrRowTop(0), rowH = arrGrid.children[0].offsetHeight, fit = n => arrRowTop(n - 1) - t0 + rowH + 3 <= avail; let n = 2; while (n < 256 && fit(n + 1)) n++;
+      hg = Math.min(avail, Math.round(arrRowTop(n - 1) - t0 + rowH + 3)) + 'px'; }
+    else { const pitch = (arrRowH() || arRH + 2) * 1.04, rows = Math.max(2, Math.floor((avail - 3) / pitch)); hg = Math.min(avail, Math.round(3 + rows * pitch)) + 'px'; }   // (×1.04: the gap every 4 rows)
     if (arrGrid.style.height !== hg) arrGrid.style.height = hg; }
   else if (arrGrid.style.height) arrGrid.style.height = '';
   arrSbw(); arrAlign(); arrFollowX(); arrBoxes();
@@ -32185,6 +32204,7 @@ function arrSize(){
   if (bigOn && arrBigFloor > 1 && arrZoom < arrBigFloor - 0.005){ if (arrBigPre == null) arrBigPre = arrZoom; arrZoom = arrBigFloor; }
   else if (!bigOn && arrBigPre != null){ arrZoom = arrBigPre; arrBigPre = null; }
   if (arrZoom > arrZMax()) arrZoom = arrZMax();   // a zoom saved on a smaller screen
+  if (arrZoom < arrZMin()) arrZoom = arrZMin();
   const z = arrZoom > 1 ? arrZoom : 1;
   const col = z > 1 ? Math.max(6, cwFit * z).toFixed(1) + 'px' : 'minmax(0,1fr)', grp = [];
   if (ms){ if (PFs > 0) grp.push(`repeat(${PFs},${col})`); if (NA > PFs) grp.push(`repeat(${NA - PFs},${col})`); grp.push(col); }
@@ -32192,24 +32212,27 @@ function arrSize(){
   arrEl.style.setProperty('--arcols', grp.join(` ${SP}px `));
   // As the Song screen the row height comes from the space the grid HAS (arrAvail), not the grid's own height: drawArr
   // snaps that height to whole rows, so reading it back here flipped 12 rows ↔ 13 rows on every redraw during playback.
-  const cw = (W - 34) / (NA + mx + 0.3 + (G + mx) * 0.2) * z, rh = Math.max(bigOn ? 24 : 0, clamp(Math.round(cw * 0.8), 16, z > 1 ? (arrDeskZ() ? (ms ? 34 : 40) : 44) : ms ? clamp(Math.floor(arrAvail() / 12) - 3, 16, 30) : 40));   // as the Song screen: at least about 12 rows, as the text grid showed
+  const cw = (W - 34) / (NA + mx + 0.3 + (G + mx) * 0.2) * z; let rh = Math.max(bigOn ? 24 : 0, clamp(Math.round(cw * 0.8), 16, z > 1 ? (arrDeskZ() ? (ms ? 34 : 40) : 44) : ms ? clamp(Math.floor(arrAvail() / 12) - 3, 16, 30) : 40));   // as the Song screen: at least about 12 rows, as the text grid showed
   // THREE DIGITS: the label also has to fit the block's width (three characters); too narrow for 7 px text, no label.
-  const lf = Math.min(clamp(Math.round(rh * 0.5), 8, 16), Math.floor(cwFit * z / 2));
-  arrGrid.style.setProperty('--arh', rh + 'px'); arrGrid.style.setProperty('--arf', Math.max(7, lf) + 'px'); arrEl.classList.toggle('arnolab', lf < 7);
+  const rh1 = rh; if (arrZoom < 1) rh = Math.max(AZ_RH_MIN, Math.round(rh * arrZoom));   // ZOOM OUT: lower rows (the columns stay at fit)
+  let lf = Math.min(clamp(Math.round(rh1 * 0.5), 8, 16), Math.floor(cwFit * z / 2));
+  if (arrZoom < 1) lf = Math.min(lf, Math.round(rh * 0.7));   // a number needs about 7 px: under that the block shows its colour only (arnolab)
+  arrGrid.style.setProperty('--arh', rh + 'px'); arrGrid.style.setProperty('--arf', Math.max(arrZoom < 1 ? 5 : 7, lf) + 'px'); arrEl.classList.toggle('arnolab', lf < 7);
+  arrGrid.style.setProperty('--arn', clamp(rh - 2, 5, 11) + 'px'); arrEl.classList.toggle('arout', arrZoom < 1); arrEl.classList.toggle('arlow', arrZoom < 1 && rh < 10);
   // Where the MONO | POLY break sits when every track fits (track PF's column starts after a spacer every 8 tracks):
   // the header's ○ is centred over it, and stays there while zoomed so it is always in the same place.
   { const p = sm ? 6 : 8, rnw = RNW, g = sm ? 1 : 2, PF = polyFrom(), colL = t => p + rnw + g + t * (cwFit + g) + (t >= PF && PF > 0 ? 1 : 0) * (SP + g);
     const bx = PF > 0 && PF < NA ? (colL(PF - 1) + cwFit + colL(PF)) / 2 : W / 2;
     arrEl.style.setProperty('--azfx', Math.max(120, Math.min(W - 70, bx)).toFixed(1) + 'px'); }
   arrEl.classList.toggle('zoomed', z > 1);
-  if (ARR_ZOOM_BTNS){ $('tArrZo').disabled = $('tArrZf').disabled = z <= 1; $('tArrZi').disabled = z >= arrZMax() - 0.01; }
+  if (ARR_ZOOM_BTNS){ $('tArrZo').disabled = arrZoom <= arrZMin() + 0.01; $('tArrZf').disabled = Math.abs(arrZoom - 1) < 0.01; $('tArrZi').disabled = arrZoom >= arrZMax() - 0.01; }
   return rh;
 }
 function arrHSync(){ const x = arrGrid.scrollLeft; $('tArrTh').scrollLeft = x; $('tArrGp').scrollLeft = x; if (asongOn()) arrBoxes(); }
 // fx: the point to keep still, as a fraction of the content's width; cx: where it sits in the panel (px). On a computer
 // the song cursor's block is the point kept still instead (or brought to the middle if it was out of view).
 function arrSetZoom(z, fx, cx){
-  z = clamp(z, 1, arrZMax()); if (z < 1.05) z = 1;
+  z = clamp(z, arrZMin(), arrZMax()); if (z > 0.95 && z < 1.05) z = 1;   // (a pinch near fit snaps to fit; below it the zoom-out levels)
   if (Math.abs(z - arrZoom) < 0.005) return;
   let el = null;
   if (arrDeskZ() && !arrPinch){
@@ -32291,8 +32314,11 @@ arrGrid.addEventListener('wheel', e => {
 if (ARR_ZOOM_BTNS){
   const step = d => {
     let z;
-    if (arrDeskZ()){ const m = arrZMax(); z = d > 0 ? (arrZoom >= m - 0.01 ? null : Math.min(m, arrZoom * 1.25)) : (arrZoom <= 1 ? null : arrZoom / 1.25); }
+    if (d < 0 && arrZoom <= 1.01) z = AZ_OUT.find(s => s < arrZoom - 0.01) || null;   // below fit: the zoom-out levels
+    else if (d > 0 && arrZoom < 0.99) z = [...AZ_OUT].reverse().concat(1).find(s => s > arrZoom + 0.01);
+    else if (arrDeskZ()){ const m = arrZMax(); z = d > 0 ? (arrZoom >= m - 0.01 ? null : Math.min(m, arrZoom * 1.25)) : arrZoom / 1.25; }
     else z = d > 0 ? AZ_STEPS.find(s => s > arrZoom + 0.01) : [...AZ_STEPS].reverse().find(s => s < arrZoom - 0.01);
+    if (z != null && z < arrZMin() - 0.001) z = null;
     if (z == null) return; arrSetZoom(z); arrZoomDone(); };
   $('tArrZo').addEventListener('click', () => step(-1)); $('tArrZi').addEventListener('click', () => step(1));
   $('tArrZf').addEventListener('click', () => { arrSetZoom(1); arrZoomDone(); });   // ○: back to every track in the panel
