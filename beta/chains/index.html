@@ -433,6 +433,21 @@ body.selmode .ws{cursor:crosshair}
 html{-webkit-touch-callout:none; touch-action:pan-x pan-y; -webkit-text-size-adjust:100%; text-size-adjust:100%}
 body{user-select:none; -webkit-user-select:none; -webkit-touch-callout:none}
 :is(input:not([type=range]):not([type=checkbox]):not([type=radio]),textarea,[contenteditable]:not([contenteditable=false])){user-select:text; -webkit-user-select:text; -webkit-touch-callout:default}
+/* ═══ PASS 4 (14 Nov 2026): desktop feel ═══ */
+.row.sl input.wheelon{outline:2px solid var(--selc); outline-offset:2px}   /* the wheel changes this slider now (it has been rested on) */
+.node:focus:not(:focus-visible){outline:none}
+.cabread{position:fixed; z-index:2000000; pointer-events:none; max-width:340px; padding:5px 9px; background:var(--panel); color:var(--ink); border:1px solid var(--edge); font-size:12.5px; line-height:1.35; white-space:pre-wrap}
+#notes{position:absolute; left:0; top:0; width:0; height:0}
+.cmt{border:1px dashed var(--muted); background:var(--panel-2); color:var(--ink); pointer-events:auto}
+.cmt .cgrip{display:flex; align-items:center; justify-content:space-between; gap:6px; padding:1px 2px 1px 8px; font-size:11px; color:var(--muted); cursor:grab; user-select:none; border-bottom:1px dashed var(--muted)}
+.cmt .cx{border:0; background:none; font-size:14px; line-height:1; padding:2px 6px; color:var(--muted); opacity:0}
+.cmt:hover .cx, .cmt .cx:focus-visible{opacity:1}
+.cmt .ctext{display:block; width:100%; resize:none; overflow:hidden; border:0; background:transparent; padding:6px 8px; font-size:14px; line-height:1.4; min-height:30px; outline:none}
+.cmt:focus-within{border-style:solid; border-color:var(--selc)}
+body.play .cmt .ctext, body.play .cmt .cgrip{pointer-events:none}
+.plist .psearch{display:block; width:100%; margin:0 0 8px; padding:6px 8px; border:1px solid var(--edge); background:var(--panel); position:sticky; top:0; z-index:2}
+.plist.searching > :not(.psearch):not(.presults){display:none}
+.presults{display:grid; gap:4px}
 </style>
 <script>
 // No long-press menu outside text fields (it is how Chrome offers "Search Google for…").
@@ -502,16 +517,16 @@ document.addEventListener('contextmenu', e => { if (e.cancelable && !(e.target.c
     <div class="plist" id="plist"><div class="quick" id="quick"></div></div>
   </div>
 </aside>
-<div class="ws" id="ws">
+<div class="ws" id="ws" role="region" aria-label="Patch">
   <div class="world" id="world">
     <div id="groups"></div>
     <svg class="cables under" id="cablehits" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"></svg>
-    <svg class="cables" id="cables" xmlns="http://www.w3.org/2000/svg"></svg>
+    <svg class="cables" id="cables" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"></svg>
   </div>
   <div class="hint" id="hint"><span class="tipm">Drag from an output jack to an input jack to patch (on a touch screen you can also tap one jack, then the other; double-tap a cable to remove it). Every slider has a small purple jack on its left: patch an LFO, envelope or any other signal into it to move that slider. Drag a patched input to move its cable, or drop it on empty space to unplug. Hold Option (Alt on Windows) and click while drawing a cable to bend it, or Option-drag an existing cable. Click a cable to select it (Delete removes it, and its bend handles show: drag one to move the bend), double-click it to remove it, or a module’s title bar to collapse it. Gate cables are dotted and gate jacks are diamonds. Drag the background or scroll with two fingers to pan, and pinch to zoom. Shift-click or Shift-drag to select modules, then right-click to group them. Alt+E switches Play and Edit. Start with a Track In (your tracker track) and end with a Chain Out back to the same track.</span><button id="hintmore" class="hintmore" aria-expanded="false" aria-controls="hint">More</button><span class="tipt">Tap a jack, then another jack, to patch. Tap a cable to select it; double-tap it to remove it. Drag the background to pan and pinch to zoom. Tap the arrow on a title bar to fold a module. Hold a module, a cable, a slider or the background for its menu. Drag a slider sideways to change it (drag away up or down for fine steps), tap its value to type one. Play locks the patch so you can play it; Select picks several modules.</span><button id="hintx" aria-label="Hide tips">×</button><button id="hintpill" class="hintpill" aria-label="Show tips" aria-expanded="false">Tips</button></div>
   <div class="lasso" id="lasso" hidden></div>
   <div class="emptylbl" id="emptylbl" aria-hidden="true" hidden></div>
-  <div class="toast" id="toast" hidden></div>
+  <div class="toast" id="toast" hidden role="status" aria-live="polite"></div>
 </div>
 </div>
 <div class="learnbar" id="learnbar" hidden><span id="learntext"></span><button class="tb" id="learndone">Done</button></div>
@@ -1800,6 +1815,7 @@ function secWrap(n, rows, plan){
     const hd = h('button', { class:'sechd', 'aria-expanded':String(open), title:'Show or hide these controls' }, h('i', { class:'secchev', 'aria-hidden':'true' }), h('span', { class:'sect', text:p.title }), h('span', { class:'secm' }));
     const box = h('div', { class:'sec' + (open ? '' : ' shut'), 'data-i':String(i) }, hd, h('div', { class:'secbody' }, p.keys.map(k => rows.get(k))));
     hd.addEventListener('click', () => {
+      if (playBlocked()) return;   // folding a section changes the view that is saved with the patch: not in Play
       const v = view(), nxt = secMask(n.m.id) ^ (1 << i), on = !!((nxt >> i) & 1);
       (v.sec || (v.sec = {}))[n.m.id] = nxt;
       box.classList.toggle('shut', !on); hd.setAttribute('aria-expanded', String(on)); markScene(); store.touch();
@@ -1817,6 +1833,231 @@ function secMarks(){
 }
 // where a cable into a control inside a shut section ends: the left edge of that section's title bar
 const secHeadOf = el => { const b = el.closest && el.closest('.secbody'); return b && b.previousElementSibling; };
+/* ── PASS 4 (14 Nov 2026, "Desktop feel": audit D5, D7, D10, M4, M5, M8, M11): editor helpers shared by chains and waves ── */
+// SNAP (M11): a dragged module lands on a 10 px grid (the editor's settings.snap, on unless switched off in the background menu).
+const GRID = 10;
+let snapOn = true;
+const snapV = v => snapOn ? Math.round(v / GRID) * GRID : v;
+// WHEEL OVER A SLIDER (D5; owner decision 3, 13 Nov): the wheel changes a slider only after the pointer has rested on it for WHEEL_REST ms (it is outlined then,
+// as in the rest of the app); until then the wheel pans the patch, as everywhere on it. While a pan or zoom is going on (a wheel pan within WHEEL_REST ms, a
+// Ctrl/Cmd+wheel zoom, a pinch, a drag on the background or a module, a cable being drawn) it never changes a value: the slider that slides under a still pointer
+// has not been rested on. Shift is fine (a tenth); Ctrl/Cmd+wheel stays the zoom here. One burst of wheel steps is one undo step.
+const WHEEL_REST = 350;
+let wheelR = { el:null, at:0, v:null, on:null, t:0 }, wheelPanAt = -1e9, wheelChT = 0;
+const wheelSlider = t => t && t.closest ? t.closest('.row.sl input[type=range]') : null;
+function wheelSee(sl){
+  if (sl === wheelR.el) return;
+  clearTimeout(wheelR.t); if (wheelR.on) wheelR.on.classList.remove('wheelon');
+  wheelR = { el:sl, at:performance.now(), v:null, on:null, t:0 };
+  if (sl) wheelR.t = setTimeout(() => { if (wheelR.el === sl && sl.isConnected){ wheelR.on = sl; sl.classList.add('wheelon'); } }, WHEEL_REST);
+}
+let lastPtr = null;   // where the mouse last was over the patch (quick add opens there)
+window.addEventListener('pointermove', e => {
+  if (e.pointerType !== 'mouse') return;
+  if (ws.contains(e.target)) lastPtr = { x:e.clientX, y:e.clientY };
+  wheelSee(wheelSlider(e.target));
+}, true);
+window.addEventListener('wheel', e => {
+  if (!ws.contains(e.target)) return;
+  const now = performance.now();
+  if (e.ctrlKey || e.metaKey){ wheelPanAt = now; return; }   // a zoom (a trackpad pinch is a Ctrl+wheel)
+  const sl = wheelSlider(e.target); wheelSee(sl);
+  const busy = inGesture || drag || nodeDragging || ws.classList.contains('panning') || touches.size > 0;
+  if (!sl || busy || now - wheelR.at < WHEEL_REST || now - wheelPanAt < WHEEL_REST){ wheelPanAt = now; return; }   // not rested: the patch pans (below)
+  const k = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? 400 : 1, dy = (e.deltaY || e.deltaX) * k;
+  e.preventDefault(); e.stopImmediatePropagation(); if (!dy) return;
+  const lo = +sl.min, hi = +sl.max, st = +sl.step || 0, per = (hi - lo) * (e.shiftKey ? 0.002 : 0.02);
+  if (wheelR.v == null || Math.abs(wheelR.v - +sl.value) > Math.max(st, (hi - lo) / 1000)) wheelR.v = +sl.value;
+  wheelR.v = Math.max(lo, Math.min(hi, wheelR.v - Math.max(-1.5, Math.min(1.5, dy / 100)) * per));
+  const q = st ? Math.max(lo, Math.min(hi, lo + Math.round((wheelR.v - lo) / st) * st)) : wheelR.v;
+  if (q !== +sl.value){ sl.value = q; sl.dispatchEvent(new Event('input', { bubbles:true })); }
+  clearTimeout(wheelChT); wheelChT = setTimeout(() => sl.dispatchEvent(new Event('change', { bubbles:true })), 500);   // (ends the undo step, as the end of a drag does)
+}, { capture:true, passive:false });
+// A CABLE'S VALUE ON HOVER (M8): the pointer on a cable shows what it carries, from the level telemetry the jack meters already get (paintJacks): no new
+// message from the engine. Nothing is written to the page while no cable is hovered; while one is, the text is rewritten only when it changes.
+let hovCable = null, hovTxt = '', cabTip = null;
+const cabWho = (n, port, dir) => (n.m.label || MODULES[n.m.type].label) + ' ' + (typeof port === 'string' && port.startsWith('p:') ? plabel(n.m.type, port.slice(2)) : portName(n.m.type, port, dir));
+function cabReadText(c){
+  const a = nodes.get(c.from[0]), b = nodes.get(c.to[0]); if (!a || !b) return '';
+  const kind = cableKind(c), q = a.pms && a.pms['out:' + c.from[1]], p = c.to[1], key = typeof p === 'string' && p.startsWith('p:') ? p.slice(2) : null;
+  let val;
+  if (!q || Date.now() - jackSeen > 400) val = 'no live level (audio is not running)';
+  else if (kind === 'audio') val = q.v < 0.0001 ? 'silent' : (20 * Math.log10(q.v)).toFixed(1).replace('-', '−') + ' dB peak';
+  else if (kind === 'gate') val = q.v > 0.5 ? 'gate on' : 'gate off';
+  else val = 'level ' + q.v.toFixed(2);
+  if (key && b.live && key in b.live){ try { val += ' · ' + plabel(b.m.type, key) + ' now ' + fmtOf(b.m.type, key)(b.live[key]); } catch (_) {} }
+  return cabWho(a, c.from[1], 'out') + ' → ' + cabWho(b, p, 'in') + '\n' + val;
+}
+function cabText(){ if (!hovCable || !cabTip) return; const t = cabReadText(hovCable); if (t !== hovTxt){ hovTxt = t; cabTip.textContent = t; } }
+function cabHover(c, ev){
+  hovCable = c || null;
+  if (!c){ if (cabTip && !cabTip.hidden) cabTip.hidden = true; hovTxt = ''; return; }
+  if (drag) return;
+  if (!cabTip){ cabTip = h('div', { id:'cabread', class:'cabread', role:'tooltip', hidden:true }); document.body.append(cabTip); }
+  hovTxt = ''; cabText(); cabTip.hidden = false; cabPlace(ev);
+}
+function cabPlace(ev){
+  if (!cabTip || cabTip.hidden || !ev) return;
+  const r = cabTip.getBoundingClientRect();
+  cabTip.style.left = Math.max(4, Math.min(ev.clientX + 14, innerWidth - r.width - 4)) + 'px'; cabTip.style.top = Math.max(4, Math.min(ev.clientY + 16, innerHeight - r.height - 4)) + 'px';
+}
+// ZOOM TO SELECTION (D10): the view frames the picked modules (Shift+F; Fit, F, frames all of them). Fit may go below the 25% floor, as Fit does.
+function fitNodes(list, maxZ){
+  if (!list.length || !ws.clientWidth) return false;
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  for (const n of list){ x0 = Math.min(x0, n.m.pos[0]); y0 = Math.min(y0, n.m.pos[1]); x1 = Math.max(x1, n.m.pos[0] + n.el.offsetWidth); y1 = Math.max(y1, n.m.pos[1] + n.el.offsetHeight); }
+  const pad = 40, W = ws.clientWidth - pad * 2, H = ws.clientHeight - pad * 2, v = view();
+  v.zoom = Math.max(FIT_MIN, Math.min(maxZ || 1.5, W / (x1 - x0), H / (y1 - y0)));
+  v.x = pad + (W - (x1 - x0) * v.zoom) / 2 - x0 * v.zoom; v.y = pad + (H - (y1 - y0) * v.zoom) / 2 - y0 * v.zoom;
+  applyPan(); store.touch(); return true;
+}
+function zoomToSel(){ const list = [...selected].map(id => nodes.get(id)).filter(Boolean); if (!list.length){ toast('Pick a module first (click it), then zoom to it.'); return false; } return fitNodes(list, 1.5); }
+// ALIGN AND DISTRIBUTE (M11): for two or more picked modules (distribute: three or more); one undo step each.
+function alignSel(kind){
+  const ns = [...selected].map(id => nodes.get(id)).filter(Boolean);
+  if (playMode || ns.length < 2 || (/^dist/.test(kind) && ns.length < 3)) return false;
+  store.snapshot();
+  const set = (n, x, y) => { n.m.pos = [Math.round(x), Math.round(y)]; n.el.style.left = n.m.pos[0] + 'px'; n.el.style.top = n.m.pos[1] + 'px'; };
+  const W = n => n.el.offsetWidth, H = n => n.el.offsetHeight;
+  if (kind === 'left'){ const x = Math.min(...ns.map(n => n.m.pos[0])); for (const n of ns) set(n, x, n.m.pos[1]); }
+  else if (kind === 'right'){ const x = Math.max(...ns.map(n => n.m.pos[0] + W(n))); for (const n of ns) set(n, x - W(n), n.m.pos[1]); }
+  else if (kind === 'top'){ const y = Math.min(...ns.map(n => n.m.pos[1])); for (const n of ns) set(n, n.m.pos[0], y); }
+  else if (kind === 'bottom'){ const y = Math.max(...ns.map(n => n.m.pos[1] + H(n))); for (const n of ns) set(n, n.m.pos[0], y - H(n)); }
+  else if (kind === 'dist-h'){ const s = ns.slice().sort((a, b) => a.m.pos[0] - b.m.pos[0]), x0 = s[0].m.pos[0], x1 = s[s.length - 1].m.pos[0] + W(s[s.length - 1]), gap = (x1 - x0 - s.reduce((t, n) => t + W(n), 0)) / (s.length - 1); let x = x0; for (const n of s){ set(n, x, n.m.pos[1]); x += W(n) + gap; } }
+  else if (kind === 'dist-v'){ const s = ns.slice().sort((a, b) => a.m.pos[1] - b.m.pos[1]), y0 = s[0].m.pos[1], y1 = s[s.length - 1].m.pos[1] + H(s[s.length - 1]), gap = (y1 - y0 - s.reduce((t, n) => t + H(n), 0)) / (s.length - 1); let y = y0; for (const n of s){ set(n, n.m.pos[0], y); y += H(n) + gap; } }
+  markScene(); store.touch(); return true;
+}
+// TIDY UP (M11): modules in columns by signal flow (a module sits one column right of the furthest module that feeds it; its column is ordered by where its
+// inputs are), unpatched modules in a last column, all on the grid. Groups are kept: each group's box is drawn again around its modules. One undo step.
+function tidy(){
+  const list = [...nodes.values()]; if (!list.length) return;
+  store.snapshot();
+  const ids = new Set(nodes.keys()), pred = new Map(list.map(n => [n.m.id, []])), used = new Set();
+  for (const c of doc.cables){ const a = c.from[0], b = c.to[0]; if (a !== b && ids.has(a) && ids.has(b)){ pred.get(b).push(a); used.add(a); used.add(b); } }
+  const layer = new Map(), busy = new Set();
+  const lay = id => { if (layer.has(id)) return layer.get(id); if (busy.has(id)) return 0; busy.add(id); let L = 0; for (const p of pred.get(id)) L = Math.max(L, lay(p) + 1); busy.delete(id); layer.set(id, L); return L; };
+  for (const n of list) if (used.has(n.m.id)) lay(n.m.id);
+  const last = Math.max(-1, ...layer.values()), cols = [];
+  for (const n of list){ const L = used.has(n.m.id) ? layer.get(n.m.id) : last + 1; (cols[L] || (cols[L] = [])).push(n); }
+  const newY = new Map(), X0 = 20, Y0 = 20, GAP = 30, WRAP = 1800, up10 = v => Math.ceil(v / GRID) * GRID;
+  let x = X0;
+  cols.forEach(col => {
+    if (!col) return;
+    const bary = n => { const ys = (pred.get(n.m.id) || []).map(p => newY.get(p)).filter(v => v != null); return ys.length ? ys.reduce((s, v) => s + v, 0) / ys.length : n.m.pos[1]; };
+    col.sort((a, b) => bary(a) - bary(b) || a.m.pos[1] - b.m.pos[1] || a.m.pos[0] - b.m.pos[0]);
+    let y = Y0, w = 0, cx = x;
+    for (const n of col){
+      if (y > Y0 && y + n.el.offsetHeight > Y0 + WRAP){ cx += up10(w) + 40; y = Y0; w = 0; }   // a very tall column wraps into a second one
+      n.m.pos = [cx, y]; n.el.style.left = cx + 'px'; n.el.style.top = y + 'px'; newY.set(n.m.id, y);
+      y += up10(n.el.offsetHeight + GAP); w = Math.max(w, n.el.offsetWidth);
+    }
+    x = cx + up10(w) + 40;
+  });
+  for (const g of doc.groups){
+    const ms = (g.modules || []).map(id => nodes.get(id)).filter(Boolean); if (!ms.length) continue;
+    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+    for (const n of ms){ x0 = Math.min(x0, n.m.pos[0]); y0 = Math.min(y0, n.m.pos[1]); x1 = Math.max(x1, n.m.pos[0] + n.el.offsetWidth); y1 = Math.max(y1, n.m.pos[1] + n.el.offsetHeight); }
+    g.bounds = [x0 - 24, y0 - 54, x1 - x0 + 48, y1 - y0 + 78];
+  }
+  renderGroups(); markScene(); store.touch();
+}
+// COMMENTS (M5): a plain text note on the patch (doc.notes: [{ id, pos, w, text }], optional in the saved patch; a build without them leaves the field alone).
+// Add one from the background menu or Find a module (type "comment"); drag it by its top edge, type into it, remove it with its x. Not editable in Play.
+let notesEl = null;
+const NOTE_W = 220;
+function renderNotes(){
+  if (!notesEl){ notesEl = h('div', { id:'notes' }); groupsEl.after(notesEl); }
+  notesEl.replaceChildren(...(Array.isArray(doc.notes) ? doc.notes : []).filter(nt => nt && Array.isArray(nt.pos)).map(buildNote));
+}
+function buildNote(nt){
+  const ta = h('textarea', { class:'ctext', 'aria-label':'Comment', rows:'1', placeholder:'Comment…', spellcheck:'false' });
+  ta.value = nt.text || '';
+  const x = h('button', { class:'cx', 'aria-label':'Remove this comment', title:'Remove this comment', text:'×' });
+  const grip = h('div', { class:'cgrip', title:'Drag to move the comment' }, h('span', { text:'Comment' }), x);
+  const box = h('div', { class:'decor cmt', 'data-id':nt.id, role:'group', 'aria-label':'Comment' }, grip, ta);
+  box.style.left = nt.pos[0] + 'px'; box.style.top = nt.pos[1] + 'px'; box.style.width = (nt.w || NOTE_W) + 'px';
+  const fit = () => { ta.style.height = 'auto'; ta.style.height = Math.max(24, ta.scrollHeight) + 'px'; };
+  let snapped = false;
+  ta.addEventListener('input', () => { if (playMode){ ta.value = nt.text || ''; return; } if (!snapped){ store.snapshot(); snapped = true; } nt.text = ta.value; fit(); store.touch(); });
+  ta.addEventListener('blur', () => { snapped = false; });
+  ta.addEventListener('keydown', e => { e.stopPropagation(); if (e.key === 'Escape') ta.blur(); });
+  ta.addEventListener('pointerdown', e => e.stopPropagation());
+  x.addEventListener('pointerdown', e => e.stopPropagation());
+  x.addEventListener('click', () => { if (playBlocked()) return; store.snapshot(); doc.notes = (doc.notes || []).filter(q => q !== nt); if (!doc.notes.length) delete doc.notes; renderNotes(); store.touch(); });
+  grip.addEventListener('pointerdown', e => {
+    if (e.button !== 0 || playMode || e.target.closest('button')) return;
+    e.stopPropagation(); e.preventDefault(); grip.setPointerCapture(e.pointerId);
+    const sx = e.clientX, sy = e.clientY, p0 = nt.pos.slice(); let moved = false;
+    const mv = ev => { const z = view().zoom, dx = (ev.clientX - sx) / z, dy = (ev.clientY - sy) / z; if (!moved && Math.hypot(ev.clientX - sx, ev.clientY - sy) < 3) return;
+      if (!moved){ moved = true; store.snapshot(); }
+      nt.pos = [snapV(p0[0] + dx), snapV(p0[1] + dy)]; box.style.left = nt.pos[0] + 'px'; box.style.top = nt.pos[1] + 'px'; };
+    const up = () => { grip.removeEventListener('pointermove', mv); grip.removeEventListener('pointerup', up); grip.removeEventListener('pointercancel', up); if (moved) store.touch(); };
+    grip.addEventListener('pointermove', mv); grip.addEventListener('pointerup', up); grip.addEventListener('pointercancel', up);
+  });
+  requestAnimationFrame(fit);
+  return box;
+}
+function addNote(wx, wy){
+  if (playBlocked()) return null;
+  store.snapshot();
+  const nt = { id:newId('n'), pos:[snapV(wx), snapV(wy)], w:NOTE_W, text:'' };
+  (doc.notes || (doc.notes = [])).push(nt); renderNotes(); store.touch();
+  const ta = notesEl.querySelector('.cmt[data-id="' + nt.id + '"] textarea'); if (ta) setTimeout(() => ta.focus(), 0);
+  return nt;
+}
+// RENAME (M5): a module's own name (m.label, which a build without this already shows in the title bar); an empty name goes back to the module's own.
+async function renameModule(id){
+  const n = nodes.get(id); if (!n || playBlocked()) return;
+  const def = MODULES[n.m.type], cur = n.m.label || def.label;
+  const nm = await askDialog('Name this module (leave it empty to go back to “' + def.label + '”):', { input:cur, ok:'Rename', label:'Module name' });
+  if (nm == null || !nodes.has(id)) return;
+  const t = String(nm).trim().slice(0, 40), next = t && t !== def.label ? t : '';
+  if (next === (n.m.label || '')) return;
+  store.snapshot(); if (next) n.m.label = next; else delete n.m.label;
+  rebuildNode(id); store.touch();
+}
+// KEYS (D7). Single keys that do not play notes in waves (whose letters are a piano), so the same ones work in both editors; Ctrl/Cmd and Alt keys as noted.
+// Taken elsewhere, so not used: Space, Shift+Space, Ctrl/Cmd+Z, +S, +O, +N, +M, Alt+C, Alt+E, Alt+0-9 and Alt+` (the host's views), F2-F9, / and \.
+//   A (chains also N)  Find a module: type a name, Enter        F  Fit all          Shift+F  Zoom to the picked modules
+//   Ctrl/Cmd+A  select all     Ctrl/Cmd+G  group the picked     Ctrl/Cmd + = / - / 0  zoom in / out / 100%
+//   arrows  nudge the picked modules 10 px (Shift: 1 px)        Enter  rename the picked module        Esc  let go of the selection
+const KEYS_NEW = true;
+let nudgeAt = -1e9;
+function escBusy(){ const ov = document.getElementById('helpov'); return !ctx.hidden || !!drag || !!document.querySelector('.dlgov') || (ov && !ov.hidden) || !document.getElementById('filemenu').hidden || !document.getElementById('setmenu').hidden || !!(typeof mhelpBtnOn !== 'undefined' && mhelpBtnOn); }
+function quickAddKey(){
+  if (playBlocked()) return;
+  const r = ws.getBoundingClientRect(); let x, y;
+  if (lastPtr && lastPtr.x > r.left + 4 && lastPtr.x < r.right - 4 && lastPtr.y > r.top + 4 && lastPtr.y < r.bottom - 4 && !(typeof palette !== 'undefined' && palette.contains(document.elementFromPoint(lastPtr.x, lastPtr.y)))){ x = lastPtr.x; y = lastPtr.y; }   // under the pointer, as in Max
+  else if (selected.size === 1){ const n = nodes.get([...selected][0]), nr = n && n.el.getBoundingClientRect(); if (nr){ x = nr.right + 40 * view().zoom; y = nr.top; } }   // else beside the picked module
+  if (x == null){ x = r.left + r.width / 2; y = r.top + r.height / 3; }
+  quickAddAt(x, y);
+}
+window.addEventListener('keydown', e => {
+  if (typing(e) || document.querySelector('.dlgov') || (learn && learn.on)) return;
+  const t = e.target, inCtl = !!(t && t.closest && t.closest('input, select, textarea, [contenteditable="true"]')), mod = e.ctrlKey || e.metaKey, c = e.code;
+  if (mod && !e.altKey){
+    if (inCtl) return;
+    if (!e.shiftKey && c === 'KeyA'){ e.preventDefault(); if (!playMode) for (const k of nodes.keys()) setSel(k, true); return; }
+    if (!e.shiftKey && c === 'KeyG'){ e.preventDefault(); if (!playMode && selected.size) groupSel(); return; }
+    if (c === 'Equal' || c === 'NumpadAdd' || e.key === '+' || e.key === '='){ e.preventDefault(); zoomCenter(view().zoom * 1.2); return; }
+    if (c === 'Minus' || c === 'NumpadSubtract' || e.key === '-'){ e.preventDefault(); zoomCenter(view().zoom / 1.2); return; }
+    if (c === 'Digit0' || c === 'Numpad0'){ e.preventDefault(); zoomCenter(1); return; }
+    return;
+  }
+  if (e.altKey || inCtl) return;
+  if (c === 'KeyF' && !mod){ e.preventDefault(); if (e.shiftKey) zoomToSel(); else fitAll(); return; }
+  if (!e.shiftKey && (c === 'KeyA' || (c === 'KeyN' && typeof K_LOW === 'undefined')) && !e.repeat){ e.preventDefault(); quickAddKey(); return; }
+  if (e.key === 'Escape' && !e.shiftKey){ if (!escBusy() && selected.size) clearSel(); return; }
+  if (/^Arrow(Left|Right|Up|Down)$/.test(e.key)){
+    if (playMode || !selected.size || !ctx.hidden) return;
+    e.preventDefault();
+    const s = e.shiftKey ? 1 : GRID, dx = e.key === 'ArrowLeft' ? -s : e.key === 'ArrowRight' ? s : 0, dy = e.key === 'ArrowUp' ? -s : e.key === 'ArrowDown' ? s : 0, now = performance.now();
+    if (now - nudgeAt > 800) store.snapshot(); nudgeAt = now;
+    for (const id of selected){ const n = nodes.get(id); if (!n) continue; n.m.pos = [n.m.pos[0] + dx, n.m.pos[1] + dy]; n.el.style.left = n.m.pos[0] + 'px'; n.el.style.top = n.m.pos[1] + 'px'; }
+    markScene(); store.touch(); return;
+  }
+  if (e.key === 'Enter' && !e.shiftKey && !e.repeat && selected.size === 1 && !playMode && !(t && t.closest && t.closest('button, a, summary')) && ctx.hidden){ e.preventDefault(); renameModule([...selected][0]); return; }
+});
 /* ===SHARED EDITOR END=== */
 /* TRACK IN STEREO (owner, 20 Oct): the starter patch sent only Track In's left side into its first effect, so the track
    reached the chain as its left channel, played as mono. A patch made before (ti2 not set) gets, once, for each Track In
@@ -2107,6 +2348,7 @@ if (EMBED) document.documentElement.classList.add('embed');
 const SETKEY = KP + 'settings';
 let settings = {};
 try { settings = JSON.parse(localStorage.getItem(SETKEY) || '{}') || {}; } catch (e) {}
+snapOn = settings.snap !== false;   // M11: snap to a 10 px grid unless switched off in the background menu
 const saveSettings = () => { try { localStorage.setItem(SETKEY, JSON.stringify(settings)); } catch (e) {} };
 
 /* ---------- patch document, autosave, undo and backups ---------- */
@@ -2166,7 +2408,7 @@ class PatchStore {
     });
   }
   exportCustom(){
-    const blob = new Blob([JSON.stringify({ format:'chains.custom', custom:this.doc.custom }, null, 2)], { type:'application/json' });
+    const blob = new Blob([JSON.stringify({ format:'chains.custom', custom:this.doc.custom, presets:this.doc.presets }, null, 2)], { type:'application/json' });
     const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
     a.download = 'chains-custom-modules.json'; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
   }
@@ -2174,7 +2416,9 @@ class PatchStore {
     return file.text().then(txt => {
       const d = JSON.parse(txt);
       if (d.format !== 'chains.custom' && d.format !== 'waves.custom') throw new Error('That file doesn’t hold custom modules.');
-      this.snapshot(); this.doc.custom = this.doc.custom.concat(d.custom); return d.custom.length;
+      this.snapshot(); this.doc.custom = this.doc.custom.concat(d.custom);
+      if (d.presets && typeof d.presets === 'object') for (const t in d.presets){ const L = Array.isArray(d.presets[t]) ? d.presets[t].filter(preOk) : [], cur = (this.doc.presets && this.doc.presets[t]) || []; if (L.length) prePatchSet(t, cur.filter(x => !L.some(y => y[0] === x[0])).concat(L)); }   // U4: its presets come with it
+      return d.custom.length;
     });
   }
 }
@@ -2400,7 +2644,7 @@ function portName(type, port, dir){
 }
 function makeJack(n, port, kind, dir, small){
   const pt = portTip(n.m.type, port);
-  const j = h('span', {class: small ? 'jack small' : 'jack', 'data-id': n.m.id, 'data-port': port, 'data-dir': dir, 'data-kind': kind,
+  const j = h('span', {class: small ? 'jack small' : 'jack', 'data-id': n.m.id, 'data-port': port, 'data-dir': dir, 'data-kind': kind, role:'button', 'aria-label': (dir === 'in' ? 'Input ' : 'Output ') + (small ? plabel(n.m.type, port.slice(2)) + ' modulation' : portName(n.m.type, port, dir)),
     title: pt ? pt.t + ' (' + KIND_WORD[kind] + ')' : small ? plabel(n.m.type, port.slice(2)) + ' modulation: ' + KIND_WORD[kind] + ' input' : portName(n.m.type, port, dir) + ': ' + KIND_WORD[kind] + (dir === 'in' ? ' input' : ' output')});
   n.jacks[dir + ':' + port] = j;
   j.addEventListener('pointerdown', e => { if (e.button !== 0 || (MAC && e.ctrlKey && e.pointerType !== 'touch')) return; onJackDown(e, j); });   // left button only (3 Nov: a right or middle click started a cable)
@@ -2535,7 +2779,7 @@ function slider(n, key, spec){
   inp.addEventListener('change', () => { snapped = false; });
   // ONE SLIDER (mouse audit, 3 Nov; Thunder Plus's rule, as its own sliders and this control in its bottom panel): with a mouse
   // a drag moves the value from where it is (no jump to the click), Shift is fine (a tenth), holding Ctrl/⌘ takes big steps,
-  // Alt/⌥- or Ctrl/⌘-click resets (Ctrl+click on a Mac is the right-click menu). Touch keeps the plain slider.
+  // Alt/⌥-click resets (D8, 14 Nov: Ctrl/⌘-click no longer does, so holding Ctrl before a drag takes big steps; Ctrl+click on a Mac is the right-click menu).
   const reset = () => { if (+n.m.params[key] !== +def) store.snapshot(); setParam(n, key, def); inp.value = n.m.params[key]; show(); };
   // TOUCH SLIDER (T7, 13 Nov): a finger moves the value from where it is (no jump to the finger), by the width of the slider, like the mouse. The first
   // 8 screen px decide it: mostly sideways (|dx| >= |dy|) is the slider; mostly up or down hands the finger to the patch, which pans (so a slider never
@@ -2578,7 +2822,7 @@ function slider(n, key, spec){
     if (e.pointerType === 'touch'){ if (e.isPrimary) touchSlide(e); return; }
     if (e.button !== 0 || (MAC && e.ctrlKey)){ if (e.button === 0) e.preventDefault(); return; }
     e.preventDefault(); e.stopPropagation();
-    if (e.altKey || (MAC ? e.metaKey : e.ctrlKey)){ reset(); return; }
+    if (e.altKey){ reset(); return; }   // D8 (14 Nov): Alt-click and double-click reset; Ctrl/Cmd held at the press now takes big steps from the start of the drag
     const w = Math.max(40, inp.getBoundingClientRect().width), lo = +min, hi = +max, st = +step || 0, id = e.pointerId;
     let v = +inp.value, lastX = e.clientX;
     try { inp.setPointerCapture(id); } catch(_){}
@@ -2736,7 +2980,12 @@ const PRESETS = {
 const PRE_SKIP = new Set(['track', 'chans', '_byp', '_bn', 'src', 'edit']);   // routing and structure: a preset leaves them
 const PRE_KEY = 'chains.presets';
 const preUser = () => { try { const o = JSON.parse(localStorage.getItem(PRE_KEY) || '{}'); return o && typeof o === 'object' ? o : {}; } catch(e){ return {}; } };
-const preUserOf = t => { const L = preUser()[t]; return Array.isArray(L) ? L.filter(x => Array.isArray(x) && typeof x[0] === 'string' && x[1] && typeof x[1] === 'object') : []; };
+const preOk = x => Array.isArray(x) && typeof x[0] === 'string' && x[1] && typeof x[1] === 'object';
+// U4 (14 Nov): a preset you save is kept on this device (every patch) AND in the patch (doc.presets: { moduleType: [[name, values]] }, optional), so it goes with the song and with an exported file;
+// the list shows both, the device's winning where a name is in both.
+const prePatchOf = t => { const L = doc && doc.presets && doc.presets[t]; return Array.isArray(L) ? L.filter(preOk) : []; };
+const preUserOf = t => { const L = preUser()[t], dev = Array.isArray(L) ? L.filter(preOk) : []; return dev.concat(prePatchOf(t).filter(x => !dev.some(d => d[0] === x[0]))).sort((a, b) => a[0].localeCompare(b[0])); };
+function prePatchSet(t, list){ if (!doc) return; const P = doc.presets && typeof doc.presets === 'object' ? doc.presets : (doc.presets = {}); if (list.length) P[t] = list; else delete P[t]; if (!Object.keys(P).length) delete doc.presets; }
 function preUserSet(t, list){ try { const o = preUser(); if (list.length) o[t] = list; else delete o[t]; localStorage.setItem(PRE_KEY, JSON.stringify(o)); } catch(e){ toast('Couldn’t save presets on this device.'); } }
 const PRE_SRC = new Set((PAL_LAYOUT.find(g => g[0] === 'Sound sources') || [0, 0, []])[2]);
 // Which modules get the row: those with factory presets, every effect (an audio In and Out), the sound sources, and
@@ -2761,14 +3010,15 @@ function preMenu(n, btn){
   if (fac.length){ items.push(['§Factory']); for (const [nm, v] of fac) items.push([mark(nm), () => applyPreset(n, nm, v)]); }
   if (mine.length){ items.push(['§Yours']); for (const [nm, v] of mine) items.push([mark(nm), () => applyPreset(n, nm, v)]); }
   items.push(['Save as a preset…', async () => {
-    const nm0 = await askDialog('Name this ' + (n.m.label || def.label) + ' preset (it’s kept on this device, for every patch):', { input:cur && !PRESETS[t]?.some(p => p[0] === cur) && cur !== 'Default' ? cur : '', ok:'Save' });
+    const nm0 = await askDialog('Name this ' + (n.m.label || def.label) + ' preset (kept on this device for every patch, and in this patch so it goes with the song):', { input:cur && !PRESETS[t]?.some(p => p[0] === cur) && cur !== 'Default' ? cur : '', ok:'Save' });
     const nm = nm0 && nm0.trim().slice(0, 40); if (!nm) return;
     const vals = {}; for (const k in def.params) if (!PRE_SKIP.has(k)) vals[k] = n.m.params[k];
-    const list = preUserOf(t).filter(x => x[0] !== nm); list.push([nm, vals]); list.sort((a, b) => a[0].localeCompare(b[0])); preUserSet(t, list);
-    n.m.pre = nm; delete n.m.preEd; paintPre(n); store.touch(); toast('Saved “' + nm + '”. It now shows in every ' + def.label + ' preset list.');
+    const list = preUserOf(t).filter(x => x[0] !== nm); list.push([nm, vals]); list.sort((a, b) => a[0].localeCompare(b[0])); preUserSet(t, list.filter(x => !prePatchOf(t).some(p => p === x)));
+    prePatchSet(t, prePatchOf(t).filter(x => x[0] !== nm).concat([[nm, vals]]));
+    n.m.pre = nm; delete n.m.preEd; paintPre(n); store.touch(); toast('Saved “' + nm + '”. It shows in every ' + def.label + ' preset list, and travels with this patch.');
   }]);
   if (mine.length) items.push(['Delete one of yours…', () => showMenu(r.left, r.bottom + 2, mine.map(([nm]) => ['Delete “' + nm + '”', () => {
-    preUserSet(t, preUserOf(t).filter(x => x[0] !== nm)); for (const x of nodes.values()) if (x.m.type === t && x.m.pre === nm) paintPre(x); toast('Deleted the preset “' + nm + '”.'); }]))]);
+    store.snapshot(); preUserSet(t, preUser()[t] ? preUserOf(t).filter(x => x[0] !== nm && !prePatchOf(t).includes(x)) : []); prePatchSet(t, prePatchOf(t).filter(x => x[0] !== nm)); store.touch(); for (const x of nodes.values()) if (x.m.type === t && x.m.pre === nm) paintPre(x); toast('Deleted the preset “' + nm + '”.'); }]))]);
   showMenu(r.left, r.bottom + 2, items);
 }
 function presetRow(n){
@@ -2857,7 +3107,8 @@ function buildNode(m){
   const body = h('div', {class:'body'}, kids);
   buildSummary(n);   // COMPACT: the collapsed look
   n.stubEl = h('div', {class:'cstubs'});   // COMPACT: the modulation stubs
-  n.el = catStyle(h('div', {class:'node fam-' + famOf(m.type), 'data-id': m.id}, head, n.sum, ports, n.stubEl, n.mini || null, body), m.type);   // n.mini: a folded dynamics module's meter
+  n.el = catStyle(h('div', {class:'node fam-' + famOf(m.type), 'data-id': m.id, tabindex:'0', role:'group', 'aria-label': title}, head, n.sum, ports, n.stubEl, n.mini || null, body), m.type);   // n.mini: a folded dynamics module's meter
+  n.el.addEventListener('focus', () => { if (!playMode && n.el.matches(':focus-visible') && !(selected.size === 1 && selected.has(m.id))){ clearSel(); setSel(m.id, true); } });   // U11: Tab onto a module picks it (a mouse click does not go through here)
   n.head = head; titleFit.watch(n.tEl);
   n.el.style.left = m.pos[0] + 'px'; n.el.style.top = m.pos[1] + 'px';
   n.el.style.zIndex = ++zTop;
@@ -2885,7 +3136,9 @@ function buildNode(m){
       if (stopped) return;
       if (!moved && Math.hypot(dx, dy) * z > thr){ moved = true; store.snapshot(); if (dup) start = dupForDrag(group); }
       if (!moved) return;
-      for (const [g, ox, oy] of start){ g.m.pos = [Math.round(ox + dx), Math.round(oy + dy)]; g.el.style.left = g.m.pos[0] + 'px'; g.el.style.top = g.m.pos[1] + 'px'; }
+      // M11 (14 Nov): the dragged module lands on the 10 px grid and the others in the selection keep their distance from it
+      const an = start.find(q => q[0] === n) || start[0], sx2 = snapOn && an ? snapV(an[1] + dx) - an[1] : dx, sy2 = snapOn && an ? snapV(an[2] + dy) - an[2] : dy;
+      for (const [g, ox, oy] of start){ g.m.pos = [Math.round(ox + sx2), Math.round(oy + sy2)]; g.el.style.left = g.m.pos[0] + 'px'; g.el.style.top = g.m.pos[1] + 'px'; }
     };
     nodeDragging = v => { extra[0] -= v[0]; extra[1] -= v[1]; place(); }; nodeDragging.still = () => !moved; nodeDragging.stop = () => { stopped = true; };
     let pend = 0;
@@ -3080,7 +3333,7 @@ function renderAll(){
   for (const m of doc.modules) buildNode(m);
   selected = new Set([...selected].filter(id => nodes.has(id)));
   alignChainTracks(true);   // keep each track's input and output in step on load, undo and redo
-  renderGroups(); syncCableEls(); markMapped(); markDeck(); applyPan(); renderCustom(); paintByp(); paintChainOff();
+  renderGroups(); renderNotes(); syncCableEls(); markMapped(); markDeck(); applyPan(); renderCustom(); paintByp(); paintChainOff();
   document.getElementById('pname').value = doc.meta.name || 'Untitled';
   ws.style.backgroundColor = (doc.view && doc.view.bg) || '';
 }
@@ -3132,6 +3385,7 @@ function addAtCenter(type){
 }
 function addItem(type, x, y){
   if (playBlocked()) return;
+  x = snapV(x); y = snapV(y);   // M11: a new module lands on the grid
   store.snapshot();
   if (type.startsWith('c:')){ const ids = addCustom(type.slice(2), [x, y]); clearSel(); ids.forEach(id => setSel(id, true)); afterAdd(ids); return; }
   const m = addModule(type, x, y); if (m){ clearSel(); setSel(m.id, true); afterAdd([m.id]); }
@@ -3231,7 +3485,7 @@ function paintChainOff(){
   for (const n of nodes.values()){ const ts = tracks.get(n.m.id); n.el.classList.toggle('chnoff', !!(ts && ts.size && [...ts].every(t => !on[t - 1]))); }
 }
 function syncCableEls(){
-  for (const [c, el] of cableEls) if (!doc.cables.includes(c)){ el.g.remove(); if (el.gh) el.gh.remove(); cableEls.delete(c); }
+  for (const [c, el] of cableEls) if (!doc.cables.includes(c)){ el.g.remove(); if (el.gh) el.gh.remove(); cableEls.delete(c); if (hovCable === c) cabHover(null); }
   if (selCable && !cableEls.has(selCable)) selCable = null;   // its cable is gone (removed, or an undo built the patch again)
   relDirty = true;
   for (const c of doc.cables){
@@ -3256,7 +3510,7 @@ function syncCableEls(){
     });
     hit.addEventListener('dblclick', ev => { ev.stopPropagation(); ev.preventDefault(); cableDblAt = performance.now(); if (!doc.cables.includes(c)) return; store.snapshot(); disconnect(c); });   // (round 2, 13 Nov: this gesture ends here; it must not reach the background's quick-add)
     el.gh = svgEl('g', {}); el.gh.append(hit); el.hit = hit; svgHits.append(el.gh);   // (D4: the hit line is in the layer below the modules)
-    hit.addEventListener('mouseenter', () => el.g.classList.add('hov')); hit.addEventListener('mouseleave', () => el.g.classList.remove('hov'));
+    hit.addEventListener('mouseenter', () => el.g.classList.add('hov')); hit.addEventListener('mouseleave', () => el.g.classList.remove('hov')); hit.addEventListener('mouseenter', ev => cabHover(c, ev)); hit.addEventListener('mousemove', ev => cabPlace(ev)); hit.addEventListener('mouseleave', () => cabHover(null));   // M8: the value readout
     svg.append(el.g); cableEls.set(c, el);
   }
   compactAll(); secMarks(); markScene();
@@ -3300,20 +3554,27 @@ function drawCables(){
   }
 }
 const edgeInto = (id, port) => doc.cables.find(c => c.to[0] === id && c.to[1] === port);
+const intoCount = (id, port) => doc.cables.filter(c => c.to[0] === id && c.to[1] === port).length;
+const lastInto = (id, port) => { let r = null; for (const c of doc.cables) if (c.to[0] === id && c.to[1] === port) r = c; return r; };   // the newest cable into an input
 function reaches(a, b){
   const seen = new Set([a]), q = [a];
   while (q.length){ const c = q.shift(); if (c === b) return true; for (const e of doc.cables) if (e.from[0] === c && !seen.has(e.to[0])){ seen.add(e.to[0]); q.push(e.to[0]); } }
   return false;
 }
-function connect(from, to, pts){
+function connect(from, to, pts, snap){
   if (from[0] === to[0]){ toast('A module can’t feed itself.'); return false; }
   if (reaches(to[0], from[0])){ toast('That cable would make a loop.'); return false; }
-  const old = edgeInto(to[0], to[1]); if (old) disconnect(old, true);
+  // M3 SUMMING (14 Nov, audit M3): a second cable into an input ADDS to the first: the engines already sum every cable into an input (_gather), so nothing is
+  // replaced any more. Only an exact copy of a cable is refused (the engine drops it anyway). To replace one, drag the old cable off first.
+  if (doc.cables.some(q => q.from[0] === from[0] && q.from[1] === from[1] && q.to[0] === to[0] && q.to[1] === to[1])){ toast('Those two are already connected.'); return false; }
+  const had = intoCount(to[0], to[1]);
+  if (snap) store.snapshot();
   const c = { from, to, bend:0 }; if (pts && pts.length) c.pts = pts;
   doc.cables.push(c);
   if (bridge) bridge.connect(from, to);
   else if (EMBED && TW && TW.mod) TW.mod({ op:'connect', a:from, b:to });
   syncCableEls(); store.touch();
+  if (had) toast('Two cables now feed this input: they add together (Undo takes the new one off). Drag the old one off to replace it.', 4200);
   return true;
 }
 function disconnect(c, quiet){
@@ -3332,9 +3593,9 @@ function onJackDown(e, jack){
   let anchor = { id: jack.dataset.id, port: jack.dataset.port, dir: jack.dataset.dir, kind: jack.dataset.kind };
   let snapped = false;
   if (anchor.dir === 'in'){
-    const ex = edgeInto(anchor.id, anchor.port);
-    // Picking up a patched input moves its cable.
-    if (ex){ store.snapshot(); snapped = true; disconnect(ex); anchor = { id: ex.from[0], port: ex.from[1], dir:'out', kind: cableKind(ex) }; }
+    const ex = lastInto(anchor.id, anchor.port);
+    // Picking up a patched input moves its cable (with several cables in it, the newest one).
+    if (ex){ if (intoCount(anchor.id, anchor.port) > 1) toast('This input has ' + intoCount(anchor.id, anchor.port) + ' cables: you picked up the newest.'); store.snapshot(); snapped = true; disconnect(ex); anchor = { id: ex.from[0], port: ex.from[1], dir:'out', kind: cableKind(ex) }; }
   }
   const el = cableGroup(anchor.kind); el.g.style.opacity = .8; svg.append(el.g);
   drag = { anchor, el, x: e.clientX, y: e.clientY, pts: [] };
@@ -3379,8 +3640,7 @@ function onJackDown(e, jack){
     const tt = { id: t.dataset.id, port: t.dataset.port, dir: t.dataset.dir };
     if (tt.dir === d.anchor.dir){ if (snapped) toast('Cable removed.'); return; }
     const out = d.anchor.dir === 'out' ? d.anchor : tt, inp = d.anchor.dir === 'out' ? tt : d.anchor;
-    if (!snapped) store.snapshot();
-    connect([out.id, out.port], [inp.id, inp.port], d.anchor.dir === 'out' ? d.pts : d.pts.slice().reverse());
+    connect([out.id, out.port], [inp.id, inp.port], d.anchor.dir === 'out' ? d.pts : d.pts.slice().reverse(), !snapped);   // (the undo step is taken inside, once the cable is accepted: a refused one leaves none)
   };
   window.addEventListener('pointermove', mv); window.addEventListener('pointerup', up); window.addEventListener('pointercancel', up); window.addEventListener('keydown', esc);
 }
@@ -3667,17 +3927,6 @@ function groupSel(){
     bounds:[x0 - 24, y0 - 54, x1 - x0 + 48, y1 - y0 + 78] });
   clearSel(); renderGroups(); store.touch();
 }
-function tidy(){
-  store.snapshot();
-  const list = [...nodes.values()], cols = Math.max(1, Math.round(Math.sqrt(list.length + 1)));
-  let y = 24;
-  for (let r = 0; r < list.length; r += cols){
-    const row = list.slice(r, r + cols); let tall = 0;
-    row.forEach((n, i) => { n.m.pos = [24 + i * 290, y]; n.el.style.left = n.m.pos[0] + 'px'; n.el.style.top = y + 'px'; tall = Math.max(tall, n.el.offsetHeight); });
-    y += tall + 40;
-  }
-  doc.groups = []; renderGroups(); store.touch();
-}
 
 /* ----- custom modules: a saved set of modules and the cables between them ----- */
 function captureCustom(name, ids){
@@ -3767,12 +4016,12 @@ function pasteClip(){
 const ctx = document.getElementById('ctxmenu');
 function showMenu(x, y, items){
   ctx.replaceChildren(...items.map(([label, fn, dis]) => { if (label[0] === '§') return h('div', {class:'ctxhead', text: label.slice(1)});   // a section heading
-    const b = h('button', {class:'ctxitem', text: label}); if (dis) b.disabled = true; b.addEventListener('click', () => { hideMenu(); fn(); }); return b; }));
+    const b = h('button', {class:'ctxitem', role:'menuitem', text: label}); if (dis) b.disabled = true; b.addEventListener('click', () => { hideMenu(); fn(); }); return b; }));
   ctx.hidden = false;
   const r = ctx.getBoundingClientRect();
   ctx.style.left = Math.max(8, Math.min(x, window.innerWidth - r.width - 8)) + 'px'; ctx.style.top = Math.max(8, Math.min(y, window.innerHeight - r.height - 8)) + 'px';   // (U10) never off the top: a tall menu scrolls
 }
-function hideMenu(){ ctx.hidden = true; }
+function hideMenu(){ ctx.hidden = true; if (ctx.contains(document.activeElement)) document.activeElement.blur(); }   // (a closed Find a module box must not keep the keyboard: the keys after it are shortcuts again)
 /* QUICK ADD (21 Oct): double-click an empty spot of the patch, type a few letters of a module's name, then Enter (or a
    click on it in the list) adds it right there. Esc or a click elsewhere closes it. Custom modules are in the list too. */
 ws.addEventListener('dblclick', e => {
@@ -3787,21 +4036,21 @@ ws.addEventListener('dblclick', e => {
 function quickAddAt(cx, cy){
   if (playBlocked()) return;
   const [wx, wy] = worldPt({ clientX:cx, clientY:cy });
-  const all = PALETTE.filter(([g]) => !isSection(g)).flatMap(([, items]) => items).concat(((doc && doc.custom) || []).map(c => ['c:' + c.id, c.name + ' (custom)']));
+  const all = PALETTE.filter(([g]) => !isSection(g)).flatMap(([, items]) => items).concat(((doc && doc.custom) || []).map(c => ['c:' + c.id, c.name + ' (custom)']), [['note:comment', 'Comment (a text note)']]);
   const seen = new Set(), list = all.filter(([t]) => !seen.has(t) && seen.add(t)).sort((a, b) => a[1].localeCompare(b[1]));
-  const inp = h('input', {class:'qainp', type:'text', placeholder:'Find a module…', 'aria-label':'Find a module'}), box = h('div', {class:'qalist'});
+  const inp = h('input', {class:'qainp', type:'text', placeholder:'Find a module… (Enter adds, Esc closes)', 'aria-label':'Find a module'}), box = h('div', {class:'qalist'});
   let shown = [];
-  const add = t => { hideMenu(); addItem(t, wx - 20, wy - 16); };
+  const add = t => { hideMenu(); if (t === 'note:comment') addNote(wx - 20, wy - 16); else addItem(t, wx - 20, wy - 16); };
   const render = () => { const q = inp.value.trim().toLowerCase();
     shown = (q ? list.filter(([t, l]) => l.toLowerCase().includes(q) || t.toLowerCase().includes(q) || (PAL_HINT[t] || '').toLowerCase().includes(q)) : list).slice(0, 14);
-    box.replaceChildren(...(shown.length ? shown.map(([t, l], i) => { const b = h('button', {class:'ctxitem' + (i === 0 ? ' qa1' : ''), text:l}); b.addEventListener('click', () => add(t)); return b; })
+    box.replaceChildren(...(shown.length ? shown.map(([t, l], i) => { const b = h('button', {class:'ctxitem' + (i === 0 ? ' qa1' : ''), role:'menuitem', text:l}); b.addEventListener('click', () => add(t)); return b; })
       : [h('div', {class:'ctxhead', text:'No module by that name'})])); };
   inp.addEventListener('input', render);
   inp.addEventListener('keydown', ev => { ev.stopPropagation(); if (ev.key === 'Enter'){ ev.preventDefault(); if (shown[0]) add(shown[0][0]); } else if (ev.key === 'Escape'){ ev.preventDefault(); hideMenu(); } });
   ctx.replaceChildren(inp, box); render(); ctx.hidden = false;
   const r = ctx.getBoundingClientRect();
   ctx.style.left = Math.max(8, Math.min(cx, window.innerWidth - r.width - 8)) + 'px'; ctx.style.top = Math.max(8, Math.min(cy, window.innerHeight - 380)) + 'px';
-  setTimeout(() => inp.focus(), 0);
+  inp.focus(); setTimeout(() => inp.focus(), 0);   // (focused at once, so the first letters typed after the key are not lost)
 }
 window.addEventListener('keydown', e => {
   if (e.key !== 'Escape') return;
@@ -3828,11 +4077,11 @@ function ctxMenu(target, x, y, o = {}){
   const el = target.closest('.node'), id = el && el.dataset.id;
   if (id && !selected.has(id)){ if (!(o.touch && selMode)) clearSel(); setSel(id, true); }   // (with Select on, a long press adds the module to the selection)
   const sel = [...selected], n = sel.length, items = [];
-  if (o.touch && id && nodes.has(id)){   // T6, T9: on a slider, the value menu first (Reset, Type a value, MIDI learn)
+  if (id && nodes.has(id)){   // D1 (14 Nov; T6, T9 for a finger): on a slider, the value menu first (Reset, Type a value, MIDI learn), a right-click as well as a long press
     const nd = nodes.get(id), row = target.closest('.row[data-key]'), key = row && row.dataset.id === id ? row.dataset.key : null, c = key && nd.ctl[key];
     if (c && c.reset){ const lab = plabel(nd.m.type, key); items.push(['§' + lab], ['Reset to default', () => c.reset()], ['Type a value…', () => c.typeBox()], ['MIDI learn this slider', () => { if (!learn.on) setLearn(true); armLearn(nd, key, row); }]); }
   }
-  if (o.touch && !id) items.push(['Add a module here…', () => quickAddAt(x, y)]);   // T8: quick add (a double-click with a mouse)
+  if (o.touch && !id) items.push(['Add a module here… (A)', () => quickAddAt(x, y)]);   // T8: quick add (a double-click with a mouse)
   // Inside Thunder Plus: put a control, or all of a module's, in the bottom panel (it shows them for the track whose chain they're in).
   if (EMBED && id && nodes.has(id)){
     const nd = nodes.get(id), m = nd.m, row = target.closest('.row[data-key]'), key = row && row.dataset.id === id ? row.dataset.key : null, title = m.label || MODULES[m.type].label;
@@ -3850,11 +4099,14 @@ function ctxMenu(target, x, y, o = {}){
     const nm = await askDialog('Name the new custom module:', { input:'My voice', ok:'Make it' }); if (!nm || !nm.trim()) return;
     const def = captureCustom(nm.trim(), sel); if (def) toast('“' + def.name + '” is in the module list under Custom.');
   }]);
-  if (n) items.push(['Group ' + (n === 1 ? 'module' : n + ' modules'), () => groupSel()]);
+  if (n === 1) items.push(['Rename module… (Enter)', () => renameModule(sel[0])]);
+  if (n) items.push(['Group ' + (n === 1 ? 'module' : n + ' modules') + ' (' + MOD + '+G)', () => groupSel()], ['Zoom to ' + these + ' (Shift+F)', () => zoomToSel()]);
+  if (n >= 2) items.push(['Align left edges', () => alignSel('left')], ['Align right edges', () => alignSel('right')], ['Align tops', () => alignSel('top')], ['Align bottoms', () => alignSel('bottom')]);
+  if (n >= 3) items.push(['Space evenly across', () => alignSel('dist-h')], ['Space evenly down', () => alignSel('dist-v')]);
   if (n) items.push(['Copy (' + MOD + '+C)', () => copySel()], ['Duplicate (' + MOD + '+D)', () => { if (copySel(true)) pasteClip(); }]);
   if (clip) items.push(['Paste (' + MOD + '+V)', () => pasteClip()]);
   if (n) items.push(['Delete ' + (n === 1 ? 'module' : n + ' modules'), () => { if (o.touch){ if (n === 1) askRemove(sel[0], (nodes.get(sel[0]).m.label || MODULES[nodes.get(sel[0]).m.type].label)); else askRemoveMany(sel); return; } store.snapshot(); for (const x of sel) removeModule(x); clearSel(); }]);   // a finger or pen asks first, with the question the close button asks
-  items.push(['Select all', () => { for (const k of nodes.keys()) setSel(k, true); }]);
+  items.push(['Select all (' + MOD + '+A)', () => { for (const k of nodes.keys()) setSel(k, true); }]);
   { // COLLAPSE ALL / EXPAND ALL (C4), each one undo step
     const all = [...nodes.values()], open = all.filter(x => !x.m.collapsed).length, shut = all.length - open, picked = sel.map(x => nodes.get(x)).filter(Boolean);
     const say = (k, c) => toast((c ? 'Collapsed ' : 'Expanded ') + k + (k === 1 ? ' module' : ' modules') + ' (' + MOD + '+Z undoes it).');
@@ -3863,7 +4115,7 @@ function ctxMenu(target, x, y, o = {}){
     if (open) items.push(['Collapse all modules (Alt+C)', () => say(setAllCollapsed(true), true)]);
     if (shut) items.push(['Expand all modules' + (open ? '' : ' (Alt+C)'), () => say(setAllCollapsed(false), false)]);
   }
-  if (!id) items.push(['Tidy up', () => tidy()]);
+  if (!id) items.push(['Add a comment here', () => addNote(...worldPt({ clientX:x, clientY:y }))], ['Fit all modules (F)', () => fitAll()], ['Tidy up (by signal flow)', () => tidy()], ['Snap to grid: ' + (snapOn ? 'on (turn off)' : 'off (turn on)'), () => { snapOn = !snapOn; settings.snap = snapOn; saveSettings(); toast(snapOn ? 'Snap to grid on: modules land on a 10 px grid.' : 'Snap to grid off.'); }]);
   if (!id) items.push(['Patch background color…', () => pickPatchBg()]);
   if (!id && doc.view.bg) items.push(['Reset background color', () => { store.snapshot(); delete doc.view.bg; ws.style.backgroundColor = ''; store.touch(); }]);
   showMenu(x, y, items);
@@ -4027,10 +4279,23 @@ function updateAllBtn(){ const any = Object.values(pstate.open).some(Boolean); a
 allBtn.addEventListener('click', () => { const any = Object.values(pstate.open).some(Boolean); groupOpeners.forEach(f => f(!any)); psave(); updateAllBtn(); });
 updateAllBtn();
 renderQuick();
+{ // M4 (14 Nov): SEARCH at the top of the module list (the same words as Find a module): matches replace the list; Enter adds the first at the middle of the view, Esc clears
+  const box = h('input', {class:'psearch', type:'search', placeholder:'Find a module…', 'aria-label':'Find a module in the list', autocomplete:'off'}), res = h('div', {class:'presults', hidden:true});
+  plist.prepend(box, res);
+  const go = () => {
+    const q = box.value.trim().toLowerCase(); plist.classList.toggle('searching', !!q); res.hidden = !q;
+    if (!q){ res.replaceChildren(); return; }
+    const seen = new Set(), all = PALETTE.filter(([g]) => !isSection(g)).flatMap(([, items]) => items).concat(((doc && doc.custom) || []).map(c => ['c:' + c.id, c.name + ' (custom)'])).filter(([t]) => !seen.has(t) && seen.add(t)).sort((a, b) => a[1].localeCompare(b[1]));
+    const hits = all.filter(([t, l]) => l.toLowerCase().includes(q) || t.toLowerCase().includes(q) || (PAL_HINT[t] || '').toLowerCase().includes(q)).slice(0, 40);
+    res.replaceChildren(...(hits.length ? hits.map(([t, l]) => h('div', {class:'pwrap'}, paletteItem(t, l, false))) : [h('div', {class:'qempty', text:'No module by that name.'})]));
+  };
+  box.addEventListener('input', go);
+  box.addEventListener('keydown', e => { e.stopPropagation(); if (e.key === 'Enter'){ const b = res.querySelector('.pitem'); if (b){ e.preventDefault(); addAtCenter(b.dataset.type); } } else if (e.key === 'Escape'){ e.preventDefault(); box.value = ''; go(); box.blur(); } });
+}
 // The module list starts closed; it remembers whether you left it open.
 const setDrawer = open => { drawer.classList.toggle('collapsed', !open); dtoggle.setAttribute('aria-expanded', String(open)); pstate.drawer = open; psave(); };
 setDrawer(!!pstate.drawer);
-dtoggle.addEventListener('click', () => { if (playBlocked()) return; setDrawer(drawer.classList.contains('collapsed')); });
+dtoggle.addEventListener('click', () => { if (playBlocked()) return; setDrawer(drawer.classList.contains('collapsed')); if (!drawer.classList.contains('collapsed') && matchMedia('(pointer: fine)').matches){ const q = palette.querySelector('.psearch'); if (q) q.focus(); } });   // M4: on a mouse the list opens with its search ready
 // Drag the right edge of the open module list to make it wider or narrower.
 {
   const rz = h('div', {class:'dresize', title:'Drag to resize the module list'}); drawer.append(rz);
@@ -4262,15 +4527,18 @@ function helpDoc(){
     .map(([k, l, d, w, da]) => '<div class="lg"><svg width="46" height="14" viewBox="0 0 46 14"><path d="M2 7H44" fill="none" stroke="' + KC[k] + '" stroke-width="' + w + '"' + da + '/></svg><i class="jk ' + (k === 'gate' ? 'g' : '') + '" style="background:' + KC[k] + '"></i><span class="lt"><b>' + esc(l) + '</b>' + esc(': ' + d) + '</span></div>').join('') + '</div></div>';   // round 2: the heading on its own line, then three rows on one grid (sample, jack, text) so every text starts at the same x
   const guide = [
     ['Patching', 'Drag from an output jack (right edge) to an input jack (left edge). Teal solid cables carry audio, purple dashed cables carry control signals and pink dotted cables carry gates; gate jacks are diamonds, the others round. Every slider has a small purple jack on its left for modulation. Drag a patched input to move its cable, or drop it on empty space to unplug. Click a cable to select it: Delete removes it, Escape lets go, and its bend handles show (drag one to move the bend, Option-click one to remove it). Double-click a cable to remove it. Hold Option (Alt on Windows) and click while drawing a cable to bend it, or Option-drag an existing cable.'],
+    ['Summing and reading cables', 'A second cable into an input adds to the first: the signals are summed (two equal signals come out 6 dB louder, with no automatic level trim). To replace a cable, drag the old one off first; dragging from a patched input picks up its newest cable. Rest the pointer on a cable to read what it carries: the two ends and, while the sound engine runs, its level (audio in dB, control as a number, gates on or off).'],
+    ['Keys', 'A or N opens Find a module under the pointer (or beside the picked module): type a few letters, Enter adds it, Esc closes it. F fits the whole patch and Shift+F zooms to the picked modules. Ctrl/⌘+A picks every module, Ctrl/⌘+G groups the picked ones, Ctrl/⌘ with = and - zooms, Ctrl/⌘+0 goes back to 100%. Arrow keys move the picked modules 10 px (Shift: 1 px), Enter renames the picked one, Esc lets go of them, Delete removes them. Alt+C collapses or expands every module, Alt+E switches Play and Edit, Ctrl/⌘+Z undoes. Tab walks through the modules and their controls: a module you Tab onto is picked, so the arrows move it. These keys do nothing while you type in a box, and the ones that change the patch do nothing in Play.'],
+    ['Comments, names and layout', 'Right-click the background and choose Add a comment here (or type “comment” in Find a module) for a plain text note you can type into, move by its top edge and remove with its x; a comment is saved with the patch. Right-click a module and choose Rename module to give it a name of your own (empty goes back to the usual one). With two or more modules picked, the menu aligns their edges; with three, it spaces them evenly. Modules snap to a 10 px grid as you drag; the background menu turns that off. Tidy up lays the modules out in columns by signal flow and keeps your groups.'],
     ['Modulation', 'Patch any signal into a slider’s small purple jack and it moves that slider: the slider sets the center, and the signal swings it across its range. The value turns purple and a mark shows where the slider really is. Use the Depth slider on an LFO or envelope, or an Attenuverter, to make the swing smaller.'],
     ['Audio as control', 'Audio can drive anything a control signal can. Patch audio into Envelope follow to make it swell a filter or level, into Gate extract to fire envelopes and clocks from hits, or into Pitch follow to track a monophonic melody. Then shape it with Slew (to smooth it), Sample & hold (to step it) or Quantizer (to snap it to a scale).'],
     ['Tracks', 'Each track has its own Track In and Chain Out. In the Mixer, turning a track’s CHN on adds that track’s pair (wired straight through, in a column below everything else) without leaving the Mixer, so every track gets its own chain and toggling one never disturbs another; the next time you come here, the patch is fitted so you see them all. If that track already has a chain, switching its CHN on just runs it through that chain again. The output always follows its own input — set the Track In and its Chain Out moves with it, and a Chain Out can’t be pointed elsewhere. Picking a track that is already used also jumps to and highlights the existing chain. A track takes one pair; control and gate inputs are not limited.'],
-    ['Moving around', 'Scroll with two fingers or turn the mouse wheel to pan (Shift+wheel sideways); with a mouse a middle-button drag pans too, and on a touch screen dragging the background does. Pinch or Ctrl/⌘+wheel zooms; the zoom buttons are in the top bar (click the percentage to type one, Fit shows everything).'],
+    ['Moving around', 'Scroll with two fingers or turn the mouse wheel to pan (Shift+wheel sideways); with a mouse a middle-button drag pans too, and on a touch screen dragging the background does. Rest the pointer on a slider for a moment (it gets an outline) and the wheel changes that slider instead, Shift+wheel in fine steps. Pinch or Ctrl/⌘+wheel zooms; the zoom buttons are in the top bar (click the percentage to type one, Fit shows everything).'],
     ['Play and Edit', 'The Play and Edit switch in the top bar (Alt+E on a keyboard) decides what a touch or a click does. In Edit everything works. In Play the patch is locked for playing: sliders, selects, buttons and readouts work, but no module can be moved, selected, folded, removed or given a menu, no cable can be made or removed, and a drag on anything that is not a control moves the view. The patch is framed and tagged PLAY while it is on. The choice is remembered for this editor on this device, not saved in the patch.'],
     ['On a touch screen', 'Drag a slider sideways to change it from where it is; drag up or down from it to move the view instead; move your finger well above or below the slider while you drag for fine steps; double-tap to reset; tap the value to type a number (1e3 works too). Hold a finger on a module, a cable, a slider or the background to open its menu (on a cable: Add a bend here; on the background: Add a module here). Select (in the top bar, or in its overflow menu on a narrow screen) makes a tap on a module pick it, and a drag on the background draw a box. Two fingers pan and zoom from anywhere. The ⋯ button holds File, Settings, Help, MIDI learn and zoom. A module with many controls is cut into sections: tap a section bar to open or close it.'],
     ['Modules', 'Open the Modules list on the left. Click a module to add it to the middle of the view, or drag it onto the patch. Star a module to keep it in Quick access. Drag a module by its title bar; double-click the title bar to collapse it. Double-click a slider to reset it, or its value to type one.'],
-    ['Selecting and the right-click menu', 'As in Max: click a module to select it, Shift-click to add it or take it out, Shift-drag on the background for a selection box (a plain drag there moves the view to it). Delete or Backspace removes the selection. Hold Option (Alt on Windows) and drag a module’s title bar to copy it (or the selection) and drop the copy where you let go; Option-click opens its help; Ctrl/⌘-click works a module without selecting it. Right-click to group them, copy, duplicate, delete, or make a custom module that you can add again from the list.'],
-    ['Presets', 'Effects and sound sources have a Preset row at the top. Pick a factory preset (it sets every control: the ones it names, the rest back to their defaults), Default, or one of yours; Undo takes it back. Save as a preset keeps the module’s settings on this device under a name, for every patch; Delete one of yours removes one. The row keeps the preset’s name and says “edited” once you move a control.'],
+    ['Selecting and the right-click menu', 'As in Max: click a module to select it, Shift-click to add it or take it out, Shift-drag on the background for a selection box (a plain drag there moves the view to it). Delete or Backspace removes the selection. Hold Option (Alt on Windows) and drag a module’s title bar to copy it (or the selection) and drop the copy where you let go; Option-click opens its help; Ctrl/⌘-click works a module without selecting it. Right-click a slider for Reset, Type a value and MIDI learn (Alt-click or double-click also reset it); right-click a module to group, copy, duplicate, delete, rename, align or make a custom module that you can add again from the list.'],
+    ['Presets', 'Effects and sound sources have a Preset row at the top. Pick a factory preset (it sets every control: the ones it names, the rest back to their defaults), Default, or one of yours; Undo takes it back. Save as a preset keeps the module’s settings under a name, on this device for every patch and in this patch, so it goes with the song and with Export custom modules; Delete one of yours removes one. The row keeps the preset’s name and says “edited” once you move a control.'],
     ['Bypass', 'BYP on an effect’s title bar passes its dry sound. In a phrase, the tracker’s BYP command switches it by its number (1–F): BYP 31 bypasses module 3 on that track, BYP 20 brings module 2 back.'],
     ['MIDI learn', 'Press MIDI learn, click a slider, then move a knob on your controller. Press Delete to clear the slider’s mapping, and Done when you’re finished.'],
     ['Saving', 'Your patch saves itself as you work. File → Save downloads it as a .chains.json file; Open loads one (waves patches open too, keeping their effects). Settings → Backups holds earlier versions.']
@@ -4401,6 +4669,7 @@ let jackSeen = 0;
 function paintJacks(list){
   if (list){ jackSeen = Date.now(); for (const [id, dir, port, v] of list){ const n = nodes.get(id), q = n && n.pms && n.pms[dir + ':' + port]; if (q && v > q.v) q.v = v;
     if (n && n.scLed && dir === 'in' && (port === 'sc' || port === 'scbus') && v > n.scLed.v) n.scLed.v = v; } }
+  if (hovCable) cabText();   // M8: the hovered cable's readout, from the same telemetry (before the meters fall back)
   for (const n of nodes.values()){
     if (n.scLed){ const L = n.scLed, a = L.v > .003 ? Math.round(Math.min(1, .35 + Math.sqrt(L.v)) * 10) / 10 : 0;   // dark below about −50 dB
       if (a !== L.shown){ L.shown = a; L.el.classList.toggle('on', a > 0); L.el.style.setProperty('--a', a); } L.v *= .6; }
@@ -4484,6 +4753,7 @@ function setMode(play, quiet){
   for (const k in modeBtns){ const on = (k === 'play') === play; modeBtns[k].classList.toggle('on', on); modeBtns[k].setAttribute('aria-pressed', String(on)); }
   if (play){
     setSelMode(false, true); hideMenu(); clearSel(); clearCableSel(); lpCancel();
+    if (nodeDragging && nodeDragging.stop) nodeDragging.stop();   // review fix (14 Nov): Alt+E in the middle of a title-bar drag ends that drag: the module stops following the pointer
     if (drag && drag.armed) window.dispatchEvent(new KeyboardEvent('keydown', { key:'Escape' }));
     if (!drawer.classList.contains('collapsed')) setDrawer(false);
   }
@@ -4519,7 +4789,7 @@ selBtn.addEventListener('click', () => { if (playBlocked()) return; setSelMode(!
   window.addEventListener('keydown', e => { if (e.key === 'Escape') setMore(false); });
   pop.addEventListener('click', e => { const b = e.target.closest('button'); if (b && !b.closest('.setmenu') && !['filebtn', 'setbtn', 'zoomval', 'zoomout', 'zoomin'].includes(b.id)) setMore(false); });   // a command closes the menu; File and Settings open their own list inside it
   mq.addEventListener('change', e => place(e.matches)); place(mq.matches);
-  document.getElementById('baradd').addEventListener('click', () => { if (playBlocked()) return; setDrawer(drawer.classList.contains('collapsed')); });
+  document.getElementById('baradd').addEventListener('click', () => { if (playBlocked()) return; setDrawer(drawer.classList.contains('collapsed')); if (!drawer.classList.contains('collapsed') && matchMedia('(pointer: fine)').matches){ const q = palette.querySelector('.psearch'); if (q) q.focus(); } });   // M4: on a mouse the list opens with its search ready
   document.getElementById('barundo').addEventListener('click', () => { if (canUndo()) undo(); else toast('Nothing to undo.'); });
 }
 setMode(settings.mode === 'play', true);   // (remembered per editor, in its settings; Edit when nothing is stored)
