@@ -1362,6 +1362,12 @@ body.mob .top .kitname{width:auto; flex:1 1 90px; min-width:64px; max-width:220p
 /* SYNTH UX C (13 Nov): with Waves and Chains shown (4 tabs) on the folded phone (360-412 px) every label reads in full and the tabs do not scroll inside themselves: a step down in size, tighter padding. */
 @media (max-width:520px){ body.mob .top #segView:has(button:nth-child(4)){overflow:visible; flex:none} body.mob .top #segView:has(button:nth-child(4)) button{padding-inline:3px!important; letter-spacing:-.02em; font-size:11px} }
 @media (max-width:380px){ body.mob .top #segView:has(button:nth-child(4)) button{font-size:10.5px} }
+/* TABS ON THEIR OWN ROW (14 Nov, owner: "Tracker | Synth | Chai" on the folded Fold, 3 tabs): Tracker, Synth and Chains / Waves are 150 px (4 tabs: 170) and the rest of the bar (LEFT, File, Settings, PLAY, CPU)
+   is another ~220, more than a 320-460 px screen has: with 3 tabs the switch shrank and scrolled inside itself (Chains cut), with 4 the whole bar ran off the screen (the 360 / 412 check measured the tabs, not the bar).
+   Three or more tabs now take a full row of their own there and share it out, at the normal size; two tabs (Tracker | Synth) stay beside the rest as before. */
+@media (max-width:460px){ body.mob .top{flex-wrap:wrap}
+  body.mob .top #segView:has(button:nth-child(3)){flex:1 1 100%; min-width:0; overflow:visible}
+  body.mob .top #segView:has(button:nth-child(3)) button{flex:1 1 auto; padding-inline:6px!important; letter-spacing:.02em; font-size:var(--fs-3)} }
 body.mob .top .brand{flex-shrink:1; min-width:0; overflow:hidden}
 /* (owner, 11 Nov) The name leaves the title bar when the bar has no room for the whole word (the Fold unfolded showed "Thunde"): brandFit()
    measures it. And with no name showing (folded, or hidden by brandFit) the bar starts at the screen edge, so Tracker lines up with SONG below it. */
@@ -23750,7 +23756,7 @@ function msHook(el){ try { ['playing', 'pause', 'ended', 'volumechange', 'error'
    song: the project file's name (opened or saved as a file, without .thunder) else the song's own name; set again when that changes while playing (rename, save as, open, new),
    never on a redraw. Artwork: the app's own icons, resolved against the page, so beta/ and stable/ find their own copy. (Chrome may still badge the notification with its small icon.) */
 let msTitleNow = null;
-function msTitle(){ let f = ''; try { f = (typeof projLabel === 'function' && projLabel() || '').replace(/\.(thunder|json)$/i, ''); } catch(e){} return f || S.name || 'Song'; }
+function msTitle(){ let f = ''; try { f = (typeof projTitle === 'function' ? projTitle() : typeof projLabel === 'function' && projLabel() || '').replace(/\.(thunder|json)$/i, ''); } catch(e){} return f || S.name || 'Song'; }
 function msIcon(p, sizes){ let u = p; try { u = new URL(p, location.href).href; } catch(e){} return {src:u, sizes, type:'image/png'}; }
 function msMeta(force){
   const ms = navigator.mediaSession; if (!ms || !bgOn || (!force && !tp.on)) return;
@@ -24139,16 +24145,21 @@ async function kvSet(k, v){ try { const db = await kvDb(); await new Promise(res
 async function kvDel(k){ try { const db = await kvDb(); await new Promise(res => { const tx = db.transaction('kv', 'readwrite'); tx.objectStore('kv').delete(k); tx.oncomplete = () => res(); tx.onerror = tx.onabort = () => { kvFail('deleting', k, tx); res(); }; }); } catch(e){ tpLog('deleting "' + k + '" failed', e); } }
 // The project file: a handle (browser) or a path (desktop app). Remembered across restarts.
 let projFile = null, projPath = null;
+// A project opened from a file the app got no handle or path for (Android's file picker, Open with, Share): its file name, kept with the song's own name at the time, so the
+// notification's title and the window title can still say "acid" and not the song's inner default "Song 1"; dropped by projSet, and not used once the song is renamed.
+let projLoose = null;
 const PPK = 'thunderplus-projpath-v1', DTK = 'thunderplus-dirty-v1';
 try { projPath = DESK ? localStorage.getItem(PPK) || null : null; } catch(e){}
-if (!DESK && canFS) kvGet('cur').then(h => { if (h && !projFile) projFile = h; });
+if (!DESK && canFS) kvGet('cur').then(h => { if (h && !projFile){ projFile = h; try { msMeta(); } catch(e){} } });
 const projLabel = () => projPath ? projPath.split(/[\\/]/).pop() : projFile ? projFile.name : '';
+const projTitle = () => projLabel() || (projLoose && projLoose.s === S.name ? projLoose.f : '');
 function projSet(path, handle){
-  projPath = path || null; projFile = handle || null;
+  projPath = path || null; projFile = handle || null; projLoose = null;
   try { if (DESK){ if (projPath) localStorage.setItem(PPK, projPath); else localStorage.removeItem(PPK); } } catch(e){}
   if (!DESK && canFS) kvSet('cur', projFile || null);
   if (projPath || projFile) recentAdd({name:projLabel(), path:projPath, h:projFile});
   try { msMeta(); } catch(e){}   // the notification's title follows the file
+  try { dirtyShow(); } catch(e){}   // and so does the window title (Save as: setDirty ran before the file changed)
 }
 // Unsaved changes: set by every song or sound edit (markChange, from saveS and changed), cleared by a save or an open.
 // Edits in the first moments after start-up (conversions, the saved song settling) don't count.
@@ -24160,7 +24171,7 @@ function setDirty(on){ projDirty = !!on; if (!projDirty) smpNew = false; try { l
 var smpNew = (() => { try { return localStorage.getItem(DTK + '-smp') === '1'; } catch(e){ return false; } })();
 function markSmpNew(){ smpNew = true; try { localStorage.setItem(DTK + '-smp', '1'); } catch(e){} }
 function dirtyShow(){
-  try { const app = isMobile() ? 'Thunder' : 'Thunder Plus', t = (projDirty ? '• ' : '') + (S.name || 'Song') + ' — ' + app; if (document.title !== t) document.title = t;
+  try { const app = isMobile() ? 'Thunder' : 'Thunder Plus', t = (projDirty ? '• ' : '') + ((typeof msTitle === 'function' && msTitle()) || S.name || 'Song') + ' — ' + app; if (document.title !== t) document.title = t;
     const b = $('bFile'); if (b){ b.classList.toggle('dirty', projDirty); b.title = 'File: new, open, save, share, render and export' + (projDirty ? ' · the project has unsaved changes' : ''); } } catch(e){}
 }
 // Before anything replaces the song: true when that's fine (nothing unsaved, it was saved now, or the person chose not to).
@@ -24250,7 +24261,11 @@ async function loadProjText(text, name, where){
     return true;
   } catch(err){ toast(err.message || 'Couldn’t read that project file.'); return false; }
 }
-async function loadProjFile(f, h){ return loadProjText(await f.text(), f.name, h ? {h} : null); }
+async function loadProjFile(f, h){
+  const ok = await loadProjText(await f.text(), f.name, h ? {h} : null);
+  if (ok && !h && f && f.name){ projLoose = {f:String(f.name), s:S.name}; try { msMeta(); dirtyShow(); } catch(e){} }   // no handle: the file's name is all the app has of it
+  return ok;
+}
 async function openProj(){
   if (!await okToLeave('opening another project')) return;
   if (DESK){ const r = await DESK.open(); if (r && r.text != null) loadProjText(r.text, r.name, {path:r.path}); else if (r && r.error) toastErr('Couldn’t open it: ' + r.error); return; }
@@ -24684,7 +24699,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 589;
+const BUILD = 590;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD + (location.pathname.includes('/beta/') ? ' · beta' : '');
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -34491,6 +34506,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [590, '14 Nov', ['On the phone, the now-playing notification names your project: a project opened from Files, \u201cOpen with\u201d or Share showed the song\u2019s inner name (\u201cSong 1\u201d) because Android hands the app no file to remember; the app now keeps the file\u2019s name. The window title follows it too.', 'On the folded phone the view tabs read in full: with Chains or Waves showing, Tracker, Synth and the others take a row of their own (\u201cChains\u201d was cut to \u201cChai\u201d with three tabs, and with four the top bar ran off the screen).']],
   [589, '14 Nov', ['\u2026waves and \u2026chains: feedback loops. A cable that closes a loop used to be refused; now it is allowed, and so is patching a module into itself. The cable that closes the loop is drawn as a long dash and a dot with a small \u201c1 blk\u201d tag: what it carries arrives one block late (128 samples, about 3 ms). A loop cannot run away: a signal inside the normal range passes through that cable untouched, and anything louder is bent smoothly towards a ceiling (about +6 dB). Turn loop gain up carefully all the same. Patches without a loop sound exactly as before.']],
   [588, '14 Nov', ['\u2026waves and \u2026chains: a module can now fold to Mini, a one-line title bar with its cables on the edges, as well as to Compact. Shift+click the chevron, press and hold it on a phone, use the module menu, or press Alt+Shift+C to take every module to Mini; the plain chevron and Alt+C work as before.', 'Some modules are narrower now (Attenuverter, Random, Quantizer, Logic, Math, Slew limiter, Sample & hold, Clock divider, Gate extract), so a busy patch fits more on screen. The \u201cAbout this module\u201d entry moved into the module menu.', 'A group has a chevron: click it and the whole group folds to one block that keeps the cables going in and out. The group box follows its modules when you move, nudge, fold or remove them. Old patches open as they were.', 'Touch: a long press that opens a menu no longer picks the first item when your finger lifts.']],
   [587, '14 Nov', ['\u2026waves and \u2026chains feel more like a desktop program. The mouse wheel over a slider now turns it, but only once the pointer has rested on it for a moment, and never while you are panning or zooming. Right-click a slider for Reset, Type a value and MIDI learn; hold Alt and click to reset it.', 'Two cables into one input now add together instead of the new one replacing the old one, and hovering a cable shows what is on it (level, gate, or the value it carries). Modules snap to a grid as you drag (the background menu turns that off).', 'New keys: A (or N in Chains) adds a module, F fits the view, Shift+F zooms to the picked modules, Ctrl+A picks all, Ctrl+G groups, arrows nudge, Enter renames, Esc lets go. Right-click gives Rename, Align, Space evenly, Tidy up by signal flow and Add a comment. The module list has a search box.', 'In Chains you can save your own presets and they travel with the patch. Tab now steps from module to module, and buttons and cables have names for screen readers. Folding a long module no longer works in Play, and Alt+E during a drag lets go of the module.']],
