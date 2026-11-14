@@ -376,5 +376,8 @@
  "midside @switches-on": "8e712c25",
  "dline @default": "489bcb25",
  "dline @stressed": "3fde1dc5",
- "dline @switches-on": "3fde1dc5"
+ "dline @switches-on": "3fde1dc5",
+ "expr @default": "c9779565",
+ "expr @stressed": "c2b5c62d",
+ "expr @switches-on": "197ed939"
 }

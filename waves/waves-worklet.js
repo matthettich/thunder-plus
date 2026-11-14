@@ -1639,6 +1639,129 @@ const DelayLine = {
   }
 };
 
+/* EXPRESSION (14 Nov, module queue): a module whose sound is a line of maths you type. The text is NEVER run as code:
+   it is read character by character by the small parser below (numbers, names, the operators and functions listed,
+   brackets; nothing else exists), turned into a short list of steps, and one loop works those steps out for every
+   sample on a small stack of numbers. No loops in a formula, no way to reach anything outside it.
+   Names: a b c d (the four inputs, this sample), k1 k2 (the two sliders), t (seconds since the song started or the
+   module was made), y (this module's own previous output sample: a one-sample feedback, for filters and counters),
+   rnd (a new random number from -1 to 1 each sample), pi, sr (samples a second).
+   Operators, lowest first:  ?:   ||   &&   == != < <= > >=   + -   * / %   unary - !   ^ (to the power of).
+   A comparison gives 1 or 0. Dividing by 0 gives 0. && || and ?: work every side out (nothing has side effects).
+   Functions: sin cos tan tanh abs sqrt exp log floor ceil round sign fract (one value); min max pow mod (two);
+   clip(x, low, high), mix(a, b, amount) (three); tri(x) saw(x) sq(x): waves from -1 to 1 that repeat every 1
+   (saw(220 * t) is a 220 Hz saw).
+   Limits: 200 characters, 128 steps, 32 numbers on the stack. The result is held between -4 and 4; not-a-number is 0.
+   MathExpr.compile(text) → { err:0, pos:0, ops, args, n, depth, rnd } or { err:code, pos } (1 empty, 2 too long,
+   3 too complicated, 4 a character it does not know, 5 a name it does not know, 6 a bracket not closed, 7 the wrong
+   number of values for a function, 8 a value expected, 9 something left over after the formula, 10 not text).
+   mxRun(P, S, V) → the value; V = [a, b, c, d, k1, k2, t, y, pi, sr, rnd]. Neither makes anything per sample. */
+const MX_VARS = { a:0, b:1, c:2, d:3, k1:4, k2:5, t:6, y:7, pi:8, sr:9, rnd:10 };
+const MX_FUNCS = { sin:[20,1], cos:[21,1], tan:[22,1], tanh:[23,1], abs:[24,1], sqrt:[25,1], exp:[26,1], log:[27,1], floor:[28,1], ceil:[29,1], round:[30,1], sign:[31,1], fract:[32,1],
+  min:[33,2], max:[34,2], pow:[7,2], mod:[6,2], clip:[35,3], mix:[36,3], tri:[37,1], saw:[38,1], sq:[39,1] };
+const MX_DEFAULT = 'a * k1';
+class MathExpr {
+  static compile(src){
+    if (typeof src !== 'string') return { err:10, pos:0 };
+    if (src.length > 200) return { err:2, pos:200 };
+    const ops = [], args = []; let i = 0, depth = 0, maxDepth = 0, err = 0, epos = 0, rnd = false, level = 0;
+    const fail = (c, p) => { if (!err){ err = c; epos = p; } return false; };
+    const emit = (op, arg, d) => { if (ops.length >= 128) return fail(3, i); ops.push(op); args.push(arg || 0); depth += d; if (depth > maxDepth) maxDepth = depth; if (maxDepth > 32) return fail(3, i); return true; };
+    const ws = () => { while (i < src.length && (src[i] === ' ' || src[i] === '\t' || src[i] === '\n' || src[i] === '\r')) i++; };
+    const eat = tok => { ws(); if (src.startsWith(tok, i)){ i += tok.length; return true; } return false; };
+    const isD = ch => ch >= '0' && ch <= '9', isA = ch => (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || ch === '_';
+    const primary = () => {
+      ws(); if (i >= src.length) return fail(8, i);
+      const ch = src[i], p0 = i;
+      if (isD(ch) || (ch === '.' && isD(src[i + 1] || ''))){
+        let j = i; while (j < src.length && isD(src[j])) j++; if (src[j] === '.'){ j++; while (j < src.length && isD(src[j])) j++; }
+        if ((src[j] === 'e' || src[j] === 'E') && (isD(src[j + 1] || '') || ((src[j + 1] === '-' || src[j + 1] === '+') && isD(src[j + 2] || '')))){ j += 2; while (j < src.length && isD(src[j])) j++; }
+        const v = Number(src.slice(i, j)); i = j; return emit(0, v === v ? v : 0, 1);
+      }
+      if (isA(ch)){
+        let j = i; while (j < src.length && (isA(src[j]) || isD(src[j]))) j++; const name = src.slice(i, j).toLowerCase(); i = j; ws();
+        if (src[i] === '('){
+          const fn = Object.prototype.hasOwnProperty.call(MX_FUNCS, name) ? MX_FUNCS[name] : null; if (!fn) return fail(5, p0);
+          i++; if (++level > 24) return fail(3, i); let n = 0; ws();
+          if (src[i] !== ')'){ for (;;){ if (!ternary()) return false; n++; ws(); if (src[i] === ','){ i++; continue; } break; } }
+          if (src[i] !== ')') return fail(6, i); i++; level--;
+          if (n !== fn[1]) return fail(7, p0);
+          return emit(fn[0], 0, 1 - n);
+        }
+        if (!Object.prototype.hasOwnProperty.call(MX_VARS, name)) return fail(5, p0);
+        if (name === 'rnd') rnd = true; return emit(1, MX_VARS[name], 1);
+      }
+      if (ch === '('){ i++; if (++level > 24) return fail(3, i); if (!ternary()) return false; ws(); if (src[i] !== ')') return fail(6, i); i++; level--; return true; }
+      return fail(isA(ch) || isD(ch) || '+-*/%^<>=!&|?:(),.'.includes(ch) ? 8 : 4, i);
+    };
+    const power = () => { if (!primary()) return false; ws(); if (src[i] === '^'){ i++; if (!unary()) return false; return emit(7, 0, -1); } return true; };   // right to left; -2 ^ 2 is -(2 ^ 2)
+    const unary = () => { ws(); if (src[i] === '-'){ i++; if (++level > 24) return fail(3, i); if (!unary()) return false; level--; return emit(8, 0, 0); } if (src[i] === '+'){ i++; return unary(); }
+      if (src[i] === '!' && src[i + 1] !== '='){ i++; if (++level > 24) return fail(3, i); if (!unary()) return false; level--; return emit(9, 0, 0); } return power(); };
+    const mul = () => { if (!unary()) return false; for (;;){ ws(); const ch = src[i]; if (ch === '*' || ch === '/' || ch === '%'){ i++; if (!unary()) return false; if (!emit(ch === '*' ? 4 : ch === '/' ? 5 : 6, 0, -1)) return false; } else return true; } };
+    const add = () => { if (!mul()) return false; for (;;){ ws(); const ch = src[i]; if (ch === '+' || ch === '-'){ i++; if (!mul()) return false; if (!emit(ch === '+' ? 2 : 3, 0, -1)) return false; } else return true; } };
+    const cmp = () => { if (!add()) return false; for (;;){ ws(); let op = 0;
+      if (eat('<=')) op = 11; else if (eat('>=')) op = 13; else if (eat('==')) op = 14; else if (eat('!=')) op = 15; else if (src[i] === '<'){ i++; op = 10; } else if (src[i] === '>'){ i++; op = 12; } else return true;
+      if (!add()) return false; if (!emit(op, 0, -1)) return false; } };
+    const and = () => { if (!cmp()) return false; for (;;){ if (eat('&&')){ if (!cmp()) return false; if (!emit(16, 0, -1)) return false; } else return true; } };
+    const or = () => { if (!and()) return false; for (;;){ if (eat('||')){ if (!and()) return false; if (!emit(17, 0, -1)) return false; } else return true; } };
+    const ternary = () => { if (!or()) return false; ws(); if (src[i] === '?'){ i++; if (++level > 24) return fail(3, i); if (!ternary()) return false; ws(); if (src[i] !== ':') return fail(8, i); i++; if (!ternary()) return false; level--; return emit(18, 0, -2); } return true; };
+    ws(); if (i >= src.length) return { err:1, pos:0 };
+    if (!ternary()) return { err:err || 8, pos:epos };
+    ws(); if (i < src.length) return { err:'+-*/%^<>=!&|?:(),.'.includes(src[i]) || isA(src[i]) || isD(src[i]) ? 9 : 4, pos:i };
+    return { err:0, pos:0, ops:Uint8Array.from(ops), args:Float64Array.from(args), n:ops.length, depth:maxDepth, rnd };
+  }
+}
+function mxRun(P, S, V){
+  const ops = P.ops, args = P.args, n = P.n; let sp = 0;
+  for (let k = 0; k < n; k++){
+    const op = ops[k];
+    if (op === 0) S[sp++] = args[k];
+    else if (op === 1) S[sp++] = V[args[k]];
+    else if (op < 8 || (op >= 10 && op <= 17) || op === 33 || op === 34){
+      const b = S[--sp], a = S[sp - 1]; let r;
+      switch (op){ case 2: r = a + b; break; case 3: r = a - b; break; case 4: r = a * b; break; case 5: r = b === 0 ? 0 : a / b; break; case 6: r = b === 0 ? 0 : a - b * Math.floor(a / b); break; case 7: r = Math.pow(a, b); break;
+        case 10: r = a < b ? 1 : 0; break; case 11: r = a <= b ? 1 : 0; break; case 12: r = a > b ? 1 : 0; break; case 13: r = a >= b ? 1 : 0; break; case 14: r = a === b ? 1 : 0; break; case 15: r = a !== b ? 1 : 0; break;
+        case 16: r = a !== 0 && b !== 0 ? 1 : 0; break; case 17: r = a !== 0 || b !== 0 ? 1 : 0; break; case 33: r = a < b ? a : b; break; default: r = a > b ? a : b; }
+      S[sp - 1] = r;
+    }
+    else if (op === 18){ const c = S[--sp], b = S[--sp]; S[sp - 1] = S[sp - 1] !== 0 ? b : c; }
+    else if (op === 35){ const hi = S[--sp], lo = S[--sp], x = S[sp - 1]; S[sp - 1] = x < lo ? lo : x > hi ? hi : x; }
+    else if (op === 36){ const m = S[--sp], b = S[--sp], a = S[sp - 1]; S[sp - 1] = a + (b - a) * m; }
+    else {
+      const x = S[sp - 1]; let r;
+      switch (op){ case 8: r = -x; break; case 9: r = x === 0 ? 1 : 0; break; case 20: r = Math.sin(x); break; case 21: r = Math.cos(x); break; case 22: r = Math.tan(x); break; case 23: r = Math.tanh(x); break;
+        case 24: r = x < 0 ? -x : x; break; case 25: r = x > 0 ? Math.sqrt(x) : 0; break; case 26: r = Math.exp(x); break; case 27: r = x > 1e-300 ? Math.log(x) : 0; break; case 28: r = Math.floor(x); break; case 29: r = Math.ceil(x); break;
+        case 30: r = Math.round(x); break; case 31: r = x > 0 ? 1 : x < 0 ? -1 : 0; break; case 32: r = x - Math.floor(x); break;
+        case 37: { const f = x - Math.floor(x); r = f < .5 ? 4 * f - 1 : 3 - 4 * f; break; } case 38: r = 2 * (x - Math.floor(x)) - 1; break; default: r = x - Math.floor(x) < .5 ? 1 : -1; }
+      S[sp - 1] = r;
+    }
+  }
+  return S[0];
+}
+const Expression = {
+  type:'expr', scope:'poly', cost:.25, text:true,
+  inputs:{ a:'audio', b:'audio', c:'cv', d:'cv' }, outputs:{ out:'audio' },
+  params:{ k1:[1,-4,4,.001], k2:[0,-4,4,.001] },
+  create:() => ({ src:null, prog:null, err:0, pos:0, n:0, y:0, rs:0, sn:-1, S:new Float64Array(40), V:new Float64Array(11), out:[0, 0] }),
+  process(st, io, ctx){
+    const txt = io.inst && typeof io.inst.text === 'string' ? io.inst.text : MX_DEFAULT, O = io.out.out;
+    if (st.src !== txt){ st.src = txt; st.prog = MathExpr.compile(txt); st.err = st.prog.err; st.pos = st.prog.pos; st.y = 0; }   // (only when the text changes: the one place this module makes anything)
+    if (restarted(st, ctx)) st.n = 0;
+    const P = st.prog; if (P.err){ for (let i = 0; i < ctx.block; i++) O[i] = 0; return; }
+    const A = io.in.a, B = io.in.b, C = io.in.c, D = io.in.d, V = st.V, S = st.S, sr = ctx.sr, useR = P.rnd; let y = st.y, n = st.n, rs = st.rs || (useR ? (st.rs = nextSeed() || 1) : 0);
+    V[4] = io.p.k1; V[5] = io.p.k2; V[8] = Math.PI; V[9] = sr;
+    for (let i = 0; i < ctx.block; i++){
+      V[0] = A[i]; V[1] = B[i]; V[2] = C[i]; V[3] = D[i]; V[6] = n / sr; V[7] = y;
+      if (useR){ rs ^= rs << 13; rs >>>= 0; rs ^= rs >>> 17; rs ^= rs << 5; rs >>>= 0; V[10] = rs / 2147483648 - 1; }
+      y = mxRun(P, S, V);
+      if (!(y > -4)) y = y < 0 ? -4 : 0; else if (y > 4) y = 4;   // (not-a-number fails both tests: 0)
+      O[i] = y; n++;
+    }
+    st.y = y; st.n = n; st.rs = rs;
+  },
+  show(st){ st.out[0] = st.err; st.out[1] = st.pos; return st.out; }
+};
+
 /* CONTROL MATHS (14 Nov, the owner's low-level module queue, group 1). Small sample-accurate blocks for control and
    audio alike. They are 'poly' so that in …waves one fed by a voice runs once per voice (in …chains scope means nothing).
    Add, subtract, multiply, min and max are Math's outputs; AND / OR / XOR / NOT are Logic's. */
@@ -5282,7 +5405,7 @@ const SHARED_MODULES = { beads:Beads,
   meter:Meter, limiter:Limiter, utility:Utility, ringmod:RingMod, spring:Spring, plate:Plate, lverb:Lverb, ensemble:Ensemble, math:MathM, logic:Logic, divider:Divider, euclid:Euclid,
   rect:Rectify, scale:ScaleMap, compare:Comparator, switch:Switch2, xfade:Crossfade, const:Constant,
   steps:Steps, clock:Clock, clkmul:ClockMul, chance:ChanceGate, counter:Counter, stepsw:StepSwitch, burst:Burst, gatedly:GateDelay, flipflop:FlipFlop, scope:Scope,
-  onepole:OnePole, allpass:AllpassM, dcblock:DCBlock, midside:MidSide, dline:DelayLine,
+  onepole:OnePole, allpass:AllpassM, dcblock:DCBlock, midside:MidSide, dline:DelayLine, expr:Expression,
   dimension:Dimension, bbd:BBD, harm:Harmonizer, blipdrum:BlipDrum, life:Life, degrade:Degrade, reson:Reson,
   flex:FlexM, sgate:StepGateM, retrig:RetrigM, pdelay:PDelayM, preverb:PReverbM,
   spectral:Spectral, stretch:XStretch, convolve:Convolve,
@@ -5448,9 +5571,12 @@ class WavesEngine {
     if (this.graph.mods.has(id)) this.removeModule(id);
     const params = {};
     for (const [k, v] of Object.entries(def.params)) params[k] = (o.params && typeof o.params[k] === 'number') ? o.params[k] : v[0];
-    this.graph.add(id, def, { scope:def.scope, pos:o.pos || [0, 0], params });
+    const inst = { scope:def.scope, pos:o.pos || [0, 0], params };
+    if (def.text === true) inst.text = typeof o.text === 'string' ? o.text.slice(0, 200) : undefined;   // TEXT: a module that takes typed text (Expression) keeps it here; it is only ever read by that module's own parser
+    this.graph.add(id, def, inst);
     this._sync();
   }
+  setText(id, v){ const m = this.graph.mods.get(id); if (m && m.def.text === true && typeof v === 'string') m.inst.text = v.slice(0, 200); }
   removeModule(id){ this._drop(id); this.graph.remove(id); this._sync(); }
   connect(a, b, fb){ this.graph.connect(a, b, fb); this._sync(); }
   disconnect(a, b){ this.graph.disconnect(a, b); this._sync(); }
@@ -5515,7 +5641,7 @@ class WavesEngine {
     const key = this._key(m, v);
     let io = this._ios.get(key);
     if (!io){
-      io = { in:{}, out:{}, base:m.inst.params, p:m.inst.params, pm:null, linked:new Set(), poly:m.poly, mods:null };
+      io = { in:{}, out:{}, base:m.inst.params, p:m.inst.params, inst:m.inst, pm:null, linked:new Set(), poly:m.poly, mods:null };
       for (const n in m.def.inputs) io.in[n] = new Float32Array(BLOCK);
       for (const n in m.def.outputs) io.out[n] = new Float32Array(BLOCK);
       this._ios.set(key, io);
@@ -5711,6 +5837,7 @@ class WavesEngine {
       case 'connect': return this.connect(m.a, m.b, m.fb === true);
       case 'disconnect': return this.disconnect(m.a, m.b);
       case 'param': return this.setParam(m.id, m.name, m.value);
+      case 'text': return this.setText(m.id, m.value);
       case 'params': return this.setParams(m.list);
       case 'quality': this.quality = m.value; return;
       case 'transport': return this.setTransport(m.value);
@@ -5879,6 +6006,6 @@ class WavesLiveProc extends AudioWorkletProcessor {
 }
 try { registerProcessor('thunder-wlive', WavesLiveProc); } catch (_) {}
 } else if (typeof globalThis !== 'undefined'){
-  globalThis.WavesDSP = { WavesEngine, wasmInit, modsPrepare, MODULES, WASM, BUS_COUNT, fbAdd };
+  globalThis.WavesDSP = { WavesEngine, wasmInit, modsPrepare, MODULES, WASM, BUS_COUNT, fbAdd, MathExpr, mxRun };
 }
 })();

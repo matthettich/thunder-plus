@@ -708,6 +708,15 @@ The owner's top priority to add is the MOD screen. Work down the list; ask befor
 
 Start a session by asking for results. Fix on `beta`. (10 Nov, 15:10: the web beta is build 560; the build numbers in the rest of this paragraph are older.) Web beta: https://matthettich.github.io/thunder-plus/beta/ (build 547 as of 10 Nov morning, 548 once its PR merges; the night of 9–10 Nov shipped 544–547, see the four "10 Nov" entries below. Decisions the lead made that night for the owner to confirm or reverse: on a phone the saved Sequencer default plays on the Page unless Audio thread is picked on that device; on a phone the safety limiter is its stand-in until another worklet loads; the resync only runs with a worklet loaded and its margins are untested on a device). Desktop: v1.3.4-beta.2 (build 541, no feed view or scopes); further desktop betas on hold until the owner asks.
 
+**Build 597** (module queue: Expression; branch `feat/modules-expr`)
+- [ ] **By ear:** add an Expression, a sound into A: it passes through (the formula is `a * k1`); K1 at 0.5: half as loud. Examples → Soft clip, raise K1: more drive. Bit crush (K1) and Sine at K1 kHz: a crusher and a pure tone.
+- [ ] **By ear:** change the formula while the song plays (pick another Example): any click or dropout?
+- [ ] Type `sin(` and press Enter: silence and a line under the field saying where the mistake is; fix it: the sound is back.
+- [ ] Computer: typing A, N, F, Delete or the arrows in the field types into the field and does nothing else (no module search, nothing deleted; in …waves no note plays). Escape puts the old formula back.
+- [ ] Phone: the field is comfortable on the folded screen; the keyboard does not capitalise or correct what you type; Enter applies.
+- [ ] Copy and paste the module, save and reopen the song, undo and redo: each copy keeps its own formula. Compact shows the formula.
+- [ ] Is the Help's "Expression" paragraph enough to write your own, or do you want more examples?
+
 **Build 596** (module queue: Delay line; branch `feat/modules-delay`; **the owner listens**)
 - [ ] **By ear, a plucked string:** a short burst of Noise (a VCA with a short envelope) into a Delay line, Time 4.5 ms, Feedback 95%, Damp 20%: it rings near 220 Hz like a string; Fine retunes it smoothly; more Damp: a duller, shorter note.
 - [ ] **By ear, an echo:** Time 350 ms, Feedback 40%, Out into a Crossfade's B with the dry on A: repeats that fade; negative Feedback turns every other repeat over (a hollower echo).
@@ -1169,6 +1178,14 @@ Suggested order: N0 → N1 → N2 (phone cured) → N4 with N3 alongside → N5 
   the edge `R.t0`, "waiting…" while armed), `rcdClk` / `rcdFmt` / `rcdFreeSecs`, a 250 ms timer only while recording; the
   final length stays until the next take. recorder-check covers FREE, PATTERN, Stop, next take and closing mid-take.
 
+
+## 14 Nov (module queue: Expression; build 597)
+
+Branch `feat/modules-expr`. The lead wrote the engine, the parser and their tests, a Sonnet agent the editor side and the host's document plumbing; the lead reviewed.
+- **Engine (shared; worklets `?v=56` / `?v=45`; scope `'poly'`):** `expr`. `MathExpr.compile(text)` is its own recursive-descent parser over characters (numbers, the eleven names, the listed operators and 22 functions, brackets): **the text is never run as code**, names are looked up with `hasOwnProperty` in two fixed tables, and the result is a short list of steps (`Uint8Array` ops, `Float64Array` constants) that `mxRun` works out per sample on a fixed stack. Limits: 200 characters, 128 steps, 32 deep; ÷0 and %0 give 0; the output is held in −4..4 and not-a-number is 0. A bad formula is silence and `show()` reports `[code, position]`. Names: a b c d, k1 k2, t (seconds since the song or the module started), y (the previous output sample), rnd, pi, sr. The reference is the comment above `MX_VARS`.
+- **A module's text (new plumbing, both engines):** a def with `text:true` keeps `inst.text` (≤ 200 characters) from `addModule`'s `o.text`; `{ op:'text', id, value }` / `setText` changes it; `io.inst` reaches `process`. Nothing else reads it.
+- **Editor and host:** a two-row field (no autocorrect), Enter / blur applies (one undo step), Escape restores, the error line from the engine's report (ignored for 450 ms after an apply), an Examples menu (12, each compiled in a test), Compact shows the formula. The text travels with save / load, undo, copy / paste, custom modules, the bridges, and in the host `patchOp` ('add' carries it; a 'text' op) and `chnDiff`. A waves patch opened as chains drops `expr` like the other new modules (`normalizeChainsImport` keeps a fixed list).
+- **Notes:** in …waves the error line only appears once a voice is running (the report comes from a module that has run); the position is shown 1-based.
 
 ## 14 Nov (module queue: Delay line; build 596)
 
