@@ -702,6 +702,10 @@ The owner's top priority to add is the MOD screen. Work down the list; ask befor
 
 Start a session by asking for results. Fix on `beta`. (10 Nov, 15:10: the web beta is build 560; the build numbers in the rest of this paragraph are older.) Web beta: https://matthettich.github.io/thunder-plus/beta/ (build 547 as of 10 Nov morning, 548 once its PR merges; the night of 9–10 Nov shipped 544–547, see the four "10 Nov" entries below. Decisions the lead made that night for the owner to confirm or reverse: on a phone the saved Sequencer default plays on the Page unless Audio thread is picked on that device; on a phone the safety limiter is its stand-in until another worklet loads; the resync only runs with a worklet loaded and its margins are untested on a device). Desktop: v1.3.4-beta.2 (build 541, no feed view or scopes); further desktop betas on hold until the owner asks.
 
+**Build 590** (the owner's two phone bugs of 14 Nov; branch `fix/phone-chip-and-tabs`)
+- [ ] **Phone (installed app if you use it):** open the `acid` project from Files or "Open with", press PLAY, pull the notification shade down: the title says "acid", not "Song 1". Rename the song while it plays: the title follows. (In a Chrome tab the small Chrome logo stays; the installed app should show Thunder Plus's own icon: which do you see?)
+- [ ] **Folded phone, Mobile mode, Chains shown (three tabs):** Tracker, Synth and Chains all read in full, on a row of their own at the top; nothing scrolls sideways and the gear and PLAY are on screen. Show Waves too (four tabs): the same. Is the extra row acceptable, or would you rather keep one row and lose the LEFT time readout at that width?
+
 **Build 589** (feedback loops in …waves / …chains, M2; branch `feat/feedback-loops`; **the owner listens before relying on it**)
 - [ ] **By ear, computer, …chains:** Track In → Tape delay → Reverb → Chain Out, then drag Reverb's Out back to the delay's In. It is accepted (it used to be refused), drawn as a long dash and a dot with a "1 blk" tag. Does the loop sound like feedback should (a wash that builds)? Turn the levels in the loop up until it runs away: it should settle loud (about +6 dB at the cable) but never explode, click or go silent for good. How does it sound when pushed: usable, or too harsh / too tame?
 - [ ] **By ear:** patch a module's Out into its own In (a filter or a delay): accepted, same look; a short metallic ring (the loop is 128 samples, about 375 Hz at 48 kHz) is expected.
@@ -1115,6 +1119,12 @@ Suggested order: N0 → N1 → N2 (phone cured) → N4 with N3 alongside → N5 
   the edge `R.t0`, "waiting…" while armed), `rcdClk` / `rcdFmt` / `rcdFreeSecs`, a 250 ms timer only while recording; the
   final length stays until the next take. recorder-check covers FREE, PATTERN, Stop, next take and closing mid-take.
 
+
+## 14 Nov (the owner's two phone bugs; build 590)
+
+Branch `fix/phone-chip-and-tabs`, a Sonnet agent built it, the lead reviewed.
+- **"Song 1" in the now-playing chip:** the title was the project file's name, else the song's own name. On Android a file opened through the picker, "Open with" or Share reaches the app with no handle or path (`loadProjFile(f)` without `h`), so `projLabel()` was empty and the title fell back to the song's inner name, which his `acid.thunder` still has as "Song 1". That is why the 12 Nov fix (handle or path only) did not hold. Now `loadProjFile` keeps the file's name (`projLoose`, used by `projTitle()` while the song's name is unchanged; dropped by `projSet` and New); `msTitle()` and the window title use it; the title is also refreshed when the stored handle comes back at startup. Artwork was already the app's icons. Not run on a phone (a fake media session in `tests/media-session.test.js`). **Still to ask him: installed app or Chrome tab** (the Chrome logo cannot be changed in a tab).
+- **"Chai":** `body.mob .top #segView{flex:0 1 auto; overflow-x:auto}` let the switch shrink and scroll; only the 2-tab and 4-tab cases had overrides. With four tabs the whole bar was wider than the screen and Chrome widened the viewport, which hid it from build 578's check (it measured the tabs, not the bar). Now at 460 px and under, three or more tabs take a full row of their own (header one row taller). Lead's decision, flagged to him: the alternative is one row without the LEFT readout. `tests/view-tabs-fit.test.js` (static pins; the real-page check is opt-in with `TP_BROWSER_TESTS=1`; passed at 320–412 px, 3 and 4 tabs, 63 skins at three widths).
 
 ## 14 Nov (feedback loops in …waves / …chains, M2; build 589)
 
