@@ -1197,8 +1197,9 @@ body:not(.legon) .tside .tlegend{display:none}
 #tSub.msS::after{content:' · SOLO'; font-weight:800} #tSub.msM::after{content:' · MUTED'; font-weight:800}
 #tPad #kMute.any:not(.lt):not(#zz):not(#zz), #tPad #kSolo.any:not(.lt):not(#zz):not(#zz){outline:3px solid currentColor; outline-offset:-5px}
 /* LOOP and PLAY when engaged (owner, 9 Nov): lit the same way as MUTE and SOLO, each its own colour, on every skin */
+/* (14 Nov, owner: "make the control bar stop button look like the skin") only the PAD's LOOP and PLAY keep their own colours: the control bar's STOP (.tcmd [data-c=song].on) is a plain control-bar button now, lit by the skin's own on state (.tcmd button.on, .cmini's inverted ink, and the skins' PLAYING accent below), flat, with no colour or shadow of its own */
 #tPad #kLoop.on:not(#zz):not(#zz):not(#zz){background:#7cecff !important; color:#06384a !important; border:4px solid #0a6a8c !important; box-shadow:4px 4px 0 0 #0a6a8c !important; font-weight:800; text-shadow:none !important}
-#tPad #kPlay.on:not(#zz):not(#zz):not(#zz), .tcmd button[data-c=song].on:not(#zz):not(#zz):not(#zz):not(#zz):not(#zz){background:#ffc23d !important; color:#3a2200 !important; border:4px solid #a85f00 !important; box-shadow:4px 4px 0 0 #a85f00 !important; font-weight:800; text-shadow:none !important}
+#tPad #kPlay.on:not(#zz):not(#zz):not(#zz){background:#ffc23d !important; color:#3a2200 !important; border:4px solid #a85f00 !important; box-shadow:4px 4px 0 0 #a85f00 !important; font-weight:800; text-shadow:none !important}
 .k.dn,.k.on{background:var(--ink); color:var(--inv)}
 #kPlay.on{background:var(--pl); border-color:var(--line); color:var(--inv)}
 .k.lt{background:var(--pl); color:var(--inv); border-color:var(--line)}
@@ -1223,7 +1224,7 @@ body:not(.legon) .tside .tlegend{display:none}
 .tcmd.cmini :is([data-c=cut],[data-c=sel],[data-c="b:-16"],[data-c=prev]), :root[data-skinbase] .tcmd.cmini :is([data-c=cut],[data-c=sel],[data-c="b:-16"],[data-c=prev]):not(#zz){margin-left:.9em; border-left:1px solid var(--line)}
 .tcmd.cmini [data-c=song], :root[data-skinbase] .tcmd.cmini [data-c=song]:not(#zz){margin-left:auto; border-left:1px solid var(--line)}
 .tcmd.cmini button:hover, :root[data-skinbase] .tcmd.cmini button:not(#zz):hover{background:color-mix(in srgb, var(--ink) 14%, transparent)}
-.tcmd.cmini button:is(.on,.dn), :root[data-skinbase] .tcmd.cmini button:is(.on,.dn):not(#zz){background:var(--ink)!important; color:var(--inv)}
+.tcmd.cmini button:is(.on,.dn), :root[data-skinbase] .tcmd.cmini button:is(.on,.dn):not(#zz){background:var(--ink)!important; color:var(--inv)!important}   /* (14 Nov: !important on the text too: the Low power skins force white on every lit button, which was white on the light ink here, unreadable once STOP uses this) */
 .tcmd.cmini button.off, :root[data-skinbase] .tcmd.cmini button.off:not(#zz){opacity:.32; pointer-events:none}
 .tcmd button[hidden]{display:none}
 /* CONTROL BAR LABELS FIT (13 Nov, owner: "m.pat and lp.sel both get cutoff by their outlines… Cln down is tight, we could put the arrow below cln"): a label of the big bar never overflows its button.
@@ -2154,11 +2155,12 @@ body.sdesk .dock:not(.vtrk) .pads .pad:nth-child(17)::before{content:'More pads'
 .stm i.clip::after{background:var(--meter-clip)}
 .stsc{grid-row:1; grid-column:4; position:relative; margin:1px 0}
 .stsc i{position:absolute; left:0; right:0; transform:translateY(50%); font:var(--fs-1)/1 var(--mono); font-style:normal; color:var(--muted); text-align:center}
-/* the fader looks like the app's other sliders: a thin track filled in ink up to a round thumb */
+/* the fader: a thin track filled in ink up to a flat bar cap, the Mixer's fader (14 Nov, owner: a line at the top, not a round thumb) */
 .stfad{grid-row:1; grid-column:2; justify-self:center; position:relative; width:30px; min-height:0; cursor:ns-resize; touch-action:none; outline-offset:2px; border-radius:3px}
 .stfad::before{content:''; position:absolute; left:50%; top:8px; bottom:8px; width:4px; margin-left:-2px; border-radius:2px; background:var(--track)}
 .stfill{position:absolute; left:50%; bottom:8px; width:4px; margin-left:-2px; border-radius:2px; background:var(--ink)}
-.stcap{position:absolute; left:50%; width:16px; height:16px; margin:0 0 -8px -8px; border-radius:50%; background:var(--ink)}
+.stcap{position:absolute; left:50%; width:28px; height:3px; margin:0 0 -1.5px -14px; border-radius:1px; background:var(--ink); box-shadow:0 0 0 1px var(--panel)}   /* a flat bar, as the Mixer's .mfbar (3 px, 1 px radius, the ink with a 1 px halo of the ground; 4 px on hover and while dragged) */
+.stfad:is(:hover,:active,:focus-visible) .stcap{height:4px; margin-bottom:-2px}
 .st0{position:absolute; left:2px; right:2px; height:0; border-top:1px solid var(--muted); opacity:.6}
 .stvv{grid-row:2; grid-column:2 / 5; text-align:center; font-size:var(--fs-2); white-space:nowrap}
 .stms{grid-row:1 / 3; grid-column:6; display:flex; flex-direction:column; gap:8px}
@@ -24645,7 +24647,7 @@ function irsUI(sec){
   }
   sec.append(box);
 }
-function setSong(s, msg){ tStop(true); tp.paused = null; pendPlace = null;   /* (12 Nov: a phrase waiting in the old song must not follow into the new one) */ irsAdopt(s); S = s; setTimeout(() => { try { irsResolve(); } catch(e){ tpLog('could not load the song’s impulse responses', e); } }, 0); swingNote(); scNote(); setTimeout(mstSync, 0); try { projSet(null, null); } catch(e){ projFile = null; } resetCursors(); last.sect = last.phrase = 0; phraseToCursor(); CH.doc = S.chainPatch || null; chainsDropFrame(); if (rt){ rt.pl.buses.forEach(b => { if (b && b.chn) b.chn._sent = null; }); rtAllFx(); rtRoute(); rt.pl.applyMix(); } saveS(); draw(); if (msg) toast(msg); try { PumpFX._notifyAll('load'); } catch(e){} }
+function setSong(s, msg){ tStop(true); tp.paused = null; pendPlace = null; try { lastChord = null; } catch(e){}   /* (14 Nov: a chord picked up in the old song is not dropped into the new one) */   /* (12 Nov: a phrase waiting in the old song must not follow into the new one) */ irsAdopt(s); S = s; setTimeout(() => { try { irsResolve(); } catch(e){ tpLog('could not load the song’s impulse responses', e); } }, 0); swingNote(); scNote(); setTimeout(mstSync, 0); try { projSet(null, null); } catch(e){ projFile = null; } resetCursors(); last.sect = last.phrase = 0; phraseToCursor(); CH.doc = S.chainPatch || null; chainsDropFrame(); if (rt){ rt.pl.buses.forEach(b => { if (b && b.chn) b.chn._sent = null; }); rtAllFx(); rtRoute(); rt.pl.applyMix(); } saveS(); draw(); if (msg) toast(msg); try { PumpFX._notifyAll('load'); } catch(e){} }
 
 /* ---------- views ---------- */
 const MID = ['song', 'sect', 'phrase', 'inst'], VIEWS = ['song', 'sect', 'phrase', 'inst', 'mixer', 'fx', 'mod', 'project'], GRIDV = new Set(['song', 'sect', 'phrase']);
@@ -24703,7 +24705,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 597;
+const BUILD = 598;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD + (location.pathname.includes('/beta/') ? ' · beta' : '');
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -25881,6 +25883,7 @@ function fxNeed(t, type){
 }
 function after(k, v, x, y, val){
   const prevFxc = last.fxc;
+  if (k === 'note') lastChord = null;   // CHORD PICK-UP: a note typed (or EDIT+arrows) is the current note again, not the chord
   if (val >= 0 && val !== OFF && k in last) last[k] = val;
   if (k === 'inst' && val >= 0) instPicked = true;
   if (v === 'phrase'){
@@ -25906,9 +25909,38 @@ function clipCellQuiet(x, y){
   if (k === 'fxc' || k === 'fxv'){ const x0 = k === 'fxc' ? x : x - 1; if (!(r[x0] >= 0)) return false; clip = {v:'phrase', x0, d:[[r[x0], r[x0 + 1]]], line:false}; return true; }
   return false;
 }
+/* CHORD PICK-UP (14 Nov, owner: "on a poly track, if Enter is pressed while the cursor is over a line, store all of the notes on that line,
+   rather than the one under the cursor"). On a polyphonic track Enter / EDIT on a filled note picks up every note of the row (each note column
+   with a note or an OFF; the instrument is the row's, one for the whole row, as for a single note) when the row holds two or more; the next
+   Enter / EDIT on an empty note cell of a poly track puts them all back, in the same columns, as ONE undo step. Nothing is removed from the
+   source (a pick-up copies, as it did). One note on the row: exactly the single-note pick-up. Mono tracks, buses and the command columns
+   are untouched; a chord dropped on a mono track writes just the note that was under the cursor, and says so. lastChord: {ref, cols, notes}; it
+   is only good while last.note is still its ref (typing or recording a note, or picking up another single note, drops it). Song data only. */
+let lastChord = null;
+const rowChord = r => { const c = []; for (let k = 0; k < NCOL; k++) if (r[k] >= 0) c.push([k, r[k]]); return c; };   // [column, note or OFF] of the row's filled note columns
+const chordNames = ch => ch.map(([, v]) => v === OFF ? 'OFF' : noteS(v)).join(' ');
+function chordClip(r, ch){ const row = new Array(IC + 1); for (const [k, v] of ch) row[k] = v; row[IC] = r[IC]; clip = {v:'phrase', x0:0, d:[row], line:false}; }
+function pickUpChord(x, r, ch, say){
+  const got = [`${ch.length} notes picked up: ${chordNames(ch)}`];
+  if (r[IC] >= 0 && (r[IC] !== last.inst || r[IC] !== cInst || !instPicked)){ last.inst = cInst = r[IC]; instPicked = true; const I = S.insts[r[IC]]; got.push(`instrument ${hx(r[IC])} (pad ${hx(I.pad)} ${(kit.voices[I.pad] || {}).name || ''})`.replace(' )', ')')); }
+  last.note = r[x]; lastChord = {ref:last.note, cols:ch.map(c => c[0]), notes:ch.map(c => c[1])};
+  if (say) chordClip(r, ch);
+  toast(got.join(' · ') + (say ? ' · copied (' + pasteKey() + ' pastes them) · Enter on an empty note adds them' : '')); draw();
+}
+// Puts the picked-up chord on row y of the phrase, in its own columns (a filled column is replaced); one saveS = one undo step.
+function chordDrop(y){
+  if (!lastChord) return 0; if (!S.phrases[cPhrase]) S.phrases[cPhrase] = freshPhrase();   // (a phrase not written to yet: make it, as a single note's drop does)
+  const p = S.phrases[cPhrase], r = p && p[y]; if (!r) return 0;
+  lastChord.cols.forEach((c, i) => { r[c] = lastChord.notes[i]; });
+  if (r[IC] < 0){ r[IC] = defInst(); if (!instPicked) last.inst = cInst = r[IC]; }
+  mstShareWarn(cPhrase); saveS(); if (pnoeOn) aud(r);
+  toast(`${lastChord.notes.length} notes dropped: ${chordNames(lastChord.cols.map((c, i) => [c, lastChord.notes[i]]))}`); draw();
+  return lastChord.notes.length;
+}
 function pickUp(x, y, say){
   const p = S.phrases[cPhrase]; if (!p || y < 0) return;
   const r = p[y], k = PK[x], got = [];
+  if (k === 'note' && tv === 'phrase' && r[x] >= 0 && r[x] !== OFF){ const ch = polyView() && !busTrack(cTrack) ? rowChord(r) : []; if (ch.length >= 2) return pickUpChord(x, r, ch, say); lastChord = null; }   // (one note: as before, and no chord stays current)
   const clipped = say && tv === 'phrase' && clipCellQuiet(x, y);
   if (r[IC] >= 0 && (r[IC] !== last.inst || r[IC] !== cInst || !instPicked)){ last.inst = cInst = r[IC]; instPicked = true; const I = S.insts[r[IC]]; got.push(`instrument ${hx(r[IC])} (pad ${hx(I.pad)} ${(kit.voices[I.pad] || {}).name || ''})`.replace(' )', ')')); }
   if (k === 'note' && r[x] >= 0 && r[x] !== OFF && r[x] !== last.note){ last.note = r[x]; got.push('note ' + noteS(r[x])); }
@@ -25947,9 +25979,14 @@ function aud(r){ const ii = r[IC] >= 0 ? r[IC] : defInst(), poly = polyView(), h
 const audRelease = code => { const hs = audHeld.get(code); if (hs){ audHeld.delete(code); hs.forEach(h => previewOff(h)); } };
 document.addEventListener('keyup', e => audRelease(e.code));
 window.addEventListener('blur', () => { for (const k of [...audHeld.keys()]) audRelease(k); try { releaseKeys(); } catch(e){} });
-function insertAt(x, y, k){
+function insertAt(x, y, k, chordOk){
   if (k === 'tsp') return;
   if (k === 'fxv' && getCell(tv, x - 1, y) < 0) return toast('Pick an effect in the column to the left first.');
+  if (chordOk && k === 'note' && tv === 'phrase' && lastChord && lastChord.ref === last.note){   // CHORD PICK-UP: Enter / EDIT on an empty note cell
+    if (polyView() && !busTrack(cTrack) && cTrack !== MT) return void chordDrop(y);
+    const keep = lastChord; setCell(tv, x, y, last[k]); after(k, tv, x, y, last[k]); lastChord = keep;   // a mono track holds one note: the one that was under the cursor
+    return toast(`Dropped one note (${noteS(last.note)}): the ${keep.notes.length} notes of the chord need a poly track (9–16)`, 3500);
+  }
   setCell(tv, x, y, last[k]); after(k, tv, x, y, last[k]);
 }
 function bump(d, big){
@@ -26182,7 +26219,7 @@ function editTap(enter, stamp){   // stamp: Shift+Enter, which writes the curren
     // 00's notes: the "current" block was placed, and UNIQUE PER TRACK copied it). An empty block gets a new empty pattern,
     // unless a pattern was picked up with Enter on purpose (keyboard arranging, 3 Nov): then that one is placed.
     if (tv === 'song' && !sectsOn && k !== 'tsp' && v < 0 && !(sectPicked >= 0 && sectPicked === last.sect && S.chains[sectPicked])){ lastTap = {t:0, key:'', empty:false}; return newBlock(c, -1); }
-    if (k !== 'tsp' && v < 0){ lastTap.empty = true; insertAt(c.x, c.y, k); }
+    if (k !== 'tsp' && v < 0){ lastTap.empty = true; insertAt(c.x, c.y, k, true); }
     else if (tv === 'phrase'){ const p = S.phrases[cPhrase]; if (p) aud(p[c.y]); }
     return;
   }
@@ -34510,6 +34547,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [598, '14 Nov', ['The control bar’s Stop button now takes its look from the skin, like the other lit control bar buttons: flat, in the skin’s own playing colour, with no amber fill or shadow.', 'The volume fader in the bottom effects bar has a flat line for its cap, the same as the Mixer’s faders, in place of the round knob.', 'On a poly track, Enter (or EDIT on the pad) on a note picks up every note on that row, and Enter on an empty row drops the whole chord in the same columns, as one undo step. Dropped on a mono track it writes the one note that was under the cursor and says so.', 'In the Low power skins, lit control bar buttons (Stop, SELECT, LOOP SEL) are readable again: dark text on the light fill.']],
   [597, '14 Nov', ['…waves and …chains: an Expression module (Modules, Control utilities): type a line of maths and it becomes the sound. It reads four inputs (a, b, c, d), two sliders (k1, k2), time in seconds (t), its own previous output (y, so one line can be a filter or a counter) and a random number (rnd), with the usual operators and functions such as sin, tanh, abs, min, max, clip and mix. An Examples menu has a dozen to start from (ring modulation, soft clip, fold, bit crush, sample and hold …). What you type is only ever read as maths, never run as a program; a mistake is silence with a note saying where; the result is held between −4 and 4.']],
   [596, '14 Nov', ['…waves and …chains: a Delay line (Modules, Building blocks). A bare delay from one sample to two seconds whose feedback is inside it and exact to the sample, so short times ring at a pitch you can tune (1000 ÷ the time in ms: 2 ms rings at 500 Hz): combs and plucked strings from a burst of noise. Longer times echo, and an LFO into its Time input makes a chorus or flanger. Out is only the delayed sound; mix it with the dry yourself. Feedback stops at 99% and is limited inside, so it cannot run away.']],
   [595, '14 Nov', ['…chains fix: opening a song or patch whose …chains patch had exactly as many modules and cables as the one loaded before could leave part of it switched off (a Track In that was unpatched before and patched now stayed silent, so the whole chain was silent) until the patch was edited. Each loaded patch now starts clean.']],
