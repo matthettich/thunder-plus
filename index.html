@@ -25883,6 +25883,7 @@ function fxNeed(t, type){
 }
 function after(k, v, x, y, val){
   const prevFxc = last.fxc;
+  if (k === 'note') lastChord = null;   // CHORD PICK-UP: a note typed (or EDIT+arrows) is the current note again, not the chord
   if (val >= 0 && val !== OFF && k in last) last[k] = val;
   if (k === 'inst' && val >= 0) instPicked = true;
   if (v === 'phrase'){
@@ -25908,9 +25909,37 @@ function clipCellQuiet(x, y){
   if (k === 'fxc' || k === 'fxv'){ const x0 = k === 'fxc' ? x : x - 1; if (!(r[x0] >= 0)) return false; clip = {v:'phrase', x0, d:[[r[x0], r[x0 + 1]]], line:false}; return true; }
   return false;
 }
+/* CHORD PICK-UP (14 Nov, owner: "on a poly track, if Enter is pressed while the cursor is over a line, store all of the notes on that line,
+   rather than the one under the cursor"). On a polyphonic track Enter / EDIT on a filled note picks up every note of the row (each note column
+   with a note or an OFF; the instrument is the row's, one for the whole row, as for a single note) when the row holds two or more; the next
+   Enter / EDIT on an empty note cell of a poly track puts them all back, in the same columns, as ONE undo step. Nothing is removed from the
+   source (a pick-up copies, as it did). One note on the row: exactly the single-note pick-up. Mono tracks, buses and the command columns
+   are untouched; a chord dropped on a mono track writes just the note that was under the cursor, and says so. lastChord: {ref, cols, notes}; it
+   is only good while last.note is still its ref (typing or recording a note, or picking up another single note, drops it). Song data only. */
+let lastChord = null;
+const rowChord = r => { const c = []; for (let k = 0; k < NCOL; k++) if (r[k] >= 0) c.push([k, r[k]]); return c; };   // [column, note or OFF] of the row's filled note columns
+const chordNames = ch => ch.map(([, v]) => v === OFF ? 'OFF' : noteS(v)).join(' ');
+function chordClip(r, ch){ const row = new Array(IC + 1); for (const [k, v] of ch) row[k] = v; row[IC] = r[IC]; clip = {v:'phrase', x0:0, d:[row], line:false}; }
+function pickUpChord(x, r, ch, say){
+  const got = [`${ch.length} notes picked up: ${chordNames(ch)}`];
+  if (r[IC] >= 0 && (r[IC] !== last.inst || r[IC] !== cInst || !instPicked)){ last.inst = cInst = r[IC]; instPicked = true; const I = S.insts[r[IC]]; got.push(`instrument ${hx(r[IC])} (pad ${hx(I.pad)} ${(kit.voices[I.pad] || {}).name || ''})`.replace(' )', ')')); }
+  last.note = r[x]; lastChord = {ref:last.note, cols:ch.map(c => c[0]), notes:ch.map(c => c[1])};
+  if (say) chordClip(r, ch);
+  toast(got.join(' · ') + (say ? ' · copied (' + pasteKey() + ' pastes them) · Enter on an empty note adds them' : '')); draw();
+}
+// Puts the picked-up chord on row y of the phrase, in its own columns (a filled column is replaced); one saveS = one undo step.
+function chordDrop(y){
+  const p = S.phrases[cPhrase], r = p && p[y]; if (!r || !lastChord) return 0;
+  lastChord.cols.forEach((c, i) => { r[c] = lastChord.notes[i]; });
+  if (r[IC] < 0){ r[IC] = defInst(); if (!instPicked) last.inst = cInst = r[IC]; }
+  mstShareWarn(cPhrase); saveS(); if (pnoeOn) aud(r);
+  toast(`${lastChord.notes.length} notes dropped: ${chordNames(lastChord.cols.map((c, i) => [c, lastChord.notes[i]]))}`); draw();
+  return lastChord.notes.length;
+}
 function pickUp(x, y, say){
   const p = S.phrases[cPhrase]; if (!p || y < 0) return;
   const r = p[y], k = PK[x], got = [];
+  if (k === 'note' && tv === 'phrase' && r[x] >= 0 && r[x] !== OFF){ const ch = polyView() && !busTrack(cTrack) ? rowChord(r) : []; if (ch.length >= 2) return pickUpChord(x, r, ch, say); lastChord = null; }   // (one note: as before, and no chord stays current)
   const clipped = say && tv === 'phrase' && clipCellQuiet(x, y);
   if (r[IC] >= 0 && (r[IC] !== last.inst || r[IC] !== cInst || !instPicked)){ last.inst = cInst = r[IC]; instPicked = true; const I = S.insts[r[IC]]; got.push(`instrument ${hx(r[IC])} (pad ${hx(I.pad)} ${(kit.voices[I.pad] || {}).name || ''})`.replace(' )', ')')); }
   if (k === 'note' && r[x] >= 0 && r[x] !== OFF && r[x] !== last.note){ last.note = r[x]; got.push('note ' + noteS(r[x])); }
@@ -25949,9 +25978,14 @@ function aud(r){ const ii = r[IC] >= 0 ? r[IC] : defInst(), poly = polyView(), h
 const audRelease = code => { const hs = audHeld.get(code); if (hs){ audHeld.delete(code); hs.forEach(h => previewOff(h)); } };
 document.addEventListener('keyup', e => audRelease(e.code));
 window.addEventListener('blur', () => { for (const k of [...audHeld.keys()]) audRelease(k); try { releaseKeys(); } catch(e){} });
-function insertAt(x, y, k){
+function insertAt(x, y, k, chordOk){
   if (k === 'tsp') return;
   if (k === 'fxv' && getCell(tv, x - 1, y) < 0) return toast('Pick an effect in the column to the left first.');
+  if (chordOk && k === 'note' && tv === 'phrase' && lastChord && lastChord.ref === last.note){   // CHORD PICK-UP: Enter / EDIT on an empty note cell
+    if (polyView() && !busTrack(cTrack) && cTrack !== MT) return void chordDrop(y);
+    const keep = lastChord; setCell(tv, x, y, last[k]); after(k, tv, x, y, last[k]); lastChord = keep;   // a mono track holds one note: the one that was under the cursor
+    return toast(`Dropped one note (${noteS(last.note)}): the ${keep.notes.length} notes of the chord need a poly track (9–16)`, 3500);
+  }
   setCell(tv, x, y, last[k]); after(k, tv, x, y, last[k]);
 }
 function bump(d, big){
@@ -26184,7 +26218,7 @@ function editTap(enter, stamp){   // stamp: Shift+Enter, which writes the curren
     // 00's notes: the "current" block was placed, and UNIQUE PER TRACK copied it). An empty block gets a new empty pattern,
     // unless a pattern was picked up with Enter on purpose (keyboard arranging, 3 Nov): then that one is placed.
     if (tv === 'song' && !sectsOn && k !== 'tsp' && v < 0 && !(sectPicked >= 0 && sectPicked === last.sect && S.chains[sectPicked])){ lastTap = {t:0, key:'', empty:false}; return newBlock(c, -1); }
-    if (k !== 'tsp' && v < 0){ lastTap.empty = true; insertAt(c.x, c.y, k); }
+    if (k !== 'tsp' && v < 0){ lastTap.empty = true; insertAt(c.x, c.y, k, true); }
     else if (tv === 'phrase'){ const p = S.phrases[cPhrase]; if (p) aud(p[c.y]); }
     return;
   }
