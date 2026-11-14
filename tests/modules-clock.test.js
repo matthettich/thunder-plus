@@ -77,6 +77,8 @@ for (const [name, D] of BOTH) {
     r = run(D, 'stepsw', { steps: 3, fade: 0 }, ins, 12); assert.deepEqual([100, 300, 600, 800].map(i => r.out[i]), [.1, .2, .3, .1].map(Math.fround));
     r = run(D, 'stepsw', { steps: 4, fade: .005 }, ins, 12); let jump = 0; for (let i = 1; i < r.out.length; i++) jump = Math.max(jump, Math.abs(r.out[i] - r.out[i - 1])); assert.ok(jump <= .3 / 240 + 1e-6, 'largest step ' + jump);
     assert.equal(r.out[256 + 239], Math.fround(.2)); assert.equal(r.out[255], Math.fround(.1));
+    // clock pulses faster than the fade (10 ms apart, Fade 100 ms): each change carries on from the mix as it is, so there is still no jump
+    const fast = run(D, 'stepsw', { steps: 4, fade: .1 }, { i1: () => 0, i2: () => 1, i3: () => -1, i4: () => .5, clock: pulse(480, 8, 480) }, 60); let fj = 0; for (let i = 1; i < fast.out.length; i++) fj = Math.max(fj, Math.abs(fast.out[i] - fast.out[i - 1])); assert.ok(fj <= 4 / 4800 + 1e-6, 'interrupted fades: largest step ' + fj);
     r = run(D, 'stepsw', { steps: 4, fade: 0 }, Object.assign({}, ins, { reset: i => i === 700 ? 1 : 0 }), 8); assert.equal(r.out[699], Math.fround(.3)); assert.equal(r.out[700], Math.fround(.1));
   });
   test(name + ': Burst: Count pulses, Time apart, bent closer or wider, with a falling Level', () => {
@@ -95,6 +97,7 @@ for (const [name, D] of BOTH) {
     r = run(D, 'gatedly', { delay: 0, length: 0 }, { in: g }, 6); assert.equal(r.out[100], 1); assert.equal(r.out[99], 0); assert.equal(r.out[400], 0);
     r = run(D, 'gatedly', { delay: .01, length: .001 }, { in: g }, 12); assert.deepEqual(rises(r.out), [580]); assert.equal(r.out[580 + 47], 1); assert.equal(r.out[580 + 48], 0);
     r = run(D, 'gatedly', { delay: 2, length: 0 }, { in: g }, 800); assert.deepEqual(rises(r.out), [100 + 96000]);
+    { const R = runner(D, 'gatedly', { delay: 0, length: 1 }); R.run({ in: i => i === 10 ? 1 : 0 }, 2); R.p.length = 0; R.run({}, 4); R.p.length = 1; const after = R.run({}, 4); for (const v of after.out) assert.equal(v, 0, 'a hold left over from before Length went to 0 does not come back'); }
     assert.ok(D.MODULES.gatedly.create(SR).b.length <= SR * 2 + 4, 'two seconds of gate, a byte a sample');
   });
   test(name + ': Flip-flop: Toggle turns it over, Set and Reset place it, a song start clears it', () => {

@@ -1464,21 +1464,26 @@ const StepSwitch = {
   type:'stepsw', scope:'poly', cost:.04,
   inputs:{ i1:'audio', i2:'audio', i3:'audio', i4:'audio', clock:'gate', reset:'gate' }, outputs:{ out:'audio' },
   params:{ steps:[4,2,4,1], fade:[.005,0,.1,.001] },
-  create:() => ({ k:0, from:0, g:1, lc:0, lr:0, sn:-1 }),
+  create:() => ({ k:0, w0:1, w1:0, w2:0, w3:0, lc:0, lr:0, sn:-1 }),
   process(st, io, ctx){
     const I = io.in, C = I.clock, Rs = I.reset, O = io.out.out, N = clamp(io.p.steps | 0, 2, 4);
     const step = io.p.fade > 0 ? 1 / Math.max(1, io.p.fade * ctx.sr) : 1;
-    if (restarted(st, ctx) && st.k){ st.from = st.k; st.k = 0; st.g = 0; }
-    if (st.k >= N){ st.k = 0; st.g = 1; }
+    if (restarted(st, ctx)) st.k = 0;
+    if (st.k >= N) st.k = 0;
+    // each input has its own share of the output, moving towards 1 (the chosen one) or 0 at Fade's speed: a change that comes
+    // in the middle of a fade carries on from where the shares are, so it cannot jump
+    let k = st.k, w0 = st.w0, w1 = st.w1, w2 = st.w2, w3 = st.w3;
     for (let i = 0; i < ctx.block; i++){
-      const r = Rs[i] >= .5, c = C[i] >= .5; let to = st.k;
-      if (r && !st.lr) to = 0; else if (c && !st.lc) to = (st.k + 1) % N;
+      const r = Rs[i] >= .5, c = C[i] >= .5;
+      if (r && !st.lr) k = 0; else if (c && !st.lc) k = (k + 1) % N;
       st.lr = r; st.lc = c;
-      if (to !== st.k){ st.from = st.k; st.k = to; st.g = 0; }
-      const k = st.k, x = k === 0 ? I.i1[i] : k === 1 ? I.i2[i] : k === 2 ? I.i3[i] : I.i4[i];
-      if (st.g >= 1) O[i] = x;
-      else { st.g += step; if (st.g > 1) st.g = 1; const f = st.from, y = f === 0 ? I.i1[i] : f === 1 ? I.i2[i] : f === 2 ? I.i3[i] : I.i4[i]; O[i] = y + (x - y) * st.g; }
+      if (k === 0){ if (w0 < 1){ w0 += step; if (w0 > 1) w0 = 1; } } else if (w0 > 0){ w0 -= step; if (w0 < 0) w0 = 0; }
+      if (k === 1){ if (w1 < 1){ w1 += step; if (w1 > 1) w1 = 1; } } else if (w1 > 0){ w1 -= step; if (w1 < 0) w1 = 0; }
+      if (k === 2){ if (w2 < 1){ w2 += step; if (w2 > 1) w2 = 1; } } else if (w2 > 0){ w2 -= step; if (w2 < 0) w2 = 0; }
+      if (k === 3){ if (w3 < 1){ w3 += step; if (w3 > 1) w3 = 1; } } else if (w3 > 0){ w3 -= step; if (w3 < 0) w3 = 0; }
+      O[i] = w0 === 1 ? I.i1[i] : w1 === 1 ? I.i2[i] : w2 === 1 ? I.i3[i] : w3 === 1 ? I.i4[i] : I.i1[i] * w0 + I.i2[i] * w1 + I.i3[i] * w2 + I.i4[i] * w3;
     }
+    st.k = k; st.w0 = w0; st.w1 = w1; st.w2 = w2; st.w3 = w3;
   }
 };
 /* Burst: one pulse in → a run of Count pulses, Time apart. Bend pulls them closer together (above 0) or further apart
@@ -1517,7 +1522,7 @@ const GateDelay = {
       let r = st.w - d; if (r < 0) r += M; const x = B[r];
       if (++st.w >= M) st.w = 0;
       if (L > 0){ if (x && !st.lo) st.hold = L; O[i] = st.hold > 0 ? 1 : 0; if (st.hold > 0) st.hold--; }
-      else O[i] = x;
+      else { O[i] = x; st.hold = 0; }   // (Length 0: nothing is left waiting from an earlier setting)
       st.lo = x;
     }
   }
