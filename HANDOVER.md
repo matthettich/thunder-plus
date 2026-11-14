@@ -708,6 +708,15 @@ The owner's top priority to add is the MOD screen. Work down the list; ask befor
 
 Start a session by asking for results. Fix on `beta`. (10 Nov, 15:10: the web beta is build 560; the build numbers in the rest of this paragraph are older.) Web beta: https://matthettich.github.io/thunder-plus/beta/ (build 547 as of 10 Nov morning, 548 once its PR merges; the night of 9–10 Nov shipped 544–547, see the four "10 Nov" entries below. Decisions the lead made that night for the owner to confirm or reverse: on a phone the saved Sequencer default plays on the Page unless Audio thread is picked on that device; on a phone the safety limiter is its stand-in until another worklet loads; the resync only runs with a worklet loaded and its margins are untested on a device). Desktop: v1.3.4-beta.2 (build 541, no feed view or scopes); further desktop betas on hold until the owner asks.
 
+**Build 594** (module queue: audio building blocks; an oscillator and noise in …chains; branch `feat/modules-blocks`)
+- [ ] **By ear, a phaser:** four Allpass (Phase) in a row, one LFO into every Freq jack, the last one's Out on a Crossfade's B with the dry sound on A at 50%: a phaser sweep.
+- [ ] **By ear, diffusion:** three Allpass in Echo (Time 5, 8, 13 ms, Gain 0.5 to 0.7) on a drum hit: the hit smears into a soft tail; a held tone keeps its pitch and level.
+- [ ] **By ear, wider:** Mid / side on Encode → the Side output through a Utility turned up → a second Mid / side on Decode: wider, the centre stays put. Decode straight after Encode: identical to the input.
+- [ ] **By ear, …chains:** an Oscillator at 5 Hz into another's FM with FM depth 5%: vibrato; at 440 Hz and about 30%: a bell. Sync from a Clock restarts the tone on each beat. Noise through a band-pass Filter and a VCA with a short ADSR: a hi-hat; compare White, Pink, Brown.
+- [ ] One-pole: a stepped Random into In at Freq 3 Hz, Low into a cutoff jack: the steps glide. DC blocker after Invert / rectify's Absolute output: the sound sits round zero again.
+- [ ] The Freq sliders (One-pole, Allpass, Oscillator) are linear, so the low end is cramped at the left: is that a problem in use, or is typing the value enough?
+- [ ] Phone: the six in …chains (four in …waves: no Oscillator or Noise there, its own are unchanged), Compact and Mini.
+
 **Build 593** (module queue: Scope; branch `feat/modules-scope`)
 - [ ] Computer, …chains: Modules → Scope (after Meter). A sine LFO into A, a square LFO into B: a teal sine and a purple square on one screen, "500 ms pk-pk 2.00" in the corner. Trigger on Rising: the picture stands still; Free: it drifts.
 - [ ] Freeze On: the picture stops while the sound carries on; Off: it moves again. Zoom magnifies; the small tick at the left follows Level (Rising only).
@@ -1150,6 +1159,14 @@ Suggested order: N0 → N1 → N2 (phone cured) → N4 with N3 alongside → N5 
   the edge `R.t0`, "waiting…" while armed), `rcdClk` / `rcdFmt` / `rcdFreeSecs`, a 250 ms timer only while recording; the
   final length stays until the next take. recorder-check covers FREE, PATTERN, Stop, next take and closing mid-take.
 
+
+## 14 Nov (module queue: audio building blocks, Oscillator and Noise for …chains; build 594)
+
+Branch `feat/modules-blocks`. The lead wrote the engine and its tests, a Sonnet agent the editor side; the lead reviewed.
+- **Shared (both editors; worklets `?v=53` / `?v=43`; scope `'poly'`, one channel each):** `onepole` One-pole filter (Low and High outputs that add up to the input; −3 dB at Freq), `allpass` Allpass (Phase: first-order, a quarter turn at Freq; Echo: a Schroeder allpass, Time to 100 ms, Gain ±0.95, all of an impulse comes out), `dcblock` DC blocker (1–200 Hz), `midside` Mid / side (Encode / Decode, exact both ways; a mono input has no side).
+- **…chains only (scope `'mono'`; …waves keeps its own VCO and Noise):** `osc` Oscillator (sine, triangle, band-limited saw and square; 0.1 Hz–20 kHz; FM input in octaves, five at 100% depth; Sync), `wnoise` Noise (white, pink, brown; each module its own run of numbers, taken from the engine's counter the first time it sounds).
+- **Editor:** a "Building blocks" palette group after Filters and EQ; Oscillator and Noise lead …chains' Sound sources; a per-definition `plabels` for port names ("L / Mid", "Low", "High"). **No log sliders exist in the editors** (Filter's Cutoff is linear too), so the new Freq sliders and the Scope's Time are linear: typing a value is exact; a real fix is a slider-curve option in the editors (editor only, no engine change) and would help Filter as well. Allpass shows all four controls in both modes (no show-when mechanism outside the mixer).
+- **Tests:** `tests/modules-blocks.test.js`, `tests/modules-blocks-editor.test.js`; goldens only added lines.
 
 ## 14 Nov (module queue: Scope; build 593)
 
