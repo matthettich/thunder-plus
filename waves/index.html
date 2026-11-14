@@ -157,6 +157,12 @@ svg.cables .cln.ctl{stroke-width:2px; stroke-dasharray:6 4}
 /* SIGNAL KINDS (13 Nov, audit M9, U1): told apart without hue. Audio is a solid line and a round jack, control a dashed line and a
    round jack, gate a dotted line (round dots) and a diamond jack. */
 svg.cables .cln.gate{stroke-width:3px; stroke-linecap:round; stroke-dasharray:.1 7}
+/* FEEDBACK CABLE (14 Nov, audit M2): the cable that closes a loop keeps its kind's colour and is drawn long dash, dot, long dash (a third pattern: control is
+   short dashes, gate round dots), with a small tag by its target end. Both only through the skin's own variables (--ink, --panel). */
+svg.cables .cln.fb{stroke-linecap:round; stroke-dasharray:14 4 .1 4}
+svg.cables .fbtag{pointer-events:none}
+svg.cables .fbtag rect{fill:var(--panel); stroke:var(--ink); stroke-width:1; vector-effect:non-scaling-stroke}
+svg.cables .fbtag text{fill:var(--ink); font-size:11px; font-weight:600; font-family:var(--font); text-anchor:middle; dominant-baseline:central}
 /* CABLE STATES (13 Nov, audit D6, D9): hover and selected are CSS only (nothing runs per frame). The wide invisible .hit line is the halo;
    its width is 14 screen pixels at any zoom (--iz is 1 / zoom, written when the zoom changes: Chrome's hit test ignores non-scaling strokes). */
 svg.cables .hit{cursor:pointer; stroke-width:calc(14px * var(--iz, 1))}
@@ -1926,7 +1932,7 @@ function cabReadText(c){
   else if (kind === 'gate') val = q.v > 0.5 ? 'gate on' : 'gate off';
   else val = 'level ' + q.v.toFixed(2);
   if (key && b.live && key in b.live){ try { val += ' · ' + plabel(b.m.type, key) + ' now ' + fmtOf(b.m.type, key)(b.live[key]); } catch (_) {} }
-  return cabWho(a, c.from[1], 'out') + ' → ' + cabWho(b, p, 'in') + '\n' + val;
+  return cabWho(a, c.from[1], 'out') + ' → ' + cabWho(b, p, 'in') + (c.fb === true ? '\nfeedback, one block late' : '') + '\n' + val;
 }
 function cabText(){ if (!hovCable || !cabTip) return; const t = cabReadText(hovCable); if (t !== hovTxt){ hovTxt = t; cabTip.textContent = t; } }
 function cabHover(c, ev){
@@ -1973,7 +1979,7 @@ function tidy(){
   const list = [...nodes.values()]; if (!list.length) return;
   store.snapshot();
   const ids = new Set(nodes.keys()), pred = new Map(list.map(n => [n.m.id, []])), used = new Set();
-  for (const c of doc.cables){ const a = c.from[0], b = c.to[0]; if (a !== b && ids.has(a) && ids.has(b)){ pred.get(b).push(a); used.add(a); used.add(b); } }
+  for (const c of doc.cables){ const a = c.from[0], b = c.to[0]; if (a !== b && c.fb !== true && ids.has(a) && ids.has(b)){ pred.get(b).push(a); used.add(a); used.add(b); } }
   const layer = new Map(), busy = new Set();
   const lay = id => { if (layer.has(id)) return layer.get(id); if (busy.has(id)) return 0; busy.add(id); let L = 0; for (const p of pred.get(id)) L = Math.max(L, lay(p) + 1); busy.delete(id); layer.set(id, L); return L; };
   for (const n of list) if (used.has(n.m.id)) lay(n.m.id);
@@ -2500,7 +2506,7 @@ class WavesBridge {
   loadPatch(doc){ this._send({ op:'patch', value:JSON.parse(JSON.stringify(doc)) }); }
   addModule(id, type, o){ o = o || {}; this._send({ op:'add', id, type, params:o.params, pos:o.pos }); }
   removeModule(id){ this._send({ op:'remove', id }); }
-  connect(a, b){ this._send({ op:'connect', a, b }); }
+  connect(a, b, fb){ this._send(fb === true ? { op:'connect', a, b, fb:true } : { op:'connect', a, b }); }   // fb: the cable closes a loop (the engine leaves it out of the run order)
   disconnect(a, b){ this._send({ op:'disconnect', a, b }); }
   setParam(id, name, value){
     this._params.set(id + '\u0000' + name, [id, name, value]);
@@ -2564,6 +2570,7 @@ function normalize(d){
   // Patches made before the wider modules: spread them out so they don't overlap.
   if (!d.view.ui){ for (const m of d.modules) m.pos = [Math.round(m.pos[0] * 1.32), m.pos[1]]; d.view.ui = 2; }
   chainsStereoUp(d);   // STEREO: an older patch's Blades/Meta/Phaser right sides, once (st2)
+  fbFix(d.cables);   // FEEDBACK: marks true on every load, undo, redo and import (the engine is sent the whole patch after); a patch with no loop is left byte for byte as it was
   return d;
 }
 
@@ -3083,6 +3090,7 @@ function removeModule(id){
   for (const g of doc.groups) g.modules = (g.modules || []).filter(x => x !== id);
   const gBefore = doc.groups.length; doc.groups = doc.groups.filter(g => (g.modules || []).length);   // M6: a group with no modules left goes
   if (bridge) bridge.removeModule(id);
+  normFeedback();   // FEEDBACK: a loop through this module is gone, so the mark on the cable that closed it goes too
   if (n){ n.el.remove(); const t = n.head && n.head.querySelector('.t'); if (t) titleFit.drop(t); } nodes.delete(id); selected.delete(id);
   if (doc.groups.length !== gBefore) renderGroups(); else groupsFollow();
   syncCableEls(); store.touch();
@@ -3197,10 +3205,10 @@ function syncCableEls(){
   if (selCable && !cableEls.has(selCable)) selCable = null;   // its cable is gone (removed, or an undo built the patch again)
   relDirty = true;
   for (const c of doc.cables){
-    if (cableEls.has(c)) continue;
+    if (cableEls.has(c)){ const o = cableEls.get(c); if (o.fb !== (c.fb === true)) paintFb(c, o); continue; }
     const el = cableGroup(cableKind(c));
     const hit = svgEl('path', {fill:'none', stroke:'transparent', 'stroke-width':16, 'pointer-events':'stroke', class:'hit'});
-    const title = svgEl('title', {}); title.textContent = 'Click to select (Delete removes it), double-click or right-click to remove'; hit.append(title);
+    const title = svgEl('title', {}); title.textContent = 'Click to select (Delete removes it), double-click or right-click to remove'; hit.append(title); el.ttl = title; paintFb(c, el);
     hit._cable = c;   // the right-click menu's "Remove cable" (3 Nov)
     hit.addEventListener('pointerdown', ev => {
       if (ev.button !== 0 || (MAC && ev.ctrlKey && ev.pointerType !== 'touch')) return;   // a right-click (Ctrl+click on a Mac) is the menu
@@ -3245,12 +3253,32 @@ function cablePath(a, b, pts){
   return 'M' + [[a.x, a.y], ...(pts || []), [b.x, b.y]].map(q => (q.x != null ? q.x + ',' + q.y : q[0] + ',' + q[1])).join(' L');
 }
 function placeCable(el, a, b, pts, c){
+  // FEEDBACK: a cable that runs back (its source is right of its target, on about the same row) would lie along the cables of the loop it closes, so with no bend of its own it is drawn
+  // with a detour below (orthogonal, nothing saved); a bend the user adds takes over. fbDet is where the tag goes then.
+  let fbDet = null;
+  if (el.fb && c && !(pts && pts.length) && a.x + 30 > b.x && Math.abs(a.y - b.y) < 60){ const y = Math.max(a.y, b.y) + 56; pts = [[a.x + 22, a.y], [a.x + 22, y], [b.x - 22, y], [b.x - 22, b.y]]; fbDet = [b.x - 22, (y + b.y) / 2]; }
   const d = cablePath(a, b, pts);
   if (c) syncHandles(el, c);
   el.line.setAttribute('d', d);
   if (el.hit) el.hit.setAttribute('d', d);
   el.ends[0].setAttribute('cx', a.x); el.ends[0].setAttribute('cy', a.y);
   el.ends[1].setAttribute('cx', b.x); el.ends[1].setAttribute('cy', b.y);
+  if (el.fb && el.tag){   // FEEDBACK: the tag sits on the last stretch of the cable, a little back from the target end and above the line
+    const q = pts && pts.length ? pts[pts.length - 1] : a, qx = q.x != null ? q.x : q[0], qy = q.x != null ? q.y : q[1], dx = qx - b.x, dy = qy - b.y, L = Math.hypot(dx, dy) || 1, k = Math.min(34, L / 2);
+    const t = fbDet ? 'translate(' + Math.round(fbDet[0]) + ' ' + Math.round(fbDet[1]) + ')' : 'translate(' + Math.round(b.x + dx / L * k) + ' ' + Math.round(b.y + dy / L * k - 12) + ')';
+    if (el.tagT !== t){ el.tagT = t; el.tag.setAttribute('transform', t); }
+  }
+}
+const FB_TIP = 'Feedback cable: one block late. Click to select (Delete removes it), double-click or right-click to remove';
+// A cable's feedback look (dash pattern, tag by its target end, tooltip): only when its mark is different from what is drawn.
+function paintFb(c, el){
+  const on = c.fb === true; if (!!el.fb === on && el.fbDone) return; el.fbDone = true; el.fb = on;
+  el.line.classList.toggle('fb', on);
+  if (on && !el.tag){
+    el.tag = svgEl('g', { class:'fbtag' }); const r = svgEl('rect', { x:-19, y:-8, width:38, height:16 }), t = svgEl('text', {}); t.textContent = '1 blk'; el.tag.append(r, t); el.g.append(el.tag);
+  }
+  if (el.tag){ el.tag.style.display = on ? '' : 'none'; el.tagT = ''; }
+  if (el.ttl) el.ttl.textContent = on ? FB_TIP : 'Click to select (Delete removes it), double-click or right-click to remove';
 }
 function drawCables(){
   const wr = world.getBoundingClientRect();
@@ -3272,29 +3300,67 @@ function drawCables(){
 const edgeInto = (id, port) => doc.cables.find(c => c.to[0] === id && c.to[1] === port);
 const intoCount = (id, port) => doc.cables.filter(c => c.to[0] === id && c.to[1] === port).length;
 const lastInto = (id, port) => { let r = null; for (const c of doc.cables) if (c.to[0] === id && c.to[1] === port) r = c; return r; };   // the newest cable into an input
-function reaches(a, b){
+/* FEEDBACK (14 Nov, audit M2): a loop is allowed. The cable that closes it is marked fb:true (saved in the patch on the cable); the engine leaves a marked cable
+   out of the run order, so its target hears its source one block (128 samples, about 2.7 ms) late, and what comes through it is level-limited. "Loop" is
+   always about the cables that are NOT marked: a loop already closed by a marked cable is not a loop for ordering.
+   fbReach: can b be reached from a over the unmarked cables of the list (a module reaches itself). fbFix keeps the marks true: it clears the mark of a cable
+   that no longer closes a loop, and if the unmarked cables still hold a cycle (an old or hand-edited patch) it marks, in turn, the LAST cable of the list that
+   lies on a cycle, until none is left. Pure and deterministic for a given list; returns the cables whose mark changed (it adds nothing to a patch that needs no change). */
+const fbOk = c => !!(c && Array.isArray(c.from) && Array.isArray(c.to));
+function fbReach(cables, a, b){
+  if (a === b) return true;
+  const adj = new Map();
+  for (const e of cables) if (fbOk(e) && e.fb !== true){ if (!adj.has(e.from[0])) adj.set(e.from[0], []); adj.get(e.from[0]).push(e.to[0]); }
   const seen = new Set([a]), q = [a];
-  while (q.length){ const c = q.shift(); if (c === b) return true; for (const e of doc.cables) if (e.from[0] === c && !seen.has(e.to[0])){ seen.add(e.to[0]); q.push(e.to[0]); } }
+  while (q.length){ const c = q.pop(); for (const t of adj.get(c) || []){ if (t === b) return true; if (!seen.has(t)){ seen.add(t); q.push(t); } } }
   return false;
 }
+function fbCyclic(cables){   // Kahn: is there a cycle among the unmarked cables (a self-cable counts)?
+  const indeg = new Map(), adj = new Map();
+  for (const e of cables) if (fbOk(e) && e.fb !== true){ const a = e.from[0], b = e.to[0]; if (a === b) return true;
+    if (!adj.has(a)) adj.set(a, []); adj.get(a).push(b); indeg.set(b, (indeg.get(b) || 0) + 1); if (!indeg.has(a)) indeg.set(a, 0); }
+  const q = [...indeg].filter(([, n]) => !n).map(([k]) => k); let done = 0;
+  while (q.length){ const k = q.pop(); done++; for (const t of adj.get(k) || []){ indeg.set(t, indeg.get(t) - 1); if (!indeg.get(t)) q.push(t); } }
+  return done < indeg.size;
+}
+function fbFix(cables){
+  const changed = [], ok = cables.filter(fbOk);
+  const stale = ok.filter(c => c.fb === true && !fbReach(ok, c.to[0], c.from[0]));   // judged on the marks as they stood, then all cleared together
+  for (const c of stale){ delete c.fb; changed.push(c); }
+  while (fbCyclic(ok)){
+    let pick = null;
+    for (let i = ok.length - 1; i >= 0 && !pick; i--){ const c = ok[i]; if (c.fb !== true && fbReach(ok, c.to[0], c.from[0])) pick = c; }
+    if (!pick) break;   // (cannot happen: a cycle has a cable on it)
+    pick.fb = true; if (!changed.includes(pick)) changed.push(pick); else changed.splice(changed.indexOf(pick), 1);
+  }
+  return changed;
+}
+function reaches(a, b){ return fbReach(doc.cables, a, b); }
+// Tell the engine a cable's mark (connecting a cable again with another mark only changes its mark).
+function fbSend(c){
+  if (bridge) bridge.connect(c.from, c.to, c.fb === true);
+}
+function normFeedback(){ const ch = fbFix(doc.cables); for (const c of ch) fbSend(c); return ch; }
+let fbToldOnce = false;
+function fbToast(){ if (fbToldOnce) toast('Feedback cable.'); else { fbToldOnce = true; toast('Feedback cable: it arrives one block late (about 3 ms).', 4200); } }
 function connect(from, to, pts, snap){
-  if (from[0] === to[0]){ toast('A module can’t feed itself.'); return false; }
-  if (reaches(to[0], from[0])){ toast('That cable would make a loop.'); return false; }
+  const loop = from[0] === to[0] || reaches(to[0], from[0]);   // FEEDBACK: a cable that would close a loop is allowed, and marked
   // M3 SUMMING (14 Nov, audit M3): a second cable into an input ADDS to the first: the engines already sum every cable into an input (_gather), so nothing is
   // replaced any more. Only an exact copy of a cable is refused (the engine drops it anyway). To replace one, drag the old cable off first.
   if (doc.cables.some(q => q.from[0] === from[0] && q.from[1] === from[1] && q.to[0] === to[0] && q.to[1] === to[1])){ toast('Those two are already connected.'); return false; }
   const had = intoCount(to[0], to[1]);
   if (snap) store.snapshot();
-  const c = { from, to, bend:0 }; if (pts && pts.length) c.pts = pts;
+  const c = { from, to, bend:0 }; if (pts && pts.length) c.pts = pts; if (loop) c.fb = true;
   doc.cables.push(c);
-  if (bridge) bridge.connect(from, to);
+  if (bridge) bridge.connect(from, to, loop);
   syncCableEls(); store.touch();
-  if (had) toast('Two cables now feed this input: they add together (Undo takes the new one off). Drag the old one off to replace it.', 4200);
+  if (loop) fbToast(); else if (had) toast('Two cables now feed this input: they add together (Undo takes the new one off). Drag the old one off to replace it.', 4200);
   return true;
 }
 function disconnect(c, quiet){
   doc.cables = doc.cables.filter(x => x !== c);
   if (bridge) bridge.disconnect(c.from, c.to);
+  normFeedback();   // FEEDBACK: a loop this cable was part of may be gone: its closing cable loses the mark
   if (!quiet){ syncCableEls(); store.touch(); }
 }
 
@@ -3704,7 +3770,7 @@ function captureCustom(name, ids){
   const map = new Map(picked.map((m, i) => [m.id, 'c' + i]));
   const mods = picked.map(m => ({ id:map.get(m.id), type:m.type, scope:m.scope, pos:[m.pos[0] - ox, m.pos[1] - oy], collapsed:!!m.collapsed, ...(m.collapsed && m.view === 'mini' ? { view:'mini' } : {}), params:Object.assign({}, m.params) }));
   const cables = doc.cables.filter(c => inside.has(c.from[0]) && inside.has(c.to[0]))
-    .map(c => ({ from:[map.get(c.from[0]), c.from[1]], to:[map.get(c.to[0]), c.to[1]], bend:0 }));
+    .map(c => ({ from:[map.get(c.from[0]), c.from[1]], to:[map.get(c.to[0]), c.to[1]], bend:0, ...(c.fb === true ? { fb:true } : {}) }));
   store.snapshot();
   const def = { id:newId('u'), name, color:'#8a73c9', graph:{ modules:mods, cables } };
   doc.custom.push(def); renderCustom(); store.touch();
@@ -3719,12 +3785,16 @@ function pasteGraph(graph, pos){
     if (bridge) bridge.addModule(m.id, m.type, { params:m.params, pos:m.pos });
     buildNode(m); ids.push(m.id);
   }
+  const pasted = [];
   for (const cc of graph.cables){
     const from = [idmap.get(cc.from[0]), cc.from[1]], to = [idmap.get(cc.to[0]), cc.to[1]];
     if (!from[0] || !to[0]) continue;
-    const c = { from, to, bend:0 }; if (cc.pts) c.pts = cc.pts.map(p => [p[0] + pos[0], p[1] + pos[1]]);
-    doc.cables.push(c); if (bridge) bridge.connect(from, to);
+    const c = { from, to, bend:0 }; if (cc.pts) c.pts = cc.pts.map(p => [p[0] + pos[0], p[1] + pos[1]]); if (cc.fb === true) c.fb = true;   // FEEDBACK: the mark travels with the copy
+    doc.cables.push(c); pasted.push(c);
   }
+  const fbChg = fbFix(doc.cables);   // FEEDBACK: marks that do not fit the pasted cables (a copy of a loop's other half, an old custom module) are put right before the engine hears them
+  if (bridge) for (const c of pasted) bridge.connect(c.from, c.to, c.fb === true);
+  for (const c of fbChg) if (!pasted.includes(c)) fbSend(c);
   syncCableEls(); store.touch();
   return ids;
 }
@@ -3733,7 +3803,7 @@ function pasteGraph(graph, pos){
 function dupForDrag(group){
   const ids = new Set(group.map(g => g.m.id));
   const graph = { modules: doc.modules.filter(m => ids.has(m.id)).map(m => JSON.parse(JSON.stringify(m))),
-    cables: doc.cables.filter(c => ids.has(c.from[0]) && ids.has(c.to[0])).map(c => ({ from:c.from.slice(), to:c.to.slice(), pts:c.pts && c.pts.map(q => q.slice()) })) };
+    cables: doc.cables.filter(c => ids.has(c.from[0]) && ids.has(c.to[0])).map(c => ({ from:c.from.slice(), to:c.to.slice(), pts:c.pts && c.pts.map(q => q.slice()), ...(c.fb === true ? { fb:true } : {}) })) };
   const made = pasteGraph(graph, [0, 0]);
   clearSel(); made.forEach(id => setSel(id, true));
   return made.map(id => nodes.get(id)).filter(Boolean).map(g => [g, g.m.pos[0], g.m.pos[1]]);
@@ -3748,7 +3818,7 @@ function copySel(quiet){
   const ids = new Set(picked.map(m => m.id));
   clip = { ox, oy, graph:{
     modules: picked.map(m => ({ id:m.id, type:m.type, scope:m.scope, pos:[m.pos[0] - ox, m.pos[1] - oy], collapsed:!!m.collapsed, ...(m.collapsed && m.view === 'mini' ? { view:'mini' } : {}), params:Object.assign({}, m.params) })),
-    cables: doc.cables.filter(c => ids.has(c.from[0]) && ids.has(c.to[0])).map(c => ({ from:c.from.slice(), to:c.to.slice(), pts:c.pts && c.pts.map(p => [p[0] - ox, p[1] - oy]) })) } };
+    cables: doc.cables.filter(c => ids.has(c.from[0]) && ids.has(c.to[0])).map(c => ({ from:c.from.slice(), to:c.to.slice(), pts:c.pts && c.pts.map(p => [p[0] - ox, p[1] - oy]), ...(c.fb === true ? { fb:true } : {}) })) } };
   if (!quiet) toast(picked.length === 1 ? 'Copied 1 module.' : 'Copied ' + picked.length + ' modules.');
   return true;
 }
@@ -4225,6 +4295,7 @@ function helpDoc(){
   const guide = [
     ['Patching', 'Drag from an output jack (right edge) to an input jack (left edge). Teal solid cables carry audio, purple dashed cables carry control signals and pink dotted cables carry gates; gate jacks are diamonds, the others round. Every slider has a small purple jack on its left for modulation. Drag a patched input to move its cable, or drop it on empty space to unplug. Click a cable to select it: Delete removes it, Escape lets go, and its bend handles show (drag one to move the bend, Option-click one to remove it). Double-click a cable to remove it. Hold Option (Alt on Windows) and click while drawing a cable to bend it, or Option-drag an existing cable.'],
     ['Summing and reading cables', 'A second cable into an input adds to the first: the signals are summed (two equal signals come out 6 dB louder, with no automatic level trim). To replace a cable, drag the old one off first; dragging from a patched input picks up its newest cable. Rest the pointer on a cable to read what it carries: the two ends and, while the sound engine runs, its level (audio in dB, control as a number, gates on or off).'],
+    ['Feedback loops', 'A cable that would close a loop is allowed: it is marked as a feedback cable, drawn as a long dash and a dot with a small “1 blk” tag by its end, and rest the pointer on it to read “feedback, one block late”. That cable arrives one block late (128 samples, about 3 ms), whatever order the modules are in, and what comes through it is limited if it gets very loud. Turn the gain round the loop up carefully: above 1 it grows until the limit holds it. Take the cable away and the others run as before.'],
     ['Keys', 'A opens Find a module under the pointer (or beside the picked module): type a few letters, Enter adds it, Esc closes it. F fits the whole patch and Shift+F zooms to the picked modules. Ctrl/⌘+A picks every module, Ctrl/⌘+G groups the picked ones, Ctrl/⌘ with = and - zooms, Ctrl/⌘+0 goes back to 100%. Arrow keys move the picked modules 10 px (Shift: 1 px), Enter renames the picked one, Esc lets go of them, Delete removes them. Alt+C collapses or expands every module, Alt+Shift+C takes them all to Mini, Alt+E switches Play and Edit, Ctrl/⌘+Z undoes. Tab walks through the modules and their controls. Most letters play notes (the - and = keys change the octave), so every key above is one that does not. These keys do nothing while you type in a box, and the ones that change the patch do nothing in Play.'],
     ['Comments, names and layout', 'Right-click the background and choose Add a comment here (or type “comment” in Find a module) for a plain text note you can type into, move by its top edge and remove with its x; a comment is saved with the patch. Right-click a module and choose Rename module to give it a name of your own (empty goes back to the usual one). With two or more modules picked, the menu aligns their edges; with three, it spaces them evenly. Modules snap to a 10 px grid as you drag; the background menu turns that off. Tidy up lays the modules out in columns by signal flow and keeps your groups.'],
     ['Folding, Mini, widths and groups', 'The chevron folds a module to Compact (its key values, the ports that have a cable and a stub for each modulated control) and opens it again; a double-click on the title bar does the same. Shift+click the chevron, or hold it on a touch screen, shrinks it to Mini: the title bar alone, with every cable ending on its left (inputs) or right (outputs) edge. Shift+click again goes back to Compact; a plain click opens it. Alt+C folds or opens every module, Alt+Shift+C takes every module to Mini or opens them all, and the right-click menus list the same. Small utility modules (Attenuverter, Math, Logic and the like) are drawn narrower than the rest; their About card is in the right-click menu. The arrow on a group\u2019s label collapses the group into one block: its modules keep running, only the cables that cross the group stay drawn, and unfolding puts everything back. A group\u2019s box follows its modules when you move, fold or remove them. None of this works in Play.'],
