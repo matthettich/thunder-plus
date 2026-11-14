@@ -29,7 +29,7 @@ for (const [name, D] of BOTH) {
     assert.deepEqual(Object.keys(D.MODULES.rect.outputs), ['inv', 'abs', 'pos', 'neg']);
     assert.deepEqual(Object.keys(D.MODULES.compare.outputs), ['gt', 'lt']);
     assert.deepEqual(Object.keys(D.MODULES.switch.inputs), ['a', 'b', 'sel']);
-    assert.deepEqual(Object.keys(D.MODULES.xfade.inputs), ['a', 'b', 'cv']);
+    assert.deepEqual(Object.keys(D.MODULES.xfade.inputs), ['a', 'b', 'mixin']);
   });
   test(name + ': Invert / rectify', () => {
     const r = run(D, 'rect', {}, { in: ramp });
@@ -74,11 +74,11 @@ for (const [name, D] of BOTH) {
     let r = run(D, 'xfade', { mix: 0 }, { a, b }); for (const v of r.out) assert.equal(v, 1);
     r = run(D, 'xfade', { mix: 1 }, { a, b }); for (const v of r.out) assert.equal(v, -1);
     r = run(D, 'xfade', { mix: .5 }, { a, b }); for (const v of r.out) assert.equal(v, 0);
-    r = run(D, 'xfade', { mix: 0 }, { a, b, cv: i => i / (N - 1) }); assert.equal(r.out[0], 1); assert.equal(r.out[N - 1], -1); for (let i = 1; i < N; i++) assert.ok(r.out[i] < r.out[i - 1], 'the input moves it sample by sample');
-    r = run(D, 'xfade', { mix: .5 }, { a, b, cv: i => i < 64 ? -9 : 9 }); assert.equal(r.out[0], 1); assert.equal(r.out[N - 1], -1);   // held at the ends
+    r = run(D, 'xfade', { mix: 0 }, { a, b, mixin: i => i / (N - 1) }); assert.equal(r.out[0], 1); assert.equal(r.out[N - 1], -1); for (let i = 1; i < N; i++) assert.ok(r.out[i] < r.out[i - 1], 'the input moves it sample by sample');
+    r = run(D, 'xfade', { mix: .5 }, { a, b, mixin: i => i < 64 ? -9 : 9 }); assert.equal(r.out[0], 1); assert.equal(r.out[N - 1], -1);   // held at the ends
     r = run(D, 'xfade', { mix: .5, curve: 1 }, { a: () => 1, b: () => 1 }); assert.ok(Math.abs(r.out[0] - Math.SQRT2) < 1e-6, 'equal power: both at 0.707');
     r = run(D, 'xfade', { mix: 0, curve: 1 }, { a, b }); assert.ok(Math.abs(r.out[0] - 1) < 1e-6); r = run(D, 'xfade', { mix: 1, curve: 1 }, { a, b }); assert.ok(Math.abs(r.out[0] + 1) < 1e-6);
-    r = run(D, 'xfade', { mix: .5 }, { a, b, cv: () => NaN }); for (const v of r.out) assert.equal(v, 1);   // a broken Mix input falls to A, it does not poison the output
+    r = run(D, 'xfade', { mix: .5 }, { a, b, mixin: () => NaN }); for (const v of r.out) assert.equal(v, 1);   // a broken Mix input falls to A, it does not poison the output
   });
   test(name + ': Constant', () => {
     let r = run(D, 'const', { value: .25 }); for (const v of r.out) assert.equal(v, .25);
@@ -107,7 +107,7 @@ test('waves engine: fed by a voice the maths run per voice; a Constant alone is 
   E.loadPatch({ modules: [{ id: 'h', type: 'hostIn', scope: 'poly', params: { transpose: 0 } }, { id: 'v', type: 'vco', scope: 'poly', params: { wave: 1, tune: 0, fine: 0 } },
     { id: 'r', type: 'rect', scope: 'poly', params: {} }, { id: 'k', type: 'const', scope: 'poly', params: { value: .5, fine: 0 } }, { id: 'x', type: 'xfade', scope: 'poly', params: { mix: 0, curve: 0 } },
     { id: 'o', type: 'out', scope: 'mono', params: { slot: 1, level: 1 } }],
-    cables: [{ from: ['h', 'pitch'], to: ['v', 'pitch'] }, { from: ['v', 'out'], to: ['r', 'in'] }, { from: ['r', 'abs'], to: ['x', 'a'] }, { from: ['k', 'out'], to: ['x', 'cv'] }, { from: ['x', 'out'], to: ['o', 'in'] }] });
+    cables: [{ from: ['h', 'pitch'], to: ['v', 'pitch'] }, { from: ['v', 'out'], to: ['r', 'in'] }, { from: ['r', 'abs'], to: ['x', 'a'] }, { from: ['k', 'out'], to: ['x', 'mixin'] }, { from: ['x', 'out'], to: ['o', 'in'] }] });
   const g = E.graph.mods; assert.equal(g.get('r').poly, true); assert.equal(g.get('x').poly, true); assert.equal(g.get('k').poly, false);
   E.noteOn(60, 1); E.noteOn(67, 1);
   let e = 0, neg = 0; for (let b = 0; b < 40; b++) { E.process(N); for (const v of E.bus(1)) { assert.ok(Number.isFinite(v)); e += v * v; if (v < -1e-6) neg++; } }

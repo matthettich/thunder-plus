@@ -836,7 +836,7 @@ Object.assign(SHARED_MODULES, {
   switch:{ label:'Switch', scope:'mono', inputs:{ a:'audio', b:'audio', sel:'gate' }, outputs:{ out:'audio' },
     params:{ pick:[0,0,1,1], fade:[.005,0,.1,.001] }, ui:{ pick:{l:'Pick', c:opts(['A', 'B'])}, fade:{l:'Fade', f:secs} },
     about:'Switch: sends A or B to Out. Pick chooses one; a gate on Select chooses the other one while it is high. Fade is how long the change takes, a few milliseconds so audio does not click (0 is instant, for control signals).' },
-  xfade:{ label:'Crossfade', scope:'mono', inputs:{ a:'audio', b:'audio', cv:'cv' }, outputs:{ out:'audio' },
+  xfade:{ label:'Crossfade', scope:'mono', inputs:{ a:'audio', b:'audio', mixin:'cv' }, outputs:{ out:'audio' },
     params:{ mix:[.5,0,1,.01], curve:[0,0,1,1] }, ui:{ mix:{l:'Mix', f:pct}, curve:{l:'Curve', c:opts(['Straight', 'Equal power'])} },
     about:'Crossfade: blends A and B. Mix is the slider, plus the control input if you patch one (0 is all A, 1 is all B). Straight is right for similar sounds and control signals; Equal power keeps two different sounds at the same loudness through the middle.' },
   divider:{ label:'Clock divider', scope:'mono', inputs:{ clock:'gate', reset:'gate' }, outputs:{ d2:'gate', d4:'gate', d8:'gate', n:'gate' },
@@ -930,6 +930,7 @@ SHARED_MODULES.degrade = Object.assign({ label:'Degrade', scope:'mono', params:{
     noise:{l:'Noise', f:v => v < .005 ? 'Off' : (20 * Math.log10(v * v * .25)).toFixed(1) + ' dB'}, color:{l:'Color', f:v => v < .02 ? 'White' : v > .98 ? 'Dark' : pct(v) + ' dark'},
     follow:{l:'Follow', f:pct}, dry:{l:'Dry', f:pct}, wet:{l:'Wet', f:pct} },
   about:'Degrade: lo-fi in one box, after the classic tracker lofi plugins. Bits crushes (24 is off), Rate lowers the sample rate (the top is off), and Noise adds a floor of hiss, from a whisper up to −12 dB: Color darkens it from white, and Follow makes it track the sound, so it breathes with the notes and silence stays clean. A little Noise on a soft sine helps it stand out in a mix. Dry and Wet are separate.' }, STEREO);
+Object.assign(SHARED_PORT_LABEL, { mixin:'Mix' });   // Crossfade's Mix input
 Object.assign(SHARED_PORT_LABEL, { t1:'1', t2:'2', t3:'3', t4:'4', t5:'5', t6:'6', t7:'7', t8:'8', g1:'1', g2:'2', g3:'3', g4:'4', g5:'5', g6:'6', g7:'7', g8:'8', any:'Any', count:'Count' });
 SHARED_PALETTE.push(['Drums', [['blipdrum', 'Blip drum']], 'audio']);
 SHARED_PALETTE.find(g => g[0] === 'Rhythm and logic')[1].unshift(['life', 'Life']);
@@ -2587,7 +2588,7 @@ class ChainsBridge {
   }
   static standalone(opts){
     opts = opts || {};
-    const url = opts.url || './chains-worklet.js?v=49';
+    const url = opts.url || './chains-worklet.js?v=50';
     const ctx = new (window.AudioContext || window.webkitAudioContext)({ latencyHint:'interactive' });
     return Promise.all([ctx.audioWorklet.addModule(url), ChainsBridge.wasm()]).then(([, [tfxBytes, pumpBytes]]) => {
       const node = new AudioWorkletNode(ctx, 'chains', {

@@ -1358,11 +1358,11 @@ const Switch2 = {
    Curve: Straight adds up to the same level for signals that are alike (and for control); Equal power keeps the loudness of two different sounds even through the middle. */
 const Crossfade = {
   type:'xfade', scope:'poly', cost:.03,
-  inputs:{ a:'audio', b:'audio', cv:'cv' }, outputs:{ out:'audio' },
+  inputs:{ a:'audio', b:'audio', mixin:'cv' }, outputs:{ out:'audio' },
   params:{ mix:[.5,0,1,.01], curve:[0,0,1,1] },
   create:() => ({}),
   process(st, io, ctx){
-    const A = io.in.a, B = io.in.b, C = io.in.cv, O = io.out.out, m = io.p.mix, eq = io.p.curve >= .5;
+    const A = io.in.a, B = io.in.b, C = io.in.mixin, O = io.out.out, m = io.p.mix, eq = io.p.curve >= .5;
     for (let i = 0; i < ctx.block; i++){
       let x = m + C[i]; if (!(x > 0)) x = 0; else if (x > 1) x = 1;
       if (eq){ const t = x * 1.5707963267948966; O[i] = A[i] * Math.cos(t) + B[i] * Math.sin(t); }
