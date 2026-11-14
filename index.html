@@ -1224,7 +1224,7 @@ body:not(.legon) .tside .tlegend{display:none}
 .tcmd.cmini :is([data-c=cut],[data-c=sel],[data-c="b:-16"],[data-c=prev]), :root[data-skinbase] .tcmd.cmini :is([data-c=cut],[data-c=sel],[data-c="b:-16"],[data-c=prev]):not(#zz){margin-left:.9em; border-left:1px solid var(--line)}
 .tcmd.cmini [data-c=song], :root[data-skinbase] .tcmd.cmini [data-c=song]:not(#zz){margin-left:auto; border-left:1px solid var(--line)}
 .tcmd.cmini button:hover, :root[data-skinbase] .tcmd.cmini button:not(#zz):hover{background:color-mix(in srgb, var(--ink) 14%, transparent)}
-.tcmd.cmini button:is(.on,.dn), :root[data-skinbase] .tcmd.cmini button:is(.on,.dn):not(#zz){background:var(--ink)!important; color:var(--inv)}
+.tcmd.cmini button:is(.on,.dn), :root[data-skinbase] .tcmd.cmini button:is(.on,.dn):not(#zz){background:var(--ink)!important; color:var(--inv)!important}   /* (14 Nov: !important on the text too: the Low power skins force white on every lit button, which was white on the light ink here, unreadable once STOP uses this) */
 .tcmd.cmini button.off, :root[data-skinbase] .tcmd.cmini button.off:not(#zz){opacity:.32; pointer-events:none}
 .tcmd button[hidden]{display:none}
 /* CONTROL BAR LABELS FIT (13 Nov, owner: "m.pat and lp.sel both get cutoff by their outlines… Cln down is tight, we could put the arrow below cln"): a label of the big bar never overflows its button.

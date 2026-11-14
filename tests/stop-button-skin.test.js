@@ -21,7 +21,7 @@ test('the control bar STOP has no colour or shadow of its own outside a skin', (
 });
 test('the control bar STOP is lit by the bar\'s own on state, in the thin bar and the grid', () => {
   assert.ok(rule(/^\.tcmd button\.on$/).some(([, b]) => /background:var\(--pl\)/.test(b) && /color:var\(--inv\)/.test(b)));
-  assert.ok(rule(/\.tcmd\.cmini button:is\(\.on,\.dn\)/).some(([, b]) => /background:var\(--ink\)!important/.test(b) && /color:var\(--inv\)/.test(b)));
+  assert.ok(rule(/\.tcmd\.cmini button:is\(\.on,\.dn\)/).some(([, b]) => /background:var\(--ink\)!important/.test(b) && /color:var\(--inv\)!important/.test(b)));
   assert.ok(rule(/^\.tcmd\.cmini button,/).some(([, b]) => /box-shadow:none/.test(b)), 'the thin bar\'s buttons are flat');
   assert.match(src, /sb\.classList\.toggle\('on', tp\.on\)/, 'the song button still gets "on" while playing (what it does is unchanged)');
 });
