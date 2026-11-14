@@ -1715,6 +1715,7 @@ const MidSide = {
    feedback cable is (untouched inside -1..1, bent towards 2 above), so it cannot run away. Damp dulls each repeat. */
 const DelayLine = {
   type:'dline', scope:'poly', cost:.12,
+  tail:p => (p.time + p.fine + p.depth) * .001,   // how long after its input stops it may still have something to say (…waves keeps a released voice awake that long)
   inputs:{ in:'audio', tmod:'cv' }, outputs:{ out:'audio' },
   params:{ time:[10,0,2000,.1], fine:[0,-1,1,.001], fb:[0,-.99,.99,.01], damp:[0,0,1,.01], depth:[0,0,50,.1] },
   create(sr){ const N = 1 << Math.ceil(Math.log2(sr * 2.1 + 8)); return { b:new Float32Array(N), M:N - 1, w:0, d:-1, lp:0 }; },

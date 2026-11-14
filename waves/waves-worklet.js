@@ -1611,6 +1611,7 @@ const MidSide = {
    feedback cable is (untouched inside -1..1, bent towards 2 above), so it cannot run away. Damp dulls each repeat. */
 const DelayLine = {
   type:'dline', scope:'poly', cost:.12,
+  tail:p => (p.time + p.fine + p.depth) * .001,   // how long after its input stops it may still have something to say (…waves keeps a released voice awake that long)
   inputs:{ in:'audio', tmod:'cv' }, outputs:{ out:'audio' },
   params:{ time:[10,0,2000,.1], fine:[0,-1,1,.001], fb:[0,-.99,.99,.01], damp:[0,0,1,.01], depth:[0,0,50,.1] },
   create(sr){ const N = 1 << Math.ceil(Math.log2(sr * 2.1 + 8)); return { b:new Float32Array(N), M:N - 1, w:0, d:-1, lp:0 }; },
@@ -5412,6 +5413,8 @@ class Graph {
     }
     // A poly module's "exit" outputs: audio that leaves the voice for a mono module (the bus, a mono effect). Those are
     // what the engine listens to when deciding that a released voice has gone silent (its own oscillator never does).
+    // TAILS: per-voice modules that can stay silent for a while and then speak (a Delay line before its echo): see _render
+    this.tails = null; for (const m of this.mods.values()) if (m.poly && typeof m.def.tail === 'function') (this.tails || (this.tails = [])).push(m);
     for (const m of this.mods.values()) m.exits = null;
     for (const c of this.cables){ const a = this.mods.get(c.a[0]), b = this.mods.get(c.b[0]); if (!a || !b || !a.poly || b.poly || isParamPort(c.b[1])) continue;
       if (a.def.outputs[c.a[1]] !== 'audio') continue; (a.exits || (a.exits = [])).push(c.a[1]);
@@ -5580,7 +5583,10 @@ class WavesEngine {
     const ctx = this._ctx, meter = this.telemetryOn === true, only = this.only;
     ctx.block = frames; ctx.quality = this.quality; ctx.notes = this.voices.rows; ctx.transport = this.transport;
     this.voices.now += frames;
-    const hold = this.sr * 12, quietFor = this.sr * 0.25;
+    // A released voice sleeps after a quarter second of silence, plus the longest wait any of its modules may still be in (a
+    // Delay line's echo arrives up to 2 s after the note: without this a short note lost its only echo).
+    let tailS = 0; const tails = this.graph.tails; if (tails) for (let k = 0; k < tails.length; k++){ const t = tails[k].def.tail(tails[k].inst.params); if (t > tailS) tailS = t; }
+    const hold = this.sr * 12, quietFor = this.sr * (0.25 + (tailS > 0 ? (tailS < 4 ? tailS : 4) : 0));
     for (let v = 0; v < this.voices.max; v++){
       ctx.voice = v;
       const row = this.voices.rows[v], awake = this.voices.awake(v, hold);

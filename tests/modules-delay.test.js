@@ -54,3 +54,15 @@ test('waves: a Delay line fed by a voice is per voice (a string for each note)',
     cables: [{ from: ['h', 'pitch'], to: ['v', 'pitch'] }, { from: ['v', 'out'], to: ['d', 'in'] }, { from: ['d', 'out'], to: ['o', 'in'] }] });
   assert.equal(E.graph.mods.get('d').poly, true); E.noteOn(60, 1); E.noteOn(64, 1); let e = 0; for (let b = 0; b < 60; b++) { E.process(N); for (const v of E.bus(1)) { assert.ok(Number.isFinite(v)); e += v * v; } } assert.ok(e > 1);
 });
+test('waves: a short note through a long per-voice Delay line still gets its echo (the voice is kept awake for the delay)', () => {
+  const D = wavesD(), E = new D.WavesEngine(SR, { voices: 4, quality: 'full', transport: { tempo: 120, lpb: 4, ticks: 6, playing: true } });
+  E.loadPatch({ modules: [{ id: 'h', type: 'hostIn', scope: 'poly', params: { transpose: 0 } }, { id: 'v', type: 'vco', scope: 'poly', params: { wave: 1, tune: 0, fine: 0 } }, { id: 'e', type: 'adsr', scope: 'poly', params: { a: .001, d: .02, s: 0, r: .01 } }, { id: 'g', type: 'vca', scope: 'poly', params: { gain: 0 } },
+    { id: 'd', type: 'dline', scope: 'poly', params: { time: 900, fine: 0, fb: 0, damp: 0, depth: 0 } }, { id: 'o', type: 'out', scope: 'mono', params: { slot: 1, level: 1 } }],
+    cables: [{ from: ['h', 'pitch'], to: ['v', 'pitch'] }, { from: ['h', 'gate'], to: ['e', 'gate'] }, { from: ['v', 'out'], to: ['g', 'in'] }, { from: ['e', 'out'], to: ['g', 'p:gain'] }, { from: ['g', 'out'], to: ['d', 'in'] }, { from: ['d', 'out'], to: ['o', 'in'] }] });
+  assert.ok(E.graph.tails && E.graph.tails.length === 1);
+  E.noteOn(60, 1); const out = new Float32Array(N * 560); for (let b = 0; b < 560; b++) { if (b === 8) E.noteOff(60); E.process(N); out.set(E.bus(1), b * N); }
+  let early = 0, echo = 0; for (let i = 0; i < 40000; i++) early = Math.max(early, Math.abs(out[i])); for (let i = 43000; i < 48000; i++) echo = Math.max(echo, Math.abs(out[i]));
+  assert.equal(early, 0, 'nothing before the delay'); assert.ok(echo > .05, 'the echo arrives 0.9 s later although the note ended long before (' + echo + ')');
+  let late = 0; for (let i = N * 400; i < out.length; i++) late = Math.max(late, Math.abs(out[i])); assert.equal(late, 0);
+  assert.ok(!E.voices.awake(0, SR * 12) || E.voices.rows[0].offAt < E.voices.now, 'and the voice is let go afterwards');
+});
