@@ -1,4 +1,4 @@
-/* …pump BAND pop-up (stage 3): plugins/band/UIBand.cpp in the browser. The spectrum (in / out) behind the band regions,
+/* pump BAND pop-up (stage 3): plugins/band/UIBand.cpp in the browser. The spectrum (in / out) behind the band regions,
    each band's threshold as a draggable line on the level scale with its detector level beside it, the GAIN lane on top
    with the live combined response (drag in it: the band's makeup), crossover handles and the S / M / B strip
    (multiband.js), the selected band's controls with its transfer curve, and the globals. */

@@ -44,3 +44,33 @@ Chrome keeps each offline render's worklet wasm memories until it tears that thr
 space, only about 100–125 wasm memories fit in one page, so `effects.mjs` opens a fresh page for each batch of 32 effect
 nodes. Desktop Chrome has far more room. In the live engine the audio thread frees dropped effect nodes itself (150 add and
 remove cycles checked).
+
+## Soak test (`soak.mjs`)
+
+`node tests/sweep/soak.mjs --minutes=10 --seq=page|core [--song=sounds/ELECTRO.thunder] [--phone] [--only=stopplay,tour,panels,reload]`
+plays the song in a loop in real time (not offline) and, every 5 s, samples: the JS heap (after a forced GC every 30 s, over CDP),
+DOM nodes, event listeners and documents (CDP `Performance.getMetrics` / `Memory.getDOMCounters`), renderer and browser RSS (from
+`/proc`), live AudioNode / AudioWorkletNode / AudioBuffer wrappers (`Runtime.queryObjects`, at the 30 s mark), the app's own counts
+(`rt.pl.aliveN()`, `bassLive`, `padSrcs`, `VAR.map` / `VAR.bytes`, `tp.q`, `MOB.q`, `MOLED`, `PB.log`, undo, localStorage size, live
+intervals and pending timeouts in the page and in the waves / chains frames) and the audio health (`ctx.currentTime` against the wall
+clock, `playbackStats`, the app's dropout counter, the CPU meter, `PB.late` / `PB.drop` / `PB.skips`, the page ticks' lead, moved-on
+and held counts, long tasks over 50 ms, rAF rate). Every sample also records `os.loadavg()`.
+
+It does what a user does, on a schedule: STOP then PLAY every 60 s, a tour of all screens, Synth, Waves and Chains every 2 min,
+Settings, the …pump window and the waves / chains frames every 3 min, and a reload of the song (`__seqTest.load`, the `setSong` path)
+at half time. After the run it fits a line to each series (per minute, after a 2-minute warm-up, `--warm=N`) and prints PASS / FAIL /
+NOTE: a count FAILs when its slope is over a stated bound **and** it is still rising in the second half of the run (a step is not
+growth); DOM nodes and listeners are judged on the lowest value of each minute, because a screen's DOM comes and goes. Audio-health
+series are timing, so they are only ever a NOTE. Raw samples go to `tests/sweep/out/soak-<seq>-<timestamp>.json` (gitignored); score a
+file again with `--rescore=<file>`. `--phone` is touch + Mobile setup + a 412 x 915 window + a 4x CPU throttle: it is not a phone's
+audio stack. Run it on a quiet machine, one browser at a time; on a shared one read the trends, not the numbers. Report:
+[`docs/audits/2026-11-10-soak.md`](../../docs/audits/2026-11-10-soak.md).
+
+## Redraw churn (`redraw-churn.mjs`)
+
+`node tests/sweep/redraw-churn.mjs [--secs=5] [--screens=song,phrase,mixer,fx,inst,project] [--top=12] [--json]` plays `sounds/ELECTRO.thunder` in
+headless Chrome and, per tracker screen, counts the DOM writes the page makes in a few seconds (a MutationObserver on the page) and how many of
+them leave the value as it was (a text node replaced by the same text, an attribute set to what it was). The redraw paths that run while a song
+plays should write only what changed (`setText`, 10 Nov; `tests/redraw-churn.test.js`). About 1 minute for six screens. After the change the
+same-value text / node writes are 0 on every screen (before: 1,100 to 2,100 in 5 s); same-value attribute writes (`hidden`, `title`, `aria-*`)
+remain and are not counted as garbage (an identical attribute is not stored again).

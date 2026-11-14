@@ -166,6 +166,9 @@ const u = v => clamp(v, 0, 1);
 // wetAt (REVERB MIX, 24 Oct): the index in map()'s list of a reverb's own wet/dry control. The reverb is then run fully
 // wet and blended here with rvMix's curve, so every reverb's Mix feels the same (see rvMix).
 function effect(type, id, params, map, cost, wetAt){
+  // map() makes a new array every call and runs every block; it reads only the declared params, the sample rate and the song's tempo / start
+  // counter, so its 12 numbers are kept (st.pc) and map() is called again only when one of those changed (a modulated param still does each block).
+  const keys = Object.keys(params), nk = keys.length;
   return {
     type, scope:'mono', cost: cost || 1, effect:true,
     inputs:{ in:'audio', inR:'audio' }, outputs:{ out:'audio', outR:'audio' }, params,
@@ -178,7 +181,12 @@ function effect(type, id, params, map, cost, wetAt){
       // Views into the wasm memory are kept on the state (remade only when the memory grew or the handle changed):
       // five new typed arrays per effect per block were steady garbage on the audio thread.
       if (st.buf !== buf || st.vh !== st.h){ st.buf = buf; st.vh = st.h; st.P = new Float32Array(buf, x.tfx_params(st.h), 12); st.L = new Float32Array(buf, x.tfx_l(), 128); st.R = new Float32Array(buf, x.tfx_r(), 128); }
-      const P = st.P, L = st.L, R = st.R; P.fill(0); P.set(map(io.p, ctx));
+      const P = st.P, L = st.L, R = st.R; P.fill(0);
+      const pc = st.pc || (st.pc = new Float32Array(12)), pk = st.pk || (st.pk = new Float64Array(nk + 3)), pp = io.p, tr = ctx.transport, tt = tr ? tr.tempo : 0, ts = tr ? tr.startN || 0 : 0;
+      let hit = st.pv === 1 && pk[nk] === ctx.sr && pk[nk + 1] === tt && pk[nk + 2] === ts;
+      for (let k = 0; hit && k < nk; k++) if (pk[k] !== pp[keys[k]]) hit = false;
+      if (hit) P.set(pc);
+      else { P.set(map(pp, ctx)); pc.set(P); for (let k = 0; k < nk; k++) pk[k] = pp[keys[k]]; pk[nk] = ctx.sr; pk[nk + 1] = tt; pk[nk + 2] = ts; st.pv = 1; }
       const wm = wetAt == null ? -1 : P[wetAt]; if (wm >= 0) P[wetAt] = 1;   // REVERB MIX: fully wet in, blended below
       // The wasm only checks its output. A NaN or infinity on the way IN hangs the tape delay for good and leaves
       // twenty other effects silent, so bad or absurd samples are zeroed here first.
@@ -193,8 +201,8 @@ function effect(type, id, params, map, cost, wetAt){
       const L2 = st.L, R2 = st.R;
       let bad = false; for (let i = 0; i < ctx.block; i++){ const a = L2[i], b = R2[i]; if (!(a > -1e4 && a < 1e4 && b > -1e4 && b < 1e4)){ bad = true; break; } }
       if (bad){ try { x.tfx_free(st.h); st.h = x.tfx_new(id, ctx.sr); } catch (e){ st.h = -1; } io.out.out.fill(0); io.out.outR.fill(0); return; }   // its state went bad: start it afresh
-      if (wm >= 0){ const [dg, wg] = rvMix(wm), oL = io.out.out, oR = io.out.outR; for (let i = 0; i < ctx.block; i++){ oL[i] = L0[i] * dg + L2[i] * wg; oR[i] = R0[i] * dg + R2[i] * wg; } return; }
-      io.out.out.set(L2.subarray(0, ctx.block)); io.out.outR.set(R2.subarray(0, ctx.block));
+      if (wm >= 0){ const [dg, wg] = rvMix(wm, RVO), oL = io.out.out, oR = io.out.outR; for (let i = 0; i < ctx.block; i++){ oL[i] = L0[i] * dg + L2[i] * wg; oR[i] = R0[i] * dg + R2[i] * wg; } return; }
+      cpTo(io.out.out, 0, L2, 0, ctx.block); cpTo(io.out.outR, 0, R2, 0, ctx.block);
     }
   };
 }
@@ -386,9 +394,8 @@ const TrackIn = {
   create:() => ({}),
   process(st, io, ctx){
     const k = clamp((io.p.track | 0) - 1, 0, CHAN_COUNT - 1);
-    const L = ctx._inL ? ctx._inL.subarray(k * BLOCK, (k + 1) * BLOCK) : null;
-    const R = ctx._inR ? ctx._inR.subarray(k * BLOCK, (k + 1) * BLOCK) : null;
-    if (L && R){ io.out.out.set(L.subarray(0, ctx.block)); io.out.outR.set(R.subarray(0, ctx.block)); }
+    // (copied by loops from the track's slot of the host's buffer: two views of it and two more were made every block)
+    if (ctx._inL && ctx._inR){ cpTo(io.out.out, 0, ctx._inL, k * BLOCK, ctx.block); cpTo(io.out.outR, 0, ctx._inR, k * BLOCK, ctx.block); }
     else { io.out.out.fill(0); io.out.outR.fill(0); }
   }
 };
@@ -405,7 +412,7 @@ const Resample = {
   create:() => ({ t:0, sn:-1, arm:false, done:false, L:null, R:null, n:0, len:0 }),
   process(st, io, ctx){
     const B = ctx.block, inL = io.in.in, inR = linked(io, 'inR') ? io.in.inR : io.in.in;
-    io.out.out.set(inL.subarray(0, B)); io.out.outR.set(inR.subarray(0, B));
+    cpTo(io.out.out, 0, inL, 0, B); cpTo(io.out.outR, 0, inR, 0, B);
     const tr = ctx.transport;
     if (restarted(st, ctx)) st.t = 0;
     const rec = io.p.rec | 0;
@@ -619,7 +626,11 @@ const SCK_TOP = 136;
    reverb), so a low setting already sounded drenched and 50 % was nowhere near halfway. Now the dry falls as an equal-power
    fade, cos(πm/2), and the tail rises as sin²(πm/2): 10 % is a touch (−32 dB), 35 % about −11 dB, 50 % a real middle
    (dry −3 dB, tail −6 dB), 100 % the tail alone. Returns [dry gain, wet gain]. */
-const rvMix = m => { const a = (m < 0 ? 0 : m > 1 ? 1 : m) * Math.PI / 2, s = Math.sin(a); return [Math.cos(a), s * s]; };
+// rvMix(m, o): with o (a two-slot array the caller keeps) the pair goes into o and o comes back, so a block makes no array; without o a fresh pair (as before).
+const rvMix = (m, o) => { const a = (m < 0 ? 0 : m > 1 ? 1 : m) * Math.PI / 2, s = Math.sin(a); if (o){ o[0] = Math.cos(a); o[1] = s * s; return o; } return [Math.cos(a), s * s]; };
+const RVO = [0, 0];   // the modules' shared scratch for rvMix (each reads it at once, in the same call)
+// cpTo: dst[d0 + i] = src[s0 + i] for n samples (what `dst.set(src.subarray(s0, s0 + n), d0)` did, without making a view every block)
+function cpTo(dst, d0, src, s0, n){ for (let i = 0; i < n; i++) dst[d0 + i] = src[s0 + i]; }
 
 /* Mutable Instruments Beads (MIT): time, size, pitch, shape, density, feedback, blend, reverb + media. */
 // Beads divides by zero with Freeze on and Size at exactly 1, which traps the whole wasm module. Cap it just under.
@@ -858,6 +869,22 @@ const Quant = {
 /* ── Phase 2: filters, shapers and stereo effects (all original DSP) ────────── */
 
 /* Dual (2/4-pole) multimode filter with drive. Cutoff follows the VCF's mapping so the % reads the same. */
+// one side through one pair of stages (state z); the cutoff and resonance are worked out once a sample for both
+// (module-level, not a closure made in process() every block: audio-thread garbage)
+function bladeSide(z, xin, a1, a2, a3, k, mode, four, dr, norm){
+  const x = Math.tanh(xin * dr) / norm;
+  const v3 = x - z.ic2, v1 = a1 * z.ic1 + a2 * v3, v2 = z.ic2 + a2 * z.ic1 + a3 * v3;
+  z.ic1 = 2 * v1 - z.ic1; z.ic2 = 2 * v2 - z.ic2;
+  let y = mode === 0 ? v2 : mode === 1 ? v1 : mode === 2 ? (x - k * v1 - v2) : (x - k * v1);
+  if (four){
+    const x2 = mode === 1 ? v1 : v2;
+    const u3 = x2 - z.jc2, u1 = a1 * z.jc1 + a2 * u3, u2 = z.jc2 + a2 * z.jc1 + a3 * u3;
+    z.jc1 = 2 * u1 - z.jc1; z.jc2 = 2 * u2 - z.jc2;
+    y = mode === 0 ? u2 : mode === 1 ? u1 : mode === 2 ? (x2 - k * u1 - u2) : (x2 - k * u1);
+  }
+  return y;
+}
+function bladeGuard(z){ if (!(Math.abs(z.ic1) < 1e4 && Math.abs(z.ic2) < 1e4 && Math.abs(z.jc1) < 1e4 && Math.abs(z.jc2) < 1e4)){ z.ic1 = z.ic2 = z.jc1 = z.jc2 = 0; } }
 const Blades = {
   type:'blades', scope:'mono', cost:1.2,
   inputs:{ in:'audio', inR:'audio', cutoff:'cv', res:'cv' }, outputs:{ out:'audio', outR:'audio' },   // stereo (owner, 19 Oct): In R optional
@@ -865,32 +892,25 @@ const Blades = {
   create:() => ({ ic1:0, ic2:0, jc1:0, jc2:0, R:{ ic1:0, ic2:0, jc1:0, jc2:0 } }),
   process(st, io, ctx){
     const mode = io.p.mode | 0, four = (io.p.slope | 0) >= 4, dr = 1 + io.p.drive * 6, norm = Math.tanh(dr) || 1, XR = inR(io), oR = io.out.outR;
-    // one side through one pair of stages (state z); the cutoff and resonance are worked out once a sample for both
-    const side = (z, xin, a1, a2, a3, k) => {
-      const x = Math.tanh(xin * dr) / norm;
-      const v3 = x - z.ic2, v1 = a1 * z.ic1 + a2 * v3, v2 = z.ic2 + a2 * z.ic1 + a3 * v3;
-      z.ic1 = 2 * v1 - z.ic1; z.ic2 = 2 * v2 - z.ic2;
-      let y = mode === 0 ? v2 : mode === 1 ? v1 : mode === 2 ? (x - k * v1 - v2) : (x - k * v1);
-      if (four){
-        const x2 = mode === 1 ? v1 : v2;
-        const u3 = x2 - z.jc2, u1 = a1 * z.jc1 + a2 * u3, u2 = z.jc2 + a2 * z.jc1 + a3 * u3;
-        z.jc1 = 2 * u1 - z.jc1; z.jc2 = 2 * u2 - z.jc2;
-        y = mode === 0 ? u2 : mode === 1 ? u1 : mode === 2 ? (x2 - k * u1 - u2) : (x2 - k * u1);
-      }
-      return y;
-    };
     for (let i = 0; i < ctx.block; i++){
       const fc = Math.min(.49, (.01 + Math.pow(10, (io.p.cutoff + io.in.cutoff[i]) * 3) * .004) * 44100 / ctx.sr);
       const g = Math.tan(Math.PI * fc), k = 2 - 2 * Math.min(clamp(io.p.res + io.in.res[i], 0, 1), .98);
       const a1 = 1 / (1 + g * (g + k)), a2 = g * a1, a3 = g * a2;
-      io.out.out[i] = side(st, io.in.in[i], a1, a2, a3, k);   // TPT state-variable stages
-      oR[i] = side(st.R, XR[i], a1, a2, a3, k);
+      io.out.out[i] = bladeSide(st, io.in.in[i], a1, a2, a3, k, mode, four, dr, norm);   // TPT state-variable stages
+      oR[i] = bladeSide(st.R, XR[i], a1, a2, a3, k, mode, four, dr, norm);
     }
-    for (const z of [st, st.R]) if (!(Math.abs(z.ic1) < 1e4 && Math.abs(z.ic2) < 1e4 && Math.abs(z.jc1) < 1e4 && Math.abs(z.jc2) < 1e4)){ z.ic1 = z.ic2 = z.jc1 = z.jc2 = 0; }
+    bladeGuard(st); bladeGuard(st.R);
   }
 };
 
 /* Meta-modulator (Warps-style): crossfade, ring mod, wave fold or comparator between In and Mod. */
+// (module-level, not a closure made in process() every block: audio-thread garbage)
+function metaF(mode, a, x, m){
+  return mode === 0 ? x * (1 - a) + m * a              // crossfade
+    : mode === 1 ? x * ((1 - a) + a * m * 1.4142)      // ring mod
+    : mode === 2 ? Math.sin(x * (1 + a * 7) * Math.PI) // wave fold (sine shaper)
+    : x * (m >= 0 ? 1 : -1);                           // comparator (mod flips sign)
+}
 const Meta = {
   type:'meta', scope:'mono', cost:.3,
   inputs:{ in:'audio', inR:'audio', mod:'audio' }, outputs:{ out:'audio', outR:'audio' },   // stereo (owner, 19 Oct): In R optional, one Mod
@@ -898,13 +918,9 @@ const Meta = {
   create:() => ({}),
   process(st, io, ctx){
     const mode = io.p.mode | 0, a = io.p.amount, mx = io.p.mix, XR = inR(io), oR = io.out.outR;
-    const f = (x, m) => mode === 0 ? x * (1 - a) + m * a              // crossfade
-      : mode === 1 ? x * ((1 - a) + a * m * 1.4142)                    // ring mod
-      : mode === 2 ? Math.sin(x * (1 + a * 7) * Math.PI)               // wave fold (sine shaper)
-      : x * (m >= 0 ? 1 : -1);                                         // comparator (mod flips sign)
     for (let i = 0; i < ctx.block; i++){
       const m = io.in.mod[i], x = io.in.in[i], xr = XR[i];
-      io.out.out[i] = x + (f(x, m) - x) * mx; oR[i] = xr + (f(xr, m) - xr) * mx;
+      io.out.out[i] = x + (metaF(mode, a, x, m) - x) * mx; oR[i] = xr + (metaF(mode, a, xr, m) - xr) * mx;
     }
   }
 };
@@ -1086,6 +1102,10 @@ const Utility = {
   }
 };
 
+/* Audio-thread garbage (10 Nov): helpers that were closures made inside process() every block, now module-level functions
+   taking what they closed over; the arithmetic is the same. ringRd: a linearly interpolated read `d` samples behind the write head. */
+function ringRd(st, B, N, d){ const r = st.w - d, ri = Math.floor(r), fr = r - ri, a = B[((ri % N) + N) % N], b = B[(((ri + 1) % N) + N) % N]; return a + (b - a) * fr; }
+const rmOsc = (w, ph) => w === 0 ? sinT(ph) : w === 1 ? 1 - 4 * Math.abs(ph - .5) : w === 2 ? (ph < .5 ? 1 : -1) : 0;   // Ring mod's carrier shapes
 /* Ring mod: multiplies the sound by a carrier, its own oscillator (Freq, 5 Hz–5 kHz; the Freq input adds ±4
    octaves) or whatever is patched into Carrier. Spread offsets the right side's phase; Shape squares the carrier up. */
 const RingMod = {
@@ -1097,7 +1117,6 @@ const RingMod = {
     const L = io.in.in, R = inR(io), oL = io.out.out, oR = io.out.outR, ext = linked(io, 'car'), fcv = linked(io, 'freq'), p = io.p;
     const base = 5 * Math.pow(1000, p.freq) * Math.pow(2, p.fine / 12), w = p.wave | 0, sp = p.spread * .25, mx = p.mix;
     const dr = 1 + p.shape * 12, nd = Math.tanh(dr);
-    const osc = ph => w === 0 ? sinT(ph) : w === 1 ? 1 - 4 * Math.abs(ph - .5) : w === 2 ? (ph < .5 ? 1 : -1) : 0;
     for (let i = 0; i < ctx.block; i++){
       let c1, c2;
       if (ext){ c1 = c2 = io.in.car[i]; }
@@ -1105,7 +1124,7 @@ const RingMod = {
         const f = base * (fcv ? Math.pow(2, clamp(io.in.freq[i], -1, 1) * 4) : 1);
         const ph0 = st.ph; st.ph += f / ctx.sr; if (st.ph >= 1){ st.ph -= Math.floor(st.ph); if (w === 3){ st.n1 = st.nr() * 2 - 1; } }
         if (w === 3){ if ((ph0 + sp) % 1 > (st.ph + sp) % 1) st.n2 = st.nr() * 2 - 1; c1 = st.n1; c2 = sp ? st.n2 : st.n1; }
-        else { c1 = osc(st.ph); const q = st.ph + sp; c2 = osc(q - Math.floor(q)); }
+        else { c1 = rmOsc(w, st.ph); const q = st.ph + sp; c2 = rmOsc(w, q - Math.floor(q)); }
         if (dr > 1){ c1 = Math.tanh(c1 * dr) / nd; c2 = Math.tanh(c2 * dr) / nd; }
       }
       oL[i] = L[i] * (1 - mx + c1 * mx); oR[i] = R[i] * (1 - mx + c2 * mx);
@@ -1128,7 +1147,7 @@ const Spring = {
   process(st, io, ctx){
     const p = io.p, sr = ctx.sr, L = io.in.in, R = inR(io), oL = io.out.out, oR = io.out.outR;
     const g = .55 + p.decay * .43, a = .3 + p.chirp * .45, kl = 1 - Math.exp(-2 * Math.PI * (1500 * Math.pow(6, p.tone)) / sr);
-    const kh = 1 - Math.exp(-2 * Math.PI * 140 / sr), kp = 1 - Math.exp(-2 * Math.PI * 900 / sr), drip = p.drip * 3, mx = p.mix, [dg, wg] = rvMix(mx);
+    const kh = 1 - Math.exp(-2 * Math.PI * 140 / sr), kp = 1 - Math.exp(-2 * Math.PI * 900 / sr), drip = p.drip * 3, mx = p.mix, [dg, wg] = rvMix(mx, RVO);
     const base = (.028 + p.length * .05) * sr;
     for (let c = 0; c < 2; c++){
       const s = st.s[c], X = c ? R : L, O = c ? oR : oL, D = s.d, N = D.length, len = base * (c ? 1.13 : 1);
@@ -1181,7 +1200,7 @@ const Plate = {
     return st;
   },
   process(st, io, ctx){
-    const p = io.p, s = st.s, L = io.in.in, R = inR(io), oL = io.out.out, oR = io.out.outR, mx = p.mix, [dg, wg] = rvMix(mx);
+    const p = io.p, s = st.s, L = io.in.in, R = inR(io), oL = io.out.out, oR = io.out.outR, mx = p.mix, [dg, wg] = rvMix(mx, RVO);
     const sz = p.size, dec = p.decay, dd2 = clamp(dec + .15, .25, .5), kd = 1 - p.damp * .9, sc = s * sz;
     const pre = Math.min(st.pre.n - 1, Math.round(p.pre * ctx.sr) + 1), exc = p.mod * 16 * s;
     const ind = st.ind, ik = st.indK, A1 = st.ap1, D1 = st.dl1, A2 = st.ap2, D2 = st.dl2;
@@ -1223,6 +1242,102 @@ const Plate = {
   }
 };
 
+/* Lite reverb: a very cheap room / plate-ish reverb, written to cost a small fraction of the others and to port to C++
+   unchanged (plain float math, power-of-two ring buffers, integer delays, no per-sample sin / exp / pow, no allocation
+   after create()).  Structure: mono sum → pre-delay → 2 Schroeder all-passes (diffusion) → a 4-line feedback delay
+   network (Householder mix y = x − ½Σx, which is orthogonal, so the loop only ever loses energy through the per-line
+   gain g < 1 and the per-line one-pole damping) → decorrelated stereo taps (L = r0+r1−r2−r3, R = r0−r1+r2−r3).
+   - Size scales the 4 prime-ish base lengths (made odd, so no two share a factor 2); Decay is the low-frequency RT60 (0.2 s … 12 s; damping shortens the highs, so the broadband T20-measured RT60 is about 0.75 of it),
+     g_i = exp(−6.9078·len_i / (sr·RT60)); Tone is the damping cutoff (1.2 kHz … 14 kHz); Pre is the pre-delay (≤ 100 ms).
+   - Per block (not per sample): targets are recomputed only when a knob or the sample rate changed (the exp / pow live
+     there), g / damping / mix glide to them (one-pole, 4 blocks), and a changed delay length is crossfaded across that
+     block from the old read position to the new one, so moving Size or Pre never clicks (and costs nothing otherwise).
+   - Denormals: ±1e-18 alternating (no DC) is injected into every line, so nothing decays into the denormal range; no
+     per-sample branch for it.  The input is guarded (±8, NaN → 0); the wet output is clamped to ±4; state that goes
+     non-finite or huge at the end of a block is cleared.
+   - Silence: when the input has been below −140 dB and the wet output below −90 dB for two passes of the longest line,
+     the buffers are cleared once and the module only copies the dry sound (plus a peak scan of the input) until sound
+     returns.  Any block length works (the ramp is over ctx.block). */
+const LV = { base:[1423, 1709, 2017, 2411], ap:[142, 107], apg:.6, tail:3.2e-5, wake:1e-7 };   // line lengths at 48 kHz, Size 1; the all-passes; −90 dB; −140 dB
+const lvPow2 = n => { let p = 256; while (p < n) p <<= 1; return p; };
+const Lverb = {
+  type:'lverb', scope:'mono', cost:.06,
+  inputs:{ in:'audio', inR:'audio' }, outputs:{ out:'audio', outR:'audio' },
+  params:{ size:[.5,0,1,.01], decay:[.5,0,1,.01], tone:[.6,0,1,.01], pre:[0,0,.1,.001], mix:[.3,0,1,.01] },
+  create(sr){
+    const k = Math.max(sr, 96000) / 48000, n = lvPow2(Math.ceil(2411 * k) + 8), pn = lvPow2(Math.ceil(.1 * Math.max(sr, 96000)) + 8), an = lvPow2(Math.ceil(142 * k) + 8);
+    return { sr:0, ps:-1, pd:-1, pt:-1, pp:-1, m:n - 1, pm:pn - 1, am:an - 1, w:0, pw:0, aw:0, B:[0, 1, 2, 3].map(() => new Float32Array(n)), P:new Float32Array(pn), A:[new Float32Array(an), new Float32Array(an)],
+      len:new Int32Array(4), lenT:new Int32Array(4), g:new Float64Array(4), gT:new Float64Array(4), lp:new Float64Array(4), kd:.5, kdT:.5, pre:0, preT:0, apk:new Int32Array(2),
+      dg:1, wg:0, q:0, qmax:0, asleep:false, init:false };
+  },
+  process(st, io, ctx){
+    const p = io.p, L = io.in.in, R = inR(io), oL = io.out.out, oR = io.out.outR, N = ctx.block, sr = ctx.sr, m = st.m, pm = st.pm, am = st.am;
+    const mxg = rvMix(p.mix, RVO), dgT = mxg[0], wgT = mxg[1];   // (by index: destructuring an array goes through its iterator)
+    // ── targets: only when a knob or the sample rate changed
+    if (p.size !== st.ps || p.decay !== st.pd || p.tone !== st.pt || p.pre !== st.pp || sr !== st.sr){
+      const k = sr / 48000, sc = (.15 + .85 * clamp(p.size, 0, 1)) * k, rt = .2 * Math.pow(60, clamp(p.decay, 0, 1)), lim = m - 2;
+      for (let i = 0; i < 4; i++){
+        const l = Math.min(lim, (Math.round(LV.base[i] * sc) | 1)); st.lenT[i] = l;
+        st.gT[i] = Math.min(.9995, Math.exp(-6.9078 * l / (sr * rt)));   // −60 dB after RT60 seconds
+      }
+      st.kdT = 1 - Math.exp(-6.2832 * 1200 * Math.pow(11.7, clamp(p.tone, 0, 1)) / sr);
+      st.preT = Math.min(pm - 2, Math.round(clamp(p.pre, 0, .1) * sr));
+      if (sr !== st.sr){ st.apk[0] = Math.round(LV.ap[0] * k); st.apk[1] = Math.round(LV.ap[1] * k); }
+      st.qmax = 2 * st.lenT[3] + st.preT;
+      st.ps = p.size; st.pd = p.decay; st.pt = p.tone; st.pp = p.pre; st.sr = sr;
+      if (!st.init){ st.init = true; st.len.set(st.lenT); st.g.set(st.gT); st.kd = st.kdT; st.pre = st.preT; st.dg = dgT; st.wg = wgT; }
+    }
+    // ── glide the few coefficients, per block
+    st.dg += (dgT - st.dg) * .35; st.wg += (wgT - st.wg) * .35;
+    const B = st.B, B0 = B[0], B1 = B[1], B2 = B[2], B3 = B[3], PB = st.P, A0 = st.A[0], A1 = st.A[1], lp = st.lp, g = st.g, len = st.len, lenT = st.lenT;
+    const dg = st.dg, wg = st.wg;
+    if (st.asleep){   // nothing in the tank: copy the dry sound, wake when sound returns
+      let pk = 0; for (let i = 0; i < N; i++){ let a = L[i], b = R[i]; a = a > -8 && a < 8 ? a : 0; b = b > -8 && b < 8 ? b : 0; oL[i] = a * dg; oR[i] = b * dg; const x = (a < 0 ? -a : a) + (b < 0 ? -b : b); if (x > pk) pk = x; }
+      if (pk >= LV.wake){ st.asleep = false; len.set(lenT); st.pre = st.preT; }   // sound: wake, and run this block again below with the tank (cleared) and the sound; a Size or Pre changed while asleep applies at once (review: nothing to crossfade from, and the old Pre let the first block through early)
+      else return;
+    }
+    for (let i = 0; i < 4; i++) g[i] += (st.gT[i] - g[i]) * .35;
+    st.kd += (st.kdT - st.kd) * .35;
+    const g0 = g[0], g1 = g[1], g2 = g[2], g3 = g[3], kd = st.kd, k0 = st.apk[0], k1 = st.apk[1], ag = LV.apg;
+    // a changed length is read at its old and new position across this block (fd), the pre-delay likewise
+    const o0 = len[0], o1 = len[1], o2 = len[2], o3 = len[3], n0 = lenT[0], n1 = lenT[1], n2 = lenT[2], n3 = lenT[3], po = st.pre, pn = st.preT;
+    const fd = o0 !== n0 || o1 !== n1 || o2 !== n2 || o3 !== n3 || po !== pn, iN = 1 / N;
+    let w = st.w, pw = st.pw, aw = st.aw, lp0 = lp[0], lp1 = lp[1], lp2 = lp[2], lp3 = lp[3], dn = 1e-18, ipk = 0, opk = 0;
+    for (let i = 0; i < N; i++){
+      let dl = L[i], dr = R[i]; dl = dl > -8 && dl < 8 ? dl : 0; dr = dr > -8 && dr < 8 ? dr : 0;   // guarded: NaN / Infinity / huge → 0 (±8 kept)
+      const a = (dl + dr) * .5, aa = a < 0 ? -a : a; if (aa > ipk) ipk = aa;
+      PB[pw & pm] = a;
+      let x = PB[(pw - pn) & pm], r0 = B0[(w - n0) & m], r1 = B1[(w - n1) & m], r2 = B2[(w - n2) & m], r3 = B3[(w - n3) & m];
+      if (fd){   // fade from the old read positions to the new ones
+        const u = (i + 1) * iN, v = 1 - u;
+        x = x * u + PB[(pw - po) & pm] * v; r0 = r0 * u + B0[(w - o0) & m] * v; r1 = r1 * u + B1[(w - o1) & m] * v;
+        r2 = r2 * u + B2[(w - o2) & m] * v; r3 = r3 * u + B3[(w - o3) & m] * v;
+      }
+      pw++;
+      // input diffusion: two Schroeder all-passes (y = −g·x + d; d ← x + g·y)
+      let y = -ag * x + A0[(aw - k0) & am]; A0[aw & am] = x + ag * y; x = y;
+      y = -ag * x + A1[(aw - k1) & am]; A1[aw & am] = x + ag * y; x = y;
+      aw++;
+      // Householder mix, line gain, one-pole damping, back into the line with the input and the denormal guard
+      const s = (r0 + r1 + r2 + r3) * .5, inj = x * .5 + dn; dn = -dn;
+      lp0 += ((r0 - s) * g0 - lp0) * kd; lp1 += ((r1 - s) * g1 - lp1) * kd; lp2 += ((r2 - s) * g2 - lp2) * kd; lp3 += ((r3 - s) * g3 - lp3) * kd;
+      B0[w & m] = lp0 + inj; B1[w & m] = lp1 + inj; B2[w & m] = lp2 + inj; B3[w & m] = lp3 + inj; w++;
+      // decorrelated stereo taps (orthogonal combinations of the four lines), clamped
+      let yl = (r0 + r1 - r2 - r3) * .75, yr = (r0 - r1 + r2 - r3) * .75;
+      yl = yl > 4 ? 4 : yl < -4 ? -4 : yl; yr = yr > 4 ? 4 : yr < -4 ? -4 : yr;
+      const al = yl < 0 ? -yl : yl, ar = yr < 0 ? -yr : yr; if (al > opk) opk = al; if (ar > opk) opk = ar;
+      oL[i] = dl * dg + yl * wg; oR[i] = dr * dg + yr * wg;   // REVERB MIX
+    }
+    st.w = w & m; st.pw = pw & pm; st.aw = aw & am; lp[0] = lp0; lp[1] = lp1; lp[2] = lp2; lp[3] = lp3;
+    len.set(lenT); st.pre = pn;
+    if (!(lp0 > -1e3 && lp0 < 1e3 && lp1 > -1e3 && lp1 < 1e3 && lp2 > -1e3 && lp2 < 1e3 && lp3 > -1e3 && lp3 < 1e3)){   // went bad: start clean
+      lp.fill(0); B0.fill(0); B1.fill(0); B2.fill(0); B3.fill(0); PB.fill(0); A0.fill(0); A1.fill(0); st.q = 0; return;
+    }
+    st.q = ipk < LV.wake && opk < LV.tail ? st.q + N : 0;
+    if (st.q >= st.qmax){ lp.fill(0); B0.fill(0); B1.fill(0); B2.fill(0); B3.fill(0); PB.fill(0); A0.fill(0); A1.fill(0); st.q = 0; st.asleep = true; }
+  }
+};
+
 /* Ensemble: a lush chorus. Ensemble runs three voices around the stereo field with a little fast shimmer;
    Classic I, II and I+II are the two-speed bucket-brigade chorus of 80s polysynths. Rate and Depth scale it. */
 const ENS = [[.6, .5, 3], [.513, .35, 2], [.863, .35, 2], [9.75, .12, 2]];
@@ -1236,7 +1351,6 @@ const Ensemble = {
     const [hz0, dep0, voices] = ENS[clamp(p.mode | 0, 0, 3)], hz = hz0 * Math.pow(2, (p.rate - .5) * 4), dep = dep0 * p.depth * 2;
     const ctr = (voices === 3 ? .012 : .0035) * sr, sw = (voices === 3 ? .004 : .0019) * sr * dep / .5;
     const kt = 1 - Math.exp(-2 * Math.PI * (2000 * Math.pow(8, p.tone)) / sr), mx = p.mix;
-    const rd = d => { const r = st.w - d, ri = Math.floor(r), fr = r - ri, a = B[((ri % N) + N) % N], b = B[(((ri + 1) % N) + N) % N]; return a + (b - a) * fr; };
     for (let i = 0; i < ctx.block; i++){
       const m = (L[i] + R[i]) * .5; B[st.w] = m;
       st.ph += hz / sr; if (st.ph >= 1) st.ph -= 1;
@@ -1244,11 +1358,11 @@ const Ensemble = {
       if (voices === 3){
         st.vib += 6.3 / sr; if (st.vib >= 1) st.vib -= 1;
         const v = sinT(st.vib) * .08;
-        const a = rd(ctr + sw * (sinT(st.ph) + v)), b = rd(ctr + sw * (sinT(st.ph + 1 / 3) + v)), c = rd(ctr + sw * (sinT(st.ph + 2 / 3) + v));
+        const a = ringRd(st, B, N, ctr + sw * (sinT(st.ph) + v)), b = ringRd(st, B, N, ctr + sw * (sinT(st.ph + 1 / 3) + v)), c = ringRd(st, B, N, ctr + sw * (sinT(st.ph + 2 / 3) + v));
         wl = a * .7 + b * .45 + c * .15; wr = c * .7 + b * .45 + a * .15;
       } else {
         const tri = 1 - 4 * Math.abs(st.ph - .5);   // triangle, as the originals
-        wl = rd(ctr + sw * tri); wr = rd(ctr - sw * tri);
+        wl = ringRd(st, B, N, ctr + sw * tri); wr = ringRd(st, B, N, ctr - sw * tri);
       }
       st.lp[0] += (wl - st.lp[0]) * kt; st.lp[1] += (wr - st.lp[1]) * kt;
       oL[i] = L[i] * (1 - mx * .5) + st.lp[0] * mx; oR[i] = R[i] * (1 - mx * .5) + st.lp[1] * mx;
@@ -1302,6 +1416,9 @@ const Divider = {
 /* Euclidean: spreads Hits as evenly as possible over Steps (rotated by Rotate), one step per note value at the
    song tempo, or per pulse on Clock in. Gate fires on the hits; Accent on the first hit of each cycle.
    Restarts from step 1 when the song starts. */
+// (module-level; these were closures made in process() every block)
+function eucHit(k, rot, S, H){ const j = (((k - rot) % S) + S) % S; return H > 0 && ((j * H) % S) < H; }
+function eucFirst(k, rot, S, H){ for (let j = 0; j < S; j++) if (eucHit(j, rot, S, H)) return j === ((k % S) + S) % S; return false; }
 const Euclid = {
   type:'euclid', scope:'mono', cost:.02,
   inputs:{ clock:'gate', reset:'gate' }, outputs:{ gate:'gate', accent:'gate' },
@@ -1309,8 +1426,6 @@ const Euclid = {
   create:() => ({ step:-1, ph:1, lc:0, lr:0, sn:undefined }),
   process(st, io, ctx){
     const p = io.p, S = Math.max(1, p.steps | 0), H = clamp(p.hits | 0, 0, S), rot = p.rot | 0, ck = linked(io, 'clock');
-    const hit = k => { const j = (((k - rot) % S) + S) % S; return H > 0 && ((j * H) % S) < H; };
-    const first = k => { for (let j = 0; j < S; j++) if (hit(j)) return j === ((k % S) + S) % S; return false; };
     if (restarted(st, ctx)){ st.step = -1; st.ph = 1; }
     const inc = (ctx.transport.tempo || 120) / 60 / divBeats(p.div) / ctx.sr;
     for (let i = 0; i < ctx.block; i++){
@@ -1318,8 +1433,8 @@ const Euclid = {
       let on;
       if (ck){ const c = io.in.clock[i] >= .5; if (c && !st.lc) st.step = (st.step + 1) % S; st.lc = c; on = c; }
       else { st.ph += inc; if (st.ph >= 1){ st.ph -= Math.floor(st.ph); st.step = (st.step + 1) % S; } on = st.ph < p.len; }
-      const h = st.step >= 0 && on && hit(st.step);
-      io.out.gate[i] = h ? 1 : 0; io.out.accent[i] = h && first(st.step) ? 1 : 0;
+      const h = st.step >= 0 && on && eucHit(st.step, rot, S, H);
+      io.out.gate[i] = h ? 1 : 0; io.out.accent[i] = h && eucFirst(st.step, rot, S, H) ? 1 : 0;
     }
   }
 };
@@ -1338,14 +1453,13 @@ const Dimension = {
     const p = io.p, sr = ctx.sr, L = io.in.in, R = inR(io), oL = io.out.out, oR = io.out.outR, B = st.b, N = B.length;
     const [hz, ms] = DIM_MODES[clamp(p.mode | 0, 0, 3)], ctr = .0042 * sr, sw = ms * .001 * sr * .5, wd = p.width;
     const kt = 1 - Math.exp(-2 * Math.PI * (2500 * Math.pow(4, p.tone)) / sr);
-    const rd = d => { const r = st.w - d, ri = Math.floor(r), fr = r - ri, a = B[((ri % N) + N) % N], b = B[(((ri + 1) % N) + N) % N]; return a + (b - a) * fr; };
     for (let i = 0; i < ctx.block; i++){
       const m = (L[i] + R[i]) * .5; B[st.w] = m;
       st.ph += hz / sr; if (st.ph >= 1) st.ph -= 1;
       const tri = 1 - 4 * Math.abs(st.ph - .5);
       // two poles of filtering each, as the chips' clock filters round off the top
-      st.l1 += (rd(ctr + sw * tri) - st.l1) * kt; st.m1 += (st.l1 - st.m1) * kt;
-      st.l2 += (rd(ctr - sw * tri) - st.l2) * kt; st.m2 += (st.l2 - st.m2) * kt;
+      st.l1 += (ringRd(st, B, N, ctr + sw * tri) - st.l1) * kt; st.m1 += (st.l1 - st.m1) * kt;
+      st.l2 += (ringRd(st, B, N, ctr - sw * tri) - st.l2) * kt; st.m2 += (st.l2 - st.m2) * kt;
       oL[i] = L[i] + (st.m1 - st.m2 * .4) * wd * .7; oR[i] = R[i] + (st.m2 - st.m1 * .4) * wd * .7;
       st.w = st.w + 1 === N ? 0 : st.w + 1;
     }
@@ -1394,6 +1508,18 @@ const BBD = {
    thickening double) and Delay. Each voice reads the input through a delay that drifts at the new speed; when
    it runs out of room it jumps, choosing the jump whose waveform lines up best with what is playing (so the
    pitch stays true, not just the speed) and crossfading into it. Window trades smoothness (long) for tightness. */
+// Harmonizer's helpers (module-level; they were closures made in process() every block, and `vs` was four arrays a block)
+function harmVoice(o, oct, lv, pan){ const a = (clamp(pan, -1, 1) + 1) * Math.PI / 4; o[0] = Math.pow(2, oct); o[1] = lv * Math.cos(a) * Math.SQRT2; o[2] = lv * Math.sin(a) * Math.SQRT2; }
+function harmAt(st, B, N, d){ let x = st.w - ((d + .5) | 0); if (x < 0) x += N; return B[x]; }
+// the jump (by about half a window, refined over one period's worth of lags) that best matches the recent waveform
+function harmScore(st, B, N, d, dn, step){ let c = 0, e = 1e-9; for (let j = 0; j < 384; j += step){ const y = harmAt(st, B, N, dn + j); c += harmAt(st, B, N, d + j) * y; e += y * y; } return c / Math.sqrt(e); }
+function harmBest(st, B, N, W, PER, d, dir){
+  const L0 = Math.round(W * .5); let bl = L0, bv = -Infinity;
+  for (let L = L0; L < L0 + PER; L += 6){ const v = harmScore(st, B, N, d, d + dir * L, 12); if (v > bv){ bv = v; bl = L; } }   // coarse
+  const c0 = bl; bv = -Infinity;
+  for (let L = c0 - 5; L <= c0 + 5; L++){ const v = harmScore(st, B, N, d, d + dir * L, 3); if (v > bv){ bv = v; bl = L; } }   // fine
+  return d + dir * bl;
+}
 const HARM_INT = [-24, -19, -12, -7, -5, -4, -3, 0, 3, 4, 5, 7, 9, 12, 19, 24];
 const Harmonizer = {
   type:'harm', scope:'mono', cost:.2,
@@ -1403,19 +1529,8 @@ const Harmonizer = {
   process(st, io, ctx){
     const p = io.p, sr = ctx.sr, L = io.in.in, R = inR(io), oL = io.out.out, oR = io.out.outR, B = st.b, N = B.length;
     const W = (.02 + p.win * .08) * sr, pre = p.delay * sr + 2, dt = p.detune / 1200, F = Math.max(64, Math.min(W / 3, .012 * sr)), PER = Math.round(.02 * sr);
-    const rd = d => { const r = st.w - d, ri = Math.floor(r), fr = r - ri, a = B[((ri % N) + N) % N], b = B[(((ri + 1) % N) + N) % N]; return a + (b - a) * fr; };
-    const at = d => { let x = st.w - ((d + .5) | 0); if (x < 0) x += N; return B[x]; };
-    const vs = [[HARM_INT[clamp(p.v1 | 0, 0, 15)] / 12 + dt, p.lv1, p.pan1], [HARM_INT[clamp(p.v2 | 0, 0, 15)] / 12 - dt, p.lv2, p.pan2]].map(([oct, lv, pan]) => {
-      const a = (clamp(pan, -1, 1) + 1) * Math.PI / 4; return [Math.pow(2, oct), lv * Math.cos(a) * Math.SQRT2, lv * Math.sin(a) * Math.SQRT2]; });
-    // the jump (by about half a window, refined over one period's worth of lags) that best matches the recent waveform
-    const score = (d, dn, step) => { let c = 0, e = 1e-9; for (let j = 0; j < 384; j += step){ const y = at(dn + j); c += at(d + j) * y; e += y * y; } return c / Math.sqrt(e); };
-    const best = (d, dir) => {
-      const L0 = Math.round(W * .5); let bl = L0, bv = -Infinity;
-      for (let L = L0; L < L0 + PER; L += 6){ const v = score(d, d + dir * L, 12); if (v > bv){ bv = v; bl = L; } }   // coarse
-      const c0 = bl; bv = -Infinity;
-      for (let L = c0 - 5; L <= c0 + 5; L++){ const v = score(d, d + dir * L, 3); if (v > bv){ bv = v; bl = L; } }   // fine
-      return d + dir * bl;
-    };
+    const vs = st.vs || (st.vs = [[0, 0, 0], [0, 0, 0]]);   // the two voices' [ratio, left gain, right gain], refilled each block (kept: no arrays made per block)
+    harmVoice(vs[0], HARM_INT[clamp(p.v1 | 0, 0, 15)] / 12 + dt, p.lv1, p.pan1); harmVoice(vs[1], HARM_INT[clamp(p.v2 | 0, 0, 15)] / 12 - dt, p.lv2, p.pan2);
     for (let i = 0; i < ctx.block; i++){
       B[st.w] = (L[i] + R[i]) * .5;
       let yl = L[i] * p.dry, yr = R[i] * p.dry;
@@ -1426,11 +1541,11 @@ const Harmonizer = {
         if (v.d < 0){ v.d = (lo + hi) * .5; v.f = 1; }
         v.d += 1 - ratio; if (v.f < 1) v.o += 1 - ratio;
         if (v.f >= 1){
-          if (ratio > 1 && v.d < lo){ v.o = v.d; v.d = best(v.d, 1); v.f = 0; }
-          else if (ratio < 1 && v.d > hi){ v.o = v.d; v.d = best(v.d, -1); v.f = 0; }
+          if (ratio > 1 && v.d < lo){ v.o = v.d; v.d = harmBest(st, B, N, W, PER, v.d, 1); v.f = 0; }
+          else if (ratio < 1 && v.d > hi){ v.o = v.d; v.d = harmBest(st, B, N, W, PER, v.d, -1); v.f = 0; }
         }
-        let s = rd(v.d);
-        if (v.f < 1){ const q = v.f * Math.PI / 2; s = s * Math.sin(q) + rd(v.o) * Math.cos(q); v.f += 1 / F; }
+        let s = ringRd(st, B, N, v.d);
+        if (v.f < 1){ const q = v.f * Math.PI / 2; s = s * Math.sin(q) + ringRd(st, B, N, v.o) * Math.cos(q); v.f += 1 / F; }
         yl += s * gl; yr += s * gr;
       }
       oL[i] = yl; oR[i] = yr;
@@ -1562,6 +1677,15 @@ const lifeParams = () => {
   for (let y = 0; y < 8; y++) P['b' + y] = [glider[y], 0, 65535, 1];
   return P;
 };
+// Life's per-block names and its step (module-level: a string made and a closure built in process() every block were audio-thread garbage)
+const LIFE_B = ['b0', 'b1', 'b2', 'b3', 'b4', 'b5', 'b6', 'b7'], LIFE_G = ['g1', 'g2', 'g3', 'g4', 'g5', 'g6', 'g7', 'g8'];
+function lifeStep(st, p, W){
+  st.x++;
+  if (st.x >= W){ st.x = 0; if ((p.gens | 0) > 0 && st.gen + 1 >= (p.gens | 0)) Life.load(st, p); else Life.next(st, p); }
+  let f = 0, c = 0;
+  for (let y = 0; y < 8; y++){ const a = (st.cur[y] >> st.x) & 1, b = (st.prev[y] >> st.x) & 1; c += a; if (p.trig >= .5 ? a && !b : a) f |= 1 << ((y + (p.rot | 0)) % 8); }
+  st.fire = f; st.cnt = c;
+}
 const Life = {
   type:'life', scope:'mono', cost:.02,
   inputs:{ clock:'gate', reset:'gate' }, outputs:{ g1:'gate', g2:'gate', g3:'gate', g4:'gate', g5:'gate', g6:'gate', g7:'gate', g8:'gate', any:'gate', count:'cv' },
@@ -1581,24 +1705,17 @@ const Life = {
   process(st, io, ctx){
     const p = io.p, W = clamp(p.w | 0, 4, 16), ck = linked(io, 'clock');
     const SG = st.sg || (st.sg = new Int32Array(8).fill(-1)); let ch = false;
-    for (let y = 0; y < 8; y++){ const v = p['b' + y] | 0; if (v !== SG[y]){ SG[y] = v; ch = true; } }
+    for (let y = 0; y < 8; y++){ const v = p[LIFE_B[y]] | 0; if (v !== SG[y]){ SG[y] = v; ch = true; } }
     if (ch) Life.load(st, p);   // the drawn grid changed: start from it
     if (restarted(st, ctx)){ Life.load(st, p); st.x = -1; st.ph = 1; }
     const inc = (ctx.transport.tempo || 120) / 60 / divBeats(p.div) / ctx.sr, o = io.out, G = st.G || (st.G = []);
-    for (let k = 0; k < 8; k++) G[k] = o['g' + (k + 1)];
+    for (let k = 0; k < 8; k++) G[k] = o[LIFE_G[k]];
     const ANY = o.any, CNT = o.count, RS = io.in.reset, CK = io.in.clock;
-    const step = () => {
-      st.x++;
-      if (st.x >= W){ st.x = 0; if ((p.gens | 0) > 0 && st.gen + 1 >= (p.gens | 0)) Life.load(st, p); else Life.next(st, p); }
-      let f = 0, c = 0;
-      for (let y = 0; y < 8; y++){ const a = (st.cur[y] >> st.x) & 1, b = (st.prev[y] >> st.x) & 1; c += a; if (p.trig >= .5 ? a && !b : a) f |= 1 << ((y + (p.rot | 0)) % 8); }
-      st.fire = f; st.cnt = c;
-    };
     for (let i = 0; i < ctx.block; i++){
       const r = RS[i] >= .5; if (r && !st.lr){ Life.load(st, p); st.x = -1; st.ph = 1; } st.lr = r;
       let on;
-      if (ck){ const c = CK[i] >= .5; if (c && !st.lc) step(); st.lc = c; on = c; }
-      else { st.ph += inc; if (st.ph >= 1){ st.ph -= Math.floor(st.ph); step(); } on = st.ph < p.len; }
+      if (ck){ const c = CK[i] >= .5; if (c && !st.lc) lifeStep(st, p, W); st.lc = c; on = c; }
+      else { st.ph += inc; if (st.ph >= 1){ st.ph -= Math.floor(st.ph); lifeStep(st, p, W); } on = st.ph < p.len; }
       const f = on ? st.fire : 0;
       for (let k = 0; k < 8; k++) G[k][i] = (f >> k) & 1;
       ANY[i] = f ? 1 : 0; CNT[i] = st.cnt / 8;
@@ -1727,7 +1844,7 @@ class PitchFxCore {
     this.ap = [0, 1].map(() => ap.map(n => ({b:new Float32Array(Math.ceil(n * sr / 44100) + 8), i:0})));
     this.lp = [0, 0]; this.fbS = [0, 0]; this.step = 0; this.cnt = 0; this.wph = 0; this.tsm = 0; this.rev = 0;
   }
-  static get ARP(){ return [0, 4, 7, 12, 7, 4]; }
+  static get ARP(){ return PitchFxCore._arp || (PitchFxCore._arp = [0, 4, 7, 12, 7, 4]); }   // (one array: the delay's arp mode read it every sample)
   static defaults(){ return {kind:0, mode:0, time:380, fb:0.45, pitch:12, pitch2:-12, tone:0.6, size:0.6, wow:0.2, mix:0.4}; }
   shift(s, x, ratio, win){   // one sample through pitch shifter s
     const b = s.b, N = 8192; b[s.w] = x;
@@ -1747,7 +1864,7 @@ class PitchFxCore {
     return y * 0.25;
   }
   process(Lb, Rb, n, p){
-    const sr = this.sr, mix = p.mix, rv = rvMix(mix), dry = p.kind | 0 ? rv[0] : 1 - mix * 0.5, wgm = rv[1], r1 = Math.pow(2, p.pitch / 12), r2 = Math.pow(2, p.pitch2 / 12), win = sr * 0.06;
+    const sr = this.sr, mix = p.mix, rv = rvMix(mix, this.rvo || (this.rvo = [0, 0])), dry = p.kind | 0 ? rv[0] : 1 - mix * 0.5, wgm = rv[1], r1 = Math.pow(2, p.pitch / 12), r2 = Math.pow(2, p.pitch2 / 12), win = sr * 0.06;
     const tc = 1 - Math.exp(-2 * Math.PI * (500 + p.tone * p.tone * 12000) / sr), mode = p.mode | 0, D = this.D;
     if (p.kind | 0){   // reverb
       // Size tops out at a ~7 s tail (it was 0.97, ~14 s), and the shimmer loop is scaled to stay under unity (measured: it rose at 0.45 of the old value, decays at 0.4): with large
@@ -1797,6 +1914,7 @@ class PitchFxCore {
     }
   }
 }
+// ===== BEGIN GENERATED by tools/make-fx-cores.mjs from index.html: do not edit here, edit index.html and run `node tools/make-fx-cores.mjs` =====
 /* Three tempo-locked effects (original code) for track and master FX. They follow the song through the player's beat
    clock (`tr.bp`: the song position in beats, wrapping every 16; below 0 or still = stopped), and the tracker commands
    FLX / GAT / RTG reach them as `tr.flx`, `tr.gat`, `tr.rtg` (−1 = use the effect's own setting). Self-contained: the
@@ -1831,9 +1949,271 @@ function clkSpb(o, bp, n){
    (`ph`, float64, a sample at a time, locked to the clock each block) and a glided samples-per-beat (`sp`), so the read
    head moves smoothly: reading the float32 clock directly made the moving patterns gritty. */
 class FlexCore {
-  constructor(sr){ this.sr = sr; this.N = Math.ceil(sr * 13); this.bL = null; this.bR = null; this.w = 0; this.D = 0; this.xo = 0; this.xc = 0; this.xn = 1; this.g = 1; this.pg = 1; this.spb = sr / 2; this.sp = sr / 2; this.ph = -1; }
-  static get NAMES(){ return ['OFF', 'REPEAT 1/4', 'REPEAT 1/8', 'FILL 1/16', 'STUTTER BUILD', 'HALF SPEED', 'TAPE STOP', 'REVERSE BEATS', 'REVERSE 1/8', 'BACKSPIN', 'SCRATCH',
-    'GATE 1/16', 'TRANCE CHOP', 'SHUFFLE', 'BEAT JUGGLE', 'OCTAVE UP', 'RANDOM SLICES']; }
+  constructor(sr){ this.sr = sr; this.N = Math.ceil(sr * 13); this.bL = null; this.bR = null; this.w = 0; this.D = 0; this.xo = 0; this.xc = 0; this.xn = 1; this.g = 1; this.pg = 1; this.spb = sr / 2; this.sp = sr / 2; this.ph = -1;
+    this.T = null; this.lp = 1; this.hp = 0; this.cr = 1; this.bt = 0; this.slp = 1; this.shp = 0; this.fs = [0, 0, 0, 0, 0, 0, 0, 0]; this.fa = 1; this.fb = 1; this.fk = 0; this.hc = 0; this.hl = 0; this.hr = 0; }
+  /* FLEX 256 (owner, 31 Oct: "reminiscent of the OP-Z and Pocket Operator punch-in effects"): 01–10 are the originals;
+     11–FF are families by the first hex digit, the second one the variant, gentler to wilder:
+     1 ROLL (a roll from late in the bar) · 2 STUTTER (the start of every beat, half, two beats… again) · 3 BUILD (rolls that
+     speed up) · 4 REVERSE · 5 DOWN (slower, pitched down) · 6 UP (faster, pitched up) · 7 TAPE (stops, spin-ups, wow and
+     flutter) · 8 SCRATCH · 9 GATE (chops, pumps, swells) · A FILTER (low- and high-pass sweeps and wobbles) · B CRUSH
+     (bits and sample rate) · C FADE REPEAT (repeats that die away) · D JUGGLE (the bar's slices reordered, the same every
+     bar) · E GROOVE (swing, 6/8, 5s, vibrato) · F CHAOS (a random move on some slices, some new every bar). */
+  static SPEC(){
+    const F = (a, b) => b === 1 ? '' + a : a + '/' + b, fr = x => { for (const d of [1, 2, 3, 4, 6, 8, 12, 16, 24, 32, 64]){ const n = Math.round(x * d); if (Math.abs(n / d - x) < 1e-6) return F(n, d); } return x.toFixed(2); };
+    // FLEX CHECK (3 Nov): the lengths below are in beats, but the names printed them as beats too ("ROLL 1/4" was a 16th,
+    // "STUTTER 1/16" a 64th), while the first sixteen and every musician read 1/4 as a quarter note. Names now say note
+    // values: nv(beats) → '1/16', '1/8T', '3/16', 'BAR'. The sounds are unchanged.
+    const nv = b => { const x = b / 4; if (Math.abs(x - 1) < 1e-9) return 'BAR';
+      for (const d of [1, 2, 4, 8, 16, 32, 64, 128, 256]){ const n = Math.round(x * d); if (n && Math.abs(n / d - x) < 1e-9) return n + '/' + d;
+        const t = x * d * 1.5; if (Math.abs(t - 1) < 1e-9) return '1/' + d + 'T'; }
+      return fr(b) + ' BEAT'; };
+    const st = s => { const v = Math.round(12 * Math.log2(s)); return (v > 0 ? '+' : '') + v; };
+    const T = new Array(512).fill(null), put = (X, list) => list.forEach((o, y) => { if (X * 16 + y > 16) T[X * 16 + y] = o; });
+    put(1, [null, ...[[3, 1/2], [3, 1/3], [3, 1/4], [3, 1/6], [3, 1/8], [3, 1/12], [3, 1/16], [3, 1/32], [2, 1/4], [2, 1/8], [2, 1/16], [3.5, 1/16], [3.5, 1/32], [3.5, 1/64], [0, 1/16]]
+      .map(([s, L]) => ({f:'roll', s, L, n:`ROLL ${nv(L)} FROM BEAT ${s + 1}`}))]);
+    put(2, [[1, 1/3], [1, 1/4], [1, 1/8], [1, 1/16], [1/2, 1/4], [1/2, 1/6], [1/2, 1/8], [1/2, 1/16], [2, 1], [2, 1/2], [2, 1/4], [4, 1/2], [4, 1/3], [4, 3/4], [4, 1/8], [1/4, 1/16]]
+      .map(([C, L]) => ({f:'stut', C, L, n:`STUTTER ${nv(L)} EVERY ${nv(C)}`})));
+    put(3, [[[2, 1/2], [3, 1/4], [3.5, 1/8]], [[2, 1/4], [3, 1/8], [3.5, 1/16]], [[2, 1/8], [3, 1/16], [3.5, 1/32]], [[0, 1], [1, 1/2], [2, 1/4], [3, 1/8]],
+      [[0, 1/2], [1, 1/4], [2, 1/8], [3, 1/16]], [[0, 1/4], [1, 1/8], [2, 1/16], [3, 1/32]], [[3, 1/4], [3.5, 1/8], [3.75, 1/16]], [[3, 1/8], [3.5, 1/16], [3.75, 1/32]],
+      [[2, 1/3], [3, 1/6], [3.5, 1/12]], [[0, 1/3], [1, 1/6], [2, 1/12], [3, 1/24]], [[0, 1/16], [1, 1/8], [2, 1/4], [3, 1/2]], [[2, 1/16], [3, 1/8]],
+      [[2, 1/4], [3, 1/8], [3.5, 1/16], [3.75, 1/32]], [[1, 1/2], [2, 1/4], [2.5, 1/8], [3, 1/16], [3.5, 1/32]], [[0, 2], [2, 1], [3, 1/2], [3.5, 1/4]], [[3.5, 1/32], [3.75, 1/64]]]
+      .map((sg, i) => ({f:'build', sg, n:(i === 10 || i === 11 ? 'SLOW DOWN ' : 'BUILD ') + sg.map(q => nv(q[1])).join(' ') + (sg[0][0] ? ` FROM BEAT ${sg[0][0] + 1}` : '')})));
+    put(4, [[4, 'all'], [2, 'all'], [1/4, 'all'], [1/8, 'all'], [1/3, 'all'], [1/6, 'all'], [1, 'alt'], [1/2, 'alt'], [1/4, 'alt'], [2, 'alt'], [1, 'last'], [1/2, 'last'], [1/4, 'last'], [1, 'half'], [2, 'half'], [1/2, 'rnd']]
+      .map(([C, m]) => ({f:'rev', C, m, n:{all:`REVERSE ${nv(C)}S`, alt:`REVERSE EVERY OTHER ${nv(C)}`, last:`REVERSE ${nv(C)}S IN BEAT 4`, half:`REVERSE HALF SPEED ${nv(C)}`, rnd:`REVERSE RANDOM ${nv(C)}S`}[m]})));
+    put(5, [[1, 1/2], [2, 1/2], [1/2, 1/2], [4, 3/4], [1, 3/4], [4, 2/3], [1, 2/3], [4, 1/4], [1, 1/4], [2, 1/2, 2], [1, 1/2, 3], [1/4, 1/2], [2, 3/4, 2], [4, 0.89], [4, 1/2, 2], [1/2, 1/4]]
+      .map(([C, s, a]) => ({f:'down', C, s, a:a || 0, n:`DOWN ${st(s)} EVERY ${nv(C)}` + (a ? ` FROM BEAT ${a + 1}` : '')})));
+    put(6, [[1/2, 2], [1/4, 2], [2, 2], [4, 2], [1, 1.5], [1/2, 1.5], [1, 4/3], [1/2, 4/3], [1/4, 3], [1/4, 4], [1/8, 4], [1, 2, 'last'], [1/2, 2, 'alt'], [1, 1.5, 'alt'], [2, 1.5], [1, 1.1225]]
+      .map(([C, s, m]) => ({f:'up', C, s, m, n:`UP ${st(s)} EVERY ${nv(C)}` + (m === 'last' ? ' IN BEAT 4' : m === 'alt' ? ' (EVERY OTHER)' : '')})));
+    put(7, [{f:'stop', a:3, b:4, n:'TAPE STOP BEAT 4'}, {f:'stop', a:2, b:4, n:'TAPE STOP HALF BAR'}, {f:'stop', a:3.5, b:4, n:'TAPE STOP 1/2 BEAT'}, {f:'stop', C:1, n:'TAPE STOP EVERY BEAT'},
+      {f:'stop', C:2, n:'TAPE STOP EVERY 2 BEATS'}, {f:'stop', C:1/2, n:'TAPE STOP EVERY 1/8'}, {f:'start', a:0, b:1, n:'TAPE START BEAT 1'}, {f:'start', a:0, b:2, n:'TAPE START HALF BAR'},
+      {f:'start', a:0, b:4, n:'TAPE START BAR'}, {f:'start', C:1, n:'TAPE START EVERY BEAT'}, {f:'start', C:2, n:'TAPE START EVERY 2 BEATS'}, {f:'wow', T:1, d:0.012, n:'WOW'},
+      {f:'wow', T:1/2, d:0.02, n:'WOW DEEP'}, {f:'wow', T:1/16, d:0.0012, n:'FLUTTER'}, {f:'wow', T:1/3, d:0.01, T2:1/24, d2:0.0008, n:'WARBLE'}, {f:'stop', a:3.75, b:4, n:'TAPE STOP 1/4 BEAT'}]);
+    put(8, [[1, 0.25, 1], [1, 0.5, 2], [1/2, 0.5, 1], [1/4, 0.5, 1], [2, 0.25, 4], [1, 0.25, 4], [1/2, 0.5, 2, 1], [1, 0.5, 4, 1], [1/4, 1, 1, 1], [4, 0.125, 8], [1, 0.125, 8], [1/2, 1, 2], [2, 0.5, 2], [1, 0.25, 2, 2], [1/2, 0.25, 4, 1], [4, 0.25, 2]]
+      .map(([C, d, k, gt]) => ({f:'scr', C, d, k, gt:gt || 0, n:`${gt === 2 ? 'TRANSFORM' : gt ? 'CHIRP' : 'SCRATCH'} ${nv(C)} ×${k}`})));
+    const M = s => { let m = 0; for (let j = 0; j < 16; j++) if (s[j] === 'x') m |= 1 << (15 - j); return m; };
+    put(9, [{f:'gate', g:1/16, n:'GATE 1/32'}, {f:'gate', g:1/6, n:'GATE 1/8T'}, {f:'gate', g:1/12, n:'GATE 1/16T'},   // FLEX CHECK: g is half the named period in beats (was half that: a 1/64 gate)
+      {f:'pump', C:1, n:'PUMP 1/4'}, {f:'pump', C:1/2, n:'PUMP 1/8'},
+      {f:'swell', C:1, n:'SWELL EVERY BEAT'}, {f:'swell', C:4, n:'SWELL BAR'}, {f:'fade', n:'FADE OUT BAR'},
+      ...['xx.x.xx.x.xx.x.x', 'x...x.x.x...x.xx', 'xxx.x.x.xxx.x.x.', 'x.x.xx.x.x.xx.x.', '.xxx.xxx.xxx.xxx', 'x..xx..xx..xx..x', 'xxxxxx..xxxx..x.', 'x.x.x.x.xxxxxxxx'].map(s => ({f:'mask', m:M(s), n:'GATE ' + s.replace(/x/g, '■').replace(/\./g, '·')}))]);
+    put(10, [{lp:[1, 0.1], n:'LOW-PASS DOWN BAR'}, {lp:[0.1, 1], n:'LOW-PASS UP BAR'}, {hp:[0, 0.85], n:'HIGH-PASS RISER BAR'}, {hp:[0.85, 0], n:'HIGH-PASS DOWN BAR'}, {lp:[1, 0.1], a:3, n:'LOW-PASS DOWN BEAT 4'},
+      {hp:[0, 0.85], a:3, n:'HIGH-PASS UP BEAT 4'}, {lpw:[1, 0.55, 0.4], n:'LOW-PASS WOBBLE 1/4'}, {lpw:[2, 0.55, 0.4], n:'LOW-PASS WOBBLE 1/8'}, {hpw:[1, 0.4, 0.35], n:'HIGH-PASS WOBBLE 1/4'},
+      {lp:[0.35, 0.35], n:'LOW-PASS CLOSED'}, {hp:[0.6, 0.6], n:'HIGH-PASS THIN'}, {lp:[0.62, 0.62], hp:[0.42, 0.42], n:'BAND-PASS'}, {bw:1, n:'BAND SWEEP UP BAR'},
+      {lpw:[1.5, 0.5, 0.42], n:'LOW-PASS WOBBLE 1/4T'}, {lpb:1, n:'LOW-PASS DOWN EVERY BEAT'}, {lp:[0.55, 0.55], hp:[0.5, 0.5], n:'TELEPHONE'}].map(o => Object.assign({f:'filt'}, o)));
+    put(11, [{b:8, n:'CRUSH 8 BIT'}, {b:6, n:'CRUSH 6 BIT'}, {b:4, n:'CRUSH 4 BIT'}, {h:4, n:'DOWNSAMPLE ÷4'}, {h:8, n:'DOWNSAMPLE ÷8'}, {h:16, n:'DOWNSAMPLE ÷16'}, {h:8, b:6, n:'CRUSH ÷8 6 BIT'},
+      {hs:[1, 24], n:'CRUSH SWEEP UP BAR'}, {hs:[24, 1], n:'CRUSH SWEEP DOWN BAR'}, {h:12, b:5, beats:[1, 3], n:'CRUSH BEATS 2 AND 4'}, {h:12, b:5, alt:1/2, n:'CRUSH EVERY OTHER 1/8'},
+      {b:3, n:'CRUSH 3 BIT'}, {h:32, n:'DOWNSAMPLE ÷32'}, {h:4, b:4, n:'CRUSH ÷4 4 BIT'}, {h:16, b:5, a:3, n:'CRUSH BEAT 4'}, {h:12, lp:0.55, n:'CRUSH DARK'}].map(o => Object.assign({f:'crush'}, o)));
+    put(12, [[1, 1/4, 0.6], [1, 1/8, 0.75], [1, 1/3, 0.6], [2, 1/2, 0.6], [2, 3/4, 0.6], [4, 1, 0.6], [4, 3/4, 0.65], [4, 1/2, 0.7], [1/2, 1/8, 0.6], [1/2, 1/16, 0.75], [1, 1/6, 0.7], [4, 1/4, 0.85], [2, 1/3, 0.7], [1, 1/16, 0.85], [4, 3/2, 0.6], [4, 2, 0.5]]
+      .map(([C, L, k]) => ({f:'echo', C, L, k, n:`FADE REPEAT ${nv(L)} EVERY ${nv(C)}`})));
+    put(13, [...[0, 1, 2, 3, 4, 5, 6, 7].map(i => ({f:'jug', G:1/4, c:0.5, rv:i > 5 ? 0.25 : 0, seed:i, n:`JUGGLE 1/16 #${i + 1}`})), ...[0, 1, 2, 3].map(i => ({f:'jug', G:1/2, c:0.6, rv:i > 2 ? 0.3 : 0, seed:8 + i, n:`JUGGLE 1/8 #${i + 1}`})),
+      {f:'jug', G:1/3, c:0.55, rv:0, seed:12, n:'JUGGLE 1/8T'}, {f:'jug', G:1/6, c:0.55, rv:0.2, seed:13, n:'JUGGLE 1/16T'}, {f:'jug', G:1/4, c:1, rv:0.3, seed:14, n:'JUGGLE ALL 1/16'}, {f:'jug', G:1/8, c:0.5, rv:0.2, seed:15, n:'JUGGLE 1/32'}]);
+    put(14, [{f:'swing', C:1/2, a:0.08, n:'SWING 1/8 LIGHT'}, {f:'swing', C:1/2, a:0.12, n:'SWING 1/8'}, {f:'swing', C:1/2, a:0.17, n:'SWING 1/8 HARD'}, {f:'swing', C:1/4, a:0.08, n:'SWING 1/16 LIGHT'},
+      {f:'swing', C:1/4, a:0.12, n:'SWING 1/16'}, {f:'swing', C:1/4, a:0.17, n:'SWING 1/16 HARD'}, {f:'tup', C:1, q:3, n:'6/8 FEEL'}, {f:'tup', C:1/2, q:3, n:'6/8 FEEL 1/8'},
+      {f:'tup', C:1, q:5, n:'5-TUPLET FEEL'}, {f:'wow', T:1, d:0.004, n:'VIBRATO SLOW'}, {f:'wow', T:1/8, d:0.0008, n:'VIBRATO FAST'}, {f:'wow', T:1/2, d:0.009, n:'VIBRATO DEEP'},
+      {f:'drunk', n:'DRUNK'}, {f:'lag', n:'LAID-BACK OFFBEATS'}, {f:'swing', C:1/2, a:0.22, n:'SWING 1/8 EXTREME'}, {f:'swing', C:1/4, a:0.22, n:'SWING 1/16 EXTREME'}]);
+    put(15, Array.from({length:16}, (_, y) => { const G = y < 4 ? 1 : y < 10 ? 1/2 : 1/4, c = 0.25 + 0.5 * ((y < 4 ? y : y < 10 ? y - 4 : y - 10) / (y < 4 ? 3 : 5)), nb = y & 1;
+      return {f:'chaos', G, c, nb, seed:y, n:`CHAOS ${fr(G / 4)} ${Math.round(c * 100)}%` + (nb ? ' NEW EVERY BAR' : '')}; }));
+    // FLY (owner, 5 Nov: "IDM, Aphex Twin, Autechre type effects … let's make 0-0F a variety selection and then arrange them
+    // in categories after"): a second bank of 255, played by the same Flex effect (the flx param 256 + FLY value; 0 = off).
+    // 01–0F: one of each family. 10–FF: the families by the first hex digit. "NEW EVERY BAR" follows the beat clock's
+    // four-bar cycle. Every one reads only what has played (r ≤ p): tests/flex.test.js scans all 255.
+    // 1 PITCH ROLL (drill'n'bass: each repeat a step higher or lower) · 2 EUCLID (gates; REPEAT holds the last hit) ·
+    // 3 PROB (slices muted, repeated or ratcheted by chance) · 4 SLICE PITCH (slices jump to other pitches) · 5 FREEZE /
+    // SMEAR (a grain held, or crawled through) · 6 CD SKIP · 7 BOUNCE (rolls that speed up, slow down, die away) · 8 MUTATE
+    // (a shuffle that changes a little every bar) · 9 STUTTER EDIT · A POLYMETER (a loop out of step with the bar) · B WARP
+    // (each slice bends in pitch) · C REVERSE ROLL / REWIND · D GRAINS · E TEXTURE (crush, filter, chop on slices) · F CHAOS 2.
+    const put2 = (X, list) => list.forEach((o, y) => { T[256 + X * 16 + y] = o; });
+    const st2 = v => (v > 0 ? '+' : '') + v;
+    put2(1, [[3, 1/4, 1], [3, 1/4, 2], [3, 1/4, -1], [3, 1/4, -2], [3, 1/8, 1], [3, 1/8, -1], [2, 1/4, 1], [2, 1/4, -1], [3.5, 1/8, 2], [3.5, 1/16, 1],
+      [2, 1/2, 3], [3, 1/6, 1], [3, 1/6, -2], [0, 1/2, 1], [0, 1/4, -0.5], [2, 1/3, 2]]
+      .map(([a, L, s]) => ({f:'proll', a, L, s, n:`PITCH ROLL ${nv(L)} ${st2(s)}` + (a ? ` FROM BEAT ${a + 1}` : ' BAR')})));
+    put2(2, [[3, 8], [5, 8], [5, 16], [7, 16], [9, 16], [11, 16], [5, 12], [7, 12], [4, 9], [5, 11], [7, 13], [3, 16, 0, 2],
+      [3, 8, 1], [5, 16, 1], [7, 16, 1], [5, 12, 1]]
+      .map(([k, N, h, rot]) => ({f:'euc', k, N, h:h || 0, rot:rot || 0, n:`EUCLID ${h ? 'REPEAT ' : ''}${k}/${N}` + (rot ? ` +${rot}` : '')})));
+    put2(3, [['mute', 1/4, .25], ['mute', 1/4, .5], ['mute', 1/8, .33], ['rep', 1/4, .25], ['rep', 1/4, .5], ['rep', 1/4, .75], ['rep', 1/2, .5],
+      ['rat', 1/4, .33, 2], ['rat', 1/4, .33, 3], ['rat', 1/4, .25, 4], ['rat', 1/2, .5, 3], ['any', 1/4, .25], ['any', 1/4, .5], ['any', 1/4, .75], ['any', 1/8, .5], ['any', 1/3, .5]]
+      .map(([op, G, c, x]) => ({f:'prob', op, G, c, x:x || 0, n:`PROB ${{mute:'MUTE', rep:'REPEAT', rat:'RATCHET', any:'ANY'}[op]} ${nv(G)}${x ? ' ×' + x : ''} ${Math.round(c * 100)}%`})));
+    const PS = {OCTAVES:[-12, 12], 'OCT+5TH':[-12, -5, 7, 12], DOWN:[-12, -7, -5], UP:[5, 7, 12], CHROMATIC:[-5, -4, -3, -2, -1, 1, 2, 3, 4, 5], WIDE:[-24, -19, -12, -7, 7, 12, 19], DETUNE:[-0.6, -0.3, 0.3, 0.6]};
+    put2(4, [['OCTAVES', 1/4, .5], ['OCT+5TH', 1/4, .5], ['DOWN', 1/4, .5], ['UP', 1/4, .5], ['CHROMATIC', 1/4, .6], ['WIDE', 1/4, .5], ['DETUNE', 1/4, 1], ['OCTAVES', 1/2, .5],
+      ['OCT+5TH', 1/2, .6], ['CHROMATIC', 1/2, .75], ['WIDE', 1/8, .5], ['OCTAVES', 1/8, .4], ['OCT+5TH', 1/4, 1], ['DOWN', 1/2, .7], ['CHROMATIC', 1/4, .6, 1], ['WIDE', 1/3, .6]]
+      .map(([s, G, c, fx]) => ({f:'spitch', S:PS[s].map(v => Math.pow(2, v / 12)), G, c, nb:fx ? 0 : 1, n:`SLICE PITCH ${s} ${nv(G)}` + (c < 1 ? ` ${Math.round(c * 100)}%` : '') + (fx ? ' FIXED' : '')})));
+    put2(5, [{a:3, b:4, w:1/16, n:'FREEZE BEAT 4'}, {a:3.5, b:4, w:1/32, n:'FREEZE LAST 1/8'}, {a:2, b:4, w:1/8, n:'FREEZE HALF BAR'}, {C:1, h:.5, w:1/32, n:'FREEZE EVERY 2ND 1/8'},
+      {C:1/2, h:.5, w:1/64, n:'FREEZE EVERY 2ND 1/16'}, {a:3, b:4, w:1/128, n:'BUZZ BEAT 4'}, {C:1, h:.75, w:1/128, n:'BUZZ END OF EVERY BEAT'}, {a:3, b:4, w:1/8, rho:.25, n:'SMEAR BEAT 4'},
+      {a:2, b:4, w:1/8, rho:.5, n:'SMEAR HALF BAR'}, {a:0, b:4, w:1/4, rho:.5, n:'SMEAR BAR'}, {C:1, h:0, w:1/16, rho:.5, n:'SMEAR EVERY BEAT'}, {C:2, h:0, w:1/8, rho:.5, n:'STRETCH ×2 EVERY 2 BEATS'},
+      {C:1/2, h:.25, w:1/32, pr:.4, n:'FREEZE RANDOM 1/8S'}, {C:1/4, h:0, w:1/64, pr:.35, n:'FREEZE RANDOM 1/16S'}, {a:3, b:4, w:1/16, sw:.85, n:'FREEZE RISING BEAT 4'}, {a:0, b:4, w:1/16, n:'FREEZE BAR'}]
+      .map(o => Object.assign({f:'frz', rho:0, pr:1, sw:0}, o)));
+    put2(6, [[1/4, .2], [1/4, .35], [1/4, .5], [1/4, .7], [1/2, .35], [1/2, .6], [1/8, .3], [1/8, .5], [1/4, .9], [1/4, .5, 'stuck'], [1/8, .5, 'stuck'], [1/4, .4, 'drop'],
+      [1/8, .5, 'drop'], [1/4, .5, 'jump'], [1/2, .5, 'jump'], [1/4, .5, '', 1]]
+      .map(([G, d, only, fx]) => ({f:'skip', G, d, only:only || '', nb:fx ? 0 : 1, n:`${{'':'CD SKIP', stuck:'CD STUCK', drop:'DROPOUTS', jump:'SKIP BACK'}[only || '']} ${nv(G)} ${Math.round(d * 100)}%${fx ? ' FIXED' : ''}`})));
+    put2(7, [{a:3, L0:1/2, q:.75, dk:.8, n:'BOUNCE BEAT 4'}, {a:2, L0:1/2, q:.8, dk:.85, n:'BOUNCE HALF BAR'}, {a:0, L0:1, q:.8, dk:.88, n:'BOUNCE BAR'}, {a:3, L0:1/4, q:.7, dk:.8, n:'BOUNCE BEAT 4 FAST'},
+      {a:3, L0:1/4, q:.85, n:'ACCEL ROLL BEAT 4'}, {a:2, L0:1/2, q:.85, n:'ACCEL ROLL HALF BAR'}, {a:0, L0:1/2, q:.9, n:'ACCEL ROLL BAR'}, {a:3, L0:1/4, q:.7, n:'ACCEL TO BUZZ BEAT 4'},
+      {a:2, L0:1/16, q:1.3, n:'DECEL ROLL HALF BAR'}, {a:0, L0:1/16, q:1.25, n:'DECEL ROLL BAR'}, {a:3, L0:1/32, q:1.4, n:'DECEL ROLL BEAT 4'}, {C:2, L0:1/2, q:.75, dk:.85, n:'BOUNCE EVERY 2 BEATS'},
+      {C:1, L0:1/4, q:.7, dk:.8, n:'BOUNCE EVERY BEAT'}, {C:1, L0:1/4, q:.8, n:'ACCEL EVERY BEAT'}, {C:1, L0:1/16, q:1.35, n:'DECEL EVERY BEAT'}, {a:3, L0:1/4, q:.85, sw:1, n:'SWELL ROLL BEAT 4'}]
+      .map(o => Object.assign({f:'bnc', dk:1, sw:0}, o)));
+    put2(8, [[1/4, .5, .15], [1/4, .5, .3], [1/4, .5, .5], [1/2, .6, .2], [1/2, .6, .4], [1/3, .55, .3], [1/8, .5, .3], [1/4, .5, .3, .25], [1/2, .6, .3, .3], [1/4, .5, .3, 0, 2],
+      [1/4, .5, .3, 0, 4], [1/2, .6, .4, 0, 4], [1/4, .35, .1], [1/4, .8, .3], [1/4, 1, .25, .2], [1/6, .55, .35]]
+      .map(([G, c, m, rv, cyc]) => ({f:'mut', G, c, m, rv:rv || 0, cyc:cyc || 0, n:`MUTATE ${nv(G)} ${Math.round(m * 100)}%` + (c >= 1 ? ' ALL' : '') + (rv ? ' REVERSE' : '') + (cyc ? ` CYCLE ${cyc}` : '')})));
+    put2(9, [[1/4, .25], [1/4, .4], [1/4, .6], [1/2, .3], [1/2, .5], [1, .4], [1/4, .4, 2], [1/4, .4, -2], [1/2, .4, 1], [1/2, .4, -3], [1/4, .4, 0, .7], [1/2, .5, 0, .75],
+      [1/8, .5], [1/3, .45], [1/4, .4, 0, 0, 1], [1/4, .4, 0, 0, 0, 1]]
+      .map(([G, d, s, fd, gt, fx]) => ({f:'sted', G, d, s:s || 0, fd:fd || 0, gt:gt || 0, nb:fx ? 0 : 1,
+        n:`STUTTER EDIT ${nv(G)} ${Math.round(d * 100)}%` + (s ? ' ' + st2(s) : '') + (fd ? ' FADE' : '') + (gt ? ' GATED' : '') + (fx ? ' FIXED' : '')})));
+    put2(10, [[3/4, 0], [5/4, 0], [3/2, 0], [7/4, 0], [9/4, 0], [5/2, 0], [11/4, 0], [13/4, 0], [3/4, 2], [5/4, 2], [3/4, 3], [2/3, 0], [3/4, 0, 1], [5/4, 0, 1], [7/4, 0, 1], [5/6, 0]]
+      .map(([M, a, pp]) => ({f:'poly', M, a, pp:pp || 0, n:`POLYMETER ${nv(M)}` + (a ? ` FROM BEAT ${a + 1}` : '') + (pp ? ' PING-PONG' : '')})));
+    put2(11, [[1/4, .5, 'UP'], [1/4, .5, 'DOWN'], [1/4, .5, 'ZIGZAG'], [1/4, .5, 'RANDOM'], [1/2, .5, 'UP'], [1/2, .5, 'DOWN'], [1/2, .5, 'ZIGZAG'], [1/2, .5, 'RANDOM'],
+      [1, .4, 'UP'], [1, .4, 'DOWN'], [1, .4, 'RANDOM'], [2, .3, 'UP'], [2, .3, 'DOWN'], [1/3, .5, 'RANDOM'], [1/8, .6, 'RANDOM'], [4, .25, 'DOWN']]
+      .map(([G, k, d]) => ({f:'warp', G, k, d, n:`WARP ${d} ${nv(G)}`})));
+    put2(12, [{a:3, L:1/4, m:'rev'}, {a:3, L:1/2, m:'rev'}, {a:3, L:1/8, m:'rev'}, {a:2, L:1/4, m:'rev'}, {a:3, L:1/4, m:'pp'}, {a:2, L:1/2, m:'pp'}, {a:3, L:1/8, m:'pp'},
+      {a:3, L:1/4, m:'rev', s:-1}, {a:2, L:1/2, m:'rev', s:-2}, {a:3, k:2, m:'rew', n:'REWIND BEAT 4'}, {a:2, k:1.5, m:'rew', n:'REWIND HALF BAR'}, {a:3.5, k:3, m:'rew', n:'REWIND LAST 1/8'},
+      {C:1, h:.5, k:2, m:'rew', n:'REWIND EVERY 2ND 1/8'}, {a:2, L:1/4, m:'rev', sw:1}, {a:3, L:1/3, m:'rev'}, {a:0, L:1/2, m:'pp'}]
+      .map(o => Object.assign({f:'rroll', s:0, sw:0}, o, {n:o.n || `${o.m === 'pp' ? 'PING-PONG ROLL' : o.sw ? 'REVERSE SWELL' : 'REVERSE ROLL'} ${nv(o.L)}` + (o.s ? ' ' + st2(o.s) : '') + (o.a ? ` FROM BEAT ${o.a + 1}` : ' BAR')})));
+    put2(13, [[1/16, 1, 0, 0, 'FROM 1 BEAT'], [1/8, 1, 0, 0, 'FROM 1 BEAT'], [1/4, 4, 0, 0, 'FROM 1 BAR'], [1/16, 4, 0, 0, 'FROM 1 BAR'], [1/32, 1/2, 0, 0, 'FROM 1/8'],
+      [1/8, 1, .5, 0, 'REVERSE 50%'], [1/16, 1, .5, 0, 'REVERSE 50%'], [1/8, 1, 0, .4, 'GAPS 40%'], [1/16, 1, 0, .6, 'SPARSE'], [1/4, 8, .3, 0, 'CLOUD FROM 2 BARS'],
+      [1/16, 1, 0, 0, 'BEAT 4', 3], [1/8, 1, 0, 0, 'HALF BAR', 2], [1/32, 1, 0, 0, 'DENSE'], [1/8, 1, 1, 0, 'ALL REVERSE'], [1/32, 1/4, .5, 0, 'SHIMMER'], [1/2, 4, 0, .3, 'GAPS 30%']]
+      .map(([w, W, rv, gap, t, a]) => ({f:'grain', w, W, rv, gap, a:a || 0, n:`GRAINS ${nv(w)} ${t}`})));
+    put2(14, [[1/4, .3, 'all'], [1/4, .5, 'all'], [1/4, .75, 'all'], [1/2, .5, 'all'], [1/8, .4, 'all'], [1/4, .5, 'crush'], [1/2, .6, 'crush'], [1/4, .5, 'filt'],
+      [1/2, .6, 'filt'], [1/4, .5, 'chop'], [1/4, .6, 'cf'], [1/3, .5, 'all'], [1/4, 1, 'all'], [1/4, .5, 'all', 1], [1/2, .25, 'all'], [1/8, .75, 'all']]
+      .map(([G, d, set, fx]) => ({f:'tex', G, d, set, nb:fx ? 0 : 1, n:`${{all:'TEXTURE', crush:'CRUSH SLICES', filt:'FILTER SLICES', chop:'CHOP SLICES', cf:'CRUSH+FILTER SLICES'}[set]} ${nv(G)} ${Math.round(d * 100)}%${fx ? ' FIXED' : ''}`})));
+    put2(15, [[1/4, .25], [1/4, .4], [1/4, .55], [1/4, .7], [1/4, .85], [1/4, 1], [1/2, .4], [1/2, .6], [1/2, .8], [1/8, .4], [1/8, .6], [1/3, .5], [1/4, .5, 1], [1/2, .5, 1], [1, .5], [1/4, .6, 0, 1]]
+      .map(([G, d, fx, slow]) => ({f:'chaos2', G, d, nb:fx ? 0 : 1, slow:slow || 0, n:`CHAOS 2 ${nv(G)} ${Math.round(d * 100)}%` + (fx ? ' FIXED' : slow ? ' SLOW' : '')})));
+    // 01–0F: one of each family
+    [0x10, 0x22, 0x34, 0x41, 0x50, 0x61, 0x70, 0x81, 0x91, 0xA0, 0xB3, 0xC0, 0xD1, 0xE1, 0xF2].forEach((x, i) => { T[256 + 1 + i] = T[256 + x]; });
+    return T;
+  }
+  static get NAMES(){
+    if (FlexCore._N) return FlexCore._N;
+    const T = FlexCore.SPEC(), N = ['OFF', 'REPEAT 1/4', 'REPEAT 1/8', 'FILL 1/16', 'STUTTER BUILD', 'HALF SPEED', 'TAPE STOP', 'REVERSE BEATS', 'REVERSE 1/8', 'BACKSPIN', 'SCRATCH',
+      'GATE 1/16', 'TRANCE CHOP', 'SHUFFLE', 'BEAT JUGGLE', 'OCTAVE UP', 'RANDOM SLICES'];
+    for (let k = 17; k < 256; k++) N[k] = T[k] ? T[k].n : 'OFF';
+    return (FlexCore._N = N);
+  }
+  // FLY's names, 00–FF (the flx param plays FLY v as 256 + v)
+  static get NAMES2(){ if (FlexCore._N2) return FlexCore._N2; const T = FlexCore.SPEC(), N = ['OFF']; for (let v = 1; v < 256; v++) N[v] = T[256 + v] ? T[256 + v].n : 'OFF'; return (FlexCore._N2 = N); }
+  // Per-sample helpers, once (ext() / pat() run for every sample of a playing pattern: a closure or an array literal made in them was audio-thread garbage).
+  static cs(p, C){ return Math.floor(p / C + 1e-9) * C; }
+  static lr(v, t){ return v[0] + (v[1] - v[0]) * t; }
+  static eon(o, N, j){ return ((((j + o.rot) % N) * o.k) % N) < o.k; }
+  static get K(){ return FlexCore._K || (FlexCore._K = {tup:[0, 0, 1, 2, 3], mrr:['mute', 'rep', 'rat'], skp:['stuck', 'jump', 'drop', 'prev'], ste:[1/2, 1/3, 1/4, 1/6, 1/8, 1/12, 1/16],
+    tx4:['crush', 'lp', 'hp', 'chop'], tx3:['crush', 'lp', 'hp'], cp:[0.5, 0.75, 1.5, 2], p13:[0, 1, 2, 3, 4, 5, 2, 7, 8, 9, 10, 11, 8, 13, 6, 15]}); }
+  // the Flex filter's coefficients for cutoff f, into o (made once; they were a new array every 8 samples) and one sample through a filter stage (it was a closure made for every sample)
+  svc(o, f, nyq){ const gg = Math.tan(Math.PI * Math.min(nyq, f) / this.sr), kk = 1.1, a1 = 1 / (1 + gg * (gg + kk)); if (typeof o !== 'object') o = [0, 0, 0]; o[0] = a1; o[1] = gg * a1; o[2] = gg * gg * a1; return o; }
+  svf(fs, x, j, c, hi){ const v3 = x - fs[j + 1], v1 = c[0] * fs[j] + c[1] * v3, v2 = fs[j + 1] + c[1] * fs[j] + c[2] * v3; fs[j] = 2 * v1 - fs[j]; fs[j + 1] = 2 * v2 - fs[j + 1]; return hi ? x - 1.1 * v1 - v2 : v2; }
+  static hh(a, b, c){ let h = Math.imul((a | 0) * 73856093 ^ (b | 0) * 19349663 ^ (c | 0) * 83492791, 2654435761) >>> 0; h ^= h >>> 15; h = Math.imul(h, 2246822519) >>> 0; h = (h ^ (h >>> 13)) >>> 0; return h / 4294967296; }
+  // 17–255: sets this.pg (gain), this.plp / this.php (filter, 0–1; 1 / 0 = open), this.pcr / this.pbt (hold, bits; 1 / 0 = clean); returns the read position
+  ext(k, p, bar){
+    const o = (this.T || (this.T = FlexCore.SPEC()))[k]; let r = p, g = 1, lp = 1, hp = 0, cr = 1, bt = 0;
+    if (o){
+      switch (o.f){
+        case 'roll': if (p >= o.s) r = o.s + (p - o.s) % o.L; break;
+        case 'stut': { const c = FlexCore.cs(p, o.C); r = c + (p - c) % o.L; } break;
+        case 'build': { let s = null; for (const q of o.sg) if (p >= q[0]) s = q; if (s) r = s[0] + (p - s[0]) % s[1]; } break;
+        case 'rev': { const C = o.C, c = FlexCore.cs(p, C), i = Math.round(c / C), u = p - c;
+          const on = o.m === 'all' || o.m === 'half' || (o.m === 'alt' && (i & 1)) || (o.m === 'last' && c >= 3 - 1e-9) || (o.m === 'rnd' && FlexCore.hh(i, k, 5) < 0.5);
+          if (on) r = c - (o.m === 'half' ? u / 2 : u); } break;
+        case 'down': if (p >= o.a){ const c = o.a + Math.floor((p - o.a) / o.C + 1e-9) * o.C; r = c + (p - c) * o.s; } break;
+        case 'up': { const C = o.C, c = FlexCore.cs(p, C), i = Math.round(c / C);
+          if (!o.m || (o.m === 'last' && c >= 3 - 1e-9) || (o.m === 'alt' && (i & 1))) r = c - C * (o.s - 1) + (p - c) * o.s; } break;
+        case 'stop': { const a = o.C ? FlexCore.cs(p, o.C) : o.a, W = o.C || o.b - o.a;
+          if (p >= a){ const u = Math.min(p - a, W); r = a + u - u * u / (2 * W); if (u > W * 0.85) g = Math.max(0, (W - u) / (W * 0.15)); } } break;
+        case 'start': { const a = o.C ? FlexCore.cs(p, o.C) : o.a, W = o.C || o.b - o.a;
+          // FLX CHECK 2 (5 Nov, owner: "FLX 76 sort of feels broken … flx lags"): the spin-up read the half-length before it
+          // at 0 → 1× speed, so it never caught up: the rest of the bar (76 TAPE START BEAT 1, 77 HALF BAR) played straight
+          // but 1/8 or a 1/4 late, and the EVERY versions only ever played the tail of the beat before. Now speed 4t − 3t²
+          // (0 → peak 1.33× → 1×): it starts from the spin-up's own downbeat, never reads ahead (r ≤ p) and lands on the grid.
+          if (p >= a && p < a + W){ const u = p - a, t = u / W; r = a + W * t * t * (2 - t); g = Math.min(1, u / (W * 0.2)); } } break;
+        case 'wow': r = p - o.d * (1 - Math.cos(2 * Math.PI * p / o.T)) / 2 - (o.d2 ? o.d2 * (1 - Math.cos(2 * Math.PI * p / o.T2)) / 2 : 0); break;
+        case 'scr': { const C = o.C, c = FlexCore.cs(p, C), u = (p - c) / C; r = c - C * o.d + C * o.d * (1 - Math.cos(2 * Math.PI * o.k * u)) / 2;
+          if (o.gt === 1) g = Math.sin(2 * Math.PI * o.k * u) >= 0 ? 1 : 0; else if (o.gt === 2) g = (p * 16) % 1 < 0.5 ? 1 : 0; } break;
+        case 'gate': g = (p / o.g) % 2 < 1 ? 1 : 0; break;
+        case 'pump': { const u = (p % o.C) / o.C; g = Math.min(1, u * 3); } break;
+        case 'swell': g = (p % o.C) / o.C; break;
+        case 'fade': g = 1 - p / 4; break;
+        case 'mask': g = (o.m >> (15 - Math.min(15, Math.floor(p * 4)))) & 1; break;
+        case 'filt': { const t = o.a ? Math.max(0, (p - o.a) / (4 - o.a)) : p / 4;
+          if (o.lp) lp = FlexCore.lr(o.lp, t); if (o.hp) hp = FlexCore.lr(o.hp, t);
+          if (o.lpw) lp = o.lpw[1] + o.lpw[2] * Math.cos(2 * Math.PI * p * o.lpw[0]);
+          if (o.hpw) hp = Math.max(0, o.hpw[1] - o.hpw[2] * Math.cos(2 * Math.PI * p));
+          if (o.bw){ hp = 0.05 + 0.7 * t; lp = hp + 0.25; }
+          if (o.lpb) lp = 1 - 0.8 * (p % 1); } break;
+        case 'crush': { let on = true;
+          if (o.beats) on = o.beats.includes(Math.floor(p)); if (o.alt) on = Math.floor(p / o.alt) & 1; if (o.a) on = p >= o.a;
+          if (on){ cr = o.hs ? o.hs[0] + (o.hs[1] - o.hs[0]) * p / 4 : o.h || 1; bt = o.b || 0; if (o.lp) lp = o.lp; } } break;
+        case 'echo': { const c = FlexCore.cs(p, o.C), n = Math.floor((p - c) / o.L + 1e-9); r = c + (p - c) - n * o.L; g = Math.pow(o.k, n); } break;
+        case 'jug': { const G = o.G, per = Math.round(4 / G), s = Math.min(per - 1, Math.floor(p / G + 1e-9)), u = p - s * G;
+          if (FlexCore.hh(o.seed, s, 11) < o.c){ let src = s - 1 - Math.floor(FlexCore.hh(o.seed, s, 23) * (per - 1)); const rv = FlexCore.hh(o.seed, s, 31) < o.rv;
+            r = src * G + (rv ? G - u : u); } } break;
+        case 'swing': { const C = o.C, c = FlexCore.cs(p, C), u = (p - c) / C, h = 0.5 + o.a;
+          r = c + C * (u < h ? u * 0.5 / h : 0.5 + (u - h) * 0.5 / (1 - h)); } break;
+        case 'tup': { const C = o.C, c = FlexCore.cs(p, C), u = (p - c) / C, j = Math.min(o.q - 1, Math.floor(u * o.q + 1e-9)), sj = o.q === 5 ? FlexCore.K.tup[j] : j;   // FLX CHECK 2: was [0,1,2,3,3]: notes 2–4 read ahead (clamped: mostly straight with jumps); now the downbeat doubles and 2–4 land late, as a quintuplet does
+          r = c + C * (sj / 4 + (u - j / o.q)); } break;
+        case 'drunk': { const s = Math.floor(p * 4); r = p - FlexCore.hh(bar & 3, s, 41) * 0.06; } break;
+        case 'lag': r = (p % 1) >= 0.5 ? p - 1/16 : p; break;
+        case 'chaos': { const G = o.G, s = Math.floor(p / G + 1e-9), c = s * G, u = p - c, key = o.nb ? (bar & 3) + 1 : 0;
+          if (FlexCore.hh(o.seed, s, key * 7 + 3) < o.c){ const op = Math.floor(FlexCore.hh(o.seed, s, key * 7 + 4) * 7);
+            if (op === 0) r = p - G; else if (op === 1) r = c - u; else if (op === 2) r = c - G + u * 2; else if (op === 3) r = c + u / 2;
+            else if (op === 4) r = c + u % (G / 4); else if (op === 5) g = u < G / 2 ? 1 : 0; else r = c + u - u * u / (2 * G); } } break;
+        // ===== FLY (5 Nov): k 257–511. Each reads only what has played (r ≤ p); see the notes by SPEC's FLY families.
+        case 'proll': if (p >= o.a){ const n = Math.floor((p - o.a) / o.L + 1e-9), u = p - o.a - n * o.L;   // repeat n: speed ≤ n + 1 keeps it behind now
+          if (n > 0) r = o.a + u * Math.min(n + 1, Math.max(0.25, Math.pow(2, n * o.s / 12))); } break;
+        case 'euc': { const N = o.N, step = 4 / N, s = Math.min(N - 1, Math.floor(p / step + 1e-9));
+          if (!o.h) g = FlexCore.eon(o, N, s) ? 1 : 0;
+          else if (!FlexCore.eon(o, N, s)){ let j = s - 1; while (j >= 0 && !FlexCore.eon(o, N, j)) j--; if (j >= 0){ const c0 = j * step; r = c0 + (p - c0) % step; } } } break;
+        case 'prob': { const G = o.G, s = Math.floor(p / G + 1e-9), c0 = s * G, u = p - c0, B = bar & 255;
+          if (FlexCore.hh(k, s, B * 13 + 1) < o.c){ let op = o.op; if (op === 'any') op = FlexCore.K.mrr[Math.floor(FlexCore.hh(k, s, B * 13 + 2) * 3)];
+            if (op === 'mute') g = 0; else if (op === 'rep') r = p - G; else r = c0 + u % (G / (o.x || 2 + Math.floor(FlexCore.hh(k, s, B * 13 + 3) * 3))); } } break;
+        case 'spitch': { const G = o.G, s = Math.floor(p / G + 1e-9), c0 = s * G, u = p - c0, B = o.nb ? bar & 255 : 0;
+          if (FlexCore.hh(k, s, B * 17 + 1) < o.c){ const sp = o.S[Math.floor(FlexCore.hh(k, s, B * 17 + 2) * o.S.length)]; r = sp > 1 ? c0 - G * (sp - 1) + u * sp : c0 + u * sp; } } break;
+        case 'frz': { let a, b; if (o.C){ const c = FlexCore.cs(p, o.C); a = c + o.h * o.C; b = c + o.C; } else { a = o.a; b = o.b; }
+          if (p >= a && p < b && (o.pr >= 1 || FlexCore.hh(k, Math.round(a * 64), bar & 255) < o.pr)){ const u = p - a, w = o.sw ? o.w * (1 - o.sw * u / (b - a)) : o.w;
+            r = a + Math.floor(u / w + 1e-9) * w * o.rho + u % w; } } break;
+        case 'skip': { const G = o.G, s = Math.floor(p / G + 1e-9), c0 = s * G, u = p - c0, B = o.nb ? bar & 255 : 0;
+          if (FlexCore.hh(k, s, B * 19 + 1) < o.d){ const op = o.only || FlexCore.K.skp[Math.floor(FlexCore.hh(k, s, B * 19 + 2) * 4)];
+            if (op === 'stuck') r = c0 + u % (G / 8); else if (op === 'jump') r = p - G * (1 + Math.floor(FlexCore.hh(k, s, B * 19 + 3) * 3)) / 2;
+            else if (op === 'drop') g = u < G * 0.35 ? 0 : 1; else r = c0 - G / 4 + u % (G / 4); } } break;
+        case 'bnc': { const a = o.C ? FlexCore.cs(p, o.C) : o.a, b = o.C ? a + o.C : 4;
+          if (p >= a && p < b){ const x = p - a, q = o.q, Lm = 1 / 128; let n, c;   // repeat n lasts L0·qⁿ (q < 1 faster, > 1 slower)
+            if (q > 1){ n = Math.floor(Math.log(1 + x * (q - 1) / o.L0) / Math.log(q) + 1e-9); c = o.L0 * (Math.pow(q, n) - 1) / (q - 1); }
+            else { const nm = Math.max(0, Math.ceil(Math.log(Lm / o.L0) / Math.log(q))), Sm = o.L0 * (1 - Math.pow(q, nm)) / (1 - q);
+              if (x < Sm){ n = Math.floor(Math.log(1 - x * (1 - q) / o.L0) / Math.log(q) + 1e-9); c = o.L0 * (1 - Math.pow(q, n)) / (1 - q); }
+              else { const m = Math.floor((x - Sm) / Lm + 1e-9); n = nm + m; c = Sm + m * Lm; if (o.dk < 1) g = 0; } }   // a bounce stops; a roll buzzes on
+            if (c > x) c = x;
+            r = a + x - c; if (o.dk < 1 && g) g = Math.pow(o.dk, n); if (o.sw) g = Math.min(1, 0.25 * Math.pow(1.2, n)); } } break;
+        case 'mut': { const G = o.G, per = Math.round(4 / G), s = Math.min(per - 1, Math.floor(p / G + 1e-9)), u = p - s * G; let key = 0;
+          if (o.cyc){ const B = bar % o.cyc; if (B && FlexCore.hh(k, s, 97 + B) < o.m) key = 100 + B; }
+          else for (let B = bar & 3; B > 0; B--) if (FlexCore.hh(k, s, 97 + B) < o.m){ key = 100 + B; break; }   // the changes add up over the four bars
+          if (FlexCore.hh(k, s, key * 7 + 11) < o.c){ const src = s - 1 - Math.floor(FlexCore.hh(k, s, key * 7 + 23) * (per - 1)), rv = FlexCore.hh(k, s, key * 7 + 31) < o.rv;
+            r = src * G + (rv ? G - u : u); } } break;
+        case 'sted': { const G = o.G, s = Math.floor(p / G + 1e-9), c0 = s * G, u = p - c0, B = o.nb ? bar & 255 : 0;
+          if (FlexCore.hh(k, s, B * 23 + 1) < o.d){ const Lr = G * FlexCore.K.ste[Math.floor(FlexCore.hh(k, s, B * 23 + 2) * 7)], n = Math.floor(u / Lr + 1e-9), v = u - n * Lr;
+            r = c0 + v * (o.s && n > 0 ? Math.min(n + 1, Math.max(0.25, Math.pow(2, n * o.s / 12))) : 1);
+            if (o.fd) g = Math.pow(o.fd, n); if (o.gt) g = v < Lr / 2 ? 1 : 0; } } break;
+        case 'poly': if (p >= o.a){ const x = p - o.a, n = Math.floor(x / o.M + 1e-9), u = x - n * o.M; r = o.a + (o.pp && (n & 1) ? o.M - u : u); } break;
+        case 'warp': { const G = o.G, s = Math.floor(p / G + 1e-9), c0 = s * G, u = p - c0, K = o.k;
+          const up = o.d === 'UP' ? true : o.d === 'DOWN' ? false : o.d === 'ZIGZAG' ? !(s & 1) : FlexCore.hh(k, s, (bar & 255) * 29 + 1) < 0.5;
+          r = up ? c0 + (1 - K) * u + K * u * u / G : c0 - K * G / 4 + (1 + K) * u - K * u * u / G; } break;   // up: slow → fast, lands on the grid; down: fast → slow
+        case 'rroll': if (o.m === 'rew'){ const a = o.C ? FlexCore.cs(p, o.C) + o.h * o.C : o.a, b = o.C ? FlexCore.cs(p, o.C) + o.C : 4;
+            if (p >= a && p < b){ r = a - o.k * (p - a); g = Math.min(1, (b - p) / ((b - a) * 0.1)); } }
+          else if (p >= o.a){ const L = o.L, n = Math.floor((p - o.a) / L + 1e-9), u = p - o.a - n * L;
+            if (n > 0){ const sp = o.s ? Math.max(0.25, Math.pow(2, n * o.s / 12)) : 1; r = o.m === 'rev' || (n & 1) ? o.a + L - u * sp : o.a + u;
+              if (o.sw) g = Math.min(1, 0.2 + 0.8 * (p - o.a) / (4 - o.a)); } } break;
+        case 'grain': if (p >= o.a){ const w = o.w, j = Math.floor(p / w + 1e-9), u = p - j * w, B = bar & 255, off = w + FlexCore.hh(k, j, B * 31 + 1) * (o.W - w);
+          r = FlexCore.hh(k, j, B * 31 + 2) < o.rv ? p - off + w - 2 * u : p - off; if (o.gap && FlexCore.hh(k, j, B * 31 + 3) < o.gap) g = 0; } break;
+        case 'tex': { const G = o.G, s = Math.floor(p / G + 1e-9), u = p - s * G, B = o.nb ? bar & 255 : 0;
+          if (FlexCore.hh(k, s, B * 37 + 1) < o.d){ const h2 = FlexCore.hh(k, s, B * 37 + 2), h3 = FlexCore.hh(k, s, B * 37 + 3);
+            const op = o.set === 'all' ? FlexCore.K.tx4[Math.floor(h2 * 4)] : o.set === 'cf' ? FlexCore.K.tx3[Math.floor(h2 * 3)] : o.set === 'filt' ? (h2 < 0.5 ? 'lp' : 'hp') : o.set;
+            if (op === 'crush'){ cr = 3 + Math.floor(h3 * 22); bt = h3 < 0.5 ? 4 + Math.floor(h3 * 8) : 0; } else if (op === 'lp') lp = 0.2 + h3 * 0.35; else if (op === 'hp') hp = 0.5 + h3 * 0.3;
+            else g = u < G * (0.25 + h3 * 0.4) ? 1 : 0; } } break;
+        case 'chaos2': { const G = o.G, s = Math.floor(p / G + 1e-9), c0 = s * G, u = p - c0, B = o.nb ? (o.slow ? (bar >> 1) & 1 : bar & 255) : 0;
+          if (FlexCore.hh(k, s, B * 41 + 1) < o.d){ const op = Math.floor(FlexCore.hh(k, s, B * 41 + 2) * 8), h3 = FlexCore.hh(k, s, B * 41 + 3);
+            if (op === 0){ const sp = FlexCore.K.cp[Math.floor(h3 * 4)]; r = sp > 1 ? c0 - G * (sp - 1) + u * sp : c0 + u * sp; }   // pitch
+            else if (op === 1) r = c0 + u % (G / 8);            // freeze
+            else if (op === 2) r = p - G / 2;                   // skip back
+            else if (op === 3) r = c0 - u;                      // the slice before, backwards
+            else if (op === 4) r = c0 + 0.5 * u + 0.5 * u * u / G;   // warp up
+            else if (op === 5) g = u < G / 2 ? 1 : 0;           // gate
+            else if (op === 6){ cr = 6 + Math.floor(h3 * 16); bt = 5; }   // crush
+            else r = c0 + u % (G / 3); } } break;               // ratchet
+      } }
+    this.pg = g; this.plp = lp; this.php = hp; this.pcr = cr; this.pbt = bt; return r;
+  }
   pat(k, p, bar){
     let r = p, g = 1, u;
     switch (k){
@@ -1846,10 +2226,12 @@ class FlexCore {
       case 7: r = Math.floor(p) - p % 1; break;
       case 8: r = Math.floor(p * 2) / 2 - p % 0.5; break;
       case 9: if (p >= 3){ u = p - 3; r = 3 - 2.5 * u * u; g = 1 - u * u; } break;
-      case 10: { const b = Math.floor(p * 2) / 2; u = (p - b) * 2; r = b + 0.125 * (1 - Math.cos(2 * Math.PI * u)); } break;
+      // FLX CHECK 2 (5 Nov): depth 0.125 ran ahead of the playhead for part of each push (clamped to "now": a flat spot then
+      // a jump); 0.105 is the most that stays behind it (0.1098), so the push and pull are smooth.
+      case 10: { const b = Math.floor(p * 2) / 2; u = (p - b) * 2; r = b + 0.105 * (1 - Math.cos(2 * Math.PI * u)); } break;
       case 11: g = p % 0.25 < 0.125 ? 1 : 0; break;
       case 12: g = (0xB6B6 >> (15 - Math.floor(p * 4))) & 1; break;
-      case 13: { const s = Math.floor(p * 4); r = [0, 1, 2, 3, 4, 5, 2, 7, 8, 9, 10, 11, 8, 13, 6, 15][s] * 0.25 + p % 0.25; } break;
+      case 13: { const s = Math.floor(p * 4); r = FlexCore.K.p13[s] * 0.25 + p % 0.25; } break;
       case 14: if (p >= 2) r = p - 2; break;
       case 15: r = Math.floor(p) - 1 + 2 * (p % 1); break;
       case 16: { const s = Math.floor(p * 4); let h = Math.imul((bar & 3) * 31 + s * 17 + 7, 2654435761) >>> 0; h ^= h >>> 13; h = h % 11; r = (s - (h < 4 ? 0 : h - 3)) * 0.25 + p % 0.25; } break;
@@ -1869,7 +2251,9 @@ class FlexCore {
   run(L, R, n, dp, tr){
     if (!this.bL){ this.bL = new Float32Array(this.N); this.bR = new Float32Array(this.N); }
     const N = this.N, bL = this.bL, bR = this.bR, bp = tr && tr.bp, spb = clkSpb(this, bp, n), live = !!(bp && bp.length > 1);
-    const k = !dp ? 0 : tr && tr.flx >= 0 ? Math.min(16, Math.round(tr.flx)) : dp.pat | 0, mix = dp ? dp.mix : 0;
+    // WAITS FOR ITS COMMAND (owner, 3 Nov): STARTS ON FLX (dp.wait) plays nothing until an FLX sets a pattern or an FXO
+    // switches the slot on (tr.sw: that slot's FXO, then its own PATTERN); the switches go back to −1 on STOP, so it waits again.
+    const k = !dp ? 0 : tr && tr.flx >= 0 ? Math.min(511, Math.round(tr.flx)) : dp.wait && !(tr && tr.sw > 0.5) ? 0 : dp.pat | 0, mix = dp ? dp.mix : 0, fsk = 1 - Math.exp(-1 / (this.sr * 0.015)), fs = this.fs, nyq = this.sr * 0.45;
     const XF = Math.max(16, Math.round(this.sr * (dp ? dp.xf : 5) / 1000)), gk = 1 - Math.exp(-1 / (this.sr * 0.002));
     // Lock our position to the clock: gently while close (the clock's own float32 steps stay out), at once when it jumps.
     const q0 = live ? bp[0] : -1;
@@ -1883,12 +2267,23 @@ class FlexCore {
       this.sp += (spb - this.sp) * sk;
       const q = this.ph; if (q >= 0){ this.ph += 1 / this.sp; if (this.ph >= 16) this.ph -= 16; }
       if (!dp){ this.D = 0; this.w = w + 1 >= N ? 0 : w + 1; continue; }
-      let D = 0, g = 1;
-      if (k > 0 && q >= 0){ const p = q % 4, r = this.pat(k, p, Math.floor(q / 4)); g = this.pg; D = Math.max(0, Math.min(N - 4, (p - r) * this.sp)); }
+      let D = 0, g = 1, lp = 1, hp = 0, cr = 1, bt = 0;
+      if (k > 0 && q >= 0){ const p = q % 4, bar = Math.floor(q / 4), r = k > 16 ? this.ext(k, p, bar) : this.pat(k, p, bar); g = this.pg;
+        if (k > 16){ lp = this.plp; hp = this.php; cr = this.pcr; bt = this.pbt; }
+        D = Math.max(0, Math.min(N - 4, (p - r) * this.sp)); }
       if (Math.abs(D - this.D) > 8){ this.xo = this.D; this.xc = XF; this.xn = XF; }
       this.D = D; this.g += (g - this.g) * gk;
       let yl = this.rd(bL, w, D), yr = this.rd(bR, w, D);
       if (this.xc > 0){ const f = this.xc / this.xn; yl += (this.rd(bL, w, this.xo) - yl) * f; yr += (this.rd(bR, w, this.xo) - yr) * f; this.xc--; }
+      // FLEX 256: CRUSH (hold every cr samples, bt bits) and FILTER (12 dB low- and high-pass state-variable filters)
+      if (cr > 1.01){ if (++this.hc >= cr){ this.hc -= cr; this.hl = yl; this.hr = yr; } yl = this.hl; yr = this.hr; } else { this.hc = 0; this.hl = yl; this.hr = yr; }
+      if (bt > 0){ const qz = Math.pow(2, bt - 1); yl = Math.round(yl * qz) / qz; yr = Math.round(yr * qz) / qz; }
+      this.slp += (lp - this.slp) * fsk; this.shp += (hp - this.shp) * fsk;
+      if (this.slp < 0.995 || this.shp > 0.005){
+        if (!(this.fk++ & 7)){ this.fa = this.svc(this.fa, 40 * Math.pow(2, this.slp * 9), nyq); this.fb = this.svc(this.fb, 20 * Math.pow(2, this.shp * 9), nyq); }
+        if (this.slp < 0.995){ yl = this.svf(fs, yl, 0, this.fa, false); yr = this.svf(fs, yr, 2, this.fa, false); }
+        if (this.shp > 0.005){ yl = this.svf(fs, yl, 4, this.fb, true); yr = this.svf(fs, yr, 6, this.fb, true); }
+      } else if (fs[0] || fs[1] || fs[4]) fs.fill(0);
       L[i] += (yl * this.g - L[i]) * mix; R[i] += (yr * this.g - R[i]) * mix;
       this.w = w + 1 >= N ? 0 : w + 1;
     }
@@ -1898,14 +2293,16 @@ class FlexCore {
    step 1 = the top bit); 1–15 are built in. */
 class StepGateCore {
   constructor(sr){ this.sr = sr; this.g = 1; }
-  static get PATS(){ return ['', 'xxxxxxxxxxxxxxxx', 'x.x.x.x.x.x.x.x.', '.x.x.x.x.x.x.x.x', 'x..x..x.x..x..x.', 'xx.xx.x.xx.xx.x.', 'x.xxx.x.x.xxx.xx', 'xxx.xxx.xxx.x.x.',
-    'x...x...x...x...', '..x...x...x...x.', 'x.x..x.x.x..x.x.', 'xxxx....xxxx....', 'xxxxxxxx........', 'x.xx.x.xx.xx.x.x', 'xx..xx..xx..x.x.', 'x..x.x..x..x.xx.']; }
+  static get PATS(){ return StepGateCore._P || (StepGateCore._P = ['', 'xxxxxxxxxxxxxxxx', 'x.x.x.x.x.x.x.x.', '.x.x.x.x.x.x.x.x', 'x..x..x.x..x..x.', 'xx.xx.x.xx.xx.x.', 'x.xxx.x.x.xxx.xx', 'xxx.xxx.xxx.x.x.',
+    'x...x...x...x...', '..x...x...x...x.', 'x.x..x.x.x..x.x.', 'xxxx....xxxx....', 'xxxxxxxx........', 'x.xx.x.xx.xx.x.x', 'xx..xx..xx..x.x.', 'x..x.x..x..x.xx.']); }   // (one array: process() read it every block)
+  static get SB(){ return StepGateCore._SB || (StepGateCore._SB = [0.5, 0.25, 0.125, 1 / 6, 1 / 3]); }
   static get NAMES(){ return ['CUSTOM', 'EVERY STEP', '8THS', 'OFFBEATS', '3-3-2', 'GALLOP', 'BROKEN', 'TRIPLE', 'QUARTERS', 'OFF 8THS', 'SYNCOPATE', 'HALF ON', 'FIRST HALF', 'DENSE', 'PAIRS', 'TRESILLO']; }
   static mask(s){ let m = 0; for (let j = 0; j < 16; j++) if (s[j] === 'x') m |= 1 << (15 - j); return m; }
   process(L, R, n, dp, tr){
-    const bp = tr && tr.bp, live = !!(bp && bp.length > 1), pi = tr && tr.gat >= 0 ? Math.min(15, Math.round(tr.gat)) : dp.pat | 0;
+    // tr.gat: −1 the slot's own (PATTERN, or waiting with STARTS ON GAT), 0 GAT 00 (off: the gate opens), 1–15 a pattern, 16 CUSTOM
+    const g = tr && tr.gat >= 0 ? Math.round(tr.gat) : -1, bp = tr && tr.bp, wait = g === 0 || (g < 0 && dp.wait && !(tr && tr.sw > 0.5)), live = !wait && !!(bp && bp.length > 1), pi = g > 0 ? (g >= 16 ? 0 : g) : dp.pat | 0;
     const mask = pi === 0 ? ((dp.m1 & 255) << 8) | (dp.m2 & 255) : StepGateCore.mask(StepGateCore.PATS[pi]);
-    const sb = [0.5, 0.25, 0.125, 1 / 6, 1 / 3][dp.div | 0] || 0.25, len = dp.len, lo = 1 - dp.depth, tc = 1 - Math.exp(-1 / (this.sr * Math.max(0.0003, dp.smooth / 1000)));
+    const sb = StepGateCore.SB[dp.div | 0] || 0.25, len = dp.len, lo = 1 - dp.depth, tc = 1 - Math.exp(-1 / (this.sr * Math.max(0.0003, dp.smooth / 1000)));
     for (let i = 0; i < n; i++){
       const q = bp ? (live ? bp[i] : bp[0]) : -1; let tg = 1;
       if (live && q >= 0){ const sp = q / sb, st = Math.floor(sp + 1e-6), fr = sp - st, idx = ((st % 16) + 16) % 16; tg = ((mask >> (15 - idx)) & 1) && fr < len ? 1 : lo; }
@@ -1944,6 +2341,7 @@ class RetrigCore {
     }
   }
 }
+// ===== END GENERATED (tools/make-fx-cores.mjs) =====
 
 
 /* The track effects' Flex, Step gate and Retrigger as modules. On a tracker track they hear the song position from the
@@ -1983,7 +2381,7 @@ const StepGateM = {
   create(sr){ return { c:new StepGateCore(sr), tr:{ bp:null, flx:-1, gat:-1, rtg:-1 }, dp:{} }; },
   process(st, io, ctx){
     fxPass(io); st.tr.bp = fxBeats(st, ctx);
-    st.tr.gat = linked(io, 'pat') ? clamp(Math.round(io.in.pat[0] * 15), 0, 15) : -1;
+    st.tr.gat = linked(io, 'pat') ? clamp(Math.round(io.in.pat[0] * 15), 0, 15) || 16 : -1;   // the cores read gat 0 as "GAT 00: the gate opens", 16 as the custom steps: pattern 0 here is the custom one
     const p = io.p, dp = st.dp; dp.pat = clamp(p.pat | 0, 0, 15); dp.m1 = clamp(p.m1 | 0, 0, 255); dp.m2 = clamp(p.m2 | 0, 0, 255);
     dp.div = clamp(p.div | 0, 0, 4); dp.len = clamp(p.len, .03, 1); dp.depth = u(p.depth); dp.smooth = clamp(p.smooth, .3, 20);
     st.c.process(io.out.out, io.out.outR, ctx.block, dp, st.tr);
@@ -4115,12 +4513,12 @@ function modsClose(st){
 const modsSilence = io => { for (const k in io.out) io.out[k].fill(0); };
 /* A steady clock at the song tempo (high for the first half of each note value), for when nothing is patched to Clock.
    st.ck < 0: start a new pulse now (made, or the song started). A rising edge on rs (Reset) starts one too. */
-function modsClock(st, IN, n, hz, sr, rs){
-  const inc = hz / sr;
+function modsClock(st, IN, n, hz, sr, rs, off){   // off: write from IN[off] (Tides gave a view of IN from 128)
+  const inc = hz / sr, o = off | 0;
   if (st.ck < 0) st.ck = 0;
   for (let i = 0; i < n; i++){
     if (rs){ const r = rs[i] > .5; if (r && !st.rk) st.ck = 0; st.rk = r; }
-    IN[i] = st.ck < .5 ? 1 : 0; st.ck += inc; if (st.ck >= 1) st.ck -= Math.floor(st.ck);
+    IN[o + i] = st.ck < .5 ? 1 : 0; st.ck += inc; if (st.ck >= 1) st.ck -= Math.floor(st.ck);
   }
 }
 
@@ -4152,13 +4550,13 @@ const MarblesM = {
     P[9] = p.tdv; P[10] = p.xdv; P[11] = p.spread; P[12] = p.xbias; P[13] = p.steps; P[14] = p.scale; P[15] = p.xrange; P[16] = p.xmode;
     P[17] = p.xclk; P[18] = p.yrange; P[19] = p.ydiv; P[20] = p.yspread; P[21] = p.ybias; P[22] = p.ysteps; P[23] = p.oct; P[24] = p.xout;
     P[28] = linked(io, 'xclock') ? 1 : 0; P[29] = rs || st.fresh ? 1 : 0; st.fresh = false;
-    if (linked(io, 'clock')) IN.set(io.in.clock.subarray(0, n), 0);
+    if (linked(io, 'clock')) cpTo(IN, 0, io.in.clock, 0, n);
     else modsClock(st, IN, n, (ctx.transport.tempo || 120) / 60 / divBeats(p.div), ctx.sr, io.in.reset);
-    IN.set(io.in.reset.subarray(0, n), 128); IN.set(io.in.xclock.subarray(0, n), 256); IN.set(io.in.dejavu.subarray(0, n), 384);
+    cpTo(IN, 128, io.in.reset, 0, n); cpTo(IN, 256, io.in.xclock, 0, n); cpTo(IN, 384, io.in.dejavu, 0, n);
     if (!modsRun(st, x, n)){ modsSilence(io); return; }
     const o = io.out;
-    o.t1.set(OUT.subarray(0, n)); o.t2.set(OUT.subarray(128, 128 + n)); o.t3.set(OUT.subarray(256, 256 + n));
-    o.x1.set(OUT.subarray(384, 384 + n)); o.x2.set(OUT.subarray(512, 512 + n)); o.x3.set(OUT.subarray(640, 640 + n)); o.y.set(OUT.subarray(768, 768 + n));
+    cpTo(o.t1, 0, OUT, 0, n); cpTo(o.t2, 0, OUT, 128, n); cpTo(o.t3, 0, OUT, 256, n);
+    cpTo(o.x1, 0, OUT, 384, n); cpTo(o.x2, 0, OUT, 512, n); cpTo(o.x3, 0, OUT, 640, n); cpTo(o.y, 0, OUT, 768, n);
   }
 };
 
@@ -4191,13 +4589,13 @@ const TidesM = {
     const P = st.P, IN = MODS_RT.IN, OUT = MODS_RT.OUT;
     P[0] = p.mode; P[1] = p.output; P[2] = p.range; P[3] = p.freq; P[4] = p.shape; P[5] = p.slope; P[6] = p.smooth; P[7] = p.shift;
     P[8] = linked(io, 'pitch') ? 1 : 0; P[9] = linked(io, 'trig') ? 1 : 0; P[10] = clk || sync ? 1 : 0; P[11] = p.ratio; P[12] = rs ? 1 : 0;
-    IN.set(io.in.trig.subarray(0, n), 0);
-    if (sync) modsClock(st, IN.subarray(128), n, (ctx.transport.tempo || 120) / 60 / divBeats(p.div), ctx.sr);
-    else IN.set(io.in.clock.subarray(0, n), 128);
-    IN.set(io.in.pitch.subarray(0, n), 256);
+    cpTo(IN, 0, io.in.trig, 0, n);
+    if (sync) modsClock(st, IN, n, (ctx.transport.tempo || 120) / 60 / divBeats(p.div), ctx.sr, undefined, 128);   // (writes IN from index 128: no view)
+    else cpTo(IN, 128, io.in.clock, 0, n);
+    cpTo(IN, 256, io.in.pitch, 0, n);
     if (!modsRun(st, x, n)){ modsSilence(io); return; }
     const o = io.out;
-    o.out1.set(OUT.subarray(0, n)); o.out2.set(OUT.subarray(128, 128 + n)); o.out3.set(OUT.subarray(256, 256 + n)); o.out4.set(OUT.subarray(384, 384 + n));
+    cpTo(o.out1, 0, OUT, 0, n); cpTo(o.out2, 0, OUT, 128, n); cpTo(o.out3, 0, OUT, 256, n); cpTo(o.out4, 0, OUT, 384, n);
   }
 };
 
@@ -4553,7 +4951,7 @@ const SHARED_MODULES = { beads:Beads,
   flanger:FlangerFx, tremolo:TremoloFx, odrive:OdriveFx, folder:FolderFx, autowah:AutowahFx, pshift:PshiftFx, ladder:LadderFx, xmod:XmodFx, space:SpaceFx, lofi:LofiFx, drive:DriveFx, air:AirFx, room:RoomFx,
   comb:CombFx, transient:TransientFx, tgate:TgateFx, ott:OttFx, fshift:FshiftFx, vinyl:VinylFx, dub:DubFx, cab:CabFx, tube:TubeFx,
   envfol:EnvFol, gateex:GateEx, pitchfol:PitchFol, pitchtrk:PitchTrk, slew:Slew, snh:SampleHold, quant:Quant, blades:Blades, meta:Meta, phaser:Phaser, width:Width, pingpong:PingPong,
-  meter:Meter, limiter:Limiter, utility:Utility, ringmod:RingMod, spring:Spring, plate:Plate, ensemble:Ensemble, math:MathM, logic:Logic, divider:Divider, euclid:Euclid,
+  meter:Meter, limiter:Limiter, utility:Utility, ringmod:RingMod, spring:Spring, plate:Plate, lverb:Lverb, ensemble:Ensemble, math:MathM, logic:Logic, divider:Divider, euclid:Euclid,
   dimension:Dimension, bbd:BBD, harm:Harmonizer, blipdrum:BlipDrum, life:Life, degrade:Degrade, reson:Reson,
   flex:FlexM, sgate:StepGateM, retrig:RetrigM, pdelay:PDelayM, preverb:PReverbM,
   spectral:Spectral, stretch:XStretch, convolve:Convolve,
@@ -4584,10 +4982,10 @@ function trackInStereoCables(d){
    without them a module passes its input through. */
 const PUMP_CH = {"ptube":{"t":9,"np":15,"cost":1.2,"ps":[["mode",0,"v",0,5,"lin",1,1,1],["drive",1,"v",0,36,"lin",1,12,0.036],["bias",2,"v",-100,100,"lin",1,0,0.2],["sag",3,"v",0,100,"lin",1,25,0.1],["voltage",4,"v",0,100,"lin",1,100,0.1],["stages",5,"v",1,3,"lin",1,1,1],["focus",6,"v",0,3,"lin",1,0,1],["low_cut",7,"n",10,1000,"log",1,0,0.001],["tone",8,"v",-100,100,"lin",1,0,0.2],["high_cut",9,"n",1000,22000,"log",1,1,0.001],["mix",10,"v",0,100,"lin",1,100,0.1],["out_gain",11,"v",-24,24,"lin",1,0,0.048],["auto_gain",12,"v",0,1,"lin",1,1,1],["oversampling",13,"v",0,3,"lin",1,2,1]]},"psnap":{"t":10,"np":15,"cost":0.4,"ps":[["attack",0,"v",-100,100,"lin",1,0,0.2],["sustain",1,"v",-100,100,"lin",1,0,0.2],["attack_time",2,"n",1,100,"log",1,0.5,0.001],["release",3,"n",20,2000,"log",1,0.5,0.001],["link",4,"v",0,100,"lin",1,100,0.1],["focus",5,"v",0,3,"lin",1,0,1],["band",6,"v",0,2,"lin",1,0,1],["crossover",7,"n",40,8000,"log",1,0.3458799,0.001],["lookahead",8,"v",0,5,"lin",1,0,0.005],["clip",9,"v",0,1,"lin",1,0,1],["ceiling",10,"v",-12,0,"lin",1,-1,0.012],["mix",12,"v",0,100,"lin",1,100,0.1],["out_gain",13,"v",-24,24,"lin",1,0,0.048]]},"pgate":{"t":11,"np":48,"cost":0.3,"ps":[["steps",0,"v",1,32,"lin",1,16,1],["rate",1,"v",0,17,"lin",1,5,1],["swing",2,"v",0,75,"lin",1,0,0.075],["length",3,"v",5,100,"lin",1,75,0.095],["attack",4,"n",0,50,"pow",3,0.2714418,0.001],["release",5,"n",0,500,"pow",3,0.3419952,0.001],["smooth",6,"v",0,100,"lin",1,0,0.1],["depth",7,"v",0,100,"lin",1,100,0.1],["mode",8,"v",0,2,"lin",1,0,1],["filter_low",9,"n",20,5000,"log",1,0.4574385,0.001],["filter_high",10,"n",200,20000,"log",1,1,0.001],["resonance",11,"v",0,100,"lin",1,25,0.1],["stereo_offset",12,"v",0,16,"lin",1,0,1],["mix",13,"v",0,100,"lin",1,100,0.1],["out_gain",14,"v",-24,24,"lin",1,0,0.048],["step01",16,"v",0,100,"lin",1,100,0.1],["step02",17,"v",0,100,"lin",1,0,0.1],["step03",18,"v",0,100,"lin",1,100,0.1],["step04",19,"v",0,100,"lin",1,100,0.1],["step05",20,"v",0,100,"lin",1,100,0.1],["step06",21,"v",0,100,"lin",1,0,0.1],["step07",22,"v",0,100,"lin",1,100,0.1],["step08",23,"v",0,100,"lin",1,0,0.1],["step09",24,"v",0,100,"lin",1,100,0.1],["step10",25,"v",0,100,"lin",1,100,0.1],["step11",26,"v",0,100,"lin",1,0,0.1],["step12",27,"v",0,100,"lin",1,100,0.1],["step13",28,"v",0,100,"lin",1,100,0.1],["step14",29,"v",0,100,"lin",1,0,0.1],["step15",30,"v",0,100,"lin",1,100,0.1],["step16",31,"v",0,100,"lin",1,100,0.1],["step17",32,"v",0,100,"lin",1,100,0.1],["step18",33,"v",0,100,"lin",1,0,0.1],["step19",34,"v",0,100,"lin",1,100,0.1],["step20",35,"v",0,100,"lin",1,100,0.1],["step21",36,"v",0,100,"lin",1,100,0.1],["step22",37,"v",0,100,"lin",1,0,0.1],["step23",38,"v",0,100,"lin",1,100,0.1],["step24",39,"v",0,100,"lin",1,0,0.1],["step25",40,"v",0,100,"lin",1,100,0.1],["step26",41,"v",0,100,"lin",1,100,0.1],["step27",42,"v",0,100,"lin",1,0,0.1],["step28",43,"v",0,100,"lin",1,100,0.1],["step29",44,"v",0,100,"lin",1,100,0.1],["step30",45,"v",0,100,"lin",1,0,0.1],["step31",46,"v",0,100,"lin",1,100,0.1],["step32",47,"v",0,100,"lin",1,100,0.1]]},"pecho":{"t":12,"np":25,"cost":0.8,"ps":[["mode",0,"v",0,4,"lin",1,0,1],["time_l",1,"n",1,4000,"log",1,0.7492851,0.001],["time_r",2,"n",1,4000,"log",1,0.7981714,0.001],["sync",3,"v",0,1,"lin",1,1,1],["note_l",4,"v",0,17,"lin",1,11,1],["note_r",5,"v",0,17,"lin",1,12,1],["link",6,"v",0,1,"lin",1,0,1],["feedback",7,"v",0,120,"lin",1,35,0.12],["stereo",8,"v",0,2,"lin",1,0,1],["width",9,"v",0,100,"lin",1,100,0.1],["mod_depth",10,"v",0,100,"lin",1,0,0.1],["mod_rate",11,"n",0.05,10,"log",1,0.5232961,0.001],["age",12,"v",0,100,"lin",1,0,0.1],["drive",13,"v",0,24,"lin",1,0,0.024],["low_cut",14,"n",10,2000,"log",1,0,0.001],["high_cut",15,"n",1000,22000,"log",1,1,0.001],["diffuse",16,"v",0,100,"lin",1,0,0.1],["duck",17,"v",0,100,"lin",1,0,0.1],["freeze",18,"v",0,1,"lin",1,0,1],["pitch",19,"v",-24,24,"lin",1,12,1],["fine",20,"v",-100,100,"lin",1,0,0.2],["pitch_mode",21,"v",0,1,"lin",1,0,1],["mix",22,"v",0,100,"lin",1,30,0.1],["out_gain",23,"v",-24,24,"lin",1,0,0.048]]},"pspring":{"t":13,"np":14,"cost":1.2,"ps":[["model",0,"v",0,5,"lin",1,0,1],["dwell",1,"v",0,100,"lin",1,50,0.1],["decay",2,"n",0.3,8,"log",1,0.6457496,0.001],["tension",3,"v",-100,100,"lin",1,0,0.2],["drip",4,"v",0,100,"lin",1,50,0.1],["tone",5,"v",-100,100,"lin",1,0,0.2],["low_cut",6,"n",20,1000,"log",1,0.4114081,0.001],["pre_delay",7,"n",0,250,"pow",2,0,0.001],["wobble",8,"v",0,100,"lin",1,15,0.1],["width",9,"v",0,100,"lin",1,70,0.1],["grit",10,"v",0,100,"lin",1,35,0.1],["mix",11,"v",0,100,"lin",1,30,0.1],["out_gain",12,"v",-24,24,"lin",1,0,0.048]]},"pverb":{"t":14,"np":26,"cost":1.5,"ps":[["mode",0,"v",0,11,"lin",1,0,1],["predelay",1,"n",0,500,"pow",2,0.2,0.001],["predelay_sync",2,"v",0,1,"lin",1,0,1],["predelay_note",3,"v",0,12,"lin",1,2,1],["size",4,"v",0,100,"lin",1,50,0.1],["decay",5,"n",0.1,30,"log",1,0.5419285,0.001],["diffusion",6,"v",0,100,"lin",1,80,0.1],["early_late",7,"v",-100,100,"lin",1,0,0.2],["bass_mult",8,"n",0.5,2,"log",1,0.6315172,0.001],["crossover",9,"n",50,2000,"log",1,0.673621,0.001],["high_damp",10,"v",0.1,1,"lin",1,0.55,0.0009],["damp_freq",11,"n",1000,20000,"log",1,0.598104,0.001],["low_cut",12,"n",10,1000,"log",1,0,0.001],["high_cut",13,"n",1000,22000,"log",1,1,0.001],["mod_depth",14,"v",0,100,"lin",1,40,0.1],["mod_rate",15,"n",0.05,5,"log",1,0.573064,0.001],["width",16,"v",0,150,"lin",1,100,0.15],["age",17,"v",0,100,"lin",1,35,0.1],["env_time",18,"n",50,1500,"log",1,0.5457778,0.001],["shimmer_pitch",19,"v",-24,24,"lin",1,12,1],["shimmer_amount",20,"v",0,100,"lin",1,50,0.1],["duck",21,"v",0,100,"lin",1,0,0.1],["freeze",22,"v",0,1,"lin",1,0,1],["mix",23,"v",0,100,"lin",1,30,0.1],["out_gain",24,"v",-24,24,"lin",1,0,0.048]]},"pgrain":{"t":15,"np":25,"cost":1.2,"ps":[["position",0,"n",0,4000,"pow",2.5,0.329877,0.001],["size",1,"n",5,1000,"log",1,0.5998232,0.001],["density",2,"n",1,100,"log",1,0.5395906,0.001],["spray",3,"v",0,100,"lin",1,10,0.1],["sync",4,"v",0,1,"lin",1,0,1],["division",5,"v",0,17,"lin",1,5,1],["envelope",6,"v",0,4,"lin",1,0,1],["reverse",7,"v",0,100,"lin",1,0,0.1],["stereo",8,"v",0,100,"lin",1,40,0.1],["pitch",9,"v",-24,24,"lin",1,0,1],["pitch_spread",10,"n",0,24,"pow",2,0,0.001],["quantize",11,"v",0,6,"lin",1,0,1],["feedback",12,"v",0,100,"lin",1,0,0.1],["filter",13,"v",0,3,"lin",1,0,1],["cutoff",14,"n",20,20000,"log",1,0.6666667,0.001],["resonance",15,"v",0,100,"lin",1,20,0.1],["space",16,"v",0,100,"lin",1,25,0.1],["motion_rate",17,"n",0.02,10,"log",1,0.406418,0.001],["motion_depth",18,"v",0,100,"lin",1,20,0.1],["morph_x",19,"v",-100,100,"lin",1,0,0.2],["morph_y",20,"v",-100,100,"lin",1,0,0.2],["freeze",21,"v",0,1,"lin",1,0,1],["mix",22,"v",0,100,"lin",1,50,0.1],["out_gain",23,"v",-24,24,"lin",1,0,0.048]]},"pvox":{"t":16,"np":62,"cost":2,"ps":[["engine",34,"v",0,1,"lin",1,0,1],["mode",0,"v",0,3,"lin",1,0,1],["route",1,"v",0,3,"lin",1,3,1],["bands",2,"v",0,6,"lin",1,2,1],["formant",11,"v",-12,12,"lin",1,0,0.024],["attack",12,"n",0.5,100,"log",1,0.3924721,0.001],["release",13,"n",5,1000,"log",1,0.4689992,0.001],["source",20,"v",0,2,"lin",1,0,1],["wave",21,"v",0,4,"lin",1,0,1],["octave",22,"v",-2,2,"lin",1,0,1],["chord",23,"v",0,6,"lin",1,0,1],["key",24,"v",0,11,"lin",1,0,1],["scale",25,"v",0,14,"lin",1,1,1],["ensemble",29,"v",0,100,"lin",1,0,0.1],["voice_dry",30,"v",0,100,"lin",1,0,0.1],["carrier_dry",31,"v",0,100,"lin",1,0,0.1],["fx_pitch",36,"v",-24,24,"lin",1,0,0.048],["fx_formant",37,"v",-12,12,"lin",1,0,0.024],["fx_robot_on",46,"v",0,1,"lin",1,0,1],["fx_char_on",54,"v",0,1,"lin",1,0,1],["fx_filter",55,"v",0,4,"lin",1,0,1],["fx_mix",61,"v",0,100,"lin",1,100,0.1],["out_gain",32,"v",-24,24,"lin",1,0,0.048]]},"ptune":{"t":17,"np":33,"cost":1.2,"ps":[["mode",0,"v",0,1,"lin",1,0,1],["key",1,"v",0,11,"lin",1,0,1],["scale",2,"v",0,13,"lin",1,0,1],["midi",3,"v",0,2,"lin",1,0,1],["range",4,"v",0,2,"lin",1,1,1],["retune",5,"n",0,400,"pow",2,0.2236068,0.001],["amount",6,"v",0,100,"lin",1,100,0.1],["humanize",7,"v",0,100,"lin",1,0,0.1],["flex",8,"v",0,100,"lin",1,0,0.1],["vib_depth",9,"v",0,100,"lin",1,0,0.1],["vib_rate",10,"v",2,9,"lin",1,5.5,0.007],["transpose",11,"v",-24,24,"lin",1,0,1],["formant",12,"v",-12,12,"lin",1,0,0.024],["formant_follow",13,"v",0,1,"lin",1,0,1],["harm_mode",14,"v",0,2,"lin",1,0,1],["h1",15,"v",-12,12,"lin",1,2,1],["h2",16,"v",-12,12,"lin",1,-3,1],["h3",17,"v",-12,12,"lin",1,4,1],["h4",18,"v",-12,12,"lin",1,7,1],["h1_level",19,"v",0,100,"lin",1,70,0.1],["h2_level",20,"v",0,100,"lin",1,60,0.1],["h3_level",21,"v",0,100,"lin",1,0,0.1],["h4_level",22,"v",0,100,"lin",1,0,0.1],["h1_pan",23,"v",-100,100,"lin",1,-45,0.2],["h2_pan",24,"v",-100,100,"lin",1,45,0.2],["h3_pan",25,"v",-100,100,"lin",1,-80,0.2],["h4_pan",26,"v",-100,100,"lin",1,80,0.2],["harm_formant",27,"v",-12,12,"lin",1,0,0.024],["harm_humanize",28,"v",0,100,"lin",1,30,0.1],["lead",29,"v",0,100,"lin",1,100,0.1],["harm_level",30,"v",-24,12,"lin",1,0,0.036],["out_gain",31,"v",-24,24,"lin",1,0,0.048]]},"pcrush":{"t":18,"np":17,"cost":0.5,"ps":[["mode",0,"v",0,6,"lin",1,1,1],["drive",1,"v",0,24,"lin",1,0,0.024],["bits",2,"v",1,24,"lin",1,12,0.023],["rate",3,"n",200,48000,"log",1,0.8884132,0.001],["jitter",4,"v",0,100,"lin",1,0,0.1],["order",5,"v",0,1,"lin",1,0,1],["wow",6,"v",0,100,"lin",1,0,0.1],["flutter",7,"v",0,100,"lin",1,0,0.1],["hiss",8,"v",0,100,"lin",1,0,0.1],["crackle",9,"v",0,100,"lin",1,0,0.1],["dropout",10,"v",0,100,"lin",1,0,0.1],["age",11,"v",0,100,"lin",1,0,0.1],["low_cut",12,"n",10,1000,"log",1,0,0.001],["high_cut",13,"n",1000,22000,"log",1,1,0.001],["mix",14,"v",0,100,"lin",1,100,0.1],["out_gain",15,"v",-24,24,"lin",1,0,0.048]]},"pswirl":{"t":19,"np":14,"cost":0.8,"ps":[["mode",0,"v",0,5,"lin",1,1,1],["variant",1,"v",0,3,"lin",1,0,1],["rate",2,"n",0.02,12,"log",1,0.5031908,0.001],["sync",3,"v",0,1,"lin",1,0,1],["division",4,"v",0,17,"lin",1,16,1],["depth",5,"v",0,100,"lin",1,60,0.1],["manual",6,"v",0,100,"lin",1,45,0.1],["feedback",7,"v",-95,95,"lin",1,0,0.19],["spread",8,"v",0,180,"lin",1,90,0.18],["tone",9,"n",1000,20000,"log",1,1,0.001],["warmth",10,"v",0,100,"lin",1,30,0.1],["mix",11,"v",0,100,"lin",1,50,0.1],["out_gain",12,"v",-24,24,"lin",1,0,0.048]]},"pstutter":{"t":20,"np":25,"cost":0.6,"ps":[["trigger",0,"v",0,1,"lin",1,0,1],["interval",1,"v",0,17,"lin",1,16,1],["chance",2,"v",0,100,"lin",1,35,0.1],["length",3,"v",0,17,"lin",1,11,1],["grid",4,"v",0,17,"lin",1,5,1],["gate",5,"v",5,100,"lin",1,100,0.095],["pitch",6,"v",-12,12,"lin",1,0,0.024],["decay",7,"v",0,100,"lin",1,0,0.1],["filter",8,"v",-100,100,"lin",1,0,0.2],["variation",9,"v",0,100,"lin",1,0,0.1],["tape",10,"v",10,100,"lin",1,100,0.09],["mix",11,"v",0,100,"lin",1,100,0.1],["out_gain",12,"v",-24,24,"lin",1,0,0.048],["use_repeat",14,"v",0,1,"lin",1,1,1],["use_roll",15,"v",0,1,"lin",1,1,1],["use_reverse",16,"v",0,1,"lin",1,1,1],["use_tape",17,"v",0,1,"lin",1,1,1],["use_half",18,"v",0,1,"lin",1,0,1],["use_shuffle",19,"v",0,1,"lin",1,0,1],["use_gate",20,"v",0,1,"lin",1,0,1],["use_glitch",21,"v",0,1,"lin",1,0,1],["pattern_on",22,"v",0,1,"lin",1,0,1],["pattern",23,"v",0,12,"lin",1,1,1],["pattern_step",24,"v",0,17,"lin",1,5,1]]},"ptwang":{"t":22,"np":20,"cost":1.5,"ps":[["model",0,"v",0,5,"lin",1,0,1],["tension",1,"v",-100,100,"lin",1,0,0.2],["drip",2,"v",0,100,"lin",1,50,0.1],["decay",3,"n",0.1,15,"log",1,0.6424087,0.001],["release",4,"n",0.02,8,"log",1,0.5676738,0.001],["harmonic",5,"v",0,100,"lin",1,40,0.1],["spread",6,"v",0,100,"lin",1,10,0.1],["wobble",7,"v",0,100,"lin",1,15,0.1],["tone",8,"v",-100,100,"lin",1,0,0.2],["grit",9,"v",0,100,"lin",1,35,0.1],["tuning",10,"v",0,2,"lin",1,0,1],["root",11,"v",0,11,"lin",1,9,1],["chord",12,"v",0,11,"lin",1,2,1],["octave",13,"v",-2,2,"lin",1,0,1],["drive",14,"v",0,100,"lin",1,50,0.1],["tank",15,"v",0,100,"lin",1,0,0.1],["width",16,"v",0,100,"lin",1,70,0.1],["mix",17,"v",0,100,"lin",1,50,0.1],["volume",18,"v",-24,12,"lin",1,0,0.036]]}};
 function pumpWasmX(){
-  const g = globalThis; if (g.__pumpX) return g.__pumpX; if (!g.__pumpBytes) return null;
-  try { const z = () => 0, m = new WebAssembly.Module(g.__pumpBytes);
+  const g = globalThis; if (g.__pumpX) return g.__pumpX; if (!g.__pumpMod && !g.__pumpBytes) return null;
+  try { const z = () => 0, m = g.__pumpMod || new WebAssembly.Module(g.__pumpBytes);   // __pumpMod: compiled on the page (no compile on this thread)
     const x = new WebAssembly.Instance(m, {wasi_snapshot_preview1:{fd_close:z, fd_seek:z, fd_write:z, proc_exit:z}}).exports;
-    if (x._initialize) x._initialize(); g.__pumpX = x; return x; } catch (e){ g.__pumpBytes = null; return null; }
+    if (x._initialize) x._initialize(); g.__pumpX = x; return x; } catch (e){ g.__pumpBytes = null; g.__pumpMod = null; return null; }
 }
 function pumpCurve(q, v){ v = v < 0 ? 0 : v > 1 ? 1 : v; return q[5] === 'log' ? q[3] * Math.pow(q[4] / q[3], v) : q[3] + (q[4] - q[3]) * Math.pow(v, q[6] > 0 ? q[6] : 1); }
 function pumpModule(key, d){
@@ -4627,7 +5025,7 @@ function pumpModule(key, d){
       const oL = st.io[0], oR = st.io[1]; let bad = false;
       for (let i = 0; i < n; i++){ const a = oL[i], b = oR[i]; if (!(a > -8 && a < 8 && b > -8 && b < 8)){ bad = true; break; } }
       if (bad){ try { x.pump_free(st.h); } catch (e){} st.h = -1; st.last.fill(NaN); io.out.out.fill(0); io.out.outR.fill(0); return; }   // gone bad: afresh next block
-      io.out.out.set(oL.subarray(0, n)); io.out.outR.set(oR.subarray(0, n));
+      cpTo(io.out.out, 0, oL, 0, n); cpTo(io.out.outR, 0, oR, 0, n);
     }
   };
 }
@@ -4677,6 +5075,7 @@ class Graph {
    module's _byp param; each such module also has a number 1–15 (_bn, else the lowest free one in patch order: the
    editor shows the same) that the tracker's BYP command switches: bsw[n] −1 the patch's own, 0 in, 1 bypassed, 2 the
    opposite of the patch's own. */
+const NO_CABLES = [];   // a module with no cable in: nothing to make per block
 const bypOk = def => !!(def && def.inputs && def.inputs.in === 'audio' && def.outputs && def.outputs.out === 'audio');
 class ChainsEngine {
   constructor(sampleRate, opts = {}){
@@ -4686,6 +5085,7 @@ class ChainsEngine {
     this.graph = new Graph();
     this.busesL = new Float32Array(CHAN_COUNT * BLOCK); this.busesR = new Float32Array(CHAN_COUNT * BLOCK);
     this._bw = new Uint8Array(CHAN_COUNT); this._bwl = [];   // the buses written this block (cleared next block, not all 128)
+    this._bvL = []; this._bvR = []; this._svO = []; this._tvL = []; this._tvR = []; this._tvLb = null; this._tvRb = null;   // kept views of those buffers (see _ctx)
     // SENDS: Sidechain Out writes sendOut (NSEND × BLOCK); Sidechain In reads sendIn (the host's input 3, one block later;
     // standalone, the engine's own previous block).
     this.sendOut = new Float32Array(NSEND * BLOCK); this.sendIn = null; this._sendPrev = null;
@@ -4706,13 +5106,15 @@ class ChainsEngine {
     this.focus = opts.focus == null ? -1 : opts.focus; this._act = null; this._actKey = -1;
     this.bsw = new Float32Array(16).fill(-1); this._bn = null; this._bnKey = -1;   // BYPASS: the tracker's switches, the module numbers
     this._ctx = { sr:sampleRate, block:BLOCK, quality:this.quality, transport:this.transport, engine:this,
-      trackInL:k => this.trackInL ? this.trackInL.subarray(k * BLOCK, (k + 1) * BLOCK) : null,
-      trackInR:k => this.trackInR ? this.trackInR.subarray(k * BLOCK, (k + 1) * BLOCK) : null,
-      busL:k => { if (!this._bw[k]){ this._bw[k] = 1; this._bwl.push(k); } return this.busesL.subarray(k * BLOCK, (k + 1) * BLOCK); },
-      busR:k => { if (!this._bw[k]){ this._bw[k] = 1; this._bwl.push(k); } return this.busesR.subarray(k * BLOCK, (k + 1) * BLOCK); },
+      // The views below are made once per slot and kept (modules ask for them every block: a new subarray each time was steady garbage).
+      // The track inputs are the host's own buffers (the same each block), so their views are dropped only if the buffer is replaced.
+      trackInL:k => { const b = this.trackInL; if (!b) return null; if (this._tvLb !== b){ this._tvLb = b; this._tvL.length = 0; } return this._tvL[k] || (this._tvL[k] = b.subarray(k * BLOCK, (k + 1) * BLOCK)); },
+      trackInR:k => { const b = this.trackInR; if (!b) return null; if (this._tvRb !== b){ this._tvRb = b; this._tvR.length = 0; } return this._tvR[k] || (this._tvR[k] = b.subarray(k * BLOCK, (k + 1) * BLOCK)); },
+      busL:k => { if (!this._bw[k]){ this._bw[k] = 1; this._bwl.push(k); } return this._bvL[k] || (this._bvL[k] = this.busesL.subarray(k * BLOCK, (k + 1) * BLOCK)); },
+      busR:k => { if (!this._bw[k]){ this._bw[k] = 1; this._bwl.push(k); } return this._bvR[k] || (this._bvR[k] = this.busesR.subarray(k * BLOCK, (k + 1) * BLOCK)); },
       scL:this.scL, scR:this.scR, scOn:() => this.scOn,
       tap:k => { const c = this.tapMap ? this.tapMap[k] : k; return (c >= 0 && this.taps && this.taps[c]) || this._zero; },   // SOURCE: track k's own sound (input 2), silence when not sent
-      sendOut:n => this.sendOut.subarray(n * BLOCK, (n + 1) * BLOCK),
+      sendOut:n => this._svO[n] || (this._svO[n] = this.sendOut.subarray(n * BLOCK, (n + 1) * BLOCK)),
       sendIn:n => (this.sendIn && this.sendIn[n]) || this._zero,
       // SOURCE (21 Oct): 0 Self → null; 1–8 a send; 9– a track's own sound (input 2, through tapMap).
       key:v => { v = Math.round(v) || 0; if (v <= 0) return null; if (v <= NSEND) return (this.sendIn && this.sendIn[v - 1]) || this._zero; return this._ctx.tap(v - NSEND - 1); },
@@ -4803,8 +5205,8 @@ class ChainsEngine {
   setSidechain(L, R, n){
     n = Math.min(BLOCK, n || BLOCK);
     this.scL.fill(0); this.scR.fill(0);
-    if (L) this.scL.set(L.subarray(0, n));
-    if (R) this.scR.set(R.subarray(0, n)); else if (L) this.scR.set(L.subarray(0, n));
+    if (L) cpTo(this.scL, 0, L, 0, n);
+    if (R) cpTo(this.scR, 0, R, 0, n); else if (L) cpTo(this.scR, 0, L, 0, n);   // (loops, not .set(x.subarray(0, n)): no view per block)
     this.scOn = !!L;
   }
   process(frames = BLOCK){
@@ -4835,19 +5237,19 @@ class ChainsEngine {
   /* Sum every cable into this module's inputs, and work out its modulated parameters. */
   _gather(m, io){
     for (const k in io.in) io.in[k].fill(0);
-    io.linked.clear();
+    if (io.lkVer !== this.graph.ver){ io.linked.clear(); io.lkVer = this.graph.ver; }   // (Set.clear() makes a new table: it ran every block; the ports below are added again each block, so the set is exactly the patched ones)
     let mods = null;
     // Modulation buffers live on io (io.mb, one per parameter, kept; io.mo, the set in use), so no array or object is
     // made per block: that garbage (one per modulated parameter per block) is what paused the audio thread on phones.
     if (!io.mb){ io.mb = {}; io.mo = {}; io.moVer = -1; }
     if (io.moVer !== this.graph.ver){ for (const k in io.mo) delete io.mo[k]; io.moVer = this.graph.ver; }   // the cables changed: start the set over
     else for (const k in io.mo) io.mo[k].fill(0);
-    for (const c of this.graph.inc.get(m.id) || []){
+    for (const c of this.graph.inc.get(m.id) || NO_CABLES){
       const src = this.graph.mods.get(c.a[0]); if (!src) continue;
       const port = c.b[1], param = isParamPort(port);
       let dst;
       if (param){
-        const k = port.slice(2); if (!(k in m.def.params)) continue;
+        const k = c.pk || (c.pk = port.slice(2)); if (!(k in m.def.params)) continue;   // (the name is cut once per cable, not every block)
         mods = mods || io.mo; dst = mods[k] || (mods[k] = io.mb[k] || (io.mb[k] = new Float32Array(BLOCK)));
       } else { dst = io.in[port]; if (!dst) continue; io.linked.add(port); }
       const b = this._bufs(src).out[c.a[1]];
@@ -4969,12 +5371,30 @@ const OP = { patch:'patch', add:'add', remove:'remove', connect:'connect', disco
    Only inside an AudioWorklet. Loaded as a plain <script> on a page, the engine
    above is all there is: ChainsEngine, wasmInit, MODULES. */
 if (typeof AudioWorkletProcessor !== 'undefined'){
+/* ANY BLOCK LENGTH (10 Nov): Chrome is adding a render size hint, so a block need not be 128 frames. tcChunks runs one (a function of the code
+   written for at most B frames) over a longer block in chunks of at most B, on views of the same buffers (no copy). Thunder
+   Core's parameter overrides are made once for the whole block, then off for the chunks, and its post gain / pan runs once at
+   the end. A block longer than 4096 fails soft: silence, and one {failed:'block size N'} to the page. (A block of 128 or less
+   never comes here: it takes the old path unchanged.) */
+function tcChunks(self, ins, outs, P, B, one){
+  const N = outs[0][0].length;
+  if (N > 4096){ for (const g of outs) for (const c of g) c.fill(0); if (!self.__bsFail){ self.__bsFail = 1; self.port.postMessage({failed:'block size ' + N}); } return true; }
+  if (self.__ov && globalThis.__tcOv) P = globalThis.__tcOv(self, P, N);
+  const ov = self.__ov; self.__ov = null; let ok = true;   // (read after: __tcOv lets go of an expired override)
+  try { for (let a = 0; a < N && ok; a += B){ const e = Math.min(a + B, N), v = c => c.subarray(a, e), Q = {};
+      for (const k in P){ const A = P[k]; Q[k] = A.length > 1 ? v(A) : A; }
+      ok = one.call(self, ins.map(g => g.map(v)), outs.map(g => g.map(v)), Q) !== false; } }
+  finally { self.__ov = ov; }
+  if (ok && ov && globalThis.__tcPost) globalThis.__tcPost(self, outs[0]);
+  return ok;
+}
 class ChainsProcessor extends AudioWorkletProcessor {
   constructor(options){
     super();
     const o = options.processorOptions || {};
     wasmInit(o);
     if (o.pumpBytes && !globalThis.__pumpBytes) globalThis.__pumpBytes = o.pumpBytes;   // PUMP MODULES
+    if (o.pumpModule && !globalThis.__pumpMod) globalThis.__pumpMod = o.pumpModule;
     this.engine = new ChainsEngine(sampleRate, {
       quality:o.quality ?? 'full',
       transport:Object.assign({ tempo:120, lpb:4, ticks:6, playing:false }, o.transport || {})
@@ -4990,10 +5410,11 @@ class ChainsProcessor extends AudioWorkletProcessor {
     catch (err){ this.port.postMessage({ target:TARGET, op:OP.error, value:{ op:m.op, message:String(err?.message || err) } }); }
   }
   /* Standalone, every chain bus plays through the speakers; in Thunder each bus is its own track return. */
-  process(_ins, outs){
+  process(_ins, outs){ return outs[0][0].length <= BLOCK ? this.p1(_ins, outs) : tcChunks(this, _ins, outs, undefined, BLOCK, this.p1); }   // (any block length: p1 is for at most BLOCK frames)
+  p1(_ins, outs){
     const e = this.engine;
     { const sc = _ins && _ins[1]; e.setSidechain(sc && sc[0], sc && (sc[1] || sc[0]), BLOCK); }
-    try { e.process(BLOCK); }
+    try { e.process(outs[0][0].length); }
     catch (err){ e.busesL.fill(0); e.busesR.fill(0); if ((this._blocks & 255) === 0) this.port.postMessage({ target:TARGET, op:OP.error, value:{ op:'process', message:String(err?.message || err) } }); }
     // SENDS: standalone, a Sidechain In hears the sends of the block before (as in ...Thunder Plus, one block late).
     if (!e._sendPrev){ e._sendPrev = new Float32Array(NSEND * BLOCK); e.sendIn = Array.from({length:NSEND}, (_, n) => e._sendPrev.subarray(n * BLOCK, (n + 1) * BLOCK)); }
@@ -5002,9 +5423,9 @@ class ChainsProcessor extends AudioWorkletProcessor {
     L.fill(0); if (R !== L) R.fill(0);
     for (const k of e._bwl){
       const o = k * BLOCK;
-      for (let i = 0; i < BLOCK; i++){ L[i] += e.busesL[o + i]; if (R !== L) R[i] += e.busesR[o + i]; }
+      for (let i = 0; i < L.length; i++){ L[i] += e.busesL[o + i]; if (R !== L) R[i] += e.busesR[o + i]; }
     }
-    for (let i = 0; i < BLOCK; i++){ L[i] = soft(L[i]); if (R !== L) R[i] = soft(R[i]); }
+    for (let i = 0; i < L.length; i++){ L[i] = soft(L[i]); if (R !== L) R[i] = soft(R[i]); }
     if (e.telemetryOn && (++this._blocks % 12) === 0) this.port.postMessage({ target:TARGET, op:OP.meter, value:e.telemetry() });
     else if (!e.telemetryOn) this._blocks++;
     return true;
@@ -5020,6 +5441,7 @@ registerProcessor('chains', ChainsProcessor);
    Track In modules); every Chain Out t sums into output channel pair t.
    Anything after the track in the chain (native track FX, fader, mute/solo,
    pan, master) is untouched Thunder code downstream of this node. */
+const BYP_NAMES = ['', 'b1', 'b2', 'b3', 'b4', 'b5', 'b6', 'b7', 'b8', 'b9', 'b10', 'b11', 'b12', 'b13', 'b14', 'b15'];   // (the parameter names, made once: 15 strings a block otherwise)
 class ThunderChains extends AudioWorkletProcessor {
   // b1–b15: the tracker's BYP switches for the modules numbered 1–15 (−1 the patch's own, 0 in, 1 bypassed, 2 flipped)
   static get parameterDescriptors(){ return Array.from({length:15}, (_, i) => ({name:'b' + (i + 1), defaultValue:-1, minValue:-1, maxValue:2, automationRate:'k-rate'})); }
@@ -5030,6 +5452,7 @@ class ThunderChains extends AudioWorkletProcessor {
     // The host hands the tfx bytes over as `bytes` (same convention as native thunder-tfx).
     wasmInit({ tfxBytes:o.bytes || o.tfxBytes, tfxModule:o.tfxModule });
     if (o.pump && !globalThis.__pumpBytes) globalThis.__pumpBytes = o.pump;   // PUMP MODULES: …Thunder Plus sends pump.wasm too
+    if (o.pumpModule && !globalThis.__pumpMod) globalThis.__pumpMod = o.pumpModule;   // (or the module the page compiled: no compile on this thread)
     this.track = Math.max(0, Math.min(CHAN_COUNT - 1, (o.track | 0) || 0));
     if (o.cid){ this.__cid = o.cid; (globalThis.__tcNodes || (globalThis.__tcNodes = new Map())).set(o.cid, this); }   // THUNDER CORE (…Thunder Plus): BYP and tempo from the audio-thread sequencer
     this.engine = new ChainsEngine(sampleRate, {
@@ -5058,6 +5481,7 @@ class ThunderChains extends AudioWorkletProcessor {
     if (!m || (m.target && m.target !== 'chains-host')) return;
     try {
       if (m.op === 'irs'){ globalThis.__thunderIR = m.value; return; }   // the song's impulse responses (Convolution reverb), for every node in this thread
+      if (m.op === 'pumpModule'){ if (!globalThis.__pumpMod && m.value) globalThis.__pumpMod = m.value; return; }
       if (m.op === 'pump'){ if (!globalThis.__pumpBytes && m.value) globalThis.__pumpBytes = m.value; return; }   // PUMP MODULES: pump.wasm, when it arrives after the node
       if (m.op === 'dispose'){
         this.engine.dispose(); this._dead = true;
@@ -5069,37 +5493,37 @@ class ThunderChains extends AudioWorkletProcessor {
     }
     catch (err){ this.port.postMessage({ target:'chains-host', op:OP.error, value:{ op:m.op, message:String(err?.message || err) } }); }
   }
-  process(ins, outs, params){
+  process(ins, outs, params){ return outs[0][0].length <= BLOCK ? this.p1(ins, outs, params) : tcChunks(this, ins, outs, params, BLOCK, this.p1); }   // (any block length: p1 is for at most BLOCK frames)
+  p1(ins, outs, params){
     if (this._dead) return false;
     const e = this.engine, i = ins[0], o = outs[0], n = o[0].length;
     if (this.__q && this.__q.length){ const q = this.__q, due = currentTime + 64 / sampleRate; while (q.length && q[0][0] <= due) this._recv(q.shift()[1]); }   // THUNDER CORE: tempo at its time
     if (this.__ov && globalThis.__tcOv) params = globalThis.__tcOv(this, params, n);   // THUNDER CORE: BYP
-    if (params) for (let k = 1; k <= 15; k++){ const a = params['b' + k]; e.bsw[k] = a ? a[0] : -1; }   // BYPASS: the tracker's switches
+    if (params) for (let k = 1; k <= 15; k++){ const a = params[BYP_NAMES[k]]; e.bsw[k] = a ? a[0] : -1; }   // BYPASS: the tracker's switches
     const L = o[0], R = o[1] || o[0];
     // Feed this track's input into the engine's per-track buffers.
     for (const k of this._tw){ this._tmpL.fill(0, k * BLOCK, (k + 1) * BLOCK); this._tmpR.fill(0, k * BLOCK, (k + 1) * BLOCK); }
     this._tw.length = 0;
-    if (i && i.length){ this._tmpL.set(i[0].subarray(0, n), this.track * BLOCK); this._tmpR.set((i[1] || i[0]).subarray(0, n), this.track * BLOCK); this._tw.push(this.track); }
+    if (i && i.length){ cpTo(this._tmpL, this.track * BLOCK, i[0], 0, n); cpTo(this._tmpR, this.track * BLOCK, i[1] || i[0], 0, n); this._tw.push(this.track); }
     // BUS FEEDS (20 Oct): the other tracks this node's chain takes in (a bus: Track In 1, 2, 3 → … → Chain Out 4), each one
     // after its own effects, fader and pan, as stereo pairs on inputs 4 and 5 (16 tracks each), in busMap's order.
     const bm = e.busMap;
     if (bm && bm.length) for (let j = 0; j < bm.length && j < 32; j++){
       const t = bm[j], inp = ins[4 + (j >> 4)], c = (j & 15) * 2; if (t === this.track || !inp || !inp[c]) continue;
-      this._tmpL.set(inp[c].subarray(0, n), t * BLOCK); this._tmpR.set((inp[c + 1] || inp[c]).subarray(0, n), t * BLOCK); this._tw.push(t);
+      cpTo(this._tmpL, t * BLOCK, inp[c], 0, n); cpTo(this._tmpR, t * BLOCK, inp[c + 1] || inp[c], 0, n); this._tw.push(t);
     }
     e.setTrackInputs(this._tmpL, this._tmpR);
     { const sc = ins[1]; e.setSidechain(sc && sc[0], sc && (sc[1] || sc[0]), n); }
     { const tk = ins[2]; e.taps = tk && tk.length ? tk : null; }   // SOURCE: the tracks' own sounds (Sidechain In set to a track)
     // SENDS: input 3 carries every chain's Sidechain Out sends (one channel per send), a block late.
     { const sd = ins[3]; for (let k = 0; k < NSEND; k++) this._sendCh[k] = sd && sd[k] ? sd[k] : null; e.sendIn = this._sendCh; }
-    try { e.process(BLOCK); }
+    try { e.process(n); }
     catch (err){ e.busesL.fill(0); e.busesR.fill(0); if ((this._blocks & 255) === 0) this.port.postMessage({ target:'chains-host', op:OP.error, value:{ op:'process', message:String(err?.message || err) } }); }
     // Return this track's bus (the sum of its Chain Out modules) downstream.
-    const bL = e.busesL.subarray(this.track * BLOCK, this.track * BLOCK + n);
-    const bR = e.busesR.subarray(this.track * BLOCK, this.track * BLOCK + n);
-    L.set(bL); if (R !== L) R.set(bR);
+    // (copied by loops: a view of the buses and of each send made every block was steady garbage)
+    cpTo(L, 0, e.busesL, this.track * BLOCK, n); if (R !== L) cpTo(R, 0, e.busesR, this.track * BLOCK, n);
     // SENDS out: output 1, one channel per send (what this node's Sidechain Outs wrote this block).
-    { const so = outs[1]; if (so) for (let k = 0; k < so.length && k < NSEND; k++) so[k].set(e.sendOut.subarray(k * BLOCK, k * BLOCK + n)); }
+    { const so = outs[1]; if (so) for (let k = 0; k < so.length && k < NSEND; k++) cpTo(so[k], 0, e.sendOut, k * BLOCK, n); }
     ++this._blocks;
     if (e.telemetryOn === true){ if (this._blocks % 12 === 0) this.port.postMessage({ target:'chains-host', op:OP.meter, value:e.telemetry() }); }
     else if (e.telemetryOn === 'load'){ if (this._blocks % 96 === 0) this.port.postMessage({ target:'chains-host', op:OP.meter, value:{ load:e.load, light:true } }); }

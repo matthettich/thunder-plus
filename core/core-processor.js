@@ -15,13 +15,20 @@
      {op:'vars', vars}           the page settings again (each PLAY)
      {op:'kit', kv}              per pad: {choke, syn, rel, live, sf} (what decides whether the core can play it)
      {op:'buf', pad, data, sr}   a pad's render (mono), or data:null when it has none
-     {op:'play', gen, mode, o, t0, rs}  start: o as makeSeq takes it; rs {ref, row, step}: RESUME (the page played that step)
+     {op:'play', gen, mode, o, t0, rs, watch}  start: o as makeSeq takes it; rs {ref, row, step}: RESUME (the page played that step); watch: the WATCHDOG (phones)
+     {op:'ack'}                  the page read a batch of rows (WATCHDOG)
      {op:'stop', at}  ·  {op:'loop', l}  ·  {op:'bpm', v}  ·  {op:'perf', xf, mac, fill}  ·  {op:'lxp', st}  ·  {op:'lead', s}
      {op:'test', id, mode, max, opt}  run the sequencer at once (sim, seeded random): tools/seq-golden.mjs --core
    Messages out:
      {op:'ready', v}  ·  {op:'rows', rows, time, bpm, tks, alive}  ·  {op:'end'}  ·  {op:'test', id, rows}  ·
+     {op:'self', gen, why, t}  the WATCHDOG let go of the song at audio time t (why: 'deaf' or 'clock <ratio>')  ·
      {op:'error', where, message} */
 
+/* RESUME_SPREAD: a RESUME's silent replay up to the step the song stopped on (up to 4096 steps, 260-650 ms at song row 60+) is
+   no longer run inside the PLAY message. The page sends {op:'prep'} before its own replay; the core builds the sequencer then
+   and replays a millisecond's worth of steps in each block, so the work is done by the time PLAY arrives (what is left is run
+   there, as before). The result is the same steps in the same order, so the same sequencer. false: PLAY replays it all, as before. */
+const RESUME_SPREAD = true, CHASE_MS = 1;
 const CORE_V = 7;   // the message set's version: index.html's CORE_WANT must match (3: patch sync; 4: the mix outputs NT+1..NT+3; 5: FXV, BYP, tempo; 6: SoundFonts; 7: hold / held, the exact STOP)
 const coreNum = v => Math.round(v * 1e6) / 1e6;
 const corePlain = e => { const o = {}; for (const k of Object.keys(e).sort()){ const v = e[k];
@@ -56,37 +63,40 @@ class Auto {
   // was walked for every sample): what is over is folded into one value, keeping a fade in progress and a curve running.
   prune(t){
     const A = this.ev; if (!A.length || A[0].t > t) return;
-    let v = this.v0, st = null, cur = null, i = 0, pt = 0;
-    const val = x => st ? st.to + (st.from - st.to) * Math.exp(-(x - st.t) / st.tc) : v;
+    // No closure and no per-event object here (this runs on the audio thread, per block per timeline): a target in progress
+    // lives in scalars: hs (is there one), sf (from), sT (start), so (to), sc (time constant).
+    let v = this.v0, hs = false, sf = 0, sT = 0, so = 0, sc = 1, cur = null, i = 0, pt = 0;
     for (; i < A.length; i++){ const e = A[i];
-      if (e.k === 1){ if (e.t > t) break; v = e.v; st = null; pt = e.t; continue; }
+      if (e.k === 1){ if (e.t > t) break; v = e.v; hs = false; pt = e.t; continue; }
       if (e.t > t) break;
-      if (e.k === 0){ v = e.v; st = null; cur = null; pt = e.t; }
-      else if (e.k === 2){ st = {from:val(e.t), t:e.t, to:e.v, tc:e.tc}; cur = null; }
-      else if (e.k === 3){ if (e.t + e.d > t){ cur = e; } else { v = e.fn(e.t + e.d); st = null; cur = null; pt = e.t + e.d; } } }
+      if (e.k === 0){ v = e.v; hs = false; cur = null; pt = e.t; }
+      else if (e.k === 2){ sf = hs ? so + (sf - so) * Math.exp(-(e.t - sT) / sc) : v; hs = true; sT = e.t; so = e.v; sc = e.tc; cur = null; }
+      else if (e.k === 3){ if (e.t + e.d > t){ cur = e; } else { v = e.fn(e.t + e.d); hs = false; cur = null; pt = e.t + e.d; } } }
     if (i === 0) return;
     // FLX CHECK 2 (5 Nov, owner: FLX stutters / "feels like it lags"): a linear ramp still running (the next event a k:1
     // later than t) starts from the last point's TIME, not t. Folding it to {t, v} restarted the ramp from v at every block,
     // so the beat clock (one 'beat' ramp a row) sat at the row's value at each block start and sawed inside it: Flex,
     // Step gate, Retrigger and every tempo-locked effect on the Audio thread sequencer heard a staircase, and ramps on live
     // engines (level fades, glides) crawled. Keep the point where it was.
-    if (!st && !cur && i < A.length && A[i].k === 1){ this.v0 = v; this.ev = [{k:0, t:pt, v}].concat(A.slice(i)); return; }
-    const now = cur ? cur.fn(t) : val(t), head = [{k:0, t, v:now}];
-    if (st) head.push({k:2, t, v:st.to, tc:st.tc});
+    if (!hs && !cur && i < A.length && A[i].k === 1){ this.v0 = v; this.ev = [{k:0, t:pt, v}].concat(A.slice(i)); return; }
+    const now = cur ? cur.fn(t) : hs ? so + (sf - so) * Math.exp(-(t - sT) / sc) : v, head = [{k:0, t, v:now}];
+    if (hs) head.push({k:2, t, v:so, tc:sc});
     if (cur) head.push(cur);
     this.v0 = now; this.ev = head.concat(A.slice(i));
   }
   at(t){
-    let v = this.v0, pt = 0, st = null;   // st: a target in progress {from, t, to, tc}
-    const val = x => st ? st.to + (st.from - st.to) * Math.exp(-(x - st.t) / st.tc) : v;
-    for (const e of this.ev){
-      if (e.k === 1){ if (t < e.t){ const a = val(pt); return e.t > pt ? a + (e.v - a) * (t - pt) / (e.t - pt) : e.v; } v = e.v; st = null; pt = e.t; continue; }
-      if (t < e.t) return val(t);
-      if (e.k === 0){ v = e.v; st = null; pt = e.t; }
-      else if (e.k === 2){ st = {from:val(e.t), t:e.t, to:e.v, tc:e.tc}; pt = e.t; }
-      else if (e.k === 3){ if (t < e.t + e.d) return e.fn(t); v = e.fn(e.t + e.d); st = null; pt = e.t + e.d; }
+    // No closure and no per-call object (this runs per sample on the audio thread): a target in progress lives in scalars:
+    // hs (is there one), sf (from), sT (start), so (to), sc (time constant). Same arithmetic as before, in the same order.
+    let v = this.v0, pt = 0, hs = false, sf = 0, sT = 0, so = 0, sc = 1;
+    const A = this.ev;
+    for (let q = 0; q < A.length; q++){ const e = A[q];
+      if (e.k === 1){ if (t < e.t){ const a = hs ? so + (sf - so) * Math.exp(-(pt - sT) / sc) : v; return e.t > pt ? a + (e.v - a) * (t - pt) / (e.t - pt) : e.v; } v = e.v; hs = false; pt = e.t; continue; }
+      if (t < e.t) return hs ? so + (sf - so) * Math.exp(-(t - sT) / sc) : v;
+      if (e.k === 0){ v = e.v; hs = false; pt = e.t; }
+      else if (e.k === 2){ sf = hs ? so + (sf - so) * Math.exp(-(e.t - sT) / sc) : v; hs = true; sT = e.t; so = e.v; sc = e.tc; pt = e.t; }
+      else if (e.k === 3){ if (t < e.t + e.d) return e.fn(t); v = e.fn(e.t + e.d); hs = false; pt = e.t + e.d; }
     }
-    return val(t);
+    return hs ? so + (sf - so) * Math.exp(-(t - sT) / sc) : v;
   }
 }
 
@@ -98,20 +108,26 @@ class Auto {
    to its output by __tcPost (the page sets those nodes to 1 and centre when the core takes the node over). */
 // STEREO SAMPLES (5 Nov): the StereoPannerNode's law for a stereo input (Web Audio spec), as [L→L, R→L, L→R, R→R]:
 // panned left the right channel folds into the left, panned right the left into the right; centred, each stays put.
-function stBal(pan){ if (pan <= 0){ const a = (pan + 1) * Math.PI / 2; return [1, Math.cos(a), 0, Math.sin(a)]; } const a = pan * Math.PI / 2; return [Math.cos(a), 0, Math.sin(a), 1]; }
+// stBal runs per SAMPLE on a stereo pad whose pan or gain is moving: it fills one shared array (no array per call). Callers
+// read the four numbers at once ([ll, rl, lr, rr] = stBal(p)) and never keep it. ZERO4: the "no balance" row, never written.
+const SBAL = [0, 0, 0, 0], ZERO4 = [0, 0, 0, 0];
+function stBal(pan){ const o = SBAL; if (pan <= 0){ const a = (pan + 1) * Math.PI / 2; o[0] = 1; o[1] = Math.cos(a); o[2] = 0; o[3] = Math.sin(a); return o; } const a = pan * Math.PI / 2; o[0] = Math.cos(a); o[1] = 0; o[2] = Math.sin(a); o[3] = 1; return o; }
 const tcNodes = () => globalThis.__tcNodes || (globalThis.__tcNodes = new Map());
 function tcOver(proc){ return proc.__ov || (proc.__ov = {p:new Map(), buf:new Map(), g:new Auto(1), pn:new Auto(0), until:Infinity}); }
 globalThis.__tcOv = (proc, P, n) => {
   const ov = proc.__ov; if (!ov) return P;
   if (currentTime > ov.until){ proc.__ov = null; return P; }   // released (the core stopped a while ago): the page's params again
-  const Q = {}, dt = 1 / sampleRate;
+  // The result object and the one-number arrays are kept on the override and refilled every block (they were new each block);
+  // every key of P is written below on each call; a key P no longer has is dropped (a node's params don't change, so this loop deletes nothing in a song).
+  const Q = ov.Q || (ov.Q = {}), O1 = ov.O1 || (ov.O1 = {}), dt = 1 / sampleRate;
   for (const k in P){ const A = ov.p.get(k); if (!A){ Q[k] = P[k]; continue; }
     A.prune(currentTime);
-    const src = P[k], b = ov.buf.get(k) || (ov.buf.set(k, new Float32Array(n)), ov.buf.get(k));
+    const src = P[k], b = ov.buf.get(k) && ov.buf.get(k).length === n ? ov.buf.get(k) : (ov.buf.set(k, new Float32Array(n)), ov.buf.get(k));
     const c = A.from > currentTime + n * dt ? null : A.constFrom(currentTime);
-    if (A.from <= currentTime && c != null){ Q[k] = [c]; continue; }
+    if (A.from <= currentTime && c != null){ const a1 = O1[k] || (O1[k] = [0]); a1[0] = c; Q[k] = a1; continue; }
     for (let i = 0; i < n; i++){ const t = currentTime + i * dt; b[i] = t < A.from ? (src.length > 1 ? src[i] : src[0]) : A.at(t); }
     Q[k] = b; }
+  for (const k in Q) if (!(k in P)) delete Q[k];
   return Q;
 };
 globalThis.__tcPost = (proc, o) => {
@@ -132,12 +148,45 @@ globalThis.__tcPost = (proc, o) => {
    instruments or a new render of the pad drops the core's copies (the page sends them again as notes ask). CUT / RES /
    DEC shape the sound here with the page's own shapeData. A note whose variation the core doesn't have yet: the page
    plays it, as before. */
-const varBufs = new Map(), varShaped = new Map(); let varBytes = 0;
+const varBufs = new Map(), varShaped = new Map(); let varBytes = 0;   // (varShaped: no longer filled, 7 Nov; Rd shapes as it plays)
 /* SOUNDFONTS (3 Nov): a SoundFont pad's preset, as the page has it once its font is loaded and the preset decoded: the
    pad's controls (P), the zones, the sample headers they read, and the decoded samples ({d, sr, ls, le}). The voice is
    the page's sfNote, played here: sfPick / sfVoice (copied from index.html by make-core) choose the zones and their
    numbers, and each zone runs its sample (looped where the font says), its volume envelope, the font's low-pass with its
    mod envelope and its own pan. Until a pad's preset arrives, the page plays its notes. */
+/* Rd: a voice's sample read in playback order, without copying it on the audio thread. REVERSE reads it back to front; SHAPED
+   (CUT / RES / DEC) runs shapeData's filter and decay sample by sample as the note reaches them (into a ring), from where
+   the note starts (with a short warm-up before an offset start), and ends it where shapeData would have cut it (N). */
+const RD_RING = 16384, RD_M = RD_RING - 1;
+/* The ring is 64 KB, allocated when a SHAPED note starts (on the audio thread). A note's reader is read only while its voice is
+   in `alive`; when the voice ends, process1 gives the ring back (Rd.free) and the next shaped note takes it, cleared to zeros
+   exactly as a new Float32Array is (the reader can look at slots it never wrote). At most RD_POOL_MAX are kept; when the pool
+   is empty a new one is made. */
+const RD_POOL = [], RD_POOL_MAX = 32;
+class Rd {
+  constructor(src, src2, sr, tw, rev, start){
+    this.src = src; this.src2 = src2; this.rev = rev; this.len = src.length; this.N = this.len; this.tw = tw;
+    if (!tw) return;
+    const tau = tw.dec != null ? decSec(tw.dec) : 0; this.tau = tau; this.N = tau ? Math.min(this.len, Math.ceil(tau * 9.3 * sr)) : this.len;
+    this.f = tw.cut != null;
+    if (this.f){ const fc = Math.min(cutHz(tw.cut), sr * 0.45), g = Math.tan(Math.PI * fc / sr), k = 2 - 2 * Math.min(clamp(tw.res | 0, 0, 255) / 255 * 0.97, 0.97);
+      this.a1 = 1 / (1 + g * (g + k)); this.a2 = g * this.a1; this.a3 = g * this.a2; }
+    this.l1 = 0; this.l2 = 0; this.ring = RD_POOL.length ? RD_POOL.pop().fill(0) : new Float32Array(RD_RING);
+    const s0 = Math.max(0, Math.floor(start) - 4096); this.hi = s0; this.lo = s0;   // (the filter settles in the warm-up)
+    this.kd = tau ? Math.exp(-1 / (tau * sr)) : 1; this.e = tau ? Math.pow(this.kd, s0) : 1;
+  }
+  free(){ const r = this.ring; if (r){ this.ring = null; if (RD_POOL.length < RD_POOL_MAX) RD_POOL.push(r); } }   // (the voice is over: nothing reads this reader again)
+  raw(c, i){ const D = c ? this.src2 : this.src; if (!D || i < 0 || i >= this.len) return 0; return D[this.rev ? this.len - 1 - i : i]; }
+  at(c, i){
+    if (!this.tw) return this.raw(c, i);
+    if (c || i < 0 || i >= this.N) return 0;
+    while (this.hi <= i){ const n = this.hi; let x = n < this.len ? this.src[n] : 0;
+      if (this.f){ const v3 = x - this.l2, v1 = this.a1 * this.l1 + this.a2 * v3, v2 = this.l2 + this.a2 * this.l1 + this.a3 * v3; this.l1 = 2 * v1 - this.l1; this.l2 = 2 * v2 - this.l2; x = v2; }
+      if (this.tau){ x *= this.e; this.e *= this.kd; const m = this.N - 1 - n; if (m < 64) x *= m / Math.min(this.N, 64); }
+      this.ring[n & RD_M] = x; this.hi = n + 1; }
+    return i < this.hi - RD_RING ? 0 : this.ring[i & RD_M];
+  }
+}
 const sfPads = new Map();
 function varDrop(pad){ for (const [k, r] of varBufs) if (pad == null || r.pad === pad){ varBufs.delete(k); varBytes -= r.data.length * 4; }
   for (const k of [...varShaped.keys()]) if (pad == null || k.split(':')[2] === String(pad)) varShaped.delete(k); }
@@ -153,9 +202,12 @@ function varRec(ev){
     varBufs.delete(key); varBufs.set(key, base); }   // most recent last
   else { base = coreBufs.get(ev.pad); key = 'p:' + ev.pad + ':' + ev.pad; if (!base) return null; }
   if (!ev.tw) return base;
-  const k2 = key + ':c' + ev.tw.cut + ':q' + ev.tw.res + ':d' + ev.tw.dec; let r2 = varShaped.get(k2);
-  if (!r2 || r2.src !== base.data){ r2 = {sr:base.sr, data:shapeData(base.data, base.sr, ev.tw), src:base.data}; varShaped.set(k2, r2); if (varShaped.size > 192) varShaped.delete(varShaped.keys().next().value); }
-  return r2;
+  // NO WHOLE-SAMPLE WORK HERE (owner, 7 Nov: stutters, then faster, then deaf to STOP, on a three-track sample song). CUT / RES
+  // / DEC shaped the WHOLE sample (shapeData) inside one audio block, a fresh copy per value, up to 192 kept: a long sample
+  // stalled the thread. Now the voice shapes as it plays (Rd, below), a block at a time. Reversed AND shaped: the page plays it
+  // (it shapes, then reverses, which can't be streamed from the start).
+  if (ev.rev) return null;
+  return {data:base.data, data2:null, sr:base.sr, tw:ev.tw};   // (mono, as the page's shaped notes)
 }
 // A message for another processor in this scope, handled at audio time `at` (its process() takes the due ones at the
 // start of each block: proc.__q, sorted by time). FXV's settings and …chains' tempo go this way instead of a timer on the
@@ -177,19 +229,52 @@ function fxvMsg(f, slot, ov, bpm){
   const p = new Array(12).fill(0); vals.forEach((v, i) => p[i] = v); return {pset:{slot, p}};
 }
 // One driven parameter: a timeline that takes over from the node's own AudioParam at its first event
+/* ENGINE TARGETS (10 Nov; docs/mod/ENGINE-TARGETS-DESIGN.md): the sequencer's `eng` event {track, t, c, o} (CUT / RES / ATK / DEC / REL and the MOD targets cut res
+   env atk dec sus rel) goes to every live node of the track as twelve override timelines: cCut cRes cDec cAtk cRel (-1 = none) with set, oCut oRes oEnv oAtk oDec oSus oRel
+   (signed offsets) with a ramp from the node's last point. A node that does not declare one never reads it (__tcOv walks the declared params). */
+const ENG_C = {cut:'cCut', res:'cRes', dec:'cDec', atk:'cAtk', rel:'cRel'}, ENG_O = {cut:'oCut', res:'oRes', env:'oEnv', atk:'oAtk', dec:'oDec', sus:'oSus', rel:'oRel'};
+const ENG_DEF = new Map([...Object.values(ENG_C).map(n => [n, -1]), ...Object.values(ENG_O).map(n => [n, 0])]);
 function tcParam(ov, k, t){ let A = ov.p.get(k); if (!A){ A = new Auto(0); A.from = t; ov.p.set(k, A); } return A; }
 
 const POLY = 4, FXP_CORE = ['sw0', 'sw1', 'sw2', 'sw3', 'sw4', 'sw5', 'sw6', 'sw7', 'flx', 'gat', 'rtg'];
 class ThunderCore extends AudioWorkletProcessor {
   constructor(){
     super();
-    this.seq = null; this.LEAD = 0.25; this.kv = []; this.vs = []; this.alive = new Set(); this.ended = false; this.lnodes = new Map(); this.voxG = new Map(); this.fxTouched = new Set(); this.fxOv = new Map();   // fxOv: FXV's moved controls, 'track:slot' → {key: value}
+    this.seq = null; this.LEAD = 0.25; this.kv = []; this.vs = []; this.alive = new Set(); this.ended = false; this.lnodes = new Map(); this.engSt = new Array(NT).fill(null); this.engL = new Array(NT).fill(null); this.voxG = new Map(); this.fxTouched = new Set(); this.fxOv = new Map();   // fxOv: FXV's moved controls, 'track:slot' → {key: value}
     this.clk = new Auto(0); this.clkOn = false; this.clkBase = 0;   // the beat clock (output NT): beat + 1 while playing, 0 stopped
     this.mixReset();
     this.port.onmessage = e => { try { this.msg(e.data || {}); } catch(err){ this.port.postMessage({op:'error', where:(e.data && e.data.op) || '?', message:String(err && err.stack || err)}); } };
     this.port.postMessage({op:'ready', v:CORE_V});
   }
+  /* A prepared replay (prep) stays good only while nothing the sequencer reads has changed: any message but these drops it, and
+     PLAY then replays on its own. (vars, lxp and kit arrive with every PLAY: they drop it only when they carry a different value.) */
+  chaseKeep(d){
+    const o = d.op;
+    if (o === 'prep' || o === 'play' || o === 'lead' || o === 'ack' || o === 'stats' || o === 'sig' || o === 'dbg') return true;
+    if (o === 'vars') return !d.vars || (!('vtrk' in d.vars) || d.vars.vtrk === vtrk) && (!('NSLOT' in d.vars) || d.vars.NSLOT === NSLOT) && !d.vars.TFX;
+    if (o === 'lxp') return (d.st | 0) === lxp.st;
+    if (o === 'kit') return JSON.stringify(d.kv || []) === JSON.stringify(this.kv);
+    return false;
+  }
+  chaseKey(d){ return JSON.stringify([d.mode || 'song', d.o || {}, d.rs.ref, d.rs.row, d.rs.step]); }
+  // The silent run up to the RESUME step, in steps of the same loop PLAY always ran: ms = a time budget, null = to the end
+  chaseRun(c, ms){
+    const t0 = Date.now();
+    while (c.seq.alive() && c.g++ < 4096){
+      const r = c.seq.step(), p = r.pos && r.pos[c.rs.ref];
+      if (p && (p.row > c.rs.row || (p.row === c.rs.row && p.step >= c.rs.step))){ c.first = r; c.done = true; return; }
+      for (const e of r.evs) if (e.type === 'eng') (c.eng || (c.eng = new Map())).set(e.track, e);   // ENGINE TARGETS: the state the silent steps left
+      if (ms != null && Date.now() - t0 >= ms) return;
+    }
+    c.done = true;
+  }
+  prep(d){
+    this.chase = null;
+    if (!RESUME_SPREAD || !d.rs || !S || this.seq) return;   // (a song still playing here would have its performance state cleared by the new sequencer)
+    this.chase = {key:this.chaseKey(d), rs:d.rs, g:0, first:null, done:false, seq:makeSeq(S, d.mode || 'song', Object.assign({}, d.o || {}, {live:true}))};
+  }
   msg(d){
+    if (this.chase && !this.chaseKeep(d)) this.chase = null;
     switch (d.op){
       case 'load': S = d.S; if (d.vars){ if ('vtrk' in d.vars) vtrk = d.vars.vtrk; if ('NSLOT' in d.vars) NSLOT = d.vars.NSLOT; if (d.vars.TFX) TFX = d.vars.TFX; } busPlanH = null; busPlanVal = null; return;
       case 'song': { if (!S){ S = d.S; return; } for (const k of Object.keys(S)) if (!(k in d.S)) delete S[k]; Object.assign(S, d.S); busPlanH = null; busPlanVal = null; return; }   // in place: the running sequencer holds this object
@@ -211,6 +296,7 @@ class ThunderCore extends AudioWorkletProcessor {
           for (let n = 0; sq.alive() && n < (d.max || 20000); n++){ const r = sq.step(); out.push({t:coreNum(r.t), evs:r.evs.map(corePlain)}); }
           return out; });
         this.port.postMessage({op:'test', id:d.id, rows}); return; }
+      case 'prep': return this.prep(d);
       case 'play': return this.play(d);
       case 'hold': this.hold = true; return;   // EXACT STOP (6 Nov): stop at the next pattern edge, tell the page {op:'held', t, pos}
       case 'stop': { this.seq = null; const at = d.at == null ? currentTime : d.at; this.stopAll(at); this.clkOn = false; this.clk.cancel(at); this.clk.set(0, at);
@@ -224,6 +310,7 @@ class ThunderCore extends AudioWorkletProcessor {
       case 'sig': { const j = JSON.stringify(S); let h = 0; for (let i = 0; i < j.length; i++) h = (h * 31 + j.charCodeAt(i)) | 0; this.port.postMessage({op:'sig', len:j.length, h}); return; }
       case 'dbg': this.noSampler = !!d.noSampler; return;   // measuring: the page plays every note (the core only sequences)
       case 'die': this.release(currentTime); this.dead = true; this.seq = null; this.alive.clear(); return;   // the page let this core go (Reset audio engine)
+      case 'ack': this.ackT = currentTime; return;   // WATCHDOG: the page read our rows
       case 'lead': this.LEAD = Math.max(0.05, Math.min(2, +d.s || 0.25)); return;
     }
   }
@@ -232,10 +319,12 @@ class ThunderCore extends AudioWorkletProcessor {
      track's VOL / mute / solo; NT + 2, one per track, a pan offset (target − the mixer's pan) added to its StereoPanner's
      pan; NT + 3, the master's level offset (target − its knob) added to the master gain. The page plugs a channel in when
      the first such command for it arrives and stops touching that param itself; STOP unplugs them all. */
-  mixReset(){ this.mg = new Array(NT).fill(null); this.mp = new Array(NT).fill(null); this.mm = null; }
+  mixReset(){ this.mg = new Array(NT).fill(null); this.mp = new Array(NT).fill(null); this.mm = null; this.mo = null; }
   mixEv(ev){
     const at = Math.max(ev.t, currentTime);
     if (ev.type === 'mvol'){ const A = this.mm || (this.mm = new Auto(0)); A.hold(at); A.lin(curve(ev.v) - curve(S && S.master != null ? S.master : 255), at + 0.004); return true; }
+    // MOD vol:MT (10 Nov): the master OUT fader (after the limiter). Output NT + 4: its offset (target − S.mout's gain) is added to the OUT gain; the 4 ms glide of TVA
+    if (ev.type === 'mout'){ const A = this.mo || (this.mo = new Auto(0)); A.target(curve(ev.v) - curve(S && S.mout != null ? S.mout : 255), at, 0.004); return true; }
     const t = ev.track; if (t == null || t < 0 || t >= NT) return false;
     const m = S && S.mix && S.mix[t];
     if (ev.type === 'tpn'){ const A = this.mp[t] || (this.mp[t] = new Auto(0)), P = v => Math.max(-1, Math.min(1, (v - 128) / 127));
@@ -245,24 +334,48 @@ class ThunderCore extends AudioWorkletProcessor {
     else { const fg = trackGain(m && m.vol != null ? m.vol : 224), g = trackGain(ev.v); A.target(fg > 1e-6 ? g / fg : 0, at, 0.004); }
     return true;
   }
-  mixOut(outputs, N, dt){
-    const fill = (C, A, d) => { if (!C) return; if (!A){ C.fill(d); return; } A.prune(currentTime); const c = A.constFrom(currentTime); if (c != null){ C.fill(c); return; } for (let i = 0; i < N; i++) C[i] = A.at(currentTime + i * dt); };
-    const G = outputs[NT + 1], P = outputs[NT + 2], M = outputs[NT + 3];
-    if (G) for (let t = 0; t < G.length; t++) fill(G[t], this.mg[t], 1);
-    if (P) for (let t = 0; t < P.length; t++) fill(P[t], this.mp[t], 0);
-    if (M) fill(M[0], this.mm, 0);
+  // ENGINE TARGETS: remember the track's state (a node that starts a note later takes it in liveStart) and set it on the track's nodes
+  engEv(ev){
+    const t = ev.track; if (t == null || t < 0 || t >= NT) return;
+    const st = {c:ev.c || {}, o:ev.o || {}}, at = Math.max(ev.t, currentTime);
+    let def = true; for (const k in ENG_C) if (!(st.c[k] < 0)) def = false; for (const k in ENG_O) if (st.o[k]) def = false;
+    this.engSt[t] = def ? null : st;
+    const Ls = this.engL[t]; if (!Ls) return;
+    for (const L of Ls){ if (tcNodes().get(L.key) !== L.proc){ Ls.delete(L); continue; } if (def && !L.engOn) continue; this.engPut(L, st, at, true); }
   }
+  engPut(L, st, at, ramp){
+    const ov = tcOver(L.proc), rp = ramp && L.engOn; ov.until = Infinity;
+    for (const k in ENG_C){ const v = st.c[k]; if (typeof v === 'number' && isFinite(v)) tcParam(ov, ENG_C[k], at).set(v, at); }
+    for (const k in ENG_O){ const v = st.o[k]; if (typeof v === 'number' && isFinite(v)){ const A = tcParam(ov, ENG_O[k], at); if (rp) A.lin(v, at); else A.set(v, at); } }
+    L.engOn = true;
+  }
+  mixOut(outputs, N, dt){
+    const G = outputs[NT + 1], P = outputs[NT + 2], M = outputs[NT + 3], O = outputs[NT + 4];
+    if (G) for (let t = 0; t < G.length; t++) this.mixFill(G[t], this.mg[t], 1, N, dt);
+    if (P) for (let t = 0; t < P.length; t++) this.mixFill(P[t], this.mp[t], 0, N, dt);
+    if (M) this.mixFill(M[0], this.mm, 0, N, dt);
+    if (O) this.mixFill(O[0], this.mo, 0, N, dt);
+  }
+  mixFill(C, A, d, N, dt){ if (!C) return; if (!A){ C.fill(d); return; } A.prune(currentTime); const c = A.constFrom(currentTime); if (c != null){ C.fill(c); return; } for (let i = 0; i < N; i++) C[i] = A.at(currentTime + i * dt); }   // (a method: no closure per block)
   play(d){
     const ms0 = Date.now(), at0 = currentTime;   // PLAYBACK REPORT: how late this PLAY reached the audio thread, and how long it took
     this.stopAll(currentTime); this.mixReset(); this.clkOn = false; this.clk.cancel(currentTime); this.clk.set(0, currentTime);
-    const seq = makeSeq(S, d.mode || 'song', Object.assign({}, d.o || {}, {live:true}));
     // RESUME: run silently up to the step the song stopped on; the page played that step, the core carries on after it
-    if (d.rs){ let g = 0, first = null;
-      while (seq.alive() && g++ < 4096){ const r = seq.step(), p = r.pos && r.pos[d.rs.ref]; if (p && (p.row > d.rs.row || (p.row === d.rs.row && p.step >= d.rs.step))){ first = r; break; } }
+    // (prepared by 'prep', block by block, when the page sent it in time: what is left runs here)
+    let seq;
+    if (d.rs){
+      let c = this.chase; this.chase = null;
+      if (!(c && c.key === this.chaseKey(d))) c = {key:null, rs:d.rs, g:0, first:null, done:false, seq:makeSeq(S, d.mode || 'song', Object.assign({}, d.o || {}, {live:true}))};
+      if (!c.done) this.chaseRun(c, null);
+      seq = c.seq; const first = c.first;
+      if (c.eng) for (const e of c.eng.values()) this.engEv(Object.assign({}, e, {t:d.t0}));   // the steps run silently: the live engines' state they left, now (then the step it stopped on, below)
+      if (first) for (const e of first.evs) if (e.type === 'eng') this.engEv(Object.assign({}, e, {t:e.t + (d.t0 - first.t)}));
       if (first){ const dt = d.t0 - first.t; seq.base += dt; seq.time += dt; if (seq.btT != null) seq.btT += dt; }
       else seq.time = d.t0; }
-    else seq.time = d.t0;
+    else { this.chase = null; seq = makeSeq(S, d.mode || 'song', Object.assign({}, d.o || {}, {live:true})); seq.time = d.t0; }
     this.seq = seq; this.ended = false; this.gen = d.gen | 0; this.hold = false; this.lr = null; this.ls = null;
+    // WATCHDOG (phones; owner, 7 Nov, Fold, screen on: stutter, faster, slower, then it played on after STOP)
+    this.watch = !!d.watch; this.ackT = currentTime; this.ckW = Date.now(); this.ckA = currentTime; this.ckBad = 0;
     this.port.postMessage({op:'started', gen:this.gen, late:at0 - d.t0, ms:Date.now() - ms0});
   }
 
@@ -324,8 +437,8 @@ class ThunderCore extends AudioWorkletProcessor {
   // One block of a SoundFont voice into its track's output (as the page's nodes: zones → [zone pan] → gain → fade → pan)
   sfRun(v, out, N){
     const L = out[0], R = out[1] || out[0], dt = 1 / sampleRate, t0 = currentTime;
-    for (const A of [v.g, v.f, v.pn, v.r]) A.prune(t0);
-    const sL = v.sL || (v.sL = new Float32Array(128)), sR = v.sR || (v.sR = new Float32Array(128)); sL.fill(0); sR.fill(0);
+    v.g.prune(t0); v.f.prune(t0); v.pn.prune(t0); v.r.prune(t0);
+    const sL = v.sL && v.sL.length >= N ? v.sL : (v.sL = new Float32Array(Math.max(128, N))), sR = v.sR && v.sR.length >= N ? v.sR : (v.sR = new Float32Array(Math.max(128, N))); sL.fill(0); sR.fill(0);   // (the block length, not 128: grown once)
     const rc = v.r.constFrom(t0); let any = false;
     for (const z of v.sf){ if (z.done) continue;
       z.env.prune(t0); z.r.prune(t0); if (z.flt) z.flt.fr.prune(t0);
@@ -422,8 +535,8 @@ class ThunderCore extends AudioWorkletProcessor {
     else while (T.length >= POLY) this.kill(T.shift(), ev.t, 0.006);
     const ck = kv.choke || 0;
     if (ck) for (let k = 0; k < NT; k++) if (k !== ev.track) for (const v of this.T(k)) if (v.choke === ck) this.kill(v, ev.t);
-    const data = ev.rev ? (c.rev || (c.rev = c.data.slice().reverse())) : c.data, dur = data.length / c.sr;
-    const data2 = c.data2 ? (ev.rev ? (c.rev2 || (c.rev2 = c.data2.slice().reverse())) : c.data2) : null;   // STEREO SAMPLES (5 Nov)
+    // REVERSE (7 Nov): read back to front by the voice's reader (Rd) instead of a reversed copy of the whole sample made here
+    const data = c.data, dur = data.length / c.sr, data2 = c.data2 || null;   // STEREO SAMPLES (5 Nov)
     const r = new Auto(ev.rate), g = new Auto(ev.gain), f = new Auto(1), pn = new Auto(Math.max(-1, Math.min(1, (ev.pan - 128) / 127)));
     if (ev.slide && ev.slide.dur > 0){ r.set(ev.slide.from, ev.t); r.lin(ev.rate, ev.t + ev.slide.dur); }
     const t0n = Math.max(ev.t, currentTime), hz = x => ((x >> 4) || 1) * (this.seq ? this.seq.bpm : S.bpm) / 60, dep = x => (x & 15) / 15;
@@ -431,11 +544,12 @@ class ThunderCore extends AudioWorkletProcessor {
     if (ev.fdi > 0){ g.set(0, t0n); g.lin(ev.gain, t0n + ev.fdi); }
     if (ev.trm && dep(ev.trm) > 0){ const k = dep(ev.trm) / 2; trm = {hz:hz(ev.trm), d:ev.gain * k, t:t0n}; if (!(ev.fdi > 0)) g.v0 = ev.gain * (1 - k); }
     if (ev.apn && dep(ev.apn) > 0) apn = {hz:hz(ev.apn), d:dep(ev.apn), t:t0n};
-    const syn = !!kv.syn, v = {data, data2, sr:c.sr, r, g, f, pn, trm, apn, base:ev.rate, rate:ev.rate, choke:ck, col:ev.col, ended:false, stopAt:null, syn, rel:syn ? kv.rel || 0 : 0, track:ev.track, end:Infinity, pos:0, t0:0};
+    const syn = !!kv.syn, v = {data, data2, sr:c.sr, r, g, f, pn, trm, apn, base:ev.rate, rate:ev.rate, choke:ck, col:ev.col, ended:false, stopAt:null, syn, rel:syn ? (ev.rlo != null ? ev.rlo : kv.rel || 0) : 0, track:ev.track, end:Infinity, pos:0, t0:0};
     if (!ev.slide) this.pitchMods(v, ev.t, ev.rate, ev);
     const off = ev.ofsSec != null ? (ev.rev ? Math.max(0, dur - ev.ofsSec - ev.durSec) : ev.ofsSec) : Math.max(0, Math.min(255, ev.ofs || 0)) / 256 * dur;
     if (off > 0.0005){ f.set(0, t0n); f.lin(1, t0n + 0.0015); }
     v.t0 = t0n; v.pos = Math.min(off, Math.max(0, dur - 0.001)) * c.sr;
+    if (ev.rev || c.tw) v.rd = new Rd(c.data, c.data2 || null, c.sr, c.tw || null, !!ev.rev, v.pos);   // (see Rd)
     this.alive.add(v);
     if (ev.cut != null) this.kill(v, ev.cut);
     if (ev.rel != null) this.kill(v, ev.rel, syn ? this.relTc(v) : 0.05);
@@ -453,10 +567,17 @@ class ThunderCore extends AudioWorkletProcessor {
     }
     // FXV (3 Nov): the selected control of an effect slot, makePlayer's fxpTo: the slot's settings are worked out here
     // (TFX_MAP: the effect's own map()) and handed to its node at the row's time. Effects whose map isn't in the core
-    // (TFX_MAP) and …pump slots stay on the page.
+    // (TFX_MAP) stay on the page. A …pump slot (MOD, 10 Nov) takes the rows that are LFO targets (q.lfo): its value list is made
+    // by pumpPv from the song's own f.pump and the moved rows, with the parameter table (TFX[k].pd) the page sent.
     if (ev.type === 'fxp'){
       const proc = tcNodes().get('fx:' + ev.track), A = S && (ev.track >= NT ? S.mfx : S.tfx && S.tfx[ev.track]), f = A && A[ev.slot];
-      if (!proc || !f || !TFX[f.type] || TFX[f.type].pump || !fxvMap(TFX[f.type], f.type)) return false;
+      if (!proc || !f || !TFX[f.type]) return false;
+      if (TFX[f.type].pump){
+        const D = TFX[f.type], q = D.ps[ev.pi]; if (!D.pd || !q || !q.lfo || (q.pb && !(ev.b >= 0 && ev.b < q.pb.length))) return false;   // a banded row (q.pb) needs its band
+        const key = ev.track + ':' + ev.slot, ov = Object.assign({}, this.fxOv.get(key)); ov[q.pb ? D.pd[q.pb[ev.b]].s : q.k] = q.min + Math.round((q.max - q.min) * ev.v / 255);
+        this.fxOv.set(key, ov); tcAt(proc, Math.max(ev.t, currentTime), {pset:{slot:ev.slot, pv:pumpPv(D, f, ov)}}); return true;
+      }
+      if (!fxvMap(TFX[f.type], f.type)) return false;
       const q = TFX[f.type].ps[ev.pi]; if (!q) return false;
       const key = ev.track + ':' + ev.slot, ov = Object.assign({}, this.fxOv.get(key)); ov[q.k] = q.min + Math.round((q.max - q.min) * ev.v / 255);
       const m = fxvMsg(f, ev.slot, ov, this.seq ? this.seq.bpm : S.bpm); if (!m) return false;
@@ -478,7 +599,8 @@ class ThunderCore extends AudioWorkletProcessor {
       if (!this.clkOn){ this.clkOn = true; this.clkBase = Math.floor(ev.b / 16) * 16; A.set(ev.b - this.clkBase + 1, at); return true; }
       const v = ev.b - this.clkBase; A.lin(v + 1, at); if (v >= 16){ this.clkBase += 16; A.set(v - 16 + 1, at); } return true; }
     if (ev.type === 'stp'){ for (let k = 0; k <= NT; k++) if (ev.all || k === ev.track){ for (const v of this.T(k)) this.kill(v, ev.t, 0.004); this.T(k).length = 0; } return false; }
-    if (ev.type === 'tvl' || ev.type === 'tva' || ev.type === 'tpn' || ev.type === 'mvol') return this.mixEv(ev);
+    if (ev.type === 'eng'){ this.engEv(ev); return false; }   // (false: the page's player sets its own params from it too: the same values)
+    if (ev.type === 'tvl' || ev.type === 'tva' || ev.type === 'tpn' || ev.type === 'mvol' || ev.type === 'mout') return this.mixEv(ev);
     if (ev.type === 'off' && ev.track != null){ const T = this.T(ev.track);
       if (ev.cols){ for (let k = T.length - 1; k >= 0; k--) if (ev.cols.includes(T[k].col)){ this.kill(T[k], ev.t, this.relTc(T[k])); T.splice(k, 1); } return false; }
       for (const v of T) this.kill(v, ev.t, this.relTc(v)); T.length = 0; return false; }
@@ -493,26 +615,28 @@ class ThunderCore extends AudioWorkletProcessor {
   // on those nodes from then aren't held shut by the core's gates
   release(at){ for (const proc of tcNodes().values()) if (proc && proc.__ov) proc.__ov.until = Math.min(proc.__ov.until, at); }
   stopAll(at){ for (const v of this.alive) this.kill(v, at, 0.004, true); for (const T of this.vs) if (T) T.length = 0;
-    for (const L of this.lnodes.values()){ if (L.cur) this.kill(L.cur, at); if (L.lanes) for (const q of L.lanes) if (q.cur) this.kill(q.cur, at); L.sylN = 0;
+    for (const L of this.lnodes.values()){ if (L.cur) this.kill(L.cur, at); if (L.lanes) for (const q of L.lanes) if (q.cur) this.kill(q.cur, at); L.sylN = 0; L.engOn = false;
       const ov = L.proc.__ov; if (!ov) continue;   // and whatever is still booked on it: gates shut now, no note after this
-      for (const [k, A] of ov.p){ if (/^(gate|g\d)$/.test(k)){ A.cancel(at); A.set(0, at); } else if (/^(trig|t\d)$/.test(k)) A.cancel(at); }
+      for (const [k, A] of ov.p){ if (/^(gate|g\d)$/.test(k)){ A.cancel(at); A.set(0, at); } else if (/^(trig|t\d)$/.test(k)) A.cancel(at); else if (ENG_DEF.has(k)){ A.cancel(at); A.set(ENG_DEF.get(k), at); } }   // ENGINE TARGETS: the twelve back to their defaults
       ov.until = at + 4; }   // a live note lets go; its release rings, then the page has the node back
-    this.voxG.clear();
+    this.voxG.clear(); this.engSt.fill(null);
     // the effect switches go back to the slots' own (−1), as the page's resetSeq does, then the page has the params again
     for (const key of this.fxTouched){ const proc = tcNodes().get(key); if (!proc || !proc.__ov) continue; const ov = proc.__ov;
       for (const A of ov.p.values()){ A.cancel(at); A.set(-1, at); } ov.until = at + 0.5; }   // FXO… (fx:) and BYP b1–b15 (chn:)
     this.fxTouched.clear();
     // FXV: the slots' own settings again (makePlayer's resetSeq does the same for the ones the page moved)
     for (const [key, ov] of this.fxOv){ const [t, k] = key.split(':').map(Number), proc = tcNodes().get('fx:' + t), A = S && (t >= NT ? S.mfx : S.tfx && S.tfx[t]), f = A && A[k];
-      const m = proc && f && fxvMsg(f, k, {}, S.bpm); if (m){ if (proc.__q) proc.__q = proc.__q.filter(x => !(x[1].pset && x[1].pset.slot === k)); tcAt(proc, at, m); } }
+      const m = proc && f && (TFX[f.type] && TFX[f.type].pump ? (TFX[f.type].pd ? {pset:{slot:k, pv:pumpPv(TFX[f.type], f, null)}} : null) : fxvMsg(f, k, {}, S.bpm)); if (m){ if (proc.__q) proc.__q = proc.__q.filter(x => !(x[1].pset && x[1].pset.slot === k)); tcAt(proc, at, m); } }
     this.fxOv.clear(); }
 
   /* ---- live engines: makePlayer's bassNode / bassNote / polyVox / polyPs, driving the registered nodes ---- */
   lnode(t, pad, j){
     const k = this.kv[pad], lk = k && k.lk; if (!lk) return null;
     const key = t + ':' + pad + ':' + lk.kind + (j ? ':' + j : ''), proc = tcNodes().get(key); if (!proc) return null;
-    let L = this.lnodes.get(key); if (!L || L.proc !== proc){ L = {key, proc, pad, kind:lk.kind, vox:!!lk.vox, ps:!!lk.ps, n:1e6 + Math.floor(Math.random() * 1e5) * 10, lastOn:-1, cur:null, sylN:0, took:false};
+    let L = this.lnodes.get(key); if (!L || L.proc !== proc){ const old = L; L = {key, proc, pad, kind:lk.kind, vox:!!lk.vox, ps:!!lk.ps, n:1e6 + Math.floor(Math.random() * 1e5) * 10, lastOn:-1, cur:null, sylN:0, took:false};
       if (L.ps) L.lanes = [0, 1, 2, 3].map(q => ({L, lane:q, n:L.n + q * 1e5, lastOn:-1, cur:null}));
+      if (old) for (const A of this.engL) if (A) A.delete(old);
+      (this.engL[t] || (this.engL[t] = new Set())).add(L);   // ENGINE TARGETS: the track's live nodes
       this.lnodes.set(key, L); }
     return L;
   }
@@ -556,6 +680,7 @@ class ThunderCore extends AudioWorkletProcessor {
     let gain = ev.gain;
     if (L.ps){ const vc = ev.vc != null && ev.vc >= 0 ? ev.vc : -1, hit = (this.kv[L.pad].lk.vel) || 100, V = P('vel'); V.cancel(t); V.set(Math.max(1, Math.min(127, Math.round((vc >= 0 ? 127 : hit) * (ev.vel != null ? ev.vel : 1)))), t);
       if (vc >= 0){ const c = curve(vc); gain = c > 1e-4 ? ev.gain / c : 0; } }
+    { const es = this.engSt[ev.track]; if (es) this.engPut(L, es, t, false); }   // the track's commands and LFOs as they are now
     P('leg').set(leg, t); P('gate').set(1, t); B.n += 1; P('trig').set(B.n, t);
     ov.g.set(gain, t); ov.pn.set(Math.max(-1, Math.min(1, (ev.pan - 128) / 127)), t);
     if (ev.wob != null && L.kind === 'bass'){ const W = P('wob'); W.set(ev.wob, t); }
@@ -572,7 +697,29 @@ class ThunderCore extends AudioWorkletProcessor {
     if (this.dead) return false;
     const __t0 = Date.now(); try { return this.process1(inputs, outputs); } finally { this.pms = (this.pms || 0) + Date.now() - __t0; this.pbl = (this.pbl || 0) + 1; }
   }
+  /* WATCHDOG (phones only: the page sends watch:true where it hands over, seqHandHere). The page's own checks needed this
+     thread to read their messages, and an overloaded audio thread doesn't: its clock lurches (0.8×, then 1.5×) and STOP,
+     re-sent or not, waits behind the rendering, while the core keeps driving the live engines (the poly tracks), which
+     unplugging the core doesn't silence. So the core watches itself and lets go on its own:
+     - CLOCK: audio time ÷ wall time outside 0.8–1.25 over two 1-second windows running;
+     - DEAF: the page hasn't acknowledged a row for 3 s of audio time (it can't hear us, or we can't hear it: a STOP may be
+       stuck behind us, or the page dropped this core).
+     Letting go is a hand-over stop: every voice and booked note ends now, and the live engines go back to the page's own
+     params at once (silent when stopped; the page sequencer's notes when it carries on). The page is told ('self'). */
+  watchdog(){
+    const s = this.seq; if (!s || !this.watch) return false;
+    let why = null;
+    if (currentTime - (this.ackT || 0) > 3) why = 'deaf';
+    else { const w = Date.now(); if (w - this.ckW >= 1000){ const r = (currentTime - this.ckA) / ((w - this.ckW) / 1000); this.ckW = w; this.ckA = currentTime;
+      if (r < 0.8 || r > 1.25){ if (++this.ckBad >= 2) why = 'clock ' + r.toFixed(2); } else this.ckBad = 0; } }
+    if (!why) return false;
+    const at = currentTime; this.seq = null; this.hold = false; this.stopAll(at); this.release(at); this.clkOn = false; this.clk.cancel(at); this.clk.set(0, at);
+    this.port.postMessage({op:'self', gen:this.gen, why, t:at});
+    return true;
+  }
   process1(inputs, outputs){
+    this.watchdog();
+    if (this.chase && !this.chase.done) this.chaseRun(this.chase, CHASE_MS);   // a prepared RESUME replay, a millisecond a block
     // 1. step the song up to LEAD ahead: the core books its own notes, the rows go up for the page's part
     const s = this.seq;
     if (s){
@@ -602,34 +749,39 @@ class ThunderCore extends AudioWorkletProcessor {
     for (const v of this.alive){
       const out = outputs[v.track]; if (!out || !out[0]){ continue; }
       if (v.sf){ this.sfRun(v, out, N); if (v.ended){ this.alive.delete(v); const T = this.vs[v.track]; if (T){ const q = T.indexOf(v); if (q >= 0) T.splice(q, 1); } } continue; }   // SOUNDFONTS
-      const L = out[0], R = out[1] || out[0], D = v.data, len = D.length, inc0 = v.sr / sr;
+      const L = out[0], R = out[1] || out[0], D = v.data, RD = v.rd, len = RD ? RD.N : D.length, inc0 = v.sr / sr;
       // FAST PATH (the usual case: a note that is just playing): gain, fade, pan and pitch don't move in this block
       const gc = v.trm ? null : v.g.constFrom(tb0), fc = v.f.constFrom(tb0), pc = v.apn ? null : v.pn.constFrom(tb0), rc = v.r.constFrom(tb0);
       if (gc != null && fc != null && pc != null && rc != null && v.t0 <= tb0 && v.end >= tb1){
         const k = gc * fc, a = (pc + 1) * Math.PI / 4, kl = k * Math.cos(a), kr = k * Math.sin(a), inc = rc * inc0; let p = v.pos;
-        if (v.data2){ const D2 = v.data2, [ll, rl, lr, rr] = stBal(pc);   // a stereo pad: the StereoPannerNode's balance law, as the page plays it
+        if (RD){ const st = !RD.tw && v.data2, [ll, rl, lr, rr] = st ? stBal(pc) : ZERO4;   // REVERSED / SHAPED (Rd): the same, read through the reader
+          for (let i = 0; i < N; i++){ if (p >= len - 1){ v.ended = true; break; } const j = p | 0, f = p - j, d0 = RD.at(0, j), x = d0 + (RD.at(0, j + 1) - d0) * f;
+            if (st){ const e0 = RD.at(1, j), y = e0 + (RD.at(1, j + 1) - e0) * f; L[i] += (x * ll + y * rl) * k; R[i] += (x * lr + y * rr) * k; }
+            else { L[i] += x * kl; R[i] += x * kr; }
+            p += inc; } }
+        else if (v.data2){ const D2 = v.data2, [ll, rl, lr, rr] = stBal(pc);   // a stereo pad: the StereoPannerNode's balance law, as the page plays it
           for (let i = 0; i < N; i++){ if (p >= len - 1){ v.ended = true; break; } const j = p | 0, f = p - j, x = D[j] + (D[j + 1] - D[j]) * f, y = D2[j] + (D2[j + 1] - D2[j]) * f;
             L[i] += (x * ll + y * rl) * k; R[i] += (x * lr + y * rr) * k; p += inc; } }
         else for (let i = 0; i < N; i++){ if (p >= len - 1){ v.ended = true; break; } const j = p | 0, x = D[j] + (D[j + 1] - D[j]) * (p - j); L[i] += x * kl; R[i] += x * kr; p += inc; }
         v.pos = p;
-        if (v.ended){ this.alive.delete(v); const T = this.vs[v.track]; if (T){ const q = T.indexOf(v); if (q >= 0) T.splice(q, 1); } }
+        if (v.ended){ this.alive.delete(v); const T = this.vs[v.track]; if (T){ const q = T.indexOf(v); if (q >= 0) T.splice(q, 1); } if (RD){ RD.free(); v.rd = null; } }
         continue;
       }
-      for (const A of [v.g, v.f, v.pn, v.r]) A.prune(tb0);
+      v.g.prune(tb0); v.f.prune(tb0); v.pn.prune(tb0); v.r.prune(tb0);   // (no array per voice per block)
       for (let i = 0; i < N; i++){
         const t = currentTime + i * dt;
         if (t < v.t0) continue;
         if (t >= v.end || v.pos >= len - 1){ v.ended = true; break; }
-        const p = v.pos, j = p | 0, x = D[j] + (D[j + 1] - D[j]) * (p - j), D2 = v.data2;
+        const p = v.pos, j = p | 0, d0 = RD ? RD.at(0, j) : D[j], d1 = RD ? RD.at(0, j + 1) : D[j + 1], x = d0 + (d1 - d0) * (p - j), D2 = RD && RD.tw ? null : v.data2;
         let g = v.g.at(t); if (v.trm) g += v.trm.d * Math.sin(2 * Math.PI * v.trm.hz * (t - v.trm.t));
         let pan = v.pn.at(t); if (v.apn) pan = Math.max(-1, Math.min(1, pan + v.apn.d * Math.sin(2 * Math.PI * v.apn.hz * (t - v.apn.t))));
         const gf = g * v.f.at(t);
-        if (D2){ const y2 = D2[j] + (D2[j + 1] - D2[j]) * (p - j), [ll, rl, lr, rr] = stBal(pan); L[i] += (x * ll + y2 * rl) * gf; R[i] += (x * lr + y2 * rr) * gf; }
+        if (D2){ const e0 = RD ? RD.at(1, j) : D2[j], e1 = RD ? RD.at(1, j + 1) : D2[j + 1], y2 = e0 + (e1 - e0) * (p - j), [ll, rl, lr, rr] = stBal(pan); L[i] += (x * ll + y2 * rl) * gf; R[i] += (x * lr + y2 * rr) * gf; }
         else { const y = x * gf, a = (pan + 1) * Math.PI / 4;   // StereoPannerNode, mono in: equal power
           L[i] += y * Math.cos(a); R[i] += y * Math.sin(a); }
         v.pos += v.r.at(t) * inc0;
       }
-      if (v.ended){ this.alive.delete(v); const T = this.vs[v.track]; if (T){ const k = T.indexOf(v); if (k >= 0) T.splice(k, 1); } }
+      if (v.ended){ this.alive.delete(v); const T = this.vs[v.track]; if (T){ const k = T.indexOf(v); if (k >= 0) T.splice(k, 1); } if (RD){ RD.free(); v.rd = null; } }
     }
     return true;
   }

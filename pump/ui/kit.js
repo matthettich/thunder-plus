@@ -1,4 +1,4 @@
-/* …pump pop-up windows: the shared kit (stage 2 of the pump effects, 23 Oct 2026).
+/* pump pop-up windows: the shared kit (stage 2 of the pump effects, 23 Oct 2026).
    Each plugin's window is drawn on one canvas in the plugin's own logical coordinates, scaled to the window, so its
    layout, colours and mouse conventions are the plugin's: matthettich/pump common/ui/PumpUI.hpp (header, controls,
    typed entry, menus, help, status line) and common/ui/Theme.hpp (accents, light/dark palettes) are the reference, and
@@ -54,7 +54,7 @@ function skinDark(){
     return getComputedStyle(document.documentElement).colorScheme.includes('dark'); } catch(e){ return false; }
 }
 /* SKIN THEME (owner, 24 Oct: the windows' own pink / cyan / lime palettes looked out of place in Thunder): unless the DARK
-   key has picked pump's own light or dark look on this device, a window takes its colours from Thunder's skin, the
+   key has picked pump's own light or dark look on this device, a window takes its colors from Thunder's skin, the
    tracker screen's (the --ts-* and --tk-* variables): its background and ink, the cursor's colour as the accent, the
    track colours as the second accent. themeFor() is the one entry; buildTheme() stays pump's own palettes. */
 let probe = null;
@@ -445,13 +445,13 @@ class Win {
     this.abSeg = this.add(new Seg(null, ['A', 'B'])); this.abSeg.getFn = () => this.ab.sel; this.abSeg.setFn = i => this.selectAB(i); this.abSeg.tip = 'Compare two settings: A and B';
     this.copyBtn = this.button('COPY', () => this.copyAB()); this.copyBtn.small = true; this.copyBtn.tip = 'Copy this setting to the other slot';
     // CHAIN (owner, 3 Nov: the MASTERING button opens pump MASTER, "but i want to be able to open the other pump master fx"):
-    // the track's other …pump effects with a window (the master's EQ → CALM → COMP → TONE → MASTER), one click to open one
-    const cm = this.chainMenu = this.add(new Menu(null)); cm.tip = 'The other …pump effects on ' + (this.tname || 'this track') + ': pick one to open its window';
+    // the track's other pump effects with a window (the master's EQ → CALM → COMP → TONE → MASTER), one click to open one
+    const cm = this.chainMenu = this.add(new Menu(null)); cm.tip = 'The other pump effects on ' + (this.tname || 'this track') + ': pick one to open its window';
     cm.itemsFn = () => this.chainRows().map(r => r.label); cm.getFn = () => this.chainRows().findIndex(r => r.k === this.k);
     cm.setFn = i => { const r = this.chainRows()[i]; if (r && r.k !== this.k) FX.open(this.t, r.k); }; cm.textFn = () => 'CHAIN';
     this.helpBtn = this.button('?', () => { this.help = !this.help; }, () => this.help); this.helpBtn.small = true; this.helpBtn.tip = 'Mouse and keyboard shortcuts (?)';
     this.darkBtn = this.button('DARK', () => this.setDark(!this.dark), () => this.dark); this.darkBtn.small = true;
-    this.darkBtn.tip = 'pump’s own light or dark colours (remembered on this device; Ctrl/Cmd-click: follow Thunder’s skin again, the default)';
+    this.darkBtn.tip = 'pump’s own light or dark colors (remembered on this device; Ctrl/Cmd-click: follow Thunder’s skin again, the default)';
     this.darkBtn.onExclusive = () => { try { localStorage.removeItem(THEME_KEY); } catch(e){} for (const w of wins.values()) w.setDark(themeDark(), true); this.status = 'Follows Thunder’s skin'; };
     if (this.D.bypass !== false){ this.bypBtn = this.button('BYPASS', () => this.setOn(!this.on), () => !this.on); this.bypBtn.small = true;
       this.bypBtn.tip = 'Bypass: the FX slot’s ACTIVE (latency-matched, so the timing never jumps)'; }
@@ -462,7 +462,7 @@ class Win {
   chainRows(){ let L = []; try { L = (FX.slots ? FX.slots(this.t) : []).filter(q => defs[q.type]); } catch(e){} return L.map(q => ({k:q.k, label:(q.k + 1) + '  ' + q.name + (q.on ? '' : '  (off)')})); }
   get headH(){ return this.narrow ? HEAD_N : HEAD; }
   kindLines(){ const k = String(this.fx.long || '').toUpperCase(); if (!k) return []; const i = k.indexOf(' '); return i < 0 ? [k] : [k.slice(0, i), k.slice(i + 1)]; }
-  tagRight(){ return 14 + this.textW('…pump', 'bold', 21) + 10 + this.textW(this.fx.name, 'bold', 15) + 16; }
+  tagRight(){ return 14 + this.textW('pump', 'bold', 21) + 10 + this.textW(this.fx.name, 'bold', 15) + 16; }
   brandRight(){ const kw = Math.max(0, ...this.kindLines().map(l => this.textW(l, 'label', 10, 1.2))); return this.tagRight() + (kw > 0 ? 9 + kw : 0); }
   layoutHeader(){
     const W = this.W, h = 28;
@@ -607,8 +607,8 @@ class Win {
   drawHeader(){
     const t = this.th, H = this.headH; this.fill(R(0, 0, this.W, H), t.panel2); this.line(0, H - 0.75, this.W, H - 0.75, t.ink, 1.5);
     const bx = 14, by = this.narrow ? 23 : H / 2;
-    this.text(bx + 1.5, by + 2, '…pump', 'bold', 21, t.dim); this.text(bx, by, '…pump', 'bold', 21, t.ink);
-    const tx = bx + this.textW('…pump', 'bold', 21) + 10, tw = this.textW(this.fx.name, 'bold', 15) + 16, tag = R(tx, by - 13, tw, 26);
+    this.text(bx + 1.5, by + 2, 'pump', 'bold', 21, t.dim); this.text(bx, by, 'pump', 'bold', 21, t.ink);
+    const tx = bx + this.textW('pump', 'bold', 21) + 10, tw = this.textW(this.fx.name, 'bold', 15) + 16, tag = R(tx, by - 13, tw, 26);
     this.keyBox(tag, false, false, t.neon, 3); this.text(tag.cx, tag.cy + 0.5, this.fx.name, 'bold', 15, t.neonInk, 'center');
     const kl = this.kindLines(), kx = tag.r + 9;
     if (kl.length === 1) this.text(kx, tag.cy + 0.5, kl[0], 'label', 10, t.ink2, 'left', 1.2);
@@ -718,7 +718,9 @@ class Win {
         // Type a value; on a touch screen a double-tap or a long press still types one
         const dflt = () => { const p = this.spec(c.sym); this.setGesture(c.sym, this.h.defaultOf ? this.h.defaultOf(c.sym) : p.def); };
         if (btn === 2){ clearTimeout(this.lpT); const vr = c.valueRect();
-          this.openMenu(vr, ['#' + String(this.spec(c.sym).n || c.label || '').toUpperCase(), 'Reset to default', 'Type a value…'], -1, i => { if (i === 1) dflt(); else if (i === 2) this.openTextEntry(c.sym, vr, this.ringFor(c)); }); return; }
+          // MOD (10 Nov): Add LFO… when the app can modulate this parameter (PumpFX.lfoId: its target id, a band's own symbol names the band)
+          const lid = FX.lfoId ? FX.lfoId(this.t, this.k, c.sym) : '';
+          this.openMenu(vr, ['#' + String(this.spec(c.sym).n || c.label || '').toUpperCase(), 'Reset to default', 'Type a value…', ...(lid ? ['Add LFO…'] : [])], -1, i => { if (i === 1) dflt(); else if (i === 2) this.openTextEntry(c.sym, vr, this.ringFor(c)); else if (i === 3 && lid){ FX.addLfo(lid); this.close(); } }); return; }
         if (dbl && btn === 0){ clearTimeout(this.lpT); if (touch) this.openTextEntry(c.sym, c.valueRect(), this.ringFor(c)); else dflt(); return; }
         if ((m.cmd || m.alt) && btn === 0){ dflt(); return; }
       }
@@ -766,8 +768,9 @@ class Win {
   }
   // WHEEL (27 Oct, Thunder Plus audit M2): the movement is added up and a step taken per 100 px (a mouse notch), as the
   // host's sliders do; one step per event made a trackpad flick (30-100 events) run a control across its whole range.
+  // Thunder Plus: window.thunderWheelSign is -1 with macOS Natural scrolling (index.html, ONE WHEEL DIRECTION)
   wheelN(e){
-    const raw = e.deltaY || e.deltaX, px = e.deltaMode === 1 ? raw * 40 : e.deltaMode === 2 ? raw * 400 : raw; if (!px) return 0;
+    const raw = (e.deltaY || e.deltaX) * (typeof window !== 'undefined' && window.thunderWheelSign === -1 ? -1 : 1), px = e.deltaMode === 1 ? raw * 40 : e.deltaMode === 2 ? raw * 400 : raw; if (!px) return 0;
     const now = performance.now(); if (now - (this.wT || 0) > 250 || Math.sign(this.wAcc || 0) !== Math.sign(px)) this.wAcc = 0;
     this.wAcc += px; this.wT = now; const n = Math.trunc(this.wAcc / 100); this.wAcc -= n * 100; return clamp(n, -8, 8);
   }
@@ -822,7 +825,7 @@ function open(t, k, info){
   const id = t + '/' + k, have = wins.get(id);
   if (have && have.type === info.type){ have.raise(); try { have.el.focus({preventScroll:true}); } catch(e){} return have; }
   if (have) have.close();
-  if (!defs[info.type]){ FX.toast('pump ' + PM.fx[info.type].name + ': its window comes in a later update. The FX boxes change its main settings.'); return null; }
+  if (!defs[info.type]){ FX.toast('pump ' + PM.fx[info.type].name + ' doesn’t have a full window yet. The FX boxes change its main settings.'); return null; }
   if (innerWidth < NARROW) for (const w of [...wins.values()]) w.close();   // a phone shows one window at a time
   const w = new Win(t, k, info); wins.set(id, w); w.raise();
   try { w.el.focus({preventScroll:true}); } catch(e){}

@@ -38,7 +38,7 @@ test('toast (B3): honours the time asked for, keeps a long message up, queues th
 /* ───────── M2: the mouse wheel adds up movement (a trackpad flick no longer runs a slider end to end) ───────── */
 test('wheel (M2): host sliders take a step per 100 px (a mouse notch), trackpad deltas add up, and a pause or turn starts again', () => {
   const blk = cut('index.html', /const wheelAcc = new WeakMap\(\);\nfunction wheelSteps\(key, e, per = 100\)\{[\s\S]*?\n\}\n/, 'wheelSteps');
-  let now = 1000; const c = run(blk + '\nthis.wheelSteps = wheelSteps;', { WeakMap, performance: { now: () => now } });
+  let now = 1000; const c = run('var wheelSign = 1;\n' + blk + '\nthis.wheelSteps = wheelSteps; this.sign = v => { wheelSign = v; };', { WeakMap, performance: { now: () => now } });
   const k1 = {}, k2 = {}, sum = (k, ev, n, dt = 8) => { let s = 0; for (let i = 0; i < n; i++){ now += dt; s += c.wheelSteps(k, ev); } return s; };
   assert.equal(c.wheelSteps(k1, { deltaY: 100, deltaMode: 0 }), 1, 'a mouse notch: one step');
   now += 500; assert.equal(sum(k1, { deltaY: 6, deltaMode: 0 }, 60), 3, 'a trackpad flick of 60 events x 6 px: 3 steps (was 60)');
@@ -48,6 +48,11 @@ test('wheel (M2): host sliders take a step per 100 px (a mouse notch), trackpad 
   now += 500; c.wheelSteps(k1, { deltaY: 60, deltaMode: 0 }); assert.equal(c.wheelSteps(k2, { deltaY: 60, deltaMode: 0 }), 0, 'each slider adds up its own');
   now += 500; assert.equal(c.wheelSteps(k1, { deltaY: -5000, deltaMode: 0 }), -8, 'one huge event: at most 8 steps');
   assert.equal(c.wheelSteps(k1, { deltaY: 0, deltaX: 0 }), 0);
+  // ONE WHEEL DIRECTION (owner, 7 Nov): with macOS Natural scrolling the deltaY comes flipped, so the steps flip back with it
+  c.sign(-1); now += 500; assert.equal(c.wheelSteps(k1, { deltaY: -100, deltaMode: 0 }), 1, 'Natural scrolling: pulling down (deltaY < 0) still steps down');
+  assert.match(H.read('index.html'), /function wheelNotch\(key, e\)\{\n  const raw = \(e\.deltaY \|\| e\.deltaX\) \* wheelSign,/, 'rows and tracker values flip too');
+  assert.match(H.read('index.html'), /const dy = \(e\.deltaMode === 1 \? e\.deltaY \* 40 : e\.deltaY\) \* wheelSign;/, 'Arrange flips too');
+  assert.match(H.read('electron/preload.js'), /naturalScroll: \(\) => ipcRenderer\.invoke\('thunder:natural-scroll'\)/, 'the desktop app reads the setting');
 });
 
 test('wheel (M2): …pump windows do the same for their knobs (kit.js wheelN)', () => {
@@ -309,11 +314,11 @@ test('one rule for value controls (3 Nov): faders, strip, FX bar and pump drag r
   assert.match(src, /base = clamp\(base \+ \(from - ev\.clientY\) \/ h \* 255 \* dragMul\(ev\), 0, 255\); from = ev\.clientY;/, 'strip fader');
   assert.match(src, /x = clamp\(x \+ \(ly - ev\.clientY\) \/ per \* dragMul\(ev\), q\.min, q\.max\); ly = ev\.clientY;/, 'FX bar values');
   assert.match(src, /out\.addEventListener\('dblclick', e => \{ e\.stopPropagation\(\); reset\(\); \}\);/, 'a slider readout double-click resets');
-  assert.match(src, /valMenu\(e, q\.l, \{reset:\(\) => set\(q\.d\), type:typeIt\}\)/, 'FX bar menu');
+  assert.match(src, /valMenu\(e, q\.l, \{reset:\(\) => set\(q\.d\), type:typeIt, lfo:[^}]*\}\)/, 'FX bar menu (and its Add LFO…)');
   assert.match(src, /const wheelOk = r => !!r && \(r\.hasAttribute\('data-wheel'\)/, 'data-wheel controls take the wheel after the rest');
   const k = H.read('pump/ui/kit.js');
   assert.match(k, /const dragMul = m => m\.shift \? 0\.1 : m\.cmd \? 4 : 1;/, 'pump: dragMul');
-  assert.match(k, /'Reset to default', 'Type a value…'\]/, 'pump: right-click menu');
+  assert.match(k, /'Reset to default', 'Type a value…'[,\]]/, 'pump: right-click menu');
   assert.match(k, /if \(c !== this\.wheelC\) return;/, 'pump: the wheel waits for the rest');
 });
 
@@ -380,4 +385,125 @@ test('build 398: …waves live engine', () => {
   assert.match(src, /if \(isWlV\(V\)\) return wlNode\(t, pad, V, kind, key\)/);
   assert.match(src, /ps = isPsV\(v\) \|\| isWlV\(v\)/);
   assert.ok(!/waves-worklet\.js\?v=31/.test(src));
+});
+
+/* ───────── FOLLOW PATTERN jumps on a change only (owner, 7 Nov: one phrase on a track trapped the cursor) ───────── */
+test('FOLLOW PATTERN: a track playing one phrase lets the cursor move off it; a new phrase or row still pulls it over', () => {
+  const blk = cut('index.html', /var fpHome = null;[^\n]*\nvar fpMem = null;[\s\S]*?\nfunction followPlay\(\)\{[\s\S]*?\n\}\n(?=\/\/ ARRANGE PAGES)/, 'fpMem and followPlay');
+  const c = run(`var tp = {on:true, mode:'song', pos:null}, sdrag = 0, drag = 0, tv = 'phrase', cTrack = 0, followMode = 1, selA = null,
+    cSect = 0, cPhrase = 0, arrHandT = -1e9, workT = -1e9, FOLLOW_HOLD = 4000, apReady = false, apF = '', apLastKey = '', cs = {phrase:{y:0}, song:{x:0, y:0}};
+    const plen = () => 16, pvActive = () => false, pvFollow = () => {}, arrFollowPage = () => {}, asongOn = () => false;
+    ${blk}
+    this.api = { step(P){ tp.pos = P; followPlay(); }, st: () => ({cPhrase, y: cs.song.y}), set(o){ if ('cPhrase' in o) cPhrase = o.cPhrase; if ('y' in o) cs.song.y = o.y; if ('tv' in o) tv = o.tv; },
+      stop(){ tp.on = false; fpMem = null; tp.on = true; } };`, { performance: { now: () => 1e6 } });
+  const P = (phrase, row) => [{ phrase, row, step: 0, sect: 0 }];
+  c.api.step(P(3, 0)); assert.equal(c.api.st().cPhrase, 3, 'the first step shows what plays');
+  c.api.set({ cPhrase: 7 });
+  for (let i = 0; i < 8; i++) c.api.step(P(3, 0));
+  assert.equal(c.api.st().cPhrase, 7, 'the same phrase playing on: the cursor stays where it was moved');
+  c.api.step(P(4, 1)); assert.equal(c.api.st().cPhrase, 4, 'a new phrase on the track still follows');
+  c.api.set({ tv: 'song' }); c.api.step(P(4, 1)); c.api.set({ y: 9 });
+  for (let i = 0; i < 8; i++) c.api.step(P(4, 1));
+  assert.equal(c.api.st().y, 9, 'Song screen: one block playing, the cursor stays on the row it was moved to');
+  c.api.step(P(5, 2)); assert.equal(c.api.st().y, 2, 'the next row playing still moves it');
+});
+
+test('dialog sliders take touch: the shared drag serves .ask on touch, and the row doesn\'t let the browser pan it away', () => {
+  const src = H.read('index.html');
+  assert.match(src, /const sliderOk = \(r, touch\) =>[^\n]*touch \? '#gset, \.rlock' : '#gset, \.rlock, \.ask'/, 'touch reaches dialogs');
+  assert.match(src, /!sliderOk\(r, e\.pointerType === 'touch'\)/, 'the drag says it is a touch');
+  assert.match(src, /\.acidr, \.acidf:has\(input\[type=range\]\)\{touch-action:pan-y\}/, 'no horizontal pan cancels the drag');
+});
+
+test('instrument big step: past either end it stays put rather than clamping to 00', () => {
+  assert.match(H.read('index.html'), /case 'inst': \{ if \(big && \(v \+ d \* 8 < 0 \|\| v \+ d \* 8 > NI - 1\)\) return;/);
+});
+
+test('mobile stalls: playhead-only Arrange redraws are thinned on touch, and the page sequencer moves on sooner there', () => {
+  const src = H.read('index.html');
+  assert.match(src, /if \(playDraw && COARSE\)\{ const t = performance\.now\(\); if \(t - arrPlayT < 240\) return;/);
+  assert.match(src, /s\.time < ctx\.currentTime - \(COARSE && !document\.hidden \? Math\.max\(0\.15, outLat \+ 0\.05\) : 0\.5\)/, 'desktop keeps 0.5 s');
+});
+
+test('Mobile: SHIFT+▲ goes to Arrange from every screen', () => {
+  assert.match(H.read('index.html'), /if \(dir === 'up' && isMobile\(\)\)\{ if \(apF === 'arr'\) return null; if \(apArrOk\(\)\)\{ apFocus\('arr', true\);/);
+});
+
+test('the pad has latching MUTE and SOLO', () => {
+  const src = H.read('index.html');
+  assert.match(src, /data-b="mute" id="kMute"/); assert.match(src, /data-b="solo" id="kSolo"/);
+  assert.match(src, /if \(b === 'mute' \|\| b === 'solo'\)\{ clearTimeout\(rep\); b === 'mute' \? muteKey\(true\) : soloKey\(\); return; \}/);
+});
+
+test('Phrase ◀ ▶ step one column at a time (no skipped INST / FX value / chord columns)', () => {
+  const blk = cut('index.html', /function move\(dx, dy\)\{[\s\S]*?\n\}\n/, 'move');
+  const run1 = (cols, from, dx) => {
+    const cs = { phrase: { x: from, y: 0 } };
+    const c = run(blk + '\nthis.go = () => move(' + dx + ', 0);', { tv: 'phrase', cs, dims: () => ({ w: 12, h: 16 }), pvActive: () => false, pCols: () => cols,
+      mstView: () => false, busFxView: () => false, draw() {}, FX0: 6 });
+    c.go(); return cs.phrase.x;
+  };
+  const mono = [0, 4, 5, 6, 7, 8, 9, 10, 11], poly = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
+  for (const cols of [mono, poly]) for (let i = 0; i < cols.length; i++) {
+    assert.equal(run1(cols, cols[i], 1), cols[Math.min(i + 1, cols.length - 1)], 'right from ' + cols[i]);
+    assert.equal(run1(cols, cols[i], -1), cols[Math.max(i - 1, 0)], 'left from ' + cols[i]);
+  }
+});
+
+/* ───────── usability audit leftovers (10 Nov): U4 sheet buttons, U6, U12, U14, U15, U16 ───────── */
+test('U4: sheet Close / Done buttons are at least 40 px tall on a touch screen', () => {
+  const html = H.read('index.html');
+  const blk = html.match(/@media \(pointer:coarse\)\{\n  \.top \.tsong[\s\S]*?\n\}\n/);
+  assert.ok(blk, 'the TOUCH TARGETS block moved');
+  for (const sel of ['.pbs .phd button', '.pbs .pft button', '.pbs .btnrow button', '.pbs .smbfoot button', '.phlhd button']) assert.ok(blk[0].includes(sel), sel + ' is in the coarse block');
+  assert.match(blk[0], /\.phlhd button\{min-height:40px\}\n\}\n$/, 'the sheet buttons get min-height 40px');
+  assert.match(html, /\.gsethead button\{min-height:40px/, 'the Settings Done stays 40 px');
+});
+
+test('U6: picking an engine on touch scrolls its editor into view; a mouse is left alone', () => {
+  const html = H.read('index.html');
+  assert.match(html, /if \(k !== curK\)\{ setEngine\(k\); engShowEditor\(\); \}/, 'the engine sheet calls engShowEditor after setEngine');
+  const fn = cut('index.html', /function touchUi\(\)[^\n]*\nfunction engShowEditor\(\)\{[\s\S]*?\n\}\n/, 'touchUi and engShowEditor');
+  let scrolled = 0, coarse = true;
+  const card = { hidden: false, offsetParent: {}, scrollIntoView(o) { scrolled++; assert.equal(o.block, 'start'); } };
+  const mk = () => run(fn + '\nthis.go = engShowEditor;', { isMobile: () => false, matchMedia: () => ({ matches: coarse }),
+    requestAnimationFrame: f => f(), document: { getElementById: id => id === 'blipCard' ? card : null } });
+  mk().go(); assert.equal(scrolled, 1, 'touch: scrolled to the visible engine card');
+  coarse = false; mk().go(); assert.equal(scrolled, 1, 'mouse: no scroll');
+});
+
+test('U12: the right-click wording in two settings is for the mouse only', () => {
+  const html = H.read('index.html');
+  for (const l of ['SONG MOUSE', 'ROW COLOR IN PATTERN']) {
+    const m = html.match(new RegExp("\\{l:'" + l + "', get ck\\(\\)\\{ return touchUi\\(\\) \\? '([^']*)' : '([^']*)'; \\}"));
+    assert.ok(m, l + ' has a touch and a mouse label');
+    assert.ok(!/right-click/i.test(m[1]), l + ': the touch label has no right-click'); assert.ok(/right-click/i.test(m[2]), l + ': the mouse label keeps it');
+  }
+  assert.match(html, /info:\(\) => touchUi\(\) \? 'In Pattern view, press and hold/, 'ROW COLOR IN PATTERN info');
+});
+
+test('U14: a picker row with no description has no second line', () => {
+  assert.match(H.read('index.html'), /if \(gn\) b\.append\(el\('small', null, gn\)\)/, 'perfPick adds the small line only when there is a group name');
+});
+
+test('U15: hints show the platform key (MODK), never the literal "Ctrl/⌘", in script strings', () => {
+  const html = H.read('index.html'), i0 = html.indexOf('/* ===ENGINE START=== */'), i1 = html.indexOf('<script src="pump/ui/kit.js');
+  assert.ok(i0 > 0 && i1 > i0);
+  const decl = cut('index.html', /const MODK = [^\n]*;/, 'MODK');   // the page's own line, run as shipped
+  // a literal "Ctrl/⌘" may stay in comments, the What's new entries and the static Help page (before the script), nowhere else
+  const live = html.slice(i0, i1).split('\n').filter(l => l.includes('Ctrl/⌘') && !/^\s*(\/\/|\/\*|\*|-|\[\d+, '|'pump windows)/.test(l))
+    .filter(l => !/^\s{2,}[^'"`]*$/.test(l) && /['"`][^'"`]*Ctrl\/⌘[^'"`]*['"`]/.test(l.replace(/\/\/.*$/, '')));
+  assert.deepEqual(live.map(l => l.trim().slice(0, 80)), [], 'these still show Ctrl/⌘ to the user');
+  const m = run(decl + ' this.v = MODK;', { navigator: { platform: 'MacIntel' } });
+  assert.equal(m.v, '⌘'); assert.equal(run(decl + ' this.v = MODK;', { navigator: { platform: 'Win32' } }).v, 'Ctrl'); assert.equal(run(decl + ' this.v = MODK;', {}).v, 'Ctrl', 'no navigator (the engine golden harness): Ctrl');
+});
+
+test('U16: under-contrast text in IDM, IDM pink & green, IDM pink paper and 909 gets a darker colour; backgrounds are untouched', () => {
+  const html = H.read('index.html'), at = html.indexOf('/* CONTRAST (usability audit U16)'); assert.ok(at > 0, 'the U16 block');
+  const css = html.slice(at, html.indexOf('</style>', at));
+  assert.match(css, /\.tclk\.live b\{color:var\(--mx\)\}/, 'BPM / LPB while playing');
+  assert.match(css, /idmpink"\]\.tpon[^{]*\{color:#0a1a12!important\}/, 'Stop on pink paper');
+  assert.match(css, /\.stgph\{color:var\(--ts-rn\)\}/, 'the stage label');
+  assert.match(css, /tr909"\] :is\(\.tagp b\.gp, \.tgrid span\.pvh\.gp\)\{color:var\(--mxon\)\}/, 'POLY labels on the 909');
+  assert.ok(!/background/.test(css.replace(/\/\*[\s\S]*?\*\//g, '')), 'colour only: no background is changed');
 });

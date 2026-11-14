@@ -163,3 +163,52 @@ test('waves: soft() is exact where the app depends on it (identity below the kne
   assert.ok(Math.abs(soft(.8) - soft(.8 + 1e-9)) < 1e-6); for (const x of [.3, .9, 1.7]) assert.equal(soft(-x), -soft(x));
   assert.ok(Math.abs(soft(1) - 0.9523) < 1e-3, 'pinned value at 1.0 (' + soft(1).toFixed(5) + ')');
 });
+
+/* …WAVES LIVE (8 Nov): a node plays one Out bus and runs only what feeds it (setOnly). The bus must come out the same, sample for
+   sample, and whatever can't be proven safe must keep running. */
+function twoBusDoc(extra = {}) {
+  const v = (id, wave) => ({ id, type: 'vco', scope: 'poly', params: { wave, tune: 0, fine: 0 } });
+  return { format: 'waves.patch', version: 1, modules: [
+    { id: 'h', type: 'hostIn', scope: 'poly', params: { transpose: 0 } },
+    v('a', 1), { id: 'ea', type: 'adsr', scope: 'poly', params: { a: .005, d: .2, s: .7, r: .05 } }, { id: 'ga', type: 'vca', scope: 'poly', params: { gain: 1 } }, { id: 'o1', type: 'out', scope: 'mono', params: { slot: 1, level: 1 } },
+    v('b', 2), { id: 'gb', type: 'vca', scope: 'poly', params: { gain: 1 } }, { id: 'o2', type: 'out', scope: 'mono', params: { slot: 2, level: 1 } },
+    ...(extra.modules || [])],
+  cables: [
+    { from: ['h', 'pitch'], to: ['a', 'pitch'] }, { from: ['h', 'gate'], to: ['ea', 'gate'] }, { from: ['a', 'out'], to: ['ga', 'in'] }, { from: ['ea', 'out'], to: ['ga', 'cv'] }, { from: ['ga', 'out'], to: ['o1', 'in'] },
+    { from: ['h', 'pitch'], to: ['b', 'pitch'] }, { from: ['b', 'out'], to: ['gb', 'in'] }, { from: ['ea', 'out'], to: ['gb', 'cv'] }, { from: ['gb', 'out'], to: ['o2', 'in'] },
+    ...(extra.cables || [])] };
+}
+function playBus(D, doc, bus, only) {
+  const e = new D.WavesEngine(48000, { maxVoices: 4, transport: TRANSPORT, seed: 1234, costCeiling: Infinity });
+  e.loadPatch(doc); if (only) e.setOnly(only);
+  const k = e.voices.on(-12, 1), out = [];
+  for (let b = 0; b < 300; b++) { if (b === 200) { e.voices.rows[k].gate = 0; e.voices.rows[k].offAt = e.voices.now; } e.process(128); out.push(...e.bus(bus), ...e.busR(bus)); }
+  const r = { out, only: e.only && [...e.only].sort(), cull: () => e._cull() }; e.dispose(); return r;
+}
+test('…waves live: running one bus sounds the same and skips what only feeds the others', () => {
+  const { D, ctx } = engine(), doc = twoBusDoc();
+  ctx.Math.random = () => .25;   // oscillators start at a random phase; skipped ones would take fewer of the random numbers
+  for (const bus of [1, 2]) {
+    const full = playBus(D, doc, bus, 0), one = playBus(D, doc, bus, bus);
+    assert.ok(full.out.some(x => Math.abs(x) > .01), 'it plays');
+    let at = -1; for (let i = 0; i < full.out.length && at < 0; i++) if (one.out[i] !== full.out[i]) at = i;
+    assert.equal(at, -1, 'bus ' + bus + ' is identical, sample for sample');
+    assert.equal(full.only, null, 'without setOnly everything runs');
+  }
+  assert.deepEqual(playBus(D, doc, 1, 1).only, ['a', 'ea', 'ga', 'h', 'o1']);
+  assert.deepEqual(playBus(D, doc, 2, 2).only, ['b', 'ea', 'gb', 'h', 'o2']);
+});
+test('…waves live: what can\'t be skipped safely keeps running', () => {
+  const { D } = engine();
+  const seq = twoBusDoc({ modules: [{ id: 's', type: Object.keys(D.MODULES).find(k => D.MODULES[k].playsNotes), scope: 'mono', params: {} }] });
+  assert.ok(playBus(D, seq, 1, 1).only.includes('s'), 'the Sequencer plays voices with no cable, so it stays');
+  const lfoDoc = twoBusDoc({ modules: [{ id: 'l', type: 'lfo', scope: 'mono', params: {} }], cables: [{ from: ['l', Object.keys(D.MODULES.lfo.outputs)[0]], to: ['o1', 'p:slot'] }] });
+  assert.equal(playBus(D, lfoDoc, 1, 1).only, null, 'an Out whose slot is modulated: everything runs');
+  const noExit = twoBusDoc(); noExit.cables = noExit.cables.filter(c => c.to[0] !== 'o1');
+  assert.equal(playBus(D, noExit, 1, 1).only, null, 'no voice audio left on this bus: everything runs');
+  const e = new D.WavesEngine(48000, { maxVoices: 4, transport: TRANSPORT, costCeiling: Infinity });
+  e.loadPatch(twoBusDoc()); e.setOnly(1); e.process(128); assert.ok(e.only.has('a'));
+  e.setOnly(2); e.process(128); assert.ok(!e.only.has('a') && e.only.has('b'), 'changing the Bus follows');
+  e.setParam('o1', 'slot', 2); e.process(128); assert.ok(e.only.has('a') && e.only.has('b'), 'an Out moved onto this bus is picked up');
+  e.setOnly(0); e.process(128); assert.equal(e.only, null, 'off again'); e.dispose();
+});
