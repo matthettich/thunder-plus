@@ -5589,8 +5589,135 @@ function pumpModule(key, d){
 }
 const PUMP_MODULES = {}; for (const k in PUMP_CH) PUMP_MODULES[k] = pumpModule(k, PUMP_CH[k]);
 /* ===PUMP MODULES END=== */
+/* MORPH (14 Nov, module queue; …chains only): two stereo sounds, A and B, combined frame by frame in the frequency
+   domain. Each frame (Frame samples, a new one every quarter frame) of each input is turned into its spectrum; a new
+   spectrum is made from the two and turned back into sound. It is one frame late (the def's latency says the default's;
+   show() the real one), about 11, 21 or 43 ms at 48 kHz.
+   Mode Convolve: the two spectra's strengths are multiplied, so only what both sounds have at the same frequency at the
+   same moment is heard (cross-synthesis); the partials keep A's phases. Sharpness is the power the product is raised
+   to: low keeps more of each sound, high leaves only the strongest shared partials. One side silent: silence.
+   Mode Shape: B's spectral shape (its formants, the outline of its spectrum) is put on A's own partials, the way a
+   vocoder does, so A always sounds, with B's vowel. Sharpness is how fine an outline is taken (low: broad, high: every
+   bump). B silent: A as it is.
+   Morph: 0 is A alone, the middle the combined sound, 1 B alone (all three one frame late, so they line up).
+   Smoothing: how slowly the spectra are allowed to change (0: frame by frame; up: a wash). Freeze holds A's or B's
+   spectrum as it is now (its partials keep turning, so it sustains instead of buzzing).
+   Level: in Convolve what the two share comes out about as loud as they are and the rest falls away (no make-up gain: it
+   would turn up what they do not share); in Shape the frame is given A's own loudness (at most 30 dB of lift). Then
+   everything leaves through a limiter (untouched inside -1..1, bent towards 2 above).
+   Cost: per frame and channel two transforms in and one out; the right channel's frames fall half a hop after the
+   left's so no block does both; with nothing patched into either right input only one channel is worked out. */
+const MORPH_SIZES = [512, 1024, 2048];
+const morphChan = () => ({ fa:new Float32Array(2048), fb:new Float32Array(2048), acc:new Float32Array(2048), oq:new Float32Array(512), x:new Float32Array(2048),
+  ar:new Float32Array(1025), ai:new Float32Array(1025), br:new Float32Array(1025), bi:new Float32Array(1025), yr:new Float32Array(1025), yi:new Float32Array(1025),
+  ma:new Float32Array(1025), mb:new Float32Array(1025), pa:new Float32Array(1025), pb:new Float32Array(1025), da:new Float32Array(1025), db:new Float32Array(1025),
+  qa:new Float32Array(1025), qb:new Float32Array(1025), ta:new Float32Array(1025), tb:new Float32Array(1025), ea:new Float32Array(1026), eb:new Float32Array(1026), g:1, has:0 });
+const MorphM = {
+  type:'morph', scope:'mono', cost:1.2, latency:1024,
+  inputs:{ in:'audio', inR:'audio', inB:'audio', inBR:'audio' }, outputs:{ out:'audio', outR:'audio' },
+  params:{ mode:[0,0,1,1], morph:[.5,0,1,.01], sharp:[.5,0,1,.01], smooth:[.2,0,1,.01], frame:[1,0,2,1], freeze:[0,0,2,1], level:[0,-24,24,.1] },
+  create:() => ({ c:[morphChan(), morphChan()], N:0, cl:0, cr:0, W:null, fft:null, fz:0, out:[0, 0] }),
+  process(st, io, ctx){
+    const p = io.p, N = MORPH_SIZES[clamp(p.frame | 0, 0, 2)], H = N >> 2, c0 = st.c[0], c1 = st.c[1];
+    if (st.N !== N){   // a new frame size: start clean (the only time anything is looked up; the tables are kept per size)
+      st.N = N; st.W = MORPH_WIN[N] || (MORPH_WIN[N] = hannWin(N)); st.fft = FFTR.get(N); st.cl = 0; st.cr = H >> 1;
+      for (const c of st.c){ c.fa.fill(0); c.fb.fill(0); c.acc.fill(0); c.oq.fill(0); c.ma.fill(0); c.mb.fill(0); c.pa.fill(1); c.pb.fill(1); c.da.fill(1); c.db.fill(1); c.ta.fill(0); c.tb.fill(0); c.qa.fill(0); c.qb.fill(0); c.g = 1; c.has = 0; }
+    }
+    const A = io.in.in, Bn = io.in.inB, sA = linked(io, 'inR'), sB = linked(io, 'inBR'), stereo = sA || sB;
+    const AR = sA ? io.in.inR : A, BR = sB ? io.in.inBR : Bn, oL = io.out.out, oR = io.out.outR, lv = dbLin(clamp(p.level, -24, 24));
+    const mode = p.mode >= .5 ? 1 : 0, mo = clamp(p.morph, 0, 1), sh = clamp(p.sharp, 0, 1), fz = clamp(p.freeze | 0, 0, 2);
+    const ks = p.smooth < .005 ? 1 : 1 - Math.exp(-H / (ctx.sr * (.004 + p.smooth * p.smooth * .6)));   // Smoothing: none at 0, then 4 ms to 0.6 s
+    let cl = st.cl, cr = st.cr;
+    for (let i = 0; i < ctx.block; i++){
+      const a = A[i], b = Bn[i];
+      c0.fa[N - H + cl] = a > -8 && a < 8 ? a : 0; c0.fb[N - H + cl] = b > -8 && b < 8 ? b : 0;
+      let y = c0.oq[cl] * lv; if (!(y > -1 && y < 1)){ if (y !== y) y = 0; else if (y < 0) y = -1 - Math.tanh(-y - 1); else y = 1 + Math.tanh(y - 1); }
+      oL[i] = y;
+      if (++cl === H){ cl = 0; morphFrame(st, c0, N, mode, mo, sh, ks, fz); }
+      if (stereo){
+        const ar = AR[i], br = BR[i];
+        c1.fa[N - H + cr] = ar > -8 && ar < 8 ? ar : 0; c1.fb[N - H + cr] = br > -8 && br < 8 ? br : 0;
+        let z = c1.oq[cr] * lv; if (!(z > -1 && z < 1)){ if (z !== z) z = 0; else if (z < 0) z = -1 - Math.tanh(-z - 1); else z = 1 + Math.tanh(z - 1); }
+        oR[i] = z;
+        if (++cr === H){ cr = 0; morphFrame(st, c1, N, mode, mo, sh, ks, fz); }
+      } else oR[i] = y;
+    }
+    st.cl = cl; st.cr = cr; st.fz = fz;
+  },
+  show(st){ st.out[0] = st.N; st.out[1] = st.fz; return st.out; }
+};
+const MORPH_WIN = {};
+/* One frame of one channel. No angle is ever worked out: a partial's phase is kept as a point on the unit circle
+   (ua / va for A, ub / vb for B), and while a side is frozen each point is turned by the step it took between its last two
+   live frames (ra / sa, rb / sb), so a held spectrum goes on sounding its partials at their own pitches. */
+function morphFrame(st, c, N, mode, mo, sh, ks, fz){
+  const H = N >> 2, K = (N >> 1) + 1, W = st.W, x = c.x, fft = st.fft, ar = c.ar, ai = c.ai, br = c.br, bi = c.bi, yr = c.yr, yi = c.yi;
+  const ma = c.ma, mb = c.mb, ua = c.pa, va = c.qa, ra = c.da, sa = c.ta, ub = c.pb, vb = c.qb, rb = c.db, sb = c.tb;
+  for (let i = 0; i < N; i++) x[i] = c.fa[i] * W[i]; fft.forward(x, ar, ai);
+  for (let i = 0; i < N; i++) x[i] = c.fb[i] * W[i]; fft.forward(x, br, bi);
+  c.fa.copyWithin(0, H, N); c.fb.copyWithin(0, H, N);
+  const first = !c.has, holdA = fz === 1 && !first, holdB = fz === 2 && !first; c.has = 1;
+  let pkA = 0, pkB = 0, EA = 0, EB = 0;
+  for (let k = 0; k < K; k++){
+    if (holdA){ const u = ua[k] * ra[k] - va[k] * sa[k], v = ua[k] * sa[k] + va[k] * ra[k], n = u * u + v * v, q = n > 1e-30 ? 1 / Math.sqrt(n) : 0; ua[k] = u * q; va[k] = v * q; }
+    else {
+      const re = ar[k], im = ai[k], a = Math.sqrt(re * re + im * im), q = a > 1e-20 ? 1 / a : 0, u = q ? re * q : 1, v = im * q;
+      ra[k] = u * ua[k] + v * va[k]; sa[k] = v * ua[k] - u * va[k]; ua[k] = u; va[k] = v;   // this frame's point times the last one's mirror: the step between them
+      let m = ma[k] + (a - ma[k]) * ks; if (m < 1e-15) m = 0; ma[k] = m;
+    }
+    if (holdB){ const u = ub[k] * rb[k] - vb[k] * sb[k], v = ub[k] * sb[k] + vb[k] * rb[k], n = u * u + v * v, q = n > 1e-30 ? 1 / Math.sqrt(n) : 0; ub[k] = u * q; vb[k] = v * q; }
+    else {
+      const re = br[k], im = bi[k], b = Math.sqrt(re * re + im * im), q = b > 1e-20 ? 1 / b : 0, u = q ? re * q : 1, v = im * q;
+      rb[k] = u * ub[k] + v * vb[k]; sb[k] = v * ub[k] - u * vb[k]; ub[k] = u; vb[k] = v;
+      let m = mb[k] + (b - mb[k]) * ks; if (m < 1e-15) m = 0; mb[k] = m;
+    }
+    const A2 = ma[k], B2 = mb[k]; if (A2 > pkA) pkA = A2; if (B2 > pkB) pkB = B2; EA += A2 * A2; EB += B2 * B2;
+  }
+  // the three parts of Morph: A alone, the combined sound, B alone
+  const wA = mo < .5 ? 1 - mo * 2 : 0, wB = mo > .5 ? mo * 2 - 1 : 0, wC = 1 - wA - wB;
+  let g = 0;
+  if (wC > 0){
+    if (mode === 0){
+      // Convolve: (|A| |B|) ^ e, e from 0.5 (the geometric mean of the two) to 1.5, brought back to the size of a magnitude by the
+      // two spectra's own peaks: where both peak together it is as loud as they are, where only one has anything it is next to nothing
+      // (no make-up gain: that would turn up exactly what the two do NOT share). It keeps A's phases.
+      const e = .5 + sh, ref = pkA * pkB;
+      if (!(ref > 1e-30)) for (let k = 0; k < K; k++) yr[k] = 0;
+      else if (e > .999 && e < 1.001){ const nrm = 1 / Math.sqrt(ref); for (let k = 0; k < K; k++) yr[k] = ma[k] * mb[k] * nrm; }
+      else { const nrm = Math.pow(ref, .5 - e); for (let k = 0; k < K; k++){ const m = ma[k] * mb[k]; yr[k] = m > 1e-30 ? Math.pow(m, e) * nrm : 0; } }
+      g = 1;
+    } else {
+      // Shape: the outline of each spectrum is its magnitudes averaged over a few bins either side (fewer the sharper); A keeps its
+      // own fine detail (A / A's outline) and takes B's outline, scaled so the frame is as loud as A was
+      const hw = Math.max(1, Math.round((2 + (1 - sh) * 30) * N / 1024)), ea = c.ea, eb = c.eb;
+      ea[0] = 0; eb[0] = 0; for (let k = 0; k < K; k++){ ea[k + 1] = ea[k] + ma[k]; eb[k + 1] = eb[k] + mb[k]; }
+      let Er = 0; const useB = EB > 1e-18, fla = ea[K] / K * .02 + 1e-12, flb = eb[K] / K * .02;
+      for (let k = 0; k < K; k++){
+        const lo = k - hw < 0 ? 0 : k - hw, hi = k + hw + 1 > K ? K : k + hw + 1, n = hi - lo, oa = (ea[hi] - ea[lo]) / n, ob = (eb[hi] - eb[lo]) / n;
+        const v = useB ? ma[k] / (oa + fla) * (ob + flb) : ma[k]; yr[k] = v; Er += v * v;   // (the floors: an outline never goes to nothing, so A always sounds)
+      }
+      g = Er > 1e-30 ? Math.min(32, Math.sqrt(EA / Er)) : 0;
+    }
+    // the level moves smoothly from frame to frame (a sudden match would pump)
+    c.g += (g - c.g) * .5; if (!(c.g <= 32)) c.g = c.g > 32 ? 32 : 0; g = c.g * wC;
+  }
+  for (let k = 0; k < K; k++){
+    let re = 0, im = 0;
+    if (wC > 0){ const m = yr[k] * g; re = m * ua[k]; im = m * va[k]; }
+    if (wA > 0){ if (holdA){ const m = ma[k] * wA; re += m * ua[k]; im += m * va[k]; } else { re += ar[k] * wA; im += ai[k] * wA; } }
+    if (wB > 0){ if (holdB){ const m = mb[k] * wB; re += m * ub[k]; im += m * vb[k]; } else { re += br[k] * wB; im += bi[k] * wB; } }
+    yr[k] = re; yi[k] = im;
+  }
+  fft.inverse(yr, yi, x);
+  const acc = c.acc, oq = c.oq;
+  for (let i = 0; i < N; i++){ const v = acc[i] + x[i] * W[i] * MORPH_OLA; acc[i] = v === v && v > -1e6 && v < 1e6 ? v : 0; }
+  for (let i = 0; i < H; i++) oq[i] = acc[i];
+  acc.copyWithin(0, H, N); acc.fill(0, N - H, N);
+}
+const MORPH_OLA = 1 / 1.5;   // Hann squared at a quarter-frame hop adds up to 1.5
+
 const MODULES = { ...SHARED_MODULES, ...PUMP_MODULES, trackIn:TrackIn,
-  vocoder:Vocoder,
+  vocoder:Vocoder, morph:MorphM,
   vcf:VCF, vca:VCA, mixer:Mixer, smixer:StereoMixer,
   eq:EQ, comp:Comp, saturation:Saturation, tape:Tape, chorus:Chorus, crush:Crush, delay:Delay, reverb:Reverb, rings:Rings, clouds:Clouds, beads:Beads,
   flanger:FlangerFx, tremolo:TremoloFx, odrive:OdriveFx, folder:FolderFx, autowah:AutowahFx, pshift:PshiftFx, ladder:LadderFx, xmod:XmodFx, space:SpaceFx, lofi:LofiFx, drive:DriveFx, air:AirFx, room:RoomFx,
