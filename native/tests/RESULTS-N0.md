@@ -56,3 +56,63 @@ Remaining small gaps found (for the lead; no `HANDOVER.md` edit was made from `n
    A song using a user font needs that font on the other device; the native app must say how it finds it (H3 / U32).
 4. `ELECTRO.thunder` and the owner's `acid.thunder` carry no embedded samples (`CENSUS.md`: 0 samples), so neither
    exercises sample embedding on load.
+
+## A3. Android shell v0: what is proven in CI, and what is not
+
+Built in CI (run 43688661447, commit b092029; job "Android shell v0 (debug APK)" green). Debug APK
+`thunder-plus-native-n0-android-5.apk`, 41.8 MB, sha256 `848a4cba5ee9b23a9b56673daeb7b3207bea5ac781b5827a4d24de1dd6151d35`,
+attached to the GitHub PRE-release `native-n0-android-5`
+(https://github.com/matthettich/thunder-plus/releases/tag/native-n0-android-5). From the job log (`aapt2 dump badging`
+and `unzip -l`): package `app.thunderplus.nativetest`, minSdk 29, target 35, native code `arm64-v8a` only,
+`lib/arm64-v8a/libthunder_android.so` (1.0 MB), the real `assets/index.html` (3.6 MB) with `chains/`, `waves/`, `pump/`,
+`lxr/` wasm files beside it, permissions FOREGROUND_SERVICE, FOREGROUND_SERVICE_MEDIA_PLAYBACK, POST_NOTIFICATIONS
+(no WAKE_LOCK, no INTERNET).
+
+| Check | Where | Result |
+|---|---|---|
+| Test core: stopped = silence, hits land exactly on the core's own sample grid (24000 frames per quarter note at 120 bpm), clock events ten a second, echo, unknown commands refused, bulk put | CI (Linux, Windows, macOS: `ctest core_pattern`) | PASS |
+| APK assembles with the NDK, miniaudio AAudio backend, the core linked in | CI | PASS |
+| Installs on an Android 14+ device, the page loads, Play makes the click pattern audible (the plan's BrowserStack gate) | not run: no BrowserStack access in the build session | open |
+| Clock 1.00 s in 1.00 s, underruns, output latency (A6) | owner's device (`OWNER-TEST-N0.md`) | open |
+
+Nothing was run on a device or emulator by the build session. The APK is untested at run time: expect the first install
+to show small shell bugs.
+
+What was built (all under `native/`): `core/` (the C API of WORKPLAN section 10, plus `thunder_put_info` and
+`thunder_host_stats`, both additions for N0), `android/` (Kotlin: `MainActivity` with the overlay, `ThunderHost`,
+`ThunderService` of type mediaPlayback, `Bridge`, `MimeAssets`; JNI + miniaudio in `app/src/main/cpp/`).
+Marked `// F-REVIEW` for the lead: the audio callback `dataCallback` in `native/android/app/src/main/cpp/jni.cpp`, and
+`thunder_process` in `native/core/src/core.cpp`.
+
+## A4. Bridge transport proof: code is in, the timed numbers are the owner's device
+
+Code: `native/android/app/src/main/java/app/thunderplus/nativetest/Bridge.kt` (WebMessagePort pair for `send` / `on` /
+`ask`, ArrayBuffer path (a), base64-to-file path (b) through `addWebMessageListener`), the page shim
+`app/src/main/res/raw/thunder_bridge.js` (`window.thunderCore`), the test page `app/src/debug/assets/bridge-test.html`
+(overlay button "Bridge test"; debug builds only). Echoes go through the C++ core's command queue and event queue (the
+audio thread answers), so the round trip includes the core.
+
+| Measurement | Measurable where | Result |
+|---|---|---|
+| Echo, 60 messages a second for 5 minutes: sent / received / lost / duplicates | owner's device | open |
+| Echo round trip: median, 99th percentile, worst (ms) | owner's device | open |
+| 53 MB (13.25 M floats): (a1) one ArrayBuffer message, seconds | owner's device | open |
+| 53 MB: (a2) ArrayBuffer in 1 MB chunks, seconds | owner's device | open |
+| 53 MB: (b) base64 chunks to a file, then the core reads it: seconds, split into write and core read | owner's device | open |
+| Does the core hold every float afterwards (count and exact sum) | owner's device (the page checks it) | open |
+| Core side only: `thunder_put` of 53 MB in 1 MB chunks, no web view | CI Linux runner | 20 to 29 ms (floor; the bridge paths cost far more) |
+| Device model, Android version, WebView version, `WEB_MESSAGE_ARRAY_BUFFER` supported | owner's device (the page prints them) | open |
+
+Not done and why: path (b) as the plan words it, "a `WebViewAssetLoader` POST handler", is not possible: the loader's
+`PathHandler.handle(path)` receives no request body, so POSTed bytes never reach it. The file path therefore uses
+`addWebMessageListener` with base64 strings (about 33 % more bytes, plus encode / decode time), which the plan names as the
+alternative. Fable picks the path and updates CORE-BRIDGE sections 2 and 6 once the numbers are in.
+
+## Stand-ins the lead replaces
+
+- The `clock` events come from a small stand-in in the test core (`thunder_process`, "ten a second") with the host's output
+  latency and underrun count passed in by `thunder_host_stats`. A5's clock logger replaces both. Output latency is an
+  estimate from AAudio's frame timestamp (`jni.cpp` `probeLoop`); underruns are AAudio's own `getXRunCount`, read through
+  `dlsym` on the stream pointer inside miniaudio's device (a read of miniaudio's internal field `aaudio.pStreamPlayback`,
+  fine while the vendored header is pinned at 0.11.26).
+- The overlay's ratio is cumulative from the first second (a one-second window is too jittery for the plan's +-0.1 %).
