@@ -18,16 +18,19 @@ open(p,'w').write(n)
 PY
 # Marbles / Tides ramp extractors (mods/build.sh)
 R="$E/marbles/ramp/ramp_extractor.cc"
-sed -i 's#^namespace marbles {#extern float marbles_sample_rate_hz;\nnamespace marbles {#' "$R"
-sed -i 's#1.0f / (100.0f / 32000.0f)#1.0f / (100.0f / marbles_sample_rate_hz)#; s#reset_interval_ = 32000 \* 3;#reset_interval_ = uint32_t(marbles_sample_rate_hz * 3.0f);#; s#std::max(4.0f / target_frequency_, 32000 \* 3.0f)#std::max(std::max(4.0f / target_frequency_, 4.0f * period), marbles_sample_rate_hz * 3.0f)#' "$R"
+# GNU sed is needed (-i with no suffix, \n in a replacement). macOS ships BSD sed: brew install gnu-sed gives gsed.
+SED=sed; if command -v gsed >/dev/null 2>&1; then SED=gsed; fi
+if ! $SED --version 2>/dev/null | grep -q GNU; then echo "prepare.sh: GNU sed not found (macOS: brew install gnu-sed)" >&2; exit 1; fi
+$SED -i 's#^namespace marbles {#extern float marbles_sample_rate_hz;\nnamespace marbles {#' "$R"
+$SED -i 's#1.0f / (100.0f / 32000.0f)#1.0f / (100.0f / marbles_sample_rate_hz)#; s#reset_interval_ = 32000 \* 3;#reset_interval_ = uint32_t(marbles_sample_rate_hz * 3.0f);#; s#std::max(4.0f / target_frequency_, 32000 \* 3.0f)#std::max(std::max(4.0f / target_frequency_, 4.0f * period), marbles_sample_rate_hz * 3.0f)#' "$R"
 [ "$(grep -c marbles_sample_rate_hz "$R")" = 4 ] || { echo "Marbles ramp extractor patch failed" >&2; exit 1; }
 T="$E/tides2/ramp/ramp_extractor.h"
-sed -i 's#^  void Reset();#  void Reset();\n  void Restart() { reset_counter_ = 1; }#' "$T"
+$SED -i 's#^  void Reset();#  void Reset();\n  void Restart() { reset_counter_ = 1; }#' "$T"
 grep -q 'void Restart()' "$T" || { echo "Tides ramp extractor patch failed" >&2; exit 1; }
 # Cloud Seed: smaller delay buffers (tfx/build.sh)
 cp -r "$D/CloudSeedCore" "$O/cs"; rm -rf "$O/cs/.git"; C="$O/cs"
-sed -i 's/DelayBufferSize = 192000 \* 2;/DelayBufferSize = 32768;/' "$C/DSP/ModulatedDelay.h" "$C/DSP/MultitapDelay.h"
-sed -i 's/DelayBufferSize = 19200;/DelayBufferSize = 2400;/' "$C/DSP/ModulatedAllpass.h"
+$SED -i 's/DelayBufferSize = 192000 \* 2;/DelayBufferSize = 32768;/' "$C/DSP/ModulatedDelay.h" "$C/DSP/MultitapDelay.h"
+$SED -i 's/DelayBufferSize = 19200;/DelayBufferSize = 2400;/' "$C/DSP/ModulatedAllpass.h"
 grep -q 'DelayBufferSize = 32768' "$C/DSP/ModulatedDelay.h" && grep -q 'DelayBufferSize = 2400' "$C/DSP/ModulatedAllpass.h" || { echo "Cloud Seed patch failed" >&2; exit 1; }
 # Airwindows: no VST host (default: throw -> break, createEffectInstance removed)
 A="$D/airwindows/plugins/LinuxVST/src"
