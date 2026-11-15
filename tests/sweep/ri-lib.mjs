@@ -29,6 +29,8 @@ export function variant(proj, o = {}) {
 // ---- one session: load a variant, then render and / or capture live ----
 export async function session(projText, opts = {}) {
   const A = await open(); const { page } = A;
+  if (opts.roundStart) await A.page.evaluate(() => { const o = AudioBufferSourceNode.prototype.start; AudioBufferSourceNode.prototype.start = function (when, ...r) { if (this.context instanceof OfflineAudioContext && when > 0) when = Math.ceil(when * this.context.sampleRate - 1e-6) / this.context.sampleRate; return o.call(this, when, ...r); }; });   // EXPERIMENT: whole-sample note starts in the offline render, as the core's sampler does const { page } = A;
+  if (opts.roundParams) await page.evaluate(() => { const q = t => (t > 0 ? Math.ceil(t * 44100 - 1e-6) / 44100 : t), P = AudioParam.prototype; for (const m of ['setValueAtTime', 'linearRampToValueAtTime', 'exponentialRampToValueAtTime', 'cancelScheduledValues', 'cancelAndHoldAtTime']) { const o = P[m]; P[m] = function (a, b) { return m === 'setValueAtTime' || m.endsWith('RampToValueAtTime') ? o.call(this, a, q(b)) : o.call(this, q(a)); }; } });   // EXPERIMENT: parameter events on whole samples
   const run = src => page.evaluate(s => window.__seqTest.ev(s), `(async()=>{${src}\n})()`);
   await page.evaluate(t => window.__seqTest.load(t, 'acid.thunder'), projText);
   await page.waitForTimeout(1500);

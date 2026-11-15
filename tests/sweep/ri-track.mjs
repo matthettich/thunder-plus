@@ -11,7 +11,7 @@ fs.mkdirSync(OUT, { recursive: true });
 const opts = { from: FROM, rows: ROWS, solo: list(arg('solo', '')).map(Number), dropFx: list(arg('drop', '')), dropAllFx: list(arg('dropAll', '')).map(Number), noLfo: !!arg('nolfo', false), dropMaster: !!arg('dropmaster', false), noLimiter: !!arg('nolimiter', false), noMst: !!arg('nomst', false) };
 if (arg('lfoOnly', null)) opts.lfoOnly = list(arg('lfoOnly', ''));
 const proj = variant(fs.readFileSync(arg('song', '/home/claude/acid/acid.thunder'), 'utf8'), opts);
-let S = await session(proj); const R = await S.render(); await S.close(); save(path.join(OUT, TAG + '-render.f32'), R.data);
+let S = await session(proj, { roundStart: !!arg('roundstart', false), roundParams: !!arg('roundparams', false) }); const R = await S.render(); await S.close(); save(path.join(OUT, TAG + '-render.f32'), R.data);
 const mono = d => Float32Array.from({ length: d.length / 2 }, (_, i) => (d[2*i] + d[2*i+1]) / 2);
 const out = [];
 for (let li = 0; li < NL; li++) {
