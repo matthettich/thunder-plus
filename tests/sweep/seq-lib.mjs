@@ -17,7 +17,7 @@ export async function open(opts = {}) {
   });
   await new Promise(ok => srv.listen(0, ok));
   const port = srv.address().port;
-  const browser = await chromium.launch({ ...(CHROME ? { executablePath: CHROME } : {}), args: ['--autoplay-policy=no-user-gesture-required'] });
+  const browser = await chromium.launch({ ...(CHROME ? { executablePath: CHROME } : {}), args: ['--autoplay-policy=no-user-gesture-required', ...(process.env.CHROME_ARGS ? process.env.CHROME_ARGS.split(' ') : [])] });
   const context = await browser.newContext({ viewport: { width: 1400, height: 900 }, acceptDownloads: true });
   const page = await context.newPage();
   const errors = [];

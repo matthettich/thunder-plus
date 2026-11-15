@@ -19334,6 +19334,19 @@ const TFX_SRC = `
    output went past ±8 was started afresh every block, so a loud signal through a lot of Output or Makeup gain was heard
    as dropouts. Now only a real runaway does that: a NaN, an infinity, or a sample past ±64 (+36 dB over full scale, more
    than any gain row gives). Anything below is clipped at ±8 and goes on (the master's limiter follows). */
+/* ONE WASM INSTANCE PER NODE, OR SHARED IN A RENDER (15 Nov): the browser allows only about 100 WebAssembly memories in the whole page
+   (each reserves 10 GB of address space; the 105th new Instance throws "Out of memory"), and an offline render's audio thread is never
+   freed while the page lives (Chrome keeps it), so every effect node of every render used up one for good: about the ninth render
+   of a song with a dozen effect nodes, or the 33rd of a small one, started no effects and came out silent. A node of a render (processorOptions.shareX)
+   takes a share of an instance already in this audio thread instead: the effects' own state lives behind their handles, and the one
+   pair of I/O buffers is only used inside one process() call (nodes run one after another on the thread), so sharing is exact.
+   An instance holds 32 handles (tfx.cc): a node reserves its chain length plus 2, and a new instance is made only when none has room. */
+const tfxInst = () => { const z = () => 0, x = new WebAssembly.Instance(globalThis.__tfxMod, {wasi_snapshot_preview1:{fd_close:z, fd_seek:z, fd_write:z, proc_exit:z}}).exports; if (x._initialize) x._initialize(); return x; };
+function tfxShared(n){
+  const P = globalThis.__tfxPool || (globalThis.__tfxPool = []), need = Math.max(1, n | 0) + 2;
+  let e = P.find(q => q.used + need <= 32); if (!e){ e = {x:tfxInst(), used:0}; P.push(e); }
+  e.used += need; return e.x;
+}
 const hotBad = (oL, oR, n) => { for (let k = 0; k < n; k++){ const a = oL[k], b = oR[k]; if (!(a > -64 && a < 64 && b > -64 && b < 64)) return true; } return false; };
 const hotClip = (L, R, n) => { for (let k = 0; k < n; k++){ const a = L[k], b = R[k]; if (a > 8) L[k] = 8; else if (a < -8) L[k] = -8; if (b > 8) R[k] = 8; else if (b < -8) R[k] = -8; } };
 /* ANY BLOCK LENGTH (10 Nov): Chrome is adding a render size hint, so a block need not be 128 frames. tcChunks runs one (a function of the code
@@ -19369,9 +19382,7 @@ class ThunderFx extends AudioWorkletProcessor {
     if (op.pump && !globalThis.__pumpBytes) globalThis.__pumpBytes = op.pump;   // …PUMP: pump.wasm, compiled when a pump slot first needs it
     if (op.pumpModule && !globalThis.__pumpMod) globalThis.__pumpMod = op.pumpModule;   // (or the module the page compiled)
     this.ptel = new Map(); this.platS = '';   // …PUMP: the pump slots whose full telemetry a pop-up wants (key → {back, rp}); the latencies last reported
-    const z = () => 0;
-    this.x = new WebAssembly.Instance(globalThis.__tfxMod, {wasi_snapshot_preview1:{fd_close:z, fd_seek:z, fd_write:z, proc_exit:z}}).exports;
-    if (this.x._initialize) this.x._initialize();
+    this.x = op.shareX ? tfxShared(op.chain ? op.chain.length : 0) : tfxInst();   /* RENDERS (op.shareX): several nodes of one render share a wasm instance (see tfxShared) */
     this.slots = []; this.dead = false; this.buf = null; this.ms = 0; this.fr = 0; this.idle = 0;
     this.tel = false; this.telN = 0;   // FX DYNAMICS: the app wants the dynamics slots' levels ({tel:true}), ~31 times a second
     // for the shared-module slots (MODFX): their transport (the song tempo, from the beat clock while it plays) and the sidechain bus (input 1)
@@ -19948,7 +19959,7 @@ function chainsNode(ac, track, patch, tempo, cid){
     processorOptions:Object.assign({cid:cid || null, track, patch, quality:'full', transport:{tempo:tempo || S.bpm || 120, lpb:S.lpb || 4, ticks:S.ticks || TICKS, playing:tp.on}, irs:irsOpt(ac),
       // BUS and SOURCE maps from the start (later changes go as messages): an offline render can finish before a message arrives.
       busMap:(busPlan().feeds.get(track) || []).slice(0, 32), tapMap:chnTapList(patch)}, tfxModOpt() ? {tfxModule:tfxModOpt()} : {bytes:chnBin()}, pumpModOpt() ? {pumpModule:pumpModOpt()} : {pump:pumpBin() || null})});
-  n.load = 0;
+  n.load = 0; n.onprocessorerror = () => { if (isOfflineAc(ac)) tfxErrAc.add(ac); };   /* a render whose chains node never started is not kept: pass() says so */
   // 2048 samples (~45 ms) per look, read every 60 ms, so short hits (hats, clicks) still show on the meters.
   n.an = ac.createAnalyser(); n.an.fftSize = 2048;   // hears the chains return: the chain screen's Chain Out meters
   n.anIn = ac.createAnalyser(); n.anIn.fftSize = 2048;   // hears what the track sends in: the Track In meters (wired in rtRoute)
@@ -20107,7 +20118,7 @@ function tfxNode(ac, chain, cid){
   // Inputs: 0 the track, 1 (SOURCE) the picked tracks' own sounds, one channel each ('tapmap'), 2 (SENDS) the Sidechain Out sends.
   const pb = pumpBin() && !pumpSent.has(ac) ? pumpBin() : null; if (pb) pumpSent.add(ac);
   const n = new AudioWorkletNode(ac, 'thunder-tfx', {numberOfInputs:3, numberOfOutputs:1, outputChannelCount:[2], channelCount:2,
-    channelCountMode:'max', channelInterpretation:'speakers', processorOptions:Object.assign({chain, irs:irsOpt(ac), tapMap:keyTrackList(), cid:cid || null}, tfxModOpt() ? {module:tfxModOpt()} : {bytes:tfxBin()}, pb ? (pumpModOpt() ? {pumpModule:pumpModOpt()} : {pump:pb}) : {pump:null})});   // irs: this audio thread's copy of the song's impulse responses
+    channelCountMode:'max', channelInterpretation:'speakers', processorOptions:Object.assign({chain, irs:irsOpt(ac), tapMap:keyTrackList(), cid:cid || null, shareX:isOfflineAc(ac)}, tfxModOpt() ? {module:tfxModOpt()} : {bytes:tfxBin()}, pb ? (pumpModOpt() ? {pumpModule:pumpModOpt()} : {pump:pb}) : {pump:null})});   // irs: this audio thread's copy of the song's impulse responses
   n.load = 0; n.port.onmessage = e => { const d = e.data; if (!d) return;
     if (typeof d.load === 'number'){ n.load = n.load * 0.6 + d.load * 0.4;
       /* CPU PANEL: each slot's share, smoothed like the node's (slots that report nothing fall away) */
@@ -20122,11 +20133,12 @@ function tfxNode(ac, chain, cid){
   // FIX (sweep, 4 Nov): a node that can't start at all (the browser out of memory for its DSP, seen after many renders in a
   // small-memory browser) passed its track through dry with no word; now it says so, once per audio context.
   n.onprocessorerror = () => { if (tfxErrAc.has(ac)) return; tfxErrAc.add(ac);
-    toast(typeof OfflineAudioContext !== 'undefined' && ac instanceof OfflineAudioContext
-      ? 'An effect couldn’t start in this render, so its track rendered without it. Reload the app and render again.'
-      : 'An effect couldn’t start, so its track plays without it. Reload the app to bring it back.', 8000); };
+    if (isOfflineAc(ac)) return;   /* a render has the answer when it ends: pass() stops with a message instead of writing a silent file */
+    toast('An effect couldn’t start, so its track plays without it. Reload the app to bring it back.', 8000); };
   return n;
 }
+const isOfflineAc = ac => typeof OfflineAudioContext !== 'undefined' && ac instanceof OfflineAudioContext;
+const RENDER_FX_FAIL = 'An effect couldn’t start in this render (the browser has no room left for effects). Nothing was saved. Reload the app and render again.';
 const tfxErrAc = new WeakSet();
 
 /* ---------- song data ---------- */
@@ -24200,6 +24212,7 @@ async function pass(evs, keep, N, sr, getB, lim, masterFx){
   const wantChn = [...keep].some(t => chainsFeed(t)) && S.chainPatch && S.chainPatch.format === 'chains.patch';
   const wantFx = [...keep].some(t => fxAny(S.tfx[t])) || (masterFx && fxAny(S.mfx));
   const ok = wantFx ? await tfxReady(oc) : false;
+  if (wantFx && !ok && !NOWK) throw new Error(RENDER_FX_FAIL);   /* the effects' module didn't load into this render: say so, don't write a render without them */
   const chnOk = wantChn ? await chainsReady(oc) : false;
   if (chnOk) chnSync.add(oc);
   let head = out;
@@ -24231,6 +24244,7 @@ async function pass(evs, keep, N, sr, getB, lim, masterFx){
   if (passProg){ const pg = passProg, tot = oc.length / sr, q = 128 / sr, k = Math.max(1, Math.ceil(tot / 50 / q)) * q;
     for (let t = k; t < tot - q; t += k){ const at = t, p = oc.suspend(at); if (p && p.then) p.then(() => { if (rprog.cancelled) return; try { pg(at / tot); } catch(e){} return oc.resume(); }).catch(() => {}); } }   // CANCEL: stays suspended
   const b = passProg && rprog.cancelP ? await Promise.race([oc.startRendering(), rprog.cancelP]) : await oc.startRendering();
+  if (tfxErrAc.has(oc)) throw new Error(RENDER_FX_FAIL);   /* an effect node never started: the render is silent where it plays, so it is not kept */
   return [b.getChannelData(0).slice(lat, lat + N), b.getChannelData(1).slice(lat, lat + N)];   // the latency (mastering, the limiter's lookahead) trimmed off
 }
 function wavN(chs, sr, bits){
