@@ -1316,6 +1316,7 @@ Owner, 14 Nov 21:53 and 22:00 (Mac): he expected Option+▲ to jump into Arrange
 - **Option+▲▼ on Mixer, FX, MOD, INST** (KEYS mode): the song position moves to the block above / below on that screen's track (PATTERN NAV off: 16 rows) and the user stays on the screen. Sect and Project unchanged; Alt+◀▶ unchanged. PAD mode's ALT+▲▼ is a different path (`optDir`: Mixer changes track, INST the instrument) and was left alone. The Synth page ignores Alt+arrows.
 - **Phone:** no touch equivalent of Alt+A. The agent proposed a second tap on the SONG tab = jump and back; the owner: "I think we are good on the phone" (he will check tomorrow whether this was tried before). NOT built.
 - Unsure (agent): Alt+A does nothing inside the …waves / …chains frames; the selection restore is not covered by the real-page run when Arrange moved the phrase.
+- **CodeRabbit on #148, fixed before the merge:** the Mixer's master row steps on the master column; the return snapshot keeps `pendPlace` (a note typed after the return went to the cell tapped in Arrange); returning from the Song-screen fallback creates no block (`goNoNew`); Alt+A from the Synth page returns to it when Song was the last tracker screen; Esc works in the Song-screen fallback; README and help row.
 - `tests/arrange-focus-key.test.js` (15, plus an opt-in real-key browser test).
 - **Also:** CodeRabbit on #147: a desktop Save as whose rewrite fails (rejected, or `{ok:false}`) is a failed save: the unsaved mark stays and the save-failed message shows.
 
