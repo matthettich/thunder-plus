@@ -9,6 +9,7 @@
 //   live engines: a pad with a live engine plays its rendered pad (the page's own fallback; the engines are later port units)
 // and renderOut's own last steps left out: no tail trim (there is no tail), no Normalise, no file. Math.random is the seeded stream the
 // sequencer goldens use (0x2545F491) while the sequencer runs, as the C++ sequencer's stand-in for Math.random is.
+// With --master the folder is <name>-master and the reference is the page's render with that chain on and pass(lim = true).
 // What is written to <outDir> (default /tmp/thunder-ref/<song name>):
 //   song.thunder   the song as rendered (the switched-off copy): thunder-render's input
 //   index.json     {sr, frames, vars (coreVars()), kit (coreKitV()), pads: [{pad, file, len, sr, stereo}], off, stats, sha256 of ref.f32}
@@ -20,7 +21,10 @@ import http from 'node:http'; import fs from 'node:fs'; import path from 'node:p
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const songFile = process.argv[2]; if (!songFile) { console.error('usage: song-ref.mjs <song.thunder> [outDir]'); process.exit(2); }
-const name = path.basename(songFile).replace(/\.thunder$/, '');
+// --master (U12): the app's own master chain switched ON (track effects, master effects, chains and live engines stay off): S.mst on with a shaped EQ,
+// the suppressor, the compressor (the freshMst defaults) and its own limiter OFF, so that the safety limiter (S.limiter, pass(lim = true)) is in the path too.
+const MASTER = process.argv.includes('--master');
+const name = path.basename(songFile).replace(/\.thunder$/, '') + (MASTER ? '-master' : '');
 const OUT = (process.argv[3] && !process.argv[3].startsWith('--') ? process.argv[3] : null) || '/tmp/thunder-ref/' + name;
 const PW = process.env.PLAYWRIGHT || ['/opt/npm-tools/node_modules/playwright/index.mjs', path.join(ROOT, 'node_modules/playwright/index.mjs')].find(f => fs.existsSync(f));
 const CHROME = process.env.CHROME || ['/usr/bin/google-chrome', '/usr/bin/chromium', '/usr/bin/chromium-browser'].find(f => fs.existsSync(f));
@@ -34,8 +38,12 @@ const off = { tfx: 0, mfx: 0, chainOn: 0, mst: !!(S0.mst && S0.mst.on), limiter:
 S0.tfx = (S0.tfx || []).map(a => (a || []).map(f => { if (f) off.tfx++; return null; }));
 S0.mfx = (S0.mfx || []).map(f => { if (f) off.mfx++; return null; });
 S0.chainOn = (S0.chainOn || []).map(v => { if (v) off.chainOn++; return false; });
-if (S0.mst) S0.mst.on = false;
-S0.limiter = false;
+if (MASTER) { const B = (type, f, g = 0, q = 1, slope = 24, on = true) => ({ type, f, g, q, slope, on });
+  S0.mst = { on: true, eq: { on: true, bands: [B('lowcut', 28, 0, .71, 24), B('lowshelf', 110, 2, .7), B('bell', 350, -3, 1.2), B('bell', 2500, 2, 1.2), B('highshelf', 9000, 1.5, .7), B('highcut', 19000, 0, .71, 12, true)] },
+    sup: { on: true }, comp: { on: true }, lim: { on: false } };
+  if (process.env.MSTJSON) S0.mst = JSON.parse(process.env.MSTJSON);   // (an experiment: another master chain)
+  S0.limiter = process.env.LIMITER !== '0'; }
+else { if (S0.mst) S0.mst.on = false; S0.limiter = false; }
 const text = JSON.stringify(file);
 fs.writeFileSync(path.join(OUT, 'song.thunder'), text);
 
@@ -59,10 +67,10 @@ try {
   await page.evaluate(([t, n]) => window.__seqTest.load(t, n), [text, name + '.thunder']);
   /* eslint-disable no-undef */
   // (the app's code lives in one closure: __seqTest.ev runs a line inside it, where S, kit, makeSeq, pass... are)
-  const inApp = async () => {
+  const inApp = async MASTER => {
     const save = (nm, f32) => fetch('/__save?name=' + nm, { method: 'POST', body: new Blob([f32.buffer.slice(f32.byteOffset, f32.byteOffset + f32.byteLength)]) }).then(r => r.text());
     // in memory too (the loader may fill in defaults)
-    S.tfx = S.tfx.map(a => (a || []).map(() => null)); S.mfx = S.mfx.map(() => null); S.chainOn = S.chainOn.map(() => false); if (S.mst) S.mst.on = false; S.limiter = false;
+    S.tfx = S.tfx.map(a => (a || []).map(() => null)); S.mfx = S.mfx.map(() => null); S.chainOn = S.chainOn.map(() => false); if (MASTER) { if (!(S.mst && S.mst.on)) return { err: 'the master chain did not load' }; } else { if (S.mst) S.mst.on = false; S.limiter = false; }
     // LIVE ENGINES OFF: a pad with a live engine (acid, mach, vox, bass, the pump synths, waves) plays its RENDERED pad, as the page itself
     // does wherever the live module is not loaded (bassNode returns null: "play the render"). The live modules still load into the
     // render's context; the sets that say "loaded" are kept empty, so no live node is ever made.
@@ -88,7 +96,7 @@ try {
     let end = seq.time;
     for (const e of notes) { const len = (e.st ? e.st.beats * 60 / e.st.bpm : pads.get(e.pad).length / sr) / Math.min(e.rate, e.slide ? e.slide.from : e.rate); end = Math.max(end, e.cut != null ? Math.min(e.t + len, e.cut + 0.06) : e.t + len); }
     const N = Math.ceil((end + 0.05) * sr);
-    const mix = await pass(evs, new Set(keepT), N, sr, getB, false, true);
+    const mix = await pass(evs, new Set(keepT), N, sr, getB, !!(MASTER && S.limiter), true);
     // what the song asks of the player (so a difference can be read)
     const cnt = {}; for (const e of evs) cnt[e.type] = (cnt[e.type] || 0) + 1;
     const nk = k => notes.filter(e => e[k] != null && e[k] !== false && e[k] !== 0).length;
@@ -97,13 +105,13 @@ try {
       st: nk('st'), tw: nk('tw'), vk: nk('vk'), rev: nk('rev'), slide: nk('slide'), cut: nk('cut'), rel: nk('rel'), arp: nk('arp'), bend: nk('bend'), vib: nk('vib'), wob: nk('wob'), trm: nk('trm'), apn: nk('apn'), fdi: nk('fdi'), ofs: nk('ofs'),
       poly: notes.filter(e => e.poly).length, rateNot1: notes.filter(e => e.rate !== 1).length, stretched, offGrid: notes.filter(e => Math.abs(e.t * sr - Math.round(e.t * sr)) > 1e-6).length,
       mix: S.mix.slice(0, 12).map(m => [m.vol, m.trim, m.pan, +m.mute, +m.solo].join('/')), master: S.master, mout: S.mout };
-    const off2 = { tfx: S.tfx.flat().filter(Boolean).length, mfx: S.mfx.filter(Boolean).length, chainOn: S.chainOn.filter(Boolean).length, mst: !!(S.mst && S.mst.on), limiter: !!S.limiter, passLim: false, normalise: false, liveEngines: false };
+    const off2 = { tfx: S.tfx.flat().filter(Boolean).length, mfx: S.mfx.filter(Boolean).length, chainOn: S.chainOn.filter(Boolean).length, mst: !!(S.mst && S.mst.on), limiter: !!S.limiter, passLim: !!MASTER, master: !!MASTER, normalise: false, liveEngines: false };
     const padList = [];
     for (const [pad, d] of pads) { await save('pad-' + pad + '.f32', d); padList.push({ pad, file: 'pad-' + pad + '.f32', len: d.length, sr, stereo: false }); }
     const all = new Float32Array(2 * N); all.set(mix[0], 0); all.set(mix[1], N); await save('ref.f32', all);
     return { sr, frames: N, vars: coreVars(), kit: coreKitV(), pads: padList, offAfter: off2, stats };
   };
-  info = await page.evaluate(src => window.__seqTest.ev(src), '(' + inApp.toString() + ')()');
+  info = await page.evaluate(src => window.__seqTest.ev(src), '(' + inApp.toString() + ')(' + MASTER + ')');
 } finally { await browser.close(); srv.close(); }
 if (!info || info.err) { console.error('song-ref: ' + (info ? info.err : 'no result')); process.exit(1); }
 const ref = fs.readFileSync(path.join(OUT, 'ref.f32')), f = new Float32Array(ref.buffer, ref.byteOffset, ref.length / 4);

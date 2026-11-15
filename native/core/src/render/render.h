@@ -12,6 +12,8 @@
 #include <cstdint>
 #include <memory>
 
+#include "master/chain.h"
+#include "meter/meter.h"
 #include "mix/mix.h"
 #include "mix/pdc.h"
 #include "seq/seq.h"
@@ -50,7 +52,15 @@ class SongRenderer {
   // `N + latencyFrames()` long and the start is trimmed. extraLatencyFrames: what pass() adds for the master side (mastering, the master's pump
   // effects, the limiter's look-ahead: U11 / U12 / U18 say how much). Call before the first block.
   void setPlan(const PdcPlan& plan, PdcMode mode, int64_t extraLatencyFrames = 0);
-  int64_t latencyFrames() const { return extra_ + pdc_trim_frames(plan_, sr_); }
+  int64_t latencyFrames() const { return extra_ + (mchain_ ? mchain_->latency() : 0) + pdc_trim_frames(plan_, sr_); }
+  // THE MASTER CHAIN (U12): between MASTER VOL and OUT, as the page routes it: [mastering: EQ, suppressor / compressor / limiter] -> [the safety limiter].
+  // OFF by default (no chain: what U09 / U10 rendered). master_chain_from_song(song.mst, song.limiter) is the song's own. Its latency (mastering's
+  // suppressor + limiter look-ahead, the safety limiter's look-ahead) is part of latencyFrames() and renderTrimmed() trims it, as pass() does.
+  // Control thread, before the first block (the processors start from rest).
+  void setMasterChain(const MasterChainConfig& cfg);
+  MasterChain* masterChain() { return mchain_.get(); }
+  // METERS (U13): every block, after the mixer, the tracks' post-pan pairs and the master output are fed to `bank` and its clock advanced (null: none). The bank outlives the renderer.
+  void setMeters(MeterBank* bank) { meters_ = bank; }
   // N frames of the song with the latency trimmed off the start, as pass() returns them: renders latencyFrames() + N and drops the first
   // latencyFrames(). Allocates nothing (a scratch block made at construction).
   void renderTrimmed(float* outL, float* outR, int64_t N);
@@ -76,6 +86,8 @@ class SongRenderer {
   int64_t frame_ = 0;
   PdcPlan plan_; int64_t extra_ = 0;
   std::unique_ptr<float[]> scratch_;
+  std::unique_ptr<MasterChain> mchain_;
+  MeterBank* meters_ = nullptr;
   RenderStats st_;
 };
 
