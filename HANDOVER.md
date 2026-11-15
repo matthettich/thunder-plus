@@ -747,6 +747,9 @@ The owner's top priority to add is the MOD screen. Work down the list; ask befor
 
 Start a session by asking for results. Fix on `beta`. (10 Nov, 15:10: the web beta is build 560; the build numbers in the rest of this paragraph are older.) Web beta: https://matthettich.github.io/thunder-plus/beta/ (build 547 as of 10 Nov morning, 548 once its PR merges; the night of 9–10 Nov shipped 544–547, see the four "10 Nov" entries below. Decisions the lead made that night for the owner to confirm or reverse: on a phone the saved Sequencer default plays on the Page unless Audio thread is picked on that device; on a phone the safety limiter is its stand-in until another worklet loads; the resync only runs with a worklet loaded and its margins are untested on a device). Desktop: v1.3.4-beta.2 (build 541, no feed view or scopes); further desktop betas on hold until the owner asks.
 
+**Build 611** (mono / poly counts, the invisible part)
+- [ ] **Computer:** open a few existing songs (`acid`, an older one), play them, Settings › TRACKS up two and down two, save, reopen. Pass: everything as before this build: the same tracks mono and poly, the hidden tracks come back with their notes, nothing new on screen.
+
 **Build 610** (chance and seeds)
 - [ ] **Computer or phone, by ear:** a drum track with `CHA 80` on every hat, and `SED 07` on the first row of the MASTER column. PLAY from the top three times. Pass: the same hats every time. Render: the WAV has those hats. Change it to `SED 08`: a different set, again the same every time. Take the SED away: different every play.
 - [ ] **Computer:** the same song, PLAY from the middle (a few song rows down). Pass: the hats there are the ones you heard there when it played from the top.
@@ -1290,6 +1293,17 @@ Suggested order: N0 → N1 → N2 (phone cured) → N4 with N3 alongside → N5 
   the edge `R.t0`, "waiting…" while armed), `rcdClk` / `rcdFmt` / `rcdFreeSecs`, a 250 ms timer only while recording; the
   final length stays until the next take. recorder-check covers FREE, PATTERN, Stop, next take and closing mid-take.
 
+
+## 14 Nov (mono / poly track counts, stage 1 and 2: the song data and the sequencer (nothing to see yet); build 611)
+
+The owner said "Build it" (21:39) with his answers: at least one track of each kind; shrinking asks first only when a track that would be hidden holds something; no warning about older builds (`docs/MONO-POLY-PLAN.md`). Stage 1 (data) by an agent, stage 2 (sequencer) and review by the lead. No UI yet.
+- **`S.nmono`** (mono tracks; absent = the half rule, `ceil(ntr / 2)`) and **`S.hmono`** (how many parked slots are hidden mono tracks; mono run first, poly run after). Both are written only when the song has an uneven split, so untouched songs are byte-identical. `normSplit` on load (clamped: at least one of each kind).
+- `polyFrom()` reads `S.nmono`; everything else already went through `polyFrom` / `isPolyT` (the agent found no other "first half" assumption in the code; the help text still says "second half", for stage 3).
+- `ntrPermOld` is the old function, kept: with both counts on the half rule and no `hmono`, `ntrPlan` returns exactly its permutation, and a legacy song's parked kinds are read by growing through it one track at a time (16 → 15 → 16 restores the same track). `ntrPlan(n0, m0, n1, m1, h0, holds)` → `{P, h1, over}`; `ntrPerm` is its `P`. A shrinking kind parks its last tracks at the front of its run; growing takes back that kind's most recently hidden track first.
+- `trackHolds(S, t)` (notes, mixer, effects, a chain, a voice, Perform data, or another track pointing at it), `tracksHiddenBy(mono, poly)` (for the "ask first only if something is in it" rule), `tracksCheck`, `setTracks(mono, poly)` → `{why, tN}` (one undo step; refuses, with the reason, to grow into the other kind's hidden tracks that hold something; never deletes). `setNtr(v)` stays for callers that know only a total: on the half rule exactly as before, on an uneven song it keeps the mono count. MORE TRACKS (`dupTrack`) adds one of each kind through `setTracks`.
+- **Sequencer:** `core/seq-core.js` regenerated (its `polyFrom` reads `S.nmono` from the song the page already sends). `CORE_V` / `CORE_WANT` NOT bumped (the plan said to): no message changed, and the core's URL already carries `CORE_REV`, a hash of the file, so a stale core cannot be served. Sequencer goldens unchanged, page and core.
+- **Agent's open points:** `setNtr` on a song with `hmono` can be refused silently by the may-it-grow rule (stage 3 shows the reason); `trackHolds` counts a part's mix entry only when it differs from 224 / 128.
+- `tests/mono-poly-counts.test.js` (14: old permutations identical for every 8..24 pair, the 8/8 → 6 → 6 → 8 → 8 round trip, legacy 16 → 15 → 16, refuse and overwrite rules, save / load, undo, the sequencer's chords by `nmono`).
 
 ## 14 Nov (chance and seeds: TCH, SKP, CHD, CND 08, SED with two scopes, MOD → CHANCE; build 610)
 

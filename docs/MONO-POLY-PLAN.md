@@ -1,4 +1,4 @@
-# Plan: separate MONO TRACKS and POLY TRACKS counts (not built: waiting for the owner's go-ahead)
+# Plan: separate MONO TRACKS and POLY TRACKS counts (go-ahead given 14 Nov 21:39; being built)
 
 Owner's ask of 14 Nov ("nice to have: plan it and show me before building"). Planned by an agent on build 602, checked by the lead.
 
@@ -17,7 +17,7 @@ Owner's ask of 14 Nov ("nice to have: plan it and show me before building"). Pla
 
 ## The change
 
-- Keep `S.ntr` (the total). Add `S.nmono` to the song, written only when it differs from the half rule, so untouched songs stay byte-identical and old builds read them. `polyFrom = S.nmono ?? ceil(ntr / 2)`. Limits: total 8 to 24 (32), each count 0 to the total.
+- Keep `S.ntr` (the total). Add `S.nmono` to the song, written only when it differs from the half rule, so untouched songs stay byte-identical and old builds read them. `polyFrom = S.nmono ?? ceil(ntr / 2)`. Limits: total 8 to 24 (32), each count 1 to the total minus 1 (the owner: at least one of each).
 - `ntrPerm(n0, m0, n1, m1)` takes the two counts; `setTracks(mono, poly)` beside `setNtr` (kept as a wrapper). Nothing is deleted when a count shrinks; one short notice says which tracks were hidden. One undo step.
 - Two Settings rows with the total in their info lines.
 - **When the total is full** (CodeRabbit on #140): hidden tracks are parked in the unused slots past the count, so they only fit while the total leaves room (32 slots in all). Rule: a count may not grow into slots that hold hidden tracks WITH notes, mixer settings, effects, a chain, a voice of their own, or Perform data (LFOs, locks, scene or macro targets, part values: they follow the track, so a track that holds only an LFO is not empty). The row stops there and its info line says why ("8 hidden poly tracks still hold notes: clear them or lower MONO first"); hidden tracks that are empty are simply dropped. Nothing is ever stored outside the 32 slots, so the song file needs no new field for it.
@@ -37,8 +37,8 @@ Owner's ask of 14 Nov ("nice to have: plan it and show me before building"). Pla
 - A count of 0 (all mono or all poly): the voice and Pattern-view code assume at least one mono track and need guards.
 - Changing a count while playing re-routes the sound, as TRACKS does today, and may click.
 
-## Questions for you (the plan's suggested answers)
+## The owner's answers (14 Nov, 21:36 and 21:39: "Build it")
 
-1. May either count be 0 (all mono, or all poly)? Suggested: yes, with at least 8 tracks in total.
-2. Should making a count smaller ask first? Suggested: no (notes are kept), a short notice instead.
-3. Should saving an uneven song warn about older builds? Suggested: no; it is written down here and in HANDOVER.
+1. **Each count is at least 1** (never all mono or all poly), with at least 8 tracks in total. So the guards for "no mono track" are not needed.
+2. **Shrinking asks first only when a track that would be hidden has something in it** (notes, mixer settings, effects, a chain, a voice, Perform data, or another track pointing at it); otherwise it just does it. Nothing is deleted either way.
+3. **No warning** about older builds when an uneven song is saved.

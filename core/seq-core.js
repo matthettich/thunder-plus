@@ -175,7 +175,7 @@ const VC = 4;
 const IC = 5;
 const FX0 = 6;
 const RW = 12;
-const polyFrom = () => Math.ceil(ntr() / 2);
+const polyFrom = () => { const n = ntr(), m = S.nmono; return m >= 1 ? Math.min(m | 0, n - 1) : Math.ceil(n / 2); };
 const isPolyT = t => t >= polyFrom() && t < NT;
 const isBusT = t => t >= 0 && t < NT && busPlan().feeds.has(t);
 const int = (v, d) => Number.isFinite(+v) && v !== null && v !== '' ? Math.round(+v) : d;

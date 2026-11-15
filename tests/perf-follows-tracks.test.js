@@ -6,11 +6,11 @@ const H = require('./helpers');
 const eq = (a, b, m) => assert.equal(JSON.stringify(a), JSON.stringify(b), m);   // the vm's arrays are from another realm
 const src = H.read('index.html');
 const cut = (a, b) => { const i = src.indexOf(a), j = src.indexOf(b, i); assert.ok(i >= 0 && j > i, 'moved: ' + a); return src.slice(i, j); };
-const code = cut('function ntrPerm(', 'function setNtr(');
+const code = cut('function ntrPermOld(', 'function setTracks(');   // (the half-and-half renumbering is kept as ntrPermOld; the new one is tested in mono-poly-counts.test.js)
 
 function rig() {
   const c = { NT: 32, MT: 32, SCK_SEND: 8, vtrk: false, kit: null, sckTrack: v => (v > 8 ? v - 9 : -1), perfLive: { sent: new Map(), pno: new Map() } };
-  vm.createContext(c); vm.runInContext(code + '\nthis.ntrPerm = ntrPerm; this.ntrRemap = ntrRemap;', c);
+  vm.createContext(c); vm.runInContext(code + '\nthis.ntrPerm = ntrPermOld; this.ntrRemap = ntrRemap;', c);
   const S = { ntr: 16, song: [], smute: [], tfx: Array.from({ length: 32 }, () => []), mfx: [], chainOn: new Array(32).fill(0),
     mix: Array.from({ length: 32 }, (_, t) => ({ vol: 100 + t, pan: 50 + t })), chainPatch: null };
   c.S = S;
