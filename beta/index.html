@@ -1616,6 +1616,17 @@ body.arrsmall #tArr .tatop button{width:26px} body.asong #tArr .tatop button{wid
 .tagrid .ar.q4{margin-top:7px}
 .tagrid .ar.q4::before{content:''; position:absolute; left:8px; right:8px; top:-5px; height:1px; background:var(--ar-ink, #111); opacity:.45; pointer-events:none}
 .tagrid .rn{font-size:var(--fs-1); line-height:var(--arh,16px); color:var(--ar-dim); cursor:pointer}
+/* ARRANGE ZOOM OUT (14 Nov): rows below the fit size; tighter gaps, row numbers and labels that shrink with the row, and under 10 px only every fourth row's number and no label (the block's colour, the cursor, the selection, the playhead and the hatching of a muted block stay) */
+.tarr.arout .tagrid .ar{margin-bottom:1px}
+.tarr.arout .tagrid .ar.q4{margin-top:3px}
+.tarr.arout .tagrid .ar.q4::before{top:-2px}
+body .tarr.arout .tagrid .rn{font-size:var(--arn, 7px)}
+.tarr.arout .tagrid b{border-radius:1px}
+.tarr.arout .tagrid b.z:not(.p):not(.m)::after{inset:1px}
+.tarr.arlow .tagrid .rn:not(.r4):not(.rc):not(.pl){color:transparent}
+.tarr.arlow .tagrid b.p{outline-width:1px}
+.tarr.arlow .tagrid b.sl{box-shadow:inset 0 0 0 1px var(--ar-sel) !important}
+.tarr.arlow .tagrid b.o:not(.p)::after{height:1px; margin-top:0}
 .tagrid .rn.r4{color:var(--ar-ink); font-weight:700}
 .tagrid .rn.pl{background:var(--ar-pl); color:var(--ar-pl-ink); border-radius:2px}
  .tagrid b{display:block; position:relative; height:var(--arh,16px); line-height:var(--arh,16px); font-size:var(--arf,9px); font-weight:600; text-align:center; border-radius:2px; background:var(--ar-empty); color:transparent; cursor:pointer}
@@ -9163,7 +9174,7 @@ let tt = 0, busNote = '';   // busNote: BUS, the one-time note on a bus track (b
    "saved by a newer build", "couldn't save" and "audio was interrupted" were gone in 2 s). A message given 4 s or more is
    kept: quick ones that arrive meanwhile wait for it (the latest one, shown after), and another long one queues behind
    it (three at most). A click or tap on the toast lets it go and shows the next. Screen readers hear each one (aria-live). */
-const toastQ = []; let toastLong = false, toastQuick = null;
+const toastQ = []; let toastLong = false, toastQuick = null, toastKey = '';   // toastKey: which toastBrief() text is on screen (a new one of that kind replaces it)
 // toastOnce: a notice that only needs reading once on this device (key: what it is about)
 function toastOnce(key, msg, ms){ const K = 'thunderplus-seen-' + key; try { if (localStorage.getItem(K)) return; localStorage.setItem(K, '1'); } catch(e){} toast(msg, ms); }
 setTimeout(() => { try { $('toast').addEventListener('click', () => toastNext()); } catch(e){} }, 0);
@@ -9196,12 +9207,21 @@ function toastPlace(t){
   } catch(e){}
 }
 function toastShow(msg, dur, long){
-  const t = $('toast'); t.textContent = msg; t.hidden = false; toastPlace(t); clearTimeout(tt); toastLong = long;
+  const t = $('toast'); t.textContent = msg; t.hidden = false; toastPlace(t); clearTimeout(tt); toastLong = long; toastKey = '';
   tt = setTimeout(toastNext, dur); }
 function toastNext(){
   const t = $('toast'); clearTimeout(tt); t.hidden = true; toastLong = false;
   const n = toastQ.shift() || toastQuick; if (n === toastQuick) toastQuick = null;
   if (n) toastShow(n[0], n[1], n[1] >= 4000); }
+/* A BRIEF NOTICE (14 Nov, owner: "block x exists on another track … persists way too long"). The block-got-its-own-number and shared-phrase notes were asked for
+   5 to 7 s, which makes a long toast: it is kept, the next quick ones wait for it and further long ones queue behind it (three), so entering a few blocks left
+   it on screen for 15 s or more. toastBrief(key, msg): long enough to read (2.5 to 3.9 s by length), never a long toast (nothing queues, nothing waits), and a
+   new one of the same key replaces the text on screen and restarts the time, so a run of entries shows one note, the latest. The POP-UP MESSAGES setting still applies (it goes through toast()). */
+function toastBrief(key, msg){
+  msg = String(msg == null ? '' : msg); const dur = clamp(1500 + msg.length * 18, 2500, 3900), t = $('toast');
+  if (!toastsOn) return;
+  if (!t.hidden && !toastLong && toastKey === key){ toastShow(msg, dur, false); toastKey = key; return; }
+  toast(msg, dur); if (!t.hidden && !toastLong && t.textContent.indexOf(msg) === 0) toastKey = key; }
 
 /* ---------- in-page prompt / confirm ----------
    The browser's prompt() and confirm() stop the whole page: the 25 ms sequencer pump can't run, so after the dialog
@@ -24736,7 +24756,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 599;
+const BUILD = 600;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD + (location.pathname.includes('/beta/') ? ' · beta' : '');
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -24901,15 +24921,15 @@ function followPlay(){
   // track plays, and the rows scroll a page when the playhead runs off them), but the cursor stays on its row, so you
   // can edit while it plays. c.pg: the rows were paged by the playhead (draw() then doesn't scroll back to the cursor;
   // moving the cursor brings it back into view).
-  const page = (c, row, VR, len) => { if (row < 0) return; const top = c.top || 0; if (row < top || row > top + VR - 1){ c.top = clamp(row, 0, Math.max(0, len - VR)); c.pg = true; } };
-  if (tv === 'song'){ if (tp.mode === 'song' && !asongOn()) page(cs.song, own.row, songRows(), 256); }
+  const page = (c, row, VR, len, end) => { if (row < 0) return; const top = c.top || 0, nt = arrPageTop(top, VR, row, len, -1, end); if (nt !== top){ c.top = nt; c.pg = true; } };   // the same early page turn as Arrange's (arrPageTop)
+  if (tv === 'song'){ if (tp.mode === 'song' && !asongOn()) page(cs.song, own.row, songRows(), 256, arrWrapRow()); }
   else if (tv === 'sect'){ if (tp.mode !== 'phrase' && own.sect >= 0) cSect = own.sect; }
   else if (tv === 'phrase'){
     // The screen stays on the cursor's own track (owner, 30 Oct): when that track isn't playing on this row (an empty cell,
     // a bus with no block), only the rows follow, in Pattern view; the plain phrase editor stays put.
     const mine = P[cTrack];
     const pvr = pvActive() ? pvVR() : Math.max(4, songRows());
-    if (mine && mine.phrase >= 0){ cPhrase = mine.phrase; cs.phrase.y = Math.min(cs.phrase.y, Math.max(0, plen(cPhrase) - 1)); page(cs.phrase, mine.step, pvr, pvActive() ? 256 : plen(cPhrase)); }
+    if (mine && mine.phrase >= 0){ cPhrase = mine.phrase; cs.phrase.y = Math.min(cs.phrase.y, Math.max(0, plen(cPhrase) - 1)); page(cs.phrase, mine.step, pvr, pvActive() ? 256 : plen(cPhrase), plen(cPhrase) - 1); }
     else if (pvActive() && own.step != null) page(cs.phrase, own.step, pvr, 256); }
   if (tv === 'phrase' && tp.mode === 'song' && own.row >= 0 && pvActive() && !(apReady && apF)) pvFollow(P, own);   // PATTERN VIEW: the song row follows too (not the cursor Arrange is moving)
   arrFollowPage(own);
@@ -24936,6 +24956,33 @@ const markHands = () => { workT = arrActT = arrHandT = arrTouchT = navT = perfor
 // navT: the last ALT + arrow move around the Song grid (optDir, grid). Arrange beside the phrase WITHOUT the keys was held off only by arrHandT / arrTouchT, which a pad press never sets, so every ALT+▲ put Arrange's rows where the cursor was
 // and the very next redraw the playhead put them back: the cursor's row flipped in and out of view. It holds like Arrange's own work does: 4 s with FOLLOW on, the owner's minute (3 Nov) with FOLLOW OFF.
 let navT = -1e9;
+/* EARLY PAGING WITH LOOK-AHEAD (14 Nov, owner: "it's difficult to see whole phrases" in Arrange: the page turned only when the playhead had passed the last
+   row, so the next phrase was never in sight). The one rule for every view that pages with the playhead (Arrange; the Song, Phrase and Pattern view rows
+   of followPlay's page()): when the playhead is within ARR_AHEAD rows of the bottom of the view (a quarter of the view when it shows under 16 rows) the view turns
+   ONCE so that the playhead sits ARR_KEEP rows from the top (an eighth of the view if that is smaller, at least one), keeping the rows just played in sight. No
+   scrolling and no centred playhead (that would redraw the grid every row); one page turn is one full draw, as before. A playhead above the view (a loop,
+   LP.SEL or song wrap, a jump back) puts its row first, as before. keep: a row (the cursor's) to keep in view too when the playhead has left the view (12 Nov), or -1.
+   NOT EARLY when the view already shows the last row the playhead reaches before it wraps (end: the loop's last row, or the song's), so a loop that fits the view never turns a page.
+   arrPageTop(top, VR, row, len, keep, end) is pure: the new first row (top itself when nothing turns). len: how many rows there are. */
+const ARR_AHEAD = 8, ARR_KEEP = 4;
+function arrPageTop(top, VR, row, len, keep = -1, end = len - 1){
+  if (!(row >= 0)) return top;
+  VR = Math.max(2, VR | 0); const ahead = VR < 16 ? Math.max(1, VR >> 2) : ARR_AHEAD, kp = Math.min(ARR_KEEP, Math.max(1, VR >> 3));
+  if (row >= top && row < top + VR && (row < top + VR - ahead || end < top + VR)) return top;   // well inside, or nothing more to come before the wrap: nothing turns
+  let nt = row < top ? row : row - kp;
+  // The last page: when the end is within reach, one turn goes straight to the page that shows it (the playhead already on it), instead of turning again a few rows on
+  if (row >= top){ const lastTop = end - VR + 1; if (lastTop > top && lastTop <= row && lastTop - nt <= ahead) nt = lastTop; }
+  if (keep >= 0 && keep !== row && (row < top || row >= top + VR)) nt = Math.min(keep, nt);   // (the cursor holds the page only when the playhead has left the view; an early turn is the playhead's, the owner idle)
+  return clamp(nt, 0, Math.max(0, len - VR));
+}
+// The last song row the playhead reaches before it wraps: the row a pattern loop holds, the last row of a selection loop, or the song's last row with a block. Read from what the display
+// already has (the loop it asked for, the song); nothing here touches the sequencer.
+function arrWrapRow(){
+  if (tp.loopV === 'pat'){ if (patRow >= 0) return patRow; }
+  else if (tp.loopV === 'song' && loopArm && loopArm.v === 'song') return Math.max(loopArm.y0, loopArm.y1);
+  for (let y = 255; y >= 0; y--){ const r = S.song[y]; if (r && r.some(v => v >= 0)) return y; }
+  return 0;
+}
 function arrFollowPage(own){
   if (handsOn(FOLLOW_HOLD, arrHandT, arrTouchT)) return;   // (9 Nov, owner: tapping blocks made the view fight itself)
   // A follow mode that's on pages again after the short hold; FOLLOW OFF keeps the owner's minute (3 Nov)
@@ -24943,10 +24990,9 @@ function arrFollowPage(own){
   if (handsOn(followMode ? FOLLOW_HOLD : ARR_IDLE, navT)) return;
   try { if (tp.mode === 'song' && own && own.row >= 0 && (asongOn() || (tv !== 'song' && apPanel()))){
     const VR = Math.max(2, arrRows()), top = cs.song.top || 0;
-    if (own.row < top || own.row > top + VR - 1){
-      // The cursor's row stays in view when both fit (12 Nov): the page starts at the higher of the two rows, so the playhead does not hide the cursor the user moved past it
-      const cy = cs.song.y, both = tv !== 'song' && cy >= 0 && cy !== own.row && Math.abs(cy - own.row) < VR;
-      cs.song.top = clamp(both ? Math.min(cy, own.row) : own.row, 0, Math.max(0, 256 - VR)); cs.song.pg = true; } } } catch(e){}
+    // The cursor's row stays in view when both fit (12 Nov): the page starts at the higher of the two rows, so the playhead does not hide the cursor the user moved past it
+    const cy = cs.song.y, nt = arrPageTop(top, VR, own.row, 256, tv !== 'song' && cy >= 0 && cy !== own.row && Math.abs(cy - own.row) < VR ? cy : -1, arrWrapRow());
+    if (nt !== top){ cs.song.top = nt; cs.song.pg = true; } } } catch(e){}
 }
 // TRACKS (Song): how many tracks this song uses (8–32, but 24 at most with a voice per track, so every
 // track keeps its own voice within 40 kit voices). Song and Mixer show as many as fit and scroll sideways.
@@ -25180,10 +25226,10 @@ function mstShareWarn(p){
   if (!(k.mst && k.trk.size) && !(cTrack !== MT && others.length)) return; mstShared.add(p);
   const ts = [...k.trk].sort((a, b) => a - b).map(t => d2(t + 1)).join(', ');
   if (!k.mst){ const os = others.map(t => d2(t + 1)).join(', ');
-    setTimeout(() => toast(`Phrase ${hp(p)} also plays on track${others.length > 1 ? 's' : ''} ${os}, so edits here change those too. UNIQ on this block (Song or Arrange) gives this track its own copy.`, 7000), 60); return; }
-  setTimeout(() => toast(cTrack === MT
+    setTimeout(() => toastBrief('share', `Phrase ${hp(p)} also plays on track${others.length > 1 ? 's' : ''} ${os}, so edits here change those too. UNIQ on this block (Song or Arrange) gives this track its own copy.`), 60); return; }
+  setTimeout(() => toastBrief('share', cTrack === MT
     ? `Phrase ${hp(p)} also plays on track${k.trk.size > 1 ? 's' : ''} ${ts}. What you write here changes there too (VOL turns their notes down). UNIQ on the block gives the master its own copy.`
-    : `Phrase ${hp(p)} also plays in the master column. There, VOL is the whole song’s level and FLX / FXO the master’s effects. UNIQ on this block (Song or Arrange) gives the track its own copy.`, 7000), 60);
+    : `Phrase ${hp(p)} also plays in the master column. There, VOL is the whole song’s level and FLX / FXO the master’s effects. UNIQ on this block (Song or Arrange) gives the track its own copy.`), 60);
 }
 function setCell(v, x, y, val){
   if (v === 'song' && x < NT && val >= 0 && busNo(x, val)) return false;   // NO NOTES INTO A BUS (12 Nov, owner): no write, no undo step
@@ -25191,8 +25237,8 @@ function setCell(v, x, y, val){
   if (v === 'song'){
     if (val >= 0 && !mstUniqIn && S.song[y][x] !== val && blockMixed(val, x, y)){
       mstUniqIn = true; try { const nc = mstUniq(val); if (nc >= 0){ const was = val; val = nc;
-        setTimeout(() => toast(x === MT ? `Block ${hp(songShown(was))} is also on tracks, so the master column got its own copy, ${hp(songShown(nc))}. Its VOL and FLX can’t reach the tracks.`
-          : `Block ${hp(songShown(was))} is also used ${blockOnMst(was) ? 'in the master column' : 'on another track'}, so this track got its own copy, ${hp(songShown(nc))}` + (blockOnMst(was) ? '.' : ' (Settings → UNIQUE PER TRACK).'), 5000), 60); } } finally { mstUniqIn = false; } }
+        setTimeout(() => toastBrief('uniq', x === MT ? `Block ${hp(songShown(was))} is also on tracks, so the master column got its own copy, ${hp(songShown(nc))}. Its VOL and FLX can’t reach the tracks.`
+          : `Block ${hp(songShown(was))} is also used ${blockOnMst(was) ? 'in the master column' : 'on another track'}, so this track got its own copy, ${hp(songShown(nc))}` + (blockOnMst(was) ? '.' : ' (Settings → UNIQUE PER TRACK).')), 60); } } finally { mstUniqIn = false; } }
     S.song[y][x] = val; if (val < 0 && x <= MT) setBlockMute(y, x, false); }
   else if (v === 'sect'){ sectRowEdit(cSect, y)[x] = val; }
   else { if (!S.phrases[cPhrase]) S.phrases[cPhrase] = freshPhrase(); S.phrases[cPhrase][y][x] = val; if (val >= 0) mstShareWarn(cPhrase); }
@@ -30507,6 +30553,12 @@ function deckFxBar(){
   if (sig !== dkFbSig){
     dkFbSig = sig; bar.replaceChildren(); dkFbVals = [];
     const goFx = k => { cFxT = mst ? NT : dkTrack(); cFxS = k; cs.fx.y = A[k] ? FXSLOTS + 1 : k + 1; go('fx'); };
+    // + ADD FX (14 Nov, owner: "automatically open the FX picker after it pages to the Mixer"): to the FX screen for this track, then the same effect list EDIT opens on an
+    // empty slot (fxsOpen: grouped, the keys ▲▼ Enter and Esc as always). Esc closes it and leaves you on the screen. No empty slot (the bar was drawn before it filled): a toast.
+    const addFx = () => { const t = mst ? NT : dkTrack(), AA = t >= NT ? S.mfx : S.tfx[t], k = AA.findIndex(x => !x);
+      if (k < 0){ toast('Every effect slot on ' + (mst ? 'the master' : 'track ' + d2(t + 1)) + ' is in use.'); return; }
+      goFx(k); try { if (document.activeElement && document.activeElement.blur && document.activeElement.closest && document.activeElement.closest('#dkFxBar')) document.activeElement.blur(); } catch(e){}
+      fxsOpen(k); };
     for (let k = 0; k < FXSLOTS; k++){
       const f = A[k], col = el('div', 'dkfc' + (f ? (f.on ? '' : ' off') : ' empty')), h = el('div', 'fch'), b = el('div', 'fcb');
       if (!f) continue;   // empty slots: one + ADD FX after the effects
@@ -30578,7 +30630,7 @@ function deckFxBar(){
     }
     const free = Array.from({length:FXSLOTS}, (_, k) => k).filter(k => !A[k]);
     if (free.length){ const ad = el('button', 'dkadd'); ad.type = 'button'; ad.append('+ ADD FX', el('small', null, 'slot ' + (free[0] + 1)));
-      ad.title = 'Add an effect in slot ' + (free[0] + 1) + ' (FX screen)'; ad.dataset.k = free[0]; ad.addEventListener('click', () => goFx(free[0])); bar.append(ad);
+      ad.title = 'Add an effect in slot ' + (free[0] + 1) + ' (FX screen)'; ad.dataset.k = free[0]; ad.addEventListener('click', () => addFx()); bar.append(ad);
       if (free.length === FXSLOTS) bar.append(el('div', 'dkempty', 'NO EFFECTS ON ' + (mst ? 'THE MASTER' : 'TRACK ' + d2(t + 1)) + ' YET')); }   // EMPTY FX
   }
   dkFbVals.forEach(fn => fn());
@@ -31685,12 +31737,16 @@ let arrFast = false, arrFastKey = '', arrFastN = 0, arrFastR = -1, arrSoon = 0; 
 // ARR_ZOOM_BTNS: the − ○ + in the arrange header (○ = fit). Set it to false to take them away (pinch and Ctrl+wheel stay).
 const ARR_ZOOM_BTNS = true;
 const AZK = 'thunderplus-arrange-zoom-v1', AZ_MAX = 3, AZ_STEPS = [1, 1.5, 2, 2.5, 3];
-let arrZoom = (() => { try { const z = parseFloat(localStorage.getItem(AZK)); return z >= 1 && z <= AZ_MAX ? z : 1; } catch(e){ return 1; } })();
+// ZOOM OUT (14 Nov, owner: "difficult to see whole phrases"): below 1 (fit: every track in the panel, today's smallest) the ROWS get lower, the columns stay at fit, so many more song rows are in view
+// (about 1.5, 2, 2.5, 3 and 4 times as many as at fit). The same saved number (AZK), the same − ○ +, Ctrl+wheel and pinch reach it; never zooming leaves it at 1, as before. AZ_OUT: the − button's steps.
+const AZ_MIN = 0.32, AZ_OUT = [0.8, 0.64, 0.5, 0.4, 0.32], AZ_RH_MIN = 5;
+let arrZoom = (() => { try { const z = parseFloat(localStorage.getItem(AZK)); return z >= AZ_MIN && z <= AZ_MAX ? z : 1; } catch(e){ return 1; } })();
 let arrBigPre = null, arrBigFloor = 0;   // BIGGER CELLS: the zoom the user chose while the cells are raised to the floor; the zoom that makes a cell 28 px
 let arrPinch = null, arrCurX = -1, arrWheelT = 0, arrFitW = 30;
 // On a computer (Desktop, a mouse) zoom is gentler and stops sooner: blocks grow to about 84 px wide at most, in 1.25×
 // steps (Ctrl+wheel about 1.15× a notch), and the song cursor's block stays where it is on screen while zooming.
 const arrDeskZ = () => !document.body.classList.contains('mob') && !matchMedia('(pointer: coarse)').matches;
+const arrZMin = () => bigCellsOn && !arrDeskZ() ? 1 : AZ_MIN;   // BIGGER CELLS (touch) keeps cells from shrinking
 const arrZMax = () => arrDeskZ() ? clamp(84 / Math.max(6, arrFitW), 1.25, AZ_MAX) : Math.max(AZ_MAX, arrBigFloor);
 const arrPtrs = new Set();
 const arrEl = $('tArr'), arrGrid = $('tArrGrid');
@@ -31712,7 +31768,7 @@ function arrSideMst(){ return true; }
 // ROWS IN VIEW (3 Nov): the rows that fit from the top row down, measured (every 4th row has a gap above it, EVERY 4 ROWS,
 // so a fixed row height overcounted and the cursor could go under the bottom edge without Arrange following it)
 function arrRows(top = cs.song.top || 0){ const rh = arrRowH(); if (!(rh > 0)) return 16;
-  const h = arrGrid.clientHeight - 3, t0 = arrRowTop(top); let n = 0; while (top + n < 256 && arrRowTop(top + n) - t0 + rh - 1 <= h) n++; return clamp(n, 2, 96); }
+  const h = arrGrid.clientHeight - 3, t0 = arrRowTop(top); let n = 0; while (top + n < 256 && arrRowTop(top + n) - t0 + rh - 1 <= h) n++; return clamp(n, 2, 256); }   // (was 96: zoomed right out a tall panel shows more, and paging read the cap as the bottom; review, #131)
 // The panel's width: 0 is the default for the screen size, otherwise what the grip was dragged to.
 const AWK = 'thunderplus-arrange-w-v1';
 let arrW = (() => { try { return Math.max(0, int(localStorage.getItem(AWK), 0)); } catch(e){ return 0; } })(), arrKey = '';
@@ -32003,10 +32059,14 @@ function drawArr0(PH){
   if (ms && selA && selA.v === 'song'){ const r = selRect(); for (let y = r.y0; y <= r.y1; y++) for (let t = r.x0; t <= r.x1; t++) mark(y, t, 'sl'); }
   if (ms) for (const p of sxPicks) mark(p.y, p.t, 'sl');
   const nm = mutedCount();
-  setText($('tArrSub'), (ms ? S.name + ' · ' : '') + (lastR + 1) + (lastR ? ' rows' : ' row') + (nm ? ` · ${nm} muted` : '') + (arrZoom > 1 ? ` · ${+arrZoom.toFixed(1)}×` : ''));
+  setText($('tArrSub'), (ms ? S.name + ' · ' : '') + (lastR + 1) + (lastR ? ' rows' : ' row') + (nm ? ` · ${nm} muted` : '') + (arrZoom > 1 ? ` · ${+arrZoom.toFixed(1)}×` : arrZoom < 1 ? ` · ${Math.round(arrZoom * 100)}%` : ''));
   { const lb = arrEl.querySelector('.tahl b'); if (lb && lb.textContent !== (ms ? 'SONG' : 'ARRANGE')) lb.textContent = ms ? 'SONG' : 'ARRANGE'; }
   // As the Song screen the grid holds whole rows only (the space left over sits under the boxes), so it never ends on half a row.
-  if (fast){} else if (ms){ const pitch = (arrRowH() || arRH + 2) * 1.04, avail = arrAvail(), rows = Math.max(2, Math.floor((avail - 3) / pitch)), hg = Math.min(avail, Math.round(3 + rows * pitch)) + 'px';   // (×1.04: the gap every 4 rows)
+  if (fast){} else if (ms){ const avail = arrAvail(); let hg;
+    if (arrZoom < 1 && arrGrid.children.length > 8){   // ZOOM OUT: the rows are measured (the gap every 4 rows is 3 px here), so the last row is whole
+      const t0 = arrRowTop(0), rowH = arrGrid.children[0].offsetHeight, fit = n => arrRowTop(n - 1) - t0 + rowH + 3 <= avail; let n = 2; while (n < 256 && fit(n + 1)) n++;
+      hg = Math.min(avail, Math.round(arrRowTop(n - 1) - t0 + rowH + 3)) + 'px'; }
+    else { const pitch = (arrRowH() || arRH + 2) * 1.04, rows = Math.max(2, Math.floor((avail - 3) / pitch)); hg = Math.min(avail, Math.round(3 + rows * pitch)) + 'px'; }   // (×1.04: the gap every 4 rows)
     if (arrGrid.style.height !== hg) arrGrid.style.height = hg; }
   else if (arrGrid.style.height) arrGrid.style.height = '';
   arrSbw(); arrAlign(); arrFollowX(); arrBoxes();
@@ -32144,6 +32204,7 @@ function arrSize(){
   if (bigOn && arrBigFloor > 1 && arrZoom < arrBigFloor - 0.005){ if (arrBigPre == null) arrBigPre = arrZoom; arrZoom = arrBigFloor; }
   else if (!bigOn && arrBigPre != null){ arrZoom = arrBigPre; arrBigPre = null; }
   if (arrZoom > arrZMax()) arrZoom = arrZMax();   // a zoom saved on a smaller screen
+  if (arrZoom < arrZMin()) arrZoom = arrZMin();
   const z = arrZoom > 1 ? arrZoom : 1;
   const col = z > 1 ? Math.max(6, cwFit * z).toFixed(1) + 'px' : 'minmax(0,1fr)', grp = [];
   if (ms){ if (PFs > 0) grp.push(`repeat(${PFs},${col})`); if (NA > PFs) grp.push(`repeat(${NA - PFs},${col})`); grp.push(col); }
@@ -32151,24 +32212,27 @@ function arrSize(){
   arrEl.style.setProperty('--arcols', grp.join(` ${SP}px `));
   // As the Song screen the row height comes from the space the grid HAS (arrAvail), not the grid's own height: drawArr
   // snaps that height to whole rows, so reading it back here flipped 12 rows ↔ 13 rows on every redraw during playback.
-  const cw = (W - 34) / (NA + mx + 0.3 + (G + mx) * 0.2) * z, rh = Math.max(bigOn ? 24 : 0, clamp(Math.round(cw * 0.8), 16, z > 1 ? (arrDeskZ() ? (ms ? 34 : 40) : 44) : ms ? clamp(Math.floor(arrAvail() / 12) - 3, 16, 30) : 40));   // as the Song screen: at least about 12 rows, as the text grid showed
+  const cw = (W - 34) / (NA + mx + 0.3 + (G + mx) * 0.2) * z; let rh = Math.max(bigOn ? 24 : 0, clamp(Math.round(cw * 0.8), 16, z > 1 ? (arrDeskZ() ? (ms ? 34 : 40) : 44) : ms ? clamp(Math.floor(arrAvail() / 12) - 3, 16, 30) : 40));   // as the Song screen: at least about 12 rows, as the text grid showed
   // THREE DIGITS: the label also has to fit the block's width (three characters); too narrow for 7 px text, no label.
-  const lf = Math.min(clamp(Math.round(rh * 0.5), 8, 16), Math.floor(cwFit * z / 2));
-  arrGrid.style.setProperty('--arh', rh + 'px'); arrGrid.style.setProperty('--arf', Math.max(7, lf) + 'px'); arrEl.classList.toggle('arnolab', lf < 7);
+  const rh1 = rh; if (arrZoom < 1) rh = Math.max(AZ_RH_MIN, Math.round(rh * arrZoom));   // ZOOM OUT: lower rows (the columns stay at fit)
+  let lf = Math.min(clamp(Math.round(rh1 * 0.5), 8, 16), Math.floor(cwFit * z / 2));
+  if (arrZoom < 1) lf = Math.min(lf, Math.round(rh * 0.7));   // a number needs about 7 px: under that the block shows its colour only (arnolab)
+  arrGrid.style.setProperty('--arh', rh + 'px'); arrGrid.style.setProperty('--arf', Math.max(arrZoom < 1 ? 5 : 7, lf) + 'px'); arrEl.classList.toggle('arnolab', lf < 7);
+  arrGrid.style.setProperty('--arn', clamp(rh - 2, 5, 11) + 'px'); arrEl.classList.toggle('arout', arrZoom < 1); arrEl.classList.toggle('arlow', arrZoom < 1 && rh < 10);
   // Where the MONO | POLY break sits when every track fits (track PF's column starts after a spacer every 8 tracks):
   // the header's ○ is centred over it, and stays there while zoomed so it is always in the same place.
   { const p = sm ? 6 : 8, rnw = RNW, g = sm ? 1 : 2, PF = polyFrom(), colL = t => p + rnw + g + t * (cwFit + g) + (t >= PF && PF > 0 ? 1 : 0) * (SP + g);
     const bx = PF > 0 && PF < NA ? (colL(PF - 1) + cwFit + colL(PF)) / 2 : W / 2;
     arrEl.style.setProperty('--azfx', Math.max(120, Math.min(W - 70, bx)).toFixed(1) + 'px'); }
   arrEl.classList.toggle('zoomed', z > 1);
-  if (ARR_ZOOM_BTNS){ $('tArrZo').disabled = $('tArrZf').disabled = z <= 1; $('tArrZi').disabled = z >= arrZMax() - 0.01; }
+  if (ARR_ZOOM_BTNS){ $('tArrZo').disabled = arrZoom <= arrZMin() + 0.01; $('tArrZf').disabled = Math.abs(arrZoom - 1) < 0.01; $('tArrZi').disabled = arrZoom >= arrZMax() - 0.01; }
   return rh;
 }
 function arrHSync(){ const x = arrGrid.scrollLeft; $('tArrTh').scrollLeft = x; $('tArrGp').scrollLeft = x; if (asongOn()) arrBoxes(); }
 // fx: the point to keep still, as a fraction of the content's width; cx: where it sits in the panel (px). On a computer
 // the song cursor's block is the point kept still instead (or brought to the middle if it was out of view).
 function arrSetZoom(z, fx, cx){
-  z = clamp(z, 1, arrZMax()); if (z < 1.05) z = 1;
+  z = clamp(z, arrZMin(), arrZMax()); if (z > 0.95 && z < 1.05) z = 1;   // (a pinch near fit snaps to fit; below it the zoom-out levels)
   if (Math.abs(z - arrZoom) < 0.005) return;
   let el = null;
   if (arrDeskZ() && !arrPinch){
@@ -32250,8 +32314,11 @@ arrGrid.addEventListener('wheel', e => {
 if (ARR_ZOOM_BTNS){
   const step = d => {
     let z;
-    if (arrDeskZ()){ const m = arrZMax(); z = d > 0 ? (arrZoom >= m - 0.01 ? null : Math.min(m, arrZoom * 1.25)) : (arrZoom <= 1 ? null : arrZoom / 1.25); }
+    if (d < 0 && arrZoom <= 1.01) z = AZ_OUT.find(s => s < arrZoom - 0.01) || null;   // below fit: the zoom-out levels
+    else if (d > 0 && arrZoom < 0.99) z = [...AZ_OUT].reverse().concat(1).find(s => s > arrZoom + 0.01);
+    else if (arrDeskZ()){ const m = arrZMax(); z = d > 0 ? (arrZoom >= m - 0.01 ? null : Math.min(m, arrZoom * 1.25)) : arrZoom / 1.25; }
     else z = d > 0 ? AZ_STEPS.find(s => s > arrZoom + 0.01) : [...AZ_STEPS].reverse().find(s => s < arrZoom - 0.01);
+    if (z != null && z < arrZMin() - 0.001) z = null;
     if (z == null) return; arrSetZoom(z); arrZoomDone(); };
   $('tArrZo').addEventListener('click', () => step(-1)); $('tArrZi').addEventListener('click', () => step(1));
   $('tArrZf').addEventListener('click', () => { arrSetZoom(1); arrZoomDone(); });   // ○: back to every track in the panel
@@ -34578,6 +34645,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [600, '14 Nov', ['Arrange: zoom out further (the − button, Ctrl+wheel or pinch: five levels below fit, up to about three times the rows) so whole phrases fit', 'Arrange, Song, Phrase and Pattern view turn the page early while playing: when the playhead is 8 rows from the bottom, keeping 4 rows of what just played at the top', '+ ADD FX in the bottom FX bar opens the effect list straight away on the first empty slot', 'The "got its own copy" and "also plays on track" notices show for about 3 seconds and replace each other instead of queueing']],
   [599, '14 Nov', ['MOD: an LFO you add, change or remove while the song is playing is heard at once (it did nothing until the next PLAY)', 'Effects rest when nothing is playing through them: a switched-off Retrigger, Grains, Scramble or Glitch no longer keeps a track\'s effects running, and each effect naps after half a minute of silence in and out. On Windows and Intel/AMD machines a reverb or resonator fading to nothing could cost twenty times more than while it played (track effects climbing after STOP or while patterns were muted)']],
   [598, '14 Nov', ['The control bar’s Stop button now takes its look from the skin, like the other lit control bar buttons: flat, in the skin’s own playing colour, with no amber fill or shadow.', 'The volume fader in the bottom effects bar has a flat line for its cap, the same as the Mixer’s faders, in place of the round knob.', 'On a poly track, Enter (or EDIT on the pad) on a note picks up every note on that row, and Enter on an empty row drops the whole chord in the same columns, as one undo step. Dropped on a mono track it writes the one note that was under the cursor and says so.', 'In the Low power skins, lit control bar buttons (Stop, SELECT, LOOP SEL) are readable again: dark text on the light fill.']],
   [597, '14 Nov', ['…waves and …chains: an Expression module (Modules, Control utilities): type a line of maths and it becomes the sound. It reads four inputs (a, b, c, d), two sliders (k1, k2), time in seconds (t), its own previous output (y, so one line can be a filter or a counter) and a random number (rnd), with the usual operators and functions such as sin, tanh, abs, min, max, clip and mix. An Examples menu has a dozen to start from (ring modulation, soft clip, fold, bit crush, sample and hold …). What you type is only ever read as maths, never run as a program; a mistake is silence with a note saying where; the result is held between −4 and 4.']],
