@@ -22,7 +22,7 @@ namespace thunder {
 
 constexpr int kRenderPads = 256;       // pad slots a kit can have (a pad number is one byte)
 constexpr int kRenderQuantum = 128;    // frames a song is rendered in (the web core's block), whatever the host's block
-constexpr int kRenderEvents = 1024;    // one sequencer step's events (more are counted: stats().seqDropped)
+constexpr int kRenderEvents = kSeqStepEvents;   // one sequencer step's events, sized for the worst case (seq.h; more are counted: stats().seqDropped)
 
 struct RenderPads {
   VoiceBuf buf[kRenderPads];           // data == nullptr: the kit has no buffer for the pad (its notes are silent, as `kit.voices[pad]` missing)

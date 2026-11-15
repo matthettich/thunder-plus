@@ -192,6 +192,22 @@ static void testB3() {
   (void)got; thunder_destroy(c);
 }
 
+// ---- B4: the step buffer holds the worst case: sixteen poly tracks (the ticks clamp at 20 a hit each: about 80 a track), nothing dropped ----
+static void testB4() {
+  // four notes on a row with RET 01 (every tick) and TIC 20 (32 ticks a line): 4 x up to 64 hits a track
+  char r[160]; std::snprintf(r, sizeof r, "[60,64,67,71,-1,0,11,1,27,32,-1,-1]");
+  std::string js = "{\"v\":6,\"bpm\":120,\"lpb\":4,\"ntr\":16,\"song\":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],\"chains\":[[[0,0]]],\"plen\":[16],\"phrases\":[[" + std::string(r);
+  for (int i = 1; i < 32; i++) js += ",[-1,-1,-1,-1,-1,0,-1,-1,-1,-1,-1,-1]";
+  js += "]]}";
+  Song song; CHECK("B4 song loads", loadSong(song, js)); SeqVars vars; SeqOpts o; o.once = true;
+  SongRenderer R(song, vars, *mkPads(), 48000, 512, o); std::vector<float> L(512), Rr(512);
+  for (int b = 0; b < 200; b++) R.block(L.data(), Rr.data(), 512);
+  const RenderStats st = R.stats();
+  std::printf("  B4: largest step %d events, seqDropped %llu\n", st.peakStepEvents, (unsigned long long)st.seqDropped);
+  CHECK("B4 one step wrote more than the old 1024-event buffer", st.peakStepEvents > 1024);
+  CHECK("B4 and nothing was dropped", st.seqDropped == 0);
+}
+
 // @@TESTS_END
 
 int main() {
@@ -201,6 +217,7 @@ int main() {
   testB1();
   testB2();
   testB3();
+  testB4();
   // @@CALLS_END
   if (g_fail) { std::printf("test_hostile: %d FAILED\n", g_fail); return 1; }
   std::printf("test_hostile: all passed\n");
