@@ -35,9 +35,10 @@ static bool writeWav(const std::string& path, const std::vector<float>& L, const
 }
 
 int main(int argc, char** argv) {
-  if (argc < 4) { std::fprintf(stderr, "usage: thunder-render <song.thunder> <padsDir> <out.wav> [--frames N] [--block N]\n"); return 2; }
+  if (argc < 4) { std::fprintf(stderr, "usage: thunder-render <song.thunder> <padsDir> <out.wav> [--frames N] [--block N] [--page-timing] [--master]\n"); return 2; }
   const std::string songPath = argv[1], dir = argv[2], outPath = argv[3]; int64_t frames = -1; int block = 128;
   bool pageTiming = false; for (int i = 4; i < argc; i++) if (!std::strcmp(argv[i], "--page-timing")) { pageTiming = true; for (int j = i; j + 1 < argc; j++) argv[j] = argv[j + 1]; argc--; break; }
+  bool master = false; for (int i = 4; i < argc; i++) if (!std::strcmp(argv[i], "--master")) { master = true; for (int j = i; j + 1 < argc; j++) argv[j] = argv[j + 1]; argc--; break; }
   for (int i = 4; i + 1 < argc; i += 2) { if (!std::strcmp(argv[i], "--frames")) frames = std::atoll(argv[i + 1]); else if (!std::strcmp(argv[i], "--block")) block = std::atoi(argv[i + 1]); }
   if (block < 1 || block > 8192) { std::fprintf(stderr, "thunder-render: --block 1..8192\n"); return 2; }
   std::string text, idx;
@@ -63,6 +64,8 @@ int main(int argc, char** argv) {
   SeqOpts o; o.row = song.renderFrom; o.once = true;
   SongRenderer R(song, vars, pads, sr, block, o);
   R.pool().setPageTiming(pageTiming);
+  // --master (U12): the master chain as the song has it (mst + limiter, master/chain.h); the render is trimmed of its latency as pass() does
+  int64_t skip = 0; if (master) { R.setMasterChain(master_chain_from_song(song.mst, song.limiter)); skip = R.latencyFrames(); if (frames >= 0) frames += skip; }
   std::vector<float> L, Rt, bl((size_t)block), br((size_t)block);
   if (frames >= 0) { L.reserve((size_t)frames); Rt.reserve((size_t)frames); }
   const int64_t cap = (int64_t)(sr * 1260);   // (renderOut's own limit is 1200 s of song)
@@ -70,11 +73,13 @@ int main(int argc, char** argv) {
     const int n = frames >= 0 ? (int)std::min<int64_t>(block, frames - R.frame()) : block;
     R.block(bl.data(), br.data(), n); L.insert(L.end(), bl.begin(), bl.begin() + n); Rt.insert(Rt.end(), br.begin(), br.begin() + n);
   }
-  const int64_t written = R.frame(); const int atEnd = R.voices(); const bool overAtEnd = R.songOver();
+  if (skip > 0) { L.erase(L.begin(), L.begin() + std::min<int64_t>(skip, (int64_t)L.size())); Rt.erase(Rt.begin(), Rt.begin() + std::min<int64_t>(skip, (int64_t)Rt.size())); }
+  const int64_t written = R.frame() - skip; const int atEnd = R.voices(); const bool overAtEnd = R.songOver();
   // the pool must empty once the song is over (U08's trap: a voice on a track with no output never ends; with the mixer every track has one)
   int64_t extra = 0; while (!(R.songOver() && R.voices() == 0) && extra < (int64_t)(sr * 120)) { R.block(bl.data(), br.data(), block); extra += block; }
   const RenderStats s = R.stats(); double pk = 0; for (size_t i = 0; i < L.size(); i++) pk = std::max(pk, (double)std::max(std::fabs(L[i]), std::fabs(Rt[i])));
   if (!writeWav(outPath, L, Rt, (int)sr)) { std::fprintf(stderr, "thunder-render: cannot write %s\n", outPath.c_str()); return 1; }
+  if (master) std::printf("thunder-render: master chain on (mastering %s, safety limiter %s), latency %lld samples trimmed\n", R.masterChain()->mstActive() ? "on" : "off", R.masterChain()->safetyActive() ? "on" : "off", (long long)skip);
   std::printf("thunder-render: %lld frames (%.2f s) at %d Hz, peak %.4f -> %s\n", (long long)written, written / sr, (int)sr, pk, outPath.c_str());
   std::printf("  steps %d, events %d (largest step %d of %d), notes %d: played %d, no pad %d, MIDI-only %d, reversed+shaped (the page's) %d; mixer events %d\n", s.steps, s.events, s.peakStepEvents, kRenderEvents, s.notes, s.notesPlayed, s.notesNoPad, s.notesMidiOnly, s.notesShapedRev, s.mixEvents);
   std::printf("  peak voices %d of %d, longest voice lane %d, longest mixer lane %d (of %d / %d)\n", s.peakVoices, R.pool().capacity(), s.peakVoiceLane, s.peakMixLane, Mixer::kAutoUi, Mixer::kAutoSong);

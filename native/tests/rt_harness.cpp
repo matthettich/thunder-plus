@@ -13,6 +13,7 @@
 #include "mix/mix.h"
 #include "mix/pdc.h"
 #include "master/master.h"
+#include "master/chain.h"
 #include "render/render.h"
 #include "voice/voice.h"
 
@@ -342,6 +343,31 @@ static int run_master() {
   return 0;
 }
 
+// ---- U12: the master chain (EQ biquads -> mastering worklet -> safety limiter) under the guard, reconfigured between blocks, driven as the mixer's master hook ----
+static int run_chain() {
+  using namespace thunder;
+  const int MAXB = 600; Mixer M(48000, MAXB); MasterChain C(48000, MAXB); M.setMasterFx(&MasterChain::hook, &C);
+  std::vector<float> oL((size_t)MAXB), oR((size_t)MAXB);
+  uint32_t rng = 99; auto rnd = [&]() { rng = rng * 1664525u + 1013904223u; return (rng >> 8) / 16777216.0; };
+  long frame = 0; bool finite = true; double peak = 0; int cfgs = 0;
+  { rt_guard g;
+    for (int blk = 0; blk < 1200; blk++) {
+      const int N = 1 + (int)(rnd() * MAXB); const double t0 = (double)frame / 48000; M.setTime(t0);
+      if (blk % 40 == 0) { MasterChainConfig c = master_chain_fresh(rnd() < 0.7); c.mstOn = rnd() < 0.7; c.eqOn = rnd() < 0.8; c.nBands = 1 + (int)(rnd() * 7);
+        for (int i = 0; i < c.nBands; i++) { EqBand& b = c.bands[i]; b.type = (EqType)(int)(rnd() * 5); b.f = 20 + rnd() * 19980; b.g = -18 + rnd() * 36; b.q = 0.1 + rnd() * 17.9; b.slope = rnd() < 0.3 ? 12 : rnd() < 0.5 ? 24 : 48; b.on = rnd() < 0.85; }
+        c.set.sup.on = rnd() < 0.5; c.set.comp.on = rnd() < 0.6; c.set.lim.on = rnd() < 0.5; C.configure(c); cfgs++; }
+      for (int t = 0; t < 4; t++) { float *l = M.inputsL()[t], *r = M.inputsR()[t]; for (int i = 0; i < N; i++) { l[i] = (float)((rnd() - 0.5) * 1.5); r[i] = (float)((rnd() - 0.5) * 1.5); } }
+      M.render(oL.data(), oR.data(), N, t0);
+      for (int i = 0; i < N; i++) { const double a = oL[(size_t)i], b = oR[(size_t)i]; if (!std::isfinite(a) || !std::isfinite(b)) finite = false; peak = std::max(peak, std::max(std::fabs(a), std::fabs(b))); }
+      frame += N;
+    }
+  }
+  if (!finite) return fail("the master chain produced NaN");
+  if (peak <= 0) return fail("the master chain run was silent");
+  std::printf("rt_harness: master chain: %ld frames, %d configurations, no allocation\n", frame, cfgs);
+  return 0;
+}
+
 int main(int argc, char** argv) {
   if (argc > 1 && std::strcmp(argv[1], "--selftest") == 0) return selftest();
   if (int r = run_logger()) return r;
@@ -350,5 +376,6 @@ int main(int argc, char** argv) {
   if (int r = run_voice()) return r;
   if (int r = run_mix()) return r;
   if (int r = run_master()) return r;
+  if (int r = run_chain()) return r;
   return run_song();
 }
