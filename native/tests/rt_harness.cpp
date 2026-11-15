@@ -8,11 +8,17 @@
 #include "thunder/core.h"
 #include "thunder/rtlog.h"
 
+#include "seq/seq.h"
+#include "song/song.h"
+
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <fstream>
 #include <new>
+#include <sstream>
+#include <string>
 #include <vector>
 
 #if defined(__unix__) || defined(__APPLE__)
@@ -149,8 +155,29 @@ static int selftest() {
 #endif
 }
 
+// ---- U07: the sequencer's step() under the guard ---------------------------------------------------------------------
+// The song is read and the sequencer built outside the guard (the control thread's work); every step() runs inside it.
+// ELECTRO three ways: the whole song played live (it wraps: songWrap, wake), a render from row 9 (CHASE), and one phrase looped.
+static int run_seq() {
+  std::string text; { std::ifstream f(std::string(THUNDER_ROOT) + "/sounds/ELECTRO.thunder", std::ios::binary); if (!f) return fail("cannot read sounds/ELECTRO.thunder"); std::ostringstream o; o << f.rdbuf(); text = o.str(); }
+  thunder::Song song; thunder::JsonError je; if (!song.load(text.data(), text.size(), &je)) return fail("ELECTRO does not load");
+  thunder::SeqVars vars; const int CAP = 1024; std::vector<thunder::SeqEvent> evs((size_t)CAP); thunder::SeqStep st;
+  for (int k = 0; k < 3; k++) {
+    thunder::SeqOpts o; o.sim = k != 0; o.live = k == 0; o.once = k == 1; if (k == 1) o.row = 9; if (k == 2) { o.track = 0; o.phrase = 0; }
+    thunder::Seq sq(song, vars, k == 2 ? thunder::SeqMode::Phrase : thunder::SeqMode::Song, o);
+    long total = 0; int steps = 0; double last = -1; bool order = true;
+    { rt_guard g; for (; steps < 6000 && sq.alive(); steps++) { total += sq.step(evs.data(), CAP, &st); if (st.t < last) order = false; last = st.t; } }
+    if (!order) return fail("the sequencer's steps went back in time");
+    if (sq.dropped()) return fail("the sequencer dropped events");
+    if (total < steps) return fail("the sequencer made fewer events than steps (every step has its beat)");
+    std::printf("rt_harness: sequencer run %d: %d steps, %ld events, no allocation\n", k, steps, total);
+  }
+  return 0;
+}
+
 int main(int argc, char** argv) {
   if (argc > 1 && std::strcmp(argv[1], "--selftest") == 0) return selftest();
   if (int r = run_logger()) return r;
-  return run_core();
+  if (int r = run_core()) return r;
+  return run_seq();
 }

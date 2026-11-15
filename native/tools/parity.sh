@@ -1,53 +1,20 @@
 #!/bin/sh
-# Parity gate (u03: see parity-u03.sh). Usage: native/tools/parity.sh u02 [OUTDIR]     (OUTDIR default /tmp/u02-wasm; needs node, python3, git, curl)
-# U02 gate: "wasm built from CMake gives identical hashes to today's tfx.wasm on chains-modules.json", i.e. the AUDIO the modules produce.
-# 1. builds tfx.wasm, thunder-dsp.wasm, mods.wasm with CMake + wasi-sdk (build-wasm.sh; canonical link order, so the bytes do not depend on
-#    the machine);
-# 2. makes a temporary copy of the tree and swaps the CMake files in (waves/dsp/*.wasm, chains/dsp/tfx.wasm, and the MODS_WASM_B64 base64 in
-#    chains/chains-worklet.js and waves/waves-worklet.js). The committed files are never touched;
-# 3. runs the golden tests in the copy exactly as `npm test` does (node --test, one process per file) and prints PASS / FAIL per golden.
-# Byte equality with the committed files is printed as INFO only (the committed files came from unpinned upstreams).
-# Exit status 1 if any line is FAIL.
-set -e
-[ "$1" = u03 ] && exec sh "$(dirname "$0")/parity-u03.sh" "$@"
-[ "$1" = u02 ] || { echo "usage: parity.sh u02|u03 [OUTDIR]" >&2; exit 2; }
-R=$(cd "$(dirname "$0")/../.." && pwd)
-OUT=${2:-/tmp/u02-wasm}
-if [ -z "$PARITY_SKIP_BUILD" ]; then sh "$R/native/tools/build-wasm.sh" "$OUT" >/dev/null; fi
-for f in tfx thunder-dsp mods; do [ -f "$OUT/$f.wasm" ] || { echo "missing $OUT/$f.wasm" >&2; exit 2; }; done
-for p in "waves/dsp/tfx.wasm tfx" "chains/dsp/tfx.wasm tfx" "waves/dsp/thunder-dsp.wasm thunder-dsp"; do
-  set -- $p; if cmp -s "$OUT/$2.wasm" "$R/$1"; then echo "INFO  bytes equal   $1"; else echo "INFO  bytes differ  $1 (built $(wc -c <"$OUT/$2.wasm") B, committed $(wc -c <"$R/$1") B)"; fi
-done
-T="$OUT/tree"; rm -rf "$T"; mkdir -p "$T"
-( cd "$R" && tar --exclude=./.git --exclude=./native --exclude=./stable --exclude=./beta --exclude=./node_modules -cf - . ) | ( cd "$T" && tar -xf - )
-[ -d "$R/node_modules" ] && ln -s "$R/node_modules" "$T/node_modules"
-cp "$OUT/tfx.wasm" "$T/waves/dsp/tfx.wasm"; cp "$OUT/tfx.wasm" "$T/chains/dsp/tfx.wasm"; cp "$OUT/thunder-dsp.wasm" "$T/waves/dsp/thunder-dsp.wasm"
-python3 -I - "$OUT/mods.wasm" "$T/chains/chains-worklet.js" "$T/waves/waves-worklet.js" <<'PY'
-import re,sys,base64
-b=base64.b64encode(open(sys.argv[1],'rb').read()).decode()
-for p in sys.argv[2:]:
-    s=open(p,encoding='utf-8').read()
-    n,k=re.subn(r"(MODS_WASM_B64\s*=\s*['\"])[A-Za-z0-9+/=]+(['\"])",lambda m:m.group(1)+b+m.group(2),s)
-    if k!=1: sys.exit("expected exactly one MODS_WASM_B64 assignment in "+p+", found "+str(k))
-    open(p,'w',encoding='utf-8').write(n)
-PY
-fail=0
-run() {  # label files...
-  label=$1; shift
-  if ( cd "$T" && node --test "$@" >"$OUT/test-$(echo "$label" | tr ' /' '__').log" 2>&1 ); then echo "PASS  $label"; else echo "FAIL  $label   (log: $OUT/test-$(echo "$label" | tr ' /' '__').log)"; fail=1; fi
-}
-echo "== goldens rendered through the CMake-built wasm (tests run in a copy of the tree)"
-run "tests/golden/chains-modules.json (chains.test.js)" tests/chains.test.js
-run "tests/golden/chains-processor.json (chains.test.js)" tests/chains.test.js
-run "tests/golden/chains-thunder-node.json (chains.test.js)" tests/chains.test.js
-run "tests/golden/waves-modules.json (waves.test.js)" tests/waves.test.js
-run "tests/golden/waves-processor.json (waves.test.js)" tests/waves.test.js
-run "tests/golden/chains-modules.json again via waves.test.js" tests/waves.test.js
-echo "== other tests that load these wasm files"
-for t in block-size feedback idle-shortcut lverb fx-rest modules-blocks modules-clock modules-delay modules-expr modules-maths modules-scope wc-pass4 worklet-memory; do
-  [ -f "$T/tests/$t.test.js" ] && run "tests/$t.test.js" "tests/$t.test.js"
-done
-echo "== the whole suite as npm test runs it"
-run "npm test (node --test tests/*.test.js)" tests/*.test.js
-[ $fail = 0 ] && echo "parity u02: PASS" || echo "parity u02: FAIL"
-exit $fail
+# Parity gates of the native port, one case a unit: builds what the unit needs and prints PASS or FAIL (exit 0 / 1).
+#   native/tools/parity.sh u07     the sequencer: ctest `seq` (the four seq-electro goldens, every row hash and the sha256)
+#                                  and, where Node is installed, `seq_extra` (cases the goldens do not reach, against the JS)
+#   native/tools/parity.sh u02     the CMake-built effects wasm against every golden that renders through it (parity-u02.sh)
+# BUILD_DIR names the build folder (default /tmp/thunder-parity).
+set -u
+here=$(cd "$(dirname "$0")" && pwd)
+native=$(cd "$here/.." && pwd)
+build=${BUILD_DIR:-/tmp/thunder-parity}
+unit=${1:-}
+case "$unit" in
+  u07)
+    cmake -S "$native" -B "$build" -DCMAKE_BUILD_TYPE=Release >/dev/null || { echo "FAIL u07 (configure)"; exit 1; }
+    cmake --build "$build" -j8 --target test_seq >/dev/null || { echo "FAIL u07 (build)"; exit 1; }
+    if ctest --test-dir "$build" -R '^seq(_extra)?$' --output-on-failure; then echo "PASS u07"; exit 0; else echo "FAIL u07"; exit 1; fi ;;
+  u02) shift; exec sh "$here/parity-u02.sh" u02 "$@" ;;   # the existing C++ DSP built from CMake: the goldens rendered through it (parity-u02.sh)
+  u03) exec sh "$here/parity-u03.sh" "$@" ;;   # the pump DSP built from CMake: the goldens and pump's own compare (parity-u03.sh)
+  *) echo "usage: parity.sh u02 [OUTDIR] | u03 | u07"; exit 2 ;;
+esac

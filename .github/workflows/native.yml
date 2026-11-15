@@ -30,6 +30,8 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4   # the goldens' reference JS engine: Node 22 (as tests.yml); another V8 may differ in the last bit of Math.pow
+        with: { node-version: 22 }
       - run: cmake -S native -B build -DCMAKE_BUILD_TYPE=Release
       - run: cmake --build build -j
       - run: ctest --test-dir build --output-on-failure -V -R 'bench_put|core_pattern'
