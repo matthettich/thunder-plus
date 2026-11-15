@@ -1056,6 +1056,7 @@ body.mob #bFile.dirty{position:relative} body.mob #bFile.dirty::before{position:
 .tscr .pl{background:var(--ts-pl-bg); color:var(--ts-pl)}
 .tscr .sel{background:var(--ts-sel)}
 .tscr .fxpane{position:relative; overflow-y:auto; overscroll-behavior:contain; scrollbar-width:thin; border-bottom:1px dashed var(--ts-dim)}
+.tscr .tgrid .ln.fxact{position:sticky; top:0; z-index:3; background:var(--ts-bg)}
 .tscr .fxcue{min-height:1.25em; color:var(--ts-th); font-size:.8em; letter-spacing:.04em}
 .tscr .cur{background:var(--ts-cur-bg); color:var(--ts-cur)}
 /* The playing line (Phrase, Sect, Pattern view) inverted, as Arrange's playing blocks are: the line takes the text
@@ -30256,11 +30257,12 @@ function draw(){
       L.push([{t:lfoOn && r.lfo && lfoOn.has(r.lfo) ? r.l.padEnd(lw - 1) + '~' : r.l.padEnd(lw), cls:'lb' + (lfoOn && r.lfo && lfoOn.has(r.lfo) ? ' lfom' : ''), x:0, y}, {t:val, cls:cc(0, y, 'v'), x:0, y}]);
       // FX: the slot whose controls are shown is highlighted (owner, 2 Nov: "make it clearer what effect you are editing")
       if (tv === 'fx' && y >= 1 && y <= FXSLOTS && y - 1 === cFxS) L[L.length - 1].fxsel = true;
+      if (tv === 'fx' && y === FXSLOTS + 1) L[L.length - 1].fxact = true;   // PINNED (15 Nov): the open slot's ACTIVE line stays at the top of the controls while a long effect scrolls
       if (tv === 'fx' && y === FXSLOTS) fxB = L.length;
     });
   }
   const spanH = s => typeof s === 'string' ? s : `<span class="${s.cls || ''}"${s.x != null ? ` data-x="${s.x}" data-y="${s.y}"` : ''}${s.r != null ? ` data-r="${s.r}"` : ''}${s.title ? ` title="${esc(s.title)}"` : ''}${s.st ? ` style="${s.st}"` : ''}>${esc(s.t)}</span>`;
-  const gl = L.map(ln => '<div class="ln' + (ln.b4 ? ' b4' : '') + (ln.wrap ? ' wrap' : '') + (ln.fxsel ? ' fxsel' : '') + '">' + ln.map(spanH).join('') + '</div>');
+  const gl = L.map(ln => '<div class="ln' + (ln.b4 ? ' b4' : '') + (ln.wrap ? ' wrap' : '') + (ln.fxsel ? ' fxsel' : '') + (ln.fxact ? ' fxact' : '') + '">' + ln.map(spanH).join('') + '</div>');
   if (tv === 'fx' && fxA != null && fxB != null){ gl.splice(fxB, 0, '</div><div class="ln fxcue"></div>'); gl.splice(fxA, 0, '<div class="fxpane">'); }
   const gh = gl.join('');
   const rebuilt = gh !== gridHTML; if (rebuilt){ gridHTML = gh; grid.innerHTML = gh; gridLit = []; pvLit.clear(); pvSp.clear(); pvLnEls = null; }
@@ -35085,8 +35087,14 @@ scr.addEventListener('wheel', e => {
   const c = cs[tv]; let lo = 0, hi = dims(tv).h - 1;
   // FX SCREEN (owner, 2 Nov): the wheel stays in the section the cursor is in, the slot list (rows 0–8) or the effect's
   // values (below); a click moves between them.
-  if (tv === 'fx'){ if (c.y <= FXSLOTS) hi = Math.min(hi, FXSLOTS); else lo = FXSLOTS + 1; }
-  c.y = clamp(c.y + n, lo, hi);
+  // WHEEL REACHES THE SLOT LIST (15 Nov, owner: with a long effect the wheel stopped at its first row): past the top of the controls it steps onto the open slot's row
+  // (what ◀ does), and past the last slot it steps onto the controls (of the slot that is open: the active effect never changes by scrolling).
+  let ny;
+  if (tv === 'fx'){ const full = hi;
+    if (c.y > FXSLOTS){ if (c.y + n <= FXSLOTS) ny = clamp(cFxS + 1, 0, FXSLOTS); else lo = FXSLOTS + 1; }
+    else if (c.y + n > FXSLOTS) ny = Math.min(FXSLOTS + 1, full);
+    else hi = Math.min(hi, FXSLOTS); }
+  c.y = ny != null ? ny : clamp(c.y + n, lo, hi);
   if (pvActive()) pvHoldX = true;   // the pattern stays where it was scrolled to
   draw();
 }, {passive:false});
