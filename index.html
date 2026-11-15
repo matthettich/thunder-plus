@@ -23570,10 +23570,11 @@ function tStop(quiet){
     tp.paused = ref >= 0 ? {pos:P, ref, row:P[ref].row, step:P[ref].step, key:curKey()} : null;
   });
   // STOP CURSOR: a STOP you make (not a restart, a song change or the song running out while hidden) puts the cursor there
-  let stopP = null, home = null;
+  let stopP = null, home = null, arrP = null;
   G('stop cursor', () => {
   stopP = !quiet && stopToPlayhead() && tp.on && tp.pos && tp.pos.some(Boolean) ? {P:tp.pos.map(q => q && Object.assign({}, q)), mode:tp.mode} : null;
-  home = !quiet && tp.on && !stopToPlayhead() && fpHome && fpHome.t >= workT && fpHome.t >= arrHandT ? fpHome : null; });   // (12 Nov, owner: PLAY from the pad, ▼ / scroll down, STOP before row 2 jumped the cursor back to the top) fpHome is the cursor as FOLLOW first noted it, and is only noted again 4 s after your last key, press or scroll: a place you moved to after that note stands, only an untouched cursor goes back   // (9 Nov, owner: with ON STOP at STAYS it still ended up at the playback spot: FOLLOW had carried it there)
+  home = !quiet && tp.on && !stopToPlayhead() && fpHome && fpHome.t >= workT && fpHome.t >= arrHandT ? fpHome : null;
+  arrP = !quiet && stopArrOn && !stopToPlayhead() && tv !== 'song' && tp.on && tp.mode === 'song' && tp.pos && tp.pos.some(Boolean) && apPanel() ? tp.pos.map(q => q && Object.assign({}, q)) : null; });   // (12 Nov, owner: PLAY from the pad, ▼ / scroll down, STOP before row 2 jumped the cursor back to the top) fpHome is the cursor as FOLLOW first noted it, and is only noted again 4 s after your last key, press or scroll: a place you moved to after that note stands, only an untouched cursor goes back   // (9 Nov, owner: with ON STOP at STAYS it still ended up at the playback spot: FOLLOW had carried it there)
   tp.timer = 0; tp.on = false; if (mtrMode === 'off') setTimeout(mtrWake, 0); fpMem = null; fpHome = null; tp.q = []; tp.pos = null; tp.snd = null; tp.stopAt = null; tp.ahead = tp.aheadT = 0; tp.rsUntil = 0; PB.rsA = null; G('runaway kick', rkReset);
   // HAND-OVER (seqHandover): the core and the voices already booked keep sounding until the page sequencer's first step
   if (tp.core){ tp.core = false; core.gen++; if (!handing) G('core', () => { coreWire(false); try { core.node.port.postMessage({op:'stop', at:ctx.currentTime}); } catch(e){} }); }
@@ -23587,7 +23588,17 @@ function tStop(quiet){
   if (!handing){ bgPlay(false); wakeLock(false); }   // BACKGROUND PLAY, KEEP SCREEN ON (a hand-over plays on)
   if (stopP) try { if (curToPlay(stopP.P, stopP.mode) && tp.paused) tp.paused.key = curKey(); } catch(e){ tpLog('stop cursor', e); }
   else if (home) try { cs.song.y = home.y; cs.song.top = home.top; cPhrase = home.p; cSect = home.s; cs.phrase.y = home.py; cs.phrase.top = home.ptop; cs.song.pg = cs.phrase.pg = false; if (tp.paused) tp.paused.key = curKey(); } catch(e){ tpLog('stop cursor', e); }
+  // ARRANGE ON STOP beside another screen (14 Nov, owner: ARRANGE ON STOP = PLAYHEAD, yet the Arrange cursor went back to where it was): with the Phrase (or the Mixer…) holding
+  // the keys, stopToPlayhead() reads PHRASE ON STOP, which moves or restores the phrase side AND Arrange's cursor. Arrange's own cursor and view now follow ARRANGE ON STOP alone.
+  if (arrP) G('arrange cursor', () => { if (tv === 'phrase' && pvActive()){ curToPlay(arrP, 'song'); if (tp.paused) tp.paused.key = curKey(); } else arrCurToPlay(arrP); });   // Pattern view draws the song row's pattern, so the pattern goes with the row (pvGo); else only Arrange's cursor moves
   if (!quiet) draw();
+}
+// Arrange's cursor onto the row playing on its own track (the track column stays), and that row in view. For the Arrange beside another screen only: nothing of the phrase moves.
+function arrCurToPlay(P){
+  const want = cs.song.x, t = P[want] && P[want].row >= 0 && want !== MT ? want : P.findIndex((q, i) => q && q.row >= 0 && i !== MT); if (t < 0) return false;
+  const row = P[t].row, VR = Math.max(2, arrRows()), top = cs.song.top || 0;
+  cs.song.y = row; cs.song.pg = false; if (row < top || row > top + VR - 1) cs.song.top = clamp(row - 2, 0, Math.max(0, 256 - VR));
+  return true;
 }
 /* ===== REC, METRONOME AND COUNT-IN (20 Oct) =====
    REC (the tracker's top strip, F9 or Alt+R) records a MIDI keyboard (Settings → MIDI → Keys play) and, while playing, the
