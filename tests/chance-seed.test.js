@@ -135,3 +135,16 @@ test('review fixes: a JMP 00 loop rolls each pass differently; a SED on a track 
   assert.equal(hits(play(mu, { row: 1 }), 0).length, 0, 'the TCH 00 in the muted block above still holds (as it does when the song plays through it)');
   assert.equal(hits(play(mu), 0).length, 0);
 });
+test('CodeRabbit on #144: TCH survives a gap in the track; the fallback seed does not depend on where the song starts; PRB cannot cancel TCH; a lock of 00 on CHANCE ends with the next note', () => {
+  const gap = song([{ t: 0, y: 0, rows: { 0: [['TCH', 0]] } }, { t: 0, y: 2 }, { t: 1, y: 0 }, { t: 1, y: 1 }, { t: 1, y: 2 }]);
+  assert.equal(hits(play(gap), 0).length, 0, 'TCH 00, an empty song row, then a block: still silent (as a start at row 2 finds it)');
+  assert.equal(hits(play(gap, { row: 2 }), 0).length, 0);
+  // two tracks give a SED at different steps; a third has none: it borrows the lowest track's, from the top and from row 1 alike
+  const fb = song([{ t: 0, y: 0, rows: { 15: [['SED', 7]] } }, { t: 1, y: 0, rows: { 0: [['SED', 9]] } }, { t: 0, y: 1 }, { t: 1, y: 1 }, { t: 2, y: 0, all: CHA(128) }, { t: 2, y: 1, all: CHA(128) }, { t: 2, y: 2, all: CHA(128) }]);
+  const full = hits(play(fb), 2), again = hits(play(fb), 2); assert.deepEqual(full.filter(s => s >= 16), again.filter(s => s >= 16), 'seeded once both SEDs are given');
+  assert.deepEqual(hits(play(fb, { row: 1 }), 2), full.filter(s => s >= 16).map(s => s - 16), 'a start at row 1 borrows the same seed as playing through');
+  const pr = song([{ t: 0, y: 0, rows: { 0: [['TCH', 0], ['PRB', 0]] } }, { t: 0, y: 1 }]);
+  assert.equal(hits(play(pr), 0).length, 0, 'TCH 00 with a PRB 00 beside it: the TCH stands'); assert.equal(hits(play(pr, { row: 1 }), 0).length, 0, 'and a start below finds it');
+  const lk = song([{ t: 0, y: 0, rows: { 4: [['LK1', 0]] } }]); lk.perf.lk = { 0: ['tch:0', null, null, null] };
+  assert.deepEqual(hits(play(lk), 0), [0, 1, 2, 3, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15], 'the locked note (step 4) rolls with chance 00; the next note ends the lock and plays');
+});

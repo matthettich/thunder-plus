@@ -283,18 +283,20 @@ function makeSeq(S, mode, o){
      rolled there since PLAY, and which roll of the row it is. So with a seed the same notes fall every time, live and rendered,
      from the top or from the middle; each pass through a looped pattern differs, the same way every time; and one track's rolls
      never depend on another's notes. The seed: the track's own (SED nn on the track, until its next SED; SED 00 hands back),
-     else the song's (SED nn in the master column), else the last SED given on any track (lseed: a song from before this build
-     with its SED on a track still repeats on every track), else one drawn for this PLAY (a new roll every time, as before).
+     else the song's (SED nn in the master column), else the seed of the lowest track that has one in force (a song from before
+     this build with its SED on a track still repeats on every track; "the lowest track's", not "the last one given", so a start
+     in the middle finds the same one), else one drawn for this PLAY (a new roll every time, as before).
      RND, RNL, ONE, DIR 3, ARC random and HUMAN keep the old stream (rand), which any SED still seeds.
      rvs: how often each track has rolled at each place. Kept apart from the track's state, which JMP, a wake after a gap and a
      hand-over start afresh: the passes of a song that loops by JMP 00 must not all fall alike. */
-  let sseed = null, lseed = null, pseed = null, mtch = 255;   // the song's seed (master SED), the last track SED, this play's; the master column's TCH
+  let sseed = null, pseed = null, mtch = 255;   // the song's seed (master SED), this play's; the master column's TCH
+  const anySeed = () => { for (let u = 0; u < MT; u++) if (tr[u].seed != null) return tr[u].seed; return null; };
   const rvs = Array.from({length:MT + 1}, () => new Map());
   const hmix = x => { x = Math.imul(x ^ x >>> 16, 0x85EBCA6B); x = Math.imul(x ^ x >>> 13, 0xC2B2AE35); return (x ^ x >>> 16) >>> 0; };
   const roll = (T, t, salt) => {
     const key = (mode === 'song' ? T.row * 65536 : 0) + T.cr * 256 + T.step;
     if (T.vn < 0){ const rv = rvs[t]; T.vn = rv.get(key) || 0; rv.set(key, T.vn + 1); }   /* (vn is put back to -1 when the track reads its next row) */
-    const sd = T.seed != null ? T.seed : sseed != null ? sseed : lseed != null ? lseed : pseed != null ? pseed : (pseed = o && o.seed != null ? o.seed >>> 0 : Math.floor(Math.random() * 4294967296));
+    const fb = T.seed != null || sseed != null ? null : anySeed(), sd = T.seed != null ? T.seed : sseed != null ? sseed : fb != null ? fb : pseed != null ? pseed : (pseed = o && o.seed != null ? o.seed >>> 0 : Math.floor(Math.random() * 4294967296));
     return hmix(hmix(hmix((sd ^ Math.imul(t + 1, 0x9E3779B1)) | 0) ^ key) ^ Math.imul(T.vn * 31 + salt + 1, 0x27D4EB2F)) / 4294967296;
   };
   const rand = () => { if (!seeded) return Math.random(); let x = seeded.s += 0x6D2B79F5; x = Math.imul(x ^ x >>> 15, x | 1); x ^= x + Math.imul(x ^ x >>> 7, x | 61); return ((x ^ x >>> 14) >>> 0) / 4294967296; };
@@ -382,7 +384,7 @@ function makeSeq(S, mode, o){
       if (!loop && T.wr && y < T.wr) continue;   // (12 Nov) it ran ahead of this row and has played it: it waits for a row past the one it stopped on (not under a LOOP set meanwhile: its rows come round again, review)
       const line = 60 / api.bpm / (api.lpb || plpbOf(S, p)), st = Math.max(0, Math.ceil((rel - L.r0) / line - 1e-6));
       if (st >= lenOf(p)) continue;   // past its end on this row: it starts with the next row
-      Object.assign(T, fresh(), {on:true, row:y, cr:0, step:st, g:st, cnt:st, r0:L.r0, rel:L.r0 + st * line});
+      Object.assign(T, fresh(), {on:true, row:y, cr:0, step:st, g:st, cnt:st, r0:L.r0, rel:L.r0 + st * line, seed:T.seed, tch:T.tch, skp:T.skp, chd:T.chd});   // (CHANCE: its seed, TCH, SKP and CHD last "until the next one", across a gap too, as a start in the middle finds them)
     }
   }
   // A random whole number from -dn to +up.
@@ -418,15 +420,15 @@ function makeSeq(S, mode, o){
   /* CHASE (chance): a song started below the top, or sent there by JMP, takes the seeds and the track chances the rows above would
      have left: the last SED, TCH, SKP and CHD on each track, and the master column's SED and TCH for the song. (A muted block's
      commands still count on a track, as when playing; a muted master block is not read.) */
-  const SKPI = FXC.indexOf('SKP'), CHDI = FXC.indexOf('CHD'), PRBI = FXC.indexOf('PRB');
+  const SKPI = FXC.indexOf('SKP'), CHDI = FXC.indexOf('CHD'), RNDI = FXC.indexOf('RND'), RNLI = FXC.indexOf('RNL'), REPI = FXC.indexOf('REP');
   const chaseChance = row => {
-    sseed = null; lseed = null; mtch = 255; for (const T of tr){ T.seed = null; T.tch = null; T.skp = 0; T.chd = 0; }
+    sseed = null; mtch = 255; for (const T of tr){ T.seed = null; T.tch = null; T.skp = 0; T.chd = 0; }
     for (let y = 0; y < row && y < 256; y++){ const sr = S.song[y]; if (!sr) continue;
       for (let t = 0; t <= MT; t++){ const cid = sr[t], ch = cid >= 0 ? S.chains[cid] : null; if (!ch || (t === MT && mutedAt(MT, y))) continue;
         for (const cr of ch){ const ph = cr && cr[0] >= 0 ? S.phrases[cr[0]] : null; if (!ph) continue; const L = Math.min(ph.length, lenOf(cr[0]));
           for (let i = 0; i < L; i++){ const r = ph[i]; if (!r) continue;
             for (let k = FX0; k < RW; k += 2){ const c = r[k]; if (c !== SEDI && c !== TCHI && c !== SKPI && c !== CHDI) continue; const v = Math.max(0, r[k + 1]);
-              if (c === SEDI){ const sd = v ? v * 2654435761 >>> 0 : null; if (t === MT) sseed = sd; else { tr[t].seed = sd; lseed = sd; } }
+              if (c === SEDI){ const sd = v ? v * 2654435761 >>> 0 : null; if (t === MT) sseed = sd; else tr[t].seed = sd; }
               else if (c === TCHI){ if (t === MT) mtch = v; else tr[t].tch = v >= 255 ? null : v; }
               else if (c === SKPI) tr[t].skp = v ? 1 : 0;
               else tr[t].chd = v ? 1 : 0; } } } } }
@@ -535,7 +537,7 @@ function makeSeq(S, mode, o){
     };
     /* The master column is read last, but its SED and TCH count for every track on the same row: read them first. */
     { const T = tr[MT]; if (mode !== 'phrase' && T.on && !(T.rel > rel0 + 1e-9)){ const cid = sectId(T, MT), ch = cid >= 0 ? S.chains[cid] : null, chRow = ch ? ch[T.cr] : null, r = r0(T, !T.empty && chRow ? chRow[0] : -1);
-        if (r && cmdV(r, PRBI) == null){ const sd = cmdV(r, SEDI), tc = cmdV(r, TCHI); if (sd != null) sseed = sd ? sd * 2654435761 >>> 0 : null; if (tc != null) mtch = tc; } } }   /* (a row with a PRB: its commands may not happen, so they count when the master's row is read, from the next row on) */
+        if (r && cmdV(r, RNDI) == null && cmdV(r, RNLI) == null && cmdV(r, REPI) == null){ const sd = cmdV(r, SEDI), tc = cmdV(r, TCHI); if (sd != null) sseed = sd ? sd * 2654435761 >>> 0 : null; if (tc != null) mtch = tc; } } }   /* (a row with RND, RNL or REP: they may change the value, so it counts when the master's row itself is read, from the next row on) */
     const lfoRan = [];   // the tracks whose own row ran this step (their LFO went out with it)
     for (let t = 0; t <= MT; t++){
       const T = tr[t]; if (!T.on || T.rel > rel0 + 1e-9) continue;
@@ -568,7 +570,8 @@ function makeSeq(S, mode, o){
         for (let k = FX0; k < RW; k += 2){
           if (r[k] < 0 || !FXC[r[k]]) continue;
           let c = FXC[r[k]], v = Math.max(0, r[k + 1]);
-          if (c === 'PRB'){ const tg = cmds[cmds.length - 1]; if (tg){ if (roll(T, t, 8 + k) * 255 >= v) cmds.pop(); } else if (roll(T, t, 8 + k) * 255 >= v) cmds.push({c:'CHA', v:0}); continue; }   // (owner, 30 Oct) Renoise-style chance for the command to the left
+          if (c === 'PRB'){ const tg = cmds[cmds.length - 1]; if (tg && (tg.c === 'SED' || tg.c === 'TCH' || tg.c === 'SKP' || tg.c === 'CHD')) continue;   /* (these four set what the rows below roll with; a PRB cannot take them away, so a start in the middle of the song finds what playing through leaves) */
+            if (tg){ if (roll(T, t, 8 + k) * 255 >= v) cmds.pop(); } else if (roll(T, t, 8 + k) * 255 >= v) cmds.push({c:'CHA', v:0}); continue; }   // (owner, 30 Oct) Renoise-style chance for the command to the left
           if (c === 'REP'){ if (!T.last) continue; T.last = {c:T.last.c, v:(T.last.v + v) & 255}; cmds.push({...T.last}); continue; }
           if (c === 'RND' || c === 'RNL'){
             const dn = v >> 4, up = v & 15, tg = cmds[cmds.length - 1];
@@ -586,7 +589,7 @@ function makeSeq(S, mode, o){
         if (fx.TPO != null && fx.TPO >= 40) nb = fx.TPO;
         if (fx.GRV != null) T.grv = fx.GRV ? [(fx.GRV >> 4) || api.tks, (fx.GRV & 15) || api.tks] : null;
         if (fx.GGR != null) ngrv = fx.GGR ? [(fx.GGR >> 4) || api.tks, (fx.GGR & 15) || api.tks] : null;
-        if (fx.SED != null){ seeded = fx.SED ? {s:fx.SED * 2654435761 >>> 0} : null; const sd = fx.SED ? fx.SED * 2654435761 >>> 0 : null; if (t === MT) sseed = sd; else { T.seed = sd; lseed = sd; } }   // (the old stream, and the chance seed: the song's from the master column, else this track's)
+        if (fx.SED != null){ seeded = fx.SED ? {s:fx.SED * 2654435761 >>> 0} : null; const sd = fx.SED ? fx.SED * 2654435761 >>> 0 : null; if (t === MT) sseed = sd; else T.seed = sd; }   // (the old stream, and the chance seed: the song's from the master column, else this track's)
         if (fx.TCH != null){ if (t === MT) mtch = fx.TCH; else T.tch = fx.TCH >= 255 ? null : fx.TCH; }
         if (fx.SKP != null) T.skp = fx.SKP ? 1 : 0;
         if (fx.CHD != null) T.chd = fx.CHD ? 1 : 0;
@@ -607,6 +610,16 @@ function makeSeq(S, mode, o){
         if (fx.ARC != null) T.arc = {mode:fx.ARC >> 4, spd:(fx.ARC & 15) || 1};
         if (fx.DIR != null){ T.dir = Math.min(3, fx.DIR); T.pp = T.dir === 1 ? -1 : 1; }   // DIR: from the next row on
         if (fx.HOP != null) hop = Math.min(fx.HOP, PROWS - 1);
+        // NUD (owner, 1 Nov): ± ticks, so a note can land early as well as late (DEL only pushes it later); at most half a step early
+        const nud = fx.NUD != null ? s8(fx.NUD) * tick : 0;
+        const at = Math.max(t0 - line * 0.5, t0 + Math.min((fx.DEL || 0) * tick, dur * 0.98) + nud), end = t0 + dur;
+        // PERFORM commands (owner, 1 Nov): XFD the crossfader, MAC a macro (X 1–8, Y 0–F), PRT a part (00 = the song's own),
+        // LK1–LK4 this track's locks (what they set: Perform → Locks). They act even when a condition stops the note
+        // (and before the row's chance is rolled: a lock on the track's CHANCE counts for the note it is given with).
+        if (fx.XFD != null){ PF.xf = fx.XFD; perfDiff(evs, at); }
+        if (fx.MAC != null){ const X = fx.MAC >> 4; if (X >= 1 && X <= PERF_MACROS){ PF.mac[X - 1] = (fx.MAC & 15) * 17; perfDiff(evs, at); } }
+        if (fx.PRT != null){ const k = fx.PRT - 1, P = k >= 0 && S.parts ? S.parts[k] : null; PF.part = P ? k : -1; evs.push(...partEvs(P || partSnap(), at)); PF.sent.clear(); perfDiff(evs, at); }
+        { const lk = PFS.lk[t]; if (lk) for (let n = 0; n < 4; n++){ const v = fx['LK' + (n + 1)], id = lk[n]; if (v == null || !id) continue; evs.push(...tgtEvs(id, v, at, PF.pno)); if (!T.lk) T.lk = {}; T.lk[n] = id; } }
         let play = true;
         if (fx.NTH != null){ const X = (fx.NTH >> 4) || 1, Y = (fx.NTH & 15) || 1, key = pid + ':' + T.step, n = T.nth.get(key) || 0;
           T.nth.set(key, n + 1); play = n % X === (Y - 1) % X; T.cres = play; }
@@ -615,6 +628,9 @@ function makeSeq(S, mode, o){
            without one is not touched by it. */
         const polyT = isPolyT(t); let hasN = false, keepC = null;
         if (t < MT && !busT.has(t)) for (let c = 0; c < (polyT ? NCOL : 1); c++) if (r[c] >= 0 && r[c] < 120){ hasN = true; break; }
+        /* A lock on CHANCE lasts until the next note without it, and that note must already roll with the track's own chance again: a lock of
+           00 would otherwise skip every note after it, and a skipped note never ended the lock (CodeRabbit on #144). The other locks end below, when a note plays. */
+        if (hasN && T.lk) for (const n of Object.keys(T.lk)){ const id = T.lk[n]; if (fx['LK' + (+n + 1)] != null || String(id).slice(0, 4) !== 'tch:') continue; delete T.lk[n]; evs.push(...tgtEvs(id, PF.sent.has(id) ? PF.sent.get(id) : null, at, PF.pno)); }
         { const po = hasN ? PF.pno.get(t) : null, tc = !hasN ? 255 : T.tch != null ? T.tch : po && po.tch != null ? po.tch : 255, pc = (fx.CHA != null ? fx.CHA : 255) * tc * (hasN ? mtch : 255);
           if (pc < 16581375){ const p = pc / 16581375; let ok;
             if (T.chd && polyT && hasN){ keepC = []; for (let c = 0; c < NCOL; c++) if (r[c] >= 0 && r[c] < 120 && roll(T, t, 1 + c) < p) keepC.push(c); ok = keepC.length > 0; }
@@ -635,15 +651,6 @@ function makeSeq(S, mode, o){
           if (ty & 1) ok = !ok;
           if (kind === 3) T.cres = ok;
           if (!ok) play = false; }
-        // NUD (owner, 1 Nov): ± ticks, so a note can land early as well as late (DEL only pushes it later); at most half a step early
-        const nud = fx.NUD != null ? s8(fx.NUD) * tick : 0;
-        const at = Math.max(t0 - line * 0.5, t0 + Math.min((fx.DEL || 0) * tick, dur * 0.98) + nud), end = t0 + dur;
-        // PERFORM commands (owner, 1 Nov): XFD the crossfader, MAC a macro (X 1–8, Y 0–F), PRT a part (00 = the song's own),
-        // LK1–LK4 this track's locks (what they set: Perform → Locks). They act even when a condition stops the note.
-        if (fx.XFD != null){ PF.xf = fx.XFD; perfDiff(evs, at); }
-        if (fx.MAC != null){ const X = fx.MAC >> 4; if (X >= 1 && X <= PERF_MACROS){ PF.mac[X - 1] = (fx.MAC & 15) * 17; perfDiff(evs, at); } }
-        if (fx.PRT != null){ const k = fx.PRT - 1, P = k >= 0 && S.parts ? S.parts[k] : null; PF.part = P ? k : -1; evs.push(...partEvs(P || partSnap(), at)); PF.sent.clear(); perfDiff(evs, at); }
-        { const lk = PFS.lk[t]; if (lk) for (let n = 0; n < 4; n++){ const v = fx['LK' + (n + 1)], id = lk[n]; if (v == null || !id) continue; evs.push(...tgtEvs(id, v, at, PF.pno)); if (!T.lk) T.lk = {}; T.lk[n] = id; } }
         if (play) fxEvs(t, fx, at, line);
         if (play && fx.FXV != null){ const sel = T.fxs || {s:0, p:0}; evs.push({type:'fxp', t:at, track:t, slot:sel.s, pi:sel.p, v:fx.FXV}); }   // FXV   // momentary lengths count rows (a row averages one line)
         // MIDI: PGM and the CC slots go to the row's instrument (or the track's last), ahead of the row's notes.

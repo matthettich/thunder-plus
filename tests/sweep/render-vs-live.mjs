@@ -65,5 +65,6 @@ for (const r of rows) {
 console.log('chain latency the code expects (samples) and notes matched for the start:', rows_info.map(x => x.join(': ')).join(' | '));
 const nInc = rows.filter(r => r.incon).length;
 console.log(`\n${rows.length - bad} PASS, ${bad} FAIL, ${nInc} with timing INCONCLUSIVE`);
-if (nInc === rows.length) { console.log('Every row has inconclusive timing: nothing was verified.'); process.exit(2); }
+if (bad) process.exit(1);   // (a failed check is a failure, whatever the timing rows say)
+if (nInc === rows.length) { console.log('Every row has inconclusive timing: the timing was not verified.'); process.exit(2); }
 process.exit(bad ? 1 : 0);
