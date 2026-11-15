@@ -32,4 +32,8 @@ get airwindows https://github.com/airwindows/airwindows  143a86df3642881e0be4bf8
   /plugins/LinuxVST/src/Galactic /plugins/LinuxVST/src/TapeDelay2 /plugins/LinuxVST/src/DeRez2 /plugins/LinuxVST/src/PurestDrive \
   /plugins/LinuxVST/src/Air3 /plugins/LinuxVST/src/Verbity2 /plugins/LinuxVST/src/ToVinyl4 /plugins/LinuxVST/src/Dubly \
   /plugins/LinuxVST/src/Cabs /plugins/LinuxVST/src/Tube2
+# pump: the owner's own repo (U03). Sparse checkout WITHOUT plugins/machine (GPL-3.0-only LXR firmware): it is never even on disk.
+# tests/data/mix.f32 is the input of pump's own wasm/compare.mjs.
+get pump https://github.com/matthettich/pump deb07d331b4f6a058abc847106be66bfc498faa3 \
+  /LICENSE /THIRD_PARTY_NOTICES.md /common/ /wasm/ /plugins/ '!/plugins/machine/' /tools/check-licence-boundary.sh /tests/data/mix.f32
 echo "third_party: all pins fetched into $D"

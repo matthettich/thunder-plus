@@ -23,5 +23,10 @@ case "$unit" in
     if ctest --test-dir "$build" -R '^(voice_ref|voice|voice_golden_current|rt_core)$' --output-on-failure; then echo "PASS u08"; exit 0; else echo "FAIL u08"; exit 1; fi ;;
   u10) shift; exec sh "$here/parity-u10.sh" u10 "$@" ;;   # latency compensation + the beat clock (parity-u10.sh)
   u02) shift; exec sh "$here/parity-u02.sh" u02 "$@" ;;   # the existing C++ DSP built from CMake: the goldens rendered through it (parity-u02.sh)
+<<<<<<< HEAD
   *) echo "usage: parity.sh u02 [OUTDIR] | u07 | u08 | u10"; exit 2 ;;
+=======
+  u03) exec sh "$here/parity-u03.sh" "$@" ;;   # the pump DSP built from CMake: the goldens and pump's own compare (parity-u03.sh)
+  *) echo "usage: parity.sh u02 [OUTDIR] | u03 | u07 | u08"; exit 2 ;;
+>>>>>>> 929eeb77546580b6d2529ed515fad6e732881afc
 esac

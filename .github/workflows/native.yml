@@ -78,7 +78,7 @@ jobs:
           path: out/thunder_core.wasm
           retention-days: 7
       # U02: the existing C++ DSP (tfx, thunder-dsp, mods) from CMake with the same wasi-sdk, pinned upstreams (third_party/PINS.md).
-      - name: Build tfx / thunder-dsp / mods wasm from CMake (U02)
+      - name: Build tfx / thunder-dsp / mods / pump / pump-synth wasm from CMake (U02, U03)
         run: WASI_SDK="$PWD/wasi-sdk" native/tools/build-wasm.sh "$RUNNER_TEMP/u02-wasm"
       # U02 gate: the golden tests rendered through the CMake-built wasm (copy of the tree; committed files untouched).
       - uses: actions/setup-node@v4
@@ -86,6 +86,10 @@ jobs:
           node-version: '22'
       - name: Parity u02 (goldens through the CMake wasm)
         run: WASI_SDK="$PWD/wasi-sdk" PARITY_SKIP_BUILD=1 native/tools/parity.sh u02 "$RUNNER_TEMP/u02-wasm"
+      # U03 gate: pump-synth golden + every test that loads the pump wasm, through the CMake-built pump.wasm / pump-synth.wasm
+      # (build-wasm.sh above built them into the same folder), plus pump's own wasm/compare for the nine mastering effects.
+      - name: Parity u03 (pump goldens through the CMake wasm)
+        run: WASI_SDK="$PWD/wasi-sdk" PARITY_SKIP_BUILD=1 native/tools/parity.sh u03 "$RUNNER_TEMP/u02-wasm"
       - uses: actions/upload-artifact@v4
         with:
           name: thunder_dsp-wasm-u02
@@ -93,6 +97,8 @@ jobs:
             ${{ runner.temp }}/u02-wasm/tfx.wasm
             ${{ runner.temp }}/u02-wasm/thunder-dsp.wasm
             ${{ runner.temp }}/u02-wasm/mods.wasm
+            ${{ runner.temp }}/u02-wasm/pump.wasm
+            ${{ runner.temp }}/u02-wasm/pump-synth.wasm
           retention-days: 7
 
   windows:
