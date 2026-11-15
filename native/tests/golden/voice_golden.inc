@@ -8,6 +8,7 @@ static const VoiceGolden kVoiceGolden[] = {
   {"cutrel", 0x42f42c3f32e335a9ull, 102400},
   {"reverse", 0x6bd10aa825a20ed8ull, 153600},
   {"shape", 0x0b105f07881c5491ull, 204800},
+  {"shape_rev", 0xe508bb3f38919323ull, 51200},
   {"loop", 0xc460ceb105ba7a49ull, 51200},
   {"slice", 0x20ebc5b2cb55a09bull, 153600},
   {"choke", 0xc54402b3ecb10caeull, 153600},
@@ -24,4 +25,4 @@ static const VoiceGolden kVoiceGolden[] = {
   {"stop", 0x1b420b123037132dull, 102400},
   {"tiny_blocks", 0xc94c4835c545daf3ull, 67200},
 };
-static const int kVoiceGoldenN = 21;
+static const int kVoiceGoldenN = 22;

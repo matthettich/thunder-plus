@@ -53,6 +53,7 @@ const CASES = {
     [0, note({ t: FB(1), pad: 1, tw: { cut: 120, res: 200, dec: 150 } })], [0, note({ t: FB(2), track: 1, pad: 0, tw: { cut: 60, res: 0 } })],
     [0, note({ t: FB(3), track: 2, pad: 1, tw: { dec: 40 } })], [0, note({ t: FB(4), track: 3, pad: 1, ofs: 100, tw: { cut: 200, res: 255, dec: 220 } })],
     [10, note({ t: FB(12), track: 0, pad: 3, tw: { cut: 90, res: 128 }, rate: 0.9 })]] },
+  shape_rev: { tracks: 1, evs: [[0, note({ t: FB(0) })], [10, note({ t: FB(12), pad: 1, rev: true, tw: { cut: 100, res: 50 } })], [20, note({ t: FB(22), pad: 3, rev: true })]] },   // reversed + shaped: varRec gives null, the page plays it; the voices still give way (take)
   loop: { tracks: 1, evs: [[0, note({ t: FB(1), pad: 2, rate: 0.25 })], [20, note({ t: FB(21), pad: 2, rate: 1, poly: true })]] },
   slice: { tracks: 3, evs: [[0, note({ t: FB(1), ofs: 64 })], [0, note({ t: FB(1, 40), track: 1, pad: 1, ofs: 128, rate: 1.1 })], [0, note({ t: FB(2), track: 2, pad: 3, ofs: 200 })]] },
   choke: { tracks: 3, kit: kit({ choke: 1 }, { choke: 1 }, { choke: 0 }, { choke: 2 }), evs: [
