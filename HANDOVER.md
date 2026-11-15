@@ -366,6 +366,7 @@ clock mapping at that latency (7 Nov (16)). Re-check MIDI timing with Measure…
 
 ## Desktop releases
 
+- **v1.3.8** (15 Nov 2026, a regular release; owner, 14 Nov 23:15: "after finishing everything on your list, please push to main and cut a build"; beta → main at build 619): builds 610 to 619 (chance and seeds, MONO / POLY TRACKS, MOD follows Arrange, the file's name for the song, Option+A and Option+▲▼, LATENCY COMP AUTO, about 630 new presets and 12 kits, stereo pads and many renders). The run id is added when it has finished. Next is 1.3.9.
 - **v1.3.7** (14 Nov 2026 night, a regular release; owner, 14 Nov: "when a few builds have landed, merge `beta` into `main` and build the desktop app"; PR #142 beta → main at build 609, run 43673860734, all three platforms, 11 assets): builds 603 to 609 (renders start on time and are as bright as playback, Synth slider number entry and arrow nudge, Arrange TRANSP. on a selection, switched-OFF pump effects and muted tracks' effects rest, the CPU panel names the effect). Build 610 (chance and seeds) is on `beta` only. Next is 1.3.8.
 - **v1.3.6** (14 Nov 2026 evening, a regular release; owner, 14 Nov: "when you hit a reasonable milestone, can you merge beta and main and push a new desktop app?"; PR #134 beta → main at build 602, run 43660864512, all three platforms, 11 assets): builds 590 to 602 (the module queue, MOD while playing, effects resting in silence, LFOs follow tracks, Arrange zoom and paging, FX Clear, ANIMATIONS). Installed copies update to it.
 - **v1.3.5** (14 Nov 2026, a regular release; owner, 14 Nov: "Merge `beta` into `main` and build the desktop app"; PR #120 beta → main at build 589 (CodeRabbit had not finished after 15 minutes and left no comments), Run workflow through the API with version 1.3.5, run 43637300817, succeeded): everything since build 563 (the 12–13 Nov phone fixes, Lite reverb and presets, the Synth page rework, …waves / …chains audit passes 1–5, feedback loops). Installed copies update to it.
@@ -528,7 +529,26 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0) and `link/` (Ableton
 
 ## To-do (owner's list: keep it current; newest dated entries below have the details)
 
-### Where things stand (14 Nov, night: READ THIS FIRST; it supersedes the evening block below where they disagree)
+### Where things stand (15 Nov, midday: READ THIS FIRST; it supersedes the blocks below where they disagree)
+
+**`beta` = build 619; `main` = build 619 = desktop v1.3.8** (if the Desktop releases list below has no v1.3.8 line with a run id, the merge to `main` and the build were NOT done: do them). Builds 610 to 619 since v1.3.7, all the owner's asks of 14 Nov evening and night:
+- **610** chance and seeds. **611 + 615** MONO TRACKS / POLY TRACKS (`docs/MONO-POLY-PLAN.md`: built). **612** MOD beside Arrange follows the cursor. **613** a "Song 1" takes its file's name. **614** Option+A returns exactly; Option+▲▼ on Mixer / FX / MOD / INST. **616** LATENCY COMP AUTO (default). **617** about 360 engine presets. **618** 273 drum sounds, 12 kits. **619** stereo pads in renders; many renders.
+- **Nothing since 603 has been heard by the owner except the `acid` render on the Mac** ("sounds much better", 14 Nov 21:59; Windows, where the original was rendered, still to try). The presets were measured, never heard. His checklist doc has builds 603 to 616 in section 1 (78 open); **617 to 619 are in the punch list only: add them to the doc and re-export.**
+
+**Native port: stage N0 is built and waits for the owner's phone.** Branch `native` (never merged into `beta`), `native/` only. A1, A2, A3 (test APK), A4 (bridge code; timings need the phone), A5 (the lead's `rt_harness` and `thunder/rtlog.h`), A7, A8, A9 done; CI green on Linux, Windows, Mac, wasm, Android. Pre-release `native-n0-android-8` (the desktop updater cannot see it). **A6 is his:** three five-minute runs on the Fold (`native/tests/OWNER-TEST-N0.md`); he installed it 15 Nov 08:58; no results yet. **Go or stop after N0 is his decision; do not start N1 before it.** He said Android first (14 Nov 23:31), after considering Windows.
+
+**Open, for the next session:**
+1. His N0 results, then his go / stop.
+2. His ears on 610 to 619; presets to cut.
+3. `acid`: three LFOs sit on track 12 that belong to track 13 (stored before build 602); he is fixing them himself.
+4. Latency AUTO leftovers (build 616 entry): PLAY with something ringing may tick (10 ms glide, not re-measured); effect commands waiting in `fxcPend`, FXV and the core's own command delivery are not shifted by the input latency; a JS clocked effect after a latency pump effect in one chain.
+5. Two engine presets whose render depends on voice order in the golden tool (build 618 entry). Stereo pad: live L / R levels differ from the render's (build 619 entry).
+6. Phone: a second tap on SONG = jump to Arrange and back was proposed, not built (he will check whether it was tried before).
+7. The older open questions (the 14 Nov evening block's item 4, and the "still open" audio list of the build 599 entry).
+
+**Things that bit this session:** the environment restarted twice and killed running agents without their reports (the notice said "the user stopped it": he had not; ask him rather than wait hours). Agents' notes in `/home/claude/progress/` let new agents finish the work. A `const` used by a control that is built while the page loads stops the app (`pdcModeOf`): the vm tests cannot see that, a browser run can. The engine golden now takes minutes (2100 voices) and the full suite about ten.
+
+### Where things stand (14 Nov, night: it supersedes the evening block below where they disagree)
 
 **Done this session (builds 603 to 610), all six items of the owner's 18:22 message:** `main` = build 609 = desktop **v1.3.7** (out, 11 assets); `beta` = build 610.
 1. **Renders sound like playback:** 603 (switched-OFF pump slots' latency counted: renders started 4454 samples late on his song) and 608 (sample notes start on a whole sample: renders were 1 dB dull at the top). The second investigation found NO other difference on tracks 7 / 9 / 13: level, tone, timing and pitch match live; the low waveform correlation was oscillator phase and an overloaded capture. Regression check: `tests/sweep/render-vs-live.mjs`. If he still hears a difference he must say which track and when (punch list, build 608); also his two dead LFOs on old track 12.
@@ -746,6 +766,10 @@ The owner's top priority to add is the MOD screen. Work down the list; ask befor
 **The owner's checklist by importance (13 Nov):** he works from a Claude Doc, "Thunder Plus test checklist, by priority" (https://claude.ai/artifact/LrzQ18ur18Fc5gkvxmQDbK), ordered: 1 Do these first, 2 Really worth trying, 3 If you have time, 4 Safe to skip, Parked, Set aside, Done. A snapshot with his ticks is `docs/TEST-CHECKLIST.md`: re-export it whenever the doc changes, and add each new build's checks to the doc's section 1 as well as here. He said the two "decides" groups (native apps; smoothing / Worklets / clock experiments) are parked and block nothing. "Close the skip list" from him means: close section 4's items as not tested.
 
 Start a session by asking for results. Fix on `beta`. (10 Nov, 15:10: the web beta is build 560; the build numbers in the rest of this paragraph are older.) Web beta: https://matthettich.github.io/thunder-plus/beta/ (build 547 as of 10 Nov morning, 548 once its PR merges; the night of 9–10 Nov shipped 544–547, see the four "10 Nov" entries below. Decisions the lead made that night for the owner to confirm or reverse: on a phone the saved Sequencer default plays on the Page unless Audio thread is picked on that device; on a phone the safety limiter is its stand-in until another worklet loads; the resync only runs with a worklet loaded and its margins are untested on a device). Desktop: v1.3.4-beta.2 (build 541, no feed view or scopes); further desktop betas on hold until the owner asks.
+
+**Build 619** (stereo pads in renders; many renders)
+- [ ] **Computer:** a stereo sample on a pad (something wide), play it, render it, compare on headphones. Pass: the render is as wide as playback (it was mono).
+- [ ] **Computer:** render the stems of your 22-track song, twice in one session. Pass: every stem has sound; or, if it runs out, the render stops with a “Render failed” message and writes no silent file (reload, then render again).
 
 **Build 618** (new drum sounds and kits)
 - [ ] **Any device, by ear:** load the IDM clicks, Glitch and Chip kits. Pass: the 8 pads of each are distinct and at a similar loudness. Then the other nine kits: name any that are weak.
@@ -1334,6 +1358,14 @@ Suggested order: N0 → N1 → N2 (phone cured) → N4 with N3 alongside → N5 
   the edge `R.t0`, "waiting…" while armed), `rcdClk` / `rcdFmt` / `rcdFreeSecs`, a 250 ms timer only while recording; the
   final length stays until the next take. recorder-check covers FREE, PATTERN, Stop, next take and closing mid-take.
 
+
+## 15 Nov (stereo pads render in stereo; many renders in one session; build 619)
+
+Two leftovers of "renders should sound like the playback". By two agents (the first was killed by an environment restart after confirming A); reviewed by the lead.
+- **A. Stereo pads rendered mono.** Live (audio-thread and page sequencer) plays a stereo sample in stereo (L/R correlation −0.01); the render gave identical channels. `padRender` / `renderGetB` now carry the right channel into `renderOut` and `renderPart` (so stems and `pass()` too); reverse and stretch act on both channels as live does. After: 0.002. MUT / GEN variations are mono live too and stay mono. **Open:** in the stereo run the live L and R levels differ from the render's (live R louder; the mono control matched): not chased.
+- **B. Silent renders after many in one session.** V8 allows about 104 WebAssembly memories in a page; Chrome never frees a finished offline render's audio thread (held by Blink's worklet proxy, not by the app), and every effects node of every render kept its own wasm instance. On `acid` the 9th render came out silent with no error. **Fix:** effect nodes in ONE render share their wasm instances (live nodes unchanged); a render whose effects or chains node cannot start fails with a message and saves nothing (the old toast said the track "rendered without it", which was untrue). Sweep song (six tracks, a plate each): 17 good then 23 silent → 40 of 40; to exhaustion: 53 good, then refusals with the message, no silent file. The limit is pushed back, not removed.
+- **Also:** CodeRabbit on #151: `tests/engine-presets.test.js` checks whole-number parameters; `tools/engine-preset-check.js` no longer accepts a note a fifth off (it finds the fundamental and allows only the octaves a preset declares). Re-run over every new preset: none was a mistake; 15 are skip-listed with reasons (fixed thumps, chords, detuned sets). CodeRabbit on #152, left: `tools/drum-measure.js` analyses only the first 131072 samples of a long hit. On #151, left: two punch-list wordings for the mono / poly checks (start from 8 + 8 with an empty track 17; test Ctrl+Z and raising the count separately).
+- Tests: `tests/render-stereo.test.js`, `tests/render-fx-share.test.js`; sweeps `tests/sweep/render-stereo.mjs`, `tests/sweep/render-many.mjs`.
 
 ## 15 Nov (273 new drum sounds and 12 new kits; build 618)
 
