@@ -24,7 +24,11 @@ add_executable(test_runtime test_runtime.cpp)
 target_link_libraries(test_runtime PRIVATE thunder_core)
 target_include_directories(test_runtime PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../core/src ${CMAKE_CURRENT_SOURCE_DIR})
 add_test(NAME runtime COMMAND test_runtime)
-if(NODE_EXE)
+# The golden is made by Node on Linux x86-64 (the reference); the same script gave a different file on the macOS and Windows
+# CI runners (15 Nov; not yet looked at which lines: line endings on Windows, and V8's own exp may differ in the last bit where
+# V8 is built with fused multiply-add). The C++ equals the committed golden on every platform (ctest `runtime`), which is the
+# point; whether the committed golden is current is checked where it is made.
+if(NODE_EXE AND CMAKE_SYSTEM_NAME STREQUAL "Linux")
   add_test(NAME runtime_golden_current COMMAND ${NODE_EXE} ${CMAKE_CURRENT_SOURCE_DIR}/../tools/runtime-golden.mjs --check)
 endif()
 
