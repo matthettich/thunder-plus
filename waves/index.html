@@ -160,6 +160,9 @@ svg.cables .cln.gate{stroke-width:3px; stroke-linecap:round; stroke-dasharray:.1
 /* FEEDBACK CABLE (14 Nov, audit M2): the cable that closes a loop keeps its kind's colour and is drawn long dash, dot, long dash (a third pattern: control is
    short dashes, gate round dots), with a small tag by its target end. Both only through the skin's own variables (--ink, --panel). */
 svg.cables .cln.fb{stroke-linecap:round; stroke-dasharray:14 4 .1 4}
+/* CROSS-CHAIN CABLE (15 Nov): a cable from one track's chain into another track's carries no signal (each track runs its own chain). Drawn as short dashes with a gap and a
+   faded line (a fourth pattern: control 6 4, gate dots, feedback dash-dot), with a "no signal" tag by its target end. */
+svg.cables .cln.xc{stroke-linecap:butt; stroke-dasharray:2 7; opacity:.6}
 svg.cables .fbtag{pointer-events:none}
 svg.cables .fbtag rect{fill:var(--panel); stroke:var(--ink); stroke-width:1; vector-effect:non-scaling-stroke}
 svg.cables .fbtag text{fill:var(--ink); font-size:11px; font-weight:600; font-family:var(--font); text-anchor:middle; dominant-baseline:central}
@@ -213,6 +216,9 @@ svg.cables g:hover > rect.bend, svg.cables g.sel > rect.bend, body.alting svg.ca
 .node.collapsed{min-height:64px}
 .node.collapsed > header{padding:4px 8px 2px 12px; border-bottom:0}
 .node.collapsed > header .x{width:22px; height:22px}
+/* HELP BUTTON SIZE (15 Nov, owner): the ? is exactly the size of the x, expanded and collapsed (button.mq outranks the shared .mq rule, which is added later) */
+.node > header button.mq{width:26px; height:26px}
+.node.collapsed > header button.mq{width:22px; height:22px}
 .csum{display:none}
 .node.collapsed > .csum{display:flex; align-items:center; gap:6px; position:relative; padding:2px 12px 5px; font-size:12.5px; line-height:16px; min-height:22px}
 .cs-t{flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--ink)}
@@ -250,7 +256,7 @@ button.mk.more:hover{color:var(--ink); border-color:var(--ink)}
 @media (pointer: coarse){
   .node > header .fold::before{inset:0 -10px}   /* 40 x 40: the button is 40 tall now, so the touch area grows sideways only */
   .node > header{gap:2px; padding-top:3px; padding-bottom:3px}
-  .node > header button.mq{width:32px; height:40px; margin-right:0}
+  .node > header button.mq, .node.collapsed > header button.mq{width:36px; height:40px; margin-right:0}   /* the same as button.x below */
   .node > header button.x, .node.collapsed > header button.x{width:36px; height:40px}
   .node > header button.fold{height:40px}
   .node > header button.byp{height:40px; min-width:40px}
@@ -1664,6 +1670,7 @@ function buildShow(n){
   const kind = MODULES[n.m.type].display;
   if (kind === 'scope') return buildScope(n);
   if (kind === 'expr') return buildExpr(n);
+  if (kind === 'srlab') return buildSrLab(n);
   if (kind === 'dyn' || kind === 'dynlv'){ const box = h('div', {class:'shw dyn'}); buildDyn(n, box, kind); return box; }
   if (kind === 'bars' || kind === 'life'){ const box = h('div', {class:'shw ' + kind}); (kind === 'bars' ? buildBars : buildLife)(n, box); return box; }
   const box = h('div', {class:'shw' + (kind === 'gr' ? ' gr' : '')}), rows = [];
@@ -1672,6 +1679,7 @@ function buildShow(n){
     const r = h('div', {class:'ch'}, h('span', {text:lbl}), tr, v); box.append(r); rows.push({r, i, b, v, hold:-200, ht:0}); };
   if (kind === 'meter'){ mk('L'); mk('R'); box.title = 'Bars: average (VU) level. Tick: peak (held 1.5 s). Number: peak in dB. The red line is 0 dB.'; }
   else if (kind === 'scin'){ mk('IN'); mk('ENV'); rows[1].b.hidden = true; box.classList.add('sci'); box.title = 'IN: the level of what Source picks (peak, dB). ENV: the envelope its hits make (what Env and Duck send out).'; }
+  else if (kind === 'mixout'){ mk('OUT'); box.classList.add('sci'); rows[0].i.style.background = 'var(--audio)'; box.title = 'The level this mixer is sending out (peak, dB; held 1.5 s at the tick). \u2212\u221e means nothing is passing through it.'; }
   else if (kind === 'scout'){ mk('SEND'); box.classList.add('sci'); box.title = 'What this Sidechain Out sends (peak, dB).'; }
   else { mk('GR'); rows[0].b.hidden = true; box.title = 'Gain reduction: how much it is turning the sound down.'; }
   n.show = { kind, rows, seen:0 };
@@ -1696,7 +1704,7 @@ function paintShows(list){
     if (S.kind === 'scin'){ scinPaint(S, v[0], v[1], now); continue; }
     if (S.kind === 'scope'){ if (v.length >= 2 + SCOPE_W * 4 && v[0] !== S.seq){ S.seq = v[0]; S.data = v; drawScope(n); } continue; }   // a new picture only when a whole sweep is done
     if (S.kind === 'expr'){ exprPaint(n, v); continue; }   // Expression: the engine's [error code, position]
-    if (S.kind === 'scout'){ const A = S.rows[0], pk = v[0]; A.i.style.transform = 'scaleX(' + showPos(pk) + ')'; if (pk >= A.hold || now - A.ht > 1500){ A.hold = pk; A.ht = now; }
+    if (S.kind === 'scout' || S.kind === 'mixout'){ const A = S.rows[0], pk = v[0]; A.i.style.transform = 'scaleX(' + showPos(pk) + ')'; if (pk >= A.hold || now - A.ht > 1500){ A.hold = pk; A.ht = now; }
       A.b.style.left = (showPos(A.hold) * 100) + '%'; A.v.textContent = A.hold <= -90 ? '−∞' : (A.hold > 0 ? '+' : '') + A.hold.toFixed(1); if (n.lvl) setLvl(n, showPos(pk)); continue; }
     if (S.kind === 'meter') for (let c = 0; c < 2; c++){
       const R = S.rows[c], vu = v[c], pk = v[c + 2];
@@ -2381,6 +2389,84 @@ window.addEventListener('keydown', e => {
   }
   if (e.key === 'Enter' && !e.shiftKey && !e.repeat && selected.size === 1 && !playMode && !(t && t.closest && t.closest('button, a, summary')) && ctx.hidden){ e.preventDefault(); renameModule([...selected][0]); return; }
 });
+/* SEND / RECEIVE (15 Nov, owner): an invisible cable. A Send takes In / In R, and every Receive with the same label outputs what its Send gets. The engine turns the pair into
+   ordinary cables when the patch is compiled (srResolve in the worklet), so nothing about ordering or feedback changes. Label: lab 1-8 is A-H, 0 is the module's own text
+   (kept trimmed and not case sensitive, as in the engine). The colour chip is the label's colour; a Receive with no Send, or a Send with no Receive, says so. Within one
+   track's chain only: a pair that joins two tracks' chains carries nothing (each track runs its own chain), and its cable is drawn with the cross-chain warning. */
+const SR_LAB = 'ABCDEFGH', SR_COL = ['#d6336c', '#2b8a3e', '#1c7ed6', '#e8590c', '#7048e8', '#0b7285', '#a68a00', '#7d5a3c'];
+function srKeyOf(m){
+  const l = Math.round(m && m.params && m.params.lab) || 0;
+  if (l >= 1 && l <= 8) return SR_LAB[l - 1];
+  const t = m && typeof m.text === 'string' ? m.text.trim().toLowerCase() : '';
+  return t ? 't:' + t : '';
+}
+const srName = m => { const k = srKeyOf(m); return !k ? '' : k.startsWith('t:') ? m.text.trim() : k; };
+function srColor(k){
+  if (!k) return '#777777'; const i = SR_LAB.indexOf(k); if (i >= 0 && k.length === 1) return SR_COL[i];
+  let x = 7; for (let i = 0; i < k.length; i++) x = (x * 31 + k.charCodeAt(i)) % 360; return 'hsl(' + x + ' 55% 38%)';
+}
+Object.assign(SHARED_MODULES, {
+  send:{ label:'Send', scope:'mono', display:'srlab', text:true, inputs:{ in:'audio', inR:'audio' }, outputs:{}, plabels:{ in:'In L', inR:'In R' },
+    params:{ lab:[1,0,8,1] }, ui:{ lab:{ l:'Label', fixed:true, c:[[0, 'Custom text'], ...Array.from(SR_LAB, (c, i) => [i + 1, c])] } } },
+  recv:{ label:'Receive', scope:'mono', display:'srlab', text:true, inputs:{}, outputs:{ out:'audio', outR:'audio' }, plabels:{ out:'Out L', outR:'Out R' },
+    params:{ lab:[1,0,8,1] }, ui:{ lab:{ l:'Label', fixed:true, c:[[0, 'Custom text'], ...Array.from(SR_LAB, (c, i) => [i + 1, c])] } } }
+});
+Object.assign(SHARED_FAMILY, { send:'util', recv:'util' });
+Object.assign(SHARED_ABOUT, {
+  send:'Send: an invisible cable, sending end. Patch a sound into In L and In R, pick a Label (A to H, or Custom text and type a name), and every Receive with the same label outputs that sound. Use it to carry a signal across a busy patch without drawing the cable. Two Sends with one label add together. It works inside one track’s chain: to carry a sound to another track’s chain, use a Sidechain Out and a Source of Send 1 to 8.',
+  recv:'Receive: an invisible cable, receiving end. Pick the same Label as a Send and its Out L and Out R carry what that Send gets. Several Receives can share one Send. With no Send of that label it is silent and says "no Send named …". It works inside one track’s chain: to bring in a sound from another track’s chain, use a Sidechain In or a Source of Send 1 to 8.'
+});
+Object.assign(MODULE_USE, {
+  send:'Patch the reverb’s output into a Send labelled A. Far away, a Receive labelled A gives the same sound into a mixer, with no cable across the patch.',
+  recv:'Set the Label to the Send’s, then patch Out L and Out R where you need the sound. Several Receives can use one Send.'
+});
+SHARED_PALETTE.push(['Utilities', [['send', 'Send'], ['recv', 'Receive']], 'audio']);
+{ const g = PAL_LAYOUT.find(r => r[0] === 'In and out'); if (g && !g[2].includes('send')) g[2].splice(g[2].indexOf('resample') >= 0 ? g[2].indexOf('resample') : g[2].length, 0, 'send', 'recv'); }
+let srCss = false;
+function buildSrLab(n){
+  if (!srCss){ srCss = true; const st = document.createElement('style'); st.textContent = `.srbox{display:grid; gap:4px; padding:2px 0 4px}
+.srbox .srrow{display:flex; align-items:center; gap:8px}
+.srchip{display:inline-block; min-width:26px; height:20px; padding:0 6px; box-sizing:border-box; border:1.5px solid var(--ink); background:var(--src, #777); color:#fff; font:600 12px/17px var(--font); text-align:center; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:110px}
+.srbox input.srtext{flex:1; min-width:0; box-sizing:border-box; padding:3px 6px; font:inherit; font-size:12.5px; background:var(--panel); color:var(--ink); border:1px solid var(--muted); border-radius:0}
+.node.sr > header{box-shadow:inset 0 6px 0 var(--src, transparent)}`; document.head.append(st); }
+  const m = n.m, chip = h('span', { class:'srchip', 'aria-hidden':'true' });
+  const inp = h('input', { class:'srtext', type:'text', maxlength:'40', spellcheck:'false', autocomplete:'off', 'aria-label':'Custom label', placeholder:'Custom label', title:'A name of your own (used when Label is Custom text; typing one switches Label to it). Enter applies it. Not case sensitive.' });
+  inp.value = typeof m.text === 'string' ? m.text : '';
+  const apply = () => {
+    if (!doc.modules.includes(m) || !inp.isConnected) return;
+    const v = inp.value.replace(/[\r\n\t  ]+/g, ' ').slice(0, 40); inp.value = v;
+    if (v === (typeof m.text === 'string' ? m.text : '')) return;
+    if (playBlocked()){ inp.value = typeof m.text === 'string' ? m.text : ''; return; }
+    store.snapshot(); m.text = v; exprSend(m, v);
+    if (v.trim() && (Math.round(m.params.lab) || 0) !== 0){ setParam(n, 'lab', 0); }
+    paintSr(); if (m.collapsed) paintSum(n); store.touch();
+  };
+  inp.addEventListener('keydown', e => { if (!(e.ctrlKey || e.metaKey)) e.stopPropagation(); if (e.key === 'Enter'){ e.preventDefault(); apply(); inp.blur(); } else if (e.key === 'Escape'){ e.preventDefault(); inp.value = typeof m.text === 'string' ? m.text : ''; inp.blur(); } });
+  inp.addEventListener('keyup', e => { if (!(e.ctrlKey || e.metaKey)) e.stopPropagation(); });
+  inp.addEventListener('focus', () => { inp.readOnly = !!playMode; });
+  inp.addEventListener('blur', apply);
+  n.show = { kind:'srlab', chip, inp, seen:0 };
+  return h('div', { class:'srbox', title:'The Label pairs this ' + (m.type === 'send' ? 'Send with the Receives' : 'Receive with the Send') + ' of the same label. The colour chip is the same on both ends.' }, h('div', { class:'srrow' }, chip, inp));
+}
+// Chips, the colour strip on the title bar and the status line of every Send and Receive; run after any change to the patch or a label.
+function paintSr(){
+  const need = new Map(), have = new Map();
+  for (const m of doc.modules){ if (m.type !== 'send' && m.type !== 'recv') continue; const k = srKeyOf(m); if (!k) continue; (m.type === 'send' ? have : need).set(k, ((m.type === 'send' ? have : need).get(k) || 0) + 1); }
+  for (const n of nodes.values()){
+    const m = n.m; if (m.type !== 'send' && m.type !== 'recv') continue;
+    const k = srKeyOf(m), col = srColor(k), S = n.show; n.el.classList.toggle('sr', !!k); n.el.style.setProperty('--src', col);
+    if (S && S.chip){ S.chip.textContent = k ? srName(m) : '?'; S.chip.style.setProperty('--src', col); if (document.activeElement !== S.inp){ const t = typeof m.text === 'string' ? m.text : ''; if (S.inp.value !== t) S.inp.value = t; } }
+    paintNote(n);
+  }
+}
+// What a Send or Receive says about its pair ('' when all is well).
+function srStatus(m){
+  const k = srKeyOf(m); if (!k) return m.type === 'send' ? 'No label: nothing is sent. Pick A to H or type a name.' : 'No label: silent. Pick A to H or type a name.';
+  const label = srName(m); let sends = 0, recvs = 0;
+  for (const q of doc.modules){ if (q === m || (q.type !== 'send' && q.type !== 'recv') || srKeyOf(q) !== k) continue; if (q.type === 'send') sends++; else recvs++; }
+  if (m.type === 'recv') return sends ? (sends > 1 ? 'Hears ' + sends + ' Sends of this label, added together.' : '') : 'no Send named ' + label;
+  return recvs ? '' : 'No Receive named ' + label + ' yet.';
+}
 /* ===SHARED EDITOR END=== */
 
 /* Mixer: Inputs picks how many channels show, 1 to 16 (old patches open with 4). The rest hide, with their cables. */
@@ -2390,7 +2476,7 @@ function mixDef(label, scope){
   const ui = { chans:{ l:'Inputs', c:Array.from({ length:MIXN }, (_, i) => [i + 1, String(i + 1)]), fixed:true } };
   for (let k = 1; k <= MIXN; k++){ inputs['in' + k] = 'audio'; params['l' + k] = [.8,0,1.5,.01]; ui['l' + k] = { l:'Level ' + k, f:pct }; }
   params.level = [1,0,2,.01]; ui.level = { l:'Master', f:pct };
-  return { label, scope, inputs, outputs:{ out:'audio' }, params, ui };
+  return { label, scope, inputs, outputs:{ out:'audio' }, params, ui, display:'mixout' };
 }
 // Which channel a port or control belongs to (In 5, Level 5, and its modulation jack), 0 for none.
 const mixChan = k => { const r = /^(?:p:)?(?:in|l)(\d+)$/.exec(k); return r ? +r[1] : 0; };
@@ -2516,6 +2602,7 @@ const NOTES = {
     : 'Plays on Waves In ' + m.params.slot + '. On its own, waves plays every output through your speakers. Patch only In for mono.'
 };
 for (const t in MODULES) if (MODULES[t].fx && !NOTES[t]) NOTES[t] = () => WASM_OK.tfx ? null : 'Couldn’t load the effects code (dsp/tfx.wasm), so this passes sound through unchanged.';
+NOTES.send = NOTES.recv = m => srStatus(m) || null;   // SEND / RECEIVE: what the label does not find
 let WASM_OK = { dsp:true, tfx:true };
 
 /* ---------- helpers ---------- */
@@ -2891,6 +2978,7 @@ function setParam(n, key, v, fromUser){
   if (bridge) bridge.setParam(n.m.id, key, v);
   if (key === 'chans' && MIXT.has(n.m.type)){ mixResize(n); return; }
   const c = n.ctl[key]; if (c && !fromUser) c.show();
+  if (key === 'lab' && (n.m.type === 'send' || n.m.type === 'recv')){ try { paintSr(); paintXc(); } catch (e) {} }   // SEND / RECEIVE: the chips, the status lines and the cross-chain marks follow the label
   if (n.m.type === 'out' && key === 'slot') paintNote(n);
   if (n.m.collapsed) paintSum(n);
   store.touch();
@@ -3086,7 +3174,7 @@ function buildNode(m){
   { const plan = secPlan(m.type, [...rowEls.keys()], k => plabel(m.type, k));   // T14: a long module is cut into sections (the first open)
     if (plan){ const at = kids.indexOf(rowEls.values().next().value); kids.splice(at, rowEls.size, ...secWrap(n, rowEls, plan)); } }
   if (m.type === 'out'){ n.meter = h('span'); kids.push(h('div', {class:'prog', title:'Level'}, n.meter)); }
-  if (def.display){ const sh = buildShow(n); if (sh) { if (def.display === 'expr') kids.unshift(sh); else kids.push(sh); } }   // (Expression: its formula field leads, above the sliders)
+  if (def.display){ const sh = buildShow(n); if (sh) { if (def.display === 'expr') kids.unshift(sh); else if (def.display === 'mixout') kids.unshift(sh); else kids.push(sh); } }   // (Expression: its formula field leads, above the sliders)
   if (NOTES[m.type]){ n.note = h('div', {class:'status'}); kids.push(n.note); }
   const body = h('div', {class:'body'}, kids);
   buildSummary(n);   // COMPACT: the collapsed look
@@ -3189,7 +3277,7 @@ function buildSummary(n){
   });
   n.sumM = h('span', {class:'cs-m'});
   const kids = [h('span', {class:'cs-t'}, n.sumIt.map(i => i.el)), n.sumM];
-  if (n.meter || def.display === 'scout' || Object.values(def.outputs).some(k => KIND[k] === 'audio')){ n.lvl = { el: h('b'), shown:-1 }; kids.push(h('span', {class:'clvl', 'aria-hidden':'true'}, n.lvl.el)); }
+  if (n.meter || def.display === 'scout' || def.display === 'mixout' || Object.values(def.outputs).some(k => KIND[k] === 'audio')){ n.lvl = { el: h('b'), shown:-1 }; kids.push(h('span', {class:'clvl', 'aria-hidden':'true'}, n.lvl.el)); }
   n.sum = h('div', {class:'csum'}, kids);
 }
 // The summary line: each key value as its control would read it (a modulated one at its live value, in the modulation colour).
@@ -3510,6 +3598,7 @@ function syncCableEls(){
     hit.addEventListener('mouseenter', () => el.g.classList.add('hov')); hit.addEventListener('mouseleave', () => el.g.classList.remove('hov')); hit.addEventListener('mouseenter', ev => cabHover(c, ev)); hit.addEventListener('mousemove', ev => cabPlace(ev)); hit.addEventListener('mouseleave', () => cabHover(null));   // M8: the value readout
     svg.append(el.g); cableEls.set(c, el);
   }
+  try { paintSr(); paintXc(); } catch (e) {}
   compactAll(); secMarks(); groupBlocks(); markScene();
 }
 function jackPos(id, dir, port, wr){
@@ -3548,6 +3637,9 @@ function placeCable(el, a, b, pts, c){
     const q = pts && pts.length ? pts[pts.length - 1] : a, qx = q.x != null ? q.x : q[0], qy = q.x != null ? q.y : q[1], dx = qx - b.x, dy = qy - b.y, L = Math.hypot(dx, dy) || 1, k = Math.min(34, L / 2);
     const t = fbDet ? 'translate(' + Math.round(fbDet[0]) + ' ' + Math.round(fbDet[1]) + ')' : 'translate(' + Math.round(b.x + dx / L * k) + ' ' + Math.round(b.y + dy / L * k - 12) + ')';
     if (el.tagT !== t){ el.tagT = t; el.tag.setAttribute('transform', t); }
+  }  if (el.xc && el.xtag){   // CROSS-CHAIN: the tag sits mid-way along the cable, above the line
+    const t = 'translate(' + Math.round((a.x + b.x) / 2) + ' ' + Math.round((a.y + b.y) / 2 - 12) + ')';
+    if (el.xtagT !== t){ el.xtagT = t; el.xtag.setAttribute('transform', t); }
   }
 }
 const FB_TIP = 'Feedback cable: one block late. Click to select (Delete removes it), double-click or right-click to remove';
@@ -3560,6 +3652,53 @@ function paintFb(c, el){
   }
   if (el.tag){ el.tag.style.display = on ? '' : 'none'; el.tagT = ''; }
   if (el.ttl) el.ttl.textContent = on ? FB_TIP : 'Click to select (Delete removes it), double-click or right-click to remove';
+}
+/* CROSS-CHAIN CABLES (15 Nov): inside Thunder Plus every track runs its own chains node, which runs only the modules that lead to ITS Chain Out and has only its own
+   track's audio on its Track In (plus the tracks a bus takes in: a Chain Out with no Track In of its own). A cable that brings another track's Track In into a chain that has
+   a Track In of its own (a bus's mixer cabled into a Sidechain comp's SC on track 15) therefore carries silence. xcCables() finds those cables: for each track T that has
+   a Track In, the "native" modules are those T's Track In reaches that reach T's Chain Out; a cable into a native module from a module that is not native, whose own inputs
+   include a Track In of another track, is a crossing. Returns Map cable -> {from: tracks it brings in, to: T}. */
+function xcCables(){
+  const out = new Map(), mods = doc.modules, cables = doc.cables.filter(fbOk);
+  const trk = m => (m.params && m.params.track) | 0, ins = mods.filter(m => m.type === 'trackIn' && trk(m) > 0), outs = mods.filter(m => m.type === 'chainOut' && trk(m) > 0);
+  if (!ins.length || !outs.length) return out;
+  // The edges the engine runs: a cable out of a Receive is one edge from every source cabled into the Send of its label (both drawn cables are what gets marked).
+  const by = new Map(mods.map(m => [m.id, m])), edges = [], sends = new Map();
+  for (const c of cables){ const d = by.get(c.to[0]); if (d && d.type === 'send'){ const k = srKeyOf(d); if (k){ if (!sends.has(k)) sends.set(k, []); sends.get(k).push(c); } } }
+  for (const c of cables){
+    const s = by.get(c.from[0]), d = by.get(c.to[0]);
+    if (d && d.type === 'send') continue;
+    if (s && s.type === 'recv'){ for (const q of sends.get(srKeyOf(s)) || []) edges.push({ a:q.from[0], b:c.to[0], marks:[q, c] }); continue; }
+    edges.push({ a:c.from[0], b:c.to[0], marks:[c] });
+  }
+  const fwd = new Map(), back = new Map(), add = (M, a, b) => { if (!M.has(a)) M.set(a, []); M.get(a).push(b); };
+  for (const e of edges){ add(fwd, e.a, e.b); add(back, e.b, e.a); }
+  const walk = (M, starts) => { const seen = new Set(starts), w = [...starts]; while (w.length){ const x = w.pop(); for (const y of M.get(x) || []) if (!seen.has(y)){ seen.add(y); w.push(y); } } return seen; };
+  const tin = new Map(); for (const m of ins) tin.set(m.id, trk(m));
+  const coneIns = new Map();   // module -> the tracks of the Track Ins behind it (itself included)
+  const coneOf = id => { let r = coneIns.get(id); if (!r){ const s = walk(back, [id]); r = new Set(); for (const x of s) if (tin.has(x)) r.add(tin.get(x)); coneIns.set(id, r); } return r; };
+  for (const T of new Set(ins.map(trk))){
+    const own = walk(fwd, ins.filter(m => trk(m) === T).map(m => m.id)), toOut = walk(back, outs.filter(m => trk(m) === T).map(m => m.id));
+    for (const e of edges){
+      const a = e.a, b = e.b; if (!(own.has(b) && toOut.has(b)) || (own.has(a) && toOut.has(a))) continue;
+      const foreign = [...coneOf(a)].filter(t => t !== T); if (!foreign.length) continue;
+      for (const c of e.marks){ const o = out.get(c); if (o){ for (const t of foreign) if (!o.from.includes(t)) o.from.push(t); } else out.set(c, { from:foreign.slice(), to:T }); }
+    }
+  }
+  return out;
+}
+function xcTip(x){ return 'No signal: this cable crosses from track ' + x.from.slice().sort((p, q) => p - q).join(', ') + '\'s chain into track ' + x.to + '\'s. Each track runs its own chain, so it carries silence. Use a Sidechain Out (Send 1\u20138) in the first chain and Source: Send N on the module that listens, or a Send / Receive pair in one chain.'; }
+let xcToldOnce = false;
+function paintXc(){
+  const X = xcCables();
+  for (const [c, el] of cableEls){
+    const x = X.get(c), on = !!x; if (!!el.xc === on && (!on || el.xcFrom === x.from.join())) continue;
+    el.xc = on; el.xcFrom = on ? x.from.join() : ''; el.line.classList.toggle('xc', on);
+    if (on && !el.xtag){ el.xtag = svgEl('g', { class:'fbtag' }); const r = svgEl('rect', { x:-30, y:-8, width:60, height:16 }), t = svgEl('text', {}); t.textContent = 'no signal'; el.xtag.append(r, t); el.g.append(el.xtag); }
+    if (el.xtag){ el.xtag.style.display = on ? '' : 'none'; el.xtagT = ''; }
+    if (el.ttl) el.ttl.textContent = on ? xcTip(x) : (el.fb ? FB_TIP : 'Click to select (Delete removes it), double-click or right-click to remove');
+  }
+  return X;
 }
 function drawCables(){
   const wr = world.getBoundingClientRect();
@@ -3728,11 +3867,42 @@ function syncHandles(el, c){
   el.hdl.forEach((r, i) => { r.setAttribute('x', pts[i][0] - 5); r.setAttribute('y', pts[i][1] - 5); });
 }
 // Drag a bend point. Option/Alt-click a point without moving it to remove it.
+/* RIGHT ANGLES (15 Nov, owner): dragging a bend point snaps it square to the points either side of it (the previous bend or the source jack, the next bend or the target jack):
+   within SNAP_PX screen pixels of the same x (or y) as a neighbour, it takes that x (or y), so the segment on that side is vertical (or horizontal). Alt turns the snap off.
+   "Square up" (cable menu) makes every segment horizontal or vertical, adding a corner where the last one would still be slanted. Both are pure: ends are [x, y] world points. */
+const SNAP_PX = 8;
+function snapBendPt(ends, pts, i, P, tol){
+  const prev = i > 0 ? pts[i - 1] : ends[0], next = i < pts.length - 1 ? pts[i + 1] : ends[1], out = [P[0], P[1]];
+  for (const k of [0, 1]){ let best = tol + 1e-9; for (const q of [prev, next]){ const d = Math.abs(P[k] - q[k]); if (d < best){ best = d; out[k] = q[k]; } } }
+  return out;
+}
+function squareUpPts(ends, pts){
+  const a = ends[0], b = ends[1], out = []; let last = [a[0], a[1]], horiz = null;
+  for (const p of pts || []){
+    const dx = p[0] - last[0], dy = p[1] - last[1], h = Math.abs(dx) >= Math.abs(dy);
+    const q = h ? [p[0], last[1]] : [last[0], p[1]];
+    if (q[0] === last[0] && q[1] === last[1]) continue;   // (no length: dropped)
+    out.push(q); last = q; horiz = h;
+  }
+  if (last[0] !== b[0] && last[1] !== b[1]){
+    if (!out.length){ const mx = Math.round((a[0] + b[0]) / 2); out.push([mx, a[1]], [mx, b[1]]); }   // no bends: a Z, out of the jack and into the next one level
+    else out.push(horiz ? [last[0], b[1]] : [b[0], last[1]]);
+  }
+  return out;
+}
+function cableEndPts(c){ const wr = world.getBoundingClientRect(), a = jackPos(c.from[0], 'out', c.from[1], wr), b = jackPos(c.to[0], 'in', c.to[1], wr); return a && b ? [[a.x, a.y], [b.x, b.y]] : null; }
+function squareUpCable(c){
+  if (!doc.cables.includes(c)) return;
+  const ends = cableEndPts(c); if (!ends){ toast('That cable is hidden: open its group first.'); return; }
+  const pts = squareUpPts(ends, c.pts); store.snapshot();
+  if (pts.length) c.pts = pts; else delete c.pts;
+  drawCables(); store.touch(); toast('Squared up.');
+}
 function bendDrag(ev, c, idx, lazy){
   ev.stopPropagation(); ev.preventDefault();
   const i = idx(), sx = ev.clientX, sy = ev.clientY; let moved = false, snapped = !lazy;
   if (!lazy) store.snapshot();
-  const mv = e => { if (Math.hypot(e.clientX - sx, e.clientY - sy) > 3) moved = true; if (moved){ if (!snapped){ snapped = true; store.snapshot(); } c.pts[i] = worldPt(e); } };
+  const mv = e => { if (Math.hypot(e.clientX - sx, e.clientY - sy) > 3) moved = true; if (moved){ if (!snapped){ snapped = true; store.snapshot(); } let P = worldPt(e); if (!e.altKey){ const en = cableEndPts(c); if (en) P = snapBendPt(en, c.pts, i, P, SNAP_PX / view().zoom); } c.pts[i] = P; } };   // (right angles: Alt-drag leaves the point where it is put)
   const up = e => {
     window.removeEventListener('pointermove', mv); window.removeEventListener('pointerup', up);
     if (!moved && e.altKey){ if (!snapped) store.snapshot(); c.pts.splice(i, 1); if (!c.pts.length) delete c.pts; snapped = true; }
@@ -4175,9 +4345,10 @@ function ctxMenu(target, x, y, o = {}){
   if (cab && doc.cables.includes(cab)){
     const its = [['Remove cable', () => { if (!doc.cables.includes(cab)) return; store.snapshot(); disconnect(cab); toast('Cable removed.'); }]];
     if (o.touch) its.unshift(['Add a bend here', () => { if (doc.cables.includes(cab)){ selectCable(cab); addBendAt(cab, worldPt({ clientX:x, clientY:y })); } }]);   // T8: the bend a mouse makes with Option-drag
+    its.splice(its.length - 1, 0, ['Square up', () => squareUpCable(cab)]);   // (right angles: before Remove cable)
     showMenu(x, y, its); return; }
   const hb = target.closest && target.closest('.bend');
-  if (hb && hb._cable && doc.cables.includes(hb._cable)){ const c = hb._cable, i = hb._el.hdl.indexOf(hb); showMenu(x, y, [['Remove this bend', () => { if (!doc.cables.includes(c) || i < 0 || !c.pts) return; store.snapshot(); c.pts.splice(i, 1); if (!c.pts.length) delete c.pts; store.touch(); }]]); return; }
+  if (hb && hb._cable && doc.cables.includes(hb._cable)){ const c = hb._cable, i = hb._el.hdl.indexOf(hb); showMenu(x, y, [['Square up this cable', () => squareUpCable(c)], ['Remove this bend', () => { if (!doc.cables.includes(c) || i < 0 || !c.pts) return; store.snapshot(); c.pts.splice(i, 1); if (!c.pts.length) delete c.pts; store.touch(); }]]); return; }
   const el = target.closest('.node'), id = el && el.dataset.id;
   if (id && !selected.has(id)){ if (!(o.touch && selMode)) clearSel(); setSel(id, true); }   // (with Select on, a long press adds the module to the selection)
   const sel = [...selected], n = sel.length, items = [];
@@ -4653,6 +4824,7 @@ function paintJacks(list){
   if (list){ jackSeen = Date.now(); for (const [id, dir, port, v] of list){ const n = nodes.get(id), q = n && n.pms && n.pms[dir + ':' + port]; if (q && v > q.v) q.v = v; } }
   if (hovCable) cabText();   // M8: the hovered cable's readout, from the same telemetry (before the meters fall back)
   for (const n of nodes.values()){
+    if (n.show && n.show.kind === 'mixout' && n.show.seen && performance.now() - n.show.seen > 400){ const A = n.show.rows[0]; n.show.seen = 0; A.i.style.transform = 'scaleX(0)'; A.hold = -200; A.b.style.left = '0%'; A.v.textContent = '\u2212\u221e'; if (n.lvl) setLvl(n, 0); }   // a Mixer's OUT meter, stopped: falls back to nothing
     if (!n.pms) continue;
     let lv = 0;
     for (const k in n.pms){
@@ -4661,7 +4833,7 @@ function paintJacks(list){
       if (w !== q.shown){ q.shown = w; q.el.style.transform = 'scaleY(' + w + ')'; }
       q.v *= .6;
     }
-    if (n.lvl && !n.meter && !(n.show && n.show.kind === 'scout')) setLvl(n, lv);   // COMPACT: the level strip
+    if (n.lvl && !n.meter && !(n.show && (n.show.kind === 'scout' || n.show.kind === 'mixout'))) setLvl(n, lv);   // COMPACT: the level strip
   }
 }
 setInterval(() => { if (napping()) return; if (doc && Date.now() - jackSeen > 250) paintJacks(null); }, 120);
