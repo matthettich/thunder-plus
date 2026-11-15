@@ -16,6 +16,8 @@ add_test(NAME bench_put COMMAND bench_put)
 # logger's checks. rt_guard_selftest: proves the allocator really kills a callback that allocates.
 add_executable(rt_harness rt_harness.cpp)
 target_link_libraries(rt_harness PRIVATE thunder_core)
+target_include_directories(rt_harness PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../core/src)   # U07: the sequencer's step() runs under the guard too
+target_compile_definitions(rt_harness PRIVATE THUNDER_ROOT="${CMAKE_CURRENT_SOURCE_DIR}/../..")
 add_test(NAME rt_core COMMAND rt_harness)
 add_test(NAME rt_guard_selftest COMMAND rt_harness --selftest)
 
