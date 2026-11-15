@@ -127,7 +127,7 @@ static int selftest() {
       if (!std::freopen("/dev/null", "w", stderr)) {}
       int* pre = new int(1); void* m = std::malloc(8); std::vector<int> v;
       { rt_guard g;   // what a callback that breaks the rule looks like
-        if (k.kind == 0) sink = new int(42);
+        if (k.kind == 0) sink = ::operator new(42);   /* the function, not a new-expression: clang may elide a new-expression whose result goes nowhere (CI, 15 Nov) */
         else if (k.kind == 1) { for (int i = 0; i < 100; i++) v.push_back(i); sink = v.data(); }
         else if (k.kind == 2) delete pre;
         else if (k.kind == 3) sink = std::malloc(16);
