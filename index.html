@@ -2196,6 +2196,7 @@ body.sdesk .dock:not(.vtrk) .pads .pad:nth-child(17)::before{content:'More pads'
 .tstage[hidden]{display:none}
 .stgx{position:absolute; top:0; right:0; pointer-events:auto; min-height:0; width:22px; height:22px; padding:0; border:0; background:transparent; color:var(--muted); opacity:0; transition:opacity .15s; font-size:var(--fs-3)}
 .tstage:hover .stgx, .stgx:focus-visible{opacity:1}
+.tstage.dogk .stgx{opacity:.6}   /* U2 (609): the dogs' off control is always visible (it was hover-only: MOD seemed to have none) */
 .stgdogs{flex:1; min-height:0; display:flex; align-items:flex-end; justify-content:center; padding-bottom:2px}
 .stgdogs .dogs{pointer-events:auto; max-width:420px; max-height:100%; color:var(--ts-ink)}
 .tstage .dogs{--dk-ink:var(--ts-ink); --dk-fill:var(--ts-bg)}
@@ -30562,7 +30563,7 @@ const PHSK = 'thunderplus-phstage-v1', PHS = ['dance', 'drum', 'keys', 'hide'];
 const phStageDef = () => smallScr() ? 'hide' : 'keys';
 let phStage = (() => { try { const v = localStorage.getItem(PHSK); return PHS.includes(v) ? v : phStageDef(); } catch(e){ return phStageDef(); } })();
 function setPhStage(v){ phStage = PHS.includes(v) ? v : 'keys'; try { localStorage.setItem(PHSK, phStage); } catch(e){} stageLayout(); }
-const stageKind0 = () => stage === 'dogs' ? 'dogs' : tv === 'song' && SX.peek && asongOn() ? 'peek' /* SONG EXTRAS */ : tv === 'phrase' && mstView() ? 'chain' : tv === 'phrase' ? ({dance:'dogs', drum:'drum', keys:'piano', hide:''})[phStage] : ({song:'dogs', project:'dogs', sect:'preview', phrase:'piano', inst:'wave', mixer:'spec', fx:'chain'})[tv] || 'dogs';
+const stageKind0 = () => stage === 'dogs' ? 'dogs' : tv === 'song' && SX.peek && asongOn() ? 'peek' /* SONG EXTRAS */ : tv === 'phrase' && mstView() ? 'chain' : tv === 'phrase' ? ({dance:'dogs', drum:'drum', keys:'piano', hide:''})[phStage] : ({song:'dogs', project:'dogs', mod:'dogs', sect:'preview', phrase:'piano', inst:'wave', mixer:'spec', fx:'chain'})[tv] || 'dogs';
 const stageKind = () => { const k = stageKind0(); return animOn || (k !== 'dogs' && k !== 'drum') ? k : tv === 'phrase' ? 'piano' : ''; };   // ANIMATIONS OFF: no dogs (the Phrase screen's piano takes their place)
 let stgKindNow = '', stgSig = '', stgReq = '';   // stgReq: what the last layout was asked for
 // It sits in the space to the right of the grid's text, the grid's height, when that space is big enough.
@@ -30601,7 +30602,8 @@ function stageLayout(){
   Object.assign(box.style, {left:left + 'px', top:top + 'px', width:w + 'px', height:h + 'px'});
   const dg = kind === 'dogs' || kind === 'drum'; $('tStageDogs').hidden = !dg; $('tStagePh').hidden = dg || kind === 'peek';
   $('tStagePk').hidden = kind !== 'peek'; box.classList.toggle('peek', kind === 'peek'); box.setAttribute('aria-hidden', String(kind !== 'peek')); sxStageSwitch(kind); sxPkSig = '';   // SONG EXTRAS
-  box.classList.toggle('piano', kind === 'piano');
+  box.classList.toggle('piano', kind === 'piano'); box.classList.toggle('dogk', dg);
+  { const x = $('tStageX'); if (x) x.title = dg ? 'Hide the stage (right-click the dogs: Hide animations; Settings → ANIMATIONS)' : 'Hide (Settings → STAGE brings it back)'; }
   stgKindNow = kind; stgSig = '';
   if (dg) dogsState(); else stageCanvas(true);
 }
