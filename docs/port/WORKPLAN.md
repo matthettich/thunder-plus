@@ -237,7 +237,7 @@ you could not port and why.
 | Stage | State | Notes |
 |---|---|---|
 | N0 | **done, passed** (15 Nov; `native/tests/RESULTS-N0.md`) | A1 to A9 done; A6 (the owner's Fold): all three runs pass. A4's phone timings were not run (see CORE-BRIDGE section 6, point 7) |
-| N1 | **started 15 Nov** (the owner: "prioritize the native porting work") | Step 1: U01 exists on `beta` (`tests/engine-golden.test.js`); U02 in work (branch `n1/u02`); U03 waits on bringing in `matthettich/pump`; U04 not started. **Step 2: B1, B2 done** (CORE-BRIDGE, `BRIDGE_V = 1`). **Step 3: U05 done by the lead** (branch `n1/u05`): `native/core/src/rt/` (rings, snapshot swap, `Auto`, seeded random stream, `js_exp`), timed commands, the runtime tests and their JS golden. Next: U06 (song reader), then U07 (sequencer) |
+| N1 | **started 15 Nov** (the owner: "prioritize the native porting work") | Done and merged: step 1 U01 (on `beta`), U02 (#159); step 2 B1 / B2 (`BRIDGE_V = 1`); step 3 U05 (#156, the lead); step 4 U06 (#158); step 5 U07 the sequencer (#162: four goldens exact, 19 extra cases); step 6 U08 voices (#163: 22 cases bit-exact) and U09 the mixer with the first whole-song render (ELECTRO within −87.4 dB of Chrome's render, effects off: see section 12). In review: U03 pump (#165). Next: U10 latency compensation and the beat clock (the renderer drops `beat` events today), then step 7 (U11 to U13), step 8 (U14, U15, U18). Not started: U04. The lead has still to read U07, U08 and U09 line by line before they are wired into `thunder_process` |
 | N2 | not started | |
 | N3 | not started | |
 | N4 | not started | |
@@ -402,7 +402,8 @@ Order: A1 → A2 → A5 → A3 → A4, with A7, A8 and A9 any time after A1. A6 
 | Keep the web copy afterwards | Open | Default: yes, as demo, development copy and fallback |
 | iOS | Open | Default: not before Android and Mac are settled |
 | MOD's remaining engine-side steps | Open | Default: no new engine features on `beta` once N1 step 3 starts; build them in N3 |
-| How `matthettich/pump` comes in | Open | Default: git submodule pinned to a commit |
+| How `matthettich/pump` comes in | **Settled** (15 Nov, U03) | The pinned fetch script (one mechanism with the other upstreams; the GPL folder `plugins/machine/` is never on disk) |
+| Voice timing: the page player's or the core's | **Settled** (the lead, 15 Nov, U09) | The core's, for live play AND renders: a note starts on the first sample at or after its time and a slide's rate is read per sample. The page player (Web Audio) starts on `ceil(t·sr − 1e-6)` and reads `playbackRate` once per 128 frames, so a render made by the page and one made by the core differ in waveform (−3.7 dB on ELECTRO as a difference signal: phase, not level) while each is right by its own rule. `VoicePool::setPageTiming` exists only so `render-compare.sh` can prove the mixer and voices against Chrome's render (−87.4 dB); it is never on in an app. One engine for live and render is the point of the port (the owner, 14 Nov: "renders should sound like the playback") |
 | Distribution on Android | Open | Default: signed APK on GitHub Releases, no Play Store |
 
 ## 13. What can go wrong, and what the manager does

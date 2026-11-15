@@ -1,0 +1,47 @@
+Chrome 153.0.8010.12, OfflineAudioContext at 48000 Hz: the model minus Web Audio, dB below the case's peak
+  fader_const        exact   peak 0.4783
+  fader_plus6        exact   peak 1.1972
+  fader_zero         exact   peak 0.0000
+  fader_tvl          -91.7 dB (largest at frame 6189)   peak 0.5173
+  fader_tvl_quick    -58.9 dB (largest at frame 4457)   peak 0.5173   NOT COUNTED: Chrome starts a setTargetAtTime that interrupts a moving one from the value one sample before its time; the core from the value at its time
+  fader_tva          -91.4 dB (largest at frame 6279)   peak 1.1972
+  fader_set          -121.6 dB (largest at frame 6065)   peak 0.8569
+  fader_set_ramp     -134.4 dB (largest at frame 1017)   peak 0.8570
+  trim_00            exact   peak 0.0755
+  trim_80            exact   peak 0.6000
+  trim_ff            exact   peak 0.3002
+  trim_set           -126.2 dB (largest at frame 7667)   peak 1.9423
+  pan_mono_l         exact   peak 0.6986
+  pan_mono_c         exact   peak 0.4940
+  pan_mono_r         exact   peak 0.6986
+  pan_mono_70        exact   peak 0.4551
+  pan_st_l           exact   peak 1.1440
+  pan_st_c           exact   peak 0.6000
+  pan_st_r           exact   peak 1.1440
+  pan_st_70          -144.1 dB (largest at frame 232)   peak 0.9567
+  pan_st_200         exact   peak 1.0110
+  pan_tpn_mono       -92.7 dB (largest at frame 6322)   peak 0.6690
+  pan_tpn_st         -89.7 dB (largest at frame 6279)   peak 1.1438
+  pan_set            -99.7 dB (largest at frame 6713)   peak 1.3981
+  mute_mid           -129.2 dB (largest at frame 5796)   peak 0.9458
+  mute_init          -94.2 dB (largest at frame 9795)   peak 0.9928
+  mute_ramp          -132.1 dB (largest at frame 1126)   peak 0.6000
+  mute_now           exact   peak 0.6000
+  solo_mid           -92.8 dB (largest at frame 6980)   peak 0.9416
+  send_post          -106.0 dB (largest at frame 8799)   peak 1.8270
+  send_pre           -140.0 dB (largest at frame 469)   peak 2.3860
+  send_mixed         -104.3 dB (largest at frame 4992)   peak 1.2785
+  bus_of_bus         -110.9 dB (largest at frame 9416)   peak 1.8578
+  solo_quick         -62.8 dB (largest at frame 1263)   peak 0.9476   NOT COUNTED: Chrome starts a setTargetAtTime that interrupts a moving one from the value one sample before its time; the core from the value at its time
+  bus_solo           -110.8 dB (largest at frame 6726)   peak 2.3157
+  bus_absent         exact   peak 1.0851
+  master_const       exact   peak 0.2906
+  master_mvol        -134.0 dB (largest at frame 992)   peak 0.6000
+  master_mvol_quick  -1.9 dB (largest at frame 4422)   peak 0.4589   NOT COUNTED: the page player jumps to the last MVOL target before ramping; the core holds the value reached
+  master_mout        -90.4 dB (largest at frame 6191)   peak 0.6000
+  master_set         -89.6 dB (largest at frame 9796)   peak 0.4589
+  preview_bus        exact   peak 0.6717
+  combo              -83.8 dB (largest at frame 3942)   peak 8.6982
+  combo_live         -42.4 dB (largest at frame 4459)   peak 1.8245   NOT COUNTED: the page re-aims every param (12 ms) on a mixer move, song glides included; the core keeps the song's lanes apart from the mixer's
+  combo_n7           (not Web Audio's block size: model only)
+worst counted -83.8 dB; all at or below -80 dB: PASS

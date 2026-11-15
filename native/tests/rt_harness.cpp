@@ -10,6 +10,8 @@
 
 #include "seq/seq.h"
 #include "song/song.h"
+#include "mix/mix.h"
+#include "render/render.h"
 #include "voice/voice.h"
 
 #include <cmath>
@@ -223,10 +225,80 @@ static int run_voice() {
   return 0;
 }
 
+// ---- U09: the mixer under the guard ------------------------------------------------------------------------------------------------
+// The mixer, the bus plan and a stand-in chain hook are set up outside the guard; inside it: blocks of mixed sizes with noise on eight
+// tracks, the sequencer's mixer events (TVL / TVA / TPN / MVOL / MOUT) and mix.set of every kind (the page's law, at once, a ramp)
+// arriving between blocks, the song's lanes reset now and then (STOP), the plan and the hook swapped in and out.
+static void mix_sum_hook(void*, int, float* L, float* R, int N, double, const thunder::MixFeed* fd, int nf) {
+  for (int i = 0; i < N; i++) for (int j = 0; j < nf; j++) { L[i] += fd[j].L[i]; R[i] += fd[j].R[i]; }
+}
+static int run_mix() {
+  using namespace thunder;
+  const int MAXB = 512; Mixer M(48000, MAXB);
+  BusPlan P; P.feeds[3][0] = 1; P.feeds[3][1] = 2; P.nFeeds[3] = P.feedLen[3] = 2; P.feedMask[3] = 6; P.targets[1] = P.targets[2] = 8; P.pure = 6; P.pre = 2;
+  std::vector<float> oL((size_t)MAXB), oR((size_t)MAXB);
+  uint32_t rng = 20251116; auto rnd = [&]() { rng = rng * 1664525u + 1013904223u; return (rng >> 8) / 16777216.0; };
+  long frame = 0; double peak = 0; bool finite = true; long cmds = 0;
+  { rt_guard g;
+    M.setPlan(P); M.setChain(3, mix_sum_hook, nullptr);
+    for (int blk = 0; blk < 4000; blk++) {
+      const int N = 1 + (int)(rnd() * MAXB); const double t0 = (double)frame / 48000; M.setTime(t0);
+      const int ne = (int)(rnd() * 3.2);
+      for (int q = 0; q < ne; q++) { const double z = rnd(); cmds++;
+        if (z < 0.5) { SeqEvent e; const int k = (int)(rnd() * 5); e.type = k == 0 ? SEV_TVL : k == 1 ? SEV_TVA : k == 2 ? SEV_TPN : k == 3 ? SEV_MVOL : SEV_MOUT; e.track = (int)(rnd() * 8); e.v = (double)(int)(rnd() * 256); e.t = t0 + rnd() * 0.25; M.event(e); }
+        else if (z < 0.97) { MixSet c; const int k = (int)(rnd() * 7); c.k = (MixKey)k; c.tr = c.k == MixKey::Out || rnd() < 0.1 ? kSongNT : (int)(rnd() * 8); c.v = c.k == MixKey::Mute || c.k == MixKey::Solo ? (rnd() < 0.3 ? 1 : 0) : (double)(int)(rnd() * 256);
+          const double y = rnd(); c.ramp = y < 0.6 ? -1 : y < 0.8 ? 0 : 1 + rnd() * 2000; if (rnd() < 0.3) c.at = t0 + rnd() * 0.01; M.set(c); }
+        else if (z < 0.985) M.songLanesReset();
+        else { const bool on = rnd() < 0.5; M.setChain(3, on ? mix_sum_hook : nullptr, nullptr); M.setPlan(P); } }
+      for (int t = 0; t < 8; t++) { float *l = M.inputsL()[t], *r = M.inputsR()[t]; for (int i = 0; i < N; i++) { l[i] = (float)(rnd() - 0.5); r[i] = (float)(rnd() - 0.5); } }
+      M.render(oL.data(), oR.data(), N, t0);
+      for (int i = 0; i < N; i++) { const double a = oL[(size_t)i], b = oR[(size_t)i]; if (!(a == a) || !(b == b)) finite = false; peak = std::max(peak, std::max(std::fabs(a), std::fabs(b))); }
+      frame += N;
+    }
+  }
+  if (!finite) return fail("the mixer produced NaN");
+  if (M.autoDropped()) return fail("the mixer dropped automation events");
+  if (peak <= 0) return fail("the mixer run was silent");
+  std::printf("rt_harness: mixer: %ld commands over %ld frames, longest lane %d of %d / %d, no allocation\n", cmds, frame, M.peakEvents(), Mixer::kAutoUi, Mixer::kAutoSong);
+  return 0;
+}
+
+// ---- U09: the whole path, sequencer -> voices -> mixer, under the guard ---------------------------------------------------------------
+// ELECTRO as a render (once), with a made-up pad for every slot, through SongRenderer::block in blocks of mixed sizes: every block
+// inside the guard. Then on, until the voice pool is empty: with the mixer every track has an output, so every voice ends (U08's trap).
+static int run_song() {
+  using namespace thunder;
+  std::string text; { std::ifstream f(std::string(THUNDER_ROOT) + "/sounds/ELECTRO.thunder", std::ios::binary); if (!f) return fail("cannot read sounds/ELECTRO.thunder"); std::ostringstream o; o << f.rdbuf(); text = o.str(); }
+  Song song; JsonError je; if (!song.load(text.data(), text.size(), &je)) return fail("ELECTRO does not load");
+  SeqVars vars; static RenderPads pads; const int PN = 64, NS = 24000; std::vector<float> pd((size_t)PN * NS);
+  for (int p = 0; p < PN; p++) { float* d = &pd[(size_t)p * NS]; for (int i = 0; i < NS; i++) d[i] = (float)std::sin(0.01 * (p % 7 + 1) * i) * (1.0f - (float)i / NS) * 0.3f;
+    pads.buf[p].data = d; pads.buf[p].len = NS; pads.buf[p].sr = 48000; pads.kit[p].syn = p >= 8; pads.kit[p].rel = p >= 8 ? 0.1 : 0; pads.kit[p].choke = p == 3 ? 1 : 0; }
+  SeqOpts o; o.once = true; o.row = song.renderFrom;
+  const int MAXB = 512; SongRenderer R(song, vars, pads, 48000, MAXB, o);
+  std::vector<float> L((size_t)MAXB), Rr((size_t)MAXB);
+  uint32_t rng = 7; auto rnd = [&]() { rng = rng * 1664525u + 1013904223u; return (rng >> 8) / 16777216.0; };
+  double peak = 0; bool finite = true; long tail = 0;
+  { rt_guard g;
+    while (!R.songOver() && R.frame() < 48000L * 600) { const int N = 1 + (int)(rnd() * MAXB); R.block(L.data(), Rr.data(), N);
+      for (int i = 0; i < N; i++) { const double a = L[(size_t)i], b = Rr[(size_t)i]; if (!(a == a) || !(b == b)) finite = false; peak = std::max(peak, std::max(std::fabs(a), std::fabs(b))); } }
+    while (R.voices() > 0 && tail < 48000L * 30) { R.block(L.data(), Rr.data(), MAXB); tail += MAXB; }
+  }
+  const RenderStats s = R.stats();
+  if (!R.songOver()) return fail("the song did not end in ten minutes");
+  if (R.voices() != 0) return fail("the voice pool did not empty after the song ended");
+  if (!finite) return fail("the song render produced NaN");
+  if (s.voiceDropped || s.voiceOverflow || s.voiceAutoDropped || s.mixAutoDropped || s.seqDropped) return fail("the song render lost notes or events");
+  if (s.notesPlayed < 1000 || peak <= 0) return fail("the song render played (almost) nothing");
+  std::printf("rt_harness: whole song: %d steps, %d notes played, %d mixer events, %lld frames + %.2f s until the pool emptied, peak %d voices, no allocation\n", s.steps, s.notesPlayed, s.mixEvents, (long long)(s.frames - tail), tail / 48000.0, s.peakVoices);
+  return 0;
+}
+
 int main(int argc, char** argv) {
   if (argc > 1 && std::strcmp(argv[1], "--selftest") == 0) return selftest();
   if (int r = run_logger()) return r;
   if (int r = run_core()) return r;
   if (int r = run_seq()) return r;
-  return run_voice();
+  if (int r = run_voice()) return r;
+  if (int r = run_mix()) return r;
+  return run_song();
 }
