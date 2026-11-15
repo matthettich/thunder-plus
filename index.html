@@ -3625,10 +3625,10 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
           <div class="dkb dkstrip" id="dkStripB">
             <div class="stm" id="stM" title="Track level, left and right"><i></i><i></i></div>
             <div class="stsc" aria-hidden="true"><i style="bottom:100%">0</i><i style="bottom:87.5%">6</i><i style="bottom:75%">12</i><i style="bottom:50%">24</i><i style="bottom:25%">36</i><i style="bottom:0%">48</i></div>
-            <div class="stfad" id="stVol" role="slider" tabindex="0" aria-label="Track volume" aria-valuemin="0" aria-valuemax="255" title="Volume: drag · double-click for 0 dB · +6 dB at the top"><i class="stfill"></i><u class="st0"></u><b class="stcap"></b></div>
+            <div class="stfad" id="stVol" role="slider" tabindex="0" aria-label="Track volume" aria-valuemin="0" aria-valuemax="255" title="Volume: drag · double-click to type · Alt-click for 0 dB · +6 dB at the top"><i class="stfill"></i><u class="st0"></u><b class="stcap"></b></div>
             <output class="stvv" id="stVolV"></output>
             <div class="stms"><button type="button" class="mu" id="stMute" aria-pressed="false" title="Mute this track">M</button><button type="button" class="so" id="stSolo" aria-pressed="false" title="Solo this track (the others go silent)">S</button></div>
-            <div class="stpan"><span>PAN</span><input type="range" id="stPan" min="0" max="255" step="1" aria-label="Track pan" title="Pan · double-click centers"><output id="stPanV"></output></div>
+            <div class="stpan"><span>PAN</span><input type="range" id="stPan" min="0" max="255" step="1" aria-label="Track pan" title="Pan · double-click to type · Alt-click centers"><output id="stPanV"></output></div>
           </div></section>
       </div>
     </div>
@@ -30413,7 +30413,7 @@ function mixFaders(){
     const L1 = (a.left + ox - 2).toFixed(1) + 'px', W1 = (a.width + 4).toFixed(1) + 'px', T1 = (y - 1.5).toFixed(1) + 'px';
     if (b._mfL !== L1 || b._mfW !== W1 || b._mfT !== T1){ b._mfL = L1; b._mfW = W1; b._mfT = T1; Object.assign(b.style, {left:L1, width:W1, top:T1}); }
     if (b.dataset.t !== String(t)) b.dataset.t = t; if (b.dataset.top !== String(top)) b.dataset.top = top; if (b.dataset.bot !== String(bot)) b.dataset.bot = bot;
-    const ttl = 'Track ' + d2(t + 1) + ' · VOL ' + hx(S.mix[t].vol) + ' · ' + dB(trackGain(S.mix[t].vol)) + ' · the fader, after chains and the FX (TRIM is above, before them) · drag to change, double-click for 0 dB'; if (b.title !== ttl) b.title = ttl;
+    const ttl = 'Track ' + d2(t + 1) + ' · VOL ' + hx(S.mix[t].vol) + ' · ' + dB(trackGain(S.mix[t].vol)) + ' · the fader, after chains and the FX (TRIM is above, before them) · drag to change, double-click to type, Alt-click for 0 dB'; if (b.title !== ttl) b.title = ttl;
     b.classList.toggle('mu', !!S.mix[t].mute); b.classList.toggle('cur', mixFv() && t === cs.mixer.x);
   }
   mixOutBar();
@@ -30443,14 +30443,15 @@ function mixOutBar(){
   const x0 = a.left + ox, w = MW * cw, mo = S.mout == null ? 255 : S.mout, x = moX(outDb(mo), x0, w);
   Object.assign(b.style, {left:(x - 1.5).toFixed(1) + 'px', top:(tL.top + oy).toFixed(1) + 'px', height:(bR.bottom - tL.top).toFixed(1) + 'px'});
   b.dataset.x0 = x0; b.dataset.w = w;
-  b.title = 'Master OUT · ' + hx(mo) + ' · ' + dB(curve(mo)) + ' · the master fader, after the limiter · drag to change, double-click for 0 dB';
+  b.title = 'Master OUT · ' + hx(mo) + ' · ' + dB(curve(mo)) + ' · the master fader, after the limiter · drag to change, double-click to type, Alt-click for 0 dB';
   b.classList.toggle('on', !!moDrag);
 }
 grid.addEventListener('pointerdown', e => {
   const b = e.target.closest && e.target.closest('.mobar'); if (!b || tv !== 'mixer' || e.button !== 0 || ctxPress(e)) return;
   e.preventDefault(); e.stopPropagation();
   const now = performance.now(), two = now - moTap.t < 350 && Math.abs(e.clientX - moTap.x) < 8; moTap = {t:two ? 0 : now, x:e.clientX};
-  if (two || resetClick(e)){ moReset(); return; }   // double-click / double-tap, or Alt / ⌘-click (3 Nov): 0 dB
+  if (resetClick(e)){ moReset(); return; }   // Alt / ⌘-click (3 Nov): 0 dB
+  if (two){ cs.mixer.y = 7; cs.mixer.mx = 2; draw(); moType(); return; }   // double-click / double-tap (15 Nov, owner): type the level (right-click: Reset)
   // RELATIVE (3 Nov): from where the bar is, Shift a tenth, Ctrl/⌘ held four times
   const x0 = +b.dataset.x0, w = +b.dataset.w;
   moDrag = {id:e.pointerId, x0, w, lx:e.clientX, vx:moX(outDb(S.mout == null ? 255 : S.mout), x0, w)};
@@ -30502,7 +30503,7 @@ grid.addEventListener('pointermove', e => {
 const mfEnd = e => { if (!mfDrag || e.pointerId !== mfDrag.id) return; const t = mfDrag.t; mfDrag = null; grid.querySelectorAll('.mfbar.on').forEach(b => b.classList.remove('on')); mixChanged(); draw(); };
 grid.addEventListener('pointerup', mfEnd, true); grid.addEventListener('pointercancel', mfEnd, true);
 grid.addEventListener('dblclick', e => { const b = e.target.closest && e.target.closest('.mfbar:not(.mobar)'); if (!b || tv !== 'mixer') return; e.preventDefault(); e.stopPropagation();
-  mfReset(+b.dataset.t); }, true);
+  mfType(+b.dataset.t); }, true);   /* TYPED ENTRY (15 Nov, owner): a double-click types the level; Reset is Alt / ⌘-click and the right-click menu */
 // RIGHT-CLICK a fader (3 Nov): Reset / Type a value (the Mixer's command menu stays for the rest of the grid)
 grid.addEventListener('contextmenu', e => { const b = e.target.closest && e.target.closest('.mfbar'); if (!b || tv !== 'mixer') return;
   if (b.classList.contains('mobar')) valMenu(e, 'Master OUT', {reset:moReset, type:moType});
@@ -31601,8 +31602,18 @@ stVol.addEventListener('keydown', e => { const d = {ArrowUp:1, ArrowRight:1, Arr
 stVol.dataset.wheel = ''; stVol._wheel = (d, e) => stSet(stGet() + d * (e.shiftKey ? 1 : wheelBig(e) ? 16 : 4));   // WHEEL FOCUS (3 Nov)
 stVol.addEventListener('contextmenu', e => valMenu(e, dkMst() ? 'Master OUT' : 'Track ' + d2(dkTrack() + 1) + ' VOL', {reset:stReset, type:() => dkMst() ? moType() : mfType(dkTrack())}));
 stPan.addEventListener('input', () => { if (dkMst()) return; const t = dkTrack(); S.mix[t].pan = +stPan.value; mixChanged(); deckStrip(); });
-stVol.addEventListener('dblclick', stReset);
-stPan.addEventListener('dblclick', () => { if (dkMst()) return; S.mix[dkTrack()].pan = 128; mixChanged(); deckStrip(); });
+/* TYPED ENTRY (15 Nov, owner): a double-click on the strip's VOL or PAN types the value; Reset is Alt / ⌘-click and the right-click menu */
+const stVolType = () => dkMst() ? moType() : mfType(dkTrack());
+const panReset = () => { if (dkMst()) return; S.mix[dkTrack()].pan = 128; mixChanged(); deckStrip(); };
+async function panType(){ if (dkMst()) return; const t = dkTrack(), p0 = S.mix[t].pan;
+  const a = await askText({title:'Track ' + d2(t + 1) + ' · PAN', body:'Now ' + $('stPanV').textContent + ' (' + hx(p0) + '). Type L50 or R30 (per cent), C for centre, or 00–FF (80 is centre).'}, '', 6, 'Set'); if (a == null) return;
+  const x = a.trim(), m = /^([lr])\s*(\d{1,3})$/i.exec(x); let v = null;
+  if (/^c(entre|enter)?$/i.test(x)) v = 128; else if (m){ const n = clamp(+m[2], 0, 100); v = m[1].toLowerCase() === 'l' ? Math.round(128 - n / 100 * 128) : Math.round(128 + n / 100 * 127); } else if (/^[0-9a-f]{1,2}$/i.test(x)) v = parseInt(x, 16);
+  if (v == null) return toast('Not a pan: L50, R30, C or 00–FF');
+  S.mix[t].pan = clamp(v, 0, 255); mixChanged(); deckStrip(); }
+stVol.addEventListener('dblclick', stVolType);
+stPan.addEventListener('dblclick', panType);
+stPan.addEventListener('contextmenu', e => valMenu(e, dkMst() ? 'Master' : 'Track ' + d2(dkTrack() + 1) + ' PAN', {reset:dkMst() ? null : panReset, type:dkMst() ? null : panType}));
 $('stMute').addEventListener('click', () => { if (dkMst()) return; const m = S.mix[dkTrack()]; setMute(m, !m.mute); mixChanged(); draw(); });
 $('stSolo').addEventListener('click', () => { if (dkMst()) return; const m = S.mix[dkTrack()]; setSolo(m, !m.solo); mixChanged(); draw(); });
 function deckStrip(){
@@ -31623,7 +31634,7 @@ function deckStrip(){
   setText($('stPanV'), mst ? '—' : m.pan === 128 ? 'C' : m.pan < 128 ? 'L' + Math.round((128 - m.pan) / 128 * 100) : 'R' + Math.round((m.pan - 128) / 127 * 100));
   const mu = $('stMute'), so = $('stSolo'); mu.classList.toggle('on', !!m.mute); so.classList.toggle('on', !!m.solo);
   mu.setAttribute('aria-pressed', String(!!m.mute)); so.setAttribute('aria-pressed', String(!!m.solo));
-  stVol.setAttribute('aria-label', mst ? 'Master out' : 'Track volume'); stVol.title = mst ? 'Master OUT: the master fader, after the limiter · drag · double-click for 0 dB' : 'Volume: drag · double-click for 0 dB · +6 dB at the top';
+  stVol.setAttribute('aria-label', mst ? 'Master out' : 'Track volume'); stVol.title = mst ? 'Master OUT: the master fader, after the limiter · drag · double-click to type · Alt-click for 0 dB' : 'Volume: drag · double-click to type · Alt-click for 0 dB · +6 dB at the top';
   $('stM').title = mst ? 'Master level after OUT, left and right' : anySolo && !m.solo ? 'Silent: another track is soloed' : '';
 }
 // The strip's meter is stereo: the shown track's bus (after its pan) is split into left and right, each with its
@@ -35008,12 +35019,16 @@ grid.addEventListener('pointermove', e => {
   drag.lastY = e.clientY; drag.big = !!(e.ctrlKey || e.metaKey);
   if (!gridPend) gridPend = requestAnimationFrame(() => { gridPend = 0; gridDragMove(); });
 });
+let mxDbl = {key:'', t:0};
 const dragEnd = e => {
   if (!drag || e.pointerId !== drag.id) return;
   if (drag.wait) clearTimeout(drag.wait.tm);
   if (e.clientY != null) drag.lastY = e.clientY;
   if (gridPend){ cancelAnimationFrame(gridPend); gridPend = 0; gridDragMove(); }
   const d = drag; drag = null;
+  if (tv === 'mixer' && d.edit && !d.moved && e.type === 'pointerup' && e.pointerType === 'mouse'){   /* TYPED ENTRY (15 Nov, owner): a double-click on a Mixer value (TRIM, PAN, MASTER, OUT) types it; Reset: Del, Alt-click */
+    const c = cs.mixer, key = c.y === 7 ? 'm' + (c.mx || 0) : c.x + ':' + c.y, now = performance.now(), dbl = mxDbl.key === key && now - mxDbl.t < 400; mxDbl = {key, t:dbl ? 0 : now};
+    if (dbl){ keyType(); return; } }
   if (d.altMute && !d.moved && e.type === 'pointerup'){ toggleBlockMute(d.altMute.y, d.altMute.x); return; }   // an Alt-click on the Song mutes
   if (d.edit && !d.moved && e.type === 'pointerup' && d.tap !== false){   // VALUE MOUSE: a click on another value only selects it
     const c = cs[tv];
