@@ -1667,6 +1667,7 @@ function buildShow(n){
   const kind = MODULES[n.m.type].display;
   if (kind === 'scope') return buildScope(n);
   if (kind === 'expr') return buildExpr(n);
+  if (kind === 'srlab') return buildSrLab(n);
   if (kind === 'dyn' || kind === 'dynlv'){ const box = h('div', {class:'shw dyn'}); buildDyn(n, box, kind); return box; }
   if (kind === 'bars' || kind === 'life'){ const box = h('div', {class:'shw ' + kind}); (kind === 'bars' ? buildBars : buildLife)(n, box); return box; }
   const box = h('div', {class:'shw' + (kind === 'gr' ? ' gr' : '')}), rows = [];
@@ -2385,6 +2386,84 @@ window.addEventListener('keydown', e => {
   }
   if (e.key === 'Enter' && !e.shiftKey && !e.repeat && selected.size === 1 && !playMode && !(t && t.closest && t.closest('button, a, summary')) && ctx.hidden){ e.preventDefault(); renameModule([...selected][0]); return; }
 });
+/* SEND / RECEIVE (15 Nov, owner): an invisible cable. A Send takes In / In R, and every Receive with the same label outputs what its Send gets. The engine turns the pair into
+   ordinary cables when the patch is compiled (srResolve in the worklet), so nothing about ordering or feedback changes. Label: lab 1-8 is A-H, 0 is the module's own text
+   (kept trimmed and not case sensitive, as in the engine). The colour chip is the label's colour; a Receive with no Send, or a Send with no Receive, says so. Within one
+   track's chain only: a pair that joins two tracks' chains carries nothing (each track runs its own chain), and its cable is drawn with the cross-chain warning. */
+const SR_LAB = 'ABCDEFGH', SR_COL = ['#d6336c', '#2b8a3e', '#1c7ed6', '#e8590c', '#7048e8', '#0b7285', '#a68a00', '#7d5a3c'];
+function srKeyOf(m){
+  const l = Math.round(m && m.params && m.params.lab) || 0;
+  if (l >= 1 && l <= 8) return SR_LAB[l - 1];
+  const t = m && typeof m.text === 'string' ? m.text.trim().toLowerCase() : '';
+  return t ? 't:' + t : '';
+}
+const srName = m => { const k = srKeyOf(m); return !k ? '' : k.startsWith('t:') ? m.text.trim() : k; };
+function srColor(k){
+  if (!k) return '#777777'; const i = SR_LAB.indexOf(k); if (i >= 0 && k.length === 1) return SR_COL[i];
+  let x = 7; for (let i = 0; i < k.length; i++) x = (x * 31 + k.charCodeAt(i)) % 360; return 'hsl(' + x + ' 55% 38%)';
+}
+Object.assign(SHARED_MODULES, {
+  send:{ label:'Send', scope:'mono', display:'srlab', text:true, inputs:{ in:'audio', inR:'audio' }, outputs:{}, plabels:{ in:'In L', inR:'In R' },
+    params:{ lab:[1,0,8,1] }, ui:{ lab:{ l:'Label', fixed:true, c:[[0, 'Custom text'], ...Array.from(SR_LAB, (c, i) => [i + 1, c])] } } },
+  recv:{ label:'Receive', scope:'mono', display:'srlab', text:true, inputs:{}, outputs:{ out:'audio', outR:'audio' }, plabels:{ out:'Out L', outR:'Out R' },
+    params:{ lab:[1,0,8,1] }, ui:{ lab:{ l:'Label', fixed:true, c:[[0, 'Custom text'], ...Array.from(SR_LAB, (c, i) => [i + 1, c])] } } }
+});
+Object.assign(SHARED_FAMILY, { send:'util', recv:'util' });
+Object.assign(SHARED_ABOUT, {
+  send:'Send: an invisible cable, sending end. Patch a sound into In L and In R, pick a Label (A to H, or Custom text and type a name), and every Receive with the same label outputs that sound. Use it to carry a signal across a busy patch without drawing the cable. Two Sends with one label add together. It works inside one track’s chain: to carry a sound to another track’s chain, use a Sidechain Out and a Source of Send 1 to 8.',
+  recv:'Receive: an invisible cable, receiving end. Pick the same Label as a Send and its Out L and Out R carry what that Send gets. Several Receives can share one Send. With no Send of that label it is silent and says "no Send named …". It works inside one track’s chain: to bring in a sound from another track’s chain, use a Sidechain In or a Source of Send 1 to 8.'
+});
+Object.assign(MODULE_USE, {
+  send:'Patch the reverb’s output into a Send labelled A. Far away, a Receive labelled A gives the same sound into a mixer, with no cable across the patch.',
+  recv:'Set the Label to the Send’s, then patch Out L and Out R where you need the sound. Several Receives can use one Send.'
+});
+SHARED_PALETTE.push(['Utilities', [['send', 'Send'], ['recv', 'Receive']], 'audio']);
+{ const g = PAL_LAYOUT.find(r => r[0] === 'In and out'); if (g && !g[2].includes('send')) g[2].splice(g[2].indexOf('resample') >= 0 ? g[2].indexOf('resample') : g[2].length, 0, 'send', 'recv'); }
+let srCss = false;
+function buildSrLab(n){
+  if (!srCss){ srCss = true; const st = document.createElement('style'); st.textContent = `.srbox{display:grid; gap:4px; padding:2px 0 4px}
+.srbox .srrow{display:flex; align-items:center; gap:8px}
+.srchip{display:inline-block; min-width:26px; height:20px; padding:0 6px; box-sizing:border-box; border:1.5px solid var(--ink); background:var(--src, #777); color:#fff; font:600 12px/17px var(--font); text-align:center; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:110px}
+.srbox input.srtext{flex:1; min-width:0; box-sizing:border-box; padding:3px 6px; font:inherit; font-size:12.5px; background:var(--panel); color:var(--ink); border:1px solid var(--muted); border-radius:0}
+.node.sr > header{box-shadow:inset 0 6px 0 var(--src, transparent)}`; document.head.append(st); }
+  const m = n.m, chip = h('span', { class:'srchip', 'aria-hidden':'true' });
+  const inp = h('input', { class:'srtext', type:'text', maxlength:'40', spellcheck:'false', autocomplete:'off', 'aria-label':'Custom label', placeholder:'Custom label', title:'A name of your own (used when Label is Custom text; typing one switches Label to it). Enter applies it. Not case sensitive.' });
+  inp.value = typeof m.text === 'string' ? m.text : '';
+  const apply = () => {
+    if (!doc.modules.includes(m) || !inp.isConnected) return;
+    const v = inp.value.replace(/[\r\n\t  ]+/g, ' ').slice(0, 40); inp.value = v;
+    if (v === (typeof m.text === 'string' ? m.text : '')) return;
+    if (playBlocked()){ inp.value = typeof m.text === 'string' ? m.text : ''; return; }
+    store.snapshot(); m.text = v; exprSend(m, v);
+    if (v.trim() && (Math.round(m.params.lab) || 0) !== 0){ setParam(n, 'lab', 0); }
+    paintSr(); if (m.collapsed) paintSum(n); store.touch();
+  };
+  inp.addEventListener('keydown', e => { if (!(e.ctrlKey || e.metaKey)) e.stopPropagation(); if (e.key === 'Enter'){ e.preventDefault(); apply(); inp.blur(); } else if (e.key === 'Escape'){ e.preventDefault(); inp.value = typeof m.text === 'string' ? m.text : ''; inp.blur(); } });
+  inp.addEventListener('keyup', e => { if (!(e.ctrlKey || e.metaKey)) e.stopPropagation(); });
+  inp.addEventListener('focus', () => { inp.readOnly = !!playMode; });
+  inp.addEventListener('blur', apply);
+  n.show = { kind:'srlab', chip, inp, seen:0 };
+  return h('div', { class:'srbox', title:'The Label pairs this ' + (m.type === 'send' ? 'Send with the Receives' : 'Receive with the Send') + ' of the same label. The colour chip is the same on both ends.' }, h('div', { class:'srrow' }, chip, inp));
+}
+// Chips, the colour strip on the title bar and the status line of every Send and Receive; run after any change to the patch or a label.
+function paintSr(){
+  const need = new Map(), have = new Map();
+  for (const m of doc.modules){ if (m.type !== 'send' && m.type !== 'recv') continue; const k = srKeyOf(m); if (!k) continue; (m.type === 'send' ? have : need).set(k, ((m.type === 'send' ? have : need).get(k) || 0) + 1); }
+  for (const n of nodes.values()){
+    const m = n.m; if (m.type !== 'send' && m.type !== 'recv') continue;
+    const k = srKeyOf(m), col = srColor(k), S = n.show; n.el.classList.toggle('sr', !!k); n.el.style.setProperty('--src', col);
+    if (S && S.chip){ S.chip.textContent = k ? srName(m) : '?'; S.chip.style.setProperty('--src', col); if (document.activeElement !== S.inp){ const t = typeof m.text === 'string' ? m.text : ''; if (S.inp.value !== t) S.inp.value = t; } }
+    paintNote(n);
+  }
+}
+// What a Send or Receive says about its pair ('' when all is well).
+function srStatus(m){
+  const k = srKeyOf(m); if (!k) return m.type === 'send' ? 'No label: nothing is sent. Pick A to H or type a name.' : 'No label: silent. Pick A to H or type a name.';
+  const label = srName(m); let sends = 0, recvs = 0;
+  for (const q of doc.modules){ if (q === m || (q.type !== 'send' && q.type !== 'recv') || srKeyOf(q) !== k) continue; if (q.type === 'send') sends++; else recvs++; }
+  if (m.type === 'recv') return sends ? (sends > 1 ? 'Hears ' + sends + ' Sends of this label, added together.' : '') : 'no Send named ' + label;
+  return recvs ? '' : 'No Receive named ' + label + ' yet.';
+}
 /* ===SHARED EDITOR END=== */
 
 /* Mixer: Inputs picks how many channels show, 1 to 16 (old patches open with 4). The rest hide, with their cables. */
@@ -2520,6 +2599,7 @@ const NOTES = {
     : 'Plays on Waves In ' + m.params.slot + '. On its own, waves plays every output through your speakers. Patch only In for mono.'
 };
 for (const t in MODULES) if (MODULES[t].fx && !NOTES[t]) NOTES[t] = () => WASM_OK.tfx ? null : 'Couldn’t load the effects code (dsp/tfx.wasm), so this passes sound through unchanged.';
+NOTES.send = NOTES.recv = m => srStatus(m) || null;   // SEND / RECEIVE: what the label does not find
 let WASM_OK = { dsp:true, tfx:true };
 
 /* ---------- helpers ---------- */
@@ -2895,6 +2975,7 @@ function setParam(n, key, v, fromUser){
   if (bridge) bridge.setParam(n.m.id, key, v);
   if (key === 'chans' && MIXT.has(n.m.type)){ mixResize(n); return; }
   const c = n.ctl[key]; if (c && !fromUser) c.show();
+  if (key === 'lab' && (n.m.type === 'send' || n.m.type === 'recv')){ try { paintSr(); paintXc(); } catch (e) {} }   // SEND / RECEIVE: the chips, the status lines and the cross-chain marks follow the label
   if (n.m.type === 'out' && key === 'slot') paintNote(n);
   if (n.m.collapsed) paintSum(n);
   store.touch();
@@ -3090,7 +3171,7 @@ function buildNode(m){
   { const plan = secPlan(m.type, [...rowEls.keys()], k => plabel(m.type, k));   // T14: a long module is cut into sections (the first open)
     if (plan){ const at = kids.indexOf(rowEls.values().next().value); kids.splice(at, rowEls.size, ...secWrap(n, rowEls, plan)); } }
   if (m.type === 'out'){ n.meter = h('span'); kids.push(h('div', {class:'prog', title:'Level'}, n.meter)); }
-  if (def.display){ const sh = buildShow(n); if (sh) { if (def.display === 'expr' || def.display === 'mixout') kids.unshift(sh); else kids.push(sh); } }   // (Expression: its formula field leads, above the sliders)
+  if (def.display){ const sh = buildShow(n); if (sh) { if (def.display === 'expr') kids.unshift(sh); else if (def.display === 'mixout') kids.unshift(sh); else kids.push(sh); } }   // (Expression: its formula field leads, above the sliders)
   if (NOTES[m.type]){ n.note = h('div', {class:'status'}); kids.push(n.note); }
   const body = h('div', {class:'body'}, kids);
   buildSummary(n);   // COMPACT: the collapsed look
@@ -3514,7 +3595,7 @@ function syncCableEls(){
     hit.addEventListener('mouseenter', () => el.g.classList.add('hov')); hit.addEventListener('mouseleave', () => el.g.classList.remove('hov')); hit.addEventListener('mouseenter', ev => cabHover(c, ev)); hit.addEventListener('mousemove', ev => cabPlace(ev)); hit.addEventListener('mouseleave', () => cabHover(null));   // M8: the value readout
     svg.append(el.g); cableEls.set(c, el);
   }
-  try { paintXc(); } catch (e) {}
+  try { paintSr(); paintXc(); } catch (e) {}
   compactAll(); secMarks(); groupBlocks(); markScene();
 }
 function jackPos(id, dir, port, wr){
@@ -3578,18 +3659,27 @@ function xcCables(){
   const out = new Map(), mods = doc.modules, cables = doc.cables.filter(fbOk);
   const trk = m => (m.params && m.params.track) | 0, ins = mods.filter(m => m.type === 'trackIn' && trk(m) > 0), outs = mods.filter(m => m.type === 'chainOut' && trk(m) > 0);
   if (!ins.length || !outs.length) return out;
+  // The edges the engine runs: a cable out of a Receive is one edge from every source cabled into the Send of its label (both drawn cables are what gets marked).
+  const by = new Map(mods.map(m => [m.id, m])), edges = [], sends = new Map();
+  for (const c of cables){ const d = by.get(c.to[0]); if (d && d.type === 'send'){ const k = srKeyOf(d); if (k){ if (!sends.has(k)) sends.set(k, []); sends.get(k).push(c); } } }
+  for (const c of cables){
+    const s = by.get(c.from[0]), d = by.get(c.to[0]);
+    if (d && d.type === 'send') continue;
+    if (s && s.type === 'recv'){ for (const q of sends.get(srKeyOf(s)) || []) edges.push({ a:q.from[0], b:c.to[0], marks:[q, c] }); continue; }
+    edges.push({ a:c.from[0], b:c.to[0], marks:[c] });
+  }
   const fwd = new Map(), back = new Map(), add = (M, a, b) => { if (!M.has(a)) M.set(a, []); M.get(a).push(b); };
-  for (const c of cables){ add(fwd, c.from[0], c.to[0]); add(back, c.to[0], c.from[0]); }
+  for (const e of edges){ add(fwd, e.a, e.b); add(back, e.b, e.a); }
   const walk = (M, starts) => { const seen = new Set(starts), w = [...starts]; while (w.length){ const x = w.pop(); for (const y of M.get(x) || []) if (!seen.has(y)){ seen.add(y); w.push(y); } } return seen; };
   const tin = new Map(); for (const m of ins) tin.set(m.id, trk(m));
   const coneIns = new Map();   // module -> the tracks of the Track Ins behind it (itself included)
   const coneOf = id => { let r = coneIns.get(id); if (!r){ const s = walk(back, [id]); r = new Set(); for (const x of s) if (tin.has(x)) r.add(tin.get(x)); coneIns.set(id, r); } return r; };
   for (const T of new Set(ins.map(trk))){
     const own = walk(fwd, ins.filter(m => trk(m) === T).map(m => m.id)), toOut = walk(back, outs.filter(m => trk(m) === T).map(m => m.id));
-    for (const c of cables){
-      const a = c.from[0], b = c.to[0]; if (!(own.has(b) && toOut.has(b)) || (own.has(a) && toOut.has(a))) continue;
+    for (const e of edges){
+      const a = e.a, b = e.b; if (!(own.has(b) && toOut.has(b)) || (own.has(a) && toOut.has(a))) continue;
       const foreign = [...coneOf(a)].filter(t => t !== T); if (!foreign.length) continue;
-      const o = out.get(c); if (o) { for (const t of foreign) if (!o.from.includes(t)) o.from.push(t); } else out.set(c, { from:foreign, to:T });
+      for (const c of e.marks){ const o = out.get(c); if (o){ for (const t of foreign) if (!o.from.includes(t)) o.from.push(t); } else out.set(c, { from:foreign.slice(), to:T }); }
     }
   }
   return out;
