@@ -18,6 +18,10 @@ object ThunderHost {
         private set
     @Volatile private var running = false
     private var poller: Thread? = null
+    // N1 review A4 (UNVERIFIED at run time: no Android here). The core must never be destroyed while the poller may be inside it.
+    // shutdown() waits for the poller; if a listener keeps it longer, the core is left alone and the poller itself ends the engine
+    // when it leaves its loop (it is the only thread that calls nativePoll).
+    private val pendingStop = java.util.concurrent.atomic.AtomicBoolean(false)
     private val main = Handler(Looper.getMainLooper())
 
     // ---- the owner's three 5-minute runs (A6) -------------------------------------------------------------------------
@@ -36,7 +40,7 @@ object ThunderHost {
         if (!ensureRunning(ctx)) return false
         NativeEngine.nativeRtReset(); clock.reset()
         activeRun = label; results.remove(label); lastFinished = null
-        NativeEngine.nativePost("{\"t\":\"play\"}")
+        synchronized(this) { NativeEngine.nativePost("{\"t\":\"play\"}") }   // N1 A4: one producer at a time (command() is @Synchronized too)
         return true
     }
 
@@ -87,14 +91,21 @@ object ThunderHost {
             }
             if (!any) try { Thread.sleep(5) } catch (e: InterruptedException) { }
         }
+        if (pendingStop.compareAndSet(true, false)) NativeEngine.nativeStop()   // shutdown() gave up waiting: the poller is out of the core now
     }
 
     /** Ends the engine. Safe to call twice. */
     @Synchronized fun shutdown() {
         if (!running) return
         running = false
-        poller?.join(500)
+        val p = poller
         poller = null
+        try { p?.join(2000) } catch (e: InterruptedException) { }
+        if (p != null && p.isAlive) {
+            pendingStop.set(true)   // the poller is inside a listener: do not destroy the core under it; it ends the engine itself
+            if (!p.isAlive && pendingStop.compareAndSet(true, false)) NativeEngine.nativeStop()   // it left in the meantime
+            return
+        }
         NativeEngine.nativeStop()
     }
 

@@ -152,10 +152,13 @@ JNIEXPORT jint JNICALL Java_app_thunderplus_nativetest_NativeEngine_nativeStart(
 
 JNIEXPORT void JNICALL Java_app_thunderplus_nativetest_NativeEngine_nativeStop(JNIEnv*, jobject) {
   if (!g.deviceInit) return;
-  ma_device_uninit(&g.device);   // stops the callback
-  g.deviceInit = false;
+  // N1 review A4 (UNVERIFIED at run time: no Android here): the probe thread reads the AAudio stream, so it is stopped and joined
+  // BEFORE ma_device_uninit closes that stream (the old order let it call into a closed stream for up to 10 ms). Then the
+  // callback is stopped, and only then is the core destroyed.
   g.probeRun = false;
   if (g.probe.joinable()) g.probe.join();
+  ma_device_uninit(&g.device);   // stops the callback
+  g.deviceInit = false;
   thunder_destroy(g.core);
   g.core = nullptr;
 }
