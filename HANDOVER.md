@@ -732,6 +732,13 @@ The owner's top priority to add is the MOD screen. Work down the list; ask befor
 
 Start a session by asking for results. Fix on `beta`. (10 Nov, 15:10: the web beta is build 560; the build numbers in the rest of this paragraph are older.) Web beta: https://matthettich.github.io/thunder-plus/beta/ (build 547 as of 10 Nov morning, 548 once its PR merges; the night of 9–10 Nov shipped 544–547, see the four "10 Nov" entries below. Decisions the lead made that night for the owner to confirm or reverse: on a phone the saved Sequencer default plays on the Page unless Audio thread is picked on that device; on a phone the safety limiter is its stand-in until another worklet loads; the resync only runs with a worklet loaded and its margins are untested on a device). Desktop: v1.3.4-beta.2 (build 541, no feed view or scopes); further desktop betas on hold until the owner asks.
 
+**Build 604** (Synth page sliders: type a value, arrow nudge)
+- [ ] **Computer, Synth page:** double-click a slider. Pass: a field opens with the value selected; type `440` or `440 Hz` (or `35%`, `-6 dB` on a level) and Enter: the slider goes there, and one Ctrl+Z puts it back. Esc leaves it alone.
+- [ ] **Computer:** Alt-click a slider. Pass: it returns to its default; double-click no longer resets. Right-click › Reset to default does the same.
+- [ ] **Computer:** click a slider, then ◀ ▶ and Shift+◀ ▶. Pass: it moves about 1% a press (Shift: finer) with a ring round it, and the pad list and tracker cursor stay still; Esc lets go and the keys work as before. Say if 1% is the wrong size.
+- [ ] **Phone (Fold):** double-tap a slider. Pass: the field opens with the number keyboard; long press › Reset to default still resets.
+- [ ] **Computer:** a slider with a MIDI knob learned or an LFO on it. Pass: a typed value and a nudge behave like a drag (the sound follows, the learned knob still moves it).
+
 **Build 603** (renders and LATENCY COMP count switched-OFF pump effects)
 - [ ] **Computer (song `acid`):** render the song and open the WAV in an editor. Pass: the first kick starts at the very beginning of the file (before this build it started about 93 ms in), and the end of the song is not cut short.
 - [ ] **Computer:** Audio & MIDI › LATENCY COMP ON; put pump CALM on a drum track and switch it OFF; play it against another drum track on the same steps. Pass: the two tracks hit together whether CALM is ON or OFF (before, the track with the OFF effect played about 43 ms late). With LATENCY COMP OFF the track with CALM is late either way, as the FX screen says.
@@ -1234,6 +1241,14 @@ Suggested order: N0 → N1 → N2 (phone cured) → N4 with N3 alongside → N5 
   the edge `R.t0`, "waiting…" while armed), `rcdClk` / `rcdFmt` / `rcdFreeSecs`, a 250 ms timer only while recording; the
   final length stays until the next take. recorder-check covers FREE, PATTERN, Stop, next take and closing mid-take.
 
+
+## 14 Nov (Synth page sliders: double-click types a value, arrows nudge; build 604)
+
+Owner's ask 1 of 14 Nov evening. Built by an agent, reviewed by the lead.
+- **Double-click types a value** on every `makeRow` slider (Synth page, and …chains / …waves rows, which share it): the slider, its name or its readout. The old inline parser became `rowParse(d, txt)` (units optional: Hz, kHz, ms, s, %, st, dB; clamped, then snapped by the new `snapDef`, the step a drag lands on). Enter applies, Esc or leaving it unchanged cancels; the slider keeps the focus afterwards.
+- **Reset** is Alt-click or Ctrl/⌘-click (already there) and right-click › Reset to default. Two-state rows (Reverse, Loop) still reset on a double-click of the name (nothing to type). The 32 mod-sequence step sliders still reset on double-click (not `makeRow`).
+- **Arrows:** a clicked slider has the focus (ring: one CSS rule); `sliderKey` / `sliderNudge`: ◀ ▶ (▲ ▼) move 1% of the travel, Shift a tenth of that (lead's choice: the agent's one slider step, 0.1%, was too small to be useful, and Shift = finer matches a drag); a row that rounds its value takes as many steps as it needs to change by one. The keys stop at the slider (not the tracker or pad list); Esc blurs. Changes go through `sliderSet`, the call a drag makes (undo, MOD, MIDI learn).
+- Help paragraph, README and titles reworded. `tests/synth-slider-entry.test.js` (9 tests); `tests/usability.test.js` no longer pins double-click = reset. Checked in headless Chrome by the agent.
 
 ## 14 Nov (renders and LATENCY COMP count switched-OFF pump effects; build 603)
 
