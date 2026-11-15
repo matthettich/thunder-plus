@@ -366,6 +366,7 @@ clock mapping at that latency (7 Nov (16)). Re-check MIDI timing with Measure…
 
 ## Desktop releases
 
+- **v1.3.9** (15 Nov 2026, a regular release; owner, 15 Nov 13:11: "push to main and build a desktop app"; PR #164 beta → main at build 621, run 43758572461, all three platforms, 11 assets, the latest release): builds 620 and 621 (the owner's list from desktop build 609, and chains and waves Send / Receive, cross-track warning, Mixer meters, square cables, the side panel takes the skin). Next is 1.3.10.
 - **v1.3.8** (15 Nov 2026, a regular release; owner, 14 Nov 23:15: "after finishing everything on your list, please push to main and cut a build"; PR #154 beta → main at build 619, run 43747193363, all three platforms, 11 assets, the latest release): builds 610 to 619 (chance and seeds, MONO / POLY TRACKS, MOD follows Arrange, the file's name for the song, Option+A and Option+▲▼, LATENCY COMP AUTO, about 630 new presets and 12 kits, stereo pads and many renders). Next is 1.3.9.
 - **v1.3.7** (14 Nov 2026 night, a regular release; owner, 14 Nov: "when a few builds have landed, merge `beta` into `main` and build the desktop app"; PR #142 beta → main at build 609, run 43673860734, all three platforms, 11 assets): builds 603 to 609 (renders start on time and are as bright as playback, Synth slider number entry and arrow nudge, Arrange TRANSP. on a selection, switched-OFF pump effects and muted tracks' effects rest, the CPU panel names the effect). Build 610 (chance and seeds) is on `beta` only. Next is 1.3.8.
 - **v1.3.6** (14 Nov 2026 evening, a regular release; owner, 14 Nov: "when you hit a reasonable milestone, can you merge beta and main and push a new desktop app?"; PR #134 beta → main at build 602, run 43660864512, all three platforms, 11 assets): builds 590 to 602 (the module queue, MOD while playing, effects resting in silence, LFOs follow tracks, Arrange zoom and paging, FX Clear, ANIMATIONS). Installed copies update to it.
@@ -529,23 +530,25 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0) and `link/` (Ableton
 
 ## To-do (owner's list: keep it current; newest dated entries below have the details)
 
-### Where things stand (15 Nov, afternoon: READ THIS FIRST; it supersedes the blocks below where they disagree)
+### Where things stand (15 Nov, afternoon, 13:40: READ THIS FIRST; it supersedes the blocks below where they disagree)
 
-**`beta` = build 620** (PR #157, merged 15 Nov about 12:25). **`main` is still build 619 = desktop v1.3.8.** No desktop build was made. Build 620 is the owner's list from the Windows desktop app (build 609), built by four Sonnet agents and the lead; see the dated entry "15 Nov (the owner's list from desktop build 609; build 620)".
+**`beta` = `main` = build 621.** Desktop **v1.3.9** was started from `main` at 13:31 (run 43758572461; the owner, 13:11: "push to main and build a desktop app"; PR #164 beta → main). The run finished with all three platforms and 11 assets, and v1.3.9 is the latest release. Build 620 is the owner's list from the Windows desktop app (build 609); see the dated entry "15 Nov (the owner's list from desktop build 609; build 620)". Build 621 is the chains and waves Send / Receive and meters work.
 
 **Open questions for the owner from that list:**
 1. **"flx command stuck on":** by his own rule of 12 Nov, an effect command holds through later patterns, wraps and LOOPs until another command. So FLX turned on inside a loop whose FLX 00 is outside it stays on. The lead did not change it and asks whether he wants effect switches put back at each LOOP wrap, and whether Stop cleared it.
-2. **The new poly track that was silent on its first pass:** was "a kit slot per track" on?
+2. **The new poly track that was silent on its first pass:** was "a kit slot per track" on? Still open.
 3. **Clone down inserting empty phrases on the third press:** not reproduced (a test clones 8 rows six times and passes). Needs his song or the exact steps.
 4. **"Phrase on stop is set to stays but is following playhead":** fixed as "on Stop in Pattern view only the song row moves". If he meant while playing, that is FOLLOW.
 
+**The owner's answers (15 Nov 12:39):** FLX stuck on and clone-down inserting empties are minor, parked until he can reproduce them (documented, not to be worked on). "Phrase stays" was about Stop, so the 620 fix is the right one. The poly-track question ("a kit slot per track" on?) is still open.
+
 **A bus cannot be picked as a sidechain Source by its track number.** A track Source taps the track's own notes, and a bus has none, so its meter reads silence. What works: a Sidechain Out with Send N in the bus's part of the chains patch, and Source: Send N on the compressor or a Sidechain In (the owner confirmed the Send route shows signal, 15 Nov 12:20). A cable from one track's sub-graph to another's does nothing. Making "Track N" work for a bus needs audio-graph work with a feedback-loop risk: not built, noted here.
 
-**In work when this was written:** branch `fix/609-chains` (a Sonnet agent; notes in `/home/claude/progress/chains.md`): mark cables that cross between two tracks' chains; meters on Mixer modules; Send / Receive modules (labelled pairs instead of a cable); bend points that snap to right angles and "Square up"; the ? button the size of ✕. Will be build 621.
+**Build 621 is merged (PR #161): see its dated entry** "15 Nov (…chains and …waves: Send / Receive, cross-chain cable warning, Mixer meters, square cables; the side panel takes the skin; build 621)".
 
-**Native port:** the owner said on 15 Nov to prioritise it (taken as the go for N1). On branch `native`: N0 done. N1 step 2 done (B1 / B2: `BRIDGE_V = 1` frozen in `docs/port/CORE-BRIDGE.md`). Step 3 done by the lead: U05 core runtime, PR #156 merged (`native/core/src/rt/`: timed commands, snapshot swap). The C++ equals the JS bit for bit on Linux, Windows, Mac, Android and wasm builds in CI. Open PRs into `native`: #158 U06 song reader (two CI failures being fixed: wasm include path, a Windows line-ending test); #159 U02 CMake build of the existing DSP with pinned upstreams (the gate is the goldens' audio hashes, decided by the lead). In work: U07 the sequencer (a Fable agent, branch `n1/u07`, notes `/home/claude/progress/u07.md`). Not started: U03 (needs the owner's `matthettich/pump` repo brought in: ask him to add it to the session), U04 LXR. The status table is section 7 of `docs/port/WORKPLAN.md` on `native`.
+**Native port:** the owner said on 15 Nov to prioritise it (taken as the go for N1). On `native` now: U05 runtime (#156), U06 song reader (#158), U02 CMake build of the existing DSP, pinned (#159), U07 the sequencer (#162: all four `seq-electro` goldens match exactly, plus 19 extra cases; `js_pow` and friends in `rt/jsmath`), U08 the sampler voices (#163: 22 cases bit-exact against the JS). Open: #165 U03 the pump DSP in the build, pinned at pump deb07d33 (CI not yet checked; `matthettich/pump` is public, nothing was needed from the owner). In work: U09 the mixer and the first whole-song render (a Fable agent, branch `n1/u09`, notes `/home/claude/progress/u09.md`). Next after it: U10 latency compensation and beat clock, then U11 to U13 master, U14 effects host. Not started: U04 LXR module. For the lead before U18: on the host build pump's STUTTER can output NaN after a SPRING instance ran in the same process (not in the wasm); the pin's MASTER is one commit newer than the app's shipped `pump.wasm`. The lead has not yet read U07 and U08 line by line: their proof so far is the exact goldens and the allocation guard; read them before U09's code is wired into `thunder_process`. The goldens' reference JS engine is Node 22 on Linux x86-64 (another V8 can differ in the last bit of `Math.pow`); the Linux CI job pins it. The core builds without fast-math and without fused multiply-add on every target, wasm included.
 
-**Things that bit this session:** an agent put code using a variable that only exists in another function into `draw()` (`m`); the page stopped loading, and the vm tests passed. CodeRabbit and CI's sequencer golden caught it. Before pushing a build, load the page in headless Chrome (`/tmp/loadcheck.mjs` style: playwright at `/opt/npm-tools/node_modules/playwright/index.mjs`, Chrome at `/usr/bin/google-chrome`) and run `PLAYWRIGHT=… node tools/seq-golden.mjs`. Agents in separate `git worktree`s on one file merged cleanly except one small conflict.
+**Things that bit this session:** an agent put code using a variable that only exists in another function into `draw()` (`m`); the page stopped loading, and the vm tests passed. CodeRabbit and CI's sequencer golden caught it. Before pushing a build, load the page in headless Chrome (`/tmp/loadcheck.mjs` style: playwright at `/opt/npm-tools/node_modules/playwright/index.mjs`, Chrome at `/usr/bin/google-chrome`) and run `PLAYWRIGHT=… node tools/seq-golden.mjs`. Agents in separate `git worktree`s on one file merged cleanly except one small conflict. Two branches each adding a case to `native/tools/parity.sh` conflict every time: it is now a dispatcher (`parity.sh u02|u03|u07|u08`, bodies in `parity-uNN.sh` where long). A merge left conflict markers in a CMake file because `git add -A` was run before looking: grep for `<<<<<<<` before committing a merge. A PR with a conflict gets no CI run at all (no failure shown): merge the base in first.
 
 ### Where things stand (15 Nov, midday: it supersedes the blocks below where they disagree)
 
@@ -784,6 +787,17 @@ The owner's top priority to add is the MOD screen. Work down the list; ask befor
 **The owner's checklist by importance (13 Nov):** he works from a Claude Doc, "Thunder Plus test checklist, by priority" (https://claude.ai/artifact/LrzQ18ur18Fc5gkvxmQDbK), ordered: 1 Do these first, 2 Really worth trying, 3 If you have time, 4 Safe to skip, Parked, Set aside, Done. A snapshot with his ticks is `docs/TEST-CHECKLIST.md`: re-export it whenever the doc changes, and add each new build's checks to the doc's section 1 as well as here. He said the two "decides" groups (native apps; smoothing / Worklets / clock experiments) are parked and block nothing. "Close the skip list" from him means: close section 4's items as not tested.
 
 Start a session by asking for results. Fix on `beta`. (10 Nov, 15:10: the web beta is build 560; the build numbers in the rest of this paragraph are older.) Web beta: https://matthettich.github.io/thunder-plus/beta/ (build 547 as of 10 Nov morning, 548 once its PR merges; the night of 9–10 Nov shipped 544–547, see the four "10 Nov" entries below. Decisions the lead made that night for the owner to confirm or reverse: on a phone the saved Sequencer default plays on the Page unless Audio thread is picked on that device; on a phone the safety limiter is its stand-in until another worklet loads; the resync only runs with a worklet loaded and its margins are untested on a device). Desktop: v1.3.4-beta.2 (build 541, no feed view or scopes); further desktop betas on hold until the owner asks.
+
+**Build 621** (chains and waves: Send / Receive, cross-track warning, Mixer meters, square cables, the side panel's skin)
+- [ ] **Computer:** an old chains patch (any you have): play it and render it. Pass: it sounds as it did before build 621.
+- [ ] **Computer, …chains:** a Send and a Receive with the same label (A to H or free text) and a module between them. Pass: the sound passes through like a cable; a second Receive on the same label also gets it.
+- [ ] **Computer, …chains:** a cable from one track's chains into another track's chains. Pass: the cable is dashed and marked "no signal", with a tooltip and a one-time toast.
+- [ ] **Computer, by ear:** duck a track from a bus: Sidechain Out with Send 1 in the bus's chain, and Source: Send 1 on the compressor. Pass: the track ducks when the bus plays.
+- [ ] **Computer:** a Mixer module's OUT meter. Pass: it moves with the audio and falls back when it stops.
+- [ ] **Computer:** drag a cable bend close to a right angle. Pass: it snaps square; hold Alt and it moves freely; the cable menu's "Square up" squares it.
+- [ ] **Computer and phone:** the ? button is the same size as ✕. Pass: they match.
+- [ ] **Computer:** the side panel (status card, meters, KEYS, instrument list) in the IDM, IDM pink, IDM pink & green, 909 and Low power skins. Pass: it takes each skin's colours, and no band shows above the command bar.
+- [ ] **Phone:** …chains still opens and plays an old patch. Pass: it opens and plays.
 
 **Build 620** (the owner's list from desktop build 609; mostly the Windows desktop app)
 - [ ] **Computer (Windows desktop app):** open a song you know, press PLAY, then STOP. Pass: the page loads, plays and stops; nothing is blank or stuck. If it is, tell Claude the build.
@@ -1397,6 +1411,18 @@ Suggested order: N0 → N1 → N2 (phone cured) → N4 with N3 alongside → N5 
   the edge `R.t0`, "waiting…" while armed), `rcdClk` / `rcdFmt` / `rcdFreeSecs`, a 250 ms timer only while recording; the
   final length stays until the next take. recorder-check covers FREE, PATTERN, Stop, next take and closing mid-take.
 
+
+## 15 Nov (…chains and …waves: Send / Receive, cross-chain cable warning, Mixer meters, square cables; the side panel takes the skin; build 621)
+
+Build 621, from the chains and waves work. Merged as PR #161 into `beta`. One line each:
+- **Send and Receive** modules in both editors, resolved in `Graph.compile` by `srResolve` so the engine runs ordinary cables (labels A to H or free text; several Receives per Send; pairs in series resolve through; identical resulting cables are kept once, so two Sends of one label fed from the same source do not double; loops are marked as feedback).
+- **Cross-track:** they work inside one track's chain only. A pair or a cable from one track's sub-graph into another's carries no sound and the editor marks it (dashed, "no signal", a tooltip, a one-time toast), because each track runs its own chains node that only runs modules reachable from its own Chain Out and only gets its own track's audio (`chains-worklet.js` `_active`, `index.html` `busPlan`). What works across tracks is Sidechain Out with Send N + Source: Send N. Routing pairs across chains would need a stereo send path in the per-node I/O, host changes in `index.html` and label-to-channel allocation (not built).
+- **Mixer and Stereo mixer modules** (and waves' Mixer) show an OUT meter.
+- **Cable bends** snap square within 8 px (Alt: free) and "Square up" on the cable menu. The ? button is the size of ✕.
+- **The side panel** (`.tside`: status card, meters, KEYS, instrument list) used the paler `--side` and literal colours; it now uses `--panel`, `--inv`, `--acc` and the mono font, which also removed the band above the command bar (screenshots were shown to the owner).
+- `chains-worklet.js` v58, `waves-worklet.js` v46. CodeRabbit on #161: seven findings over two rounds, all fixed.
+
+Tests added: `chains-crosstrack`, `chains-mixmeter`, `chains-sendrecv`, `chains-sendrecv-editor`, `chains-squarecable`, `chains-helpbtn-size`, `sidebar-skin`. `npm test` 1440, 0 fail; the page loads in headless Chrome; sequencer goldens unchanged.
 
 ## 15 Nov (the owner's list from desktop build 609; build 620)
 
