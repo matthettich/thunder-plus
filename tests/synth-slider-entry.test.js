@@ -33,7 +33,7 @@ function world(def = { l: 'Cutoff', min: 20, max: 20000, d: 1000, c: 'log', f: v
     document: { addEventListener: (t, f) => { (docL[t] = docL[t] || []).push(f); }, createElement: t => new El(t), activeElement: null },
     ctxPress: e => e.button === 2, resetClick: () => false };
   vm.createContext(c);
-  const code = [cut('const toPos = (d, v)', '/* ---------- state ---------- */'), cut('/* What a row stores per unit', "const rows = [];"), cut('const rows = [];', 'function makeSeg('),
+  const code = [cut('const toPos = (d, v)', '/* ---------- state ---------- */'), cut('/* The stored value whose readout', "const rows = [];"), cut('const rows = [];', 'function makeSeg('),
     cut('const sliderOk =', '/* ONE RULE FOR VALUE CONTROLS'), cut('function sliderSet(r, v){', '/* WHEEL (27 Oct'), cut('/* SLIDER KEYS', '/* WHEEL (27 Oct')].join('\n');
   vm.runInContext(code + '\nthis.api = {makeRow, rowParse, snapDef, fromPos, toPos, sliderNudge, sliderKey, sliderSet, rowTypeBox};', c);
   const row = c.api.makeRow(def, 'f', () => obj, { idp: 't', on: () => { log.changed++; } });
@@ -123,7 +123,7 @@ const KHZ = { l: 'Freq', min: 0.02, max: 20, d: 1, c: 'lin', f: v => (v * 1000 <
 test('time and frequency units are converted into what the row stores (read from its own readout)', () => {
   assert.equal(R(SW, '500 ms'), 0.5); assert.equal(R(SW, '0.5 s'), 0.5); assert.equal(R(SW, '2 s'), 2); assert.equal(R(SW, '0.5'), 0.5, 'bare: the row\'s own unit');
   assert.equal(R(MSN, '500 ms'), 500); assert.equal(R(MSN, '0.5 s'), 500); assert.equal(R(MSN, '1.5 s'), 1500); assert.equal(R(MSN, '300'), 300);
-  assert.equal(R(MSW, '500 ms'), 500); assert.equal(R(MSW, '0.5 s'), 500); assert.equal(R(MSW, '2 s'), 2000); assert.equal(R(MSW, '0.25 ms'), 0.3, 'the 0.1 minimum row');
+  assert.equal(R(MSW, '500 ms'), 500); assert.equal(R(MSW, '0.5 s'), 500); assert.equal(R(MSW, '2 s'), 2000); assert.equal(R(MSW, '0.3 ms'), 0.3, 'the 0.1 minimum row');
   assert.equal(R(KHZ, '440 Hz'), 0.44); assert.equal(R(KHZ, '2 kHz'), 2); assert.equal(R(KHZ, '2'), 2);
   assert.equal(R(HZ, '500 ms'), 500, 'a unit that does not match the readout is a bare number'); assert.equal(R(MSN, '440 Hz'), 440);
   assert.equal(R({ l: 'x', min: 0, max: 10, d: 1, f: v => 'n' + v }, '5 ms'), 5, 'unknown unit: bare');
@@ -141,4 +141,15 @@ test('IME: while composing, Enter and Escape in the entry field do nothing (the 
 test('docs say two-state rows and the mod-sequence steps still reset on a double-click', () => {
   assert.match(H.read('README.md'), /two-state buttons[^.]*mod-sequence step sliders[^.]*still reset/);
   assert.match(src, /two-state buttons[^.]*mod-sequence step sliders[^.]*still reset/);
+});
+test('units are read through the row\'s own readout: a 2x seconds row (a 2 s sample) and a (0.05 + v*v*5) ms row (CodeRabbit on 606)', () => {
+  const LS = { l: 'Loop start', min: 0, max: 1, d: 0, c: 'lin', f: v => (2 * v).toFixed(3) + ' s' };
+  assert.equal(R(LS, '500 ms'), 0.25); assert.equal(R(LS, '1 s'), 0.5); assert.equal(R(LS, '0.25'), 0.25, 'bare stays the row\'s own unit');
+  const CW = { l: 'Click width', min: 0, max: 1, d: 0.2, c: 'lin', f: v => (0.05 + v * v * 5).toFixed(2) + ' ms' };
+  assert.equal(R(CW, '1.30 ms'), 0.5); assert.ok(R(CW, '0.05 ms') < 0.04, 'the bottom of its range'); assert.equal(R(CW, '99 ms'), 1, 'past the end: clamped');
+  const down = { l: 'x', min: 0, max: 10, d: 1, c: 'lin', f: v => (10 - v) + ' s' }; assert.equal(R(down, '4 s'), 6, 'a falling readout');
+  const wobble = { l: 'x', min: 0, max: 10, d: 1, c: 'lin', f: v => Math.abs(v - 5) + ' s' }; assert.equal(R(wobble, '2 s'), 2, 'not steady: bare number');
+  assert.equal(R({ l: 'x', min: 0, max: 5, d: 1, c: 'lin', f: v => (v < 1 ? 'off' : v + ' s') }, '2 ms'), 2, 'a readout that prints no unit somewhere: bare');
+  let len = 4; const LL = { l: 'Loop', min: 0, max: 1, d: 0, c: 'lin', f: v => (len * v).toFixed(3) + ' s' };
+  assert.equal(R(LL, '1 s'), 0.25); len = 2; assert.equal(R(LL, '1 s'), 0.5, 'read at the moment of typing');
 });
