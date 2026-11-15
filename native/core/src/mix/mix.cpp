@@ -2,6 +2,7 @@
 // trimGain) and core/core-processor.js (mixEv, mixOut, mixFill). The JS model of the nodes' arithmetic this file equals bit for bit is
 // native/tools/mix-dump.mjs (class Model).
 #include "mix/mix.h"
+#include "rt/num.h"
 
 #include <algorithm>
 #include <cmath>
@@ -309,7 +310,7 @@ void Mixer::track(int t, int N, double t0) {
   const bool hasChn = t < kNT && chn_[t].fn, isBus = t < kNT && (busOn_ >> t & 1u), mono = mono_[t] && !hasChn;
   if (!hasChn && !fx_[t].fn) {   // nothing in: nothing out (the same zeros the arithmetic gives)
     bool any = false; for (int i = 0; i < N && !any; i++) any = L[i] != 0 || (!mono_[t] && R[i] != 0);
-    if (!any) { std::memset(pL, 0, sizeof(float) * (size_t)N); std::memset(pR, 0, sizeof(float) * (size_t)N); if (preSrc_ >> t & 1u) { std::memset(eL, 0, sizeof(float) * (size_t)N); std::memset(eR, 0, sizeof(float) * (size_t)N); } return; }
+    if (!any) { std::memset(pL, 0, sizeof(float) * (size_t)N); std::memset(pR, 0, sizeof(float) * (size_t)N); if (bit32(preSrc_, t)) { std::memset(eL, 0, sizeof(float) * (size_t)N); std::memset(eR, 0, sizeof(float) * (size_t)N); } return; }
   }
   // inp (TRIM)
   for (int i = 0; i < N; i++) L[i] = L[i] * cI[i];
@@ -322,7 +323,7 @@ void Mixer::track(int t, int N, double t0) {
   }
   if (fx_[t].fn) fx_[t].fn(fx_[t].user, t, L, R, N, t0, nullptr, 0);
   // pre (an explicit stereo pair: mute and solo still silence it)
-  if (preSrc_ >> t & 1u) for (int i = 0; i < N; i++) { eL[i] = L[i] * cP[i]; eR[i] = R[i] * cP[i]; }
+  if (bit32(preSrc_, t)) for (int i = 0; i < N; i++) { eL[i] = L[i] * cP[i]; eR[i] = R[i] * cP[i]; }
   // g (VOL x audible), cg (the song's TVL / TVA)
   for (int i = 0; i < N; i++) { L[i] = L[i] * cG[i]; R[i] = R[i] * cG[i]; }
   if (s.hasMg) for (int i = 0; i < N; i++) { L[i] = L[i] * cMg[i]; R[i] = R[i] * cMg[i]; }
@@ -378,8 +379,8 @@ void Mixer::render(float* outL, float* outR, int N, double t0) {
     // the delay points' histories take this block (always: a delay that starts later reads what played before it), and the feeds a bus will hear
     Dly& D = dly_[t]; const float *pL = post_.get() + (size_t)(t * 2) * mb, *pR = pL + mb, *eL = preb_.get() + (size_t)(t * 2) * mb, *eR = eL + mb;
     D.post.push(pL, pR, N); fpL_[t] = pL; fpR_[t] = pR; feL_[t] = eL; feR_[t] = eR;
-    if (preSrc_ >> t & 1u) { D.pre.push(eL, eR, N); tap(D.pre, D.fdlP, feL_[t], feR_[t], fd_.get() + (size_t)(t * 4 + 2) * mb, fd_.get() + (size_t)(t * 4 + 3) * mb, N, t0); }
-    if (fdlSrc_ >> t & 1u) tap(D.post, D.fdl, fpL_[t], fpR_[t], fd_.get() + (size_t)(t * 4) * mb, fd_.get() + (size_t)(t * 4 + 1) * mb, N, t0);
+    if (bit32(preSrc_, t)) { D.pre.push(eL, eR, N); tap(D.pre, D.fdlP, feL_[t], feR_[t], fd_.get() + (size_t)(t * 4 + 2) * mb, fd_.get() + (size_t)(t * 4 + 3) * mb, N, t0); }
+    if (bit32(fdlSrc_, t)) tap(D.post, D.fdl, fpL_[t], fpR_[t], fd_.get() + (size_t)(t * 4) * mb, fd_.get() + (size_t)(t * 4 + 1) * mb, N, t0);
   }
   // the master sum (dl -> out), in track order
   for (int i = 0; i < N; i++) { outL[i] = 0; outR[i] = 0; }
