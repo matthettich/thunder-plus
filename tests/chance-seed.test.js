@@ -123,3 +123,15 @@ test('MOD: track chance is a target (tch:t); an LFO on it thins the track, and a
   assert.ok(n < 128 && n > 64, 'a square LFO at full depth: the low half of each cycle plays about half its notes: ' + n);
   assert.equal(hits(play(song([M, { t: 0, y: 0, rows: { 0: [['TCH', 254]] } }, ...Array.from({ length: 7 }, (_, k) => ({ t: 0, y: k + 1 }))], lfo)), 0).length >= 120, true, 'TCH FE on the track: the command’s chance, not the LFO’s');
 });
+test('review fixes: a JMP 00 loop rolls each pass differently; a SED on a track alone still seeds the whole song (songs from before); a muted block’s TCH above the start row counts', () => {
+  // two rows of chance, then JMP 00 on the master at the top of row 2: three passes
+  const J = song([{ t: MT, y: 0, rows: { 0: [['SED', 3]] } }, ...row(0, 2, { all: CHA(128) }), { t: MT, y: 2, rows: { 0: [['JMP', 0]] } }]);
+  const a = hits(play(J, { once: false, live: true }, 96), 0), p1 = a.filter(s => s < 32), p2 = a.filter(s => s >= 32 && s < 64).map(s => s - 32);
+  assert.ok(p1.length > 8 && p2.length > 8, 'it looped: ' + a.length); assert.notDeepEqual(p1, p2, 'pass 2 is not pass 1 again');
+  assert.deepEqual(hits(play(J, { once: false, live: true }, 96), 0), a, 'and the whole thing repeats');
+  const old = song([{ t: 0, y: 0, all: CHA(128), rows: { 0: [['SED', 7], ['CHA', 128]] } }, ...[1, 2, 3].map(y => ({ t: 0, y, all: CHA(128) })), ...row(1, 4, { all: CHA(128) })]);
+  assert.deepEqual(hits(play(old), 1), hits(play(old), 1), 'SED on track 1 only: track 2 repeats too');
+  const mu = song([{ t: 0, y: 0, rows: { 0: [['TCH', 0]] } }, { t: 0, y: 1 }, { t: 0, y: 2 }]); mu.smute[0] |= 1;
+  assert.equal(hits(play(mu, { row: 1 }), 0).length, 0, 'the TCH 00 in the muted block above still holds (as it does when the song plays through it)');
+  assert.equal(hits(play(mu), 0).length, 0);
+});

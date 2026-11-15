@@ -20814,7 +20814,7 @@ function makeSeq(S, mode, o){
     while (w.length) for (const b of tg.get(w.pop()) || []) if (!hearT.has(b)){ hearT.add(b); w.push(b); } }
   const busT = new Set(); for (let t = 0; t < NT; t++) if (isBusT(t)) busT.add(t);   // loop: {y0,y1} rows to cycle; api.setLoop swaps it while playing
   const fresh = () => ({on:false, empty:false, row:0, cr:0, step:0, inst:0, rate:1, tsp:0, next:-1, last:null, rnl:{}, rnlNote:0, nth:new Map(), arc:{mode:0, spd:1},
-    rel:0, g:0, grv:null, dir:0, pp:1, cnt:0, r0:0, wr:0, tch:null, skp:0, chd:0, seed:null, rv:new Map(), vn:-1});   // tch / skp / chd / seed: TCH, SKP, CHD and the track's SED; rv, vn: see roll   // dir/pp/cnt: DIR's play direction, ping-pong heading, steps played this pass; r0: when it entered its song row
+    rel:0, g:0, grv:null, dir:0, pp:1, cnt:0, r0:0, wr:0, tch:null, skp:0, chd:0, seed:null, vn:-1});   // tch / skp / chd / seed: TCH, SKP, CHD and the track's SED; vn: see roll   // dir/pp/cnt: DIR's play direction, ping-pong heading, steps played this pass; r0: when it entered its song row
   for (let t = 0; t <= MT; t++) tr.push(fresh());
   const api = {time:0, bpm:S.bpm, tks:clamp(S.ticks || TICKS, 1, 32), grv:null, base:null, bt:0, btT:null};
   // PERFORM: live play shares the panel's state (perfLive: a crossfader move is heard at once, and XFD / MAC move the panel);
@@ -20840,14 +20840,18 @@ function makeSeq(S, mode, o){
      rolled there since PLAY, and which roll of the row it is. So with a seed the same notes fall every time, live and rendered,
      from the top or from the middle; each pass through a looped pattern differs, the same way every time; and one track's rolls
      never depend on another's notes. The seed: the track's own (SED nn on the track, until its next SED; SED 00 hands back),
-     else the song's (SED nn in the master column), else one drawn for this PLAY (a new roll every time, as before).
-     RND, RNL, ONE, DIR 3, ARC random and HUMAN keep the old stream (rand), which any SED still seeds. */
-  let sseed = null, pseed = null, mtch = 255;   // the song's seed (master SED), this play's, and the master column's TCH
+     else the song's (SED nn in the master column), else the last SED given on any track (lseed: a song from before this build
+     with its SED on a track still repeats on every track), else one drawn for this PLAY (a new roll every time, as before).
+     RND, RNL, ONE, DIR 3, ARC random and HUMAN keep the old stream (rand), which any SED still seeds.
+     rvs: how often each track has rolled at each place. Kept apart from the track's state, which JMP, a wake after a gap and a
+     hand-over start afresh: the passes of a song that loops by JMP 00 must not all fall alike. */
+  let sseed = null, lseed = null, pseed = null, mtch = 255;   // the song's seed (master SED), the last track SED, this play's; the master column's TCH
+  const rvs = Array.from({length:MT + 1}, () => new Map());
   const hmix = x => { x = Math.imul(x ^ x >>> 16, 0x85EBCA6B); x = Math.imul(x ^ x >>> 13, 0xC2B2AE35); return (x ^ x >>> 16) >>> 0; };
   const roll = (T, t, salt) => {
     const key = (mode === 'song' ? T.row * 65536 : 0) + T.cr * 256 + T.step;
-    if (T.vn < 0){ T.vn = T.rv.get(key) || 0; T.rv.set(key, T.vn + 1); }   /* (vn is put back to -1 when the track reads its next row) */
-    const sd = T.seed != null ? T.seed : sseed != null ? sseed : pseed != null ? pseed : (pseed = o && o.seed != null ? o.seed >>> 0 : Math.floor(Math.random() * 4294967296));
+    if (T.vn < 0){ const rv = rvs[t]; T.vn = rv.get(key) || 0; rv.set(key, T.vn + 1); }   /* (vn is put back to -1 when the track reads its next row) */
+    const sd = T.seed != null ? T.seed : sseed != null ? sseed : lseed != null ? lseed : pseed != null ? pseed : (pseed = o && o.seed != null ? o.seed >>> 0 : Math.floor(Math.random() * 4294967296));
     return hmix(hmix(hmix((sd ^ Math.imul(t + 1, 0x9E3779B1)) | 0) ^ key) ^ Math.imul(T.vn * 31 + salt + 1, 0x27D4EB2F)) / 4294967296;
   };
   const rand = () => { if (!seeded) return Math.random(); let x = seeded.s += 0x6D2B79F5; x = Math.imul(x ^ x >>> 15, x | 1); x ^= x + Math.imul(x ^ x >>> 7, x | 61); return ((x ^ x >>> 14) >>> 0) / 4294967296; };
@@ -20968,18 +20972,23 @@ function makeSeq(S, mode, o){
   const ticCmd = r => { let v = null; for (let k = FX0; k < RW; k += 2) if (r[k] === TICI) v = Math.max(0, r[k + 1]); return v; };
   // GROOVE ON ITS OWN ROW (sweep, 4 Nov): GRV / GGR shape the row they are on too, as TIC does (they started on the next step)
   const GRVI = FXC.indexOf('GRV'), GGRI = FXC.indexOf('GGR'), SEDI = FXC.indexOf('SED'), TCHI = FXC.indexOf('TCH');
-  /* CHASE (chance): a song started below the top takes the seeds and the track chances the rows above would have left: the last SED,
-     TCH, SKP and CHD on each track, and the master column's SED and TCH for the song. (Blocks that are muted are not read, as when playing.) */
-  if (mode === 'song' && o && (o.row | 0) > 0){ const SKPI = FXC.indexOf('SKP'), CHDI = FXC.indexOf('CHD');
-    for (let y = 0; y < (o.row | 0) && y < 256; y++){ const sr = S.song[y]; if (!sr) continue;
-      for (let t = 0; t <= MT; t++){ const cid = sr[t], ch = cid >= 0 ? S.chains[cid] : null; if (!ch || mutedAt(t, y)) continue;
+  /* CHASE (chance): a song started below the top, or sent there by JMP, takes the seeds and the track chances the rows above would
+     have left: the last SED, TCH, SKP and CHD on each track, and the master column's SED and TCH for the song. (A muted block's
+     commands still count on a track, as when playing; a muted master block is not read.) */
+  const SKPI = FXC.indexOf('SKP'), CHDI = FXC.indexOf('CHD'), PRBI = FXC.indexOf('PRB');
+  const chaseChance = row => {
+    sseed = null; lseed = null; mtch = 255; for (const T of tr){ T.seed = null; T.tch = null; T.skp = 0; T.chd = 0; }
+    for (let y = 0; y < row && y < 256; y++){ const sr = S.song[y]; if (!sr) continue;
+      for (let t = 0; t <= MT; t++){ const cid = sr[t], ch = cid >= 0 ? S.chains[cid] : null; if (!ch || (t === MT && mutedAt(MT, y))) continue;
         for (const cr of ch){ const ph = cr && cr[0] >= 0 ? S.phrases[cr[0]] : null; if (!ph) continue; const L = Math.min(ph.length, lenOf(cr[0]));
           for (let i = 0; i < L; i++){ const r = ph[i]; if (!r) continue;
             for (let k = FX0; k < RW; k += 2){ const c = r[k]; if (c !== SEDI && c !== TCHI && c !== SKPI && c !== CHDI) continue; const v = Math.max(0, r[k + 1]);
-              if (c === SEDI){ const sd = v ? v * 2654435761 >>> 0 : null; if (t === MT) sseed = sd; else tr[t].seed = sd; }
+              if (c === SEDI){ const sd = v ? v * 2654435761 >>> 0 : null; if (t === MT) sseed = sd; else { tr[t].seed = sd; lseed = sd; } }
               else if (c === TCHI){ if (t === MT) mtch = v; else tr[t].tch = v >= 255 ? null : v; }
               else if (c === SKPI) tr[t].skp = v ? 1 : 0;
-              else tr[t].chd = v ? 1 : 0; } } } } } }
+              else tr[t].chd = v ? 1 : 0; } } } } }
+  };
+  if (mode === 'song' && o && (o.row | 0) > 0) chaseChance(o.row | 0);
   const cmdV = (r, ci) => { let v = null; if (r) for (let k = FX0; k < RW; k += 2) if (r[k] === ci) v = Math.max(0, r[k + 1]); return v; };
   const grvOf = (v, tks) => v ? [(v >> 4) || tks, (v & 15) || tks] : null;
   // Each call plays the next line of every track that is due. Tracks keep their own clocks, so a phrase
@@ -21004,7 +21013,8 @@ function makeSeq(S, mode, o){
       if (jc){
         if (jc.end || (once && jc.to <= jc.from)) for (const T of tr){ T.on = false; T.wr = 0; }   // (wr: an END is an end, not a wrap)
         else { const y = jc.to; for (let t = 0; t <= MT; t++){ const T = tr[t]; Object.assign(T, fresh()); T.row = y; T.rel = rel0; T.r0 = rel0;
-            if ((t < (S.ntr || 16) || t === MT) && S.song[y] && S.song[y][t] >= 0 && (!o.only || o.only.has(t))){ T.on = true; settle(T, t); } } } } }
+            if ((t < (S.ntr || 16) || t === MT) && S.song[y] && S.song[y][t] >= 0 && (!o.only || o.only.has(t))){ T.on = true; settle(T, t); } }
+          chaseChance(y); } } }   /* (CHANCE: the seeds and track chances as a PLAY from that row would have them) */
     const t0 = api.base + rel0, evs = [], pos = new Array(NT + 1).fill(null), {amt:sw, beat:swB} = swingOf();
     let nb = api.bpm, ngrv = api.grv, pdl = 0; const tks0 = api.tks;   // pdl: PDL, the rows every track waits
     // The song position in beats at this step, for the player's beat clock (tempo-locked effects).
@@ -21082,7 +21092,7 @@ function makeSeq(S, mode, o){
     };
     /* The master column is read last, but its SED and TCH count for every track on the same row: read them first. */
     { const T = tr[MT]; if (mode !== 'phrase' && T.on && !(T.rel > rel0 + 1e-9)){ const cid = sectId(T, MT), ch = cid >= 0 ? S.chains[cid] : null, chRow = ch ? ch[T.cr] : null, r = r0(T, !T.empty && chRow ? chRow[0] : -1);
-        if (r){ const sd = cmdV(r, SEDI), tc = cmdV(r, TCHI); if (sd != null) sseed = sd ? sd * 2654435761 >>> 0 : null; if (tc != null) mtch = tc; } } }
+        if (r && cmdV(r, PRBI) == null){ const sd = cmdV(r, SEDI), tc = cmdV(r, TCHI); if (sd != null) sseed = sd ? sd * 2654435761 >>> 0 : null; if (tc != null) mtch = tc; } } }   /* (a row with a PRB: its commands may not happen, so they count when the master's row is read, from the next row on) */
     const lfoRan = [];   // the tracks whose own row ran this step (their LFO went out with it)
     for (let t = 0; t <= MT; t++){
       const T = tr[t]; if (!T.on || T.rel > rel0 + 1e-9) continue;
@@ -21133,7 +21143,7 @@ function makeSeq(S, mode, o){
         if (fx.TPO != null && fx.TPO >= 40) nb = fx.TPO;
         if (fx.GRV != null) T.grv = fx.GRV ? [(fx.GRV >> 4) || api.tks, (fx.GRV & 15) || api.tks] : null;
         if (fx.GGR != null) ngrv = fx.GGR ? [(fx.GGR >> 4) || api.tks, (fx.GGR & 15) || api.tks] : null;
-        if (fx.SED != null){ seeded = fx.SED ? {s:fx.SED * 2654435761 >>> 0} : null; const sd = fx.SED ? fx.SED * 2654435761 >>> 0 : null; if (t === MT) sseed = sd; else T.seed = sd; }   // (the old stream, and the chance seed: the song's from the master column, else this track's)
+        if (fx.SED != null){ seeded = fx.SED ? {s:fx.SED * 2654435761 >>> 0} : null; const sd = fx.SED ? fx.SED * 2654435761 >>> 0 : null; if (t === MT) sseed = sd; else { T.seed = sd; lseed = sd; } }   // (the old stream, and the chance seed: the song's from the master column, else this track's)
         if (fx.TCH != null){ if (t === MT) mtch = fx.TCH; else T.tch = fx.TCH >= 255 ? null : fx.TCH; }
         if (fx.SKP != null) T.skp = fx.SKP ? 1 : 0;
         if (fx.CHD != null) T.chd = fx.CHD ? 1 : 0;
@@ -23271,7 +23281,7 @@ function padBlink(e){
 // Phones and tablets (10 Nov): the audio-thread sequencer's module (a second thread) loads only when the owner picked it there
 // (aset.corePick, set in Settings); the saved default 'core' plays on the Page sequencer on such a device.
 function coreWanted(){ return aset.core === 'core' && (!wkLazy() || !!aset.corePick); }   // (a declaration: the Settings row reads it at load)
-const CORE_REV = '1wou1ty';
+const CORE_REV = 'pil6p1';
 const CORE_WANT = 7;   // the core's message set this page speaks (core-processor.js CORE_V); an older core is not used
 const CORE_URL = () => 'core/seq-core.js?v=' + BUILD + '-' + CORE_REV;
 const core = {node:null, ready:false, loading:null, gen:0, sent:new Map(), sT:0, tally:new Map(), mir:null};   // mir: what the core's song holds, as JSON per part (coreDiff)   // tally: events by who played them (test hook)
