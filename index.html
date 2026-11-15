@@ -1386,6 +1386,8 @@ body.mob .top #tLen{min-height:34px; padding:0 8px; align-self:auto}
 :root[data-skin="idm"] #tPad #kLoop.on:not(#zz):not(#zz){background:#7cd0ff!important; color:#141414!important; border-color:#7cd0ff!important; text-shadow:none!important}   /* IDM (owner): light blue, apart from EDIT's blue */   /* tight: the pad's PLAY and the COMMANDS ▶ play the song */
 .tsong{border:1px solid var(--line); min-height:34px; padding:0 14px; margin:0 4px; font-size:var(--fs-3); font-weight:700; letter-spacing:.04em; flex:none; white-space:nowrap; background:var(--panel)}
 .tsong:hover{border-color:var(--ink)}
+.top #tLoop.tsong{display:flex; flex-direction:column; justify-content:center; align-items:center; line-height:1.05; padding:0 10px; min-width:52px; font-weight:600}   /* LOOP beside PLAY (609) */
+.top #tLoop small{font-size:var(--fs-1); letter-spacing:.06em; color:var(--muted)} .top #tLoop b{font-size:var(--fs-4)} .top #tLoop.on small{color:var(--inv)}
 .tsong.on{background:var(--pl); color:var(--inv); border-color:var(--pl)}
 /* The transport button's label flips between Song and Stop. Both labels sit in one grid cell, so the
    button keeps a single width and position as it toggles — it never resizes or nudges the CPU readout. */
@@ -3595,7 +3597,7 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
         <dt>/ or \</dt><dd>mute or unmute the track you're on (the whole track, as the mixer's M; M on the Song mutes one block)</dd>
         <dt>Ctrl/⌘ / or \</dt><dd>solo the track you're on (again: unsolo it) · Ctrl/⌘+Shift+/ (or \) clears every solo</dd>
         <dt>Ctrl+Space</dt><dd>loop play, as the control bar’s loop play button (a play sign inside a loop): turns LOOP on and plays the song row, every track, looped; LOOP pressed while it plays carries on as normal play; again stops and puts LOOP back as it was (⌘+Space works too if Spotlight isn't on it)</dd>
-        <dt>Alt+L</dt><dd>loop the pattern on/off: the song repeats the row it is on (LOOP in the tab bar)</dd>
+        <dt>Alt+L</dt><dd>loop the pattern on/off: the song repeats the row it is on (LOOP, beside PLAY on a computer, in the tab bar on a phone)</dd>
         <dt>Shift+Alt+L</dt><dd>loop the selection on/off (LOOP SEL beside it, on a computer)</dd>
         <dt>TRANSPOSE ▲▼</dt><dd>top bar: arm it, then ▲/▼ transposes the selection (Esc cancels)</dd>
         <dt>Alt+, Alt+.</dt><dd>transpose the phrase selection down / up a semitone (works on any cell); on the Song / Arrange the selected and picked blocks, else the block under the cursor (Shift+Alt for an octave). It edits the patterns themselves, so other blocks playing the same pattern change too: the message says how many</dd>
@@ -30341,6 +30343,9 @@ function draw(){
   if (lpW){ if (tp.on) lpW.seen = true; else if (lpW.seen) lpRestore(); }   // LOOP PLAY ended: LOOP back as it was
   if (lsW){ if (tp.on) lsW.seen = true; else if (lsW.seen) lpSelRestore(); }   // LP.SEL ended: LOOP SEL back as it was
   $('kPlay').classList.toggle('on', tp.on);
+  /* LOOP BESIDE PLAY (609, owner): on the desktop layout the LOOP button sits right after PLAY in the top bar; on the Mobile setup it is back in the selection bar */
+  { const lp = $('tLoop'), ps = $('tSong'), sb = $('tLoopSel');
+    if (lp && ps && sb){ if (!m && lp.previousElementSibling !== ps){ ps.after(lp); lp.classList.add('tsong'); } else if (m && lp.parentNode !== sb.parentNode){ sb.before(lp); lp.classList.remove('tsong'); } } }
   keyVis();
   syncLoop();   // before the labels below, so they show the range that is actually looping
   const tLoopTop = $('tLoopTop'); if (tLoopTop) tLoopTop.classList.toggle('on', loopSel);
