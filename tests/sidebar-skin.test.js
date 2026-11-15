@@ -19,7 +19,7 @@ test('the side panel\'s cards and instrument list take the skin\'s variables, no
   assert.match(get(card, 'box-shadow'), /^4px 4px 0 0 var\(--inv, #fff\), 4px 4px 0 1\.5px var\(--line\)$/);
   assert.equal(get(card, 'background'), 'var(--panel)'); assert.equal(get(card, 'color'), 'var(--ink)');
   const hit = rule(/^\.tinl button\.hit$/)[0][1];
-  assert.doesNotMatch(hit, /#fff\b|#ff5a1f\s*!important/); assert.match(hit, /var\(--acc, #ff5a1f\)/); assert.match(hit, /var\(--acc-on, #fff\)/);
+  assert.doesNotMatch(hit.replace(/var\([^)]*\)/g, ''), /#[0-9a-f]{3,8}\b/i, 'only fallbacks inside var()'); assert.match(hit, /var\(--acc, #ff5a1f\)/); assert.match(hit, /var\(--acc-on, #fff\)/);
   for (const re of [/^\.mtr$/, /^\.tside \.tinl button$/, /^\.tside \.tinlh$/]) assert.doesNotMatch(rule(re).map(r => r[1]).join(';'), /#[0-9a-f]{3,8}\b|rgba?\(/i);
 });
 test('the side panel is set in the tracker\'s font, over the skin\'s own button font', () => {
