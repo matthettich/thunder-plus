@@ -2195,7 +2195,7 @@ body.sdesk .dock:not(.vtrk) .pads .pad:nth-child(17)::before{content:'More pads'
 .stgx{position:absolute; top:0; right:0; pointer-events:auto; min-height:0; width:22px; height:22px; padding:0; border:0; background:transparent; color:var(--muted); opacity:0; transition:opacity .15s; font-size:var(--fs-3)}
 .tstage:hover .stgx, .stgx:focus-visible{opacity:1}
 .stgdogs{flex:1; min-height:0; display:flex; align-items:flex-end; justify-content:center; padding-bottom:2px}
-.stgdogs .dogs{max-width:420px; max-height:100%; color:var(--ts-ink)}
+.stgdogs .dogs{pointer-events:auto; max-width:420px; max-height:100%; color:var(--ts-ink)}
 .tstage .dogs{--dk-ink:var(--ts-ink); --dk-fill:var(--ts-bg)}
 .stgph{flex:1; min-height:0; display:flex; flex-direction:column; gap:4px; font:var(--fs-2)/1.2 var(--mono); color:var(--ts-dim)}
 .stgph b{font-weight:600; letter-spacing:.06em}
@@ -14877,20 +14877,30 @@ let skin = (() => { try { const v = localStorage.getItem(SKK); if (SKINS.some(k 
 // below a visible step, so the drift looks continuous at a third of the repaints of a per-frame animation. Paused while
 // the app is hidden; off with reduced motion.
 let rbT = 0;
+// ANIMATIONS (14 Nov, owner: "the dancing dogs and the other animations ... turn them off on any screen they appear on"): ON by default. OFF stops the decorations and the work behind them:
+// the dancing dogs (Song, Project, Phrase and the DOGS stage), the FX bar's effect pictures (rooms, grains, springs, swirls ...) and the Simple rainbow dynamic skin's colour drift.
+// Meters, scopes, playheads and the piano / spectrum / chain displays are functional and stay. Per device (localStorage). var: rbWheel() can run before this line is passed.
+var animOn = (() => { try { return localStorage.getItem('thunderplus-anim-v1') !== '0'; } catch(e){ return true; } })();
+function setAnim(on, say){
+  animOn = !!on; try { localStorage.setItem('thunderplus-anim-v1', animOn ? '1' : '0'); } catch(e){}
+  try { rbWheel(); } catch(e){} try { stageLayout(); } catch(e){} try { dkFbSig = ''; } catch(e){}
+  if (say) toast(animOn ? 'Animations are on.' : 'Animations are off. Settings → ANIMATIONS turns them back on.', 3600);
+  draw();
+}
 // Simple rainbow dynamic turns the --rbo hue offset that every rainbow colour is built from (10×/s, 1.8° steps, once
 // round in 20 s). The earlier hue-rotate() filter on <html> made the browser re-rasterise the whole page at device
 // resolution on every step (frame gaps doubled on the phone); a property change only restyles the coloured elements.
 function rbWheel(){
   const de = document.documentElement;
   clearInterval(rbT); rbT = 0; de.style.removeProperty('filter'); de.style.removeProperty('--rbo');
-  if (skin !== 'rainbowdyn' || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  if (skin !== 'rainbowdyn' || animOn === false || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
   rbT0 = performance.now(); if (!document.hidden) rbRun();
 }
 // BATTERY (8 Nov): no timer at all while the app is hidden (it only skipped the write before); the colours carry on from the same
 // place when it comes back, as the phase is read from the clock.
 var rbT0;   // var, no initialiser: rbWheel() may run before this line
 function rbRun(){ const de = document.documentElement; clearInterval(rbT); rbT = setInterval(() => { de.style.setProperty('--rbo', ((performance.now() - rbT0) * 0.018 % 360).toFixed(1) + 'deg'); }, 100); }
-document.addEventListener('visibilitychange', () => { if (skin !== 'rainbowdyn' || !rbT0 || matchMedia('(prefers-reduced-motion: reduce)').matches) return; if (document.hidden){ clearInterval(rbT); rbT = 0; } else if (!rbT) rbRun(); });
+document.addEventListener('visibilitychange', () => { if (skin !== 'rainbowdyn' || animOn === false || !rbT0 || matchMedia('(prefers-reduced-motion: reduce)').matches) return; if (document.hidden){ clearInterval(rbT); rbT = 0; } else if (!rbT) rbRun(); });
 // MATRIX TABS (owner, 31 Oct): in the Matrix skins the screen tabs (Tracker … Chains) end where the tracker's tabs below
 // (… PROJECT) do: their buttons share out the difference. Other skins, or a gap too big to be the same row of tabs: as is.
 function alignTabs(){
@@ -25699,6 +25709,8 @@ function projRows(){
       info:() => 'KEYS mode with the keypad off: a panel at the bottom with a spectrum of the master, quick controls for the current instrument, its chains and the current track’s effects, and a channel strip for the current track. Click INST, …CHAINS or FX to fold that part to a narrow strip; click the strip to open it again'},
     {l:'STAGE', opts:true, get:() => STG.indexOf(stage), set:v => setStage(STG[v]), min:0, max:STG.length - 1, d:smallScr() ? 2 : 0, fmt:v => STG_NAMES[v],
       info:() => 'Big screens: the space beside the grid. BY SCREEN: the dogs dance on Song and Project; Sect previews the phrase; Phrase shows a piano lighting the notes playing; Inst its waveform; Mixer the master spectrum; FX the effects chain. DOGS: the dogs everywhere. OFF: empty'},
+    {l:'ANIMATIONS', ck:'Animations: the dancing dogs, the FX bar’s effect pictures and the rainbow skin’s drift', get:() => animOn ? 1 : 0, set:v => setAnim(!!v), min:0, max:1, tog:true, d:1, fmt:onOff,
+      info:() => 'ON: the dancing dogs (Song, Project, Phrase), the pictures on the FX bar’s effects and the Simple rainbow dynamic skin’s moving colours. OFF: none of them is drawn and none of their work runs. Meters, scopes, playheads and the piano stay. You can also right-click (or long press) the dogs or an FX bar effect and choose Hide animations'},
     // REC, METRONOME AND COUNT-IN (kept on this device, like the rows above)
     {l:'METRONOME', sec:'Record & play', gap:true, opts:true, get:() => recS.met, set:v => setMet(v), min:0, max:2, d:1, fmt:v => ['OFF', 'WHILE RECORDING', 'ALWAYS'][v],
       info:() => 'A click on every beat, higher on the first of the bar (CLICK on the top strip, Alt+M). WHILE RECORDING: only with REC on'},
@@ -29243,6 +29255,11 @@ function smallScr(){ try { return Math.min(screen.width, screen.height) < 900; }
 const STK = 'thunderplus-stage-v1', STG = ['screen', 'dogs', 'off'], STG_NAMES = ['BY SCREEN', 'DOGS', 'OFF'];
 let stage = (() => { try { const v = localStorage.getItem(STK); if (STG.includes(v)) return v; if (v === 'phrase') return 'screen'; } catch(e){} return smallScr() ? 'off' : 'screen'; })();
 function setStage(v){ stage = v; try { localStorage.setItem(STK, v); } catch(e){} stageLayout(); }
+// The dogs: right-click, or a long press, for Hide animations (the stage itself is pointer-events:none; only the dogs take the press)
+{ const dg = $('tStageDogs'), menu = (x, y) => sxMenu(x, y, 'DOGS', [{l:'Hide animations', f:() => setAnim(false, true)}, {l:'Hide the stage', f:() => $('tStageX').click()}]); let lp = 0, lpT = 0;
+  dg.addEventListener('contextmenu', e => { e.preventDefault(); lpT = performance.now(); menu(e.clientX, e.clientY); });
+  dg.addEventListener('pointerdown', e => { if (e.pointerType !== 'touch') return; const x = e.clientX, y = e.clientY; clearTimeout(lp); lp = setTimeout(() => { lp = 0; lpT = performance.now(); menu(x, y); }, 550); });
+  for (const ev of ['pointerup', 'pointercancel', 'pointermove']) dg.addEventListener(ev, () => { clearTimeout(lp); lp = 0; }); }
 $('tStageX').addEventListener('click', () => { setStage('off'); toast('Stage hidden. Settings → STAGE brings it back.'); });
 // The Phrase screen's stage: DANCE (the dogs), DRUM (the dogs on a kit and bongos), KEYS (the piano, the default) or
 // HIDE (nothing beside the phrase).
@@ -29250,7 +29267,8 @@ const PHSK = 'thunderplus-phstage-v1', PHS = ['dance', 'drum', 'keys', 'hide'];
 const phStageDef = () => smallScr() ? 'hide' : 'keys';
 let phStage = (() => { try { const v = localStorage.getItem(PHSK); return PHS.includes(v) ? v : phStageDef(); } catch(e){ return phStageDef(); } })();
 function setPhStage(v){ phStage = PHS.includes(v) ? v : 'keys'; try { localStorage.setItem(PHSK, phStage); } catch(e){} stageLayout(); }
-const stageKind = () => stage === 'dogs' ? 'dogs' : tv === 'song' && SX.peek && asongOn() ? 'peek' /* SONG EXTRAS */ : tv === 'phrase' && mstView() ? 'chain' : tv === 'phrase' ? ({dance:'dogs', drum:'drum', keys:'piano', hide:''})[phStage] : ({song:'dogs', project:'dogs', sect:'preview', phrase:'piano', inst:'wave', mixer:'spec', fx:'chain'})[tv] || 'dogs';
+const stageKind0 = () => stage === 'dogs' ? 'dogs' : tv === 'song' && SX.peek && asongOn() ? 'peek' /* SONG EXTRAS */ : tv === 'phrase' && mstView() ? 'chain' : tv === 'phrase' ? ({dance:'dogs', drum:'drum', keys:'piano', hide:''})[phStage] : ({song:'dogs', project:'dogs', sect:'preview', phrase:'piano', inst:'wave', mixer:'spec', fx:'chain'})[tv] || 'dogs';
+const stageKind = () => { const k = stageKind0(); return animOn || (k !== 'dogs' && k !== 'drum') ? k : tv === 'phrase' ? 'piano' : ''; };   // ANIMATIONS OFF: no dogs (the Phrase screen's piano takes their place)
 let stgKindNow = '', stgSig = '', stgReq = '';   // stgReq: what the last layout was asked for
 // It sits in the space to the right of the grid's text, the grid's height, when that space is big enough.
 // What the stage should show now ('' = nothing). SIMPLE PHRASE: no piano beside the phrase.
@@ -29328,7 +29346,7 @@ function stageTick(now){
   if (stgOn !== !!tp.on){ stgOn = !!tp.on; if (stgKindNow === 'dogs' || stgKindNow === 'drum') dogsState(); else if (stgKindNow) stageCanvas(true); }
   if (!stgKindNow || $('tStage').hidden) return;
   if (stgKindNow === 'piano' || stgKindNow === 'spec'){ if (stgKindNow === 'spec' && meterBlank('stg', () => stageCanvas(true))) return; if (meterDue(now, stgFrameT, 46, stgKindNow === 'piano')){ stgFrameT = now; stageCanvas(false); } return; }   // METERS: the piano's lit notes are marks (OFF keeps LIGHT's rate); the spectrum is a meter
-  if ((stgKindNow !== 'dogs' && stgKindNow !== 'drum') || !tp.on || !ctx) return;
+  if ((stgKindNow !== 'dogs' && stgKindNow !== 'drum') || !tp.on || !ctx || !animOn) return;
   const lat = heardLat(), t = ctx.currentTime - lat, bpm = tp.bpm || S.bpm;
   if (bpm !== stgBpm){ const b = (t - stgT0) * stgBpm / 60; stgBpm = bpm; stgT0 = t - b * 60 / bpm; }
   const per = 60 / bpm, b = Math.floor((t - stgT0) / per);
@@ -29360,7 +29378,7 @@ function dogsBeat(bar, ms){
 const DRUM_HIT = {hat:['al', 24], snare:['ar', 44], tom:['ar', 22], crash:['ar', -24]};   // [arm, angle over that drum]
 let dkKitT = 0, dkBongoT = 0, dkHand = 0;
 const dkDogs = () => $('tStageDogs').querySelector('.dogs');
-function dkOk(){ return stgKindNow === 'drum' && !$('tStage').hidden && !matchMedia('(prefers-reduced-motion: reduce)').matches; }
+function dkOk(){ return animOn && stgKindNow === 'drum' && !$('tStage').hidden && !matchMedia('(prefers-reduced-motion: reduce)').matches; }
 // A strike: the paw pulls back along the arm, comes down on the drum and stays hovering over it.
 function dkArm(g, cls, ang){
   const a = g && g.querySelector('.arm.' + cls); if (!a) return;
@@ -30586,7 +30604,7 @@ function deckFxBar(){
   let bar = $('dkFxBar');
   if (!bar){ bar = el('div', 'dkfxbar'); bar.id = 'dkFxBar'; $('dkFxSlots').parentElement.append(bar); dkFbSig = ''; }
   $('dkFxSlots').hidden = $('dkFxRows').hidden = true;
-  const sig = t + ':' + Array.from({length:FXSLOTS}, (_, k) => A[k] ? A[k].type + (A[k].on ? 1 : 0) : '-').join(',');
+  const sig = (animOn ? 'a' : 'n') + t + ':' + Array.from({length:FXSLOTS}, (_, k) => A[k] ? A[k].type + (A[k].on ? 1 : 0) : '-').join(',');
   if (sig !== dkFbSig){
     dkFbSig = sig; bar.replaceChildren(); dkFbVals = [];
     const goFx = k => { cFxT = mst ? NT : dkTrack(); cFxS = k; cs.fx.y = A[k] ? FXSLOTS + 1 : k + 1; go('fx'); };
@@ -30620,7 +30638,7 @@ function deckFxBar(){
       const rmFx = () => { const AA = FA(), g = AA[k], tt = mst ? NT : dkTrack(); if (!g) return; const nmx = (TFX[g.type] || {}).n || 'effect';
         fxSwap(tt, k, AA, null); fxChanged(tt); dkFbSig = ''; draw();
         toast(`Removed ${nmx} from ${mst ? 'the master' : 'track ' + d2(tt + 1)} · ${keyHint('mod+Z') || 'Undo'} brings it back`); };
-      const fxMenu = (x, y) => sxMenu(x, y, (D.n + ' · ' + (mst ? 'MASTER' : 'TRACK ' + d2(t + 1))).toUpperCase(), [{l:'Remove effect', f:rmFx}, {l:'Open on the FX screen', f:() => goFx(k)}]);
+      const fxMenu = (x, y) => sxMenu(x, y, (D.n + ' · ' + (mst ? 'MASTER' : 'TRACK ' + d2(t + 1))).toUpperCase(), [{l:'Remove effect', f:rmFx}, {l:'Open on the FX screen', f:() => goFx(k)}, ...(col._spr ? [null, {l:'Hide animations', f:() => setAnim(false, true)}] : [])]);
       col.addEventListener('contextmenu', e => { if (e._valMenu || e.target.closest('input')) return;   // (a value's own menu stops the event before it gets here)
          e.preventDefault(); col._lpT = performance.now(); fxMenu(e.clientX, e.clientY); });
       col.addEventListener('pointerdown', e => { if (e.pointerType !== 'touch' || e.target.closest('.fr span, .fon')) return; const x0 = e.clientX, y0 = e.clientY; let done = false;
@@ -30629,7 +30647,8 @@ function deckFxBar(){
         addEventListener('pointermove', mv, true); addEventListener('pointerup', off, true); addEventListener('pointercancel', off, true); });
       col.addEventListener('click', e => { if (col._lpT && performance.now() - col._lpT < 800){ e.stopPropagation(); e.preventDefault(); } }, true);   // the release after a long press is not a tap
       const vz = el('div', 'fviz'); vz.append(document.createElement('canvas')); col.append(vz); col._h = new Float32Array(90); col._w = 0; col._q = 0;
-      if (isSpringFx(f)){ col.classList.add('spr'); const sc = document.createElement('canvas'); sc.className = 'fspr'; col.prepend(sc); col._spr = {cv:sc, e:0, t:0}; }   // SPRING
+      if (!animOn){}   // ANIMATIONS OFF: no picture behind the values
+      else if (isSpringFx(f)){ col.classList.add('spr'); const sc = document.createElement('canvas'); sc.className = 'fspr'; col.prepend(sc); col._spr = {cv:sc, e:0, t:0}; }   // SPRING
       else { const ak = fxAnimKind(f); if (ak){ col.classList.add('spr'); const sc = document.createElement('canvas'); sc.className = 'fspr'; col.prepend(sc); col._spr = {cv:sc, e:0, t:0, kind:ak, P:[]}; } }   // FX ANIMATIONS
       if (isFxDyn(f.type)){ col.classList.add('dyn'); const dm = document.createElement('canvas'); dm.className = 'fdm'; dm.title = FXLV.has(f.type) ? 'IN, the change in level, OUT' : 'IN level, gain reduction (0 to 24 dB) and OUT level; the line is the threshold'; col.append(dm); }
       const getF = () => FA()[k];
