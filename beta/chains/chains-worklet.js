@@ -129,7 +129,9 @@ const mixCount = p => clamp(Math.round(p.chans) || 4, 1, MIXN);
 const Mixer = Object.assign({
   type:'mixer', scope:'mono', cost:.1,
   outputs:{ out:'audio' },
-  create:() => ({}),
+  create:() => ({ pk:0 }),
+  // OUT METER (15 Nov): the loudest sample it sent out since the editor last asked (peak in dB; -120 for nothing), so a mixer shows it is passing audio.
+  show(st){ const v = [st.pk > 1e-5 ? 20 * Math.log10(st.pk) : -120]; st.pk = 0; return v; },
   process(st, io, ctx){
     const p = io.p, o = io.out.out, n = ctx.block, N = mixCount(p);
     o.fill(0);
@@ -138,6 +140,8 @@ const Mixer = Object.assign({
       const x = io.in[MXI[k]], g = p[MXL[k]] * p.level;
       for (let i = 0; i < n; i++) o[i] += x[i] * g;
     }
+    let pk = st.pk; for (let i = 0; i < n; i++){ const a = o[i] < 0 ? -o[i] : o[i]; if (a > pk) pk = a; }
+    st.pk = pk < 8 ? pk : 8;
   }
 }, mixDef(false));
 
@@ -147,7 +151,8 @@ const Mixer = Object.assign({
 const StereoMixer = Object.assign({
   type:'smixer', scope:'mono', cost:.15,
   outputs:{ out:'audio', outR:'audio' },
-  create:() => ({}),
+  create:() => ({ pk:0 }),
+  show(st){ const v = [st.pk > 1e-5 ? 20 * Math.log10(st.pk) : -120]; st.pk = 0; return v; },   // OUT METER (15 Nov): the louder side's peak, in dB
   process(st, io, ctx){
     const p = io.p, oL = io.out.out, oR = io.out.outR, n = ctx.block, N = mixCount(p);
     oL.fill(0); oR.fill(0);
@@ -157,6 +162,8 @@ const StereoMixer = Object.assign({
       const g = p[MXL[k]] * p.level, pn = p[MXP[k]], gL = g * (pn > 0 ? 1 - pn : 1), gR = g * (pn < 0 ? 1 + pn : 1);
       for (let i = 0; i < n; i++){ oL[i] += L[i] * gL; oR[i] += R[i] * gR; }
     }
+    let pk = st.pk; for (let i = 0; i < n; i++){ const a = oL[i] < 0 ? -oL[i] : oL[i], b = oR[i] < 0 ? -oR[i] : oR[i]; if (a > pk) pk = a; if (b > pk) pk = b; }
+    st.pk = pk < 8 ? pk : 8;
   }
 }, mixDef(true));
 
@@ -5502,6 +5509,72 @@ function stereoUpCables(d){
   }
   return add;
 }
+/* ── Send / Receive (15 Nov): an invisible cable. Send takes In / In R; every Receive with the same label outputs what its Send(s) get. Nothing here runs:
+   the graph's compile step (srResolve, called from Graph.compile) replaces each cable out of a Receive by the cables into the matching Send, so the engine
+   sees ordinary cables and its ordering, feedback marking and run lists apply unchanged. Label: lab 1-8 is A-H; 0 is the module's own text (trimmed,
+   not case sensitive). A Receive with no matching Send is silent. Several Receives may share one Send, and several Sends with one label add together. */
+const SR_LAB = 'ABCDEFGH';
+function srKey(inst){
+  const l = Math.round(inst.params.lab) || 0;
+  if (l >= 1 && l <= 8) return SR_LAB[l - 1];
+  const t = typeof inst.text === 'string' ? inst.text.trim().toLowerCase() : '';
+  return t ? 't:' + t : '';
+}
+const SendM = { type:'send', scope:'mono', cost:0, text:true, inputs:{ in:'audio', inR:'audio' }, outputs:{}, params:{ lab:[1,0,8,1] }, create:() => ({}), process(){} };
+const RecvM = { type:'recv', scope:'mono', cost:0, text:true, inputs:{}, outputs:{ out:'audio', outR:'audio' }, params:{ lab:[1,0,8,1] }, create:() => ({}),
+  process(st, io){ io.out.out.fill(0); io.out.outR.fill(0); } };
+/* srResolve(mods, cables): the cables the engine runs. With no Send or Receive in the patch it is `cables` itself. A cable out of a Receive's Out (Out R) becomes one cable
+   from every source cabled into the matching Send's In (In R; In when In R has nothing, as a mixer pair does). A cable that closes a loop only through a pair is marked
+   fb, as the editor marks one it can see. Cables into a Send, and out of a Receive with no Send, are left out. */
+function srResolve(mods, cables){
+  let any = false; for (const m of mods.values()) if (m.def.type === 'send' || m.def.type === 'recv'){ any = true; break; }
+  if (!any) return cables;
+  const into = new Map(), per = new Map();   // label -> its Sends, each with its own In / In R cables
+  for (const c of cables){
+    const m = mods.get(c.b[0]); if (!m || m.def.type !== 'send') continue;
+    const k = srKey(m.inst); if (!k) continue; let l = into.get(k); if (!l) into.set(k, l = []);
+    let e = per.get(m.id); if (!e){ per.set(m.id, e = { in:[], inR:[] }); l.push(e); }
+    if (c.b[1] === 'in') e.in.push(c); else if (c.b[1] === 'inR') e.inR.push(c);
+  }
+  /* What a Receive's port carries: the sources cabled into its label's Sends (In R falling back to In, Send by Send). A source that is itself a Receive (a pair in series)
+     is followed through, with a loop of Receives cut. */
+  /* Memoised per label and port, so a chain of stages costs the sum of its stages (not the number of routes); identical sources are kept once (a non-feedback route wins). A result worked
+     out while a loop was cut is not kept, since it may be short. */
+  const memo = new Map(); let cuts = 0;
+  const feeds = (lab, port, seen) => {
+    const key = lab + '.' + port, hit = memo.get(key); if (hit) return hit;
+    if (seen.has(key)){ cuts++; return []; }
+    seen.add(key); const before = cuts, got = new Map();
+    const put = (a, fb) => { const k = a[0] + '.' + a[1], o = got.get(k); if (!o) got.set(k, { a, fb }); else if (o.fb && !fb) o.fb = false; };
+    for (const e of into.get(lab) || []){
+      for (const s of port === 'outR' ? (e.inR.length ? e.inR : e.in) : port === 'out' ? e.in : []){
+        const sm = mods.get(s.a[0]);
+        if (sm && sm.def.type === 'recv'){ for (const f of feeds(srKey(sm.inst), s.a[1], seen)) put(f.a, f.fb || s.fb === true); }
+        else put(s.a, s.fb === true);
+      }
+    }
+    seen.delete(key); const res = [...got.values()]; if (cuts === before) memo.set(key, res); return res;
+  };
+  const eff = [], virt = [], vseen = new Map();
+  for (const c of cables){
+    const sm = mods.get(c.a[0]), dm = mods.get(c.b[0]);
+    if (dm && dm.def.type === 'send') continue;
+    if (sm && sm.def.type === 'recv'){
+      for (const f of feeds(srKey(sm.inst), c.a[1], new Set())){ const k = f.a[0] + '.' + f.a[1] + '>' + c.b[0] + '.' + c.b[1], fb = c.fb === true || f.fb, o = vseen.get(k); if (!o){ const v = { a:f.a, b:c.b, fb }; vseen.set(k, v); virt.push(v); } else if (o.fb && !fb) o.fb = false; }   // (the same cable from two Receives is kept once)
+      continue;
+    }
+    eff.push(c);
+  }
+  const adj = new Map(); for (const c of eff) if (!c.fb){ let l = adj.get(c.a[0]); if (!l) adj.set(c.a[0], l = []); l.push(c.b[0]); }
+  const reach = (a, b) => { if (a === b) return true; const seen = new Set([a]), w = [a]; while (w.length){ for (const y of adj.get(w.pop()) || []) if (y === b) return true; else if (!seen.has(y)){ seen.add(y); w.push(y); } } return false; };
+  for (const v of virt){
+    if (!v.fb && reach(v.b[0], v.a[0])) v.fb = true;
+    if (!v.fb){ let l = adj.get(v.a[0]); if (!l) adj.set(v.a[0], l = []); l.push(v.b[0]); }
+    eff.push(v.fb ? v : { a:v.a, b:v.b });
+  }
+  return eff;
+}
+
 const SHARED_MODULES = { beads:Beads,
   flanger:FlangerFx, tremolo:TremoloFx, odrive:OdriveFx, folder:FolderFx, autowah:AutowahFx, pshift:PshiftFx, ladder:LadderFx, xmod:XmodFx, space:SpaceFx, lofi:LofiFx, drive:DriveFx, air:AirFx, room:RoomFx,
   comb:CombFx, transient:TransientFx, tgate:TgateFx, ott:OttFx, fshift:FshiftFx, vinyl:VinylFx, dub:DubFx, cab:CabFx, tube:TubeFx,
@@ -5515,7 +5588,8 @@ const SHARED_MODULES = { beads:Beads,
   spectral:Spectral, stretch:XStretch, convolve:Convolve,
   autotune:PitchCorrect, vowel:VowelFilter, rotary:RotarySpk, gdelay:GrainDelay, reverse:ReverseEcho, envfilt:EnvFilter,
   bytebeat:Bytebeat, chaos:Chaos, marbles:MarblesM, tides:TidesM,
-  sdelay:SimpleDelay, filter:Filter, cut:LoHiCut, compressor:ClassicComp, ngate:NoiseGate, autopan:AutoPan, pump:Pump, buscomp:BusComp, glue:GlueComp };
+  sdelay:SimpleDelay, filter:Filter, cut:LoHiCut, compressor:ClassicComp, ngate:NoiseGate, autopan:AutoPan, pump:Pump, buscomp:BusComp, glue:GlueComp,
+  send:SendM, recv:RecvM };
 /* ===SHARED MODULES END=== */
 withLevels(Comp);   // METERING: Pressure (…chains only) shows its levels in and out
 /* TRACK IN STEREO (owner, 20 Oct): the starter patch sent only Track In's left side into its first effect. In a patch
@@ -5759,7 +5833,7 @@ class Graph {
   compile(){
     const indeg = new Map([...this.mods.keys()].map(k => [k, 0])), adj = new Map([...this.mods.keys()].map(k => [k, []]));
     this.inc = new Map([...this.mods.keys()].map(k => [k, []]));
-    for (const c of this.cables){
+    for (const c of srResolve(this.mods, this.cables)){   // SEND / RECEIVE: the cables as the engine runs them (the drawn ones when the patch has no pair)
       if (!adj.has(c.a[0]) || !adj.has(c.b[0])) continue;
       this.inc.get(c.b[0]).push(c);
       if (c.fb) continue;   // FEEDBACK: heard (it is in inc), but it does not decide who runs first
@@ -5836,11 +5910,11 @@ class ChainsEngine {
     this.graph.add(id, def, inst);
     this._sync();
   }
-  setText(id, v){ const m = this.graph.mods.get(id); if (m && m.def.text === true && typeof v === 'string') m.inst.text = v.slice(0, 200); }
+  setText(id, v){ const m = this.graph.mods.get(id); if (m && m.def.text === true && typeof v === 'string'){ m.inst.text = v.slice(0, 200); if (m.def.type === 'send' || m.def.type === 'recv') this.graph.compile(); } }
   removeModule(id){ this._drop(id); this.graph.remove(id); this._sync(); }
   connect(a, b, fb){ this.graph.connect(a, b, fb); this._sync(); }
   disconnect(a, b){ this.graph.disconnect(a, b); this._sync(); }
-  setParam(id, name, v){ const m = this.graph.mods.get(id); if (m && typeof v === 'number'){ m.inst.params[name] = v; if (name === 'track') this._actKey = -1; if (name === '_bn') this._bnKey = -1; } }
+  setParam(id, name, v){ const m = this.graph.mods.get(id); if (m && typeof v === 'number'){ m.inst.params[name] = v; if (name === 'track') this._actKey = -1; if (name === '_bn') this._bnKey = -1; if (name === 'lab' && (m.def.type === 'send' || m.def.type === 'recv')) this.graph.compile(); } }
   /* BYPASS: module id → its number (1–15): its own _bn, else the lowest free one, in patch order. */
   _bnMap(){
     const g = this.graph, key = g.ver * 4096 + g.mods.size;
