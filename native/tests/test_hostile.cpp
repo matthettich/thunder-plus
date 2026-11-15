@@ -99,11 +99,31 @@ static void testA2A3() {
   if (e) { float l[4], r[4]; thunder_post(e, "{\"t\":\"play\"}", 12); thunder_process(e, l, r, 4); thunder_destroy(e); }
 }
 
+// ---- A5: a full mixer lane: the latest move wins ----
+static void testA5() {
+  Mixer m(48000, 128); std::vector<float> L(128), Rr(128); double t = 0;
+  auto block = [&]() { m.setTime(t); for (int i = 0; i < 128; i++) { m.inputsL()[0][i] = 1; m.inputsR()[0][i] = 1; } m.render(L.data(), Rr.data(), 128, t); t += 128.0 / 48000; };
+  for (int b = 0; b < 4; b++) block();
+  m.setTime(t);
+  for (int i = 0; i < 40; i++) { MixSet c; c.tr = 0; c.k = MixKey::Vol; c.v = 224 - i; m.set(c); }   // a fader pulled down in 40 moves inside one block
+  { MixSet c; c.tr = 0; c.k = MixKey::Mute; c.v = 1; m.set(c); }
+  for (int b = 0; b < 400; b++) block();
+  CHECK("A5 muted track is silent 1 s after MUTE (was 0.86)", std::fabs(L[127]) < 1e-6f && std::fabs(Rr[127]) < 1e-6f);
+  CHECK("A5 audible mask says muted", (m.audibleMask() & 1u) == 0);
+  // and the reverse: UNMUTE after another flood comes back
+  m.setTime(t);
+  for (int i = 0; i < 40; i++) { MixSet c; c.tr = 0; c.k = MixKey::Vol; c.v = 100 + i; m.set(c); }
+  { MixSet c; c.tr = 0; c.k = MixKey::Mute; c.v = 0; m.set(c); }
+  for (int b = 0; b < 400; b++) block();
+  CHECK("A5 unmuted track is audible again", L[127] > 0.01f);
+}
+
 // @@TESTS_END
 
 int main() {
   testA1();
   testA2A3();
+  testA5();
   // @@CALLS_END
   if (g_fail) { std::printf("test_hostile: %d FAILED\n", g_fail); return 1; }
   std::printf("test_hostile: all passed\n");
