@@ -27,7 +27,7 @@ jobs:
   linux:
     name: Core (Linux, ctest)
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4   # the goldens' reference JS engine: Node 22 (as tests.yml); another V8 may differ in the last bit of Math.pow
@@ -36,6 +36,12 @@ jobs:
       - run: cmake --build build -j
       - run: ctest --test-dir build --output-on-failure -V -R 'bench_put|core_pattern'
       - run: ctest --test-dir build --output-on-failure
+      # N1 review fixes: the same tests again under AddressSanitizer + UBSan (undefined behaviour is fatal), in a second build directory.
+      - name: Sanitizers (ASan + UBSan)
+        run: |
+          cmake -S native -B build-san -DCMAKE_BUILD_TYPE=Release -DTHUNDER_SANITIZE=ON
+          cmake --build build-san -j
+          ctest --test-dir build-san --output-on-failure
       - uses: actions/upload-artifact@v4
         with:
           name: thunder_core-linux-x64
