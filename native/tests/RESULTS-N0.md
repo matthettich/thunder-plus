@@ -100,7 +100,7 @@ audio thread answers), so the round trip includes the core.
 | 53 MB: (b) base64 chunks to a file, then the core reads it: seconds, split into write and core read | owner's device | open |
 | Does the core hold every float afterwards (count and exact sum) | owner's device (the page checks it) | open |
 | Core side only: `thunder_put` of 53 MB in 1 MB chunks, no web view | CI Linux runner | 20 to 29 ms (floor; the bridge paths cost far more) |
-| Device model, Android version, WebView version, `WEB_MESSAGE_ARRAY_BUFFER` supported | owner's device (the page prints them) | open |
+| Device model, Android version, WebView version, `WEB_MESSAGE_ARRAY_BUFFER` supported | samsung SM-F956U1, Android 17 (API 37), WebView 157.0.8103.50, **supported** (owner, 15 Nov) | done |
 
 Not done and why: path (b) as the plan words it, "a `WebViewAssetLoader` POST handler", is not possible: the loader's
 `PathHandler.handle(path)` receives no request body, so POSTed bytes never reach it. The file path therefore uses
@@ -120,9 +120,9 @@ COPY RESULTS:**
 
 | Run (5 min) | ratio (s per s) | ppm | underruns | late | longest gap ms | longest callback ms | output latency ms | by ear | PASS |
 |---|---|---|---|---|---|---|---|---|---|
-| SCREEN ON | 0.9999 | −107 | 0 | 0 | 33.1 | 1.82 | 26.2 | not reported | **PASS** |
-| SCREEN OFF | 1.0000 | −1 | 0 | 0 | 41.4 | 2.51 | 54.0 | not reported | **PASS** |
-| BACKGROUND | 1.0000 | −2 | 0 | 0 | 37.3 | 1.64 | 54.8 | not reported | **PASS** |
+| SCREEN ON | 0.9999 | −107 | 0 | 0 | 33.1 | 1.82 | 26.2 | "sounded great" | **PASS** |
+| SCREEN OFF | 1.0000 | −1 | 0 | 0 | 41.4 | 2.51 | 54.0 | "sounded great" | **PASS** |
+| BACKGROUND | 1.0000 | −2 | 0 | 0 | 37.3 | 1.64 | 54.8 | "sounded great" | **PASS** |
 
 **A6 done: the owner's runs, 15 Nov 2026, 11:03 to 11:20** (pasted from COPY RESULTS, with three screenshots). Samsung SM-F956U1 (Galaxy Z Fold 6), Android 17 (API 37), WebView 157.0.8103.50; 48000 Hz, burst 192 frames, buffer 1536 frames, shared, low-latency performance mode; release `native-n0-android-8`. Cross-check from the core's clock events: 299 s (audio 299.008 s, wall 299.008 s), 300 s (300.032 / 300.033), 299 s (299.008 / 299.009), ratio 1.00000 each, 0 underruns.
 
@@ -130,7 +130,8 @@ COPY RESULTS:**
 - **Output latency doubles with the screen off or the app in the background** (26 ms → 54 ms): Android moves the stream off the fast path there. Fine for playback; playing pads live happens with the screen on.
 - **Longest gap between callbacks is 33 to 41 ms** against a 4 ms burst and a 32 ms buffer, with no underrun counted: callbacks arrive in bunches. 26 ms with the screen on is not yet a low-latency figure for finger drumming; N1 should try a smaller buffer and exclusive mode and see whether the gaps then cost underruns.
 - The -107 ppm with the screen on is the first-seconds settling of the timestamps (the cross-check reads 1.00000), well inside the gate.
-- He did not say what he heard (the click pattern by ear), and the A4 bridge timings (Bridge test button) are still open.
+- **By ear (owner, 11:24): "It sounded great."**
+- **A4 bridge timings: not run** (optional; he pasted only the page's device block: `arrayBufferSupported: true`, same device and WebView). He asked whether they are needed and was told no: run them at the start of N1, when the numbers decide how samples cross the bridge.
 
 ## Stand-ins
 
