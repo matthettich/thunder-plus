@@ -216,6 +216,9 @@ svg.cables g:hover > rect.bend, svg.cables g.sel > rect.bend, body.alting svg.ca
 .node.collapsed{min-height:64px}
 .node.collapsed > header{padding:4px 8px 2px 12px; border-bottom:0}
 .node.collapsed > header .x{width:22px; height:22px}
+/* HELP BUTTON SIZE (15 Nov, owner): the ? is exactly the size of the x, expanded and collapsed (button.mq outranks the shared .mq rule, which is added later) */
+.node > header button.mq{width:26px; height:26px}
+.node.collapsed > header button.mq{width:22px; height:22px}
 .csum{display:none}
 .node.collapsed > .csum{display:flex; align-items:center; gap:6px; position:relative; padding:2px 12px 5px; font-size:12.5px; line-height:16px; min-height:22px}
 .cs-t{flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--ink)}
@@ -253,7 +256,7 @@ button.mk.more:hover{color:var(--ink); border-color:var(--ink)}
 @media (pointer: coarse){
   .node > header .fold::before{inset:0 -10px}   /* 40 x 40: the button is 40 tall now, so the touch area grows sideways only */
   .node > header{gap:2px; padding-top:3px; padding-bottom:3px}
-  .node > header button.mq{width:32px; height:40px; margin-right:0}
+  .node > header button.mq, .node.collapsed > header button.mq{width:36px; height:40px; margin-right:0}   /* the same as button.x below */
   .node > header button.x, .node.collapsed > header button.x{width:36px; height:40px}
   .node > header button.fold{height:40px}
   .node > header button.byp{height:40px; min-width:40px}
