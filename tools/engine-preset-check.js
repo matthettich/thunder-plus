@@ -77,6 +77,10 @@ function analyse(d, f0exp) {
   for (let i = lo; i < hi; i++) { let p = Math.log(m[i] + 1e-12); for (let h = 2; h <= 5; h++) p += Math.log(m[i * h] + 1e-12); if (p > bestV || !bestV) { bestV = p; bestI = i; } }
   const a = Math.log(m[bestI - 1] + 1e-12), b = Math.log(m[bestI] + 1e-12), c = Math.log(m[bestI + 1] + 1e-12), off = (a - c) / (2 * (a - 2 * b + c) || 1);
   const f0 = (bestI + (isFinite(off) ? off : 0)) * bw;
+  // strongest spectral peak and how far it is from a multiple of f0exp / 2 (a note and its sub-octave sound)
+  let pI = 2, pV = 0; for (let i = 2; i < m.length; i++) if (m[i] > pV) { pV = m[i]; pI = i; }
+  const pa = Math.log(m[pI - 1] + 1e-12), pb = Math.log(m[pI] + 1e-12), pc = Math.log(m[Math.min(m.length - 1, pI + 1)] + 1e-12), po = (pa - pc) / (2 * (pa - 2 * pb + pc) || 1), fpk = (pI + (isFinite(po) ? po : 0)) * bw;
+  const hh = f0exp / 2, nearest = Math.max(1, Math.round(fpk / hh)) * hh, peakDev = 1200 * Math.log2(fpk / nearest);
   // harmonicity: share of spectral energy near integer multiples of the measured f0, above what noise would give (24 %)
   let he = 0; for (const ff of [f0, f0exp, f0exp / 2]) { let e1 = 0; for (let h = 1; h * ff < SR / 2 && h < 200; h++) { const c0 = h * ff / bw, w2 = Math.max(2, 0.12 * ff / bw); for (let i = Math.max(2, Math.floor(c0 - w2)); i <= Math.min(m.length - 1, Math.ceil(c0 + w2)); i++) e1 += m[i] * m[i]; } he = Math.max(he, e1); }
   const harm = Math.max(0, Math.min(1, (he / Math.max(tot, 1e-30) - 0.24) / 0.76));
@@ -93,7 +97,7 @@ function analyse(d, f0exp) {
   let sd = 0, cnt = 0, mu = 0; const arr = []; for (let f = imax; f < Math.min(nf, imax + 100); f++) if (env[f] > emax * 0.05) arr.push(20 * Math.log10(env[f] / emax));
   for (const x of arr) mu += x; mu /= Math.max(1, arr.length); for (const x of arr) sd += (x - mu) * (x - mu); sd = Math.sqrt(sd / Math.max(1, arr.length));
   const db = x => 20 * Math.log10(Math.max(x, 1e-9));
-  return { n, bad, pk, rmsDb: db(rms), loudDb: db(loud), attMs: att, shape, cen, cenRel: Math.log2(Math.max(cen, 20) / f0exp), cenDrift: Math.log2(Math.max(cen2, 20) / Math.max(cen, 20)), f0, harm, bdb, evod, am: sd };
+  return { n, bad, pk, rmsDb: db(rms), loudDb: db(loud), attMs: att, shape, cen, cenRel: Math.log2(Math.max(cen, 20) / f0exp), cenDrift: Math.log2(Math.max(cen2, 20) / Math.max(cen, 20)), f0, peakDev, harm, bdb, evod, am: sd };
 }
 const expF0 = v => 65.406 * Math.pow(2, ((v[v.engine] && v[v.engine].oct) || 0) + v.tune / 12);
 function centsOff(f, fe) { let c = 1200 * Math.log2(f / fe); c -= 1200 * Math.round(c / 1200); return c; }
@@ -102,7 +106,7 @@ function measure(k, i) {
   const out = { k, i, name: presetList(k)[i][0], at: [] };
   for (const tune of PITCHES) {
     const { v, d } = render(k, i, tune), fe = expF0(v), a = analyse(d, fe);
-    a.tune = tune; a.fe = fe; a.cents = centsOff(a.f0, fe); a.octs = Math.round(Math.log2(a.f0 / fe)); out.at.push(a);
+    a.tune = tune; a.fe = fe; a.cents = centsOff(a.f0, fe); a.octs = Math.round(Math.log2(a.f0 / fe)); a.pitchErr = Math.min(Math.abs(a.cents), Math.abs(a.peakDev)); out.at.push(a);
   }
   return out;
 }
@@ -131,9 +135,9 @@ if (require.main === module) {
     for (let p = 0; p < PITCHES.length; p++) { const r = rng(m => m.at[p].rmsDb), l = rng(m => m.at[p].loudDb), q = rng(m => m.at[p].pk);
       console.log('  tune ' + PITCHES[p] + ': existing RMS ' + r[0].toFixed(1) + '..' + r[1].toFixed(1) + ' dB  loud ' + l[0].toFixed(1) + '..' + l[1].toFixed(1) + '  peak max ' + q[1].toFixed(2)); }
     const nnb = base.map(m => m.nn).sort((x, y) => x - y); console.log('  loud(C3) median ' + med(m => m.at[1].loudDb).toFixed(1) + '; existing nearest-neighbour distance: min ' + nnb[0].toFixed(2) + ' p10 ' + nnb[Math.floor(nnb.length * 0.1)].toFixed(2) + ' median ' + nnb[Math.floor(nnb.length / 2)].toFixed(2));
-    console.log('  idx name'.padEnd(34) + ' new  pk   rms(C2/C3/C4)       loud(C3) pitch(cents C2/C3/C4) att  cenRel harm  nn  (nearest)');
+    console.log('  idx name'.padEnd(34) + ' new  pk   rms(C2/C3/C4)       loud(C3) pitchErr cents att  cenRel harm  nn  (nearest)');
     for (const m of ms) { if (NEWONLY && !m.isNew) continue; if (!V && !NEWONLY && !m.isNew) continue;
       const a = m.at; console.log(('  ' + String(m.i).padStart(2) + ' ' + m.name).padEnd(34) + (m.isNew ? ' N ' : '   ') + Math.max(...a.map(x => x.pk)).toFixed(2) + ' ' + a.map(x => x.rmsDb.toFixed(1).padStart(6)).join(' ') + '  ' + a[1].loudDb.toFixed(1).padStart(6) + '  ' +
-        a.map(x => (x.cents >= 0 ? '+' : '') + x.cents.toFixed(0) + (x.octs ? '/' + x.octs : '')).join(' ').padEnd(20) + String(a[1].attMs).padStart(4) + ' ' + a[1].cenRel.toFixed(1).padStart(5) + ' ' + a[1].harm.toFixed(2) + ' ' + m.nn.toFixed(2) + ' ' + m.nnName.slice(0, 18)); }
+        a.map(x => x.pitchErr.toFixed(0)).join(' ').padEnd(20) + String(a[1].attMs).padStart(4) + ' ' + a[1].cenRel.toFixed(1).padStart(5) + ' ' + a[1].harm.toFixed(2) + ' ' + m.nn.toFixed(2) + ' ' + m.nnName.slice(0, 18)); }
   }
 }
