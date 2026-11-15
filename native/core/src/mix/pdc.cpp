@@ -48,4 +48,9 @@ PdcPlan pdc_plan(const BusPlan& P, const PdcSlot* slots, int nSlots, double sr, 
 
 int64_t pdc_trim_frames(const PdcPlan& p, double sr) { return (int64_t)std::floor(p.T * sr + 0.5); }   // Math.round
 
+Mixer::DelaySet pdc_delay_set(const PdcApply& a) {
+  Mixer::DelaySet s; s.glide = a.live; s.idle = a.live && !a.playing && a.mode == PdcMode::Auto; s.ramp = a.now ? 0.01 : 0.05; return s;
+}
+void pdc_apply(Mixer& mix, const PdcPlan& plan, const PdcApply& a) { mix.setDelays(plan.d, plan.f, pdc_delay_set(a)); }
+
 }  // namespace thunder

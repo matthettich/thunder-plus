@@ -132,3 +132,13 @@ if(NODE_EXE)
 else()
   add_test(NAME pdc COMMAND test_pdc)
 endif()
+
+# U10: the delays in the mixer (impulse lands late by exactly the plan, compensation in phase, bus feeds, live glide / AUTO idle, cap) and the renderer's trim.
+add_executable(test_pdcmix test_pdcmix.cpp)
+target_link_libraries(test_pdcmix PRIVATE thunder_core)
+target_include_directories(test_pdcmix PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../core/src ${CMAKE_CURRENT_SOURCE_DIR})
+target_compile_definitions(test_pdcmix PRIVATE THUNDER_ROOT="${CMAKE_CURRENT_SOURCE_DIR}/../..")
+if(NOT MSVC)
+  target_compile_options(test_pdcmix PRIVATE -Wall -Wextra)
+endif()
+add_test(NAME pdcmix COMMAND test_pdcmix)

@@ -40,5 +40,12 @@ PdcPlan pdc_plan(const BusPlan& plan, const PdcSlot* slots, int nSlots, double s
 // What pass() adds to the render's length and trims off the start: Math.round(T * sr)
 int64_t pdc_trim_frames(const PdcPlan& p, double sampleRate);
 
+// How a plan is put in force (makePlayer's pdcSync(now)): live: the page's player, where a change glides over 50 ms (10 ms when `now`: the call made
+// as PLAY starts) instead of jumping; playing: a song is playing; Auto live is in force only while playing (idle: all 0). A render (live false)
+// sets every delay at once. Off: the plan is all zeros, so every delay is 0.
+struct PdcApply { PdcMode mode = PdcMode::Auto; bool live = false; bool playing = false; bool now = false; };
+Mixer::DelaySet pdc_delay_set(const PdcApply& a);
+void pdc_apply(Mixer& mix, const PdcPlan& plan, const PdcApply& a);   // at the mixer's time (setTime); allocates nothing
+
 }  // namespace thunder
 #endif

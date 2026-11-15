@@ -5,6 +5,8 @@
 //   voices -> inp (TRIM) -> [chains hook: dry 0 / wet 1] -> [track FX hook] -> ins -> g (VOL x audible) -> cg (TVL / TVA) -> p (pan) -> dl -> master sum
 //                                                                               ins -> pre (audible ? 1 : 0) -> a PRE send's bus
 //                                                                                                              p -> a POST send's bus
+//   (U10, LATENCY COMPENSATION: three DelayNodes read the pan's output p and the `pre` pair: dl on the way to the master sum, fdl on p's feed
+//    into the buses it feeds, fdlP on `pre`'s. Their delay is pdcPlan's d and f, all 0 until setDelays() says otherwise; see mix/pdc.h.)
 //   master sum -> out (MASTER VOL + MVOL) -> [master FX hook: effects, mastering, limiter] -> mo (OUT + MOUT) -> the output
 //
 // Every node's arithmetic is Chrome's, in float32 as its nodes are: a gain is sample x gain (both float32); the StereoPanner's
@@ -31,6 +33,7 @@
 #include <cstdint>
 #include <memory>
 
+#include "mix/delay.h"
 #include "rt/auto.h"
 #include "rt/json.h"
 #include "seq/seq.h"
@@ -83,7 +86,9 @@ struct MixSet {
 
 class Mixer {
  public:
-  Mixer(double sampleRate, int maxBlock);   // allocates (control thread)
+  // maxDelaySec: the longest delay any delay point can hold (a ring each: 2 x 4 bytes x sr x maxDelaySec for the post side of every track and
+  // the pre side again; the JS holds 0.99 s, which is 38 MB at 48 kHz). A longer plan is cut to it and counted (pdcClamped()).
+  Mixer(double sampleRate, int maxBlock, double maxDelaySec = kPdcMaxSec);   // allocates (control thread)
   ~Mixer();
   Mixer(const Mixer&) = delete;
   Mixer& operator=(const Mixer&) = delete;
@@ -99,6 +104,15 @@ class Mixer {
   void setFx(int t, MixInsertFn fn, void* user);           // the track's effects (U14)
   void setMasterFx(MixInsertFn fn, void* user);            // between MASTER VOL and OUT: master effects, mastering, the limiter
   void setMono(int t, bool mono) { if (t >= 0 && t < kMixTracks) mono_[t] = mono; }   // a one-channel input (the panner's mono law): inL only is read. The sampler's voices are stereo.
+
+  // U10: pdcSync's `set` on every delay point at time now (setTime): d[t] / f[t] seconds for t in 0..kMixTracks-1 (a PdcPlan's d and f; f is
+  // both fdl and fdlP). glide (live): each point ramps linearly from its value now over `ramp` s, else it takes the value at once (a render).
+  // idle: every delay is 0 (LATENCY COMP AUTO while no song plays). A delay already at the target is left alone. Allocates nothing.
+  struct DelaySet { bool glide = false; bool idle = false; double ramp = 0.05; };
+  void setDelays(const double* d, const double* f, const DelaySet& s);
+  uint32_t pdcClamped() const;       // delay requests above the cap (cut to it)
+  double delayNow(int t, int point) const;   // the target of a delay point in seconds (point 0 dl, 1 fdl, 2 fdlP); for tests
+  double maxDelaySec() const { return capSec_; }
 
   void setTime(double now) { now_ = now; }                 // currentTime: the start of the block about to be rendered
   bool event(const SeqEvent& e);                           // mixEv: tvl, tva, tpn, mvol, mout. true: taken
@@ -139,6 +153,9 @@ class Mixer {
   void rebuild();
   bool lane(float* C, Auto& A, int N, double t0);   // fills C with the lane's block values; true: one value for the whole block
   void track(int t, int N, double t0);
+  struct Dly { DelayRing post, pre; DelayParam dl, fdl, fdlP; };
+  // reads a delay point for the block just pushed: returns the input pair itself when the delay is 0 for the whole block, else fills oL / oR
+  void tap(const DelayRing& r, DelayParam& p, const float*& L, const float*& R, float* oL, float* oR, int N, double t0);
   void note(const Auto& A) { if (A.size() > peakEv_) peakEv_ = A.size(); }
 
   double sr_, dt_;
@@ -158,6 +175,11 @@ class Mixer {
   int order_[kMixTracks];
   std::unique_ptr<float[]> in_, post_, preb_, c_;   // inputs, after-pan pairs, pre pairs (maxBlock each), the lanes' block values
   std::unique_ptr<double[]> d_;
+  double capSec_;
+  std::unique_ptr<Dly[]> dly_;
+  std::unique_ptr<float[]> fd_, sc_;               // the delayed feeds (post, pre) of every track; a scratch pair for the master sum
+  const float *fpL_[kMixTracks], *fpR_[kMixTracks], *feL_[kMixTracks], *feR_[kMixTracks];   // what a bus hears of each source (this block)
+  uint32_t fdlSrc_ = 0;                            // sources some existing bus hears POST (preSrc_ are heard PRE)
   float* inPL_[kMixTracks]; float* inPR_[kMixTracks];
   int peakEv_ = 0;
 };
