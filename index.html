@@ -2968,6 +2968,8 @@ select.pkhid{position:absolute; width:1px; height:1px; min-height:0; margin:0; p
 }
 :root:root:root:root :is(#main, #synRight) :is(#lOn.on, #vAud.on, .fxhead button.on){background:var(--acc)!important; color:var(--acc-on)!important; border-color:var(--acc)}
 :root:root :is(#main, #synRight) :is(button, input, textarea, [tabindex]):focus-visible{outline:2px solid var(--acc); outline-offset:2px}
+/* a clicked slider keeps the keys (◀ ▶ nudge it), so the ring shows after a mouse click too, not only after Tab (14 Nov) */
+:root:root :is(#main, #synRight) input[type=range]:focus{outline:2px solid var(--acc); outline-offset:2px}
 /* no frame inside a frame: in the 3.5 px cards the sections are ruled off from each other, not boxed */
 :is(.layercard, .voicecard, .sndcard) .sec{border:0; border-top:1px solid var(--line); padding-inline:4px}
 :is(.layercard, .voicecard, .sndcard) .secs{gap:0 22px; padding:0 10px 4px}
@@ -3705,7 +3707,7 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
 <p>The nine <b>pump</b> mastering plugins run on <b>bus tracks and the master</b>, and <b>EQ</b> on any track too (FX picker → <b>Mastering (pump)</b>; › EQ WINDOW on the FX screen opens it): <b>EQ</b> (24 bands, cuts to 96 dB/oct or Brickwall, dynamic bands, zero latency or linear phase), <b>COMP</b>, <b>LIMIT</b> (true peak, loudness targets), <b>CALM</b> (resonance suppressor), <b>TONE</b> (tonal balance), <b>BAND</b> (multiband dynamics), <b>WIDE</b> (stereo imager), <b>HEAT</b> (saturator) and <b>METER</b> (loudness). They are the plugins' own DSP, so a setting sounds as it does in the VST3 / CLAP plugin. The slot shows the main settings as hex rows (EQ, BAND, WIDE and HEAT pick a <b>BAND</b> first); <b>› PRESET</b> has the plugin's presets and <b>› OPEN</b> its full window, which works like the plugin: drag, Shift-drag for fine, double-click to type, Ctrl-click to reset, A/B, and Alt held to listen to a band or a range. A slot's ACTIVE is the plugin's bypass. CALM, TONE, LIMIT and linear-phase EQ add latency: renders of the master line it up, but on a bus that track plays late against the others.</p>
 <h3>Settings</h3>
 <p><b>⚙ Settings</b> at the top: it starts with Audio (output device, level, latency, rate), then this screen’s own settings (in the tracker every Project setting: Song, Input, Screen, Render), then Master, Skin, Export, MIDI, Kit and App (Mobile, install, check for update). There you can also turn off <b>Display steps as decimal</b> (row numbers in hex), turn off <b>Play note on entry</b> (audition notes as you type them), show or hide the KEYS-mode <b>on-screen keypad</b> (Settings → KEYS KEYPAD; it starts hidden on a computer and shown in the Mobile setup), and change the <b>Text size</b> of the tracker screen. With the KEYS keypad off, a <b>bottom panel</b> takes its place: a spectrum of the master, quick controls for the current instrument’s sound, the <b>chains</b> controls you have added for the current track (in chains, right-click a control or a module → Add to the bottom panel; right-click one in the panel to remove it), the current track’s effects, and a channel strip for the current track (stereo meter, fader with 0 dB at E0 and +6 dB at the top, pan, M and S). When it holds more than fits, the panel scrolls sideways. Tap a section’s button to hide it (it waits as a dashed + button); drag the panel’s top edge for its height and the scope’s or FX section’s edge for their widths. On a big screen the space beside the grid is the <b>stage</b> (Settings → STAGE): BY SCREEN shows something useful for each screen (the dogs dance to the beat on Song and Project — a hop every beat, a bigger one on the bar, and a new dance (arms up, arms down, leg kicks, jumping jacks) every time the cursor’s track starts a phrase, so they count beats and phrases for you — Sect previews the phrase, Phrase shows a piano lighting the notes as they play, Inst the waveform, Mixer the master spectrum, FX the effects chain), DOGS shows the dogs everywhere, OFF leaves it empty. In the bar above the grid, double-click the tempo or LPB to type a new one (ticks a step are in Settings). The panel follows the track the cursor is on: its instrument (on Song, the one the block under the cursor plays), its effects and its strip. When any track is soloed, SOLO · CLEAR shows; ✕ hides the panel and Settings → BOTTOM PANEL brings it back. Drag a finger up or down anywhere on the tracker screen to scroll; drag on the cursor's cell to change its value. With a mouse, a drag selects instead (the wheel scrolls), a selection drags to move (Alt, Ctrl or ⌘ copies), and right-click on a track number solos it: see Tracker · KEYS mode → Mouse.</p>
-<p><b>Project files</b> are <code>.thunder</code> files (.json ones still open). A dot on <b>File ▾</b> and in the window title means changes that aren't in the file yet; New, Open and the rest ask <b>Save changes?</b> first. The app remembers the file (Ctrl/⌘+S goes back to it after a restart) and File ▾ → <b>Open recent…</b> lists the last eight. Every 3 minutes the song and kit are backed up in the browser, the last 10: File ▾ → <b>Restore a backup…</b>. On Android, tapping a <code>.thunder</code> attachment can’t open the web app, so either tap <b>Share</b> on the attachment and send it to Thunder Plus (install it first: <b>Settings → App</b>), or download it and use <b>LOAD PROJECT</b>; that picker shows every file. Drop audio on a pad to load it; drop a project, kit or .mid on the window to open it. <b>Sliders, faders and values</b> all work alike (the synth sliders, the Mixer's faders, the strip fader, the FX bar, the pump windows and the sliders in chains and waves): drag one from where it is (it doesn't jump to the click); hold Shift for fine control or Ctrl/⌘ for big moves, and press or let go of either at any time; on a touch screen it moves only once your finger slides sideways. Double-click, Alt-click or Ctrl/⌘-click (⌘ on a Mac) resets it; right-click for Reset / Type a value (and MIDI learn on the synth sliders). On the FX bar a double-click types a value in place instead (as it shows, such as 2.5k or −6, or the raw number; Enter sets it, Esc leaves it), and Alt / ⌘-click resets. The wheel moves the control the pointer rests on (it gets an outline); Shift+wheel in fine steps, Ctrl/⌘+wheel in big ones.</p>
+<p><b>Project files</b> are <code>.thunder</code> files (.json ones still open). A dot on <b>File ▾</b> and in the window title means changes that aren't in the file yet; New, Open and the rest ask <b>Save changes?</b> first. The app remembers the file (Ctrl/⌘+S goes back to it after a restart) and File ▾ → <b>Open recent…</b> lists the last eight. Every 3 minutes the song and kit are backed up in the browser, the last 10: File ▾ → <b>Restore a backup…</b>. On Android, tapping a <code>.thunder</code> attachment can’t open the web app, so either tap <b>Share</b> on the attachment and send it to Thunder Plus (install it first: <b>Settings → App</b>), or download it and use <b>LOAD PROJECT</b>; that picker shows every file. Drop audio on a pad to load it; drop a project, kit or .mid on the window to open it. <b>Sliders, faders and values</b> all work alike (the synth sliders, the Mixer's faders, the strip fader, the FX bar, the pump windows and the sliders in chains and waves): drag one from where it is (it doesn't jump to the click); hold Shift for fine control or Ctrl/⌘ for big moves, and press or let go of either at any time; on a touch screen it moves only once your finger slides sideways. Alt-click or Ctrl/⌘-click (⌘ on a Mac) resets it; right-click for Reset / Type a value (and MIDI learn on the synth sliders). On the Synth page's sliders a double-click types a value in place (the number with or without its unit, such as 440, 440 Hz, −6 dB or 35%; Enter sets it, Esc leaves it), and a clicked slider takes ◀ ▶ (1% of its travel; Shift: ten times finer; Esc lets go). On the FX bar a double-click types a value in place too (as it shows, such as 2.5k or −6, or the raw number; Enter sets it, Esc leaves it), and Alt / ⌘-click resets. The wheel moves the control the pointer rests on (it gets an outline); Shift+wheel in fine steps, Ctrl/⌘+wheel in big ones.</p>
 <h3>Drum pads and synths</h3>
 <p>The kit has 16 slots to start, up to 64: <b>SLOTS</b> at the top of the Synth page (− and + step by 8, tap the number to type one; fewer slots only hide the last ones, and their sounds come back). <b>THIS SLOT</b> sets how the selected slot plays: <b>ONE-SHOT</b> plays its whole sound, like a drum; <b>HELD</b> sounds until note-off, like a synth. By default: <b>1–8</b> are drum pads: one-shots that play their whole sound. <b>9–16</b> are synths for melodies and chords (Bass, Pluck, Keys, Pad, Lead, Bell, Organ, Sub to start): a note holds at its sustain level for as long as you hold it, up to the slot’s Max len, then fades over its release when you let go. C-4 plays middle C. In the tracker, instruments 08–0F play the synth slots in a new project. <b>A kit slot per track</b> (Settings → Kit) grows the kit past 16 slots: every song track gets its own pad — drums on mono tracks, a simple synth on poly ones. The pads stay the same size and scroll up and down.</p>
 <h3>Chopping breaks</h3>
@@ -8461,9 +8463,12 @@ const MOD_SRC = [['r1', 'LFO 1'], ['r2', 'LFO 2'], ['r3', 'LFO 3'], ['r4', 'Env 
 const toPos = (d, v) => d.c === 'log' || d.c === 'logf' ? Math.log(v / d.min) / Math.log(d.max / d.min)
   : d.c === 'sq' ? Math.sqrt(Math.max(0, (v - d.min) / (d.max - d.min))) : (v - d.min) / (d.max - d.min);
 function fromPos(d, p){
-  let v = d.c === 'log' || d.c === 'logf' ? d.min * Math.pow(d.max / d.min, p) : d.c === 'sq' ? d.min + (d.max - d.min) * p * p : d.min + (d.max - d.min) * p;
+  return snapDef(d, d.c === 'log' || d.c === 'logf' ? d.min * Math.pow(d.max / d.min, p) : d.c === 'sq' ? d.min + (d.max - d.min) * p * p : d.min + (d.max - d.min) * p);
+}
+// The step a row's value takes (what a drag lands on); a typed value is snapped the same way (SLIDER ENTRY, 14 Nov).
+function snapDef(d, v){
   if (d.c === 'int') v = Math.round(v); else if (d.c === 'half') v = Math.round(v * 2) / 2;
-  else if (d.c === 'logf') v = +v.toPrecision(4);   // a fine log curve (the module effects' small times): four figures, never rounded to 0
+  else if (d.c === 'logf') v = +v.toPrecision(4);   /* a fine log curve (the module effects' small times): four figures, never rounded to 0 */
   else if (d.c === 'log' || d.c === 'sq') v = v < 10 ? Math.round(v * 10) / 10 : Math.round(v);
   else v = Math.round(v * 1000) / 1000;
   return v;
@@ -9058,40 +9063,42 @@ function el(tag, cls, txt){ const e = document.createElement(tag); if (cls) e.cl
 // when the node does not already read exactly `s` (it compares the node itself, not a cache, so any other writer can still change it, and a
 // node that holds something else, such as a value box's input, is overwritten as before).
 function setText(e, s){ s = String(s); const f = e.firstChild; if (f ? f.nodeType === 3 && f === e.lastChild && f.data === s : s === '') return; e.textContent = s; }
-// Type a value into a row's value box (double-click or double-tap). Entries accept the unit shown next to
-// the slider (Hz, kHz, ms, s, %, semitones, dB) or the bare number; the entry is clamped to the row's range
-// and applied through row.refresh(), so it behaves exactly like dragging its slider.
+// Type a value into a row's value box (double-click or double-tap the slider, its name or its value; right-click > Type a value…).
+// Entries accept the unit shown next to the slider (Hz, kHz, ms, s, %, semitones, dB) or the bare number; the entry is clamped
+// to the row's range, snapped to the step a drag lands on, and applied through row.refresh() and the row's own handler, so it
+// behaves exactly like dragging its slider (undo, MOD / LFO targets and MIDI learn hang off that handler).
+// rowParse(d, txt): the value a typed text means for row definition d (clamped and snapped), or null when it holds no number.
+function rowParse(d, txt){
+  txt = String(txt == null ? '' : txt).trim().replace(',', '.').replace('−', '-'); const low = txt.toLowerCase();
+  const m = txt.match(/[-+]?[0-9]*\.?[0-9]+([eE][-+]?[0-9]+)?/);
+  const n = m ? parseFloat(m[0]) : NaN; if (isNaN(n)) return null;
+  let v;
+  if (low.includes('khz')) v = n * 1000;
+  else if (low.includes('db')) v = n;                    /* dB, semitones and Hz are the row's own units */
+  else if (low.includes('st')) v = n;
+  else if (low.includes('hz')) v = n;
+  else if (low.includes('%')) v = n / 100 * pctBase(d);  /* an explicit % is "of the range" */
+  else if (low.includes('ms')) v = n / 1000;
+  else if (d.max <= 1 && d.min === 0) v = n > 1 ? n / 100 : n;  /* bare number on a 0..1 row: 50 means 50% */
+  else if (d.min === -36 && d.max === 6 && (n > 6 || n < -36)) v = d.min + (n / 100) * (d.max - d.min);  /* voice Level: 50 means halfway */
+  else v = n;                                            /* bare number or 's': the row's own units */
+  return Math.max(d.min, Math.min(d.max, snapDef(d, Math.max(d.min, Math.min(d.max, v)))));
+}
 function rowTypeBox(row, opts){
   if (row.out.querySelector('input')) return;
   const d = row.def, fmt = row.fmt || d.f || pct, prev = row.getObj()[row.key];
-  const inp = el('input', 'vtype');
-  inp.type = 'text'; inp.inputMode = 'decimal'; inp.value = fmt(prev); inp.setAttribute('aria-label', d.l + ' value');
+  const inp = el('input', 'vtype'), t0 = fmt(prev);
+  inp.type = 'text'; inp.inputMode = 'decimal'; inp.value = t0; inp.setAttribute('aria-label', d.l + ' value');
   row.out.replaceChildren(inp); inp.focus(); inp.select();
   let done = false;
-  const finish = commit => {
+  const finish = (commit, back) => {
     if (done) return; done = true;
-    if (commit){
-      const txt = inp.value.trim().replace(',', '.').replace('−', '-'), low = txt.toLowerCase();
-      const m = txt.match(/[-+]?[0-9]*\.?[0-9]+([eE][-+]?[0-9]+)?/);
-      const n = m ? parseFloat(m[0]) : NaN;
-      if (!isNaN(n)){
-        let v;
-        if (low.includes('khz')) v = n * 1000;
-        else if (low.includes('db')) v = n;                    // dB, semitones and Hz are the row's own units
-        else if (low.includes('st')) v = n;
-        else if (low.includes('hz')) v = n;
-        else if (low.includes('%')) v = n / 100 * pctBase(d);  // an explicit % is "of the range"
-        else if (low.includes('ms')) v = n / 1000;
-        else if (d.max <= 1 && d.min === 0) v = n > 1 ? n / 100 : n;  // bare number on a 0..1 row: 50 means 50%
-        else if (d.min === -36 && d.max === 6 && (n > 6 || n < -36)) v = d.min + (n / 100) * (d.max - d.min);  // voice Level: 50 means halfway
-        else v = n;                                            // bare number or 's': the row's own units
-        v = Math.max(d.min, Math.min(d.max, v));
-        row.getObj()[row.key] = v; row.refresh(); (opts.on || (() => changed(cur, true)))();
-      }
-    }
-    row.refresh();
+    const v = commit && inp.value !== t0 ? rowParse(d, inp.value) : null;   /* Escape, or leaving it unchanged, cancels */
+    if (v != null && v !== prev){ row.getObj()[row.key] = v; row.refresh(); (opts.on || (() => changed(cur, true)))(); }
+    else row.refresh();
+    if (back){ try { row.inp.focus({preventScroll:true}); } catch(_){} }   /* Enter / Escape: the slider keeps the keys (arrows nudge it) */
   };
-  inp.addEventListener('keydown', e => { e.stopPropagation(); if (e.key === 'Enter') finish(true); if (e.key === 'Escape') finish(false); });
+  inp.addEventListener('keydown', e => { e.stopPropagation(); if (e.key === 'Enter'){ e.preventDefault(); finish(true, true); } if (e.key === 'Escape'){ e.preventDefault(); finish(false, true); } });
   inp.addEventListener('blur', () => finish(true));
   inp.addEventListener('pointerdown', e => e.stopPropagation());
 }
@@ -9109,9 +9116,11 @@ function makeRow(def, key, getObj, opts = {}){
     refresh(){ const o = getObj(); const v = o[key]; inp.value = Math.round(toPos(this.def, v) * 1000); setText(out, (this.fmt || this.def.f || pct)(v)); }};
   inp.addEventListener('input', () => { const o = getObj(); o[key] = fromPos(row.def, inp.value / 1000);
     setText(out, (row.fmt || row.def.f || pct)(o[key])); (opts.on || (() => changed(cur, true)))(); });
-  out.title = 'Double-click to reset · right-click to type a value';
+  const two = () => r.classList.contains('two');   // a two-state row (twoStateRow): two buttons, nothing to type, so its name's double-click still resets
+  out.title = 'Double-click to type a value · Alt-click the slider or right-click to reset';
   const typeBox = () => rowTypeBox(row, opts);
-  out.addEventListener('dblclick', e => { e.stopPropagation(); reset(); });   // ONE RULE (3 Nov): double-click resets everywhere; Type a value… is in the right-click menu
+  const dbl = e => { e.stopPropagation(); if (two()) reset(); else typeBox(); };   // SLIDER ENTRY (14 Nov): double-click types a value; reset is Alt-click or the right-click menu
+  out.addEventListener('dblclick', dbl);
   // Touch screens: double-tap the value box to type a value (tap, lift, tap).
   let lastValTap = null;
   out.addEventListener('pointerup', e => {
@@ -9121,19 +9130,20 @@ function makeRow(def, key, getObj, opts = {}){
       else lastValTap = {t:now, x:cx, y:cy};
     }
   });
-  lab.addEventListener('dblclick', reset);
-  inp.addEventListener('dblclick', reset);   // the slider itself too (its default, as on the label)
-  inp._reset = reset; inp._out = out;   // ONE SLIDER: Alt/Ctrl-click resets, the tip shows the readout
+  lab.addEventListener('dblclick', dbl);
+  inp.addEventListener('dblclick', dbl);   // the slider itself too (as on the label)
+  inp._reset = reset; inp._out = out; inp._row = row;   // ONE SLIDER: Alt/Ctrl-click resets, the tip shows the readout
+  inp.addEventListener('keydown', e => sliderKey(e, inp));   // a clicked slider takes ◀ ▶ (▲ ▼): see sliderKey
   // SLIDER MOUSE: right-click for its menu.
   // opts.menu: more items for this row's menu (a chains row in the bottom panel: remove it, show its module), in the same
   // menu (FIX 27 Oct, audit M3: the panel added a second menu, a dialog, under this one).
   r.addEventListener('contextmenu', e => { if (e.target.closest('input[type=text]') || typeof sxMenu !== 'function') return; e.preventDefault(); e._valMenu = true;
     sxMenu(e.clientX, e.clientY, String(row.def.l || key).toUpperCase(), [
-      {l:'Reset to default', f:reset, off:row.def.d == null}, ...(r.classList.contains('two') ? [] : [{l:'Type a value…', f:typeBox}]),   // a two-state row (twoStateRow): two buttons, nothing to type
+      {l:'Reset to default', f:reset, off:row.def.d == null}, ...(two() ? [] : [{l:'Type a value…', f:typeBox}]),   // a two-state row (twoStateRow): two buttons, nothing to type
      
       {l:'Learn a MIDI knob for it', f:() => { setLearn(true); midi.target = -1; midi.ccTarget = inp.id; renderPads(); ccBadges(); midiStatus(`${rowLabel(inp.id)}: turn a knob on the controller.`); }},
       ...(opts.menu ? [null, ...opts.menu()] : [])]); });
-  inp.title = 'Drag to change (Shift: finer, ' + MODK + ': coarser) · double-click or Alt-click to reset · right-click: menu';
+  inp.title = 'Drag to change (Shift: finer, ' + MODK + ': coarser) · double-click: type a value · Alt-click: reset · click, then ◀ ▶ nudge · right-click: menu';
   if (!opts.noTrack) rows.push(row);
   return row;
 }
@@ -9152,7 +9162,7 @@ function makeCk(box, get, set){
 }
 // SYNTH UX B (13 Nov): a row that is really a switch (min 0, max 1, whole steps: Reverse, Freeze, Loop, Mix law…) shows its two
 // value names as a segmented control, named by the row's own formatter (f(0), f(1)). The slider stays in the row (hidden), so
-// the row's id, its value, a MIDI knob learned on it, Reset (double-click on the label) and refresh() all work as before; the
+// the row's id, its value, a MIDI knob learned on it, Reset (right-click menu; double-click on the name) and refresh() all work as before; the
 // segment writes the same 0 / 1 into the same field and runs the same handler (`on`) the slider did.
 const twoOf = def => !!def && def.min === 0 && def.max === 1 && def.c === 'int' && typeof def.f === 'function';
 function twoStateRow(row, on, names){
@@ -13317,7 +13327,7 @@ const TUNE_SETS = {
   Pythagorean: [0,13.7,3.9,5.9,7.8,-1.9,1.9,-7.8,5.9,-3.9,13.7,1.9],
   'Meantone': [0,-24,-7,-10,-14,-3,-17,-20,3,-21,-10,-7],
 };
-const tuneRows = [];   // the 12 cents sliders (makeRow, so double-click / Alt-click / right-click work: SYNTH UX A, item 7)
+const tuneRows = [];   // the 12 cents sliders (makeRow, so double-click (type) / Alt-click (reset) / right-click work: SYNTH UX A, item 7)
 let tuneFold = null;
 const tuneCt = c => (c > 0 ? '+' : '') + c.toFixed(0) + ' ct';
 function tuneSum(){ if (!tuneFold) return; const n = (S.tune || []).filter(c => Math.abs(c) >= 0.5).length; tuneFold.sum(n ? n + ' of 12 notes detuned' : 'Equal temperament, no notes detuned'); }
@@ -16162,7 +16172,7 @@ const sliderOk = (r, touch) => !!r && r.matches && r.matches('input[type=range]'
    controls all take the mouse the same way:
    - a drag moves the value from where it is; Shift held is ten times finer and Ctrl/⌘ held four times coarser, read on
      every move, so pressing or letting go of either mid-drag carries on from there (no jump);
-   - double-click, Alt/⌥-click or Ctrl/⌘-click (⌘ on a Mac, where Ctrl+click is the right-click) resets it;
+   - Alt/⌥-click or Ctrl/⌘-click (⌘ on a Mac, where Ctrl+click is the right-click) resets it; double-click: a Synth page slider types a value (14 Nov), the other controls reset;
    - right-click opens Reset to default / Type a value… (and Learn a MIDI knob where the control can be learned);
    - the wheel takes the control the pointer has rested on (outlined; WHEEL FOCUS), Shift fine, Ctrl/⌘ big steps.
    dragMul(e) / resetClick(e) / valMenu() below; a control that isn't a slider takes the wheel through data-wheel + el._wheel(d, e). */
@@ -16185,6 +16195,25 @@ function sliderSet(r, v){
   const nv = clamp(Math.round((v - mn) / st) * st + mn, mn, mx); if (Math.abs(nv - +r.value) < st / 2) return;
   r.value = nv; r.dispatchEvent(new Event('input', {bubbles:true}));
   clearTimeout(r._chgT); r._chgT = setTimeout(() => r.dispatchEvent(new Event('change', {bubbles:true})), 300);
+}
+/* SLIDER KEYS (owner, 14 Nov): a slider that has been clicked has the focus; ◀ ▶ (▲ ▼ too) nudge it by 1% of its travel, with Shift by a
+   tenth of that (Shift is "finer", as on a drag; lead's choice: one slider step, 0.1%, was too small to be useful); a row that rounds its value (whole numbers, half steps, the log curves) takes as
+   many steps as it needs to change by one. The keys stay with the slider (the tracker's cursor and the pad list don't see
+   them) until Escape lets go. The change goes through sliderSet, the same call a drag makes. */
+function sliderNudge(r, dir, fine){
+  const mn = r.min === '' ? 0 : +r.min, mx = r.max === '' ? 100 : +r.max, st = r.step === 'any' || !+r.step ? (mx - mn) / 1000 : +r.step, row = r._row;
+  const cur0 = row ? row.getObj()[row.key] : null, inc = fine ? 1 : 10; let n = inc, nv = +r.value;
+  for (let k = 0; k < 1000; k++){
+    nv = clamp(+r.value + dir * n * st, mn, mx);
+    if (!row || nv === +r.value || fromPos(row.def, (nv - mn) / (mx - mn)) !== cur0) break;
+    n += inc; }
+  sliderSet(r, nv);
+}
+function sliderKey(e, r){
+  if (e.altKey || e.ctrlKey || e.metaKey) return;
+  if (e.key === 'Escape'){ e.preventDefault(); e.stopPropagation(); r.blur(); return; }
+  const d = { ArrowRight:1, ArrowUp:1, ArrowLeft:-1, ArrowDown:-1 }[e.key]; if (!d) return;
+  e.preventDefault(); e.stopPropagation(); sliderNudge(r, d, e.shiftKey);
 }
 /* WHEEL (27 Oct, audit M2): the movement is added up and a step is taken per 100 px of it (a mouse notch), not one per
    event: a trackpad flick sends 30-100 events, which moved a slider 60-200 %. A pause or a change of direction starts the
@@ -16285,7 +16314,7 @@ document.addEventListener('wheel', e => {
   sliderSet(r, +r.value - n * Math.max(st, (mx - mn) * (e.shiftKey ? 0.002 : wheelBig(e) ? 0.08 : 0.02)));
 }, {passive:false});
 // RIGHT-CLICK on a slider that has no menu of its own (the strip's PAN, Perform's crossfader and macros, tuning…): Reset to
-// default (what its double-click does). makeRow's sliders keep their own menu (they mark the event).
+// default (what its Alt-click does). makeRow's sliders keep their own menu (they mark the event).
 document.addEventListener('contextmenu', e => {
   if (e._valMenu || e.pointerType === 'touch') return; const r = e.target.closest && e.target.closest('input[type=range]'); if (!sliderOk(r)) return;
   const lab = r.getAttribute('aria-label') || r.title.split(/[·:]/)[0] || 'Slider';
@@ -16297,7 +16326,7 @@ document.addEventListener('contextmenu', e => {
    - on a touch screen nothing changes until the finger has moved sideways (a vertical swipe scrolls the page; a tap
      does nothing), so brushing a slider while scrolling never changes the sound;
    - a tip shows the value while it moves;
-   - double-click, Alt/⌥-click or Ctrl/⌘-click puts it back to its default (makeRow's), the value too (3 Nov); right-click → Type a value.
+   - Alt/⌥-click or Ctrl/⌘-click puts it back to its default (makeRow's), the value too (3 Nov); double-click (14 Nov) or right-click → Type a value; click then ◀ ▶ nudges (sliderKey).
    The wheel takes the slider under the pointer once it has rested on it (below). To go back: this block. */
 let sldTip = null;
 function sliderTip(r, on){
@@ -19927,9 +19956,14 @@ function pumpLatencyOf(f, sr){
   if (pumpLatCache.size > 200) pumpLatCache.clear();
   pumpLatCache.set(key, lat); return lat;
 }
-// The master's pump slots together (switched on): a render starts that much later, and pass() trims it off as it does
-// the mastering's latency. (A bus's latency isn't compensated anywhere: see pumpLatTxt.)
-const pumpChainLatency = (A, sr) => (A || []).reduce((n, f) => n + (f && f.on && isPumpT(f.type) ? pumpLatencyOf(f, sr) : 0), 0);
+// The master's pump slots together: a render starts that much later, and pass() trims it off as it does the mastering's
+// latency. (A bus's latency isn't compensated anywhere: see pumpLatTxt.)
+// FIX (build 603): a switched-OFF pump slot counts too. OFF is the plugin's own bypass, which still delays by its latency
+// (so switching it, by hand or with FXO, never moves the timing); counting only the slots that are ON left renders late by
+// the OFF slots' latency (owner's song: 4454 samples) and LATENCY COMP lined tracks up without them. Only a pump effect with
+// no bypass of its own (METER) is skipped whole by the worklet when OFF, so it adds nothing then.
+const pumpSlotLat = (f, sr) => f && isPumpT(f.type) && (f.on || pumpIdx[TFX[f.type].pump].bypass != null) ? pumpLatencyOf(f, sr) : 0;
+const pumpChainLatency = (A, sr) => (A || []).reduce((n, f) => n + pumpSlotLat(f, sr), 0);
 /* LATENCY COMPENSATION (owner, 1 Nov: Audio & MIDI → LATENCY COMP, off by default). The pump effects that look ahead (LIMIT,
    CALM, TONE, linear-phase EQ…) make a track or bus play late. With the option on, every path to the master is delayed to
    the latest one: pdcPlan() works out, from the song alone (no audio nodes, so renders get the same answer), each track's
@@ -24777,7 +24811,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 602;
+const BUILD = 604;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD + (location.pathname.includes('/beta/') ? ' · beta' : '');
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -34736,6 +34770,8 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [604, '14 Nov', ['Synth page sliders: double-click a slider (or its name or value) to type a number: 440, 440 Hz, -6 dB or 35% all work; Enter sets it, Esc cancels. Reset is now Alt-click (or Ctrl/⌘-click, or right-click › Reset to default)', 'Click a slider, then ◀ ▶ nudge it by 1% of its travel (Shift: a tenth of that). Esc lets go of it. The same in …chains and …waves']],
+  [603, '14 Nov', ['Renders no longer start late when the master holds switched-off …pump effects (CALM, TONE, MASTER, LIMIT…): a switched-off one still delays the sound, and that delay is now counted. LATENCY COMP lines tracks up with their switched-off …pump effects too']],
   [602, '14 Nov', ['Settings › TRACKS: LFOs, macros, locks, scenes and parts now follow their tracks when the track count changes (LFOs stayed on the old track number and seemed to vanish)', 'ARRANGE ON STOP = PLAYHEAD now also moves the Arrange cursor when the Phrase (or another screen) holds the keys', 'FX screen: right-click › Clear (and CLEAR) empties the effect you clicked, not the last one in the list', 'Bottom FX bar: right-click or long press an effect for Remove effect (Ctrl+Z brings it back)', 'Settings › ANIMATIONS: OFF hides the dancing dogs and the moving effect pictures (also right-click or long press them › Hide animations). Meters, scopes and playheads stay']],
   [601, '14 Nov', ['…chains: Morph, a new module that combines two sounds by their frequencies. Convolve keeps only what both share (a pad chopped and coloured by a drum loop); Shape plays A with B\'s tone colour. Morph, Sharpness, Smoothing, Frame and Freeze (hold A or B as a drone). It is under Granular and spectral']],
   [600, '14 Nov', ['Arrange: zoom out further (the − button, Ctrl+wheel or pinch: five levels below fit, up to about three times the rows) so whole phrases fit', 'Arrange, Song, Phrase and Pattern view turn the page early while playing: when the playhead is 8 rows from the bottom, keeping 4 rows of what just played at the top', '+ ADD FX in the bottom FX bar opens the effect list straight away on the first empty slot', 'The "got its own copy" and "also plays on track" notices show for about 3 seconds and replace each other instead of queueing']],
