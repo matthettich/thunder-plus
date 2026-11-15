@@ -73,10 +73,11 @@ function analyse(d, f0exp) {
   let sw = 0, swf = 0, tot = 0; for (let i = 2; i < m.length; i++) { const p = m[i] * m[i]; tot += p; swf += p * i * bw; sw += p; }
   const cen = swf / Math.max(sw, 1e-30);
   // harmonic product spectrum for f0
+  let mx0 = 0; for (let i = 2; i < m.length; i++) if (m[i] > mx0) mx0 = m[i]; const eps = mx0 * 1e-4 + 1e-12;
   let bestI = 0, bestV = 0; const lo = Math.max(2, Math.floor(25 / bw)), hi = Math.floor(2500 / bw);
-  for (let i = lo; i < hi; i++) { let p = Math.log(m[i] + 1e-12); for (let h = 2; h <= 5; h++) p += Math.log(m[i * h] + 1e-12); if (p > bestV || !bestV) { bestV = p; bestI = i; } }
-  const a = Math.log(m[bestI - 1] + 1e-12), b = Math.log(m[bestI] + 1e-12), c = Math.log(m[bestI + 1] + 1e-12), off = (a - c) / (2 * (a - 2 * b + c) || 1);
-  const f0 = (bestI + (isFinite(off) ? off : 0)) * bw;
+  for (let i = lo; i < hi; i++) { let p = Math.log(m[i] + eps); for (let h = 2; h <= 5; h++) p += Math.log(m[i * h] + eps); if (p > bestV || !bestV) { bestV = p; bestI = i; } }
+  const a = Math.log(m[bestI - 1] + eps), b = Math.log(m[bestI] + eps), c = Math.log(m[bestI + 1] + eps), off = (a - c) / (2 * (a - 2 * b + c) || 1);
+  let f0 = (bestI + (isFinite(off) ? Math.max(-1, Math.min(1, off)) : 0)) * bw;
   // strongest spectral peak and how far it is from a multiple of f0exp / 2 (a note and its sub-octave sound)
   let pI = 2, pV = 0; for (let i = 2; i < m.length; i++) if (m[i] > pV) { pV = m[i]; pI = i; }
   const pa = Math.log(m[pI - 1] + 1e-12), pb = Math.log(m[pI] + 1e-12), pc = Math.log(m[Math.min(m.length - 1, pI + 1)] + 1e-12), po = (pa - pc) / (2 * (pa - 2 * pb + pc) || 1), fpk = (pI + (isFinite(po) ? po : 0)) * bw;
