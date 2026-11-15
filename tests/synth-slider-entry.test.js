@@ -1,5 +1,5 @@
 // SYNTH SLIDER ENTRY (14 Nov, owner): double-click types a number into a Synth page slider; reset is Alt-click and right-click > Reset to
-// default; a clicked slider takes the arrow keys (Shift: ten steps) and keeps them from the tracker / pad list until Escape lets go.
+// default; a clicked slider takes the arrow keys (1% of the travel; Shift: a tenth of that) and keeps them from the tracker / pad list until Escape lets go.
 // The code under test is cut out of index.html and run in a vm with a tiny fake DOM (no browser), as the other UI tests do.
 'use strict';
 const test = require('node:test'), assert = require('node:assert/strict'), vm = require('vm');
@@ -90,12 +90,12 @@ test('reset: a double-click no longer resets; the right-click menu\'s Reset to d
 test('two-state rows (nothing to type) keep double-click on the name as reset', () => {
   const w = world({ l: 'Reverse', min: 0, max: 1, d: 0, c: 'int', f: v => v ? 'on' : 'off' }); w.obj.f = 1; w.row.r.classList.add('two'); w.row.lab.fire('dblclick'); assert.equal(w.obj.f, 0);
 });
-test('arrows on a focused slider: one step, Shift ten steps; whole-number rows still change by one; Up / Down match; bounds hold', () => {
+test('arrows on a focused slider: 1% of the travel, Shift a tenth of that; whole-number rows still change by one; Up / Down match; bounds hold', () => {
   const w = world(); const { row, obj, log } = w; row.refresh(); const p0 = +row.inp.value;
   let e = row.inp.fire('keydown', { key: 'ArrowRight' }); assert.ok(e.prevented && e.stopped, 'the arrow stays with the slider');
-  assert.equal(+row.inp.value, p0 + 1); assert.equal(log.changed, 1, 'through the same input handler a drag uses');
-  row.inp.fire('keydown', { key: 'ArrowLeft', shiftKey: true }); assert.equal(+row.inp.value, p0 + 1 - 10);
-  row.inp.fire('keydown', { key: 'ArrowUp' }); assert.equal(+row.inp.value, p0 - 9 + 1);
+  assert.equal(+row.inp.value, p0 + 10); assert.equal(log.changed, 1, 'through the same input handler a drag uses');
+  row.inp.fire('keydown', { key: 'ArrowLeft', shiftKey: true }); assert.equal(+row.inp.value, p0 + 10 - 1);
+  row.inp.fire('keydown', { key: 'ArrowUp' }); assert.equal(+row.inp.value, p0 + 9 + 10);
   const wi = world(INT); wi.obj.f = 0; wi.row.refresh(); wi.row.inp.fire('keydown', { key: 'ArrowRight' }); assert.equal(wi.obj.f, 1, 'a whole-number row moves by one, not by a no-op slider step');
   wi.row.inp.fire('keydown', { key: 'ArrowLeft', shiftKey: true }); assert.equal(wi.obj.f, 0, 'Shift on a whole-number row: at least one unit back');
   const wb = world(PC); wb.obj.f = 1; wb.row.refresh(); wb.row.inp.fire('keydown', { key: 'ArrowRight' }); assert.equal(wb.obj.f, 1);
