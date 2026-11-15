@@ -16428,7 +16428,7 @@ addEventListener('drop', async e => {
       if (j && (j.app === 'thunder-project' || j.song || j.app === 'thunder-song')){
         if (!await okToLeave('opening ' + f.name)) continue;
         const path = DESK && DESK.pathOf ? DESK.pathOf(f) : '';
-        await loadProjText(JSON.stringify(j), f.name, path ? {path} : null); continue; }
+        await loadProjText(JSON.stringify(j), f.name, path ? {path, file:true} : {file:true}); continue; }
       if (j && (j.format === 'chains.patch' || j.format === 'waves.patch')){ importChainsFile(f); continue; }
       if (j && Array.isArray(j.voices)){ try { const k = kitFromJSON(j); if (await kitReplaceOk(k, 'Load kit “' + (k.name || 'Kit') + '”?')){ setKit(k); toast('Loaded ' + kit.name + '. Undo puts the previous kit back.'); } } catch(err){ toast(err.message || 'Couldn’t read that kit file.'); } continue; }
       if (j && (j.voices || j.layers || j.presets)){ importPresetsFile(f); continue; }
@@ -24434,6 +24434,8 @@ async function shareProj(){
   try { await navigator.share({files:[f], title:S.name || 'Thunder project'}); }
   catch(e){ if (e && e.name === 'AbortError') return; await deliver(f.name, projBlob()); toastErr('Sharing didn’t work here, so the project was saved to your downloads instead.'); }
 }
+/* Save / Save as under a new file name: a default-named song takes that name (before the file is written, so the name inside the file matches). True when it renamed. */
+function adoptFileName(fname){ if (!songNameDefault(S.name)) return false; const n = fileSongName(fname); if (!n || n === S.name) return false; S.name = n; try { saveS(); draw(); msMeta(); } catch(e){} return true; }
 async function writeTo(h){ const w = await h.createWritable(); await w.write(projBlob()); await w.close(); }
 // The browser's file permission: asked again after a restart (a click or Ctrl/⌘+S counts as the go-ahead).
 async function fsPerm(h, write){ try { const o = {mode:write ? 'readwrite' : 'read'}; if (await h.queryPermission(o) === 'granted') return true; return await h.requestPermission(o) === 'granted'; } catch(e){ return false; } }
@@ -24456,6 +24458,11 @@ try { projPath = DESK ? localStorage.getItem(PPK) || null : null; } catch(e){}
 if (!DESK && canFS) kvGet('cur').then(h => { if (h && !projFile){ projFile = h; try { msMeta(); } catch(e){} } });
 const projLabel = () => projPath ? projPath.split(/[\\/]/).pop() : projFile ? projFile.name : '';
 const projTitle = () => projLabel() || (projLoose && projLoose.s === S.name ? projLoose.f : '');
+/* THE SONG'S NAME FROM ITS FILE (14 Nov, owner: "the program still thinks every track I load is called 'song 1' instead of the file name"): a song still
+   called by its default ("Song 1", "Song N", nothing) takes the name of the file it is loaded from or saved to, without .thunder / .json, so the NAME field,
+   renders, MIDI, backups and the window all say "acid". A name the user chose stays. */
+const songNameDefault = n => { n = String(n == null ? '' : n).trim(); return !n || /^song(\s+\d+)?$/i.test(n); };
+const fileSongName = f => String(f == null ? '' : f).split(/[\\/]/).pop().replace(/\.(thunder|json)$/i, '').trim().slice(0, 40).trim();
 function projSet(path, handle){
   projPath = path || null; projFile = handle || null; projLoose = null;
   try { if (DESK){ if (projPath) localStorage.setItem(PPK, projPath); else localStorage.removeItem(PPK); } } catch(e){}
@@ -24529,6 +24536,7 @@ async function saveProj(as){
       if (!as && projPath){ const r = await DESK.save(projPath, projText()); if (r && r.ok){ setDirty(false); projSet(projPath, null); toast('Saved ' + projLabel()); return true; }
         toastErr('Couldn’t save to ' + projLabel() + (r && r.error ? ': ' + r.error : '') + '. Choose where to save it.', 5000); }
       const r = await DESK.saveAs(projName(), projText(), projPath || ''); if (!r || !r.ok) { if (r && r.error) toastErr('Couldn’t save: ' + r.error); return false; }
+      if (adoptFileName(r.path)){ try { await DESK.save(r.path, projText()); } catch(e){ tpLog('could not rewrite the saved file with the song’s new name', e); } }   /* the file written by the Save dialog holds the old default name: once more with the new one */
       setDirty(false); projSet(r.path, null); toast('Saved ' + projLabel()); return true;
     }
     if (!as && projFile){
@@ -24536,7 +24544,7 @@ async function saveProj(as){
       catch(e){ if (e && e.name === 'AbortError') return false; }   // permission gone or file moved: ask for a file instead
     }
     if (canFS){
-      try { const h = await window.showSaveFilePicker(Object.assign({suggestedName:projName()}, isAndroid ? {} : {types:PJT})); await writeTo(h); setDirty(false); projSet(null, h); toast('Saved ' + h.name); return true; }
+      try { const h = await window.showSaveFilePicker(Object.assign({suggestedName:projName()}, isAndroid ? {} : {types:PJT})); adoptFileName(h.name); await writeTo(h); setDirty(false); projSet(null, h); toast('Saved ' + h.name); return true; }
       // FIX (sweep, 4 Nov): when the picker itself fails (not Cancel), the song still gets saved, as a download
       catch(e){ if (e && e.name === 'AbortError') return false; toastErr('Couldn’t save there (' + ((e && e.message) || e) + '), so it went to your downloads.', 6000);
         await deliver(projName(), projBlob()); setDirty(false); return true; }
@@ -24555,8 +24563,11 @@ async function loadProjText(text, name, where){
     if (typeof j.build === 'number' && j.build > BUILD) toastErr(`Saved by a newer version of Thunder Plus. Some things may not play as they should. Update the app.`, 9000);
     if (j.kit){ const k = kitFromJSON(j.kit); if (!await kitReplaceOk(k, 'Open this project?')) return false; setKit(k); }
     const ns = normSong(j.app === 'thunder-song' ? j : j.song); if (ns.presets) try { presetsByRef(ns.presets); } catch(e){ tpLog('could not move preset samples out of the loaded song', e); }
-    setSong(ns, 'Loaded ' + (j.song && j.song.name || name));
+    /* from a file (where.file, a path or a handle): a default-named song takes the file's name, before setSong so it is not a change; a backup or the first-run song has no where.file */
+    if (where && (where.file || where.path || where.h) && songNameDefault(ns.name)){ const fn = fileSongName(name); if (fn) ns.name = fn; }
+    setSong(ns, 'Loaded ' + (ns.name || name));
     if (where && (where.path || where.h)){ projSet(where.path, where.h); setDirty(false); } else setDirty(!!(where && where.dirty));
+    if (where && where.file && !where.path && !where.h && name){ projLoose = {f:String(name), s:S.name}; try { msMeta(); dirtyShow(); } catch(e){} }   /* no handle: the file's name is all the app has of it */
     // FIX (27 Oct, audit B2): an opened project starts a fresh undo history, as in any DAW. Undo used to bring back the
     // previous project's song while the app pointed at the new file, so the next Save wrote the old song over it. (New song
     // and Funk breaks keep their undo: the owner's choice.) After the kit's and the song's own snapshots have run.
@@ -24565,13 +24576,11 @@ async function loadProjText(text, name, where){
   } catch(err){ toast(err.message || 'Couldn’t read that project file.'); return false; }
 }
 async function loadProjFile(f, h){
-  const ok = await loadProjText(await f.text(), f.name, h ? {h} : null);
-  if (ok && !h && f && f.name){ projLoose = {f:String(f.name), s:S.name}; try { msMeta(); dirtyShow(); } catch(e){} }   // no handle: the file's name is all the app has of it
-  return ok;
+  return await loadProjText(await f.text(), f.name, h ? {h, file:true} : {file:true});
 }
 async function openProj(){
   if (!await okToLeave('opening another project')) return;
-  if (DESK){ const r = await DESK.open(); if (r && r.text != null) loadProjText(r.text, r.name, {path:r.path}); else if (r && r.error) toastErr('Couldn’t open it: ' + r.error); return; }
+  if (DESK){ const r = await DESK.open(); if (r && r.text != null) loadProjText(r.text, r.name, {path:r.path, file:true}); else if (r && r.error) toastErr('Couldn’t open it: ' + r.error); return; }
   if (canFS && !isAndroid && typeof window.showOpenFilePicker === 'function'){
     try { const [h] = await window.showOpenFilePicker({types:PJT}); await loadProjFile(await h.getFile(), h); }
     catch(e){ if (e && e.name !== 'AbortError') toastErr('Couldn’t open that file.'); }
@@ -24595,7 +24604,7 @@ async function openRecent(){
   const k = await askPick({title:'Open recent', body:'The project files you saved or opened last.'}, recentL.map(e => e.name + (e.path ? '  ·  ' + e.path.replace(/[\\/][^\\/]*$/, '') : '')));
   if (k < 0) return; const e = recentL[k];
   if (!await okToLeave('opening ' + e.name)) return;
-  if (e.path && DESK){ const r = await DESK.read(e.path); if (r && r.text != null) return loadProjText(r.text, r.name, {path:r.path});
+  if (e.path && DESK){ const r = await DESK.read(e.path); if (r && r.text != null) return loadProjText(r.text, r.name, {path:r.path, file:true});
     recentL.splice(k, 1); kvSet('recent', recentL); return toastErr('Couldn’t open ' + e.name + (r && r.error ? ': ' + r.error : '') + '. It was taken off the list.', 5000); }
   if (e.h){ if (!await fsPerm(e.h, false)) return toastErr('The browser didn’t allow opening ' + e.name + '.');
     try { return await loadProjFile(await e.h.getFile(), e.h); } catch(err){ recentL.splice(k, 1); kvSet('recent', recentL); return toastErr('Couldn’t open ' + e.name + ': it may have moved. It was taken off the list.', 5000); } }
@@ -24627,7 +24636,7 @@ async function restoreBackup(){
 // (double-click, or dropped on the app's icon) arrives here by path.
 if (DESK_APP){
   try { DESK_APP.onCloseAsk(async () => { DESK_APP.closeAck(); let ok = true; try { ok = await okToLeave('closing the app'); } catch(e){} DESK_APP.closeReply(ok); }); } catch(e){}
-  try { DESK_APP.onOpenPath(async p => { if (!await okToLeave('opening ' + String(p).split(/[\\/]/).pop())) return; const r = await DESK.read(p); if (r && r.text != null) loadProjText(r.text, r.name, {path:r.path}); else toastErr('Couldn’t open ' + p + (r && r.error ? ': ' + r.error : '')); }); } catch(e){}
+  try { DESK_APP.onOpenPath(async p => { if (!await okToLeave('opening ' + String(p).split(/[\\/]/).pop())) return; const r = await DESK.read(p); if (r && r.text != null) loadProjText(r.text, r.name, {path:r.path, file:true}); else toastErr('Couldn’t open ' + p + (r && r.error ? ': ' + r.error : '')); }); } catch(e){}
   try { DESK_APP.ready(); } catch(e){}
 }
 setTimeout(dirtyShow, 0);
