@@ -25440,7 +25440,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 616;
+const BUILD = 617;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD + (location.pathname.includes('/beta/') ? ' · beta' : '');
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -35602,6 +35602,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [617, '15 Nov', ['About 360 new presets across the pitched engines: Acid 20, Bass 23, Phase 20, Partials 20, Vector 19, Scanned 18, Swarm 18, Chip 18, Drift 16, Table 16, Bytebeat 16, Modal 16, Resynth 14, Breath 14, Strings 12, Wind 12, Blip 11, Tone 11, Vox 11, Piano 10, EP 10, Organ 10. Basses, leads, pads, keys and bells, textures, short arp sounds and metallic IDM material. They were levelled and checked by measurement, not by ear: say which to cut']],
   [616, '14 Nov', ['Audio & MIDI › LATENCY COMP is now AUTO / ON / OFF, and AUTO is the default. When a track or bus holds an effect that looks ahead (CALM, TONE, LIMIT, TUNE, linear-phase EQ…), the other tracks wait for it while the song plays, so that bus, and a tempo-synced delay on it, land on the beat instead of about 46 ms late. With no such effect nothing changes. Stopped, pads answer at once. A notice tells you the first time it happens; OFF brings the old behaviour back', 'With latency compensation working, Flex, Step gate and Retrigger on the master (and on a bus) stay on the beat of what they hear (they ran early), a clocked pump effect after CALM in one chain keeps time, and changing the delay no longer clicks']],
   [615, '14 Nov', ['Settings › Song: MONO TRACKS and POLY TRACKS replace TRACKS, so a song can have, say, 4 mono and 12 poly tracks (at least one of each). The tracks after a changed count renumber, with their notes, mixer, effects and LFOs. Lowering a count hides tracks and keeps everything in them; it asks first only when a track that would be hidden has something in it. Existing songs open as before']],
   [614, '14 Nov', ['Option/Alt+A (jump to Arrange) now brings you back exactly where you were when you press it again, or Esc: the same screen, cell, selection and scroll, even if you moved around Arrange. If you open a block from Arrange, the next Option+A jumps from there instead', 'Option/Alt+▲▼ on Mixer, FX, MOD and INST now steps to the pattern above or below on that track, as on Phrase, and you stay on the page (it used to go to the Project screen). Project is on Option+8, its tab, or Option+◀▶']],

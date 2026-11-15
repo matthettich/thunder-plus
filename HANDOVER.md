@@ -747,6 +747,12 @@ The owner's top priority to add is the MOD screen. Work down the list; ask befor
 
 Start a session by asking for results. Fix on `beta`. (10 Nov, 15:10: the web beta is build 560; the build numbers in the rest of this paragraph are older.) Web beta: https://matthettich.github.io/thunder-plus/beta/ (build 547 as of 10 Nov morning, 548 once its PR merges; the night of 9–10 Nov shipped 544–547, see the four "10 Nov" entries below. Decisions the lead made that night for the owner to confirm or reverse: on a phone the saved Sequencer default plays on the Page unless Audio thread is picked on that device; on a phone the safety limiter is its stand-in until another worklet loads; the resync only runs with a worklet loaded and its margins are untested on a device). Desktop: v1.3.4-beta.2 (build 541, no feed view or scopes); further desktop betas on hold until the owner asks.
 
+**Build 617** (new engine presets)
+- [ ] **Any device, by ear:** Acid and Bass: step through the new presets with your own patterns. Pass: each is usable and sits at the level of the old ones. Name the ones to cut or fix.
+- [ ] **Any device, by ear:** Bytebeat: the new formulas. Pass: they read as musical lines, not only noise.
+- [ ] **Any device, by ear:** Tone and Blip: the new tonal presets (Tone “Spectra bell”, Blip “FM bleep”). Pass: they sit at a usable level next to the drum presets.
+- [ ] **Any device, by ear:** a quick pass over the other engines’ new presets (Phase, Partials, Vector, Scanned, Swarm, Table, Chip, Drift, Resynth, Modal, the acoustic ones). Pass: nothing harsh, silent, or far louder or quieter than its neighbours; tell me any that are near-copies.
+
 **Build 616** (LATENCY COMP AUTO)
 - [ ] **Computer, by ear:** a kick on one track; a second drum track fed into a bus that holds pump CALM and a synced 1/8 delay. Pass: bus and echoes are in time with the kick (before: the whole bus about 46 ms late). Switch CALM off and on: the timing does not move.
 - [ ] **Computer:** the first time you press PLAY with such an effect loaded. Pass: one notice names the effect and the track and says the other tracks now wait; it never comes back. Audio & MIDI shows LATENCY COMP: AUTO / ON / OFF.
@@ -1322,6 +1328,14 @@ Suggested order: N0 → N1 → N2 (phone cured) → N4 with N3 alongside → N5 
   the edge `R.t0`, "waiting…" while armed), `rcdClk` / `rcdFmt` / `rcdFreeSecs`, a 250 ms timer only while recording; the
   final length stays until the next take. recorder-check covers FREE, PATTERN, Stop, next take and closing mid-take.
 
+
+## 15 Nov (about 360 new presets on the pitched engines; build 617)
+
+Owner, 14 Nov 23:08: "I'd also like a lot more presets, especially drums, but across all engines." The pitched engines, by two agents (the first was killed by an environment restart after seven engines; the second finished from its notes). Data only: no engine code changed. Reviewed by the lead by the numbers; nobody has HEARD them.
+- **Counts:** as in the change list (about 360). Machine was left alone (partly a drum engine); Blip and Tone got tonal sounds only; Vox's were appended after pump SING's 32 voices; the pump synths' own presets are generated from the plugin and were not touched. The drum presets and kits are a separate build.
+- **Measured** with `tools/engine-preset-check.js`: each preset rendered at three pitches; finite, not silent, peak below full scale, loudness inside its engine's existing window, pitch within 60 cents at C2 or C3 unless listed in `tools/engine-preset-skip.json` (inharmonic, slides, chords, noise; all of Bytebeat and Breath), and not a near-copy of another preset of its engine (eight were dropped or changed).
+- Engine goldens: additions only; no existing hash changed. `tests/engine-presets.test.js` (counts, unique names, ranges, a measured sample; windows in `tests/engine-presets-windows.json`).
+- **Also in this PR:** the checklist export for builds 611 to 616 (`docs/TEST-CHECKLIST.md`; the doc itself is updated: section 1 has 78 open).
 
 ## 14 Nov (LATENCY COMP: AUTO (a bus with a look-ahead effect stays on the beat); build 616)
 
