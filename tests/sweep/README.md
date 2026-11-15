@@ -79,6 +79,6 @@ remain and are not counted as garbage (an identical attribute is not stored agai
 
 `node tests/sweep/render-vs-live.mjs --song=/path/to/song.thunder --from=72 --rows=4 --tracks=0,2,13,9 --full` renders a stretch of a
 song offline (the app's own `renderOut`) and captures the same stretch played live by the audio-thread sequencer, track by track, and
-prints PASS / FAIL for level, octave spectrum, timing and envelope (`ri-lib.mjs` holds the session, alignment and band maths). It warms
+prints PASS / FAIL for level, left and right level and balance (stereo), octave spectrum, timing (INCONCLUSIVE when the envelope has no timing information; exit 2 if every row is, or if nothing was compared) and envelope (`ri-lib.mjs` holds the session, alignment and band maths). It warms
 the engine up with a PLAY / STOP first and retries when the core skipped; it needs a quiet machine (a starved capture reads as a
 difference). Waveform correlation is NOT a pass criterion: the synth engines' oscillator phase depends on when the note starts.
