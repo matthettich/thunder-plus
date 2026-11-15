@@ -74,3 +74,11 @@ them leave the value as it was (a text node replaced by the same text, an attrib
 plays should write only what changed (`setText`, 10 Nov; `tests/redraw-churn.test.js`). About 1 minute for six screens. After the change the
 same-value text / node writes are 0 on every screen (before: 1,100 to 2,100 in 5 s); same-value attribute writes (`hidden`, `title`, `aria-*`)
 remain and are not counted as garbage (an identical attribute is not stored again).
+
+## render-vs-live.mjs (14 Nov, "renders should sound like the playback")
+
+`node tests/sweep/render-vs-live.mjs --song=/path/to/song.thunder --from=72 --rows=4 --tracks=0,2,13,9 --full` renders a stretch of a
+song offline (the app's own `renderOut`) and captures the same stretch played live by the audio-thread sequencer, track by track, and
+prints PASS / FAIL for level, octave spectrum, timing and envelope (`ri-lib.mjs` holds the session, alignment and band maths). It warms
+the engine up with a PLAY / STOP first and retries when the core skipped; it needs a quiet machine (a starved capture reads as a
+difference). Waveform correlation is NOT a pass criterion: the synth engines' oscillator phase depends on when the note starts.

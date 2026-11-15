@@ -9076,20 +9076,26 @@ function setText(e, s){ s = String(s); const f = e.firstChild; if (f ? f.nodeTyp
    units. fmt is read now, so a readout that depends on outside state (a sample's length) is read as it is at the moment of typing. */
 function rowReadout(fmt, x){
   let t; try { t = String(fmt(x)); } catch(_){ return null; }
-  const m = t.replace(',', '.').match(/(-?[0-9]*\.?[0-9]+)\s*(khz|hz|ms|s)\b/i); if (!m) return null;
+  const m = t.replace(',', '.').replace('−', '-').match(/(-?[0-9]*\.?[0-9]+)\s*(khz|hz|ms|s)\b/i); if (!m) return null;
   const u = m[2].toLowerCase(); return {dim: u === 'ms' || u === 's' ? 't' : 'f', v: +m[1] * (u === 'ms' ? 0.001 : u === 'khz' ? 1000 : 1)};
 }
 function rowInvert(d, fmt, dim, target){
   fmt = fmt || d.f; if (typeof fmt !== 'function' || !(d.max > d.min)) return null;
   const rd = x => { const r = rowReadout(fmt, x); return r && r.dim === dim ? r.v : NaN; };
-  let up = 0, dn = 0, prev = NaN;
-  for (let i = 0; i <= 16; i++){ const y = rd(d.min + (d.max - d.min) * i / 16); if (isNaN(y)) return null; if (i){ if (y > prev) up++; else if (y < prev) dn++; } prev = y; }
+  /* a word at an end of the range ("Open", "Off", "Max") is not a number: the search keeps to the part that prints the unit */
+  const N = 32, xs = [], ys = []; for (let i = 0; i <= N; i++){ const x = d.min + (d.max - d.min) * i / N; xs.push(x); ys.push(rd(x)); }
+  let i0 = 0, i1 = N; while (i0 < N && isNaN(ys[i0])) i0++; while (i1 > 0 && isNaN(ys[i1])) i1--;
+  if (i1 - i0 < 2) return null;
+  for (let i = i0; i <= i1; i++) if (isNaN(ys[i])) return null;
+  const edge = (num, non) => { for (let i = 0; i < 50; i++){ const mid = (num + non) / 2; if (isNaN(rd(mid))) non = mid; else num = mid; } return num; };   /* where the number starts */
+  const mn = i0 ? edge(xs[i0], xs[i0 - 1]) : d.min, mx = i1 < N ? edge(xs[i1], xs[i1 + 1]) : d.max;
+  let up = 0, dn = 0; for (let i = i0 + 1; i <= i1; i++){ if (ys[i] > ys[i - 1]) up++; else if (ys[i] < ys[i - 1]) dn++; }
   if ((up && dn) || !(up || dn)) return null;
   const inc = up > 0;
   const plateau = t => {   /* the first and the last stored value whose readout reaches / has not passed t */
-    const ge = x => inc ? rd(x) >= t : rd(x) <= t, le = x => inc ? rd(x) <= t : rd(x) >= t; let lo = d.min, hi = d.max, first, last;
+    const ge = x => inc ? rd(x) >= t : rd(x) <= t, le = x => inc ? rd(x) <= t : rd(x) >= t; let lo = mn, hi = mx, first, last;
     if (ge(lo)) first = lo; else if (!ge(hi)) first = hi; else { for (let i = 0; i < 60; i++){ const mid = (lo + hi) / 2; if (ge(mid)) hi = mid; else lo = mid; } first = hi; }
-    lo = d.min; hi = d.max;
+    lo = mn; hi = mx;
     if (le(hi)) last = hi; else if (!le(lo)) last = lo; else { for (let i = 0; i < 60; i++){ const mid = (lo + hi) / 2; if (le(mid)) lo = mid; else hi = mid; } last = lo; }
     return [first, last]; };
   let [f, l] = plateau(target);
@@ -21890,7 +21896,11 @@ function makePlayer(ac, out, getBuf, live, mo){   // mo: the master OUT gain (af
     const syn = isSyn(ev.pad), v = {src, f, g, pn, base:ev.rate, rate:ev.rate, choke:ck, col:ev.col, ended:false, stopAt:null, syn, rel:syn && kv ? (ev.rlo != null ? ev.rlo : relOf(kv)) : 0};
     if (!ev.slide) pitchMods(v, ev.t, ev.rate, ev);
     const off = ev.ofsSec != null ? (ev.rev ? Math.max(0, b.duration - ev.ofsSec - ev.durSec) : ev.ofsSec) : clamp(ev.ofs, 0, 255) / 256 * b.duration;
-    const st0 = Math.max(ev.t, ac.currentTime);
+    /* WHOLE-SAMPLE STARTS (build 608; owner, 14 Nov: "renders should sound like the playback"). A sample started between two samples is
+       interpolated by the browser from its first sample to its last, which dulls it (measured on his song: a render's drums 0.8 to
+       1.1 dB down at 8 to 16 kHz against the audio-thread sequencer, which starts every note on a sample). So the start moves up to
+       the next sample (at most 21 µs late). Renders, and playing with the sequencer on the page, now sound as the audio thread does. */
+    const st0 = Math.ceil(Math.max(ev.t, ac.currentTime) * ac.sampleRate - 1e-6) / ac.sampleRate;
     // Starting part-way into a sample (slices, offsets) lands mid-waveform: a 1.5 ms fade-in keeps it from clicking.
     if (off > 0.0005){ f.gain.setValueAtTime(0, st0); f.gain.linearRampToValueAtTime(1, st0 + 0.0015); }
     src.start(st0, Math.min(off, Math.max(0, b.duration - 0.001)));
@@ -24908,7 +24918,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 607;
+const BUILD = 608;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD + (location.pathname.includes('/beta/') ? ' · beta' : '');
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -34875,6 +34885,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [608, '14 Nov', ['Renders are as bright as playback: a drum or sample that started between two samples was slightly dulled in a render (about 1 dB down at the very top). Every note now starts on a sample, in renders and when the sequencer runs on the page', 'Typing a value into a slider: negative pitches (−440 Hz) and sliders whose top or bottom reads as a word (Open, Off) take a typed unit too']],
   [607, '14 Nov', ['A switched-off …pump effect no longer costs anything: it used to keep doing all its work behind the bypass (pump MASTER, switched off, took about 8% of the audio engine on a busy song). The timing does not move. Switching one on takes 20 to 65 ms to come in', 'A muted track’s effects rest (also when another track is soloed): their echoes die away and the work stops, within ten seconds at the latest. Unmute and the track is back at once, its effects starting fresh', 'CPU panel: an effects row now names the two dearest effects of that track with their share, such as “Effects · Track 07: pump TWANG 5%, Space reverb 3%”', 'Typing a time or a pitch into a slider now works on every slider that shows one, whatever its scale (a sample’s Loop start, Click width)']],
   [606, '14 Nov', ['Typing a value into a slider: a time typed as ms or s (and a pitch as Hz or kHz) is now read in the unit that slider shows (500 ms into a slider that shows milliseconds gave its lowest value); 50% on a voice’s Level means halfway, as a bare 50 does']],
   [605, '14 Nov', ['Arrange beside the Phrase: with Arrange holding the keys and blocks selected, TRANSP. − / + transpose every phrase in the selection, each phrase once, as one undo step (it said “Select rows first”). The buttons’ tips say how many blocks they will move']],
