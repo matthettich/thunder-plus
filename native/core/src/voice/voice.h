@@ -82,6 +82,7 @@ class VoicePool {
   int capacity() const { return cap_; }
   uint32_t dropped() const { return dropped_; }
   uint32_t tOverflow() const { return tOver_; }
+  uint32_t refused() const { return refused_; }   // notes note() refused: a rate / time / gain not finite, a bad pad (N1 review A1)
   uint32_t autoDropped() const;
   int peakVoices() const { return peakV_; }
   int peakEvents() const { return peakEv_; }   // the longest automation list seen (r, g, f or pn) after an event; size kAutoR / kAutoGFP from it
@@ -128,7 +129,7 @@ class VoicePool {
   std::unique_ptr<int[]> alive_, free_;
   int nAlive_ = 0, nFree_ = 0;
   int T_[kVoiceTracks][kVoiceTrackCap]; int nT_[kVoiceTracks];
-  uint32_t dropped_ = 0, tOver_ = 0; int peakV_ = 0, peakEv_ = 0;
+  uint32_t dropped_ = 0, tOver_ = 0, refused_ = 0; int peakV_ = 0, peakEv_ = 0;
 };
 
 }  // namespace thunder

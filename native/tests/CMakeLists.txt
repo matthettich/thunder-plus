@@ -161,3 +161,13 @@ if(NODE_EXE)
 else()
   add_test(NAME beat COMMAND test_beat)
 endif()
+
+# N1 review fixes: hostile inputs (the independent review's findings, one regression test each). Names the finding in every failure line.
+add_executable(test_hostile test_hostile.cpp)
+target_link_libraries(test_hostile PRIVATE thunder_core)
+target_include_directories(test_hostile PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../core/src ${CMAKE_CURRENT_SOURCE_DIR})
+target_compile_definitions(test_hostile PRIVATE THUNDER_ROOT="${CMAKE_CURRENT_SOURCE_DIR}/../..")
+if(NOT MSVC)
+  target_compile_options(test_hostile PRIVATE -Wall -Wextra)
+endif()
+add_test(NAME hostile COMMAND test_hostile)

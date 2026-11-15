@@ -131,6 +131,10 @@ void VoicePool::take(const SeqEvent& e, const VoiceKit* kv) {
 // startNote
 bool VoicePool::note(const SeqEvent& e, const double* arp, const VoiceBuf& c, const VoiceKit& kv, double bpm) {
   if (e.track < 0 || e.track >= kVoiceTracks || !c.data) return false;
+  // N1 review A1: refuse a note the player cannot play, before it touches anything: a rate that is not finite and above 0 (a part's
+  // instrument without `tsp` makes rate = NaN, in the JS too: Math.pow(2, NaN)), a time or gain that is not finite, a pad with no
+  // usable sample rate or fewer than two samples. A NaN position used to index the buffer; now no voice starts and refused() counts it.
+  if (!(e.rate > 0 && std::isfinite(e.rate)) || !std::isfinite(e.t) || !std::isfinite(e.gain) || !(c.sr > 0 && std::isfinite(c.sr)) || c.len < 2) { refused_++; return false; }
   const int tr = e.track;
   // (STUB: `if (kv.sf) return sfNote(ev)`: SoundFont pads are not this player's; the host does not call note() for them)
   for (int k = nT_[tr] - 1; k >= 0; k--) if (!live1(V_[(size_t)T_[tr][k]], e.t)) tErase(tr, k);
@@ -231,7 +235,7 @@ void VoicePool::run(Voice& v, float* L, float* R, int N, double tb0, double tb1)
       const bool st = !RD->tw && v.data2; double B4[4]; if (st) stBal(pc, B4); else std::memcpy(B4, kZero4, sizeof B4);
       const double ll = B4[0], rl = B4[1], lr = B4[2], rr = B4[3];
       for (int i = 0; i < N; i++) {
-        if (p >= len - 1) { v.ended = true; break; }
+        if (!(p >= 0 && p < len - 1)) { v.ended = true; break; }   // (N1 A1: also a NaN or negative position: never index the buffer outside it)
         const int j = (int)p; const double f = p - j, d0 = RD->at(0, j), x = d0 + (RD->at(0, j + 1) - d0) * f;
         if (st) { const double e0 = RD->at(1, j), y = e0 + (RD->at(1, j + 1) - e0) * f; acc(L + i, (x * ll + y * rl) * k); acc(R + i, (x * lr + y * rr) * k); }
         else { acc(L + i, x * kl); acc(R + i, x * kr); }
@@ -240,13 +244,13 @@ void VoicePool::run(Voice& v, float* L, float* R, int N, double tb0, double tb1)
     } else if (v.data2) {   // a stereo pad: the StereoPannerNode's balance law, as the page plays it
       const float* D2 = v.data2; double B4[4]; stBal(pc, B4); const double ll = B4[0], rl = B4[1], lr = B4[2], rr = B4[3];
       for (int i = 0; i < N; i++) {
-        if (p >= len - 1) { v.ended = true; break; }
+        if (!(p >= 0 && p < len - 1)) { v.ended = true; break; }   // (N1 A1: also a NaN or negative position: never index the buffer outside it)
         const int j = (int)p; const double f = p - j, x = (double)D[j] + ((double)D[j + 1] - (double)D[j]) * f, y = (double)D2[j] + ((double)D2[j + 1] - (double)D2[j]) * f;
         acc(L + i, (x * ll + y * rl) * k); acc(R + i, (x * lr + y * rr) * k); p += inc;
       }
     } else {
       for (int i = 0; i < N; i++) {
-        if (p >= len - 1) { v.ended = true; break; }
+        if (!(p >= 0 && p < len - 1)) { v.ended = true; break; }   // (N1 A1: also a NaN or negative position: never index the buffer outside it)
         const int j = (int)p; const double x = (double)D[j] + ((double)D[j + 1] - (double)D[j]) * (p - j);
         acc(L + i, x * kl); acc(R + i, x * kr); p += inc;
       }
@@ -258,7 +262,7 @@ void VoicePool::run(Voice& v, float* L, float* R, int N, double tb0, double tb1)
   for (int i = 0; i < N; i++) {
     const double t = tb0 + i * dt;
     if (pageTiming_ ? t < v.t0 - 1e-9 : t < v.t0) continue;
-    if (t >= v.end || v.pos >= len - 1) { v.ended = true; break; }
+    if (t >= v.end || !(v.pos >= 0 && v.pos < len - 1)) { v.ended = true; break; }   // (N1 A1: a NaN or negative position ends the voice)
     const double p = v.pos; const int j = (int)p;
     const double d0 = RD ? RD->at(0, j) : (double)D[j], d1 = RD ? RD->at(0, j + 1) : (double)D[j + 1], x = d0 + (d1 - d0) * (p - j);
     const float* D2 = RD && RD->tw ? nullptr : v.data2;
