@@ -9876,7 +9876,7 @@ const BLIP_PRE = [
   ['Buzz tone', {pitch:110, kick:0, ring:0.9, ringF:220, drive:0.5, decay:700, atk:5}],
   ['Noisy whistle', {pitch:2400, kick:0, noise:0.35, filt:0.2, res:0.8, decay:900, atk:20}],
   ['Resonant pluck', {pitch:330, kick:0.1, kickT:6, click:0.5, decay:300, filt:-0.2, res:0.6, drive:0.3}],
-  ['Metal swell', {pitch:520, kick:0, fm:0.7, fmR:3.73, ring:0.6, ringF:1900, decay:2200, atk:300}]
+  ['Metal swell', {pitch:520, kick:0, fm:0.7, fmR:3.73, ring:0.6, ringF:1900, decay:2200, atk:100}]
 ];
 const blipRows = [];
 const BL = () => { const v = V(); if (!v.blip) v.blip = normBlip(null); return v.blip; };
@@ -9969,12 +9969,12 @@ const VOX_PRE = [
   ['Monster', {oct:-1, form:-1, rough:0.6, robot:0.4, vib:0.1, drive:0.4}],
   ['Fairy', {form:0.7, breath:0.5, choir:3, spread:0.4, vib:0.4, robot:0.1}],
   // (15 Nov) more presets
-  ['Vowel pad', {choir:5, spread:0.7, vib:0.15, atk:500, rel:1800, bw:0.8, breath:0.2, clar:0.5, robot:0.05}],
+  ['Vowel pad', {choir:5, spread:0.7, vib:0.15, atk:400, rel:1800, bw:0.8, breath:0.2, clar:0.5, robot:0.05}],
   ['Sub vowel', {oct:-2, form:-0.8, robot:0.3, vib:0.05, bright:0.35, bw:0.6, glide:100, atk:40, rel:300}],
-  ['Whisper pad', {voice:0.05, breath:1, choir:6, spread:0.9, bright:0.6, vib:0, atk:700, rel:2000}],
+  ['Whisper pad', {voice:0.05, breath:1, choir:6, spread:0.9, bright:0.6, vib:0, atk:400, rel:2000}],
   ['Glitch robot', {robot:1, breath:0, vib:0, glide:0, bright:0.6, bw:0.35, clar:0.7, cons:1.8, atk:0.5, rel:30, form:-0.2}],
   ['Formant lead', {oct:1, form:0.3, robot:0.5, vib:0.35, vibDelay:200, bright:0.85, bw:0.2, clar:0.9, glide:60}],
-  ['Detuned choir bed', {choir:8, spread:1, vib:0.5, vibRate:4, bright:0.5, bw:0.75, atk:900, rel:2500, rough:0.15, breath:0.3}],
+  ['Detuned choir bed', {choir:8, spread:1, vib:0.5, vibRate:4, bright:0.5, bw:0.75, atk:400, rel:2500, rough:0.15, breath:0.3}],
   ['Gritty throat', {oct:-1, rough:1, form:-0.3, bright:0.7, vib:0, drive:0.5, bw:0.3, glide:30}],
   ['Airy voice', {voice:0.5, breath:0.9, vib:0.2, bright:0.75, bw:0.6, clar:0.4, atk:150, rel:700}],
   ['Tight stab voice', {robot:0.4, bright:0.8, vib:0, glide:0, cons:1.6, atk:1, rel:40, clar:0.9, bw:0.2}],
@@ -12616,7 +12616,7 @@ const XUI = {
       ['Distant storm', {color:0.1, bands:2, freq:90, spread:0.3, q:0.5, body:0.6, hp:20, lp:900, wind:1, atk:2500, sus:1, rel:3000}],
       ['Glassy chimes', {color:0.7, grain:0.7, grate:6, bands:6, freq:2400, spread:0.6, metal:0.7, q:1, body:1, hp:800, lp:16000, atk:2, dec:2000, sus:0.4, rel:900}],
       ['Vocal formant noise', {color:0.4, bands:3, freq:700, spread:0.7, metal:0, q:0.8, body:0.9, key:0.5, hp:100, lp:5000, wind:0.5, atk:300, sus:1, rel:600}],
-      ['Sub rumble', {color:0, bands:1, freq:50, q:0.6, body:0.7, hp:15, lp:300, wind:0.3, atk:600, sus:1, rel:1200}],
+      ['Sub rumble', {color:0, bands:1, freq:60, q:0.6, body:0.7, hp:15, lp:300, wind:0.3, atk:600, sus:1, rel:1200}],
       ['Tape hiss bed', {color:0.85, grain:0.2, grate:150, bands:1, freq:8000, q:0, body:0, hp:3000, lp:16000, wind:0.2, sus:1, rel:200}],
       ['Plucked noise tone', {color:0.5, bands:3, freq:330, spread:0.5, metal:0.1, q:1, body:1, key:1, hp:60, lp:9000, atk:1, dec:900, sus:0, rel:300}],
       ['Wandering whistle', {color:0.35, bands:1, freq:1500, q:0.98, body:1, key:1, hp:200, lp:8000, wind:1, atk:150, sus:1, rel:500}]]},
@@ -13048,7 +13048,7 @@ const XUI = {
       ['Detuned glass', {oct:3, harm:0.4, stretch:0.15, parts:64, tilt:0.2, noise:0.1, speed:0.8, rel:900}],
       ['Frozen sub', {oct:0, freeze:1, pos:0.05, harm:0.8, parts:24, tilt:-0.5, noise:0, atk:300, sus:1, rel:800}],
       ['Wide frozen shimmer', {oct:3, freeze:1, pos:0.2, parts:128, tilt:0.4, stretch:0.1, noise:0.15, atk:1500, sus:1, rel:3000}],
-      ['Slow smear', {oct:2, speed:0.07, parts:128, harm:0.3, tilt:0.3, noise:1, pmot:0.5, atk:300, dec:3000, sus:0.4, rel:1500}],
+      ['Slow smear', {oct:2, speed:0.1, parts:128, harm:0.3, tilt:0.3, noise:1, pmot:0.5, atk:300, dec:3000, sus:0.4, rel:1500}],
       ['Stretched metal', {oct:2, stretch:0.9, harm:0, parts:48, noise:0.1, tilt:0.2, dec:1200, sus:0.2, rel:600}],
       ['Compressed spectrum', {oct:2, stretch:-0.9, parts:72, noise:0.2, tilt:0.1, dec:900, sus:0.3, rel:300}],
       ['Pitchless noise bed', {oct:2, parts:8, noise:2, tilt:0.3, atk:400, sus:1, rel:1200}],
