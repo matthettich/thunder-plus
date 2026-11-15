@@ -74,13 +74,13 @@ test('notification title (12 Nov): the project file name, else the song name; se
 });
 
 // 14 Nov (owner, folded Fold 6: the chip said "Song 1" for a project called "acid"): on Android a picked / shared / "Open with" file gives the app no handle or path, so
-// projLabel() was '' and the title fell back to the song's inner default name. loadProjFile now keeps the file's name (projLoose) beside the song's name at that time.
+// projLabel() was '' and the title fell back to the song's inner default name. loadProjText now keeps the file's name (projLoose) beside the song's name at that time (since 14 Nov, build 610, a default-named song also takes the file's name: tests/song-name-from-file.test.js).
 test('title (14 Nov): a project opened without a file handle shows the file name, not the song\'s inner "Song 1"; follows a rename, a new song, a later play', async () => {
   const grab = re => { const x = src.match(re); assert.ok(x, 'could not find ' + re); return x[0]; };
   const R = rig();
   R.ctx.projLabel = () => proj.label; R.ctx.dirtyShow = () => {};
   // the real projTitle / loadProjFile / projLoose from index.html; loadProjText stands in for setSong(): a new song, its inner name "Song 1", the file link dropped
-  vm.runInContext('var projLoose = null; var loadProjText = async () => { S = { name: "Song 1" }; projLoose = null; return true; };' + grab(/const projTitle = [^\n]*/) + ';' + grab(/async function loadProjFile\([\s\S]*?\n\}\n/), R.ctx);
+  vm.runInContext('var projLoose = null; var loadProjText = async (t, name, where) => { S = { name: "Song 1" }; projLoose = where && where.file && !where.path && !where.h ? { f: String(name), s: S.name } : null; return true; };' + grab(/const projTitle = [^\n]*/) + ';' + grab(/async function loadProjFile\([\s\S]*?\n\}\n/), R.ctx);
   vm.runInContext('S = { name: "My Song" }', R.ctx);
   R.ctx.bgPlay(true); assert.equal(R.ms.metadata.title, 'My Song', 'before: the song name');
   R.tp.on = false; R.ctx.bgPlay(false); R.tp.on = true;
