@@ -2968,6 +2968,8 @@ select.pkhid{position:absolute; width:1px; height:1px; min-height:0; margin:0; p
 }
 :root:root:root:root :is(#main, #synRight) :is(#lOn.on, #vAud.on, .fxhead button.on){background:var(--acc)!important; color:var(--acc-on)!important; border-color:var(--acc)}
 :root:root :is(#main, #synRight) :is(button, input, textarea, [tabindex]):focus-visible{outline:2px solid var(--acc); outline-offset:2px}
+/* a clicked slider keeps the keys (◀ ▶ nudge it), so the ring shows after a mouse click too, not only after Tab (14 Nov) */
+:root:root :is(#main, #synRight) input[type=range]:focus{outline:2px solid var(--acc); outline-offset:2px}
 /* no frame inside a frame: in the 3.5 px cards the sections are ruled off from each other, not boxed */
 :is(.layercard, .voicecard, .sndcard) .sec{border:0; border-top:1px solid var(--line); padding-inline:4px}
 :is(.layercard, .voicecard, .sndcard) .secs{gap:0 22px; padding:0 10px 4px}
@@ -3705,7 +3707,7 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
 <p>The nine <b>pump</b> mastering plugins run on <b>bus tracks and the master</b>, and <b>EQ</b> on any track too (FX picker → <b>Mastering (pump)</b>; › EQ WINDOW on the FX screen opens it): <b>EQ</b> (24 bands, cuts to 96 dB/oct or Brickwall, dynamic bands, zero latency or linear phase), <b>COMP</b>, <b>LIMIT</b> (true peak, loudness targets), <b>CALM</b> (resonance suppressor), <b>TONE</b> (tonal balance), <b>BAND</b> (multiband dynamics), <b>WIDE</b> (stereo imager), <b>HEAT</b> (saturator) and <b>METER</b> (loudness). They are the plugins' own DSP, so a setting sounds as it does in the VST3 / CLAP plugin. The slot shows the main settings as hex rows (EQ, BAND, WIDE and HEAT pick a <b>BAND</b> first); <b>› PRESET</b> has the plugin's presets and <b>› OPEN</b> its full window, which works like the plugin: drag, Shift-drag for fine, double-click to type, Ctrl-click to reset, A/B, and Alt held to listen to a band or a range. A slot's ACTIVE is the plugin's bypass. CALM, TONE, LIMIT and linear-phase EQ add latency: renders of the master line it up, but on a bus that track plays late against the others.</p>
 <h3>Settings</h3>
 <p><b>⚙ Settings</b> at the top: it starts with Audio (output device, level, latency, rate), then this screen’s own settings (in the tracker every Project setting: Song, Input, Screen, Render), then Master, Skin, Export, MIDI, Kit and App (Mobile, install, check for update). There you can also turn off <b>Display steps as decimal</b> (row numbers in hex), turn off <b>Play note on entry</b> (audition notes as you type them), show or hide the KEYS-mode <b>on-screen keypad</b> (Settings → KEYS KEYPAD; it starts hidden on a computer and shown in the Mobile setup), and change the <b>Text size</b> of the tracker screen. With the KEYS keypad off, a <b>bottom panel</b> takes its place: a spectrum of the master, quick controls for the current instrument’s sound, the <b>chains</b> controls you have added for the current track (in chains, right-click a control or a module → Add to the bottom panel; right-click one in the panel to remove it), the current track’s effects, and a channel strip for the current track (stereo meter, fader with 0 dB at E0 and +6 dB at the top, pan, M and S). When it holds more than fits, the panel scrolls sideways. Tap a section’s button to hide it (it waits as a dashed + button); drag the panel’s top edge for its height and the scope’s or FX section’s edge for their widths. On a big screen the space beside the grid is the <b>stage</b> (Settings → STAGE): BY SCREEN shows something useful for each screen (the dogs dance to the beat on Song and Project — a hop every beat, a bigger one on the bar, and a new dance (arms up, arms down, leg kicks, jumping jacks) every time the cursor’s track starts a phrase, so they count beats and phrases for you — Sect previews the phrase, Phrase shows a piano lighting the notes as they play, Inst the waveform, Mixer the master spectrum, FX the effects chain), DOGS shows the dogs everywhere, OFF leaves it empty. In the bar above the grid, double-click the tempo or LPB to type a new one (ticks a step are in Settings). The panel follows the track the cursor is on: its instrument (on Song, the one the block under the cursor plays), its effects and its strip. When any track is soloed, SOLO · CLEAR shows; ✕ hides the panel and Settings → BOTTOM PANEL brings it back. Drag a finger up or down anywhere on the tracker screen to scroll; drag on the cursor's cell to change its value. With a mouse, a drag selects instead (the wheel scrolls), a selection drags to move (Alt, Ctrl or ⌘ copies), and right-click on a track number solos it: see Tracker · KEYS mode → Mouse.</p>
-<p><b>Project files</b> are <code>.thunder</code> files (.json ones still open). A dot on <b>File ▾</b> and in the window title means changes that aren't in the file yet; New, Open and the rest ask <b>Save changes?</b> first. The app remembers the file (Ctrl/⌘+S goes back to it after a restart) and File ▾ → <b>Open recent…</b> lists the last eight. Every 3 minutes the song and kit are backed up in the browser, the last 10: File ▾ → <b>Restore a backup…</b>. On Android, tapping a <code>.thunder</code> attachment can’t open the web app, so either tap <b>Share</b> on the attachment and send it to Thunder Plus (install it first: <b>Settings → App</b>), or download it and use <b>LOAD PROJECT</b>; that picker shows every file. Drop audio on a pad to load it; drop a project, kit or .mid on the window to open it. <b>Sliders, faders and values</b> all work alike (the synth sliders, the Mixer's faders, the strip fader, the FX bar, the pump windows and the sliders in chains and waves): drag one from where it is (it doesn't jump to the click); hold Shift for fine control or Ctrl/⌘ for big moves, and press or let go of either at any time; on a touch screen it moves only once your finger slides sideways. Double-click, Alt-click or Ctrl/⌘-click (⌘ on a Mac) resets it; right-click for Reset / Type a value (and MIDI learn on the synth sliders). On the FX bar a double-click types a value in place instead (as it shows, such as 2.5k or −6, or the raw number; Enter sets it, Esc leaves it), and Alt / ⌘-click resets. The wheel moves the control the pointer rests on (it gets an outline); Shift+wheel in fine steps, Ctrl/⌘+wheel in big ones.</p>
+<p><b>Project files</b> are <code>.thunder</code> files (.json ones still open). A dot on <b>File ▾</b> and in the window title means changes that aren't in the file yet; New, Open and the rest ask <b>Save changes?</b> first. The app remembers the file (Ctrl/⌘+S goes back to it after a restart) and File ▾ → <b>Open recent…</b> lists the last eight. Every 3 minutes the song and kit are backed up in the browser, the last 10: File ▾ → <b>Restore a backup…</b>. On Android, tapping a <code>.thunder</code> attachment can’t open the web app, so either tap <b>Share</b> on the attachment and send it to Thunder Plus (install it first: <b>Settings → App</b>), or download it and use <b>LOAD PROJECT</b>; that picker shows every file. Drop audio on a pad to load it; drop a project, kit or .mid on the window to open it. <b>Sliders, faders and values</b> all work alike (the synth sliders, the Mixer's faders, the strip fader, the FX bar, the pump windows and the sliders in chains and waves): drag one from where it is (it doesn't jump to the click); hold Shift for fine control or Ctrl/⌘ for big moves, and press or let go of either at any time; on a touch screen it moves only once your finger slides sideways. Alt-click or Ctrl/⌘-click (⌘ on a Mac) resets it; right-click for Reset / Type a value (and MIDI learn on the synth sliders). On the Synth page's sliders a double-click types a value in place (the number with or without its unit, such as 440, 440 Hz, −6 dB or 35%; Enter sets it, Esc leaves it; the two-state buttons such as Reverse and Loop and the mod-sequence step sliders still reset on a double-click), and a clicked slider takes ◀ ▶ (1% of its travel; Shift: ten times finer; Esc lets go). On the FX bar a double-click types a value in place too (as it shows, such as 2.5k or −6, or the raw number; Enter sets it, Esc leaves it), and Alt / ⌘-click resets. The wheel moves the control the pointer rests on (it gets an outline); Shift+wheel in fine steps, Ctrl/⌘+wheel in big ones.</p>
 <h3>Drum pads and synths</h3>
 <p>The kit has 16 slots to start, up to 64: <b>SLOTS</b> at the top of the Synth page (− and + step by 8, tap the number to type one; fewer slots only hide the last ones, and their sounds come back). <b>THIS SLOT</b> sets how the selected slot plays: <b>ONE-SHOT</b> plays its whole sound, like a drum; <b>HELD</b> sounds until note-off, like a synth. By default: <b>1–8</b> are drum pads: one-shots that play their whole sound. <b>9–16</b> are synths for melodies and chords (Bass, Pluck, Keys, Pad, Lead, Bell, Organ, Sub to start): a note holds at its sustain level for as long as you hold it, up to the slot’s Max len, then fades over its release when you let go. C-4 plays middle C. In the tracker, instruments 08–0F play the synth slots in a new project. <b>A kit slot per track</b> (Settings → Kit) grows the kit past 16 slots: every song track gets its own pad — drums on mono tracks, a simple synth on poly ones. The pads stay the same size and scroll up and down.</p>
 <h3>Chopping breaks</h3>
@@ -8461,9 +8463,12 @@ const MOD_SRC = [['r1', 'LFO 1'], ['r2', 'LFO 2'], ['r3', 'LFO 3'], ['r4', 'Env 
 const toPos = (d, v) => d.c === 'log' || d.c === 'logf' ? Math.log(v / d.min) / Math.log(d.max / d.min)
   : d.c === 'sq' ? Math.sqrt(Math.max(0, (v - d.min) / (d.max - d.min))) : (v - d.min) / (d.max - d.min);
 function fromPos(d, p){
-  let v = d.c === 'log' || d.c === 'logf' ? d.min * Math.pow(d.max / d.min, p) : d.c === 'sq' ? d.min + (d.max - d.min) * p * p : d.min + (d.max - d.min) * p;
+  return snapDef(d, d.c === 'log' || d.c === 'logf' ? d.min * Math.pow(d.max / d.min, p) : d.c === 'sq' ? d.min + (d.max - d.min) * p * p : d.min + (d.max - d.min) * p);
+}
+// The step a row's value takes (what a drag lands on); a typed value is snapped the same way (SLIDER ENTRY, 14 Nov).
+function snapDef(d, v){
   if (d.c === 'int') v = Math.round(v); else if (d.c === 'half') v = Math.round(v * 2) / 2;
-  else if (d.c === 'logf') v = +v.toPrecision(4);   // a fine log curve (the module effects' small times): four figures, never rounded to 0
+  else if (d.c === 'logf') v = +v.toPrecision(4);   /* a fine log curve (the module effects' small times): four figures, never rounded to 0 */
   else if (d.c === 'log' || d.c === 'sq') v = v < 10 ? Math.round(v * 10) / 10 : Math.round(v);
   else v = Math.round(v * 1000) / 1000;
   return v;
@@ -9058,40 +9063,75 @@ function el(tag, cls, txt){ const e = document.createElement(tag); if (cls) e.cl
 // when the node does not already read exactly `s` (it compares the node itself, not a cache, so any other writer can still change it, and a
 // node that holds something else, such as a value box's input, is overwritten as before).
 function setText(e, s){ s = String(s); const f = e.firstChild; if (f ? f.nodeType === 3 && f === e.lastChild && f.data === s : s === '') return; e.textContent = s; }
-// Type a value into a row's value box (double-click or double-tap). Entries accept the unit shown next to
-// the slider (Hz, kHz, ms, s, %, semitones, dB) or the bare number; the entry is clamped to the row's range
-// and applied through row.refresh(), so it behaves exactly like dragging its slider.
+// Type a value into a row's value box (double-click or double-tap the slider, its name or its value; right-click > Type a value…).
+// Entries accept the unit shown next to the slider (Hz, kHz, ms, s, %, semitones, dB) or the bare number; the entry is clamped
+// to the row's range, snapped to the step a drag lands on, and applied through row.refresh() and the row's own handler, so it
+// behaves exactly like dragging its slider (undo, MOD / LFO targets and MIDI learn hang off that handler).
+// rowParse(d, txt): the value a typed text means for row definition d (clamped and snapped), or null when it holds no number.
+/* The stored value whose readout says what was typed (CR 139). A time row prints "ms" or "s" (some switch with size), a pitch row
+   "Hz" or "kHz", and the readout can be any curve (a scale of 2, a square). So the row's own readout is inverted numerically: it is
+   read back (number and unit, as seconds or Hz) across the range; if that is one kind of unit and rises or falls steadily, the
+   stored value is bisected for the typed amount (the middle of the run of values that print the same, when the readout rounds).
+   Returns null when the readout is not of the typed kind or not steady: the typed number is then a bare number in the row's own
+   units. fmt is read now, so a readout that depends on outside state (a sample's length) is read as it is at the moment of typing. */
+function rowReadout(fmt, x){
+  let t; try { t = String(fmt(x)); } catch(_){ return null; }
+  const m = t.replace(',', '.').replace('−', '-').match(/(-?[0-9]*\.?[0-9]+)\s*(khz|hz|ms|s)\b/i); if (!m) return null;
+  const u = m[2].toLowerCase(); return {dim: u === 'ms' || u === 's' ? 't' : 'f', v: +m[1] * (u === 'ms' ? 0.001 : u === 'khz' ? 1000 : 1)};
+}
+function rowInvert(d, fmt, dim, target){
+  fmt = fmt || d.f; if (typeof fmt !== 'function' || !(d.max > d.min)) return null;
+  const rd = x => { const r = rowReadout(fmt, x); return r && r.dim === dim ? r.v : NaN; };
+  /* a word at an end of the range ("Open", "Off", "Max") is not a number: the search keeps to the part that prints the unit */
+  const N = 32, xs = [], ys = []; for (let i = 0; i <= N; i++){ const x = d.min + (d.max - d.min) * i / N; xs.push(x); ys.push(rd(x)); }
+  let i0 = 0, i1 = N; while (i0 < N && isNaN(ys[i0])) i0++; while (i1 > 0 && isNaN(ys[i1])) i1--;
+  if (i1 - i0 < 2) return null;
+  for (let i = i0; i <= i1; i++) if (isNaN(ys[i])) return null;
+  const edge = (num, non) => { for (let i = 0; i < 50; i++){ const mid = (num + non) / 2; if (isNaN(rd(mid))) non = mid; else num = mid; } return num; };   /* where the number starts */
+  const mn = i0 ? edge(xs[i0], xs[i0 - 1]) : d.min, mx = i1 < N ? edge(xs[i1], xs[i1 + 1]) : d.max;
+  let up = 0, dn = 0; for (let i = i0 + 1; i <= i1; i++){ if (ys[i] > ys[i - 1]) up++; else if (ys[i] < ys[i - 1]) dn++; }
+  if ((up && dn) || !(up || dn)) return null;
+  const inc = up > 0;
+  const plateau = t => {   /* the first and the last stored value whose readout reaches / has not passed t */
+    const ge = x => inc ? rd(x) >= t : rd(x) <= t, le = x => inc ? rd(x) <= t : rd(x) >= t; let lo = mn, hi = mx, first, last;
+    if (ge(lo)) first = lo; else if (!ge(hi)) first = hi; else { for (let i = 0; i < 60; i++){ const mid = (lo + hi) / 2; if (ge(mid)) hi = mid; else lo = mid; } first = hi; }
+    lo = mn; hi = mx;
+    if (le(hi)) last = hi; else if (!le(lo)) last = lo; else { for (let i = 0; i < 60; i++){ const mid = (lo + hi) / 2; if (le(mid)) lo = mid; else hi = mid; } last = lo; }
+    return [first, last]; };
+  let [f, l] = plateau(target);
+  if (f > l){ const a = rd(f), b = rd(l); [f, l] = plateau(Math.abs(a - target) <= Math.abs(b - target) ? a : b); }   /* the readout jumps over it (it rounds): the nearer printable value */
+  return (f + l) / 2;
+}
+function rowParse(d, txt, fmt){
+  txt = String(txt == null ? '' : txt).trim().replace(',', '.').replace('−', '-');
+  const m = txt.match(/[-+]?[0-9]*\.?[0-9]+([eE][-+]?[0-9]+)?/);
+  const n = m ? parseFloat(m[0]) : NaN; if (isNaN(n)) return null;
+  const u = ((txt.slice(m.index + m[0].length).match(/[a-z%]+/i) || [''])[0]).toLowerCase(), tu = /^(ms|s|sec)$/.test(u), fu = /^k?hz$/.test(u);
+  const inv = tu || fu ? rowInvert(d, fmt, tu ? 't' : 'f', n * (u === 'ms' ? 0.001 : u === 'khz' ? 1000 : 1)) : null;   /* into the row's own unit, by its own readout */
+  let v;
+  if (inv != null) v = inv;
+  else if (u === '%') v = d.min === -36 && d.max === 6 ? d.min + n / 100 * (d.max - d.min) : n / 100 * pctBase(d);  /* an explicit % is "of the range" (the voice Level row's range starts at -36 dB) */
+  else if (u && !tu && !fu) v = n;  /* dB, st, semitones: the row's own units */
+  else if (u === '' && d.max <= 1 && d.min === 0) v = n > 1 ? n / 100 : n;  /* bare number on a 0..1 row: 50 means 50% */
+  else if (u === '' && d.min === -36 && d.max === 6 && (n > 6 || n < -36)) v = d.min + (n / 100) * (d.max - d.min);  /* voice Level: 50 means halfway */
+  else v = n;                                            /* a bare number, or a unit that does not fit this row: its own units */
+  return Math.max(d.min, Math.min(d.max, snapDef(d, Math.max(d.min, Math.min(d.max, v)))));
+}
 function rowTypeBox(row, opts){
   if (row.out.querySelector('input')) return;
   const d = row.def, fmt = row.fmt || d.f || pct, prev = row.getObj()[row.key];
-  const inp = el('input', 'vtype');
-  inp.type = 'text'; inp.inputMode = 'decimal'; inp.value = fmt(prev); inp.setAttribute('aria-label', d.l + ' value');
+  const inp = el('input', 'vtype'), t0 = fmt(prev);
+  inp.type = 'text'; inp.inputMode = 'decimal'; inp.value = t0; inp.setAttribute('aria-label', d.l + ' value');
   row.out.replaceChildren(inp); inp.focus(); inp.select();
   let done = false;
-  const finish = commit => {
+  const finish = (commit, back) => {
     if (done) return; done = true;
-    if (commit){
-      const txt = inp.value.trim().replace(',', '.').replace('−', '-'), low = txt.toLowerCase();
-      const m = txt.match(/[-+]?[0-9]*\.?[0-9]+([eE][-+]?[0-9]+)?/);
-      const n = m ? parseFloat(m[0]) : NaN;
-      if (!isNaN(n)){
-        let v;
-        if (low.includes('khz')) v = n * 1000;
-        else if (low.includes('db')) v = n;                    // dB, semitones and Hz are the row's own units
-        else if (low.includes('st')) v = n;
-        else if (low.includes('hz')) v = n;
-        else if (low.includes('%')) v = n / 100 * pctBase(d);  // an explicit % is "of the range"
-        else if (low.includes('ms')) v = n / 1000;
-        else if (d.max <= 1 && d.min === 0) v = n > 1 ? n / 100 : n;  // bare number on a 0..1 row: 50 means 50%
-        else if (d.min === -36 && d.max === 6 && (n > 6 || n < -36)) v = d.min + (n / 100) * (d.max - d.min);  // voice Level: 50 means halfway
-        else v = n;                                            // bare number or 's': the row's own units
-        v = Math.max(d.min, Math.min(d.max, v));
-        row.getObj()[row.key] = v; row.refresh(); (opts.on || (() => changed(cur, true)))();
-      }
-    }
-    row.refresh();
+    const v = commit && inp.value !== t0 ? rowParse(d, inp.value, fmt) : null;   /* Escape, or leaving it unchanged, cancels */
+    if (v != null && v !== prev){ row.getObj()[row.key] = v; row.refresh(); (opts.on || (() => changed(cur, true)))(); }
+    else row.refresh();
+    if (back){ try { row.inp.focus({preventScroll:true}); } catch(_){} }   /* Enter / Escape: the slider keeps the keys (arrows nudge it) */
   };
-  inp.addEventListener('keydown', e => { e.stopPropagation(); if (e.key === 'Enter') finish(true); if (e.key === 'Escape') finish(false); });
+  inp.addEventListener('keydown', e => { e.stopPropagation(); if (e.isComposing) return; if (e.key === 'Enter'){ e.preventDefault(); finish(true, true); } if (e.key === 'Escape'){ e.preventDefault(); finish(false, true); } });
   inp.addEventListener('blur', () => finish(true));
   inp.addEventListener('pointerdown', e => e.stopPropagation());
 }
@@ -9109,9 +9149,11 @@ function makeRow(def, key, getObj, opts = {}){
     refresh(){ const o = getObj(); const v = o[key]; inp.value = Math.round(toPos(this.def, v) * 1000); setText(out, (this.fmt || this.def.f || pct)(v)); }};
   inp.addEventListener('input', () => { const o = getObj(); o[key] = fromPos(row.def, inp.value / 1000);
     setText(out, (row.fmt || row.def.f || pct)(o[key])); (opts.on || (() => changed(cur, true)))(); });
-  out.title = 'Double-click to reset · right-click to type a value';
+  const two = () => r.classList.contains('two');   // a two-state row (twoStateRow): two buttons, nothing to type, so its name's double-click still resets
+  out.title = 'Double-click to type a value · Alt-click the slider or right-click to reset';
   const typeBox = () => rowTypeBox(row, opts);
-  out.addEventListener('dblclick', e => { e.stopPropagation(); reset(); });   // ONE RULE (3 Nov): double-click resets everywhere; Type a value… is in the right-click menu
+  const dbl = e => { e.stopPropagation(); if (two()) reset(); else typeBox(); };   // SLIDER ENTRY (14 Nov): double-click types a value; reset is Alt-click or the right-click menu
+  out.addEventListener('dblclick', dbl);
   // Touch screens: double-tap the value box to type a value (tap, lift, tap).
   let lastValTap = null;
   out.addEventListener('pointerup', e => {
@@ -9121,19 +9163,20 @@ function makeRow(def, key, getObj, opts = {}){
       else lastValTap = {t:now, x:cx, y:cy};
     }
   });
-  lab.addEventListener('dblclick', reset);
-  inp.addEventListener('dblclick', reset);   // the slider itself too (its default, as on the label)
-  inp._reset = reset; inp._out = out;   // ONE SLIDER: Alt/Ctrl-click resets, the tip shows the readout
+  lab.addEventListener('dblclick', dbl);
+  inp.addEventListener('dblclick', dbl);   // the slider itself too (as on the label)
+  inp._reset = reset; inp._out = out; inp._row = row;   // ONE SLIDER: Alt/Ctrl-click resets, the tip shows the readout
+  inp.addEventListener('keydown', e => sliderKey(e, inp));   // a clicked slider takes ◀ ▶ (▲ ▼): see sliderKey
   // SLIDER MOUSE: right-click for its menu.
   // opts.menu: more items for this row's menu (a chains row in the bottom panel: remove it, show its module), in the same
   // menu (FIX 27 Oct, audit M3: the panel added a second menu, a dialog, under this one).
   r.addEventListener('contextmenu', e => { if (e.target.closest('input[type=text]') || typeof sxMenu !== 'function') return; e.preventDefault(); e._valMenu = true;
     sxMenu(e.clientX, e.clientY, String(row.def.l || key).toUpperCase(), [
-      {l:'Reset to default', f:reset, off:row.def.d == null}, ...(r.classList.contains('two') ? [] : [{l:'Type a value…', f:typeBox}]),   // a two-state row (twoStateRow): two buttons, nothing to type
+      {l:'Reset to default', f:reset, off:row.def.d == null}, ...(two() ? [] : [{l:'Type a value…', f:typeBox}]),   // a two-state row (twoStateRow): two buttons, nothing to type
      
       {l:'Learn a MIDI knob for it', f:() => { setLearn(true); midi.target = -1; midi.ccTarget = inp.id; renderPads(); ccBadges(); midiStatus(`${rowLabel(inp.id)}: turn a knob on the controller.`); }},
       ...(opts.menu ? [null, ...opts.menu()] : [])]); });
-  inp.title = 'Drag to change (Shift: finer, ' + MODK + ': coarser) · double-click or Alt-click to reset · right-click: menu';
+  inp.title = 'Drag to change (Shift: finer, ' + MODK + ': coarser) · double-click: type a value · Alt-click: reset · click, then ◀ ▶ nudge · right-click: menu';
   if (!opts.noTrack) rows.push(row);
   return row;
 }
@@ -9152,7 +9195,7 @@ function makeCk(box, get, set){
 }
 // SYNTH UX B (13 Nov): a row that is really a switch (min 0, max 1, whole steps: Reverse, Freeze, Loop, Mix law…) shows its two
 // value names as a segmented control, named by the row's own formatter (f(0), f(1)). The slider stays in the row (hidden), so
-// the row's id, its value, a MIDI knob learned on it, Reset (double-click on the label) and refresh() all work as before; the
+// the row's id, its value, a MIDI knob learned on it, Reset (right-click menu; double-click on the name) and refresh() all work as before; the
 // segment writes the same 0 / 1 into the same field and runs the same handler (`on`) the slider did.
 const twoOf = def => !!def && def.min === 0 && def.max === 1 && def.c === 'int' && typeof def.f === 'function';
 function twoStateRow(row, on, names){
@@ -13317,7 +13360,7 @@ const TUNE_SETS = {
   Pythagorean: [0,13.7,3.9,5.9,7.8,-1.9,1.9,-7.8,5.9,-3.9,13.7,1.9],
   'Meantone': [0,-24,-7,-10,-14,-3,-17,-20,3,-21,-10,-7],
 };
-const tuneRows = [];   // the 12 cents sliders (makeRow, so double-click / Alt-click / right-click work: SYNTH UX A, item 7)
+const tuneRows = [];   // the 12 cents sliders (makeRow, so double-click (type) / Alt-click (reset) / right-click work: SYNTH UX A, item 7)
 let tuneFold = null;
 const tuneCt = c => (c > 0 ? '+' : '') + c.toFixed(0) + ' ct';
 function tuneSum(){ if (!tuneFold) return; const n = (S.tune || []).filter(c => Math.abs(c) >= 0.5).length; tuneFold.sum(n ? n + ' of 12 notes detuned' : 'Equal temperament, no notes detuned'); }
@@ -16162,7 +16205,7 @@ const sliderOk = (r, touch) => !!r && r.matches && r.matches('input[type=range]'
    controls all take the mouse the same way:
    - a drag moves the value from where it is; Shift held is ten times finer and Ctrl/⌘ held four times coarser, read on
      every move, so pressing or letting go of either mid-drag carries on from there (no jump);
-   - double-click, Alt/⌥-click or Ctrl/⌘-click (⌘ on a Mac, where Ctrl+click is the right-click) resets it;
+   - Alt/⌥-click or Ctrl/⌘-click (⌘ on a Mac, where Ctrl+click is the right-click) resets it; double-click: a Synth page slider types a value (14 Nov), the other controls reset;
    - right-click opens Reset to default / Type a value… (and Learn a MIDI knob where the control can be learned);
    - the wheel takes the control the pointer has rested on (outlined; WHEEL FOCUS), Shift fine, Ctrl/⌘ big steps.
    dragMul(e) / resetClick(e) / valMenu() below; a control that isn't a slider takes the wheel through data-wheel + el._wheel(d, e). */
@@ -16185,6 +16228,25 @@ function sliderSet(r, v){
   const nv = clamp(Math.round((v - mn) / st) * st + mn, mn, mx); if (Math.abs(nv - +r.value) < st / 2) return;
   r.value = nv; r.dispatchEvent(new Event('input', {bubbles:true}));
   clearTimeout(r._chgT); r._chgT = setTimeout(() => r.dispatchEvent(new Event('change', {bubbles:true})), 300);
+}
+/* SLIDER KEYS (owner, 14 Nov): a slider that has been clicked has the focus; ◀ ▶ (▲ ▼ too) nudge it by 1% of its travel, with Shift by a
+   tenth of that (Shift is "finer", as on a drag; lead's choice: one slider step, 0.1%, was too small to be useful); a row that rounds its value (whole numbers, half steps, the log curves) takes as
+   many steps as it needs to change by one. The keys stay with the slider (the tracker's cursor and the pad list don't see
+   them) until Escape lets go. The change goes through sliderSet, the same call a drag makes. */
+function sliderNudge(r, dir, fine){
+  const mn = r.min === '' ? 0 : +r.min, mx = r.max === '' ? 100 : +r.max, st = r.step === 'any' || !+r.step ? (mx - mn) / 1000 : +r.step, row = r._row;
+  const cur0 = row ? row.getObj()[row.key] : null, inc = fine ? 1 : 10; let n = inc, nv = +r.value;
+  for (let k = 0; k < 1000; k++){
+    nv = clamp(+r.value + dir * n * st, mn, mx);
+    if (!row || nv === +r.value || fromPos(row.def, (nv - mn) / (mx - mn)) !== cur0) break;
+    n += inc; }
+  sliderSet(r, nv);
+}
+function sliderKey(e, r){
+  if (e.altKey || e.ctrlKey || e.metaKey) return;
+  if (e.key === 'Escape'){ e.preventDefault(); e.stopPropagation(); r.blur(); return; }
+  const d = { ArrowRight:1, ArrowUp:1, ArrowLeft:-1, ArrowDown:-1 }[e.key]; if (!d) return;
+  e.preventDefault(); e.stopPropagation(); sliderNudge(r, d, e.shiftKey);
 }
 /* WHEEL (27 Oct, audit M2): the movement is added up and a step is taken per 100 px of it (a mouse notch), not one per
    event: a trackpad flick sends 30-100 events, which moved a slider 60-200 %. A pause or a change of direction starts the
@@ -16285,7 +16347,7 @@ document.addEventListener('wheel', e => {
   sliderSet(r, +r.value - n * Math.max(st, (mx - mn) * (e.shiftKey ? 0.002 : wheelBig(e) ? 0.08 : 0.02)));
 }, {passive:false});
 // RIGHT-CLICK on a slider that has no menu of its own (the strip's PAN, Perform's crossfader and macros, tuning…): Reset to
-// default (what its double-click does). makeRow's sliders keep their own menu (they mark the event).
+// default (what its Alt-click does). makeRow's sliders keep their own menu (they mark the event).
 document.addEventListener('contextmenu', e => {
   if (e._valMenu || e.pointerType === 'touch') return; const r = e.target.closest && e.target.closest('input[type=range]'); if (!sliderOk(r)) return;
   const lab = r.getAttribute('aria-label') || r.title.split(/[·:]/)[0] || 'Slider';
@@ -16297,7 +16359,7 @@ document.addEventListener('contextmenu', e => {
    - on a touch screen nothing changes until the finger has moved sideways (a vertical swipe scrolls the page; a tap
      does nothing), so brushing a slider while scrolling never changes the sound;
    - a tip shows the value while it moves;
-   - double-click, Alt/⌥-click or Ctrl/⌘-click puts it back to its default (makeRow's), the value too (3 Nov); right-click → Type a value.
+   - Alt/⌥-click or Ctrl/⌘-click puts it back to its default (makeRow's), the value too (3 Nov); double-click (14 Nov) or right-click → Type a value; click then ◀ ▶ nudges (sliderKey).
    The wheel takes the slider under the pointer once it has rested on it (below). To go back: this block. */
 let sldTip = null;
 function sliderTip(r, on){
@@ -19318,6 +19380,7 @@ class ThunderFx extends AudioWorkletProcessor {
     this.set(op.chain || []);
     this.port.onmessage = e => { if (e.data === null){ this.dead = true; for (const s of this.slots) this.drop(s); this.slots = []; } else if (e.data && e.data.irs !== undefined) globalThis.__thunderIR = e.data.irs; else if (e.data && e.data.tapmap) this.setTap(e.data.tapmap); else if (e.data && e.data.tel !== undefined) this.tel = !!e.data.tel; else if (e.data && e.data.lvl !== undefined){ this.lvl = !!e.data.lvl; this.lvlN = 0; this.lvlP = new Float32Array(8); }
       else if (e.data && (e.data.pumpBytes || e.data.pumpModule)){ if (e.data.pumpModule && !globalThis.__pumpMod) globalThis.__pumpMod = e.data.pumpModule; if (e.data.pumpBytes && !globalThis.__pumpBytes) globalThis.__pumpBytes = e.data.pumpBytes; this.pumpAsked = false; this.set(this.chain || []); }
+      else if (e.data && e.data.rest !== undefined){ this.restAt = e.data.rest ? currentTime + 0.1 : -1; }   /* MUTED TRACKS REST: a tenth of a second on, so the mute's own fade is over first */
       else if (e.data && e.data.ptel){ const q = e.data.ptel; if (q.on) this.ptel.set(q.key, {back:Math.max(0, Math.min(32768, q.back | 0)), rp:[]}); else this.ptel.delete(q.key); }
       else if (e.data && e.data.pset){ const q = e.data.pset, ch = (this.chain || []).map(c => c && c.slot === q.slot ? Object.assign({}, c, q.p ? {p:q.p} : {}, q.mp ? {mp:q.mp} : {}, q.pv ? {pv:q.pv} : {}) : c); this.set(ch); }   // FXV: one slot's settings for now (the chain's own come back with the next full set)
       else if (e.data && e.data.pmidi){ const q = this.pq || (this.pq = []); for (const m of e.data.pmidi) q.push(m); q.sort((a, b) => a[1] - b[1]); }   // …PUMP CREATIVE: [slot, at (s), status, d1, d2]
@@ -19414,7 +19477,7 @@ class ThunderFx extends AudioWorkletProcessor {
       if (c.pt !== undefined){   // …PUMP: a pump effect. Until pump.wasm reaches this audio thread the sound passes.
         const P = this.pumpX();
         if (!P){ if (!this.pumpAsked){ this.pumpAsked = true; this.port.postMessage({needPump:true}); } continue; }
-        if (i >= 0 && old[i].pu !== undefined && old[i].pt === c.pt && old[i].pu >= 0 && !old[i].dead){ s = old[i]; old.splice(i, 1); s.pv = c.pv; s.dirty = true; }
+        if (i >= 0 && old[i].pu !== undefined && old[i].pt === c.pt && old[i].pu >= 0 && !old[i].dead){ s = old[i]; old.splice(i, 1); if (s.rd && !s.pch){ const a = s.pv, b = c.pv; if (a.length !== b.length) s.pch = true; else for (let j = 0; j < a.length; j++) if (a[j] !== b[j]){ s.pch = true; break; } } s.pv = c.pv; s.dirty = true; }
         else { s = {key:c.key, h:-2, pt:c.pt, pv:c.pv, bi:c.bi, byp:!on, pst:c.pst};
           try { if (!this.pumpNew(P, s)) continue; } catch (e){ continue; } }
         s.on = on; s.slot = slot; s.sck = c.sck | 0; s.cr = !!c.cr; s.clk = !!c.clk;
@@ -19491,6 +19554,68 @@ class ThunderFx extends AudioWorkletProcessor {
      out 10 to 20 times slower, for as long as the silence lasts (a phone's does not); the tiny guard added at the node's input does not
      stop it. With sound going through, nothing changes: the slot runs exactly as before. Not for effects that speak up on their own
      after a pause (Vinyl's crackle, pump CRUSH's): they always run. */
+  /* PUMP OFF REST (build 607; owner's song, 14 Nov: pump MASTER switched OFF still cost about 8% of the audio thread). A pump effect's OFF is
+     the plugin's own bypass, and the plugin keeps doing all its work behind it (measured: COMP 135, LIMIT 146, MASTER 142 µs a block
+     bypassed). Every pump effect's bypass is exactly "the input, late by the plugin's latency" (measured on all 24, to the bit, within
+     15 ms of the switch), so a slot that is OFF by its own setting is replaced by that delay and the plugin is not run:
+       rs 0  the plugin runs. While it is OFF, a delay line the length of its latency runs beside it and the two outputs are compared:
+             after a quarter second of the same output (with sound in it, the first time) the slot rests.
+       rs 1  resting: the delay line is the output, the plugin is not called.
+       rs 2  waking (switched ON, its values changed, its window opened): the plugin is started afresh (what it held is from before
+             the rest) and hears the sound for its latency + 1024 samples, still bypassed, while the delay line stays the output;
+             then it takes over without a step, and switches on with its own crossfade. So ON comes that much late (21 to 64 ms).
+             Woken by an FXO command it catches up within the block instead, so that switch is on the beat.
+     The timing never moves: the delay is the plugin's latency, which the page counts whether the slot is ON or OFF (pumpSlotLat).
+     Never for a slot an FXO command has held (its switches are on the beat), with notes on their way to it, or while its window is fed.
+     Returns true when it has written the slot's output itself. */
+  pumpRest(s, n, tr, tg, pqOn){
+    const P = globalThis.__pumpX; if (s.bi < 0 || !P || s.dead || s.pu < 0) return false;
+    const can = !tg && !s.fxo && !pqOn && !this.ptel.has(s.key);
+    let D = s.rd;
+    if (!s.rs){
+      if (!can || !s.byp || s.pch){ if (D){ D.ok = 0; D.sig = 0; } if (s.pch){ s.pch = false; s.pd = false; } return false; }
+      const lat = P.pump_latency(s.pu) | 0; if (lat > 8192) return false;
+      if (!D || D.n !== lat) D = s.rd = {n:lat, m:lat + 128, L:new Float32Array(lat + 128), R:new Float32Array(lat + 128), w:0, ok:0, sig:0};
+      if (!this.rL){ this.rL = new Float32Array(128); this.rR = new Float32Array(128); }
+      const rL = this.rL, rR = this.rR, L = this.L, R = this.R; this.restDelay(D, n);
+      if (s.dirty){ D.ok = 0; D.sig = 0; }   /* (a change on its way into the plugin: start counting again) */
+      if (s.clk) this.slotRun(s, n, tr); else this.slotNap(s, n, tr);
+      let same = true, pk = 0;
+      for (let k = 0; k < n; k++){ const a = rL[k], b = rR[k], d = L[k] - a, e = R[k] - b; if (d > 1e-6 || d < -1e-6 || e > 1e-6 || e < -1e-6){ same = false; break; } const x = a < 0 ? -a : a, y = b < 0 ? -b : b; if (x > pk) pk = x; if (y > pk) pk = y; }
+      if (!same){ D.ok = 0; D.sig = 0; return true; }
+      D.ok += n; if (pk > 1e-4) D.sig += n;
+      if (D.ok >= sampleRate / 4 && (s.pd || D.sig >= 2048)){ s.pd = true; s.rs = 1; }
+      return true;
+    }
+    if (s.rs === 1 && (!can || s.pch)){   /* wake: a fresh plugin, bypassed, to hear the sound before it takes over */
+      s.pch = false; s.byp = true;
+      try { P.pump_free(s.pu); if (!this.pumpNew(P, s)){ s.dead = true; s.rs = 0; return false; } } catch (e){ s.dead = true; s.rs = 0; return false; }
+      if (s.fxo && tg){
+        /* (build 609, CodeRabbit on #142) An FXO command switched it on: its switches are on the beat, so it cannot wait for the warm-up.
+           The new plugin hears what the delay line holds (the last "latency" samples, oldest first) at once, in this block, and then
+           runs this block switched on: the timing is as if it had never rested. One dearer block, once: from now on (s.fxo) it never rests. */
+        if (!this.dL){ this.dL = new Float32Array(128); this.dR = new Float32Array(128); }
+        const L = this.L, R = this.R, kL = this.dL, kR = this.dR, m = D.m; kL.set(L); kR.set(R);
+        let r = D.w - D.n; if (r < 0) r += m;
+        for (let left = D.n; left > 0 && !s.dead; ){ const c = left < 128 ? left : 128; for (let k = 0; k < c; k++){ L[k] = D.L[r]; R[k] = D.R[r]; if (++r === m) r = 0; } this.pumpRun(s, c); left -= c; }
+        this.L.set(kL); this.R.set(kR); s.rs = 0; D.ok = 0; D.sig = 0; s.zq = 0; s.zz = false; return false;
+      }
+      /* (build 609, CodeRabbit on #142) the warm-up is as long as the NEW plugin's latency when that is the longer (an EQ changed to
+         linear phase while it rested): it must have filled its own delay before it takes over, or the track would fall silent for the difference */
+      let nl = D.n; try { nl = Math.max(nl, P.pump_latency(s.pu) | 0); } catch (e){}
+      s.rs = 2; s.wm = nl + 1024;
+    }
+    const rL = this.rL, rR = this.rR; this.restDelay(D, n);
+    if (s.rs === 2){ this.pumpRun(s, n); if ((s.wm -= n) <= 0){ s.rs = 0; D.ok = 0; D.sig = 0; s.zq = 0; s.zz = false; } }
+    this.L.set(rL.subarray(0, n)); this.R.set(rR.subarray(0, n));
+    return true;
+  }
+  /* The resting slot's delay line: this block's input goes in, the input of D.n samples ago comes out (into rL / rR). */
+  restDelay(D, n){
+    const L = this.L, R = this.R, rL = this.rL, rR = this.rR, bl = D.L, br = D.R, m = D.m; let w = D.w, r = w - D.n; if (r < 0) r += m;
+    for (let k = 0; k < n; k++){ bl[w] = L[k]; br[w] = R[k]; rL[k] = bl[r]; rR[k] = br[r]; if (++w === m) w = 0; if (++r === m) r = 0; }
+    D.w = w;
+  }
   slotNap(s, n, tr){
     if (s.nn === undefined) s.nn = /vinyl|pcrush/.test(String(s.key));
     if (s.nn){ this.slotRun(s, n, tr); return; }
@@ -19534,7 +19659,14 @@ class ThunderFx extends AudioWorkletProcessor {
     // Silence in, and the effects' tails have died away: sleep (output silence) until sound arrives again.
     let ip = 0;
     let bad = false;
-    if (i && i.length){ const a = i[0], b = i[1] || a; for (let k = 0; k < n; k++){ const v = a[k] < 0 ? -a[k] : a[k], w = b[k] < 0 ? -b[k] : b[k]; if (v > ip) ip = v; if (w > ip) ip = w; if (!(v < 8 && w < 8)) bad = true; } }
+    /* MUTED TRACKS REST (build 607; owner's song: a muted track's effects still took about 3% of the audio thread). While its track cannot
+       be heard (muted, or another is soloed: nothing reads a track's effects but its own fader and its "before the fader" bus feed, and
+       both are shut then) the node hears silence instead of the track. The echoes die away as they would after the last note, and the
+       sleep rules below then stop the work, at the latest ten seconds on. Unmuted, it hears the track again from
+       the next block: the notes that are sounding come through, with the effects as silence left them (their echoes died while it was muted;
+       an effect that never dies down by itself, a delay fed back for ever, still holds what it held: the node is put to sleep, not cleared). */
+    const rest = this.restAt > 0 && currentTime >= this.restAt;
+    if (!rest && i && i.length){ const a = i[0], b = i[1] || a; for (let k = 0; k < n; k++){ const v = a[k] < 0 ? -a[k] : a[k], w = b[k] < 0 ? -b[k] : b[k]; if (v > ip) ip = v; if (w > ip) ip = w; if (!(v < 8 && w < 8)) bad = true; } }
     // A switch (FXO) or a running clock wakes it: a slot just switched on must hear the moment it comes in.
     const swv = this.swv || (this.swv = [0, 0, 0, 0, 0, 0, 0, 0]); swv[0] = params.sw0[0]; swv[1] = params.sw1[0]; swv[2] = params.sw2[0]; swv[3] = params.sw3[0]; swv[4] = params.sw4[0]; swv[5] = params.sw5[0]; swv[6] = params.sw6[0]; swv[7] = params.sw7[0]; const bp = params.bp;   // reused: no array per block
     // bp (the beat clock) is an a-rate ramp whenever the song plays, so "bp.length < 2" kept every track-FX node awake
@@ -19553,8 +19685,10 @@ class ThunderFx extends AudioWorkletProcessor {
       const c = s.clk ? 3 : s.js ? (s.jt === 93 || (s.jt >= 100 && s.jt <= 102) ? 3 : s.jt === 94 || s.jt === 95 ? 2 : 0) : 0; if (!c) continue;
       const sv = s.slot >= 0 && s.slot < 8 ? swv[s.slot] : -1, live = (sv < -0.5 ? s.on : sv > 0.5) || (s.pu !== undefined ? s.byp === false : s.g > 0);
       const w = live ? c : s.js && s.js.feed ? 1 : 0; if (w > ck) ck = w; }
-    if (ip < 1e-7 && this.idle >= sampleRate && (ck === 0 || (ck < 3 && this.idle >= sampleRate * 14 && (ck === 1 || !(bp[0] >= 0 && bp[bp.length - 1] >= 0))))){ o[0].fill(0); if (o[1]) o[1].fill(0); this.fr += n; if (this.fr >= sampleRate / 2){ this.port.postMessage({load:this.ms / (this.fr / sampleRate * 1000)}); this.ms = 0; this.fr = 0; } return true; }
-    if (i && i.length){ L.set(i[0]); R.set(i[1] || i[0]); } else { L.fill(0); R.fill(0); }
+    /* (MUTED TRACKS REST) ten seconds unheard and it sleeps whatever its slots are doing: an effect that never falls silent by itself
+       (Spring and BBD on the owner's track 13 kept running) has had its echoes' time, and nobody can hear what is left. */
+    if ((rest && currentTime - this.restAt >= 10) || (ip < 1e-7 && this.idle >= sampleRate && (ck === 0 || (ck < 3 && this.idle >= sampleRate * 14 && (ck === 1 || !(bp[0] >= 0 && bp[bp.length - 1] >= 0)))))){ o[0].fill(0); if (o[1]) o[1].fill(0); this.fr += n; if (this.fr >= sampleRate / 2){ this.port.postMessage({load:this.ms / (this.fr / sampleRate * 1000)}); this.ms = 0; this.fr = 0; } return true; }
+    if (!rest && i && i.length){ L.set(i[0]); R.set(i[1] || i[0]); } else { L.fill(0); R.fill(0); }
     // A NaN or infinity reaching the wasm hangs the tape delay for good and leaves many effects silent: zero those samples.
     // (sweep, 4 Nov) a loud but real sample (8 to 64, up to +36 dB) is clipped to ±8 rather than silenced: it was heard as a dropout
     if (bad) for (let k = 0; k < n; k++){ const a = L[k], b = R[k]; if (!(a > -8 && a < 8)) L[k] = a > -64 && a < 64 ? (a < 0 ? -8 : 8) : 0; if (!(b > -8 && b < 8)) R[k] = b > -64 && b < 64 ? (b < 0 ? -8 : 8) : 0; }
@@ -19568,11 +19702,15 @@ class ThunderFx extends AudioWorkletProcessor {
       const tk = inputs[1], sd = inputs[2]; this.taps = tk && tk.length ? tk : null; this.sends = sd && sd.length ? sd : null; }   // SOURCE
     if (!this.dL){ this.dL = new Float32Array(128); this.dR = new Float32Array(128); }
     const pqOn = !!(this.pq && this.pq.length);   // notes on their way to a pump effect: none of them naps
+    /* CPU PANEL NAMES THE EFFECT (build 607): each slot's own share of the time. Date.now() is in whole milliseconds, far coarser than
+       a slot's cost, but where its ticks fall is chance, so over half a second the ticks counted against a slot add up to its time. */
+    let tp = Date.now(), ps = null;
     for (const s of this.slots){
+      { const now = Date.now(); if (ps) ps.ms = (ps.ms || 0) + now - tp; tp = now; ps = s; }
       // On or off: the slot's own setting, unless an FXO switch is holding it. Changes fade over 5 ms.
       const sv = s.slot >= 0 && s.slot < 8 ? swv[s.slot] : -1, tg = (sv < -0.5 ? s.on : sv > 0.5) ? 1 : 0;
       // …PUMP: on / off is the plugin's own bypass (latency-matched, crossfaded), so the timing never jumps; METER just stops
-      if (s.pu !== undefined){ if (s.byp !== !tg){ s.byp = !tg; s.dirty = true; s.zq = 0; s.zz = false; } if (!(s.bi < 0 && s.byp)){ if (s.clk || pqOn) this.slotRun(s, n, tr); else this.slotNap(s, n, tr); } if (this.lvl && tg && s.slot >= 0 && s.slot < 8){ const a = this.pk(n); if (a > this.lvlP[s.slot]) this.lvlP[s.slot] = a; } continue; }
+      if (s.pu !== undefined){ if (sv >= -0.5) s.fxo = true; if (!this.pumpRest(s, n, tr, tg, pqOn)){ if (s.byp !== !tg){ s.byp = !tg; s.dirty = true; s.zq = 0; s.zz = false; } if (!(s.bi < 0 && s.byp)){ if (s.clk || pqOn) this.slotRun(s, n, tr); else this.slotNap(s, n, tr); } } if (this.lvl && tg && s.slot >= 0 && s.slot < 8){ const a = this.pk(n); if (a > this.lvlP[s.slot]) this.lvlP[s.slot] = a; } continue; }
       if (s.g === undefined) s.g = tg;
       if (!tg && s.g <= 0){ if (s.js && s.js.feed){ tr.sw = sv; s.js.feed(this.L, this.R, n, tr); } continue; }
       const fade = s.g !== tg; if (fade){ this.dL.set(this.L); this.dR.set(this.R); }
@@ -19587,6 +19725,7 @@ class ThunderFx extends AudioWorkletProcessor {
         s.g = g; }
       if (this.lvl && s.slot >= 0 && s.slot < 8){ const a = this.pk(n); if (a > this.lvlP[s.slot]) this.lvlP[s.slot] = a; }   // FX BAR: each slot's level out
     }
+    if (ps) ps.ms = (ps.ms || 0) + Date.now() - tp;
     if (this.lvl && ++this.lvlN >= 12){ this.lvlN = 0; this.port.postMessage({lvl:Array.from(this.lvlP)}); this.lvlP.fill(0); }
     // FX DYNAMICS: [slot, key, [reduction dB, level in dB, peak out dB]] for each dynamics slot (the shared modules' own show())
     if ((this.tel || this.ptel.size) && ++this.telN >= 12){ this.telN = 0; const out = [], db = v => v > 1e-9 ? 20 * Math.log10(v) : -180, pout = [];
@@ -19606,7 +19745,8 @@ class ThunderFx extends AudioWorkletProcessor {
       if (pout.length) this.port.postMessage({pump:pout}); }
     // Date.now() is coarse, but its average over many blocks is the real cost: report it as a share of real time.
     this.ms += Date.now() - t0; this.fr += n;
-    if (this.fr >= sampleRate / 2){ this.port.postMessage({load:this.ms / (this.fr / sampleRate * 1000)}); this.ms = 0; this.fr = 0;
+    if (this.fr >= sampleRate / 2){ const span = this.fr / sampleRate * 1000, sl = []; for (const s of this.slots){ if (s.slot >= 0 && s.ms) sl.push([s.slot, s.ms / span]); s.ms = 0; }
+      this.port.postMessage({load:this.ms / span, sl}); this.ms = 0; this.fr = 0;
       // …PUMP: each pump slot's latency, when it changes (the FX screen warns on buses: nothing compensates it)
       const P = globalThis.__pumpX; if (P){ const lat = []; for (const s of this.slots) if (s.pu !== undefined && s.pu >= 0) lat.push([s.slot, s.key, P.pump_latency(s.pu)]);
         const k = JSON.stringify(lat); if (k !== this.platS){ this.platS = k; this.port.postMessage({plat:lat}); } } }
@@ -19927,9 +20067,14 @@ function pumpLatencyOf(f, sr){
   if (pumpLatCache.size > 200) pumpLatCache.clear();
   pumpLatCache.set(key, lat); return lat;
 }
-// The master's pump slots together (switched on): a render starts that much later, and pass() trims it off as it does
-// the mastering's latency. (A bus's latency isn't compensated anywhere: see pumpLatTxt.)
-const pumpChainLatency = (A, sr) => (A || []).reduce((n, f) => n + (f && f.on && isPumpT(f.type) ? pumpLatencyOf(f, sr) : 0), 0);
+// The master's pump slots together: a render starts that much later, and pass() trims it off as it does the mastering's
+// latency. (A bus's latency isn't compensated anywhere: see pumpLatTxt.)
+// FIX (build 603): a switched-OFF pump slot counts too. OFF is the plugin's own bypass, which still delays by its latency
+// (so switching it, by hand or with FXO, never moves the timing); counting only the slots that are ON left renders late by
+// the OFF slots' latency (owner's song: 4454 samples) and LATENCY COMP lined tracks up without them. Only a pump effect with
+// no bypass of its own (METER) is skipped whole by the worklet when OFF, so it adds nothing then.
+const pumpSlotLat = (f, sr) => f && isPumpT(f.type) && (f.on || pumpIdx[TFX[f.type].pump].bypass != null) ? pumpLatencyOf(f, sr) : 0;
+const pumpChainLatency = (A, sr) => (A || []).reduce((n, f) => n + pumpSlotLat(f, sr), 0);
 /* LATENCY COMPENSATION (owner, 1 Nov: Audio & MIDI → LATENCY COMP, off by default). The pump effects that look ahead (LIMIT,
    CALM, TONE, linear-phase EQ…) make a track or bus play late. With the option on, every path to the master is delayed to
    the latest one: pdcPlan() works out, from the song alone (no audio nodes, so renders get the same answer), each track's
@@ -19958,7 +20103,9 @@ function tfxNode(ac, chain, cid){
   const n = new AudioWorkletNode(ac, 'thunder-tfx', {numberOfInputs:3, numberOfOutputs:1, outputChannelCount:[2], channelCount:2,
     channelCountMode:'max', channelInterpretation:'speakers', processorOptions:Object.assign({chain, irs:irsOpt(ac), tapMap:keyTrackList(), cid:cid || null}, tfxModOpt() ? {module:tfxModOpt()} : {bytes:tfxBin()}, pb ? (pumpModOpt() ? {pumpModule:pumpModOpt()} : {pump:pb}) : {pump:null})});   // irs: this audio thread's copy of the song's impulse responses
   n.load = 0; n.port.onmessage = e => { const d = e.data; if (!d) return;
-    if (typeof d.load === 'number') n.load = n.load * 0.6 + d.load * 0.4;
+    if (typeof d.load === 'number'){ n.load = n.load * 0.6 + d.load * 0.4;
+      /* CPU PANEL: each slot's share, smoothed like the node's (slots that report nothing fall away) */
+      const o = n.sl || (n.sl = new Map()), seen = new Set(); for (const [k, v] of d.sl || []){ seen.add(k); o.set(k, (o.get(k) || 0) * 0.6 + v * 0.4); } for (const k of [...o.keys()]) if (!seen.has(k)){ const v = o.get(k) * 0.6; if (v < 0.0005) o.delete(k); else o.set(k, v); } }
     if (d.dyn) fxDynIn(n, d.dyn);
     if (d.lvl){ n.lvl = d.lvl; n.lvlT = performance.now(); }   // FX BAR: each slot's level out (fxLvlSet)
     if (d.needPump){ if (pumpBin()) n.port.postMessage(pumpModOpt() ? {pumpModule:pumpModOpt()} : {pumpBytes:pumpBin()}); else pumpWait.add(n); }
@@ -21764,7 +21911,11 @@ function makePlayer(ac, out, getBuf, live, mo){   // mo: the master OUT gain (af
     const syn = isSyn(ev.pad), v = {src, f, g, pn, base:ev.rate, rate:ev.rate, choke:ck, col:ev.col, ended:false, stopAt:null, syn, rel:syn && kv ? (ev.rlo != null ? ev.rlo : relOf(kv)) : 0};
     if (!ev.slide) pitchMods(v, ev.t, ev.rate, ev);
     const off = ev.ofsSec != null ? (ev.rev ? Math.max(0, b.duration - ev.ofsSec - ev.durSec) : ev.ofsSec) : clamp(ev.ofs, 0, 255) / 256 * b.duration;
-    const st0 = Math.max(ev.t, ac.currentTime);
+    /* WHOLE-SAMPLE STARTS (build 608; owner, 14 Nov: "renders should sound like the playback"). A sample started between two samples is
+       interpolated by the browser from its first sample to its last, which dulls it (measured on his song: a render's drums 0.8 to
+       1.1 dB down at 8 to 16 kHz against the audio-thread sequencer, which starts every note on a sample). So the start moves up to
+       the next sample (at most 21 µs late). Renders, and playing with the sequencer on the page, now sound as the audio thread does. */
+    const st0 = Math.ceil(Math.max(ev.t, ac.currentTime) * ac.sampleRate - 1e-6) / ac.sampleRate;
     // Starting part-way into a sample (slices, offsets) lands mid-waveform: a 1.5 ms fade-in keeps it from clicking.
     if (off > 0.0005){ f.gain.setValueAtTime(0, st0); f.gain.linearRampToValueAtTime(1, st0 + 0.0015); }
     src.start(st0, Math.min(off, Math.max(0, b.duration - 0.001)));
@@ -21863,11 +22014,15 @@ function makePlayer(ac, out, getBuf, live, mo){   // mo: the master OUT gain (af
   // (13 Nov, owner's Balanced report: "1 s after STOP … voices 1", then 2) a live engine's note never 'ends' (its node plays on; kill only lets the gate go), so it
   // stayed in `alive` until that engine's next note: the report counted one 'voice' per live engine that had played, for good. Let go at a STOP, it is forgotten here.
   function stopAll(at){ resetSeq(at); for (const v of alive){ kill(v, at); if (v.bass) alive.delete(v); } for (const T of vs) T.length = 0; for (const b of bassN.values()) if (b.vox) b.sylN = 0; voxG.clear(); }   // lyrics start over
+  /* MUTED TRACKS REST (build 607): tell a track's effects node whether the track can be heard (see the note in ThunderFx.p1). Live only:
+     a render builds no effects node for a track that isn't heard. */
+  function fxRest(t, on){ const b = buses[t]; if (!live || !b || !b.fx || t >= NT) return; const r = !on; if (b.fx._rest === r) return; b.fx._rest = r; try { b.fx.port.postMessage({rest:r}); } catch(e){} }
   function applyMix(filter){
     const at = ac.currentTime;
     buses.forEach((b, t) => {
       if (t >= NT){ b.g.gain.value = 1; return; }
       const m = S.mix[t], on = filter ? filter(t) : audible(t), tv = typeof tvlOv !== 'undefined' && tvlOv.has(t) ? tvlOv.get(t) / 255 : 1, tpv = typeof tpnOv !== 'undefined' && tpnOv.has(t) ? tpnOv.get(t) : m.pan, gv = on ? trackGain(m.vol) * tv : 0, pv = clamp((tpv - 128) / 127, -1, 1);   // TVL / TPN (guarded: the tests load applyMix alone)
+      if (typeof fxRest === 'function') fxRest(t, on);   // (guarded, as above)
       const tg = trimGain(m.trim == null ? TRIM_0 : m.trim), prv = on ? 1 : 0;   // GAIN STAGING: TRIM on the input; a PRE send keeps mute and solo
       const scv = 0;   // SOURCE: no mixer sidechain bus
       if (live){ b.g.gain.setTargetAtTime(gv, at, 0.012); b.p.pan.setTargetAtTime(pv, at, 0.012); b.scs.gain.setTargetAtTime(scv, at, 0.012); b.inp.gain.setTargetAtTime(tg, at, 0.012); b.pre.gain.setTargetAtTime(prv, at, 0.012); }
@@ -21938,6 +22093,7 @@ function makePlayer(ac, out, getBuf, live, mo){   // mo: the master OUT gain (af
     if (wantFx && !b.fx){ try { b.fx = tfxNode(ac, chain, live ? 'fx:' + t : null); clockTo(b.fx); fxcFlush(t, b.fx); } catch(e){ b.fx = null; } }
     else if (wantFx && b.fx){ try { b.fx.port.postMessage(chain); } catch(e){} }
     fxKeySync(b.fx, S.tfx[t]);   // SOURCE: the picked tracks and the sends, as this track's effect slots ask
+    if (live && b.fx && t < NT) fxRest(t, audible(t));   // (a new node for a track that is muted already)
     // Rewire only what changed: disconnecting/reconnecting a running worklet every param change is its own little click.
     // The track's input is no longer pulled off everything (its taps and meters stay put).
     const mid = b.fx || b.ins;
@@ -24777,7 +24933,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 602;
+const BUILD = 609;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD + (location.pathname.includes('/beta/') ? ' · beta' : '');
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -26936,6 +27092,21 @@ function xposeScope(){
   }
   toast('Transpose works on a phrase, or on blocks on the Song.'); return null;
 }
+/* How many blocks the TRANSP. buttons would act on: Arrange's selection plus picked blocks (the Song screen, or Arrange holding the keys beside Phrase); 0 anywhere else. Filled blocks only, not the master column. */
+function xposeBlocks(){
+  const side = tv !== 'song' && typeof apReady !== 'undefined' && apReady && apF === 'arr';
+  if (tv !== 'song' && !side) return 0;
+  const get = () => selA && selA.v === 'song' ? songCells() : [], cells = (side ? apAsSong(get) : get()).concat(sxPicks.map(q => [q.y, q.t])), seen = new Set();
+  for (const [y, t] of cells) if (t !== MT && S.song[y] && S.song[y][t] >= 0) seen.add(y + ':' + t);
+  return seen.size;
+}
+function xposeTitles(){
+  const n = xposeBlocks();
+  for (const [id, d, w] of [['tXposeDn', 'down', 'Alt+,'], ['tXposeUp', 'up', 'Alt+.']]){ const b = $(id); if (!b) continue;
+    const t = n ? `Transposes the ${n} selected block${n > 1 ? 's\u2019 phrases' : '\u2019s phrases'} ${d} a semitone (${w}). Each phrase moves once; one used by a block outside the selection changes there too.` : `Transpose the selection ${d} a semitone (${w})`;
+    if (b.title === t) continue;   /* (draw() calls this every redraw: write only when it changes) */
+    b.title = t; b.setAttribute('aria-label', n ? `Transpose the ${n} selected block${n > 1 ? 's' : ''} ${d} a semitone` : `Transpose selection ${d} a semitone`); }
+}
 function transposeSel(d, needSel, songOk){
   // songOk (the pad's SEMI keys, 12 Nov): on the Song / Arrange they work without a selection too, on the block under the cursor
   if (needSel && !(selA && selA.v === tv) && !(tv === 'song' && (songOk || sxPicks.length))) return toast(`Select rows first (or ${keyHint('alt+,')} / ${keyHint('alt+.')} for the whole ${tv === 'song' ? 'block' : 'phrase'}).`);
@@ -29058,6 +29229,7 @@ function draw(){
     $('tCmd').hidden = !show; document.body.classList.toggle('cmdv', show && !mini); cmdTips(); }
   const sb = $('tCmd').querySelector('[data-c=song]'); if (sb){ cmdSongSet(sb); sb.classList.toggle('on', tp.on); }
   const onSong = tv === 'song';
+  xposeTitles();
   { const lb = $('tCmd').querySelector('[data-c=lpsel]'), arrK = !!(typeof apReady !== 'undefined' && apReady && apF === 'arr'), vis = onSong || arrK; if (lb){ lb.hidden = !vis; lb.classList.toggle('on', !!lsW && tp.on); } $('tCmd').classList.toggle('lps', vis); }   // LP.SEL: where a song selection can exist (Song, Arrange holding the keys)
   { const seq = ['song', ...(sectsOn ? ['sect'] : []), 'phrase', 'inst', 'mixer', 'fx', 'mod', 'project'];
     const TCV = {song:'#dbe6f8', sect:'#e9e0f8', phrase:'#d8f0e2', inst:'#fbe2d2', mixer:'#f6edc8', fx:'#f8dce8', mod:'#ebdcf6', project:'#d5eef2'};
@@ -33108,11 +33280,19 @@ function cpuRank(m){
   if (tip === 'Nothing to fix: plenty of headroom.' && sc && sc.ms >= 0.3 && !m.lowPower) tip = 'Try: Low power mode (Settings): drawing the screen takes ' + pct(sc.ms) + ' of the page’s time.';
   return {head, list:top, keep, tip, screen, screenHead:screen.length ? 'The screen (the page’s own time, a separate budget: do not add it to the audio engine above)' : '', bad:!!(d || (total != null && total > 1))};
 }
+/* CPU PANEL NAMES THE EFFECT (build 607; owner, 14 Nov): an effects row says which effects take the time: the two dearest slots of that
+   track (or the master) with their own share of the audio engine, from what the node reports (ThunderFx: sl). A: the track's effect
+   list, sl: slot -> share. "(off)" is a slot switched off by its own setting that still costs. */
+function cpuFxTop(A, sl, nameOf){
+  if (!sl || !sl.size || !A) return '';
+  const r = [...sl].filter(([k, v]) => v >= 0.005 && A[k] && A[k].type).sort((a, b) => b[1] - a[1]).slice(0, 2);
+  return r.length ? ': ' + r.map(([k, v]) => nameOf(A[k].type) + (A[k].on === false ? ' (off)' : '') + ' ' + Math.round(v * 100) + '%').join(', ') : '';
+}
 function cpuMeasured(){
   const now = performance.now(), cap = cpu.cap && now - cpu.cap.t < 3000 ? cpu.cap : null, pr = cpu.probe && now - cpu.probe.t < 1500 ? cpu.probe : null;
   const tn = t => { const nm = S.mix && S.mix[t] && S.mix[t].nm; return 'Track ' + d2(t + 1) + (nm ? ' ' + nm : ''); }, parts = [];
-  if (rt){ rt.pl.buses.forEach((b, t) => { if (t >= NT) return; if (b.fx && b.fx.load) parts.push({name:'Effects · ' + tn(t), v:b.fx.load}); if (b.chn && b.chn.load) parts.push({name:'Chains · ' + tn(t), v:b.chn.load}); });
-    if (rt.mfx && rt.mfx.load) parts.push({name:'Master effects', v:rt.mfx.load}); if (rt.mst && rt.mst.wk && mstMeter && mstMeter.load) parts.push({name:'Master dynamics', v:mstMeter.load}); }
+  if (rt){ rt.pl.buses.forEach((b, t) => { if (t >= NT) return; if (b.fx && b.fx.load) parts.push({name:'Effects · ' + tn(t) + cpuFxTop(S.tfx[t], b.fx.sl, fxNameOf), v:b.fx.load}); if (b.chn && b.chn.load) parts.push({name:'Chains · ' + tn(t), v:b.chn.load}); });
+    if (rt.mfx && rt.mfx.load) parts.push({name:'Master effects' + cpuFxTop(S.mfx, rt.mfx.sl, fxNameOf), v:rt.mfx.load}); if (rt.mst && rt.mst.wk && mstMeter && mstMeter.load) parts.push({name:'Master dynamics', v:mstMeter.load}); }
   let bl = 0; for (const b of bassLive) bl += (b.node && b.node.load) || 0; if (bl) parts.push({name:'Bass voices', v:bl});
   const inMin = a => a.filter(t => now - (t.t || t) < 60000);
   const ev = inMin(PB.ev), stl = inMin(PB.stalls), dr = inMin(glitch.ts);
@@ -33909,8 +34089,9 @@ window.addEventListener('blur', releaseAll);
 $('tRowsDn').addEventListener('click', () => setRows(plen(rowsId()) - 1));
 $('tLoop').addEventListener('click', () => toggleLoopPat());
 $('tLoopSel').addEventListener('click', () => toggleLoop());
-$('tXposeDn').addEventListener('click', () => transposeSel(-1, true));   // (the buttons keep needing a selection: a stray tap shouldn't move a whole phrase)
-$('tXposeUp').addEventListener('click', () => transposeSel(1, true));
+/* (14 Nov, owner: TRANSP. on a selection of blocks with Arrange in focus) apRun turns the keys into the Song screen's while Arrange holds them beside Phrase, so the button acts on Arrange's selection there (selected + picked blocks, each pattern once) as on the Song screen */
+$('tXposeDn').addEventListener('click', () => apRun(transposeSel, [-1, true]));   // (the buttons keep needing a selection: a stray tap shouldn't move a whole phrase)
+$('tXposeUp').addEventListener('click', () => apRun(transposeSel, [1, true]));
 // The strip under the tabs is one line. On a screen too narrow for all of it (the Fold's cover screen in PAD mode:
 // TRANSP + fell off the edge), hide what has a twin elsewhere; measured, so it only happens when it doesn't fit.
 let patMode = null;
@@ -34719,6 +34900,13 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [609, '14 Nov', ['Resting …pump effects (build 607): an FXO command that switches one on now lands on the beat the first time too; changing a switched-off EQ to linear phase no longer leaves a moment of silence on its track']],
+  [608, '14 Nov', ['Renders are as bright as playback: a drum or sample that started between two samples was slightly dulled in a render (about 1 dB down at the very top). Every note now starts on a sample, in renders and when the sequencer runs on the page', 'Typing a value into a slider: negative pitches (−440 Hz) and sliders whose top or bottom reads as a word (Open, Off) take a typed unit too']],
+  [607, '14 Nov', ['A switched-off …pump effect no longer costs anything: it used to keep doing all its work behind the bypass (pump MASTER, switched off, took about 8% of the audio engine on a busy song). The timing does not move. Switching one on takes 20 to 65 ms to come in', 'A muted track’s effects rest (also when another track is soloed): their echoes die away and the work stops, within ten seconds at the latest. Unmute and the track is back at once, its effects starting fresh', 'CPU panel: an effects row now names the two dearest effects of that track with their share, such as “Effects · Track 07: pump TWANG 5%, Space reverb 3%”', 'Typing a time or a pitch into a slider now works on every slider that shows one, whatever its scale (a sample’s Loop start, Click width)']],
+  [606, '14 Nov', ['Typing a value into a slider: a time typed as ms or s (and a pitch as Hz or kHz) is now read in the unit that slider shows (500 ms into a slider that shows milliseconds gave its lowest value); 50% on a voice’s Level means halfway, as a bare 50 does']],
+  [605, '14 Nov', ['Arrange beside the Phrase: with Arrange holding the keys and blocks selected, TRANSP. − / + transpose every phrase in the selection, each phrase once, as one undo step (it said “Select rows first”). The buttons’ tips say how many blocks they will move']],
+  [604, '14 Nov', ['Synth page sliders: double-click a slider (or its name or value) to type a number: 440, 440 Hz, -6 dB or 35% all work; Enter sets it, Esc cancels. Reset is now Alt-click (or Ctrl/⌘-click, or right-click › Reset to default)', 'Click a slider, then ◀ ▶ nudge it by 1% of its travel (Shift: a tenth of that). Esc lets go of it. The same in …chains and …waves']],
+  [603, '14 Nov', ['Renders no longer start late when the master holds switched-off …pump effects (CALM, TONE, MASTER, LIMIT…): a switched-off one still delays the sound, and that delay is now counted. LATENCY COMP lines tracks up with their switched-off …pump effects too']],
   [602, '14 Nov', ['Settings › TRACKS: LFOs, macros, locks, scenes and parts now follow their tracks when the track count changes (LFOs stayed on the old track number and seemed to vanish)', 'ARRANGE ON STOP = PLAYHEAD now also moves the Arrange cursor when the Phrase (or another screen) holds the keys', 'FX screen: right-click › Clear (and CLEAR) empties the effect you clicked, not the last one in the list', 'Bottom FX bar: right-click or long press an effect for Remove effect (Ctrl+Z brings it back)', 'Settings › ANIMATIONS: OFF hides the dancing dogs and the moving effect pictures (also right-click or long press them › Hide animations). Meters, scopes and playheads stay']],
   [601, '14 Nov', ['…chains: Morph, a new module that combines two sounds by their frequencies. Convolve keeps only what both share (a pad chopped and coloured by a drum loop); Shape plays A with B\'s tone colour. Morph, Sharpness, Smoothing, Frame and Freeze (hold A or B as a drone). It is under Granular and spectral']],
   [600, '14 Nov', ['Arrange: zoom out further (the − button, Ctrl+wheel or pinch: five levels below fit, up to about three times the rows) so whole phrases fit', 'Arrange, Song, Phrase and Pattern view turn the page early while playing: when the playhead is 8 rows from the bottom, keeping 4 rows of what just played at the top', '+ ADD FX in the bottom FX bar opens the effect list straight away on the first empty slot', 'The "got its own copy" and "also plays on track" notices show for about 3 seconds and replace each other instead of queueing']],
