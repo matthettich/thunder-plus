@@ -71,9 +71,9 @@ static void testA1() {
   CHECK("A1 a good note still starts", pool.note(e, nullptr, b, k, 120) && pool.active() == 1);
 }
 
-// ---- A2: thunder_put offsets and counts ----
-static void testA2() {
-  thunder_core* c = thunder_create(48000, 256); if (!c) return;
+// ---- A2: thunder_put offsets and counts; A3: thunder_create arguments ----
+static void testA2A3() {
+  thunder_core* c = thunder_create(48000, 256); CHECK("A3 sane create", c != nullptr); if (!c) return;
   float d[8] = {1, 2, 3, 4, 5, 6, 7, 8};
   CHECK("A2 first chunk", thunder_put(c, 0, "{\"o\":0,\"n\":16}", d, 8) == 1);
   CHECK("A2 second chunk at 8", thunder_put(c, 0, "{\"o\":8,\"n\":16}", d, 8) == 1);
@@ -89,13 +89,21 @@ static void testA2() {
   CHECK("A2 zero count", thunder_put(c, 3, "{\"o\":0,\"n\":4}", d, 0) == 1);
   int64_t cnt = 0; double sum = 0; CHECK("A2 info", thunder_put_info(c, 0, &cnt, &sum) == 1 && cnt == 16 && sum == 72);
   thunder_destroy(c);
+  CHECK("A3 rate 40", thunder_create(40, 64) == nullptr);
+  CHECK("A3 rate 0", thunder_create(0, 64) == nullptr);
+  CHECK("A3 rate negative", thunder_create(-48000, 64) == nullptr);
+  CHECK("A3 rate huge", thunder_create(2000000000, 64) == nullptr);
+  CHECK("A3 block 0", thunder_create(48000, 0) == nullptr);
+  CHECK("A3 block negative", thunder_create(48000, -1) == nullptr);
+  thunder_core* e = thunder_create(8000, 1); CHECK("A3 smallest accepted", e != nullptr);
+  if (e) { float l[4], r[4]; thunder_post(e, "{\"t\":\"play\"}", 12); thunder_process(e, l, r, 4); thunder_destroy(e); }
 }
 
 // @@TESTS_END
 
 int main() {
   testA1();
-  testA2();
+  testA2A3();
   // @@CALLS_END
   if (g_fail) { std::printf("test_hostile: %d FAILED\n", g_fail); return 1; }
   std::printf("test_hostile: all passed\n");

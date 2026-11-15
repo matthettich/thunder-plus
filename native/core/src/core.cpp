@@ -80,6 +80,9 @@ struct thunder_core {
 extern "C" {
 
 thunder_core* thunder_create(int sample_rate, int max_block) {
+  // N1 review A3: refuse what the core cannot run on. A rate under 50 made the 20 ms click zero samples long and the callback read
+  // click[0] of an empty vector; a rate outside 8 kHz..384 kHz is not an audio device; a block under one frame is no block.
+  if (sample_rate < 8000 || sample_rate > 384000 || max_block < 1) return nullptr;
   thunder_core* c = new (std::nothrow) thunder_core();
   if (!c) return nullptr;
   c->sr = sample_rate;
