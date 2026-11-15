@@ -30399,7 +30399,7 @@ function draw(){
   if (lsW){ if (tp.on) lsW.seen = true; else if (lsW.seen) lpSelRestore(); }   // LP.SEL ended: LOOP SEL back as it was
   $('kPlay').classList.toggle('on', tp.on);
   /* LOOP BESIDE PLAY (609, owner): on the desktop layout the LOOP button sits right after PLAY in the top bar; on the Mobile setup it is back in the selection bar */
-  { const lp = $('tLoop'), ps = $('tSong'), sb = $('tLoopSel');
+  { const lp = $('tLoop'), ps = $('tSong'), sb = $('tLoopSel'), m = isMobile();
     if (lp && ps && sb){ if (!m && lp.previousElementSibling !== ps){ ps.after(lp); lp.classList.add('tsong'); } else if (m && lp.parentNode !== sb.parentNode){ sb.before(lp); lp.classList.remove('tsong'); } } }
   keyVis();
   syncLoop();   // before the labels below, so they show the range that is actually looping
