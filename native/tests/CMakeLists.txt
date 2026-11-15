@@ -19,6 +19,8 @@ target_link_libraries(rt_harness PRIVATE thunder_core)
 add_test(NAME rt_core COMMAND rt_harness)
 add_test(NAME rt_guard_selftest COMMAND rt_harness --selftest)
 
+# U02: smoke tests for the existing C++ DSP libraries (native/core/dsp)
+add_subdirectory(dsp)
 # U05: the core runtime (Auto, the seeded random stream and js_exp against the JS's own values; the callback contract).
 add_executable(test_runtime test_runtime.cpp)
 target_link_libraries(test_runtime PRIVATE thunder_core)
