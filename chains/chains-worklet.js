@@ -5699,6 +5699,7 @@ function morphFrame(st, c, N, mode, mo, sh, ks, fz){
       g = Er > 1e-30 ? Math.min(32, Math.sqrt(EA / Er)) : 0;
     }
     // the level moves smoothly from frame to frame (a sudden match would pump)
+    if (c.gm !== mode){ c.gm = mode; c.g = g; }   // a new Mode starts at its own level: Shape's lift (up to 32) must not ride into Convolve (review, #132)
     c.g += (g - c.g) * .5; if (!(c.g <= 32)) c.g = c.g > 32 ? 32 : 0; g = c.g * wC;
   }
   for (let k = 0; k < K; k++){

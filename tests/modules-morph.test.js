@@ -48,7 +48,7 @@ test('Shape: A always sounds, at its own loudness, with B\'s outline; B silent l
   for (const sh of [0, .5, 1]) assert.ok(Math.abs(rms(run({ mode: 1, sharp: sh }, Nf, S, 400).L, 9600) / rms(NZ) - 1) < .25, 'noise shaped by the test signal keeps the noise\'s loudness, Sharpness ' + sh);
   // noise (flat) as A, a low-passed sound as B: the result is darker than A
   let y = 0; const dark = new Float32Array(N * 800); let s3 = 99; for (let i = 0; i < dark.length; i++) { s3 ^= s3 << 13; s3 >>>= 0; s3 ^= s3 >>> 17; s3 ^= s3 << 5; s3 >>>= 0; y += ((s3 / 2147483648 - 1) - y) * .03; dark[i] = y; }
-  const r = run({ mode: 1, sharp: .5 }, Nf, i => dark[i], 400).L, hf = x => { let d = 0; for (let i = 9601; i < x.length; i++) d += Math.abs(x[i] - x[i - 1]); return d / rms(x, 9600); };
+  const r = run({ mode: 1, sharp: .5 }, Nf, i => dark[i], 400).L, hf = x => { let d = 0; for (let i = 9601; i < x.length; i++) d += Math.abs(x[i] - x[i - 1]); return d / (x.length - 9601) / rms(x, 9600); };
   assert.ok(hf(r) < hf(NZ) * .5, 'the bright noise took the dark sound\'s outline');
   assert.ok(rms(run({ mode: 1 }, sine(440, .5), sine(3000, .5), 200).L, 8000) > .005, 'even two pure tones that share nothing: A is still there');
 });
