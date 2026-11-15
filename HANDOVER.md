@@ -732,6 +732,12 @@ The owner's top priority to add is the MOD screen. Work down the list; ask befor
 
 Start a session by asking for results. Fix on `beta`. (10 Nov, 15:10: the web beta is build 560; the build numbers in the rest of this paragraph are older.) Web beta: https://matthettich.github.io/thunder-plus/beta/ (build 547 as of 10 Nov morning, 548 once its PR merges; the night of 9–10 Nov shipped 544–547, see the four "10 Nov" entries below. Decisions the lead made that night for the owner to confirm or reverse: on a phone the saved Sequencer default plays on the Page unless Audio thread is picked on that device; on a phone the safety limiter is its stand-in until another worklet loads; the resync only runs with a worklet loaded and its margins are untested on a device). Desktop: v1.3.4-beta.2 (build 541, no feed view or scopes); further desktop betas on hold until the owner asks.
 
+**Build 605** (Arrange: TRANSP. on a selection)
+- [ ] **Computer:** Phrase screen with Arrange beside it, click into Arrange, select several blocks (some sharing a phrase), click TRANSP. +. Pass: every phrase in the selection goes up a semitone once (a shared one not twice), one notice, and one Ctrl+Z undoes all of it.
+- [ ] **Computer:** the same with a block whose phrase is also used on a row outside the selection. Pass: the notice says some are also used elsewhere, and that other block has moved too (the pattern itself is edited, as on the Song screen). Say if you would rather it made a copy.
+- [ ] **Computer:** hover TRANSP. with blocks selected. Pass: the tip reads “Transposes the N selected blocks’ phrases…”. With Arrange focused and nothing selected, or the Phrase focused, the buttons behave as before.
+- [ ] **Phone:** KEYS mode, Arrange selection, TRANSP. − / +. Pass: the same as on the computer.
+
 **Build 604** (Synth page sliders: type a value, arrow nudge)
 - [ ] **Computer, Synth page:** double-click a slider. Pass: a field opens with the value selected; type `440` or `440 Hz` (or `35%`, `-6 dB` on a level) and Enter: the slider goes there, and one Ctrl+Z puts it back. Esc leaves it alone.
 - [ ] **Computer:** Alt-click a slider. Pass: it returns to its default; double-click no longer resets. Right-click › Reset to default does the same.
@@ -1241,6 +1247,15 @@ Suggested order: N0 → N1 → N2 (phone cured) → N4 with N3 alongside → N5 
   the edge `R.t0`, "waiting…" while armed), `rcdClk` / `rcdFmt` / `rcdFreeSecs`, a 250 ms timer only while recording; the
   final length stays until the next take. recorder-check covers FREE, PATTERN, Stop, next take and closing mid-take.
 
+
+## 14 Nov (Arrange: TRANSP. on a selection of blocks; build 605)
+
+Owner's ask 2 of 14 Nov evening. Built by an agent, reviewed by the lead.
+- **What was missing:** on the Song screen TRANSP. already transposed the selected and picked blocks' phrases, each once (`xposeScope` / `transposeSel`, build 569). With Arrange as the side panel beside Phrase, its selection is `apSel` and the Phrase screen is still the active one, so the buttons answered "Select rows first".
+- **Fix:** the `tXposeDn` / `tXposeUp` click handlers go through `apRun`, so with Arrange holding the keys they run as on the Song screen. No selection, or another view, is unchanged.
+- **Shared phrases:** the existing rule is kept (12 Nov: "the pattern itself is edited"): the phrase is edited in place, a block outside the selection that plays it changes too, and the one notice says "N are also used elsewhere". Not copy-on-write; his call if he wants that (it is in the punch list).
+- `xposeBlocks()` counts the filled blocks the buttons would act on; `xposeTitles()` (from `draw`, writes only on change) sets the tips.
+- `tests/arrange-transp-selection.test.js` (11); `tests/mobile-header.test.js` regex updated.
 
 ## 14 Nov (Synth page sliders: double-click types a value, arrows nudge; build 604)
 
