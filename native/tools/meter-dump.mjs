@@ -25,7 +25,7 @@ export function expected(L, R) {
   return out;
 }
 const f32 = a => new Uint8Array(a.buffer, a.byteOffset, a.byteLength);
-if (import.meta.url === 'file://' + process.argv[1]) {
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {   // (not a string compare with 'file://': a Windows path has a drive letter and backslashes)
   const dir = process.argv[2] || '/tmp/u11/meter-ref'; fs.mkdirSync(dir, { recursive: true });
   for (const [name, mk] of Object.entries(SIG)) { const [L, R] = mk(); fs.writeFileSync(path.join(dir, name + '.json'), JSON.stringify({ name, n: N, expected: expected(L, R) })); fs.writeFileSync(path.join(dir, name + '.in.f32'), Buffer.concat([f32(L), f32(R)])); }
   console.log(`wrote ${Object.keys(SIG).length} cases to ${dir}`);

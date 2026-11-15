@@ -105,7 +105,7 @@ const fnv32 = u => { let h = 0x811c9dc5 >>> 0; for (const b of u) { h ^= b; h = 
 const hex = h => '0x' + h.toString(16).padStart(16, '0') + 'ull';
 
 const a = process.argv.slice(2);
-if (import.meta.url === 'file://' + process.argv[1]) {
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {   // (not a string compare with 'file://': a Windows path has a drive letter and backslashes)
   const golden = a[0] === '--golden' || a[0] === '--check', outDir = golden ? null : (a[0] || '/tmp/u11/master-ref');
   if (outDir) fs.mkdirSync(outDir, { recursive: true });
   const rows = [];

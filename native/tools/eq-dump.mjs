@@ -110,7 +110,7 @@ const M64 = (1n << 64n) - 1n;
 function fnv(u) { let h = 0xcbf29ce484222325n; for (let i = 0; i < u.length; i++) { h ^= BigInt(u[i]); h = (h * 0x100000001b3n) & M64; } return h; }
 const hex = h => '0x' + h.toString(16).padStart(16, '0') + 'ull';
 
-if (import.meta.url === 'file://' + process.argv[1]) {
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {   // (not a string compare with 'file://': a Windows path has a drive letter and backslashes)
   const a = process.argv.slice(2), golden = a[0] === '--golden' || a[0] === '--check', outDir = golden ? null : (a[0] || '/tmp/u11/eq-ref');
   if (outDir) fs.mkdirSync(outDir, { recursive: true });
   const rows = [];
