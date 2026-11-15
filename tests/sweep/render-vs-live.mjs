@@ -35,6 +35,7 @@ async function one(name, opts, tries = 0) {
   const info = await S.run(`const sq = makeSeq(S, 'song', {row:${FROM}, once:true}); let g = 0, z = null, dur = 0; const ts = []; while (sq.alive() && g++ < 100000){ const r = sq.step(); if (z == null) z = r.t; for (const e of r.evs) if (e.type === 'note' && kit.voices[e.pad]) ts.push(e.t - z); } dur = sq.time - z;
     const sr = ex.sr, useM = !!(S.mst && S.mst.on), L = (useM ? mstLatency(S.mst, sr) : 0) + pumpChainLatency(S.mfx, sr) + Math.round(pdcPlan(sr).T * sr) + (S.limiter ? safeLatency(sr) : 0); return {ts, dur, L};`); await S.close();
   const dur = info.dur;
+  if (!(dur > 6)){ console.log(`${name}: the section is ${(+dur || 0).toFixed(1)} s long; the comparison skips the first 3.5 s of a take and needs more than 6 s. Use more --rows.`); process.exit(2); }   // (CodeRabbit on #142: a window of no length gave meaningless numbers)
   S = await session(proj); const Lv = await S.live(dur + 1, FROM); await S.close();
   if (Lv.st.skips > 1 && tries < 2) { console.log(`  (${name}: the core skipped ahead ${Lv.st.skips} times: the machine is too busy, playing again)`); return one(name, opts, tries + 1); }
   // where the live take's song time 0 is in the capture: the note events' audio times (rt.pl.coreTake) against the song's own note times (the offset most notes agree on)
