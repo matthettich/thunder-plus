@@ -27,3 +27,13 @@ add_test(NAME runtime COMMAND test_runtime)
 if(NODE_EXE)
   add_test(NAME runtime_golden_current COMMAND ${NODE_EXE} ${CMAKE_CURRENT_SOURCE_DIR}/../tools/runtime-golden.mjs --check)
 endif()
+
+# U06: the JSON reader / writer and the song reader, against sounds/ELECTRO.thunder and the JS's own JSON round trip.
+add_executable(test_song test_song.cpp)
+target_link_libraries(test_song PRIVATE thunder_core)
+target_include_directories(test_song PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../core/src ${CMAKE_CURRENT_SOURCE_DIR})
+target_compile_definitions(test_song PRIVATE THUNDER_ROOT="${CMAKE_CURRENT_SOURCE_DIR}/../..")
+add_test(NAME song COMMAND test_song)
+if(NODE_EXE)
+  add_test(NAME song_golden_current COMMAND ${NODE_EXE} ${CMAKE_CURRENT_SOURCE_DIR}/../tools/song-golden.mjs --check)
+endif()
