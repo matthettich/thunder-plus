@@ -181,3 +181,18 @@ test('setNtr on an uneven song keeps MONO and changes POLY (MORE TRACKS grows on
   const c = rig({ ntr: 16, nmono: 4 }); c.setNtr(18); assert.equal(c.S.ntr, 18); assert.equal(c.S.nmono, 4); assert.equal(c.polyFrom(), 4);
   assert.match(src, /setTracks\(PF \+ 1, n0 - PF \+ 1\)/, 'dupTrack grows one mono and one poly');
 });
+
+// The sequencer (the audio thread's copy, core/seq-core.js, generated from index.html's makeSeq): which tracks play chords follows S.nmono.
+test('the sequencer plays chords from track nmono + 1 on, and by the half rule when the song has no nmono', () => {
+  const vm2 = require('vm'), Hh = require('./helpers'), c = Hh.workletScope(); vm2.runInContext(Hh.read('core/seq-core.js'), c, { filename: 'seq-core.js' }); vm2.runInContext('TFX = {};', c);
+  const RW = vm2.runInContext('RW', c), NCOL = vm2.runInContext('NCOL', c), NTT = 32;
+  const mk = nmono => { const S = { bpm: 120, ticks: 6, ntr: 8, swing: 50, swingB: 2, lpb: 4, dlen: 4, plen: [4], tune: new Array(12).fill(0), insts: [{}], parts: [], master: 255, mout: 255,
+      song: Array.from({ length: 256 }, () => new Array(NTT + 1).fill(-1)), chains: [[[0, 0]]], phrases: [Array.from({ length: 4 }, () => new Array(RW).fill(-1))],
+      mix: Array.from({ length: NTT }, () => ({ vol: 128, pan: 128, mute: false, solo: false })), tfx: Array.from({ length: NTT }, () => []), mfx: [], smute: new Array(256).fill(0), perf: { sc: [], mac: [], lk: {}, xa: 0, xb: 1, xf: 0, lfo: {} } };
+    for (let k = 0; k < NCOL; k++) S.phrases[0][0][k] = 48 + 4 * k; for (let t = 0; t < 8; t++) S.song[0][t] = 0; if (nmono != null) S.nmono = nmono; return S; };
+  const per = nmono => { c.__S = mk(nmono); vm2.runInContext('S = __S;', c); const sq = c.makeSeq(c.__S, 'song', { row: 0, sim: true, once: true }), n = new Array(8).fill(0);
+    for (let i = 0; i < 8 && sq.alive(); i++) for (const e of sq.step().evs) if (e.type === 'note') n[e.track]++; return n.join(','); };
+  assert.equal(per(null), '1,1,1,1,4,4,4,4', 'no nmono: the first half one note, the second half the chord');
+  assert.equal(per(2), '1,1,4,4,4,4,4,4', 'two mono tracks');
+  assert.equal(per(7), '1,1,1,1,1,1,1,4', 'seven mono tracks');
+});
