@@ -732,6 +732,9 @@ The owner's top priority to add is the MOD screen. Work down the list; ask befor
 
 Start a session by asking for results. Fix on `beta`. (10 Nov, 15:10: the web beta is build 560; the build numbers in the rest of this paragraph are older.) Web beta: https://matthettich.github.io/thunder-plus/beta/ (build 547 as of 10 Nov morning, 548 once its PR merges; the night of 9–10 Nov shipped 544–547, see the four "10 Nov" entries below. Decisions the lead made that night for the owner to confirm or reverse: on a phone the saved Sequencer default plays on the Page unless Audio thread is picked on that device; on a phone the safety limiter is its stand-in until another worklet loads; the resync only runs with a worklet loaded and its margins are untested on a device). Desktop: v1.3.4-beta.2 (build 541, no feed view or scopes); further desktop betas on hold until the owner asks.
 
+**Build 606** (typed slider values: units)
+- [ ] **Computer, Synth page:** on a slider that shows milliseconds (an envelope Attack, a delay time) double-click and type `500 ms`, then `0.5 s`. Pass: both give half a second (500 ms). On one that shows seconds, `250 ms` gives 0.25 s. On a pad’s Level, `50%` and `50` both give the middle of the slider.
+
 **Build 605** (Arrange: TRANSP. on a selection)
 - [ ] **Computer:** Phrase screen with Arrange beside it, click into Arrange, select several blocks (some sharing a phrase), click TRANSP. +. Pass: every phrase in the selection goes up a semitone once (a shared one not twice), one notice, and one Ctrl+Z undoes all of it.
 - [ ] **Computer:** the same with a block whose phrase is also used on a row outside the selection. Pass: the notice says some are also used elsewhere, and that other block has moved too (the pattern itself is edited, as on the Song screen). Say if you would rather it made a copy.
@@ -1247,6 +1250,15 @@ Suggested order: N0 → N1 → N2 (phone cured) → N4 with N3 alongside → N5 
   the edge `R.t0`, "waiting…" while armed), `rcdClk` / `rcdFmt` / `rcdFreeSecs`, a 250 ms timer only while recording; the
   final length stays until the next take. recorder-check covers FREE, PATTERN, Stop, next take and closing mid-take.
 
+
+## 14 Nov (typed slider values: units and percent (CodeRabbit on #137); build 606)
+
+CodeRabbit's four comments on #137 (build 604), carried forward. Built by the same agent, reviewed by the lead.
+- **Major:** `rowParse` divided a typed `ms` by 1000 and took `s` as it was, right only for rows that store seconds. New `rowUnit(d, fmt)` reads the row's own readout (formats a few known values and reads the unit back) to learn what the row stores; typed ms / s / Hz / kHz are converted into that. A unit that does not fit the row is read as the bare number.
+- An explicit % on the voice Level row (−36 to +6 dB) maps over that range, as a bare number does.
+- The entry field ignores Enter / Escape while an IME is composing.
+- README and the help say that two-state rows and the mod-sequence step sliders still reset on a double-click.
+- Tests added to `tests/synth-slider-entry.test.js` (seconds, milliseconds, a readout that switches, kHz).
 
 ## 14 Nov (Arrange: TRANSP. on a selection of blocks; build 605)
 

@@ -33,20 +33,21 @@ function world(def = { l: 'Cutoff', min: 20, max: 20000, d: 1000, c: 'log', f: v
     document: { addEventListener: (t, f) => { (docL[t] = docL[t] || []).push(f); }, createElement: t => new El(t), activeElement: null },
     ctxPress: e => e.button === 2, resetClick: () => false };
   vm.createContext(c);
-  const code = [cut('const toPos = (d, v)', '/* ---------- state ---------- */'), cut('// rowParse(d, txt)', "const rows = [];"), cut('const rows = [];', 'function makeSeg('),
+  const code = [cut('const toPos = (d, v)', '/* ---------- state ---------- */'), cut('/* What a row stores per unit', "const rows = [];"), cut('const rows = [];', 'function makeSeg('),
     cut('const sliderOk =', '/* ONE RULE FOR VALUE CONTROLS'), cut('function sliderSet(r, v){', '/* WHEEL (27 Oct'), cut('/* SLIDER KEYS', '/* WHEEL (27 Oct')].join('\n');
   vm.runInContext(code + '\nthis.api = {makeRow, rowParse, snapDef, fromPos, toPos, sliderNudge, sliderKey, sliderSet, rowTypeBox};', c);
   const row = c.api.makeRow(def, 'f', () => obj, { idp: 't', on: () => { log.changed++; } });
   return { c, row, obj, log, docL };
 }
-const R = (def, txt) => world(def).c.api.rowParse(def, txt);
-const HZ = { l: 'Cutoff', min: 20, max: 20000, d: 1000, c: 'log' }, DB = { l: 'Level', min: -60, max: 6, d: 0 }, PC = { l: 'Mix', min: 0, max: 1, d: 0.5 }, INT = { l: 'Octave', min: -4, max: 4, d: 0, c: 'int' };
+const R = (def, txt) => world(def).c.api.rowParse(def, txt, def.f);
+const hzf = v => v < 1000 ? Math.round(v) + ' Hz' : (v / 1000).toFixed(v < 10000 ? 2 : 1) + ' kHz';
+const HZ = { l: 'Cutoff', min: 20, max: 20000, d: 1000, c: 'log', f: hzf }, DB = { l: 'Level', min: -60, max: 6, d: 0 }, PC = { l: 'Mix', min: 0, max: 1, d: 0.5 }, INT = { l: 'Octave', min: -4, max: 4, d: 0, c: 'int' };
 
 test('typed values: the unit shown or the bare number, both work', () => {
   assert.equal(R(HZ, '440'), 440); assert.equal(R(HZ, '440 Hz'), 440); assert.equal(R(HZ, '440hz'), 440); assert.equal(R(HZ, '2 kHz'), 2000); assert.equal(R(HZ, '2,5 kHz'), 2500);
   assert.equal(R(DB, '-6.0 dB'), -6); assert.equal(R(DB, '−6'), -6); assert.equal(R(DB, '+3 dB'), 3);
   assert.equal(R(PC, '35%'), 0.35); assert.equal(R(PC, '35'), 0.35); assert.equal(R(PC, '0.35'), 0.35);
-  assert.equal(R({ l: 'Time', min: 0, max: 5, d: 0.1 }, '250 ms'), 0.25);
+  assert.equal(R({ l: 'Time', min: 0, max: 5, d: 0.1, f: v => Math.round(v * 1000) + ' ms' }, '250 ms'), 0.25);
   assert.equal(R(HZ, 'abc'), null); assert.equal(R(HZ, ''), null);
 });
 test('typed values are clamped to the range and snapped to the step a drag lands on', () => {
@@ -113,4 +114,31 @@ test('source pins: arrows are stopped on the slider and skipped by the Synth pag
   const tracker = cut("document.addEventListener('keydown', e0 => {\n  const e = noAltGr(e0);", 'if (fileKeys(e))');
   assert.match(tracker, /typing\(e\)/);
   const rd = H.read('README.md'); assert.doesNotMatch(rd, /Double-click any slider \(or its name\) to put it back/);
+});
+
+const SW = { l: 'Time', min: 0.001, max: 5, d: 0.25, c: 'lin', f: v => (v < 1 ? Math.round(v * 1000) + ' ms' : v.toFixed(2) + ' s') };   /* stores seconds, prints ms or s by size */
+const MSN = { l: 'Time', min: 20, max: 2000, d: 380, c: 'log', f: v => Math.round(v) + ' ms' };   /* stores milliseconds (the Pitch delay) */
+const MSW = { l: 'Time', min: 0.1, max: 3000, d: 8, c: 'log', f: v => v < 10 ? v.toFixed(1) + ' ms' : v < 1000 ? Math.round(v) + ' ms' : (v / 1000).toFixed(2) + ' s' };   /* stores ms, switches to s by size */
+const KHZ = { l: 'Freq', min: 0.02, max: 20, d: 1, c: 'lin', f: v => (v * 1000 < 1000 ? Math.round(v * 1000) + ' Hz' : v.toFixed(2) + ' kHz') };   /* stores kHz */
+test('time and frequency units are converted into what the row stores (read from its own readout)', () => {
+  assert.equal(R(SW, '500 ms'), 0.5); assert.equal(R(SW, '0.5 s'), 0.5); assert.equal(R(SW, '2 s'), 2); assert.equal(R(SW, '0.5'), 0.5, 'bare: the row\'s own unit');
+  assert.equal(R(MSN, '500 ms'), 500); assert.equal(R(MSN, '0.5 s'), 500); assert.equal(R(MSN, '1.5 s'), 1500); assert.equal(R(MSN, '300'), 300);
+  assert.equal(R(MSW, '500 ms'), 500); assert.equal(R(MSW, '0.5 s'), 500); assert.equal(R(MSW, '2 s'), 2000); assert.equal(R(MSW, '0.25 ms'), 0.3, 'the 0.1 minimum row');
+  assert.equal(R(KHZ, '440 Hz'), 0.44); assert.equal(R(KHZ, '2 kHz'), 2); assert.equal(R(KHZ, '2'), 2);
+  assert.equal(R(HZ, '500 ms'), 500, 'a unit that does not match the readout is a bare number'); assert.equal(R(MSN, '440 Hz'), 440);
+  assert.equal(R({ l: 'x', min: 0, max: 10, d: 1, f: v => 'n' + v }, '5 ms'), 5, 'unknown unit: bare');
+});
+test('an explicit % on the voice Level row (-36..+6 dB) maps like the bare number: 0% = -36, 50% = -15, 100% = +6', () => {
+  const L = { l: 'Level', min: -36, max: 6, d: 0, f: v => v.toFixed(1) + ' dB' };
+  assert.equal(R(L, '0%'), -36); assert.equal(R(L, '50%'), -15); assert.equal(R(L, '100%'), 6); assert.equal(R(L, '50'), -15); assert.equal(R(L, '-6 dB'), -6);
+  assert.equal(R(PC, '35%'), 0.35);
+});
+test('IME: while composing, Enter and Escape in the entry field do nothing (the keys still do not leave the field)', () => {
+  const w = world(); w.row.refresh(); w.row.inp.fire('dblclick'); const box = w.row.out.children[0]; box.value = '2000';
+  const e = box.fire('keydown', { key: 'Enter', isComposing: true }); assert.ok(e.stopped); assert.equal(w.obj.f, 1000); assert.ok(w.row.out.children[0] === box, 'still open');
+  box.fire('keydown', { key: 'Enter' }); assert.equal(w.obj.f, 2000);
+});
+test('docs say two-state rows and the mod-sequence steps still reset on a double-click', () => {
+  assert.match(H.read('README.md'), /two-state buttons[^.]*mod-sequence step sliders[^.]*still reset/);
+  assert.match(src, /two-state buttons[^.]*mod-sequence step sliders[^.]*still reset/);
 });
