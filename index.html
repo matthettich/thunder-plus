@@ -26936,6 +26936,20 @@ function xposeScope(){
   }
   toast('Transpose works on a phrase, or on blocks on the Song.'); return null;
 }
+/* How many blocks the TRANSP. buttons would act on: Arrange's selection plus picked blocks (the Song screen, or Arrange holding the keys beside Phrase); 0 anywhere else. Filled blocks only, not the master column. */
+function xposeBlocks(){
+  const side = tv !== 'song' && typeof apReady !== 'undefined' && apReady && apF === 'arr';
+  if (tv !== 'song' && !side) return 0;
+  const get = () => selA && selA.v === 'song' ? songCells() : [], cells = (side ? apAsSong(get) : get()).concat(sxPicks.map(q => [q.y, q.t])), seen = new Set();
+  for (const [y, t] of cells) if (t !== MT && S.song[y] && S.song[y][t] >= 0) seen.add(y + ':' + t);
+  return seen.size;
+}
+function xposeTitles(){
+  const n = xposeBlocks();
+  for (const [id, d, w] of [['tXposeDn', 'down', 'Alt+,'], ['tXposeUp', 'up', 'Alt+.']]){ const b = $(id); if (!b) continue;
+    const t = n ? `Transposes the ${n} selected block${n > 1 ? 's\u2019 phrases' : '\u2019s phrases'} ${d} a semitone (${w}). Each phrase moves once; one used by a block outside the selection changes there too.` : `Transpose the selection ${d} a semitone (${w})`;
+    b.title = t; b.setAttribute('aria-label', n ? `Transpose the ${n} selected block${n > 1 ? 's' : ''} ${d} a semitone` : `Transpose selection ${d} a semitone`); }
+}
 function transposeSel(d, needSel, songOk){
   // songOk (the pad's SEMI keys, 12 Nov): on the Song / Arrange they work without a selection too, on the block under the cursor
   if (needSel && !(selA && selA.v === tv) && !(tv === 'song' && (songOk || sxPicks.length))) return toast(`Select rows first (or ${keyHint('alt+,')} / ${keyHint('alt+.')} for the whole ${tv === 'song' ? 'block' : 'phrase'}).`);
@@ -29058,6 +29072,7 @@ function draw(){
     $('tCmd').hidden = !show; document.body.classList.toggle('cmdv', show && !mini); cmdTips(); }
   const sb = $('tCmd').querySelector('[data-c=song]'); if (sb){ cmdSongSet(sb); sb.classList.toggle('on', tp.on); }
   const onSong = tv === 'song';
+  xposeTitles();
   { const lb = $('tCmd').querySelector('[data-c=lpsel]'), arrK = !!(typeof apReady !== 'undefined' && apReady && apF === 'arr'), vis = onSong || arrK; if (lb){ lb.hidden = !vis; lb.classList.toggle('on', !!lsW && tp.on); } $('tCmd').classList.toggle('lps', vis); }   // LP.SEL: where a song selection can exist (Song, Arrange holding the keys)
   { const seq = ['song', ...(sectsOn ? ['sect'] : []), 'phrase', 'inst', 'mixer', 'fx', 'mod', 'project'];
     const TCV = {song:'#dbe6f8', sect:'#e9e0f8', phrase:'#d8f0e2', inst:'#fbe2d2', mixer:'#f6edc8', fx:'#f8dce8', mod:'#ebdcf6', project:'#d5eef2'};
@@ -33909,8 +33924,9 @@ window.addEventListener('blur', releaseAll);
 $('tRowsDn').addEventListener('click', () => setRows(plen(rowsId()) - 1));
 $('tLoop').addEventListener('click', () => toggleLoopPat());
 $('tLoopSel').addEventListener('click', () => toggleLoop());
-$('tXposeDn').addEventListener('click', () => transposeSel(-1, true));   // (the buttons keep needing a selection: a stray tap shouldn't move a whole phrase)
-$('tXposeUp').addEventListener('click', () => transposeSel(1, true));
+/* (14 Nov, owner: TRANSP. on a selection of blocks with Arrange in focus) apRun turns the keys into the Song screen's while Arrange holds them beside Phrase, so the button acts on Arrange's selection there (selected + picked blocks, each pattern once) as on the Song screen */
+$('tXposeDn').addEventListener('click', () => apRun(transposeSel, [-1, true]));   // (the buttons keep needing a selection: a stray tap shouldn't move a whole phrase)
+$('tXposeUp').addEventListener('click', () => apRun(transposeSel, [1, true]));
 // The strip under the tabs is one line. On a screen too narrow for all of it (the Fold's cover screen in PAD mode:
 // TRANSP + fell off the edge), hide what has a twin elsewhere; measured, so it only happens when it doesn't fit.
 let patMode = null;
