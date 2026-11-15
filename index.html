@@ -24552,7 +24552,11 @@ async function saveProj(as){
       if (!as && projPath){ const r = await DESK.save(projPath, projText()); if (r && r.ok){ setDirty(false); projSet(projPath, null); toast('Saved ' + projLabel()); return true; }
         toastErr('Couldn’t save to ' + projLabel() + (r && r.error ? ': ' + r.error : '') + '. Choose where to save it.', 5000); }
       const r = await DESK.saveAs(projName(), projText(), projPath || ''); if (!r || !r.ok) { if (r && r.error) toastErr('Couldn’t save: ' + r.error); return false; }
-      if (adoptFileName(r.path)){ try { await DESK.save(r.path, projText()); } catch(e){ tpLog('could not rewrite the saved file with the song’s new name', e); } }   /* the file written by the Save dialog holds the old default name: once more with the new one */
+      if (adoptFileName(r.path)){   /* the file the Save dialog wrote holds the old default name: once more with the new one */
+        let w = null, we = null; try { w = await DESK.save(r.path, projText()); } catch(e){ we = e; }
+        if (we || !w || !w.ok){   /* the rewrite failed: still unsaved. The file is now the project's (a later Save writes it), and the adopted name stays in memory (not rolled back) */
+          projSet(r.path, null); setDirty(true); toastErr('Couldn’t save to ' + projLabel() + ': ' + ((we && we.message) || (w && w.error) || 'the file could not be written') + '. The project is still unsaved.', 5000); return false; }
+      }
       setDirty(false); projSet(r.path, null); toast('Saved ' + projLabel()); return true;
     }
     if (!as && projFile){
