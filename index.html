@@ -27473,15 +27473,15 @@ function fxpOpen(x, y){
 // EDIT on an FX-screen slot: every effect in a list, the slot's own one marked NOW. Choosing it opens its controls.
 // FAVOURITES (1 Nov): the slot's favourite effects first, under FAVOURITES (the ones this track can take), then every
 // effect in its group as before. fxp.types is what each row picks ('' = empty the slot).
-function fxsOpen(k, keepType){
-  const A = cFxT >= NT ? S.mfx : S.tfx[cFxT], f = A[k], cur = f ? f.type : null, FL = fxtL(), FV = favs.list('fx').filter(t => FL.includes(t));
+function fxsOpen(k, keepType, bt){   /* bt: a track given (the FX bar's + ADD FX): the list opens over the screen that is open and picks for that track, leaving cFxT and cFxS alone */
+  const ft = bt != null ? bt : cFxT, A = ft >= NT ? S.mfx : S.tfx[ft], f = A[k], cur = f ? f.type : null, FL = fxtL(ft), FV = favs.list('fx').filter(t => FL.includes(t));
   const types = ['', ...FV, ...FL], at = t => types.indexOf(t);
-  Object.assign(fxp, {open:true, slot:k, pre:null, types, i:keepType != null ? Math.max(0, at(keepType)) : cur ? at(cur) : Math.max(0, at(lastFxType))});
+  Object.assign(fxp, {open:true, slot:k, pre:null, bt:bt != null ? bt : null, types, i:keepType != null ? Math.max(0, at(keepType)) : cur ? at(cur) : Math.max(0, at(lastFxType))});
   const heads = {}; if (FV.length) heads[1] = 'FAVORITES';
   FL.forEach((t, j) => { const g = fxtGroup(t); if (!j || g !== fxtGroup(FL[j - 1])) heads[j + 1 + FV.length] = g.toUpperCase(); });
-  const fav = t => ({kind:'fx', id:t, label:TFX[t].long, after:() => { const sel = fxp.types[fxp.i]; fxsOpen(k, sel || null); }});
+  const fav = t => ({kind:'fx', id:t, label:TFX[t].long, after:() => { const sel = fxp.types[fxp.i]; fxsOpen(k, sel || null, bt); }});
   fxpFill([['---', f ? 'Empty this slot (remove the effect)' : 'Leave this slot empty', !f],
-    ...types.slice(1).map(t => [TFX[t].n, TFX[t].long, t === cur, fav(t)])], cur, 'EFFECT · ' + fxWho(cFxT) + ' SLOT ' + (k + 1), true, heads);
+    ...types.slice(1).map(t => [TFX[t].n, TFX[t].long, t === cur, fav(t)])], cur, 'EFFECT · ' + fxWho(ft) + ' SLOT ' + (k + 1), true, heads);
 }
 // …PUMP: a pump slot's factory presets in the same list, under their sections (FACTORY, SOURCES, CHAINS).
 function pumpPresetOpen(t, k){
@@ -27491,7 +27491,7 @@ function pumpPresetOpen(t, k){
   const heads = {}; list.forEach((p, j) => { if (!j || p.section !== list[j - 1].section) heads[j] = p.section; });
   fxpFill(list.map(p => [String(p.index).padStart(2, '0'), p.name, p.name === f.pname]), cur, 'PRESET · pump ' + pumpFx(type).name + ' · ' + fxWho(t) + ' SLOT ' + (k + 1), true, heads);
 }
-function fxpClose(){ if (!fxp.open) return; fxp.open = false; fxp.pre = null; fxp.tpre = null; $('fxPick').hidden = true; }
+function fxpClose(){ if (!fxp.open) return; fxp.open = false; fxp.pre = null; fxp.bt = null; fxp.tpre = null; $('fxPick').hidden = true; }
 function fxpShow(jump){
   $('fxPickList').querySelectorAll('.fpi').forEach((it, k) => { const on = k === fxp.i; it.classList.toggle('on', on); it.setAttribute('aria-selected', on);
     if (on) it.scrollIntoView({block:jump ? 'center' : 'nearest'}); });
@@ -27509,11 +27509,11 @@ function fxpChoose(k = fxp.i){
 // Picking the slot's own effect keeps its settings; another one starts fresh, or with the settings it had in this slot
 // before (SLOT MEMORY). Either way its controls open.
 function fxsChoose(s, k){
-  fxpClose(); const t = cFxT, A = t >= NT ? S.mfx : S.tfx[t], had = A[s];
-  if (!k){ fxSwap(t, s, A, null); cFxS = s; cs.fx.y = s + 1; fxChanged(t); saveS(); draw(); if (had) toast(`Slot ${s + 1} emptied.`); return; }
+  const bt = fxp.bt; fxpClose(); const t = bt != null ? bt : cFxT, A = t >= NT ? S.mfx : S.tfx[t], had = A[s];
+  if (!k){ fxSwap(t, s, A, null); if (bt == null){ cFxS = s; cs.fx.y = s + 1; } fxChanged(t); saveS(); draw(); if (had) toast(`Slot ${s + 1} emptied.`); return; }
   const type = (fxp.types && fxp.types[k]) || fxtL(t)[k - 1];
   if (!had || had.type !== type){ fxSwap(t, s, A, type); fxChanged(t); saveS(); toast(`Slot ${s + 1}: ${TFX[type].long}` + (isPumpT(type) && t < NT ? pumpBusNote(type, S.tfx[t] && S.tfx[t][s]) : '')); }
-  lastFxType = type; cFxS = s; cs.fx.y = FXSLOTS + 1; draw();
+  lastFxType = type; if (bt == null){ cFxS = s; cs.fx.y = FXSLOTS + 1; } draw();
 }
 // The pad's buttons while the list is open. Returns true when it used the press.
 function fxpPad(b){
@@ -31893,12 +31893,12 @@ function deckFxBar(){
   if (sig !== dkFbSig){
     dkFbSig = sig; bar.replaceChildren(); dkFbVals = [];
     const goFx = k => { cFxT = mst ? NT : dkTrack(); cFxS = k; cs.fx.y = A[k] ? FXSLOTS + 1 : k + 1; go('fx'); };
-    // + ADD FX (14 Nov, owner: "automatically open the FX picker after it pages to the Mixer"): to the FX screen for this track, then the same effect list EDIT opens on an
-    // empty slot (fxsOpen: grouped, the keys ▲▼ Enter and Esc as always). Esc closes it and leaves you on the screen. No empty slot (the bar was drawn before it filled): a toast.
+    // + ADD FX (15 Nov, owner: "could the menu pop up over the open window ... and not change the view to the fx page?"): the same effect list EDIT opens on an empty slot
+    // (fxsOpen: grouped, the keys ▲▼ Enter and Esc), as a pop-up over whatever screen is open, picking for this track; the screen stays. No empty slot (the bar was drawn before it filled): a toast.
     const addFx = () => { const t = mst ? NT : dkTrack(), AA = t >= NT ? S.mfx : S.tfx[t], k = AA.findIndex(x => !x);
       if (k < 0){ toast('Every effect slot on ' + (mst ? 'the master' : 'track ' + d2(t + 1)) + ' is in use.'); return; }
-      goFx(k); try { if (document.activeElement && document.activeElement.blur && document.activeElement.closest && document.activeElement.closest('#dkFxBar')) document.activeElement.blur(); } catch(e){}
-      fxsOpen(k); };
+      try { if (document.activeElement && document.activeElement.blur && document.activeElement.closest && document.activeElement.closest('#dkFxBar')) document.activeElement.blur(); } catch(e){}
+      fxsOpen(k, null, t); };
     for (let k = 0; k < FXSLOTS; k++){
       const f = A[k], col = el('div', 'dkfc' + (f ? (f.on ? '' : ' off') : ' empty')), h = el('div', 'fch'), b = el('div', 'fcb');
       if (!f) continue;   // empty slots: one + ADD FX after the effects
@@ -31984,7 +31984,7 @@ function deckFxBar(){
     }
     const free = Array.from({length:FXSLOTS}, (_, k) => k).filter(k => !A[k]);
     if (free.length){ const ad = el('button', 'dkadd'); ad.type = 'button'; ad.append('+ ADD FX', el('small', null, 'slot ' + (free[0] + 1)));
-      ad.title = 'Add an effect in slot ' + (free[0] + 1) + ' (FX screen)'; ad.dataset.k = free[0]; ad.addEventListener('click', () => addFx()); bar.append(ad);
+      ad.title = 'Add an effect in slot ' + (free[0] + 1); ad.dataset.k = free[0]; ad.addEventListener('click', () => addFx()); bar.append(ad);
       if (free.length === FXSLOTS) bar.append(el('div', 'dkempty', 'NO EFFECTS ON ' + (mst ? 'THE MASTER' : 'TRACK ' + d2(t + 1)) + ' YET')); }   // EMPTY FX
   }
   dkFbVals.forEach(fn => fn());
