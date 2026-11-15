@@ -68,7 +68,7 @@ test('LATENCY COMP: a track whose pump effect is OFF is as late as one whose eff
   assert.ok(Math.abs(p.d.get(0) - 2048 / SR) < 1e-12, 'the others wait for it');
 });
 
-// LATENCY COMP AUTO (build 615): the plan's `c` is how late each track's input is: its effects' beat clock runs that late.
+// LATENCY COMP AUTO (build 616): the plan's `c` is how late each track's input is: its effects' beat clock runs that late.
 test('LATENCY COMP: the clock of a bus runs as late as its latest source, the master’s as late as the whole plan; off gives none', () => {
   const c = vm.createContext({Math, Map, Set, NT:32, MT:32, aset:{}, TFX:{pcalm:{pump:'calm'}}, pumpIdx:{calm:{bypass:9}}, pumpLatencyOf:f => 2048});
   c.isPumpT = k => !!(c.TFX[k] && c.TFX[k].pump);

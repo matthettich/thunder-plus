@@ -19456,7 +19456,7 @@ class ThunderFx extends AudioWorkletProcessor {
       if (s.bi >= 0) v[s.bi] = s.byp ? 1 : 0;
       P.pump_commit(s.pu); s.dirty = false; }
     if (s.cr){   // …PUMP CREATIVE: the song's tempo and position, and the notes of NOTES FROM that fall in this block
-      const T = this.mctx.transport, lag = (s.up || 0) * T.tempo / 60 / sampleRate; P.pump_transport(s.pu, T.tempo, T.playing ? Math.max(0, (this.ppq || 0) - lag) : 0, T.playing ? 1 : 0);   /* (build 615) s.up: the latency of the pump slots before this one: the sound reaches it that much late, so its song position is that much earlier (a GATE after CALM closed 2048 samples early) */
+      const T = this.mctx.transport, lag = (s.up || 0) * T.tempo / 60 / sampleRate; P.pump_transport(s.pu, T.tempo, T.playing ? Math.max(0, (this.ppq || 0) - lag) : 0, T.playing ? 1 : 0);   /* (build 616) s.up: the latency of the pump slots before this one: the sound reaches it that much late, so its song position is that much earlier (a GATE after CALM closed 2048 samples early) */
       const q = this.pq;
       if (q && q.length){ const end = currentTime + n / sampleRate;
         for (let j = 0; j < q.length; j++){ const m = q[j]; if (m[1] >= end) break;
@@ -19566,6 +19566,7 @@ class ThunderFx extends AudioWorkletProcessor {
       s.on = on; s.slot = slot; next.push(s);
     }
     for (const s of old) this.drop(s);
+    { const P = globalThis.__pumpX; let acc = 0; if (P) for (const s of next) if (s.pu !== undefined && s.pu >= 0){ s.up = acc; if (!(s.bi < 0 && s.byp)){ try { acc += P.pump_latency(s.pu); } catch (e){} } } }   /* (build 616) s.up at once, not only with the half-second latency report: a clocked pump effect after CALM ran early for the first half second */
     this.slots = next; this.idle = 0; this.clocked = next.some(s => (s.js && ((s.jt >= 93 && s.jt <= 95) || (s.jt >= 100 && s.jt <= 102))) || s.clk);
     this.chard = next.some(s => s.clk || (s.js && (s.jt === 93 || (s.jt >= 100 && s.jt <= 102))));   // clocked by more than Flex / Step gate (Retrigger, Grains, Scramble, Glitch, a clocked module): those keep running while stopped
   }
@@ -20113,13 +20114,13 @@ const pumpChainLatency = (A, sr) => (A || []).reduce((n, f) => n + pumpSlotLat(f
      d: the delay on its direct way to the master (latest arrival T minus its own), 0 for a pure source (heard only via its bus)
      f: the delay on its feed into the buses it feeds, so a bus's sources line up with the latest of them.
    A send (a track heard directly and through a bus) gets the two separately, so both copies line up. */
-/* LATENCY COMP: AUTO (build 615; owner, 14 Nov: a bus with a look-ahead effect, and a tempo-synced delay on it, must land on the beat).
+/* LATENCY COMP: AUTO (build 616; owner, 14 Nov: a bus with a look-ahead effect, and a tempo-synced delay on it, must land on the beat).
    aset.pdcMode: 'auto' (the default: the plan below whenever something has latency, and live only while the song plays, so pads
    answer at once when it is stopped), 'on' (always), 'off'. A setting saved before this (aset.pdc true / false) reads as on / auto.
    The plan itself is the same in auto and on: with no latency anywhere it is all zeros, and the sound is sample for sample what off gives.
    c: how late each track's INPUT is (a bus: the latest of its sources; the master: T), which is how late its effects' beat clock
    must run, so Flex, Step gate, Retrigger and the clocked pump effects stay on the beat of the sound they hear (they ran T early). */
-const pdcModeOf = () => aset.pdcMode === 'on' || aset.pdcMode === 'off' || aset.pdcMode === 'auto' ? aset.pdcMode : aset.pdc ? 'on' : 'auto';
+function pdcModeOf(){ return aset.pdcMode === 'on' || aset.pdcMode === 'off' || aset.pdcMode === 'auto' ? aset.pdcMode : aset.pdc ? 'on' : 'auto'; }   /* (a function declaration: the Audio & MIDI control reads it while the page is still loading; as a const further down it stopped the app from starting) */
 function pdcPlan(sr){
   const none = {on:false, T:0, d:new Map(), f:new Map(), c:new Map()};
   if ((aset.pdcMode === 'on' || aset.pdcMode === 'off' || aset.pdcMode === 'auto' ? aset.pdcMode : aset.pdc ? 'on' : 'auto') === 'off') return none;
@@ -21612,15 +21613,16 @@ function makePlayer(ac, out, getBuf, live, mo){   // mo: the master OUT gain (af
   const setBusOff = v => { busOff = !!v; busSync(); };
   // LATENCY COMPENSATION: set every track's delays from pdcPlan (all 0 with the option off). Run after the buses are wired
   // (busSync) and after a track's effects change (routeTrack); cheap when nothing changed.
-  /* (build 615) AUTO: live, the delays are in force only while the song plays (clk.on); stopped they are 0, so pads and keys answer at
+  /* (build 616) AUTO: live, the delays are in force only while the song plays (clk.on); stopped they are 0, so pads and keys answer at
      once. Live, a change glides over 50 ms (a jump of the delay time clicked: measured, a step of 0.2 on a sine), also the one at
-     STOP, under whatever is still ringing; as PLAY starts, and in a render, it is set at once. Each effects node's beat clock is delayed by how late its input is (pl.c, see pdcPlan). */
+     STOP, under whatever is still ringing; as PLAY starts it takes 3 ms (in force before the first note; a plain jump clicked
+     when a pad was still ringing: measured 17 times the normal step), and in a render it is set at once. Each effects node's beat clock is delayed by how late its input is (pl.c, see pdcPlan). */
   let pdcNow = false;   // set for the call made as PLAY starts or STOP lands: at once, no glide
   function pdcSync(now){
-    pdcNow = !!now; const pl = pdcPlan(ac.sampleRate), playing = clk.on || (typeof tp !== 'undefined' && !!(tp && tp.on)), idle = live && !playing && pdcModeOf() === 'auto', glide = live && !pdcNow;   /* (tp.on: the audio-thread sequencer keeps its own clock, so clk.on stays off while it plays) */
+    pdcNow = !!now; const pl = pdcPlan(ac.sampleRate), playing = clk.on || (typeof tp !== 'undefined' && !!(tp && tp.on)), idle = live && !playing && pdcModeOf() === 'auto', glide = live, ramp = pdcNow ? 0.003 : 0.05;   /* (tp.on: the audio-thread sequencer keeps its own clock, so clk.on stays off while it plays) */
     const set = (n, v) => { if (!n) return; v = idle ? 0 : Math.max(0, Math.min(0.99, v || 0)); if (n._pv === v) return; n._pv = v;
       const q = n.delayTime; if (!glide){ try { q.cancelScheduledValues(0); } catch(e){} q.value = v; return; }
-      try { const at = ac.currentTime; q.cancelScheduledValues(at); q.setValueAtTime(q.value, at); q.linearRampToValueAtTime(v, at + 0.05); } catch(e){ q.value = v; } };
+      try { const at = ac.currentTime; q.cancelScheduledValues(at); q.setValueAtTime(q.value, at); q.linearRampToValueAtTime(v, at + ramp); } catch(e){ q.value = v; } };
     for (let t = 0; t < buses.length; t++){ const b = buses[t]; if (!b) continue; set(b.dl, pl.d.get(t)); set(b.fdl, pl.f.get(t)); set(b.fdlP, pl.f.get(t)); if (b.fx) set(b.fx._cd, pl.c.get(t)); }
     if (mfx) set(mfx._cd, pl.c.get(MT));
     pdcNow = false;
@@ -21633,7 +21635,7 @@ function makePlayer(ac, out, getBuf, live, mo){   // mo: the master OUT gain (af
   // beat + 1 while it plays and 0 otherwise, so with this source at −1 the effects get the same values, on the sample.
   const clkBus = ac.createGain(); clock.connect(clkBus);
   let mfx = null, mvol = null, moOv = false;
-  /* (build 615) each effects node hears the clock through its own delay (0 unless LATENCY COMP makes its input late: pdcSync) */
+  /* (build 616) each effects node hears the clock through its own delay (0 unless LATENCY COMP makes its input late: pdcSync) */
   const clockTo = n => { try { if (n && n.parameters){ if (!n._cd){ n._cd = ac.createDelay(1); n._cd.delayTime.value = 0; n._cd._pv = 0; clkBus.connect(n._cd); } n._cd.connect(n.parameters.get('bp')); } } catch(e){} };
   // An effect node that goes lets go of its inputs too (the picked tracks, the sends, the beat clock): they kept it running,
   // a little more each time an effect was removed (review, 27 Oct).
@@ -22116,6 +22118,7 @@ function makePlayer(ac, out, getBuf, live, mo){   // mo: the master OUT gain (af
     seqGen++;   // 10 Nov: timers booked ahead by atTime / tempoTo are void from here (the restore below books its own after this)
     fxcPend.clear();
     clk.on = false; try { clock.offset.cancelScheduledValues(at); clock.offset.setValueAtTime(-1, at); } catch(e){}
+    try { pdcSync(); } catch(e){}   /* (LATENCY COMP AUTO: the song has stopped here, with the page's own sequencer after tStop's call: the delays go) */
     for (const n of [...buses.map(b => b && b.fx), mfx]) if (n && n.parameters) for (const k of FXP){ const q = n.parameters.get(k); if (q) try { q.cancelScheduledValues(at); q.setValueAtTime(-1, at); } catch(e){} }
     for (const b of buses) if (b && b.chn && b.chn.parameters) for (let k = 1; k <= 15; k++){ const q = b.chn.parameters.get('b' + k); if (q) try { q.cancelScheduledValues(at); q.setValueAtTime(-1, at); } catch(e){} }   // BYP back to the patch
     for (const key of fxOv.keys()){ const [t, k] = key.split(':').map(Number), m = fxpMsg(t, k, {}); if (m) atTime(at, () => { const n = fxNodeOf(t); if (n && n.port) try { n.port.postMessage(m); } catch(e){} }); }   // FXV: back to the slots' own
