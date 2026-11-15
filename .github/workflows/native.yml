@@ -58,8 +58,10 @@ jobs:
         run: |
           SDK="$PWD/wasi-sdk"
           mkdir -p out
+          # The core is built WITHOUT -ffast-math and without fused multiply-add, as native/core/CMakeLists.txt builds it: its
+          # values must equal the web copy's bit for bit (U05). (The effects in dsp/ keep their own flags.)
           "$SDK/bin/clang++" --target=wasm32-wasi --sysroot="$SDK/share/wasi-sysroot" \
-            -O3 -ffast-math -fno-finite-math-only -msimd128 -fno-exceptions -fno-rtti -std=c++17 -Wall -Wextra \
+            -O3 -ffp-contract=off -msimd128 -fno-exceptions -fno-rtti -std=c++17 -Wall -Wextra \
             -Inative/core/include -Inative/core/src \
             native/core/src/core.cpp native/core/src/rt/auto.cpp native/core/src/rt/jsmath.cpp \
             native/core/src/rt/json.cpp native/core/src/song/song.cpp \
