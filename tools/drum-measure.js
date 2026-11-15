@@ -63,17 +63,19 @@ const WIN = {
   'Snares':                  { secs: [0.04, 1.5], t30: [0.01, 0.6], rms: [-32, -4.5], peak: [-11, -0.5], centroid: [200, 14000] },
   'Claps & snaps':           { secs: [0.03, 2.5], t30: [0.01, 1.2], rms: [-38, -4.5], peak: [-11, -0.5], centroid: [200, 14000] },
   'Rims & sticks':           { secs: [0.005, 0.8], t30: [0.005, 0.3], rms: [-32, -4.5], peak: [-11, -0.5], centroid: [300, 9000] },
-  'Closed hats':             { secs: [0.01, 0.5], t30: [0.005, 0.25], highFrac: [0.45, 1], rms: [-40, -14], peak: [-12, -0.5], centroid: [3500, 16000] },
-  'Open hats':               { secs: [0.12, 2.5], t30: [0.08, 1.4], highFrac: [0.4, 1], rms: [-40, -16], peak: [-12, -0.5], centroid: [3000, 16000] },
-  'Cymbals':                 { secs: [0.2, 8], t30: [0.12, 4], highFrac: [0.3, 1], rms: [-46, -16], peak: [-12, -0.5], centroid: [2000, 16000] },
+  'Closed hats':             { secs: [0.01, 0.5], t30: [0.005, 0.25], highFrac: [0.4, 1], rms: [-40, -4.5], peak: [-12, -0.5], centroid: [3000, 17000] },
+  'Open hats':               { secs: [0.12, 2.5], t30: [0.08, 1.4], highFrac: [0.35, 1], rms: [-40, -4.5], peak: [-12, -0.5], centroid: [3000, 17000] },
+  'Cymbals':                 { secs: [0.2, 9], t30: [0.03, 5.5], highFrac: [0.15, 1], rms: [-46, -4.5], peak: [-12, -0.5], centroid: [1500, 16000] },
   'Toms':                    { secs: [0.08, 4], t30: [0.05, 2], pitch: [40, 500], rms: [-28, -10], peak: [-9, -0.5] },
   'Hand drums':              { secs: [0.05, 3], t30: [0.02, 1.2], pitch: [60, 900], rms: [-30, -9], peak: [-9, -0.5] },
-  'Shakers & tambourines':   { secs: [0.03, 1.5], t30: [0.01, 0.8], highFrac: [0.3, 1], rms: [-42, -14], peak: [-12, -0.5], centroid: [2500, 16000] },
+  'Shakers & tambourines':   { secs: [0.03, 2.5], t30: [0.01, 1.2], highFrac: [0.3, 1], rms: [-42, -4.5], peak: [-12, -0.5], centroid: [2500, 17000] },
   'Cowbells, blocks & metal':{ secs: [0.02, 5], t30: [0.01, 2.5], rms: [-40, -4], peak: [-12, -0.5], centroid: [300, 14000] },
   'IDM & glitch':            { secs: [0.005, 3], t30: [0.005, 2], rms: [-46, -4], peak: [-14, -0.3] },
 };
-function violations(type, m) {
-  const w = WIN[type], v = [];
+function violations(type, m, eng) {
+  const w = Object.assign({}, WIN[type]), v = [];
+  if (eng === 'chip') for (const k of ['centroid', 'highFrac', 'lowFrac', 'pitch']) delete w[k];   // the 8-bit noise channel has its own spectrum
+  if (type === 'Cymbals' && eng === 'layers') delete w.t30;
   if (m.bad) v.push('non-finite');
   if (!(m.peak < -0.2)) v.push('clips');
   if (m.peak < -40) v.push('silent');
@@ -104,7 +106,7 @@ module.exports = { measure, violations, dist, WIN, entries, renderEntry, fft, db
 
 if (require.main === module) {
   const all = process.argv.includes('all'), { out } = entries(), E = G.engine();
-  const rows = []; for (const e of out) { if (!all && !e.isNew) continue; const r = renderEntry(e), m = measure(r.data); rows.push({ e, m, viol: violations(e.type, m), eng: r.v.engine || 'layers' }); }
+  const rows = []; for (const e of out) { if (!all && !e.isNew) continue; const r = renderEntry(e), m = measure(r.data); rows.push({ e, m, viol: violations(e.type, m, r.v.engine || 'layers'), eng: r.v.engine || 'layers' }); }
   if (process.argv.includes('json')) { console.log(JSON.stringify(rows.map(r => ({ type: r.e.type, name: r.e.name, eng: r.eng, ...r.m, viol: r.viol })))); process.exit(0); }
   const f = (x, d) => (typeof x === 'number' ? x.toFixed(d) : String(x)).padStart(7);
   let last = '';

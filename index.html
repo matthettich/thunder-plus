@@ -11104,7 +11104,7 @@ function moreDrumPresets2(){
   ['Snares', 'Fat wood snare', K('Fat wood snare', {pitch:200, size:0.5, tension:0.3, tenT:25, dec:200, damp:0.55, muffle:0.1, hard:0.8, pos:0.4, noise:0.7, shell:0.9, shellF:0.6}, {level:-1.5})],
   ['Snares', 'Brush tap snare', K('Brush tap snare', {pitch:360, size:0.3, tension:0.2, tenT:20, dec:170, damp:0.6, muffle:0.3, hard:0.1, pos:0.5, noise:1, shell:0.4}, {level:-1.5})],
   ['Snares', 'Marching snare', K('Marching snare', {pitch:260, size:0.25, tension:0.2, tenT:15, dec:140, damp:0.6, muffle:0, hard:1, pos:0.6, noise:0.9, shell:0.8, shellF:0.8}, {level:-1.5})],
-  ['Snares', 'Dead muffled snare', K('Dead muffled snare', {pitch:310, size:0.4, tension:0.3, tenT:20, dec:100, damp:0.9, muffle:1, hard:0.7, pos:0.4, noise:0.6, shell:0.6}, {level:-1.5})],
+  ['Snares', 'Dead muffled snare', K('Dead muffled snare', {pitch:420, size:0.4, tension:0.3, tenT:20, dec:80, damp:0.9, muffle:1, hard:0.7, pos:0.4, noise:0.6, shell:0.6}, {level:-1.5})],
   ['Snares', 'Ghost note snare', K('Ghost note snare', {pitch:270, size:0.25, tension:0.25, tenT:15, dec:60, damp:0.85, muffle:0.6, hard:0.3, pos:0.5, noise:0.4, shell:0.4}, {level:-1.5})],
   ['Snares', 'Noise snare (breath)', B('Noise snare (breath)', {color:0.55, bands:2, freq:1800, spread:0.4, metal:0.2, q:0.4, body:0.35, hp:200, lp:11000, atk:0.5, dec:160, rel:50}, {level:-1.5})],
   ['Snares', 'Wire rattle snare', B('Wire rattle snare', {grain:0.6, grate:180, bands:3, freq:3500, spread:0.4, metal:0.4, q:0.3, body:0.4, hp:1500, atk:0.5, dec:200, rel:60}, {level:-1.5})],
@@ -11197,6 +11197,103 @@ function moreDrumPresets2(){
     {type:'click', a:0.5, level:0.7, atk:0.05, dec:3, hpCut:3000},
     {type:'sine', atk:0.05, dec:6, level:0.3, tune:43, fine:-20}], {tune:24, level:21.5})],
   ['Rims & sticks', 'Soft side stick', K('Soft side stick', {pitch:500, size:0.1, tension:0.1, tenT:8, dec:35, damp:0.85, muffle:0.5, hard:0.5, pos:0.9, noise:0.3, shell:0.5}, {level:-1})],
+  ['Closed hats', 'FM tick hat', F('FM tick hat', {pitch:3000, bend:0, alg:2, r1:3.51, i1:0.9, idec1:30, r2:5.43, i2:0.8, idec2:25, fb:0.5, noise:0.5, ndec:30, ncut:14000, dec:35, tone:0.3, click:0}, {choke:1, level:-4})],
+  ['Closed hats', 'FM sizzle closed hat', F('FM sizzle closed hat', {pitch:2000, bend:0, alg:2, r1:3.1, i1:0.8, idec1:60, r2:6.2, i2:0.7, idec2:50, fb:0.4, noise:0.6, ndec:60, ncut:12000, dec:75, tone:0.4, click:0}, {choke:1, level:-4})],
+  ['Closed hats', 'FM bright closed hat', F('FM bright closed hat', {pitch:4200, bend:0, alg:0, r1:1.7, i1:0.9, idec1:25, r2:4.3, i2:0.9, idec2:20, fb:0.3, noise:0.4, ndec:25, ncut:16000, dec:30, tone:0.25, click:0.1}, {choke:1, level:-4})],
+  ['Closed hats', 'Glass tick hat', F('Glass tick hat', {pitch:5200, bend:0, alg:1, r1:2.4, i1:0.6, idec1:15, r2:5.7, i2:0.5, idec2:12, noise:0.2, ndec:15, ncut:16000, dec:22, tone:0.3, click:0.2}, {choke:1, level:-4})],
+  ['Closed hats', 'Closed hat (606-style)', L('Closed hat (606-style)', [
+    {type:'metal', a:0.4, b:0.5, atk:0.1, dec:55, hpCut:7000, hpRes:0.3, lpCut:15000, level:1}], {level:11.5, choke:1})],
+  ['Closed hats', 'Closed hat (808-style tight)', L('Closed hat (808-style tight)', [
+    {type:'metal', a:0.5, atk:0.1, dec:40, hpCut:8500, hpRes:0.45, lpCut:16000, level:1}], {choke:1, level:13.5})],
+  ['Closed hats', 'Closed hat (909-style)', L('Closed hat (909-style)', [
+    {type:'metal', a:0.6, b:0.5, atk:0.1, dec:60, hpCut:7000, level:0.8},
+    {type:'white', atk:0.1, dec:30, hpCut:9000, level:0.4}], {choke:1, level:8.5})],
+  ['Closed hats', 'Closed hat (707-style)', L('Closed hat (707-style)', [
+    {type:'white', atk:0.1, dec:45, hpCut:8000, hpRes:0.3, lpCut:14000, level:0.9},
+    {type:'metal', a:0.3, atk:0.1, dec:30, hpCut:9000, level:0.3}], {choke:1, level:5})],
+  ['Closed hats', 'Pedal hat', B('Pedal hat', {bands:4, freq:3800, spread:0.3, metal:0.7, q:0.5, body:0.7, hp:2800, dec:26, rel:12}, {choke:1, level:-4})],
+  ['Closed hats', 'Pedal chick hat', B('Pedal chick hat', {bands:4, freq:3200, spread:0.35, metal:0.7, q:0.5, body:0.6, hp:2000, lp:9000, dec:35, rel:15}, {choke:1, level:-4})],
+  ['Closed hats', 'Silver closed hat', B('Silver closed hat', {bands:8, freq:9000, spread:0.25, metal:1, q:0.6, body:0.85, hp:6500, dec:30, rel:15}, {choke:1, level:-4})],
+  ['Closed hats', 'Wet closed hat', B('Wet closed hat', {bands:6, freq:6500, spread:0.4, metal:0.8, q:0.7, body:0.8, hp:3500, dec:110, rel:50}, {choke:1, level:-4})],
+  ['Closed hats', 'Noise tick hat', T('Noise tick hat', {tLev:0, nType:2, nFreq:11000, nRes:0.2, nDec:18, nLev:1, click:0.2}, {choke:1, level:-1.5})],
+  ['Closed hats', 'Soft noise hat', T('Soft noise hat', {tLev:0, nType:2, nFreq:8000, nRes:0.15, nDec:45, nLev:0.6, click:0}, {choke:1, level:4.5})],
+  ['Closed hats', 'Dark noise hat', T('Dark noise hat', {tLev:0, nType:1, nFreq:5500, nRes:0.3, nDec:40, nLev:0.9, click:0.1}, {choke:1, level:-1})],
+  ['Closed hats', 'Resonant hat', T('Resonant hat', {tLev:0, nType:3, nFreq:9500, nRes:0.6, nDec:35, nLev:0.8, click:0}, {choke:1, level:-5})],
+  ['Closed hats', 'Swept hat', T('Swept hat', {tLev:0, nType:2, nFreq:5000, nRes:0.3, nDec:50, nLev:0.9, nSweep:0.6, click:0.1}, {choke:1, level:3})],
+  ['Closed hats', 'Blip bright hat', BL('Blip bright hat', {pitch:7000, kick:0, noise:1, click:0.3, decay:25, filt:0.75, res:0.5}, {choke:1, level:-5.5})],
+  ['Closed hats', 'Blip glitch hat', BL('Blip glitch hat', {pitch:6000, kick:0, noise:1, click:0.4, decay:20, filt:0.7, res:0.4, grain:3, grainT:22}, {choke:1, level:-4.5})],
+  ['Closed hats', 'Chip closed hat', C('Chip closed hat', {wave:2, nfreq:1, nshort:1, atk:0, dec:2, sus:0, rel:1}, {choke:1, level:-4})],
+  ['Closed hats', 'Chip metal hat', C('Chip metal hat', {wave:2, nfreq:0.9, nshort:1, atk:0, dec:3, sus:0, rel:1}, {choke:1, level:-4})],
+  ['Closed hats', 'Lo-fi closed hat', L('Lo-fi closed hat', [
+    {type:'white', atk:0.1, dec:60, hpCut:3000, lpCut:9000, level:0.9}], {level:3.5, fx:[PFX('crush', {down:0.4, bits:7, mix:0.7})], choke:1})],
+  ['Closed hats', 'Dust crackle hat', L('Dust crackle hat', [
+    {type:'dust', a:0.5, b:0.3, atk:0.1, dec:45, hpCut:3500, level:0.9}], {choke:1, level:3.5})],
+  ['Closed hats', 'LFSR digital hat', L('LFSR digital hat', [
+    {type:'lfsr', a:0.9, b:0, atk:0.1, dec:30, hpCut:6000, level:0.9}], {choke:1, level:-2.5})],
+  ['Closed hats', 'S&H noise hat', L('S&H noise hat', [
+    {type:'grit', a:0.1, b:0.6, atk:0.1, dec:40, hpCut:5000, level:0.9}], {choke:1})],
+  ['Open hats', 'Washy open hat', B('Washy open hat', {bands:6, freq:5000, spread:0.5, metal:1, q:0.9, body:0.85, hp:3000, dec:600, rel:200}, {len:3, choke:1, level:-5})],
+  ['Open hats', 'Half-open hat', B('Half-open hat', {bands:6, freq:6200, spread:0.35, metal:0.9, q:0.65, body:0.8, hp:3500, dec:250, rel:100}, {choke:1, level:-5})],
+  ['Open hats', 'Dark open hat', B('Dark open hat', {bands:5, freq:4000, spread:0.3, metal:0.8, q:0.7, body:0.75, hp:2000, lp:9000, dec:500, rel:200}, {choke:1, level:-5})],
+  ['Open hats', 'Silver open hat', B('Silver open hat', {bands:8, freq:9000, spread:0.25, metal:1, q:0.7, body:0.85, hp:6000, dec:600, rel:250}, {choke:1, level:-5})],
+  ['Open hats', 'FM metal open hat', F('FM metal open hat', {pitch:3200, bend:0, alg:2, r1:3.3, i1:0.9, idec1:300, r2:5.9, i2:0.7, idec2:200, fb:0.5, noise:0.5, ndec:250, ncut:13000, dec:380, tone:0.35, click:0}, {choke:1, level:-5})],
+  ['Open hats', 'FM glass open hat', F('FM glass open hat', {pitch:4500, bend:0, alg:1, r1:2.4, i1:0.6, idec1:300, r2:5.7, i2:0.5, idec2:200, noise:0.3, ndec:250, ncut:16000, dec:380, tone:0.3, click:0}, {choke:1, level:-5})],
+  ['Open hats', 'Open hat (606-style)', L('Open hat (606-style)', [
+    {type:'metal', a:0.4, b:0.5, atk:0.1, dec:380, hpCut:7000, hpRes:0.3, lpCut:15000, level:1}], {level:9.5, choke:1})],
+  ['Open hats', 'Open hat (808-style long)', L('Open hat (808-style long)', [
+    {type:'metal', a:0.5, atk:0.1, dec:1200, hpCut:8500, hpRes:0.45, lpCut:16000, level:1}], {len:3, choke:1, level:9.5})],
+  ['Open hats', 'Open hat (909-style)', L('Open hat (909-style)', [
+    {type:'metal', a:0.6, b:0.5, atk:0.1, dec:520, hpCut:7000, level:0.8},
+    {type:'white', atk:0.1, dec:300, hpCut:9000, level:0.4}], {choke:1, level:6.5})],
+  ['Open hats', 'Resonant open hat', T('Resonant open hat', {tLev:0, nType:3, nFreq:8500, nRes:0.5, nDec:300, nLev:0.7, click:0}, {choke:1, level:-6.5})],
+  ['Open hats', 'Swept open hat', T('Swept open hat', {tLev:0, nType:2, nFreq:4500, nRes:0.3, nDec:300, nLev:0.8, nSweep:0.5, click:0}, {choke:1, level:-2})],
+  ['Open hats', 'Blip open hat', BL('Blip open hat', {pitch:6500, kick:0, noise:0.95, ring:0.4, ringF:6000, decay:450, filt:0.65, res:0.4}, {choke:1, level:-5.5})],
+  ['Open hats', 'Chip open hat', C('Chip open hat', {wave:2, nfreq:1, nshort:1, atk:0, dec:20, sus:0, rel:8}, {choke:1, level:-5})],
+  ['Open hats', 'Gated open hat', L('Gated open hat', [
+    {type:'metal', a:0.9, b:0.8, atk:0.1, dec:900, hpCut:5500, hpRes:0.4, level:1}], {gAmpOn:true, gMode:'AHD', gAtk:0.1, gHold:150, gDec:8, level:2, choke:1})],
+  ['Open hats', 'Trash open hat', L('Trash open hat', [
+    {type:'white', atk:0.1, dec:500, hpCut:5000, level:0.9}], {level:-6, fx:[PFX('crush', {down:0.5, bits:6, mix:0.8})], choke:1})],
+  ['Cymbals', 'Wide crash', B('Wide crash', {bands:6, freq:2400, spread:0.9, metal:0.8, q:1, body:0.8, hp:400, lp:9000, dec:2600, sus:0.4, rel:1500}, {len:5, level:-5})],
+  ['Cymbals', 'Short crash', B('Short crash', {bands:8, freq:5000, spread:0.35, metal:1, q:0.7, body:0.9, hp:2000, dec:700, rel:300}, {len:3, level:-5})],
+  ['Cymbals', 'Dark washy crash', B('Dark washy crash', {bands:7, freq:2000, spread:0.5, metal:0.95, q:0.85, body:0.9, hp:500, lp:6000, dec:3400, sus:0.15, rel:1500}, {len:6, level:-5})],
+  ['Cymbals', 'Choked cymbal', B('Choked cymbal', {bands:8, freq:5500, spread:0.35, metal:1, q:0.7, body:0.9, hp:1800, dec:300, rel:80}, {len:2, level:-5})],
+  ['Cymbals', 'Sizzle ride', B('Sizzle ride', {bands:8, freq:6000, spread:0.3, metal:0.9, q:0.9, body:0.9, hp:2500, dec:1500, sus:0.05, rel:700, grain:0.15, grate:300}, {len:4, level:-5})],
+  ['Cymbals', 'FM crash', F('FM crash', {pitch:700, bend:0, alg:2, r1:1.47, i1:0.9, idec1:1200, r2:3.7, i2:0.8, idec2:1000, fb:0.3, noise:0.45, ndec:900, ncut:15000, dec:1500, tone:0.5, click:0.1}, {len:6, level:-5})],
+  ['Cymbals', 'FM ping ride', F('FM ping ride', {pitch:1300, bend:0, alg:2, r1:2.13, i1:0.6, idec1:1000, r2:3.9, i2:0.4, idec2:800, noise:0.15, ndec:500, ncut:12000, dec:1200, tone:0.6, click:0.3}, {len:5, level:-5})],
+  ['Cymbals', 'FM splash', F('FM splash', {pitch:3500, bend:0, alg:2, r1:1.9, i1:0.9, idec1:300, r2:4.1, i2:0.8, idec2:250, noise:0.4, ndec:300, ncut:15000, dec:550, tone:0.45, click:0}, {len:3, level:-5})],
+  ['Cymbals', 'FM china', F('FM china', {pitch:520, bend:0, alg:2, r1:1.2, i1:0.9, idec1:600, r2:3.3, i2:0.9, idec2:500, fb:0.6, noise:0.5, ndec:700, ncut:11000, dec:900, tone:0.5, click:0.2}, {len:4, level:-5})],
+  ['Cymbals', 'Ride bell (FM)', F('Ride bell (FM)', {pitch:1250, bend:0, alg:1, r1:2.76, i1:0.4, idec1:1300, r2:5.4, i2:0.3, idec2:700, noise:0.1, ndec:200, ncut:12000, dec:1300, tone:0.8, click:0.2}, {len:5, level:-5})],
+  ['Cymbals', 'Crash (909-style long)', L('Crash (909-style long)', [
+    {type:'metal', a:0.7, b:0.6, atk:0.5, dec:2800, hpCut:5500, level:0.8},
+    {type:'white', atk:0.5, dec:2200, hpCut:8000, level:0.4}], {len:6, level:1.5})],
+  ['Cymbals', 'Ride (606-style)', L('Ride (606-style)', [
+    {type:'metal', a:0.35, b:0.4, atk:0.1, dec:1500, hpCut:6000, hpRes:0.3, level:1}], {len:4, level:1.5})],
+  ['Cymbals', 'Reverse crash swell', L('Reverse crash swell', [
+    {type:'metal', a:0.9, b:0.6, atk:1400, dec:40, hpCut:3500, level:0.8},
+    {type:'white', atk:1400, dec:40, hpCut:5000, lpCut:14000, level:0.4}], {len:3, level:1.5})],
+  ['Cymbals', 'Riser noise swell', L('Riser noise swell', [
+    {type:'white', atk:2200, dec:30, hpCut:1500, lpCut:12000, level:0.9}], {len:4, level:-4.5})],
+  ['Cymbals', 'Noise crash', T('Noise crash', {tLev:0, nType:2, nFreq:6000, nRes:0.3, nDec:1200, nLev:0.8, nSweep:-0.3, click:0.1}, {len:5, level:-4})],
+  ['Shakers & tambourines', 'Tight shaker', B('Tight shaker', {grain:0.8, grate:100, bands:2, freq:6000, q:0.2, body:0.4, hp:3500, atk:3, dec:45, rel:20}, {level:-4})],
+  ['Shakers & tambourines', 'Loose shaker', B('Loose shaker', {grain:0.9, grate:45, bands:2, freq:4000, q:0.3, body:0.5, hp:2000, atk:25, dec:280, rel:100}, {len:2, level:-4})],
+  ['Shakers & tambourines', 'Sand shaker', B('Sand shaker', {color:0.65, grain:0.95, grate:250, bands:1, freq:7000, q:0.1, body:0.2, hp:3000, atk:10, dec:170, rel:60}, {level:-4})],
+  ['Shakers & tambourines', 'Cabasa chick', B('Cabasa chick', {grain:0.6, grate:300, bands:3, freq:8000, q:0.2, body:0.4, hp:5000, atk:2, dec:60, rel:25}, {level:-4})],
+  ['Shakers & tambourines', 'Seed pod shake', B('Seed pod shake', {grain:1, grate:12, bands:2, freq:2500, q:0.4, body:0.5, hp:1000, atk:5, dec:200, rel:70}, {len:2, level:-4})],
+  ['Shakers & tambourines', 'Rainstick', B('Rainstick', {color:0.7, grain:0.9, grate:150, bands:2, freq:5000, q:0.3, body:0.4, hp:2500, atk:150, sus:0, dec:350, rel:100, wind:0.5}, {len:3, level:-4})],
+  ['Shakers & tambourines', 'Tambourine shake', B('Tambourine shake', {grain:0.8, grate:40, bands:5, freq:8500, spread:0.4, metal:1, q:0.8, body:0.8, hp:5000, atk:25, dec:360, rel:120}, {level:-4})],
+  ['Shakers & tambourines', 'FM jingle tambourine', F('FM jingle tambourine', {pitch:3200, bend:0, alg:2, r1:2.4, i1:0.9, idec1:180, r2:5.1, i2:0.8, idec2:120, noise:0.7, ndec:120, ncut:14000, dec:200, tone:0.4, click:0}, {level:-4})],
+  ['Shakers & tambourines', 'Sleigh jingle', F('Sleigh jingle', {pitch:4000, bend:0, alg:1, r1:1.9, i1:0.8, idec1:250, r2:3.7, i2:0.6, idec2:180, noise:0.3, ndec:150, ncut:15000, dec:330, tone:0.6, click:0}, {len:2, level:-4})],
+  ['Shakers & tambourines', 'Maracas pair', L('Maracas pair', [
+    {type:'white', burst:2, spacing:35, atk:3, dec:40, hpCut:6500, lpCut:14000, level:0.8}], {level:5.5})],
+  ['Shakers & tambourines', 'Fast shaker roll', L('Fast shaker roll', [
+    {type:'white', burst:6, spacing:14, atk:3, dec:30, hpCut:5000, lpCut:14000, level:0.8}], {level:3.5})],
+  ['Shakers & tambourines', 'Tambourine strike', L('Tambourine strike', [
+    {type:'metal', a:0.85, b:0.8, atk:0.3, dec:200, hpCut:6500, level:0.7},
+    {type:'white', atk:0.3, dec:90, hpCut:5000, lpCut:12000, level:0.4}], {level:8.5})],
+  ['Shakers & tambourines', 'Washboard', L('Washboard', [
+    {type:'white', burst:8, spacing:9, atk:0.3, dec:12, hpCut:3500, hpRes:0.5, lpCut:8000, lpRes:0.4, level:0.9}], {level:-1})],
+  ['Shakers & tambourines', 'Blip shaker', BL('Blip shaker', {pitch:5000, kick:0, noise:1, click:0, atk:12, decay:90, filt:0.65, res:0.3}, {level:-5.5})],
+  ['Shakers & tambourines', 'Chip shaker', C('Chip shaker', {wave:2, nfreq:0.95, nshort:0, atk:2, dec:12, sus:0, rel:3}, {level:-4})],
   ];
 }
 // DRUMS BY TYPE (owner, 30 Oct): every drum sound in the pad Presets list sits in a group for its type (Kicks, Snares, …),
