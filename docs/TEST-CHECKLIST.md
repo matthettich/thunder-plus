@@ -1,6 +1,6 @@
 # Thunder Plus test checklist, by priority
 
-> Snapshot of the owner's Claude Doc "Thunder Plus test checklist, by priority" (https://claude.ai/artifact/LrzQ18ur18Fc5gkvxmQDbK), exported 14 Nov 2026 with his ticks as of the afternoon (build 590).
+> Snapshot of the owner's Claude Doc "Thunder Plus test checklist, by priority" (https://claude.ai/artifact/LrzQ18ur18Fc5gkvxmQDbK), exported 14 Nov 2026 with his ticks as of the afternoon (build 602).
 > The live list is the Claude Doc; the source of every item is "Owner's punch list" in HANDOVER.md (build numbers are in brackets).
 > Re-export this file when the doc changes.
 
@@ -10,7 +10,7 @@
 
 This list is in order of importance, so start at the top.
 
-Do section 1 first; it is short: the newest builds (589, 590), what could lose work or sound, the fixes from your feedback, and the two main checks of builds 586 to 588.
+Do section 1 first; it is short: the newest builds (589 to 602, ears first), what could lose work or sound.
 
 Do sections 2 and 3 as time allows.
 
@@ -22,14 +22,33 @@ If something fails, tell Claude the build number and what happened; tick an item
 
 | Section | Open items | Mostly on | Why it matters |
 | --- | --- | --- | --- |
-| 1. Do these first | 24 | Phone and computer | The newest builds (589, 590), lost work or sound, and the re-checks of your last fixes |
-| 2. Really worth trying | 56 | Phone | Everyday features nobody has tried on a real device, and the rest of the 585 to 588 editor checks |
+| 1. Do these first | 29 | Phone and computer | The newest builds (589 to 602), lost work or sound |
+| 2. Really worth trying | 68 | Phone | Everyday features nobody has tried on a real device, the 585 to 588 editor checks and the re-checks of your last fixes |
 | 3. If you have time | 47 | Phone, then gear | Secondary features, by-ear comparisons and hardware |
 | 4. Safe to skip unless something looks wrong | 55 | Mixed | Cosmetic, older, or already covered by automated tests |
 | Parked | 6 | Phone | When the native apps start; whether three optional things get built |
 | Set aside | 5 | none | Nothing: probably superseded |
 
 ## 1. Do these first
+
+### New in builds 591 to 602: your ears first
+
+*Builds 599, 602 and 600 first, then one listening check for each new module build.*
+
+- [ ] Computer (the ROG, desktop app), ears: open acid, Balanced, PLAY, then mute track 07's patterns or press STOP and leave it two minutes with the CPU panel open. Pass: "Effects T07" falls to about nothing within a minute or two and stays there (it used to climb to 40%). Un-mute or PLAY: the effects sound as before, tails included, with no click when they wake. On any track with a reverb or delay, stop the notes and listen to the whole tail: nothing is cut short. (599)
+- [ ] Phone or computer, ears: while a song plays, add an LFO on the MOD screen to an effect knob (for example track 12 FX1 delay time). Change its depth and rate, then delete it. Pass: you hear each change at once, without stopping the song. (599)
+- [ ] Computer, a COPY of a song with LFOs: Settings › TRACKS, add two tracks. Pass: the LFOs show on the same track's MOD screen (its new number) and still move the same knobs. Take the two tracks away: everything goes back. A song changed before this build is not repaired. (602)
+- [ ] Computer: set ARRANGE ON STOP to PLAYHEAD, show the Phrase screen with Arrange beside it, PLAY past a page turn, then STOP. Pass: the Arrange cursor sits on the row where it stopped, in view. With STAYS it stays where it was. (602)
+- [ ] Computer: on the FX screen with several effects, right-click the first one › Clear. Pass: only that one goes. Same on the master. (602)
+- [ ] Computer: in the Arrange header press − several times. Pass: rows get lower until about three times as many show; labels hide when rows get tiny, colours and the playhead stay; ○ goes back to fit. (600)
+- [ ] Computer and phone: play a song with Arrange beside the Phrase, hands off. Pass: the page turns once when the playhead is about 8 rows from the bottom, a few rows that just played stay at the top, and touching a key keeps it still for 4 seconds. (600)
+- [ ] By ear, …chains, control maths: Envelope follow → Comparator A (Level about 0.30), its A > B gate → a Switch's Select, dry on A and a delay's output on B. Pass: loud hits jump to B with no click (Fade 5 ms; at 0 it may click, which is what 0 is for). Then a Crossfade with dry on A, an effect on B and a slow LFO into Mix: it sweeps, and Equal power keeps the loudness even. (591)
+- [ ] By ear, …chains, clock tools: a Clock into Chance gate, Out to a drum, Seed 7, Chance 50%. Play twice from the start: the same hits both times, and a render has them too. Seed 0: different every play. Then Clock → Clock multiplier ×3 → a drum: three even hits a beat. A kick's gate into Burst (Count 4, Bend up) → a snare: a roll that tightens. (592)
+- [ ] Computer, …chains, Scope: a sine LFO into A and a square LFO into B. Pass: a teal sine and a purple square on one screen; Rising keeps the picture still, Free lets it drift; Freeze stops the picture while the sound carries on. On a Track In while the song plays at 20 ms: can you read the waveform? (593)
+- [ ] By ear, …chains, building blocks: four Allpass (Phase) in a row with one LFO into every Freq jack, the last Out on a Crossfade's B against the dry sound: a phaser sweep. Three Allpass in Echo on a drum hit: a soft smear, and a held tone keeps its pitch. Noise through a band-pass Filter and a VCA with a short ADSR: a hi-hat. (594)
+- [ ] By ear, Delay line: Noise burst into it, Time 4.5 ms, Feedback 95%, Damp 20%: a plucked string near 220 Hz. Time 350 ms, Feedback 40%: an echo that fades. Feedback 99% on a loud sustained sound: loud and bent, never exploding, clicking or going silent for good. Too harsh or too tame when pushed? (596)
+- [ ] By ear, Expression: a sound into A passes through; K1 at 0.5 is half as loud. Pick Soft clip, raise K1: more drive. Change the formula while the song plays: any click or dropout? Type sin( and press Enter: silence and a line saying where the mistake is; fix it and the sound returns. (597)
+- [ ] By ear, …chains, Morph (Granular and spectral): a pad into In, a drum loop into In B, Mode Convolve, Morph 50%. Pass: the pad is chopped by the drums' rhythm; 0% is the pad alone, 100% the drums alone; no clicks turning Morph, Sharpness or Smoothing. Mode Shape: the pad sounds with the drums' tone colour. Is Convolve loud enough at the default? (601)
 
 ### New in build 589: feedback loops (listen first)
 
@@ -47,6 +66,12 @@ If something fails, tell Claude the build number and what happened; tick an item
 - [ ] Phone (installed app if you use it): open the acid project from Files or "Open with", press PLAY, pull the notification shade down: the title says "acid", not "Song 1". Rename the song while it plays: the title follows. Which icon do you see: the small Chrome logo, or Thunder Plus's own? (590)
 - [ ] Folded phone, Mobile mode, Chains shown (three tabs): Tracker, Synth and Chains read in full on a row of their own at the top; nothing scrolls sideways and the gear and PLAY are on screen. Show Waves too (four tabs): the same. Is the extra row acceptable, or would you rather keep one row and lose the LEFT time readout at that width? (590)
 
+### New in build 598: your three small requests
+
+- [ ] Computer, any skin: press Play on the Pattern screen. Pass: the small "■ STOP" at the right of the control bar looks like the other lit buttons (flat, the skin's own playing colour; no amber, thick border or shadow) and still stops the song. Try white, an IDM skin and a Low power skin. (598)
+- [ ] Computer, bottom effects bar: a track strip's volume fader cap is a flat line like the Mixer's, not a round knob. Drag, wheel, double-click (0 dB), Shift-fine and the right-click menu work as before, also on a bus strip and the master. (598)
+- [ ] Poly track, a row with three notes: put the cursor on one, press Enter (EDIT on the phone). Pass: "3 notes picked up". Enter on an empty row: all three appear in their columns, and one Undo removes all three. A single note, a mono track and effect columns behave as before. (598)
+
 ### Could lose work or sound
 
 *A failure here means lost notes, a lost save, a hang, or no sound.*
@@ -58,6 +83,19 @@ If something fails, tell Claude the build number and what happened; tick an item
 - [ ] Computer, Audio thread sequencer: STOP late in a long song (row 60+) and RESUME; no freeze, and it continues exactly where it was. (552)
 - [ ] Computer: sleep and wake (Chrome, then the Mac and Windows apps once built); after waking, PLAY makes sound without a reload. (552)
 
+## 2. Really worth trying
+
+### Builds 586 to 588: the two most important checks of each
+
+*Moved down from section 1 on 14 Nov to make room for builds 591 to 602. Each build's other checks are in the groups below.*
+
+- [ ] Folded phone: tap Play in the top bar. Can you play a patch with one thumb (sliders, dropdowns, keys) without ever moving, folding or deleting a module? Is it obvious which mode you are in? Should the phone start in Play or in Edit? (586)
+- [ ] Folded phone: drag a slider sideways: it moves from where it was instead of jumping to your finger; slide your finger up or down away from it while dragging for fine control; double-tap resets it. Drag up or down starting on a slider: the patch pans instead of the value changing. Does the sideways-versus-up-down choice feel right? (586)
+- [ ] Computer: rest the pointer on a slider for a moment, then turn the mouse wheel: the value changes (hold Shift for fine steps). Scrolling across the patch without stopping on a slider never changes a value. Does the short wait feel right, also on a trackpad? (587)
+- [ ] Computer: plug a second cable into an input that already has one: both now feed it and add together (before, the new one replaced the old). Try two sources into one filter input: it should sound like both. (587)
+- [ ] Computer: collapse a whole patch to Mini (Alt+Shift+C, or Shift+click a module's arrow): each module becomes a one-line bar. Can you still tell the modules apart and follow the cables? Click a bar to open it. (588)
+- [ ] Computer: put a few modules in a group, then drag one of them: the group's box follows. Fold the group: it becomes one block that says how many modules and cables it holds. (588)
+
 ### Re-check the fixes from your feedback
 
 *These check the fixes made from your 13 Nov results.*
@@ -68,19 +106,6 @@ If something fails, tell Claude the build number and what happened; tick an item
 - [ ] Computer: drag an LFO to the small jack beside a mixer's Pan slider: it connects on the first try. (584)
 - [ ] Computer: Help shows Signal kinds as three tidy rows; choosing "Modules" in Help scrolls to that section and does not open a second editor. (584)
 - [ ] Computer: in Chains and Waves the File menu starts with New project and has no Undo / Redo; Edit has them; the Tracker says "New project" too. (584)
-
-### Builds 586 to 588: the two most important checks of each
-
-*The rest of each build's checks are in section 2.*
-
-- [ ] Folded phone: tap Play in the top bar. Can you play a patch with one thumb (sliders, dropdowns, keys) without ever moving, folding or deleting a module? Is it obvious which mode you are in? Should the phone start in Play or in Edit? (586)
-- [ ] Folded phone: drag a slider sideways: it moves from where it was instead of jumping to your finger; slide your finger up or down away from it while dragging for fine control; double-tap resets it. Drag up or down starting on a slider: the patch pans instead of the value changing. Does the sideways-versus-up-down choice feel right? (586)
-- [ ] Computer: rest the pointer on a slider for a moment, then turn the mouse wheel: the value changes (hold Shift for fine steps). Scrolling across the patch without stopping on a slider never changes a value. Does the short wait feel right, also on a trackpad? (587)
-- [ ] Computer: plug a second cable into an input that already has one: both now feed it and add together (before, the new one replaced the old). Try two sources into one filter input: it should sound like both. (587)
-- [ ] Computer: collapse a whole patch to Mini (Alt+Shift+C, or Shift+click a module's arrow): each module becomes a one-line bar. Can you still tell the modules apart and follow the cables? Click a bar to open it. (588)
-- [ ] Computer: put a few modules in a group, then drag one of them: the group's box follows. Fold the group: it becomes one block that says how many modules and cables it holds. (588)
-
-## 2. Really worth trying
 
 ### Phone editing in …waves / …chains (586)
 

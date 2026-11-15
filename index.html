@@ -23600,7 +23600,7 @@ function tStop(quiet){
   else if (home) try { cs.song.y = home.y; cs.song.top = home.top; cPhrase = home.p; cSect = home.s; cs.phrase.y = home.py; cs.phrase.top = home.ptop; cs.song.pg = cs.phrase.pg = false; if (tp.paused) tp.paused.key = curKey(); } catch(e){ tpLog('stop cursor', e); }
   // ARRANGE ON STOP beside another screen (14 Nov, owner: ARRANGE ON STOP = PLAYHEAD, yet the Arrange cursor went back to where it was): with the Phrase (or the Mixer…) holding
   // the keys, stopToPlayhead() reads PHRASE ON STOP, which moves or restores the phrase side AND Arrange's cursor. Arrange's own cursor and view now follow ARRANGE ON STOP alone.
-  if (arrP) G('arrange cursor', () => { if (tv === 'phrase' && pvActive()){ curToPlay(arrP, 'song'); if (tp.paused) tp.paused.key = curKey(); } else arrCurToPlay(arrP); });   // Pattern view draws the song row's pattern, so the pattern goes with the row (pvGo); else only Arrange's cursor moves
+  if (arrP) G('arrange cursor', () => { if (tv === 'phrase' && pvActive()){ curToPlay(arrP, 'song'); if (tp.paused) tp.paused.key = curKey(); } else { arrCurToPlay(arrP); if (tp.paused) tp.paused.key = curKey(); } });   // Pattern view draws the song row's pattern, so the pattern goes with the row (pvGo); else only Arrange's cursor moves
   if (!quiet) draw();
 }
 // Arrange's cursor onto the row playing on its own track (the track column stays), and that row in view. For the Arrange beside another screen only: nothing of the phrase moves.
@@ -25059,7 +25059,8 @@ function perfRemap(P, tN){
     if (Array.isArray(p.mix)){ const c = p.mix.slice(0, NT), nm = [];   // a short list leaves the later tracks as the song has them: fill with the song's own (S.mix is already moved)
       for (let t = 0; t < NT; t++){ const o = P[t], m = S.mix[t]; nm.push(c[o] != null ? c[o] : [m ? m.vol : 224, m ? m.pan : 128]); }
       p.mix = nm; }
-    if (p.fx && typeof p.fx === 'object'){ const r = {}; for (const k in p.fx){ const a = k.split(':'), t = +a[0]; if (t >= 0 && t < NT) a[0] = String(tN(t)); r[a.join(':')] = p.fx[k]; } p.fx = r; } }
+    if (p.fx && typeof p.fx === 'object'){ const r = {}; for (const k in p.fx){ const a = k.split(':'), t = +a[0]; if (t >= 0 && t < NT) a[0] = String(tN(t)); const o = p.fx[k]; if (o && o.sck != null && +o.sck > SCK_SEND){ const st = sckTrack(+o.sck); if (st >= 0 && st < NT) o.sck = tN(st) + SCK_SEND + 1; }   /* a saved side-chain source is a track too (review, #133) */
+      r[a.join(':')] = o; } p.fx = r; } }
   try { perfLive.sent.clear(); perfLive.pno.clear(); } catch(e){}
 }
 function ntrRemap(P){
