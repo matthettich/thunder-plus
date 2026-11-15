@@ -73,16 +73,25 @@ function analyse(d, f0exp) {
   const m = spectrum(d, st, N), bw = BIN(N);
   let sw = 0, swf = 0, tot = 0; for (let i = 2; i < m.length; i++) { const p = m[i] * m[i]; tot += p; swf += p * i * bw; sw += p; }
   const cen = swf / Math.max(sw, 1e-30);
-  // harmonic product spectrum for f0
-  let mx0 = 0; for (let i = 2; i < m.length; i++) if (m[i] > mx0) mx0 = m[i]; const eps = mx0 * 1e-4 + 1e-12;
-  let bestI = 0, bestV = 0; const lo = Math.max(2, Math.floor(25 / bw)), hi = Math.floor(2500 / bw);
-  for (let i = lo; i < hi; i++) { let p = Math.log(m[i] + eps); for (let h = 2; h <= 5; h++) p += Math.log(m[i * h] + eps); if (p > bestV || !bestV) { bestV = p; bestI = i; } }
-  const a = Math.log(m[bestI - 1] + eps), b = Math.log(m[bestI] + eps), c = Math.log(m[bestI + 1] + eps), off = (a - c) / (2 * (a - 2 * b + c) || 1);
+  // Fundamental = the LOWEST STRONG PARTIAL, checked for a missing fundamental. Spectrum of the loudest frame (plucks and pings are gone 50 ms later).
+  // Strong: a local maximum within 24 dB of the biggest peak, above max(20 Hz, f0exp / 8). A harmonic of the note can never pass for the note: the peak
+  // that decides is the lowest one, so a lone tone at 1.5 x f0exp reads 702 cents sharp and fails. Missing fundamental: when the lowest peak p has
+  // strong peaks at 1.5p, 2.5p and 3.5p (the odd multiples of p / 2, which a harmonic series on p / 2 has and a root + fifth stack does not), the
+  // fundamental is p / 2. Whether the answer is acceptable is pitchErr's job: against the note, with only the octaves the preset itself declares.
+  const mp = spectrum(d, Math.max(0, Math.min(Math.max(0, n - N), imax * fr)), N);
+  let mxp = 0; for (let i = 2; i < mp.length; i++) if (mp[i] > mxp) mxp = mp[i];
+  const thr = mxp * Math.pow(10, -24 / 20), loI = Math.max(3, Math.floor(Math.max(20, f0exp / 8) / bw));
+  // a lowest peak only counts when it has a harmonic family (2 of its 2nd..5th multiples are strong too: 3rd and 5th suffice for a tube / odd-harmonic sound): a body thump or a rumble does not
+  const strongAt0 = ff => { const c0 = Math.round(ff / bw); let e = 0; for (let i = Math.max(2, c0 - 2); i <= Math.min(mp.length - 1, c0 + 2); i++) e = Math.max(e, mp[i]); return e >= thr; };
+  let bestI = -1, strI = -1;
+  for (let i = loI; i < mp.length - 2; i++) if (mp[i] >= thr && mp[i] >= mp[i - 1] && mp[i] > mp[i + 1]) {
+    if (mp[i] === mxp) strI = i;
+    const ff = i * bw; if ([2, 3, 4, 5].filter(h => ff * h < SR / 2.2 && strongAt0(ff * h)).length >= 2) { bestI = i; break; } }
+  if (bestI < 0) { bestI = strI > 0 ? strI : Math.max(loI, 2); for (let i = loI; i < mp.length - 2; i++) if (mp[i] > mp[bestI]) bestI = i; }
+  const a = Math.log(mp[bestI - 1] + 1e-12), b = Math.log(mp[bestI] + 1e-12), c = Math.log(mp[bestI + 1] + 1e-12), off = (a - c) / (2 * (a - 2 * b + c) || 1);
   let f0 = (bestI + (isFinite(off) ? Math.max(-1, Math.min(1, off)) : 0)) * bw;
-  // strongest spectral peak and how far it is from a multiple of f0exp / 2 (a note and its sub-octave sound)
-  let pI = 2, pV = 0; for (let i = 2; i < m.length; i++) if (m[i] > pV) { pV = m[i]; pI = i; }
-  const pa = Math.log(m[pI - 1] + 1e-12), pb = Math.log(m[pI] + 1e-12), pc = Math.log(m[Math.min(m.length - 1, pI + 1)] + 1e-12), po = (pa - pc) / (2 * (pa - 2 * pb + pc) || 1), fpk = (pI + (isFinite(po) ? po : 0)) * bw;
-  const hh = f0exp / 2, nearest = Math.max(1, Math.round(fpk / hh)) * hh, peakDev = 1200 * Math.log2(fpk / nearest);
+  const strongAt = ff => { const c0 = Math.round(ff / bw); let e = 0; for (let i = Math.max(2, c0 - 2); i <= Math.min(mp.length - 1, c0 + 2); i++) e = Math.max(e, mp[i]); return e >= thr; };
+  if (f0 * 0.5 >= 20 && f0 * 3.5 < SR / 2.2 && strongAt(f0 * 1.5) && strongAt(f0 * 2.5) && strongAt(f0 * 3.5)) f0 *= 0.5;
   // harmonicity: share of spectral energy near integer multiples of the measured f0, above what noise would give (24 %)
   let he = 0; for (const ff of [f0, f0exp, f0exp / 2]) { let e1 = 0; for (let h = 1; h * ff < SR / 2 && h < 200; h++) { const c0 = h * ff / bw, w2 = Math.max(2, 0.12 * ff / bw); for (let i = Math.max(2, Math.floor(c0 - w2)); i <= Math.min(m.length - 1, Math.ceil(c0 + w2)); i++) e1 += m[i] * m[i]; } he = Math.max(he, e1); }
   const harm = Math.max(0, Math.min(1, (he / Math.max(tot, 1e-30) - 0.24) / 0.76));
@@ -99,16 +108,45 @@ function analyse(d, f0exp) {
   let sd = 0, cnt = 0, mu = 0; const arr = []; for (let f = imax; f < Math.min(nf, imax + 100); f++) if (env[f] > emax * 0.05) arr.push(20 * Math.log10(env[f] / emax));
   for (const x of arr) mu += x; mu /= Math.max(1, arr.length); for (const x of arr) sd += (x - mu) * (x - mu); sd = Math.sqrt(sd / Math.max(1, arr.length));
   const db = x => 20 * Math.log10(Math.max(x, 1e-9));
-  return { n, bad, pk, rmsDb: db(rms), loudDb: db(loud), attMs: att, shape, cen, cenRel: Math.log2(Math.max(cen, 20) / f0exp), cenDrift: Math.log2(Math.max(cen2, 20) / Math.max(cen, 20)), f0, peakDev, harm, bdb, evod, am: sd };
+  return { n, bad, pk, rmsDb: db(rms), loudDb: db(loud), attMs: att, shape, cen, cenRel: Math.log2(Math.max(cen, 20) / f0exp), cenDrift: Math.log2(Math.max(cen2, 20) / Math.max(cen, 20)), f0, harm, bdb, evod, am: sd };
 }
-const expF0 = v => (v.engine === 'tone' || v.engine === 'blip') ? Math.max(20, v[v.engine].pitch) * Math.pow(2, v.tune / 12) : 65.406 * Math.pow(2, ((v[v.engine] && v[v.engine].oct) || 0) + v.tune / 12);
-function centsOff(f, fe) { let c = 1200 * Math.log2(f / fe); c -= 1200 * Math.round(c / 1200); return c; }
+/* Expected fundamental: Tone / Blip have a pitch in Hz; Vox counts octaves from C4 (VoxCore: 261.626 * 2^(oct + tune / 12)); every other engine from C2 (65.406). */
+const expF0 = v => (v.engine === 'tone' || v.engine === 'blip') ? Math.max(20, v[v.engine].pitch) * Math.pow(2, v.tune / 12)
+  : (v.engine === 'vox' ? 261.626 : 65.406) * Math.pow(2, ((v[v.engine] && v[v.engine].oct) || 0) + v.tune / 12);
+/* Octaves (relative to the played note) a preset declares itself to sit at: 0 always, and for Bass the sub oscillator's octave when Sub is up. */
+function declaredOctaves(v) {
+  const o = [0], b = v.engine === 'bass' ? v.bass : null;
+  if (b && b.sub > 0 && (b.subOct | 0) > 0) o.push(-(b.subOct | 0));
+  // Sub oscillator (Acid, Swarm, Drift, Table have a Sub level): it sounds one octave under the note, so with Sub up the fundamental may read an octave down.
+  const E0 = v[v.engine] || {};
+  if (['acid', 'swarm', 'drift', 'table'].includes(v.engine) && E0.sub >= 0.2) o.push(-1);
+  // Drift oscillator B transposed by whole octaves (bSemi = -12 ...): its pitch is declared by the preset.
+  if (v.engine === 'drift' && E0.bSemi && E0.bSemi % 12 === 0) o.push(E0.bSemi / 12);
+  // Modal bell (material 4): its first mode, the hum, is at 0.5 x the note (ModalCore ratios).
+  if (v.engine === 'modal' && Math.round(E0.mat) === 4) o.push(-1);
+  // Swarm scatter: with Scatter up some voices sit at the intervals of the chosen "Scatter to" set; the octave ones (+-12, 24) are declared octaves.
+  if (v.engine === 'swarm' && E0.scatter > 0) [[12, -12, 24], [7, 12, -5, 19], [4, 7, 12, 16], [3, 7, 12, 15], [5, 7, 12, 17], [1, 2, -1, -2, 3], [12, 19, 24, 28, 31]][Math.max(0, Math.min(6, E0.ivl | 0))].forEach(x => { if (x % 12 === 0 && !o.includes(x / 12)) o.push(x / 12); });
+  // Vox Rough: every other glottal cycle is changed (period doubling, vocal fry), so with Rough up the fundamental reads an octave down.
+  if (v.engine === 'vox' && E0.rough >= 0.5) o.push(-1);
+  // Blip / Tone FM: the carrier is at the pitch and the modulator at fmR x pitch; with fmR = n / 2 or n / 4 (0.5, 1.5, 3.5, ...) the spectrum repeats
+  // at pitch / 2 or pitch / 4, i.e. the fundamental sits one or two octaves down. That is declared by the preset's own FM ratio.
+  if ((v.engine === 'blip' || v.engine === 'tone') && E0.fm > 0.05 && E0.fmR) for (const q of [2, 4]) if (Math.abs(E0.fmR * q - Math.round(E0.fmR * q)) < 0.02 && Math.round(E0.fmR * q) % 2 === 1 && !o.includes(-Math.log2(q))) o.push(-Math.log2(q));
+  // Phase 'Double sine' (wave 3) is a cosine read twice per cycle: with it in the mix the fundamental reads an octave UP, declared by the wave choice.
+  if (v.engine === 'phase' && ((Math.round(E0.wave) === 3 && (E0.mix == null ? 0 : E0.mix) < 0.9) || (Math.round(E0.wave2 == null ? 1 : E0.wave2) === 3 && E0.mix > 0.1))) o.push(1);
+  // Tine EP: the tone bar always sounds one octave under the tine (TineEPCore: f0 * 0.5), so its fundamental reads an octave down.
+  if (v.engine === 'ep') o.push(-1);
+  // Organ: each drawbar is a footage (RATIOS 0.5 1.5 1 2 3 4 5 6 8): the lowest octave-related drawbar that is up sets where the fundamental sits.
+  if (v.engine === 'organ') { const r = [0.5, 1.5, 1, 2, 3, 4, 5, 6, 8]; r.forEach((x, i) => { if (Number.isInteger(Math.log2(x)) && Math.round(v.organ['d' + (i + 1)] || 0) > 0 && !o.includes(Math.log2(x))) o.push(Math.log2(x)); }); }
+  return o;
+}
+/* cents between the measured fundamental and the note, against the nearest DECLARED octave only: 1.5 x is 702 cents, never 0 */
+function centsOff(f, fe, octs) { const raw = 1200 * Math.log2(f / fe); return octs.map(o => raw - 1200 * o).reduce((a, c) => Math.abs(c) < Math.abs(a) ? c : a); }
 
 function measure(k, i) {
   const out = { k, i, name: presetList(k)[i][0], at: [] };
   for (const tune of PITCHES) {
     const { v, d } = render(k, i, tune), fe = expF0(v), a = analyse(d, fe);
-    a.tune = tune; a.fe = fe; a.cents = centsOff(a.f0, fe); a.octs = Math.round(Math.log2(a.f0 / fe)); a.pitchErr = Math.min(Math.abs(a.cents), Math.abs(a.peakDev)); out.at.push(a);
+    a.tune = tune; a.fe = fe; a.cents = centsOff(a.f0, fe, declaredOctaves(v)); a.octs = Math.round(Math.log2(a.f0 / fe)); a.pitchErr = Math.abs(a.cents); out.at.push(a);
   }
   return out;
 }
@@ -125,7 +163,10 @@ function table(k, only) {
   ms.forEach((m, a) => { m.nn = nn[a].bd; m.nnName = ms[nn[a].b].name; m.isNew = m.i >= BASELINE[k]; });
   return ms;
 }
-module.exports = { BASELINE, NEW_MIN, PITCH_SKIP, PITCHES, engines, presetList, build, render, measure, table, feat, dist, analyse, E };
+/* A preset is off pitch when at least two of the three played pitches miss the note by more than 60 cents: a single miss is a slip of the
+   estimator (a body thump, a partial that has decayed), while a wrong note or a wrong octave is wrong at every pitch. */
+const pitchBad = m => m.at.filter(a => a.pitchErr > 60).length >= 2;
+module.exports = { pitchBad, BASELINE, NEW_MIN, PITCH_SKIP, PITCHES, engines, presetList, build, render, measure, table, feat, dist, analyse, E };
 
 if (require.main === module) {
   const args = process.argv.slice(2), V = args.includes('-v'), NEWONLY = args.includes('-n'), ks = args.filter(a => a[0] !== '-'), list = ks.length ? ks : engines();
