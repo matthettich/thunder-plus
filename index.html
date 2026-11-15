@@ -21294,6 +21294,7 @@ let sT = 0, sPend = false;   // sPend (12 Nov): a change is waiting for its auto
 // (a paste, a cut, a note plus its instrument) settle at the end of that event, so they undo as one step.
 const undo = {past:[], future:[], cur:JSON.stringify(S), busy:false, pend:false};
 var recTake = false;   // REC: a live take is under way; its notes become one undo step when it ends (recEndTake)
+let arrKeepOff = 0;   /* 1: keep the scroll as it is, 2: use cs.song.top as set */   /* UNDO KEEPS ARRANGE'S VIEW (build 609): undoStep's redraw does not scroll Arrange back to the selection / cursor */
 function undoReset(){ undo.past.length = 0; undo.future.length = 0; undo.cur = JSON.stringify(S); try { kitUndoBase(); } catch(e){} }
 /* ONE UNDO STEP PER GESTURE (27 Oct, Phase 2): while a pointer is down (a fader, a value or a selection being dragged), the
    changes it makes wait, and become one step when it lets go. A drag of the Mixer's faders made a step per mouse move. */
@@ -21369,6 +21370,7 @@ function undoStep(dir){
     const v = kit.voices[e.i]; draw(); return toast(`${dir < 0 ? 'Undo' : 'Redo'}: pad ${hx(e.i)} ${(v && v.name) || ''}`.trim());
   }
   to.push({k:'S', j:undo.cur}); undo.cur = e.j;
+  const rowsWas = S.song.map(r => r.join());
   // Swap the contents in place rather than the object: the running sequencer holds this object, so
   // replacing it would keep playing the old song (the screen would show the undo, the speakers wouldn't).
   undo.busy = true; const n = normSong(JSON.parse(undo.cur));
@@ -21383,7 +21385,10 @@ function undoStep(dir){
   undo.cur = JSON.stringify(S);
   saveS(); undo.busy = false;
   if (rt){ rt.pl.buses.forEach(b => { if (b && b.chn) b.chn._sent = null; }); rtAllFx(); rtRoute(); rt.pl.applyMix(); mstSync(); }
-  draw(); toast(dir < 0 ? 'Undo' : 'Redo');
+  /* UNDO KEEPS ARRANGE'S VIEW (owner, build 609: undo kept jumping Arrange to the selected area): the scroll stays; it moves only when every row the undo changed is off screen (then to the first of them) */
+  try { arrKeepOff = 1; let top = cs.song.top || 0; try { if (arrGrid.offsetParent) top = arrRowAt(arrGrid.scrollTop); } catch(_){} const VR = Math.max(2, arrRows()), ch = []; S.song.forEach((r, y) => { if (r.join() !== rowsWas[y]) ch.push(y); });
+    if (ch.length && !ch.some(y => y >= top && y < top + VR)){ cs.song.top = clamp(ch[0] - 2, 0, Math.max(0, 256 - VR)); arrKeepOff = 2; } } catch(_){}
+  try { draw(); } finally { arrKeepOff = 0; } toast(dir < 0 ? 'Undo' : 'Redo');
   try { PumpFX._notifyAll('undo'); } catch(e){}   // …PUMP: open pop-up windows read their slot again
 }
 setTimeout(kitUndoReset, 0);
@@ -35613,7 +35618,8 @@ function apTop(){
    never moves; a cursor one row off the edge scrolls one row; one further away lands in the middle of Arrange's own
    window (not the bottom edge). */
 function arrKeepRow(c, VR){
-  try { const rh = arrRowH(); if (rh > 0 && arrGrid.offsetParent && arrIgnore < 0){ const real = arrRowAt(arrGrid.scrollTop); if (real !== c.top) c.top = real; } } catch(e){}
+  try { const rh = arrRowH(); if (arrKeepOff !== 2 && rh > 0 && arrGrid.offsetParent && arrIgnore < 0){ const real = arrRowAt(arrGrid.scrollTop); if (real !== c.top) c.top = real; } } catch(e){}
+  if (arrKeepOff) return;
   const top = c.top || 0; VR = arrRows(top);
   if (c.y >= top && c.y <= top + VR - 1) return;
   // PAGES (owner, 3 Nov: "moving the cursor below the screen break should page the screen down"): just past the bottom, the
