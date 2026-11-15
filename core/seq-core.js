@@ -277,7 +277,7 @@ function makeSeq(S, mode, o){
   const emptyLen = () => clamp(S.dlen || 16, 1, PROWS);
   // Random numbers: Math.random until a SED command seeds them, so a seeded song plays the same every time.
   let seeded = null, gscl = null;   // gscl: SCG, the song's scale from here on
-  /* CHANCE AND SEEDS (build 609; owner, 14 Nov). A chance roll (CHA, TCH, PRB) no longer draws from the one stream every track and
+  /* CHANCE AND SEEDS (build 610; owner, 14 Nov). A chance roll (CHA, TCH, PRB) no longer draws from the one stream every track and
      every random command shared (so adding a note anywhere moved every later roll, and a render never matched what was heard):
      it is a hash of the seed, the track, where the row is in the song (song row, chain row, step), how many times this track has
      rolled there since PLAY, and which roll of the row it is. So with a seed the same notes fall every time, live and rendered,
