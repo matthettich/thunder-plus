@@ -59,8 +59,10 @@ jobs:
           SDK="$PWD/wasi-sdk"
           mkdir -p out
           "$SDK/bin/clang++" --target=wasm32-wasi --sysroot="$SDK/share/wasi-sysroot" \
-            -O3 -ffast-math -msimd128 -fno-exceptions -fno-rtti -std=c++17 -Wall -Wextra \
-            -Inative/core/include native/core/src/core.cpp \
+            -O3 -ffast-math -fno-finite-math-only -msimd128 -fno-exceptions -fno-rtti -std=c++17 -Wall -Wextra \
+            -Inative/core/include -Inative/core/src \
+            native/core/src/core.cpp native/core/src/rt/auto.cpp native/core/src/rt/jsmath.cpp \
+            native/core/src/rt/json.cpp native/core/src/song/song.cpp \
             -mexec-model=reactor -Wl,--export=_initialize \
             -Wl,--export=thunder_create -Wl,--export=thunder_process -Wl,--export=thunder_post \
             -Wl,--export=thunder_poll -Wl,--export=thunder_put -Wl,--export=thunder_destroy \
