@@ -54,7 +54,7 @@ static std::string withCommands(const std::string& text, int* count) {
   o += '}'; *count = n; return o;
 }
 
-struct Case { std::string id; std::string songText; SeqMode mode = SeqMode::Song; SeqOpts opt; int max = 0; SeqVars vars; };
+struct Case { std::string id; std::string songText; SeqMode mode = SeqMode::Song; SeqOpts opt; int max = 0; SeqVars vars; bool full = false; };
 struct Stats { int rows = 0, maxEvs = 0, maxArp = 0; size_t rollPlaces = 0, countRows = 0, ids = 0; };
 
 // Runs a case; false on a mismatch (already printed).
@@ -70,7 +70,7 @@ static bool runCase(const Case& C, const std::string& goldenPath, const std::str
   const int maxRows = C.max ? C.max : 20000;
   for (; sq.alive() && n < maxRows; n++) {
     const int k = sq.step(evs.data(), CAP, &step);
-    std::string row = seqplain::row(step.t, evs.data(), k);
+    std::string row = seqplain::row(step.t, evs.data(), k, C.full ? &sq : nullptr);
     const std::string h = sha256_hex(row).substr(0, 12);
     if (firstBad < 0 && (n >= (int)RH.size() || h != RH.at((size_t)n).asStr())) { firstBad = n; badMine = row; }
     row += '\n'; all.add(row);
@@ -95,6 +95,8 @@ static void optsFromJson(Json o, SeqOpts& q) {
   if (o.get("sect").isNum()) q.sect = (int)o.get("sect").asNum();
   if (o.get("phrase").isNum()) q.phrase = (int)o.get("phrase").asNum();
   if (o.get("seed").isNum()) { q.hasSeed = true; q.seed = js_to_uint32(o.get("seed").asNum()); }
+  const Json at = o.arr("at"); if (!at.missing()) { q.hasAt = true; q.atRef = (int)o.num("atRef"); for (size_t i = 0; i < at.size() && i < (size_t)kSeqTracks; i++) { const Json a = at.at(i); if (!a.isObj()) continue;
+      q.at[i].valid = true; q.at[i].row = (int)a.num("row"); q.at[i].cr = (int)a.num("cr", -1); q.at[i].phrase = (int)a.num("phrase", -1); q.at[i].step = (int)a.num("step"); } }
   const Json on = o.arr("only"); if (!on.missing()) { q.hasOnly = true; for (size_t i = 0; i < on.size(); i++) q.only |= 1ull << (int)on.at(i).asNum(); }
 }
 
@@ -105,11 +107,11 @@ int main(int argc, char** argv) {
     std::string ct; if (!readFile(argv[2], ct)) { std::printf("FAIL: cannot read %s\n", argv[2]); return 1; }
     JsonDoc cd; if (!cd.parse(ct)) { std::printf("FAIL: the case is not JSON\n"); return 1; }
     const Json J = cd.root(); Case C; C.id = std::string(J.str("id"));
-    if (J.get("song").isObj()) C.songText = json_write(J.get("song")); else if (!readFile(root + "/" + std::string(J.str("file")), C.songText)) { std::printf("FAIL: cannot read the case's song\n"); return 1; }
+    if (J.get("song").isObj()) C.songText = json_write(J.get("song")); else if (!readFile(J.str("file").substr(0, 1) == "/" ? std::string(J.str("file")) : root + "/" + std::string(J.str("file")), C.songText)) { std::printf("FAIL: cannot read the case's song\n"); return 1; }
     if (J.str("edit") == "cmds") { int n = 0; C.songText = withCommands(C.songText, &n); }
     const std::string_view m = J.str("mode", "song"); C.mode = m == "sect" ? SeqMode::Sect : m == "phrase" ? SeqMode::Phrase : SeqMode::Song;
     optsFromJson(J.get("opt"), C.opt); if (J.get("opt").missing()) { C.opt.once = true; C.opt.sim = true; }
-    C.max = (int)J.num("max"); C.vars.load(J.get("vars"));
+    C.max = (int)J.num("max"); C.vars.load(J.get("vars")); C.full = J.boolean("full");
     Stats st; const bool ok = runCase(C, std::string(argv[3]) + "/seq-" + C.id + ".json", std::string(argv[3]) + "/seq-" + C.id + ".jsonl", &st);
     std::printf("%s %s: %d rows, at most %d events a step, %zu target ids\n", ok ? "ok  " : "FAIL", C.id.c_str(), st.rows, st.maxEvs, st.ids);
     return ok && !fails ? 0 : 1;

@@ -5,7 +5,8 @@
 //                                                    exit 1 unless each sha256 equals tests/golden/seq-<id>.json's
 //   node native/tools/seq-dump.mjs --cmds-song FILE  only writes the `electro-cmds` case's edited song file (for the C++ test)
 //   node native/tools/seq-dump.mjs --case FILE.json [outDir]   one extra case {id, file | song, vars, mode, opt, max, edit:'cmds'}
-//                                                    (no golden: prints its sha256; used for the U07 extra checks)
+//                                                    (no golden: prints its sha256; used for the U07 extra checks, seq-extra.mjs).
+//                                                    "full": true keeps what corePlain drops (the eng event's c and o, tw, slide, bend, vib, arp)
 // The song is the saved file's `song` object as it is (the page hands the core its S after normSong; for a current song that
 // is the same values, which the sha256 check proves for these cases).
 import fs from 'node:fs';
@@ -39,17 +40,18 @@ const SONGS = [
 ];
 
 function run(C) {
-  const j = C.song ? { song: C.song } : JSON.parse(fs.readFileSync(path.join(ROOT, C.file), 'utf8'));
+  const j = C.song ? { song: C.song } : JSON.parse(fs.readFileSync(path.resolve(ROOT, C.file), 'utf8'));
   if (C.edit === 'cmds') withCommands(j);
   // into the context's own realm, so `Array.isArray`, Map and friends see its own objects
   const S = vm.runInContext('(' + JSON.stringify(j.song) + ')', ctx), vars = vm.runInContext('(' + JSON.stringify(C.vars || { vtrk: false, NSLOT: 16, TFX: {} }) + ')', ctx);
   U.load(S, vars);
   const o = C.opt || {}, max = C.max || 0;
-  ctx.__case = { mode: C.mode || 'song', o, max };
+  ctx.__case = { mode: C.mode || 'song', o, max, full: !!C.full };
   // op:'test', statement for statement (extra options of a --case file are passed through: sect, track, phrase, only, seed, live)
   const rows = vm.runInContext(`(() => { const d = __case, o = d.o; return __u07.coreSeeded(() => { const out = [];
       const sq = __u07.makeSeq(S, d.mode || 'song', Object.assign({}, o, {row:o.row || 0, loop:o.loop || null, once:'once' in o ? !!o.once : !o.loop, sim:true}, o.only ? {only:new Set(o.only)} : {}));
-      for (let n = 0; sq.alive() && n < (d.max || 20000); n++){ const r = sq.step(); out.push({t:__u07.coreNum(r.t), evs:r.evs.map(__u07.corePlain)}); }
+      const full = v => typeof v === 'number' ? __u07.coreNum(v) : Array.isArray(v) ? v.map(full) : v && typeof v === 'object' ? Object.fromEntries(Object.keys(v).sort().map(k => [k, full(v[k])])) : v;
+      for (let n = 0; sq.alive() && n < (d.max || 20000); n++){ const r = sq.step(); out.push({t:__u07.coreNum(r.t), evs:r.evs.map(d.full ? full : __u07.corePlain)}); }
       return out; }); })()`, ctx);
   const text = rows.map(r => JSON.stringify(r)).join('\n') + '\n';
   return { rows, text, sha256: crypto.createHash('sha256').update(text).digest('hex') };
