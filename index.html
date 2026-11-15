@@ -31768,7 +31768,7 @@ function arrSideMst(){ return true; }
 // ROWS IN VIEW (3 Nov): the rows that fit from the top row down, measured (every 4th row has a gap above it, EVERY 4 ROWS,
 // so a fixed row height overcounted and the cursor could go under the bottom edge without Arrange following it)
 function arrRows(top = cs.song.top || 0){ const rh = arrRowH(); if (!(rh > 0)) return 16;
-  const h = arrGrid.clientHeight - 3, t0 = arrRowTop(top); let n = 0; while (top + n < 256 && arrRowTop(top + n) - t0 + rh - 1 <= h) n++; return clamp(n, 2, 96); }
+  const h = arrGrid.clientHeight - 3, t0 = arrRowTop(top); let n = 0; while (top + n < 256 && arrRowTop(top + n) - t0 + rh - 1 <= h) n++; return clamp(n, 2, 256); }   // (was 96: zoomed right out a tall panel shows more, and paging read the cap as the bottom; review, #131)
 // The panel's width: 0 is the default for the screen size, otherwise what the grip was dragged to.
 const AWK = 'thunderplus-arrange-w-v1';
 let arrW = (() => { try { return Math.max(0, int(localStorage.getItem(AWK), 0)); } catch(e){ return 0; } })(), arrKey = '';

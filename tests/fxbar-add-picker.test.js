@@ -7,7 +7,7 @@ const src = H.read('index.html');
 test('source: the + ADD FX button goes to the FX screen, then opens fxsOpen for the first empty slot; a full track says so in a toast', () => {
   const m = src.match(/const addFx = \(\) => \{[\s\S]*?fxsOpen\(k\); \};/); assert.ok(m, 'addFx moved');
   assert.match(m[0], /findIndex\(x => !x\)/, 'the first empty slot, read when it is clicked');
-  assert.match(m[0], /if \(k < 0\)\{ toast\(/); assert.ok(m[0].indexOf('goFx(k)') < m[0].indexOf('fxsOpen(k)'), 'page first, picker after');
+  assert.match(m[0], /if \(k < 0\)\{ toast\(/); assert.ok(m[0].indexOf('goFx(k)') >= 0 && m[0].indexOf('goFx(k)') < m[0].indexOf('fxsOpen(k)'), 'page first, picker after');
   assert.match(src, /ad\.addEventListener\('click', \(\) => addFx\(\)\)/);
 });
 const PW = process.env.PLAYWRIGHT || ['/opt/npm-tools/node_modules/playwright/index.mjs', '/opt/node-tools/node_modules/playwright/index.mjs'].find(f => fs.existsSync(f));
