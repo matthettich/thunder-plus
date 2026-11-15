@@ -10,22 +10,23 @@ const E = G.engine();
 
 /* Preset counts before the 14 Nov 2026 "many more presets" pass: the presets with an index at or above these are the new ones. */
 const BASELINE = { acid: 28, mach: 17, modal: 23, swarm: 17, drift: 19, piano: 15, ep: 13, organ: 15, table: 18, breath: 13, strings: 17, wind: 17,
-  phase: 17, partials: 17, chip: 18, vector: 18, scanned: 17, resynth: 12, bytebeat: 21, bass: 18, vox: 33 };
+  phase: 17, partials: 17, chip: 18, vector: 18, scanned: 17, resynth: 12, bytebeat: 21, bass: 18, vox: 33, tone: 11, blip: 13 };
 /* The least each engine must have now (existing + the new minimum). Breath and Machine are partly drum engines: pitched / texture presets only. */
 const NEW_MIN = { acid: 20, mach: 10, modal: 12, swarm: 12, drift: 12, piano: 8, ep: 8, organ: 8, table: 14, breath: 8, strings: 10, wind: 10,
-  phase: 14, partials: 14, chip: 12, vector: 14, scanned: 14, resynth: 10, bytebeat: 14, bass: 20, vox: 8 };
+  phase: 14, partials: 14, chip: 12, vector: 14, scanned: 14, resynth: 10, bytebeat: 14, bass: 20, vox: 8, tone: 8, blip: 8 };
 /* Presets whose pitch is not a clean harmonic note (noise, metal, clusters): the pitch check is skipped for them (listed by name). */
 const NO_PITCH = new Set(); // filled by the data below via the 'np' marker file: see PITCH_SKIP
 const PITCH_SKIP = require('./engine-preset-skip.json');
 const PITCHES = [0, 12, 24];   // pad Tune in semitones: C2, C3, C4 on the pad's own scale (f0 = 65.406 * 2^(oct + tune / 12))
 
 const engines = () => Object.keys(BASELINE);
-const presetList = k => k === 'bass' ? E.BASS_PRE : k === 'vox' ? E.VOX_PRE : E.XUI[k].pre;
+const presetList = k => k === 'bass' ? E.BASS_PRE : k === 'vox' ? E.VOX_PRE : k === 'blip' ? E.BLIP_PRE : E.XUI[k].pre;
 
 function build(k, i, tune) {
   const name = presetList(k)[i][0];
   const v = E.PD(k + ' ' + name, [{ type: 'sine' }], {}); v.engine = k; v.tune = tune; v.level = E.ENGINE_LEVEL;
   if (k === 'bass') { v.bass = E.normBass(null); E.setCur(v); E.bassPreset(i, true); }
+  else if (k === 'blip') { v.blip = E.normBlip(null); E.setCur(v); E.blipPreset(i, true); }
   else if (k === 'vox') { v.vox = E.normVox(null); E.setCur(v); E.voxPreset(i, true); }
   else { v[k] = E.normX(k, null); E.setCur(v); E.xPreset(i, true); }
   return v;
@@ -100,7 +101,7 @@ function analyse(d, f0exp) {
   const db = x => 20 * Math.log10(Math.max(x, 1e-9));
   return { n, bad, pk, rmsDb: db(rms), loudDb: db(loud), attMs: att, shape, cen, cenRel: Math.log2(Math.max(cen, 20) / f0exp), cenDrift: Math.log2(Math.max(cen2, 20) / Math.max(cen, 20)), f0, peakDev, harm, bdb, evod, am: sd };
 }
-const expF0 = v => 65.406 * Math.pow(2, ((v[v.engine] && v[v.engine].oct) || 0) + v.tune / 12);
+const expF0 = v => (v.engine === 'tone' || v.engine === 'blip') ? Math.max(20, v[v.engine].pitch) * Math.pow(2, v.tune / 12) : 65.406 * Math.pow(2, ((v[v.engine] && v[v.engine].oct) || 0) + v.tune / 12);
 function centsOff(f, fe) { let c = 1200 * Math.log2(f / fe); c -= 1200 * Math.round(c / 1200); return c; }
 
 function measure(k, i) {

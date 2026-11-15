@@ -9865,6 +9865,18 @@ const BLIP_PRE = [
   ['Wood', {pitch:620, kick:0.25, kickT:8, decay:70, filt:-0.25, res:0.6, click:0.4}],
   ['Glitch', {pitch:900, kick:0.3, kickT:10, decay:70, grain:6, grainT:28, fm:0.25, fmR:2}],
   ['Tremolo tone', {pitch:330, kick:0, ring:0.7, ringF:14, decay:700}],
+  // (15 Nov) more presets
+  ['Sub sine', {pitch:55, kick:0, click:0, decay:900, atk:3, filt:-0.3}],
+  ['FM bleep', {pitch:660, kick:0, fm:0.5, fmR:2, click:0.05, decay:260, atk:1}],
+  ['FM bass pluck', {pitch:82, kick:0.05, kickT:10, fm:0.6, fmR:1, decay:380, drive:0.3, filt:-0.2, res:0.3}],
+  ['Ring bell', {pitch:1100, kick:0, ring:0.7, ringF:2300, fm:0.2, fmR:3, decay:1800, atk:1}],
+  ['Glass tone', {pitch:1500, kick:0, fm:0.2, fmR:5.5, decay:2500, atk:2, filt:-0.15}],
+  ['Dark drone', {pitch:65, kick:0, fm:0.2, fmR:0.5, ring:0.3, ringF:3, decay:3500, atk:60, drive:0.2, filt:-0.5}],
+  ['Stutter bleep', {pitch:880, kick:0, fm:0.25, fmR:1.5, decay:300, grain:4, grainT:45}],
+  ['Buzz tone', {pitch:110, kick:0, ring:0.9, ringF:220, drive:0.5, decay:700, atk:5}],
+  ['Noisy whistle', {pitch:2400, kick:0, noise:0.35, filt:0.2, res:0.8, decay:900, atk:20}],
+  ['Resonant pluck', {pitch:330, kick:0.1, kickT:6, click:0.5, decay:300, filt:-0.2, res:0.6, drive:0.3}],
+  ['Metal swell', {pitch:520, kick:0, fm:0.7, fmR:3.73, ring:0.6, ringF:1900, decay:2200, atk:300}]
 ];
 const blipRows = [];
 const BL = () => { const v = V(); if (!v.blip) v.blip = normBlip(null); return v.blip; };
@@ -12343,7 +12355,19 @@ const XUI = {
       ['Electro tom', {wave:0, pitch:110, bend:12, bendT:120, tdec:420, nLev:0.08}], ['Spectra perc', {wave:4, pitch:320, spectra:0.6, bend:4, tdec:260, nLev:0.1}],
       ['Noise hat', {tLev:0, nType:2, nFreq:8000, nRes:0.2, nDec:60, nLev:0.9, click:0.1}], ['Open hat', {tLev:0, nType:2, nFreq:7000, nRes:0.35, nDec:450, nLev:0.8, click:0.05}],
       ['Clap-ish', {tLev:0, nType:1, nFreq:1300, nRes:0.4, nDec:240, nLev:0.9, nSweep:0.3}], ['Zap tom', {wave:3, pitch:300, bend:36, bendT:60, tdec:180, dist:0.3, nLev:0}],
-      ['Resonant ping', {tLev:0.3, nType:3, nFreq:900, nRes:0.95, nDec:400, nLev:0.6}], ['Dirty kick', {wave:0, pitch:48, bend:30, bendT:40, tdec:550, dist:0.6, click:0.5, nLev:0}]]},
+      ['Resonant ping', {tLev:0.3, nType:3, nFreq:900, nRes:0.95, nDec:400, nLev:0.6}], ['Dirty kick', {wave:0, pitch:48, bend:30, bendT:40, tdec:550, dist:0.6, click:0.5, nLev:0}],
+      /* (15 Nov) more presets */
+      ['Sub sine tone', {wave:0, pitch:55, bend:0, tdec:1500, tLev:1, nLev:0, click:0}],
+      ['Saw bass tone', {wave:2, pitch:65, bend:2, bendT:20, tdec:600, nLev:0, click:0.1, dist:0.3}],
+      ['Square lead blip', {wave:3, pitch:520, bend:0, tdec:300, nLev:0, click:0.05}],
+      ['Rising zap', {wave:1, pitch:200, bend:-18, bendT:140, tdec:260, nLev:0, dist:0.1}],
+      ['Falling laser', {wave:3, pitch:900, bend:36, bendT:90, tdec:350, nLev:0, dist:0.2}],
+      ['Spectra bell', {wave:4, pitch:660, spectra:0.8, bend:0, tdec:1800, tLev:0.9, nLev:0, click:0.1}],
+      ['Spectra pad tone', {wave:4, pitch:220, spectra:0.4, bend:0, tdec:3500, tLev:0.8, nLev:0.1, nType:1, nFreq:900, nDec:3000}],
+      ['Ping noise tone', {wave:0, pitch:440, bend:0, tdec:400, tLev:0.4, nType:3, nFreq:1100, nRes:0.97, nDec:1200, nLev:0.6, click:0}],
+      ['Fuzz saw drone', {wave:2, pitch:110, bend:0, tdec:2500, dist:0.9, tLev:0.8, nLev:0.05, click:0}],
+      ['Triangle pluck', {wave:1, pitch:330, bend:3, bendT:15, tdec:250, nLev:0, click:0.2}],
+      ['Metal hiss tone', {wave:4, pitch:1500, spectra:1, bend:0, tdec:500, tLev:0.5, nType:2, nFreq:7000, nRes:0.5, nDec:700, nLev:0.4}]]},
   modal:{title:'Modal', tag:'material · exciter · modes', rows:{
       mat:{l:'Material', min:0, max:11, c:'int', d:0, f:nameOf(ModalCore.MATERIALS)}, oct:{l:'Octave', min:-1, max:4, c:'int', d:2, f:v => 'C' + (2 + Math.round(v))},
       exc:{l:'Exciter', min:0, max:4, c:'int', d:0, f:nameOf(ModalCore.EXCITERS)}, hard:{l:'Hardness', min:0, max:1, c:'lin', d:0.55, f:pct},
