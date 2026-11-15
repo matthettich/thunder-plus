@@ -19586,7 +19586,7 @@ class ThunderFx extends AudioWorkletProcessor {
     /* MUTED TRACKS REST (build 606; owner's song: a muted track's effects still took about 3% of the audio thread). While its track cannot
        be heard (muted, or another is soloed: nothing reads a track's effects but its own fader and its "before the fader" bus feed, and
        both are shut then) the node hears silence instead of the track. The echoes die away as they would after the last note, and the
-       sleep rules below then stop the work (a slot that keeps time, switched on, still runs). Unmuted, it hears the track again from
+       sleep rules below then stop the work, at the latest ten seconds on. Unmuted, it hears the track again from
        the next block: the notes that are sounding come through, with the effects starting from rest, not from old echoes. */
     const rest = this.restAt > 0 && currentTime >= this.restAt;
     if (!rest && i && i.length){ const a = i[0], b = i[1] || a; for (let k = 0; k < n; k++){ const v = a[k] < 0 ? -a[k] : a[k], w = b[k] < 0 ? -b[k] : b[k]; if (v > ip) ip = v; if (w > ip) ip = w; if (!(v < 8 && w < 8)) bad = true; } }
@@ -19608,7 +19608,9 @@ class ThunderFx extends AudioWorkletProcessor {
       const c = s.clk ? 3 : s.js ? (s.jt === 93 || (s.jt >= 100 && s.jt <= 102) ? 3 : s.jt === 94 || s.jt === 95 ? 2 : 0) : 0; if (!c) continue;
       const sv = s.slot >= 0 && s.slot < 8 ? swv[s.slot] : -1, live = (sv < -0.5 ? s.on : sv > 0.5) || (s.pu !== undefined ? s.byp === false : s.g > 0);
       const w = live ? c : s.js && s.js.feed ? 1 : 0; if (w > ck) ck = w; }
-    if (ip < 1e-7 && this.idle >= sampleRate && (ck === 0 || (ck < 3 && this.idle >= sampleRate * 14 && (ck === 1 || !(bp[0] >= 0 && bp[bp.length - 1] >= 0))))){ o[0].fill(0); if (o[1]) o[1].fill(0); this.fr += n; if (this.fr >= sampleRate / 2){ this.port.postMessage({load:this.ms / (this.fr / sampleRate * 1000)}); this.ms = 0; this.fr = 0; } return true; }
+    /* (MUTED TRACKS REST) ten seconds unheard and it sleeps whatever its slots are doing: an effect that never falls silent by itself
+       (Spring and BBD on the owner's track 13 kept running) has had its echoes' time, and nobody can hear what is left. */
+    if ((rest && currentTime - this.restAt >= 10) || (ip < 1e-7 && this.idle >= sampleRate && (ck === 0 || (ck < 3 && this.idle >= sampleRate * 14 && (ck === 1 || !(bp[0] >= 0 && bp[bp.length - 1] >= 0)))))){ o[0].fill(0); if (o[1]) o[1].fill(0); this.fr += n; if (this.fr >= sampleRate / 2){ this.port.postMessage({load:this.ms / (this.fr / sampleRate * 1000)}); this.ms = 0; this.fr = 0; } return true; }
     if (!rest && i && i.length){ L.set(i[0]); R.set(i[1] || i[0]); } else { L.fill(0); R.fill(0); }
     // A NaN or infinity reaching the wasm hangs the tape delay for good and leaves many effects silent: zero those samples.
     // (sweep, 4 Nov) a loud but real sample (8 to 64, up to +36 dB) is clipped to ±8 rather than silenced: it was heard as a dropout

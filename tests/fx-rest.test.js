@@ -130,3 +130,14 @@ test('the CPU panel names the dearest effects of a row', () => {
   assert.equal(c.f(A, null, nm), ''); assert.equal(c.f(null, new Map([[0, 1]]), nm), '');
   assert.match(HTML, /'Effects · ' \+ tn\(t\) \+ cpuFxTop\(S\.tfx\[t\], b\.fx\.sl, fxNameOf\)/); assert.match(HTML, /'Master effects' \+ cpuFxTop\(S\.mfx, rt\.mfx\.sl, fxNameOf\)/);
 });
+test('a muted track whose effect never falls silent (Spring, BBD: they hum on) still sleeps, ten seconds after the mute', skip, () => {
+  const N = mkNode([pslot('echo', true)]); N.step(1);
+  let runs = 0; N.node.slotRun = function (s, n){ runs++; for (let k = 0; k < n; k++){ this.L[k] += 1e-3; this.R[k] -= 1e-3; } };   // a stand-in effect that always puts something out
+  for (let b = 0; b < secs(1); b++) N.step(1);
+  N.msg({ rest: true }); for (let b = 0; b < secs(9.5); b++) N.step(1);
+  const r0 = runs; for (let b = 0; b < 50; b++) N.step(1); assert.ok(runs > r0, 'nine and a half seconds muted: still running (its echoes may not be over)');
+  for (let b = 0; b < secs(1); b++) N.step(1);
+  const r1 = runs; for (let b = 0; b < 200; b++) N.step(1); assert.equal(runs, r1, 'past ten seconds: asleep');
+  { const y = N.out(); for (let i = y.length - 100 * B; i < y.length; i++) assert.equal(y[i], 0); }
+  N.msg({ rest: false }); N.step(1); assert.ok(runs > r1, 'unmuted: running again at once');
+});
