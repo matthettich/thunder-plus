@@ -18,3 +18,6 @@ add_executable(rt_harness rt_harness.cpp)
 target_link_libraries(rt_harness PRIVATE thunder_core)
 add_test(NAME rt_core COMMAND rt_harness)
 add_test(NAME rt_guard_selftest COMMAND rt_harness --selftest)
+
+# U02: smoke tests for the existing C++ DSP libraries (native/core/dsp)
+add_subdirectory(dsp)
