@@ -77,6 +77,23 @@ jobs:
           name: thunder_core-wasm
           path: out/thunder_core.wasm
           retention-days: 7
+      # U02: the existing C++ DSP (tfx, thunder-dsp, mods) from CMake with the same wasi-sdk, pinned upstreams (third_party/PINS.md).
+      - name: Build tfx / thunder-dsp / mods wasm from CMake (U02)
+        run: WASI_SDK="$PWD/wasi-sdk" native/tools/build-wasm.sh "$RUNNER_TEMP/u02-wasm"
+      # U02 gate: the golden tests rendered through the CMake-built wasm (copy of the tree; committed files untouched).
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Parity u02 (goldens through the CMake wasm)
+        run: WASI_SDK="$PWD/wasi-sdk" PARITY_SKIP_BUILD=1 native/tools/parity.sh u02 "$RUNNER_TEMP/u02-wasm"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: thunder_dsp-wasm-u02
+          path: |
+            ${{ runner.temp }}/u02-wasm/tfx.wasm
+            ${{ runner.temp }}/u02-wasm/thunder-dsp.wasm
+            ${{ runner.temp }}/u02-wasm/mods.wasm
+          retention-days: 7
 
   windows:
     name: Core (Windows x64, MSVC)
@@ -99,6 +116,7 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
+      - run: brew install gnu-sed   # native/core/third_party/prepare.sh needs GNU sed
       - run: cmake -S native -B build -DCMAKE_BUILD_TYPE=Release "-DCMAKE_OSX_ARCHITECTURES=arm64;x86_64"
       - run: cmake --build build -j
       - run: ctest --test-dir build --output-on-failure
