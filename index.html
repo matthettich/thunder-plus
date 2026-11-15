@@ -416,7 +416,8 @@ body:not(.nowv) .wvMobNote{display:none}
 .vrow.vact{flex-wrap:wrap}   /* SYNTH UX C: the buttons wrap between themselves; "Pad presets…" stays on one line */
 .vrow.vact .presel{flex:1 1 auto; min-width:0; max-width:none; white-space:nowrap}
 .vrow .grp{display:inline-flex; flex:none} .vrow .grp button{margin:0} .vrow .grp button+button{border-left:0}
-.vrow.vttl{margin-bottom:-2px}   /* the pad's number and kind on a line of its own, over the name and the buttons */
+.vrow.vttl{margin-bottom:-2px}
+.vused{margin-left:10px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0} body.mob .vused{display:none}   /* USED ON (609): desktop only */   /* the pad's number and kind on a line of its own, over the name and the buttons */
 .vrow.vkit{flex-wrap:wrap; row-gap:6px}   /* SLOTS and this slot's kind, at the top */
 .vrow.vkit .vel{color:var(--muted); font-size:var(--fs-2); letter-spacing:.04em; text-transform:uppercase}
 .vrow.vkit .kslotn{min-width:44px; font-variant-numeric:tabular-nums; font-weight:600}
@@ -3262,7 +3263,7 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
   <section class="band voice">
     <div class="bar vbar">
       <div class="vrow vkit" id="vKit"><span class="vel">Slots</span><span class="grp" role="group" aria-label="How many slots the kit has"><button type="button" class="sm" id="kSlotDn" aria-label="Fewer slots" title="8 fewer slots (the ones taken away keep their sound: more slots bring it back)">−</button><button type="button" class="sm kslotn" id="kSlotN" title="How many slots (pads) the kit has, 16 to 64. Tap to type a number">16</button><button type="button" class="sm" id="kSlotUp" aria-label="More slots" title="8 more slots">+</button></span><span class="vel">This pad</span><div class="seg" id="vKindSeg" role="group" aria-label="How this pad plays"></div><span class="lbl" id="vKindLbl"></span></div>
-      <div class="vrow vttl"><span class="ttl" id="vNum">Pad 1</span><span class="vmeter" id="vMeter" title="Level of what you play here (pads, keys, MIDI), −48 to +6 dB. The line is 0 dB: past it the bar turns red and the safety limiter (Project → LIMITER) is holding the peaks down." aria-hidden="true"><i></i><b></b></span></div>
+      <div class="vrow vttl"><span class="ttl" id="vNum">Pad 1</span><span class="lbl vused" id="vUsed" aria-live="off"></span><span class="vmeter" id="vMeter" title="Level of what you play here (pads, keys, MIDI), −48 to +6 dB. The line is 0 dB: past it the bar turns red and the safety limiter (Project → LIMITER) is holding the peaks down." aria-hidden="true"><i></i><b></b></span></div>
       <div class="vrow vid"><input id="vName" type="text" aria-label="Pad name" spellcheck="false"><button class="sm play" id="vPlay" title="Play this pad (Shift+Space)"><svg class="ic" aria-hidden="true"><use href="#ic-play"/></svg>Play</button><button type="button" class="sm" id="vAud" aria-pressed="true" title="Audition: play this pad after each change you make to it, so you hear the edit. Turn it off to edit in silence.">Audition</button></div>
       <div class="vengine" id="vEngine" hidden><span class="vel">Engine</span><div class="seg" id="vEngSeg"></div><span class="lbl" id="vEngLbl"></span></div>   <!-- SYNTH UX A: the engine picker sits right under the name row, above the waveform -->
       <div class="vrow vact">
@@ -14431,6 +14432,22 @@ function buildPads(){
 }
 // DRUM NAME (owner, 1 Nov): a drum machine pad's drum (pump Strike / Boing / X0X / Life: its Drum), shown with its name
 const padDrum = v => { try { return v && typeof PsynCore !== 'undefined' && PsynCore.isKind(v.engine) && v[v.engine] ? PsynCore.drumName(v.engine, v[v.engine]) : ''; } catch(e){ return ''; } };
+/* USED ON (609, owner: "a display that lists the tracks each synth / pad is used on"): the tracks whose phrases play an instrument that sits on this slot
+   (the instrument column or INS, as IN USE on the Inst screen). One pass over the phrases, memoised on songVer and the instruments' pads, so a redraw or a
+   selection change costs nothing once it is worked out; set by refreshAll (selection) and setView (the song may have changed). */
+let padUseM = null;
+function padTracks(){
+  const sig = songVer + ':' + S.insts.map(I => I && I.pad).join(',');
+  if (padUseM && padUseM.sig === sig && padUseM.S === S) return padUseM.m;
+  const byInst = new Map(), m = new Map();
+  for (const [pid, ts] of phraseTracks()){ const p = S.phrases[pid]; if (!p) continue; const L = Math.min(plen(pid), p.length), seen = new Set();
+    for (let y = 0; y < L; y++){ const r = p[y]; if (!r) continue; if (r[IC] >= 0) seen.add(r[IC]); for (let k = FX0; k < RW; k += 2) if (FXC[r[k]] === 'INS' && r[k + 1] >= 0) seen.add(r[k + 1]); }
+    for (const i of seen){ let a = byInst.get(i); if (!a) byInst.set(i, a = new Set()); for (const t of ts) a.add(t); } }
+  S.insts.forEach((I, i) => { const a = byInst.get(i); if (!a || !I) return; let q = m.get(I.pad); if (!q) m.set(I.pad, q = new Set()); for (const t of a) q.add(t); });
+  padUseM = {sig, S, m}; return m;
+}
+function padUsedText(i){ try { const a = padTracks().get(i); if (!a || !a.size) return 'unused'; return 'Track' + (a.size > 1 ? 's ' : ' ') + [...a].sort((x, y) => x - y).map(t => d2(t + 1) + (tName(t) ? ' ' + tName(t) : '')).join(' · '); } catch(e){ return ''; } }
+function usedUI(){ const u = $('vUsed'); if (!u || isMobile()) return; const x = padUsedText(cur), t = x === 'unused' || !x ? 'unused' : 'Used on: ' + x; if (u.textContent !== t){ u.textContent = t; u.title = 'The tracks whose phrases play an instrument on this slot (' + t + ')'; } }
 function renderPads(){
   kit.voices.forEach((v, i) => {
     if (i >= padEls.length) return;
@@ -14442,7 +14459,7 @@ function renderPads(){
     b.textContent = hx(i);
     // The tooltip names the tracker instruments that play this pad, plus its track when it has one.
     let ins = [i]; try { ins = S.insts.map((I, k) => I.pad === i ? k : -1).filter(k => k >= 0); } catch(e){}   // S may not exist yet at start-up
-    p.title = (vtrk && trackOfPad(i) >= 0 ? `Track ${d2(trackOfPad(i) + 1)} · ` : '') + (ins.length ? `Instrument ${ins.map(k => hx(k)).join(', ')} in the tracker` : 'No tracker instrument plays this pad');
+    p.title = (vtrk && trackOfPad(i) >= 0 ? `Track ${d2(trackOfPad(i) + 1)} · ` : '') + (ins.length ? `Instrument ${ins.map(k => hx(k)).join(', ')} in the tracker` : 'No tracker instrument plays this pad') + (isMobile() ? '' : ' · ' + (padUsedText(i) === 'unused' ? 'unused in the song' : 'used on ' + padUsedText(i).toLowerCase()));
     m.textContent = midi.on ? (midi.notes[i] >= 0 ? noteName(midi.notes[i]) : isSyn(i) ? '' : '—') : '';
     p.classList.toggle('sel', i === cur);
     p.classList.toggle('learn', midi.learn && midi.target !== i);
@@ -14466,6 +14483,7 @@ function refreshAll(){
   vRows.forEach(r => r.refresh()); updChoke(); padSum();
   refreshVoiceGlobals(); refreshTune();
   refreshLayer(); renderPads(); renderFx(); try { preLabels(); } catch(e){}
+  usedUI();
   bassUI();
   showCur();
   try { ccBadges(); } catch(e){}   // sliders may have been rebuilt (another layer type or effect)
@@ -35976,6 +35994,7 @@ function setView(v){
   const tr = view === 'tracker', wv = view === 'waves', ch = view === 'chains';
   $('main').hidden = $('dock').hidden = tr || wv || ch; $('trk').hidden = !tr; $('wvView').hidden = !wv; $('chView').hidden = !ch;
   synDesk();
+  if (view === 'synth') try { usedUI(); renderPads(); } catch(e){}   /* USED ON: the song may have changed in the tracker */
   $('kitName').hidden = tr || wv || ch;
   if (tr || wv || ch){ gsetToggle(false); gfileToggle(false); }
   document.body.classList.toggle('wvv', wv);
