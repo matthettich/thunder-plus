@@ -1,0 +1,30 @@
+# NATIVE PORT (branch `native` only; WORKPLAN docs/port/WORKPLAN.md). Builds the C++ core and the shells.
+# Runs only for pushes to `native` and PRs into it, and only when native/** (or this file) changed.
+name: Native
+
+on:
+  push:
+    branches: [native]
+    paths: ['native/**', '.github/workflows/native.yml']
+  pull_request:
+    branches: [native]
+    paths: ['native/**', '.github/workflows/native.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: native-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  linux:
+    name: Core (Linux, ctest)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - run: cmake -S native -B build -DCMAKE_BUILD_TYPE=Release
+      - run: cmake --build build -j
+      - run: ctest --test-dir build --output-on-failure
