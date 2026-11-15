@@ -120,7 +120,8 @@ class Seq {
   // (also out->n). Audio thread: no allocation, no lock, no I/O.
   int step(SeqEvent* evs, int cap, SeqStep* out);
   bool alive() const;                         // api.alive()
-  void setLoop(bool has, int y0, int y1) { hasLoop_ = has; loopY0_ = y0; loopY1_ = y1; }   // api.setLoop
+  void setLoop(bool has, int y0, int y1);   // api.setLoop; the rows are clamped to the mode's range (N1 review C2)
+  int loopMax() const { return mode_ == SeqMode::Song ? 255 : mode_ == SeqMode::Sect ? 15 : 31; }   // the last row / chain row / step a loop can name
   double time() const { return time_; }      // api.time: when the next step is due
   double bpm() const { return bpm_; }
   int tks() const { return tks_; }
