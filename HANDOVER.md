@@ -732,6 +732,10 @@ The owner's top priority to add is the MOD screen. Work down the list; ask befor
 
 Start a session by asking for results. Fix on `beta`. (10 Nov, 15:10: the web beta is build 560; the build numbers in the rest of this paragraph are older.) Web beta: https://matthettich.github.io/thunder-plus/beta/ (build 547 as of 10 Nov morning, 548 once its PR merges; the night of 9–10 Nov shipped 544–547, see the four "10 Nov" entries below. Decisions the lead made that night for the owner to confirm or reverse: on a phone the saved Sequencer default plays on the Page unless Audio thread is picked on that device; on a phone the safety limiter is its stand-in until another worklet loads; the resync only runs with a worklet loaded and its margins are untested on a device). Desktop: v1.3.4-beta.2 (build 541, no feed view or scopes); further desktop betas on hold until the owner asks.
 
+**Build 609** (resting pump effects: FXO and latency changes)
+- [ ] **Computer:** a track with a pump effect switched OFF on the FX screen and an `FXO` command that switches it on in the song (after it has played for a few seconds). Pass: the effect comes in on the row of the command, the first time and every time.
+- [ ] **Computer, by ear:** a pump EQ on a track, switched OFF; while the track plays, open the EQ and change Phase to Linear Phase (and back). Pass: the track keeps sounding through the change (it moves slightly in time, as that EQ’s latency does); no gap.
+
 **Build 608** (renders sound like playback)
 - [ ] **Computer (song `acid`), by ear:** render the song on this build and play the WAV against the app playing it (headphones, same level). Pass: the drums are as crisp in the WAV as live, the WAV starts on the first kick, and the parts stay in step with each other to the end. If something still sounds different, tell me WHICH track and about what time in the song: measured here, each track’s level, tone, timing and pitch now match live within 0.1 dB and 2 ms; only the synths’ wave shape differs from one play to the next (their oscillators start at a different point in the wave each time, live too).
 - [ ] **Computer:** the three LFOs on your old track 12 in `acid`: two of them point at effect slots that are now empty (they do nothing, live or rendered) and one at ENSEMBLE MODE; one on 13 at SPACE MIX. Pass: open MOD on those tracks and re-point or delete the two dead ones if you want them back (the song was changed before build 602, which is when LFOs started following their tracks).
@@ -1261,6 +1265,14 @@ Suggested order: N0 → N1 → N2 (phone cured) → N4 with N3 alongside → N5 
   the edge `R.t0`, "waiting…" while armed), `rcdClk` / `rcdFmt` / `rcdFreeSecs`, a 250 ms timer only while recording; the
   final length stays until the next take. recorder-check covers FREE, PATTERN, Stop, next take and closing mid-take.
 
+
+## 14 Nov (resting pump effects: FXO switches on the beat, longer warm-up when the latency grows (CodeRabbit on #142); build 609)
+
+CodeRabbit's review of the beta → main PR (#142), carried forward before the release. By the lead.
+- **`pumpRest`, the wake:** (1) the warm-up was sized from the OLD latency (`D.n`); a rested EQ changed to linear phase got 1024 samples of warm-up for a latency of thousands, and the track fell silent for the difference. It is now the longer of the old and the new plugin's latency, + 1024. (2) A slot woken by an FXO command no longer waits for the warm-up: the fresh plugin is fed the delay line's contents (the last latency's worth of sound) inside that block and then runs the block switched on, so the first FXO switch is on the beat (one dearer block, once; `s.fxo` keeps it from resting again).
+- **Not changed (answered):** a muted track's node put to sleep after ten seconds keeps its slots' state. Its echoes had ten seconds of silence to die; an effect that never dies down still holds what it would hold had it kept running. The comment in `p1` now says so.
+- `docs/MONO-POLY-PLAN.md`: hidden tracks keep their kind (two parked runs, `hmono`); a chain, a voice or Perform data makes a hidden track non-empty.
+- `tests/fx-rest.test.js`: two more tests (the real `pump.wasm`: LIMIT woken by FXO, EQ to linear phase while resting). A stray backtick in a `TFX_SRC` comment would have broken the worklet: the tests caught it (as with `//` in one-liners: no backticks inside `TFX_SRC`).
 
 ## 14 Nov (renders sound like playback: sample notes start on a whole sample; build 608)
 
