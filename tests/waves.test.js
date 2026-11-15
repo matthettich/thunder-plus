@@ -70,7 +70,7 @@ const finite = a => { for (const v of a) if (!Number.isFinite(v)) return false; 
 const energy = a => { let e = 0; for (const v of a) e += v * v; return e; };
 // lverb (Lite reverb) is not rendered here: its golden hashes are in chains-modules.json and tests/lverb.test.js tests the shared code (and checks the waves copy is identical).
 // Rendering it here would also move every later module's hash: the hashes depend on how many renders came before them in this one wasm instance (found 12 Nov).
-const SKIP = new Set(['hostIn', 'out', 'lverb']);
+const SKIP = new Set(['hostIn', 'out', 'lverb', 'send', 'recv']);   // send, recv: never run, the graph's compile step resolves them into cables (tests/chains-sendrecv.test.js)
 /* Modules that are silent in this harness, and why. A silent hash proves "unchanged", not "working", so the list is explicit. */
 const NEEDS_OWN_INPUT = new Set(['beads', 'mixer', 'compare', 'rect', 'clkmul', 'chance', 'burst', 'gatedly', 'flipflop', 'dline', 'expr']);   // expr: its default formula (a * k1) needs input A, which the harness does not feed (tests/modules-expr.test.js tests its sound); dline: the stressed Time (1.4 s) is longer than the 1.07 s render, so it is silent (tests/modules-delay.test.js tests its sound); beads: a texture source that needs its own trigger/input; mixer: needs in1..in16, not `in`; compare, rect: control maths that need a control signal patched in (their gates and halves are 0 on the harness's input); clkmul, chance, burst, gatedly, flipflop: gate tools that need a pulse patched in (the default input holds no gate)
 

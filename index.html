@@ -1081,7 +1081,7 @@ body.mob #bFile.dirty{position:relative} body.mob #bFile.dirty::before{position:
 .tinfo>.thint.open{-webkit-line-clamp:unset; display:block}
 .tinfo>.thint.more:not(.open){cursor:pointer}
 .thint{color:var(--ts-hint)}
-.tside{width:236px; flex:none; border-left:1px solid var(--line); background:var(--side); padding:12px; display:flex; flex-direction:column; gap:12px; overflow:auto}
+.tside{width:236px; flex:none; border-left:1px solid var(--line); background:var(--panel); padding:12px; display:flex; flex-direction:column; gap:12px; overflow:auto}
 .tmap{display:grid; grid-template-columns:repeat(4,1fr); gap:4px}
 .tmap button{min-height:28px; padding:0 2px; font-size:var(--fs-2); font-weight:600; letter-spacing:.03em}
 .tmap .wide{grid-column:1 / -1}
@@ -1130,8 +1130,11 @@ body:not(.legon) .tside .tlegend{display:none}
    an offset shadow, a dark title bar); the instruments card takes the room that's left and scrolls inside itself, in rows
    that wrap to the panel's width, so nothing is cut off at the side or the bottom. */
 .tside{gap:14px; padding-right:16px}
+/* THE SIDE PANEL TAKES THE SKIN (owner, 15 Nov: "make the sidebar with the meters and instruments match the skin", "an awkward grey strip at the bottom if the command bar is on"): its ground is the tracker screen's own (--panel, as .tscr, the command bar and the tab strip), not --side, the paler tint the term skins give cards; the strip under it was the command bar's --panel against that paler ground. The text is the tracker's font (--mono), the offset block of its cards the skin's own light (--inv), not white. */
+:root .tside, :root .tside :is(button, select, input){font-family:var(--mono)}
+.tcmd.cmini{background:var(--panel)}
 .tside .tcard{flex:none; display:flex; flex-direction:column; min-height:0; border:1.5px solid var(--line); background:var(--panel); color:var(--ink);
-  box-shadow:4px 4px 0 0 #fff, 4px 4px 0 1.5px var(--line)}
+  box-shadow:4px 4px 0 0 var(--inv, #fff), 4px 4px 0 1.5px var(--line)}
 .tside .tcst .tstat{background:var(--ink); color:var(--inv); padding:5px 8px 6px; gap:1px}
 .tside .tcst .tstat b{font-size:var(--fs-3); letter-spacing:.06em}
 .tside .tcst .tstat span{font-size:var(--fs-2); opacity:.8; letter-spacing:.03em}
@@ -1154,7 +1157,7 @@ body:not(.legon) .tside .tlegend{display:none}
 .tside .tinl button.on{background:var(--ink); color:var(--inv); border-color:var(--ink)}
 /* PLAYING (owner, 3 Nov: "flash them as they play, just like on the synth screen"): an instrument lights as its notes sound */
 .acidask option.acidfree{background:color-mix(in srgb, var(--meter-ok, #4fd18a) 16%, var(--panel, #fff))}
-.tinl button.hit{background:#ff5a1f !important; color:#fff !important; border-color:#ff5a1f !important}
+.tinl button.hit{background:var(--acc, #ff5a1f) !important; color:var(--acc-on, #fff) !important; border-color:var(--acc, #ff5a1f) !important}
 .tinl button.hit i{opacity:.9}
 /* Lp. Sel. and TRANS − + sit side by side: one rule between neighbours, not two. */
 .trows .rv + .rv{border-left:0}
@@ -3774,7 +3777,7 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
 </div>
 <div class="toast" id="toast" role="status" aria-live="polite" title="Tap to dismiss" hidden></div>
 
-<script src="waves/waves-worklet.js?v=45"></script>
+<script src="waves/waves-worklet.js?v=46"></script>
 <!-- LXR ENGINES (23 Oct 2026): the LXR-02 firmware's drum voices, GPL-3.0, all of it in lxr/. Optional: without the folder
      this fails quietly and the app has no Firmware engines. The render Worker loads the same file (LXR_JS below). -->
 <script src="lxr/lxr-engine.js?v=2"></script>
@@ -8767,7 +8770,7 @@ self.onmessage = async e => {
       if (m.op === 'done') j.ok({data:m.data, data2:m.data2 || null, st:m.st}); else j.no(new Error(m.err));
     };
     w.onerror = e => { e.preventDefault && e.preventDefault(); rwDown(); };
-    w.postMessage({op:'init', pl:plMod, tx:txMod, lx:lxMod || null, ps:psMod || null, wv:new URL('waves/waves-worklet.js?v=45', location.href).href});
+    w.postMessage({op:'init', pl:plMod, tx:txMod, lx:lxMod || null, ps:psMod || null, wv:new URL('waves/waves-worklet.js?v=46', location.href).href});
     PW.w = w;
   } catch(e){ PW.w = null; }
 }
@@ -20647,7 +20650,7 @@ function chainsReady(ac){
     chnLoaded.set(ac, (async () => {
       await tfxLoad; await tfxModLoad; if (!chnBin() || !ac.audioWorklet || !window.AudioWorkletNode) return false;
       if (!chnURL){
-        const src = await (await fetch('chains/chains-worklet.js?v=57')).text();
+        const src = await (await fetch('chains/chains-worklet.js?v=58')).text();
         chnURL = URL.createObjectURL(new Blob([src], {type:'application/javascript'}));
       }
       wkNote(ac, 'chains'); await ac.audioWorklet.addModule(chnURL);
@@ -23665,7 +23668,7 @@ let bassURL = null; const bassLoad = new WeakMap(), bassOK = new WeakSet(), bass
 // …PUMP SYNTHS live: their worklet, loaded with the others; psSent: the contexts whose audio thread has the wasm's bytes
 const PSYN_WK = 'pump/synth/pump-synth-worklet.js?v=12', psOK = new WeakSet(), psSent = new WeakSet();
 // …WAVES LIVE: the waves worklet in the tracker's own context (thunder-wlive); wlSent: the contexts that have the wasm
-const WAVES_WK = 'waves/waves-worklet.js?v=45', wlOK = new WeakSet(), wlSent = new WeakSet();
+const WAVES_WK = 'waves/waves-worklet.js?v=46', wlOK = new WeakSet(), wlSent = new WeakSet();
 /* BATTERY (8 Nov, Fold): a bookkeeping timer that only does something in one situation (playing, the screen visible, one
    screen open) had been waking the phone 2 to 16 times a second for nothing. idleTick(fn, fast, busy, slow) calls fn every
    `fast` ms while busy() says so and every `slow` ms otherwise (fn runs either way, so its own reset-when-idle code still
@@ -25951,7 +25954,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 620;
+const BUILD = 621;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD + (location.pathname.includes('/beta/') ? ' · beta' : '');
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -36184,6 +36187,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [621, '15 Nov', ['…chains and …waves: Send and Receive modules: give a pair the same label (A to H, or your own text) and the Receive outputs what the Send gets, with no cable. Several Receives can share one Send. They work inside one track’s chain', '…chains: a cable that runs from one track’s chain into another’s carries no sound, and now says so (dashed, “no signal”): to key a compressor from a bus use a Sidechain Out with Send 1 in the bus’s chain and Source: Send 1 on the compressor', 'Mixer and Stereo mixer modules show an OUT meter, so you can see they pass audio', 'Cable bends snap to right angles as you drag them (hold Alt for free); right-click a cable: Square up', 'The ? on a module is the size of its ✕', 'The side panel (status, meters, KEYS, instruments) takes the skin’s own ground, font and accent, and the paler band along the bottom with the command bar on is gone']],
   [620, '15 Nov', ['MOD: a dot beside every parameter an LFO moves (FX screen, the FX bar, the Mixer’s PAN, VOL and OUT); hover it for which LFO', 'The dancing dogs: MOD is a dogs screen like Song and Project, and the ✕ that hides them is always visible (Settings › ANIMATIONS switches them off everywhere)', 'LOOP sits beside PLAY on a computer (Alt+L toggles it)', 'Synth page: “Used on” lists the tracks that play the selected pad or synth', 'Renoise’s transpose keys: Alt+F1 / F2 a semitone, Alt+F11 / F12 an octave, on the selection', 'FX bar: + ADD FX opens the effect list over the screen you are on; double-click a value for a pop-up slider with a number box', 'Mixer: double-click a value to type it (Alt-click still resets)', 'FX screen: the wheel reaches the slot list from a long effect, and the ACTIVE line stays in view', 'Arrange: ARRANGE LOOK-AHEAD in Settings (rows from the bottom before it pages, default 16), and the cursor pages too; Undo no longer jumps the view to the selection; coming back from the Synth page with LOOP on no longer leaves Arrange stuck', 'The Mixer follows Arrange’s cursor track even with PIN on', 'LOOP SEL armed on Arrange still loops when PLAY is pressed on the Mixer, FX, MOD or INST', 'A new track’s sound is made ready at once (a new poly track was silent on its first pass)', 'Pattern view obeys PHRASE ON STOP: STAYS']],
   [619, '15 Nov', ['A stereo sample on a pad now renders in stereo, as it plays (renders and stems made it mono)', 'Rendering many times in one session, or the stems of a big song, no longer ends in silent files: the app ran out of room for effects after enough renders. It now gets roughly three times as far, and if the limit is still reached the render stops with “Render failed: an effect couldn’t start…” and saves nothing (reloading the app clears it)']],
   [618, '15 Nov', ['273 new drum sounds in the pad’s Presets list: 31 kicks, 30 snares, 23 claps, 16 rims, 25 closed and 15 open hats, 15 cymbals, 15 shakers, 28 toms, 15 hand drums, 26 cowbells / blocks / metal, and 34 IDM and glitch hits', '12 new kits in File › Drum kits: Electro 2, IDM clicks, IDM metallic, Glitch, Deep sub, Hard, Lo-fi, Minimal, FM percussion, Breaks, Industrial, Chip. Like the engine presets they were levelled and checked by measurement, not by ear: say which to cut']],
