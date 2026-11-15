@@ -11,3 +11,10 @@ endif()
 add_executable(bench_put bench_put.cpp)
 target_link_libraries(bench_put PRIVATE thunder_core)
 add_test(NAME bench_put COMMAND bench_put)
+
+# A5: the real-time harness. rt_core: the core's callback under an allocator that aborts on allocation, plus the clock-drift
+# logger's checks. rt_guard_selftest: proves the allocator really kills a callback that allocates.
+add_executable(rt_harness rt_harness.cpp)
+target_link_libraries(rt_harness PRIVATE thunder_core)
+add_test(NAME rt_core COMMAND rt_harness)
+add_test(NAME rt_guard_selftest COMMAND rt_harness --selftest)
