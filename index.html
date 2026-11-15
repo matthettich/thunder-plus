@@ -21890,7 +21890,11 @@ function makePlayer(ac, out, getBuf, live, mo){   // mo: the master OUT gain (af
     const syn = isSyn(ev.pad), v = {src, f, g, pn, base:ev.rate, rate:ev.rate, choke:ck, col:ev.col, ended:false, stopAt:null, syn, rel:syn && kv ? (ev.rlo != null ? ev.rlo : relOf(kv)) : 0};
     if (!ev.slide) pitchMods(v, ev.t, ev.rate, ev);
     const off = ev.ofsSec != null ? (ev.rev ? Math.max(0, b.duration - ev.ofsSec - ev.durSec) : ev.ofsSec) : clamp(ev.ofs, 0, 255) / 256 * b.duration;
-    const st0 = Math.max(ev.t, ac.currentTime);
+    /* WHOLE-SAMPLE STARTS (build 608; owner, 14 Nov: "renders should sound like the playback"). A sample started between two samples is
+       interpolated by the browser from its first sample to its last, which dulls it (measured on his song: a render's drums 0.8 to
+       1.1 dB down at 8 to 16 kHz against the audio-thread sequencer, which starts every note on a sample). So the start moves up to
+       the next sample (at most 21 µs late). Renders, and playing with the sequencer on the page, now sound as the audio thread does. */
+    const st0 = Math.ceil(Math.max(ev.t, ac.currentTime) * ac.sampleRate - 1e-6) / ac.sampleRate;
     // Starting part-way into a sample (slices, offsets) lands mid-waveform: a 1.5 ms fade-in keeps it from clicking.
     if (off > 0.0005){ f.gain.setValueAtTime(0, st0); f.gain.linearRampToValueAtTime(1, st0 + 0.0015); }
     src.start(st0, Math.min(off, Math.max(0, b.duration - 0.001)));
