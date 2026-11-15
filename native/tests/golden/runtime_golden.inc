@@ -155,3 +155,6 @@ static const unsigned long long kAutoGolden[600] = {
 };
 static const unsigned long long kRngGolden[4] = { 0x5015f8224b9c06eeull, 0x0f4ebb4891bde0b8ull, 0x79b2b0e7d3c537cbull, 0xd2a6bc535faa2c38ull };
 static const unsigned long long kExpGolden = 0x13e18d898972b32cull;
+static const unsigned long long kPowGolden = 0x629cee30ad506fa0ull;
+static const unsigned long long kRoundGolden = 0xca360364753ddd74ull;
+static const unsigned long long kNumStrGolden = 0xe70d5519bd583feaull;
