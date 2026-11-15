@@ -3,7 +3,7 @@
 Written 10 Nov 2026 by the lead. The contract between the interface (`index.html` and the two editors, in a web view) and
 the C++ core. It replaces every boundary listed in [`BRIDGE-TODAY.md`](BRIDGE-TODAY.md) sections 1–3 and the audio / MIDI
 parts of 4 and 6. Design rules are in `../NATIVE-DESKTOP-PLAN.md` sections 4.1 and 5; this file is the message list.
-**`BRIDGE_V = 1`, frozen 15 Nov 2026 (tasks B1 and B2, the lead) for N1 steps 3 to 10.** Two points stay open and block nothing (section 6): the Android bulk path's timings, and the `meters` array layout. A change to anything else now needs a new `BRIDGE_V`.
+**`BRIDGE_V = 1`, frozen 15 Nov 2026 (tasks B1 and B2, the lead) for N1 steps 3 to 10.** One point stays open and blocks nothing (section 6): the Android bulk path's timings. A change to anything else now needs a new `BRIDGE_V`.
 
 ## 1. What is different from today (from the inventory)
 
@@ -117,8 +117,11 @@ loaded in the Android web view, and commands and events crossed through the core
    owner's phone (Android 17, WebView 157), so `put` / `take` use ArrayBuffer messages in 1 MB chunks (path a2); the
    base64-to-file path stays as the fallback for a web view without that feature. **Open:** the A4 timings on the phone
    (not run in N0). They decide only whether a 5-minute sample is sent in one go or behind a progress bar, not the API.
-8. **`meters` layout (draft point 3): open until U13.** The array's layout is fixed by the unit that builds the meters,
-   from what the Mixer and FX bar draw today; until then no native build sends `meters`.
+8. **`meters` layout (draft point 3): fixed by U13, 15 Nov.** `{t:"meters", seq, at, a:[70 floats]}` at 30 a second.
+   `a[2s]` is the peak and `a[2s+1]` the RMS of slot `s`: slots 0 to 31 the tracks (a 512-sample window of the mono mix
+   (L+R)/2, as the page's analysers), 32 the preview bus, 33 master left, 34 master right (1024 samples per channel).
+   Decay, holds and floors stay with the page. The FX bar's per-slot peaks come with U14; the master processor's own
+   reduction meters are a separate small message.
 
 Exactness (decided in U05, recorded here because every later unit depends on it): the core is built without fused
 multiply-add and uses its own `exp` (fdlibm's, as V8), so values the sequencer and the automation compute are the same
