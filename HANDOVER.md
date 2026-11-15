@@ -747,6 +747,10 @@ The owner's top priority to add is the MOD screen. Work down the list; ask befor
 
 Start a session by asking for results. Fix on `beta`. (10 Nov, 15:10: the web beta is build 560; the build numbers in the rest of this paragraph are older.) Web beta: https://matthettich.github.io/thunder-plus/beta/ (build 547 as of 10 Nov morning, 548 once its PR merges; the night of 9–10 Nov shipped 544–547, see the four "10 Nov" entries below. Decisions the lead made that night for the owner to confirm or reverse: on a phone the saved Sequencer default plays on the Page unless Audio thread is picked on that device; on a phone the safety limiter is its stand-in until another worklet loads; the resync only runs with a worklet loaded and its margins are untested on a device). Desktop: v1.3.4-beta.2 (build 541, no feed view or scopes); further desktop betas on hold until the owner asks.
 
+**Build 613** (the song takes its file's name)
+- [ ] **Mac desktop:** double-click `acid.thunder` (or File › Open). Pass: Project › NAME says “acid”, the title bar shows no unsaved dot, and a render suggests “acid mix.wav”.
+- [ ] **Mac desktop:** New project, Save as `beat2.thunder`. Pass: NAME becomes “beat2”. Rename a song to “My tune”, save, open another file and come back: “My tune” is kept.
+
 **Build 612** (MOD follows Arrange)
 - [ ] **Mac:** load `acid`, open MOD, press Option+A (Arrange takes the keys, MOD says FOLLOWS), move the cursor to track 12, then 13. Pass: the MOD header says TRACK 12 and lists its three LFOs at once, and TRACK 13 lists one; it changes with every move, across the mono / poly boundary too.
 - [ ] **Mac:** the two LFOs on track 12 that point at settings those effects do not have. Pass: they read “no such setting” (or “no effect in this slot”), not “(empty)”, and can be re-pointed or cleared.
@@ -1297,6 +1301,14 @@ Suggested order: N0 → N1 → N2 (phone cured) → N4 with N3 alongside → N5 
   the edge `R.t0`, "waiting…" while armed), `rcdClk` / `rcdFmt` / `rcdFreeSecs`, a 250 ms timer only while recording; the
   final length stays until the next take. recorder-check covers FREE, PATTERN, Stop, next take and closing mid-take.
 
+
+## 14 Nov (a song still called “Song 1” takes its file's name; build 613)
+
+Owner's report (Mac desktop, build 609): "the program still thinks every track I load is called 'song 1' instead of the file name". Found, fixed and tested by an agent; reviewed by the lead.
+- **Cause:** `acid.thunder` stores the name "Song 1" inside the file and `normSong()` keeps it in `S.name`. The earlier fix (the now-playing chip) only made `projTitle()` / `msTitle()` prefer the file's name; everything else read `S.name`: the NAME field, render / stems / MIDI / preset file names, Save's suggestion, the unsaved-changes prompt, backups, the screen subtitles. `loadProjText(text, name, where)` used `name` for a toast only. Electron already passes the file's base name.
+- **Fix (lead's rule):** a song whose stored name is still a default ("Song 1", "Song N", empty: `songNameDefault`) takes the file's name without its extension (`fileSongName`) on every load path, before `setSong`, so nothing is marked unsaved. A song the user named keeps his name. Save as and a first Save do the same (`adoptFileName`). Restore a backup renames nothing.
+- No change in `electron/`: no desktop release needed for it.
+- `tests/song-name-from-file.test.js` (10); the stub in `tests/media-session.test.js` updated.
 
 ## 14 Nov (MOD beside Arrange follows the cursor's track; LFOs with a missing target say so; build 612)
 
