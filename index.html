@@ -25519,9 +25519,10 @@ function tracksRowSet(mono, poly){
   const back = lm && lp ? 'raising MONO TRACKS or POLY TRACKS' : lm ? 'raising MONO TRACKS' : 'raising POLY TRACKS', say = tracksSay(all), sayHeld = tracksSay(held);   /* named before the change: the kinds are read from the split as it is now */
   const apply = () => { const r = setTracks(mono, poly); if (r.why){ toast(r.why, 5000); return; }
     if (all.length) toastBrief('tracks', 'Hid ' + say + '. Nothing is deleted: ' + back + ' brings ' + (all.length > 1 ? 'them' : 'it') + ' back.');
-    try { buildProj(); } catch(e){} };
+    try { buildProjKeep(); } catch(e){} };
   if (!held.length){ apply(); return; }
-  askYes({title:'Hide ' + say + '?', body:(held.length > 1 ? 'They hold' : 'It holds') + ' notes, effects or other settings' + (all.length > held.length ? ' (' + sayHeld.replace(/^tracks? /, '') + ')' : '') + '. Nothing is deleted: ' + back + ' brings ' + (all.length > 1 ? 'them' : 'it') + ' back.'}, 'Hide').then(ok => { if (ok) apply(); });
+  const song = S;   /* a project dropped on the window while the question is open replaces the song: Hide must not hide tracks of the new one */
+  askYes({title:'Hide ' + say + '?', body:(held.length > 1 ? 'They hold' : 'It holds') + ' notes, effects or other settings' + (all.length > held.length ? ' (' + sayHeld.replace(/^tracks? /, '') + ')' : '') + '. Nothing is deleted: ' + back + ' brings ' + (all.length > 1 ? 'them' : 'it') + ' back.'}, 'Hide').then(ok => { if (!ok) return; if (S !== song){ toast('The song changed: nothing was hidden.'); return; } apply(); });
 }
 /* the two rows' limits: each at least 1, 8 to 24 (32) tracks in all; a row stops at its limit and says why in its info line */
 function tracksLimits(kind){
@@ -35822,13 +35823,23 @@ function tsetRow(r){
   // FIX (sweep, 4 Nov): − / + grey out at the ends of the range, so a click that can't change anything shows it can't
   let bDn = null, bUp = null; const lim = () => { if (bDn) bDn.disabled = r.get() <= r.min; if (bUp) bUp.disabled = r.get() >= r.max; };
   const put = v => { tsetSet(r, v); rg.value = r.get(); out.textContent = show(r.get()); lim(); refresh(); };
-  const btn = (t, d, a) => { const b = el('button', 'stp', t); b.type = 'button'; b.setAttribute('aria-label', a); b.addEventListener('click', () => { put(r.get() + d); if (r.l === 'PATTERN LEN' || r.late) buildProj(); }); return b; };
+  const btn = (t, d, a) => { const b = el('button', 'stp', t); b.type = 'button'; b.setAttribute('aria-label', a); if (r.late){ b.dataset.fk = r.l + '|' + t; b.addEventListener('focus', () => { tsetFk = b.dataset.fk; }); } b.addEventListener('click', () => { put(r.get() + d); if (r.l === 'PATTERN LEN') buildProj(); else if (r.late){ tsetFk = b.dataset.fk; buildProjKeep(); } }); return b; };
   /* r.late (MONO / POLY TRACKS): the slider only commits when let go, so dragging past a track that holds something asks once, not at every step; the other row's limits follow */
   rg.addEventListener('input', () => { if (r.late) out.textContent = show(+rg.value); else put(+rg.value); });
-  rg.addEventListener('change', () => { if (r.late) put(+rg.value); if (r.l === 'PATTERN LEN' || r.late) buildProj(); });
+  if (r.late){ rg.dataset.fk = r.l + '|range'; rg.addEventListener('focus', () => { tsetFk = rg.dataset.fk; }); }
+  rg.addEventListener('change', () => { if (r.late){ put(+rg.value); tsetFk = rg.dataset.fk; buildProjKeep(); } else if (r.l === 'PATTERN LEN') buildProj(); });
   bDn = btn('−', -st, 'Less'); bUp = btn('+', st, 'More'); lim();
   c.append(bDn, rg, bUp, out);
   row.append(lab(), c, inf); return row;
+}
+/* A keyboard user keeps their place: buildProj rebuilds the open sheet, so the control last used (data-fk = row + which control) is found again afterwards; a button that went disabled at a limit hands focus to its row's slider. */
+let tsetFk = '';
+function buildProjKeep(){
+  const a = document.activeElement, fk = (a && a.dataset && a.dataset.fk) || tsetFk;
+  buildProj();
+  if (!fk) return;
+  const q = k => [...document.querySelectorAll('[data-fk]')].find(x => x.dataset.fk === k && !x.disabled), n = q(fk) || q(fk.split('|')[0] + '|range');
+  if (n) try { n.focus({preventScroll:true}); } catch(e){}
 }
 // The Project tab of the settings menu: the same rows as the Project screen (projRows).
 function buildProj(){
