@@ -41,3 +41,13 @@ add_test(NAME song COMMAND test_song)
 if(NODE_EXE AND CMAKE_SYSTEM_NAME STREQUAL "Linux")
   add_test(NAME song_golden_current COMMAND ${NODE_EXE} ${CMAKE_CURRENT_SOURCE_DIR}/../tools/song-golden.mjs --check)
 endif()
+
+# U07: the sequencer against the JS's four goldens (tests/golden/seq-electro*.json): every row hash and the overall sha256.
+add_executable(test_seq test_seq.cpp)
+target_link_libraries(test_seq PRIVATE thunder_core)
+target_include_directories(test_seq PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../core/src ${CMAKE_CURRENT_SOURCE_DIR})
+target_compile_definitions(test_seq PRIVATE THUNDER_ROOT="${CMAKE_CURRENT_SOURCE_DIR}/../..")
+if(NOT MSVC)
+  target_compile_options(test_seq PRIVATE -Wall -Wextra)
+endif()
+add_test(NAME seq COMMAND test_seq)
