@@ -299,49 +299,53 @@ const Attenuverter = {
 
 
 /* Steps: an 8-step CV sequence, one step per note value, with a gate out on every step and optional glide. */
-const Steps = {
-  type:'steps', scope:'mono', cost:.05,
-  inputs:{ clock:'gate', reset:'gate' }, outputs:{ out:'cv', gate:'gate' },
-  params:{ div:[3,0,9,1], len:[8,1,8,1], glide:[0,0,1,.01], depth:[1,0,1,.01],
-    s1:[0,-1,1,.01], s2:[0,-1,1,.01], s3:[0,-1,1,.01], s4:[0,-1,1,.01], s5:[0,-1,1,.01], s6:[0,-1,1,.01], s7:[0,-1,1,.01], s8:[0,-1,1,.01] },
-  create:() => ({ ph:0, step:0, y:0, c:0, r:0, sn:-1 }),
+/* SOURCES FOR …CHAINS (14 Nov, module queue; …waves has its own oscillators and Noise). */
+/* Oscillator: a plain tone at Freq, from far below hearing (0.1 Hz: a slow control wave) to the top. FM moves the pitch:
+   with FM depth at 100% the input at 1 is five octaves up, at -1 five down. A pulse on Sync starts the wave again. */
+const OscM = {
+  type:'osc', scope:'mono', cost:.15,
+  inputs:{ fm:'cv', sync:'gate' }, outputs:{ out:'audio' },
+  params:{ wave:[0,0,3,1], freq:[220,.1,20000,.1], fm:[0,0,1,.01], level:[.5,0,1,.01] },
+  create:() => ({ ph:0, ls:0 }),
   process(st, io, ctx){
-    const ext = linked(io, 'clock'), hz = ctx.transport.tempo / 60 / divBeats(io.p.div), n = io.p.len | 0 || 8;
-    const k = io.p.glide > 0 ? 1 - Math.exp(-1 / (ctx.sr * io.p.glide * .25 / hz)) : 1;
-    if (restarted(st, ctx)){ st.ph = 0; st.step = 0; }
+    const F = io.in.fm, S = io.in.sync, O = io.out.out, p = io.p, w = p.wave | 0, f0 = p.freq / ctx.sr, d = p.fm * 5, lv = p.level, fm = d > 0 && linked(io, 'fm');
+    let ph = st.ph, ls = st.ls;
     for (let i = 0; i < ctx.block; i++){
-      const rs = io.in.reset[i] > .5; if (rs && !st.r){ st.ph = 0; st.step = 0; } st.r = rs;
-      if (ext){ const g = io.in.clock[i] > .5; if (g && !st.c){ st.step = (st.step + 1) % n; st.ph = 0; } st.c = g; }
-      else { st.ph += hz / ctx.sr; if (st.ph >= 1){ st.ph -= 1; st.step = (st.step + 1) % n; } }
-      if (st.step >= n) st.step = 0;
-      const tgt = io.p['s' + (st.step + 1)] * io.p.depth; st.y += (tgt - st.y) * k;
-      io.out.out[i] = st.y; io.out.gate[i] = ext ? (io.in.clock[i] > .5 ? 1 : 0) : (st.ph < .5 ? 1 : 0);
+      const sy = S[i] >= .5; if (sy && !ls) ph = 0; ls = sy;
+      let dt = fm ? f0 * Math.pow(2, clamp(F[i], -4, 4) * d) : f0; if (!(dt > 0)) dt = 0; else if (dt > .49) dt = .49;
+      let y;
+      if (w === 0) y = Math.sin(6.283185307179586 * ph);
+      else if (w === 1) y = 1 - 4 * Math.abs(ph - .5);   // triangle, starting at its lowest point's rise: -1 at 0, 1 at half way
+      else {
+        const t = ph; let b = 0; if (t < dt){ const u = t / dt; b = u + u - u * u - 1; } else if (t > 1 - dt){ const u = (t - 1) / dt; b = u * u + u + u + 1; }
+        if (w === 2) y = 2 * t - 1 - b;
+        else { let t2 = t + .5; if (t2 >= 1) t2 -= 1; let b2 = 0; if (t2 < dt){ const u = t2 / dt; b2 = u + u - u * u - 1; } else if (t2 > 1 - dt){ const u = (t2 - 1) / dt; b2 = u * u + u + u + 1; } y = (t < .5 ? 1 : -1) + b - b2; }
+      }
+      O[i] = y * lv; ph += dt; if (ph >= 1) ph -= 1;
     }
+    st.ph = ph; st.ls = ls;
   }
 };
-
-/* Clock: a gate every note value (with swing on every second one) and a ramp that rises 0→1 across each one.
-   The ramp, patched into a slider, scans it in time with the song: the tempo-synced ramp trick. */
-const Clock = {
-  type:'clock', scope:'mono', cost:.03,
-  inputs:{ reset:'gate' }, outputs:{ gate:'gate', ramp:'cv', bar:'cv' },
-  params:{ div:[3,0,9,1], swing:[0,0,.75,.01], width:[.5,.05,.95,.01], bars:[1,1,16,1] },
-  create:() => ({ ph:0, n:0, bp:0, r:0, sn:-1 }),
+/* Noise: White (every frequency alike: hiss), Pink (less top: rain) or Brown (mostly low: a distant roar). */
+const NoiseSrc = {
+  type:'wnoise', scope:'mono', cost:.08,
+  inputs:{}, outputs:{ out:'audio' },
+  params:{ color:[0,0,2,1], level:[.5,0,1,.01] },
+  create:() => ({ s:0, b0:0, b1:0, b2:0, b3:0, b4:0, b5:0, b6:0, br:0 }),
   process(st, io, ctx){
-    const beats = divBeats(io.p.div), hz = ctx.transport.tempo / 60 / beats, sw = io.p.swing, w = io.p.width;
-    const barHz = ctx.transport.tempo / 60 / (4 * Math.max(1, io.p.bars | 0));
-    if (restarted(st, ctx)){ st.ph = 0; st.n = 0; st.bp = 0; }
+    const O = io.out.out, c = io.p.color | 0, lv = io.p.level; let s = st.s || (st.s = nextSeed() || 1);   // (its own run of numbers, taken the first time it sounds)
     for (let i = 0; i < ctx.block; i++){
-      const rs = io.in.reset[i] > .5; if (rs && !st.r){ st.ph = 0; st.n = 0; st.bp = 0; } st.r = rs;
-      st.ph += hz / ctx.sr; if (st.ph >= 1){ st.ph -= 1; st.n ^= 1; }
-      st.bp += barHz / ctx.sr; if (st.bp >= 1) st.bp -= 1;
-      // swing delays every second pulse by up to three quarters of a step
-      const off = st.n ? sw * .5 : 0, q = st.ph - off;
-      io.out.gate[i] = q >= 0 && q < w * (1 - off) ? 1 : 0;
-      io.out.ramp[i] = st.ph; io.out.bar[i] = st.bp;
+      s ^= s << 13; s >>>= 0; s ^= s >>> 17; s ^= s << 5; s >>>= 0; const w = s / 2147483648 - 1; let y;
+      if (c === 0) y = w;
+      else if (c === 1){ st.b0 = .99886 * st.b0 + w * .0555179; st.b1 = .99332 * st.b1 + w * .0750759; st.b2 = .969 * st.b2 + w * .153852; st.b3 = .8665 * st.b3 + w * .3104856;
+        st.b4 = .55 * st.b4 + w * .5329522; st.b5 = -.7616 * st.b5 - w * .016898; y = (st.b0 + st.b1 + st.b2 + st.b3 + st.b4 + st.b5 + st.b6 + w * .5362) * .11; st.b6 = w * .115926; }
+      else { st.br = (st.br + .02 * w) / 1.02; y = st.br * 3.5; }
+      O[i] = y * lv;
     }
+    st.s = s;
   }
 };
+/* (Steps and Clock live in the shared block since 14 Nov, so …waves has them too.) */
 
 /* Repeat: beat repeat, reverse and tape stop. It keeps the last 4 s; while Hold is on (or the Gate input is high)
    it loops the note-value slice it caught, each pass Decay quieter and Pitch lower, or slows to a stop. */
@@ -1393,6 +1397,557 @@ const Logic = {
     const A = io.in.a, B = io.in.b, o = io.out, t = io.p.thr;
     for (let i = 0; i < ctx.block; i++){ const a = A[i] >= t, b = B[i] >= t; o.and[i] = a && b ? 1 : 0; o.or[i] = a || b ? 1 : 0; o.xor[i] = a !== b ? 1 : 0; o.not[i] = a ? 0 : 1; }
   }
+};
+
+const Steps = {
+  type:'steps', scope:'mono', cost:.05,
+  inputs:{ clock:'gate', reset:'gate' }, outputs:{ out:'cv', gate:'gate' },
+  params:{ div:[3,0,9,1], len:[8,1,8,1], glide:[0,0,1,.01], depth:[1,0,1,.01],
+    s1:[0,-1,1,.01], s2:[0,-1,1,.01], s3:[0,-1,1,.01], s4:[0,-1,1,.01], s5:[0,-1,1,.01], s6:[0,-1,1,.01], s7:[0,-1,1,.01], s8:[0,-1,1,.01] },
+  create:() => ({ ph:0, step:0, y:0, c:0, r:0, sn:-1 }),
+  process(st, io, ctx){
+    const ext = linked(io, 'clock'), hz = ctx.transport.tempo / 60 / divBeats(io.p.div), n = io.p.len | 0 || 8;
+    const k = io.p.glide > 0 ? 1 - Math.exp(-1 / (ctx.sr * io.p.glide * .25 / hz)) : 1;
+    if (restarted(st, ctx)){ st.ph = 0; st.step = 0; }
+    for (let i = 0; i < ctx.block; i++){
+      const rs = io.in.reset[i] > .5; if (rs && !st.r){ st.ph = 0; st.step = 0; } st.r = rs;
+      if (ext){ const g = io.in.clock[i] > .5; if (g && !st.c){ st.step = (st.step + 1) % n; st.ph = 0; } st.c = g; }
+      else { st.ph += hz / ctx.sr; if (st.ph >= 1){ st.ph -= 1; st.step = (st.step + 1) % n; } }
+      if (st.step >= n) st.step = 0;
+      const tgt = io.p['s' + (st.step + 1)] * io.p.depth; st.y += (tgt - st.y) * k;
+      io.out.out[i] = st.y; io.out.gate[i] = ext ? (io.in.clock[i] > .5 ? 1 : 0) : (st.ph < .5 ? 1 : 0);
+    }
+  }
+};
+
+/* Clock: a gate every note value (with swing on every second one) and a ramp that rises 0→1 across each one.
+   The ramp, patched into a slider, scans it in time with the song: the tempo-synced ramp trick. */
+const Clock = {
+  type:'clock', scope:'mono', cost:.03,
+  inputs:{ reset:'gate' }, outputs:{ gate:'gate', ramp:'cv', bar:'cv' },
+  params:{ div:[3,0,9,1], swing:[0,0,.75,.01], width:[.5,.05,.95,.01], bars:[1,1,16,1] },
+  create:() => ({ ph:0, n:0, bp:0, r:0, sn:-1 }),
+  process(st, io, ctx){
+    const beats = divBeats(io.p.div), hz = ctx.transport.tempo / 60 / beats, sw = io.p.swing, w = io.p.width;
+    const barHz = ctx.transport.tempo / 60 / (4 * Math.max(1, io.p.bars | 0));
+    if (restarted(st, ctx)){ st.ph = 0; st.n = 0; st.bp = 0; }
+    for (let i = 0; i < ctx.block; i++){
+      const rs = io.in.reset[i] > .5; if (rs && !st.r){ st.ph = 0; st.n = 0; st.bp = 0; } st.r = rs;
+      st.ph += hz / ctx.sr; if (st.ph >= 1){ st.ph -= 1; st.n ^= 1; }
+      st.bp += barHz / ctx.sr; if (st.bp >= 1) st.bp -= 1;
+      // swing delays every second pulse by up to three quarters of a step
+      const off = st.n ? sw * .5 : 0, q = st.ph - off;
+      io.out.gate[i] = q >= 0 && q < w * (1 - off) ? 1 : 0;
+      io.out.ramp[i] = st.ph; io.out.bar[i] = st.bp;
+    }
+  }
+};
+
+/* CLOCK AND TRIGGER TOOLS (14 Nov, the owner's low-level module queue, group 2). A gate is high at 0.5 and above; every
+   one acts on the rising edge. 'poly' as the control maths above: per voice in …waves when a voice feeds them. */
+/* Clock multiplier: N evenly spaced pulses for every pulse in. It measures the time between the last two pulses, so it
+   follows a tempo change one pulse late; until it has seen two pulses it passes the clock through. Reset forgets the tempo. */
+const ClockMul = {
+  type:'clkmul', scope:'poly', cost:.03,
+  inputs:{ clock:'gate', reset:'gate' }, outputs:{ out:'gate' },
+  params:{ mul:[2,1,16,1], width:[.5,.05,.95,.01] },
+  create:() => ({ lc:0, lr:0, t:0, per:0, k:0, seen:0 }),
+  process(st, io, ctx){
+    const C = io.in.clock, Rs = io.in.reset, O = io.out.out, M = Math.max(1, io.p.mul | 0), w = io.p.width;
+    for (let i = 0; i < ctx.block; i++){
+      const r = Rs[i] >= .5; if (r && !st.lr){ st.seen = 0; st.per = 0; st.t = 0; } st.lr = r;
+      const c = C[i] >= .5;
+      if (c && !st.lc){ if (st.seen) st.per = st.t; st.seen = 1; st.t = 0; }
+      st.lc = c;
+      if (!st.seen) O[i] = 0;
+      else if (!(st.per > 0)) O[i] = c ? 1 : 0;   // one pulse seen: no tempo yet
+      else { const sub = st.per / M, k = Math.floor(st.t / sub); O[i] = k < M && st.t - k * sub < sub * w ? 1 : 0; }   // (k < M: a late pulse does not get extra ones)
+      st.t++;
+    }
+  }
+};
+/* Chance gate: each pulse in goes to Out with the Chance set, otherwise to Other. Seeded: the same Seed gives the same
+   run of choices every time, starting again at Reset and whenever the song starts, so a render matches what was heard.
+   Seed 0 is different every time. */
+const ChanceGate = {
+  type:'chance', scope:'poly', cost:.02,
+  inputs:{ in:'gate', reset:'gate' }, outputs:{ out:'gate', other:'gate' },
+  params:{ prob:[.5,0,1,.01], seed:[1,0,999,1] },
+  create:() => ({ s:0, sd:-1, lg:0, lr:0, pass:0, sn:-1, free:0 }),
+  process(st, io, ctx){
+    const G = io.in.in, Rs = io.in.reset, o = io.out, p = io.p.prob, sd = io.p.seed | 0;
+    if (restarted(st, ctx) || st.sd !== sd){ st.sd = sd; st.s = sd ? (Math.imul(sd, 2654435761) >>> 0) || 1 : st.free || (st.free = nextSeed() || 1); }   // (Seed 0 takes a number from the engine's counter the first time it is used, not when the module is made)
+    for (let i = 0; i < ctx.block; i++){
+      const r = Rs[i] >= .5; if (r && !st.lr && sd) st.s = (Math.imul(sd, 2654435761) >>> 0) || 1; st.lr = r;
+      const g = G[i] >= .5;
+      if (g && !st.lg){ let s = st.s; s ^= s << 13; s >>>= 0; s ^= s >>> 17; s ^= s << 5; s >>>= 0; st.s = s; if (!sd) st.free = s; st.pass = s / 4294967296 < p ? 1 : 0; }
+      st.lg = g;
+      o.out[i] = g && st.pass ? 1 : 0; o.other[i] = g && !st.pass ? 1 : 0;
+    }
+  }
+};
+/* Counter: counts pulses. Step is a staircase from 0 to 1 over Steps counts (patch it into Scale / map or a slider);
+   End is high during the last count, for chaining another counter or resetting something. Up, Down or Up and down. */
+const Counter = {
+  type:'counter', scope:'poly', cost:.02,
+  inputs:{ clock:'gate', reset:'gate' }, outputs:{ step:'cv', end:'gate' },
+  params:{ steps:[8,1,64,1], mode:[0,0,2,1] },
+  create:() => ({ c:-1, lc:0, lr:0, sn:-1 }),
+  process(st, io, ctx){
+    const C = io.in.clock, Rs = io.in.reset, o = io.out, N = Math.max(1, io.p.steps | 0), mode = io.p.mode | 0, L = mode === 2 && N > 1 ? 2 * N - 2 : N;
+    if (restarted(st, ctx)) st.c = -1;
+    for (let i = 0; i < ctx.block; i++){
+      const r = Rs[i] >= .5; if (r && !st.lr) st.c = -1; st.lr = r;
+      const c = C[i] >= .5; if (c && !st.lc) st.c = (st.c + 1) % L; st.lc = c;
+      const k = st.c < 0 ? 0 : st.c % L, pos = mode === 1 ? N - 1 - k : mode === 2 && k >= N ? L - k : k;
+      o.step[i] = N > 1 ? pos / (N - 1) : 0; o.end[i] = st.c >= 0 && k === L - 1 && c ? 1 : 0;
+    }
+  }
+};
+/* Step switch: up to four inputs, one at a time to Out; each pulse on Clock moves to the next, Reset goes back to the
+   first. Fade is a short crossfade at each change (0 is instant). */
+const StepSwitch = {
+  type:'stepsw', scope:'poly', cost:.04,
+  inputs:{ i1:'audio', i2:'audio', i3:'audio', i4:'audio', clock:'gate', reset:'gate' }, outputs:{ out:'audio' },
+  params:{ steps:[4,2,4,1], fade:[.005,0,.1,.001] },
+  create:() => ({ k:0, w0:1, w1:0, w2:0, w3:0, lc:0, lr:0, sn:-1 }),
+  process(st, io, ctx){
+    const I = io.in, C = I.clock, Rs = I.reset, O = io.out.out, N = clamp(io.p.steps | 0, 2, 4);
+    const step = io.p.fade > 0 ? 1 / Math.max(1, io.p.fade * ctx.sr) : 1;
+    if (restarted(st, ctx)) st.k = 0;
+    if (st.k >= N) st.k = 0;
+    // each input has its own share of the output, moving towards 1 (the chosen one) or 0 at Fade's speed: a change that comes
+    // in the middle of a fade carries on from where the shares are, so it cannot jump
+    let k = st.k, w0 = st.w0, w1 = st.w1, w2 = st.w2, w3 = st.w3;
+    for (let i = 0; i < ctx.block; i++){
+      const r = Rs[i] >= .5, c = C[i] >= .5;
+      if (r && !st.lr) k = 0; else if (c && !st.lc) k = (k + 1) % N;
+      st.lr = r; st.lc = c;
+      if (k === 0){ if (w0 < 1){ w0 += step; if (w0 > 1) w0 = 1; } } else if (w0 > 0){ w0 -= step; if (w0 < 0) w0 = 0; }
+      if (k === 1){ if (w1 < 1){ w1 += step; if (w1 > 1) w1 = 1; } } else if (w1 > 0){ w1 -= step; if (w1 < 0) w1 = 0; }
+      if (k === 2){ if (w2 < 1){ w2 += step; if (w2 > 1) w2 = 1; } } else if (w2 > 0){ w2 -= step; if (w2 < 0) w2 = 0; }
+      if (k === 3){ if (w3 < 1){ w3 += step; if (w3 > 1) w3 = 1; } } else if (w3 > 0){ w3 -= step; if (w3 < 0) w3 = 0; }
+      O[i] = w0 === 1 ? I.i1[i] : w1 === 1 ? I.i2[i] : w2 === 1 ? I.i3[i] : w3 === 1 ? I.i4[i] : I.i1[i] * w0 + I.i2[i] * w1 + I.i3[i] * w2 + I.i4[i] * w3;
+    }
+    st.k = k; st.w0 = w0; st.w1 = w1; st.w2 = w2; st.w3 = w3;
+  }
+};
+/* Burst: one pulse in → a run of Count pulses, Time apart. Bend pulls them closer together (above 0) or further apart
+   (below 0) as the run goes on, like a bouncing ball or its opposite. Level falls from 1 to 0 across the run (for a
+   fading roll). A new pulse in starts the run again. */
+const Burst = {
+  type:'burst', scope:'poly', cost:.03,
+  inputs:{ trig:'gate' }, outputs:{ out:'gate', level:'cv' },
+  params:{ count:[4,1,32,1], time:[.06,.005,1,.001], bend:[0,-1,1,.01], width:[.5,.05,.95,.01] },
+  create:() => ({ n:0, t:0, len:0, lt:0, of:0 }),
+  process(st, io, ctx){
+    const T = io.in.trig, o = io.out, N = Math.max(1, io.p.count | 0), base = Math.max(1, io.p.time * ctx.sr), w = io.p.width;
+    const ratio = Math.pow(2, -io.p.bend * 3 / Math.max(1, N - 1));   // by the last pulse the gap is 8 times shorter (Bend 1) or longer (Bend -1)
+    for (let i = 0; i < ctx.block; i++){
+      const g = T[i] >= .5;
+      if (g && !st.lt){ st.n = N; st.of = N; st.t = 0; st.len = base; }
+      st.lt = g;
+      if (st.n > 0){
+        o.out[i] = st.t < st.len * w ? 1 : 0; o.level[i] = st.of > 1 ? (st.n - 1) / (st.of - 1) : 1;
+        if (++st.t >= st.len){ st.t = 0; st.n--; st.len = Math.max(1, st.len * ratio); }
+      } else { o.out[i] = 0; o.level[i] = 0; }
+    }
+  }
+};
+/* Gate delay: the gate comes out Delay later. Length 0 keeps the gate's own length; above 0 every delayed gate lasts
+   that long (a short trigger from a long gate, or the other way round). Up to 2 seconds. */
+const GateDelay = {
+  type:'gatedly', scope:'poly', cost:.03,
+  inputs:{ in:'gate' }, outputs:{ out:'gate' },
+  params:{ delay:[.1,0,2,.001], length:[0,0,2,.001] },
+  create:sr => ({ b:new Uint8Array(Math.ceil(sr * 2) + 2), w:0, lo:0, hold:0 }),
+  process(st, io, ctx){
+    const G = io.in.in, O = io.out.out, B = st.b, M = B.length, d = clamp(Math.round(io.p.delay * ctx.sr), 0, M - 1), L = Math.round(io.p.length * ctx.sr);
+    for (let i = 0; i < ctx.block; i++){
+      B[st.w] = G[i] >= .5 ? 1 : 0;
+      let r = st.w - d; if (r < 0) r += M; const x = B[r];
+      if (++st.w >= M) st.w = 0;
+      if (L > 0){ if (x && !st.lo) st.hold = L; O[i] = st.hold > 0 ? 1 : 0; if (st.hold > 0) st.hold--; }
+      else { O[i] = x; st.hold = 0; }   // (Length 0: nothing is left waiting from an earlier setting)
+      st.lo = x;
+    }
+  }
+};
+/* Flip-flop: each pulse on Toggle turns Q over (on, off, on …): a gate at half the speed, or a switch that stays where
+   you leave it. Set turns it on, Reset turns it off. Not Q is its opposite. */
+const FlipFlop = {
+  type:'flipflop', scope:'poly', cost:.02,
+  inputs:{ toggle:'gate', set:'gate', reset:'gate' }, outputs:{ q:'gate', nq:'gate' },
+  params:{},
+  create:() => ({ q:0, lt:0, ls:0, lr:0, sn:-1 }),
+  process(st, io, ctx){
+    const T = io.in.toggle, S = io.in.set, Rs = io.in.reset, o = io.out;
+    if (restarted(st, ctx)) st.q = 0;
+    for (let i = 0; i < ctx.block; i++){
+      const t = T[i] >= .5, s = S[i] >= .5, r = Rs[i] >= .5;
+      if (t && !st.lt) st.q ^= 1;
+      if (s && !st.ls) st.q = 1;
+      if (r && !st.lr) st.q = 0;
+      st.lt = t; st.ls = s; st.lr = r;
+      o.q[i] = st.q; o.nq[i] = 1 - st.q;
+    }
+  }
+};
+
+/* SCOPE (14 Nov, module queue): draws what is on its inputs. Nothing comes out of it; it only watches, and it only runs
+   while the editor is watching (it is a probe: see ChainsEngine._active; the …waves engine skips probes while telemetry is off). A and B are two traces on the same time base.
+   One sweep is Time long and is kept as SCOPE_W columns, each the lowest and highest sample in its slice of time, so a
+   fast signal shows as a band, never as a lie. Trigger: Free (sweep after sweep), Rising (a sweep starts when A climbs
+   through Level, so a steady wave stands still; after two sweeps with no trigger it sweeps anyway) or Gate (when the
+   Trig input goes high). Freeze keeps the last picture. show(): [sweep number, B patched (1 / 0), then lowA, highA,
+   lowB, highB for each column, then the Time the picture was taken at], numbers to 3 places. */
+const SCOPE_W = 128;
+const Scope = {
+  type:'scope', scope:'mono', cost:.05, probe:true,
+  inputs:{ a:'audio', b:'audio', trig:'gate' }, outputs:{},
+  params:{ time:[.02,.001,2,.001], trig:[1,0,2,1], level:[0,-1,1,.01], freeze:[0,0,1,1], zoom:[1,.25,16,.25] },
+  create:() => ({ back:new Float32Array(SCOPE_W * 4), front:new Float32Array(SCOPE_W * 4), col:0, n:0, run:0, wait:0, la:0, lt:0, seq:0, hasB:0,
+    lo:1e9, hi:-1e9, lob:1e9, hib:-1e9, tm:0, shown:0, out:new Array(3 + SCOPE_W * 4).fill(0) }),
+  process(st, io, ctx){
+    const p = io.p, A = io.in.a, B = io.in.b, T = io.in.trig, mode = p.trig | 0, lvl = p.level;
+    const per = Math.max(1, p.time * ctx.sr / SCOPE_W), limit = Math.max(1, p.time * ctx.sr * 2);
+    st.hasB = io.linked && io.linked.has('b') ? 1 : 0;
+    if (st.tm !== p.time){ st.tm = p.time; st.run = 0; st.wait = 0; }   // Time changed: a sweep under way is dropped, so one picture never holds two time scales
+    if (p.freeze >= .5){ st.run = 0; st.wait = 0; st.la = A[ctx.block - 1]; st.lt = T[ctx.block - 1] >= .5 ? 1 : 0; return; }
+    for (let i = 0; i < ctx.block; i++){
+      const a = A[i], t = T[i] >= .5 ? 1 : 0;
+      if (!st.run){
+        const go = mode === 0 || (mode === 1 ? st.la < lvl && a >= lvl : t && !st.lt) || ++st.wait > limit;
+        if (go){ st.run = 1; st.col = 0; st.n = 0; st.wait = 0; st.lo = st.lob = 1e9; st.hi = st.hib = -1e9; }
+      }
+      st.la = a; st.lt = t;
+      if (st.run){
+        const b = B[i];
+        if (a < st.lo) st.lo = a; if (a > st.hi) st.hi = a; if (b < st.lob) st.lob = b; if (b > st.hib) st.hib = b;
+        if (++st.n >= per * (st.col + 1)){
+          const k = st.col * 4, K = st.back; K[k] = st.lo; K[k + 1] = st.hi; K[k + 2] = st.lob; K[k + 3] = st.hib;
+          st.lo = st.lob = 1e9; st.hi = st.hib = -1e9;
+          if (++st.col >= SCOPE_W){ const x = st.front; st.front = st.back; st.back = x; st.seq++; st.run = 0; st.shown = st.tm; }
+        }
+      }
+    }
+  },
+  show(st){
+    const o = st.out, F = st.front; o[0] = st.seq; o[1] = st.hasB;
+    for (let i = 0; i < SCOPE_W * 4; i++){ const v = F[i]; o[2 + i] = v === v && v > -1e6 && v < 1e6 ? Math.round(v * 1000) / 1000 : 0; }
+    o[2 + SCOPE_W * 4] = st.shown;   // the Time this picture was taken at (the slider may have moved since, or the picture be frozen)
+    return o;
+  }
+};
+
+/* AUDIO BUILDING BLOCKS (14 Nov, module queue): the small parts filters, phasers and reverbs are made of. One channel
+   each (patch two for stereo). 'poly' as the control maths: per voice in …waves when a voice feeds them. */
+/* One-pole filter: the gentlest filter there is (6 dB an octave). Low and High are its two halves; added together they
+   are the input again. Also a smoother for control signals. */
+const OnePole = {
+  type:'onepole', scope:'poly', cost:.03,
+  inputs:{ in:'audio' }, outputs:{ lp:'audio', hp:'audio' },
+  params:{ freq:[1000,5,20000,1] },
+  create:() => ({ y:0 }),
+  process(st, io, ctx){
+    const X = io.in.in, L = io.out.lp, Hh = io.out.hp, k = 1 - Math.exp(-6.283185307179586 * clamp(io.p.freq, 1, ctx.sr * .49) / ctx.sr); let y = st.y;
+    for (let i = 0; i < ctx.block; i++){ const x = X[i]; y += (x - y) * k; L[i] = y; Hh[i] = x - y; }
+    st.y = y === y && (y > 1e-20 || y < -1e-20) && y > -1e6 && y < 1e6 ? y : 0;
+  }
+};
+/* Allpass: every frequency passes at the same level; only the timing changes. Phase: a first-order one that turns the
+   phase round Freq (several in a row, mixed with the dry sound, make a phaser). Echo: a short delay with its own
+   feedback and feedforward (Time, Gain), the diffuser reverbs are built from; it smears a click without colouring a tone. */
+const AllpassM = {
+  type:'allpass', scope:'poly', cost:.05,
+  inputs:{ in:'audio' }, outputs:{ out:'audio' },
+  params:{ mode:[0,0,1,1], freq:[1000,20,20000,1], time:[.01,.0005,.1,.0001], gain:[.5,-.95,.95,.01] },
+  create:sr => ({ x1:0, y1:0, b:new Float32Array(Math.ceil(sr * .1) + 4), w:0 }),
+  process(st, io, ctx){
+    const X = io.in.in, O = io.out.out, p = io.p;
+    if (p.mode < .5){
+      const t = Math.tan(Math.PI * clamp(p.freq, 1, ctx.sr * .49) / ctx.sr), a = (t - 1) / (t + 1); let x1 = st.x1, y1 = st.y1;
+      for (let i = 0; i < ctx.block; i++){ const x = X[i], y = a * x + x1 - a * y1; x1 = x; y1 = y; O[i] = y; }
+      st.x1 = x1; st.y1 = y1 === y1 && (y1 > 1e-20 || y1 < -1e-20) && y1 > -1e6 && y1 < 1e6 ? y1 : 0;
+    } else {
+      const B = st.b, M = B.length, D = clamp(Math.round(p.time * ctx.sr), 1, M - 1), g = clamp(p.gain, -.95, .95); let w = st.w;
+      for (let i = 0; i < ctx.block; i++){
+        let r = w - D; if (r < 0) r += M; const d = B[r]; let v = X[i] + g * d;
+        if (!(v === v && v > -1e6 && v < 1e6)) v = 0; else if (v < 1e-20 && v > -1e-20) v = 0;
+        B[w] = v; O[i] = d - g * v; if (++w >= M) w = 0;
+      }
+      st.w = w;
+    }
+  }
+};
+/* DC blocker: takes out a constant offset (and anything below Freq) so a signal sits round zero again: after a
+   rectifier, a feedback loop or an asymmetric shaper. */
+const DCBlock = {
+  type:'dcblock', scope:'poly', cost:.02,
+  inputs:{ in:'audio' }, outputs:{ out:'audio' },
+  params:{ freq:[10,1,200,1] },
+  create:() => ({ x1:0, y1:0 }),
+  process(st, io, ctx){
+    const X = io.in.in, O = io.out.out, R = 1 - 6.283185307179586 * clamp(io.p.freq, 1, 200) / ctx.sr; let x1 = st.x1, y1 = st.y1;
+    for (let i = 0; i < ctx.block; i++){ const x = X[i], y = x - x1 + R * y1; x1 = x; y1 = y; O[i] = y; }
+    st.x1 = x1 === x1 ? x1 : 0; st.y1 = y1 === y1 && (y1 > 1e-20 || y1 < -1e-20) && y1 > -1e6 && y1 < 1e6 ? y1 : 0;
+  }
+};
+/* Mid / side: Encode turns left and right into mid (what both share) and side (what differs); Decode turns them back.
+   Encode, treat the two differently, Decode: that is how a stereo widener or a mid-only EQ is patched. Exact both ways. */
+const MidSide = {
+  type:'midside', scope:'poly', cost:.02,
+  inputs:{ in:'audio', inR:'audio' }, outputs:{ out:'audio', outR:'audio' },
+  params:{ mode:[0,0,1,1] },
+  create:() => ({}),
+  process(st, io, ctx){
+    const A = io.in.in, B = io.in.inR, O = io.out.out, P = io.out.outR;
+    if (io.p.mode < .5){ const R = io.linked && io.linked.has('inR') ? B : A; for (let i = 0; i < ctx.block; i++){ const l = A[i], r = R[i]; O[i] = (l + r) * .5; P[i] = (l - r) * .5; } }
+    else for (let i = 0; i < ctx.block; i++){ const m = A[i], sd = B[i]; O[i] = m + sd; P[i] = m - sd; }
+  }
+};
+
+/* DELAY LINE (14 Nov, module queue): a bare delay, from one sample to two seconds, with its own feedback. Out is only
+   the delayed sound (mix it with the dry yourself). Because the feedback is inside the module it is exact to the sample,
+   which a feedback cable (one block late) is not: at a few milliseconds it rings at a pitch (a comb, a plucked string:
+   1000 / Time in ms = the pitch in Hz), longer it echoes. The Time input moves the delay by up to ± Mod depth, sample by
+   sample (a chorus or flanger from an LFO). Feedback stops at 99%, and inside the loop the sound is limited the way a
+   feedback cable is (untouched inside -1..1, bent towards 2 above), so it cannot run away. Damp dulls each repeat. */
+const DelayLine = {
+  type:'dline', scope:'poly', cost:.12,
+  tail:p => (p.time + p.fine + p.depth) * .001,   // how long after its input stops it may still have something to say (…waves keeps a released voice awake that long)
+  inputs:{ in:'audio', tmod:'cv' }, outputs:{ out:'audio' },
+  params:{ time:[10,0,2000,.1], fine:[0,-1,1,.001], fb:[0,-.99,.99,.01], damp:[0,0,1,.01], depth:[0,0,50,.1] },
+  create(sr){ const N = 1 << Math.ceil(Math.log2(sr * 2.1 + 8)); return { b:new Float32Array(N), M:N - 1, w:0, d:-1, lp:0 }; },
+  process(st, io, ctx){
+    const p = io.p, sr = ctx.sr, X = io.in.in, T = io.in.tmod, O = io.out.out, B = st.b, M = st.M;
+    const want = clamp((p.time + p.fine) * .001 * sr, 1, sr * 2), dep = p.depth * .001 * sr, mod = dep > 0 && linked(io, 'tmod');
+    const fb = clamp(p.fb, -.99, .99), kd = 1 - p.damp * .95, ks = 1 - Math.exp(-1 / (sr * .02));
+    let d = st.d < 0 ? want : st.d, w = st.w, lp = st.lp;
+    for (let i = 0; i < ctx.block; i++){
+      d += (want - d) * ks;   // the slider glides (20 ms), so turning it bends the pitch instead of clicking
+      let dd = mod ? d + clamp(T[i], -1, 1) * dep : d; if (dd < 1) dd = 1; else if (dd > M - 4) dd = M - 4;
+      const pos = w - dd + M + 1, i0 = Math.floor(pos), f = pos - i0;
+      const xm = B[(i0 - 1) & M], x0 = B[i0 & M], x1 = B[(i0 + 1) & M], x2 = B[(i0 + 2) & M];
+      // 4-point Hermite between x0 and x1 (dd >= 1 keeps x1 at or before the newest sample written; x2 may be the one about to be overwritten, the oldest: at 1 sample f is 0 and it has no weight)
+      const c1 = .5 * (x1 - xm), c2 = xm - 2.5 * x0 + 2 * x1 - .5 * x2, c3 = .5 * (x2 - xm) + 1.5 * (x0 - x1);
+      const y = dd < 2 ? x0 + (x1 - x0) * f : ((c3 * f + c2) * f + c1) * f + x0;
+      lp += (y - lp) * kd;
+      let v = X[i] + lp * fb;
+      if (!(v > -1 && v < 1)){ if (v !== v || v === Infinity || v === -Infinity) v = 0; else if (v < 0) v = -1 - Math.tanh(-v - 1); else v = 1 + Math.tanh(v - 1); }
+      else if (v < 1e-20 && v > -1e-20) v = 0;
+      B[w] = v; w = (w + 1) & M;
+      O[i] = y;
+    }
+    st.d = d; st.w = w; st.lp = lp === lp && (lp > 1e-20 || lp < -1e-20) ? lp : 0;
+  }
+};
+
+/* EXPRESSION (14 Nov, module queue): a module whose sound is a line of maths you type. The text is NEVER run as code:
+   it is read character by character by the small parser below (numbers, names, the operators and functions listed,
+   brackets; nothing else exists), turned into a short list of steps, and one loop works those steps out for every
+   sample on a small stack of numbers. No loops in a formula, no way to reach anything outside it.
+   Names: a b c d (the four inputs, this sample), k1 k2 (the two sliders), t (seconds since the song started or the
+   module was made), y (this module's own previous output sample: a one-sample feedback, for filters and counters),
+   rnd (a new random number from -1 to 1 each sample), pi, sr (samples a second).
+   Operators, lowest first:  ?:   ||   &&   == != < <= > >=   + -   * / %   unary - !   ^ (to the power of).
+   A comparison gives 1 or 0. Dividing by 0 gives 0. && || and ?: work every side out (nothing has side effects).
+   Functions: sin cos tan tanh abs sqrt exp log floor ceil round sign fract (one value); min max pow mod (two);
+   clip(x, low, high), mix(a, b, amount) (three); tri(x) saw(x) sq(x): waves from -1 to 1 that repeat every 1
+   (saw(220 * t) is a 220 Hz saw).
+   Limits: 200 characters, 128 steps, 32 numbers on the stack. The result is held between -4 and 4; not-a-number is 0.
+   MathExpr.compile(text) → { err:0, pos:0, ops, args, n, depth, rnd } or { err:code, pos } (1 empty, 2 too long,
+   3 too complicated, 4 a character it does not know, 5 a name it does not know, 6 a bracket not closed, 7 the wrong
+   number of values for a function, 8 a value expected, 9 something left over after the formula, 10 not text).
+   mxRun(P, S, V) → the value; V = [a, b, c, d, k1, k2, t, y, pi, sr, rnd]. Neither makes anything per sample. */
+const MX_VARS = { a:0, b:1, c:2, d:3, k1:4, k2:5, t:6, y:7, pi:8, sr:9, rnd:10 };
+const MX_FUNCS = { sin:[20,1], cos:[21,1], tan:[22,1], tanh:[23,1], abs:[24,1], sqrt:[25,1], exp:[26,1], log:[27,1], floor:[28,1], ceil:[29,1], round:[30,1], sign:[31,1], fract:[32,1],
+  min:[33,2], max:[34,2], pow:[7,2], mod:[6,2], clip:[35,3], mix:[36,3], tri:[37,1], saw:[38,1], sq:[39,1] };
+const MX_DEFAULT = 'a * k1';
+class MathExpr {
+  static compile(src){
+    if (typeof src !== 'string') return { err:10, pos:0 };
+    if (src.length > 200) return { err:2, pos:200 };
+    const ops = [], args = []; let i = 0, depth = 0, maxDepth = 0, err = 0, epos = 0, rnd = false, level = 0;
+    const fail = (c, p) => { if (!err){ err = c; epos = p; } return false; };
+    const emit = (op, arg, d) => { if (ops.length >= 128) return fail(3, i); ops.push(op); args.push(arg || 0); depth += d; if (depth > maxDepth) maxDepth = depth; if (maxDepth > 32) return fail(3, i); return true; };
+    const ws = () => { while (i < src.length && (src[i] === ' ' || src[i] === '\t' || src[i] === '\n' || src[i] === '\r')) i++; };
+    const eat = tok => { ws(); if (src.startsWith(tok, i)){ i += tok.length; return true; } return false; };
+    const isD = ch => ch >= '0' && ch <= '9', isA = ch => (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || ch === '_';
+    const primary = () => {
+      ws(); if (i >= src.length) return fail(8, i);
+      const ch = src[i], p0 = i;
+      if (isD(ch) || (ch === '.' && isD(src[i + 1] || ''))){
+        let j = i; while (j < src.length && isD(src[j])) j++; if (src[j] === '.'){ j++; while (j < src.length && isD(src[j])) j++; }
+        if ((src[j] === 'e' || src[j] === 'E') && (isD(src[j + 1] || '') || ((src[j + 1] === '-' || src[j + 1] === '+') && isD(src[j + 2] || '')))){ j += 2; while (j < src.length && isD(src[j])) j++; }
+        const v = Number(src.slice(i, j)); i = j; return emit(0, v === v ? v : 0, 1);
+      }
+      if (isA(ch)){
+        let j = i; while (j < src.length && (isA(src[j]) || isD(src[j]))) j++; const name = src.slice(i, j).toLowerCase(); i = j; ws();
+        if (src[i] === '('){
+          const fn = Object.prototype.hasOwnProperty.call(MX_FUNCS, name) ? MX_FUNCS[name] : null; if (!fn) return fail(5, p0);
+          i++; if (++level > 24) return fail(3, i); let n = 0; ws();
+          if (src[i] !== ')'){ for (;;){ if (!ternary()) return false; n++; ws(); if (src[i] === ','){ i++; continue; } break; } }
+          if (src[i] !== ')') return fail(6, i); i++; level--;
+          if (n !== fn[1]) return fail(7, p0);
+          return emit(fn[0], 0, 1 - n);
+        }
+        if (!Object.prototype.hasOwnProperty.call(MX_VARS, name)) return fail(5, p0);
+        if (name === 'rnd') rnd = true; return emit(1, MX_VARS[name], 1);
+      }
+      if (ch === '('){ i++; if (++level > 24) return fail(3, i); if (!ternary()) return false; ws(); if (src[i] !== ')') return fail(6, i); i++; level--; return true; }
+      return fail(isA(ch) || isD(ch) || '+-*/%^<>=!&|?:(),.'.includes(ch) ? 8 : 4, i);
+    };
+    const power = () => { if (!primary()) return false; ws(); if (src[i] === '^'){ i++; if (!unary()) return false; return emit(7, 0, -1); } return true; };   // right to left; -2 ^ 2 is -(2 ^ 2)
+    const unary = () => { ws(); if (src[i] === '-'){ i++; if (++level > 24) return fail(3, i); if (!unary()) return false; level--; return emit(8, 0, 0); } if (src[i] === '+'){ i++; return unary(); }
+      if (src[i] === '!' && src[i + 1] !== '='){ i++; if (++level > 24) return fail(3, i); if (!unary()) return false; level--; return emit(9, 0, 0); } return power(); };
+    const mul = () => { if (!unary()) return false; for (;;){ ws(); const ch = src[i]; if (ch === '*' || ch === '/' || ch === '%'){ i++; if (!unary()) return false; if (!emit(ch === '*' ? 4 : ch === '/' ? 5 : 6, 0, -1)) return false; } else return true; } };
+    const add = () => { if (!mul()) return false; for (;;){ ws(); const ch = src[i]; if (ch === '+' || ch === '-'){ i++; if (!mul()) return false; if (!emit(ch === '+' ? 2 : 3, 0, -1)) return false; } else return true; } };
+    const cmp = () => { if (!add()) return false; for (;;){ ws(); let op = 0;
+      if (eat('<=')) op = 11; else if (eat('>=')) op = 13; else if (eat('==')) op = 14; else if (eat('!=')) op = 15; else if (src[i] === '<'){ i++; op = 10; } else if (src[i] === '>'){ i++; op = 12; } else return true;
+      if (!add()) return false; if (!emit(op, 0, -1)) return false; } };
+    const and = () => { if (!cmp()) return false; for (;;){ if (eat('&&')){ if (!cmp()) return false; if (!emit(16, 0, -1)) return false; } else return true; } };
+    const or = () => { if (!and()) return false; for (;;){ if (eat('||')){ if (!and()) return false; if (!emit(17, 0, -1)) return false; } else return true; } };
+    const ternary = () => { if (!or()) return false; ws(); if (src[i] === '?'){ i++; if (++level > 24) return fail(3, i); if (!ternary()) return false; ws(); if (src[i] !== ':') return fail(8, i); i++; if (!ternary()) return false; level--; return emit(18, 0, -2); } return true; };
+    ws(); if (i >= src.length) return { err:1, pos:0 };
+    if (!ternary()) return { err:err || 8, pos:epos };
+    ws(); if (i < src.length) return { err:'+-*/%^<>=!&|?:(),.'.includes(src[i]) || isA(src[i]) || isD(src[i]) ? 9 : 4, pos:i };
+    return { err:0, pos:0, ops:Uint8Array.from(ops), args:Float64Array.from(args), n:ops.length, depth:maxDepth, rnd };
+  }
+}
+function mxRun(P, S, V){
+  const ops = P.ops, args = P.args, n = P.n; let sp = 0;
+  for (let k = 0; k < n; k++){
+    const op = ops[k];
+    if (op === 0) S[sp++] = args[k];
+    else if (op === 1) S[sp++] = V[args[k]];
+    else if (op < 8 || (op >= 10 && op <= 17) || op === 33 || op === 34){
+      const b = S[--sp], a = S[sp - 1]; let r;
+      switch (op){ case 2: r = a + b; break; case 3: r = a - b; break; case 4: r = a * b; break; case 5: r = b === 0 ? 0 : a / b; break; case 6: r = b === 0 ? 0 : a - b * Math.floor(a / b); break; case 7: r = Math.pow(a, b); break;
+        case 10: r = a < b ? 1 : 0; break; case 11: r = a <= b ? 1 : 0; break; case 12: r = a > b ? 1 : 0; break; case 13: r = a >= b ? 1 : 0; break; case 14: r = a === b ? 1 : 0; break; case 15: r = a !== b ? 1 : 0; break;
+        case 16: r = a !== 0 && b !== 0 ? 1 : 0; break; case 17: r = a !== 0 || b !== 0 ? 1 : 0; break; case 33: r = a < b ? a : b; break; default: r = a > b ? a : b; }
+      S[sp - 1] = r;
+    }
+    else if (op === 18){ const c = S[--sp], b = S[--sp]; S[sp - 1] = S[sp - 1] !== 0 ? b : c; }
+    else if (op === 35){ const hi = S[--sp], lo = S[--sp], x = S[sp - 1]; S[sp - 1] = x < lo ? lo : x > hi ? hi : x; }
+    else if (op === 36){ const m = S[--sp], b = S[--sp], a = S[sp - 1]; S[sp - 1] = a + (b - a) * m; }
+    else {
+      const x = S[sp - 1]; let r;
+      switch (op){ case 8: r = -x; break; case 9: r = x === 0 ? 1 : 0; break; case 20: r = Math.sin(x); break; case 21: r = Math.cos(x); break; case 22: r = Math.tan(x); break; case 23: r = Math.tanh(x); break;
+        case 24: r = x < 0 ? -x : x; break; case 25: r = x > 0 ? Math.sqrt(x) : 0; break; case 26: r = Math.exp(x); break; case 27: r = x > 1e-300 ? Math.log(x) : 0; break; case 28: r = Math.floor(x); break; case 29: r = Math.ceil(x); break;
+        case 30: r = Math.round(x); break; case 31: r = x > 0 ? 1 : x < 0 ? -1 : 0; break; case 32: r = x - Math.floor(x); break;
+        case 37: { const f = x - Math.floor(x); r = f < .5 ? 4 * f - 1 : 3 - 4 * f; break; } case 38: r = 2 * (x - Math.floor(x)) - 1; break; default: r = x - Math.floor(x) < .5 ? 1 : -1; }
+      S[sp - 1] = r;
+    }
+  }
+  return S[0];
+}
+const Expression = {
+  type:'expr', scope:'poly', cost:.25, text:true,
+  inputs:{ a:'audio', b:'audio', c:'cv', d:'cv' }, outputs:{ out:'audio' },
+  params:{ k1:[1,-4,4,.001], k2:[0,-4,4,.001] },
+  create:() => ({ src:null, prog:null, err:0, pos:0, n:0, y:0, rs:0, sn:-1, S:new Float64Array(40), V:new Float64Array(11), out:[0, 0] }),
+  process(st, io, ctx){
+    const txt = io.inst && typeof io.inst.text === 'string' ? io.inst.text : MX_DEFAULT, O = io.out.out;
+    if (st.src !== txt){ st.src = txt; st.prog = MathExpr.compile(txt); st.err = st.prog.err; st.pos = st.prog.pos; st.y = 0; }   // (only when the text changes: the one place this module makes anything)
+    if (restarted(st, ctx)) st.n = 0;
+    const P = st.prog; if (P.err){ for (let i = 0; i < ctx.block; i++) O[i] = 0; return; }
+    const A = io.in.a, B = io.in.b, C = io.in.c, D = io.in.d, V = st.V, S = st.S, sr = ctx.sr, useR = P.rnd; let y = st.y, n = st.n, rs = st.rs || (useR ? (st.rs = nextSeed() || 1) : 0);
+    V[4] = io.p.k1; V[5] = io.p.k2; V[8] = Math.PI; V[9] = sr;
+    for (let i = 0; i < ctx.block; i++){
+      V[0] = A[i]; V[1] = B[i]; V[2] = C[i]; V[3] = D[i]; V[6] = n / sr; V[7] = y;
+      if (useR){ rs ^= rs << 13; rs >>>= 0; rs ^= rs >>> 17; rs ^= rs << 5; rs >>>= 0; V[10] = rs / 2147483648 - 1; }
+      y = mxRun(P, S, V);
+      if (!(y > -4)) y = y < 0 ? -4 : 0; else if (y > 4) y = 4;   // (not-a-number fails both tests: 0)
+      O[i] = y; n++;
+    }
+    st.y = y; st.n = n; st.rs = rs;
+  },
+  show(st){ st.out[0] = st.err; st.out[1] = st.pos; return st.out; }
+};
+
+/* CONTROL MATHS (14 Nov, the owner's low-level module queue, group 1). Small sample-accurate blocks for control and
+   audio alike. They are 'poly' so that in …waves one fed by a voice runs once per voice (in …chains scope means nothing).
+   Add, subtract, multiply, min and max are Math's outputs; AND / OR / XOR / NOT are Logic's. */
+/* Invert / rectify: one signal in → its mirror, its absolute value, and its positive and negative halves (both as positive values). */
+const Rectify = {
+  type:'rect', scope:'poly', cost:.02,
+  inputs:{ in:'cv' }, outputs:{ inv:'cv', abs:'cv', pos:'cv', neg:'cv' },
+  params:{},
+  create:() => ({}),
+  process(st, io, ctx){
+    const X = io.in.in, o = io.out;
+    for (let i = 0; i < ctx.block; i++){ const x = X[i]; o.inv[i] = -x; o.abs[i] = x < 0 ? -x : x; o.pos[i] = x > 0 ? x : 0; o.neg[i] = x < 0 ? -x : 0; }
+  }
+};
+/* Scale / map: the range In low..In high becomes Out low..Out high (a straight line through both points, so swapping
+   the Out ends turns it over). Clip holds the result inside the Out range. In low = In high gives Out low. */
+const ScaleMap = {
+  type:'scale', scope:'poly', cost:.02,
+  inputs:{ in:'cv' }, outputs:{ out:'cv' },
+  params:{ ilo:[-1,-1,1,.01], ihi:[1,-1,1,.01], olo:[0,-1,1,.01], ohi:[1,-1,1,.01], clip:[1,0,1,1] },
+  create:() => ({}),
+  process(st, io, ctx){
+    const p = io.p, X = io.in.in, O = io.out.out, d = p.ihi - p.ilo, k = d > 1e-6 || d < -1e-6 ? (p.ohi - p.olo) / d : 0, a = p.ilo, b = p.olo;
+    const lo = p.olo < p.ohi ? p.olo : p.ohi, hi = p.olo < p.ohi ? p.ohi : p.olo, clip = p.clip >= .5;
+    for (let i = 0; i < ctx.block; i++){ let y = b + (X[i] - a) * k; if (clip){ if (y < lo) y = lo; else if (y > hi) y = hi; } O[i] = y; }
+  }
+};
+/* Comparator: is A above B (plus Level)? Gates A > B and its opposite. Hysteresis is a dead band around the level, so a
+   signal hovering at it does not chatter: the gate goes high above level + half the band and low below level - half. */
+const Comparator = {
+  type:'compare', scope:'poly', cost:.02,
+  inputs:{ a:'cv', b:'cv' }, outputs:{ gt:'gate', lt:'gate' },
+  params:{ thr:[0,-1,1,.01], hyst:[.02,0,.5,.01] },
+  create:() => ({ s:0 }),
+  process(st, io, ctx){
+    const A = io.in.a, B = io.in.b, o = io.out, t = io.p.thr, h = io.p.hyst * .5; let s = st.s;
+    for (let i = 0; i < ctx.block; i++){ const d = A[i] - B[i] - t; if (d > h) s = 1; else if (!(d >= -h) || !(h > 0)) s = 0;   /* below the band, not a number, or no band at all: with Hysteresis 0 it is a plain A > B */ o.gt[i] = s; o.lt[i] = 1 - s; }
+    st.s = s;
+  }
+};
+/* Switch: A or B to Out. The Pick switch chooses; a gate on Select chooses the other one while it is high. Fade is the
+   time the change takes (a short crossfade, so audio does not click; 0 is instant, for control signals). */
+const Switch2 = {
+  type:'switch', scope:'poly', cost:.03,
+  inputs:{ a:'audio', b:'audio', sel:'gate' }, outputs:{ out:'audio' },
+  params:{ pick:[0,0,1,1], fade:[.005,0,.1,.001] },
+  create:() => ({ g:-1 }),
+  process(st, io, ctx){
+    const A = io.in.a, B = io.in.b, S = io.in.sel, O = io.out.out, base = io.p.pick >= .5 ? 1 : 0;
+    const step = io.p.fade > 0 ? 1 / Math.max(1, io.p.fade * ctx.sr) : 1; let g = st.g;
+    if (g < 0) g = (S[0] >= .5 ? 1 - base : base);   // the first block starts where it is, with no fade from A
+    for (let i = 0; i < ctx.block; i++){
+      const want = S[i] >= .5 ? 1 - base : base;
+      if (g < want){ g += step; if (g > want) g = want; } else if (g > want){ g -= step; if (g < want) g = want; }
+      O[i] = g <= 0 ? A[i] : g >= 1 ? B[i] : A[i] + (B[i] - A[i]) * g;
+    }
+    st.g = g;
+  }
+};
+/* Crossfade: a mix of A and B. Mix is the slider plus the Mix input (0..1 moves it from A to B, sample by sample).
+   Curve: Straight adds up to the same level for signals that are alike (and for control); Equal power keeps the loudness of two different sounds even through the middle. */
+const Crossfade = {
+  type:'xfade', scope:'poly', cost:.03,
+  inputs:{ a:'audio', b:'audio', mixin:'cv' }, outputs:{ out:'audio' },
+  params:{ mix:[.5,0,1,.01], curve:[0,0,1,1] },
+  create:() => ({}),
+  process(st, io, ctx){
+    const A = io.in.a, B = io.in.b, C = io.in.mixin, O = io.out.out, m = io.p.mix, eq = io.p.curve >= .5;
+    for (let i = 0; i < ctx.block; i++){
+      let x = m + C[i]; if (!(x > 0)) x = 0; else if (x > 1) x = 1;
+      if (eq){ const t = x * 1.5707963267948966; O[i] = A[i] * Math.cos(t) + B[i] * Math.sin(t); }
+      else O[i] = A[i] + (B[i] - A[i]) * x;
+    }
+  }
+};
+/* Constant: a steady value (Value + Fine), for an offset, a threshold or a fixed level. */
+const Constant = {
+  type:'const', scope:'poly', cost:.01,
+  inputs:{}, outputs:{ out:'cv' },
+  params:{ value:[0,-1,1,.01], fine:[0,-.01,.01,.0001] },
+  create:() => ({}),
+  process(st, io, ctx){ io.out.out.fill(io.p.value + io.p.fine); }
 };
 
 /* Divider: counts Clock in and gates every 2nd, 4th, 8th and Nth pulse (each output stays high for the length of
@@ -4952,6 +5507,9 @@ const SHARED_MODULES = { beads:Beads,
   comb:CombFx, transient:TransientFx, tgate:TgateFx, ott:OttFx, fshift:FshiftFx, vinyl:VinylFx, dub:DubFx, cab:CabFx, tube:TubeFx,
   envfol:EnvFol, gateex:GateEx, pitchfol:PitchFol, pitchtrk:PitchTrk, slew:Slew, snh:SampleHold, quant:Quant, blades:Blades, meta:Meta, phaser:Phaser, width:Width, pingpong:PingPong,
   meter:Meter, limiter:Limiter, utility:Utility, ringmod:RingMod, spring:Spring, plate:Plate, lverb:Lverb, ensemble:Ensemble, math:MathM, logic:Logic, divider:Divider, euclid:Euclid,
+  rect:Rectify, scale:ScaleMap, compare:Comparator, switch:Switch2, xfade:Crossfade, const:Constant,
+  steps:Steps, clock:Clock, clkmul:ClockMul, chance:ChanceGate, counter:Counter, stepsw:StepSwitch, burst:Burst, gatedly:GateDelay, flipflop:FlipFlop, scope:Scope,
+  onepole:OnePole, allpass:AllpassM, dcblock:DCBlock, midside:MidSide, dline:DelayLine, expr:Expression,
   dimension:Dimension, bbd:BBD, harm:Harmonizer, blipdrum:BlipDrum, life:Life, degrade:Degrade, reson:Reson,
   flex:FlexM, sgate:StepGateM, retrig:RetrigM, pdelay:PDelayM, preverb:PReverbM,
   spectral:Spectral, stretch:XStretch, convolve:Convolve,
@@ -5031,14 +5589,142 @@ function pumpModule(key, d){
 }
 const PUMP_MODULES = {}; for (const k in PUMP_CH) PUMP_MODULES[k] = pumpModule(k, PUMP_CH[k]);
 /* ===PUMP MODULES END=== */
+/* MORPH (14 Nov, module queue; …chains only): two stereo sounds, A and B, combined frame by frame in the frequency
+   domain. Each frame (Frame samples, a new one every quarter frame) of each input is turned into its spectrum; a new
+   spectrum is made from the two and turned back into sound. It is one frame late (the def's latency says the default's;
+   show() the real one), about 11, 21 or 43 ms at 48 kHz.
+   Mode Convolve: the two spectra's strengths are multiplied, so only what both sounds have at the same frequency at the
+   same moment is heard (cross-synthesis); the partials keep A's phases. Sharpness is the power the product is raised
+   to: low keeps more of each sound, high leaves only the strongest shared partials. One side silent: silence.
+   Mode Shape: B's spectral shape (its formants, the outline of its spectrum) is put on A's own partials, the way a
+   vocoder does, so A always sounds, with B's vowel. Sharpness is how fine an outline is taken (low: broad, high: every
+   bump). B silent: A as it is.
+   Morph: 0 is A alone, the middle the combined sound, 1 B alone (all three one frame late, so they line up).
+   Smoothing: how slowly the spectra are allowed to change (0: frame by frame; up: a wash). Freeze holds A's or B's
+   spectrum as it is now (its partials keep turning, so it sustains instead of buzzing).
+   Level: in Convolve what the two share comes out about as loud as they are and the rest falls away (no make-up gain: it
+   would turn up what they do not share); in Shape the frame is given A's own loudness (at most 30 dB of lift). Then
+   everything leaves through a limiter (untouched inside -1..1, bent towards 2 above).
+   Cost: per frame and channel two transforms in and one out; the right channel's frames fall half a hop after the
+   left's so no block does both; with nothing patched into either right input only one channel is worked out. */
+const MORPH_SIZES = [512, 1024, 2048];
+const morphChan = () => ({ fa:new Float32Array(2048), fb:new Float32Array(2048), acc:new Float32Array(2048), oq:new Float32Array(512), x:new Float32Array(2048),
+  ar:new Float32Array(1025), ai:new Float32Array(1025), br:new Float32Array(1025), bi:new Float32Array(1025), yr:new Float32Array(1025), yi:new Float32Array(1025),
+  ma:new Float32Array(1025), mb:new Float32Array(1025), pa:new Float32Array(1025), pb:new Float32Array(1025), da:new Float32Array(1025), db:new Float32Array(1025),
+  qa:new Float32Array(1025), qb:new Float32Array(1025), ta:new Float32Array(1025), tb:new Float32Array(1025), ea:new Float32Array(1026), eb:new Float32Array(1026), g:1, has:0 });
+const MorphM = {
+  type:'morph', scope:'mono', cost:1.2, latency:1024,
+  inputs:{ in:'audio', inR:'audio', inB:'audio', inBR:'audio' }, outputs:{ out:'audio', outR:'audio' },
+  params:{ mode:[0,0,1,1], morph:[.5,0,1,.01], sharp:[.5,0,1,.01], smooth:[.2,0,1,.01], frame:[1,0,2,1], freeze:[0,0,2,1], level:[0,-24,24,.1] },
+  create:() => ({ c:[morphChan(), morphChan()], N:0, cl:0, cr:0, W:null, fft:null, fz:0, out:[0, 0] }),
+  process(st, io, ctx){
+    const p = io.p, N = MORPH_SIZES[clamp(p.frame | 0, 0, 2)], H = N >> 2, c0 = st.c[0], c1 = st.c[1];
+    if (st.N !== N){   // a new frame size: start clean (the only time anything is looked up; the tables are kept per size)
+      st.N = N; st.W = MORPH_WIN[N] || (MORPH_WIN[N] = hannWin(N)); st.fft = FFTR.get(N); st.cl = 0; st.cr = H >> 1;
+      for (const c of st.c){ c.fa.fill(0); c.fb.fill(0); c.acc.fill(0); c.oq.fill(0); c.ma.fill(0); c.mb.fill(0); c.pa.fill(1); c.pb.fill(1); c.da.fill(1); c.db.fill(1); c.ta.fill(0); c.tb.fill(0); c.qa.fill(0); c.qb.fill(0); c.g = 1; c.has = 0; }
+    }
+    const A = io.in.in, Bn = io.in.inB, sA = linked(io, 'inR'), sB = linked(io, 'inBR'), stereo = sA || sB;
+    const AR = sA ? io.in.inR : A, BR = sB ? io.in.inBR : Bn, oL = io.out.out, oR = io.out.outR, lv = dbLin(clamp(p.level, -24, 24));
+    const mode = p.mode >= .5 ? 1 : 0, mo = clamp(p.morph, 0, 1), sh = clamp(p.sharp, 0, 1), fz = clamp(p.freeze | 0, 0, 2);
+    const ks = p.smooth < .005 ? 1 : 1 - Math.exp(-H / (ctx.sr * (.004 + p.smooth * p.smooth * .6)));   // Smoothing: none at 0, then 4 ms to 0.6 s
+    let cl = st.cl, cr = st.cr;
+    for (let i = 0; i < ctx.block; i++){
+      const a = A[i], b = Bn[i];
+      c0.fa[N - H + cl] = a > -8 && a < 8 ? a : 0; c0.fb[N - H + cl] = b > -8 && b < 8 ? b : 0;
+      let y = c0.oq[cl] * lv; if (!(y > -1 && y < 1)){ if (y !== y) y = 0; else if (y < 0) y = -1 - Math.tanh(-y - 1); else y = 1 + Math.tanh(y - 1); }
+      oL[i] = y;
+      if (++cl === H){ cl = 0; morphFrame(st, c0, N, mode, mo, sh, ks, fz); }
+      if (stereo){
+        const ar = AR[i], br = BR[i];
+        c1.fa[N - H + cr] = ar > -8 && ar < 8 ? ar : 0; c1.fb[N - H + cr] = br > -8 && br < 8 ? br : 0;
+        let z = c1.oq[cr] * lv; if (!(z > -1 && z < 1)){ if (z !== z) z = 0; else if (z < 0) z = -1 - Math.tanh(-z - 1); else z = 1 + Math.tanh(z - 1); }
+        oR[i] = z;
+        if (++cr === H){ cr = 0; morphFrame(st, c1, N, mode, mo, sh, ks, fz); }
+      } else oR[i] = y;
+    }
+    st.cl = cl; st.cr = cr; st.fz = fz;
+  },
+  show(st){ st.out[0] = st.N; st.out[1] = st.fz; return st.out; }
+};
+const MORPH_WIN = {};
+/* One frame of one channel. No angle is ever worked out: a partial's phase is kept as a point on the unit circle
+   (ua / va for A, ub / vb for B), and while a side is frozen each point is turned by the step it took between its last two
+   live frames (ra / sa, rb / sb), so a held spectrum goes on sounding its partials at their own pitches. */
+function morphFrame(st, c, N, mode, mo, sh, ks, fz){
+  const H = N >> 2, K = (N >> 1) + 1, W = st.W, x = c.x, fft = st.fft, ar = c.ar, ai = c.ai, br = c.br, bi = c.bi, yr = c.yr, yi = c.yi;
+  const ma = c.ma, mb = c.mb, ua = c.pa, va = c.qa, ra = c.da, sa = c.ta, ub = c.pb, vb = c.qb, rb = c.db, sb = c.tb;
+  for (let i = 0; i < N; i++) x[i] = c.fa[i] * W[i]; fft.forward(x, ar, ai);
+  for (let i = 0; i < N; i++) x[i] = c.fb[i] * W[i]; fft.forward(x, br, bi);
+  c.fa.copyWithin(0, H, N); c.fb.copyWithin(0, H, N);
+  const first = !c.has, holdA = fz === 1 && !first, holdB = fz === 2 && !first; c.has = 1;
+  let pkA = 0, pkB = 0, EA = 0, EB = 0;
+  for (let k = 0; k < K; k++){
+    if (holdA){ const u = ua[k] * ra[k] - va[k] * sa[k], v = ua[k] * sa[k] + va[k] * ra[k], n = u * u + v * v, q = n > 1e-30 ? 1 / Math.sqrt(n) : 0; ua[k] = u * q; va[k] = v * q; }
+    else {
+      const re = ar[k], im = ai[k], a = Math.sqrt(re * re + im * im), q = a > 1e-20 ? 1 / a : 0, u = q ? re * q : 1, v = im * q;
+      ra[k] = u * ua[k] + v * va[k]; sa[k] = v * ua[k] - u * va[k]; ua[k] = u; va[k] = v;   // this frame's point times the last one's mirror: the step between them
+      let m = ma[k] + (a - ma[k]) * ks; if (m < 1e-15) m = 0; ma[k] = m;
+    }
+    if (holdB){ const u = ub[k] * rb[k] - vb[k] * sb[k], v = ub[k] * sb[k] + vb[k] * rb[k], n = u * u + v * v, q = n > 1e-30 ? 1 / Math.sqrt(n) : 0; ub[k] = u * q; vb[k] = v * q; }
+    else {
+      const re = br[k], im = bi[k], b = Math.sqrt(re * re + im * im), q = b > 1e-20 ? 1 / b : 0, u = q ? re * q : 1, v = im * q;
+      rb[k] = u * ub[k] + v * vb[k]; sb[k] = v * ub[k] - u * vb[k]; ub[k] = u; vb[k] = v;
+      let m = mb[k] + (b - mb[k]) * ks; if (m < 1e-15) m = 0; mb[k] = m;
+    }
+    const A2 = ma[k], B2 = mb[k]; if (A2 > pkA) pkA = A2; if (B2 > pkB) pkB = B2; EA += A2 * A2; EB += B2 * B2;
+  }
+  // the three parts of Morph: A alone, the combined sound, B alone
+  const wA = mo < .5 ? 1 - mo * 2 : 0, wB = mo > .5 ? mo * 2 - 1 : 0, wC = 1 - wA - wB;
+  let g = 0;
+  if (wC > 0){
+    if (mode === 0){
+      // Convolve: (|A| |B|) ^ e, e from 0.5 (the geometric mean of the two) to 1.5, brought back to the size of a magnitude by the
+      // two spectra's own peaks: where both peak together it is as loud as they are, where only one has anything it is next to nothing
+      // (no make-up gain: that would turn up exactly what the two do NOT share). It keeps A's phases.
+      const e = .5 + sh, ref = pkA * pkB;
+      if (!(ref > 1e-30)) for (let k = 0; k < K; k++) yr[k] = 0;
+      else if (e > .999 && e < 1.001){ const nrm = 1 / Math.sqrt(ref); for (let k = 0; k < K; k++) yr[k] = ma[k] * mb[k] * nrm; }
+      else { const nrm = Math.pow(ref, .5 - e); for (let k = 0; k < K; k++){ const m = ma[k] * mb[k]; yr[k] = m > 1e-30 ? Math.pow(m, e) * nrm : 0; } }
+      g = 1;
+    } else {
+      // Shape: the outline of each spectrum is its magnitudes averaged over a few bins either side (fewer the sharper); A keeps its
+      // own fine detail (A / A's outline) and takes B's outline, scaled so the frame is as loud as A was
+      const hw = Math.max(1, Math.round((2 + (1 - sh) * 30) * N / 1024)), ea = c.ea, eb = c.eb;
+      ea[0] = 0; eb[0] = 0; for (let k = 0; k < K; k++){ ea[k + 1] = ea[k] + ma[k]; eb[k + 1] = eb[k] + mb[k]; }
+      let Er = 0; const useB = EB > 1e-18, fla = ea[K] / K * .02 + 1e-12, flb = eb[K] / K * .02;
+      for (let k = 0; k < K; k++){
+        const lo = k - hw < 0 ? 0 : k - hw, hi = k + hw + 1 > K ? K : k + hw + 1, n = hi - lo, oa = (ea[hi] - ea[lo]) / n, ob = (eb[hi] - eb[lo]) / n;
+        const v = useB ? ma[k] / (oa + fla) * (ob + flb) : ma[k]; yr[k] = v; Er += v * v;   // (the floors: an outline never goes to nothing, so A always sounds)
+      }
+      g = Er > 1e-30 ? Math.min(32, Math.sqrt(EA / Er)) : 0;
+    }
+    // the level moves smoothly from frame to frame (a sudden match would pump)
+    if (c.gm !== mode){ c.gm = mode; c.g = g; }   // a new Mode starts at its own level: Shape's lift (up to 32) must not ride into Convolve (review, #132)
+    c.g += (g - c.g) * .5; if (!(c.g <= 32)) c.g = c.g > 32 ? 32 : 0; g = c.g * wC;
+  }
+  for (let k = 0; k < K; k++){
+    let re = 0, im = 0;
+    if (wC > 0){ const m = yr[k] * g; re = m * ua[k]; im = m * va[k]; }
+    if (wA > 0){ if (holdA){ const m = ma[k] * wA; re += m * ua[k]; im += m * va[k]; } else { re += ar[k] * wA; im += ai[k] * wA; } }
+    if (wB > 0){ if (holdB){ const m = mb[k] * wB; re += m * ub[k]; im += m * vb[k]; } else { re += br[k] * wB; im += bi[k] * wB; } }
+    yr[k] = re; yi[k] = im;
+  }
+  fft.inverse(yr, yi, x);
+  const acc = c.acc, oq = c.oq;
+  for (let i = 0; i < N; i++){ const v = acc[i] + x[i] * W[i] * MORPH_OLA; acc[i] = v === v && v > -1e6 && v < 1e6 ? v : 0; }
+  for (let i = 0; i < H; i++) oq[i] = acc[i];
+  acc.copyWithin(0, H, N); acc.fill(0, N - H, N);
+}
+const MORPH_OLA = 1 / 1.5;   // Hann squared at a quarter-frame hop adds up to 1.5
+
 const MODULES = { ...SHARED_MODULES, ...PUMP_MODULES, trackIn:TrackIn,
-  vocoder:Vocoder,
+  vocoder:Vocoder, morph:MorphM,
   vcf:VCF, vca:VCA, mixer:Mixer, smixer:StereoMixer,
   eq:EQ, comp:Comp, saturation:Saturation, tape:Tape, chorus:Chorus, crush:Crush, delay:Delay, reverb:Reverb, rings:Rings, clouds:Clouds, beads:Beads,
   flanger:FlangerFx, tremolo:TremoloFx, odrive:OdriveFx, folder:FolderFx, autowah:AutowahFx, pshift:PshiftFx, ladder:LadderFx, xmod:XmodFx, space:SpaceFx, lofi:LofiFx, drive:DriveFx, air:AirFx, room:RoomFx,
   comb:CombFx, transient:TransientFx, tgate:TgateFx, ott:OttFx, fshift:FshiftFx, vinyl:VinylFx, dub:DubFx, cab:CabFx, tube:TubeFx,
   scin:SidechainIn, sccomp:SidechainComp, scout:SidechainOut,
-  lfo:LFO, adsr:ADSR, random:Random, atten:Attenuverter, steps:Steps, clock:Clock, repeat:Repeat,
+  lfo:LFO, adsr:ADSR, random:Random, atten:Attenuverter, osc:OscM, wnoise:NoiseSrc, repeat:Repeat,
   envfol:EnvFol, gateex:GateEx, pitchfol:PitchFol, pitchtrk:PitchTrk, slew:Slew, snh:SampleHold, quant:Quant,
   blades:Blades, meta:Meta, phaser:Phaser, width:Width, pingpong:PingPong, resample:Resample, chainOut:ChainOut };
 
@@ -5145,9 +5831,12 @@ class ChainsEngine {
     for (const [k, v] of Object.entries(def.params)) params[k] = (o.params && typeof o.params[k] === 'number') ? o.params[k] : v[0];
     for (const k of ['_byp', '_bn']) if (o.params && typeof o.params[k] === 'number') params[k] = o.params[k];   // BYPASS
     if (def.params.sck && !(o.params && typeof o.params.sck === 'number')) params.sck = sckFrom(type, o.params);   // SOURCE: an older patch
-    this.graph.add(id, def, { scope:def.scope, pos:o.pos || [0, 0], params });
+    const inst = { scope:def.scope, pos:o.pos || [0, 0], params };
+    if (def.text === true) inst.text = typeof o.text === 'string' ? o.text.slice(0, 200) : undefined;   // TEXT: a module that takes typed text (Expression) keeps it here; it is only ever read by that module's own parser
+    this.graph.add(id, def, inst);
     this._sync();
   }
+  setText(id, v){ const m = this.graph.mods.get(id); if (m && m.def.text === true && typeof v === 'string') m.inst.text = v.slice(0, 200); }
   removeModule(id){ this._drop(id); this.graph.remove(id); this._sync(); }
   connect(a, b, fb){ this.graph.connect(a, b, fb); this._sync(); }
   disconnect(a, b){ this.graph.disconnect(a, b); this._sync(); }
@@ -5192,7 +5881,8 @@ class ChainsEngine {
         if (low === this.focus){ act.add(m.id); q.push(m.id); }
       }
     }
-    if (tel) for (const m of g.mods.values()) if (m.def === SidechainIn && !act.has(m.id)){ act.add(m.id); q.push(m.id); }   // its meter shows before it's patched
+    if (tel) for (const m of g.mods.values()) if ((m.def === SidechainIn || m.def.probe === true) && !act.has(m.id)){ act.add(m.id); q.push(m.id); }   // (a probe, the Scope, has no output to reach a Chain Out by: it runs while the editor watches, with whatever feeds it)
+      // its meter shows before it's patched
     while (q.length){ for (const c of g.inc.get(q.pop()) || []) if (!act.has(c.a[0])){ act.add(c.a[0]); q.push(c.a[0]); } }
     this._act = act; this._actKey = key; return act;
   }
@@ -5207,9 +5897,13 @@ class ChainsEngine {
   _destroy(s){ try { if (s.def.destroy) s.def.destroy(s.st, this); } catch (e) {} }
   _reset(){ for (const s of this._states.values()) this._destroy(s); this._states.clear(); this._ios.clear(); }
   /* Frees the effects' WebAssembly slots. Call when an engine is thrown away (offline renders). */
-  dispose(){ this._reset(); this.graph = new Graph(); }
+  dispose(){ const ver = this.graph.ver; this._reset(); this.graph = new Graph(); this.graph.ver = ver + 1; this._actKey = -1; this._bnKey = -1; }
   loadPatch(doc){
-    this._reset(); this.graph = new Graph();
+    // A new patch never inherits the last one's run list or bypass numbers: those are kept against the graph's change count
+    // (ver) and its size, and a fresh Graph counts from 0 again, so a patch with as many modules and cables as the one before it
+    // looked unchanged (a Track In that was unpatched before and patched now stayed switched off: the chain was silent). The
+    // count now carries on from the old graph's.
+    const ver = this.graph.ver; this._reset(); this.graph = new Graph(); this.graph.ver = ver + 1; this._actKey = -1; this._bnKey = -1;
     for (const m of doc.modules || []) this.addModule(m.id, m.type, m);
     for (const c of doc.cables || []) this.connect(c.from, c.to, c.fb === true);
     for (const c of stereoUpCables(doc)) this.connect(c.from, c.to);   // STEREO: an older patch's right sides (the editor saves them)
@@ -5240,7 +5934,7 @@ class ChainsEngine {
   _bufs(m){
     let io = this._ios.get(m.id);
     if (!io){
-      io = { in:{}, out:{}, base:m.inst.params, p:m.inst.params, pm:null, linked:new Set(), mods:null };
+      io = { in:{}, out:{}, base:m.inst.params, p:m.inst.params, inst:m.inst, pm:null, linked:new Set(), mods:null };
       for (const n in m.def.inputs) io.in[n] = new Float32Array(BLOCK);
       for (const n in m.def.outputs) io.out[n] = new Float32Array(BLOCK);
       this._ios.set(m.id, io);
@@ -5369,6 +6063,7 @@ class ChainsEngine {
       case 'connect': return this.connect(m.a, m.b, m.fb === true);
       case 'disconnect': return this.disconnect(m.a, m.b);
       case 'param': return this.setParam(m.id, m.name, m.value);
+      case 'text': return this.setText(m.id, m.value);
       case 'params': return this.setParams(m.list);
       case 'quality': this.quality = m.value; return;
       case 'transport': return this.setTransport(m.value);
@@ -5552,5 +6247,5 @@ registerProcessor('thunder-chains', ThunderChains);
 }
 /* Also published inside the audio thread: ...Thunder Plus's track-effect worklet (thunder-tfx, in the same audio context)
    runs the shared modules as track effects through this. */
-if (typeof globalThis !== 'undefined') globalThis.ChainsDSP = { ChainsEngine, wasmInit, modsPrepare, MODULES, WASM, CHAN_COUNT, fbAdd };
+if (typeof globalThis !== 'undefined') globalThis.ChainsDSP = { ChainsEngine, wasmInit, modsPrepare, MODULES, WASM, CHAN_COUNT, fbAdd, MathExpr, mxRun };
 })();

@@ -34,6 +34,14 @@ const coreNum = v => Math.round(v * 1e6) / 1e6;
 const corePlain = e => { const o = {}; for (const k of Object.keys(e).sort()){ const v = e[k];
   if (typeof v === 'number') o[k] = coreNum(v); else if (typeof v === 'string' || typeof v === 'boolean' || v === null) o[k] = v;
   else if (Array.isArray(v) && v.every(x => typeof x === 'number')) o[k] = v.map(coreNum); } return o; };
+/* The running sequencer holds on to the song's perf object (PFS = perfOf(S), taken once when PLAY makes it: the MOD screen's LFOs,
+   scenes, macros), so a new perf from the page must go INTO that object, not replace it: replaced, the LFOs he adds, changes or
+   removes while the song plays did nothing until the next PLAY (owner, 14 Nov). */
+function keepObj(old, now){
+  if (!old || !now || old === now || typeof old !== 'object' || typeof now !== 'object' || Array.isArray(old) || Array.isArray(now)) return now;
+  for (const k of Object.keys(old)) if (!(k in now)) delete old[k];
+  return Object.assign(old, now);
+}
 function coreSeeded(f){
   const R = Math.random; let s = 0x2545F491;
   Math.random = () => { let x = s += 0x6D2B79F5; x = Math.imul(x ^ x >>> 15, x | 1); x ^= x + Math.imul(x ^ x >>> 7, x | 61); return ((x ^ x >>> 14) >>> 0) / 4294967296; };
@@ -317,10 +325,10 @@ class ThunderCore extends AudioWorkletProcessor {
     if (this.chase && !this.chaseKeep(d)) this.chase = null;
     switch (d.op){
       case 'load': S = d.S; if (d.vars){ if ('vtrk' in d.vars) vtrk = d.vars.vtrk; if ('NSLOT' in d.vars) NSLOT = d.vars.NSLOT; if (d.vars.TFX) TFX = d.vars.TFX; } busPlanH = null; busPlanVal = null; return;
-      case 'song': { if (!S){ S = d.S; return; } for (const k of Object.keys(S)) if (!(k in d.S)) delete S[k]; Object.assign(S, d.S); busPlanH = null; busPlanVal = null; return; }   // in place: the running sequencer holds this object
+      case 'song': { if (!S){ S = d.S; return; } const pf = S.perf; for (const k of Object.keys(S)) if (!(k in d.S)) delete S[k]; Object.assign(S, d.S); S.perf = keepObj(pf, S.perf); busPlanH = null; busPlanVal = null; return; }   // in place: the running sequencer holds this object
       case 'patch': {   // only what changed (coreDiff on the page): [key, null, value] · [key, index, item] · [key, 'len', n] · [key, 'del']
         if (!S) return;
-        for (const [k, i, v] of d.ops){ if (i === null) S[k] = v; else if (i === 'del') delete S[k]; else if (i === 'len'){ if (Array.isArray(S[k])) S[k].length = v; }
+        for (const [k, i, v] of d.ops){ if (i === null) S[k] = k === 'perf' ? keepObj(S[k], v) : v; else if (i === 'del') delete S[k]; else if (i === 'len'){ if (Array.isArray(S[k])) S[k].length = v; }
           else { if (!Array.isArray(S[k])) S[k] = []; S[k][i] = v; } }
         if (d.ops.some(o => o[0] === 'insts')) varDrop(null);   // an instrument's RANGE / GEN TYPE… changed: its variations are other sounds now
         busPlanH = null; busPlanVal = null; return; }

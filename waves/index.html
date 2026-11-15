@@ -784,6 +784,11 @@ const SHARED_ABOUT = {
 Object.assign(SHARED_MODULES, {
   meter:Object.assign({ label:'Meter', scope:'mono', params:{ trim:[0,-24,24,.1] }, ui:{ trim:{l:'Trim', f:db} }, display:'meter',
     about:'Meter: a stereo level meter you can put between any two modules. The bars show the average (VU) level, the tick the peak, and the numbers the peak in dB (red past 0 dB). Trim raises or lowers the level on the way through.' }, STEREO),
+  // Scope (14 Nov, module queue): params identical to the worklet's; tests/modules-scope-editor.test.js compares. Its picture is drawn by buildScope / drawScope below.
+  scope:{ label:'Scope', scope:'mono', display:'scope', inputs:{ a:'audio', b:'audio', trig:'gate' }, outputs:{},
+    params:{ time:[.02,.001,2,.001], trig:[1,0,2,1], level:[0,-1,1,.01], freeze:[0,0,1,1], zoom:[1,.25,16,.25] },
+    ui:{ time:{l:'Time', f:secs}, trig:{l:'Trigger', c:opts(['Free', 'Rising', 'Gate'])}, level:{l:'Level', f:v => (v > 0 ? '+' : '') + v.toFixed(2)}, freeze:{l:'Freeze', c:opts(['Off', 'On'])}, zoom:{l:'Zoom', f:v => '×' + v} },
+    about:'Scope: draws what is on its inputs, so you can see a signal. A and B are two traces on the same time base, so you can watch two things move together (B is optional); a fast signal shows as a band and a slow one as a line. Time is how long one sweep takes. Trigger decides where a sweep starts: Free sweeps again and again, Rising waits for A to climb through Level so a steady wave holds still, and Gate starts a sweep when a pulse arrives on Trig. Freeze keeps the picture where it is, and Zoom magnifies it up and down. The number in the corner is how far A swings, peak to peak. Nothing comes out of it. It only runs while this editor is open, and it costs nothing while the song plays with the editor closed.' },
   limiter:Object.assign({ label:'Limiter', scope:'mono', params:{ input:[0,0,24,.1], ceil:[-.3,-24,0,.1], rel:[.15,.01,1,.001] },
     ui:{ input:{l:'Input', f:db}, ceil:{l:'Ceiling', f:db}, rel:{l:'Release', f:secs} }, display:'dyn',
     about:'Limiter: a peak limiter with a 2 ms look-ahead, so nothing gets past Ceiling. Input pushes the sound into it for more loudness; Release sets how fast it lets go. The display shows the curve (Input up to Ceiling), the levels in and out and the gain reduction.' }, STEREO),
@@ -814,13 +819,63 @@ Object.assign(SHARED_MODULES, {
   logic:{ label:'Logic', scope:'mono', inputs:{ a:'gate', b:'gate' }, outputs:{ and:'gate', or:'gate', xor:'gate', not:'gate' },
     params:{ thr:[.5,.05,.95,.01] }, ui:{ thr:{l:'Threshold', f:pct} },
     about:'Logic: two gates in, AND, OR, XOR and NOT A out. Combine rhythms: AND keeps the hits two patterns share, XOR the ones they don’t.' },
+  // Control maths (14 Nov, module queue group 1): params identical to the worklet's; tests/modules-maths-editor.test.js compares.
+  const:{ label:'Constant', scope:'mono', inputs:{}, outputs:{ out:'cv' },
+    params:{ value:[0,-1,1,.01], fine:[0,-.01,.01,.0001] }, ui:{ value:{l:'Value', f:v => v.toFixed(2)}, fine:{l:'Fine', f:v => (v > 0 ? '+' : '') + v.toFixed(4)} },
+    about:'Constant: a steady number you set yourself, with Fine for tiny steps. Use it as a fixed threshold, an offset or a set level to patch into anything that takes a control signal.' },
+  rect:{ label:'Invert / rectify', scope:'mono', inputs:{ in:'cv' }, outputs:{ inv:'cv', abs:'cv', pos:'cv', neg:'cv' }, params:{}, ui:{},
+    about:'Invert / rectify: one control signal in. Invert flips it upside down, Absolute folds the negative half up so it is always positive, Positive keeps only the upper half and Negative only the lower half (as positive values).' },
+  scale:{ label:'Scale / map', scope:'mono', inputs:{ in:'cv' }, outputs:{ out:'cv' },
+    params:{ ilo:[-1,-1,1,.01], ihi:[1,-1,1,.01], olo:[0,-1,1,.01], ohi:[1,-1,1,.01], clip:[1,0,1,1] },
+    ui:{ ilo:{l:'In low', f:v => v.toFixed(2)}, ihi:{l:'In high', f:v => v.toFixed(2)}, olo:{l:'Out low', f:v => v.toFixed(2)}, ohi:{l:'Out high', f:v => v.toFixed(2)}, clip:{l:'Clip', c:opts(['Off', 'On'])} },
+    about:'Scale / map: takes the range you set with In low and In high and stretches it to Out low and Out high. Swap the Out ends and it turns upside down. Clip stops the result going outside the Out range.' },
+  compare:{ label:'Comparator', scope:'mono', inputs:{ a:'cv', b:'cv' }, outputs:{ gt:'gate', lt:'gate' },
+    params:{ thr:[0,-1,1,.01], hyst:[.02,0,.5,.01] }, ui:{ thr:{l:'Level', f:v => v.toFixed(2)}, hyst:{l:'Hysteresis', f:pct} },
+    about:'Comparator: turns a control signal into a gate. A > B goes high while A is above B plus Level, A < B is its opposite. With nothing in B it is a plain threshold. Hysteresis is a small dead zone that stops a wobbling signal from chattering on and off.' },
+  switch:{ label:'Switch', scope:'mono', inputs:{ a:'audio', b:'audio', sel:'gate' }, outputs:{ out:'audio' },
+    params:{ pick:[0,0,1,1], fade:[.005,0,.1,.001] }, ui:{ pick:{l:'Pick', c:opts(['A', 'B'])}, fade:{l:'Fade', f:secs} },
+    about:'Switch: sends A or B to Out. Pick chooses one; a gate on Select chooses the other one while it is high. Fade is how long the change takes, a few milliseconds so audio does not click (0 is instant, for control signals).' },
+  xfade:{ label:'Crossfade', scope:'mono', inputs:{ a:'audio', b:'audio', mixin:'cv' }, outputs:{ out:'audio' },
+    params:{ mix:[.5,0,1,.01], curve:[0,0,1,1] }, ui:{ mix:{l:'Mix', f:pct}, curve:{l:'Curve', c:opts(['Straight', 'Equal power'])} },
+    about:'Crossfade: blends A and B. Mix is the slider, plus the control input if you patch one (0 is all A, 1 is all B). Straight is right for similar sounds and control signals; Equal power keeps two different sounds at the same loudness through the middle.' },
   divider:{ label:'Clock divider', scope:'mono', inputs:{ clock:'gate', reset:'gate' }, outputs:{ d2:'gate', d4:'gate', d8:'gate', n:'gate' },
     params:{ n:[3,1,32,1] }, ui:{ n:{l:'N', f:v => '÷' + Math.round(v)} },
     about:'Clock divider: counts the pulses on Clock and fires every 2nd, 4th, 8th and Nth one. Reset starts counting again.' },
+  // Clock and trigger tools (14 Nov, module queue group 2): params identical to the worklet's; tests/modules-clock-editor.test.js compares.
+  clkmul:{ label:'Clock multiplier', scope:'mono', inputs:{ clock:'gate', reset:'gate' }, outputs:{ out:'gate' },
+    params:{ mul:[2,1,16,1], width:[.5,.05,.95,.01] }, ui:{ mul:{l:'Times', f:v => '×' + Math.round(v)}, width:{l:'Gate length', f:pct} },
+    about:'Clock multiplier: makes Times pulses for every pulse that comes in, evenly spaced, so ×3 on a quarter-note clock gives triplets. It measures the gap between the last two pulses, so after a tempo change it catches up one pulse late; until it has seen two pulses it simply passes the clock through. Gate length is how long each pulse stays high. Reset makes it forget the tempo.' },
+  chance:{ label:'Chance gate', scope:'mono', inputs:{ in:'gate', reset:'gate' }, outputs:{ out:'gate', other:'gate' },
+    params:{ prob:[.5,0,1,.01], seed:[1,0,999,1] }, ui:{ prob:{l:'Chance', f:pct}, seed:{l:'Seed', f:v => v < 1 ? 'Random' : String(Math.round(v))} },
+    about:'Chance gate: every pulse that comes in goes either to Out or to Other, never both, and Chance is how often it goes to Out. Use Out to thin a rhythm out, and Other for the pulses it dropped. The same Seed gives the same run of hits every time, starting again when the song starts or at Reset, so a render matches what you heard. Seed 0 is different every time.' },
+  counter:{ label:'Counter', scope:'mono', inputs:{ clock:'gate', reset:'gate' }, outputs:{ step:'cv', end:'gate' },
+    params:{ steps:[8,1,64,1], mode:[0,0,2,1] }, ui:{ steps:{l:'Steps', f:whole}, mode:{l:'Direction', c:opts(['Up', 'Down', 'Up and down'])} },
+    about:'Counter: counts the pulses on Clock. Step is a staircase from 0 to 1 across Steps counts (through Scale / map or into a slider’s jack it becomes a rising or falling staircase). End is high on the last count of each round, to reset another counter or start something. Direction counts Up, Down, or Up and down. Reset, and the start of the song, go back to the beginning.' },
+  stepsw:{ label:'Step switch', scope:'mono', inputs:{ i1:'audio', i2:'audio', i3:'audio', i4:'audio', clock:'gate', reset:'gate' }, outputs:{ out:'audio' },
+    params:{ steps:[4,2,4,1], fade:[.005,0,.1,.001] }, ui:{ steps:{l:'Steps', f:whole}, fade:{l:'Fade', f:secs} },
+    about:'Step switch: up to four sounds in, one at a time out. Each pulse on Clock moves on to the next sound, and Reset goes back to the first. Steps is how many of the inputs it goes round (2 to 4). Fade is a short crossfade at each change so it does not click (0 is instant, for control signals).' },
+  burst:{ label:'Burst', scope:'mono', inputs:{ trig:'gate' }, outputs:{ out:'gate', level:'cv' },
+    params:{ count:[4,1,32,1], time:[.06,.005,1,.001], bend:[0,-1,1,.01], width:[.5,.05,.95,.01] },
+    ui:{ count:{l:'Count', f:whole}, time:{l:'Time', f:secs}, bend:{l:'Bend', f:v => Math.abs(v) < .005 ? 'even' : (v > 0 ? 'closer ' : 'wider ') + Math.round(Math.abs(v) * 100) + '%'}, width:{l:'Gate length', f:pct} },
+    about:'Burst: one pulse in makes a quick run of pulses, a ratchet or a roll. Count is how many, Time is the gap between the first two. Bend pulls the pulses closer together as the run goes (like a bouncing ball) or spreads them wider. Level falls from full to nothing across the run, for a roll that fades out; Gate length is how long each pulse stays high. A new pulse in starts the run again.' },
+  gatedly:{ label:'Gate delay', scope:'mono', inputs:{ in:'gate' }, outputs:{ out:'gate' },
+    params:{ delay:[.1,0,2,.001], length:[0,0,2,.001] }, ui:{ delay:{l:'Delay', f:secs}, length:{l:'Length', f:v => v < .0005 ? 'As it came' : secs(v)} },
+    about:'Gate delay: the gate comes out Delay later, up to 2 seconds: a flam, or a second sound a moment behind the first. Length at 0 keeps the gate as long as it came in; above 0, every delayed gate lasts that long (a short trigger from a long gate, or the other way round).' },
+  flipflop:{ label:'Flip-flop', scope:'mono', inputs:{ toggle:'gate', set:'gate', reset:'gate' }, outputs:{ q:'gate', nq:'gate' }, params:{}, ui:{},
+    about:'Flip-flop: each pulse on Toggle turns Q over (on, off, on…): a gate at half the speed, or a switch that stays where you leave it. Set turns it on and Reset turns it off. Not Q is the opposite of Q. It starts off whenever the song starts.' },
   euclid:{ label:'Euclidean', scope:'mono', inputs:{ clock:'gate', reset:'gate' }, outputs:{ gate:'gate', accent:'gate' },
     params:{ steps:[16,1,32,1], hits:[5,0,32,1], rot:[0,0,31,1], div:[3,0,9,1], len:[.5,.05,.95,.01] },
     ui:{ steps:{l:'Steps', f:whole}, hits:{l:'Hits', f:whole}, rot:{l:'Rotate', f:whole}, div:{l:'Step', c:opts(STEP_NAMES)}, len:{l:'Length', f:pct} },
-    about:'Euclidean: spreads Hits as evenly as possible across Steps (the rhythm behind many world grooves), turned by Rotate. It steps once per Step at the song tempo, or on each pulse at Clock. Accent fires on the first hit of each cycle. Restarts when the song starts.' }
+    about:'Euclidean: spreads Hits as evenly as possible across Steps (the rhythm behind many world grooves), turned by Rotate. It steps once per Step at the song tempo, or on each pulse at Clock. Accent fires on the first hit of each cycle. Restarts when the song starts.' },
+  // Steps and Clock moved here from …chains' own list (14 Nov): …waves has them too, one definition for both editors.
+  steps:{ label:'Steps', scope:'mono', inputs:{ clock:'gate', reset:'gate' }, outputs:{ out:'cv', gate:'gate' },
+    params:{ div:[3,0,9,1], len:[8,1,8,1], glide:[0,0,1,.01], depth:[1,0,1,.01], s1:[0,-1,1,.01], s2:[0,-1,1,.01], s3:[0,-1,1,.01], s4:[0,-1,1,.01], s5:[0,-1,1,.01], s6:[0,-1,1,.01], s7:[0,-1,1,.01], s8:[0,-1,1,.01] },
+    ui:{ div:{l:'Step', c:opts(['1/64','1/32','1/16T','1/16','1/8T','1/8','1/4','1/2','1 bar','2 bars'])}, len:{l:'Length', f:v => v + ' steps'}, glide:{l:'Glide', f:v => Math.round(v * 100) + '%'}, depth:{l:'Depth', f:v => Math.round(v * 100) + '%'}, s1:{l:'Step 1', f:v => (v > 0 ? '+' : '') + Math.round(v * 100) + '%'}, s2:{l:'Step 2', f:v => (v > 0 ? '+' : '') + Math.round(v * 100) + '%'}, s3:{l:'Step 3', f:v => (v > 0 ? '+' : '') + Math.round(v * 100) + '%'}, s4:{l:'Step 4', f:v => (v > 0 ? '+' : '') + Math.round(v * 100) + '%'}, s5:{l:'Step 5', f:v => (v > 0 ? '+' : '') + Math.round(v * 100) + '%'}, s6:{l:'Step 6', f:v => (v > 0 ? '+' : '') + Math.round(v * 100) + '%'}, s7:{l:'Step 7', f:v => (v > 0 ? '+' : '') + Math.round(v * 100) + '%'}, s8:{l:'Step 8', f:v => (v > 0 ? '+' : '') + Math.round(v * 100) + '%'} },
+    about:'Steps: an 8-step sequence of control values, one step per note value at the song tempo (or advanced by Clock in). Gate fires on every step; Glide slides between them. Restarts from step 1 when the song starts.' },
+  clock:{ label:'Clock', scope:'mono', inputs:{ reset:'gate' }, outputs:{ gate:'gate', ramp:'cv', bar:'cv' },
+    params:{ div:[3,0,9,1], swing:[0,0,.75,.01], width:[.5,.05,.95,.01], bars:[1,1,16,1] },
+    ui:{ div:{l:'Every', c:opts(['1/64','1/32','1/16T','1/16','1/8T','1/8','1/4','1/2','1 bar','2 bars'])}, swing:{l:'Swing', f:v => Math.round(v * 100) + '%'}, width:{l:'Gate length', f:v => Math.round(v * 100) + '%'}, bars:{l:'Bar ramp', f:v => v + (v > 1 ? ' bars' : ' bar')} },
+    about:'Clock: a gate every note value at the song tempo, with Swing on every second one. Ramp rises from 0 to 1 across each step and Bar across 1–16 bars: patch either into a slider to sweep it in time (Clouds or Beads position, a filter, a Repeat’s Hold).' },
 });
 const INT_NAMES = ['−2 oct', '−10th', '−oct', '−5th', '−4th', '−maj 3rd', '−min 3rd', 'Unison', '+min 3rd', '+maj 3rd', '+4th', '+5th', '+6th', '+oct', '+10th', '+2 oct'];
 Object.assign(SHARED_MODULES, {
@@ -837,11 +892,45 @@ Object.assign(SHARED_MODULES, {
       detune:{l:'Detune', f:v => '±' + v.toFixed(1) + ' ct'}, delay:{l:'Delay', f:secs}, win:{l:'Window', f:pct}, dry:{l:'Dry', f:pct} },
     about:'Harmonizer: up to two pitch-shifted copies of the sound at fixed intervals (a third, fifth, octave…), each with its own level and pan. Voice 2 starts silent: turn up Level 2 for a three-part stack (a major triad with the defaults). Detune spreads the two voices apart (set both to Unison with a little Detune and Delay for a wide double). Window: longer is smoother, shorter is tighter on drums. Dry sets the original.' }, STEREO)
 });
-Object.assign(SHARED_FAMILY, { meter:'util', limiter:'util', utility:'util', ringmod:'afx', spring:'afx', plate:'afx', lverb:'afx', ensemble:'afx',
+// Delay line's Time: ms below 100, whole ms above, seconds from 1000; under 20 ms it adds the pitch it rings at (1000 / ms). A formatter sees only its own value, so Feedback is not consulted.
+const dlTime = v => v >= 1000 ? (v / 1000).toFixed(2) + ' s' : v >= 100 ? Math.round(v) + ' ms' : v < 20 && v >= .1 ? v.toFixed(1) + ' ms (' + khz(1000 / v) + ')' : v.toFixed(1) + ' ms';
+// Audio building blocks (14 Nov, module queue): params identical to the worklet's; tests/modules-blocks-editor.test.js compares. One channel each.
+// `plabels` names a module's own jacks (portName reads it), for Mid / side, whose jacks mean different things in Encode and Decode.
+Object.assign(SHARED_MODULES, {
+  onepole:{ label:'One-pole filter', scope:'mono', inputs:{ in:'audio' }, outputs:{ lp:'audio', hp:'audio' },
+    params:{ freq:[1000,5,20000,1] }, ui:{ freq:{l:'Freq', f:khz} },
+    about:'One-pole filter: the gentlest filter there is, 6 dB an octave, with no resonance and no edge. Low keeps what is below Freq and High keeps what is above it; add the two together and you have the input again. Use it as the lightest tone control (take a little brightness off a harsh sound), or on a control signal to smooth it: a stepped Random through Low with Freq at a few Hz glides instead of jumping. One channel: patch two for stereo.' },
+  allpass:{ label:'Allpass', scope:'mono', inputs:{ in:'audio' }, outputs:{ out:'audio' },
+    params:{ mode:[0,0,1,1], freq:[1000,20,20000,1], time:[.01,.0005,.1,.0001], gain:[.5,-.95,.95,.01] },
+    ui:{ mode:{l:'Mode', c:opts(['Phase', 'Echo'])}, freq:{l:'Freq', f:khz}, time:{l:'Time', f:v => (v * 1000).toFixed(1) + ' ms'}, gain:{l:'Gain', f:spct} },
+    about:'Allpass: every frequency comes out at the same level, only its timing changes. Phase turns the phase of the sound around Freq. On its own you hear nothing, but mixed with the dry sound it makes a notch, and four in a row (an LFO into every Freq) make a phaser. Echo is a very short delay with its own feedback, up to 100 ms: Time is its length and Gain how strong it is, negative for the opposite sign. It is what reverbs are built from: it smears a click without colouring a tone, and several in a row make a diffuse wash. Freq is used in Phase, Time and Gain in Echo. One channel: patch two for stereo.' },
+  dcblock:{ label:'DC blocker', scope:'mono', inputs:{ in:'audio' }, outputs:{ out:'audio' },
+    params:{ freq:[10,1,200,1] }, ui:{ freq:{l:'Freq', f:v => Math.round(v) + ' Hz'} },
+    about:'DC blocker: takes out a steady offset (a constant “DC” level that the signal sits above or below zero), and anything below Freq, so the signal sits round zero again. An offset wastes headroom and makes clicks when it changes. Put one after Invert / rectify, in a feedback loop, or after a shaper that is not symmetrical. At 10 Hz you will hear no difference otherwise. One channel: patch two for stereo.' },
+  midside:{ label:'Mid / side', scope:'mono', inputs:{ in:'audio', inR:'audio' }, outputs:{ out:'audio', outR:'audio' },
+    plabels:{ in:'L / Mid', inR:'R / Side', out:'Mid / L', outR:'Side / R' },
+    params:{ mode:[0,0,1,1] }, ui:{ mode:{l:'Mode', c:opts(['Encode', 'Decode'])} },
+    about:'Mid / side: Encode turns left and right into Mid (what both sides share, the centre) and Side (what is different, the width). Decode turns Mid and Side back into left and right, exactly. Encode, treat the two differently, then Decode: Side turned up widens the sound, an EQ on Mid alone shapes the centre. In Encode the jacks are L and R in, Mid and Side out; in Decode they are Mid and Side in, L and R out. With only L patched in Encode, the sound is treated as mono (no Side).' },
+  dline:{ label:'Delay line', scope:'mono', inputs:{ in:'audio', tmod:'cv' }, outputs:{ out:'audio' },
+    params:{ time:[10,0,2000,.1], fine:[0,-1,1,.001], fb:[0,-.99,.99,.01], damp:[0,0,1,.01], depth:[0,0,50,.1] },
+    plabels:{ tmod:'Time' },
+    ui:{ time:{l:'Time', f:dlTime}, fine:{l:'Fine', f:v => (v > 0 ? '+' : '') + v.toFixed(3) + ' ms'}, fb:{l:'Feedback', f:spct}, damp:{l:'Damp', f:pct}, depth:{l:'Mod depth', f:v => v.toFixed(1) + ' ms'} },
+    about:'Delay line: a bare delay, from one sample to two seconds. Out is only the delayed sound, with none of the dry, so mix it with the dry yourself (a Crossfade, or a Mixer). Short times with Feedback ring at a pitch: 1000 ÷ Time in ms is the pitch in Hz, so 2 ms rings at 500 Hz, and Fine tunes it to the note you want. That is a comb filter, and with a burst of Noise in, Feedback high and a little Damp it is a plucked string. Longer times are echoes: Feedback is how many repeats, negative turns each repeat over, Damp dulls each one. An LFO into the Time jack with a little Mod depth (Mod depth is how many ms the jack moves the delay at full swing) is a chorus or a flanger. Feedback stops at 99% and the sound inside the loop is limited, so it can get loud but cannot run away. A feedback cable is not the same thing: a cable loop is one block (about 3 ms) late, so it can only echo; the loop inside this module is exact to the sample, so it can be tuned. One channel: patch two for stereo.' },
+  // Expression (14 Nov, module queue): a formula typed into the module. The text is the module's `text` (a string, at most 200 characters; missing = a * k1), not a number; the engine reads it with
+  // its own parser and never runs it as code. Params identical to the worklet's; tests/modules-expr-editor.test.js compares. Its field, error line and Examples button are drawn by buildExpr below.
+  expr:{ label:'Expression', scope:'mono', display:'expr', text:true, inputs:{ a:'audio', b:'audio', c:'cv', d:'cv' }, outputs:{ out:'audio' },
+    plabels:{ a:'A', b:'B', c:'C', d:'D' },
+    params:{ k1:[1,-4,4,.001], k2:[0,-4,4,.001] }, ui:{ k1:{l:'K1', f:v => v.toFixed(3)}, k2:{l:'K2', f:v => v.toFixed(3)} },
+    about:'Expression: type a line of maths and its answer is the sound, one sample at a time. A and B are the two audio inputs, C and D the two control inputs, and K1 and K2 the two sliders. Names: a, b, c, d, k1, k2, t (seconds since the song started, or since the module was made), y (this module’s own output one sample ago, so one line can be a filter or a counter), rnd (a new random number from −1 to 1 every sample), pi and sr (the sample rate). Operators: + − * / % ^, the comparisons < <= > >= == !=, && || !, and a ? b : c. Functions: sin cos tan tanh abs sqrt exp log floor ceil round sign fract, min max pow mod, clip(x, low, high), mix(a, b, amount), and tri saw sq, which are waves from −1 to 1 that repeat every 1 (saw(220 * t) is a 220 Hz saw). The result is held between −4 and 4. What you type is only ever read as maths: it is never run as a program, and a formula that cannot be read gives silence and says where the trouble is. 200 characters at most. Enter (or tapping away) applies it and Escape puts back the last one; Examples fills the field with a working formula to start from. A single Expression can be a ring modulator, a soft clipper, a crossfade, a bit crusher or a small filter.' }
+});
+Object.assign(SHARED_FAMILY, { onepole:'afx', allpass:'afx', dcblock:'afx', midside:'afx', dline:'afx', expr:'util' });
+Object.assign(SHARED_FAMILY, { meter:'util', scope:'util', limiter:'util', utility:'util', ringmod:'afx', spring:'afx', plate:'afx', lverb:'afx', ensemble:'afx',
   reson:'afx', degrade:'afx', blipdrum:'gen', life:'mod', dimension:'afx', bbd:'afx', harm:'afx', phaser:'afx', width:'afx', pingpong:'afx', blades:'util', meta:'afx', math:'mod', logic:'mod', divider:'mod', euclid:'mod',
+  rect:'mod', scale:'mod', compare:'mod', const:'mod', switch:'util', xfade:'util',
+  clkmul:'mod', chance:'mod', counter:'mod', stepsw:'util', burst:'mod', gatedly:'mod', flipflop:'mod',   // (Steps and Clock stay out: …chains has always drawn them in the default family)
   envfol:'mod', gateex:'mod', pitchfol:'mod', pitchtrk:'mod', slew:'util', snh:'util', quant:'util' });
 const SHARED_PORT_LABEL = { note:'Note', trig:'Trig', env:'Env', car:'Carrier', freq:'Freq', a:'A', b:'B', sum:'A+B', diff:'A−B', mul:'A×B', min:'Min', max:'Max',
-  and:'AND', or:'OR', xor:'XOR', not:'NOT A', d2:'÷2', d4:'÷4', d8:'÷8', n:'÷N', accent:'Accent', time:'Time',
+  and:'AND', or:'OR', xor:'XOR', not:'NOT A', gt:'A > B', lt:'A < B', inv:'Invert', abs:'Absolute', pos:'Positive', neg:'Negative', sel:'Select', step:'Step', end:'End', other:'Other', level:'Level', toggle:'Toggle', set:'Set', q:'Q', nq:'Not Q', i1:'1', i2:'2', i3:'3', i4:'4', d2:'÷2', d4:'÷4', d8:'÷8', n:'÷N', accent:'Accent', time:'Time',
   // U3 (13 Nov): ports that showed their raw key (Blades res, Meta mod, Flex and Step gate pat, Sample & hold noise, Clock ramp and bar)
   res:'Resonance', mod:'Modulator', pat:'Pattern', noise:'Noise', ramp:'Ramp', bar:'Bar' };
 /* Palette groups: added to an existing group of the same name, or made (audio groups before Control, the rest at the end).
@@ -851,12 +940,14 @@ const SHARED_PALETTE = [
   ['Reverbs', [['spring','Spring reverb'],['plate','Plate reverb'],['lverb','Lite reverb'],['room','Room reverb'],['space','Space reverb']], 'audio'],
   ['More effects', [['comb','Comb resonator'],['transient','Transient shaper'],['tgate','Trance gate'],['ott','Multiband squash'],['fshift','Frequency shifter'],['vinyl','Vinyl'],['dub','Dub tape'],['cab','Speaker cab'],['tube','Tube'],['flanger','Flanger'],['tremolo','Tremolo'],['odrive','Overdrive'],['folder','Wavefolder'],['autowah','Auto-wah'],['pshift','Pitch shifter'],['ladder','Ladder filter'],['xmod','Cross-mod'],['lofi','Lo-fi'],['drive','Drive'],['air','Air']], 'audio'],
   ['Filters and amps', [['blades','Blades filter']], 'audio'],
-  ['Utilities', [['meter','Meter'],['limiter','Limiter'],['utility','Utility']], 'audio'],
+  ['Utilities', [['meter','Meter'],['scope','Scope'],['limiter','Limiter'],['utility','Utility']], 'audio'],
   ['Stereo', [['width','Width']], 'audio'],
   ['Audio followers', [['envfol','Envelope follow'],['gateex','Gate extract'],['pitchfol','Pitch follow'],['pitchtrk','Pitch track']], 'control'],
-  ['Control utilities', [['slew','Slew limiter'],['snh','Sample & hold'],['quant','Quantizer'],['math','Math']], 'control'],
-  ['Rhythm and logic', [['euclid','Euclidean'],['divider','Clock divider'],['logic','Logic']], 'control']
+  ['Control utilities', [['slew','Slew limiter'],['snh','Sample & hold'],['quant','Quantizer'],['math','Math'],['const','Constant'],['rect','Invert / rectify'],['scale','Scale / map'],['compare','Comparator'],['switch','Switch'],['xfade','Crossfade'],['expr','Expression']], 'control'],
+  ['Rhythm and logic', [['euclid','Euclidean'],['divider','Clock divider'],['clkmul','Clock multiplier'],['chance','Chance gate'],['counter','Counter'],['stepsw','Step switch'],['burst','Burst'],['gatedly','Gate delay'],['flipflop','Flip-flop'],['logic','Logic']], 'control']
 ];
+Object.assign(SHARED_PORT_LABEL, { lp:'Low', hp:'High' });   // (One-pole filter's two outputs; Building blocks, 14 Nov)
+SHARED_PALETTE.push(['Building blocks', [['onepole','One-pole filter'],['allpass','Allpass'],['dline','Delay line'],['dcblock','DC blocker'],['midside','Mid / side']], 'audio']);
 /* Blip drum and Life: their parameters match the worklet's exactly (same tables). */
 const BD_ROWS = ['p', 'k', 'f', 'm', 'n', 'd', 'a', 'x'];
 const BD_NAMES = ['Pitch', 'Kick', 'FM', 'Ring', 'Noise', 'Decay', 'Level', 'Filter'];
@@ -904,6 +995,7 @@ SHARED_MODULES.degrade = Object.assign({ label:'Degrade', scope:'mono', params:{
     noise:{l:'Noise', f:v => v < .005 ? 'Off' : (20 * Math.log10(v * v * .25)).toFixed(1) + ' dB'}, color:{l:'Color', f:v => v < .02 ? 'White' : v > .98 ? 'Dark' : pct(v) + ' dark'},
     follow:{l:'Follow', f:pct}, dry:{l:'Dry', f:pct}, wet:{l:'Wet', f:pct} },
   about:'Degrade: lo-fi in one box, after the classic tracker lofi plugins. Bits crushes (24 is off), Rate lowers the sample rate (the top is off), and Noise adds a floor of hiss, from a whisper up to −12 dB: Color darkens it from white, and Follow makes it track the sound, so it breathes with the notes and silence stays clean. A little Noise on a soft sine helps it stand out in a mix. Dry and Wet are separate.' }, STEREO);
+Object.assign(SHARED_PORT_LABEL, { mixin:'Mix' });   // Crossfade's Mix input
 Object.assign(SHARED_PORT_LABEL, { t1:'1', t2:'2', t3:'3', t4:'4', t5:'5', t6:'6', t7:'7', t8:'8', g1:'1', g2:'2', g3:'3', g4:'4', g5:'5', g6:'6', g7:'7', g8:'8', any:'Any', count:'Count' });
 SHARED_PALETTE.push(['Drums', [['blipdrum', 'Blip drum']], 'audio']);
 SHARED_PALETTE.find(g => g[0] === 'Rhythm and logic')[1].unshift(['life', 'Life']);
@@ -1090,6 +1182,7 @@ Object.assign(SHARED_PORT_LABEL, { x:'X', y:'Y', z:'Z', rate:'Rate' });
 SHARED_PALETTE.push(['Sound sources', [['bytebeat', 'Bytebeat']], 'audio']);
 // Chaos: with the modulation sources (both editors already have the group; GROUP_FAM marks it 'mod').
 SHARED_PALETTE.push(['Modulation sources', [['chaos', 'Chaos']], 'control']);
+SHARED_PALETTE.push(['Modulation sources', [['steps', 'Steps'], ['clock', 'Clock']], 'control']);   // (from …chains' own list, 14 Nov; PAL_LAYOUT puts Clock under Clocks and rhythm)
 /* Notes for the integrator:
    - chains has no 'Sound sources' group: mergeShared makes it before §Control, and its family falls back to 'afx'
      for the group colour unless 'Sound sources':'gen' is added to the fallback map inside mergeShared
@@ -1270,32 +1363,33 @@ const PAL_LAYOUT = [
   ['§In and out'],
   ['In and out', '#0f8f8f', ['trackIn', 'chainOut', 'scin', 'scout', 'resample', 'out']],
   ['§Sound'],
-  ['Sound sources', '#b8792a', ['string', 'vco', 'fm', 'additive', 'noise', 'plaits', 'elements', 'bytebeat', 'blipdrum']],
+  ['Sound sources', '#b8792a', ['string', 'vco', 'fm', 'additive', 'noise', 'plaits', 'elements', 'osc', 'wnoise', 'bytebeat', 'blipdrum']],
   ['§Mix and dynamics'],
-  ['Mix and level', '#7b8794', ['mixer', 'smixer', 'vca', 'utility', 'width', 'meter']],
+  ['Mix and level', '#7b8794', ['mixer', 'smixer', 'vca', 'utility', 'width', 'meter', 'scope']],
   ['Dynamics', '#e07a2e', ['compressor', 'buscomp', 'glue', 'comp', 'sccomp', 'limiter', 'ngate', 'ott', 'transient']],
   ['§Effects'],
   ['Filters and EQ', '#2e9e4f', ['filter', 'cut', 'eq', 'air', 'vcf', 'ladder', 'blades', 'autowah', 'envfilt', 'vowel']],
+  ['Building blocks', '#5f8f6f', ['onepole', 'allpass', 'dline', 'dcblock', 'midside']],
   ['Drive and lo-fi', '#d23c3c', ['saturation', 'odrive', 'drive', 'tube', 'folder', 'cab', 'crush', 'lofi', 'degrade', 'tape', 'vinyl', 'dub']],
   ['Modulation effects', '#c04ab8', ['chorus', 'ensemble', 'dimension', 'flanger', 'phaser', 'tremolo', 'autopan', 'rotary', 'ringmod', 'xmod', 'fshift', 'meta']],
   ['Delays', '#3a8ee0', ['sdelay', 'delay', 'pingpong', 'bbd', 'gdelay', 'pdelay', 'reverse']],
   ['Reverbs', '#4a55c8', ['reverb', 'room', 'plate', 'lverb', 'spring', 'space', 'preverb', 'convolve']],
   ['Resonators', '#8a9a1a', ['comb', 'reson', 'rings']],
   ['Pitch and voice', '#e0609a', ['pshift', 'harm', 'autotune', 'vocoder']],
-  ['Granular and spectral', '#9a6ad6', ['clouds', 'beads', 'spectral', 'stretch']],
+  ['Granular and spectral', '#9a6ad6', ['clouds', 'beads', 'spectral', 'stretch', 'morph']],
   ['Rhythmic effects', '#d9b30f', ['pump', 'tgate', 'sgate', 'repeat', 'retrig', 'flex']],
   ['§Control'],
   ['Notes and MIDI', '#a0703a', ['hostIn', 'seq']],
   ['Modulation sources', '#6e4fc0', ['lfo', 'adsr', 'tides', 'random', 'marbles', 'chaos', 'steps']],
-  ['Clocks and rhythm', '#8c5a8c', ['clock', 'divider', 'euclid', 'logic', 'life']],
+  ['Clocks and rhythm', '#8c5a8c', ['clock', 'divider', 'clkmul', 'chance', 'counter', 'stepsw', 'burst', 'gatedly', 'flipflop', 'euclid', 'logic', 'life']],
   ['Audio to control', '#4f6f9f', ['envfol', 'gateex', 'pitchfol', 'pitchtrk']],
-  ['Control utilities', '#9a8fb8', ['atten', 'math', 'slew', 'snh', 'quant']]
+  ['Control utilities', '#9a8fb8', ['atten', 'math', 'const', 'rect', 'scale', 'compare', 'switch', 'xfade', 'expr', 'slew', 'snh', 'quant']]
 ];
 const PAL_COLOR = { More:'#888888' }, CAT_COLOR = {};
 // ONE NAME PER MODULE (13 Nov, audit U6): the list, the title bar and Help all read the module's own name. What the list used to add in
 // brackets after a name ("Resonator (chord)") is this tooltip text now.
-const PAL_HINT = { blipdrum:'8 voices', chaos:'Lorenz, Rössler…', degrade:'lo-fi', dimension:'stereo chorus', ensemble:'chorus', envfilt:'auto-wah', flex:'beat re-sequencer', life:'Game of Life',
-  meter:'VU', preverb:'shimmer', repeat:'beat repeat', resample:'record to a pad', reson:'chord', retrig:'stutter', spectral:'FFT', string:'pluck', utility:'gain, pan' };
+const PAL_HINT = { onepole:'6 dB/oct', allpass:'phaser, diffuser', dline:'comb, echo', expr:'type a formula', dcblock:'remove offset', midside:'centre / sides', osc:'tone, LFO, FM', wnoise:'white, pink, brown', blipdrum:'8 voices', chaos:'Lorenz, Rössler…', degrade:'lo-fi', dimension:'stereo chorus', ensemble:'chorus', envfilt:'auto-wah', flex:'beat re-sequencer', life:'Game of Life', compare:'gate from a level', const:'fixed value', clkmul:'×2, ×3…', chance:'random thinning', counter:'staircase', stepsw:'rotate 4 sounds', burst:'ratchet', gatedly:'flam', flipflop:'toggle', rect:'abs, flip', scale:'map a range', switch:'A or B', xfade:'A to B',
+  meter:'VU', scope:'see a signal', preverb:'shimmer', repeat:'beat repeat', resample:'record to a pad', reson:'chord', retrig:'stutter', morph:'two sounds as one', spectral:'FFT', string:'pluck', utility:'gain, pan' };
 // Rebuild the merged palette (in place) in PAL_LAYOUT's order; group families too, for anything still keyed on them.
 function organizePalette(palette, groupFam){
   const label = new Map(); for (const [, items] of palette) for (const [t, l] of items || []) if (!label.has(t)) label.set(t, l);
@@ -1428,6 +1522,7 @@ const MODULE_USE = {
   // granular and spectral
   clouds:'On a piano or pad: Position half way, Size large, Density and Texture up, Blend mostly wet. Flip Freeze for an instant ambient bed.',
   beads:'Feed it a short vocal or guitar phrase: Density around 60%, a large Size, Feedback and some Reverb for an evolving cloud. Freeze holds it as a pad.',
+  morph:'A pad into In (A) and a drum loop into In B, Mode Convolve, Morph in the middle: only what both share is heard, so the pad is chopped by the drums\u2019 rhythm and colour. Switch to Shape and A always plays, with B\u2019s vowel.',
   spectral:'On a pad or vocal: Mode Freeze, then switch Freeze to Hold on a chord you like, and it becomes an endless drone to play over.',
   stretch:'Stretch ×8, a long Window and Mix 100%: a one-bar loop becomes a slow ambient wash. Freeze holds the moment.',
   // rhythmic effects
@@ -1459,6 +1554,28 @@ const MODULE_USE = {
   // Control utilities
   atten:'Between an LFO and a filter’s Cutoff jack: Amount 30% for a gentle wobble, or negative so the LFO sweeps the other way.',
   math:'Multiply an LFO (A) by an envelope (B) and use the × output: the wobble only happens while the note is held.',
+  const:'Patch it into a Comparator’s B and type the threshold to the hundredth, or into a slider’s purple jack for a fixed offset.',
+  rect:'An Envelope follow into In, then Invert into a pad’s level jack: the slider sets the level and every drum hit pulls it down, so the pad ducks.',
+  scale:'A −1..1 LFO into In and Out into a level jack: the default Out 0..1 gives a tremolo that never goes below silence.',
+  compare:'Envelope follow’s Out into A, Level 0.30: A > B is a gate that fires on every loud hit, to trigger an ADSR or a Sample & hold.',
+  switch:'Dry on A, a reverb’s output on B, and a Clock divider’s ÷4 into Select: every fourth beat the sound jumps to the reverb.',
+  xfade:'Dry on A, an effect’s output on B, a slow LFO into Mix: the effect breathes in and out of the dry sound.',
+  scope:'Patch an LFO into A and the envelope it shapes into B to see both move together.',
+  onepole:'A stepped Random’s Out into In, Freq 3 Hz, and Low into a filter’s Cutoff jack: the steps glide instead of jumping. As a tone control, Freq 8 kHz on a harsh hi-hat and take Low.',
+  allpass:'A phaser: four Allpass in a row (Phase), one LFO into every Freq jack, and the last one on B of a Crossfade with the dry sound on A. Or three in Echo (5, 8 and 13 ms) to smear a drum hit into a soft tail.',
+  dcblock:'Right after Invert / rectify or a Wavefolder and before the Chain Out: any steady offset is gone, so the next effect keeps its headroom.',
+  midside:'Encode, then Side (R / Side out) through a Utility with its gain raised and into a second Mid / side set to Decode, Mid straight across: a wider image that leaves the centre alone.',
+  expr:'Soft clip, one line: tanh(a * (1 + k1 * 4)) with K1 as the drive. Or a crossfade you steer with a control signal: mix(a, b, clip(c, 0, 1)), a slow LFO into C.',
+  dline:'A plucked string: a short burst of Noise (a Noise through a VCA with a very short ADSR) into In, Time 4.5 ms (about 220 Hz), Feedback 95%, Damp 20%, and take Out. Or an echo: Time 350 ms, Feedback 40%, Out into B of a Crossfade with the dry on A.',
+  osc:'Two Oscillators: the second at 5 Hz into the first one’s FM jack with FM depth 5% is a vibrato; the second at 440 Hz with FM depth 30% is bell-like FM. Sync from a Clock restarts the tone on every beat.',
+  wnoise:'White Noise into a Filter set to band-pass and a VCA with a short ADSR on its Control: a hi-hat. Pink through a slowly swept filter is wind or surf.',
+  clkmul:'A Clock at 1/4 into Clock and Times ×3: three even pulses per beat, triplets against the beat, into a Blip drum.',
+  chance:'After a Euclidean’s Gate: Chance 70% thins the pattern out, and Other plays a second sound on the hits that were dropped.',
+  counter:'A Clock into Clock, Step through Scale / map into a filter’s Cutoff jack: Steps 8 is a rising staircase that starts over every eight beats.',
+  stepsw:'Four sounds on 1 to 4 and a Clock divider’s ÷4 into Clock: the sound changes every fourth beat and goes round all four.',
+  burst:'A kick’s gate into Trig, Out into a snare’s trigger: every kick fires a roll of four fast hits; turn Bend up and the roll tightens.',
+  gatedly:'A drum’s gate into In, Out into a second drum’s trigger with Delay 30 ms: a flam, the second hit just behind the first.',
+  flipflop:'A Clock’s beat into Toggle and Q into a Switch’s Select: two sounds that take turns, one beat each.',
   slew:'After Steps or a Random going to a pitch or cutoff: Rise and Fall around 100 ms turn hard jumps into smooth glides.',
   snh:'Noise or an LFO into In, a clock into Trig, and Out into a filter’s Cutoff jack: the classic stepped “computer” filter.',
   quant:'After a Random or LFO going to an oscillator’s pitch, Scale minor pentatonic: random melodies that always stay in key.',
@@ -1528,6 +1645,13 @@ window.addEventListener('wheel', e => { if (mhelpBtnOn && !(mhelpEl && mhelpEl.c
 .shw canvas.lifegrid{width:100%; height:132px; display:block; touch-action:none; cursor:pointer}
 .shw .lifebtns{display:flex; gap:6px; flex-wrap:wrap}
 .shw canvas.dyncv{width:100%; height:116px; display:block}
+.node > .scopebox{display:block; padding:4px 12px 8px} .node.nar > .scopebox{padding:4px 10px 8px}   /* the Scope's screen: above the controls when open, under the title when folded to Compact; Mini hides it with everything else but the title */
+.scopebox canvas.scopecv{width:100%; height:120px; display:block; background:var(--panel-2); border:1px solid color-mix(in srgb, var(--edge) 30%, transparent)}
+.exbox{display:grid; gap:4px; padding:2px 0 4px}
+.exbox textarea.extext{width:100%; box-sizing:border-box; min-height:44px; resize:none; padding:4px 6px; font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size:12.5px; line-height:17px; background:var(--panel); color:var(--ink); border:1px solid var(--muted); border-radius:0; overflow-wrap:anywhere}
+.exbox textarea.extext[aria-invalid="true"]{outline:2px solid var(--rec); outline-offset:0; border-color:var(--rec)}
+.exbox .exerr{font-size:12.5px; line-height:16px; color:var(--rec); font-weight:600; overflow-wrap:anywhere}
+.cs-i.cs-x .cs-v{display:inline-block; max-width:100%; vertical-align:bottom; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size:12.5px}
 .node > .dmini{display:none; padding:6px 12px 8px} .node.collapsed > .dmini{display:grid}
 .dmini .ch{grid-template-columns:28px 1fr 58px}
 .dmini .tr i{background:#3cc8b9}
@@ -1538,6 +1662,8 @@ window.addEventListener('wheel', e => { if (mhelpBtnOn && !(mhelpEl && mhelpEl.c
 const SHOW_LO = -48, SHOW_HI = 3, showPos = d => Math.max(0, Math.min(1, (d - SHOW_LO) / (SHOW_HI - SHOW_LO)));
 function buildShow(n){
   const kind = MODULES[n.m.type].display;
+  if (kind === 'scope') return buildScope(n);
+  if (kind === 'expr') return buildExpr(n);
   if (kind === 'dyn' || kind === 'dynlv'){ const box = h('div', {class:'shw dyn'}); buildDyn(n, box, kind); return box; }
   if (kind === 'bars' || kind === 'life'){ const box = h('div', {class:'shw ' + kind}); (kind === 'bars' ? buildBars : buildLife)(n, box); return box; }
   const box = h('div', {class:'shw' + (kind === 'gr' ? ' gr' : '')}), rows = [];
@@ -1568,6 +1694,8 @@ function paintShows(list){
     if (S.kind === 'life'){ S.x = v[0]; S.gen = v[1]; S.live = v.slice(2, 10); continue; }
     if (S.kind === 'dyn' || S.kind === 'dynlv'){ dynPush(n, v, now); continue; }
     if (S.kind === 'scin'){ scinPaint(S, v[0], v[1], now); continue; }
+    if (S.kind === 'scope'){ if (v.length >= 2 + SCOPE_W * 4 && v[0] !== S.seq){ S.seq = v[0]; S.data = v; drawScope(n); } continue; }   // a new picture only when a whole sweep is done
+    if (S.kind === 'expr'){ exprPaint(n, v); continue; }   // Expression: the engine's [error code, position]
     if (S.kind === 'scout'){ const A = S.rows[0], pk = v[0]; A.i.style.transform = 'scaleX(' + showPos(pk) + ')'; if (pk >= A.hold || now - A.ht > 1500){ A.hold = pk; A.ht = now; }
       A.b.style.left = (showPos(A.hold) * 100) + '%'; A.v.textContent = A.hold <= -90 ? '−∞' : (A.hold > 0 ? '+' : '') + A.hold.toFixed(1); if (n.lvl) setLvl(n, showPos(pk)); continue; }
     if (S.kind === 'meter') for (let c = 0; c < 2; c++){
@@ -1583,6 +1711,146 @@ function paintShows(list){
       R.v.textContent = gr > -0.05 ? '0.0 dB' : gr.toFixed(1) + ' dB';
     }
   }
+}
+/* SCOPE DISPLAY (14 Nov, module queue): the Scope module draws its two inputs. The engine's show() sends
+   [sweep number, B patched (1 / 0), then for each of 128 columns: lowA, highA, lowB, highB] (2 + 512 numbers), and the sweep number changes only
+   when a whole new picture is ready, so the canvas is drawn then (and when its size, the Zoom or a colour changes), not on every report. Each trace is
+   a filled band from the lowest to the highest sample of every column, joined into one shape, at least 1.5 px thick. The screen is the module's own
+   panel colour; the traces are the signal colours (A: audio, B: control), the lines the muted ink: all read from the page's CSS variables, so a skin
+   changes them. No pointer handlers: in Play a drag on it pans the view like a drag on any other display. The canvas sits in n.mini (outside the
+   body) so Compact keeps it, and Mini (everything but the title) hides it. */
+const SCOPE_W = 128;
+function buildScope(n){
+  const cv = h('canvas', {class:'scopecv', role:'img', 'aria-label':'Scope: the signals on A and B'});
+  const box = h('div', {class:'scopebox', title:'The signal on A (and on B, if patched), one sweep across. A fast signal is a band, a slow one a line. The small tick at the left is the Rising trigger level. Top left: the sweep time and how far A swings, peak to peak.'}, cv);
+  n.show = { kind:'scope', cv, data:null, seq:-1, sig:'', col:null, colT:0, seen:0 };
+  n.mini = box;
+  return null;   // (nothing in the body: the box above it is the display)
+}
+function scopeColors(S, now){
+  if (S.col && now - S.colT < 1500) return S.col;
+  const cs = getComputedStyle(S.cv), v = k => cs.getPropertyValue(k).trim() || cs.color;
+  S.col = { a:v('--audio'), b:v('--mod'), ink:v('--ink'), muted:v('--muted'), bg:v('--panel-2'), font:cs.fontFamily || 'sans-serif' }; S.colT = now; return S.col;
+}
+function drawScope(n){
+  const S = n.show, cv = S.cv, W = cv.clientWidth, H = cv.clientHeight; if (!W || !H) return;
+  const dpr = Math.min(3, window.devicePixelRatio || 1), pw = Math.round(W * dpr), ph = Math.round(H * dpr);
+  if (cv.width !== pw || cv.height !== ph){ cv.width = pw; cv.height = ph; }
+  const g = cv.getContext('2d'), C = scopeColors(S, performance.now()), p = n.m.params, zoom = +p.zoom || 1, d = S.data, hasB = !!d && d[1] === 1;
+  g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, H);
+  // vertical scale: at Zoom 1 the screen holds -1.2 to +1.2; Zoom magnifies that
+  const mid = H / 2, unit = (H / 2 - 2) / 1.2 * zoom, Y = v => Math.max(-2, Math.min(H + 2, mid - v * unit));
+  g.lineJoin = 'round'; g.lineCap = 'butt';
+  g.strokeStyle = C.muted; g.lineWidth = 1; g.globalAlpha = .55; g.beginPath(); g.moveTo(0, Math.round(mid) + .5); g.lineTo(W, Math.round(mid) + .5); g.stroke();   // the centre line
+  g.globalAlpha = .25; g.setLineDash([2, 3]); g.beginPath();
+  for (const k of [1, -1]){ const y = mid - k * unit; if (y > 1 && y < H - 1){ g.moveTo(0, Math.round(y) + .5); g.lineTo(W, Math.round(y) + .5); } }   // the +1 and -1 lines
+  g.stroke(); g.setLineDash([]); g.globalAlpha = 1;
+  let pp = null;
+  if (d){
+    const trace = (lo, hi, col, fillA) => {
+      const top = [], bot = [];
+      for (let i = 0; i < SCOPE_W; i++){
+        let yt = Y(d[2 + i * 4 + hi]), yb = Y(d[2 + i * 4 + lo]);
+        if (yb - yt < 1.5){ const m = (yt + yb) / 2; yt = m - .75; yb = m + .75; }   // a slow signal is a line at least 1.5 px thick
+        const x = i / (SCOPE_W - 1) * W; top.push(x, yt); bot.push(x, yb);
+      }
+      g.beginPath(); g.moveTo(top[0], top[1]); for (let i = 2; i < top.length; i += 2) g.lineTo(top[i], top[i + 1]);
+      for (let i = bot.length - 2; i >= 0; i -= 2) g.lineTo(bot[i], bot[i + 1]);
+      g.closePath(); g.fillStyle = col; g.globalAlpha = fillA; g.fill(); g.globalAlpha = 1; g.strokeStyle = col; g.lineWidth = 1; g.stroke();
+    };
+    trace(0, 1, C.a, .5);
+    if (hasB) trace(2, 3, C.b, .3);
+    let lo = 1e9, hi = -1e9; for (let i = 0; i < SCOPE_W; i++){ if (d[2 + i * 4] < lo) lo = d[2 + i * 4]; if (d[3 + i * 4] > hi) hi = d[3 + i * 4]; }
+    pp = hi - lo;
+  }
+  if ((p.trig | 0) === 1){   // the trigger level: a small tick at the left edge
+    const y = Math.round(Y(+p.level)) + .5; g.strokeStyle = C.ink; g.lineWidth = 1.5; g.beginPath(); g.moveTo(0, y); g.lineTo(7, y); g.stroke();
+    g.fillStyle = C.ink; g.beginPath(); g.moveTo(7, y - 3.5); g.lineTo(11, y); g.lineTo(7, y + 3.5); g.closePath(); g.fill();
+  }
+  const txt = secs((d && +d[2 + SCOPE_W * 4]) || +p.time || .02) + (pp == null ? '' : '   pk-pk ' + pp.toFixed(2)) + (zoom !== 1 ? '   ×' + zoom : '') + (+p.freeze >= .5 ? '   frozen' : '');
+  g.font = '11px ' + C.font; g.textBaseline = 'top'; const tw = g.measureText(txt).width;
+  g.globalAlpha = .8; g.fillStyle = C.bg; g.fillRect(14, 3, tw + 8, 15); g.globalAlpha = 1; g.fillStyle = C.ink; g.fillText(txt, 18, 5);
+}
+// A setting moved (Zoom, Time, Trigger), the module was unfolded or resized, or the skin changed: draw the last picture again.
+setInterval(() => { if (napping()) return; const now = performance.now();
+  for (const n of nodes.values()){ const S = n.show; if (!S || S.kind !== 'scope' || !n.el.isConnected) continue;
+    const p = n.m.params, w = S.cv.clientWidth; if (!w){ S.sig = ''; continue; }
+    const C = scopeColors(S, now), sig = [p.zoom, p.time, p.trig, p.level, p.freeze, w, S.cv.clientHeight, window.devicePixelRatio, C.a, C.b, C.bg, C.ink].join('|');
+    if (sig !== S.sig){ S.sig = sig; drawScope(n); } } }, 150);
+/* EXPRESSION FIELD (14 Nov, module queue): the formula is the module's `text`. It is only ever put in a field's value and in text nodes (never in markup, never
+   run, never used as a name). Typing changes nothing in the patch: Enter or leaving the field APPLIES it (one undo step, the engine is sent {op:'text'}, the
+   patch is saved); Escape puts back the last applied text. The keys typed in the field are the field's own: the editors' shortcut handlers all skip a keydown
+   whose target is an input or a textarea (typing()), and the field also keeps its key events to itself. The engine reports [error code, position] with its
+   telemetry (show()); a report is not trusted until EXPR_HOLD ms after an apply (or after the module is drawn), so the text that was just replaced never
+   shows an error that belonged to the old one. */
+// A module's text: kept (cut to 200 characters) only on a module whose definition takes text; on any other module it is dropped. (Also run on a pasted copy and on every load.)
+function textFix(m){ if (!m || typeof m !== 'object' || !('text' in m)) return; const d = MODULES[m.type]; if (d && d.text === true && typeof m.text === 'string') m.text = m.text.slice(0, 200); else delete m.text; }
+const EXPR_MAX = 200, EXPR_DEFAULT = 'a * k1', EXPR_HOLD = 450;
+const EXPR_EXAMPLES = [
+  ['Pass A (K1 = level)', 'a * k1'], ['Ring modulate A by B', 'a * b'], ['Soft clip', 'tanh(a * (1 + k1 * 4))'], ['Fold', 'tri(a * (1 + k1 * 4) / 4 + 0.25)'],
+  ['Rectify', 'abs(a)'], ['Crossfade by C', 'mix(a, b, clip(c, 0, 1))'], ['Sine at K1 kHz', 'sin(2 * pi * 1000 * k1 * t)'], ['One-pole lowpass (K1)', 'y + (a - y) * clip(k1, 0, 1)'],
+  ['Sample and hold on C', 'c > 0.5 ? a : y'], ['Noise', 'rnd * k1'], ['Bit crush (K1)', 'round(a * (2 + k1 * 30)) / (2 + k1 * 30)'], ['Gate A when B is loud', 'abs(b) > k1 ? a : 0']
+];
+// What the module has as its formula: its own text, or the default when it has none (a string of any length is cut to the 200 the engine keeps).
+const exprText = m => m && typeof m.text === 'string' ? m.text.slice(0, EXPR_MAX) : EXPR_DEFAULT;
+// A typed or pasted formula as it is kept: line breaks are spaces (the formula is one line), at most 200 characters.
+const exprClean = v => String(v == null ? '' : v).replace(/[\r\n\t\u2028\u2029]+/g, ' ').slice(0, EXPR_MAX);
+// The engine's error code (see the language reference above MX_VARS in the worklet) as one plain sentence; the position is the 0-based character, said from 1.
+const EXPR_WORDS = { 3:'the formula is too complicated', 4:'a character that is not used in this maths', 5:'a name that is not known (the names are a b c d k1 k2 t y rnd pi sr)', 6:'a bracket is not closed', 7:'a function has the wrong number of values', 8:'a value is expected here', 9:'something is left over after the formula' };
+function exprMessage(code, pos){
+  code = code | 0; if (!code) return '';
+  if (code === 1) return 'The formula is empty.';
+  if (code === 2) return 'The formula is too long: ' + EXPR_MAX + ' characters at most.';
+  if (code === 10) return 'The formula is not text.';
+  const at = Math.max(0, Math.min(EXPR_MAX, pos | 0)) + 1;
+  return 'At character ' + at + ': ' + (EXPR_WORDS[code] || 'the formula cannot be read') + '.';
+}
+// Compact's line: the formula on one line, cut with an ellipsis.
+function exprShort(t){ const s = exprText({ text:t }).replace(/\s+/g, ' ').trim(); return s.length > 40 ? s.slice(0, 39) + '…' : s; }
+function exprSend(m, v){
+  if (bridge) bridge.setText(m.id, v);
+  else if (EMBED && TW && TW.mod) TW.mod({ op:'text', id:m.id, value:v });   // (the host's copy of the patch and its engines)
+}
+function buildExpr(n){
+  const m = n.m, id = 'exerr-' + String(m.id).replace(/[^\w-]/g, '');
+  const ta = h('textarea', { class:'extext', rows:'2', maxlength:String(EXPR_MAX), spellcheck:'false', autocapitalize:'off', autocorrect:'off', autocomplete:'off', 'aria-label':'Formula', 'aria-describedby':id, 'aria-invalid':'false',
+    placeholder:'type a formula, e.g. a * k1', title:'The formula: type maths using a b c d k1 k2 t y rnd pi sr. Enter applies it, Escape puts back the last one.' });
+  const err = h('div', { class:'exerr', id, role:'status', 'aria-live':'polite', hidden:true });
+  ta.value = exprText(m);
+  const S = n.show = { kind:'expr', ta, err, key:'', hold:performance.now() + EXPR_HOLD, seen:0 };
+  const clean = () => { const v = exprClean(ta.value); if (v !== ta.value) ta.value = v; return v; };
+  const apply = () => {
+    if (!doc.modules.includes(m) || !ta.isConnected) return;   // (a field of a module that an undo has replaced must not write into the new patch)
+    const v = clean(); if (v === exprText(m)) return;   // (nothing changed: no undo step; a module with no text of its own keeps none until the formula is changed)
+    if (playBlocked()){ ta.value = exprText(m); return; }
+    store.snapshot(); m.text = v; exprSend(m, v);
+    S.key = ''; S.hold = performance.now() + EXPR_HOLD; err.textContent = ''; err.hidden = true; ta.setAttribute('aria-invalid', 'false');   // the old text's error must not stay, nor a report about it come back
+    if (m.collapsed) paintSum(n);
+    store.touch();
+  };
+  ta.addEventListener('input', () => { clean(); });
+  ta.addEventListener('keydown', e => {
+    if (!(e.ctrlKey || e.metaKey)) e.stopPropagation();   // a plain key is the field's own (Ctrl/⌘ combinations such as save still reach the page; typing() keeps its shortcuts out of a field)
+    if (e.key === 'Enter'){ e.preventDefault(); apply(); ta.blur(); }
+    else if (e.key === 'Escape'){ e.preventDefault(); ta.value = exprText(m); ta.blur(); }
+  });
+  ta.addEventListener('keyup', e => { if (!(e.ctrlKey || e.metaKey)) e.stopPropagation(); });
+  ta.addEventListener('focus', () => { ta.readOnly = !!playMode; });   // Play locks the patch: a formula is read there, not typed
+  ta.addEventListener('blur', apply);
+  const eg = h('button', { type:'button', class:'presel', 'aria-haspopup':'menu', title:'Examples: fill the field with a working formula' }, h('span', { text:'Choose one…' }), h('i', { text:'▾', 'aria-hidden':'true' }));
+  eg.addEventListener('click', e => {
+    e.stopPropagation(); if (playBlocked()) return; const r = eg.getBoundingClientRect();
+    showMenu(r.left, r.bottom + 2, [['§Examples'], ...EXPR_EXAMPLES.map(([nm, f]) => [nm, () => { ta.value = f; apply(); }])]);
+  });
+  const row = h('div', { class:'row wide pre' }, h('span', { class:'jack small', style:'visibility:hidden', 'aria-hidden':'true' }), h('span', { class:'lbl', text:'Examples' }), eg);
+  return h('div', { class:'exbox' }, ta, err, row);
+}
+// A report from the engine: [error code, position]. Nothing shown when 0.
+function exprPaint(n, v){
+  const S = n.show; if (!S || S.kind !== 'expr' || performance.now() < S.hold) return;
+  const code = v[0] | 0, pos = v[1] | 0, key = code + ':' + pos; if (key === S.key) return; S.key = key;
+  const msg = exprMessage(code, pos);
+  S.err.textContent = msg; S.err.hidden = !msg; S.ta.setAttribute('aria-invalid', code ? 'true' : 'false');
 }
 /* DYNAMICS DISPLAY (owner, 22 Oct): compressors, the gate and the limiter show what they are doing, as a DAW's compressor
    does. Left, the transfer curve (level in across, level out up), from the module's own Threshold, Ratio, Knee, Range and
@@ -1764,12 +2032,15 @@ function chainsStereoUp(d){
 const SUMMARY_KEYS = {
   mixer:['level', 'l1'],    // the master level first (its label is "Master"), then the first channel's level
   smixer:['level', 'l1'],
+  scale:['olo', 'ohi', 'clip'], xfade:['mix', 'curve'], expr:['$text'],   // Expression: its formula is what Compact shows (a pseudo key, not a parameter)
+  onepole:['freq'], allpass:['mode', 'freq'], dline:['time', 'fb'], dcblock:['freq'], midside:['mode'], osc:['wave', 'freq'], wnoise:['color', 'level'], morph:['mode', 'morph'],
+  scope:['time', 'trig'], clkmul:['mul', 'width'], chance:['prob', 'seed'], counter:['mode', 'steps'], stepsw:['fade', 'steps'], burst:['count', 'time'], gatedly:['delay'],   // Scale / map: where it lands, Crossfade: the mix first
 };
 const SUMMARY_FIRST = ['Mix', 'Wet', 'Master', 'Level', 'Output', 'Gain', 'Makeup'];
 const SUMMARY_DEFAULT = { selects:1, sliders:2 };
 function summaryKeys(m){
   const def = MODULES[m.type]; if (!def) return [];
-  const ok = k => k in def.params && k[0] !== '_' && !(def.ui[k] || {}).hide && mixShown(m, k);
+  const ok = k => (k === '$text' && def.text === true) || (k in def.params && k[0] !== '_' && !(def.ui[k] || {}).hide && mixShown(m, k));
   const own = def.key || SUMMARY_KEYS[m.type];
   if (own) return own.filter(ok).slice(0, 3);
   const keys = Object.keys(def.params).filter(ok), sel = keys.filter(k => choicesOf(m.type, k)), sl = keys.filter(k => !choicesOf(m.type, k));
@@ -1789,6 +2060,9 @@ const NODE_W = 250;
 const NARROW_S = 168, NARROW_M = 190;   // the two small sizes: S for a one-word title, M for a two-word one
 const MODULE_WIDTH = {
   atten:NARROW_S, random:NARROW_S, quant:NARROW_S, logic:NARROW_S, math:NARROW_S,   // Attenuverter, Random, Quantizer, Logic, Math
+  const:NARROW_S, rect:NARROW_M, scale:216, compare:216, switch:NARROW_S, xfade:NARROW_M,   // Constant, Invert / rectify, Scale / map, Comparator, Switch, Crossfade
+  onepole:NARROW_M, allpass:216, dline:232, expr:300, dcblock:216, midside:216,
+  scope:300, clkmul:216, chance:216, counter:NARROW_S, stepsw:NARROW_M, burst:216, gatedly:NARROW_M, flipflop:NARROW_S,   // Clock multiplier, Chance gate, Counter, Step switch, Burst, Gate delay, Flip-flop
   slew:NARROW_M, snh:NARROW_M, divider:NARROW_M, gateex:NARROW_M,   // Slew limiter, Sample & hold, Clock divider, Gate extract
 };
 function widthOf(type){ const d = MODULES[type], w = d && d.w != null ? d.w : MODULE_WIDTH[type]; return typeof w === 'number' && w >= 150 && w <= 600 ? Math.round(w) : NODE_W; }
@@ -2478,7 +2752,7 @@ class WavesBridge {
   }
   static standalone(opts){
     opts = opts || {};
-    const url = opts.url || './waves-worklet.js?v=39';
+    const url = opts.url || './waves-worklet.js?v=45';
     const ctx = new (window.AudioContext || window.webkitAudioContext)({ latencyHint:'interactive' });
     return Promise.all([ctx.audioWorklet.addModule(url), WavesBridge.wasm()]).then(([, [dspBytes, tfxBytes]]) => {
       const node = new AudioWorkletNode(ctx, 'waves', {
@@ -2504,7 +2778,8 @@ class WavesBridge {
   }
   _send(msg){ msg.target = TARGET; msg.protocol = PROTOCOL; if (this._ready) this.port.postMessage(msg); else this._queue.push(msg); }
   loadPatch(doc){ this._send({ op:'patch', value:JSON.parse(JSON.stringify(doc)) }); }
-  addModule(id, type, o){ o = o || {}; this._send({ op:'add', id, type, params:o.params, pos:o.pos }); }
+  addModule(id, type, o){ o = o || {}; const msg = { op:'add', id, type, params:o.params, pos:o.pos }; if (typeof o.text === 'string') msg.text = o.text; this._send(msg); }   // TEXT: a module that takes a formula (Expression) carries it
+  setText(id, value){ this._send({ op:'text', id, value }); }   // TEXT: a live change of that formula
   removeModule(id){ this._send({ op:'remove', id }); }
   connect(a, b, fb){ this._send(fb === true ? { op:'connect', a, b, fb:true } : { op:'connect', a, b }); }   // fb: the cable closes a loop (the engine leaves it out of the run order)
   disconnect(a, b){ this._send({ op:'disconnect', a, b }); }
@@ -2559,6 +2834,8 @@ function starterDoc(){
 }
 function normalize(d){
   d.modules = d.modules || []; d.cables = d.cables || []; d.groups = d.groups || []; d.custom = d.custom || [];
+  for (const m of d.modules) textFix(m);   // TEXT: a module's formula is kept (cut to 200 characters) only on a module that takes one
+  for (const c of d.custom) if (c && c.graph && Array.isArray(c.graph.modules)) for (const m of c.graph.modules) textFix(m);
   d.meta = d.meta || { name:'Untitled' }; d.voice = d.voice || { maxVoices:8 };
   d.view = d.view || { x:0, y:0, zoom:1 };
   // Cables into a slider's jack go to "p:name" (older patches used the bare name).
@@ -2589,6 +2866,7 @@ const busPeaks = new Array(BUS_COUNT).fill(0);
 // beside "Out R" / "In R"; a mono port keeps plain "Out" / "In".
 function portName(type, port, dir){
   const d = MODULES[type], io = d && (dir === 'in' ? d.inputs : d.outputs), base = PORT_LABEL[port] || port;
+  if (d && d.plabels && d.plabels[port]) return d.plabels[port];   // a module's own jack names (Mid / side)
   return io && (port + 'R') in io ? base + ' L' : base;
 }
 function makeJack(n, port, kind, dir, small){
@@ -2808,7 +3086,7 @@ function buildNode(m){
   { const plan = secPlan(m.type, [...rowEls.keys()], k => plabel(m.type, k));   // T14: a long module is cut into sections (the first open)
     if (plan){ const at = kids.indexOf(rowEls.values().next().value); kids.splice(at, rowEls.size, ...secWrap(n, rowEls, plan)); } }
   if (m.type === 'out'){ n.meter = h('span'); kids.push(h('div', {class:'prog', title:'Level'}, n.meter)); }
-  if (def.display) kids.push(buildShow(n));
+  if (def.display){ const sh = buildShow(n); if (sh) { if (def.display === 'expr') kids.unshift(sh); else kids.push(sh); } }   // (Expression: its formula field leads, above the sliders)
   if (NOTES[m.type]){ n.note = h('div', {class:'status'}); kids.push(n.note); }
   const body = h('div', {class:'body'}, kids);
   buildSummary(n);   // COMPACT: the collapsed look
@@ -2905,6 +3183,7 @@ function headTap(n, ev){
 function buildSummary(n){
   const m = n.m, def = MODULES[m.type];
   n.sumIt = summaryKeys(m).map(k => {
+    if (k === '$text') return { k, ch:null, fmt:null, el: h('span', {class:'cs-i cs-x'}, h('span', {class:'cs-v'})), l:null, v:null, t:null, mod:false, text:true };   // Expression: its formula (no label)
     const ch = choicesOf(m.type, k), v = h('span', {class:'cs-v'}), l = h('span', {class:'cs-l', text: plabel(m.type, k) + ' '});
     return { k, ch, fmt: ch ? null : fmtOf(m.type, k), el: h('span', {class:'cs-i'}, l, v), l, v, t:null, mod:false };   // a select reads by itself ("Sine", "Track 5") unless its value is only a number ("4": then "Inputs 4")
   });
@@ -2917,6 +3196,7 @@ function buildSummary(n){
 function paintSum(n){
   if (!n.sumIt || !n.m.collapsed) return;
   for (const it of n.sumIt){
+    if (it.text){ const t = exprShort(n.m.text); if (t !== it.t){ it.t = t; it.el.firstChild.textContent = t; it.el.title = exprText(n.m); } continue; }   // Expression: the formula, cut with an ellipsis
     const live = n.live && it.k in n.live ? n.live[it.k] : null, v = live != null ? live : +n.m.params[it.k];
     let t; if (it.ch){ const o = it.ch.find(q => q[0] === Math.round(v)); t = o ? o[1] : String(Math.round(v)); } else { try { t = String(it.fmt(v)); } catch (e){ t = ''; } }
     if (t !== it.t){ it.t = t; it.v.textContent = t; if (it.ch) it.l.hidden = !/^[-\d.%\s]*$/.test(t); }
@@ -3077,8 +3357,9 @@ function addModule(type, x, y, params){
   const def = MODULES[type]; if (!def) return null;
   const p = {}; for (const k in def.params) p[k] = def.params[k][0];
   const m = { id:newId(), type, scope:def.scope, pos:[x, y], collapsed:false, params:Object.assign(p, params || {}) };
+  if (def.text === true) m.text = EXPR_DEFAULT;   // TEXT: a new Expression says its formula in the patch
   doc.modules.push(m);
-  if (bridge) bridge.addModule(m.id, type, { params:m.params, pos:m.pos });
+  if (bridge) bridge.addModule(m.id, type, { params:m.params, pos:m.pos, text:m.text });
   buildNode(m); store.touch();
   return m;
 }
@@ -3768,7 +4049,7 @@ function captureCustom(name, ids){
   if (!picked.length) return null;
   const ox = Math.min(...picked.map(m => m.pos[0])), oy = Math.min(...picked.map(m => m.pos[1]));
   const map = new Map(picked.map((m, i) => [m.id, 'c' + i]));
-  const mods = picked.map(m => ({ id:map.get(m.id), type:m.type, scope:m.scope, pos:[m.pos[0] - ox, m.pos[1] - oy], collapsed:!!m.collapsed, ...(m.collapsed && m.view === 'mini' ? { view:'mini' } : {}), params:Object.assign({}, m.params) }));
+  const mods = picked.map(m => ({ id:map.get(m.id), type:m.type, scope:m.scope, pos:[m.pos[0] - ox, m.pos[1] - oy], collapsed:!!m.collapsed, ...(m.collapsed && m.view === 'mini' ? { view:'mini' } : {}), params:Object.assign({}, m.params), ...(typeof m.text === 'string' ? { text:m.text } : {}) }));
   const cables = doc.cables.filter(c => inside.has(c.from[0]) && inside.has(c.to[0]))
     .map(c => ({ from:[map.get(c.from[0]), c.from[1]], to:[map.get(c.to[0]), c.to[1]], bend:0, ...(c.fb === true ? { fb:true } : {}) }));
   store.snapshot();
@@ -3781,8 +4062,9 @@ function pasteGraph(graph, pos){
   for (const cm of graph.modules){
     if (!MODULES[cm.type]) continue;
     const m = Object.assign(JSON.parse(JSON.stringify(cm)), { id:newId(), scope:cm.scope || MODULES[cm.type].scope, pos:[pos[0] + cm.pos[0], pos[1] + cm.pos[1]], collapsed:!!cm.collapsed, params:Object.assign({}, cm.params) });
+    textFix(m);   // TEXT: the copy keeps the formula (cut to 200; dropped from a module that takes none)
     idmap.set(cm.id, m.id); doc.modules.push(m);
-    if (bridge) bridge.addModule(m.id, m.type, { params:m.params, pos:m.pos });
+    if (bridge) bridge.addModule(m.id, m.type, { params:m.params, pos:m.pos, text:m.text });
     buildNode(m); ids.push(m.id);
   }
   const pasted = [];
@@ -3817,7 +4099,7 @@ function copySel(quiet){
   const ox = Math.min(...picked.map(m => m.pos[0])), oy = Math.min(...picked.map(m => m.pos[1]));
   const ids = new Set(picked.map(m => m.id));
   clip = { ox, oy, graph:{
-    modules: picked.map(m => ({ id:m.id, type:m.type, scope:m.scope, pos:[m.pos[0] - ox, m.pos[1] - oy], collapsed:!!m.collapsed, ...(m.collapsed && m.view === 'mini' ? { view:'mini' } : {}), params:Object.assign({}, m.params) })),
+    modules: picked.map(m => ({ id:m.id, type:m.type, scope:m.scope, pos:[m.pos[0] - ox, m.pos[1] - oy], collapsed:!!m.collapsed, ...(m.collapsed && m.view === 'mini' ? { view:'mini' } : {}), params:Object.assign({}, m.params), ...(typeof m.text === 'string' ? { text:m.text } : {}) })),
     cables: doc.cables.filter(c => ids.has(c.from[0]) && ids.has(c.to[0])).map(c => ({ from:c.from.slice(), to:c.to.slice(), pts:c.pts && c.pts.map(p => [p[0] - ox, p[1] - oy]), ...(c.fb === true ? { fb:true } : {}) })) } };
   if (!quiet) toast(picked.length === 1 ? 'Copied 1 module.' : 'Copied ' + picked.length + ' modules.');
   return true;
@@ -4300,6 +4582,11 @@ function helpDoc(){
     ['Comments, names and layout', 'Right-click the background and choose Add a comment here (or type “comment” in Find a module) for a plain text note you can type into, move by its top edge and remove with its x; a comment is saved with the patch. Right-click a module and choose Rename module to give it a name of your own (empty goes back to the usual one). With two or more modules picked, the menu aligns their edges; with three, it spaces them evenly. Modules snap to a 10 px grid as you drag; the background menu turns that off. Tidy up lays the modules out in columns by signal flow and keeps your groups.'],
     ['Folding, Mini, widths and groups', 'The chevron folds a module to Compact (its key values, the ports that have a cable and a stub for each modulated control) and opens it again; a double-click on the title bar does the same. Shift+click the chevron, or hold it on a touch screen, shrinks it to Mini: the title bar alone, with every cable ending on its left (inputs) or right (outputs) edge. Shift+click again goes back to Compact; a plain click opens it. Alt+C folds or opens every module, Alt+Shift+C takes every module to Mini or opens them all, and the right-click menus list the same. Small utility modules (Attenuverter, Math, Logic and the like) are drawn narrower than the rest; their About card is in the right-click menu. The arrow on a group\u2019s label collapses the group into one block: its modules keep running, only the cables that cross the group stay drawn, and unfolding puts everything back. A group\u2019s box follows its modules when you move, fold or remove them. None of this works in Play.'],
     ['Modulation', 'Patch any signal into a slider’s small purple jack and it moves that slider: the slider sets the center, and the signal swings it across its range. The value turns purple and a mark shows where the slider really is. Use the Depth slider on an LFO or envelope, or an Attenuverter, to make the swing smaller.'],
+    ['Basic operations', 'Add, subtract, multiply, smaller and larger are the outputs of Math (A+B, A−B, A×B, Min, Max). AND, OR, XOR and NOT are the outputs of Logic. Invert / rectify flips a control signal or folds it to positive. Scale / map stretches one range onto another (an LFO from −1..1 to 0..1, say). Comparator turns a control signal into a gate. Constant is a steady value. Switch chooses between two sounds on a gate, and Crossfade blends them. All of them are in the Control utilities group of the Modules list, and when a voice feeds one it runs once for each voice.'],
+    ['Clocks and triggers', 'Clocks and rhythm in the Modules list has the pulse tools. Clock makes the pulses and Steps plays a row of values; both follow the song’s tempo, and Reset restarts them. Clock divider and Clock multiplier slow a clock down or speed it up (×3 for triplets). Counter counts pulses, and its Step output is a staircase. Chance gate lets pulses through by chance (the same Seed gives the same pattern every time), Burst turns one pulse into a quick roll, Gate delay moves a gate later for a flam, Flip-flop turns a pulse into on and off, and Step switch passes four sounds in turn.'],
+    ['Seeing signals', 'Meter (in Mix and level in the Modules list) shows how loud a sound is and Scope draws a signal as it moves, with a sound or an LFO patched into A and a second signal such as an envelope into B so you can watch them together, Trigger on Rising to hold a steady wave still and Freeze to keep the picture, and both only work while this editor is open.'],
+    ['Building blocks', 'Building blocks in the Modules list are the small parts bigger effects are made of, each one channel (patch two for stereo). One-pole filter is the gentlest tone control, and it smooths a control signal. Allpass turns the phase (four in a row, mixed with the dry sound, make a phaser) or, in Echo, makes the short echoes a reverb is built from. Delay line is a bare delay from one sample to two seconds with exact feedback of its own: short it rings at a pitch (a comb, a plucked string), long it echoes, and you mix it with the dry sound yourself. DC blocker takes a steady offset out of a signal. Mid / side splits left and right into centre and width, so you can treat them differently, and puts them back.'],
+    ['Expression', 'Expression (in Control utilities in the Modules list) is a module you type into: a line of maths whose answer is the sound, worked out one sample at a time. Names: a and b are its two audio inputs, c and d its two control inputs, k1 and k2 its two sliders, t the seconds since the song started (or since the module was made), y this module’s own output one sample ago (so one line can be a filter or a counter), rnd a new random number from −1 to 1 every sample, and pi and sr (the sample rate). Operators: + − * / % ^ < <= > >= == != && || ! and a ? b : c. Functions: sin cos tan tanh abs sqrt exp log floor ceil round sign fract, min max pow mod, clip(x, low, high), mix(a, b, amount), and tri saw sq (waves from −1 to 1 that repeat every 1, so saw(220 * t) is a 220 Hz saw). The result is held between −4 and 4. What you type is only ever read as maths, never run as a program, and a formula that cannot be read gives silence and a short message under the field saying where. 200 characters at most. Enter or tapping away applies it and Escape puts back the last one; Examples fills the field with a working formula (a soft clipper, a ring modulator, a bit crusher, a sample and hold).'],
     ['Polyphony', 'Host In runs once for every voice, and so does anything it feeds; everything else (effects, LFOs, Out) runs once. Put effects after the voices, before Out.'],
     ['Moving around', 'Scroll with two fingers or turn the mouse wheel to pan (Shift+wheel sideways); with a mouse a middle-button drag pans too, and on a touch screen dragging the background does. Rest the pointer on a slider for a moment (it gets an outline) and the wheel changes that slider instead, Shift+wheel in fine steps. Pinch or Ctrl/⌘+wheel zooms; the zoom buttons are in the top bar (click the percentage to type one, Fit shows everything).'],
     ['Play and Edit', 'The Play and Edit switch in the top bar (Alt+E on a keyboard) decides what a touch or a click does. In Edit everything works. In Play the patch is locked for playing: sliders, selects, buttons and readouts work, but no module can be moved, selected, folded, removed or given a menu, no cable can be made or removed, and a drag on anything that is not a control moves the view. The patch is framed and tagged PLAY while it is on. The choice is remembered for this editor on this device, not saved in the patch.'],
@@ -4312,7 +4599,7 @@ function helpDoc(){
   ];
   const groups = PALETTE.filter(([g]) => !isSection(g)).map(([g, items]) => '<div class="mgroup"><h3>' + esc(g) + '</h3><div class="mgrid">' + items.map(([t]) => {
     const d = MODULES[t], ed = CAT_COLOR[t] || EDGE[famOf(t)];   // U9 (13 Nov): the card wears the module's own category colour, as the module on the patch does
-    const io = (lbl, o) => Object.keys(o).length ? '<div class="io"><b>' + lbl + '</b>' + Object.entries(o).map(([p, k]) => '<span class="pt"><i' + (KIND[k] === 'gate' ? ' class="g"' : '') + ' style="background:' + KC[KIND[k]] + '"></i>' + esc((PORT_LABEL[p] || p) + ((p + 'R') in o ? ' L' : '')) + '</span>').join('') + '</div>' : '';
+    const io = (lbl, o) => Object.keys(o).length ? '<div class="io"><b>' + lbl + '</b>' + Object.entries(o).map(([p, k]) => '<span class="pt"><i' + (KIND[k] === 'gate' ? ' class="g"' : '') + ' style="background:' + KC[KIND[k]] + '"></i>' + esc((d.plabels && d.plabels[p]) || ((PORT_LABEL[p] || p) + ((p + 'R') in o ? ' L' : ''))) + '</span>').join('') + '</div>' : '';
     return '<div class="mcard" style="--ed:' + ed + '"><h4>' + esc(d.label) + '</h4><p>' + esc(ABOUT[t] || SHARED_ABOUT[t] || d.about || '') + '</p>' + io('Inputs', d.inputs) + io('Outputs', d.outputs) + '</div>';
   }).join('') + '</div></div>').join('');
   return '<!doctype html><html><head><meta charset="utf-8"><style>' +

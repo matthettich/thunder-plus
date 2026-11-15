@@ -1,6 +1,6 @@
 # Thunder Plus test checklist, by priority
 
-> Snapshot of the owner's Claude Doc "Thunder Plus test checklist, by priority" (https://claude.ai/artifact/LrzQ18ur18Fc5gkvxmQDbK), exported 14 Nov 2026 with his ticks as of midday.
+> Snapshot of the owner's Claude Doc "Thunder Plus test checklist, by priority" (https://claude.ai/artifact/LrzQ18ur18Fc5gkvxmQDbK), exported 14 Nov 2026 with his ticks as of the afternoon (build 602).
 > The live list is the Claude Doc; the source of every item is "Owner's punch list" in HANDOVER.md (build numbers are in brackets).
 > Re-export this file when the doc changes.
 
@@ -10,7 +10,7 @@
 
 This list is in order of importance, so start at the top.
 
-Do section 1 first; it is short and covers what could lose work or sound, plus the fixes from your feedback.
+Do section 1 first; it is short: the newest builds (589 to 602, ears first), what could lose work or sound.
 
 Do sections 2 and 3 as time allows.
 
@@ -22,8 +22,8 @@ If something fails, tell Claude the build number and what happened; tick an item
 
 | Section | Open items | Mostly on | Why it matters |
 | --- | --- | --- | --- |
-| 1. Do these first | 45 | Phone and computer | Lost work or sound, and the re-checks of your last fixes |
-| 2. Really worth trying | 33 | Phone | Everyday features nobody has tried on a real device |
+| 1. Do these first | 29 | Phone and computer | The newest builds (589 to 602), lost work or sound |
+| 2. Really worth trying | 68 | Phone | Everyday features nobody has tried on a real device, the 585 to 588 editor checks and the re-checks of your last fixes |
 | 3. If you have time | 47 | Phone, then gear | Secondary features, by-ear comparisons and hardware |
 | 4. Safe to skip unless something looks wrong | 55 | Mixed | Cosmetic, older, or already covered by automated tests |
 | Parked | 6 | Phone | When the native apps start; whether three optional things get built |
@@ -31,44 +31,70 @@ If something fails, tell Claude the build number and what happened; tick an item
 
 ## 1. Do these first
 
-### New in build 586: the phone pass
+### New in builds 591 to 602: your ears first
 
-*The phone version of …chains and …waves. Play / Edit is the part most worth your time.*
+*Builds 599, 602 and 600 first, then one listening check for each new module build.*
+
+- [ ] Computer (the ROG, desktop app), ears: open acid, Balanced, PLAY, then mute track 07's patterns or press STOP and leave it two minutes with the CPU panel open. Pass: "Effects T07" falls to about nothing within a minute or two and stays there (it used to climb to 40%). Un-mute or PLAY: the effects sound as before, tails included, with no click when they wake. On any track with a reverb or delay, stop the notes and listen to the whole tail: nothing is cut short. (599)
+- [ ] Phone or computer, ears: while a song plays, add an LFO on the MOD screen to an effect knob (for example track 12 FX1 delay time). Change its depth and rate, then delete it. Pass: you hear each change at once, without stopping the song. (599)
+- [ ] Computer, a COPY of a song with LFOs: Settings › TRACKS, add two tracks. Pass: the LFOs show on the same track's MOD screen (its new number) and still move the same knobs. Take the two tracks away: everything goes back. A song changed before this build is not repaired. (602)
+- [ ] Computer: set ARRANGE ON STOP to PLAYHEAD, show the Phrase screen with Arrange beside it, PLAY past a page turn, then STOP. Pass: the Arrange cursor sits on the row where it stopped, in view. With STAYS it stays where it was. (602)
+- [ ] Computer: on the FX screen with several effects, right-click the first one › Clear. Pass: only that one goes. Same on the master. (602)
+- [ ] Computer: in the Arrange header press − several times. Pass: rows get lower until about three times as many show; labels hide when rows get tiny, colours and the playhead stay; ○ goes back to fit. (600)
+- [ ] Computer and phone: play a song with Arrange beside the Phrase, hands off. Pass: the page turns once when the playhead is about 8 rows from the bottom, a few rows that just played stay at the top, and touching a key keeps it still for 4 seconds. (600)
+- [ ] By ear, …chains, control maths: Envelope follow → Comparator A (Level about 0.30), its A > B gate → a Switch's Select, dry on A and a delay's output on B. Pass: loud hits jump to B with no click (Fade 5 ms; at 0 it may click, which is what 0 is for). Then a Crossfade with dry on A, an effect on B and a slow LFO into Mix: it sweeps, and Equal power keeps the loudness even. (591)
+- [ ] By ear, …chains, clock tools: a Clock into Chance gate, Out to a drum, Seed 7, Chance 50%. Play twice from the start: the same hits both times, and a render has them too. Seed 0: different every play. Then Clock → Clock multiplier ×3 → a drum: three even hits a beat. A kick's gate into Burst (Count 4, Bend up) → a snare: a roll that tightens. (592)
+- [ ] Computer, …chains, Scope: a sine LFO into A and a square LFO into B. Pass: a teal sine and a purple square on one screen; Rising keeps the picture still, Free lets it drift; Freeze stops the picture while the sound carries on. On a Track In while the song plays at 20 ms: can you read the waveform? (593)
+- [ ] By ear, …chains, building blocks: four Allpass (Phase) in a row with one LFO into every Freq jack, the last Out on a Crossfade's B against the dry sound: a phaser sweep. Three Allpass in Echo on a drum hit: a soft smear, and a held tone keeps its pitch. Noise through a band-pass Filter and a VCA with a short ADSR: a hi-hat. (594)
+- [ ] By ear, Delay line: Noise burst into it, Time 4.5 ms, Feedback 95%, Damp 20%: a plucked string near 220 Hz. Time 350 ms, Feedback 40%: an echo that fades. Feedback 99% on a loud sustained sound: loud and bent, never exploding, clicking or going silent for good. Too harsh or too tame when pushed? (596)
+- [ ] By ear, Expression: a sound into A passes through; K1 at 0.5 is half as loud. Pick Soft clip, raise K1: more drive. Change the formula while the song plays: any click or dropout? Type sin( and press Enter: silence and a line saying where the mistake is; fix it and the sound returns. (597)
+- [ ] By ear, …chains, Morph (Granular and spectral): a pad into In, a drum loop into In B, Mode Convolve, Morph 50%. Pass: the pad is chopped by the drums' rhythm; 0% is the pad alone, 100% the drums alone; no clicks turning Morph, Sharpness or Smoothing. Mode Shape: the pad sounds with the drums' tone colour. Is Convolve loud enough at the default? (601)
+
+### New in build 589: feedback loops (listen first)
+
+*Cables can now loop back on themselves. Listen before relying on it in a song.*
+
+- [ ] By ear, computer, …chains: Track In → Tape delay → Reverb → Chain Out, then drag Reverb's Out back to the delay's In. It is accepted and drawn as a long dash and a dot with a "1 blk" tag. Does it sound like feedback should (a wash that builds)? Turn the levels in the loop up until it runs away: it should settle loud (about +6 dB at the cable), never explode, click or go silent for good. Usable when pushed, or too harsh / too tame? (589)
+- [ ] By ear: patch a module's Out into its own In (a filter or a delay): accepted, same look; a short metallic ring is expected. Then in …waves: oscillator → filter → Out, with the filter's Out back into the oscillator's FM, and several notes held: each voice has its own loop and nothing runs away. (589)
+- [ ] Computer, …chains: delete one of the loop's forward cables: the dash-and-dot look goes from the closing cable; Undo brings it back; reload: still marked. Save, reopen, render: the render sounds like what played. Also play one of your songs with no loops: it sounds as it did before. (589)
+- [ ] Phone and computer, looks: make a loop on the folded phone; is the "1 blk" tag readable at the zoom you use, and is the cable easy to tell from control (dashed) and gate (dotted)? On the computer try the white theme, IDM pink & green and 909; hover the cable: it says "feedback, one block late". (589)
+
+### New in build 590: phone notification and tabs
+
+*Your two phone bugs of 14 Nov.*
+
+- [ ] Phone (installed app if you use it): open the acid project from Files or "Open with", press PLAY, pull the notification shade down: the title says "acid", not "Song 1". Rename the song while it plays: the title follows. Which icon do you see: the small Chrome logo, or Thunder Plus's own? (590)
+- [ ] Folded phone, Mobile mode, Chains shown (three tabs): Tracker, Synth and Chains read in full on a row of their own at the top; nothing scrolls sideways and the gear and PLAY are on screen. Show Waves too (four tabs): the same. Is the extra row acceptable, or would you rather keep one row and lose the LEFT time readout at that width? (590)
+
+### New in build 598: your three small requests
+
+- [ ] Computer, any skin: press Play on the Pattern screen. Pass: the small "■ STOP" at the right of the control bar looks like the other lit buttons (flat, the skin's own playing colour; no amber, thick border or shadow) and still stops the song. Try white, an IDM skin and a Low power skin. (598)
+- [ ] Computer, bottom effects bar: a track strip's volume fader cap is a flat line like the Mixer's, not a round knob. Drag, wheel, double-click (0 dB), Shift-fine and the right-click menu work as before, also on a bus strip and the master. (598)
+- [ ] Poly track, a row with three notes: put the cursor on one, press Enter (EDIT on the phone). Pass: "3 notes picked up". Enter on an empty row: all three appear in their columns, and one Undo removes all three. A single note, a mono track and effect columns behave as before. (598)
+
+### Could lose work or sound
+
+*A failure here means lost notes, a lost save, a hang, or no sound.*
+
+- [ ] Phone, Mobile setup: new song, SHIFT+▶ on the empty Arrange cell, type notes, PLAY with FOLLOW ON for over 5 s; the notes stay on screen, are on song row 000 and play (the lost-notes bug). Also: type three notes into a new pattern and PLAY at once; the notes are still there, also after reloading; if it hangs, did the app reload or did the notes vanish? (571, 570)
+- [ ] Phone and computer: Reset audio engine when healthy gives a toast and no dialog; after a runaway on the Fold a "Reload the app?" dialog appears and Reload brings back song, screen and kit; "Not now" leaves everything; with a recording running it refuses or asks first. (563)
+- [ ] Phone: leave the app stopped for 2 minutes, then tap a pad and PLAY; the first pad sounds at once, PLAY starts cleanly, a long reverb tail is not cut off. (553)
+- [ ] Any device: reload a song with samples and Save to a file at once (it waits or asks); reopen the file; every sample plays. (552)
+- [ ] Computer, Audio thread sequencer: STOP late in a long song (row 60+) and RESUME; no freeze, and it continues exactly where it was. (552)
+- [ ] Computer: sleep and wake (Chrome, then the Mac and Windows apps once built); after waking, PLAY makes sound without a reload. (552)
+
+## 2. Really worth trying
+
+### Builds 586 to 588: the two most important checks of each
+
+*Moved down from section 1 on 14 Nov to make room for builds 591 to 602. Each build's other checks are in the groups below.*
 
 - [ ] Folded phone: tap Play in the top bar. Can you play a patch with one thumb (sliders, dropdowns, keys) without ever moving, folding or deleting a module? Is it obvious which mode you are in? Should the phone start in Play or in Edit? (586)
-- [ ] Folded phone: drag a slider sideways: it moves from where it was instead of jumping to your finger; slide your finger up or down away from it while dragging for fine control; double-tap resets it. (586)
-- [ ] Folded phone: drag up or down starting on a slider: the patch pans instead of the value changing. Does the sideways-versus-up-down choice feel right? (586)
-- [ ] Folded phone: press and hold a module's title bar: its menu opens (Group, Copy, Duplicate, Delete). Hold a slider: Reset, Type a value, MIDI learn. Hold empty space: Add a module here. (586)
-- [ ] Folded phone: tap a value once: the box to type a number opens, and the number you type is what you get. (586)
-- [ ] Folded phone: the top bar is one row (name, Play / Edit, +, undo, Fit, …), and File, Settings, Help, MIDI learn, Select and zoom are all under the … button. Anything you reach for that is now too far away? (586)
-- [ ] Folded phone: … then Select: tap several modules, or drag a box around them, then move them together. (586)
-- [ ] Folded phone: a very long module (pump GATE in …chains) opens folded into sections; open one section at a time. (586)
-- [ ] Folded phone, …waves: the on-screen keys show a whole octave, and the octave buttons move it up and down. (586)
-- [ ] Folded phone: opening an editor no longer puts a tip box over the patch; the Tips button at the bottom left opens it. (586)
-- [ ] Unfolded phone: the same Play / Edit switch and long-press menus work, and the top bar still shows everything. (586)
-- [ ] Computer: with a mouse nothing above changed how the editors behave; Alt+E switches Play / Edit. (586)
-
-### New in build 587: the editors on a computer
-
-*Mouse and keyboard changes in …chains and …waves. The first three change how things you already do behave.*
-
+- [ ] Folded phone: drag a slider sideways: it moves from where it was instead of jumping to your finger; slide your finger up or down away from it while dragging for fine control; double-tap resets it. Drag up or down starting on a slider: the patch pans instead of the value changing. Does the sideways-versus-up-down choice feel right? (586)
 - [ ] Computer: rest the pointer on a slider for a moment, then turn the mouse wheel: the value changes (hold Shift for fine steps). Scrolling across the patch without stopping on a slider never changes a value. Does the short wait feel right, also on a trackpad? (587)
-- [ ] Computer: Alt+click resets a slider; Ctrl / Cmd+click no longer does. Right-click on a slider opens Reset, Type a value, MIDI learn. Is losing Ctrl / Cmd+click a problem for you? (587)
 - [ ] Computer: plug a second cable into an input that already has one: both now feed it and add together (before, the new one replaced the old). Try two sources into one filter input: it should sound like both. (587)
-- [ ] Computer: modules now snap to a grid when you drag them. Good, or should it be off by default? (Right-click the background to turn it off.) (587)
-- [ ] Computer: press A (or N in …chains), type part of a module's name, Enter: it is added. F fits the patch; Shift+F zooms to what is selected; arrow keys nudge the selection; Ctrl / Cmd+A selects all. (587)
-- [ ] Computer: select three or more modules, right-click: Align, Space evenly, and on the background Tidy up. Do they do what you expect? (587)
-- [ ] Computer: right-click the background, Add a comment here; right-click a module, Rename. Save, reload: both are still there. (587)
-- [ ] Computer: hold the pointer over a cable: a small label says what it connects and its level. (587)
-- [ ] Computer, …chains: save a custom preset on a module, save the project, open it on another device or browser: the preset is there. (587)
-
-### New in build 588: small modules, Mini, groups
-
 - [ ] Computer: collapse a whole patch to Mini (Alt+Shift+C, or Shift+click a module's arrow): each module becomes a one-line bar. Can you still tell the modules apart and follow the cables? Click a bar to open it. (588)
-- [ ] Phone: press and hold a module's arrow: it goes to Mini. Is that easy to find, or would you want it somewhere more obvious? (588)
-- [ ] Computer: the small utility modules (Attenuverter, Math, Logic, Quantizer, Random, Slew limiter, Sample & hold) are narrower now. Anything cramped or hard to read? Their ? button moved into the module menu. (588)
 - [ ] Computer: put a few modules in a group, then drag one of them: the group's box follows. Fold the group: it becomes one block that says how many modules and cables it holds. (588)
-- [ ] Computer: an old patch with collapsed modules and groups opens looking the same as before. (588)
 
 ### Re-check the fixes from your feedback
 
@@ -80,9 +106,40 @@ If something fails, tell Claude the build number and what happened; tick an item
 - [ ] Computer: drag an LFO to the small jack beside a mixer's Pan slider: it connects on the first try. (584)
 - [ ] Computer: Help shows Signal kinds as three tidy rows; choosing "Modules" in Help scrolls to that section and does not open a second editor. (584)
 - [ ] Computer: in Chains and Waves the File menu starts with New project and has no Undo / Redo; Edit has them; the Tracker says "New project" too. (584)
-- [ ] Computer, inside Thunder Plus (chains): MIDI-map a slider and put another in the bottom panel, then collapse the module; a small "CC" and a dot show on its summary line. (579) (could not test MIDI)
 
-### New in build 585: the editors' small fixes (pass 2)
+### Phone editing in …waves / …chains (586)
+
+*The phone version of …chains and …waves. The two most important checks are in section 1.*
+
+- [ ] Folded phone: press and hold a module's title bar: its menu opens (Group, Copy, Duplicate, Delete). Hold a slider: Reset, Type a value, MIDI learn. Hold empty space: Add a module here. (586)
+- [ ] Folded phone: tap a value once: the box to type a number opens, and the number you type is what you get. (586)
+- [ ] Folded phone: the top bar is one row (name, Play / Edit, +, undo, Fit, …), and File, Settings, Help, MIDI learn, Select and zoom are all under the … button. Anything you reach for that is now too far away? (586)
+- [ ] Folded phone: … then Select: tap several modules, or drag a box around them, then move them together. (586)
+- [ ] Folded phone: a very long module (pump GATE in …chains) opens folded into sections; open one section at a time. (586)
+- [ ] Folded phone, …waves: the on-screen keys show a whole octave, and the octave buttons move it up and down. (586)
+- [ ] Folded phone: opening an editor no longer puts a tip box over the patch; the Tips button at the bottom left opens it. (586)
+- [ ] Unfolded phone: the same Play / Edit switch and long-press menus work, and the top bar still shows everything. (586)
+- [ ] Computer: with a mouse nothing above changed how the editors behave; Alt+E switches Play / Edit. (586)
+
+### Editors on a computer (587)
+
+*Mouse and keyboard changes in …chains and …waves. The wheel and second-cable checks are in section 1.*
+
+- [ ] Computer: Alt+click resets a slider; Ctrl / Cmd+click no longer does. Right-click on a slider opens Reset, Type a value, MIDI learn. Is losing Ctrl / Cmd+click a problem for you? (587)
+- [ ] Computer: modules now snap to a grid when you drag them. Good, or should it be off by default? (Right-click the background to turn it off.) (587)
+- [ ] Computer: press A (or N in …chains), type part of a module's name, Enter: it is added. F fits the patch; Shift+F zooms to what is selected; arrow keys nudge the selection; Ctrl / Cmd+A selects all. (587)
+- [ ] Computer: select three or more modules, right-click: Align, Space evenly, and on the background Tidy up. Do they do what you expect? (587)
+- [ ] Computer: right-click the background, Add a comment here; right-click a module, Rename. Save, reload: both are still there. (587)
+- [ ] Computer: hold the pointer over a cable: a small label says what it connects and its level. (587)
+- [ ] Computer, …chains: save a custom preset on a module, save the project, open it on another device or browser: the preset is there. (587)
+
+### Mini, groups and narrow modules (588)
+
+- [ ] Phone: press and hold a module's arrow: it goes to Mini. Is that easy to find, or would you want it somewhere more obvious? (588)
+- [ ] Computer: the small utility modules (Attenuverter, Math, Logic, Quantizer, Random, Slew limiter, Sample & hold) are narrower now. Anything cramped or hard to read? Their ? button moved into the module menu. (588)
+- [ ] Computer: an old patch with collapsed modules and groups opens looking the same as before. (588)
+
+### Editors' small fixes (585, pass 2)
 
 *These decide whether the phone pass for …waves and …chains can start.*
 
@@ -90,21 +147,6 @@ If something fails, tell Claude the build number and what happened; tick an item
 - [ ] Computer: drag a slider once, then Undo once: it goes back to where it started in one step. (585)
 - [ ] Computer: a slider or dropdown that sits under a cable still responds to a click. (585)
 - [ ] Computer, Waves view inside Thunder Plus: Voices and On-screen keys can be reached. (585)
-
-### Could lose work or sound
-
-*A failure here means lost notes, a lost save, a hang, or no sound.*
-
-- [ ] Phone, Mobile setup: new song, SHIFT+▶ on the empty Arrange cell, type notes, PLAY with FOLLOW ON for over 5 s; the notes stay on screen, are on song row 000 and play (the lost-notes bug). (571)
-- [ ] Phone and computer: Reset audio engine when healthy gives a toast and no dialog; after a runaway on the Fold a "Reload the app?" dialog appears and Reload brings back song, screen and kit; "Not now" leaves everything; with a recording running it refuses or asks first. (563)
-- [ ] Phone, runaway kick retest: simple song with the delay, Page sequencer, PLAY, screen off, press a volume key, wait 15 s, screen on, STOP, Copy report; a short gap at the kick, then the song carries on (report: kicked 1x, moved on 0x). (557)
-- [ ] Phone: leave the app stopped for 2 minutes, then tap a pad and PLAY; the first pad sounds at once, PLAY starts cleanly, a long reverb tail is not cut off. (553)
-- [ ] Any device: reload a song with samples and Save to a file at once (it waits or asks); reopen the file; every sample plays. (552)
-- [ ] Computer, Audio thread sequencer: STOP late in a long song (row 60+) and RESUME; no freeze, and it continues exactly where it was. (552)
-- [ ] Computer: unplug and replug the interface, then Reset audio engine; if the engine will not run you get the dialog; say whether the desktop app's own reload fires. (563)
-- [ ] Computer: sleep and wake (Chrome, then the Mac and Windows apps once built); after waking, PLAY makes sound without a reload. (552)
-
-## 2. Really worth trying
 
 ### On the phone, playing a song
 
@@ -179,7 +221,6 @@ If something fails, tell Claude the build number and what happened; tick an item
 
 ### On the phone: notes, stutter, effects and the CPU panel
 
-- [ ] Phone: new song, type three notes into a new pattern, PLAY at once; the notes are still there, also after reloading. If it hangs, did the app reload or did the notes vanish? (570)
 - [ ] Any device: add the first effect to an effect-free song while it plays; it is heard without a reload (report any brief click). (545)
 - [ ] Phone: the stutter on a pad with a sample that stopped under LOOP (MUT); is it better? (545)
 - [ ] Phone: the song that stutters with Arrange showing: play it once, STOP, Copy report (slow and long frame lines); does it use MUT, CUT, RES or DEC on sample pads? (New on 10 Nov)
@@ -224,14 +265,15 @@ If something fails, tell Claude the build number and what happened; tick an item
 
 - [ ] Web, hardware synth: PLAY a MIDI track, hide the window, STOP (or come back and STOP at once); no notes play on. Say if drum gear sounding booked hits for up to 1.2 s matters. (548)
 - [ ] Computer with the audio interface: idle 5 minutes (no MIDI keyboard, MIDI clock out or waves / chains screens open), then play; any click from the interface or late first note? (553)
+- [ ] Phone, runaway kick retest: simple song with the delay, Page sequencer, PLAY, screen off, press a volume key, wait 15 s, screen on, STOP, Copy report; a short gap at the kick, then the song carries on (report: kicked 1x, moved on 0x). (557)
 - [ ] Computer: with your interface as Output, unplug it while stopped; a message says it plays on the system default; plug back: "is back" and sound returns. Repeat while a song plays. (552)
 - [ ] Computer: change the system default device (once with System default chosen in the app, once with a specific device); sound follows or stays as chosen, no reload. (552)
-- [ ] Computer: Reset audio engine with the interface chosen; sound comes back on the interface (say if a reload was still needed). (552)
+- [ ] Computer: Reset audio engine with the interface chosen; sound comes back on the interface (say if a reload was still needed). Also unplug and replug the interface, then Reset audio engine; if the engine will not run you get the dialog; say whether the desktop app's own reload fires. (552, 563)
 - [ ] Computer: play a key on the …waves screen; it sounds on the chosen output. (552)
 - [ ] Computer: the desktop v1.3.0 helper checklist (claude.ai artifact link in the file), including monitoring after reopening the window and the clock in, which seemed slightly out of sync. (Carried over)
 - [ ] Windows: recording (WASAPI) and MIDI (WinMM). (Carried over)
 - [ ] Ableton Link: CI build on Mac / Windows, then against Live or Koala. (Carried over)
-- [ ] Hardware MIDI tests. (Carried over)
+- [ ] Hardware MIDI tests, including: inside Thunder Plus (chains), MIDI-map a slider and put another in the bottom panel, then collapse the module; a small "CC" and a dot show on its summary line (579; could not test MIDI). (Carried over)
 
 ## 4. Safe to skip unless something looks wrong
 

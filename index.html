@@ -1197,8 +1197,9 @@ body:not(.legon) .tside .tlegend{display:none}
 #tSub.msS::after{content:' · SOLO'; font-weight:800} #tSub.msM::after{content:' · MUTED'; font-weight:800}
 #tPad #kMute.any:not(.lt):not(#zz):not(#zz), #tPad #kSolo.any:not(.lt):not(#zz):not(#zz){outline:3px solid currentColor; outline-offset:-5px}
 /* LOOP and PLAY when engaged (owner, 9 Nov): lit the same way as MUTE and SOLO, each its own colour, on every skin */
+/* (14 Nov, owner: "make the control bar stop button look like the skin") only the PAD's LOOP and PLAY keep their own colours: the control bar's STOP (.tcmd [data-c=song].on) is a plain control-bar button now, lit by the skin's own on state (.tcmd button.on, .cmini's inverted ink, and the skins' PLAYING accent below), flat, with no colour or shadow of its own */
 #tPad #kLoop.on:not(#zz):not(#zz):not(#zz){background:#7cecff !important; color:#06384a !important; border:4px solid #0a6a8c !important; box-shadow:4px 4px 0 0 #0a6a8c !important; font-weight:800; text-shadow:none !important}
-#tPad #kPlay.on:not(#zz):not(#zz):not(#zz), .tcmd button[data-c=song].on:not(#zz):not(#zz):not(#zz):not(#zz):not(#zz){background:#ffc23d !important; color:#3a2200 !important; border:4px solid #a85f00 !important; box-shadow:4px 4px 0 0 #a85f00 !important; font-weight:800; text-shadow:none !important}
+#tPad #kPlay.on:not(#zz):not(#zz):not(#zz){background:#ffc23d !important; color:#3a2200 !important; border:4px solid #a85f00 !important; box-shadow:4px 4px 0 0 #a85f00 !important; font-weight:800; text-shadow:none !important}
 .k.dn,.k.on{background:var(--ink); color:var(--inv)}
 #kPlay.on{background:var(--pl); border-color:var(--line); color:var(--inv)}
 .k.lt{background:var(--pl); color:var(--inv); border-color:var(--line)}
@@ -1223,7 +1224,7 @@ body:not(.legon) .tside .tlegend{display:none}
 .tcmd.cmini :is([data-c=cut],[data-c=sel],[data-c="b:-16"],[data-c=prev]), :root[data-skinbase] .tcmd.cmini :is([data-c=cut],[data-c=sel],[data-c="b:-16"],[data-c=prev]):not(#zz){margin-left:.9em; border-left:1px solid var(--line)}
 .tcmd.cmini [data-c=song], :root[data-skinbase] .tcmd.cmini [data-c=song]:not(#zz){margin-left:auto; border-left:1px solid var(--line)}
 .tcmd.cmini button:hover, :root[data-skinbase] .tcmd.cmini button:not(#zz):hover{background:color-mix(in srgb, var(--ink) 14%, transparent)}
-.tcmd.cmini button:is(.on,.dn), :root[data-skinbase] .tcmd.cmini button:is(.on,.dn):not(#zz){background:var(--ink)!important; color:var(--inv)}
+.tcmd.cmini button:is(.on,.dn), :root[data-skinbase] .tcmd.cmini button:is(.on,.dn):not(#zz){background:var(--ink)!important; color:var(--inv)!important}   /* (14 Nov: !important on the text too: the Low power skins force white on every lit button, which was white on the light ink here, unreadable once STOP uses this) */
 .tcmd.cmini button.off, :root[data-skinbase] .tcmd.cmini button.off:not(#zz){opacity:.32; pointer-events:none}
 .tcmd button[hidden]{display:none}
 /* CONTROL BAR LABELS FIT (13 Nov, owner: "m.pat and lp.sel both get cutoff by their outlines… Cln down is tight, we could put the arrow below cln"): a label of the big bar never overflows its button.
@@ -1362,6 +1363,12 @@ body.mob .top .kitname{width:auto; flex:1 1 90px; min-width:64px; max-width:220p
 /* SYNTH UX C (13 Nov): with Waves and Chains shown (4 tabs) on the folded phone (360-412 px) every label reads in full and the tabs do not scroll inside themselves: a step down in size, tighter padding. */
 @media (max-width:520px){ body.mob .top #segView:has(button:nth-child(4)){overflow:visible; flex:none} body.mob .top #segView:has(button:nth-child(4)) button{padding-inline:3px!important; letter-spacing:-.02em; font-size:11px} }
 @media (max-width:380px){ body.mob .top #segView:has(button:nth-child(4)) button{font-size:10.5px} }
+/* TABS ON THEIR OWN ROW (14 Nov, owner: "Tracker | Synth | Chai" on the folded Fold, 3 tabs): Tracker, Synth and Chains / Waves are 150 px (4 tabs: 170) and the rest of the bar (LEFT, File, Settings, PLAY, CPU)
+   is another ~220, more than a 320-460 px screen has: with 3 tabs the switch shrank and scrolled inside itself (Chains cut), with 4 the whole bar ran off the screen (the 360 / 412 check measured the tabs, not the bar).
+   Three or more tabs now take a full row of their own there and share it out, at the normal size; two tabs (Tracker | Synth) stay beside the rest as before. */
+@media (max-width:460px){ body.mob .top{flex-wrap:wrap}
+  body.mob .top #segView:has(button:nth-child(3)){flex:1 1 100%; min-width:0; overflow:visible}
+  body.mob .top #segView:has(button:nth-child(3)) button{flex:1 1 auto; padding-inline:6px!important; letter-spacing:.02em; font-size:var(--fs-3)} }
 body.mob .top .brand{flex-shrink:1; min-width:0; overflow:hidden}
 /* (owner, 11 Nov) The name leaves the title bar when the bar has no room for the whole word (the Fold unfolded showed "Thunde"): brandFit()
    measures it. And with no name showing (folded, or hidden by brandFit) the bar starts at the screen edge, so Tracker lines up with SONG below it. */
@@ -1609,6 +1616,17 @@ body.arrsmall #tArr .tatop button{width:26px} body.asong #tArr .tatop button{wid
 .tagrid .ar.q4{margin-top:7px}
 .tagrid .ar.q4::before{content:''; position:absolute; left:8px; right:8px; top:-5px; height:1px; background:var(--ar-ink, #111); opacity:.45; pointer-events:none}
 .tagrid .rn{font-size:var(--fs-1); line-height:var(--arh,16px); color:var(--ar-dim); cursor:pointer}
+/* ARRANGE ZOOM OUT (14 Nov): rows below the fit size; tighter gaps, row numbers and labels that shrink with the row, and under 10 px only every fourth row's number and no label (the block's colour, the cursor, the selection, the playhead and the hatching of a muted block stay) */
+.tarr.arout .tagrid .ar{margin-bottom:1px}
+.tarr.arout .tagrid .ar.q4{margin-top:3px}
+.tarr.arout .tagrid .ar.q4::before{top:-2px}
+body .tarr.arout .tagrid .rn{font-size:var(--arn, 7px)}
+.tarr.arout .tagrid b{border-radius:1px}
+.tarr.arout .tagrid b.z:not(.p):not(.m)::after{inset:1px}
+.tarr.arlow .tagrid .rn:not(.r4):not(.rc):not(.pl){color:transparent}
+.tarr.arlow .tagrid b.p{outline-width:1px}
+.tarr.arlow .tagrid b.sl{box-shadow:inset 0 0 0 1px var(--ar-sel) !important}
+.tarr.arlow .tagrid b.o:not(.p)::after{height:1px; margin-top:0}
 .tagrid .rn.r4{color:var(--ar-ink); font-weight:700}
 .tagrid .rn.pl{background:var(--ar-pl); color:var(--ar-pl-ink); border-radius:2px}
  .tagrid b{display:block; position:relative; height:var(--arh,16px); line-height:var(--arh,16px); font-size:var(--arf,9px); font-weight:600; text-align:center; border-radius:2px; background:var(--ar-empty); color:transparent; cursor:pointer}
@@ -2148,11 +2166,12 @@ body.sdesk .dock:not(.vtrk) .pads .pad:nth-child(17)::before{content:'More pads'
 .stm i.clip::after{background:var(--meter-clip)}
 .stsc{grid-row:1; grid-column:4; position:relative; margin:1px 0}
 .stsc i{position:absolute; left:0; right:0; transform:translateY(50%); font:var(--fs-1)/1 var(--mono); font-style:normal; color:var(--muted); text-align:center}
-/* the fader looks like the app's other sliders: a thin track filled in ink up to a round thumb */
+/* the fader: a thin track filled in ink up to a flat bar cap, the Mixer's fader (14 Nov, owner: a line at the top, not a round thumb) */
 .stfad{grid-row:1; grid-column:2; justify-self:center; position:relative; width:30px; min-height:0; cursor:ns-resize; touch-action:none; outline-offset:2px; border-radius:3px}
 .stfad::before{content:''; position:absolute; left:50%; top:8px; bottom:8px; width:4px; margin-left:-2px; border-radius:2px; background:var(--track)}
 .stfill{position:absolute; left:50%; bottom:8px; width:4px; margin-left:-2px; border-radius:2px; background:var(--ink)}
-.stcap{position:absolute; left:50%; width:16px; height:16px; margin:0 0 -8px -8px; border-radius:50%; background:var(--ink)}
+.stcap{position:absolute; left:50%; width:28px; height:3px; margin:0 0 -1.5px -14px; border-radius:1px; background:var(--ink); box-shadow:0 0 0 1px var(--panel)}   /* a flat bar, as the Mixer's .mfbar (3 px, 1 px radius, the ink with a 1 px halo of the ground; 4 px on hover and while dragged) */
+.stfad:is(:hover,:active,:focus-visible) .stcap{height:4px; margin-bottom:-2px}
 .st0{position:absolute; left:2px; right:2px; height:0; border-top:1px solid var(--muted); opacity:.6}
 .stvv{grid-row:2; grid-column:2 / 5; text-align:center; font-size:var(--fs-2); white-space:nowrap}
 .stms{grid-row:1 / 3; grid-column:6; display:flex; flex-direction:column; gap:8px}
@@ -2176,7 +2195,7 @@ body.sdesk .dock:not(.vtrk) .pads .pad:nth-child(17)::before{content:'More pads'
 .stgx{position:absolute; top:0; right:0; pointer-events:auto; min-height:0; width:22px; height:22px; padding:0; border:0; background:transparent; color:var(--muted); opacity:0; transition:opacity .15s; font-size:var(--fs-3)}
 .tstage:hover .stgx, .stgx:focus-visible{opacity:1}
 .stgdogs{flex:1; min-height:0; display:flex; align-items:flex-end; justify-content:center; padding-bottom:2px}
-.stgdogs .dogs{max-width:420px; max-height:100%; color:var(--ts-ink)}
+.stgdogs .dogs{pointer-events:auto; max-width:420px; max-height:100%; color:var(--ts-ink)}
 .tstage .dogs{--dk-ink:var(--ts-ink); --dk-fill:var(--ts-bg)}
 .stgph{flex:1; min-height:0; display:flex; flex-direction:column; gap:4px; font:var(--fs-2)/1.2 var(--mono); color:var(--ts-dim)}
 .stgph b{font-weight:600; letter-spacing:.06em}
@@ -3741,7 +3760,7 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
 </div>
 <div class="toast" id="toast" role="status" aria-live="polite" title="Tap to dismiss" hidden></div>
 
-<script src="waves/waves-worklet.js?v=39"></script>
+<script src="waves/waves-worklet.js?v=45"></script>
 <!-- LXR ENGINES (23 Oct 2026): the LXR-02 firmware's drum voices, GPL-3.0, all of it in lxr/. Optional: without the folder
      this fails quietly and the app has no Firmware engines. The render Worker loads the same file (LXR_JS below). -->
 <script src="lxr/lxr-engine.js?v=2"></script>
@@ -8731,7 +8750,7 @@ self.onmessage = async e => {
       if (m.op === 'done') j.ok({data:m.data, data2:m.data2 || null, st:m.st}); else j.no(new Error(m.err));
     };
     w.onerror = e => { e.preventDefault && e.preventDefault(); rwDown(); };
-    w.postMessage({op:'init', pl:plMod, tx:txMod, lx:lxMod || null, ps:psMod || null, wv:new URL('waves/waves-worklet.js?v=39', location.href).href});
+    w.postMessage({op:'init', pl:plMod, tx:txMod, lx:lxMod || null, ps:psMod || null, wv:new URL('waves/waves-worklet.js?v=45', location.href).href});
     PW.w = w;
   } catch(e){ PW.w = null; }
 }
@@ -9155,7 +9174,7 @@ let tt = 0, busNote = '';   // busNote: BUS, the one-time note on a bus track (b
    "saved by a newer build", "couldn't save" and "audio was interrupted" were gone in 2 s). A message given 4 s or more is
    kept: quick ones that arrive meanwhile wait for it (the latest one, shown after), and another long one queues behind
    it (three at most). A click or tap on the toast lets it go and shows the next. Screen readers hear each one (aria-live). */
-const toastQ = []; let toastLong = false, toastQuick = null;
+const toastQ = []; let toastLong = false, toastQuick = null, toastKey = '';   // toastKey: which toastBrief() text is on screen (a new one of that kind replaces it)
 // toastOnce: a notice that only needs reading once on this device (key: what it is about)
 function toastOnce(key, msg, ms){ const K = 'thunderplus-seen-' + key; try { if (localStorage.getItem(K)) return; localStorage.setItem(K, '1'); } catch(e){} toast(msg, ms); }
 setTimeout(() => { try { $('toast').addEventListener('click', () => toastNext()); } catch(e){} }, 0);
@@ -9188,12 +9207,21 @@ function toastPlace(t){
   } catch(e){}
 }
 function toastShow(msg, dur, long){
-  const t = $('toast'); t.textContent = msg; t.hidden = false; toastPlace(t); clearTimeout(tt); toastLong = long;
+  const t = $('toast'); t.textContent = msg; t.hidden = false; toastPlace(t); clearTimeout(tt); toastLong = long; toastKey = '';
   tt = setTimeout(toastNext, dur); }
 function toastNext(){
   const t = $('toast'); clearTimeout(tt); t.hidden = true; toastLong = false;
   const n = toastQ.shift() || toastQuick; if (n === toastQuick) toastQuick = null;
   if (n) toastShow(n[0], n[1], n[1] >= 4000); }
+/* A BRIEF NOTICE (14 Nov, owner: "block x exists on another track … persists way too long"). The block-got-its-own-number and shared-phrase notes were asked for
+   5 to 7 s, which makes a long toast: it is kept, the next quick ones wait for it and further long ones queue behind it (three), so entering a few blocks left
+   it on screen for 15 s or more. toastBrief(key, msg): long enough to read (2.5 to 3.9 s by length), never a long toast (nothing queues, nothing waits), and a
+   new one of the same key replaces the text on screen and restarts the time, so a run of entries shows one note, the latest. The POP-UP MESSAGES setting still applies (it goes through toast()). */
+function toastBrief(key, msg){
+  msg = String(msg == null ? '' : msg); const dur = clamp(1500 + msg.length * 18, 2500, 3900), t = $('toast');
+  if (!toastsOn) return;
+  if (!t.hidden && !toastLong && toastKey === key){ toastShow(msg, dur, false); toastKey = key; return; }
+  toast(msg, dur); if (!t.hidden && !toastLong && t.textContent.indexOf(msg) === 0) toastKey = key; }
 
 /* ---------- in-page prompt / confirm ----------
    The browser's prompt() and confirm() stop the whole page: the 25 ms sequencer pump can't run, so after the dialog
@@ -14849,20 +14877,30 @@ let skin = (() => { try { const v = localStorage.getItem(SKK); if (SKINS.some(k 
 // below a visible step, so the drift looks continuous at a third of the repaints of a per-frame animation. Paused while
 // the app is hidden; off with reduced motion.
 let rbT = 0;
+// ANIMATIONS (14 Nov, owner: "the dancing dogs and the other animations ... turn them off on any screen they appear on"): ON by default. OFF stops the decorations and the work behind them:
+// the dancing dogs (Song, Project, Phrase and the DOGS stage), the FX bar's effect pictures (rooms, grains, springs, swirls ...) and the Simple rainbow dynamic skin's colour drift.
+// Meters, scopes, playheads and the piano / spectrum / chain displays are functional and stay. Per device (localStorage). var: rbWheel() can run before this line is passed.
+var animOn = (() => { try { return localStorage.getItem('thunderplus-anim-v1') !== '0'; } catch(e){ return true; } })();
+function setAnim(on, say){
+  animOn = !!on; try { localStorage.setItem('thunderplus-anim-v1', animOn ? '1' : '0'); } catch(e){}
+  try { rbWheel(); } catch(e){} try { stageLayout(); } catch(e){} try { dkFbSig = ''; } catch(e){}
+  if (say) toast(animOn ? 'Animations are on.' : 'Animations are off. Settings → ANIMATIONS turns them back on.', 3600);
+  draw();
+}
 // Simple rainbow dynamic turns the --rbo hue offset that every rainbow colour is built from (10×/s, 1.8° steps, once
 // round in 20 s). The earlier hue-rotate() filter on <html> made the browser re-rasterise the whole page at device
 // resolution on every step (frame gaps doubled on the phone); a property change only restyles the coloured elements.
 function rbWheel(){
   const de = document.documentElement;
   clearInterval(rbT); rbT = 0; de.style.removeProperty('filter'); de.style.removeProperty('--rbo');
-  if (skin !== 'rainbowdyn' || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  if (skin !== 'rainbowdyn' || animOn === false || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
   rbT0 = performance.now(); if (!document.hidden) rbRun();
 }
 // BATTERY (8 Nov): no timer at all while the app is hidden (it only skipped the write before); the colours carry on from the same
 // place when it comes back, as the phase is read from the clock.
 var rbT0;   // var, no initialiser: rbWheel() may run before this line
 function rbRun(){ const de = document.documentElement; clearInterval(rbT); rbT = setInterval(() => { de.style.setProperty('--rbo', ((performance.now() - rbT0) * 0.018 % 360).toFixed(1) + 'deg'); }, 100); }
-document.addEventListener('visibilitychange', () => { if (skin !== 'rainbowdyn' || !rbT0 || matchMedia('(prefers-reduced-motion: reduce)').matches) return; if (document.hidden){ clearInterval(rbT); rbT = 0; } else if (!rbT) rbRun(); });
+document.addEventListener('visibilitychange', () => { if (skin !== 'rainbowdyn' || animOn === false || !rbT0 || matchMedia('(prefers-reduced-motion: reduce)').matches) return; if (document.hidden){ clearInterval(rbT); rbT = 0; } else if (!rbT) rbRun(); });
 // MATRIX TABS (owner, 31 Oct): in the Matrix skins the screen tabs (Tracker … Chains) end where the tracker's tabs below
 // (… PROJECT) do: their buttons share out the difference. Other skins, or a gap too big to be the same row of tabs: as is.
 function alignTabs(){
@@ -17689,11 +17727,12 @@ function chainsChanged(){ CH.doc = S.chainPatch || null; saveS(); chainsPush(); 
    and the song drifting apart. The op shapes are the engine protocol's (add / remove / connect / disconnect). */
 function patchOp(d, op){
   if (!d || !op || !op.op) return;
-  if (op.op === 'add'){ const ms = d.modules = d.modules || []; if (!ms.some(m => m.id === op.id)) ms.push({ id:op.id, type:op.type, params:op.params || {}, pos:op.pos || [0, 0] }); }
+  if (op.op === 'add'){ const ms = d.modules = d.modules || []; if (!ms.some(m => m.id === op.id)){ const nm = { id:op.id, type:op.type, params:op.params || {}, pos:op.pos || [0, 0] }; if (typeof op.text === 'string') nm.text = op.text.slice(0, 200); ms.push(nm); } }   // TEXT: a module's formula (Expression) travels with its add; the engine keeps a string cut to 200 and ignores anything else
   else if (op.op === 'remove'){ if (d.modules) d.modules = d.modules.filter(m => m.id !== op.id); if (d.cables) d.cables = d.cables.filter(c => c.from[0] !== op.id && c.to[0] !== op.id); }
   else if (op.op === 'connect'){ const cs = d.cables = d.cables || [], same = c => c.from[0] === op.a[0] && c.from[1] === op.a[1] && c.to[0] === op.b[0] && c.to[1] === op.b[1]; const ex = cs.find(same); if (!ex) cs.push(op.fb === true ? { from:op.a, to:op.b, fb:true } : { from:op.a, to:op.b }); else if (op.fb === true) ex.fb = true; else delete ex.fb; }   // FEEDBACK: the mark travels with the cable; connecting a cable again with another mark only changes its mark (the engine does the same)
   else if (op.op === 'disconnect'){ if (d.cables) d.cables = d.cables.filter(c => !(c.from[0] === op.a[0] && c.from[1] === op.a[1] && c.to[0] === op.b[0] && c.to[1] === op.b[1])); }
   else if (op.op === 'param'){ const m = (d.modules || []).find(x => x.id === op.id); if (m) (m.params = m.params || {})[op.name] = op.value; }
+  else if (op.op === 'text'){ const m = (d.modules || []).find(x => x.id === op.id); if (m && typeof op.value === 'string') m.text = op.value.slice(0, 200); }   // TEXT: a live change of a module's formula (a value that is not a string is ignored, as the engine does)
 }
 /* A track that gains a Chain Out (a new I/O pair, or a pair moved to it) turns its CHN on in the Mixer, so the chain is
    heard straight away; switching CHN off later still sticks, as only a NEW pair turns it on. This runs on every kind
@@ -19446,6 +19485,23 @@ class ThunderFx extends AudioWorkletProcessor {
     if (hotBad(oL, oR, n)){ try { if (s.def.destroy) s.def.destroy(s.st); s.st = s.def.create(sampleRate); } catch (e){ s.dead = true; } return; }   // went bad: start it afresh, pass this block
     L.set(this.sub(oL, n)); R.set(this.sub(oR, n)); hotClip(L, R, n);
   }
+  /* SLOT NAP (14 Nov): an effect with nothing going in (under 1e-9, -180 dB) and nothing left coming out for a second is skipped, its
+     output silence, until something arrives; it then runs in that same block, from the state it stopped in (a tail below -180 dB). Why: a
+     reverb, resonator or delay fed silence lets its memories decay into numbers so small (denormals) that a PC's processor works them
+     out 10 to 20 times slower, for as long as the silence lasts (a phone's does not); the tiny guard added at the node's input does not
+     stop it. With sound going through, nothing changes: the slot runs exactly as before. Not for effects that speak up on their own
+     after a pause (Vinyl's crackle, pump CRUSH's): they always run. */
+  slotNap(s, n, tr){
+    if (s.nn === undefined) s.nn = /vinyl|pcrush/.test(String(s.key));
+    if (s.nn){ this.slotRun(s, n, tr); return; }
+    const L = this.L, R = this.R; let ip = 0;
+    for (let k = 0; k < n; k++){ const a = L[k] < 0 ? -L[k] : L[k], b = R[k] < 0 ? -R[k] : R[k]; if (a > ip) ip = a; if (b > ip) ip = b; }
+    if (s.zz){ if (ip < 1e-9){ for (let k = 0; k < n; k++){ L[k] = 0; R[k] = 0; } return; } s.zz = false; s.zq = 0; }
+    this.slotRun(s, n, tr);
+    if (ip < 1e-9){ let op = 0; for (let k = 0; k < n; k++){ const a = L[k] < 0 ? -L[k] : L[k], b = R[k] < 0 ? -R[k] : R[k]; if (a > op) op = a; if (b > op) op = b; }
+      if (op < 1e-9){ if ((s.zq = (s.zq || 0) + n) >= sampleRate * 30) s.zz = true; } /* 30 s, not 1: a long delay is silent between echoes (review, #130); the slowdown this guards against starts after a minute */ else s.zq = 0; }
+    else s.zq = 0;
+  }
   slotRun(s, n, tr){
     const x = this.x;
     if (s.def){ this.modRun(s, n); return; }
@@ -19485,7 +19541,19 @@ class ThunderFx extends AudioWorkletProcessor {
     // for the whole song. Only a tempo-locked slot (Flex / Step gate / Retrigger) needs to hear the clock while silent.
     if (this.pq && this.pq.length){ const old = currentTime - 1; while (this.pq.length && this.pq[0][1] < old) this.pq.shift(); if (this.pq.length) this.idle = 0; }   // …PUMP CREATIVE: notes due wake it (stale ones are dropped)
     // A node clocked only by Flex / Step gate sleeps too while the clock is stopped and it has been silent for longer than Flex's 13 s ring (the ring is then all silence, so waking it changes nothing).
-    if (ip < 1e-7 && this.idle >= sampleRate && (!this.clocked || (!this.chard && this.idle >= sampleRate * 14 && !(bp[0] >= 0 && bp[bp.length - 1] >= 0)))){ o[0].fill(0); if (o[1]) o[1].fill(0); this.fr += n; if (this.fr >= sampleRate / 2){ this.port.postMessage({load:this.ms / (this.fr / sampleRate * 1000)}); this.ms = 0; this.fr = 0; } return true; }
+    // SLEEP AND THE CLOCKED SLOTS (14 Nov): what a tempo-locked slot asks of the node depends on whether it is ON now (its own switch, or an FXO
+    // holding it). It used to count just by being in the chain, so a switched-OFF Retrigger kept its whole track's effects running on silence
+    // for the entire song, and on a PC their dying tails then became 10 to 20 times dearer (denormals: Chrome's audio thread does not flush
+    // them; measured on the owner's song, pump TWANG 64 -> 1300 µs a block from about 70 s after the sound stopped). ck: 0 nothing clocked is
+    // on (sleep after 1 s of silence); 1 only switched-off slots that keep a ring of the input for when they come on (Flex, Step gate,
+    // Retrigger ...: sleep once the silence is longer than the 13 s ring, clock running or not); 2 Flex / Step gate on (as 1, and only while
+    // the clock is stopped); 3 Retrigger, Grains, Scramble, Glitch or a clocked pump effect on (never: they keep running while stopped).
+    let ck = 0;
+    if (this.clocked) for (const s of this.slots){
+      const c = s.clk ? 3 : s.js ? (s.jt === 93 || (s.jt >= 100 && s.jt <= 102) ? 3 : s.jt === 94 || s.jt === 95 ? 2 : 0) : 0; if (!c) continue;
+      const sv = s.slot >= 0 && s.slot < 8 ? swv[s.slot] : -1, live = (sv < -0.5 ? s.on : sv > 0.5) || (s.pu !== undefined ? s.byp === false : s.g > 0);
+      const w = live ? c : s.js && s.js.feed ? 1 : 0; if (w > ck) ck = w; }
+    if (ip < 1e-7 && this.idle >= sampleRate && (ck === 0 || (ck < 3 && this.idle >= sampleRate * 14 && (ck === 1 || !(bp[0] >= 0 && bp[bp.length - 1] >= 0))))){ o[0].fill(0); if (o[1]) o[1].fill(0); this.fr += n; if (this.fr >= sampleRate / 2){ this.port.postMessage({load:this.ms / (this.fr / sampleRate * 1000)}); this.ms = 0; this.fr = 0; } return true; }
     if (i && i.length){ L.set(i[0]); R.set(i[1] || i[0]); } else { L.fill(0); R.fill(0); }
     // A NaN or infinity reaching the wasm hangs the tape delay for good and leaves many effects silent: zero those samples.
     // (sweep, 4 Nov) a loud but real sample (8 to 64, up to +36 dB) is clipped to ±8 rather than silenced: it was heard as a dropout
@@ -19499,18 +19567,20 @@ class ThunderFx extends AudioWorkletProcessor {
       this.ppq = on ? Math.max(0, bp[n - 1] + (this.cu || 0) - (n - 1) * T.tempo / 60 / sampleRate) : 0;   // …PUMP CREATIVE: the song position (quarter notes) at this block's start
       const tk = inputs[1], sd = inputs[2]; this.taps = tk && tk.length ? tk : null; this.sends = sd && sd.length ? sd : null; }   // SOURCE
     if (!this.dL){ this.dL = new Float32Array(128); this.dR = new Float32Array(128); }
+    const pqOn = !!(this.pq && this.pq.length);   // notes on their way to a pump effect: none of them naps
     for (const s of this.slots){
       // On or off: the slot's own setting, unless an FXO switch is holding it. Changes fade over 5 ms.
       const sv = s.slot >= 0 && s.slot < 8 ? swv[s.slot] : -1, tg = (sv < -0.5 ? s.on : sv > 0.5) ? 1 : 0;
       // …PUMP: on / off is the plugin's own bypass (latency-matched, crossfaded), so the timing never jumps; METER just stops
-      if (s.pu !== undefined){ if (s.byp !== !tg){ s.byp = !tg; s.dirty = true; } if (!(s.bi < 0 && s.byp)) this.slotRun(s, n, tr); if (this.lvl && tg && s.slot >= 0 && s.slot < 8){ const a = this.pk(n); if (a > this.lvlP[s.slot]) this.lvlP[s.slot] = a; } continue; }
+      if (s.pu !== undefined){ if (s.byp !== !tg){ s.byp = !tg; s.dirty = true; s.zq = 0; s.zz = false; } if (!(s.bi < 0 && s.byp)){ if (s.clk || pqOn) this.slotRun(s, n, tr); else this.slotNap(s, n, tr); } if (this.lvl && tg && s.slot >= 0 && s.slot < 8){ const a = this.pk(n); if (a > this.lvlP[s.slot]) this.lvlP[s.slot] = a; } continue; }
       if (s.g === undefined) s.g = tg;
       if (!tg && s.g <= 0){ if (s.js && s.js.feed){ tr.sw = sv; s.js.feed(this.L, this.R, n, tr); } continue; }
       const fade = s.g !== tg; if (fade){ this.dL.set(this.L); this.dR.set(this.R); }
       // FX DYNAMICS: Pressure, Multiband squash and the Transient shaper (wasm) have no reduction to report: their levels in and out
       const lvm = this.tel && !s.def && !s.js && (s.t === 7 || s.t === 26 || s.t === 28);
       if (lvm){ const a = this.pk(n); if (!(s.lip > a)) s.lip = a; }
-      tr.sw = sv; this.slotRun(s, n, tr);
+      if (fade){ s.zz = false; s.zq = 0; }   // a forced run must not leave the slot asleep (review, #130)
+      tr.sw = sv; if (fade || (s.js && !(s.jt === 96 || s.jt === 97 || s.jt === 98))) this.slotRun(s, n, tr); else this.slotNap(s, n, tr);   // (the tempo-locked cores keep their own time and rings, and the Vintage sampler and Degrade make their own noise: they always run; Pitch delay, Pitch reverb and the Resonator nap like the rest)
       if (lvm){ const a = this.pk(n); if (!(s.lop > a)) s.lop = a; }
       if (fade){ const L = this.L, R = this.R, d = 1 / (sampleRate * 0.005); let g = s.g;
         for (let k = 0; k < n; k++){ g = tg ? Math.min(1, g + d) : Math.max(0, g - d); L[k] = this.dL[k] + (L[k] - this.dL[k]) * g; R[k] = this.dR[k] + (R[k] - this.dR[k]) * g; }
@@ -19571,7 +19641,7 @@ function chainsReady(ac){
     chnLoaded.set(ac, (async () => {
       await tfxLoad; await tfxModLoad; if (!chnBin() || !ac.audioWorklet || !window.AudioWorkletNode) return false;
       if (!chnURL){
-        const src = await (await fetch('chains/chains-worklet.js?v=49')).text();
+        const src = await (await fetch('chains/chains-worklet.js?v=57')).text();
         chnURL = URL.createObjectURL(new Blob([src], {type:'application/javascript'}));
       }
       wkNote(ac, 'chains'); await ac.audioWorklet.addModule(chnURL);
@@ -19704,12 +19774,15 @@ function chnDiff(prev, next){
   const ops = [];
   const pm = new Map((prev.modules || []).map(m => [m.id, m]));
   const nm = new Map((next.modules || []).map(m => [m.id, m]));
-  for (const [id, m] of nm) if (!pm.has(id)) ops.push({ op:'add', id, type:m.type, params:chnClone(m.params), pos:chnClone(m.pos) });
+  for (const [id, m] of nm) if (!pm.has(id)){ const o = { op:'add', id, type:m.type, params:chnClone(m.params), pos:chnClone(m.pos) }; if (typeof m.text === 'string') o.text = m.text.slice(0, 200); ops.push(o); }   // TEXT: an added module carries its formula
   for (const id of pm.keys()) if (!nm.has(id)) ops.push({ op:'remove', id });
   for (const [id, m] of nm){
     const q = pm.get(id); if (!q) continue;
     const a = q.params || {}, b = m.params || {};
     for (const k in b) if (b[k] !== a[k]) ops.push({ op:'param', id, name:k, value:b[k] });
+    // TEXT: a formula that differs is one 'text' op (the engine's own default stands in when the new module has none: tests/modules-expr-editor.test.js)
+    const ta = typeof q.text === 'string' ? q.text.slice(0, 200) : undefined, tb = typeof m.text === 'string' ? m.text.slice(0, 200) : undefined;
+    if (ta !== tb) ops.push({ op:'text', id, value:tb !== undefined ? tb : 'a * k1' });
   }
   const key = c => c.from[0] + '.' + c.from[1] + '>' + c.to[0] + '.' + c.to[1];
   const pc = new Map((prev.cables || []).map(c => [key(c), c]));
@@ -22452,7 +22525,7 @@ let bassURL = null; const bassLoad = new WeakMap(), bassOK = new WeakSet(), bass
 // …PUMP SYNTHS live: their worklet, loaded with the others; psSent: the contexts whose audio thread has the wasm's bytes
 const PSYN_WK = 'pump/synth/pump-synth-worklet.js?v=12', psOK = new WeakSet(), psSent = new WeakSet();
 // …WAVES LIVE: the waves worklet in the tracker's own context (thunder-wlive); wlSent: the contexts that have the wasm
-const WAVES_WK = 'waves/waves-worklet.js?v=39', wlOK = new WeakSet(), wlSent = new WeakSet();
+const WAVES_WK = 'waves/waves-worklet.js?v=45', wlOK = new WeakSet(), wlSent = new WeakSet();
 /* BATTERY (8 Nov, Fold): a bookkeeping timer that only does something in one situation (playing, the screen visible, one
    screen open) had been waking the phone 2 to 16 times a second for nothing. idleTick(fn, fast, busy, slow) calls fn every
    `fast` ms while busy() says so and every `slow` ms otherwise (fn runs either way, so its own reset-when-idle code still
@@ -23113,7 +23186,7 @@ function padBlink(e){
 // Phones and tablets (10 Nov): the audio-thread sequencer's module (a second thread) loads only when the owner picked it there
 // (aset.corePick, set in Settings); the saved default 'core' plays on the Page sequencer on such a device.
 function coreWanted(){ return aset.core === 'core' && (!wkLazy() || !!aset.corePick); }   // (a declaration: the Settings row reads it at load)
-const CORE_REV = '1dll47d';
+const CORE_REV = '1q1bsbi';
 const CORE_WANT = 7;   // the core's message set this page speaks (core-processor.js CORE_V); an older core is not used
 const CORE_URL = () => 'core/seq-core.js?v=' + BUILD + '-' + CORE_REV;
 const core = {node:null, ready:false, loading:null, gen:0, sent:new Map(), sT:0, tally:new Map(), mir:null};   // mir: what the core's song holds, as JSON per part (coreDiff)   // tally: events by who played them (test hook)
@@ -23507,10 +23580,11 @@ function tStop(quiet){
     tp.paused = ref >= 0 ? {pos:P, ref, row:P[ref].row, step:P[ref].step, key:curKey()} : null;
   });
   // STOP CURSOR: a STOP you make (not a restart, a song change or the song running out while hidden) puts the cursor there
-  let stopP = null, home = null;
+  let stopP = null, home = null, arrP = null;
   G('stop cursor', () => {
   stopP = !quiet && stopToPlayhead() && tp.on && tp.pos && tp.pos.some(Boolean) ? {P:tp.pos.map(q => q && Object.assign({}, q)), mode:tp.mode} : null;
-  home = !quiet && tp.on && !stopToPlayhead() && fpHome && fpHome.t >= workT && fpHome.t >= arrHandT ? fpHome : null; });   // (12 Nov, owner: PLAY from the pad, ▼ / scroll down, STOP before row 2 jumped the cursor back to the top) fpHome is the cursor as FOLLOW first noted it, and is only noted again 4 s after your last key, press or scroll: a place you moved to after that note stands, only an untouched cursor goes back   // (9 Nov, owner: with ON STOP at STAYS it still ended up at the playback spot: FOLLOW had carried it there)
+  home = !quiet && tp.on && !stopToPlayhead() && fpHome && fpHome.t >= workT && fpHome.t >= arrHandT ? fpHome : null;
+  arrP = !quiet && stopArrOn && !stopToPlayhead() && tv !== 'song' && tp.on && tp.mode === 'song' && tp.pos && tp.pos.some(Boolean) && apPanel() ? tp.pos.map(q => q && Object.assign({}, q)) : null; });   // (12 Nov, owner: PLAY from the pad, ▼ / scroll down, STOP before row 2 jumped the cursor back to the top) fpHome is the cursor as FOLLOW first noted it, and is only noted again 4 s after your last key, press or scroll: a place you moved to after that note stands, only an untouched cursor goes back   // (9 Nov, owner: with ON STOP at STAYS it still ended up at the playback spot: FOLLOW had carried it there)
   tp.timer = 0; tp.on = false; if (mtrMode === 'off') setTimeout(mtrWake, 0); fpMem = null; fpHome = null; tp.q = []; tp.pos = null; tp.snd = null; tp.stopAt = null; tp.ahead = tp.aheadT = 0; tp.rsUntil = 0; PB.rsA = null; G('runaway kick', rkReset);
   // HAND-OVER (seqHandover): the core and the voices already booked keep sounding until the page sequencer's first step
   if (tp.core){ tp.core = false; core.gen++; if (!handing) G('core', () => { coreWire(false); try { core.node.port.postMessage({op:'stop', at:ctx.currentTime}); } catch(e){} }); }
@@ -23524,7 +23598,17 @@ function tStop(quiet){
   if (!handing){ bgPlay(false); wakeLock(false); }   // BACKGROUND PLAY, KEEP SCREEN ON (a hand-over plays on)
   if (stopP) try { if (curToPlay(stopP.P, stopP.mode) && tp.paused) tp.paused.key = curKey(); } catch(e){ tpLog('stop cursor', e); }
   else if (home) try { cs.song.y = home.y; cs.song.top = home.top; cPhrase = home.p; cSect = home.s; cs.phrase.y = home.py; cs.phrase.top = home.ptop; cs.song.pg = cs.phrase.pg = false; if (tp.paused) tp.paused.key = curKey(); } catch(e){ tpLog('stop cursor', e); }
+  // ARRANGE ON STOP beside another screen (14 Nov, owner: ARRANGE ON STOP = PLAYHEAD, yet the Arrange cursor went back to where it was): with the Phrase (or the Mixer…) holding
+  // the keys, stopToPlayhead() reads PHRASE ON STOP, which moves or restores the phrase side AND Arrange's cursor. Arrange's own cursor and view now follow ARRANGE ON STOP alone.
+  if (arrP) G('arrange cursor', () => { if (tv === 'phrase' && pvActive()){ curToPlay(arrP, 'song'); if (tp.paused) tp.paused.key = curKey(); } else { arrCurToPlay(arrP); if (tp.paused) tp.paused.key = curKey(); } });   // Pattern view draws the song row's pattern, so the pattern goes with the row (pvGo); else only Arrange's cursor moves
   if (!quiet) draw();
+}
+// Arrange's cursor onto the row playing on its own track (the track column stays), and that row in view. For the Arrange beside another screen only: nothing of the phrase moves.
+function arrCurToPlay(P){
+  const want = cs.song.x, t = P[want] && P[want].row >= 0 && want !== MT ? want : P.findIndex((q, i) => q && q.row >= 0 && i !== MT); if (t < 0) return false;
+  const row = P[t].row, VR = Math.max(2, arrRows()), top = cs.song.top || 0;
+  cs.song.y = row; cs.song.pg = false; if (row < top || row > top + VR - 1) cs.song.top = clamp(row - 2, 0, Math.max(0, 256 - VR));
+  return true;
 }
 /* ===== REC, METRONOME AND COUNT-IN (20 Oct) =====
    REC (the tracker's top strip, F9 or Alt+R) records a MIDI keyboard (Settings → MIDI → Keys play) and, while playing, the
@@ -23750,7 +23834,7 @@ function msHook(el){ try { ['playing', 'pause', 'ended', 'volumechange', 'error'
    song: the project file's name (opened or saved as a file, without .thunder) else the song's own name; set again when that changes while playing (rename, save as, open, new),
    never on a redraw. Artwork: the app's own icons, resolved against the page, so beta/ and stable/ find their own copy. (Chrome may still badge the notification with its small icon.) */
 let msTitleNow = null;
-function msTitle(){ let f = ''; try { f = (typeof projLabel === 'function' && projLabel() || '').replace(/\.(thunder|json)$/i, ''); } catch(e){} return f || S.name || 'Song'; }
+function msTitle(){ let f = ''; try { f = (typeof projTitle === 'function' ? projTitle() : typeof projLabel === 'function' && projLabel() || '').replace(/\.(thunder|json)$/i, ''); } catch(e){} return f || S.name || 'Song'; }
 function msIcon(p, sizes){ let u = p; try { u = new URL(p, location.href).href; } catch(e){} return {src:u, sizes, type:'image/png'}; }
 function msMeta(force){
   const ms = navigator.mediaSession; if (!ms || !bgOn || (!force && !tp.on)) return;
@@ -24139,16 +24223,21 @@ async function kvSet(k, v){ try { const db = await kvDb(); await new Promise(res
 async function kvDel(k){ try { const db = await kvDb(); await new Promise(res => { const tx = db.transaction('kv', 'readwrite'); tx.objectStore('kv').delete(k); tx.oncomplete = () => res(); tx.onerror = tx.onabort = () => { kvFail('deleting', k, tx); res(); }; }); } catch(e){ tpLog('deleting "' + k + '" failed', e); } }
 // The project file: a handle (browser) or a path (desktop app). Remembered across restarts.
 let projFile = null, projPath = null;
+// A project opened from a file the app got no handle or path for (Android's file picker, Open with, Share): its file name, kept with the song's own name at the time, so the
+// notification's title and the window title can still say "acid" and not the song's inner default "Song 1"; dropped by projSet, and not used once the song is renamed.
+let projLoose = null;
 const PPK = 'thunderplus-projpath-v1', DTK = 'thunderplus-dirty-v1';
 try { projPath = DESK ? localStorage.getItem(PPK) || null : null; } catch(e){}
-if (!DESK && canFS) kvGet('cur').then(h => { if (h && !projFile) projFile = h; });
+if (!DESK && canFS) kvGet('cur').then(h => { if (h && !projFile){ projFile = h; try { msMeta(); } catch(e){} } });
 const projLabel = () => projPath ? projPath.split(/[\\/]/).pop() : projFile ? projFile.name : '';
+const projTitle = () => projLabel() || (projLoose && projLoose.s === S.name ? projLoose.f : '');
 function projSet(path, handle){
-  projPath = path || null; projFile = handle || null;
+  projPath = path || null; projFile = handle || null; projLoose = null;
   try { if (DESK){ if (projPath) localStorage.setItem(PPK, projPath); else localStorage.removeItem(PPK); } } catch(e){}
   if (!DESK && canFS) kvSet('cur', projFile || null);
   if (projPath || projFile) recentAdd({name:projLabel(), path:projPath, h:projFile});
   try { msMeta(); } catch(e){}   // the notification's title follows the file
+  try { dirtyShow(); } catch(e){}   // and so does the window title (Save as: setDirty ran before the file changed)
 }
 // Unsaved changes: set by every song or sound edit (markChange, from saveS and changed), cleared by a save or an open.
 // Edits in the first moments after start-up (conversions, the saved song settling) don't count.
@@ -24160,7 +24249,7 @@ function setDirty(on){ projDirty = !!on; if (!projDirty) smpNew = false; try { l
 var smpNew = (() => { try { return localStorage.getItem(DTK + '-smp') === '1'; } catch(e){ return false; } })();
 function markSmpNew(){ smpNew = true; try { localStorage.setItem(DTK + '-smp', '1'); } catch(e){} }
 function dirtyShow(){
-  try { const app = isMobile() ? 'Thunder' : 'Thunder Plus', t = (projDirty ? '• ' : '') + (S.name || 'Song') + ' — ' + app; if (document.title !== t) document.title = t;
+  try { const app = isMobile() ? 'Thunder' : 'Thunder Plus', t = (projDirty ? '• ' : '') + ((typeof msTitle === 'function' && msTitle()) || S.name || 'Song') + ' — ' + app; if (document.title !== t) document.title = t;
     const b = $('bFile'); if (b){ b.classList.toggle('dirty', projDirty); b.title = 'File: new, open, save, share, render and export' + (projDirty ? ' · the project has unsaved changes' : ''); } } catch(e){}
 }
 // Before anything replaces the song: true when that's fine (nothing unsaved, it was saved now, or the person chose not to).
@@ -24250,7 +24339,11 @@ async function loadProjText(text, name, where){
     return true;
   } catch(err){ toast(err.message || 'Couldn’t read that project file.'); return false; }
 }
-async function loadProjFile(f, h){ return loadProjText(await f.text(), f.name, h ? {h} : null); }
+async function loadProjFile(f, h){
+  const ok = await loadProjText(await f.text(), f.name, h ? {h} : null);
+  if (ok && !h && f && f.name){ projLoose = {f:String(f.name), s:S.name}; try { msMeta(); dirtyShow(); } catch(e){} }   // no handle: the file's name is all the app has of it
+  return ok;
+}
 async function openProj(){
   if (!await okToLeave('opening another project')) return;
   if (DESK){ const r = await DESK.open(); if (r && r.text != null) loadProjText(r.text, r.name, {path:r.path}); else if (r && r.error) toastErr('Couldn’t open it: ' + r.error); return; }
@@ -24626,7 +24719,7 @@ function irsUI(sec){
   }
   sec.append(box);
 }
-function setSong(s, msg){ tStop(true); tp.paused = null; pendPlace = null;   /* (12 Nov: a phrase waiting in the old song must not follow into the new one) */ irsAdopt(s); S = s; setTimeout(() => { try { irsResolve(); } catch(e){ tpLog('could not load the song’s impulse responses', e); } }, 0); swingNote(); scNote(); setTimeout(mstSync, 0); try { projSet(null, null); } catch(e){ projFile = null; } resetCursors(); last.sect = last.phrase = 0; phraseToCursor(); CH.doc = S.chainPatch || null; chainsDropFrame(); if (rt){ rt.pl.buses.forEach(b => { if (b && b.chn) b.chn._sent = null; }); rtAllFx(); rtRoute(); rt.pl.applyMix(); } saveS(); draw(); if (msg) toast(msg); try { PumpFX._notifyAll('load'); } catch(e){} }
+function setSong(s, msg){ tStop(true); tp.paused = null; pendPlace = null; try { lastChord = null; } catch(e){}   /* (14 Nov: a chord picked up in the old song is not dropped into the new one) */   /* (12 Nov: a phrase waiting in the old song must not follow into the new one) */ irsAdopt(s); S = s; setTimeout(() => { try { irsResolve(); } catch(e){ tpLog('could not load the song’s impulse responses', e); } }, 0); swingNote(); scNote(); setTimeout(mstSync, 0); try { projSet(null, null); } catch(e){ projFile = null; } resetCursors(); last.sect = last.phrase = 0; phraseToCursor(); CH.doc = S.chainPatch || null; chainsDropFrame(); if (rt){ rt.pl.buses.forEach(b => { if (b && b.chn) b.chn._sent = null; }); rtAllFx(); rtRoute(); rt.pl.applyMix(); } saveS(); draw(); if (msg) toast(msg); try { PumpFX._notifyAll('load'); } catch(e){} }
 
 /* ---------- views ---------- */
 const MID = ['song', 'sect', 'phrase', 'inst'], VIEWS = ['song', 'sect', 'phrase', 'inst', 'mixer', 'fx', 'mod', 'project'], GRIDV = new Set(['song', 'sect', 'phrase']);
@@ -24684,7 +24777,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 589;
+const BUILD = 602;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD + (location.pathname.includes('/beta/') ? ' · beta' : '');
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -24849,15 +24942,15 @@ function followPlay(){
   // track plays, and the rows scroll a page when the playhead runs off them), but the cursor stays on its row, so you
   // can edit while it plays. c.pg: the rows were paged by the playhead (draw() then doesn't scroll back to the cursor;
   // moving the cursor brings it back into view).
-  const page = (c, row, VR, len) => { if (row < 0) return; const top = c.top || 0; if (row < top || row > top + VR - 1){ c.top = clamp(row, 0, Math.max(0, len - VR)); c.pg = true; } };
-  if (tv === 'song'){ if (tp.mode === 'song' && !asongOn()) page(cs.song, own.row, songRows(), 256); }
+  const page = (c, row, VR, len, end) => { if (row < 0) return; const top = c.top || 0, nt = arrPageTop(top, VR, row, len, -1, end); if (nt !== top){ c.top = nt; c.pg = true; } };   // the same early page turn as Arrange's (arrPageTop)
+  if (tv === 'song'){ if (tp.mode === 'song' && !asongOn()) page(cs.song, own.row, songRows(), 256, arrWrapRow()); }
   else if (tv === 'sect'){ if (tp.mode !== 'phrase' && own.sect >= 0) cSect = own.sect; }
   else if (tv === 'phrase'){
     // The screen stays on the cursor's own track (owner, 30 Oct): when that track isn't playing on this row (an empty cell,
     // a bus with no block), only the rows follow, in Pattern view; the plain phrase editor stays put.
     const mine = P[cTrack];
     const pvr = pvActive() ? pvVR() : Math.max(4, songRows());
-    if (mine && mine.phrase >= 0){ cPhrase = mine.phrase; cs.phrase.y = Math.min(cs.phrase.y, Math.max(0, plen(cPhrase) - 1)); page(cs.phrase, mine.step, pvr, pvActive() ? 256 : plen(cPhrase)); }
+    if (mine && mine.phrase >= 0){ cPhrase = mine.phrase; cs.phrase.y = Math.min(cs.phrase.y, Math.max(0, plen(cPhrase) - 1)); page(cs.phrase, mine.step, pvr, pvActive() ? 256 : plen(cPhrase), plen(cPhrase) - 1); }
     else if (pvActive() && own.step != null) page(cs.phrase, own.step, pvr, 256); }
   if (tv === 'phrase' && tp.mode === 'song' && own.row >= 0 && pvActive() && !(apReady && apF)) pvFollow(P, own);   // PATTERN VIEW: the song row follows too (not the cursor Arrange is moving)
   arrFollowPage(own);
@@ -24884,6 +24977,33 @@ const markHands = () => { workT = arrActT = arrHandT = arrTouchT = navT = perfor
 // navT: the last ALT + arrow move around the Song grid (optDir, grid). Arrange beside the phrase WITHOUT the keys was held off only by arrHandT / arrTouchT, which a pad press never sets, so every ALT+▲ put Arrange's rows where the cursor was
 // and the very next redraw the playhead put them back: the cursor's row flipped in and out of view. It holds like Arrange's own work does: 4 s with FOLLOW on, the owner's minute (3 Nov) with FOLLOW OFF.
 let navT = -1e9;
+/* EARLY PAGING WITH LOOK-AHEAD (14 Nov, owner: "it's difficult to see whole phrases" in Arrange: the page turned only when the playhead had passed the last
+   row, so the next phrase was never in sight). The one rule for every view that pages with the playhead (Arrange; the Song, Phrase and Pattern view rows
+   of followPlay's page()): when the playhead is within ARR_AHEAD rows of the bottom of the view (a quarter of the view when it shows under 16 rows) the view turns
+   ONCE so that the playhead sits ARR_KEEP rows from the top (an eighth of the view if that is smaller, at least one), keeping the rows just played in sight. No
+   scrolling and no centred playhead (that would redraw the grid every row); one page turn is one full draw, as before. A playhead above the view (a loop,
+   LP.SEL or song wrap, a jump back) puts its row first, as before. keep: a row (the cursor's) to keep in view too when the playhead has left the view (12 Nov), or -1.
+   NOT EARLY when the view already shows the last row the playhead reaches before it wraps (end: the loop's last row, or the song's), so a loop that fits the view never turns a page.
+   arrPageTop(top, VR, row, len, keep, end) is pure: the new first row (top itself when nothing turns). len: how many rows there are. */
+const ARR_AHEAD = 8, ARR_KEEP = 4;
+function arrPageTop(top, VR, row, len, keep = -1, end = len - 1){
+  if (!(row >= 0)) return top;
+  VR = Math.max(2, VR | 0); const ahead = VR < 16 ? Math.max(1, VR >> 2) : ARR_AHEAD, kp = Math.min(ARR_KEEP, Math.max(1, VR >> 3));
+  if (row >= top && row < top + VR && (row < top + VR - ahead || end < top + VR)) return top;   // well inside, or nothing more to come before the wrap: nothing turns
+  let nt = row < top ? row : row - kp;
+  // The last page: when the end is within reach, one turn goes straight to the page that shows it (the playhead already on it), instead of turning again a few rows on
+  if (row >= top){ const lastTop = end - VR + 1; if (lastTop > top && lastTop <= row && lastTop - nt <= ahead) nt = lastTop; }
+  if (keep >= 0 && keep !== row && (row < top || row >= top + VR)) nt = Math.min(keep, nt);   // (the cursor holds the page only when the playhead has left the view; an early turn is the playhead's, the owner idle)
+  return clamp(nt, 0, Math.max(0, len - VR));
+}
+// The last song row the playhead reaches before it wraps: the row a pattern loop holds, the last row of a selection loop, or the song's last row with a block. Read from what the display
+// already has (the loop it asked for, the song); nothing here touches the sequencer.
+function arrWrapRow(){
+  if (tp.loopV === 'pat'){ if (patRow >= 0) return patRow; }
+  else if (tp.loopV === 'song' && loopArm && loopArm.v === 'song') return Math.max(loopArm.y0, loopArm.y1);
+  for (let y = 255; y >= 0; y--){ const r = S.song[y]; if (r && r.some(v => v >= 0)) return y; }
+  return 0;
+}
 function arrFollowPage(own){
   if (handsOn(FOLLOW_HOLD, arrHandT, arrTouchT)) return;   // (9 Nov, owner: tapping blocks made the view fight itself)
   // A follow mode that's on pages again after the short hold; FOLLOW OFF keeps the owner's minute (3 Nov)
@@ -24891,10 +25011,9 @@ function arrFollowPage(own){
   if (handsOn(followMode ? FOLLOW_HOLD : ARR_IDLE, navT)) return;
   try { if (tp.mode === 'song' && own && own.row >= 0 && (asongOn() || (tv !== 'song' && apPanel()))){
     const VR = Math.max(2, arrRows()), top = cs.song.top || 0;
-    if (own.row < top || own.row > top + VR - 1){
-      // The cursor's row stays in view when both fit (12 Nov): the page starts at the higher of the two rows, so the playhead does not hide the cursor the user moved past it
-      const cy = cs.song.y, both = tv !== 'song' && cy >= 0 && cy !== own.row && Math.abs(cy - own.row) < VR;
-      cs.song.top = clamp(both ? Math.min(cy, own.row) : own.row, 0, Math.max(0, 256 - VR)); cs.song.pg = true; } } } catch(e){}
+    // The cursor's row stays in view when both fit (12 Nov): the page starts at the higher of the two rows, so the playhead does not hide the cursor the user moved past it
+    const cy = cs.song.y, nt = arrPageTop(top, VR, own.row, 256, tv !== 'song' && cy >= 0 && cy !== own.row && Math.abs(cy - own.row) < VR ? cy : -1, arrWrapRow());
+    if (nt !== top){ cs.song.top = nt; cs.song.pg = true; } } } catch(e){}
 }
 // TRACKS (Song): how many tracks this song uses (8–32, but 24 at most with a voice per track, so every
 // track keeps its own voice within 40 kit voices). Song and Mixer show as many as fit and scroll sideways.
@@ -24924,6 +25043,26 @@ function ntrPerm(n0, n1){
   const P = mono.concat(poly, spare, free.slice(k));   // P[new] = old
   return P.length === NT ? P : null;
 }
+// PERFORM follows the tracks too (owner, 14 Nov: two new tracks left his LFOs on the old numbers). Every target id, lock and LFO
+// names a track by number, so each one is renamed with tN. A number from the master (MT = NT) up stays: that is the master.
+function perfRemap(P, tN){
+  const rid = id => { if (typeof id !== 'string') return id; const a = id.split(':'), t = +a[1]; if (a[1] == null || a[1] === '' || !(t >= 0 && t < NT)) return id; a[1] = String(tN(t)); return a.join(':'); };
+  const rkeys = o => { if (!o || typeof o !== 'object') return o; const r = {}; for (const k in o){ const t = +k; r[k !== '' && t >= 0 && t < NT ? tN(t) : k] = o[k]; } return r; };
+  const pf = S.perf;
+  if (pf && typeof pf === 'object'){
+    if (Array.isArray(pf.sc)) for (const sc of pf.sc) if (sc && sc.v){ const r = {}; for (const k in sc.v) r[rid(k)] = sc.v[k]; sc.v = r; }
+    if (Array.isArray(pf.mac)) for (const m of pf.mac) if (m && Array.isArray(m.tg)) for (const g of m.tg) if (g) g.id = rid(g.id);
+    if (pf.lk){ pf.lk = rkeys(pf.lk); for (const k in pf.lk) if (Array.isArray(pf.lk[k])) pf.lk[k] = pf.lk[k].map(rid); }
+    if (pf.lfo){ pf.lfo = rkeys(pf.lfo); for (const k in pf.lfo) if (Array.isArray(pf.lfo[k])) for (const L of pf.lfo[k]) if (L) L.id = rid(L.id); }
+  }
+  if (Array.isArray(S.parts)) for (const p of S.parts){ if (!p) continue;
+    if (Array.isArray(p.mix)){ const c = p.mix.slice(0, NT), nm = [];   // a short list leaves the later tracks as the song has them: fill with the song's own (S.mix is already moved)
+      for (let t = 0; t < NT; t++){ const o = P[t], m = S.mix[t]; nm.push(c[o] != null ? c[o] : [m ? m.vol : 224, m ? m.pan : 128]); }
+      p.mix = nm; }
+    if (p.fx && typeof p.fx === 'object'){ const r = {}; for (const k in p.fx){ const a = k.split(':'), t = +a[0]; if (t >= 0 && t < NT) a[0] = String(tN(t)); const o = p.fx[k]; if (o && o.sck != null && +o.sck > SCK_SEND){ const st = sckTrack(+o.sck); if (st >= 0 && st < NT) o.sck = tN(st) + SCK_SEND + 1; }   /* a saved side-chain source is a track too (review, #133) */
+      r[a.join(':')] = o; } p.fx = r; } }
+  try { perfLive.sent.clear(); perfLive.pno.clear(); } catch(e){}
+}
 function ntrRemap(P){
   const inv = new Array(NT); P.forEach((o, i) => inv[o] = i);
   const tN = t => t >= 0 && t < NT ? inv[t] : t;
@@ -24931,6 +25070,7 @@ function ntrRemap(P){
   if (S.smute) for (let y = 0; y < S.smute.length; y++){ const w = S.smute[y] | 0; if (!w) continue; let v = 0; for (let t = 0; t < 32 && t < NT; t++) if (w & (1 << P[t])) v |= 1 << t; S.smute[y] = v; }
   const perm = A => { if (!A) return; const c = A.slice(0, NT); for (let t = 0; t < NT; t++) A[t] = c[P[t]]; };
   perm(S.mix); perm(S.tfx); perm(S.chainOn);
+  perfRemap(P, tN);
   const sck = v => { const t = sckTrack(v); return t >= 0 && t < NT ? tN(t) + SCK_SEND + 1 : v; };
   const slots = A => (A || []).forEach(f => { if (f && f.sck != null && +f.sck > SCK_SEND) f.sck = sck(+f.sck); });
   for (let t = 0; t < NT; t++) slots(S.tfx[t]); slots(S.mfx);
@@ -25128,10 +25268,10 @@ function mstShareWarn(p){
   if (!(k.mst && k.trk.size) && !(cTrack !== MT && others.length)) return; mstShared.add(p);
   const ts = [...k.trk].sort((a, b) => a - b).map(t => d2(t + 1)).join(', ');
   if (!k.mst){ const os = others.map(t => d2(t + 1)).join(', ');
-    setTimeout(() => toast(`Phrase ${hp(p)} also plays on track${others.length > 1 ? 's' : ''} ${os}, so edits here change those too. UNIQ on this block (Song or Arrange) gives this track its own copy.`, 7000), 60); return; }
-  setTimeout(() => toast(cTrack === MT
+    setTimeout(() => toastBrief('share', `Phrase ${hp(p)} also plays on track${others.length > 1 ? 's' : ''} ${os}, so edits here change those too. UNIQ on this block (Song or Arrange) gives this track its own copy.`), 60); return; }
+  setTimeout(() => toastBrief('share', cTrack === MT
     ? `Phrase ${hp(p)} also plays on track${k.trk.size > 1 ? 's' : ''} ${ts}. What you write here changes there too (VOL turns their notes down). UNIQ on the block gives the master its own copy.`
-    : `Phrase ${hp(p)} also plays in the master column. There, VOL is the whole song’s level and FLX / FXO the master’s effects. UNIQ on this block (Song or Arrange) gives the track its own copy.`, 7000), 60);
+    : `Phrase ${hp(p)} also plays in the master column. There, VOL is the whole song’s level and FLX / FXO the master’s effects. UNIQ on this block (Song or Arrange) gives the track its own copy.`), 60);
 }
 function setCell(v, x, y, val){
   if (v === 'song' && x < NT && val >= 0 && busNo(x, val)) return false;   // NO NOTES INTO A BUS (12 Nov, owner): no write, no undo step
@@ -25139,8 +25279,8 @@ function setCell(v, x, y, val){
   if (v === 'song'){
     if (val >= 0 && !mstUniqIn && S.song[y][x] !== val && blockMixed(val, x, y)){
       mstUniqIn = true; try { const nc = mstUniq(val); if (nc >= 0){ const was = val; val = nc;
-        setTimeout(() => toast(x === MT ? `Block ${hp(songShown(was))} is also on tracks, so the master column got its own copy, ${hp(songShown(nc))}. Its VOL and FLX can’t reach the tracks.`
-          : `Block ${hp(songShown(was))} is also used ${blockOnMst(was) ? 'in the master column' : 'on another track'}, so this track got its own copy, ${hp(songShown(nc))}` + (blockOnMst(was) ? '.' : ' (Settings → UNIQUE PER TRACK).'), 5000), 60); } } finally { mstUniqIn = false; } }
+        setTimeout(() => toastBrief('uniq', x === MT ? `Block ${hp(songShown(was))} is also on tracks, so the master column got its own copy, ${hp(songShown(nc))}. Its VOL and FLX can’t reach the tracks.`
+          : `Block ${hp(songShown(was))} is also used ${blockOnMst(was) ? 'in the master column' : 'on another track'}, so this track got its own copy, ${hp(songShown(nc))}` + (blockOnMst(was) ? '.' : ' (Settings → UNIQUE PER TRACK).')), 60); } } finally { mstUniqIn = false; } }
     S.song[y][x] = val; if (val < 0 && x <= MT) setBlockMute(y, x, false); }
   else if (v === 'sect'){ sectRowEdit(cSect, y)[x] = val; }
   else { if (!S.phrases[cPhrase]) S.phrases[cPhrase] = freshPhrase(); S.phrases[cPhrase][y][x] = val; if (val >= 0) mstShareWarn(cPhrase); }
@@ -25570,6 +25710,8 @@ function projRows(){
       info:() => 'KEYS mode with the keypad off: a panel at the bottom with a spectrum of the master, quick controls for the current instrument, its chains and the current track’s effects, and a channel strip for the current track. Click INST, …CHAINS or FX to fold that part to a narrow strip; click the strip to open it again'},
     {l:'STAGE', opts:true, get:() => STG.indexOf(stage), set:v => setStage(STG[v]), min:0, max:STG.length - 1, d:smallScr() ? 2 : 0, fmt:v => STG_NAMES[v],
       info:() => 'Big screens: the space beside the grid. BY SCREEN: the dogs dance on Song and Project; Sect previews the phrase; Phrase shows a piano lighting the notes playing; Inst its waveform; Mixer the master spectrum; FX the effects chain. DOGS: the dogs everywhere. OFF: empty'},
+    {l:'ANIMATIONS', ck:'Animations: the dancing dogs, the FX bar’s effect pictures and the rainbow skin’s drift', get:() => animOn ? 1 : 0, set:v => setAnim(!!v), min:0, max:1, tog:true, d:1, fmt:onOff,
+      info:() => 'ON: the dancing dogs (Song, Project, Phrase), the pictures on the FX bar’s effects and the Simple rainbow dynamic skin’s moving colours. OFF: none of them is drawn and none of their work runs. Meters, scopes, playheads and the piano stay. You can also right-click (or long press) the dogs or an FX bar effect and choose Hide animations'},
     // REC, METRONOME AND COUNT-IN (kept on this device, like the rows above)
     {l:'METRONOME', sec:'Record & play', gap:true, opts:true, get:() => recS.met, set:v => setMet(v), min:0, max:2, d:1, fmt:v => ['OFF', 'WHILE RECORDING', 'ALWAYS'][v],
       info:() => 'A click on every beat, higher on the first of the bar (CLICK on the top strip, Alt+M). WHILE RECORDING: only with REC on'},
@@ -25862,6 +26004,7 @@ function fxNeed(t, type){
 }
 function after(k, v, x, y, val){
   const prevFxc = last.fxc;
+  if (k === 'note') lastChord = null;   // CHORD PICK-UP: a note typed (or EDIT+arrows) is the current note again, not the chord
   if (val >= 0 && val !== OFF && k in last) last[k] = val;
   if (k === 'inst' && val >= 0) instPicked = true;
   if (v === 'phrase'){
@@ -25887,9 +26030,38 @@ function clipCellQuiet(x, y){
   if (k === 'fxc' || k === 'fxv'){ const x0 = k === 'fxc' ? x : x - 1; if (!(r[x0] >= 0)) return false; clip = {v:'phrase', x0, d:[[r[x0], r[x0 + 1]]], line:false}; return true; }
   return false;
 }
+/* CHORD PICK-UP (14 Nov, owner: "on a poly track, if Enter is pressed while the cursor is over a line, store all of the notes on that line,
+   rather than the one under the cursor"). On a polyphonic track Enter / EDIT on a filled note picks up every note of the row (each note column
+   with a note or an OFF; the instrument is the row's, one for the whole row, as for a single note) when the row holds two or more; the next
+   Enter / EDIT on an empty note cell of a poly track puts them all back, in the same columns, as ONE undo step. Nothing is removed from the
+   source (a pick-up copies, as it did). One note on the row: exactly the single-note pick-up. Mono tracks, buses and the command columns
+   are untouched; a chord dropped on a mono track writes just the note that was under the cursor, and says so. lastChord: {ref, cols, notes}; it
+   is only good while last.note is still its ref (typing or recording a note, or picking up another single note, drops it). Song data only. */
+let lastChord = null;
+const rowChord = r => { const c = []; for (let k = 0; k < NCOL; k++) if (r[k] >= 0) c.push([k, r[k]]); return c; };   // [column, note or OFF] of the row's filled note columns
+const chordNames = ch => ch.map(([, v]) => v === OFF ? 'OFF' : noteS(v)).join(' ');
+function chordClip(r, ch){ const row = new Array(IC + 1); for (const [k, v] of ch) row[k] = v; row[IC] = r[IC]; clip = {v:'phrase', x0:0, d:[row], line:false}; }
+function pickUpChord(x, r, ch, say){
+  const got = [`${ch.length} notes picked up: ${chordNames(ch)}`];
+  if (r[IC] >= 0 && (r[IC] !== last.inst || r[IC] !== cInst || !instPicked)){ last.inst = cInst = r[IC]; instPicked = true; const I = S.insts[r[IC]]; got.push(`instrument ${hx(r[IC])} (pad ${hx(I.pad)} ${(kit.voices[I.pad] || {}).name || ''})`.replace(' )', ')')); }
+  last.note = r[x]; lastChord = {ref:last.note, cols:ch.map(c => c[0]), notes:ch.map(c => c[1])};
+  if (say) chordClip(r, ch);
+  toast(got.join(' · ') + (say ? ' · copied (' + pasteKey() + ' pastes them) · Enter on an empty note adds them' : '')); draw();
+}
+// Puts the picked-up chord on row y of the phrase, in its own columns (a filled column is replaced); one saveS = one undo step.
+function chordDrop(y){
+  if (!lastChord) return 0; if (!S.phrases[cPhrase]) S.phrases[cPhrase] = freshPhrase();   // (a phrase not written to yet: make it, as a single note's drop does)
+  const p = S.phrases[cPhrase], r = p && p[y]; if (!r) return 0;
+  lastChord.cols.forEach((c, i) => { r[c] = lastChord.notes[i]; });
+  if (r[IC] < 0){ r[IC] = defInst(); if (!instPicked) last.inst = cInst = r[IC]; }
+  mstShareWarn(cPhrase); saveS(); if (pnoeOn) aud(r);
+  toast(`${lastChord.notes.length} notes dropped: ${chordNames(lastChord.cols.map((c, i) => [c, lastChord.notes[i]]))}`); draw();
+  return lastChord.notes.length;
+}
 function pickUp(x, y, say){
   const p = S.phrases[cPhrase]; if (!p || y < 0) return;
   const r = p[y], k = PK[x], got = [];
+  if (k === 'note' && tv === 'phrase' && r[x] >= 0 && r[x] !== OFF){ const ch = polyView() && !busTrack(cTrack) ? rowChord(r) : []; if (ch.length >= 2) return pickUpChord(x, r, ch, say); lastChord = null; }   // (one note: as before, and no chord stays current)
   const clipped = say && tv === 'phrase' && clipCellQuiet(x, y);
   if (r[IC] >= 0 && (r[IC] !== last.inst || r[IC] !== cInst || !instPicked)){ last.inst = cInst = r[IC]; instPicked = true; const I = S.insts[r[IC]]; got.push(`instrument ${hx(r[IC])} (pad ${hx(I.pad)} ${(kit.voices[I.pad] || {}).name || ''})`.replace(' )', ')')); }
   if (k === 'note' && r[x] >= 0 && r[x] !== OFF && r[x] !== last.note){ last.note = r[x]; got.push('note ' + noteS(r[x])); }
@@ -25928,9 +26100,14 @@ function aud(r){ const ii = r[IC] >= 0 ? r[IC] : defInst(), poly = polyView(), h
 const audRelease = code => { const hs = audHeld.get(code); if (hs){ audHeld.delete(code); hs.forEach(h => previewOff(h)); } };
 document.addEventListener('keyup', e => audRelease(e.code));
 window.addEventListener('blur', () => { for (const k of [...audHeld.keys()]) audRelease(k); try { releaseKeys(); } catch(e){} });
-function insertAt(x, y, k){
+function insertAt(x, y, k, chordOk){
   if (k === 'tsp') return;
   if (k === 'fxv' && getCell(tv, x - 1, y) < 0) return toast('Pick an effect in the column to the left first.');
+  if (chordOk && k === 'note' && tv === 'phrase' && lastChord && lastChord.ref === last.note){   // CHORD PICK-UP: Enter / EDIT on an empty note cell
+    if (polyView() && !busTrack(cTrack) && cTrack !== MT) return void chordDrop(y);
+    const keep = lastChord; setCell(tv, x, y, last[k]); after(k, tv, x, y, last[k]); lastChord = keep;   // a mono track holds one note: the one that was under the cursor
+    return toast(`Dropped one note (${noteS(last.note)}): the ${keep.notes.length} notes of the chord need a poly track (9–16)`, 3500);
+  }
   setCell(tv, x, y, last[k]); after(k, tv, x, y, last[k]);
 }
 function bump(d, big){
@@ -26163,7 +26340,7 @@ function editTap(enter, stamp){   // stamp: Shift+Enter, which writes the curren
     // 00's notes: the "current" block was placed, and UNIQUE PER TRACK copied it). An empty block gets a new empty pattern,
     // unless a pattern was picked up with Enter on purpose (keyboard arranging, 3 Nov): then that one is placed.
     if (tv === 'song' && !sectsOn && k !== 'tsp' && v < 0 && !(sectPicked >= 0 && sectPicked === last.sect && S.chains[sectPicked])){ lastTap = {t:0, key:'', empty:false}; return newBlock(c, -1); }
-    if (k !== 'tsp' && v < 0){ lastTap.empty = true; insertAt(c.x, c.y, k); }
+    if (k !== 'tsp' && v < 0){ lastTap.empty = true; insertAt(c.x, c.y, k, true); }
     else if (tv === 'phrase'){ const p = S.phrases[cPhrase]; if (p) aud(p[c.y]); }
     return;
   }
@@ -26485,12 +26662,18 @@ function fxDelLast(t){
   if (k < 0) return toast('No effects to remove.');
   A[k] = null; cFxS = k; fxChanged(t); draw(); toast(`Effect ${k + 1} removed · ${A.filter(Boolean).length} left`);
 }
+// CLEAR on the FX screen's slot list (14 Nov, owner: right-click an effect, Clear: "it clears the last effect in the list"): it empties the slot the cursor is on
+function fxDelSlot(t, k){
+  const A = t >= NT ? S.mfx : S.tfx[t], f = A && A[k]; cFxS = k; cs.fx.y = k + 1;
+  if (!f){ draw(); return toast(`Slot ${k + 1} is already empty.`); }
+  fxSwap(t, k, A, null); fxChanged(t); draw(); toast(`Slot ${k + 1} cleared (${TFX[f.type] ? TFX[f.type].n : 'effect'}) · ${A.filter(Boolean).length} left`);
+}
 function del(){
   if (onPset()) return psetSet(cs.phrase.x, cs.phrase.x ? 0 : 16);
   if (tv === 'song'){ if (sxPicks.length){ const pk = sxPicks.map(p => [p.y, p.t]); sxPicks = []; return songDelete(pk, true); }   // picked cells: cleared, their phrases kept
     return songDelete(songCells(), false); }
   if (tv === 'mod') return modDel(cs.mod.y);
-  if (tv === 'fx' && cs.fx.y >= 1 && cs.fx.y <= FXSLOTS) return fxDelLast(cFxT);   // Delete takes the last effect off the chain
+  if (tv === 'fx' && cs.fx.y >= 1 && cs.fx.y <= FXSLOTS) return fxDelSlot(cFxT, cs.fx.y - 1);   // Delete / CLEAR empties the slot under the cursor (14 Nov: it took the last effect off the chain, whichever slot you were on)
   if (selA) return clearSel();   // FIX (27 Oct, audit K4): Delete clears the selection; Ctrl/⌘+X cuts (Delete used to cut, losing the clipboard)
   const c = cs[tv];
   if (GRIDV.has(tv)){
@@ -29073,6 +29256,11 @@ function smallScr(){ try { return Math.min(screen.width, screen.height) < 900; }
 const STK = 'thunderplus-stage-v1', STG = ['screen', 'dogs', 'off'], STG_NAMES = ['BY SCREEN', 'DOGS', 'OFF'];
 let stage = (() => { try { const v = localStorage.getItem(STK); if (STG.includes(v)) return v; if (v === 'phrase') return 'screen'; } catch(e){} return smallScr() ? 'off' : 'screen'; })();
 function setStage(v){ stage = v; try { localStorage.setItem(STK, v); } catch(e){} stageLayout(); }
+// The dogs: right-click, or a long press, for Hide animations (the stage itself is pointer-events:none; only the dogs take the press)
+{ const dg = $('tStageDogs'), menu = (x, y) => sxMenu(x, y, 'DOGS', [{l:'Hide animations', f:() => setAnim(false, true)}, {l:'Hide the stage', f:() => $('tStageX').click()}]); let lp = 0, lpT = 0;
+  dg.addEventListener('contextmenu', e => { e.preventDefault(); lpT = performance.now(); menu(e.clientX, e.clientY); });
+  dg.addEventListener('pointerdown', e => { if (e.pointerType !== 'touch') return; const x = e.clientX, y = e.clientY; clearTimeout(lp); lp = setTimeout(() => { lp = 0; lpT = performance.now(); menu(x, y); }, 550); });
+  for (const ev of ['pointerup', 'pointercancel', 'pointermove']) dg.addEventListener(ev, () => { clearTimeout(lp); lp = 0; }); }
 $('tStageX').addEventListener('click', () => { setStage('off'); toast('Stage hidden. Settings → STAGE brings it back.'); });
 // The Phrase screen's stage: DANCE (the dogs), DRUM (the dogs on a kit and bongos), KEYS (the piano, the default) or
 // HIDE (nothing beside the phrase).
@@ -29080,7 +29268,8 @@ const PHSK = 'thunderplus-phstage-v1', PHS = ['dance', 'drum', 'keys', 'hide'];
 const phStageDef = () => smallScr() ? 'hide' : 'keys';
 let phStage = (() => { try { const v = localStorage.getItem(PHSK); return PHS.includes(v) ? v : phStageDef(); } catch(e){ return phStageDef(); } })();
 function setPhStage(v){ phStage = PHS.includes(v) ? v : 'keys'; try { localStorage.setItem(PHSK, phStage); } catch(e){} stageLayout(); }
-const stageKind = () => stage === 'dogs' ? 'dogs' : tv === 'song' && SX.peek && asongOn() ? 'peek' /* SONG EXTRAS */ : tv === 'phrase' && mstView() ? 'chain' : tv === 'phrase' ? ({dance:'dogs', drum:'drum', keys:'piano', hide:''})[phStage] : ({song:'dogs', project:'dogs', sect:'preview', phrase:'piano', inst:'wave', mixer:'spec', fx:'chain'})[tv] || 'dogs';
+const stageKind0 = () => stage === 'dogs' ? 'dogs' : tv === 'song' && SX.peek && asongOn() ? 'peek' /* SONG EXTRAS */ : tv === 'phrase' && mstView() ? 'chain' : tv === 'phrase' ? ({dance:'dogs', drum:'drum', keys:'piano', hide:''})[phStage] : ({song:'dogs', project:'dogs', sect:'preview', phrase:'piano', inst:'wave', mixer:'spec', fx:'chain'})[tv] || 'dogs';
+const stageKind = () => { const k = stageKind0(); return animOn || (k !== 'dogs' && k !== 'drum') ? k : tv === 'phrase' ? 'piano' : ''; };   // ANIMATIONS OFF: no dogs (the Phrase screen's piano takes their place)
 let stgKindNow = '', stgSig = '', stgReq = '';   // stgReq: what the last layout was asked for
 // It sits in the space to the right of the grid's text, the grid's height, when that space is big enough.
 // What the stage should show now ('' = nothing). SIMPLE PHRASE: no piano beside the phrase.
@@ -29158,7 +29347,7 @@ function stageTick(now){
   if (stgOn !== !!tp.on){ stgOn = !!tp.on; if (stgKindNow === 'dogs' || stgKindNow === 'drum') dogsState(); else if (stgKindNow) stageCanvas(true); }
   if (!stgKindNow || $('tStage').hidden) return;
   if (stgKindNow === 'piano' || stgKindNow === 'spec'){ if (stgKindNow === 'spec' && meterBlank('stg', () => stageCanvas(true))) return; if (meterDue(now, stgFrameT, 46, stgKindNow === 'piano')){ stgFrameT = now; stageCanvas(false); } return; }   // METERS: the piano's lit notes are marks (OFF keeps LIGHT's rate); the spectrum is a meter
-  if ((stgKindNow !== 'dogs' && stgKindNow !== 'drum') || !tp.on || !ctx) return;
+  if ((stgKindNow !== 'dogs' && stgKindNow !== 'drum') || !tp.on || !ctx || !animOn) return;
   const lat = heardLat(), t = ctx.currentTime - lat, bpm = tp.bpm || S.bpm;
   if (bpm !== stgBpm){ const b = (t - stgT0) * stgBpm / 60; stgBpm = bpm; stgT0 = t - b * 60 / bpm; }
   const per = 60 / bpm, b = Math.floor((t - stgT0) / per);
@@ -29190,7 +29379,7 @@ function dogsBeat(bar, ms){
 const DRUM_HIT = {hat:['al', 24], snare:['ar', 44], tom:['ar', 22], crash:['ar', -24]};   // [arm, angle over that drum]
 let dkKitT = 0, dkBongoT = 0, dkHand = 0;
 const dkDogs = () => $('tStageDogs').querySelector('.dogs');
-function dkOk(){ return stgKindNow === 'drum' && !$('tStage').hidden && !matchMedia('(prefers-reduced-motion: reduce)').matches; }
+function dkOk(){ return animOn && stgKindNow === 'drum' && !$('tStage').hidden && !matchMedia('(prefers-reduced-motion: reduce)').matches; }
 // A strike: the paw pulls back along the arm, comes down on the drum and stays hovering over it.
 function dkArm(g, cls, ang){
   const a = g && g.querySelector('.arm.' + cls); if (!a) return;
@@ -30416,10 +30605,16 @@ function deckFxBar(){
   let bar = $('dkFxBar');
   if (!bar){ bar = el('div', 'dkfxbar'); bar.id = 'dkFxBar'; $('dkFxSlots').parentElement.append(bar); dkFbSig = ''; }
   $('dkFxSlots').hidden = $('dkFxRows').hidden = true;
-  const sig = t + ':' + Array.from({length:FXSLOTS}, (_, k) => A[k] ? A[k].type + (A[k].on ? 1 : 0) : '-').join(',');
+  const sig = (animOn ? 'a' : 'n') + t + ':' + Array.from({length:FXSLOTS}, (_, k) => A[k] ? A[k].type + (A[k].on ? 1 : 0) : '-').join(',');
   if (sig !== dkFbSig){
     dkFbSig = sig; bar.replaceChildren(); dkFbVals = [];
     const goFx = k => { cFxT = mst ? NT : dkTrack(); cFxS = k; cs.fx.y = A[k] ? FXSLOTS + 1 : k + 1; go('fx'); };
+    // + ADD FX (14 Nov, owner: "automatically open the FX picker after it pages to the Mixer"): to the FX screen for this track, then the same effect list EDIT opens on an
+    // empty slot (fxsOpen: grouped, the keys ▲▼ Enter and Esc as always). Esc closes it and leaves you on the screen. No empty slot (the bar was drawn before it filled): a toast.
+    const addFx = () => { const t = mst ? NT : dkTrack(), AA = t >= NT ? S.mfx : S.tfx[t], k = AA.findIndex(x => !x);
+      if (k < 0){ toast('Every effect slot on ' + (mst ? 'the master' : 'track ' + d2(t + 1)) + ' is in use.'); return; }
+      goFx(k); try { if (document.activeElement && document.activeElement.blur && document.activeElement.closest && document.activeElement.closest('#dkFxBar')) document.activeElement.blur(); } catch(e){}
+      fxsOpen(k); };
     for (let k = 0; k < FXSLOTS; k++){
       const f = A[k], col = el('div', 'dkfc' + (f ? (f.on ? '' : ' off') : ' empty')), h = el('div', 'fch'), b = el('div', 'fcb');
       if (!f) continue;   // empty slots: one + ADD FX after the effects
@@ -30439,8 +30634,22 @@ function deckFxBar(){
           const AA = FA(), last = AA.reduce((m, x, i) => x ? i : m, -1), to = tgt ? (tgt.classList.contains('dkadd') ? last : +tgt.dataset.k) : NaN;   // onto + ADD FX: the end of the chain
           if (Number.isFinite(to)) fxMove(mst ? NT : dkTrack(), k, to); };
         addEventListener('pointermove', mv, true); addEventListener('pointerup', up, true); });
+      // REMOVE AN EFFECT (14 Nov, owner): right-click, or a long press on a touch screen, anywhere on the card except a value (a value keeps its own menu) opens a small menu.
+      // The on / off light, the name's click and the header drag are unchanged. Removing is one undo step (fxChanged saves).
+      const rmFx = () => { const AA = FA(), g = AA[k], tt = mst ? NT : dkTrack(); if (!g) return; const nmx = (TFX[g.type] || {}).n || 'effect';
+        fxSwap(tt, k, AA, null); fxChanged(tt); dkFbSig = ''; draw();
+        toast(`Removed ${nmx} from ${mst ? 'the master' : 'track ' + d2(tt + 1)} · ${keyHint('mod+Z') || 'Undo'} brings it back`); };
+      const fxMenu = (x, y) => sxMenu(x, y, (D.n + ' · ' + (mst ? 'MASTER' : 'TRACK ' + d2(t + 1))).toUpperCase(), [{l:'Remove effect', f:rmFx}, {l:'Open on the FX screen', f:() => goFx(k)}, ...(col._spr ? [null, {l:'Hide animations', f:() => setAnim(false, true)}] : [])]);
+      col.addEventListener('contextmenu', e => { if (e._valMenu || e.target.closest('input')) return;   // (a value's own menu stops the event before it gets here)
+         e.preventDefault(); col._lpT = performance.now(); fxMenu(e.clientX, e.clientY); });
+      col.addEventListener('pointerdown', e => { if (e.pointerType !== 'touch' || e.target.closest('.fr span, .fon')) return; const x0 = e.clientX, y0 = e.clientY; let done = false;
+        const tm = setTimeout(() => { done = true; col._lpT = performance.now(); fxMenu(x0, y0); }, 550), off = () => { clearTimeout(tm); removeEventListener('pointermove', mv, true); removeEventListener('pointerup', off, true); removeEventListener('pointercancel', off, true); },
+          mv = ev => { if (Math.hypot(ev.clientX - x0, ev.clientY - y0) > 8) off(); };
+        addEventListener('pointermove', mv, true); addEventListener('pointerup', off, true); addEventListener('pointercancel', off, true); });
+      col.addEventListener('click', e => { if (col._lpT && performance.now() - col._lpT < 800){ e.stopPropagation(); e.preventDefault(); } }, true);   // the release after a long press is not a tap
       const vz = el('div', 'fviz'); vz.append(document.createElement('canvas')); col.append(vz); col._h = new Float32Array(90); col._w = 0; col._q = 0;
-      if (isSpringFx(f)){ col.classList.add('spr'); const sc = document.createElement('canvas'); sc.className = 'fspr'; col.prepend(sc); col._spr = {cv:sc, e:0, t:0}; }   // SPRING
+      if (!animOn){}   // ANIMATIONS OFF: no picture behind the values
+      else if (isSpringFx(f)){ col.classList.add('spr'); const sc = document.createElement('canvas'); sc.className = 'fspr'; col.prepend(sc); col._spr = {cv:sc, e:0, t:0}; }   // SPRING
       else { const ak = fxAnimKind(f); if (ak){ col.classList.add('spr'); const sc = document.createElement('canvas'); sc.className = 'fspr'; col.prepend(sc); col._spr = {cv:sc, e:0, t:0, kind:ak, P:[]}; } }   // FX ANIMATIONS
       if (isFxDyn(f.type)){ col.classList.add('dyn'); const dm = document.createElement('canvas'); dm.className = 'fdm'; dm.title = FXLV.has(f.type) ? 'IN, the change in level, OUT' : 'IN level, gain reduction (0 to 24 dB) and OUT level; the line is the threshold'; col.append(dm); }
       const getF = () => FA()[k];
@@ -30491,7 +30700,7 @@ function deckFxBar(){
     }
     const free = Array.from({length:FXSLOTS}, (_, k) => k).filter(k => !A[k]);
     if (free.length){ const ad = el('button', 'dkadd'); ad.type = 'button'; ad.append('+ ADD FX', el('small', null, 'slot ' + (free[0] + 1)));
-      ad.title = 'Add an effect in slot ' + (free[0] + 1) + ' (FX screen)'; ad.dataset.k = free[0]; ad.addEventListener('click', () => goFx(free[0])); bar.append(ad);
+      ad.title = 'Add an effect in slot ' + (free[0] + 1) + ' (FX screen)'; ad.dataset.k = free[0]; ad.addEventListener('click', () => addFx()); bar.append(ad);
       if (free.length === FXSLOTS) bar.append(el('div', 'dkempty', 'NO EFFECTS ON ' + (mst ? 'THE MASTER' : 'TRACK ' + d2(t + 1)) + ' YET')); }   // EMPTY FX
   }
   dkFbVals.forEach(fn => fn());
@@ -31598,12 +31807,16 @@ let arrFast = false, arrFastKey = '', arrFastN = 0, arrFastR = -1, arrSoon = 0; 
 // ARR_ZOOM_BTNS: the − ○ + in the arrange header (○ = fit). Set it to false to take them away (pinch and Ctrl+wheel stay).
 const ARR_ZOOM_BTNS = true;
 const AZK = 'thunderplus-arrange-zoom-v1', AZ_MAX = 3, AZ_STEPS = [1, 1.5, 2, 2.5, 3];
-let arrZoom = (() => { try { const z = parseFloat(localStorage.getItem(AZK)); return z >= 1 && z <= AZ_MAX ? z : 1; } catch(e){ return 1; } })();
+// ZOOM OUT (14 Nov, owner: "difficult to see whole phrases"): below 1 (fit: every track in the panel, today's smallest) the ROWS get lower, the columns stay at fit, so many more song rows are in view
+// (about 1.5, 2, 2.5, 3 and 4 times as many as at fit). The same saved number (AZK), the same − ○ +, Ctrl+wheel and pinch reach it; never zooming leaves it at 1, as before. AZ_OUT: the − button's steps.
+const AZ_MIN = 0.32, AZ_OUT = [0.8, 0.64, 0.5, 0.4, 0.32], AZ_RH_MIN = 5;
+let arrZoom = (() => { try { const z = parseFloat(localStorage.getItem(AZK)); return z >= AZ_MIN && z <= AZ_MAX ? z : 1; } catch(e){ return 1; } })();
 let arrBigPre = null, arrBigFloor = 0;   // BIGGER CELLS: the zoom the user chose while the cells are raised to the floor; the zoom that makes a cell 28 px
 let arrPinch = null, arrCurX = -1, arrWheelT = 0, arrFitW = 30;
 // On a computer (Desktop, a mouse) zoom is gentler and stops sooner: blocks grow to about 84 px wide at most, in 1.25×
 // steps (Ctrl+wheel about 1.15× a notch), and the song cursor's block stays where it is on screen while zooming.
 const arrDeskZ = () => !document.body.classList.contains('mob') && !matchMedia('(pointer: coarse)').matches;
+const arrZMin = () => bigCellsOn && !arrDeskZ() ? 1 : AZ_MIN;   // BIGGER CELLS (touch) keeps cells from shrinking
 const arrZMax = () => arrDeskZ() ? clamp(84 / Math.max(6, arrFitW), 1.25, AZ_MAX) : Math.max(AZ_MAX, arrBigFloor);
 const arrPtrs = new Set();
 const arrEl = $('tArr'), arrGrid = $('tArrGrid');
@@ -31625,7 +31838,7 @@ function arrSideMst(){ return true; }
 // ROWS IN VIEW (3 Nov): the rows that fit from the top row down, measured (every 4th row has a gap above it, EVERY 4 ROWS,
 // so a fixed row height overcounted and the cursor could go under the bottom edge without Arrange following it)
 function arrRows(top = cs.song.top || 0){ const rh = arrRowH(); if (!(rh > 0)) return 16;
-  const h = arrGrid.clientHeight - 3, t0 = arrRowTop(top); let n = 0; while (top + n < 256 && arrRowTop(top + n) - t0 + rh - 1 <= h) n++; return clamp(n, 2, 96); }
+  const h = arrGrid.clientHeight - 3, t0 = arrRowTop(top); let n = 0; while (top + n < 256 && arrRowTop(top + n) - t0 + rh - 1 <= h) n++; return clamp(n, 2, 256); }   // (was 96: zoomed right out a tall panel shows more, and paging read the cap as the bottom; review, #131)
 // The panel's width: 0 is the default for the screen size, otherwise what the grip was dragged to.
 const AWK = 'thunderplus-arrange-w-v1';
 let arrW = (() => { try { return Math.max(0, int(localStorage.getItem(AWK), 0)); } catch(e){ return 0; } })(), arrKey = '';
@@ -31916,10 +32129,14 @@ function drawArr0(PH){
   if (ms && selA && selA.v === 'song'){ const r = selRect(); for (let y = r.y0; y <= r.y1; y++) for (let t = r.x0; t <= r.x1; t++) mark(y, t, 'sl'); }
   if (ms) for (const p of sxPicks) mark(p.y, p.t, 'sl');
   const nm = mutedCount();
-  setText($('tArrSub'), (ms ? S.name + ' · ' : '') + (lastR + 1) + (lastR ? ' rows' : ' row') + (nm ? ` · ${nm} muted` : '') + (arrZoom > 1 ? ` · ${+arrZoom.toFixed(1)}×` : ''));
+  setText($('tArrSub'), (ms ? S.name + ' · ' : '') + (lastR + 1) + (lastR ? ' rows' : ' row') + (nm ? ` · ${nm} muted` : '') + (arrZoom > 1 ? ` · ${+arrZoom.toFixed(1)}×` : arrZoom < 1 ? ` · ${Math.round(arrZoom * 100)}%` : ''));
   { const lb = arrEl.querySelector('.tahl b'); if (lb && lb.textContent !== (ms ? 'SONG' : 'ARRANGE')) lb.textContent = ms ? 'SONG' : 'ARRANGE'; }
   // As the Song screen the grid holds whole rows only (the space left over sits under the boxes), so it never ends on half a row.
-  if (fast){} else if (ms){ const pitch = (arrRowH() || arRH + 2) * 1.04, avail = arrAvail(), rows = Math.max(2, Math.floor((avail - 3) / pitch)), hg = Math.min(avail, Math.round(3 + rows * pitch)) + 'px';   // (×1.04: the gap every 4 rows)
+  if (fast){} else if (ms){ const avail = arrAvail(); let hg;
+    if (arrZoom < 1 && arrGrid.children.length > 8){   // ZOOM OUT: the rows are measured (the gap every 4 rows is 3 px here), so the last row is whole
+      const t0 = arrRowTop(0), rowH = arrGrid.children[0].offsetHeight, fit = n => arrRowTop(n - 1) - t0 + rowH + 3 <= avail; let n = 2; while (n < 256 && fit(n + 1)) n++;
+      hg = Math.min(avail, Math.round(arrRowTop(n - 1) - t0 + rowH + 3)) + 'px'; }
+    else { const pitch = (arrRowH() || arRH + 2) * 1.04, rows = Math.max(2, Math.floor((avail - 3) / pitch)); hg = Math.min(avail, Math.round(3 + rows * pitch)) + 'px'; }   // (×1.04: the gap every 4 rows)
     if (arrGrid.style.height !== hg) arrGrid.style.height = hg; }
   else if (arrGrid.style.height) arrGrid.style.height = '';
   arrSbw(); arrAlign(); arrFollowX(); arrBoxes();
@@ -32057,6 +32274,7 @@ function arrSize(){
   if (bigOn && arrBigFloor > 1 && arrZoom < arrBigFloor - 0.005){ if (arrBigPre == null) arrBigPre = arrZoom; arrZoom = arrBigFloor; }
   else if (!bigOn && arrBigPre != null){ arrZoom = arrBigPre; arrBigPre = null; }
   if (arrZoom > arrZMax()) arrZoom = arrZMax();   // a zoom saved on a smaller screen
+  if (arrZoom < arrZMin()) arrZoom = arrZMin();
   const z = arrZoom > 1 ? arrZoom : 1;
   const col = z > 1 ? Math.max(6, cwFit * z).toFixed(1) + 'px' : 'minmax(0,1fr)', grp = [];
   if (ms){ if (PFs > 0) grp.push(`repeat(${PFs},${col})`); if (NA > PFs) grp.push(`repeat(${NA - PFs},${col})`); grp.push(col); }
@@ -32064,24 +32282,27 @@ function arrSize(){
   arrEl.style.setProperty('--arcols', grp.join(` ${SP}px `));
   // As the Song screen the row height comes from the space the grid HAS (arrAvail), not the grid's own height: drawArr
   // snaps that height to whole rows, so reading it back here flipped 12 rows ↔ 13 rows on every redraw during playback.
-  const cw = (W - 34) / (NA + mx + 0.3 + (G + mx) * 0.2) * z, rh = Math.max(bigOn ? 24 : 0, clamp(Math.round(cw * 0.8), 16, z > 1 ? (arrDeskZ() ? (ms ? 34 : 40) : 44) : ms ? clamp(Math.floor(arrAvail() / 12) - 3, 16, 30) : 40));   // as the Song screen: at least about 12 rows, as the text grid showed
+  const cw = (W - 34) / (NA + mx + 0.3 + (G + mx) * 0.2) * z; let rh = Math.max(bigOn ? 24 : 0, clamp(Math.round(cw * 0.8), 16, z > 1 ? (arrDeskZ() ? (ms ? 34 : 40) : 44) : ms ? clamp(Math.floor(arrAvail() / 12) - 3, 16, 30) : 40));   // as the Song screen: at least about 12 rows, as the text grid showed
   // THREE DIGITS: the label also has to fit the block's width (three characters); too narrow for 7 px text, no label.
-  const lf = Math.min(clamp(Math.round(rh * 0.5), 8, 16), Math.floor(cwFit * z / 2));
-  arrGrid.style.setProperty('--arh', rh + 'px'); arrGrid.style.setProperty('--arf', Math.max(7, lf) + 'px'); arrEl.classList.toggle('arnolab', lf < 7);
+  const rh1 = rh; if (arrZoom < 1) rh = Math.max(AZ_RH_MIN, Math.round(rh * arrZoom));   // ZOOM OUT: lower rows (the columns stay at fit)
+  let lf = Math.min(clamp(Math.round(rh1 * 0.5), 8, 16), Math.floor(cwFit * z / 2));
+  if (arrZoom < 1) lf = Math.min(lf, Math.round(rh * 0.7));   // a number needs about 7 px: under that the block shows its colour only (arnolab)
+  arrGrid.style.setProperty('--arh', rh + 'px'); arrGrid.style.setProperty('--arf', Math.max(arrZoom < 1 ? 5 : 7, lf) + 'px'); arrEl.classList.toggle('arnolab', lf < 7);
+  arrGrid.style.setProperty('--arn', clamp(rh - 2, 5, 11) + 'px'); arrEl.classList.toggle('arout', arrZoom < 1); arrEl.classList.toggle('arlow', arrZoom < 1 && rh < 10);
   // Where the MONO | POLY break sits when every track fits (track PF's column starts after a spacer every 8 tracks):
   // the header's ○ is centred over it, and stays there while zoomed so it is always in the same place.
   { const p = sm ? 6 : 8, rnw = RNW, g = sm ? 1 : 2, PF = polyFrom(), colL = t => p + rnw + g + t * (cwFit + g) + (t >= PF && PF > 0 ? 1 : 0) * (SP + g);
     const bx = PF > 0 && PF < NA ? (colL(PF - 1) + cwFit + colL(PF)) / 2 : W / 2;
     arrEl.style.setProperty('--azfx', Math.max(120, Math.min(W - 70, bx)).toFixed(1) + 'px'); }
   arrEl.classList.toggle('zoomed', z > 1);
-  if (ARR_ZOOM_BTNS){ $('tArrZo').disabled = $('tArrZf').disabled = z <= 1; $('tArrZi').disabled = z >= arrZMax() - 0.01; }
+  if (ARR_ZOOM_BTNS){ $('tArrZo').disabled = arrZoom <= arrZMin() + 0.01; $('tArrZf').disabled = Math.abs(arrZoom - 1) < 0.01; $('tArrZi').disabled = arrZoom >= arrZMax() - 0.01; }
   return rh;
 }
 function arrHSync(){ const x = arrGrid.scrollLeft; $('tArrTh').scrollLeft = x; $('tArrGp').scrollLeft = x; if (asongOn()) arrBoxes(); }
 // fx: the point to keep still, as a fraction of the content's width; cx: where it sits in the panel (px). On a computer
 // the song cursor's block is the point kept still instead (or brought to the middle if it was out of view).
 function arrSetZoom(z, fx, cx){
-  z = clamp(z, 1, arrZMax()); if (z < 1.05) z = 1;
+  z = clamp(z, arrZMin(), arrZMax()); if (z > 0.95 && z < 1.05) z = 1;   // (a pinch near fit snaps to fit; below it the zoom-out levels)
   if (Math.abs(z - arrZoom) < 0.005) return;
   let el = null;
   if (arrDeskZ() && !arrPinch){
@@ -32163,8 +32384,11 @@ arrGrid.addEventListener('wheel', e => {
 if (ARR_ZOOM_BTNS){
   const step = d => {
     let z;
-    if (arrDeskZ()){ const m = arrZMax(); z = d > 0 ? (arrZoom >= m - 0.01 ? null : Math.min(m, arrZoom * 1.25)) : (arrZoom <= 1 ? null : arrZoom / 1.25); }
+    if (d < 0 && arrZoom <= 1.01) z = AZ_OUT.find(s => s < arrZoom - 0.01) || null;   // below fit: the zoom-out levels
+    else if (d > 0 && arrZoom < 0.99) z = [...AZ_OUT].reverse().concat(1).find(s => s > arrZoom + 0.01);
+    else if (arrDeskZ()){ const m = arrZMax(); z = d > 0 ? (arrZoom >= m - 0.01 ? null : Math.min(m, arrZoom * 1.25)) : arrZoom / 1.25; }
     else z = d > 0 ? AZ_STEPS.find(s => s > arrZoom + 0.01) : [...AZ_STEPS].reverse().find(s => s < arrZoom - 0.01);
+    if (z != null && z < arrZMin() - 0.001) z = null;
     if (z == null) return; arrSetZoom(z); arrZoomDone(); };
   $('tArrZo').addEventListener('click', () => step(-1)); $('tArrZi').addEventListener('click', () => step(1));
   $('tArrZf').addEventListener('click', () => { arrSetZoom(1); arrZoomDone(); });   // ○: back to every track in the panel
@@ -33402,6 +33626,10 @@ function cmdCtx(e){
   if (!$('gedit').hidden) geditToggle(false);
   { const rn = tv === 'song' && e.target.closest('[data-r]'); if (rn){ rowColour(+rn.dataset.r); return; } }   // ROW COLOURS (3 Nov): the Song's row numbers
   if (tv === 'phrase' && SX.pvcol && typeof pvActive === 'function' && pvActive() && e.target.closest('.pvrn, .pvrow')){ rowColour(cs.song.y); return; }   // ROW COLOUR IN PATTERN: this pattern's song row
+  // The commands act on the cell under the pointer (14 Nov, owner: FX → right-click an effect → Clear cleared another one): a right-click used to leave the cursor where it was.
+  // Inside a selection the selection is the target and stays. FX: a slot or control row; Mixer: a cell (not the master's own row).
+  if (tv === 'fx' || tv === 'mixer'){ const q = e.target.closest('[data-x][data-y]'), c = cs[tv], y = q ? +q.dataset.y : -1, x = q ? +q.dataset.x : -1;
+    if (q && y >= 0 && !(tv === 'mixer' && y === 7) && !(selA && selA.v === tv)){ c.x = x; c.y = y; if (tv === 'fx' && y >= 1 && y <= FXSLOTS) cFxS = y - 1; draw(); } }
   const sel = selA && selA.v === tv;
   // RIGHT-CLICK (menu audit, 2 Nov): the commands for what's under the pointer; Undo / Redo, selecting, value steps,
   // previous / next and play stay on their keys and in Edit ▾.
@@ -34491,6 +34719,19 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [602, '14 Nov', ['Settings › TRACKS: LFOs, macros, locks, scenes and parts now follow their tracks when the track count changes (LFOs stayed on the old track number and seemed to vanish)', 'ARRANGE ON STOP = PLAYHEAD now also moves the Arrange cursor when the Phrase (or another screen) holds the keys', 'FX screen: right-click › Clear (and CLEAR) empties the effect you clicked, not the last one in the list', 'Bottom FX bar: right-click or long press an effect for Remove effect (Ctrl+Z brings it back)', 'Settings › ANIMATIONS: OFF hides the dancing dogs and the moving effect pictures (also right-click or long press them › Hide animations). Meters, scopes and playheads stay']],
+  [601, '14 Nov', ['…chains: Morph, a new module that combines two sounds by their frequencies. Convolve keeps only what both share (a pad chopped and coloured by a drum loop); Shape plays A with B\'s tone colour. Morph, Sharpness, Smoothing, Frame and Freeze (hold A or B as a drone). It is under Granular and spectral']],
+  [600, '14 Nov', ['Arrange: zoom out further (the − button, Ctrl+wheel or pinch: five levels below fit, up to about three times the rows) so whole phrases fit', 'Arrange, Song, Phrase and Pattern view turn the page early while playing: when the playhead is 8 rows from the bottom, keeping 4 rows of what just played at the top', '+ ADD FX in the bottom FX bar opens the effect list straight away on the first empty slot', 'The "got its own copy" and "also plays on track" notices show for about 3 seconds and replace each other instead of queueing']],
+  [599, '14 Nov', ['MOD: an LFO you add, change or remove while the song is playing is heard at once (it did nothing until the next PLAY)', 'Effects rest when nothing is playing through them: a switched-off Retrigger, Grains, Scramble or Glitch no longer keeps a track\'s effects running, and each effect naps after half a minute of silence in and out. On Windows and Intel/AMD machines a reverb or resonator fading to nothing could cost twenty times more than while it played (track effects climbing after STOP or while patterns were muted)']],
+  [598, '14 Nov', ['The control bar’s Stop button now takes its look from the skin, like the other lit control bar buttons: flat, in the skin’s own playing colour, with no amber fill or shadow.', 'The volume fader in the bottom effects bar has a flat line for its cap, the same as the Mixer’s faders, in place of the round knob.', 'On a poly track, Enter (or EDIT on the pad) on a note picks up every note on that row, and Enter on an empty row drops the whole chord in the same columns, as one undo step. Dropped on a mono track it writes the one note that was under the cursor and says so.', 'In the Low power skins, lit control bar buttons (Stop, SELECT, LOOP SEL) are readable again: dark text on the light fill.']],
+  [597, '14 Nov', ['…waves and …chains: an Expression module (Modules, Control utilities): type a line of maths and it becomes the sound. It reads four inputs (a, b, c, d), two sliders (k1, k2), time in seconds (t), its own previous output (y, so one line can be a filter or a counter) and a random number (rnd), with the usual operators and functions such as sin, tanh, abs, min, max, clip and mix. An Examples menu has a dozen to start from (ring modulation, soft clip, fold, bit crush, sample and hold …). What you type is only ever read as maths, never run as a program; a mistake is silence with a note saying where; the result is held between −4 and 4.']],
+  [596, '14 Nov', ['…waves and …chains: a Delay line (Modules, Building blocks). A bare delay from one sample to two seconds whose feedback is inside it and exact to the sample, so short times ring at a pitch you can tune (1000 ÷ the time in ms: 2 ms rings at 500 Hz): combs and plucked strings from a burst of noise. Longer times echo, and an LFO into its Time input makes a chorus or flanger. Out is only the delayed sound; mix it with the dry yourself. Feedback stops at 99% and is limited inside, so it cannot run away.']],
+  [595, '14 Nov', ['…chains fix: opening a song or patch whose …chains patch had exactly as many modules and cables as the one loaded before could leave part of it switched off (a Track In that was unpatched before and patched now stayed silent, so the whole chain was silent) until the patch was edited. Each loaded patch now starts clean.']],
+  [594, '14 Nov', ['…waves and …chains: four building blocks (Modules, Building blocks). One-pole filter (the gentlest filter, with a Low and a High output; also a smoother for control signals), Allpass (Phase: the stage a phaser is made of; Echo: the short diffusing delay reverbs are made of), DC blocker (brings a signal back round zero) and Mid / side (Encode, treat the middle and the sides differently, Decode).', '…chains: an Oscillator (sine, triangle, saw, square, from 0.1 Hz to the top, with FM and Sync) and Noise (white, pink, brown) under Sound sources, so a patch can make sound and control waves of its own.']],
+  [593, '14 Nov', ['…waves and …chains: a Scope (Modules, next to Meter). Patch a signal into A, and a second into B if you like: it draws them on one time base, each as the band between its lowest and highest point, so a fast signal reads as a band and a slow one as a line. Trigger on Rising holds a steady wave still; Freeze keeps the picture; Zoom magnifies it. It only runs while the editor is open, so it costs nothing while a song plays with the editor closed.']],
+  [592, '14 Nov', ['\u2026waves and \u2026chains: seven clock and trigger tools under Clocks and rhythm. Clock multiplier (two to sixteen even pulses for each one in), Chance gate (each pulse passes with the chance you set; the same Seed gives the same run of hits every time, so a render matches what you heard; Seed 0 is different every time; inside a \u2026waves instrument the run starts again at Reset, not yet at each play), Counter (a rising, falling or back-and-forth staircase), Step switch (up to four inputs, one at a time), Burst (a run of pulses that can tighten or widen, with a falling level), Gate delay and Flip-flop.', '\u2026waves now has Steps and Clock, the same as \u2026chains.']],
+  [591, '14 Nov', ['\u2026waves and \u2026chains: six small building blocks under Control utilities. Constant (a fixed value), Invert / rectify (the mirror, the absolute value, and each half), Scale / map (one range onto another, with Clip), Comparator (a gate when A is above B, with a dead band so it does not chatter), Switch (A or B on a gate, with a short fade so audio does not click) and Crossfade (a mix of A and B you can move with a cable, straight or equal power). Add, subtract, multiply, min and max are still Math\u2019s outputs, and AND / OR / XOR / NOT are Logic\u2019s. In \u2026waves a block fed by a voice works once per voice.']],
+  [590, '14 Nov', ['On the phone, the now-playing notification names your project: a project opened from Files, \u201cOpen with\u201d or Share showed the song\u2019s inner name (\u201cSong 1\u201d) because Android hands the app no file to remember; the app now keeps the file\u2019s name. The window title follows it too.', 'On the folded phone the view tabs read in full: with Chains or Waves showing, Tracker, Synth and the others take a row of their own (\u201cChains\u201d was cut to \u201cChai\u201d with three tabs, and with four the top bar ran off the screen).']],
   [589, '14 Nov', ['\u2026waves and \u2026chains: feedback loops. A cable that closes a loop used to be refused; now it is allowed, and so is patching a module into itself. The cable that closes the loop is drawn as a long dash and a dot with a small \u201c1 blk\u201d tag: what it carries arrives one block late (128 samples, about 3 ms). A loop cannot run away: a signal inside the normal range passes through that cable untouched, and anything louder is bent smoothly towards a ceiling (about +6 dB). Turn loop gain up carefully all the same. Patches without a loop sound exactly as before.']],
   [588, '14 Nov', ['\u2026waves and \u2026chains: a module can now fold to Mini, a one-line title bar with its cables on the edges, as well as to Compact. Shift+click the chevron, press and hold it on a phone, use the module menu, or press Alt+Shift+C to take every module to Mini; the plain chevron and Alt+C work as before.', 'Some modules are narrower now (Attenuverter, Random, Quantizer, Logic, Math, Slew limiter, Sample & hold, Clock divider, Gate extract), so a busy patch fits more on screen. The \u201cAbout this module\u201d entry moved into the module menu.', 'A group has a chevron: click it and the whole group folds to one block that keeps the cables going in and out. The group box follows its modules when you move, nudge, fold or remove them. Old patches open as they were.', 'Touch: a long press that opens a menu no longer picks the first item when your finger lifts.']],
   [587, '14 Nov', ['\u2026waves and \u2026chains feel more like a desktop program. The mouse wheel over a slider now turns it, but only once the pointer has rested on it for a moment, and never while you are panning or zooming. Right-click a slider for Reset, Type a value and MIDI learn; hold Alt and click to reset it.', 'Two cables into one input now add together instead of the new one replacing the old one, and hovering a cable shows what is on it (level, gate, or the value it carries). Modules snap to a grid as you drag (the background menu turns that off).', 'New keys: A (or N in Chains) adds a module, F fits the view, Shift+F zooms to the picked modules, Ctrl+A picks all, Ctrl+G groups, arrows nudge, Enter renames, Esc lets go. Right-click gives Rename, Align, Space evenly, Tidy up by signal flow and Add a comment. The module list has a search box.', 'In Chains you can save your own presets and they travel with the patch. Tab now steps from module to module, and buttons and cables have names for screen readers. Folding a long module no longer works in Play, and Alt+E during a drag lets go of the module.']],

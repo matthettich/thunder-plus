@@ -101,3 +101,43 @@ test('ThunderFx (Flex only): the shortcut really skips the slots (silent, stoppe
 test('ThunderFx: a Retrigger / Grains slot (or a clocked module) keeps a clocked node awake even when stopped', skipFx, () => {
   const node = fxNode(HTML, [{ key: 'r', slot: 1, t: 93, on: true, p: [0, 2, 0.5, 0, 0.5, 1, 0] }]); assert.equal(node.chard, true);
 });
+
+/* ---------- 14 Nov: only clocked slots that are ON keep a node awake; a silent slot naps ---------- */
+function fxNodeOf(h, chain) {
+  const reg = {};
+  new Function('AudioWorkletProcessor', 'registerProcessor', 'sampleRate', 'currentTime', tfxSrc(h))(class { constructor() { this.port = { postMessage() {}, onmessage: null }; } }, (n, c) => { reg[n] = c; }, SR, 0);
+  return new reg['thunder-tfx']({ processorOptions: { bytes: TFXWASM, chain } });
+}
+const RETRIG = on => ({ key: 'r', slot: 0, t: 93, on, p: [0, 2, 0.5, 0, 0.5, 1, 0] });
+const skipNew = { skip: !ACORN && 'needs acorn' };
+function work(node) { let n = 0; for (const s of node.slots) { if (s.js) { for (const k of ['process', 'feed']) if (typeof s.js[k] === 'function') { const f = s.js[k]; s.js[k] = function (...a) { n++; return f.apply(this, a); }; } } } const r = node.slotRun; node.slotRun = function (...a) { n++; return r.apply(this, a); }; return () => n; }
+test('ThunderFx: a switched-OFF Retrigger no longer keeps the node awake (it slept never, even on silence, for the whole song)', skipNew, () => {
+  const node = fxNodeOf(HTML, [RETRIG(false)]), calls = work(node), o = () => [new Float32Array(B), new Float32Array(B)], z = new Float32Array(B), sig = H.testSignal(B * 40);
+  let t = 0; const step = a => { const out = o(); node.process([[a || z, a || z], [], []], [out], fxP(B, 8 + t)); t += B / 24000; return out[0]; };
+  for (let b = 0; b < 40; b++) step(sig.subarray(b * B, (b + 1) * B));
+  for (let b = 0; b < Math.ceil(15 * SR / B); b++) step(null);   // 15 s of silence with the clock RUNNING (the song is playing)
+  const c0 = calls(); for (let b = 0; b < 200; b++) { const out = step(null); for (const v of out) assert.equal(v, 0); } assert.equal(calls(), c0, 'asleep: nothing in the node runs');
+  const out = step(sig.subarray(0, B)); assert.ok(calls() > c0 || out.some(v => v !== 0), 'sound wakes it in the same block'); let e = 0; for (const v of out) e += Math.abs(v); assert.ok(e > 0.01, 'and it is heard (the OFF slot passes it)');
+});
+test('ThunderFx: the same Retrigger switched ON keeps the node awake, and an FXO switch holding the OFF one on wakes it', skipNew, () => {
+  const on = fxNodeOf(HTML, [RETRIG(true)]), cOn = work(on), o = () => [new Float32Array(B), new Float32Array(B)], z = new Float32Array(B);
+  for (let b = 0; b < Math.ceil(16 * SR / B); b++) on.process([[z, z], [], []], [o()], fxP(B, 8 + b * B / 24000));
+  const a = cOn(); for (let b = 0; b < 50; b++) on.process([[z, z], [], []], [o()], fxP(B, 500 + b * B / 24000)); assert.ok(cOn() >= a + 50, 'still running on silence: it is tempo-locked and ON');
+  const off = fxNodeOf(HTML, [RETRIG(false)]), cOff = work(off);
+  for (let b = 0; b < Math.ceil(16 * SR / B); b++) off.process([[z, z], [], []], [o()], fxP(B, 8 + b * B / 24000));
+  const s0 = cOff(); for (let b = 0; b < 50; b++) off.process([[z, z], [], []], [o()], fxP(B, 500 + b * B / 24000)); assert.equal(cOff(), s0, 'OFF: asleep');
+  const P = fxP(B, 600); P.sw0 = Float32Array.from([1]); off.process([[z, z], [], []], [o()], P); assert.ok(cOff() > s0, 'the tracker switches it on (FXO): awake in that block');
+});
+test('ThunderFx slot nap: silent in and silent out for a second skips the slot; sound wakes it in the same block; Vinyl and pump CRUSH never nap', skipNew, () => {
+  const node = fxNodeOf(HTML, [RETRIG(false)]); let runs = 0, tail = 1;
+  { const z = new Float32Array(B); node.process([[z, z], [], []], [[new Float32Array(B), new Float32Array(B)]], fxP(B, null)); if (!node.L) { node.L = new Float32Array(B); node.R = new Float32Array(B); } }
+  node.slotRun = function (s, n) { runs++; for (let k = 0; k < n; k++) { this.L[k] = this.L[k] + tail; this.R[k] = this.R[k] + tail; } tail *= 0.5; };   // a fake effect: its input plus a tail that halves every block
+  const s = { key: 'plate' }, feed = v => { for (let k = 0; k < B; k++) { node.L[k] = v; node.R[k] = -v; } node.slotNap(s, B, null); };
+  for (let b = 0; b < 30; b++) feed(0); assert.equal(runs, 30, 'the tail is still above -180 dB: it runs'); assert.ok(!s.zz);
+  for (let b = 0; b < Math.ceil(2.5 * SR / B); b++) feed(0); assert.equal(s.zz, undefined === s.zz ? undefined : false, 'two and a half seconds of quiet is not enough: a 2 s delay may still hold an echo'); assert.equal(runs, 30 + Math.ceil(2.5 * SR / B));
+  for (let b = 0; b < Math.ceil(30 * SR / B) + 2; b++) feed(0); const r0 = runs; assert.equal(s.zz, true, 'half a minute of nothing in and nothing out: asleep');
+  for (let b = 0; b < 500; b++) { feed(0); assert.equal(node.L[5], 0); assert.equal(node.R[5], 0); } assert.equal(runs, r0, 'skipped, its output exactly silent');
+  feed(5e-10); assert.equal(runs, r0, 'still under -180 dB: stays asleep'); feed(1e-6); assert.equal(runs, r0 + 1, 'sound: it runs in that very block'); assert.ok(Math.abs(node.L[5] - 1e-6) < 1e-9); assert.equal(s.zz, false);
+  tail = 1; feed(0); const r1 = runs; for (let b = 0; b < 10; b++) feed(.5); assert.equal(runs, r1 + 10, 'with sound going through it always runs');
+  for (const key of ['vinyl', '3:pcrush']) { const q = { key }; tail = 0; const r2 = runs; for (let b = 0; b < 2000; b++) { for (let k = 0; k < B; k++) { node.L[k] = 0; node.R[k] = 0; } node.slotNap(q, B, null); } assert.equal(runs, r2 + 2000, key + ' speaks up on its own after a pause: never skipped'); }
+});

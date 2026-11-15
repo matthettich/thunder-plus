@@ -366,6 +366,7 @@ clock mapping at that latency (7 Nov (16)). Re-check MIDI timing with Measure…
 
 ## Desktop releases
 
+- **v1.3.5** (14 Nov 2026, a regular release; owner, 14 Nov: "Merge `beta` into `main` and build the desktop app"; PR #120 beta → main at build 589 (CodeRabbit had not finished after 15 minutes and left no comments), Run workflow through the API with version 1.3.5, run 43637300817, succeeded): everything since build 563 (the 12–13 Nov phone fixes, Lite reverb and presets, the Synth page rework, …waves / …chains audit passes 1–5, feedback loops). Installed copies update to it.
 - **v1.3.4** (11 Nov 2026, a regular release; owner, 10 Nov 22:49: "do the queue and push a full desktop app after you do"; PR #92 beta → main at build 563, Run workflow through the API with version 1.3.4, run 42983473062, all three platforms built, 11 assets): everything since build 541 (MOD finished, the 10 Nov stability work, build 563). Installed copies update to it.
 - **v1.3.4-beta.2** (9 Nov 2026, pre-release; owner asked for a beta desktop; Run workflow through the API from `beta` at build 541, run 42700107769): MOD screen, chains rail lines, acid Mutate. **v1.3.4-beta.1**: the same at build 540, without acid Mutate. Owner, 9 Nov: hold further desktop betas for now.
 - **v1.3.3** (8 Nov 2026; owner: update the desktop app at a stopping point; Run workflow through the API with version 1.3.3, from `main` at build 523): builds 517–523 on top of v1.3.2 (`· beta` label, Mobile SHIFT+▲, pad MUTE / SOLO, the review fixes).
@@ -592,6 +593,11 @@ Found while building pass 4:
 - (lead, 14 Nov) The module right-click menu in the editors has grown to 15 entries (custom module, group, zoom, four aligns, two spacings, copy, duplicate, delete, select all, two collapses). I would group Align / Space into one "Arrange" submenu and put a rule between the groups. Not done.
 - (lead, 14 Nov) `tests/sweep/audition.mjs`'s "two held notes" check is timing-sensitive: it failed once while other sweeps were running and passes alone. I would make it wait on the engine's state instead of fixed delays. Not done.
 
+Found while building the module queue (builds 591–592):
+- …waves does not count song starts (see the build 592 entry): clocks and seeded chance do not restart at PLAY there.
+- The editors' own `scope` for the new shared modules says 'mono' while the engines say 'poly'; only the engine's is used, but the two should agree.
+- Clock's Compact summary is clipped at its default width (was so before).
+
 Found while building feedback loops (build 589):
 - A feedback cable's detour runs under the modules it passes (through their bodies when they are tall). Would route it under the tallest module of the loop.
 - The "1 blk" tag scales with the zoom; on a phone zoomed out it is too small to read. Would keep it at a fixed screen size.
@@ -701,6 +707,91 @@ The owner's top priority to add is the MOD screen. Work down the list; ask befor
 **The owner's checklist by importance (13 Nov):** he works from a Claude Doc, "Thunder Plus test checklist, by priority" (https://claude.ai/artifact/LrzQ18ur18Fc5gkvxmQDbK), ordered: 1 Do these first, 2 Really worth trying, 3 If you have time, 4 Safe to skip, Parked, Set aside, Done. A snapshot with his ticks is `docs/TEST-CHECKLIST.md`: re-export it whenever the doc changes, and add each new build's checks to the doc's section 1 as well as here. He said the two "decides" groups (native apps; smoothing / Worklets / clock experiments) are parked and block nothing. "Close the skip list" from him means: close section 4's items as not tested.
 
 Start a session by asking for results. Fix on `beta`. (10 Nov, 15:10: the web beta is build 560; the build numbers in the rest of this paragraph are older.) Web beta: https://matthettich.github.io/thunder-plus/beta/ (build 547 as of 10 Nov morning, 548 once its PR merges; the night of 9–10 Nov shipped 544–547, see the four "10 Nov" entries below. Decisions the lead made that night for the owner to confirm or reverse: on a phone the saved Sequencer default plays on the Page unless Audio thread is picked on that device; on a phone the safety limiter is its stand-in until another worklet loads; the resync only runs with a worklet loaded and its margins are untested on a device). Desktop: v1.3.4-beta.2 (build 541, no feed view or scopes); further desktop betas on hold until the owner asks.
+
+**Build 602** (LFOs follow tracks; Arrange on stop; FX Clear; remove from the FX bar; ANIMATIONS)
+- [ ] **Computer (a COPY of a song with LFOs):** Settings › TRACKS, add two tracks. Pass: the LFOs show on the same track's MOD screen (its new number) and still move the same knobs; taking the two tracks away again puts everything back. (A song changed before this build is not repaired: its LFOs sit on the old track number.)
+- [ ] **Computer:** ARRANGE ON STOP = PLAYHEAD, Phrase screen with Arrange beside it, PLAY past a page turn, STOP. Pass: the Arrange cursor is on the row where it stopped, in view. With STAYS it stays where it was.
+- [ ] **Computer:** FX screen with several effects, right-click the first one › Clear. Pass: only that one goes. Same on the master.
+- [ ] **Computer and phone:** bottom FX bar, right-click (long press) an effect › Remove effect. Pass: it goes, a short notice names it, Ctrl+Z brings it back; a plain click and the on/off light work as before.
+- [ ] **Computer and phone:** Settings › ANIMATIONS OFF. Pass: no dogs and no moving pictures on the FX bar on any screen; meters, scopes and playheads still move; ON brings them back.
+
+**Build 601** (…chains: Morph)
+- [ ] **Computer, ears:** …chains, add Morph (Granular and spectral). A pad into In, a drum loop into In B, Mode Convolve, Morph 50%. Pass: you hear the pad chopped by the drums' rhythm; Morph at 0% is the pad alone, 100% the drums alone; no clicks while turning Morph, Sharpness or Smoothing.
+- [ ] **Computer, ears:** Mode Shape. Pass: the pad always sounds, with the drums' (or a voice's) tone colour. Freeze on Hold A, then stop the pad: it sustains as a drone. Frame Short / Long changes the character without a bang.
+- [ ] **Computer, ears:** Convolve is quieter than its inputs by design. Pass: Level up to +24 dB makes up for it without harsh clipping (there is a limiter); tell me if the default should be louder.
+
+**Build 600** (Arrange zoom out and early paging; + ADD FX; brief notices)
+- [ ] **Computer:** Arrange header, press − several times. Pass: rows get lower until about three times as many show (labels hide when rows get tiny, colours and the playhead stay); ○ goes back to fit.
+- [ ] **Computer and phone:** play a song with Arrange beside the Phrase, hands off. Pass: the page turns once when the playhead is about 8 rows from the bottom and a few rows that just played stay at the top; touch a key and it stays put for 4 s.
+- [ ] **Computer and phone:** + ADD FX in the bottom FX bar. Pass: the FX screen opens with the effect list already up on the first empty slot; Esc leaves you on the FX screen.
+- [ ] **Computer:** enter the same block number on a second track a few times quickly. Pass: one short notice with the latest text, gone in about 3 s.
+
+**Build 599** (MOD while playing; effects rest in silence)
+- [ ] **Computer (the ROG, desktop app), ears:** open `acid`, Balanced, PLAY, then mute track 07's patterns or press STOP and leave it two minutes with the CPU panel open. Pass: "Effects T07" falls to about nothing within a minute or two and stays there (it used to climb to 40%); un-mute or PLAY and the effects sound exactly as before, tails included, with no click when they wake.
+- [ ] **Computer, ears:** any track with a reverb or delay: stop the notes and listen to the whole tail. Pass: the tail rings out fully, nothing is cut short.
+- [ ] **Phone or computer, ears:** while a song plays, add an LFO on the MOD screen to an effect knob (e.g. track 12 FX1 delay time), change its depth and rate, then delete it. Pass: you hear each change straight away, without stopping the song.
+
+**Build 598** (the owner's three small requests of 14 Nov; branch `fix/stop-button-fx-fader`)
+- [ ] Computer, any skin: press Play on the Pattern screen: the small "■ STOP" at the right of the control bar looks like the other lit control bar buttons (flat, the skin's own playing colour; no amber, no thick border, no shadow) and still stops the song. Try white, an IDM skin and a Low power skin (dark text on a light fill there).
+- [ ] Bottom effects bar, a track's strip: the volume fader's cap is a flat line like the Mixer's, not a round knob; drag, wheel, double-click (0 dB), Shift-fine and the right-click menu work as before. A bus strip and the master strip too.
+- [ ] Poly track, a row with three notes: cursor on any one, Enter (EDIT on the phone): "3 notes picked up"; Enter on an empty row: all three appear in their columns; one Undo removes all three. A row with one note, a mono track and effect columns behave as before; a chord dropped on a mono track writes one note and says why.
+
+**Build 597** (module queue: Expression; branch `feat/modules-expr`)
+- [ ] **By ear:** add an Expression, a sound into A: it passes through (the formula is `a * k1`); K1 at 0.5: half as loud. Examples → Soft clip, raise K1: more drive. Bit crush (K1) and Sine at K1 kHz: a crusher and a pure tone.
+- [ ] **By ear:** change the formula while the song plays (pick another Example): any click or dropout?
+- [ ] Type `sin(` and press Enter: silence and a line under the field saying where the mistake is; fix it: the sound is back.
+- [ ] Computer: typing A, N, F, Delete or the arrows in the field types into the field and does nothing else (no module search, nothing deleted; in …waves no note plays). Escape puts the old formula back.
+- [ ] Phone: the field is comfortable on the folded screen; the keyboard does not capitalise or correct what you type; Enter applies.
+- [ ] Copy and paste the module, save and reopen the song, undo and redo: each copy keeps its own formula. Compact shows the formula.
+- [ ] Is the Help's "Expression" paragraph enough to write your own, or do you want more examples?
+
+**Build 596** (module queue: Delay line; branch `feat/modules-delay`; **the owner listens**)
+- [ ] **By ear, a plucked string:** a short burst of Noise (a VCA with a short envelope) into a Delay line, Time 4.5 ms, Feedback 95%, Damp 20%: it rings near 220 Hz like a string; Fine retunes it smoothly; more Damp: a duller, shorter note.
+- [ ] **By ear, an echo:** Time 350 ms, Feedback 40%, Out into a Crossfade's B with the dry on A: repeats that fade; negative Feedback turns every other repeat over (a hollower echo).
+- [ ] **By ear, a flanger:** an LFO into the Time jack, Time about 3 ms, Mod depth 2 ms, mixed with the dry: it sweeps. Turning Time while a sound plays bends the pitch, with no clicks.
+- [ ] **By ear, pushed:** Feedback at 99% with a loud sustained sound at a short Time: loud and bent, never exploding, clicking or going silent for good. Too harsh or too tame when pushed?
+- [ ] Looks: Time reads "2.0 ms (500 Hz)" under 20 ms; on the folded phone Compact cuts "Feedback" short when the pitch shows: acceptable?
+
+**Build 595** (…chains: a loaded patch inherited the last one's run list; branch `fix/chains-loadpatch-runlist`)
+- [ ] If you ever opened a song and a track that goes through …chains was silent until you touched the patch: that was this. Nothing to test on purpose; tell me if a …chains track is ever silent after opening a song or switching patches again.
+
+**Build 594** (module queue: audio building blocks; an oscillator and noise in …chains; branch `feat/modules-blocks`)
+- [ ] **By ear, a phaser:** four Allpass (Phase) in a row, one LFO into every Freq jack, the last one's Out on a Crossfade's B with the dry sound on A at 50%: a phaser sweep.
+- [ ] **By ear, diffusion:** three Allpass in Echo (Time 5, 8, 13 ms, Gain 0.5 to 0.7) on a drum hit: the hit smears into a soft tail; a held tone keeps its pitch and level.
+- [ ] **By ear, wider:** Mid / side on Encode → the Side output through a Utility turned up → a second Mid / side on Decode: wider, the centre stays put. Decode straight after Encode: identical to the input.
+- [ ] **By ear, …chains:** an Oscillator at 5 Hz into another's FM with FM depth 5%: vibrato; at 440 Hz and about 30%: a bell. Sync from a Clock restarts the tone on each beat. Noise through a band-pass Filter and a VCA with a short ADSR: a hi-hat; compare White, Pink, Brown.
+- [ ] One-pole: a stepped Random into In at Freq 3 Hz, Low into a cutoff jack: the steps glide. DC blocker after Invert / rectify's Absolute output: the sound sits round zero again.
+- [ ] The Freq sliders (One-pole, Allpass, Oscillator) are linear, so the low end is cramped at the left: is that a problem in use, or is typing the value enough?
+- [ ] Phone: the six in …chains (four in …waves: no Oscillator or Noise there, its own are unchanged), Compact and Mini.
+
+**Build 593** (module queue: Scope; branch `feat/modules-scope`)
+- [ ] Computer, …chains: Modules → Scope (after Meter). A sine LFO into A, a square LFO into B: a teal sine and a purple square on one screen, "500 ms pk-pk 2.00" in the corner. Trigger on Rising: the picture stands still; Free: it drifts.
+- [ ] Freeze On: the picture stops while the sound carries on; Off: it moves again. Zoom magnifies; the small tick at the left follows Level (Rising only).
+- [ ] An audio signal (a Track In while the song plays) at Time 20 ms: can you read the waveform? At 1 s: the level's outline?
+- [ ] Compact keeps the screen, Mini hides it. Phone, Play mode: a drag across the Scope pans the patch and does nothing else.
+- [ ] Inside Thunder Plus: the …chains screen with a Scope on a Track In while the song plays: it draws; close the …chains screen: the CPU reading does not show the Scope's cost. …waves: it draws once a note has played.
+- [ ] Skins: A and B stay apart and readable in IDM pink & green, 909 and the white theme.
+
+**Build 592** (module queue, group 2: clock and trigger tools; branch `feat/modules-clock`)
+- [ ] **By ear, Chance gate (this is the seeded chance you asked about):** a Clock into In, Out to a drum, Seed 7, Chance 50%. Play twice from the start: the same hits both times. Render the song: the render has those hits too. Seed 0: different on every play. Other carries the pulses that did not pass (patch it to a second drum: the two never hit together).
+- [ ] **By ear:** Clock → Clock multiplier ×3 → a drum: three even hits a beat; change the tempo: it catches up one pulse late.
+- [ ] **By ear:** a kick's gate into Burst (Count 4, Bend up) → a snare: a roll that tightens; Level into the snare's volume: it fades. Gate delay at about 30 ms to a second drum: a flam.
+- [ ] Counter's Step through Scale / map into a filter's cutoff: an 8-step staircase that starts over; Direction Up and down: it comes back the way it went. Flip-flop's Q into a Switch's Select: two sounds take turns.
+- [ ] Step switch: four different sources in, a Clock: they take turns, no clicks (Fade 5 ms).
+- [ ] An old …chains patch with Steps and Clock looks and plays as before. …waves: Steps and Clock are in the Modules list now and follow the song's tempo.
+- [ ] Phone: add the seven, Compact and Mini: readable, nothing cut off ("Times ×3", "Seed Random").
+
+**Build 591** (module queue, group 1: control maths; branch `feat/modules-maths`)
+- [ ] Computer, …chains: Modules list, Control utilities: Math, Constant, Invert / rectify, Scale / map, Comparator, Switch, Crossfade, in that order, each with a one-line hint.
+- [ ] Scale / map: an LFO into In, Out into a slider's jack: by default −1..1 becomes 0..1; swap Out low and Out high and it turns over; Clip off lets it run past the ends.
+- [ ] **By ear:** Envelope follow → Comparator A, Level about 0.30, the "A > B" gate → Switch's Select, the dry sound on A and a delay's output on B: loud hits jump to B with no click (Fade 5 ms). Set Fade to 0: now it may click (that is what 0 is for: control signals).
+- [ ] **By ear:** Crossfade with dry on A, an effect on B and a slow LFO into Mix: it sweeps between them; Curve on Equal power keeps the loudness even through the middle with two different sounds.
+- [ ] …waves: Scale / map or Crossfade fed from a voice (Host In → oscillator), several notes held: each note has its own, nothing stuck or doubled.
+- [ ] Phone: add the six, fold to Compact and Mini: names and values readable, nothing outside the frames.
+
+**Build 590** (the owner's two phone bugs of 14 Nov; branch `fix/phone-chip-and-tabs`)
+- [ ] **Phone (installed app if you use it):** open the `acid` project from Files or "Open with", press PLAY, pull the notification shade down: the title says "acid", not "Song 1". Rename the song while it plays: the title follows. (In a Chrome tab the small Chrome logo stays; the installed app should show Thunder Plus's own icon: which do you see?)
+- [ ] **Folded phone, Mobile mode, Chains shown (three tabs):** Tracker, Synth and Chains all read in full, on a row of their own at the top; nothing scrolls sideways and the gear and PLAY are on screen. Show Waves too (four tabs): the same. Is the extra row acceptable, or would you rather keep one row and lose the LEFT time readout at that width?
 
 **Build 589** (feedback loops in …waves / …chains, M2; branch `feat/feedback-loops`; **the owner listens before relying on it**)
 - [ ] **By ear, computer, …chains:** Track In → Tape delay → Reverb → Chain Out, then drag Reverb's Out back to the delay's In. It is accepted (it used to be refused), drawn as a long dash and a dot with a "1 blk" tag. Does the loop sound like feedback should (a wash that builds)? Turn the levels in the loop up until it runs away: it should settle loud (about +6 dB at the cable) but never explode, click or go silent for good. How does it sound when pushed: usable, or too harsh / too tame?
@@ -1115,6 +1206,122 @@ Suggested order: N0 → N1 → N2 (phone cured) → N4 with N3 alongside → N5 
   the edge `R.t0`, "waiting…" while armed), `rcdClk` / `rcdFmt` / `rcdFreeSecs`, a 250 ms timer only while recording; the
   final length stays until the next take. recorder-check covers FREE, PATTERN, Stop, next take and closing mid-take.
 
+
+## 14 Nov (LFOs follow tracks, Arrange on stop, FX Clear, remove from the FX bar, ANIMATIONS; build 602)
+
+Owner's reports from the ROG on desktop 1.3.5 (build 589), built by an agent, reviewed by the lead.
+- **LFOs "vanished" (data bug):** `ntrRemap` moved the song, mixer and effects on a TRACKS change but not the Perform data, which names tracks by number. New `perfRemap(P, tN)`: scene values, macro targets, locks, LFOs (keys and ids) and parts (`mix`, `fx` keys) follow the tracks; the master is left alone. A song changed before this build is not repaired (its LFOs are still stored on the old number). Every other write to `perf.lfo` was checked: nothing else drops LFOs unasked. Known oddity left alone: the Perform lock sheet shows and ✕-removes only a track's first LFO. `tests/perf-follows-tracks.test.js`.
+- **ARRANGE ON STOP:** failed when the Phrase held the keys with Arrange beside it (STOP used PHRASE ON STOP and put Arrange's old cursor back). `arrCurToPlay` in `tStop`. `tests/arrange-on-stop.test.js`.
+- **FX Clear:** Clear on a slot row called `fxDelLast` and the right-click never moved the cursor. New `fxDelSlot`; the context menu moves the cursor to the clicked row first. The Mixer's FX row still clears the last effect (that row is the whole chain). `tests/fx-clear-slot.test.js`.
+- **FX bar:** right-click / long press a card: Remove effect, Open on the FX screen. `tests/fxbar-remove.test.js`.
+- **ANIMATIONS** (Settings, saved): dogs, FX bar pictures, rainbow skin drift; no frame work when off. `tests/animations-off.test.js`.
+
+**Owner's asks of 14 Nov evening, not built yet (queue, in this order unless he says otherwise):**
+1. Synth view sliders: double-click opens number entry (he ranks this above double-click = reset; keep reset on another gesture, e.g. right-click › Reset or Alt+click); click a slider then ← / → nudges by a small step.
+2. Arrange: with a selection of blocks in Arrange and Arrange in focus, TRANSP. (next to LP. SEL) transposes every phrase in the selection (mind phrases shared with rows outside the selection: copy or warn, as the existing transpose notice does).
+3. Nice to have: separate MONO TRACKS and POLY TRACKS counts in Settings (today the first half are mono; `ntrPerm` / `polyFrom`). Touches voices, the core sequencer and saved songs: plan before building.
+4. From the audio measurements (see the build 599 entry): switched-OFF pump effects still cost (pump MASTER about 8% of the audio thread while OFF), muted tracks still run their notes and effects, the CPU panel should name the effect.
+5. After the punch-list queue: the chance / probability commands (extend CHA / PRB / NTH / CND; SED seed with two scopes).
+
+## 14 Nov (…chains: Morph; build 601)
+
+Last module of the queue. Engine by the lead (`MorphM` in `chains/chains-worklet.js`, chains only), editor side by an agent.
+- Two stereo inputs (In / In R = A, In B / In B R = B), frames of 512 / 1024 / 2048 with a quarter-frame hop, one frame late (`latency:1024` is the default's). Convolve: geometric mean of the two spectra (Sharpness raises the exponent), A's phase; Shape: A's fine detail with B's outline, as loud as A (at most 30 dB of lift). Morph 0 = A, .5 = combined, 1 = B. Smoothing, Freeze (Off / Hold A / Hold B), Level ±24 dB, limiter out. Phases are kept as unit phasors (no atan2 / sin / cos per bin).
+- By design Convolve is quieter than its inputs on full-range material (no make-up). Owner's ears to judge the default Level.
+- Tests: `tests/modules-morph.test.js`, `tests/modules-morph-editor.test.js`; goldens: three new entries, no other hash changed.
+- **The module queue is now complete:** control maths (591), clock tools (592), Scope (593), building blocks (594), Delay line (596), Expression (597), Morph (601).
+
+## 14 Nov (Arrange zoom out, early paging, + ADD FX opens the list, brief notices; build 600)
+
+Owner's asks of 14 Nov (15:59, 16:01, 16:07), built by an agent, reviewed by the lead.
+- **Zoom out:** `AZ_OUT`, five levels below 1 down to 0.32 (rows lower, columns stay at fit; under 10 px rows only every fourth row number and no labels). Same saved key. With "Bigger cells on touch" on, zoom stays at 1 or above.
+- **Early paging:** one pure function `arrPageTop(top, VR, row, len, keep, end)` for Arrange (`arrFollowPage`) and `followPlay`'s `page()`; `ARR_AHEAD = 8`, `ARR_KEEP = 4` (a quarter / an eighth of a short view). No early turn when the view already shows the row the playhead wraps at (`arrWrapRow`); the last page goes straight to the end. Cost: a 12-row view turns twice where it turned once; from 20 rows up no more turns than before.
+- **+ ADD FX:** `addFx()` goes to the FX screen and calls `fxsOpen` on the first empty slot.
+- **Notices:** `toastBrief(key, msg)`: 2.5 to 3.9 s by length, same key replaces the text, never queues. Used by the three shared-block notices.
+- Tests: `tests/toast-brief.test.js`, `fxbar-add-picker.test.js`, `arrange-zoomout.test.js`, `arrange-paging.test.js`.
+
+## 14 Nov (MOD edits while playing; effects rest in silence; build 599)
+
+Owner's reports from the ROG (Windows desktop 1.3.5, song `acid`): MOD on effects "does nothing" until stop and PLAY; track 07's effects 43% of the audio thread with its patterns muted, growing after STOP; "reset audio engine" clears it.
+
+- **MOD:** the core sequencer's `patch` / `song` messages replaced `S.perf` with a new object while the running `makeSeq` kept the old one (`PFS = perfOf(S)`), so LFO edits waited for the next PLAY. `keepObj` in `core/core-processor.js` now writes the new perf INTO the object the player holds. `tests/mod-live-edit.test.js`.
+- **Effects cost in silence (not a leak):** measured by an agent with the real `tfx.wasm` / `pump.wasm` on x86 and in headless Chrome: Chrome's audio thread does not flush denormals, and wasm effects whose tails decay to nothing slow down hugely (pump TWANG 64 → 1300 µs a block about 70 s after the sound stops; also spring, vox, verb, ladder, space; with exact zeros going in also pump WIDE, HEAT, BAND, SNAP, GRAIN, OTT, frequency shifter, comb, auto-wah). A plain ±1e-18 guard or dither below 1e-6 does not prevent it. Track 07 never slept because its switched-OFF Retrigger counted as a clocked slot.
+- **Fix in `ThunderFx` (index.html `TFX_SRC`):** the sleep gate counts only clocked slots that are ON (`ck`: 0 none → sleep after 1 s of silence; OFF Flex/Step-gate feeding → 14 s; ON Flex/Step gate → 14 s once the clock stops; ON Retrig/Grains/Scramble/Glitch/clocked pump → stays awake). New `slotNap`: a slot with input and output under 1e-9 for 30 s is skipped (30 s, not 1: a long delay is silent between its echoes) until input returns (never for vinyl / crush, which make their own noise). Output with signal present is unchanged (tests in `tests/idle-shortcut.test.js`).
+- **Still open (measured, not built; owner's ears / go-ahead):** (1) switched-OFF pump effects still run their process call: pump MASTER costs about 215 µs a block while OFF (about 8% of the audio thread on this song's master); (2) after STOP the master and ringing tracks sit around −85 dB for a long time, above the −140 dB sleep line, so "Master effects" stays up until tails are truly gone; (3) a muted track still synthesises its notes and runs its effects (track 04 here, about 3%); (4) "Everything else 27%" while stopped is not broken down; (5) the report's collapse at the third pass of the song (about 381 s, underruns ×220) was not reproduced; (6) …chains nodes have no sleep gate; (7) the CPU panel should name the effect and the playback report should carry the CPU rows.
+
+## 14 Nov (the owner's three small requests: Stop button, bottom-bar fader, chord pick-up; build 598)
+
+Branch `fix/stop-button-fx-fader`. A Sonnet agent built it, the lead reviewed. No audio code.
+- **Control bar Stop:** one CSS rule gave the pad's PLAY key and the thin control bar's `■ STOP` (`.tcmd button[data-c=song].on`) the same amber fill, 4 px border and hard shadow; the control bar's Stop is taken out of it and is now lit by the control bar's own "on" state (each skin's playing accent). The pad's PLAY key keeps its amber (his choice of 9 Nov). The Low power skins forced white text on lit buttons, which the thin bar fills light: lit text there is `var(--inv)` (also fixes SELECT and LOOP SEL). Checked in all 66 skins (contrast at least 3:1).
+- **Bottom-bar fader:** `.stcap` (a round 16 px knob) is now a 28 × 3 px bar like the Mixer's `.mfbar` (`--ink` with a `--panel` halo; 4 px on hover / drag). CSS only; behaviour pinned by a test.
+- **Chord pick-up:** `pickUp` / `insertAt` (reached from `editTap`, so Enter and the pad's EDIT): on a poly track a filled note cell picks up every note of the row when there are two or more (pick-up copies, as before; instrument and velocity are per row); the drop writes them to their own columns as one undo step and replaces notes already in those columns; on a mono track only the note that was under the cursor is written, with a toast; typing, recording or a single pick-up forgets the chord.
+- **Tests:** `tests/stop-button-skin.test.js`, `tests/bottom-fader-cap.test.js`, `tests/chord-pickup.test.js`.
+- **Queued from him the same afternoon (not in this build):** "add FX" from the FX bar should open the FX picker once it has paged to the Mixer; Arrange: more zoom-out, and page early with look-ahead (when the playhead is about 8 rows from the bottom, keep a few played rows at the top), not a centred playhead; MOD edits made while the song plays do not reach the audio-thread sequencer until the next PLAY (root cause found, see the next build); effects fed silence get very slow on his Windows PC (see the next build).
+
+## 14 Nov (module queue: Expression; build 597)
+
+Branch `feat/modules-expr`. The lead wrote the engine, the parser and their tests, a Sonnet agent the editor side and the host's document plumbing; the lead reviewed.
+- **Engine (shared; worklets `?v=56` / `?v=45`; scope `'poly'`):** `expr`. `MathExpr.compile(text)` is its own recursive-descent parser over characters (numbers, the eleven names, the listed operators and 22 functions, brackets): **the text is never run as code**, names are looked up with `hasOwnProperty` in two fixed tables, and the result is a short list of steps (`Uint8Array` ops, `Float64Array` constants) that `mxRun` works out per sample on a fixed stack. Limits: 200 characters, 128 steps, 32 deep; ÷0 and %0 give 0; the output is held in −4..4 and not-a-number is 0. A bad formula is silence and `show()` reports `[code, position]`. Names: a b c d, k1 k2, t (seconds since the song or the module started), y (the previous output sample), rnd, pi, sr. The reference is the comment above `MX_VARS`.
+- **A module's text (new plumbing, both engines):** a def with `text:true` keeps `inst.text` (≤ 200 characters) from `addModule`'s `o.text`; `{ op:'text', id, value }` / `setText` changes it; `io.inst` reaches `process`. Nothing else reads it.
+- **Editor and host:** a two-row field (no autocorrect), Enter / blur applies (one undo step), Escape restores, the error line from the engine's report (ignored for 450 ms after an apply), an Examples menu (12, each compiled in a test), Compact shows the formula. The text travels with save / load, undo, copy / paste, custom modules, the bridges, and in the host `patchOp` ('add' carries it; a 'text' op) and `chnDiff`. A waves patch opened as chains drops `expr` like the other new modules (`normalizeChainsImport` keeps a fixed list).
+- **Notes:** in …waves the error line only appears once a voice is running (the report comes from a module that has run); the position is shown 1-based.
+
+## 14 Nov (module queue: Delay line; build 596)
+
+Branch `feat/modules-delay`. The lead wrote the engine and its tests, a Sonnet agent the editor side; the lead reviewed.
+- **Engine (shared; worklets `?v=55` / `?v=44`; scope `'poly'`):** `dline`: a 2 s line (power-of-two buffer), read with 4-point Hermite interpolation (linear under 2 samples), Time 0–2000 ms + Fine ±1 ms (the knob glides over 20 ms; the Time input does not, it is sample-accurate, ± Mod depth up to 50 ms), **feedback inside the module, exact to the sample**, clamped to ±99% whatever the parameter says, with the feedback cable's guard inside the loop (untouched in −1..1, `1 + tanh(|x| − 1)` above, non-finite → 0) and a one-pole Damp. Out is the delayed sound only.
+- **For his ears:** how the loop sounds pushed is the same question as the feedback cable's guard (build 589); the two numbers are in `DelayLine.process`.
+- **Editor:** in Building blocks after Allpass; Time's readout adds the pitch under 20 ms (a formatter only sees its own value, so it shows whatever Feedback is and does not include Fine).
+- **Goldens:** only added lines; `dline` stays in the silent-allowed lists because its stressed Time (1.4 s) is longer than the 1.07 s render (its default and switches-on renders do sound since the build 595 fix).
+
+## 14 Nov (…chains: a loaded patch inherited the previous patch's run list; build 595)
+
+Branch `fix/chains-loadpatch-runlist`, by the lead (audio engine). Found by the Sonnet agent doing the Delay line's editor side: its golden render came out silent when it followed a clock module's in the same engine.
+- **Cause:** `ChainsEngine._active()` (which modules this node runs) and `_bnMap()` (bypass numbers) are cached against `graph.ver * 4096 + mods.size`. `loadPatch` made a `new Graph()`, whose `ver` starts at 0 again, so a patch with as many modules and cables as the one before it produced the same key and the OLD run list was kept: a Track In that was not cabled in the old patch and is cabled in the new one did not run, and the chain was silent until any edit bumped `ver`. Real in the app (the per-track nodes take new patches through `loadPatch`), though it needs two same-sized patches in a row with different wiring.
+- **Fix (chains worklet `?v=54`):** `loadPatch` and `dispose` carry the change count on (`ver + 1`) and clear both cache keys. …waves is not affected (its cull is marked dirty by `loadPatch`, and its other caches live on objects the reset drops).
+- **Goldens unchanged:** no existing module's golden render happened to follow a same-sized patch with other wiring. `tests/chains-loadpatch.test.js` fails on the old code three ways.
+
+## 14 Nov (module queue: audio building blocks, Oscillator and Noise for …chains; build 594)
+
+Branch `feat/modules-blocks`. The lead wrote the engine and its tests, a Sonnet agent the editor side; the lead reviewed.
+- **Shared (both editors; worklets `?v=53` / `?v=43`; scope `'poly'`, one channel each):** `onepole` One-pole filter (Low and High outputs that add up to the input; −3 dB at Freq), `allpass` Allpass (Phase: first-order, a quarter turn at Freq; Echo: a Schroeder allpass, Time to 100 ms, Gain ±0.95, all of an impulse comes out), `dcblock` DC blocker (1–200 Hz), `midside` Mid / side (Encode / Decode, exact both ways; a mono input has no side).
+- **…chains only (scope `'mono'`; …waves keeps its own VCO and Noise):** `osc` Oscillator (sine, triangle, band-limited saw and square; 0.1 Hz–20 kHz; FM input in octaves, five at 100% depth; Sync), `wnoise` Noise (white, pink, brown; each module its own run of numbers, taken from the engine's counter the first time it sounds).
+- **Editor:** a "Building blocks" palette group after Filters and EQ; Oscillator and Noise lead …chains' Sound sources; a per-definition `plabels` for port names ("L / Mid", "Low", "High"). **No log sliders exist in the editors** (Filter's Cutoff is linear too), so the new Freq sliders and the Scope's Time are linear: typing a value is exact; a real fix is a slider-curve option in the editors (editor only, no engine change) and would help Filter as well. Allpass shows all four controls in both modes (no show-when mechanism outside the mixer).
+- **Tests:** `tests/modules-blocks.test.js`, `tests/modules-blocks-editor.test.js`; goldens only added lines.
+
+## 14 Nov (module queue: Scope; build 593)
+
+Branch `feat/modules-scope`. The lead wrote the engine and its tests, a Sonnet agent the editor side; the lead reviewed.
+- **Engine (shared; worklets `?v=52` / `?v=42`):** `scope`, a **probe** (`probe:true`, no outputs): inputs A, B, Trig; one sweep of Time is kept as 128 columns of lowest / highest sample for each trace; Trigger Free / Rising (through Level; sweeps anyway after two windows with no trigger) / Gate; Freeze; Zoom is display only. `show()` → `[sweep number, B patched, 128 × (lowA, highA, lowB, highB)]` through the existing telemetry (one reused list).
+- **Probes in …chains:** `_active` now also runs a module whose def says `probe:true` (with what feeds it) while telemetry is on, as it did for Sidechain In; with the editor closed a Scope and its sources do not run at all.
+- **Editor:** a 300 px module with a 120 px canvas kept in Compact, hidden in Mini; redraws only when the sweep number changes; colours from `--audio` / `--mod` / `--panel-2` / `--muted` / `--ink`; no pointer handlers on the canvas. Golden builders hash a probe's `show()` list.
+- **Embedded in Thunder Plus (read, not run on a device):** …chains turns telemetry on for the track engines while its screen shows, and the reports reach the editor the way the Meter's do (relay every 60 ms); …waves' page has its own engine with telemetry always on, started by the first note.
+- **Rough edges:** the Time slider is linear from 1 ms to 2 s, so the useful short times are crowded at the left (the editors have no log slider); Freeze is a plain Off / On select; embedded frames only carry the Matrix skin's colours, so an embedded Scope uses the white theme's.
+
+## 14 Nov (module queue, group 2: clock and trigger tools; build 592)
+
+Branch `feat/modules-clock`. The lead wrote the engine and its tests, a Sonnet agent the editor side; the lead reviewed.
+- **New, shared block (both editors; worklets `?v=51` / `?v=41`), all scope `'poly'`, all on the rising edge at 0.5:** `clkmul` Clock multiplier (measures the last two pulses; passes the clock until it has a tempo; no extra pulses when the clock slows), `chance` Chance gate (**seeded**: xorshift from Seed, restarted at Reset, when Seed changes and on a song start (`restarted`); Seed 0 takes a number from the engine's counter the first time it runs; Out / Other split every pulse), `counter` Counter (Step 0..1 staircase over 1–64 counts, Up / Down / Up and down, End gate), `stepsw` Step switch (2–4 inputs, Fade), `burst` Burst (Count, Time, Bend ±3 octaves of spacing across the run, Level 1→0), `gatedly` Gate delay (a byte-a-sample line of 2 s; Length 0 keeps the gate's own length), `flipflop` Flip-flop (Toggle, Set, Reset; Q, Not Q).
+- **Steps and Clock** moved into the shared blocks (engine and editor), unchanged, so …waves has them; …chains checked identical before / after in a browser.
+- **Rough edge found (not fixed, an engine behaviour change):** …waves' `setTransport` does not count song starts (`transport.startN`), so in …waves "starts again when the song starts" never fires for Clock, Steps, Counter, Flip-flop or the Chance gate's seed: they free-run there and only Reset restarts them. …chains counts starts. Making …waves count them would also restart the existing shared modules that read `startN` (Step gate and others) at each play, which changes how old …waves patches behave: **for the owner to decide**. It matters for "the render matches what I heard" with a Chance gate inside a …waves instrument.
+- **Tests:** `tests/modules-clock.test.js` (exact pulse positions, the seed repeating after Reset and on a second play, both worklets, one patch through each engine), `tests/modules-clock-editor.test.js`. Goldens: only added lines.
+- **Compact keys** for Counter / Step switch / Gate delay were chosen round a `tests/wc-wording.test.js` rule that takes any `['moduleId', 'word']` pair for a palette entry (`['steps','fade']` tripped it); the rule could be narrowed instead.
+
+## 14 Nov (module queue, group 1: control maths; build 591)
+
+Branch `feat/modules-maths`. The lead wrote the engine and its tests, a Sonnet agent the editor side; the lead reviewed.
+- **What existed (inventory, 14 Nov):** Math (A, B → sum, diff, mul, min, max; a knob per input), Logic (AND, OR, XOR, NOT of A), Clock divider, Euclid, Slew limiter, Sample & hold, Quantizer, Gate extract, Attenuverter, Random in both editors; Steps, Clock, Vocoder, Repeat in …chains only; oscillators, Noise and the Sequencer in …waves only. So add / multiply / min / max / logic were NOT rebuilt.
+- **New, in the shared block (both editors; worklets `?v=50` / `?v=40`):** `const` Constant (Value + Fine), `rect` Invert / rectify (inv, abs, pos, neg), `scale` Scale / map (In low / high → Out low / high, Clip), `compare` Comparator (A against B + Level, Hysteresis; gates A > B and A < B), `switch` Switch (A / B, Select gate, Fade 0–100 ms), `xfade` Crossfade (A, B, a sample-accurate Mix input `mixin`, Straight / Equal power). All sample-accurate, no allocation in `process`.
+- **Scope `'poly'` (lead's decision):** in …waves they run once per voice when a voice feeds them (the older shared control modules are `'mono'` there and sum the voices; changing those would change old patches, so they are left). In …chains scope means nothing.
+- **Tests:** `tests/modules-maths.test.js` (exact values in both worklets, one patch through each engine), `tests/modules-maths-editor.test.js`. Goldens: 18 hashes added per engine, none changed; in `tests/waves.test.js` the new types render LAST (a `LATE` list) because waves hashes depend on how many renders the shared wasm instance did before them.
+- **Still missing from the queue after this:** group 2 (clock multiplier, seeded probability gate, counter / step switch, burst, gate delay, flip-flop; Steps and Clock into …waves), scope, one-pole / allpass / DC blocker, oscillator and noise in …chains, delay line, expression, Morph.
+- **Checklist doc:** section 1 trimmed 45 → 24 (589 and 590 added at its top; the rest of 585–588 moved to section 2; three gear items to section 3); `docs/TEST-CHECKLIST.md` re-exported.
+
+## 14 Nov (the owner's two phone bugs; build 590)
+
+Branch `fix/phone-chip-and-tabs`, a Sonnet agent built it, the lead reviewed.
+- **"Song 1" in the now-playing chip:** the title was the project file's name, else the song's own name. On Android a file opened through the picker, "Open with" or Share reaches the app with no handle or path (`loadProjFile(f)` without `h`), so `projLabel()` was empty and the title fell back to the song's inner name, which his `acid.thunder` still has as "Song 1". That is why the 12 Nov fix (handle or path only) did not hold. Now `loadProjFile` keeps the file's name (`projLoose`, used by `projTitle()` while the song's name is unchanged; dropped by `projSet` and New); `msTitle()` and the window title use it; the title is also refreshed when the stored handle comes back at startup. Artwork was already the app's icons. Not run on a phone (a fake media session in `tests/media-session.test.js`). **Still to ask him: installed app or Chrome tab** (the Chrome logo cannot be changed in a tab).
+- **"Chai":** `body.mob .top #segView{flex:0 1 auto; overflow-x:auto}` let the switch shrink and scroll; only the 2-tab and 4-tab cases had overrides. With four tabs the whole bar was wider than the screen and Chrome widened the viewport, which hid it from build 578's check (it measured the tabs, not the bar). Now at 460 px and under, three or more tabs take a full row of their own (header one row taller). Lead's decision, flagged to him: the alternative is one row without the LEFT readout. `tests/view-tabs-fit.test.js` (static pins; the real-page check is opt-in with `TP_BROWSER_TESTS=1`; passed at 320–412 px, 3 and 4 tabs, 63 skins at three widths).
 
 ## 14 Nov (feedback loops in …waves / …chains, M2; build 589)
 

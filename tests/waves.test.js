@@ -50,17 +50,21 @@ function patchFor(M, type, params) {
     if (aIn.includes('in')) cab.push({ from: ['g', 'out'], to: ['b', 'in'] }); if (aIn.includes('inR')) cab.push({ from: ['g', 'out'], to: ['b', 'inR'] });
     outs.slice(0, 2).forEach((p, i) => cab.push({ from: ['b', p], to: ['o', ['in', 'inR'][i]] }));
     if (!aIn.length) cab.push({ from: ['g', 'out'], to: ['o', 'in'] });
+    if (m.probe === true) cab.push({ from: ['g', 'out'], to: ['b', 'a'] }, { from: ['e', 'out'], to: ['b', 'b'] });   // a probe (the Scope) watches the voice and its envelope; nothing comes out of it
   }
   return { modules: mods, cables: cab };
 }
 function renderModule(D, type, over) {
   const m = D.MODULES[type], params = Object.assign(defaults(m), over);
   const E = new D.WavesEngine(48000, { maxVoices: 4, quality: 'full', seed: 7, transport: TRANSPORT }); E.loadPatch(patchFor(D.MODULES, type, params));
+  const probe = D.MODULES[type].probe === true; if (probe) E.handleMessage({ op: 'telemetry', value: true });
   const L = new Float32Array(128 * BLOCKS), R = new Float32Array(128 * BLOCKS);
   for (let b = 0; b < BLOCKS; b++) { if (b === 0) { E.noteOn(60, 1); E.noteOn(67, .7); } if (b === 70) E.noteOff(60); E.process(128); L.set(E.bus(1), b * 128); R.set(E.busR(1), b * 128); }
   // Under load the engine sheds to 'draft' quality, which changes the DSP; a golden hash taken then would be wrong.
   if (E.quality !== 'full') throw new Error('engine shed to draft quality while rendering ' + type + ' (machine too slow for a stable hash)');
-  return { L, R };
+  let extra = null;   // a probe's show() list (the Scope has no output): hashed with the sound, so its picture is under a golden too
+  if (probe) { const sh = E.telemetry().shows.find(x => x[0] === 'b'); extra = new Float32Array(sh ? sh[1] : 2 + 512); }
+  return extra ? { L, R, extra } : { L, R };
 }
 const finite = a => { for (const v of a) if (!Number.isFinite(v)) return false; return true; };
 const energy = a => { let e = 0; for (const v of a) e += v * v; return e; };
@@ -68,7 +72,7 @@ const energy = a => { let e = 0; for (const v of a) e += v * v; return e; };
 // Rendering it here would also move every later module's hash: the hashes depend on how many renders came before them in this one wasm instance (found 12 Nov).
 const SKIP = new Set(['hostIn', 'out', 'lverb']);
 /* Modules that are silent in this harness, and why. A silent hash proves "unchanged", not "working", so the list is explicit. */
-const NEEDS_OWN_INPUT = new Set(['beads', 'mixer']);   // beads: a texture source that needs its own trigger/input; mixer: needs in1..in16, not `in`
+const NEEDS_OWN_INPUT = new Set(['beads', 'mixer', 'compare', 'rect', 'clkmul', 'chance', 'burst', 'gatedly', 'flipflop', 'dline', 'expr']);   // expr: its default formula (a * k1) needs input A, which the harness does not feed (tests/modules-expr.test.js tests its sound); dline: the stressed Time (1.4 s) is longer than the 1.07 s render, so it is silent (tests/modules-delay.test.js tests its sound); beads: a texture source that needs its own trigger/input; mixer: needs in1..in16, not `in`; compare, rect: control maths that need a control signal patched in (their gates and halves are 0 on the harness's input); clkmul, chance, burst, gatedly, flipflop: gate tools that need a pulse patched in (the default input holds no gate)
 
 test('waves: the engine loads and exposes its public surface', () => {
   const { D } = engine({ wasm: false });
@@ -82,11 +86,14 @@ test('waves: the real wasm (Plaits/Elements and the effects) loads, and records 
 
 test('waves: every module renders finite audio and matches its golden hash (defaults, stressed, switches on)', () => {
   const { D } = engine(), actual = {}, bad = [];
-  for (const type of Object.keys(D.MODULES).sort()) {
+  // The hashes depend on how many renders came before them in this one wasm instance (see SKIP below), so a module added later is
+  // rendered after all the existing ones (LATE, in this order): that way no existing hash moves. Add new modules to LATE, not into the sorted run.
+  const LATE = ['compare', 'const', 'rect', 'scale', 'switch', 'xfade', 'clkmul', 'chance', 'counter', 'stepsw', 'burst', 'gatedly', 'flipflop', 'steps', 'clock', 'scope', 'onepole', 'allpass', 'dcblock', 'midside', 'dline', 'expr'];
+  for (const type of Object.keys(D.MODULES).filter(t => !LATE.includes(t)).sort().concat(LATE)) {
     const m = D.MODULES[type]; if (!m || !m.process || SKIP.has(type)) continue;
     const d = renderModule(D, type), s = renderModule(D, type, stress(m)), w = renderModule(D, type, switchesOn(m));
-    for (const r of [d, s, w]) if (!finite(r.L) || !finite(r.R)) bad.push(type);
-    actual[type + ' @default'] = H.hashFloats([d.L, d.R]); actual[type + ' @stressed'] = H.hashFloats([s.L, s.R]); actual[type + ' @switches-on'] = H.hashFloats([w.L, w.R]);
+    for (const r of [d, s, w]) if (!finite(r.L) || !finite(r.R) || (r.extra && !finite(r.extra))) bad.push(type);
+    actual[type + ' @default'] = H.hashFloats([d.L, d.R].concat(d.extra ? [d.extra] : [])); actual[type + ' @stressed'] = H.hashFloats([s.L, s.R].concat(s.extra ? [s.extra] : [])); actual[type + ' @switches-on'] = H.hashFloats([w.L, w.R].concat(w.extra ? [w.extra] : []));
   }
   assert.deepEqual([...new Set(bad)], [], 'modules producing NaN/Infinity');
   const g = H.golden('waves-modules', actual);
