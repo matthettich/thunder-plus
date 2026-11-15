@@ -44,6 +44,10 @@ void SongRenderer::setPlan(const PdcPlan& plan, PdcMode mode, int64_t extraLaten
   PdcApply a; a.mode = mode; a.live = false; pdc_apply(mix_, plan, a);
 }
 
+void SongRenderer::setMasterChain(const MasterChainConfig& cfg) {
+  if (!mchain_) mchain_.reset(new MasterChain(sr_, maxBlock_));
+  mchain_->configure(cfg); mix_.setMasterFx(&MasterChain::hook, mchain_.get());
+}
 void SongRenderer::renderTrimmed(float* outL, float* outR, int64_t N) {
   int64_t skip = latencyFrames(), done = 0; float* sl = scratch_.get(); float* sr = sl + maxBlock_;
   while (skip > 0) { const int n = (int)std::min<int64_t>(skip, maxBlock_); block(sl, sr, n); skip -= n; }
@@ -73,7 +77,9 @@ void SongRenderer::quantum() {
   }
   // 2. the voices into their tracks' inputs, then the mixer
   pool_.render(mix_.inputsL(), mix_.inputsR(), N, t0);
-  mix_.render(q_.get(), q_.get() + kRenderQuantum, N, t0);
+  float* const qL = q_.get(); float* const qR = q_.get() + kRenderQuantum;
+  mix_.render(qL, qR, N, t0);
+  if (meters_) { meters_feed(*meters_, mix_, qL, qR, N); meters_->advance(N, t0 + (double)N / sr_); }
   qFrame_ += N;
 }
 

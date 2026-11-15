@@ -1,0 +1,6 @@
+master-webaudio-check: Chrome 153.0.8010.12, master-worklet.js in an OfflineAudioContext against the same file in a Node vm, 192000 frames of ELECTRO's mix
+worklet sup                exact  (0 of 192000 samples differ)
+worklet comp               exact  (0 of 192000 samples differ)
+worklet lim                exact  (0 of 192000 samples differ)
+worklet all                exact  (0 of 192000 samples differ)
+whole master graph         exact  (0 of 192000 samples differ)

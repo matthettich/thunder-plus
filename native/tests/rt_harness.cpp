@@ -12,6 +12,9 @@
 #include "song/song.h"
 #include "mix/mix.h"
 #include "mix/pdc.h"
+#include "master/master.h"
+#include "master/chain.h"
+#include "meter/meter.h"
 #include "render/render.h"
 #include "voice/voice.h"
 
@@ -306,6 +309,69 @@ static int run_song() {
   return 0;
 }
 
+// ---- U11: the master processor under the guard -----------------------------------------------------------------------------------------
+// All three stages (and the loudness meters) on a loud noisy signal, blocks of mixed sizes (not multiples of 128: the quantum split), settings
+// changed between blocks (stages on / off, every parameter, the limiter's look-ahead, junk values), samples outside +-64 and NaN now and then,
+// silence long enough for the shortcut; the meter queue popped as a host would. Nothing may allocate.
+static int run_master() {
+  using namespace thunder;
+  MasterProcessor P(48000, true);   // (the constructor allocates: outside the guard)
+  const int MAXB = 700; std::vector<float> L((size_t)MAXB), R((size_t)MAXB);
+  uint32_t rng = 4242; auto rnd = [&]() { rng = rng * 1664525u + 1013904223u; return (rng >> 8) / 16777216.0; };
+  long frame = 0, msgs = 0; bool finite = true; double peak = 0; MasterMeter m;
+  { rt_guard g;
+    MasterSet s0; s0.hasSup = s0.hasComp = s0.hasLim = true; s0.sup.on = s0.comp.on = s0.lim.on = true; P.set(s0);
+    for (int blk = 0; blk < 1500; blk++) {
+      const int N = 1 + (int)(rnd() * MAXB);
+      if (rnd() < 0.15) { MasterSet s; const double z = rnd();
+        if (z < 0.34) { s.hasSup = true; s.sup.on = rnd() < 0.7; s.sup.depth = rnd(); s.sup.sharp = rnd(); s.sup.sel = rnd() * 6; s.sup.lo = 20 + rnd() * 400; s.sup.hi = 4000 + rnd() * 16000; s.sup.delta = rnd() < 0.2; s.sup.mix = rnd(); }
+        else if (z < 0.67) { s.hasComp = true; s.comp.on = rnd() < 0.7; s.comp.thr = -40 + rnd() * 30; s.comp.ratio = 1 + rnd() * 10; s.comp.atk = rnd() * 30; s.comp.rel = 20 + rnd() * 300; s.comp.hpf = rnd() < 0.3 ? 0 : rnd() * 300; s.comp.knee = rnd() * 12; s.comp.mix = rnd(); s.comp.autoRel = rnd() < 0.5; s.comp.autoMakeup = rnd() < 0.5; if (rnd() < 0.1) s.comp.ratio = std::nan(""); }
+        else { s.hasLim = true; s.lim.on = rnd() < 0.8; s.lim.drive = rnd() * 18; s.lim.ceil = -6 * rnd(); s.lim.rel = 10 + rnd() * 500; s.lim.look = 1 + rnd() * 9; s.lim.tp = rnd() < 0.7; if (rnd() < 0.1) s.lim.look = 1e9; }
+        P.set(s); }
+      const bool quiet = (blk / 150) % 3 == 2;
+      for (int i = 0; i < N; i++) { L[(size_t)i] = quiet ? 0.0f : (float)((rnd() - 0.5) * 1.6); R[(size_t)i] = quiet ? 0.0f : (float)((rnd() - 0.5) * 1.6); }
+      if (!quiet && rnd() < 0.05) { L[0] = std::nanf(""); R[(size_t)(N - 1)] = 1000.0f; }
+      P.process(L.data(), R.data(), N);
+      for (int i = 0; i < N; i++) { if (!std::isfinite(L[(size_t)i]) || !std::isfinite(R[(size_t)i])) finite = false; peak = std::max(peak, (double)std::fabs(L[(size_t)i])); }
+      while (P.popMeter(&m)) msgs++;
+      frame += N;
+    }
+  }
+  if (!finite) return fail("the master processor produced NaN");
+  if (peak <= 0) return fail("the master processor run was silent");
+  if (msgs < 100) return fail("the master processor posted (almost) no meter messages");
+  std::printf("rt_harness: master processor: %ld frames, %ld meter messages, %u silent quanta skipped, no allocation\n", frame, msgs, P.silentBlocks());
+  return 0;
+}
+
+// ---- U12: the master chain (EQ biquads -> mastering worklet -> safety limiter) under the guard, reconfigured between blocks, driven as the mixer's master hook ----
+static int run_chain() {
+  using namespace thunder;
+  const int MAXB = 600; Mixer M(48000, MAXB); MasterChain C(48000, MAXB); M.setMasterFx(&MasterChain::hook, &C);
+  MeterBank bank(48000, 30); MeterEvent ev; long events = 0;   // U13: the meters fed from the mixer's pairs and the master output, in the same guarded loop
+  std::vector<float> oL((size_t)MAXB), oR((size_t)MAXB);
+  uint32_t rng = 99; auto rnd = [&]() { rng = rng * 1664525u + 1013904223u; return (rng >> 8) / 16777216.0; };
+  long frame = 0; bool finite = true; double peak = 0; int cfgs = 0;
+  { rt_guard g;
+    for (int blk = 0; blk < 1200; blk++) {
+      const int N = 1 + (int)(rnd() * MAXB); const double t0 = (double)frame / 48000; M.setTime(t0);
+      if (blk % 40 == 0) { MasterChainConfig c = master_chain_fresh(rnd() < 0.7); c.mstOn = rnd() < 0.7; c.eqOn = rnd() < 0.8; c.nBands = 1 + (int)(rnd() * 7);
+        for (int i = 0; i < c.nBands; i++) { EqBand& b = c.bands[i]; b.type = (EqType)(int)(rnd() * 5); b.f = 20 + rnd() * 19980; b.g = -18 + rnd() * 36; b.q = 0.1 + rnd() * 17.9; b.slope = rnd() < 0.3 ? 12 : rnd() < 0.5 ? 24 : 48; b.on = rnd() < 0.85; }
+        c.set.sup.on = rnd() < 0.5; c.set.comp.on = rnd() < 0.6; c.set.lim.on = rnd() < 0.5; C.configure(c); cfgs++; }
+      for (int t = 0; t < 4; t++) { float *l = M.inputsL()[t], *r = M.inputsR()[t]; for (int i = 0; i < N; i++) { l[i] = (float)((rnd() - 0.5) * 1.5); r[i] = (float)((rnd() - 0.5) * 1.5); } }
+      M.render(oL.data(), oR.data(), N, t0);
+      meters_feed(bank, M, oL.data(), oR.data(), N); bank.advance(N, t0 + (double)N / 48000); while (bank.pop(&ev)) events++;
+      for (int i = 0; i < N; i++) { const double a = oL[(size_t)i], b = oR[(size_t)i]; if (!std::isfinite(a) || !std::isfinite(b)) finite = false; peak = std::max(peak, std::max(std::fabs(a), std::fabs(b))); }
+      frame += N;
+    }
+  }
+  if (events < 100) return fail("the meters published (almost) nothing");
+  if (!finite) return fail("the master chain produced NaN");
+  if (peak <= 0) return fail("the master chain run was silent");
+  std::printf("rt_harness: master chain + meters: %ld frames, %d configurations, %ld meter events, no allocation\n", frame, cfgs, events);
+  return 0;
+}
+
 int main(int argc, char** argv) {
   if (argc > 1 && std::strcmp(argv[1], "--selftest") == 0) return selftest();
   if (int r = run_logger()) return r;
@@ -313,5 +379,7 @@ int main(int argc, char** argv) {
   if (int r = run_seq()) return r;
   if (int r = run_voice()) return r;
   if (int r = run_mix()) return r;
+  if (int r = run_master()) return r;
+  if (int r = run_chain()) return r;
   return run_song();
 }

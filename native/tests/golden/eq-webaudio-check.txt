@@ -1,0 +1,33 @@
+eq-webaudio-check: Chrome 153.0.8010.12, 31 cases (the JS model of tools/eq-dump.mjs against an OfflineAudioContext)
+default_flat            6 nodes  samples exact        response 0.00e+0 dB
+shaped                  7 nodes  samples exact        response 0.00e+0 dB
+shaped_44k              7 nodes  samples exact        response 0.00e+0 dB
+shaped_96k              7 nodes  samples exact        response 0.00e+0 dB
+eq_off                  0 nodes  samples exact        response 0.00e+0 dB
+lowcut12                1 nodes  samples -733.2 dB    response 0.00e+0 dB
+highcut12               1 nodes  samples -751.8 dB    response 0.00e+0 dB
+lowcut24                2 nodes  samples -728.4 dB    response 0.00e+0 dB
+highcut24               2 nodes  samples -754.9 dB    response 0.00e+0 dB
+lowcut48                4 nodes  samples -732.2 dB    response 0.00e+0 dB
+highcut48               4 nodes  samples -754.1 dB    response 0.00e+0 dB
+lowcut_20               4 nodes  samples exact        response 0.00e+0 dB
+highcut_20k             4 nodes  samples -750.6 dB    response 0.00e+0 dB
+lowshelf_up             1 nodes  samples -731.4 dB    response 0.00e+0 dB
+lowshelf_dn             1 nodes  samples -136.9 dB    response 3.18e-6 dB
+highshelf_up            1 nodes  samples -768.6 dB    response 0.00e+0 dB
+highshelf_dn            1 nodes  samples -98.6 dB     response 1.54e-4 dB
+lowshelf_20             1 nodes  samples exact        response 0.00e+0 dB
+highshelf_20k           1 nodes  samples -137.6 dB    response 6.54e-7 dB
+bell_q0.1_f20           1 nodes  samples exact        response 0.00e+0 dB
+bell_q0.1_f1000         1 nodes  samples -126.0 dB    response 4.42e-6 dB
+bell_q0.1_f19999        1 nodes  samples -767.3 dB    response 0.00e+0 dB
+bell_q1_f20             1 nodes  samples exact        response 0.00e+0 dB
+bell_q1_f1000           1 nodes  samples -125.7 dB    response 9.73e-6 dB
+bell_q1_f19999          1 nodes  samples -753.9 dB    response 0.00e+0 dB
+bell_q18_f20            1 nodes  samples exact        response 0.00e+0 dB
+bell_q18_f1000          1 nodes  samples -115.4 dB    response 9.25e-6 dB
+bell_q18_f19999         1 nodes  samples -747.8 dB    response 0.00e+0 dB
+eight_bands            12 nodes  samples exact        response 0.00e+0 dB
+off_bands               0 nodes  samples exact        response 0.00e+0 dB
+no_bands                0 nodes  samples exact        response 0.00e+0 dB
+worst: samples -98.6 dB of the peak, magnitude response 1.54e-4 dB (gate 0.01 dB): PASS
