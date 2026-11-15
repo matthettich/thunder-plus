@@ -15,6 +15,11 @@ option(THUNDER_WITH_DSP "Build the existing C++ DSP (tfx, thunder-dsp, mods) fro
 if(THUNDER_WITH_DSP)
   add_subdirectory(dsp)
 endif()
+# U03: the pump DSP (owner's repo matthettich/pump, pinned; plugins/machine (GPL) is never fetched or built; see pump/CMakeLists.txt)
+option(THUNDER_WITH_PUMP "Build the pump effects and synths (thunder_pump, thunder_pump_synth) from the pinned matthettich/pump checkout (needs git + network at configure)" ON)
+if(THUNDER_WITH_PUMP)
+  add_subdirectory(pump)
+endif()
 # SAME BITS AS THE WEB COPY (U05): no fused multiply-add. JavaScript never fuses a * b + c; GCC and clang do by default
 # where the CPU has the instruction (every arm64 phone and Mac), which changes the last bit of sums like the automation
 # ramps and the sequencer's times, and the goldens are compared exactly. PUBLIC so the tests' own reference code is built

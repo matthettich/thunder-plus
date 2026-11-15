@@ -21,5 +21,6 @@ case "$unit" in
     cmake --build "$build" -j8 --target test_voice rt_harness >/dev/null || { echo "FAIL u08 (build)"; exit 1; }
     if ctest --test-dir "$build" -R '^(voice_ref|voice|voice_golden_current|rt_core)$' --output-on-failure; then echo "PASS u08"; exit 0; else echo "FAIL u08"; exit 1; fi ;;
   u02) shift; exec sh "$here/parity-u02.sh" u02 "$@" ;;   # the existing C++ DSP built from CMake: the goldens rendered through it (parity-u02.sh)
-  *) echo "usage: parity.sh u02 [OUTDIR] | u07 | u08"; exit 2 ;;
+  u03) exec sh "$here/parity-u03.sh" "$@" ;;   # the pump DSP built from CMake: the goldens and pump's own compare (parity-u03.sh)
+  *) echo "usage: parity.sh u02 [OUTDIR] | u03 | u07 | u08"; exit 2 ;;
 esac
