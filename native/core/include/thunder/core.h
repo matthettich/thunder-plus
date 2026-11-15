@@ -24,9 +24,11 @@ void thunder_process(thunder_core* core, float* out_l, float* out_r, int frames)
    at the first sample of the next block. Returns 1 if queued, 0 if the queue is full or the command is unknown. */
 int thunder_post(thunder_core* core, const char* bytes, int len);
 
-/* One non-audio thread (single consumer). Copies the next event (UTF-8 JSON, NUL-terminated) into buf; returns its
-   length, or 0 if none. Events: clock {f, wallNs, sr, outLat, under} (10 a second), pos {f, step}, echo {n, f},
-   song {rev, f} (the audio thread now reads that song snapshot, from frame f). */
+/* One non-audio thread (single consumer). Copies the next event (UTF-8 JSON, NUL-terminated) into buf (cap >= 256); returns its
+   length, or 0 if none. Events: clock {f, wallNs, sr, outLat, under, evtDropped, lateCmds} (10 a second; evtDropped: events the
+   full event ring refused since the start, lateCmds: timed commands applied at once because the waiting list was full), pos {f, step},
+   echo {n, f}, song {rev, f} (the audio thread now reads that song snapshot, from frame f; it is kept and retried until the ring has
+   room, and one acknowledgement for rev N covers every revision below N that was adopted in the same block). */
 int thunder_poll(thunder_core* core, char* buf, int cap);
 
 /* Any non-audio thread. Hands the core a bulk buffer. N0: stored only. meta: {"o":<float offset>,"n":<total floats>}

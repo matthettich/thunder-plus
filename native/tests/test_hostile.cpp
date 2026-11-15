@@ -171,6 +171,27 @@ static void testB2() {
   thunder_destroy(core);
 }
 
+// ---- B3: the song acknowledgement survives a full event ring; drops and late commands are reported ----
+static void testB3() {
+  thunder_core* c = thunder_create(48000, 64); float l[64], r[64];
+  int queued = 0; std::vector<float> big(12000);
+  for (int k = 0; k < 20; k++) { for (int i = 0; i < 200; i++) queued += thunder_post(c, "{\"t\":\"echo\",\"n\":1}", 20); thunder_process(c, l, r, 64); }   // ~4000 echoes, never polled
+  const char* sj = "{\"t\":\"song.load\",\"rev\":7,\"S\":{\"v\":6}}";
+  CHECK("B3 song.load accepted", thunder_post(c, sj, (int)std::strlen(sj)) == 1);
+  thunder_process(c, l, r, 64);
+  char buf[512]; int song = 0, got = 0; long long ackRev = -1; bool clockSeen = false; unsigned dropped = 0;
+  for (int round = 0; round < 40 && !song; round++) {   // the host polls now: room appears, the retried ack lands in a following block
+    while (thunder_poll(c, buf, sizeof buf)) { got++; if (std::strstr(buf, "\"t\":\"song\"")) { song++; std::sscanf(std::strstr(buf, "\"rev\":"), "\"rev\":%lld", &ackRev); }
+      if (const char* d = std::strstr(buf, "\"evtDropped\":")) { clockSeen = true; std::sscanf(d, "\"evtDropped\":%u", &dropped); } }
+    thunder_process(c, l, r, 64);
+  }
+  CHECK("B3 the song ack arrives after the ring was full", song == 1 && ackRev == 7);
+  for (int round = 0; round < 200; round++) { thunder_process(c, l, r, 64); while (thunder_poll(c, buf, sizeof buf)) if (const char* d = std::strstr(buf, "\"evtDropped\":")) { clockSeen = true; std::sscanf(d, "\"evtDropped\":%u", &dropped); } }
+  CHECK("B3 the clock event reports evtDropped > 0", clockSeen && dropped > 0);
+  CHECK("B3 the clock event carries lateCmds", [&] { thunder_process(c, big.data(), big.data() + 6000, 6000); while (thunder_poll(c, buf, sizeof buf)) if (std::strstr(buf, "\"lateCmds\":")) return true; return false; }());
+  (void)got; thunder_destroy(c);
+}
+
 // @@TESTS_END
 
 int main() {
@@ -179,6 +200,7 @@ int main() {
   testA5();
   testB1();
   testB2();
+  testB3();
   // @@CALLS_END
   if (g_fail) { std::printf("test_hostile: %d FAILED\n", g_fail); return 1; }
   std::printf("test_hostile: all passed\n");

@@ -39,7 +39,7 @@ enum CmdType { C_BPM = 1, C_PLAY, C_STOP, C_ECHO };
 struct Cmd { int type; double v; int64_t n; int64_t at; };   // at: the frame it takes effect on; -1: the next block's first sample
 
 enum EvtType { E_CLOCK = 1, E_POS, E_ECHO, E_SONG };
-struct Evt { int type; int64_t f; int64_t wallNs; int64_t a; int sr; int outLat; int under; };
+struct Evt { int type; int64_t f; int64_t wallNs; int64_t a; int sr; int outLat; int under; uint32_t dropped = 0, late = 0; };   // dropped / late: the clock event's counters (N1 B3)
 
 // The song as the audio thread sees it: immutable once published (song/song.h, U06: the parsed document and typed tables).
 // thunder_process reads the typed tables only, never the JSON tree.
@@ -70,7 +70,9 @@ struct thunder_core {
   int64_t next_clock = 0;
   Cmd pend[kPend]; int npend = 0;        // timed commands, ordered by frame (equal frames: in the order posted)
   thunder::SnapSlot<Song> song;          // the song snapshot (control thread publishes, audio thread adopts)
-  std::atomic<uint32_t> late_cmds{0};    // timed commands applied at once because the waiting list was full
+  std::atomic<uint32_t> late_cmds{0};    // timed commands applied at once because the waiting list was full (reported in the clock event)
+  uint32_t evt_dropped = 0;              // events the full event ring refused (audio thread only; reported in the clock event) (N1 B3)
+  bool song_ack_pending = false; int64_t song_ack_rev = 0, song_ack_f = 0;   // a `song` event not yet in the ring: retried every piece
   // host stats (written by the host, read on the audio thread)
   std::atomic<int> out_lat{0}, under{0};
   // bulk buffers (non-audio threads only)
@@ -97,13 +99,18 @@ thunder_core* thunder_create(int sample_rate, int max_block) {
   return c;
 }
 
+// N1 review B3: every push into the event ring is checked. A refused event is counted (evt_dropped, in the clock event) except the
+// `song` acknowledgement, which is kept and retried on the next piece until it fits: a host that waits for {"t":"song","rev":N} must
+// get it. One acknowledgement covers every revision up to N: several snapshots adopted in one block give one event for the last.
+static inline void push_evt(thunder_core* c, const Evt& e) { if (!c->evts.push(e)) c->evt_dropped++; }
+
 // The audio thread's side of one command, at frame `now`.
 static inline void apply_cmd(thunder_core* c, const Cmd& cmd, int64_t now, int64_t wall) {
   switch (cmd.type) {
     case C_BPM: if (cmd.v >= 20.0 && cmd.v <= 400.0) c->bpm = cmd.v; break;
     case C_PLAY: c->playing = true; c->step = 0; c->next_step = (double)now; break;
     case C_STOP: c->playing = false; break;
-    case C_ECHO: { Evt e{E_ECHO, now, wall, cmd.n, c->sr, 0, 0}; c->evts.push(e); } break;
+    case C_ECHO: { Evt e{E_ECHO, now, wall, cmd.n, c->sr, 0, 0}; push_evt(c, e); } break;
     default: break;
   }
 }
@@ -113,7 +120,8 @@ static inline void apply_cmd(thunder_core* c, const Cmd& cmd, int64_t now, int64
 // unbounded loops (the command ring, the waiting list and the voice pool are fixed; the step loop runs at most once per
 // frame), steady_clock::now() is a vDSO read.
 static void process_piece(thunder_core* c, float* out_l, float* out_r, int frames, int64_t wall) {
-  if (c->song.adopt()) { Evt e{E_SONG, c->frame, wall, c->song.get()->rev, c->sr, 0, 0}; c->evts.push(e); }
+  if (c->song.adopt()) { c->song_ack_pending = true; c->song_ack_rev = c->song.get()->rev; c->song_ack_f = c->frame; }   // (a newer one replaces an unsent older: its ack covers it)
+  if (c->song_ack_pending) { Evt e{E_SONG, c->song_ack_f, wall, c->song_ack_rev, c->sr, 0, 0}; if (c->evts.push(e)) c->song_ack_pending = false; }
   Cmd cmd;
   while (c->cmds.pop(cmd)) {
     if (cmd.at < 0 || cmd.at <= c->frame) { apply_cmd(c, cmd, c->frame, wall); continue; }
@@ -137,7 +145,7 @@ static void process_piece(thunder_core* c, float* out_l, float* out_r, int frame
       if (g > 0.0f) {
         for (int v = 0; v < kVoices; v++) if (!c->voices[v].on) { c->voices[v].on = true; c->voices[v].pos = 0; c->voices[v].gain = g; break; }
       }
-      if ((c->step & 3) == 0) { Evt e{E_POS, now, wall, c->step, c->sr, 0, 0}; c->evts.push(e); }
+      if ((c->step & 3) == 0) { Evt e{E_POS, now, wall, c->step, c->sr, 0, 0}; push_evt(c, e); }
       c->step = (c->step + 1) & (kSteps - 1);
       c->next_step += (double)c->sr * 60.0 / c->bpm / 4.0;
     }
@@ -153,7 +161,8 @@ static void process_piece(thunder_core* c, float* out_l, float* out_r, int frame
   c->frame += frames;
   if (c->frame >= c->next_clock) {   // ten a second
     Evt e{E_CLOCK, c->frame, wall, 0, c->sr, c->out_lat.load(std::memory_order_relaxed), c->under.load(std::memory_order_relaxed)};
-    c->evts.push(e);
+    e.dropped = c->evt_dropped; e.late = c->late_cmds.load(std::memory_order_relaxed);
+    push_evt(c, e);
     c->next_clock = c->frame + c->sr / 10;
   }
 }
@@ -218,9 +227,9 @@ int thunder_post(thunder_core* c, const char* s, int len) {
 
 int thunder_poll(thunder_core* c, char* buf, int cap) {
   Evt e;
-  if (!c || !buf || cap < 160 || !c->evts.pop(e)) return 0;
+  if (!c || !buf || cap < 256 || !c->evts.pop(e)) return 0;
   int n = 0;
-  if (e.type == E_CLOCK) n = std::snprintf(buf, (size_t)cap, "{\"t\":\"clock\",\"f\":%lld,\"wallNs\":%lld,\"sr\":%d,\"outLat\":%d,\"under\":%d}", (long long)e.f, (long long)e.wallNs, e.sr, e.outLat, e.under);
+  if (e.type == E_CLOCK) n = std::snprintf(buf, (size_t)cap, "{\"t\":\"clock\",\"f\":%lld,\"wallNs\":%lld,\"sr\":%d,\"outLat\":%d,\"under\":%d,\"evtDropped\":%u,\"lateCmds\":%u}", (long long)e.f, (long long)e.wallNs, e.sr, e.outLat, e.under, (unsigned)e.dropped, (unsigned)e.late);
   else if (e.type == E_POS) n = std::snprintf(buf, (size_t)cap, "{\"t\":\"pos\",\"f\":%lld,\"step\":%lld}", (long long)e.f, (long long)e.a);
   else if (e.type == E_SONG) n = std::snprintf(buf, (size_t)cap, "{\"t\":\"song\",\"rev\":%lld,\"f\":%lld}", (long long)e.a, (long long)e.f);
   else if (e.type == E_ECHO) n = std::snprintf(buf, (size_t)cap, "{\"t\":\"echo\",\"n\":%lld,\"f\":%lld}", (long long)e.a, (long long)e.f);
