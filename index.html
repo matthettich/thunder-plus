@@ -16800,7 +16800,7 @@ function msend(bytes, t, early, p){
 let moFxT = 0, moFxAt = -1e9;
 function moFxLat(){
   const now = performance.now(); if (now - moFxAt < 250) return moFxT; moFxAt = now;
-  try { const sr = ctx.sampleRate; moFxT = ((S.mst ? mstLatency(S.mst, sr) : 0) + pumpChainLatency(S.mfx, sr) + safeLatency(sr)) / sr + pdcPlan(sr).T; } catch(e){ moFxT = 0; }
+  try { const sr = ctx.sampleRate; moFxT = ((S.mst ? mstLatency(S.mst, sr) : 0) + pumpChainLatency(S.mfx, sr) + safeLatency(sr)) / sr + (pdcModeOf() === 'auto' && !(typeof tp !== 'undefined' && tp && tp.on) ? 0 : pdcPlan(sr).T); } catch(e){ moFxT = 0; }   /* (AUTO, stopped: the tracks are not delayed, so neither is what the screen shows) */
   return moFxT; }
 /* OUTBOX (owner, 7 Nov: "midi notes keep playing for a couple of notes after stop"). The sequencers book notes up to 0.25 s
    ahead (more in a hidden tab), and a message handed to Web MIDI can't be taken back (Chrome / Electron have no clear()), so a
@@ -21929,7 +21929,8 @@ function makePlayer(ac, out, getBuf, live, mo){   // mo: the master OUT gain (af
       return; }
     if (ev.type === 'fxc'){ if (ac === ctx && wkLazy() && !(rt && rt.fxAsk) && /^sw/.test(ev.p)) wkFxAsk(ev.track, true);   // phones: a switch for a slot the song didn't need yet
       const n = fxNodeOf(ev.track), q = n && n.parameters && n.parameters.get(ev.p);
-      if (q) try { q.setValueAtTime(ev.v, Math.max(ev.t, ac.currentTime)); } catch(e){}
+      /* (build 616, CodeRabbit on #150) the command lands as late as this node's input is (n._cd, the delay its beat clock has: pdcSync), so a GAT or FXO on a row acts on that row's sound, not on the row before it */
+      if (q) try { q.setValueAtTime(ev.v, Math.max(ev.t, ac.currentTime) + ((n._cd && n._cd._pv) || 0)); } catch(e){}
       else { const k = ev.track + ':' + ev.p, L = fxcPend.get(k) || []; L.push(ev); fxcPend.set(k, L); }   // FIRST PLAY (owner, 31 Oct): the effect isn't built yet: it gets the values when it is
       return; }
     if (ev.type === 'chc'){ const b = buses[ev.track], n = b && b.chn, q = n && n.parameters && n.parameters.get(ev.p); if (q) try { q.setValueAtTime(ev.v, Math.max(ev.t, ac.currentTime)); } catch(e){} return; }   // BYP
@@ -23143,7 +23144,7 @@ function tStart(mode, o){
   met.next = 0; rec.hist = []; if (ci) countIn(t0start - ci, recS.cnt, seq.bpm);
   if ([...S.tfx, S.mfx].some(A => (A || []).some(f => f && f.on && f.type === 'tgate'))){ fxRestartN++; rtAllFx(); }
   Object.assign(tp, {on:true, mode, seq, q:[], pos:null, snd:null, bpm:seq.bpm, tks:seq.tks, st:0, loopV:o.loop ? o.loop.v : '', row0:mode === 'song' ? (o.row | 0) : 0, t0:t0start, lenTot:null, lenPre:0, hiRow:null});
-  try { if (rt && rt.pl) rt.pl.pdcSync(true); } catch(e){}   // LATENCY COMP AUTO: the delays come in with PLAY (before its first note sounds)
+  try { if (rt && rt.pl) rt.pl.pdcSync(true); moFxAt = -1e9; } catch(e){}   // LATENCY COMP AUTO: the delays come in with PLAY (before its first note sounds)
   try { pdcNotice(); } catch(e){}
   if (rsFirst){   // RESUME: the effect commands passed on the way, then the step it stopped on, now
     for (const e of rsFx.values()) rt.pl.play(Object.assign({}, e, {t:t0start}));
@@ -23876,7 +23877,7 @@ function tStop(quiet){
   stopP = !quiet && stopToPlayhead() && tp.on && tp.pos && tp.pos.some(Boolean) ? {P:tp.pos.map(q => q && Object.assign({}, q)), mode:tp.mode} : null;
   home = !quiet && tp.on && !stopToPlayhead() && fpHome && fpHome.t >= workT && fpHome.t >= arrHandT ? fpHome : null;
   arrP = !quiet && stopArrOn && !stopToPlayhead() && tv !== 'song' && tp.on && tp.mode === 'song' && tp.pos && tp.pos.some(Boolean) && apPanel() ? tp.pos.map(q => q && Object.assign({}, q)) : null; });   // (12 Nov, owner: PLAY from the pad, ▼ / scroll down, STOP before row 2 jumped the cursor back to the top) fpHome is the cursor as FOLLOW first noted it, and is only noted again 4 s after your last key, press or scroll: a place you moved to after that note stands, only an untouched cursor goes back   // (9 Nov, owner: with ON STOP at STAYS it still ended up at the playback spot: FOLLOW had carried it there)
-  tp.timer = 0; tp.on = false; try { if (rt && rt.pl) rt.pl.pdcSync(); } catch(e){}   /* LATENCY COMP AUTO: stopped, pads answer at once again */
+  tp.timer = 0; tp.on = false; try { if (rt && rt.pl) rt.pl.pdcSync(); moFxAt = -1e9; } catch(e){}   /* LATENCY COMP AUTO: stopped, pads answer at once again */
   if (mtrMode === 'off') setTimeout(mtrWake, 0); fpMem = null; fpHome = null; tp.q = []; tp.pos = null; tp.snd = null; tp.stopAt = null; tp.ahead = tp.aheadT = 0; tp.rsUntil = 0; PB.rsA = null; G('runaway kick', rkReset);
   // HAND-OVER (seqHandover): the core and the voices already booked keep sounding until the page sequencer's first step
   if (tp.core){ tp.core = false; core.gen++; if (!handing) G('core', () => { coreWire(false); try { core.node.port.postMessage({op:'stop', at:ctx.currentTime}); } catch(e){} }); }

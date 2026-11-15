@@ -90,7 +90,7 @@ test('one-time notice: once, only when AUTO delays something, never in a render,
 });
 
 test('the notice is wired to effect changes and PLAY, and the displays add the compensation', () => {
-  assert.match(src, /function fxChanged\(t\)\{[^\n]*pdcNotice\(\)/); assert.match(src, /pdcSync\(true\); \} catch\(e\)\{\}[^\n]*\n  try \{ pdcNotice\(\); \}/);
+  assert.match(src, /function fxChanged\(t\)\{[^\n]*pdcNotice\(\)/); assert.match(src, /pdcSync\(true\); moFxAt = -1e9; \} catch\(e\)\{\}[^\n]*\n  try \{ pdcNotice\(\); \}/);
   assert.ok(!/function render[^\n]*pdcNotice/.test(src));
   assert.equal((src.match(/heardLat\(\) \+ moFxLat\(\)|heardLat\(\) - moFxLat\(\)/g) || []).length >= 5, true);
 });
