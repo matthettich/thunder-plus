@@ -747,6 +747,13 @@ The owner's top priority to add is the MOD screen. Work down the list; ask befor
 
 Start a session by asking for results. Fix on `beta`. (10 Nov, 15:10: the web beta is build 560; the build numbers in the rest of this paragraph are older.) Web beta: https://matthettich.github.io/thunder-plus/beta/ (build 547 as of 10 Nov morning, 548 once its PR merges; the night of 9–10 Nov shipped 544–547, see the four "10 Nov" entries below. Decisions the lead made that night for the owner to confirm or reverse: on a phone the saved Sequencer default plays on the Page unless Audio thread is picked on that device; on a phone the safety limiter is its stand-in until another worklet loads; the resync only runs with a worklet loaded and its margins are untested on a device). Desktop: v1.3.4-beta.2 (build 541, no feed view or scopes); further desktop betas on hold until the owner asks.
 
+**Build 615** (MONO TRACKS and POLY TRACKS)
+- [ ] **Computer:** Settings › Song › POLY TRACKS up one, then down one. Pass: the Arrange boxes follow (“POLY 09–17”, then “09–16”), a short “Hid track 17 (poly)” notice, no question.
+- [ ] **Computer (a COPY of a song):** MONO TRACKS down past a track with notes. Pass: it asks “Hide track 08 (mono)?”; Cancel changes nothing; Hide gives “MONO 01–07” and every poly track keeps its notes, mixer, effects and LFOs under its new number; Ctrl+Z puts both counts and every track back; raising MONO brings the hidden track back with its notes.
+- [ ] **Phone:** drag the MONO slider down past a track with notes. Pass: one question when you let go, not one per step.
+- [ ] **Computer:** try to take either count to 0, and the total above 24 with a voice per track (32 without). Pass: the row stops and its info line says why.
+- [ ] **Computer:** save an uneven song (say 4 mono, 12 poly), reopen it. Pass: the same split, the same notes.
+
 **Build 614** (Option+A and back; Option+▲▼ on every page)
 - [ ] **Mac:** on Phrase with a selection and Arrange beside it, Option+A, move around Arrange, Option+A again. Pass: the same screen, cell, selection and scroll as before. The same with Esc.
 - [ ] **Mac:** Option+A, open a block from Arrange (Option+▶), Option+A. Pass: it does not jump back to the old place; Arrange takes the keys again from the new one.
@@ -1307,6 +1314,17 @@ Suggested order: N0 → N1 → N2 (phone cured) → N4 with N3 alongside → N5 
   the edge `R.t0`, "waiting…" while armed), `rcdClk` / `rcdFmt` / `rcdFreeSecs`, a 250 ms timer only while recording; the
   final length stays until the next take. recorder-check covers FREE, PATTERN, Stop, next take and closing mid-take.
 
+
+## 14 Nov (MONO TRACKS and POLY TRACKS in Settings; build 615)
+
+Mono / poly track counts, stage 3: the Settings rows. By an agent; reviewed by the lead. (Stages 1 and 2: build 611.)
+- **Rows:** MONO TRACKS ("8 mono") and POLY TRACKS ("8 poly") replace TRACKS: step 1, big 4, each at least 1 (the owner), total 8 to 32 (24 with a voice per track); the info lines end "Total 16 of 32" and say why a row stops at a limit.
+- **The owner's shrink rule:** the question ("Hide track 08 (mono)?", Hide / Cancel, all hidden tracks named) appears only when a track that would be hidden holds something (`tracksHiddenAll` / `trackHolds`); otherwise it just hides, with a brief notice. Nothing is deleted. The settings-sheet sliders apply on release (`late`), so a drag asks once.
+- **A refused grow** (the other kind's hidden tracks hold something) shows the reason and changes nothing; `setNtr` shows it too.
+- **CodeRabbit on #145:** a track that takes an over slot gets its own kind's stock voice (`voiceIsStock`: a voice the user made is kept), so a poly track cannot play the mono one-shot it inherited.
+- Help paragraph, README, MORE TRACKS, MIDI import and the 24-cap messages reworded.
+- Agent unsure: Ctrl+Z was checked by unit tests only, not in the real app.
+- `tests/mono-poly-settings.test.js` (8). Headless Chrome: the Arrange boxes follow; screenshots were in `/home/claude/scratch/`.
 
 ## 14 Nov (Option+A returns exactly where you were; Option+▲▼ steps patterns on Mixer, FX, MOD and INST; build 614)
 
