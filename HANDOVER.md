@@ -708,6 +708,12 @@ The owner's top priority to add is the MOD screen. Work down the list; ask befor
 
 Start a session by asking for results. Fix on `beta`. (10 Nov, 15:10: the web beta is build 560; the build numbers in the rest of this paragraph are older.) Web beta: https://matthettich.github.io/thunder-plus/beta/ (build 547 as of 10 Nov morning, 548 once its PR merges; the night of 9–10 Nov shipped 544–547, see the four "10 Nov" entries below. Decisions the lead made that night for the owner to confirm or reverse: on a phone the saved Sequencer default plays on the Page unless Audio thread is picked on that device; on a phone the safety limiter is its stand-in until another worklet loads; the resync only runs with a worklet loaded and its margins are untested on a device). Desktop: v1.3.4-beta.2 (build 541, no feed view or scopes); further desktop betas on hold until the owner asks.
 
+**Build 600** (Arrange zoom out and early paging; + ADD FX; brief notices)
+- [ ] **Computer:** Arrange header, press − several times. Pass: rows get lower until about three times as many show (labels hide when rows get tiny, colours and the playhead stay); ○ goes back to fit.
+- [ ] **Computer and phone:** play a song with Arrange beside the Phrase, hands off. Pass: the page turns once when the playhead is about 8 rows from the bottom and a few rows that just played stay at the top; touch a key and it stays put for 4 s.
+- [ ] **Computer and phone:** + ADD FX in the bottom FX bar. Pass: the FX screen opens with the effect list already up on the first empty slot; Esc leaves you on the FX screen.
+- [ ] **Computer:** enter the same block number on a second track a few times quickly. Pass: one short notice with the latest text, gone in about 3 s.
+
 **Build 599** (MOD while playing; effects rest in silence)
 - [ ] **Computer (the ROG, desktop app), ears:** open `acid`, Balanced, PLAY, then mute track 07's patterns or press STOP and leave it two minutes with the CPU panel open. Pass: "Effects T07" falls to about nothing within a minute or two and stays there (it used to climb to 40%); un-mute or PLAY and the effects sound exactly as before, tails included, with no click when they wake.
 - [ ] **Computer, ears:** any track with a reverb or delay: stop the notes and listen to the whole tail. Pass: the tail rings out fully, nothing is cut short.
@@ -1188,6 +1194,15 @@ Suggested order: N0 → N1 → N2 (phone cured) → N4 with N3 alongside → N5 
   the edge `R.t0`, "waiting…" while armed), `rcdClk` / `rcdFmt` / `rcdFreeSecs`, a 250 ms timer only while recording; the
   final length stays until the next take. recorder-check covers FREE, PATTERN, Stop, next take and closing mid-take.
 
+
+## 14 Nov (Arrange zoom out, early paging, + ADD FX opens the list, brief notices; build 600)
+
+Owner's asks of 14 Nov (15:59, 16:01, 16:07), built by an agent, reviewed by the lead.
+- **Zoom out:** `AZ_OUT`, five levels below 1 down to 0.32 (rows lower, columns stay at fit; under 10 px rows only every fourth row number and no labels). Same saved key. With "Bigger cells on touch" on, zoom stays at 1 or above.
+- **Early paging:** one pure function `arrPageTop(top, VR, row, len, keep, end)` for Arrange (`arrFollowPage`) and `followPlay`'s `page()`; `ARR_AHEAD = 8`, `ARR_KEEP = 4` (a quarter / an eighth of a short view). No early turn when the view already shows the row the playhead wraps at (`arrWrapRow`); the last page goes straight to the end. Cost: a 12-row view turns twice where it turned once; from 20 rows up no more turns than before.
+- **+ ADD FX:** `addFx()` goes to the FX screen and calls `fxsOpen` on the first empty slot.
+- **Notices:** `toastBrief(key, msg)`: 2.5 to 3.9 s by length, same key replaces the text, never queues. Used by the three shared-block notices.
+- Tests: `tests/toast-brief.test.js`, `fxbar-add-picker.test.js`, `arrange-zoomout.test.js`, `arrange-paging.test.js`.
 
 ## 14 Nov (MOD edits while playing; effects rest in silence; build 599)
 
