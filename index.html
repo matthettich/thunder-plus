@@ -1081,7 +1081,7 @@ body.mob #bFile.dirty{position:relative} body.mob #bFile.dirty::before{position:
 .tinfo>.thint.open{-webkit-line-clamp:unset; display:block}
 .tinfo>.thint.more:not(.open){cursor:pointer}
 .thint{color:var(--ts-hint)}
-.tside{width:236px; flex:none; border-left:1px solid var(--line); background:var(--side); padding:12px; display:flex; flex-direction:column; gap:12px; overflow:auto}
+.tside{width:236px; flex:none; border-left:1px solid var(--line); background:var(--panel); padding:12px; display:flex; flex-direction:column; gap:12px; overflow:auto}
 .tmap{display:grid; grid-template-columns:repeat(4,1fr); gap:4px}
 .tmap button{min-height:28px; padding:0 2px; font-size:var(--fs-2); font-weight:600; letter-spacing:.03em}
 .tmap .wide{grid-column:1 / -1}
@@ -1130,8 +1130,11 @@ body:not(.legon) .tside .tlegend{display:none}
    an offset shadow, a dark title bar); the instruments card takes the room that's left and scrolls inside itself, in rows
    that wrap to the panel's width, so nothing is cut off at the side or the bottom. */
 .tside{gap:14px; padding-right:16px}
+/* THE SIDE PANEL TAKES THE SKIN (owner, 15 Nov: "make the sidebar with the meters and instruments match the skin", "an awkward grey strip at the bottom if the command bar is on"): its ground is the tracker screen's own (--panel, as .tscr, the command bar and the tab strip), not --side, the paler tint the term skins give cards; the strip under it was the command bar's --panel against that paler ground. The text is the tracker's font (--mono), the offset block of its cards the skin's own light (--inv), not white. */
+:root .tside, :root .tside :is(button, select, input){font-family:var(--mono)}
+.tcmd.cmini{background:var(--panel)}
 .tside .tcard{flex:none; display:flex; flex-direction:column; min-height:0; border:1.5px solid var(--line); background:var(--panel); color:var(--ink);
-  box-shadow:4px 4px 0 0 #fff, 4px 4px 0 1.5px var(--line)}
+  box-shadow:4px 4px 0 0 var(--inv, #fff), 4px 4px 0 1.5px var(--line)}
 .tside .tcst .tstat{background:var(--ink); color:var(--inv); padding:5px 8px 6px; gap:1px}
 .tside .tcst .tstat b{font-size:var(--fs-3); letter-spacing:.06em}
 .tside .tcst .tstat span{font-size:var(--fs-2); opacity:.8; letter-spacing:.03em}
@@ -1154,7 +1157,7 @@ body:not(.legon) .tside .tlegend{display:none}
 .tside .tinl button.on{background:var(--ink); color:var(--inv); border-color:var(--ink)}
 /* PLAYING (owner, 3 Nov: "flash them as they play, just like on the synth screen"): an instrument lights as its notes sound */
 .acidask option.acidfree{background:color-mix(in srgb, var(--meter-ok, #4fd18a) 16%, var(--panel, #fff))}
-.tinl button.hit{background:#ff5a1f !important; color:#fff !important; border-color:#ff5a1f !important}
+.tinl button.hit{background:var(--acc, #ff5a1f) !important; color:var(--acc-on, #fff) !important; border-color:var(--acc, #ff5a1f) !important}
 .tinl button.hit i{opacity:.9}
 /* Lp. Sel. and TRANS − + sit side by side: one rule between neighbours, not two. */
 .trows .rv + .rv{border-left:0}
