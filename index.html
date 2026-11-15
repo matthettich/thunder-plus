@@ -24908,7 +24908,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 606;
+const BUILD = 607;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD + (location.pathname.includes('/beta/') ? ' · beta' : '');
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -34875,6 +34875,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [607, '14 Nov', ['A switched-off …pump effect no longer costs anything: it used to keep doing all its work behind the bypass (pump MASTER, switched off, took about 8% of the audio engine on a busy song). The timing does not move. Switching one on takes 20 to 65 ms to come in', 'A muted track’s effects rest (also when another track is soloed): their echoes die away and the work stops, within ten seconds at the latest. Unmute and the track is back at once, its effects starting fresh', 'CPU panel: an effects row now names the two dearest effects of that track with their share, such as “Effects · Track 07: pump TWANG 5%, Space reverb 3%”', 'Typing a time or a pitch into a slider now works on every slider that shows one, whatever its scale (a sample’s Loop start, Click width)']],
   [606, '14 Nov', ['Typing a value into a slider: a time typed as ms or s (and a pitch as Hz or kHz) is now read in the unit that slider shows (500 ms into a slider that shows milliseconds gave its lowest value); 50% on a voice’s Level means halfway, as a bare 50 does']],
   [605, '14 Nov', ['Arrange beside the Phrase: with Arrange holding the keys and blocks selected, TRANSP. − / + transpose every phrase in the selection, each phrase once, as one undo step (it said “Select rows first”). The buttons’ tips say how many blocks they will move']],
   [604, '14 Nov', ['Synth page sliders: double-click a slider (or its name or value) to type a number: 440, 440 Hz, -6 dB or 35% all work; Enter sets it, Esc cancels. Reset is now Alt-click (or Ctrl/⌘-click, or right-click › Reset to default)', 'Click a slider, then ◀ ▶ nudge it by 1% of its travel (Shift: a tenth of that). Esc lets go of it. The same in …chains and …waves']],
