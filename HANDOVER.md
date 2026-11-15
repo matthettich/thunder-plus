@@ -366,6 +366,7 @@ clock mapping at that latency (7 Nov (16)). Re-check MIDI timing with Measure…
 
 ## Desktop releases
 
+- **v1.3.7** (14 Nov 2026 night, a regular release; owner, 14 Nov: "when a few builds have landed, merge `beta` into `main` and build the desktop app"; PR #142 beta → main at build 609, run 43673860734 dispatched 03:46 UTC 15 Nov: CHECK that it finished with all three platforms and 11 assets, the lead's turn ended while it ran): builds 603 to 609 (renders start on time and are as bright as playback, Synth slider number entry and arrow nudge, Arrange TRANSP. on a selection, switched-OFF pump effects and muted tracks' effects rest, the CPU panel names the effect). Build 610 (chance and seeds) is on `beta` only. Next is 1.3.8.
 - **v1.3.6** (14 Nov 2026 evening, a regular release; owner, 14 Nov: "when you hit a reasonable milestone, can you merge beta and main and push a new desktop app?"; PR #134 beta → main at build 602, run 43660864512, all three platforms, 11 assets): builds 590 to 602 (the module queue, MOD while playing, effects resting in silence, LFOs follow tracks, Arrange zoom and paging, FX Clear, ANIMATIONS). Installed copies update to it.
 - **v1.3.5** (14 Nov 2026, a regular release; owner, 14 Nov: "Merge `beta` into `main` and build the desktop app"; PR #120 beta → main at build 589 (CodeRabbit had not finished after 15 minutes and left no comments), Run workflow through the API with version 1.3.5, run 43637300817, succeeded): everything since build 563 (the 12–13 Nov phone fixes, Lite reverb and presets, the Synth page rework, …waves / …chains audit passes 1–5, feedback loops). Installed copies update to it.
 - **v1.3.4** (11 Nov 2026, a regular release; owner, 10 Nov 22:49: "do the queue and push a full desktop app after you do"; PR #92 beta → main at build 563, Run workflow through the API with version 1.3.4, run 42983473062, all three platforms built, 11 assets): everything since build 541 (MOD finished, the 10 Nov stability work, build 563). Installed copies update to it.
@@ -527,7 +528,21 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0) and `link/` (Ableton
 
 ## To-do (owner's list: keep it current; newest dated entries below have the details)
 
-### Where things stand (14 Nov, evening: READ THIS FIRST; it supersedes the 13 Nov block below where they disagree)
+### Where things stand (14 Nov, night: READ THIS FIRST; it supersedes the evening block below where they disagree)
+
+**Done this session (builds 603 to 610), all six items of the owner's 18:22 message:** `main` = build 609 = desktop **v1.3.7** (run 43673860734: confirm it finished); `beta` = build 610.
+1. **Renders sound like playback:** 603 (switched-OFF pump slots' latency counted: renders started 4454 samples late on his song) and 608 (sample notes start on a whole sample: renders were 1 dB dull at the top). The second investigation found NO other difference on tracks 7 / 9 / 13: level, tone, timing and pitch match live; the low waveform correlation was oscillator phase and an overloaded capture. Regression check: `tests/sweep/render-vs-live.mjs`. If he still hears a difference he must say which track and when (punch list, build 608); also his two dead LFOs on old track 12.
+2. **Synth sliders** (604, with 606 / 607 / 608 for CodeRabbit's rounds on typed units: `rowParse` / `rowInvert`).
+3. **Arrange TRANSP. on a selection** (605).
+4. **CPU items** (607, 609): `pumpRest`, `fxRest` / `{rest}`, `cpuFxTop`. Left: a muted track's NOTES still play (lead's decision), its …chains node does not rest, the playback report still has no CPU rows, "Everything else" is not broken down.
+5. **Mono / poly track counts: PLANNED, NOT BUILT.** `docs/MONO-POLY-PLAN.md` (three PRs; CodeRabbit's rounds on hidden tracks are in it). **Waiting for the owner's go-ahead and his answers to its three questions.**
+6. **Chance and seeds** (610): see the dated entry. Awaiting his ears; several lead's decisions are his to reverse (listed there).
+
+**Next:** his results on the punch list (builds 603 to 610 are in section 1 of the checklist doc and `docs/TEST-CHECKLIST.md`); the mono / poly go-ahead; then the open questions of the evening block (item 4 there) and the "still open" audio list of the build 599 entry.
+
+**Things that bit this session:** a backtick inside a `TFX_SRC` comment ends the template (the tests caught it): no backticks, no `//` in one-liners there. `git diff beta` in a worktree is ambiguous with the `beta/` folder: use a commit id. CodeRabbit reviews PRs into `beta` only when asked (`@coderabbitai review` as an issue comment), allows about 10 an hour, and comments on docs too: plan documents attract rounds. Agents' progress notes are in `/home/claude/progress/` (lost with the container); helper scripts were `/home/claude/scratch/bump.py` (BUILD, CHANGES, sw.js, punch list, dated entry from one JSON) and `pr.sh`.
+
+### Where things stand (14 Nov, evening: it supersedes the 13 Nov block below where they disagree)
 
 **PICK UP HERE (a new chat was started on purpose to save context; the owner asked for it).** `beta` = `main` = build 602, desktop **v1.3.6** is out. Working rules from the owner (14 Nov): the lead project-manages, hands everything it can to lower-cost agents, reviews every diff itself and writes audio-engine code itself; each item its own branch and PR into `beta`, merged when checks pass after waiting up to 15 minutes for CodeRabbit (its comments are carried forward); agents write progress notes to a file; a check-in every couple of hours; decide and tell him rather than ask; after each merged build add his checks to the punch list and to section 1 of the checklist doc, and re-export `docs/TEST-CHECKLIST.md` (done up to 602).
 
@@ -731,6 +746,16 @@ The owner's top priority to add is the MOD screen. Work down the list; ask befor
 **The owner's checklist by importance (13 Nov):** he works from a Claude Doc, "Thunder Plus test checklist, by priority" (https://claude.ai/artifact/LrzQ18ur18Fc5gkvxmQDbK), ordered: 1 Do these first, 2 Really worth trying, 3 If you have time, 4 Safe to skip, Parked, Set aside, Done. A snapshot with his ticks is `docs/TEST-CHECKLIST.md`: re-export it whenever the doc changes, and add each new build's checks to the doc's section 1 as well as here. He said the two "decides" groups (native apps; smoothing / Worklets / clock experiments) are parked and block nothing. "Close the skip list" from him means: close section 4's items as not tested.
 
 Start a session by asking for results. Fix on `beta`. (10 Nov, 15:10: the web beta is build 560; the build numbers in the rest of this paragraph are older.) Web beta: https://matthettich.github.io/thunder-plus/beta/ (build 547 as of 10 Nov morning, 548 once its PR merges; the night of 9–10 Nov shipped 544–547, see the four "10 Nov" entries below. Decisions the lead made that night for the owner to confirm or reverse: on a phone the saved Sequencer default plays on the Page unless Audio thread is picked on that device; on a phone the safety limiter is its stand-in until another worklet loads; the resync only runs with a worklet loaded and its margins are untested on a device). Desktop: v1.3.4-beta.2 (build 541, no feed view or scopes); further desktop betas on hold until the owner asks.
+
+**Build 610** (chance and seeds)
+- [ ] **Computer or phone, by ear:** a drum track with `CHA 80` on every hat, and `SED 07` on the first row of the MASTER column. PLAY from the top three times. Pass: the same hats every time. Render: the WAV has those hats. Change it to `SED 08`: a different set, again the same every time. Take the SED away: different every play.
+- [ ] **Computer:** the same song, PLAY from the middle (a few song rows down). Pass: the hats there are the ones you heard there when it played from the top.
+- [ ] **Computer:** with `SED 07` on the master, put `SED 21` on the hat track’s first row. Pass: only the hats change; try a few numbers until you like them, the other chance tracks stay. `SED 00` on the track puts its first set back.
+- [ ] **Computer, by ear:** `TCH 80` on a busy track’s first row (no CHA). Pass: about half its notes play, for the rest of the song, until a `TCH FF`. `TCH 40` in the master column thins every track.
+- [ ] **Computer:** MOD on that track › add an LFO › target CHANCE, slow, full depth (take the TCH away first: a TCH on the track wins). Pass: the track thins out and fills up with the LFO. Note: the LFO swings around “every note”, so it only thins in its lower half; a scene or macro on CHANCE sets a lower middle. Say if you want the LFO to work differently.
+- [ ] **Computer, by ear:** a long note followed by chance notes, with `SKP 01` on the first row. Pass: when a chance note is skipped the long note stops there; with `SKP 00` it rings on.
+- [ ] **Computer:** a poly track with four-note chords and `CHA 80`, `CHD 01` on the first row. Pass: chords come out thinned, some notes missing; with `CHD 00` each chord is all there or not at all.
+- [ ] **Computer:** `NTH 41` and `CND 08` on one row of a looping phrase. Pass: it plays on passes 2, 3 and 4 of every four, not the first.
 
 **Build 609** (resting pump effects: FXO and latency changes)
 - [ ] **Computer:** a track with a pump effect switched OFF on the FX screen and an `FXO` command that switches it on in the song (after it has played for a few seconds). Pass: the effect comes in on the row of the command, the first time and every time.
@@ -1265,6 +1290,18 @@ Suggested order: N0 → N1 → N2 (phone cured) → N4 with N3 alongside → N5 
   the edge `R.t0`, "waiting…" while armed), `rcdClk` / `rcdFmt` / `rcdFreeSecs`, a 250 ms timer only while recording; the
   final length stays until the next take. recorder-check covers FREE, PATTERN, Stop, next take and closing mid-take.
 
+
+## 14 Nov (chance and seeds: TCH, SKP, CHD, CND 08, SED with two scopes, MOD → CHANCE; build 610)
+
+The owner's chance / probability commands (queued 14 Nov; the spec is his chat "Thunderplus per-track probability": he liked every option and wanted a tracker command for each). Sequencer by the lead from an agent's map of the code; reviewed by a second agent (ten questions, its defects fixed).
+- **Rolls are a hash, not a stream** (`roll` in `makeSeq`): seed, track, song row, chain row, step, how often this track has rolled at that place since PLAY (`rvs`, kept apart from the track state that JMP, a wake after a gap and a hand-over reset), and which roll of the row. So seeded chance is the same live, rendered, from the top or the middle; a looped pattern differs each pass, the same way every time; one track never moves another's rolls. Before, CHA and PRB drew from the one `rand()` stream every track and RND / RNL / ONE / DIR / ARC shared, seeded only after a SED row, and each `makeSeq` (live, render, core) started its own.
+- **Seeds:** the track's (`T.seed`: SED on a track until its next; SED 00 hands back), else the song's (`sseed`: SED in the master column; read BEFORE the tracks of the same row, unless that row holds a PRB), else the last SED on any track (`lseed`: a song from before this build with its SED on a track still repeats on every track), else one per PLAY (`pseed`, or `o.seed`). `chaseChance(row)`: a start below the top, and a JMP, take the SED / TCH / SKP / CHD the rows above leave. The old stream is untouched (any SED still seeds it), so RND and friends play as before.
+- **New commands** (on the end of `FXC`): `TCH` (sticky; FF off; times CHA in one roll; applies to rows with a note only; the master column's is `mtch` for every track), `SKP` (01: a skipped note also sends the track an 'off'), `CHD` (01: on a poly track each note of the chord rolls, `keepC`). `CND` low nibble 8 is NOT (it used to read as 7, !1ST: a song with CND x8 changes).
+- **MOD target `tch:t`** (CHANCE): like cut / res / dec it lives in `PF.pno` and the sequencer reads it for the next notes; a TCH command on the track wins. Its own value is FF, so an LFO swings below "every note" only in its lower half (in the punch list for his opinion).
+- **Lead's decisions, his to reverse:** no SED = a new roll every play, as before (not "the last roll heard"); a failed row is silent and its state commands still run, as before; a TCH on a row without a note does not gate that row's commands; songs with SED + CHA fall differently than before (the stream is gone).
+- **Known, left:** BUS PLAY (`o.only`) never reads the master column, so its rolls are not the full mix's (the same is true of TPO there); `tests/sweep/commands.mjs` has no rows for the new commands yet; the chase ignores PRB / REP / HOP on the rows it reads.
+- No message between the page and the core changed (no `CORE_V` bump); `core/seq-core.js` regenerated. `tests/chance-seed.test.js` (11); the sequencer golden is unchanged (songs without chance play as before).
+- **Also:** CodeRabbit on #141: the render-vs-live harness compares the two channels, fails on no comparisons and reports an ambiguous lag as inconclusive; the mono / poly plan counts Perform data as track data. Desktop v1.3.7 noted under Desktop releases.
 
 ## 14 Nov (resting pump effects: FXO switches on the beat, longer warm-up when the latency grows (CodeRabbit on #142); build 609)
 
