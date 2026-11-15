@@ -10,6 +10,7 @@ option(THUNDER_BUILD_TESTS "Build and register the C++ tests" ON)
 option(THUNDER_WITH_LXR "Build the optional LXR module (GPL-3.0-only; off by default, not part of N0)" OFF)
 
 add_subdirectory(core)
+add_subdirectory(tools/thunder-render)   # U09: the offline song renderer
 
 if(THUNDER_BUILD_TESTS)
   enable_testing()

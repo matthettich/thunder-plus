@@ -99,7 +99,7 @@ void VoicePool::pitchMods(Voice& v, double t, double base, const SeqEvent& e, co
     for (int q = 0; q < e.arpN; q++) pr.set(base * arp[2 * q + 1], std::max(arp[2 * q], t));
     if (e.arpN) pr.set(base, arp[2 * (e.arpN - 1)] + (e.arpN > 1 ? arp[2] - arp[0] : 0.02));
   } else if (e.has & SH_BEND) {
-    pr.set(base, t); pr.lin(base * e.bendMul, e.bendT1); v.rate = base * e.bendMul;
+    pr.set(base, t); pr.lin(base * e.bendMul, e.bendT1); v.rate = base * e.bendMul;   // (pageTiming_: see voice.h, U09)
   } else if ((e.has & SH_VIB) && e.vibDep != 0 && e.vibDep == e.vibDep) {   // ev.vib && ev.vib.dep (truthy)
     const double d = std::max(0.02, e.vibT1 - t), hz = 1 + e.vibSpd * 1.2, st = e.vibDep / 15 * 1.5, t0 = t + 0.0005, dd = d - 0.001;
     pr.set(base, t);
@@ -144,7 +144,7 @@ bool VoicePool::note(const SeqEvent& e, const double* arp, const VoiceBuf& c, co
   Voice& v = V_[(size_t)vi];
   const double dur = c.len / c.sr;
   v.r.reset(e.rate); v.g.reset(e.gain); v.f.reset(1); v.pn.reset(std::max(-1.0, std::min(1.0, (e.pan - 128) / 127)));
-  if ((e.has & SH_SLIDE) && e.slideDur > 0) { v.r.set(e.slideFrom, e.t); v.r.lin(e.rate, e.t + e.slideDur); }
+  if ((e.has & SH_SLIDE) && e.slideDur > 0) { if (pageTiming_) v.r.reset(1); v.r.set(e.slideFrom, pageTiming_ ? std::ceil(e.t * sr_ / 128) * 128 / sr_ : e.t); v.r.lin(e.rate, e.t + e.slideDur); }   // (pageTiming_: see voice.h, U09)
   const double t0n = std::max(e.t, now_);
   const int32_t trmI = js_to_int32(e.trm), apnI = js_to_int32(e.apn);
   auto hz = [&](int32_t x) { return (double)(((x >> 4) ? (x >> 4) : 1)) * bpm / 60; };
@@ -160,7 +160,7 @@ bool VoicePool::note(const SeqEvent& e, const double* arp, const VoiceBuf& c, co
   // (ev.ofsSec / ev.durSec: the sequencer never emits them; the JS reads them for a page that does. STUB: only the ofs form.)
   const double ofs = e.ofs == e.ofs ? e.ofs : 0, off = std::max(0.0, std::min(255.0, ofs)) / 256 * dur;
   if (off > 0.0005) { v.f.set(0, t0n); v.f.lin(1, t0n + 0.0015); }
-  v.t0 = t0n; v.pos = std::min(off, std::max(0.0, dur - 0.001)) * c.sr;
+  v.t0 = pageTiming_ ? std::ceil(t0n * sr_ - 1e-6) / sr_ : t0n; v.pos = std::min(off, std::max(0.0, dur - 0.001)) * c.sr;
   if (e.rev || tw) {   // REVERSE / SHAPED: the reader (Rd)
     v.hasRd = true;
     v.rd.init(c.data, tw ? nullptr : c.data2, c.len, c.sr, tw, (e.has & SH_TWCUT) != 0, e.twCut, e.twRes, (e.has & SH_TWDEC) != 0, e.twDec, e.rev, v.pos);
@@ -257,7 +257,7 @@ void VoicePool::run(Voice& v, float* L, float* R, int N, double tb0, double tb1)
   v.g.prune(tb0); v.f.prune(tb0); v.pn.prune(tb0); v.r.prune(tb0);
   for (int i = 0; i < N; i++) {
     const double t = tb0 + i * dt;
-    if (t < v.t0) continue;
+    if (pageTiming_ ? t < v.t0 - 1e-9 : t < v.t0) continue;
     if (t >= v.end || v.pos >= len - 1) { v.ended = true; break; }
     const double p = v.pos; const int j = (int)p;
     const double d0 = RD ? RD->at(0, j) : (double)D[j], d1 = RD ? RD->at(0, j + 1) : (double)D[j + 1], x = d0 + (d1 - d0) * (p - j);
@@ -272,7 +272,7 @@ void VoicePool::run(Voice& v, float* L, float* R, int N, double tb0, double tb1)
       const double y = x * gf, a = (pan + 1) * kPi / 4;   // StereoPannerNode, mono in: equal power
       acc(L + i, y * std::cos(a)); acc(R + i, y * std::sin(a));
     }
-    v.pos += v.r.at(t) * inc0;
+    v.pos += (pageTiming_ ? v.r.at(std::floor((tb0 * sr_ + i + 1e-6) / 128) * 128 / sr_) : v.r.at(t)) * inc0;
   }
 }
 

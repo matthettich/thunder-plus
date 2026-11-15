@@ -67,6 +67,17 @@ class VoicePool {
   void render(float* const* outL, float* const* outR, int frames, double t0);
   void render(float* L, float* R, int frames, double t0);   // every track onto one pair (a convenience for tests and a mixer-less host)
 
+  // U09, for native/tools/render-compare.sh's reading of a difference ONLY (off by default: the core's own behaviour, U08's goldens).
+  // On: a voice is timed as the PAGE player's AudioBufferSourceNode is in a Web Audio render, where the web app's two players differ:
+  //   1. the start is ceil(t sr - 1e-6) / sr (index.html startNote's st0, build 608); the core starts on the first sample at or after t,
+  //      so a note a hair above a sample (60.00000000000129 s) starts one sample later in the core;
+  //   2. playbackRate is a k-rate param: read once per 128-frame render quantum (a slide or bend moves in steps). A slide's ramp is the
+  //      first thing ever booked on its param (startNote sets no .value on a slide): Chrome then starts the ramp at the first quantum
+  //      boundary at or after the note's time, and until that boundary the note plays at the node's own rate, 1. A bend's ramp (after
+  //      `.value = rate`) starts at the note's time. Both measured against Chrome 153 on ELECTRO's 6 slides and 3 bends. The core reads
+  //      its rate lane per sample, from the note's time. (Arpeggios and vibrato are not timed the page's way here: no test song has them.)
+  void setPageTiming(bool on) { pageTiming_ = on; }
+
   int active() const { return nAlive_; }
   int capacity() const { return cap_; }
   uint32_t dropped() const { return dropped_; }
@@ -109,6 +120,7 @@ class VoicePool {
   void run(Voice& v, float* L, float* R, int N, double tb0, double tb1);
 
   double sr_;
+  bool pageTiming_ = false;
   int cap_;
   double now_ = 0;
   std::unique_ptr<Voice[]> V_;
