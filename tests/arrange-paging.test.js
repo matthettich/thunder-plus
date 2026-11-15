@@ -93,7 +93,11 @@ test('arrFollowPage: a wrap (loop, song) puts the playhead row first; the cursor
   const L = rigFollow({ arrWrapRow: () => 20 }); L.go(26); assert.equal(L.c.cs.song.top, 0, 'a loop that ends in view does not turn a page');
 });
 test('source: followPlay\'s page() (Song grid, Phrase, Pattern view) and Arrange use the one rule; the loop / song end is read, not asked of the sequencer', () => {
-  assert.match(src, /const page = \(c, row, VR, len, end\) => \{ if \(row < 0\) return; const top = c\.top \|\| 0, nt = arrPageTop\(top, VR, row, len, -1, end\);/);
+  assert.match(src, /const page = \(c, row, VR, len, end\) => \{ if \(row < 0 \|\| view !== 'tracker'\) return; const top = c\.top \|\| 0, nt = arrPageTop\(top, VR, row, len, -1, end\);/);
   assert.match(src, /page\(cs\.song, own\.row, songRows\(\), 256, arrWrapRow\(\)\)/); assert.match(src, /page\(cs\.phrase, mine\.step, pvr, pvActive\(\) \? 256 : plen\(cPhrase\), plen\(cPhrase\) - 1\)/);
   const w = cut(/function arrWrapRow\(\)\{[\s\S]*?\n\}\n/, 'arrWrapRow'); assert.doesNotMatch(w, /tp\.seq|setLoop|patLoopRow|postMessage/);
+});
+
+test('followPlay\'s page() does nothing off the tracker (build 609: the Synth page round trip with LOOP on left Arrange paged on the loop\'s row)', () => {
+  assert.match(src, /const page = \(c, row, VR, len, end\) => \{ if \(row < 0 \|\| view !== 'tracker'\) return;/);
 });
