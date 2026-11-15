@@ -11,6 +11,7 @@
 #include "seq/seq.h"
 #include "song/song.h"
 #include "mix/mix.h"
+#include "mix/pdc.h"
 #include "render/render.h"
 #include "voice/voice.h"
 
@@ -232,6 +233,8 @@ static int run_voice() {
 static void mix_sum_hook(void*, int, float* L, float* R, int N, double, const thunder::MixFeed* fd, int nf) {
   for (int i = 0; i < N; i++) for (int j = 0; j < nf; j++) { L[i] += fd[j].L[i]; R[i] += fd[j].R[i]; }
 }
+static float g_clkSink = 0;   // (keeps the clock reads from being optimised away)
+static void mix_clock_hook(void* u, int track, float* L, float*, int N, double, const thunder::MixFeed*, int) { const float* b = ((thunder::Mixer*)u)->beat(track); for (int i = 0; i < N; i += 16) g_clkSink += b[i]; (void)L; }
 static int run_mix() {
   using namespace thunder;
   const int MAXB = 512; Mixer M(48000, MAXB);
@@ -241,6 +244,8 @@ static int run_mix() {
   long frame = 0; double peak = 0; bool finite = true; long cmds = 0;
   { rt_guard g;
     M.setPlan(P); M.setChain(3, mix_sum_hook, nullptr);
+    M.setFx(2, mix_clock_hook, &M); M.setFx(5, mix_clock_hook, &M); M.setMasterFx(mix_clock_hook, &M);   // effects nodes: each reads its beat clock (through its delay)
+    double beat = 0;
     for (int blk = 0; blk < 4000; blk++) {
       const int N = 1 + (int)(rnd() * MAXB); const double t0 = (double)frame / 48000; M.setTime(t0);
       const int ne = (int)(rnd() * 3.2);
@@ -250,6 +255,11 @@ static int run_mix() {
           const double y = rnd(); c.ramp = y < 0.6 ? -1 : y < 0.8 ? 0 : 1 + rnd() * 2000; if (rnd() < 0.3) c.at = t0 + rnd() * 0.01; M.set(c); }
         else if (z < 0.985) M.songLanesReset();
         else { const bool on = rnd() < 0.5; M.setChain(3, on ? mix_sum_hook : nullptr, nullptr); M.setPlan(P); } }
+      // U10: a new latency plan now and then (every delay point, glided or at once, idle or in force), the beat clock's events and stops
+      if (rnd() < 0.04) { PdcPlan pl; pl.on = rnd() < 0.9; for (int t = 0; t < kMixTracks; t++) { pl.d[t] = rnd() < 0.4 ? 0 : rnd() * 0.12; pl.f[t] = rnd() < 0.5 ? 0 : rnd() * 0.12; pl.c[t] = rnd() < 0.5 ? 0 : rnd() * 0.12; }
+        PdcApply a; a.live = rnd() < 0.5; a.playing = rnd() < 0.7; a.now = rnd() < 0.2; a.mode = rnd() < 0.15 ? PdcMode::Off : rnd() < 0.5 ? PdcMode::On : PdcMode::Auto; pdc_apply(M, pl, a); cmds++; }
+      if (rnd() < 0.25) { SeqEvent e; e.type = SEV_BEAT; e.t = t0 + rnd() * 0.02; beat += 0.0625 + rnd() * 0.2; if (rnd() < 0.03) beat = rnd() * 40; e.v = beat; M.event(e); cmds++; }
+      if (rnd() < 0.01) { M.clockStop(t0 + rnd() * 0.01); cmds++; }
       for (int t = 0; t < 8; t++) { float *l = M.inputsL()[t], *r = M.inputsR()[t]; for (int i = 0; i < N; i++) { l[i] = (float)(rnd() - 0.5); r[i] = (float)(rnd() - 0.5); } }
       M.render(oL.data(), oR.data(), N, t0);
       for (int i = 0; i < N; i++) { const double a = oL[(size_t)i], b = oR[(size_t)i]; if (!(a == a) || !(b == b)) finite = false; peak = std::max(peak, std::max(std::fabs(a), std::fabs(b))); }
@@ -257,7 +267,7 @@ static int run_mix() {
     }
   }
   if (!finite) return fail("the mixer produced NaN");
-  if (M.autoDropped()) return fail("the mixer dropped automation events");
+  if (M.autoDropped()) return fail("the mixer dropped automation events (a lane or the clock's)");
   if (peak <= 0) return fail("the mixer run was silent");
   std::printf("rt_harness: mixer: %ld commands over %ld frames, longest lane %d of %d / %d, no allocation\n", cmds, frame, M.peakEvents(), Mixer::kAutoUi, Mixer::kAutoSong);
   return 0;
@@ -278,7 +288,9 @@ static int run_song() {
   std::vector<float> L((size_t)MAXB), Rr((size_t)MAXB);
   uint32_t rng = 7; auto rnd = [&]() { rng = rng * 1664525u + 1013904223u; return (rng >> 8) / 16777216.0; };
   double peak = 0; bool finite = true; long tail = 0;
+  PdcSlot lat{31, 0, true, true, 1000}; const PdcPlan plan = pdc_plan(BusPlan(), &lat, 1, 48000, PdcMode::Auto);   // a made-up latent slot: every other track waits 1000 samples
   { rt_guard g;
+    R.setPlan(plan, PdcMode::Auto, 0);
     while (!R.songOver() && R.frame() < 48000L * 600) { const int N = 1 + (int)(rnd() * MAXB); R.block(L.data(), Rr.data(), N);
       for (int i = 0; i < N; i++) { const double a = L[(size_t)i], b = Rr[(size_t)i]; if (!(a == a) || !(b == b)) finite = false; peak = std::max(peak, std::max(std::fabs(a), std::fabs(b))); } }
     while (R.voices() > 0 && tail < 48000L * 30) { R.block(L.data(), Rr.data(), MAXB); tail += MAXB; }
@@ -289,6 +301,7 @@ static int run_song() {
   if (!finite) return fail("the song render produced NaN");
   if (s.voiceDropped || s.voiceOverflow || s.voiceAutoDropped || s.mixAutoDropped || s.seqDropped) return fail("the song render lost notes or events");
   if (s.notesPlayed < 1000 || peak <= 0) return fail("the song render played (almost) nothing");
+  if (s.beats < 100 || !R.mixer().clock().on() || R.mixer().clock().dropped()) return fail("the beat clock did not follow the song");
   std::printf("rt_harness: whole song: %d steps, %d notes played, %d mixer events, %lld frames + %.2f s until the pool emptied, peak %d voices, no allocation\n", s.steps, s.notesPlayed, s.mixEvents, (long long)(s.frames - tail), tail / 48000.0, s.peakVoices);
   return 0;
 }

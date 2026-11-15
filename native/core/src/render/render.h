@@ -13,6 +13,7 @@
 #include <memory>
 
 #include "mix/mix.h"
+#include "mix/pdc.h"
 #include "seq/seq.h"
 #include "song/song.h"
 #include "voice/voice.h"
@@ -29,7 +30,7 @@ struct RenderPads {
 
 struct RenderStats {
   int64_t frames = 0;
-  int steps = 0, events = 0, notes = 0, notesPlayed = 0, notesNoPad = 0, notesMidiOnly = 0, notesShapedRev = 0, mixEvents = 0;
+  int steps = 0, events = 0, notes = 0, notesPlayed = 0, notesNoPad = 0, notesMidiOnly = 0, notesShapedRev = 0, mixEvents = 0, beats = 0;
   int peakVoices = 0, peakVoiceLane = 0, peakMixLane = 0, peakStepEvents = 0;
   uint32_t voiceDropped = 0, voiceOverflow = 0, voiceAutoDropped = 0, mixAutoDropped = 0;
   uint64_t seqDropped = 0;
@@ -44,6 +45,15 @@ class SongRenderer {
   SongRenderer& operator=(const SongRenderer&) = delete;
 
   void block(float* outL, float* outR, int frames);     // the next `frames` (<= maxBlock) samples
+
+  // LATENCY COMPENSATION (pass()): the plan is set in force at once (a render's pdcSync) and everything plays plan.T later, so the render is
+  // `N + latencyFrames()` long and the start is trimmed. extraLatencyFrames: what pass() adds for the master side (mastering, the master's pump
+  // effects, the limiter's look-ahead: U11 / U12 / U18 say how much). Call before the first block.
+  void setPlan(const PdcPlan& plan, PdcMode mode, int64_t extraLatencyFrames = 0);
+  int64_t latencyFrames() const { return extra_ + pdc_trim_frames(plan_, sr_); }
+  // N frames of the song with the latency trimmed off the start, as pass() returns them: renders latencyFrames() + N and drops the first
+  // latencyFrames(). Allocates nothing (a scratch block made at construction).
+  void renderTrimmed(float* outL, float* outR, int64_t N);
   bool songOver() const { return !seq_->alive(); }       // the sequencer has reached the end
   int voices() const { return pool_.active(); }          // voices still sounding
   double time() const { return (double)frame_ / sr_; }
@@ -64,6 +74,8 @@ class SongRenderer {
   std::unique_ptr<SeqEvent[]> evs_;
   std::unique_ptr<SeqStep> step_;
   int64_t frame_ = 0;
+  PdcPlan plan_; int64_t extra_ = 0;
+  std::unique_ptr<float[]> scratch_;
   RenderStats st_;
 };
 
