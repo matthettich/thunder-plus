@@ -1,0 +1,12 @@
+# U02 smoke tests: each DSP static library is linked into a tiny executable that runs one effect / module for a few blocks.
+if(TARGET thunder_dsp_tfx)
+  add_executable(dsp_smoke_tfx smoke_tfx.cpp)
+  target_link_libraries(dsp_smoke_tfx PRIVATE thunder_dsp_tfx)
+  add_test(NAME dsp_smoke_tfx COMMAND dsp_smoke_tfx)
+  add_executable(dsp_smoke_mods smoke_mods.cpp)
+  target_link_libraries(dsp_smoke_mods PRIVATE thunder_dsp_mods)
+  add_test(NAME dsp_smoke_mods COMMAND dsp_smoke_mods)
+  add_executable(dsp_smoke_w smoke_w.cpp)
+  target_link_libraries(dsp_smoke_w PRIVATE thunder_dsp_w)
+  add_test(NAME dsp_smoke_w COMMAND dsp_smoke_w)
+endif()
