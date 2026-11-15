@@ -1,6 +1,6 @@
 # Thunder Plus test checklist, by priority
 
-> Snapshot of the owner's Claude Doc "Thunder Plus test checklist, by priority" (https://claude.ai/artifact/LrzQ18ur18Fc5gkvxmQDbK), exported 14 Nov 2026 with his ticks as of the afternoon (build 610).
+> Snapshot of the owner's Claude Doc "Thunder Plus test checklist, by priority" (https://claude.ai/artifact/LrzQ18ur18Fc5gkvxmQDbK), exported 15 Nov 2026 with his ticks as in the doc (build 616).
 > The live list is the Claude Doc; the source of every item is "Owner's punch list" in HANDOVER.md (build numbers are in brackets).
 > Re-export this file when the doc changes.
 
@@ -10,7 +10,7 @@
 
 This list is in order of importance, so start at the top.
 
-Do section 1 first; it is short: the newest builds (589 to 610, ears first), what could lose work or sound.
+Do section 1 first; it is short: the newest builds (589 to 616, ears first), what could lose work or sound.
 
 Do sections 2 and 3 as time allows.
 
@@ -22,7 +22,7 @@ If something fails, tell Claude the build number and what happened; tick an item
 
 | Section | Open items | Mostly on | Why it matters |
 | --- | --- | --- | --- |
-| 1. Do these first | 58 | Phone and computer | The newest builds (589 to 610), lost work or sound |
+| 1. Do these first | 78 | Phone and computer | The newest builds (589 to 616), lost work or sound |
 | 2. Really worth trying | 68 | Phone | Everyday features nobody has tried on a real device, the 585 to 588 editor checks and the re-checks of your last fixes |
 | 3. If you have time | 47 | Phone, then gear | Secondary features, by-ear comparisons and hardware |
 | 4. Safe to skip unless something looks wrong | 55 | Mixed | Cosmetic, older, or already covered by automated tests |
@@ -30,6 +30,31 @@ If something fails, tell Claude the build number and what happened; tick an item
 | Set aside | 5 | none | Nothing: probably superseded |
 
 ## 1. Do these first
+
+### New in builds 611 to 616: mono / poly tracks, MOD and names, Arrange keys, latency
+
+*The six newest builds, newest first. Builds 616, 615, 612 and 611 are the ones that touch sound or saved songs.*
+
+- [ ] Computer, by ear: a kick on one track; a second drum track fed into a bus that holds pump CALM and a synced 1/8 delay. Pass: bus and echoes are in time with the kick (before: the whole bus about 46 ms late). Switch CALM off and on: the timing does not move. (616)
+- [ ] Computer: the first time you press PLAY with such an effect loaded. Pass: one notice names the effect and the track and says the other tracks now wait; it never comes back. Audio & MIDI shows LATENCY COMP: AUTO / ON / OFF. (616)
+- [ ] Computer, by ear: with that song stopped, play a pad by hand: it answers at once. While the song plays the pad is about 46 ms late (it has to be, to line up). Say if that bothers you when playing along: ON / OFF are there, and the delay could be kept off live pads. (616)
+- [ ] Computer, by ear: Step gate or Flex on the master with CALM on a track. Pass: the gate chops on the beat (it was early). (616)
+- [ ] Computer, by ear: add and remove CALM on a track while the song plays, and press STOP and PLAY with a pad still ringing. Pass: no click (a short pitch wobble on what is ringing is expected). Say if PLAY with something ringing still ticks. (616)
+- [ ] Computer: a song with no look-ahead effects. Pass: it sounds and renders exactly as before. (616)
+- [ ] Computer: Settings › Song › POLY TRACKS up one, then down one. Pass: the Arrange boxes follow (“POLY 09–17”, then “09–16”), a short “Hid track 17 (poly)” notice, no question. (615)
+- [ ] Computer (a COPY of a song): MONO TRACKS down past a track with notes. Pass: it asks “Hide track 08 (mono)?”; Cancel changes nothing; Hide gives “MONO 01–07” and every poly track keeps its notes, mixer, effects and LFOs under its new number; Ctrl+Z puts both counts and every track back; raising MONO brings the hidden track back with its notes. (615)
+- [ ] Phone: drag the MONO slider down past a track with notes. Pass: one question when you let go, not one per step. (615)
+- [ ] Computer: try to take either count to 0, and the total above 24 with a voice per track (32 without). Pass: the row stops and its info line says why. (615)
+- [ ] Computer: save an uneven song (say 4 mono, 12 poly), reopen it. Pass: the same split, the same notes. (615)
+- [ ] Mac: on Phrase with a selection and Arrange beside it, Option+A, move around Arrange, Option+A again. Pass: the same screen, cell, selection and scroll as before. The same with Esc. (614)
+- [ ] Mac: Option+A, open a block from Arrange (Option+▶), Option+A. Pass: it does not jump back to the old place; Arrange takes the keys again from the new one. (614)
+- [ ] Mac: on Mixer, FX, MOD and INST press Option+▼ then Option+▲. Pass: you stay on the page, the Arrange cursor moves a block down and up on that track (MOD and FX show that track still), and Phrase then shows that block. (614)
+- [ ] Mac: Option+◀▶ and Option+8. Pass: they change screen as before; Option+8 is Project. (614)
+- [ ] Mac desktop: double-click acid.thunder (or File › Open). Pass: Project › NAME says “acid”, the title bar shows no unsaved dot, and a render suggests “acid mix.wav”. (613)
+- [ ] Mac desktop: New project, Save as beat2.thunder. Pass: NAME becomes “beat2”. Rename a song to “My tune”, save, open another file and come back: “My tune” is kept. (613)
+- [ ] Mac: load acid, open MOD, press Option+A (Arrange takes the keys, MOD says FOLLOWS), move the cursor to track 12, then 13. Pass: the MOD header says TRACK 12 and lists its three LFOs at once, and TRACK 13 lists one; it changes with every move, across the mono / poly boundary too. (612)
+- [ ] Mac: the two LFOs on track 12 that point at settings those effects do not have. Pass: they read “no such setting” (or “no effect in this slot”), not “(empty)”, and can be re-pointed or cleared. (612)
+- [ ] Computer: open a few existing songs (acid, an older one), play them, Settings › TRACKS up two and down two, save, reopen. Pass: everything as before this build: the same tracks mono and poly, the hidden tracks come back with their notes, nothing new on screen. (611)
 
 ### New in builds 603 to 610: renders, sliders, CPU, chance
 
@@ -64,7 +89,7 @@ If something fails, tell Claude the build number and what happened; tick an item
 - [ ] Phone (Fold): double-tap a slider. Pass: the field opens with the number keyboard; long press › Reset to default still resets. (604)
 - [ ] Computer: a slider with a MIDI knob learned or an LFO on it. Pass: a typed value and a nudge behave like a drag (the sound follows, the learned knob still moves it). (604)
 - [ ] Computer (song acid): render the song and open the WAV in an editor. Pass: the first kick starts at the very beginning of the file (before this build it started about 93 ms in), and the end of the song is not cut short. (603)
-- [ ] Computer, by ear: Audio & MIDI › LATENCY COMP ON; put pump CALM on a drum track and switch it OFF; play it against another drum track on the same steps. Pass: the two tracks hit together whether CALM is ON or OFF (before, the track with the OFF effect played about 43 ms late). With LATENCY COMP OFF the track with CALM is late either way, as the FX screen says. (603)
+- [ ] Computer, by ear: Audio & MIDI › LATENCY COMP: AUTO (the default) or ON; put pump CALM on a drum track and switch it OFF; play it against another drum track on the same steps. Pass: the two tracks hit together whether CALM is ON or OFF (before, the track with the OFF effect played about 43 ms late). With LATENCY COMP OFF the track with CALM is late either way, as the FX screen says. (603)
 
 ### New in builds 591 to 602: your ears first
 
