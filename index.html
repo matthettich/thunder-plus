@@ -25031,7 +25031,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 613;
+const BUILD = 614;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD + (location.pathname.includes('/beta/') ? ' · beta' : '');
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -35150,6 +35150,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [614, '14 Nov', ['Option/Alt+A (jump to Arrange) now brings you back exactly where you were when you press it again, or Esc: the same screen, cell, selection and scroll, even if you moved around Arrange. If you open a block from Arrange, the next Option+A jumps from there instead', 'Option/Alt+▲▼ on Mixer, FX, MOD and INST now steps to the pattern above or below on that track, as on Phrase, and you stay on the page (it used to go to the Project screen). Project is on Option+8, its tab, or Option+◀▶']],
   [613, '14 Nov', ['A project whose song is still called “Song 1” now takes the file’s name when you open it, however you open it: the NAME field, render and stem file names, MIDI export, backups and the prompts all say “acid”, not “Song 1”. A song you named yourself keeps its name. Saving a new song under a file name names it too']],
   [612, '14 Nov', ['MOD beside Arrange (the FOLLOWS badge): MOD now shows the track the Arrange cursor is on. It stayed on the track it showed before, so a track\'s LFOs seemed to be missing until you went to Song and back', 'An LFO whose target is gone says why (“FX1 DLAY: no such setting”, “FX4: no effect in this slot”) instead of “(empty)”']],
   [611, '14 Nov', ['Under the hood: a song can now hold its own number of mono and poly tracks. Nothing changes on screen yet (the two Settings rows come next), and every existing song opens and saves exactly as before']],
