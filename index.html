@@ -3713,7 +3713,7 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
 <h3>Chopping breaks</h3>
 <p>Load a drum loop into a pad (Synth → Load sample), then on its instrument (<b>INST</b>) set <b>SLICES</b> (GRID cuts equal parts, HITS cuts at each drum hit it finds). Each note now plays one slice: C-4 the first, C#4 the second and so on, so you can rearrange the break in a phrase. <b>SYNC</b> fits the loop to the song tempo: set <b>BEATS</b> to how long the loop is (or use › GUESS BEATS). REPITCH changes its speed and pitch together; STRETCH keeps the pitch with smooth grains; LOOP keeps the pitch with little tempo-synced loops for a gritty, stuttery sound (<b>GRAIN</b> sets their length). › PLAY SLICES auditions them in order.</p>
 <h3>Chords and polyphony</h3>
-<p><b>The second half of the tracks is polyphonic</b> (9–16 with 16 tracks, 17–32 with 32; Settings → Song → Tracks): the green POLY box on the right of Song and Mixer. The first half, in the pink MONO box on the left, plays one note at a time. Open a phrase from a polyphonic track and it shows four note columns, N1–N4, so a row can hold a chord. Notes on these tracks ring over each other, up to 4 at a time per track; a fifth steals the oldest. A note OFF in any note column releases everything on the track. The mono tracks stay one note at a time, and a phrase played there uses only N1.</p>
+<p><b>The poly tracks play chords</b> (the last 8 of 16 in a new song; Settings → Song → MONO TRACKS and POLY TRACKS set how many of each, at least one of each, 8 to 24 tracks in all, or 32 without a voice per track): the green POLY box on the right of Song and Mixer. The mono tracks, in the pink MONO box on the left, play one note at a time. Open a phrase from a polyphonic track and it shows four note columns, N1–N4, so a row can hold a chord. Notes on these tracks ring over each other, up to 4 at a time per track; a fifth steals the oldest. A note OFF in any note column releases everything on the track. The mono tracks stay one note at a time, and a phrase played there uses only N1.</p>
 <h3>Two input modes</h3>
 <p><b>PAD</b> is a d-pad plus SHIFT, PLAY, ALT and EDIT, good with a thumb. <b>KEYS</b> is direct entry: type notes, hex and effects, with an on-screen keypad on touch screens. The keyboard works in both — in PAD mode Z and X stay ALT and EDIT and Alt+arrows page; everything else types as in KEYS. Switch with ⚙ Settings → Input (or Project → INPUT).</p>
 </section>
@@ -14019,7 +14019,7 @@ function growKit(){
 }
 function setVtrk(on){
   vtrk = !!on; try { localStorage.setItem(VTRK, vtrk ? '1' : '0'); } catch(e){} syncHeld();
-  try { if (vtrk && S.ntr > 24){ S.ntr = 24; saveS(); toast('A kit slot per track allows up to 24 tracks: TRACKS is 24 now (tracks 25–32 are kept, not played).', 5000); } } catch(e){}
+  try { if (vtrk && S.ntr > 24){ S.ntr = 24; saveS(); toast('A kit slot per track allows up to 24 tracks: the song has 24 now (tracks 25–32 are kept, not played).', 5000); } } catch(e){}
   for (let i = 0; i < Math.max(nslots(), 40); i++){ dirty[i] = true; cache[i] = null; }
   growKit();
 }
@@ -20141,8 +20141,8 @@ const PROWS = 32;   // rows stored per phrase; each phrase plays its own LEN (16
 const NCOL = 4, VC = 4, IC = 5, FX0 = 6, RW = 12;
 const blankRow = () => new Array(RW).fill(-1);
 const freshPhrase = () => Array.from({length:PROWS}, blankRow);
-// The first half of the song's tracks play one note at a time (mono); the second half are polyphonic. With an odd
-// count the mono half gets the extra track. 16 tracks: 1–8 mono, 9–16 poly; 32 tracks: 1–16 mono, 17–32 poly.
+// The first MONO TRACKS tracks play one note at a time (mono); the rest are polyphonic (Settings → Song → MONO TRACKS / POLY TRACKS). A song without its own split: the first half, the mono half with the extra track
+// when the count is odd (16 tracks: 1–8 mono, 9–16 poly).
 // (ntr() lives with the song state below; these arrows only call it after everything is initialized.)
 /* MONO / POLY COUNTS (14 Nov): S.nmono, when the song has one, is the number of mono tracks (kept within 1..ntr-1: at least one of each kind); without it the mono half gets the extra track, as before. */
 const polyFrom = () => { const n = ntr(), m = S.nmono; return m >= 1 ? Math.min(m | 0, n - 1) : Math.ceil(n / 2); }, isPolyT = t => t >= polyFrom() && t < NT;
@@ -24819,7 +24819,7 @@ async function importMidiFile(f){
   saveS(); draw();
   const tempoNote = m.tempo > 0 ? (songEmpty ? ` Tempo ${S.bpm} BPM from the file.` : ` (the file is at ${Math.round(m.tempo)} BPM; the song stays at ${S.bpm})`) : '';
   toast(`Imported ${tracks.length} MIDI track${tracks.length === 1 ? '' : 's'} into tracks ${d2(t0 + 1)}–${d2(t0 + tracks.length)} from row ${rS(y0, 3)}: ${placed} blocks, using instrument ${hx(clamp(last.inst, 0, NI - 1))}${tracks.length > 1 ? ' and up' : ''}.` + tempoNote
-    + (m.tracks.length > tracks.length ? ` ${m.tracks.length - tracks.length} more didn’t fit (TRACKS).` : '') + (out ? ' Ran out of phrases or sects: the rest was left out.' : ''), 8000);
+    + (m.tracks.length > tracks.length ? ` ${m.tracks.length - tracks.length} more didn’t fit (MONO TRACKS and POLY TRACKS).` : '') + (out ? ' Ran out of phrases or sects: the rest was left out.' : ''), 8000);
 }
 $('midIn').addEventListener('change', e => { const f = e.target.files[0]; e.target.value = ''; if (f) importMidiFile(f); });
 
@@ -25339,13 +25339,16 @@ function trackHolds(Sx, t){
     if (![false, true].some(po => nj(trackVoiceOf(t, po)) === mine)) return true; } } catch(e){ return true; }
   return false;
 }
+// Is voice v exactly the stock voice a track of that kind starts with (its name aside)?
+function voiceIsStock(v, t, poly){ try { const nj = x => { const j = voiceToJSON(x); j.name = ''; return JSON.stringify(j); }; return nj(v) === nj(trackVoiceOf(t, poly)); } catch(e){ return false; } }
 // The visible tracks that going to `mono` mono and `poly` poly tracks would hide AND that hold something (for "ask first only if something is in it"): their numbers, from 0.
-function tracksHiddenBy(mono, poly, Sx = S){
+function tracksHiddenAll(mono, poly, Sx = S){   /* every visible track the new counts would hide, held or not (the notice names them) */
   const n0 = Sx.ntr || 16, m0 = polyFrom(), out = [];
   for (let t = Math.max(0, mono); t < m0; t++) out.push(t);
   for (let t = m0 + Math.max(0, poly); t < n0; t++) out.push(t);
-  return out.filter(t => trackHolds(Sx, t));
+  return out;
 }
+const tracksHiddenBy = (mono, poly, Sx = S) => tracksHiddenAll(mono, poly, Sx).filter(t => trackHolds(Sx, t));
 // Can the song go to `mono` / `poly`? {why:''} = yes (with n0, m0, n1 and the plan), else why = the reason in plain English. A count may not grow into hidden tracks of the OTHER kind that hold something.
 function tracksCheck(mono, poly, Sx = S){
   const most = vtrk ? 24 : NT, n0 = Sx.ntr || 16, m0 = polyFrom();
@@ -25414,6 +25417,10 @@ function setTracks(mono, poly){
     try { PumpFX._notifyAll('load'); } catch(e){} }
     if (ck.plan.h1 != null) S.hmono = ck.plan.h1; }
   S.ntr = n1; const n = S.ntr; if (m1 === Math.ceil(n1 / 2)) delete S.nmono; else S.nmono = m1;
+  /* A track that took an OVER slot (a hidden slot of the other kind, empty by trackHolds, which counts either kind's stock voice as empty) may still hold that other kind's stock voice: a poly track would play the mono
+     drum one-shot, a mono track the poly saw. Give it its own kind's voice. A voice somebody made is never touched (trackHolds would have refused the slot). (CodeRabbit, #145) */
+  if (vtrk && kit && kit.voices && (n1 !== n0 || m1 !== m0)) for (const o of ck.plan.over){ const i = ck.plan.P.indexOf(o.t), v = i >= 0 && i < n1 ? kit.voices[NPAD + i] : null, poly = !o.mono;
+    if (v && voiceIsStock(v, i, !poly)) kit.voices[NPAD + i] = trackVoiceOf(i, poly); }
   if (vtrk && (n1 !== n0 || m1 !== m0)){ kit.voices.forEach((v, i) => { if (v === null) kit.voices[i] = trackVoice(i - NPAD); }); for (let i = 0; i < kit.voices.length; i++){ dirty[i] = true; cache[i] = null; } }
   if (cTrack >= n) cTrack = n - 1; if (cs.song.x >= n && cs.song.x !== MT) cs.song.x = n - 1; if (cs.mixer.x >= n) cs.mixer.x = n - 1;
   // A new track instantiates its voice before the redraw, so the kit keeps one-to-one voice/track parity.
@@ -25425,7 +25432,35 @@ function setTracks(mono, poly){
 // MONO count (within 1..total-1) and changes POLY. Returns the old → new track map (the identity when refused: a total outside 8..max is clamped, but a refusal for a hidden track is not reported here).
 function setNtr(v){
   const n0 = ntr(), n1 = clamp(v, 8, vtrk ? 24 : NT), m0 = polyFrom(), even = m0 === Math.ceil(n0 / 2), m1 = even ? Math.ceil(n1 / 2) : clamp(m0, 1, n1 - 1);
-  return setTracks(m1, n1 - m1).tN;
+  const r = setTracks(m1, n1 - m1); if (r.why && typeof toast === 'function') toast(r.why, 5000);   /* a refusal is always said */
+  return r.tN;
+}
+/* SETTINGS: MONO TRACKS / POLY TRACKS (owner, 14 Nov). tracksSay: "track 12 (poly)" / "tracks 07, 08 (mono) and 16 (poly)" for the track numbers as they are NOW. */
+function tracksSay(list){
+  const m0 = polyFrom(), g = [[], []]; list.forEach(t => g[t >= m0 ? 1 : 0].push(d2(t + 1)));
+  const part = (a, k) => a.length ? a.join(', ') + ' (' + k + ')' : '';
+  return (list.length === 1 ? 'track ' : 'tracks ') + [part(g[0], 'mono'), part(g[1], 'poly')].filter(x => x).join(' and ');
+}
+/* tracksRowSet(mono, poly): what a Settings row does with a new count. Refused by the may-it-grow rule or the limits: the reason is shown (toast) and nothing changes. Shrinking so a track that HOLDS something would be hidden:
+   ask first (the app's own dialog, Hide is the default button; Cancel leaves everything). Otherwise just do it and say briefly which tracks were hidden. Nothing is ever deleted; setTracks is one undo step. */
+function tracksRowSet(mono, poly){
+  mono = Math.round(+mono); poly = Math.round(+poly);
+  if (!(mono >= 1 && poly >= 1) || (mono === polyFrom() && mono + poly === ntr())) return;
+  const ck = tracksCheck(mono, poly); if (ck.why){ toast(ck.why, 5000); return; }
+  const all = tracksHiddenAll(mono, poly), held = all.filter(t => trackHolds(S, t)), lm = all.some(t => t < polyFrom()), lp = all.some(t => t >= polyFrom());
+  const back = lm && lp ? 'raising MONO TRACKS or POLY TRACKS' : lm ? 'raising MONO TRACKS' : 'raising POLY TRACKS', say = tracksSay(all), sayHeld = tracksSay(held);   /* named before the change: the kinds are read from the split as it is now */
+  const apply = () => { const r = setTracks(mono, poly); if (r.why){ toast(r.why, 5000); return; }
+    if (all.length) toastBrief('tracks', 'Hid ' + say + '. Nothing is deleted: ' + back + ' brings ' + (all.length > 1 ? 'them' : 'it') + ' back.');
+    try { buildProj(); } catch(e){} };
+  if (!held.length){ apply(); return; }
+  askYes({title:'Hide ' + say + '?', body:(held.length > 1 ? 'They hold' : 'It holds') + ' notes, effects or other settings' + (all.length > held.length ? ' (' + sayHeld.replace(/^tracks? /, '') + ')' : '') + '. Nothing is deleted: ' + back + ' brings ' + (all.length > 1 ? 'them' : 'it') + ' back.'}, 'Hide').then(ok => { if (ok) apply(); });
+}
+/* the two rows' limits: each at least 1, 8 to 24 (32) tracks in all; a row stops at its limit and says why in its info line */
+function tracksLimits(kind){
+  const m = polyFrom(), p = ntr() - m, most = vtrk ? 24 : NT, own = kind === 'mono' ? m : p, other = kind === 'mono' ? p : m, oth = kind === 'mono' ? 'POLY' : 'MONO';
+  const lo = Math.max(1, 8 - other), hi = most - other;
+  const why = own >= hi ? ` At the most: the song has ${most} tracks at the most${vtrk ? ' (a voice per track)' : ''}; lower ${oth} TRACKS to make room.` : own <= lo ? (lo > 1 ? ` At the least: the song needs 8 tracks in all; raise ${oth} TRACKS first.` : ' At the least: one of each kind.') : '';
+  return {lo, hi, why, n:m + p, most};
 }
 // The window of tracks a Song or Mixer line has room for (each track takes 3 characters after a lab-wide label).
 let mixL = 0, mixN = 16, winTrk = 16;
@@ -26124,8 +26159,10 @@ function projRows(){
     {l:'NEIGHBORS', ck:'View neighboring phrases', get:() => nbOn ? 1 : 0, set:v => setNb(!!v), min:0, max:1, tog:true, d:0, fmt:onOff,
       info:() => 'In Phrase, a faint copy of the notes the tracks either side play at the same song row: the track to the left in violet before the notes, the track to the right in mustard after them. A poly track shows its whole chord: all four notes when there is room (unfolded, desktop), otherwise one letter per voice (capital = natural, small = sharp, so CEGa is C E G A#; · is an empty voice, × a note off). Only to look at; they can’t be edited'},
     {l:'NAME', sec:'Song', gap:true, show:() => S.name, tap:async () => { const n = await askText({title:'Rename the song'}, S.name, 40, 'Rename'); if (n != null){ S.name = n.trim().slice(0, 40) || 'Song'; saveS(); draw(); msMeta(); } }, info:() => 'EDIT renames the song'},
-    {l:'TRACKS', get:() => ntr(), set:v => setNtr(v), min:8, max:NT, big:8, d:16, fmt:v => v + ' tracks',
-      info:() => `How many tracks this song uses, 8 to ${vtrk ? 24 : NT} with ${vtrk ? 'a voice per track (one voice each)' : 'the shared 16 voices'}. Song and Mixer show as many as fit and scroll sideways (arrows, or swipe left and right). Tracks past this number are hidden and silent; their notes are kept`},
+    {l:'MONO TRACKS', late:true, get:() => polyFrom(), set:v => tracksRowSet(v, ntr() - polyFrom()), min:tracksLimits('mono').lo, max:tracksLimits('mono').hi, big:4, d:8, fmt:v => v + ' mono',
+      info:() => { const L = tracksLimits('mono'); return `How many one-note-at-a-time tracks: tracks 1 to ${polyFrom()}. The poly tracks follow them and move up or down when this changes, with their notes, mixer and effects. Hidden tracks keep everything. Total ${L.n} of ${L.most}.${L.why}`; }},
+    {l:'POLY TRACKS', late:true, get:() => ntr() - polyFrom(), set:v => tracksRowSet(polyFrom(), v), min:tracksLimits('poly').lo, max:tracksLimits('poly').hi, big:4, d:8, fmt:v => v + ' poly',
+      info:() => { const L = tracksLimits('poly'), m = polyFrom(); return `How many chord tracks (four notes each), numbered after the mono ones: tracks ${m + 1} to ${L.n}. They move up or down with MONO TRACKS. Hidden tracks keep everything. Total ${L.n} of ${L.most}.${L.why}`; }},
     {l:'TEMPO', get:() => S.bpm, set:v => { S.bpm = v; if (tp.on && tp.seq) tp.seq.bpm = v; lkTempoOut(v); }, min:40, max:300, big:10, d:120, fmt:v => v + ' BPM', after:() => { rtAllFx(); chainsTempo(); }, info:() => 'Beats per minute, 4 steps to a beat. Track delays follow it'},
     {l:'LPB', get:() => S.lpb, set:v => S.lpb = v, min:1, max:16, big:4, d:8, fmt:v => v + ' lines/beat · 1/' + (v * 4), info:() => 'Lines per beat: 4 makes each row a 16th, 8 a 32nd (new projects start at 8), 3 or 6 triplets. A phrase can set its own on its LEN line'},
     {l:'TICKS', get:() => S.ticks || TICKS, set:v => { S.ticks = v; if (tp.on && tp.seq) tp.seq.tks = v; }, min:1, max:32, big:4, d:TICKS, fmt:v => v + ' ticks a step', after:chainsTempo, info:() => 'How many ticks each step is cut into for DEL, RET, KIL, OFF, ARC, PSL and GRV (6 by default). A TIC command in a phrase changes it from that row on'},
@@ -26863,8 +26900,8 @@ function dupTrack(notes, tAt){
   const free = () => { for (let u = t + 1; u < end; u++) if (S.song.every(row => row[u] < 0) && !(notes && busTrack(u))) return u; return -1; };   // (12 Nov, owner: with notes, never onto a bus)
   let to = free(), grew = false;
   // MORE TRACKS (owner, 4 Nov: "create a track of the type you're trying to duplicate rather than ask where to go"; "ok if it
-  // created a mono and poly track"): with no empty track of its kind to the right, TRACKS goes up by two (one mono, one poly,
-  // as the half-and-half split keeps them) and the copy goes into the new one. At the most tracks there are, it says so.
+  // created a mono and poly track"): with no empty track of its kind to the right, MONO and POLY TRACKS each go up by one (setTracks; refused with its reason when
+  // the song is full or a hidden track in the way holds something) and the copy goes into the new one. At the most tracks there are, it says so.
   if (to < 0){
     const n0 = ntr(), most = vtrk ? 24 : NT;
     if (n0 + 2 > most) return toast(`No empty ${poly ? 'poly' : 'mono'} track to the right of track ${d2(t + 1)}, and the song has the most tracks it can (${most}).`);
@@ -26886,7 +26923,7 @@ function dupTrack(notes, tAt){
   draw();
   const extra = notes ? (made < want ? ` and ${made} of ${want} blocks (no free sects or phrases left)` : want ? ` and its ${made} block${made > 1 ? 's' : ''}, as unique copies` : ' (it has no blocks yet)')
     : ` · no notes (${keyHint('mod+alt+D')} brings them too)`;
-  toast((grew ? `TRACKS is ${ntr()} (a mono and a poly track added). ` : '') + `Track ${d2(t + 1)} duplicated to track ${d2(to + 1)} with its trim, volume, pan and effects${extra}.` + (S.chainOn[t] ? ' chains isn’t copied.' : ''), grew ? 6000 : undefined);
+  toast((grew ? `The song has ${ntr()} tracks now (a mono and a poly track added). ` : '') + `Track ${d2(t + 1)} duplicated to track ${d2(to + 1)} with its trim, volume, pan and effects${extra}.` + (S.chainOn[t] ? ' chains isn’t copied.' : ''), grew ? 6000 : undefined);
 }
 // CLN↓ (command row, Ctrl/⌘+Shift+C) on the song: the block under the cursor, or every block in the
 // selection, is cloned into new, unique numbers on the row(s) just below; the cursor follows.
@@ -35484,8 +35521,8 @@ const SHEETS = {
     ['Recording', ['REC TIMING', 'REC VELOCITY', 'REC NOTE OFFS']],
     ['Metronome', ['METRONOME', 'CLICK LEVEL', 'COUNT-IN']],
     ['Live transpose', ['LIVE TRANSPOSE']]]},
-  song:{title:'Song', about:'Name, tracks, tempo, swing, ticks, the scale, pattern length and the song’s impulse responses', groups:[
-    ['Song', ['NAME', 'TRACKS', 'TEMPO', 'LPB']],
+  song:{title:'Song', about:'Name, mono and poly tracks, tempo, swing, ticks, the scale, pattern length and the song’s impulse responses', groups:[
+    ['Song', ['NAME', 'MONO TRACKS', 'POLY TRACKS', 'TEMPO', 'LPB']],
     ['Groove', ['SWING', 'SWING NOTE', 'TICKS']],
     ['Key', ['SCALE', 'SCALE ROOT']],
     ['Patterns', ['PATTERN LEN', '› ALL PHRASES TO']],
@@ -35646,9 +35683,10 @@ function tsetRow(r){
   // FIX (sweep, 4 Nov): − / + grey out at the ends of the range, so a click that can't change anything shows it can't
   let bDn = null, bUp = null; const lim = () => { if (bDn) bDn.disabled = r.get() <= r.min; if (bUp) bUp.disabled = r.get() >= r.max; };
   const put = v => { tsetSet(r, v); rg.value = r.get(); out.textContent = show(r.get()); lim(); refresh(); };
-  const btn = (t, d, a) => { const b = el('button', 'stp', t); b.type = 'button'; b.setAttribute('aria-label', a); b.addEventListener('click', () => { put(r.get() + d); if (r.l === 'PATTERN LEN') buildProj(); }); return b; };
-  rg.addEventListener('input', () => put(+rg.value));
-  rg.addEventListener('change', () => { if (r.l === 'PATTERN LEN') buildProj(); });
+  const btn = (t, d, a) => { const b = el('button', 'stp', t); b.type = 'button'; b.setAttribute('aria-label', a); b.addEventListener('click', () => { put(r.get() + d); if (r.l === 'PATTERN LEN' || r.late) buildProj(); }); return b; };
+  /* r.late (MONO / POLY TRACKS): the slider only commits when let go, so dragging past a track that holds something asks once, not at every step; the other row's limits follow */
+  rg.addEventListener('input', () => { if (r.late) out.textContent = show(+rg.value); else put(+rg.value); });
+  rg.addEventListener('change', () => { if (r.late) put(+rg.value); if (r.l === 'PATTERN LEN' || r.late) buildProj(); });
   bDn = btn('−', -st, 'Less'); bUp = btn('+', st, 'More'); lim();
   c.append(bDn, rg, bUp, out);
   row.append(lab(), c, inf); return row;
