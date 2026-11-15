@@ -708,6 +708,11 @@ The owner's top priority to add is the MOD screen. Work down the list; ask befor
 
 Start a session by asking for results. Fix on `beta`. (10 Nov, 15:10: the web beta is build 560; the build numbers in the rest of this paragraph are older.) Web beta: https://matthettich.github.io/thunder-plus/beta/ (build 547 as of 10 Nov morning, 548 once its PR merges; the night of 9–10 Nov shipped 544–547, see the four "10 Nov" entries below. Decisions the lead made that night for the owner to confirm or reverse: on a phone the saved Sequencer default plays on the Page unless Audio thread is picked on that device; on a phone the safety limiter is its stand-in until another worklet loads; the resync only runs with a worklet loaded and its margins are untested on a device). Desktop: v1.3.4-beta.2 (build 541, no feed view or scopes); further desktop betas on hold until the owner asks.
 
+**Build 601** (…chains: Morph)
+- [ ] **Computer, ears:** …chains, add Morph (Granular and spectral). A pad into In, a drum loop into In B, Mode Convolve, Morph 50%. Pass: you hear the pad chopped by the drums' rhythm; Morph at 0% is the pad alone, 100% the drums alone; no clicks while turning Morph, Sharpness or Smoothing.
+- [ ] **Computer, ears:** Mode Shape. Pass: the pad always sounds, with the drums' (or a voice's) tone colour. Freeze on Hold A, then stop the pad: it sustains as a drone. Frame Short / Long changes the character without a bang.
+- [ ] **Computer, ears:** Convolve is quieter than its inputs by design. Pass: Level up to +24 dB makes up for it without harsh clipping (there is a limiter); tell me if the default should be louder.
+
 **Build 600** (Arrange zoom out and early paging; + ADD FX; brief notices)
 - [ ] **Computer:** Arrange header, press − several times. Pass: rows get lower until about three times as many show (labels hide when rows get tiny, colours and the playhead stay); ○ goes back to fit.
 - [ ] **Computer and phone:** play a song with Arrange beside the Phrase, hands off. Pass: the page turns once when the playhead is about 8 rows from the bottom and a few rows that just played stay at the top; touch a key and it stays put for 4 s.
@@ -1194,6 +1199,14 @@ Suggested order: N0 → N1 → N2 (phone cured) → N4 with N3 alongside → N5 
   the edge `R.t0`, "waiting…" while armed), `rcdClk` / `rcdFmt` / `rcdFreeSecs`, a 250 ms timer only while recording; the
   final length stays until the next take. recorder-check covers FREE, PATTERN, Stop, next take and closing mid-take.
 
+
+## 14 Nov (…chains: Morph; build 601)
+
+Last module of the queue. Engine by the lead (`MorphM` in `chains/chains-worklet.js`, chains only), editor side by an agent.
+- Two stereo inputs (In / In R = A, In B / In B R = B), frames of 512 / 1024 / 2048 with a quarter-frame hop, one frame late (`latency:1024` is the default's). Convolve: geometric mean of the two spectra (Sharpness raises the exponent), A's phase; Shape: A's fine detail with B's outline, as loud as A (at most 30 dB of lift). Morph 0 = A, .5 = combined, 1 = B. Smoothing, Freeze (Off / Hold A / Hold B), Level ±24 dB, limiter out. Phases are kept as unit phasors (no atan2 / sin / cos per bin).
+- By design Convolve is quieter than its inputs on full-range material (no make-up). Owner's ears to judge the default Level.
+- Tests: `tests/modules-morph.test.js`, `tests/modules-morph-editor.test.js`; goldens: three new entries, no other hash changed.
+- **The module queue is now complete:** control maths (591), clock tools (592), Scope (593), building blocks (594), Delay line (596), Expression (597), Morph (601).
 
 ## 14 Nov (Arrange zoom out, early paging, + ADD FX opens the list, brief notices; build 600)
 

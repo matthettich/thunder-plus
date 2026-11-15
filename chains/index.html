@@ -1382,7 +1382,7 @@ const PAL_LAYOUT = [
   ['Reverbs', '#4a55c8', ['reverb', 'room', 'plate', 'lverb', 'spring', 'space', 'preverb', 'convolve']],
   ['Resonators', '#8a9a1a', ['comb', 'reson', 'rings']],
   ['Pitch and voice', '#e0609a', ['pshift', 'harm', 'autotune', 'vocoder']],
-  ['Granular and spectral', '#9a6ad6', ['clouds', 'beads', 'spectral', 'stretch']],
+  ['Granular and spectral', '#9a6ad6', ['clouds', 'beads', 'spectral', 'stretch', 'morph']],
   ['Rhythmic effects', '#d9b30f', ['pump', 'tgate', 'sgate', 'repeat', 'retrig', 'flex']],
   ['§Control'],
   ['Notes and MIDI', '#a0703a', ['hostIn', 'seq']],
@@ -1395,7 +1395,7 @@ const PAL_COLOR = { More:'#888888' }, CAT_COLOR = {};
 // ONE NAME PER MODULE (13 Nov, audit U6): the list, the title bar and Help all read the module's own name. What the list used to add in
 // brackets after a name ("Resonator (chord)") is this tooltip text now.
 const PAL_HINT = { onepole:'6 dB/oct', allpass:'phaser, diffuser', dline:'comb, echo', expr:'type a formula', dcblock:'remove offset', midside:'centre / sides', osc:'tone, LFO, FM', wnoise:'white, pink, brown', blipdrum:'8 voices', chaos:'Lorenz, Rössler…', degrade:'lo-fi', dimension:'stereo chorus', ensemble:'chorus', envfilt:'auto-wah', flex:'beat re-sequencer', life:'Game of Life', compare:'gate from a level', const:'fixed value', clkmul:'×2, ×3…', chance:'random thinning', counter:'staircase', stepsw:'rotate 4 sounds', burst:'ratchet', gatedly:'flam', flipflop:'toggle', rect:'abs, flip', scale:'map a range', switch:'A or B', xfade:'A to B',
-  meter:'VU', scope:'see a signal', preverb:'shimmer', repeat:'beat repeat', resample:'record to a pad', reson:'chord', retrig:'stutter', spectral:'FFT', string:'pluck', utility:'gain, pan' };
+  meter:'VU', scope:'see a signal', preverb:'shimmer', repeat:'beat repeat', resample:'record to a pad', reson:'chord', retrig:'stutter', morph:'two sounds as one', spectral:'FFT', string:'pluck', utility:'gain, pan' };
 // Rebuild the merged palette (in place) in PAL_LAYOUT's order; group families too, for anything still keyed on them.
 function organizePalette(palette, groupFam){
   const label = new Map(); for (const [, items] of palette) for (const [t, l] of items || []) if (!label.has(t)) label.set(t, l);
@@ -1528,6 +1528,7 @@ const MODULE_USE = {
   // granular and spectral
   clouds:'On a piano or pad: Position half way, Size large, Density and Texture up, Blend mostly wet. Flip Freeze for an instant ambient bed.',
   beads:'Feed it a short vocal or guitar phrase: Density around 60%, a large Size, Feedback and some Reverb for an evolving cloud. Freeze holds it as a pad.',
+  morph:'A pad into In (A) and a drum loop into In B, Mode Convolve, Morph in the middle: only what both share is heard, so the pad is chopped by the drums\u2019 rhythm and colour. Switch to Shape and A always plays, with B\u2019s vowel.',
   spectral:'On a pad or vocal: Mode Freeze, then switch Freeze to Hold on a chord you like, and it becomes an endless drone to play over.',
   stretch:'Stretch ×8, a long Window and Mix 100%: a one-bar loop becomes a slow ambient wash. Freeze holds the moment.',
   // rhythmic effects
@@ -2038,7 +2039,7 @@ const SUMMARY_KEYS = {
   mixer:['level', 'l1'],    // the master level first (its label is "Master"), then the first channel's level
   smixer:['level', 'l1'],
   scale:['olo', 'ohi', 'clip'], xfade:['mix', 'curve'], expr:['$text'],   // Expression: its formula is what Compact shows (a pseudo key, not a parameter)
-  onepole:['freq'], allpass:['mode', 'freq'], dline:['time', 'fb'], dcblock:['freq'], midside:['mode'], osc:['wave', 'freq'], wnoise:['color', 'level'],
+  onepole:['freq'], allpass:['mode', 'freq'], dline:['time', 'fb'], dcblock:['freq'], midside:['mode'], osc:['wave', 'freq'], wnoise:['color', 'level'], morph:['mode', 'morph'],
   scope:['time', 'trig'], clkmul:['mul', 'width'], chance:['prob', 'seed'], counter:['mode', 'steps'], stepsw:['fade', 'steps'], burst:['count', 'time'], gatedly:['delay'],   // Scale / map: where it lands, Crossfade: the mix first
 };
 const SUMMARY_FIRST = ['Mix', 'Wet', 'Master', 'Level', 'Output', 'Gain', 'Makeup'];
@@ -2505,6 +2506,12 @@ const MODULES = {
     ui:{ color:{l:'Colour', c:opts(['White', 'Pink', 'Brown'])}, level:{l:'Level', f:pct} },
     about:'Noise: a steady random hiss. White has every frequency alike (a bright hiss: hi-hats and snares), Pink has less top (rain, surf) and Brown is mostly low (wind, a distant roar). Level sets how loud it is. Through a Filter and a VCA with a short envelope it makes percussion.' },
 
+  morph:{ label:'Morph', scope:'mono', latency:1024, w:248, plabels:{ in:'In A', inR:'In A R', inB:'In B', inBR:'In B R' }, inputs:{ in:'audio', inR:'audio', inB:'audio', inBR:'audio' }, outputs:{ out:'audio', outR:'audio' },
+    params:{ mode:[0,0,1,1], morph:[.5,0,1,.01], sharp:[.5,0,1,.01], smooth:[.2,0,1,.01], frame:[1,0,2,1], freeze:[0,0,2,1], level:[0,-24,24,.1] },
+    ui:{ mode:{l:'Mode', c:opts(['Convolve', 'Shape'])}, morph:{l:'Morph', f:pct}, sharp:{l:'Sharpness', f:pct}, smooth:{l:'Smoothing', f:pct},
+      frame:{l:'Frame', c:opts(['Short (512)', 'Medium (1024)', 'Long (2048)'])}, freeze:{l:'Freeze', c:opts(['Off', 'Hold A', 'Hold B'])}, level:{l:'Level', f:db} },
+    about:'Morph: mixes two stereo sounds, A and B, by their frequencies. A goes into In and In R, B into In B and In B R. Leave a right jack empty and its left side is used for both. Mode Convolve keeps only what A and B have in common: a frequency is heard only when both sounds have it at the same moment, so a pad and a drum loop become the pad chopped and coloured by the drums. Mode Shape plays A as it is but gives it B\u2019s tone colour, like a vocoder: A always sounds, with B\u2019s vowels. With B silent, A comes through unchanged. Morph slides from A alone (0%), through the combined sound (50%), to B alone (100%). Sharpness: in Convolve, low keeps more of each sound and high keeps only the strongest shared frequencies; in Shape, low takes B\u2019s broad outline and high copies every bump. Smoothing makes the sound change more slowly, from frame by frame up to a long wash. Frame is the size of the slice it works on: Short (512) is tighter in time, Long (2048) is more detailed in pitch. Freeze holds A\u2019s or B\u2019s sound as it is now and sustains it as a drone. It delays the sound by about 21 ms at 48 kHz (11 ms with Short, 43 ms with Long), so line it up if it plays beside the dry track. In Convolve the result comes out quieter than the inputs on full-range material, by design: only the shared part is left and nothing is boosted to cover it. Turn Level up, it goes to +24 dB. The output always passes a gentle limiter.' },
+
   /* audio → CV and Control utilities. Pitch CV: 0.5 = A4 (440 Hz), one octave = 0.125. */
 
   /* filters, shapers and stereo (all JS) */
@@ -2835,7 +2842,7 @@ class ChainsBridge {
   }
   static standalone(opts){
     opts = opts || {};
-    const url = opts.url || './chains-worklet.js?v=56';
+    const url = opts.url || './chains-worklet.js?v=57';
     const ctx = new (window.AudioContext || window.webkitAudioContext)({ latencyHint:'interactive' });
     return Promise.all([ctx.audioWorklet.addModule(url), ChainsBridge.wasm()]).then(([, [tfxBytes, pumpBytes]]) => {
       const node = new AudioWorkletNode(ctx, 'chains', {
@@ -4665,7 +4672,7 @@ const PALETTE = [
   ['Track I/O', [['trackIn','Track In'],['chainOut','Chain Out'],['resample','Resample']]],
   ['Sound sources', [['osc','Oscillator'],['wnoise','Noise']]],
   ['Filters and amps', [['vcf','VCF'],['blades','Blades filter'],['vca','VCA'],['mixer','Mixer'],['smixer','Stereo mixer']]],
-  ['Effects', [['eq','EQ'],['comp','Simple compressor'],['saturation','Saturation'],['tape','Tape'],['chorus','Chorus'],['crush','Bitcrush'],['delay','Tape delay'],['pingpong','Ping-pong delay'],['meta','Meta modulator'],['phaser','Phaser'],['reverb','Reverb'],['rings','Rings'],['clouds','Clouds'],['beads','Beads'],['vocoder','Vocoder']]],
+  ['Effects', [['eq','EQ'],['comp','Simple compressor'],['saturation','Saturation'],['tape','Tape'],['chorus','Chorus'],['crush','Bitcrush'],['delay','Tape delay'],['pingpong','Ping-pong delay'],['meta','Meta modulator'],['phaser','Phaser'],['reverb','Reverb'],['rings','Rings'],['clouds','Clouds'],['beads','Beads'],['vocoder','Vocoder'],['morph','Morph']]],
   ['More effects', [['repeat','Repeat'],['comb','Comb resonator'],['transient','Transient shaper'],['tgate','Trance gate'],['ott','Multiband squash'],['fshift','Frequency shifter'],['vinyl','Vinyl'],['dub','Dub tape'],['cab','Speaker cab'],['tube','Tube'],['flanger','Flanger'],['tremolo','Tremolo'],['odrive','Overdrive'],['folder','Wavefolder'],['autowah','Auto-wah'],['pshift','Pitch shifter'],['ladder','Ladder filter'],['xmod','Cross-mod'],['space','Space reverb'],['lofi','Lo-fi'],['drive','Drive'],['air','Air'],['room','Room reverb']]],
   ['Stereo', [['width','Width']]],
   ['Sidechain', [['scin','Sidechain In'],['scout','Sidechain Out'],['sccomp','Sidechain comp'],['buscomp','Bus comp'],['glue','Glue comp']]],
