@@ -21323,6 +21323,7 @@ let sT = 0, sPend = false;   // sPend (12 Nov): a change is waiting for its auto
 // (a paste, a cut, a note plus its instrument) settle at the end of that event, so they undo as one step.
 const undo = {past:[], future:[], cur:JSON.stringify(S), busy:false, pend:false};
 var recTake = false;   // REC: a live take is under way; its notes become one undo step when it ends (recEndTake)
+let arrKeepOff = 0;   /* 1: keep the scroll as it is, 2: use cs.song.top as set */   /* UNDO KEEPS ARRANGE'S VIEW (build 609): undoStep's redraw does not scroll Arrange back to the selection / cursor */
 function undoReset(){ undo.past.length = 0; undo.future.length = 0; undo.cur = JSON.stringify(S); try { kitUndoBase(); } catch(e){} }
 /* ONE UNDO STEP PER GESTURE (27 Oct, Phase 2): while a pointer is down (a fader, a value or a selection being dragged), the
    changes it makes wait, and become one step when it lets go. A drag of the Mixer's faders made a step per mouse move. */
@@ -21398,6 +21399,7 @@ function undoStep(dir){
     const v = kit.voices[e.i]; draw(); return toast(`${dir < 0 ? 'Undo' : 'Redo'}: pad ${hx(e.i)} ${(v && v.name) || ''}`.trim());
   }
   to.push({k:'S', j:undo.cur}); undo.cur = e.j;
+  const rowsWas = S.song.map(r => r.join());
   // Swap the contents in place rather than the object: the running sequencer holds this object, so
   // replacing it would keep playing the old song (the screen would show the undo, the speakers wouldn't).
   undo.busy = true; const n = normSong(JSON.parse(undo.cur));
@@ -21412,7 +21414,10 @@ function undoStep(dir){
   undo.cur = JSON.stringify(S);
   saveS(); undo.busy = false;
   if (rt){ rt.pl.buses.forEach(b => { if (b && b.chn) b.chn._sent = null; }); rtAllFx(); rtRoute(); rt.pl.applyMix(); mstSync(); }
-  draw(); toast(dir < 0 ? 'Undo' : 'Redo');
+  /* UNDO KEEPS ARRANGE'S VIEW (owner, build 609: undo kept jumping Arrange to the selected area): the scroll stays; it moves only when every row the undo changed is off screen (then to the first of them) */
+  try { arrKeepOff = 1; let top = cs.song.top || 0; try { if (arrGrid.offsetParent) top = arrRowAt(arrGrid.scrollTop); } catch(_){} const VR = Math.max(2, arrRows()), ch = []; S.song.forEach((r, y) => { if (r.join() !== rowsWas[y]) ch.push(y); });
+    if (ch.length && !ch.some(y => y >= top && y < top + VR)){ cs.song.top = clamp(ch[0] - 2, 0, Math.max(0, 256 - VR)); arrKeepOff = 2; } } catch(_){}
+  try { draw(); } finally { arrKeepOff = 0; } toast(dir < 0 ? 'Undo' : 'Redo');
   try { PumpFX._notifyAll('undo'); } catch(e){}   // …PUMP: open pop-up windows read their slot again
 }
 setTimeout(kitUndoReset, 0);
@@ -24741,8 +24746,13 @@ function tStop(quiet){
   else if (home) try { cs.song.y = home.y; cs.song.top = home.top; cPhrase = home.p; cSect = home.s; cs.phrase.y = home.py; cs.phrase.top = home.ptop; cs.song.pg = cs.phrase.pg = false; if (tp.paused) tp.paused.key = curKey(); } catch(e){ tpLog('stop cursor', e); }
   // ARRANGE ON STOP beside another screen (14 Nov, owner: ARRANGE ON STOP = PLAYHEAD, yet the Arrange cursor went back to where it was): with the Phrase (or the Mixer…) holding
   // the keys, stopToPlayhead() reads PHRASE ON STOP, which moves or restores the phrase side AND Arrange's cursor. Arrange's own cursor and view now follow ARRANGE ON STOP alone.
-  if (arrP) G('arrange cursor', () => { if (tv === 'phrase' && pvActive()){ curToPlay(arrP, 'song'); if (tp.paused) tp.paused.key = curKey(); } else { arrCurToPlay(arrP); if (tp.paused) tp.paused.key = curKey(); } });   // Pattern view draws the song row's pattern, so the pattern goes with the row (pvGo); else only Arrange's cursor moves
+  if (arrP) G('arrange cursor', () => { if (tv === 'phrase' && pvActive()){ pvArrToPlay(arrP); if (tp.paused) tp.paused.key = curKey(); } else { arrCurToPlay(arrP); if (tp.paused) tp.paused.key = curKey(); } });   // Pattern view draws the song row's pattern, so the pattern goes with the row (pvGo); else only Arrange's cursor moves
   if (!quiet) draw();
+}
+/* PHRASE ON STOP = STAYS in Pattern view (14 Nov, owner: "following playhead"): with ARRANGE ON STOP at PLAYHEAD the Arrange side goes to the playing song row, but the phrase cursor keeps its track and step (curToPlay moved those too). The row's pattern is shown, the cursor stays on its own track. */
+function pvArrToPlay(P){
+  const q = P[cTrack] && P[cTrack].row >= 0 && cTrack !== MT ? P[cTrack] : P.find((x, i) => x && x.row >= 0 && i !== MT); if (!q) return false;
+  return pvGo(cTrack, q.row, null, null);
 }
 // Arrange's cursor onto the row playing on its own track (the track column stays), and that row in view. For the Arrange beside another screen only: nothing of the phrase moves.
 function arrCurToPlay(P){
@@ -26106,7 +26116,8 @@ function followPlay(){
   // track plays, and the rows scroll a page when the playhead runs off them), but the cursor stays on its row, so you
   // can edit while it plays. c.pg: the rows were paged by the playhead (draw() then doesn't scroll back to the cursor;
   // moving the cursor brings it back into view).
-  const page = (c, row, VR, len, end) => { if (row < 0) return; const top = c.top || 0, nt = arrPageTop(top, VR, row, len, -1, end); if (nt !== top){ c.top = nt; c.pg = true; } };   // the same early page turn as Arrange's (arrPageTop)
+  /* (build 609, owner: after the Synth page and back, Arrange scrolled up only one pattern with LOOP on) the tracker isn't shown on the Synth page: its rows are measured for a hidden grid (asongOn is false there), so paging them left c.top / c.pg stuck on the loop's row */
+  const page = (c, row, VR, len, end) => { if (row < 0 || view !== 'tracker') return; const top = c.top || 0, nt = arrPageTop(top, VR, row, len, -1, end); if (nt !== top){ c.top = nt; c.pg = true; } };   // the same early page turn as Arrange's (arrPageTop)
   if (tv === 'song'){ if (tp.mode === 'song' && !asongOn()) page(cs.song, own.row, songRows(), 256, arrWrapRow()); }
   else if (tv === 'sect'){ if (tp.mode !== 'phrase' && own.sect >= 0) cSect = own.sect; }
   else if (tv === 'phrase'){
@@ -26149,10 +26160,15 @@ let navT = -1e9;
    LP.SEL or song wrap, a jump back) puts its row first, as before. keep: a row (the cursor's) to keep in view too when the playhead has left the view (12 Nov), or -1.
    NOT EARLY when the view already shows the last row the playhead reaches before it wraps (end: the loop's last row, or the song's), so a loop that fits the view never turns a page.
    arrPageTop(top, VR, row, len, keep, end) is pure: the new first row (top itself when nothing turns). len: how many rows there are. */
-const ARR_AHEAD = 8, ARR_KEEP = 4;
+/* ARRANGE LOOK-AHEAD (build 609, owner: "have arrange page down when the cursor is 16 from bottom? can the number of cells be a setting?"): Settings → ARRANGE LOOK-AHEAD, this device. How many rows from the bottom of
+   Arrange's view the page turns, for the playhead (arrPageTop) and for the cursor moved down by key or wheel (arrKeepRow). Default 16; never more than half the view (a view under 16 rows keeps its quarter). */
+const ARR_AHEADS = [4, 8, 12, 16, 24, 32], ARR_AHEAD_K = 'thunderplus-arrahead-v1';
+let arrAhead = (() => { try { const v = +localStorage.getItem(ARR_AHEAD_K); return ARR_AHEADS.includes(v) ? v : 16; } catch(e){ return 16; } })();
+function setArrAhead(i){ arrAhead = ARR_AHEADS[clamp(i | 0, 0, ARR_AHEADS.length - 1)]; try { localStorage.setItem(ARR_AHEAD_K, String(arrAhead)); } catch(e){} arrSig = ''; draw(); }
+const ARR_KEEP = 4;
 function arrPageTop(top, VR, row, len, keep = -1, end = len - 1){
   if (!(row >= 0)) return top;
-  VR = Math.max(2, VR | 0); const ahead = VR < 16 ? Math.max(1, VR >> 2) : ARR_AHEAD, kp = Math.min(ARR_KEEP, Math.max(1, VR >> 3));
+  VR = Math.max(2, VR | 0); const ahead = VR < 16 ? Math.min(arrAhead, Math.max(1, VR >> 2)) : clamp(arrAhead, 1, VR >> 1), kp = Math.min(ARR_KEEP, Math.max(1, VR >> 3));
   if (row >= top && row < top + VR && (row < top + VR - ahead || end < top + VR)) return top;   // well inside, or nothing more to come before the wrap: nothing turns
   let nt = row < top ? row : row - kp;
   // The last page: when the end is within reach, one turn goes straight to the page that shows it (the playhead already on it), instead of turning again a few rows on
@@ -27080,6 +27096,8 @@ function projRows(){
       info:() => 'How often the level meters and the other moving marks are drawn while a song plays: the Mixer, the top bar’s meters, the FX bar, the master window, the spectrum. SMOOTH (the default): as before. LIGHT: about 10 times a second, less drawing and less battery; a short peak still shows. OFF: the meters stay empty while a song plays and come back when it stops; the sound, the peak and CLIP checks and the playback report are unchanged. Separate from LOW POWER DISPLAY (with both on, the slower one wins). This device only'},
     {l:'FOLLOW', segs:true, get:() => followMode, set:v => setFollow(v), min:0, max:2, d:0, fmt:v => ['OFF', 'PATTERN', 'ON'][v] || 'OFF',
       info:() => 'While the song plays. ON: Song and Phrase scroll with the playhead, and Phrase (and Sect) switch to what the cursor’s track is playing. PATTERN: Phrase (and Sect) switch to what the cursor’s track is playing and Arrange turns its pages with the song, but the phrase’s rows stay where you put them. OFF: the screen stays where you put it, except that Arrange still turns its pages when the playhead runs off it. While you work in Arrange it waits until you’ve left it alone for a minute. The cursor stays on its row in every mode, so you can edit while it plays'},
+    {l:'ARRANGE LOOK-AHEAD', get:() => ARR_AHEADS.indexOf(arrAhead), set:v => setArrAhead(v), min:0, max:ARR_AHEADS.length - 1, d:3, fmt:v => ARR_AHEADS[v] + ' ROWS',
+      info:() => 'How many rows from the bottom of Arrange the page turns, for the playhead and for the cursor when you move it down with the keys or the wheel: the view turns once, so the row lands near the top and the next phrases are in sight. 16 by default; never more than half of what Arrange shows (a short view uses a quarter). A click never turns the page'},
     {l:'TAB', segs:true, get:() => tabTracks ? 1 : 0, set:v => setTabTracks(!!v), min:0, max:1, d:1, fmt:v => v ? 'TRACKS' : 'COLUMNS',
       info:() => 'In a phrase. TRACKS (as Renoise): Tab / Shift+Tab go to the next / previous track’s phrase. COLUMNS: they step note → instrument → FX1 → FX2 → FX3, so the instrument is one press away'},
     {l:'RESUME', ck:'Playback resumes from pause', get:() => resumeOn ? 1 : 0, set:v => setResume(!!v), min:0, max:1, tog:true, d:0, fmt:onOff,
@@ -33580,7 +33598,7 @@ function arrAlign(){
 arrGrid.addEventListener('scroll', () => {
   arrHSync();
   if (arrIgnore >= 0 && Math.abs(arrGrid.scrollTop - arrIgnore) <= 1){ arrIgnore = -1; return; }
-  arrIgnore = -1; arrUserT = performance.now(); arrHandT = arrUserT;
+  arrIgnore = -1; arrUserT = performance.now(); arrHandT = arrUserT; arrLookY = -1;
   const rh = arrRowH(); if (!(rh > 0)) return;
   const c = cs.song, top = arrRowAt(arrGrid.scrollTop);
   if (top === c.top) return;
@@ -35704,9 +35722,14 @@ function apTop(){
    really shows first is read from the grid's scroll (the remembered top could lag behind it), so a block already on screen
    never moves; a cursor one row off the edge scrolls one row; one further away lands in the middle of Arrange's own
    window (not the bottom edge). */
+let arrLastY = -1, arrLookY = -1;   /* arrLookY: the cursor row a look-ahead page turn was made for; until the grid has scrolled, the real scroll is not read back over it */
 function arrKeepRow(c, VR){
-  try { const rh = arrRowH(); if (rh > 0 && arrGrid.offsetParent && arrIgnore < 0){ const real = arrRowAt(arrGrid.scrollTop); if (real !== c.top) c.top = real; } } catch(e){}
+  try { const rh = arrRowH(); if (arrKeepOff !== 2 && arrLookY !== c.y && rh > 0 && arrGrid.offsetParent && arrIgnore < 0){ const real = arrRowAt(arrGrid.scrollTop); if (real !== c.top) c.top = real; } } catch(e){}
+  if (arrKeepOff) return;
   const top = c.top || 0; VR = arrRows(top);
+  /* LOOK-AHEAD for the cursor (build 609): moved down by key or wheel (not a click) into the last arrAhead rows of the view, with song below it: one page turn puts it ARR_KEEP rows from the top */
+  const dn = c.y > arrLastY && c.y - arrLastY <= 16 && performance.now() - arrTouchT > 600; arrLastY = c.y;
+  if (dn && c.y >= top && c.y <= top + VR - 1 && top + VR < 256 && c.y >= top + VR - (VR < 16 ? Math.min(arrAhead, Math.max(1, VR >> 2)) : clamp(arrAhead, 1, VR >> 1))){ c.top = clamp(c.y - Math.min(ARR_KEEP, Math.max(1, VR >> 3)), 0, Math.max(0, 256 - VR)); arrLookY = c.y; return; }
   if (c.y >= top && c.y <= top + VR - 1) return;
   // PAGES (owner, 3 Nov: "moving the cursor below the screen break should page the screen down"): just past the bottom, the
   // cursor's row becomes the first one shown; just past the top, the last
@@ -35783,12 +35806,12 @@ function apFocus(f, sync){
 // stays. True when the phrase changed.
 function apFollow(){
   const k = apKey(); if (k === apLastKey) return false; apLastKey = k;
-  if (apPin) return false;
   // Beside another screen that screen follows: FX its track's effects, Mixer its track (FOCUS TRACK, 24 Oct: on an empty
   // block and the master column too; they used to wait for a block with a phrase), Inst the block's instrument.
   const t = cs.song.x, hm = apHost === 'fx' || apHost === 'mod' || apHost === 'mixer';
   if (apHost === 'fx' || apHost === 'mod') cFxT = t === MT ? NT : Math.min(t, ntr() - 1);
   else if (apHost === 'mixer'){ if (t === MT) cs.mixer.y = 7; else { cs.mixer.x = Math.min(t, ntr() - 1); if (cs.mixer.y === 7) cs.mixer.y = 0; } }
+  if (apPin) return hm;   /* MIXER FOLLOWS ARRANGE (build 609): PIN keeps the phrase only; FX and the Mixer above still follow the song cursor's track */
   const r = S.song[cs.song.y], cid = r ? r[cs.song.x] : -1, p = cid >= 0 ? firstPhrase(cid) : -1;
   if (cid < 0 && tv === 'phrase' && !pvActive() && t !== MT && !isBusT(t)){ cTrack = t; phraseToCursor(); return true; }   // (9 Nov, owner: a generated line and notes went into the last phrase, not this empty block)
   if (p < 0 || (p === cPhrase && cTrack === cs.song.x)) return hm;
