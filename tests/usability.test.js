@@ -313,7 +313,7 @@ test('one rule for value controls (3 Nov): faders, strip, FX bar and pump drag r
   assert.match(src, /D\.vx = clamp\(D\.vx \+ \(e\.clientX - D\.lx\) \* dragMul\(e\)/, 'OUT bar: dragMul each move');
   assert.match(src, /base = clamp\(base \+ \(from - ev\.clientY\) \/ h \* 255 \* dragMul\(ev\), 0, 255\); from = ev\.clientY;/, 'strip fader');
   assert.match(src, /x = clamp\(x \+ \(ly - ev\.clientY\) \/ per \* dragMul\(ev\), q\.min, q\.max\); ly = ev\.clientY;/, 'FX bar values');
-  assert.match(src, /out\.addEventListener\('dblclick', e => \{ e\.stopPropagation\(\); reset\(\); \}\);/, 'a slider readout double-click resets');
+  assert.match(src, /const dbl = e => \{ e\.stopPropagation\(\); if \(two\(\)\) reset\(\); else typeBox\(\); \};/, 'a Synth slider double-click types a value since 14 Nov (reset: Alt-click, right-click menu; tests/synth-slider-entry.test.js)');
   assert.match(src, /valMenu\(e, q\.l, \{reset:\(\) => set\(q\.d\), type:typeIt, lfo:[^}]*\}\)/, 'FX bar menu (and its Add LFO…)');
   assert.match(src, /const wheelOk = r => !!r && \(r\.hasAttribute\('data-wheel'\)/, 'data-wheel controls take the wheel after the rest');
   const k = H.read('pump/ui/kit.js');
