@@ -61,13 +61,16 @@ export async function session(projText, opts = {}) {
       window.__rec = n; window.__recBlocks = []; n.port.onmessage = e => { window.__recGot = e.data; };
       await new Promise(r => setTimeout(r, 400));
       window.__w0 = Date.now(); window.__c0 = ctx.currentTime;
+      if (!rt.pl.__wrapped) { const o = rt.pl.coreTake; rt.pl.coreTake = e => { if (e.type === 'note') { (window.__nl = window.__nl || []).push(e.t); if (!window.__n0) window.__n0 = {t: e.t, track: e.track}; } return o(e); }; rt.pl.__wrapped = true; }
+      window.__n0 = null; window.__nl = [];
       tStart('song', {row:${row}});
       for (let i = 0; i < 600 && !(tp.on && tp.core); i++) await new Promise(r => setTimeout(r, 5));
       window.__t0 = tp.t0; window.__ct = ctx.currentTime;
+      await new Promise(r => setTimeout(r, 700)); const B = fxcTL.beats.slice(); window.__beat0 = B.length ? B.reduce((m, x) => (x[1] < m[1] ? x : m)) : null; window.__beats = B.slice(0, 4);   // audio time of the song's first beat: the reliable start (tp.t0 is not, 40-150 ms off)
       return 'ok';`);
     if (ok !== 'ok') throw new Error(ok);
     await page.waitForTimeout(secs * 1000 + 800);
-    const st = await run(`return {on: tp.on, core: tp.core, t0: window.__t0, ct0: window.__ct, t0now: tp.t0, sr: ctx.sampleRate, wall: (Date.now()-window.__w0)/1000, clk: ctx.currentTime-window.__c0, late: PB.late, drop: PB.drop, skips: PB.skips, ps: ctx.playbackStats ? JSON.stringify(ctx.playbackStats.toJSON ? ctx.playbackStats.toJSON() : {}) : ''}`);
+    const st = await run(`return {on: tp.on, core: tp.core, beat0: window.__beat0, n0: window.__n0, nl: window.__nl, beats: window.__beats, t0: window.__t0, ct0: window.__ct, t0now: tp.t0, sr: ctx.sampleRate, wall: (Date.now()-window.__w0)/1000, clk: ctx.currentTime-window.__c0, late: PB.late, drop: PB.drop, skips: PB.skips, ps: ctx.playbackStats ? JSON.stringify(ctx.playbackStats.toJSON ? ctx.playbackStats.toJSON() : {}) : ''}`);
     await run(`tStop(); return 1;`);
     // fetch the recording in pieces
     const got = await run(`window.__recGot = null; __rec.port.postMessage('get'); for (let i = 0; i < 200 && !window.__recGot; i++) await new Promise(r => setTimeout(r, 50));
@@ -75,7 +78,7 @@ export async function session(projText, opts = {}) {
       let s = '', u = new Uint8Array(o.buffer); for (let i = 0; i < u.length; i += 32768) s += String.fromCharCode.apply(null, u.subarray(i, i + 32768));
       return {f0: g.f0, n: tot/2, b: btoa(s)};`);
     if (!got) throw new Error('no recording');
-    return { st, f0: got.f0, n: got.n, k0: Math.round(window_t0(st) * st.sr) - got.f0, data: new Float32Array(Buffer.from(got.b, 'base64').buffer.slice(0)) };
+    return { st, f0: got.f0, n: got.n, k0: Math.round(window_t0(st) * st.sr) - got.f0, kn: st.n0 ? Math.round(st.n0.t * st.sr) - got.f0 : null, kb: st.beat0 ? Math.round(st.beat0[0] * st.sr) - got.f0 : null, data: new Float32Array(Buffer.from(got.b, 'base64').buffer.slice(0)) };
   };
   S.close = () => A.close();
   return S;
