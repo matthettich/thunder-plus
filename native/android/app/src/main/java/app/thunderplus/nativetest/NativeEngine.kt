@@ -14,4 +14,7 @@ object NativeEngine {
     external fun nativePutBytes(id: Int, meta: String, bytes: ByteArray, off: Int, len: Int): Boolean
     external fun nativePutInfo(id: Int): String?
     external fun nativeInfo(): String
+    /** A5's clock-drift logger: reset (done by the audio thread at its next callback) and a JSON snapshot. */
+    external fun nativeRtReset()
+    external fun nativeRtSnapshot(): String
 }

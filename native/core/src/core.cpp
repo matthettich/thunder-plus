@@ -83,7 +83,7 @@ thunder_core* thunder_create(int sample_rate, int max_block) {
   return c;
 }
 
-// F-REVIEW (A3): this is the audio callback's only entry into the core. Check: no allocation (the vectors are only
+// Reviewed by the lead, 15 Nov. The audio callback's only entry into the core. Checked: no allocation (the vectors are only
 // read; click.data() is stable), no locks (the rings are SPSC atomics), no I/O, no unbounded loops (the voice pool is
 // fixed; the step loop runs at most once per frame), steady_clock::now() is a vDSO read.
 void thunder_process(thunder_core* c, float* out_l, float* out_r, int frames) {

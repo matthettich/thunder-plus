@@ -33,15 +33,43 @@ import androidx.webkit.WebViewCompat
 class MainActivity : Activity() {
     private lateinit var webView: WebView
     private lateinit var bridge: Bridge
-    private lateinit var status: TextView
     private val ui = Handler(Looper.getMainLooper())
     private val base = "https://appassets.androidplatform.net/"
+
+    private lateinit var verdict: TextView
+    private lateinit var readout: TextView
+    private lateinit var runLines: TextView
+    private lateinit var resultsBox: TextView
+    private val green = Color.rgb(40, 200, 90)
+    private val red = Color.rgb(235, 60, 60)
+
+    private fun mmss(s: Double): String { val t = s.toInt(); return String.format(java.util.Locale.US, "%d:%02d", t / 60, t % 60) }
 
     private val refresh = object : Runnable {
         override fun run() {
             val running = ThunderHost.isRunning
-            val head = if (running) "RUNNING  sr ${ThunderHost.sampleRate}  ${NativeEngine.nativeInfo()}" else "stopped"
-            status.text = head + "\n" + ThunderHost.clock.lastTen()
+            val rt = Rt.now()
+            val active = ThunderHost.activeRun
+            val done = ThunderHost.lastFinished?.let { ThunderHost.results[it] }
+            // the big line: a finished run's verdict stays until the next run or RESET
+            if (active != null) {
+                val live = !rt.pending && rt.elapsedS >= 2
+                verdict.setTextColor(if (!live) Color.WHITE else if (rt.pass) green else red)
+                verdict.text = "RUNNING $active  ${mmss(if (rt.pending) 0.0 else rt.elapsedS)} / ${mmss(ThunderHost.RUN_SECONDS.toDouble())}" + if (live) (if (rt.pass) "  (so far OK)" else "  (so far FAIL)") else ""
+            } else if (done != null) {
+                verdict.setTextColor(if (done.pass) green else red)
+                verdict.text = "${done.label}: ${if (done.pass) "PASS" else "FAIL"}"
+            } else {
+                verdict.setTextColor(Color.WHITE)
+                verdict.text = if (running) "PLAYING (free run)" else "ready"
+            }
+            val shown = done?.numbers ?: if (!rt.pending && rt.frames > 0) rt.numbers() else "-"
+            readout.text = shown + "\ncross-check (core clock events): " + (done?.crossCheck ?: ThunderHost.clock.lastLine()) +
+                (if (running) "\naudio: sr ${ThunderHost.sampleRate}  ${NativeEngine.nativeInfo()}" else "")
+            runLines.text = ThunderHost.RUN_LABELS.joinToString("\n") { l ->
+                val r = ThunderHost.results[l]
+                "$l: " + (if (r == null) (if (l == active) "running" else "not run yet") else (if (r.pass) "PASS" else "FAIL"))
+            }
             ui.postDelayed(this, 500)
         }
     }
@@ -84,29 +112,46 @@ class MainActivity : Activity() {
     }
 
     private fun buildOverlay(): View {
-        val col = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setBackgroundColor(Color.argb(210, 0, 0, 0)); setPadding(8, 4, 8, 4) }
-        val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
-        row.addView(btn("Play") { if (!ThunderHost.command(this, "{\"t\":\"play\"}")) Toast.makeText(this, "Audio did not start", Toast.LENGTH_LONG).show() })
-        row.addView(btn("Stop") { ThunderHost.command(this, "{\"t\":\"stop\"}") })
-        row.addView(btn("Copy") { copyLog() })
-        row.addView(btn("Bridge test") { webView.loadUrl(base + "bridge-test.html") })
-        row.addView(btn("App") { webView.loadUrl(base + "index.html") })
-        status = TextView(this).apply { setTextColor(Color.WHITE); typeface = Typeface.MONOSPACE; setTextSize(TypedValue.COMPLEX_UNIT_SP, 9f); text = "stopped" }
-        row.addView(btn("Hide") { status.visibility = if (status.visibility == View.VISIBLE) View.GONE else View.VISIBLE })
-        col.addView(row)
-        col.addView(status)
+        val col = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setBackgroundColor(Color.argb(235, 0, 0, 0)); setPadding(8, 4, 8, 4) }
+        fun row(vararg v: View) = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; v.forEach { addView(it) } }
+        val runRow = row(*ThunderHost.RUN_LABELS.map { l ->
+            btn("$l 5 min") { if (!ThunderHost.startRun(this, l)) Toast.makeText(this, "Audio did not start", Toast.LENGTH_LONG).show() }
+        }.toTypedArray())
+        val ctlRow = row(
+            btn("RESET") { ThunderHost.resetRun(this); resultsBox.text = "" },
+            btn("COPY RESULTS") { copyResults() },
+            btn("Bridge test") { webView.loadUrl(base + "bridge-test.html") },
+            btn("App") { webView.loadUrl(base + "index.html") },
+            btn("Hide") { val v = if (readout.visibility == View.VISIBLE) View.GONE else View.VISIBLE; readout.visibility = v; runLines.visibility = v; resultsBox.visibility = if (v == View.GONE) View.GONE else resultsBox.visibility })
+        verdict = TextView(this).apply { setTextColor(Color.WHITE); setTextSize(TypedValue.COMPLEX_UNIT_SP, 26f); typeface = Typeface.DEFAULT_BOLD; text = "ready" }
+        readout = TextView(this).apply { setTextColor(Color.WHITE); typeface = Typeface.MONOSPACE; setTextSize(TypedValue.COMPLEX_UNIT_SP, 10f) }
+        runLines = TextView(this).apply { setTextColor(Color.LTGRAY); typeface = Typeface.MONOSPACE; setTextSize(TypedValue.COMPLEX_UNIT_SP, 11f) }
+        resultsBox = TextView(this).apply { setTextColor(Color.YELLOW); typeface = Typeface.MONOSPACE; setTextSize(TypedValue.COMPLEX_UNIT_SP, 9f); setTextIsSelectable(true); visibility = View.GONE }
+        col.addView(verdict); col.addView(readout); col.addView(runLines); col.addView(runRow); col.addView(ctlRow)
+        col.addView(android.widget.ScrollView(this).apply { addView(resultsBox); layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, (120 * resources.displayMetrics.density).toInt()) })
         return col
     }
 
-    private fun copyLog() {
+    /** All three runs as text: on the clipboard, and in the selectable box under the buttons in case the clipboard is refused. */
+    private fun copyResults() {
         val wv = WebViewCompat.getCurrentWebViewPackage(this)
-        val text = "Thunder Plus native N0 clock log\n" +
-            "device: ${Build.MANUFACTURER} ${Build.MODEL}, Android ${Build.VERSION.RELEASE} (API ${Build.VERSION.SDK_INT}), WebView ${wv?.versionName}\n" +
-            "audio: sr ${ThunderHost.sampleRate}  ${NativeEngine.nativeInfo()}\n" +
-            "ratio = audio seconds / wall seconds, cumulative from the first second. PASS = 1.000 +-0.001 and 'after 1s' = 0.\n" +
-            ThunderHost.clock.everything()
-        (getSystemService(CLIPBOARD_SERVICE) as ClipboardManager).setPrimaryClip(ClipData.newPlainText("clock log", text))
-        Toast.makeText(this, "Copied " + ThunderHost.clock.everything().lines().size + " lines", Toast.LENGTH_SHORT).show()
+        val sb = StringBuilder("Thunder Plus native N0: clock test results\n")
+        sb.append("device: ${Build.MANUFACTURER} ${Build.MODEL}, Android ${Build.VERSION.RELEASE} (API ${Build.VERSION.SDK_INT}), WebView ${wv?.versionName}\n")
+        sb.append("audio: sr ${ThunderHost.sampleRate}  ${NativeEngine.nativeInfo()}\n")
+        sb.append("PASS = ratio within +-1000 ppm (1.0000 +- 0.001 s per second), 0 underruns, 0 late callbacks; the first second of each run is left out.\n")
+        for (l in ThunderHost.RUN_LABELS) {
+            val r = ThunderHost.results[l]
+            sb.append("\n$l 5 min: ").append(if (r == null) "NOT RUN" else if (r.pass) "PASS" else "FAIL").append('\n')
+            if (r != null) sb.append("  ").append(r.numbers).append("\n  cross-check (core clock events): ").append(r.crossCheck).append('\n')
+        }
+        val text = sb.toString()
+        resultsBox.text = text; resultsBox.visibility = View.VISIBLE
+        try {
+            (getSystemService(CLIPBOARD_SERVICE) as ClipboardManager).setPrimaryClip(ClipData.newPlainText("N0 results", text))
+            Toast.makeText(this, "Copied. The same text is in the yellow box below.", Toast.LENGTH_LONG).show()
+        } catch (e: Exception) {
+            Toast.makeText(this, "The clipboard refused: select the yellow text and copy it by hand.", Toast.LENGTH_LONG).show()
+        }
     }
 
     override fun onResume() { super.onResume(); ui.post(refresh) }

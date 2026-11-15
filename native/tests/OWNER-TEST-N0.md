@@ -12,40 +12,55 @@ It is a separate test app: it does not touch Thunder Plus on your phone, or your
 3. When it finishes, tap **Open**. Android asks once to **allow Chrome to install apps**: tap Settings, switch it on, go
    back, tap **Install**. If Play Protect asks, tap **More details**, then **Install anyway**.
 4. Open **Thunder Plus (native TEST)**. Say Allow to notifications when asked (needed so the playing notice can show).
-5. You see the normal Thunder Plus page with a dark strip at the bottom: **Play, Stop, Copy, Bridge test, App, Hide**.
-   The page may look as usual; it is the real app. You do not need to use it.
+5. You see the normal Thunder Plus page with a dark panel at the bottom. You do not need to use the page. The panel has:
+   a big word at the top (`ready`, then `RUNNING ...`, then `PASS` or `FAIL`), a few lines of numbers, three lines
+   `SCREEN ON / SCREEN OFF / BACKGROUND: not run yet`, three run buttons, and the buttons RESET, COPY RESULTS,
+   Bridge test, App and Hide. Hide folds the numbers away; tap it again to bring them back.
 
 ## 2. The three 5-minute runs
 
-Use headphones or the phone speaker, at a volume you can hear. A click should repeat steadily, like a metronome
-(120 beats a minute: four loud clicks, with softer ones between).
+Use headphones or the phone speaker, at a volume you can hear. You should hear a steady click like a metronome (four loud
+clicks with softer ones between). Each run starts itself at zero, plays for exactly 5 minutes and then stops by itself,
+with the answer left on the screen. The 5 minutes are counted from the sound itself, so the screen being off cannot
+throw the timer off. Do the runs in any order; each button only changes its own line.
 
-**Run 1: screen on.** Tap **Play**. The strip shows `RUNNING` and, once a second, a line like
-`  64s  audio 64.000s  wall 64.001s  ratio 1.00000  outLat 12.3ms  under 0 (after 1s: 0)`. Leave the phone alone with the
-screen on for 5 minutes (it may dim: that is fine; tap it if it locks). Listen: is the click steady, any gaps, any rush?
-At 5 minutes tap **Copy**, then **Stop**.
+**Run 1: tap SCREEN ON 5 min.** The big word turns to `RUNNING SCREEN ON 0:12 / 5:00` and the sound starts. Leave the
+phone alone with the screen on (it may dim: tap it if it locks). After 5:00 the sound stops and the big word says
+`SCREEN ON: PASS` (green) or `SCREEN ON: FAIL` (red).
 
-**Run 2: screen off.** Tap **Play**. Press the power button so the screen goes dark. Wait 5 minutes (a timer helps).
-Listen: does the click carry on with no gaps? Press the power button, unlock, tap **Copy**, then **Stop**.
+**Run 2: tap SCREEN OFF 5 min.** Press the power button so the screen goes dark. Wait 5 minutes plus 20 seconds, then
+press the power button and unlock. The sound will have stopped on its own, and `SCREEN OFF: PASS` or `FAIL` is on the
+screen. Listen while it plays: the click must carry on with no gaps.
 
-**Run 3: in the background.** Tap **Play**. Press Home and open another app (YouTube muted, Messages, anything) and use it for
-5 minutes. A "Thunder Plus (native test) Playing" notice should stay in the notification shade. Come back to the test
-app, tap **Copy**, then **Stop**.
+**Run 3: tap BACKGROUND 5 min.** Press Home and use another app (Messages, a browser, anything) for 5 minutes plus 20
+seconds. A "Thunder Plus (native test) Playing" notice stays in the notification shade. Come back to the test app: the
+verdict is there. (You can tap the notice's Stop once, in any run, to check it works; that run is then thrown away and you
+redo it.)
 
-## 3. Send me the numbers
+If you mess a run up (a phone call, you pressed the wrong button), tap **RESET** and start that run again.
 
-After each run, paste what **Copy** put on the clipboard into the chat with me (long-press in the message box, Paste).
-That is three pastes. Add, in your own words, for each run: "steady", or "gaps / rushing" and roughly when.
-Also tell me if the Stop button in the notification works (tap it during a run once).
+## 3. What the numbers mean (what PASS is)
 
-## What counts as a pass
+The line under the big word reads like `ratio 1.0000 s per second (+12 ppm)  underruns 0  late callbacks 0  longest gap 21.3 ms
+longest callback 0.40 ms  output latency 14.2 ms`.
 
-- Every line's **ratio** reads `1.000` (between 0.999 and 1.001) in all three runs.
-- **after 1s** reads `0` (no dropouts after the first second) in all three runs.
-- By ear: no gaps, no rushing.
-- `outLat` (the output delay in milliseconds) is just recorded: I do not need it to be any particular number.
+- **ratio**: how many seconds of sound the phone made per real second. It must be 1.0000, give or take 0.001 (the same
+  as within 1000 ppm). The first second of each run is left out.
+- **underruns**: must be 0. **late callbacks**: must be 0 (a late callback is the engine taking longer than the sound it made).
+- **longest gap** and **longest callback**: just recorded; a gap of 100 ms or more is a stutter you would also hear.
+- **output latency**: just recorded.
+- Below that, a line "cross-check (core clock events)" is a second, independent count; ignore it unless the two disagree.
 
-If a run fails, do not retry it ten times: send the paste as it is. A fail is a useful answer.
+PASS needs the ratio, the underruns and the late callbacks all inside those limits. Also tell me by ear for each run:
+"steady", or "gaps / rushing" and roughly when.
+
+## 4. Send me the results
+
+After all three runs, tap **COPY RESULTS**. The text of all three runs goes to the clipboard (and also appears in a
+yellow box under the buttons, in case the clipboard refuses: then long-press the yellow text, Select all, Copy).
+Paste it into the chat with me (long-press the message box, Paste), and add your by-ear notes. If a run fails, do not
+retry it ten times: send the text as it is. A fail is a useful answer. If only some runs are done, COPY RESULTS still
+works and says "NOT RUN" for the others.
 
 ## Optional, only if you feel like it (about 10 minutes more): the bridge test
 

@@ -20,11 +20,48 @@ object ThunderHost {
     private var poller: Thread? = null
     private val main = Handler(Looper.getMainLooper())
 
+    // ---- the owner's three 5-minute runs (A6) -------------------------------------------------------------------------
+    const val RUN_SECONDS = 300
+    val RUN_LABELS = listOf("SCREEN ON", "SCREEN OFF", "BACKGROUND")
+    val results = java.util.concurrent.ConcurrentHashMap<String, RunResult>()
+    @Volatile var activeRun: String? = null
+        private set
+    @Volatile var lastFinished: String? = null
+        private set
+    @Volatile private var appCtx: Context? = null
+    private var lastRtPush = 0L
+
+    /** Resets the logger and the clock cross-check, starts the pattern and times 5 minutes by AUDIO FRAMES (so a locked screen cannot stop the timer). */
+    fun startRun(ctx: Context, label: String): Boolean {
+        if (!ensureRunning(ctx)) return false
+        NativeEngine.nativeRtReset(); clock.reset()
+        activeRun = label; results.remove(label); lastFinished = null
+        NativeEngine.nativePost("{\"t\":\"play\"}")
+        return true
+    }
+
+    /** RESET: ends the current run without keeping it, stops the sound, clears the logger. */
+    fun resetRun(ctx: Context) {
+        activeRun = null; lastFinished = null
+        if (running) command(ctx, "{\"t\":\"stop\"}")
+        NativeEngine.nativeRtReset(); clock.reset()
+    }
+
+    private fun checkRun() {
+        val label = activeRun ?: return
+        val rt = Rt.now()
+        if (rt.pending || rt.elapsedS < RUN_SECONDS) return
+        results[label] = RunResult(label, rt.pass, rt.numbers(), clock.lastLine())
+        lastFinished = label; activeRun = null
+        appCtx?.let { c -> main.post { command(c, "{\"t\":\"stop\"}") } }
+    }
+
     @Synchronized fun ensureRunning(ctx: Context): Boolean {
         if (running) return true
         val sr = NativeEngine.nativeStart()
         if (sr <= 0) return false
         sampleRate = sr
+        appCtx = ctx.applicationContext
         running = true
         clock.reset()
         poller = Thread({ pollLoop() }, "thunder-poller").also { it.start() }
@@ -40,6 +77,13 @@ object ThunderHost {
                 any = true
                 clock.onEvent(s)
                 for (l in listeners) l(s)
+            }
+            val now = System.nanoTime()
+            if (now - lastRtPush > 250_000_000L) {
+                lastRtPush = now
+                checkRun()
+                val snap = NativeEngine.nativeRtSnapshot()
+                if (snap.isNotEmpty()) { val ev = snap.replaceFirst("{", "{\"t\":\"rtlog\","); for (l in listeners) l(ev) }   // the bridge's view of the logger
             }
             if (!any) try { Thread.sleep(5) } catch (e: InterruptedException) { }
         }

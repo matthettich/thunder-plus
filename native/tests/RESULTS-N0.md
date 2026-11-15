@@ -81,8 +81,7 @@ to show small shell bugs.
 What was built (all under `native/`): `core/` (the C API of WORKPLAN section 10, plus `thunder_put_info` and
 `thunder_host_stats`, both additions for N0), `android/` (Kotlin: `MainActivity` with the overlay, `ThunderHost`,
 `ThunderService` of type mediaPlayback, `Bridge`, `MimeAssets`; JNI + miniaudio in `app/src/main/cpp/`).
-Marked `// F-REVIEW` for the lead: the audio callback `dataCallback` in `native/android/app/src/main/cpp/jni.cpp`, and
-`thunder_process` in `native/core/src/core.cpp`.
+The audio callback (`dataCallback` in `jni.cpp`) and `thunder_process` were reviewed and accepted by the lead on 15 Nov.
 
 ## A4. Bridge transport proof: code is in, the timed numbers are the owner's device
 
@@ -108,11 +107,27 @@ Not done and why: path (b) as the plan words it, "a `WebViewAssetLoader` POST ha
 `addWebMessageListener` with base64 strings (about 33 % more bytes, plus encode / decode time), which the plan names as the
 alternative. Fable picks the path and updates CORE-BRIDGE sections 2 and 6 once the numbers are in.
 
-## Stand-ins the lead replaces
+## A5. Real-time harness and clock logger (written by the lead)
 
-- The `clock` events come from a small stand-in in the test core (`thunder_process`, "ten a second") with the host's output
-  latency and underrun count passed in by `thunder_host_stats`. A5's clock logger replaces both. Output latency is an
-  estimate from AAudio's frame timestamp (`jni.cpp` `probeLoop`); underruns are AAudio's own `getXRunCount`, read through
-  `dlsym` on the stream pointer inside miniaudio's device (a read of miniaudio's internal field `aaudio.pStreamPlayback`,
-  fine while the vendored header is pinned at 0.11.26).
-- The overlay's ratio is cumulative from the first second (a one-second window is too jittery for the plan's +-0.1 %).
+Done: `native/core/include/thunder/rtlog.h` (the logger), `native/tests/rt_harness.cpp` (ctest `rt_core`,
+`rt_guard_selftest`). CI: green on Linux, macOS and Windows (the self-test is skipped on Windows, which has no `fork`; the
+wasm job builds no tests). Fixed on the way: clang elided the self-test's deliberate `new` / `delete`, so the self-test now
+calls `operator new` / `operator delete` directly (the check is not weakened: the child must still die by SIGABRT).
+The Android callback now runs the logger (`rtlog_begin` / `rtlog_end` around `thunder_process`, flush-to-zero set on
+arm64 through FPCR.FZ at the top of every callback), the AAudio xrun count feeds `rtlog_host_underruns`, and the
+debug overlay's readout and PASS / FAIL come from it. **Where the owner's numbers go (A6), one block per run, pasted from
+COPY RESULTS:**
+
+| Run (5 min) | ratio (s per s) | ppm | underruns | late | longest gap ms | longest callback ms | output latency ms | by ear | PASS |
+|---|---|---|---|---|---|---|---|---|---|
+| SCREEN ON | owner's device | | | | | | | | |
+| SCREEN OFF | owner's device | | | | | | | | |
+| BACKGROUND | owner's device | | | | | | | | |
+
+## Stand-ins
+
+- The core's own `clock` events stay as an independent cross-check (the overlay shows one line from them; they are not
+  the readout). Their output latency is an estimate from AAudio's frame timestamp (`jni.cpp` `probeLoop`); the logger's
+  underruns are AAudio's own `getXRunCount`, read through `dlsym` on the stream pointer inside miniaudio's device (a read
+  of miniaudio's internal field `aaudio.pStreamPlayback`, fine while the vendored header is pinned at 0.11.26).
+- (Removed: the old note that the overlay ratio was cumulative from the first second: the logger now owns that.)

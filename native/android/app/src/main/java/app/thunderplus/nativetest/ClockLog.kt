@@ -39,6 +39,7 @@ class ClockLog {
         last.addLast(line); while (last.size > 10) last.removeFirst()
     }
 
+    @Synchronized fun lastLine(): String = if (last.isEmpty()) "(none)" else last.last()
     @Synchronized fun lastTen(): String = last.joinToString("\n")
     @Synchronized fun everything(): String = all.joinToString("\n")
 }

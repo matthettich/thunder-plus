@@ -11,6 +11,10 @@
 
 #include "miniaudio.h"
 #include "thunder/core.h"
+#include "thunder/rtlog.h"
+#if defined(__x86_64__)
+#include <xmmintrin.h>
+#endif
 
 #define LOG_TAG "ThunderCore"
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__)
@@ -28,15 +32,33 @@ struct Engine {
   std::thread probe;
   char info[256] = {0};
   std::atomic<bool> infoReady{false};
+  std::atomic<bool> resetReq{false};      // the callback performs rtlog_reset (the logger is written by the audio thread only)
+  std::atomic<int> xrunLast{0}, xrunBase{0}, latFrames{0};
 };
 Engine g;
+rtlog g_rt;   // A5's clock-drift logger (native/core/include/thunder/rtlog.h)
 
-// F-REVIEW (A3): THE AUDIO CALLBACK. It must do nothing but call thunder_process and interleave. Check: no allocation
-// (scratch is in the Engine, fixed size), no locks, no logging, no JNI. A block larger than kMaxBlock is rendered in
-// pieces. thunder_process itself is reviewed in native/core/src/core.cpp.
+inline int64_t monoNs() { timespec t; clock_gettime(CLOCK_MONOTONIC, &t); return (int64_t)t.tv_sec * 1000000000LL + t.tv_nsec; }
+
+// Denormals: on arm64 FPCR.FZ (bit 24) flushes denormal inputs and results to zero for this thread; x86_64 gets FTZ + DAZ.
+// Set at the top of every callback (the audio thread is AAudio's, not ours, and this is cheap). Does not affect other threads.
+inline void setFlushToZero() {
+#if defined(__aarch64__)
+  uint64_t fpcr; asm volatile("mrs %0, fpcr" : "=r"(fpcr)); fpcr |= (1ull << 24); asm volatile("msr fpcr, %0" : : "r"(fpcr));
+#elif defined(__x86_64__)
+  _mm_setcsr(_mm_getcsr() | 0x8040);
+#endif
+}
+
+// THE AUDIO CALLBACK (reviewed by the lead, 15 Nov). Only: flush-to-zero, the logger's begin / end, thunder_process, interleave.
+// No allocation (scratch is in the Engine, fixed size), no locks, no logging, no JNI. A block larger than kMaxBlock is
+// rendered in pieces.
 void dataCallback(ma_device* dev, void* out, const void* /*in*/, ma_uint32 frames) {
   Engine* e = static_cast<Engine*>(dev->pUserData);
   float* o = static_cast<float*>(out);
+  setFlushToZero();
+  if (e->resetReq.load(std::memory_order_acquire)) { rtlog_reset(&g_rt, (int)dev->sampleRate); e->resetReq.store(false, std::memory_order_release); }
+  rtlog_begin(&g_rt, monoNs());
   ma_uint32 done = 0;
   while (done < frames) {
     ma_uint32 n = frames - done;
@@ -48,6 +70,7 @@ void dataCallback(ma_device* dev, void* out, const void* /*in*/, ma_uint32 frame
     }
     done += n;
   }
+  rtlog_end(&g_rt, monoNs(), (int)frames);
 }
 
 // AAudio's own counters (not exposed by miniaudio): the stream pointer is miniaudio's, the functions come from libaaudio.
@@ -71,6 +94,8 @@ void probeLoop() {
     if (stream && g.core) {
       int under = xrun ? xrun(stream) : 0;
       if (under < 0) under = 0;
+      g.xrunLast = under;
+      rtlog_host_underruns(&g_rt, under - g.xrunBase.load());
       int latFrames = 0;
       int64_t pos = 0, tns = 0;
       if (ts && written && ts(stream, CLOCK_MONOTONIC, &pos, &tns) == 0) {
@@ -81,6 +106,7 @@ void probeLoop() {
         double lat = (double)written(stream) - presented;
         if (lat > 0 && lat < g.device.sampleRate) latFrames = (int)lat;
       }
+      g.latFrames = latFrames;
       thunder_host_stats(g.core, latFrames, under);
       if (!infoDone && burst && bufsz) {
         std::snprintf(g.info, sizeof g.info, "sr=%u burstFrames=%d bufferFrames=%d sharing=%d (0 exclusive, 1 shared) perfMode=%d (12 low latency)", g.device.sampleRate,
@@ -112,6 +138,8 @@ JNIEXPORT jint JNICALL Java_app_thunderplus_nativetest_NativeEngine_nativeStart(
   g.core = thunder_create((int)g.device.sampleRate, kMaxBlock);
   if (!g.core) { ma_device_uninit(&g.device); g.deviceInit = false; return -1; }
   g.infoReady = false;
+  rtlog_reset(&g_rt, (int)g.device.sampleRate);
+  g.resetReq = false; g.xrunBase = 0; g.xrunLast = 0; g.latFrames = 0;
   g.probeRun = true;
   g.probe = std::thread(probeLoop);
   if (ma_device_start(&g.device) != MA_SUCCESS) {
@@ -163,6 +191,28 @@ JNIEXPORT jstring JNICALL Java_app_thunderplus_nativetest_NativeEngine_nativePut
   int64_t count = 0; double sum = 0;
   if (!thunder_put_info(g.core, id, &count, &sum)) return nullptr;
   char b[96]; std::snprintf(b, sizeof b, "%lld,%.17g", (long long)count, sum);
+  return env->NewStringUTF(b);
+}
+
+JNIEXPORT void JNICALL Java_app_thunderplus_nativetest_NativeEngine_nativeRtReset(JNIEnv*, jobject) {
+  g.xrunBase = g.xrunLast.load();
+  if (g.deviceInit) g.resetReq.store(true, std::memory_order_release);   // the callback does it; a stopped engine is reset at its next start
+  else { rtlog_reset(&g_rt, g_rt.sample_rate ? g_rt.sample_rate : 48000); }
+}
+
+JNIEXPORT jstring JNICALL Java_app_thunderplus_nativetest_NativeEngine_nativeRtSnapshot(JNIEnv* env, jobject) {
+  char b[400];
+  if (g.resetReq.load(std::memory_order_acquire)) {
+    std::snprintf(b, sizeof b, "{\"pending\":1,\"sr\":%d}", g_rt.sample_rate);
+    return env->NewStringUTF(b);
+  }
+  rtlog_snapshot sn = rtlog_read(&g_rt);
+  const int sr = g_rt.sample_rate;
+  std::snprintf(b, sizeof b,
+    "{\"pending\":0,\"sr\":%d,\"frames\":%lld,\"calls\":%lld,\"late\":%lld,\"under\":%lld,\"audioS\":%.6f,\"wallS\":%.6f,"
+    "\"ratioPpm\":%.2f,\"maxGapMs\":%.3f,\"maxWorkMs\":%.3f,\"pass\":%d,\"outLatMs\":%.2f}",
+    sr, (long long)sn.frames, (long long)sn.calls, (long long)sn.late, (long long)sn.underruns, sn.audio_s, sn.wall_s,
+    sn.ratio_ppm, sn.max_gap_ms, sn.max_work_ms, sn.pass, sr > 0 ? g.latFrames.load() * 1000.0 / sr : 0.0);
   return env->NewStringUTF(b);
 }
 
