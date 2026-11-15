@@ -45,7 +45,9 @@ struct Fnv { uint64_t h = 0xcbf29ce484222325ull;
   void f64(double x) { unsigned char b[8]; std::memcpy(b, &x, 8); for (int i = 0; i < 8; i++) byte(b[i]); }
   void bytes(const std::string& s) { for (unsigned char c : s) byte(c); } };
 
-static std::string readFile(const std::string& p) { std::ifstream f(p, std::ios::binary); std::ostringstream o; o << f.rdbuf(); return o.str(); }
+// A checkout may have CRLF line endings (Windows, autocrlf). JSON cannot hold a raw CR inside a string, so dropping every CR
+// gives the bytes the goldens were made from; whitespace outside strings never reaches the writer's output anyway.
+static std::string readFile(const std::string& p) { std::ifstream f(p, std::ios::binary); std::ostringstream o; o << f.rdbuf(); std::string t = o.str(), u; u.reserve(t.size()); for (char c : t) if (c != '\r') u.push_back(c); return u; }
 
 static void checkSong(const Song& s, const char* what) {
   std::string w = what; auto C = [&](bool ok, const char* m) { if (!ok) { std::printf("FAIL: %s: %s\n", w.c_str(), m); fails++; } };
@@ -153,7 +155,8 @@ static void testMalformed(const std::string& root) {
   { Song s; JsonError e; CHECK(!s.load("[1,2]", 5, &e), "a song that is not an object is refused"); CHECK(!s.load("{\"bpm\":", 7, &e) && e.offset == 7, "a song with broken JSON is refused with the offset"); }
   // truncations of valid files: every prefix of a short one, a stride over the big one, all fail (a prefix of an object or array is never complete)
   const char* small[] = {"tests/golden/master.json", "tests/golden/chains-modules.json", "tests/golden/waves-processor.json"};
-  for (const char* f : small) { std::string t = readFile(root + "/" + f); while (!t.empty() && (t.back() == '\n' || t.back() == ' ')) t.pop_back(); int bad = 0; for (size_t n = 0; n < t.size(); n++) { JsonDoc d; JsonError e; if (d.parse(t.data(), n, &e) || e.offset > n) bad++; } CHECK(bad == 0, "every truncation of a golden fails cleanly"); }
+  for (const char* f : small) { std::string t = readFile(root + "/" + f); while (!t.empty() && (t.back() == '\n' || t.back() == ' ' || t.back() == '\t')) t.pop_back();   // a prefix that only drops trailing whitespace is valid JSON: not a truncation
+    int bad = 0; for (size_t n = 0; n < t.size(); n++) { JsonDoc d; JsonError e; if (d.parse(t.data(), n, &e) || e.offset > n) bad++; } CHECK(bad == 0, "every truncation of a golden fails cleanly"); }
   { const std::string t = readFile(root + "/sounds/ELECTRO.thunder"); int bad = 0, tried = 0; for (size_t n = 0; n < t.size(); n += 1237) { JsonDoc d; JsonError e; tried++; if (d.parse(t.data(), n, &e) || e.offset > n) bad++; Song s; if (s.load(t.data(), n, &e)) bad++; } CHECK(bad == 0 && tried > 600, "truncations of ELECTRO.thunder fail cleanly"); }
   // byte flips: never a crash (a flip may still leave valid JSON)
   { std::string t = readFile(root + "/tests/golden/chains-modules.json"); uint32_t x = 12345; int parsed = 0, failed = 0;
