@@ -24811,7 +24811,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 604;
+const BUILD = 605;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD + (location.pathname.includes('/beta/') ? ' · beta' : '');
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -26970,6 +26970,21 @@ function xposeScope(){
   }
   toast('Transpose works on a phrase, or on blocks on the Song.'); return null;
 }
+/* How many blocks the TRANSP. buttons would act on: Arrange's selection plus picked blocks (the Song screen, or Arrange holding the keys beside Phrase); 0 anywhere else. Filled blocks only, not the master column. */
+function xposeBlocks(){
+  const side = tv !== 'song' && typeof apReady !== 'undefined' && apReady && apF === 'arr';
+  if (tv !== 'song' && !side) return 0;
+  const get = () => selA && selA.v === 'song' ? songCells() : [], cells = (side ? apAsSong(get) : get()).concat(sxPicks.map(q => [q.y, q.t])), seen = new Set();
+  for (const [y, t] of cells) if (t !== MT && S.song[y] && S.song[y][t] >= 0) seen.add(y + ':' + t);
+  return seen.size;
+}
+function xposeTitles(){
+  const n = xposeBlocks();
+  for (const [id, d, w] of [['tXposeDn', 'down', 'Alt+,'], ['tXposeUp', 'up', 'Alt+.']]){ const b = $(id); if (!b) continue;
+    const t = n ? `Transposes the ${n} selected block${n > 1 ? 's\u2019 phrases' : '\u2019s phrases'} ${d} a semitone (${w}). Each phrase moves once; one used by a block outside the selection changes there too.` : `Transpose the selection ${d} a semitone (${w})`;
+    if (b.title === t) continue;   /* (draw() calls this every redraw: write only when it changes) */
+    b.title = t; b.setAttribute('aria-label', n ? `Transpose the ${n} selected block${n > 1 ? 's' : ''} ${d} a semitone` : `Transpose selection ${d} a semitone`); }
+}
 function transposeSel(d, needSel, songOk){
   // songOk (the pad's SEMI keys, 12 Nov): on the Song / Arrange they work without a selection too, on the block under the cursor
   if (needSel && !(selA && selA.v === tv) && !(tv === 'song' && (songOk || sxPicks.length))) return toast(`Select rows first (or ${keyHint('alt+,')} / ${keyHint('alt+.')} for the whole ${tv === 'song' ? 'block' : 'phrase'}).`);
@@ -29092,6 +29107,7 @@ function draw(){
     $('tCmd').hidden = !show; document.body.classList.toggle('cmdv', show && !mini); cmdTips(); }
   const sb = $('tCmd').querySelector('[data-c=song]'); if (sb){ cmdSongSet(sb); sb.classList.toggle('on', tp.on); }
   const onSong = tv === 'song';
+  xposeTitles();
   { const lb = $('tCmd').querySelector('[data-c=lpsel]'), arrK = !!(typeof apReady !== 'undefined' && apReady && apF === 'arr'), vis = onSong || arrK; if (lb){ lb.hidden = !vis; lb.classList.toggle('on', !!lsW && tp.on); } $('tCmd').classList.toggle('lps', vis); }   // LP.SEL: where a song selection can exist (Song, Arrange holding the keys)
   { const seq = ['song', ...(sectsOn ? ['sect'] : []), 'phrase', 'inst', 'mixer', 'fx', 'mod', 'project'];
     const TCV = {song:'#dbe6f8', sect:'#e9e0f8', phrase:'#d8f0e2', inst:'#fbe2d2', mixer:'#f6edc8', fx:'#f8dce8', mod:'#ebdcf6', project:'#d5eef2'};
@@ -33943,8 +33959,9 @@ window.addEventListener('blur', releaseAll);
 $('tRowsDn').addEventListener('click', () => setRows(plen(rowsId()) - 1));
 $('tLoop').addEventListener('click', () => toggleLoopPat());
 $('tLoopSel').addEventListener('click', () => toggleLoop());
-$('tXposeDn').addEventListener('click', () => transposeSel(-1, true));   // (the buttons keep needing a selection: a stray tap shouldn't move a whole phrase)
-$('tXposeUp').addEventListener('click', () => transposeSel(1, true));
+/* (14 Nov, owner: TRANSP. on a selection of blocks with Arrange in focus) apRun turns the keys into the Song screen's while Arrange holds them beside Phrase, so the button acts on Arrange's selection there (selected + picked blocks, each pattern once) as on the Song screen */
+$('tXposeDn').addEventListener('click', () => apRun(transposeSel, [-1, true]));   // (the buttons keep needing a selection: a stray tap shouldn't move a whole phrase)
+$('tXposeUp').addEventListener('click', () => apRun(transposeSel, [1, true]));
 // The strip under the tabs is one line. On a screen too narrow for all of it (the Fold's cover screen in PAD mode:
 // TRANSP + fell off the edge), hide what has a twin elsewhere; measured, so it only happens when it doesn't fit.
 let patMode = null;
@@ -34753,6 +34770,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [605, '14 Nov', ['Arrange beside the Phrase: with Arrange holding the keys and blocks selected, TRANSP. − / + transpose every phrase in the selection, each phrase once, as one undo step (it said “Select rows first”). The buttons’ tips say how many blocks they will move']],
   [604, '14 Nov', ['Synth page sliders: double-click a slider (or its name or value) to type a number: 440, 440 Hz, -6 dB or 35% all work; Enter sets it, Esc cancels. Reset is now Alt-click (or Ctrl/⌘-click, or right-click › Reset to default)', 'Click a slider, then ◀ ▶ nudge it by 1% of its travel (Shift: a tenth of that). Esc lets go of it. The same in …chains and …waves']],
   [603, '14 Nov', ['Renders no longer start late when the master holds switched-off …pump effects (CALM, TONE, MASTER, LIMIT…): a switched-off one still delays the sound, and that delay is now counted. LATENCY COMP lines tracks up with their switched-off …pump effects too']],
   [602, '14 Nov', ['Settings › TRACKS: LFOs, macros, locks, scenes and parts now follow their tracks when the track count changes (LFOs stayed on the old track number and seemed to vanish)', 'ARRANGE ON STOP = PLAYHEAD now also moves the Arrange cursor when the Phrase (or another screen) holds the keys', 'FX screen: right-click › Clear (and CLEAR) empties the effect you clicked, not the last one in the list', 'Bottom FX bar: right-click or long press an effect for Remove effect (Ctrl+Z brings it back)', 'Settings › ANIMATIONS: OFF hides the dancing dogs and the moving effect pictures (also right-click or long press them › Hide animations). Meters, scopes and playheads stay']],
