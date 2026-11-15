@@ -1,5 +1,5 @@
 #!/bin/sh
-# Parity gate. Usage: native/tools/parity.sh u02 [OUTDIR]     (OUTDIR default /tmp/u02-wasm; needs node, python3, git, curl)
+# Parity gate (u03: see parity-u03.sh). Usage: native/tools/parity.sh u02 [OUTDIR]     (OUTDIR default /tmp/u02-wasm; needs node, python3, git, curl)
 # U02 gate: "wasm built from CMake gives identical hashes to today's tfx.wasm on chains-modules.json", i.e. the AUDIO the modules produce.
 # 1. builds tfx.wasm, thunder-dsp.wasm, mods.wasm with CMake + wasi-sdk (build-wasm.sh; canonical link order, so the bytes do not depend on
 #    the machine);
@@ -9,7 +9,8 @@
 # Byte equality with the committed files is printed as INFO only (the committed files came from unpinned upstreams).
 # Exit status 1 if any line is FAIL.
 set -e
-[ "$1" = u02 ] || { echo "usage: parity.sh u02 [OUTDIR]" >&2; exit 2; }
+[ "$1" = u03 ] && exec sh "$(dirname "$0")/parity-u03.sh" "$@"
+[ "$1" = u02 ] || { echo "usage: parity.sh u02|u03 [OUTDIR]" >&2; exit 2; }
 R=$(cd "$(dirname "$0")/../.." && pwd)
 OUT=${2:-/tmp/u02-wasm}
 if [ -z "$PARITY_SKIP_BUILD" ]; then sh "$R/native/tools/build-wasm.sh" "$OUT" >/dev/null; fi
