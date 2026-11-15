@@ -24,7 +24,7 @@ await run(`
 let silent = 0, failed = 0, ok = 0, firstFail = 0; const rows = [];
 for (let i = 1; i <= N; i++) {
   const r = await run(`
-    const keep = wavN; window.__W = null; wavN = function(chs, sr, bits){ let pk = 0; for (const c of chs) for (let k = 0; k < c.length; k++){ const a = Math.abs(c[k]); if (a > pk) pk = a; } window.__W = {pk}; return new Uint8Array(1); };
+    const keep = wavN; window.__W = null; wavN = function(chs, sr, bits){ let pk = 0; for (const c of chs) for (let k = 0; k < c.length; k++){ const a = Math.abs(c[k]); if (a > pk) pk = a; } window.__W = {pk: window.__W ? Math.min(window.__W.pk, pk) : pk}; return new Uint8Array(1); };   /* the QUIETEST file of this render (mix and every stem): one silent stem fails it */
     pickOut = async () => ({dl:true}); writeOut = async () => {};
     const msgs = []; const mo = new MutationObserver(ms => { for (const m of ms) for (const n of m.addedNodes) { const t = (n.textContent || '').trim(); if (/Render failed|couldn/.test(t)) msgs.push(t.slice(0, 160)); } }); mo.observe(document.body, {childList:true, subtree:true});
     try { await renderOut(${STEMS}); } finally { wavN = keep; }

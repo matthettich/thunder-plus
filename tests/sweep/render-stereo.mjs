@@ -63,7 +63,7 @@ for (KIND of ['stereo', 'sine']) {
     rows.push(['render is stereo', st.corr < 0.5 ? 'PASS' : 'FAIL', `L/R correlation ${st.corr} (mono would be 1); rms L ${st.rmsL} R ${st.rmsR}`]);
     rows.push(['render has both channels', st.rmsL > 0.05 && st.rmsR > 0.05 ? 'PASS' : 'FAIL', '']);
     if (LIVE) for (const mode of ['core', 'page']) { const l = await liveIt(mode); if (typeof l === 'string') { rows.push([`live ${mode}`, 'FAIL', l]); continue; } const ls = stat(l); tab['live ' + mode] = ls;
-      rows.push([`live ${mode} is stereo`, ls.corr < 0.5 ? 'PASS' : 'FAIL', `L/R correlation ${ls.corr}`]); }
+      rows.push([`live ${mode} is stereo`, ls.rmsL > 0.01 && ls.rmsR > 0.01 && ls.corr < 0.5 ? 'PASS' : 'FAIL', `L/R correlation ${ls.corr}; rms L ${ls.rmsL} R ${ls.rmsR} (silence is not a pass)`]); }
   } else rows.push(['mono control renders as before', st.corr > 0.999 ? 'PASS' : 'FAIL', `L/R correlation ${st.corr}`]);
 }
 console.log('\nL/R table (render / live):'); for (const [k, v] of Object.entries(tab)) console.log('  ' + k.padEnd(14) + `rms L ${v.rmsL}  rms R ${v.rmsR}  correlation ${v.corr}`);

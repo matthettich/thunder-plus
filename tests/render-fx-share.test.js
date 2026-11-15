@@ -29,6 +29,7 @@ test('source: a render\'s effect nodes ask to share, live nodes do not; a render
   const pass = cut('async function pass(', 'function wavN(');
   assert.ok(/if \(tfxErrAc\.has\(oc\)\) throw new Error\(RENDER_FX_FAIL\)/.test(pass), 'pass() throws when an effect node errored');
   assert.ok(/if \(wantFx && !ok && !NOWK\) throw new Error\(RENDER_FX_FAIL\)/.test(pass), 'and when the effects module did not load');
+  assert.ok(/n\._wasmGiven && isOfflineAc\(ac\) && d\.value && d\.value\.wasm && d\.value\.wasm\.tfx === false\) tfxErrAc\.add\(ac\)/.test(src), 'a chains node that started without its effects wasm fails the render too');
   assert.ok(/Render failed: /.test(cut('async function renderOut(', 'async function renderPart(')), 'renderOut shows the error');
   assert.ok(/Render failed: /.test(cut('async function renderPart(', '\nfunction ')), 'renderPart too');
 });

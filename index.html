@@ -20779,7 +20779,7 @@ function chainsNode(ac, track, patch, tempo, cid){
     processorOptions:Object.assign({cid:cid || null, track, patch, quality:'full', transport:{tempo:tempo || S.bpm || 120, lpb:S.lpb || 4, ticks:S.ticks || TICKS, playing:tp.on}, irs:irsOpt(ac),
       // BUS and SOURCE maps from the start (later changes go as messages): an offline render can finish before a message arrives.
       busMap:(busPlan().feeds.get(track) || []).slice(0, 32), tapMap:chnTapList(patch)}, tfxModOpt() ? {tfxModule:tfxModOpt()} : {bytes:chnBin()}, pumpModOpt() ? {pumpModule:pumpModOpt()} : {pump:pumpBin() || null})});
-  n.load = 0; n.onprocessorerror = () => { if (isOfflineAc(ac)) tfxErrAc.add(ac); };   /* a render whose chains node never started is not kept: pass() says so */
+  n.load = 0; n._wasmGiven = !!(tfxModOpt() || chnBin()); n.onprocessorerror = () => { if (isOfflineAc(ac)) tfxErrAc.add(ac); };   /* a render whose chains node never started is not kept: pass() says so */
   // 2048 samples (~45 ms) per look, read every 60 ms, so short hits (hats, clicks) still show on the meters.
   n.an = ac.createAnalyser(); n.an.fftSize = 2048;   // hears the chains return: the chain screen's Chain Out meters
   n.anIn = ac.createAnalyser(); n.anIn.fftSize = 2048;   // hears what the track sends in: the Track In meters (wired in rtRoute)
@@ -20797,6 +20797,9 @@ function chainsNode(ac, track, patch, tempo, cid){
     if (d.op === 'meter' && d.value){ n.load = d.value.load || 0; if (!d.value.light){ n.mods = d.value.mods || null; n.shows = d.value.shows || null; n.jacks = d.value.jacks || null; n.byp = d.value.byp || null; n.modsT = performance.now(); if (n.onMeter) n.onMeter(d.value); } }
     if (d.op === 'ready'){
       n._live = true;
+      /* RENDER: the processor started but its effects' wasm did not (wasmInit catches the error and the chain's effects
+         bypass, so no processorerror fires): that render is not kept either. Only when the wasm was handed over. */
+      if (n._wasmGiven && isOfflineAc(ac) && d.value && d.value.wasm && d.value.wasm.tfx === false) tfxErrAc.add(ac);
       for (const m of n._q){ try { n.port.postMessage(m); } catch(e){} }
       n._q.length = 0;
       if (n._onReady){ const f = n._onReady; n._onReady = null; try { f(); } catch(e){} }   // CHN SWITCH: fade the chain in now
