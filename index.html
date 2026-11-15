@@ -19430,11 +19430,11 @@ class ThunderFx extends AudioWorkletProcessor {
       if (s.bi >= 0) v[s.bi] = s.byp ? 1 : 0;
       P.pump_commit(s.pu); s.dirty = false; }
     if (s.cr){   // …PUMP CREATIVE: the song's tempo and position, and the notes of NOTES FROM that fall in this block
-      const T = this.mctx.transport; P.pump_transport(s.pu, T.tempo, T.playing ? this.ppq || 0 : 0, T.playing ? 1 : 0);
+      const T = this.mctx.transport, lag = (s.up || 0) * T.tempo / 60 / sampleRate; P.pump_transport(s.pu, T.tempo, T.playing ? Math.max(0, (this.ppq || 0) - lag) : 0, T.playing ? 1 : 0);   /* (build 615) s.up: the latency of the pump slots before this one: the sound reaches it that much late, so its song position is that much earlier (a GATE after CALM closed 2048 samples early) */
       const q = this.pq;
       if (q && q.length){ const end = currentTime + n / sampleRate;
         for (let j = 0; j < q.length; j++){ const m = q[j]; if (m[1] >= end) break;
-          if (m[0] === s.slot){ P.pump_midi(s.pu, Math.max(0, Math.min(n - 1, Math.round((m[1] - currentTime) * sampleRate))), m[2], m[3], m[4]); q.splice(j--, 1); } } }
+          if (m[0] === s.slot){ P.pump_midi(s.pu, Math.max(0, Math.min(n - 1, Math.round((m[1] - currentTime) * sampleRate))), m[2], m[3], m[4]); q.splice(j--, 1); } } }   /* (notes are not shifted by s.up: they are booked a block ahead at most; left as it was) */
     }
     if (s.pso && s.pso.length && ((s.psN = (s.psN | 0) + 1) % 192) === 0){   // …PUMP STATE: about twice a second, has the plugin changed its own (MASTER learned)?
       for (const key of s.pso) try { const tx = this.pumpStateGet(P, s, key); if (tx !== s.psIn[key]){ s.psIn[key] = tx; this.port.postMessage({pst:[[s.slot, s.key, key, tx]]}); } } catch (e){} }
@@ -19753,7 +19753,7 @@ class ThunderFx extends AudioWorkletProcessor {
     if (this.fr >= sampleRate / 2){ const span = this.fr / sampleRate * 1000, sl = []; for (const s of this.slots){ if (s.slot >= 0 && s.ms) sl.push([s.slot, s.ms / span]); s.ms = 0; }
       this.port.postMessage({load:this.ms / span, sl}); this.ms = 0; this.fr = 0;
       // …PUMP: each pump slot's latency, when it changes (the FX screen warns on buses: nothing compensates it)
-      const P = globalThis.__pumpX; if (P){ const lat = []; for (const s of this.slots) if (s.pu !== undefined && s.pu >= 0) lat.push([s.slot, s.key, P.pump_latency(s.pu)]);
+      const P = globalThis.__pumpX; if (P){ const lat = []; let acc = 0; for (const s of this.slots) if (s.pu !== undefined && s.pu >= 0){ const l = P.pump_latency(s.pu); lat.push([s.slot, s.key, l]); s.up = acc; if (!(s.bi < 0 && s.byp)) acc += l; }
         const k = JSON.stringify(lat); if (k !== this.platS){ this.platS = k; this.port.postMessage({plat:lat}); } } }
     o[0].set(this.sub(this.L, n)); if (o[1]) o[1].set(this.sub(this.R, n));
     let op = 0; for (let k = 0; k < n; k++){ const v = this.L[k] < 0 ? -this.L[k] : this.L[k], w = this.R[k] < 0 ? -this.R[k] : this.R[k]; if (v > op) op = v; if (w > op) op = w; }
@@ -20087,9 +20087,16 @@ const pumpChainLatency = (A, sr) => (A || []).reduce((n, f) => n + pumpSlotLat(f
      d: the delay on its direct way to the master (latest arrival T minus its own), 0 for a pure source (heard only via its bus)
      f: the delay on its feed into the buses it feeds, so a bus's sources line up with the latest of them.
    A send (a track heard directly and through a bus) gets the two separately, so both copies line up. */
+/* LATENCY COMP: AUTO (build 615; owner, 14 Nov: a bus with a look-ahead effect, and a tempo-synced delay on it, must land on the beat).
+   aset.pdcMode: 'auto' (the default: the plan below whenever something has latency, and live only while the song plays, so pads
+   answer at once when it is stopped), 'on' (always), 'off'. A setting saved before this (aset.pdc true / false) reads as on / auto.
+   The plan itself is the same in auto and on: with no latency anywhere it is all zeros, and the sound is sample for sample what off gives.
+   c: how late each track's INPUT is (a bus: the latest of its sources; the master: T), which is how late its effects' beat clock
+   must run, so Flex, Step gate, Retrigger and the clocked pump effects stay on the beat of the sound they hear (they ran T early). */
+const pdcModeOf = () => aset.pdcMode === 'on' || aset.pdcMode === 'off' || aset.pdcMode === 'auto' ? aset.pdcMode : aset.pdc ? 'on' : 'auto';
 function pdcPlan(sr){
-  const none = {on:false, T:0, d:new Map(), f:new Map()};
-  if (!aset.pdc) return none;
+  const none = {on:false, T:0, d:new Map(), f:new Map(), c:new Map()};
+  if ((aset.pdcMode === 'on' || aset.pdcMode === 'off' || aset.pdcMode === 'auto' ? aset.pdcMode : aset.pdc ? 'on' : 'auto') === 'off') return none;
   const P = busPlan(), L = t => t < NT ? pumpChainLatency(S.tfx[t], sr) / sr : 0;
   const at = new Map(), busy = new Set(), f = new Map(), d = new Map();
   const atP = t => { if (at.has(t)) return at.get(t); let v = L(t); if (busy.has(t)) return v; busy.add(t);
@@ -20100,7 +20107,8 @@ function pdcPlan(sr){
   const routed = new Set(); for (const src of P.feeds.values()) for (const q of src) if (P.pure.has(q)) routed.add(q);
   let T = 0; for (let t = 0; t <= NT; t++) if (!routed.has(t)) T = Math.max(T, at.get(t));
   for (let t = 0; t <= NT; t++) d.set(t, routed.has(t) ? 0 : T - at.get(t));
-  return {on:true, T, d, f};
+  const c = new Map(); for (let t = 0; t < NT; t++){ const v = at.get(t) - L(t); if (v > 1e-9) c.set(t, v); } if (T > 1e-9) c.set(MT, T);
+  return {on:true, T, d, f, c};
 }
 function tfxNode(ac, chain, cid){
   // Inputs: 0 the track, 1 (SOURCE) the picked tracks' own sounds, one channel each ('tapmap'), 2 (SENDS) the Sidechain Out sends.
@@ -21578,9 +21586,18 @@ function makePlayer(ac, out, getBuf, live, mo){   // mo: the master OUT gain (af
   const setBusOff = v => { busOff = !!v; busSync(); };
   // LATENCY COMPENSATION: set every track's delays from pdcPlan (all 0 with the option off). Run after the buses are wired
   // (busSync) and after a track's effects change (routeTrack); cheap when nothing changed.
-  function pdcSync(){
-    const pl = pdcPlan(ac.sampleRate), set = (n, v) => { if (!n) return; v = Math.max(0, Math.min(0.99, v || 0)); if (Math.abs(n.delayTime.value - v) > 1e-6) n.delayTime.value = v; };
-    for (let t = 0; t < buses.length; t++){ const b = buses[t]; if (!b) continue; set(b.dl, pl.d.get(t)); set(b.fdl, pl.f.get(t)); set(b.fdlP, pl.f.get(t)); }
+  /* (build 615) AUTO: live, the delays are in force only while the song plays (clk.on); stopped they are 0, so pads and keys answer at
+     once. Live, a change glides over 50 ms (a jump of the delay time clicked: measured, a step of 0.2 on a sine), also the one at
+     STOP, under whatever is still ringing; as PLAY starts, and in a render, it is set at once. Each effects node's beat clock is delayed by how late its input is (pl.c, see pdcPlan). */
+  let pdcNow = false;   // set for the call made as PLAY starts or STOP lands: at once, no glide
+  function pdcSync(now){
+    pdcNow = !!now; const pl = pdcPlan(ac.sampleRate), playing = clk.on || (typeof tp !== 'undefined' && !!(tp && tp.on)), idle = live && !playing && pdcModeOf() === 'auto', glide = live && !pdcNow;   /* (tp.on: the audio-thread sequencer keeps its own clock, so clk.on stays off while it plays) */
+    const set = (n, v) => { if (!n) return; v = idle ? 0 : Math.max(0, Math.min(0.99, v || 0)); if (n._pv === v) return; n._pv = v;
+      const q = n.delayTime; if (!glide){ try { q.cancelScheduledValues(0); } catch(e){} q.value = v; return; }
+      try { const at = ac.currentTime; q.cancelScheduledValues(at); q.setValueAtTime(q.value, at); q.linearRampToValueAtTime(v, at + 0.05); } catch(e){ q.value = v; } };
+    for (let t = 0; t < buses.length; t++){ const b = buses[t]; if (!b) continue; set(b.dl, pl.d.get(t)); set(b.fdl, pl.f.get(t)); set(b.fdlP, pl.f.get(t)); if (b.fx) set(b.fx._cd, pl.c.get(t)); }
+    if (mfx) set(mfx._cd, pl.c.get(MT));
+    pdcNow = false;
   }
   // The beat clock for tempo-locked track and master effects (Flex, Step gate, Retrigger): the song position in beats
   // (wrapping every 16) as sample-accurate automation on a constant source, wired into every effect node's `bp`.
@@ -21590,10 +21607,11 @@ function makePlayer(ac, out, getBuf, live, mo){   // mo: the master OUT gain (af
   // beat + 1 while it plays and 0 otherwise, so with this source at −1 the effects get the same values, on the sample.
   const clkBus = ac.createGain(); clock.connect(clkBus);
   let mfx = null, mvol = null, moOv = false;
-  const clockTo = n => { try { if (n && n.parameters) clkBus.connect(n.parameters.get('bp')); } catch(e){} };
+  /* (build 615) each effects node hears the clock through its own delay (0 unless LATENCY COMP makes its input late: pdcSync) */
+  const clockTo = n => { try { if (n && n.parameters){ if (!n._cd){ n._cd = ac.createDelay(1); n._cd.delayTime.value = 0; n._cd._pv = 0; clkBus.connect(n._cd); } n._cd.connect(n.parameters.get('bp')); } } catch(e){} };
   // An effect node that goes lets go of its inputs too (the picked tracks, the sends, the beat clock): they kept it running,
   // a little more each time an effect was removed (review, 27 Oct).
-  const fxDrop = n => { if (!n) return; fxKeySync(n, []); try { const q = n.parameters && n.parameters.get('bp'); if (q) clkBus.disconnect(q); } catch(e){} };
+  const fxDrop = n => { if (!n) return; fxKeySync(n, []); try { if (n._cd){ clkBus.disconnect(n._cd); n._cd.disconnect(); n._cd = null; } } catch(e){} };
   // FIRST PLAY (owner, 31 Oct: after opening a song, the master's first FLX was lost): an FXO / FLX / GAT / RTG sent before
   // its track's (or the master's) effect node exists waits here, and the node takes it when it is made.
   const fxcPend = new Map();
@@ -21601,7 +21619,7 @@ function makePlayer(ac, out, getBuf, live, mo){   // mo: the master OUT gain (af
   // the pending list kept only the LAST command per param, so an FLX 00 booked before a later FLX was dropped and the slot
   // wasn't held off until the later one. Each param now keeps its commands, and they're all booked at their own times.
   const fxcFlush = (t, n) => { if (!n || !n.parameters || !fxcPend.size) return; for (const [k, L] of fxcPend){ const [tt, p] = k.split(':'); if (+tt !== t) continue; fxcPend.delete(k); const q = n.parameters.get(p); if (q) for (const ev of L) try { q.setValueAtTime(ev.v, Math.max(ev.t, ac.currentTime)); } catch(e){} } };
-  const setMfx = n => { if (mfx && mfx !== n) fxDrop(mfx); mfx = n || null; clockTo(mfx); if (mfx){ fxKeySync(mfx, S.mfx); fxcFlush(MT, mfx); } };   // SOURCE: the master's effect slots
+  const setMfx = n => { if (mfx && mfx !== n) fxDrop(mfx); mfx = n || null; clockTo(mfx); if (mfx){ fxKeySync(mfx, S.mfx); fxcFlush(MT, mfx); try { pdcSync(); } catch(e){} } };   // SOURCE: the master's effect slots
   const fxNodeOf = t => t >= MT ? mfx : buses[t] && buses[t].fx;
   const FXP = ['sw0', 'sw1', 'sw2', 'sw3', 'sw4', 'sw5', 'sw6', 'sw7', 'flx', 'gat', 'rtg'];
   /* GAIN STAGING (owner, 27 Oct; docs/GAIN-STAGING.md). Per track:
@@ -21854,7 +21872,8 @@ function makePlayer(ac, out, getBuf, live, mo){   // mo: the master OUT gain (af
     if (ev.type === 'tempo'){ tempoTo(ev); return; }
     if (ev.type === 'beat'){
       const o = clock.offset, at = Math.max(ev.t, ac.currentTime);
-      if (!clk.on){ clk.on = true; clk.base = Math.floor(ev.b / 16) * 16; o.setValueAtTime(ev.b - clk.base, at); clk.lt = at; clk.lv = ev.b - clk.base; PB.rsGap = 0; return; }
+      if (!clk.on){ clk.on = true; try { pdcSync(true); } catch(e){}   /* (AUTO: the delays come in as the song starts) */
+        clk.base = Math.floor(ev.b / 16) * 16; o.setValueAtTime(ev.b - clk.base, at); clk.lt = at; clk.lv = ev.b - clk.base; PB.rsGap = 0; return; }
       const v = ev.b - clk.base;
       // HOLD KEEPS THE TEMPO (10 Nov, HOLD_CLK_FLAT): rsHold moved this beat on by d, so the ramp from the last beat took d longer, the clock's slope
       // fell, and the effects' modules (Simple delay, ...) read that as a slower tempo: their delay TIME glided (pitching). The clock now waits
@@ -23091,6 +23110,7 @@ function tStart(mode, o){
   met.next = 0; rec.hist = []; if (ci) countIn(t0start - ci, recS.cnt, seq.bpm);
   if ([...S.tfx, S.mfx].some(A => (A || []).some(f => f && f.on && f.type === 'tgate'))){ fxRestartN++; rtAllFx(); }
   Object.assign(tp, {on:true, mode, seq, q:[], pos:null, snd:null, bpm:seq.bpm, tks:seq.tks, st:0, loopV:o.loop ? o.loop.v : '', row0:mode === 'song' ? (o.row | 0) : 0, t0:t0start, lenTot:null, lenPre:0, hiRow:null});
+  try { if (rt && rt.pl) rt.pl.pdcSync(true); } catch(e){}   // LATENCY COMP AUTO: the delays come in with PLAY (before its first note sounds)
   if (rsFirst){   // RESUME: the effect commands passed on the way, then the step it stopped on, now
     for (const e of rsFx.values()) rt.pl.play(Object.assign({}, e, {t:t0start}));
     const d = t0start - rsFirst.t;
@@ -23822,7 +23842,8 @@ function tStop(quiet){
   stopP = !quiet && stopToPlayhead() && tp.on && tp.pos && tp.pos.some(Boolean) ? {P:tp.pos.map(q => q && Object.assign({}, q)), mode:tp.mode} : null;
   home = !quiet && tp.on && !stopToPlayhead() && fpHome && fpHome.t >= workT && fpHome.t >= arrHandT ? fpHome : null;
   arrP = !quiet && stopArrOn && !stopToPlayhead() && tv !== 'song' && tp.on && tp.mode === 'song' && tp.pos && tp.pos.some(Boolean) && apPanel() ? tp.pos.map(q => q && Object.assign({}, q)) : null; });   // (12 Nov, owner: PLAY from the pad, ▼ / scroll down, STOP before row 2 jumped the cursor back to the top) fpHome is the cursor as FOLLOW first noted it, and is only noted again 4 s after your last key, press or scroll: a place you moved to after that note stands, only an untouched cursor goes back   // (9 Nov, owner: with ON STOP at STAYS it still ended up at the playback spot: FOLLOW had carried it there)
-  tp.timer = 0; tp.on = false; if (mtrMode === 'off') setTimeout(mtrWake, 0); fpMem = null; fpHome = null; tp.q = []; tp.pos = null; tp.snd = null; tp.stopAt = null; tp.ahead = tp.aheadT = 0; tp.rsUntil = 0; PB.rsA = null; G('runaway kick', rkReset);
+  tp.timer = 0; tp.on = false; try { if (rt && rt.pl) rt.pl.pdcSync(); } catch(e){}   /* LATENCY COMP AUTO: stopped, pads answer at once again */
+  if (mtrMode === 'off') setTimeout(mtrWake, 0); fpMem = null; fpHome = null; tp.q = []; tp.pos = null; tp.snd = null; tp.stopAt = null; tp.ahead = tp.aheadT = 0; tp.rsUntil = 0; PB.rsA = null; G('runaway kick', rkReset);
   // HAND-OVER (seqHandover): the core and the voices already booked keep sounding until the page sequencer's first step
   if (tp.core){ tp.core = false; core.gen++; if (!handing) G('core', () => { coreWire(false); try { core.node.port.postMessage({op:'stop', at:ctx.currentTime}); } catch(e){} }); }
   else if (coreWanted() && !core.ready && ctx) setTimeout(() => { try { if (!tp.on) coreLoad(); } catch(e){} }, 400);

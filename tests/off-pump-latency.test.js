@@ -42,7 +42,7 @@ test('pump.wasm: a bypassed look-ahead effect still delays by its reported laten
 });
 
 function page(lat){
-  const c = vm.createContext({Math, Map, Set, NT:32, aset:{pdc:true}, TFX:{pcalm:{pump:'calm'}, pmeter:{pump:'meter'}, sdelay:{}},
+  const c = vm.createContext({Math, Map, Set, NT:32, MT:32, aset:{pdc:true}, TFX:{pcalm:{pump:'calm'}, pmeter:{pump:'meter'}, sdelay:{}},
     pumpIdx:{calm:{bypass:9}, meter:{}}, pumpLatencyOf:f => lat[f.type] || 0});
   c.isPumpT = k => !!(c.TFX[k] && c.TFX[k].pump);
   vm.runInContext(cut(/const pumpSlotLat = [^\n]*\nconst pumpChainLatency = [^\n]*\n/, 'pumpSlotLat / pumpChainLatency') + '\nglobalThis.pumpChainLatency = pumpChainLatency;', c);
@@ -67,3 +67,21 @@ test('LATENCY COMP: a track whose pump effect is OFF is as late as one whose eff
   assert.equal(p.d.get(3), 0, 'that track is not delayed further');
   assert.ok(Math.abs(p.d.get(0) - 2048 / SR) < 1e-12, 'the others wait for it');
 });
+
+// LATENCY COMP AUTO (build 615): the plan's `c` is how late each track's input is: its effects' beat clock runs that late.
+test('LATENCY COMP: the clock of a bus runs as late as its latest source, the master’s as late as the whole plan; off gives none', () => {
+  const c = vm.createContext({Math, Map, Set, NT:32, MT:32, aset:{}, TFX:{pcalm:{pump:'calm'}}, pumpIdx:{calm:{bypass:9}}, pumpLatencyOf:f => 2048});
+  c.isPumpT = k => !!(c.TFX[k] && c.TFX[k].pump);
+  vm.runInContext(cut(/const pumpSlotLat = [^\n]*\nconst pumpChainLatency = [^\n]*\n/, 'pumpSlotLat / pumpChainLatency') + '\nglobalThis.pumpChainLatency = pumpChainLatency;', c);
+  c.S = {tfx:Array.from({length:32}, () => [])}; c.S.tfx[1] = [{type:'pcalm', on:true}];   // track 2 has CALM and feeds bus 5 with track 3
+  c.busPlan = () => ({feeds:new Map([[4, [1, 2]]]), pure:new Set([1, 2])});
+  vm.runInContext(cut(/function pdcPlan\(sr\)\{[\s\S]*?\n\}\n/, 'pdcPlan'), c);
+  const p = c.pdcPlan(SR), L = 2048 / SR, near = (a, b) => Math.abs(a - b) < 1e-12;
+  assert.equal(p.on, true, 'no setting saved: auto');
+  assert.ok(near(p.c.get(4), L), 'the bus hears its sources 2048 late: so does its clock'); assert.ok(near(p.c.get(MT_), L), 'the master too');
+  assert.equal(p.c.get(1), undefined, 'the track with CALM itself: its input is on time'); assert.ok(near(p.f.get(2), L), 'the clean source waits for the late one on the way into the bus');
+  c.aset.pdcMode = 'off'; const o = c.pdcPlan(SR); assert.equal(o.on, false); assert.equal(o.c.size, 0); assert.equal(o.T, 0);
+  c.aset.pdcMode = 'on'; assert.ok(near(c.pdcPlan(SR).T, L));
+  c.aset = {pdc:true}; assert.equal(c.pdcPlan(SR).on, true, 'saved on before: on'); c.aset = {pdc:false}; assert.equal(c.pdcPlan(SR).on, true, 'saved off before (or never chosen): auto');
+});
+const MT_ = 32;
