@@ -29,6 +29,7 @@
 #include "rt/ftz.h"
 #include "rt/snap.h"
 #include "rt/spsc.h"
+#include "song/song.h"
 
 namespace {
 
@@ -40,9 +41,9 @@ struct Cmd { int type; double v; int64_t n; int64_t at; };   // at: the frame it
 enum EvtType { E_CLOCK = 1, E_POS, E_ECHO, E_SONG };
 struct Evt { int type; int64_t f; int64_t wallNs; int64_t a; int sr; int outLat; int under; };
 
-// The song as the audio thread sees it: immutable once published. U06 gives it its real fields (the parsed song and kit);
-// for U05 it carries the revision and the text, which is what the swap, the acknowledgement and the tests need.
-struct Song { int64_t rev = 0; std::string json; };
+// The song as the audio thread sees it: immutable once published (song/song.h, U06: the parsed document and typed tables).
+// thunder_process reads the typed tables only, never the JSON tree.
+using thunder::Song;
 
 constexpr int kPend = 64;   // timed commands waiting for their frame
 
@@ -199,10 +200,10 @@ int thunder_post(thunder_core* c, const char* s, int len) {
   else if (is("play")) cmd.type = C_PLAY;
   else if (is("stop")) cmd.type = C_STOP;
   else if (is("echo")) { cmd.type = C_ECHO; const char* n = find_key(s, len, "n"); double d = 0; if (n && parse_num(n, end, &d)) cmd.n = (int64_t)d; }
-  else if (is("song.load")) {   // U05: the swap only. {"t":"song.load","rev":N,...}: the whole message is kept as the snapshot's text (U06 parses it)
+  else if (is("song.load")) {   // {"t":"song.load","rev":N,"S":{...}}: parsed here, on the control thread, into an immutable Song
     Song* sn = new (std::nothrow) Song(); if (!sn) return 0;
-    const char* r = find_key(s, len, "rev"); double d = 0; if (r && parse_num(r, end, &d)) sn->rev = (int64_t)d;
-    sn->json.assign(s, (size_t)len);
+    thunder::JsonError je;
+    if (!sn->load(s, (size_t)len, &je)) { delete sn; return 0; }   // malformed: nothing is queued
     if (!c->song.publish(sn)) { delete sn; return 0; }
     return 1;
   }

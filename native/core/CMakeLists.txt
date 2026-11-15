@@ -1,5 +1,5 @@
 # thunder_core: the one C++ engine library (N0: a test core only; it is thrown away in N1).
-add_library(thunder_core STATIC src/core.cpp src/rt/auto.cpp src/rt/jsmath.cpp)
+add_library(thunder_core STATIC src/core.cpp src/rt/auto.cpp src/rt/jsmath.cpp src/rt/json.cpp src/song/song.cpp)
 target_include_directories(thunder_core PUBLIC include)
 target_include_directories(thunder_core PRIVATE src)
 target_compile_features(thunder_core PUBLIC cxx_std_17)
