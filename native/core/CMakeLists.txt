@@ -9,13 +9,12 @@ if(MSVC)
 else()
   target_compile_options(thunder_core PRIVATE -Wall -Wextra -fno-exceptions -fno-rtti)
 endif()
-<<<<<<< HEAD
 
 # U02: the existing C++ DSP as static libraries (see dsp/CMakeLists.txt, third_party/PINS.md)
 option(THUNDER_WITH_DSP "Build the existing C++ DSP (tfx, thunder-dsp, mods) from pinned upstreams (needs git + network at configure)" ON)
 if(THUNDER_WITH_DSP)
   add_subdirectory(dsp)
-=======
+endif()
 # SAME BITS AS THE WEB COPY (U05): no fused multiply-add. JavaScript never fuses a * b + c; GCC and clang do by default
 # where the CPU has the instruction (every arm64 phone and Mac), which changes the last bit of sums like the automation
 # ramps and the sequencer's times, and the goldens are compared exactly. PUBLIC so the tests' own reference code is built
@@ -24,5 +23,4 @@ if(MSVC)
   target_compile_options(thunder_core PUBLIC /fp:precise)
 else()
   target_compile_options(thunder_core PUBLIC -ffp-contract=off)
->>>>>>> 075503de1a92a95d9a83573f8d6180b9edf14dd8
 endif()
