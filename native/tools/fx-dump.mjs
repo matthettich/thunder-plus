@@ -122,11 +122,12 @@ function mapSets() {
   for (const e of E) {
     const sets = [];
     for (let i = 0; i < 200; i++) {
-      const o = { type: e.key, on: true }; for (const p of e.ps) o[p.k] = i === 0 ? p.d : i === 1 ? p.min : i === 2 ? p.max : p.min + Math.floor(r() * (p.max - p.min + 1));
+      const o = { type: e.key, on: i % 13 !== 12 }; for (const p of e.ps) o[p.k] = i === 0 ? p.d : i === 1 ? p.min : i === 2 ? p.max : p.min + Math.floor(r() * (p.max - p.min + 1));
+      if (i % 11 === 10) e.ps.forEach((p, j) => { const m = (i + j) % 5; if (m === 0) o[p.k] = p.max + 40; else if (m === 1) o[p.k] = String(o[p.k]); else if (m === 2) delete o[p.k]; else if (m === 3) o[p.k] = -5.7; else o[p.k] = p.min + 0.4; });
       const sr = i % 5 === 4 ? 44100 : SR, bpm = [120, 87.5, 140, 33, 999][i % 5], rn = i % 7;
       F.setRestartN(rn);
       const norm = F.normTfx(o), ch = F.tfxChain([norm], sr, bpm)[0];
-      sets.push({ v: e.ps.map(p => norm[p.k]), sr, bpm, restartN: rn, p: ch.p });
+      sets.push({ obj: o, on: ch.on, key: ch.key, v: e.ps.map(p => norm[p.k]), sr, bpm, restartN: rn, p: ch.p });
     }
     out.push({ key: e.key, id: e.id, sets });
   }
