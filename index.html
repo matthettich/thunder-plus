@@ -23902,6 +23902,9 @@ function tStart(mode, o){
   // after the last change, and the first PLAY can stall the page for a second or two (the audio engine starting); if the page is killed or reloaded
   // in that stall, the last notes were never written. A change still waiting is written now, before anything heavy starts. (Not reproduced: a guard.)
   if (sPend && !tp.on && !(o && o._warm)) try { flushS(); } catch(e){}
+  /* PADS WITHOUT A RENDER (15 Nov): a pad that is stale when PLAY is pressed starts rendering now, not at its first note (ensurePlay
+     leaves a note silent while its pad renders). Only with the render Worker up: without it prerender would render on this thread. */
+  if (!tp.on && !(o && o._warm) && PW.ready) try { prerender(); } catch(e){}
   // LIVE WARM-UP: the first PLAY of a session starts the audio engine; with live engine pads in the kit it waits (once, at
   // most 600 ms) for their worklets, so their nodes can be made before the first notes instead of on them
   // 10 Nov: and for the effect and chains modules' handlers still to run (playWaitFor), so rtAllFx is not 1-4 bars into the song
@@ -26312,6 +26315,10 @@ function setTracks(mono, poly){
   if (cTrack >= n) cTrack = n - 1; if (cs.song.x >= n && cs.song.x !== MT) cs.song.x = n - 1; if (cs.mixer.x >= n) cs.mixer.x = n - 1;
   // A new track instantiates its voice before the redraw, so the kit keeps one-to-one voice/track parity.
   if (vtrk) growKit();
+  /* The counts changed: every pad's render was dropped above, and nothing made them again until a note needed one, which while the
+     song plays means that note is silent (owner, 15 Nov: "added a new poly track with an instrument, but when I played it nothing
+     played until second pass"). Start the renders now, in the Worker. */
+  if (vtrk && (n1 !== n0 || m1 !== m0)) try { prerender(); } catch(e){}
   if (cFxT < NT && cFxT >= n) cFxT = 0; arrSig = ''; saveS(); draw();
   return {why:'', tN:tOut || (x => x)};
 }
@@ -28563,6 +28570,7 @@ function go(v){
   }
   if (v === 'mixer' && (tv === 'fx' || tv === 'mod')){ if (cFxT < NT){ cs.mixer.x = cFxT; if (cs.mixer.y === 7) cs.mixer.y = 0; } else cs.mixer.y = 7; }   // FX on the master: the Mixer's master row
   const refit = (tv === 'mixer') !== (v === 'mixer');   // the Mixer is sized for more rows
+  if (loopSel && !tp.on) loopFor(tv);   /* (LOOP SEL: keep the selection's rows as the armed loop before the selection goes with the screen; 15 Nov) */
   tv = v; if (MID.includes(v)) midV = v; selA = null; sxPicks = []; if (refit) fit(); draw(); saveCur();
 }
 // SHIFT+▼ ON MOBILE AND DESKTOP (12 Nov, owner: "Make shift + down always go to phrase or pattern view."): from the Song / Arrange (the screen, or Arrange holding the keys beside
@@ -28816,10 +28824,14 @@ function playPhraseNow(){
 function playKey(shift){ const sw = playKeySwap(); if (sw && !shift && tv === 'song') playCtx(); else if (sw ? !shift : shift){ if (tp.on) tStopUser(); else tStart('song', {row:songRow()}); } else if (sw) playPhraseNow(); else playCtx(); }
 function playCtx(){
   if (tp.on) return tStopUser();
-  const lp = loopFor(tv);
+  /* LOOP SEL armed on Arrange still loops when PLAY is pressed on a screen with no rows of its own (Mixer, FX, MOD, INST, PROJECT):
+     those screens play the song, so they play the song's armed loop (owner, 15 Nov: "switching to the mixer panel caused the
+     sequencer to ignore the loop selection I had turned on"). Phrase / Pattern view keep their own play. */
+  const lv = loopSel && loopArm && loopArm.v === 'song' && !GRIDV.has(tv) ? 'song' : tv;
+  const lp = loopFor(lv);
   if (!lp && (tv === 'phrase' || tv === 'sect') && cTrack < NT && isBusT(cTrack)) return busPlay();   // BUS PLAY
   if (lp){
-    if (tv === 'song') return tStart('song', {row:lp.y0, loop:lp});
+    if (lv === 'song') return tStart('song', {row:lp.y0, loop:lp});
     if (tv === 'sect') return tStart('sect', {sect:cSect, track:cTrack, loop:lp});
     if (tv === 'phrase') return tStart('phrase', {phrase:cPhrase, track:cTrack, loop:lp});
   } else if (loopSel && GRIDV.has(tv)) toast('LOOP SEL is on but nothing to loop: select 2 or more rows first.');
