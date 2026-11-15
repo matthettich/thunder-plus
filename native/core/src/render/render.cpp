@@ -20,6 +20,7 @@ void SongRenderer::dispatch(const SeqEvent& e) {
   switch (e.type) {
     case SEV_STP: pool_.stp(e); return;
     case SEV_TVL: case SEV_TVA: case SEV_TPN: case SEV_MVOL: case SEV_MOUT: if (mix_.event(e)) st_.mixEvents++; return;
+    case SEV_BEAT: if (mix_.event(e)) st_.beats++; return;   // the beat clock (U10)
     case SEV_OFF: if (e.track >= 0) pool_.off(e); return;
     case SEV_MOD: if (e.track >= 0) pool_.mod(e, seq_->arp(e)); return;
     case SEV_NOTE: break;

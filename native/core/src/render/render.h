@@ -30,7 +30,7 @@ struct RenderPads {
 
 struct RenderStats {
   int64_t frames = 0;
-  int steps = 0, events = 0, notes = 0, notesPlayed = 0, notesNoPad = 0, notesMidiOnly = 0, notesShapedRev = 0, mixEvents = 0;
+  int steps = 0, events = 0, notes = 0, notesPlayed = 0, notesNoPad = 0, notesMidiOnly = 0, notesShapedRev = 0, mixEvents = 0, beats = 0;
   int peakVoices = 0, peakVoiceLane = 0, peakMixLane = 0, peakStepEvents = 0;
   uint32_t voiceDropped = 0, voiceOverflow = 0, voiceAutoDropped = 0, mixAutoDropped = 0;
   uint64_t seqDropped = 0;

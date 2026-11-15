@@ -5,13 +5,14 @@
 
 namespace thunder {
 
-void DelayRing::init(int capSamples, int maxBlock) {
-  cap_ = capSamples; R_ = capSamples + maxBlock + 4; n_ = 0;
-  b_.reset(new float[(size_t)R_ * 2]()); }
+void DelayRing::init(int capSamples, int maxBlock, int channels) {
+  cap_ = capSamples; R_ = capSamples + maxBlock + 4; n_ = 0; nch_ = channels == 1 ? 1 : 2;
+  b_.reset(new float[(size_t)R_ * (size_t)nch_]()); }
 
 void DelayRing::push(const float* L, const float* R, int N) {
   float* bl = b_.get(); float* br = bl + R_; int64_t i0 = n_ % R_;
-  for (int i = 0; i < N; i++) { bl[i0] = L[i]; br[i0] = R[i]; if (++i0 == R_) i0 = 0; }
+  if (nch_ == 1) for (int i = 0; i < N; i++) { bl[i0] = L[i]; if (++i0 == R_) i0 = 0; }
+  else for (int i = 0; i < N; i++) { bl[i0] = L[i]; br[i0] = R[i]; if (++i0 == R_) i0 = 0; }
   n_ += N;
 }
 
@@ -21,11 +22,12 @@ void DelayRing::read(double D, float* oL, float* oR, int N) const {
   double fl = std::floor(D); double f = D - fl;
   if (f < 1e-9) f = 0; else if (f > 1 - 1e-9) { fl += 1; f = 0; }
   const int64_t k = (int64_t)fl, a0 = n_ - N;
-  if (f == 0) { for (int i = 0; i < N; i++) { const int64_t a = a0 + i - k; oL[i] = a < 0 ? 0.f : at(0, a); oR[i] = a < 0 ? 0.f : at(1, a); } return; }
+  if (f == 0) { for (int i = 0; i < N; i++) { const int64_t a = a0 + i - k; oL[i] = a < 0 ? 0.f : at(0, a); if (nch_ == 2) oR[i] = a < 0 ? 0.f : at(1, a); } return; }
   for (int i = 0; i < N; i++) {   // between x[a - k - 1] (weight f) and x[a - k]
     const int64_t a = a0 + i - k, b = a - 1;
-    const double xl = a < 0 ? 0.0 : at(0, a), xr = a < 0 ? 0.0 : at(1, a), yl = b < 0 ? 0.0 : at(0, b), yr = b < 0 ? 0.0 : at(1, b);
-    oL[i] = (float)(xl * (1 - f) + yl * f); oR[i] = (float)(xr * (1 - f) + yr * f); }
+    const double xl = a < 0 ? 0.0 : at(0, a), yl = b < 0 ? 0.0 : at(0, b);
+    oL[i] = (float)(xl * (1 - f) + yl * f);
+    if (nch_ == 2) { const double xr = a < 0 ? 0.0 : at(1, a), yr = b < 0 ? 0.0 : at(1, b); oR[i] = (float)(xr * (1 - f) + yr * f); } }
 }
 
 void DelayRing::readVar(const double* D, float* oL, float* oR, int N) const {
@@ -35,9 +37,10 @@ void DelayRing::readVar(const double* D, float* oL, float* oR, int N) const {
     if (d > cap_) d = cap_;
     double fl = std::floor(d), f = d - fl; if (f < 1e-9) f = 0; else if (f > 1 - 1e-9) { fl += 1; f = 0; }
     const int64_t a = a0 + i - (int64_t)fl, b = a - 1;
-    if (f == 0) { oL[i] = a < 0 ? 0.f : at(0, a); oR[i] = a < 0 ? 0.f : at(1, a); continue; }
-    const double xl = a < 0 ? 0.0 : at(0, a), xr = a < 0 ? 0.0 : at(1, a), yl = b < 0 ? 0.0 : at(0, b), yr = b < 0 ? 0.0 : at(1, b);
-    oL[i] = (float)(xl * (1 - f) + yl * f); oR[i] = (float)(xr * (1 - f) + yr * f);
+    if (f == 0) { oL[i] = a < 0 ? 0.f : at(0, a); if (nch_ == 2) oR[i] = a < 0 ? 0.f : at(1, a); continue; }
+    const double xl = a < 0 ? 0.0 : at(0, a), yl = b < 0 ? 0.0 : at(0, b);
+    oL[i] = (float)(xl * (1 - f) + yl * f);
+    if (nch_ == 2) { const double xr = a < 0 ? 0.0 : at(1, a), yr = b < 0 ? 0.0 : at(1, b); oR[i] = (float)(xr * (1 - f) + yr * f); }
   }
 }
 

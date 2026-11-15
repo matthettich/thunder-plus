@@ -171,6 +171,8 @@ Mixer::Mixer(double sampleRate, int maxBlock, double maxDelaySec) : sr_(sampleRa
   dly_.reset(new Dly[kMixTracks]); for (int t = 0; t < kMixTracks; t++) { dly_[t].post.init(cap, maxBlock); dly_[t].pre.init(cap, maxBlock); }
   fd_.reset(new float[(size_t)kMixTracks * 4 * mb]()); sc_.reset(new float[2 * mb]());
   for (int t = 0; t < kMixTracks; t++) { const float* p = post_.get() + (size_t)(t * 2) * mb; const float* e = preb_.get() + (size_t)(t * 2) * mb; fpL_[t] = p; fpR_[t] = p + mb; feL_[t] = e; feR_[t] = e + mb; }
+  rd_.reset(new Rd[kMixTracks]); for (int t = 0; t < kMixTracks; t++) { rd_[t].ring.init(cap, maxBlock, 1); clkRd_[t] = nullptr; }
+  clkLane_.reset(new float[mb]()); clkBus_.reset(new float[mb]()); clkOut_.reset(new float[(size_t)kMixTracks * mb]());
   reset();
 }
 Mixer::~Mixer() = default;
@@ -259,6 +261,7 @@ bool Mixer::set(const MixSet& c) {
 
 // mixEv
 bool Mixer::event(const SeqEvent& e) {
+  if (e.type == SEV_BEAT) return clk_.event(e, now_);
   const double at = std::max(e.t, now_);
   if (e.type == SEV_MVOL) { if (!hasMm_) { mm_.reset(0); hasMm_ = true; } mm_.hold(at); mm_.lin(mix_curve(e.v) - mix_curve(master_), at + kTcSong); note(mm_); return true; }
   if (e.type == SEV_MOUT) { if (!hasMo_) { mo2_.reset(0); hasMo_ = true; } mo2_.target(mix_curve(e.v) - mix_curve(mout_), at, kTcSong); note(mo2_); return true; }
@@ -274,7 +277,7 @@ bool Mixer::event(const SeqEvent& e) {
 }
 
 uint32_t Mixer::autoDropped() const {
-  uint32_t n = out_.dropped + mo_.dropped + mm_.dropped + mo2_.dropped;
+  uint32_t n = out_.dropped + mo_.dropped + mm_.dropped + mo2_.dropped + clk_.dropped();
   for (int t = 0; t < kMixTracks; t++) { const Strip& s = S_[t]; n += s.inp.dropped + s.g.dropped + s.pre.dropped + s.pan.dropped + s.mg.dropped + s.mp.dropped; }
   return n;
 }
@@ -341,9 +344,26 @@ void Mixer::setDelays(const double* d, const double* f, const DelaySet& s) {
 uint32_t Mixer::pdcClamped() const { uint32_t n = 0; for (int t = 0; t < kMixTracks; t++) n += dly_[t].dl.clamped + dly_[t].fdl.clamped + dly_[t].fdlP.clamped; return n; }
 double Mixer::delayNow(int t, int point) const { if (t < 0 || t >= kMixTracks) return 0; const Dly& D = dly_[t]; const double v = point == 0 ? D.dl.pv : point == 1 ? D.fdl.pv : D.fdlP.pv; return v == v ? v : 0; }
 
+void Mixer::setClockDelays(const double* c, const DelaySet& s) { for (int t = 0; t < kMixTracks; t++) rd_[t].cd.set(c[t], now_, s.glide, s.ramp, s.idle, capSec_); }
+double Mixer::clockDelaySec(int t) const { if (t < 0 || t >= kMixTracks) return 0; const double v = rd_[t].cd.pv; return v == v ? v : 0; }
+// process1's clock fill, then clkBus (the lane + the ConstantSource's -1, float32 adds) and each effects node's delayed copy
+void Mixer::clockBlock(int N, double t0) {
+  const size_t mb = (size_t)maxBlock_; float* lane = clkLane_.get(); float* bus = clkBus_.get();
+  clk_.render(lane, N, t0, dt_, d_.get());
+  for (int i = 0; i < N; i++) bus[i] = lane[i] + -1.0f;
+  for (int t = 0; t < kMixTracks; t++) {
+    if (!(t < kNT ? fx_[t].fn != nullptr : mfx_.fn != nullptr)) { clkRd_[t] = nullptr; continue; }
+    Rd& R = rd_[t]; R.ring.push(bus, nullptr, N); clkRd_[t] = bus;
+    double v; if (R.cd.constant(t0, t0 + N * dt_, &v)) { const double D = v * sr_; if (!(D > 1e-9)) continue; R.ring.read(D, clkOut_.get() + (size_t)t * mb, nullptr, N); }
+    else { double* d = d_.get(); R.cd.lane.fill(d, t0, dt_, N); for (int i = 0; i < N; i++) d[i] = d[i] * sr_; R.ring.readVar(d, clkOut_.get() + (size_t)t * mb, nullptr, N); }
+    clkRd_[t] = clkOut_.get() + (size_t)t * mb;
+  }
+}
+
 void Mixer::render(float* outL, float* outR, int N, double t0) {
   if (N > maxBlock_) N = maxBlock_;
   const size_t mb = (size_t)maxBlock_;
+  clockBlock(N, t0);
   for (int k = 0; k < kMixTracks; k++) {
     const int t = order_[k]; track(t, N, t0);
     // the delay points' histories take this block (always: a delay that starts later reads what played before it), and the feeds a bus will hear

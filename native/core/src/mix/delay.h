@@ -19,7 +19,7 @@ namespace thunder {
 class DelayRing {
  public:
   DelayRing() = default;
-  void init(int capSamples, int maxBlock);     // allocates (control thread)
+  void init(int capSamples, int maxBlock, int channels = 2);     // allocates (control thread). One channel: the R pointers are not read or written (a mono signal: the beat clock)
   bool ready() const { return b_ != nullptr; }
   int cap() const { return cap_; }
   void push(const float* L, const float* R, int N);                          // the next N samples (N <= maxBlock)
@@ -29,7 +29,7 @@ class DelayRing {
  private:
   float at(int ch, int64_t a) const { return b_[(size_t)ch * (size_t)R_ + (size_t)(a % R_)]; }   // a >= 0 (the callers clamp)
   std::unique_ptr<float[]> b_;
-  int R_ = 0, cap_ = 0;
+  int R_ = 0, cap_ = 0, nch_ = 2;
   int64_t n_ = 0;   // samples pushed so far (the next one's absolute index)
 };
 

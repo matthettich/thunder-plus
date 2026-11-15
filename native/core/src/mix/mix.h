@@ -33,6 +33,7 @@
 #include <cstdint>
 #include <memory>
 
+#include "mix/beat.h"
 #include "mix/delay.h"
 #include "rt/auto.h"
 #include "rt/json.h"
@@ -110,6 +111,10 @@ class Mixer {
   // idle: every delay is 0 (LATENCY COMP AUTO while no song plays). A delay already at the target is left alone. Allocates nothing.
   struct DelaySet { bool glide = false; bool idle = false; double ramp = 0.05; };
   void setDelays(const double* d, const double* f, const DelaySet& s);
+  // The beat clock's readers (n._cd): the effects node of track t (a setFx hook) or of the master (kSongNT: setMasterFx) hears the clock through
+  // a delay of c[t] seconds (a PdcPlan's c), set with the same rules. A reader is fed only while its node has a hook.
+  void setClockDelays(const double* c, const DelaySet& s);
+  double clockDelaySec(int t) const;    // n._cd._pv: the delay now in force in seconds (0 if none); the effect commands of FXO / FLX / GAT / RTG wait this long (index.html 22741)
   uint32_t pdcClamped() const;       // delay requests above the cap (cut to it)
   double delayNow(int t, int point) const;   // the target of a delay point in seconds (point 0 dl, 1 fdl, 2 fdlP); for tests
   double maxDelaySec() const { return capSec_; }
@@ -117,7 +122,15 @@ class Mixer {
   void setTime(double now) { now_ = now; }                 // currentTime: the start of the block about to be rendered
   bool event(const SeqEvent& e);                           // mixEv: tvl, tva, tpn, mvol, mout. true: taken
   bool set(const MixSet& c);                               // false: not a thing this mixer has (a bad track, Send)
-  void songLanesReset();                                   // mixReset (PLAY and STOP): the song's lanes are gone, the mixer's own stay
+  void songLanesReset();
+  // THE BEAT CLOCK (mix/beat.h): 'beat' events (event()) ramp it; stop it with clockStop at PLAY / STOP; render() fills it each block.
+  void clockStop(double at) { clk_.stop(at); }
+  BeatClock& clock() { return clk_; }
+  // after render() and valid until the next: the core's lane (beat + 1 playing, 0 stopped); clkBus (the lane - 1: the beat playing, -1 stopped);
+  // and what the effects node of track t (kSongNT: the master) hears: clkBus, delayed by its c. Callable from a track's / the master's hook.
+  const float* beatLane() const { return clkLane_.get(); }
+  const float* beatBus() const { return clkBus_.get(); }
+  const float* beat(int t) const { return t >= 0 && t < kMixTracks && clkRd_[t] ? clkRd_[t] : clkBus_.get(); }                                   // mixReset (PLAY and STOP): the song's lanes are gone, the mixer's own stay
 
   // The tracks' inputs for this block: the voice pool adds into them (VoicePool::render(inputsL(), inputsR(), ...)). render() clears them.
   float* const* inputsL() { return inPL_; }
@@ -176,6 +189,12 @@ class Mixer {
   std::unique_ptr<float[]> in_, post_, preb_, c_;   // inputs, after-pan pairs, pre pairs (maxBlock each), the lanes' block values
   std::unique_ptr<double[]> d_;
   double capSec_;
+  BeatClock clk_;
+  struct Rd { DelayRing ring; DelayParam cd; };
+  std::unique_ptr<Rd[]> rd_;
+  std::unique_ptr<float[]> clkLane_, clkBus_, clkOut_;
+  const float* clkRd_[kMixTracks];
+  void clockBlock(int N, double t0);
   std::unique_ptr<Dly[]> dly_;
   std::unique_ptr<float[]> fd_, sc_;               // the delayed feeds (post, pre) of every track; a scratch pair for the master sum
   const float *fpL_[kMixTracks], *fpR_[kMixTracks], *feL_[kMixTracks], *feR_[kMixTracks];   // what a bus hears of each source (this block)

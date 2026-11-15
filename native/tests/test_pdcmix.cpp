@@ -141,7 +141,9 @@ int main() {
     for (int p = 0; p < PN; p++) { float* d = &pd[(size_t)p * NS]; for (int i = 0; i < NS; i++) d[i] = (float)std::sin(0.01 * (p % 7 + 1) * i) * (1.0f - (float)i / NS) * 0.3f; pads.buf[p].data = d; pads.buf[p].len = NS; pads.buf[p].sr = 48000; pads.kit[p].syn = p >= 8; pads.kit[p].rel = p >= 8 ? 0.1 : 0; pads.kit[p].choke = p == 3 ? 1 : 0; }
     SeqOpts o; o.once = true; o.row = song.renderFrom; const int N = 48000 * 4, B = 512;
     std::vector<float> aL((size_t)N), aR((size_t)N), bL((size_t)N), bR((size_t)N);
-    { SongRenderer R(song, vars, pads, 48000, B, o); for (int f = 0; f < N; f += B) R.block(&aL[(size_t)f], &aR[(size_t)f], std::min(B, N - f)); }
+    bool clkOk = false;
+    { SongRenderer R(song, vars, pads, 48000, B, o); for (int f = 0; f < N; f += B) R.block(&aL[(size_t)f], &aR[(size_t)f], std::min(B, N - f)); clkOk = R.stats().beats > 10 && R.mixer().clock().on() && R.mixer().clock().dropped() == 0 && R.mixer().beatLane()[B - 1] > 1.0f; }
+    check(clkOk, "ELECTRO: the renderer no longer drops the sequencer's beat events: the clock runs (beat + 1 > 1)");
     SongRenderer R(song, vars, pads, 48000, B, o); const BusPlan BP;   // (ELECTRO's own plan has pure sources: pdcPlan counts them routed, but no bus exists here until a chains host is plugged in (U14), so they would play early, as in the page when the chains node is missing)
     PdcSlot s{31, 0, true, true, 2048};   // a made-up latent effect on track 32 (empty in ELECTRO): everything else waits for it
     const PdcPlan plan = pdc_plan(BP, &s, 1, 48000, PdcMode::Auto); R.setPlan(plan, PdcMode::Auto, 0);
