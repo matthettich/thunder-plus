@@ -92,7 +92,7 @@ test('the Alt+A binding clashes with nothing: the only Alt+KeyA lines are the ju
   assert.equal(lines.length, 3, 'globalKeys, the Synth page and the Alt+A-again wrapper: ' + lines.map(l => l[0]).join(','));
   assert.ok(lines.every(([, l]) => /arrKeyToggle|arrBackGo/.test(l)));
   assert.ok(!/PIANO_CODE = \{[^}]*KeyA/.test(src), 'KeyA is not a piano key');
-  assert.match(src, /else if \(e\.altKey && \(arrow === 'up' \|\| arrow === 'down'\) && \(tv === 'phrase' \|\| tv === 'song'\)\)\{ if \(tv === 'phrase'\) optDir\(arrow, true\); else shiftAltArrow\(arrow\); \}\n\s+else if \(e\.altKey\) nav\(arrow\);/, 'Alt+▲▼ keep their meaning');
+  assert.match(src, /else if \(e\.altKey && \(arrow === 'up' \|\| arrow === 'down'\) && \(tv === 'phrase' \|\| tv === 'song'\)\)\{ if \(tv === 'phrase'\) optDir\(arrow, true\); else shiftAltArrow\(arrow\); \}\n\s+else if \(e\.altKey && \(arrow === 'up' \|\| arrow === 'down'\) && PATSTEP_V\.has\(tv\)\) otherPatStep\(arrow\);[^\n]*\n\s+else if \(e\.altKey\) nav\(arrow\);/, 'Alt+▲▼ keep their meaning on Phrase and Song');
   assert.match(src, /globalKeys = \(\.\.\.a\) => \{ const e = a\[0\];\n[^\n]*\n[^\n]*arrBackLive\(\)\)\{ arrBackGo\(\); return true; \}/, 'the second press runs outside apRun');
 });
 test('the help and README rows and the hint line say what the key does', () => {
@@ -100,6 +100,38 @@ test('the help and README rows and the hint line say what the key does', () => {
   assert.match(src, /<kbd>A<\/kbd><\/td><td>Jump to Arrange from any screen[\s\S]{0,400}?back to exactly where you were/);
   assert.match(H.read('README.md'), /\*\*Alt\+A\*\* \(Option\+A on a Mac\) jumps to Arrange[^\n]*back to exactly where you were/);
   assert.match(src, /Alt\+A or Esc: back to exactly where you were/);
+});
+
+
+// ---- ⌥▲▼ on Mixer / FX / MOD / INST (14 Nov, owner: "persist across pages even if there is nothing to edit on the current page") ----
+const stepSrc = cut(/const PATSTEP_V = [^\n]*\nfunction otherPatStep\(dir\)\{[\s\S]*?\n\}\n/, 'otherPatStep');
+function srig(tv, o = {}) {
+  const song = []; for (let y = 0; y < 256; y++) song.push(Array(33).fill(-1));
+  song[4][2] = 7; song[9][2] = 8; song[9][3] = 1;
+  const log = [];
+  const c = Object.assign({ tv, NT: 31, MT: 32, patNavOn: true, navT: 0, performance: { now: () => 5 }, ntr: () => 8, S: { song }, selA: { v: 'x' }, apHost: 'phrase', apLastKey: 'k', apF: null, cTrack: 2, cFxT: 2,
+    cs: { song: { x: 0, y: 4, top: 0, pg: true }, mixer: { x: 2, y: 0 } }, clamp: (v, a, b) => Math.max(a, Math.min(b, v)), log, draw: () => log.push('draw:' + c.apHost), apArrOk: () => true,
+    apTop: () => log.push('apTop'), apFollow: () => { log.push('follow:' + c.apHost); return true; },
+    songGridDir(d) { const y = c.cs.song.y + (d === 'down' ? 1 : -1); c.cs.song.y = y; log.push('grid:' + d + ':' + c.cs.song.x); } }, o);
+  vm.createContext(c); vm.runInContext(stepSrc.replace(/^const /gm, 'var '), c); vm.runInContext('this.step = otherPatStep; this.V = PATSTEP_V;', c); return c;
+}
+test('Alt+▲▼ on Mixer, FX, MOD and INST: the song position steps on this screen\'s track, the screen stays, Arrange and the followers update in the same redraw', () => {
+  for (const v of ['mixer', 'fx', 'mod', 'inst']) {
+    const c = srig(v); c.step('down');
+    assert.equal(c.tv, v, v + ' stays'); assert.equal(c.cs.song.x, 2, v + ': this track'); assert.equal(c.cs.song.y, 5); assert.equal(c.selA, null); assert.equal(c.cs.song.pg, false);
+    assert.deepEqual(c.log, ['grid:down:2', 'apTop', 'follow:' + v, 'draw:phrase'], v + ': Arrange paged, the screen followed, one draw'); assert.equal(c.apHost, 'phrase', 'apHost put back');
+  }
+  const m = srig('mixer', { cs: { song: { x: 0, y: 4, top: 0 }, mixer: { x: 6, y: 0 } } }); m.step('up'); assert.equal(m.cs.song.x, 6, 'the Mixer\'s own track');
+  const f = srig('fx', { cFxT: 31 }); f.step('up'); assert.equal(f.cs.song.x, 32, 'the master effects: the master column');
+});
+test('PATTERN NAV off: 16 rows, as on the Song screen', () => { const c = srig('mixer', { patNavOn: false }); c.cs.song.y = 20; c.step('down'); assert.equal(c.cs.song.y, 36); c.step('up'); c.step('up'); assert.equal(c.cs.song.y, 4); });
+test('wiring: KEYS-mode Alt+▲▼ on those screens run it; Alt+◀▶, Sect and Project still change screen; PAD mode keeps optDir; Project is reachable by tab, Alt+8 and Alt+◀▶', () => {
+  assert.match(src, /else if \(e\.altKey && \(arrow === 'up' \|\| arrow === 'down'\) && PATSTEP_V\.has\(tv\)\) otherPatStep\(arrow\);[^\n]*\n\s+else if \(e\.altKey\) nav\(arrow\);/);
+  const c = srig('mixer'); assert.deepEqual([...c.V].sort(), ['fx', 'inst', 'mixer', 'mod']);
+  assert.match(src, /if \(e\.altKey && !mod\)\{ const a = \{ArrowUp:'up'[^\n]*optDir\(a, true\); return true; \}/, 'the PAD branch returns before: PAD mode ALT+▲▼ is optDir\'s, unchanged');
+  assert.match(src, /VIEWS = \['song', 'sect', 'phrase', 'inst', 'mixer', 'fx', 'mod', 'project'\]/); assert.match(src, /e\.altKey && !mod && \/\^Digit\[1-8\]\$\/\.test\(e\.code\)\)\{ go\(VIEWS\[\+e\.code\.slice\(5\) - 1\]\)/, 'Alt+8 = Project');
+  assert.match(src, /if \(dir === 'up'\) return tv === 'mixer' \? go\(midV\) : tv !== 'project' \? go\('project'\) : null;/, 'nav() itself is untouched (Project, PAD SHIFT+▲)');
+  assert.match(H.read('README.md'), /Mixer, FX, MOD and Inst in KEYS mode: Alt\/⌥\+▲▼ step to the pattern above/);
 });
 
 const PW = process.env.PLAYWRIGHT || ['/opt/npm-tools/node_modules/playwright/index.mjs', '/opt/node-tools/node_modules/playwright/index.mjs'].find(f => fs.existsSync(f));
@@ -124,5 +156,11 @@ test('in a real page, real key events: Alt+A jumps, Alt+A / Esc come back; a blo
     const o = await st(); assert.equal(o.back, false, 'a block opened: no back'); assert.equal(o.apF, null);
     await B.page.keyboard.press('Alt+KeyA'); await B.page.waitForTimeout(150);
     assert.equal((await st()).apF, 'arr', 'jumps to Arrange again');
+    await B.page.keyboard.press('Escape'); await app(B.page, `(typeof setInMode === 'function' ? setInMode('keys') : (inMode = 'keys'), go('mixer'), cs.mixer.x = 0, cs.song.x = 0, cs.song.y = 0, draw(), 1)`);
+    for (const v of ['mixer', 'fx', 'mod', 'inst']) {
+      await app(B.page, `(go('${v}'), cs.song.y = 0, draw(), 1)`); const y0 = await app(B.page, `cs.song.y`);
+      await B.page.keyboard.press('Alt+ArrowDown'); await B.page.waitForTimeout(100);
+      assert.equal(await app(B.page, `tv`), v, v + ' stays'); assert.ok(Number(await app(B.page, `cs.song.y`)) > Number(y0), v + ': the song position moved down');
+    }
   } finally { await B.close(); }
 });
