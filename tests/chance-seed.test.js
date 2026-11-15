@@ -1,4 +1,4 @@
-// CHANCE AND SEEDS (build 608; owner, 14 Nov). Chance rolls (CHA, TCH, PRB) are a hash of the seed, the track and the place in the song,
+// CHANCE AND SEEDS (build 609; owner, 14 Nov). Chance rolls (CHA, TCH, PRB) are a hash of the seed, the track and the place in the song,
 // not draws from one shared stream: seeded, the same notes fall every time (a render matches what was heard), from the top or the middle,
 // and one track's rolls do not depend on another's notes. SED in the master column seeds the song, on a track that track; TCH is the
 // track's sticky chance (times CHA; the master column's: every track; MOD target tch:t); SKP what a skipped note does; CHD chords as one
