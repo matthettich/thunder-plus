@@ -71,6 +71,22 @@ jobs:
           name: thunder_core-wasm
           path: out/thunder_core.wasm
           retention-days: 7
+      # U02: the existing C++ DSP (tfx, thunder-dsp, mods) from CMake with the same wasi-sdk, pinned upstreams (third_party/PINS.md).
+      - name: Build tfx / thunder-dsp / mods wasm from CMake (U02)
+        run: WASI_SDK="$PWD/wasi-sdk" native/tools/build-wasm.sh "$RUNNER_TEMP/u02-wasm"
+      # Hash gate. continue-on-error until a run shows whether the committed files can be matched at the pinned commits
+      # (see native/core/third_party/PINS.md): the step's log is the evidence the manager reads.
+      - name: Parity u02 (CMake wasm vs committed files and vs dsp/build.sh)
+        continue-on-error: true
+        run: WASI_SDK="$PWD/wasi-sdk" native/tools/parity.sh u02 "$RUNNER_TEMP/u02-wasm"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: thunder_dsp-wasm-u02
+          path: |
+            ${{ runner.temp }}/u02-wasm/tfx.wasm
+            ${{ runner.temp }}/u02-wasm/thunder-dsp.wasm
+            ${{ runner.temp }}/u02-wasm/mods.wasm
+          retention-days: 7
 
   windows:
     name: Core (Windows x64, MSVC)
