@@ -10586,14 +10586,22 @@ function drumKits(){
     // the acoustic kits share one layout, so every funk break plays on any of them
     ['Funk kit (acoustic)', ['Kick', 'Snare', 'Snare (ghost)', 'Closed hat', 'Open hat', 'Floor tom', 'High tom', 'Crash']],
     ['Studio kit (acoustic)', ['Kick', 'Snare', 'Snare (ghost)', 'Closed hat', 'Open hat', 'Floor tom', 'High tom', 'Crash']],
-    ['Jazz kit (acoustic)', ['Kick', 'Snare', 'Snare (ghost)', 'Closed hat', 'Open hat', 'Floor tom', 'High tom', 'Ride']],
+    ['Jazz kit (acoustic)', ['Kick', 'Snare', 'Snare (ghost)', 'Closed hat', 'Open hat', 'Floor tom', 'High tom', 'Ride']],    ...MORE_KITS.map(([n, pads]) => [n + ' kit', pads.map(p => p[1]), pads]),   /* the third item marks a kit made of the new sounds */
   ];
 }
 // "808" from "808-style drums", "Funk" from "Funk kit (acoustic)": the prefix a kit's sounds carry in the Presets list.
 const kitTag = g => g.replace(/-style.*$| kit \(.*$/, '');
 // Pads 1–8 get the kit; the synth slots (and any further drum pads) stay as they are. Each pad is its own undo step.
 function loadClassicKit(i){
-  const K = drumKits()[i], G = K && drumKitGroups().find(g => g[0] === K[0]); if (!G) return;
+  const K = drumKits()[i];
+  if (K && K[2]){   /* a kit of the new sounds: each pad is looked up by type and name */
+    const L = moreDrumPresets2();
+    K[2].forEach(([ty, n], p) => { const it = L.find(e => e[0] === ty && e[1] === n); if (!it || !kit.voices[p]) return; kit.voices[p] = it[2](); changed(p, true); });
+    kit.name = K[0].replace(/ kit$/, '') + ' kit';
+    refreshAll(); save();
+    return toast(`${K[0].replace(/ kit$/, '')} kit on pads 1–8. Undo puts a pad back.`);
+  }
+  const G = K && drumKitGroups().find(g => g[0] === K[0]); if (!G) return;
   K[1].forEach((n, p) => { const it = G[1].find(e => e[0] === n); if (!it || !kit.voices[p]) return; kit.voices[p] = it[1](); changed(p, true); });
   kit.name = kitTag(K[0]) + '-style kit';
   refreshAll(); save();
@@ -10620,7 +10628,7 @@ async function importLxrKit(f){
   toast(`${K.name}: ${n} sounds on pads ${at + 1}–${at + n}.`);
 }
 async function pickClassicKit(){
-  const K = drumKits(), list = K.map(([g, pads]) => (g.includes('acoustic') ? kitTag(g) + ' kit (acoustic)' : kitTag(g)) + ' — ' + pads.filter(n => n !== 'Open hat').map(n => n === 'Closed hat' ? 'hats' : n === 'Snare (ghost)' ? 'ghost snare' : n.toLowerCase()).join(', '));
+  const K = drumKits(), list = K.map(([g, pads, full]) => full ? g + ' — ' + pads.slice(0, 3).join(', ').toLowerCase() + '…' : (g.includes('acoustic') ? kitTag(g) + ' kit (acoustic)' : kitTag(g)) + ' — ' + pads.filter(n => n !== 'Open hat').map(n => n === 'Closed hat' ? 'hats' : n === 'Snare (ghost)' ? 'ghost snare' : n.toLowerCase()).join(', '));
   const i = await askPick({title:'Drum kits', body:'Puts eight sounds from one kit on pads 1–8, in the factory kit’s order. The synth slots stay as they are. Every sound of each kit is also in a pad’s Presets list.'}, list);
   if (i >= 0) loadClassicKit(i);
 }
@@ -11181,9 +11189,9 @@ function moreDrumPresets2(){
   ['Rims & sticks', 'Cross stick (dry)', K('Cross stick (dry)', {pitch:520, size:0.15, tension:0.1, tenT:6, dec:30, damp:0.9, muffle:0.7, hard:0.9, pos:0.95, noise:0.35, shell:0.8, shellF:0.7}, {level:-1})],
   ['Rims & sticks', 'Wood ping rim', M('Wood ping rim', {mat:10, oct:3, exc:0, hard:1, dec:0.08, bright:0.7, pos:0.2}, {level:-1})],
   ['Rims & sticks', 'Clack rim', L('Clack rim', [
-    {type:'square', atk:0.05, dec:14, level:0.6, lpCut:6000, tune:49, fine:-14},
-    {type:'square', atk:0.05, dec:9, level:0.4, tune:56, fine:-12},
-    {type:'click', a:0.3, level:0.5, atk:0.05, dec:4}], {level:4.5})],
+    {type:'square', atk:0.05, dec:14, level:0.6, lpCut:6000, tune:37, fine:-14},
+    {type:'square', atk:0.05, dec:9, level:0.4, tune:44, fine:-12},
+    {type:'click', a:0.3, level:0.5, atk:0.05, dec:4}], {tune:12, level:4.5})],
   ['Rims & sticks', 'Lo-fi rim', L('Lo-fi rim', [
     {type:'tri', atk:0.05, dec:18, level:0.7, tune:46, fine:33},
     {type:'click', a:0.3, level:0.4, atk:0.05, dec:5}], {tune:12, fx:[PFX('crush', {down:0.3, bits:8, mix:0.6})], level:6})],
@@ -11371,18 +11379,18 @@ function moreDrumPresets2(){
   ['Cowbells, blocks & metal', 'Muted triangle', L('Muted triangle', [
     {type:'bell', a:0.9, b:0.3, tune:48, atk:0.1, dec:140, level:0.6}], {level:7})],
   ['Cowbells, blocks & metal', 'Finger cymbal', L('Finger cymbal', [
-    {type:'bell', a:0.7, b:0.5, tune:50, atk:0.1, dec:1500, level:0.4},
-    {type:'bell', a:0.7, b:0.5, tune:44, fine:30, atk:0.1, dec:1300, level:0.35}], {len:4, level:9.5})],
+    {type:'bell', a:0.7, b:0.5, tune:26, atk:0.1, dec:1500, level:0.4},
+    {type:'bell', a:0.7, b:0.5, tune:20, fine:30, atk:0.1, dec:1300, level:0.35}], {len:4, tune:24, level:9.5})],
   ['Cowbells, blocks & metal', 'Metal bar tap', L('Metal bar tap', [
     {type:'metal', a:0.15, b:0.2, atk:0.1, dec:90, hpCut:3500, lpCut:12000, level:0.5},
-    {type:'bell', a:0.4, b:0.2, tune:56, atk:0.1, dec:420, level:0.5}], {level:8})],
+    {type:'bell', a:0.4, b:0.2, tune:32, atk:0.1, dec:420, level:0.5}], {tune:24, level:7.5})],
   ['Cowbells, blocks & metal', 'Anvil tap', L('Anvil tap', [
     {type:'metal', a:0.3, atk:0.1, dec:140, hpCut:1500, level:0.5},
     {type:'sine', tune:33, pAmt:3, pDec:10, atk:0.1, dec:320, level:0.5}], {level:7})],
   ['Cowbells, blocks & metal', 'Chime tree', L('Chime tree', [
-    {type:'bell', a:0.8, b:0.2, tune:52, atk:0.1, dec:2200, level:0.35},
-    {type:'bell', a:0.8, b:0.2, tune:57, atk:0.1, dec:2000, level:0.3},
-    {type:'bell', a:0.8, b:0.2, tune:61, atk:0.1, dec:1800, level:0.3}], {len:5, level:8})],
+    {type:'bell', a:0.8, b:0.2, tune:28, atk:0.1, dec:2200, level:0.35},
+    {type:'bell', a:0.8, b:0.2, tune:33, atk:0.1, dec:2000, level:0.3},
+    {type:'bell', a:0.8, b:0.2, tune:37, atk:0.1, dec:1800, level:0.3}], {len:5, tune:24, level:8})],
   ['Cowbells, blocks & metal', 'Blip cowbell', BL('Blip cowbell', {pitch:600, kick:0, fm:0.5, fmR:1.5, decay:220, click:0.2, filt:0.1, res:0.4}, {level:0.5})],
   ['Cowbells, blocks & metal', 'Blip woodblock', BL('Blip woodblock', {pitch:1000, kick:0.2, kickT:5, click:0.5, decay:50, filt:0, res:0.3}, {level:-3})],
   ['Cowbells, blocks & metal', 'Chip cowbell', C('Chip cowbell', {wave:0, nfreq:0.4, nshort:0, atk:0, dec:40, sus:0, rel:10, pitch:0.5}, {level:-1})],
@@ -11455,6 +11463,22 @@ function moreDrumPresets2(){
   ['IDM & glitch', 'Sine ping', T('Sine ping', {wave:0, pitch:1800, bend:0, tdec:80, nLev:0, click:0}, {level:3.5})],
   ];
 }
+/* The new kits (build 615+): eight sounds each from moreDrumPresets2(), pads 1–8 in the factory kit's order (kick, snare, clap,
+   closed hat, open hat, tom, two extras). [name, [[type, preset name] × 8]]. Loaded by loadClassicKit like the machine kits. */
+const MORE_KITS = [
+  ['Electro 2', [['Kicks', 'Tight electro kick'], ['Snares', 'Tight electro snare'], ['Claps & snaps', 'Dry clap'], ['Closed hats', 'Closed hat (808-style tight)'], ['Open hats', 'Open hat (808-style long)'], ['Toms', 'Electro tom low'], ['Cowbells, blocks & metal', 'Cowbell (808-style)'], ['Rims & sticks', 'Electro rim']]],
+  ['IDM clicks', [['Kicks', 'Click kick'], ['Snares', 'Short snare'], ['Claps & snaps', 'Click snap'], ['Closed hats', 'Noise tick hat'], ['Open hats', 'Blip open hat'], ['Toms', 'Blip tom'], ['IDM & glitch', 'Click single'], ['IDM & glitch', 'Tick roll']]],
+  ['IDM metallic', [['Kicks', 'FM thud kick'], ['Snares', 'FM metallic snare'], ['Claps & snaps', 'FM noise clap'], ['Closed hats', 'FM tick hat'], ['Open hats', 'FM metal open hat'], ['Toms', 'FM metal tom'], ['IDM & glitch', 'Metal clang short'], ['IDM & glitch', 'Crushed metal hit']]],
+  ['Glitch', [['Kicks', 'Micro kick'], ['Snares', 'Zap snare'], ['Claps & snaps', 'Wood snap'], ['Closed hats', 'Blip glitch hat'], ['Open hats', 'Trash open hat'], ['Toms', 'Laser tom'], ['IDM & glitch', 'Data stutter'], ['IDM & glitch', 'Pitch dropout']]],
+  ['Deep sub', [['Kicks', 'Deep drop kick'], ['Snares', 'Low tuned snare'], ['Claps & snaps', 'Low thick clap'], ['Closed hats', 'Dark noise hat'], ['Open hats', 'Dark open hat'], ['Toms', 'Sub tom (long)'], ['Cowbells, blocks & metal', 'Pipe bell (modal)'], ['IDM & glitch', 'Sub pulse']]],
+  ['Hard', [['Kicks', 'Hardstyle thump kick'], ['Snares', 'Big room snare'], ['Claps & snaps', 'Huge hall clap'], ['Closed hats', 'Closed hat (909-style)'], ['Open hats', 'Open hat (909-style)'], ['Toms', 'Rock floor tom'], ['Cowbells, blocks & metal', 'Anvil tap'], ['Cymbals', 'Crash (909-style long)']]],
+  ['Lo-fi', [['Kicks', 'Dead lowpass kick'], ['Snares', 'Lo-fi snare'], ['Claps & snaps', 'Tape clap'], ['Closed hats', 'Lo-fi closed hat'], ['Open hats', 'Dark open hat'], ['Toms', 'Dead muffled tom'], ['Rims & sticks', 'Lo-fi rim'], ['IDM & glitch', 'Dust crackle']]],
+  ['Minimal', [['Kicks', 'Dry house kick'], ['Snares', 'Ghost note snare'], ['Claps & snaps', 'Soft band clap'], ['Closed hats', 'Soft noise hat'], ['Open hats', 'Half-open hat'], ['Toms', 'Jazz small tom'], ['Shakers & tambourines', 'Tight shaker'], ['Rims & sticks', 'Stick tick']]],
+  ['FM percussion', [['Kicks', 'FM bell kick'], ['Snares', 'FM clang snare'], ['Claps & snaps', 'FM noise clap'], ['Closed hats', 'FM sizzle closed hat'], ['Open hats', 'FM glass open hat'], ['Toms', 'FM tom mid'], ['Cowbells, blocks & metal', 'FM cowbell'], ['Hand drums', 'FM conga']]],
+  ['Breaks', [['Kicks', 'Beater kick (acoustic)'], ['Snares', 'Fat wood snare'], ['Snares', 'Ghost note snare'], ['Closed hats', 'Pedal hat'], ['Open hats', 'Half-open hat'], ['Toms', 'Rock floor tom'], ['Toms', 'Rock rack tom'], ['Cymbals', 'Sizzle ride']]],
+  ['Industrial', [['Kicks', 'Overdriven box kick'], ['Snares', 'Crack snare'], ['Claps & snaps', 'Gated clap (layers)'], ['Closed hats', 'Silver closed hat'], ['Open hats', 'Gated open hat'], ['Toms', 'Taiko big'], ['Cowbells, blocks & metal', 'Anvil tap'], ['IDM & glitch', 'Metal clang ring']]],
+  ['Chip', [['Kicks', 'Triangle chip kick'], ['Snares', 'Metal chip snare'], ['Claps & snaps', 'Chip clap'], ['Closed hats', 'Chip closed hat'], ['Open hats', 'Chip open hat'], ['Toms', 'Chip tom'], ['Cowbells, blocks & metal', 'Chip cowbell'], ['IDM & glitch', 'Chip zap']]],
+];
 // DRUMS BY TYPE (owner, 30 Oct): every drum sound in the pad Presets list sits in a group for its type (Kicks, Snares, …),
 // wherever it came from: the hand-made drums, the new ones above, the drum engines' presets (Tone drum, FM Drum, Skin, and
 // the drum ones of Breath, Chip, Bytebeat and Modal) and the classic and acoustic kits. A sound from an engine or kit keeps
