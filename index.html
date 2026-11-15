@@ -3244,7 +3244,7 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
       <h3>Engine</h3>
       <div class="segrow" title="Lowest answers the pads fastest; Safest uses a bigger buffer if you hear crackles. Changes when audio restarts"><span>Latency</span><div class="seg" id="segLat"></div></div>
       <div class="segrow" title="Device uses the output’s own rate. Changes when audio restarts"><span>Rate</span><div class="seg" id="segARate"></div></div>
-      <div class="audrow" title="Delays everything else so tracks with pump effects that look ahead (LIMIT, CALM, TONE, linear-phase EQ) stay in time. Off: those tracks play a little late. Renders follow this setting."><span>Latency comp</span><input type="checkbox" class="msw1" id="ckPdc" aria-label="Latency compensation"></div>
+      <div class="segrow" title="AUTO: lines every track up when an effect with look-ahead (CALM, TONE, LIMIT, TUNE, linear-phase EQ…) sits on a track or bus: the others wait for it while the song plays. Does nothing otherwise. Stopped, pads answer at once. ON: the same, also while stopped (pads feel later whenever such an effect is loaded). OFF: never: a track or bus with such an effect plays late. Renders follow this setting."><span>Latency comp</span><div class="seg" id="segPdc"></div></div>
       <div class="segrow" id="psLiveRow" hidden><span>Live engines</span><div class="seg" id="segPsLive"></div></div>
       <div class="segrow" id="coreRow" title="Where the song is sequenced. Audio thread: the steps are worked out on the audio thread and rendered pads play there, so a busy screen can’t make them late. Page: as before. On a phone or tablet it plays on the Page unless you pick Audio thread here, because loading it can slow the phone’s audio clock."><span>Sequencer</span><div class="seg" id="segCore"></div></div>
       <div class="segrow" id="noWkRow" title="For testing a phone whose audio clock runs fast. Off (test): track effects, chains, live engines and the audio-thread sequencer are silent or unused, and the safety limiter uses its simpler stand-in. Changes when the app reloads."><span>Worklets</span><div class="seg" id="segNoWk"></div></div>
@@ -3713,7 +3713,7 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
 <h3>Chopping breaks</h3>
 <p>Load a drum loop into a pad (Synth → Load sample), then on its instrument (<b>INST</b>) set <b>SLICES</b> (GRID cuts equal parts, HITS cuts at each drum hit it finds). Each note now plays one slice: C-4 the first, C#4 the second and so on, so you can rearrange the break in a phrase. <b>SYNC</b> fits the loop to the song tempo: set <b>BEATS</b> to how long the loop is (or use › GUESS BEATS). REPITCH changes its speed and pitch together; STRETCH keeps the pitch with smooth grains; LOOP keeps the pitch with little tempo-synced loops for a gritty, stuttery sound (<b>GRAIN</b> sets their length). › PLAY SLICES auditions them in order.</p>
 <h3>Chords and polyphony</h3>
-<p><b>The second half of the tracks is polyphonic</b> (9–16 with 16 tracks, 17–32 with 32; Settings → Song → Tracks): the green POLY box on the right of Song and Mixer. The first half, in the pink MONO box on the left, plays one note at a time. Open a phrase from a polyphonic track and it shows four note columns, N1–N4, so a row can hold a chord. Notes on these tracks ring over each other, up to 4 at a time per track; a fifth steals the oldest. A note OFF in any note column releases everything on the track. The mono tracks stay one note at a time, and a phrase played there uses only N1.</p>
+<p><b>The poly tracks play chords</b> (the last 8 of 16 in a new song; Settings → Song → MONO TRACKS and POLY TRACKS set how many of each, at least one of each, 8 to 24 tracks in all, or 32 without a voice per track): the green POLY box on the right of Song and Mixer. The mono tracks, in the pink MONO box on the left, play one note at a time. Open a phrase from a polyphonic track and it shows four note columns, N1–N4, so a row can hold a chord. Notes on these tracks ring over each other, up to 4 at a time per track; a fifth steals the oldest. A note OFF in any note column releases everything on the track. The mono tracks stay one note at a time, and a phrase played there uses only N1.</p>
 <h3>Two input modes</h3>
 <p><b>PAD</b> is a d-pad plus SHIFT, PLAY, ALT and EDIT, good with a thumb. <b>KEYS</b> is direct entry: type notes, hex and effects, with an on-screen keypad on touch screens. The keyboard works in both — in PAD mode Z and X stay ALT and EDIT and Alt+arrows page; everything else types as in KEYS. Switch with ⚙ Settings → Input (or Project → INPUT).</p>
 </section>
@@ -8623,7 +8623,7 @@ function asetSave(){ try { localStorage.setItem(AUK, JSON.stringify(aset)); } ca
 // RESET AUDIO SETTINGS (10 Nov, owner: "reset any testing settings"): the defaults of Settings → Audio's saved fields, in one place. A field
 // with no default of its own (latPick, corePick, noWk) is removed, which is how the loaders read "default". Output, level, MIDI, input engines,
 // Link and the playhead offset are the owner's setup, not tests, so they are not here. Used by the Reset audio settings button.
-function audResetAset(a){ a.lat = 'interactive'; a.rate = 0; a.pdc = false; a.psLive = 'auto'; a.core = 'core'; delete a.latPick; delete a.corePick; delete a.noWk; return a; }
+function audResetAset(a){ a.lat = 'interactive'; a.rate = 0; a.pdc = false; a.pdcMode = 'auto'; a.psLive = 'auto'; a.core = 'core'; delete a.latPick; delete a.corePick; delete a.noWk; return a; }
 const psLive = {off:false, strikes:0};   // …PUMP SYNTHS live: the safety net's switch for this visit (see psFallback)
 let aLive = null; // the latency and rate the running context was made with
 
@@ -9641,6 +9641,30 @@ const BASS_PRE = [
   ['Reese stab', {shape:0, parts:50, det:24, width:0.8, cut:800, res:0.3, fenv:3, fdec:300, dec:900, sus:0.7, rel:150, sub:0.5, vDrive:0.2}],
   ['Square pump', {shape:0.5, cut:150, res:0.5, fenv:0, wCut:4, wRate:8, wShape:4, wSmooth:0.1, sub:0.55, vDrive:0.2}],
   ['Talk box', {shape:0, cut:1800, res:0.3, fenv:0, vowel:0.5, form:0.8, wVowel:0.7, wShape:1, wRate:6, wSmooth:0.3, sub:0.4, vDrive:0.3}],
+  // (14 Nov) more presets
+  ['Round sub boom', {parts:2, tilt:-0.6, sub:0.8, cut:220, res:0.1, fenv:0, key:0.3, atk:2, dec:2500, sus:0.3, rel:120, vDrive:0.35}],
+  ['Triangle sub', {shape:1, parts:6, tilt:-0.8, sub:0.5, cut:500, res:0.1, fenv:0, key:0.4, atk:4, sus:1, rel:100}],
+  ['Acid saw 16th', {shape:0, cut:220, res:0.75, fenv:3.5, fdec:160, dec:380, sus:0.5, sub:0.3, glide:60, vDrive:0.55}],
+  ['Acid square', {shape:0.5, cut:260, res:0.7, fenv:3, fdec:140, dec:300, sus:0.5, sub:0.35, glide:40, legato:1, vDrive:0.5}],
+  ['Detroit fat', {shape:0.3, parts:56, det:10, width:0.5, cut:500, res:0.3, fenv:2, fdec:200, dec:500, sus:0.6, sub:0.55, vDrive:0.2}],
+  ['Reese slow', {shape:0, parts:56, det:22, width:1, cut:600, res:0.2, fenv:0, wCut:1.2, wRate:2, wShape:0, wSmooth:0.3, sub:0.55, vDrive:0.25}],
+  ['Reese dark', {shape:0, parts:40, det:12, width:0.8, cut:300, res:0.15, fenv:0, key:0.6, sub:0.65, glide:30, vDrive:0.15}],
+  ['FM clang bass', {shape:0.5, parts:20, stretch:0.5, cut:1800, res:0.3, fenv:0, sub:0.4, atk:1, dec:600, sus:0.5, vDrive:0.4}],
+  ['Metal pluck', {shape:0, parts:32, stretch:0.25, comb:0.5, combF:0.4, cut:300, res:0.3, fenv:3, fdec:120, dec:600, sus:0.25, rel:60, sub:0.3, vDrive:0.85}],
+  ['Hollow odd', {shape:0.5, parts:30, oddeven:-1, cut:900, res:0.2, fenv:0, sub:0.5, key:0.6}],
+  ['Even buzz', {shape:0, parts:40, oddeven:1, cut:1200, res:0.25, fenv:0, sub:0.45, key:0.6}],
+  ['Pluck sub', {parts:4, tilt:-0.3, sub:0.8, cut:300, res:0.2, fenv:3, fdec:100, dec:900, sus:0.2, rel:80, vDrive:0.5}],
+  ['Slap', {shape:0, cut:150, res:0.5, fenv:5, fdec:70, dec:250, sus:0.35, rel:60, comb:0.2, combF:0.3, sub:0.4, vDrive:0.45}],
+  ['Vowel crawl', {shape:0, cut:2000, res:0.2, fenv:0, form:0.85, vowel:0, wVowel:1, wRate:2, wShape:1, wSmooth:0.5, sub:0.45, vDrive:0.2}],
+  ['Dub wobble 1/2', {shape:0.2, cut:90, res:0.5, fenv:0, wCut:4, wRate:3, wShape:0, sub:0.6, vDrive:0.2}],
+  ['Tremolo sub', {parts:3, tilt:-0.4, sub:0.55, cut:600, res:0.1, fenv:0, wAmp:0.85, wRate:8, wShape:1, wSmooth:0.1}],
+  ['Fade-in wobble', {shape:0.3, cut:110, res:0.55, fenv:0, wCut:4.5, wRate:8, wShape:0, wDelay:400, wFade:900, sub:0.55, vDrive:0.25}],
+  ['Stepped grinder', {shape:0, parts:48, cut:200, res:0.6, fenv:0, comb:0.4, combF:0.35, wCut:3.5, wRate:10, wShape:5, wSmooth:0.1, sub:0.4, vDrive:0.4}],
+  ['Fuzz bass', {shape:0.3, parts:32, cut:800, res:0.2, fenv:1, fdec:200, dec:400, sus:0.7, sub:0.4, vDrive:0.8}],
+  ['Mono lead', {oct:1, shape:0.1, parts:32, cut:3000, res:0.3, fenv:0, key:0.8, sub:0.15, glide:80, legato:1, atk:8, rel:120}],
+  ['Dark drone', {oct:-1, shape:0, parts:36, det:8, width:0.9, cut:250, res:0.1, fenv:0, wCut:1, wRate:0, wShape:0, wSmooth:0.5, sub:0.8, atk:500, sus:1, rel:900, vDrive:0.4}],
+  ['Pulse stab bass', {shape:0.5, parts:32, cut:350, res:0.4, fenv:4, fdec:110, dec:500, sus:0.3, rel:50, sub:0.35, vDrive:0.5}],
+  ['Bright saw riff', {shape:0, parts:64, tilt:0.4, cut:1800, res:0.4, fenv:2, fdec:150, dec:350, sus:0.5, sub:0.2, vDrive:0.6}],
 ];
 const BU_SECS = [
   ['Source', ['oct', 'shape', 'parts', 'tilt', 'oddeven', 'stretch', 'sub', 'subOct']],
@@ -9841,6 +9865,18 @@ const BLIP_PRE = [
   ['Wood', {pitch:620, kick:0.25, kickT:8, decay:70, filt:-0.25, res:0.6, click:0.4}],
   ['Glitch', {pitch:900, kick:0.3, kickT:10, decay:70, grain:6, grainT:28, fm:0.25, fmR:2}],
   ['Tremolo tone', {pitch:330, kick:0, ring:0.7, ringF:14, decay:700}],
+  // (15 Nov) more presets
+  ['Sub sine', {pitch:55, kick:0, click:0, decay:900, atk:3, filt:-0.3}],
+  ['FM bleep', {pitch:660, kick:0, fm:0.5, fmR:2, click:0.05, decay:260, atk:1}],
+  ['FM bass pluck', {pitch:82, kick:0.05, kickT:10, fm:0.6, fmR:1, decay:380, drive:0.3, filt:-0.2, res:0.3}],
+  ['Ring bell', {pitch:1100, kick:0, ring:0.7, ringF:2300, fm:0.2, fmR:3, decay:1800, atk:1}],
+  ['Glass tone', {pitch:1500, kick:0, fm:0.2, fmR:5.5, decay:2500, atk:2, filt:-0.15}],
+  ['Dark drone', {pitch:65, kick:0, fm:0.2, fmR:0.5, ring:0.3, ringF:3, decay:3500, atk:60, drive:0.2, filt:-0.5}],
+  ['Stutter bleep', {pitch:880, kick:0, fm:0.25, fmR:1.5, decay:300, grain:4, grainT:45}],
+  ['Buzz tone', {pitch:110, kick:0, ring:0.9, ringF:220, drive:0.5, decay:700, atk:5}],
+  ['Noisy whistle', {pitch:2400, kick:0, noise:0.35, filt:0.2, res:0.8, decay:900, atk:20}],
+  ['Resonant pluck', {pitch:330, kick:0.1, kickT:6, click:0.5, decay:300, filt:-0.2, res:0.6, drive:0.3}],
+  ['Metal swell', {pitch:520, kick:0, fm:0.7, fmR:3.73, ring:0.6, ringF:1900, decay:2200, atk:100}]
 ];
 const blipRows = [];
 const BL = () => { const v = V(); if (!v.blip) v.blip = normBlip(null); return v.blip; };
@@ -9932,6 +9968,18 @@ const VOX_PRE = [
   ['Buzz box', {robot:1, bw:0, clar:1, bright:0.85, choir:2, spread:0.15, vib:0}],
   ['Monster', {oct:-1, form:-1, rough:0.6, robot:0.4, vib:0.1, drive:0.4}],
   ['Fairy', {form:0.7, breath:0.5, choir:3, spread:0.4, vib:0.4, robot:0.1}],
+  // (15 Nov) more presets
+  ['Vowel pad', {choir:5, spread:0.7, vib:0.15, atk:400, rel:1800, bw:0.8, breath:0.2, clar:0.5, robot:0.05}],
+  ['Sub vowel', {oct:-2, form:-0.8, robot:0.3, vib:0.05, bright:0.35, bw:0.6, glide:100, atk:40, rel:300}],
+  ['Whisper pad', {voice:0.05, breath:1, choir:6, spread:0.9, bright:0.6, vib:0, atk:400, rel:2000}],
+  ['Glitch robot', {robot:1, breath:0, vib:0, glide:0, bright:0.6, bw:0.35, clar:0.7, cons:1.8, atk:0.5, rel:30, form:-0.2}],
+  ['Formant lead', {oct:1, form:0.3, robot:0.5, vib:0.35, vibDelay:200, bright:0.85, bw:0.2, clar:0.9, glide:60}],
+  ['Detuned choir bed', {choir:8, spread:1, vib:0.5, vibRate:4, bright:0.5, bw:0.75, atk:400, rel:2500, rough:0.15, breath:0.3}],
+  ['Gritty throat', {oct:-1, rough:1, form:-0.3, bright:0.7, vib:0, drive:0.5, bw:0.3, glide:30}],
+  ['Airy voice', {voice:0.5, breath:0.9, vib:0.2, bright:0.75, bw:0.6, clar:0.4, atk:150, rel:700}],
+  ['Tight stab voice', {robot:0.4, bright:0.8, vib:0, glide:0, cons:1.6, atk:1, rel:40, clar:0.9, bw:0.2}],
+  ['Portamento trio', {choir:3, spread:0.6, vib:0.5, vibRate:4.5, vibDelay:600, glide:450, bw:0.65, breath:0.35, atk:120, rel:700, form:0.1, robot:0.35}],
+  ['Alien choir', {choir:4, spread:0.9, form:0.9, robot:0.8, bright:0.9, vib:0.7, vibRate:8, rough:0.3, atk:300, rel:1500}]
 ];
 const VOX_SECS = [
   ['Voice', ['oct', 'form', 'robot', 'voice', 'breath', 'bright', 'bw', 'clar', 'rough']],
@@ -12696,7 +12744,28 @@ const XUI = {
       ['Tight 16th', {cut:650, res:0.7, envAmt:0.55, dec:110, ampDec:320, sus:0.25, rel:30, sat:0.3, slide:0}],
       ['Acid pad', {wave:0.3, cut:520, res:0.55, envAmt:0.3, dec:2500, ampDec:4000, sus:1, rel:400, slide:0, key:0.4, sat:0.1}],
       ['Rolling bass', {oct:0, wave:0.5, sub:0.6, cut:200, res:0.55, envAmt:0.5, dec:250, slide:60, ampDec:1000, sus:0.8}],
-      ['Wow siren', {cut:350, res:1, envAmt:1, dec:800, key:0.5, sat:0.5, ampDec:1800, sus:0.7}]]},
+      ['Wow siren', {cut:350, res:1, envAmt:1, dec:800, key:0.5, sat:0.5, ampDec:1800, sus:0.7}],
+      // (14 Nov) more presets
+      ['Acid stab', {oct:2, wave:0, cut:2200, res:0.4, envAmt:0.5, dec:120, ampDec:260, sus:0, rel:40, slide:0, sat:0.3}, {drive:0.35}],
+      ['Zap chirp', {oct:2, wave:0.1, cut:3500, res:0.9, envAmt:1, dec:45, ampDec:150, sus:0, rel:15, slide:0, sat:0.3}, {drive:0.2}],
+      ['Wide pulse lead', {oct:2, wave:1, pw:0.2, cut:2400, res:0.35, envAmt:0.25, dec:800, key:0.8, ampDec:2500, sus:1, rel:50, slide:60}],
+      ['Tight squelch', {cut:380, res:1, envAmt:0.9, dec:90, ampDec:240, sus:0.15, rel:25, slide:0, sat:0.5}, {drive:0.35}],
+      ['Sine sub drop', {oct:0, wave:1, pw:0.5, sub:1, cut:120, res:0, envAmt:0, dec:300, key:1, sat:0, ampDec:3000, sus:1, rel:80, slide:0}],
+      ['Hiss acid', {wave:0.5, noise:0.6, cut:3000, res:0.7, envAmt:0.4, dec:150, key:0.5, sat:0.4, ampDec:300, sus:0.2, slide:0}, {drive:0.4}],
+      ['Fat open saw', {wave:0, sub:0.4, cut:1500, res:0.1, envAmt:0.1, dec:400, key:0.5, sat:0.35, ampDec:1800, sus:0.9, rel:60}],
+      ['Bleep ping', {oct:3, wave:1, pw:0.5, cut:2500, res:1.05, envAmt:0, dec:200, key:1, sat:0, ampDec:110, sus:0, rel:30, slide:0}],
+      ['Pluck bass', {oct:0, wave:0, cut:140, res:0.5, envAmt:0.9, dec:90, key:0.2, sat:0.3, ampDec:320, sus:0, rel:40, slide:0}, {drive:0.35}],
+      ['Fuzz sub acid', {oct:0, wave:1, pw:0.5, sub:0.4, cut:320, res:0.6, envAmt:0.5, dec:220, sat:0.8, ampDec:900, sus:0.8}, {drive:0.15}],
+      ['Needle pulse', {oct:1, wave:1, pw:0.06, noise:0.1, cut:1500, res:0.3, envAmt:0, dec:300, key:0.6, sat:0.2, ampDec:700, sus:0.5}],
+      ['Sparkle top', {oct:3, wave:0.5, cut:4000, res:0.5, envAmt:0.5, dec:50, key:0.8, sat:0.2, ampDec:140, sus:0, rel:30, slide:0}, {drive:0.5}],
+      ['Filter rise', {oct:0, wave:0, noise:0.1, cut:60, res:0.95, envAmt:1, dec:2800, key:0, sat:0.4, ampDec:4000, sus:1, rel:300, slide:0}],
+      ['Electro bass', {oct:0, wave:0.7, sub:0.3, cut:400, res:0.5, envAmt:0.5, dec:150, sat:0.3, ampDec:500, sus:0.5, rel:50}],
+      ['Rave squeal', {oct:1, wave:0.3, pw:0.5, cut:1800, res:0.85, envAmt:0.6, dec:1200, key:0.7, sat:0.7, ampDec:3000, sus:1, slide:250}, {drive:0.25}],
+      ['Gated stutter', {oct:1, wave:0, cut:700, res:0.8, envAmt:0.6, dec:70, key:0.3, sat:0.4, ampDec:130, sus:0, rel:10, slide:0}, {drive:0.35}],
+      ['Wet bubble', {oct:1, wave:0.2, cut:220, res:0.9, envAmt:1, dec:260, slide:300, key:0.2, sat:0.2, ampDec:500, sus:0.2, rel:30}, {drive:0.35}],
+      ['Bright growl lead', {oct:2, wave:0, cut:1200, res:0.75, envAmt:0.5, dec:1800, key:0.6, sat:0.5, ampDec:3000, sus:0.9, slide:120}],
+      ['Mellow keys', {oct:2, wave:0.6, cut:700, res:0.2, envAmt:0.3, dec:400, key:0.8, sat:0, ampDec:1000, sus:0.2, rel:200, slide:0}, {drive:0.3}],
+      ['Deep stab', {oct:0, wave:0.3, sub:0.4, cut:300, res:0.4, envAmt:0.6, dec:200, key:0.8, sat:0.3, ampDec:350, sus:0.1, rel:60, slide:0}, {drive:0.4}]]},
   mach:{title:'Machine', tag:'machines · HP/LP · LFO', rows:{
       machine:{l:'Machine', min:0, max:6, c:'int', d:0, f:nameOf(MachCore.MACHINES)},
       oct:{l:'Octave', min:-1, max:3, c:'int', d:2, f:v => 'C' + (2 + Math.round(v))},
@@ -12734,7 +12803,19 @@ const XUI = {
       ['Electro tom', {wave:0, pitch:110, bend:12, bendT:120, tdec:420, nLev:0.08}], ['Spectra perc', {wave:4, pitch:320, spectra:0.6, bend:4, tdec:260, nLev:0.1}],
       ['Noise hat', {tLev:0, nType:2, nFreq:8000, nRes:0.2, nDec:60, nLev:0.9, click:0.1}], ['Open hat', {tLev:0, nType:2, nFreq:7000, nRes:0.35, nDec:450, nLev:0.8, click:0.05}],
       ['Clap-ish', {tLev:0, nType:1, nFreq:1300, nRes:0.4, nDec:240, nLev:0.9, nSweep:0.3}], ['Zap tom', {wave:3, pitch:300, bend:36, bendT:60, tdec:180, dist:0.3, nLev:0}],
-      ['Resonant ping', {tLev:0.3, nType:3, nFreq:900, nRes:0.95, nDec:400, nLev:0.6}], ['Dirty kick', {wave:0, pitch:48, bend:30, bendT:40, tdec:550, dist:0.6, click:0.5, nLev:0}]]},
+      ['Resonant ping', {tLev:0.3, nType:3, nFreq:900, nRes:0.95, nDec:400, nLev:0.6}], ['Dirty kick', {wave:0, pitch:48, bend:30, bendT:40, tdec:550, dist:0.6, click:0.5, nLev:0}],
+      /* (15 Nov) more presets */
+      ['Sub sine tone', {wave:0, pitch:55, bend:0, tdec:1500, tLev:1, nLev:0, click:0}],
+      ['Saw bass tone', {wave:2, pitch:65, bend:2, bendT:20, tdec:600, nLev:0, click:0.1, dist:0.3}],
+      ['Square lead blip', {wave:3, pitch:520, bend:0, tdec:300, nLev:0, click:0.05}],
+      ['Rising zap', {wave:1, pitch:200, bend:-18, bendT:140, tdec:260, nLev:0, dist:0.1}],
+      ['Falling laser', {wave:3, pitch:900, bend:36, bendT:90, tdec:350, nLev:0, dist:0.2}],
+      ['Spectra bell', {wave:4, pitch:660, spectra:0.8, bend:0, tdec:1800, tLev:0.9, nLev:0, click:0.1}],
+      ['Spectra pad tone', {wave:4, pitch:220, spectra:0.4, bend:0, tdec:3500, tLev:0.8, nLev:0.1, nType:1, nFreq:900, nDec:3000}],
+      ['Ping noise tone', {wave:0, pitch:440, bend:0, tdec:400, tLev:0.4, nType:3, nFreq:1100, nRes:0.97, nDec:1200, nLev:0.6, click:0}],
+      ['Fuzz saw drone', {wave:2, pitch:110, bend:0, tdec:2500, dist:0.9, tLev:0.8, nLev:0.05, click:0}],
+      ['Triangle pluck', {wave:1, pitch:330, bend:3, bendT:15, tdec:250, nLev:0, click:0.2}],
+      ['Metal hiss tone', {wave:4, pitch:1500, spectra:1, bend:0, tdec:500, tLev:0.5, nType:2, nFreq:7000, nRes:0.5, nDec:700, nLev:0.4}]]},
   modal:{title:'Modal', tag:'material · exciter · modes', rows:{
       mat:{l:'Material', min:0, max:11, c:'int', d:0, f:nameOf(ModalCore.MATERIALS)}, oct:{l:'Octave', min:-1, max:4, c:'int', d:2, f:v => 'C' + (2 + Math.round(v))},
       exc:{l:'Exciter', min:0, max:4, c:'int', d:0, f:nameOf(ModalCore.EXCITERS)}, hard:{l:'Hardness', min:0, max:1, c:'lin', d:0.55, f:pct},
@@ -12758,7 +12839,24 @@ const XUI = {
       ['Dark gong swell', {mat:5, oct:0, exc:2, bow:0.5, hard:0.2, dec:7, bright:0.3, inharm:0.3}],
       ['Glass bowl', {mat:7, exc:2, bow:0.5, dec:6, bright:0.45, modes:10}],
       ['Cymbal plate', {mat:11, oct:3, exc:0, hard:1, dec:1.2, bright:0.9, inharm:0.8, modes:24}],
-      ['Muted marimba bass', {mat:1, oct:0, exc:0, hard:0.3, dec:0.45, bright:0.3, pos:0.3}]]},
+      ['Muted marimba bass', {mat:1, oct:0, exc:0, hard:0.3, dec:0.45, bright:0.3, pos:0.3}],
+      /* (15 Nov) more presets */
+      ['Deep marimba bass', {mat:1, oct:0, exc:0, hard:0.35, dec:0.8, bright:0.3, dtilt:0.6, pos:0.2}],
+      ['Hard vibes stab', {mat:2, oct:2, exc:0, hard:0.9, dec:1.0, bright:0.7, dtilt:0.6, pos:0.3}],
+      ['Bowed glock', {mat:3, oct:3, exc:2, bow:0.6, dec:3, bright:0.6}],
+      ['Breath bell', {mat:4, oct:2, exc:4, bow:0.5, noise:0.3, dec:3, bright:0.5}],
+      ['Pluck bell', {mat:4, oct:3, exc:3, hard:0.8, dec:2.2, bright:0.6, inharm:0.2}],
+      ['Wood marimba pluck', {mat:10, oct:2, exc:3, hard:0.6, dec:0.6, bright:0.5, pos:0.15}],
+      ['Glass pluck', {mat:7, oct:3, exc:3, hard:0.8, dec:1.8, bright:0.65, pos:0.12}],
+      ['Tube drone', {mat:9, oct:1, exc:4, bow:0.8, noise:0.2, dec:7, bright:0.4, modes:10}],
+      ['String harp', {mat:8, oct:2, exc:3, hard:0.5, dec:3, bright:0.5, dtilt:0.4, pos:0.1}],
+      ['Bar pad', {mat:0, oct:2, exc:2, bow:0.4, hard:0.3, dec:8, bright:0.35, dtilt:0.4}],
+      ['Bowed vibes', {mat:2, oct:1, exc:2, bow:0.55, hard:0.4, dec:4, bright:0.45, dtilt:0.4}],
+      ['Noise glass', {mat:7, oct:3, exc:1, hard:0.7, noise:0.3, dec:1.5, bright:0.7, inharm:0.4}],
+      ['Short glock tick', {mat:3, oct:4, exc:0, hard:1, dec:0.25, bright:0.8, dtilt:0.7, modes:6}],
+      ['Low tube bell', {mat:4, oct:0, exc:0, hard:0.5, dec:6, bright:0.4, dtilt:0.3}],
+      ['Gong chime', {mat:5, oct:3, exc:0, hard:0.8, dec:3.5, bright:0.6, inharm:0.4, modes:12}],
+      ['Dark membrane hum', {mat:6, oct:0, exc:2, bow:0.5, hard:0.2, dec:5, bright:0.25, dtilt:0.5}]]},
   piano:{title:'Piano', tag:'struck strings · hammer · soundboard', rows:{
       oct:{l:'Octave', min:-1, max:4, c:'int', d:2, f:v => 'C' + (2 + Math.round(v))},
       hard:{l:'Hammer', min:0, max:1, c:'lin', d:0.55, f:v => v < 0.33 ? 'Soft ' + pct(v) : v < 0.7 ? 'Medium ' + pct(v) : 'Hard ' + pct(v)},
@@ -12777,7 +12875,18 @@ const XUI = {
       ['Detuned tack', {strings:2, det:0.8, inharm:0.8, hard:0.75, bright:0.7, dec:0.6, thump:0.2}],
       ['Music box piano', {oct:4, strings:1, hard:0.8, bright:0.9, dec:0.35, inharm:0.2, body:0.1, thump:0, rel:50}],
       ['Ballad grand', {hard:0.35, bright:0.4, dec:1.8, body:0.6, thump:0.4, rel:400, pedal:1}],
-      ['Dark felt pad', {hard:0.1, bright:0.15, dec:2.5, pedal:1, body:0.7, det:0.5, rel:800}]]},
+      ['Dark felt pad', {hard:0.1, bright:0.15, dec:2.5, pedal:1, body:0.7, det:0.5, rel:800}],
+      /* (15 Nov) more presets */
+      ['Dry studio grand', {hard:0.5, bright:0.5, dec:0.7, body:0.35, thump:0.3, det:0.2, rel:120}],
+      ['Muted felt', {hard:0.2, bright:0.2, dec:0.5, body:0.5, thump:0.6, strings:2, rel:60}],
+      ['Bell piano', {oct:3, hard:0.9, bright:0.95, dec:1.5, inharm:0.9, strings:2, body:0.1, thump:0}],
+      ['Prepared piano', {hard:0.8, bright:0.35, dec:0.4, inharm:1, det:1, strings:2, thump:0.7, body:0.2, rel:40}],
+      ['Sub piano', {oct:-1, hard:0.5, bright:0.3, dec:1.2, body:0.7, thump:0.6, strings:2}],
+      ['Wide pedal pad', {hard:0.3, bright:0.4, dec:3, det:0.7, strings:3, pedal:1, body:0.6, rel:1200}],
+      ['Stab chord piano', {oct:2, hard:1, bright:0.8, dec:0.3, body:0.3, thump:0.4, rel:50}],
+      ['Glass hammers', {oct:3, hard:1, bright:1, dec:0.6, strings:1, inharm:0.3, body:0, thump:0, rel:60}],
+      ['Broken upright', {hard:0.65, bright:0.45, det:1, inharm:0.7, dec:0.6, body:0.8, thump:0.5, strings:3}],
+      ['Long soft decay', {hard:0.25, bright:0.35, dec:3, body:0.5, thump:0.3, rel:900}]]},
   ep:{title:'Tine EP', tag:'tine · pickup bark · bell · tremolo', rows:{
       oct:{l:'Octave', min:-1, max:4, c:'int', d:2, f:v => 'C' + (2 + Math.round(v))},
       hard:{l:'Hammer', min:0, max:1, c:'lin', d:0.5, f:pct}, bark:{l:'Bark', min:0, max:1, c:'lin', d:0.45, f:pct}, bell:{l:'Bell', min:0, max:1, c:'lin', d:0.4, f:pct},
@@ -12794,7 +12903,18 @@ const XUI = {
       ['Wurly bark', {hard:0.75, bark:0.85, bell:0.2, tone:0.55, dec:0.6, trem:0.3, tremRate:6}],
       ['Dreamy chorus', {hard:0.3, bark:0.15, bell:0.5, tone:0.55, dec:2.4, trem:0.4, tremRate:2.2, rel:600}],
       ['Crystal tines', {oct:3, hard:0.7, bark:0.05, bell:1, tone:0.95, dec:1.4}],
-      ['Tape EP', {hard:0.4, bark:0.5, tone:0.3, trem:0.25, tremRate:1.5, dec:1.5}, {drive:0.15}]]},
+      ['Tape EP', {hard:0.4, bark:0.5, tone:0.3, trem:0.25, tremRate:1.5, dec:1.5}, {drive:0.15}],
+      /* (15 Nov) more presets */
+      ['Soft sub EP', {oct:0, hard:0.3, bark:0.15, bell:0.05, tone:0.3, dec:1.2, rel:200}],
+      ['Growl bass EP', {oct:0, hard:0.95, bark:1, bell:0.1, tone:0.6, dec:0.5}],
+      ['Slow tremolo pad', {hard:0.25, bark:0.1, bell:0.4, tone:0.45, dec:3, trem:0.8, tremRate:1.2, rel:1000}],
+      ['Fast vibrato keys', {hard:0.5, bark:0.4, bell:0.3, tone:0.6, trem:0.7, tremRate:9, dec:1}],
+      ['Bell-only EP', {oct:3, hard:0.5, bark:0, bell:1, tone:1, dec:2.5, rel:500}],
+      ['Short pluck EP', {hard:0.7, bark:0.5, bell:0.3, tone:0.6, dec:0.25, rel:60}],
+      ['Dark chord EP', {hard:0.35, bark:0.3, bell:0.1, tone:0.15, dec:1.5, rel:400}],
+      ['Biting lead EP', {oct:3, hard:1, bark:0.9, bell:0.6, tone:0.9, dec:1}],
+      ['Warped tine', {hard:0.6, bark:0.7, bell:0.8, tone:0.2, dec:2, trem:0.35, tremRate:0.7}],
+      ['Mellow wash EP', {hard:0.15, bark:0.05, bell:0.2, tone:0.5, dec:3, trem:0.2, tremRate:3.2, rel:1200}]]},
   organ:{title:'Organ', tag:'drawbars · percussion · click · rotary', rows:{
       oct:{l:'Octave', min:-1, max:4, c:'int', d:2, f:v => 'C' + (2 + Math.round(v))},
       d1:{l:"16′", min:0, max:8, c:'int', d:8, f:v => String(Math.round(v))},
@@ -12824,7 +12944,18 @@ const XUI = {
       ['Pedal bass', {oct:0, d1:8, d2:6, d3:0, d4:0, click:0.2, atk:3, rel:50, bright:0.4}],
       ['Tonewheel vibe', {d1:8, d2:8, d3:6, d4:0, perc:0, click:0.3, rotary:1, rotDepth:0.35, bright:0.65}],
       ['Cathedral', {d1:8, d2:6, d3:8, d4:4, d5:0, d6:0, d7:0, d8:0, d9:0, click:0, atk:80, rel:1200, bright:0.5}],
-      ['Tight funk chop', {d1:0, d2:0, d3:8, d4:8, perc:2, percLv:0.6, percDec:90, pluck:0.9, pluckDec:90, click:0.7, rel:20}, {drive:0.1}]]},
+      ['Tight funk chop', {d1:0, d2:0, d3:8, d4:8, perc:2, percLv:0.6, percDec:90, pluck:0.9, pluckDec:90, click:0.7, rel:20}, {drive:0.1}],
+      /* (15 Nov) more presets */
+      ['Sub drawbar bass', {oct:0, d1:8, d2:0, d3:5, d4:0, click:0.3, atk:4, rel:50, bright:0.35}],
+      ['Acid organ bass', {oct:1, d1:0, d2:0, d3:8, d4:6, d5:0, click:0.7, pluck:0.6, pluckDec:200, bright:0.55, rel:30}],
+      ['Thin reed', {d1:0, d2:0, d3:8, d4:0, d5:0, d6:8, d7:0, d8:6, d9:5, click:0.2, bright:0.9, rotary:0}],
+      ['Slow rotary pad', {d1:8, d2:4, d3:8, d4:5, d5:0, d6:3, d7:0, d8:0, d9:0, click:0.1, atk:200, rel:900, rotary:1, rotDepth:0.8, bright:0.55}],
+      ['Fast rotary lead', {oct:3, d1:0, d2:0, d3:8, d4:6, d5:0, d6:4, d7:0, d8:0, d9:0, click:0.4, rotary:2, rotDepth:0.7, bright:0.8, atk:6, rel:80}],
+      ['Pluck stab organ', {oct:3, d1:4, d2:0, d3:8, d4:0, d5:0, d6:8, d7:0, d8:0, d9:6, rotary:1, rotDepth:0.4, click:0.7, pluck:0.65, pluckDec:200, bright:0.95, rel:20}],
+      ['Quiet chapel', {d1:6, d2:0, d3:8, d4:0, d5:0, d6:0, d7:0, d8:0, d9:0, click:0.02, atk:120, rel:1500, bright:0.3}],
+      ['Hollow flute pipe', {d1:0, d2:0, d3:8, d4:0, d5:0, d6:0, d7:0, d8:0, d9:0, click:0.1, atk:40, rel:300, bright:0.25}],
+      ['Bright 3rd percussion', {d1:0, d2:0, d3:8, d4:6, d5:0, d6:0, d7:0, d8:0, d9:0, perc:2, percLv:0.9, percDec:300, click:0.3, rotary:0, bright:0.85}],
+      ['Cluster drone', {oct:1, d1:8, d2:8, d3:8, d4:8, d5:8, d6:8, d7:8, d8:8, d9:8, click:0, atk:400, rel:1800, rotary:1, rotDepth:1, bright:0.45}]]},
   sf:{title:'SoundFont', tag:'General MIDI · your .sf2 / .sf3', rows:{
       bank:{l:'Bank', min:0, max:128, c:'int', d:0, f:v => Math.round(v) >= 128 ? '128 · drum kits' : String(Math.round(v))},
       prog:{l:'Program', min:0, max:127, c:'int', d:0, f:v => sfPresetLabel(Math.round(v))},
@@ -12868,7 +12999,24 @@ const XUI = {
       ['Evolving drone', {oct:0, table:1, pos:0.2, prate:0.1, pdepth:0.9, unison:3, det:0.2, cut:3500, res:0.25, atk:1500, dec:3000, sus:0.9, rel:2500}],
       ['Digital stab', {oct:2, table:3, pos:0.5, pmod:-0.6, pdec:120, unison:3, det:0.3, cut:7000, fenv:0.3, fdec:180, dec:260, sus:0.1, rel:100}],
       ['Reedy pad', {table:2, pos:0.45, warp:0.3, prate:0.3, pdepth:0.3, unison:4, det:0.25, cut:4500, atk:350, dec:1200, sus:0.8, rel:900}],
-      ['Hollow sub', {oct:0, table:0, pos:0.1, warp:0.2, sub:0.5, cut:1200, res:0.1, fenv:0.1, dec:700, sus:0.85, rel:70}]]},
+      ['Hollow sub', {oct:0, table:0, pos:0.1, warp:0.2, sub:0.5, cut:1200, res:0.1, fenv:0.1, dec:700, sus:0.85, rel:70}],
+      /* (15 Nov) more presets */
+      ['Square sub growl', {oct:0, table:0, pos:0.8, warp:0.3, pmod:0.3, pdec:300, sub:0.6, cut:500, res:0.35, fenv:0.5, fdec:250, dec:600, sus:0.7, rel:100}],
+      ['Wobble warp bass', {oct:1, table:0, pos:0.5, warp:0.8, prate:2.5, pdepth:0.7, sub:0.4, cut:700, res:0.45, fenv:0.2, sus:0.9, rel:120}],
+      ['Vowel bass', {oct:1, table:2, pos:0.15, pmod:0.5, pdec:400, sub:0.35, cut:1800, res:0.2, fenv:0.3, fdec:300, dec:500, sus:0.6, rel:100}],
+      ['Fold lead', {oct:3, table:3, pos:0.4, pmod:0.5, pdec:700, unison:2, det:0.15, cut:10000, fenv:0.1, atk:8, sus:0.85, rel:250}],
+      ['Harmonic arp', {oct:3, table:1, pos:0.5, pmod:-0.6, pdec:140, cut:9000, fenv:0.3, fdec:150, atk:1, dec:220, sus:0, rel:90}],
+      ['Digital pad', {oct:2, table:3, pos:0.3, warp:0.2, prate:0.15, pdepth:0.6, unison:5, det:0.3, cut:5500, res:0.1, atk:1200, dec:2000, sus:0.9, rel:2200}],
+      ['Slow formant drone', {oct:0, table:2, pos:0.5, prate:0.07, pdepth:1, unison:3, det:0.15, sub:0.3, cut:2500, res:0.2, atk:2500, dec:4000, sus:1, rel:3500}],
+      ['Comb bell', {oct:3, table:1, pos:0.75, warp:0.2, pmod:-0.4, pdec:900, unison:2, det:0.1, cut:15000, fenv:0, atk:1, dec:2600, sus:0, rel:1400}],
+      ['Saw sweep stab', {oct:2, table:0, pos:0.7, unison:5, det:0.45, cut:600, res:0.3, fenv:0.8, fdec:260, atk:2, dec:380, sus:0.05, rel:160}],
+      ['Breathy vowel pad', {oct:2, table:2, pos:0.6, warp:0.15, prate:0.25, pdepth:0.35, unison:4, det:0.2, noise:0.15, cut:3800, atk:900, dec:2000, sus:0.85, rel:2000}],
+      ['Noisy digital', {oct:2, table:3, pos:0.85, warp:0.6, prate:9, pdepth:0.5, noise:0.3, cut:6500, res:0.3, fenv:0.4, fdec:200, atk:2, dec:350, sus:0.2, rel:120}],
+      ['Pulse pluck', {oct:2, table:0, pos:0.95, pmod:-0.5, pdec:110, cut:2500, res:0.2, fenv:0.6, fdec:180, atk:1, dec:300, sus:0, rel:140}],
+      ['Glitch table lead', {oct:3, table:3, pos:0.7, warp:0.5, prate:14, pdepth:0.4, cut:8000, res:0.25, fenv:0.2, atk:3, dec:500, sus:0.6, rel:150}],
+      ['Thin electric keys', {oct:2, table:1, pos:0.15, pmod:0.3, pdec:350, cut:5000, fenv:0.2, fdec:300, atk:2, dec:1100, sus:0.2, rel:350}],
+      ['Shimmer wash', {oct:3, table:1, pos:0.6, prate:0.18, pdepth:0.8, unison:7, det:0.6, cut:12000, atk:2000, dec:3000, sus:0.9, rel:3500}],
+      ['Dry vowel stab', {oct:2, table:2, pos:0.3, pmod:0.7, pdec:200, unison:2, det:0.2, cut:4500, fenv:0.2, atk:1, dec:600, sus:0.5, rel:150}]]},
   breath:{title:'Breath', tag:'noise · resonators · wind', rows:{
       color:{l:'Color', min:0, max:1, c:'lin', d:0.5, f:v => v < 0.35 ? 'brown ' + Math.round((1 - v * 2) * 100) + '%' : v > 0.65 ? 'blue ' + Math.round((v * 2 - 1) * 100) + '%' : 'white'},
       grain:{l:'Grain', min:0, max:1, c:'lin', d:0, f:pct}, grate:{l:'Grain rate', min:2, max:400, c:'log', d:40, f:v => Math.round(v) + ' /s'},
@@ -12892,7 +13040,22 @@ const XUI = {
       ['Breath', {color:0.45, bands:2, freq:1800, spread:0.4, q:0.5, body:0.7, key:1, lp:6000, atk:40, dec:300, sus:0.6, rel:120, wind:0.4}],
       ['Crackle', {grain:1, grate:12, color:0.7, bands:1, freq:3000, q:0.1, body:0.3, hp:800, sus:1, rel:100}],
       ['Static', {color:0.8, body:0, hp:2000, lp:12000, sus:1, rel:50, grain:0.3, grate:300}],
-      ['Noise kick', {color:0.1, bands:1, freq:70, q:0.9, body:1, hp:20, lp:2000, fenv:-1, fdec:80, dec:220, rel:40}]]},
+      ['Noise kick', {color:0.1, bands:1, freq:70, q:0.9, body:1, hp:20, lp:2000, fenv:-1, fdec:80, dec:220, rel:40}],
+      /* (15 Nov) more presets */
+      ['Resonant drone', {color:0.3, bands:4, freq:130, spread:0.5, metal:0.1, q:0.95, body:1, key:1, hp:40, lp:6000, atk:800, sus:1, rel:1500}],
+      ['Pitched breath pad', {color:0.4, bands:6, freq:260, spread:0.5, metal:0, q:0.85, body:0.9, key:1, hp:80, lp:8000, wind:0.3, atk:700, sus:1, rel:1500}],
+      ['Metal shimmer', {color:0.6, bands:8, freq:1800, spread:0.4, metal:1, q:0.9, body:0.8, key:0, hp:600, lp:16000, wind:0.4, atk:1200, sus:1, rel:2500}],
+      ['Slow riser', {color:0.5, bands:4, freq:200, spread:0.5, q:0.8, body:0.7, sweep:1, atk:4000, sus:1, rel:600, hp:80}],
+      ['Reverse fall', {color:0.4, bands:4, freq:5000, spread:0.5, q:0.85, body:0.7, sweep:-1, atk:60, dec:3000, sus:0, rel:600, hp:200}],
+      ['Rain', {color:0.7, grain:1, grate:300, bands:2, freq:5000, q:0.2, body:0.2, hp:1500, lp:14000, sus:1, rel:400}],
+      ['Bubbling', {color:0.3, grain:0.8, grate:20, bands:2, freq:500, spread:0.3, q:0.9, body:0.9, hp:100, lp:4000, wind:0.5, sus:1, rel:300}],
+      ['Distant storm', {color:0.1, bands:2, freq:90, spread:0.3, q:0.5, body:0.6, hp:20, lp:900, wind:1, atk:2500, sus:1, rel:3000}],
+      ['Glassy chimes', {color:0.7, grain:0.7, grate:6, bands:6, freq:2400, spread:0.6, metal:0.7, q:1, body:1, hp:800, lp:16000, atk:2, dec:2000, sus:0.4, rel:900}],
+      ['Vocal formant noise', {color:0.4, bands:3, freq:700, spread:0.7, metal:0, q:0.8, body:0.9, key:0.5, hp:100, lp:5000, wind:0.5, atk:300, sus:1, rel:600}],
+      ['Sub rumble', {color:0, bands:1, freq:60, q:0.6, body:0.7, hp:15, lp:300, wind:0.3, atk:600, sus:1, rel:1200}],
+      ['Tape hiss bed', {color:0.85, grain:0.2, grate:150, bands:1, freq:8000, q:0, body:0, hp:3000, lp:16000, wind:0.2, sus:1, rel:200}],
+      ['Plucked noise tone', {color:0.5, bands:3, freq:330, spread:0.5, metal:0.1, q:1, body:1, key:1, hp:60, lp:9000, atk:1, dec:900, sus:0, rel:300}],
+      ['Wandering whistle', {color:0.35, bands:1, freq:1500, q:0.98, body:1, key:1, hp:200, lp:8000, wind:1, atk:150, sus:1, rel:500}]]},
   strings:{title:'Strings', tag:'plucked ensemble · strum · body', rows:{
       oct:{l:'Octave', min:-1, max:4, c:'int', d:2, f:v => 'C' + (2 + Math.round(v))},
       voices:{l:'Strings', min:1, max:6, c:'int', d:1, f:v => String(Math.round(v))},
@@ -12922,7 +13085,20 @@ const XUI = {
       ['Resonant harp glide', {voices:6, chord:7, strum:140, oct:3, pick:0.35, pos:0.1, decay:5, damp:0.1, body:0.35, size:0.7, det:0.15}],
       ['Banjo', {voices:1, oct:3, pick:1, pos:0.06, decay:2.2, damp:0.1, body:0.4, size:0.25, vib:0}],
       ['Slow strum pad', {voices:6, chord:5, strum:300, down:1, pick:0.2, decay:5, damp:0.15, body:0.7, size:0.8, det:0.6, rel:1800}],
-      ['Upright slap', {voices:1, oct:1, pick:0.75, pos:0.45, decay:0.5, damp:0.7, body:0.8, size:0.9}]]},
+      ['Upright slap', {voices:1, oct:1, pick:0.75, pos:0.45, decay:0.5, damp:0.7, body:0.8, size:0.9}],
+      /* (15 Nov) more presets */
+      ['Sub pluck bass', {voices:1, oct:0, pick:0.3, pos:0.4, decay:1.2, damp:0.6, body:0.4, size:0.9}],
+      ['Dub pluck', {voices:1, oct:1, pick:0.4, pos:0.3, decay:0.3, damp:0.9, body:0.5, size:0.7, rel:30}],
+      ['Glassy harp arp', {voices:1, oct:4, pick:0.7, pos:0.07, decay:3, damp:0.05, body:0.2, size:0.2}],
+      ['Soft major strum', {voices:4, chord:3, strum:60, down:1, pick:0.25, decay:3, damp:0.3, body:0.6, size:0.5, det:0.3}],
+      ['Minor 7 shimmer', {voices:6, chord:7, strum:180, oct:2, pick:0.4, pos:0.12, decay:6, damp:0.1, body:0.3, size:0.4, det:0.4, rel:1500}],
+      ['Sus4 harp wash', {voices:3, chord:5, strum:90, down:0, oct:3, pick:0.3, pos:0.1, decay:4, damp:0.1, body:0.4, size:0.5, det:0.3}],
+      ['Open tuning wash', {voices:6, chord:8, strum:250, oct:2, pick:0.3, decay:7, damp:0.1, body:0.7, size:0.6, det:0.7, rel:2500}],
+      ['Vibrato sitar-ish', {voices:2, chord:2, strum:5, oct:2, pick:1, pos:0.04, decay:3, damp:0.1, body:0.6, size:0.3, det:0.7, vib:0.5, vrate:6}],
+      ['Fat string bass', {voices:2, chord:1, strum:4, oct:1, pick:0.55, pos:0.3, decay:1.6, damp:0.5, body:0.7, size:0.85, det:0.5}],
+      ['Detuned zither', {voices:3, chord:1, strum:15, oct:3, pick:0.8, pos:0.1, decay:2.5, damp:0.2, body:0.4, size:0.15, det:1}],
+      ['Damped muted chord', {voices:4, chord:4, strum:6, oct:2, pick:0.6, decay:0.2, damp:1, body:0.5, size:0.5, det:0.2, rel:20}],
+      ['Slow wobble string', {voices:1, oct:2, pick:0.2, pos:0.3, decay:5, damp:0.1, body:0.5, size:0.5, vib:0.8, vrate:2, rel:800}]]},
   fmdrum:{title:'FM Drum', tag:'3-op FM · pitch env · noise', rows:{
       pitch:{l:'Pitch', min:30, max:2000, c:'log', d:110, f:hz}, bend:{l:'Pitch bend', min:0, max:48, c:'lin', d:18, f:st}, bendT:{l:'Bend time', min:2, max:1000, c:'log', d:60, f:ms},
       alg:{l:'Algorithm', min:0, max:2, c:'int', d:0, f:v => FmDrumCore.ALGS[Math.max(0, Math.min(2, Math.round(v)))]},
@@ -12971,7 +13147,20 @@ const XUI = {
       ['Shakuhachi', {model:1, oct:2, breath:0.9, noise:0.8, stiff:0.4, pos:0.5, damp:0.5, vib:0.4, vrate:4, atk:90, rel:150}],
       ['Fiddle', {model:2, oct:3, breath:0.6, stiff:0.8, pos:0.15, damp:0.35, body:0.4, vib:0.2, vrate:6.5, atk:30, noise:0.15}],
       ['Reed pad', {model:0, oct:2, breath:0.5, stiff:0.4, damp:0.5, noise:0.1, vib:0.3, vrate:3, atk:600, rel:900, body:0.6}],
-      ['Bowed sub', {model:2, oct:0, breath:0.75, stiff:0.5, pos:0.4, damp:0.6, body:0.9, vib:0.05, atk:150, rel:400}]]},
+      ['Bowed sub', {model:2, oct:0, breath:0.75, stiff:0.5, pos:0.4, damp:0.6, body:0.9, vib:0.05, atk:150, rel:400}],
+      /* (15 Nov) more presets */
+      ['Soft low flute', {model:1, oct:1, breath:0.5, noise:0.3, stiff:0.4, pos:0.35, damp:0.5, vib:0.2, atk:100, rel:200}],
+      ['Overblown flute', {model:1, oct:3, breath:0.95, noise:0.5, stiff:0.9, pos:0.25, damp:0.2, vib:0.3, atk:20, rel:80}],
+      ['Airy whistle', {model:1, oct:3, breath:0.55, noise:0.35, stiff:0.35, pos:0.45, damp:0.5, vib:0.5, vrate:5, atk:60, rel:120}],
+      ['Slow reed drone', {model:0, oct:1, breath:0.6, noise:0.1, stiff:0.5, damp:0.6, vib:0.1, vrate:2, atk:1500, rel:2000, body:0.5}],
+      ['Buzzy clarinet', {model:0, oct:2, breath:0.9, stiff:0.9, damp:0.1, growl:0.4, noise:0.2, vib:0.1, atk:25, body:0.3}],
+      ['Soft bowed pad', {model:2, oct:2, breath:0.7, stiff:0.5, pos:0.3, damp:0.5, body:0.7, vib:0.25, vrate:4, atk:500, rel:1500}],
+      ['High bowed harmonic', {model:2, oct:4, breath:0.5, stiff:0.4, pos:0.12, damp:0.4, body:0.2, vib:0.1, atk:200, rel:300}],
+      ['Rough bow bass', {model:2, oct:0, breath:0.9, stiff:0.9, pos:0.7, damp:0.3, body:0.6, noise:0.4, growl:0.3, atk:40, rel:200}],
+      ['Tremor reed', {model:0, oct:2, breath:0.7, stiff:0.6, damp:0.4, vib:0.9, vrate:8, atk:60, rel:120, body:0.4}],
+      ['Noisy bottle drone', {model:1, oct:1, breath:0.4, noise:1, stiff:0.15, pos:0.6, damp:0.9, vib:0.05, atk:500, rel:800}],
+      ['Muted horn', {model:0, oct:1, breath:0.8, stiff:0.7, damp:0.8, body:0.9, growl:0.2, vib:0.15, atk:90, rel:250}],
+      ['Wobble pipe', {model:1, oct:2, breath:0.6, noise:0.4, stiff:0.5, pos:0.4, damp:0.5, vib:1, vrate:3, atk:50, rel:150}]]},
   phase:{title:'Phase', tag:'phase distortion · DCW · resonance', rows:{
       oct:{l:'Octave', min:-1, max:4, c:'int', d:2, f:v => 'C' + (2 + Math.round(v))},
       wave:{l:'Wave 1', min:0, max:7, c:'int', d:0, f:v => PhaseCore.WAVES[Math.max(0, Math.min(7, Math.round(v)))]},
@@ -12999,7 +13188,28 @@ const XUI = {
       ['Resonant bass pulse', {oct:0, wave:2, wave2:4, mix:0.4, dcw:0.9, ddec:300, dsus:0.2, dec:400, sus:0.6, rel:80}],
       ['Soft bell pad', {oct:2, wave:3, wave2:6, mix:0.4, det:0.3, dcw:0.5, datk:900, ddec:2500, dsus:0.3, atk:600, dec:3000, sus:0.8, rel:1800}],
       ['Saw lead', {oct:2, wave:0, wave2:0, det:0.2, dcw:0.6, datk:3, ddec:400, dsus:0.7, atk:5, sus:0.9, rel:150}],
-      ['Synth harp', {oct:3, wave:4, wave2:3, mix:0.5, dcw:0.9, ddec:80, dsus:0.1, dec:900, sus:0, rel:300, key:0.4}]]},
+      ['Synth harp', {oct:3, wave:4, wave2:3, mix:0.5, dcw:0.9, ddec:80, dsus:0.1, dec:900, sus:0, rel:300, key:0.4}],
+      // (14 Nov) more presets
+      ['Phase sub', {oct:0, wave:3, wave2:3, mix:0, det:0.05, dcw:0.15, ddec:400, dsus:0.15, atk:4, sus:1, rel:120, key:0.2}],
+      ['Wide detune pad', {oct:2, wave:0, wave2:0, det:0.6, dcw:0.5, datk:800, ddec:3000, dsus:0.5, atk:900, sus:1, rel:1500}],
+      ['Zap laser', {oct:3, wave:5, wave2:5, dcw:1, datk:0.5, ddec:90, dsus:0, dec:350, sus:0, rel:80, key:0.5}],
+      ['Wah lead', {oct:2, wave:6, wave2:6, det:0.1, dcw:0.8, datk:30, ddec:500, dsus:0.4, atk:8, sus:0.9, rel:200, key:0.7}],
+      ['Hollow keys', {oct:2, wave:1, wave2:2, mix:0.5, dcw:0.55, ddec:500, dsus:0.15, dec:900, sus:0.1, rel:300, key:0.5}],
+      ['Ring bell', {oct:3, wave:3, wave2:3, mix:0.5, det:0.35, ring:0.9, dcw:0.4, ddec:3000, dsus:0, dec:3500, sus:0, rel:1200}],
+      ['Metal clang', {oct:2, wave:4, wave2:7, mix:0.5, det:0.8, ring:0.8, dcw:1, ddec:300, dsus:0, dec:700, sus:0, rel:200}],
+      ['Evolving DCW pad', {oct:2, wave:7, wave2:6, mix:0.5, det:0.3, dcw:0.9, datk:4000, ddec:6000, dsus:0.6, atk:1500, sus:1, rel:2500}],
+      ['Grit lead', {oct:2, wave:4, wave2:0, mix:0.3, det:0.2, noise:0.15, dcw:0.9, ddec:300, dsus:0.6, atk:5, sus:0.9, rel:120}],
+      ['Sweep saw', {oct:2, wave:5, wave2:7, mix:0.3, dcw:1, datk:800, ddec:2000, dsus:0.2, atk:5, sus:1, rel:300}],
+      ['Dark drone', {oct:0, wave:3, wave2:1, mix:0.3, det:0.2, dcw:0.4, ddec:1500, dsus:0.4, atk:300, sus:1, rel:800}],
+      ['Zap bass', {oct:0, wave:0, wave2:5, mix:0.4, dcw:1, datk:1, ddec:120, dsus:0, dec:350, sus:0.2, rel:60, key:0.5}],
+      ['Pulse pad', {oct:2, wave:2, wave2:2, det:0.5, dcw:0.6, datk:600, ddec:2500, dsus:0.5, atk:500, sus:1, rel:1200}],
+      ['Breathy flute', {oct:3, wave:3, wave2:0, mix:0.2, dcw:0.25, datk:80, ddec:300, dsus:0.5, noise:0.08, atk:60, sus:0.9, rel:200}],
+      ['Marimba tick', {oct:3, wave:3, wave2:4, mix:0.3, dcw:0.8, ddec:60, dsus:0, dec:500, sus:0, rel:150, key:0.7}],
+      ['Fat unison bass', {oct:1, wave:0, wave2:4, mix:0.5, det:0.7, dcw:0.8, ddec:500, dsus:0.5, sus:0.9, rel:100, key:0.4}],
+      ['Glass ping', {oct:4, wave:3, wave2:3, det:0.15, dcw:0.4, ddec:400, dsus:0, dec:1500, sus:0, rel:600, key:0.5}],
+      ['Digital strings', {oct:2, wave:4, wave2:0, mix:0.5, det:0.6, dcw:0.5, datk:500, ddec:1500, dsus:0.4, atk:350, sus:0.9, rel:700}],
+      ['Bloom trapezoid', {oct:1, wave:7, wave2:7, det:0.2, dcw:1, datk:3000, ddec:5000, dsus:0.3, atk:400, sus:0.9, rel:900}],
+      ['Chirp pluck', {oct:3, wave:5, wave2:4, mix:0.5, dcw:1, datk:0.5, ddec:40, dsus:0, dec:250, sus:0, rel:80, key:0.6}]]},
   partials:{title:'Partials', tag:'additive · 256 harmonics · morph', rows:{
       oct:{l:'Octave', min:-1, max:4, c:'int', d:2, f:v => 'C' + (2 + Math.round(v))},
       count:{l:'Partials', min:1, max:256, c:'sq', d:64, f:v => String(Math.round(v))},
@@ -13030,7 +13240,28 @@ const XUI = {
       ['Soft organ pad', {count:24, tilt:0.7, comb:0.6, atk:400, sus:1, rel:900, drift:0.2, drate:0.4}],
       ['Metal bar', {oct:2, count:12, tilt:0.5, stretch:0.9, sus:0, decay:3, dtilt:0.8, atk:1, rel:600}],
       ['Formant stab', {oct:2, count:160, famt:0.7, fmt:1400, fwidth:0.6, tilt:0.4, bright:0.9, bdec:600, atk:2, sus:0.5, decay:1.5, rel:200}],
-      ['Slow shimmer', {oct:3, count:200, tilt:0.5, bright:0.7, batk:2500, bdec:6000, atk:1200, rel:3500, drift:0.5, drate:0.2, morph:0.5, mtime:5000, tilt2:0.8}]]},
+      ['Slow shimmer', {oct:3, count:200, tilt:0.5, bright:0.7, batk:2500, bdec:6000, atk:1200, rel:3500, drift:0.5, drate:0.2, morph:0.5, mtime:5000, tilt2:0.8}],
+      // (14 Nov) more presets
+      ['Sub sine', {oct:0, count:3, tilt:0.9, bright:0.3, atk:5, sus:1, rel:200, drift:0}],
+      ['Odd saw bass', {oct:1, count:64, tilt:0.3, comb:0.8, bright:0.8, batk:1, bdec:400, atk:3, sus:0.9, rel:120, drift:0.05}],
+      ['Even rich', {oct:2, count:80, tilt:0.4, comb:-0.7, bright:0.7, atk:10, sus:1, rel:300, drift:0.15}],
+      ['Temple gong', {oct:1, count:30, tilt:0.5, stretch:0.7, bright:0.6, batk:40, bdec:1500, sus:0, decay:10, dtilt:0.7, atk:2, rel:3000}],
+      ['Gamelan metal', {oct:3, count:16, tilt:0.35, stretch:0.8, sus:0, decay:4, dtilt:0.6, bright:0.8, atk:1, rel:800}],
+      ['Glass harmonica', {oct:3, count:12, tilt:0.75, stretch:0.05, atk:200, sus:1, rel:1500, drift:0.3, drate:0.4}],
+      ['Formant whistle', {oct:3, count:200, tilt:0.4, famt:1, fmt:2500, fwidth:0.2, atk:400, rel:900, drift:0.6, drate:3}],
+      ['Saw to square', {oct:2, count:160, tilt:0.3, bright:0.9, bdec:2000, morph:1, mtime:1500, tilt2:0.35, comb2:1, atk:8, sus:1, rel:300}],
+      ['Spectral swell', {oct:2, count:256, tilt:0.8, bright:0.2, batk:3000, bdec:3000, atk:2500, rel:3000, morph:1, mtime:4000, tilt2:0.1, drift:0.3}],
+      ['Harp pluck', {oct:3, count:32, tilt:0.45, sus:0, decay:2, dtilt:1, bright:1, batk:1, bdec:150, atk:1, rel:300}],
+      ['Kalimba', {oct:3, count:10, tilt:0.8, comb:-0.5, stretch:0.1, sus:0, decay:0.9, dtilt:0.6, atk:1, rel:250}],
+      ['Shimmer drift', {oct:2, count:80, tilt:0.5, bright:0.6, drift:0.9, drate:6, atk:600, sus:1, rel:1800}],
+      ['Reedy odd', {oct:2, count:90, tilt:0.4, comb:0.6, famt:0.6, fmt:1800, fwidth:0.4, bright:0.8, bdec:500, atk:30, sus:1, rel:200}],
+      ['Oo vowel', {oct:1, count:128, tilt:0.5, famt:1, fmt:400, fwidth:0.5, atk:300, sus:1, rel:900, drift:0.2, drate:5}],
+      ['Dark organ', {oct:1, count:32, tilt:0.75, comb:0.3, bright:0.4, atk:15, sus:1, rel:150, drift:0}],
+      ['Bell pad', {oct:2, count:24, tilt:0.5, stretch:0.35, atk:800, sus:1, rel:4000, drift:0.3, drate:0.3}],
+      ['Metal cluster', {oct:2, count:256, tilt:0.3, stretch:0.95, sus:0.6, atk:5, rel:600, drift:0.8, drate:2}],
+      ['Laser fall', {oct:3, count:100, tilt:0.2, bright:1, batk:1, bdec:200, sus:0, decay:1, dtilt:0.5, atk:1, rel:300}],
+      ['Pluck bass', {oct:0, count:24, tilt:0.7, sus:0, decay:1.5, dtilt:0.8, bright:0.6, bdec:120, atk:1, rel:200}],
+      ['Brass swell', {oct:2, count:120, tilt:0.35, comb:0.2, bright:0.9, batk:200, bdec:800, atk:120, sus:1, rel:300, drift:0.1}]]},
   skin:{title:'Skin', tag:'membrane · modes · shell', rows:{
       pitch:{l:'Pitch', min:30, max:1200, c:'log', d:110, f:hz}, size:{l:'Size', min:0, max:1, c:'lin', d:0.5, f:v => v < 0.25 ? 'bongo' : v < 0.5 ? 'tom' : v < 0.75 ? 'floor tom' : 'timpani'},
       tension:{l:'Tension bend', min:0, max:1, c:'lin', d:0.3, f:pct}, tenT:{l:'Bend time', min:5, max:600, c:'log', d:80, f:ms},
@@ -13071,7 +13302,26 @@ const XUI = {
       ['Pulse bass', {oct:1, duty:2, dec:30, sus:0.7, rel:2}],
       ['Fast arp up', {oct:3, chord:5, arp:3, duty:1, dec:25, sus:0.6, rel:2}],
       ['Pitch drop kick', {oct:1, wave:1, slide:-1, atk:0, dec:12, sus:0, rel:1}],
-      ['Vibrato lead', {oct:3, duty:0, vib:0.8, vrate:5, dec:20, sus:0.7, rel:4}]]},
+      ['Vibrato lead', {oct:3, duty:0, vib:0.8, vrate:5, dec:20, sus:0.7, rel:4}],
+      /* (15 Nov) more presets */
+      ['Square sub bass', {oct:0, duty:2, dec:20, sus:0.85, rel:3}],
+      ['Triangle sub', {oct:0, wave:1, dec:60, sus:1, rel:3}],
+      ['Wobble pulse bass', {oct:1, duty:0, sweep:1, dec:30, sus:0.8, rel:2, vib:0.5, vrate:8}],
+      ['Slap bass', {oct:1, duty:1, slide:-0.25, dec:9, sus:0.1, rel:2}],
+      ['Triangle lead', {oct:3, wave:1, vib:0.4, vrate:5.5, dec:30, sus:0.8, rel:6}],
+      ['Fat 75% lead', {oct:3, duty:3, vib:0.2, dec:15, sus:0.7, rel:5}],
+      ['Slow minor arp', {oct:2, chord:4, arp:6, duty:3, dec:50, sus:0.8, rel:3}],
+      ['Sus4 arp fast', {oct:3, chord:7, arp:1, duty:1, dec:20, sus:0.6, rel:2}],
+      ['Dim arp 5 fr', {oct:2, chord:8, arp:5, duty:0, dec:30, sus:0.5, rel:3}],
+      ['Major 7 shimmer', {oct:4, chord:5, arp:2, duty:2, sweep:0.6, atk:8, dec:50, sus:0.5, rel:30}],
+      ['Pad of pulses', {oct:3, duty:2, sweep:1, atk:25, dec:60, sus:0.8, rel:60, vib:0.15, vrate:4}],
+      ['Plucked pulse', {oct:3, duty:0, dec:8, sus:0, rel:3}],
+      ['Bell triangle', {oct:4, wave:1, chord:1, arp:1, dec:40, sus:0, rel:25}],
+      ['Fifth drone', {oct:1, chord:2, arp:1, duty:2, dec:60, sus:1, rel:20, vib:0.1}],
+      ['Dive bomb', {oct:4, duty:1, slide:-1, vib:0.6, vrate:12, dec:30, sus:0.3, rel:2}],
+      ['Coin chirp', {oct:5, duty:2, slide:1, dec:8, sus:0, rel:6}],
+      ['Bit-crushed echo', {oct:3, duty:0, chord:1, arp:4, quant:1, dec:40, sus:0.2, rel:20}],
+      ['Noise drone', {oct:1, wave:2, nfreq:0.2, nshort:1, atk:10, dec:60, sus:0.9, rel:20}]]},
   vector:{title:'Vector', tag:'four waves · joystick · wave sequence', rows:{
       oct:{l:'Octave', min:-1, max:4, c:'int', d:2, f:v => 'C' + (2 + Math.round(v))},
       mode:{l:'Mode', min:0, max:1, c:'int', d:0, f:nameOf(['Vector', 'Wave sequence'])},
@@ -13129,7 +13379,27 @@ const XUI = {
       ['Acid vector', {oct:1, wa:2, wb:16, wc:13, wd:3, jx:0.2, jy:0.1, venv:1, x1:0, y1:0, t1:120, x2:1, y2:0.4, t2:200, x3:1, y3:1, t3:200, x4:1, y4:1, t4:100, cut:900, res:0.55, fenv:0.7, fdec:180, atk:2, dec:350, sus:0.5, rel:80}],
       ['Soft evolving keys', {oct:2, wa:7, wb:8, wc:14, wd:15, venv:1, x1:0.5, y1:0, t1:600, x2:0.8, y2:0.5, t2:1800, x3:0.5, y3:1, t3:2500, x4:0.5, y4:1, t4:500, unison:2, det:0.15, cut:6000, fenv:0.2, fdec:1000, atk:4, dec:1800, sus:0.2, rel:900}],
       ['Wide dark pad', {oct:1, wa:6, wb:9, wc:10, wd:0, lx:0.35, ly:0.3, lrate:0.08, unison:6, det:0.35, spread:0.7, cut:2200, res:0.15, fenv:0, atk:1100, dec:3000, sus:0.9, rel:3000}],
-      ['Wave seq pluck', {oct:2, mode:1, steps:4, s1:16, s2:2, s3:13, s4:3, sdiv:9, xfade:0.05, sgate:0.6, unison:2, det:0.15, cut:3200, res:0.3, fenv:0.5, fdec:200, sfenv:0.4, atk:1, dec:500, sus:0.3, rel:150}]]},
+      ['Wave seq pluck', {oct:2, mode:1, steps:4, s1:16, s2:2, s3:13, s4:3, sdiv:9, xfade:0.05, sgate:0.6, unison:2, det:0.15, cut:3200, res:0.3, fenv:0.5, fdec:200, sfenv:0.4, atk:1, dec:500, sus:0.3, rel:150}],
+      // (14 Nov) more presets
+      ['Sub triangle', {oct:0, wa:0, wb:1, wc:0, wd:1, jx:0.3, jy:0, cut:3000, res:0, fenv:0, key:0.3, atk:3, dec:500, sus:0.2, rel:150}],
+      ['Sync bass', {oct:1, wa:16, wb:2, wc:3, wd:12, jx:0, jy:0, venv:1, x1:0, y1:0, t1:300, x2:1, y2:0, t2:400, x3:1, y3:0, t3:200, x4:1, y4:0, t4:200, cut:1200, res:0.3, fenv:0.4, fdec:250, key:0.3, atk:2, dec:500, sus:0.7, rel:100}],
+      ['Reso pluck', {oct:2, wa:12, wb:13, wc:2, wd:16, jx:0.3, jy:0.3, venv:1, x1:1, y1:0, t1:80, x2:1, y2:1, t2:300, x3:1, y3:1, t3:200, x4:1, y4:1, t4:200, cut:6000, res:0.2, fenv:0.4, fdec:250, atk:1, dec:400, sus:0, rel:150}],
+      ['Metal bell', {oct:3, wa:14, wb:15, wc:0, wd:12, jx:0.2, jy:0.2, venv:1, x1:0.6, y1:0, t1:100, x2:0.9, y2:0.6, t2:600, x3:1, y3:1, t3:2000, x4:1, y4:1, t4:500, cut:14000, fenv:0, atk:1, dec:3000, sus:0, rel:2000}],
+      ['Digital arp', {oct:3, mode:1, steps:4, s1:13, s2:4, s3:16, s4:8, sdiv:9, xfade:0.1, sgate:0.3, cut:7000, res:0.2, fenv:0.3, fdec:200, atk:1, dec:300, sus:0.2, rel:150}],
+      ['Acid wave seq', {oct:1, mode:1, steps:2, s1:2, s2:16, sdiv:9, xfade:0.05, sgate:0.6, sfenv:0.6, cut:700, res:0.6, fenv:0.6, fdec:180, key:0.2, atk:1, dec:300, sus:0.6, rel:80}],
+      ['Ee-Oh talker', {oct:2, mode:1, steps:8, s1:11, s2:9, s3:10, s4:11, s5:9, s6:10, s7:11, s8:9, sdiv:8, xfade:0.6, unison:2, det:0.15, cut:8000, fenv:0, atk:5, sus:0.9, rel:200}],
+      ['Slow vector drone', {oct:0, wa:0, wb:7, wc:6, wd:14, jx:0.5, jy:0.5, lrate:0.05, lx:0.8, ly:0.6, unison:5, det:0.3, spread:0.8, cut:1800, res:0.1, fenv:0, atk:2500, dec:4000, sus:1, rel:4000}],
+      ['Hollow pulse pad', {oct:2, wa:7, wb:4, wc:5, wd:3, jx:0.5, jy:0.5, lrate:0.15, lx:0.3, ly:0.3, unison:4, det:0.2, spread:0.4, cut:5000, fenv:0, atk:700, dec:3000, sus:0.9, rel:1800}],
+      ['Glass seq bells', {oct:3, mode:1, steps:6, s1:15, s2:14, s3:0, s4:15, s5:1, s6:12, sdiv:7, xfade:0.5, sgate:0.3, cut:12000, fenv:0, atk:1, dec:2000, sus:0, rel:1500}],
+      ['Square sync lead', {oct:2, wa:3, wb:16, wc:2, wd:13, jx:0.3, jy:0.2, lrate:5, lx:0.15, ly:0, unison:2, det:0.15, cut:7000, res:0.25, fenv:0.2, fdec:300, atk:5, sus:0.9, rel:200}],
+      ['Glitch steps', {oct:2, mode:1, steps:16, s1:17, s2:13, s3:5, s4:14, s5:16, s6:12, s7:17, s8:4, s9:13, s10:14, s11:5, s12:17, s13:16, s14:12, s15:14, s16:13, sdiv:11, xfade:0, sgate:0.5, sfenv:0.5, cut:9000, res:0.3, fenv:0, atk:1, sus:0.9, rel:100}],
+      ['Wobble vector bass', {oct:0, wa:2, wb:3, wc:5, wd:4, jx:0.5, jy:0.5, lrate:4, lx:1, ly:0.5, cut:500, res:0.4, fenv:0.2, fdec:300, key:0.3, atk:2, sus:0.9, rel:100}],
+      ['Slow choir', {oct:1, wa:9, wb:10, wc:11, wd:6, jx:0.5, jy:0.5, lrate:0.1, lx:0.5, ly:0.5, law:1, unison:5, det:0.25, spread:0.5, cut:4500, fenv:0, atk:1200, dec:3000, sus:1, rel:2500}],
+      ['Plucked organ', {oct:2, wa:6, wb:7, wc:8, wd:1, jx:0.2, jy:0.2, venv:1, x1:0, y1:0, t1:150, x2:1, y2:0, t2:500, x3:1, y3:1, t3:600, x4:1, y4:1, t4:400, cut:9000, fenv:0.3, fdec:400, atk:1, dec:700, sus:0, rel:200}],
+      ['Clang cluster', {oct:2, wa:14, wb:12, wc:13, wd:15, jx:0.7, jy:0.3, venv:1, x1:0.7, y1:0.3, t1:200, x2:1, y2:0.8, t2:600, x3:0.3, y3:1, t3:800, x4:0.5, y4:0.5, t4:800, cut:12000, fenv:0, atk:1, dec:900, sus:0, rel:700}],
+      ['Pulse stab seq', {oct:2, mode:1, steps:3, s1:4, s2:5, s3:3, sdiv:9, xfade:0.05, sgate:0.7, sfenv:0.6, cut:3000, res:0.3, fenv:0.5, fdec:150, atk:1, dec:400, sus:0.5, rel:120}],
+      ['Warm unison saw', {oct:1, wa:2, wb:1, wc:3, wd:8, jx:0.2, jy:0.1, unison:7, det:0.5, spread:0.5, cut:3500, res:0.15, fenv:0.1, fdec:800, atk:10, sus:0.9, rel:400}],
+      ['Morph lead', {oct:2, wa:8, wb:13, wc:2, wd:16, jx:0, jy:0, venv:1, x1:0, y1:0, t1:900, x2:1, y2:0, t2:900, x3:1, y3:1, t3:900, x4:0, y4:1, t4:900, vloop:2, unison:2, det:0.2, cut:7000, res:0.2, fenv:0.2, fdec:500, atk:6, sus:0.9, rel:250}]]},
   scanned:{title:'Scanned', tag:'a ring of masses, scanned as a wave', rows:{
       oct:{l:'Octave', min:-1, max:4, c:'int', d:2, f:v => 'C' + (2 + Math.round(v))},
       masses:{l:'Masses', min:16, max:128, c:'int', d:64, f:v => String(Math.round(v))}, ends:{l:'Shape', min:0, max:1, c:'int', d:0, f:nameOf(ScannedCore.ENDS)},
@@ -13164,7 +13434,26 @@ const XUI = {
       ['Glass chimes', {oct:3, masses:64, exc:1, pos:0.15, width:0.08, stiff:0.7, damp:0.2, smooth:0.4, taper:0.5, keep:0.1, cut:15000, fenv:0, atk:1, dec:3000, sus:0, rel:1800}],
       ['Slow ripple pad', {oct:2, masses:96, exc:3, pos:0.4, width:0.6, stiff:0.2, center:0.3, damp:0.1, smooth:0.7, urate:40, keep:0.95, cut:5000, fenv:0, atk:1100, dec:3000, sus:0.9, rel:2500}],
       ['Resonant pluck', {oct:2, masses:56, exc:0, pos:0.12, width:0.15, stiff:0.6, damp:0.45, smooth:0.5, keep:0, urate:220, cut:3500, res:0.5, fenv:0.6, fdec:200, atk:1, dec:700, sus:0, rel:300}],
-      ['Dark thrum', {oct:0, masses:64, exc:2, pos:0.5, width:0.7, stiff:0.2, center:0.4, damp:0.25, smooth:0.8, urate:60, keep:0.8, cut:1200, res:0.2, fenv:0, atk:50, dec:2000, sus:0.9, rel:400}]]},
+      ['Dark thrum', {oct:0, masses:64, exc:2, pos:0.5, width:0.7, stiff:0.2, center:0.4, damp:0.25, smooth:0.8, urate:60, keep:0.8, cut:1200, res:0.2, fenv:0, atk:50, dec:2000, sus:0.9, rel:400}],
+      // (14 Nov) more presets
+      ['Round pluck', {oct:2, masses:40, exc:0, pos:0.5, width:0.3, stiff:0.5, damp:0.6, smooth:0.7, keep:0, urate:150, cut:5000, fenv:0.2, fdec:300, atk:1, dec:700, sus:0, rel:300}],
+      ['Hollow tube', {oct:2, masses:64, ends:1, exc:4, pos:0.3, width:0.4, stiff:0.4, center:0.05, damp:0.4, smooth:0.6, keep:0.7, urate:100, cut:7000, fenv:0, atk:20, dec:1500, sus:0.7, rel:400}],
+      ['Sub ring', {oct:0, masses:24, exc:3, pos:0.5, width:0.9, stiff:0.2, damp:0.5, smooth:0.9, keep:1, urate:40, cut:800, res:0.1, fenv:0, atk:5, dec:2000, sus:1, rel:200}],
+      ['Marimba ring', {oct:3, masses:48, exc:1, pos:0.3, width:0.05, stiff:0.6, damp:0.6, smooth:0.4, keep:0, urate:200, cut:9000, fenv:0, atk:1, dec:1200, sus:0, rel:300}],
+      ['Bowed shimmer', {oct:2, masses:64, exc:4, pos:0.35, width:0.3, stiff:0.3, center:0.2, damp:0.1, smooth:0.6, keep:0.95, urate:80, cut:6000, fenv:0, atk:600, dec:3000, sus:1, rel:1500}],
+      ['Broken glass', {oct:3, masses:128, exc:2, pos:0.5, width:0.9, stiff:0.9, damp:0.1, smooth:0, taper:1, hard:1, path:2, urate:500, keep:0.3, cut:16000, fenv:0, atk:1, dec:2500, sus:0.15, rel:800}],
+      ['Slow wobble ring', {oct:0, masses:32, exc:4, pos:0.4, width:0.5, stiff:0.1, center:0.6, damp:0.1, smooth:0.5, urate:8, keep:0.9, cut:900, res:0.3, fenv:0, atk:20, dec:2000, sus:1, rel:300}],
+      ['Tape string', {oct:2, masses:64, exc:0, pos:0.2, width:0.2, stiff:0.55, damp:0.35, smooth:0.4, hard:0.3, path:1, urate:40, keep:0.5, cut:6000, fenv:0.2, fdec:500, atk:2, dec:1800, sus:0.3, rel:600}],
+      ['Ring arp', {oct:3, masses:40, exc:4, pos:0.4, width:0.3, stiff:0.5, damp:0.6, smooth:0.3, urate:400, rexc:12, keep:0.4, cut:8000, fenv:0.3, fdec:150, atk:1, dec:300, sus:0.6, rel:150}],
+      ['Kalimba ring', {oct:3, masses:24, exc:1, pos:0.1, width:0.04, stiff:0.45, damp:0.7, smooth:0.2, keep:0, urate:250, cut:9000, fenv:0, atk:1, dec:700, sus:0, rel:200}],
+      ['Bell cluster', {oct:3, masses:128, exc:1, pos:0.05, width:0.03, stiff:0.9, damp:0.15, smooth:0.1, taper:0.8, keep:0.1, urate:300, cut:16000, fenv:0, atk:1, dec:5000, sus:0, rel:3000}],
+      ['Deep evolving drone', {oct:1, masses:96, exc:3, pos:0.5, width:0.6, stiff:0.12, center:0.5, damp:0.02, smooth:0.6, urate:12, keep:1, cut:2500, res:0.15, fenv:0, atk:3000, dec:4000, sus:1, rel:5000}],
+      ['Metal pad', {oct:2, masses:64, exc:2, pos:0.5, width:0.9, stiff:0.6, damp:0.2, smooth:0.4, taper:0.5, hard:0.5, urate:100, keep:0.9, cut:8000, fenv:0, atk:800, dec:3000, sus:1, rel:2000}],
+      ['Zap ring', {oct:3, masses:32, exc:0, pos:0.02, width:0.01, stiff:1, damp:0.05, smooth:0, urate:800, keep:0, cut:12000, fenv:0, atk:1, dec:300, sus:0, rel:100}],
+      ['Acid ring bass', {oct:1, masses:40, exc:0, pos:0.3, width:0.3, stiff:0.5, damp:0.5, smooth:0.4, keep:0.6, urate:150, cut:400, res:0.6, fenv:0.7, fdec:160, atk:1, dec:350, sus:0.4, rel:100}],
+      ['Warm ring keys', {oct:2, masses:56, exc:1, pos:0.25, width:0.15, stiff:0.45, damp:0.4, smooth:0.6, keep:0.3, urate:150, cut:6000, fenv:0.1, fdec:800, atk:2, dec:2000, sus:0.1, rel:600}],
+      ['Pulsing pad', {oct:2, masses:64, exc:4, pos:0.5, width:0.6, stiff:0.3, center:0.2, damp:0.3, smooth:0.7, urate:60, rexc:3, keep:0.8, cut:5000, fenv:0, atk:300, dec:2000, sus:0.8, rel:1500}],
+      ['Choir ring', {oct:2, masses:48, exc:3, pos:0.5, width:0.8, stiff:0.3, center:0.25, damp:0.2, smooth:0.85, urate:25, keep:1, cut:3500, fenv:0, atk:700, dec:3000, sus:1, rel:1800}]]},
   resynth:{title:'Resynth', tag:'a sample rebuilt from its partials', rows:{
       oct:{l:'Octave', min:-1, max:4, c:'int', d:2, f:v => 'C' + (2 + Math.round(v))},
       orig:{l:'Pitch', min:0, max:1, c:'int', d:0, f:nameOf(['Keyed (Octave)', 'Original'])},
@@ -13189,7 +13478,22 @@ const XUI = {
       ['Formant keep', {oct:3, fkeep:1, parts:96, noise:0.5}],
       ['Few partials', {parts:6, harm:1, noise:0, speed:0.5}],
       ['Squeezed', {stretch:-0.5, parts:64, noise:0.3, speed:0.7}],
-      ['Frozen bell drone', {oct:1, freeze:1, pos:0.02, stretch:0.35, parts:64, noise:0, atk:1200, sus:1, rel:3000}]]},
+      ['Frozen bell drone', {oct:1, freeze:1, pos:0.02, stretch:0.35, parts:64, noise:0, atk:1200, sus:1, rel:3000}],
+      /* (15 Nov) more presets */
+      ['Hollow organ', {oct:1, harm:1, parts:20, tilt:-0.3, noise:0, pmot:0, rel:300}],
+      ['Detuned glass', {oct:3, harm:0.4, stretch:0.15, parts:64, tilt:0.2, noise:0.1, speed:0.8, rel:900}],
+      ['Frozen sub', {oct:0, freeze:1, pos:0.05, harm:0.8, parts:24, tilt:-0.5, noise:0, atk:300, sus:1, rel:800}],
+      ['Wide frozen shimmer', {oct:3, freeze:1, pos:0.2, parts:128, tilt:0.4, stretch:0.1, noise:0.15, atk:1500, sus:1, rel:3000}],
+      ['Slow smear', {oct:2, speed:0.1, parts:128, harm:0.3, tilt:0.3, noise:1, pmot:0.5, atk:300, dec:3000, sus:0.4, rel:1500}],
+      ['Stretched metal', {oct:2, stretch:0.9, harm:0, parts:48, noise:0.1, tilt:0.2, dec:1200, sus:0.2, rel:600}],
+      ['Compressed spectrum', {oct:2, stretch:-0.9, parts:72, noise:0.2, tilt:0.1, dec:900, sus:0.3, rel:300}],
+      ['Pitchless noise bed', {oct:2, parts:8, noise:2, tilt:0.3, atk:400, sus:1, rel:1200}],
+      ['Odd bell pluck', {oct:3, stretch:0.4, harm:0.7, parts:32, noise:0, speed:1.5, dec:800, sus:0, rel:500}],
+      ['Fast scan lead', {oct:3, speed:3, pos:0.1, parts:48, harm:0.5, noise:0.1, atk:5, sus:0.8, rel:150}],
+      ['Formant choir', {oct:2, fkeep:0.5, parts:100, noise:0.4, atk:900, dec:1500, sus:0.4, rel:1500}],
+      ['Bright formant lead', {oct:3, fkeep:0.7, tilt:0.5, parts:96, noise:0.2, atk:10, sus:0.9, rel:200}],
+      ['Grain freeze', {oct:2, freeze:1, pos:0.5, parts:40, noise:0.8, pmot:0, atk:200, sus:1, rel:600}],
+      ['Late start hum', {oct:1, pos:0.6, parts:30, harm:0.9, noise:0.1, speed:0.5, atk:100, sus:1, rel:500}]]},
   bytebeat:{title:'Bytebeat', tag:'one-line formulas · 8-bit · a b c', rows:{
       oct:{l:'Octave', min:-1, max:4, c:'int', d:2, f:v => 'C' + (2 + Math.round(v))},
       rate:{l:'Clock', min:1000, max:48000, c:'log', d:8000, f:hz},
@@ -13229,7 +13533,24 @@ const XUI = {
       ['Acid byte', {rate:8000, smooth:0.2, dec:300, sus:0.6, rel:60}, null, '(t*(1+(t>>12&3)))&(t>>5|t>>8)&63'],
       ['Slow arp tone', {rate:11025, mode:2, smooth:0.3, atk:5, rel:150}, null, 'sin(t*(2+(t>>12&7))>>1)*(a+64)>>7'],
       ['Metal clang', {rate:16000, bits:5, smooth:0.1, dec:200, sus:0.2, rel:40}, null, '(t*(t>>9&7)|t>>3)^(t>>6)'],
-      ['Sub rumble', {rate:6000, smooth:0.5, bits:6, dec:500, sus:0.8, rel:80}, null, 't*(t>>14&7|1)&(t>>6)']]},
+      ['Sub rumble', {rate:6000, smooth:0.5, bits:6, dec:500, sus:0.8, rel:80}, null, 't*(t>>14&7|1)&(t>>6)'],
+      /* (15 Nov) more presets */
+      ['Square bass line', {rate:8000, smooth:0.35, dec:400, sus:0.8, rel:60}, null, '((t*(1+(t>>13&3)))&64)*2'],
+      ['Saw sequence', {rate:8000, smooth:0.2, dec:500, sus:0.7, rel:80}, null, 't*(4+(t>>11&3)+(t>>14&1)*2)'],
+      ['Triangle walk', {rate:11025, mode:2, smooth:0.3, atk:3, rel:100}, null, 'tri(t*(2+(t>>12&7))>>1)*(a+64)>>7'],
+      ['Detuned sines', {rate:11025, mode:2, smooth:0.4, atk:20, dec:900, sus:0.8, rel:400}, null, '(sin(t*3>>1)+sin(t*49>>5))*(b+64)>>8'],
+      ['Slow pad bytes', {rate:6000, smooth:0.6, bits:6, atk:600, dec:2000, sus:0.9, rel:1200}, null, '(t*3&t>>5)+(t*5&t>>6)>>1'],
+      ['Two voice canon', {rate:8000, smooth:0.25, dec:600, sus:0.6, rel:80}, null, '(t*(3+(t>>11&5))&t>>5)|(t*(5+(t>>12&3))&t>>6)'],
+      ['Pitch glide saw', {rate:8000, smooth:0.2, dec:500, sus:0.7, rel:60}, null, '(t*t>>14)&255|(t>>2)'],
+      ['Lofi pluck', {rate:8000, mode:2, smooth:0.4, dec:350, sus:0, rel:60, bits:6}, null, 'sin(t*(3+(t>>12&3)))*(255-(t&1023)>>2)>>7'],
+      ['Bit shift lead', {rate:12000, smooth:0.2, dec:300, sus:0.7, rel:80}, null, 't*(9+(t>>10&3))&(t>>4|t>>7)&128|t>>9'],
+      ['Fractal drone', {rate:5000, smooth:0.5, atk:800, dec:3000, sus:1, rel:1500}, null, '(t&t>>6)*(t>>11&3|4)'],
+      ['Rhythmic gate', {rate:8000, smooth:0.2, dec:300, sus:0.6, rel:50, a:180}, null, '((t*7)&(t>>5))*((t>>8&5)>0)&a'],
+      ['Crunch chords', {rate:16000, bits:5, smooth:0.1, dec:400, sus:0.6, rel:60}, null, '(t*5&t>>4)+(t*4&t>>5)+(t*6&t>>3)>>1'],
+      ['Stepped formant', {rate:11025, smooth:0.45, dec:600, sus:0.7, rel:80}, null, '(t*(1+(t>>10&7))&(t>>3|t>>5))^(t>>7)&127'],
+      ['Rising scale', {rate:8000, smooth:0.2, dec:500, sus:0.6, rel:60}, null, 't*(5+(t>>13&7))*(1+(t>>10&1))'],
+      ['Broken radio', {rate:16000, bits:3, smooth:0.2, dec:500, sus:0.7, rel:80, a:90}, null, '(t>>2)*(t>>5|t>>8)^(t>>3)&a'],
+      ['Low pulse drive', {rate:4000, smooth:0.5, bits:7, dec:600, sus:0.9, rel:60}, null, '((t*(1+(t>>12&1)))&128)|((t>>1)&64)']]},
   swarm:{title:'Swarm', tag:'oscillator cloud · drift · bloom', rows:{
       oct:{l:'Octave', min:-1, max:4, c:'int', d:2, f:v => 'C' + (2 + Math.round(v))},
       voices:{l:'Voices', min:1, max:48, c:'int', d:16, f:v => String(Math.round(v))},
@@ -13264,7 +13585,26 @@ const XUI = {
       ['Hoover-ish', {voices:16, wave:0.2, spread:0.9, drift:0.5, rate:1.2, cut:5000, res:0.25, fenv:0.2, atk:10, sus:0.85, rel:300}],
       ['Glass cloud', {oct:3, voices:36, wave:3, spread:0.5, drift:0.4, scatter:0.4, ivl:4, cut:11000, shimmer:0.4, atk:800, rel:3000}],
       ['Pluck swarm', {oct:2, voices:10, spread:0.25, drift:0.15, cut:2500, res:0.3, fenv:0.7, fdec:300, atk:1, dec:600, sus:0, rel:250}],
-      ['Sub choir', {oct:0, voices:20, wave:2, sub:0.5, spread:0.3, drift:0.3, scatter:0.3, cut:1400, atk:500, sus:0.9, rel:2000}]]},
+      ['Sub choir', {oct:0, voices:20, wave:2, sub:0.5, spread:0.3, drift:0.3, scatter:0.3, cut:1400, atk:500, sus:0.9, rel:2000}],
+      // (14 Nov) more presets
+      ['Sub swarm sine', {oct:0, voices:4, wave:3, spread:0.1, drift:0.1, sub:0.5, cut:900, res:0.05, fenv:0, key:0.3, atk:10, dec:900, sus:0.3, rel:300}],
+      ['Octave stack lead', {oct:2, voices:12, wave:0, spread:0.2, drift:0.15, scatter:0.6, ivl:0, cut:5000, res:0.15, fenv:0.3, fdec:500, atk:5, sus:0.9, rel:300}],
+      ['Major cloud', {voices:24, wave:0.5, spread:0.3, drift:0.3, scatter:0.6, ivl:2, cut:3500, atk:500, sus:0.9, rel:2000, bloom:500}],
+      ['Sus pad', {voices:28, wave:0.3, spread:0.35, drift:0.35, scatter:0.7, ivl:4, cut:3000, fenv:0, atk:900, sus:1, rel:2500, shimmer:0.2}],
+      ['Dissonant wash', {oct:2, voices:32, wave:0.3, spread:0.8, drift:0.8, rate:3, scatter:0.9, ivl:5, cut:6000, res:0.2, shimmer:0.5, atk:250, sus:1, rel:1500}],
+      ['Square pluck', {oct:3, voices:4, wave:1, spread:0.1, drift:0.05, cut:3500, res:0.2, fenv:0.6, fdec:250, atk:1, dec:350, sus:0, rel:120}],
+      ['Buzzing hive', {oct:1, voices:48, wave:0, spread:1, drift:1, rate:12, cohes:0, cut:2000, res:0.3, atk:20, sus:1, rel:400}],
+      ['Warm triangle pad', {oct:2, voices:16, wave:2, spread:0.3, drift:0.25, cut:3500, fenv:0, atk:1200, sus:1, rel:2500}],
+      ['Reverse bloom', {oct:2, voices:40, wave:0.2, spread:0.4, drift:0.3, bloom:4000, cut:4000, res:0.1, fenv:0, atk:2500, sus:1, rel:1500}],
+      ['Harmonic bells', {oct:3, voices:16, wave:3, spread:0.1, drift:0.15, scatter:0.8, ivl:6, cut:14000, shimmer:0.5, fenv:0, atk:1, dec:3000, sus:0, rel:2500}],
+      ['Dark wash', {oct:1, voices:36, wave:0.3, spread:0.5, drift:0.6, cut:600, res:0.1, fenv:0, atk:1500, sus:1, rel:4000}],
+      ['Fifths stab', {oct:2, voices:12, wave:0, spread:0.25, drift:0.15, scatter:0.7, ivl:1, cut:3000, res:0.2, fenv:0.5, fdec:200, atk:2, dec:700, sus:0.25, rel:150}],
+      ['Slow filter swell', {oct:2, voices:24, wave:0, spread:0.4, drift:0.3, cut:250, res:0.3, fenv:0.9, fdec:5000, atk:2000, dec:6000, sus:0.9, rel:2500}],
+      ['Reese swarm', {oct:0, voices:3, wave:0, spread:0.35, drift:0.05, sub:0.5, cut:700, res:0.2, fenv:0, key:0.3, atk:5, sus:1, rel:200}],
+      ['Sine choir', {oct:2, voices:32, wave:3, spread:0.5, drift:0.5, cut:6000, fenv:0, atk:800, sus:1, rel:2500, shimmer:0.2}],
+      ['Shimmer lead', {oct:3, voices:8, wave:0, spread:0.2, drift:0.3, rate:5, shimmer:0.7, cut:8000, res:0.2, fenv:0.2, fdec:400, atk:10, sus:0.8, rel:400}],
+      ['Seasick pad', {oct:2, voices:16, wave:0.3, spread:0.3, drift:0.9, rate:0.8, cohes:1, cut:3000, atk:600, sus:1, rel:2000}],
+      ['Metal swarm', {oct:2, voices:24, wave:1, spread:0.9, drift:0.5, rate:2, scatter:0.9, ivl:5, cut:3000, res:0.8, fenv:0.3, fdec:400, atk:5, dec:1500, sus:0.3, rel:600}]]},
   drift:{title:'Drift', tag:'two-line analog poly · tape wow & flutter · haze', rows:{
       oct:{l:'Octave', min:-1, max:4, c:'int', d:2, f:v => 'C' + (2 + Math.round(v))},
       aSaw:{l:'I saw', min:0, max:1, c:'lin', d:0.8, f:pct}, aPulse:{l:'I pulse', min:0, max:1, c:'lin', d:0, f:pct},
@@ -13314,7 +13654,24 @@ const XUI = {
       ['Tape Juno pad', {aSaw:0.7, bPulse:0.4, detune:8, voices:3, spread:0.6, cut:1600, res:0.1, fenv:0.1, fatk:900, fdec:2500, atk:900, rel:2500, wow:0.4, flutter:0.25, chorus:0.7, sat:0.3, age:0.4, hiss:0.2}],
       ['Crumbling arp', {oct:3, voices:1, aSaw:0.6, bPulse:0.5, bSemi:12, detune:5, cut:2600, fenv:0.5, fatk:2, fdec:260, fsus:0.1, atk:2, dec:700, sus:0, rel:500, wow:0.5, flutter:0.4, chorus:0.3, sat:0.4, age:0.7, hiss:0.35}],
       ['Sub warmth', {oct:0, voices:1, aSaw:0, aPulse:0, sub:1, bSaw:0.3, bPulse:0, cut:700, fenv:0, atk:8, dec:800, sus:0.9, rel:200, wow:0.1, flutter:0.05, chorus:0, sat:0.4, age:0.1, hiss:0.02}],
-      ['Broken radio lead', {oct:3, voices:1, aSaw:0.6, bPulse:0.6, detune:9, noise:0.08, hp:300, cut:3200, res:0.3, fenv:0.3, fatk:10, fdec:500, atk:10, dec:800, sus:0.8, rel:300, vib:10, vibRate:5.5, vibDelay:400, wow:0.6, wowRate:0.7, flutter:0.55, chorus:0.2, sat:0.5, age:0.85, hiss:0.5}]]},
+      ['Broken radio lead', {oct:3, voices:1, aSaw:0.6, bPulse:0.6, detune:9, noise:0.08, hp:300, cut:3200, res:0.3, fenv:0.3, fatk:10, fdec:500, atk:10, dec:800, sus:0.8, rel:300, vib:10, vibRate:5.5, vibDelay:400, wow:0.6, wowRate:0.7, flutter:0.55, chorus:0.2, sat:0.5, age:0.85, hiss:0.5}],
+      // (14 Nov) more presets
+      ['Pulse thump', {oct:0, voices:1, aSaw:0, aPulse:0.8, pw:0.25, pwm:0.1, bPulse:0, sub:0.4, cut:500, res:0.25, fenv:0.6, fatk:2, fdec:200, fsus:0.2, atk:3, dec:400, sus:0.5, rel:150, wow:0.1, flutter:0.05, chorus:0, sat:0.4, age:0.1, hiss:0.02}],
+      ['PWM pad', {aSaw:0, aPulse:1, bPulse:1, detune:4, pw:0.5, pwm:1, pwmRate:0.3, voices:3, spread:0.4, cut:3000, res:0.1, fenv:0.1, fatk:800, fdec:2500, fsus:0.6, atk:800, dec:2000, sus:0.9, rel:2200, wow:0.2, chorus:0.6, age:0.2, hiss:0.1}],
+      ['Low ring bell', {oct:2, voices:1, aSaw:0.3, bPulse:0.5, bSemi:-12, ring:1, detune:2, cut:6000, fenv:-0.1, atk:2, dec:2500, sus:0, rel:1800, wow:0.15, flutter:0.1, chorus:0.3, age:0.2, hiss:0.1}],
+      ['Analog pluck', {oct:2, voices:1, aSaw:0.8, bPulse:0.4, detune:5, cut:600, res:0.3, fenv:0.7, fatk:1, fdec:250, fsus:0.1, atk:2, dec:500, sus:0, rel:300, wow:0.1, chorus:0.2, sat:0.35, age:0.1, hiss:0.05}],
+      ['Resonant sweep pad', {aSaw:0.8, bSaw:0.4, bPulse:0, detune:10, voices:3, spread:0.4, cut:300, res:0.7, fenv:0.9, fatk:3500, fdec:5000, fsus:0.5, atk:1500, dec:3000, sus:0.9, rel:2500, wow:0.2, chorus:0.4, sat:0.3, age:0.2, hiss:0.1}],
+      ['Octave-down brass', {aSaw:0.9, bSaw:0.7, bPulse:0, bSemi:-12, detune:6, voices:2, spread:0.2, cut:900, res:0.2, fenv:0.6, fatk:200, fdec:1000, fsus:0.5, atk:120, dec:1000, sus:0.85, rel:500, vib:6, vibRate:5, vibDelay:600, wow:0.15, chorus:0.2, sat:0.4, age:0.15, hiss:0.05}],
+      ['Whisper pad', {aSaw:0.5, aPulse:0, bPulse:0, noise:0.6, hp:900, cut:5000, res:0.2, fenv:0, atk:1000, dec:3000, sus:1, rel:3000, wow:0.3, flutter:0.2, chorus:0.5, age:0.5, hiss:0.5}],
+      ['Soft pulse lead', {oct:3, voices:1, aSaw:0, aPulse:0.8, bPulse:0.4, detune:7, pw:0.35, pwm:0.3, pwmRate:3, cut:2800, res:0.15, fenv:0.2, fatk:30, fdec:500, fsus:0.5, atk:12, dec:800, sus:0.8, rel:300, vib:10, vibRate:5.5, vibDelay:500, wow:0.2, flutter:0.1, chorus:0.25, sat:0.3, age:0.15, hiss:0.05}],
+      ['Minor third pad', {aSaw:0.7, bSaw:0.5, bPulse:0, bSemi:3, detune:6, voices:3, spread:0.4, cut:1800, res:0.1, fenv:0.15, fatk:900, fdec:2500, fsus:0.5, atk:900, dec:2000, sus:0.9, rel:2500, wow:0.3, chorus:0.5, age:0.3, hiss:0.15}],
+      ['Dark age drone', {oct:0, aSaw:0.7, bSaw:0.6, bPulse:0, sub:0.5, detune:20, voices:3, spread:0.6, drift:0.7, cut:500, res:0.1, fenv:0, atk:2500, dec:4000, sus:1, rel:4000, wow:0.5, wowRate:0.3, flutter:0.3, chorus:0.4, sat:0.4, age:0.8, hiss:0.5}],
+      ['Wide chorus keys', {oct:2, voices:4, aSaw:0.6, bPulse:0.5, detune:8, pw:0.4, pwm:0.5, spread:1, cut:2400, res:0.1, fenv:0.4, fatk:2, fdec:800, fsus:0.3, atk:3, dec:1500, sus:0.2, rel:900, wow:0.2, chorus:1, sat:0.25, age:0.2, hiss:0.05}],
+      ['Hard square lead', {oct:3, voices:1, aSaw:0, aPulse:1, bPulse:0, pw:0.5, pwm:0, cut:5000, res:0.25, fenv:0.15, fatk:5, fdec:300, fsus:0.6, atk:3, dec:500, sus:0.3, rel:200, wow:0, flutter:0, chorus:0, sat:0.6, age:0, hiss:0}],
+      ['Sync-ish ring lead', {oct:3, voices:1, aSaw:0.8, bPulse:0.6, bSemi:5, detune:25, ring:0.5, cut:3500, res:0.3, fenv:0.4, fatk:5, fdec:400, fsus:0.4, atk:6, dec:700, sus:0.8, rel:250, wow:0.1, chorus:0.15, sat:0.5, age:0.1, hiss:0.03}],
+      ['Slow open swell', {aSaw:0.8, bPulse:0.5, detune:9, voices:2, spread:0.3, hp:60, cut:8000, res:0.05, fenv:0, atk:3000, dec:4000, sus:1, rel:3500, wow:0.25, flutter:0.15, chorus:0.45, sat:0.2, age:0.15, hiss:0.08}],
+      ['Tremor stab', {oct:2, voices:2, aSaw:0.8, bPulse:0.5, bSemi:7, detune:6, cut:1500, res:0.2, fenv:0.5, fatk:2, fdec:300, fsus:0.1, atk:2, dec:350, sus:0, rel:200, wow:0.7, wowRate:2.5, flutter:0.5, chorus:0.3, sat:0.4, age:0.3, hiss:0.1}],
+      ['Glassy highs', {oct:3, voices:3, aSaw:0.3, aPulse:0.3, bPulse:0.4, bSemi:12, detune:12, pw:0.2, hp:900, cut:9000, res:0.15, fenv:0, atk:1000, dec:3000, sus:0.9, rel:3000, wow:0.3, flutter:0.2, chorus:0.6, age:0.2, hiss:0.1}]]},
   // LXR ENGINES: each voice's knob pages, from the firmware's menus (lxr/lxr-engine.js)
   ...(typeof LxrCore !== 'undefined' ? LxrCore.xui() : {}),
   // …PUMP SYNTHS: each instrument's panels and its plugin's factory presets (pump/synth/pump-synth-engine.js)
@@ -14293,7 +14650,7 @@ function sndSpecPaint(){
   }
   // where each sounding note is in the render: a line with the screen colour either side, so it shows on any part
   if (sndPH.length && ctx){
-    const t = ctx.currentTime - heardLat();
+    const t = ctx.currentTime - heardLat() - moFxLat();   /* (LATENCY COMP: the sound is T later too) */
     for (const p of sndPH){
       if (t < p.t0 || p.c !== c) continue;
       const pos = p.from + (t - p.t0) * p.rate * (p.to < p.from ? -1 : 1), x = pos / (c.data.length / c.sr) * W;
@@ -14337,7 +14694,7 @@ function sndSoon(){ if (!sndQ) sndQ = requestAnimationFrame(() => { sndQ = 0; if
 function sndWake(){ if (!sndRaf && sndOn()) sndRaf = requestAnimationFrame(sndFrame); }
 function sndFrame(){
   sndRaf = 0; if (!sndOn() || document.hidden) return; if (!sndCol) sndColours(); if (meterBlank('snd', () => sndScopePaint(false))) return; /* METERS: OFF: empty once, then parked (mtrWake at STOP) */ if (lpHold(sndFrame.t || 0)){ sndRaf = requestAnimationFrame(sndFrame); return; } sndFrame.t = performance.now();   // BATTERY: parked while hidden (sndWake on return)
-  const t = ctx ? ctx.currentTime - heardLat() : 0;
+  const t = ctx ? ctx.currentTime - heardLat() - moFxLat() : 0;
   for (let i = sndPH.length - 1; i >= 0; i--) if (t > sndPH[i].end) sndPH.splice(i, 1);
   const live = !!ctx && (tp.on || performance.now() - audioWake < 1500 || sndPH.length > 0);
   sndSpecPaint(); sndScopePaint(live);
@@ -14456,7 +14813,7 @@ function growKit(){
 }
 function setVtrk(on){
   vtrk = !!on; try { localStorage.setItem(VTRK, vtrk ? '1' : '0'); } catch(e){} syncHeld();
-  try { if (vtrk && S.ntr > 24){ S.ntr = 24; saveS(); toast('A kit slot per track allows up to 24 tracks: TRACKS is 24 now (tracks 25–32 are kept, not played).', 5000); } } catch(e){}
+  try { if (vtrk && S.ntr > 24){ S.ntr = 24; saveS(); toast('A kit slot per track allows up to 24 tracks: the song has 24 now (tracks 25–32 are kept, not played).', 5000); } } catch(e){}
   for (let i = 0; i < Math.max(nslots(), 40); i++){ dirty[i] = true; cache[i] = null; }
   growKit();
 }
@@ -15233,10 +15590,32 @@ $('audLvl').addEventListener('input', e => {
 });
 $('audLvl').addEventListener('change', asetSave);
 const updLat = makeSeg($('segLat'), [['interactive', 'Lowest'], ['balanced', 'Balanced'], ['playback', 'Safest']], () => latOf(), v => { aset.lat = v; aset.latPick = true; asetSave(); audRestartRow(); });
-// LATENCY COMPENSATION (owner, 1 Nov): this device's choice, off by default; the live player re-times at once.
+// LATENCY COMPENSATION (owner, 1 Nov): this device's choice (AUTO by default since build 615); the live player re-times at once.
 // (3 Nov, ports table pass: a switch, not an Off / On pair; makeCk is makeSeg for one checkbox.)
-const updPdc = makeCk($('ckPdc'), () => !!aset.pdc, v => { aset.pdc = !!v; asetSave(); try { if (rt && rt.pl) rt.pl.pdcSync(); } catch(e){}
-  const T = pdcPlan(48000).T; toast(v ? (T > 0 ? `Latency compensation on: every track waits ${Math.round(T * 1000)} ms to line up with the slowest one` : 'Latency compensation on. No track has latency right now.') : 'Latency compensation off', 2600); });
+/* (14 Nov, build 615) three values: aset.pdcMode 'auto' (the default) | 'on' | 'off'; pdc (the old boolean) is still written, as pdcMode === 'on', for an older build. */
+const PDC_HELP = {auto:'AUTO: lines every track up when an effect with look-ahead (CALM, TONE, LIMIT, TUNE, linear-phase EQ…) sits on a track or bus: the others wait for it while the song plays. Does nothing otherwise. Stopped, pads answer at once.',
+  on:'ON: the same, also while stopped (pads feel later whenever such an effect is loaded).', off:'OFF: never: a track or bus with such an effect plays late.'};
+function pdcSet(v){ aset.pdcMode = v === 'on' || v === 'off' ? v : 'auto'; aset.pdc = aset.pdcMode === 'on'; asetSave(); moFxAt = -1e9;
+  try { if (rt && rt.pl) rt.pl.pdcSync(); } catch(e){}
+  let T = 0; try { T = pdcPlan(ctx ? ctx.sampleRate : 48000).T; } catch(e){}
+  const ms = Math.round(T * 1000), m = aset.pdcMode;
+  toast(m === 'auto' ? (T > 0 ? `Latency comp AUTO: the other tracks wait ${ms} ms while the song plays, to line up with the slowest one` : 'Latency comp AUTO: lines tracks up only when an effect has look-ahead. None does right now.')
+    : m === 'on' ? (T > 0 ? `Latency comp ON: every track waits ${ms} ms to line up with the slowest one, also while stopped` : 'Latency comp ON. No track has latency right now.')
+    : 'Latency comp OFF: a track or bus with a look-ahead effect plays late', 3200);
+  pdcNotice(); }
+const updPdc = makeSeg($('segPdc'), [['auto', 'AUTO'], ['on', 'ON'], ['off', 'OFF']], () => pdcModeOf(), pdcSet);
+/* THE ONE-TIME NOTICE (owner, 14 Nov: people who had it OFF now get AUTO, so say so once): the first time on this device that AUTO
+   really delays something (T > 0), as an effect is added, PLAY starts or the setting changes: one toast, never in a render. */
+function pdcWho(sr){ let w = null;
+  for (let t = 0; t < NT; t++) for (const f of (S.tfx && S.tfx[t]) || []){ const l = pumpSlotLat(f, sr); if (l > 0 && (!w || l > w.l)) w = {t, f, l}; }
+  return w; }
+function pdcNotice(){
+  if (rendering || pdcModeOf() !== 'auto') return;
+  const K = 'thunderplus-seen-pdc-auto'; try { if (localStorage.getItem(K)) return; } catch(e){ return; }
+  const sr = ctx ? ctx.sampleRate : 48000; let T = 0; try { T = pdcPlan(sr).T; } catch(e){}
+  if (!(T > 0)) return;
+  const w = pdcWho(sr), ms = x => Math.round(x * 1000), ps = w && TFX[w.f.type] && pumpFx(TFX[w.f.type].pump), nm = ps && ps.name ? String(ps.name).toUpperCase() : 'An effect';
+  toastOnce('pdc-auto', (w ? `${nm} on track ${w.t + 1} looks ${ms(w.l / sr)} ms ahead, so the other tracks now wait ${ms(T)} ms` : `An effect with look-ahead makes the other tracks wait ${ms(T)} ms`) + ' while the song plays, to stay in time. Audio & MIDI › LATENCY COMP turns this off.', 9000); }
 const updARate = makeSeg($('segARate'), [[0, 'Device'], [44100, '44.1k'], [48000, '48k']], () => aset.rate, v => { aset.rate = v; asetSave(); audRestartRow(); });
 /* …PUMP SYNTHS LIVE (owner, 26 Oct), for this device: AUTO plays Mono live, Poly live and Coil live live, with the safety net
    (their renders when the device can't keep up); RENDERED always plays their renders, the same values' sound, which is
@@ -17214,7 +17593,7 @@ function msend(bytes, t, early, p){
 let moFxT = 0, moFxAt = -1e9;
 function moFxLat(){
   const now = performance.now(); if (now - moFxAt < 250) return moFxT; moFxAt = now;
-  try { const sr = ctx.sampleRate; moFxT = ((S.mst ? mstLatency(S.mst, sr) : 0) + pumpChainLatency(S.mfx, sr) + safeLatency(sr)) / sr + pdcPlan(sr).T; } catch(e){ moFxT = 0; }
+  try { const sr = ctx.sampleRate; moFxT = ((S.mst ? mstLatency(S.mst, sr) : 0) + pumpChainLatency(S.mfx, sr) + safeLatency(sr)) / sr + (pdcModeOf() === 'auto' && !(typeof tp !== 'undefined' && tp && tp.on) ? 0 : pdcPlan(sr).T); } catch(e){ moFxT = 0; }   /* (AUTO, stopped: the tracks are not delayed, so neither is what the screen shows) */
   return moFxT; }
 /* OUTBOX (owner, 7 Nov: "midi notes keep playing for a couple of notes after stop"). The sequencers book notes up to 0.25 s
    ahead (more in a hidden tab), and a message handed to Web MIDI can't be taken back (Chrome / Electron have no clear()), so a
@@ -19677,16 +20056,20 @@ function pumpRowInfo(t, k, q){
   const type = TFX[f.type].pump, p = pumpFx(type).params[pumpIdx[type][pumpSymOf(q, f)]];
   return p ? ' (' + p.n + ' = ' + pumpFmt(p, f.pump[p.s]) + ')' : '';
 }
-// A toast's note when a pump effect goes on a bus: its latency isn't compensated.
-const pumpBusNote = type => ['calm', 'tone', 'limit'].includes(type) ? '. It delays this bus (see OPEN’s note): fine on the master, on a bus it plays late against the other tracks' : '';
+// A toast's note when a pump effect with latency (pumpLatencyOf > 0: CALM, TONE, LIMIT, TUNE, CRUSH, MASTER, TUBE, STRIP, HEAT, linear-phase EQ…)
+// goes on a bus or track, worded by LATENCY COMP: AUTO / ON: the others wait; OFF: it plays late.
+const pumpBusNote = (type, f) => { let v = 0; try { v = pumpLatencyOf(f || {type, pump:{}}, ctx ? ctx.sampleRate : 48000); } catch(e){}
+  if (!(v > 0)) return ''; const ms = Math.round(v / (ctx ? ctx.sampleRate : 48000) * 1000), m = pdcModeOf();
+  return m === 'off' ? '. It delays this bus (see OPEN’s note): fine on the master, on a bus it plays late against the other tracks. Audio & MIDI › LATENCY COMP lines it up' : `. It looks ${ms} ms ahead: the other tracks will wait ${ms} ms` + (m === 'auto' ? ' while the song plays' : ''); };
 const pumpSyncT = t => { const A = t >= NT ? S.mfx : (S.tfx && S.tfx[t]); (A || []).forEach(f => { if (f && isPumpT(f.type)) pumpSync(f); }); };
-// What the FX screen says about a pump slot's latency (nothing compensates it: on a bus it plays late against the rest).
+// What the FX screen says about a pump slot's latency (LATENCY COMP AUTO / ON: the others wait; OFF: on a bus it plays late against the rest).
 function pumpLatTxt(t, k){
   const v = PumpFX.latency(t, k), sr = ctx ? ctx.sampleRate : 48000;
   if (v == null) return '';
   if (!v) return 'no latency';
   const ms = (v / sr * 1000).toFixed(v / sr < 0.01 ? 1 : 0) + ' ms';
-  return t >= NT ? 'latency ' + ms + ' (the whole mix moves; nothing to line up)' : 'latency ' + ms + ': this bus plays that much late against the other tracks (not compensated)';
+  if (t >= NT) return 'latency ' + ms + ' (the whole mix moves; nothing to line up)';
+  return pdcModeOf() === 'off' ? 'latency ' + ms + ': this bus plays that much late against the other tracks (not compensated). Audio & MIDI › LATENCY COMP lines it up' : 'latency ' + ms + ': the other tracks wait for it (LATENCY COMP)';
 }
 // The track effects in their groups (the pad list's: FX_GROUPS, MODFX.group or FX_GROUP), the everyday ones first in
 // each group (FXT_FIRST), then the rest in the old order. The slot picker shows the group names as headings; a slot
@@ -19867,11 +20250,11 @@ class ThunderFx extends AudioWorkletProcessor {
       if (s.bi >= 0) v[s.bi] = s.byp ? 1 : 0;
       P.pump_commit(s.pu); s.dirty = false; }
     if (s.cr){   // …PUMP CREATIVE: the song's tempo and position, and the notes of NOTES FROM that fall in this block
-      const T = this.mctx.transport; P.pump_transport(s.pu, T.tempo, T.playing ? this.ppq || 0 : 0, T.playing ? 1 : 0);
+      const T = this.mctx.transport, lag = (s.up || 0) * T.tempo / 60 / sampleRate; P.pump_transport(s.pu, T.tempo, T.playing ? Math.max(0, (this.ppq || 0) - lag) : 0, T.playing ? 1 : 0);   /* (build 616) s.up: the latency of the pump slots before this one: the sound reaches it that much late, so its song position is that much earlier (a GATE after CALM closed 2048 samples early) */
       const q = this.pq;
       if (q && q.length){ const end = currentTime + n / sampleRate;
         for (let j = 0; j < q.length; j++){ const m = q[j]; if (m[1] >= end) break;
-          if (m[0] === s.slot){ P.pump_midi(s.pu, Math.max(0, Math.min(n - 1, Math.round((m[1] - currentTime) * sampleRate))), m[2], m[3], m[4]); q.splice(j--, 1); } } }
+          if (m[0] === s.slot){ P.pump_midi(s.pu, Math.max(0, Math.min(n - 1, Math.round((m[1] - currentTime) * sampleRate))), m[2], m[3], m[4]); q.splice(j--, 1); } } }   /* (notes are not shifted by s.up: they are booked a block ahead at most; left as it was) */
     }
     if (s.pso && s.pso.length && ((s.psN = (s.psN | 0) + 1) % 192) === 0){   // …PUMP STATE: about twice a second, has the plugin changed its own (MASTER learned)?
       for (const key of s.pso) try { const tx = this.pumpStateGet(P, s, key); if (tx !== s.psIn[key]){ s.psIn[key] = tx; this.port.postMessage({pst:[[s.slot, s.key, key, tx]]}); } } catch (e){} }
@@ -19977,6 +20360,7 @@ class ThunderFx extends AudioWorkletProcessor {
       s.on = on; s.slot = slot; next.push(s);
     }
     for (const s of old) this.drop(s);
+    { const P = globalThis.__pumpX; let acc = 0; if (P) for (const s of next) if (s.pu !== undefined && s.pu >= 0){ s.up = acc; if (!(s.bi < 0 && s.byp)){ try { acc += P.pump_latency(s.pu); } catch (e){} } } }   /* (build 616) s.up at once, not only with the half-second latency report: a clocked pump effect after CALM ran early for the first half second */
     this.slots = next; this.idle = 0; this.clocked = next.some(s => (s.js && ((s.jt >= 93 && s.jt <= 95) || (s.jt >= 100 && s.jt <= 102))) || s.clk);
     this.chard = next.some(s => s.clk || (s.js && (s.jt === 93 || (s.jt >= 100 && s.jt <= 102))));   // clocked by more than Flex / Step gate (Retrigger, Grains, Scramble, Glitch, a clocked module): those keep running while stopped
   }
@@ -20190,7 +20574,7 @@ class ThunderFx extends AudioWorkletProcessor {
     if (this.fr >= sampleRate / 2){ const span = this.fr / sampleRate * 1000, sl = []; for (const s of this.slots){ if (s.slot >= 0 && s.ms) sl.push([s.slot, s.ms / span]); s.ms = 0; }
       this.port.postMessage({load:this.ms / span, sl}); this.ms = 0; this.fr = 0;
       // …PUMP: each pump slot's latency, when it changes (the FX screen warns on buses: nothing compensates it)
-      const P = globalThis.__pumpX; if (P){ const lat = []; for (const s of this.slots) if (s.pu !== undefined && s.pu >= 0) lat.push([s.slot, s.key, P.pump_latency(s.pu)]);
+      const P = globalThis.__pumpX; if (P){ const lat = []; let acc = 0; for (const s of this.slots) if (s.pu !== undefined && s.pu >= 0){ const l = P.pump_latency(s.pu); lat.push([s.slot, s.key, l]); s.up = acc; if (!(s.bi < 0 && s.byp)) acc += l; }
         const k = JSON.stringify(lat); if (k !== this.platS){ this.platS = k; this.port.postMessage({plat:lat}); } } }
     o[0].set(this.sub(this.L, n)); if (o[1]) o[1].set(this.sub(this.R, n));
     let op = 0; for (let k = 0; k < n; k++){ const v = this.L[k] < 0 ? -this.L[k] : this.L[k], w = this.R[k] < 0 ? -this.R[k] : this.R[k]; if (v > op) op = v; if (w > op) op = w; }
@@ -20524,9 +20908,16 @@ const pumpChainLatency = (A, sr) => (A || []).reduce((n, f) => n + pumpSlotLat(f
      d: the delay on its direct way to the master (latest arrival T minus its own), 0 for a pure source (heard only via its bus)
      f: the delay on its feed into the buses it feeds, so a bus's sources line up with the latest of them.
    A send (a track heard directly and through a bus) gets the two separately, so both copies line up. */
+/* LATENCY COMP: AUTO (build 616; owner, 14 Nov: a bus with a look-ahead effect, and a tempo-synced delay on it, must land on the beat).
+   aset.pdcMode: 'auto' (the default: the plan below whenever something has latency, and live only while the song plays, so pads
+   answer at once when it is stopped), 'on' (always), 'off'. A setting saved before this (aset.pdc true / false) reads as on / auto.
+   The plan itself is the same in auto and on: with no latency anywhere it is all zeros, and the sound is sample for sample what off gives.
+   c: how late each track's INPUT is (a bus: the latest of its sources; the master: T), which is how late its effects' beat clock
+   must run, so Flex, Step gate, Retrigger and the clocked pump effects stay on the beat of the sound they hear (they ran T early). */
+function pdcModeOf(){ return aset.pdcMode === 'on' || aset.pdcMode === 'off' || aset.pdcMode === 'auto' ? aset.pdcMode : aset.pdc ? 'on' : 'auto'; }   /* (a function declaration: the Audio & MIDI control reads it while the page is still loading; as a const further down it stopped the app from starting) */
 function pdcPlan(sr){
-  const none = {on:false, T:0, d:new Map(), f:new Map()};
-  if (!aset.pdc) return none;
+  const none = {on:false, T:0, d:new Map(), f:new Map(), c:new Map()};
+  if ((aset.pdcMode === 'on' || aset.pdcMode === 'off' || aset.pdcMode === 'auto' ? aset.pdcMode : aset.pdc ? 'on' : 'auto') === 'off') return none;
   const P = busPlan(), L = t => t < NT ? pumpChainLatency(S.tfx[t], sr) / sr : 0;
   const at = new Map(), busy = new Set(), f = new Map(), d = new Map();
   const atP = t => { if (at.has(t)) return at.get(t); let v = L(t); if (busy.has(t)) return v; busy.add(t);
@@ -20537,7 +20928,8 @@ function pdcPlan(sr){
   const routed = new Set(); for (const src of P.feeds.values()) for (const q of src) if (P.pure.has(q)) routed.add(q);
   let T = 0; for (let t = 0; t <= NT; t++) if (!routed.has(t)) T = Math.max(T, at.get(t));
   for (let t = 0; t <= NT; t++) d.set(t, routed.has(t) ? 0 : T - at.get(t));
-  return {on:true, T, d, f};
+  const c = new Map(); for (let t = 0; t < NT; t++){ const v = at.get(t) - L(t); if (v > 1e-9) c.set(t, v); } if (T > 1e-9) c.set(MT, T);
+  return {on:true, T, d, f, c};
 }
 function tfxNode(ac, chain, cid){
   // Inputs: 0 the track, 1 (SOURCE) the picked tracks' own sounds, one channel each ('tapmap'), 2 (SENDS) the Sidechain Out sends.
@@ -20578,8 +20970,8 @@ const PROWS = 32;   // rows stored per phrase; each phrase plays its own LEN (16
 const NCOL = 4, VC = 4, IC = 5, FX0 = 6, RW = 12;
 const blankRow = () => new Array(RW).fill(-1);
 const freshPhrase = () => Array.from({length:PROWS}, blankRow);
-// The first half of the song's tracks play one note at a time (mono); the second half are polyphonic. With an odd
-// count the mono half gets the extra track. 16 tracks: 1–8 mono, 9–16 poly; 32 tracks: 1–16 mono, 17–32 poly.
+// The first MONO TRACKS tracks play one note at a time (mono); the rest are polyphonic (Settings → Song → MONO TRACKS / POLY TRACKS). A song without its own split: the first half, the mono half with the extra track
+// when the count is odd (16 tracks: 1–8 mono, 9–16 poly).
 // (ntr() lives with the song state below; these arrows only call it after everything is initialized.)
 /* MONO / POLY COUNTS (14 Nov): S.nmono, when the song has one, is the number of mono tracks (kept within 1..ntr-1: at least one of each kind); without it the mono half gets the extra track, as before. */
 const polyFrom = () => { const n = ntr(), m = S.nmono; return m >= 1 ? Math.min(m | 0, n - 1) : Math.ceil(n / 2); }, isPolyT = t => t >= polyFrom() && t < NT;
@@ -22018,9 +22410,19 @@ function makePlayer(ac, out, getBuf, live, mo){   // mo: the master OUT gain (af
   const setBusOff = v => { busOff = !!v; busSync(); };
   // LATENCY COMPENSATION: set every track's delays from pdcPlan (all 0 with the option off). Run after the buses are wired
   // (busSync) and after a track's effects change (routeTrack); cheap when nothing changed.
-  function pdcSync(){
-    const pl = pdcPlan(ac.sampleRate), set = (n, v) => { if (!n) return; v = Math.max(0, Math.min(0.99, v || 0)); if (Math.abs(n.delayTime.value - v) > 1e-6) n.delayTime.value = v; };
-    for (let t = 0; t < buses.length; t++){ const b = buses[t]; if (!b) continue; set(b.dl, pl.d.get(t)); set(b.fdl, pl.f.get(t)); set(b.fdlP, pl.f.get(t)); }
+  /* (build 616) AUTO: live, the delays are in force only while the song plays (clk.on); stopped they are 0, so pads and keys answer at
+     once. Live, a change glides over 50 ms (a jump of the delay time clicked: measured, a step of 0.2 on a sine), also the one at
+     STOP, under whatever is still ringing; as PLAY starts it takes 10 ms (in force before the first note; a plain jump clicked
+     when a pad was still ringing: measured 17 times the normal step), and in a render it is set at once. Each effects node's beat clock is delayed by how late its input is (pl.c, see pdcPlan). */
+  let pdcNow = false;   // set for the call made as PLAY starts or STOP lands: at once, no glide
+  function pdcSync(now){
+    pdcNow = !!now; const pl = pdcPlan(ac.sampleRate), playing = clk.on || (typeof tp !== 'undefined' && !!(tp && tp.on)), idle = live && !playing && pdcModeOf() === 'auto', glide = live, ramp = pdcNow ? 0.01 : 0.05;   /* (tp.on: the audio-thread sequencer keeps its own clock, so clk.on stays off while it plays) */
+    const set = (n, v) => { if (!n) return; v = idle ? 0 : Math.max(0, Math.min(0.99, v || 0)); if (n._pv === v) return; n._pv = v;
+      const q = n.delayTime; if (!glide){ try { q.cancelScheduledValues(0); } catch(e){} q.value = v; return; }
+      try { const at = ac.currentTime; q.cancelScheduledValues(at); q.setValueAtTime(q.value, at); q.linearRampToValueAtTime(v, at + ramp); } catch(e){ q.value = v; } };
+    for (let t = 0; t < buses.length; t++){ const b = buses[t]; if (!b) continue; set(b.dl, pl.d.get(t)); set(b.fdl, pl.f.get(t)); set(b.fdlP, pl.f.get(t)); if (b.fx) set(b.fx._cd, pl.c.get(t)); }
+    if (mfx) set(mfx._cd, pl.c.get(MT));
+    pdcNow = false;
   }
   // The beat clock for tempo-locked track and master effects (Flex, Step gate, Retrigger): the song position in beats
   // (wrapping every 16) as sample-accurate automation on a constant source, wired into every effect node's `bp`.
@@ -22030,10 +22432,11 @@ function makePlayer(ac, out, getBuf, live, mo){   // mo: the master OUT gain (af
   // beat + 1 while it plays and 0 otherwise, so with this source at −1 the effects get the same values, on the sample.
   const clkBus = ac.createGain(); clock.connect(clkBus);
   let mfx = null, mvol = null, moOv = false;
-  const clockTo = n => { try { if (n && n.parameters) clkBus.connect(n.parameters.get('bp')); } catch(e){} };
+  /* (build 616) each effects node hears the clock through its own delay (0 unless LATENCY COMP makes its input late: pdcSync) */
+  const clockTo = n => { try { if (n && n.parameters){ if (!n._cd){ n._cd = ac.createDelay(1); n._cd.delayTime.value = 0; n._cd._pv = 0; clkBus.connect(n._cd); } n._cd.connect(n.parameters.get('bp')); } } catch(e){} };
   // An effect node that goes lets go of its inputs too (the picked tracks, the sends, the beat clock): they kept it running,
   // a little more each time an effect was removed (review, 27 Oct).
-  const fxDrop = n => { if (!n) return; fxKeySync(n, []); try { const q = n.parameters && n.parameters.get('bp'); if (q) clkBus.disconnect(q); } catch(e){} };
+  const fxDrop = n => { if (!n) return; fxKeySync(n, []); try { if (n._cd){ clkBus.disconnect(n._cd); n._cd.disconnect(); n._cd = null; } } catch(e){} };
   // FIRST PLAY (owner, 31 Oct: after opening a song, the master's first FLX was lost): an FXO / FLX / GAT / RTG sent before
   // its track's (or the master's) effect node exists waits here, and the node takes it when it is made.
   const fxcPend = new Map();
@@ -22041,7 +22444,7 @@ function makePlayer(ac, out, getBuf, live, mo){   // mo: the master OUT gain (af
   // the pending list kept only the LAST command per param, so an FLX 00 booked before a later FLX was dropped and the slot
   // wasn't held off until the later one. Each param now keeps its commands, and they're all booked at their own times.
   const fxcFlush = (t, n) => { if (!n || !n.parameters || !fxcPend.size) return; for (const [k, L] of fxcPend){ const [tt, p] = k.split(':'); if (+tt !== t) continue; fxcPend.delete(k); const q = n.parameters.get(p); if (q) for (const ev of L) try { q.setValueAtTime(ev.v, Math.max(ev.t, ac.currentTime)); } catch(e){} } };
-  const setMfx = n => { if (mfx && mfx !== n) fxDrop(mfx); mfx = n || null; clockTo(mfx); if (mfx){ fxKeySync(mfx, S.mfx); fxcFlush(MT, mfx); } };   // SOURCE: the master's effect slots
+  const setMfx = n => { if (mfx && mfx !== n) fxDrop(mfx); mfx = n || null; clockTo(mfx); if (mfx){ fxKeySync(mfx, S.mfx); fxcFlush(MT, mfx); try { pdcSync(); } catch(e){} } };   // SOURCE: the master's effect slots
   const fxNodeOf = t => t >= MT ? mfx : buses[t] && buses[t].fx;
   const FXP = ['sw0', 'sw1', 'sw2', 'sw3', 'sw4', 'sw5', 'sw6', 'sw7', 'flx', 'gat', 'rtg'];
   /* GAIN STAGING (owner, 27 Oct; docs/GAIN-STAGING.md). Per track:
@@ -22294,7 +22697,8 @@ function makePlayer(ac, out, getBuf, live, mo){   // mo: the master OUT gain (af
     if (ev.type === 'tempo'){ tempoTo(ev); return; }
     if (ev.type === 'beat'){
       const o = clock.offset, at = Math.max(ev.t, ac.currentTime);
-      if (!clk.on){ clk.on = true; clk.base = Math.floor(ev.b / 16) * 16; o.setValueAtTime(ev.b - clk.base, at); clk.lt = at; clk.lv = ev.b - clk.base; PB.rsGap = 0; return; }
+      if (!clk.on){ clk.on = true; try { pdcSync(true); } catch(e){}   /* (AUTO: the delays come in as the song starts) */
+        clk.base = Math.floor(ev.b / 16) * 16; o.setValueAtTime(ev.b - clk.base, at); clk.lt = at; clk.lv = ev.b - clk.base; PB.rsGap = 0; return; }
       const v = ev.b - clk.base;
       // HOLD KEEPS THE TEMPO (10 Nov, HOLD_CLK_FLAT): rsHold moved this beat on by d, so the ramp from the last beat took d longer, the clock's slope
       // fell, and the effects' modules (Simple delay, ...) read that as a slower tempo: their delay TIME glided (pitching). The clock now waits
@@ -22318,7 +22722,8 @@ function makePlayer(ac, out, getBuf, live, mo){   // mo: the master OUT gain (af
       return; }
     if (ev.type === 'fxc'){ if (ac === ctx && wkLazy() && !(rt && rt.fxAsk) && /^sw/.test(ev.p)) wkFxAsk(ev.track, true);   // phones: a switch for a slot the song didn't need yet
       const n = fxNodeOf(ev.track), q = n && n.parameters && n.parameters.get(ev.p);
-      if (q) try { q.setValueAtTime(ev.v, Math.max(ev.t, ac.currentTime)); } catch(e){}
+      /* (build 616, CodeRabbit on #150) the command lands as late as this node's input is (n._cd, the delay its beat clock has: pdcSync), so a GAT or FXO on a row acts on that row's sound, not on the row before it */
+      if (q) try { q.setValueAtTime(ev.v, Math.max(ev.t, ac.currentTime) + ((n._cd && n._cd._pv) || 0)); } catch(e){}
       else { const k = ev.track + ':' + ev.p, L = fxcPend.get(k) || []; L.push(ev); fxcPend.set(k, L); }   // FIRST PLAY (owner, 31 Oct): the effect isn't built yet: it gets the values when it is
       return; }
     if (ev.type === 'chc'){ const b = buses[ev.track], n = b && b.chn, q = n && n.parameters && n.parameters.get(ev.p); if (q) try { q.setValueAtTime(ev.v, Math.max(ev.t, ac.currentTime)); } catch(e){} return; }   // BYP
@@ -22511,6 +22916,7 @@ function makePlayer(ac, out, getBuf, live, mo){   // mo: the master OUT gain (af
     seqGen++;   // 10 Nov: timers booked ahead by atTime / tempoTo are void from here (the restore below books its own after this)
     fxcPend.clear();
     clk.on = false; try { clock.offset.cancelScheduledValues(at); clock.offset.setValueAtTime(-1, at); } catch(e){}
+    try { pdcSync(); } catch(e){}   /* (LATENCY COMP AUTO: the song has stopped here, with the page's own sequencer after tStop's call: the delays go) */
     for (const n of [...buses.map(b => b && b.fx), mfx]) if (n && n.parameters) for (const k of FXP){ const q = n.parameters.get(k); if (q) try { q.cancelScheduledValues(at); q.setValueAtTime(-1, at); } catch(e){} }
     for (const b of buses) if (b && b.chn && b.chn.parameters) for (let k = 1; k <= 15; k++){ const q = b.chn.parameters.get('b' + k); if (q) try { q.cancelScheduledValues(at); q.setValueAtTime(-1, at); } catch(e){} }   // BYP back to the patch
     for (const key of fxOv.keys()){ const [t, k] = key.split(':').map(Number), m = fxpMsg(t, k, {}); if (m) atTime(at, () => { const n = fxNodeOf(t); if (n && n.port) try { n.port.postMessage(m); } catch(e){} }); }   // FXV: back to the slots' own
@@ -23362,7 +23768,7 @@ function rtFx(t){
   else if (rt.mfx){ rt.mfx.port.postMessage(null); try { rt.mfx.disconnect(); } catch(e){} rt.mfx = null; rt.pl.setMfx(null); rtRoute(); }
 }
 function rtAllFx(){ for (let t = 0; t <= NT; t++) rtFx(t); }
-function fxChanged(t){ pumpSyncT(t); saveS(); rtFx(t); try { PumpFX._notify(t, 'fx'); } catch(e){} }
+function fxChanged(t){ pumpSyncT(t); saveS(); rtFx(t); try { PumpFX._notify(t, 'fx'); } catch(e){} try { pdcNotice(); } catch(e){} }
 /* MOVE AN EFFECT (owner, 2 Nov: drag an effect to another slot, in the bottom bar or on the FX screen): the effect leaves
    slot `from` and goes in at slot `to`; the ones between shift over a slot, as in a DAW's chain. One undo step. */
 function fxMove(t, from, to){
@@ -23531,6 +23937,8 @@ function tStart(mode, o){
   met.next = 0; rec.hist = []; if (ci) countIn(t0start - ci, recS.cnt, seq.bpm);
   if ([...S.tfx, S.mfx].some(A => (A || []).some(f => f && f.on && f.type === 'tgate'))){ fxRestartN++; rtAllFx(); }
   Object.assign(tp, {on:true, mode, seq, q:[], pos:null, snd:null, bpm:seq.bpm, tks:seq.tks, st:0, loopV:o.loop ? o.loop.v : '', row0:mode === 'song' ? (o.row | 0) : 0, t0:t0start, lenTot:null, lenPre:0, hiRow:null});
+  try { if (rt && rt.pl) rt.pl.pdcSync(true); moFxAt = -1e9; } catch(e){}   // LATENCY COMP AUTO: the delays come in with PLAY (before its first note sounds)
+  try { pdcNotice(); } catch(e){}
   if (rsFirst){   // RESUME: the effect commands passed on the way, then the step it stopped on, now
     for (const e of rsFx.values()) rt.pl.play(Object.assign({}, e, {t:t0start}));
     const d = t0start - rsFirst.t;
@@ -24262,7 +24670,8 @@ function tStop(quiet){
   stopP = !quiet && stopToPlayhead() && tp.on && tp.pos && tp.pos.some(Boolean) ? {P:tp.pos.map(q => q && Object.assign({}, q)), mode:tp.mode} : null;
   home = !quiet && tp.on && !stopToPlayhead() && fpHome && fpHome.t >= workT && fpHome.t >= arrHandT ? fpHome : null;
   arrP = !quiet && stopArrOn && !stopToPlayhead() && tv !== 'song' && tp.on && tp.mode === 'song' && tp.pos && tp.pos.some(Boolean) && apPanel() ? tp.pos.map(q => q && Object.assign({}, q)) : null; });   // (12 Nov, owner: PLAY from the pad, ▼ / scroll down, STOP before row 2 jumped the cursor back to the top) fpHome is the cursor as FOLLOW first noted it, and is only noted again 4 s after your last key, press or scroll: a place you moved to after that note stands, only an untouched cursor goes back   // (9 Nov, owner: with ON STOP at STAYS it still ended up at the playback spot: FOLLOW had carried it there)
-  tp.timer = 0; tp.on = false; if (mtrMode === 'off') setTimeout(mtrWake, 0); fpMem = null; fpHome = null; tp.q = []; tp.pos = null; tp.snd = null; tp.stopAt = null; tp.ahead = tp.aheadT = 0; tp.rsUntil = 0; PB.rsA = null; G('runaway kick', rkReset);
+  tp.timer = 0; tp.on = false; try { if (rt && rt.pl) rt.pl.pdcSync(); moFxAt = -1e9; } catch(e){}   /* LATENCY COMP AUTO: stopped, pads answer at once again */
+  if (mtrMode === 'off') setTimeout(mtrWake, 0); fpMem = null; fpHome = null; tp.q = []; tp.pos = null; tp.snd = null; tp.stopAt = null; tp.ahead = tp.aheadT = 0; tp.rsUntil = 0; PB.rsA = null; G('runaway kick', rkReset);
   // HAND-OVER (seqHandover): the core and the voices already booked keep sounding until the page sequencer's first step
   if (tp.core){ tp.core = false; core.gen++; if (!handing) G('core', () => { coreWire(false); try { core.node.port.postMessage({op:'stop', at:ctx.currentTime}); } catch(e){} }); }
   else if (coreWanted() && !core.ready && ctx) setTimeout(() => { try { if (!tp.on) coreLoad(); } catch(e){} }, 400);
@@ -25272,7 +25681,7 @@ async function importMidiFile(f){
   saveS(); draw();
   const tempoNote = m.tempo > 0 ? (songEmpty ? ` Tempo ${S.bpm} BPM from the file.` : ` (the file is at ${Math.round(m.tempo)} BPM; the song stays at ${S.bpm})`) : '';
   toast(`Imported ${tracks.length} MIDI track${tracks.length === 1 ? '' : 's'} into tracks ${d2(t0 + 1)}–${d2(t0 + tracks.length)} from row ${rS(y0, 3)}: ${placed} blocks, using instrument ${hx(clamp(last.inst, 0, NI - 1))}${tracks.length > 1 ? ' and up' : ''}.` + tempoNote
-    + (m.tracks.length > tracks.length ? ` ${m.tracks.length - tracks.length} more didn’t fit (TRACKS).` : '') + (out ? ' Ran out of phrases or sects: the rest was left out.' : ''), 8000);
+    + (m.tracks.length > tracks.length ? ` ${m.tracks.length - tracks.length} more didn’t fit (MONO TRACKS and POLY TRACKS).` : '') + (out ? ' Ran out of phrases or sects: the rest was left out.' : ''), 8000);
 }
 $('midIn').addEventListener('change', e => { const f = e.target.files[0]; e.target.value = ''; if (f) importMidiFile(f); });
 
@@ -25467,7 +25876,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 614;
+const BUILD = 617;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD + (location.pathname.includes('/beta/') ? ' · beta' : '');
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -25792,13 +26201,16 @@ function trackHolds(Sx, t){
     if (![false, true].some(po => nj(trackVoiceOf(t, po)) === mine)) return true; } } catch(e){ return true; }
   return false;
 }
+// Is voice v exactly the stock voice a track of that kind starts with (its name aside)?
+function voiceIsStock(v, t, poly){ try { const nj = x => { const j = voiceToJSON(x); j.name = ''; return JSON.stringify(j); }; return nj(v) === nj(trackVoiceOf(t, poly)); } catch(e){ return false; } }
 // The visible tracks that going to `mono` mono and `poly` poly tracks would hide AND that hold something (for "ask first only if something is in it"): their numbers, from 0.
-function tracksHiddenBy(mono, poly, Sx = S){
+function tracksHiddenAll(mono, poly, Sx = S){   /* every visible track the new counts would hide, held or not (the notice names them) */
   const n0 = Sx.ntr || 16, m0 = polyFrom(), out = [];
   for (let t = Math.max(0, mono); t < m0; t++) out.push(t);
   for (let t = m0 + Math.max(0, poly); t < n0; t++) out.push(t);
-  return out.filter(t => trackHolds(Sx, t));
+  return out;
 }
+const tracksHiddenBy = (mono, poly, Sx = S) => tracksHiddenAll(mono, poly, Sx).filter(t => trackHolds(Sx, t));
 // Can the song go to `mono` / `poly`? {why:''} = yes (with n0, m0, n1 and the plan), else why = the reason in plain English. A count may not grow into hidden tracks of the OTHER kind that hold something.
 function tracksCheck(mono, poly, Sx = S){
   const most = vtrk ? 24 : NT, n0 = Sx.ntr || 16, m0 = polyFrom();
@@ -25867,6 +26279,10 @@ function setTracks(mono, poly){
     try { PumpFX._notifyAll('load'); } catch(e){} }
     if (ck.plan.h1 != null) S.hmono = ck.plan.h1; }
   S.ntr = n1; const n = S.ntr; if (m1 === Math.ceil(n1 / 2)) delete S.nmono; else S.nmono = m1;
+  /* A track that took an OVER slot (a hidden slot of the other kind, empty by trackHolds, which counts either kind's stock voice as empty) may still hold that other kind's stock voice: a poly track would play the mono
+     drum one-shot, a mono track the poly saw. Give it its own kind's voice. A voice somebody made is never touched (trackHolds would have refused the slot). (CodeRabbit, #145) */
+  if (vtrk && kit && kit.voices && (n1 !== n0 || m1 !== m0)) for (const o of ck.plan.over){ const i = ck.plan.P.indexOf(o.t), v = i >= 0 && i < n1 ? kit.voices[NPAD + i] : null, poly = !o.mono;
+    if (v && voiceIsStock(v, i, !poly)) kit.voices[NPAD + i] = trackVoiceOf(i, poly); }
   if (vtrk && (n1 !== n0 || m1 !== m0)){ kit.voices.forEach((v, i) => { if (v === null) kit.voices[i] = trackVoice(i - NPAD); }); for (let i = 0; i < kit.voices.length; i++){ dirty[i] = true; cache[i] = null; } }
   if (cTrack >= n) cTrack = n - 1; if (cs.song.x >= n && cs.song.x !== MT) cs.song.x = n - 1; if (cs.mixer.x >= n) cs.mixer.x = n - 1;
   // A new track instantiates its voice before the redraw, so the kit keeps one-to-one voice/track parity.
@@ -25878,7 +26294,36 @@ function setTracks(mono, poly){
 // MONO count (within 1..total-1) and changes POLY. Returns the old → new track map (the identity when refused: a total outside 8..max is clamped, but a refusal for a hidden track is not reported here).
 function setNtr(v){
   const n0 = ntr(), n1 = clamp(v, 8, vtrk ? 24 : NT), m0 = polyFrom(), even = m0 === Math.ceil(n0 / 2), m1 = even ? Math.ceil(n1 / 2) : clamp(m0, 1, n1 - 1);
-  return setTracks(m1, n1 - m1).tN;
+  const r = setTracks(m1, n1 - m1); if (r.why && typeof toast === 'function') toast(r.why, 5000);   /* a refusal is always said */
+  return r.tN;
+}
+/* SETTINGS: MONO TRACKS / POLY TRACKS (owner, 14 Nov). tracksSay: "track 12 (poly)" / "tracks 07, 08 (mono) and 16 (poly)" for the track numbers as they are NOW. */
+function tracksSay(list){
+  const m0 = polyFrom(), g = [[], []]; list.forEach(t => g[t >= m0 ? 1 : 0].push(d2(t + 1)));
+  const part = (a, k) => a.length ? a.join(', ') + ' (' + k + ')' : '';
+  return (list.length === 1 ? 'track ' : 'tracks ') + [part(g[0], 'mono'), part(g[1], 'poly')].filter(x => x).join(' and ');
+}
+/* tracksRowSet(mono, poly): what a Settings row does with a new count. Refused by the may-it-grow rule or the limits: the reason is shown (toast) and nothing changes. Shrinking so a track that HOLDS something would be hidden:
+   ask first (the app's own dialog, Hide is the default button; Cancel leaves everything). Otherwise just do it and say briefly which tracks were hidden. Nothing is ever deleted; setTracks is one undo step. */
+function tracksRowSet(mono, poly){
+  mono = Math.round(+mono); poly = Math.round(+poly);
+  if (!(mono >= 1 && poly >= 1) || (mono === polyFrom() && mono + poly === ntr())) return;
+  const ck = tracksCheck(mono, poly); if (ck.why){ toast(ck.why, 5000); return; }
+  const all = tracksHiddenAll(mono, poly), held = all.filter(t => trackHolds(S, t)), lm = all.some(t => t < polyFrom()), lp = all.some(t => t >= polyFrom());
+  const back = lm && lp ? 'raising MONO TRACKS or POLY TRACKS' : lm ? 'raising MONO TRACKS' : 'raising POLY TRACKS', say = tracksSay(all), sayHeld = tracksSay(held);   /* named before the change: the kinds are read from the split as it is now */
+  const apply = () => { const r = setTracks(mono, poly); if (r.why){ toast(r.why, 5000); return; }
+    if (all.length) toastBrief('tracks', 'Hid ' + say + '. Nothing is deleted: ' + back + ' brings ' + (all.length > 1 ? 'them' : 'it') + ' back.');
+    try { buildProjKeep(); } catch(e){} };
+  if (!held.length){ apply(); return; }
+  const song = S;   /* a project dropped on the window while the question is open replaces the song: Hide must not hide tracks of the new one */
+  askYes({title:'Hide ' + say + '?', body:(held.length > 1 ? 'They hold' : 'It holds') + ' notes, effects or other settings' + (all.length > held.length ? ' (' + sayHeld.replace(/^tracks? /, '') + ')' : '') + '. Nothing is deleted: ' + back + ' brings ' + (all.length > 1 ? 'them' : 'it') + ' back.'}, 'Hide').then(ok => { if (!ok) return; if (S !== song){ toast('The song changed: nothing was hidden.'); return; } apply(); });
+}
+/* the two rows' limits: each at least 1, 8 to 24 (32) tracks in all; a row stops at its limit and says why in its info line */
+function tracksLimits(kind){
+  const m = polyFrom(), p = ntr() - m, most = vtrk ? 24 : NT, own = kind === 'mono' ? m : p, other = kind === 'mono' ? p : m, oth = kind === 'mono' ? 'POLY' : 'MONO';
+  const lo = Math.max(1, 8 - other), hi = most - other;
+  const why = own >= hi ? ` At the most: the song has ${most} tracks at the most${vtrk ? ' (a voice per track)' : ''}; lower ${oth} TRACKS to make room.` : own <= lo ? (lo > 1 ? ` At the least: the song needs 8 tracks in all; raise ${oth} TRACKS first.` : ' At the least: one of each kind.') : '';
+  return {lo, hi, why, n:m + p, most};
 }
 // The window of tracks a Song or Mixer line has room for (each track takes 3 characters after a lab-wide label).
 let mixL = 0, mixN = 16, winTrk = 16;
@@ -25926,7 +26371,7 @@ function instList(){
 }
 // The INST LIST's instrument lights as its note sounds (at the note's time, through the output latency), as the Synth page's pads do.
 function inlBlink(e){
-  const ms = Math.max(0, (e.t - ctx.currentTime + heardLat()) * 1000), ii = e.ii;
+  const ms = Math.max(0, (e.t - ctx.currentTime + heardLat() + moFxLat()) * 1000), ii = e.ii;
   setTimeout(() => { if (!tp.on || view !== 'tracker') return; let au = true; try { au = audible(e.track); } catch(err){} if (!au) return;
     for (const id of ['tInlSide', 'tInlPad']){ const b = $(id).querySelector(`[data-i="${ii}"]`); if (!b || b.hidden) continue; b.classList.add('hit'); clearTimeout(b._hit); b._hit = setTimeout(() => b.classList.remove('hit'), 110); } }, ms);
 }
@@ -26577,8 +27022,10 @@ function projRows(){
     {l:'NEIGHBORS', ck:'View neighboring phrases', get:() => nbOn ? 1 : 0, set:v => setNb(!!v), min:0, max:1, tog:true, d:0, fmt:onOff,
       info:() => 'In Phrase, a faint copy of the notes the tracks either side play at the same song row: the track to the left in violet before the notes, the track to the right in mustard after them. A poly track shows its whole chord: all four notes when there is room (unfolded, desktop), otherwise one letter per voice (capital = natural, small = sharp, so CEGa is C E G A#; · is an empty voice, × a note off). Only to look at; they can’t be edited'},
     {l:'NAME', sec:'Song', gap:true, show:() => S.name, tap:async () => { const n = await askText({title:'Rename the song'}, S.name, 40, 'Rename'); if (n != null){ S.name = n.trim().slice(0, 40) || 'Song'; saveS(); draw(); msMeta(); } }, info:() => 'EDIT renames the song'},
-    {l:'TRACKS', get:() => ntr(), set:v => setNtr(v), min:8, max:NT, big:8, d:16, fmt:v => v + ' tracks',
-      info:() => `How many tracks this song uses, 8 to ${vtrk ? 24 : NT} with ${vtrk ? 'a voice per track (one voice each)' : 'the shared 16 voices'}. Song and Mixer show as many as fit and scroll sideways (arrows, or swipe left and right). Tracks past this number are hidden and silent; their notes are kept`},
+    {l:'MONO TRACKS', late:true, get:() => polyFrom(), set:v => tracksRowSet(v, ntr() - polyFrom()), min:tracksLimits('mono').lo, max:tracksLimits('mono').hi, big:4, d:8, fmt:v => v + ' mono',
+      info:() => { const L = tracksLimits('mono'); return `How many one-note-at-a-time tracks: tracks 1 to ${polyFrom()}. The poly tracks follow them and move up or down when this changes, with their notes, mixer and effects. Hidden tracks keep everything. Total ${L.n} of ${L.most}.${L.why}`; }},
+    {l:'POLY TRACKS', late:true, get:() => ntr() - polyFrom(), set:v => tracksRowSet(polyFrom(), v), min:tracksLimits('poly').lo, max:tracksLimits('poly').hi, big:4, d:8, fmt:v => v + ' poly',
+      info:() => { const L = tracksLimits('poly'), m = polyFrom(); return `How many chord tracks (four notes each), numbered after the mono ones: tracks ${m + 1} to ${L.n}. They move up or down with MONO TRACKS. Hidden tracks keep everything. Total ${L.n} of ${L.most}.${L.why}`; }},
     {l:'TEMPO', get:() => S.bpm, set:v => { S.bpm = v; if (tp.on && tp.seq) tp.seq.bpm = v; lkTempoOut(v); }, min:40, max:300, big:10, d:120, fmt:v => v + ' BPM', after:() => { rtAllFx(); chainsTempo(); }, info:() => 'Beats per minute, 4 steps to a beat. Track delays follow it'},
     {l:'LPB', get:() => S.lpb, set:v => S.lpb = v, min:1, max:16, big:4, d:8, fmt:v => v + ' lines/beat · 1/' + (v * 4), info:() => 'Lines per beat: 4 makes each row a 16th, 8 a 32nd (new projects start at 8), 3 or 6 triplets. A phrase can set its own on its LEN line'},
     {l:'TICKS', get:() => S.ticks || TICKS, set:v => { S.ticks = v; if (tp.on && tp.seq) tp.seq.tks = v; }, min:1, max:32, big:4, d:TICKS, fmt:v => v + ' ticks a step', after:chainsTempo, info:() => 'How many ticks each step is cut into for DEL, RET, KIL, OFF, ARC, PSL and GRV (6 by default). A TIC command in a phrase changes it from that row on'},
@@ -27040,7 +27487,7 @@ function fxsChoose(s, k){
   fxpClose(); const t = cFxT, A = t >= NT ? S.mfx : S.tfx[t], had = A[s];
   if (!k){ fxSwap(t, s, A, null); cFxS = s; cs.fx.y = s + 1; fxChanged(t); saveS(); draw(); if (had) toast(`Slot ${s + 1} emptied.`); return; }
   const type = (fxp.types && fxp.types[k]) || fxtL(t)[k - 1];
-  if (!had || had.type !== type){ fxSwap(t, s, A, type); fxChanged(t); saveS(); toast(`Slot ${s + 1}: ${TFX[type].long}` + (isPumpT(type) && t < NT ? pumpBusNote(type) : '')); }
+  if (!had || had.type !== type){ fxSwap(t, s, A, type); fxChanged(t); saveS(); toast(`Slot ${s + 1}: ${TFX[type].long}` + (isPumpT(type) && t < NT ? pumpBusNote(type, S.tfx[t] && S.tfx[t][s]) : '')); }
   lastFxType = type; cFxS = s; cs.fx.y = FXSLOTS + 1; draw();
 }
 // The pad's buttons while the list is open. Returns true when it used the press.
@@ -27316,8 +27763,8 @@ function dupTrack(notes, tAt){
   const free = () => { for (let u = t + 1; u < end; u++) if (S.song.every(row => row[u] < 0) && !(notes && busTrack(u))) return u; return -1; };   // (12 Nov, owner: with notes, never onto a bus)
   let to = free(), grew = false;
   // MORE TRACKS (owner, 4 Nov: "create a track of the type you're trying to duplicate rather than ask where to go"; "ok if it
-  // created a mono and poly track"): with no empty track of its kind to the right, TRACKS goes up by two (one mono, one poly,
-  // as the half-and-half split keeps them) and the copy goes into the new one. At the most tracks there are, it says so.
+  // created a mono and poly track"): with no empty track of its kind to the right, MONO and POLY TRACKS each go up by one (setTracks; refused with its reason when
+  // the song is full or a hidden track in the way holds something) and the copy goes into the new one. At the most tracks there are, it says so.
   if (to < 0){
     const n0 = ntr(), most = vtrk ? 24 : NT;
     if (n0 + 2 > most) return toast(`No empty ${poly ? 'poly' : 'mono'} track to the right of track ${d2(t + 1)}, and the song has the most tracks it can (${most}).`);
@@ -27339,7 +27786,7 @@ function dupTrack(notes, tAt){
   draw();
   const extra = notes ? (made < want ? ` and ${made} of ${want} blocks (no free sects or phrases left)` : want ? ` and its ${made} block${made > 1 ? 's' : ''}, as unique copies` : ' (it has no blocks yet)')
     : ` · no notes (${keyHint('mod+alt+D')} brings them too)`;
-  toast((grew ? `TRACKS is ${ntr()} (a mono and a poly track added). ` : '') + `Track ${d2(t + 1)} duplicated to track ${d2(to + 1)} with its trim, volume, pan and effects${extra}.` + (S.chainOn[t] ? ' chains isn’t copied.' : ''), grew ? 6000 : undefined);
+  toast((grew ? `The song has ${ntr()} tracks now (a mono and a poly track added). ` : '') + `Track ${d2(t + 1)} duplicated to track ${d2(to + 1)} with its trim, volume, pan and effects${extra}.` + (S.chainOn[t] ? ' chains isn’t copied.' : ''), grew ? 6000 : undefined);
 }
 // CLN↓ (command row, Ctrl/⌘+Shift+C) on the song: the block under the cursor, or every block in the
 // selection, is cloned into new, unique numbers on the row(s) just below; the cursor follows.
@@ -30160,7 +30607,7 @@ function stageTick(now){
   if (!stgKindNow || $('tStage').hidden) return;
   if (stgKindNow === 'piano' || stgKindNow === 'spec'){ if (stgKindNow === 'spec' && meterBlank('stg', () => stageCanvas(true))) return; if (meterDue(now, stgFrameT, 46, stgKindNow === 'piano')){ stgFrameT = now; stageCanvas(false); } return; }   // METERS: the piano's lit notes are marks (OFF keeps LIGHT's rate); the spectrum is a meter
   if ((stgKindNow !== 'dogs' && stgKindNow !== 'drum') || !tp.on || !ctx || !animOn) return;
-  const lat = heardLat(), t = ctx.currentTime - lat, bpm = tp.bpm || S.bpm;
+  const lat = heardLat() + moFxLat(), t = ctx.currentTime - lat, bpm = tp.bpm || S.bpm;
   if (bpm !== stgBpm){ const b = (t - stgT0) * stgBpm / 60; stgBpm = bpm; stgT0 = t - b * 60 / bpm; }
   const per = 60 / bpm, b = Math.floor((t - stgT0) / per);
   if (b < 0 || b === stgBeat) return; stgBeat = b;
@@ -32181,7 +32628,7 @@ function dkFxPatState(f, k, t, at){
 }
 function dkFxPat(col, cv, g, W, H, f, k, font){
   if (!f || (f.type !== 'flex' && f.type !== 'sgate' && f.type !== 'retrig') || W < 60 || H < 34){ col._pk = ''; return false; }
-  const t = dkMst() ? NT : dkTrack(), lat = ctx ? heardLat() : 0, at = ctx ? ctx.currentTime - lat : 0;
+  const t = dkMst() ? NT : dkTrack(), lat = ctx ? heardLat() + moFxLat() : 0, at = ctx ? ctx.currentTime - lat : 0;
   const st = dkFxPatState(f, k, t, at); if (!st) return false;
   const beat = tp.on ? fxcBeat(at) : null, bar = beat == null ? 0 : Math.floor(beat / 4);
   const C = fxDynPal(), dpr = devicePixelRatio || 1, vals = TFX[f.type].ps.map(q => f[q.k]).join(',');
@@ -35591,6 +36038,9 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [617, '15 Nov', ['About 360 new presets across the pitched engines: Acid 20, Bass 23, Phase 20, Partials 20, Vector 19, Scanned 18, Swarm 18, Chip 18, Drift 16, Table 16, Bytebeat 16, Modal 16, Resynth 14, Breath 14, Strings 12, Wind 12, Blip 11, Tone 11, Vox 11, Piano 10, EP 10, Organ 10. Basses, leads, pads, keys and bells, textures, short arp sounds and metallic IDM material. They were levelled and checked by measurement, not by ear: say which to cut']],
+  [616, '14 Nov', ['Audio & MIDI › LATENCY COMP is now AUTO / ON / OFF, and AUTO is the default. When a track or bus holds an effect that looks ahead (CALM, TONE, LIMIT, TUNE, linear-phase EQ…), the other tracks wait for it while the song plays, so that bus, and a tempo-synced delay on it, land on the beat instead of about 46 ms late. With no such effect nothing changes. Stopped, pads answer at once. A notice tells you the first time it happens; OFF brings the old behaviour back', 'With latency compensation working, Flex, Step gate and Retrigger on the master (and on a bus) stay on the beat of what they hear (they ran early), a clocked pump effect after CALM in one chain keeps time, and changing the delay no longer clicks']],
+  [615, '14 Nov', ['Settings › Song: MONO TRACKS and POLY TRACKS replace TRACKS, so a song can have, say, 4 mono and 12 poly tracks (at least one of each). The tracks after a changed count renumber, with their notes, mixer, effects and LFOs. Lowering a count hides tracks and keeps everything in them; it asks first only when a track that would be hidden has something in it. Existing songs open as before']],
   [614, '14 Nov', ['Option/Alt+A (jump to Arrange) now brings you back exactly where you were when you press it again, or Esc: the same screen, cell, selection and scroll, even if you moved around Arrange. If you open a block from Arrange, the next Option+A jumps from there instead', 'Option/Alt+▲▼ on Mixer, FX, MOD and INST now steps to the pattern above or below on that track, as on Phrase, and you stay on the page (it used to go to the Project screen). Project is on Option+8, its tab, or Option+◀▶']],
   [613, '14 Nov', ['A project whose song is still called “Song 1” now takes the file’s name when you open it, however you open it: the NAME field, render and stem file names, MIDI export, backups and the prompts all say “acid”, not “Song 1”. A song you named yourself keeps its name. Saving a new song under a file name names it too']],
   [612, '14 Nov', ['MOD beside Arrange (the FOLLOWS badge): MOD now shows the track the Arrange cursor is on. It stayed on the track it showed before, so a track\'s LFOs seemed to be missing until you went to Song and back', 'An LFO whose target is gone says why (“FX1 DLAY: no such setting”, “FX4: no effect in this slot”) instead of “(empty)”']],
@@ -36007,8 +36457,8 @@ const SHEETS = {
     ['Recording', ['REC TIMING', 'REC VELOCITY', 'REC NOTE OFFS']],
     ['Metronome', ['METRONOME', 'CLICK LEVEL', 'COUNT-IN']],
     ['Live transpose', ['LIVE TRANSPOSE']]]},
-  song:{title:'Song', about:'Name, tracks, tempo, swing, ticks, the scale, pattern length and the song’s impulse responses', groups:[
-    ['Song', ['NAME', 'TRACKS', 'TEMPO', 'LPB']],
+  song:{title:'Song', about:'Name, mono and poly tracks, tempo, swing, ticks, the scale, pattern length and the song’s impulse responses', groups:[
+    ['Song', ['NAME', 'MONO TRACKS', 'POLY TRACKS', 'TEMPO', 'LPB']],
     ['Groove', ['SWING', 'SWING NOTE', 'TICKS']],
     ['Key', ['SCALE', 'SCALE ROOT']],
     ['Patterns', ['PATTERN LEN', '› ALL PHRASES TO']],
@@ -36169,12 +36619,23 @@ function tsetRow(r){
   // FIX (sweep, 4 Nov): − / + grey out at the ends of the range, so a click that can't change anything shows it can't
   let bDn = null, bUp = null; const lim = () => { if (bDn) bDn.disabled = r.get() <= r.min; if (bUp) bUp.disabled = r.get() >= r.max; };
   const put = v => { tsetSet(r, v); rg.value = r.get(); out.textContent = show(r.get()); lim(); refresh(); };
-  const btn = (t, d, a) => { const b = el('button', 'stp', t); b.type = 'button'; b.setAttribute('aria-label', a); b.addEventListener('click', () => { put(r.get() + d); if (r.l === 'PATTERN LEN') buildProj(); }); return b; };
-  rg.addEventListener('input', () => put(+rg.value));
-  rg.addEventListener('change', () => { if (r.l === 'PATTERN LEN') buildProj(); });
+  const btn = (t, d, a) => { const b = el('button', 'stp', t); b.type = 'button'; b.setAttribute('aria-label', a); if (r.late){ b.dataset.fk = r.l + '|' + t; b.addEventListener('focus', () => { tsetFk = b.dataset.fk; }); } b.addEventListener('click', () => { put(r.get() + d); if (r.l === 'PATTERN LEN') buildProj(); else if (r.late){ tsetFk = b.dataset.fk; buildProjKeep(); } }); return b; };
+  /* r.late (MONO / POLY TRACKS): the slider only commits when let go, so dragging past a track that holds something asks once, not at every step; the other row's limits follow */
+  rg.addEventListener('input', () => { if (r.late) out.textContent = show(+rg.value); else put(+rg.value); });
+  if (r.late){ rg.dataset.fk = r.l + '|range'; rg.addEventListener('focus', () => { tsetFk = rg.dataset.fk; }); }
+  rg.addEventListener('change', () => { if (r.late){ put(+rg.value); tsetFk = rg.dataset.fk; buildProjKeep(); } else if (r.l === 'PATTERN LEN') buildProj(); });
   bDn = btn('−', -st, 'Less'); bUp = btn('+', st, 'More'); lim();
   c.append(bDn, rg, bUp, out);
   row.append(lab(), c, inf); return row;
+}
+/* A keyboard user keeps their place: buildProj rebuilds the open sheet, so the control last used (data-fk = row + which control) is found again afterwards; a button that went disabled at a limit hands focus to its row's slider. */
+let tsetFk = '';
+function buildProjKeep(){
+  const a = document.activeElement, fk = (a && a.dataset && a.dataset.fk) || tsetFk;
+  buildProj();
+  if (!fk) return;
+  const q = k => [...document.querySelectorAll('[data-fk]')].find(x => x.dataset.fk === k && !x.disabled), n = q(fk) || q(fk.split('|')[0] + '|range');
+  if (n) try { n.focus({preventScroll:true}); } catch(e){}
 }
 // The Project tab of the settings menu: the same rows as the Project screen (projRows).
 function buildProj(){

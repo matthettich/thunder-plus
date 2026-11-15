@@ -76,7 +76,7 @@ test('sequencer hooks: conditions, nudge, retrigger curve, slices, perform comma
 test('latency compensation: the plan lines direct tracks, sends and bus sources up', () => {
   const blk = cut(/function pdcPlan\(sr\)\{[\s\S]*?\n\}\n/, 'pdcPlan');
   const NT = 4, lat = { 0: 0, 1: 0, 2: 0, 3: 100 };   // samples; track 3 is a bus with a latent effect
-  const c = vm.createContext({ Math, Map, Set, NT, aset: { pdc: true }, S: { tfx: [[], [], [], []] },
+  const c = vm.createContext({ Math, Map, Set, NT, MT: 32, aset: { pdc: true }, S: { tfx: [[], [], [], []] },
     pumpChainLatency: (A, sr) => lat[c.S.tfx.indexOf(A)] || 0,
     busPlan: () => ({ feeds: new Map([[3, [0, 1]]]), pure: new Set([0]) }) });
   vm.runInContext(blk, c);
@@ -86,7 +86,8 @@ test('latency compensation: the plan lines direct tracks, sends and bus sources 
   assert.equal(p.d.get(1), 100, 'a send: its direct copy waits for the bus');
   assert.equal(p.d.get(2), 100, 'a plain track waits');
   assert.equal(p.d.get(3), 0, 'the latest path waits for nothing');
-  c.aset.pdc = false; assert.equal(c.pdcPlan(1).T, 0, 'off: nothing moves');
+  c.aset.pdc = false; assert.ok(c.pdcPlan(1).T > 0, 'a setting saved as false before AUTO existed reads as auto: the plan stands');
+  c.aset.pdcMode = 'off'; assert.equal(c.pdcPlan(1).T, 0, 'off: nothing moves'); c.aset.pdcMode = 'auto'; assert.ok(c.pdcPlan(1).T > 0);
 });
 
 test('bus groups: every source takes its bus’s colour, a send too (5 Nov: sends are striped, not one olive)', () => {
