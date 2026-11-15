@@ -14,16 +14,16 @@ Android (`include/libremidi/backends/android/`, 718 lines, API `ANDROID_AMIDI`):
   (`midi_in.hpp:128`) and sends with `AMidiInputPort_send` (`midi_out.hpp:104`); `helpers.hpp:4` includes
   `<amidi/AMidi.h>`, so minSdk 29 (the plan's) is the floor.
 - Why not rely on it as is:
-  1. It needs a Java class that is not in the vendored tree: `helpers.cpp:~190` does `FindClass("dev/celtera/libremidi/MidiDeviceCallback")`
+  1. It needs a Java class that is not in the vendored tree: `helpers.cpp:184` does `FindClass("dev/celtera/libremidi/MidiDeviceCallback")`
      and the JNI entry `Java_dev_celtera_libremidi_MidiDeviceCallback_onDeviceOpened` (`helpers.cpp:211`). We would add
      that Kotlin / Java class to our app by hand (upstream ships it separately). `find io/vendor/libremidi -name '*.java'` finds nothing.
   2. It gets the app context by reflection on the hidden `android.app.ActivityThread.currentActivityThread()`
      (`helpers.cpp:33-57`), a non-SDK interface that Android may restrict.
-  3. Input is a polling thread, `sleep_for(1 ms)` then a non-blocking receive (`midi_in.hpp:119-131`), with
-     `has_absolute_timestamps = false` (`:113`): the device's own AMidi timestamp is not used for timing. For MIDI-in
+  3. Input is a polling thread, `sleep_for(1 ms)` (`midi_in.hpp:126`) then a non-blocking receive (`:128`), with
+     `has_absolute_timestamps = false` (`:114`): the device's own AMidi timestamp is not used for timing. For MIDI-in
      timing in the core (frames on the sample timeline) we want the AMidi timestamp and a tighter loop.
   4. One client name per process (`midi_in.hpp:24-30`), and the port opens asynchronously: `open_port` returns success
-     and sets `port_open = true` (`:72-75`) before the device is actually open (the JNI callback opens the port later).
+     and sets `port_open = true` before the device is actually open (`:72`; the JNI callback opens the port later).
   5. libremidi needs C++20 and exceptions (`io/README.md:72`); fine in a host, not in `native/core/`. It has not been
      compiled for Android in this repo (`io/binding.gyp` has no Android target); that is untested here, not known broken.
 - H2 plan: Kotlin `MidiManager` (device list, hot-plug, `openDevice`) plus about 150 lines of JNI over `AMidi_*`
