@@ -747,6 +747,10 @@ The owner's top priority to add is the MOD screen. Work down the list; ask befor
 
 Start a session by asking for results. Fix on `beta`. (10 Nov, 15:10: the web beta is build 560; the build numbers in the rest of this paragraph are older.) Web beta: https://matthettich.github.io/thunder-plus/beta/ (build 547 as of 10 Nov morning, 548 once its PR merges; the night of 9–10 Nov shipped 544–547, see the four "10 Nov" entries below. Decisions the lead made that night for the owner to confirm or reverse: on a phone the saved Sequencer default plays on the Page unless Audio thread is picked on that device; on a phone the safety limiter is its stand-in until another worklet loads; the resync only runs with a worklet loaded and its margins are untested on a device). Desktop: v1.3.4-beta.2 (build 541, no feed view or scopes); further desktop betas on hold until the owner asks.
 
+**Build 612** (MOD follows Arrange)
+- [ ] **Mac:** load `acid`, open MOD, press Option+A (Arrange takes the keys, MOD says FOLLOWS), move the cursor to track 12, then 13. Pass: the MOD header says TRACK 12 and lists its three LFOs at once, and TRACK 13 lists one; it changes with every move, across the mono / poly boundary too.
+- [ ] **Mac:** the two LFOs on track 12 that point at settings those effects do not have. Pass: they read “no such setting” (or “no effect in this slot”), not “(empty)”, and can be re-pointed or cleared.
+
 **Build 611** (mono / poly counts, the invisible part)
 - [ ] **Computer:** open a few existing songs (`acid`, an older one), play them, Settings › TRACKS up two and down two, save, reopen. Pass: everything as before this build: the same tracks mono and poly, the hidden tracks come back with their notes, nothing new on screen.
 
@@ -1293,6 +1297,16 @@ Suggested order: N0 → N1 → N2 (phone cured) → N4 with N3 alongside → N5 
   the edge `R.t0`, "waiting…" while armed), `rcdClk` / `rcdFmt` / `rcdFreeSecs`, a 250 ms timer only while recording; the
   final length stays until the next take. recorder-check covers FREE, PATTERN, Stop, next take and closing mid-take.
 
+
+## 14 Nov (MOD beside Arrange follows the cursor's track; LFOs with a missing target say so; build 612)
+
+Owner's report from the Mac (build 609, a screenshot: Arrange cursor on track 13, MOD header "TRACK 12 FOLLOWS", "no LFOs"). Found, fixed and tested by an agent; reviewed by the lead.
+- **Cause:** `apFollow()` moved the followed track (`cFxT`, which `modT()` reads) only when the host screen was FX. With MOD as the host nothing moved it and nothing redrew, so MOD stayed on whatever track it had; going to Song and back refreshed it. Every other way into MOD (from Song, Phrase, Mixer, FX, Project) was already right.
+- **Fix:** `apFollow` treats `'mod'` like `'fx'` and reports the change so the screen redraws in the same pass.
+- An LFO whose target does not resolve is still listed, with the reason.
+- **His song:** `perf.lfo["11"]` (track 12) holds three LFOs that match track 13's effects (Delay time, Grain delay reverse, Space mix): stored before build 602, when LFOs did not follow added tracks. He is re-pointing them himself.
+- Not changed: MOD's track is not carried back to Phrase / Song on leaving (FX behaves the same).
+- `tests/mod-follows-arrange.test.js` (4).
 
 ## 14 Nov (mono / poly track counts, stage 1 and 2: the song data and the sequencer (nothing to see yet); build 611)
 
