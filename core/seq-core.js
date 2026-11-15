@@ -572,6 +572,7 @@ function makeSeq(S, mode, o){
           let c = FXC[r[k]], v = Math.max(0, r[k + 1]);
           if (c === 'PRB'){ const tg = cmds[cmds.length - 1]; if (tg && (tg.c === 'SED' || tg.c === 'TCH' || tg.c === 'SKP' || tg.c === 'CHD')) continue;   /* (these four set what the rows below roll with; a PRB cannot take them away, so a start in the middle of the song finds what playing through leaves) */
             if (tg){ if (roll(T, t, 8 + k) * 255 >= v) cmds.pop(); } else if (roll(T, t, 8 + k) * 255 >= v) cmds.push({c:'CHA', v:0}); continue; }   // (owner, 30 Oct) Renoise-style chance for the command to the left
+          if (c === 'SED'){ const sd = v ? v * 2654435761 >>> 0 : null; if (t === MT) sseed = sd; else T.seed = sd; }   /* (at once, so a PRB to its right on this row already rolls with it: the commands read left to right; CodeRabbit on #144) */
           if (c === 'REP'){ if (!T.last) continue; T.last = {c:T.last.c, v:(T.last.v + v) & 255}; cmds.push({...T.last}); continue; }
           if (c === 'RND' || c === 'RNL'){
             const dn = v >> 4, up = v & 15, tg = cmds[cmds.length - 1];

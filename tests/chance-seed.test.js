@@ -148,3 +148,7 @@ test('CodeRabbit on #144: TCH survives a gap in the track; the fallback seed doe
   const lk = song([{ t: 0, y: 0, rows: { 4: [['LK1', 0]] } }]); lk.perf.lk = { 0: ['tch:0', null, null, null] };
   assert.deepEqual(hits(play(lk), 0), [0, 1, 2, 3, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15], 'the locked note (step 4) rolls with chance 00; the next note ends the lock and plays');
 });
+test('a PRB to the right of a SED on the same row rolls with that seed', () => {
+  const S = song(row(0, 4, { all: [['SED', 7], ['TVL', 0], ['PRB', 128]] })), tv = () => play(S).filter(e => e.type === 'tvl' && e.track === 0).map(e => Math.round(e.t / STEP));
+  const a = tv(); assert.deepEqual(tv(), a, 'the same rows keep their TVL every play'); assert.ok(a.length > 16 && a.length < 48, 'about half: ' + a.length);
+});
