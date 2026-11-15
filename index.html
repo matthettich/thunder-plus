@@ -2014,7 +2014,11 @@ body.sdesk .dock:not(.vtrk) .pads .pad:nth-child(17)::before{content:'More pads'
 #dkFxBar .dkfc .fr{padding:0 8px; line-height:1.55}
 #dkFxBar .dkfc .fr b{opacity:1; color:var(--muted)}
 #dkFxBar .dkfc .fr span{font-weight:700}
-#dkFxBar .dkfc .fr span.edit{display:inline-block} #dkFxBar .dkfc .fr input.fred{font:inherit; font-weight:700; width:9ch; max-width:100%; min-height:0; height:1.4em; padding:0 3px; margin:0; border:1px solid var(--fxac, #ff5a1f); background:var(--panel); color:var(--ink); outline:none; box-shadow:none}
+#dkFxBar .dkfc .fr span.edit{display:inline-block}
+.fbpop{min-width:220px; padding:5px 10px 10px; gap:6px} .fbpop .sxmt{padding:2px 0}
+.fbpop .fbbar{position:relative; height:22px; border:1.5px solid var(--line); background:var(--panel); cursor:ew-resize; touch-action:none} .fbpop .fbbar i{position:absolute; left:0; top:0; bottom:0; background:var(--fxac, var(--ink)); opacity:.85; pointer-events:none}
+.fbpop input.fbnum{font:700 var(--fs-1)/1.4 var(--mono); width:100%; box-sizing:border-box; min-height:0; height:1.8em; padding:0 6px; border:1.5px solid var(--line); background:var(--panel); color:var(--ink); outline:none}
+.fbpop input.fbnum:focus{border-color:var(--ink)} #dkFxBar .dkfc .fr input.fred{font:inherit; font-weight:700; width:9ch; max-width:100%; min-height:0; height:1.4em; padding:0 3px; margin:0; border:1px solid var(--fxac, #ff5a1f); background:var(--panel); color:var(--ink); outline:none; box-shadow:none}
 #dkFxBar .dkfc .fr.sel{background:var(--ink); color:var(--inv)} #dkFxBar .dkfc .fr.sel b{color:inherit; opacity:.75}
 #dkFxBar:not(.kfoc) .dkfc .fr.sel{background:color-mix(in srgb, var(--ink) 55%, transparent)}   /* (the keys are elsewhere: the pick shows dimmer) */
 #dkFxBar .dkfc .fviz{flex:1 1 0; min-height:0; position:relative; margin:0 6px 6px}
@@ -31946,7 +31950,7 @@ function deckFxBar(){
         const show = x => q.names ? (q.names[x] ?? String(x)) : (q.tpl || q.band) ? q.fmt(x, getF()) : q.fmt(x);
         const set = x => { const g = getF(); if (!g) return; x = clamp(Math.round(x), q.min, q.max); if (x === g[q.k]) return; g[q.k] = x; if (isPumpT(g.type)) delete g.pname; fxChanged(mst ? NT : dkTrack()); v.textContent = show(x); };
         r._fbSet = d => { const g = getF(); if (g) set(g[q.k] + d); };
-        v.title = q.l + ': drag up or down (Shift: fine, ' + MODK + ': coarse) · rest on it and use the wheel · double-click: type a value · Alt-click: default · right-click: menu';
+        v.title = q.l + ': drag up or down (Shift: fine, ' + MODK + ': coarse) · rest on it and use the wheel · double-click: slider and typing · Alt-click: default · right-click: menu';
         // ONE RULE (mouse audit, 3 Nov): a drag adds to the value from where it is, Shift a tenth and Ctrl/⌘ held four
         // times, read on every move (no jump when either changes); Alt / ⌘-click and double-click reset; right-click: Reset /
         // Type a value; the wheel takes it once the mouse rests on it (and with Alt, or while held, as before).
@@ -31965,18 +31969,9 @@ function deckFxBar(){
         v.dataset.wheel = ''; v._wheel = (d, e) => { const g = getF(); if (g) set(g[q.k] + d * wstep(e)); };
         // the wheel with Alt held, or while the mouse button is held on it (owner, 2 Nov: click and hold, then scroll), even before the rest
         v.addEventListener('wheel', e => { if (!e.altKey && !(e.buttons & 1) && !v.classList.contains('drag')) return; e.preventDefault(); e.stopPropagation(); const n = wheelSteps(v, e); if (!n) return; v._wheel(-n, e); }, {passive:false});
-        // TYPE IN PLACE (owner, 5 Nov): a double-click turns the value into a text box. Type it as it shows (2.5k, -6, 40%,
-        // a name) or the raw number; Enter or a click away sets it, Esc leaves it. Reset stays on Alt / ⌘-click and the menu.
-        const editIt = () => { const g = getF(); if (!g || v.classList.contains('edit')) return;
-          const inp = el('input', 'fred'); inp.type = 'text'; inp.value = show(g[q.k]); inp.spellcheck = false; inp.setAttribute('aria-label', q.l);
-          v.classList.add('edit'); v.replaceChildren(inp); inp.focus(); inp.select();
-          let done = false;
-          const fin = ok => { if (done) return; done = true; v.classList.remove('edit'); const a = inp.value.trim(); const g2 = getF();
-            v.textContent = g2 ? show(g2[q.k]) : ''; if (ok && a) { const x = fbParse(a, q, show); if (x == null) toast('Not a value for ' + q.l + '. Type a number from ' + q.min + ' to ' + q.max + ', or type the value as the control shows it.'); else set(x); } };
-          inp.addEventListener('keydown', e => { e.stopPropagation(); if (e.key === 'Enter'){ e.preventDefault(); fin(true); } else if (e.key === 'Escape'){ e.preventDefault(); fin(false); } });
-          inp.addEventListener('pointerdown', e => e.stopPropagation());
-          inp.addEventListener('blur', () => fin(true)); };
-        v.addEventListener('dblclick', e => { e.preventDefault(); editIt(); });
+        // POP-UP SLIDER (15 Nov, owner: "maybe some sort of pop up click and drag bar"): a double-click opens a small pop-up by the value with a click-and-drag bar (the whole range,
+        // live, Shift fine, Ctrl/⌘ coarse) and the number box (type it as it shows, 2.5k, -6, 40%, a name: Enter sets, Esc or a click away closes). Reset stays on Alt / ⌘-click and the menu.
+        v.addEventListener('dblclick', e => { e.preventDefault(); fbPop(v, q, getF, show, set); });
         v.addEventListener('contextmenu', e => valMenu(e, q.l, {reset:() => set(q.d), type:typeIt, lfo:tgtRowId(t, k, getF() || f, q) || null}));
         dkFbVals.push(() => { const g = getF(); if (g && document.activeElement !== v && !v.classList.contains('drag') && !v.classList.contains('edit')) v.textContent = show(g[q.k]); });
       }
@@ -31991,6 +31986,35 @@ function deckFxBar(){
   // which slot the FX screen has open, outlined
   const cur = tv === 'fx' && cFxT === (mst ? NT : dkTrack()) ? cFxS : -1;
   for (const c of bar.children) c.classList.toggle('cur', +c.dataset.k === cur);
+}
+// POP-UP SLIDER (15 Nov): the FX bar value's double-click pop-up (set is the bar's own setter: clamps, snaps, fxChanged). One at a time.
+let fbPopEl = null;
+function fbPopClose(){ if (!fbPopEl) return; const m = fbPopEl; fbPopEl = null; removeEventListener('pointerdown', m._out, true); m.remove(); }
+function fbPop(v, q, getF, show, set){
+  fbPopClose(); const g0 = getF(); if (!g0) return;
+  const m = fbPopEl = el('div', 'sxmenu fbpop'), bar = el('div', 'fbbar'), fill = el('i'), inp = el('input', 'fbnum'), R = q.max - q.min;
+  m.setAttribute('role', 'dialog'); m.setAttribute('aria-label', q.l); bar.append(fill); inp.type = 'text'; inp.spellcheck = false; inp.setAttribute('aria-label', q.l + ' value');
+  m.append(el('div', 'sxmt', q.l.toUpperCase()), bar, inp);
+  let x = g0[q.k];
+  const sync = () => { const g = getF(); if (!g) return fbPopClose(); fill.style.width = (R > 0 ? clamp((g[q.k] - q.min) / R, 0, 1) * 100 : 0) + '%'; inp.value = show(g[q.k]); };
+  bar.addEventListener('pointerdown', e => { if (e.button) return; e.preventDefault(); const W = bar.getBoundingClientRect(); let lx = e.clientX;
+    if (!e.shiftKey && W.width) x = q.min + clamp((e.clientX - W.left) / W.width, 0, 1) * R;   /* a plain press jumps to the spot; Shift starts from where it is */
+    set(x); sync();
+    try { bar.setPointerCapture(e.pointerId); } catch(_){}
+    const mv = ev => { x = clamp(x + (ev.clientX - lx) / Math.max(1, W.width) * R * dragMul(ev), q.min, q.max); lx = ev.clientX; set(x); sync(); },
+      up = () => { bar.removeEventListener('pointermove', mv); bar.removeEventListener('pointerup', up); bar.removeEventListener('pointercancel', up); };
+    bar.addEventListener('pointermove', mv); bar.addEventListener('pointerup', up); bar.addEventListener('pointercancel', up); });
+  inp.addEventListener('keydown', e => { e.stopPropagation(); if (e.isComposing) return;
+    if (e.key === 'Escape'){ e.preventDefault(); fbPopClose(); }
+    else if (e.key === 'Enter'){ e.preventDefault(); const a = inp.value.trim(), n = a ? fbParse(a, q, show) : null;
+      if (n == null){ toast('Not a value for ' + q.l + '. Type a number from ' + q.min + ' to ' + q.max + ', or type the value as the control shows it.'); return; } set(n); fbPopClose(); }
+    else if (e.key === 'ArrowUp' || e.key === 'ArrowDown'){ e.preventDefault(); const g = getF(); if (g){ x = g[q.k] + (e.key === 'ArrowUp' ? 1 : -1); set(x); sync(); } } });
+  m._out = e => { if (!m.contains(e.target)) fbPopClose(); };
+  document.body.append(m); sync(); addEventListener('pointerdown', m._out, true);
+  const r = v.getBoundingClientRect(), b = m.getBoundingClientRect();
+  m.style.left = Math.max(4, Math.min(r.left, innerWidth - b.width - 6)) + 'px';
+  m.style.top = Math.max(4, r.bottom + 4 + b.height > innerHeight - 4 ? r.top - b.height - 4 : r.bottom + 4) + 'px';
+  inp.focus({preventScroll:true}); inp.select();
 }
 // TYPE IN PLACE (5 Nov): what was typed into an FX bar value → the raw value. A name matches the names list (or the
 // shown text); a number is matched against the values as they show (2.5k, -6 dB, 40%: the nearest one), and if the
