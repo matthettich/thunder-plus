@@ -26649,12 +26649,18 @@ function fxDelLast(t){
   if (k < 0) return toast('No effects to remove.');
   A[k] = null; cFxS = k; fxChanged(t); draw(); toast(`Effect ${k + 1} removed · ${A.filter(Boolean).length} left`);
 }
+// CLEAR on the FX screen's slot list (14 Nov, owner: right-click an effect, Clear: "it clears the last effect in the list"): it empties the slot the cursor is on
+function fxDelSlot(t, k){
+  const A = t >= NT ? S.mfx : S.tfx[t], f = A && A[k]; cFxS = k; cs.fx.y = k + 1;
+  if (!f){ draw(); return toast(`Slot ${k + 1} is already empty.`); }
+  fxSwap(t, k, A, null); fxChanged(t); draw(); toast(`Slot ${k + 1} cleared (${TFX[f.type] ? TFX[f.type].n : 'effect'}) · ${A.filter(Boolean).length} left`);
+}
 function del(){
   if (onPset()) return psetSet(cs.phrase.x, cs.phrase.x ? 0 : 16);
   if (tv === 'song'){ if (sxPicks.length){ const pk = sxPicks.map(p => [p.y, p.t]); sxPicks = []; return songDelete(pk, true); }   // picked cells: cleared, their phrases kept
     return songDelete(songCells(), false); }
   if (tv === 'mod') return modDel(cs.mod.y);
-  if (tv === 'fx' && cs.fx.y >= 1 && cs.fx.y <= FXSLOTS) return fxDelLast(cFxT);   // Delete takes the last effect off the chain
+  if (tv === 'fx' && cs.fx.y >= 1 && cs.fx.y <= FXSLOTS) return fxDelSlot(cFxT, cs.fx.y - 1);   // Delete / CLEAR empties the slot under the cursor (14 Nov: it took the last effect off the chain, whichever slot you were on)
   if (selA) return clearSel();   // FIX (27 Oct, audit K4): Delete clears the selection; Ctrl/⌘+X cuts (Delete used to cut, losing the clipboard)
   const c = cs[tv];
   if (GRIDV.has(tv)){
@@ -33587,6 +33593,10 @@ function cmdCtx(e){
   if (!$('gedit').hidden) geditToggle(false);
   { const rn = tv === 'song' && e.target.closest('[data-r]'); if (rn){ rowColour(+rn.dataset.r); return; } }   // ROW COLOURS (3 Nov): the Song's row numbers
   if (tv === 'phrase' && SX.pvcol && typeof pvActive === 'function' && pvActive() && e.target.closest('.pvrn, .pvrow')){ rowColour(cs.song.y); return; }   // ROW COLOUR IN PATTERN: this pattern's song row
+  // The commands act on the cell under the pointer (14 Nov, owner: FX → right-click an effect → Clear cleared another one): a right-click used to leave the cursor where it was.
+  // Inside a selection the selection is the target and stays. FX: a slot or control row; Mixer: a cell (not the master's own row).
+  if (tv === 'fx' || tv === 'mixer'){ const q = e.target.closest('[data-x][data-y]'), c = cs[tv], y = q ? +q.dataset.y : -1, x = q ? +q.dataset.x : -1;
+    if (q && y >= 0 && !(tv === 'mixer' && y === 7) && !(selA && selA.v === tv)){ c.x = x; c.y = y; if (tv === 'fx' && y >= 1 && y <= FXSLOTS) cFxS = y - 1; draw(); } }
   const sel = selA && selA.v === tv;
   // RIGHT-CLICK (menu audit, 2 Nov): the commands for what's under the pointer; Undo / Redo, selecting, value steps,
   // previous / next and play stay on their keys and in Edit ▾.
