@@ -24165,10 +24165,26 @@ function guessBeats(I){
 /* ---------- rendering the song and stems ---------- */
 let rendering = false, lastR = null;
 const idle = () => new Promise(r => setTimeout(r, 0));
-function mkBuf(d, sr){
-  let b; try { b = new AudioBuffer({length:d.length, sampleRate:sr, numberOfChannels:1}); }
-  catch(e){ const O = window.OfflineAudioContext || window.webkitOfflineAudioContext; b = new O(1, 1, sr).createBuffer(1, d.length, sr); }
-  b.copyToChannel(d, 0); return b;
+function mkBuf(d, sr, d2){
+  /* STEREO SAMPLES: d2 is the right channel of a stereo pad (the same shape live plays it in: stBuf) */
+  const nc = d2 ? 2 : 1; let b; try { b = new AudioBuffer({length:d.length, sampleRate:sr, numberOfChannels:nc}); }
+  catch(e){ const O = window.OfflineAudioContext || window.webkitOfflineAudioContext; b = new O(1, 1, sr).createBuffer(nc, d.length, sr); }
+  b.copyToChannel(d, 0); if (d2) b.copyToChannel(d2.length === d.length ? d2 : d2.subarray(0, d.length), 1); return b;
+}
+/* A pad's sound for an offline render: {d, d2}, d the left channel (or the only one), d2 the right one of a stereo pad (null
+   for mono). renderAsync (the Worker) hands the right channel back as .data2, renderVoice (here) as .r on the data. */
+async function padRender(v, sr, hold){
+  try { const r = await renderAsync(v, sr, hold, false); return {d:r.data, d2:r.data2 || null}; }
+  catch(err){ const d = renderVoice(v, sr, null, hold); await idle(); return {d, d2:d.r || null}; }
+}
+/* getB for pass(): the AudioBuffer of a rendered pad, stereo when the pad is (reversed and stretched like live: rtBuf). */
+function renderGetB(pads, pads2, sr){
+  const bufs = new Map();
+  return (pad, rev, st) => { const k = pad + (rev ? 'r' : 'f') + stKey(st); let b = bufs.get(k);
+    if (!b){ const d0 = pads.get(pad); if (!d0) return null; const e0 = pads2.get(pad) || null, ls = st ? loopSecs(pad, d0, sr) : 0;
+      let d = st ? stretchData(d0, sr, ls, st) : d0, e = e0 && st ? stretchData(e0, sr, ls, st) : e0;
+      if (rev){ d = d.slice().reverse(); if (e) e = e.slice().reverse(); }
+      b = mkBuf(d, sr, e); bufs.set(k, b); } return b; };
 }
 async function pass(evs, keep, N, sr, getB, lim, masterFx){
   // BUS (20 Oct): a bus track's render takes its sources with it (they play through it); one pure source rendered on its
@@ -24258,15 +24274,11 @@ async function renderOut(stems){
     const inBus = t => BP.pure.has(t) && (BP.targets.get(t) || []).some(b => keepT.includes(b));
     if (!keepT.length) return toast('Every track with notes is muted.');
     const nStem = stems ? keepT.filter(t => !inBus(t)).length : 0; rprog.n = 1.15 + nStem; rprog.step(0, 'Rendering the pads…'); await idle();
-    const pads = new Map(); let pi = 0; const pN = new Set(notes.map(e => e.pad)).size;
-    // In the Worker when it can (the page stays responsive), here otherwise.
+    const pads = new Map(), pads2 = new Map(); let pi = 0; const pN = new Set(notes.map(e => e.pad)).size;
+    // In the Worker when it can (the page stays responsive), here otherwise. STEREO SAMPLES: a stereo pad keeps its right channel (pads2).
     for (const e of notes) if (!pads.has(e.pad)){ const v = kit.voices[e.pad], hold = isSyn(e.pad) ? v.len : 0;
-      let d; try { d = (await renderAsync(v, sr, hold, false)).data; } catch(err){ d = renderVoice(v, sr, null, hold); await idle(); }
-      pads.set(e.pad, d); rprog.set(0.15 * ++pi / pN); rprog.check(); }
-    const bufs = new Map();
-    const getB = (pad, rev, st) => { const k = pad + (rev ? 'r' : 'f') + stKey(st); let b = bufs.get(k);
-      if (!b){ const d0 = pads.get(pad); if (!d0) return null; let d = st ? stretchData(d0, sr, loopSecs(pad, d0, sr), st) : d0;
-        b = mkBuf(rev ? d.slice().reverse() : d, sr); bufs.set(k, b); } return b; };
+      const r = await padRender(v, sr, hold); pads.set(e.pad, r.d); if (r.d2) pads2.set(e.pad, r.d2); rprog.set(0.15 * ++pi / pN); rprog.check(); }
+    const getB = renderGetB(pads, pads2, sr);
     let end = seq.time;
     for (const e of notes){ const len = (e.st ? e.st.beats * 60 / e.st.bpm : pads.get(e.pad).length / sr) / Math.min(e.rate, e.slide ? e.slide.from : e.rate); end = Math.max(end, e.cut != null ? Math.min(e.t + len, e.cut + 0.06) : e.t + len); }
     // Reverb, delay and resonator tails ring past the last note: render extra, then trim the silence.
@@ -24375,14 +24387,10 @@ async function renderPart(dest){
     const notes = evs.filter(e => e.type === 'note' && kit.voices[e.pad] && part.tracks.includes(e.track));
     if (!notes.length) return toast('Nothing to render: ' + part.label + ' plays no notes.');
     toast('Rendering ' + part.label + '…'); await idle();
-    const pads = new Map();
+    const pads = new Map(), pads2 = new Map();
     for (const e of notes) if (!pads.has(e.pad)){ const v = kit.voices[e.pad], hold = isSyn(e.pad) ? v.len : 0;
-      let d; try { d = (await renderAsync(v, sr, hold, false)).data; } catch(err){ d = renderVoice(v, sr, null, hold); await idle(); }
-      pads.set(e.pad, d); }
-    const bufs = new Map();
-    const getB = (p, rev, st) => { const k = p + (rev ? 'r' : 'f') + stKey(st); let b = bufs.get(k);
-      if (!b){ const d0 = pads.get(p); if (!d0) return null; let d = st ? stretchData(d0, sr, loopSecs(p, d0, sr), st) : d0;
-        b = mkBuf(rev ? d.slice().reverse() : d, sr); bufs.set(k, b); } return b; };
+      const r = await padRender(v, sr, hold); pads.set(e.pad, r.d); if (r.d2) pads2.set(e.pad, r.d2); }
+    const getB = renderGetB(pads, pads2, sr);
     let end = seq.time;
     for (const e of notes){ const len = (e.st ? e.st.beats * 60 / e.st.bpm : pads.get(e.pad).length / sr) / Math.min(e.rate, e.slide ? e.slide.from : e.rate); end = Math.max(end, e.cut != null ? Math.min(e.t + len, e.cut + 0.06) : e.t + len); }
     const tail = part.tracks.some(t => hasTailAny(S.tfx[t]) || chainsFeed(t)) || (part.master && hasTailAny(S.mfx)) ? 8 : 0;
