@@ -118,12 +118,50 @@ static void testA5() {
   CHECK("A5 unmuted track is audible again", L[127] > 0.01f);
 }
 
+// ---- B1: the same song, the same samples, whatever block size the host asks for ----
+static std::vector<float> renderWith(const std::string& js, int total, const std::vector<int>& sizes, int maxBlock, double* overAt = nullptr) {
+  Song song; loadSong(song, js);
+  SeqVars vars; SeqOpts o; o.once = true; SongRenderer R(song, vars, *mkPads(), 48000, maxBlock, o);
+  std::vector<float> out((size_t)total * 2); std::vector<float> L((size_t)maxBlock * 2 + 8192), Rr((size_t)maxBlock * 2 + 8192);
+  int done = 0; size_t k = 0;
+  while (done < total) {
+    int n = sizes[k++ % sizes.size()]; if (n > total - done) n = total - done;
+    R.block(L.data(), Rr.data(), n);
+    for (int i = 0; i < n; i++) { out[(size_t)(done + i) * 2] = L[(size_t)i]; out[(size_t)(done + i) * 2 + 1] = Rr[(size_t)i]; }
+    done += n;
+    if (overAt && *overAt < 0 && R.songOver() && R.voices() == 0) *overAt = R.time();
+  }
+  return out;
+}
+static void testB1() {
+  // 512 rows at 300 BPM, 16 lines a beat (12.5 ms a row): three steps fit in no 4096-frame block
+  const std::string js = songJson(row(60, -1, -1), "", 300, 16, true, 16);
+  const int total = 48000 * 3;
+  const std::vector<float> ref = renderWith(js, total, {128}, 128);
+  const std::vector<std::vector<int>> cases = {{480}, {4096}, {1}, {7, 333, 1000, 129, 127}, {1920}, {128, 4096, 3}};
+  for (const auto& c : cases) {
+    const std::vector<float> got = renderWith(js, total, c, 4096);
+    CHECK("B1 samples equal to the 128-frame render whatever the block size", got == ref);
+  }
+  // the song is not slowed down by a large block: its second half is not silent / delayed (notes at 12.5 ms)
+  double lastNote = 0; for (int i = total - 1; i >= 0; i--) if (std::fabs(ref[(size_t)i * 2]) > 1e-4f) { lastNote = i / 48000.0; break; }
+  CHECK("B1 the song is still sounding at 3 s", lastNote > 2.9);
+  Song song; loadSong(song, js); SeqVars vars; SeqOpts o; o.once = true; SongRenderer R(song, vars, *mkPads(), 48000, 4096, o);
+  std::vector<float> L(4096), Rr(4096);
+  while (!R.songOver() && R.frame() < 48000L * 60) R.block(L.data(), Rr.data(), 4096);
+  CHECK("B1 512 rows of 12.5 ms are over by 6.6 s at block 4096 (was 14.6 s)", R.time() < 6.7);
+  // a block larger than maxBlock is rendered whole, not cut
+  { SongRenderer R2(song, vars, *mkPads(), 48000, 256, o); std::vector<float> a(1000, 7.0f), b(1000, 7.0f); R2.block(a.data(), b.data(), 1000);
+    bool all = true; for (float v : a) if (v == 7.0f) all = false; CHECK("B1 N > maxBlock fills every sample", all); }
+}
+
 // @@TESTS_END
 
 int main() {
   testA1();
   testA2A3();
   testA5();
+  testB1();
   // @@CALLS_END
   if (g_fail) { std::printf("test_hostile: %d FAILED\n", g_fail); return 1; }
   std::printf("test_hostile: all passed\n");

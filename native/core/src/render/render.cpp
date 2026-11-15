@@ -6,8 +6,8 @@
 namespace thunder {
 
 SongRenderer::SongRenderer(const Song& song, const SeqVars& vars, const RenderPads& pads, double sampleRate, int maxBlock, const SeqOpts& opts, int maxVoices)
-    : S_(song), pads_(pads), sr_(sampleRate), maxBlock_(maxBlock), seq_(new Seq(song, vars, SeqMode::Song, opts)), pool_(sampleRate, maxVoices), mix_(sampleRate, maxBlock),
-      evs_(new SeqEvent[kRenderEvents]), step_(new SeqStep), scratch_(new float[(size_t)maxBlock * 2]()) {
+    : S_(song), pads_(pads), sr_(sampleRate), maxBlock_(maxBlock), seq_(new Seq(song, vars, SeqMode::Song, opts)), pool_(sampleRate, maxVoices), mix_(sampleRate, kRenderQuantum),
+      evs_(new SeqEvent[kRenderEvents]), step_(new SeqStep), scratch_(new float[(size_t)maxBlock * 2]()), q_(new float[(size_t)kRenderQuantum * 2]()) {
   // the page's mixer as a render sets it (applyMix, live false) and the bus plan (no bus exists until a chains host is plugged in)
   mix_.setPlan(bus_plan(song.chainPatch, song.chainOn));
   mix_.load(song);
@@ -38,7 +38,7 @@ void SongRenderer::dispatch(const SeqEvent& e) {
 
 void SongRenderer::setPlan(const PdcPlan& plan, PdcMode mode, int64_t extraLatencyFrames) {
   plan_ = plan; extra_ = extraLatencyFrames < 0 ? 0 : extraLatencyFrames;
-  mix_.setTime((double)frame_ / sr_);
+  mix_.setTime((double)qFrame_ / sr_);
   PdcApply a; a.mode = mode; a.live = false; pdc_apply(mix_, plan, a);
 }
 
@@ -49,10 +49,20 @@ void SongRenderer::renderTrimmed(float* outL, float* outR, int64_t N) {
 }
 
 void SongRenderer::block(float* outL, float* outR, int N) {
-  if (N > maxBlock_) N = maxBlock_;
-  const double t0 = (double)frame_ / sr_;
+  while (N > 0) {
+    if (qRead_ >= kRenderQuantum) { quantum(); qRead_ = 0; }
+    const int n = std::min(N, kRenderQuantum - qRead_);
+    std::copy(q_.get() + qRead_, q_.get() + qRead_ + n, outL);
+    std::copy(q_.get() + kRenderQuantum + qRead_, q_.get() + kRenderQuantum + qRead_ + n, outR);
+    outL += n; outR += n; qRead_ += n; N -= n; frame_ += n;
+  }
+}
+
+void SongRenderer::quantum() {
+  const int N = kRenderQuantum;
+  const double t0 = (double)qFrame_ / sr_;
   pool_.setTime(t0); mix_.setTime(t0);
-  // 1. step the song up to LEAD ahead (at most 3 steps a block)
+  // 1. step the song up to LEAD ahead (at most 3 steps a quantum, as the web core's block)
   int n = 0;
   while (seq_->alive() && seq_->time() < t0 + lead && n++ < 3) {
     const int k = seq_->step(evs_.get(), kRenderEvents, step_.get());
@@ -61,8 +71,8 @@ void SongRenderer::block(float* outL, float* outR, int N) {
   }
   // 2. the voices into their tracks' inputs, then the mixer
   pool_.render(mix_.inputsL(), mix_.inputsR(), N, t0);
-  mix_.render(outL, outR, N, t0);
-  frame_ += N;
+  mix_.render(q_.get(), q_.get() + kRenderQuantum, N, t0);
+  qFrame_ += N;
 }
 
 RenderStats SongRenderer::stats() const {
