@@ -11044,12 +11044,167 @@ function moreDrumPresets(){
   ['Cowbells, blocks & metal', 'Glass tink', BL('Glass tink', {pitch:2400, kick:0, fm:0.3, fmR:2.76, decay:500, atk:0.5, click:0.3})],
   ];
 }
+/* More drums (build 615+, owner 14 Nov: "a lot more presets, especially drums"): data only, the same helpers as above.
+   [type, name, make]; the kits at MORE_KITS use these by name. */
+function moreDrumPresets2(){
+  const E = (k, len) => (name, o, x) => () => PE(name, k, normX(k, Object.assign(XENG[k].d(), o)), Object.assign({len:len || 2, gate:400}, x || {}));
+  const T = E('tone', 3), F = E('fmdrum'), K = E('skin', 3), B = E('breath'), C = E('chip', 1), M = E('modal', 2), BL = (name, o, x) => () => PE(name, 'blip', normBlip(Object.assign(BlipVoice.defaults(), o)), x);
+  const L = (name, layers, o) => () => PD(name, layers, o);
+  return [
+  //@@NEW
+  ['Kicks', 'Sub thump kick', T('Sub thump kick', {wave:0, pitch:42, bend:10, bendT:35, tdec:520, nLev:0, click:0.05}, {len:3, level:6.5})],
+  ['Kicks', 'Long boom kick (808-style)', T('Long boom kick (808-style)', {wave:0, pitch:44, bend:22, bendT:100, tdec:1100, nLev:0, click:0.1}, {len:5, level:5})],
+  ['Kicks', 'Short kick (808-style)', T('Short kick (808-style)', {wave:0, pitch:52, bend:14, bendT:30, tdec:380, nLev:0.02, click:0.15}, {level:5.5})],
+  ['Kicks', 'Deep drop kick', T('Deep drop kick', {wave:0, pitch:36, bend:30, bendT:150, tdec:900, nLev:0, click:0.05}, {len:4, level:5})],
+  ['Kicks', 'Triangle sub kick', T('Triangle sub kick', {wave:1, pitch:44, bend:6, bendT:30, tdec:700, nLev:0, click:0.08}, {level:4.5})],
+  ['Kicks', 'Four floor kick', T('Four floor kick', {wave:0, pitch:41, bend:38, bendT:14, tdec:620, nType:0, nFreq:800, nLev:0.06, click:0.85, dist:0.2}, {level:3.5})],
+  ['Kicks', 'Tight electro kick', T('Tight electro kick', {wave:0, pitch:60, bend:24, bendT:14, tdec:160, nLev:0, click:0.5, dist:0.15}, {len:2, level:3.5})],
+  ['Kicks', 'Snap kick', T('Snap kick', {wave:0, pitch:66, bend:36, bendT:10, tdec:140, nLev:0, click:0.8}, {len:2, level:-0.5})],
+  ['Kicks', 'Dry house kick', T('Dry house kick', {wave:0, pitch:50, bend:20, bendT:28, tdec:260, nLev:0, click:0.3}, {level:5})],
+  ['Kicks', 'Rubber kick', T('Rubber kick', {wave:0, pitch:48, bend:40, bendT:55, tdec:300, nLev:0, click:0.2}, {level:4})],
+  ['Kicks', 'Thick mid kick', T('Thick mid kick', {wave:1, pitch:70, bend:18, bendT:20, tdec:280, nLev:0.03, click:0.3, dist:0.3}, {level:4})],
+  ['Kicks', 'Gabber crunch kick', T('Gabber crunch kick', {wave:0, pitch:64, bend:48, bendT:22, tdec:380, nLev:0, click:0.9, dist:1}, {len:3, level:1.5})],
+  ['Kicks', 'Hardstyle thump kick', T('Hardstyle thump kick', {wave:0, pitch:52, bend:44, bendT:40, tdec:700, nLev:0, click:0.6, dist:0.8}, {len:3, level:1.5})],
+  ['Kicks', 'Overdriven box kick', T('Overdriven box kick', {wave:3, pitch:58, bend:24, bendT:20, tdec:240, nLev:0.03, click:0.4, dist:0.6})],
+  ['Kicks', 'Clipped sub kick', T('Clipped sub kick', {wave:0, pitch:47, bend:12, bendT:40, tdec:550, nLev:0, click:0.1, dist:0.85}, {len:4, level:1.5})],
+  ['Kicks', 'FM thud kick', F('FM thud kick', {pitch:64, bend:20, bendT:18, alg:0, r1:1, i1:0.4, idec1:50, r2:2, i2:0.2, idec2:30, dec:200, curve:0.5, click:0.3, tone:0.6})],
+  ['Kicks', 'FM bell kick', F('FM bell kick', {pitch:55, bend:24, bendT:20, alg:0, r1:1.5, i1:0.5, idec1:80, r2:3.5, i2:0.3, idec2:40, dec:300, curve:0.4, click:0.4, tone:0.7})],
+  ['Kicks', 'FM growl kick', F('FM growl kick', {pitch:45, bend:30, bendT:60, alg:2, r1:1, i1:0.7, idec1:200, r2:0.5, i2:0.5, idec2:150, fb:0.5, dec:600, curve:0.4, click:0.2, tone:0.6}, {len:3})],
+  ['Kicks', 'FM sub drop kick', F('FM sub drop kick', {pitch:38, bend:36, bendT:180, alg:0, r1:1, i1:0.2, idec1:300, r2:2, i2:0, idec2:50, dec:1200, curve:0.3, click:0.1, tone:0.3}, {len:4})],
+  ['Kicks', 'Beater kick (acoustic)', K('Beater kick (acoustic)', {pitch:72, size:0.6, tension:0.5, tenT:20, dec:180, damp:0.75, muffle:0.25, hard:1, pos:0.3, shell:0.5, noise:0.25})],
+  ['Kicks', 'Pillow kick (acoustic)', K('Pillow kick (acoustic)', {pitch:52, size:0.85, tension:0.3, tenT:50, dec:220, damp:0.8, muffle:0.85, hard:0.2, pos:0.3, shell:0.7, noise:0.1})],
+  ['Kicks', 'Open bass drum', K('Open bass drum', {pitch:58, size:0.8, tension:0.35, tenT:60, dec:900, damp:0.35, muffle:0.1, hard:0.5, pos:0.3, shell:0.6, noise:0.1}, {len:3})],
+  ['Kicks', 'Taiko thump kick', K('Taiko thump kick', {pitch:44, size:1, tension:0.4, tenT:80, dec:1200, damp:0.45, muffle:0, hard:0.9, pos:0.3, shell:1, noise:0.3}, {len:3})],
+  ['Kicks', 'Click kick', BL('Click kick', {pitch:60, kick:0.7, kickT:12, click:1, decay:90}, {level:-4.5})],
+  ['Kicks', 'Micro kick', BL('Micro kick', {pitch:90, kick:0.9, kickT:8, click:0.6, decay:60, filt:-0.3})],
+  ['Kicks', 'Pulse FM kick', BL('Pulse FM kick', {pitch:55, kick:0.8, kickT:20, decay:200, fm:0.2, fmR:0.5, drive:0.3})],
+  ['Kicks', 'Dead lowpass kick', BL('Dead lowpass kick', {pitch:70, kick:0.6, kickT:25, decay:140, filt:-0.5, res:0.3}, {level:2})],
+  ['Kicks', 'Tuned boom kick', L('Tuned boom kick', [
+    {type:'sine', pAmt:14, pDec:60, atk:0.1, dec:700, level:0.95, tune:-5, fine:-36},
+    {type:'click', a:0.2, level:0.4, hpCut:600, atk:0.05, dec:6}], {drive:0.1, len:3, level:-1.5})],
+  ['Kicks', 'Noise punch kick', L('Noise punch kick', [
+    {type:'sine', pAmt:26, pDec:18, atk:0.1, dec:130, level:0.9, tune:3, fine:49},
+    {type:'white', atk:0.1, dec:25, lpCut:5000, level:0.7}], {drive:0.2, level:-1.5})],
+  ['Kicks', 'Triangle chip kick', C('Triangle chip kick', {oct:0, wave:1, slide:-1, atk:0, dec:8, sus:0, rel:1})],
+  ['Kicks', 'Membrane kick (modal)', M('Membrane kick (modal)', {mat:6, oct:0, exc:0, hard:0.8, dec:0.7, bright:0.55, pos:0.1})],
+  ['Snares', 'Tight electro snare', T('Tight electro snare', {wave:1, pitch:210, bend:14, bendT:12, tdec:70, nType:1, nFreq:3500, nRes:0.3, nDec:110, nLev:0.8, click:0.5}, {len:2, level:-2.5})],
+  ['Snares', 'Noise-heavy snare', T('Noise-heavy snare', {wave:1, pitch:190, bend:6, bendT:20, tdec:70, tLev:0.35, nType:1, nFreq:2200, nRes:0.15, nDec:170, nLev:1, click:0.2}, {len:2, level:3})],
+  ['Snares', 'High tuned snare', T('High tuned snare', {wave:0, pitch:300, bend:8, bendT:20, tdec:140, nType:1, nFreq:4500, nRes:0.25, nDec:130, nLev:0.5, click:0.3}, {len:2})],
+  ['Snares', 'Low tuned snare', T('Low tuned snare', {wave:0, pitch:150, bend:12, bendT:30, tdec:170, nType:1, nFreq:1800, nRes:0.2, nDec:200, nLev:0.6, click:0.25}, {len:2, level:0.5})],
+  ['Snares', 'Rimmy snare', T('Rimmy snare', {wave:3, pitch:330, bend:4, bendT:20, tdec:50, nType:1, nFreq:4500, nRes:0.4, nDec:90, nLev:0.5, click:0.7}, {len:2, level:-2})],
+  ['Snares', 'Crushed snare', T('Crushed snare', {wave:1, pitch:200, bend:10, bendT:25, tdec:90, nType:1, nFreq:3000, nRes:0.3, nDec:110, nLev:0.8, click:0.4, dist:0.6}, {len:2, level:2})],
+  ['Snares', 'Snappy snare (909-style)', T('Snappy snare (909-style)', {wave:1, pitch:185, bend:12, bendT:18, tdec:100, nType:2, nFreq:3500, nRes:0.2, nDec:130, nLev:0.85, click:0.35}, {len:2, level:-2.5})],
+  ['Snares', 'Big room snare', T('Big room snare', {wave:1, pitch:190, bend:10, bendT:25, tdec:130, nType:1, nFreq:2800, nRes:0.2, nDec:210, nLev:0.8, click:0.3}, {len:2, fx:[PFX('room', {size:0.8, wet:0.35})], tail:3, level:-0.5})],
+  ['Snares', 'Resonant ping snare', T('Resonant ping snare', {wave:0, pitch:260, bend:6, bendT:15, tdec:160, nType:3, nFreq:1500, nRes:0.7, nDec:150, nLev:0.45, click:0.3}, {len:2, level:0.5})],
+  ['Snares', 'FM metallic snare', F('FM metallic snare', {pitch:240, bend:10, bendT:20, alg:2, r1:3.3, i1:0.6, idec1:60, r2:5.7, i2:0.5, idec2:40, noise:0.6, ndec:160, ncut:8000, dec:200, click:0.3}, {level:-1.5})],
+  ['Snares', 'FM clang snare', F('FM clang snare', {pitch:330, bend:4, bendT:15, alg:1, r1:1.41, i1:0.7, idec1:90, r2:2.7, i2:0.5, idec2:70, noise:0.4, ndec:120, ncut:6000, dec:180, click:0.2}, {level:-1.5})],
+  ['Snares', 'FM tom snare', F('FM tom snare', {pitch:180, bend:20, bendT:30, alg:0, r1:1, i1:0.3, idec1:50, r2:2, i2:0.1, idec2:30, noise:0.5, ndec:100, ncut:5000, dec:160, click:0.4}, {level:-1.5})],
+  ['Snares', 'FM digital snare', F('FM digital snare', {pitch:200, bend:14, bendT:12, alg:0, r1:2, i1:0.5, idec1:40, r2:3, i2:0.3, idec2:25, noise:0.8, ndec:150, ncut:9000, dec:170, curve:0.9, click:0.2}, {level:-1.5})],
+  ['Snares', 'Tight piccolo snare', K('Tight piccolo snare', {pitch:520, size:0.1, tension:0.2, tenT:12, dec:100, damp:0.7, muffle:0.2, hard:1, pos:0.5, noise:0.9, shell:0.4, shellF:0.9}, {level:-1.5})],
+  ['Snares', 'Fat wood snare', K('Fat wood snare', {pitch:200, size:0.5, tension:0.3, tenT:25, dec:200, damp:0.55, muffle:0.1, hard:0.8, pos:0.4, noise:0.7, shell:0.9, shellF:0.6}, {level:-1.5})],
+  ['Snares', 'Brush tap snare', K('Brush tap snare', {pitch:360, size:0.3, tension:0.2, tenT:20, dec:170, damp:0.6, muffle:0.3, hard:0.1, pos:0.5, noise:1, shell:0.4}, {level:-1.5})],
+  ['Snares', 'Marching snare', K('Marching snare', {pitch:260, size:0.25, tension:0.2, tenT:15, dec:140, damp:0.6, muffle:0, hard:1, pos:0.6, noise:0.9, shell:0.8, shellF:0.8}, {level:-1.5})],
+  ['Snares', 'Dead muffled snare', K('Dead muffled snare', {pitch:310, size:0.4, tension:0.3, tenT:20, dec:100, damp:0.9, muffle:1, hard:0.7, pos:0.4, noise:0.6, shell:0.6}, {level:-1.5})],
+  ['Snares', 'Ghost note snare', K('Ghost note snare', {pitch:270, size:0.25, tension:0.25, tenT:15, dec:60, damp:0.85, muffle:0.6, hard:0.3, pos:0.5, noise:0.4, shell:0.4}, {level:-1.5})],
+  ['Snares', 'Noise snare (breath)', B('Noise snare (breath)', {color:0.55, bands:2, freq:1800, spread:0.4, metal:0.2, q:0.4, body:0.35, hp:200, lp:11000, atk:0.5, dec:160, rel:50}, {level:-1.5})],
+  ['Snares', 'Wire rattle snare', B('Wire rattle snare', {grain:0.6, grate:180, bands:3, freq:3500, spread:0.4, metal:0.4, q:0.3, body:0.4, hp:1500, atk:0.5, dec:200, rel:60}, {level:-1.5})],
+  ['Snares', 'Blip noise snare', BL('Blip noise snare', {pitch:260, kick:0.3, kickT:12, noise:0.8, click:0.8, decay:100, filt:0.1, res:0.4}, {level:-3.5})],
+  ['Snares', 'Zap snare', BL('Zap snare', {pitch:400, kick:1, kickT:40, noise:0.5, click:0.4, decay:160, fm:0.3, fmR:1.5}, {level:-2.5})],
+  ['Snares', 'Long tri snare', L('Long tri snare', [
+    {type:'tri', pAmt:9, pDec:20, atk:0.1, dec:140, level:0.6, tune:19, fine:35},
+    {type:'white', atk:0.1, dec:320, hpCut:1400, lpCut:9000, lpRes:0.2, level:0.75}], {drive:0.15, level:-1})],
+  ['Snares', 'Short snare', L('Short snare', [
+    {type:'sine', pAmt:6, pDec:15, atk:0.1, dec:70, level:0.6, tune:19, fine:35},
+    {type:'white', atk:0.1, dec:90, hpCut:2000, lpCut:10000, level:0.8}], {level:1})],
+  ['Snares', 'Crack snare', L('Crack snare', [
+    {type:'click', a:0.3, level:0.7, hpCut:1500, atk:0.05, dec:6},
+    {type:'white', atk:0.1, dec:130, hpCut:3000, lpCut:12000, level:0.8},
+    {type:'sine', pAmt:5, pDec:12, atk:0.1, dec:60, level:0.4, tune:23, fine:-49}], {level:2.5})],
+  ['Snares', 'Snare clap stack', L('Snare clap stack', [
+    {type:'white', burst:3, spacing:9, atk:0.3, dec:90, hpCut:1000, lpCut:3500, level:0.8},
+    {type:'tri', pAmt:8, pDec:18, atk:0.1, dec:110, level:0.55, tune:18, fine:46},
+    {type:'white', delay:27, atk:0.1, dec:200, hpCut:1500, lpCut:7000, level:0.4}], {level:4})],
+  ['Snares', 'Gated snare', L('Gated snare', [
+    {type:'tri', pAmt:8, pDec:20, atk:0.1, dec:400, level:0.55, tune:18, fine:-47},
+    {type:'white', atk:0.1, dec:700, hpCut:1300, lpCut:9000, level:0.85}], {gAmpOn:true, gMode:'AHD', gAtk:0.1, gHold:110, gDec:15, len:2, level:-0.5})],
+  ['Snares', 'Lo-fi snare', L('Lo-fi snare', [
+    {type:'tri', pAmt:6, pDec:20, atk:0.1, dec:100, level:0.6, tune:17, fine:-46},
+    {type:'white', atk:0.1, dec:180, hpCut:1500, lpCut:6000, level:0.8}], {fx:[PFX('crush', {down:0.4, bits:7, mix:0.7})], level:2.5})],
+  ['Snares', 'Metal chip snare', C('Metal chip snare', {wave:2, nfreq:0.85, nshort:1, atk:0, dec:5, sus:0, rel:2}, {level:-1.5})],
+  ['Claps & snaps', 'Dry clap', L('Dry clap', [
+    {type:'white', burst:3, spacing:6, atk:0.3, dec:90, hpCut:1200, lpCut:3600, lpRes:0.4, level:1}], {level:2.5})],
+  ['Claps & snaps', 'Snappy clap', L('Snappy clap', [
+    {type:'white', burst:4, spacing:5, atk:0.3, dec:70, hpCut:1500, lpCut:5000, lpRes:0.5, level:1}], {level:2.5})],
+  ['Claps & snaps', 'Roomy clap', L('Roomy clap', [
+    {type:'white', burst:4, spacing:9, atk:0.3, dec:160, hpCut:900, lpCut:3500, lpRes:0.3, level:1}], {fx:[PFX('room', {size:0.6, wet:0.3})], tail:3, level:3})],
+  ['Claps & snaps', 'Stacked clap', L('Stacked clap', [
+    {type:'white', burst:3, spacing:8, atk:0.3, dec:110, hpCut:1000, lpCut:3200, lpRes:0.35, level:1},
+    {type:'white', burst:3, spacing:8, atk:0.3, dec:110, hpCut:1400, lpCut:4200, lpRes:0.3, level:0.7, delay:12}], {level:3})],
+  ['Claps & snaps', 'Triple hit clap', L('Triple hit clap', [
+    {type:'white', burst:1, spacing:1, atk:0.3, dec:40, hpCut:900, lpCut:3000, lpRes:0.4, level:0.8, delay:0},
+    {type:'white', burst:1, spacing:1, atk:0.3, dec:40, hpCut:900, lpCut:3000, lpRes:0.4, level:0.8, delay:10},
+    {type:'white', burst:1, spacing:1, atk:0.3, dec:40, hpCut:900, lpCut:3000, lpRes:0.4, level:0.8, delay:20},
+    {type:'white', burst:1, spacing:1, atk:0.3, dec:220, hpCut:900, lpCut:3000, lpRes:0.4, level:1, delay:30}], {level:5.5})],
+  ['Claps & snaps', 'Long tail clap', L('Long tail clap', [
+    {type:'white', burst:4, spacing:8, atk:0.3, dec:500, hpCut:800, lpCut:3000, lpRes:0.3, level:1}], {len:3, level:3})],
+  ['Claps & snaps', 'Loose clap', L('Loose clap', [
+    {type:'white', burst:6, spacing:16, atk:0.3, dec:260, hpCut:700, lpCut:2400, lpRes:0.25, level:1}], {level:5.5})],
+  ['Claps & snaps', 'Bright noise clap', L('Bright noise clap', [
+    {type:'white', burst:3, spacing:7, atk:0.3, dec:120, hpCut:2200, lpCut:7000, lpRes:0.3, level:1}], {level:1.5})],
+  ['Claps & snaps', 'Low thick clap', L('Low thick clap', [
+    {type:'white', burst:4, spacing:9, atk:0.3, dec:200, hpCut:500, lpCut:1800, lpRes:0.3, level:1}], {level:6.5})],
+  ['Claps & snaps', 'Gated clap (layers)', L('Gated clap (layers)', [
+    {type:'white', burst:4, spacing:8, atk:0.3, dec:600, hpCut:1000, lpCut:3500, lpRes:0.3, level:1}], {gAmpOn:true, gMode:'AHD', gAtk:0.1, gHold:90, gDec:12, level:2.5})],
+  ['Claps & snaps', 'Tape clap', L('Tape clap', [
+    {type:'white', burst:4, spacing:8, atk:0.3, dec:200, hpCut:900, lpCut:2600, lpRes:0.4, level:1}], {fx:[PFX('crush', {down:0.3, bits:9, mix:0.5})], level:5.5})],
+  ['Claps & snaps', 'Huge hall clap', L('Huge hall clap', [
+    {type:'white', burst:4, spacing:10, atk:0.3, dec:380, hpCut:700, lpCut:3000, lpRes:0.3, level:1}], {fx:[PFX('room', {size:0.95, wet:0.5})], tail:4, level:3})],
+  ['Claps & snaps', 'Hand clap (tone drum)', T('Hand clap (tone drum)', {tLev:0, nType:1, nFreq:1500, nRes:0.3, nDec:180, nLev:1, nSweep:0.25, click:0.3})],
+  ['Claps & snaps', 'Snappy band clap', T('Snappy band clap', {tLev:0, nType:1, nFreq:2400, nRes:0.5, nDec:90, nLev:1, nSweep:-0.3, click:0.5}, {level:1.5})],
+  ['Claps & snaps', 'Soft band clap', T('Soft band clap', {tLev:0, nType:1, nFreq:900, nRes:0.2, nDec:260, nLev:1, nSweep:0.1, click:0.1}, {level:6.5})],
+  ['Claps & snaps', 'Grainy clap', B('Grainy clap', {grain:0.8, grate:60, bands:2, freq:1500, spread:0.4, q:0.3, body:0.4, hp:700, lp:6000, atk:0.5, dec:140, rel:50}, {level:-1.5})],
+  ['Claps & snaps', 'Crowd claps', B('Crowd claps', {grain:1, grate:25, bands:2, freq:1800, spread:0.5, q:0.2, body:0.3, hp:600, lp:7000, atk:2, dec:500, rel:150}, {len:3, level:-1.5})],
+  ['Claps & snaps', 'FM noise clap', F('FM noise clap', {pitch:900, bend:0, alg:0, r1:1, i1:0, idec1:20, i2:0, idec2:20, noise:1, ndec:140, ncut:3000, click:0.4, tone:0.1, dec:160, curve:0.3}, {level:-1.5})],
+  ['Claps & snaps', 'Blip band clap', BL('Blip band clap', {pitch:1500, kick:0, noise:0.8, click:0.7, decay:120, filt:-0.35, res:0.6}, {level:3.5})],
+  ['Claps & snaps', 'Chip clap', C('Chip clap', {wave:2, nfreq:0.85, nshort:0, atk:0, dec:6, sus:0, rel:2}, {level:-1.5})],
+  ['Claps & snaps', 'Wood snap', L('Wood snap', [
+    {type:'white', atk:0.1, dec:30, hpCut:2500, lpCut:7000, lpRes:0.6, level:0.9},
+    {type:'sine', atk:0.05, dec:14, level:0.3, tune:45, fine:39}], {level:3})],
+  ['Claps & snaps', 'Double finger snap', L('Double finger snap', [
+    {type:'white', atk:0.1, dec:40, hpCut:2200, lpCut:6500, lpRes:0.5, level:0.9},
+    {type:'white', delay:55, atk:0.1, dec:50, hpCut:2000, lpCut:6000, lpRes:0.5, level:0.7}], {level:4.5})],
+  ['Claps & snaps', 'Click snap', BL('Click snap', {pitch:2000, kick:0.1, kickT:4, noise:0.3, click:1, decay:35, filt:0.5, res:0.7}, {level:1.5})],
+  ['Rims & sticks', 'Tight rimshot', T('Tight rimshot', {wave:3, pitch:880, bend:0, bendT:5, tdec:25, nType:2, nFreq:4000, nRes:0.3, nDec:20, nLev:0.3, click:0.8}, {len:1, level:-1.5})],
+  ['Rims & sticks', 'Woody rim', K('Woody rim', {pitch:700, size:0.1, tension:0.3, tenT:10, dec:40, damp:0.85, muffle:0.3, hard:1, pos:0.9, noise:0.3, shell:0.9, shellF:0.6}, {level:-1})],
+  ['Rims & sticks', 'Metal rim', F('Metal rim', {pitch:600, bend:0, bendT:5, alg:1, r1:4.1, i1:0.6, idec1:12, r2:6.3, i2:0.4, idec2:10, dec:45, click:0.6, tone:0.9, curve:0.2}, {level:-1})],
+  ['Rims & sticks', 'Stick tick', BL('Stick tick', {pitch:2200, kick:0, click:1, decay:20, filt:0.4, res:0.7})],
+  ['Rims & sticks', 'Cross stick (dry)', K('Cross stick (dry)', {pitch:520, size:0.15, tension:0.1, tenT:6, dec:30, damp:0.9, muffle:0.7, hard:0.9, pos:0.95, noise:0.35, shell:0.8, shellF:0.7}, {level:-1})],
+  ['Rims & sticks', 'Wood ping rim', M('Wood ping rim', {mat:10, oct:3, exc:0, hard:1, dec:0.08, bright:0.7, pos:0.2}, {level:-1})],
+  ['Rims & sticks', 'Clack rim', L('Clack rim', [
+    {type:'square', atk:0.05, dec:14, level:0.6, lpCut:6000, tune:49, fine:-14},
+    {type:'square', atk:0.05, dec:9, level:0.4, tune:56, fine:-12},
+    {type:'click', a:0.3, level:0.5, atk:0.05, dec:4}], {level:4.5})],
+  ['Rims & sticks', 'Lo-fi rim', L('Lo-fi rim', [
+    {type:'tri', atk:0.05, dec:18, level:0.7, tune:46, fine:33},
+    {type:'click', a:0.3, level:0.4, atk:0.05, dec:5}], {tune:12, fx:[PFX('crush', {down:0.3, bits:8, mix:0.6})], level:6})],
+  ['Rims & sticks', 'Tick rim', T('Tick rim', {wave:0, pitch:1400, bend:0, bendT:3, tdec:12, tLev:0.8, nLev:0, click:0.9}, {len:1, level:-2.5})],
+  ['Rims & sticks', 'Hollow rim', K('Hollow rim', {pitch:300, size:0.5, tension:0.1, tenT:10, dec:40, damp:0.6, muffle:0, hard:0.9, pos:0.8, noise:0.2, shell:1, shellF:0.5}, {level:-1})],
+  ['Rims & sticks', 'Pulse chip rim', C('Pulse chip rim', {wave:0, duty:2, oct:4, atk:0, dec:2, sus:0, rel:1}, {level:-1})],
+  ['Rims & sticks', 'Hoop ping', B('Hoop ping', {bands:3, freq:2200, spread:0.4, metal:0.8, q:0.8, body:0.6, hp:1000, atk:0.5, dec:30, rel:15}, {level:-1})],
+  ['Rims & sticks', 'Electro rim', T('Electro rim', {wave:1, pitch:450, bend:12, bendT:8, tdec:40, nType:2, nFreq:2500, nRes:0.3, nDec:25, nLev:0.2, click:1}, {len:1, level:-3.5})],
+  ['Rims & sticks', 'Double rim', BL('Double rim', {pitch:1300, kick:0.1, kickT:6, click:0.8, decay:25, filt:0.3, res:0.6, grain:1, grainT:25}, {level:1})],
+  ['Rims & sticks', 'Dry stick', L('Dry stick', [
+    {type:'click', a:0.5, level:0.7, atk:0.05, dec:3, hpCut:3000},
+    {type:'sine', atk:0.05, dec:6, level:0.3, tune:43, fine:-20}], {tune:24, level:21.5})],
+  ['Rims & sticks', 'Soft side stick', K('Soft side stick', {pitch:500, size:0.1, tension:0.1, tenT:8, dec:35, damp:0.85, muffle:0.5, hard:0.5, pos:0.9, noise:0.3, shell:0.5}, {level:-1})],
+  ];
+}
 // DRUMS BY TYPE (owner, 30 Oct): every drum sound in the pad Presets list sits in a group for its type (Kicks, Snares, …),
 // wherever it came from: the hand-made drums, the new ones above, the drum engines' presets (Tone drum, FM Drum, Skin, and
 // the drum ones of Breath, Chip, Bytebeat and Modal) and the classic and acoustic kits. A sound from an engine or kit keeps
 // that in its name ("Round kick (tone drum)", "808 Kick"). The groups they came from go (they were all drums) or keep
 // what isn't a drum. The kits still load whole from File ▾ → Drum kits…; each engine card keeps its own list.
-const DRUM_TYPES = ['Kicks', 'Snares', 'Claps & snaps', 'Rims & sticks', 'Closed hats', 'Open hats', 'Cymbals', 'Toms', 'Hand drums', 'Shakers & tambourines', 'Cowbells, blocks & metal'];
+const DRUM_TYPES = ['Kicks', 'Snares', 'Claps & snaps', 'Rims & sticks', 'Closed hats', 'Open hats', 'Cymbals', 'Toms', 'Hand drums', 'Shakers & tambourines', 'Cowbells, blocks & metal', 'IDM & glitch'];
 function drumTypeOf(name){
   const n = name.toLowerCase();
   if (/snare|brush/.test(n)) return 'Snares';
@@ -11072,8 +11227,9 @@ const DRUM_SOURCES = {'Kicks':['', null], 'Snares & claps':['', null], 'Hats & c
 const isKitGroup = g => /-style (drums|percussion)$| kit \(acoustic\)$/.test(g);
 function organizeDrums(groups){
   const T = new Map(DRUM_TYPES.map(t => [t, []])), out = [], kits = [];
-  for (const [t, name, make] of moreDrumPresets()) T.get(t).push([name, make]);
+  for (const [t, name, make] of [...moreDrumPresets(), ...moreDrumPresets2()]) T.get(t).push([name, make]);
   for (const [g, list] of groups){
+    if (g === 'IDM & glitch'){ T.get(g).unshift(...list); continue; }   /* the older glitch hits come first in their type */
     const src = DRUM_SOURCES[g], kit = isKitGroup(g);
     if (!src && !kit){ out.push([g, list]); continue; }
     const keep = [];
