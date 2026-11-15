@@ -708,6 +708,13 @@ The owner's top priority to add is the MOD screen. Work down the list; ask befor
 
 Start a session by asking for results. Fix on `beta`. (10 Nov, 15:10: the web beta is build 560; the build numbers in the rest of this paragraph are older.) Web beta: https://matthettich.github.io/thunder-plus/beta/ (build 547 as of 10 Nov morning, 548 once its PR merges; the night of 9–10 Nov shipped 544–547, see the four "10 Nov" entries below. Decisions the lead made that night for the owner to confirm or reverse: on a phone the saved Sequencer default plays on the Page unless Audio thread is picked on that device; on a phone the safety limiter is its stand-in until another worklet loads; the resync only runs with a worklet loaded and its margins are untested on a device). Desktop: v1.3.4-beta.2 (build 541, no feed view or scopes); further desktop betas on hold until the owner asks.
 
+**Build 602** (LFOs follow tracks; Arrange on stop; FX Clear; remove from the FX bar; ANIMATIONS)
+- [ ] **Computer (a COPY of a song with LFOs):** Settings › TRACKS, add two tracks. Pass: the LFOs show on the same track's MOD screen (its new number) and still move the same knobs; taking the two tracks away again puts everything back. (A song changed before this build is not repaired: its LFOs sit on the old track number.)
+- [ ] **Computer:** ARRANGE ON STOP = PLAYHEAD, Phrase screen with Arrange beside it, PLAY past a page turn, STOP. Pass: the Arrange cursor is on the row where it stopped, in view. With STAYS it stays where it was.
+- [ ] **Computer:** FX screen with several effects, right-click the first one › Clear. Pass: only that one goes. Same on the master.
+- [ ] **Computer and phone:** bottom FX bar, right-click (long press) an effect › Remove effect. Pass: it goes, a short notice names it, Ctrl+Z brings it back; a plain click and the on/off light work as before.
+- [ ] **Computer and phone:** Settings › ANIMATIONS OFF. Pass: no dogs and no moving pictures on the FX bar on any screen; meters, scopes and playheads still move; ON brings them back.
+
 **Build 601** (…chains: Morph)
 - [ ] **Computer, ears:** …chains, add Morph (Granular and spectral). A pad into In, a drum loop into In B, Mode Convolve, Morph 50%. Pass: you hear the pad chopped by the drums' rhythm; Morph at 0% is the pad alone, 100% the drums alone; no clicks while turning Morph, Sharpness or Smoothing.
 - [ ] **Computer, ears:** Mode Shape. Pass: the pad always sounds, with the drums' (or a voice's) tone colour. Freeze on Hold A, then stop the pad: it sustains as a drone. Frame Short / Long changes the character without a bang.
@@ -1199,6 +1206,22 @@ Suggested order: N0 → N1 → N2 (phone cured) → N4 with N3 alongside → N5 
   the edge `R.t0`, "waiting…" while armed), `rcdClk` / `rcdFmt` / `rcdFreeSecs`, a 250 ms timer only while recording; the
   final length stays until the next take. recorder-check covers FREE, PATTERN, Stop, next take and closing mid-take.
 
+
+## 14 Nov (LFOs follow tracks, Arrange on stop, FX Clear, remove from the FX bar, ANIMATIONS; build 602)
+
+Owner's reports from the ROG on desktop 1.3.5 (build 589), built by an agent, reviewed by the lead.
+- **LFOs "vanished" (data bug):** `ntrRemap` moved the song, mixer and effects on a TRACKS change but not the Perform data, which names tracks by number. New `perfRemap(P, tN)`: scene values, macro targets, locks, LFOs (keys and ids) and parts (`mix`, `fx` keys) follow the tracks; the master is left alone. A song changed before this build is not repaired (its LFOs are still stored on the old number). Every other write to `perf.lfo` was checked: nothing else drops LFOs unasked. Known oddity left alone: the Perform lock sheet shows and ✕-removes only a track's first LFO. `tests/perf-follows-tracks.test.js`.
+- **ARRANGE ON STOP:** failed when the Phrase held the keys with Arrange beside it (STOP used PHRASE ON STOP and put Arrange's old cursor back). `arrCurToPlay` in `tStop`. `tests/arrange-on-stop.test.js`.
+- **FX Clear:** Clear on a slot row called `fxDelLast` and the right-click never moved the cursor. New `fxDelSlot`; the context menu moves the cursor to the clicked row first. The Mixer's FX row still clears the last effect (that row is the whole chain). `tests/fx-clear-slot.test.js`.
+- **FX bar:** right-click / long press a card: Remove effect, Open on the FX screen. `tests/fxbar-remove.test.js`.
+- **ANIMATIONS** (Settings, saved): dogs, FX bar pictures, rainbow skin drift; no frame work when off. `tests/animations-off.test.js`.
+
+**Owner's asks of 14 Nov evening, not built yet (queue, in this order unless he says otherwise):**
+1. Synth view sliders: double-click opens number entry (he ranks this above double-click = reset; keep reset on another gesture, e.g. right-click › Reset or Alt+click); click a slider then ← / → nudges by a small step.
+2. Arrange: with a selection of blocks in Arrange and Arrange in focus, TRANSP. (next to LP. SEL) transposes every phrase in the selection (mind phrases shared with rows outside the selection: copy or warn, as the existing transpose notice does).
+3. Nice to have: separate MONO TRACKS and POLY TRACKS counts in Settings (today the first half are mono; `ntrPerm` / `polyFrom`). Touches voices, the core sequencer and saved songs: plan before building.
+4. From the audio measurements (see the build 599 entry): switched-OFF pump effects still cost (pump MASTER about 8% of the audio thread while OFF), muted tracks still run their notes and effects, the CPU panel should name the effect.
+5. After the punch-list queue: the chance / probability commands (extend CHA / PRB / NTH / CND; SED seed with two scopes).
 
 ## 14 Nov (…chains: Morph; build 601)
 
