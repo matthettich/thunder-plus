@@ -284,6 +284,12 @@ export const BUSPLANS = {
   odd_ids: { patch: { format: 'chains.patch', modules: [{ id: 1, type: 'trackIn', params: { track: '3' } }, { id: '1', type: 'trackIn', params: { track: 5, pre: 1 } }, { id: 2, type: 'chainOut', params: { track: 8.4 } }, null,
       { id: 1, type: 'trackIn', params: { track: 4, pre: '1' } }, { id: 'x', type: 'chainOut' }, { type: 'chainOut', params: { track: 9 } }, { id: 9, type: 'trackIn', params: { track: null } }],
     cables: [{ from: [1, 'o'], to: [2, 'i'] }, { from: ['1', 'o'], to: [2, 'i'] }, null, { from: [9, 'o'], to: ['x', 'i'] }, { from: [9, 'o'], to: [2, 'i'] }, { to: [2] }] }, chainOn: on(1, 3, 4, 5, 8) },
+  // two Track Ins of one track that both reach the bus: the JS list holds the track twice (busSync then wires it twice): ported as is
+  twice: { patch: patch([['trackIn', 2], ['trackIn', 2, 1], ['chainOut', 5], ['trackIn', 3]], [[0, 2], [1, 2], [3, 2]]), chainOn: on(2, 3, 5) },
+  // audible(): mute, solo, a soloed bus keeps its sources, a soloed source keeps its bus
+  aud_mute: { patch: patch([['trackIn', 2], ['trackIn', 3], ['chainOut', 4]], [[0, 2], [1, 2]]), chainOn: on(2, 3, 4), mix: { 1: { mute: true }, 6: { mute: true } } },
+  aud_solo_bus: { patch: patch([['trackIn', 2], ['trackIn', 3], ['chainOut', 4]], [[0, 2], [1, 2]]), chainOn: on(2, 3, 4), mix: { 3: { solo: true }, 1: { mute: true } } },
+  aud_solo_src: { patch: patch([['trackIn', 2], ['trackIn', 3], ['chainOut', 4]], [[0, 2], [1, 2]]), chainOn: on(2, 3, 4), mix: { 2: { solo: true }, 9: { solo: true, mute: true } } },
   many: { patch: patch([...Array.from({ length: 20 }, (_, i) => ['trackIn', i + 1, i % 3 === 0]), ['chainOut', 30], ['chainOut', 31], ['chainOut', 32]],
       [...Array.from({ length: 20 }, (_, i) => [i, 20 + i % 3]), [3, 22], [4, 20]]), chainOn: on(...Array.from({ length: 32 }, (_, i) => i + 1)) },
 };
@@ -292,7 +298,8 @@ export function busPlanOf(S) {
   const mask = it => { let m = 0; for (const t of it) m = (m | (1 << t)) >>> 0; return m >>> 0; };
   const feeds = new Array(NT).fill(0), targets = new Array(NT).fill(0); for (const [b, s] of P.feeds) feeds[b] = mask(s); for (const [t, s] of P.targets) targets[t] = mask(s);
   let cf = 0, au = 0; for (let t = 0; t < NT; t++) { if (U.chainsFeed(t)) cf = (cf | (1 << t)) >>> 0; if (U.audible(t)) au = (au | (1 << t)) >>> 0; }
-  return { feeds, targets, pure: mask(P.pure), pre: mask(P.pre), loop: !!P.loop, chainsFeed: cf >>> 0, audible: au >>> 0 };
+  const lists = {}; for (const [b, src] of P.feeds) lists[b] = src.slice();
+  return { feeds, lists, targets, pure: mask(P.pure), pre: mask(P.pre), loop: !!P.loop, chainsFeed: cf >>> 0, audible: au >>> 0 };
 }
 export function busPlanCases() {
   const out = [];
