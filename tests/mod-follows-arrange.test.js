@@ -44,3 +44,17 @@ test('an LFO target that does not resolve is labelled plainly, not "(empty)"', (
   assert.equal(c.tgtLabel('fx:11:0:8', true), 'FX1 DLAY: no such setting');
   assert.equal(c.tgtLabel('fx:11:3:7', true), 'FX4: no effect in this slot');
 });
+
+// MIXER FOLLOWS ARRANGE (build 609, owner: "the track with the cursor on the arrange panel always is under cursor in the mixer"): PIN (keep the phrase) returned before FX / MOD / Mixer followed.
+test('PIN keeps the phrase only: the Mixer, FX and MOD beside Arrange still follow its cursor track', () => {
+  for (const host of ['mixer', 'fx', 'mod']) {
+    const c = rig(host); c.apPin = true; c.cs.mixer = { x: 0, y: 3 }; c.cs.song.x = 9;
+    c.apFollow(); assert.equal(host === 'mixer' ? c.cs.mixer.x : c.cFxT, 9, host + ' follows although pinned');
+  }
+  const c = rig('mixer'); c.apPin = true; c.cs.mixer = { x: 0, y: 3 }; c.cs.song.x = 22; c.apFollow(); assert.equal(c.cs.mixer.y, 7, 'the master column: the Mixer\'s master row');
+  const d = rig('phrase'); d.apPin = true; d.S.song = [[5, 5, 5]]; d.firstPhrase = () => 4; d.cs.song.x = 1; d.cs.song.y = 0; d.apFollow(); assert.equal(d.cPhrase, 0, 'the pinned phrase stays');
+});
+test('source pins: go() into the Mixer and Alt+arrows beside it set cs.mixer.x from the Arrange cursor', () => {
+  assert.match(src, /else if \(t === MT\) cs\.mixer\.y = 7; else \{ cs\.mixer\.x = t;/, 'go(mixer) from a track screen');
+  assert.match(src, /const x = tv === 'mixer' \? \(cs\.mixer\.y === 7 \? MT : cs\.mixer\.x\)/, 'otherPatStep reads the Mixer track');
+});

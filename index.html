@@ -35691,12 +35691,12 @@ function apFocus(f, sync){
 // stays. True when the phrase changed.
 function apFollow(){
   const k = apKey(); if (k === apLastKey) return false; apLastKey = k;
-  if (apPin) return false;
   // Beside another screen that screen follows: FX its track's effects, Mixer its track (FOCUS TRACK, 24 Oct: on an empty
   // block and the master column too; they used to wait for a block with a phrase), Inst the block's instrument.
   const t = cs.song.x, hm = apHost === 'fx' || apHost === 'mod' || apHost === 'mixer';
   if (apHost === 'fx' || apHost === 'mod') cFxT = t === MT ? NT : Math.min(t, ntr() - 1);
   else if (apHost === 'mixer'){ if (t === MT) cs.mixer.y = 7; else { cs.mixer.x = Math.min(t, ntr() - 1); if (cs.mixer.y === 7) cs.mixer.y = 0; } }
+  if (apPin) return hm;   /* MIXER FOLLOWS ARRANGE (build 609): PIN keeps the phrase only; FX and the Mixer above still follow the song cursor's track */
   const r = S.song[cs.song.y], cid = r ? r[cs.song.x] : -1, p = cid >= 0 ? firstPhrase(cid) : -1;
   if (cid < 0 && tv === 'phrase' && !pvActive() && t !== MT && !isBusT(t)){ cTrack = t; phraseToCursor(); return true; }   // (9 Nov, owner: a generated line and notes went into the last phrase, not this empty block)
   if (p < 0 || (p === cPhrase && cTrack === cs.song.x)) return hm;
