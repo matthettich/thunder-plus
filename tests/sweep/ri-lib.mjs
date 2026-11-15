@@ -126,7 +126,12 @@ export function envLag(a, b, sr, center, span = 0.3, skip = 2, secs = 8) {
   const env = x => { const n = Math.floor(x.length / D), e = new Float32Array(n); for (let i = 0; i < n; i++) { let s = 0; for (let k = 0; k < D; k++) s += Math.abs(x[i * D + k]); e[i] = s / D; } return e; };
   const ea = env(ma), eb = env(mb), C = Math.round(center / D), L = Math.round(span * sr / D); let best = -2, bk = 0;
   const i0 = Math.floor(skip * sr / D), i1 = Math.min(ea.length - 50, i0 + Math.floor(secs * sr / D));
-  for (let k = C - L; k <= C + L; k++) { let s = 0, x = 0, y = 0; for (let i = i0; i < i1; i++) { const j = i + k; if (j < 0 || j >= eb.length) continue; s += ea[i] * eb[j]; x += ea[i] ** 2; y += eb[j] ** 2; } const r = s / Math.sqrt(x * y + 1e-30); if (r > best) { best = r; bk = k; } }
-  return { k: bk * D, r: best };
+  const rs = new Map();
+  for (let k = C - L; k <= C + L; k++) { let s = 0, x = 0, y = 0; for (let i = i0; i < i1; i++) { const j = i + k; if (j < 0 || j >= eb.length) continue; s += ea[i] * eb[j]; x += ea[i] ** 2; y += eb[j] ** 2; } const r = s / Math.sqrt(x * y + 1e-30); rs.set(k, r); if (r > best) { best = r; bk = k; } }
+  // Is there any timing information? The envelope must vary (coefficient of variation) and the best lag must clearly beat the best one 5 ms or more away (a periodic or flat envelope ties).
+  let mean = 0, sq = 0, cnt = 0; for (let i = i0; i < i1; i++) { mean += ea[i]; sq += ea[i] ** 2; cnt++; } mean /= Math.max(1, cnt); const cv = Math.sqrt(Math.max(0, sq / Math.max(1, cnt) - mean * mean)) / (mean + 1e-20);
+  let runner = -2; const far = Math.ceil(0.005 * sr / D); for (const [k, r] of rs) if (Math.abs(k - bk) >= far && r > runner) runner = r;
+  const inconclusive = cv < 0.15 || (rs.size > 2 * far && best - runner < 0.002);
+  return { k: bk * D, r: best, inconclusive, why: cv < 0.15 ? `flat envelope (variation ${cv.toFixed(2)})` : inconclusive ? `lag ties (best ${best.toFixed(4)}, another lag ${runner.toFixed(4)})` : '' };
 }
 export function octaves(x, sr, i0, n) { const edges = [60, 120, 250, 500, 1000, 2000, 4000, 8000, 16000], o = []; for (let q = 0; q < edges.length - 1; q++) { const y = biquad(biquad(x.subarray(i0, i0 + n), 'hp', edges[q], sr), 'lp', edges[q + 1], sr); let s = 0; for (let i = 0; i < y.length; i++) s += y[i] * y[i]; o.push(10 * Math.log10(s / n + 1e-20)); } return o; }

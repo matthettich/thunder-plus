@@ -1,0 +1,94 @@
+{
+ "acid": [
+  "Hiss acid",
+  "Filter rise",
+  "Bleep ping"
+ ],
+ "bass": [],
+ "partials": [
+  "Metal cluster"
+ ],
+ "swarm": [
+  "Dissonant wash",
+  "Buzzing hive",
+  "Seasick pad",
+  "Metal swarm",
+  "Fifths stab"
+ ],
+ "drift": [
+  "Sync-ish ring lead"
+ ],
+ "chip": [
+  "Slap bass",
+  "Sus4 arp fast",
+  "Dim arp 5 fr",
+  "Fifth drone",
+  "Dive bomb",
+  "Coin chirp",
+  "Noise drone",
+  "Major 7 shimmer"
+ ],
+ "bytebeat": [
+  "*"
+ ],
+ "resynth": [
+  "Stretched metal",
+  "Compressed spectrum",
+  "Detuned glass",
+  "Wide frozen shimmer"
+ ],
+ "modal": [
+  "Bowed glock",
+  "Glass pluck",
+  "Bar pad",
+  "Noise glass"
+ ],
+ "tone": [
+  "Rising zap",
+  "Falling laser"
+ ],
+ "blip": [
+  "Metal swell"
+ ],
+ "breath": [
+  "*"
+ ],
+ "strings": [
+  "Damped muted chord",
+  "Sus4 harp wash",
+  "Open tuning wash",
+  "Detuned zither"
+ ],
+ "_reasons": {
+  "acid / Bleep ping": "self-oscillating filter (Res 1.05): the ping is at the key-tracked cutoff, not a harmonic of the note",
+  "swarm / Fifths stab": "detuned fifth stack (voices scattered to -5 / +7 / +12 semitones)",
+  "piano / Muted felt": "fixed 95 Hz soundboard thump (Thump 0.6) reads as the lowest partial at C3; C2 and C4 are right",
+  "piano / Prepared piano": "inharmonic (Inharm 1, Detune 1) plus a 95 Hz thump",
+  "piano / Stab chord piano": "fixed 95 Hz soundboard thump reads as the lowest partial at C3; C2 is right",
+  "piano / Long soft decay": "fixed 95 Hz soundboard thump reads as the lowest partial at C3; C2 is right",
+  "table / Slow formant drone": "formant vowel: the fundamental sits under the formants, the Sub carries it (partials are 4x, 6x, 8x)",
+  "strings / Sus4 harp wash": "chord stack (sus4 chord: the 4th and 5th above the root are strong)",
+  "strings / Open tuning wash": "chord stack with a low body thump (Body 0.7, Detune 0.7)",
+  "strings / Detuned zither": "Detune 1 with a low body resonance under the string",
+  "phase / Chirp pluck": "resonant sweep (Res saw, DCW 1 over 40 ms): the resonance, not the note, is the lowest strong partial",
+  "chip / Major 7 shimmer": "arpeggio of a major 7 chord (4 notes over the pitch)",
+  "resynth / Detuned glass": "inharmonic (Stretch 0.15, 64 partials)",
+  "resynth / Wide frozen shimmer": "inharmonic (Stretch 0.1, frozen 128 partials)",
+  "vox / Whisper pad": "whisper: noise, no voiced pitch (Voice 0.05, Breath 1)"
+ },
+ "piano": [
+  "Muted felt",
+  "Prepared piano",
+  "Stab chord piano",
+  "Long soft decay"
+ ],
+ "table": [
+  "Slow formant drone"
+ ],
+ "phase": [
+  "Chirp pluck"
+ ],
+ "vox": [
+  "Whisper pad"
+ ]
+}

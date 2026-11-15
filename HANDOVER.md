@@ -366,6 +366,8 @@ clock mapping at that latency (7 Nov (16)). Re-check MIDI timing with Measure…
 
 ## Desktop releases
 
+- **v1.3.8** (15 Nov 2026, a regular release; owner, 14 Nov 23:15: "after finishing everything on your list, please push to main and cut a build"; beta → main at build 619): builds 610 to 619 (chance and seeds, MONO / POLY TRACKS, MOD follows Arrange, the file's name for the song, Option+A and Option+▲▼, LATENCY COMP AUTO, about 630 new presets and 12 kits, stereo pads and many renders). The run id is added when it has finished. Next is 1.3.9.
+- **v1.3.7** (14 Nov 2026 night, a regular release; owner, 14 Nov: "when a few builds have landed, merge `beta` into `main` and build the desktop app"; PR #142 beta → main at build 609, run 43673860734, all three platforms, 11 assets): builds 603 to 609 (renders start on time and are as bright as playback, Synth slider number entry and arrow nudge, Arrange TRANSP. on a selection, switched-OFF pump effects and muted tracks' effects rest, the CPU panel names the effect). Build 610 (chance and seeds) is on `beta` only. Next is 1.3.8.
 - **v1.3.6** (14 Nov 2026 evening, a regular release; owner, 14 Nov: "when you hit a reasonable milestone, can you merge beta and main and push a new desktop app?"; PR #134 beta → main at build 602, run 43660864512, all three platforms, 11 assets): builds 590 to 602 (the module queue, MOD while playing, effects resting in silence, LFOs follow tracks, Arrange zoom and paging, FX Clear, ANIMATIONS). Installed copies update to it.
 - **v1.3.5** (14 Nov 2026, a regular release; owner, 14 Nov: "Merge `beta` into `main` and build the desktop app"; PR #120 beta → main at build 589 (CodeRabbit had not finished after 15 minutes and left no comments), Run workflow through the API with version 1.3.5, run 43637300817, succeeded): everything since build 563 (the 12–13 Nov phone fixes, Lite reverb and presets, the Synth page rework, …waves / …chains audit passes 1–5, feedback loops). Installed copies update to it.
 - **v1.3.4** (11 Nov 2026, a regular release; owner, 10 Nov 22:49: "do the queue and push a full desktop app after you do"; PR #92 beta → main at build 563, Run workflow through the API with version 1.3.4, run 42983473062, all three platforms built, 11 assets): everything since build 541 (MOD finished, the 10 Nov stability work, build 563). Installed copies update to it.
@@ -527,7 +529,40 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0) and `link/` (Ableton
 
 ## To-do (owner's list: keep it current; newest dated entries below have the details)
 
-### Where things stand (14 Nov, evening: READ THIS FIRST; it supersedes the 13 Nov block below where they disagree)
+### Where things stand (15 Nov, midday: READ THIS FIRST; it supersedes the blocks below where they disagree)
+
+**`beta` = build 619; `main` = build 619 = desktop v1.3.8** (if the Desktop releases list below has no v1.3.8 line with a run id, the merge to `main` and the build were NOT done: do them). Builds 610 to 619 since v1.3.7, all the owner's asks of 14 Nov evening and night:
+- **610** chance and seeds. **611 + 615** MONO TRACKS / POLY TRACKS (`docs/MONO-POLY-PLAN.md`: built). **612** MOD beside Arrange follows the cursor. **613** a "Song 1" takes its file's name. **614** Option+A returns exactly; Option+▲▼ on Mixer / FX / MOD / INST. **616** LATENCY COMP AUTO (default). **617** about 360 engine presets. **618** 273 drum sounds, 12 kits. **619** stereo pads in renders; many renders.
+- **Nothing since 603 has been heard by the owner except the `acid` render on the Mac** ("sounds much better", 14 Nov 21:59; Windows, where the original was rendered, still to try). The presets were measured, never heard. His checklist doc has builds 603 to 616 in section 1 (78 open); **617 to 619 are in the punch list only: add them to the doc and re-export.**
+
+**Native port: stage N0 is built and waits for the owner's phone.** Branch `native` (never merged into `beta`), `native/` only. A1, A2, A3 (test APK), A4 (bridge code; timings need the phone), A5 (the lead's `rt_harness` and `thunder/rtlog.h`), A7, A8, A9 done; CI green on Linux, Windows, Mac, wasm, Android. Pre-release `native-n0-android-8` (the desktop updater cannot see it). **A6 done, 15 Nov 11:20: all three runs PASS** (screen on −107 ppm, off −1, background −2; 0 underruns, 0 late; output latency 26 ms screen on, 54 ms off / background; `native/tests/RESULTS-N0.md` on `native`). Not yet from him: what he heard, and the A4 bridge timings (Bridge test button). **Go or stop after N0 is his decision; do not start N1 before it.** He said Android first (14 Nov 23:31), after considering Windows.
+
+**Open, for the next session:**
+1. His go / stop on the native port (N0 passed; asked 15 Nov 11:22).
+2. His ears on 610 to 619; presets to cut.
+3. `acid`: three LFOs sit on track 12 that belong to track 13 (stored before build 602); he is fixing them himself.
+4. Latency AUTO leftovers (build 616 entry): PLAY with something ringing may tick (10 ms glide, not re-measured); effect commands waiting in `fxcPend`, FXV and the core's own command delivery are not shifted by the input latency; a JS clocked effect after a latency pump effect in one chain.
+5. Two engine presets whose render depends on voice order in the golden tool (build 618 entry). Stereo pad: live L / R levels differ from the render's (build 619 entry).
+6. Phone: a second tap on SONG = jump to Arrange and back was proposed, not built (he will check whether it was tried before).
+7. The older open questions (the 14 Nov evening block's item 4, and the "still open" audio list of the build 599 entry).
+
+**Things that bit this session:** the environment restarted twice and killed running agents without their reports (the notice said "the user stopped it": he had not; ask him rather than wait hours). Agents' notes in `/home/claude/progress/` let new agents finish the work. A `const` used by a control that is built while the page loads stops the app (`pdcModeOf`): the vm tests cannot see that, a browser run can. The engine golden now takes minutes (2100 voices) and the full suite about ten.
+
+### Where things stand (14 Nov, night: it supersedes the evening block below where they disagree)
+
+**Done this session (builds 603 to 610), all six items of the owner's 18:22 message:** `main` = build 609 = desktop **v1.3.7** (out, 11 assets); `beta` = build 610.
+1. **Renders sound like playback:** 603 (switched-OFF pump slots' latency counted: renders started 4454 samples late on his song) and 608 (sample notes start on a whole sample: renders were 1 dB dull at the top). The second investigation found NO other difference on tracks 7 / 9 / 13: level, tone, timing and pitch match live; the low waveform correlation was oscillator phase and an overloaded capture. Regression check: `tests/sweep/render-vs-live.mjs`. If he still hears a difference he must say which track and when (punch list, build 608); also his two dead LFOs on old track 12.
+2. **Synth sliders** (604, with 606 / 607 / 608 for CodeRabbit's rounds on typed units: `rowParse` / `rowInvert`).
+3. **Arrange TRANSP. on a selection** (605).
+4. **CPU items** (607, 609): `pumpRest`, `fxRest` / `{rest}`, `cpuFxTop`. Left: a muted track's NOTES still play (lead's decision), its …chains node does not rest, the playback report still has no CPU rows, "Everything else" is not broken down.
+5. **Mono / poly track counts: PLANNED, NOT BUILT.** `docs/MONO-POLY-PLAN.md` (three PRs; CodeRabbit's rounds on hidden tracks are in it). **Waiting for the owner's go-ahead and his answers to its three questions.**
+6. **Chance and seeds** (610): see the dated entry. Awaiting his ears; several lead's decisions are his to reverse (listed there).
+
+**Next:** his results on the punch list (builds 603 to 610 are in section 1 of the checklist doc and `docs/TEST-CHECKLIST.md`); the mono / poly go-ahead; then the open questions of the evening block (item 4 there) and the "still open" audio list of the build 599 entry.
+
+**Things that bit this session:** a backtick inside a `TFX_SRC` comment ends the template (the tests caught it): no backticks, no `//` in one-liners there. `git diff beta` in a worktree is ambiguous with the `beta/` folder: use a commit id. CodeRabbit reviews PRs into `beta` only when asked (`@coderabbitai review` as an issue comment), allows about 10 an hour, and comments on docs too: plan documents attract rounds. Agents' progress notes are in `/home/claude/progress/` (lost with the container); helper scripts were `/home/claude/scratch/bump.py` (BUILD, CHANGES, sw.js, punch list, dated entry from one JSON) and `pr.sh`.
+
+### Where things stand (14 Nov, evening: it supersedes the 13 Nov block below where they disagree)
 
 **PICK UP HERE (a new chat was started on purpose to save context; the owner asked for it).** `beta` = `main` = build 602, desktop **v1.3.6** is out. Working rules from the owner (14 Nov): the lead project-manages, hands everything it can to lower-cost agents, reviews every diff itself and writes audio-engine code itself; each item its own branch and PR into `beta`, merged when checks pass after waiting up to 15 minutes for CodeRabbit (its comments are carried forward); agents write progress notes to a file; a check-in every couple of hours; decide and tell him rather than ask; after each merged build add his checks to the punch list and to section 1 of the checklist doc, and re-export `docs/TEST-CHECKLIST.md` (done up to 602).
 
@@ -731,6 +766,64 @@ The owner's top priority to add is the MOD screen. Work down the list; ask befor
 **The owner's checklist by importance (13 Nov):** he works from a Claude Doc, "Thunder Plus test checklist, by priority" (https://claude.ai/artifact/LrzQ18ur18Fc5gkvxmQDbK), ordered: 1 Do these first, 2 Really worth trying, 3 If you have time, 4 Safe to skip, Parked, Set aside, Done. A snapshot with his ticks is `docs/TEST-CHECKLIST.md`: re-export it whenever the doc changes, and add each new build's checks to the doc's section 1 as well as here. He said the two "decides" groups (native apps; smoothing / Worklets / clock experiments) are parked and block nothing. "Close the skip list" from him means: close section 4's items as not tested.
 
 Start a session by asking for results. Fix on `beta`. (10 Nov, 15:10: the web beta is build 560; the build numbers in the rest of this paragraph are older.) Web beta: https://matthettich.github.io/thunder-plus/beta/ (build 547 as of 10 Nov morning, 548 once its PR merges; the night of 9–10 Nov shipped 544–547, see the four "10 Nov" entries below. Decisions the lead made that night for the owner to confirm or reverse: on a phone the saved Sequencer default plays on the Page unless Audio thread is picked on that device; on a phone the safety limiter is its stand-in until another worklet loads; the resync only runs with a worklet loaded and its margins are untested on a device). Desktop: v1.3.4-beta.2 (build 541, no feed view or scopes); further desktop betas on hold until the owner asks.
+
+**Build 619** (stereo pads in renders; many renders)
+- [ ] **Computer:** a stereo sample on a pad (something wide), play it, render it, compare on headphones. Pass: the render is as wide as playback (it was mono).
+- [ ] **Computer:** render the stems of your 22-track song, twice in one session. Pass: every stem has sound; or, if it runs out, the render stops with a “Render failed” message and writes no silent file (reload, then render again).
+
+**Build 618** (new drum sounds and kits)
+- [ ] **Any device, by ear:** load the IDM clicks, Glitch and Chip kits. Pass: the 8 pads of each are distinct and at a similar loudness. Then the other nine kits: name any that are weak.
+- [ ] **Any device, by ear:** hats and cymbals: the open hats choke on the closed ones; the reverse crash and riser swells sound right.
+- [ ] **Any device, by ear:** toms: Analog tom 1 to 6 step evenly in pitch; the big drums (Taiko-style) feel big.
+- [ ] **Any device, by ear:** kicks, snares and claps: step through the new ones on a pad. Pass: nothing clipped, clicky by mistake, or far off the level of the old ones. Name the ones to cut.
+
+**Build 617** (new engine presets)
+- [ ] **Any device, by ear:** Acid and Bass: step through the new presets with your own patterns. Pass: each is usable and sits at the level of the old ones. Name the ones to cut or fix.
+- [ ] **Any device, by ear:** Bytebeat: the new formulas. Pass: they read as musical lines, not only noise.
+- [ ] **Any device, by ear:** Tone and Blip: the new tonal presets (Tone “Spectra bell”, Blip “FM bleep”). Pass: they sit at a usable level next to the drum presets.
+- [ ] **Any device, by ear:** a quick pass over the other engines’ new presets (Phase, Partials, Vector, Scanned, Swarm, Table, Chip, Drift, Resynth, Modal, the acoustic ones). Pass: nothing harsh, silent, or far louder or quieter than its neighbours; tell me any that are near-copies.
+
+**Build 616** (LATENCY COMP AUTO)
+- [ ] **Computer, by ear:** a kick on one track; a second drum track fed into a bus that holds pump CALM and a synced 1/8 delay. Pass: bus and echoes are in time with the kick (before: the whole bus about 46 ms late). Switch CALM off and on: the timing does not move.
+- [ ] **Computer:** the first time you press PLAY with such an effect loaded. Pass: one notice names the effect and the track and says the other tracks now wait; it never comes back. Audio & MIDI shows LATENCY COMP: AUTO / ON / OFF.
+- [ ] **Computer, by ear:** with that song stopped, play a pad by hand: it answers at once. While the song plays the pad is about 46 ms late (it has to be, to line up). Say if that bothers you when playing along: ON / OFF are there, and the delay could be kept off live pads.
+- [ ] **Computer, by ear:** Step gate or Flex on the master with CALM on a track. Pass: the gate chops on the beat (it was early).
+- [ ] **Computer, by ear:** add and remove CALM on a track while the song plays, and press STOP and PLAY with a pad still ringing. Pass: no click (a short pitch wobble on what is ringing is expected). Say if PLAY with something ringing still ticks.
+- [ ] **Computer:** a song with no look-ahead effects. Pass: it sounds and renders exactly as before.
+
+**Build 615** (MONO TRACKS and POLY TRACKS)
+- [ ] **Computer:** Settings › Song › POLY TRACKS up one, then down one. Pass: the Arrange boxes follow (“POLY 09–17”, then “09–16”), a short “Hid track 17 (poly)” notice, no question.
+- [ ] **Computer (a COPY of a song):** MONO TRACKS down past a track with notes. Pass: it asks “Hide track 08 (mono)?”; Cancel changes nothing; Hide gives “MONO 01–07” and every poly track keeps its notes, mixer, effects and LFOs under its new number; Ctrl+Z puts both counts and every track back; raising MONO brings the hidden track back with its notes.
+- [ ] **Phone:** drag the MONO slider down past a track with notes. Pass: one question when you let go, not one per step.
+- [ ] **Computer:** try to take either count to 0, and the total above 24 with a voice per track (32 without). Pass: the row stops and its info line says why.
+- [ ] **Computer:** save an uneven song (say 4 mono, 12 poly), reopen it. Pass: the same split, the same notes.
+
+**Build 614** (Option+A and back; Option+▲▼ on every page)
+- [ ] **Mac:** on Phrase with a selection and Arrange beside it, Option+A, move around Arrange, Option+A again. Pass: the same screen, cell, selection and scroll as before. The same with Esc.
+- [ ] **Mac:** Option+A, open a block from Arrange (Option+▶), Option+A. Pass: it does not jump back to the old place; Arrange takes the keys again from the new one.
+- [ ] **Mac:** on Mixer, FX, MOD and INST press Option+▼ then Option+▲. Pass: you stay on the page, the Arrange cursor moves a block down and up on that track (MOD and FX show that track still), and Phrase then shows that block.
+- [ ] **Mac:** Option+◀▶ and Option+8. Pass: they change screen as before; Option+8 is Project.
+
+**Build 613** (the song takes its file's name)
+- [ ] **Mac desktop:** double-click `acid.thunder` (or File › Open). Pass: Project › NAME says “acid”, the title bar shows no unsaved dot, and a render suggests “acid mix.wav”.
+- [ ] **Mac desktop:** New project, Save as `beat2.thunder`. Pass: NAME becomes “beat2”. Rename a song to “My tune”, save, open another file and come back: “My tune” is kept.
+
+**Build 612** (MOD follows Arrange)
+- [ ] **Mac:** load `acid`, open MOD, press Option+A (Arrange takes the keys, MOD says FOLLOWS), move the cursor to track 12, then 13. Pass: the MOD header says TRACK 12 and lists its three LFOs at once, and TRACK 13 lists one; it changes with every move, across the mono / poly boundary too.
+- [ ] **Mac:** the two LFOs on track 12 that point at settings those effects do not have. Pass: they read “no such setting” (or “no effect in this slot”), not “(empty)”, and can be re-pointed or cleared.
+
+**Build 611** (mono / poly counts, the invisible part)
+- [ ] **Computer:** open a few existing songs (`acid`, an older one), play them, Settings › TRACKS up two and down two, save, reopen. Pass: everything as before this build: the same tracks mono and poly, the hidden tracks come back with their notes, nothing new on screen.
+
+**Build 610** (chance and seeds)
+- [ ] **Computer or phone, by ear:** a drum track with `CHA 80` on every hat, and `SED 07` on the first row of the MASTER column. PLAY from the top three times. Pass: the same hats every time. Render: the WAV has those hats. Change it to `SED 08`: a different set, again the same every time. Take the SED away: different every play.
+- [ ] **Computer:** the same song, PLAY from the middle (a few song rows down). Pass: the hats there are the ones you heard there when it played from the top.
+- [ ] **Computer:** with `SED 07` on the master, put `SED 21` on the hat track’s first row. Pass: only the hats change; try a few numbers until you like them, the other chance tracks stay. `SED 00` on the track puts its first set back.
+- [ ] **Computer, by ear:** `TCH 80` on a busy track’s first row (no CHA). Pass: about half its notes play, for the rest of the song, until a `TCH FF`. `TCH 40` in the master column thins every track.
+- [ ] **Computer:** MOD on that track › add an LFO › target CHANCE, slow, full depth (take the TCH away first: a TCH on the track wins). Pass: the track thins out and fills up with the LFO. Note: the LFO swings around “every note”, so it only thins in its lower half; a scene or macro on CHANCE sets a lower middle. Say if you want the LFO to work differently.
+- [ ] **Computer, by ear:** a long note followed by chance notes, with `SKP 01` on the first row. Pass: when a chance note is skipped the long note stops there; with `SKP 00` it rings on.
+- [ ] **Computer:** a poly track with four-note chords and `CHA 80`, `CHD 01` on the first row. Pass: chords come out thinned, some notes missing; with `CHD 00` each chord is all there or not at all.
+- [ ] **Computer:** `NTH 41` and `CND 08` on one row of a looping phrase. Pass: it plays on passes 2, 3 and 4 of every four, not the first.
 
 **Build 609** (resting pump effects: FXO and latency changes)
 - [ ] **Computer:** a track with a pump effect switched OFF on the FX screen and an `FXO` command that switches it on in the song (after it has played for a few seconds). Pass: the effect comes in on the row of the command, the first time and every time.
@@ -1265,6 +1358,108 @@ Suggested order: N0 → N1 → N2 (phone cured) → N4 with N3 alongside → N5 
   the edge `R.t0`, "waiting…" while armed), `rcdClk` / `rcdFmt` / `rcdFreeSecs`, a 250 ms timer only while recording; the
   final length stays until the next take. recorder-check covers FREE, PATTERN, Stop, next take and closing mid-take.
 
+
+## 15 Nov (stereo pads render in stereo; many renders in one session; build 619)
+
+Two leftovers of "renders should sound like the playback". By two agents (the first was killed by an environment restart after confirming A); reviewed by the lead.
+- **A. Stereo pads rendered mono.** Live (audio-thread and page sequencer) plays a stereo sample in stereo (L/R correlation −0.01); the render gave identical channels. `padRender` / `renderGetB` now carry the right channel into `renderOut` and `renderPart` (so stems and `pass()` too); reverse and stretch act on both channels as live does. After: 0.002. MUT / GEN variations are mono live too and stay mono. **Open:** in the stereo run the live L and R levels differ from the render's (live R louder; the mono control matched): not chased.
+- **B. Silent renders after many in one session.** V8 allows about 104 WebAssembly memories in a page; Chrome never frees a finished offline render's audio thread (held by Blink's worklet proxy, not by the app), and every effects node of every render kept its own wasm instance. On `acid` the 9th render came out silent with no error. **Fix:** effect nodes in ONE render share their wasm instances (live nodes unchanged); a render whose effects or chains node cannot start fails with a message and saves nothing (the old toast said the track "rendered without it", which was untrue). Sweep song (six tracks, a plate each): 17 good then 23 silent → 40 of 40; to exhaustion: 53 good, then refusals with the message, no silent file. The limit is pushed back, not removed.
+- **Also:** CodeRabbit on #151: `tests/engine-presets.test.js` checks whole-number parameters; `tools/engine-preset-check.js` no longer accepts a note a fifth off (it finds the fundamental and allows only the octaves a preset declares). Re-run over every new preset: none was a mistake; 15 are skip-listed with reasons (fixed thumps, chords, detuned sets). CodeRabbit on #152, left: `tools/drum-measure.js` analyses only the first 131072 samples of a long hit. On #151, left: two punch-list wordings for the mono / poly checks (start from 8 + 8 with an empty track 17; test Ctrl+Z and raising the count separately).
+- **CodeRabbit on #153, done in this build:** a chains node whose processor starts but whose effects wasm does not (`wasmInit` catches it, so no `processorerror`) now fails the render too (the `ready` message's `wasm.tfx`); `render-many` checks the quietest file of a render, not the last; `render-stereo` no longer passes a silent live capture. **Left:** `tools/engine-preset-check.js` can read a sound that is only a fundamental and a louder octave an octave high (not shown to affect a real preset).
+- Tests: `tests/render-stereo.test.js`, `tests/render-fx-share.test.js`; sweeps `tests/sweep/render-stereo.mjs`, `tests/sweep/render-many.mjs`.
+
+## 15 Nov (273 new drum sounds and 12 new kits; build 618)
+
+The drum half of the owner's "a lot more presets, especially drums". By two agents (the first killed by an environment restart after batch 1). Data only, plus the kit loader glue. Nobody has HEARD them.
+- **273 sounds** by type as in the change list, filed in the pad's Presets list; **12 kits** of 8 pads in the factory pad order (`MORE_KITS`, loaded by `drumKits()` / `loadClassicKit()` like the machine kits; the Drum kits picker lists them).
+- **Method** (kept from the first agent): drafts and a generator outside the repo fitted each sound's level to a per-type peak target (−2 dB kicks down to −7 dB open hats and cymbals); `tools/drum-measure.js` prints the table: finite, audible, length and spectral centroid in a window for its type, no near-duplicate pairs (six dropped, one retuned).
+- Engine goldens: 273 voices added. Merging with build 617 changed the hashes of two of 617's own new presets (Resynth "Slow smear", Breath "Sub rumble"): their render depends on what was rendered before them (noise state carried between voices in the golden tool, or in the engine). **To look into**: every other voice is order-independent.
+- `tests/drum-presets.test.js` (5).
+
+## 15 Nov (about 360 new presets on the pitched engines; build 617)
+
+Owner, 14 Nov 23:08: "I'd also like a lot more presets, especially drums, but across all engines." The pitched engines, by two agents (the first was killed by an environment restart after seven engines; the second finished from its notes). Data only: no engine code changed. Reviewed by the lead by the numbers; nobody has HEARD them.
+- **Counts:** as in the change list (about 360). Machine was left alone (partly a drum engine); Blip and Tone got tonal sounds only; Vox's were appended after pump SING's 32 voices; the pump synths' own presets are generated from the plugin and were not touched. The drum presets and kits are a separate build.
+- **Measured** with `tools/engine-preset-check.js`: each preset rendered at three pitches; finite, not silent, peak below full scale, loudness inside its engine's existing window, pitch within 60 cents at C2 or C3 unless listed in `tools/engine-preset-skip.json` (inharmonic, slides, chords, noise; all of Bytebeat and Breath), and not a near-copy of another preset of its engine (eight were dropped or changed).
+- Engine goldens: additions only; no existing hash changed. `tests/engine-presets.test.js` (counts, unique names, ranges, a measured sample; windows in `tests/engine-presets-windows.json`).
+- **Also in this PR:** the checklist export for builds 611 to 616 (`docs/TEST-CHECKLIST.md`; the doc itself is updated: section 1 has 78 open).
+
+## 14 Nov (LATENCY COMP: AUTO (a bus with a look-ahead effect stays on the beat); build 616)
+
+Owner, 14 Nov (21:36 to 22:13): a tempo-synced delay on a bus must stay in time when a look-ahead effect is on that bus; "build it!" with answers 1 yes (delay only while the song plays), 2 yes (people on OFF move to AUTO, with a notice), 3 yes (a switched-OFF effect still counts). An agent measured first and wrote the plan (`/home/claude/progress/LATENCY-AUTO-PLAN.md` in that session: renders, 44.1 kHz), the lead wrote the engine, an agent the setting and wording, and the first agent measured the result twice.
+- **What was measured before:** OFF: a bus with CALM (on or switched off) is 2048 samples late, a send's two copies 2048 apart, echoes of a 1/8 delay on that bus spaced right but 2048 late. ON: all on the sample; with no latency anywhere ON is sample-identical to OFF. Defects with ON: master Flex / Step gate / Retrigger ran T early (a gate that should close at 5713 closed at 3672); a clocked pump effect after CALM in one chain kept its old timing; `pdcSync` set `delayTime.value` (a click: step 0.205 on a sine against 0.031).
+- **Engine (lead):** `pdcModeOf()` (a function declaration: as a const it stopped the app loading, caught by the agent's browser run, not by the vm tests) reads `aset.pdcMode` ('auto' | 'on' | 'off'; an old `pdc` true = on, false or nothing = auto). `pdcPlan` returns `c` too: how late each track's input is (a bus: its latest source's arrival; the master: T). `pdcSync(now)`: live in auto and not playing, every delay is 0; live changes glide 50 ms; the call at PLAY (`tp` start and the first 'beat') takes 10 ms; STOP glides to 0 (also from `resetSeq`, for the page sequencer). Every effects node hears the beat clock through its own DelayNode (`n._cd` in `clockTo`, dropped in `fxDrop`), set from `c`. In ThunderFx a clocked pump slot's song position lags by the latency of the pump slots before it (`s.up`, set with the chain and with the latency report).
+- **Setting and wording (agent):** the AUTO / ON / OFF segment (`#segPdc`), saved as `pdcMode` plus the old boolean; reset = AUTO; `pdcNotice()` once per device when AUTO first delays something (flag `thunderplus-seen-pdc-auto`); `pumpLatTxt` and `pumpBusNote` by mode and by the effect's real latency; the scope, INST LIST blink, stage animation and FX pattern display add `moFxLat()`; README.
+- **Measured after (the tip):** the whole table on the sample in auto and on; master and bus Step gate at 5713; CALM then pump GATE aligned from the first kick; add CALM while playing: step 0.031 (the steady value); remove CALM / STOP: 0.060, a pitch wobble, no click; STOP: delays 0 on both sequencers; first notes after PLAY aligned; the notice once; T = 0 renders sample-identical to before.
+- **CodeRabbit on #150, fixed before the merge:** effect commands that set a node's parameters on a row (FXO, FLX, GAT, RTG: `fxc`) are booked as late as the node's input is, like its clock; stopped in AUTO, `moFxLat` leaves T out (the tracks are not delayed then). Not done: the same shift for values waiting in `fxcPend`, for FXV (`fxp` messages) and for commands the audio-thread sequencer delivers itself.
+- **Left / known:** PLAY with something still ringing through a track that is about to be delayed: a tick (step 0.44 with a 3 ms glide; now 10 ms, not re-measured). A JS clocked effect (Flex, Step gate, Retrigger) AFTER a latency pump effect in the same chain is not shifted (only pump effects are, by `s.up`). Side-chain key taps are taken before the delay (unmeasured). The notice names the track with the largest chain latency, which on a bus may not be the one that sets T. **Found on beta too, not from this:** after about 32 renders in one page session, renders come back silent (a limit on offline contexts?): to look into.
+- Tests: `tests/latency-auto-setting.test.js`, `tests/off-pump-latency.test.js` (the plan's `c`), `tests/perform.test.js`. Harness: `/home/claude/scratch/pdc2/` in that session (not in the repo).
+- **Also:** CodeRabbit on #149 (mono / poly rows): Hide applies only if the song is still the one the question was about; the Song sheet keeps keyboard focus on the row after it redraws.
+
+## 14 Nov (MONO TRACKS and POLY TRACKS in Settings; build 615)
+
+Mono / poly track counts, stage 3: the Settings rows. By an agent; reviewed by the lead. (Stages 1 and 2: build 611.)
+- **Rows:** MONO TRACKS ("8 mono") and POLY TRACKS ("8 poly") replace TRACKS: step 1, big 4, each at least 1 (the owner), total 8 to 32 (24 with a voice per track); the info lines end "Total 16 of 32" and say why a row stops at a limit.
+- **The owner's shrink rule:** the question ("Hide track 08 (mono)?", Hide / Cancel, all hidden tracks named) appears only when a track that would be hidden holds something (`tracksHiddenAll` / `trackHolds`); otherwise it just hides, with a brief notice. Nothing is deleted. The settings-sheet sliders apply on release (`late`), so a drag asks once.
+- **A refused grow** (the other kind's hidden tracks hold something) shows the reason and changes nothing; `setNtr` shows it too.
+- **CodeRabbit on #145:** a track that takes an over slot gets its own kind's stock voice (`voiceIsStock`: a voice the user made is kept), so a poly track cannot play the mono one-shot it inherited.
+- Help paragraph, README, MORE TRACKS, MIDI import and the 24-cap messages reworded.
+- Agent unsure: Ctrl+Z was checked by unit tests only, not in the real app.
+- `tests/mono-poly-settings.test.js` (8). Headless Chrome: the Arrange boxes follow; screenshots were in `/home/claude/scratch/`.
+
+## 14 Nov (Option+A returns exactly where you were; Option+▲▼ steps patterns on Mixer, FX, MOD and INST; build 614)
+
+Owner, 14 Nov 21:53 and 22:00 (Mac): he expected Option+▲ to jump into Arrange; then: "I like the option + up down behavior as is, and would like that to persist across pages (ie mixer and mod) even if there is nothing to edit on the current page", plus a key to jump to Song and back. By an agent; reviewed by the lead.
+- **What existed:** no decision ever moved Option+▲ into Arrange (3 Nov: Option+▲▼ step patterns on Phrase; Song: the block jump; elsewhere it went to Project via `nav`). The jump has been **Alt/Option+A** since build 273. Nothing on a Mac drops Option+arrows (`noAltGr` only touches single characters; `electron/main.js` has no accelerators). Backquote (note-off, and Alt+Backquote the view toggle), IntlBackslash (mute on ISO keyboards) and Ctrl/⌘+Enter (insert row) are all taken, so Alt+A stays the key.
+- **Back is exact now:** `arrKeyToggle` keeps `arrBack` (screen, every cursor and scroll row, selection, phrase / track / sect / inst / FX track, grid scroll, the panel setting: `arrSnap` / `arrSnapPut`); Alt+A again, or Esc with nothing selected in Arrange, restores it; opening a block from Arrange drops it. A hidden panel is shown if there is room, else the Song screen opens. Works from the Synth page too.
+- **Option+▲▼ on Mixer, FX, MOD, INST** (KEYS mode): the song position moves to the block above / below on that screen's track (PATTERN NAV off: 16 rows) and the user stays on the screen. Sect and Project unchanged; Alt+◀▶ unchanged. PAD mode's ALT+▲▼ is a different path (`optDir`: Mixer changes track, INST the instrument) and was left alone. The Synth page ignores Alt+arrows.
+- **Phone:** no touch equivalent of Alt+A. The agent proposed a second tap on the SONG tab = jump and back; the owner: "I think we are good on the phone" (he will check tomorrow whether this was tried before). NOT built.
+- Unsure (agent): Alt+A does nothing inside the …waves / …chains frames; the selection restore is not covered by the real-page run when Arrange moved the phrase.
+- **CodeRabbit on #148, fixed before the merge:** the Mixer's master row steps on the master column; the return snapshot keeps `pendPlace` (a note typed after the return went to the cell tapped in Arrange); returning from the Song-screen fallback creates no block (`goNoNew`); Alt+A from the Synth page returns to it when Song was the last tracker screen; Esc works in the Song-screen fallback; README and help row.
+- `tests/arrange-focus-key.test.js` (15, plus an opt-in real-key browser test).
+- **Also:** CodeRabbit on #147: a desktop Save as whose rewrite fails (rejected, or `{ok:false}`) is a failed save: the unsaved mark stays and the save-failed message shows.
+
+## 14 Nov (a song still called “Song 1” takes its file's name; build 613)
+
+Owner's report (Mac desktop, build 609): "the program still thinks every track I load is called 'song 1' instead of the file name". Found, fixed and tested by an agent; reviewed by the lead.
+- **Cause:** `acid.thunder` stores the name "Song 1" inside the file and `normSong()` keeps it in `S.name`. The earlier fix (the now-playing chip) only made `projTitle()` / `msTitle()` prefer the file's name; everything else read `S.name`: the NAME field, render / stems / MIDI / preset file names, Save's suggestion, the unsaved-changes prompt, backups, the screen subtitles. `loadProjText(text, name, where)` used `name` for a toast only. Electron already passes the file's base name.
+- **Fix (lead's rule):** a song whose stored name is still a default ("Song 1", "Song N", empty: `songNameDefault`) takes the file's name without its extension (`fileSongName`) on every load path, before `setSong`, so nothing is marked unsaved. A song the user named keeps his name. Save as and a first Save do the same (`adoptFileName`). Restore a backup renames nothing.
+- No change in `electron/`: no desktop release needed for it.
+- `tests/song-name-from-file.test.js` (10); the stub in `tests/media-session.test.js` updated.
+
+## 14 Nov (MOD beside Arrange follows the cursor's track; LFOs with a missing target say so; build 612)
+
+Owner's report from the Mac (build 609, a screenshot: Arrange cursor on track 13, MOD header "TRACK 12 FOLLOWS", "no LFOs"). Found, fixed and tested by an agent; reviewed by the lead.
+- **Cause:** `apFollow()` moved the followed track (`cFxT`, which `modT()` reads) only when the host screen was FX. With MOD as the host nothing moved it and nothing redrew, so MOD stayed on whatever track it had; going to Song and back refreshed it. Every other way into MOD (from Song, Phrase, Mixer, FX, Project) was already right.
+- **Fix:** `apFollow` treats `'mod'` like `'fx'` and reports the change so the screen redraws in the same pass.
+- An LFO whose target does not resolve is still listed, with the reason.
+- **His song:** `perf.lfo["11"]` (track 12) holds three LFOs that match track 13's effects (Delay time, Grain delay reverse, Space mix): stored before build 602, when LFOs did not follow added tracks. He is re-pointing them himself.
+- Not changed: MOD's track is not carried back to Phrase / Song on leaving (FX behaves the same).
+- `tests/mod-follows-arrange.test.js` (4).
+
+## 14 Nov (mono / poly track counts, stage 1 and 2: the song data and the sequencer (nothing to see yet); build 611)
+
+The owner said "Build it" (21:39) with his answers: at least one track of each kind; shrinking asks first only when a track that would be hidden holds something; no warning about older builds (`docs/MONO-POLY-PLAN.md`). Stage 1 (data) by an agent, stage 2 (sequencer) and review by the lead. No UI yet.
+- **`S.nmono`** (mono tracks; absent = the half rule, `ceil(ntr / 2)`) and **`S.hmono`** (how many parked slots are hidden mono tracks; mono run first, poly run after). Both are written only when the song has an uneven split, so untouched songs are byte-identical. `normSplit` on load (clamped: at least one of each kind).
+- `polyFrom()` reads `S.nmono`; everything else already went through `polyFrom` / `isPolyT` (the agent found no other "first half" assumption in the code; the help text still says "second half", for stage 3).
+- `ntrPermOld` is the old function, kept: with both counts on the half rule and no `hmono`, `ntrPlan` returns exactly its permutation, and a legacy song's parked kinds are read by growing through it one track at a time (16 → 15 → 16 restores the same track). `ntrPlan(n0, m0, n1, m1, h0, holds)` → `{P, h1, over}`; `ntrPerm` is its `P`. A shrinking kind parks its last tracks at the front of its run; growing takes back that kind's most recently hidden track first.
+- `trackHolds(S, t)` (notes, mixer, effects, a chain, a voice, Perform data, or another track pointing at it), `tracksHiddenBy(mono, poly)` (for the "ask first only if something is in it" rule), `tracksCheck`, `setTracks(mono, poly)` → `{why, tN}` (one undo step; refuses, with the reason, to grow into the other kind's hidden tracks that hold something; never deletes). `setNtr(v)` stays for callers that know only a total: on the half rule exactly as before, on an uneven song it keeps the mono count. MORE TRACKS (`dupTrack`) adds one of each kind through `setTracks`.
+- **Sequencer:** `core/seq-core.js` regenerated (its `polyFrom` reads `S.nmono` from the song the page already sends). `CORE_V` / `CORE_WANT` NOT bumped (the plan said to): no message changed, and the core's URL already carries `CORE_REV`, a hash of the file, so a stale core cannot be served. Sequencer goldens unchanged, page and core.
+- **Agent's open points:** `setNtr` on a song with `hmono` can be refused silently by the may-it-grow rule (stage 3 shows the reason); `trackHolds` counts a part's mix entry only when it differs from 224 / 128.
+- `tests/mono-poly-counts.test.js` (14: old permutations identical for every 8..24 pair, the 8/8 → 6 → 6 → 8 → 8 round trip, legacy 16 → 15 → 16, refuse and overwrite rules, save / load, undo, the sequencer's chords by `nmono`).
+
+## 14 Nov (chance and seeds: TCH, SKP, CHD, CND 08, SED with two scopes, MOD → CHANCE; build 610)
+
+The owner's chance / probability commands (queued 14 Nov; the spec is his chat "Thunderplus per-track probability": he liked every option and wanted a tracker command for each). Sequencer by the lead from an agent's map of the code; reviewed by a second agent (ten questions, its defects fixed).
+- **Rolls are a hash, not a stream** (`roll` in `makeSeq`): seed, track, song row, chain row, step, how often this track has rolled at that place since PLAY (`rvs`, kept apart from the track state that JMP, a wake after a gap and a hand-over reset), and which roll of the row. So seeded chance is the same live, rendered, from the top or the middle; a looped pattern differs each pass, the same way every time; one track never moves another's rolls. Before, CHA and PRB drew from the one `rand()` stream every track and RND / RNL / ONE / DIR / ARC shared, seeded only after a SED row, and each `makeSeq` (live, render, core) started its own.
+- **Seeds:** the track's (`T.seed`: SED on a track until its next; SED 00 hands back), else the song's (`sseed`: SED in the master column; read BEFORE the tracks of the same row, unless that row holds a PRB), else the seed of the lowest track that has one in force (`anySeed`: a song from before this build with its SED on a track still repeats on every track), else one per PLAY (`pseed`, or `o.seed`). `chaseChance(row)`: a start below the top, and a JMP, take the SED / TCH / SKP / CHD the rows above leave. The old stream is untouched (any SED still seeds it), so RND and friends play as before.
+- **New commands** (on the end of `FXC`): `TCH` (sticky; FF off; times CHA in one roll; applies to rows with a note only; the master column's is `mtch` for every track), `SKP` (01: a skipped note also sends the track an 'off'), `CHD` (01: on a poly track each note of the chord rolls, `keepC`). `CND` low nibble 8 is NOT (it used to read as 7, !1ST: a song with CND x8 changes).
+- **MOD target `tch:t`** (CHANCE): like cut / res / dec it lives in `PF.pno` and the sequencer reads it for the next notes; a TCH command on the track wins. Its own value is FF, so an LFO swings below "every note" only in its lower half (in the punch list for his opinion).
+- **Lead's decisions, his to reverse:** no SED = a new roll every play, as before (not "the last roll heard"); a failed row is silent and its state commands still run, as before; a TCH on a row without a note does not gate that row's commands; songs with SED + CHA fall differently than before (the stream is gone).
+- **CodeRabbit on #144, fixed before the merge:** `wake()` (a track coming back after a gap) keeps its seed, TCH, SKP and CHD; a PRB cannot cancel SED / TCH / SKP / CHD (so the chase finds what playing leaves); the master pre-read skips a row with RND / RNL / REP; the Perform commands (XFD, MAC, PRT, LK1 to LK4) now run BEFORE the row's chance, and a lock on CHANCE ends at the next note before that note rolls (a lock of 00 silenced the track for good); the fallback seed is the lowest seeded track's, not "the last given".
+- **Known, left:** BUS PLAY (`o.only`) never reads the master column, so its rolls are not the full mix's (the same is true of TPO there); `tests/sweep/commands.mjs` has no rows for the new commands yet; the chase ignores PRB / REP / HOP on the rows it reads.
+- No message between the page and the core changed (no `CORE_V` bump); `core/seq-core.js` regenerated. `tests/chance-seed.test.js` (11). Sequencer goldens (`tools/seq-golden.mjs`, headless Chrome, CI): the three songs without chance commands are unchanged; `seq-electro-cmds` (which puts PRB 80 and CHA 80 on rows) was accepted with `--update` (4 notes fewer of 3637 events; 223 of 1792 rows fall differently: the re-rolled chance, and RND / RNL, whose stream CHA and PRB no longer draw from), and the audio-thread core matches the new golden event for event (`--core`).
+- **Also:** CodeRabbit on #141: the render-vs-live harness compares the two channels, fails on no comparisons and reports an ambiguous lag as inconclusive; the mono / poly plan counts Perform data as track data. Desktop v1.3.7 noted under Desktop releases.
 
 ## 14 Nov (resting pump effects: FXO switches on the beat, longer warm-up when the latency grows (CodeRabbit on #142); build 609)
 

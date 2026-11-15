@@ -10,10 +10,12 @@ device, so it runs in about 15 seconds.
 | `master.test.js` | the mastering chain (suppressor, compressor, limiter), including what each stage must *do* |
 | `hangs.test.js` | renders that once froze the audio thread, run in a child process with a time limit |
 | `app-logic.test.js` | logic cut out of the HTML/JS: logger, PatchStore dirty flag, sample prune, `esc()`, phrase/pattern sizing and layout, CSP header, service-worker file list, shared-block sync |
+| `song-name-from-file.test.js` | a default-named song takes the file's name on every load path and on Save as; a user's name is kept; no unsaved mark; names with dots, spaces, non-ASCII |
 | `updater.test.js` | the desktop updater's SHA-256 check |
 | `pump-synth.test.js` | the …pump synth engines (MONO, POLY, COIL from `pump/synth/`): every factory preset renders finite and below full scale, hold / release / Tune, golden output; the live worklet's notes as MIDI (retrigger, legato, bend, chords), live = render for the same note, sleeping in silence |
 | `usability.test.js` | the usability audit's Phase 1 fixes (`docs/USABILITY-AUDIT.md`): toast timing and queue, wheel step accumulation (host sliders and pump windows), AltGr, F8 panic, row insert/remove inside a phrase's LEN, Delete on a selection, and source guards for KEYS-mode modifiers, Synth-page keys, dialogs over Settings, unsaved-change marks, Open's fresh undo, leaving the page, and the key docs |
 | `perform.test.js` | the 1 Nov Perform block (targets, scenes and the crossfader, macros, parts, LFO shapes, the song fields), latency compensation's plan, and source guards for the sequencer's new commands (CND, NUD, RTV, SLC, XFD, MAC, LK1–LK4, PRT, the track LFO) |
+| `mono-poly-counts.test.js` | MONO / POLY track counts, stage 1 (`docs/MONO-POLY-PLAN.md`): `S.nmono` / `S.hmono`, `ntrPlan` / `ntrPerm` (the old songs renumber exactly as before), hidden tracks keeping their kind, `trackHolds`, `tracksHiddenBy`, the refuse rule, `setTracks` / `setNtr`, load / save, undo |
 | `gain-staging.test.js` | the 27 Oct gain staging (`docs/GAIN-STAGING.md`): TRIM's scale, `applyMix` (TRIM, VOL, the PRE tap with mute and solo), the CHN crossfade's ramps and node lifetimes, `busPlan().pre`, and source guards for the per-track graph, the master OUT (live and in renders), the Mixer rows and the song file |
 
 `tests/sweep/` holds slower headless-Chrome sweeps (every engine, preset and effect through the app itself), not run by
@@ -50,6 +52,8 @@ npm test` renders and compares every voice. The golden records the Node version;
 message, since `Math.sin` / `Math.pow` can differ in the last bit between versions.
 
 To update on purpose: `UPDATE_GOLDEN=1 node --test tests/engine-golden.test.js` (or `UPDATE_GOLDEN=1 npm test`) and commit the diff.
+
+`engine-presets.test.js` (measuring: `tools/engine-preset-check.js`, skips in `tools/engine-preset-skip.json`, loudness windows in `engine-presets-windows.json`) checks the 14-15 Nov 2026 preset pass: every non-drum engine has its minimum of new presets, unique names, parameters inside their ranges, and a sample of the new presets renders finite, not silent, below full scale, in the engine's loudness window and in pitch.
 **Never update to make a failing test pass unless the change in sound is intended**: the failure message gives the old and new
 peak and RMS (and the dB difference) so you can tell a tiny numeric drift from a real change.
 

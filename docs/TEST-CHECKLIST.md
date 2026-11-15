@@ -1,6 +1,6 @@
 # Thunder Plus test checklist, by priority
 
-> Snapshot of the owner's Claude Doc "Thunder Plus test checklist, by priority" (https://claude.ai/artifact/LrzQ18ur18Fc5gkvxmQDbK), exported 14 Nov 2026 with his ticks as of the afternoon (build 605).
+> Snapshot of the owner's Claude Doc "Thunder Plus test checklist, by priority" (https://claude.ai/artifact/LrzQ18ur18Fc5gkvxmQDbK), exported 15 Nov 2026 with his ticks as in the doc (build 619).
 > The live list is the Claude Doc; the source of every item is "Owner's punch list" in HANDOVER.md (build numbers are in brackets).
 > Re-export this file when the doc changes.
 
@@ -10,7 +10,7 @@
 
 This list is in order of importance, so start at the top.
 
-Do section 1 first; it is short: the newest builds (589 to 605, ears first), what could lose work or sound.
+Do section 1 first; it is short: the newest builds (589 to 619, ears first), what could lose work or sound.
 
 Do sections 2 and 3 as time allows.
 
@@ -22,7 +22,7 @@ If something fails, tell Claude the build number and what happened; tick an item
 
 | Section | Open items | Mostly on | Why it matters |
 | --- | --- | --- | --- |
-| 1. Do these first | 40 | Phone and computer | The newest builds (589 to 605), lost work or sound |
+| 1. Do these first | 88 | Phone and computer | The newest builds (589 to 619), lost work or sound |
 | 2. Really worth trying | 68 | Phone | Everyday features nobody has tried on a real device, the 585 to 588 editor checks and the re-checks of your last fixes |
 | 3. If you have time | 47 | Phone, then gear | Secondary features, by-ear comparisons and hardware |
 | 4. Safe to skip unless something looks wrong | 55 | Mixed | Cosmetic, older, or already covered by automated tests |
@@ -31,9 +31,68 @@ If something fails, tell Claude the build number and what happened; tick an item
 
 ## 1. Do these first
 
-### New in builds 603 to 605: render timing, Synth sliders, Arrange transpose
+### New in builds 617 to 619: engine presets, drum sounds and kits, stereo renders
 
-*The three newest builds, newest first. The 603 checks include one by ear against another track.*
+*The three newest builds, newest first. Build 619 changes what renders contain; 617 and 618 are by ear.*
+
+- [ ] Computer: a stereo sample on a pad (something wide), play it, render it, compare on headphones. Pass: the render is as wide as playback (it was mono). (619)
+- [ ] Computer: render the stems of your 22-track song, twice in one session. Pass: every stem has sound; or, if it runs out, the render stops with a “Render failed” message and writes no silent file (reload, then render again). (619)
+- [ ] Any device, by ear: load the IDM clicks, Glitch and Chip kits. Pass: the 8 pads of each are distinct and at a similar loudness. Then the other nine kits: name any that are weak. (618)
+- [ ] Any device, by ear: hats and cymbals: the open hats choke on the closed ones; the reverse crash and riser swells sound right. (618)
+- [ ] Any device, by ear: toms: Analog tom 1 to 6 step evenly in pitch; the big drums (Taiko-style) feel big. (618)
+- [ ] Any device, by ear: kicks, snares and claps: step through the new ones on a pad. Pass: nothing clipped, clicky by mistake, or far off the level of the old ones. Name the ones to cut. (618)
+- [ ] Any device, by ear: Acid and Bass: step through the new presets with your own patterns. Pass: each is usable and sits at the level of the old ones. Name the ones to cut or fix. (617)
+- [ ] Any device, by ear: Bytebeat: the new formulas. Pass: they read as musical lines, not only noise. (617)
+- [ ] Any device, by ear: Tone and Blip: the new tonal presets (Tone “Spectra bell”, Blip “FM bleep”). Pass: they sit at a usable level next to the drum presets. (617)
+- [ ] Any device, by ear: a quick pass over the other engines’ new presets (Phase, Partials, Vector, Scanned, Swarm, Table, Chip, Drift, Resynth, Modal, the acoustic ones). Pass: nothing harsh, silent, or far louder or quieter than its neighbours; tell me any that are near-copies. (617)
+
+### New in builds 611 to 616: mono / poly tracks, MOD and names, Arrange keys, latency
+
+*The six newest builds, newest first. Builds 616, 615, 612 and 611 are the ones that touch sound or saved songs.*
+
+- [ ] Computer, by ear: a kick on one track; a second drum track fed into a bus that holds pump CALM and a synced 1/8 delay. Pass: bus and echoes are in time with the kick (before: the whole bus about 46 ms late). Switch CALM off and on: the timing does not move. (616)
+- [ ] Computer: the first time you press PLAY with such an effect loaded. Pass: one notice names the effect and the track and says the other tracks now wait; it never comes back. Audio & MIDI shows LATENCY COMP: AUTO / ON / OFF. (616)
+- [ ] Computer, by ear: with that song stopped, play a pad by hand: it answers at once. While the song plays the pad is about 46 ms late (it has to be, to line up). Say if that bothers you when playing along: ON / OFF are there, and the delay could be kept off live pads. (616)
+- [ ] Computer, by ear: Step gate or Flex on the master with CALM on a track. Pass: the gate chops on the beat (it was early). (616)
+- [ ] Computer, by ear: add and remove CALM on a track while the song plays, and press STOP and PLAY with a pad still ringing. Pass: no click (a short pitch wobble on what is ringing is expected). Say if PLAY with something ringing still ticks. (616)
+- [ ] Computer: a song with no look-ahead effects. Pass: it sounds and renders exactly as before. (616)
+- [ ] Computer: Settings › Song › POLY TRACKS up one, then down one. Pass: the Arrange boxes follow (“POLY 09–17”, then “09–16”), a short “Hid track 17 (poly)” notice, no question. (615)
+- [ ] Computer (a COPY of a song): MONO TRACKS down past a track with notes. Pass: it asks “Hide track 08 (mono)?”; Cancel changes nothing; Hide gives “MONO 01–07” and every poly track keeps its notes, mixer, effects and LFOs under its new number; Ctrl+Z puts both counts and every track back; raising MONO brings the hidden track back with its notes. (615)
+- [ ] Phone: drag the MONO slider down past a track with notes. Pass: one question when you let go, not one per step. (615)
+- [ ] Computer: try to take either count to 0, and the total above 24 with a voice per track (32 without). Pass: the row stops and its info line says why. (615)
+- [ ] Computer: save an uneven song (say 4 mono, 12 poly), reopen it. Pass: the same split, the same notes. (615)
+- [ ] Mac: on Phrase with a selection and Arrange beside it, Option+A, move around Arrange, Option+A again. Pass: the same screen, cell, selection and scroll as before. The same with Esc. (614)
+- [ ] Mac: Option+A, open a block from Arrange (Option+▶), Option+A. Pass: it does not jump back to the old place; Arrange takes the keys again from the new one. (614)
+- [ ] Mac: on Mixer, FX, MOD and INST press Option+▼ then Option+▲. Pass: you stay on the page, the Arrange cursor moves a block down and up on that track (MOD and FX show that track still), and Phrase then shows that block. (614)
+- [ ] Mac: Option+◀▶ and Option+8. Pass: they change screen as before; Option+8 is Project. (614)
+- [ ] Mac desktop: double-click acid.thunder (or File › Open). Pass: Project › NAME says “acid”, the title bar shows no unsaved dot, and a render suggests “acid mix.wav”. (613)
+- [ ] Mac desktop: New project, Save as beat2.thunder. Pass: NAME becomes “beat2”. Rename a song to “My tune”, save, open another file and come back: “My tune” is kept. (613)
+- [ ] Mac: load acid, open MOD, press Option+A (Arrange takes the keys, MOD says FOLLOWS), move the cursor to track 12, then 13. Pass: the MOD header says TRACK 12 and lists its three LFOs at once, and TRACK 13 lists one; it changes with every move, across the mono / poly boundary too. (612)
+- [ ] Mac: the two LFOs on track 12 that point at settings those effects do not have. Pass: they read “no such setting” (or “no effect in this slot”), not “(empty)”, and can be re-pointed or cleared. (612)
+- [ ] Computer: open a few existing songs (acid, an older one), play them, Settings › TRACKS up two and down two, save, reopen. Pass: everything as before this build: the same tracks mono and poly, the hidden tracks come back with their notes, nothing new on screen. (611)
+
+### New in builds 603 to 610: renders, sliders, CPU, chance
+
+*The eight newest builds, newest first. Builds 603, 607, 608, 609 and 610 include checks by ear.*
+
+- [ ] Computer or phone, by ear: a drum track with CHA 80 on every hat, and SED 07 on the first row of the MASTER column. PLAY from the top three times. Pass: the same hats every time. Render: the WAV has those hats. Change it to SED 08: a different set, again the same every time. Take the SED away: different every play. (610)
+- [ ] Computer: the same song, PLAY from the middle (a few song rows down). Pass: the hats there are the ones you heard there when it played from the top. (610)
+- [ ] Computer: with SED 07 on the master, put SED 21 on the hat track’s first row. Pass: only the hats change; try a few numbers until you like them, the other chance tracks stay. SED 00 on the track puts its first set back. (610)
+- [ ] Computer, by ear: TCH 80 on a busy track’s first row (no CHA). Pass: about half its notes play, for the rest of the song, until a TCH FF. TCH 40 in the master column thins every track. (610)
+- [ ] Computer: MOD on that track › add an LFO › target CHANCE, slow, full depth (take the TCH away first: a TCH on the track wins). Pass: the track thins out and fills up with the LFO. Note: the LFO swings around “every note”, so it only thins in its lower half; a scene or macro on CHANCE sets a lower middle. Say if you want the LFO to work differently. (610)
+- [ ] Computer, by ear: a long note followed by chance notes, with SKP 01 on the first row. Pass: when a chance note is skipped the long note stops there; with SKP 00 it rings on. (610)
+- [ ] Computer: a poly track with four-note chords and CHA 80, CHD 01 on the first row. Pass: chords come out thinned, some notes missing; with CHD 00 each chord is all there or not at all. (610)
+- [ ] Computer: NTH 41 and CND 08 on one row of a looping phrase. Pass: it plays on passes 2, 3 and 4 of every four, not the first. (610)
+- [ ] Computer: a track with a pump effect switched OFF on the FX screen and an FXO command that switches it on in the song (after it has played for a few seconds). Pass: the effect comes in on the row of the command, the first time and every time. (609)
+- [ ] Computer, by ear: a pump EQ on a track, switched OFF; while the track plays, open the EQ and change Phase to Linear Phase (and back). Pass: the track keeps sounding through the change (it moves slightly in time, as that EQ’s latency does); no gap. (609)
+- [ ] Computer (song acid), by ear: render the song on this build and play the WAV against the app playing it (headphones, same level). Pass: the drums are as crisp in the WAV as live, the WAV starts on the first kick, and the parts stay in step with each other to the end. If something still sounds different, tell me WHICH track and about what time in the song: measured here, each track’s level, tone, timing and pitch now match live within 0.1 dB and 2 ms; only the synths’ wave shape differs from one play to the next (their oscillators start at a different point in the wave each time, live too). (608)
+- [ ] Computer: the three LFOs on your old track 12 in acid: two of them point at effect slots that are now empty (they do nothing, live or rendered) and one at ENSEMBLE MODE; one on 13 at SPACE MIX. Pass: open MOD on those tracks and re-point or delete the two dead ones if you want them back (the song was changed before build 602, which is when LFOs started following their tracks). (608)
+- [ ] Computer (song acid, ROG): play it with the CPU panel open. Pass: “Master effects” is far lower than before (its three switched-off pump effects took about 8 to 12% between them), and the effects rows name effects, like “Effects · Track 07: pump TWANG 5%, Space reverb 3%”. (607)
+- [ ] Computer, by ear: while it plays, switch a pump effect on the master (CALM or MASTER) ON and OFF a few times. Pass: no click, no jump in timing, and ON is heard within a blink (it comes in 20 to 65 ms after the click). Say if that is too slow. (607)
+- [ ] Computer, by ear: mute a track with a long reverb or delay for half a minute, then unmute while it is playing. Pass: the track is back at once; its echoes build up again from nothing (no burst of old echoes). In the CPU panel that track’s effects row falls away while it is muted. Say if you miss the echoes that were ringing before the mute. (607)
+- [ ] Computer: a track switched by FXO commands on a pump effect. Pass: the switches land on the beat as before (a slot FXO has held never rests). (607)
+- [ ] Computer, Synth page: on a sample pad, double-click Loop start and type 500 ms. Pass: the readout says 0.500 s (it gave 1.000 s on a two-second sample). (607)
+- [ ] Computer, Synth page: on a slider that shows milliseconds (an envelope Attack, a delay time) double-click and type 500 ms, then 0.5 s. Pass: both give half a second (500 ms). On one that shows seconds, 250 ms gives 0.25 s. On a pad’s Level, 50% and 50 both give the middle of the slider. (606)
 
 - [ ] Computer: Phrase screen with Arrange beside it, click into Arrange, select several blocks (some sharing a phrase), click TRANSP. +. Pass: every phrase in the selection goes up a semitone once (a shared one not twice), one notice, and one Ctrl+Z undoes all of it. (605)
 - [ ] Computer: the same with a block whose phrase is also used on a row outside the selection. Pass: the notice says some are also used elsewhere, and that other block has moved too (the pattern itself is edited, as on the Song screen). Say if you would rather it made a copy. (605)
@@ -45,7 +104,7 @@ If something fails, tell Claude the build number and what happened; tick an item
 - [ ] Phone (Fold): double-tap a slider. Pass: the field opens with the number keyboard; long press › Reset to default still resets. (604)
 - [ ] Computer: a slider with a MIDI knob learned or an LFO on it. Pass: a typed value and a nudge behave like a drag (the sound follows, the learned knob still moves it). (604)
 - [ ] Computer (song acid): render the song and open the WAV in an editor. Pass: the first kick starts at the very beginning of the file (before this build it started about 93 ms in), and the end of the song is not cut short. (603)
-- [ ] Computer, by ear: Audio & MIDI › LATENCY COMP ON; put pump CALM on a drum track and switch it OFF; play it against another drum track on the same steps. Pass: the two tracks hit together whether CALM is ON or OFF (before, the track with the OFF effect played about 43 ms late). With LATENCY COMP OFF the track with CALM is late either way, as the FX screen says. (603)
+- [ ] Computer, by ear: Audio & MIDI › LATENCY COMP: AUTO (the default) or ON; put pump CALM on a drum track and switch it OFF; play it against another drum track on the same steps. Pass: the two tracks hit together whether CALM is ON or OFF (before, the track with the OFF effect played about 43 ms late). With LATENCY COMP OFF the track with CALM is late either way, as the FX screen says. (603)
 
 ### New in builds 591 to 602: your ears first
 

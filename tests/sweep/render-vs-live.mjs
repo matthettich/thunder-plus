@@ -25,6 +25,7 @@ if (TR === 'auto') {
   await S.close();
 } else tracks = TR.split(',').map(Number);
 console.log(`song ${SONG}, rows ${FROM}..${FROM + ROWS - 1}, tracks ${tracks.join(',')}${FULL ? ' + full mix' : ''}`);
+const chanDb = (d, c, i0, n) => { let e = 0; for (let i = i0; i < i0 + n; i++) e += d[2*i + c] ** 2; return 10 * Math.log10(e / n + 1e-20); };   // one channel's level over the window
 const mono = d => Float32Array.from({ length: d.length / 2 }, (_, i) => (d[2*i] + d[2*i+1]) / 2);
 const rows = [], lags = [], rows_info = [];
 async function one(name, opts, tries = 0) {
@@ -34,6 +35,7 @@ async function one(name, opts, tries = 0) {
   const info = await S.run(`const sq = makeSeq(S, 'song', {row:${FROM}, once:true}); let g = 0, z = null, dur = 0; const ts = []; while (sq.alive() && g++ < 100000){ const r = sq.step(); if (z == null) z = r.t; for (const e of r.evs) if (e.type === 'note' && kit.voices[e.pad]) ts.push(e.t - z); } dur = sq.time - z;
     const sr = ex.sr, useM = !!(S.mst && S.mst.on), L = (useM ? mstLatency(S.mst, sr) : 0) + pumpChainLatency(S.mfx, sr) + Math.round(pdcPlan(sr).T * sr) + (S.limiter ? safeLatency(sr) : 0); return {ts, dur, L};`); await S.close();
   const dur = info.dur;
+  if (!(dur > 6)){ console.log(`${name}: the section is ${(+dur || 0).toFixed(1)} s long; the comparison skips the first 3.5 s of a take and needs more than 6 s. Use more --rows.`); process.exit(2); }   // (CodeRabbit on #142: a window of no length gave meaningless numbers)
   S = await session(proj); const Lv = await S.live(dur + 1, FROM); await S.close();
   if (Lv.st.skips > 1 && tries < 2) { console.log(`  (${name}: the core skipped ahead ${Lv.st.skips} times: the machine is too busy, playing again)`); return one(name, opts, tries + 1); }
   // where the live take's song time 0 is in the capture: the note events' audio times (rt.pl.coreTake) against the song's own note times (the offset most notes agree on)
@@ -45,17 +47,24 @@ async function one(name, opts, tries = 0) {
   const oa = octaves(A, sr, i0, n), ob = octaves(B, sr, i0 + k, n), tot = o => 10 * Math.log10(o.reduce((s, v) => s + 10 ** (v / 10), 0));
   const lvl = tot(ob) - tot(oa), oct = oa.map((v, i) => ob[i] - v), rl = align(A, B, sr, 0.003, 12, 2, k / sr), bd = bands(A, sr), bb = bands(B, sr);
   const cr = nm => { let s = 0, x = 0, y = 0; for (let i = i0; i < i0 + n; i++) { const p = bd[nm][i], q = bb[nm][i + rl.k]; s += p * q; x += p * p; y += q * q; } return s / Math.sqrt(x * y + 1e-30); };
+  // STEREO: L and R separately and the L-R balance (a swapped or one-sided pass is invisible in the mono sum)
+  const dl = chanDb(Lv.data, 0, i0 + k, n) - chanDb(R.data, 0, i0, n), dr = chanDb(Lv.data, 1, i0 + k, n) - chanDb(R.data, 1, i0, n), bal = dl - dr;
   const lagMs = (k - Lv.k0) / sr * 1000; lags.push(lagMs);
-  rows.push({ name, lvl, oct, lagMs, absMs: k / sr * 1000, envR: e.r, wf: [cr('low'), cr('mid'), cr('high')], skips: Lv.st.skips });
+  rows.push({ name, dl, dr, bal, incon: e.inconclusive ? e.why : '', lvl, oct, lagMs, absMs: k / sr * 1000, envR: e.r, wf: [cr('low'), cr('mid'), cr('high')], skips: Lv.st.skips });
 }
 for (const t of tracks) await one('track ' + t, { solo: [t] });
 if (FULL) await one('full mix', {});
-const med = lags.slice().sort((a, b) => a - b)[Math.floor(lags.length / 2)];
+if (!rows.length) { console.log('No comparisons were made (no track qualified and --full was not given): nothing was checked.'); process.exit(2); }
+const med = lags.filter((_, i) => !rows[i].incon).sort((a, b) => a - b)[Math.floor(lags.filter((_, i) => !rows[i].incon).length / 2)] || 0;
 let bad = 0; console.log('\nname        level dB  worst oct  lag vs code   lag vs median  env r   waveform r (low/mid/high)   result');
 for (const r of rows) {
-  const why = []; if (Math.abs(r.lvl) > 0.5) why.push('level'); if (r.oct.some((v, i) => Math.abs(v) > (i === 7 ? 3 : 1.5))) why.push('spectrum'); if (Math.abs(r.lagMs) > 3 || Math.abs(r.lagMs - med) > 3) why.push('timing'); if (r.envR < 0.8) why.push('envelope');
+  const why = []; if (Math.abs(r.lvl) > 0.5) why.push('level'); if (Math.abs(r.dl) > 0.5 || Math.abs(r.dr) > 0.5 || Math.abs(r.bal) > 0.5) why.push(`stereo (L ${r.dl.toFixed(2)} R ${r.dr.toFixed(2)} balance ${r.bal.toFixed(2)} dB)`); if (r.oct.some((v, i) => Math.abs(v) > (i === 7 ? 3 : 1.5))) why.push('spectrum'); if (!r.incon && (Math.abs(r.lagMs) > 3 || Math.abs(r.lagMs - med) > 3)) why.push('timing'); if (r.envR < 0.8) why.push('envelope');
   if (r.skips > 1) why.push('(core skipped: rerun)'); if (why.length) bad++;
-  console.log(r.name.padEnd(11) + r.lvl.toFixed(2).padStart(8) + Math.max(...r.oct.map(Math.abs)).toFixed(2).padStart(10) + r.lagMs.toFixed(1).padStart(14) + ' ms' + (r.lagMs - med).toFixed(1).padStart(10) + ' ms' + r.envR.toFixed(3).padStart(8) + '   ' + r.wf.map(v => v.toFixed(2)).join(' / ').padEnd(24) + (why.length ? 'FAIL ' + why.join(', ') : 'PASS'));
+  console.log(r.name.padEnd(11) + r.lvl.toFixed(2).padStart(8) + Math.max(...r.oct.map(Math.abs)).toFixed(2).padStart(10) + r.lagMs.toFixed(1).padStart(14) + ' ms' + (r.lagMs - med).toFixed(1).padStart(10) + ' ms' + r.envR.toFixed(3).padStart(8) + '   ' + r.wf.map(v => v.toFixed(2)).join(' / ').padEnd(24) + (why.length ? 'FAIL ' + why.join(', ') : 'PASS') + (r.incon ? (why.length ? '; ' : ' ') + 'timing INCONCLUSIVE: ' + r.incon : ''));
 }
 console.log('chain latency the code expects (samples) and notes matched for the start:', rows_info.map(x => x.join(': ')).join(' | '));
-console.log(`\n${rows.length - bad} PASS, ${bad} FAIL`); process.exit(bad ? 1 : 0);
+const nInc = rows.filter(r => r.incon).length;
+console.log(`\n${rows.length - bad} PASS, ${bad} FAIL, ${nInc} with timing INCONCLUSIVE`);
+if (bad) process.exit(1);   // (a failed check is a failure, whatever the timing rows say)
+if (nInc === rows.length) { console.log('Every row has inconclusive timing: the timing was not verified.'); process.exit(2); }
+process.exit(bad ? 1 : 0);
