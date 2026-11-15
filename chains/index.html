@@ -4261,11 +4261,42 @@ function syncHandles(el, c){
   el.hdl.forEach((r, i) => { r.setAttribute('x', pts[i][0] - 5); r.setAttribute('y', pts[i][1] - 5); });
 }
 // Drag a bend point. Option/Alt-click a point without moving it to remove it.
+/* RIGHT ANGLES (15 Nov, owner): dragging a bend point snaps it square to the points either side of it (the previous bend or the source jack, the next bend or the target jack):
+   within SNAP_PX screen pixels of the same x (or y) as a neighbour, it takes that x (or y), so the segment on that side is vertical (or horizontal). Alt turns the snap off.
+   "Square up" (cable menu) makes every segment horizontal or vertical, adding a corner where the last one would still be slanted. Both are pure: ends are [x, y] world points. */
+const SNAP_PX = 8;
+function snapBendPt(ends, pts, i, P, tol){
+  const prev = i > 0 ? pts[i - 1] : ends[0], next = i < pts.length - 1 ? pts[i + 1] : ends[1], out = [P[0], P[1]];
+  for (const k of [0, 1]){ let best = tol + 1e-9; for (const q of [prev, next]){ const d = Math.abs(P[k] - q[k]); if (d < best){ best = d; out[k] = q[k]; } } }
+  return out;
+}
+function squareUpPts(ends, pts){
+  const a = ends[0], b = ends[1], out = []; let last = [a[0], a[1]], horiz = null;
+  for (const p of pts || []){
+    const dx = p[0] - last[0], dy = p[1] - last[1], h = Math.abs(dx) >= Math.abs(dy);
+    const q = h ? [p[0], last[1]] : [last[0], p[1]];
+    if (q[0] === last[0] && q[1] === last[1]) continue;   // (no length: dropped)
+    out.push(q); last = q; horiz = h;
+  }
+  if (last[0] !== b[0] && last[1] !== b[1]){
+    if (!out.length){ const mx = Math.round((a[0] + b[0]) / 2); out.push([mx, a[1]], [mx, b[1]]); }   // no bends: a Z, out of the jack and into the next one level
+    else out.push(horiz ? [last[0], b[1]] : [b[0], last[1]]);
+  }
+  return out;
+}
+function cableEndPts(c){ const wr = world.getBoundingClientRect(), a = jackPos(c.from[0], 'out', c.from[1], wr), b = jackPos(c.to[0], 'in', c.to[1], wr); return a && b ? [[a.x, a.y], [b.x, b.y]] : null; }
+function squareUpCable(c){
+  if (!doc.cables.includes(c)) return;
+  const ends = cableEndPts(c); if (!ends){ toast('That cable is hidden: open its group first.'); return; }
+  const pts = squareUpPts(ends, c.pts); store.snapshot();
+  if (pts.length) c.pts = pts; else delete c.pts;
+  drawCables(); store.touch(); toast('Squared up.');
+}
 function bendDrag(ev, c, idx, lazy){
   ev.stopPropagation(); ev.preventDefault();
   const i = idx(), sx = ev.clientX, sy = ev.clientY; let moved = false, snapped = !lazy;
   if (!lazy) store.snapshot();
-  const mv = e => { if (Math.hypot(e.clientX - sx, e.clientY - sy) > 3) moved = true; if (moved){ if (!snapped){ snapped = true; store.snapshot(); } c.pts[i] = worldPt(e); } };
+  const mv = e => { if (Math.hypot(e.clientX - sx, e.clientY - sy) > 3) moved = true; if (moved){ if (!snapped){ snapped = true; store.snapshot(); } let P = worldPt(e); if (!e.altKey){ const en = cableEndPts(c); if (en) P = snapBendPt(en, c.pts, i, P, SNAP_PX / view().zoom); } c.pts[i] = P; } };   // (right angles: Alt-drag leaves the point where it is put)
   const up = e => {
     window.removeEventListener('pointermove', mv); window.removeEventListener('pointerup', up);
     if (!moved && e.altKey){ if (!snapped) store.snapshot(); c.pts.splice(i, 1); if (!c.pts.length) delete c.pts; snapped = true; }
@@ -4740,9 +4771,10 @@ function ctxMenu(target, x, y, o = {}){
   if (cab && doc.cables.includes(cab)){
     const its = [['Remove cable', () => { if (!doc.cables.includes(cab)) return; store.snapshot(); disconnect(cab); toast('Cable removed.'); }]];
     if (o.touch) its.unshift(['Add a bend here', () => { if (doc.cables.includes(cab)){ selectCable(cab); addBendAt(cab, worldPt({ clientX:x, clientY:y })); } }]);   // T8: the bend a mouse makes with Option-drag
+    its.splice(its.length - 1, 0, ['Square up', () => squareUpCable(cab)]);   // (right angles: before Remove cable)
     showMenu(x, y, its); return; }
   const hb = target.closest && target.closest('.bend');
-  if (hb && hb._cable && doc.cables.includes(hb._cable)){ const c = hb._cable, i = hb._el.hdl.indexOf(hb); showMenu(x, y, [['Remove this bend', () => { if (!doc.cables.includes(c) || i < 0 || !c.pts) return; store.snapshot(); c.pts.splice(i, 1); if (!c.pts.length) delete c.pts; store.touch(); }]]); return; }
+  if (hb && hb._cable && doc.cables.includes(hb._cable)){ const c = hb._cable, i = hb._el.hdl.indexOf(hb); showMenu(x, y, [['Square up this cable', () => squareUpCable(c)], ['Remove this bend', () => { if (!doc.cables.includes(c) || i < 0 || !c.pts) return; store.snapshot(); c.pts.splice(i, 1); if (!c.pts.length) delete c.pts; store.touch(); }]]); return; }
   const el = target.closest('.node'), id = el && el.dataset.id;
   if (id && !selected.has(id)){ if (!(o.touch && selMode)) clearSel(); setSel(id, true); }   // (with Select on, a long press adds the module to the selection)
   const sel = [...selected], n = sel.length, items = [];
