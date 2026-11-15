@@ -52,6 +52,8 @@ npm test` renders and compares every voice. The golden records the Node version;
 message, since `Math.sin` / `Math.pow` can differ in the last bit between versions.
 
 To update on purpose: `UPDATE_GOLDEN=1 node --test tests/engine-golden.test.js` (or `UPDATE_GOLDEN=1 npm test`) and commit the diff.
+
+`engine-presets.test.js` (measuring: `tools/engine-preset-check.js`, skips in `tools/engine-preset-skip.json`, loudness windows in `engine-presets-windows.json`) checks the 14-15 Nov 2026 preset pass: every non-drum engine has its minimum of new presets, unique names, parameters inside their ranges, and a sample of the new presets renders finite, not silent, below full scale, in the engine's loudness window and in pitch.
 **Never update to make a failing test pass unless the change in sound is intended**: the failure message gives the old and new
 peak and RMS (and the dB difference) so you can tell a tiny numeric drift from a real change.
 
