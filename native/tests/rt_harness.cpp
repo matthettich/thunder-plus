@@ -10,6 +10,7 @@
 
 #include "seq/seq.h"
 #include "song/song.h"
+#include "voice/voice.h"
 
 #include <cmath>
 #include <cstdio>
@@ -175,9 +176,57 @@ static int run_seq() {
   return 0;
 }
 
+// ---- U08: the sampler voice pool under the guard ----------------------------------------------------------------------------
+// The pool and the pads are made outside the guard (the control thread); every note / off / mod / stp / stopAll and every render() runs
+// inside it: notes of every kind (poly, reverse, CUT / RES / DEC shaped, slide, arpeggio, vibrato, tremolo, fade-in) arriving between blocks
+// of mixed sizes, as the sequencer's rows arrive while the callback runs.
+static int run_voice() {
+  using namespace thunder;
+  const int PN = 3, NS = 30000; std::vector<float> pd[PN], pd2((size_t)NS); VoiceBuf bufs[PN]; VoiceKit kit[PN];
+  for (int p = 0; p < PN; p++) { pd[p].resize((size_t)NS); for (int i = 0; i < NS; i++) pd[p][(size_t)i] = (float)std::sin(0.02 * (p + 1) * i) * (1.0f - (float)i / NS); }
+  for (int i = 0; i < NS; i++) pd2[(size_t)i] = (float)std::sin(0.013 * i) * 0.5f;
+  for (int p = 0; p < PN; p++) { bufs[p].data = pd[p].data(); bufs[p].data2 = p == 2 ? pd2.data() : nullptr; bufs[p].len = NS; bufs[p].sr = 44100; kit[p].choke = p == 1 ? 1 : 0; kit[p].syn = p != 1; kit[p].rel = 0.05; }
+  VoicePool pool(48000, 64);
+  const int MAXB = 512; std::vector<float> L((size_t)8 * MAXB), R((size_t)8 * MAXB); float* ls[kVoiceTracks] = {}; float* rs[kVoiceTracks] = {};
+  for (int t = 0; t < 8; t++) { ls[t] = &L[(size_t)t * MAXB]; rs[t] = &R[(size_t)t * MAXB]; }
+  static const double arp[8] = {0.001, 1, 0.01, 1.5, 0.02, 2, 0.03, 1.25};
+  uint32_t rng = 20251115; auto rnd = [&]() { rng = rng * 1664525u + 1013904223u; return (rng >> 8) / 16777216.0; };
+  long frame = 0; double peak = 0; long notes = 0; bool finite = true;
+  { rt_guard g;
+    for (int blk = 0; blk < 3000; blk++) {
+      const int N = 1 + (int)(rnd() * MAXB); const double t0 = (double)frame / 48000;
+      pool.setTime(t0);
+      const int ne = (int)(rnd() * 3.5);
+      for (int q = 0; q < ne; q++) {
+        SeqEvent e; const double z = rnd(); e.track = (int)(rnd() * 8); e.t = t0 + rnd() * 0.01; e.pad = (double)(int)(rnd() * PN); e.rate = 0.5 + rnd() * 1.5; e.gain = 0.2 + rnd() * 0.8; e.pan = rnd() * 255; e.col = (int)(rnd() * 4);
+        if (z < 0.55) { e.type = SEV_NOTE; e.poly = rnd() < 0.6; e.rev = rnd() < 0.15; e.ofs = rnd() < 0.2 ? rnd() * 255 : 0; e.fdi = rnd() < 0.15 ? 0.02 : 0; e.trm = rnd() < 0.1 ? 0x4f : 0; e.apn = rnd() < 0.1 ? 0x38 : 0;
+          const double y = rnd(); const double* ap = nullptr;
+          if (y < 0.15) { e.has |= SH_SLIDE; e.slideFrom = 0.5; e.slideDur = 0.05; } else if (y < 0.3) { e.has |= SH_ARP; e.arpN = 4; ap = arp; } else if (y < 0.4) { e.has |= SH_VIB; e.vibSpd = 4; e.vibDep = 9; e.vibT1 = e.t + 0.2; } else if (y < 0.5) { e.has |= SH_BEND; e.bendMul = 2; e.bendT1 = e.t + 0.1; }
+          if (rnd() < 0.2 && !e.rev) { e.has |= SH_TW | SH_TWCUT | SH_TWDEC; e.twCut = 100; e.twRes = 100; e.twDec = 120; }
+          if (rnd() < 0.1) { e.has |= SH_CUT; e.cut = e.t + 0.05; }
+          const int pi = (int)e.pad; if (VoicePool::shapedReverse(e, bufs[pi])) pool.take(e, &kit[pi]); else if (pool.note(e, ap, bufs[pi], kit[pi], 120)) notes++;
+        } else if (z < 0.7) { e.type = SEV_OFF; if (rnd() < 0.5) { e.has |= SH_COLS; e.cols = (uint8_t)(1u << e.col); } pool.off(e); }
+        else if (z < 0.9) { e.type = SEV_MOD; e.has |= SH_GAIN | SH_PAN; if (rnd() < 0.3) { e.has |= SH_MUL; e.mul = 1.2; } pool.mod(e, nullptr); }
+        else if (z < 0.97) { e.type = SEV_STP; e.flag = rnd() < 0.3; pool.stp(e); }
+        else pool.stopAll(t0 + 0.001);
+      }
+      std::memset(L.data(), 0, L.size() * 4); std::memset(R.data(), 0, R.size() * 4);
+      pool.render(ls, rs, N, t0);
+      for (int t = 0; t < 8; t++) for (int i = 0; i < N; i++) { const double a = ls[t][i], b = rs[t][i]; if (!(a == a) || !(b == b)) finite = false; peak = std::max(peak, std::max(std::fabs(a), std::fabs(b))); }
+      frame += N;
+    }
+  }
+  if (!finite) return fail("the voice pool produced NaN");
+  if (pool.dropped() || pool.tOverflow() || pool.autoDropped()) return fail("the voice pool dropped notes or automation events");
+  if (notes < 100 || peak <= 0) return fail("the voice run played (almost) nothing");
+  std::printf("rt_harness: voice pool: %ld notes over %ld frames, peak %d voices, no allocation\n", notes, frame, pool.peakVoices());
+  return 0;
+}
+
 int main(int argc, char** argv) {
   if (argc > 1 && std::strcmp(argv[1], "--selftest") == 0) return selftest();
   if (int r = run_logger()) return r;
   if (int r = run_core()) return r;
-  return run_seq();
+  if (int r = run_seq()) return r;
+  return run_voice();
 }
