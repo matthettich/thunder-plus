@@ -30615,6 +30615,19 @@ function deckFxBar(){
           const AA = FA(), last = AA.reduce((m, x, i) => x ? i : m, -1), to = tgt ? (tgt.classList.contains('dkadd') ? last : +tgt.dataset.k) : NaN;   // onto + ADD FX: the end of the chain
           if (Number.isFinite(to)) fxMove(mst ? NT : dkTrack(), k, to); };
         addEventListener('pointermove', mv, true); addEventListener('pointerup', up, true); });
+      // REMOVE AN EFFECT (14 Nov, owner): right-click, or a long press on a touch screen, anywhere on the card except a value (a value keeps its own menu) opens a small menu.
+      // The on / off light, the name's click and the header drag are unchanged. Removing is one undo step (fxChanged saves).
+      const rmFx = () => { const AA = FA(), g = AA[k], tt = mst ? NT : dkTrack(); if (!g) return; const nmx = (TFX[g.type] || {}).n || 'effect';
+        fxSwap(tt, k, AA, null); fxChanged(tt); dkFbSig = ''; draw();
+        toast(`Removed ${nmx} from ${mst ? 'the master' : 'track ' + d2(tt + 1)} · ${keyHint('mod+Z') || 'Undo'} brings it back`); };
+      const fxMenu = (x, y) => sxMenu(x, y, (D.n + ' · ' + (mst ? 'MASTER' : 'TRACK ' + d2(t + 1))).toUpperCase(), [{l:'Remove effect', f:rmFx}, {l:'Open on the FX screen', f:() => goFx(k)}]);
+      col.addEventListener('contextmenu', e => { if (e._valMenu || e.target.closest('input')) return;   // (a value's own menu stops the event before it gets here)
+         e.preventDefault(); col._lpT = performance.now(); fxMenu(e.clientX, e.clientY); });
+      col.addEventListener('pointerdown', e => { if (e.pointerType !== 'touch' || e.target.closest('.fr span, .fon')) return; const x0 = e.clientX, y0 = e.clientY; let done = false;
+        const tm = setTimeout(() => { done = true; col._lpT = performance.now(); fxMenu(x0, y0); }, 550), off = () => { clearTimeout(tm); removeEventListener('pointermove', mv, true); removeEventListener('pointerup', off, true); removeEventListener('pointercancel', off, true); },
+          mv = ev => { if (Math.hypot(ev.clientX - x0, ev.clientY - y0) > 8) off(); };
+        addEventListener('pointermove', mv, true); addEventListener('pointerup', off, true); addEventListener('pointercancel', off, true); });
+      col.addEventListener('click', e => { if (col._lpT && performance.now() - col._lpT < 800){ e.stopPropagation(); e.preventDefault(); } }, true);   // the release after a long press is not a tap
       const vz = el('div', 'fviz'); vz.append(document.createElement('canvas')); col.append(vz); col._h = new Float32Array(90); col._w = 0; col._q = 0;
       if (isSpringFx(f)){ col.classList.add('spr'); const sc = document.createElement('canvas'); sc.className = 'fspr'; col.prepend(sc); col._spr = {cv:sc, e:0, t:0}; }   // SPRING
       else { const ak = fxAnimKind(f); if (ak){ col.classList.add('spr'); const sc = document.createElement('canvas'); sc.className = 'fspr'; col.prepend(sc); col._spr = {cv:sc, e:0, t:0, kind:ak, P:[]}; } }   // FX ANIMATIONS
