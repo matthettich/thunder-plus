@@ -1,6 +1,6 @@
 # Thunder Plus test checklist, by priority
 
-> Snapshot of the owner's Claude Doc "Thunder Plus test checklist, by priority" (https://claude.ai/artifact/LrzQ18ur18Fc5gkvxmQDbK), exported 14 Nov 2026 with his ticks as of the afternoon (build 602).
+> Snapshot of the owner's Claude Doc "Thunder Plus test checklist, by priority" (https://claude.ai/artifact/LrzQ18ur18Fc5gkvxmQDbK), exported 14 Nov 2026 with his ticks as of the afternoon (build 605).
 > The live list is the Claude Doc; the source of every item is "Owner's punch list" in HANDOVER.md (build numbers are in brackets).
 > Re-export this file when the doc changes.
 
@@ -10,7 +10,7 @@
 
 This list is in order of importance, so start at the top.
 
-Do section 1 first; it is short: the newest builds (589 to 602, ears first), what could lose work or sound.
+Do section 1 first; it is short: the newest builds (589 to 605, ears first), what could lose work or sound.
 
 Do sections 2 and 3 as time allows.
 
@@ -22,7 +22,7 @@ If something fails, tell Claude the build number and what happened; tick an item
 
 | Section | Open items | Mostly on | Why it matters |
 | --- | --- | --- | --- |
-| 1. Do these first | 29 | Phone and computer | The newest builds (589 to 602), lost work or sound |
+| 1. Do these first | 40 | Phone and computer | The newest builds (589 to 605), lost work or sound |
 | 2. Really worth trying | 68 | Phone | Everyday features nobody has tried on a real device, the 585 to 588 editor checks and the re-checks of your last fixes |
 | 3. If you have time | 47 | Phone, then gear | Secondary features, by-ear comparisons and hardware |
 | 4. Safe to skip unless something looks wrong | 55 | Mixed | Cosmetic, older, or already covered by automated tests |
@@ -30,6 +30,22 @@ If something fails, tell Claude the build number and what happened; tick an item
 | Set aside | 5 | none | Nothing: probably superseded |
 
 ## 1. Do these first
+
+### New in builds 603 to 605: render timing, Synth sliders, Arrange transpose
+
+*The three newest builds, newest first. The 603 checks include one by ear against another track.*
+
+- [ ] Computer: Phrase screen with Arrange beside it, click into Arrange, select several blocks (some sharing a phrase), click TRANSP. +. Pass: every phrase in the selection goes up a semitone once (a shared one not twice), one notice, and one Ctrl+Z undoes all of it. (605)
+- [ ] Computer: the same with a block whose phrase is also used on a row outside the selection. Pass: the notice says some are also used elsewhere, and that other block has moved too (the pattern itself is edited, as on the Song screen). Say if you would rather it made a copy. (605)
+- [ ] Computer: hover TRANSP. with blocks selected. Pass: the tip reads “Transposes the N selected blocks’ phrases…”. With Arrange focused and nothing selected, or the Phrase focused, the buttons behave as before. (605)
+- [ ] Phone: KEYS mode, Arrange selection, TRANSP. − / +. Pass: the same as on the computer. (605)
+- [ ] Computer, Synth page: double-click a slider. Pass: a field opens with the value selected; type 440 or 440 Hz (or 35%, -6 dB on a level) and Enter: the slider goes there, and one Ctrl+Z puts it back. Esc leaves it alone. (604)
+- [ ] Computer: Alt-click a slider. Pass: it returns to its default; double-click no longer resets. Right-click › Reset to default does the same. (604)
+- [ ] Computer: click a slider, then ◀ ▶ and Shift+◀ ▶. Pass: it moves about 1% a press (Shift: finer) with a ring round it, and the pad list and tracker cursor stay still; Esc lets go and the keys work as before. Say if 1% is the wrong size. (604)
+- [ ] Phone (Fold): double-tap a slider. Pass: the field opens with the number keyboard; long press › Reset to default still resets. (604)
+- [ ] Computer: a slider with a MIDI knob learned or an LFO on it. Pass: a typed value and a nudge behave like a drag (the sound follows, the learned knob still moves it). (604)
+- [ ] Computer (song acid): render the song and open the WAV in an editor. Pass: the first kick starts at the very beginning of the file (before this build it started about 93 ms in), and the end of the song is not cut short. (603)
+- [ ] Computer, by ear: Audio & MIDI › LATENCY COMP ON; put pump CALM on a drum track and switch it OFF; play it against another drum track on the same steps. Pass: the two tracks hit together whether CALM is ON or OFF (before, the track with the OFF effect played about 43 ms late). With LATENCY COMP OFF the track with CALM is late either way, as the FX screen says. (603)
 
 ### New in builds 591 to 602: your ears first
 
