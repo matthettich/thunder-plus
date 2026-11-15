@@ -66,6 +66,7 @@ void SongRenderer::block(float* outL, float* outR, int N) {
   // 2. the voices into their tracks' inputs, then the mixer
   pool_.render(mix_.inputsL(), mix_.inputsR(), N, t0);
   mix_.render(outL, outR, N, t0);
+  if (meters_) { meters_feed(*meters_, mix_, outL, outR, N); meters_->advance(N, t0 + (double)N / sr_); }
   frame_ += N;
 }
 

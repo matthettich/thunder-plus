@@ -14,6 +14,7 @@
 #include "mix/pdc.h"
 #include "master/master.h"
 #include "master/chain.h"
+#include "meter/meter.h"
 #include "render/render.h"
 #include "voice/voice.h"
 
@@ -347,6 +348,7 @@ static int run_master() {
 static int run_chain() {
   using namespace thunder;
   const int MAXB = 600; Mixer M(48000, MAXB); MasterChain C(48000, MAXB); M.setMasterFx(&MasterChain::hook, &C);
+  MeterBank bank(48000, 30); MeterEvent ev; long events = 0;   // U13: the meters fed from the mixer's pairs and the master output, in the same guarded loop
   std::vector<float> oL((size_t)MAXB), oR((size_t)MAXB);
   uint32_t rng = 99; auto rnd = [&]() { rng = rng * 1664525u + 1013904223u; return (rng >> 8) / 16777216.0; };
   long frame = 0; bool finite = true; double peak = 0; int cfgs = 0;
@@ -358,13 +360,15 @@ static int run_chain() {
         c.set.sup.on = rnd() < 0.5; c.set.comp.on = rnd() < 0.6; c.set.lim.on = rnd() < 0.5; C.configure(c); cfgs++; }
       for (int t = 0; t < 4; t++) { float *l = M.inputsL()[t], *r = M.inputsR()[t]; for (int i = 0; i < N; i++) { l[i] = (float)((rnd() - 0.5) * 1.5); r[i] = (float)((rnd() - 0.5) * 1.5); } }
       M.render(oL.data(), oR.data(), N, t0);
+      meters_feed(bank, M, oL.data(), oR.data(), N); bank.advance(N, t0 + (double)N / 48000); while (bank.pop(&ev)) events++;
       for (int i = 0; i < N; i++) { const double a = oL[(size_t)i], b = oR[(size_t)i]; if (!std::isfinite(a) || !std::isfinite(b)) finite = false; peak = std::max(peak, std::max(std::fabs(a), std::fabs(b))); }
       frame += N;
     }
   }
+  if (events < 100) return fail("the meters published (almost) nothing");
   if (!finite) return fail("the master chain produced NaN");
   if (peak <= 0) return fail("the master chain run was silent");
-  std::printf("rt_harness: master chain: %ld frames, %d configurations, no allocation\n", frame, cfgs);
+  std::printf("rt_harness: master chain + meters: %ld frames, %d configurations, %ld meter events, no allocation\n", frame, cfgs, events);
   return 0;
 }
 
