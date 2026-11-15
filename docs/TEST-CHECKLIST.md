@@ -10,7 +10,7 @@
 
 This list is in order of importance, so start at the top.
 
-Do section 1 first; it is short: the newest builds (589 to 619, ears first), what could lose work or sound.
+Do section 1 first; it is short: the newest builds (589 to 620, ears first), what could lose work or sound.
 
 Do sections 2 and 3 as time allows.
 
@@ -22,7 +22,7 @@ If something fails, tell Claude the build number and what happened; tick an item
 
 | Section | Open items | Mostly on | Why it matters |
 | --- | --- | --- | --- |
-| 1. Do these first | 88 | Phone and computer | The newest builds (589 to 619), lost work or sound |
+| 1. Do these first | 107 | Phone and computer | The newest builds (589 to 620), lost work or sound |
 | 2. Really worth trying | 68 | Phone | Everyday features nobody has tried on a real device, the 585 to 588 editor checks and the re-checks of your last fixes |
 | 3. If you have time | 47 | Phone, then gear | Secondary features, by-ear comparisons and hardware |
 | 4. Safe to skip unless something looks wrong | 55 | Mixed | Cosmetic, older, or already covered by automated tests |
@@ -30,6 +30,30 @@ If something fails, tell Claude the build number and what happened; tick an item
 | Set aside | 5 | none | Nothing: probably superseded |
 
 ## 1. Do these first
+
+### New in build 620: the owner's list from desktop build 609
+
+*The newest build, first. Most of it is on the Windows desktop app; the phone items say so.*
+
+- [ ] Computer, Windows desktop app: open a song you know, press PLAY, then STOP. Pass: the page loads, plays and stops; nothing is blank or stuck. If it is, tell Claude the build. (620)
+- [ ] Computer: on Arrange, select some blocks with LOOP SEL on, then press PLAY from Mixer, then from FX, MOD, INST and PROJECT. Pass: the selected blocks loop, as they do when PLAY is pressed on Arrange. (620)
+- [ ] Computer: add a poly track with a sound on it and press PLAY at once. Pass: its first pass is audible. If it is still silent, say whether a kit slot was set on that track. (620)
+- [ ] Computer: Mixer, double-click a track’s PAN, VOL or OUT value. Pass: a box opens; type a value (or -6 dB on a level) and Enter, and the control goes there. Esc leaves it alone; Alt-click and the right-click menu reset it. (Double-click used to reset on the Mixer; you asked for typing.) (620)
+- [ ] Computer: on FX, double-click a value on the FX bar. Pass: a small slider with a number box opens; type a number and Enter, and the effect is there. Esc closes it. (620)
+- [ ] Computer: on Mixer, FX, MOD, INST and Synth, press ADD FX on the FX bar. Pass: the effect list opens over the page you are on, you stay on that page, and the effect you pick is added. (620)
+- [ ] Computer: an LFO aimed at a Mixer PAN / VOL / OUT or an FX row shows a dot beside that control. Pass: the dot shows while the LFO targets it and goes when it is removed. Not expected yet on Synth engine knobs or pump windows: say if you want them there. (620)
+- [ ] Computer: open the dogs’ MOD screen. Pass: the screen is named for the dogs, and each ✕ is always showing (no hover needed). (620)
+- [ ] Computer: LOOP sits beside PLAY. Pass: it toggles from its button and from Alt+L, and the button shows the state. (620)
+- [ ] Phone: LOOP is still in the tab bar. Pass: it is there and turns the loop on and off. (620)
+- [ ] Computer: the Synth page and a pad’s tooltip show “Used on” with the tracks that play the pad. Pass: the tracks listed are the ones that use it. (620)
+- [ ] Computer: Renoise transpose keys Alt+F1, F2, F11, F12. Pass: each transposes by its step; Alt+F1 no longer opens Help. (620)
+- [ ] Computer: on FX, scroll the wheel over the slot list. Pass: the list scrolls and the ACTIVE line stays pinned at the top. (620)
+- [ ] Phone: on FX, scroll a long slot list. Pass: the ACTIVE line stays pinned at the top. (620)
+- [ ] Computer: Settings, ARRANGE LOOK-AHEAD: set 4, then 32 (default 16). Pass: the rows after the playhead change to match; the cursor pages with the keys and the wheel, not with clicks. (620)
+- [ ] Computer: on Arrange, scroll down, make an edit, press Ctrl+Z (⌘Z on a Mac). Pass: Arrange keeps the scroll you had, not the top. (620)
+- [ ] Computer: with LOOP on, go to the Synth page and back to Arrange. Pass: Arrange is not left paged away. (620)
+- [ ] Computer: with PIN on, move the Arrange cursor to another track. Pass: the Mixer follows it. (620)
+- [ ] Computer: Pattern view with PHRASE ON STOP set to STAYS, then press STOP. Pass: the pattern stays on its phrase; only the song row moves. If you meant while playing, say so: that is FOLLOW. (620)
 
 ### New in builds 617 to 619: engine presets, drum sounds and kits, stereo renders
 
