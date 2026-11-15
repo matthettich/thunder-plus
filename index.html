@@ -21615,11 +21615,11 @@ function makePlayer(ac, out, getBuf, live, mo){   // mo: the master OUT gain (af
   // (busSync) and after a track's effects change (routeTrack); cheap when nothing changed.
   /* (build 616) AUTO: live, the delays are in force only while the song plays (clk.on); stopped they are 0, so pads and keys answer at
      once. Live, a change glides over 50 ms (a jump of the delay time clicked: measured, a step of 0.2 on a sine), also the one at
-     STOP, under whatever is still ringing; as PLAY starts it takes 3 ms (in force before the first note; a plain jump clicked
+     STOP, under whatever is still ringing; as PLAY starts it takes 10 ms (in force before the first note; a plain jump clicked
      when a pad was still ringing: measured 17 times the normal step), and in a render it is set at once. Each effects node's beat clock is delayed by how late its input is (pl.c, see pdcPlan). */
   let pdcNow = false;   // set for the call made as PLAY starts or STOP lands: at once, no glide
   function pdcSync(now){
-    pdcNow = !!now; const pl = pdcPlan(ac.sampleRate), playing = clk.on || (typeof tp !== 'undefined' && !!(tp && tp.on)), idle = live && !playing && pdcModeOf() === 'auto', glide = live, ramp = pdcNow ? 0.003 : 0.05;   /* (tp.on: the audio-thread sequencer keeps its own clock, so clk.on stays off while it plays) */
+    pdcNow = !!now; const pl = pdcPlan(ac.sampleRate), playing = clk.on || (typeof tp !== 'undefined' && !!(tp && tp.on)), idle = live && !playing && pdcModeOf() === 'auto', glide = live, ramp = pdcNow ? 0.01 : 0.05;   /* (tp.on: the audio-thread sequencer keeps its own clock, so clk.on stays off while it plays) */
     const set = (n, v) => { if (!n) return; v = idle ? 0 : Math.max(0, Math.min(0.99, v || 0)); if (n._pv === v) return; n._pv = v;
       const q = n.delayTime; if (!glide){ try { q.cancelScheduledValues(0); } catch(e){} q.value = v; return; }
       try { const at = ac.currentTime; q.cancelScheduledValues(at); q.setValueAtTime(q.value, at); q.linearRampToValueAtTime(v, at + ramp); } catch(e){ q.value = v; } };
