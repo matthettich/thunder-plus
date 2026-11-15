@@ -155,6 +155,22 @@ static void testB1() {
     bool all = true; for (float v : a) if (v == 7.0f) all = false; CHECK("B1 N > maxBlock fills every sample", all); }
 }
 
+// ---- B2: song text is UTF-8 bytes; 4-byte characters and surrogate-pair escapes load ----
+static void testB2() {
+  const char raw[] = "{\"v\":6,\"name\":\"a\xF0\x9F\x98\x80z\"}";                 // U+1F600 as real UTF-8 (what toByteArray(UTF_8) gives)
+  const char esc[] = "{\"v\":6,\"name\":\"a\\ud83d\\ude00z\"}";                  // the same as a JSON surrogate-pair escape
+  const char mod[] = "{\"v\":6,\"name\":\"a\xED\xA0\xBD\xED\xB8\x80z\"}";      // modified UTF-8 (GetStringUTFChars): still refused, so the glue must not use it
+  Song a, b, c; JsonError je;
+  CHECK("B2 raw 4-byte UTF-8 loads", a.load(raw, sizeof raw - 1, &je));
+  CHECK("B2 surrogate-pair escape loads", b.load(esc, sizeof esc - 1, &je));
+  CHECK("B2 both decode to the same name", a.root.get("name").asStr() == b.root.get("name").asStr() && a.root.get("name").asStr() == "a\xF0\x9F\x98\x80z");
+  CHECK("B2 modified UTF-8 is refused (why the glue passes bytes)", !c.load(mod, sizeof mod - 1, &je));
+  thunder_core* core = thunder_create(48000, 256);
+  const std::string msg = std::string("{\"t\":\"song.load\",\"rev\":3,\"S\":") + raw + "}";
+  CHECK("B2 song.load with an emoji through thunder_post", thunder_post(core, msg.data(), (int)msg.size()) == 1);
+  thunder_destroy(core);
+}
+
 // @@TESTS_END
 
 int main() {
@@ -162,6 +178,7 @@ int main() {
   testA2A3();
   testA5();
   testB1();
+  testB2();
   // @@CALLS_END
   if (g_fail) { std::printf("test_hostile: %d FAILED\n", g_fail); return 1; }
   std::printf("test_hostile: all passed\n");

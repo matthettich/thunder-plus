@@ -8,6 +8,7 @@
 #include <cstdio>
 #include <cstring>
 #include <thread>
+#include <vector>
 
 #include "miniaudio.h"
 #include "thunder/core.h"
@@ -163,20 +164,18 @@ JNIEXPORT void JNICALL Java_app_thunderplus_nativetest_NativeEngine_nativeStop(J
   g.core = nullptr;
 }
 
-JNIEXPORT jboolean JNICALL Java_app_thunderplus_nativetest_NativeEngine_nativePost(JNIEnv* env, jobject, jstring s) {
-  if (!g.core || !s) return JNI_FALSE;
-  const char* c = env->GetStringUTFChars(s, nullptr);
-  int ok = thunder_post(g.core, c, (int)std::strlen(c));
-  env->ReleaseStringUTFChars(s, c);
-  return ok ? JNI_TRUE : JNI_FALSE;
-}
-
-JNIEXPORT jstring JNICALL Java_app_thunderplus_nativetest_NativeEngine_nativePoll(JNIEnv* env, jobject) {
-  if (!g.core) return nullptr;
-  char buf[512];
-  int n = thunder_poll(g.core, buf, (int)sizeof buf);
-  if (n <= 0) return nullptr;
-  return env->NewStringUTF(buf);
+// N1 review B2 (UNVERIFIED at run time: no Android here). The command arrives as a UTF-8 BYTE ARRAY (Kotlin: String.toByteArray(UTF_8)),
+// not a jstring: GetStringUTFChars gives MODIFIED UTF-8 (a character above U+FFFF as two 3-byte surrogates, U+0000 as C0 80), which the
+// core's strict reader refuses, so a song with an emoji in a name did not load. Bytes also carry their own length (no strlen, no int cast
+// of a size_t). Copied out (not pinned): a song.load parses for a while and a pinned array stops the Java GC.
+JNIEXPORT jboolean JNICALL Java_app_thunderplus_nativetest_NativeEngine_nativePostBytes(JNIEnv* env, jobject, jbyteArray bytes) {
+  if (!g.core || !bytes) return JNI_FALSE;
+  const jsize n = env->GetArrayLength(bytes);
+  if (n <= 0) return JNI_FALSE;
+  std::vector<char> buf((size_t)n);
+  env->GetByteArrayRegion(bytes, 0, n, reinterpret_cast<jbyte*>(buf.data()));
+  if (env->ExceptionCheck()) { env->ExceptionClear(); return JNI_FALSE; }
+  return thunder_post(g.core, buf.data(), (int)n) ? JNI_TRUE : JNI_FALSE;
 }
 
 JNIEXPORT jboolean JNICALL Java_app_thunderplus_nativetest_NativeEngine_nativePutBytes(JNIEnv* env, jobject, jint id, jstring meta, jbyteArray bytes, jint off, jint len) {
