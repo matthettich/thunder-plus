@@ -993,7 +993,9 @@ body.mob #bFile.dirty{position:relative} body.mob #bFile.dirty::before{position:
 .ttabs button[data-v],.tmap button[data-v]{background:color-mix(in srgb, var(--tc) 55%, var(--side)); color:#1b2130}
 .ttabs button[data-v].on,.tmap button[data-v].on{background:var(--tc); color:#1b2130; font-weight:700; box-shadow:inset 0 -3px 0 #1b2130}
 /* (sweep, 4 Nov) empty cells a quarter of the way from the skin's dim colour toward its ink: still quiet, no longer near invisible (about 1:1 on most skins) */
-.tscr .lfom{color:var(--fxac, var(--ts-hot)); font-weight:700}   /* a parameter an LFO moves (MOD): the ~ after its name */
+.tscr .lfom{color:var(--fxac, var(--ts-hot)); font-weight:700}
+.lfod{position:relative}
+.lfod::after{content:''; position:absolute; right:-.32em; top:.12em; width:.3em; height:.3em; border-radius:50%; background:var(--fxac, var(--acc, var(--ts-hot))); pointer-events:none}   /* LFO DOT (609): a parameter an LFO moves (lfoMark); not animated */
 /* MOD scopes: a layer over the text grid that never takes a click (pointer-events:none); thin square lines, no rounding */
 .modsc{position:absolute; left:0; top:0; width:0; height:0; z-index:1; pointer-events:none; color:var(--fxac, var(--ts-hot))}
 .modsc, .modsc *{pointer-events:none!important; border-radius:0!important}
@@ -21656,6 +21658,14 @@ function normParts(j){
   return A;
 }
 const perfOf = (Sx = S) => Sx.perf || (Sx.perf = freshPerf());
+/* LFO DOT (owner, 609: "show what parameter the mod is connected to"): an element with data-lfo="<target id>" gets the class lfod (a dot, CSS) and the
+   LFO's name added to its title ("LFO 2"; two on one target: "LFO 1, LFO 2"). lfoMark() runs at the end of draw() and when the FX bar is built, so a changed or removed target updates. */
+function lfoNames(){ const m = new Map(), P = S.perf;
+  if (P && P.lfo) for (const t in P.lfo){ const a = P.lfo[t]; if (Array.isArray(a)) a.forEach((L, i) => { if (!L || L.id == null) return; const n = 'LFO ' + (i + 1), o = m.get(L.id); m.set(L.id, o ? o + ', ' + n : n); }); }
+  return m; }
+function lfoMark(root){ const els = (root || document).querySelectorAll('[data-lfo]'); if (!els.length) return; const m = lfoNames();
+  for (const e of els){ const n = m.get(e.dataset.lfo) || ''; if (e._lfoN === n) continue; e._lfoN = n; if (e._lfoT == null) e._lfoT = e.title || '';
+    e.classList.toggle('lfod', !!n); const t = n ? (e._lfoT ? e._lfoT + ' · ' : '') + n : e._lfoT; if (t) e.title = t; else e.removeAttribute('title'); } }
 // The target's parts: {k, t, s, p}
 function tgtParse(id){ const a = String(id).split(':'); return {k:a[0], t:+a[1], s:a[2] != null ? +a[2] : -1, p:a[3] != null ? +a[3] : -1, b:a[4] != null ? +a[4] : null}; }   // b: the band of a banded ...pump row (fx:t:s:p:b), else null
 const tgtTrk = t => t >= MT ? 'MASTER' : 'TRACK ' + d2(t + 1);
@@ -30192,7 +30202,7 @@ function draw(){
       for (let t = T0; t < T1; t++){ const m = S.mix[t];
         const tx = y === 0 ? hx(m.trim == null ? TRIM_0 : m.trim) : y === 1 ? hx(m.pan) : y === 2 ? (m.mute ? 'MU' : '--') : (m.solo ? 'SO' : '--');
         const on = y < 2 || (y === 2 ? m.mute : m.solo);
-        ln.push({t:tx, cls:cc(t, y, on ? (y === 2 ? 'v mu2' : y === 3 ? 'v so2' : 'v') : 'e') + tkm(t) + (y === 0 ? ' trm' : ''), x:t, y}, ' '); }
+        ln.push({t:tx, cls:cc(t, y, on ? (y === 2 ? 'v mu2' : y === 3 ? 'v so2' : 'v') : 'e') + tkm(t) + (y === 0 ? ' trm' : ''), x:t, y, lfo:y === 1 ? 'pan:' + t : null}, ' '); }
       L.push(ln);
     });
     // MIXER ROWS (owner, 2 Nov): CHN above FX, as the sound goes (TRIM → chains → FX → VOL): CHN is row 4, FX row 5.
@@ -30212,7 +30222,7 @@ function draw(){
     // Level meters, 8 lines of 6 dB each: red above −6 dB, yellow above −12.
     for (let k = 0; k < MH; k++){
       const ml = [{t:(k ? String(-6 * k) : '0').padStart(3) + ' ', cls:'lb'}];
-      for (let t = T0; t < T1; t++) ml.push({t:'  ', cls:'mt ' + (k === 0 ? 'm3' : k === 1 ? 'm2' : 'm1') + tkm(t) + (k === MH - 1 ? ' gb' : '')}, ' ');
+      for (let t = T0; t < T1; t++) ml.push({t:'  ', cls:'mt ' + (k === 0 ? 'm3' : k === 1 ? 'm2' : 'm1') + tkm(t) + (k === MH - 1 ? ' gb' : ''), lfo:k === MH - 1 ? 'vol:' + t : null}, ' ');
       L.push(ml);
     }
     const mn = fxCount(S.mfx);
@@ -30223,7 +30233,7 @@ function draw(){
     const mxc = c.y === 7 ? c.mx || 0 : -1, mo = S.mout == null ? 255 : S.mout;
     L.push([{t:'MASTER ', cls:'lb'}, {t:hx(S.master), cls:'v' + (mxc === 0 ? ' cur' : ''), x:0, y:7, title:'MASTER ' + dB(curve(S.master)) + ': the drive into the limiter'}, '  ', {t:mn ? 'FX ' + fxShort(S.mfx) : 'FX --', cls:mn ? 'cf' : 'e', title:mn ? 'Master FX: ' + fxList(S.mfx) : ''}, '  ',
       {t:'AUTO MASTER ' + (mstOn() ? 'ON' : 'OFF'), cls:'mstc' + (mstOn() ? ' on' : '') + (mxc === 1 ? ' cur' : ''), x:1, y:7}, '  ',
-      {t:'OUT ', cls:'lb', title:'Master OUT: the master fader, after the limiter (FF = 0 dB, no boost). Its bar is on the meter below'}, {t:hx(mo), cls:'v' + (mxc === 2 ? ' cur' : ''), x:2, y:7, title:'OUT ' + dB(curve(mo))}]);
+      {t:'OUT ', cls:'lb', title:'Master OUT: the master fader, after the limiter (FF = 0 dB, no boost). Its bar is on the meter below'}, {t:hx(mo), cls:'v' + (mxc === 2 ? ' cur' : ''), x:2, y:7, lfo:'vol:' + MT, title:'OUT ' + dB(curve(mo))}]);
     for (const ch of ['L', 'R']) L.push([{t:ch + '   ', cls:'lb'}, {t:'', cls:'mm m1'}, {t:'', cls:'mm m2'}, {t:'', cls:'mm m3'}, {t:'', cls:'mm e'}, ' ', {t:'', cls:'mm lb'}]);
   } else if (tv === 'mod'){
     // MOD: one LFO a row (TARGET, SHAPE, RATE, DEPTH); an empty row shows a dash target
@@ -30239,7 +30249,6 @@ function draw(){
     if (tv === 'project') sub = S.name;
     if (tv === 'fx'){ title = 'FX ' + fxWho(cFxT); const A = cFxT >= NT ? S.mfx : S.tfx[cFxT]; sub = fxList(A) || 'no effects'; }
     const RR = rowsOf(tv), lw = Math.max(12, ...RR.filter(r => !r.act).map(r => r.l.length + 1));   // labels like PLAY NOTE ON ENTRY ran into their values
-    const lfoOn = tv === 'fx' ? new Set(Object.values((S.perf && S.perf.lfo) || {}).flat().map(M => M.id)) : null;   // MOD: parameters an LFO moves get a ~
     var fxA = null, fxB = null;   // FX: the slot list (TRACK and the slots) is its own scrolling pane, the controls below it
     RR.forEach((r, y) => {
       if (tv === 'fx' && y === 0) fxA = L.length;
@@ -30249,13 +30258,13 @@ function draw(){
       else if (r.gap) L.push([]);
       if (r.act){ L.push([{t:r.l, cls:cc(0, y, 'act'), x:0, y}]); return; }
       const val = r.show ? r.show() : r.fmt ? r.fmt(r.get()) : (r.min < 0 ? sgn(r.get()) : hx(r.get()));
-      L.push([{t:lfoOn && r.lfo && lfoOn.has(r.lfo) ? r.l.padEnd(lw - 1) + '~' : r.l.padEnd(lw), cls:'lb' + (lfoOn && r.lfo && lfoOn.has(r.lfo) ? ' lfom' : ''), x:0, y}, {t:val, cls:cc(0, y, 'v'), x:0, y}]);
+      L.push([{t:r.l.padEnd(lw), cls:'lb', x:0, y, lfo:tv === 'fx' && r.lfo ? r.lfo : null}, {t:val, cls:cc(0, y, 'v'), x:0, y}]);
       // FX: the slot whose controls are shown is highlighted (owner, 2 Nov: "make it clearer what effect you are editing")
       if (tv === 'fx' && y >= 1 && y <= FXSLOTS && y - 1 === cFxS) L[L.length - 1].fxsel = true;
       if (tv === 'fx' && y === FXSLOTS) fxB = L.length;
     });
   }
-  const spanH = s => typeof s === 'string' ? s : `<span class="${s.cls || ''}"${s.x != null ? ` data-x="${s.x}" data-y="${s.y}"` : ''}${s.r != null ? ` data-r="${s.r}"` : ''}${s.title ? ` title="${esc(s.title)}"` : ''}${s.st ? ` style="${s.st}"` : ''}>${esc(s.t)}</span>`;
+  const spanH = s => typeof s === 'string' ? s : `<span class="${s.cls || ''}"${s.x != null ? ` data-x="${s.x}" data-y="${s.y}"` : ''}${s.r != null ? ` data-r="${s.r}"` : ''}${s.lfo ? ` data-lfo="${esc(s.lfo)}"` : ''}${s.title ? ` title="${esc(s.title)}"` : ''}${s.st ? ` style="${s.st}"` : ''}>${esc(s.t)}</span>`;
   const gl = L.map(ln => '<div class="ln' + (ln.b4 ? ' b4' : '') + (ln.wrap ? ' wrap' : '') + (ln.fxsel ? ' fxsel' : '') + '">' + ln.map(spanH).join('') + '</div>');
   if (tv === 'fx' && fxA != null && fxB != null){ gl.splice(fxB, 0, '</div><div class="ln fxcue"></div>'); gl.splice(fxA, 0, '<div class="fxpane">'); }
   const gh = gl.join('');
@@ -30263,6 +30272,7 @@ function draw(){
   if (tv === 'fx') fxPaneFit(rebuilt);   // unchanged screens (most redraws while playing) skip the rebuild
   pvBusFrame(rebuilt);
   modScSync(rebuilt);   // MOD: the LFO scopes (nothing on any other screen)
+  lfoMark();
   // The playing line: its row number lit, and the whole line inverted, like Arrange's playing blocks (owner, 19 Oct).
   litRows(prLit);
   if (tv === 'phrase' && pvActive()) pvPlayMark(tp.on ? tp.pos : null); else if (pvLit.size) pvPlayMark(null);   // PER-TRACK PLAYHEAD (Pattern view): only while playing (the gutter's mark keeps RESUME's stopped spot; the bands go on STOP)
@@ -31942,7 +31952,7 @@ function deckFxBar(){
         const selK = t + ':' + k + ':' + q.k; if (dkFbSel === selK) r.classList.add('sel');
         // PICKED VALUE (owner, 2 Nov): a click on a value (or its label) highlights the row, so you can see what you are editing
         r.addEventListener('pointerdown', () => { dkFbPick(r); dkFbFoc = true; bar.classList.add('kfoc'); });
-        r.dataset.sel = selK; r._fb = {t, k, i:D.ps.indexOf(q), q};
+        r.dataset.sel = selK; r._fb = {t, k, i:D.ps.indexOf(q), q}; { const li = tgtRowId(t, k, f, q); if (li) lb.dataset.lfo = li; }
         const show = x => q.names ? (q.names[x] ?? String(x)) : (q.tpl || q.band) ? q.fmt(x, getF()) : q.fmt(x);
         const set = x => { const g = getF(); if (!g) return; x = clamp(Math.round(x), q.min, q.max); if (x === g[q.k]) return; g[q.k] = x; if (isPumpT(g.type)) delete g.pname; fxChanged(mst ? NT : dkTrack()); v.textContent = show(x); };
         r._fbSet = d => { const g = getF(); if (g) set(g[q.k] + d); };
@@ -31987,7 +31997,7 @@ function deckFxBar(){
       ad.title = 'Add an effect in slot ' + (free[0] + 1) + ' (FX screen)'; ad.dataset.k = free[0]; ad.addEventListener('click', () => addFx()); bar.append(ad);
       if (free.length === FXSLOTS) bar.append(el('div', 'dkempty', 'NO EFFECTS ON ' + (mst ? 'THE MASTER' : 'TRACK ' + d2(t + 1)) + ' YET')); }   // EMPTY FX
   }
-  dkFbVals.forEach(fn => fn());
+  dkFbVals.forEach(fn => fn()); lfoMark(bar);
   // which slot the FX screen has open, outlined
   const cur = tv === 'fx' && cFxT === (mst ? NT : dkTrack()) ? cFxS : -1;
   for (const c of bar.children) c.classList.toggle('cur', +c.dataset.k === cur);
