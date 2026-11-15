@@ -73,7 +73,7 @@ and `unzip -l`): package `app.thunderplus.nativetest`, minSdk 29, target 35, nat
 | Test core: stopped = silence, hits land exactly on the core's own sample grid (24000 frames per quarter note at 120 bpm), clock events ten a second, echo, unknown commands refused, bulk put | CI (Linux, Windows, macOS: `ctest core_pattern`) | PASS |
 | APK assembles with the NDK, miniaudio AAudio backend, the core linked in | CI | PASS |
 | Installs on an Android 14+ device, the page loads, Play makes the click pattern audible (the plan's BrowserStack gate) | not run: no BrowserStack access in the build session | open |
-| Clock 1.00 s in 1.00 s, underruns, output latency (A6) | owner's device (`OWNER-TEST-N0.md`) | open |
+| Clock 1.00 s in 1.00 s, underruns, output latency (A6) | owner's device (`OWNER-TEST-N0.md`) | **PASS, 15 Nov** (table under A5) |
 
 Nothing was run on a device or emulator by the build session. The APK is untested at run time: expect the first install
 to show small shell bugs.
@@ -120,9 +120,17 @@ COPY RESULTS:**
 
 | Run (5 min) | ratio (s per s) | ppm | underruns | late | longest gap ms | longest callback ms | output latency ms | by ear | PASS |
 |---|---|---|---|---|---|---|---|---|---|
-| SCREEN ON | owner's device | | | | | | | | |
-| SCREEN OFF | owner's device | | | | | | | | |
-| BACKGROUND | owner's device | | | | | | | | |
+| SCREEN ON | 0.9999 | −107 | 0 | 0 | 33.1 | 1.82 | 26.2 | not reported | **PASS** |
+| SCREEN OFF | 1.0000 | −1 | 0 | 0 | 41.4 | 2.51 | 54.0 | not reported | **PASS** |
+| BACKGROUND | 1.0000 | −2 | 0 | 0 | 37.3 | 1.64 | 54.8 | not reported | **PASS** |
+
+**A6 done: the owner's runs, 15 Nov 2026, 11:03 to 11:20** (pasted from COPY RESULTS, with three screenshots). Samsung SM-F956U1 (Galaxy Z Fold 6), Android 17 (API 37), WebView 157.0.8103.50; 48000 Hz, burst 192 frames, buffer 1536 frames, shared, low-latency performance mode; release `native-n0-android-8`. Cross-check from the core's clock events: 299 s (audio 299.008 s, wall 299.008 s), 300 s (300.032 / 300.033), 299 s (299.008 / 299.009), ratio 1.00000 each, 0 underruns.
+
+**All three pass the gate (±1000 ppm, 0 underruns, 0 late).** Go or stop is the owner's decision. For N1, not failures:
+- **Output latency doubles with the screen off or the app in the background** (26 ms → 54 ms): Android moves the stream off the fast path there. Fine for playback; playing pads live happens with the screen on.
+- **Longest gap between callbacks is 33 to 41 ms** against a 4 ms burst and a 32 ms buffer, with no underrun counted: callbacks arrive in bunches. 26 ms with the screen on is not yet a low-latency figure for finger drumming; N1 should try a smaller buffer and exclusive mode and see whether the gaps then cost underruns.
+- The -107 ppm with the screen on is the first-seconds settling of the timestamps (the cross-check reads 1.00000), well inside the gate.
+- He did not say what he heard (the click pattern by ear), and the A4 bridge timings (Bridge test button) are still open.
 
 ## Stand-ins
 
