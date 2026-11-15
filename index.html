@@ -9068,32 +9068,45 @@ function setText(e, s){ s = String(s); const f = e.firstChild; if (f ? f.nodeTyp
 // to the row's range, snapped to the step a drag lands on, and applied through row.refresh() and the row's own handler, so it
 // behaves exactly like dragging its slider (undo, MOD / LFO targets and MIDI learn hang off that handler).
 // rowParse(d, txt): the value a typed text means for row definition d (clamped and snapped), or null when it holds no number.
-/* What a row stores per unit it shows (CR 137): read from the row's own readout, not tagged by hand. A time row prints "ms" or "s"
-   (some switch with size), a pitch row "Hz" or "kHz". Format a few known values, read the printed number and unit back, and
-   compare with the value: the ratio is the base unit (seconds / Hz) per stored unit, a power of ten. null when the readout prints
-   no such unit (then a typed ms / s / Hz / kHz is only a bare number, in the row's own units). */
-function rowUnit(d, fmt){
-  fmt = fmt || d.f; if (typeof fmt !== 'function') return null;
-  for (const x of [d.max, d.d, (d.min + d.max) / 2, d.min]){
-    if (!isFinite(x) || !x) continue;
-    let t; try { t = String(fmt(x)); } catch(_){ continue; }
-    const m = t.replace(',', '.').match(/(-?[0-9]*\.?[0-9]+)\s*(khz|hz|ms|s)\b/i); if (!m || !+m[1]) continue;
-    const u = m[2].toLowerCase(), k = u === 'ms' ? 0.001 : u === 'khz' ? 1000 : 1, r = Math.pow(10, Math.round(Math.log10(Math.abs(+m[1] * k / x))));
-    return {dim: u === 'ms' || u === 's' ? 't' : 'f', per: r};   /* per: seconds (Hz) per stored unit */
-  }
-  return null;
+/* The stored value whose readout says what was typed (CR 139). A time row prints "ms" or "s" (some switch with size), a pitch row
+   "Hz" or "kHz", and the readout can be any curve (a scale of 2, a square). So the row's own readout is inverted numerically: it is
+   read back (number and unit, as seconds or Hz) across the range; if that is one kind of unit and rises or falls steadily, the
+   stored value is bisected for the typed amount (the middle of the run of values that print the same, when the readout rounds).
+   Returns null when the readout is not of the typed kind or not steady: the typed number is then a bare number in the row's own
+   units. fmt is read now, so a readout that depends on outside state (a sample's length) is read as it is at the moment of typing. */
+function rowReadout(fmt, x){
+  let t; try { t = String(fmt(x)); } catch(_){ return null; }
+  const m = t.replace(',', '.').match(/(-?[0-9]*\.?[0-9]+)\s*(khz|hz|ms|s)\b/i); if (!m) return null;
+  const u = m[2].toLowerCase(); return {dim: u === 'ms' || u === 's' ? 't' : 'f', v: +m[1] * (u === 'ms' ? 0.001 : u === 'khz' ? 1000 : 1)};
+}
+function rowInvert(d, fmt, dim, target){
+  fmt = fmt || d.f; if (typeof fmt !== 'function' || !(d.max > d.min)) return null;
+  const rd = x => { const r = rowReadout(fmt, x); return r && r.dim === dim ? r.v : NaN; };
+  let up = 0, dn = 0, prev = NaN;
+  for (let i = 0; i <= 16; i++){ const y = rd(d.min + (d.max - d.min) * i / 16); if (isNaN(y)) return null; if (i){ if (y > prev) up++; else if (y < prev) dn++; } prev = y; }
+  if ((up && dn) || !(up || dn)) return null;
+  const inc = up > 0;
+  const plateau = t => {   /* the first and the last stored value whose readout reaches / has not passed t */
+    const ge = x => inc ? rd(x) >= t : rd(x) <= t, le = x => inc ? rd(x) <= t : rd(x) >= t; let lo = d.min, hi = d.max, first, last;
+    if (ge(lo)) first = lo; else if (!ge(hi)) first = hi; else { for (let i = 0; i < 60; i++){ const mid = (lo + hi) / 2; if (ge(mid)) hi = mid; else lo = mid; } first = hi; }
+    lo = d.min; hi = d.max;
+    if (le(hi)) last = hi; else if (!le(lo)) last = lo; else { for (let i = 0; i < 60; i++){ const mid = (lo + hi) / 2; if (le(mid)) lo = mid; else hi = mid; } last = lo; }
+    return [first, last]; };
+  let [f, l] = plateau(target);
+  if (f > l){ const a = rd(f), b = rd(l); [f, l] = plateau(Math.abs(a - target) <= Math.abs(b - target) ? a : b); }   /* the readout jumps over it (it rounds): the nearer printable value */
+  return (f + l) / 2;
 }
 function rowParse(d, txt, fmt){
   txt = String(txt == null ? '' : txt).trim().replace(',', '.').replace('−', '-');
   const m = txt.match(/[-+]?[0-9]*\.?[0-9]+([eE][-+]?[0-9]+)?/);
   const n = m ? parseFloat(m[0]) : NaN; if (isNaN(n)) return null;
-  const u = ((txt.slice(m.index + m[0].length).match(/[a-z%]+/i) || [''])[0]).toLowerCase(), q = /^(khz|hz|ms|s|sec)$/.test(u) ? rowUnit(d, fmt) : null;
+  const u = ((txt.slice(m.index + m[0].length).match(/[a-z%]+/i) || [''])[0]).toLowerCase(), tu = /^(ms|s|sec)$/.test(u), fu = /^k?hz$/.test(u);
+  const inv = tu || fu ? rowInvert(d, fmt, tu ? 't' : 'f', n * (u === 'ms' ? 0.001 : u === 'khz' ? 1000 : 1)) : null;   /* into the row's own unit, by its own readout */
   let v;
-  if (q && q.dim === 't' && (u === 'ms' || u === 's' || u === 'sec')) v = n * (u === 'ms' ? 0.001 : 1) / q.per;   /* into the row's own unit */
-  else if (q && q.dim === 'f' && (u === 'hz' || u === 'khz')) v = n * (u === 'khz' ? 1000 : 1) / q.per;
+  if (inv != null) v = inv;
   else if (u === '%') v = d.min === -36 && d.max === 6 ? d.min + n / 100 * (d.max - d.min) : n / 100 * pctBase(d);  /* an explicit % is "of the range" (the voice Level row's range starts at -36 dB) */
-  else if (u && !/^(khz|hz|ms|s|sec)$/.test(u)) v = n;  /* dB, st, semitones: the row's own units */
-  else if (!q && u === '' && d.max <= 1 && d.min === 0) v = n > 1 ? n / 100 : n;  /* bare number on a 0..1 row: 50 means 50% */
+  else if (u && !tu && !fu) v = n;  /* dB, st, semitones: the row's own units */
+  else if (u === '' && d.max <= 1 && d.min === 0) v = n > 1 ? n / 100 : n;  /* bare number on a 0..1 row: 50 means 50% */
   else if (u === '' && d.min === -36 && d.max === 6 && (n > 6 || n < -36)) v = d.min + (n / 100) * (d.max - d.min);  /* voice Level: 50 means halfway */
   else v = n;                                            /* a bare number, or a unit that does not fit this row: its own units */
   return Math.max(d.min, Math.min(d.max, snapDef(d, Math.max(d.min, Math.min(d.max, v)))));
