@@ -747,6 +747,21 @@ The owner's top priority to add is the MOD screen. Work down the list; ask befor
 
 Start a session by asking for results. Fix on `beta`. (10 Nov, 15:10: the web beta is build 560; the build numbers in the rest of this paragraph are older.) Web beta: https://matthettich.github.io/thunder-plus/beta/ (build 547 as of 10 Nov morning, 548 once its PR merges; the night of 9–10 Nov shipped 544–547, see the four "10 Nov" entries below. Decisions the lead made that night for the owner to confirm or reverse: on a phone the saved Sequencer default plays on the Page unless Audio thread is picked on that device; on a phone the safety limiter is its stand-in until another worklet loads; the resync only runs with a worklet loaded and its margins are untested on a device). Desktop: v1.3.4-beta.2 (build 541, no feed view or scopes); further desktop betas on hold until the owner asks.
 
+**Build 616** (LATENCY COMP AUTO)
+- [ ] **Computer, by ear:** a kick on one track; a second drum track fed into a bus that holds pump CALM and a synced 1/8 delay. Pass: bus and echoes are in time with the kick (before: the whole bus about 46 ms late). Switch CALM off and on: the timing does not move.
+- [ ] **Computer:** the first time you press PLAY with such an effect loaded. Pass: one notice names the effect and the track and says the other tracks now wait; it never comes back. Audio & MIDI shows LATENCY COMP: AUTO / ON / OFF.
+- [ ] **Computer, by ear:** with that song stopped, play a pad by hand: it answers at once. While the song plays the pad is about 46 ms late (it has to be, to line up). Say if that bothers you when playing along: ON / OFF are there, and the delay could be kept off live pads.
+- [ ] **Computer, by ear:** Step gate or Flex on the master with CALM on a track. Pass: the gate chops on the beat (it was early).
+- [ ] **Computer, by ear:** add and remove CALM on a track while the song plays, and press STOP and PLAY with a pad still ringing. Pass: no click (a short pitch wobble on what is ringing is expected). Say if PLAY with something ringing still ticks.
+- [ ] **Computer:** a song with no look-ahead effects. Pass: it sounds and renders exactly as before.
+
+**Build 615** (MONO TRACKS and POLY TRACKS)
+- [ ] **Computer:** Settings › Song › POLY TRACKS up one, then down one. Pass: the Arrange boxes follow (“POLY 09–17”, then “09–16”), a short “Hid track 17 (poly)” notice, no question.
+- [ ] **Computer (a COPY of a song):** MONO TRACKS down past a track with notes. Pass: it asks “Hide track 08 (mono)?”; Cancel changes nothing; Hide gives “MONO 01–07” and every poly track keeps its notes, mixer, effects and LFOs under its new number; Ctrl+Z puts both counts and every track back; raising MONO brings the hidden track back with its notes.
+- [ ] **Phone:** drag the MONO slider down past a track with notes. Pass: one question when you let go, not one per step.
+- [ ] **Computer:** try to take either count to 0, and the total above 24 with a voice per track (32 without). Pass: the row stops and its info line says why.
+- [ ] **Computer:** save an uneven song (say 4 mono, 12 poly), reopen it. Pass: the same split, the same notes.
+
 **Build 614** (Option+A and back; Option+▲▼ on every page)
 - [ ] **Mac:** on Phrase with a selection and Arrange beside it, Option+A, move around Arrange, Option+A again. Pass: the same screen, cell, selection and scroll as before. The same with Esc.
 - [ ] **Mac:** Option+A, open a block from Arrange (Option+▶), Option+A. Pass: it does not jump back to the old place; Arrange takes the keys again from the new one.
@@ -1307,6 +1322,29 @@ Suggested order: N0 → N1 → N2 (phone cured) → N4 with N3 alongside → N5 
   the edge `R.t0`, "waiting…" while armed), `rcdClk` / `rcdFmt` / `rcdFreeSecs`, a 250 ms timer only while recording; the
   final length stays until the next take. recorder-check covers FREE, PATTERN, Stop, next take and closing mid-take.
 
+
+## 14 Nov (LATENCY COMP: AUTO (a bus with a look-ahead effect stays on the beat); build 616)
+
+Owner, 14 Nov (21:36 to 22:13): a tempo-synced delay on a bus must stay in time when a look-ahead effect is on that bus; "build it!" with answers 1 yes (delay only while the song plays), 2 yes (people on OFF move to AUTO, with a notice), 3 yes (a switched-OFF effect still counts). An agent measured first and wrote the plan (`/home/claude/progress/LATENCY-AUTO-PLAN.md` in that session: renders, 44.1 kHz), the lead wrote the engine, an agent the setting and wording, and the first agent measured the result twice.
+- **What was measured before:** OFF: a bus with CALM (on or switched off) is 2048 samples late, a send's two copies 2048 apart, echoes of a 1/8 delay on that bus spaced right but 2048 late. ON: all on the sample; with no latency anywhere ON is sample-identical to OFF. Defects with ON: master Flex / Step gate / Retrigger ran T early (a gate that should close at 5713 closed at 3672); a clocked pump effect after CALM in one chain kept its old timing; `pdcSync` set `delayTime.value` (a click: step 0.205 on a sine against 0.031).
+- **Engine (lead):** `pdcModeOf()` (a function declaration: as a const it stopped the app loading, caught by the agent's browser run, not by the vm tests) reads `aset.pdcMode` ('auto' | 'on' | 'off'; an old `pdc` true = on, false or nothing = auto). `pdcPlan` returns `c` too: how late each track's input is (a bus: its latest source's arrival; the master: T). `pdcSync(now)`: live in auto and not playing, every delay is 0; live changes glide 50 ms; the call at PLAY (`tp` start and the first 'beat') takes 10 ms; STOP glides to 0 (also from `resetSeq`, for the page sequencer). Every effects node hears the beat clock through its own DelayNode (`n._cd` in `clockTo`, dropped in `fxDrop`), set from `c`. In ThunderFx a clocked pump slot's song position lags by the latency of the pump slots before it (`s.up`, set with the chain and with the latency report).
+- **Setting and wording (agent):** the AUTO / ON / OFF segment (`#segPdc`), saved as `pdcMode` plus the old boolean; reset = AUTO; `pdcNotice()` once per device when AUTO first delays something (flag `thunderplus-seen-pdc-auto`); `pumpLatTxt` and `pumpBusNote` by mode and by the effect's real latency; the scope, INST LIST blink, stage animation and FX pattern display add `moFxLat()`; README.
+- **Measured after (the tip):** the whole table on the sample in auto and on; master and bus Step gate at 5713; CALM then pump GATE aligned from the first kick; add CALM while playing: step 0.031 (the steady value); remove CALM / STOP: 0.060, a pitch wobble, no click; STOP: delays 0 on both sequencers; first notes after PLAY aligned; the notice once; T = 0 renders sample-identical to before.
+- **CodeRabbit on #150, fixed before the merge:** effect commands that set a node's parameters on a row (FXO, FLX, GAT, RTG: `fxc`) are booked as late as the node's input is, like its clock; stopped in AUTO, `moFxLat` leaves T out (the tracks are not delayed then). Not done: the same shift for values waiting in `fxcPend`, for FXV (`fxp` messages) and for commands the audio-thread sequencer delivers itself.
+- **Left / known:** PLAY with something still ringing through a track that is about to be delayed: a tick (step 0.44 with a 3 ms glide; now 10 ms, not re-measured). A JS clocked effect (Flex, Step gate, Retrigger) AFTER a latency pump effect in the same chain is not shifted (only pump effects are, by `s.up`). Side-chain key taps are taken before the delay (unmeasured). The notice names the track with the largest chain latency, which on a bus may not be the one that sets T. **Found on beta too, not from this:** after about 32 renders in one page session, renders come back silent (a limit on offline contexts?): to look into.
+- Tests: `tests/latency-auto-setting.test.js`, `tests/off-pump-latency.test.js` (the plan's `c`), `tests/perform.test.js`. Harness: `/home/claude/scratch/pdc2/` in that session (not in the repo).
+- **Also:** CodeRabbit on #149 (mono / poly rows): Hide applies only if the song is still the one the question was about; the Song sheet keeps keyboard focus on the row after it redraws.
+
+## 14 Nov (MONO TRACKS and POLY TRACKS in Settings; build 615)
+
+Mono / poly track counts, stage 3: the Settings rows. By an agent; reviewed by the lead. (Stages 1 and 2: build 611.)
+- **Rows:** MONO TRACKS ("8 mono") and POLY TRACKS ("8 poly") replace TRACKS: step 1, big 4, each at least 1 (the owner), total 8 to 32 (24 with a voice per track); the info lines end "Total 16 of 32" and say why a row stops at a limit.
+- **The owner's shrink rule:** the question ("Hide track 08 (mono)?", Hide / Cancel, all hidden tracks named) appears only when a track that would be hidden holds something (`tracksHiddenAll` / `trackHolds`); otherwise it just hides, with a brief notice. Nothing is deleted. The settings-sheet sliders apply on release (`late`), so a drag asks once.
+- **A refused grow** (the other kind's hidden tracks hold something) shows the reason and changes nothing; `setNtr` shows it too.
+- **CodeRabbit on #145:** a track that takes an over slot gets its own kind's stock voice (`voiceIsStock`: a voice the user made is kept), so a poly track cannot play the mono one-shot it inherited.
+- Help paragraph, README, MORE TRACKS, MIDI import and the 24-cap messages reworded.
+- Agent unsure: Ctrl+Z was checked by unit tests only, not in the real app.
+- `tests/mono-poly-settings.test.js` (8). Headless Chrome: the Arrange boxes follow; screenshots were in `/home/claude/scratch/`.
 
 ## 14 Nov (Option+A returns exactly where you were; Option+▲▼ steps patterns on Mixer, FX, MOD and INST; build 614)
 
