@@ -3244,7 +3244,7 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
       <h3>Engine</h3>
       <div class="segrow" title="Lowest answers the pads fastest; Safest uses a bigger buffer if you hear crackles. Changes when audio restarts"><span>Latency</span><div class="seg" id="segLat"></div></div>
       <div class="segrow" title="Device uses the output’s own rate. Changes when audio restarts"><span>Rate</span><div class="seg" id="segARate"></div></div>
-      <div class="audrow" title="Delays everything else so tracks with pump effects that look ahead (LIMIT, CALM, TONE, linear-phase EQ) stay in time. Off: those tracks play a little late. Renders follow this setting."><span>Latency comp</span><input type="checkbox" class="msw1" id="ckPdc" aria-label="Latency compensation"></div>
+      <div class="segrow" title="AUTO: lines every track up when an effect with look-ahead (CALM, TONE, LIMIT, TUNE, linear-phase EQ…) sits on a track or bus: the others wait for it while the song plays. Does nothing otherwise. Stopped, pads answer at once. ON: the same, also while stopped (pads feel later whenever such an effect is loaded). OFF: never: a track or bus with such an effect plays late. Renders follow this setting."><span>Latency comp</span><div class="seg" id="segPdc"></div></div>
       <div class="segrow" id="psLiveRow" hidden><span>Live engines</span><div class="seg" id="segPsLive"></div></div>
       <div class="segrow" id="coreRow" title="Where the song is sequenced. Audio thread: the steps are worked out on the audio thread and rendered pads play there, so a busy screen can’t make them late. Page: as before. On a phone or tablet it plays on the Page unless you pick Audio thread here, because loading it can slow the phone’s audio clock."><span>Sequencer</span><div class="seg" id="segCore"></div></div>
       <div class="segrow" id="noWkRow" title="For testing a phone whose audio clock runs fast. Off (test): track effects, chains, live engines and the audio-thread sequencer are silent or unused, and the safety limiter uses its simpler stand-in. Changes when the app reloads."><span>Worklets</span><div class="seg" id="segNoWk"></div></div>
@@ -8623,7 +8623,7 @@ function asetSave(){ try { localStorage.setItem(AUK, JSON.stringify(aset)); } ca
 // RESET AUDIO SETTINGS (10 Nov, owner: "reset any testing settings"): the defaults of Settings → Audio's saved fields, in one place. A field
 // with no default of its own (latPick, corePick, noWk) is removed, which is how the loaders read "default". Output, level, MIDI, input engines,
 // Link and the playhead offset are the owner's setup, not tests, so they are not here. Used by the Reset audio settings button.
-function audResetAset(a){ a.lat = 'interactive'; a.rate = 0; a.pdc = false; a.psLive = 'auto'; a.core = 'core'; delete a.latPick; delete a.corePick; delete a.noWk; return a; }
+function audResetAset(a){ a.lat = 'interactive'; a.rate = 0; a.pdc = false; a.pdcMode = 'auto'; a.psLive = 'auto'; a.core = 'core'; delete a.latPick; delete a.corePick; delete a.noWk; return a; }
 const psLive = {off:false, strikes:0};   // …PUMP SYNTHS live: the safety net's switch for this visit (see psFallback)
 let aLive = null; // the latency and rate the running context was made with
 
@@ -14796,10 +14796,32 @@ $('audLvl').addEventListener('input', e => {
 });
 $('audLvl').addEventListener('change', asetSave);
 const updLat = makeSeg($('segLat'), [['interactive', 'Lowest'], ['balanced', 'Balanced'], ['playback', 'Safest']], () => latOf(), v => { aset.lat = v; aset.latPick = true; asetSave(); audRestartRow(); });
-// LATENCY COMPENSATION (owner, 1 Nov): this device's choice, off by default; the live player re-times at once.
+// LATENCY COMPENSATION (owner, 1 Nov): this device's choice (AUTO by default since build 615); the live player re-times at once.
 // (3 Nov, ports table pass: a switch, not an Off / On pair; makeCk is makeSeg for one checkbox.)
-const updPdc = makeCk($('ckPdc'), () => !!aset.pdc, v => { aset.pdc = !!v; asetSave(); try { if (rt && rt.pl) rt.pl.pdcSync(); } catch(e){}
-  const T = pdcPlan(48000).T; toast(v ? (T > 0 ? `Latency compensation on: every track waits ${Math.round(T * 1000)} ms to line up with the slowest one` : 'Latency compensation on. No track has latency right now.') : 'Latency compensation off', 2600); });
+/* (14 Nov, build 615) three values: aset.pdcMode 'auto' (the default) | 'on' | 'off'; pdc (the old boolean) is still written, as pdcMode === 'on', for an older build. */
+const PDC_HELP = {auto:'AUTO: lines every track up when an effect with look-ahead (CALM, TONE, LIMIT, TUNE, linear-phase EQ…) sits on a track or bus: the others wait for it while the song plays. Does nothing otherwise. Stopped, pads answer at once.',
+  on:'ON: the same, also while stopped (pads feel later whenever such an effect is loaded).', off:'OFF: never: a track or bus with such an effect plays late.'};
+function pdcSet(v){ aset.pdcMode = v === 'on' || v === 'off' ? v : 'auto'; aset.pdc = aset.pdcMode === 'on'; asetSave(); moFxAt = -1e9;
+  try { if (rt && rt.pl) rt.pl.pdcSync(); } catch(e){}
+  let T = 0; try { T = pdcPlan(ctx ? ctx.sampleRate : 48000).T; } catch(e){}
+  const ms = Math.round(T * 1000), m = aset.pdcMode;
+  toast(m === 'auto' ? (T > 0 ? `Latency comp AUTO: the other tracks wait ${ms} ms while the song plays, to line up with the slowest one` : 'Latency comp AUTO: lines tracks up only when an effect has look-ahead. None does right now.')
+    : m === 'on' ? (T > 0 ? `Latency comp ON: every track waits ${ms} ms to line up with the slowest one, also while stopped` : 'Latency comp ON. No track has latency right now.')
+    : 'Latency comp OFF: a track or bus with a look-ahead effect plays late', 3200);
+  pdcNotice(); }
+const updPdc = makeSeg($('segPdc'), [['auto', 'AUTO'], ['on', 'ON'], ['off', 'OFF']], () => pdcModeOf(), pdcSet);
+/* THE ONE-TIME NOTICE (owner, 14 Nov: people who had it OFF now get AUTO, so say so once): the first time on this device that AUTO
+   really delays something (T > 0), as an effect is added, PLAY starts or the setting changes: one toast, never in a render. */
+function pdcWho(sr){ let w = null;
+  for (let t = 0; t < NT; t++) for (const f of (S.tfx && S.tfx[t]) || []){ const l = pumpSlotLat(f, sr); if (l > 0 && (!w || l > w.l)) w = {t, f, l}; }
+  return w; }
+function pdcNotice(){
+  if (rendering || pdcModeOf() !== 'auto') return;
+  const K = 'thunderplus-seen-pdc-auto'; try { if (localStorage.getItem(K)) return; } catch(e){ return; }
+  const sr = ctx ? ctx.sampleRate : 48000; let T = 0; try { T = pdcPlan(sr).T; } catch(e){}
+  if (!(T > 0)) return;
+  const w = pdcWho(sr), ms = x => Math.round(x * 1000), ps = w && TFX[w.f.type] && pumpFx(TFX[w.f.type].pump), nm = ps && ps.name ? String(ps.name).toUpperCase() : 'An effect';
+  toastOnce('pdc-auto', (w ? `${nm} on track ${w.t + 1} looks ${ms(w.l / sr)} ms ahead, so the other tracks now wait ${ms(T)} ms` : `An effect with look-ahead makes the other tracks wait ${ms(T)} ms`) + ' while the song plays, to stay in time. Audio & MIDI › LATENCY COMP turns this off.', 9000); }
 const updARate = makeSeg($('segARate'), [[0, 'Device'], [44100, '44.1k'], [48000, '48k']], () => aset.rate, v => { aset.rate = v; asetSave(); audRestartRow(); });
 /* …PUMP SYNTHS LIVE (owner, 26 Oct), for this device: AUTO plays Mono live, Poly live and Coil live live, with the safety net
    (their renders when the device can't keep up); RENDERED always plays their renders, the same values' sound, which is
@@ -19240,16 +19262,20 @@ function pumpRowInfo(t, k, q){
   const type = TFX[f.type].pump, p = pumpFx(type).params[pumpIdx[type][pumpSymOf(q, f)]];
   return p ? ' (' + p.n + ' = ' + pumpFmt(p, f.pump[p.s]) + ')' : '';
 }
-// A toast's note when a pump effect goes on a bus: its latency isn't compensated.
-const pumpBusNote = type => ['calm', 'tone', 'limit'].includes(type) ? '. It delays this bus (see OPEN’s note): fine on the master, on a bus it plays late against the other tracks' : '';
+// A toast's note when a pump effect with latency (pumpLatencyOf > 0: CALM, TONE, LIMIT, TUNE, CRUSH, MASTER, TUBE, STRIP, HEAT, linear-phase EQ…)
+// goes on a bus or track, worded by LATENCY COMP: AUTO / ON: the others wait; OFF: it plays late.
+const pumpBusNote = (type, f) => { let v = 0; try { v = pumpLatencyOf(f || {type, pump:{}}, ctx ? ctx.sampleRate : 48000); } catch(e){}
+  if (!(v > 0)) return ''; const ms = Math.round(v / (ctx ? ctx.sampleRate : 48000) * 1000), m = pdcModeOf();
+  return m === 'off' ? '. It delays this bus (see OPEN’s note): fine on the master, on a bus it plays late against the other tracks. Audio & MIDI › LATENCY COMP lines it up' : `. It looks ${ms} ms ahead: the other tracks will wait ${ms} ms` + (m === 'auto' ? ' while the song plays' : ''); };
 const pumpSyncT = t => { const A = t >= NT ? S.mfx : (S.tfx && S.tfx[t]); (A || []).forEach(f => { if (f && isPumpT(f.type)) pumpSync(f); }); };
-// What the FX screen says about a pump slot's latency (nothing compensates it: on a bus it plays late against the rest).
+// What the FX screen says about a pump slot's latency (LATENCY COMP AUTO / ON: the others wait; OFF: on a bus it plays late against the rest).
 function pumpLatTxt(t, k){
   const v = PumpFX.latency(t, k), sr = ctx ? ctx.sampleRate : 48000;
   if (v == null) return '';
   if (!v) return 'no latency';
   const ms = (v / sr * 1000).toFixed(v / sr < 0.01 ? 1 : 0) + ' ms';
-  return t >= NT ? 'latency ' + ms + ' (the whole mix moves; nothing to line up)' : 'latency ' + ms + ': this bus plays that much late against the other tracks (not compensated)';
+  if (t >= NT) return 'latency ' + ms + ' (the whole mix moves; nothing to line up)';
+  return pdcModeOf() === 'off' ? 'latency ' + ms + ': this bus plays that much late against the other tracks (not compensated). Audio & MIDI › LATENCY COMP lines it up' : 'latency ' + ms + ': the other tracks wait for it (LATENCY COMP)';
 }
 // The track effects in their groups (the pad list's: FX_GROUPS, MODFX.group or FX_GROUP), the everyday ones first in
 // each group (FXT_FIRST), then the rest in the old order. The slot picker shows the group names as headings; a slot
@@ -22941,7 +22967,7 @@ function rtFx(t){
   else if (rt.mfx){ rt.mfx.port.postMessage(null); try { rt.mfx.disconnect(); } catch(e){} rt.mfx = null; rt.pl.setMfx(null); rtRoute(); }
 }
 function rtAllFx(){ for (let t = 0; t <= NT; t++) rtFx(t); }
-function fxChanged(t){ pumpSyncT(t); saveS(); rtFx(t); try { PumpFX._notify(t, 'fx'); } catch(e){} }
+function fxChanged(t){ pumpSyncT(t); saveS(); rtFx(t); try { PumpFX._notify(t, 'fx'); } catch(e){} try { pdcNotice(); } catch(e){} }
 /* MOVE AN EFFECT (owner, 2 Nov: drag an effect to another slot, in the bottom bar or on the FX screen): the effect leaves
    slot `from` and goes in at slot `to`; the ones between shift over a slot, as in a DAW's chain. One undo step. */
 function fxMove(t, from, to){
@@ -23111,6 +23137,7 @@ function tStart(mode, o){
   if ([...S.tfx, S.mfx].some(A => (A || []).some(f => f && f.on && f.type === 'tgate'))){ fxRestartN++; rtAllFx(); }
   Object.assign(tp, {on:true, mode, seq, q:[], pos:null, snd:null, bpm:seq.bpm, tks:seq.tks, st:0, loopV:o.loop ? o.loop.v : '', row0:mode === 'song' ? (o.row | 0) : 0, t0:t0start, lenTot:null, lenPre:0, hiRow:null});
   try { if (rt && rt.pl) rt.pl.pdcSync(true); } catch(e){}   // LATENCY COMP AUTO: the delays come in with PLAY (before its first note sounds)
+  try { pdcNotice(); } catch(e){}
   if (rsFirst){   // RESUME: the effect commands passed on the way, then the step it stopped on, now
     for (const e of rsFx.values()) rt.pl.play(Object.assign({}, e, {t:t0start}));
     const d = t0start - rsFirst.t;
@@ -26608,7 +26635,7 @@ function fxsChoose(s, k){
   fxpClose(); const t = cFxT, A = t >= NT ? S.mfx : S.tfx[t], had = A[s];
   if (!k){ fxSwap(t, s, A, null); cFxS = s; cs.fx.y = s + 1; fxChanged(t); saveS(); draw(); if (had) toast(`Slot ${s + 1} emptied.`); return; }
   const type = (fxp.types && fxp.types[k]) || fxtL(t)[k - 1];
-  if (!had || had.type !== type){ fxSwap(t, s, A, type); fxChanged(t); saveS(); toast(`Slot ${s + 1}: ${TFX[type].long}` + (isPumpT(type) && t < NT ? pumpBusNote(type) : '')); }
+  if (!had || had.type !== type){ fxSwap(t, s, A, type); fxChanged(t); saveS(); toast(`Slot ${s + 1}: ${TFX[type].long}` + (isPumpT(type) && t < NT ? pumpBusNote(type, S.tfx[t] && S.tfx[t][s]) : '')); }
   lastFxType = type; cFxS = s; cs.fx.y = FXSLOTS + 1; draw();
 }
 // The pad's buttons while the list is open. Returns true when it used the press.
