@@ -17,7 +17,7 @@ function page(o = {}){
     toast:(m, ms) => toasts.push(m), moFxAt:5, rt:null, pdcNotice:null, saved:null});
   c.toasts = toasts; c.store = store;
   c.toastOnce = (key, msg, ms) => { const K = 'thunderplus-seen-' + key; if (store[K]) return; store[K] = '1'; toasts.push(msg); };
-  vm.runInContext(cut(/const pdcModeOf = [^\n]*\n/, 'pdcModeOf'), c);
+  vm.runInContext(cut(/function pdcModeOf\(\)\{[^\n]*\n/, 'pdcModeOf'), c);
   vm.runInContext(cut(/const PDC_HELP = [\s\S]*?\n  on:[^\n]*\n/, 'PDC_HELP'), c);
   vm.runInContext(cut(/function pdcSet\(v\)\{[\s\S]*?\n  pdcNotice\(\); \}\n/, 'pdcSet'), c);
   vm.runInContext(cut(/function pdcWho\(sr\)\{[\s\S]*?\n  return w; \}\n/, 'pdcWho') + cut(/function pdcNotice\(\)\{[\s\S]*?\n  toastOnce\([^\n]*\n/, 'pdcNotice'), c);
@@ -93,4 +93,10 @@ test('the notice is wired to effect changes and PLAY, and the displays add the c
   assert.match(src, /function fxChanged\(t\)\{[^\n]*pdcNotice\(\)/); assert.match(src, /pdcSync\(true\); \} catch\(e\)\{\}[^\n]*\n  try \{ pdcNotice\(\); \}/);
   assert.ok(!/function render[^\n]*pdcNotice/.test(src));
   assert.equal((src.match(/heardLat\(\) \+ moFxLat\(\)|heardLat\(\) - moFxLat\(\)/g) || []).length >= 5, true);
+});
+
+// The app must start: the Audio & MIDI control reads pdcModeOf() while the page loads, long before the line it is written on.
+test('pdcModeOf is a function declaration (a const further down the file stopped the app from loading)', () => {
+  const src = require('./helpers').read('index.html');
+  assert.match(src, /\nfunction pdcModeOf\(\)\{/); assert.doesNotMatch(src, /const pdcModeOf\s*=/);
 });
