@@ -14002,8 +14002,9 @@ function kitFromJSON(j){
 // Existing voices are never touched.
 // A new track's voice (a voice per track): mono tracks get a drum one-shot (a copy of the factory Kick's voice, renamed
 // for the track), poly tracks a simple held saw synth.
-function trackVoice(t){
-  if (isPolyT(t)) return mkVoice('Synth T' + d2(t + 1), [{type:'saw', mode:'ADSR', atk:2, dec:400, sus:0.7, rel:200, level:0.8}], {tune:24, len:6, gate:400, tail:2});
+function trackVoice(t){ return trackVoiceOf(t, isPolyT(t)); }
+function trackVoiceOf(t, poly){
+  if (poly) return mkVoice('Synth T' + d2(t + 1), [{type:'saw', mode:'ADSR', atk:2, dec:400, sus:0.7, rel:200, level:0.8}], {tune:24, len:6, gate:400, tail:2});
   const kv = voiceFromJSON(JSON.parse(JSON.stringify(voiceToJSON(factoryKit().voices[0])))); kv.name = 'Drums T' + d2(t + 1); return kv;
 }
 function growKit(){
@@ -20143,7 +20144,8 @@ const freshPhrase = () => Array.from({length:PROWS}, blankRow);
 // The first half of the song's tracks play one note at a time (mono); the second half are polyphonic. With an odd
 // count the mono half gets the extra track. 16 tracks: 1–8 mono, 9–16 poly; 32 tracks: 1–16 mono, 17–32 poly.
 // (ntr() lives with the song state below; these arrows only call it after everything is initialized.)
-const polyFrom = () => Math.ceil(ntr() / 2), isPolyT = t => t >= polyFrom() && t < NT;
+/* MONO / POLY COUNTS (14 Nov): S.nmono, when the song has one, is the number of mono tracks (kept within 1..ntr-1: at least one of each kind); without it the mono half gets the extra track, as before. */
+const polyFrom = () => { const n = ntr(), m = S.nmono; return m >= 1 ? Math.min(m | 0, n - 1) : Math.ceil(n / 2); }, isPolyT = t => t >= polyFrom() && t < NT;
 // BUS (owner, 21 Oct): a track other tracks play through (a chains Chain Out set to it) looks a little darker on every
 // screen and says BUS, so it isn't mistaken for a track to program (its own notes still play).
 const isBusT = t => t >= 0 && t < NT && busPlan().feeds.has(t);
@@ -20274,6 +20276,15 @@ function scMigrate(j){
   if (Array.isArray(j.tfx)) j.tfx.forEach(slots); slots(j.mfx);
   if (used && scT.length) scConv = {t:scT[0], n:scT.length};
 }
+// MONO / POLY COUNTS (14 Nov): the song's own split, read from a saved song j into Sx (after Sx.ntr is set). nmono: how many tracks are mono, 1..ntr-1;
+// written only when it differs from the half rule (the mono half gets the extra track), so a song on the half rule loads and saves exactly as before.
+// hmono: how many of the parked slots (past ntr) are hidden MONO tracks (the rest are poly; mono first), 0..NT-ntr; absent = a song from before this, whose parked kinds are the OLD ones (ntrPlan).
+function normSplit(j, Sx){
+  delete Sx.nmono; delete Sx.hmono;
+  const num = v => v != null && v !== '' && Number.isFinite(+v) ? Math.round(+v) : null, n = Sx.ntr, m = num(j.nmono), h = num(j.hmono);
+  if (m != null){ const c = clamp(m, 1, n - 1); if (c !== Math.ceil(n / 2)) Sx.nmono = c; }
+  if (h != null) Sx.hmono = clamp(h, 0, NT - n);
+}
 function normSong(j){
   const S = freshSong(); if (!j || typeof j !== 'object') return S;
   try { scMigrate(j); } catch(e){}
@@ -20360,6 +20371,7 @@ function normSong(j){
 // Voice-per-track parity: one synth voice per song track. ntr caps at 24, because 24 tracks need pads
 // 8–31: exactly 32 voices.
   S.ntr = clamp(int(j.ntr, 16), 8, vtrk ? 24 : NT);   // 32 with the shared voices; 24 with a voice per track (32 voices)
+  normSplit(j, S);   // MONO / POLY COUNTS: nmono and hmono, only when the song has an uneven split
   // Microtuning: cents per pitch class, clamped to ±100 (a semitone).
   S.tune = Array.from({length:12}, (_, k) => clamp(Number.isFinite(+((j.tune || [])[k])) ? +j.tune[k] : 0, -100, 100));
   S.presets = normPresets(j.presets);
@@ -23411,7 +23423,7 @@ function padBlink(e){
 // Phones and tablets (10 Nov): the audio-thread sequencer's module (a second thread) loads only when the owner picked it there
 // (aset.corePick, set in Settings); the saved default 'core' plays on the Page sequencer on such a device.
 function coreWanted(){ return aset.core === 'core' && (!wkLazy() || !!aset.corePick); }   // (a declaration: the Settings row reads it at load)
-const CORE_REV = '1x2bbb6';
+const CORE_REV = '1skz324';
 const CORE_WANT = 7;   // the core's message set this page speaks (core-processor.js CORE_V); an older core is not used
 const CORE_URL = () => 'core/seq-core.js?v=' + BUILD + '-' + CORE_REV;
 const core = {node:null, ready:false, loading:null, gen:0, sent:new Map(), sT:0, tally:new Map(), mir:null};   // mir: what the core's song holds, as JSON per part (coreDiff)   // tally: events by who played them (test hook)
@@ -25002,7 +25014,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 610;
+const BUILD = 611;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD + (location.pathname.includes('/beta/') ? ' · beta' : '');
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -25257,7 +25269,7 @@ const voiceForTrack = t => vtrk ? NPAD + t : t % NSLOT;
 // back brings it back where it was. Everything that names a track by its number follows it: the song's columns and mutes,
 // the mixer, track FX, chains (its Track In / Chain Out and SOURCE picks), FX SOURCE picks and, with a voice per track,
 // the track's voice.
-function ntrPerm(n0, n1){
+function ntrPermOld(n0, n1){   /* the half-and-half rule, kept as it was: songs without hmono still restore their parked tracks the way it did (ntrPlan) */
   const m0 = Math.ceil(n0 / 2), m1 = Math.ceil(n1 / 2), p1 = n1 - m1, mono = [], poly = [], spare = [];
   for (let t = 0; t < m0; t++) (t < m1 ? mono : spare).push(t);
   for (let t = m0; t < n0; t++) (t - m0 < p1 ? poly : spare).push(t);
@@ -25267,6 +25279,84 @@ function ntrPerm(n0, n1){
   while (poly.length < p1) poly.push(take());
   const P = mono.concat(poly, spare, free.slice(k));   // P[new] = old
   return P.length === NT ? P : null;
+}
+// MONO / POLY COUNTS (14 Nov, docs/MONO-POLY-PLAN.md). The parked slots (n0..NT-1) are two ordered runs: hidden MONO tracks first, hidden POLY tracks after (S.hmono = how many are mono).
+// A song without hmono keeps the OLD layout: which parked slot is which kind is what ntrPermOld hands out growing one track at a time (an even total adds a mono track, an odd one a poly track).
+function legacyParkedMono(n0){
+  const k = []; for (let n = n0; n < NT; n++){ const P = ntrPermOld(n, n + 1); k.push(!!P && P.indexOf(n) < Math.ceil((n + 1) / 2)); }
+  return k;
+}
+// ntrPlan(n0, m0, n1, m1, h0, holds): total and mono count before and after, h0 = hidden mono tracks now (null / undefined: an old song). Returns {P, h1, over} or null.
+// P[new] = old over all NT slots: visible mono, visible poly, parked mono, parked poly. h1: hidden mono tracks after (null: the old layout is kept). over: [{t, mono}] parked slots of the OTHER kind
+// that a growing count had to take because its own kind had none hidden (t: the old slot, mono: the kind that takes it); holds(t) (optional) lets it pick empty ones first.
+// A shrinking kind parks its LAST tracks at the front of its parked run, so growing takes the most recently hidden one first. Both counts on the half rule and no hmono: exactly ntrPermOld.
+function ntrPlan(n0, m0, n1, m1, h0, holds){
+  const half = n => Math.ceil(n / 2);
+  if (h0 == null && m0 === half(n0) && m1 === half(n1)){ const P = ntrPermOld(n0, n1); return P ? {P, h1:null, over:[]} : null; }
+  const parked = []; for (let t = n0; t < NT; t++) parked.push(t);
+  let mr, pr;
+  if (h0 == null){ const k = legacyParkedMono(n0); mr = parked.filter((t, i) => k[i]); pr = parked.filter((t, i) => !k[i]); }
+  else { const h = clamp(h0 | 0, 0, parked.length); mr = parked.slice(0, h); pr = parked.slice(h); }
+  const vm = [], vp = [], p1 = n1 - m1; for (let t = 0; t < n0; t++) (t < m0 ? vm : vp).push(t);
+  if (m1 < vm.length) mr = vm.splice(m1).concat(mr);
+  if (p1 < vp.length) pr = vp.splice(p1).concat(pr);
+  vm.push(...mr.splice(0, Math.max(0, m1 - vm.length))); vp.push(...pr.splice(0, Math.max(0, p1 - vp.length)));
+  const over = [], pick = (run, mono) => { let i = run.length - 1; if (holds) while (i > 0 && holds(run[i])) i--; const t = run.splice(i, 1)[0]; over.push({t, mono}); return t; };
+  while (vm.length < m1 && pr.length) vm.push(pick(pr, true));
+  while (vp.length < p1 && mr.length) vp.push(pick(mr, false));
+  const P = vm.concat(vp, mr, pr);
+  return P.length === NT && vm.length === m1 && vp.length === p1 ? {P, h1:mr.length, over} : null;
+}
+const ntrPerm = (n0, m0, n1, m1, h0, holds) => { const r = ntrPlan(n0, m0, n1, m1, h0, holds); return r ? r.P : null; };
+// Does slot t of song Sx hold anything the person made? Notes in any song row's phrases (through its chains), a non-default mixer strip, effects, a chain, a voice of its own (a voice per track),
+// Perform data (LFOs, locks, scene / macro targets, parts naming it), or another track pointing at it (a side-chain source, a Track In / Chain Out / SCIN pick). An empty one may be overwritten.
+function trackHolds(Sx, t){
+  if (!Sx || !(t >= 0 && t < NT)) return false;
+  const m = Sx.mix && Sx.mix[t], d = freshMix(); if (m) for (const k in d) if (m[k] != null && m[k] !== d[k]) return true;
+  for (const r of Sx.song || []){ const cid = r ? r[t] : -1; if (cid >= 0){ const ch = Sx.chains && Sx.chains[cid]; if (ch) for (const q of ch){ const p = q && q[0] >= 0 ? Sx.phrases[q[0]] : null; if (p && p.some(w => w.some(v => v >= 0))) return true; } } }
+  if ((Sx.tfx && Sx.tfx[t] || []).some(f => f) || (Sx.chainOn && Sx.chainOn[t])) return true;
+  const at = id => { if (typeof id !== 'string') return false; const a = id.split(':'); return a[1] !== '' && +a[1] === t; }, pf = Sx.perf;
+  if (pf){
+    for (const sc of pf.sc || []) if (sc && sc.v) for (const k in sc.v) if (at(k)) return true;
+    for (const mc of pf.mac || []) if (mc && mc.tg) for (const g of mc.tg) if (g && at(g.id)) return true;
+    if (pf.lk){ if ((pf.lk[t] || []).some(x => x)) return true; for (const k in pf.lk) if (Array.isArray(pf.lk[k]) && pf.lk[k].some(at)) return true; }
+    if (pf.lfo){ if ((pf.lfo[t] || []).length) return true; for (const k in pf.lfo) if (Array.isArray(pf.lfo[k]) && pf.lfo[k].some(L => L && at(L.id))) return true; }
+  }
+  const sc = f => f && f.sck != null && sckTrack(f.sck) === t;
+  for (const p of Sx.parts || []) if (p){
+    const pm = Array.isArray(p.mix) ? p.mix[t] : null; if (pm && (pm[0] !== 224 || pm[1] !== 128)) return true;
+    if (p.fx) for (const k in p.fx) if (p.fx[k] && (+k.split(':')[0] === t || (u => u !== t && sc(p.fx[k]))(+k.split(':')[0]))) return true;
+  }
+  if ((Sx.mfx || []).some(sc)) return true;
+  for (let u = 0; u < NT; u++) if (u !== t && ((Sx.tfx && Sx.tfx[u]) || []).some(sc)) return true;
+  const pd = Sx.chainPatch;
+  if (pd && Array.isArray(pd.modules)) for (const mo of pd.modules){ const q = mo && mo.params; if (!q) continue;
+    if ((mo.type === 'trackIn' || mo.type === 'chainOut') && +q.track === t + 1) return true;
+    if (q.sck != null && sckTrack(q.sck) === t) return true;
+    if (mo.type === 'scin' && +q.src === t + 1) return true; }
+  try { if (vtrk && typeof kit !== 'undefined' && kit && kit.voices && kit.voices[NPAD + t]){   /* a voice per track: its own once it is not the stock one of either kind */
+    const nj = v => { const j = voiceToJSON(v); j.name = ''; return JSON.stringify(j); }, mine = nj(kit.voices[NPAD + t]);
+    if (![false, true].some(po => nj(trackVoiceOf(t, po)) === mine)) return true; } } catch(e){ return true; }
+  return false;
+}
+// The visible tracks that going to `mono` mono and `poly` poly tracks would hide AND that hold something (for "ask first only if something is in it"): their numbers, from 0.
+function tracksHiddenBy(mono, poly, Sx = S){
+  const n0 = Sx.ntr || 16, m0 = polyFrom(), out = [];
+  for (let t = Math.max(0, mono); t < m0; t++) out.push(t);
+  for (let t = m0 + Math.max(0, poly); t < n0; t++) out.push(t);
+  return out.filter(t => trackHolds(Sx, t));
+}
+// Can the song go to `mono` / `poly`? {why:''} = yes (with n0, m0, n1 and the plan), else why = the reason in plain English. A count may not grow into hidden tracks of the OTHER kind that hold something.
+function tracksCheck(mono, poly, Sx = S){
+  const most = vtrk ? 24 : NT, n0 = Sx.ntr || 16, m0 = polyFrom();
+  if (!(mono >= 1) || !(poly >= 1)) return {why:'There must be at least one MONO track and one POLY track.'};
+  if (mono + poly < 8 || mono + poly > most) return {why:`The song needs 8 to ${most} tracks in all${vtrk && most < NT ? ' (a voice per track allows 24)' : ''}.`};
+  const plan = ntrPlan(n0, m0, mono + poly, mono, Sx.hmono, t => trackHolds(Sx, t));
+  if (!plan) return {why:'Could not work out where the tracks go.'};
+  const bad = plan.over.filter(o => trackHolds(Sx, o.t));
+  if (bad.length){ const k = bad[0].mono ? 'MONO' : 'POLY', o = bad[0].mono ? 'poly' : 'mono', many = bad.length > 1;
+    return {why:`${bad.length} hidden ${o} track${many ? 's' : ''} (${bad.map(b => d2(b.t + 1)).join(', ')}) still hold${many ? '' : 's'} something, so ${k} cannot grow into ${many ? 'them' : 'it'}. Clear ${many ? 'them' : 'it'} first, or lower ${k === 'MONO' ? 'POLY' : 'MONO'}.`}; }
+  return {why:'', n0, m0, n1:mono + poly, plan};
 }
 // PERFORM follows the tracks too (owner, 14 Nov: two new tracks left his LFOs on the old numbers). Every target id, lock and LFO
 // names a track by number, so each one is renamed with tN. A number from the master (MT = NT) up stays: that is the master.
@@ -25309,21 +25399,33 @@ function ntrRemap(P){
     return tN; }
   return tN;
 }
-function setNtr(v){
-  const n0 = ntr(), n1 = clamp(v, 8, vtrk ? 24 : NT);
+// setTracks(mono, poly): the song gets `mono` mono and `poly` poly tracks (each at least 1; 8 to 24 / 32 in all). One undo step (everything below is one saveS). Returns {why, tN}: why is '' when it was done,
+// else the reason it was refused (nothing changed; the Settings rows show it); tN maps an old track number to its new one. Nothing is ever deleted: a count that shrinks parks its last tracks (ntrPlan), and
+// one that grows takes its own kind back first; it may not take a hidden track of the other kind that holds something (tracksCheck). S.nmono / S.hmono are stored only when the split needs them.
+function setTracks(mono, poly){
+  mono = Math.round(+mono); poly = Math.round(+poly);
+  const ck = tracksCheck(mono, poly); if (ck.why) return {why:ck.why, tN:x => x};
+  const n0 = ck.n0, m0 = ck.m0, n1 = ck.n1, m1 = mono;
   let tOut = null;   // (MORE TRACKS, 4 Nov: the old → new track numbers, for dupTrack)
-  if (n1 !== n0){ const P = ntrPerm(n0, n1); if (P){ const tN = ntrRemap(P); tOut = tN; cTrack = tN(cTrack); if (cs.song.x !== MT) cs.song.x = tN(cs.song.x); cs.mixer.x = tN(cs.mixer.x); if (cFxT < NT) cFxT = tN(cFxT); tp.paused = null; busPlanH = null;
+  if (n1 !== n0 || m1 !== m0){ const P = ck.plan.P; { const tN = ntrRemap(P); tOut = tN; cTrack = tN(cTrack); if (cs.song.x !== MT) cs.song.x = tN(cs.song.x); cs.mixer.x = tN(cs.mixer.x); if (cFxT < NT) cFxT = tN(cFxT); tp.paused = null; busPlanH = null;
     // the sound follows the tracks (owner, 31 Oct: a new track kept the delay of the track that had been at its number)
     if (rt){ try { rt.pl.buses.forEach(b => { if (b && b.chn) b.chn._sent = null; }); for (let t = 0; t <= NT; t++){ try { pumpSyncT(t); } catch(e){} } rtAllFx(); rtRoute(); rt.pl.applyMix(); } catch(e){ tpLog('tracks: re-routing the sound', e); } }
     try { CH.doc = S.chainPatch || null; chainsDropFrame(); } catch(e){}
-    try { PumpFX._notifyAll('load'); } catch(e){} } }
-  S.ntr = n1; const n = S.ntr;
-  if (vtrk && n1 !== n0){ kit.voices.forEach((v, i) => { if (v === null) kit.voices[i] = trackVoice(i - NPAD); }); for (let i = 0; i < kit.voices.length; i++){ dirty[i] = true; cache[i] = null; } }
+    try { PumpFX._notifyAll('load'); } catch(e){} }
+    if (ck.plan.h1 != null) S.hmono = ck.plan.h1; }
+  S.ntr = n1; const n = S.ntr; if (m1 === Math.ceil(n1 / 2)) delete S.nmono; else S.nmono = m1;
+  if (vtrk && (n1 !== n0 || m1 !== m0)){ kit.voices.forEach((v, i) => { if (v === null) kit.voices[i] = trackVoice(i - NPAD); }); for (let i = 0; i < kit.voices.length; i++){ dirty[i] = true; cache[i] = null; } }
   if (cTrack >= n) cTrack = n - 1; if (cs.song.x >= n && cs.song.x !== MT) cs.song.x = n - 1; if (cs.mixer.x >= n) cs.mixer.x = n - 1;
   // A new track instantiates its voice before the redraw, so the kit keeps one-to-one voice/track parity.
   if (vtrk) growKit();
   if (cFxT < NT && cFxT >= n) cFxT = 0; arrSig = ''; saveS(); draw();
-  return tOut || (x => x);
+  return {why:'', tN:tOut || (x => x)};
+}
+// setNtr(v): the old TRACKS entry point, for callers that only know a total (MORE TRACKS, the TRACKS row). A song on the half rule stays on it (today's permutation exactly); a song with an uneven split keeps its
+// MONO count (within 1..total-1) and changes POLY. Returns the old → new track map (the identity when refused: a total outside 8..max is clamped, but a refusal for a hidden track is not reported here).
+function setNtr(v){
+  const n0 = ntr(), n1 = clamp(v, 8, vtrk ? 24 : NT), m0 = polyFrom(), even = m0 === Math.ceil(n0 / 2), m1 = even ? Math.ceil(n1 / 2) : clamp(m0, 1, n1 - 1);
+  return setTracks(m1, n1 - m1).tN;
 }
 // The window of tracks a Song or Mixer line has room for (each track takes 3 characters after a lab-wide label).
 let mixL = 0, mixN = 16, winTrk = 16;
@@ -26766,7 +26868,7 @@ function dupTrack(notes, tAt){
   if (to < 0){
     const n0 = ntr(), most = vtrk ? 24 : NT;
     if (n0 + 2 > most) return toast(`No empty ${poly ? 'poly' : 'mono'} track to the right of track ${d2(t + 1)}, and the song has the most tracks it can (${most}).`);
-    const tN = setNtr(n0 + 2); if (tN) t = tN(t); PF = polyFrom(); poly = t >= PF; end = poly ? ntr() : PF; to = free(); grew = true;
+    const r = setTracks(PF + 1, n0 - PF + 1); if (r.why) return toast(r.why, 5000); const tN = r.tN; t = tN(t);   /* one of each kind, whatever the split (the half rule gives the same as TRACKS + 2) */ PF = polyFrom(); poly = t >= PF; end = poly ? ntr() : PF; to = free(); grew = true;
     if (to < 0) return toast(`Couldn’t make room for a copy of track ${d2(t + 1)}.`);
   }
   const a = S.mix[t], b = S.mix[to]; b.vol = a.vol; b.trim = a.trim; b.pan = a.pan; b.sc = a.sc;   // trim: GAIN STAGING
@@ -34969,6 +35071,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [611, '14 Nov', ['Under the hood: a song can now hold its own number of mono and poly tracks. Nothing changes on screen yet (the two Settings rows come next), and every existing song opens and saves exactly as before']],
   [610, '14 Nov', ['Chance you can keep. SED nn in the MASTER column seeds the song: the same notes fall every time it plays and in every render, from the top or from the middle. SED 00 there (or no SED): a new roll each time. SED nn on a TRACK seeds that track alone until its next SED (SED 00 hands it back), so you can re-roll one part and keep the rest. One track’s rolls no longer depend on another track’s notes', 'TCH xx: the track’s chance from that row on (00 never – FE; FF off). It multiplies with each note’s CHA. In the master column it thins every track. MOD has a new target, CHANCE, for an LFO, a macro or a scene', 'SKP 01: a note that chance or a condition skips also stops the note before it (SKP 00: it rings on, as before). CHD 01: each note of a chord rolls by itself (CHD 00: the chord plays or is skipped as one)', 'CND 08 (NOT) turns the row’s NTH or chance round: NTH 41 with CND 08 plays every pass but the first of four', 'Changed: a song that already used SED with CHA or PRB still repeats, but falls on different notes than before this build']],
   [609, '14 Nov', ['Resting …pump effects (build 607): an FXO command that switches one on now lands on the beat the first time too; changing a switched-off EQ to linear phase no longer leaves a moment of silence on its track']],
   [608, '14 Nov', ['Renders are as bright as playback: a drum or sample that started between two samples was slightly dulled in a render (about 1 dB down at the very top). Every note now starts on a sample, in renders and when the sequencer runs on the page', 'Typing a value into a slider: negative pitches (−440 Hz) and sliders whose top or bottom reads as a word (Open, Off) take a typed unit too']],
