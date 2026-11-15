@@ -83,6 +83,18 @@ test('source: every load path says it comes from a file; Save and Save as adopt 
   assert.match(src, /loadProjText\(JSON\.stringify\(j\), f\.name, path \? \{path, file:true\} : \{file:true\}\)/, 'drop');
   assert.match(src, /h \? \{h, file:true\} : \{file:true\}/, 'loadProjFile');
   assert.match(src, /adoptFileName\(h\.name\); await writeTo\(h\)/, 'browser Save: the name goes in before the file is written');
-  assert.match(src, /if \(adoptFileName\(r\.path\)\)\{ try \{ await DESK\.save\(r\.path, projText\(\)\)/, 'desktop Save as: the file is rewritten with the new name');
+  assert.match(src, /if \(adoptFileName\(r\.path\)\)\{[^\n]*\n\s*let w = null, we = null; try \{ w = await DESK\.save\(r\.path, projText\(\)\)/, 'desktop Save as: the file is rewritten with the new name');
   assert.match(src, /loadProjText\(text, idx\[k\]\.name, \{dirty:true\}\)/, 'Restore a backup');
+});
+
+test('desktop Save as: a failed rewrite (rejected promise or {ok:false}) stays unsaved, shows the error, keeps the adopted name', async () => {
+  const body = (src.match(/if \(adoptFileName\(r\.path\)\)\{[^\n]*\n([\s\S]*?)\n      \}\n      setDirty\(false\); projSet\(r\.path, null\); toast\('Saved '/) || [])[1]; assert.ok(body, 'could not find the Save as rewrite block');
+  for (const [label, save] of [['rejected', async () => { throw new Error('disk full'); }], ['ok:false', async () => ({ ok: false, error: 'read-only' })], ['nothing returned', async () => undefined]]) {
+    const ev = [], c = vm.createContext({ ev, DESK: { save }, projText: () => '{}', S: { name: 'acid' }, projSet: p => ev.push('projSet ' + p), setDirty: on => ev.push('dirty ' + on), toastErr: m => ev.push('err ' + m), projLabel: () => 'acid.thunder', r: { path: '/a/acid.thunder' } });
+    const ret = await vm.runInContext('(async () => {' + body + '\n return true; })()', c);
+    assert.equal(ret, false, label); assert.ok(ev.includes('dirty true'), label + ': still unsaved'); assert.ok(!ev.includes('dirty false'), label);
+    assert.ok(ev.some(e => /^err Couldn’t save to acid\.thunder/.test(e)), label + ': save-failed message'); assert.equal(c.S.name, 'acid', label + ': name kept');
+  }
+  const ok = vm.createContext({ DESK: { save: async () => ({ ok: true }) }, projText: () => '{}', projSet() {}, setDirty() { throw new Error('not here'); }, toastErr() { throw new Error('no error'); }, projLabel: () => 'x', r: { path: '/a/x.thunder' } });
+  assert.equal(await vm.runInContext('(async () => {' + body + '\n return true; })()', ok), true, 'a successful rewrite falls through to the normal success path');
 });

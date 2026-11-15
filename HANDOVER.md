@@ -747,6 +747,12 @@ The owner's top priority to add is the MOD screen. Work down the list; ask befor
 
 Start a session by asking for results. Fix on `beta`. (10 Nov, 15:10: the web beta is build 560; the build numbers in the rest of this paragraph are older.) Web beta: https://matthettich.github.io/thunder-plus/beta/ (build 547 as of 10 Nov morning, 548 once its PR merges; the night of 9–10 Nov shipped 544–547, see the four "10 Nov" entries below. Decisions the lead made that night for the owner to confirm or reverse: on a phone the saved Sequencer default plays on the Page unless Audio thread is picked on that device; on a phone the safety limiter is its stand-in until another worklet loads; the resync only runs with a worklet loaded and its margins are untested on a device). Desktop: v1.3.4-beta.2 (build 541, no feed view or scopes); further desktop betas on hold until the owner asks.
 
+**Build 614** (Option+A and back; Option+▲▼ on every page)
+- [ ] **Mac:** on Phrase with a selection and Arrange beside it, Option+A, move around Arrange, Option+A again. Pass: the same screen, cell, selection and scroll as before. The same with Esc.
+- [ ] **Mac:** Option+A, open a block from Arrange (Option+▶), Option+A. Pass: it does not jump back to the old place; Arrange takes the keys again from the new one.
+- [ ] **Mac:** on Mixer, FX, MOD and INST press Option+▼ then Option+▲. Pass: you stay on the page, the Arrange cursor moves a block down and up on that track (MOD and FX show that track still), and Phrase then shows that block.
+- [ ] **Mac:** Option+◀▶ and Option+8. Pass: they change screen as before; Option+8 is Project.
+
 **Build 613** (the song takes its file's name)
 - [ ] **Mac desktop:** double-click `acid.thunder` (or File › Open). Pass: Project › NAME says “acid”, the title bar shows no unsaved dot, and a render suggests “acid mix.wav”.
 - [ ] **Mac desktop:** New project, Save as `beat2.thunder`. Pass: NAME becomes “beat2”. Rename a song to “My tune”, save, open another file and come back: “My tune” is kept.
@@ -1301,6 +1307,18 @@ Suggested order: N0 → N1 → N2 (phone cured) → N4 with N3 alongside → N5 
   the edge `R.t0`, "waiting…" while armed), `rcdClk` / `rcdFmt` / `rcdFreeSecs`, a 250 ms timer only while recording; the
   final length stays until the next take. recorder-check covers FREE, PATTERN, Stop, next take and closing mid-take.
 
+
+## 14 Nov (Option+A returns exactly where you were; Option+▲▼ steps patterns on Mixer, FX, MOD and INST; build 614)
+
+Owner, 14 Nov 21:53 and 22:00 (Mac): he expected Option+▲ to jump into Arrange; then: "I like the option + up down behavior as is, and would like that to persist across pages (ie mixer and mod) even if there is nothing to edit on the current page", plus a key to jump to Song and back. By an agent; reviewed by the lead.
+- **What existed:** no decision ever moved Option+▲ into Arrange (3 Nov: Option+▲▼ step patterns on Phrase; Song: the block jump; elsewhere it went to Project via `nav`). The jump has been **Alt/Option+A** since build 273. Nothing on a Mac drops Option+arrows (`noAltGr` only touches single characters; `electron/main.js` has no accelerators). Backquote (note-off, and Alt+Backquote the view toggle), IntlBackslash (mute on ISO keyboards) and Ctrl/⌘+Enter (insert row) are all taken, so Alt+A stays the key.
+- **Back is exact now:** `arrKeyToggle` keeps `arrBack` (screen, every cursor and scroll row, selection, phrase / track / sect / inst / FX track, grid scroll, the panel setting: `arrSnap` / `arrSnapPut`); Alt+A again, or Esc with nothing selected in Arrange, restores it; opening a block from Arrange drops it. A hidden panel is shown if there is room, else the Song screen opens. Works from the Synth page too.
+- **Option+▲▼ on Mixer, FX, MOD, INST** (KEYS mode): the song position moves to the block above / below on that screen's track (PATTERN NAV off: 16 rows) and the user stays on the screen. Sect and Project unchanged; Alt+◀▶ unchanged. PAD mode's ALT+▲▼ is a different path (`optDir`: Mixer changes track, INST the instrument) and was left alone. The Synth page ignores Alt+arrows.
+- **Phone:** no touch equivalent of Alt+A. The agent proposed a second tap on the SONG tab = jump and back; the owner: "I think we are good on the phone" (he will check tomorrow whether this was tried before). NOT built.
+- Unsure (agent): Alt+A does nothing inside the …waves / …chains frames; the selection restore is not covered by the real-page run when Arrange moved the phrase.
+- **CodeRabbit on #148, fixed before the merge:** the Mixer's master row steps on the master column; the return snapshot keeps `pendPlace` (a note typed after the return went to the cell tapped in Arrange); returning from the Song-screen fallback creates no block (`goNoNew`); Alt+A from the Synth page returns to it when Song was the last tracker screen; Esc works in the Song-screen fallback; README and help row.
+- `tests/arrange-focus-key.test.js` (15, plus an opt-in real-key browser test).
+- **Also:** CodeRabbit on #147: a desktop Save as whose rewrite fails (rejected, or `{ok:false}`) is a failed save: the unsaved mark stays and the save-failed message shows.
 
 ## 14 Nov (a song still called “Song 1” takes its file's name; build 613)
 
