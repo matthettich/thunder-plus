@@ -18,3 +18,12 @@ add_executable(rt_harness rt_harness.cpp)
 target_link_libraries(rt_harness PRIVATE thunder_core)
 add_test(NAME rt_core COMMAND rt_harness)
 add_test(NAME rt_guard_selftest COMMAND rt_harness --selftest)
+
+# U05: the core runtime (Auto, the seeded random stream and js_exp against the JS's own values; the callback contract).
+add_executable(test_runtime test_runtime.cpp)
+target_link_libraries(test_runtime PRIVATE thunder_core)
+target_include_directories(test_runtime PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../core/src ${CMAKE_CURRENT_SOURCE_DIR})
+add_test(NAME runtime COMMAND test_runtime)
+if(NODE_EXE)
+  add_test(NAME runtime_golden_current COMMAND ${NODE_EXE} ${CMAKE_CURRENT_SOURCE_DIR}/../tools/runtime-golden.mjs --check)
+endif()

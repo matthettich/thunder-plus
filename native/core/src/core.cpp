@@ -1,6 +1,20 @@
-// N0 TEST CORE. Plays a 16-step click pattern at a set tempo from its own sample clock. Thrown away in N1.
-// Rules (NATIVE-DESKTOP-PLAN 4.1): thunder_process allocates nothing, takes no lock, does no I/O; commands and events
-// cross threads only through the fixed-size single-producer / single-consumer rings below.
+// THE CORE RUNTIME (N1 step 3, unit U05): the audio callback contract, the command and event rings, commands timed to the
+// sample, and the snapshot swap. The pieces are in src/rt/ (spsc.h, snap.h, auto.h, rng.h, jsmath.h, ftz.h).
+// What still makes the sound is N0's stand-in, a 16-step click pattern; the sequencer (U07) and the voices (U08) replace it,
+// and until then it keeps the Android test app audible and gives the timing tests something to measure.
+//
+// THE CALLBACK CONTRACT (NATIVE-DESKTOP-PLAN 4.1; native/tests/rt_harness.cpp enforces the first line):
+//   - thunder_process allocates nothing, frees nothing, takes no lock, does no I/O, and has no loop whose length depends on
+//     anything but `frames` and fixed pool sizes.
+//   - Any block length from 1 frame up: more than max_block is processed in max_block pieces.
+//   - One timeline: `frame` counts every sample ever rendered. A command may carry "at" (a frame): it takes effect on exactly
+//     that sample, wherever in a block it falls; without "at", at the first sample of the next block. An "at" already past
+//     is applied at once.
+//   - Commands and events cross threads only through fixed-size single-producer / single-consumer rings. thunder_post is
+//     called from ONE control thread; thunder_poll from ONE thread (it may be another).
+//   - What the callback only reads (the song, later the kit and buffers) arrives as an immutable snapshot (rt/snap.h): built
+//     and freed on the control thread, swapped in at the top of a block, acknowledged with a `song` event.
+//   - Denormals are flushed to zero for the length of the callback and the host's floating-point mode is restored (rt/ftz.h).
 #include "thunder/core.h"
 
 #include <atomic>
@@ -9,35 +23,28 @@
 #include <cstdio>
 #include <cstring>
 #include <new>
+#include <string>
 #include <vector>
+
+#include "rt/ftz.h"
+#include "rt/snap.h"
+#include "rt/spsc.h"
 
 namespace {
 
-template <class T, uint32_t N>
-struct Spsc {   // N must be a power of two
-  T buf[N];
-  std::atomic<uint32_t> head{0}, tail{0};   // head: next write (producer), tail: next read (consumer)
-  bool push(const T& v) {
-    uint32_t h = head.load(std::memory_order_relaxed);
-    if (h - tail.load(std::memory_order_acquire) >= N) return false;
-    buf[h & (N - 1)] = v;
-    head.store(h + 1, std::memory_order_release);
-    return true;
-  }
-  bool pop(T& v) {
-    uint32_t t = tail.load(std::memory_order_relaxed);
-    if (t == head.load(std::memory_order_acquire)) return false;
-    v = buf[t & (N - 1)];
-    tail.store(t + 1, std::memory_order_release);
-    return true;
-  }
-};
+using thunder::Spsc;
 
 enum CmdType { C_BPM = 1, C_PLAY, C_STOP, C_ECHO };
-struct Cmd { int type; double v; int64_t n; };
+struct Cmd { int type; double v; int64_t n; int64_t at; };   // at: the frame it takes effect on; -1: the next block's first sample
 
-enum EvtType { E_CLOCK = 1, E_POS, E_ECHO };
+enum EvtType { E_CLOCK = 1, E_POS, E_ECHO, E_SONG };
 struct Evt { int type; int64_t f; int64_t wallNs; int64_t a; int sr; int outLat; int under; };
+
+// The song as the audio thread sees it: immutable once published. U06 gives it its real fields (the parsed song and kit);
+// for U05 it carries the revision and the text, which is what the swap, the acknowledgement and the tests need.
+struct Song { int64_t rev = 0; std::string json; };
+
+constexpr int kPend = 64;   // timed commands waiting for their frame
 
 constexpr int kVoices = 16, kSteps = 16, kBuffers = 8;
 const float kPattern[kSteps] = {1.0f, 0, 0.4f, 0, 1.0f, 0, 0.4f, 0, 1.0f, 0, 0.4f, 0, 1.0f, 0, 0.4f, 0.3f};
@@ -60,6 +67,9 @@ struct thunder_core {
   int step = 0;
   Voice voices[kVoices];
   int64_t next_clock = 0;
+  Cmd pend[kPend]; int npend = 0;        // timed commands, ordered by frame (equal frames: in the order posted)
+  thunder::SnapSlot<Song> song;          // the song snapshot (control thread publishes, audio thread adopts)
+  std::atomic<uint32_t> late_cmds{0};    // timed commands applied at once because the waiting list was full
   // host stats (written by the host, read on the audio thread)
   std::atomic<int> out_lat{0}, under{0};
   // bulk buffers (non-audio threads only)
@@ -83,26 +93,41 @@ thunder_core* thunder_create(int sample_rate, int max_block) {
   return c;
 }
 
-// Reviewed by the lead, 15 Nov. The audio callback's only entry into the core. Checked: no allocation (the vectors are only
-// read; click.data() is stable), no locks (the rings are SPSC atomics), no I/O, no unbounded loops (the voice pool is
-// fixed; the step loop runs at most once per frame), steady_clock::now() is a vDSO read.
-void thunder_process(thunder_core* c, float* out_l, float* out_r, int frames) {
-  if (frames <= 0) return;
-  const int64_t wall = std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
+// The audio thread's side of one command, at frame `now`.
+static inline void apply_cmd(thunder_core* c, const Cmd& cmd, int64_t now, int64_t wall) {
+  switch (cmd.type) {
+    case C_BPM: if (cmd.v >= 20.0 && cmd.v <= 400.0) c->bpm = cmd.v; break;
+    case C_PLAY: c->playing = true; c->step = 0; c->next_step = (double)now; break;
+    case C_STOP: c->playing = false; break;
+    case C_ECHO: { Evt e{E_ECHO, now, wall, cmd.n, c->sr, 0, 0}; c->evts.push(e); } break;
+    default: break;
+  }
+}
+
+// One piece of at most max_block frames. Written by the lead (U05, 15 Nov). Checked: no allocation (the vectors are only
+// read; click.data() is stable; the snapshot swap moves pointers through rings), no locks (SPSC atomics), no I/O, no
+// unbounded loops (the command ring, the waiting list and the voice pool are fixed; the step loop runs at most once per
+// frame), steady_clock::now() is a vDSO read.
+static void process_piece(thunder_core* c, float* out_l, float* out_r, int frames, int64_t wall) {
+  if (c->song.adopt()) { Evt e{E_SONG, c->frame, wall, c->song.get()->rev, c->sr, 0, 0}; c->evts.push(e); }
   Cmd cmd;
   while (c->cmds.pop(cmd)) {
-    switch (cmd.type) {
-      case C_BPM: if (cmd.v >= 20.0 && cmd.v <= 400.0) c->bpm = cmd.v; break;
-      case C_PLAY: c->playing = true; c->step = 0; c->next_step = (double)c->frame; break;
-      case C_STOP: c->playing = false; break;
-      case C_ECHO: { Evt e{E_ECHO, c->frame, wall, cmd.n, c->sr, 0, 0}; c->evts.push(e); } break;
-      default: break;
-    }
+    if (cmd.at < 0 || cmd.at <= c->frame) { apply_cmd(c, cmd, c->frame, wall); continue; }
+    if (c->npend >= kPend) { c->late_cmds.fetch_add(1, std::memory_order_relaxed); apply_cmd(c, cmd, c->frame, wall); continue; }
+    int i = c->npend;   // keep the list ordered by frame; a command posted later at the same frame stays later
+    while (i > 0 && c->pend[i - 1].at > cmd.at) { c->pend[i] = c->pend[i - 1]; i--; }
+    c->pend[i] = cmd; c->npend++;
   }
   const float* click = c->click.data();
   const int clickLen = (int)c->click.size();
   for (int i = 0; i < frames; i++) {
     const int64_t now = c->frame + i;
+    if (c->npend && c->pend[0].at <= now) {
+      int k = 0;
+      while (k < c->npend && c->pend[k].at <= now) apply_cmd(c, c->pend[k++], now, wall);
+      for (int q = k; q < c->npend; q++) c->pend[q - k] = c->pend[q];
+      c->npend -= k;
+    }
     if (c->playing && c->next_step <= (double)now) {
       const float g = kPattern[c->step];
       if (g > 0.0f) {
@@ -122,10 +147,22 @@ void thunder_process(thunder_core* c, float* out_l, float* out_r, int frames) {
     out_l[i] = s; out_r[i] = s;
   }
   c->frame += frames;
-  if (c->frame >= c->next_clock) {   // ten a second (A5's logger replaces this)
+  if (c->frame >= c->next_clock) {   // ten a second
     Evt e{E_CLOCK, c->frame, wall, 0, c->sr, c->out_lat.load(std::memory_order_relaxed), c->under.load(std::memory_order_relaxed)};
     c->evts.push(e);
     c->next_clock = c->frame + c->sr / 10;
+  }
+}
+
+void thunder_process(thunder_core* c, float* out_l, float* out_r, int frames) {
+  if (!c || frames <= 0) return;
+  thunder::ScopedFtz ftz;
+  const int64_t wall = std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
+  const int piece = c->max_block > 0 ? c->max_block : frames;
+  for (int done = 0; done < frames; ) {
+    const int n = frames - done < piece ? frames - done : piece;
+    process_piece(c, out_l + done, out_r + done, n, wall);
+    done += n;
   }
 }
 
@@ -155,13 +192,22 @@ int thunder_post(thunder_core* c, const char* s, int len) {
   if (!t || t >= s + len || *t != '"') return 0;
   t++;
   const char* end = s + len;
-  Cmd cmd{0, 0, 0};
+  Cmd cmd{0, 0, 0, -1};
+  c->song.collect();   // snapshots the audio thread has let go of are freed here, on the control thread
   auto is = [&](const char* w) { size_t n = std::strlen(w); return (size_t)(end - t) > n && std::memcmp(t, w, n) == 0 && t[n] == '"'; };
   if (is("bpm")) { cmd.type = C_BPM; const char* v = find_key(s, len, "v"); if (!v || !parse_num(v, end, &cmd.v)) return 0; }
   else if (is("play")) cmd.type = C_PLAY;
   else if (is("stop")) cmd.type = C_STOP;
   else if (is("echo")) { cmd.type = C_ECHO; const char* n = find_key(s, len, "n"); double d = 0; if (n && parse_num(n, end, &d)) cmd.n = (int64_t)d; }
+  else if (is("song.load")) {   // U05: the swap only. {"t":"song.load","rev":N,...}: the whole message is kept as the snapshot's text (U06 parses it)
+    Song* sn = new (std::nothrow) Song(); if (!sn) return 0;
+    const char* r = find_key(s, len, "rev"); double d = 0; if (r && parse_num(r, end, &d)) sn->rev = (int64_t)d;
+    sn->json.assign(s, (size_t)len);
+    if (!c->song.publish(sn)) { delete sn; return 0; }
+    return 1;
+  }
   else return 0;
+  { const char* a = find_key(s, len, "at"); double d = 0; if (a && parse_num(a, end, &d) && d >= 0) cmd.at = (int64_t)d; }
   return c->cmds.push(cmd) ? 1 : 0;
 }
 
@@ -171,6 +217,7 @@ int thunder_poll(thunder_core* c, char* buf, int cap) {
   int n = 0;
   if (e.type == E_CLOCK) n = std::snprintf(buf, (size_t)cap, "{\"t\":\"clock\",\"f\":%lld,\"wallNs\":%lld,\"sr\":%d,\"outLat\":%d,\"under\":%d}", (long long)e.f, (long long)e.wallNs, e.sr, e.outLat, e.under);
   else if (e.type == E_POS) n = std::snprintf(buf, (size_t)cap, "{\"t\":\"pos\",\"f\":%lld,\"step\":%lld}", (long long)e.f, (long long)e.a);
+  else if (e.type == E_SONG) n = std::snprintf(buf, (size_t)cap, "{\"t\":\"song\",\"rev\":%lld,\"f\":%lld}", (long long)e.a, (long long)e.f);
   else if (e.type == E_ECHO) n = std::snprintf(buf, (size_t)cap, "{\"t\":\"echo\",\"n\":%lld,\"f\":%lld}", (long long)e.a, (long long)e.f);
   return n > 0 && n < cap ? n : 0;
 }

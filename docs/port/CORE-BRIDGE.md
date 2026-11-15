@@ -3,7 +3,7 @@
 Written 10 Nov 2026 by the lead. The contract between the interface (`index.html` and the two editors, in a web view) and
 the C++ core. It replaces every boundary listed in [`BRIDGE-TODAY.md`](BRIDGE-TODAY.md) sections 1–3 and the audio / MIDI
 parts of 4 and 6. Design rules are in `../NATIVE-DESKTOP-PLAN.md` sections 4.1 and 5; this file is the message list.
-**Draft:** N0 proves the transport and the bulk path; a message may change until task B2 freezes `BRIDGE_V = 1`.
+**`BRIDGE_V = 1`, frozen 15 Nov 2026 (tasks B1 and B2, the lead) for N1 steps 3 to 10.** Two points stay open and block nothing (section 6): the Android bulk path's timings, and the `meters` array layout. A change to anything else now needs a new `BRIDGE_V`.
 
 ## 1. What is different from today (from the inventory)
 
@@ -87,9 +87,39 @@ Files, dialogs, the updater, window chrome, file associations, wake lock, notifi
 and IndexedDB keys in BRIDGE-TODAY section 6) stays in the web view; native shells add the songs folder through
 `thunderDesktop`.
 
-## 6. Open points for N0 and B2
+## 6. B1: the draft reviewed against N0's results (15 Nov 2026), and what B2 froze
 
-1. The bulk path on Android (N0 measures both options with a 5-minute stereo sample, 53 MB of float data).
-2. Whether `song.patch` keeps today's diff or moves to the undo format NATIVE-DESKTOP-PLAN assumed (suggested: keep today's; it exists and is tested).
-3. `meters` as one `Float32Array` layout: fix the layout in B2 so the UI indexes without parsing.
-4. Whether `note.on` for the editors needs its own latency class (auditioning should not wait for a snapshot swap).
+N0 passed on the owner's Fold (`native/tests/RESULTS-N0.md`): the clock held in all three runs with no underrun, the page
+loaded in the Android web view, and commands and events crossed through the core's two rings. What that settles:
+
+1. **Time is frames, and a command can name its frame.** Any command in section 3 may carry `at` (a frame on the core's
+   timeline, as `clock` reports it). It takes effect on exactly that sample, wherever in a block it falls; without `at`, on
+   the first sample of the next block; an `at` already past is applied at once. Commands for the same frame apply in the
+   order they were sent. Built and tested in U05 (`native/tests/test_runtime.cpp`). The page converts a wall-clock moment
+   to a frame from the last `clock` event (`f`, `wallNs`, `sr`); N0 measured that pair steady to 1 ppm.
+2. **Latency classes.** N0 measured callbacks arriving in bunches (longest gap 33 to 41 ms) and 26 ms of output latency
+   with the screen on. So: `note.on` / `note.off` and `mix.set` never wait for a snapshot; they are small commands and
+   land on the next block (open point 4 of the draft: closed, no separate class is needed). `song.load`, `kit.load` and
+   `buf.use` are snapshots: built off the audio thread, swapped at a block's start, and each is acknowledged.
+3. **Acknowledgements (new in v1).** Event `song {rev, f}`: the audio thread reads snapshot `rev` from frame `f`. The page
+   must not assume a `song.load` / `song.patch` is audible before its `song` event; `kit` and `buf` follow the same
+   pattern when U06 / U08 land (`kit {rev, f}`, `buf {id, f}`). When several snapshots arrive between two blocks only the
+   newest is acknowledged.
+4. **`song.patch` keeps today's diff format** (key / index / len / del, `core.mir` on the page): it exists and is tested
+   (draft point 2: closed).
+5. **Block size.** The host may ask for any number of frames; the core works in pieces of at most `max_block`. The host
+   sets flush-to-zero or not as it likes: the core sets it for the length of its callback and restores the host's mode.
+6. **Overload is counted, never blocking.** A full command ring makes `send` fail on the control side (the shell retries
+   on its next tick and reports `err {where:'cmd', fatal:false}` after one second). A full event ring drops the event;
+   `clock` carries on, so the page's clock mapping survives. More than 64 timed commands waiting: the extra one is applied
+   at once and counted.
+7. **Bulk path on Android (draft point 1): chosen, timings still to come.** `WEB_MESSAGE_ARRAY_BUFFER` is supported on the
+   owner's phone (Android 17, WebView 157), so `put` / `take` use ArrayBuffer messages in 1 MB chunks (path a2); the
+   base64-to-file path stays as the fallback for a web view without that feature. **Open:** the A4 timings on the phone
+   (not run in N0). They decide only whether a 5-minute sample is sent in one go or behind a progress bar, not the API.
+8. **`meters` layout (draft point 3): open until U13.** The array's layout is fixed by the unit that builds the meters,
+   from what the Mixer and FX bar draw today; until then no native build sends `meters`.
+
+Exactness (decided in U05, recorded here because every later unit depends on it): the core is built without fused
+multiply-add and uses its own `exp` (fdlibm's, as V8), so values the sequencer and the automation compute are the same
+bits as the web copy's on every platform. `pow` and `sin` join `js_exp` in the first unit whose golden needs them exact.

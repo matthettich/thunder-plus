@@ -236,8 +236,8 @@ you could not port and why.
 
 | Stage | State | Notes |
 |---|---|---|
-| N0 | not started: waiting for the owner's "start the native spike" | A1 ☐ A2 ☐ A5 ☐ A3 ☐ A4 ☐ A7 ☐ A8 ☐ A9 ☐ A6 ☐ (tick each with its PR number) |
-| N1 | not started | Steps 1–11 of section 4; list each unit here with its PR as it lands. U01 may start early on `beta` if the owner wants better engine tests now |
+| N0 | **done, passed** (15 Nov; `native/tests/RESULTS-N0.md`) | A1 to A9 done; A6 (the owner's Fold): all three runs pass. A4's phone timings were not run (see CORE-BRIDGE section 6, point 7) |
+| N1 | **started 15 Nov** (the owner: "prioritize the native porting work") | Step 1: U01 exists on `beta` (`tests/engine-golden.test.js`); U02 in work (branch `n1/u02`); U03 waits on bringing in `matthettich/pump`; U04 not started. **Step 2: B1, B2 done** (CORE-BRIDGE, `BRIDGE_V = 1`). **Step 3: U05 done by the lead** (branch `n1/u05`): `native/core/src/rt/` (rings, snapshot swap, `Auto`, seeded random stream, `js_exp`), timed commands, the runtime tests and their JS golden. Next: U06 (song reader), then U07 (sequencer) |
 | N2 | not started | |
 | N3 | not started | |
 | N4 | not started | |
@@ -420,4 +420,6 @@ Order: A1 → A2 → A5 → A3 → A4, with A7, A8 and A9 any time after A1. A6 
 
 ## 9. For Fable (items waiting for the audio lead; kept last in the file so it is easy to find)
 
-- (none yet)
+- **Sizes of the `Auto` lists (from U05).** `AutoN<N>` refuses an event when full and counts it in `dropped`. U07 / U08 / U09 must run the census songs with `dropped` asserted 0 and report the largest list seen, so N is set from a measurement (U05's tests use 64).
+- **`pow` and `sin` to match V8 exactly** (fdlibm's, beside `js_exp` in `native/core/src/rt/jsmath.cpp`): needed by the first unit whose golden compares a value made with them exactly (the glide and vibrato curves of U08; anything in U07 that uses `Math.pow` for a time). Until then curves use the platform's and are compared at −80 dB.
+- **Android: a smaller buffer and exclusive mode** (N0's 26 ms output latency with the screen on): try in N2 with the real voices, watching for underruns.
