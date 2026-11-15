@@ -11294,6 +11294,165 @@ function moreDrumPresets2(){
     {type:'white', burst:8, spacing:9, atk:0.3, dec:12, hpCut:3500, hpRes:0.5, lpCut:8000, lpRes:0.4, level:0.9}], {level:-1})],
   ['Shakers & tambourines', 'Blip shaker', BL('Blip shaker', {pitch:5000, kick:0, noise:1, click:0, atk:12, decay:90, filt:0.65, res:0.3}, {level:-5.5})],
   ['Shakers & tambourines', 'Chip shaker', C('Chip shaker', {wave:2, nfreq:0.95, nshort:0, atk:2, dec:12, sus:0, rel:3}, {level:-4})],
+  ['Toms', 'Analog tom 1 (floor)', T('Analog tom 1 (floor)', {wave:0, pitch:58, bend:14, bendT:90, tdec:450, nType:0, nFreq:232, nLev:0.05, nDec:40, click:0.2}, {len:3, level:4.5})],
+  ['Toms', 'Analog tom 2', T('Analog tom 2', {wave:0, pitch:74, bend:14, bendT:90, tdec:380, nType:0, nFreq:296, nLev:0.05, nDec:40, click:0.2}, {len:3, level:4.5})],
+  ['Toms', 'Analog tom 3', T('Analog tom 3', {wave:0, pitch:102, bend:14, bendT:90, tdec:330, nType:0, nFreq:408, nLev:0.06, nDec:40, click:0.2}, {level:4})],
+  ['Toms', 'Analog tom 4', T('Analog tom 4', {wave:0, pitch:140, bend:14, bendT:90, tdec:290, nType:0, nFreq:560, nLev:0.06, nDec:40, click:0.2}, {level:3.5})],
+  ['Toms', 'Analog tom 5', T('Analog tom 5', {wave:0, pitch:185, bend:14, bendT:90, tdec:240, nType:0, nFreq:740, nLev:0.07, nDec:40, click:0.2}, {level:3.5})],
+  ['Toms', 'Analog tom 6 (high)', T('Analog tom 6 (high)', {wave:0, pitch:245, bend:14, bendT:90, tdec:200, nType:0, nFreq:980, nLev:0.08, nDec:40, click:0.2}, {level:3.5})],
+  ['Toms', 'Electro tom low', T('Electro tom low', {wave:0, pitch:90, bend:40, bendT:60, tdec:380, nLev:0.1, nType:1, nFreq:1500, nDec:25, click:0.4, dist:0.2}, {level:3.5})],
+  ['Toms', 'Electro tom high', T('Electro tom high', {wave:0, pitch:170, bend:50, bendT:50, tdec:260, nLev:0.1, nType:1, nFreq:2500, nDec:20, click:0.4, dist:0.2}, {level:4})],
+  ['Toms', 'Laser tom', T('Laser tom', {wave:0, pitch:130, bend:96, bendT:120, tdec:350, nLev:0, click:0.2}, {level:3})],
+  ['Toms', 'Dive tom', T('Dive tom', {wave:1, pitch:100, bend:-30, bendT:200, tdec:500, nLev:0.04, click:0.15}, {level:3})],
+  ['Toms', 'Sub tom (long)', T('Sub tom (long)', {wave:0, pitch:50, bend:8, bendT:150, tdec:500, nLev:0, click:0.05}, {len:5, level:5.5})],
+  ['Toms', 'Triangle tom', T('Triangle tom', {wave:1, pitch:112, bend:18, bendT:100, tdec:420, nLev:0.15, nType:1, nFreq:1200, nDec:60, click:0.2}, {level:3})],
+  ['Toms', 'FM tom low', F('FM tom low', {pitch:80, bend:30, bendT:80, alg:0, r1:1.5, i1:0.5, idec1:120, r2:2.3, i2:0.2, idec2:60, noise:0.1, ndec:30, ncut:3000, dec:600, curve:0.6, tone:0.7, click:0.2}, {len:3, level:-0.5})],
+  ['Toms', 'FM tom mid', F('FM tom mid', {pitch:130, bend:30, bendT:70, alg:0, r1:1.5, i1:0.5, idec1:100, r2:2.3, i2:0.2, idec2:50, noise:0.1, ndec:30, ncut:3000, dec:450, curve:0.6, tone:0.7, click:0.2}, {level:-0.5})],
+  ['Toms', 'FM tom high', F('FM tom high', {pitch:210, bend:30, bendT:60, alg:0, r1:1.5, i1:0.5, idec1:80, r2:2.3, i2:0.2, idec2:40, noise:0.1, ndec:30, ncut:3000, dec:340, curve:0.6, tone:0.7, click:0.2}, {level:-0.5})],
+  ['Toms', 'FM metal tom', F('FM metal tom', {pitch:150, bend:20, bendT:60, alg:2, r1:1.41, i1:0.8, idec1:150, r2:2.76, i2:0.6, idec2:100, fb:0.3, noise:0.2, ndec:20, ncut:5000, dec:380, curve:0.5, tone:0.5, click:0.3}, {level:-0.5})],
+  ['Toms', 'FM hollow tom', F('FM hollow tom', {pitch:100, bend:10, bendT:100, alg:1, r1:1.9, i1:0.3, idec1:300, r2:3.1, i2:0.15, idec2:200, dec:550, curve:0.5, tone:0.9, click:0.1}, {len:3, level:-0.5})],
+  ['Toms', 'Rock floor tom', K('Rock floor tom', {pitch:95, size:0.6, tension:0.35, tenT:90, dec:450, damp:0.4, hard:0.7, shell:0.6}, {len:3, level:-0.5})],
+  ['Toms', 'Rock rack tom', K('Rock rack tom', {pitch:165, size:0.4, tension:0.3, tenT:60, dec:300, damp:0.45, hard:0.75, shell:0.8}, {level:-0.5})],
+  ['Toms', 'Jazz small tom', K('Jazz small tom', {pitch:230, size:0.3, tension:0.25, tenT:40, dec:420, damp:0.5, hard:0.4, shell:0.4}, {level:-0.5})],
+  ['Toms', 'Dead muffled tom', K('Dead muffled tom', {pitch:120, size:0.5, tension:0.3, tenT:30, dec:150, damp:0.8, muffle:0.9, hard:0.6, shell:0.5, noise:0.2}, {level:-0.5})],
+  ['Toms', 'Roto tom', K('Roto tom', {pitch:190, size:0.3, tension:0.6, tenT:150, dec:420, damp:0.35, hard:0.7, shell:0.2}, {level:-0.5})],
+  ['Toms', 'Taiko big', K('Taiko big', {pitch:60, size:1, tension:0.3, tenT:50, dec:700, damp:0.25, hard:0.85, shell:0.5, noise:0.15}, {len:4, level:-0.5})],
+  ['Toms', 'Membrane tom (modal)', M('Membrane tom (modal)', {mat:6, oct:1, exc:0, hard:0.8, dec:0.5, bright:0.5, pos:0.15}, {level:-0.5})],
+  ['Toms', 'Wood tom (modal)', M('Wood tom (modal)', {mat:1, oct:2, exc:0, hard:0.7, dec:0.6, bright:0.4, pos:0.2}, {level:-0.5})],
+  ['Toms', 'Blip tom', BL('Blip tom', {pitch:140, kick:1, kickT:60, noise:0.1, click:0.3, decay:320, filt:0, res:0.2}, {level:-2})],
+  ['Toms', 'Chip tom', C('Chip tom', {wave:1, nfreq:0.3, nshort:0, atk:0, dec:12, sus:0, rel:6, pitch:0.4}, {level:-0.5})],
+  ['Toms', 'Layer tom pair', L('Layer tom pair', [
+    {type:'membrane', a:0.4, b:0.4, tune:13, pAmt:8, pDec:80, atk:0.1, dec:250, level:0.8},
+    {type:'sine', tune:13, pAmt:10, pDec:60, atk:0.1, dec:180, level:0.4},
+    {type:'click', a:0.2, level:0.3, atk:0.05, dec:6}], {tune:0, level:-1.5})],
+  ['Hand drums', 'Low conga open', K('Low conga open', {pitch:210, size:0.38, tension:0.25, tenT:35, dec:380, damp:0.5, hard:0.55, pos:0.35, shell:0.35}, {len:3, level:-0.5})],
+  ['Hand drums', 'Conga heel', K('Conga heel', {pitch:190, size:0.35, tension:0.2, tenT:20, dec:180, damp:0.7, muffle:0.6, hard:0.4, pos:0.2}, {level:-0.5})],
+  ['Hand drums', 'Quinto', K('Quinto', {pitch:300, size:0.25, tension:0.25, tenT:35, dec:380, damp:0.55, hard:0.6, pos:0.4, shell:0.3}, {level:-0.5})],
+  ['Hand drums', 'Tabla bayan', K('Tabla bayan', {pitch:130, size:0.45, tension:0.7, tenT:220, dec:450, damp:0.3, hard:0.6, pos:0.3, shell:0.3}, {len:3, level:-0.5})],
+  ['Hand drums', 'Frame drum', K('Frame drum', {pitch:105, size:0.6, tension:0.2, tenT:25, dec:450, damp:0.6, muffle:0.2, hard:0.5, pos:0.4, noise:0.2, shell:0.2}, {level:-0.5})],
+  ['Hand drums', 'Darbuka dum', K('Darbuka dum', {pitch:185, size:0.4, tension:0.3, tenT:30, dec:300, damp:0.5, hard:0.7, pos:0.2, shell:0.5, shellF:0.5}, {level:-0.5})],
+  ['Hand drums', 'Darbuka ka', K('Darbuka ka', {pitch:700, size:0.1, tension:0.3, tenT:8, dec:70, damp:0.85, hard:1, pos:0.9, noise:0.35}, {level:-0.5})],
+  ['Hand drums', 'Udu pot', K('Udu pot', {pitch:135, size:0.5, tension:0.1, tenT:90, dec:500, damp:0.35, hard:0.4, pos:0.3, shell:0.9, shellF:0.6}, {len:3, level:-0.5})],
+  ['Hand drums', 'Log drum', K('Log drum', {pitch:270, size:0.3, tension:0.1, tenT:10, dec:260, damp:0.45, hard:0.5, pos:0.5, shell:1, shellF:0.3}, {level:-0.5})],
+  ['Hand drums', 'FM conga', F('FM conga', {pitch:230, bend:12, bendT:40, alg:0, r1:1, i1:0.4, idec1:60, r2:2.6, i2:0.2, idec2:30, noise:0.15, ndec:20, ncut:4000, dec:300, curve:0.5, tone:0.8, click:0.2}, {level:-0.5})],
+  ['Hand drums', 'FM bongo', F('FM bongo', {pitch:480, bend:10, bendT:30, alg:0, r1:1, i1:0.4, idec1:40, r2:2.6, i2:0.2, idec2:20, noise:0.15, ndec:15, ncut:5000, dec:180, curve:0.5, tone:0.8, click:0.3}, {level:-0.5})],
+  ['Hand drums', 'Synth conga', T('Synth conga', {wave:0, pitch:250, bend:20, bendT:25, tdec:300, nLev:0.1, nType:0, nFreq:1500, nDec:15, click:0.3}, {level:2})],
+  ['Hand drums', 'Synth bongo', T('Synth bongo', {wave:0, pitch:420, bend:20, bendT:20, tdec:160, nLev:0.1, nType:0, nFreq:2000, nDec:12, click:0.3}, {level:2})],
+  ['Hand drums', 'Skin hand drum (modal)', M('Skin hand drum (modal)', {mat:6, oct:2, exc:0, hard:0.6, dec:0.4, bright:0.5, pos:0.25}, {level:-0.5})],
+  ['Hand drums', 'Blip conga', BL('Blip conga', {pitch:260, kick:0.8, kickT:25, noise:0.1, click:0.3, decay:260, filt:0, res:0.2}, {level:-2})],
+  ['Cowbells, blocks & metal', 'Cowbell (808-style)', L('Cowbell (808-style)', [
+    {type:'square', tune:37, fine:20, atk:0.2, dec:240, hpCut:450, lpCut:3500, lpRes:0.25, level:0.6},
+    {type:'square', tune:44, fine:-10, atk:0.2, dec:240, hpCut:450, lpCut:3500, lpRes:0.25, level:0.6}])],
+  ['Cowbells, blocks & metal', 'High cowbell', L('High cowbell', [
+    {type:'square', tune:41, fine:55, atk:0.2, dec:260, hpCut:600, lpCut:5000, lpRes:0.25, level:0.6},
+    {type:'square', tune:48, fine:36, atk:0.2, dec:260, hpCut:600, lpCut:5000, lpRes:0.25, level:0.6}], {level:-0.5})],
+  ['Cowbells, blocks & metal', 'Dull cowbell', L('Dull cowbell', [
+    {type:'square', tune:32, fine:55, atk:0.2, dec:160, hpCut:250, lpCut:2200, lpRes:0.25, level:0.6},
+    {type:'square', tune:39, fine:36, atk:0.2, dec:160, hpCut:250, lpCut:2200, lpRes:0.25, level:0.6}], {level:0.5})],
+  ['Cowbells, blocks & metal', 'Open cowbell ring', L('Open cowbell ring', [
+    {type:'square', tune:36, fine:55, atk:0.2, dec:900, hpCut:500, lpCut:4500, lpRes:0.25, level:0.5},
+    {type:'square', tune:43, fine:36, atk:0.2, dec:900, hpCut:500, lpCut:4500, lpRes:0.25, level:0.5}], {len:3, level:2})],
+  ['Cowbells, blocks & metal', 'FM cowbell', F('FM cowbell', {pitch:560, bend:0, alg:1, r1:1.5, i1:0.5, idec1:200, r2:2.1, i2:0.3, idec2:120, dec:350, curve:0.3, tone:0.8, click:0.2}, {level:-1})],
+  ['Cowbells, blocks & metal', 'Clank bell', F('Clank bell', {pitch:880, bend:0, alg:2, r1:1.9, i1:0.7, idec1:260, r2:4.4, i2:0.5, idec2:140, noise:0.2, ndec:15, dec:500, curve:0.3, tone:0.7, click:0.4}, {level:-1})],
+  ['Cowbells, blocks & metal', 'Agogo pair high', F('Agogo pair high', {pitch:1250, bend:0, alg:1, r1:2.76, i1:0.4, idec1:260, r2:5.4, i2:0.15, idec2:120, dec:350, curve:0.2, tone:0.85, click:0.1}, {level:-1})],
+  ['Cowbells, blocks & metal', 'Agogo pair low', F('Agogo pair low', {pitch:820, bend:0, alg:1, r1:2.76, i1:0.4, idec1:300, r2:5.4, i2:0.15, idec2:150, dec:420, curve:0.2, tone:0.85, click:0.1}, {level:-1})],
+  ['Cowbells, blocks & metal', 'Woodblock high', T('Woodblock high', {wave:0, pitch:1100, bend:-5, bendT:6, tdec:55, nLev:0.1, nType:0, nFreq:3000, nDec:5, click:0.4}, {level:1})],
+  ['Cowbells, blocks & metal', 'Woodblock mid', T('Woodblock mid', {wave:0, pitch:780, bend:-5, bendT:8, tdec:70, nLev:0.1, nType:0, nFreq:2500, nDec:6, click:0.4}, {level:1})],
+  ['Cowbells, blocks & metal', 'Claves (wood)', T('Claves (wood)', {wave:0, pitch:2000, bend:0, tdec:90, nLev:0, click:0.2}, {len:2, level:2.5})],
+  ['Cowbells, blocks & metal', 'Claves (low)', T('Claves (low)', {wave:0, pitch:1500, bend:0, tdec:100, nLev:0, click:0.2}, {len:2, level:2.5})],
+  ['Cowbells, blocks & metal', 'Temple block (modal)', M('Temple block (modal)', {mat:10, oct:3, exc:0, hard:0.9, dec:0.18, bright:0.5, pos:0.15}, {level:-1})],
+  ['Cowbells, blocks & metal', 'Wood bar (modal)', M('Wood bar (modal)', {mat:10, oct:4, exc:0, hard:0.8, dec:0.8, bright:0.5, pos:0.2}, {level:-1})],
+  ['Cowbells, blocks & metal', 'Steel plate (modal)', M('Steel plate (modal)', {mat:11, oct:2, exc:0, hard:0.8, dec:0.2, bright:0.6, pos:0.2, inharm:0.4}, {len:3, level:-1})],
+  ['Cowbells, blocks & metal', 'Glass bowl (modal)', M('Glass bowl (modal)', {mat:7, oct:4, exc:0, hard:0.8, dec:0.2, bright:0.5, pos:0.2}, {len:4, level:-1})],
+  ['Cowbells, blocks & metal', 'Pipe bell (modal)', M('Pipe bell (modal)', {mat:9, oct:3, exc:0, hard:0.7, dec:0.4, bright:0.5, pos:0.2}, {len:3, level:-1})],
+  ['Cowbells, blocks & metal', 'Triangle (layers)', L('Triangle (layers)', [
+    {type:'bell', a:0.9, b:0.3, tune:48, atk:0.1, dec:1800, level:0.5},
+    {type:'metal', a:0.2, atk:0.1, dec:1200, hpCut:6000, level:0.15}], {len:4, level:7.5})],
+  ['Cowbells, blocks & metal', 'Muted triangle', L('Muted triangle', [
+    {type:'bell', a:0.9, b:0.3, tune:48, atk:0.1, dec:140, level:0.6}], {level:7})],
+  ['Cowbells, blocks & metal', 'Finger cymbal', L('Finger cymbal', [
+    {type:'bell', a:0.7, b:0.5, tune:50, atk:0.1, dec:1500, level:0.4},
+    {type:'bell', a:0.7, b:0.5, tune:44, fine:30, atk:0.1, dec:1300, level:0.35}], {len:4, level:9.5})],
+  ['Cowbells, blocks & metal', 'Metal bar tap', L('Metal bar tap', [
+    {type:'metal', a:0.15, b:0.2, atk:0.1, dec:90, hpCut:3500, lpCut:12000, level:0.5},
+    {type:'bell', a:0.4, b:0.2, tune:56, atk:0.1, dec:420, level:0.5}], {level:8})],
+  ['Cowbells, blocks & metal', 'Anvil tap', L('Anvil tap', [
+    {type:'metal', a:0.3, atk:0.1, dec:140, hpCut:1500, level:0.5},
+    {type:'sine', tune:33, pAmt:3, pDec:10, atk:0.1, dec:320, level:0.5}], {level:7})],
+  ['Cowbells, blocks & metal', 'Chime tree', L('Chime tree', [
+    {type:'bell', a:0.8, b:0.2, tune:52, atk:0.1, dec:2200, level:0.35},
+    {type:'bell', a:0.8, b:0.2, tune:57, atk:0.1, dec:2000, level:0.3},
+    {type:'bell', a:0.8, b:0.2, tune:61, atk:0.1, dec:1800, level:0.3}], {len:5, level:8})],
+  ['Cowbells, blocks & metal', 'Blip cowbell', BL('Blip cowbell', {pitch:600, kick:0, fm:0.5, fmR:1.5, decay:220, click:0.2, filt:0.1, res:0.4}, {level:0.5})],
+  ['Cowbells, blocks & metal', 'Blip woodblock', BL('Blip woodblock', {pitch:1000, kick:0.2, kickT:5, click:0.5, decay:50, filt:0, res:0.3}, {level:-3})],
+  ['Cowbells, blocks & metal', 'Chip cowbell', C('Chip cowbell', {wave:0, nfreq:0.4, nshort:0, atk:0, dec:40, sus:0, rel:10, pitch:0.5}, {level:-1})],
+  ['IDM & glitch', 'Zap down', L('Zap down', [
+    {type:'sine', tune:40, pAmt:-48, pDec:30, atk:0.05, dec:150, level:0.8}], {level:1})],
+  ['IDM & glitch', 'Zap up', L('Zap up', [
+    {type:'sine', tune:12, pAmt:60, pDec:50, atk:0.05, dec:200, level:0.8}])],
+  ['IDM & glitch', 'Square zap', L('Square zap', [
+    {type:'square', tune:30, pAmt:-30, pDec:40, atk:0.05, dec:120, lpCut:6000, level:0.6}], {level:7})],
+  ['IDM & glitch', 'Blip pair', L('Blip pair', [
+    {type:'square', tune:40, atk:0.05, dec:20, level:0.5},
+    {type:'square', tune:47, atk:0.05, dec:20, level:0.4, delay:30}], {level:11})],
+  ['IDM & glitch', 'Sine blip', L('Sine blip', [
+    {type:'sine', tune:48, atk:0.05, dec:35, level:0.8}], {level:1})],
+  ['IDM & glitch', 'Pulse blip low', L('Pulse blip low', [
+    {type:'pulse', a:0.3, tune:24, atk:0.05, dec:60, lpCut:3000, level:0.6}], {level:5})],
+  ['IDM & glitch', 'Click single', L('Click single', [
+    {type:'click', a:0.1, level:0.9, atk:0.05, dec:2},
+    {type:'white', atk:0.05, dec:6, hpCut:3000, level:0.5}], {level:11})],
+  ['IDM & glitch', 'Click hi', L('Click hi', [
+    {type:'white', atk:0.05, dec:4, hpCut:7000, level:0.9}], {level:6})],
+  ['IDM & glitch', 'Click lo thud', L('Click lo thud', [
+    {type:'click', a:0.1, level:0.6, atk:0.05, dec:4, lpCut:900},
+    {type:'sine', tune:30, atk:0.05, dec:15, level:0.4}], {level:13.5})],
+  ['IDM & glitch', 'Click burst x3', L('Click burst x3', [
+    {type:'white', burst:3, spacing:8, atk:0.05, dec:4, hpCut:2500, level:0.9}], {level:-1.5})],
+  ['IDM & glitch', 'Tick roll', L('Tick roll', [
+    {type:'white', burst:8, spacing:9, atk:0.05, dec:4, hpCut:4000, level:0.8}], {level:0.5})],
+  ['IDM & glitch', 'Noise burst short', L('Noise burst short', [
+    {type:'white', atk:0.05, dec:12, hpCut:1000, level:0.8}], {level:0.5})],
+  ['IDM & glitch', 'Noise burst filtered', L('Noise burst filtered', [
+    {type:'white', atk:0.05, dec:60, lpCut:1800, lpRes:0.6, lpEnv:0.5, fDec:30, level:0.8}], {level:-2})],
+  ['IDM & glitch', 'Noise swell reverse', L('Noise swell reverse', [
+    {type:'white', atk:260, dec:8, lpCut:6000, level:0.7}], {len:2, level:5})],
+  ['IDM & glitch', 'Pink thud burst', L('Pink thud burst', [
+    {type:'pink', atk:0.1, dec:50, lpCut:700, level:0.9}], {level:15})],
+  ['IDM & glitch', 'Data stutter', L('Data stutter', [
+    {type:'lfsr', a:0.3, b:0.8, burst:5, spacing:12, atk:0.1, dec:10, lpCut:6000, level:0.6}], {level:9.5})],
+  ['IDM & glitch', 'Bit crush ping', L('Bit crush ping', [
+    {type:'chip', a:0.2, b:0.5, tune:44, atk:0.05, dec:80, level:0.6}], {fx:[PFX('crush', {down:0.6, bits:4, mix:0.9})], level:8})],
+  ['IDM & glitch', 'Crushed metal hit', L('Crushed metal hit', [
+    {type:'metal', a:0.6, atk:0.1, dec:140, hpCut:2000, level:0.8}], {fx:[PFX('crush', {down:0.5, bits:5, mix:0.8})], level:7.5})],
+  ['IDM & glitch', 'Metal clang short', L('Metal clang short', [
+    {type:'fmmetal', a:0.8, b:0.7, tune:30, atk:0.1, dec:110, hpCut:600, level:0.7}])],
+  ['IDM & glitch', 'Metal clang ring', L('Metal clang ring', [
+    {type:'fmmetal', a:0.6, b:0.9, tune:36, atk:0.1, dec:700, hpCut:800, level:0.6}], {len:3, level:0.5})],
+  ['IDM & glitch', 'Ring mod chirp', L('Ring mod chirp', [
+    {type:'fm2', a:0.7, b:0.8, tune:36, pAmt:-12, pDec:25, atk:0.1, dec:90, level:0.6}], {level:5})],
+  ['IDM & glitch', 'Feedback squeal', L('Feedback squeal', [
+    {type:'fmfb', a:0.8, b:0.7, tune:46, pAmt:12, pDec:70, atk:0.1, dec:260, level:0.5}], {level:8})],
+  ['IDM & glitch', 'Grit snap', L('Grit snap', [
+    {type:'grit', a:0.2, b:0.7, atk:0.1, dec:25, hpCut:2500, level:0.8}], {level:4})],
+  ['IDM & glitch', 'Dust crackle', L('Dust crackle', [
+    {type:'dust', a:0.7, b:0.4, atk:0.1, dec:220, hpCut:2000, level:0.8}], {len:2, level:2})],
+  ['IDM & glitch', 'Sub pulse', L('Sub pulse', [
+    {type:'sine', tune:6, atk:0.1, dec:140, level:0.9}], {level:-1})],
+  ['IDM & glitch', 'Glitch bleep chord', L('Glitch bleep chord', [
+    {type:'square', tune:40, atk:0.05, dec:30, level:0.4},
+    {type:'square', tune:44, atk:0.05, dec:30, level:0.35},
+    {type:'square', tune:47, atk:0.05, dec:30, level:0.35}], {level:6.5})],
+  ['IDM & glitch', 'Pitch dropout', L('Pitch dropout', [
+    {type:'tri', tune:36, pAmt:-60, pDec:12, atk:0.05, dec:70, level:0.8},
+    {type:'click', a:0.3, level:0.3, atk:0.05, dec:3}], {level:3})],
+  ['IDM & glitch', 'Blip glitch zap', BL('Blip glitch zap', {pitch:900, kick:1, kickT:20, noise:0.2, click:0.5, decay:80, filt:0.2, res:0.5, grain:4, grainT:15}, {level:-1})],
+  ['IDM & glitch', 'Blip tick stutter', BL('Blip tick stutter', {pitch:3000, kick:0, noise:0.4, click:1, decay:12, filt:0.5, res:0.5, grain:5, grainT:10})],
+  ['IDM & glitch', 'Chip zap', C('Chip zap', {wave:0, nfreq:0.5, nshort:0, atk:0, dec:15, sus:0, rel:5, pitch:0.7}, {level:-2})],
+  ['IDM & glitch', 'FM glitch ping', F('FM glitch ping', {pitch:2200, bend:-20, bendT:15, alg:2, r1:3.7, i1:0.9, idec1:40, r2:7.1, i2:0.8, idec2:30, fb:0.6, dec:90, curve:0.5, tone:0.6, click:0.4}, {level:-2})],
+  ['IDM & glitch', 'FM metallic hit', F('FM metallic hit', {pitch:600, bend:0, alg:2, r1:2.4, i1:0.9, idec1:120, r2:5.9, i2:0.8, idec2:80, fb:0.5, noise:0.3, ndec:20, ncut:9000, dec:260, curve:0.5, tone:0.5, click:0.3}, {level:-2})],
+  ['IDM & glitch', 'FM bleep', F('FM bleep', {pitch:1400, bend:0, alg:0, r1:2, i1:0.3, idec1:60, r2:3, i2:0.1, idec2:30, dec:70, curve:0.4, tone:0.9, click:0.1}, {level:-2})],
+  ['IDM & glitch', 'Sine ping', T('Sine ping', {wave:0, pitch:1800, bend:0, tdec:80, nLev:0, click:0}, {level:3.5})],
   ];
 }
 // DRUMS BY TYPE (owner, 30 Oct): every drum sound in the pad Presets list sits in a group for its type (Kicks, Snares, …),
