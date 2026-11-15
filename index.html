@@ -20153,6 +20153,19 @@ const TFX_SRC = `
    output went past ±8 was started afresh every block, so a loud signal through a lot of Output or Makeup gain was heard
    as dropouts. Now only a real runaway does that: a NaN, an infinity, or a sample past ±64 (+36 dB over full scale, more
    than any gain row gives). Anything below is clipped at ±8 and goes on (the master's limiter follows). */
+/* ONE WASM INSTANCE PER NODE, OR SHARED IN A RENDER (15 Nov): the browser allows only about 100 WebAssembly memories in the whole page
+   (each reserves 10 GB of address space; the 105th new Instance throws "Out of memory"), and an offline render's audio thread is never
+   freed while the page lives (Chrome keeps it), so every effect node of every render used up one for good: about the ninth render
+   of a song with a dozen effect nodes, or the 33rd of a small one, started no effects and came out silent. A node of a render (processorOptions.shareX)
+   takes a share of an instance already in this audio thread instead: the effects' own state lives behind their handles, and the one
+   pair of I/O buffers is only used inside one process() call (nodes run one after another on the thread), so sharing is exact.
+   An instance holds 32 handles (tfx.cc): a node reserves its chain length plus 2, and a new instance is made only when none has room. */
+const tfxInst = () => { const z = () => 0, x = new WebAssembly.Instance(globalThis.__tfxMod, {wasi_snapshot_preview1:{fd_close:z, fd_seek:z, fd_write:z, proc_exit:z}}).exports; if (x._initialize) x._initialize(); return x; };
+function tfxShared(n){
+  const P = globalThis.__tfxPool || (globalThis.__tfxPool = []), need = Math.max(1, n | 0) + 2;
+  let e = P.find(q => q.used + need <= 32); if (!e){ e = {x:tfxInst(), used:0}; P.push(e); }
+  e.used += need; return e.x;
+}
 const hotBad = (oL, oR, n) => { for (let k = 0; k < n; k++){ const a = oL[k], b = oR[k]; if (!(a > -64 && a < 64 && b > -64 && b < 64)) return true; } return false; };
 const hotClip = (L, R, n) => { for (let k = 0; k < n; k++){ const a = L[k], b = R[k]; if (a > 8) L[k] = 8; else if (a < -8) L[k] = -8; if (b > 8) R[k] = 8; else if (b < -8) R[k] = -8; } };
 /* ANY BLOCK LENGTH (10 Nov): Chrome is adding a render size hint, so a block need not be 128 frames. tcChunks runs one (a function of the code
@@ -20188,9 +20201,7 @@ class ThunderFx extends AudioWorkletProcessor {
     if (op.pump && !globalThis.__pumpBytes) globalThis.__pumpBytes = op.pump;   // …PUMP: pump.wasm, compiled when a pump slot first needs it
     if (op.pumpModule && !globalThis.__pumpMod) globalThis.__pumpMod = op.pumpModule;   // (or the module the page compiled)
     this.ptel = new Map(); this.platS = '';   // …PUMP: the pump slots whose full telemetry a pop-up wants (key → {back, rp}); the latencies last reported
-    const z = () => 0;
-    this.x = new WebAssembly.Instance(globalThis.__tfxMod, {wasi_snapshot_preview1:{fd_close:z, fd_seek:z, fd_write:z, proc_exit:z}}).exports;
-    if (this.x._initialize) this.x._initialize();
+    this.x = op.shareX ? tfxShared(op.chain ? op.chain.length : 0) : tfxInst();   /* RENDERS (op.shareX): several nodes of one render share a wasm instance (see tfxShared) */
     this.slots = []; this.dead = false; this.buf = null; this.ms = 0; this.fr = 0; this.idle = 0;
     this.tel = false; this.telN = 0;   // FX DYNAMICS: the app wants the dynamics slots' levels ({tel:true}), ~31 times a second
     // for the shared-module slots (MODFX): their transport (the song tempo, from the beat clock while it plays) and the sidechain bus (input 1)
@@ -20768,7 +20779,7 @@ function chainsNode(ac, track, patch, tempo, cid){
     processorOptions:Object.assign({cid:cid || null, track, patch, quality:'full', transport:{tempo:tempo || S.bpm || 120, lpb:S.lpb || 4, ticks:S.ticks || TICKS, playing:tp.on}, irs:irsOpt(ac),
       // BUS and SOURCE maps from the start (later changes go as messages): an offline render can finish before a message arrives.
       busMap:(busPlan().feeds.get(track) || []).slice(0, 32), tapMap:chnTapList(patch)}, tfxModOpt() ? {tfxModule:tfxModOpt()} : {bytes:chnBin()}, pumpModOpt() ? {pumpModule:pumpModOpt()} : {pump:pumpBin() || null})});
-  n.load = 0;
+  n.load = 0; n._wasmGiven = !!(tfxModOpt() || chnBin()); n.onprocessorerror = () => { if (isOfflineAc(ac)) tfxErrAc.add(ac); };   /* a render whose chains node never started is not kept: pass() says so */
   // 2048 samples (~45 ms) per look, read every 60 ms, so short hits (hats, clicks) still show on the meters.
   n.an = ac.createAnalyser(); n.an.fftSize = 2048;   // hears the chains return: the chain screen's Chain Out meters
   n.anIn = ac.createAnalyser(); n.anIn.fftSize = 2048;   // hears what the track sends in: the Track In meters (wired in rtRoute)
@@ -20786,6 +20797,9 @@ function chainsNode(ac, track, patch, tempo, cid){
     if (d.op === 'meter' && d.value){ n.load = d.value.load || 0; if (!d.value.light){ n.mods = d.value.mods || null; n.shows = d.value.shows || null; n.jacks = d.value.jacks || null; n.byp = d.value.byp || null; n.modsT = performance.now(); if (n.onMeter) n.onMeter(d.value); } }
     if (d.op === 'ready'){
       n._live = true;
+      /* RENDER: the processor started but its effects' wasm did not (wasmInit catches the error and the chain's effects
+         bypass, so no processorerror fires): that render is not kept either. Only when the wasm was handed over. */
+      if (n._wasmGiven && isOfflineAc(ac) && d.value && d.value.wasm && d.value.wasm.tfx === false) tfxErrAc.add(ac);
       for (const m of n._q){ try { n.port.postMessage(m); } catch(e){} }
       n._q.length = 0;
       if (n._onReady){ const f = n._onReady; n._onReady = null; try { f(); } catch(e){} }   // CHN SWITCH: fade the chain in now
@@ -20935,7 +20949,7 @@ function tfxNode(ac, chain, cid){
   // Inputs: 0 the track, 1 (SOURCE) the picked tracks' own sounds, one channel each ('tapmap'), 2 (SENDS) the Sidechain Out sends.
   const pb = pumpBin() && !pumpSent.has(ac) ? pumpBin() : null; if (pb) pumpSent.add(ac);
   const n = new AudioWorkletNode(ac, 'thunder-tfx', {numberOfInputs:3, numberOfOutputs:1, outputChannelCount:[2], channelCount:2,
-    channelCountMode:'max', channelInterpretation:'speakers', processorOptions:Object.assign({chain, irs:irsOpt(ac), tapMap:keyTrackList(), cid:cid || null}, tfxModOpt() ? {module:tfxModOpt()} : {bytes:tfxBin()}, pb ? (pumpModOpt() ? {pumpModule:pumpModOpt()} : {pump:pb}) : {pump:null})});   // irs: this audio thread's copy of the song's impulse responses
+    channelCountMode:'max', channelInterpretation:'speakers', processorOptions:Object.assign({chain, irs:irsOpt(ac), tapMap:keyTrackList(), cid:cid || null, shareX:isOfflineAc(ac)}, tfxModOpt() ? {module:tfxModOpt()} : {bytes:tfxBin()}, pb ? (pumpModOpt() ? {pumpModule:pumpModOpt()} : {pump:pb}) : {pump:null})});   // irs: this audio thread's copy of the song's impulse responses
   n.load = 0; n.port.onmessage = e => { const d = e.data; if (!d) return;
     if (typeof d.load === 'number'){ n.load = n.load * 0.6 + d.load * 0.4;
       /* CPU PANEL: each slot's share, smoothed like the node's (slots that report nothing fall away) */
@@ -20950,11 +20964,12 @@ function tfxNode(ac, chain, cid){
   // FIX (sweep, 4 Nov): a node that can't start at all (the browser out of memory for its DSP, seen after many renders in a
   // small-memory browser) passed its track through dry with no word; now it says so, once per audio context.
   n.onprocessorerror = () => { if (tfxErrAc.has(ac)) return; tfxErrAc.add(ac);
-    toast(typeof OfflineAudioContext !== 'undefined' && ac instanceof OfflineAudioContext
-      ? 'An effect couldn’t start in this render, so its track rendered without it. Reload the app and render again.'
-      : 'An effect couldn’t start, so its track plays without it. Reload the app to bring it back.', 8000); };
+    if (isOfflineAc(ac)) return;   /* a render has the answer when it ends: pass() stops with a message instead of writing a silent file */
+    toast('An effect couldn’t start, so its track plays without it. Reload the app to bring it back.', 8000); };
   return n;
 }
+const isOfflineAc = ac => typeof OfflineAudioContext !== 'undefined' && ac instanceof OfflineAudioContext;
+const RENDER_FX_FAIL = 'An effect couldn’t start in this render (the browser has no room left for effects). Nothing was saved. Reload the app and render again.';
 const tfxErrAc = new WeakSet();
 
 /* ---------- song data ---------- */
@@ -25010,10 +25025,26 @@ function guessBeats(I){
 /* ---------- rendering the song and stems ---------- */
 let rendering = false, lastR = null;
 const idle = () => new Promise(r => setTimeout(r, 0));
-function mkBuf(d, sr){
-  let b; try { b = new AudioBuffer({length:d.length, sampleRate:sr, numberOfChannels:1}); }
-  catch(e){ const O = window.OfflineAudioContext || window.webkitOfflineAudioContext; b = new O(1, 1, sr).createBuffer(1, d.length, sr); }
-  b.copyToChannel(d, 0); return b;
+function mkBuf(d, sr, d2){
+  /* STEREO SAMPLES: d2 is the right channel of a stereo pad (the same shape live plays it in: stBuf) */
+  const nc = d2 ? 2 : 1; let b; try { b = new AudioBuffer({length:d.length, sampleRate:sr, numberOfChannels:nc}); }
+  catch(e){ const O = window.OfflineAudioContext || window.webkitOfflineAudioContext; b = new O(1, 1, sr).createBuffer(nc, d.length, sr); }
+  b.copyToChannel(d, 0); if (d2) b.copyToChannel(d2.length === d.length ? d2 : d2.subarray(0, d.length), 1); return b;
+}
+/* A pad's sound for an offline render: {d, d2}, d the left channel (or the only one), d2 the right one of a stereo pad (null
+   for mono). renderAsync (the Worker) hands the right channel back as .data2, renderVoice (here) as .r on the data. */
+async function padRender(v, sr, hold){
+  try { const r = await renderAsync(v, sr, hold, false); return {d:r.data, d2:r.data2 || null}; }
+  catch(err){ const d = renderVoice(v, sr, null, hold); await idle(); return {d, d2:d.r || null}; }
+}
+/* getB for pass(): the AudioBuffer of a rendered pad, stereo when the pad is (reversed and stretched like live: rtBuf). */
+function renderGetB(pads, pads2, sr){
+  const bufs = new Map();
+  return (pad, rev, st) => { const k = pad + (rev ? 'r' : 'f') + stKey(st); let b = bufs.get(k);
+    if (!b){ const d0 = pads.get(pad); if (!d0) return null; const e0 = pads2.get(pad) || null, ls = st ? loopSecs(pad, d0, sr) : 0;
+      let d = st ? stretchData(d0, sr, ls, st) : d0, e = e0 && st ? stretchData(e0, sr, ls, st) : e0;
+      if (rev){ d = d.slice().reverse(); if (e) e = e.slice().reverse(); }
+      b = mkBuf(d, sr, e); bufs.set(k, b); } return b; };
 }
 async function pass(evs, keep, N, sr, getB, lim, masterFx){
   // BUS (20 Oct): a bus track's render takes its sources with it (they play through it); one pure source rendered on its
@@ -25029,6 +25060,7 @@ async function pass(evs, keep, N, sr, getB, lim, masterFx){
   const wantChn = [...keep].some(t => chainsFeed(t)) && S.chainPatch && S.chainPatch.format === 'chains.patch';
   const wantFx = [...keep].some(t => fxAny(S.tfx[t])) || (masterFx && fxAny(S.mfx));
   const ok = wantFx ? await tfxReady(oc) : false;
+  if (wantFx && !ok && !NOWK) throw new Error(RENDER_FX_FAIL);   /* the effects' module didn't load into this render: say so, don't write a render without them */
   const chnOk = wantChn ? await chainsReady(oc) : false;
   if (chnOk) chnSync.add(oc);
   let head = out;
@@ -25060,6 +25092,7 @@ async function pass(evs, keep, N, sr, getB, lim, masterFx){
   if (passProg){ const pg = passProg, tot = oc.length / sr, q = 128 / sr, k = Math.max(1, Math.ceil(tot / 50 / q)) * q;
     for (let t = k; t < tot - q; t += k){ const at = t, p = oc.suspend(at); if (p && p.then) p.then(() => { if (rprog.cancelled) return; try { pg(at / tot); } catch(e){} return oc.resume(); }).catch(() => {}); } }   // CANCEL: stays suspended
   const b = passProg && rprog.cancelP ? await Promise.race([oc.startRendering(), rprog.cancelP]) : await oc.startRendering();
+  if (tfxErrAc.has(oc)) throw new Error(RENDER_FX_FAIL);   /* an effect node never started: the render is silent where it plays, so it is not kept */
   return [b.getChannelData(0).slice(lat, lat + N), b.getChannelData(1).slice(lat, lat + N)];   // the latency (mastering, the limiter's lookahead) trimmed off
 }
 function wavN(chs, sr, bits){
@@ -25103,15 +25136,11 @@ async function renderOut(stems){
     const inBus = t => BP.pure.has(t) && (BP.targets.get(t) || []).some(b => keepT.includes(b));
     if (!keepT.length) return toast('Every track with notes is muted.');
     const nStem = stems ? keepT.filter(t => !inBus(t)).length : 0; rprog.n = 1.15 + nStem; rprog.step(0, 'Rendering the pads…'); await idle();
-    const pads = new Map(); let pi = 0; const pN = new Set(notes.map(e => e.pad)).size;
-    // In the Worker when it can (the page stays responsive), here otherwise.
+    const pads = new Map(), pads2 = new Map(); let pi = 0; const pN = new Set(notes.map(e => e.pad)).size;
+    // In the Worker when it can (the page stays responsive), here otherwise. STEREO SAMPLES: a stereo pad keeps its right channel (pads2).
     for (const e of notes) if (!pads.has(e.pad)){ const v = kit.voices[e.pad], hold = isSyn(e.pad) ? v.len : 0;
-      let d; try { d = (await renderAsync(v, sr, hold, false)).data; } catch(err){ d = renderVoice(v, sr, null, hold); await idle(); }
-      pads.set(e.pad, d); rprog.set(0.15 * ++pi / pN); rprog.check(); }
-    const bufs = new Map();
-    const getB = (pad, rev, st) => { const k = pad + (rev ? 'r' : 'f') + stKey(st); let b = bufs.get(k);
-      if (!b){ const d0 = pads.get(pad); if (!d0) return null; let d = st ? stretchData(d0, sr, loopSecs(pad, d0, sr), st) : d0;
-        b = mkBuf(rev ? d.slice().reverse() : d, sr); bufs.set(k, b); } return b; };
+      const r = await padRender(v, sr, hold); pads.set(e.pad, r.d); if (r.d2) pads2.set(e.pad, r.d2); rprog.set(0.15 * ++pi / pN); rprog.check(); }
+    const getB = renderGetB(pads, pads2, sr);
     let end = seq.time;
     for (const e of notes){ const len = (e.st ? e.st.beats * 60 / e.st.bpm : pads.get(e.pad).length / sr) / Math.min(e.rate, e.slide ? e.slide.from : e.rate); end = Math.max(end, e.cut != null ? Math.min(e.t + len, e.cut + 0.06) : e.t + len); }
     // Reverb, delay and resonator tails ring past the last note: render extra, then trim the silence.
@@ -25220,14 +25249,10 @@ async function renderPart(dest){
     const notes = evs.filter(e => e.type === 'note' && kit.voices[e.pad] && part.tracks.includes(e.track));
     if (!notes.length) return toast('Nothing to render: ' + part.label + ' plays no notes.');
     toast('Rendering ' + part.label + '…'); await idle();
-    const pads = new Map();
+    const pads = new Map(), pads2 = new Map();
     for (const e of notes) if (!pads.has(e.pad)){ const v = kit.voices[e.pad], hold = isSyn(e.pad) ? v.len : 0;
-      let d; try { d = (await renderAsync(v, sr, hold, false)).data; } catch(err){ d = renderVoice(v, sr, null, hold); await idle(); }
-      pads.set(e.pad, d); }
-    const bufs = new Map();
-    const getB = (p, rev, st) => { const k = p + (rev ? 'r' : 'f') + stKey(st); let b = bufs.get(k);
-      if (!b){ const d0 = pads.get(p); if (!d0) return null; let d = st ? stretchData(d0, sr, loopSecs(p, d0, sr), st) : d0;
-        b = mkBuf(rev ? d.slice().reverse() : d, sr); bufs.set(k, b); } return b; };
+      const r = await padRender(v, sr, hold); pads.set(e.pad, r.d); if (r.d2) pads2.set(e.pad, r.d2); }
+    const getB = renderGetB(pads, pads2, sr);
     let end = seq.time;
     for (const e of notes){ const len = (e.st ? e.st.beats * 60 / e.st.bpm : pads.get(e.pad).length / sr) / Math.min(e.rate, e.slide ? e.slide.from : e.rate); end = Math.max(end, e.cut != null ? Math.min(e.t + len, e.cut + 0.06) : e.t + len); }
     const tail = part.tracks.some(t => hasTailAny(S.tfx[t]) || chainsFeed(t)) || (part.master && hasTailAny(S.mfx)) ? 8 : 0;
@@ -25876,7 +25901,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 618;
+const BUILD = 619;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD + (location.pathname.includes('/beta/') ? ' · beta' : '');
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -36038,6 +36063,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [619, '15 Nov', ['A stereo sample on a pad now renders in stereo, as it plays (renders and stems made it mono)', 'Rendering many times in one session, or the stems of a big song, no longer ends in silent files: the app ran out of room for effects after enough renders. It now gets roughly three times as far, and if the limit is still reached the render stops with “Render failed: an effect couldn’t start…” and saves nothing (reloading the app clears it)']],
   [618, '15 Nov', ['273 new drum sounds in the pad’s Presets list: 31 kicks, 30 snares, 23 claps, 16 rims, 25 closed and 15 open hats, 15 cymbals, 15 shakers, 28 toms, 15 hand drums, 26 cowbells / blocks / metal, and 34 IDM and glitch hits', '12 new kits in File › Drum kits: Electro 2, IDM clicks, IDM metallic, Glitch, Deep sub, Hard, Lo-fi, Minimal, FM percussion, Breaks, Industrial, Chip. Like the engine presets they were levelled and checked by measurement, not by ear: say which to cut']],
   [617, '15 Nov', ['About 360 new presets across the pitched engines: Acid 20, Bass 23, Phase 20, Partials 20, Vector 19, Scanned 18, Swarm 18, Chip 18, Drift 16, Table 16, Bytebeat 16, Modal 16, Resynth 14, Breath 14, Strings 12, Wind 12, Blip 11, Tone 11, Vox 11, Piano 10, EP 10, Organ 10. Basses, leads, pads, keys and bells, textures, short arp sounds and metallic IDM material. They were levelled and checked by measurement, not by ear: say which to cut']],
   [616, '14 Nov', ['Audio & MIDI › LATENCY COMP is now AUTO / ON / OFF, and AUTO is the default. When a track or bus holds an effect that looks ahead (CALM, TONE, LIMIT, TUNE, linear-phase EQ…), the other tracks wait for it while the song plays, so that bus, and a tempo-synced delay on it, land on the beat instead of about 46 ms late. With no such effect nothing changes. Stopped, pads answer at once. A notice tells you the first time it happens; OFF brings the old behaviour back', 'With latency compensation working, Flex, Step gate and Retrigger on the master (and on a bus) stay on the beat of what they hear (they ran early), a clocked pump effect after CALM in one chain keeps time, and changing the delay no longer clicks']],

@@ -1,6 +1,6 @@
 # Thunder Plus test checklist, by priority
 
-> Snapshot of the owner's Claude Doc "Thunder Plus test checklist, by priority" (https://claude.ai/artifact/LrzQ18ur18Fc5gkvxmQDbK), exported 15 Nov 2026 with his ticks as in the doc (build 616).
+> Snapshot of the owner's Claude Doc "Thunder Plus test checklist, by priority" (https://claude.ai/artifact/LrzQ18ur18Fc5gkvxmQDbK), exported 15 Nov 2026 with his ticks as in the doc (build 619).
 > The live list is the Claude Doc; the source of every item is "Owner's punch list" in HANDOVER.md (build numbers are in brackets).
 > Re-export this file when the doc changes.
 
@@ -10,7 +10,7 @@
 
 This list is in order of importance, so start at the top.
 
-Do section 1 first; it is short: the newest builds (589 to 616, ears first), what could lose work or sound.
+Do section 1 first; it is short: the newest builds (589 to 619, ears first), what could lose work or sound.
 
 Do sections 2 and 3 as time allows.
 
@@ -22,7 +22,7 @@ If something fails, tell Claude the build number and what happened; tick an item
 
 | Section | Open items | Mostly on | Why it matters |
 | --- | --- | --- | --- |
-| 1. Do these first | 78 | Phone and computer | The newest builds (589 to 616), lost work or sound |
+| 1. Do these first | 88 | Phone and computer | The newest builds (589 to 619), lost work or sound |
 | 2. Really worth trying | 68 | Phone | Everyday features nobody has tried on a real device, the 585 to 588 editor checks and the re-checks of your last fixes |
 | 3. If you have time | 47 | Phone, then gear | Secondary features, by-ear comparisons and hardware |
 | 4. Safe to skip unless something looks wrong | 55 | Mixed | Cosmetic, older, or already covered by automated tests |
@@ -30,6 +30,21 @@ If something fails, tell Claude the build number and what happened; tick an item
 | Set aside | 5 | none | Nothing: probably superseded |
 
 ## 1. Do these first
+
+### New in builds 617 to 619: engine presets, drum sounds and kits, stereo renders
+
+*The three newest builds, newest first. Build 619 changes what renders contain; 617 and 618 are by ear.*
+
+- [ ] Computer: a stereo sample on a pad (something wide), play it, render it, compare on headphones. Pass: the render is as wide as playback (it was mono). (619)
+- [ ] Computer: render the stems of your 22-track song, twice in one session. Pass: every stem has sound; or, if it runs out, the render stops with a “Render failed” message and writes no silent file (reload, then render again). (619)
+- [ ] Any device, by ear: load the IDM clicks, Glitch and Chip kits. Pass: the 8 pads of each are distinct and at a similar loudness. Then the other nine kits: name any that are weak. (618)
+- [ ] Any device, by ear: hats and cymbals: the open hats choke on the closed ones; the reverse crash and riser swells sound right. (618)
+- [ ] Any device, by ear: toms: Analog tom 1 to 6 step evenly in pitch; the big drums (Taiko-style) feel big. (618)
+- [ ] Any device, by ear: kicks, snares and claps: step through the new ones on a pad. Pass: nothing clipped, clicky by mistake, or far off the level of the old ones. Name the ones to cut. (618)
+- [ ] Any device, by ear: Acid and Bass: step through the new presets with your own patterns. Pass: each is usable and sits at the level of the old ones. Name the ones to cut or fix. (617)
+- [ ] Any device, by ear: Bytebeat: the new formulas. Pass: they read as musical lines, not only noise. (617)
+- [ ] Any device, by ear: Tone and Blip: the new tonal presets (Tone “Spectra bell”, Blip “FM bleep”). Pass: they sit at a usable level next to the drum presets. (617)
+- [ ] Any device, by ear: a quick pass over the other engines’ new presets (Phase, Partials, Vector, Scanned, Swarm, Table, Chip, Drift, Resynth, Modal, the acoustic ones). Pass: nothing harsh, silent, or far louder or quieter than its neighbours; tell me any that are near-copies. (617)
 
 ### New in builds 611 to 616: mono / poly tracks, MOD and names, Arrange keys, latency
 

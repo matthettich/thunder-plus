@@ -18,7 +18,7 @@ const MARGIN = 4;
 /* rows (min / max) of the engines that keep them outside XUI: parsed from the tables in index.html */
 function rowsFrom(anchor) {
   const a = HTML.indexOf(anchor); assert.ok(a >= 0, anchor); const b = HTML.indexOf('\n};', a), rows = {};
-  for (const m of HTML.slice(a, b).matchAll(/^\s{2}(\w+):\{[^\n]*?min:\s*(-?[\d.]+),\s*max:\s*(-?[\d.]+)/gm)) rows[m[1]] = { min: +m[2], max: +m[3] };
+  for (const m of HTML.slice(a, b).matchAll(/^\s{2}(\w+):\{[^\n]*?min:\s*(-?[\d.]+),\s*max:\s*(-?[\d.]+)(?:,\s*c:\s*'(\w+)')?/gm)) rows[m[1]] = { min: +m[2], max: +m[3], c: m[4] };
   return rows;
 }
 const rowsOf = k => k === 'bass' ? rowsFrom('const BU = {') : k === 'vox' ? rowsFrom('const VU = {') : k === 'blip' ? rowsFrom('const BLU = {') : C.E.XUI[k].rows;
@@ -68,7 +68,7 @@ test('engine presets: a sample of the new presets measures well (finite, not sil
         if (a.pk >= 1) failures.push(tag + 'peak ' + a.pk.toFixed(2));
       }
       if (w && (a1.loudDb < w[0] - MARGIN || a1.loudDb > w[1] + MARGIN)) failures.push(tag + 'loudness ' + a1.loudDb.toFixed(1) + ' dB outside ' + w[0] + '..' + w[1] + ' (+-' + MARGIN + ')');
-      if (!skip.includes('*') && !skip.includes(m.name) && Math.min(m.at[0].pitchErr, a1.pitchErr) > 60) failures.push(tag + 'pitch off by ' + Math.min(m.at[0].pitchErr, a1.pitchErr).toFixed(0) + ' cents');
+      if (!skip.includes('*') && !skip.includes(m.name) && C.pitchBad(m)) failures.push(tag + 'pitch off by ' + m.at.map(a => a.cents.toFixed(0)).join(' / ') + ' cents (C2 / C3 / C4)');
     }
   }
   assert.deepEqual(failures, []);
