@@ -2445,7 +2445,7 @@ function buildSrLab(n){
     if (playBlocked()){ inp.value = typeof m.text === 'string' ? m.text : ''; return; }
     store.snapshot(); m.text = v; exprSend(m, v);
     if (v.trim() && (Math.round(m.params.lab) || 0) !== 0){ setParam(n, 'lab', 0); }
-    paintSr(); if (m.collapsed) paintSum(n); store.touch();
+    paintSr(); try { paintXc(); } catch (e) {} if (m.collapsed) paintSum(n); store.touch();
   };
   inp.addEventListener('keydown', e => { if (!(e.ctrlKey || e.metaKey)) e.stopPropagation(); if (e.key === 'Enter'){ e.preventDefault(); apply(); inp.blur(); } else if (e.key === 'Escape'){ e.preventDefault(); inp.value = typeof m.text === 'string' ? m.text : ''; inp.blur(); } });
   inp.addEventListener('keyup', e => { if (!(e.ctrlKey || e.metaKey)) e.stopPropagation(); });
@@ -4056,12 +4056,22 @@ function xcCables(){
   const trk = m => (m.params && m.params.track) | 0, ins = mods.filter(m => m.type === 'trackIn' && trk(m) > 0), outs = mods.filter(m => m.type === 'chainOut' && trk(m) > 0);
   if (!ins.length || !outs.length) return out;
   // The edges the engine runs: a cable out of a Receive is one edge from every source cabled into the Send of its label (both drawn cables are what gets marked).
-  const by = new Map(mods.map(m => [m.id, m])), edges = [], sends = new Map();
-  for (const c of cables){ const d = by.get(c.to[0]); if (d && d.type === 'send'){ const k = srKeyOf(d); if (k){ if (!sends.has(k)) sends.set(k, []); sends.get(k).push(c); } } }
+  const by = new Map(mods.map(m => [m.id, m])), edges = [], sends = new Map(), per = new Map();   // same port choice as the worklet's srResolve: Out takes In, Out R takes In R (In when it has none, Send by Send), a Receive cabled into a Send is followed through
+  for (const c of cables){ const d = by.get(c.to[0]); if (d && d.type === 'send'){ const k = srKeyOf(d); if (k){ if (!sends.has(k)) sends.set(k, []); let e = per.get(d.id); if (!e){ per.set(d.id, e = { in:[], inR:[] }); sends.get(k).push(e); } if (c.to[1] === 'in') e.in.push(c); else if (c.to[1] === 'inR') e.inR.push(c); } } }
+  const feeds = (rm, port, seen) => {
+    const key = rm.id + '.' + port; if (seen.has(key)) return []; seen.add(key); const res = [];
+    for (const e of sends.get(srKeyOf(rm)) || []){
+      for (const q of port === 'outR' ? (e.inR.length ? e.inR : e.in) : port === 'out' ? e.in : []){
+        const sm = by.get(q.from[0]);
+        if (sm && sm.type === 'recv'){ for (const f of feeds(sm, q.from[1], seen)) res.push({ a:f.a, marks:[q, ...f.marks] }); } else res.push({ a:q.from[0], marks:[q] });
+      }
+    }
+    seen.delete(key); return res;
+  };
   for (const c of cables){
     const s = by.get(c.from[0]), d = by.get(c.to[0]);
     if (d && d.type === 'send') continue;
-    if (s && s.type === 'recv'){ for (const q of sends.get(srKeyOf(s)) || []) edges.push({ a:q.from[0], b:c.to[0], marks:[q, c] }); continue; }
+    if (s && s.type === 'recv'){ for (const f of feeds(s, c.from[1], new Set())) edges.push({ a:f.a, b:c.to[0], marks:[...f.marks, c] }); continue; }
     edges.push({ a:c.from[0], b:c.to[0], marks:[c] });
   }
   const fwd = new Map(), back = new Map(), add = (M, a, b) => { if (!M.has(a)) M.set(a, []); M.get(a).push(b); };

@@ -39,3 +39,15 @@ test('the Send and Receive entries are the same in both editors (shared block)',
   const g = s => s.match(/const SR_LAB = [\s\S]*?\nfunction srStatus[\s\S]*?\n\}\n/)[0];
   assert.equal(g(ED.chains), g(ED.waves));
 });
+
+for (const [ed, src] of Object.entries(ED)){
+  test(ed + ': the editor picks ports as the worklet does (Out takes In only; In R falls back per Send), follows pairs in series, and a custom-text rename refreshes the marks', () => {
+    const d = { modules: [mod('i1', 'trackIn', { track: 1 }), mod('i2', 'trackIn', { track: 2 }), mod('o1', 'chainOut', { track: 1 }), mod('s', 'send', { lab: 1 }), mod('r', 'recv', { lab: 1 })],
+      cables: [cab('i1', 'out', 's', 'in'), cab('i2', 'out', 's', 'inR'), cab('r', 'out', 'o1', 'in')] };
+    assert.equal(fns(src, d).xcCables().size, 0, 'track 2 is on In R, which Out does not carry');
+    const e = { modules: [mod('i1', 'trackIn', { track: 1 }), mod('i2', 'trackIn', { track: 2 }), mod('o1', 'chainOut', { track: 1 }), mod('sa', 'send', { lab: 1 }), mod('ra', 'recv', { lab: 1 }), mod('sb', 'send', { lab: 2 }), mod('rb', 'recv', { lab: 2 })],
+      cables: [cab('i2', 'out', 'sa', 'in'), cab('ra', 'out', 'sb', 'in'), cab('rb', 'out', 'o1', 'in'), cab('i1', 'out', 'o1', 'in')] };
+    assert.equal(fns(src, e).xcCables().size, 3, 'the whole series is marked');
+    assert.match(src, /paintSr\(\); try \{ paintXc\(\); \} catch \(e\) \{\} if \(m\.collapsed\) paintSum\(n\); store\.touch\(\);/);
+  });
+}

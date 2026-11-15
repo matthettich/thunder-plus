@@ -66,3 +66,26 @@ test('send/receive: a patch with no pair runs on the very cables that were drawn
   const E = engine(); E.loadPatch(direct()); const g = E.graph;
   for (const [id, list] of g.inc) for (const c of list) assert.ok(g.cables.includes(c), id);
 });
+
+/* CodeRabbit findings on PR 161 */
+test('send/receive: two Sends of one label, one with In R and one without: Out R gets the mono one on both sides (per Send)', () => {
+  const p = { ti2: 1, modules: [tin(), mod('i2', 'trackIn', { track: 2 }), mod('s1', 'send', { lab: 1 }), mod('s2', 'send', { lab: 1 }), mod('r', 'recv', { lab: 1 }), tout()],
+    cables: [cab('i', 'out', 's1', 'in'), cab('i', 'outR', 's1', 'inR'), cab('i2', 'out', 's2', 'in'), cab('r', 'out', 'o', 'in'), cab('r', 'outR', 'o', 'inR')] };
+  const E = engine(); E.loadPatch(p);
+  const into = E.graph.inc.get('o').filter(c => c.b[1] === 'inR').map(c => c.a[0] + '.' + c.a[1]).sort();
+  assert.equal(into.join(), 'i.outR,i2.out', 'In R of s1 and the In fallback of s2');
+});
+test('send/receive: pairs in series resolve through (Track In -> Send A, Receive A -> Send B, Receive B -> out), and a loop of Receives does not hang', () => {
+  const p = { modules: [tin(), mod('sa', 'send', { lab: 1 }), mod('ra', 'recv', { lab: 1 }), mod('sb', 'send', { lab: 2 }), mod('rb', 'recv', { lab: 2 }), tout()],
+    cables: [cab('i', 'out', 'sa', 'in'), cab('i', 'outR', 'sa', 'inR'), cab('ra', 'out', 'sb', 'in'), cab('ra', 'outR', 'sb', 'inR'), cab('rb', 'out', 'o', 'in'), cab('rb', 'outR', 'o', 'inR')] };
+  const direct = { modules: [tin(), tout()], cables: [cab('i', 'out', 'o', 'in'), cab('i', 'outR', 'o', 'inR')] };
+  const a = render(p), d = render(direct); assert.ok(energy(a.L) > 1 && same(a.L, d.L) && same(a.R, d.R));
+  const loop = { modules: [mod('sa', 'send', { lab: 1 }), mod('ra', 'recv', { lab: 1 }), tout()], cables: [cab('ra', 'out', 'sa', 'in'), cab('ra', 'out', 'o', 'in')] };
+  assert.doesNotThrow(() => render(loop, 4));
+});
+test('waves: a label change through setText / setParam marks culling dirty', () => {
+  const ctx = H.freezeClock(H.pageScope()); H.load(ctx, 'waves/waves-worklet.js');
+  const src = H.read('waves/waves-worklet.js');
+  assert.match(src, /this\.graph\.compile\(\); this\._sync\(\); \} \} \}\n/);
+  assert.equal((src.match(/this\.graph\.compile\(\); this\._sync\(\);/g) || []).length, 2);
+});

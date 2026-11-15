@@ -5529,20 +5529,34 @@ const RecvM = { type:'recv', scope:'mono', cost:0, text:true, inputs:{}, outputs
 function srResolve(mods, cables){
   let any = false; for (const m of mods.values()) if (m.def.type === 'send' || m.def.type === 'recv'){ any = true; break; }
   if (!any) return cables;
-  const into = new Map();
+  const into = new Map(), per = new Map();   // label -> its Sends, each with its own In / In R cables
   for (const c of cables){
     const m = mods.get(c.b[0]); if (!m || m.def.type !== 'send') continue;
-    const k = srKey(m.inst); if (!k) continue; let e = into.get(k); if (!e) into.set(k, e = { in:[], inR:[] });
+    const k = srKey(m.inst); if (!k) continue; let l = into.get(k); if (!l) into.set(k, l = []);
+    let e = per.get(m.id); if (!e){ per.set(m.id, e = { in:[], inR:[] }); l.push(e); }
     if (c.b[1] === 'in') e.in.push(c); else if (c.b[1] === 'inR') e.inR.push(c);
   }
+  /* What a Receive's port carries: the sources cabled into its label's Sends (In R falling back to In, Send by Send). A source that is itself a Receive (a pair in series)
+     is followed through, with a loop of Receives cut. */
+  const feeds = (rm, port, seen) => {
+    const key = rm.id + '.' + port; if (seen.has(key)) return []; seen.add(key);
+    const out = [];
+    for (const e of into.get(srKey(rm.inst)) || []){
+      const src = port === 'outR' ? (e.inR.length ? e.inR : e.in) : port === 'out' ? e.in : [];
+      for (const s of src){
+        const sm = mods.get(s.a[0]);
+        if (sm && sm.def.type === 'recv'){ for (const f of feeds(sm, s.a[1], seen)) out.push({ a:f.a, fb:f.fb || s.fb === true }); }
+        else out.push({ a:s.a, fb:s.fb === true });
+      }
+    }
+    seen.delete(key); return out;
+  };
   const eff = [], virt = [];
   for (const c of cables){
     const sm = mods.get(c.a[0]), dm = mods.get(c.b[0]);
     if (dm && dm.def.type === 'send') continue;
     if (sm && sm.def.type === 'recv'){
-      const e = into.get(srKey(sm.inst)); if (!e) continue;
-      const src = c.a[1] === 'outR' ? (e.inR.length ? e.inR : e.in) : c.a[1] === 'out' ? e.in : [];
-      for (const s of src) virt.push({ a:s.a, b:c.b, fb:c.fb === true || s.fb === true });
+      for (const f of feeds(sm, c.a[1], new Set())) virt.push({ a:f.a, b:c.b, fb:c.fb === true || f.fb });
       continue;
     }
     eff.push(c);
