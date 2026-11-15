@@ -1,4 +1,4 @@
-// EFFECTS THAT REST (build 606; the owner's CPU items of 14 Nov, measured on his song `acid`):
+// EFFECTS THAT REST (build 607; the owner's CPU items of 14 Nov, measured on his song `acid`):
 //  1. a switched-OFF pump effect still cost its plugin's whole process call (pump MASTER about 8% of the audio thread). Its OFF is exactly
 //     "the input, late by the latency", so ThunderFx now plays that delay itself and leaves the plugin alone (pumpRest);
 //  2. a muted track's effects kept running. The node now hears silence while its track cannot be heard, and the sleep rules take it from there;

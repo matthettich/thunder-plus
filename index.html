@@ -19548,7 +19548,7 @@ class ThunderFx extends AudioWorkletProcessor {
      out 10 to 20 times slower, for as long as the silence lasts (a phone's does not); the tiny guard added at the node's input does not
      stop it. With sound going through, nothing changes: the slot runs exactly as before. Not for effects that speak up on their own
      after a pause (Vinyl's crackle, pump CRUSH's): they always run. */
-  /* PUMP OFF REST (build 606; owner's song, 14 Nov: pump MASTER switched OFF still cost about 8% of the audio thread). A pump effect's OFF is
+  /* PUMP OFF REST (build 607; owner's song, 14 Nov: pump MASTER switched OFF still cost about 8% of the audio thread). A pump effect's OFF is
      the plugin's own bypass, and the plugin keeps doing all its work behind it (measured: COMP 135, LIMIT 146, MASTER 142 µs a block
      bypassed). Every pump effect's bypass is exactly "the input, late by the plugin's latency" (measured on all 24, to the bit, within
      15 ms of the switch), so a slot that is OFF by its own setting is replaced by that delay and the plugin is not run:
@@ -19639,7 +19639,7 @@ class ThunderFx extends AudioWorkletProcessor {
     // Silence in, and the effects' tails have died away: sleep (output silence) until sound arrives again.
     let ip = 0;
     let bad = false;
-    /* MUTED TRACKS REST (build 606; owner's song: a muted track's effects still took about 3% of the audio thread). While its track cannot
+    /* MUTED TRACKS REST (build 607; owner's song: a muted track's effects still took about 3% of the audio thread). While its track cannot
        be heard (muted, or another is soloed: nothing reads a track's effects but its own fader and its "before the fader" bus feed, and
        both are shut then) the node hears silence instead of the track. The echoes die away as they would after the last note, and the
        sleep rules below then stop the work, at the latest ten seconds on. Unmuted, it hears the track again from
@@ -19681,7 +19681,7 @@ class ThunderFx extends AudioWorkletProcessor {
       const tk = inputs[1], sd = inputs[2]; this.taps = tk && tk.length ? tk : null; this.sends = sd && sd.length ? sd : null; }   // SOURCE
     if (!this.dL){ this.dL = new Float32Array(128); this.dR = new Float32Array(128); }
     const pqOn = !!(this.pq && this.pq.length);   // notes on their way to a pump effect: none of them naps
-    /* CPU PANEL NAMES THE EFFECT (build 606): each slot's own share of the time. Date.now() is in whole milliseconds, far coarser than
+    /* CPU PANEL NAMES THE EFFECT (build 607): each slot's own share of the time. Date.now() is in whole milliseconds, far coarser than
        a slot's cost, but where its ticks fall is chance, so over half a second the ticks counted against a slot add up to its time. */
     let tp = Date.now(), ps = null;
     for (const s of this.slots){
@@ -21989,7 +21989,7 @@ function makePlayer(ac, out, getBuf, live, mo){   // mo: the master OUT gain (af
   // (13 Nov, owner's Balanced report: "1 s after STOP … voices 1", then 2) a live engine's note never 'ends' (its node plays on; kill only lets the gate go), so it
   // stayed in `alive` until that engine's next note: the report counted one 'voice' per live engine that had played, for good. Let go at a STOP, it is forgotten here.
   function stopAll(at){ resetSeq(at); for (const v of alive){ kill(v, at); if (v.bass) alive.delete(v); } for (const T of vs) T.length = 0; for (const b of bassN.values()) if (b.vox) b.sylN = 0; voxG.clear(); }   // lyrics start over
-  /* MUTED TRACKS REST (build 606): tell a track's effects node whether the track can be heard (see the note in ThunderFx.p1). Live only:
+  /* MUTED TRACKS REST (build 607): tell a track's effects node whether the track can be heard (see the note in ThunderFx.p1). Live only:
      a render builds no effects node for a track that isn't heard. */
   function fxRest(t, on){ const b = buses[t]; if (!live || !b || !b.fx || t >= NT) return; const r = !on; if (b.fx._rest === r) return; b.fx._rest = r; try { b.fx.port.postMessage({rest:r}); } catch(e){} }
   function applyMix(filter){
@@ -33255,7 +33255,7 @@ function cpuRank(m){
   if (tip === 'Nothing to fix: plenty of headroom.' && sc && sc.ms >= 0.3 && !m.lowPower) tip = 'Try: Low power mode (Settings): drawing the screen takes ' + pct(sc.ms) + ' of the page’s time.';
   return {head, list:top, keep, tip, screen, screenHead:screen.length ? 'The screen (the page’s own time, a separate budget: do not add it to the audio engine above)' : '', bad:!!(d || (total != null && total > 1))};
 }
-/* CPU PANEL NAMES THE EFFECT (build 606; owner, 14 Nov): an effects row says which effects take the time: the two dearest slots of that
+/* CPU PANEL NAMES THE EFFECT (build 607; owner, 14 Nov): an effects row says which effects take the time: the two dearest slots of that
    track (or the master) with their own share of the audio engine, from what the node reports (ThunderFx: sl). A: the track's effect
    list, sl: slot -> share. "(off)" is a slot switched off by its own setting that still costs. */
 function cpuFxTop(A, sl, nameOf){
