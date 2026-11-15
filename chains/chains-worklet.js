@@ -129,7 +129,9 @@ const mixCount = p => clamp(Math.round(p.chans) || 4, 1, MIXN);
 const Mixer = Object.assign({
   type:'mixer', scope:'mono', cost:.1,
   outputs:{ out:'audio' },
-  create:() => ({}),
+  create:() => ({ pk:0 }),
+  // OUT METER (15 Nov): the loudest sample it sent out since the editor last asked (peak in dB; -120 for nothing), so a mixer shows it is passing audio.
+  show(st){ const v = [st.pk > 1e-5 ? 20 * Math.log10(st.pk) : -120]; st.pk = 0; return v; },
   process(st, io, ctx){
     const p = io.p, o = io.out.out, n = ctx.block, N = mixCount(p);
     o.fill(0);
@@ -138,6 +140,8 @@ const Mixer = Object.assign({
       const x = io.in[MXI[k]], g = p[MXL[k]] * p.level;
       for (let i = 0; i < n; i++) o[i] += x[i] * g;
     }
+    let pk = st.pk; for (let i = 0; i < n; i++){ const a = o[i] < 0 ? -o[i] : o[i]; if (a > pk) pk = a; }
+    st.pk = pk < 8 ? pk : 8;
   }
 }, mixDef(false));
 
@@ -147,7 +151,8 @@ const Mixer = Object.assign({
 const StereoMixer = Object.assign({
   type:'smixer', scope:'mono', cost:.15,
   outputs:{ out:'audio', outR:'audio' },
-  create:() => ({}),
+  create:() => ({ pk:0 }),
+  show(st){ const v = [st.pk > 1e-5 ? 20 * Math.log10(st.pk) : -120]; st.pk = 0; return v; },   // OUT METER (15 Nov): the louder side's peak, in dB
   process(st, io, ctx){
     const p = io.p, oL = io.out.out, oR = io.out.outR, n = ctx.block, N = mixCount(p);
     oL.fill(0); oR.fill(0);
@@ -157,6 +162,8 @@ const StereoMixer = Object.assign({
       const g = p[MXL[k]] * p.level, pn = p[MXP[k]], gL = g * (pn > 0 ? 1 - pn : 1), gR = g * (pn < 0 ? 1 + pn : 1);
       for (let i = 0; i < n; i++){ oL[i] += L[i] * gL; oR[i] += R[i] * gR; }
     }
+    let pk = st.pk; for (let i = 0; i < n; i++){ const a = oL[i] < 0 ? -oL[i] : oL[i], b = oR[i] < 0 ? -oR[i] : oR[i]; if (a > pk) pk = a; if (b > pk) pk = b; }
+    st.pk = pk < 8 ? pk : 8;
   }
 }, mixDef(true));
 

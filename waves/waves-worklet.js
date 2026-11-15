@@ -319,7 +319,8 @@ const Mixer = (() => {
   params.level = [1,0,2,.01];
   return {
     type:'mixer', scope:'poly', cost:.1, inputs, outputs:{ out:'audio' }, params,
-    create:() => ({}),
+    create:() => ({ pk:0 }),
+    show(st){ const v = [st.pk > 1e-5 ? 20 * Math.log10(st.pk) : -120]; st.pk = 0; return v; },   // OUT METER (15 Nov): peak in dB of what it sent out
     process(st, io, ctx){
       const p = io.p, o = io.out.out, n = ctx.block, N = clamp(Math.round(p.chans) || 4, 1, MIXN);
       o.fill(0);
@@ -328,6 +329,8 @@ const Mixer = (() => {
         const x = io.in[MXI[k]], g = p[MXL[k]] * p.level;
         for (let i = 0; i < n; i++) o[i] += x[i] * g;
       }
+      let pk = st.pk; for (let i = 0; i < n; i++){ const a = o[i] < 0 ? -o[i] : o[i]; if (a > pk) pk = a; }
+      st.pk = pk < 8 ? pk : 8;
     }
   };
 })();

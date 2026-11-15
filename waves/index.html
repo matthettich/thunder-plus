@@ -1675,6 +1675,7 @@ function buildShow(n){
     const r = h('div', {class:'ch'}, h('span', {text:lbl}), tr, v); box.append(r); rows.push({r, i, b, v, hold:-200, ht:0}); };
   if (kind === 'meter'){ mk('L'); mk('R'); box.title = 'Bars: average (VU) level. Tick: peak (held 1.5 s). Number: peak in dB. The red line is 0 dB.'; }
   else if (kind === 'scin'){ mk('IN'); mk('ENV'); rows[1].b.hidden = true; box.classList.add('sci'); box.title = 'IN: the level of what Source picks (peak, dB). ENV: the envelope its hits make (what Env and Duck send out).'; }
+  else if (kind === 'mixout'){ mk('OUT'); box.classList.add('sci'); rows[0].i.style.background = 'var(--audio)'; box.title = 'The level this mixer is sending out (peak, dB; held 1.5 s at the tick). \u2212\u221e means nothing is passing through it.'; }
   else if (kind === 'scout'){ mk('SEND'); box.classList.add('sci'); box.title = 'What this Sidechain Out sends (peak, dB).'; }
   else { mk('GR'); rows[0].b.hidden = true; box.title = 'Gain reduction: how much it is turning the sound down.'; }
   n.show = { kind, rows, seen:0 };
@@ -1699,7 +1700,7 @@ function paintShows(list){
     if (S.kind === 'scin'){ scinPaint(S, v[0], v[1], now); continue; }
     if (S.kind === 'scope'){ if (v.length >= 2 + SCOPE_W * 4 && v[0] !== S.seq){ S.seq = v[0]; S.data = v; drawScope(n); } continue; }   // a new picture only when a whole sweep is done
     if (S.kind === 'expr'){ exprPaint(n, v); continue; }   // Expression: the engine's [error code, position]
-    if (S.kind === 'scout'){ const A = S.rows[0], pk = v[0]; A.i.style.transform = 'scaleX(' + showPos(pk) + ')'; if (pk >= A.hold || now - A.ht > 1500){ A.hold = pk; A.ht = now; }
+    if (S.kind === 'scout' || S.kind === 'mixout'){ const A = S.rows[0], pk = v[0]; A.i.style.transform = 'scaleX(' + showPos(pk) + ')'; if (pk >= A.hold || now - A.ht > 1500){ A.hold = pk; A.ht = now; }
       A.b.style.left = (showPos(A.hold) * 100) + '%'; A.v.textContent = A.hold <= -90 ? '−∞' : (A.hold > 0 ? '+' : '') + A.hold.toFixed(1); if (n.lvl) setLvl(n, showPos(pk)); continue; }
     if (S.kind === 'meter') for (let c = 0; c < 2; c++){
       const R = S.rows[c], vu = v[c], pk = v[c + 2];
@@ -2393,7 +2394,7 @@ function mixDef(label, scope){
   const ui = { chans:{ l:'Inputs', c:Array.from({ length:MIXN }, (_, i) => [i + 1, String(i + 1)]), fixed:true } };
   for (let k = 1; k <= MIXN; k++){ inputs['in' + k] = 'audio'; params['l' + k] = [.8,0,1.5,.01]; ui['l' + k] = { l:'Level ' + k, f:pct }; }
   params.level = [1,0,2,.01]; ui.level = { l:'Master', f:pct };
-  return { label, scope, inputs, outputs:{ out:'audio' }, params, ui };
+  return { label, scope, inputs, outputs:{ out:'audio' }, params, ui, display:'mixout' };
 }
 // Which channel a port or control belongs to (In 5, Level 5, and its modulation jack), 0 for none.
 const mixChan = k => { const r = /^(?:p:)?(?:in|l)(\d+)$/.exec(k); return r ? +r[1] : 0; };
@@ -3089,7 +3090,7 @@ function buildNode(m){
   { const plan = secPlan(m.type, [...rowEls.keys()], k => plabel(m.type, k));   // T14: a long module is cut into sections (the first open)
     if (plan){ const at = kids.indexOf(rowEls.values().next().value); kids.splice(at, rowEls.size, ...secWrap(n, rowEls, plan)); } }
   if (m.type === 'out'){ n.meter = h('span'); kids.push(h('div', {class:'prog', title:'Level'}, n.meter)); }
-  if (def.display){ const sh = buildShow(n); if (sh) { if (def.display === 'expr') kids.unshift(sh); else kids.push(sh); } }   // (Expression: its formula field leads, above the sliders)
+  if (def.display){ const sh = buildShow(n); if (sh) { if (def.display === 'expr' || def.display === 'mixout') kids.unshift(sh); else kids.push(sh); } }   // (Expression: its formula field leads, above the sliders)
   if (NOTES[m.type]){ n.note = h('div', {class:'status'}); kids.push(n.note); }
   const body = h('div', {class:'body'}, kids);
   buildSummary(n);   // COMPACT: the collapsed look
@@ -3192,7 +3193,7 @@ function buildSummary(n){
   });
   n.sumM = h('span', {class:'cs-m'});
   const kids = [h('span', {class:'cs-t'}, n.sumIt.map(i => i.el)), n.sumM];
-  if (n.meter || def.display === 'scout' || Object.values(def.outputs).some(k => KIND[k] === 'audio')){ n.lvl = { el: h('b'), shown:-1 }; kids.push(h('span', {class:'clvl', 'aria-hidden':'true'}, n.lvl.el)); }
+  if (n.meter || def.display === 'scout' || def.display === 'mixout' || Object.values(def.outputs).some(k => KIND[k] === 'audio')){ n.lvl = { el: h('b'), shown:-1 }; kids.push(h('span', {class:'clvl', 'aria-hidden':'true'}, n.lvl.el)); }
   n.sum = h('div', {class:'csum'}, kids);
 }
 // The summary line: each key value as its control would read it (a modulated one at its live value, in the modulation colour).
@@ -4698,6 +4699,7 @@ function paintJacks(list){
   if (list){ jackSeen = Date.now(); for (const [id, dir, port, v] of list){ const n = nodes.get(id), q = n && n.pms && n.pms[dir + ':' + port]; if (q && v > q.v) q.v = v; } }
   if (hovCable) cabText();   // M8: the hovered cable's readout, from the same telemetry (before the meters fall back)
   for (const n of nodes.values()){
+    if (n.show && n.show.kind === 'mixout' && n.show.seen && performance.now() - n.show.seen > 400){ const A = n.show.rows[0]; n.show.seen = 0; A.i.style.transform = 'scaleX(0)'; A.hold = -200; A.b.style.left = '0%'; A.v.textContent = '\u2212\u221e'; if (n.lvl) setLvl(n, 0); }   // a Mixer's OUT meter, stopped: falls back to nothing
     if (!n.pms) continue;
     let lv = 0;
     for (const k in n.pms){
@@ -4706,7 +4708,7 @@ function paintJacks(list){
       if (w !== q.shown){ q.shown = w; q.el.style.transform = 'scaleY(' + w + ')'; }
       q.v *= .6;
     }
-    if (n.lvl && !n.meter && !(n.show && n.show.kind === 'scout')) setLvl(n, lv);   // COMPACT: the level strip
+    if (n.lvl && !n.meter && !(n.show && (n.show.kind === 'scout' || n.show.kind === 'mixout'))) setLvl(n, lv);   // COMPACT: the level strip
   }
 }
 setInterval(() => { if (napping()) return; if (doc && Date.now() - jackSeen > 250) paintJacks(null); }, 120);
