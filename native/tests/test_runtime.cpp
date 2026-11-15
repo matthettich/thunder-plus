@@ -10,6 +10,7 @@
 #include <cstdio>
 #include <cstring>
 #include <functional>
+#include <limits>
 #include <vector>
 
 #include "rt/auto.h"
@@ -39,6 +40,28 @@ static Curve mk(double (*fn)(const double*, double)) { Curve c; c.fn = fn; retur
 static void golden() {
   { Fnv H; Lcg r{777}; for (int i = 0; i < 20000; i++) { const double x = (r() * 2 - 1) * (i % 4 == 0 ? 700 : i % 4 == 1 ? 30 : i % 4 == 2 ? 1.2 : 1e-3); H.add(js_exp(x)); }
     CHECK(H.h == kExpGolden, "js_exp gives V8's Math.exp, bit for bit, over 20000 values"); }
+  // U07: js_pow, js_round, the 32-bit conversions, js_imul and js_number_to_string (the same programs as runtime-golden.mjs)
+  { Fnv H; Lcg r{4242}; const double INF = HUGE_VAL, NaN = std::numeric_limits<double>::quiet_NaN();
+    for (int i = 0; i < 20000; i++) { const double a = r(), b = r(); const int m = i % 5;
+      H.add(m == 0 ? js_pow(2, (std::floor(a * 241) - 120 + (b < 0.3 ? std::floor(b * 100) / 100 : 0)) / 12) : m == 1 ? js_pow(a * 1.2, 2) : m == 2 ? js_pow(a * 100, b * 8 - 4)
+        : m == 3 ? js_pow(2, (b * 2400 - 1200) / 1200) : js_pow(10, (a * 2 - 1) * 300 * b)); }
+    const double xy[][2] = {{0, 0}, {-0.0, 3}, {-0.0, -3}, {-8, 1.0 / 3}, {-8, 3}, {-8, 2}, {1, INF}, {-1, -INF}, {2, INF}, {0.5, INF}, {2, -INF}, {NaN, 0}, {1, NaN}, {INF, -1}, {-INF, 3}, {4, 0.5}, {-4, 0.5},
+      {5e-324, 0.5}, {2, -1074}, {2, -1080}, {2, 1023.5}, {2, 1024}, {10, 308}, {10, -320}, {1.0000001, 1e10}, {0.9999999, 1e20}, {3, -1}, {7, 1}};
+    for (const auto& q : xy) { const double v = js_pow(q[0], q[1]); H.add(v != v ? std::numeric_limits<double>::quiet_NaN() : v); }
+    CHECK(H.h == kPowGolden, "js_pow gives V8's Math.pow, bit for bit, over 20000 values and the special cases"); }
+  { Fnv H; Lcg r{99}; const double INF = HUGE_VAL, NaN = std::numeric_limits<double>::quiet_NaN();
+    const double xs[] = {0, -0.0, 0.5, -0.5, 1.5, -1.5, 2.5, -2.5, 0.49999999999999994, -0.49999999999999994, 4503599627370497.0, -4503599627370497.0, 9007199254740991.0, NaN, INF, -INF, 1e300, -1e300, 2147483647.5, 4294967295.7, 4294967296.0, -4294967297.2, 6e18, -6e18};
+    for (double x : xs) { H.add(js_round(x)); H.add((double)js_to_int32(x)); H.add((double)js_to_uint32(x)); }
+    for (int i = 0; i < 20000; i++) { const double a = r(), b = r(), x = (a * 2 - 1) * (i % 3 == 0 ? 1000 : i % 3 == 1 ? 5e9 : 3e19), h = std::floor(b * 2000) / 2 - 500;
+      H.add(js_round(x)); H.add(js_round(h)); H.add((double)js_to_int32(x)); H.add((double)js_to_uint32(x)); H.add((double)(js_to_int32(x) >> 3)); H.add((double)(int32_t)js_imul(js_to_uint32(x), js_to_uint32(b * 4294967296.0))); }
+    CHECK(H.h == kRoundGolden, "js_round, js_to_int32 / js_to_uint32 and js_imul equal the JS's, over 20000 values and the edge cases"); }
+  { uint64_t h = 0xcbf29ce484222325ull; Lcg r{31337}; const double INF = HUGE_VAL, NaN = std::numeric_limits<double>::quiet_NaN();
+    const auto addS = [&h](double x) { char b[32]; const int n = js_number_to_string(x, b); for (int i = 0; i < n; i++) { h ^= (unsigned char)b[i]; h *= 0x100000001b3ull; } h ^= 10; h *= 0x100000001b3ull; };
+    const double xs[] = {0, -0.0, 1, -1, 0.1, 1e21, 1e-7, 0.000001, 123456789012345680000.0, 1.7976931348623157e308, 5e-324, 0.5, 1.0 / 3, 2.0 / 3, 100, 1e5, 123.456, NaN, INF, -INF, 0.009542, 1.145038};
+    for (double x : xs) addS(x);
+    for (int i = 0; i < 6000; i++) { const double a = r(), b = r(); const int m = i % 6;
+      addS(m == 0 ? js_round(a * 4e8) / 1e6 : m == 1 ? js_round((a - 0.5) * 2e3) / 1e6 : m == 2 ? std::floor(a * 1e6) : m == 3 ? a * js_pow(10, std::floor(b * 60) - 30) : m == 4 ? -a * b : js_round(a * 1e9) * js_pow(10, std::floor(b * 30))); }
+    CHECK(h == kNumStrGolden, "js_number_to_string equals String(x) in V8 over 6000 values and the edge cases"); }
   { const uint32_t nn[4] = {1, 2, 0x7f, 0xff};
     for (int k = 0; k < 4; k++) { Mulberry32 g(sed_seed(nn[k])); Fnv H; for (int i = 0; i < 1000; i++) H.add(g.next()); CHECK(H.h == kRngGolden[k], "the seeded random stream equals the JS's"); } }
   const Curve fns[3] = {mk(f_sq), mk(f_exp), mk(f_lin)};
