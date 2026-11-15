@@ -24,6 +24,6 @@ test('the bottom panel fader cap is a flat bar like the Mixer\'s .mfbar, not a r
 test('the fader\'s behaviour code is untouched: the cap is still positioned with style.bottom at stPos, the drag is on the strip', () => {
   assert.match(src, /stVol\.querySelector\('\.stcap'\)\.style\.bottom = fy \+ 'px'/);
   assert.match(src, /const stPos = v => \{ const h = stVol\.clientHeight - 16; return 8 \+ v \/ 255 \* h; \};/);
-  assert.match(src, /stVol\.addEventListener\('dblclick', stReset\)/); assert.match(src, /stVol\.dataset\.wheel = ''; stVol\._wheel = /); assert.match(src, /stVol\.addEventListener\('contextmenu', e => valMenu\(/);
+  assert.match(src, /stVol\.addEventListener\('dblclick', stVolType\)/); assert.match(src, /stVol\.dataset\.wheel = ''; stVol\._wheel = /); assert.match(src, /stVol\.addEventListener\('contextmenu', e => valMenu\(/);
   assert.equal(rules.filter(([s]) => /\.stcap/.test(s)).every(([, b]) => !/pointer-events/.test(b)), true);
 });

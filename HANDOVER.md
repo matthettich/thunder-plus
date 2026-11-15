@@ -366,7 +366,7 @@ clock mapping at that latency (7 Nov (16)). Re-check MIDI timing with Measure…
 
 ## Desktop releases
 
-- **v1.3.8** (15 Nov 2026, a regular release; owner, 14 Nov 23:15: "after finishing everything on your list, please push to main and cut a build"; beta → main at build 619): builds 610 to 619 (chance and seeds, MONO / POLY TRACKS, MOD follows Arrange, the file's name for the song, Option+A and Option+▲▼, LATENCY COMP AUTO, about 630 new presets and 12 kits, stereo pads and many renders). The run id is added when it has finished. Next is 1.3.9.
+- **v1.3.8** (15 Nov 2026, a regular release; owner, 14 Nov 23:15: "after finishing everything on your list, please push to main and cut a build"; PR #154 beta → main at build 619, run 43747193363, all three platforms, 11 assets, the latest release): builds 610 to 619 (chance and seeds, MONO / POLY TRACKS, MOD follows Arrange, the file's name for the song, Option+A and Option+▲▼, LATENCY COMP AUTO, about 630 new presets and 12 kits, stereo pads and many renders). Next is 1.3.9.
 - **v1.3.7** (14 Nov 2026 night, a regular release; owner, 14 Nov: "when a few builds have landed, merge `beta` into `main` and build the desktop app"; PR #142 beta → main at build 609, run 43673860734, all three platforms, 11 assets): builds 603 to 609 (renders start on time and are as bright as playback, Synth slider number entry and arrow nudge, Arrange TRANSP. on a selection, switched-OFF pump effects and muted tracks' effects rest, the CPU panel names the effect). Build 610 (chance and seeds) is on `beta` only. Next is 1.3.8.
 - **v1.3.6** (14 Nov 2026 evening, a regular release; owner, 14 Nov: "when you hit a reasonable milestone, can you merge beta and main and push a new desktop app?"; PR #134 beta → main at build 602, run 43660864512, all three platforms, 11 assets): builds 590 to 602 (the module queue, MOD while playing, effects resting in silence, LFOs follow tracks, Arrange zoom and paging, FX Clear, ANIMATIONS). Installed copies update to it.
 - **v1.3.5** (14 Nov 2026, a regular release; owner, 14 Nov: "Merge `beta` into `main` and build the desktop app"; PR #120 beta → main at build 589 (CodeRabbit had not finished after 15 minutes and left no comments), Run workflow through the API with version 1.3.5, run 43637300817, succeeded): everything since build 563 (the 12–13 Nov phone fixes, Lite reverb and presets, the Synth page rework, …waves / …chains audit passes 1–5, feedback loops). Installed copies update to it.
@@ -529,13 +529,31 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0) and `link/` (Ableton
 
 ## To-do (owner's list: keep it current; newest dated entries below have the details)
 
-### Where things stand (15 Nov, midday: READ THIS FIRST; it supersedes the blocks below where they disagree)
+### Where things stand (15 Nov, afternoon: READ THIS FIRST; it supersedes the blocks below where they disagree)
 
-**`beta` = build 619; `main` = build 619 = desktop v1.3.8** (if the Desktop releases list below has no v1.3.8 line with a run id, the merge to `main` and the build were NOT done: do them). Builds 610 to 619 since v1.3.7, all the owner's asks of 14 Nov evening and night:
+**`beta` = build 620** (PR #157, merged 15 Nov about 12:25). **`main` is still build 619 = desktop v1.3.8.** No desktop build was made. Build 620 is the owner's list from the Windows desktop app (build 609), built by four Sonnet agents and the lead; see the dated entry "15 Nov (the owner's list from desktop build 609; build 620)".
+
+**Open questions for the owner from that list:**
+1. **"flx command stuck on":** by his own rule of 12 Nov, an effect command holds through later patterns, wraps and LOOPs until another command. So FLX turned on inside a loop whose FLX 00 is outside it stays on. The lead did not change it and asks whether he wants effect switches put back at each LOOP wrap, and whether Stop cleared it.
+2. **The new poly track that was silent on its first pass:** was "a kit slot per track" on?
+3. **Clone down inserting empty phrases on the third press:** not reproduced (a test clones 8 rows six times and passes). Needs his song or the exact steps.
+4. **"Phrase on stop is set to stays but is following playhead":** fixed as "on Stop in Pattern view only the song row moves". If he meant while playing, that is FOLLOW.
+
+**A bus cannot be picked as a sidechain Source by its track number.** A track Source taps the track's own notes, and a bus has none, so its meter reads silence. What works: a Sidechain Out with Send N in the bus's part of the chains patch, and Source: Send N on the compressor or a Sidechain In (the owner confirmed the Send route shows signal, 15 Nov 12:20). A cable from one track's sub-graph to another's does nothing. Making "Track N" work for a bus needs audio-graph work with a feedback-loop risk: not built, noted here.
+
+**In work when this was written:** branch `fix/609-chains` (a Sonnet agent; notes in `/home/claude/progress/chains.md`): mark cables that cross between two tracks' chains; meters on Mixer modules; Send / Receive modules (labelled pairs instead of a cable); bend points that snap to right angles and "Square up"; the ? button the size of ✕. Will be build 621.
+
+**Native port:** the owner said on 15 Nov to prioritise it (taken as the go for N1). On branch `native`: N0 done. N1 step 2 done (B1 / B2: `BRIDGE_V = 1` frozen in `docs/port/CORE-BRIDGE.md`). Step 3 done by the lead: U05 core runtime, PR #156 merged (`native/core/src/rt/`: timed commands, snapshot swap). The C++ equals the JS bit for bit on Linux, Windows, Mac, Android and wasm builds in CI. Open PRs into `native`: #158 U06 song reader (two CI failures being fixed: wasm include path, a Windows line-ending test); #159 U02 CMake build of the existing DSP with pinned upstreams (the gate is the goldens' audio hashes, decided by the lead). In work: U07 the sequencer (a Fable agent, branch `n1/u07`, notes `/home/claude/progress/u07.md`). Not started: U03 (needs the owner's `matthettich/pump` repo brought in: ask him to add it to the session), U04 LXR. The status table is section 7 of `docs/port/WORKPLAN.md` on `native`.
+
+**Things that bit this session:** an agent put code using a variable that only exists in another function into `draw()` (`m`); the page stopped loading, and the vm tests passed. CodeRabbit and CI's sequencer golden caught it. Before pushing a build, load the page in headless Chrome (`/tmp/loadcheck.mjs` style: playwright at `/opt/npm-tools/node_modules/playwright/index.mjs`, Chrome at `/usr/bin/google-chrome`) and run `PLAYWRIGHT=… node tools/seq-golden.mjs`. Agents in separate `git worktree`s on one file merged cleanly except one small conflict.
+
+### Where things stand (15 Nov, midday: it supersedes the blocks below where they disagree)
+
+**`beta` = build 619; `main` = build 619 = desktop v1.3.8** (built 15 Nov 11:45, run 43747193363; done). **The owner's next session opens with new bugs from the Windows desktop app: start there.** Builds 610 to 619 since v1.3.7, all the owner's asks of 14 Nov evening and night:
 - **610** chance and seeds. **611 + 615** MONO TRACKS / POLY TRACKS (`docs/MONO-POLY-PLAN.md`: built). **612** MOD beside Arrange follows the cursor. **613** a "Song 1" takes its file's name. **614** Option+A returns exactly; Option+▲▼ on Mixer / FX / MOD / INST. **616** LATENCY COMP AUTO (default). **617** about 360 engine presets. **618** 273 drum sounds, 12 kits. **619** stereo pads in renders; many renders.
-- **Nothing since 603 has been heard by the owner except the `acid` render on the Mac** ("sounds much better", 14 Nov 21:59; Windows, where the original was rendered, still to try). The presets were measured, never heard. His checklist doc has builds 603 to 616 in section 1 (78 open); **617 to 619 are in the punch list only: add them to the doc and re-export.**
+- **Nothing since 603 has been heard by the owner except the `acid` render on the Mac** ("sounds much better", 14 Nov 21:59; Windows, where the original was rendered, still to try). The presets were measured, never heard. His checklist doc has builds 603 to 616 in section 1 (78 open); 617 to 619 were added 15 Nov (section 1: 88 open; `docs/TEST-CHECKLIST.md` re-exported).
 
-**Native port: stage N0 is built and waits for the owner's phone.** Branch `native` (never merged into `beta`), `native/` only. A1, A2, A3 (test APK), A4 (bridge code; timings need the phone), A5 (the lead's `rt_harness` and `thunder/rtlog.h`), A7, A8, A9 done; CI green on Linux, Windows, Mac, wasm, Android. Pre-release `native-n0-android-8` (the desktop updater cannot see it). **A6 done, 15 Nov 11:20: all three runs PASS** (screen on −107 ppm, off −1, background −2; 0 underruns, 0 late; output latency 26 ms screen on, 54 ms off / background; `native/tests/RESULTS-N0.md` on `native`). Not yet from him: what he heard, and the A4 bridge timings (Bridge test button). **Go or stop after N0 is his decision; do not start N1 before it.** He said Android first (14 Nov 23:31), after considering Windows.
+**Native port: stage N0 is built and waits for the owner's phone.** Branch `native` (never merged into `beta`), `native/` only. A1, A2, A3 (test APK), A4 (bridge code; timings need the phone), A5 (the lead's `rt_harness` and `thunder/rtlog.h`), A7, A8, A9 done; CI green on Linux, Windows, Mac, wasm, Android. Pre-release `native-n0-android-8` (the desktop updater cannot see it). **A6 done, 15 Nov 11:20: all three runs PASS** (screen on −107 ppm, off −1, background −2; 0 underruns, 0 late; output latency 26 ms screen on, 54 ms off / background; `native/tests/RESULTS-N0.md` on `native`). By ear: "it sounded great". The A4 bridge timings were not run (optional; told he can skip them: run them at the start of N1). For N1: 26 ms output latency with the screen on is high for finger drumming (try a smaller buffer, exclusive mode); callbacks arrive in bunches (longest gap 33 to 41 ms). **Go or stop after N0 is his decision; do not start N1 before it.** He said Android first (14 Nov 23:31), after considering Windows.
 
 **Open, for the next session:**
 1. His go / stop on the native port (N0 passed; asked 15 Nov 11:22).
@@ -766,6 +784,27 @@ The owner's top priority to add is the MOD screen. Work down the list; ask befor
 **The owner's checklist by importance (13 Nov):** he works from a Claude Doc, "Thunder Plus test checklist, by priority" (https://claude.ai/artifact/LrzQ18ur18Fc5gkvxmQDbK), ordered: 1 Do these first, 2 Really worth trying, 3 If you have time, 4 Safe to skip, Parked, Set aside, Done. A snapshot with his ticks is `docs/TEST-CHECKLIST.md`: re-export it whenever the doc changes, and add each new build's checks to the doc's section 1 as well as here. He said the two "decides" groups (native apps; smoothing / Worklets / clock experiments) are parked and block nothing. "Close the skip list" from him means: close section 4's items as not tested.
 
 Start a session by asking for results. Fix on `beta`. (10 Nov, 15:10: the web beta is build 560; the build numbers in the rest of this paragraph are older.) Web beta: https://matthettich.github.io/thunder-plus/beta/ (build 547 as of 10 Nov morning, 548 once its PR merges; the night of 9–10 Nov shipped 544–547, see the four "10 Nov" entries below. Decisions the lead made that night for the owner to confirm or reverse: on a phone the saved Sequencer default plays on the Page unless Audio thread is picked on that device; on a phone the safety limiter is its stand-in until another worklet loads; the resync only runs with a worklet loaded and its margins are untested on a device). Desktop: v1.3.4-beta.2 (build 541, no feed view or scopes); further desktop betas on hold until the owner asks.
+
+**Build 620** (the owner's list from desktop build 609; mostly the Windows desktop app)
+- [ ] **Computer (Windows desktop app):** open a song you know, press PLAY, then STOP. Pass: the page loads, plays and stops; nothing is blank or stuck. If it is, tell Claude the build.
+- [ ] **Computer:** on Arrange, select some blocks with LOOP SEL on, then press PLAY from Mixer, then from FX, MOD, INST and PROJECT. Pass: the selected blocks loop, as they do when PLAY is pressed on Arrange.
+- [ ] **Computer:** add a poly track with a sound on it and press PLAY at once. Pass: its first pass is audible. If it is still silent, say whether a kit slot was set on that track.
+- [ ] **Computer:** Mixer, double-click a track's PAN, VOL or OUT value. Pass: a box opens; type a value (or -6 dB on a level) and Enter, and the control goes there. Esc leaves it alone; Alt-click and the right-click menu reset it. (Double-click used to reset on the Mixer; this is at the owner's request.)
+- [ ] **Computer:** on FX, double-click a value on the FX bar. Pass: a small slider with a number box opens; type a number and Enter, and the effect is there. Esc closes it.
+- [ ] **Computer:** on Mixer, FX, MOD, INST and Synth, press ADD FX on the FX bar. Pass: the effect list opens over the page you are on, you stay on that page, and the effect you pick is added.
+- [ ] **Computer:** an LFO aimed at a Mixer PAN / VOL / OUT or an FX row shows a dot beside that control. Pass: the dot shows while the LFO targets it and goes when it is removed. Not expected yet on Synth engine knobs or pump windows: say if you want them there.
+- [ ] **Computer:** open the dogs' MOD screen. Pass: the screen is named for the dogs, and each ✕ is always showing (no hover needed).
+- [ ] **Computer:** LOOP sits beside PLAY. Pass: it toggles from its button and from Alt+L, and the button shows the state.
+- [ ] **Phone:** LOOP is still in the tab bar. Pass: it is there and turns the loop on and off.
+- [ ] **Computer:** the Synth page and a pad's tooltip show "Used on" with the tracks that play the pad. Pass: the tracks listed are the ones that use it.
+- [ ] **Computer:** Renoise transpose keys Alt+F1, F2, F11, F12. Pass: each transposes by its step; Alt+F1 no longer opens Help.
+- [ ] **Computer:** on FX, scroll the wheel over the slot list. Pass: the list scrolls and the ACTIVE line stays pinned at the top.
+- [ ] **Phone:** on FX, scroll a long slot list. Pass: the ACTIVE line stays pinned at the top.
+- [ ] **Computer:** Settings, ARRANGE LOOK-AHEAD: set 4, then 32 (default 16). Pass: the rows after the playhead change to match; the cursor pages with the keys and the wheel, not with clicks.
+- [ ] **Computer:** on Arrange, scroll down, make an edit, press Ctrl+Z (⌘Z on a Mac). Pass: Arrange keeps the scroll you had, not the top.
+- [ ] **Computer:** with LOOP on, go to the Synth page and back to Arrange. Pass: Arrange is not left paged away. (Fixed from reading, not reproduced: say if it still happens.)
+- [ ] **Computer:** with PIN on, move the Arrange cursor to another track. Pass: the Mixer follows it.
+- [ ] **Computer:** Pattern view with PHRASE ON STOP set to STAYS, then press STOP. Pass: the pattern stays on its phrase; only the song row moves. (If you meant while playing, that is FOLLOW: say so.)
 
 **Build 619** (stereo pads in renders; many renders)
 - [ ] **Computer:** a stereo sample on a pad (something wide), play it, render it, compare on headphones. Pass: the render is as wide as playback (it was mono).
@@ -1358,6 +1397,27 @@ Suggested order: N0 → N1 → N2 (phone cured) → N4 with N3 alongside → N5 
   the edge `R.t0`, "waiting…" while armed), `rcdClk` / `rcdFmt` / `rcdFreeSecs`, a 250 ms timer only while recording; the
   final length stays until the next take. recorder-check covers FREE, PATTERN, Stop, next take and closing mid-take.
 
+
+## 15 Nov (the owner's list from desktop build 609; build 620)
+
+The owner's list from the Windows desktop app (build 609). By four Sonnet agents and the lead; merged as PR #157 into `beta`. One line each:
+- **MOD dots** beside LFO targets (`lfoMark`, `data-lfo`): FX rows, FX bar, Mixer PAN / VOL / OUT. Not yet on Synth engine knobs or pump windows.
+- **Dogs:** MOD is a named dogs screen and the ✕ is always visible (`stageKind0`).
+- **LOOP** beside PLAY on the desktop layout (in `draw()`). Alt+L already toggled it.
+- **"Used on"** on the Synth page and pad tooltips (`padTracks`).
+- **Renoise transpose keys** Alt+F1 / F2 / F11 / F12 (Alt+F1 no longer opens Help).
+- **FX bar + ADD FX** opens the picker over the open screen (`fxsOpen(k, keepType, bt)`).
+- **FX bar double-click** = pop-up slider with a number box (`fbPop`).
+- **Mixer double-click types a value** (`panType`, `mfType`, `moType`); Reset on Alt-click and in the menu. This reverses the 3 Nov "double-click resets" rule on the Mixer, at the owner's request.
+- **FX screen wheel** reaches the slot list, and the ACTIVE line is pinned (`.fxact`).
+- **ARRANGE LOOK-AHEAD** setting (4 to 32 rows, default 16, `arrAhead`); the cursor pages too (keys and wheel, not clicks).
+- **Undo keeps Arrange's scroll** (`arrKeepRow`).
+- **Synth page round trip** with LOOP on no longer leaves Arrange paged (`followPlay` does nothing off the tracker). Fixed from reading, not reproduced.
+- **Mixer follows Arrange's cursor track** even with PIN on (`apFollow`).
+- **Pattern view obeys PHRASE ON STOP: STAYS** (`pvArrToPlay`).
+- **By the lead:** LOOP SEL armed on Arrange loops when PLAY is pressed on Mixer / FX / MOD / INST / PROJECT (`playCtx`; `go()` arms the selection before it is cleared). Pads whose render was dropped start rendering at once after the track counts change and at PLAY (`setTracks`, `tStart` call `prerender()`). The cause of "a new poly track was silent on its first pass": a pad with no render stays silent while it renders (`ensurePlay`).
+
+Tests added: `lfo-dot`, `loop-beside-play`, `pad-used-on`, `transpose-renoise-keys`, `fx-wheel-selector`, `mixer-dblclick-type`, `fxbar-value-popup`, `arrange-undo-view`, `loop-other-screens`; changes to `arrange-paging`, `alt-nav-hold`, `fxbar-add-picker`, `animations-off`, `bottom-fader-cap`. `npm test` 1441, 0 fail.
 
 ## 15 Nov (stereo pads render in stereo; many renders in one session; build 619)
 

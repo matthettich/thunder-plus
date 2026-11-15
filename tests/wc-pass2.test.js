@@ -35,7 +35,7 @@ for (const [ed, src] of Object.entries(ED)) {
     assert.match(a, /askDialog\('Remove “' \+ title \+ '”\? Undo brings it back\.', \{ ok:'Remove' \}\)/);
     assert.match(a, /if \(yes && nodes\.has\(id\)\)\{ store\.snapshot\(\); removeModule\(id\); \}/, 'the snapshot is taken after the answer: Cancel leaves no step');
     const css = src.slice(src.indexOf('/* T5 (13 Nov, audit T5'), src.indexOf('@media (prefers-reduced-motion: reduce){ .node > header .fold svg'));
-    assert.match(css, /button\.mq\{width:32px; height:40px/); assert.match(css, /button\.x, \.node\.collapsed > header button\.x\{width:36px; height:40px\}/);
+    assert.match(css, /button\.mq, \.node\.collapsed > header button\.mq\{width:36px; height:40px/);   /* 15 Nov: the ? is the size of the x */ assert.match(css, /button\.x, \.node\.collapsed > header button\.x\{width:36px; height:40px\}/);
     assert.match(css, /button\.byp\{height:40px; min-width:40px\}/); assert.match(css, /\.fold::before\{inset:0 -10px\}/);
   });
   test(ed + ' D3: the undo step is taken on the first change, not on the press; a select takes one when its value changes', () => {
