@@ -14,15 +14,19 @@ typedef struct thunder_core thunder_core;
 /* Any thread, not the audio thread. Allocates everything the core will ever need. */
 thunder_core* thunder_create(int sample_rate, int max_block);
 
-/* AUDIO THREAD. Writes `frames` samples (frames <= max_block) to out_l and out_r. No allocation, no locks, no I/O. */
+/* AUDIO THREAD. Writes `frames` samples to out_l and out_r (any count; more than max_block is done in pieces).
+   No allocation, no locks, no I/O. */
 void thunder_process(thunder_core* core, float* out_l, float* out_r, int frames);
 
-/* One non-audio thread at a time (single producer). A command as UTF-8 JSON (N0): {"t":"bpm","v":120}, {"t":"play"},
-   {"t":"stop"}, {"t":"echo","n":<int>}. Returns 1 if queued, 0 if the queue is full or the command is unknown. */
+/* One control thread (single producer). A command as UTF-8 JSON, "t" first: {"t":"bpm","v":120}, {"t":"play"},
+   {"t":"stop"}, {"t":"echo","n":<int>}, {"t":"song.load","rev":<int>,...}. bpm / play / stop / echo may carry "at":<frame>
+   (the core's sample timeline, as clock events report it): the command takes effect on exactly that sample; without it,
+   at the first sample of the next block. Returns 1 if queued, 0 if the queue is full or the command is unknown. */
 int thunder_post(thunder_core* core, const char* bytes, int len);
 
 /* One non-audio thread (single consumer). Copies the next event (UTF-8 JSON, NUL-terminated) into buf; returns its
-   length, or 0 if none. Events: clock {f, wallNs, sr, outLat, under} (10 a second), pos {f, step}, echo {n, f}. */
+   length, or 0 if none. Events: clock {f, wallNs, sr, outLat, under} (10 a second), pos {f, step}, echo {n, f},
+   song {rev, f} (the audio thread now reads that song snapshot, from frame f). */
 int thunder_poll(thunder_core* core, char* buf, int cap);
 
 /* Any non-audio thread. Hands the core a bulk buffer. N0: stored only. meta: {"o":<float offset>,"n":<total floats>}

@@ -68,6 +68,9 @@ static int run_core() {
     const int n = sizes[bi++ % 10];
     if ((bi % 97) == 0) { char cmd[64]; seed = seed * 1664525u + 1013904223u; int len = std::snprintf(cmd, sizeof cmd, "{\"t\":\"bpm\",\"v\":%d}", 60 + (int)(seed >> 24)); thunder_post(c, cmd, len); }
     if ((bi % 31) == 0) { const char* e = "{\"t\":\"echo\",\"n\":7}"; thunder_post(c, e, (int)std::strlen(e)); }
+    // U05: timed commands (they wait in the callback's own list) and song snapshots (swapped inside the callback, freed outside it)
+    if ((bi % 41) == 0) { char cmd[96]; int len = std::snprintf(cmd, sizeof cmd, "{\"t\":\"echo\",\"n\":9,\"at\":%lld}", (long long)(frames + 1500)); thunder_post(c, cmd, len); }
+    if ((bi % 53) == 0) { char cmd[96]; int len = std::snprintf(cmd, sizeof cmd, "{\"t\":\"song.load\",\"rev\":%d,\"S\":{}}", bi); thunder_post(c, cmd, len); }
     rtlog_begin(&log, fake_ns);
     { rt_guard g; thunder_process(c, l.data(), r.data(), n); }   // <- THE GUARDED CALL
     rtlog_end(&log, fake_ns + 1000, n);
