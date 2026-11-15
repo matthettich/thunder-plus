@@ -26948,6 +26948,7 @@ function xposeTitles(){
   const n = xposeBlocks();
   for (const [id, d, w] of [['tXposeDn', 'down', 'Alt+,'], ['tXposeUp', 'up', 'Alt+.']]){ const b = $(id); if (!b) continue;
     const t = n ? `Transposes the ${n} selected block${n > 1 ? 's\u2019 phrases' : '\u2019s phrases'} ${d} a semitone (${w}). Each phrase moves once; one used by a block outside the selection changes there too.` : `Transpose the selection ${d} a semitone (${w})`;
+    if (b.title === t) continue;   /* (draw() calls this every redraw: write only when it changes) */
     b.title = t; b.setAttribute('aria-label', n ? `Transpose the ${n} selected block${n > 1 ? 's' : ''} ${d} a semitone` : `Transpose selection ${d} a semitone`); }
 }
 function transposeSel(d, needSel, songOk){
