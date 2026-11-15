@@ -60,6 +60,19 @@ for (const side of [false, true]) {
   });
 }
 
+for (const side of [false, true]) {
+  const where = side ? 'Arrange beside Phrase' : 'the Song screen';
+  test(`${where}: picked blocks (sxPicks) alone, and mixed with a selection; a pick whose phrase is also selected moves once`, () => {
+    const base = { side, cells: [[0, 0, 1], [5, 3, 2], [8, 4, 3]], chains: { 1: chain(10), 2: chain(11), 3: chain(10) }, phrases: { 10: P([60]), 11: P([60]) } };
+    const a = rig({ ...base, picks: [{ y: 5, t: 3 }], cursor: [0, 0] }); a.click(1);
+    assert.deepEqual([10, 11].map(p => a.notes(p)[0][0]), [60, 61], 'picks alone: only the picked block, not the cursor block'); assert.equal(a.log.saves, 1);
+    const b = rig({ ...base, picks: [{ y: 5, t: 3 }], sel: { x: 0, y: 0 }, cursor: [0, 0] }); b.click(2);
+    assert.deepEqual([10, 11].map(p => b.notes(p)[0][0]), [62, 62], 'selection and pick together'); assert.equal(b.log.saves, 1);
+    const c = rig({ ...base, picks: [{ y: 8, t: 4 }], sel: { x: 0, y: 0 }, cursor: [0, 0] }); c.click(1);
+    assert.equal(c.notes(10)[0][0], 61, 'phrase 10 is in the selected block and the picked block: +1 once, not +2'); assert.equal(c.notes(11)[0][0], 60);
+  });
+}
+
 test('Arrange beside Phrase with no selection: the buttons still ask for one and change nothing; another screen: unchanged too', () => {
   const r = rig({ side: true, cells: [[0, 0, 1]], chains: { 1: chain(10) }, phrases: { 10: P([60]) }, cursor: [0, 0] }); r.click(1);
   assert.deepEqual(r.log.toast, ['Select rows first (or alt+, / alt+. for the whole block).']); assert.equal(r.notes(10)[0][0], 60); assert.equal(r.log.saves, 0);
