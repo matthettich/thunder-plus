@@ -26476,7 +26476,13 @@ function instShown(){
 for (const id of ['tInlSide', 'tInlPad']) $(id).addEventListener('click', e => {
   const b = e.target.closest('[data-i]'); if (!b) return;
   cInst = +b.dataset.i; go('inst');
+  inlAudition(cInst);
 });
+/* A click on an instrument in the INST LIST also plays it once: the note keys' own preview on INST (keyPlay: the octave's C, the
+   instrument through its first track, normal velocity), so it sounds while the song plays too. */
+function inlAudition(ii){
+  try { preview(ii, clamp(kOct * 12, 0, 119), -1, true, null, false, keyPlayTrack()); } catch(e){}
+}
 // TABS LINE UP WITH THE VIEW BUTTONS (owner, 5 Nov): SONG … PROJECT widen evenly so the last tab ends where the
 // Tracker / Synth / Waves / Chains buttons end, while the header sits on one row above them (not when it wraps, or when
 // that would stretch them past 1.8×).
