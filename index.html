@@ -19564,6 +19564,7 @@ class ThunderFx extends AudioWorkletProcessor {
        rs 2  waking (switched ON, its values changed, its window opened): the plugin is started afresh (what it held is from before
              the rest) and hears the sound for its latency + 1024 samples, still bypassed, while the delay line stays the output;
              then it takes over without a step, and switches on with its own crossfade. So ON comes that much late (21 to 64 ms).
+             Woken by an FXO command it catches up within the block instead, so that switch is on the beat.
      The timing never moves: the delay is the plugin's latency, which the page counts whether the slot is ON or OFF (pumpSlotLat).
      Never for a slot an FXO command has held (its switches are on the beat), with notes on their way to it, or while its window is fed.
      Returns true when it has written the slot's output itself. */
@@ -19589,7 +19590,20 @@ class ThunderFx extends AudioWorkletProcessor {
     if (s.rs === 1 && (!can || s.pch)){   /* wake: a fresh plugin, bypassed, to hear the sound before it takes over */
       s.pch = false; s.byp = true;
       try { P.pump_free(s.pu); if (!this.pumpNew(P, s)){ s.dead = true; s.rs = 0; return false; } } catch (e){ s.dead = true; s.rs = 0; return false; }
-      s.rs = 2; s.wm = D.n + 1024;
+      if (s.fxo && tg){
+        /* (build 609, CodeRabbit on #142) An FXO command switched it on: its switches are on the beat, so it cannot wait for the warm-up.
+           The new plugin hears what the delay line holds (the last "latency" samples, oldest first) at once, in this block, and then
+           runs this block switched on: the timing is as if it had never rested. One dearer block, once: from now on (s.fxo) it never rests. */
+        if (!this.dL){ this.dL = new Float32Array(128); this.dR = new Float32Array(128); }
+        const L = this.L, R = this.R, kL = this.dL, kR = this.dR, m = D.m; kL.set(L); kR.set(R);
+        let r = D.w - D.n; if (r < 0) r += m;
+        for (let left = D.n; left > 0 && !s.dead; ){ const c = left < 128 ? left : 128; for (let k = 0; k < c; k++){ L[k] = D.L[r]; R[k] = D.R[r]; if (++r === m) r = 0; } this.pumpRun(s, c); left -= c; }
+        this.L.set(kL); this.R.set(kR); s.rs = 0; D.ok = 0; D.sig = 0; s.zq = 0; s.zz = false; return false;
+      }
+      /* (build 609, CodeRabbit on #142) the warm-up is as long as the NEW plugin's latency when that is the longer (an EQ changed to
+         linear phase while it rested): it must have filled its own delay before it takes over, or the track would fall silent for the difference */
+      let nl = D.n; try { nl = Math.max(nl, P.pump_latency(s.pu) | 0); } catch (e){}
+      s.rs = 2; s.wm = nl + 1024;
     }
     const rL = this.rL, rR = this.rR; this.restDelay(D, n);
     if (s.rs === 2){ this.pumpRun(s, n); if ((s.wm -= n) <= 0){ s.rs = 0; D.ok = 0; D.sig = 0; s.zq = 0; s.zz = false; } }
@@ -19649,7 +19663,8 @@ class ThunderFx extends AudioWorkletProcessor {
        be heard (muted, or another is soloed: nothing reads a track's effects but its own fader and its "before the fader" bus feed, and
        both are shut then) the node hears silence instead of the track. The echoes die away as they would after the last note, and the
        sleep rules below then stop the work, at the latest ten seconds on. Unmuted, it hears the track again from
-       the next block: the notes that are sounding come through, with the effects starting from rest, not from old echoes. */
+       the next block: the notes that are sounding come through, with the effects as silence left them (their echoes died while it was muted;
+       an effect that never dies down by itself, a delay fed back for ever, still holds what it held: the node is put to sleep, not cleared). */
     const rest = this.restAt > 0 && currentTime >= this.restAt;
     if (!rest && i && i.length){ const a = i[0], b = i[1] || a; for (let k = 0; k < n; k++){ const v = a[k] < 0 ? -a[k] : a[k], w = b[k] < 0 ? -b[k] : b[k]; if (v > ip) ip = v; if (w > ip) ip = w; if (!(v < 8 && w < 8)) bad = true; } }
     // A switch (FXO) or a running clock wakes it: a slot just switched on must hear the moment it comes in.
@@ -24918,7 +24933,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 608;
+const BUILD = 609;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD + (location.pathname.includes('/beta/') ? ' · beta' : '');
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -34885,6 +34900,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [609, '14 Nov', ['Resting …pump effects (build 607): an FXO command that switches one on now lands on the beat the first time too; changing a switched-off EQ to linear phase no longer leaves a moment of silence on its track']],
   [608, '14 Nov', ['Renders are as bright as playback: a drum or sample that started between two samples was slightly dulled in a render (about 1 dB down at the very top). Every note now starts on a sample, in renders and when the sequencer runs on the page', 'Typing a value into a slider: negative pitches (−440 Hz) and sliders whose top or bottom reads as a word (Open, Off) take a typed unit too']],
   [607, '14 Nov', ['A switched-off …pump effect no longer costs anything: it used to keep doing all its work behind the bypass (pump MASTER, switched off, took about 8% of the audio engine on a busy song). The timing does not move. Switching one on takes 20 to 65 ms to come in', 'A muted track’s effects rest (also when another track is soloed): their echoes die away and the work stops, within ten seconds at the latest. Unmute and the track is back at once, its effects starting fresh', 'CPU panel: an effects row now names the two dearest effects of that track with their share, such as “Effects · Track 07: pump TWANG 5%, Space reverb 3%”', 'Typing a time or a pitch into a slider now works on every slider that shows one, whatever its scale (a sample’s Loop start, Click width)']],
   [606, '14 Nov', ['Typing a value into a slider: a time typed as ms or s (and a pitch as Hz or kHz) is now read in the unit that slider shows (500 ms into a slider that shows milliseconds gave its lowest value); 50% on a voice’s Level means halfway, as a bare 50 does']],

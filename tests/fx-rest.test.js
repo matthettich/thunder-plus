@@ -141,3 +141,29 @@ test('a muted track whose effect never falls silent (Spring, BBD: they hum on) s
   { const y = N.out(); for (let i = y.length - 100 * B; i < y.length; i++) assert.equal(y[i], 0); }
   N.msg({ rest: false }); N.step(1); assert.ok(runs > r1, 'unmuted: running again at once');
 });
+test('woken by an FXO command it is on in that very block (no warm-up wait), and from then on it never rests', skip, () => {
+  const N = mkNode([pslot('limit', false)]), s = N.node.slots[0];
+  for (let b = 0; b < secs(1); b++) N.step(1);
+  assert.equal(s.rs, 1); const at = N.blocks();
+  N.step(1, [1]);   // FXO switches slot 0 on
+  assert.equal(s.rs, 0, 'no warm-up: caught up inside the block'); assert.equal(s.byp, false, 'and switched on in it'); assert.equal(s.fxo, true);
+  for (let b = 0; b < secs(1); b++) N.step(1, [1]);
+  const lat = s.rd.n, x = N.inp(), y = N.out(); assert.equal(lat, 358);
+  // the delay line was handed to the plugin whole: across the switch the output never drops out, and the limiter's output stays the input late by its latency (it only turns peaks down)
+  let gap = 0, run = 0, corr = 0, ex = 0, ey = 0; for (let i = at * B - 512; i < at * B + 4096; i++){ run = Math.abs(y[i]) < 1e-7 ? run + 1 : 0; if (run > gap) gap = run; corr += y[i] * x[i - lat]; ex += x[i - lat] * x[i - lat]; ey += y[i] * y[i]; }
+  assert.ok(gap < 8, 'no hole in the sound at the switch (longest run of silence ' + gap + ' samples)');
+  assert.ok(corr / Math.sqrt(ex * ey) > 0.98, 'still the input, late by the latency, right through the switch: ' + corr / Math.sqrt(ex * ey));
+  N.step(1, [0]); for (let b = 0; b < secs(1); b++) N.step(1, [0]); assert.ok(!s.rs, 'switched off again by FXO: it keeps running');
+});
+test('values changed while it rests that make its latency longer (an EQ to linear phase): the warm-up covers the new latency, no hole in the sound', skip, () => {
+  const N = mkNode([pslot('eq', false)]), s = N.node.slots[0];
+  for (let b = 0; b < secs(1); b++) N.step(1);
+  assert.equal(s.rs, 1); assert.equal(s.rd.n, 0, 'zero-latency EQ');
+  N.msg([pslot('eq', false, 0, { phase: 1, lin_quality: 3 })]); const at = N.blocks(); N.step(1);
+  assert.equal(s.rs, 2); const P = globalThis.__pumpX, nl = P.pump_latency(s.pu); assert.ok(nl > 1024, 'linear phase has a long latency: ' + nl);
+  assert.ok(s.wm >= nl + 1024 - B, 'the warm-up is as long as the new latency + 1024, not the old one: ' + s.wm);
+  for (let b = 0; b < secs(2); b++) N.step(1);
+  const y = N.out(); let gap = 0, run = 0; for (let i = at * B; i < y.length; i++){ run = Math.abs(y[i]) < 1e-7 ? run + 1 : 0; if (run > gap) gap = run; }
+  assert.ok(gap < 8, 'the track never falls silent while the new plugin fills up (longest silence ' + gap + ' samples)');
+  const x = N.inp(); let worst = 0; for (let i = y.length - 4096; i < y.length; i++) worst = Math.max(worst, Math.abs(y[i] - x[i - nl])); assert.ok(worst <= 1e-6, 'and ends up late by the new latency: ' + worst);
+});
