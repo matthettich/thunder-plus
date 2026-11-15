@@ -31,8 +31,8 @@ import { fileURLToPath } from 'node:url';
 
 export const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 export const SR = 48000, NT = 32;
-const coreSrc = fs.readFileSync(path.join(ROOT, 'core/seq-core.js'), 'utf8');
-const html = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
+const coreSrc = fs.readFileSync(path.join(ROOT, 'core/seq-core.js'), 'utf8').replace(/\r\n/g, '\n');   // (a Windows checkout has CRLF; the patterns below are written for LF)
+const html = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8').replace(/\r\n/g, '\n');
 const grab = re => { const m = html.match(re); if (!m) throw new Error('index.html: not found: ' + re); return m[0]; };
 // the page's own source for what the core copy does not hold
 export const PAGE_SRC = [grab(/^const TRIM_0 = .*$/m), grab(/^const trimDb = .*$/m), grab(/^const trimGain = .*$/m), grab(/^const audible = t => \{[\s\S]*?\n  return false; \};/m)].join('\n');
