@@ -732,6 +732,10 @@ The owner's top priority to add is the MOD screen. Work down the list; ask befor
 
 Start a session by asking for results. Fix on `beta`. (10 Nov, 15:10: the web beta is build 560; the build numbers in the rest of this paragraph are older.) Web beta: https://matthettich.github.io/thunder-plus/beta/ (build 547 as of 10 Nov morning, 548 once its PR merges; the night of 9–10 Nov shipped 544–547, see the four "10 Nov" entries below. Decisions the lead made that night for the owner to confirm or reverse: on a phone the saved Sequencer default plays on the Page unless Audio thread is picked on that device; on a phone the safety limiter is its stand-in until another worklet loads; the resync only runs with a worklet loaded and its margins are untested on a device). Desktop: v1.3.4-beta.2 (build 541, no feed view or scopes); further desktop betas on hold until the owner asks.
 
+**Build 603** (renders and LATENCY COMP count switched-OFF pump effects)
+- [ ] **Computer (song `acid`):** render the song and open the WAV in an editor. Pass: the first kick starts at the very beginning of the file (before this build it started about 93 ms in), and the end of the song is not cut short.
+- [ ] **Computer:** Audio & MIDI › LATENCY COMP ON; put pump CALM on a drum track and switch it OFF; play it against another drum track on the same steps. Pass: the two tracks hit together whether CALM is ON or OFF (before, the track with the OFF effect played about 43 ms late). With LATENCY COMP OFF the track with CALM is late either way, as the FX screen says.
+
 **Build 602** (LFOs follow tracks; Arrange on stop; FX Clear; remove from the FX bar; ANIMATIONS)
 - [ ] **Computer (a COPY of a song with LFOs):** Settings › TRACKS, add two tracks. Pass: the LFOs show on the same track's MOD screen (its new number) and still move the same knobs; taking the two tracks away again puts everything back. (A song changed before this build is not repaired: its LFOs sit on the old track number.)
 - [ ] **Computer:** ARRANGE ON STOP = PLAYHEAD, Phrase screen with Arrange beside it, PLAY past a page turn, STOP. Pass: the Arrange cursor is on the row where it stopped, in view. With STAYS it stays where it was.
@@ -1230,6 +1234,15 @@ Suggested order: N0 → N1 → N2 (phone cured) → N4 with N3 alongside → N5 
   the edge `R.t0`, "waiting…" while armed), `rcdClk` / `rcdFmt` / `rcdFreeSecs`, a 250 ms timer only while recording; the
   final length stays until the next take. recorder-check covers FREE, PATTERN, Stop, next take and closing mid-take.
 
+
+## 14 Nov (renders and LATENCY COMP count switched-OFF pump effects; build 603)
+
+Owner, 14 Nov: "renders should sound like the playback". First part (the constant offset found by the 14 Nov investigation), by the lead.
+- **Cause:** a pump slot's OFF is the plugin's own bypass, which still delays by the plugin's latency (so switching it, by hand or with FXO, never moves the timing). `pumpChainLatency` counted only slots that are ON, so `pass()` trimmed too little (his song: CALM 2048 + TONE 2048 + MASTER 358 = 4454 samples late), the playhead's `moFxT` was short by the same, and `pdcPlan` (LATENCY COMP) lined tracks up as if a track's OFF pump effect were not there.
+- **Fix:** new `pumpSlotLat(f, sr)`: a pump slot counts ON or OFF; only a pump effect with no bypass of its own (METER) counts nothing when OFF, because the worklet skips it whole. `pumpChainLatency` sums it, so renders, the playhead and LATENCY COMP all follow. No worklet change.
+- **Decision (lead):** kept the latency-matched bypass rather than making OFF a zero-latency pass, because an FXO switch in the middle of a song would otherwise move that track's timing. The idle cost of an OFF pump slot is handled separately (the CPU items).
+- `tests/off-pump-latency.test.js`: the real `pump.wasm` (bypassed CALM, TONE, LIMIT, MASTER delay an impulse by exactly `pump_latency`), the count, and `pdcPlan` with an OFF slot.
+- **Still open:** why tracks 9 and 13 sound different live versus rendered (an agent is measuring on build 602 with his project file; notes in the next entry when it reports).
 
 ## 14 Nov (LFOs follow tracks, Arrange on stop, FX Clear, remove from the FX bar, ANIMATIONS; build 602)
 
