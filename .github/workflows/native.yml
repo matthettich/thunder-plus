@@ -28,3 +28,91 @@ jobs:
       - run: cmake -S native -B build -DCMAKE_BUILD_TYPE=Release
       - run: cmake --build build -j
       - run: ctest --test-dir build --output-on-failure
+      - uses: actions/upload-artifact@v4
+        with:
+          name: thunder_core-linux-x64
+          path: build/core/libthunder_core.a
+          retention-days: 7
+
+  wasm:
+    name: Core (wasm, wasi-sdk)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      WASI_SDK_VERSION: '25'
+    steps:
+      - uses: actions/checkout@v4
+      # A pinned wasi-sdk is downloaded in the job (never vendored). Same compiler flags as dsp/build.sh.
+      - name: Fetch wasi-sdk
+        run: |
+          curl -fsSL -o wasi-sdk.tar.gz "https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-${WASI_SDK_VERSION}/wasi-sdk-${WASI_SDK_VERSION}.0-x86_64-linux.tar.gz"
+          mkdir wasi-sdk && tar -xzf wasi-sdk.tar.gz -C wasi-sdk --strip-components=1
+          wasi-sdk/bin/clang --version | head -1
+      - name: Build thunder_core.wasm
+        run: |
+          SDK="$PWD/wasi-sdk"
+          mkdir -p out
+          "$SDK/bin/clang++" --target=wasm32-wasi --sysroot="$SDK/share/wasi-sysroot" \
+            -O3 -ffast-math -msimd128 -fno-exceptions -fno-rtti -std=c++17 -Wall -Wextra \
+            -Inative/core/include native/core/src/core.cpp \
+            -mexec-model=reactor -Wl,--export=_initialize \
+            -Wl,--export=thunder_create -Wl,--export=thunder_process -Wl,--export=thunder_post \
+            -Wl,--export=thunder_poll -Wl,--export=thunder_put -Wl,--export=thunder_destroy \
+            -Wl,--strip-all -o out/thunder_core.wasm
+          ls -l out/thunder_core.wasm
+      - uses: actions/upload-artifact@v4
+        with:
+          name: thunder_core-wasm
+          path: out/thunder_core.wasm
+          retention-days: 7
+
+  windows:
+    name: Core (Windows x64, MSVC)
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - run: cmake -S native -B build -A x64
+      - run: cmake --build build --config Release -j
+      - run: ctest --test-dir build -C Release --output-on-failure
+      - uses: actions/upload-artifact@v4
+        with:
+          name: thunder_core-windows-x64
+          path: build/core/Release/thunder_core.lib
+          retention-days: 7
+
+  macos:
+    name: Core (macOS universal)
+    runs-on: macos-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - run: cmake -S native -B build -DCMAKE_BUILD_TYPE=Release "-DCMAKE_OSX_ARCHITECTURES=arm64;x86_64"
+      - run: cmake --build build -j
+      - run: ctest --test-dir build --output-on-failure
+      - run: lipo -info build/core/libthunder_core.a
+      - uses: actions/upload-artifact@v4
+        with:
+          name: thunder_core-macos-universal
+          path: build/core/libthunder_core.a
+          retention-days: 7
+
+  android-core:
+    name: Core (Android arm64-v8a, NDK)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build with the runner's NDK
+        run: |
+          NDK="${ANDROID_NDK_LATEST_HOME:-$ANDROID_NDK_ROOT}"
+          echo "NDK: $NDK"
+          cmake -S native -B build -DCMAKE_TOOLCHAIN_FILE="$NDK/build/cmake/android.toolchain.cmake" \
+            -DANDROID_ABI=arm64-v8a -DANDROID_PLATFORM=android-29 -DCMAKE_BUILD_TYPE=Release -DTHUNDER_BUILD_TESTS=OFF
+          cmake --build build -j
+          file build/core/libthunder_core.a || true
+      - uses: actions/upload-artifact@v4
+        with:
+          name: thunder_core-android-arm64
+          path: build/core/libthunder_core.a
+          retention-days: 7
