@@ -1,0 +1,81 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Thunder bridge test (A4)</title>
+<style>
+body{font:14px/1.4 system-ui,sans-serif;margin:8px;background:#111;color:#eee}
+button{font-size:15px;padding:10px 12px;margin:3px 3px 3px 0}
+pre{white-space:pre-wrap;background:#000;padding:8px;border-radius:6px;font-size:12px}
+h1{font-size:17px}
+</style></head><body>
+<h1>Bridge transport proof (A4)</h1>
+<p>Keep the app in front with the screen on. The echo test takes 5 minutes (60 messages a second, through the C++ core).
+The overlay's Hide button gives more room.</p>
+<div>
+<button id="b1">1. Echo test, 5 min</button>
+<button id="b1s">Echo test, 20 s (try)</button>
+<button id="b2">2. Buffer: ArrayBuffer, 1 MB chunks</button>
+<button id="b3">3. Buffer: ArrayBuffer, one message</button>
+<button id="b4">4. Buffer: base64 to file, core reads it</button>
+<button id="cp">Copy results</button>
+</div>
+<pre id="out">waiting for the bridge...</pre>
+<script>
+var out = document.getElementById('out'), results = {}, log = [];
+function say(s){ log.push(s); out.textContent = log.slice(-40).join('\n'); }
+function bridgeUp(){ return new Promise(function(res){ if (window.thunderCore && window.thunderCore.caps) return res(); var t = setInterval(function(){ if (window.thunderCore && window.thunderCore.caps){ clearInterval(t); res(); } }, 100); }); }
+function once(type){ return new Promise(function(res){ var f = function(m){ thunderCore.off(type, f); res(m); }; thunderCore.on(type, f); }); }
+function sleep(ms){ return new Promise(function(r){ setTimeout(r, ms); }); }
+bridgeUp().then(function(){
+  var c = thunderCore.caps; results.device = c.model; results.android = c.android; results.webview = c.webview; results.arrayBufferSupported = c.arrayBuffer;
+  say('bridge up: ' + c.model + ', Android ' + c.android + ', WebView ' + c.webview + ', ArrayBuffer messages: ' + c.arrayBuffer);
+});
+
+/* ---- echo test: 60 a second; each message is echoed by the C++ core on the audio thread ---- */
+function echoTest(seconds){
+  return bridgeUp().then(function(){
+    thunderCore.send({t:'open'});
+    return once('clock');
+  }).then(function(){
+    var N = seconds * 60, sentAt = new Float64Array(N), rt = new Float64Array(N).fill(-1), sent = 0, recv = 0, dup = 0;
+    thunderCore.on('echo', function(m){ var n = m.n; if (n >= 0 && n < N){ if (rt[n] >= 0) dup++; else { rt[n] = performance.now() - sentAt[n]; recv++; } } });
+    var t0 = performance.now(), period = 1000 / 60;
+    say('echo test running, ' + seconds + ' s ...');
+    return new Promise(function(done){
+      (function tick(){
+        var due = Math.min(N, Math.floor((performance.now() - t0) / period) + 1);
+        while (sent < due){ sentAt[sent] = performance.now(); thunderCore.send({t:'echo', n: sent}); sent++; }
+        if (sent % 600 === 0) say('  sent ' + sent + ' received ' + recv);
+        if (sent < N) setTimeout(tick, 4); else setTimeout(done, 2000);   // 2 s for the last echoes
+      })();
+    }).then(function(){
+      var xs = []; for (var i = 0; i < N; i++) if (rt[i] >= 0) xs.push(rt[i]); xs.sort(function(a,b){return a-b;});
+      var q = function(p){ return xs.length ? xs[Math.min(xs.length - 1, Math.floor(p * xs.length))] : null; };
+      var r = { seconds: seconds, sent: sent, received: recv, lost: sent - recv, duplicates: dup,
+        medianMs: q(0.5), p99Ms: q(0.99), worstMs: xs.length ? xs[xs.length - 1] : null, elapsedS: (performance.now() - t0) / 1000 };
+      results['echo_' + seconds + 's'] = r; say('ECHO ' + JSON.stringify(r)); thunderCore.send({t:'close'});
+    });
+  });
+}
+
+/* ---- 53 MB of float data (5 minutes of mono 44.1 kHz) ---- */
+function makeBuf(){ var n = 13250000, f = new Float32Array(n); for (var i = 0; i < n; i++) f[i] = (i % 1000) * 0.001; var s = 0; for (var j = 0; j < n; j++) s += f[j]; return {f: f, sum: s}; }
+function check(name, t0, m, sum){
+  var parts = (m.info || '').split(','), ok = m.ok && parseInt(parts[0], 10) === 13250000 && parseFloat(parts[1]) === sum;
+  var r = { path: name, seconds: (performance.now() - t0) / 1000, coreHasAll: ok, nativeMs: m.nativeMs, writeMs: m.writeMs, coreMs: m.coreMs };
+  results[name] = r; say('BUFFER ' + JSON.stringify(r));
+}
+function bufTest(name, fn){
+  thunderCore.send({t:'open'});
+  return once('clock').then(function(){ say('building 53 MB array ...'); var b = makeBuf(); var t0 = performance.now(); return fn(b.f).then(function(m){ check(name, t0, m, b.sum); }); })
+    .catch(function(e){ results[name] = {path: name, error: String(e)}; say('ERROR ' + name + ': ' + e); })
+    .then(function(){ thunderCore.send({t:'close'}); });
+}
+document.getElementById('b1').onclick = function(){ echoTest(300); };
+document.getElementById('b1s').onclick = function(){ echoTest(20); };
+document.getElementById('b2').onclick = function(){ bufTest('a_arraybuffer_1MB_chunks', function(f){ return thunderCore.put(1, f, 1 << 20); }); };
+document.getElementById('b3').onclick = function(){ bufTest('a_arraybuffer_single_message', function(f){ return thunderCore.put(2, f, 0); }); };
+document.getElementById('b4').onclick = function(){ bufTest('b_base64_file_then_core', function(f){ return thunderCore.putFile(3, f, 1 << 20); }); };
+document.getElementById('cp').onclick = function(){
+  var t = 'Thunder bridge test (A4)\n' + JSON.stringify(results, null, 1); navigator.clipboard.writeText(t).then(function(){ say('copied'); }, function(){ say('copy failed; select the text above'); out.textContent = t; });
+};
+</script></body></html>

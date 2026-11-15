@@ -10,6 +10,11 @@ on:
     branches: [native]
     paths: ['native/**', '.github/workflows/native.yml']
   workflow_dispatch:
+    inputs:
+      release:
+        description: 'Attach the debug APK to a GitHub PRE-release (test build; never touches the desktop app)'
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -116,3 +121,59 @@ jobs:
           name: thunder_core-android-arm64
           path: build/core/libthunder_core.a
           retention-days: 7
+
+  android-apk:
+    name: Android shell v0 (debug APK)
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.10.2'
+      - name: Android SDK pieces (pinned)
+        run: |
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-35" "build-tools;35.0.0" "ndk;27.0.12077973" "cmake;3.22.1" > /dev/null
+      - name: Assemble the debug APK
+        run: gradle -p native/android :app:assembleDebug --no-daemon --stacktrace
+      - name: Name the APK
+        run: |
+          mkdir -p out
+          cp native/android/app/build/outputs/apk/debug/app-debug.apk "out/thunder-plus-native-n0-android-${{ github.run_number }}.apk"
+          sha256sum out/*.apk | tee out/SHA256.txt
+          ls -l out
+      - uses: actions/upload-artifact@v4
+        with:
+          name: thunder-plus-native-n0-android-apk
+          path: out/
+          retention-days: 30
+
+  android-release:
+    name: Attach the APK to a pre-release
+    needs: android-apk
+    if: ${{ (github.event_name == 'push' && contains(github.event.head_commit.message, '[release-apk]')) || (github.event_name == 'workflow_dispatch' && inputs.release) }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: thunder-plus-native-n0-android-apk
+          path: out
+      - name: Create the pre-release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: native-n0-android-${{ github.run_number }}
+        run: |
+          # A PRE-release with a tag that is not v<number>: the desktop updater reads /releases/latest (never a pre-release)
+          # and only tags of the form v<digit>. --latest=false keeps GitHub from ever calling this one "latest".
+          gh release create "$TAG" out/*.apk out/SHA256.txt --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
+            --prerelease --latest=false \
+            --title "NATIVE TEST BUILD N0 (Android, run ${{ github.run_number }}): not the desktop app" \
+            --notes "Test build of the Thunder Plus native spike (stage N0). Android debug APK, sideload only. It is NOT a release of the desktop app and the desktop updater ignores it. Steps: native/tests/OWNER-TEST-N0.md on the native branch. Commit: $GITHUB_SHA"
