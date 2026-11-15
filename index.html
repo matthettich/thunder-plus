@@ -19927,9 +19927,14 @@ function pumpLatencyOf(f, sr){
   if (pumpLatCache.size > 200) pumpLatCache.clear();
   pumpLatCache.set(key, lat); return lat;
 }
-// The master's pump slots together (switched on): a render starts that much later, and pass() trims it off as it does
-// the mastering's latency. (A bus's latency isn't compensated anywhere: see pumpLatTxt.)
-const pumpChainLatency = (A, sr) => (A || []).reduce((n, f) => n + (f && f.on && isPumpT(f.type) ? pumpLatencyOf(f, sr) : 0), 0);
+// The master's pump slots together: a render starts that much later, and pass() trims it off as it does the mastering's
+// latency. (A bus's latency isn't compensated anywhere: see pumpLatTxt.)
+// FIX (build 603): a switched-OFF pump slot counts too. OFF is the plugin's own bypass, which still delays by its latency
+// (so switching it, by hand or with FXO, never moves the timing); counting only the slots that are ON left renders late by
+// the OFF slots' latency (owner's song: 4454 samples) and LATENCY COMP lined tracks up without them. Only a pump effect with
+// no bypass of its own (METER) is skipped whole by the worklet when OFF, so it adds nothing then.
+const pumpSlotLat = (f, sr) => f && isPumpT(f.type) && (f.on || pumpIdx[TFX[f.type].pump].bypass != null) ? pumpLatencyOf(f, sr) : 0;
+const pumpChainLatency = (A, sr) => (A || []).reduce((n, f) => n + pumpSlotLat(f, sr), 0);
 /* LATENCY COMPENSATION (owner, 1 Nov: Audio & MIDI → LATENCY COMP, off by default). The pump effects that look ahead (LIMIT,
    CALM, TONE, linear-phase EQ…) make a track or bus play late. With the option on, every path to the master is delayed to
    the latest one: pdcPlan() works out, from the song alone (no audio nodes, so renders get the same answer), each track's
@@ -24777,7 +24782,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 602;
+const BUILD = 603;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD + (location.pathname.includes('/beta/') ? ' · beta' : '');
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -34719,6 +34724,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [603, '14 Nov', ['Renders no longer start late when the master holds switched-off …pump effects (CALM, TONE, MASTER, LIMIT…): a switched-off one still delays the sound, and that delay is now counted. LATENCY COMP lines tracks up with their switched-off …pump effects too']],
   [602, '14 Nov', ['Settings › TRACKS: LFOs, macros, locks, scenes and parts now follow their tracks when the track count changes (LFOs stayed on the old track number and seemed to vanish)', 'ARRANGE ON STOP = PLAYHEAD now also moves the Arrange cursor when the Phrase (or another screen) holds the keys', 'FX screen: right-click › Clear (and CLEAR) empties the effect you clicked, not the last one in the list', 'Bottom FX bar: right-click or long press an effect for Remove effect (Ctrl+Z brings it back)', 'Settings › ANIMATIONS: OFF hides the dancing dogs and the moving effect pictures (also right-click or long press them › Hide animations). Meters, scopes and playheads stay']],
   [601, '14 Nov', ['…chains: Morph, a new module that combines two sounds by their frequencies. Convolve keeps only what both share (a pad chopped and coloured by a drum loop); Shape plays A with B\'s tone colour. Morph, Sharpness, Smoothing, Frame and Freeze (hold A or B as a drone). It is under Granular and spectral']],
   [600, '14 Nov', ['Arrange: zoom out further (the − button, Ctrl+wheel or pinch: five levels below fit, up to about three times the rows) so whole phrases fit', 'Arrange, Song, Phrase and Pattern view turn the page early while playing: when the playhead is 8 rows from the bottom, keeping 4 rows of what just played at the top', '+ ADD FX in the bottom FX bar opens the effect list straight away on the first empty slot', 'The "got its own copy" and "also plays on track" notices show for about 3 seconds and replace each other instead of queueing']],
