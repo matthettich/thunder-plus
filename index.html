@@ -25017,7 +25017,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 611;
+const BUILD = 612;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD + (location.pathname.includes('/beta/') ? ' · beta' : '');
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -35074,6 +35074,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [612, '14 Nov', ['MOD beside Arrange (the FOLLOWS badge): MOD now shows the track the Arrange cursor is on. It stayed on the track it showed before, so a track\'s LFOs seemed to be missing until you went to Song and back', 'An LFO whose target is gone says why (“FX1 DLAY: no such setting”, “FX4: no effect in this slot”) instead of “(empty)”']],
   [611, '14 Nov', ['Under the hood: a song can now hold its own number of mono and poly tracks. Nothing changes on screen yet (the two Settings rows come next), and every existing song opens and saves exactly as before']],
   [610, '14 Nov', ['Chance you can keep. SED nn in the MASTER column seeds the song: the same notes fall every time it plays and in every render, from the top or from the middle. SED 00 there (or no SED): a new roll each time. SED nn on a TRACK seeds that track alone until its next SED (SED 00 hands it back), so you can re-roll one part and keep the rest. One track’s rolls no longer depend on another track’s notes', 'TCH xx: the track’s chance from that row on (00 never – FE; FF off). It multiplies with each note’s CHA. In the master column it thins every track. MOD has a new target, CHANCE, for an LFO, a macro or a scene', 'SKP 01: a note that chance or a condition skips also stops the note before it (SKP 00: it rings on, as before). CHD 01: each note of a chord rolls by itself (CHD 00: the chord plays or is skipped as one)', 'CND 08 (NOT) turns the row’s NTH or chance round: NTH 41 with CND 08 plays every pass but the first of four', 'Changed: a song that already used SED with CHA or PRB still repeats, but falls on different notes than before this build']],
   [609, '14 Nov', ['Resting …pump effects (build 607): an FXO command that switches one on now lands on the beat the first time too; changing a switched-off EQ to linear phase no longer leaves a moment of silence on its track']],
