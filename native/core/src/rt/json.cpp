@@ -3,6 +3,8 @@
 #include <clocale>
 #include <cmath>
 #include <cstdlib>
+#include <charconv>
+#include <cmath>
 #include <cstring>
 #include <new>
 #include <vector>
@@ -101,10 +103,33 @@ double toDouble(const char* t, size_t n, bool simpleInt) {
     double v = 0; for (; i < n; i++) v = v * 10 + (t[i] - '0');
     return neg ? -v : v;
   }
+  // N1 review C9: the library's strtod follows the process locale (a ',' decimal point would stop it at the '.'), and the old fix read
+  // localeconv(), which is not thread-safe against a setlocale on another thread (the Android side may call one). std::from_chars is
+  // locale-free and correctly rounded, as strtod is in the C locale: the same doubles (tested against strtod on 100,000 strings:
+  // test_hostile). It does not accept a '+' before the number, which JSON never has. An out-of-range result: a value too big is
+  // +-infinity and one too small is +-0, as strtod gives (a subnormal is in range, but see below).
+#if defined(__cpp_lib_to_chars) && __cpp_lib_to_chars >= 201611L
+  {
+    double v = 0; const std::from_chars_result r = std::from_chars(t, t + n, v);
+    if (r.ec == std::errc() && r.ptr == t + n) return v;
+    if (r.ec == std::errc::result_out_of_range) {
+      // too big or too small? The decimal magnitude of the value: its integer digits (or minus the zeros after the point) plus the exponent.
+      const bool neg = t[0] == '-'; size_t i = neg ? 1 : 0; long mag = 0, ex = 0; bool seen = false, tiny = false;
+      for (; i < n && t[i] >= '0' && t[i] <= '9'; i++) { if (t[i] != '0') seen = true; if (seen) mag++; }
+      if (i < n && t[i] == '.') for (i++; i < n && t[i] >= '0' && t[i] <= '9'; i++) { if (!seen && t[i] == '0') mag--; else seen = true; }
+      if (i < n && (t[i] == 'e' || t[i] == 'E')) { i++; const bool en = i < n && t[i] == '-'; if (i < n && (t[i] == '-' || t[i] == '+')) i++; for (; i < n && ex < 100000; i++) ex = ex * 10 + (t[i] - '0'); if (en) ex = -ex; }
+      tiny = mag + ex <= 0;
+      if (!tiny) return neg ? -HUGE_VAL : HUGE_VAL;
+      // too small: libstdc++ reports a SUBNORMAL result as out of range too (it keeps strtod's ERANGE), so these few numbers (below
+      // 2.2e-308) go to the strtod path below: the one case that still reads the locale. Overflow, the normal range and every number
+      // above 2.2e-308 are locale-free.
+    }
+  }
+#endif
+  // No floating-point from_chars in this C++ library: strtod, with the locale's decimal point put in for the '.'.
   char buf[64]; std::string big;
   char* b = buf;
   if (n >= sizeof buf) { big.assign(t, n); b = &big[0]; } else { std::memcpy(buf, t, n); buf[n] = 0; }
-  // strtod follows the C locale of the process; give it that locale's decimal point
   const char dp = std::localeconv()->decimal_point[0];
   if (dp != '.') for (size_t i = 0; i < n; i++) if (b[i] == '.') b[i] = dp;
   if (b == &big[0]) big.push_back(0);

@@ -1,6 +1,7 @@
 // N1 review fixes: regression tests for the independent review's findings (progress/review-n1.md, 15 Nov 2026). Each test is
 // named for its finding (A1..C9) and fails with that id. Built with the sanitizers in CI (THUNDER_SANITIZE), where a read out of
 // range, a shift by the type's width or a cast of NaN is itself a failure.
+#include <chrono>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
@@ -9,6 +10,7 @@
 #include <vector>
 
 #include "mix/mix.h"
+#include "rt/num.h"
 #include "render/render.h"
 #include "seq/seq.h"
 #include "song/song.h"
@@ -226,6 +228,41 @@ static void testB5() {
   CHECK("B5 the voice is still sounding", pool.active() == 1);
 }
 
+// ---- C1..C3, C9: shifts, loops, casts, the locale-free number reader ----
+static void testC() {
+  // C1: bit32 is false outside 0..31 (the preview bus is track 32); the renderer's mixer runs it every block (a failure under the sanitizers)
+  CHECK("C1 bit32 in range", bit32(0x80000001u, 0) && bit32(0x80000001u, 31) && !bit32(0x80000001u, 5));
+  CHECK("C1 bit32 out of range", !bit32(0xFFFFFFFFu, 32) && !bit32(0xFFFFFFFFu, -1) && !bit32(0xFFFFFFFFu, 64));
+  // C2: a loop of 1e8 / 2e9 rows is clamped: one step() is fast (it took 101 ms and then seconds)
+  { const std::string js = songJson(row(60, -1, -1), ""); Song song; loadSong(song, js); SeqVars vars;
+    for (int y1 : {100000000, 2000000000}) {
+      SeqOpts o; o.hasLoop = true; o.loopY0 = -5; o.loopY1 = y1; Seq q(song, vars, SeqMode::Song, o); std::vector<SeqEvent> ev(2048); SeqStep st;
+      const auto a = std::chrono::steady_clock::now(); for (int i = 0; i < 40; i++) q.step(ev.data(), 2048, &st);
+      const double ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - a).count();
+      CHECK("C2 a huge loop is clamped: 40 steps are fast", ms < 200 && q.alive());
+      q.setLoop(true, -1000000, 2000000000); for (int i = 0; i < 10; i++) q.step(ev.data(), 2048, &st);
+      CHECK("C2 setLoop clamps too", q.alive()); } }
+  // C3: the saturating casts
+  CHECK("C3 to_int_sat NaN -> lo", to_int_sat(NAN, -1, 9) == -1);
+  CHECK("C3 to_int_sat range", to_int_sat(1e300, -1, 9) == 9 && to_int_sat(-1e300, -1, 9) == -1 && to_int_sat(4.9, -1, 9) == 4 && to_int_sat(-0.5, -1, 9) == 0);
+  CHECK("C3 to_i64_sat", to_i64_sat(1e300, 0, 1LL << 62) == (1LL << 62) && to_i64_sat(NAN, -7, 7) == -7 && to_i64_sat(-INFINITY, -7, 7) == -7 && to_i64_sat(123456789012.0, 0, 1LL << 62) == 123456789012LL);
+  { thunder_core* c = thunder_create(48000, 256); std::string s = "{\"t\":\"echo\",\"n\":"; s += std::string(400, '9'); s += ",\"at\":" + std::string(400, '9') + "}";
+    CHECK("C3 a 400-digit n and at no longer reach an integer cast", thunder_post(c, s.data(), (int)s.size()) == 1); thunder_destroy(c); }
+  // C9: the JSON reader's numbers equal strtod's in the C locale: 100,000 generated strings (long mantissas, exponents, subnormals, overflow)
+  { uint64_t r = 88172645463325252ull; auto rnd = [&]() { r ^= r << 13; r ^= r >> 7; r ^= r << 17; return r; };
+    int bad = 0, total = 0; std::string first;
+    for (int k = 0; k < 100000; k++) {
+      std::string n; if (rnd() % 3 == 0) n += '-';
+      const int mode = (int)(rnd() % 6); int digits = mode == 0 ? 1 + (int)(rnd() % 6) : mode == 1 ? 1 + (int)(rnd() % 17) : mode == 2 ? 15 + (int)(rnd() % 10) : mode == 3 ? 1 + (int)(rnd() % 40) : mode == 4 ? 300 + (int)(rnd() % 500) : 1 + (int)(rnd() % 20);
+      std::string m; for (int i = 0; i < digits; i++) m += (char)('0' + rnd() % 10); if (m[0] == '0' && m.size() > 1) m[0] = '1' + (char)(rnd() % 9);
+      int dot = (rnd() % 2) ? (int)(rnd() % (m.size() + 1)) : -1; if (dot == 0) { n += "0"; } n += m.substr(0, dot < 0 ? m.size() : (size_t)dot); if (dot >= 0) { n += '.'; std::string fr = m.substr((size_t)dot); if (fr.empty()) fr = "0"; n += fr; }
+      if (rnd() % 2) { int e = (rnd() % 4 == 0) ? (int)(rnd() % 700) - 350 : (int)(rnd() % 60) - 30; if (rnd() % 8 == 0) e = -300 - (int)(rnd() % 30); n += (rnd() % 2 ? "e" : "E"); if (e < 0) n += '-'; else if (rnd() % 2) n += '+'; n += std::to_string(e < 0 ? -e : e); }
+      JsonDoc d; const std::string text = "[" + n + "]"; if (!d.parse(text.data(), text.size())) { bad++; if (first.empty()) first = "parse failed " + n; continue; }
+      const double got = d.root().at(0).asNum(), want = std::strtod(n.c_str(), nullptr); total++;
+      if (std::memcmp(&got, &want, sizeof got) != 0) { bad++; if (first.empty()) first = n; } }
+    CHECK("C9 100,000 numbers equal strtod's, bit for bit", bad == 0 && total == 100000); if (bad) std::printf("  first mismatch: %s (%d bad)\n", first.c_str(), bad); }
+}
+
 // @@TESTS_END
 
 int main() {
@@ -237,6 +274,7 @@ int main() {
   testB3();
   testB4();
   testB5();
+  testC();
   // @@CALLS_END
   if (g_fail) { std::printf("test_hostile: %d FAILED\n", g_fail); return 1; }
   std::printf("test_hostile: all passed\n");
