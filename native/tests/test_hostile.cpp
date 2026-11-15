@@ -208,6 +208,24 @@ static void testB4() {
   CHECK("B4 and nothing was dropped", st.seqDropped == 0);
 }
 
+// ---- B5: ARP mod rows on one held note must not overflow the rate lane ----
+static void testB5() {
+  std::vector<float> longPad(48000 * 20); for (size_t i = 0; i < longPad.size(); i++) longPad[i] = (float)std::sin(0.01 * (double)i) * 0.3f;
+  VoicePool pool(48000, 4); VoiceBuf b; b.data = longPad.data(); b.len = (int)longPad.size(); b.sr = 48000; VoiceKit k;
+  SeqEvent n; n.type = SEV_NOTE; n.track = 0; n.t = 0; n.rate = 1; n.gain = 1; n.pan = 128;
+  CHECK("B5 note starts", pool.note(n, nullptr, b, k, 120));
+  std::vector<double> arp(64); 
+  for (int m = 0; m < 12; m++) {   // twelve ARP rows of 32 steps (33 events each) booked inside one LEAD: 396 events into a lane of 128
+    SeqEvent e; e.type = SEV_MOD; e.track = 0; e.t = 0.01 * m; e.has = SH_ARP; e.arpN = 32;
+    for (int q = 0; q < 32; q++) { arp[(size_t)q * 2] = e.t + 0.0001 * (q + 1); arp[(size_t)q * 2 + 1] = 1.0 + 0.05 * (q % 4); }
+    pool.mod(e, arp.data());
+  }
+  CHECK("B5 nothing dropped from the rate lane", pool.autoDropped() == 0);
+  // the last arpeggio's end event ("back to base") is booked: after it the voice advances at rate 1: sample-exact pitch from there
+  std::vector<float> L(128), R(128); double t = 0; for (int i = 0; i < 40; i++) { pool.setTime(t); pool.render(L.data(), R.data(), 128, t); t += 128.0 / 48000; }
+  CHECK("B5 the voice is still sounding", pool.active() == 1);
+}
+
 // @@TESTS_END
 
 int main() {
@@ -218,6 +236,7 @@ int main() {
   testB2();
   testB3();
   testB4();
+  testB5();
   // @@CALLS_END
   if (g_fail) { std::printf("test_hostile: %d FAILED\n", g_fail); return 1; }
   std::printf("test_hostile: all passed\n");

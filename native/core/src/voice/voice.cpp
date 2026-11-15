@@ -96,6 +96,16 @@ void VoicePool::kill(int vi, double at, double tc, bool stop) {
 void VoicePool::pitchMods(Voice& v, double t, double base, const SeqEvent& e, const double* arp) {
   Auto& pr = v.r;
   if (e.has & SH_ARP) {
+    // N1 review B5: an ARP row books arpN + 1 events and the rate lane holds kAutoR. On a held note several ARP `mod` rows inside LEAD
+    // overflowed it, and the dropped tail was the "back to base" event: the note stayed off pitch. The JS list is unbounded and does not
+    // cancel, so nothing is cancelled while the events fit (overlapping arpeggios interleave exactly as in the JS: the voice goldens
+    // stay bit for bit). Only when they would not fit: fold what is over (what run() does every block), and if that is not enough the
+    // new arpeggio replaces what is booked from its first step on (latest wins).
+    if (pr.size() + e.arpN + 1 > pr.capacity()) {
+      const double t1 = e.arpN ? std::max(arp[0], t) : t;
+      pr.prune(now_);
+      if (pr.size() + e.arpN + 1 > pr.capacity()) { pr.prune(t1); pr.cancel(t1); }   // earlier steps still booked are folded into the value at t1
+    }
     for (int q = 0; q < e.arpN; q++) pr.set(base * arp[2 * q + 1], std::max(arp[2 * q], t));
     if (e.arpN) pr.set(base, arp[2 * (e.arpN - 1)] + (e.arpN > 1 ? arp[2] - arp[0] : 0.02));
   } else if (e.has & SH_BEND) {
