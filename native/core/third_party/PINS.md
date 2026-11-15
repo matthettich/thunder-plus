@@ -19,8 +19,13 @@ per-file headers of the files used are MIT). Nothing non-permissive is fetched. 
 exceptions), downloaded in CI, never vendored.
 
 ## Parity
-`native/tools/parity.sh u02` compares the CMake-built wasm with (a) the committed files and (b) the output of the three `build.sh` scripts
-on these same pins. Findings of the first local run: with HEAD pins the original `build.sh` already does not reproduce the committed files
-(tfx 674311 B vs 674341 B committed), so some drift in upstream (or a different path / locale for the link) is already in the committed
-bytes. The scripts link `"$O"/*.o`, a shell glob of object names made from absolute temp paths: the wasm bytes depend on the checkout path and
-locale. The CMake link order is not that order, so (b) differs by a few hundred bytes (order only: same sources and flags).
+The gate is the audio, not the bytes: `native/tools/parity.sh u02` builds the three wasm files with CMake, swaps them (and the
+`MODS_WASM_B64` base64 in both worklet files) into a temporary copy of the tree, and runs the golden tests there as `npm test` does
+(chains-modules / chains-processor / chains-thunder-node / waves-modules / waves-processor and every other test that loads these files).
+Local result at the pins above: every one PASSes, so the pins reproduce today's hashes. mods.wasm is also byte-identical to the committed
+one; tfx.wasm and thunder-dsp.wasm differ in bytes (the committed files came from unpinned upstreams) but not in audio.
+
+**Canonical link order.** `dsp/build.sh` links `"$O"/*.o`, a shell glob of names made from absolute temp paths, so its bytes depend on the
+checkout path and locale. The CMake wasm link lists every object sorted by its source path relative to `dsp/`, DaisySP or the prepared
+upstream tree (`native/core/dsp/CMakeLists.txt`, `dsp_wasm`), so two builds on different machines or paths give the same bytes (checked:
+same tfx / thunder-dsp / mods hashes from two different checkout paths). `dsp/build.sh` is unchanged.

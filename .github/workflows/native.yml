@@ -74,11 +74,12 @@ jobs:
       # U02: the existing C++ DSP (tfx, thunder-dsp, mods) from CMake with the same wasi-sdk, pinned upstreams (third_party/PINS.md).
       - name: Build tfx / thunder-dsp / mods wasm from CMake (U02)
         run: WASI_SDK="$PWD/wasi-sdk" native/tools/build-wasm.sh "$RUNNER_TEMP/u02-wasm"
-      # Hash gate. continue-on-error until a run shows whether the committed files can be matched at the pinned commits
-      # (see native/core/third_party/PINS.md): the step's log is the evidence the manager reads.
-      - name: Parity u02 (CMake wasm vs committed files and vs dsp/build.sh)
-        continue-on-error: true
-        run: WASI_SDK="$PWD/wasi-sdk" native/tools/parity.sh u02 "$RUNNER_TEMP/u02-wasm"
+      # U02 gate: the golden tests rendered through the CMake-built wasm (copy of the tree; committed files untouched).
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Parity u02 (goldens through the CMake wasm)
+        run: WASI_SDK="$PWD/wasi-sdk" PARITY_SKIP_BUILD=1 native/tools/parity.sh u02 "$RUNNER_TEMP/u02-wasm"
       - uses: actions/upload-artifact@v4
         with:
           name: thunder_dsp-wasm-u02
