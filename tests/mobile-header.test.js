@@ -9,7 +9,7 @@ test('mobile header: TRANSP hides only in body.mob.inpad, and the pad SEMI keys 
   assert.match(src, /body\.mob\.inpad #tXposeDn, body\.mob\.inpad #tXposeUp\{display:none\}/, 'TRANSP − / + hidden in Mobile + PAD');
   assert.match(src, /function padHdr\(\)\{ document\.body\.classList\.toggle\('inpad', inMode === 'pad'\); \}/, 'body.inpad follows the input mode');
   assert.match(src, /function setInput\(m\)\{[^\n]*\n[^\n]*padHdr\(\);/, 'and it is kept in step when the input changes');
-  assert.match(src, /\$\('tXposeDn'\)\.addEventListener\('click', \(\) => transposeSel\(-1, true\)\)/, 'the hidden button is the same move (selection needed)');
+  assert.match(src, /\$\('tXposeDn'\)\.addEventListener\('click', \(\) => apRun\(transposeSel, \[-1, true\]\)\)/, 'the hidden button is the same move (selection needed)');
   assert.match(src, /\.ttabbar\.tcompact \.ttabs button\[data-v=project\]::before\{content:'PROJ'/, 'PROJ when the row is tight');
   assert.match(src, /b\.setAttribute\('aria-label', 'Project'\)/, 'PROJECT keeps its name for readers');
 });
