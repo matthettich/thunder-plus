@@ -13856,7 +13856,7 @@ function sndSpecPaint(){
   }
   // where each sounding note is in the render: a line with the screen colour either side, so it shows on any part
   if (sndPH.length && ctx){
-    const t = ctx.currentTime - heardLat();
+    const t = ctx.currentTime - heardLat() - moFxLat();   /* (LATENCY COMP: the sound is T later too) */
     for (const p of sndPH){
       if (t < p.t0 || p.c !== c) continue;
       const pos = p.from + (t - p.t0) * p.rate * (p.to < p.from ? -1 : 1), x = pos / (c.data.length / c.sr) * W;
@@ -13900,7 +13900,7 @@ function sndSoon(){ if (!sndQ) sndQ = requestAnimationFrame(() => { sndQ = 0; if
 function sndWake(){ if (!sndRaf && sndOn()) sndRaf = requestAnimationFrame(sndFrame); }
 function sndFrame(){
   sndRaf = 0; if (!sndOn() || document.hidden) return; if (!sndCol) sndColours(); if (meterBlank('snd', () => sndScopePaint(false))) return; /* METERS: OFF: empty once, then parked (mtrWake at STOP) */ if (lpHold(sndFrame.t || 0)){ sndRaf = requestAnimationFrame(sndFrame); return; } sndFrame.t = performance.now();   // BATTERY: parked while hidden (sndWake on return)
-  const t = ctx ? ctx.currentTime - heardLat() : 0;
+  const t = ctx ? ctx.currentTime - heardLat() - moFxLat() : 0;
   for (let i = sndPH.length - 1; i >= 0; i--) if (t > sndPH[i].end) sndPH.splice(i, 1);
   const live = !!ctx && (tp.on || performance.now() - audioWake < 1500 || sndPH.length > 0);
   sndSpecPaint(); sndScopePaint(live);
@@ -25521,7 +25521,7 @@ function instList(){
 }
 // The INST LIST's instrument lights as its note sounds (at the note's time, through the output latency), as the Synth page's pads do.
 function inlBlink(e){
-  const ms = Math.max(0, (e.t - ctx.currentTime + heardLat()) * 1000), ii = e.ii;
+  const ms = Math.max(0, (e.t - ctx.currentTime + heardLat() + moFxLat()) * 1000), ii = e.ii;
   setTimeout(() => { if (!tp.on || view !== 'tracker') return; let au = true; try { au = audible(e.track); } catch(err){} if (!au) return;
     for (const id of ['tInlSide', 'tInlPad']){ const b = $(id).querySelector(`[data-i="${ii}"]`); if (!b || b.hidden) continue; b.classList.add('hit'); clearTimeout(b._hit); b._hit = setTimeout(() => b.classList.remove('hit'), 110); } }, ms);
 }
@@ -29739,7 +29739,7 @@ function stageTick(now){
   if (!stgKindNow || $('tStage').hidden) return;
   if (stgKindNow === 'piano' || stgKindNow === 'spec'){ if (stgKindNow === 'spec' && meterBlank('stg', () => stageCanvas(true))) return; if (meterDue(now, stgFrameT, 46, stgKindNow === 'piano')){ stgFrameT = now; stageCanvas(false); } return; }   // METERS: the piano's lit notes are marks (OFF keeps LIGHT's rate); the spectrum is a meter
   if ((stgKindNow !== 'dogs' && stgKindNow !== 'drum') || !tp.on || !ctx || !animOn) return;
-  const lat = heardLat(), t = ctx.currentTime - lat, bpm = tp.bpm || S.bpm;
+  const lat = heardLat() + moFxLat(), t = ctx.currentTime - lat, bpm = tp.bpm || S.bpm;
   if (bpm !== stgBpm){ const b = (t - stgT0) * stgBpm / 60; stgBpm = bpm; stgT0 = t - b * 60 / bpm; }
   const per = 60 / bpm, b = Math.floor((t - stgT0) / per);
   if (b < 0 || b === stgBeat) return; stgBeat = b;
@@ -31760,7 +31760,7 @@ function dkFxPatState(f, k, t, at){
 }
 function dkFxPat(col, cv, g, W, H, f, k, font){
   if (!f || (f.type !== 'flex' && f.type !== 'sgate' && f.type !== 'retrig') || W < 60 || H < 34){ col._pk = ''; return false; }
-  const t = dkMst() ? NT : dkTrack(), lat = ctx ? heardLat() : 0, at = ctx ? ctx.currentTime - lat : 0;
+  const t = dkMst() ? NT : dkTrack(), lat = ctx ? heardLat() + moFxLat() : 0, at = ctx ? ctx.currentTime - lat : 0;
   const st = dkFxPatState(f, k, t, at); if (!st) return false;
   const beat = tp.on ? fxcBeat(at) : null, bar = beat == null ? 0 : Math.floor(beat / 4);
   const C = fxDynPal(), dpr = devicePixelRatio || 1, vals = TFX[f.type].ps.map(q => f[q.k]).join(',');
