@@ -110,3 +110,21 @@ test('the help text and README no longer call the second half poly', () => {
   assert.ok(!/The second half of the tracks is polyphonic/.test(src)); assert.ok(!/The second half of the tracks is polyphonic/.test(H.read('README.md')));
   assert.match(H.read('README.md'), /MONO TRACKS\*\* and \*\*POLY TRACKS/);
 });
+test('Hide on a song that was replaced while the question was open hides nothing and says so', async () => {
+  const c = rig(); let resolve; c.askYes = (msg, ok) => { c.asks.push({ msg, ok }); return new Promise(r => { resolve = r; }); };
+  c.tracksRowSet(8, 7); assert.equal(c.asks.length, 1); const other = JSON.parse(JSON.stringify(c.S)); c.S = other;   /* a project dropped on the window */
+  resolve(true); await flush();
+  assert.equal(c.S.ntr, 16); assert.equal(c.saves.length, 0); assert.equal(c.toasts.at(-1), 'The song changed: nothing was hidden.'); assert.equal(c.briefs.length, 0);
+  const d = rig(); let res2; d.askYes = () => new Promise(r => { res2 = r; }); d.tracksRowSet(8, 7); res2(true); await flush(); assert.equal(d.S.ntr, 15, 'the same song: it hides');
+});
+test('the Song sheet keeps keyboard focus on the MONO / POLY control after it redraws', () => {
+  const code = cut('let tsetFk = ', '// The Project tab of the settings menu'), made = [];
+  const mk = fk => { const n = { dataset: { fk }, disabled: false, focused: 0, focus() { this.focused++; } }; made.push(n); return n; };
+  const ctx = { buildProj() { ctx.rebuilt = (ctx.rebuilt || 0) + 1; }, document: { activeElement: null, querySelectorAll: () => made } };
+  vm.createContext(ctx); vm.runInContext(code + '\nthis.keep = buildProjKeep; this.setFk = v => { tsetFk = v; };', ctx);
+  const rg = mk('MONO TRACKS|range'), plus = mk('MONO TRACKS|+'), other = mk('POLY TRACKS|+');
+  ctx.document.activeElement = plus; ctx.keep(); assert.equal(plus.focused, 1, 'the + that was pressed'); assert.equal(other.focused, 0);
+  ctx.document.activeElement = null; ctx.setFk('MONO TRACKS|range'); ctx.keep(); assert.equal(rg.focused, 1, 'the slider (the dialog had focus when Hide was accepted)');
+  plus.disabled = true; ctx.document.activeElement = plus; ctx.keep(); assert.equal(rg.focused, 2, 'a button that went disabled at a limit hands focus to its slider');
+  assert.match(src, /dataset\.fk = r\.l \+ '\|range'/); assert.ok(!/r\.late\) buildProj\(\)|\|\| r\.late\) buildProj/.test(src), 'no late row rebuilds without keeping focus');
+});
