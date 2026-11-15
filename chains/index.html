@@ -4058,20 +4058,24 @@ function xcCables(){
   // The edges the engine runs: a cable out of a Receive is one edge from every source cabled into the Send of its label (both drawn cables are what gets marked).
   const by = new Map(mods.map(m => [m.id, m])), edges = [], sends = new Map(), per = new Map();   // same port choice as the worklet's srResolve: Out takes In, Out R takes In R (In when it has none, Send by Send), a Receive cabled into a Send is followed through
   for (const c of cables){ const d = by.get(c.to[0]); if (d && d.type === 'send'){ const k = srKeyOf(d); if (k){ if (!sends.has(k)) sends.set(k, []); let e = per.get(d.id); if (!e){ per.set(d.id, e = { in:[], inR:[] }); sends.get(k).push(e); } if (c.to[1] === 'in') e.in.push(c); else if (c.to[1] === 'inR') e.inR.push(c); } } }
-  const feeds = (rm, port, seen) => {
-    const key = rm.id + '.' + port; if (seen.has(key)) return []; seen.add(key); const res = [];
-    for (const e of sends.get(srKeyOf(rm)) || []){
+  const memo = new Map(); let cuts = 0;   // per label and port, as in the worklet's srResolve: linear in the stages, identical sources kept once (their marks merged)
+  const feeds = (lab, port, seen) => {
+    const key = lab + '.' + port, hit = memo.get(key); if (hit) return hit;
+    if (seen.has(key)){ cuts++; return []; }
+    seen.add(key); const before = cuts, got = new Map();
+    for (const e of sends.get(lab) || []){
       for (const q of port === 'outR' ? (e.inR.length ? e.inR : e.in) : port === 'out' ? e.in : []){
-        const sm = by.get(q.from[0]);
-        if (sm && sm.type === 'recv'){ for (const f of feeds(sm, q.from[1], seen)) res.push({ a:f.a, marks:[q, ...f.marks] }); } else res.push({ a:q.from[0], marks:[q] });
+        const sm = by.get(q.from[0]), part = sm && sm.type === 'recv' ? feeds(srKeyOf(sm), q.from[1], seen) : [{ a:q.from[0], marks:[] }];
+        for (const f of part){ let o = got.get(f.a); if (!o) got.set(f.a, o = { a:f.a, marks:new Set() }); o.marks.add(q); for (const m of f.marks) o.marks.add(m); }
       }
     }
-    seen.delete(key); return res;
+    seen.delete(key); const res = [...got.values()].map(o => ({ a:o.a, marks:[...o.marks] })); if (cuts === before) memo.set(key, res); return res;
   };
+  const eseen = new Map();
   for (const c of cables){
     const s = by.get(c.from[0]), d = by.get(c.to[0]);
     if (d && d.type === 'send') continue;
-    if (s && s.type === 'recv'){ for (const f of feeds(s, c.from[1], new Set())) edges.push({ a:f.a, b:c.to[0], marks:[...f.marks, c] }); continue; }
+    if (s && s.type === 'recv'){ for (const f of feeds(srKeyOf(s), c.from[1], new Set())){ const k = f.a + '>' + c.to[0], o = eseen.get(k); if (!o){ const e = { a:f.a, b:c.to[0], marks:[...f.marks, c] }; eseen.set(k, e); edges.push(e); } else for (const m of [...f.marks, c]) if (!o.marks.includes(m)) o.marks.push(m); } continue; }
     edges.push({ a:c.from[0], b:c.to[0], marks:[c] });
   }
   const fwd = new Map(), back = new Map(), add = (M, a, b) => { if (!M.has(a)) M.set(a, []); M.get(a).push(b); };

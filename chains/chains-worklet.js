@@ -5538,25 +5538,29 @@ function srResolve(mods, cables){
   }
   /* What a Receive's port carries: the sources cabled into its label's Sends (In R falling back to In, Send by Send). A source that is itself a Receive (a pair in series)
      is followed through, with a loop of Receives cut. */
-  const feeds = (rm, port, seen) => {
-    const key = rm.id + '.' + port; if (seen.has(key)) return []; seen.add(key);
-    const out = [];
-    for (const e of into.get(srKey(rm.inst)) || []){
-      const src = port === 'outR' ? (e.inR.length ? e.inR : e.in) : port === 'out' ? e.in : [];
-      for (const s of src){
+  /* Memoised per label and port, so a chain of stages costs the sum of its stages (not the number of routes); identical sources are kept once (a non-feedback route wins). A result worked
+     out while a loop was cut is not kept, since it may be short. */
+  const memo = new Map(); let cuts = 0;
+  const feeds = (lab, port, seen) => {
+    const key = lab + '.' + port, hit = memo.get(key); if (hit) return hit;
+    if (seen.has(key)){ cuts++; return []; }
+    seen.add(key); const before = cuts, got = new Map();
+    const put = (a, fb) => { const k = a[0] + '.' + a[1], o = got.get(k); if (!o) got.set(k, { a, fb }); else if (o.fb && !fb) o.fb = false; };
+    for (const e of into.get(lab) || []){
+      for (const s of port === 'outR' ? (e.inR.length ? e.inR : e.in) : port === 'out' ? e.in : []){
         const sm = mods.get(s.a[0]);
-        if (sm && sm.def.type === 'recv'){ for (const f of feeds(sm, s.a[1], seen)) out.push({ a:f.a, fb:f.fb || s.fb === true }); }
-        else out.push({ a:s.a, fb:s.fb === true });
+        if (sm && sm.def.type === 'recv'){ for (const f of feeds(srKey(sm.inst), s.a[1], seen)) put(f.a, f.fb || s.fb === true); }
+        else put(s.a, s.fb === true);
       }
     }
-    seen.delete(key); return out;
+    seen.delete(key); const res = [...got.values()]; if (cuts === before) memo.set(key, res); return res;
   };
-  const eff = [], virt = [];
+  const eff = [], virt = [], vseen = new Map();
   for (const c of cables){
     const sm = mods.get(c.a[0]), dm = mods.get(c.b[0]);
     if (dm && dm.def.type === 'send') continue;
     if (sm && sm.def.type === 'recv'){
-      for (const f of feeds(sm, c.a[1], new Set())) virt.push({ a:f.a, b:c.b, fb:c.fb === true || f.fb });
+      for (const f of feeds(srKey(sm.inst), c.a[1], new Set())){ const k = f.a[0] + '.' + f.a[1] + '>' + c.b[0] + '.' + c.b[1], fb = c.fb === true || f.fb, o = vseen.get(k); if (!o){ const v = { a:f.a, b:c.b, fb }; vseen.set(k, v); virt.push(v); } else if (o.fb && !fb) o.fb = false; }   // (the same cable from two Receives is kept once)
       continue;
     }
     eff.push(c);

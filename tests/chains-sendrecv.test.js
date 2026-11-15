@@ -38,10 +38,10 @@ test('send/receive: several Receives share one Send; several Sends with one labe
   const one = { modules: [tin(), mod('m', 'smixer', { chans: 2, l1: 1, l2: 1, level: 1 }), tout()], cables: [cab('i', 'out', 'm', 'in1'), cab('i', 'out', 'm', 'in2'), cab('m', 'out', 'o', 'in'), cab('m', 'outR', 'o', 'inR')] };
   assert.ok(same(render(p).L, render(one).L), 'two Receives = two cables from the same source');
   const two = { modules: [tin(), mod('s1', 'send', { lab: 2 }), mod('s2', 'send', { lab: 2 }), mod('r', 'recv', { lab: 2 }), tout()],
-    cables: [cab('i', 'out', 's1', 'in'), cab('i', 'out', 's2', 'in'), cab('r', 'out', 'o', 'in')] };
+    cables: [cab('i', 'out', 's1', 'in'), cab('i', 'outR', 's2', 'in'), cab('r', 'out', 'o', 'in')] };
   const sum = { modules: [tin(), tout()], cables: [cab('i', 'out', 'o', 'in'), cab('i', 'out', 'o', 'in')] };
-  const r = render(two), d = render({ modules: [tin(), mod('a', 'utility'), tout()], cables: [cab('i', 'out', 'o', 'in')] });
-  assert.ok(Math.abs(energy(r.L) / energy(d.L) - 4) < 1e-6, 'two Sends of one label add (twice the signal, four times the energy)');
+  const r = render(two), d = render({ modules: [tin(), tout()], cables: [cab('i', 'out', 'o', 'in'), cab('i', 'outR', 'o', 'in')] });
+  assert.ok(same(r.L, d.L) && energy(r.L) > 1, 'two Sends of one label add (their sources sum, as two cables would)');
   const mono = { modules: [tin(), mod('s', 'send', { lab: 1 }), mod('r', 'recv', { lab: 1 }), tout()], cables: [cab('i', 'out', 's', 'in'), cab('r', 'out', 'o', 'in'), cab('r', 'outR', 'o', 'inR')] };
   mono.ti2 = 1; const q = render(mono); assert.ok(same(q.L, q.R), 'only In patched on the Send: Out R carries In');
 });
@@ -88,4 +88,16 @@ test('waves: a label change through setText / setParam marks culling dirty', () 
   const src = H.read('waves/waves-worklet.js');
   assert.match(src, /this\.graph\.compile\(\); this\._sync\(\); \} \} \}\n/);
   assert.equal((src.match(/this\.graph\.compile\(\); this\._sync\(\);/g) || []).length, 2);
+});
+
+test('send/receive: 12 pairs in series, each Send fed by two Receives, resolve in linear time to the right sources', () => {
+  const N = 12, mods = [mod('a', 'trackIn', { track: 1 }), mod('b', 'trackIn', { track: 2 }), tout()], cables = [];
+  for (let k = 1; k <= N; k++) mods.push(mod('s' + k, 'send', { lab: k > 8 ? 0 : k }, k > 8 ? 'L' + k : undefined), mod('r' + k + 'x', 'recv', { lab: k > 8 ? 0 : k }, k > 8 ? 'L' + k : undefined), mod('r' + k + 'y', 'recv', { lab: k > 8 ? 0 : k }, k > 8 ? 'L' + k : undefined));
+  cables.push(cab('a', 'out', 's1', 'in'), cab('b', 'out', 's1', 'in'));
+  for (let k = 2; k <= N; k++) cables.push(cab('r' + (k - 1) + 'x', 'out', 's' + k, 'in'), cab('r' + (k - 1) + 'y', 'out', 's' + k, 'in'));
+  cables.push(cab('r' + N + 'x', 'out', 'o', 'in'), cab('r' + N + 'y', 'out', 'o', 'in'));
+  const E = engine(), t0 = Date.now(); E.loadPatch({ modules: mods, cables }); const ms = Date.now() - t0;
+  assert.ok(ms < 1000, 'resolved in ' + ms + ' ms');
+  const into = E.graph.inc.get('o').map(c => c.a[0] + '.' + c.a[1]).sort();
+  assert.equal(into.join(), 'a.out,b.out', 'only the two Track Ins, each once');
 });

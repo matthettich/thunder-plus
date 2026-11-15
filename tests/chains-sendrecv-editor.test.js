@@ -51,3 +51,16 @@ for (const [ed, src] of Object.entries(ED)){
     assert.match(src, /paintSr\(\); try \{ paintXc\(\); \} catch \(e\) \{\} if \(m\.collapsed\) paintSum\(n\); store\.touch\(\);/);
   });
 }
+
+for (const [ed, src] of Object.entries(ED)){
+  test(ed + ': 12 pairs in series, each Send fed by two Receives, mark in linear time (every cable once)', () => {
+    const N = 12, modules = [mod('a', 'trackIn', { track: 1 }), mod('b', 'trackIn', { track: 2 }), mod('o1', 'chainOut', { track: 1 }), mod('o2', 'chainOut', { track: 2 })], cables = [cab('a', 'out', 'o1', 'in'), cab('b', 'out', 'o2', 'in')];
+    for (let k = 1; k <= N; k++) modules.push(mod('s' + k, 'send', { lab: 0 }, 'L' + k), mod('x' + k, 'recv', { lab: 0 }, 'L' + k), mod('y' + k, 'recv', { lab: 0 }, 'L' + k));
+    cables.push(cab('a', 'out', 's1', 'in'), cab('b', 'out', 's1', 'in'));
+    for (let k = 2; k <= N; k++) cables.push(cab('x' + (k - 1), 'out', 's' + k, 'in'), cab('y' + (k - 1), 'out', 's' + k, 'in'));
+    cables.push(cab('x' + N, 'out', 'o1', 'in'), cab('y' + N, 'out', 'o1', 'in'));
+    const t0 = Date.now(), X = fns(src, { modules, cables }).xcCables(); assert.ok(Date.now() - t0 < 1000);
+    assert.ok(X.size >= 2 + 2 * (N - 1) + 2 - 1 && X.size <= cables.length, 'marked cables: ' + X.size);
+    assert.ok([...X.keys()].some(c => c.from[0] === 'x' + N));
+  });
+}
