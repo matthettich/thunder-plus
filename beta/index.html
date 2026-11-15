@@ -2195,7 +2195,7 @@ body.sdesk .dock:not(.vtrk) .pads .pad:nth-child(17)::before{content:'More pads'
 .stgx{position:absolute; top:0; right:0; pointer-events:auto; min-height:0; width:22px; height:22px; padding:0; border:0; background:transparent; color:var(--muted); opacity:0; transition:opacity .15s; font-size:var(--fs-3)}
 .tstage:hover .stgx, .stgx:focus-visible{opacity:1}
 .stgdogs{flex:1; min-height:0; display:flex; align-items:flex-end; justify-content:center; padding-bottom:2px}
-.stgdogs .dogs{max-width:420px; max-height:100%; color:var(--ts-ink)}
+.stgdogs .dogs{pointer-events:auto; max-width:420px; max-height:100%; color:var(--ts-ink)}
 .tstage .dogs{--dk-ink:var(--ts-ink); --dk-fill:var(--ts-bg)}
 .stgph{flex:1; min-height:0; display:flex; flex-direction:column; gap:4px; font:var(--fs-2)/1.2 var(--mono); color:var(--ts-dim)}
 .stgph b{font-weight:600; letter-spacing:.06em}
@@ -14877,20 +14877,30 @@ let skin = (() => { try { const v = localStorage.getItem(SKK); if (SKINS.some(k 
 // below a visible step, so the drift looks continuous at a third of the repaints of a per-frame animation. Paused while
 // the app is hidden; off with reduced motion.
 let rbT = 0;
+// ANIMATIONS (14 Nov, owner: "the dancing dogs and the other animations ... turn them off on any screen they appear on"): ON by default. OFF stops the decorations and the work behind them:
+// the dancing dogs (Song, Project, Phrase and the DOGS stage), the FX bar's effect pictures (rooms, grains, springs, swirls ...) and the Simple rainbow dynamic skin's colour drift.
+// Meters, scopes, playheads and the piano / spectrum / chain displays are functional and stay. Per device (localStorage). var: rbWheel() can run before this line is passed.
+var animOn = (() => { try { return localStorage.getItem('thunderplus-anim-v1') !== '0'; } catch(e){ return true; } })();
+function setAnim(on, say){
+  animOn = !!on; try { localStorage.setItem('thunderplus-anim-v1', animOn ? '1' : '0'); } catch(e){}
+  try { rbWheel(); } catch(e){} try { stageLayout(); } catch(e){} try { dkFbSig = ''; } catch(e){}
+  if (say) toast(animOn ? 'Animations are on.' : 'Animations are off. Settings → ANIMATIONS turns them back on.', 3600);
+  draw();
+}
 // Simple rainbow dynamic turns the --rbo hue offset that every rainbow colour is built from (10×/s, 1.8° steps, once
 // round in 20 s). The earlier hue-rotate() filter on <html> made the browser re-rasterise the whole page at device
 // resolution on every step (frame gaps doubled on the phone); a property change only restyles the coloured elements.
 function rbWheel(){
   const de = document.documentElement;
   clearInterval(rbT); rbT = 0; de.style.removeProperty('filter'); de.style.removeProperty('--rbo');
-  if (skin !== 'rainbowdyn' || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  if (skin !== 'rainbowdyn' || animOn === false || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
   rbT0 = performance.now(); if (!document.hidden) rbRun();
 }
 // BATTERY (8 Nov): no timer at all while the app is hidden (it only skipped the write before); the colours carry on from the same
 // place when it comes back, as the phase is read from the clock.
 var rbT0;   // var, no initialiser: rbWheel() may run before this line
 function rbRun(){ const de = document.documentElement; clearInterval(rbT); rbT = setInterval(() => { de.style.setProperty('--rbo', ((performance.now() - rbT0) * 0.018 % 360).toFixed(1) + 'deg'); }, 100); }
-document.addEventListener('visibilitychange', () => { if (skin !== 'rainbowdyn' || !rbT0 || matchMedia('(prefers-reduced-motion: reduce)').matches) return; if (document.hidden){ clearInterval(rbT); rbT = 0; } else if (!rbT) rbRun(); });
+document.addEventListener('visibilitychange', () => { if (skin !== 'rainbowdyn' || animOn === false || !rbT0 || matchMedia('(prefers-reduced-motion: reduce)').matches) return; if (document.hidden){ clearInterval(rbT); rbT = 0; } else if (!rbT) rbRun(); });
 // MATRIX TABS (owner, 31 Oct): in the Matrix skins the screen tabs (Tracker … Chains) end where the tracker's tabs below
 // (… PROJECT) do: their buttons share out the difference. Other skins, or a gap too big to be the same row of tabs: as is.
 function alignTabs(){
@@ -23570,10 +23580,11 @@ function tStop(quiet){
     tp.paused = ref >= 0 ? {pos:P, ref, row:P[ref].row, step:P[ref].step, key:curKey()} : null;
   });
   // STOP CURSOR: a STOP you make (not a restart, a song change or the song running out while hidden) puts the cursor there
-  let stopP = null, home = null;
+  let stopP = null, home = null, arrP = null;
   G('stop cursor', () => {
   stopP = !quiet && stopToPlayhead() && tp.on && tp.pos && tp.pos.some(Boolean) ? {P:tp.pos.map(q => q && Object.assign({}, q)), mode:tp.mode} : null;
-  home = !quiet && tp.on && !stopToPlayhead() && fpHome && fpHome.t >= workT && fpHome.t >= arrHandT ? fpHome : null; });   // (12 Nov, owner: PLAY from the pad, ▼ / scroll down, STOP before row 2 jumped the cursor back to the top) fpHome is the cursor as FOLLOW first noted it, and is only noted again 4 s after your last key, press or scroll: a place you moved to after that note stands, only an untouched cursor goes back   // (9 Nov, owner: with ON STOP at STAYS it still ended up at the playback spot: FOLLOW had carried it there)
+  home = !quiet && tp.on && !stopToPlayhead() && fpHome && fpHome.t >= workT && fpHome.t >= arrHandT ? fpHome : null;
+  arrP = !quiet && stopArrOn && !stopToPlayhead() && tv !== 'song' && tp.on && tp.mode === 'song' && tp.pos && tp.pos.some(Boolean) && apPanel() ? tp.pos.map(q => q && Object.assign({}, q)) : null; });   // (12 Nov, owner: PLAY from the pad, ▼ / scroll down, STOP before row 2 jumped the cursor back to the top) fpHome is the cursor as FOLLOW first noted it, and is only noted again 4 s after your last key, press or scroll: a place you moved to after that note stands, only an untouched cursor goes back   // (9 Nov, owner: with ON STOP at STAYS it still ended up at the playback spot: FOLLOW had carried it there)
   tp.timer = 0; tp.on = false; if (mtrMode === 'off') setTimeout(mtrWake, 0); fpMem = null; fpHome = null; tp.q = []; tp.pos = null; tp.snd = null; tp.stopAt = null; tp.ahead = tp.aheadT = 0; tp.rsUntil = 0; PB.rsA = null; G('runaway kick', rkReset);
   // HAND-OVER (seqHandover): the core and the voices already booked keep sounding until the page sequencer's first step
   if (tp.core){ tp.core = false; core.gen++; if (!handing) G('core', () => { coreWire(false); try { core.node.port.postMessage({op:'stop', at:ctx.currentTime}); } catch(e){} }); }
@@ -23587,7 +23598,17 @@ function tStop(quiet){
   if (!handing){ bgPlay(false); wakeLock(false); }   // BACKGROUND PLAY, KEEP SCREEN ON (a hand-over plays on)
   if (stopP) try { if (curToPlay(stopP.P, stopP.mode) && tp.paused) tp.paused.key = curKey(); } catch(e){ tpLog('stop cursor', e); }
   else if (home) try { cs.song.y = home.y; cs.song.top = home.top; cPhrase = home.p; cSect = home.s; cs.phrase.y = home.py; cs.phrase.top = home.ptop; cs.song.pg = cs.phrase.pg = false; if (tp.paused) tp.paused.key = curKey(); } catch(e){ tpLog('stop cursor', e); }
+  // ARRANGE ON STOP beside another screen (14 Nov, owner: ARRANGE ON STOP = PLAYHEAD, yet the Arrange cursor went back to where it was): with the Phrase (or the Mixer…) holding
+  // the keys, stopToPlayhead() reads PHRASE ON STOP, which moves or restores the phrase side AND Arrange's cursor. Arrange's own cursor and view now follow ARRANGE ON STOP alone.
+  if (arrP) G('arrange cursor', () => { if (tv === 'phrase' && pvActive()){ curToPlay(arrP, 'song'); if (tp.paused) tp.paused.key = curKey(); } else { arrCurToPlay(arrP); if (tp.paused) tp.paused.key = curKey(); } });   // Pattern view draws the song row's pattern, so the pattern goes with the row (pvGo); else only Arrange's cursor moves
   if (!quiet) draw();
+}
+// Arrange's cursor onto the row playing on its own track (the track column stays), and that row in view. For the Arrange beside another screen only: nothing of the phrase moves.
+function arrCurToPlay(P){
+  const want = cs.song.x, t = P[want] && P[want].row >= 0 && want !== MT ? want : P.findIndex((q, i) => q && q.row >= 0 && i !== MT); if (t < 0) return false;
+  const row = P[t].row, VR = Math.max(2, arrRows()), top = cs.song.top || 0;
+  cs.song.y = row; cs.song.pg = false; if (row < top || row > top + VR - 1) cs.song.top = clamp(row - 2, 0, Math.max(0, 256 - VR));
+  return true;
 }
 /* ===== REC, METRONOME AND COUNT-IN (20 Oct) =====
    REC (the tracker's top strip, F9 or Alt+R) records a MIDI keyboard (Settings → MIDI → Keys play) and, while playing, the
@@ -24756,7 +24777,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 601;
+const BUILD = 602;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD + (location.pathname.includes('/beta/') ? ' · beta' : '');
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -25022,6 +25043,26 @@ function ntrPerm(n0, n1){
   const P = mono.concat(poly, spare, free.slice(k));   // P[new] = old
   return P.length === NT ? P : null;
 }
+// PERFORM follows the tracks too (owner, 14 Nov: two new tracks left his LFOs on the old numbers). Every target id, lock and LFO
+// names a track by number, so each one is renamed with tN. A number from the master (MT = NT) up stays: that is the master.
+function perfRemap(P, tN){
+  const rid = id => { if (typeof id !== 'string') return id; const a = id.split(':'), t = +a[1]; if (a[1] == null || a[1] === '' || !(t >= 0 && t < NT)) return id; a[1] = String(tN(t)); return a.join(':'); };
+  const rkeys = o => { if (!o || typeof o !== 'object') return o; const r = {}; for (const k in o){ const t = +k; r[k !== '' && t >= 0 && t < NT ? tN(t) : k] = o[k]; } return r; };
+  const pf = S.perf;
+  if (pf && typeof pf === 'object'){
+    if (Array.isArray(pf.sc)) for (const sc of pf.sc) if (sc && sc.v){ const r = {}; for (const k in sc.v) r[rid(k)] = sc.v[k]; sc.v = r; }
+    if (Array.isArray(pf.mac)) for (const m of pf.mac) if (m && Array.isArray(m.tg)) for (const g of m.tg) if (g) g.id = rid(g.id);
+    if (pf.lk){ pf.lk = rkeys(pf.lk); for (const k in pf.lk) if (Array.isArray(pf.lk[k])) pf.lk[k] = pf.lk[k].map(rid); }
+    if (pf.lfo){ pf.lfo = rkeys(pf.lfo); for (const k in pf.lfo) if (Array.isArray(pf.lfo[k])) for (const L of pf.lfo[k]) if (L) L.id = rid(L.id); }
+  }
+  if (Array.isArray(S.parts)) for (const p of S.parts){ if (!p) continue;
+    if (Array.isArray(p.mix)){ const c = p.mix.slice(0, NT), nm = [];   // a short list leaves the later tracks as the song has them: fill with the song's own (S.mix is already moved)
+      for (let t = 0; t < NT; t++){ const o = P[t], m = S.mix[t]; nm.push(c[o] != null ? c[o] : [m ? m.vol : 224, m ? m.pan : 128]); }
+      p.mix = nm; }
+    if (p.fx && typeof p.fx === 'object'){ const r = {}; for (const k in p.fx){ const a = k.split(':'), t = +a[0]; if (t >= 0 && t < NT) a[0] = String(tN(t)); const o = p.fx[k]; if (o && o.sck != null && +o.sck > SCK_SEND){ const st = sckTrack(+o.sck); if (st >= 0 && st < NT) o.sck = tN(st) + SCK_SEND + 1; }   /* a saved side-chain source is a track too (review, #133) */
+      r[a.join(':')] = o; } p.fx = r; } }
+  try { perfLive.sent.clear(); perfLive.pno.clear(); } catch(e){}
+}
 function ntrRemap(P){
   const inv = new Array(NT); P.forEach((o, i) => inv[o] = i);
   const tN = t => t >= 0 && t < NT ? inv[t] : t;
@@ -25029,6 +25070,7 @@ function ntrRemap(P){
   if (S.smute) for (let y = 0; y < S.smute.length; y++){ const w = S.smute[y] | 0; if (!w) continue; let v = 0; for (let t = 0; t < 32 && t < NT; t++) if (w & (1 << P[t])) v |= 1 << t; S.smute[y] = v; }
   const perm = A => { if (!A) return; const c = A.slice(0, NT); for (let t = 0; t < NT; t++) A[t] = c[P[t]]; };
   perm(S.mix); perm(S.tfx); perm(S.chainOn);
+  perfRemap(P, tN);
   const sck = v => { const t = sckTrack(v); return t >= 0 && t < NT ? tN(t) + SCK_SEND + 1 : v; };
   const slots = A => (A || []).forEach(f => { if (f && f.sck != null && +f.sck > SCK_SEND) f.sck = sck(+f.sck); });
   for (let t = 0; t < NT; t++) slots(S.tfx[t]); slots(S.mfx);
@@ -25668,6 +25710,8 @@ function projRows(){
       info:() => 'KEYS mode with the keypad off: a panel at the bottom with a spectrum of the master, quick controls for the current instrument, its chains and the current track’s effects, and a channel strip for the current track. Click INST, …CHAINS or FX to fold that part to a narrow strip; click the strip to open it again'},
     {l:'STAGE', opts:true, get:() => STG.indexOf(stage), set:v => setStage(STG[v]), min:0, max:STG.length - 1, d:smallScr() ? 2 : 0, fmt:v => STG_NAMES[v],
       info:() => 'Big screens: the space beside the grid. BY SCREEN: the dogs dance on Song and Project; Sect previews the phrase; Phrase shows a piano lighting the notes playing; Inst its waveform; Mixer the master spectrum; FX the effects chain. DOGS: the dogs everywhere. OFF: empty'},
+    {l:'ANIMATIONS', ck:'Animations: the dancing dogs, the FX bar’s effect pictures and the rainbow skin’s drift', get:() => animOn ? 1 : 0, set:v => setAnim(!!v), min:0, max:1, tog:true, d:1, fmt:onOff,
+      info:() => 'ON: the dancing dogs (Song, Project, Phrase), the pictures on the FX bar’s effects and the Simple rainbow dynamic skin’s moving colours. OFF: none of them is drawn and none of their work runs. Meters, scopes, playheads and the piano stay. You can also right-click (or long press) the dogs or an FX bar effect and choose Hide animations'},
     // REC, METRONOME AND COUNT-IN (kept on this device, like the rows above)
     {l:'METRONOME', sec:'Record & play', gap:true, opts:true, get:() => recS.met, set:v => setMet(v), min:0, max:2, d:1, fmt:v => ['OFF', 'WHILE RECORDING', 'ALWAYS'][v],
       info:() => 'A click on every beat, higher on the first of the bar (CLICK on the top strip, Alt+M). WHILE RECORDING: only with REC on'},
@@ -26618,12 +26662,18 @@ function fxDelLast(t){
   if (k < 0) return toast('No effects to remove.');
   A[k] = null; cFxS = k; fxChanged(t); draw(); toast(`Effect ${k + 1} removed · ${A.filter(Boolean).length} left`);
 }
+// CLEAR on the FX screen's slot list (14 Nov, owner: right-click an effect, Clear: "it clears the last effect in the list"): it empties the slot the cursor is on
+function fxDelSlot(t, k){
+  const A = t >= NT ? S.mfx : S.tfx[t], f = A && A[k]; cFxS = k; cs.fx.y = k + 1;
+  if (!f){ draw(); return toast(`Slot ${k + 1} is already empty.`); }
+  fxSwap(t, k, A, null); fxChanged(t); draw(); toast(`Slot ${k + 1} cleared (${TFX[f.type] ? TFX[f.type].n : 'effect'}) · ${A.filter(Boolean).length} left`);
+}
 function del(){
   if (onPset()) return psetSet(cs.phrase.x, cs.phrase.x ? 0 : 16);
   if (tv === 'song'){ if (sxPicks.length){ const pk = sxPicks.map(p => [p.y, p.t]); sxPicks = []; return songDelete(pk, true); }   // picked cells: cleared, their phrases kept
     return songDelete(songCells(), false); }
   if (tv === 'mod') return modDel(cs.mod.y);
-  if (tv === 'fx' && cs.fx.y >= 1 && cs.fx.y <= FXSLOTS) return fxDelLast(cFxT);   // Delete takes the last effect off the chain
+  if (tv === 'fx' && cs.fx.y >= 1 && cs.fx.y <= FXSLOTS) return fxDelSlot(cFxT, cs.fx.y - 1);   // Delete / CLEAR empties the slot under the cursor (14 Nov: it took the last effect off the chain, whichever slot you were on)
   if (selA) return clearSel();   // FIX (27 Oct, audit K4): Delete clears the selection; Ctrl/⌘+X cuts (Delete used to cut, losing the clipboard)
   const c = cs[tv];
   if (GRIDV.has(tv)){
@@ -29206,6 +29256,11 @@ function smallScr(){ try { return Math.min(screen.width, screen.height) < 900; }
 const STK = 'thunderplus-stage-v1', STG = ['screen', 'dogs', 'off'], STG_NAMES = ['BY SCREEN', 'DOGS', 'OFF'];
 let stage = (() => { try { const v = localStorage.getItem(STK); if (STG.includes(v)) return v; if (v === 'phrase') return 'screen'; } catch(e){} return smallScr() ? 'off' : 'screen'; })();
 function setStage(v){ stage = v; try { localStorage.setItem(STK, v); } catch(e){} stageLayout(); }
+// The dogs: right-click, or a long press, for Hide animations (the stage itself is pointer-events:none; only the dogs take the press)
+{ const dg = $('tStageDogs'), menu = (x, y) => sxMenu(x, y, 'DOGS', [{l:'Hide animations', f:() => setAnim(false, true)}, {l:'Hide the stage', f:() => $('tStageX').click()}]); let lp = 0, lpT = 0;
+  dg.addEventListener('contextmenu', e => { e.preventDefault(); lpT = performance.now(); menu(e.clientX, e.clientY); });
+  dg.addEventListener('pointerdown', e => { if (e.pointerType !== 'touch') return; const x = e.clientX, y = e.clientY; clearTimeout(lp); lp = setTimeout(() => { lp = 0; lpT = performance.now(); menu(x, y); }, 550); });
+  for (const ev of ['pointerup', 'pointercancel', 'pointermove']) dg.addEventListener(ev, () => { clearTimeout(lp); lp = 0; }); }
 $('tStageX').addEventListener('click', () => { setStage('off'); toast('Stage hidden. Settings → STAGE brings it back.'); });
 // The Phrase screen's stage: DANCE (the dogs), DRUM (the dogs on a kit and bongos), KEYS (the piano, the default) or
 // HIDE (nothing beside the phrase).
@@ -29213,7 +29268,8 @@ const PHSK = 'thunderplus-phstage-v1', PHS = ['dance', 'drum', 'keys', 'hide'];
 const phStageDef = () => smallScr() ? 'hide' : 'keys';
 let phStage = (() => { try { const v = localStorage.getItem(PHSK); return PHS.includes(v) ? v : phStageDef(); } catch(e){ return phStageDef(); } })();
 function setPhStage(v){ phStage = PHS.includes(v) ? v : 'keys'; try { localStorage.setItem(PHSK, phStage); } catch(e){} stageLayout(); }
-const stageKind = () => stage === 'dogs' ? 'dogs' : tv === 'song' && SX.peek && asongOn() ? 'peek' /* SONG EXTRAS */ : tv === 'phrase' && mstView() ? 'chain' : tv === 'phrase' ? ({dance:'dogs', drum:'drum', keys:'piano', hide:''})[phStage] : ({song:'dogs', project:'dogs', sect:'preview', phrase:'piano', inst:'wave', mixer:'spec', fx:'chain'})[tv] || 'dogs';
+const stageKind0 = () => stage === 'dogs' ? 'dogs' : tv === 'song' && SX.peek && asongOn() ? 'peek' /* SONG EXTRAS */ : tv === 'phrase' && mstView() ? 'chain' : tv === 'phrase' ? ({dance:'dogs', drum:'drum', keys:'piano', hide:''})[phStage] : ({song:'dogs', project:'dogs', sect:'preview', phrase:'piano', inst:'wave', mixer:'spec', fx:'chain'})[tv] || 'dogs';
+const stageKind = () => { const k = stageKind0(); return animOn || (k !== 'dogs' && k !== 'drum') ? k : tv === 'phrase' ? 'piano' : ''; };   // ANIMATIONS OFF: no dogs (the Phrase screen's piano takes their place)
 let stgKindNow = '', stgSig = '', stgReq = '';   // stgReq: what the last layout was asked for
 // It sits in the space to the right of the grid's text, the grid's height, when that space is big enough.
 // What the stage should show now ('' = nothing). SIMPLE PHRASE: no piano beside the phrase.
@@ -29291,7 +29347,7 @@ function stageTick(now){
   if (stgOn !== !!tp.on){ stgOn = !!tp.on; if (stgKindNow === 'dogs' || stgKindNow === 'drum') dogsState(); else if (stgKindNow) stageCanvas(true); }
   if (!stgKindNow || $('tStage').hidden) return;
   if (stgKindNow === 'piano' || stgKindNow === 'spec'){ if (stgKindNow === 'spec' && meterBlank('stg', () => stageCanvas(true))) return; if (meterDue(now, stgFrameT, 46, stgKindNow === 'piano')){ stgFrameT = now; stageCanvas(false); } return; }   // METERS: the piano's lit notes are marks (OFF keeps LIGHT's rate); the spectrum is a meter
-  if ((stgKindNow !== 'dogs' && stgKindNow !== 'drum') || !tp.on || !ctx) return;
+  if ((stgKindNow !== 'dogs' && stgKindNow !== 'drum') || !tp.on || !ctx || !animOn) return;
   const lat = heardLat(), t = ctx.currentTime - lat, bpm = tp.bpm || S.bpm;
   if (bpm !== stgBpm){ const b = (t - stgT0) * stgBpm / 60; stgBpm = bpm; stgT0 = t - b * 60 / bpm; }
   const per = 60 / bpm, b = Math.floor((t - stgT0) / per);
@@ -29323,7 +29379,7 @@ function dogsBeat(bar, ms){
 const DRUM_HIT = {hat:['al', 24], snare:['ar', 44], tom:['ar', 22], crash:['ar', -24]};   // [arm, angle over that drum]
 let dkKitT = 0, dkBongoT = 0, dkHand = 0;
 const dkDogs = () => $('tStageDogs').querySelector('.dogs');
-function dkOk(){ return stgKindNow === 'drum' && !$('tStage').hidden && !matchMedia('(prefers-reduced-motion: reduce)').matches; }
+function dkOk(){ return animOn && stgKindNow === 'drum' && !$('tStage').hidden && !matchMedia('(prefers-reduced-motion: reduce)').matches; }
 // A strike: the paw pulls back along the arm, comes down on the drum and stays hovering over it.
 function dkArm(g, cls, ang){
   const a = g && g.querySelector('.arm.' + cls); if (!a) return;
@@ -30549,7 +30605,7 @@ function deckFxBar(){
   let bar = $('dkFxBar');
   if (!bar){ bar = el('div', 'dkfxbar'); bar.id = 'dkFxBar'; $('dkFxSlots').parentElement.append(bar); dkFbSig = ''; }
   $('dkFxSlots').hidden = $('dkFxRows').hidden = true;
-  const sig = t + ':' + Array.from({length:FXSLOTS}, (_, k) => A[k] ? A[k].type + (A[k].on ? 1 : 0) : '-').join(',');
+  const sig = (animOn ? 'a' : 'n') + t + ':' + Array.from({length:FXSLOTS}, (_, k) => A[k] ? A[k].type + (A[k].on ? 1 : 0) : '-').join(',');
   if (sig !== dkFbSig){
     dkFbSig = sig; bar.replaceChildren(); dkFbVals = [];
     const goFx = k => { cFxT = mst ? NT : dkTrack(); cFxS = k; cs.fx.y = A[k] ? FXSLOTS + 1 : k + 1; go('fx'); };
@@ -30578,8 +30634,22 @@ function deckFxBar(){
           const AA = FA(), last = AA.reduce((m, x, i) => x ? i : m, -1), to = tgt ? (tgt.classList.contains('dkadd') ? last : +tgt.dataset.k) : NaN;   // onto + ADD FX: the end of the chain
           if (Number.isFinite(to)) fxMove(mst ? NT : dkTrack(), k, to); };
         addEventListener('pointermove', mv, true); addEventListener('pointerup', up, true); });
+      // REMOVE AN EFFECT (14 Nov, owner): right-click, or a long press on a touch screen, anywhere on the card except a value (a value keeps its own menu) opens a small menu.
+      // The on / off light, the name's click and the header drag are unchanged. Removing is one undo step (fxChanged saves).
+      const rmFx = () => { const AA = FA(), g = AA[k], tt = mst ? NT : dkTrack(); if (!g) return; const nmx = (TFX[g.type] || {}).n || 'effect';
+        fxSwap(tt, k, AA, null); fxChanged(tt); dkFbSig = ''; draw();
+        toast(`Removed ${nmx} from ${mst ? 'the master' : 'track ' + d2(tt + 1)} · ${keyHint('mod+Z') || 'Undo'} brings it back`); };
+      const fxMenu = (x, y) => sxMenu(x, y, (D.n + ' · ' + (mst ? 'MASTER' : 'TRACK ' + d2(t + 1))).toUpperCase(), [{l:'Remove effect', f:rmFx}, {l:'Open on the FX screen', f:() => goFx(k)}, ...(col._spr ? [null, {l:'Hide animations', f:() => setAnim(false, true)}] : [])]);
+      col.addEventListener('contextmenu', e => { if (e._valMenu || e.target.closest('input')) return;   // (a value's own menu stops the event before it gets here)
+         e.preventDefault(); col._lpT = performance.now(); fxMenu(e.clientX, e.clientY); });
+      col.addEventListener('pointerdown', e => { if (e.pointerType !== 'touch' || e.target.closest('.fr span, .fon')) return; const x0 = e.clientX, y0 = e.clientY; let done = false;
+        const tm = setTimeout(() => { done = true; col._lpT = performance.now(); fxMenu(x0, y0); }, 550), off = () => { clearTimeout(tm); removeEventListener('pointermove', mv, true); removeEventListener('pointerup', off, true); removeEventListener('pointercancel', off, true); },
+          mv = ev => { if (Math.hypot(ev.clientX - x0, ev.clientY - y0) > 8) off(); };
+        addEventListener('pointermove', mv, true); addEventListener('pointerup', off, true); addEventListener('pointercancel', off, true); });
+      col.addEventListener('click', e => { if (col._lpT && performance.now() - col._lpT < 800){ e.stopPropagation(); e.preventDefault(); } }, true);   // the release after a long press is not a tap
       const vz = el('div', 'fviz'); vz.append(document.createElement('canvas')); col.append(vz); col._h = new Float32Array(90); col._w = 0; col._q = 0;
-      if (isSpringFx(f)){ col.classList.add('spr'); const sc = document.createElement('canvas'); sc.className = 'fspr'; col.prepend(sc); col._spr = {cv:sc, e:0, t:0}; }   // SPRING
+      if (!animOn){}   // ANIMATIONS OFF: no picture behind the values
+      else if (isSpringFx(f)){ col.classList.add('spr'); const sc = document.createElement('canvas'); sc.className = 'fspr'; col.prepend(sc); col._spr = {cv:sc, e:0, t:0}; }   // SPRING
       else { const ak = fxAnimKind(f); if (ak){ col.classList.add('spr'); const sc = document.createElement('canvas'); sc.className = 'fspr'; col.prepend(sc); col._spr = {cv:sc, e:0, t:0, kind:ak, P:[]}; } }   // FX ANIMATIONS
       if (isFxDyn(f.type)){ col.classList.add('dyn'); const dm = document.createElement('canvas'); dm.className = 'fdm'; dm.title = FXLV.has(f.type) ? 'IN, the change in level, OUT' : 'IN level, gain reduction (0 to 24 dB) and OUT level; the line is the threshold'; col.append(dm); }
       const getF = () => FA()[k];
@@ -33556,6 +33626,10 @@ function cmdCtx(e){
   if (!$('gedit').hidden) geditToggle(false);
   { const rn = tv === 'song' && e.target.closest('[data-r]'); if (rn){ rowColour(+rn.dataset.r); return; } }   // ROW COLOURS (3 Nov): the Song's row numbers
   if (tv === 'phrase' && SX.pvcol && typeof pvActive === 'function' && pvActive() && e.target.closest('.pvrn, .pvrow')){ rowColour(cs.song.y); return; }   // ROW COLOUR IN PATTERN: this pattern's song row
+  // The commands act on the cell under the pointer (14 Nov, owner: FX → right-click an effect → Clear cleared another one): a right-click used to leave the cursor where it was.
+  // Inside a selection the selection is the target and stays. FX: a slot or control row; Mixer: a cell (not the master's own row).
+  if (tv === 'fx' || tv === 'mixer'){ const q = e.target.closest('[data-x][data-y]'), c = cs[tv], y = q ? +q.dataset.y : -1, x = q ? +q.dataset.x : -1;
+    if (q && y >= 0 && !(tv === 'mixer' && y === 7) && !(selA && selA.v === tv)){ c.x = x; c.y = y; if (tv === 'fx' && y >= 1 && y <= FXSLOTS) cFxS = y - 1; draw(); } }
   const sel = selA && selA.v === tv;
   // RIGHT-CLICK (menu audit, 2 Nov): the commands for what's under the pointer; Undo / Redo, selecting, value steps,
   // previous / next and play stay on their keys and in Edit ▾.
@@ -34645,6 +34719,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [602, '14 Nov', ['Settings › TRACKS: LFOs, macros, locks, scenes and parts now follow their tracks when the track count changes (LFOs stayed on the old track number and seemed to vanish)', 'ARRANGE ON STOP = PLAYHEAD now also moves the Arrange cursor when the Phrase (or another screen) holds the keys', 'FX screen: right-click › Clear (and CLEAR) empties the effect you clicked, not the last one in the list', 'Bottom FX bar: right-click or long press an effect for Remove effect (Ctrl+Z brings it back)', 'Settings › ANIMATIONS: OFF hides the dancing dogs and the moving effect pictures (also right-click or long press them › Hide animations). Meters, scopes and playheads stay']],
   [601, '14 Nov', ['…chains: Morph, a new module that combines two sounds by their frequencies. Convolve keeps only what both share (a pad chopped and coloured by a drum loop); Shape plays A with B\'s tone colour. Morph, Sharpness, Smoothing, Frame and Freeze (hold A or B as a drone). It is under Granular and spectral']],
   [600, '14 Nov', ['Arrange: zoom out further (the − button, Ctrl+wheel or pinch: five levels below fit, up to about three times the rows) so whole phrases fit', 'Arrange, Song, Phrase and Pattern view turn the page early while playing: when the playhead is 8 rows from the bottom, keeping 4 rows of what just played at the top', '+ ADD FX in the bottom FX bar opens the effect list straight away on the first empty slot', 'The "got its own copy" and "also plays on track" notices show for about 3 seconds and replace each other instead of queueing']],
   [599, '14 Nov', ['MOD: an LFO you add, change or remove while the song is playing is heard at once (it did nothing until the next PLAY)', 'Effects rest when nothing is playing through them: a switched-off Retrigger, Grains, Scramble or Glitch no longer keeps a track\'s effects running, and each effect naps after half a minute of silence in and out. On Windows and Intel/AMD machines a reverb or resonator fading to nothing could cost twenty times more than while it played (track effects climbing after STOP or while patterns were muted)']],
