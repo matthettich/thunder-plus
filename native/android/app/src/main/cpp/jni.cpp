@@ -177,8 +177,12 @@ JNIEXPORT jstring JNICALL Java_app_thunderplus_nativetest_NativeEngine_nativePol
 }
 
 JNIEXPORT jboolean JNICALL Java_app_thunderplus_nativetest_NativeEngine_nativePutBytes(JNIEnv* env, jobject, jint id, jstring meta, jbyteArray bytes, jint off, jint len) {
-  if (!g.core || !bytes || (len & 3) || (off & 3)) return JNI_FALSE;
+  // N1 review A2: the range is checked against the Java array here (off + len in 64 bits), and a null meta or a failed
+  // GetStringUTFChars is refused instead of dereferenced. UNVERIFIED at run time: no Android here.
+  if (!g.core || !bytes || !meta || off < 0 || len < 0 || (len & 3) || (off & 3)) return JNI_FALSE;
+  if ((jlong)off + (jlong)len > (jlong)env->GetArrayLength(bytes)) return JNI_FALSE;
   const char* m = env->GetStringUTFChars(meta, nullptr);
+  if (!m) return JNI_FALSE;
   void* p = env->GetPrimitiveArrayCritical(bytes, nullptr);
   int ok = p ? thunder_put(g.core, id, m, reinterpret_cast<const float*>(static_cast<char*>(p) + off), len / 4) : 0;
   if (p) env->ReleasePrimitiveArrayCritical(bytes, p, JNI_ABORT);

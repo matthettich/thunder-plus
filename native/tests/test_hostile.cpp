@@ -71,10 +71,31 @@ static void testA1() {
   CHECK("A1 a good note still starts", pool.note(e, nullptr, b, k, 120) && pool.active() == 1);
 }
 
+// ---- A2: thunder_put offsets and counts ----
+static void testA2() {
+  thunder_core* c = thunder_create(48000, 256); if (!c) return;
+  float d[8] = {1, 2, 3, 4, 5, 6, 7, 8};
+  CHECK("A2 first chunk", thunder_put(c, 0, "{\"o\":0,\"n\":16}", d, 8) == 1);
+  CHECK("A2 second chunk at 8", thunder_put(c, 0, "{\"o\":8,\"n\":16}", d, 8) == 1);
+  CHECK("A2 negative offset refused (it wrote before the buffer)", thunder_put(c, 0, "{\"o\":-4,\"n\":16}", d, 8) == 0);
+  CHECK("A2 fractional offset refused", thunder_put(c, 0, "{\"o\":1.5,\"n\":16}", d, 8) == 0);
+  CHECK("A2 past the end refused", thunder_put(c, 0, "{\"o\":12,\"n\":16}", d, 8) == 0);
+  CHECK("A2 offset beyond size refused", thunder_put(c, 0, "{\"o\":1000000,\"n\":16}", d, 8) == 0);
+  CHECK("A2 huge o refused", thunder_put(c, 0, "{\"o\":1e300,\"n\":16}", d, 8) == 0);
+  CHECK("A2 huge n refused (it was bad_alloc)", thunder_put(c, 1, "{\"o\":0,\"n\":1e18}", d, 8) == 0);
+  CHECK("A2 negative n refused", thunder_put(c, 1, "{\"o\":0,\"n\":-5}", d, 8) == 0);
+  CHECK("A2 n smaller than count refused", thunder_put(c, 1, "{\"o\":0,\"n\":4}", d, 8) == 0);
+  CHECK("A2 no meta: whole buffer", thunder_put(c, 2, nullptr, d, 8) == 1);
+  CHECK("A2 zero count", thunder_put(c, 3, "{\"o\":0,\"n\":4}", d, 0) == 1);
+  int64_t cnt = 0; double sum = 0; CHECK("A2 info", thunder_put_info(c, 0, &cnt, &sum) == 1 && cnt == 16 && sum == 72);
+  thunder_destroy(c);
+}
+
 // @@TESTS_END
 
 int main() {
   testA1();
+  testA2();
   // @@CALLS_END
   if (g_fail) { std::printf("test_hostile: %d FAILED\n", g_fail); return 1; }
   std::printf("test_hostile: all passed\n");

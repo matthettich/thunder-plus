@@ -184,6 +184,7 @@ static bool parse_num(const char* p, const char* end, double* out) {   // locale
   while (p < end && *p >= '0' && *p <= '9') { v = v * 10 + (*p - '0'); p++; digits++; }
   if (p < end && *p == '.') { p++; double f = 0.1; while (p < end && *p >= '0' && *p <= '9') { v += (*p - '0') * f; f *= 0.1; p++; digits++; } }
   if (!digits) return false;
+  if (p < end && (*p == 'e' || *p == 'E')) return false;   // no exponent form here: refused, not read as its mantissa
   *out = neg ? -v : v; return true;
 }
 
@@ -223,14 +224,20 @@ int thunder_poll(thunder_core* c, char* buf, int cap) {
   return n > 0 && n < cap ? n : 0;
 }
 
+// N1 review A2: the offset and the total come from text, so they are checked as numbers before any is turned into a size: a negative
+// offset wrapped (size_t)o + count back into range and wrote before the buffer; a huge total was a std::bad_alloc (an abort here).
+// Accepted: whole numbers, o >= 0, 0 <= n <= kMaxPutFloats, and o + count inside the buffer.
 int thunder_put(thunder_core* c, int id, const char* meta, const float* data, int count) {
+  constexpr double kMaxPutFloats = 134217728.0;   // 2^27 floats (512 MB) a buffer
   if (!c || id < 0 || id >= kBuffers || !data || count < 0) return 0;
   double o = 0, n = 0;
-  if (meta) { int ml = (int)std::strlen(meta); const char* po = find_key(meta, ml, "o"); const char* pn = find_key(meta, ml, "n"); if (po) parse_num(po, meta + ml, &o); if (pn) parse_num(pn, meta + ml, &n); }
+  if (meta) { int ml = (int)std::strlen(meta); const char* po = find_key(meta, ml, "o"); const char* pn = find_key(meta, ml, "n"); if (po && !parse_num(po, meta + ml, &o)) return 0; if (pn && !parse_num(pn, meta + ml, &n)) return 0; }   // a key that is there but not a number: refused, not 0
+  if (!(o >= 0 && o <= kMaxPutFloats && o == std::floor(o)) || !(n >= 0 && n <= kMaxPutFloats && n == std::floor(n))) return 0;
   PutBuf& b = c->bufs[id];
   if (o == 0) b.data.assign(n > 0 ? (size_t)n : (size_t)count, 0.0f);
-  if ((size_t)o + (size_t)count > b.data.size()) return 0;
-  std::memcpy(b.data.data() + (size_t)o, data, sizeof(float) * (size_t)count);
+  const size_t size = b.data.size(), off = (size_t)o;
+  if (off > size || (size_t)count > size - off) return 0;
+  if (count > 0) std::memcpy(b.data.data() + off, data, sizeof(float) * (size_t)count);
   return 1;
 }
 
