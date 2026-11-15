@@ -747,6 +747,12 @@ The owner's top priority to add is the MOD screen. Work down the list; ask befor
 
 Start a session by asking for results. Fix on `beta`. (10 Nov, 15:10: the web beta is build 560; the build numbers in the rest of this paragraph are older.) Web beta: https://matthettich.github.io/thunder-plus/beta/ (build 547 as of 10 Nov morning, 548 once its PR merges; the night of 9–10 Nov shipped 544–547, see the four "10 Nov" entries below. Decisions the lead made that night for the owner to confirm or reverse: on a phone the saved Sequencer default plays on the Page unless Audio thread is picked on that device; on a phone the safety limiter is its stand-in until another worklet loads; the resync only runs with a worklet loaded and its margins are untested on a device). Desktop: v1.3.4-beta.2 (build 541, no feed view or scopes); further desktop betas on hold until the owner asks.
 
+**Build 618** (new drum sounds and kits)
+- [ ] **Any device, by ear:** load the IDM clicks, Glitch and Chip kits. Pass: the 8 pads of each are distinct and at a similar loudness. Then the other nine kits: name any that are weak.
+- [ ] **Any device, by ear:** hats and cymbals: the open hats choke on the closed ones; the reverse crash and riser swells sound right.
+- [ ] **Any device, by ear:** toms: Analog tom 1 to 6 step evenly in pitch; the big drums (Taiko-style) feel big.
+- [ ] **Any device, by ear:** kicks, snares and claps: step through the new ones on a pad. Pass: nothing clipped, clicky by mistake, or far off the level of the old ones. Name the ones to cut.
+
 **Build 617** (new engine presets)
 - [ ] **Any device, by ear:** Acid and Bass: step through the new presets with your own patterns. Pass: each is usable and sits at the level of the old ones. Name the ones to cut or fix.
 - [ ] **Any device, by ear:** Bytebeat: the new formulas. Pass: they read as musical lines, not only noise.
@@ -1328,6 +1334,14 @@ Suggested order: N0 → N1 → N2 (phone cured) → N4 with N3 alongside → N5 
   the edge `R.t0`, "waiting…" while armed), `rcdClk` / `rcdFmt` / `rcdFreeSecs`, a 250 ms timer only while recording; the
   final length stays until the next take. recorder-check covers FREE, PATTERN, Stop, next take and closing mid-take.
 
+
+## 15 Nov (273 new drum sounds and 12 new kits; build 618)
+
+The drum half of the owner's "a lot more presets, especially drums". By two agents (the first killed by an environment restart after batch 1). Data only, plus the kit loader glue. Nobody has HEARD them.
+- **273 sounds** by type as in the change list, filed in the pad's Presets list; **12 kits** of 8 pads in the factory pad order (`MORE_KITS`, loaded by `drumKits()` / `loadClassicKit()` like the machine kits; the Drum kits picker lists them).
+- **Method** (kept from the first agent): drafts and a generator outside the repo fitted each sound's level to a per-type peak target (−2 dB kicks down to −7 dB open hats and cymbals); `tools/drum-measure.js` prints the table: finite, audible, length and spectral centroid in a window for its type, no near-duplicate pairs (six dropped, one retuned).
+- Engine goldens: 273 voices added. Merging with build 617 changed the hashes of two of 617's own new presets (Resynth "Slow smear", Breath "Sub rumble"): their render depends on what was rendered before them (noise state carried between voices in the golden tool, or in the engine). **To look into**: every other voice is order-independent.
+- `tests/drum-presets.test.js` (5).
 
 ## 15 Nov (about 360 new presets on the pitched engines; build 617)
 
