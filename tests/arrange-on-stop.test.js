@@ -46,3 +46,14 @@ test('in a real page: Phrase holds the keys, Arrange beside, FOLLOW on or off, P
     }
   } finally { await B.close(); }
 });
+
+// PHRASE ON STOP = STAYS in Pattern view (build 609, owner: "following playhead"): the Arrange-beside step must not move the phrase cursor's track or step.
+test('Pattern view: the Arrange step goes through pvArrToPlay (row only, own track kept), not curToPlay', () => {
+  assert.match(src, /if \(tv === 'phrase' && pvActive\(\)\)\{ pvArrToPlay\(arrP\);/, 'the arrP step');
+  const f = src.match(/function pvArrToPlay\(P\)\{[\s\S]*?\n\}\n/); assert.ok(f, 'pvArrToPlay moved');
+  const c = { cTrack: 4, MT: 32, calls: [], pvGo: (...a) => (c.calls.push(a), true) }; vm.createContext(c); vm.runInContext(f[0] + '\nthis.f = pvArrToPlay;', c);
+  const P = []; P[4] = { row: 12, step: 7, phrase: 3 }; P[9] = { row: 30, step: 1, phrase: 8 };
+  assert.equal(c.f(P), true); assert.deepEqual(c.calls[0], [4, 12, null, null], 'own track, the playing row, no step');
+  c.calls.length = 0; const Q = []; Q[9] = { row: 30 }; Q[32] = { row: 99 }; c.f(Q); assert.deepEqual(c.calls[0], [4, 30, null, null], 'an empty own track: the row of one that played, never the master');
+  assert.equal(c.f([]), false);
+});

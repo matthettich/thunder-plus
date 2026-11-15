@@ -24701,8 +24701,13 @@ function tStop(quiet){
   else if (home) try { cs.song.y = home.y; cs.song.top = home.top; cPhrase = home.p; cSect = home.s; cs.phrase.y = home.py; cs.phrase.top = home.ptop; cs.song.pg = cs.phrase.pg = false; if (tp.paused) tp.paused.key = curKey(); } catch(e){ tpLog('stop cursor', e); }
   // ARRANGE ON STOP beside another screen (14 Nov, owner: ARRANGE ON STOP = PLAYHEAD, yet the Arrange cursor went back to where it was): with the Phrase (or the Mixer…) holding
   // the keys, stopToPlayhead() reads PHRASE ON STOP, which moves or restores the phrase side AND Arrange's cursor. Arrange's own cursor and view now follow ARRANGE ON STOP alone.
-  if (arrP) G('arrange cursor', () => { if (tv === 'phrase' && pvActive()){ curToPlay(arrP, 'song'); if (tp.paused) tp.paused.key = curKey(); } else { arrCurToPlay(arrP); if (tp.paused) tp.paused.key = curKey(); } });   // Pattern view draws the song row's pattern, so the pattern goes with the row (pvGo); else only Arrange's cursor moves
+  if (arrP) G('arrange cursor', () => { if (tv === 'phrase' && pvActive()){ pvArrToPlay(arrP); if (tp.paused) tp.paused.key = curKey(); } else { arrCurToPlay(arrP); if (tp.paused) tp.paused.key = curKey(); } });   // Pattern view draws the song row's pattern, so the pattern goes with the row (pvGo); else only Arrange's cursor moves
   if (!quiet) draw();
+}
+/* PHRASE ON STOP = STAYS in Pattern view (14 Nov, owner: "following playhead"): with ARRANGE ON STOP at PLAYHEAD the Arrange side goes to the playing song row, but the phrase cursor keeps its track and step (curToPlay moved those too). The row's pattern is shown, the cursor stays on its own track. */
+function pvArrToPlay(P){
+  const q = P[cTrack] && P[cTrack].row >= 0 && cTrack !== MT ? P[cTrack] : P.find((x, i) => x && x.row >= 0 && i !== MT); if (!q) return false;
+  return pvGo(cTrack, q.row, null, null);
 }
 // Arrange's cursor onto the row playing on its own track (the track column stays), and that row in view. For the Arrange beside another screen only: nothing of the phrase moves.
 function arrCurToPlay(P){
