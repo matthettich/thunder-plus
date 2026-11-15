@@ -27,6 +27,7 @@
 #include <vector>
 
 #include "rt/ftz.h"
+#include "rt/num.h"
 #include "rt/snap.h"
 #include "rt/spsc.h"
 #include "song/song.h"
@@ -212,7 +213,7 @@ int thunder_post(thunder_core* c, const char* s, int len) {
   if (is("bpm")) { cmd.type = C_BPM; const char* v = find_key(s, len, "v"); if (!v || !parse_num(v, end, &cmd.v)) return 0; }
   else if (is("play")) cmd.type = C_PLAY;
   else if (is("stop")) cmd.type = C_STOP;
-  else if (is("echo")) { cmd.type = C_ECHO; const char* n = find_key(s, len, "n"); double d = 0; if (n && parse_num(n, end, &d)) cmd.n = (int64_t)d; }
+  else if (is("echo")) { cmd.type = C_ECHO; const char* n = find_key(s, len, "n"); double d = 0; if (n && parse_num(n, end, &d)) cmd.n = thunder::to_i64_sat(d, -(1LL << 53), 1LL << 53); }
   else if (is("song.load")) {   // {"t":"song.load","rev":N,"S":{...}}: parsed here, on the control thread, into an immutable Song
     Song* sn = new (std::nothrow) Song(); if (!sn) return 0;
     thunder::JsonError je;
@@ -221,7 +222,7 @@ int thunder_post(thunder_core* c, const char* s, int len) {
     return 1;
   }
   else return 0;
-  { const char* a = find_key(s, len, "at"); double d = 0; if (a && parse_num(a, end, &d) && d >= 0) cmd.at = (int64_t)d; }
+  { const char* a = find_key(s, len, "at"); double d = 0; if (a && parse_num(a, end, &d) && d >= 0) cmd.at = thunder::to_i64_sat(d, 0, 1LL << 62); }
   return c->cmds.push(cmd) ? 1 : 0;
 }
 

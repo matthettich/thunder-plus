@@ -6,6 +6,8 @@
 #include <string_view>
 #include <vector>
 
+#include "rt/num.h"
+
 namespace thunder {
 
 PdcPlan::PdcPlan() { for (int t = 0; t < kMixTracks; t++) d[t] = f[t] = c[t] = 0; }
@@ -46,7 +48,7 @@ PdcPlan pdc_plan(const BusPlan& P, const PdcSlot* slots, int nSlots, double sr, 
   return out;
 }
 
-int64_t pdc_trim_frames(const PdcPlan& p, double sr) { return (int64_t)std::floor(p.T * sr + 0.5); }   // Math.round
+int64_t pdc_trim_frames(const PdcPlan& p, double sr) { return to_i64_sat(std::floor(p.T * sr + 0.5), -(1LL << 40), 1LL << 40); }   // Math.round
 
 Mixer::DelaySet pdc_delay_set(const PdcApply& a) {
   Mixer::DelaySet s; s.glide = a.live; s.idle = a.live && !a.playing && a.mode == PdcMode::Auto; s.ramp = a.now ? 0.01 : 0.05; return s;

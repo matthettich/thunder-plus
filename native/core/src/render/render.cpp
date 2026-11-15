@@ -3,6 +3,8 @@
 
 #include <algorithm>
 
+#include "rt/num.h"
+
 namespace thunder {
 
 SongRenderer::SongRenderer(const Song& song, const SeqVars& vars, const RenderPads& pads, double sampleRate, int maxBlock, const SeqOpts& opts, int maxVoices)
@@ -28,8 +30,8 @@ void SongRenderer::dispatch(const SeqEvent& e) {
   }
   if (e.track < 0) return;
   st_.notes++;
-  { const int ii = (int)e.ii; if (ii >= 0 && ii < kNI && S_.insts[ii].mo == 1) { st_.notesMidiOnly++; return; } }   // MIDI gear only: nothing sounds here
-  const int pad = (int)e.pad;
+  { const int ii = to_int_sat(e.ii, -1, 1 << 20); /* N1 C3: NaN is "none" */ if (ii >= 0 && ii < kNI && S_.insts[ii].mo == 1) { st_.notesMidiOnly++; return; } }   // MIDI gear only: nothing sounds here
+  const int pad = to_int_sat(e.pad, -1, 1 << 20);   // (N1 C3: a part without `pad` gives NaN: no pad, what x86 gave and what the JS's kit.voices[NaN] is)
   if (pad < 0 || pad >= kRenderPads || !pads_.buf[pad].data) { st_.notesNoPad++; return; }   // a slot the kit doesn't have is silent
   const VoiceBuf& b = pads_.buf[pad];
   if (VoicePool::shapedReverse(e, b)) { st_.notesShapedRev++; pool_.take(e, &pads_.kit[pad]); return; }   // (the page plays a reversed + shaped note: not this player's)
