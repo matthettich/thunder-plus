@@ -45,7 +45,7 @@ function engine() {
   // `cur` / `V` / `isSyn` / `changed` / `refreshAll` are the page's; the preset functions only touch them when `quiet` is false.
   const stub = 'let __cur = null; const V = () => __cur; const cur = 0; const GM_FONT = {id:"gm"}; const sfPreparePad = () => ({then(){}});\n';
   const tail = '\n;globalThis.__E = {XUI, XENG, TYPES, BASS_PRE, BLIP_PRE, VOX_PRE, fvp, flp, factoryKit, mkVoice, renderVoice, PD, PS, PE, normX, normBass, normBlip, normVox,\n' +
-    ' bassPreset, blipPreset, voxPreset, xPreset, ENGINE_LEVEL, setSeed: n => { _seed = n >>> 0; }, setCur: v => { __cur = v; }};';
+    ' bassPreset, blipPreset, voxPreset, xPreset, ENGINE_LEVEL, moreDrumPresets, newDrumPresets: typeof moreDrumPresets2 === "function" ? moreDrumPresets2 : null, drumKits, drumKitGroups, DRUM_TYPES, kitVoices: typeof kitVoices === "function" ? kitVoices : null, setSeed: n => { _seed = n >>> 0; }, setCur: v => { __cur = v; }};';
   vm.runInContext(stub + sources() + tail, ctx, { filename: 'index.html(engine)' });
   return (_ctx = ctx.__E);
 }
