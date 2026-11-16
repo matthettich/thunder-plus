@@ -164,3 +164,26 @@ Source: branch n1/jsexp (origin/native 35bed8e + the js_exp fix). Not fixed anyt
 ## Caveat on the meaning of a clean result
 The only thread creation in native/ is android/.../jni.cpp (not built on Linux). The test suite is single-threaded, so a clean TSan run says little; races between the audio thread
 and the UI/message thread are not exercised by any test.
+
+## Independent verification of #189 (U22)
+# Verify U22 (PR #189, n3/u22 @ 8360be9)
+
+## 1. Gate real: PASS
+- test_engine.cpp:132-150 renders each voice with eng_render_voice, SHA-256s the float32 bytes, compares to engine_golden.inc (and to the local Node ref on x86-64 Linux). Final `exact != ran` -> fail (line ~170).
+- Script check: engine_golden.inc has 294 rows / 294 unique keys; every key exists in beta tests/golden/engines.json; sha256 and len match for all 294 (0 mismatch, 0 missing). 10 random spot checks identical. engine_voices.json key set == golden key set.
+- No skip-as-pass path: missing golden/ref/status!=Ok (incl. kEngUnsupported), loader refusal, missing ref files all -> CHECK fail. Count is checked as fixture==golden==ref size (not a hard-coded 294).
+- Caveats: 18 voices with crush/room/drive prove only the dry path (notes admit it). Hashes are Linux x86 only as local-Node check; beta golden is the gate everywhere.
+
+## 2. Mutation: PASS (baseline: engine, engine_ref, engine_golden_current, rt_core all pass)
+Fresh mutations, each caught (test rc=1), each reverted (worktree clean):
+- saw/square osc constant `yy * 0.8` -> 0.81 (engine.cpp:131): 62 voices fail, 54 direct cases fail
+- LP filter coefficient `(gg + lk)` -> `(gg + lk + 0.001)` (engine.cpp:266): 200 voices fail, 142 direct cases fail
+- envelope time `-6.9` -> `-6.8` in env1 (engine.cpp:238): 241 voices fail, 142 direct cases fail
+Gap: lpRes clamp 0.98->0.97 (:266): 0 of 294 voices fail; only 1 direct case catches it.
+
+## 3. Scope: PASS
+- Diff vs merge-base: only native/ and docs/port/U22-NOTES.md (15 files, API confirms). Goldens are added, none edited. No -ffast-math; -ffp-contract=off is set. Tolerances: none, memcmp/hash only.
+- Math.*: sin/cos/exp/pow/tan/tanh/round/imul all go through js_*; floor/abs/fmod/ceil exact. Math.sqrt appears only in the un-ported sq01 helper. Compared renderLayer, voiceFilter, voiceAmp, voiceMod, blep, rng, makeOsc, renderLayersOnly line for line: faithful.
+
+## 4. Allocation in render path
+- Beyond notes: none heap. Stack only: EngVoice copied (eng_render_voice, eng_render_bound, eng_layers_len; a few KB each). Lazy static sin table (4097 js_sin) on first eng_sinT: a latency hit if first touched on the audio thread (rt test pre-warms it). Pad effects allocate std::vector (admitted).
