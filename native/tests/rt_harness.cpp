@@ -18,6 +18,7 @@
 #include "fx/fxbank.h"
 #include "modfx/mods.h"
 #include "render/render.h"
+#include "engine/engine.h"
 #include "voice/voice.h"
 
 #include <cmath>
@@ -517,6 +518,32 @@ static int run_fxu17() {
   std::printf("rt_fxu17 ok: %d blocks, Pitch reverb / Pitch delay / Resonator / Degrade under the allocation guard\n", nb); return 0;
 }
 
+// U22: the engine foundation under the guard: the render of a voice WITHOUT pad effects (layers of every type of this unit, the burst, the layer and voice filters, the voice amp, the LFO / envelope /
+// sequence matrix, the drive) into a buffer the caller made, over and over. (A voice WITH the four JS pad effects allocates: U17's pad_* return std::vector. That is an offline render, not an audio path.)
+static int run_engine() {
+  using namespace thunder;
+  eng_sin_table();   // (made on first use: outside the guard)
+  std::vector<EngVoice> vs(3); std::vector<std::vector<float>> bufs; std::vector<EngRenderOpts> os(3);
+  { EngVoice& V = vs[0]; V.drive = 0.3; V.level = -3; V.layers[0].on = true; V.layers[0].type = LType::Sine; V.layers[0].pAmt = 30; V.layers[0].pDec = 55; V.layers[0].dec = 300; V.layers[0].seed = 11;
+    V.layers[1].on = true; V.layers[1].type = LType::White; V.layers[1].burst = 3; V.layers[1].spacing = 11; V.layers[1].hpCut = 850; V.layers[1].lpCut = 2600; V.layers[1].lpRes = 0.35; V.layers[1].seed = 12;
+    V.layers[2].on = true; V.layers[2].type = LType::Metal; V.layers[2].a = 0.5; V.layers[2].hpCut = 7200; V.layers[2].delay = 20; V.layers[2].seed = 13; }
+  { EngVoice& V = vs[1]; V.tune = 24; V.gate = 400; V.len = 6; os[1].hold = 1;
+    for (int i = 0; i < 3; i++) { EngLayer& L = V.layers[i]; L.on = true; L.adsr = true; L.type = i == 0 ? LType::Saw : i == 1 ? LType::Square : LType::Tri; L.fine = i * 9 - 9; L.atk = 20; L.dec = 600; L.sus = 0.7; L.rel = 300; L.lpCut = 1800; L.lpEnv = 0.3; L.seed = 20 + (double)i; }
+    V.gLpCut = 3000; V.gLpEnv = 0.4; V.gAmpOn = true; V.gAdsr = true; V.gAtk = 5; V.gDec = 400; V.gSus = 0.8; V.gRel = 200;
+    V.lfoRate[0] = 5; V.lfoDepth[0] = 1; V.lfoShape[0] = 5; V.rdst[0] = 1; V.ramt[0] = 0.4; V.lfoRate[1] = 3; V.lfoDepth[1] = 1; V.lfoShape[1] = 4; V.rdst[1] = 3; V.ramt[1] = 3; V.lfoSync[2] = 3; V.lfoDepth[2] = 1; V.rdst[2] = 2; V.ramt[2] = 0.2;
+    V.envS[0] = 0.5; V.rdst[3] = 4; V.ramt[3] = 1; V.seqDepth = 1; V.seqSync = 2; V.rdst[6] = 1; V.ramt[6] = 0.5; for (int i = 0; i < 32; i++) V.seq[i] = (i % 5) / 4.0 - 0.3; }
+  { EngVoice& V = vs[2]; V.len = 1.5; static const LType t[8] = {LType::Pink, LType::Brown, LType::Blue, LType::Lfsr, LType::Dust, LType::Grit, LType::Pulse, LType::Sine};
+    for (int i = 0; i < 8; i++) { EngLayer& L = V.layers[i]; L.on = true; L.type = t[i]; L.a = 0.3; L.b = 0.6; L.level = 0.4; L.seed = 100 + (double)i; L.atk = 1; L.dec = 800; } os[2].sr = 44100; }
+  for (size_t i = 0; i < vs.size(); i++) { bufs.emplace_back(eng_render_bound(vs[i], os[i]) + 1); if (bufs[i].size() < 2) { std::printf("rt_engine FAIL: bound 0\n"); return 1; } }
+  size_t total = 0; int renders = 0;
+  { rt_guard g;
+    for (int rep = 0; rep < 12; rep++) for (size_t i = 0; i < vs.size(); i++) { size_t n = 0; const int st = eng_render_voice(vs[i], os[i], bufs[i].data(), bufs[i].size() - 1, &n); if (st != kEngOk) { total = 0; goto done; } total += n; renders++; }
+  }
+done:
+  if (!total) { std::printf("rt_engine FAIL: a render failed\n"); return 1; }
+  std::printf("rt_engine ok: %d voice renders (%zu samples) under the allocation guard\n", renders, total); return 0;
+}
+
 int main(int argc, char** argv) {
   if (argc > 1 && std::strcmp(argv[1], "--selftest") == 0) return selftest();
   if (int r = run_logger()) return r;
@@ -531,5 +558,6 @@ int main(int argc, char** argv) {
   if (int r = run_fxidm()) return r;
   if (int r = run_modfx()) return r;
   if (int r = run_fxu17()) return r;
+  if (int r = run_engine()) return r;
   return run_song();
 }
