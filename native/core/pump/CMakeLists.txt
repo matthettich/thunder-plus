@@ -47,6 +47,14 @@ set(OPT -O3 -ffast-math -fno-finite-math-only -w)
 if(IS_WASM)
   list(APPEND OPT -msimd128)
 endif()
+# x86 host builds: no MMX registers. GCC 13 at -O3 builds a two-quadword zero in pump::spring::SpringTank::process through %mm0 (movq (%rsp),%mm0;
+# movq2dq) and, as compilers do, never runs EMMS, which leaves all eight x87 registers tagged in use. STUTTER's fmod is inlined as x87 fprem under
+# -ffast-math, its fld then overflows the x87 stack and the result is NaN: "STUTTER puts out NaN at its first sample after a SPRING ran in the
+# same process" (found in U03, the cause found 16 Nov with FE_INVALID trapped: gdb shows R0 to R7 tagged Zero at the faulting fld). GCC 15 and
+# clang do not emit it; wasm and ARM have no x87. tests/dsp runs all 25 types in one process to keep it found.
+if(NOT IS_WASM AND CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|AMD64|amd64|i[3-6]86)$")
+  list(APPEND OPT -mno-mmx)
+endif()
 set(DEFS PUMP_SYNC_KERNELS=1 PFFFT_STATIC_DEFINE NDEBUG)
 set(OPT_CXX ${OPT} -fno-exceptions -fno-rtti)
 
