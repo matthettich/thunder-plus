@@ -251,3 +251,43 @@ They are ported in this PR (kNames in layer_u24.cpp, LType::Membrane/Bell/Bar, l
 1. docs/port/U24-NOTES.md ("Decisions") and layer_u24.h:7 say the JS throws for addsaw/addodd > 64 partials; it does not (port limit). Reword.
 2. test_engine_u24.cpp:3 and parity.sh comment: "97" should be 110.
 3. engine-u24-dump.mjs header says voices that mix U24 with U23 types are in neither file; the notes and the data show they are in the fixture.
+
+## Independent verification of #195 (U28): memory safety FAILED
+# Verify U28 (PR #195, n3/u28 @ b668e8f)
+
+## 1. Gate real: PASS
+- test_engine_xeng.cpp renders each voice/case with xeng_render_voice, SHA-256s the float32 bytes, compares with the committed .inc (every platform) and, on x86-64 Linux, the local Node run of the repo's ENGINE block (engine_xeng_ref). status != kEngOk (incl. kEngUnsupported, xeng_voice_from_json false -> -100), missing golden, missing ref, fixture/golden/ref count mismatch, `exact != ran`, and fewer than 8 voices / 14 cases per engine all fail. Missing ref dir -> FAIL, not skip. No tolerance (hash and length equality).
+- Script (python): engine_xeng_voices_golden.inc has 1068 rows, 1068 unique keys, each present in beta tests/golden/engines.json with identical sha256 and len (0 bad); fixture key set == golden key set.
+- Completeness (own script /tmp/cov28.cjs, beta's tools/engine-golden listVoices, all 2142 voices): every beta voice whose engine is one of the 15 is in the fixture; 0 missing, none has an error golden.
+- Baseline (Release -j2): engine_xeng_ref, engine_xeng pass: 1068/1068 voices, 313/313 cases, local Node differs 0.
+- Table (engine: beta voices = gated / direct cases): tone 122/122/21, modal 87/87/30, swarm 69/69/22, drift 69/69/18, piano 49/49/20, ep 45/45/17, organ 49/49/20, breath 92/92/17, strings 58/58/25, fmdrum 72/72/19, wind 57/57/24, phase 73/73/23, partials 73/73/18, skin 71/71/18, chip 82/82/21 (sum 1068 / 313). KeysUtil is exercised by all.
+- Unsupported (kEngUnsupported, never silent): table, vector, scanned, resynth, bytebeat, sf, wavesl, acid, mach, lx*, p* (U29). The test checks table -> Other and a layers voice -> None.
+- Earlier goldens/tests: diff vs origin/native has only A entries for goldens; M only on core/CMakeLists.txt (+1), rt/fdlibm.cpp (+1), rt/jsmath.h (+1), tests/CMakeLists.txt (+20), tests/rt_harness.cpp (+21), tools/parity.sh (+2): all additive.
+- Not run: engine_xeng_golden_current, rt_core, full parity.sh (time).
+
+## 2. Mutation: PASS
+Each one-line change, test rc=1, reverted (git status clean afterwards):
+- xeng_tone.cpp:26 `tone *= 0.45` -> 0.46: 8 voices + 1 case fail
+- xeng_swarm.cpp:62 `p.sub * 0.7` -> 0.71: 10 voices + 15 cases
+- xeng_strings.cpp:52 `0.999` -> 0.998: 58 voices + 25 cases
+- xeng_skin.cpp:27 `0.85` -> 0.86: 71 voices + 17 cases
+- xeng_fmdrum.cpp:32 click `* 0.8` -> 0.81: 60 voices + 19 cases
+- xeng_wind.cpp:76 `vib*vib*0.02` -> 0.021: 51 voices + 24 cases
+
+## 3. Scope: PASS
+- Only native/ and docs/port/U28-NOTES.md. No golden edited. No -ffast-math/-Ofast in the diff (the only hits are pre-existing in native/core/pump/CMakeLists.txt). No tolerance. No std::sin/cos/tan/exp/pow/tanh/round/hypot in xeng_* (grep): all js_*; js_hypot2 = existing v8_hypot with 2 values; sqrt/floor/ceil/fmod/fabs only.
+- Line-by-line vs beta index.html (KeysUtil 6416, PianoCore, SwarmCore 6231, StringsCore 6748): piano, swarm, strings. Operation order, rnd() call order (object-literal order in swarm path / voice), float32 stores (exc, buf, out, trim fade), Float32 vs double arrays (KeysUtil bank is doubles), the `|0`, `|| default`, Math.round/min/max (NaN-propagating mx/mn), finish/trim all match. State init equal. No mismatch for finite parameters.
+- Divergences for NaN only (not reachable from JSON, since non-numbers fall back to defaults): JS `bloom ? :`, `shimmer ?`, `vibA ?` are falsy for NaN, the C++ `!= 0` is true (xeng_swarm.cpp bloom/shimmer lines, xeng_strings.cpp vibA).
+
+## 4. Memory safety: FAIL (one real finding, wind)
+- ASan+UBSan build (-O1, no-recover): test_engine_xeng 1068/1068 and 313/313, clean.
+- Own fork-per-render fuzz (/tmp/fz28/fuzz2.cpp): all 15 engines, 1-4 fields set to {-1e9..1e9, 0, 2.04, 100, ...}, random level/tune/drive/len/hold, sr 8k..96k. Finite run 1800 renders; with NaN/inf 1200 more.
+- **FAIL, xeng_wind.cpp:14 (`mk`) and :15 (`rd`) / :16 (`wr`)**: `D.b.assign((size_t)D.L, ...)` with D.L = ceil(n*2.6)+8 where n = sr/f0. For f0 -> 0 (wind oct=-100, oct=-1000, tune=-1000, all finite, valid JSON) D.L is far above SIZE_MAX, the cast is UB and gives an empty vector, then D.b[i0] / D.b[(size_t)D.w] indexes a null buffer (UBSan: "reference binding to null pointer", SEGV in non-sanitised use). The JS throws RangeError (new Float32Array(1e33)) there. Not guarded like strings (L<1e8, xeng_strings.cpp:26) or the quiet run (Md<1e8). Fix: refuse (return 0) when L is not in [1, 1e8). oct=-10 gives a 1-sample result after a large allocation; fine but heavy.
+- Minor, NaN only (not JSON-reachable, struct API only): `(int)NaN` before an array index. xeng_chip.cpp:19 (chord -> kIvlN[INT_MIN]), :30 (arp NaN -> ivl[(int)stI], SEGV in fuzz), :36 (duty NaN -> duties[INT_MIN], UBSan). Also (int)NaN in swarm nv/wi and strings/wind casts (no OOB: loops simply skipped).
+- Parameter-driven loops: swarm/drift `step()` `while (q.ph >= 1)` (xeng_swarm.cpp:32, xeng_drift.cpp:30) run O(rate) times: rate=1e8 takes 3 s, 1e12 or 1e999 (valid JSON -> inf) never ends. Identical to the JS (it hangs too); UI range is small. Other loops bounded (drift dips capped 32 and len<=32 s gives <=27; organ halving loop; partials 256 = kBankMax; modal 24; skin 24; breath 8; chip LFSR while bounded by nacc).
+- Fixed-size buffers checked: KeysBank 256 (piano 64x3, partials<=256, organ 9 bars), Vc V[48]/V[4], Mode[24], Bq[8], dips[32], drift chorus 8192 floats with size check, chip kIvl[9] / duties[4]: all inside by clamp for finite input.
+
+## Problems
+1. xeng_wind.cpp:14-16: null/empty delay line for f0 -> 0 (oct <= about -100, tune <= about -1000): out-of-bounds, FAIL.
+2. xeng_chip.cpp:19,30,36: (int)NaN indexes (NaN-only).
+3. swarm/strings NaN truthiness (above), minor.
