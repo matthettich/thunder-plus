@@ -16,6 +16,7 @@
 #include "master/chain.h"
 #include "meter/meter.h"
 #include "fx/fxbank.h"
+#include "modfx/mods.h"
 #include "render/render.h"
 #include "voice/voice.h"
 
@@ -465,6 +466,27 @@ static int run_fxidm() {
   std::printf("rt_fxidm ok: %d blocks, Beat grains / scramble / Glitch / Vintage sampler under the allocation guard\n", nb); return 0;
 }
 
+// U19: every MODFX module (core/src/modfx) under the guard: made (rings and all) outside it, then 1500 blocks each with noise on every input, parameters moving over their ranges, ports
+// linked and unlinked, partial blocks (the output is always the whole buffer), tempo / start changes, at 44.1 / 48 / 96 kHz. Nothing may allocate.
+static int run_modfx() {
+  using namespace thunder::modfx;
+  long blocks = 0; const double srs[3] = {44100, 48000, 96000};
+  for (int si = 0; si < 3; si++) for (int m = 0; m < count(); m++) {
+    const Def& d = at(m); const double sr = srs[si]; SeedCounter seeds(12345 + (uint32_t)m); std::unique_ptr<Module> mod = d.make(sr, seeds);
+    static float in[kMaxPorts][kBlock], out[kMaxPorts][kBlock]; static double p[128]; IO io; Ctx c; c.sr = sr;
+    for (int k = 0; k < kMaxPorts; k++) { io.in[k] = in[k]; io.out[k] = out[k]; } io.p = p;
+    uint32_t sd = 99 + (uint32_t)m; auto rnd = [&]() { sd = sd * 1664525u + 1013904223u; return (double)(sd >> 8) / 16777216.0; };
+    { rt_guard g;
+      for (int b = 0; b < 1500; b++) {
+        for (int k = 0; k < kMaxPorts; k++) { io.linked[k] = ((b / 50 + k) % 3) != 0; for (int i = 0; i < kBlock; i++) in[k][i] = b < 1100 ? (float)(rnd() * 1.6 - .8) : 0.f; }
+        for (int k = 0; k < d.np; k++) { const ParamDef& q = d.params[k]; p[k] = b < 200 ? q.def : q.mn + (q.mx - q.mn) * rnd(); }
+        c.block = (b % 7 == 0) ? 1 + (b * 13) % 127 : kBlock; c.full = (b % 5) != 0; c.tempo = 60 + (b / 100) * 20; c.startN = (double)(b / 400); c.playing = (b % 9) != 0;
+        mod->process(io, c); blocks++; }
+    }
+  }
+  std::printf("rt_modfx ok: %d modules x 3 sample rates, %ld blocks under the allocation guard\n", count(), blocks); return 0;
+}
+
 int main(int argc, char** argv) {
   if (argc > 1 && std::strcmp(argv[1], "--selftest") == 0) return selftest();
   if (int r = run_logger()) return r;
@@ -477,5 +499,6 @@ int main(int argc, char** argv) {
   if (int r = run_fx()) return r;
   if (int r = run_fxclk()) return r;
   if (int r = run_fxidm()) return r;
+  if (int r = run_modfx()) return r;
   return run_song();
 }

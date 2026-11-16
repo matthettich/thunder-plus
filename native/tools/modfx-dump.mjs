@@ -191,6 +191,10 @@ function incText(direct, engine) {
 }
 
 const arg = process.argv[2];
+// the waves worklet carries the same shared block (its golden needs the U30 engine): the two texts between the markers must be identical
+{ const blk = file => { const s = fs.readFileSync(path.join(ROOT, file), 'utf8'), a = s.indexOf('/* ===SHARED MODULES START==='), b = s.indexOf('/* ===SHARED MODULES END===');
+    if (a < 0 || b < a) { console.error('modfx-dump: no shared block in ' + file); process.exit(1); } return s.slice(a, b); };
+  if (blk('chains/chains-worklet.js') !== blk('waves/waves-worklet.js')) { console.error('modfx-dump: the shared module block of chains-worklet.js and waves-worklet.js differ'); process.exit(1); } }
 const t0 = Date.now();
 const engine = engineRun();
 // the engine run must give what the repo's committed golden says (else this reference is not the one the unit is gated on)
