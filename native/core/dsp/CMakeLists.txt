@@ -68,6 +68,16 @@ if(NOT IS_WASM AND CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
   set(OPT_COMMON ${OPT_COMMON} -fno-lifetime-dse)
 endif()
 set(OPT_FX  -O3 -ffast-math ${OPT_COMMON} -w)                                            # dsp/build.sh and tfx/build.sh
+# U14 (the lead, 16 Nov): the track effects (thunder_dsp_tfx) are built WITHOUT -ffast-math on host builds. With it their samples depended on the
+# compiler AND on the system's maths library: GCC under -ffast-math calls glibc's vector maths (libmvec) and merges or rewrites calls, and each
+# libm rounds expf / exp2f / cosf differently (glibc 2.43 and Apple's differ from glibc 2.39 and from the wasm's musl), which Autowah's resonator
+# and Beads turn into -50 to -64 dB. Strict IEEE arithmetic with no contraction gives GCC 13, GCC 15 and clang 20 the SAME samples on Linux x86-64
+# (measured: identical test_fx output); the test run takes the same time (a crude figure: the phone is not measured). Against today's tfx.wasm (which keeps -ffast-math until N1 step 11) every case is
+# within -80 dB except the two gated by their own figure in tests/test_fx.cpp (e_pshift_def, e_clouds_alt).
+set(OPT_TFX ${OPT_FX})
+if(NOT IS_WASM)
+  set(OPT_TFX -O3 -fno-fast-math -ffp-contract=off ${OPT_COMMON} -w)
+endif()
 set(OPT_MOD -O2 -ffast-math -ffunction-sections -fdata-sections -fno-exceptions -fno-rtti -w)  # mods/build.sh
 
 # dsp_group(<lib> <name> OPTS <flags> DEFS <defs> INCS <dirs> PRE <headers to -include> SRCS <files>)
@@ -132,17 +142,17 @@ endif()
 if(NOT IS_WASM)
   target_sources(thunder_dsp_tfx PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/fx_alloc.cpp)   # thunder_fx_malloc / thunder_fx_poison (fx_alloc.h)
 endif()
-dsp_group(${T} core OPTS ${OPT_FX} INCS ${SRC}/tfx SRCS ${SRC}/tfx/tfx.cc ${SRC}/tfx/fx_extra.cc ${RAND_SRC})
+dsp_group(${T} core OPTS ${OPT_TFX} INCS ${SRC}/tfx SRCS ${SRC}/tfx/tfx.cc ${SRC}/tfx/fx_extra.cc ${RAND_SRC})
 # (U14 diagnosis: the sanitizer build instruments Clouds again. The read past lut_window and the shift by 32 it found are patched in third_party/prepare.sh.)
-dsp_group(${T} mi OPTS ${OPT_FX} DEFS ${MI_DEFS} PRE cstdio INCS ${SRC}/tfx ${E} SRCS ${SRC}/tfx/fx_mi.cc
+dsp_group(${T} mi OPTS ${OPT_TFX} DEFS ${MI_DEFS} PRE cstdio INCS ${SRC}/tfx ${E} SRCS ${SRC}/tfx/fx_mi.cc
   ${E}/rings/dsp/part.cc ${E}/rings/dsp/resonator.cc ${E}/rings/dsp/string.cc ${E}/rings/dsp/fm_voice.cc ${E}/rings/resources.cc
   ${E}/clouds/dsp/granular_processor.cc ${E}/clouds/dsp/correlator.cc ${E}/clouds/dsp/mu_law.cc ${E}/clouds/resources.cc
   ${E}/clouds/dsp/pvoc/frame_transformation.cc ${E}/clouds/dsp/pvoc/phase_vocoder.cc ${E}/clouds/dsp/pvoc/stft.cc
   ${E}/stmlib/dsp/atan.cc ${E}/stmlib/dsp/units.cc ${E}/stmlib/utils/random.cc)
-dsp_group(${T} beads OPTS ${OPT_FX} DEFS ${MI_DEFS} PRE cstdio INCS ${SRC}/tfx ${E} SRCS ${SRC}/tfx/fx_beads.cc
+dsp_group(${T} beads OPTS ${OPT_TFX} DEFS ${MI_DEFS} PRE cstdio INCS ${SRC}/tfx ${E} SRCS ${SRC}/tfx/fx_beads.cc
   ${E}/beads/dsp/delay_clock.cc ${E}/beads/dsp/delay_controller.cc ${E}/beads/dsp/mu_law.cc
   ${E}/beads/dsp/processor.cc ${E}/beads/dsp/trigger_generator.cc ${E}/beads/resources.cc)
-dsp_group(${T} ds OPTS ${OPT_FX} INCS ${SRC}/tfx ${DS_INCS} SRCS ${SRC}/tfx/fx_ds.cc
+dsp_group(${T} ds OPTS ${OPT_TFX} INCS ${SRC}/tfx ${DS_INCS} SRCS ${SRC}/tfx/fx_ds.cc
   ${D}/Source/Effects/chorus.cpp ${D}/Source/Effects/decimator.cpp)
 # U14 diagnosis: host builds take Effects/pitchshifter.h from the prepared copy (its myrand() seed is the effect host's, not one per process:
 # prepare.sh, host_fx_state.h); the wasm build takes DaisySP's own file, as dsp/tfx/build.sh does.
@@ -150,21 +160,21 @@ set(DS2_PRE_INCS)
 if(NOT IS_WASM)
   set(DS2_PRE_INCS ${UP}/ds)
 endif()
-dsp_group(${T} ds2 OPTS ${OPT_FX} INCS ${SRC}/tfx ${DS2_PRE_INCS} ${DS_INCS} SRCS ${SRC}/tfx/fx_ds2.cc
+dsp_group(${T} ds2 OPTS ${OPT_TFX} INCS ${SRC}/tfx ${DS2_PRE_INCS} ${DS_INCS} SRCS ${SRC}/tfx/fx_ds2.cc
   ${D}/Source/Effects/flanger.cpp ${D}/Source/Effects/phaser.cpp ${D}/Source/Effects/tremolo.cpp ${D}/Source/Effects/overdrive.cpp
   ${D}/Source/Effects/wavefolder.cpp ${D}/Source/Effects/autowah.cpp ${D}/Source/Filters/ladder.cpp
   ${D}/Source/Synthesis/oscillator.cpp ${D}/Source/Control/phasor.cpp)
-dsp_group(${T} warps OPTS ${OPT_FX} DEFS ${MI_DEFS} PRE cstdio INCS ${SRC}/tfx ${E} SRCS ${SRC}/tfx/fx_warps.cc
+dsp_group(${T} warps OPTS ${OPT_TFX} DEFS ${MI_DEFS} PRE cstdio INCS ${SRC}/tfx ${E} SRCS ${SRC}/tfx/fx_warps.cc
   ${E}/warps/dsp/modulator.cc ${E}/warps/dsp/oscillator.cc ${E}/warps/dsp/vocoder.cc ${E}/warps/dsp/filter_bank.cc ${E}/warps/resources.cc)
 # host libstdc++ does not pull <cstdlib>/<cmath> into std:: transitively as wasi-sdk's libc++ does: force them in on the host only
 set(CS_PRE)
 if(NOT IS_WASM)
   set(CS_PRE ${CMAKE_CURRENT_SOURCE_DIR}/host_std_shim.h)
 endif()
-dsp_group(${T} cloudseed OPTS ${OPT_FX} ${CS_OPTS} DEFS ${CS_DEFS} PRE ${CS_PRE} ${RAND_PRE} INCS ${SRC}/tfx ${C} SRCS ${SRC}/tfx/fx_cloudseed.cc
+dsp_group(${T} cloudseed OPTS ${OPT_TFX} ${CS_OPTS} DEFS ${CS_DEFS} PRE ${CS_PRE} ${RAND_PRE} INCS ${SRC}/tfx ${C} SRCS ${SRC}/tfx/fx_cloudseed.cc
   ${C}/DSP/RandomBuffer.cpp ${C}/DSP/Biquad.cpp)
 foreach(p Density ToTape6 EQ Pressure4 Galactic TapeDelay2 DeRez2 PurestDrive Air3 Verbity2 ToVinyl4 Dubly Cabs Tube2)
-  dsp_group(${T} aw_${p} OPTS ${OPT_FX} PRE stdlib.h ${RAND_PRE} INCS ${SRC}/tfx ${SRC}/stub ${AW}
+  dsp_group(${T} aw_${p} OPTS ${OPT_TFX} PRE stdlib.h ${RAND_PRE} INCS ${SRC}/tfx ${SRC}/stub ${AW}
     SRCS ${SRC}/tfx/aw_${p}.cc ${AW}/${p}/${p}.cpp ${AW}/${p}/${p}Proc.cpp)
 endforeach()
 
