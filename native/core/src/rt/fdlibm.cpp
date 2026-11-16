@@ -989,9 +989,167 @@ static double fdlibm_tan(double x) {
   }
 }
 
+// ---- tanh (and the expm1 it uses): V8 12.4 src/base/ieee754.cc, text unchanged except the static names (U16: the Vintage sampler's MPC60 converter) ----
+static double fdlibm_expm1(double x) {
+  static const double
+      one = 1.0,
+      tiny = 1.0e-300,
+      o_threshold = 7.09782712893383973096e+02, /* 0x40862E42, 0xFEFA39EF */
+      ln2_hi = 6.93147180369123816490e-01,      /* 0x3FE62E42, 0xFEE00000 */
+      ln2_lo = 1.90821492927058770002e-10,      /* 0x3DEA39EF, 0x35793C76 */
+      invln2 = 1.44269504088896338700e+00,      /* 0x3FF71547, 0x652B82FE */
+      /* Scaled Q's: Qn_here = 2**n * Qn_above, for R(2*z) where z = hxs =
+         x*x/2: */
+      Q1 = -3.33333333333331316428e-02, /* BFA11111 111110F4 */
+      Q2 = 1.58730158725481460165e-03,  /* 3F5A01A0 19FE5585 */
+      Q3 = -7.93650757867487942473e-05, /* BF14CE19 9EAADBB7 */
+      Q4 = 4.00821782732936239552e-06,  /* 3ED0CFCA 86E65239 */
+      Q5 = -2.01099218183624371326e-07; /* BE8AFDB7 6E09C32D */
+
+  static volatile double huge = 1.0e+300;
+
+  double y, hi, lo, c, t, e, hxs, hfx, r1, twopk;
+  int32_t k, xsb;
+  uint32_t hx;
+
+  GET_HIGH_WORD(hx, x);
+  xsb = hx & 0x80000000; /* sign bit of x */
+  hx &= 0x7FFFFFFF;      /* high word of |x| */
+
+  /* filter out huge and non-finite argument */
+  if (hx >= 0x4043687A) {   /* if |x|>=56*ln2 */
+    if (hx >= 0x40862E42) { /* if |x|>=709.78... */
+      if (hx >= 0x7FF00000) {
+        uint32_t low;
+        GET_LOW_WORD(low, x);
+        if (((hx & 0xFFFFF) | low) != 0)
+          return x + x; /* NaN */
+        else
+          return (xsb == 0) ? x : -1.0; /* exp(+-inf)={inf,-1} */
+      }
+      if (x > o_threshold) return huge * huge; /* overflow */
+    }
+    if (xsb != 0) {        /* x < -56*ln2, return -1.0 with inexact */
+      if (x + tiny < 0.0)  /* raise inexact */
+        return tiny - one; /* return -1 */
+    }
+  }
+
+  /* argument reduction */
+  if (hx > 0x3FD62E42) {   /* if  |x| > 0.5 ln2 */
+    if (hx < 0x3FF0A2B2) { /* and |x| < 1.5 ln2 */
+      if (xsb == 0) {
+        hi = x - ln2_hi;
+        lo = ln2_lo;
+        k = 1;
+      } else {
+        hi = x + ln2_hi;
+        lo = -ln2_lo;
+        k = -1;
+      }
+    } else {
+      k = invln2 * x + ((xsb == 0) ? 0.5 : -0.5);
+      t = k;
+      hi = x - t * ln2_hi; /* t*ln2_hi is exact here */
+      lo = t * ln2_lo;
+    }
+    x = hi - lo;
+    c = (hi - x) - lo;
+  } else if (hx < 0x3C900000) { /* when |x|<2**-54, return x */
+    t = huge + x;               /* return x with inexact flags when x!=0 */
+    return x - (t - (huge + x));
+  } else {
+    k = 0;
+  }
+
+  /* x is now in primary range */
+  hfx = 0.5 * x;
+  hxs = x * hfx;
+  r1 = one + hxs * (Q1 + hxs * (Q2 + hxs * (Q3 + hxs * (Q4 + hxs * Q5))));
+  t = 3.0 - r1 * hfx;
+  e = hxs * ((r1 - t) / (6.0 - x * t));
+  if (k == 0) {
+    return x - (x * e - hxs); /* c is 0 */
+  } else {
+    INSERT_WORDS(
+        twopk,
+        0x3FF00000 + static_cast<int32_t>(static_cast<uint32_t>(k) << 20),
+        0); /* 2^k */
+    e = (x * (e - c) - c);
+    e -= hxs;
+    if (k == -1) return 0.5 * (x - e) - 0.5;
+    if (k == 1) {
+      if (x < -0.25)
+        return -2.0 * (e - (x + 0.5));
+      else
+        return one + 2.0 * (x - e);
+    }
+    if (k <= -2 || k > 56) { /* suffice to return exp(x)-1 */
+      y = one - (e - x);
+      // TODO(mvstanton): is this replacement for the hex float
+      // sufficient?
+      // if (k == 1024) y = y*2.0*0x1p1023;
+      if (k == 1024)
+        y = y * 2.0 * 8.98846567431158e+307;
+      else
+        y = y * twopk;
+      return y - one;
+    }
+    t = one;
+    if (k < 20) {
+      SET_HIGH_WORD(t, 0x3FF00000 - (0x200000 >> k)); /* t=1-2^-k */
+      y = t - (e - x);
+      y = y * twopk;
+    } else {
+      SET_HIGH_WORD(t, ((0x3FF - k) << 20)); /* 2^-k */
+      y = x - (e + t);
+      y += one;
+      y = y * twopk;
+    }
+  }
+  return y;
+}
+
+static double fdlibm_tanh(double x) {
+  static const volatile double tiny = 1.0e-300;
+  static const double one = 1.0, two = 2.0, huge = 1.0e300;
+  double t, z;
+  int32_t jx, ix;
+
+  GET_HIGH_WORD(jx, x);
+  ix = jx & 0x7FFFFFFF;
+
+  /* x is INF or NaN */
+  if (ix >= 0x7FF00000) {
+    if (jx >= 0)
+      return one / x + one; /* tanh(+-inf)=+-1 */
+    else
+      return one / x - one; /* tanh(NaN) = NaN */
+  }
+
+  /* |x| < 22 */
+  if (ix < 0x40360000) {            /* |x|<22 */
+    if (ix < 0x3E300000) {          /* |x|<2**-28 */
+      if (huge + x > one) return x; /* tanh(tiny) = tiny with inexact */
+    }
+    if (ix >= 0x3FF00000) { /* |x|>=1  */
+      t = fdlibm_expm1(two * fabs(x));
+      z = one - two / (t + two);
+    } else {
+      t = fdlibm_expm1(-two * fabs(x));
+      z = -t / (t + two);
+    }
+    /* |x| >= 22, return +-1 */
+  } else {
+    z = one - tiny; /* raise inexact flag */
+  }
+  return (jx >= 0) ? z : -z;
+}
+
 double js_cos(double x) { return fdlibm_cos(x); }
 double js_sin(double x) { return fdlibm_sin(x); }
 double js_tan(double x) { return fdlibm_tan(x); }
 double js_log(double x) { return fdlibm_log(x); }
+double js_tanh(double x) { return fdlibm_tanh(x); }
 
 }  // namespace thunder

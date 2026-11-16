@@ -194,6 +194,25 @@ else()
   add_test(NAME fxclk COMMAND test_fxclk)   # no directory: prints FAIL and exits 1
 endif()
 
+# U16: Beat grains, Beat scramble, Glitch sequencer, Vintage sampler against the real worklet (tools/fx-idm-dump.mjs), bit-exact. As fxclk: no platform skip, a missing fixture is a failure.
+add_executable(test_fxidm test_fxidm.cpp)
+target_link_libraries(test_fxidm PRIVATE thunder_core)
+target_include_directories(test_fxidm PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../core/src ${CMAKE_CURRENT_SOURCE_DIR})
+if(NOT MSVC)
+  target_compile_options(test_fxidm PRIVATE -Wall -Wextra)
+endif()
+if(NODE_EXE)
+  add_test(NAME fxidm_ref COMMAND ${NODE_EXE} ${CMAKE_CURRENT_SOURCE_DIR}/../tools/fx-idm-dump.mjs ${CMAKE_CURRENT_BINARY_DIR}/fxidm-ref)
+  set_tests_properties(fxidm_ref PROPERTIES FIXTURES_SETUP fxidm_ref)
+  add_test(NAME fxidm COMMAND test_fxidm ${CMAKE_CURRENT_BINARY_DIR}/fxidm-ref)
+  set_tests_properties(fxidm PROPERTIES FIXTURES_REQUIRED fxidm_ref)
+  if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    add_test(NAME fxidm_golden_current COMMAND ${NODE_EXE} ${CMAKE_CURRENT_SOURCE_DIR}/../tools/fx-idm-dump.mjs --check)
+  endif()
+else()
+  add_test(NAME fxidm COMMAND test_fxidm)   # no directory: prints FAIL and exits 1
+endif()
+
 # N1 review fixes: hostile inputs (the independent review's findings, one regression test each). Names the finding in every failure line.
 add_executable(test_hostile test_hostile.cpp)
 target_link_libraries(test_hostile PRIVATE thunder_core)

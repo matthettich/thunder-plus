@@ -17,6 +17,7 @@ double js_cos(double x);
 double js_sin(double x);
 double js_tan(double x);
 double js_log(double x);
+double js_tanh(double x);   // Math.tanh: fdlibm's (U16), V8 12.4 bit for bit
 
 // Math.round: the nearest integer, ties towards +Infinity; -0 for -0.5 <= x < 0 (and for -0); NaN and the infinities as they are.
 // (Not floor(x + 0.5): that is wrong for 0.49999999999999994 and for odd integers at and above 2^52.)
