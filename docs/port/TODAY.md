@@ -137,3 +137,8 @@ N1 step 10.
   rebuilt `mods.wasm`: **Fable's decision, with the same question for `pump.wasm`** (one decision covers TUBE, Marbles, Tides and U25).
   Started: one Sonnet worker for D6 (`n1/jsexp`), then D5 (`n1/modfx-fixture`), then D3 (TSan report to `/home/claude/progress/tsan.md`).
   Still running: U22. Not started: D4, C2 onward.
+- 11:45 **If you are taking over in a new chat while this is the last entry:** two Sonnet workers are still running on the previous
+  session's machine and will push and open their PRs on their own: U22 (`n3/u22`) and D6 / D5 / D3 (`n1/jsexp`, `n1/modfx-fixture`).
+  **Do not start a second worker on those branches** unless a branch has had no push for 90 minutes (`git ls-remote` + the notes file).
+  Your jobs meanwhile: read the diff of each PR as it opens, merge when CI is green (not #182), log it, and start D4. C2 (U23, U24)
+  only after U22 is merged. The TSan report (D3) is written to the old machine's disk: if it is not in REVIEW-16NOV.md by 17:00, run D3 again.
