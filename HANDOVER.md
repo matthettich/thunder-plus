@@ -812,6 +812,10 @@ The owner's top priority to add is the MOD screen. Work down the list; ask befor
 
 Start a session by asking for results. Fix on `beta`. (10 Nov, 15:10: the web beta is build 560; the build numbers in the rest of this paragraph are older.) Web beta: https://matthettich.github.io/thunder-plus/beta/ (build 547 as of 10 Nov morning, 548 once its PR merges; the night of 9–10 Nov shipped 544–547, see the four "10 Nov" entries below. Decisions the lead made that night for the owner to confirm or reverse: on a phone the saved Sequencer default plays on the Page unless Audio thread is picked on that device; on a phone the safety limiter is its stand-in until another worklet loads; the resync only runs with a worklet loaded and its margins are untested on a device). Desktop: v1.3.4-beta.2 (build 541, no feed view or scopes); further desktop betas on hold until the owner asks.
 
+**Build 630** (MOD section in the bottom panel)
+- [ ] **Computer, bottom panel (FX bar):** a track with 1 to 4 LFOs (MOD screen). Click the folded MOD strip. Pass: it opens, titled MOD · TRACK nn, one row per LFO with a small wave, a dot moving on it while the song plays, the shape and rate, and the destination name; clicking a row opens MOD on that track; clicking the title folds it again. Check it in the IDM skin and one other, with ANIMATIONS off (no dot) and on a track with no LFO (a one-line message).
+- [ ] **Phone:** nothing changes: the section is not shown there.
+
 **Build 629** (an instrument for each generator)
 - [ ] **Computer or phone, Phrase:** GEN › Arp, Chords, Polymeter, Markov melody, Probability fill, Mutate. Pass: each panel has an Instrument choice; with Current nothing changes from before; picking one (it plays a note) and pressing the write / roll button puts that instrument number on the written notes (Mutate: on the notes it adds). Acid line, Euclidean fill (4th number) and the Drum pattern's parts still pick theirs.
 
@@ -1494,6 +1498,12 @@ Tests added: `arrange-paging` updated (small-view numbers, helper pin).
 Build 629, on `beta`. The owner: "Make each generator allow you to set the instrument number." Already had one: Acid line (Instrument select), Euclidean fill (4th number, hex), Drum pattern (every part picks its own track and instrument: left as it is, that is the sensible answer for several instruments). Added: `genInsField` (shared) on Arp, Chords, Polymeter, Markov melody and Probability fill, via `genScope`'s `G.ins` (Current = the cursor row's instrument, as before; `G.pick` makes Probability fill use it instead of the note before); Mutate: Instrument for added notes (default as the note before). Ratchet writes no notes, so no field. Checked in headless Chrome: each panel writes the chosen instrument.
 
 Tests added: `gen-instrument` (source pins).
+
+## 15 Nov (a MOD section in the bottom panel; build 630)
+
+Build 630, on `beta`. The owner asked for a mod section in the FX bar: collapsible, small, showing that there are modulations, the waveform and the destinations. Added `#dkMod` (DK_SECS / DK_FOLD, `deck.mod` saved with the panel, default FOLDED so no existing layout changes) between FX and PERFORM. `deckMod()` rebuilds only when open and when the focused track's LFOs / skin / ANIMATIONS change; each row is a 48×18 canvas wave (`modMix`, the MOD screen's maths) with a dot moved by `dkModTick` from the frame loop (only open, playing, visible, ANIMATIONS on, LOW POWER DISPLAY off), the shape and rate, and the destination (`tgtLabel`). Click: MOD screen on that track. Skin colours through CSS variables (checked IDM and 909 in headless Chrome). Hidden on the phone's swipe layout (`max-width:700px` + coarse pointer): the bottom panel there is one section at a time and the owner's folded-phone width is not a place to add a page. Display code only; nothing posts to the engine.
+
+Tests added: `deck-mod-section` (source pins).
 
 ## 15 Nov (a line on the small command bar; the side panel's instrument list auditions; builds 622 and 623)
 
