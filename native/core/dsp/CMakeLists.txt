@@ -49,6 +49,12 @@ if(IS_WASM)
 else()
   set(OPT_COMMON -fno-exceptions -fno-rtti)
 endif()
+# U14: Fx::operator new zero-fills the object ("every effect starts in zeroed memory": members the effects never initialise rely on it, e.g.
+# DaisySP's Flanger::lfo_freq_). GCC deletes a store before the constructor runs (-flifetime-dse, the default), so natively that memset was
+# dropped and an effect started with whatever malloc returned; wasi-sdk's clang keeps it. Host builds only; the wasm objects are unchanged.
+if(NOT IS_WASM AND NOT MSVC)
+  set(OPT_COMMON ${OPT_COMMON} -fno-lifetime-dse)
+endif()
 set(OPT_FX  -O3 -ffast-math ${OPT_COMMON} -w)                                            # dsp/build.sh and tfx/build.sh
 set(OPT_MOD -O2 -ffast-math -ffunction-sections -fdata-sections -fno-exceptions -fno-rtti -w)  # mods/build.sh
 
@@ -98,7 +104,13 @@ set(DS_INCS ${D}/Source ${D}/Source/Effects ${D}/Source/Utility)
 # ---------------------------------------------------------------------------------------------- tfx (tfx/build.sh)
 dsp_lib(thunder_dsp_tfx)
 set(T thunder_dsp_tfx)
-dsp_group(${T} core OPTS ${OPT_FX} INCS ${SRC}/tfx SRCS ${SRC}/tfx/tfx.cc ${SRC}/tfx/fx_extra.cc)
+set(RAND_PRE)
+set(RAND_SRC)
+if(NOT IS_WASM)   # U14: wasi-libc's rand() (wasi_rand.cpp); the wasm build is unchanged
+  set(RAND_PRE ${CMAKE_CURRENT_SOURCE_DIR}/wasi_rand.h)
+  set(RAND_SRC ${CMAKE_CURRENT_SOURCE_DIR}/wasi_rand.cpp)
+endif()
+dsp_group(${T} core OPTS ${OPT_FX} INCS ${SRC}/tfx SRCS ${SRC}/tfx/tfx.cc ${SRC}/tfx/fx_extra.cc ${RAND_SRC})
 dsp_group(${T} mi OPTS ${OPT_FX} DEFS ${MI_DEFS} PRE cstdio INCS ${SRC}/tfx ${E} SRCS ${SRC}/tfx/fx_mi.cc
   ${E}/rings/dsp/part.cc ${E}/rings/dsp/resonator.cc ${E}/rings/dsp/string.cc ${E}/rings/dsp/fm_voice.cc ${E}/rings/resources.cc
   ${E}/clouds/dsp/granular_processor.cc ${E}/clouds/dsp/correlator.cc ${E}/clouds/dsp/mu_law.cc ${E}/clouds/resources.cc
@@ -120,10 +132,10 @@ set(CS_PRE)
 if(NOT IS_WASM)
   set(CS_PRE ${CMAKE_CURRENT_SOURCE_DIR}/host_std_shim.h)
 endif()
-dsp_group(${T} cloudseed OPTS ${OPT_FX} ${CS_OPTS} DEFS ${CS_DEFS} PRE ${CS_PRE} INCS ${SRC}/tfx ${C} SRCS ${SRC}/tfx/fx_cloudseed.cc
+dsp_group(${T} cloudseed OPTS ${OPT_FX} ${CS_OPTS} DEFS ${CS_DEFS} PRE ${CS_PRE} ${RAND_PRE} INCS ${SRC}/tfx ${C} SRCS ${SRC}/tfx/fx_cloudseed.cc
   ${C}/DSP/RandomBuffer.cpp ${C}/DSP/Biquad.cpp)
 foreach(p Density ToTape6 EQ Pressure4 Galactic TapeDelay2 DeRez2 PurestDrive Air3 Verbity2 ToVinyl4 Dubly Cabs Tube2)
-  dsp_group(${T} aw_${p} OPTS ${OPT_FX} PRE stdlib.h INCS ${SRC}/tfx ${SRC}/stub ${AW}
+  dsp_group(${T} aw_${p} OPTS ${OPT_FX} PRE stdlib.h ${RAND_PRE} INCS ${SRC}/tfx ${SRC}/stub ${AW}
     SRCS ${SRC}/tfx/aw_${p}.cc ${AW}/${p}/${p}.cpp ${AW}/${p}/${p}Proc.cpp)
 endforeach()
 

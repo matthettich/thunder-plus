@@ -7,6 +7,7 @@
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <fstream>
 #include <sstream>
@@ -28,7 +29,7 @@ static void entriesOf(Json ch, std::vector<FxEntry>* out) {
   out->clear();
   for (size_t i = 0; i < ch.size(); i++) { Json c = ch.at(i); FxEntry e; std::snprintf(e.key, kFxKey, "%s", std::string(c.str("key")).c_str()); e.t = (int)c.num("t", -1); e.slot = (int)c.num("slot", -1); e.on = c.boolean("on", true); Json p = c.arr("p"); for (int k = 0; k < 12; k++) e.p[k] = p.at((size_t)k).asNum(); out->push_back(e); }
 }
-static void setChain(FxHost& H, Json ch) { std::vector<FxEntry> v; entriesOf(ch, &v); FxPlan* p = H.plan(v.data(), (int)v.size()); H.commit(p); delete p; }
+static void setChain(FxHost& H, Json ch) { std::vector<FxEntry> v; entriesOf(ch, &v); if (std::getenv("FX_DBG")) for (auto& e : v) std::fprintf(stderr, "entry %s t=%d slot=%d on=%d p=%.17g %.17g %.17g %.17g %.17g\n", e.key, e.t, e.slot, e.on, e.p[0], e.p[1], e.p[2], e.p[3], e.p[4]); FxPlan* p = H.plan(v.data(), (int)v.size()); H.commit(p); delete p; }
 
 struct Res { bool ran = false, exact = false, hashOk = false, postOk = true; double db = -INFINITY; int posts = 0; };
 static Res runCase(const std::string& dir, const FxGolden& G) {
@@ -58,7 +59,8 @@ static Res runCase(const std::string& dir, const FxGolden& G) {
       else if (pm.get("dyn").isArr()) { Json d = pm.get("dyn"); if ((int)d.size() != nd) R.postOk = false; else for (int k = 0; k < nd; k++) { Json e = d.at((size_t)k); Json v = e.at(2); if ((int)e.at(0).asNum() != dy[k].slot) R.postOk = false; for (int c = 0; c < 3; c++) if (std::fabs(dy[k].v[c] - v.at((size_t)c).asNum()) > 0.05) R.postOk = false; } R.posts++; pk++; done = true; }
       if (!done) pk++; }
     if (wantFail != (H.failedBlock() > 0 && m > 4096)) { /* counted below */ }
-    if (m > 4096 && nfail == 0) R.postOk = false;
+    if (m > 4096 && H.failedBlock() == 1 && nfail == 0) R.postOk = false;
+    if (nfail > 1 || (m <= 4096 && nfail)) R.postOk = false;
     if ((nd0 && !(pk > 0)) ) R.postOk = false;
     f0 += m; b++;
   }
@@ -67,6 +69,7 @@ static Res runCase(const std::string& dir, const FxGolden& G) {
   double peak = 0, err = 0; bool exact = true;
   for (int c = 0; c < 2; c++) for (int i = 0; i < n; i++) { const double a = (c ? oR : oL)[(size_t)i], r = J[(size_t)c * n + i]; peak = std::max(peak, std::fabs(r)); if ((float)a == (float)r || (std::isnan(a) && std::isnan(r))) continue; exact = false; err = std::max(err, std::fabs(a - r)); }
   std::vector<float> all(oL); all.insert(all.end(), oR.begin(), oR.end());
+  if (const char* od = std::getenv("FX_OUT")) { std::ofstream o(std::string(od) + "/" + G.name + ".cpp.f32", std::ios::binary); o.write((const char*)all.data(), (std::streamsize)(all.size() * 4)); }
   R.exact = exact; R.hashOk = fnv(all.data(), all.size()) == G.hash;
   R.db = exact ? -INFINITY : 20 * std::log10(err / std::max(peak, 1e-30));
   return R;
@@ -94,9 +97,9 @@ static void mapTest(const std::string& dir) {
 int main(int argc, char** argv) {
   if (argc < 2) { std::printf("fx: no reference directory (Node not found): %d cases not run\n", kFxGoldenN); return 0; }
   int exact = 0, ran = 0; double worst = -INFINITY; const char* worstName = "";
-  mapTest(argv[1]);
+  if (argc <= 2) mapTest(argv[1]);
   for (int i = 0; i < kFxGoldenN; i++) {
-    const FxGolden& G = kFxGolden[i]; const Res R = runCase(argv[1], G);
+    const FxGolden& G = kFxGolden[i]; if (argc > 2 && !std::strstr(G.name, argv[2])) continue; const Res R = runCase(argv[1], G);
     if (!R.ran) { std::printf("%-22s could not be run  FAIL\n", G.name); fails++; continue; }
     ran++;
     const bool ok = R.db <= -80.0 && R.postOk;

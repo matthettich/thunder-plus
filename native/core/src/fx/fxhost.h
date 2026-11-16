@@ -157,6 +157,7 @@ class FxHost {
   bool lvl_ = false, tel_ = false; int lvlN_ = 0, telN_ = 0; float lvlP_[8] = {0};
   bool lvlReady_ = false; float lvlOut_[8] = {0};
   int nDynOut_ = 0; FxDyn dynOut_[kFxSlots];
+  uint64_t rand_ = 0;   // wasi-libc's rand() state of this host's "module" (see dsp/wasi_rand.cpp)
   uint32_t failedBlock_ = 0;
   bool bsFail_ = false;
 };

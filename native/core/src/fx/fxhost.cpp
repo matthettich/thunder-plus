@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdint>
 #include <cstdio>
 #include <cstdlib>
 
@@ -14,6 +15,9 @@
 struct Fx { float p[12]; float sr = 48000.f; virtual ~Fx() {} virtual void process(float*, float*, int) = 0; };
 #endif
 
+#ifdef THUNDER_HAVE_TFX
+extern "C" void thunder_wasi_rand_use(uint64_t* state);
+#endif
 namespace thunder {
 
 #ifdef THUNDER_HAVE_TFX
@@ -76,7 +80,7 @@ FxPlan* FxHost::plan(const FxEntry* e, int n) {
     int j = -1; for (int k = 0; k < nCtl_; k++) if (!used[k] && std::strcmp(ctl_[k].key, e[i].key) == 0) { j = k; break; }
     const int w = pl->n_;
     if (j >= 0) { used[j] = true; pl->reuse_[w] = true; nf[w] = ctlFx_[j]; }
-    else { Fx* f = make_fx(e[i].t, (float)sr_); if (!f) continue; pl->fx_[w] = f; nf[w] = f; }
+    else { thunder_wasi_rand_use(&rand_); Fx* f = make_fx(e[i].t, (float)sr_); thunder_wasi_rand_use(nullptr); if (!f) continue; pl->fx_[w] = f; nf[w] = f; }
     pl->e_[w] = e[i]; pl->n_++;
   }
   nCtl_ = pl->n_; for (int i = 0; i < nCtl_; i++) { ctl_[i] = pl->e_[i]; ctlFx_[i] = nf[i]; }
@@ -176,6 +180,9 @@ bool FxHost::process(float* L, float* R, int n, double t0) {
   if (dead_flag_) return false;
   if (n <= 0) return true;
   if (n > kFxMaxCall) { std::memset(L, 0, sizeof(float) * (size_t)n); std::memset(R, 0, sizeof(float) * (size_t)n); failedBlock_++; return true; }   // tcChunks: a block longer than 4096 fails soft
+#ifdef THUNDER_HAVE_TFX
+  thunder_wasi_rand_use(&rand_);
+#endif
   for (int k = 0; k < 11; k++) { lanes_[k]->prune(t0); swv_[k] = (float)lanes_[k]->at(t0); }   // the k-rate params, read once: the value at the block's start
   if (n <= kFxBlock) return p1(L, R, n, t0);
   for (int a = 0; a < n; a += kFxBlock) if (!p1(L + a, R + a, std::min(kFxBlock, n - a), t0)) return false;
