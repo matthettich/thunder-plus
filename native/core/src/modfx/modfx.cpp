@@ -18,7 +18,11 @@ struct SinTab {
 };
 const SinTab gSin;
 std::vector<const Def*>& reg() {
-  static std::vector<const Def*> v = [] { std::vector<const Def*> r; addStereoMods(r); addReverbMods(r); addCvMods(r); addFilterMods(r); addDelayMods(r); addMiscMods(r); addClkMods(r); return r; }();
+  static std::vector<const Def*> v = [] { std::vector<const Def*> r; addStereoMods(r); addReverbMods(r); addCvMods(r); addFilterMods(r); addDelayMods(r); addMiscMods(r); addClkMods(r); addBasicMods(r); addVoiceMods(r); addGenMods(r);
+#ifdef THUNDER_MODFX_MODS
+    addModsMods(r);
+#endif
+    return r; }();
   return v;
 }
 // U20: the registry as the lookups see it: the families above, then the unit B families (kept apart so the lists of the units merge without touching each other)

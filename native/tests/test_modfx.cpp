@@ -18,6 +18,7 @@
 #include <string>
 #include <vector>
 
+#include "modfx/bbexpr.h"
 #include "modfx/modfx.h"
 #include "rt/json.h"
 #include "rt/jsmath.h"
@@ -43,6 +44,12 @@ class ListSeeds : public Seeds {
  private:
   std::vector<unsigned> v_; size_t i_ = 0;
 };
+
+// U21: ctx.key (the Source of the keyed modules). The engine run: the real ChainsEngine's key() gives its silent buffer for any Source above 0 (no track taps, no sends); the direct cases with `key`:
+// the input reversed in time times .7 (tools/modfx-dump.mjs makes the same buffer). A Source of 0 (or rounding to it) is null (Self).
+static float gKeyBuf[128];
+static const float* keyEngine(void*, double v) { v = js_round(v); if (!(v > 0)) return nullptr; std::memset(gKeyBuf, 0, sizeof gKeyBuf); return gKeyBuf; }
+static const float* keyDirect(void*, double v) { v = js_round(v); return v > 0 ? gKeyBuf : nullptr; }
 
 // ---- 1. the tables -------------------------------------------------------------------------------------------------------------------------------------------------------------
 static void tableTest(const std::string& dir) {
@@ -92,7 +99,7 @@ static uint32_t engineHash(const Def& d, int set, const ModfxEngineGolden& G) {
   for (int k = 0; k < d.nin; k++) { io.in[k] = inb[k]; if (!std::strcmp(d.in[k].kind, "audio")) { if (!std::strcmp(d.in[k].name, "in")) hasIn = true; if (!std::strcmp(d.in[k].name, "inR")) hasInR = true; } }
   for (int k = 0; k < d.nout; k++) io.out[k] = outb[k];
   for (int k = 0; k < d.nin; k++) { if (!std::strcmp(d.in[k].name, "in") && hasIn) io.linked[k] = true; if (!std::strcmp(d.in[k].name, "inR") && hasInR) io.linked[k] = true; }
-  Ctx c; c.sr = 48000; c.tempo = 120; c.lpb = 4; c.ticks = 6; c.playing = true; c.startN = 0;
+  Ctx c; c.sr = 48000; c.tempo = 120; c.lpb = 4; c.ticks = 6; c.playing = true; c.startN = 0; c.key = keyEngine;
   for (int b = 0; b < BL; b++) {
     for (int k = 0; k < d.nin; k++) { const bool fed = (!std::strcmp(d.in[k].name, "in") && hasIn) || (!std::strcmp(d.in[k].name, "inR") && hasInR);
       for (int i = 0; i < 128; i++) inb[k][i] = fed ? (float)(0.0 + (double)sig[(size_t)b * 128 + i]) : 0.0f; }   // trackIn's out into the zeroed input (0 + x: a -0 becomes +0)
@@ -117,6 +124,37 @@ static void engineTest(const std::string& filt) {
   if (filt.empty()) for (int m = 0; m < count(); m++) { int n = 0; for (int i = 0; i < kModfxEngineN; i++) if (!std::strcmp(kModfxEngine[i].type, at(m).type)) n++; if (n != 3) { std::printf("engine: %s has %d golden hashes, not 3  FAIL\n", at(m).type, n); bad++; } }
   if (bad) fails++;
   std::printf("engine run (tests/golden/chains-modules.json): %d of %d renders reproduce the committed hash, %d differ  %s\n", ran - bad, ran, bad, bad ? "FAIL" : "ok");
+}
+
+
+// ---- 4. U21: the formula compiler BBExpr on its own (bytebeat) --------------------------------------------------------------------------------------------------------------------------
+// every formula of the reference list (the 16 built-in and the extra ones: operators, constant folding, the && / || with a constant, limits, every error): ok / error text and position / node count /
+// bytecode size and run() / s8() on a grid, equal to the JS's; the canonical stream hashes to the committed kBbHash (integer maths: the hash is the gate on every platform, the local comparison too).
+static void bbTest(const std::string& dir) {
+  std::string js, bin; if (!readFile(dir + "/bbexpr.json", &js) || !readFile(dir + "/bbexpr.i32", &bin)) { std::printf("bbexpr: reference files missing  FAIL\n"); fails++; return; }
+  JsonDoc doc; if (!doc.parse(js)) { std::printf("bbexpr: bbexpr.json unreadable  FAIL\n"); fails++; return; }
+  Json meta = doc.root().arr("meta"), grid = doc.root().arr("grid"); const int* ref = (const int*)bin.data(); const size_t nref = bin.size() / 4; size_t ri = 0;
+  std::vector<unsigned char> bytes; auto i32le = [&](int32_t v) { for (int k = 0; k < 4; k++) bytes.push_back((unsigned char)((uint32_t)v >> (8 * k))); };
+  int bad = 0;
+  for (size_t m = 0; m < meta.size(); m++) {
+    Json M = meta.at(m); const std::string src(M.str("src")); BBProg P; std::string err; int pos = 0;
+    const bool ok = BBProg::compile(src, &P, &err, &pos);
+    if (ok != (M.num("ok") != 0) || (!ok && (pos != (int)M.num("pos") || err != std::string(M.str("msg")))) || (ok && (P.nodes() != (int)M.num("nodes") || P.size() != (int)M.num("size")))) {
+      if (bad++ < 12) std::printf("bbexpr: '%.40s': ok %d pos %d nodes %d size %d '%s' differs from the JS (ok %d pos %d nodes %d size %d '%s')  FAIL\n", src.c_str(), ok, pos, ok ? P.nodes() : 0, ok ? P.size() : 0, err.c_str(),
+        (int)M.num("ok"), (int)M.num("pos"), (int)M.num("nodes"), (int)M.num("size"), std::string(M.str("msg")).c_str()); }
+    i32le(ok ? 1 : 0); i32le(ok ? 0 : pos); i32le(ok ? P.nodes() : 0); i32le(ok ? P.size() : 0); for (char ch : err) bytes.push_back((unsigned char)ch); bytes.push_back(0);
+    if (!ok) continue;
+    for (size_t g = 0; g < grid.size(); g++) {
+      Json G = grid.at(g); const double t = G.at(0).asNum(), a = G.at(1).asNum(), b = G.at(2).asNum(), c = G.at(3).asNum();
+      const int32_t v[4] = {P.run(t, a, b, c), P.s8((int32_t)t, (int32_t)a, (int32_t)b, (int32_t)c, 0), P.s8((int32_t)t, (int32_t)a, (int32_t)b, (int32_t)c, 1), P.s8((int32_t)t, (int32_t)a, (int32_t)b, (int32_t)c, 2)};
+      for (int k = 0; k < 4; k++) { i32le(v[k]); if (ri >= nref || ref[ri] != v[k]) { if (bad++ < 12) std::printf("bbexpr: '%.40s' grid %zu value %d: got %d want %d  FAIL\n", src.c_str(), g, k, v[k], ri < nref ? ref[ri] : 0); } ri++; }
+    }
+  }
+  const uint64_t h = fnv64(bytes.data(), bytes.size());
+  if ((int)meta.size() != kBbN || h != kBbHash) { std::printf("bbexpr: %d formulas, hash %016llx, the committed kBbHash is %016llx  FAIL\n", (int)meta.size(), (unsigned long long)h, kBbHash); bad++; }
+  if (ri != nref) { std::printf("bbexpr: %zu reference values, %zu used  FAIL\n", nref, ri); bad++; }
+  if (bad) fails++;
+  std::printf("bbexpr: %d formulas (compile result, error text, run and s8 on the grid) equal the JS's and the committed hash  %s\n", (int)meta.size(), bad ? "FAIL" : "ok");
 }
 
 // ---- 3. the direct cases
@@ -147,7 +185,7 @@ static Res runCase(const std::string& dir, const ModfxCaseGolden& G) {
   std::vector<float> out(outN); float inb[kMaxPorts][128] = {}, outb[kMaxPorts][128] = {}; IO io; double p[128] = {}; io.p = p;
   for (int k = 0; k < d->nin; k++) { io.in[k] = inb[k]; io.linked[k] = linked.at((size_t)k).asBool(); }
   for (int k = 0; k < d->nout; k++) io.out[k] = outb[k];
-  Ctx c; c.sr = M.num("sr"); size_t pe = 0, te = 0;
+  Ctx c; c.sr = M.num("sr"); size_t pe = 0, te = 0; const bool keyed = M.get("key").isBool() && M.boolean("key"); if (keyed) c.key = keyDirect;
   Json irsJ = M.arr("irs"); size_t ie = 0; std::vector<std::unique_ptr<IrObj>> irHold; const SongIR* irTab[4] = {nullptr, nullptr, nullptr, nullptr};   // each entry makes NEW objects, as the JS does
   for (int b = 0; b < nb; b++) {
     while (ie < irsJ.size() && irsJ.at(ie).num("b") <= b) {
@@ -160,6 +198,7 @@ static Res runCase(const std::string& dir, const ModfxCaseGolden& G) {
     while (te < tr.size() && tr.at(te).num("b") <= b) { Json t = tr.at(te++); if (t.get("tempo").isNum()) c.tempo = t.num("tempo"); if (t.get("playing").isBool()) c.playing = t.boolean("playing"); if (t.get("startN").isNum()) c.startN = t.num("startN"); }
     c.block = (int)sizes.at((size_t)b).asNum();
     for (int k = 0; k < d->nin; k++) std::memcpy(inb[k], I + ((size_t)b * d->nin + k) * 128, 512);
+    if (keyed) for (int i = 0; i < 128; i++) gKeyBuf[i] = (float)(.7 * (double)inb[0][127 - i]);
     m->process(io, c);
     for (int k = 0; k < d->nout; k++) std::memcpy(&out[((size_t)b * d->nout + k) * 128], outb[k], 512);
   }
@@ -172,7 +211,7 @@ static Res runCase(const std::string& dir, const ModfxCaseGolden& G) {
 int main(int argc, char** argv) {
   if (argc < 2) { std::printf("modfx: no reference directory given: FAIL (a fixture that cannot run is a failure)\n"); return 1; }
   const std::string filt = argc > 2 ? argv[2] : "";
-  if (filt.empty()) tableTest(argv[1]);
+  if (filt.empty()) { tableTest(argv[1]); bbTest(argv[1]); }
   engineTest(filt);
   int ran = 0, exact = 0, shown = 0;
   for (int i = 0; i < kModfxCasesN; i++) {

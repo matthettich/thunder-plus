@@ -14,6 +14,10 @@ void addFilterMods(std::vector<const Def*>& v);
 void addMiscMods(std::vector<const Def*>& v);
 void addClkMods(std::vector<const Def*>& v);
 void addDelayMods(std::vector<const Def*>& v);
+void addBasicMods(std::vector<const Def*>& v);   // U21
+void addVoiceMods(std::vector<const Def*>& v);   // U21
+void addGenMods(std::vector<const Def*>& v);     // U21
+void addModsMods(std::vector<const Def*>& v);    // U21 (Marbles, Tides)
 }  // namespace modfx
 }  // namespace thunder
 #endif

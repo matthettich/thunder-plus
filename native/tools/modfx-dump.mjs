@@ -25,10 +25,14 @@ const H = require(path.join(ROOT, 'tests/helpers.js'));
 const GOLDEN_INC = path.join(ROOT, 'native/tests/golden/modfx_golden.inc');
 
 // the modules of U19 (the C++ registry holds exactly these; test_modfx fails if either list has one the other has not)
-export const MODS = ['meta', 'phaser', 'width', 'pingpong', 'meter', 'limiter', 'utility', 'ringmod', 'ensemble', 'spring', 'plate', 'lverb',
+export const MODS19 = ['meta', 'phaser', 'width', 'pingpong', 'meter', 'limiter', 'utility', 'ringmod', 'ensemble', 'spring', 'plate', 'lverb',
   'envfol', 'gateex', 'slew', 'snh', 'quant', 'math', 'logic', 'steps', 'clock', 'clkmul', 'chance', 'counter', 'stepsw', 'burst', 'gatedly', 'flipflop', 'rect', 'scale', 'compare', 'switch', 'xfade', 'const', 'divider', 'euclid',
   'blades', 'onepole', 'allpass', 'dcblock', 'midside', 'dline', 'dimension', 'bbd',
   'harm', 'blipdrum', 'life', 'reson', 'degrade', 'flex', 'sgate', 'retrig', 'pitchfol', 'pitchtrk'];
+// U21 (MODFX modules C): added family by family. Their per-case seeds and signal picks use 100 + their index here (the U19 modules keep theirs; a later unit adds its own list with its own base)
+export const MODS21 = ['sdelay', 'filter', 'cut', 'compressor', 'buscomp', 'glue', 'ngate', 'autopan', 'pump', 'autotune', 'vowel', 'rotary', 'gdelay', 'reverse', 'envfilt', 'bytebeat', 'chaos'];
+export const MODS = [...MODS19, ...MODS21];
+const mi = t => { const a = MODS19.indexOf(t); if (a >= 0) return a; const b = MODS21.indexOf(t); return b >= 0 ? 100 + b : 200 + MODS_B.indexOf(t); };
 
 // ---- the chains worklet, with nextSeed() recording --------------------------------------------------------------------------------------------------------------------------------
 const NEEDLE = 'const nextSeed = () => (seedN = (seedN * 1103515245 + 12345) >>> 0);';
@@ -37,7 +41,9 @@ function loadChains() {
   const src = fs.readFileSync(path.join(ROOT, 'chains/chains-worklet.js'), 'utf8');
   if (!src.includes(NEEDLE)) throw new Error('modfx-dump: chains-worklet.js no longer has the nextSeed() text this tool patches');
   const ctx = H.freezeClock(H.workletScope());
-  vm.runInContext(src.replace(NEEDLE, PATCH), ctx, { filename: 'chains/chains-worklet.js' });
+  // (also: U21 publishes BBExpr / BB_LIST / ChaosCore for the formula-compiler check and the chaos table; nothing that runs changes)
+  const SM = '\nconst SHARED_MODULES = {'; if (!src.includes(SM)) throw new Error('modfx-dump: chains-worklet.js no longer has `const SHARED_MODULES = {`');
+  vm.runInContext(src.replace(NEEDLE, PATCH).replace(SM, '\nglobalThis.__bb = { BBExpr, BB_LIST, ChaosCore };' + SM), ctx, { filename: 'chains/chains-worklet.js' });
   return ctx;
 }
 
@@ -96,11 +102,14 @@ function signal(kind, sigKind, n, seed, hint) {
     return o;
   }
   const amp = sigKind === 'loud' ? 3.2 : sigKind === 'quiet' ? .004 : 1, f1 = 80 + r() * 900, f2 = 1000 + r() * 4000;
-  let ns = (seed * 2654435761) >>> 0 || 1;
+  let ns = (seed * 2654435761) >>> 0 || 1, vph = 0;
   for (let i = 0; i < n; i++) {
     ns ^= ns << 13; ns >>>= 0; ns ^= ns >>> 17; ns ^= ns << 5; ns >>>= 0; const noise = ns / 4294967296 - .5;
     let v;
     if (sigKind === 'impulse') v = i % 9973 === 0 ? 1 : 0;
+    // U21: a voice-like signal: six harmonics gliding between about 100 and 350 Hz with vibrato, breath noise at times, a rest every 0.6 s (the pitch detector's gate, voiced and unvoiced paths)
+    else if (sigKind === 'voiced') { const t = i / 48000, f = (100 + 250 * (.5 + .5 * Math.sin(2 * Math.PI * (.9 + (seed % 5) * .1) * t))) * (1 + .012 * Math.sin(2 * Math.PI * 5.5 * t)); vph += f / 48000;
+      let h = 0; for (let k = 1; k <= 6; k++) h += Math.sin(2 * Math.PI * k * vph) / k; const seg = Math.floor(t / .3) % 4; v = seg === 3 ? .002 * noise : seg === 1 ? .5 * noise : .3 * h + .02 * noise; }
     else if (sigKind === 'burst') v = i < 128 * 24 ? .5 * noise + .3 * Math.sin(2 * Math.PI * f1 * i / 48000) : 0;
     else if (sigKind === 'longsleep') v = (i < 128 * 24 || (i >= 128 * 220 && i < 128 * 240)) ? .5 * noise + .3 * Math.sin(2 * Math.PI * f1 * i / 48000) : 0;
     else { const env = (Math.floor(i / 4000) % 5 === 3) ? 0 : 1; v = env * (.4 * Math.sin(2 * Math.PI * f1 * i / 48000) + .2 * Math.sin(2 * Math.PI * f2 * i / 48000) + (i < n / 3 ? noise * .2 : 0)); }
@@ -123,18 +132,18 @@ const stressP = def => { const o = {}; for (const [k, d] of Object.entries(def.p
 const switchesP = def => { const o = {}; for (const [k, d] of Object.entries(def.params || {})) { const [, mn, mx, st] = d; if (k === 'flip') { o[k] = d[0]; continue; } if (mx - mn === 1 && st === 1) { o[k] = k === 'mute' ? mn : mx; continue; } let v = mn + (mx - mn) * .3; if (st >= 1) v = Math.round((v - mn) / st) * st + mn; o[k] = v; } return o; };
 
 MODS.push(...MODS_B);   // U20
-const LONG = new Set(['spring', 'plate', 'lverb', 'bbd', 'dline', 'pingpong', 'ensemble', 'dimension', 'allpass', 'gatedly']);
+const LONG = new Set(['spring', 'plate', 'lverb', 'bbd', 'dline', 'pingpong', 'ensemble', 'dimension', 'allpass', 'gatedly', 'sdelay', 'gdelay', 'reverse']);
 function casesFor(type, def) {
   const ins = Object.keys(def.inputs || {}), cs = []; let n = 0;
   const base = { type, sr: 48000, nblocks: 56, sigKind: 'mix', linkMode: 'all', changeEvery: 0, sizes: [128], transport: [], seed: 0 };
-  const add = (name, o) => { cs.push(Object.assign({}, base, o, { name: `${type}_${name}`, seed: 1000 * (MODS.indexOf(type) + 1) + (++n) })); };
+  const add = (name, o) => { cs.push(Object.assign({}, base, o, { name: `${type}_${name}`, seed: 1000 * (mi(type) + 1) + (++n) })); };
   if (casesB(type, def, add, { defaults, stressP, switchesP, randParams, lcg, signal })) return cs;   // U20: its own list of cases
   add('def', { params: [defaults(def)] });
   add('stress', { params: [stressP(def)], sigKind: 'loud' });
   add('sw', { params: [switchesP(def)], sigKind: 'impulse' });
   add('min', { params: [randParams(def, null, 'min')], sigKind: 'mix' });
   add('max', { params: [randParams(def, null, 'max')], sigKind: 'quiet' });
-  for (let i = 0; i < 4; i++) { const rr = lcg(77 + 13 * i + MODS.indexOf(type) * 101); add(`rand${i}`, { params: [randParams(def, rr)], sigKind: SIGS[(i * 2 + MODS.indexOf(type)) % 5], linkMode: ['all', 'first', 'all', 'half'][i], rr: i }); }
+  for (let i = 0; i < 4; i++) { const rr = lcg(77 + 13 * i + mi(type) * 101); add(`rand${i}`, { params: [randParams(def, rr)], sigKind: SIGS[(i * 2 + mi(type)) % 5], linkMode: ['all', 'first', 'all', 'half'][i], rr: i }); }
   for (let i = 0; i < 2; i++) add(`mod${i}`, { params: [], changeEvery: i ? 7 : 25, sigKind: 'mix', nblocks: 96, rr: 10 + i });
   add('first', { params: [defaults(def)], linkMode: 'first' });
   add('none', { params: [stressP(def)], linkMode: 'none', nblocks: 40 });
@@ -143,6 +152,9 @@ function casesFor(type, def) {
   add('sr96', { params: [switchesP(def)], sr: 96000, sigKind: 'loud' });
   if (LONG.has(type)) { add('long', { params: [defaults(def)], sigKind: 'impulse', nblocks: 300 }); add('sleep', { params: [defaults(def)], sigKind: 'longsleep', nblocks: 260 });
     add('sleep2', { params: [stressP(def)], sigKind: 'longsleep', nblocks: 260, sr: 96000 }); add('burst', { params: [switchesP(def)], sigKind: 'burst', nblocks: 180 }); }
+  // U21: a Source (ctx.key) that is a real buffer: the keyed modules listen to the input reversed in time, times .7 (the C++ makes the same buffer)
+  if (MODS21.includes(type)) { const rr = lcg(555 + mi(type)); add('voiced', { params: [randParams(def, rr)], sigKind: 'voiced', rr: 20 }); add('voicedd', { params: [defaults(def)], sigKind: 'voiced', nblocks: 140, rr: 21 }); }
+  if (def.params && def.params.sck) add('key', { params: [stressP(def)], linkMode: 'first', key: true, sigKind: 'mix' });
   return cs;
 }
 
@@ -157,7 +169,8 @@ function runDirect(ctx, def, c) {
   ctx.__seedq = allSeeds.slice(); ctx.__thunderIR = undefined; let irv = 0; const st = M.create(c.sr);
   const io = { in: {}, out: {}, base: sched[0].p, p: sched[0].p, linked: new Set(), mods: null }, tr = { tempo: 120, lpb: 4, ticks: 6, playing: true };
   ins.forEach((n, k) => { io.in[n] = new Float32Array(128); if (linked[k]) io.linked.add(n); }); outs.forEach(n => { io.out[n] = new Float32Array(128); });
-  const cx = { sr: c.sr, block: 128, quality: 'full', transport: tr, engine: {} };
+  const cx = { sr: c.sr, block: 128, quality: 'full', transport: tr, engine: {} }, KB = new Float32Array(128);
+  if (c.key) cx.key = v => ((Math.round(v) || 0) > 0 ? KB : null);
   const inF = new Float32Array(c.nblocks * ins.length * 128), outF = new Float32Array(c.nblocks * outs.length * 128), sizes = [];
   let si = 0, ev = 0, tv = 0;
   for (let b = 0; b < c.nblocks; b++) {
@@ -166,11 +179,12 @@ function runDirect(ctx, def, c) {
     while (c.irs && irv < c.irs.length && c.irs[irv].b <= b) ctx.__thunderIR = irTable(c.irs[irv++].set);   // U20: the song's IRs (a new object each time)
     const n = Math.min(128, c.sizes[si++ % c.sizes.length]); sizes.push(n); cx.block = n;
     ins.forEach((nm, k) => { io.in[nm].set(sig[k].subarray(b * 128, (b + 1) * 128)); inF.set(io.in[nm], (b * ins.length + k) * 128); });
+    if (c.key) for (let i = 0; i < 128; i++) KB[i] = Math.fround(.7 * io.in[ins[0]][127 - i]);
     M.process(st, io, cx);
     outs.forEach((nm, k) => outF.set(io.out[nm], (b * outs.length + k) * 128));
   }
   ctx.__seedq = null; ctx.__thunderIR = undefined;
-  return { meta: { type: M.type || c.type, sr: c.sr, nblocks: c.nblocks, sizes, seeds: allSeeds, linked, params: sched.map(e => ({ b: e.b, p: Object.values(e.p) })), transport: c.transport, irs: c.irs || [] }, inF, outF };
+  return { meta: { type: M.type || c.type, sr: c.sr, nblocks: c.nblocks, sizes, seeds: allSeeds, linked, params: sched.map(e => ({ b: e.b, p: Object.values(e.p) })), transport: c.transport, key: !!c.key, irs: c.irs || [] }, inF, outF };
 }
 
 function tables(M) {
@@ -179,7 +193,7 @@ function tables(M) {
   return o;
 }
 const hex8 = v => '0x' + v.toString(16).padStart(8, '0');
-function incText(direct, engine) {
+function incText(direct, engine, bbr) {
   const L = ['// GENERATED by native/tools/modfx-dump.mjs (--golden) from chains/chains-worklet.js (the shared MODFX block). Do not edit: a mismatch means the port is wrong.',
     '// (1) kModfxEngine: the 32-bit FNV-1a hashes of tests/golden/chains-modules.json for the modules of U19 (the ChainsEngine run of tests/chains.test.js), with the nextSeed() values that render took.',
     '// (2) kModfxCases: FNV-1a 64 of each direct case\'s output (every output port, every block), the real module run in Node 22 on x86-64 Linux (Math.sin / cos / tan / exp / pow / tanh in the audio loop).',
@@ -190,8 +204,35 @@ function incText(direct, engine) {
   L.push('};', 'static const int kModfxEngineN = sizeof(kModfxEngine) / sizeof(kModfxEngine[0]);',
     'struct ModfxCaseGolden { const char* name; unsigned long long hash; int floats; };', 'static const ModfxCaseGolden kModfxCases[] = {');
   for (const d of direct) L.push(`  {"${d.name}", 0x${d.hash.toString(16).padStart(16, '0')}ull, ${d.floats}},`);
-  L.push('};', 'static const int kModfxCasesN = sizeof(kModfxCases) / sizeof(kModfxCases[0]);', '');
+  L.push('};', 'static const int kModfxCasesN = sizeof(kModfxCases) / sizeof(kModfxCases[0]);',
+    '// (3) U21: the formula compiler BBExpr on its own (tools/modfx-dump.mjs: bbCheck): FNV-1a 64 of the canonical stream of `kBbN` formulas (ok, error position, node count, bytecode size, the error text, then run() and s8() on the grid)',
+    `static const unsigned long long kBbHash = 0x${bbr.hash.toString(16).padStart(16, '0')}ull; static const int kBbN = ${bbr.n};`, '');
   return L.join('\n');
+}
+
+
+// ---- U21: the formula compiler (BBExpr) on its own: the 16 built-in formulas and a list of others (every operator, constants folded, the && / || with a constant on the right, limits, every kind of error),
+// each compiled (ok / error text and position / nodes / bytecode size) and run on a grid of (t, a, b, c) in run() and s8() mode 0, 1, 2. Integer maths: no libm in it but the 256-entry sine table.
+const BB_EXTRA = ['0', '1', 't', 'a', 'b', 'c', '-t', '~t', '!t', '!0', '+5', 't+a*b-c', 't/0', 't%0', '7/2', '-7/2', '-7%3', '1<<33', '1<<31', '-1>>1', '-1>>>1', '-1>>>0', '0x7fffffff+1', '0xFFFFFFFF', '4294967295', '4294967296',
+  '0b1010', '0b', '0x', '0xZ', '1.5', '1a', 't=1', 't==1', 't===1', 't!==1', 't!=1', '1==1?5:6', 't?1:2', 't?a:b?c:1', '(t)', '((t))', ')', '(', 't t', '', '   ', 'min(t,a)', 'max(1,2)', 'min(1)', 'abs(-5)', 'abs(t)', 'sqrt(t)', 'sqrt(-9)',
+  'sqrt(0x80000000)', 'sin(t)', 'cos(t)', 'tri(t)', 'sin(40)', 'rnd()', 'rnd(t)', 'rnd(1,2)', 'random()', 'floor(t)', 'int(a)', 'floor()', 'foo(1)', 'sin t', 't&&5', '0&&5', '(t&&5)+1', '(t&1&&10)+3', '(t&1&&60)+t', '(t&1||11)*3', '(t&1||0)+a', '((t&1)&&0)+a', '(t&&1)?7:9', 't+(t&2&&30)+a', '(t>>8&&2)-1', '(a||2)*(b&&3)', '(t&3||12)>>1',  't||5', '0||5', 't&&a', 't||a', 'a&&0', '5&&t', '(t&1)&&3', '(t&1)||3',
+  't*t*t*t', '1+2+3', 't>5?a:b', 'a?b:c?1:2', 't;', 't.', 'a[1]', '"x"', 'é', 't?', 't?1', 't?1:', 't,1', 'min(t,', 'min(t a)', '0x123456789', '0b' + '1'.repeat(33), '12345678901', '-2147483648/-1', '-2147483648%-1', '-(-2147483647-1)', 'abs(-2147483647-1)',
+  't&t>>8|t>>3^a', '(t<a)+(t<=a)+(t>a)+(t>=a)', 't<<a>>b>>>c', 'tri(t>>2)*sin(t)>>3', 't*(a>>4|1)%(b%15+1)', '(a&&b)||c', '!!t', '~~t', '--t', '-+-t',
+  '('.repeat(39) + 't' + ')'.repeat(39), '('.repeat(40) + 't' + ')'.repeat(40), '('.repeat(41) + 't' + ')'.repeat(41), '('.repeat(42) + 't' + ')'.repeat(42), 't+'.repeat(150) + 't', 't+'.repeat(199) + 't', 't+'.repeat(200) + 't', '1+'.repeat(255) + 't', 't'.repeat(513)];
+function bbCheck(bb) {
+  const { BBExpr, BB_LIST } = bb, srcs = [...BB_LIST.map(x => x[1]), ...BB_EXTRA], rr = lcg(4242), grid = [];
+  for (const t of [0, 1, 255, 256, 4095, 8191, 65535, 2147483647, -2147483648, -1]) grid.push([t, 128, 128, 128]);
+  for (let i = 0; i < 150; i++) grid.push([(rr() * 4294967296) | 0, (rr() * 256) | 0, (rr() * 256) | 0, (rr() * 256) | 0]);
+  for (let i = 0; i < 100; i++) grid.push([(rr() * 70000) | 0, (rr() * 256) | 0, (rr() * 256) | 0, (rr() * 256) | 0]);
+  const meta = [], vals = [], enc = new TextEncoder();
+  const bytes = []; const i32le = v => { const b = new Uint8Array(4); new DataView(b.buffer).setInt32(0, v | 0, true); bytes.push(...b); };
+  for (const src of srcs) {
+    let P = null, err = null; try { P = BBExpr.compile(src); } catch (e) { err = e; if (!e.bb) throw e; }
+    if (err) { meta.push({ src, ok: 0, pos: err.pos, msg: err.message, nodes: 0, size: 0 }); [0, err.pos, 0, 0].forEach(i32le); bytes.push(...enc.encode(err.message), 0); continue; }
+    meta.push({ src, ok: 1, pos: 0, msg: '', nodes: P.nodes, size: P.size }); [1, 0, P.nodes, P.size].forEach(i32le); bytes.push(0);
+    for (const [t, a, b, c] of grid) for (const v of [P.run(t, a, b, c), P.s8(t, a, b, c, 0), P.s8(t, a, b, c, 1), P.s8(t, a, b, c, 2)]) { vals.push(v); i32le(v); }
+  }
+  return { meta, grid, vals: Int32Array.from(vals), hash: fnv64(new Uint8Array(bytes)), n: srcs.length };
 }
 
 const arg = process.argv[2];
@@ -207,14 +248,15 @@ for (const t of MODS) for (const s of ['default', 'stressed', 'switches-on']) { 
 if (bad) process.exit(1);
 const ctx = loadChains(), M = ctx.ChainsDSP.MODULES, outDir = arg && !arg.startsWith('--') ? arg : null;
 for (const t of MODS) if (!M[t] || !M[t].process) { console.error('modfx-dump: no such module in the JS: ' + t); process.exit(1); }
-if (outDir) { fs.mkdirSync(outDir, { recursive: true }); fs.writeFileSync(path.join(outDir, 'defs.json'), JSON.stringify(tables(engine.M))); }
+if (outDir) { fs.mkdirSync(outDir, { recursive: true }); fs.writeFileSync(path.join(outDir, 'defs.json'), JSON.stringify(tables(engine.M)));
+  { const b = bbCheck(ctx.__bb); fs.writeFileSync(path.join(outDir, 'bbexpr.json'), JSON.stringify({ meta: b.meta, grid: b.grid })); fs.writeFileSync(path.join(outDir, 'bbexpr.i32'), new Uint8Array(b.vals.buffer)); } }
 const direct = [];
 for (const t of MODS) for (const c of casesFor(t, M[t])) {
   const r = runDirect(ctx, M[t], c), outBytes = new Uint8Array(r.outF.buffer);
   direct.push({ name: c.name, hash: fnv64(outBytes), floats: r.outF.length });
   if (outDir) { fs.writeFileSync(path.join(outDir, c.name + '.json'), JSON.stringify(r.meta)); fs.writeFileSync(path.join(outDir, c.name + '.in.f32'), new Uint8Array(r.inF.buffer)); fs.writeFileSync(path.join(outDir, c.name + '.f32'), outBytes); }
 }
-const text = incText(direct, engine);
+const bbr = bbCheck(ctx.__bb), text = incText(direct, engine, bbr);
 if (arg === '--golden') { fs.writeFileSync(GOLDEN_INC, text); console.log(`modfx-dump: wrote ${path.relative(ROOT, GOLDEN_INC)} (${direct.length} direct cases, ${MODS.length * 3} engine hashes)`); }
 else if (arg === '--check') {
   const now = fs.existsSync(GOLDEN_INC) ? fs.readFileSync(GOLDEN_INC, 'utf8') : '';
