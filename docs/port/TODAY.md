@@ -107,6 +107,11 @@ N1 step 10.
   seed product above 2^53 reproduced; other platforms rest on `js_sin` equalling Node's `Math.sin`. The manager read the file list and CI, not the diff.
 - D3 ThreadSanitizer (clang 18): 83 of 86 tests, no races, but the suite is single-threaded so it proves little; `rt_core`, `rt_guard_selftest` and `song`
   do not link under TSan (`rt_harness.cpp`'s global `operator new` / `delete` collide with TSan's). The only threaded code is Android's `jni.cpp`, not built on Linux.
+- **#190 D4 (OPEN, DO NOT MERGE; a real bug in the native core, for Fable):** the new whole-song test (ELECTRO through `SongRenderer`, Flex / Step gate / Retrigger on
+  tracks 0, 1, 2, 4, 8 and the master, FLX / GAT / RTG / FXO commands; bit-exact gate against the real ThunderFx worklet in Node) passes for track effects (0 of 768000
+  samples differ) and fails for the master column (171180 differ, first at sample 5498). Cause: `SongRenderer::masterHook` runs the master effects without the beat
+  clock; the page's master node gets it (`setMfx` calls `clockTo` in `index.html`). A one-line change in `masterHook`, tried and reverted, gives 0 differences
+  (`docs/port/U15-NOTES.md` on `n1/u15-song`). Not applied: the renderer is mixer code under Fable's review. The test's inputs (voices, events, clock) come from the C++ side.
 
 ## Progress log (the manager updates and pushes this after every change of state; newest last)
 - 10:30 Fable: plan written. Nothing started.
@@ -165,3 +170,5 @@ N1 step 10.
   on every platform, local comparison only on x86-64 Linux; plus the verifier's two points (direct cases for the `lpRes` clamp, which no
   voice covers; an explicit init for the lazily built sine table). **Not merged. U23 / U24 not started.** If you take over here and
   `n3/u22` has no new push within 90 minutes, give exactly this fix to a new Sonnet worker.
+- 12:00 D4 done: PR #190 open, red on purpose (see the review queue: master effects get no beat clock in `SongRenderer::masterHook`). Section D is complete.
+  Running: only the U22 worker (macOS fix on #189). Nothing else can start until #189 is merged; then U23 and U24.
