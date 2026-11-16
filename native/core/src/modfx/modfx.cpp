@@ -5,6 +5,7 @@
 #include <vector>
 
 #include "modfx/mods.h"
+#include "modfx/mods_b.h"
 #include "modfx/util.h"
 
 namespace thunder {
@@ -24,13 +25,18 @@ std::vector<const Def*>& reg() {
     return r; }();
   return v;
 }
+// U20: the registry as the lookups see it: the families above, then the unit B families (kept apart so the lists of the units merge without touching each other)
+std::vector<const Def*>& regAll() {
+  static std::vector<const Def*> v = [] { std::vector<const Def*> r = reg(); addSpectralMods(r); addConvolveMods(r); return r; }();
+  return v;
+}
 }  // namespace
 const float* const kSin = gSin.t;
 
 
-const Def* find(const char* type) { for (const Def* d : reg()) if (!std::strcmp(d->type, type)) return d; return nullptr; }
-int count() { return (int)reg().size(); }
-const Def& at(int i) { return *reg()[(size_t)i]; }
+const Def* find(const char* type) { for (const Def* d : regAll()) if (!std::strcmp(d->type, type)) return d; return nullptr; }
+int count() { return (int)regAll().size(); }
+const Def& at(int i) { return *regAll()[(size_t)i]; }
 
 }  // namespace modfx
 }  // namespace thunder

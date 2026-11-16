@@ -157,7 +157,19 @@ static void bbTest(const std::string& dir) {
   std::printf("bbexpr: %d formulas (compile result, error text, run and s8 on the grid) equal the JS's and the committed hash  %s\n", (int)meta.size(), bad ? "FAIL" : "ok");
 }
 
-// ---- 3. the direct cases -------------------------------------------------------------------------------------------------------------------------------------------------------
+// ---- 3. the direct cases
+// U20: the song's impulse responses of a case: made here exactly as tools/modfx-b-cases.mjs makes them (an integer xorshift and basic arithmetic only: no Math.*, so the same on every platform)
+struct IrObj { std::vector<float> L, R; SongIR ir; };
+static std::unique_ptr<IrObj> irMake(double n_, double sr, bool st, double seedD, bool nan) {
+  std::unique_ptr<IrObj> o(new IrObj); const int n = (int)n_; const uint32_t seed = (uint32_t)seedD;
+  for (int ch = 0; ch < (st ? 2 : 1); ch++) {
+    std::vector<float>& a = ch ? o->R : o->L; a.assign((size_t)n, 0.f); uint32_t s = seed * 2654435761u + (uint32_t)ch * 40503u; if (!s) s = 1; double env = 1; const double d = 1 - 9.0 / n;
+    for (int i = 0; i < n; i++) { s ^= s << 13; s ^= s >> 17; s ^= s << 5; const double noise = (double)s / 4294967296.0 - .5; a[(size_t)i] = (float)(i == 0 ? 1.0 : noise * env * (i % 50 == 0 ? 3.0 : 1.0)); env *= d; }
+    if (nan) a[5] = std::nanf("");
+  }
+  o->ir.L = o->L.data(); o->ir.nL = n; o->ir.R = st ? o->R.data() : nullptr; o->ir.nR = st ? n : 0; o->ir.sr = sr; o->ir.id = seed;
+  return o;
+}
 struct Res { bool ran = false, exact = false, hashOk = false; long nDiff = 0, n = 0, first = -1; double got = 0, want = 0; };
 static Res runCase(const std::string& dir, const ModfxCaseGolden& G) {
   Res R; std::string js, in, ref;
@@ -174,7 +186,14 @@ static Res runCase(const std::string& dir, const ModfxCaseGolden& G) {
   for (int k = 0; k < d->nin; k++) { io.in[k] = inb[k]; io.linked[k] = linked.at((size_t)k).asBool(); }
   for (int k = 0; k < d->nout; k++) io.out[k] = outb[k];
   Ctx c; c.sr = M.num("sr"); size_t pe = 0, te = 0; const bool keyed = M.get("key").isBool() && M.boolean("key"); if (keyed) c.key = keyDirect;
+  Json irsJ = M.arr("irs"); size_t ie = 0; std::vector<std::unique_ptr<IrObj>> irHold; const SongIR* irTab[4] = {nullptr, nullptr, nullptr, nullptr};   // each entry makes NEW objects, as the JS does
   for (int b = 0; b < nb; b++) {
+    while (ie < irsJ.size() && irsJ.at(ie).num("b") <= b) {
+      Json set = irsJ.at(ie++).arr("set");
+      for (int k = 0; k < 4; k++) { Json e = set.at((size_t)k); if (!e.isObj()) { irTab[k] = nullptr; continue; }
+        irHold.push_back(irMake(e.num("n"), e.num("sr"), e.boolean("st"), e.num("seed"), e.boolean("nan"))); irTab[k] = &irHold.back()->ir; }
+      c.irs = irTab;
+    }
     while (pe < params.size() && params.at(pe).num("b") <= b) { Json pp = params.at(pe).arr("p"); for (int k = 0; k < d->np; k++) p[k] = pp.at((size_t)k).asNum(); pe++; }
     while (te < tr.size() && tr.at(te).num("b") <= b) { Json t = tr.at(te++); if (t.get("tempo").isNum()) c.tempo = t.num("tempo"); if (t.get("playing").isBool()) c.playing = t.boolean("playing"); if (t.get("startN").isNum()) c.startN = t.num("startN"); }
     c.block = (int)sizes.at((size_t)b).asNum();
