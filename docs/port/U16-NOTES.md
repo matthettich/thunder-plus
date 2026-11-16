@@ -33,7 +33,7 @@ The committed golden hashes were made on x86-64 Linux, Node 22: the cores call M
 
 Beat grains 46 (every RATE with the second start, random pitch 0 to 3, REVERSE, SHAPE ends, SIZE ends with the 24-voice cap, SPRAY, POSITION past the ring at 30 BPM, density 0 / mid, mix 0, FREEZE and toggling it, 12 random parameter sets, clock stopped / stopping / tempo changes / jump / const / absent, FXO). Beat scramble 40 (SLICE x3, VARY x3 over three wraps of the clock, KEEP, CHANCE 0 / 255, REVERSE 0 / 255, seeds, SMOOTH ends, mix, 12 random, stopped, stops, tempo, jump, wrap, const, absent, FXO). Glitch 55 (STEP x3, VARY x3, each action alone at each STEP (6 x 3), CHANCE 0, seeds, mix, zero weights, 12 random, clock cases, FXO). Vintage sampler 82 (every model at default, raw filter, loud (clipping and DRIVE), quiet (the hiss); DRIVE, FILTER, RATE, NOISE, MIX at their ends on three models; 16 random; settings changing while it runs; FXV; FXO). Host: block sizes 1 / 37 / 128 / 480 / 1024 and a mixed list with the four in series, series with every command, chain sets, FXV, a resting node, the sleep rules (18 s) for each kind on / stopped / off. Plus the `map()` of the four kinds on 200 value sets each (missing, null, strings, out of range) as doubles, and two hosts side by side on nine cases.
 
-Result: all 242 bit-exact (g++ 13 and clang++ 18; see the figures in the commit message / lead's report).
+Result: all 242 bit-exact with g++ 13 and with clang++ 18 (Linux x86-64, Release); full ctest 80 of 80 on each.
 
 ## Quirks kept (they are the JS)
 
