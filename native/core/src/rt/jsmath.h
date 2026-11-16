@@ -19,6 +19,8 @@ double js_tan(double x);
 double js_log(double x);
 double js_tanh(double x);   // Math.tanh: fdlibm's (U16), V8 12.4 bit for bit
 double js_log2(double x);   // Math.log2: V8 12.4's ieee754::log2 (U19), bit for bit
+double js_atan2(double y, double x);   // Math.atan2: V8 12.4's ieee754::atan2 (U20), bit for bit
+double js_hypot3(double a, double b, double c);   // Math.hypot(a, b, c): V8 12.4's builtin (scaled, Kahan-summed; U20)
 
 // Math.round: the nearest integer, ties towards +Infinity; -0 for -0.5 <= x < 0 (and for -0); NaN and the infinities as they are.
 // (Not floor(x + 0.5): that is wrong for 0.49999999999999994 and for odd integers at and above 2^52.)
