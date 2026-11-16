@@ -52,17 +52,13 @@ after every beta push), merge `beta` into it, `npm test`, push `main` (retry on 
 State at 19:45: PR #175 (U14, the track-effect host) is **merged** into `native` (539ac47), CI green on every platform. How it went green
 is in section C; read it, it changes how effects are built.
 1. PR #179 "pump: no MMX": **merged** (20:20, all CI green).
-2. **U15 Flex / Step gate / Retrigger: PR #180 (branch `n1/u15`), built, the lead read the host changes and accepted them; 73 cases bit-exact.
-   Open at 20:25: macOS fails ctest `libm` only (Node on macOS arm64 is itself built with FMA contraction, so local Node is not the reference there:
-   the agent was told to compare against a committed golden made by Node 22 on x86-64 Linux, with a Linux-only `libm_golden_current`). Merge when
-   every job is green.** The original brief, if it has to be redone: a Sonnet agent builds it on branch `n1/u15` (from U14). If the branch is on the remote, take it
-   over (its notes may be lost with the container: read the diff); if not, start it: C++ ports of `FlexCore`, `StepGateCore`, `RetrigCore`
-   and `clkSpb` (in `index.html`) under `native/core/src/fx/`, line for line (same arithmetic order, doubles where JS has Numbers); a slot kind
-   (93..95, see `fxhost.h`) that reads the beat clock lane (`Mixer::beat(track)`) and takes the `flx` / `gat` / `rtg` lane events; a Node tool
-   running the real JS cores (reuse `native/tools/fx-src.mjs`) and a C++ test, bit-exact, covering every `tests/flex.test.js` scenario, tempo
-   changes, clock stop / restart / jump, block sizes 1, 37, 128, 480, 1024, events on block edges, two hosts; `parity-u15.sh`; the kinds added
-   to the `rt_core` allocation-guard run; GCC and clang.
-3. **U18 pump hosting** (the pump effects as slot kinds of the host, through the `pump_*` C entry points that `pump.wasm` exports; model:
+2. U15 Flex / Step gate / Retrigger: PR #180 **merged** (21:00, all CI green; 73 cases bit-exact; the lead read the host changes). Learned: Node on
+   macOS arm64 rounds Math.cos / sin / tan / log differently from Node on x86-64 Linux, so `libm` compares against a committed golden made on
+   Linux (`libm_golden_current` checks it there); the C++ on macOS matches that golden. `fxclk` still takes its reference from the local Node
+   with committed hashes required to match (it passed everywhere): exposure noted in its header. Not done in U15: an end-to-end test through
+   `Mixer` + `FxBank` on a real song (the clock hand-over is covered by direct host tests only): for Fable's list.
+3. **U18 pump hosting: a Sonnet agent was started at 21:00 on branch `n1/u18` (worktree `/home/claude/wt/u18`, notes `/home/claude/progress/u18.md`); if the
+   branch is on the remote take it over, else start it.** (the pump effects as slot kinds of the host, through the `pump_*` C entry points that `pump.wasm` exports; model:
    U14's tfx kinds; reference: the web app's pump worklet path in Node with `pump.wasm`). The NaN that blocked it is fixed (item 1). Two
    things to carry: the pin's MASTER is one commit newer than the app's shipped `pump.wasm` (compare against a wasm built from the PIN, and
    say so); pump is still built with `-ffast-math -fno-finite-math-only`, so expect the same cross-compiler spread U14 had (section C). If
@@ -100,3 +96,4 @@ is in section C; read it, it changes how effects are built.
   apply IC / note edits to the core at once (no debounce) and drop or re-book the queued, unplayed events of that cell when the patch lands;
   maybe choke the previous edit-audition. Needs the core (`core/seq-core.js`, `node tools/make-core.mjs`): Fable.
 - Web items done by 20:25: 1 (624), 2 (625), 3 (626), 5 (627). The agent continues with 6 to 10.
+- #180 U15 (Sonnet agent; the lead read fxhost / fxbank changes, not clkcores.cpp line by line against the JS, and not fdlibm.cpp): merged.
