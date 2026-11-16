@@ -37,6 +37,8 @@ int main() {
     for (int a = 0; a < 18; a++) for (int b = 0; b < 18; b++) { sa = (sa ^ canon(js_atan2(SP[a], SP[b]))) * 0x100000001b3ull; sa = (sa ^ canon(js_atan2(SP[b], SP[a] * 1.5))) * 0x100000001b3ull; }
     for (int a = 0; a < 12; a++) for (int b = 0; b < 12; b++) for (int c = 0; c < 12; c++) sh = (sh ^ canon(js_hypot3(SP[a], SP[b], SP[c]))) * 0x100000001b3ull;
     std::printf("js_atan2 over the special arguments: %s; js_hypot3: %s\n", sa == kLibmSpecial[0] ? "ok" : "DIFFERS  FAIL", sh == kLibmSpecial[1] ? "ok" : "DIFFERS  FAIL"); if (sa != kLibmSpecial[0] || sh != kLibmSpecial[1]) return 1; }
+  // V8's special case: Math.exp(1) is E, 0x4005BF0A8B145769 in Node
+  { const double e1 = js_exp(1.0); const bool ok = canon(e1) == 0x4005BF0A8B145769ull; std::printf("js_exp(1.0) == Node's Math.exp(1) (0x4005BF0A8B145769): %s\n", ok ? "ok" : "FAIL"); if (!ok) return 1; }
   int fails = 0;
   for (int k = 0; k < 8; k++) { const bool ok = h[k] == kLibmHash[k] && !spotBad[k]; if (!ok) fails++;
     std::printf("js_%s: %d arguments, hash %s, %d spot values (%ld differ%s)  %s\n", nm[k], kLibmN, h[k] == kLibmHash[k] ? "as committed" : "DIFFERS", kLibmSpots, spotBad[k], firstSpot[k] >= 0 ? ", the first at argument " : "", ok ? "ok" : "FAIL");
