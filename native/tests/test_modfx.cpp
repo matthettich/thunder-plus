@@ -7,6 +7,7 @@
 //     start changes, other sample rates, tails and silences: the output compared sample by sample with the JS (bit-exact is the gate) and with the committed FNV-1a 64. A reference that is
 //     missing is a FAILURE. The sample-by-sample comparison with the LOCAL Node must also hold on x86-64 Linux; elsewhere it is reported (macOS arm64 Node rounds Math.sin / cos differently).
 //   test_modfx <dir> [module-substring]
+#include <algorithm>
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
@@ -170,15 +171,53 @@ static std::unique_ptr<IrObj> irMake(double n_, double sr, bool st, double seedD
   o->ir.L = o->L.data(); o->ir.nL = n; o->ir.R = st ? o->R.data() : nullptr; o->ir.nR = st ? n : 0; o->ir.sr = sr; o->ir.id = seed;
   return o;
 }
+// The inputs of a direct case, made here as tools/modfx-dump.mjs makes them (signal() and, for sig "bad", mkBad of modfx-b-cases.mjs): doubles, an integer xorshift and js_sin (Node's Math.sin, bit-exact on
+// every platform), rounded to float at the end. The fixture no longer writes them (run the tool with --inputs to get <case>.in.f32; runCase then checks these against that file, bit for bit).
+static uint32_t jsLcgNext(uint32_t& s) { s ^= s << 13; s ^= s >> 17; s ^= s << 5; return s; }
+static void makeSignal(const char* kind, const std::string& sigKind, size_t n, uint32_t seed, bool pitch, float* o) {
+  uint32_t s = seed ? seed : 1; auto r = [&]() { return (double)jsLcgNext(s) / 4294967296.0; };
+  if (!std::strcmp(kind, "gate")) {
+    size_t i = 0; bool hi = false; const double lo = r() < .2 ? .4 : 0, up = r() < .2 ? .6 : 1;
+    while (i < n) { const int len = (int)std::floor(200 + r() * 6000); const int w = hi ? std::max(1, (int)std::floor(len * (.1 + r() * .5))) : len; for (int j = 0; j < w && i < n; j++, i++) o[i] = (float)(hi ? up : lo); hi = !hi; }
+    return;
+  }
+  if (!std::strcmp(kind, "cv")) {
+    size_t i = 0; double v = r() * 1.2 - .1;
+    while (i < n) { const int len = (int)std::floor(100 + r() * 2000); const double nv = pitch ? r() * 1.2 - .1 : r() * 2.4 - 1.2; const bool slew = r() < .5;
+      for (int j = 0; j < len && i < n; j++, i++) o[i] = (float)(slew ? v + (nv - v) * ((double)j / (double)len) : v); v = nv; }
+    return;
+  }
+  const double amp = sigKind == "loud" ? 3.2 : sigKind == "quiet" ? .004 : 1; const double f1 = 80 + r() * 900, f2 = 1000 + r() * 4000;
+  uint32_t ns = (uint32_t)(uint64_t)((double)seed * 2654435761.0);   /* the JS multiplies in doubles: above 2^53 (U20's seeds) the product is rounded first */ if (!ns) ns = 1; double vph = 0; const double PI2 = 2 * 3.141592653589793;
+  for (size_t i = 0; i < n; i++) {
+    const double noise = (double)jsLcgNext(ns) / 4294967296.0 - .5; const double di = (double)i; double v;
+    if (sigKind == "impulse") v = i % 9973 == 0 ? 1 : 0;
+    else if (sigKind == "voiced") { const double t = di / 48000, f = (100 + 250 * (.5 + .5 * js_sin(PI2 * (.9 + (double)(seed % 5) * .1) * t))) * (1 + .012 * js_sin(PI2 * 5.5 * t)); vph += f / 48000;
+      double h = 0; for (int k = 1; k <= 6; k++) h += js_sin(PI2 * k * vph) / k; const int seg = (int)(std::floor(t / .3)) % 4; v = seg == 3 ? .002 * noise : seg == 1 ? .5 * noise : .3 * h + .02 * noise; }
+    else if (sigKind == "burst") v = i < 128 * 24 ? .5 * noise + .3 * js_sin(PI2 * f1 * di / 48000) : 0;
+    else if (sigKind == "longsleep") v = (i < 128 * 24 || (i >= 128 * 220 && i < 128 * 240)) ? .5 * noise + .3 * js_sin(PI2 * f1 * di / 48000) : 0;
+    else { const double env = (i / 4000) % 5 == 3 ? 0 : 1; v = env * (.4 * js_sin(PI2 * f1 * di / 48000) + .2 * js_sin(PI2 * f2 * di / 48000) + (di < (double)n / 3 ? noise * .2 : 0)); }
+    o[i] = (float)(v * amp);
+  }
+}
+static int gInputsChecked = 0;
 struct Res { bool ran = false, exact = false, hashOk = false; long nDiff = 0, n = 0, first = -1; double got = 0, want = 0; };
 static Res runCase(const std::string& dir, const ModfxCaseGolden& G) {
   Res R; std::string js, in, ref;
-  if (!readFile(dir + "/" + G.name + ".json", &js) || !readFile(dir + "/" + G.name + ".in.f32", &in) || !readFile(dir + "/" + G.name + ".f32", &ref)) return R;
+  if (!readFile(dir + "/" + G.name + ".json", &js) || !readFile(dir + "/" + G.name + ".f32", &ref)) return R;
   JsonDoc doc; if (!doc.parse(js)) return R; Json M = doc.root();
   const Def* d = find(std::string(M.str("type")).c_str()); if (!d) return R;
   const int nb = (int)M.num("nblocks"); const size_t inN = (size_t)nb * d->nin * 128, outN = (size_t)nb * d->nout * 128;
-  if (in.size() != inN * 4 || ref.size() != outN * 4) return R;
-  const float* I = (const float*)in.data(); const float* J = (const float*)ref.data();
+  if (ref.size() != outN * 4) return R;
+  Json linkedJ = M.arr("linked"); std::vector<float> I(inN, 0.f);   // unlinked inputs stay zero
+  { const size_t total = (size_t)nb * 128; const std::string sk(M.str("sig")); const bool pitch = std::string(M.str("hint")) == "pitch", bad = sk == "bad"; std::vector<float> a(total);
+    for (int k = 0; k < d->nin; k++) { if (!linkedJ.at((size_t)k).asBool()) continue;
+      if (bad) { makeSignal(d->in[k].kind, "mix", total, (uint32_t)(4242 + k * 7), false, a.data());
+        for (size_t i = 0; i < total; i += 331) { const uint32_t q = 0x7fc00000u; std::memcpy(&a[i], &q, 4); } for (size_t i = 17; i < total; i += 1511) a[i] = INFINITY; for (size_t i = 29; i < total; i += 1801) a[i] = (i & 1) ? 9.5f : -8.f; }
+      else makeSignal(d->in[k].kind, sk, total, (uint32_t)(M.num("seed") * 17 + k * 131 + 1), pitch, a.data());
+      for (int b = 0; b < nb; b++) std::memcpy(&I[((size_t)b * d->nin + k) * 128], &a[(size_t)b * 128], 512); }
+    if (readFile(dir + "/" + G.name + ".in.f32", &in)) { const bool same = in.size() == inN * 4 && std::memcmp(in.data(), I.data(), inN * 4) == 0; if (!same) { std::printf("%s: the inputs made here differ from %s.in.f32  FAIL\n", G.name, G.name); return R; } ++gInputsChecked; } }
+  const float* J = (const float*)ref.data();
   Json seedsJ = M.arr("seeds"), sizes = M.arr("sizes"), linked = M.arr("linked"), params = M.arr("params"), tr = M.arr("transport");
   unsigned sd[8] = {}; int ns = 0; for (size_t i = 0; i < seedsJ.size() && i < 8; i++) { sd[i] = (unsigned)seedsJ.at(i).asNum(); ns++; }
   ListSeeds seeds(sd, ns); std::unique_ptr<Module> m = d->make(M.num("sr"), seeds);
@@ -197,7 +236,7 @@ static Res runCase(const std::string& dir, const ModfxCaseGolden& G) {
     while (pe < params.size() && params.at(pe).num("b") <= b) { Json pp = params.at(pe).arr("p"); for (int k = 0; k < d->np; k++) p[k] = pp.at((size_t)k).asNum(); pe++; }
     while (te < tr.size() && tr.at(te).num("b") <= b) { Json t = tr.at(te++); if (t.get("tempo").isNum()) c.tempo = t.num("tempo"); if (t.get("playing").isBool()) c.playing = t.boolean("playing"); if (t.get("startN").isNum()) c.startN = t.num("startN"); }
     c.block = (int)sizes.at((size_t)b).asNum();
-    for (int k = 0; k < d->nin; k++) std::memcpy(inb[k], I + ((size_t)b * d->nin + k) * 128, 512);
+    for (int k = 0; k < d->nin; k++) std::memcpy(inb[k], I.data() + ((size_t)b * d->nin + k) * 128, 512);
     if (keyed) for (int i = 0; i < 128; i++) gKeyBuf[i] = (float)(.7 * (double)inb[0][127 - i]);
     m->process(io, c);
     for (int k = 0; k < d->nout; k++) std::memcpy(&out[((size_t)b * d->nout + k) * 128], outb[k], 512);
@@ -223,6 +262,7 @@ int main(int argc, char** argv) {
       if (!R.exact) std::printf("    %ld of %ld samples differ; first at %ld: got %.9g want %.9g\n", R.nDiff, R.n, R.first, R.got, R.want); } }
     if (!ok) fails++;
   }
+  std::printf("modfx: inputs made in C++; %d of the cases were also checked bit for bit against a written <case>.in.f32\n", gInputsChecked);
   if (filt.empty()) { int unc = 0; for (int m = 0; m < count(); m++) { int n = 0; for (int i = 0; i < kModfxCasesN; i++) if (!std::strncmp(kModfxCases[i].name, at(m).type, std::strlen(at(m).type)) && kModfxCases[i].name[std::strlen(at(m).type)] == '_') n++; if (n < 14) { std::printf("direct: %s has %d cases  FAIL\n", at(m).type, n); unc++; } } if (unc) fails++; }
   if (ran == 0) { std::printf("modfx: no case ran  FAIL\n"); fails++; }
   std::printf("modfx: %d of %d direct cases bit-exact (committed hash), %d failed\n", exact, ran, fails);

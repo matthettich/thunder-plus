@@ -184,7 +184,9 @@ function runDirect(ctx, def, c) {
     outs.forEach((nm, k) => outF.set(io.out[nm], (b * outs.length + k) * 128));
   }
   ctx.__seedq = null; ctx.__thunderIR = undefined;
-  return { meta: { type: M.type || c.type, sr: c.sr, nblocks: c.nblocks, sizes, seeds: allSeeds, linked, params: sched.map(e => ({ b: e.b, p: Object.values(e.p) })), transport: c.transport, key: !!c.key, irs: c.irs || [] }, inF, outF };
+  return { meta: { type: M.type || c.type, sr: c.sr, nblocks: c.nblocks, sizes, seeds: allSeeds, linked, params: sched.map(e => ({ b: e.b, p: Object.values(e.p) })), transport: c.transport, key: !!c.key, irs: c.irs || [],
+    // how the C++ test makes the inputs (it ports signal() and mkBad): the signal kind ('bad' = mkBad of modfx-b-cases.mjs), the case seed, the pitch hint
+    sig: c.mkSig ? 'bad' : c.sigKind, seed: c.seed, hint: M.type === 'quant' ? 'pitch' : '' }, inF, outF };
 }
 
 function tables(M) {
@@ -235,7 +237,7 @@ function bbCheck(bb) {
   return { meta, grid, vals: Int32Array.from(vals), hash: fnv64(new Uint8Array(bytes)), n: srcs.length };
 }
 
-const arg = process.argv[2];
+const arg = process.argv[2], WRITE_INPUTS = process.argv.includes('--inputs');   // --inputs: also write <case>.in.f32 (the C++ test makes the inputs itself; if the file exists it checks its own against it, bit for bit)
 // the waves worklet carries the same shared block (its golden needs the U30 engine): the two texts between the markers must be identical
 { const blk = file => { const s = fs.readFileSync(path.join(ROOT, file), 'utf8'), a = s.indexOf('/* ===SHARED MODULES START==='), b = s.indexOf('/* ===SHARED MODULES END===');
     if (a < 0 || b < a) { console.error('modfx-dump: no shared block in ' + file); process.exit(1); } return s.slice(a, b); };
@@ -254,7 +256,7 @@ const direct = [];
 for (const t of MODS) for (const c of casesFor(t, M[t])) {
   const r = runDirect(ctx, M[t], c), outBytes = new Uint8Array(r.outF.buffer);
   direct.push({ name: c.name, hash: fnv64(outBytes), floats: r.outF.length });
-  if (outDir) { fs.writeFileSync(path.join(outDir, c.name + '.json'), JSON.stringify(r.meta)); fs.writeFileSync(path.join(outDir, c.name + '.in.f32'), new Uint8Array(r.inF.buffer)); fs.writeFileSync(path.join(outDir, c.name + '.f32'), outBytes); }
+  if (outDir) { fs.writeFileSync(path.join(outDir, c.name + '.json'), JSON.stringify(r.meta)); if (WRITE_INPUTS) fs.writeFileSync(path.join(outDir, c.name + '.in.f32'), new Uint8Array(r.inF.buffer)); fs.writeFileSync(path.join(outDir, c.name + '.f32'), outBytes); }
 }
 const bbr = bbCheck(ctx.__bb), text = incText(direct, engine, bbr);
 if (arg === '--golden') { fs.writeFileSync(GOLDEN_INC, text); console.log(`modfx-dump: wrote ${path.relative(ROOT, GOLDEN_INC)} (${direct.length} direct cases, ${MODS.length * 3} engine hashes)`); }
