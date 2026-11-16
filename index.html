@@ -25955,7 +25955,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 623;
+const BUILD = 624;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD + (location.pathname.includes('/beta/') ? ' · beta' : '');
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -26095,7 +26095,8 @@ function followPlay(){
   if (!followMode){ arrFollowPage(own); return; }
   // A SELECTION keeps the cursor and the selection where they are, but Arrange still turns its pages with the playhead
   // (owner, 2 Nov: after selecting rows, Arrange stopped paging even with FOLLOW on: this used to return before paging).
-  if (selA){ arrFollowPage(own); return; }
+  /* (build 624, owner: selecting upward in Arrange, then PLAY, undid the selection a row at a time) beside Phrase the selection lives in apSel, not selA, so this guard did not see it and FOLLOW PATTERN pulled the cursor (the selection's moving end) down with the playhead: playback never changes a selection */
+  if (selA || (apF && apSel)){ arrFollowPage(own); return; }
   if (performance.now() - workT < FOLLOW_HOLD){ arrFollowPage(own); return; }
   if (!fpHome || workT > fpHome.t || arrHandT > fpHome.t) fpHome = {t:performance.now(), y:cs.song.y, top:cs.song.top, p:cPhrase, s:cSect, py:cs.phrase.y, ptop:cs.phrase.top};   // EDITING: it catches up when you've let go (a change made meanwhile still shows then)
   if (followMode === 1){   // FOLLOW PATTERN: only which phrase / sect is shown follows the cursor's track; nothing scrolls
@@ -36195,6 +36196,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [624, '15 Nov', ['Arrange: selecting rows (upward or downward) and then pressing PLAY no longer shrinks the selection as the song plays (FOLLOW PATTERN moved the selection\'s end with the playhead while Arrange sat beside Phrase)']],
   [623, '15 Nov', ['A click on an instrument in the side panel’s instrument list plays it once (the current octave’s C), as well as selecting it']],
   [622, '15 Nov', ['The small command bar has a thin line along its top, so it reads as its own section']],
   [621, '15 Nov', ['…chains and …waves: Send and Receive modules: give a pair the same label (A to H, or your own text) and the Receive outputs what the Send gets, with no cable. Several Receives can share one Send. They work inside one track’s chain', '…chains: a cable that runs from one track’s chain into another’s carries no sound, and now says so (dashed, “no signal”): to key a compressor from a bus use a Sidechain Out with Send 1 in the bus’s chain and Source: Send 1 on the compressor', 'Mixer and Stereo mixer modules show an OUT meter, so you can see they pass audio', 'Cable bends snap to right angles as you drag them (hold Alt for free); right-click a cable: Square up', 'The ? on a module is the size of its ✕', 'The side panel (status, meters, KEYS, instruments) takes the skin’s own ground, font and accent, and the paler band along the bottom with the command bar on is gone']],

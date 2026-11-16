@@ -812,6 +812,9 @@ The owner's top priority to add is the MOD screen. Work down the list; ask befor
 
 Start a session by asking for results. Fix on `beta`. (10 Nov, 15:10: the web beta is build 560; the build numbers in the rest of this paragraph are older.) Web beta: https://matthettich.github.io/thunder-plus/beta/ (build 547 as of 10 Nov morning, 548 once its PR merges; the night of 9–10 Nov shipped 544–547, see the four "10 Nov" entries below. Decisions the lead made that night for the owner to confirm or reverse: on a phone the saved Sequencer default plays on the Page unless Audio thread is picked on that device; on a phone the safety limiter is its stand-in until another worklet loads; the resync only runs with a worklet loaded and its margins are untested on a device). Desktop: v1.3.4-beta.2 (build 541, no feed view or scopes); further desktop betas on hold until the owner asks.
 
+**Build 624** (playback keeps a selection)
+- [ ] **Computer, Phrase view with Arrange beside it, FOLLOW PATTERN:** give Arrange the keys, select 8 or more rows upward (Shift+▲), then press PLAY. Pass: the selection stays exactly as made while the song plays (the view may page, the selection does not shrink). Check FOLLOW ON and OFF too, and the Song screen itself.
+
 **Builds 622 and 623** (command bar line; the side panel's instrument list plays and selects)
 - [ ] **Computer:** the small command bar has a thin line along its top in each skin you use. Pass: a thin line in the skin's line colour runs along the top of the bar, so it reads as its own section.
 - [ ] **Computer:** click an instrument in the side panel's instrument list, with the song stopped and then while it plays. Pass: it plays once and is selected each time, and INST opens on it.
@@ -1440,6 +1443,12 @@ Suggested order: N0 → N1 → N2 (phone cured) → N4 with N3 alongside → N5 
   the edge `R.t0`, "waiting…" while armed), `rcdClk` / `rcdFmt` / `rcdFreeSecs`, a 250 ms timer only while recording; the
   final length stays until the next take. recorder-check covers FREE, PATTERN, Stop, next take and closing mid-take.
 
+
+## 15 Nov (playback no longer changes a selection; build 624)
+
+Build 624, on `beta`. The owner: "Selecting upward, then pressing playback with selection on undoes the selection a phrase at a time." Cause: with Arrange beside Phrase its selection is `apSel` (`selA` belongs to the screen drawn), so `followPlay`'s "a selection keeps the cursor" guard did not see it and FOLLOW PATTERN set `cs.song.y` to the playing row at every change, the selection's moving end. Fix: the guard reads `selA || (apF && apSel)`; Arrange still pages. Reproduced and checked in headless Chrome (FOLLOW PATTERN, ON, OFF). The Song screen's own selection was already guarded.
+
+Tests added: `selection-playback` (source pin).
 
 ## 15 Nov (a line on the small command bar; the side panel's instrument list auditions; builds 622 and 623)
 
