@@ -3,6 +3,7 @@
 // native/tools/mix-dump.mjs (class Model).
 #include "mix/mix.h"
 #include "rt/num.h"
+#include "rt/dbl.h"
 
 #include <algorithm>
 #include <cmath>
@@ -46,7 +47,7 @@ double strToNumber(std::string_view s) {   // Number("...")
   if (!digits) return std::nan("");
   if (i < s.size() && (s[i] == 'e' || s[i] == 'E')) { i++; if (i < s.size() && (s[i] == '+' || s[i] == '-')) i++; size_t e = 0; while (i < s.size() && s[i] >= '0' && s[i] <= '9') { i++; e++; } if (!e) return std::nan(""); }
   if (i != s.size()) return std::nan("");
-  return std::strtod(std::string(s).c_str(), nullptr);
+  { double v = 0; parse_double(s, &v); return v; }
 }
 double toNumber(Json v) {   // +v
   switch (v.type()) {

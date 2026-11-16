@@ -31,6 +31,7 @@
 #include <set>
 
 #include "rt/jsmath.h"
+#include "rt/dbl.h"
 #include "rt/num.h"
 
 namespace thunder {
@@ -95,7 +96,7 @@ double strNum(std::string_view s) {   // Number(string), for the forms a song ca
   if (t == "Infinity" || t == "+Infinity") return kInf;
   if (t == "-Infinity") return -kInf;
   for (char ch : t) if (!((ch >= '0' && ch <= '9') || ch == '+' || ch == '-' || ch == '.' || ch == 'e' || ch == 'E')) return kNaN;
-  char* end = nullptr; const double v = std::strtod(t.c_str(), &end); return end && *end == 0 && end != t.c_str() ? v : kNaN;
+  double v; return parse_double(t, &v) ? v : kNaN;
 }
 double jnum(Json v) {   // +v
   switch (v.type()) { case JType::Number: return v.asNum(); case JType::Bool: return v.asBool() ? 1 : 0; case JType::Null: return 0; case JType::String: return strNum(v.asStr()); default: return kNaN; }

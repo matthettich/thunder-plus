@@ -377,6 +377,10 @@ static int run_chain() {
 // U14: the track-effect host under the guard: process (lanes, FXV, rest, sleep, telemetry, odd block sizes) and commit() of a plan made ahead.
 static int run_fx() {
   using namespace thunder;
+#ifndef THUNDER_HAVE_TFX
+  std::printf("rt_fx: not run on this platform: no DSP library (the effects are not built here)\n");
+  return 0;   // one part of the harness: the other parts' results stand; the message above says what was left out
+#else
   FxHost H(48000.0); FxEntry e[8]; const int types[8] = {6, 7, 8, 9, 4, 3, 28, 26};
   for (int i = 0; i < 8; i++) { const int id = types[i]; e[i].t = id; e[i].slot = i; e[i].on = i != 3; std::snprintf(e[i].key, kFxKey, "%d:%s", i, fx_key_of(id)); e[i].nvals = fx_param_count(id);
     for (int k = 0; k < e[i].nvals; k++) e[i].vals[k] = fx_param_default(id, k); fx_map(id, e[i].vals, 48000.0, 120.0, 0.0, e[i].p); }
@@ -397,6 +401,7 @@ static int run_fx() {
   delete p2; delete p3;
   if (H.laneDropped() || H.queueDropped()) { std::printf("rt_fx FAIL: dropped lanes %u queue %u\n", H.laneDropped(), H.queueDropped()); return 1; }
   std::printf("rt_fx ok: %d blocks, the track-effect host under the allocation guard\n", nb); return 0;
+#endif
 }
 
 int main(int argc, char** argv) {

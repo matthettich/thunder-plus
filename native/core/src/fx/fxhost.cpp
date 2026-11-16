@@ -113,8 +113,9 @@ FxPlan* FxHost::planFromSong(Json slots, double bpm, double restartN) {
 }
 
 // ---- audio thread ----------------------------------------------------------------------------------------------------------------------
+static const double kJsPi = 3.141592653589793;   // Math.PI (M_PI is not in MSVC's <cmath> without _USE_MATH_DEFINES)
 static void rvMix(double m, double* dry, double* wet) {   // rvMix(m): [cos(a), sin(a)^2]
-  const double a = (m < 0 ? 0 : m > 1 ? 1 : m) * M_PI / 2, s = std::sin(a);
+  const double a = (m < 0 ? 0 : m > 1 ? 1 : m) * kJsPi / 2, s = std::sin(a);
   *dry = std::cos(a); *wet = s * s;
 }
 void FxHost::applyEntry(Slot& s, const FxEntry& c) {

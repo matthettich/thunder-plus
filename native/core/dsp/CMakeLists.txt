@@ -62,7 +62,9 @@ endif()
 # U14: Fx::operator new zero-fills the object ("every effect starts in zeroed memory": members the effects never initialise rely on it, e.g.
 # DaisySP's Flanger::lfo_freq_). GCC deletes a store before the constructor runs (-flifetime-dse, the default), so natively that memset was
 # dropped and an effect started with whatever malloc returned; wasi-sdk's clang keeps it. Host builds only; the wasm objects are unchanged.
-if(NOT IS_WASM AND NOT MSVC)
+# The flag exists only in GCC (clang and MSVC reject or ignore it). For every compiler, tests/test_fxzero.cpp proves the zero-fill took place:
+# fx_alloc.h routes the effect sources' malloc through thunder_fx_malloc, which the test makes fill memory with a pattern.
+if(NOT IS_WASM AND CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
   set(OPT_COMMON ${OPT_COMMON} -fno-lifetime-dse)
 endif()
 set(OPT_FX  -O3 -ffast-math ${OPT_COMMON} -w)                                            # dsp/build.sh and tfx/build.sh
@@ -83,6 +85,9 @@ function(dsp_group lib name)
     foreach(h ${G_PRE})
       target_compile_options(${obj} PRIVATE "SHELL:-include ${h}")
     endforeach()
+    if(NOT IS_WASM AND lib STREQUAL "thunder_dsp_tfx")   # fx_alloc.h: after the other force-includes (it needs <stdlib.h> before it)
+      target_compile_options(${obj} PRIVATE "SHELL:-include ${CMAKE_CURRENT_SOURCE_DIR}/fx_alloc.h")
+    endif()
     target_compile_definitions(${obj} PRIVATE ${G_DEFS})
     target_include_directories(${obj} PRIVATE ${G_INCS})
     if(NOT IS_WASM)   # host_fx_state.h: the prepared stmlib/utils/random.h and DaisySP pitchshifter.h include it on host builds (prepare.sh)
@@ -123,6 +128,9 @@ set(RAND_SRC)
 if(NOT IS_WASM)   # U14: wasi-libc's rand() (wasi_rand.cpp); the wasm build is unchanged
   set(RAND_PRE ${CMAKE_CURRENT_SOURCE_DIR}/wasi_rand.h)
   set(RAND_SRC ${CMAKE_CURRENT_SOURCE_DIR}/wasi_rand.cpp)
+endif()
+if(NOT IS_WASM)
+  target_sources(thunder_dsp_tfx PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/fx_alloc.cpp)   # thunder_fx_malloc / thunder_fx_poison (fx_alloc.h)
 endif()
 dsp_group(${T} core OPTS ${OPT_FX} INCS ${SRC}/tfx SRCS ${SRC}/tfx/tfx.cc ${SRC}/tfx/fx_extra.cc ${RAND_SRC})
 # (U14 diagnosis: the sanitizer build instruments Clouds again. The read past lut_window and the shift by 32 it found are patched in third_party/prepare.sh.)

@@ -1,6 +1,6 @@
 // U14: shared by fx-table.mjs and fx-dump.mjs. Cuts the page's track-effect command layer (TFX, normTfx, tfxChain, ...) and the real
 // ThunderFx worklet source (TFX_SRC) out of index.html with acorn, runs them in Node's vm. Reads index.html with \r\n -> \n. Needs acorn
-// (ACORN env, /opt/npm-tools/node_modules, <repo>/node_modules, /usr/lib/node_modules, /usr/local/lib/node_modules); exit 77 (skipped) when missing.
+// (ACORN env, /opt/npm-tools/node_modules, <repo>/node_modules, /usr/lib/node_modules, /usr/local/lib/node_modules); exit 77 (skipped) when missing, exit 1 when the environment variable CI is set (GitHub Actions sets it: a missing acorn there must fail, not skip).
 import fs from 'node:fs';
 import path from 'node:path';
 import vm from 'node:vm';
@@ -14,7 +14,7 @@ const rd = f => fs.readFileSync(path.join(ROOT, f), 'utf8').replace(/\r\n/g, '\n
 function findAcorn() {
   for (const d of [process.env.ACORN, '/opt/npm-tools/node_modules', path.join(ROOT, 'node_modules'), '/usr/lib/node_modules', '/usr/local/lib/node_modules'])
     if (d && fs.existsSync(path.join(d, 'acorn'))) return createRequire(path.join(d, 'x.js'))(path.join(d, 'acorn'));
-  console.error('fx-src: acorn not found (set ACORN to the folder that holds it); skipped'); process.exit(77);
+  console.error('fx-src: acorn not found (set ACORN to the folder that holds it)' + (process.env.CI ? '; CI: this is a failure, the workflow must install acorn' : '; skipped')); process.exit(process.env.CI ? 1 : 77);
 }
 
 let CACHE = null;

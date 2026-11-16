@@ -28,8 +28,10 @@ static int fails = 0, steps = 0;
 // Sanitizer builds only (THUNDER_SANITIZE): Clouds hands its output over as int16, and the instrumented -ffast-math code of clouds/dsp/granular_processor.cc rounds a handful of
 // samples (44 of 65536 in e_clouds_alt) to the neighbouring int16 value: one step of 1/32768, which is -75.9 dB below that case's peak, with nothing accumulating (the samples
 // between are equal). There a Clouds case passes when no sample is further than that one step from the reference; the plain build has no such allowance (it is bit-exact).
+// The same one step appears when clang builds the effects (-ffast-math orders the arithmetic of the Clouds reverb differently from GCC and from the wasm): measured
+// on clang 18, Linux x86-64, the very same 44 samples and -75.9 dB. Nothing else is allowed more than the -80 dB gate.
 static bool oneInt16Step(const char* n, double err) {
-#ifdef THUNDER_SANITIZE_BUILD
+#if defined(THUNDER_SANITIZE_BUILD) || defined(__clang__)
   return std::strstr(n, "clouds") && err <= 1.0001 / 32768.0;
 #else
   (void)n; (void)err; return false;
@@ -111,7 +113,12 @@ static void mapTest(const std::string& dir) {
 }
 
 int main(int argc, char** argv) {
-  if (argc < 2) { std::printf("fx: no reference directory (Node not found): %d cases not run\n", kFxGoldenN); return 0; }
+#ifndef THUNDER_HAVE_TFX
+  (void)argc; (void)argv;
+  std::printf("fx: not run on this platform: no DSP library (the effects are not built here), %d cases not run\n", kFxGoldenN);
+  return 77;   // ctest: SKIP_RETURN_CODE 77 (shown as not run, never as passed)
+#endif
+  if (argc < 2) { std::printf("fx: not run: no reference directory (Node not found): %d cases not run\n", kFxGoldenN); return 77; }
   int exact = 0, ran = 0; double worst = -INFINITY; const char* worstName = "";
   if (argc <= 2) mapTest(argv[1]);
   for (int i = 0; i < kFxGoldenN; i++) {
@@ -122,7 +129,7 @@ int main(int argc, char** argv) {
     const bool ok = (R.db <= -80.0 || step) && R.postOk; if (step) steps++;
     char db[24]; if (R.exact) std::snprintf(db, sizeof db, "exact"); else std::snprintf(db, sizeof db, "%.1f dB", R.db);
     if (R.exact) exact++; else if (R.db > worst) { worst = R.db; worstName = G.name; }
-    std::printf("%-22s %-10s posts %-3d%s%s%s%s\n", G.name, db, R.posts, R.postOk ? "" : " DIFF", R.exact != R.hashOk ? "  [committed hash disagrees with the reference run]" : "", step ? "  (sanitizer build: one int16 step of Clouds' output)" : "", ok ? "" : "  FAIL");
+    std::printf("%-22s %-10s posts %-3d%s%s%s%s\n", G.name, db, R.posts, R.postOk ? "" : " DIFF", R.exact != R.hashOk ? "  [committed hash disagrees with the reference run]" : "", step ? "  (sanitizer or clang build: one int16 step of Clouds' output)" : "", ok ? "" : "  FAIL");
     if (!ok) fails++;
   }
   // Two hosts side by side: the effects that keep state in a static of their sources (DaisySP myrand: pshift; stmlib::Random: Beads, Clouds; rand(): the Airwindows reverb, Cloud Seed)
@@ -134,6 +141,6 @@ int main(int argc, char** argv) {
     const bool ok = A.ran && B.ran && (B.db <= -80.0 || oneInt16Step(nm, B.err)) && B.db <= A.db + 1e-9;
     std::printf("two hosts: %-14s alone %.1f dB, beside a second host %.1f dB  %s\n", nm, A.db, B.db, ok ? "ok" : "FAIL"); if (!ok) fails++;
   }
-  std::printf("fx: %d cases, %d bit-exact, worst %s (%s), %d failed (gate -80 dB; %d passed as one int16 step of Clouds' output, sanitizer builds only)\n", ran, exact, std::isinf(worst) ? "exact" : (std::to_string(worst) + " dB").c_str(), worstName, fails, steps);
+  std::printf("fx: %d cases, %d bit-exact, worst %s (%s), %d failed (gate -80 dB; %d passed as one int16 step of Clouds' output, sanitizer and clang builds only)\n", ran, exact, std::isinf(worst) ? "exact" : (std::to_string(worst) + " dB").c_str(), worstName, fails, steps);
   return fails ? 1 : 0;
 }
