@@ -183,3 +183,8 @@ N1 step 10.
 - 12:45 **#189 U22 merged** (all CI green after the macOS fix). **Web build 633 is on `beta` and `main`** (the Bytebeat hang; the one web change today, at the
   owner's word). Starting now: U23 (`n3/u23`) and U24 (`n3/u24`, after its first small PR `n1/bbexpr-const` for the native Bytebeat fix), one Sonnet worker each.
   Not started: U28, U29 (after U23 / U24, if before 17:45). Everything in sections A, B and D is done.
+- 12:50 Both workers active. **#192 U23 open, CI running. #191 (native Bytebeat fix) open and RED on macOS and Windows:** `modfx` "bbexpr: '(t&&5)+1' … got 1
+  want 0": the C++ is right, the committed reference came from the old JS (it had the bug). **Manager's decision (for Fable to confirm):** on `n1/bbexpr-const`
+  apply build 633's two lines to `native`'s own copies of BBExpr (index.html, chains and waves worklets: the one edit allowed outside `native/`), regenerate the
+  Bytebeat reference from the fixed JS, and list in the PR every changed row (only `&& constant` / `|| constant` formulas may change; anything else: stop).
+  Sent to the U24 worker, who does it before going on with U24 (`n3/u24` is pushed, work in progress).
