@@ -57,3 +57,90 @@ Evidence:
 - Producers: the pump repo's `wasm/build.sh` (header lines 2-14: "then copy OUT/pump.wasm and OUT/pump-meta.js to thunder-plus/pump/ ... and bump their ?v= there": a manual step). thunder-plus beta has no workflow that builds pump.wasm: .github/workflows has only beta-web.yml (copies beta to beta/ via tools/make-channel.sh), desktop.yml, lockfile.yml, tests.yml; pump's own .github/workflows/build.yml (deb07d3) has no step copying into thunder-plus (grep for wasm/thunder: only the ROOM page line). The history of pump/pump.wasm on beta is squashed. The native tree builds its own pump.wasm from the pin via native/tools/build-wasm.sh (CMake, wasi-sdk 25) for parity tests only; it never writes pump/pump.wasm in the web app.
 - The synth pair is different: PINS.md:55-56 says pump-synth.wasm is byte-identical to the pin's build (not re-measured by me).
 Not checked: the pump repo's older commits (stamp-only check done at the pin); wasi-sdk rebuild; whether some other pump-side workflow in another repo pushes the files.
+
+# Review B1 + B3 (read-only; no code changes, nothing compiled)
+
+Branch `native` (C++) vs `beta` worktree /home/claude/wt/beta-ref (JS). Line numbers marked "~" are approximate.
+Pre-check: JS blocks (FlexCore..TFX, DegradeCore, PitchFxCore, applyFx, rvMix, chains shared block) are identical on native and beta.
+`node native/tools/flex-spec.mjs --check` prints "flexspec.inc is current".
+
+## B1  C++ vs JS differences
+
+No operation-order, state init/reset, or js_* routing differences found in clkcores, idmcores, u17cores, Pitch correct or the BBExpr compiler.
+All findings below are edge cases.
+
+### B1-1  BBExpr exec hang via op 77/78 quirk  (severity HIGH/MEDIUM; confidence high, reproduced under node with a timeout)
+- C++: native/core/src/modfx/bbexpr.cpp ~244-273 (unbounded `while (i < N)`, cases 50, 51, 77, 78)
+- JS: chains/chains-worklet.js BBExpr exec, cases 50/51/77/78 (~4480+)
+- The port is faithful, so JS hangs identically. A constant 50 or 51 operand is executed as a jump op.
+  `(t && 51) + a` hangs at t=0; `(t || 51) + a` hangs when t != 0.
+- Matters: user text (U29 pad engine) can freeze the audio thread. The 16 built-in formulas (bb_list.inc) are safe.
+- Suggested fix (deviates from JS, so a decision for the owner): cap executed steps per exec.
+- Also counts as a B3 item.
+
+### B1-2  PK_tup out-of-bounds read  (LOW; confidence medium-high)
+- C++: clkcores.cpp ~132 `kTup[(int)j]`; JS: index.html ~19193
+- j = -1 when p is within 1e-9 below a beat boundary (5-TUPLET FEEL, q==5). JS reads undefined, giving NaN for one sample. C++ is UB.
+
+### B1-3  bp[] reads past bpn  (LOW; confidence medium; currently unreachable)
+- C++: clkcores.cpp:62 clk_spb `bp[n-1]`; :313 StepGateCore `bp[i]`. JS reads undefined if 1 < bpn < n.
+- fxhost.cpp:249-251 guarantees bpn == n or 1, so safe there.
+- modfx/mod_clk.cpp BeatClock sets n_ from the first block; bp_[i>=n_] would be stale 0.0 if ctx.block grows later.
+
+### B1-4  pad_pitchfx null param  (LOW; confidence medium)
+- C++: u17cores.cpp:183-184. JS `3 + null*4` = 3 (valid tail). C++ cannot hold null, so it becomes NaN and an empty vector is returned.
+- JSON.stringify(NaN) gives null, so this is reachable from saved state.
+
+### B1-5  sinT index 4097  (LOW/INFO; confidence medium)
+- C++: modfx/util.h sinT. Tiny negative p gives p - floor(p) = 1, reading index 4097 of a 4097-entry table. JS yields NaN.
+
+### B1-6  fxHermAt index conversion  (LOW; confidence medium)
+- C++: modfx/bfutil.h `i32(i)-1`; JS uses ToInt32(i-1). Differs only for NaN/Inf/huge positions.
+
+### B1-7  NaN to int casts, int overflow  (LOW; confidence medium)
+- mod_gen.cpp Bytebeat `(int32_t)clamp(js_round(p[2]),0,255)` is UB for NaN (JS stores 0). Same pattern as `(int)NaN` in mod_cv PitchTrk.
+- mod_voice PitchCorrect `++miss` int overflow after about 66 days continuous.
+
+### B1-8  BBExpr tokenizer works on bytes  (LOW/INFO; confidence medium)
+- bbexpr.cpp tokenizer and length check use bytes, not UTF-16 units. Changes error position/message only.
+
+### B1-9  StepGateCore past-15 pattern  (INFO; confidence high)
+- C++ gives an empty mask where the JS throws. Documented in the source.
+
+## B3  Real-time safety of process paths
+
+Confirmed known (not re-reported): mod_mods.cpp make()/m_.reset() reached from run()/open() in process; U17 pad_* return std::vector;
+FFTR::get/hann (mutex + allocation) are called only from constructors. Pump slot wake-up was not examined (outside the files read).
+
+### B3-1  BBProg::exec unbounded  (HIGH/MEDIUM) - same as B1-1.
+
+### B3-2  Lazy statics in modfx::find()/regAll()  (LOW; confidence medium)
+- modfx/modfx.cpp:20-31 allocate on first call. Safe only if first called on the control thread.
+
+### B3-3  No ctx.block <= kBlock (128) check  (LOW/MEDIUM; confidence medium)
+- mod_mods `cp()` and `fill(kBlock)` assume it. Only Convolve handles other block sizes. A larger host block would overrun fixed buffers.
+
+### B3-4  Bounded but heavy (RT cost, not violations)
+- mod_convolve.cpp `ready()` (:137) and process (:78) generate the first IR synchronously (terminates: finish() sets ready=inf). setup() is about 0.5-1 ms per IR change.
+- Spectral/XStretch frame work lands in a single block (spike).
+- mod_cv PitchTrk detection up to about 398x320 with two int `%` per iteration, every 4th block.
+
+### B3-5  Loops confirmed bounded
+u17 `while (rp < 0)`; Chaos n<8; Bytebeat module `while (ph_ >= 1)` (at most 5); fxhost queue loops (psetAt checks capacity);
+XStretch; Convolve jobStep; Flex euclid loop (at most 16); Life (mod_misc.cpp ~198-240) loops are fixed 8x16x9, no allocation.
+
+### B3-6  No new/push_back/resize/throw/locks found
+In any process body read or grepped, other than the known items. All `.init(` calls are in constructors. Static-local arrays are constant-initialized.
+
+## Coverage
+
+Read in full (C++): native/core/src/fx/clkcores.cpp/.h, fx/idmcores.cpp/.h, fx/u17cores.cpp/.h, fx/fxhost.cpp,
+modfx/bbexpr.cpp/.h, modfx/mod_clk.cpp, modfx/modfx.cpp/.h, modfx/util.h, modfx/bfutil.h.
+Read in full (JS): beta-ref index.html ~18970-19480 (clkSpb, FlexCore, StepGateCore, RetrigCore, beatLock, bkHash, Grains/Scramble/VSamp/GlitchCore),
+DegradeCore, ResonCore, PitchFxCore, applyFx, rvMix; chains/chains-worklet.js fx helpers + Pitch correct (~3984-4140), BBExpr (4480+),
+Bytebeat/Chaos (4927+), fxBeats/FlexM/StepGateM/RetrigM (2905-2975). Docs: TODAY.md section B, TONIGHT.md review queue.
+Read in part: mod_mods.cpp (10-100), mod_voice.cpp (1-200), mod_gen.cpp (100-181), mod_spectral.cpp (20-330), mod_convolve.cpp (1-572),
+mod_cv.cpp (139-162, 470-546), mod_reverbs.cpp (60-80, 120-140), mod_delays.cpp (15-24), mod_misc.cpp (Life, ~196-245), flexspec.inc (head; verified by tool).
+Grep only (process bodies not read): mod_basic.cpp, mod_stereo.cpp, mod_filters.cpp, rest of mod_misc/mod_delays/mod_reverbs/mod_cv/mod_voice,
+fftr.cpp/h, fxbank.cpp, fxmap.cpp. B3 "none found" for these rests on grep for new/push_back/resize/throw/lock/vector only.
+Scratch files in /tmp/rv only; nothing created in the repo.
