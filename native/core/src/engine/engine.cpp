@@ -7,6 +7,7 @@
 #include <cstring>
 #include <vector>
 
+#include "engine/layer_u24.h"
 #include "fx/u17cores.h"
 #include "rt/jsmath.h"
 
@@ -72,6 +73,7 @@ uint32_t EngSeedCounter::next() {
 }
 
 LType eng_layer_type(const char* name, size_t n) {
+  { const LType u = u24_layer_type(name, n); if (u != LType::Other) return u; }   // U24
   static const struct { const char* s; LType t; } T[] = {{"sine", LType::Sine}, {"tri", LType::Tri}, {"saw", LType::Saw}, {"square", LType::Square}, {"pulse", LType::Pulse},
     {"white", LType::White}, {"pink", LType::Pink}, {"brown", LType::Brown}, {"blue", LType::Blue}, {"metal", LType::Metal}, {"lfsr", LType::Lfsr}, {"dust", LType::Dust}, {"grit", LType::Grit},
     {"click", LType::Click}, {"wavetable", LType::Wavetable}, {"pd", LType::Pd}, {"chip", LType::Chip}, {"supersaw", LType::Supersaw}, {"pwm", LType::Pwm}, {"sample", LType::Sample}, {"grains", LType::Grains}};
@@ -102,6 +104,7 @@ struct Osc {
   LayerOsc x;   // U23: click, wavetable, pd, chip, supersaw, pwm, sample, grains
   // dust / grit
   double p = 0, cf = 0, k = 0, y = 0, cg = 0, accg = 1;
+  U24Osc u24;   // U24: FM / additive / karplus / vosim / formant (layer_u24.h)
 
   void init(const EngLayer& L, double sr) {
     const double A = L.a, B = L.b; t = L.type; R.reseed(orv(L.seed, 7));   // rng(L.seed || 7)
@@ -120,10 +123,10 @@ struct Osc {
       case LType::Lfsr: mult = js_pow(2, A * 8 - 1) * 16; shortLoop = B >= 0.5; reg = 0x7fff; acc = 0; out = 1; break;
       case LType::Dust: p = A * A * 0.25 * 48000 / sr; cf = 0.03 + B * 0.97; k = 1.5 / (0.2 + cf); y = 0; break;
       case LType::Grit: mult = js_pow(2, B * 6) * 4; cg = 1 - A * 0.995; accg = 1; held = 0; y = 0; break;
-      default: if (LayerOsc::handles(t)) x.init(L, sr, R); break;
+      default: if (LayerOsc::handles(t)) x.init(L, sr, R); else if (u24_is(t)) u24.init(L, sr, R); break;
     }
   }
-  void blk(double inc) { x.blk(inc); }
+  void blk(double tm, double env, double inc) { x.blk(inc); if (u24_is(t)) u24.blk(tm, env, inc); }   // osc.blk(t, e0, inc)
 
   double s(double inc) {
     switch (t) {
@@ -165,7 +168,7 @@ struct Osc {
         const double imp = R.next() < p ? (R.next() * 2 - 1) : 0; y += (imp - y) * cf; return jmax(-1, jmin(1, y * k)); }
       case LType::Grit: {
         accg += inc * mult; if (accg >= 1) { accg -= std::floor(accg); held = R.next() * 2 - 1; } y += (held - y) * cg; return y; }
-      default: return LayerOsc::handles(t) ? x.s(inc, R) : 0;
+      default: return LayerOsc::handles(t) ? x.s(inc, R) : u24_is(t) ? u24.s(inc, R) : 0;
     }
   }
 };
@@ -263,7 +266,7 @@ void renderLayer(const EngLayer& L, const EngVoice& V, double bpm, double sr, fl
     const double e0 = ePrev, e1 = ampAt((i + BLK) / sr); ePrev = e1;
     const EngMod mo = eng_voice_mod(V, t, bpm);
     const double inc = f0 * js_pow(2, (pA * js_exp(-t / ptau) + (gPA != 0 ? gPA * js_exp(-((d0 + i) / sr) / gPtau) : 0) + mo.pitch) / 12) / sr;
-    osc.blk(inc);   // osc.blk(t, e0, inc): only the wavetable has one
+    osc.blk(t, e0, inc);   // the wavetable (U23) and the FM / additive layers (U24) have one
     if (lpOn || hpOn) {
       const double fe = fenv(t);
       if (hpOn) { const double fc = jmin(jmax(L.hpCut * js_pow(2, L.hpEnv * 8 * fe + mo.hpcut), 10), nyq), gg = js_tan(3.141592653589793 * fc / sr);
@@ -356,7 +359,7 @@ size_t eng_render_bound(const EngVoice& V0, const EngRenderOpts& o) {
 int eng_render_voice(const EngVoice& V0, const EngRenderOpts& o, float* out, size_t cap, size_t* nOut) {
   const double sr = o.sr;
   EngVoice V = V0; applyHold(V, o);
-  for (int i = 0; i < V.nLayers; i++) { const EngLayer& L = V.layers[i]; if (L.on && L.level > 0 && !eng_type_supported(L.type)) return kEngUnsupported; }
+  for (int i = 0; i < V.nLayers; i++) { const EngLayer& L = V.layers[i]; if (L.on && L.level > 0 && (!eng_type_supported(L.type) || !u24_layer_ok(L))) return kEngUnsupported; }
   const size_t bound = eng_render_bound(V0, o);
   if (bound == 0 || cap < bound) return kEngTooSmall;
   const Plan p = planOf(V, o);

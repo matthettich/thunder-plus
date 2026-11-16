@@ -52,7 +52,9 @@ struct EngRng {                        // rng(seed): xorshift32, returns s / 2^3
 struct EngSeedCounter { uint32_t state = 1000; uint32_t next(); };
 
 // ---- parameters (mkVoice, freshLayer) -----------------------------------------------------------------------------------------------------------------
-enum class LType : uint8_t { Sine, Tri, Saw, Square, Pulse, White, Pink, Brown, Blue, Metal, Lfsr, Dust, Grit, Click, Wavetable, Pd, Chip, Supersaw, Pwm, Sample, Grains, Other };
+enum class LType : uint8_t { Sine, Tri, Saw, Square, Pulse, White, Pink, Brown, Blue, Metal, Lfsr, Dust, Grit, Click, Wavetable, Pd, Chip, Supersaw, Pwm, Sample, Grains,
+  Fm2, Fmfb, Fmmetal, Fmcross, Fm4, Fm6, Genesis, Sb, Arcade, Addsaw, Addodd, Membrane, Bell, Bar, Chord, Formant, Karplus, Vosim,   // U24 (layer_u24.h): keep these contiguous
+  Other };
 LType eng_layer_type(const char* name, size_t n);   // the layer's `type` string; Other for a type this unit does not port (the JS's own names for all of them: see TYPES)
 bool eng_type_supported(LType t);
 
