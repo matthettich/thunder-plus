@@ -21,3 +21,6 @@ fm2 fmfb fmmetal fmcross fm4 fm6 genesis sb arcade, addsaw addodd membrane bell 
 
 ## Not sure
 - Nothing in the factory voices uses a knob outside 0..1; the `edge_over_*` / `edge_under_*` cases cover the JS behaviour there (slice with a negative end, algorithm clamps).
+
+## CI time (Linux job, about 29 min on a 191 run: GCC build+ctest 8.5 min, clang 16 min with build, sanitizers 11.5 min)
+The three ctest passes each run every `*_ref` (Node makes the reference; about 266 s per pass locally: engine_ref 75, fxidm 50, modfx 38, fxclk 28, fxu17 22, master 22) and every `*_golden_current` (about 264 s: it proves the committed hashes against Node, independent of the C++ compiler). A cheap cut that changes no gate: run `*_golden_current` only in the GCC pass (`ctest -E _golden_current` in the clang and sanitizer passes), saving about 4 min each. Not done here: `.github/` is outside `native/` and `docs/port/`.
