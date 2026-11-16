@@ -397,3 +397,23 @@ if(NODE_EXE)
 else()
   add_test(NAME engine_u23 COMMAND test_engine_u23)   # no directory: prints FAIL and exits 1
 endif()
+
+# U28: the rendered-only engines tone, modal, swarm, drift, piano, ep, organ, breath, strings, fmdrum, wind, phase, partials, skin and chip (core/src/engine/xeng_*.cpp) against the real ENGINE block (tools/engine-xeng-dump.mjs)
+# and beta's tests/golden/engines.json (the committed engine_xeng_voices_golden.inc): the factory voices of these engines, SHA-256 bit-exact, and the direct cases against the committed Linux hashes (engine_xeng_golden.inc).
+add_executable(test_engine_xeng test_engine_xeng.cpp)
+target_link_libraries(test_engine_xeng PRIVATE thunder_core)
+target_include_directories(test_engine_xeng PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../core/src ${CMAKE_CURRENT_SOURCE_DIR})
+if(NOT MSVC)
+  target_compile_options(test_engine_xeng PRIVATE -Wall -Wextra)
+endif()
+if(NODE_EXE)
+  add_test(NAME engine_xeng_ref COMMAND ${NODE_EXE} ${CMAKE_CURRENT_SOURCE_DIR}/../tools/engine-xeng-dump.mjs ${CMAKE_CURRENT_BINARY_DIR}/engine-xeng-ref)
+  set_tests_properties(engine_xeng_ref PROPERTIES FIXTURES_SETUP engine_xeng_ref)
+  add_test(NAME engine_xeng COMMAND test_engine_xeng ${CMAKE_CURRENT_BINARY_DIR}/engine-xeng-ref ${CMAKE_CURRENT_SOURCE_DIR}/golden/engine_xeng_voices.json)
+  set_tests_properties(engine_xeng PROPERTIES FIXTURES_REQUIRED engine_xeng_ref)
+  if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    add_test(NAME engine_xeng_golden_current COMMAND ${NODE_EXE} ${CMAKE_CURRENT_SOURCE_DIR}/../tools/engine-xeng-dump.mjs --check)
+  endif()
+else()
+  add_test(NAME engine_xeng COMMAND test_engine_xeng)   # no directory: prints FAIL and exits 1
+endif()

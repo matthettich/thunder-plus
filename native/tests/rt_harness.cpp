@@ -19,6 +19,7 @@
 #include "modfx/mods.h"
 #include "render/render.h"
 #include "engine/engine.h"
+#include "engine/xeng.h"
 #include "voice/voice.h"
 
 #include <cmath>
@@ -568,6 +569,25 @@ done:
   std::printf("rt_engine_u23 ok: %d voice renders (%zu samples) under the allocation guard\n", renders, total); return 0;
 }
 
+// U28: the rendered-only engines under the guard: every engine of the unit that is meant not to allocate (all but strings and wind, whose delay lines are Float32Arrays sized from the pitch: std::vector here, an offline render)
+// renders into a caller's buffer, over and over. (A voice with the four JS pad effects allocates: U17's pad_* return std::vector.) Drift's chip-sized delay line lives on the stack.
+static int run_engine_xeng() {
+  using namespace thunder;
+  static const char* const kinds[13] = {"tone", "modal", "swarm", "drift", "piano", "ep", "organ", "breath", "fmdrum", "phase", "partials", "skin", "chip"};
+  std::vector<XengVoice> vs(13); std::vector<std::vector<float>> bufs; std::vector<EngRenderOpts> os(13);
+  for (int i = 0; i < 13; i++) { XengVoice& V = vs[i]; V.kind = xeng_kind(kinds[i], std::strlen(kinds[i])); V.level = -3; V.drive = i % 3 == 0 ? 0.3 : 0; V.len = 0.6; os[i].hold = i % 2 ? 0.3 : 0; }
+  vs[2].swarm.voices = 24; vs[2].swarm.scatter = 0.5; vs[2].swarm.shimmer = 0.4; vs[2].swarm.bloom = 200; vs[3].drift.voices = 4; vs[3].drift.age = 0.8; vs[4].piano.strings = 3; vs[6].organ.rotary = 2; vs[6].organ.perc = 1; vs[6].organ.d4 = 5;
+  vs[10].partials.count = 128; vs[10].partials.famt = 0.5; vs[1].modal.modes = 24; vs[1].modal.exc = 2; vs[7].breath.grain = 0.5; vs[7].breath.bands = 8;
+  for (size_t i = 0; i < vs.size(); i++) { bufs.emplace_back(xeng_render_bound(vs[i], os[i]) + 1); if (bufs[i].size() < 2) { std::printf("rt_engine_xeng FAIL: bound 0 (%s)\n", kinds[i]); return 1; } }
+  size_t total = 0; int renders = 0;
+  { rt_guard g;
+    for (int rep = 0; rep < 3; rep++) for (size_t i = 0; i < vs.size(); i++) { size_t n = 0; const int st = xeng_render_voice(vs[i], os[i], bufs[i].data(), bufs[i].size() - 1, &n); if (st != kEngOk) { total = 0; goto done; } total += n; renders++; }
+  }
+done:
+  if (!total) { std::printf("rt_engine_xeng FAIL: a render failed\n"); return 1; }
+  std::printf("rt_engine_xeng ok: %d voice renders (%zu samples) of 13 engines under the allocation guard\n", renders, total); return 0;
+}
+
 int main(int argc, char** argv) {
   if (argc > 1 && std::strcmp(argv[1], "--selftest") == 0) return selftest();
   if (int r = run_logger()) return r;
@@ -584,5 +604,6 @@ int main(int argc, char** argv) {
   if (int r = run_fxu17()) return r;
   if (int r = run_engine_u23()) return r;
   if (int r = run_engine()) return r;
+  if (int r = run_engine_xeng()) return r;
   return run_song();
 }
