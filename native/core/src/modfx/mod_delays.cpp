@@ -17,7 +17,7 @@ const ParamDef kDlP[] = {{"time", 10, 0, 2000, .1}, {"fine", 0, -1, 1, .001}, {"
 class DelayLine : public Module {
  public:
   explicit DelayLine(double sr, Seeds&) {
-    const int N = 1 << (int)std::ceil(std::log2(sr * 2.1 + 8)); M_ = N - 1; b_.init(N);
+    const int N = 1 << (int)std::ceil(js_log2(sr * 2.1 + 8)); M_ = N - 1; b_.init(N);
   }
   void process(const IO& io, const Ctx& c) override {
     const double* p = io.p; const double sr = c.sr; const In X = inp(io, 0), T = inp(io, 1); const Out O = outp(io, 0); const int32_t M = M_;

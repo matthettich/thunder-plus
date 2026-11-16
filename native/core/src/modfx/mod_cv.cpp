@@ -1,6 +1,5 @@
 // MODFX control / CV modules (chains-worklet.js 719 to 1036 and 1379 to 1603, 1873 to 2000): Envelope follower, Gate extract, Slew, Sample & hold, Quantizer, Math, Logic, Steps, Clock, Clock multiplier,
-// Chance gate, Counter, Step switch, Burst, Gate delay, Flip-flop, Rectify, Scale / map, Comparator, Switch, Crossfade, Constant, Divider, Euclidean. Pitch follow / Pitch track and
-// Scope are not here (see U19-NOTES.md). Each process() keeps the JS's statements and arithmetic order.
+// Chance gate, Counter, Step switch, Burst, Gate delay, Flip-flop, Rectify, Scale / map, Comparator, Switch, Crossfade, Constant, Divider, Euclidean. Scope is not here (see U19-NOTES.md). Each process() keeps the JS's statements and arithmetic order.
 #include <vector>
 
 #include "modfx/mods.h"
@@ -470,6 +469,82 @@ class Euclid : public Module {
   Restart rs_; double step_ = -1, ph_ = 1; bool lc_ = false, lr_ = false;
 };
 
+// ---- Pitch follow --------------------------------------------------------------------------------------------------------------------
+const PortDef kPfOut[] = {{"out", "cv"}, {"gate", "gate"}};
+const ParamDef kPfP[] = {{"thr", .02, 0, 1, .001}, {"glide", .05, 0, .5, .001}, {"depth", 1, 0, 1, .01}, {"min", 60, 40, 500, 1}, {"max", 1400, 100, 4000, 1}};
+class PitchFol : public Module {
+ public:
+  PitchFol(double, Seeds&) : buf_(4096) {}
+  void process(const IO& io, const Ctx& c) override {
+    const double* p = io.p; const int N = buf_.n; double peak = 0; const In X = inp(io, 0);
+    for (int i = 0; i < c.block; i++) {
+      const double x = X[i]; buf_[w_] = x; w_ = (w_ + 1) % N; if (filled_ < N) filled_++;
+      const double a = std::fabs(x); if (a > peak) peak = a;
+    }
+    const int M = filled_; int cross = 0; double prev = buf_[(w_ - M + N * 2) % N];
+    for (int i = 1; i < M; i++) { const double s = buf_[(w_ - M + i + N * 2) % N]; if ((s >= 0) != (prev >= 0)) cross++; prev = s; }
+    const double f = M > 1 ? cross * 0.5 * c.sr / M : 0;
+    voiced_ = peak > p[0] && f >= p[3] && f <= p[4] ? 1 : 0;
+    if (voiced_) f_ = f;
+    const double g = 1 - js_exp(-c.block / (c.sr * jmax(p[1], 1e-4)));
+    const double target = voiced_ ? clamp(0.5 + js_log2(jmax(f_, 1) / 440) / 8, 0, 1) : ph_;
+    ph_ = clamp(ph_ + (target - ph_) * g, 0, 1);
+    outp(io, 0).fill(kBlock, ph_ * p[2]); outp(io, 1).fill(kBlock, voiced_);
+  }
+ private:
+  F32 buf_; int w_ = 0, filled_ = 0; double ph_ = .5; int voiced_ = 0; double f_ = 0;
+};
+
+// ---- Pitch track ---------------------------------------------------------------------------------------------------------------------
+const PortDef kPtOut[] = {{"out", "cv"}, {"note", "cv"}, {"gate", "gate"}, {"trig", "gate"}, {"env", "cv"}};
+const ParamDef kPtP[] = {{"sens", .15, .03, .5, .01}, {"thr", .02, 0, 1, .001}, {"glide", .03, 0, .5, .001}, {"trans", 0, -24, 24, 1}, {"min", 60, 30, 500, 1}, {"max", 1200, 100, 3000, 1}, {"depth", 1, 0, 1, .01}};
+class PitchTrk : public Module {
+ public:
+  PitchTrk(double, Seeds&) : buf_(1024), d_(400) {}
+  void process(const IO& io, const Ctx& c) override {
+    const In x = inp(io, 0); const double sr = c.sr, *P = io.p; const int B = c.block, N = buf_.n; double pk = 0;
+    const double cc = 1 - js_exp(-2 * kPi * (sr / 20) / sr);
+    for (int i = 0; i < B; i++) {
+      const double v = x[i]; lp1_ += (v - lp1_) * cc; lp2_ += (lp1_ - lp2_) * cc;
+      if (++dec_ >= 4) { dec_ = 0; buf_[w_] = lp2_; w_ = (w_ + 1) % N; if (n_ < N) n_++; }
+      const double a = v < 0 ? -v : v; if (a > pk) pk = a;
+    }
+    env_ += (pk - env_) * (pk > env_ ? .5 : .05);
+    if (++k_ >= 4 && n_ >= N) {
+      k_ = 0;
+      const double rs = sr / 4, W = 320, tMin = jmax(2, std::floor(rs / jmax(P[5], P[4] + 1))), tMax = jmin(d_.n - 2, std::ceil(rs / jmax(20, P[4])));
+      const int o = (int)jmod(w_ - W - tMax - 1 + N * 2, N); double run = 0; int best = -1;
+      d_[0] = 1;
+      for (int t = 1; t <= tMax; t++) {
+        double s = 0; for (int j = 0; j < 320; j++) { const double q = (double)buf_[(o + j) % N] - (double)buf_[(o + j + t) % N]; s += q * q; }
+        run += s; d_[t] = run > 0 ? s * t / run : 1;
+        if (best < 0 && t > tMin && (double)d_[t - 1] < P[0] && (double)d_[t] >= (double)d_[t - 1]) { best = t - 1; break; }
+      }
+      double f = 0;
+      if (best > tMin) {
+        const double a = d_[best - 1], m = d_[best], z = d_[best + 1], den = a - 2 * m + z;
+        const double tt = best + (den > 1e-9 ? (a - z) / (2 * den) : 0); f = rs / tt;
+      }
+      const bool voiced = env_ > P[1] && f >= P[4] && f <= P[5];
+      if (voiced) {
+        f_ = f;
+        const double nn = js_round(69 + 12 * js_log2(f / 440));
+        if (nn == cand_) candN_++; else { cand_ = nn; candN_ = 1; }
+        if (candN_ >= 2 && nn != note_) { note_ = nn; trig_ = std::ceil(.005 * sr / B) + 1; }
+      } else if (ver_) { note_ = -1; cand_ = -1; }
+      ver_ = voiced ? 1 : 0;
+    }
+    const double g = 1 - js_exp(-B / (sr * jmax(P[2], 1e-4))), tr = P[3] / 96;
+    const double target = ver_ && f_ > 0 ? jmax(0, jmin(1, 0.5 + js_log2(f_ / 440) / 8 + tr)) : ph_;
+    ph_ = jmax(0, jmin(1, ph_ + (target - ph_) * g));
+    const double nv = note_ >= 0 ? jmax(0, jmin(1, 0.5 + (note_ - 69) / 96 + tr)) : ph_;
+    outp(io, 0).fill(kBlock, ph_ * P[6]); outp(io, 1).fill(kBlock, nv * P[6]); outp(io, 2).fill(kBlock, ver_);
+    outp(io, 3).fill(kBlock, trig_ > 0 ? 1 : 0); if (trig_ > 0) trig_--; outp(io, 4).fill(kBlock, jmin(1, env_ * 1.5));
+  }
+ private:
+  F32 buf_, d_; int w_ = 0, n_ = 0, dec_ = 0, k_ = 0, ver_ = 0, candN_ = 0; double lp1_ = 0, lp2_ = 0, f_ = 0, ph_ = .5, note_ = -1, cand_ = -1, trig_ = 0, env_ = 0;
+};
+
 template <class M> std::unique_ptr<Module> mk(double sr, Seeds& s) { return std::unique_ptr<Module>(new M(sr, s)); }
 const PortDef kNone[] = {{"", ""}};
 const Def kDefs[] = {
@@ -497,6 +572,8 @@ const Def kDefs[] = {
   {"const", 0, kNone, PD(kCvOut), PD(kKP), mk<Constant>},
   {"divider", PD(kCmIn), PD(kDvOut), PD(kDvP), mk<Divider>},
   {"euclid", PD(kCmIn), PD(kEuOut), PD(kEuP), mk<Euclid>},
+  {"pitchfol", PD(kEnvIn), PD(kPfOut), PD(kPfP), mk<PitchFol>},
+  {"pitchtrk", PD(kEnvIn), PD(kPtOut), PD(kPtP), mk<PitchTrk>},
 };
 }  // namespace
 

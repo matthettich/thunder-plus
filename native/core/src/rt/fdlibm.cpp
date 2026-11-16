@@ -1146,10 +1146,76 @@ static double fdlibm_tanh(double x) {
   return (jx >= 0) ? z : -z;
 }
 
+// Math.log2: V8 12.4's ieee754::log2 (src/base/ieee754.cc, tag 12.4.254; FreeBSD's e_log2.c with k_log1p), text unchanged except the namespace and the macros of this file (U19: Pitch follow
+// and Pitch track use it). Its Lg1..Lg7 are the ones of fdlibm_log above.
+static inline double k_log1p_(double f) {
+  static const double Lg1 = 6.666666666666735130e-01, Lg2 = 3.999999999940941908e-01, Lg3 = 2.857142874366239149e-01, Lg4 = 2.222219843214978396e-01, Lg5 = 1.818357216161805012e-01,
+                      Lg6 = 1.531383769920937332e-01, Lg7 = 1.479819860511658591e-01;
+  double hfsq, s, z, R, w, t1, t2;
+  s = f / (2.0 + f);
+  z = s * s;
+  w = z * z;
+  t1 = w * (Lg2 + w * (Lg4 + w * Lg6));
+  t2 = z * (Lg1 + w * (Lg3 + w * (Lg5 + w * Lg7)));
+  R = t2 + t1;
+  hfsq = 0.5 * f * f;
+  return s * (hfsq + R);
+}
+static double fdlibm_log2(double x) {
+  static const double
+      two54 = 1.80143985094819840000e+16,   /* 0x43500000, 0x00000000 */
+      ivln2hi = 1.44269504072144627571e+00, /* 0x3FF71547, 0x65200000 */
+      ivln2lo = 1.67517131648865118353e-10; /* 0x3DE705FC, 0x2EEFA200 */
+
+  double f, hfsq, hi, lo, r, val_hi, val_lo, w, y;
+  int32_t i, k, hx;
+  uint32_t lx;
+
+  EXTRACT_WORDS(hx, lx, x);
+
+  k = 0;
+  if (hx < 0x00100000) { /* x < 2**-1022  */
+    if (((hx & 0x7FFFFFFF) | lx) == 0) {
+      return -std::numeric_limits<double>::infinity(); /* log(+-0)=-inf */
+    }
+    if (hx < 0) {
+      return std::numeric_limits<double>::signaling_NaN(); /* log(-#) = NaN */
+    }
+    k -= 54;
+    x *= two54; /* subnormal number, scale up x */
+    GET_HIGH_WORD(hx, x);
+  }
+  if (hx >= 0x7FF00000) return x + x;
+  if (hx == 0x3FF00000 && lx == 0) return 0.0; /* log(1) = +0 */
+  k += (hx >> 20) - 1023;
+  hx &= 0x000FFFFF;
+  i = (hx + 0x95F64) & 0x100000;
+  SET_HIGH_WORD(x, hx | (i ^ 0x3FF00000)); /* normalize x or x/2 */
+  k += (i >> 20);
+  y = static_cast<double>(k);
+  f = x - 1.0;
+  hfsq = 0.5 * f * f;
+  r = k_log1p_(f);
+
+  hi = f - hfsq;
+  SET_LOW_WORD(hi, 0);
+  lo = (f - hi) - hfsq + r;
+  val_hi = hi * ivln2hi;
+  val_lo = (lo + hi) * ivln2lo + lo * ivln2hi;
+
+  /* spadd(val_hi, val_lo, y), except for not using double_t: */
+  w = y + val_hi;
+  val_lo += (y - w) + val_hi;
+  val_hi = w;
+
+  return val_lo + val_hi;
+}
+
 double js_cos(double x) { return fdlibm_cos(x); }
 double js_sin(double x) { return fdlibm_sin(x); }
 double js_tan(double x) { return fdlibm_tan(x); }
 double js_log(double x) { return fdlibm_log(x); }
 double js_tanh(double x) { return fdlibm_tanh(x); }
+double js_log2(double x) { return fdlibm_log2(x); }
 
 }  // namespace thunder
