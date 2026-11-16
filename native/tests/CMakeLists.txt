@@ -213,6 +213,25 @@ else()
   add_test(NAME fxidm COMMAND test_fxidm)   # no directory: prints FAIL and exits 1
 endif()
 
+# U19: the MODFX modules (core/src/modfx) against the real chains-worklet.js (tools/modfx-dump.mjs): the committed tests/golden/chains-modules.json hashes (the engine run) and direct cases, bit-exact. A missing fixture is a failure.
+add_executable(test_modfx test_modfx.cpp)
+target_link_libraries(test_modfx PRIVATE thunder_core)
+target_include_directories(test_modfx PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../core/src ${CMAKE_CURRENT_SOURCE_DIR})
+if(NOT MSVC)
+  target_compile_options(test_modfx PRIVATE -Wall -Wextra)
+endif()
+if(NODE_EXE)
+  add_test(NAME modfx_ref COMMAND ${NODE_EXE} ${CMAKE_CURRENT_SOURCE_DIR}/../tools/modfx-dump.mjs ${CMAKE_CURRENT_BINARY_DIR}/modfx-ref)
+  set_tests_properties(modfx_ref PROPERTIES FIXTURES_SETUP modfx_ref)
+  add_test(NAME modfx COMMAND test_modfx ${CMAKE_CURRENT_BINARY_DIR}/modfx-ref)
+  set_tests_properties(modfx PROPERTIES FIXTURES_REQUIRED modfx_ref)
+  if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    add_test(NAME modfx_golden_current COMMAND ${NODE_EXE} ${CMAKE_CURRENT_SOURCE_DIR}/../tools/modfx-dump.mjs --check)
+  endif()
+else()
+  add_test(NAME modfx COMMAND test_modfx)   # no directory: prints FAIL and exits 1
+endif()
+
 # N1 review fixes: hostile inputs (the independent review's findings, one regression test each). Names the finding in every failure line.
 add_executable(test_hostile test_hostile.cpp)
 target_link_libraries(test_hostile PRIVATE thunder_core)
