@@ -83,9 +83,11 @@ pump's `tools/check-licence-boundary.sh` needs `plugins/machine/` to exist, so i
 - pump's `wasm/compare.cpp` is stale for types 9+ (reported, not fixed): its usage comment says "type 0-8", its link line (in its header) omits
   `wasm/fx/*.cpp` (the parity script adds them), and `presetsOf()` falls through to METER's presets for every other type, so for the
   creative effects the native side is not given the wasm side's values (VOX shows latency 0 against 1024). Reported as INFO only.
-- Host (native) build, found by the smoke test: on Linux x86-64 STUTTER (type 20) can output NaN at its first sample if a SPRING (type 13)
-  instance was created and used earlier in the same process (valgrind: no uninitialised read; so state that outlives an instance, in a
-  static or in the denormal / MXCSR state). ctest therefore runs each effect type in its own process. The same sequence in one `pump.wasm` instance (node) is finite for all 25 types, so it is host-only. To be checked in pump / U18.
+- Host (native) build, found by the smoke test and FIXED 16 Nov: on Linux x86-64 with GCC 13, STUTTER (type 20) put out NaN at its first sample
+  if a SPRING (type 13) instance had run earlier in the same process. Cause: GCC 13 uses an MMX register in `SpringTank::process` and no EMMS, so
+  the x87 registers stay tagged in use; STUTTER's `fmod` is an inlined x87 `fprem` under -ffast-math and its load overflows the x87 stack.
+  `core/pump/CMakeLists.txt` now passes `-mno-mmx` on x86 host builds, and ctest also runs all 25 types in one process (`dsp_smoke_pump_all`).
+  A host process whose OTHER code leaves MMX state behind would hit the same NaN in any x87 code: for the shells, nothing of ours uses MMX.
 - `wasm/pump_synth.cpp` defines `struct std::mutex` (no-op) inside `namespace std` when building for wasm (undefined behaviour in
   principle; works with wasi-sdk 25). Reported, not changed.
 - MSVC: the pump libraries are skipped (the build needs clang or gcc, as for the U02 DSP). Windows hosting would build pump with clang-cl: later unit.

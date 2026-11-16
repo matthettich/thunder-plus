@@ -15,9 +15,9 @@ endif()
 if(TARGET thunder_pump)
   add_executable(dsp_smoke_pump smoke_pump.cpp)
   target_link_libraries(dsp_smoke_pump PRIVATE thunder_pump)
-  # One process per effect type. Run all 25 in one process on the host and STUTTER (20) can put out NaN at its first sample after a
-  # SPRING (13) instance was used (a state that survives between instances; found in U03, reported not fixed: see PINS.md). The same
-  # sequence in one pump.wasm instance (node, 15 Nov) gives finite output for all 25.
+  # One process per effect type (a failure names its type), and all 25 in one process: STUTTER (20) put out NaN at its first sample after a
+  # SPRING (13) instance had run, because GCC 13 left the x87 registers tagged in use (MMX without EMMS; core/pump/CMakeLists.txt: -mno-mmx).
+  add_test(NAME dsp_smoke_pump_all COMMAND dsp_smoke_pump)
   foreach(t RANGE 0 24)
     add_test(NAME dsp_smoke_pump_${t} COMMAND dsp_smoke_pump ${t})
   endforeach()
