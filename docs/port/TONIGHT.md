@@ -51,8 +51,11 @@ after every beta push), merge `beta` into it, `npm test`, push `main` (retry on 
 ## B. Native port, in this order
 State at 19:45: PR #175 (U14, the track-effect host) is **merged** into `native` (539ac47), CI green on every platform. How it went green
 is in section C; read it, it changes how effects are built.
-1. **PR "pump: no MMX" (branch `n1/pump-mmx`, this file's PR):** merge when CI is green.
-2. **U15 Flex / Step gate / Retrigger.** A Sonnet agent was building it on branch `n1/u15` (from U14). If the branch is on the remote, take it
+1. PR #179 "pump: no MMX": **merged** (20:20, all CI green).
+2. **U15 Flex / Step gate / Retrigger: PR #180 (branch `n1/u15`), built, the lead read the host changes and accepted them; 73 cases bit-exact.
+   Open at 20:25: macOS fails ctest `libm` only (Node on macOS arm64 is itself built with FMA contraction, so local Node is not the reference there:
+   the agent was told to compare against a committed golden made by Node 22 on x86-64 Linux, with a Linux-only `libm_golden_current`). Merge when
+   every job is green.** The original brief, if it has to be redone: a Sonnet agent builds it on branch `n1/u15` (from U14). If the branch is on the remote, take it
    over (its notes may be lost with the container: read the diff); if not, start it: C++ ports of `FlexCore`, `StepGateCore`, `RetrigCore`
    and `clkSpb` (in `index.html`) under `native/core/src/fx/`, line for line (same arithmetic order, doubles where JS has Numbers); a slot kind
    (93..95, see `fxhost.h`) that reads the beat clock lane (`Mixer::beat(track)`) and takes the `flx` / `gat` / `rtg` lane events; a Node tool
@@ -88,3 +91,12 @@ is in section C; read it, it changes how effects are built.
 ## Review queue for Fable (Opus: add a line per merged PR and per decision; newest last)
 - #175 U14 strict-maths commit 4718bd3 (Fable's own): done.
 - `n1/pump-mmx`: Fable's own; merged by Opus when green.
+- **Web item 4 (both instruments sound when a note's instrument number is changed): NOT fixed, Fable's.** The Sonnet agent's diagnosis: the
+  edit-audition path is clean (`after()` about line 27339 of `index.html` calls `aud(r)` with the NEW instrument only). While the song plays,
+  the sequencer has already booked the coming note with the OLD instrument: the core's look-ahead (`coreLead`, 0.25 s, about line 24443) plus
+  `coreSong()` (about 24448) sending the edit as a `patch` only after a 100 ms debounce; `makeSeq` on the page has the same look-ahead. So the
+  next note on that row within about 0.25 to 0.35 s plays the old instrument right after the audition of the new one. Second, cosmetic: stepping
+  the number quickly stacks auditions (`aud()` with no key held uses hold = false, so `previewOff` cannot cut a ringing drum pad). Proposed:
+  apply IC / note edits to the core at once (no debounce) and drop or re-book the queued, unplayed events of that cell when the patch lands;
+  maybe choke the previous edit-audition. Needs the core (`core/seq-core.js`, `node tools/make-core.mjs`): Fable.
+- Web items done by 20:25: 1 (624), 2 (625), 3 (626), 5 (627). The agent continues with 6 to 10.
