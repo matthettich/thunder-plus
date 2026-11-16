@@ -202,3 +202,8 @@ N1 step 10.
   Manager's next step: verifier passes → merge #192, review-queue line. Still running: the U24 worker (#191's reference, then U24).
 - 14:00 **#192 U23 merged** (verifier passed all four items). Still running: the U24 worker (#191's reference, then U24; it must rebase on U23 and check the
   voices that mix U23 and U24 types). Next unstarted: U28 (one Sonnet worker, started now on `n3/u28`), then U29.
+- 14:35 **The session's server restarted about 14:05 and stopped the two running workers** (the disk survived). State found: **#191 (native Bytebeat fix) green and
+  merged**: the only golden change is `kBbHash` in `modfx_golden.inc`, and the PR lists the 10 formulas whose values changed, every one with `&& constant` or
+  `|| constant`; `native`'s three JS copies carry build 633's two lines. **#193 U24 and #195 U28 are open; on both, every job is green except "Core (Linux, ctest)",
+  cancelled at its 30-minute limit** (the suite has grown: U23's run took 29 minutes). Manager's decision: the limit in `.github/workflows/native.yml` goes from 30 to
+  60 minutes (a time limit, not a gate; this commit), and the workers are resumed to merge `native` into their branches, find what takes the time, and re-run CI.

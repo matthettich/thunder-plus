@@ -27,7 +27,7 @@ jobs:
   linux:
     name: Core (Linux, ctest)
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4   # the goldens' reference JS engine: Node 22 (as tests.yml); another V8 may differ in the last bit of Math.pow
