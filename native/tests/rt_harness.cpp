@@ -465,6 +465,36 @@ static int run_fxidm() {
   std::printf("rt_fxidm ok: %d blocks, Beat grains / scramble / Glitch / Vintage sampler under the allocation guard\n", nb); return 0;
 }
 
+// U17: Pitch reverb, Pitch delay, Resonator and Degrade under the guard: every buffer is made in plan(), process() takes the block and the lanes, odd block sizes, a switch off and on
+// (the 5 ms fade), a settings change by FXV, a chain swap that retires three of them (deleted outside the guard with the plan), silence for long enough to nap the three that nap.
+static int run_fxu17() {
+  using namespace thunder;
+  FxHost H(48000.0); FxEntry e[4]; const int types[4] = {96, 97, 98, 99};
+  for (int i = 0; i < 4; i++) { const int id = types[i]; e[i].t = id; e[i].slot = i; e[i].on = true; std::snprintf(e[i].key, kFxKey, "%d:%s", i, fx_key_of(id)); e[i].nvals = fx_param_count(id);
+    for (int k = 0; k < e[i].nvals; k++) e[i].vals[k] = fx_param_default(id, k);
+    if (id == 96) { e[i].vals[0] = 2; e[i].vals[2] = 255; }   // Dual, SHIMMER full
+    if (id == 97) { e[i].vals[0] = 3; e[i].vals[2] = 200; e[i].vals[5] = 255; }   // Tape, FEEDBACK, WOBBLE
+    fx_map(id, e[i].vals, 48000.0, 120.0, 0.0, e[i].p); }
+  FxPlan* p1 = H.plan(e, 4); H.commit(p1); delete p1;
+  FxPlan* p2 = H.plan(e + 3, 1);   // Degrade only: the other three are retired
+  std::vector<float> L(4096), R(4096), bp(4096, 0.f); uint32_t sd = 7; auto rnd = [&]() { sd = sd * 1664525u + 1013904223u; return (float)(sd >> 8) / 16777216.f - 0.5f; };
+  double t = 0; int nb = 0;
+  { rt_guard g;
+    for (int b = 0; b < 3000; b++) {
+      const int n = (b % 5 == 0) ? 1 + (b * 37) % 1000 : 128;
+      for (int i = 0; i < n; i++) { L[(size_t)i] = b < 2000 ? rnd() * 0.5f : 0.f; R[(size_t)i] = b < 2000 ? rnd() * 0.5f : 0.f; }
+      if (b == 600) H.lane(1, 0, t); if (b == 700) H.lane(1, -1, t);
+      if (b == 900) { double pv[12]; for (int k = 0; k < 12; k++) pv[k] = e[2].p[k]; pv[1] = 10; H.psetAt(t, 2, pv); }
+      if (b == 2200) H.commit(p2);
+      H.process(L.data(), R.data(), n, t, bp.data(), 1); t += n / 48000.0; nb++; }
+    H.process(L.data(), R.data(), 100, t, nullptr, 0);
+  }
+  delete p2;
+  if (H.laneDropped() || H.queueDropped()) { std::printf("rt_fxu17 FAIL: dropped lanes %u queue %u\n", H.laneDropped(), H.queueDropped()); return 1; }
+  if (H.slotCount() != 1 || H.slotType(0) != 99) { std::printf("rt_fxu17 FAIL: the chain swap left %d slots\n", H.slotCount()); return 1; }
+  std::printf("rt_fxu17 ok: %d blocks, Pitch reverb / Pitch delay / Resonator / Degrade under the allocation guard\n", nb); return 0;
+}
+
 int main(int argc, char** argv) {
   if (argc > 1 && std::strcmp(argv[1], "--selftest") == 0) return selftest();
   if (int r = run_logger()) return r;
@@ -477,5 +507,6 @@ int main(int argc, char** argv) {
   if (int r = run_fx()) return r;
   if (int r = run_fxclk()) return r;
   if (int r = run_fxidm()) return r;
+  if (int r = run_fxu17()) return r;
   return run_song();
 }

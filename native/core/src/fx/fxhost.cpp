@@ -75,9 +75,13 @@ using GrainsFx = ClkFx<GrainsCore, GrDp>;       // U16
 using ScrambleFx = ClkFx<ScrambleCore, ScDp>;
 using GlitchFx = ClkFx<GlitchCore, GlDp>;
 using VSampFx = ClkFx<VSampCore, VsDp>;
+using PitchFx = ClkFx<PitchFxCore, PfDp>;       // U17 (96 and 97)
+using ResonFx = ClkFx<ResonCore, RsDp>;
+using DegradeFx = ClkFx<DegradeCore, DgDp>;
 static Fx* make_clk(int type, double sr) {
   switch (type) { case 93: return new RetrigFx(sr); case 94: return new SgateFx(sr); case 95: return new FlexFx(sr);
-    case 100: return new GrainsFx(sr); case 101: return new ScrambleFx(sr); case 102: return new GlitchFx(sr); case 103: return new VSampFx(sr); default: return nullptr; }
+    case 100: return new GrainsFx(sr); case 101: return new ScrambleFx(sr); case 102: return new GlitchFx(sr); case 103: return new VSampFx(sr);
+    case 96: case 97: return new PitchFx(sr); case 98: return new ResonFx(sr); case 99: return new DegradeFx(sr); default: return nullptr; }
 }
 // c.p -> s.dp: the worklet's set(): {pat, mix, xf, wait} (Flex), {pat, m1, m2, div, len, depth, smooth, wait} (Step gate), {mode, div, decay, pitch, gate, mix} (Retrigger)
 static void setClkDp(Fx* fx, int t, const double* q) {
@@ -85,6 +89,9 @@ static void setClkDp(Fx* fx, int t, const double* q) {
   else if (t == 101) static_cast<ScrambleFx*>(fx)->dp = ScDp{q[0], q[1], q[2], q[3], q[4], q[5], q[6], q[7]};                      // {div, chance, rev, keep, vary, seed, xf, mix}
   else if (t == 102) static_cast<GlitchFx*>(fx)->dp = GlDp{q[0], q[1], q[2], q[3], q[4], q[5], q[6], q[7], q[8], q[9], q[10]};     // {div, chance, stut, rev, pitch, tape, crush, gate, vary, seed, mix}
   else if (t == 103) static_cast<VSampFx*>(fx)->dp = VsDp{q[0], q[1], q[2], q[3], q[4], q[5]};                                      // {model, drive, filter, rate, noise, mix}
+  else if (t == 96 || t == 97) static_cast<PitchFx*>(fx)->dp = PfDp{q[0], q[1], q[2], q[3], q[4], q[5], q[6], q[7], q[8], q[9]};   // {kind, mode, time, fb, pitch, pitch2, tone, size, wow, mix}
+  else if (t == 98) static_cast<ResonFx*>(fx)->dp = RsDp{q[0], q[1], q[2], q[3], q[4], q[5], q[6]};                                  // {note, chord, mode, decay, bright, spread, mix}
+  else if (t == 99) static_cast<DegradeFx*>(fx)->dp = DgDp{q[0], q[1], q[2], q[3], q[4], q[5], q[6]};                                // {bits, rate, noise, color, follow, dry, wet}
   else if (t == 95) static_cast<FlexFx*>(fx)->dp = FlexDp{q[0], q[1], q[2], q[3]};
   else if (t == 94) static_cast<SgateFx*>(fx)->dp = SgDp{q[0], q[1], q[2], q[3], q[4], q[5], q[6], q[7]};
   else static_cast<RetrigFx*>(fx)->dp = RtDp{q[0], q[1], q[2], q[3], q[4], q[5]};
@@ -200,13 +207,16 @@ void FxHost::runClk(Slot& s, bool feed, int n) {
     case 100: { GrainsFx* f = static_cast<GrainsFx*>(s.fx); f->core.process(Lb_, Rb_, n, f->dp, tr_); break; }
     case 101: { ScrambleFx* f = static_cast<ScrambleFx*>(s.fx); f->core.process(Lb_, Rb_, n, f->dp, tr_); break; }
     case 102: { GlitchFx* f = static_cast<GlitchFx*>(s.fx); f->core.process(Lb_, Rb_, n, f->dp, tr_); break; }
+    case 96: case 97: { PitchFx* f = static_cast<PitchFx*>(s.fx); f->core.process(Lb_, Rb_, n, f->dp); break; }
+    case 98: { ResonFx* f = static_cast<ResonFx*>(s.fx); f->core.process(Lb_, Rb_, n, f->dp); break; }
+    case 99: { DegradeFx* f = static_cast<DegradeFx*>(s.fx); f->core.process(Lb_, Rb_, n, f->dp); break; }
     case 103: { VSampFx* f = static_cast<VSampFx*>(s.fx); f->core.process(Lb_, Rb_, n, f->dp); break; }
     default: { RetrigFx* f = static_cast<RetrigFx*>(s.fx); f->core.process(Lb_, Rb_, n, f->dp, tr_); break; }
   }
 }
 void FxHost::slotRun(Slot& s, int n) {
   if (!s.fx) return;
-  if (fx_is_core(s.t)) { runClk(s, false, n); return; }
+  if (fx_is_core(s.t)) { runClk(s, false, n); return; }   // (a core slot runs its JS core)
   std::memcpy(cL_, Lb_, sizeof(float) * (size_t)n); std::memcpy(cR_, Rb_, sizeof(float) * (size_t)n);
   s.fx->process(Lb_, Rb_, n);
   for (int i = 0; i < n; i++) {   // tfx_process: keep a broken effect from poisoning the whole track
@@ -285,7 +295,7 @@ bool FxHost::p1(float* oL, float* oR, int n, double t0, const float* bp, int bpn
     const bool lvm = tel_ && (s.t == 7 || s.t == 26 || s.t == 28);
     if (lvm) { const float a = pk(n); if (!(s.lip > a)) s.lip = a; }
     if (fade) { s.zz = false; s.zq = 0; }   // a forced run must not leave the slot asleep
-    if (fade || fx_is_core(s.t)) slotRun(s, n); else slotNap(s, n);   // (the JS cores keep their own time and rings, and the Vintage sampler makes its own noise: they always run)
+    if (fade || (fx_is_core(s.t) && !(s.t >= 96 && s.t <= 98))) slotRun(s, n); else slotNap(s, n);   // (the JS cores keep their own time and rings, and the Vintage sampler and Degrade make their own noise: they always run; Pitch delay, Pitch reverb and the Resonator nap like the rest)
     if (lvm) { const float a = pk(n); if (!(s.lop > a)) s.lop = a; }
     if (fade) { const double d = 1 / (sr_ * 0.005); double g = s.g;
       for (int k = 0; k < n; k++) { g = tg ? std::min(1.0, g + d) : std::max(0.0, g - d); L[k] = (float)((double)dL_[k] + ((double)L[k] - (double)dL_[k]) * g); R[k] = (float)((double)dR_[k] + ((double)R[k] - (double)dR_[k]) * g); }
