@@ -7299,8 +7299,8 @@ class BBExpr {
           case 74: St[s] = St[s] & C[i++]; break;
           case 75: St[s] = St[s] ^ C[i++]; break;
           case 76: St[s] = St[s] | C[i++]; break;
-          case 77: St[s] = St[s] !== 0 && C[i++] !== 0 ? 1 : 0; break;
-          case 78: St[s] = St[s] !== 0 || C[i++] !== 0 ? 1 : 0; break;
+          case 77: y = C[i++]; St[s] = St[s] !== 0 && y !== 0 ? 1 : 0; break;   // read the constant first: && and || skipped it when they short-circuited, and it then ran as a step (50 / 51 jumped: a hang)
+          case 78: y = C[i++]; St[s] = St[s] !== 0 || y !== 0 ? 1 : 0; break;
           default: i = N;
         }
       }
@@ -25969,7 +25969,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 632;
+const BUILD = 633;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD + (location.pathname.includes('/beta/') ? ' · beta' : '');
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -36255,6 +36255,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [633, '16 Nov', ['Bytebeat formulas: “x && number” and “x || number” now give the right value, and a formula with && 50, && 51, || 50 or || 51 can no longer freeze the sound']],
   [632, '15 Nov', ['Folded phone, top: the tempo line now reads BPM and LPB, then ROWS, then the time left (631 had ROWS first)']],
   [631, '15 Nov', ['Folded phone, top: the tempo line now reads ROWS (tap the number to type it; no − / +), BPM and LPB, then the time left; the time left leaves the top bar, which is roomier. REC is gone from the header: File › Record has it, with its on / off state']],
   [630, '15 Nov', ['Bottom panel: a MOD section beside FX (fold it like INST or FX; it starts folded): each LFO on the track as a tiny scope with a dot that rides the wave in time with the song, and where it goes. Click it to open MOD. Computer only']],
