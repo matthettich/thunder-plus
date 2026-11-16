@@ -119,6 +119,7 @@ class Mixer {
   double delayNow(int t, int point) const;   // the target of a delay point in seconds (point 0 dl, 1 fdl, 2 fdlP); for tests
   double maxDelaySec() const { return capSec_; }
 
+  double now() const { return now_; }
   void setTime(double now) { now_ = now; }                 // currentTime: the start of the block about to be rendered
   bool event(const SeqEvent& e);                           // mixEv: tvl, tva, tpn, mvol, mout. true: taken
   bool set(const MixSet& c);                               // false: not a thing this mixer has (a bad track, Send)
