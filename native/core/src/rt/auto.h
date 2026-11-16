@@ -51,6 +51,7 @@ class Auto {
   void fill(double* C, double t0, double dt, int N, int i0 = 0) const;   // C[i] = at(t0 + i * dt)
 
   int size() const { return n_; }
+  int capacity() const { return cap_; }   // events the list holds (without the prune slack)
   const AutoEv& event(int i) const { return ev_[i]; }
 
   static constexpr int kSlack = 2;   // prune() may grow the list by two events (a head of three replacing one)

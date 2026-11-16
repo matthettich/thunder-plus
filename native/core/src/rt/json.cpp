@@ -1,11 +1,20 @@
 #include "json.h"
 
-#include <clocale>
 #include <cmath>
 #include <cstdlib>
+#include <cmath>
 #include <cstring>
 #include <new>
 #include <vector>
+
+// Vendored, pinned (third_party/PINS.md); warnings from it are not ours to fix.
+#if defined(_MSC_VER) && !defined(__clang__)
+#pragma warning(push, 0)
+#endif
+#include "fast_float/fast_float.h"
+#if defined(_MSC_VER) && !defined(__clang__)
+#pragma warning(pop)
+#endif
 
 namespace thunder {
 
@@ -101,14 +110,12 @@ double toDouble(const char* t, size_t n, bool simpleInt) {
     double v = 0; for (; i < n; i++) v = v * 10 + (t[i] - '0');
     return neg ? -v : v;
   }
-  char buf[64]; std::string big;
-  char* b = buf;
-  if (n >= sizeof buf) { big.assign(t, n); b = &big[0]; } else { std::memcpy(buf, t, n); buf[n] = 0; }
-  // strtod follows the C locale of the process; give it that locale's decimal point
-  const char dp = std::localeconv()->decimal_point[0];
-  if (dp != '.') for (size_t i = 0; i < n; i++) if (b[i] == '.') b[i] = dp;
-  if (b == &big[0]) big.push_back(0);
-  return std::strtod(b, nullptr);
+  // N1 review C9: fast_float (vendored, third_party/PINS.md) is locale-free and correctly rounded, so the same bits come out on every
+  // platform (Linux, Windows, Android, macOS, iOS, wasm): the platform libraries' from_chars / strtod differ (Apple's, on a 150-digit
+  // mantissa). It accepts no '+' before the number, which JSON never has. Out of range it still returns the value strtod gives:
+  // +-infinity when too big, +-0 or the correctly rounded subnormal when too small; that value is used whatever ec says.
+  double v = 0; fast_float::from_chars(t, t + n, v);
+  return v;
 }
 
 bool parseNumber(Parser& P, uint32_t* off, uint32_t* len, double* val) {

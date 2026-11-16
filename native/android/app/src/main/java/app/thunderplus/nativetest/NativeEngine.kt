@@ -8,7 +8,8 @@ object NativeEngine {
     external fun nativeStart(): Int
     external fun nativeStop()
     /** One caller at a time (the core's command queue has a single producer). */
-    external fun nativePost(json: String): Boolean
+    external fun nativePostBytes(json: ByteArray): Boolean   // UTF-8 bytes: see jni.cpp (N1 B2)
+    fun nativePost(json: String): Boolean = nativePostBytes(json.toByteArray(Charsets.UTF_8))
     /** One caller only: the poller thread. */
     external fun nativePoll(): String?
     external fun nativePutBytes(id: Int, meta: String, bytes: ByteArray, off: Int, len: Int): Boolean

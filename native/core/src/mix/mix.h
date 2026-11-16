@@ -161,7 +161,7 @@ class Mixer {
     Want last;
   };
   Want want(int t) const;
-  void move(Auto& A, double v, double at, double ramp);
+  bool move(Auto& A, double v, double at, double ramp);   // true: the lane holds the move (a full lane: the latest wins, see mix.cpp)
   void refresh(double at, double ramp);
   void rebuild();
   bool lane(float* C, Auto& A, int N, double t0);   // fills C with the lane's block values; true: one value for the whole block

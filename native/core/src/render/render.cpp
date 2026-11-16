@@ -3,11 +3,13 @@
 
 #include <algorithm>
 
+#include "rt/num.h"
+
 namespace thunder {
 
 SongRenderer::SongRenderer(const Song& song, const SeqVars& vars, const RenderPads& pads, double sampleRate, int maxBlock, const SeqOpts& opts, int maxVoices)
-    : S_(song), pads_(pads), sr_(sampleRate), maxBlock_(maxBlock), seq_(new Seq(song, vars, SeqMode::Song, opts)), pool_(sampleRate, maxVoices), mix_(sampleRate, maxBlock),
-      evs_(new SeqEvent[kRenderEvents]), step_(new SeqStep), scratch_(new float[(size_t)maxBlock * 2]()) {
+    : S_(song), pads_(pads), sr_(sampleRate), maxBlock_(maxBlock), seq_(new Seq(song, vars, SeqMode::Song, opts)), pool_(sampleRate, maxVoices), mix_(sampleRate, kRenderQuantum),
+      evs_(new SeqEvent[kRenderEvents]), step_(new SeqStep), scratch_(new float[(size_t)maxBlock * 2]()), q_(new float[(size_t)kRenderQuantum * 2]()) {
   // the page's mixer as a render sets it (applyMix, live false) and the bus plan (no bus exists until a chains host is plugged in)
   mix_.setPlan(bus_plan(song.chainPatch, song.chainOn));
   mix_.load(song);
@@ -28,8 +30,8 @@ void SongRenderer::dispatch(const SeqEvent& e) {
   }
   if (e.track < 0) return;
   st_.notes++;
-  { const int ii = (int)e.ii; if (ii >= 0 && ii < kNI && S_.insts[ii].mo == 1) { st_.notesMidiOnly++; return; } }   // MIDI gear only: nothing sounds here
-  const int pad = (int)e.pad;
+  { const int ii = to_int_sat(e.ii, -1, 1 << 20); /* N1 C3: NaN is "none" */ if (ii >= 0 && ii < kNI && S_.insts[ii].mo == 1) { st_.notesMidiOnly++; return; } }   // MIDI gear only: nothing sounds here
+  const int pad = to_int_sat(e.pad, -1, 1 << 20);   // (N1 C3: a part without `pad` gives NaN: no pad, what x86 gave and what the JS's kit.voices[NaN] is)
   if (pad < 0 || pad >= kRenderPads || !pads_.buf[pad].data) { st_.notesNoPad++; return; }   // a slot the kit doesn't have is silent
   const VoiceBuf& b = pads_.buf[pad];
   if (VoicePool::shapedReverse(e, b)) { st_.notesShapedRev++; pool_.take(e, &pads_.kit[pad]); return; }   // (the page plays a reversed + shaped note: not this player's)
@@ -38,7 +40,7 @@ void SongRenderer::dispatch(const SeqEvent& e) {
 
 void SongRenderer::setPlan(const PdcPlan& plan, PdcMode mode, int64_t extraLatencyFrames) {
   plan_ = plan; extra_ = extraLatencyFrames < 0 ? 0 : extraLatencyFrames;
-  mix_.setTime((double)frame_ / sr_);
+  mix_.setTime((double)qFrame_ / sr_);
   PdcApply a; a.mode = mode; a.live = false; pdc_apply(mix_, plan, a);
 }
 
@@ -53,10 +55,20 @@ void SongRenderer::renderTrimmed(float* outL, float* outR, int64_t N) {
 }
 
 void SongRenderer::block(float* outL, float* outR, int N) {
-  if (N > maxBlock_) N = maxBlock_;
-  const double t0 = (double)frame_ / sr_;
+  while (N > 0) {
+    if (qRead_ >= kRenderQuantum) { quantum(); qRead_ = 0; }
+    const int n = std::min(N, kRenderQuantum - qRead_);
+    std::copy(q_.get() + qRead_, q_.get() + qRead_ + n, outL);
+    std::copy(q_.get() + kRenderQuantum + qRead_, q_.get() + kRenderQuantum + qRead_ + n, outR);
+    outL += n; outR += n; qRead_ += n; N -= n; frame_ += n;
+  }
+}
+
+void SongRenderer::quantum() {
+  const int N = kRenderQuantum;
+  const double t0 = (double)qFrame_ / sr_;
   pool_.setTime(t0); mix_.setTime(t0);
-  // 1. step the song up to LEAD ahead (at most 3 steps a block)
+  // 1. step the song up to LEAD ahead (at most 3 steps a quantum, as the web core's block)
   int n = 0;
   while (seq_->alive() && seq_->time() < t0 + lead && n++ < 3) {
     const int k = seq_->step(evs_.get(), kRenderEvents, step_.get());
@@ -65,9 +77,10 @@ void SongRenderer::block(float* outL, float* outR, int N) {
   }
   // 2. the voices into their tracks' inputs, then the mixer
   pool_.render(mix_.inputsL(), mix_.inputsR(), N, t0);
-  mix_.render(outL, outR, N, t0);
-  if (meters_) { meters_feed(*meters_, mix_, outL, outR, N); meters_->advance(N, t0 + (double)N / sr_); }
-  frame_ += N;
+  float* const qL = q_.get(); float* const qR = q_.get() + kRenderQuantum;
+  mix_.render(qL, qR, N, t0);
+  if (meters_) { meters_feed(*meters_, mix_, qL, qR, N); meters_->advance(N, t0 + (double)N / sr_); }
+  qFrame_ += N;
 }
 
 RenderStats SongRenderer::stats() const {

@@ -63,6 +63,17 @@ struct SeqOpts {
   bool hasAt = false; int atRef = 0; SeqAt at[kSeqTracks];   // o.at / o.atRef: each track where it was (a hand-over)
 };
 
+// N1 review B4: the most events one step() can write, so that no step drops one (a dropped OFF / STP hangs a live note). Worst case the
+// song format allows, per track (33: the 32 tracks and the master column):
+//   notes     4 columns x 64 hits (RET: the first and at most 63 more)                      = 256
+//   one row   OFF / SKP 1, TVL TPN STP 3, FXV 1, PGM MPB MAT + 4 CC 7, CHC 15 x 2 = 30,
+//             ENG 4, FXC 16 (FXSLOTS 8, a switch and a parameter each)                       =  62   (the master column has fewer)
+//   per track 256 + 62 = 318; x 33 tracks = 10494; + BEAT 1 = 10495.
+// The PERFORM events (PRT part snapshot, scenes, macros, locks, LFOs) are bounded by the song, not by the format (review C6): the
+// rest of the 12288 is theirs (1793). Past that the events are still counted (Seq::dropped, RenderStats::seqDropped), never silent.
+// 12288 x sizeof(SeqEvent) (416 B) = 5 MB, allocated once with the renderer.
+constexpr int kSeqStepEvents = 12288;
+
 // ---- events ----------------------------------------------------------------------------------------------------------
 enum SeqEvType : uint8_t { SEV_BEAT = 0, SEV_TVA, SEV_TPN, SEV_MOUT, SEV_TVL, SEV_FXP, SEV_STP, SEV_FXC, SEV_CHC, SEV_MVOL, SEV_ENG, SEV_MPG, SEV_MPB,
   SEV_MAT, SEV_MCC, SEV_OFF, SEV_NOTE, SEV_MOD, SEV_TEMPO, SEV_COUNT };
@@ -109,7 +120,8 @@ class Seq {
   // (also out->n). Audio thread: no allocation, no lock, no I/O.
   int step(SeqEvent* evs, int cap, SeqStep* out);
   bool alive() const;                         // api.alive()
-  void setLoop(bool has, int y0, int y1) { hasLoop_ = has; loopY0_ = y0; loopY1_ = y1; }   // api.setLoop
+  void setLoop(bool has, int y0, int y1);   // api.setLoop; the rows are clamped to the mode's range (N1 review C2)
+  int loopMax() const { return mode_ == SeqMode::Song ? 255 : mode_ == SeqMode::Sect ? 15 : 31; }   // the last row / chain row / step a loop can name
   double time() const { return time_; }      // api.time: when the next step is due
   double bpm() const { return bpm_; }
   int tks() const { return tks_; }

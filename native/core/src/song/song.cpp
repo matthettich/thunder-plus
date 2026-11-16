@@ -5,6 +5,8 @@
 #include <cstring>
 #include <string>
 
+#include "rt/num.h"
+
 namespace thunder {
 
 namespace {
@@ -54,7 +56,7 @@ double jsInt(Json v, double d) {
   if (!std::isfinite(x)) return d;
   return std::floor(x + 0.5);   // Math.round
 }
-int clampI(double v, int lo, int hi) { return v < lo ? lo : v > hi ? hi : (int)v; }
+int clampI(double v, int lo, int hi) { return to_int_sat(v, lo, hi); }   // (NaN gives lo: the cast of NaN is undefined; N1 C3)
 int cInt(Json v, int d, int lo, int hi) { return clampI(jsInt(v, d), lo, hi); }
 bool truthy(Json v) {
   switch (v.type()) {
@@ -123,13 +125,13 @@ bool Song::load(const char* text, size_t len, JsonError* err) {
   // Which shape: a message {"t":..,"rev":N,"S":{..}}, a bare S, or a file {app:'thunder-project', song:{..}, kit:{..}} (alone or as S).
   if (!root.isObj()) return bad("not an object");
   Json cur = root, fileObj;
-  rev = (int64_t)root.num("rev", 0);
+  rev = to_i64_sat(root.num("rev", 0), -(1LL << 53), 1LL << 53);   // (N1 C3: a JS safe integer at most; NaN and huge values no longer reach the cast)
   double bld = root.num("build", 0);
   { Json s = cur.get("S"); if (s.isObj()) cur = s; }
   if (cur.get("song").isObj()) { fileObj = cur; cur = cur.get("song"); isFile = true; if (fileObj.get("build").isNum()) bld = fileObj.num("build", 0); }
   else if (cur.get("build").isNum() && bld == 0) bld = cur.num("build", 0);
   S = cur; kit = isFile ? fileObj.get("kit") : root.get("kit");
-  build = (int)bld; newerBuild = build > kKnownBuild;
+  build = to_int_sat(bld, 0, 1 << 30); newerBuild = build > kKnownBuild;
 
   v = cInt(S.get("v"), 1, -0x7fffffff, 0x7fffffff);
   const bool v1 = !(jsInt(S.get("v"), 1) >= 2);

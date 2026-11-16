@@ -23,7 +23,8 @@
 namespace thunder {
 
 constexpr int kRenderPads = 256;       // pad slots a kit can have (a pad number is one byte)
-constexpr int kRenderEvents = 1024;    // one sequencer step's events (more are counted: stats().seqDropped)
+constexpr int kRenderQuantum = 128;    // frames a song is rendered in (the web core's block), whatever the host's block
+constexpr int kRenderEvents = kSeqStepEvents;   // one sequencer step's events, sized for the worst case (seq.h; more are counted: stats().seqDropped)
 
 struct RenderPads {
   VoiceBuf buf[kRenderPads];           // data == nullptr: the kit has no buffer for the pad (its notes are silent, as `kit.voices[pad]` missing)
@@ -46,7 +47,11 @@ class SongRenderer {
   SongRenderer(const SongRenderer&) = delete;
   SongRenderer& operator=(const SongRenderer&) = delete;
 
-  void block(float* outL, float* outR, int frames);     // the next `frames` (<= maxBlock) samples
+  // The next `frames` samples, any count (N1 review B1/C8). The song is rendered in fixed quanta of kRenderQuantum (128) frames on one
+  // global grid, as the web core's 128-frame blocks are, and handed out from a small buffer: the samples are the same whatever block
+  // size the host asks for (1, 480, 4096...), and a fast song is stepped as often at 4096 frames as at 128 (the old "three steps a block"
+  // made a 4096-frame callback play a 300 BPM song at 0.44 speed).
+  void block(float* outL, float* outR, int frames);
 
   // LATENCY COMPENSATION (pass()): the plan is set in force at once (a render's pdcSync) and everything plays plan.T later, so the render is
   // `N + latencyFrames()` long and the start is trimmed. extraLatencyFrames: what pass() adds for the master side (mastering, the master's pump
@@ -76,6 +81,7 @@ class SongRenderer {
 
  private:
   void dispatch(const SeqEvent& e);
+  void quantum();                                        // renders the next kRenderQuantum frames into q_
   const Song& S_; const RenderPads& pads_;
   double sr_; int maxBlock_;
   std::unique_ptr<Seq> seq_;
@@ -83,7 +89,9 @@ class SongRenderer {
   Mixer mix_;
   std::unique_ptr<SeqEvent[]> evs_;
   std::unique_ptr<SeqStep> step_;
-  int64_t frame_ = 0;
+  int64_t frame_ = 0;                                    // frames handed to the host
+  int64_t qFrame_ = 0; int qRead_ = kRenderQuantum;      // frames rendered into q_; how many of the last quantum the host has had
+  std::unique_ptr<float[]> q_;                           // the last quantum: left then right
   PdcPlan plan_; int64_t extra_ = 0;
   std::unique_ptr<float[]> scratch_;
   std::unique_ptr<MasterChain> mchain_;

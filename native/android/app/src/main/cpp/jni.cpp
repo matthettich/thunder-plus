@@ -8,6 +8,7 @@
 #include <cstdio>
 #include <cstring>
 #include <thread>
+#include <vector>
 
 #include "miniaudio.h"
 #include "thunder/core.h"
@@ -152,33 +153,38 @@ JNIEXPORT jint JNICALL Java_app_thunderplus_nativetest_NativeEngine_nativeStart(
 
 JNIEXPORT void JNICALL Java_app_thunderplus_nativetest_NativeEngine_nativeStop(JNIEnv*, jobject) {
   if (!g.deviceInit) return;
-  ma_device_uninit(&g.device);   // stops the callback
-  g.deviceInit = false;
+  // N1 review A4 (UNVERIFIED at run time: no Android here): the probe thread reads the AAudio stream, so it is stopped and joined
+  // BEFORE ma_device_uninit closes that stream (the old order let it call into a closed stream for up to 10 ms). Then the
+  // callback is stopped, and only then is the core destroyed.
   g.probeRun = false;
   if (g.probe.joinable()) g.probe.join();
+  ma_device_uninit(&g.device);   // stops the callback
+  g.deviceInit = false;
   thunder_destroy(g.core);
   g.core = nullptr;
 }
 
-JNIEXPORT jboolean JNICALL Java_app_thunderplus_nativetest_NativeEngine_nativePost(JNIEnv* env, jobject, jstring s) {
-  if (!g.core || !s) return JNI_FALSE;
-  const char* c = env->GetStringUTFChars(s, nullptr);
-  int ok = thunder_post(g.core, c, (int)std::strlen(c));
-  env->ReleaseStringUTFChars(s, c);
-  return ok ? JNI_TRUE : JNI_FALSE;
-}
-
-JNIEXPORT jstring JNICALL Java_app_thunderplus_nativetest_NativeEngine_nativePoll(JNIEnv* env, jobject) {
-  if (!g.core) return nullptr;
-  char buf[512];
-  int n = thunder_poll(g.core, buf, (int)sizeof buf);
-  if (n <= 0) return nullptr;
-  return env->NewStringUTF(buf);
+// N1 review B2 (UNVERIFIED at run time: no Android here). The command arrives as a UTF-8 BYTE ARRAY (Kotlin: String.toByteArray(UTF_8)),
+// not a jstring: GetStringUTFChars gives MODIFIED UTF-8 (a character above U+FFFF as two 3-byte surrogates, U+0000 as C0 80), which the
+// core's strict reader refuses, so a song with an emoji in a name did not load. Bytes also carry their own length (no strlen, no int cast
+// of a size_t). Copied out (not pinned): a song.load parses for a while and a pinned array stops the Java GC.
+JNIEXPORT jboolean JNICALL Java_app_thunderplus_nativetest_NativeEngine_nativePostBytes(JNIEnv* env, jobject, jbyteArray bytes) {
+  if (!g.core || !bytes) return JNI_FALSE;
+  const jsize n = env->GetArrayLength(bytes);
+  if (n <= 0) return JNI_FALSE;
+  std::vector<char> buf((size_t)n);
+  env->GetByteArrayRegion(bytes, 0, n, reinterpret_cast<jbyte*>(buf.data()));
+  if (env->ExceptionCheck()) { env->ExceptionClear(); return JNI_FALSE; }
+  return thunder_post(g.core, buf.data(), (int)n) ? JNI_TRUE : JNI_FALSE;
 }
 
 JNIEXPORT jboolean JNICALL Java_app_thunderplus_nativetest_NativeEngine_nativePutBytes(JNIEnv* env, jobject, jint id, jstring meta, jbyteArray bytes, jint off, jint len) {
-  if (!g.core || !bytes || (len & 3) || (off & 3)) return JNI_FALSE;
+  // N1 review A2: the range is checked against the Java array here (off + len in 64 bits), and a null meta or a failed
+  // GetStringUTFChars is refused instead of dereferenced. UNVERIFIED at run time: no Android here.
+  if (!g.core || !bytes || !meta || off < 0 || len < 0 || (len & 3) || (off & 3)) return JNI_FALSE;
+  if ((jlong)off + (jlong)len > (jlong)env->GetArrayLength(bytes)) return JNI_FALSE;
   const char* m = env->GetStringUTFChars(meta, nullptr);
+  if (!m) return JNI_FALSE;
   void* p = env->GetPrimitiveArrayCritical(bytes, nullptr);
   int ok = p ? thunder_put(g.core, id, m, reinterpret_cast<const float*>(static_cast<char*>(p) + off), len / 4) : 0;
   if (p) env->ReleasePrimitiveArrayCritical(bytes, p, JNI_ABORT);

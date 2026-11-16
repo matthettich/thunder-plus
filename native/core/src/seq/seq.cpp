@@ -31,6 +31,7 @@
 #include <set>
 
 #include "rt/jsmath.h"
+#include "rt/num.h"
 
 namespace thunder {
 
@@ -234,7 +235,7 @@ void Seq::buildPerf() {   // perfOf(S): S.perf, or freshPerf() (no scenes' value
   double xf = 0;
   if (truthy(P)) {
     xf = jnum(P.get("xf"));
-    const Json sc = P.get("sc"), ja = sc.at((size_t)std::max(0.0, jnum(P.get("xa")))), jb = sc.at((size_t)std::max(0.0, jnum(P.get("xb"))));
+    const Json sc = P.get("sc"), ja = sc.at(to_size_sat(jnum(P.get("xa")), 1u << 30)), jb = sc.at(to_size_sat(jnum(P.get("xb")), 1u << 30));
     const Json A = truthy(ja) ? ja.get("v") : Json(), B = truthy(jb) ? jb.get("v") : Json();
     const auto add = [&](std::string_view k, Json) { for (const SceneEnt& e : scene_) if (ids_[(size_t)e.id].s == k) return;
       TgtId g; g.s = std::string(k); parseId(g); if (!g.ok) return;
@@ -370,7 +371,7 @@ void Seq::chaseChance(int row) {
 }
 
 Seq::Seq(const Song& song, const SeqVars& vars, SeqMode mode, const SeqOpts& opts) : S_(song), V_(vars), mode_(mode), o_(opts), mrand_(opts.randomSeed) {
-  once_ = o_.once; hasLoop_ = o_.hasLoop; loopY0_ = o_.loopY0; loopY1_ = o_.loopY1;
+  once_ = o_.once; setLoop(o_.hasLoop, o_.loopY0, o_.loopY1);
   ntr_ = S_.ntr ? S_.ntr : 16;
   polyFrom_ = S_.nmono >= 1 ? std::min(S_.nmono, ntr_ - 1) : (ntr_ + 1) / 2;   // polyFrom(): Math.ceil(n / 2)
   NIs_ = ci(S_.ni ? S_.ni : 16, 16, NI);
@@ -509,6 +510,13 @@ const Seq::PInst& Seq::instOf(int ii) const {   // IS[ii] || IS[0] || S.insts[ii
     if (ii >= 0 && ii < (int)IS.size() && IS[(size_t)ii].present) return IS[(size_t)ii];
     if (!IS.empty() && IS[0].present) return IS[0]; }
   return sInsts_[(size_t)ci(ii, 0, NI - 1)];
+}
+// N1 review C2: settle()'s inner loop walks every row of the loop range, so a loop of 1e8 rows held one step() for 100 ms and 2e9
+// for seconds (then signed overflow). The ends are clamped to what the mode can hold: 0..255 song rows, 0..15 chain rows, 0..31 steps.
+// (Every loop a song or the page can make is inside these: the goldens and seq_extra's loops are unchanged.)
+void Seq::setLoop(bool has, int y0, int y1) {
+  const int mx = loopMax();
+  hasLoop_ = has; loopY0_ = std::max(0, std::min(mx, y0)); loopY1_ = std::max(0, std::min(mx, y1));
 }
 SeqEvent* Seq::push(Ctx& c) {
   if (c.n < c.cap) { SeqEvent* e = &c.evs[c.n++]; *e = SeqEvent(); return e; }

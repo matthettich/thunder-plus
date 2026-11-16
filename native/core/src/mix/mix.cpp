@@ -2,6 +2,7 @@
 // trimGain) and core/core-processor.js (mixEv, mixOut, mixFill). The JS model of the nodes' arithmetic this file equals bit for bit is
 // native/tools/mix-dump.mjs (class Model).
 #include "mix/mix.h"
+#include "rt/num.h"
 
 #include <algorithm>
 #include <cmath>
@@ -222,20 +223,29 @@ Mixer::Want Mixer::want(int t) const {
   w.gv = on ? mix_track_gain(vol_[t]) : 0; w.pv = mix_pan(pan_[t]); w.tg = mix_trim_gain(trim_[t]); w.prv = on ? 1 : 0;
   return w;
 }
-void Mixer::move(Auto& A, double v, double at, double ramp) {
+// N1 review A5. A lane holds kAutoUi (16) events and a full lane drops the NEWEST one, so more than 16 moves between two blocks (a
+// fader sweep across a 4096-frame block) lost the last: a MUTE could be lost for good. Now the latest wins: a lane without room for
+// this move's events first drops what is booked at or after `at` (cancel: those are being superseded, and the move's own events
+// replace them); if the list is still full of earlier events it is cleared and starts from the new value. The only cost is a jump
+// instead of a glide in a lane that was overflowing. Returns false only if even that failed (it cannot).
+bool Mixer::move(Auto& A, double v, double at, double ramp) {
+  if (A.size() + 2 > A.capacity()) A.cancel(at);
+  const uint32_t d0 = A.dropped;
   if (ramp < 0) A.target(v, at, kTcMix);
   else if (ramp > 0) { A.hold(at); A.lin(v, at + ramp / sr_); }
   else { A.cancel(at); A.set(v, at); }
+  bool ok = A.dropped == d0;
+  if (!ok) { A.cancel(-INFINITY); A.v0 = v; ok = A.set(v, at); }   // still full of earlier events: latest wins outright
   note(A);
+  return ok;
 }
 void Mixer::refresh(double at, double ramp) {
   audible_ = mix_audible(plan_, mute_, solo_);
-  for (int t = 0; t < kNT; t++) { Strip& s = S_[t]; const Want w = want(t), l = s.last;   // applyMix; only what moved gets an event (the same curve)
-    if (w.gv != l.gv) move(s.g, w.gv, at, ramp);
-    if (w.pv != l.pv) move(s.pan, w.pv, at, ramp);
-    if (w.tg != l.tg) move(s.inp, w.tg, at, ramp);
-    if (w.prv != l.prv) move(s.pre, w.prv, at, ramp);
-    s.last = w; }
+  for (int t = 0; t < kNT; t++) { Strip& s = S_[t]; const Want w = want(t); Want& l = s.last;   // applyMix; only what moved gets an event (the same curve)
+    if (w.gv != l.gv && move(s.g, w.gv, at, ramp)) l.gv = w.gv;      // `last` follows only what the lane accepted
+    if (w.pv != l.pv && move(s.pan, w.pv, at, ramp)) l.pv = w.pv;
+    if (w.tg != l.tg && move(s.inp, w.tg, at, ramp)) l.tg = w.tg;
+    if (w.prv != l.prv && move(s.pre, w.prv, at, ramp)) l.prv = w.prv; }
 }
 
 bool Mixer::set(const MixSet& c) {
@@ -300,7 +310,7 @@ void Mixer::track(int t, int N, double t0) {
   const bool hasChn = t < kNT && chn_[t].fn, isBus = t < kNT && (busOn_ >> t & 1u), mono = mono_[t] && !hasChn;
   if (!hasChn && !fx_[t].fn) {   // nothing in: nothing out (the same zeros the arithmetic gives)
     bool any = false; for (int i = 0; i < N && !any; i++) any = L[i] != 0 || (!mono_[t] && R[i] != 0);
-    if (!any) { std::memset(pL, 0, sizeof(float) * (size_t)N); std::memset(pR, 0, sizeof(float) * (size_t)N); if (preSrc_ >> t & 1u) { std::memset(eL, 0, sizeof(float) * (size_t)N); std::memset(eR, 0, sizeof(float) * (size_t)N); } return; }
+    if (!any) { std::memset(pL, 0, sizeof(float) * (size_t)N); std::memset(pR, 0, sizeof(float) * (size_t)N); if (bit32(preSrc_, t)) { std::memset(eL, 0, sizeof(float) * (size_t)N); std::memset(eR, 0, sizeof(float) * (size_t)N); } return; }
   }
   // inp (TRIM)
   for (int i = 0; i < N; i++) L[i] = L[i] * cI[i];
@@ -313,7 +323,7 @@ void Mixer::track(int t, int N, double t0) {
   }
   if (fx_[t].fn) fx_[t].fn(fx_[t].user, t, L, R, N, t0, nullptr, 0);
   // pre (an explicit stereo pair: mute and solo still silence it)
-  if (preSrc_ >> t & 1u) for (int i = 0; i < N; i++) { eL[i] = L[i] * cP[i]; eR[i] = R[i] * cP[i]; }
+  if (bit32(preSrc_, t)) for (int i = 0; i < N; i++) { eL[i] = L[i] * cP[i]; eR[i] = R[i] * cP[i]; }
   // g (VOL x audible), cg (the song's TVL / TVA)
   for (int i = 0; i < N; i++) { L[i] = L[i] * cG[i]; R[i] = R[i] * cG[i]; }
   if (s.hasMg) for (int i = 0; i < N; i++) { L[i] = L[i] * cMg[i]; R[i] = R[i] * cMg[i]; }
@@ -369,8 +379,8 @@ void Mixer::render(float* outL, float* outR, int N, double t0) {
     // the delay points' histories take this block (always: a delay that starts later reads what played before it), and the feeds a bus will hear
     Dly& D = dly_[t]; const float *pL = post_.get() + (size_t)(t * 2) * mb, *pR = pL + mb, *eL = preb_.get() + (size_t)(t * 2) * mb, *eR = eL + mb;
     D.post.push(pL, pR, N); fpL_[t] = pL; fpR_[t] = pR; feL_[t] = eL; feR_[t] = eR;
-    if (preSrc_ >> t & 1u) { D.pre.push(eL, eR, N); tap(D.pre, D.fdlP, feL_[t], feR_[t], fd_.get() + (size_t)(t * 4 + 2) * mb, fd_.get() + (size_t)(t * 4 + 3) * mb, N, t0); }
-    if (fdlSrc_ >> t & 1u) tap(D.post, D.fdl, fpL_[t], fpR_[t], fd_.get() + (size_t)(t * 4) * mb, fd_.get() + (size_t)(t * 4 + 1) * mb, N, t0);
+    if (bit32(preSrc_, t)) { D.pre.push(eL, eR, N); tap(D.pre, D.fdlP, feL_[t], feR_[t], fd_.get() + (size_t)(t * 4 + 2) * mb, fd_.get() + (size_t)(t * 4 + 3) * mb, N, t0); }
+    if (bit32(fdlSrc_, t)) tap(D.post, D.fdl, fpL_[t], fpR_[t], fd_.get() + (size_t)(t * 4) * mb, fd_.get() + (size_t)(t * 4 + 1) * mb, N, t0);
   }
   // the master sum (dl -> out), in track order
   for (int i = 0; i < N; i++) { outL[i] = 0; outR[i] = 0; }
