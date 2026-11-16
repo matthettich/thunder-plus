@@ -13,7 +13,9 @@
 // U16: Beat grains 100, Beat scramble 101, Glitch sequencer 102 and the Vintage sampler 103 (fx/idmcores.h) too. The first three are tempo-locked like Flex but keep
 // running while the clock is stopped (the worklet's `ck` 3) and have no feed; the Vintage sampler ignores the clock, is never napped and asks nothing of the sleep.
 //
-// Slot kinds the JS has that are not here yet: Pitch delay / reverb, Degrade, Resonator (U17), shared MODFX modules (U17), pump effects (U18). A chain entry of those kinds is
+// U17: Pitch reverb 96, Pitch delay 97, Resonator 98 and Degrade 99 (fx/u17cores.h): no clock; Degrade always runs, the other three nap like a wasm effect (slotNap).
+//
+// Slot kinds the JS has that are not here yet: shared MODFX modules (U19 to U21), pump effects (U18). A chain entry of those kinds is
 // left out of the host as the JS leaves out a slot whose engine is missing: the sound passes. `Slot` has the places they will use.
 //
 // REAL-TIME RULES. process(), psetAt(), lane(), reset(), setRest(), setLevels(), setTelemetry(), commit() allocate nothing and take no lock
@@ -27,6 +29,7 @@
 
 #include "fx/clkcores.h"
 #include "fx/idmcores.h"
+#include "fx/u17cores.h"
 #include "rt/auto.h"
 #include "rt/json.h"
 
@@ -41,7 +44,8 @@ constexpr int kFxQueue = 256;        // FXV messages waiting (the core's __q)
 constexpr int kFxKey = 24;           // "slot:type"
 inline bool fx_is_clocked(int id) { return id >= 93 && id <= 95; }   // Retrigger, Step gate, Flex (the tempo-locked JS cores)
 inline bool fx_is_idm(int id) { return id >= 100 && id <= 103; }    // U16: Beat grains, Beat scramble, Glitch sequencer, Vintage sampler (the other JS cores; 100..102 are tempo-locked, 103 is not)
-inline bool fx_is_core(int id) { return fx_is_clocked(id) || fx_is_idm(id); }   // a slot kind that is a JS core run by the host itself (a ClkFx), not a tfx effect
+inline bool fx_is_u17(int id) { return id >= 96 && id <= 99; }      // U17: Pitch reverb 96, Pitch delay 97, Resonator 98, Degrade 99 (JS cores that never read the clock)
+inline bool fx_is_core(int id) { return fx_is_clocked(id) || fx_is_idm(id) || fx_is_u17(id); }   // a slot kind that is a JS core run by the host itself (a ClkFx), not a tfx effect
 
 // ---- the effect table (fxtable.inc, generated from TFX: ids 0..33 and 93..95) and the parameter mapping ------------------------------------------------------
 int fx_type_of(std::string_view key);                 // the page's effect key ("eq", "reverb", "flex", ...) -> id 0..33 or 93..95, else -1

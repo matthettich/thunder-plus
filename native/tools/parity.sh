@@ -11,6 +11,7 @@
 #   native/tools/parity.sh u15     the tempo-locked effects (Flex, Step gate, Retrigger): ctest libm, fxclk (73 cases bit-exact vs the real worklet), golden + table current, rt_core (parity-u15.sh)
 #   native/tools/parity.sh u16     the JS-only effects Beat grains / scramble / Glitch / Vintage sampler: ctest libm, fxidm (242 cases bit-exact vs the real worklet), golden + table current, rt_core (parity-u16.sh)
 #   native/tools/parity.sh u19     the MODFX module block (54 modules): libm (log2), modfx (162 engine hashes + 904 direct cases bit-exact vs the real worklet), golden current + waves block identity, rt_core (parity-u19.sh)
+#   native/tools/parity.sh u17     the JS-only effects Pitch reverb / Pitch delay / Resonator / Degrade (track slots and pad applyFx): ctest libm, fxu17 (bit-exact vs the real worklet and applyFx), golden + table current, rt_core (parity-u17.sh)
 #   native/tools/parity.sh u14     the track-effect host: ctest fx (91 cases vs the real ThunderFx), golden + table current, rt_core (parity-u14.sh)
 #   native/tools/parity.sh u02     the CMake-built effects wasm against every golden that renders through it (parity-u02.sh)
 # BUILD_DIR names the build folder (default /tmp/thunder-parity).
@@ -35,6 +36,7 @@ case "$unit" in
   u15) shift; exec sh "$here/parity-u15.sh" u15 "$@" ;;   # the tempo-locked effects (parity-u15.sh)
   u16) shift; exec sh "$here/parity-u16.sh" u16 "$@" ;;   # the Grains / Scramble / Glitch / VSamp effects (parity-u16.sh)
   u19) shift; exec sh "$here/parity-u19.sh" u19 "$@" ;;   # the MODFX modules (parity-u19.sh)
+  u17) shift; exec sh "$here/parity-u17.sh" u17 "$@" ;;   # Pitch reverb / Pitch delay / Resonator / Degrade (parity-u17.sh)
   u14) shift; exec sh "$here/parity-u14.sh" u14 "$@" ;;   # the track-effect host (parity-u14.sh)   # meters and events out (parity-u13.sh)
   u02) shift; exec sh "$here/parity-u02.sh" u02 "$@" ;;   # the existing C++ DSP built from CMake: the goldens rendered through it (parity-u02.sh)
   u03) exec sh "$here/parity-u03.sh" "$@" ;;   # the pump DSP built from CMake: the goldens and pump's own compare (parity-u03.sh)

@@ -232,6 +232,25 @@ else()
   add_test(NAME modfx COMMAND test_modfx)   # no directory: prints FAIL and exits 1
 endif()
 
+# U17: Pitch reverb, Pitch delay, Resonator, Degrade (track effects and the pads' applyFx) against the real worklet / applyFx (tools/fx-u17-dump.mjs), bit-exact. As fxidm: no platform skip, a missing fixture is a failure.
+add_executable(test_fxu17 test_fxu17.cpp)
+target_link_libraries(test_fxu17 PRIVATE thunder_core)
+target_include_directories(test_fxu17 PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../core/src ${CMAKE_CURRENT_SOURCE_DIR})
+if(NOT MSVC)
+  target_compile_options(test_fxu17 PRIVATE -Wall -Wextra)
+endif()
+if(NODE_EXE)
+  add_test(NAME fxu17_ref COMMAND ${NODE_EXE} ${CMAKE_CURRENT_SOURCE_DIR}/../tools/fx-u17-dump.mjs ${CMAKE_CURRENT_BINARY_DIR}/fxu17-ref)
+  set_tests_properties(fxu17_ref PROPERTIES FIXTURES_SETUP fxu17_ref)
+  add_test(NAME fxu17 COMMAND test_fxu17 ${CMAKE_CURRENT_BINARY_DIR}/fxu17-ref)
+  set_tests_properties(fxu17 PROPERTIES FIXTURES_REQUIRED fxu17_ref)
+  if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    add_test(NAME fxu17_golden_current COMMAND ${NODE_EXE} ${CMAKE_CURRENT_SOURCE_DIR}/../tools/fx-u17-dump.mjs --check)
+  endif()
+else()
+  add_test(NAME fxu17 COMMAND test_fxu17)   # no directory: prints FAIL and exits 1
+endif()
+
 # N1 review fixes: hostile inputs (the independent review's findings, one regression test each). Names the finding in every failure line.
 add_executable(test_hostile test_hostile.cpp)
 target_link_libraries(test_hostile PRIVATE thunder_core)
