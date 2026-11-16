@@ -26475,8 +26475,9 @@ function instShown(){
 }
 for (const id of ['tInlSide', 'tInlPad']) $(id).addEventListener('click', e => {
   const b = e.target.closest('[data-i]'); if (!b) return;
-  cInst = +b.dataset.i; go('inst');
-  inlAudition(cInst);
+  const ii = +b.dataset.i; cInst = ii; go('inst');
+  if (cInst !== ii){ cInst = ii; draw(); }   /* (from Phrase, go('inst') takes the cursor row's instrument: the clicked one wins; CodeRabbit on #173) */
+  inlAudition(ii);
 });
 /* A click on an instrument in the INST LIST also plays it once: the note keys' own preview on INST (keyPlay: the octave's C, the
    instrument through its first track, normal velocity), so it sounds while the song plays too. */

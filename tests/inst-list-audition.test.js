@@ -11,7 +11,7 @@ const fn = (name) => { const i = src.indexOf('function ' + name + '('); assert.o
 test('the INST LIST click keeps selecting the instrument and opening INST, then auditions it', () => {
   const m = src.match(/for \(const id of \['tInlSide', 'tInlPad'\]\) \$\(id\)\.addEventListener\('click', e => \{([\s\S]*?)\n\}\);/);
   assert.ok(m);
-  assert.match(m[1], /cInst = \+b\.dataset\.i; go\('inst'\);\s*inlAudition\(cInst\);/);
+  assert.match(m[1], /const ii = \+b\.dataset\.i; cInst = ii; go\('inst'\);\s*if \(cInst !== ii\)\{ cInst = ii; draw\(\); \}[^\n]*\n\s*inlAudition\(ii\);/);
 });
 test('inlAudition plays the instrument once at the current octave\'s C, normal velocity, through the screen\'s track', () => {
   const calls = [], ctx = { kOct: 3, clamp: (v, a, b) => Math.min(b, Math.max(a, v)), keyPlayTrack: () => 5, preview: (...a) => { calls.push(a); } };
