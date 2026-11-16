@@ -44,6 +44,13 @@ endif()
 
 # build.sh: FLAGS="... -O3 -ffast-math -fno-finite-math-only -msimd128 -DPUMP_SYNC_KERNELS=1 -DPFFFT_STATIC_DEFINE -DNDEBUG" (SIMD only on wasm)
 set(OPT -O3 -ffast-math -fno-finite-math-only -w)
+# U18 (the lead, 15 Nov): host builds compile pump WITHOUT -ffast-math, as the track effects (core/dsp/CMakeLists.txt, OPT_TFX; the owner agreed to this
+# for effects whose samples depend on the compiler). With it VOX missed the gate against pump.wasm on every compiler (-71.8 / -75.1 dB, arithmetic spread:
+# the same bits whatever ran before, valgrind clean). Strict: VOX is within -80 dB with GCC 13 and clang 20 and the two give the same failing list.
+# The wasm keeps build.sh's flags.
+if(NOT IS_WASM)
+  set(OPT -O3 -fno-fast-math -ffp-contract=off -w)
+endif()
 if(IS_WASM)
   list(APPEND OPT -msimd128)
 endif()
