@@ -812,6 +812,9 @@ The owner's top priority to add is the MOD screen. Work down the list; ask befor
 
 Start a session by asking for results. Fix on `beta`. (10 Nov, 15:10: the web beta is build 560; the build numbers in the rest of this paragraph are older.) Web beta: https://matthettich.github.io/thunder-plus/beta/ (build 547 as of 10 Nov morning, 548 once its PR merges; the night of 9–10 Nov shipped 544–547, see the four "10 Nov" entries below. Decisions the lead made that night for the owner to confirm or reverse: on a phone the saved Sequencer default plays on the Page unless Audio thread is picked on that device; on a phone the safety limiter is its stand-in until another worklet loads; the resync only runs with a worklet loaded and its margins are untested on a device). Desktop: v1.3.4-beta.2 (build 541, no feed view or scopes); further desktop betas on hold until the owner asks.
 
+**Build 629** (an instrument for each generator)
+- [ ] **Computer or phone, Phrase:** GEN › Arp, Chords, Polymeter, Markov melody, Probability fill, Mutate. Pass: each panel has an Instrument choice; with Current nothing changes from before; picking one (it plays a note) and pressing the write / roll button puts that instrument number on the written notes (Mutate: on the notes it adds). Acid line, Euclidean fill (4th number) and the Drum pattern's parts still pick theirs.
+
 **Build 628** (paging sooner on small views)
 - [ ] **Phone (folded) and computer with a small Arrange / Song view:** play a song and watch Arrange and the Song screen. Pass: the next page turns noticeably earlier than before (about a third of the view from the bottom on a view under 16 rows), once per page, with the rows just played still in sight. Say if it should be sooner still, or if the ARRANGE LOOK-AHEAD setting should apply on small views too.
 
@@ -1485,6 +1488,12 @@ Tests added: `loop-beside-play` updated.
 Build 628, on `beta`. The owner: "Can song and arrange page down sooner?" The look-ahead rule (`arrPageTop`, used by Arrange, the Song screen, the Phrase / Pattern rows and the cursor's own page turn in `arrKeepRow`) is now one helper, `arrAheadFor(VR)`: a view of under 16 rows turns at a third of the view from the bottom, rounded up (14 rows: 5, was 3; 8 rows: 3, was 2; 12: 4, was 3), still capped by the setting; from 16 rows it is as before (the setting, 16 by default, never over half the view: already half of a 32-row view). Numbers chosen by me: the owner asked for 'about a third'; larger views were already past that. The hold rules are untouched.
 
 Tests added: `arrange-paging` updated (small-view numbers, helper pin).
+
+## 15 Nov (an instrument choice on the generators; build 629)
+
+Build 629, on `beta`. The owner: "Make each generator allow you to set the instrument number." Already had one: Acid line (Instrument select), Euclidean fill (4th number, hex), Drum pattern (every part picks its own track and instrument: left as it is, that is the sensible answer for several instruments). Added: `genInsField` (shared) on Arp, Chords, Polymeter, Markov melody and Probability fill, via `genScope`'s `G.ins` (Current = the cursor row's instrument, as before; `G.pick` makes Probability fill use it instead of the note before); Mutate: Instrument for added notes (default as the note before). Ratchet writes no notes, so no field. Checked in headless Chrome: each panel writes the chosen instrument.
+
+Tests added: `gen-instrument` (source pins).
 
 ## 15 Nov (a line on the small command bar; the side panel's instrument list auditions; builds 622 and 623)
 
