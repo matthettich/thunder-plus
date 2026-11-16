@@ -3,6 +3,7 @@
 > Snapshot of the owner's Claude Doc "Thunder Plus test checklist, by priority" (https://claude.ai/artifact/LrzQ18ur18Fc5gkvxmQDbK), exported 15 Nov 2026 with his ticks as in the doc (build 619).
 > The live list is the Claude Doc; the source of every item is "Owner's punch list" in HANDOVER.md (build numbers are in brackets).
 > Re-export this file when the doc changes.
+> **Not updated in the Claude Doc.** The items for builds 624 to 632 (the new section at the top of section 1) were added to this file on 16 Nov from HANDOVER.md's punch list. The owner's Claude Doc does not have them yet. Builds 620 to 623 were already in this file.
 
 14 Nov 2026 · Matt
 
@@ -10,7 +11,7 @@
 
 This list is in order of importance, so start at the top.
 
-Do section 1 first; it is short: the newest builds (589 to 623, ears first), what could lose work or sound.
+Do section 1 first; it is short: the newest builds (589 to 632, ears first), what could lose work or sound.
 
 Do sections 2 and 3 as time allows.
 
@@ -22,7 +23,7 @@ If something fails, tell Claude the build number and what happened; tick an item
 
 | Section | Open items | Mostly on | Why it matters |
 | --- | --- | --- | --- |
-| 1. Do these first | 119 | Phone and computer | The newest builds (589 to 623), lost work or sound |
+| 1. Do these first | 131 | Phone and computer | The newest builds (589 to 632), lost work or sound |
 | 2. Really worth trying | 68 | Phone | Everyday features nobody has tried on a real device, the 585 to 588 editor checks and the re-checks of your last fixes |
 | 3. If you have time | 47 | Phone, then gear | Secondary features, by-ear comparisons and hardware |
 | 4. Safe to skip unless something looks wrong | 55 | Mixed | Cosmetic, older, or already covered by automated tests |
@@ -30,6 +31,23 @@ If something fails, tell Claude the build number and what happened; tick an item
 | Set aside | 5 | none | Nothing: probably superseded |
 
 ## 1. Do these first
+
+### New in builds 624 to 632: the folded phone's header, the MOD strip, generators' instrument, LOOP, playback keeps a selection
+
+*The newest builds, first. Computer unless the item says otherwise.*
+
+- [ ] Phone, folded (Galaxy Z Fold 6, about 344 px wide), IDM skin and one other: the Phrase screen. Pass: the line under the tabs reads BPM, LPB, then ROWS (a number only), then LEFT with the time, in that order; nothing clips or wraps. Unfolded phone and computer unchanged. (632)
+- [ ] Phone, folded (about 344 px wide), IDM skin and one other: the Phrase screen. Pass: the top bar holds Tracker / Synth, File, Settings, Play and the CPU meter with room to spare; the ROWS number has no − / + and tapping it opens a box to type a row count (1 to 256). The line's order is the one in the build 632 item. Nothing clips or wraps. (631)
+- [ ] Phone, folded: File menu. Pass: a Record section with REC: OFF · tap to turn on; tapping it arms REC (the header has no REC button) and the entry then reads ON · tap to turn off; it records exactly as the old button did. (631)
+- [ ] Phone, unfolded, and computer: nothing changed (LEFT in the top bar on the unfolded phone, REC and ROWS with − / + on the line). (631)
+- [ ] Computer, bottom panel (FX bar): a track with 1 to 4 LFOs (MOD screen). Click the folded MOD strip. Pass: it opens, titled MOD · TRACK nn, one row per LFO with a small wave, a dot moving on it while the song plays, the shape and rate, and the destination name; clicking a row opens MOD on that track; clicking the title folds it again. Check the IDM skin and one other, with ANIMATIONS off (no dot), and on a track with no LFO (a one-line message). (630)
+- [ ] Phone: nothing changes: the MOD section is not shown there. (630)
+- [ ] Computer or phone, Phrase: GEN › Arp, Chords, Polymeter, Markov melody, Probability fill, Mutate. Pass: each panel has an Instrument choice; with Current nothing changes from before; picking one (it plays a note) and pressing the write / roll button puts that instrument number on the written notes (Mutate: on the notes it adds). Acid line, Euclidean fill (4th number) and the Drum pattern's parts still pick theirs. (629)
+- [ ] Phone (folded) and computer with a small Arrange / Song view: play a song and watch Arrange and the Song screen. Pass: the next page turns noticeably earlier than before (about a third of the view from the bottom on a view under 16 rows), once per page, with the rows just played still in sight. Say if it should be sooner still, or if the ARRANGE LOOK-AHEAD setting should apply on small views too. (628)
+- [ ] Computer, the top bar: the LOOP button is immediately left of PLAY. Pass: Alt+L and the button still work. The phone layout is unchanged (LOOP stays in the selection bar). (627)
+- [ ] Computer and phone, Song screen (Arrange and the text grid): put the cursor on an empty row below the last block, with the view there, then press LOOP play on the command bar. Pass: the view stays where it is and a toast says there is nothing on that row to loop; PLAY still works. On a row with a block, LOOP plays it as before. If LOOP still pages the view away in another case, say exactly where the cursor was and what the song looked like. (626)
+- [ ] Computer, Song / Arrange: select a few blocks (also upward), press UNIQ on the command bar. Pass: the blocks get new numbers and the selection and cursor stay where they were; picked cells (Ctrl-click) stay picked. (625)
+- [ ] Computer, Phrase view with Arrange beside it, FOLLOW PATTERN: give Arrange the keys, select 8 or more rows upward (Shift+▲), then press PLAY. Pass: the selection stays exactly as made while the song plays (the view may page, the selection does not shrink). Check FOLLOW ON and OFF too, and the Song screen itself. (624)
 
 ### New in builds 622 and 623: command bar line, the side panel's instrument list plays and selects
 
