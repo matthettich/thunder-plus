@@ -70,7 +70,7 @@ jobs:
           # values must equal the web copy's bit for bit (U05). (The effects in dsp/ keep their own flags.)
           "$SDK/bin/clang++" --target=wasm32-wasi --sysroot="$SDK/share/wasi-sysroot" \
             -O3 -ffp-contract=off -msimd128 -fno-exceptions -fno-rtti -std=c++17 -Wall -Wextra \
-            -Inative/core/include -Inative/core/src \
+            -Inative/core/include -Inative/core/src -isystem native/core/third_party \
             native/core/src/core.cpp native/core/src/rt/auto.cpp native/core/src/rt/jsmath.cpp \
             native/core/src/rt/json.cpp native/core/src/song/song.cpp \
             -mexec-model=reactor -Wl,--export=_initialize \
