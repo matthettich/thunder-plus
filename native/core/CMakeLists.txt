@@ -2,6 +2,7 @@
 add_library(thunder_core STATIC src/core.cpp src/rt/auto.cpp src/rt/jsmath.cpp src/rt/json.cpp src/song/song.cpp src/seq/seq.cpp src/voice/voice.cpp src/mix/mix.cpp src/mix/pdc.cpp src/mix/delay.cpp src/mix/beat.cpp src/master/master.cpp src/master/eq.cpp src/master/chain.cpp src/meter/meter.cpp src/render/render.cpp)
 target_include_directories(thunder_core PUBLIC include)
 target_include_directories(thunder_core PRIVATE src)
+target_include_directories(thunder_core SYSTEM PRIVATE third_party)
 target_compile_features(thunder_core PUBLIC cxx_std_17)
 # No exceptions or RTTI on the audio path (WORKPLAN section 3, rule 2).
 if(MSVC)

@@ -1,7 +1,7 @@
 // N1 review fixes: regression tests for the independent review's findings (progress/review-n1.md, 15 Nov 2026). Each test is
 // named for its finding (A1..C9) and fails with that id. Built with the sanitizers in CI (THUNDER_SANITIZE), where a read out of
 // range, a shift by the type's width or a cast of NaN is itself a failure.
-#define C9_HASH 0x662f6935bb240df0ull   /* made on Linux (glibc), where every one of the numbers equals strtod's */
+#define C9_HASH 0x617ad453f5060f56ull   /* made on Linux (glibc), where every one of the numbers equals strtod's */
 #include <chrono>
 #include <cmath>
 #include <cstdio>
@@ -249,10 +249,10 @@ static void testC() {
   CHECK("C3 to_i64_sat", to_i64_sat(1e300, 0, 1LL << 62) == (1LL << 62) && to_i64_sat(NAN, -7, 7) == -7 && to_i64_sat(-INFINITY, -7, 7) == -7 && to_i64_sat(123456789012.0, 0, 1LL << 62) == 123456789012LL);
   { thunder_core* c = thunder_create(48000, 256); std::string s = "{\"t\":\"echo\",\"n\":"; s += std::string(400, '9'); s += ",\"at\":" + std::string(400, '9') + "}";
     CHECK("C3 a 400-digit n and at no longer reach an integer cast", thunder_post(c, s.data(), (int)s.size()) == 1); thunder_destroy(c); }
-  // C9: the JSON reader's numbers equal strtod's in the C locale: 100,000 generated strings (long mantissas, exponents, subnormals, overflow)
+  // C9: the JSON reader's numbers equal strtod's in the C locale: 300,000 generated strings (long mantissas, exponents, subnormals, overflow)
   { uint64_t r = 88172645463325252ull; auto rnd = [&]() { r ^= r << 13; r ^= r >> 7; r ^= r << 17; return r; };
     int bad = 0, total = 0; std::string first; uint64_t hsum = 0xcbf29ce484222325ull;
-    for (int k = 0; k < 100000; k++) {
+    for (int k = 0; k < 300000; k++) {
       std::string n; if (rnd() % 3 == 0) n += '-';
       const int mode = (int)(rnd() % 6); int digits = mode == 0 ? 1 + (int)(rnd() % 6) : mode == 1 ? 1 + (int)(rnd() % 17) : mode == 2 ? 15 + (int)(rnd() % 10) : mode == 3 ? 1 + (int)(rnd() % 40) : mode == 4 ? 300 + (int)(rnd() % 500) : 1 + (int)(rnd() % 20);
       std::string m; for (int i = 0; i < digits; i++) m += (char)('0' + rnd() % 10); if (m[0] == '0' && m.size() > 1) m[0] = '1' + (char)(rnd() % 9);
@@ -268,9 +268,9 @@ static void testC() {
       if (std::memcmp(&got, &want, sizeof got) != 0) { bad++; if (first.empty()) first = n; }
 #endif
     }
-    std::printf("  C9 hash of the 100,000 parsed numbers: 0x%016llx\n", (unsigned long long)hsum);
-    CHECK("C9 the 100,000 parsed numbers are the same bits as on Linux (where they equal glibc's strtod)", hsum == C9_HASH);
-    CHECK("C9 100,000 numbers equal strtod's, bit for bit", bad == 0 && total == 100000); if (bad) std::printf("  first mismatch: %s (%d bad)\n", first.c_str(), bad); }
+    std::printf("  C9 hash of the 300,000 parsed numbers: 0x%016llx\n", (unsigned long long)hsum);
+    CHECK("C9 the 300,000 parsed numbers are the same bits as on Linux (where they equal glibc's strtod)", hsum == C9_HASH);
+    CHECK("C9 300,000 numbers equal strtod's, bit for bit", bad == 0 && total == 300000); if (bad) std::printf("  first mismatch: %s (%d bad)\n", first.c_str(), bad); }
 }
 
 // @@TESTS_END

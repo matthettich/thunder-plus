@@ -79,3 +79,15 @@ pump's `tools/check-licence-boundary.sh` needs `plugins/machine/` to exist, so i
 - `wasm/pump_synth.cpp` defines `struct std::mutex` (no-op) inside `namespace std` when building for wasm (undefined behaviour in
   principle; works with wasi-sdk 25). Reported, not changed.
 - MSVC: the pump libraries are skipped (the build needs clang or gcc, as for the U02 DSP). Windows hosting would build pump with clang-cl: later unit.
+
+## fast_float (N1 review C9): the JSON number reader
+Vendored as one header, `native/core/third_party/fast_float/fast_float.h` (with `LICENSE-MIT`, `LICENSE-APACHE`, `LICENSE-BOOST` beside it).
+Used by `rt/json.cpp` `toDouble()` instead of the platform's `from_chars` / `strtod`, so every platform parses a number to the same bits.
+
+| Upstream | Tag | Commit (full) | File sha256 | Licence |
+|---|---|---|---|---|
+| fastfloat/fast_float | `v8.3.3` | `dbeabeeb3e6791cb96994c2a7a084c36e62ccfb2` (the commit the tag points at; the tag object is `048df798cab53c26c9ab1a7c15585ecf6fd5ef9c`) | `2a8d07368d7d7280741db8de9dbdc69ea3c2955afbcdd54b8165e67fea02cc04` | MIT OR Apache-2.0 OR BSL-1.0 (any one; the three licence files are copied unchanged from the tag) |
+
+The header is the `fast_float.h` release asset of GitHub release v8.3.3, copied unchanged. C++11, no exceptions. Included as a SYSTEM
+include path (`third_party`) in CMake and as `-isystem` in the wasm job of `.github/workflows/native.yml`, plus an MSVC `warning(push, 0)`
+around the include. Update: change the tag, re-download the asset, and update this table and the sha256 together.
