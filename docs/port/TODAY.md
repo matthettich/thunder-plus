@@ -104,3 +104,8 @@ N1 step 10.
 
 ## Progress log (the manager updates and pushes this after every change of state; newest last)
 - 10:30 Fable: plan written. Nothing started.
+- 10:45 Fable (managing from the owner's chat): five workers started on this session's machine. Haiku: section A (all three). Sonnet:
+  C1 U22 on `n3/u22` (PR to open when bit-exact, not to be merged by the worker); B1 + B3 and B2 + B4 + B5 (read-only; they write to
+  `/home/claude/progress/review-*.md`, **not pushed yet**: the manager copies them into `docs/port/REVIEW-16NOV.md` on `rev/16nov`);
+  D1 then D2 (notes to `n1/u18` and `rev/d2-mods`). Not started: C2 onward, D3, D4, D5. Next for the manager: when a worker reports,
+  read its diff or findings, log it here, and start the next unstarted item (keep two compiling workers busy).
