@@ -15,8 +15,9 @@ import { engineOf, ROOT } from './engine-dump.mjs';
 
 const SR = 48000;
 const U22 = ['sine', 'tri', 'saw', 'square', 'pulse', 'white', 'pink', 'brown', 'blue', 'metal', 'lfsr', 'dust', 'grit'];
+const U23 = ['click', 'wavetable', 'pd', 'chip', 'supersaw', 'pwm', 'sample', 'grains'];   // U23's, in the fixture's allowed set so that the voices that mix U23 and U24 types are covered
 const U24 = ['fm2', 'fmfb', 'fmmetal', 'fmcross', 'fm4', 'fm6', 'genesis', 'sb', 'arcade', 'addsaw', 'addodd', 'membrane', 'bell', 'bar', 'chord', 'formant', 'karplus', 'vosim'];
-const OK_TYPES = new Set([...U22, ...U24]), NEW = new Set(U24);
+const OK_TYPES = new Set([...U22, ...U23, ...U24]), NEW = new Set(U24);
 const golden = path.join(ROOT, 'native/tests/golden');
 
 const sha = a => crypto.createHash('sha256').update(Buffer.from(a.buffer, a.byteOffset, a.byteLength)).digest('hex');
