@@ -46,3 +46,8 @@ Result: all 242 bit-exact with g++ 13 and with clang++ 18 (Linux x86-64, Release
 
 - `Math.tanh` and `Math.log` behaviour inside V8's optimising compiler (TurboFan) is assumed to be the same `ieee754` functions as the interpreter's (it is for Node 22); real Chrome (a different V8 build) is the step-11 check, as for U15's libm.
 - Nothing is left unported from the unit. Degrade, Resonator, Pitch delay / reverb are U17 and are still left out of the host (the sound passes).
+
+## Lead's change before the PR (Opus, 15 Nov)
+The gate of `test_fxidm` is the committed hash (Node 22 on x86-64 Linux, proved there by `fxidm_golden_current`), on every platform. The sample-by-sample
+comparison with the LOCAL Node run must also hold on x86-64 Linux; elsewhere it is only reported, because macOS arm64 Node rounds Math.sin / cos / log
+differently (U15's lesson) and these cores call them. Without this the macOS job would compare the C++ (fdlibm, Linux-identical) with a macOS-Node reference and fail.
