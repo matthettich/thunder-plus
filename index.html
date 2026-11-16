@@ -25955,7 +25955,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 625;
+const BUILD = 626;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD + (location.pathname.includes('/beta/') ? ' · beta' : '');
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -26184,7 +26184,7 @@ function arrPageTop(top, VR, row, len, keep = -1, end = len - 1){
 // The last song row the playhead reaches before it wraps: the row a pattern loop holds, the last row of a selection loop, or the song's last row with a block. Read from what the display
 // already has (the loop it asked for, the song); nothing here touches the sequencer.
 function arrWrapRow(){
-  if (tp.loopV === 'pat'){ if (patRow >= 0) return patRow; }
+  if (tp.loopV === 'pat' || (!tp.loopV && loopPat && tp.mode === 'song')){ if (patRow >= 0) return patRow; }   /* (build 626) LOOP just pressed: the row it holds is the end already, before syncLoop has set loopV, so the look-ahead does not page for a loop that stays put */
   else if (tp.loopV === 'song' && loopArm && loopArm.v === 'song') return Math.max(loopArm.y0, loopArm.y1);
   for (let y = 255; y >= 0; y--){ const r = S.song[y]; if (r && r.some(v => v >= 0)) return y; }
   return 0;
@@ -28107,10 +28107,12 @@ let lpW = null;   // {was: LOOP before, seen: tp.on has been true since}
 function lpRestore(){ if (!lpW) return; const was = lpW.was; lpW = null; if (loopPat !== was){ loopPat = was; if (was){ patRow = -1; patCur = cs.song.y; } } }
 function playPatLoop(){
   if (tp.on){ tStopUser(); return; }   // the restore is in draw(), which tStop runs
+  const r = S.song[cs.song.y], full = !!(r && r.some(v => v >= 0)), at = full ? cs.song.y : songRow();
+  /* (build 626, owner: "pressing loop paged down the bottom of the song on song mode") on an empty row the loop used to start at the next row with a block, or row 0, and the view paged there, far from the cursor: now (on the Song screen) only when that row is in view; else nothing starts and a toast says so */
+  if (!full && tv === 'song'){ const top = cs.song.top || 0, VR = Math.max(2, asongOn() ? arrRows() : songRows()); if (at < top || at >= top + VR) return toast(`Nothing on row ${rS(cs.song.y, 3)} to loop: move onto a block, or press PLAY`, 2600); }
   lpW = {was:loopPat, seen:false};
   if (!loopPat) toggleLoopPat();
-  const r = S.song[cs.song.y];
-  tStart('song', {row:r && r.some(v => v >= 0) ? cs.song.y : songRow()});
+  tStart('song', {row:at});
   if (tp.on) lpW.seen = true; else if (!warmTok){ lpRestore(); draw(); }   // (the first PLAY of a session waits for the engine: warmTok; a refused start puts LOOP back at once)
 }
 // LP.SEL (12 Nov, owner: "add a lp.sel button to the command bar that loops the selection in arrange mode. Can be next to the loop play button"; "It can disappear on folded"): next to loop play on the control bar. With rows selected on
@@ -36197,6 +36199,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [626, '15 Nov', ['Song / Arrange: LOOP play from an empty row no longer pages the view away to the next block (or to row 0): it starts only when that row is in view, otherwise it says there is nothing to loop on this row', 'The page-ahead turn no longer fires for a loop that stays put the instant LOOP is pressed']],
   [625, '15 Nov', ['Command bar: Make unique keeps the selection (and the cursor) after it runs, so you can go on with the same blocks']],
   [624, '15 Nov', ['Arrange: selecting rows (upward or downward) and then pressing PLAY no longer shrinks the selection as the song plays (FOLLOW PATTERN moved the selection\'s end with the playhead while Arrange sat beside Phrase)']],
   [623, '15 Nov', ['A click on an instrument in the side panel’s instrument list plays it once (the current octave’s C), as well as selecting it']],
