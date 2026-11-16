@@ -101,6 +101,12 @@ N1 step 10.
 
 ## Review queue for Fable (add a line per merged PR and per decision; newest last)
 - (nothing yet today; last night's queue is in TONIGHT.md and is still unreviewed)
+- #187 D6 `js_exp(1.0)` returns E as V8 does (4 lines, one `test_libm` case; no golden changed; Sonnet): merged, all CI green.
+- #188 D5 `test_modfx` builds its inputs in C++ (fixture 246 MB to 125 MB); all 1326 inputs equal Node's files bit for bit on Linux x86-64 and every hash in
+  the unchanged golden still matches; merged, all CI green (so macOS, Windows and Android match too). Least sure of: the U20 inputs needed the JS rounding of a
+  seed product above 2^53 reproduced; other platforms rest on `js_sin` equalling Node's `Math.sin`. The manager read the file list and CI, not the diff.
+- D3 ThreadSanitizer (clang 18): 83 of 86 tests, no races, but the suite is single-threaded so it proves little; `rt_core`, `rt_guard_selftest` and `song`
+  do not link under TSan (`rt_harness.cpp`'s global `operator new` / `delete` collide with TSan's). The only threaded code is Android's `jni.cpp`, not built on Linux.
 
 ## Progress log (the manager updates and pushes this after every change of state; newest last)
 - 10:30 Fable: plan written. Nothing started.
@@ -150,3 +156,5 @@ N1 step 10.
   **A second Sonnet worker is verifying it independently** (is the gate real, three mutation tests, scope): report to
   `/home/claude/progress/verify-u22.md`. Manager's next step: when CI is all green AND the verifier passes it, merge #189, add its line
   to the review queue, and start U23 and U24 (one worker each; the fixture worker must have finished or only one of them at a time).
+- 11:35 **#187 (D6) and #188 (D5) merged**, all CI green. D3 done: report appended to REVIEW-16NOV.md on `rev/16nov`. Not started: D4.
+  Waiting: #189's CI and its verifier. Then U23 and U24.
