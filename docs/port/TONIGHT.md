@@ -104,3 +104,16 @@ is in section C; read it, it changes how effects are built.
   left of the countdown timer" and "the rows box … between left and lpb", where LEFT is the time-left box: so the order he asked for is **BPM / LPB, ROWS, LEFT**.
   It is the `order` values in the build-631 media query (`body.mob #tRowsBar`, `body.mob #tClk`); check at 344 px in two skins with a screenshot.
   Item 3 is only partly confirmed (the jump was reproduced from an empty cursor row only): its punch-list item asks the owner what he pressed.
+- **U18 pump hosting at 22:20: branch `n1/u18` pushed (Sonnet agent, then one commit by Fable), NO PR yet, NOT to be merged tonight: it carries decisions for Fable.**
+  Read `docs/port/U18-NOTES.md` in the branch. Pump effects are slot kinds 200 + type of `FxHost`; 80 cases against a `pump.wasm` built from the pin.
+  Fable's decision, done in the branch: host builds compile pump without `-ffast-math` (as the track effects); VOX then passes on GCC 13 and clang 20.
+  **For Opus tonight on this branch (a Sonnet agent):** (1) regenerate the reference with the PIN-built wasm (the copy Fable tested against had the shipped wasm, where
+  MASTER differs by design: 77 parameters / latency 4454 against 75 / 358) and print the full table for GCC 13, clang 20 and GCC 15 with the strict build; ctest the whole
+  suite on each; (2) `x_two_hosts_same` is −68.4 dB on both compilers (14 of 163840 samples, a CRUSH quantiser edge): find out exactly why a second host changes those 14
+  samples at all (two hosts must not influence each other: is it shared state, or the same spread showing in this case only?) and write the proof; do not gate it away;
+  (3) run `parity-u18.sh` end to end and open the PR so CI runs (the wasm job's new step was never run); leave the PR open.
+  **For Fable (not Opus):** the audio thread can allocate when a resting pump slot wakes or a plugin's output runs away (the JS does `pump_free` + `pump_new` there; kept);
+  the gate that keeps the audio thread from waiting on `pump_new` passes the sound unprocessed for a block now and then (a click when an effect is added mid-song);
+  `pump_io` is process-global, so every host must run on one audio thread (not enforced); no ThreadSanitizer run; whether the web app's `pump.wasm` is rebuilt from the pin;
+  the heap overwrite the agent found and clamped (a value list longer than the plugin's parameter count wrote past `pump_values`): check whether the web app can do the same.
+- Units U16, U17, U19 to U21 do not depend on U18: branch them from `native`.
