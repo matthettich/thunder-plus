@@ -20,3 +20,7 @@ Status at the first push (work in progress, see "Progress" at the bottom for the
 
 ## Not here (U29 / later)
 table, vector, scanned, resynth, bytebeat, sf, wavesl, acid, mach, lx*, p*: `xeng_voice_from_json` returns false with `V.kind == XKind::Other` and `xeng_render_voice` returns `kEngUnsupported` for them (never silence).
+
+## Progress
+- 16 Nov: all 15 engines done; PR #195. Merged origin/native (after #191, #192) cleanly; engine_xeng passes. Local test times (2 cores): `engine_xeng_ref` about 3.5 min, `engine_xeng` 35 s, `engine_xeng_golden_current` 3.3 min. Checks done: GCC and clang Release, GCC ASan + UBSan clean, gcov: every line of xeng_*.cpp executed; mutations (tone dist, piano hypot, strings comb) fail 31 / 25 / 58 voices.
+- Left: nothing in this unit. If U24 merges first, merge native again (conflicts expected only in core/CMakeLists.txt, tests/CMakeLists.txt, rt_harness.cpp: keep both sides).
