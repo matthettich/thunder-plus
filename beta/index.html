@@ -25955,7 +25955,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 628;
+const BUILD = 629;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD + (location.pathname.includes('/beta/') ? ' · beta' : '');
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -29305,7 +29305,7 @@ function mutatePhrase(){
   if (busTrack(cTrack)) return busSay();
   const P = S.phrases[cPhrase]; if (!P || isEmptyPhrase(P)) return toast('This phrase is empty: there is nothing to vary yet (try Acid line or Drum pattern).');
   let y0 = 0, y1 = plen(cPhrase) - 1; if (selA && selA.v === 'phrase'){ const R = selRect(); y0 = R.y0; y1 = Math.min(R.y1, y1); }
-  const ph0 = cPhrase, orig = P.map(r => r.slice()), cols = isPolyT(cTrack) ? NCOL : 1;
+  const ph0 = cPhrase, orig = P.map(r => r.slice()), cols = isPolyT(cTrack) ? NCOL : 1; let mutIns = -1;   /* build 629: -1 = as before (the note before it); else the instrument written on the notes this adds */
   const found = songKey(cPhrase), sc = found ? ACID_SCALES[found.scale][1] : null, root = found ? found.root : 0;
   const lpb = plpbOf(S, cPhrase), spr = Math.max(1, Math.round(lpb / 4));
   const near = (n, dir) => { if (!sc){ const st = Math.random() < 0.7 ? (Math.random() < 0.5 ? 1 : 2) : 12; return n + dir * st; }
@@ -29324,7 +29324,7 @@ function mutatePhrase(){
     if (L.hits){ let prev = null;
       for (let y = y0; y <= y1; y++){ const r = P[y]; if (isNoteV(r[0])){ prev = {n:r[0], i:r[IC] >= 0 ? r[IC] : prev && prev.i}; continue; }
         const off = Math.floor((y - y0) / spr) % 2 === 1;
-        if (prev && emptyRow(r) && r[0] !== OFF && rnd() < a * (off ? 0.2 : 0.07)){ r[0] = prev.n; if (prev.i != null && prev.i >= 0) r[IC] = prev.i; r[VC] = 0x50 + Math.floor(rnd() * 0x40); nA++; } } }
+        if (prev && emptyRow(r) && r[0] !== OFF && rnd() < a * (off ? 0.2 : 0.07)){ r[0] = prev.n; { const ii = mutIns >= 0 ? mutIns : prev.i; if (ii != null && ii >= 0) r[IC] = ii; } r[VC] = 0x50 + Math.floor(rnd() * 0x40); nA++; } } }
     saveS(); draw();
     toast(`Mutated rows ${rS(y0)}–${rS(y1)}: ${nP} pitch, ${nD} dropped, ${nA} added, ${nT} moved, ${nV} volumes` + (found ? ' · in ' + found.name : ''), 3500); };
   const original = () => { if (S.phrases[ph0] !== P) return; orig.forEach((r, y) => { P[y] = r.slice(); }); saveS(); draw(); toast('Back to the phrase as it was.'); };
@@ -29333,7 +29333,8 @@ function mutatePhrase(){
       slider('Amount', () => mutSet.amt, v => { mutSet.amt = v; });
       const seg = el('div', 'seg'); [['pitch', 'PITCH'], ['hits', 'HITS'], ['time', 'TIME'], ['vol', 'VOLUME']].forEach(([k, t]) => { const b = el('button', mutSet.lanes[k] ? 'on' : null, t); b.type = 'button'; b.setAttribute('aria-pressed', !!mutSet.lanes[k]);
         b.addEventListener('click', () => { mutSet.lanes[k] = !mutSet.lanes[k]; b.classList.toggle('on', mutSet.lanes[k]); b.setAttribute('aria-pressed', mutSet.lanes[k]); }); seg.append(b); });
-      field('Vary', seg); },
+      field('Vary', seg);
+      field('Instrument for added notes', selOf([[-1, 'As the note before it'], ...S.insts.map((_, j) => [j, instLabel(j)])], -1, v => { mutIns = v; })); },
     [['▶ / ■', () => playCtx()], ['Original', () => original()], ['Mutate (M)', () => roll(), 'ok']], {m:roll, g:roll, o:original});
 }
 
@@ -29426,9 +29427,12 @@ function genScope(what){
   const ins = (() => { const r = P0[cs.phrase.y]; if (r && r[IC] >= 0) return r[IC]; const f = P0.find(q => q[IC] >= 0); return f ? f[IC] : defInst(); })();
   const curNote = (() => { for (let y = cs.phrase.y; y >= 0; y--) if (isNoteV(P0[y][0])) return P0[y][0]; const f = P0.find(q => isNoteV(q[0])); return f ? f[0] : null; })();
   const key = songKey(cPhrase), sc = key ? ACID_SCALES[key.scale][1] : ACID_SCALES[0][1], root = key ? key.root : 0;
-  return {y0, y1, ph, spr, ins, curNote, key, sc, root, P:() => { if (!S.phrases[ph]) S.phrases[ph] = P0; return S.phrases[ph]; }, ok:() => cPhrase === ph};
+  return {y0, y1, ph, spr, ins, ins0:ins, pick:false, curNote, key, sc, root, P:() => { if (!S.phrases[ph]) S.phrases[ph] = P0; return S.phrases[ph]; }, ok:() => cPhrase === ph};
 }
 const genRange = G => `rows ${rS(G.y0)}–${rS(G.y1)}`;
+/* INSTRUMENT FIELD (build 629, owner: "Make each generator allow you to set the instrument number"): the panels that write notes through genScope get an Instrument
+   choice; the first entry is what they did before (the instrument on the cursor row, else the phrase's first), so doing nothing changes nothing. G.pick: an instrument was chosen. */
+const genInsField = (G, field) => field('Instrument', selOf([[-1, 'Current (' + hx(G.ins0) + ')'], ...S.insts.map((_, j) => [j, instLabel(j)])], G.pick ? G.ins : -1, v => { G.pick = v >= 0; G.ins = v >= 0 ? v : G.ins0; if (v >= 0){ try { const h = preview(v, G.curNote != null ? G.curNote : ROOT, -1, false, null, true); if (h) setTimeout(() => previewOff(h), 280); } catch(e){} } }));
 // the effect column a command goes in on a row: the one that has it already, else the first empty (null when full)
 function fxSlot(r, cmd){ const ci = FXC.indexOf(cmd); for (let m = FX0; m < RW; m += 2) if (r[m] === ci) return m; for (let m = FX0; m < RW; m += 2) if (r[m] < 0) return m; return null; }
 function fxPut(r, cmd, v){ const m = fxSlot(r, cmd); if (m == null) return false; r[m] = FXC.indexOf(cmd); r[m + 1] = clamp(v | 0, 0, 255); return true; }
@@ -29476,11 +29480,12 @@ function probFill(){
       if (!rowEmpty(r) || r[0] === OFF) continue; const k = Math.floor((y - G.y0) / G.spr), onRow = (y - G.y0) % G.spr === 0;
       const w = !onRow ? 0.15 : k % 4 === 0 ? 0.08 : k % 2 === 0 ? 0.35 : 0.6;
       if (rnd() < w * d * 1.4){ const src = prev || {n:G.curNote != null ? G.curNote : ROOT + G.root, i:G.ins};
-        const setI = r[IC] < 0; r[0] = src.n; if (src.i != null && setI) r[IC] = src.i; r[VC] = 0x28 + Math.floor(rnd() * 0x40); if (fillSet.mode) fxPut(r, 'CHA', 0x40 + Math.floor(rnd() * 0x70)); mine.set(y, {n:r[0], v:r[VC], i:setI}); n++; } }
+        const setI = r[IC] < 0, si = G.pick ? G.ins : src.i; r[0] = src.n; if (si != null && si >= 0 && setI) r[IC] = si; r[VC] = 0x28 + Math.floor(rnd() * 0x40); if (fillSet.mode) fxPut(r, 'CHA', 0x40 + Math.floor(rnd() * 0x70)); mine.set(y, {n:r[0], v:r[VC], i:setI}); n++; } }
     saveS(); draw(); toast(`Probability fill: ${n} ghost note${n === 1 ? '' : 's'}` + (fillSet.mode ? ' (each plays by chance: CHA)' : '') + ' · ' + genRange(G)); };
   genPanel('Probability fill', `Ghost notes on the empty rows of ${genRange(G)}, offbeats likelier, quiet (volume 28–67).`,
     ({field, slider}) => {
       slider('Density', () => fillSet.dens, v => { fillSet.dens = v; });
+      genInsField(G, field);
       field('Notes', selOf([[1, 'Chance: each plays some passes (CHA)'], [0, 'Fixed: always play']], fillSet.mode, v => { fillSet.mode = v; })); },
     [['▶ / ■', () => playCtx()], ['Fill (G)', () => roll(), 'ok']], {g:roll, r:roll});
 }
@@ -29505,6 +29510,7 @@ function arpGen(){
     saveS(); draw(); toast(`Arp: ${n} note${n === 1 ? '' : 's'}, ${ARP_SHAPES[arpSet.shape][0]} on ${noteS(arpSet.root)} · ${genRange(G)}`); };
   genPanel('Arp', `A chord written out as notes, in the first note column of ${genRange(G)}, instrument ${hx(G.ins)}.`,
     ({field}) => {
+      genInsField(G, field);
       field('Root', selOf(Array.from({length:61}, (_, i) => 24 + i).map(n => [n, noteS(n)]), arpSet.root, v => { arpSet.root = v; }));
       field('Shape', selOf(ARP_SHAPES.map(([t], i) => [i, t]), arpSet.shape, v => { arpSet.shape = v; }));
       field('Pattern', selOf([[0, 'Up'], [1, 'Down'], [2, 'Up and down'], [3, 'Converge'], [4, 'Random']], arpSet.pat, v => { arpSet.pat = v; }));
@@ -29542,6 +29548,7 @@ function chordGen(){
     saveS(); draw(); toast(`Chords: ${n} in ${ROOTS[chordSet.root]} ${minor ? 'minor' : 'major'} (${M[0]})` + (cols === 1 ? ' · a mono track: roots only' : '') + ' · ' + genRange(G)); };
   genPanel('Chords', `A progression in the note columns of ${genRange(G)}` + (isPolyT(cTrack) ? ` (track ${d2(cTrack + 1)} is poly: up to four notes a chord)` : ` (track ${d2(cTrack + 1)} is mono: the roots only)`) + (G.key ? `; the song is in ${G.key.name}.` : '.'),
     ({field}) => {
+      genInsField(G, field);
       field('Key', selOf(ROOTS.map((t, i) => [i, t]), chordSet.root, v => { chordSet.root = v; }));
       field('Mood', selOf(CHORD_MOODS.map(([t], i) => [i, t]), chordSet.mood, v => { chordSet.mood = v; }));
       field('Every', selOf([[4, '4 sixteenths (a beat)'], [8, '8 (half a bar)'], [16, '16 (a bar)'], [32, '32 (two bars)']], chordSet.every, v => { chordSet.every = v; }));
@@ -29566,6 +29573,7 @@ function polyGen(){
     saveS(); draw(); toast(`Polymeter: ${K} in ${N} against ${M} notes · ${n} notes · ${genRange(G)}`); };
   genPanel('Polymeter', `A ${polySet.steps}-step rhythm and a pitch cycle repeated over ${genRange(G)}, drifting against the bar.`,
     ({field}) => {
+      genInsField(G, field);
       field('Rhythm', selOf([3, 5, 6, 7, 9, 10, 11, 12, 13].map(v => [v, v + ' steps']), polySet.steps, v => { polySet.steps = v; if (polySet.hits > v) polySet.hits = v; }));
       field('Hits', selOf([1, 2, 3, 4, 5, 6, 7].map(v => [v, v + (v === 1 ? ' hit' : ' hits')]), polySet.hits, v => { polySet.hits = v; }));
       field('Pitches', selOf([1, 2, 3, 4, 5, 7].map(v => [v, v === 1 ? 'One note' : v + ' notes']), polySet.pitch, v => { polySet.pitch = v; }));
@@ -29596,6 +29604,7 @@ function markovGen(){
     saveS(); draw(); toast(`Markov melody: ${k} notes from ${tot} in the song · ${genRange(G)}`); };
   genPanel('Markov melody', `A new line in ${genRange(G)} that moves the way the song’s melodies do (learned from ${tot} notes, ${T.size} of which lead to another note).`,
     ({field, slider}) => {
+      genInsField(G, field);
       slider('New', () => markSet.nov, v => { markSet.nov = v; });
       field('Octave', selOf([[-1, 'Down one'], [0, 'As the song'], [1, 'Up one']], markSet.oct, v => { markSet.oct = v; })); },
     [['▶ / ■', () => playCtx()], ['Generate (G)', () => roll(), 'ok']], {g:roll, r:roll});
@@ -36201,6 +36210,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [629, '15 Nov', ['Generators: Arp, Chords, Polymeter, Markov melody and Probability fill have an Instrument choice (the first entry, Current, is what they did before); Mutate has one for the notes it adds. Acid line, Euclidean fill and Drum pattern already had theirs']],
   [628, '15 Nov', ['Arrange and the Song screen turn their page sooner on a small view: under 16 rows the page turns when the playhead (or the cursor going down) is a third of the view from the bottom (it was a quarter); from 16 rows the ARRANGE LOOK-AHEAD setting rules as before']],
   [627, '15 Nov', ['Top bar (computer): LOOP now sits immediately to the left of PLAY']],
   [626, '15 Nov', ['Song / Arrange: LOOP play from an empty row no longer pages the view away to the next block (or to row 0): it starts only when that row is in view, otherwise it says there is nothing to loop on this row', 'The page-ahead turn no longer fires for a loop that stays put the instant LOOP is pressed']],
