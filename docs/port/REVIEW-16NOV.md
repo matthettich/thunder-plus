@@ -144,3 +144,23 @@ mod_cv.cpp (139-162, 470-546), mod_reverbs.cpp (60-80, 120-140), mod_delays.cpp 
 Grep only (process bodies not read): mod_basic.cpp, mod_stereo.cpp, mod_filters.cpp, rest of mod_misc/mod_delays/mod_reverbs/mod_cv/mod_voice,
 fftr.cpp/h, fxbank.cpp, fxmap.cpp. B3 "none found" for these rests on grep for new/push_back/resize/throw/lock/vector only.
 Scratch files in /tmp/rv only; nothing created in the repo.
+
+## D3: ThreadSanitizer run
+# ThreadSanitizer run of the native test suite (D3), 16 Nov
+
+Source: branch n1/jsexp (origin/native 35bed8e + the js_exp fix). Not fixed anything.
+
+## What ran
+- clang 18.1.3 on Linux x86-64; `libclang-rt-18-dev` had to be apt-installed first (the TSan runtime was missing from the machine).
+- cmake -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo, C/CXX/exe/shared flags `-fsanitize=thread -g`, -DTHUNDER_DEPS_DIR=/home/claude/deps; build dir /home/claude/b-tsan; `-j2`.
+- `ctest -j2` with TSAN_OPTIONS="halt_on_error=0 second_deadlock_stack=1 history_size=4 log_path=.../tsan-log": 83 of 86 tests passed, 427 s.
+- Races reported: NONE (0 "WARNING: ThreadSanitizer" in the ctest output, no tsan-log.* files).
+
+## What could not be built / run (3 tests, "Not Run")
+- `rt_core`, `rt_guard_selftest`, `song`: the targets `tests/rt_harness` and `tests/test_song` fail to LINK: rt_harness.cpp (lines 47-54) defines the global operator new / delete
+  (the allocation guard), which collides with TSan's own (libclang_rt.tsan_cxx, tsan_new_delete.cpp): "multiple definition of operator new(unsigned long)" etc.
+  Fixing needs the guard's operators compiled out (or turned into a hook) under TSan: not done (no fixing).
+
+## Caveat on the meaning of a clean result
+The only thread creation in native/ is android/.../jni.cpp (not built on Linux). The test suite is single-threaded, so a clean TSan run says little; races between the audio thread
+and the UI/message thread are not exercised by any test.
