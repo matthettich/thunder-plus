@@ -817,6 +817,10 @@ The owner's top priority to add is the MOD screen. Work down the list; ask befor
 
 Start a session by asking for results. Fix on `beta`. (10 Nov, 15:10: the web beta is build 560; the build numbers in the rest of this paragraph are older.) Web beta: https://matthettich.github.io/thunder-plus/beta/ (build 547 as of 10 Nov morning, 548 once its PR merges; the night of 9–10 Nov shipped 544–547, see the four "10 Nov" entries below. Decisions the lead made that night for the owner to confirm or reverse: on a phone the saved Sequencer default plays on the Page unless Audio thread is picked on that device; on a phone the safety limiter is its stand-in until another worklet loads; the resync only runs with a worklet loaded and its margins are untested on a device). Desktop: v1.3.4-beta.2 (build 541, no feed view or scopes); further desktop betas on hold until the owner asks.
 
+**Build 634** (MOD section: title bar colour and place in the bottom bar)
+- [ ] **Computer, wide window, View → Bottom panel → BOTTOM BAR FX; open the MOD section (click MOD) in the IDM, IDM pink & green and 909 skins, and one Low power skin:** Pass: MOD comes right after …CHAINS and before FX; its title bar is the same grey (or skin tone) as the …CHAINS and FX bars, with the label drawn like theirs (no black strip); folding MOD and reloading keeps it folded.
+- [ ] **Folded phone (344 px wide):** Pass: the bottom panel looks as in build 630 (MOD hidden or small, nothing new in the way).
+
 **Build 633** (Bytebeat: `&&` / `||` with a number)
 - [ ] **Computer or phone, a Bytebeat pad (or the Bytebeat module in …chains) with a typed formula:** type `(t && 51) + a` and play it, then `(t || 51) + a`. Pass: sound keeps running, the app stays responsive, no audio drop-out; the built-in formulas sound as before.
 
@@ -1527,6 +1531,10 @@ Tests added: `gen-instrument` (source pins).
 Build 630, on `beta`. The owner asked for a mod section in the FX bar: collapsible, small, showing that there are modulations, the waveform and the destinations. Added `#dkMod` (DK_SECS / DK_FOLD, `deck.mod` saved with the panel, default FOLDED so no existing layout changes) between FX and PERFORM. `deckMod()` rebuilds only when open and when the focused track's LFOs / skin / ANIMATIONS change; each row is a 48×18 canvas wave (`modMix`, the MOD screen's maths) with a dot moved by `dkModTick` from the frame loop (only open, playing, visible, ANIMATIONS on, LOW POWER DISPLAY off), the shape and rate, and the destination (`tgtLabel`). Click: MOD screen on that track. Skin colours through CSS variables (checked IDM and 909 in headless Chrome). Hidden on the phone's swipe layout (`max-width:700px` + coarse pointer): the bottom panel there is one section at a time and the owner's folded-phone width is not a place to add a page. Display code only; nothing posts to the engine.
 
 Tests added: `deck-mod-section` (source pins).
+
+## 16 Nov (MOD section: skin-toned title bar, and before the effects; build 634)
+
+Build 634, on `beta` and `main`. The owner: the MOD section's label was black, unlike the rest of the bar, and the MOD part should come before the effects. Cause: the TERM skins (IDM, IDM pink & green, the lcd / matrix ones) tint each section's title bar with `color-mix(var(--mx) var(--dkp)+…, var(--mxbg))` and set `--dkc` / `--dkp` per section by id (`#dkScope, #dkInst, #dkChn, #dkFx, #dkStrip`); `#dkMod` (630) and `#dkPerf` were not in that list, so `--dkp` fell back to the deck's 100% and the bar became solid ink with the ink-coloured label on it. Fix: both ids are in the `--dkc` list, with `--dkp` 10% (MOD) and 13% (PERFORM). Order: the `#dkMod` section is now before `#dkFx` in the markup and in `DK_SECS` (…CHAINS, MOD, FX, PERFORM, TRACK); fold flag, saved state and the phone rule are unchanged. Display code only. Checked in headless Chrome (screenshots) in IDM, IDM pink & green, 909 and Low power at 1400 px and 344 px: label colours match the neighbours, order as stated. Test: `deck-mod-section` extended.
 
 ## 16 Nov (Bytebeat: `x && number` / `x || number` could freeze the audio thread; build 633)
 

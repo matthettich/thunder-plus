@@ -2719,7 +2719,7 @@ body.mob .dogs.idle .bob{animation-iteration-count:9} body.mob .dogs.idle .tail{
 :root[data-skin="contrast"]{--mxmst:#d6331f; --mxmston:#ffffff}
 :root[data-skinbase="term"] .tdeck{--tk-mono:var(--mx); --tk-poly:var(--mxpoly); --scfill:color-mix(in srgb, var(--mx) 45%, var(--mxbg))}
 :root:is([data-skin="matrix"],[data-skin="bwterm"],[data-skin="lowpower"],[data-skin="lowpowerpink"],[data-skin="lowpowermustard"],[data-skin="night"],[data-skin="espresso"],[data-skin="midnight"],[data-skin="matrixlight"],[data-skin="haring"],[data-skin="idm"],[data-skin="idmpink"],[data-skin="idmpg"],[data-skin="vice"],[data-skin="te"],[data-skin="opuntia"],[data-skin="mpc"],[data-skin="nord"],[data-skin="tr808"],[data-skin="tr909"],[data-skin="sp202"],[data-skin="wes"],[data-skin="m8"],[data-skin="calcwatch"],[data-skin="bauhaus"],[data-skin="swiss"],[data-skin="destijl"],[data-skin="memphis"],[data-skin="valentine"],[data-skin="eames"],[data-skin="vignelli"],[data-skin="bondi"],[data-skin="dx7"],[data-skin="lcdgreen"]) .tdeck{--stpink:var(--mx)}
-:root[data-skinbase="term"] :is(#dkScope,#dkInst,#dkChn,#dkFx,#dkStrip){--dkc:var(--mx)} :root[data-skinbase="term"] #dkScope{--dkp:3%} :root[data-skinbase="term"] #dkInst{--dkp:7%} :root[data-skinbase="term"] #dkChn{--dkp:9%} :root[data-skinbase="term"] #dkFx{--dkp:11%} :root[data-skinbase="term"] #dkStrip{--dkp:15%}
+:root[data-skinbase="term"] :is(#dkScope,#dkInst,#dkChn,#dkMod,#dkFx,#dkPerf,#dkStrip){--dkc:var(--mx)} :root[data-skinbase="term"] #dkScope{--dkp:3%} :root[data-skinbase="term"] #dkInst{--dkp:7%} :root[data-skinbase="term"] #dkChn{--dkp:9%} :root[data-skinbase="term"] #dkMod{--dkp:10%} :root[data-skinbase="term"] #dkFx{--dkp:11%} :root[data-skinbase="term"] #dkPerf{--dkp:13%} :root[data-skinbase="term"] #dkStrip{--dkp:15%}
 :root[data-skinbase="term"] .dkh .dksolo{background:var(--mxsoft); color:var(--mxon)} :root[data-skinbase="term"] .stms button.so.on{background:var(--mxsoft); color:var(--mxon)}
 :root[data-skinbase="term"] .tarr .tagrid b.gm{--ar-empty:color-mix(in srgb, var(--tk-mono) 22%, var(--mxbg))} :root[data-skinbase="term"] .tarr .tagrid b.gp{--ar-empty:color-mix(in srgb, var(--tk-poly) 18%, var(--mxbg))}
 /* POLY cells in the POLY colour in every term skin (owner, 19 Oct): mixed into a tinted background the poly colour
@@ -3639,10 +3639,10 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
           <div class="dkb"><div class="dkrows" id="dkInstRows"></div></div></section>
         <section class="dks" id="dkChn" data-s="chn"><div class="dkh"><button type="button" class="dkt" data-k="chn" id="dkChnT">…CHAINS</button><span class="dki" id="dkChnI"></span></div>
           <div class="dkb"><div class="dkcg" id="dkChnRows"></div></div></section>
-        <section class="dks" id="dkFx" data-s="fx"><div class="dkw" data-w="wf" title="Drag to resize"></div><div class="dkh"><button type="button" class="dkt" data-k="fx" id="dkFxT">FX</button></div>
-          <div class="dkb"><div class="dkslots" id="dkFxSlots"></div><div class="dkrows" id="dkFxRows"></div></div></section>
         <section class="dks" id="dkMod" data-s="mod"><div class="dkh"><button type="button" class="dkt" data-k="mod" id="dkModT">MOD</button></div>
           <div class="dkb"><div class="dkmod" id="dkModB"></div></div></section>
+        <section class="dks" id="dkFx" data-s="fx"><div class="dkw" data-w="wf" title="Drag to resize"></div><div class="dkh"><button type="button" class="dkt" data-k="fx" id="dkFxT">FX</button></div>
+          <div class="dkb"><div class="dkslots" id="dkFxSlots"></div><div class="dkrows" id="dkFxRows"></div></div></section>
         <section class="dks" id="dkPerf" data-s="perf"><div class="dkh"><button type="button" class="dkt" data-k="perf" id="dkPerfT">PERFORM</button><span class="dki">fill · reload · parts · scenes · macros</span></div>
           <div class="dkb"><div class="pfbody" id="dkPerfB"></div></div></section>
         <section class="dks" id="dkStrip" data-s="strip"><div class="dkh"><button type="button" class="dkt" data-k="strip" id="dkStripT">TRACK</button></div>
@@ -25969,7 +25969,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 633;
+const BUILD = 634;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD + (location.pathname.includes('/beta/') ? ' · beta' : '');
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -31473,7 +31473,7 @@ mstLabel();
 /* ---------- bottom panel (KEYS mode with the keypad off) ---------- */
 const DKK = 'thunderplus-deck-v1';
 // In signal-flow order: the instrument, its chains (they come before the track effects), the track effects, the strip.
-const DK_SECS = [['scope', 'SCOPE'], ['inst', 'INST'], ['chn', '…CHAINS'], ['fx', 'FX'], ['mod', 'MOD'], ['perf', 'PERFORM'], ['strip', 'TRACK']];
+const DK_SECS = [['scope', 'SCOPE'], ['inst', 'INST'], ['chn', '…CHAINS'], ['mod', 'MOD'], ['fx', 'FX'], ['perf', 'PERFORM'], ['strip', 'TRACK']];
 let deck = (() => { const d = {on:true, scope:true, inst:true, chn:true, fx:true, strip:true, h:0, ws:300, wf:320, fxbar:!isMobile(), perf:true, perfOn:false, mod:false};   /* mod: the MOD section (build 630) is open, not folded: it starts folded */   // perfOn: PERFORM PART shown (1 Nov; off until turned on), perf: open, not folded   // fxbar: FX BAR (phones: off until turned on)
   try { const o = JSON.parse(localStorage.getItem(DKK) || 'null');
     if (o && typeof o === 'object'){ for (const k in d) if (typeof o[k] === typeof d[k]) d[k] = o[k]; } } catch(e){}
@@ -36255,6 +36255,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [634, '16 Nov', ['Bottom panel: the MOD section now sits before the effects (FX), and its title bar takes the skin like the other sections (it was drawn black in the terminal-style skins, IDM among them)']],
   [633, '16 Nov', ['Bytebeat formulas: “x && number” and “x || number” now give the right value, and a formula with && 50, && 51, || 50 or || 51 can no longer freeze the sound']],
   [632, '15 Nov', ['Folded phone, top: the tempo line now reads BPM and LPB, then ROWS, then the time left (631 had ROWS first)']],
   [631, '15 Nov', ['Folded phone, top: the tempo line now reads ROWS (tap the number to type it; no − / +), BPM and LPB, then the time left; the time left leaves the top bar, which is roomier. REC is gone from the header: File › Record has it, with its on / off state']],

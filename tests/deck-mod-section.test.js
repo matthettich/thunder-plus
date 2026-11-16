@@ -5,7 +5,7 @@ const test = require('node:test'), assert = require('node:assert/strict');
 const src = require('./helpers').read('index.html');
 test('a section: markup, DK_SECS, DK_FOLD, a saved fold flag that starts folded', () => {
   assert.match(src, /<section class="dks" id="dkMod" data-s="mod">[\s\S]*?id="dkModT">MOD<\/button>/);
-  assert.match(src, /\['fx', 'FX'\], \['mod', 'MOD'\], \['perf', 'PERFORM'\]/); assert.match(src, /new Set\(\['inst', 'chn', 'fx', 'mod', 'perf'\]\)/); assert.match(src, /perf:true, perfOn:false, mod:false\}/);
+  assert.match(src, /\['mod', 'MOD'\], \['fx', 'FX'\], \['perf', 'PERFORM'\]/); assert.match(src, /new Set\(\['inst', 'chn', 'fx', 'mod', 'perf'\]\)/); assert.match(src, /perf:true, perfOn:false, mod:false\}/);
 });
 test('deckMod reads the focused track\'s LFOs, builds only when open and when something changed, and goes to the MOD screen on a click', () => {
   const f = src.slice(src.indexOf('function deckMod(){'), src.indexOf('function dkModGo('));
@@ -20,4 +20,9 @@ test('the dot: only open, playing, ANIMATIONS on, LOW POWER DISPLAY off, visible
 test('no audio code: nothing posts to the engine; skin colours only (CSS variables); hidden on the phone\'s swipe layout', () => {
   const f = src.slice(src.indexOf('var dkMd ='), src.indexOf('function deckDraw(){')); assert.doesNotMatch(f, /corePost|rt\.|postMessage|makeSeq/);
   assert.match(src, /#dkMod\{--dkc:#e6e0f3;/); assert.match(src, /@media \(max-width:700px\) and \(pointer:coarse\)\{ #dkMod\{display:none!important\} \}/);
+});
+test('build 634: MOD sits before FX (markup and DK_SECS) and takes the TERM skins\' per-section tone like the others (a missing --dkp / --dkc drew its head black)', () => {
+  assert.ok(src.indexOf('id="dkChn" data-s="chn"') < src.indexOf('id="dkMod" data-s="mod"') && src.indexOf('id="dkMod" data-s="mod"') < src.indexOf('id="dkFx" data-s="fx"'));
+  assert.match(src, /:is\(#dkScope,#dkInst,#dkChn,#dkMod,#dkFx,#dkPerf,#dkStrip\)\{--dkc:var\(--mx\)\}/);
+  assert.match(src, /#dkMod\{--dkp:10%\}/); assert.match(src, /#dkPerf\{--dkp:13%\}/);
 });
