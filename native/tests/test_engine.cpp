@@ -22,6 +22,7 @@
 #include "sha256.h"
 #include "golden/engine_golden.inc"
 #include "golden/engine_cases_golden.inc"
+#include "golden/engine_probes_golden.inc"
 
 using namespace thunder;
 
@@ -80,7 +81,7 @@ int main(int argc, char** argv) {
   std::string tj, rj, fj;
   if (!readFile(refDir + "/tables.json", &tj) || !readFile(refDir + "/ref.json", &rj) || !readFile(fixPath, &fj)) { std::printf("FAIL: the reference (tables.json, ref.json) or the fixture is missing\n"); return 1; }
   JsonDoc tdoc, rdoc, fdoc; if (!tdoc.parse(tj) || !rdoc.parse(rj) || !fdoc.parse(fj)) { std::printf("FAIL: a reference file does not parse\n"); return 1; }
-  eng_sin_table();
+  eng_init();
   checkTables(tdoc.root()); checkDefaults(tdoc.root().obj("defaults"));
   std::map<std::string, const EngineGolden*> gold; for (int i = 0; i < kEngineGoldenN; i++) gold[kEngineGolden[i].key] = &kEngineGolden[i];
   std::map<std::string, std::pair<std::string, long>> ref; Json R = rdoc.root().arr("voices"); for (size_t i = 0; i < R.size(); i++) ref[std::string(R.at(i).str("k"))] = {std::string(R.at(i).str("sha256")), (long)R.at(i).num("len")};
@@ -152,15 +153,19 @@ int main(int argc, char** argv) {
     }
     std::printf("engine direct cases: %d of %d bit-exact (%d with pad effects)\n", cexact, cran, cfx);
     if (cexact != cran) fails++;
-    int pn = 0, pbad = 0;
+    // voiceMod: THE GATE is the committed hash of the real outputs (Node 22, x86-64 Linux); the local Node's values must agree on x86-64 Linux, elsewhere they are reported
+    int pn = 0, pbad = 0; Sha256 ph;
     for (size_t pi = 0; pi < P.size(); pi++) {
       Json p = P.at(pi); EngVoice V; eng_voice_from_json(V, p.obj("v"), Json(), Json()); const double bpm = p.num("bpm", 120); Json ts = p.arr("t"), ms = p.arr("m");
       for (size_t k = 0; k < ts.size(); k++) { const EngMod m = eng_voice_mod(V, ts.at(k).asNum(), bpm); Json e = ms.at(k); pn++;
         const double want[4] = {ev(e.at(0)), ev(e.at(1)), ev(e.at(2)), ev(e.at(3))}, got[4] = {m.pitch, m.level, m.lpcut, m.hpcut};
-        for (int q = 0; q < 4; q++) if (!same(got[q], want[q])) { if (!pbad) std::printf("voiceMod probe %zu t=%.17g output %d: got %.17g want %.17g\n", pi, ts.at(k).asNum(), q, got[q], want[q]); pbad++; break; } }
+        for (int q = 0; q < 4; q++) { const double c = got[q] == got[q] ? got[q] : (double)NAN; double cn = c; if (c != c) { const uint64_t nb = 0x7ff8000000000000ull; std::memcpy(&cn, &nb, 8); } ph.add((const char*)&cn, 8); }
+        for (int q = 0; q < 4; q++) if (!same(got[q], want[q])) { if (!pbad) std::printf("voiceMod probe %zu t=%.17g output %d: got %.17g want(local Node) %.17g\n", pi, ts.at(k).asNum(), q, got[q], want[q]); pbad++; break; } }
     }
-    CHECK(pbad == 0, "voiceMod: %d of %d probes differ", pbad, pn);
-    std::printf("engine voiceMod probes: %d of %d exact\n", pn - pbad, pn);
+    const bool probeGold = ph.hex() == kEngineProbesGolden && pn == kEngineProbesGoldenN;
+    CHECK(probeGold, "voiceMod: the outputs do not hash to the committed golden (%d probes)", pn);
+    if (localMustMatch) CHECK(pbad == 0, "voiceMod: %d of %d probes differ from the local Node", pbad, pn);
+    std::printf("engine voiceMod probes: %d, committed hash %s, local Node differs for %d\n", pn, probeGold ? "matches" : "DIFFERS", pbad);
   }
   // the refusals
   { EngVoice V; V.layers[0].on = true; V.layers[0].type = LType::Other; EngRenderOpts o; size_t n = 0; float tmp[64];

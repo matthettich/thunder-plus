@@ -26,6 +26,7 @@ namespace thunder {
 // ---- tables (index.html ENGINE block, top) ----------------------------------------------------------------------------------------------------------------
 constexpr double kBase = 65.40639;     // BASE: C2
 constexpr int kSinTS = 4096;           // TS
+void eng_init();                       // builds the tables now: call once off the audio thread (the lazy path below stays: the first render builds them if nobody did)
 const float* eng_sin_table();          // SIN: Float32Array(TS + 1) of Math.sin(i / TS * 2 * Math.PI); made on first use (call once before a guarded render)
 extern const double kRatios[24];       // RATIOS
 extern const double kMem[12], kBell[12], kBellA[12], kBar[6], kHat[6];

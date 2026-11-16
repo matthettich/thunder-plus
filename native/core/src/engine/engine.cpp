@@ -38,6 +38,7 @@ inline double orv(double x, double d) { return (x != 0 && x == x) ? x : d; }   /
 inline float f32(double x) { return (float)x; }
 }  // namespace
 
+void eng_init() { (void)sinTable(); }
 const float* eng_sin_table() { return sinTable().v; }
 
 double eng_sinT(double p) {

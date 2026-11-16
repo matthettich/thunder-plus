@@ -1,6 +1,6 @@
 # U22: the engine foundation
 
-Port of the voice core of index.html's ENGINE block to `native/core/src/engine/`. **Bit-exact**: 294 of 294 factory voices against beta's `tests/golden/engines.json` hashes (SHA-256 of the float32 bytes of `renderVoice(v, 48000, null, hold)`), 168 of 168 direct cases (random voices through the real `renderVoice`, plus written-out edge cases) and 1800 of 1800 `voiceMod` probes against the real JS run in Node. GCC 13 and clang 18 (Release), GCC ASan + UBSan; full ctest 89 of 89 on GCC. Gate command: `native/tools/parity.sh u22`.
+Port of the voice core of index.html's ENGINE block to `native/core/src/engine/`. **Bit-exact**: 294 of 294 factory voices against beta's `tests/golden/engines.json` hashes (SHA-256 of the float32 bytes of `renderVoice(v, 48000, null, hold)`), 168 of 183 direct cases (random voices through the real `renderVoice`, plus written-out edge cases) and 1800 of 1800 `voiceMod` probes against the real JS run in Node. GCC 13 and clang 18 (Release), GCC ASan + UBSan; full ctest 89 of 89 on GCC. Gate command: `native/tools/parity.sh u22`.
 
 ## What is where
 - `native/core/src/engine/engine.{h,cpp}`: tables, `EngRng` (rng), `eng_blep`, `eng_sinT` + SIN, `EngSeedCounter` (freshLayer's seed), the oscillator scaffolding (`Osc`, makeOsc's closures), `renderLayer`, `eng_voice_mod` (voiceMod), `voiceFilter`, `voiceAmp`, `eng_render_voice` (renderLayersOnly + renderVoice: drive, level, the pad effect chain, the trailing-silence trim, the 2 ms fade), `EngVoice` / `EngLayer` / `EngFx` (mkVoice / freshLayer parameters with their defaults).
@@ -33,3 +33,8 @@ The 294 factory voices are 560 layers: white 186, sine 135, metal 69, square 45,
 - U23 / U24 / U25: the other layer types: add a case in `Osc::init` / `Osc::s` (engine.cpp) and the name in `eng_layer_type`; widen `OK_TYPES` in `engine-dump.mjs` and re-run `--fixture <beta checkout>` (by hand; it needs beta's tools and goldens) and `--golden`.
 - `renderVoice`'s other branches (Bass, Vox, Blip, the XENG engines, stereo samples `.r`, `renderLayersOnly`'s `stages` peaks) are not here.
 - The effects other than the four JS ones (see Decisions) and the voice description reader (U06 may want `engine_json.cpp`'s keys).
+
+## Added after the first CI run (macOS)
+- Gate on every platform is now committed Linux hashes for everything: beta's hashes (voices), `engine_cases_golden.inc` (direct cases) and `engine_probes_golden.inc` (SHA-256 of the real voiceMod outputs of the 1800 probes). The comparison with the LOCAL Node run (samples and probes) must hold only on x86-64 Linux; elsewhere it is reported (macOS arm64 Node rounds Math.sin / cos differently, which moved 7 probes and 1 case). `engine_golden_current` proves all three files on Linux.
+- Resonance clamp: 15 more direct cases (`edge_lpres*`, `edge_hpres*`, `edge_gres*`: res 0.9 / 0.975 / 0.98 / 0.985 / 1 on the layer low pass, high pass and the voice low pass). Changing the layer clamp 0.98 to 0.97 now fails 5 of 183 cases (it failed 1 of 168 before, and 0 of the 294 voices).
+- `eng_init()` builds the sine table now (call once off the audio thread); the lazy path in `eng_sinT` / `eng_sin_table` stays.
