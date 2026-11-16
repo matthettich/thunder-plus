@@ -211,3 +211,10 @@ N1 step 10.
   dark title bar in the terminal-style skins (`#dkMod` was missing from the per-section `--dkc` / `--dkp` list; `#dkPerf` had the same gap and was added too, not
   asked for), and MOD now sits before FX (order: …CHAINS, MOD, FX, PERFORM, TRACK; HTML and `DK_SECS`). `npm test` green on both; screenshots taken in headless Chrome.
   Not read by the manager. Still running: the U24 (#193) and U28 (#195) workers.
+- 15:35 **#193 U24: all CI green (Linux job about 29 minutes), `native` merged in, NOT merged yet: an independent Sonnet verifier is on it** (report to
+  `/home/claude/progress/verify-u24.md`; it also checks the Karplus stack buffers and whether membrane / bell / bar are in the PR). U24's figures: 110 of 110 factory
+  voices (13 mix in U23 types), 383 direct cases, five mutations caught. Author's decisions: a chord index past the table, a NaN algorithm and more than 64 partials
+  return `kEngUnsupported`; one line of U23's test changed (`fm2` → `plaits` as the unsupported example). **CI time:** the `*_ref` and `*_golden_current` tests take
+  about 530 s per pass and run in all three passes; running `_golden_current` only in the GCC pass would save about 4 minutes per extra pass (not done: for Fable or a chore).
+  **Desktop v1.3.11** was started at 15:08 at the owner's word (run 43967032621, from `main` at build 634); a Haiku worker watches it and records it in HANDOVER.md.
+  Still running: U28 (#195).
