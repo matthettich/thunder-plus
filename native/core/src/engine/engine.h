@@ -21,6 +21,8 @@
 #include <cstddef>
 #include <cstdint>
 
+#include "engine/layer_params.h"
+
 namespace thunder {
 
 // ---- tables (index.html ENGINE block, top) ----------------------------------------------------------------------------------------------------------------
@@ -50,7 +52,7 @@ struct EngRng {                        // rng(seed): xorshift32, returns s / 2^3
 struct EngSeedCounter { uint32_t state = 1000; uint32_t next(); };
 
 // ---- parameters (mkVoice, freshLayer) -----------------------------------------------------------------------------------------------------------------
-enum class LType : uint8_t { Sine, Tri, Saw, Square, Pulse, White, Pink, Brown, Blue, Metal, Lfsr, Dust, Grit, Other };
+enum class LType : uint8_t { Sine, Tri, Saw, Square, Pulse, White, Pink, Brown, Blue, Metal, Lfsr, Dust, Grit, Click, Wavetable, Pd, Chip, Supersaw, Pwm, Sample, Grains, Other };
 LType eng_layer_type(const char* name, size_t n);   // the layer's `type` string; Other for a type this unit does not port (the JS's own names for all of them: see TYPES)
 bool eng_type_supported(LType t);
 
@@ -62,6 +64,7 @@ struct EngLayer {                       // freshLayer's fields that render (the 
   double atk = 0.5, hold = 0, dec = 300, sus = 0.6, rel = 150;
   double lpCut = 20000, lpRes = 0, lpEnv = 0, hpCut = 20, hpRes = 0, hpEnv = 0, fAtk = 0.5, fDec = 200;
   double delay = 0, burst = 0, spacing = 10;
+  EngU23 u23;                           // U23: wavetable / sample / vint / loop fields and the sample (layer_params.h)
   double seed = 1;                      // the number the JS holds (a uint32 from the counter, or whatever a song says)
 };
 
