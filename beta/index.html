@@ -2107,6 +2107,14 @@ body.sdesk .dock:not(.vtrk) .pads .pad:nth-child(17)::before{content:'More pads'
 #dkStrip{--dkc:#d8f0e2; flex:0 0 var(--dkstw, 228px); margin-left:auto}
 /* PERFORM part (1 Nov) */
 #dkPerf{--dkc:#f3e2f0; flex:0 0 400px}
+/* MOD section of the bottom panel (630): small rows, the wave in a tiny canvas with a dot, and the destination */
+#dkMod{--dkc:#e6e0f3; flex:0 0 clamp(150px, 14vw, 210px)}
+.dkmod{display:flex; flex-direction:column; gap:3px; padding:4px 6px; overflow:auto; min-height:0; min-width:0; font-size:var(--fs-1); color:var(--ink)}
+.dmr{display:grid; grid-template-columns:48px minmax(0,1fr); grid-template-rows:auto auto; column-gap:6px; align-items:center; cursor:pointer; min-width:0} .dmr:hover .dmd{color:var(--ink)}
+.dmw{position:relative; width:48px; height:18px; grid-row:1 / 3; border:1px solid var(--line); overflow:hidden; color:var(--ink)} .dmw canvas{display:block} .dmw i{position:absolute; left:-2px; top:-2px; width:5px; height:5px; background:var(--pl, var(--ink)); border-radius:50%; will-change:transform}
+.dml{color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0} .dmd{white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0; color:var(--ink); font-weight:600}
+.dmn{color:var(--muted); padding:4px 2px; cursor:pointer}
+@media (max-width:700px) and (pointer:coarse){ #dkMod{display:none!important} }
 .pfbody{display:grid; gap:5px; padding:6px 8px; font-size:var(--fs-2); overflow:auto}
 .pfr{display:flex; align-items:center; gap:4px; min-width:0}
 .pfr .sm{min-height:0; height:22px; padding:0 7px; font-size:var(--fs-2)}
@@ -3631,6 +3639,8 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
           <div class="dkb"><div class="dkcg" id="dkChnRows"></div></div></section>
         <section class="dks" id="dkFx" data-s="fx"><div class="dkw" data-w="wf" title="Drag to resize"></div><div class="dkh"><button type="button" class="dkt" data-k="fx" id="dkFxT">FX</button></div>
           <div class="dkb"><div class="dkslots" id="dkFxSlots"></div><div class="dkrows" id="dkFxRows"></div></div></section>
+        <section class="dks" id="dkMod" data-s="mod"><div class="dkh"><button type="button" class="dkt" data-k="mod" id="dkModT">MOD</button></div>
+          <div class="dkb"><div class="dkmod" id="dkModB"></div></div></section>
         <section class="dks" id="dkPerf" data-s="perf"><div class="dkh"><button type="button" class="dkt" data-k="perf" id="dkPerfT">PERFORM</button><span class="dki">fill · reload · parts · scenes · macros</span></div>
           <div class="dkb"><div class="pfbody" id="dkPerfB"></div></div></section>
         <section class="dks" id="dkStrip" data-s="strip"><div class="dkh"><button type="button" class="dkt" data-k="strip" id="dkStripT">TRACK</button></div>
@@ -25955,7 +25965,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 629;
+const BUILD = 630;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD + (location.pathname.includes('/beta/') ? ' · beta' : '');
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -31459,8 +31469,8 @@ mstLabel();
 /* ---------- bottom panel (KEYS mode with the keypad off) ---------- */
 const DKK = 'thunderplus-deck-v1';
 // In signal-flow order: the instrument, its chains (they come before the track effects), the track effects, the strip.
-const DK_SECS = [['scope', 'SCOPE'], ['inst', 'INST'], ['chn', '…CHAINS'], ['fx', 'FX'], ['perf', 'PERFORM'], ['strip', 'TRACK']];
-let deck = (() => { const d = {on:true, scope:true, inst:true, chn:true, fx:true, strip:true, h:0, ws:300, wf:320, fxbar:!isMobile(), perf:true, perfOn:false};   // perfOn: PERFORM PART shown (1 Nov; off until turned on), perf: open, not folded   // fxbar: FX BAR (phones: off until turned on)
+const DK_SECS = [['scope', 'SCOPE'], ['inst', 'INST'], ['chn', '…CHAINS'], ['fx', 'FX'], ['mod', 'MOD'], ['perf', 'PERFORM'], ['strip', 'TRACK']];
+let deck = (() => { const d = {on:true, scope:true, inst:true, chn:true, fx:true, strip:true, h:0, ws:300, wf:320, fxbar:!isMobile(), perf:true, perfOn:false, mod:false};   /* mod: the MOD section (build 630) is open, not folded: it starts folded */   // perfOn: PERFORM PART shown (1 Nov; off until turned on), perf: open, not folded   // fxbar: FX BAR (phones: off until turned on)
   try { const o = JSON.parse(localStorage.getItem(DKK) || 'null');
     if (o && typeof o === 'object'){ for (const k in d) if (typeof o[k] === typeof d[k]) d[k] = o[k]; } } catch(e){}
   d.scope = d.strip = true;   // SCOPE and TRACK can't be hidden or folded (older saves could hide them)
@@ -31499,7 +31509,7 @@ let dkInst = 0;
 function setDeck(k, v){ deck[k] = !!v; deckSave(); deckLayout(); fit(); draw(); }
 // INST, …CHAINS and FX fold to a narrow strip when their title is clicked (a click anywhere on the strip opens it
 // again), like a folded device in Ableton. SCOPE and TRACK always stay, at the left and the right.
-const DK_FOLD = new Set(['inst', 'chn', 'fx', 'perf']);
+const DK_FOLD = new Set(['inst', 'chn', 'fx', 'mod', 'perf']);
 document.querySelectorAll('#tDeck .dkt').forEach(b => { const k = b.dataset.k;
   if (!DK_FOLD.has(k)){ b.classList.add('fixed'); b.tabIndex = -1; b.removeAttribute('title'); return; }
   b.addEventListener('click', e => { e.stopPropagation(); setDeck(k, !deck[k]); }); });
@@ -33167,7 +33177,38 @@ function deckChains(){
   }
   dkChnRows.forEach(r => r.refresh());
 }
-function deckDraw(){ deckLayout(); deckStrip(); if (!deckShown()) return; deckMetersPaint(); deckInst(); deckChains(); deckFx(); }
+/* MOD SECTION OF THE BOTTOM PANEL (build 630, owner: "a mod section to the fx bar at the bottom. Collapsible like the other sections. Can be small, but would show that there are modulations, draw the waveform (can just be drawn like a scope or as an LED), and destinations"):
+   the focused track's LFOs (S.perf.lfo[track], as the MOD screen), one small row each: the wave drawn in a tiny canvas (modMix, the MOD screen's own maths) with a dot that rides it in time with the song, and the destination name. It folds like INST / FX (deck.mod, saved
+   with the panel; starts folded). Read-only: a click opens the MOD screen on that track. Folded: nothing is built or moved. The dot runs only while playing, visible, ANIMATIONS on and LOW POWER DISPLAY off. Display code only. */
+var dkMd = {sig:'', rows:[], t:0, col:''};
+function dkModList(){ const t = focusT(), a = S.perf && S.perf.lfo && S.perf.lfo[t]; return {t, a:Array.isArray(a) ? a.filter(L => L && tgtOk(L.id)) : []}; }
+function deckMod(){
+  const B = $('dkModB'); if (!B) return; if (!deck.mod){ setText($('dkModT'), 'MOD'); return; }
+  const {t, a} = dkModList(); setText($('dkModT'), t === MT ? 'MOD · MASTER' : `MOD · TRACK ${d2(t + 1)}`);
+  const sig = t + '|' + a.map(L => L.id + '.' + L.sh + '.' + L.rt + '.' + L.dp).join(',') + '|' + (document.documentElement.dataset.skin || '') + '|' + (animOn ? 1 : 0);
+  if (sig === dkMd.sig) return; dkMd.sig = sig; dkMd.rows = [];
+  B.textContent = '';
+  if (!a.length){ const n = el('div', 'dmn', 'No LFO on this track'); n.title = 'Open the MOD screen to add one'; n.addEventListener('click', () => dkModGo(t)); B.append(n); return; }
+  dkMd.col = getComputedStyle(B).color;
+  a.forEach((L, i) => {
+    const r = el('div', 'dmr'), w = el('span', 'dmw'), cv = el('canvas'), dot = el('i'), lab = el('span', 'dml', (i + 1) + ' ' + (PLFO_SHAPES[L.sh] || '?') + ' · ' + (PLFO_RATE_NAMES[L.rt] || '?')), dst = el('span', 'dmd', tgtParse(L.id).t === t ? tgtLabel(L.id, true) : tgtLabel(L.id));
+    r.title = 'LFO ' + (i + 1) + ': ' + (PLFO_SHAPES[L.sh] || '?') + ', ' + (PLFO_RATE_NAMES[L.rt] || '?') + ', depth ' + L.dp + ' → ' + dst.textContent + ' · click: open MOD';
+    w.append(cv, dot); r.append(w, lab, dst); r.addEventListener('click', () => dkModGo(t));
+    B.append(r);
+    const W = 48, H = 18, dpr = Math.min(2, devicePixelRatio || 1); cv.width = W * dpr; cv.height = H * dpr; cv.style.width = W + 'px'; cv.style.height = H + 'px';
+    const g = cv.getContext('2d'), win = modWin([L]), base = 0; g.strokeStyle = dkMd.col; g.lineWidth = Math.max(1, dpr); g.beginPath();
+    for (let x = 0; x < W * dpr; x++){ const v = modMix([L], base + win * x / (W * dpr - 1)), y = 2 * dpr + (1 - v / 255) * (H * dpr - 4 * dpr); if (x) g.lineTo(x + .5, y); else g.moveTo(.5, y); }
+    g.stroke(); dot.style.display = 'none'; dkMd.rows.push({L, dot, W, H, win});
+  });
+}
+function dkModGo(t){ cFxT = t === MT ? NT : t; go('mod'); }
+function dkModTick(){
+  if (!deck.mod || !dkMd.rows.length || !tp.on || !animOn || lpOn || document.hidden || !ctx || !deckShown() || view !== 'tracker') return;
+  const now = performance.now(); if (now - dkMd.t < 60) return; dkMd.t = now;
+  const bt = modScBeat();
+  for (const e of dkMd.rows){ const x = (bt % e.win) / e.win, v = modMix([e.L], bt), y = 2 + (1 - v / 255) * (e.H - 4); e.dot.style.display = ''; e.dot.style.transform = 'translate(' + (x * e.W).toFixed(1) + 'px,' + y.toFixed(1) + 'px)'; }
+}
+function deckDraw(){ deckLayout(); deckStrip(); if (!deckShown()) return; deckMetersPaint(); deckInst(); deckChains(); deckFx(); deckMod(); }
 // More below / above: when the INST or FX section's controls don't fit, a small ▼ sits at the bottom right of the list and
 // its last line fades out; scrolled down, a ▲ shows at the top right too. Tapping one scrolls a screenful; at either end
 // its arrow goes. While the list overflows it keeps a narrow column on its right for the arrows, so they never cover a value. Watched on scroll, on a resize, and whenever the rows are rebuilt.
@@ -34625,7 +34666,7 @@ function frame(){
     if (!tp.seq.alive() && !tp.q.length && ctx.currentTime > tp.seq.time + 0.3) tStop(); else if (ch || lpPend || plOwed){ if (lpSkip) lpPend = true; else { lpPend = false; followPlay(); playTick(); } }
   } else { plOwed = false; plBase = null; }
   if (lpSkip) return;
-  tickDots(); tickLen(); modScTick();
+  tickDots(); tickLen(); modScTick(); dkModTick();
   cpuMeter();
   // Meters read the analysers ~30×/s instead of every display frame, and stop once nothing has
   // sounded for a moment: this loop runs for the whole life of the tracker view, so scanning 32
@@ -36210,6 +36251,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [630, '15 Nov', ['Bottom panel: a MOD section beside FX (fold it like INST or FX; it starts folded): each LFO on the track as a tiny scope with a dot that rides the wave in time with the song, and where it goes. Click it to open MOD. Computer only']],
   [629, '15 Nov', ['Generators: Arp, Chords, Polymeter, Markov melody and Probability fill have an Instrument choice (the first entry, Current, is what they did before); Mutate has one for the notes it adds. Acid line, Euclidean fill and Drum pattern already had theirs']],
   [628, '15 Nov', ['Arrange and the Song screen turn their page sooner on a small view: under 16 rows the page turns when the playhead (or the cursor going down) is a third of the view from the bottom (it was a quarter); from 16 rows the ARRANGE LOOK-AHEAD setting rules as before']],
   [627, '15 Nov', ['Top bar (computer): LOOP now sits immediately to the left of PLAY']],
