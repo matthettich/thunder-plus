@@ -57,6 +57,8 @@ double js_exp(double x) {
   /* argument reduction */
   if (hx > 0x3fd62e42) {             /* if  |x| > 0.5 ln2 */
     if (hx < 0x3FF0A2B2) {           /* and |x| < 1.5 ln2 */
+      /* V8 special-cases exp(1) to return the correct E (the computation below gets the last bit wrong) */
+      if (x == 1.0) return 2.718281828459045235360287471352;   /* E, as in V8 12.4 ieee754.cc */
       hi = x - ln2HI[xsb]; lo = ln2LO[xsb]; k = 1 - xsb - xsb;
     } else {
       k = (int32_t)(invln2 * x + halF[xsb]);
