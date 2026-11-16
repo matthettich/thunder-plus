@@ -24,10 +24,14 @@ const H = require(path.join(ROOT, 'tests/helpers.js'));
 const GOLDEN_INC = path.join(ROOT, 'native/tests/golden/modfx_golden.inc');
 
 // the modules of U19 (the C++ registry holds exactly these; test_modfx fails if either list has one the other has not)
-export const MODS = ['meta', 'phaser', 'width', 'pingpong', 'meter', 'limiter', 'utility', 'ringmod', 'ensemble', 'spring', 'plate', 'lverb',
+export const MODS19 = ['meta', 'phaser', 'width', 'pingpong', 'meter', 'limiter', 'utility', 'ringmod', 'ensemble', 'spring', 'plate', 'lverb',
   'envfol', 'gateex', 'slew', 'snh', 'quant', 'math', 'logic', 'steps', 'clock', 'clkmul', 'chance', 'counter', 'stepsw', 'burst', 'gatedly', 'flipflop', 'rect', 'scale', 'compare', 'switch', 'xfade', 'const', 'divider', 'euclid',
   'blades', 'onepole', 'allpass', 'dcblock', 'midside', 'dline', 'dimension', 'bbd',
   'harm', 'blipdrum', 'life', 'reson', 'degrade', 'flex', 'sgate', 'retrig', 'pitchfol', 'pitchtrk'];
+// U21 (MODFX modules C): added family by family. Their per-case seeds and signal picks use 100 + their index here (the U19 modules keep theirs; a later unit adds its own list with its own base)
+export const MODS21 = ['sdelay', 'filter', 'cut', 'compressor', 'buscomp', 'glue', 'ngate', 'autopan', 'pump'];
+export const MODS = [...MODS19, ...MODS21];
+const mi = t => { const a = MODS19.indexOf(t); return a >= 0 ? a : 100 + MODS21.indexOf(t); };
 
 // ---- the chains worklet, with nextSeed() recording --------------------------------------------------------------------------------------------------------------------------------
 const NEEDLE = 'const nextSeed = () => (seedN = (seedN * 1103515245 + 12345) >>> 0);';
@@ -121,17 +125,17 @@ const defaults = def => { const p = {}; for (const [k, d] of Object.entries(def.
 const stressP = def => { const o = {}; for (const [k, d] of Object.entries(def.params || {})) { const [, mn, mx, st] = d; if (mx - mn === 1 && st === 1) { o[k] = mn; continue; } let v = mn + (mx - mn) * .7; if (st >= 1) v = Math.round((v - mn) / st) * st + mn; o[k] = v; } return o; };
 const switchesP = def => { const o = {}; for (const [k, d] of Object.entries(def.params || {})) { const [, mn, mx, st] = d; if (k === 'flip') { o[k] = d[0]; continue; } if (mx - mn === 1 && st === 1) { o[k] = k === 'mute' ? mn : mx; continue; } let v = mn + (mx - mn) * .3; if (st >= 1) v = Math.round((v - mn) / st) * st + mn; o[k] = v; } return o; };
 
-const LONG = new Set(['spring', 'plate', 'lverb', 'bbd', 'dline', 'pingpong', 'ensemble', 'dimension', 'allpass', 'gatedly']);
+const LONG = new Set(['spring', 'plate', 'lverb', 'bbd', 'dline', 'pingpong', 'ensemble', 'dimension', 'allpass', 'gatedly', 'sdelay', 'gdelay', 'reverse']);
 function casesFor(type, def) {
   const ins = Object.keys(def.inputs || {}), cs = []; let n = 0;
   const base = { type, sr: 48000, nblocks: 56, sigKind: 'mix', linkMode: 'all', changeEvery: 0, sizes: [128], transport: [], seed: 0 };
-  const add = (name, o) => { cs.push(Object.assign({}, base, o, { name: `${type}_${name}`, seed: 1000 * (MODS.indexOf(type) + 1) + (++n) })); };
+  const add = (name, o) => { cs.push(Object.assign({}, base, o, { name: `${type}_${name}`, seed: 1000 * (mi(type) + 1) + (++n) })); };
   add('def', { params: [defaults(def)] });
   add('stress', { params: [stressP(def)], sigKind: 'loud' });
   add('sw', { params: [switchesP(def)], sigKind: 'impulse' });
   add('min', { params: [randParams(def, null, 'min')], sigKind: 'mix' });
   add('max', { params: [randParams(def, null, 'max')], sigKind: 'quiet' });
-  for (let i = 0; i < 4; i++) { const rr = lcg(77 + 13 * i + MODS.indexOf(type) * 101); add(`rand${i}`, { params: [randParams(def, rr)], sigKind: SIGS[(i * 2 + MODS.indexOf(type)) % 5], linkMode: ['all', 'first', 'all', 'half'][i], rr: i }); }
+  for (let i = 0; i < 4; i++) { const rr = lcg(77 + 13 * i + mi(type) * 101); add(`rand${i}`, { params: [randParams(def, rr)], sigKind: SIGS[(i * 2 + mi(type)) % 5], linkMode: ['all', 'first', 'all', 'half'][i], rr: i }); }
   for (let i = 0; i < 2; i++) add(`mod${i}`, { params: [], changeEvery: i ? 7 : 25, sigKind: 'mix', nblocks: 96, rr: 10 + i });
   add('first', { params: [defaults(def)], linkMode: 'first' });
   add('none', { params: [stressP(def)], linkMode: 'none', nblocks: 40 });
@@ -140,6 +144,8 @@ function casesFor(type, def) {
   add('sr96', { params: [switchesP(def)], sr: 96000, sigKind: 'loud' });
   if (LONG.has(type)) { add('long', { params: [defaults(def)], sigKind: 'impulse', nblocks: 300 }); add('sleep', { params: [defaults(def)], sigKind: 'longsleep', nblocks: 260 });
     add('sleep2', { params: [stressP(def)], sigKind: 'longsleep', nblocks: 260, sr: 96000 }); add('burst', { params: [switchesP(def)], sigKind: 'burst', nblocks: 180 }); }
+  // U21: a Source (ctx.key) that is a real buffer: the keyed modules listen to the input reversed in time, times .7 (the C++ makes the same buffer)
+  if (def.params && def.params.sck) add('key', { params: [stressP(def)], linkMode: 'first', key: true, sigKind: 'mix' });
   return cs;
 }
 
@@ -154,7 +160,8 @@ function runDirect(ctx, def, c) {
   ctx.__seedq = allSeeds.slice(); const st = M.create(c.sr);
   const io = { in: {}, out: {}, base: sched[0].p, p: sched[0].p, linked: new Set(), mods: null }, tr = { tempo: 120, lpb: 4, ticks: 6, playing: true };
   ins.forEach((n, k) => { io.in[n] = new Float32Array(128); if (linked[k]) io.linked.add(n); }); outs.forEach(n => { io.out[n] = new Float32Array(128); });
-  const cx = { sr: c.sr, block: 128, quality: 'full', transport: tr, engine: {} };
+  const cx = { sr: c.sr, block: 128, quality: 'full', transport: tr, engine: {} }, KB = new Float32Array(128);
+  if (c.key) cx.key = v => ((Math.round(v) || 0) > 0 ? KB : null);
   const inF = new Float32Array(c.nblocks * ins.length * 128), outF = new Float32Array(c.nblocks * outs.length * 128), sizes = [];
   let si = 0, ev = 0, tv = 0;
   for (let b = 0; b < c.nblocks; b++) {
@@ -162,11 +169,12 @@ function runDirect(ctx, def, c) {
     while (tv < c.transport.length && c.transport[tv].b <= b) { const t = c.transport[tv++]; for (const k of ['tempo', 'playing', 'startN']) if (k in t) tr[k] = t[k]; }
     const n = Math.min(128, c.sizes[si++ % c.sizes.length]); sizes.push(n); cx.block = n;
     ins.forEach((nm, k) => { io.in[nm].set(sig[k].subarray(b * 128, (b + 1) * 128)); inF.set(io.in[nm], (b * ins.length + k) * 128); });
+    if (c.key) for (let i = 0; i < 128; i++) KB[i] = Math.fround(.7 * io.in[ins[0]][127 - i]);
     M.process(st, io, cx);
     outs.forEach((nm, k) => outF.set(io.out[nm], (b * outs.length + k) * 128));
   }
   ctx.__seedq = null;
-  return { meta: { type: M.type || c.type, sr: c.sr, nblocks: c.nblocks, sizes, seeds: allSeeds, linked, params: sched.map(e => ({ b: e.b, p: Object.values(e.p) })), transport: c.transport }, inF, outF };
+  return { meta: { type: M.type || c.type, sr: c.sr, nblocks: c.nblocks, sizes, seeds: allSeeds, linked, params: sched.map(e => ({ b: e.b, p: Object.values(e.p) })), transport: c.transport, key: !!c.key }, inF, outF };
 }
 
 function tables(M) {

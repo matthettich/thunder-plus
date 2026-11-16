@@ -44,6 +44,12 @@ class ListSeeds : public Seeds {
   std::vector<unsigned> v_; size_t i_ = 0;
 };
 
+// U21: ctx.key (the Source of the keyed modules). The engine run: the real ChainsEngine's key() gives its silent buffer for any Source above 0 (no track taps, no sends); the direct cases with `key`:
+// the input reversed in time times .7 (tools/modfx-dump.mjs makes the same buffer). A Source of 0 (or rounding to it) is null (Self).
+static float gKeyBuf[128];
+static const float* keyEngine(void*, double v) { v = js_round(v); if (!(v > 0)) return nullptr; std::memset(gKeyBuf, 0, sizeof gKeyBuf); return gKeyBuf; }
+static const float* keyDirect(void*, double v) { v = js_round(v); return v > 0 ? gKeyBuf : nullptr; }
+
 // ---- 1. the tables -------------------------------------------------------------------------------------------------------------------------------------------------------------
 static void tableTest(const std::string& dir) {
   std::string js; if (!readFile(dir + "/defs.json", &js)) { std::printf("defs.json missing  FAIL\n"); fails++; return; }
@@ -92,7 +98,7 @@ static uint32_t engineHash(const Def& d, int set, const ModfxEngineGolden& G) {
   for (int k = 0; k < d.nin; k++) { io.in[k] = inb[k]; if (!std::strcmp(d.in[k].kind, "audio")) { if (!std::strcmp(d.in[k].name, "in")) hasIn = true; if (!std::strcmp(d.in[k].name, "inR")) hasInR = true; } }
   for (int k = 0; k < d.nout; k++) io.out[k] = outb[k];
   for (int k = 0; k < d.nin; k++) { if (!std::strcmp(d.in[k].name, "in") && hasIn) io.linked[k] = true; if (!std::strcmp(d.in[k].name, "inR") && hasInR) io.linked[k] = true; }
-  Ctx c; c.sr = 48000; c.tempo = 120; c.lpb = 4; c.ticks = 6; c.playing = true; c.startN = 0;
+  Ctx c; c.sr = 48000; c.tempo = 120; c.lpb = 4; c.ticks = 6; c.playing = true; c.startN = 0; c.key = keyEngine;
   for (int b = 0; b < BL; b++) {
     for (int k = 0; k < d.nin; k++) { const bool fed = (!std::strcmp(d.in[k].name, "in") && hasIn) || (!std::strcmp(d.in[k].name, "inR") && hasInR);
       for (int i = 0; i < 128; i++) inb[k][i] = fed ? (float)(0.0 + (double)sig[(size_t)b * 128 + i]) : 0.0f; }   // trackIn's out into the zeroed input (0 + x: a -0 becomes +0)
@@ -135,12 +141,13 @@ static Res runCase(const std::string& dir, const ModfxCaseGolden& G) {
   std::vector<float> out(outN); float inb[kMaxPorts][128] = {}, outb[kMaxPorts][128] = {}; IO io; double p[128] = {}; io.p = p;
   for (int k = 0; k < d->nin; k++) { io.in[k] = inb[k]; io.linked[k] = linked.at((size_t)k).asBool(); }
   for (int k = 0; k < d->nout; k++) io.out[k] = outb[k];
-  Ctx c; c.sr = M.num("sr"); size_t pe = 0, te = 0;
+  Ctx c; c.sr = M.num("sr"); size_t pe = 0, te = 0; const bool keyed = M.get("key").isBool() && M.boolean("key"); if (keyed) c.key = keyDirect;
   for (int b = 0; b < nb; b++) {
     while (pe < params.size() && params.at(pe).num("b") <= b) { Json pp = params.at(pe).arr("p"); for (int k = 0; k < d->np; k++) p[k] = pp.at((size_t)k).asNum(); pe++; }
     while (te < tr.size() && tr.at(te).num("b") <= b) { Json t = tr.at(te++); if (t.get("tempo").isNum()) c.tempo = t.num("tempo"); if (t.get("playing").isBool()) c.playing = t.boolean("playing"); if (t.get("startN").isNum()) c.startN = t.num("startN"); }
     c.block = (int)sizes.at((size_t)b).asNum();
     for (int k = 0; k < d->nin; k++) std::memcpy(inb[k], I + ((size_t)b * d->nin + k) * 128, 512);
+    if (keyed) for (int i = 0; i < 128; i++) gKeyBuf[i] = (float)(.7 * (double)inb[0][127 - i]);
     m->process(io, c);
     for (int k = 0; k < d->nout; k++) std::memcpy(&out[((size_t)b * d->nout + k) * 128], outb[k], 512);
   }

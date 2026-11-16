@@ -28,6 +28,8 @@ struct Ctx {
   double tempo = 120, lpb = 4, ticks = 6;
   bool playing = true;
   double startN = 0;            // ctx.transport.startN || 0
+  // ctx.key(sck) (U21): the Source's mono buffer of 128 floats, nullptr for Self (sck rounds to 0 or less). nullptr here: the JS's `ctx.key` undefined (the same as Self).
+  const float* (*key)(void* user, double sck) = nullptr; void* keyUser = nullptr;
 };
 
 struct IO {
