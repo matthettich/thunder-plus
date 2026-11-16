@@ -18,12 +18,14 @@ void FxBank::load(const Song& S, double bpm, double restartN) {
   for (int t = 0; t <= kSongNT; t++) if (h_[t]->slotCount() > 0) flush(t, 0);
 }
 void FxBank::attach(Mixer& m, bool master) {
+  mix_ = &m;
   for (int t = 0; t < kSongNT; t++) m.setFx(t, h_[t]->slotCount() > 0 ? &FxBank::hook : nullptr, this);
   if (master && h_[kSongNT]->slotCount() > 0) m.setMasterFx(&FxBank::hook, this);
 }
 void FxBank::hook(void* user, int track, float* L, float* R, int frames, double t0, const MixFeed*, int) {
   FxBank* b = (FxBank*)user; if (track < 0 || track > kSongNT) return;
-  b->h_[track]->process(L, R, frames, t0);
+  // the clock this node hears (clkBus through the node's own delay), valid during the mixer's render: the node's `bp` param, `frames` long
+  b->h_[track]->process(L, R, frames, t0, b->mix_ ? b->mix_->beat(track) : nullptr, b->mix_ ? frames : 0);
 }
 void FxBank::flush(int track, double now) {   // fxcFlush: booked at max(t, now), no clock-delay shift
   int w = 0;

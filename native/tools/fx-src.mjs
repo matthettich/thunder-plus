@@ -54,3 +54,9 @@ export function effects() {
   for (const key of Object.keys(TFX)) { const D = TFX[key]; if (D.id === undefined || D.id > 33 || D.pump || D.mod) continue; out.push({ key, id: D.id, ps: D.ps.map(p => ({ k: p.k, d: p.d, min: p.min, max: p.max })), mapSrc: String(D.map) }); }
   out.sort((x, y) => x.id - y.id); return out;
 }
+// U15: the three tempo-locked JS effects (Flex 95, Step gate 94, Retrigger 93): in the table of the host, not among the 34 wasm effects (fx-dump.mjs's cases use effects())
+export function clockedEffects() {
+  const { TFX } = load(), out = [];
+  for (const key of Object.keys(TFX)) { const D = TFX[key]; if (D.id >= 93 && D.id <= 95) out.push({ key, id: D.id, ps: D.ps.map(p => ({ k: p.k, d: p.d, min: p.min, max: p.max })), mapSrc: String(D.map) }); }
+  out.sort((x, y) => x.id - y.id); return out;
+}

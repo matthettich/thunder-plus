@@ -162,6 +162,27 @@ else()
   add_test(NAME beat COMMAND test_beat)
 endif()
 
+# U15: the tempo-locked track effects (Flex, Step gate, Retrigger) against the real worklet (tools/fx-clk-dump.mjs: 73 cases + the map() value sets), bit-exact.
+# No platform skip, no SKIP_RETURN_CODE: the cores are plain C++ and the reference needs only Node and acorn, so a missing fixture is a failure.
+add_executable(test_fxclk test_fxclk.cpp)
+target_link_libraries(test_fxclk PRIVATE thunder_core)
+target_include_directories(test_fxclk PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../core/src ${CMAKE_CURRENT_SOURCE_DIR})
+if(NOT MSVC)
+  target_compile_options(test_fxclk PRIVATE -Wall -Wextra)
+endif()
+if(NODE_EXE)
+  add_test(NAME fxclk_ref COMMAND ${NODE_EXE} ${CMAKE_CURRENT_SOURCE_DIR}/../tools/fx-clk-dump.mjs ${CMAKE_CURRENT_BINARY_DIR}/fxclk-ref)
+  set_tests_properties(fxclk_ref PROPERTIES FIXTURES_SETUP fxclk_ref)
+  add_test(NAME fxclk COMMAND test_fxclk ${CMAKE_CURRENT_BINARY_DIR}/fxclk-ref)
+  set_tests_properties(fxclk PROPERTIES FIXTURES_REQUIRED fxclk_ref)
+  if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    add_test(NAME fxclk_golden_current COMMAND ${NODE_EXE} ${CMAKE_CURRENT_SOURCE_DIR}/../tools/fx-clk-dump.mjs --check)
+    add_test(NAME flexspec_current COMMAND ${NODE_EXE} ${CMAKE_CURRENT_SOURCE_DIR}/../tools/flex-spec.mjs --check)
+  endif()
+else()
+  add_test(NAME fxclk COMMAND test_fxclk)   # no directory: prints FAIL and exits 1
+endif()
+
 # N1 review fixes: hostile inputs (the independent review's findings, one regression test each). Names the finding in every failure line.
 add_executable(test_hostile test_hostile.cpp)
 target_link_libraries(test_hostile PRIVATE thunder_core)

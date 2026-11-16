@@ -6,7 +6,11 @@
 // dynamics levels (FX DYNAMICS), FXV (`pset`, the core's queue: a slot's new parameters at a time) and k-rate FXO / FLX / GAT / RTG lanes.
 // THE JS IS THE SPECIFICATION, quirks included (list in docs of the unit; progress/u14.md).
 //
-// Slot kinds the JS has that are not here yet: Flex / Step gate / Retrigger (93..95: U15), Beat grains / scramble / Glitch (100..102), Pitch
+// U15: the tempo-locked JS effects are slot kinds here too: Retrigger 93, Step gate 94, Flex 95 (fx/clkcores.h). They read the beat clock block `bp` that
+// process() is handed (Mixer::beat(track), what the node's `bp` AudioParam carries) and the FLX / GAT / RTG lanes, run whether the slot is on or off (Flex
+// is fed while off), and decide, with the node's sleep, when the host may sleep (`ck` of the worklet's p1).
+//
+// Slot kinds the JS has that are not here yet: Beat grains / scramble / Glitch (100..102), Pitch
 // delay / reverb, Vintage sampler, Degrade, Resonator (U16), shared MODFX modules (U17), pump effects (U18). A chain entry of those kinds is
 // left out of the host as the JS leaves out a slot whose engine is missing: the sound passes. `Slot` has the places they will use.
 //
@@ -19,6 +23,7 @@
 #include <cstring>
 #include <string_view>
 
+#include "fx/clkcores.h"
 #include "rt/auto.h"
 #include "rt/json.h"
 
@@ -31,10 +36,11 @@ constexpr int kFxBlock = 128;        // the worklet's quantum (the wasm io buffe
 constexpr int kFxMaxCall = 4096;     // a call longer than this fails soft: silence (tcChunks)
 constexpr int kFxQueue = 256;        // FXV messages waiting (the core's __q)
 constexpr int kFxKey = 24;           // "slot:type"
+inline bool fx_is_clocked(int id) { return id >= 93 && id <= 95; }   // Retrigger, Step gate, Flex (the tempo-locked JS cores)
 
-// ---- the effect table (fxtable.inc, generated from TFX) and the parameter mapping ------------------------------------------------------
-int fx_type_of(std::string_view key);                 // the page's effect key ("eq", "reverb", ...) -> id 0..33, else -1
-const char* fx_key_of(int id);                        // id -> key (nullptr outside 0..33)
+// ---- the effect table (fxtable.inc, generated from TFX: ids 0..33 and 93..95) and the parameter mapping ------------------------------------------------------
+int fx_type_of(std::string_view key);                 // the page's effect key ("eq", "reverb", "flex", ...) -> id 0..33 or 93..95, else -1
+const char* fx_key_of(int id);                        // id -> key (nullptr for an id the table has not)
 int fx_param_count(int id);
 int fx_param_min(int id, int i); int fx_param_max(int id, int i); int fx_param_default(int id, int i);
 // map(): the page's TFX[type].map(f, sr, bpm) (f: the controls in the table's order, as normTfx leaves them) into the 12 parameters; fxRestartN is tgate's 7th.
@@ -102,7 +108,9 @@ class FxHost {
 
   // L, R in place; n frames starting at t0 seconds. n <= 128 is one quantum; a longer call is cut into 128s (tcChunks; lanes read once at t0);
   // above kFxMaxCall the output is silence and failedBlock() counts. Returns false when dead.
-  bool process(float* L, float* R, int n, double t0);
+  // bp: the beat clock the node hears (params.bp: the song position in beats, -1 stopped), n floats, or bpn = 1 when the param is constant over the block;
+  // nullptr: the param at its default, a constant 0. Cut with the block (tcChunks hands each chunk its own part of an a-rate param).
+  bool process(float* L, float* R, int n, double t0, const float* bp = nullptr, int bpn = 0);
 
   // ---- reading back ----
   bool popLevels(float out[8]);                 // the {lvl} post (every 12th live block): true once per post
@@ -135,8 +143,10 @@ class FxHost {
   struct Q { double at; int slot; double p[12]; };
   void applyEntry(Slot& s, const FxEntry& c);
   void applyPset(int slot, const double* p12);
-  bool p1(float* L, float* R, int n, double t0);
+  bool p1(float* L, float* R, int n, double t0, const float* bp, int bpn);
   void slotRun(Slot& s, int n);
+  void runClk(Slot& s, bool feed, int n);        // a tempo-locked core: process() (or feed()) on Lb_ / Rb_ with tr_
+  int clockedNeed(const float* bp, int bpn) const;   // the worklet's `ck`: what the tempo-locked slots ask of the node's sleep (0..3)
   void slotNap(Slot& s, int n);
   float pk(int n) const;
   void finalizeTel();
@@ -153,6 +163,7 @@ class FxHost {
   float Lb_[kFxBlock + 2], Rb_[kFxBlock + 2], cL_[kFxBlock + 2], cR_[kFxBlock + 2], dL_[kFxBlock + 2], dR_[kFxBlock + 2];
   double restAt_ = -1;
   int idle_ = 0; bool dead_flag_ = false, asleep_ = false;
+  ClkTr tr_;                                      // the worklet's `tr` (bp, flx, gat, rtg; sw per slot)
   float swv_[11] = {-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1};
   bool lvl_ = false, tel_ = false; int lvlN_ = 0, telN_ = 0; float lvlP_[8] = {0};
   bool lvlReady_ = false; float lvlOut_[8] = {0};
