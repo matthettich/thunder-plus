@@ -188,3 +188,10 @@ N1 step 10.
   apply build 633's two lines to `native`'s own copies of BBExpr (index.html, chains and waves worklets: the one edit allowed outside `native/`), regenerate the
   Bytebeat reference from the fixed JS, and list in the PR every changed row (only `&& constant` / `|| constant` formulas may change; anything else: stop).
   Sent to the U24 worker, who does it before going on with U24 (`n3/u24` is pushed, work in progress).
+- 13:45 **#192 U23: all CI green, NOT merged yet: an independent Sonnet verifier is on it** (report to `/home/claude/progress/verify-u23.md`; it also checks
+  whether the C++ reads out of bounds on a wavetable with negative Bend, which the author ported "faithfully"). U23's figures: 61 of 61 factory voices equal
+  beta's hashes, 311 direct cases, eleven mutations caught. Author's notes: supersaw is in U23, chord and karplus left to U24; sample, grains, pwm and vint have no
+  factory voice (direct cases only); voices mixing U23 and U24 types are gated only once both are merged (the second to merge regenerates fixtures and checks the
+  union; expect small conflicts in `LType`, `Osc`, `renderLayer`, CMake, `rt_harness`). **Possible web-app bugs for Fable:** a wavetable with negative Bend reads one
+  past its table (NaN); supersaw with negative Detune and pwm with negative Shape give NaN. The Linux ctest job now takes about 29 minutes.
+  Manager's next step: verifier passes → merge #192, review-queue line. Still running: the U24 worker (#191's reference, then U24).
