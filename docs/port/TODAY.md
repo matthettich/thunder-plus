@@ -207,3 +207,7 @@ N1 step 10.
   `|| constant`; `native`'s three JS copies carry build 633's two lines. **#193 U24 and #195 U28 are open; on both, every job is green except "Core (Linux, ctest)",
   cancelled at its 30-minute limit** (the suite has grown: U23's run took 29 minutes). Manager's decision: the limit in `.github/workflows/native.yml` goes from 30 to
   60 minutes (a time limit, not a gate; this commit), and the workers are resumed to merge `native` into their branches, find what takes the time, and re-run CI.
+- 15:00 **Web build 634 on `beta` 241cff4 and `main` 43f2b8c** (Sonnet, display only, at the owner's word at 14:44): the bottom bar's MOD section had a solid
+  dark title bar in the terminal-style skins (`#dkMod` was missing from the per-section `--dkc` / `--dkp` list; `#dkPerf` had the same gap and was added too, not
+  asked for), and MOD now sits before FX (order: …CHAINS, MOD, FX, PERFORM, TRACK; HTML and `DK_SECS`). `npm test` green on both; screenshots taken in headless Chrome.
+  Not read by the manager. Still running: the U24 (#193) and U28 (#195) workers.
