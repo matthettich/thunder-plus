@@ -1303,6 +1303,8 @@ body.trkv.cmdv .toast{bottom:calc(var(--k) * 3.3 + 60px + env(safe-area-inset-bo
 .trows button.on .rv small, .trows button.on small{color:var(--inv)}
 .toct{border-left:1px solid var(--line)}
 #tRecBar + .toct{border-left:0}   /* REC / CLICK already end in a line: two side by side read as one thick one (owner, 21 Oct) */
+/* FOLDED PHONE, the tempo line (build 631, owner: "make the top of the folded phone look a little less awkward"): ROWS (no − / +: tap the number to type it), then BPM and LPB, then the time left; REC leaves the line (File menu › Record). Below 600 px on the Mobile setup only (the JS side is `fold` in applyPlatform). */
+@media (max-width:599px){ body.mob #tRowsBar{order:-2} body.mob #tClk{order:-1; border-right:0} body.mob #tRowsDn, body.mob #tRowsUp, body.mob #tRec{display:none} body.mob .tpat .tlen{flex:none; align-self:center} }
 /* On a phone the tabs take the first line; tempo, ticks, rows and INPUT share the second. */
 @media (max-width:600px){
   .ttabbar{flex-wrap:wrap} .ttabbar .ttabs{flex:1 1 100%; border-bottom:1px solid var(--line)}
@@ -3446,7 +3448,7 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
   <div class="ttabbar"><nav class="ttabs" id="tTabs" aria-label="Tracker screens"></nav>
     <div class="tpat" id="tPat">
       <span class="tclk" id="tClk" title="Tempo and lines per beat · double-click a number to type it (TPO changes the tempo as the song plays; ticks are in Settings)"><b id="tClkB" class="tce" data-k="bpm">120</b><small>BPM</small><b id="tClkT" class="tce" data-k="lpb">4</b><small>LPB</small><span class="tdots" id="tDots"></span></span>
-      <span class="trows" role="group" aria-label="Rows in this phrase"><button type="button" id="tRowsDn" aria-label="Fewer rows">−</button><button type="button" id="tRowsV" class="rv" aria-label="Rows in this phrase"><small id="tRowsP">ROWS</small><b id="tRowsN">16</b></button><button type="button" id="tRowsUp" aria-label="More rows">+</button></span>
+      <span class="trows" id="tRowsBar" role="group" aria-label="Rows in this phrase"><button type="button" id="tRowsDn" aria-label="Fewer rows">−</button><button type="button" id="tRowsV" class="rv" aria-label="Rows in this phrase"><small id="tRowsP">ROWS</small><b id="tRowsN">16</b></button><button type="button" id="tRowsUp" aria-label="More rows">+</button></span>
       <button type="button" class="tlen" id="tLen" title="Song length. LEFT: time from the playhead to the end (or from the cursor, when stopped). Tap to show TO instead: the time up to the playhead.">LEFT 0:00</button>
       <span class="trows" id="tRecBar" role="group" aria-label="Record and metronome"><button type="button" id="tRec" class="rv rec" aria-pressed="false" aria-label="Record" title="REC: a MIDI keyboard, or the computer keys while playing, writes notes into the phrase. Stopped: notes go at the cursor, which moves down on release. Playing: notes land on the step they were played on, in the track under the cursor (F9 or Alt+R)."><small>REC</small><b id="tRecN">OFF</b></button><button type="button" id="tMet" class="rv" aria-pressed="false" aria-label="Metronome" title="Metronome: a click on every beat, higher on the bar. Set when it plays, its level and the count-in in Settings → Record &amp; play (Alt+M)"><small>CLICK</small><b id="tMetN">REC</b></button></span>
       <span class="trows toct" id="tOct" role="group" aria-label="Octave for note entry" hidden><button type="button" id="tOctDn" aria-label="Octave down">−</button><button type="button" id="tOctV" class="rv" aria-label="Octave, tap to reset to 4" title="Octave for typed and keypad notes (− and = on a keyboard). Tap to reset to 4."><small>OCT</small><b id="tOctN">4</b></button><button type="button" id="tOctUp" aria-label="Octave up">+</button></span>
@@ -8576,7 +8578,8 @@ function applyPlatform(){
   document.body.classList.toggle('mob', m);
   // MOBILE TOP LINES: LEFT (the song time) sits in the top bar, left of File, in the Mobile setup; back under the tabs on desktop.
   { const len = $('tLen'), fw = $('bFile') && $('bFile').closest('.setwrap'), rb = $('tRecBar');
-    if (len && fw && rb){ if (m && len.parentNode !== fw.parentNode) fw.before(len); else if (!m && len.parentNode === fw.parentNode) rb.before(len); } }
+    const fold = m && !mqUnfolded.matches;   /* (build 631, owner: the folded phone's top) folded: LEFT leaves the top bar for the tempo line, after BPM / LPB; unfolded Mobile and desktop as before */
+    if (len && fw && rb){ if (m && !fold && len.parentNode !== fw.parentNode) fw.before(len); else if ((!m || fold) && len.parentNode === fw.parentNode) rb.before(len); } }
   document.title = m ? 'Thunder' : 'Thunder Plus'; try { dirtyShow(); } catch(e){}   // FILE SAFETY: • song — app
   const br = document.querySelector('.brand'); if (br) br.setAttribute('aria-label', m ? 'Thunder' : 'Thunder Plus');
   const ck = $('ckMobile'); if (ck) ck.checked = m;
@@ -15359,6 +15362,7 @@ function fileItems(){
     // MENUS (owner, 31 Oct: things in the right place): with the Edit menu on screen, Undo / Redo and Phrases… are there
     // only; a phone has no Edit menu, so they stay here
     ...(ed ? [] : [{h:'Edit'}, {l:'Undo', k:K('mod+Z'), f:() => undoStep(-1), off:!undo.past.length && !vUndo.t.some(Boolean)}, {l:'Redo', k:K('mod+shift+Z'), f:() => undoStep(1), off:!undo.future.length}, {l:'Phrases… (find ones not on the song)', f:() => phlOpen(true)}]),
+    ...(isMobile() && !mqUnfolded.matches ? [{h:'Record'}, {l:'REC: ' + (rec.cnt > 0 ? 'counting in…' : rec.on ? 'ON · tap to turn off' : 'OFF · tap to turn on'), f:() => setRec(!rec.on)}] : []),   /* the folded phone's header has no REC button (build 631): the same setRec, and its state */
     {h:'Project'},
     {l:'New project', k:K('mod+N'), f:newSong, ask:'song'},
     {l:'Open project…', k:K('mod+O'), f:openProj}, ...(recentL.length ? [{l:'Open recent…', f:openRecent}] : []),
@@ -25965,7 +25969,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 630;
+const BUILD = 631;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD + (location.pathname.includes('/beta/') ? ' · beta' : '');
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -36251,6 +36255,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [631, '15 Nov', ['Folded phone, top: the tempo line now reads ROWS (tap the number to type it; no − / +), BPM and LPB, then the time left; the time left leaves the top bar, which is roomier. REC is gone from the header: File › Record has it, with its on / off state']],
   [630, '15 Nov', ['Bottom panel: a MOD section beside FX (fold it like INST or FX; it starts folded): each LFO on the track as a tiny scope with a dot that rides the wave in time with the song, and where it goes. Click it to open MOD. Computer only']],
   [629, '15 Nov', ['Generators: Arp, Chords, Polymeter, Markov melody and Probability fill have an Instrument choice (the first entry, Current, is what they did before); Mutate has one for the notes it adds. Acid line, Euclidean fill and Drum pattern already had theirs']],
   [628, '15 Nov', ['Arrange and the Song screen turn their page sooner on a small view: under 16 rows the page turns when the playhead (or the cursor going down) is a third of the view from the bottom (it was a quarter); from 16 rows the ARRANGE LOOK-AHEAD setting rules as before']],
