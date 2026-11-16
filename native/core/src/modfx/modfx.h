@@ -23,6 +23,15 @@ namespace modfx {
 constexpr int kBlock = 128;     // the engine's BLOCK: every buffer is this long
 constexpr int kMaxPorts = 12;
 
+// One of the song's impulse responses (the JS's globalThis.__thunderIR[i] = { L, R or null, sr, id }): read-only views; the host keeps the buffers alive and unchanged while a module may read
+// them (the JS's garbage collector does that there) and hands a NEW SongIR object whenever the song's IRs change (the module compares the pointer and `id`, as the JS compares the object and id).
+struct SongIR {
+  const float* L = nullptr; int nL = 0;
+  const float* R = nullptr; int nR = 0;   // R null (or nR 0): the left one plays on both sides
+  double sr = 48000;
+  uint64_t id = 0;                        // the JS's id string ("ref" or "refL/refR"), as a number: equal strings give equal numbers
+};
+
 struct Ctx {
   double sr = 48000;
   int block = kBlock;
@@ -30,6 +39,7 @@ struct Ctx {
   double tempo = 120, lpb = 4, ticks = 6;
   bool playing = true;
   double startN = 0;            // ctx.transport.startN || 0
+  const SongIR* const* irs = nullptr;   // globalThis.__thunderIR: four entries (a null one is an empty slot), or null for "no IRs at all" (U20: Convolve's Song IR 1 to 4)
 };
 
 struct IO {

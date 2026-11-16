@@ -17,6 +17,7 @@ import path from 'node:path';
 import vm from 'node:vm';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
+import { MODS_B, casesB, irTable } from './modfx-b-cases.mjs';   // U20: the cases of Spectral, Extreme stretch and Convolution reverb (own file)
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const require = createRequire(import.meta.url);
@@ -121,11 +122,13 @@ const defaults = def => { const p = {}; for (const [k, d] of Object.entries(def.
 const stressP = def => { const o = {}; for (const [k, d] of Object.entries(def.params || {})) { const [, mn, mx, st] = d; if (mx - mn === 1 && st === 1) { o[k] = mn; continue; } let v = mn + (mx - mn) * .7; if (st >= 1) v = Math.round((v - mn) / st) * st + mn; o[k] = v; } return o; };
 const switchesP = def => { const o = {}; for (const [k, d] of Object.entries(def.params || {})) { const [, mn, mx, st] = d; if (k === 'flip') { o[k] = d[0]; continue; } if (mx - mn === 1 && st === 1) { o[k] = k === 'mute' ? mn : mx; continue; } let v = mn + (mx - mn) * .3; if (st >= 1) v = Math.round((v - mn) / st) * st + mn; o[k] = v; } return o; };
 
+MODS.push(...MODS_B);   // U20
 const LONG = new Set(['spring', 'plate', 'lverb', 'bbd', 'dline', 'pingpong', 'ensemble', 'dimension', 'allpass', 'gatedly']);
 function casesFor(type, def) {
   const ins = Object.keys(def.inputs || {}), cs = []; let n = 0;
   const base = { type, sr: 48000, nblocks: 56, sigKind: 'mix', linkMode: 'all', changeEvery: 0, sizes: [128], transport: [], seed: 0 };
   const add = (name, o) => { cs.push(Object.assign({}, base, o, { name: `${type}_${name}`, seed: 1000 * (MODS.indexOf(type) + 1) + (++n) })); };
+  if (casesB(type, def, add, { defaults, stressP, switchesP, randParams, lcg, signal })) return cs;   // U20: its own list of cases
   add('def', { params: [defaults(def)] });
   add('stress', { params: [stressP(def)], sigKind: 'loud' });
   add('sw', { params: [switchesP(def)], sigKind: 'impulse' });
@@ -147,11 +150,11 @@ function runDirect(ctx, def, c) {
   const M = def, ins = Object.keys(M.inputs || {}), outs = Object.keys(M.outputs || {});
   const rr = lcg(c.seed * 31 + 5 + (c.rr || 0) * 977), allSeeds = [lcg(c.seed + 3)(), lcg(c.seed + 4)(), lcg(c.seed + 5)()].map(x => (Math.floor(x * 4294967295) >>> 0) || 1);
   // parameter schedule: [{b, p}]
-  const sched = []; if (c.changeEvery) { for (let b = 0; b < c.nblocks; b += c.changeEvery) sched.push({ b, p: randParams(M, rr) }); } else sched.push({ b: 0, p: c.params[0] });
+  const sched = []; if (c.changeEvery) { for (let b = 0; b < c.nblocks; b += c.changeEvery) sched.push({ b, p: randParams(M, rr) }); } else c.params.forEach((p, i) => sched.push({ b: c.pb ? c.pb[i] : 0, p }));
   // linked inputs
   const linked = ins.map((n, k) => c.linkMode === 'all' ? true : c.linkMode === 'first' ? k === 0 : c.linkMode === 'none' ? false : (k % 2 === 0));
-  const total = c.nblocks * 128, sig = ins.map((n, k) => linked[k] ? signal(M.inputs[n], c.sigKind, total, c.seed * 17 + k * 131 + 1, M.type === 'quant' ? 'pitch' : '') : new Float32Array(total));
-  ctx.__seedq = allSeeds.slice(); const st = M.create(c.sr);
+  const total = c.nblocks * 128, sig = c.mkSig ? ins.map((n, k) => linked[k] ? c.mkSig(k, total, M.inputs[n]) : new Float32Array(total)) : ins.map((n, k) => linked[k] ? signal(M.inputs[n], c.sigKind, total, c.seed * 17 + k * 131 + 1, M.type === 'quant' ? 'pitch' : '') : new Float32Array(total));
+  ctx.__seedq = allSeeds.slice(); ctx.__thunderIR = undefined; let irv = 0; const st = M.create(c.sr);
   const io = { in: {}, out: {}, base: sched[0].p, p: sched[0].p, linked: new Set(), mods: null }, tr = { tempo: 120, lpb: 4, ticks: 6, playing: true };
   ins.forEach((n, k) => { io.in[n] = new Float32Array(128); if (linked[k]) io.linked.add(n); }); outs.forEach(n => { io.out[n] = new Float32Array(128); });
   const cx = { sr: c.sr, block: 128, quality: 'full', transport: tr, engine: {} };
@@ -160,13 +163,14 @@ function runDirect(ctx, def, c) {
   for (let b = 0; b < c.nblocks; b++) {
     while (ev < sched.length && sched[ev].b <= b) { io.p = io.base = sched[ev].p; ev++; }
     while (tv < c.transport.length && c.transport[tv].b <= b) { const t = c.transport[tv++]; for (const k of ['tempo', 'playing', 'startN']) if (k in t) tr[k] = t[k]; }
+    while (c.irs && irv < c.irs.length && c.irs[irv].b <= b) ctx.__thunderIR = irTable(c.irs[irv++].set);   // U20: the song's IRs (a new object each time)
     const n = Math.min(128, c.sizes[si++ % c.sizes.length]); sizes.push(n); cx.block = n;
     ins.forEach((nm, k) => { io.in[nm].set(sig[k].subarray(b * 128, (b + 1) * 128)); inF.set(io.in[nm], (b * ins.length + k) * 128); });
     M.process(st, io, cx);
     outs.forEach((nm, k) => outF.set(io.out[nm], (b * outs.length + k) * 128));
   }
-  ctx.__seedq = null;
-  return { meta: { type: M.type || c.type, sr: c.sr, nblocks: c.nblocks, sizes, seeds: allSeeds, linked, params: sched.map(e => ({ b: e.b, p: Object.values(e.p) })), transport: c.transport }, inF, outF };
+  ctx.__seedq = null; ctx.__thunderIR = undefined;
+  return { meta: { type: M.type || c.type, sr: c.sr, nblocks: c.nblocks, sizes, seeds: allSeeds, linked, params: sched.map(e => ({ b: e.b, p: Object.values(e.p) })), transport: c.transport, irs: c.irs || [] }, inF, outF };
 }
 
 function tables(M) {
