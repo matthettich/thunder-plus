@@ -119,7 +119,9 @@ class LoHiCut : public Module {
       }
       oL[i] = xl; oR[i] = xr;
     }
-    for (int j = 0; j < 4; j++) bfTidy(H[j]); for (int j = 0; j < 4; j++) bfTidy(Lw[j]); for (int j = 0; j < 4; j++) P[j] = fxClean(P[j]);
+    for (int j = 0; j < 4; j++) bfTidy(H[j]);
+    for (int j = 0; j < 4; j++) bfTidy(Lw[j]);
+    for (int j = 0; j < 4; j++) P[j] = fxClean(P[j]);
   }
  private:
   Svf h_[4], l_[4]; double lo_ = -1, hi_ = -1, p1_[4] = {0, 0, 0, 0};

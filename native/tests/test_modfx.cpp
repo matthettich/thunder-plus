@@ -18,6 +18,7 @@
 #include <string>
 #include <vector>
 
+#include "modfx/bbexpr.h"
 #include "modfx/modfx.h"
 #include "rt/json.h"
 #include "rt/jsmath.h"
@@ -125,6 +126,37 @@ static void engineTest(const std::string& filt) {
   std::printf("engine run (tests/golden/chains-modules.json): %d of %d renders reproduce the committed hash, %d differ  %s\n", ran - bad, ran, bad, bad ? "FAIL" : "ok");
 }
 
+
+// ---- 4. U21: the formula compiler BBExpr on its own (bytebeat) --------------------------------------------------------------------------------------------------------------------------
+// every formula of the reference list (the 16 built-in and the extra ones: operators, constant folding, the && / || with a constant, limits, every error): ok / error text and position / node count /
+// bytecode size and run() / s8() on a grid, equal to the JS's; the canonical stream hashes to the committed kBbHash (integer maths: the hash is the gate on every platform, the local comparison too).
+static void bbTest(const std::string& dir) {
+  std::string js, bin; if (!readFile(dir + "/bbexpr.json", &js) || !readFile(dir + "/bbexpr.i32", &bin)) { std::printf("bbexpr: reference files missing  FAIL\n"); fails++; return; }
+  JsonDoc doc; if (!doc.parse(js)) { std::printf("bbexpr: bbexpr.json unreadable  FAIL\n"); fails++; return; }
+  Json meta = doc.root().arr("meta"), grid = doc.root().arr("grid"); const int* ref = (const int*)bin.data(); const size_t nref = bin.size() / 4; size_t ri = 0;
+  std::vector<unsigned char> bytes; auto i32le = [&](int32_t v) { for (int k = 0; k < 4; k++) bytes.push_back((unsigned char)((uint32_t)v >> (8 * k))); };
+  int bad = 0;
+  for (size_t m = 0; m < meta.size(); m++) {
+    Json M = meta.at(m); const std::string src(M.str("src")); BBProg P; std::string err; int pos = 0;
+    const bool ok = BBProg::compile(src, &P, &err, &pos);
+    if (ok != (M.num("ok") != 0) || (!ok && (pos != (int)M.num("pos") || err != std::string(M.str("msg")))) || (ok && (P.nodes() != (int)M.num("nodes") || P.size() != (int)M.num("size")))) {
+      if (bad++ < 12) std::printf("bbexpr: '%.40s': ok %d pos %d nodes %d size %d '%s' differs from the JS (ok %d pos %d nodes %d size %d '%s')  FAIL\n", src.c_str(), ok, pos, ok ? P.nodes() : 0, ok ? P.size() : 0, err.c_str(),
+        (int)M.num("ok"), (int)M.num("pos"), (int)M.num("nodes"), (int)M.num("size"), std::string(M.str("msg")).c_str()); }
+    i32le(ok ? 1 : 0); i32le(ok ? 0 : pos); i32le(ok ? P.nodes() : 0); i32le(ok ? P.size() : 0); for (char ch : err) bytes.push_back((unsigned char)ch); bytes.push_back(0);
+    if (!ok) continue;
+    for (size_t g = 0; g < grid.size(); g++) {
+      Json G = grid.at(g); const double t = G.at(0).asNum(), a = G.at(1).asNum(), b = G.at(2).asNum(), c = G.at(3).asNum();
+      const int32_t v[4] = {P.run(t, a, b, c), P.s8((int32_t)t, (int32_t)a, (int32_t)b, (int32_t)c, 0), P.s8((int32_t)t, (int32_t)a, (int32_t)b, (int32_t)c, 1), P.s8((int32_t)t, (int32_t)a, (int32_t)b, (int32_t)c, 2)};
+      for (int k = 0; k < 4; k++) { i32le(v[k]); if (ri >= nref || ref[ri] != v[k]) { if (bad++ < 12) std::printf("bbexpr: '%.40s' grid %zu value %d: got %d want %d  FAIL\n", src.c_str(), g, k, v[k], ri < nref ? ref[ri] : 0); } ri++; }
+    }
+  }
+  const uint64_t h = fnv64(bytes.data(), bytes.size());
+  if ((int)meta.size() != kBbN || h != kBbHash) { std::printf("bbexpr: %d formulas, hash %016llx, the committed kBbHash is %016llx  FAIL\n", (int)meta.size(), (unsigned long long)h, kBbHash); bad++; }
+  if (ri != nref) { std::printf("bbexpr: %zu reference values, %zu used  FAIL\n", nref, ri); bad++; }
+  if (bad) fails++;
+  std::printf("bbexpr: %d formulas (compile result, error text, run and s8 on the grid) equal the JS's and the committed hash  %s\n", (int)meta.size(), bad ? "FAIL" : "ok");
+}
+
 // ---- 3. the direct cases -------------------------------------------------------------------------------------------------------------------------------------------------------
 struct Res { bool ran = false, exact = false, hashOk = false; long nDiff = 0, n = 0, first = -1; double got = 0, want = 0; };
 static Res runCase(const std::string& dir, const ModfxCaseGolden& G) {
@@ -160,7 +192,7 @@ static Res runCase(const std::string& dir, const ModfxCaseGolden& G) {
 int main(int argc, char** argv) {
   if (argc < 2) { std::printf("modfx: no reference directory given: FAIL (a fixture that cannot run is a failure)\n"); return 1; }
   const std::string filt = argc > 2 ? argv[2] : "";
-  if (filt.empty()) tableTest(argv[1]);
+  if (filt.empty()) { tableTest(argv[1]); bbTest(argv[1]); }
   engineTest(filt);
   int ran = 0, exact = 0, shown = 0;
   for (int i = 0; i < kModfxCasesN; i++) {
