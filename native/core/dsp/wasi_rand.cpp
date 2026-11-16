@@ -6,3 +6,9 @@
 namespace { uint64_t g_default = 0; thread_local uint64_t* g_cur = nullptr; }
 extern "C" void thunder_wasi_rand_use(uint64_t* state) { g_cur = state; }
 extern "C" int thunder_wasi_rand(void) { uint64_t& s = g_cur ? *g_cur : g_default; s = 6364136223846793005ULL * s + 1; return (int)(s >> 33); }
+
+// U14 diagnosis: the other two statics that are per wasm instance in the web app (host_fx_state.h): stmlib::Random's state (Beads, Clouds)
+// and the seed of DaisySP's myrand() (PitchShifter). The effect host points them at its own copies while it works and clears them after
+// (nullptr, nullptr), so the synth engines on the same thread keep the process-wide stmlib state they always had.
+#include "host_fx_state.h"
+extern "C" void thunder_fx_state_use(uint32_t* stmlib_rng, uint32_t* daisy_myrand) { thunder_host::stmlib_rng_cur() = stmlib_rng; thunder_host::daisy_myrand_cur() = daisy_myrand; }

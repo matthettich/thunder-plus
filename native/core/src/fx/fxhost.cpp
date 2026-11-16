@@ -17,6 +17,14 @@ struct Fx { float p[12]; float sr = 48000.f; virtual ~Fx() {} virtual void proce
 
 #ifdef THUNDER_HAVE_TFX
 extern "C" void thunder_wasi_rand_use(uint64_t* state);
+extern "C" void thunder_fx_state_use(uint32_t* stmlib_rng, uint32_t* daisy_myrand);
+namespace {
+// This host's copies of the effect sources' statics for as long as effect code runs on this thread (one tfx.wasm instance per node in the web app).
+struct ModuleState {
+  ModuleState(uint64_t* r, uint32_t* stm, uint32_t* daisy) { thunder_wasi_rand_use(r); thunder_fx_state_use(stm, daisy); }
+  ~ModuleState() { thunder_wasi_rand_use(nullptr); thunder_fx_state_use(nullptr, nullptr); }
+};
+}
 #endif
 namespace thunder {
 
@@ -80,7 +88,7 @@ FxPlan* FxHost::plan(const FxEntry* e, int n) {
     int j = -1; for (int k = 0; k < nCtl_; k++) if (!used[k] && std::strcmp(ctl_[k].key, e[i].key) == 0) { j = k; break; }
     const int w = pl->n_;
     if (j >= 0) { used[j] = true; pl->reuse_[w] = true; nf[w] = ctlFx_[j]; }
-    else { thunder_wasi_rand_use(&rand_); Fx* f = make_fx(e[i].t, (float)sr_); thunder_wasi_rand_use(nullptr); if (!f) continue; pl->fx_[w] = f; nf[w] = f; }
+    else { Fx* f; { ModuleState ms(&rand_, &stmRng_, &daisySeed_); f = make_fx(e[i].t, (float)sr_); } if (!f) continue; pl->fx_[w] = f; nf[w] = f; }
     pl->e_[w] = e[i]; pl->n_++;
   }
   nCtl_ = pl->n_; for (int i = 0; i < nCtl_; i++) { ctl_[i] = pl->e_[i]; ctlFx_[i] = nf[i]; }
@@ -181,7 +189,7 @@ bool FxHost::process(float* L, float* R, int n, double t0) {
   if (n <= 0) return true;
   if (n > kFxMaxCall) { std::memset(L, 0, sizeof(float) * (size_t)n); std::memset(R, 0, sizeof(float) * (size_t)n); failedBlock_++; return true; }   // tcChunks: a block longer than 4096 fails soft
 #ifdef THUNDER_HAVE_TFX
-  thunder_wasi_rand_use(&rand_);
+  ModuleState ms(&rand_, &stmRng_, &daisySeed_);
 #endif
   for (int k = 0; k < 11; k++) { lanes_[k]->prune(t0); swv_[k] = (float)lanes_[k]->at(t0); }   // the k-rate params, read once: the value at the block's start
   if (n <= kFxBlock) return p1(L, R, n, t0);

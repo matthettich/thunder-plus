@@ -158,6 +158,9 @@ class FxHost {
   bool lvlReady_ = false; float lvlOut_[8] = {0};
   int nDynOut_ = 0; FxDyn dynOut_[kFxSlots];
   uint64_t rand_ = 0;   // wasi-libc's rand() state of this host's "module" (see dsp/wasi_rand.cpp)
+  // the other statics of this host's "module" (dsp/host_fx_state.h): stmlib::Random's state (Beads, Clouds) and DaisySP myrand()'s seed
+  // (PitchShifter), with the values a fresh wasm instance starts from
+  uint32_t stmRng_ = 0x21, daisySeed_ = 1;
   uint32_t failedBlock_ = 0;
   bool bsFail_ = false;
 };

@@ -27,7 +27,15 @@ set(DEPS ${THUNDER_DEPS_DIR})
 if(NOT DEPS)
   set(DEPS ${TP}/_deps)
 endif()
-if(NOT EXISTS ${UP}/eurorack/plaits)
+# The prepared copy is remade when prepare.sh or fetch.sh change (their hashes are stamped beside it): an old build folder would otherwise
+# keep compiling the previous patches (U14 diagnosis: three patches were added there).
+file(SHA256 ${TP}/prepare.sh prep_h1)
+file(SHA256 ${TP}/fetch.sh prep_h2)
+set(prep_stamp "")
+if(EXISTS ${UP}/.prepared)
+  file(READ ${UP}/.prepared prep_stamp)
+endif()
+if(NOT EXISTS ${UP}/eurorack/plaits OR NOT prep_stamp STREQUAL "${prep_h1} ${prep_h2}")
   message(STATUS "thunder_dsp: fetching pinned upstreams into ${DEPS}")
   execute_process(COMMAND sh ${TP}/fetch.sh ${DEPS} RESULT_VARIABLE rc)
   if(NOT rc EQUAL 0)
@@ -37,7 +45,9 @@ if(NOT EXISTS ${UP}/eurorack/plaits)
   if(NOT rc EQUAL 0)
     message(FATAL_ERROR "third_party/prepare.sh failed")
   endif()
+  file(WRITE ${UP}/.prepared "${prep_h1} ${prep_h2}")
 endif()
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS ${TP}/prepare.sh ${TP}/fetch.sh)
 set(E ${UP}/eurorack)
 set(C ${UP}/cs)
 set(AW ${UP}/aw)
@@ -61,6 +71,7 @@ set(OPT_MOD -O2 -ffast-math -ffunction-sections -fdata-sections -fno-exceptions 
 # dsp_group(<lib> <name> OPTS <flags> DEFS <defs> INCS <dirs> PRE <headers to -include> SRCS <files>)
 # One OBJECT library per source file, so the wasm link can list every object in a canonical, path-independent order:
 # sorted by the source's path relative to dsp/ ("dsp/..."), DaisySP ("ds/...") or the prepared upstream tree ("up/...").
+set(THUNDER_DSP_DIR ${CMAKE_CURRENT_SOURCE_DIR})
 function(dsp_group lib name)
   cmake_parse_arguments(G "" "" "OPTS;DEFS;INCS;PRE;SRCS" ${ARGN})
   set(i 0)
@@ -74,6 +85,9 @@ function(dsp_group lib name)
     endforeach()
     target_compile_definitions(${obj} PRIVATE ${G_DEFS})
     target_include_directories(${obj} PRIVATE ${G_INCS})
+    if(NOT IS_WASM)   # host_fx_state.h: the prepared stmlib/utils/random.h and DaisySP pitchshifter.h include it on host builds (prepare.sh)
+      target_include_directories(${obj} PRIVATE ${THUNDER_DSP_DIR})
+    endif()
     target_sources(${lib} PRIVATE $<TARGET_OBJECTS:${obj}>)
     get_filename_component(absrc ${src} ABSOLUTE)
     foreach(root "dsp|${SRC}" "up|${UP}" "ds|${D}")
@@ -111,12 +125,8 @@ if(NOT IS_WASM)   # U14: wasi-libc's rand() (wasi_rand.cpp); the wasm build is u
   set(RAND_SRC ${CMAKE_CURRENT_SOURCE_DIR}/wasi_rand.cpp)
 endif()
 dsp_group(${T} core OPTS ${OPT_FX} INCS ${SRC}/tfx SRCS ${SRC}/tfx/tfx.cc ${SRC}/tfx/fx_extra.cc ${RAND_SRC})
-# (sanitizer build: the vendored Mutable Clouds reads past a resource table in GranularSamplePlayer::Play and Correlator shifts a uint32 by 32, both found in U14; wasm reads the next bytes of memory. Not instrumented; reported)
-set(MI_ASAN)
-if(THUNDER_SANITIZE)
-  set(MI_ASAN -fno-sanitize=address,undefined)
-endif()
-dsp_group(${T} mi OPTS ${OPT_FX} ${MI_ASAN} DEFS ${MI_DEFS} PRE cstdio INCS ${SRC}/tfx ${E} SRCS ${SRC}/tfx/fx_mi.cc
+# (U14 diagnosis: the sanitizer build instruments Clouds again. The read past lut_window and the shift by 32 it found are patched in third_party/prepare.sh.)
+dsp_group(${T} mi OPTS ${OPT_FX} DEFS ${MI_DEFS} PRE cstdio INCS ${SRC}/tfx ${E} SRCS ${SRC}/tfx/fx_mi.cc
   ${E}/rings/dsp/part.cc ${E}/rings/dsp/resonator.cc ${E}/rings/dsp/string.cc ${E}/rings/dsp/fm_voice.cc ${E}/rings/resources.cc
   ${E}/clouds/dsp/granular_processor.cc ${E}/clouds/dsp/correlator.cc ${E}/clouds/dsp/mu_law.cc ${E}/clouds/resources.cc
   ${E}/clouds/dsp/pvoc/frame_transformation.cc ${E}/clouds/dsp/pvoc/phase_vocoder.cc ${E}/clouds/dsp/pvoc/stft.cc
@@ -126,7 +136,13 @@ dsp_group(${T} beads OPTS ${OPT_FX} DEFS ${MI_DEFS} PRE cstdio INCS ${SRC}/tfx $
   ${E}/beads/dsp/processor.cc ${E}/beads/dsp/trigger_generator.cc ${E}/beads/resources.cc)
 dsp_group(${T} ds OPTS ${OPT_FX} INCS ${SRC}/tfx ${DS_INCS} SRCS ${SRC}/tfx/fx_ds.cc
   ${D}/Source/Effects/chorus.cpp ${D}/Source/Effects/decimator.cpp)
-dsp_group(${T} ds2 OPTS ${OPT_FX} INCS ${SRC}/tfx ${DS_INCS} SRCS ${SRC}/tfx/fx_ds2.cc
+# U14 diagnosis: host builds take Effects/pitchshifter.h from the prepared copy (its myrand() seed is the effect host's, not one per process:
+# prepare.sh, host_fx_state.h); the wasm build takes DaisySP's own file, as dsp/tfx/build.sh does.
+set(DS2_PRE_INCS)
+if(NOT IS_WASM)
+  set(DS2_PRE_INCS ${UP}/ds)
+endif()
+dsp_group(${T} ds2 OPTS ${OPT_FX} INCS ${SRC}/tfx ${DS2_PRE_INCS} ${DS_INCS} SRCS ${SRC}/tfx/fx_ds2.cc
   ${D}/Source/Effects/flanger.cpp ${D}/Source/Effects/phaser.cpp ${D}/Source/Effects/tremolo.cpp ${D}/Source/Effects/overdrive.cpp
   ${D}/Source/Effects/wavefolder.cpp ${D}/Source/Effects/autowah.cpp ${D}/Source/Filters/ladder.cpp
   ${D}/Source/Synthesis/oscillator.cpp ${D}/Source/Control/phasor.cpp)

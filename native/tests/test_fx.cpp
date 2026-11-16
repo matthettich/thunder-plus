@@ -22,10 +22,19 @@ using namespace thunder;
 
 static bool readFile(const std::string& path, std::string* out) { std::ifstream f(path, std::ios::binary); if (!f) return false; std::stringstream ss; ss << f.rdbuf(); *out = ss.str(); return true; }
 static uint64_t fnv(const float* f, size_t n) { uint64_t h = 0xcbf29ce484222325ull; const unsigned char* u = (const unsigned char*)f; for (size_t i = 0; i < n * 4; i++) { h ^= u[i]; h *= 0x100000001b3ull; } return h; }
-static int fails = 0, knownFailing = 0;
-// OPEN (U14 report; the gate is not loosened): effects that do not reach -80 dB natively. The case is printed as FAILING with its figure and does not fail ctest, so the rest of the
-// suite stays a gate; the lead decides (see progress/u14.md). Remove a name here when it is fixed.
-static bool openFailing(const char* n) { static const char* k[] = {"e_beads_def", "e_beads_alt", "e_pshift_alt"}; for (const char* x : k) if (!std::strcmp(n, x)) return true; return false; }
+static int fails = 0, steps = 0;
+// No case is exempt from the gate. (U14 had e_beads_def, e_beads_alt and e_pshift_alt open; the causes are in third_party/prepare.sh and core/dsp/host_fx_state.h: an argument
+// evaluation order GCC and clang choose differently, and two statics that are per wasm instance in the web app but were per process here.)
+// Sanitizer builds only (THUNDER_SANITIZE): Clouds hands its output over as int16, and the instrumented -ffast-math code of clouds/dsp/granular_processor.cc rounds a handful of
+// samples (44 of 65536 in e_clouds_alt) to the neighbouring int16 value: one step of 1/32768, which is -75.9 dB below that case's peak, with nothing accumulating (the samples
+// between are equal). There a Clouds case passes when no sample is further than that one step from the reference; the plain build has no such allowance (it is bit-exact).
+static bool oneInt16Step(const char* n, double err) {
+#ifdef THUNDER_SANITIZE_BUILD
+  return std::strstr(n, "clouds") && err <= 1.0001 / 32768.0;
+#else
+  (void)n; (void)err; return false;
+#endif
+}
 
 static int laneIndex(std::string_view k) { if (k.size() == 3 && k.substr(0, 2) == "sw") return k[2] - '0'; if (k == "flx") return 8; if (k == "gat") return 9; if (k == "rtg") return 10; return -1; }
 static void entriesOf(Json ch, std::vector<FxEntry>* out) {
@@ -34,15 +43,18 @@ static void entriesOf(Json ch, std::vector<FxEntry>* out) {
 }
 static void setChain(FxHost& H, Json ch) { std::vector<FxEntry> v; entriesOf(ch, &v); if (std::getenv("FX_DBG")) for (auto& e : v) std::fprintf(stderr, "entry %s t=%d slot=%d on=%d p=%.17g %.17g %.17g %.17g %.17g\n", e.key, e.t, e.slot, e.on, e.p[0], e.p[1], e.p[2], e.p[3], e.p[4]); FxPlan* p = H.plan(v.data(), (int)v.size()); H.commit(p); delete p; }
 
-struct Res { bool ran = false, exact = false, hashOk = false, postOk = true; double db = -INFINITY; int posts = 0; };
-static Res runCase(const std::string& dir, const FxGolden& G) {
+struct Res { bool ran = false, exact = false, hashOk = false, postOk = true; double db = -INFINITY, err = 0; int posts = 0; };
+// shadow: a second host with the same chain processes the same input just before the first, block by block. In the web app that is another node with its own wasm instance, so
+// the first host's output must not change (the statics of the effect sources are per host: core/dsp/host_fx_state.h, wasi_rand.cpp).
+static Res runCase(const std::string& dir, const FxGolden& G, bool shadow = false) {
   Res R; std::string js, in, ref;
   if (!readFile(dir + "/" + G.name + ".json", &js) || !readFile(dir + "/" + G.name + ".in.f32", &in) || !readFile(dir + "/" + G.name + ".f32", &ref)) return R;
   JsonDoc doc; if (!doc.parse(js)) return R; Json M = doc.root();
   const int n = (int)M.num("n"); if ((size_t)n * 8 != in.size() || (size_t)n * 8 != ref.size()) return R;
   const float* I = (const float*)in.data(); const float* J = (const float*)ref.data();
   std::vector<float> oL(I, I + n), oR(I + n, I + 2 * (size_t)n);
-  FxHost H(48000.0);
+  FxHost H(48000.0), H2(48000.0); std::vector<float> sL, sR;
+  if (shadow) { setChain(H2, M.arr("chain")); sL.assign(oL.begin(), oL.end()); sR.assign(oR.begin(), oR.end()); }
   setChain(H, M.arr("chain"));
   Json ops = M.arr("ops"), q = M.arr("q"), msgs = M.arr("msgs"), posted = M.arr("posted"), sz = M.arr("sizes");
   for (size_t i = 0; i < ops.size(); i++) { Json o = ops.at(i); const std::string_view k = o.at(0).asStr(); if (k == "reset") H.reset(o.at(1).asNum()); else H.lane(laneIndex(k), o.at(2).asNum(), o.at(1).asNum()); }
@@ -52,6 +64,7 @@ static Res runCase(const std::string& dir, const FxGolden& G) {
     const int want = (int)sz.at((size_t)(si++ % (int)sz.size())).asNum(), m = std::min(want, n - f0); const double t0 = f0 / 48000.0;
     for (size_t i = 0; i < msgs.size(); i++) { Json e = msgs.at(i); if ((int)e.num("b") != b) continue; Json g = e.get("msg");
       if (g.isArr()) setChain(H, g); else if (g.get("rest").isBool()) H.setRest(g.boolean("rest"), t0); else if (g.get("lvl").isBool()) H.setLevels(g.boolean("lvl")); else if (g.get("tel").isBool()) H.setTelemetry(g.boolean("tel")); }
+    if (shadow) H2.process(sL.data() + f0, sR.data() + f0, m, t0);
     H.process(oL.data() + f0, oR.data() + f0, m, t0);
     float lv[8]; FxDyn dy[8]; const int nd0 = H.popLevels(lv) ? 1 : 0; const int nd = H.popDyn(dy, 8);
     // the posts of this call: lvl first, then dyn (the worklet's order); a failed block is counted separately
@@ -74,7 +87,7 @@ static Res runCase(const std::string& dir, const FxGolden& G) {
   std::vector<float> all(oL); all.insert(all.end(), oR.begin(), oR.end());
   if (const char* od = std::getenv("FX_OUT")) { std::ofstream o(std::string(od) + "/" + G.name + ".cpp.f32", std::ios::binary); o.write((const char*)all.data(), (std::streamsize)(all.size() * 4)); }
   R.exact = exact; R.hashOk = fnv(all.data(), all.size()) == G.hash;
-  R.db = exact ? -INFINITY : 20 * std::log10(err / std::max(peak, 1e-30));
+  R.db = exact ? -INFINITY : 20 * std::log10(err / std::max(peak, 1e-30)); R.err = err;
   return R;
 }
 
@@ -105,13 +118,22 @@ int main(int argc, char** argv) {
     const FxGolden& G = kFxGolden[i]; if (argc > 2 && !std::strstr(G.name, argv[2])) continue; const Res R = runCase(argv[1], G);
     if (!R.ran) { std::printf("%-22s could not be run  FAIL\n", G.name); fails++; continue; }
     ran++;
-    const bool ok = R.db <= -80.0 && R.postOk;
+    const bool step = R.db > -80.0 && oneInt16Step(G.name, R.err);
+    const bool ok = (R.db <= -80.0 || step) && R.postOk; if (step) steps++;
     char db[24]; if (R.exact) std::snprintf(db, sizeof db, "exact"); else std::snprintf(db, sizeof db, "%.1f dB", R.db);
     if (R.exact) exact++; else if (R.db > worst) { worst = R.db; worstName = G.name; }
-    std::printf("%-22s %-10s posts %-3d%s%s%s\n", G.name, db, R.posts, R.postOk ? "" : " DIFF", R.exact != R.hashOk ? "  [committed hash disagrees with the reference run]" : "", ok ? "" : "  FAIL");
-    if (!ok && openFailing(G.name)) { std::printf("   ^ FAILING (open, reported, not gating): %s\n", G.name); knownFailing++; }
-    else if (!ok) fails++;
+    std::printf("%-22s %-10s posts %-3d%s%s%s%s\n", G.name, db, R.posts, R.postOk ? "" : " DIFF", R.exact != R.hashOk ? "  [committed hash disagrees with the reference run]" : "", step ? "  (sanitizer build: one int16 step of Clouds' output)" : "", ok ? "" : "  FAIL");
+    if (!ok) fails++;
   }
-  std::printf("fx: %d cases, %d bit-exact, worst %s (%s), %d failed + %d open FAILING (gate -80 dB)\n", ran, exact, std::isinf(worst) ? "exact" : (std::to_string(worst) + " dB").c_str(), worstName, fails, knownFailing);
+  // Two hosts side by side: the effects that keep state in a static of their sources (DaisySP myrand: pshift; stmlib::Random: Beads, Clouds; rand(): the Airwindows reverb, Cloud Seed)
+  // give the same figure with a second host running the same chain in the same process, on the same thread.
+  if (argc <= 2) for (const char* nm : {"e_pshift_alt", "e_beads_def", "e_beads_alt", "e_clouds_alt", "e_reverb_def", "e_space_def"}) {
+    const FxGolden* G = nullptr; for (int i = 0; i < kFxGoldenN; i++) if (!std::strcmp(kFxGolden[i].name, nm)) G = &kFxGolden[i];
+    if (!G) { std::printf("two hosts: %-14s no such case  FAIL\n", nm); fails++; continue; }
+    const Res A = runCase(argv[1], *G), B = runCase(argv[1], *G, true);
+    const bool ok = A.ran && B.ran && (B.db <= -80.0 || oneInt16Step(nm, B.err)) && B.db <= A.db + 1e-9;
+    std::printf("two hosts: %-14s alone %.1f dB, beside a second host %.1f dB  %s\n", nm, A.db, B.db, ok ? "ok" : "FAIL"); if (!ok) fails++;
+  }
+  std::printf("fx: %d cases, %d bit-exact, worst %s (%s), %d failed (gate -80 dB; %d passed as one int16 step of Clouds' output, sanitizer builds only)\n", ran, exact, std::isinf(worst) ? "exact" : (std::to_string(worst) + " dB").c_str(), worstName, fails, steps);
   return fails ? 1 : 0;
 }
