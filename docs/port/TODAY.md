@@ -120,6 +120,11 @@ N1 step 10.
 - **Web build 633 (Fable's own, on `beta` ede5da8 and `main` ca6bbd2; the owner asked for it at 12:02):** the Bytebeat hang from REVIEW-16NOV B1-1. Cause was not a
   missing cap: steps 77 / 78 read their constant inside the short-circuit, so it was not consumed and ran as a step. Fixed by reading it first, in all three copies;
   goldens unchanged; test `bbexpr-const-logic`. **Owed on `native`:** the same two lines in `native/core/src/modfx/bbexpr.cpp` (given to the U24 worker as a first small PR).
+- #192 U23 layer types click, wavetable, pd, chip, supersaw, pwm, sample, grains, vint (Sonnet): merged, all CI green; 61 of 61 factory voices equal beta's hashes, 311
+  direct cases. Independent Sonnet verifier passed it (all 61 hashes re-checked, four mutations caught, scope clean, ASan / UBSan clean on the NaN inputs; report in
+  REVIEW-16NOV.md). The manager did NOT read the diff. Least sure of: sample, grains, pwm and vint have no factory voice (direct cases only; the pwm DPCM mutation
+  failed only 3 cases); a sample layer in a vint mode allocates; `layer_vint.cpp` allows a huge buffer for a tiny sample rate. **Web app, for Fable:** a wavetable with
+  negative Bend (reachable: the slider is −1 to 1, `index.html:8439`) reads one past its table and gives NaN; the C++ returns NaN through a guard, no out-of-bounds read.
 
 ## Progress log (the manager updates and pushes this after every change of state; newest last)
 - 10:30 Fable: plan written. Nothing started.
@@ -195,3 +200,5 @@ N1 step 10.
   union; expect small conflicts in `LType`, `Osc`, `renderLayer`, CMake, `rt_harness`). **Possible web-app bugs for Fable:** a wavetable with negative Bend reads one
   past its table (NaN); supersaw with negative Detune and pwm with negative Shape give NaN. The Linux ctest job now takes about 29 minutes.
   Manager's next step: verifier passes → merge #192, review-queue line. Still running: the U24 worker (#191's reference, then U24).
+- 14:00 **#192 U23 merged** (verifier passed all four items). Still running: the U24 worker (#191's reference, then U24; it must rebase on U23 and check the
+  voices that mix U23 and U24 types). Next unstarted: U28 (one Sonnet worker, started now on `n3/u28`), then U29.
