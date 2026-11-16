@@ -25955,7 +25955,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 627;
+const BUILD = 628;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD + (location.pathname.includes('/beta/') ? ' · beta' : '');
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -26171,9 +26171,11 @@ const ARR_AHEADS = [4, 8, 12, 16, 24, 32], ARR_AHEAD_K = 'thunderplus-arrahead-v
 let arrAhead = (() => { try { const v = +localStorage.getItem(ARR_AHEAD_K); return ARR_AHEADS.includes(v) ? v : 16; } catch(e){ return 16; } })();
 function setArrAhead(i){ arrAhead = ARR_AHEADS[clamp(i | 0, 0, ARR_AHEADS.length - 1)]; try { localStorage.setItem(ARR_AHEAD_K, String(arrAhead)); } catch(e){} arrSig = ''; draw(); }
 const ARR_KEEP = 4;
+/* (build 628, owner: "Can song and arrange page down sooner?") a view under 16 rows turns when the playhead is a third of it (rounded up) from the bottom, not a quarter: 14 rows at 5 from the bottom (was 3), 8 at 3 (was 2). From 16 rows the setting rules as before (16 by default: half of a 32-row view, never more than half). Arrange, the Song screen and the cursor's own page turn (arrKeepRow) all read this. */
+const arrAheadFor = VR => { VR = Math.max(2, VR | 0); return VR < 16 ? Math.min(arrAhead, Math.max(1, Math.ceil(VR / 3))) : clamp(arrAhead, 1, VR >> 1); };
 function arrPageTop(top, VR, row, len, keep = -1, end = len - 1){
   if (!(row >= 0)) return top;
-  VR = Math.max(2, VR | 0); const ahead = VR < 16 ? Math.min(arrAhead, Math.max(1, VR >> 2)) : clamp(arrAhead, 1, VR >> 1), kp = Math.min(ARR_KEEP, Math.max(1, VR >> 3));
+  VR = Math.max(2, VR | 0); const ahead = arrAheadFor(VR), kp = Math.min(ARR_KEEP, Math.max(1, VR >> 3));
   if (row >= top && row < top + VR && (row < top + VR - ahead || end < top + VR)) return top;   // well inside, or nothing more to come before the wrap: nothing turns
   let nt = row < top ? row : row - kp;
   // The last page: when the end is within reach, one turn goes straight to the page that shows it (the playhead already on it), instead of turning again a few rows on
@@ -35744,7 +35746,7 @@ function arrKeepRow(c, VR){
   const top = c.top || 0; VR = arrRows(top);
   /* LOOK-AHEAD for the cursor (build 609): moved down by key or wheel (not a click) into the last arrAhead rows of the view, with song below it: one page turn puts it ARR_KEEP rows from the top */
   const dn = c.y > arrLastY && c.y - arrLastY <= 16 && performance.now() - arrTouchT > 600; arrLastY = c.y;
-  if (dn && c.y >= top && c.y <= top + VR - 1 && top + VR < 256 && c.y >= top + VR - (VR < 16 ? Math.min(arrAhead, Math.max(1, VR >> 2)) : clamp(arrAhead, 1, VR >> 1))){ c.top = clamp(c.y - Math.min(ARR_KEEP, Math.max(1, VR >> 3)), 0, Math.max(0, 256 - VR)); arrLookY = c.y; return; }
+  if (dn && c.y >= top && c.y <= top + VR - 1 && top + VR < 256 && c.y >= top + VR - arrAheadFor(VR)){ c.top = clamp(c.y - Math.min(ARR_KEEP, Math.max(1, VR >> 3)), 0, Math.max(0, 256 - VR)); arrLookY = c.y; return; }
   if (c.y >= top && c.y <= top + VR - 1) return;
   // PAGES (owner, 3 Nov: "moving the cursor below the screen break should page the screen down"): just past the bottom, the
   // cursor's row becomes the first one shown; just past the top, the last
@@ -36199,6 +36201,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [628, '15 Nov', ['Arrange and the Song screen turn their page sooner on a small view: under 16 rows the page turns when the playhead (or the cursor going down) is a third of the view from the bottom (it was a quarter); from 16 rows the ARRANGE LOOK-AHEAD setting rules as before']],
   [627, '15 Nov', ['Top bar (computer): LOOP now sits immediately to the left of PLAY']],
   [626, '15 Nov', ['Song / Arrange: LOOP play from an empty row no longer pages the view away to the next block (or to row 0): it starts only when that row is in view, otherwise it says there is nothing to loop on this row', 'The page-ahead turn no longer fires for a loop that stays put the instant LOOP is pressed']],
   [625, '15 Nov', ['Command bar: Make unique keeps the selection (and the cursor) after it runs, so you can go on with the same blocks']],
