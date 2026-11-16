@@ -15,6 +15,8 @@
 #include <cstdint>
 #include <memory>
 
+#include "rt/jsmath.h"
+
 namespace thunder {
 namespace modfx {
 
@@ -47,7 +49,8 @@ class Seeds {
 class SeedCounter : public Seeds {
  public:
   explicit SeedCounter(uint32_t start = 12345) : n_(start) {}
-  uint32_t next() override;
+  // defined here, not in modfx.cpp: thunder_core is built with -fno-rtti, so a TU with RTTI (the sanitizer build of rt_harness) must emit the vtable and typeinfo itself
+  uint32_t next() override { n_ = js_to_uint32((double)n_ * 1103515245 + 12345); return n_; }
  private:
   uint32_t n_;
 };
