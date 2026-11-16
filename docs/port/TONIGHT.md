@@ -97,3 +97,10 @@ is in section C; read it, it changes how effects are built.
   maybe choke the previous edit-audition. Needs the core (`core/seq-core.js`, `node tools/make-core.mjs`): Fable.
 - Web items done by 20:25: 1 (624), 2 (625), 3 (626), 5 (627). The agent continues with 6 to 10.
 - #180 U15 (Sonnet agent; the lead read fxhost / fxbank changes, not clkcores.cpp line by line against the JS, and not fdlibm.cpp): merged.
+- **Web list state at 21:50: `beta` = `main` = build 631.** Done: 1 (624), 2 (625), 3 (626), 5 (627), 6 (628), 7 (629), 9 (630), 10 (631); 8 needed no build
+  (INST screen's IN USE row and the Synth page's "Used on" line already list the tracks). 4 is Fable's (above). Fable read the diffs of 624 to 631: accepted.
+  Not done: `HANDOVER.md`'s PICK UP HERE block on `beta` still describes 18:10 (Haiku: bring it up to date from this file), `docs/TEST-CHECKLIST.md` not re-exported.
+  **One follow-up for a Sonnet agent (build 632):** item 10 put the folded tempo line as ROWS, BPM / LPB, time left. The owner's words were "bpm and lpb to the
+  left of the countdown timer" and "the rows box … between left and lpb", where LEFT is the time-left box: so the order he asked for is **BPM / LPB, ROWS, LEFT**.
+  It is the `order` values in the build-631 media query (`body.mob #tRowsBar`, `body.mob #tClk`); check at 344 px in two skins with a screenshot.
+  Item 3 is only partly confirmed (the jump was reproduced from an empty cursor row only): its punch-list item asks the owner what he pressed.
