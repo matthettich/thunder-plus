@@ -17,6 +17,7 @@
 #include "mix/mix.h"
 #include "mix/pdc.h"
 #include "seq/seq.h"
+#include "fx/fxbank.h"
 #include "song/song.h"
 #include "voice/voice.h"
 
@@ -64,6 +65,10 @@ class SongRenderer {
   // Control thread, before the first block (the processors start from rest).
   void setMasterChain(const MasterChainConfig& cfg);
   MasterChain* masterChain() { return mchain_.get(); }
+  // TRACK AND MASTER EFFECTS (U14): the song's tfx effects (S.tfx / S.mfx, the 34 wasm effects) in the mixer's setFx / setMasterFx hooks, their FXO / FLX / GAT /
+  // RTG / FXV events dispatched to them. Effects of the other kinds (U15 to U18) are left out. Control thread, before the first block.
+  void setEffects(bool on);
+  FxBank* fxBank() { return fx_.get(); }
   // METERS (U13): every block, after the mixer, the tracks' post-pan pairs and the master output are fed to `bank` and its clock advanced (null: none). The bank outlives the renderer.
   void setMeters(MeterBank* bank) { meters_ = bank; }
   // N frames of the song with the latency trimmed off the start, as pass() returns them: renders latencyFrames() + N and drops the first
@@ -95,6 +100,8 @@ class SongRenderer {
   PdcPlan plan_; int64_t extra_ = 0;
   std::unique_ptr<float[]> scratch_;
   std::unique_ptr<MasterChain> mchain_;
+  std::unique_ptr<FxBank> fx_;
+  static void masterHook(void* user, int track, float* L, float* R, int frames, double t0, const MixFeed* feeds, int nFeeds);
   MeterBank* meters_ = nullptr;
   RenderStats st_;
 };

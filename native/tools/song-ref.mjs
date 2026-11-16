@@ -23,8 +23,10 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
 const songFile = process.argv[2]; if (!songFile) { console.error('usage: song-ref.mjs <song.thunder> [outDir]'); process.exit(2); }
 // --master (U12): the app's own master chain switched ON (track effects, master effects, chains and live engines stay off): S.mst on with a shaped EQ,
 // the suppressor, the compressor (the freshMst defaults) and its own limiter OFF, so that the safety limiter (S.limiter, pass(lim = true)) is in the path too.
-const MASTER = process.argv.includes('--master');
-const name = path.basename(songFile).replace(/\.thunder$/, '') + (MASTER ? '-master' : '');
+const MASTER = process.argv.includes('--master'), FX = process.argv.includes('--fx');   // --fx (U14): the 34 tfx effects on the tracks and the master stay ON; every other effect is removed (not yet ported: U15 to U18)
+const FXTYPES = FX ? new Set((await import('./fx-src.mjs')).effects().map(e => e.key)) : new Set();
+const keepFx = f => FX && f && FXTYPES.has(f.type);
+const name = path.basename(songFile).replace(/\.thunder$/, '') + (MASTER ? '-master' : FX ? '-fx' : '');
 const OUT = (process.argv[3] && !process.argv[3].startsWith('--') ? process.argv[3] : null) || '/tmp/thunder-ref/' + name;
 const PW = process.env.PLAYWRIGHT || ['/opt/npm-tools/node_modules/playwright/index.mjs', path.join(ROOT, 'node_modules/playwright/index.mjs')].find(f => fs.existsSync(f));
 const CHROME = process.env.CHROME || ['/usr/bin/google-chrome', '/usr/bin/chromium', '/usr/bin/chromium-browser'].find(f => fs.existsSync(f));
@@ -35,8 +37,8 @@ fs.mkdirSync(OUT, { recursive: true });
 // the song, with everything after the mixer's own strip switched off
 const file = JSON.parse(fs.readFileSync(path.resolve(songFile), 'utf8')), S0 = file.song;
 const off = { tfx: 0, mfx: 0, chainOn: 0, mst: !!(S0.mst && S0.mst.on), limiter: !!S0.limiter };
-S0.tfx = (S0.tfx || []).map(a => (a || []).map(f => { if (f) off.tfx++; return null; }));
-S0.mfx = (S0.mfx || []).map(f => { if (f) off.mfx++; return null; });
+S0.tfx = (S0.tfx || []).map(a => (a || []).map(f => { if (f) off.tfx++; return keepFx(f) ? f : null; }));
+S0.mfx = (S0.mfx || []).map(f => { if (f) off.mfx++; return keepFx(f) ? f : null; });
 S0.chainOn = (S0.chainOn || []).map(v => { if (v) off.chainOn++; return false; });
 if (MASTER) { const B = (type, f, g = 0, q = 1, slope = 24, on = true) => ({ type, f, g, q, slope, on });
   S0.mst = { on: true, eq: { on: true, bands: [B('lowcut', 28, 0, .71, 24), B('lowshelf', 110, 2, .7), B('bell', 350, -3, 1.2), B('bell', 2500, 2, 1.2), B('highshelf', 9000, 1.5, .7), B('highcut', 19000, 0, .71, 12, true)] },
@@ -67,10 +69,10 @@ try {
   await page.evaluate(([t, n]) => window.__seqTest.load(t, n), [text, name + '.thunder']);
   /* eslint-disable no-undef */
   // (the app's code lives in one closure: __seqTest.ev runs a line inside it, where S, kit, makeSeq, pass... are)
-  const inApp = async MASTER => {
+  const inApp = async (MASTER, FXK) => {
     const save = (nm, f32) => fetch('/__save?name=' + nm, { method: 'POST', body: new Blob([f32.buffer.slice(f32.byteOffset, f32.byteOffset + f32.byteLength)]) }).then(r => r.text());
     // in memory too (the loader may fill in defaults)
-    S.tfx = S.tfx.map(a => (a || []).map(() => null)); S.mfx = S.mfx.map(() => null); S.chainOn = S.chainOn.map(() => false); if (MASTER) { if (!(S.mst && S.mst.on)) return { err: 'the master chain did not load' }; } else { if (S.mst) S.mst.on = false; S.limiter = false; }
+    S.tfx = S.tfx.map(a => (a || []).map(f => f && FXK.includes(f.type) ? f : null)); S.mfx = S.mfx.map(f => f && FXK.includes(f.type) ? f : null); S.chainOn = S.chainOn.map(() => false); if (MASTER) { if (!(S.mst && S.mst.on)) return { err: 'the master chain did not load' }; } else { if (S.mst) S.mst.on = false; S.limiter = false; }
     // LIVE ENGINES OFF: a pad with a live engine (acid, mach, vox, bass, the pump synths, waves) plays its RENDERED pad, as the page itself
     // does wherever the live module is not loaded (bassNode returns null: "play the render"). The live modules still load into the
     // render's context; the sets that say "loaded" are kept empty, so no live node is ever made.
@@ -111,7 +113,7 @@ try {
     const all = new Float32Array(2 * N); all.set(mix[0], 0); all.set(mix[1], N); await save('ref.f32', all);
     return { sr, frames: N, vars: coreVars(), kit: coreKitV(), pads: padList, offAfter: off2, stats };
   };
-  info = await page.evaluate(src => window.__seqTest.ev(src), '(' + inApp.toString() + ')(' + MASTER + ')');
+  info = await page.evaluate(src => window.__seqTest.ev(src), '(' + inApp.toString() + ')(' + MASTER + ', ' + JSON.stringify([...FXTYPES]) + ')');
 } finally { await browser.close(); srv.close(); }
 if (!info || info.err) { console.error('song-ref: ' + (info ? info.err : 'no result')); process.exit(1); }
 const ref = fs.readFileSync(path.join(OUT, 'ref.f32')), f = new Float32Array(ref.buffer, ref.byteOffset, ref.length / 4);

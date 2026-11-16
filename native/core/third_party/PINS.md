@@ -18,6 +18,16 @@ Licences were read from each repository's LICENSE file at the pin (eurorack: its
 per-file headers of the files used are MIT). Nothing non-permissive is fetched. Toolchain for wasm: wasi-sdk 25 (Apache-2.0 with LLVM
 exceptions), downloaded in CI, never vendored.
 
+## Patches `prepare.sh` adds beyond the build scripts' own (U14 diagnosis, 15 Nov 2026)
+Each is explained at its place in `prepare.sh`. tfx.wasm built from the patched tree gives the same 91 `fx_golden.inc` hashes as the committed one.
+| File | What | Applies to |
+|---|---|---|
+| `beads/dsp/delay_granular_player.h` | the three random draws of a new grain (time, pitch, shape) sequenced in clang's order: as arguments of one call their order is unspecified, and GCC takes the other one | every build (same audio from clang / wasm) |
+| `stmlib/utils/random.h` | `Random`'s state through a per-thread pointer set by the effect host (one state per wasm instance in the web app, one per process natively) | host builds (`#ifndef __wasm__`) |
+| DaisySP `Effects/pitchshifter.h` (a patched copy in `ds/Effects/`) | `myrand()`'s seed per effect host, same reason | host builds (the wasm build does not use the copy) |
+| `clouds/dsp/grain.h` | no read of `lut_window[4097]` (one past the table, multiplied by 0) | every build (same value) |
+| `clouds/dsp/correlator.cc` | shift count masked to 5 bits (was a shift by 32: undefined; wasm takes it modulo 32) | every build (the wasm's result everywhere) |
+
 ## Parity
 The gate is the audio, not the bytes: `native/tools/parity.sh u02` builds the three wasm files with CMake, swaps them (and the
 `MODS_WASM_B64` base64 in both worklet files) into a temporary copy of the tree, and runs the golden tests there as `npm test` does

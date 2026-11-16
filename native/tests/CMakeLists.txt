@@ -190,6 +190,42 @@ else()
   add_test(NAME master COMMAND test_master)
 endif()
 
+# U14: every effect starts in zeroed memory, proved for the compiler that built it (see test_fxzero.cpp)
+add_executable(test_fxzero test_fxzero.cpp)
+target_link_libraries(test_fxzero PRIVATE thunder_core)
+target_include_directories(test_fxzero PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../core/src)
+add_test(NAME fxzero COMMAND test_fxzero)
+set_tests_properties(fxzero PROPERTIES SKIP_RETURN_CODE 77)
+
+# U14: the track-effect host (ThunderFx) against the worklet itself (tools/fx-dump.mjs: 91 cases + the map() value sets; needs Node and acorn).
+add_executable(test_fx test_fx.cpp)
+target_link_libraries(test_fx PRIVATE thunder_core)
+target_include_directories(test_fx PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../core/src ${CMAKE_CURRENT_SOURCE_DIR})
+if(THUNDER_SANITIZE)   # see oneInt16Step in test_fx.cpp
+  target_compile_definitions(test_fx PRIVATE THUNDER_SANITIZE_BUILD=1)
+endif()
+if(NOT MSVC)
+  target_compile_options(test_fx PRIVATE -Wall -Wextra)
+endif()
+if(NOT TARGET thunder_dsp_tfx)   # MSVC (U02: no DSP libraries) or THUNDER_WITH_DSP=OFF: no effects to link; the test says so and is reported as not run
+  add_test(NAME fx COMMAND test_fx)
+  set_tests_properties(fx PROPERTIES SKIP_RETURN_CODE 77)
+elseif(NODE_EXE)
+  add_test(NAME fx_ref COMMAND ${NODE_EXE} ${CMAKE_CURRENT_SOURCE_DIR}/../tools/fx-dump.mjs ${CMAKE_CURRENT_BINARY_DIR}/fx-ref)
+  # exit 77 only when acorn is missing on a developer machine (fx-src.mjs); with CI set it exits 1
+  set_tests_properties(fx_ref PROPERTIES FIXTURES_SETUP fx_ref SKIP_RETURN_CODE 77)
+  add_test(NAME fx COMMAND test_fx ${CMAKE_CURRENT_BINARY_DIR}/fx-ref)
+  set_tests_properties(fx PROPERTIES FIXTURES_REQUIRED fx_ref SKIP_RETURN_CODE 77)
+  if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    add_test(NAME fx_golden_current COMMAND ${NODE_EXE} ${CMAKE_CURRENT_SOURCE_DIR}/../tools/fx-dump.mjs --check)
+    add_test(NAME fx_table_current COMMAND ${NODE_EXE} ${CMAKE_CURRENT_SOURCE_DIR}/../tools/fx-table.mjs --check)
+    set_tests_properties(fx_golden_current fx_table_current PROPERTIES SKIP_RETURN_CODE 77)
+  endif()
+else()
+  add_test(NAME fx COMMAND test_fx)
+  set_tests_properties(fx PROPERTIES SKIP_RETURN_CODE 77)
+endif()
+
 # U12: the master EQ (Chromium's biquad chain; reference tools/eq-dump.mjs, checked against Chrome by tools/eq-webaudio-check.mjs, not in CI), normMst, the chain's order.
 add_executable(test_eq test_eq.cpp)
 target_link_libraries(test_eq PRIVATE thunder_core)

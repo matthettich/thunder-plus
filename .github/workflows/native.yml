@@ -32,12 +32,27 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4   # the goldens' reference JS engine: Node 22 (as tests.yml); another V8 may differ in the last bit of Math.pow
         with: { node-version: 22 }
+      # native/tools/fx-src.mjs cuts the effect host's reference out of index.html with acorn (as tests.yml); without it the fx_ref fixture
+      # exits 1 under CI (it skips only on a developer machine). Installed at the repo root: the tool looks in <repo>/node_modules.
+      - name: acorn (the fx reference tool)
+        run: npm i --no-save --no-audit --no-fund acorn@8
       - run: cmake -S native -B build -DCMAKE_BUILD_TYPE=Release
       - run: cmake --build build -j
+      - name: Toolchain
+        run: c++ --version | head -1; clang++ --version | head -1; ldd --version | head -1; node --version
       - run: ctest --test-dir build --output-on-failure -V -R 'bench_put|core_pattern'
       - run: ctest --test-dir build --output-on-failure
+      # The same tests with clang (the compiler of macOS and Android), in a third build directory. Runs even when the GCC run above failed,
+      # so one push shows which compiler a failure belongs to.
+      - name: clang
+        if: ${{ !cancelled() }}
+        run: |
+          CXX=clang++ CC=clang cmake -S native -B build-clang -DCMAKE_BUILD_TYPE=Release
+          cmake --build build-clang -j
+          ctest --test-dir build-clang --output-on-failure
       # N1 review fixes: the same tests again under AddressSanitizer + UBSan (undefined behaviour is fatal), in a second build directory.
       - name: Sanitizers (ASan + UBSan)
+        if: ${{ !cancelled() }}
         run: |
           cmake -S native -B build-san -DCMAKE_BUILD_TYPE=Release -DTHUNDER_SANITIZE=ON
           cmake --build build-san -j
@@ -129,6 +144,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: brew install gnu-sed   # native/core/third_party/prepare.sh needs GNU sed
+      - uses: actions/setup-node@v4   # the fx reference fixture (fx-dump.mjs, Node 22 as on Linux) and its acorn
+        with: { node-version: 22 }
+      - run: npm i --no-save --no-audit --no-fund acorn@8
       - run: cmake -S native -B build -DCMAKE_BUILD_TYPE=Release "-DCMAKE_OSX_ARCHITECTURES=arm64;x86_64"
       - run: cmake --build build -j
       - run: ctest --test-dir build --output-on-failure

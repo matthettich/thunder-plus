@@ -38,6 +38,7 @@ int main(int argc, char** argv) {
   if (argc < 4) { std::fprintf(stderr, "usage: thunder-render <song.thunder> <padsDir> <out.wav> [--frames N] [--block N] [--page-timing] [--master]\n"); return 2; }
   const std::string songPath = argv[1], dir = argv[2], outPath = argv[3]; int64_t frames = -1; int block = 128;
   bool pageTiming = false; for (int i = 4; i < argc; i++) if (!std::strcmp(argv[i], "--page-timing")) { pageTiming = true; for (int j = i; j + 1 < argc; j++) argv[j] = argv[j + 1]; argc--; break; }
+  bool fxOn = false; for (int i = 4; i < argc; i++) if (!std::strcmp(argv[i], "--fx")) { fxOn = true; for (int j = i; j + 1 < argc; j++) argv[j] = argv[j + 1]; argc--; break; }
   bool master = false; for (int i = 4; i < argc; i++) if (!std::strcmp(argv[i], "--master")) { master = true; for (int j = i; j + 1 < argc; j++) argv[j] = argv[j + 1]; argc--; break; }
   for (int i = 4; i + 1 < argc; i += 2) { if (!std::strcmp(argv[i], "--frames")) frames = std::atoll(argv[i + 1]); else if (!std::strcmp(argv[i], "--block")) block = std::atoi(argv[i + 1]); }
   if (block < 1 || block > 8192) { std::fprintf(stderr, "thunder-render: --block 1..8192\n"); return 2; }
@@ -64,6 +65,7 @@ int main(int argc, char** argv) {
   SeqOpts o; o.row = song.renderFrom; o.once = true;
   SongRenderer R(song, vars, pads, sr, block, o);
   R.pool().setPageTiming(pageTiming);
+  if (fxOn) R.setEffects(true);   // --fx (U14): the tfx track and master effects of the song
   // --master (U12): the master chain as the song has it (mst + limiter, master/chain.h); the render is trimmed of its latency as pass() does
   int64_t skip = 0; if (master) { R.setMasterChain(master_chain_from_song(song.mst, song.limiter)); skip = R.latencyFrames(); if (frames >= 0) frames += skip; }
   std::vector<float> L, Rt, bl((size_t)block), br((size_t)block);

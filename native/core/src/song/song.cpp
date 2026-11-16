@@ -6,6 +6,7 @@
 #include <string>
 
 #include "rt/num.h"
+#include "rt/dbl.h"
 
 namespace thunder {
 
@@ -35,7 +36,7 @@ double stringToNumber(std::string_view s) {
   (void)d0;
   if (i < t.size() && (t[i] == 'e' || t[i] == 'E')) { i++; if (i < t.size() && (t[i] == '+' || t[i] == '-')) i++; size_t e0 = i; while (i < t.size() && t[i] >= '0' && t[i] <= '9') i++; if (i == e0) return kNaN; }
   if (i != t.size()) return kNaN;
-  return std::strtod(t.c_str(), nullptr);   // plain ASCII digits; the process locale is the C locale in the core
+  { double v = 0; parse_double(t, &v); return v; }   // checked above; locale-free
 }
 
 double jsPlus(Json v) {

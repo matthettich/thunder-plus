@@ -8,6 +8,7 @@
 #   native/tools/parity.sh u11     the master processor: ctest master (the worklet's output, meters and golden hashes), rt_core (parity-u11.sh)
 #   native/tools/parity.sh u12     the master EQ biquads, the safety limiter, the master order in the renderer (parity-u12.sh)
 #   native/tools/parity.sh u13     meters and events out (parity-u13.sh)
+#   native/tools/parity.sh u14     the track-effect host: ctest fx (91 cases vs the real ThunderFx), golden + table current, rt_core (parity-u14.sh)
 #   native/tools/parity.sh u02     the CMake-built effects wasm against every golden that renders through it (parity-u02.sh)
 # BUILD_DIR names the build folder (default /tmp/thunder-parity).
 set -u
@@ -27,7 +28,8 @@ case "$unit" in
   u10) shift; exec sh "$here/parity-u10.sh" u10 "$@" ;;   # latency compensation + the beat clock (parity-u10.sh)
   u11) shift; exec sh "$here/parity-u11.sh" u11 "$@" ;;   # the master processor (parity-u11.sh)
   u12) shift; exec sh "$here/parity-u12.sh" u12 "$@" ;;   # the master EQ + safety limiter + OUT order (parity-u12.sh)
-  u13) shift; exec sh "$here/parity-u13.sh" u13 "$@" ;;   # meters and events out (parity-u13.sh)
+  u13) shift; exec sh "$here/parity-u13.sh" u13 "$@" ;;
+  u14) shift; exec sh "$here/parity-u14.sh" u14 "$@" ;;   # the track-effect host (parity-u14.sh)   # meters and events out (parity-u13.sh)
   u02) shift; exec sh "$here/parity-u02.sh" u02 "$@" ;;   # the existing C++ DSP built from CMake: the goldens rendered through it (parity-u02.sh)
   u03) exec sh "$here/parity-u03.sh" "$@" ;;   # the pump DSP built from CMake: the goldens and pump's own compare (parity-u03.sh)
   *) echo "usage: parity.sh u02 [OUTDIR] | u03 | u07 | u08 | u10 | u11 | u12 | u13"; exit 2 ;;

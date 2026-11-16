@@ -26,6 +26,7 @@ void SongRenderer::dispatch(const SeqEvent& e) {
     case SEV_OFF: if (e.track >= 0) pool_.off(e); return;
     case SEV_MOD: if (e.track >= 0) pool_.mod(e, seq_->arp(e)); return;
     case SEV_NOTE: break;
+    case SEV_FXC: case SEV_FXP: if (fx_) fx_->event(e, mix_.now(), mix_); return;
     default: return;   // fxp / fxc / chc (U14), eng, the MIDI events, tempo
   }
   if (e.track < 0) return;
@@ -46,7 +47,18 @@ void SongRenderer::setPlan(const PdcPlan& plan, PdcMode mode, int64_t extraLaten
 
 void SongRenderer::setMasterChain(const MasterChainConfig& cfg) {
   if (!mchain_) mchain_.reset(new MasterChain(sr_, maxBlock_));
-  mchain_->configure(cfg); mix_.setMasterFx(&MasterChain::hook, mchain_.get());
+  mchain_->configure(cfg); mix_.setMasterFx(&SongRenderer::masterHook, this);
+}
+void SongRenderer::masterHook(void* user, int track, float* L, float* R, int frames, double t0, const MixFeed* feeds, int nFeeds) {
+  SongRenderer* r = (SongRenderer*)user;   // MASTER VOL -> master effects -> [mastering -> safety limiter] -> OUT
+  if (r->fx_ && r->fx_->host(kSongNT).slotCount() > 0) r->fx_->host(kSongNT).process(L, R, frames, t0);
+  if (r->mchain_) MasterChain::hook(r->mchain_.get(), track, L, R, frames, t0, feeds, nFeeds);
+}
+void SongRenderer::setEffects(bool on) {
+  if (!on) { fx_.reset(); for (int t = 0; t < kSongNT; t++) mix_.setFx(t, nullptr, nullptr); mix_.setMasterFx(mchain_ ? &SongRenderer::masterHook : nullptr, mchain_ ? this : nullptr); return; }
+  fx_.reset(new FxBank(sr_)); fx_->load(S_, S_.bpm);
+  fx_->attach(mix_, false);
+  mix_.setMasterFx((mchain_ || fx_->host(kSongNT).slotCount() > 0) ? &SongRenderer::masterHook : nullptr, this);
 }
 void SongRenderer::renderTrimmed(float* outL, float* outR, int64_t N) {
   int64_t skip = latencyFrames(), done = 0; float* sl = scratch_.get(); float* sr = sl + maxBlock_;

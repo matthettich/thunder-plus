@@ -7,6 +7,7 @@
 #include <string>
 
 #include "rt/jsmath.h"
+#include "rt/dbl.h"
 
 namespace thunder {
 
@@ -31,7 +32,7 @@ bool plusNum(Json v, double* out) {
   if (v.isNum()) { *out = v.asNum(); return std::isfinite(*out); }
   if (v.isNull()) { *out = 0; return true; }
   if (v.isBool()) { *out = v.asBool() ? 1 : 0; return true; }
-  if (v.isStr()) { std::string s(v.asStr()); char* e = nullptr; const double d = std::strtod(s.c_str(), &e); if (s.empty()) { *out = 0; return true; } if (e && *e == 0 && std::isfinite(d)) { *out = d; return true; } }
+  if (v.isStr()) { const double d = js_string_to_number(v.asStr()); if (std::isfinite(d)) { *out = d; return true; } }
   return false;
 }
 double clampd(double v, double a, double b) { return v < a ? a : v > b ? b : v; }
