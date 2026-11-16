@@ -3,6 +3,9 @@
 // sizes, commands on block edges, chain sets and FXV mid-run, the node's sleep, the three in series). Per case: the output against the JS sample by sample, THE
 // GATE IS BIT-EXACT (the cores are plain arithmetic: every libm call is V8's fdlibm, core/src/rt/fdlibm.cpp), and the committed FNV hash. Also the parameter mapping
 // of the three kinds (normTfx + tfxChain) on 200 value sets each, and two hosts side by side. A reference that is missing is a FAILURE, never a skip.
+// EXPOSURE (known, not restructured): the reference files in <dir> are made by the LOCAL Node (fxclk_ref), and only the FNV hashes are committed. On macOS and Windows the
+// fxclk case outputs are compared with what that platform's Node gives and with the committed hash (a case must be exact AND match the hash, so a platform whose Node rounds
+// differently fails the hash check rather than passing quietly); the cores' libm calls are covered by the committed golden of ctest `libm`.
 //   test_fxclk <dir> [case-substring]
 #include <cmath>
 #include <cstdint>
