@@ -187,3 +187,31 @@ Gap: lpRes clamp 0.98->0.97 (:266): 0 of 294 voices fail; only 1 direct case cat
 
 ## 4. Allocation in render path
 - Beyond notes: none heap. Stack only: EngVoice copied (eng_render_voice, eng_render_bound, eng_layers_len; a few KB each). Lazy static sin table (4097 js_sin) on first eng_sinT: a latency hit if first touched on the audio thread (rt test pre-warms it). Pad effects allocate std::vector (admitted).
+
+## Independent verification of #192 (U23)
+# Verify U23 (PR #192, n3/u23 @ cb5c459)
+
+## 1. Gate real: PASS
+- test_engine_u23.cpp renders each voice/case with eng_render_voice, SHA-256s the float32 bytes, compares with the committed .inc and (x86-64 Linux) the local Node run. `exact != ran` -> fail; status != Ok (incl. kEngUnsupported), missing golden or missing ref -> CHECK(false). Counts are checked fixture == golden == ref (not hard-coded). Missing ref dir / no Node -> FAIL, not skip.
+- Script: engine_u23_voices_golden.inc has 61 rows, 61 unique keys; every key is in beta tests/golden/engines.json with identical sha256 and len (0 bad, 0 missing). Fixture key set == golden key set.
+- Completeness: re-ran `engine-u23-dump.mjs --fixture beta-ref`: it writes 61 voices and the regenerated engine_u23_voices.json and _golden.inc are byte-identical to the committed ones (git clean after; I reverted nothing because nothing changed).
+- U22 untouched: no engine_golden.inc / engine_voices.json / test_engine.cpp in the diff; engine_ref, engine, engine_golden_current pass.
+- Gap (admitted in notes): no factory voice has sample, grains, pwm or vint layers; those are gated only by direct-case hashes made from the JS in this repo (not beta's golden). Direct-case hashes are Linux-x86 JS output.
+
+## 2. Mutation: PASS
+Baseline (build -j2): engine_ref, engine, engine_golden_current, engine_u23_ref, engine_u23, engine_u23_golden_current all pass (also 61/61 and 311/311).
+Each mutation: test rc=1, then reverted (worktree clean):
+- layer_chip.cpp `out * 0.7` -> 0.71: 6 voices + 44 cases fail
+- layer_wavetable.cpp `-B * 1.5` -> `-B * 1.4`: 0 voices, 51 cases fail (factory voices do not catch the wavetable spectrum tilt)
+- layer_grains.cpp `0.08 *` -> `0.09 *` (jitter): 30 cases fail
+- layer_pwm.cpp DPCM `cnt + 2` -> `cnt + 3`: 3 cases fail (weakest: only 3 of 311)
+
+## 3. Scope: PASS
+- Diff vs origin/native: only native/ and docs/port/U23-NOTES.md (26 files); goldens added (3 files), none modified; no -ffast-math added (the existing ones are in pump / dsp CMake, not touched); -ffp-contract=off is PUBLIC on thunder_core. No tolerance: hash equality only.
+- Math.*: no std::sin/cos/exp/pow/tan/round in layer_*.cpp; js_sin, js_cos, js_exp, js_pow, js_round used; floor/fabs only otherwise. Compared click, wavetable (init, build, blk, s, warp), supersaw, pd, chip, pwm + pwmDefault, sample (plain + loop), vint (vintData + vintOsc), grains line for line against ENGINE block of beta-ref index.html: operation order, rng draw order, float32 stores match. blk call position in renderLayer matches (after inc, before filters).
+- Minor: layer_vint.cpp guard allows n < 2e8 floats (up to 800 MB) for a tiny sample rate; unreachable with real audio.
+
+## 4. Edge inputs: PASS
+- Wavetable negative Bend: reachable (Bend slider min -1, max 1: index.html:8439). JS reads tab[1025] = undefined -> NaN. C++ `tb()` returns NaN for i outside 0..1024 (layer_wavetable.cpp:46, tab has 1025 entries): no out-of-bounds read. Under GCC ASan+UBSan (own harness, Bend -1, -0.83, -0.5, -0.1, tunes -20/0/20): no error, NaN samples only (about 25 to 105 of 144128 without a filter; positive NaN), buffer guard intact.
+- Supersaw negative Detune: not reachable from the UI (a/b rows min 0, max 1: index.html:8451; randomisers 14772/14784 stay in 0..1; mkVoice does not clamp, so only hand-edited/imported song data). C++: all samples NaN, no crash, ASan/UBSan clean.
+- PWM negative Shape: same (not reachable from the UI). C++: held = -0/0 NaN for the whole layer (sign bit set on x86), no crash, clean. Shape > 1 is fine.
