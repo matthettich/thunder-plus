@@ -812,6 +812,9 @@ The owner's top priority to add is the MOD screen. Work down the list; ask befor
 
 Start a session by asking for results. Fix on `beta`. (10 Nov, 15:10: the web beta is build 560; the build numbers in the rest of this paragraph are older.) Web beta: https://matthettich.github.io/thunder-plus/beta/ (build 547 as of 10 Nov morning, 548 once its PR merges; the night of 9–10 Nov shipped 544–547, see the four "10 Nov" entries below. Decisions the lead made that night for the owner to confirm or reverse: on a phone the saved Sequencer default plays on the Page unless Audio thread is picked on that device; on a phone the safety limiter is its stand-in until another worklet loads; the resync only runs with a worklet loaded and its margins are untested on a device). Desktop: v1.3.4-beta.2 (build 541, no feed view or scopes); further desktop betas on hold until the owner asks.
 
+**Build 626** (LOOP does not page the Song away)
+- [ ] **Computer and phone, Song screen (Arrange and the text grid):** put the cursor on an empty row below the last block, with the view there, then press LOOP play on the command bar. Pass: the view stays where it is and a toast says there is nothing on that row to loop; PLAY still works. On a row with a block, LOOP plays it as before. If LOOP still pages the view away in another case, say exactly where the cursor was and what the song looked like.
+
 **Build 625** (make unique keeps the selection)
 - [ ] **Computer, Song / Arrange:** select a few blocks (also upward), press UNIQ on the command bar. Pass: the blocks get new numbers and the selection and cursor stay where they were; picked cells (Ctrl-click) stay picked.
 
@@ -1458,6 +1461,12 @@ Tests added: `selection-playback` (source pin).
 Build 625, on `beta`. The owner: "Pressing make unique on command bar removes selection." Cause: `makeUnique` ended with `sxPicks = []; selA = null`. It now leaves the selection, picks and cursor alone (the blocks keep their cells; `newBlock` does not move the cursor). Beside Phrase the selection comes back through `apBack` as before.
 
 Tests added: `make-unique-keeps-selection` (vm).
+
+## 15 Nov (LOOP play does not page the Song away; build 626)
+
+Build 626, on `beta`. The owner: "Pressing loop paged down the bottom of the song on song mode." Reproduced in headless Chrome only from an EMPTY cursor row: `playPatLoop` started at `songRow()` (the next row with a block, else row 0) and the playhead paged the view there. Now, on the Song screen, an empty row starts only when that row is in view; otherwise a toast and nothing starts. Also `arrWrapRow` treats LOOP-on-while-playing as ending at the held row before `syncLoop` has set `tp.loopV` (the page-ahead could turn once for a loop that stays put). Pressing LOOP on a row with a block did not move the view in any run, so if the owner's case was another one this may not be all of it: the punch-list item asks for the details.
+
+Tests added: `loop-empty-row` (vm).
 
 ## 15 Nov (a line on the small command bar; the side panel's instrument list auditions; builds 622 and 623)
 
