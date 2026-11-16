@@ -54,7 +54,7 @@ So one compiler deviates in one case and the other compiler in another: nothing 
 ### Which build would be bit-identical (measured on the 8 cases, nothing applied)
 | native flags (all mods objects) | wasm flags | result |
 |---|---|---|
-| `-O2 -ffast-math` (today) | `-O2 -ffast-math` (today, the golden) | 5 of 7 non-default cases differ from sample 0 to 6084 / 17803 |
+| `-O2 -ffast-math` (today) | `-O2 -ffast-math` (today, the golden) | all 7 non-default cases differ (first differing sample: 0 to 17803; Marbles default is exact) |
 | `-ffast-math -fno-associative-math -fno-finite-math-only` | `-ffast-math -fno-associative-math` | both bit-identical to strict, so to each other, on all 8 cases |
 | strict (`-fno-fast-math -ffp-contract=off`) | strict | bit-identical |
 GCC needs `-fno-finite-math-only` as well (Tides sample 0); with `-fno-associative-math` alone native Tides still differs from sample 0 (`tides_def` 47437 samples; Marbles is exact). So to make the native build match the golden bit for bit the golden would have to be regenerated from a `mods.wasm` built with `-fno-associative-math` (or strict), i.e. the web app's `mods.wasm` (embedded in `chains-worklet.js`) rebuilt and its output changes at ULP scale for every user project that uses Marbles / Tides. That is a web-app change and a golden change: not mine, not done; Fable's decision. The other routes in the text above (run the wasm, or a hand-ordered port) stay as they were.
