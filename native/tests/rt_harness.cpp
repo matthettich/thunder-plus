@@ -544,6 +544,30 @@ done:
   std::printf("rt_engine ok: %d voice renders (%zu samples) under the allocation guard\n", renders, total); return 0;
 }
 
+// U23: the layer types click, wavetable, pd, chip, supersaw, pwm, sample (plain and looped), grains and the wavetable's table rebuilds under the guard: renders into a caller's buffer, over and over, no allocation.
+// (A sample layer with a vintage mode makes the machine-rate copy of its sample: that allocates, an offline render; it is not in this loop.)
+static int run_engine_u23() {
+  using namespace thunder;
+  eng_init();   // (the sine table and the PWM sampler's built-in cymbal: made outside the guard)
+  static float smpData[3000]; for (int i = 0; i < 3000; i++) smpData[i] = (float)(((i * 7919) % 2003) / 1001.5 - 1) * 0.8f;
+  std::vector<EngVoice> vs(3); std::vector<std::vector<float>> bufs; std::vector<EngRenderOpts> os(3);
+  { EngVoice& V = vs[0]; V.len = 0.6; V.level = -2; static const LType t[4] = {LType::Click, LType::Chip, LType::Pd, LType::Supersaw};
+    for (int i = 0; i < 4; i++) { EngLayer& L = V.layers[i]; L.on = true; L.type = t[i]; L.a = 0.2 + 0.2 * i; L.b = 0.3 + 0.15 * i; L.level = 0.5; L.seed = 30 + (double)i; L.atk = 1; L.dec = 300; L.tune = i * 5; } }
+  { EngVoice& V = vs[1]; V.len = 0.5; EngLayer& L = V.layers[0]; L.on = true; L.type = LType::Wavetable; L.a = 0.6; L.b = 0.2; L.pAmt = -30; L.pDec = 200; L.dec = 400; L.seed = 41; L.u23.wtUni = 5; L.u23.wtSub = 0.3; L.u23.wtNoise = 0.1; L.u23.wtBend = -0.4;
+    V.lfoRate[0] = 6; V.lfoDepth[0] = 1; V.lfoShape[0] = 0; V.rdst[0] = 1; V.ramt[0] = 3; }
+  { EngVoice& V = vs[2]; V.len = 0.8; static const LType t[4] = {LType::Pwm, LType::Sample, LType::Sample, LType::Grains};
+    for (int i = 0; i < 4; i++) { EngLayer& L = V.layers[i]; L.on = true; L.type = t[i]; L.a = 0.1 + 0.1 * i; L.b = i == 1 ? 0.8 : 0.3; L.level = 0.5; L.seed = 50 + (double)i; L.atk = 1; L.dec = 600; L.u23.smp = i == 0 ? nullptr : smpData; L.u23.smpLen = i == 0 ? 0 : 3000; L.u23.smpSr = 22050;
+      if (i == 2) { L.u23.lpMode = 1; L.u23.lpS = 0.1; L.u23.lpE = 0.8; L.u23.lpX = 0.2; } } }
+  for (size_t i = 0; i < vs.size(); i++) { bufs.emplace_back(eng_render_bound(vs[i], os[i]) + 1); if (bufs[i].size() < 2) { std::printf("rt_engine_u23 FAIL: bound 0\n"); return 1; } }
+  size_t total = 0; int renders = 0;
+  { rt_guard g;
+    for (int rep = 0; rep < 8; rep++) for (size_t i = 0; i < vs.size(); i++) { size_t n = 0; const int st = eng_render_voice(vs[i], os[i], bufs[i].data(), bufs[i].size() - 1, &n); if (st != kEngOk) { total = 0; goto done; } total += n; renders++; }
+  }
+done:
+  if (!total) { std::printf("rt_engine_u23 FAIL: a render failed\n"); return 1; }
+  std::printf("rt_engine_u23 ok: %d voice renders (%zu samples) under the allocation guard\n", renders, total); return 0;
+}
+
 int main(int argc, char** argv) {
   if (argc > 1 && std::strcmp(argv[1], "--selftest") == 0) return selftest();
   if (int r = run_logger()) return r;
@@ -558,6 +582,7 @@ int main(int argc, char** argv) {
   if (int r = run_fxidm()) return r;
   if (int r = run_modfx()) return r;
   if (int r = run_fxu17()) return r;
+  if (int r = run_engine_u23()) return r;
   if (int r = run_engine()) return r;
   return run_song();
 }

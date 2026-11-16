@@ -377,3 +377,23 @@ if(THUNDER_SANITIZE AND NOT MSVC)
   target_compile_options(test_modfx PRIVATE -fno-sanitize=vptr)
   target_compile_options(rt_harness PRIVATE -fno-sanitize=vptr)
 endif()
+
+# U23: the layer types click, wavetable, pd, chip, supersaw, pwm, sample (loop, vintage modes) and grains (core/src/engine/layer_*.cpp) against the real ENGINE block (tools/engine-u23-dump.mjs) and beta's
+# tests/golden/engines.json (the committed engine_u23_voices_golden.inc): the factory voices of these types, SHA-256 bit-exact, and the direct cases against the committed Linux hashes (engine_u23_golden.inc).
+add_executable(test_engine_u23 test_engine_u23.cpp)
+target_link_libraries(test_engine_u23 PRIVATE thunder_core)
+target_include_directories(test_engine_u23 PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../core/src ${CMAKE_CURRENT_SOURCE_DIR})
+if(NOT MSVC)
+  target_compile_options(test_engine_u23 PRIVATE -Wall -Wextra)
+endif()
+if(NODE_EXE)
+  add_test(NAME engine_u23_ref COMMAND ${NODE_EXE} ${CMAKE_CURRENT_SOURCE_DIR}/../tools/engine-u23-dump.mjs ${CMAKE_CURRENT_BINARY_DIR}/engine-u23-ref)
+  set_tests_properties(engine_u23_ref PROPERTIES FIXTURES_SETUP engine_u23_ref)
+  add_test(NAME engine_u23 COMMAND test_engine_u23 ${CMAKE_CURRENT_BINARY_DIR}/engine-u23-ref ${CMAKE_CURRENT_SOURCE_DIR}/golden/engine_u23_voices.json)
+  set_tests_properties(engine_u23 PROPERTIES FIXTURES_REQUIRED engine_u23_ref)
+  if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    add_test(NAME engine_u23_golden_current COMMAND ${NODE_EXE} ${CMAKE_CURRENT_SOURCE_DIR}/../tools/engine-u23-dump.mjs --check)
+  endif()
+else()
+  add_test(NAME engine_u23 COMMAND test_engine_u23)   # no directory: prints FAIL and exits 1
+endif()

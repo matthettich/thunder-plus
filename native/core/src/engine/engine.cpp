@@ -1,6 +1,7 @@
 // The engine foundation (U22): see engine.h. Line for line from index.html's ENGINE block (renderLayer, makeOsc, voiceMod, voiceFilter, voiceAmp, renderLayersOnly, renderVoice,
 // mkVoice, freshLayer, the tables). Every expression keeps the JS's order of operations (contraction is off for this target).
 #include "engine/engine.h"
+#include "engine/layers.h"
 
 #include <cmath>
 #include <cstring>
@@ -38,7 +39,7 @@ inline double orv(double x, double d) { return (x != 0 && x == x) ? x : d; }   /
 inline float f32(double x) { return (float)x; }
 }  // namespace
 
-void eng_init() { (void)sinTable(); }
+void eng_init() { (void)sinTable(); (void)eng_pwm_default(nullptr, nullptr); }
 const float* eng_sin_table() { return sinTable().v; }
 
 double eng_sinT(double p) {
@@ -72,7 +73,8 @@ uint32_t EngSeedCounter::next() {
 
 LType eng_layer_type(const char* name, size_t n) {
   static const struct { const char* s; LType t; } T[] = {{"sine", LType::Sine}, {"tri", LType::Tri}, {"saw", LType::Saw}, {"square", LType::Square}, {"pulse", LType::Pulse},
-    {"white", LType::White}, {"pink", LType::Pink}, {"brown", LType::Brown}, {"blue", LType::Blue}, {"metal", LType::Metal}, {"lfsr", LType::Lfsr}, {"dust", LType::Dust}, {"grit", LType::Grit}};
+    {"white", LType::White}, {"pink", LType::Pink}, {"brown", LType::Brown}, {"blue", LType::Blue}, {"metal", LType::Metal}, {"lfsr", LType::Lfsr}, {"dust", LType::Dust}, {"grit", LType::Grit},
+    {"click", LType::Click}, {"wavetable", LType::Wavetable}, {"pd", LType::Pd}, {"chip", LType::Chip}, {"supersaw", LType::Supersaw}, {"pwm", LType::Pwm}, {"sample", LType::Sample}, {"grains", LType::Grains}};
   for (const auto& e : T) if (std::strlen(e.s) == n && std::memcmp(e.s, name, n) == 0) return e.t;
   return LType::Other;
 }
@@ -97,6 +99,7 @@ struct Osc {
   double fr[6] = {}, pp[6] = {};
   // lfsr
   double mult = 0, acc = 0, out = 1; bool shortLoop = false; int32_t reg = 0x7fff;
+  LayerOsc x;   // U23: click, wavetable, pd, chip, supersaw, pwm, sample, grains
   // dust / grit
   double p = 0, cf = 0, k = 0, y = 0, cg = 0, accg = 1;
 
@@ -117,9 +120,10 @@ struct Osc {
       case LType::Lfsr: mult = js_pow(2, A * 8 - 1) * 16; shortLoop = B >= 0.5; reg = 0x7fff; acc = 0; out = 1; break;
       case LType::Dust: p = A * A * 0.25 * 48000 / sr; cf = 0.03 + B * 0.97; k = 1.5 / (0.2 + cf); y = 0; break;
       case LType::Grit: mult = js_pow(2, B * 6) * 4; cg = 1 - A * 0.995; accg = 1; held = 0; y = 0; break;
-      default: break;
+      default: if (LayerOsc::handles(t)) x.init(L, sr, R); break;
     }
   }
+  void blk(double inc) { x.blk(inc); }
 
   double s(double inc) {
     switch (t) {
@@ -161,7 +165,7 @@ struct Osc {
         const double imp = R.next() < p ? (R.next() * 2 - 1) : 0; y += (imp - y) * cf; return jmax(-1, jmin(1, y * k)); }
       case LType::Grit: {
         accg += inc * mult; if (accg >= 1) { accg -= std::floor(accg); held = R.next() * 2 - 1; } y += (held - y) * cg; return y; }
-      default: return 0;
+      default: return LayerOsc::handles(t) ? x.s(inc, R) : 0;
     }
   }
 };
@@ -259,6 +263,7 @@ void renderLayer(const EngLayer& L, const EngVoice& V, double bpm, double sr, fl
     const double e0 = ePrev, e1 = ampAt((i + BLK) / sr); ePrev = e1;
     const EngMod mo = eng_voice_mod(V, t, bpm);
     const double inc = f0 * js_pow(2, (pA * js_exp(-t / ptau) + (gPA != 0 ? gPA * js_exp(-((d0 + i) / sr) / gPtau) : 0) + mo.pitch) / 12) / sr;
+    osc.blk(inc);   // osc.blk(t, e0, inc): only the wavetable has one
     if (lpOn || hpOn) {
       const double fe = fenv(t);
       if (hpOn) { const double fc = jmin(jmax(L.hpCut * js_pow(2, L.hpEnv * 8 * fe + mo.hpcut), 10), nyq), gg = js_tan(3.141592653589793 * fc / sr);
