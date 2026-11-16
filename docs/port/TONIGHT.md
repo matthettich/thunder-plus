@@ -43,6 +43,10 @@ after every beta push), merge `beta` into it, `npm test`, push `main` (retry on 
 9. A MOD section in the bottom FX bar for the current track, collapsible like the other sections: per active LFO a tiny scope or LED
    following its phase (nothing drawn when collapsed, stopped or ANIMATIONS off) and its destination names; clicking may open MOD.
    Display only; follows the skin; shrinks or hides on the folded phone.
+10. (Owner, 19:45; sent to the running agent too.) The folded phone's header, folded layout only: BPM and LPB move to the left of the
+   countdown timer; REC leaves the header and becomes a File-menu entry (Settings if it reads better; same action, shows on / off); the ROWS
+   box sits between LEFT and LPB without its + / − buttons, and there the row count is changed only by tapping the number. Nothing clips at
+   344 px wide.
 
 ## B. Native port, in this order
 State at 19:45: PR #175 (U14, the track-effect host) is **merged** into `native` (539ac47), CI green on every platform. How it went green
