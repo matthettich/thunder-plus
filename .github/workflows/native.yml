@@ -128,6 +128,9 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4   # U15: the tempo-locked effects' reference (fx-clk-dump.mjs, libm-dump.mjs) runs on every platform, bit-exact: Node 22 (V8 12.4) and acorn
+        with: { node-version: 22 }
+      - run: npm i --no-save --no-audit --no-fund acorn@8
       - run: cmake -S native -B build -A x64
       - run: cmake --build build --config Release -j
       - run: ctest --test-dir build -C Release --output-on-failure
