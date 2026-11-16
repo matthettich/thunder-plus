@@ -231,3 +231,9 @@ N1 step 10.
   Still running: U28 (#195).
 - 16:00 **#193 U24 merged** (verifier passed). **Desktop v1.3.11 is released** (recorded on `beta` 89395d4). Still running: U28 (#195), which must merge `native`
   again now. Nothing else will be started today except the verification of #195. U29, U25 and everything under "Not yours today" remain.
+- 16:30 **#195 U28: the independent verifier FAILED it on memory safety; NOT merged.** Gate, mutations and scope pass (1068 of 1068 factory voices over the 15
+  engines, 313 direct cases, six mutations caught; piano, swarm, strings equal the JS line by line). The failures: `xeng_wind.cpp:14-16`, a very low oct or tune
+  (finite, valid song JSON) overflows the delay-line length, the vector is empty and `rd` / `wr` index a null buffer (the JS throws RangeError there);
+  `xeng_chip.cpp:19,30,36`, `(int)NaN` as an array index. Sent back to the U28 worker: refuse (`kEngUnsupported`) where the JS throws, guard the NaN index to give
+  what the JS gives, check its other engines for parameter-sized buffers, add extreme / NaN cases under the sanitizers. Report in REVIEW-16NOV.md on `rev/16nov`.
+  **If you take over here:** `n3/u28` holds the work; give exactly this fix list to a Sonnet worker, then have a second verifier re-run item 4 before merging.
