@@ -1,7 +1,7 @@
 # U24: layer types FM family, additive family, membrane / bell / bar / karplus / vosim / formant
 
-STATUS (update at every push): WIP. Gate passes on GCC Release locally: 97 of 97 factory voices and 383 of 383 direct cases bit-exact (local Node reference differs for 0).
-Still to do: allocation-guard case in rt_harness, `parity-u24.sh`, clang and sanitizer builds, full ctest, PR.
+STATUS: DONE locally. 97 of 97 factory voices and 383 of 383 direct cases bit-exact (local Node reference differs for 0). GCC Release: full ctest 92 of 92; clang 18 Release and GCC ASan + UBSan: engine_u24, rt_core pass. Gate command: `native/tools/parity.sh u24`. Mutation checks: Karplus DC constant, VOSIM DC constant, an FM algorithm's modulator list, the additive normaliser, the FM index floor: each fails (the first three at 2 to 5 cases).
+Waiting for CI; do not merge before U23 is decided (shared-file merge notes below).
 
 ## Types
 fm2 fmfb fmmetal fmcross fm4 fm6 genesis sb arcade, addsaw addodd membrane bell bar chord, formant karplus vosim. Every other type stays `kEngUnsupported`.

@@ -568,6 +568,27 @@ done:
   std::printf("rt_engine_u23 ok: %d voice renders (%zu samples) under the allocation guard\n", renders, total); return 0;
 }
 
+// U24: the FM / additive / karplus / vosim / formant layers under the guard (their oscillator objects live on the stack: Karplus-Strong's delay line is a 16 KB member, nothing allocates).
+static int run_engine_u24() {
+  using namespace thunder;
+  eng_sin_table();
+  static const LType t[3][6] = {{LType::Fm2, LType::Fmfb, LType::Fmmetal, LType::Fmcross, LType::Fm4, LType::Fm6}, {LType::Genesis, LType::Sb, LType::Arcade, LType::Addsaw, LType::Addodd, LType::Membrane},
+    {LType::Bell, LType::Bar, LType::Chord, LType::Karplus, LType::Vosim, LType::Formant}};
+  std::vector<EngVoice> vs(3); std::vector<std::vector<float>> bufs; std::vector<EngRenderOpts> os(3);
+  for (int v = 0; v < 3; v++) { EngVoice& V = vs[(size_t)v]; V.len = 1.0; V.drive = v == 1 ? 0.3 : 0; V.gate = 300;
+    for (int i = 0; i < 6; i++) { EngLayer& L = V.layers[i]; L.on = true; L.type = t[v][i]; L.a = 0.35 + 0.1 * i; L.b = 0.45; L.level = 0.4; L.tune = (double)(i * 3 - 6); L.atk = 1; L.dec = 600; L.seed = 300 + (double)(v * 10 + i); L.adsr = v == 2 && i % 2; if (L.adsr) { L.sus = 0.6; L.rel = 200; } }
+    V.layers[0].lpCut = 2500; V.layers[0].lpEnv = 0.4; V.layers[1].burst = 2; V.layers[1].spacing = 10; }
+  os[1].sr = 44100; os[2].hold = 0.4;
+  for (size_t i = 0; i < vs.size(); i++) { bufs.emplace_back(eng_render_bound(vs[i], os[i]) + 1); if (bufs[i].size() < 2) { std::printf("rt_engine_u24 FAIL: bound 0\n"); return 1; } }
+  size_t total = 0; int renders = 0;
+  { rt_guard g;
+    for (int rep = 0; rep < 6; rep++) for (size_t i = 0; i < vs.size(); i++) { size_t n = 0; const int st = eng_render_voice(vs[i], os[i], bufs[i].data(), bufs[i].size() - 1, &n); if (st != kEngOk) { total = 0; goto done; } total += n; renders++; }
+  }
+done:
+  if (!total) { std::printf("rt_engine_u24 FAIL: a render failed\n"); return 1; }
+  std::printf("rt_engine_u24 ok: %d voice renders (%zu samples) of FM / additive / karplus / vosim / formant layers under the allocation guard\n", renders, total); return 0;
+}
+
 int main(int argc, char** argv) {
   if (argc > 1 && std::strcmp(argv[1], "--selftest") == 0) return selftest();
   if (int r = run_logger()) return r;
@@ -584,5 +605,6 @@ int main(int argc, char** argv) {
   if (int r = run_fxu17()) return r;
   if (int r = run_engine_u23()) return r;
   if (int r = run_engine()) return r;
+  if (int r = run_engine_u24()) return r;
   return run_song();
 }
