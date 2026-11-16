@@ -10,7 +10,7 @@
 
 This list is in order of importance, so start at the top.
 
-Do section 1 first; it is short: the newest builds (589 to 620, ears first), what could lose work or sound.
+Do section 1 first; it is short: the newest builds (589 to 623, ears first), what could lose work or sound.
 
 Do sections 2 and 3 as time allows.
 
@@ -22,7 +22,7 @@ If something fails, tell Claude the build number and what happened; tick an item
 
 | Section | Open items | Mostly on | Why it matters |
 | --- | --- | --- | --- |
-| 1. Do these first | 107 | Phone and computer | The newest builds (589 to 620), lost work or sound |
+| 1. Do these first | 119 | Phone and computer | The newest builds (589 to 623), lost work or sound |
 | 2. Really worth trying | 68 | Phone | Everyday features nobody has tried on a real device, the 585 to 588 editor checks and the re-checks of your last fixes |
 | 3. If you have time | 47 | Phone, then gear | Secondary features, by-ear comparisons and hardware |
 | 4. Safe to skip unless something looks wrong | 55 | Mixed | Cosmetic, older, or already covered by automated tests |
@@ -30,6 +30,28 @@ If something fails, tell Claude the build number and what happened; tick an item
 | Set aside | 5 | none | Nothing: probably superseded |
 
 ## 1. Do these first
+
+### New in builds 622 and 623: command bar line, the side panel's instrument list plays and selects
+
+*The newest builds, first. Computer unless the item says otherwise.*
+
+- [ ] Computer: the small command bar has a thin line along its top in each skin you use. Pass: a thin line in the skin's line colour runs along the top of the bar, so it reads as its own section. (622)
+- [ ] Computer: click an instrument in the side panel's instrument list, with the song stopped and then while it plays. Pass: it plays once and is selected each time, and INST opens on it. (623)
+- [ ] Computer, Phrase view: click an instrument in the side panel's instrument list. Pass: it selects the instrument you clicked, not the instrument on the cursor row. (623)
+
+### New in build 621: chains and waves Send / Receive, cross-track warning, Mixer meters, square cables, the side panel's skin
+
+*The newest build, first. Computer unless the item says otherwise.*
+
+- [ ] Computer: an old chains patch (any you have): play it and render it. Pass: it sounds as it did before build 621. (621)
+- [ ] Computer, …chains: a Send and a Receive with the same label (A to H or free text) and a module between them. Pass: the sound passes through like a cable; a second Receive on the same label also gets it. (621)
+- [ ] Computer, …chains: a cable from one track's chains into another track's chains. Pass: the cable is dashed and marked "no signal", with a tooltip and a one-time toast. (621)
+- [ ] Computer, by ear: duck a track from a bus: Sidechain Out with Send 1 in the bus's chain, and Source: Send 1 on the compressor. Pass: the track ducks when the bus plays. (621)
+- [ ] Computer: a Mixer module's OUT meter. Pass: it moves with the audio and falls back when it stops. (621)
+- [ ] Computer: drag a cable bend close to a right angle. Pass: it snaps square; hold Alt and it moves freely; the cable menu's "Square up" squares it. (621)
+- [ ] Computer and phone: the ? button is the same size as ✕. Pass: they match. (621)
+- [ ] Computer: the side panel (status card, meters, KEYS, instrument list) in the IDM, IDM pink, IDM pink & green, 909 and Low power skins. Pass: it takes each skin's colours, and no band shows above the command bar. (621)
+- [ ] Phone: …chains still opens and plays an old patch. Pass: it opens and plays. (621)
 
 ### New in build 620: the owner's list from desktop build 609
 
