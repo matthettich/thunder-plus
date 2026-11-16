@@ -29,7 +29,7 @@ export const MODS19 = ['meta', 'phaser', 'width', 'pingpong', 'meter', 'limiter'
   'blades', 'onepole', 'allpass', 'dcblock', 'midside', 'dline', 'dimension', 'bbd',
   'harm', 'blipdrum', 'life', 'reson', 'degrade', 'flex', 'sgate', 'retrig', 'pitchfol', 'pitchtrk'];
 // U21 (MODFX modules C): added family by family. Their per-case seeds and signal picks use 100 + their index here (the U19 modules keep theirs; a later unit adds its own list with its own base)
-export const MODS21 = ['sdelay', 'filter', 'cut', 'compressor', 'buscomp', 'glue', 'ngate', 'autopan', 'pump'];
+export const MODS21 = ['sdelay', 'filter', 'cut', 'compressor', 'buscomp', 'glue', 'ngate', 'autopan', 'pump', 'autotune', 'vowel', 'rotary', 'gdelay', 'reverse', 'envfilt'];
 export const MODS = [...MODS19, ...MODS21];
 const mi = t => { const a = MODS19.indexOf(t); return a >= 0 ? a : 100 + MODS21.indexOf(t); };
 
@@ -99,11 +99,14 @@ function signal(kind, sigKind, n, seed, hint) {
     return o;
   }
   const amp = sigKind === 'loud' ? 3.2 : sigKind === 'quiet' ? .004 : 1, f1 = 80 + r() * 900, f2 = 1000 + r() * 4000;
-  let ns = (seed * 2654435761) >>> 0 || 1;
+  let ns = (seed * 2654435761) >>> 0 || 1, vph = 0;
   for (let i = 0; i < n; i++) {
     ns ^= ns << 13; ns >>>= 0; ns ^= ns >>> 17; ns ^= ns << 5; ns >>>= 0; const noise = ns / 4294967296 - .5;
     let v;
     if (sigKind === 'impulse') v = i % 9973 === 0 ? 1 : 0;
+    // U21: a voice-like signal: six harmonics gliding between about 100 and 350 Hz with vibrato, breath noise at times, a rest every 0.6 s (the pitch detector's gate, voiced and unvoiced paths)
+    else if (sigKind === 'voiced') { const t = i / 48000, f = (100 + 250 * (.5 + .5 * Math.sin(2 * Math.PI * (.9 + (seed % 5) * .1) * t))) * (1 + .012 * Math.sin(2 * Math.PI * 5.5 * t)); vph += f / 48000;
+      let h = 0; for (let k = 1; k <= 6; k++) h += Math.sin(2 * Math.PI * k * vph) / k; const seg = Math.floor(t / .3) % 4; v = seg === 3 ? .002 * noise : seg === 1 ? .5 * noise : .3 * h + .02 * noise; }
     else if (sigKind === 'burst') v = i < 128 * 24 ? .5 * noise + .3 * Math.sin(2 * Math.PI * f1 * i / 48000) : 0;
     else if (sigKind === 'longsleep') v = (i < 128 * 24 || (i >= 128 * 220 && i < 128 * 240)) ? .5 * noise + .3 * Math.sin(2 * Math.PI * f1 * i / 48000) : 0;
     else { const env = (Math.floor(i / 4000) % 5 === 3) ? 0 : 1; v = env * (.4 * Math.sin(2 * Math.PI * f1 * i / 48000) + .2 * Math.sin(2 * Math.PI * f2 * i / 48000) + (i < n / 3 ? noise * .2 : 0)); }
@@ -145,6 +148,7 @@ function casesFor(type, def) {
   if (LONG.has(type)) { add('long', { params: [defaults(def)], sigKind: 'impulse', nblocks: 300 }); add('sleep', { params: [defaults(def)], sigKind: 'longsleep', nblocks: 260 });
     add('sleep2', { params: [stressP(def)], sigKind: 'longsleep', nblocks: 260, sr: 96000 }); add('burst', { params: [switchesP(def)], sigKind: 'burst', nblocks: 180 }); }
   // U21: a Source (ctx.key) that is a real buffer: the keyed modules listen to the input reversed in time, times .7 (the C++ makes the same buffer)
+  if (MODS21.includes(type)) { const rr = lcg(555 + mi(type)); add('voiced', { params: [randParams(def, rr)], sigKind: 'voiced', rr: 20 }); add('voicedd', { params: [defaults(def)], sigKind: 'voiced', nblocks: 140, rr: 21 }); }
   if (def.params && def.params.sck) add('key', { params: [stressP(def)], linkMode: 'first', key: true, sigKind: 'mix' });
   return cs;
 }

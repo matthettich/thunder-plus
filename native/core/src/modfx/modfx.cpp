@@ -17,7 +17,7 @@ struct SinTab {
 };
 const SinTab gSin;
 std::vector<const Def*>& reg() {
-  static std::vector<const Def*> v = [] { std::vector<const Def*> r; addStereoMods(r); addReverbMods(r); addCvMods(r); addFilterMods(r); addDelayMods(r); addMiscMods(r); addClkMods(r); addBasicMods(r); return r; }();
+  static std::vector<const Def*> v = [] { std::vector<const Def*> r; addStereoMods(r); addReverbMods(r); addCvMods(r); addFilterMods(r); addDelayMods(r); addMiscMods(r); addClkMods(r); addBasicMods(r); addVoiceMods(r); return r; }();
   return v;
 }
 }  // namespace

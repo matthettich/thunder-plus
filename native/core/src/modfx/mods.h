@@ -15,6 +15,7 @@ void addMiscMods(std::vector<const Def*>& v);
 void addClkMods(std::vector<const Def*>& v);
 void addDelayMods(std::vector<const Def*>& v);
 void addBasicMods(std::vector<const Def*>& v);   // U21
+void addVoiceMods(std::vector<const Def*>& v);   // U21
 }  // namespace modfx
 }  // namespace thunder
 #endif
