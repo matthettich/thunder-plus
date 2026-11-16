@@ -112,6 +112,14 @@ N1 step 10.
   samples differ) and fails for the master column (171180 differ, first at sample 5498). Cause: `SongRenderer::masterHook` runs the master effects without the beat
   clock; the page's master node gets it (`setMfx` calls `clockTo` in `index.html`). A one-line change in `masterHook`, tried and reverted, gives 0 differences
   (`docs/port/U15-NOTES.md` on `n1/u15-song`). Not applied: the renderer is mixer code under Fable's review. The test's inputs (voices, events, clock) come from the C++ side.
+- #189 U22 engine foundation (`native/core/src/engine/`, Sonnet): merged, all CI green. 294 of 294 factory voices of the covered families equal beta's `engines.json`
+  hashes; 183 direct cases and 1800 `voiceMod` probes gated by committed Linux hashes (the local Node comparison holds only on x86-64 Linux: macOS Node rounds differently).
+  An independent Sonnet verifier passed it (gate real, mutations caught, scope clean). The manager did NOT read the diff. Least sure of: pad effects other than the four JS
+  ones pass the sound through, as the golden's Node does (18 voices prove only the dry path; the real app has the wasm loaded); voices with JS pad effects allocate
+  (U17's `std::vector`); `EngVoice` copied on the stack a few times per render; the interface is provisional; `eng_init()` builds the sine table up front (lazy path kept).
+- **Web build 633 (Fable's own, on `beta` ede5da8 and `main` ca6bbd2; the owner asked for it at 12:02):** the Bytebeat hang from REVIEW-16NOV B1-1. Cause was not a
+  missing cap: steps 77 / 78 read their constant inside the short-circuit, so it was not consumed and ran as a step. Fixed by reading it first, in all three copies;
+  goldens unchanged; test `bbexpr-const-logic`. **Owed on `native`:** the same two lines in `native/core/src/modfx/bbexpr.cpp` (given to the U24 worker as a first small PR).
 
 ## Progress log (the manager updates and pushes this after every change of state; newest last)
 - 10:30 Fable: plan written. Nothing started.
@@ -172,3 +180,6 @@ N1 step 10.
   `n3/u22` has no new push within 90 minutes, give exactly this fix to a new Sonnet worker.
 - 12:00 D4 done: PR #190 open, red on purpose (see the review queue: master effects get no beat clock in `SongRenderer::masterHook`). Section D is complete.
   Running: only the U22 worker (macOS fix on #189). Nothing else can start until #189 is merged; then U23 and U24.
+- 12:45 **#189 U22 merged** (all CI green after the macOS fix). **Web build 633 is on `beta` and `main`** (the Bytebeat hang; the one web change today, at the
+  owner's word). Starting now: U23 (`n3/u23`) and U24 (`n3/u24`, after its first small PR `n1/bbexpr-const` for the native Bytebeat fix), one Sonnet worker each.
+  Not started: U28, U29 (after U23 / U24, if before 17:45). Everything in sections A, B and D is done.
