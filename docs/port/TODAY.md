@@ -112,3 +112,10 @@ N1 step 10.
 - 10:55 Section A done (Haiku): `beta` 9361306 (HANDOVER PICK UP HERE to this morning; TEST-CHECKLIST builds 624 to 632, 620 to 623 were
   already there), `native` b6180a0 (WORKPLAN sections 7 and 9). The checklist stays newest build first, as the file was; the Claude Doc
   is not updated. Still running: U22, B1 + B3, B2 + B4 + B5, D1 / D2.
+- 11:00 B2, B4, B5 done (Sonnet, read-only): pushed as `docs/port/REVIEW-16NOV.md` on `rev/16nov`. B2: the V8 helpers and `fdlibm.cpp` match
+  V8 12.4.254 token for token; **one miss elsewhere: `js_exp` lacks V8's `if (x == 1.0) return E;`** (`js_exp(1.0)` is one ulp off Node).
+  B4: the web app cannot send too long a pump value list today (lists come from `pump/pump-meta.js`, counts equal the shipped wasm's), but
+  the worklet write at `index.html:20306` is unclamped and nothing checks meta against wasm. B5: the shipped `pump.wasm` is NOT from the
+  pin (meta stamp 30b389d8, MASTER 75; the pin gives 72cc7e55, MASTER 77); nothing in this repo builds it (manual copy).
+  **New item D6 (Sonnet, small, when a compile slot is free):** add the `x == 1.0` branch to `js_exp` exactly as V8 has it, with a
+  `test_libm` case; every golden must stay unchanged; PR into `native`, merge when green, line in the review queue.
