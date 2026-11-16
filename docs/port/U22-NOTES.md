@@ -1,7 +1,6 @@
-# U22: the engine foundation (WORK IN PROGRESS, 16 Nov)
+# U22: the engine foundation
 
-State at the first push: the port is written and **bit-exact**: 294 of 294 factory voices (beta's `tests/golden/engines.json` hashes), 160 of 168 direct cases, 1800 of 1800 voiceMod probes (GCC 13, Linux x86-64, Release).
-Still to do before the PR: clang build, sanitizer build, allocation guard (`rt_harness`), `parity-u22.sh`, full ctest, this document finished. See "Next step" at the bottom.
+Port of the voice core of index.html's ENGINE block to `native/core/src/engine/`. **Bit-exact**: 294 of 294 factory voices against beta's `tests/golden/engines.json` hashes (SHA-256 of the float32 bytes of `renderVoice(v, 48000, null, hold)`), 168 of 168 direct cases (random voices through the real `renderVoice`, plus written-out edge cases) and 1800 of 1800 `voiceMod` probes against the real JS run in Node. GCC 13 and clang 18 (Release), GCC ASan + UBSan; full ctest 89 of 89 on GCC. Gate command: `native/tools/parity.sh u22`.
 
 ## What is where
 - `native/core/src/engine/engine.{h,cpp}`: tables, `EngRng` (rng), `eng_blep`, `eng_sinT` + SIN, `EngSeedCounter` (freshLayer's seed), the oscillator scaffolding (`Osc`, makeOsc's closures), `renderLayer`, `eng_voice_mod` (voiceMod), `voiceFilter`, `voiceAmp`, `eng_render_voice` (renderLayersOnly + renderVoice: drive, level, the pad effect chain, the trailing-silence trim, the 2 ms fade), `EngVoice` / `EngLayer` / `EngFx` (mkVoice / freshLayer parameters with their defaults).
@@ -26,5 +25,11 @@ sine, tri, saw, square, pulse and the noise family: white, pink, brown, blue, me
 - A JS exception inside the pad chain (a Pitch reverb with no `size`) makes `renderVoice` throw; here `kEngFxThrew`. Not reachable from the factory voices.
 - More than 8 layers or 8 effects on one voice is refused by the loader (mkVoice makes 8; nothing in the factory has more).
 
-## Next step
-Finish: clang + sanitizer builds, `rt_harness` case, `parity-u22.sh`, full ctest, then the PR into `native` (do not merge).
+## Tests (ctest): `engine_ref` (Node makes the reference: ~55 s), `engine` (C++ against beta's hashes, the local Node's hashes, the tables, the defaults, the seed counter, sinT / rng / blep / hashRnd samples, the refusals), `engine_golden_current` (Linux: the committed hashes are what the JS gives now), `rt_core` (`rt_engine`: voices without pad effects under the allocation guard). Mutation checks done: a changed blep constant, a changed triangle-LFO centre and a 1e-7 level change are each caught (the direct cases and probes catch what the factory voices do not reach).
+To find a first differing sample after a failure: `node native/tools/engine-dump.mjs /tmp/ref --samples` then `test_engine /tmp/ref native/tests/golden/engine_voices.json <voice-substring> --first` (prints sample index, both values).
+The 294 factory voices are 560 layers: white 186, sine 135, metal 69, square 45, saw 40, tri 32, pink 28, lfsr 9, pulse 6, dust 5, grit 3, brown 1, blue 1; 19 voices use Degrade (U17's `pad_degrade`), 6 use an LFO, 52 a drive, 19 the voice filter / amp. Pitch delay / reverb and Resonator are covered by the direct cases only (no factory voice uses them).
+
+## Left for others (nothing broken here)
+- U23 / U24 / U25: the other layer types: add a case in `Osc::init` / `Osc::s` (engine.cpp) and the name in `eng_layer_type`; widen `OK_TYPES` in `engine-dump.mjs` and re-run `--fixture <beta checkout>` (by hand; it needs beta's tools and goldens) and `--golden`.
+- `renderVoice`'s other branches (Bass, Vox, Blip, the XENG engines, stereo samples `.r`, `renderLayersOnly`'s `stages` peaks) are not here.
+- The effects other than the four JS ones (see Decisions) and the voice description reader (U06 may want `engine_json.cpp`'s keys).
