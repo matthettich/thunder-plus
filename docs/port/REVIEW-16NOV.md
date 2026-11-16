@@ -215,3 +215,39 @@ Each mutation: test rc=1, then reverted (worktree clean):
 - Wavetable negative Bend: reachable (Bend slider min -1, max 1: index.html:8439). JS reads tab[1025] = undefined -> NaN. C++ `tb()` returns NaN for i outside 0..1024 (layer_wavetable.cpp:46, tab has 1025 entries): no out-of-bounds read. Under GCC ASan+UBSan (own harness, Bend -1, -0.83, -0.5, -0.1, tunes -20/0/20): no error, NaN samples only (about 25 to 105 of 144128 without a filter; positive NaN), buffer guard intact.
 - Supersaw negative Detune: not reachable from the UI (a/b rows min 0, max 1: index.html:8451; randomisers 14772/14784 stay in 0..1; mkVoice does not clamp, so only hand-edited/imported song data). C++: all samples NaN, no crash, ASan/UBSan clean.
 - PWM negative Shape: same (not reachable from the UI). C++: held = -0/0 NaN for the whole layer (sign bit set on x86), no crash, clean. Shape > 1 is fine.
+
+## Independent verification of #193 (U24)
+# Verify U24 (PR #193, n3/u24 @ 7af53d7)
+
+## 1. Gate real: PASS
+- test_engine_u24.cpp renders each voice and case with eng_render_voice, SHA-256s the float32 bytes, compares with the committed .inc and (x86-64 Linux) the local Node run. status != Ok (incl. kEngUnsupported), missing golden or missing ref -> fail. Counts are fixture == golden == ref. Missing ref dir -> FAIL, not skip. No tolerance anywhere (hash equality).
+- Script: engine_u24_voices_golden.inc has 110 rows, 110 unique keys; all in beta engines.json with identical sha256 and len (0 bad, 0 missing); fixture key set == golden key set; none overlap U22 (294) or U23 (61) goldens.
+- Completeness (own script scratch/cov24.mjs over all 2142 beta voices): exactly 110 voices have a U24-type layer (on, level>0); all 110 are in the fixture; none has a non-ported type; none has a missing or error golden; none hits chord index outside 0..13, a NaN FM algorithm, or addsaw/addodd > 64 partials; no U24 layer in any factory voice has a or b outside 0..1. So no factory voice is silently excluded by kEngUnsupported.
+- JS behaviour at the three refusals: chord idx outside table -> chordOf(a)[1] throws TypeError (real JS throw). fm4/6/genesis/sb/arcade with NaN a -> alg undefined, throws at first s() (real). addsaw/addodd > 64 partials: the JS does NOT throw (it loops n times); this is the port's fixed-array limit, only wrongly described as "the JS throws" in U24-NOTES.md ("Decisions", Layers the JS throws on) and layer_u24.h:7. Reachability: UI sliders are 0..1 (chord idx max 13, partials max 32, alg valid); NaN or a > 2.0 only via hand-edited/imported song data. Refusal is loud (kEngUnsupported), not silence.
+- U22/U23 goldens untouched (only A entries for goldens). The one U23 test line (test_engine_u23.cpp:136, fm2 -> plaits) is legitimate (fm2 is now supported; plaits is still Other).
+- Minor stale text: test_engine_u24.cpp:3 and parity.sh comment say "97 factory voices"; the real count is 110.
+
+## 2. Mutation: PASS
+Baseline (build -j2 Release): engine_ref, engine, engine_golden_current, engine_u24_ref, engine_u24, engine_u24_golden_current, engine_u23_ref, engine_u23, engine_u23_golden_current all pass (110/110, 383/383). Each mutation: test rc=1; reverted (worktree clean):
+- layer_fm.cpp fmmetal `r3 = 2.613 + a*3.1` -> 3.2: 8 voices + 16 cases fail
+- layer_add.cpp bell `(0.3 + B*B*14)` -> 0.31: 17 voices + 28 cases fail
+- layer_karplus.cpp `0.995 * dc` -> 0.994: 3 voices + 26 cases fail
+- layer_formant.cpp formant `y * 0.9` -> 0.91: 2 voices + 26 cases fail
+- layer_add.cpp chord `B * 0.33` -> 0.34 (extra): 9 voices + 31 cases fail
+
+## 3. Scope: PASS
+- Diff vs origin/native: only native/ and docs/port/U24-NOTES.md; 20 files; all golden files are additions; no -ffast-math, no tolerance added.
+- No std::sin/cos/exp/pow/tan/round in layer_fm/add/karplus/formant/u24 (grep); js_sin, js_cos, js_exp, js_pow, js_round used; only floor/ceil/trunc/fabs otherwise. Compared fm2/fmfb/fmmetal/fmcross, fmOsc (+ FM_ALGS4/6, FM_MODELS), addOsc (blk/s, norm, live), addsaw/addodd/membrane/bell/bar/chord, KSString pluck/tick (float32 stores, d, src, mean, pk, rng draw order), formant, vosim against beta index.html: operation order, float32 stores, NaN semantics (Math.max/min via u24_max/min) match. blk(t, e0, inc) call position unchanged.
+
+## 4. Memory safety: PASS
+- Karplus: P clamped to [2, 4092] before the pluck; n = ceil(P)+2 <= 4094 <= buffers (N+8 = 4104 each, 2 x 16 KB stack, static_assert'd); src index ((i-d)%Ln+Ln)%Ln with Ln <= 4092 < n; ring index (w-n+i+N)%N >= 0. tick reads via rd() that returns NaN for any index outside 0..N-1 (negative a, a=0, NaN a/P, infinite). NaN P: no pluck, no writes, NaN out like JS.
+- Chord: index checked 0..13 by u24_layer_ok before init (kChords[14]); max 5 semis x 3 = 15 <= 64. Membrane/bell: sliceLen <= 12 (tables are 12). Addsaw/addodd: n <= 64 enforced by u24_layer_ok; Osc is only built in renderLayer after the check (engine.cpp:362 vs 369). fm op alg clamped to table. fm2/fmcross ratio idx outside -> NaN, not OOB.
+- Sanitizers: GCC ASan+UBSan build of test_engine_u24: 110/110, 383/383, no report. Own harness (scratch/edge24.cpp) over all 18 types x a,b in {+-1e9, -100, -3, -1, -0.5, 0, 0.5, 1, 2.04, 3, 100, NaN, +-inf, ...} x tune {-60,0,40,120} x sr {48000, 8000}: 52,000 renders (47,880 ok, 4,104 refused), no ASan/UBSan error, bound guard intact.
+
+## 5. Membrane / bell / bar: PASS (ported)
+They are ported in this PR (kNames in layer_u24.cpp, LType::Membrane/Bell/Bar, layer_add.cpp): 36 membrane, 23 bell, 6 bar layers in the 110 gated factory voices, plus edge_membrane_*, edge_bell_*, edge_bar_* direct cases. ENGINE-INVENTORY.md:237 lists them under U24; the PR title just omits them. None left unsupported or missing.
+
+## Problems found (none blocking)
+1. docs/port/U24-NOTES.md ("Decisions") and layer_u24.h:7 say the JS throws for addsaw/addodd > 64 partials; it does not (port limit). Reword.
+2. test_engine_u24.cpp:3 and parity.sh comment: "97" should be 110.
+3. engine-u24-dump.mjs header says voices that mix U24 with U23 types are in neither file; the notes and the data show they are in the fixture.
