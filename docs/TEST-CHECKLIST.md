@@ -10,7 +10,7 @@
 
 This list is in order of importance, so start at the top.
 
-Do section 1 first; it is short: the newest builds (589 to 621, ears first), what could lose work or sound.
+Do section 1 first; it is short: the newest builds (589 to 623, ears first), what could lose work or sound.
 
 Do sections 2 and 3 as time allows.
 
@@ -22,7 +22,7 @@ If something fails, tell Claude the build number and what happened; tick an item
 
 | Section | Open items | Mostly on | Why it matters |
 | --- | --- | --- | --- |
-| 1. Do these first | 116 | Phone and computer | The newest builds (589 to 621), lost work or sound |
+| 1. Do these first | 119 | Phone and computer | The newest builds (589 to 623), lost work or sound |
 | 2. Really worth trying | 68 | Phone | Everyday features nobody has tried on a real device, the 585 to 588 editor checks and the re-checks of your last fixes |
 | 3. If you have time | 47 | Phone, then gear | Secondary features, by-ear comparisons and hardware |
 | 4. Safe to skip unless something looks wrong | 55 | Mixed | Cosmetic, older, or already covered by automated tests |
@@ -30,6 +30,14 @@ If something fails, tell Claude the build number and what happened; tick an item
 | Set aside | 5 | none | Nothing: probably superseded |
 
 ## 1. Do these first
+
+### New in builds 622 and 623: command bar line, the side panel's instrument list plays and selects
+
+*The newest builds, first. Computer unless the item says otherwise.*
+
+- [ ] Computer: the small command bar has a thin line along its top in each skin you use. Pass: a thin line in the skin's line colour runs along the top of the bar, so it reads as its own section. (622)
+- [ ] Computer: click an instrument in the side panel's instrument list, with the song stopped and then while it plays. Pass: it plays once and is selected each time, and INST opens on it. (623)
+- [ ] Computer, Phrase view: click an instrument in the side panel's instrument list. Pass: it selects the instrument you clicked, not the instrument on the cursor row. (623)
 
 ### New in build 621: chains and waves Send / Receive, cross-track warning, Mixer meters, square cables, the side panel's skin
 
