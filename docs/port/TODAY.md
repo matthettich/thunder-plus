@@ -125,6 +125,17 @@ N1 step 10.
   REVIEW-16NOV.md). The manager did NOT read the diff. Least sure of: sample, grains, pwm and vint have no factory voice (direct cases only; the pwm DPCM mutation
   failed only 3 cases); a sample layer in a vint mode allocates; `layer_vint.cpp` allows a huge buffer for a tiny sample rate. **Web app, for Fable:** a wavetable with
   negative Bend (reachable: the slider is −1 to 1, `index.html:8439`) reads one past its table and gives NaN; the C++ returns NaN through a guard, no out-of-bounds read.
+- #191 native Bytebeat fix (mirrors web build 633; Sonnet): merged, all CI green. `native`'s three JS copies got 633's two lines (the manager's decision: the reference
+  had the bug in it); only `kBbHash` changed in `modfx_golden.inc`; the PR lists the 10 formulas whose values moved, all `&& constant` / `|| constant`. Not read by the manager.
+- CI: the Linux ctest job's limit 30 → 60 minutes in `.github/workflows/native.yml` (253a3b1, the manager's; the suite takes about 29 minutes: `*_ref` and
+  `*_golden_current` cost about 530 s per pass and run in all three passes).
+- #193 U24 layer types FM, additive, chord, karplus, vosim, formant, membrane, bell, bar (Sonnet): merged, all CI green; 110 of 110 factory voices (13 mix in U23 types), 383
+  direct cases. Independent Sonnet verifier passed all five items (hashes, five mutations, scope, ASan / UBSan clean on about 52,000 extreme renders, Karplus buffers
+  cannot be overrun; report in REVIEW-16NOV.md). The manager did NOT read the diff. Open: more than 64 partials returns unsupported (a limit of the port's fixed arrays;
+  the JS does not throw; reachable only with hand-edited song data); three wrong comments (notes and `layer_u24.h:7` say the JS throws there; `test_engine_u24.cpp:3`
+  and `parity.sh` say 97 voices, not 110; `engine-u24-dump.mjs`'s header on mixed voices).
+- Web build 634 (Sonnet, display only) and desktop v1.3.11 (run 43967032621, 11 assets, from `main` at 634, holding 633 and 634): see the Progress log. `HANDOVER.md`'s
+  release list has no v1.3.10 bullet (last night's release was never recorded there).
 
 ## Progress log (the manager updates and pushes this after every change of state; newest last)
 - 10:30 Fable: plan written. Nothing started.
@@ -218,3 +229,5 @@ N1 step 10.
   about 530 s per pass and run in all three passes; running `_golden_current` only in the GCC pass would save about 4 minutes per extra pass (not done: for Fable or a chore).
   **Desktop v1.3.11** was started at 15:08 at the owner's word (run 43967032621, from `main` at build 634); a Haiku worker watches it and records it in HANDOVER.md.
   Still running: U28 (#195).
+- 16:00 **#193 U24 merged** (verifier passed). **Desktop v1.3.11 is released** (recorded on `beta` 89395d4). Still running: U28 (#195), which must merge `native`
+  again now. Nothing else will be started today except the verification of #195. U29, U25 and everything under "Not yours today" remain.
