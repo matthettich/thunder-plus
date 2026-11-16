@@ -1304,7 +1304,7 @@ body.trkv.cmdv .toast{bottom:calc(var(--k) * 3.3 + 60px + env(safe-area-inset-bo
 .toct{border-left:1px solid var(--line)}
 #tRecBar + .toct{border-left:0}   /* REC / CLICK already end in a line: two side by side read as one thick one (owner, 21 Oct) */
 /* FOLDED PHONE, the tempo line (build 631, owner: "make the top of the folded phone look a little less awkward"): ROWS (no − / +: tap the number to type it), then BPM and LPB, then the time left; REC leaves the line (File menu › Record). Below 600 px on the Mobile setup only (the JS side is `fold` in applyPlatform). */
-@media (max-width:599px){ body.mob #tRowsBar{order:-2} body.mob #tClk{order:-1; border-right:0} body.mob #tRowsDn, body.mob #tRowsUp, body.mob #tRec{display:none} body.mob .tpat .tlen{flex:none; align-self:center} }
+@media (max-width:599px){ body.mob #tClk{order:-2; border-right:0} body.mob #tRowsBar{order:-1} body.mob #tRowsDn, body.mob #tRowsUp, body.mob #tRec{display:none} body.mob .tpat .tlen{flex:none; align-self:center} }
 /* On a phone the tabs take the first line; tempo, ticks, rows and INPUT share the second. */
 @media (max-width:600px){
   .ttabbar{flex-wrap:wrap} .ttabbar .ttabs{flex:1 1 100%; border-bottom:1px solid var(--line)}
@@ -25969,7 +25969,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 631;
+const BUILD = 632;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD + (location.pathname.includes('/beta/') ? ' · beta' : '');
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -36255,6 +36255,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [632, '15 Nov', ['Folded phone, top: the tempo line now reads BPM and LPB, then ROWS, then the time left (631 had ROWS first)']],
   [631, '15 Nov', ['Folded phone, top: the tempo line now reads ROWS (tap the number to type it; no − / +), BPM and LPB, then the time left; the time left leaves the top bar, which is roomier. REC is gone from the header: File › Record has it, with its on / off state']],
   [630, '15 Nov', ['Bottom panel: a MOD section beside FX (fold it like INST or FX; it starts folded): each LFO on the track as a tiny scope with a dot that rides the wave in time with the song, and where it goes. Click it to open MOD. Computer only']],
   [629, '15 Nov', ['Generators: Arp, Chords, Polymeter, Markov melody and Probability fill have an Instrument choice (the first entry, Current, is what they did before); Mutate has one for the notes it adds. Acid line, Euclidean fill and Drum pattern already had theirs']],
