@@ -24,3 +24,11 @@ table, vector, scanned, resynth, bytebeat, sf, wavesl, acid, mach, lx*, p*: `xen
 ## Progress
 - 16 Nov: all 15 engines done; PR #195. Merged origin/native (after #191, #192) cleanly; engine_xeng passes. Local test times (2 cores): `engine_xeng_ref` about 3.5 min, `engine_xeng` 35 s, `engine_xeng_golden_current` 3.3 min. Checks done: GCC and clang Release, GCC ASan + UBSan clean, gcov: every line of xeng_*.cpp executed; mutations (tone dist, piano hypot, strings comb) fail 31 / 25 / 58 voices.
 - Left: nothing in this unit. If U24 merges first, merge native again (conflicts expected only in core/CMakeLists.txt, tests/CMakeLists.txt, rt_harness.cpp: keep both sides).
+
+## Memory-safety round (verifier fail, fixed)
+
+- Wind, strings and drift compute their delay-line length in double. If it is not finite or above `kMaxLine` (4,194,304 samples, far over any real voice) the engine returns `kRefuse` and `xeng_render_voice` gives `kEngUnsupported` before anything is allocated. The JS throws RangeError there. No engine indexes an empty buffer.
+- Every `(int)` of a possibly NaN/huge double now goes through `cidx(v, lo, hi)` (NaN gives lo, otherwise clamp). Chip follows the JS at each site: a NaN index reads `undefined`, so the result is NaN, as in the JS.
+- Loops the JS runs `hz*dt` times per step (swarm/drift `step`, chip noise `nacc`) refuse when the count per step exceeds 1e4; the JS would not finish in any usable time (never at 2^53).
+- `engine_xeng_fuzz` (native/tests/test_engine_xeng_fuzz.cpp): all 15 engines, every parameter in xeng_ranges.json at extreme values {-1e308 .. 1e308}, NaN injected, sr 2000. 3244 renders, 177 refused, 0 failed; about 1 s release, 4 s under ASan+UBSan. It checks no crash, no UB, and finite or refused output. No existing golden changed.
+- Verifier's minor point (NaN-only truthiness in swarm bloom/shimmer, strings vibA): fixed with `truthy(x)`, which matches JS falsiness (0, NaN, undefined).

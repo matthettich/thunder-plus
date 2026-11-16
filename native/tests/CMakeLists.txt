@@ -437,3 +437,12 @@ if(NODE_EXE)
 else()
   add_test(NAME engine_xeng COMMAND test_engine_xeng)   # no directory: prints FAIL and exits 1
 endif()
+
+# U28: extreme and NaN parameters of the 15 engines: no crash, no out-of-bounds access (under ASan / UBSan), refused or rendered within the bound.
+add_executable(test_engine_xeng_fuzz test_engine_xeng_fuzz.cpp)
+target_link_libraries(test_engine_xeng_fuzz PRIVATE thunder_core)
+target_include_directories(test_engine_xeng_fuzz PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../core/src ${CMAKE_CURRENT_SOURCE_DIR})
+if(NOT MSVC)
+  target_compile_options(test_engine_xeng_fuzz PRIVATE -Wall -Wextra)
+endif()
+add_test(NAME engine_xeng_fuzz COMMAND test_engine_xeng_fuzz ${CMAKE_CURRENT_SOURCE_DIR}/golden/xeng_ranges.json)

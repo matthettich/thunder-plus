@@ -22,9 +22,9 @@ const double kMat[12][2] = {{1, 1}, {0.8, 1.2}, {3, 0.5}, {2.2, 0.5}, {3.5, 0.35
 struct Mode { double c1, c2, g, y1, y2, tau; };
 // the modes (the part of render before the exciter): returns how many, and the largest tau; they are needed for the length
 int make_modes(const ModalP& p, double sr, double f0, Mode* modes, double* maxT) {
-  const int m = (int)mx(0, mn(11, (double)i32(p.mat))); const Rat& R0 = kRat[m]; const double* M = kMat[m];
+  const int m = cidx((double)i32(p.mat), 0, 11); const Rat& R0 = kRat[m]; const double* M = kMat[m];
   const double baseT = mx(0.005, p.dec) * M[0];
-  const int nm = (int)mx(1, mn(24, (double)i32(p.modes))); int cnt = 0; double mt = 0.05;
+  const int nm = cidx((double)i32(p.modes), 1, 24); int cnt = 0; double mt = 0.05;
   for (int k = 0; k < nm; k++) {
     double r = k < R0.n ? R0.r[k] : R0.r[R0.n - 1] + (k - R0.n + 1) * (R0.r[R0.n - 1] - R0.r[R0.n - 2]);
     r *= 1 + p.inharm * 0.004 * k * k;

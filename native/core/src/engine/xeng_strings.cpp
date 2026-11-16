@@ -22,12 +22,12 @@ size_t xeng_strings(const StringsP& p, double sr, double hold, float* out, size_
   if (N > cap) return 0;
   KeysRnd rnd(0x57a1);
   const double f0 = 65.406 * js_pow(2, p.oct + orz(p.tune) / 12); const int nv = (int)nvD;
-  const double* ivl = kIvl[(int)mx(0, mn(8, js_round(p.chord)))];
+  const double* ivl = kIvl[cidx(js_round(p.chord), 0, 8)];
   std::vector<Str> strs; strs.reserve((size_t)nv);
   for (int v = 0; v < nv; v++) {
     const double order = p.down >= 0.5 ? nv - 1 - v : v, f = mn(sr / 4, f0 * js_pow(2, (ivl[v] + (rnd() * 2 - 1) * p.det * p.det * 18 / 100) / 12)), D = sr / f;
     const double L = std::ceil(D) + 2, ex = std::ceil(D);
-    if (!(L >= 1 && L < 1e8)) return 0;
+    if (!(L >= 1 && L <= kMaxLine && ex >= 1)) return kRefuse;   // Float32Array(L) of a NaN / infinite / huge length throws in the JS
     Str s; s.f = f; s.L = L; s.w = 0; s.buf.assign((size_t)L, 0.0f); s.exc.assign((size_t)ex, 0.0f);
     const double pb = 0.08 + p.pick * p.pick * 0.9; double e1 = 0; for (size_t i = 0; i < (size_t)ex; i++) { e1 += ((rnd() * 2 - 1) - e1) * pb; s.exc[i] = (float)e1; }
     const double pd = mx(1, js_round(p.pos * ex)); for (double i = ex - 1; i >= pd; i--) s.exc[(size_t)i] = (float)((double)s.exc[(size_t)i] - (double)s.exc[(size_t)(i - pd)] * 0.9);
@@ -40,7 +40,7 @@ size_t xeng_strings(const StringsP& p, double sr, double hold, float* out, size_
     for (int i = 0; i < 4; i++) { const double w = 2 * kPi * mn(sr * 0.4, mf[i][0] * sz) / sr, r = js_exp(-1 / (mf[i][1] * sr)); modes[i] = Mode{2 * r * js_cos(w), -r * r, mf[i][2] * (1 - r), 0, 0}; } }
   const double wet = mx(0, mn(1, p.body)), vibA = p.vib * p.vib * 0.012;
   for (size_t i = 0; i < N; i++) {
-    const double t = (double)i / sr, rl = t < h ? 1 : js_exp(-(t - h) / rel), vib = vibA != 0 ? 1 + vibA * js_sin(6.2832 * p.vrate * t) * mn(1, t * 2) : 1;
+    const double t = (double)i / sr, rl = t < h ? 1 : js_exp(-(t - h) / rel), vib = truthy(vibA) ? 1 + vibA * js_sin(6.2832 * p.vrate * t) * mn(1, t * 2) : 1;
     double y = 0;
     for (Str& s : strs) {
       const double k = (double)i - s.start; if (k < 0) continue;

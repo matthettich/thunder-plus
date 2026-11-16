@@ -21,7 +21,7 @@ size_t xeng_partials(const PartialsP& p, double sr, double hold, float* out, siz
   if (!out) return N;
   if (N > cap) return 0;
   KeysRnd rnd(0x9a27);
-  const double cntD = mx(1, mn(256, js_round(p.count))); const int cnt = (int)cntD; KeysBank bank(sr); Part parts[256]; int np = 0;
+  const int cnt = cidx(js_round(p.count), 1, 256); KeysBank bank(sr); Part parts[256]; int np = 0;
   for (int n = 1; n <= cnt; n++) {
     const double f = n * f0 * js_pow(1 + p.stretch * p.stretch * 0.08 * (n - 1), 0.5); if (f > sr * 0.45) break;
     const double a1 = spectrum(n, f, p.tilt, p.comb, p.fmt, p.fwidth, p.famt), a2 = spectrum(n, f, p.tilt2, p.comb2, p.fmt, p.fwidth, p.famt);

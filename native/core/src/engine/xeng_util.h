@@ -18,6 +18,11 @@ inline double c01(double v) { return mx(0, mn(1, v)); }     // Math.max(0, Math.
 inline double orz(double x) { return (x != 0 && x == x) ? x : 0; }   // x || 0
 inline double orv(double x, double d) { return (x != 0 && x == x) ? x : d; }   // x || d
 inline int32_t i32(double x) { return js_to_int32(x); }     // x | 0
+// A table index from a rounded and clamped parameter: the parameters are finite (normX), so the clamp is exact; NaN (not reachable from a song) is the low end, never a cast of NaN.
+inline int cidx(double v, int lo, int hi) { if (!(v == v)) return lo; return v < lo ? lo : v > hi ? hi : (int)v; }
+inline bool truthy(double x) { return x != 0 && x == x; }   // JS truthiness of a Number
+constexpr size_t kRefuse = (size_t)-1;   // an engine's answer for input the JS cannot render either (its Float32Array would throw RangeError): the voice is refused (kEngUnsupported)
+constexpr double kMaxLine = 4194304;     // the longest delay line a voice may ask for, in floats (16 MB): the JS would throw above 2^32 and run out of memory far below; 4 M is a note of 0.012 Hz at 48 kHz
 inline double jabs(double x) { return std::fabs(x); }
 // `new Float32Array(N)` size check shared by every engine: N must be representable; (size_t)N is returned, 0 if not
 inline bool okN(double N) { return N >= 1 && N < 4e9; }

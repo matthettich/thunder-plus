@@ -17,7 +17,7 @@ size_t xeng_piano(const PianoP& p, double sr, double hold, float* out, size_t ca
   if (!out) return N;
   if (N > cap) return 0;
   KeysRnd rnd(0x91a2);
-  const double B = 0.00008 * (1 + p.inharm * 9) * js_pow(f0 / 261.6, 0.6); const int S = (int)mx(1, mn(3, js_round(p.strings)));
+  const double B = 0.00008 * (1 + p.inharm * 9) * js_pow(f0 / 261.6, 0.6); const int S = cidx(js_round(p.strings), 1, 3);
   static const double d0[3] = {0, 1, -0.73}; double dets[3]; for (int i = 0; i < S; i++) dets[i] = d0[i] * p.det * p.det * 6;
   const double fc = 600 + p.hard * p.hard * 9000 + p.bright * 3000;
   KeysBank bank(sr); Part parts[64]; int np = 0;

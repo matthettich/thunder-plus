@@ -26,26 +26,28 @@ size_t xeng_swarm(const SwarmP& p, double sr, double hold, float* out, size_t ca
   if (!out) return N;
   if (N > cap) return 0;
   KeysRnd rnd(0x5eed1234);
-  const int nv = (int)mx(1, mn(48, js_round(p.voices))); const double f0 = 65.406 * js_pow(2, p.oct + orz(p.tune) / 12);
-  const int ivi = (int)mx(0, mn(6, (double)i32(p.ivl))); const double* IV = kIvl[ivi]; const int ivn = kIvlN[ivi]; const double spreadC = p.spread * p.spread * 120, driftC = p.drift * p.drift * 80;
+  const int nv = cidx(js_round(p.voices), 1, 48); const double f0 = 65.406 * js_pow(2, p.oct + orz(p.tune) / 12);
+  const int ivi = cidx((double)i32(p.ivl), 0, 6); const double* IV = kIvl[ivi]; const int ivn = kIvlN[ivi]; const double spreadC = p.spread * p.spread * 120, driftC = p.drift * p.drift * 80;
   auto path = [&](double hz) { Path q; q.hz = hz * (0.6 + rnd() * 0.8); q.a = rnd() * 2 - 1; q.b = rnd() * 2 - 1; q.ph = rnd(); return q; };
-  auto step = [&](Path& q, double dt) { q.ph += q.hz * dt; while (q.ph >= 1) { q.ph -= 1; q.a = q.b; q.b = rnd() * 2 - 1; } const double m = (1 - js_cos(kPi * q.ph)) * 0.5; return q.a + (q.b - q.a) * m; };
+  bool bad = false;   // a path faster than 1e4 wraps per control step: the JS's `while (q.ph >= 1)` would not end within any time a render can take (at 2^53 it never ends): refused
+  auto step = [&](Path& q, double dt) { if (!(q.hz * dt <= 1e4)) { bad = true; return 0.0; } q.ph += q.hz * dt; while (q.ph >= 1) { q.ph -= 1; q.a = q.b; q.b = rnd() * 2 - 1; } const double m = (1 - js_cos(kPi * q.ph)) * 0.5; return q.a + (q.b - q.a) * m; };
   Path shared = path(mx(0.01, p.rate) * 0.7); Vc V[48];
   for (int j = 0; j < nv; j++) {
     const double pos = nv > 1 ? (double)j / (nv - 1) * 2 - 1 : 0; const double scat = rnd() < p.scatter ? IV[(int)std::floor(rnd() * ivn)] : 0;
     Vc& v = V[j]; v.ph = rnd(); v.det = (pos + (rnd() - 0.5) * 0.3) * spreadC + scat * 100; v.dp = path(mx(0.01, p.rate)); v.sp = path(2 + p.rate * 3);
-    v.on = bloom != 0 ? rnd() * bloom : 0; v.g = scat != 0 ? 0.7 : 1; v.dt = 0; v.lv = 0;
+    v.on = truthy(bloom) ? rnd() * bloom : 0; v.g = scat != 0 ? 0.7 : 1; v.dt = 0; v.lv = 0;
   }
-  const double w = mx(0, mn(3, p.wave)), wiD = mn(2, std::floor(w)), wf = w - wiD; const int wi = (int)wiD;
+  const double w = mx(0, mn(3, p.wave)), wiD = mn(2, std::floor(w)), wf = w - wiD; const int wi = cidx(wiD, 0, 2);
   const double kf = js_pow(f0 / 261.6, p.key); const size_t CR = 32; const double cdt = (double)CR / sr, sdt = 1 / sr, norm = 1 / std::sqrt((double)nv);
   const double ah = h > atk ? sus + (1 - sus) * js_exp(-6.9 * (h - atk) / dec) : 1;
   double ic1 = 0, ic2 = 0, subPh = 0, a1 = 1, a2 = 0, a3 = 0;
   for (size_t i0 = 0; i0 < N; i0 += CR) {
+    if (bad) return kRefuse;
     const double t0 = (double)i0 * sdt, sh = step(shared, cdt) * driftC * p.cohes;
     for (int j = 0; j < nv; j++) {
       Vc& v = V[j];
       v.dt = f0 * js_pow(2, (v.det + step(v.dp, cdt) * driftC * (1 - p.cohes) + sh) / 1200) * sdt;
-      v.lv = v.g * (p.shimmer != 0 ? 1 - p.shimmer * (0.5 + 0.5 * step(v.sp, cdt)) : 1);
+      v.lv = v.g * (truthy(p.shimmer) ? 1 - p.shimmer * (0.5 + 0.5 * step(v.sp, cdt)) : 1);
     }
     const double fe = js_exp(-6.9 * t0 / mx(0.005, p.fdec / 1000)), fc = mx(30, mn(sr * 0.45, p.cut * kf * js_pow(2, p.fenv * 5 * fe)));
     { const double g = js_tan(kPi * fc / sr), k = 2 - 1.96 * mn(1, p.res); a1 = 1 / (1 + g * (g + k)); a2 = g * a1; a3 = g * a2; }
@@ -56,7 +58,7 @@ size_t xeng_swarm(const SwarmP& p, double sr, double hold, float* out, size_t ca
         Vc& v = V[j]; if (t < v.on) continue;
         const double dt = v.dt; double ph = v.ph + dt; if (ph >= 1) ph -= 1; v.ph = ph;
         double y = shape(wi, ph, dt); if (wf > 0.001) y += (shape(wi + 1, ph, dt) - y) * wf;
-        mix += y * v.lv * (bloom != 0 && t - v.on < atk ? (t - v.on) / atk : 1);
+        mix += y * v.lv * (truthy(bloom) && t - v.on < atk ? (t - v.on) / atk : 1);
       }
       mix *= norm;
       if (p.sub > 0.001) { subPh += f0 * 0.5 * sdt; if (subPh >= 1) subPh -= 1; mix += js_sin(2 * kPi * subPh) * p.sub * 0.7; }

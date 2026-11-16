@@ -69,6 +69,7 @@ size_t xeng_wind(const WindP& p, double sr, double hold, float* out, size_t cap)
   const double len = mn(12, h + rel * 6 + 0.1), Nd = mx(1, std::ceil(len * sr));
   if (!okN(Nd)) return 0;
   const size_t N = (size_t)Nd;
+  { const double f0e = 65.406 * js_pow(2, p.oct + orz(p.tune) / 12), base = sr / f0e, L = std::ceil(base * 2.6) + 8; if (!(L >= 1 && L <= kMaxLine)) return kRefuse; }   // the delay lines are Float32Array(ceil(n * 2.6) + 8): NaN / infinite / huge throws in the JS
   if (!out) return N;
   if (N > cap) return 0;
   Ctx c; c.p = &p; c.sr = sr; c.model = (int)model; c.f0 = 65.406 * js_pow(2, p.oct + orz(p.tune) / 12); c.h = h; c.atk = atk; c.rel = rel;

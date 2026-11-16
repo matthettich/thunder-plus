@@ -136,8 +136,9 @@ bool xeng_voice_from_json(XengVoice& V, Json v, Json fx) {
 }
 
 size_t xeng_render_bound(const XengVoice& V, const EngRenderOpts& o) {
+  if (!(o.sr > 0 && o.sr <= 1e7)) return 0;
   const size_t N = runEngine(V, o.sr, o.hold, nullptr, 0);
-  if (N == 0) return 0;
+  if (N == 0 || N == kRefuse) return 0;
   double len = (double)N;
   if (anyFxOn(V)) {
     const double tailN = js_round(orz(V.tail) * o.sr), extN = mn((double)N + tailN, o.sr * (kSmpMax + 12));
@@ -150,10 +151,13 @@ size_t xeng_render_bound(const XengVoice& V, const EngRenderOpts& o) {
 
 int xeng_render_voice(const XengVoice& V, const EngRenderOpts& o, float* out, size_t cap, size_t* nOut) {
   if (V.kind == XKind::None || V.kind == XKind::Other) return kEngUnsupported;
+  if (!(o.sr > 0 && o.sr <= 1e7)) return kEngUnsupported;
   const size_t bound = xeng_render_bound(V, o);
-  if (bound == 0 || cap < bound) return kEngTooSmall;
+  if (bound == 0) return kEngUnsupported;   // not representable (a length the JS cannot allocate either): refused, never silence
+  if (cap < bound) return kEngTooSmall;
   const double sr = o.sr;
   size_t len = runEngine(V, sr, o.hold, out, cap);
+  if (len == kRefuse) return kEngUnsupported;
   if (len == 0) return kEngTooSmall;
   if (anyFxOn(V)) {
     const size_t N = len;

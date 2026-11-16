@@ -32,7 +32,7 @@ size_t xeng_phase(const PhaseP& p, double sr, double hold, float* out, size_t ca
   KeysRnd rnd(0x9d15);
   const double f0 = 65.406 * js_pow(2, p.oct + orz(p.tune) / 12);
   const int OS = 2; const double sr2 = sr * OS;
-  const int w1 = (int)mx(0, mn(7, js_round(p.wave))), w2 = (int)mx(0, mn(7, js_round(p.wave2))); const double mix = p.mix;
+  const int w1 = cidx(js_round(p.wave), 0, 7), w2 = cidx(js_round(p.wave2), 0, 7); const double mix = p.mix;
   const double inc1 = f0 / sr2, inc2 = f0 * js_pow(2, p.det * p.det * 50 / 1200) / sr2, kf = js_pow(261.6 / f0, p.key * 0.7);
   double x1 = 0, x2 = 0.25, env = 0, denv = 0; int st = 0, dst = 0;
   for (size_t i = 0; i < N; i++) {

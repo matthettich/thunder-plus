@@ -15,7 +15,7 @@ size_t xeng_breath(const BreathP& p, double sr, double hold, float* out, size_t 
   if (!out) return N;
   if (N > cap) return 0;
   KeysRnd rnd(0xb4ea7); const double kf = js_pow(2, orz(p.tune) / 12);
-  const int nb = (int)mx(1, mn(8, js_round(p.bands))); static const double skew[8] = {0, 0.27, -0.19, 0.41, -0.33, 0.52, -0.12, 0.61};
+  const int nb = cidx(js_round(p.bands), 1, 8); static const double skew[8] = {0, 0.27, -0.19, 0.41, -0.33, 0.52, -0.12, 0.61};
   Bq bq[8]; for (int b = 0; b < nb; b++) bq[b] = Bq{js_pow(1 + p.spread * 1.5, b) * (1 + p.metal * skew[b] * 0.9), 0, 0, 0, 0, 0, 0, 0};
   const double fkey = js_pow(kf, p.key), Q = 0.7 + p.q * p.q * 60, wet = mx(0, mn(1, p.body));
   double br = 0, bl = 0, hp1 = 0, lp1 = 0, lp2 = 0, env = 0, gEnv = 0, nextG = 0, wind = 0, wtarget = 0, wn = 0; int st = 0;

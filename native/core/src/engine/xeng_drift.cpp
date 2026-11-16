@@ -25,9 +25,10 @@ size_t xeng_drift(const DriftP& p, double sr, double hold, float* out, size_t ca
   if (N > cap) return 0;
   KeysRnd rnd(0x0d21f7e5);
   const double f0 = 65.406 * js_pow(2, js_round(p.oct) + orz(p.tune) / 12);
-  const int nv = (int)mx(1, mn(4, js_round(p.voices))); const double spreadC = p.spread * p.spread * 25, driftC = p.drift * p.drift * 30;
+  const int nv = cidx(js_round(p.voices), 1, 4); const double spreadC = p.spread * p.spread * 25, driftC = p.drift * p.drift * 30;
   auto path = [&](double hz) { Path q; q.hz = hz * (0.6 + rnd() * 0.8); q.a = rnd() * 2 - 1; q.b = rnd() * 2 - 1; q.ph = rnd(); return q; };
-  auto step = [&](Path& q, double dt) { q.ph += q.hz * dt; while (q.ph >= 1) { q.ph -= 1; q.a = q.b; q.b = rnd() * 2 - 1; } const double m = (1 - js_cos(kPi * q.ph)) * 0.5; return q.a + (q.b - q.a) * m; };
+  bool bad = false;   // a path faster than 1e4 wraps per control step: the JS's `while (q.ph >= 1)` would not end within any time a render can take (at 2^53 it never ends): refused
+  auto step = [&](Path& q, double dt) { if (!(q.hz * dt <= 1e4)) { bad = true; return 0.0; } q.ph += q.hz * dt; while (q.ph >= 1) { q.ph -= 1; q.a = q.b; q.b = rnd() * 2 - 1; } const double m = (1 - js_cos(kPi * q.ph)) * 0.5; return q.a + (q.b - q.a) * m; };
   Vc V[4];
   for (int j = 0; j < nv; j++) {
     const double pos = nv > 1 ? (double)j / (nv - 1) * 2 - 1 : 0; Vc& v = V[j]; std::memset((void*)&v, 0, sizeof v);
@@ -47,10 +48,11 @@ size_t xeng_drift(const DriftP& p, double sr, double hold, float* out, size_t ca
   const size_t CR = 32; const double cdt = (double)CR / sr, sdt = 1 / sr, norm = 1 / std::sqrt((double)nv);
   const double aSaw = p.aSaw, aPul = p.aPulse, bSaw = p.bSaw, bPul = p.bPulse, sub = p.sub * 0.6, nz = p.noise * 0.5, ring = p.ring * 0.8;
   for (size_t i0 = 0; i0 < N; i0 += CR) {
+    if (bad) return kRefuse;
     const double t0 = (double)i0 * sdt;
     const double wow = (0.6 * js_sin(2 * kPi * wph) + 0.4 * step(wowP, cdt)) * wowC; wph += p.wowRate * cdt;
     const double flut = (0.5 * js_sin(2 * kPi * fph1) + 0.3 * js_sin(2 * kPi * fph2) + 0.2 * step(fpath, cdt)) * flutC; fph1 += 7.3 * cdt; fph2 += 11.9 * cdt;
-    const double vib = vibC != 0 ? vibC * mn(1, mx(0, (t0 - vd) / 0.5)) * js_sin(2 * kPi * p.vibRate * t0) : 0;
+    const double vib = truthy(vibC) ? vibC * mn(1, mx(0, (t0 - vd) / 0.5)) * js_sin(2 * kPi * p.vibRate * t0) : 0;
     const double common = wow + flut + vib, fc = p.cut * kf * js_pow(2, p.fenv * 5 * fenv(t0));
     for (int j = 0; j < nv; j++) {
       Vc& v = V[j];
@@ -68,10 +70,10 @@ size_t xeng_drift(const DriftP& p, double sr, double hold, float* out, size_t ca
         double pb = v.pb + dB; if (pb >= 1) pb -= 1; v.pb = pb;
         const double sA = 2 * pa - 1 - blep(pa, dA), sB = 2 * pb - 1 - blep(pb, dB), qB = pulse(pb, v.w, dB);
         double x = aSaw * sA + bSaw * sB + bPul * qB;
-        if (aPul != 0) x += aPul * pulse(pa, v.w, dA);
-        if (sub != 0) { double ps = v.ps + dA * 0.5; if (ps >= 1) ps -= 1; v.ps = ps; x += sub * pulse(ps, 0.5, dA * 0.5); }
-        if (ring != 0) x += ring * sA * qB;
-        if (nz != 0) x += nz * (rnd() * 2 - 1);
+        if (truthy(aPul)) x += aPul * pulse(pa, v.w, dA);
+        if (truthy(sub)) { double ps = v.ps + dA * 0.5; if (ps >= 1) ps -= 1; v.ps = ps; x += sub * pulse(ps, 0.5, dA * 0.5); }
+        if (truthy(ring)) x += ring * sA * qB;
+        if (truthy(nz)) x += nz * (rnd() * 2 - 1);
         { const double v3 = x - v.h2, v1 = v.ha1 * v.h1 + v.ha2 * v3, v2 = v.h2 + v.ha2 * v.h1 + v.ha3 * v3; v.h1 = 2 * v1 - v.h1; v.h2 = 2 * v2 - v.h2; x = x - v.hk * v1 - v2; }
         { const double v3 = x - v.l2, v1 = v.la1 * v.l1 + v.la2 * v3, v2 = v.l2 + v.la2 * v.l1 + v.la3 * v3; v.l1 = 2 * v1 - v.l1; v.l2 = 2 * v2 - v.l2; x = v2; }
         s += x;
@@ -85,7 +87,7 @@ size_t xeng_drift(const DriftP& p, double sr, double hold, float* out, size_t ca
   const double lpA = 1 - js_exp(-2 * kPi * 18000 * js_pow(2, -p.age * 2.8) / sr), hpA = 1 - js_exp(-2 * kPi * (15 + p.age * 120) / sr);
   double dips[32][3]; int ndips = 0;
   if (p.age > 0.05) for (double t = 0.5 + rnd() * 2; t < len; t += 1.2 + rnd() * 3) { const double a = 0.04 + rnd() * 0.08, b = p.age * (0.25 + rnd() * 0.25); if (ndips < 32) { dips[ndips][0] = t; dips[ndips][1] = a; dips[ndips][2] = b; ndips++; } }
-  const double cw = c01(p.chorus) * 0.5; const double dlNd = std::ceil(sr * 0.03) + 4; const size_t dlN = (size_t)dlNd, cap0 = 8192;
+  const double cw = c01(p.chorus) * 0.5; const double dlNd = std::ceil(sr * 0.03) + 4; if (!(dlNd >= 5 && dlNd <= kMaxLine)) return kRefuse; const size_t dlN = (size_t)dlNd, cap0 = 8192;
   float dlS[8192]; std::vector<float> dlV; float* dl = dlS;
   if (dlN > cap0) { dlV.assign(dlN, 0.0f); dl = dlV.data(); } else std::memset(dlS, 0, dlN * sizeof(float));
   const double cBase = 0.008 * sr, cDep = 0.0025 * sr;
@@ -96,7 +98,7 @@ size_t xeng_drift(const DriftP& p, double sr, double hold, float* out, size_t ca
     l1 += (x - l1) * lpA; l2 += (l1 - l2) * lpA; hpS += (l2 - hpS) * hpA; x = l2 - hpS;
     while ((int)di < ndips && t > dips[di][0] + dips[di][1]) di++;
     if ((int)di < ndips && t > dips[di][0]) { const double q = (t - dips[di][0]) / dips[di][1]; x *= 1 - dips[di][2] * 0.5 * (1 - js_cos(2 * kPi * q)); }
-    if (cw != 0) {
+    if (truthy(cw)) {
       dl[w] = (float)x; c1 += 0.45 * sdt; c2 += 0.17 * sdt; if (c1 >= 1) c1 -= 1; if (c2 >= 1) c2 -= 1;
       const double m = (c1 < 0.5 ? 4 * c1 - 1 : 3 - 4 * c1) * 0.7 + js_sin(2 * kPi * c2) * 0.3;
       double rp = (double)w - (cBase + cDep * m); if (rp < 0) rp += (double)dlN; const int32_t r0i = js_to_int32(rp); const double r0 = (double)r0i, fr = rp - r0; const size_t r0u = r0i >= 0 && (size_t)r0i < dlN ? (size_t)r0i : 0, r1 = r0u + 1 < dlN ? r0u + 1 : 0;
@@ -110,7 +112,7 @@ size_t xeng_drift(const DriftP& p, double sr, double hold, float* out, size_t ca
   const double hz = p.hiss > 0.001 ? 0.8 * js_pow(10, (-62 + p.hiss * 34) / 20) * 3 : 0; double hn = 0;
   for (size_t i = 0; i < N; i++) {
     double y = (double)out[i] * lv; if (dr != 0) y = js_tanh(y * dr) * dn;
-    if (hz != 0) { hn += ((rnd() * 2 - 1) - hn) * 0.35; y += hn * hz * std::sqrt(mx(0, env((double)i * sdt))); }
+    if (truthy(hz)) { hn += ((rnd() * 2 - 1) - hn) * 0.35; y += hn * hz * std::sqrt(mx(0, env((double)i * sdt))); }
     out[i] = (float)y;
   }
   return trim_fade(out, N, sr, 0.003);
