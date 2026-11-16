@@ -25955,7 +25955,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 624;
+const BUILD = 625;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD + (location.pathname.includes('/beta/') ? ' · beta' : '');
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -27761,7 +27761,8 @@ function makeUnique(){
   const cells = sxPicks.length ? sxPicks.map(p => [p.y, p.t]) : r ? sxCols(r).flatMap(t => Array.from({length:r.y1 - r.y0 + 1}, (_, k) => [r.y0 + k, t])) : [[c.y, c.x]];
   let n = 0, made = 0;
   for (const [y, t] of cells){ const v = S.song[y] ? S.song[y][t] : -1; if (v < 0) continue; n++; newBlock({x:t, y}, v); if (getCell('song', t, y) !== v) made++; }
-  sxPicks = []; selA = null; saveS(); draw();
+  /* (build 625, owner: "pressing make unique removes selection") the selection, the picks and the cursor stay: the blocks keep their places, only their numbers change */
+  saveS(); draw();
   if (!n) return toast('Nothing to make unique here.');
   toast(made === n ? `Made ${n} block${n > 1 ? 's' : ''} unique with new phrases` : `Made ${made} of ${n} unique: no free phrases left`);
 }
@@ -36196,6 +36197,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [625, '15 Nov', ['Command bar: Make unique keeps the selection (and the cursor) after it runs, so you can go on with the same blocks']],
   [624, '15 Nov', ['Arrange: selecting rows (upward or downward) and then pressing PLAY no longer shrinks the selection as the song plays (FOLLOW PATTERN moved the selection\'s end with the playhead while Arrange sat beside Phrase)']],
   [623, '15 Nov', ['A click on an instrument in the side panel’s instrument list plays it once (the current octave’s C), as well as selecting it']],
   [622, '15 Nov', ['The small command bar has a thin line along its top, so it reads as its own section']],
