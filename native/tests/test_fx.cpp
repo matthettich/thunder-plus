@@ -45,7 +45,7 @@ static void entriesOf(Json ch, std::vector<FxEntry>* out) {
 }
 static void setChain(FxHost& H, Json ch) { std::vector<FxEntry> v; entriesOf(ch, &v); if (std::getenv("FX_DBG")) for (auto& e : v) std::fprintf(stderr, "entry %s t=%d slot=%d on=%d p=%.17g %.17g %.17g %.17g %.17g\n", e.key, e.t, e.slot, e.on, e.p[0], e.p[1], e.p[2], e.p[3], e.p[4]); FxPlan* p = H.plan(v.data(), (int)v.size()); H.commit(p); delete p; }
 
-struct Res { bool ran = false, exact = false, hashOk = false, postOk = true; double db = -INFINITY, err = 0; int posts = 0; };
+struct Res { bool ran = false, exact = false, hashOk = false, postOk = true; double db = -INFINITY, err = 0; int posts = 0; long first = -1, worstAt = -1; double firstGot = 0, firstWant = 0, worstGot = 0, worstWant = 0; long nDiff = 0, n = 0; };
 // shadow: a second host with the same chain processes the same input just before the first, block by block. In the web app that is another node with its own wasm instance, so
 // the first host's output must not change (the statics of the effect sources are per host: core/dsp/host_fx_state.h, wasi_rand.cpp).
 static Res runCase(const std::string& dir, const FxGolden& G, bool shadow = false) {
@@ -85,10 +85,10 @@ static Res runCase(const std::string& dir, const FxGolden& G, bool shadow = fals
   if (pk != posted.size()) R.postOk = false;
   R.ran = true;
   double peak = 0, err = 0; bool exact = true;
-  for (int c = 0; c < 2; c++) for (int i = 0; i < n; i++) { const double a = (c ? oR : oL)[(size_t)i], r = J[(size_t)c * n + i]; peak = std::max(peak, std::fabs(r)); if ((float)a == (float)r || (std::isnan(a) && std::isnan(r))) continue; exact = false; err = std::max(err, std::fabs(a - r)); }
+  for (int c = 0; c < 2; c++) for (int i = 0; i < n; i++) { const double a = (c ? oR : oL)[(size_t)i], r = J[(size_t)c * n + i]; peak = std::max(peak, std::fabs(r)); if ((float)a == (float)r || (std::isnan(a) && std::isnan(r))) continue; exact = false; if (R.first < 0) { R.first = (long)c * n + i; R.firstGot = a; R.firstWant = r; } R.nDiff++; if (std::fabs(a - r) > err) { R.worstAt = (long)c * n + i; R.worstGot = a; R.worstWant = r; } err = std::max(err, std::fabs(a - r)); }
   std::vector<float> all(oL); all.insert(all.end(), oR.begin(), oR.end());
   if (const char* od = std::getenv("FX_OUT")) { std::ofstream o(std::string(od) + "/" + G.name + ".cpp.f32", std::ios::binary); o.write((const char*)all.data(), (std::streamsize)(all.size() * 4)); }
-  R.exact = exact; R.hashOk = fnv(all.data(), all.size()) == G.hash;
+  R.n = n; R.exact = exact; R.hashOk = fnv(all.data(), all.size()) == G.hash;
   R.db = exact ? -INFINITY : 20 * std::log10(err / std::max(peak, 1e-30)); R.err = err;
   return R;
 }
@@ -130,7 +130,7 @@ int main(int argc, char** argv) {
     char db[24]; if (R.exact) std::snprintf(db, sizeof db, "exact"); else std::snprintf(db, sizeof db, "%.1f dB", R.db);
     if (R.exact) exact++; else if (R.db > worst) { worst = R.db; worstName = G.name; }
     std::printf("%-22s %-10s posts %-3d%s%s%s%s\n", G.name, db, R.posts, R.postOk ? "" : " DIFF", R.exact != R.hashOk ? "  [committed hash disagrees with the reference run]" : "", step ? "  (sanitizer or clang build: one int16 step of Clouds' output)" : "", ok ? "" : "  FAIL");
-    if (!ok) fails++;
+    if (!ok) { fails++; std::printf("    where: %ld of %ld samples differ (n = %ld per channel); first at %ld: got %.9g want %.9g; largest at %ld: got %.9g want %.9g\n", R.nDiff, R.n * 2, R.n, R.first, R.firstGot, R.firstWant, R.worstAt, R.worstGot, R.worstWant); }
   }
   // Two hosts side by side: the effects that keep state in a static of their sources (DaisySP myrand: pshift; stmlib::Random: Beads, Clouds; rand(): the Airwindows reverb, Cloud Seed)
   // give the same figure with a second host running the same chain in the same process, on the same thread.

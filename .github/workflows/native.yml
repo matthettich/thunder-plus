@@ -38,10 +38,21 @@ jobs:
         run: npm i --no-save --no-audit --no-fund acorn@8
       - run: cmake -S native -B build -DCMAKE_BUILD_TYPE=Release
       - run: cmake --build build -j
+      - name: Toolchain
+        run: c++ --version | head -1; clang++ --version | head -1; ldd --version | head -1; node --version
       - run: ctest --test-dir build --output-on-failure -V -R 'bench_put|core_pattern'
       - run: ctest --test-dir build --output-on-failure
+      # The same tests with clang (the compiler of macOS and Android), in a third build directory. Runs even when the GCC run above failed,
+      # so one push shows which compiler a failure belongs to.
+      - name: clang
+        if: ${{ !cancelled() }}
+        run: |
+          CXX=clang++ CC=clang cmake -S native -B build-clang -DCMAKE_BUILD_TYPE=Release
+          cmake --build build-clang -j
+          ctest --test-dir build-clang --output-on-failure
       # N1 review fixes: the same tests again under AddressSanitizer + UBSan (undefined behaviour is fatal), in a second build directory.
       - name: Sanitizers (ASan + UBSan)
+        if: ${{ !cancelled() }}
         run: |
           cmake -S native -B build-san -DCMAKE_BUILD_TYPE=Release -DTHUNDER_SANITIZE=ON
           cmake --build build-san -j
