@@ -94,6 +94,7 @@ class RetrigCore {
   explicit RetrigCore(double sr);
   RetrigCore(const RetrigCore&) = delete; RetrigCore& operator=(const RetrigCore&) = delete;
   void process(float* L, float* R, int n, const RtDp& dp, const ClkTr& tr);
+  void setSpb(double v) { c_.spb = v; }   // the module (chains' Retrigger) sets the core's `spb` from the tempo each block, as the JS does (`st.c.spb = ...`)
  private:
   double sr_;
   int N_;

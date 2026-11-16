@@ -213,6 +213,25 @@ else()
   add_test(NAME fxidm COMMAND test_fxidm)   # no directory: prints FAIL and exits 1
 endif()
 
+# U19: the MODFX modules (core/src/modfx) against the real chains-worklet.js (tools/modfx-dump.mjs): the committed tests/golden/chains-modules.json hashes (the engine run) and direct cases, bit-exact. A missing fixture is a failure.
+add_executable(test_modfx test_modfx.cpp)
+target_link_libraries(test_modfx PRIVATE thunder_core)
+target_include_directories(test_modfx PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../core/src ${CMAKE_CURRENT_SOURCE_DIR})
+if(NOT MSVC)
+  target_compile_options(test_modfx PRIVATE -Wall -Wextra)
+endif()
+if(NODE_EXE)
+  add_test(NAME modfx_ref COMMAND ${NODE_EXE} ${CMAKE_CURRENT_SOURCE_DIR}/../tools/modfx-dump.mjs ${CMAKE_CURRENT_BINARY_DIR}/modfx-ref)
+  set_tests_properties(modfx_ref PROPERTIES FIXTURES_SETUP modfx_ref)
+  add_test(NAME modfx COMMAND test_modfx ${CMAKE_CURRENT_BINARY_DIR}/modfx-ref)
+  set_tests_properties(modfx PROPERTIES FIXTURES_REQUIRED modfx_ref)
+  if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    add_test(NAME modfx_golden_current COMMAND ${NODE_EXE} ${CMAKE_CURRENT_SOURCE_DIR}/../tools/modfx-dump.mjs --check)
+  endif()
+else()
+  add_test(NAME modfx COMMAND test_modfx)   # no directory: prints FAIL and exits 1
+endif()
+
 # U17: Pitch reverb, Pitch delay, Resonator, Degrade (track effects and the pads' applyFx) against the real worklet / applyFx (tools/fx-u17-dump.mjs), bit-exact. As fxidm: no platform skip, a missing fixture is a failure.
 add_executable(test_fxu17 test_fxu17.cpp)
 target_link_libraries(test_fxu17 PRIVATE thunder_core)
@@ -329,4 +348,12 @@ if(NODE_EXE)
   set_tests_properties(meter PROPERTIES FIXTURES_REQUIRED meter_ref)
 else()
   add_test(NAME meter COMMAND test_meter)
+endif()
+
+# U19: thunder_core is built with -fno-rtti, where -fsanitize=undefined drops its vptr check by itself. test_modfx and rt_harness call the virtual
+# process() / destructor of modfx::Module objects made inside the core, so their vptr check (built with RTTI) finds no typeinfo, reports "invalid vptr"
+# and its type cache frees memory inside the guarded callback. The check cannot work across an -fno-rtti library: it is off for these two only, as in the core.
+if(THUNDER_SANITIZE AND NOT MSVC)
+  target_compile_options(test_modfx PRIVATE -fno-sanitize=vptr)
+  target_compile_options(rt_harness PRIVATE -fno-sanitize=vptr)
 endif()
