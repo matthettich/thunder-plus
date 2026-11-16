@@ -1558,4 +1558,4 @@ static const ModfxCaseGolden kModfxCases[] = {
 };
 static const int kModfxCasesN = sizeof(kModfxCases) / sizeof(kModfxCases[0]);
 // (3) U21: the formula compiler BBExpr on its own (tools/modfx-dump.mjs: bbCheck): FNV-1a 64 of the canonical stream of `kBbN` formulas (ok, error position, node count, bytecode size, the error text, then run() and s8() on the grid)
-static const unsigned long long kBbHash = 0xbe4ae4493df3a456ull; static const int kBbN = 146;
+static const unsigned long long kBbHash = 0xd55de7d8cd0249b1ull; static const int kBbN = 146;
