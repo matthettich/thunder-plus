@@ -158,3 +158,10 @@ N1 step 10.
   to the review queue, and start U23 and U24 (one worker each; the fixture worker must have finished or only one of them at a time).
 - 11:35 **#187 (D6) and #188 (D5) merged**, all CI green. D3 done: report appended to REVIEW-16NOV.md on `rev/16nov`. Not started: D4.
   Waiting: #189's CI and its verifier. Then U23 and U24.
+- 11:45 #189 U22: the independent verifier PASSED it (gate is real: 294 rows equal beta's `engines.json`; three one-line mutations fail 62,
+  200 and 241 voices; scope clean; no fast-math, no tolerances; report on the old machine at `/home/claude/progress/verify-u22.md`).
+  **CI: macOS red, everything else green**: `engine` fails with "voiceMod: 7 of 1800 probes differ" because those probes compare with the
+  LOCAL Node run (macOS Node rounds `Math.sin` differently; same as U16). Sent back to the U22 worker: committed Linux golden as the gate
+  on every platform, local comparison only on x86-64 Linux; plus the verifier's two points (direct cases for the `lpRes` clamp, which no
+  voice covers; an explicit init for the lazily built sine table). **Not merged. U23 / U24 not started.** If you take over here and
+  `n3/u22` has no new push within 90 minutes, give exactly this fix to a new Sonnet worker.
