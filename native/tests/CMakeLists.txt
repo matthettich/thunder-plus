@@ -349,3 +349,11 @@ if(NODE_EXE)
 else()
   add_test(NAME meter COMMAND test_meter)
 endif()
+
+# U19: thunder_core is built with -fno-rtti, where -fsanitize=undefined drops its vptr check by itself. test_modfx and rt_harness call the virtual
+# process() / destructor of modfx::Module objects made inside the core, so their vptr check (built with RTTI) finds no typeinfo, reports "invalid vptr"
+# and its type cache frees memory inside the guarded callback. The check cannot work across an -fno-rtti library: it is off for these two only, as in the core.
+if(THUNDER_SANITIZE AND NOT MSVC)
+  target_compile_options(test_modfx PRIVATE -fno-sanitize=vptr)
+  target_compile_options(rt_harness PRIVATE -fno-sanitize=vptr)
+endif()

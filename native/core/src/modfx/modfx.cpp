@@ -29,7 +29,6 @@ std::vector<const Def*>& regAll() {
 }  // namespace
 const float* const kSin = gSin.t;
 
-uint32_t SeedCounter::next() { n_ = js_to_uint32((double)n_ * 1103515245 + 12345); return n_; }
 
 const Def* find(const char* type) { for (const Def* d : regAll()) if (!std::strcmp(d->type, type)) return d; return nullptr; }
 int count() { return (int)regAll().size(); }
