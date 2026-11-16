@@ -117,3 +117,12 @@ is in section C; read it, it changes how effects are built.
   `pump_io` is process-global, so every host must run on one audio thread (not enforced); no ThreadSanitizer run; whether the web app's `pump.wasm` is rebuilt from the pin;
   the heap overwrite the agent found and clamped (a value list longer than the plugin's parameter count wrote past `pump_values`): check whether the web app can do the same.
 - Units U16, U17, U19 to U21 do not depend on U18: branch them from `native`.
+- **Opus (lead) from 21:05:** build 632 (Sonnet; folded header order BPM / LPB, ROWS, LEFT via the `order` values; screenshots at 344 px in IDM pink/green and Minimal black,
+  `npm test` green) pushed to `beta` and merged to `main` (ee095ad). `HANDOVER.md` PICK UP HERE brought to 21:30 and section C moved into it (Haiku, lead restored two dropped notes; `beta` 814109e, not merged to `main`: docs only).
+- #181 U16 Grains / Scramble / Glitch / VSamp (slot kinds 100 to 103, Sonnet agent; 242 cases bit-exact on GCC 13 and clang 18; `js_tanh` from V8 added to fdlibm and the libm golden): merged, all CI green.
+  **Lead's decision in it:** the agent's test failed if the C++ differed from the LOCAL Node run, which would have gone red on macOS (these cores call sin / cos / log). The gate is now the committed
+  Linux hash on every platform (bit-exact; `fxidm_golden_current` proves it on Linux), and the local-run comparison must hold only on x86-64 Linux. Same exposure in U15's `fxclk` (left as is: it passed). Least sure of:
+  the lead read the host / map / test changes, not `idmcores.cpp` line by line against the JS, nor the new `js_tanh`; the fixture is heavy (about 800 MB, 26 to 34 s in CI; 145 s here).
+- #182 U18 opened (NOT merged, by design). The Sonnet agent's follow-ups: reference from a PIN-built `pump.wasm` (wasi-sdk 25); GCC 13 = clang 18 on all 80 cases (40 bit-exact, 39 within −80 dB, worst passing
+  −115.6 dB); `x_two_hosts_same` is NOT a two-host effect: the same 14 samples and −68.4 dB with one host, hosts bit-identical to each other in both JS and C++; cause is TUBE's arithmetic spread against the wasm
+  (−128.6 dB, 1 ulp from sample 2) flipping CRUSH's `round(x*q)/q` steps. Which TUBE operation differs is open. `pump` ctest against the SHIPPED wasm fails on MASTER by design, so the PR's CI is expected red there.
