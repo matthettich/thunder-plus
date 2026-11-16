@@ -58,7 +58,7 @@ bool FxBank::event(const SeqEvent& e, double now, const Mixer& m) {
 }
 int FxBank::pdcSlots(PdcSlot* out, int max) const {
   int n = 0;
-  for (int t = 0; t < kSongNT; t++) for (int i = 0; i < h_[t]->slotCount() && n < max; i++) out[n++] = PdcSlot{t, h_[t]->slotNumber(i), h_[t]->slotOn(i), false, h_[t]->slotLatency(i)};
+  for (int t = 0; t < kSongNT; t++) for (int i = 0; i < h_[t]->slotCount() && n < max; i++) out[n++] = PdcSlot{t, h_[t]->slotNumber(i), h_[t]->slotOn(i), h_[t]->slotBypass(i), h_[t]->slotLatency(i)};
   return n;
 }
 
