@@ -109,3 +109,6 @@ N1 step 10.
   `/home/claude/progress/review-*.md`, **not pushed yet**: the manager copies them into `docs/port/REVIEW-16NOV.md` on `rev/16nov`);
   D1 then D2 (notes to `n1/u18` and `rev/d2-mods`). Not started: C2 onward, D3, D4, D5. Next for the manager: when a worker reports,
   read its diff or findings, log it here, and start the next unstarted item (keep two compiling workers busy).
+- 10:55 Section A done (Haiku): `beta` 9361306 (HANDOVER PICK UP HERE to this morning; TEST-CHECKLIST builds 624 to 632, 620 to 623 were
+  already there), `native` b6180a0 (WORKPLAN sections 7 and 9). The checklist stays newest build first, as the file was; the Claude Doc
+  is not updated. Still running: U22, B1 + B3, B2 + B4 + B5, D1 / D2.
