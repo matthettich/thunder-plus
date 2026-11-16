@@ -232,8 +232,7 @@ bool FxHost::process(float* L, float* R, int n, double t0, const float* bp, int 
 // The worklet's `ck`: what its tempo-locked slots ask of the node's sleep, by whether each is ON now (its own switch, or an FXO holding it; or still fading out):
 // 0 nothing clocked is on (sleep after 1 s of silence); 1 only switched-off Flex (it keeps a ring of the input for when it comes on): sleep once the silence is
 // longer than the 13 s ring, clock running or not; 2 Flex / Step gate on: as 1, and only while the clock is stopped; 3 Retrigger on: never (it keeps running while stopped).
-int FxHost::clockedNeed(const float* bp, int bpn) const {
-  (void)bp; (void)bpn;
+int FxHost::clockedNeed() const {
   int ck = 0;
   for (int si = 0; si < nSlots_; si++) {
     const Slot& s = slots_[si]; if (!fx_is_clocked(s.t)) continue;
@@ -253,7 +252,7 @@ bool FxHost::p1(float* oL, float* oR, int n, double t0, const float* bp, int bpn
   if (!rest) for (int k = 0; k < n; k++) { const float a = oL[k], b = oR[k], v = a < 0 ? -a : a, w = b < 0 ? -b : b; if (v > ip) ip = v; if (w > ip) ip = w; if (!(v < 8 && w < 8)) bad = true; }
   const float* swv = swv_;
   // the sleep. ck: see clockedNeed; a stopped clock is bp[0] < 0 or bp[last] < 0
-  const int ck = clockedNeed(bp, bpn);
+  const int ck = clockedNeed();
   if ((rest && t0 - restAt_ >= 10) || (ip < 1e-7 && (double)idle_ >= sr_ && (ck == 0 || (ck < 3 && (double)idle_ >= sr_ * 14 && (ck == 1 || !(bp[0] >= 0 && bp[bpn - 1] >= 0)))))) { std::memset(oL, 0, sizeof(float) * (size_t)n); std::memset(oR, 0, sizeof(float) * (size_t)n); asleep_ = true; return true; }
   asleep_ = false;
   if (!rest) { std::memcpy(L, oL, sizeof(float) * (size_t)n); std::memcpy(R, oR, sizeof(float) * (size_t)n); } else { std::memset(L, 0, sizeof(float) * (size_t)(n + 1)); std::memset(R, 0, sizeof(float) * (size_t)(n + 1)); }

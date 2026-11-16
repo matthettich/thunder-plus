@@ -146,7 +146,7 @@ class FxHost {
   bool p1(float* L, float* R, int n, double t0, const float* bp, int bpn);
   void slotRun(Slot& s, int n);
   void runClk(Slot& s, bool feed, int n);        // a tempo-locked core: process() (or feed()) on Lb_ / Rb_ with tr_
-  int clockedNeed(const float* bp, int bpn) const;   // the worklet's `ck`: what the tempo-locked slots ask of the node's sleep (0..3)
+  int clockedNeed() const;   // the worklet's `ck`: what the tempo-locked slots ask of the node's sleep (0..3)
   void slotNap(Slot& s, int n);
   float pk(int n) const;
   void finalizeTel();
