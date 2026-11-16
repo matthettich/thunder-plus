@@ -25955,7 +25955,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 626;
+const BUILD = 627;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD + (location.pathname.includes('/beta/') ? ' · beta' : '');
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -30413,9 +30413,9 @@ function draw(){
   if (lpW){ if (tp.on) lpW.seen = true; else if (lpW.seen) lpRestore(); }   // LOOP PLAY ended: LOOP back as it was
   if (lsW){ if (tp.on) lsW.seen = true; else if (lsW.seen) lpSelRestore(); }   // LP.SEL ended: LOOP SEL back as it was
   $('kPlay').classList.toggle('on', tp.on);
-  /* LOOP BESIDE PLAY (609, owner): on the desktop layout the LOOP button sits right after PLAY in the top bar; on the Mobile setup it is back in the selection bar */
+  /* LOOP BESIDE PLAY (609, owner; build 627: LEFT of PLAY, "Put loop to the left of playback"): on the desktop layout the LOOP button sits right before PLAY in the top bar; on the Mobile setup it is back in the selection bar */
   { const lp = $('tLoop'), ps = $('tSong'), sb = $('tLoopSel'), m = isMobile();
-    if (lp && ps && sb){ if (!m && lp.previousElementSibling !== ps){ ps.after(lp); lp.classList.add('tsong'); } else if (m && lp.parentNode !== sb.parentNode){ sb.before(lp); lp.classList.remove('tsong'); } } }
+    if (lp && ps && sb){ if (!m && lp.nextElementSibling !== ps){ ps.before(lp); lp.classList.add('tsong'); } else if (m && lp.parentNode !== sb.parentNode){ sb.before(lp); lp.classList.remove('tsong'); } } }
   keyVis();
   syncLoop();   // before the labels below, so they show the range that is actually looping
   const tLoopTop = $('tLoopTop'); if (tLoopTop) tLoopTop.classList.toggle('on', loopSel);
@@ -36199,6 +36199,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [627, '15 Nov', ['Top bar (computer): LOOP now sits immediately to the left of PLAY']],
   [626, '15 Nov', ['Song / Arrange: LOOP play from an empty row no longer pages the view away to the next block (or to row 0): it starts only when that row is in view, otherwise it says there is nothing to loop on this row', 'The page-ahead turn no longer fires for a loop that stays put the instant LOOP is pressed']],
   [625, '15 Nov', ['Command bar: Make unique keeps the selection (and the cursor) after it runs, so you can go on with the same blocks']],
   [624, '15 Nov', ['Arrange: selecting rows (upward or downward) and then pressing PLAY no longer shrinks the selection as the song plays (FOLLOW PATTERN moved the selection\'s end with the playhead while Arrange sat beside Phrase)']],
