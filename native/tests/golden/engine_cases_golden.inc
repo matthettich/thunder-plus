@@ -162,5 +162,13 @@ static const EngineCaseGolden kEngineCaseGolden[] = {
   {"case157", "ed76400caafc6f153766f3576fc1d21f5efbe39d2415da3409b8be4c523cda7f", 68699},
   {"case158", "c3e99fc3e538fc88b86729dd529def8eb1039e318c09a6b3041966476f917db2", 53064},
   {"case159", "8da61e4765c09529f8163a49093a91c53b105b5cc15042a40ddf19a1faf6a66f", 337494},
+  {"edge_negdelay", "667f7f2654486c23df0aa9e787d99eec43d091a448841d5c23e7501f3bcaf48b", 8800},
+  {"edge_burst_frac", "74aef090be7ff52f4c568b89b3f4899cd724499569a100bdc03a73e5058a634f", 4815},
+  {"edge_burst_neg", "7f0ec276e95b535938b2728f157928426786fe91c8b7034ce2ac771522da75bc", 3084},
+  {"edge_gamp_zero", "24cf367c8cb9acf0fe811bb68f67a86c5243fcb6b656f69eaf934e34d2532755", 14512},
+  {"edge_hold_ahd", "374187c7afcdc047327fbe41a082f03394100901fa28b843e9d80003cfe188e4", 9744},
+  {"edge_no_level", "00b1c24eceaf2850a7e7756688ab9cd28bcc7b87bf8f841ea45806a596062ae2", 9701},
+  {"edge_22k", "fa709275311058dd510ebbeddf00e96f76abbcbb9e817ddb40b3e6e9bc46a484", 6688},
+  {"edge_tail_fx", "ab32b623232c11e8b91824566ad83a72e5a1872d1227755fcafc964431e3426d", 483798},
 };
-static const int kEngineCaseGoldenN = 160;
+static const int kEngineCaseGoldenN = 168;

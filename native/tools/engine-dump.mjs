@@ -111,6 +111,18 @@ function directCases(E) {
     const bpm = r() < 0.3 ? ur(60, 180) : 120, hold = adsr || r() < 0.2 ? ur(0.05, 0.5) : 0;
     cases.push({ name: 'case' + String(i).padStart(3, '0'), sr, hold, bpm, ...slim(v, E, D) });
   }
+  // edge cases, written out: a negative delay (the JS drops the writes outside the typed array), a fractional burst, zero release / amp amount, hold on an AHD voice, a layer with no level, a different sample rate
+  { const edge = (name, layers, o, sr = 48000, hold = 0) => { const v = E.mkVoice(name, layers, o); cases.push({ name, sr, hold, bpm: 120, ...slim(v, E, D) }); };
+    const sn = (over) => ({ type: 'sine', seed: 123456789, atk: 1, dec: 200, ...over });
+    edge('edge_negdelay', [sn({ delay: -20 }), { type: 'white', seed: 77, delay: -3, atk: 1, dec: 100 }], { len: 0.5 });
+    edge('edge_burst_frac', [{ type: 'white', seed: 5, burst: 2.7, spacing: 9, atk: 0.3, dec: 80, hpCut: 900 }], {});
+    edge('edge_burst_neg', [{ type: 'pink', seed: 6, burst: -2, spacing: 9, atk: 0.3, dec: 80 }], {});
+    edge('edge_gamp_zero', [sn({ mode: 'ADSR' })], { gAmpOn: true, gMode: 'AHD', gRel: 0, gAmpAmt: 0, gate: 150, len: 0.4 });
+    edge('edge_hold_ahd', [sn({ type: 'saw', a: 0.4, b: 0.25 }), sn({ type: 'square', a: 0.7, tune: 7, seed: 987 })], { gate: 120, len: 3 }, 48000, 0.3);
+    edge('edge_no_level', [sn({ level: 0 }), sn({ type: 'pulse', a: 0.6, level: 0.5, seed: 4242 })], {});
+    edge('edge_22k', [sn({ type: 'metal', a: 0.2, b: 0.9, hpCut: 6000 }), { type: 'dust', a: 0.8, b: 0.3, seed: 9, atk: 1, dec: 300 }, { type: 'lfsr', a: 0.5, b: 0.7, seed: 10, dec: 100 }], { drive: 0.5 }, 22050);
+    edge('edge_tail_fx', [sn({})], { tail: 3, fx: [] }, 48000);
+    cases[cases.length - 1] = { ...cases[cases.length - 1], fx: [mkFx('pdelay'), mkFx('preverb')] }; }
   // voiceMod probes: the modulation matrix evaluated at many times, against the real voiceMod (NaN is written null)
   for (let i = 0; i < 60; i++) {
     const o = { gate: ur(50, 500) }; for (let k = 1; k <= 3; k++) Object.assign(o, { ['lfo' + k + 'Rate']: ur(0, 20), ['lfo' + k + 'Shape']: ui(0, 6), ['lfo' + k + 'Depth']: r(), ['lfo' + k + 'Sync']: r() < 0.3 ? ui(0, 9) : 0, ['r' + k + 'dst']: ui(0, 5), ['r' + k + 'amt']: ur(-12, 12) });

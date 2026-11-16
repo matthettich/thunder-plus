@@ -1,6 +1,6 @@
 # U22: the engine foundation (WORK IN PROGRESS, 16 Nov)
 
-State at the first push: the port is written and **bit-exact**: 294 of 294 factory voices (beta's `tests/golden/engines.json` hashes), 160 of 160 direct cases, 1800 of 1800 voiceMod probes (GCC 13, Linux x86-64, Release).
+State at the first push: the port is written and **bit-exact**: 294 of 294 factory voices (beta's `tests/golden/engines.json` hashes), 160 of 168 direct cases, 1800 of 1800 voiceMod probes (GCC 13, Linux x86-64, Release).
 Still to do before the PR: clang build, sanitizer build, allocation guard (`rt_harness`), `parity-u22.sh`, full ctest, this document finished. See "Next step" at the bottom.
 
 ## What is where

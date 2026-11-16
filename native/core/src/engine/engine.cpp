@@ -271,8 +271,8 @@ void renderLayer(const EngLayer& L, const EngVoice& V, double bpm, double sr, fl
       double x = osc.s(inc);
       if (hpOn) { const double v3 = x - h2, v1 = ha1 * h1 + ha2 * v3, v2 = h2 + ha2 * h1 + ha3 * v3; h1 = 2 * v1 - h1; h2 = 2 * v2 - h2; x = x - hk * v1 - v2; }
       if (lpOn) { const double v3 = x - l2, v1 = la1 * l1 + la2 * v3, v2 = l2 + la2 * l1 + la3 * v3; l1 = 2 * v1 - l1; l2 = 2 * v2 - l2; x = v2; }
-      const size_t idx = (size_t)(o + j);
-      out[idx] = f32((double)out[idx] + x * (e0 + de * j) * gain * lvl);
+      const double pos = o + j;   // out[pos] += ...: a position outside the typed array (a negative delay) is read as undefined and the write is dropped
+      if (pos >= 0 && pos < (double)N) { const size_t idx = (size_t)pos; out[idx] = f32((double)out[idx] + x * (e0 + de * j) * gain * lvl); }
     }
   }
 }
