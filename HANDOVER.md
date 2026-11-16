@@ -812,6 +812,9 @@ The owner's top priority to add is the MOD screen. Work down the list; ask befor
 
 Start a session by asking for results. Fix on `beta`. (10 Nov, 15:10: the web beta is build 560; the build numbers in the rest of this paragraph are older.) Web beta: https://matthettich.github.io/thunder-plus/beta/ (build 547 as of 10 Nov morning, 548 once its PR merges; the night of 9–10 Nov shipped 544–547, see the four "10 Nov" entries below. Decisions the lead made that night for the owner to confirm or reverse: on a phone the saved Sequencer default plays on the Page unless Audio thread is picked on that device; on a phone the safety limiter is its stand-in until another worklet loads; the resync only runs with a worklet loaded and its margins are untested on a device). Desktop: v1.3.4-beta.2 (build 541, no feed view or scopes); further desktop betas on hold until the owner asks.
 
+**Build 632** (the folded phone's tempo line order)
+- [ ] **Phone, folded (Galaxy Z Fold 6, about 344 px wide), IDM skin and one other:** the Phrase screen. Pass: the line under the tabs reads BPM, LPB, then ROWS (a number only), then LEFT with the time, in that order; nothing clips or wraps. Unfolded phone and computer unchanged.
+
 **Build 631** (the folded phone's top (Mobile setup, under 600 px))
 - [ ] **Phone, folded (about 344 px wide), IDM skin and one other:** the Phrase screen. Pass: the top bar holds Tracker / Synth, File, Settings, Play and the CPU meter with room to spare; the line under the tabs reads ROWS (a number only, no − / +), BPM, LPB, then LEFT with the time; nothing clips or wraps. Tap the ROWS number: a box to type a row count opens (1 to 256 as before).
 - [ ] **Phone, folded:** File menu. Pass: a Record section with REC: OFF · tap to turn on; tapping it arms REC (the header has no REC button) and the entry then reads ON · tap to turn off; it records exactly as the old button did.
@@ -1509,6 +1512,10 @@ Tests added: `gen-instrument` (source pins).
 Build 630, on `beta`. The owner asked for a mod section in the FX bar: collapsible, small, showing that there are modulations, the waveform and the destinations. Added `#dkMod` (DK_SECS / DK_FOLD, `deck.mod` saved with the panel, default FOLDED so no existing layout changes) between FX and PERFORM. `deckMod()` rebuilds only when open and when the focused track's LFOs / skin / ANIMATIONS change; each row is a 48×18 canvas wave (`modMix`, the MOD screen's maths) with a dot moved by `dkModTick` from the frame loop (only open, playing, visible, ANIMATIONS on, LOW POWER DISPLAY off), the shape and rate, and the destination (`tgtLabel`). Click: MOD screen on that track. Skin colours through CSS variables (checked IDM and 909 in headless Chrome). Hidden on the phone's swipe layout (`max-width:700px` + coarse pointer): the bottom panel there is one section at a time and the owner's folded-phone width is not a place to add a page. Display code only; nothing posts to the engine.
 
 Tests added: `deck-mod-section` (source pins).
+
+## 15 Nov (the folded phone's tempo line order; build 632)
+
+Build 632, on `beta`. The owner wanted BPM / LPB, ROWS, LEFT (LEFT = the time-left box); 631 had ROWS first. CSS only: in the `max-width:599px` `body.mob` rule `#tClk` is `order:-2`, `#tRowsBar` `order:-1`, the time left stays at 0. Test `folded-header` updated.
 
 ## 15 Nov (the folded phone's header; build 631)
 

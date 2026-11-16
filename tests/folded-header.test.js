@@ -4,8 +4,8 @@
 const test = require('node:test'), assert = require('node:assert/strict');
 const src = require('./helpers').read('index.html');
 test('CSS: order ROWS, tempo, time left; the − / + and REC buttons hidden; only below 600 px on the Mobile setup', () => {
-  const m = src.match(/@media \(max-width:599px\)\{ body\.mob #tRowsBar\{order:-2\}[^\n]*\}/); assert.ok(m);
-  for (const w of ['body.mob #tClk{order:-1', 'body.mob #tRowsDn, body.mob #tRowsUp, body.mob #tRec{display:none}']) assert.ok(m[0].includes(w), w);
+  const m = src.match(/@media \(max-width:599px\)\{ body\.mob #tClk\{order:-2; border-right:0\} body\.mob #tRowsBar\{order:-1\}[^\n]*\}/); assert.ok(m);
+  for (const w of ['body.mob #tRowsDn, body.mob #tRowsUp, body.mob #tRec{display:none}']) assert.ok(m[0].includes(w), w);
   assert.match(src, /<span class="trows" id="tRowsBar"/); assert.match(src, /\$\('tRowsV'\)\.addEventListener\('click', async \(\) => \{ const id = rowsId\(\), n = await askText/, 'tap the number to type it: already there');
 });
 test('applyPlatform: LEFT leaves the top bar only when folded (Mobile under 600 px)', () => {
