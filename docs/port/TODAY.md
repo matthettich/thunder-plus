@@ -142,3 +142,11 @@ N1 step 10.
   **Do not start a second worker on those branches** unless a branch has had no push for 90 minutes (`git ls-remote` + the notes file).
   Your jobs meanwhile: read the diff of each PR as it opens, merge when CI is green (not #182), log it, and start D4. C2 (U23, U24)
   only after U22 is merged. The TSan report (D3) is written to the old machine's disk: if it is not in REVIEW-16NOV.md by 17:00, run D3 again.
+- 11:25 (clock corrected: the entries above are about 20 minutes fast) **U22 is PR #189, open, CI running** (Sonnet): 294 of 294 factory
+  voices of the covered families give beta's `engines.json` hashes; 168 direct cases and 1800 `voiceMod` probes bit-exact; GCC, clang and
+  the sanitizer build pass locally. Worker's decisions: pad effects other than Degrade / Resonator / Pitch delay / Pitch reverb pass the
+  sound through (as the golden's Node does, which has no wasm loaded: 18 of the 294 voices prove only the dry path); layer types outside
+  the unit return `kEngUnsupported`; click left to U23; voices with JS pad effects allocate (U17's cores return `std::vector`).
+  **A second Sonnet worker is verifying it independently** (is the gate real, three mutation tests, scope): report to
+  `/home/claude/progress/verify-u22.md`. Manager's next step: when CI is all green AND the verifier passes it, merge #189, add its line
+  to the review queue, and start U23 and U24 (one worker each; the fixture worker must have finished or only one of them at a time).
