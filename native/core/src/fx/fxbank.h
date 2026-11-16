@@ -40,6 +40,7 @@ class FxBank {
   struct Ov { double v[12]; unsigned mask; };
   void flush(int track, double now);
   double sr_, bpm_ = 120, restartN_ = 0;
+  const Mixer* mix_ = nullptr;   // attach(): the hooks read the beat clock each effects node hears (Mixer::beat) from it
   std::unique_ptr<FxHost> h_[kSongNT + 1];
   static constexpr int kPend = 256;
   Pend pend_[kPend]; int nPend_ = 0; uint32_t pendDropped_ = 0;

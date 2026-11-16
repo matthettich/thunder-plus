@@ -18,15 +18,15 @@ import { ROOT, SR, load, effects } from './fx-src.mjs';
 
 const rd = f => fs.readFileSync(path.join(ROOT, f), 'utf8').replace(/\r\n/g, '\n');
 const F = load(), E = effects();
-const lcg = seed => { let s = seed >>> 0; return () => { s = (Math.imul(s, 1664525) + 1013904223) >>> 0; return s / 4294967296; }; };
+export const lcg = seed => { let s = seed >>> 0; return () => { s = (Math.imul(s, 1664525) + 1013904223) >>> 0; return s / 4294967296; }; };
 
 // ---- the core's Auto (timelines of the k-rate params) ------------------------------------------------------------------------------------
 const seqSrc = rd('core/seq-core.js'), a0 = seqSrc.indexOf('\nclass Auto {');
 const autoCtx = vm.createContext({ Math }); vm.runInContext(seqSrc.slice(a0, seqSrc.indexOf('\n}\n', a0) + 3) + '\nglobalThis.Auto = Auto;', autoCtx);
-const Auto = autoCtx.Auto;
+export const Auto = autoCtx.Auto;
 
 // ---- the worklet ------------------------------------------------------------------------------------------------------------------------
-function mkNode(chain) {
+export function mkNode(chain) {
   const reg = {}, clk = {}, posts = [];
   const fn = new Function('AudioWorkletProcessor', 'registerProcessor', 'sampleRate', '__clk', 'let currentTime = 0; __clk.set = v => { currentTime = v; };\n' + F.workletSrc);
   fn(class { constructor() { this.port = { postMessage: m => posts.push(m), onmessage: null }; } }, (n, c) => { reg[n] = c; }, SR, clk);
@@ -36,7 +36,7 @@ function mkNode(chain) {
 
 // ---- signals (float32) --------------------------------------------------------------------------------------------------------------------
 const NF = 32768;
-const SIG = {
+export const SIG = {
   noiseTail(n) { const r = lcg(12345), L = new Float32Array(n), R = new Float32Array(n), k = 12000; for (let i = 0; i < k; i++) { L[i] = Math.fround((r() * 2 - 1) * 0.3); R[i] = Math.fround((r() * 2 - 1) * 0.3); } return [L, R]; },
   drumsweep(n) { const r = lcg(777), L = new Float32Array(n), R = new Float32Array(n), beat = 6000; let ph = 0;
     for (let i = 0; i < n; i++) { let l = 0, rr = 0;
@@ -54,7 +54,7 @@ function slotObj(key, alt, on = true, seed = 1) {
   const o = { type: key, on }; if (alt) { const r = lcg(seed * 7919 + byKey[key].id); for (const p of byKey[key].ps) o[p.k] = p.min + Math.floor(r() * (p.max - p.min + 1)); }
   return o;
 }
-function chainOf(objs, bpm = 120) { const A = new Array(8).fill(null); objs.forEach((o, i) => { A[i] = o && F.normTfx(o); }); return F.tfxChain(A, SR, bpm); }
+export function chainOf(objs, bpm = 120) { const A = new Array(8).fill(null); objs.forEach((o, i) => { A[i] = o && F.normTfx(o); }); return F.tfxChain(A, SR, bpm); }
 
 // ---- cases ------------------------------------------------------------------------------------------------------------------------------
 // {name, sig, frames, sizes, chain, ops: [[param, t, v]] (param 'sw0'..'sw7','flx','gat','rtg','reset'), msgs: [{b, msg}], q: [[at, msg]]}
@@ -91,7 +91,7 @@ CASES.push({ name: 'h_tel', sig: 'drumsweep', chain: chainOf([slotObj('comp', tr
 CASES.push({ name: 'h_hot', sig: 'junk', chain: chainOf([slotObj('density', true, true, 1), slotObj('comp', false), slotObj('crush', true, true, 2)]) });
 
 // ---- the run ----------------------------------------------------------------------------------------------------------------------------
-const f32b = a => Buffer.from(a.buffer, a.byteOffset, a.byteLength);
+export const f32b = a => Buffer.from(a.buffer, a.byteOffset, a.byteLength);
 function runCase(c) {
   const n = c.frames || NF, [iL, iR] = SIG[c.sig](n), { node, clk, posts } = mkNode(c.chain);
   const lanes = {}; for (const k of ['sw0', 'sw1', 'sw2', 'sw3', 'sw4', 'sw5', 'sw6', 'sw7', 'flx', 'gat', 'rtg']) lanes[k] = new Auto(-1);

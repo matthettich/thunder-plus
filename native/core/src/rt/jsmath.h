@@ -1,7 +1,7 @@
 // Math functions that give the same bits as the web copy on every platform (U05, U07).
 // V8 computes Math.exp and Math.pow with its port of fdlibm, not the C library's, and C libraries differ from each other in the
 // last bit (glibc, Apple, MSVC, bionic). The sequencer's goldens are compared exactly, so the core must not depend on the
-// platform's exp or pow: js_exp and js_pow are fdlibm's algorithms. (sin joins them when the unit that needs it exactly lands.)
+// platform's exp or pow: js_exp and js_pow are fdlibm's algorithms. (cos, sin, tan and log joined them with U15: fdlibm.cpp.)
 // The core is built with floating-point contraction off (no fused multiply-add): see core/CMakeLists.txt.
 #ifndef THUNDER_RT_JSMATH_H
 #define THUNDER_RT_JSMATH_H
@@ -11,6 +11,12 @@
 namespace thunder {
 double js_exp(double x);
 double js_pow(double x, double y);   // Math.pow: fdlibm's e_pow (V8's ieee754::pow), bit for bit (U07; proven in ctest `runtime`)
+// Math.cos / sin / tan / log: fdlibm's, as V8 12.4 (Node 22) computes them, bit for bit (U15; core/src/rt/fdlibm.cpp, proven in ctest `libm`).
+// (Newer V8 builds moved some of these to the LLVM libc; the reference of this port is Node 22, see the note in fdlibm.cpp.)
+double js_cos(double x);
+double js_sin(double x);
+double js_tan(double x);
+double js_log(double x);
 
 // Math.round: the nearest integer, ties towards +Infinity; -0 for -0.5 <= x < 0 (and for -0); NaN and the infinities as they are.
 // (Not floor(x + 0.5): that is wrong for 0.49999999999999994 and for odd integers at and above 2^52.)

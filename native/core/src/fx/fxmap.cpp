@@ -15,17 +15,22 @@ static inline double u8(double v) { return v == 128 ? 0.5 : clampd(v, 0, 255) / 
 static inline double jsign(double x) { return x > 0 ? 1.0 : x < 0 ? -1.0 : x; }
 static inline double jmin(double a, double b) { return (a != a || b != b) ? std::nan("") : (a < b ? a : b); }
 
+// The table holds ids 0..33 (the wasm effects) and 93..95 (the tempo-locked JS cores): the id is not the index.
+static const FxDef* defOf(int id) { for (int i = 0; i < kFxDefN; i++) if (kFxDefs[i].id == id) return &kFxDefs[i]; return nullptr; }
 int fx_type_of(std::string_view key) { for (int i = 0; i < kFxDefN; i++) if (key == kFxDefs[i].key) return kFxDefs[i].id; return -1; }
-const char* fx_key_of(int id) { return id >= 0 && id < kFxDefN ? kFxDefs[id].key : nullptr; }
-int fx_param_count(int id) { return id >= 0 && id < kFxDefN ? kFxDefs[id].n : 0; }
-const char* kFxKeyOf(int id, int i) { return kFxDefs[id].ps[i].k; }
-int fx_param_min(int id, int i) { return kFxDefs[id].ps[i].min; }
-int fx_param_max(int id, int i) { return kFxDefs[id].ps[i].max; }
-int fx_param_default(int id, int i) { return kFxDefs[id].ps[i].d; }
+const char* fx_key_of(int id) { const FxDef* d = defOf(id); return d ? d->key : nullptr; }
+int fx_param_count(int id) { const FxDef* d = defOf(id); return d ? d->n : 0; }
+const char* kFxKeyOf(int id, int i) { return defOf(id)->ps[i].k; }
+int fx_param_min(int id, int i) { return defOf(id)->ps[i].min; }
+int fx_param_max(int id, int i) { return defOf(id)->ps[i].max; }
+int fx_param_default(int id, int i) { return defOf(id)->ps[i].d; }
 
 // int(v, d): Number.isFinite(+v) && v !== null && v !== '' ? Math.round(+v) : d (a number, a boolean, a numeric string), clamp(.., min, max)
 double fx_norm_value(Json v, int id, int i) {
-  const FxParamDef& P = kFxDefs[id].ps[i]; double x = P.d;
+  // WAITS FOR ITS COMMAND (normTfx): a Flex or Step gate saved before STARTS existed (o.wait == null: absent or null) plays its PATTERN from PLAY (AT PLAY, 0);
+  // a new slot carries the control's default, ON FLX / ON GAT (1).
+  if (((id == 95 && i == FXP_flex_wait) || (id == 94 && i == FXP_sgate_wait)) && (v.missing() || v.isNull())) return 0;
+  const FxParamDef& P = defOf(id)->ps[i]; double x = P.d;
   if (v.isNum()) { const double n = v.asNum(); if (std::isfinite(n)) x = js_round(n); }
   else if (v.isBool()) x = v.asBool() ? 1 : 0;
   else if (v.isStr()) { std::string_view s = v.asStr(); while (!s.empty() && (s.front() == ' ' || s.front() == '\t' || s.front() == '\n')) s.remove_prefix(1); while (!s.empty() && (s.back() == ' ' || s.back() == '\t' || s.back() == '\n')) s.remove_suffix(1);
@@ -74,6 +79,10 @@ void fx_map(int id, const double* f, double sr, double bpm, double restartN, dou
     case 31: p[0] = (0 + 1 * u8(f[FXP_dub_amt])); p[1] = (0 + 1 * u8(f[FXP_dub_mix])); break;
     case 32: p[0] = ((f[FXP_cab_model] + 0.5) / 6); p[1] = (0 + 1 * u8(f[FXP_cab_int])); p[2] = (0 + 1 * u8(f[FXP_cab_room])); p[3] = (0 + 1 * u8(f[FXP_cab_size])); p[4] = (0 + 1 * u8(f[FXP_cab_axis])); p[5] = (0 + 1 * u8(f[FXP_cab_out])); break;
     case 33: p[0] = (0 + 1 * u8(f[FXP_tube_input])); p[1] = (0 + 1 * u8(f[FXP_tube_tube])); break;
+    // U15: the tempo-locked JS effects (TFX[...].map of index.html): Flex, Step gate, Retrigger
+    case 95: p[0] = f[FXP_flex_pat]; p[1] = u8(f[FXP_flex_mix]); p[2] = 0.5 + u8(f[FXP_flex_xf]) * 19.5; p[3] = (double)js_to_int32(f[FXP_flex_wait]); break;
+    case 94: p[0] = f[FXP_sgate_pat]; p[1] = f[FXP_sgate_m1]; p[2] = f[FXP_sgate_m2]; p[3] = f[FXP_sgate_div]; p[4] = std::max(0.03, u8(f[FXP_sgate_len])); p[5] = u8(f[FXP_sgate_depth]); p[6] = 0.3 + u8(f[FXP_sgate_smooth]) * 19.7; p[7] = (double)js_to_int32(f[FXP_sgate_wait]); break;
+    case 93: p[0] = f[FXP_retrig_mode]; p[1] = f[FXP_retrig_div]; p[2] = u8(f[FXP_retrig_decay]); p[3] = f[FXP_retrig_pitch] - 24; p[4] = u8(f[FXP_retrig_gate]); p[5] = u8(f[FXP_retrig_mix]); break;
     default: break;
   }
 }

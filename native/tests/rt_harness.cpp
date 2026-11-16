@@ -404,6 +404,36 @@ static int run_fx() {
 #endif
 }
 
+// U15: the tempo-locked kinds (Flex, Step gate, Retrigger) under the guard: the cores' rings are made in plan(), process() takes the beat clock and the FLX / GAT / RTG lanes,
+// odd block sizes (chunked), a clock that stops and jumps, a chain swap that retires the Flex (deleted outside the guard with its plan).
+static int run_fxclk() {
+  using namespace thunder;
+  FxHost H(48000.0); FxEntry e[3]; const int types[3] = {95, 94, 93};
+  for (int i = 0; i < 3; i++) { const int id = types[i]; e[i].t = id; e[i].slot = i; e[i].on = true; std::snprintf(e[i].key, kFxKey, "%d:%s", i, fx_key_of(id)); e[i].nvals = fx_param_count(id);
+    for (int k = 0; k < e[i].nvals; k++) e[i].vals[k] = fx_param_default(id, k);
+    if (id != 93) e[i].vals[id == 95 ? 3 : 7] = 0;   // STARTS AT PLAY: the slot's own PATTERN from the start
+    e[i].vals[0] = id == 95 ? 0x2a : id == 94 ? 4 : 1;   // Flex pattern 2A, Step gate pattern 4, Retrigger mode ALWAYS
+    fx_map(id, e[i].vals, 48000.0, 120.0, 0.0, e[i].p); }
+  FxPlan* p1 = H.plan(e, 3); H.commit(p1); delete p1;
+  FxPlan* p2 = H.plan(e + 2, 1);   // Retrigger only: the Flex and the Step gate are retired
+  std::vector<float> L(4096), R(4096), bp(4096); uint32_t sd = 7; auto rnd = [&]() { sd = sd * 1664525u + 1013904223u; return (float)(sd >> 8) / 16777216.f - 0.5f; };
+  double t = 0, beat = 0; int nb = 0;
+  { rt_guard g;
+    for (int b = 0; b < 3000; b++) {
+      const int n = (b % 5 == 0) ? 1 + (b * 37) % 1000 : 128; bool run = !(b >= 1000 && b < 1100);
+      for (int i = 0; i < n; i++) { L[(size_t)i] = b < 2500 ? rnd() * 0.5f : 0.f; R[(size_t)i] = b < 2500 ? rnd() * 0.5f : 0.f; bp[(size_t)i] = run ? (float)std::fmod(beat, 16.0) : -1.f; if (run) beat += 2.0 / 48000 * 4; }
+      if (b == 1500) beat = 3.2;   // a jump (a song loop)
+      if (b == 100) H.lane(8, 0x12, t); if (b == 200) H.lane(9, 7, t); if (b == 300) H.lane(10, 3, t); if (b == 400) H.lane(10, -1, t); if (b == 600) H.lane(0, 0, t); if (b == 700) H.lane(0, -1, t);
+      if (b == 2000) H.commit(p2);
+      H.process(L.data(), R.data(), n, t, bp.data(), b % 11 == 0 ? 1 : n); t += n / 48000.0; nb++; }
+    H.process(L.data(), R.data(), 100, t, nullptr, 0);   // the clock param absent
+  }
+  delete p2;
+  if (H.laneDropped() || H.queueDropped()) { std::printf("rt_fxclk FAIL: dropped lanes %u queue %u\n", H.laneDropped(), H.queueDropped()); return 1; }
+  if (H.slotCount() != 1 || H.slotType(0) != 93) { std::printf("rt_fxclk FAIL: the chain swap left %d slots\n", H.slotCount()); return 1; }
+  std::printf("rt_fxclk ok: %d blocks, Flex / Step gate / Retrigger under the allocation guard\n", nb); return 0;
+}
+
 int main(int argc, char** argv) {
   if (argc > 1 && std::strcmp(argv[1], "--selftest") == 0) return selftest();
   if (int r = run_logger()) return r;
@@ -414,5 +444,6 @@ int main(int argc, char** argv) {
   if (int r = run_master()) return r;
   if (int r = run_chain()) return r;
   if (int r = run_fx()) return r;
+  if (int r = run_fxclk()) return r;
   return run_song();
 }

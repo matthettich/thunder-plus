@@ -13,6 +13,7 @@
 #include "tfx.h"
 #else
 struct Fx { float p[12]; float sr = 48000.f; virtual ~Fx() {} virtual void process(float*, float*, int) = 0; };
+namespace { struct ModuleState { ModuleState(uint64_t*, uint32_t*, uint32_t*) {} }; }   // (no effects library: no statics to swap; the tempo-locked cores need none)
 #endif
 
 #ifdef THUNDER_HAVE_TFX
@@ -59,6 +60,27 @@ static Fx* make_fx(int type, float sr) {
 static Fx* make_fx(int, float) { return nullptr; }
 #endif
 
+// U15: a tempo-locked core in a slot. It is an Fx so that the plan, commit and retirement of U14 own, keep and delete it as they do the wasm effects (reuse by key,
+// retired by commit(), deleted on the control thread); process() is never called, the host runs the core itself (runClk). dp: the slot's mapped parameters,
+// kept as doubles (the worklet's `s.dp`, an object of Numbers; the float32 `p` of a wasm effect is not used).
+template <class C, class Dp> struct ClkFx : Fx {
+  C core; Dp dp;
+  explicit ClkFx(double sr) : core(sr) {}
+  void process(float*, float*, int) override {}
+};
+using RetrigFx = ClkFx<RetrigCore, RtDp>;
+using SgateFx = ClkFx<StepGateCore, SgDp>;
+using FlexFx = ClkFx<FlexCore, FlexDp>;
+static Fx* make_clk(int type, double sr) {
+  switch (type) { case 93: return new RetrigFx(sr); case 94: return new SgateFx(sr); case 95: return new FlexFx(sr); default: return nullptr; }
+}
+// c.p -> s.dp: the worklet's set(): {pat, mix, xf, wait} (Flex), {pat, m1, m2, div, len, depth, smooth, wait} (Step gate), {mode, div, decay, pitch, gate, mix} (Retrigger)
+static void setClkDp(Fx* fx, int t, const double* q) {
+  if (t == 95) static_cast<FlexFx*>(fx)->dp = FlexDp{q[0], q[1], q[2], q[3]};
+  else if (t == 94) static_cast<SgateFx*>(fx)->dp = SgDp{q[0], q[1], q[2], q[3], q[4], q[5], q[6], q[7]};
+  else static_cast<RetrigFx*>(fx)->dp = RtDp{q[0], q[1], q[2], q[3], q[4], q[5]};
+}
+
 static void copyKey(char* d, const char* s) { std::snprintf(d, kFxKey, "%s", s); }
 static bool keyHas(const char* k, const char* needle) { return std::strstr(k, needle) != nullptr; }
 
@@ -79,21 +101,17 @@ uint32_t FxHost::laneDropped() const { uint32_t n = 0; for (int i = 0; i < 11; i
 
 // ---- control thread --------------------------------------------------------------------------------------------------------------------
 FxPlan* FxHost::plan(const FxEntry* e, int n) {
-#ifndef THUNDER_HAVE_TFX
-  (void)e; (void)n; return nullptr;
-#else
   FxPlan* pl = new FxPlan; bool used[kFxSlots] = {false}; Fx* nf[kFxSlots] = {nullptr};
   for (int i = 0; i < n && pl->n_ < kFxSlots; i++) {
-    if (e[i].t < 0 || e[i].t > 33) continue;   // not a wasm effect: left out (the sound passes)
+    if (e[i].t < 0 || (e[i].t > 33 && !fx_is_clocked(e[i].t))) continue;   // not an effect hosted here: left out (the sound passes)
     int j = -1; for (int k = 0; k < nCtl_; k++) if (!used[k] && std::strcmp(ctl_[k].key, e[i].key) == 0) { j = k; break; }
     const int w = pl->n_;
     if (j >= 0) { used[j] = true; pl->reuse_[w] = true; nf[w] = ctlFx_[j]; }
-    else { Fx* f; { ModuleState ms(&rand_, &stmRng_, &daisySeed_); f = make_fx(e[i].t, (float)sr_); } if (!f) continue; pl->fx_[w] = f; nf[w] = f; }
+    else { Fx* f; if (fx_is_clocked(e[i].t)) f = make_clk(e[i].t, sr_); else { ModuleState ms(&rand_, &stmRng_, &daisySeed_); f = make_fx(e[i].t, (float)sr_); } if (!f) continue; pl->fx_[w] = f; nf[w] = f; }
     pl->e_[w] = e[i]; pl->n_++;
   }
   nCtl_ = pl->n_; for (int i = 0; i < nCtl_; i++) { ctl_[i] = pl->e_[i]; ctlFx_[i] = nf[i]; }
   return pl;
-#endif
 }
 
 bool FxHost::entryFromSlot(Json o, int slot, double sr, double bpm, double restartN, FxEntry* out) {
@@ -124,7 +142,8 @@ void FxHost::applyEntry(Slot& s, const FxEntry& c) {
   s.nn = keyHas(c.key, "vinyl") || keyHas(c.key, "pcrush");
   double pp[12]; for (int i = 0; i < 12; i++) pp[i] = c.p[i];
   if (s.wi >= 0) { rvMix(c.p[s.wi], &s.rvDry, &s.rvWet); pp[s.wi] = 1; }
-  if (s.fx) for (int i = 0; i < 12; i++) s.fx->p[i] = (float)pp[i];
+  if (s.fx && fx_is_clocked(c.t)) setClkDp(s.fx, c.t, pp);
+  else if (s.fx) for (int i = 0; i < 12; i++) s.fx->p[i] = (float)pp[i];
 }
 void FxHost::commit(FxPlan* pl) {
   if (!pl || pl->committed_) return;
@@ -163,8 +182,18 @@ float FxHost::pk(int n) const {   // pk(n): the peak of this.L / this.R over n f
   return p < 8 ? p : 8;
 }
 
+// The worklet's `s.js.process(L, R, n, s.dp, tr)` / `s.js.feed(L, R, n, tr)`: the core works on the block in place, nothing is guarded after it (no clip, no
+// zero: the guards belong to tfx_process, the wasm effects' entry).
+void FxHost::runClk(Slot& s, bool feed, int n) {
+  switch (s.t) {
+    case 95: { FlexFx* f = static_cast<FlexFx*>(s.fx); if (feed) f->core.feed(Lb_, Rb_, n, tr_); else f->core.process(Lb_, Rb_, n, f->dp, tr_); break; }
+    case 94: { SgateFx* f = static_cast<SgateFx*>(s.fx); f->core.process(Lb_, Rb_, n, f->dp, tr_); break; }
+    default: { RetrigFx* f = static_cast<RetrigFx*>(s.fx); f->core.process(Lb_, Rb_, n, f->dp, tr_); break; }
+  }
+}
 void FxHost::slotRun(Slot& s, int n) {
   if (!s.fx) return;
+  if (fx_is_clocked(s.t)) { runClk(s, false, n); return; }
   std::memcpy(cL_, Lb_, sizeof(float) * (size_t)n); std::memcpy(cR_, Rb_, sizeof(float) * (size_t)n);
   s.fx->process(Lb_, Rb_, n);
   for (int i = 0; i < n; i++) {   // tfx_process: keep a broken effect from poisoning the whole track
@@ -185,7 +214,7 @@ void FxHost::slotNap(Slot& s, int n) {
     if (op < 1e-9) { s.zq = s.zq + n; if (s.zq >= sr_ * 30) s.zz = true; } else s.zq = 0; }
 }
 
-bool FxHost::process(float* L, float* R, int n, double t0) {
+bool FxHost::process(float* L, float* R, int n, double t0, const float* bp, int bpn) {
   if (dead_flag_) return false;
   if (n <= 0) return true;
   if (n > kFxMaxCall) { std::memset(L, 0, sizeof(float) * (size_t)n); std::memset(R, 0, sizeof(float) * (size_t)n); failedBlock_++; return true; }   // tcChunks: a block longer than 4096 fails soft
@@ -193,37 +222,57 @@ bool FxHost::process(float* L, float* R, int n, double t0) {
   ModuleState ms(&rand_, &stmRng_, &daisySeed_);
 #endif
   for (int k = 0; k < 11; k++) { lanes_[k]->prune(t0); swv_[k] = (float)lanes_[k]->at(t0); }   // the k-rate params, read once: the value at the block's start
-  if (n <= kFxBlock) return p1(L, R, n, t0);
-  for (int a = 0; a < n; a += kFxBlock) if (!p1(L + a, R + a, std::min(kFxBlock, n - a), t0)) return false;
+  static const float kBpDefault = 0;   // the `bp` AudioParam with nothing connected: its default value, constant over the block
+  if (!bp || bpn < 1) { bp = &kBpDefault; bpn = 1; }
+  if (n <= kFxBlock) return p1(L, R, n, t0, bp, bpn);
+  for (int a = 0; a < n; a += kFxBlock) if (!p1(L + a, R + a, std::min(kFxBlock, n - a), t0, bpn > 1 ? bp + a : bp, bpn > 1 ? std::min(kFxBlock, n - a) : 1)) return false;   // (tcChunks: an a-rate param is cut with the block, a constant one is handed whole)
   return true;
 }
 
-bool FxHost::p1(float* oL, float* oR, int n, double t0) {
+// The worklet's `ck`: what its tempo-locked slots ask of the node's sleep, by whether each is ON now (its own switch, or an FXO holding it; or still fading out):
+// 0 nothing clocked is on (sleep after 1 s of silence); 1 only switched-off Flex (it keeps a ring of the input for when it comes on): sleep once the silence is
+// longer than the 13 s ring, clock running or not; 2 Flex / Step gate on: as 1, and only while the clock is stopped; 3 Retrigger on: never (it keeps running while stopped).
+int FxHost::clockedNeed() const {
+  int ck = 0;
+  for (int si = 0; si < nSlots_; si++) {
+    const Slot& s = slots_[si]; if (!fx_is_clocked(s.t)) continue;
+    const int c = s.t == 93 ? 3 : 2;
+    const float sv = s.slot >= 0 && s.slot < 8 ? swv_[s.slot] : -1.f;
+    const bool live = (sv < -0.5f ? s.on : sv > 0.5f) || s.g > 0;
+    const int w = live ? c : s.t == 95 ? 1 : 0; if (w > ck) ck = w;
+  }
+  return ck;
+}
+
+bool FxHost::p1(float* oL, float* oR, int n, double t0, const float* bp, int bpn) {
   if (nq_ > 0) { const double due = t0 + 64 / sr_; while (nq_ > 0 && q_[0].at <= due) { Q q = q_[0]; for (int i = 1; i < nq_; i++) q_[i - 1] = q_[i]; nq_--; applyPset(q.slot, q.p); } }   // THUNDER CORE: FXV at its time
   float* L = Lb_; float* R = Rb_;
   const bool rest = restAt_ > 0 && t0 >= restAt_;
   float ip = 0; bool bad = false;
   if (!rest) for (int k = 0; k < n; k++) { const float a = oL[k], b = oR[k], v = a < 0 ? -a : a, w = b < 0 ? -b : b; if (v > ip) ip = v; if (w > ip) ip = w; if (!(v < 8 && w < 8)) bad = true; }
   const float* swv = swv_;
-  // the sleep (no clocked slot is hosted yet: ck 0)
-  if ((rest && t0 - restAt_ >= 10) || (ip < 1e-7 && (double)idle_ >= sr_)) { std::memset(oL, 0, sizeof(float) * (size_t)n); std::memset(oR, 0, sizeof(float) * (size_t)n); asleep_ = true; return true; }
+  // the sleep. ck: see clockedNeed; a stopped clock is bp[0] < 0 or bp[last] < 0
+  const int ck = clockedNeed();
+  if ((rest && t0 - restAt_ >= 10) || (ip < 1e-7 && (double)idle_ >= sr_ && (ck == 0 || (ck < 3 && (double)idle_ >= sr_ * 14 && (ck == 1 || !(bp[0] >= 0 && bp[bpn - 1] >= 0)))))) { std::memset(oL, 0, sizeof(float) * (size_t)n); std::memset(oR, 0, sizeof(float) * (size_t)n); asleep_ = true; return true; }
   asleep_ = false;
   if (!rest) { std::memcpy(L, oL, sizeof(float) * (size_t)n); std::memcpy(R, oR, sizeof(float) * (size_t)n); } else { std::memset(L, 0, sizeof(float) * (size_t)(n + 1)); std::memset(R, 0, sizeof(float) * (size_t)(n + 1)); }
   // A NaN or infinity reaching the effects hangs the tape delay for good: a loud but real sample (8 to 64) is clipped to +-8, the rest zeroed
   if (bad) for (int k = 0; k < n; k++) { const float a = L[k], b = R[k]; if (!(a > -8 && a < 8)) L[k] = a > -64 && a < 64 ? (a < 0 ? -8.f : 8.f) : 0.f; if (!(b > -8 && b < 8)) R[k] = b > -64 && b < 64 ? (b < 0 ? -8.f : 8.f) : 0.f; }
   for (int k = 0; k < n; k += 2) { L[k] = (float)((double)L[k] + 1e-18); L[k + 1] = (float)((double)L[k + 1] - 1e-18); R[k] = (float)((double)R[k] + 1e-18); R[k + 1] = (float)((double)R[k + 1] - 1e-18); }   // anti-denormal
+  tr_.bp = bp; tr_.bpn = bpn; tr_.flx = (double)swv_[8]; tr_.gat = (double)swv_[9]; tr_.rtg = (double)swv_[10];   // tr: the clock and the FLX / GAT / RTG params
   for (int si = 0; si < nSlots_; si++) {
     Slot& s = slots_[si];
     const float sv = s.slot >= 0 && s.slot < 8 ? swv[s.slot] : -1.f;
     const int tg = (sv < -0.5f ? s.on : sv > 0.5f) ? 1 : 0;
     if (!s.gset) { s.g = tg; s.gset = true; }
-    if (!tg && s.g <= 0) continue;
+    tr_.sw = (double)sv;
+    if (!tg && s.g <= 0) { if (s.t == 95) runClk(s, true, n); continue; }   // (a switched-off Flex is always fed: switching it on mid-bar already has the bar to play from)
     const bool fade = s.g != (double)tg;
     if (fade) { std::memcpy(dL_, L, sizeof(float) * (size_t)n); std::memcpy(dR_, R, sizeof(float) * (size_t)n); }
     const bool lvm = tel_ && (s.t == 7 || s.t == 26 || s.t == 28);
     if (lvm) { const float a = pk(n); if (!(s.lip > a)) s.lip = a; }
     if (fade) { s.zz = false; s.zq = 0; }   // a forced run must not leave the slot asleep
-    if (fade) slotRun(s, n); else slotNap(s, n);
+    if (fade || fx_is_clocked(s.t)) slotRun(s, n); else slotNap(s, n);   // (the tempo-locked cores keep their own time and rings: they always run)
     if (lvm) { const float a = pk(n); if (!(s.lop > a)) s.lop = a; }
     if (fade) { const double d = 1 / (sr_ * 0.005); double g = s.g;
       for (int k = 0; k < n; k++) { g = tg ? std::min(1.0, g + d) : std::max(0.0, g - d); L[k] = (float)((double)dL_[k] + ((double)L[k] - (double)dL_[k]) * g); R[k] = (float)((double)dR_[k] + ((double)R[k] - (double)dR_[k]) * g); }
