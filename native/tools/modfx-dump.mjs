@@ -26,7 +26,8 @@ const GOLDEN_INC = path.join(ROOT, 'native/tests/golden/modfx_golden.inc');
 // the modules of U19 (the C++ registry holds exactly these; test_modfx fails if either list has one the other has not)
 export const MODS = ['meta', 'phaser', 'width', 'pingpong', 'meter', 'limiter', 'utility', 'ringmod', 'ensemble', 'spring', 'plate', 'lverb',
   'envfol', 'gateex', 'slew', 'snh', 'quant', 'math', 'logic', 'steps', 'clock', 'clkmul', 'chance', 'counter', 'stepsw', 'burst', 'gatedly', 'flipflop', 'rect', 'scale', 'compare', 'switch', 'xfade', 'const', 'divider', 'euclid',
-  'blades', 'onepole', 'allpass', 'dcblock', 'midside', 'dline', 'dimension', 'bbd'];
+  'blades', 'onepole', 'allpass', 'dcblock', 'midside', 'dline', 'dimension', 'bbd',
+  'harm', 'blipdrum', 'life', 'reson', 'degrade', 'flex', 'sgate', 'retrig'];
 
 // ---- the chains worklet, with nextSeed() recording --------------------------------------------------------------------------------------------------------------------------------
 const NEEDLE = 'const nextSeed = () => (seedN = (seedN * 1103515245 + 12345) >>> 0);';

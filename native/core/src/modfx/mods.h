@@ -11,6 +11,8 @@ void addStereoMods(std::vector<const Def*>& v);
 void addReverbMods(std::vector<const Def*>& v);
 void addCvMods(std::vector<const Def*>& v);
 void addFilterMods(std::vector<const Def*>& v);
+void addMiscMods(std::vector<const Def*>& v);
+void addClkMods(std::vector<const Def*>& v);
 void addDelayMods(std::vector<const Def*>& v);
 }  // namespace modfx
 }  // namespace thunder

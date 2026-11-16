@@ -19,7 +19,7 @@ namespace thunder {
 namespace modfx {
 
 constexpr int kBlock = 128;     // the engine's BLOCK: every buffer is this long
-constexpr int kMaxPorts = 8;
+constexpr int kMaxPorts = 12;
 
 struct Ctx {
   double sr = 48000;

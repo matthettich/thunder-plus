@@ -85,7 +85,7 @@ static void paramSet(const Def& d, int set, double* p) {   // default / stress /
 static uint32_t engineHash(const Def& d, int set, const ModfxEngineGolden& G) {
   const int BL = 400; std::vector<float> sig((size_t)BL * 128), L((size_t)BL * 128), R((size_t)BL * 128); testSignal(sig.data(), BL * 128);
   std::vector<std::vector<float>> rec((size_t)d.nout, std::vector<float>((size_t)BL * 128));
-  double p[32] = {}; paramSet(d, set, p);
+  double p[128] = {}; paramSet(d, set, p);
   ListSeeds seeds(G.seeds, G.nseeds); std::unique_ptr<Module> m = d.make(48000.0, seeds);
   float inb[kMaxPorts][128] = {}, outb[kMaxPorts][128] = {}; IO io; io.p = p;
   bool hasIn = false, hasInR = false;
@@ -120,7 +120,7 @@ static void engineTest(const std::string& filt) {
 }
 
 // ---- 3. the direct cases -------------------------------------------------------------------------------------------------------------------------------------------------------
-struct Res { bool ran = false, exact = false, hashOk = false; long nDiff = 0, n = 0, first = -1; };
+struct Res { bool ran = false, exact = false, hashOk = false; long nDiff = 0, n = 0, first = -1; double got = 0, want = 0; };
 static Res runCase(const std::string& dir, const ModfxCaseGolden& G) {
   Res R; std::string js, in, ref;
   if (!readFile(dir + "/" + G.name + ".json", &js) || !readFile(dir + "/" + G.name + ".in.f32", &in) || !readFile(dir + "/" + G.name + ".f32", &ref)) return R;
@@ -132,7 +132,7 @@ static Res runCase(const std::string& dir, const ModfxCaseGolden& G) {
   Json seedsJ = M.arr("seeds"), sizes = M.arr("sizes"), linked = M.arr("linked"), params = M.arr("params"), tr = M.arr("transport");
   unsigned sd[8] = {}; int ns = 0; for (size_t i = 0; i < seedsJ.size() && i < 8; i++) { sd[i] = (unsigned)seedsJ.at(i).asNum(); ns++; }
   ListSeeds seeds(sd, ns); std::unique_ptr<Module> m = d->make(M.num("sr"), seeds);
-  std::vector<float> out(outN); float inb[kMaxPorts][128] = {}, outb[kMaxPorts][128] = {}; IO io; double p[32] = {}; io.p = p;
+  std::vector<float> out(outN); float inb[kMaxPorts][128] = {}, outb[kMaxPorts][128] = {}; IO io; double p[128] = {}; io.p = p;
   for (int k = 0; k < d->nin; k++) { io.in[k] = inb[k]; io.linked[k] = linked.at((size_t)k).asBool(); }
   for (int k = 0; k < d->nout; k++) io.out[k] = outb[k];
   Ctx c; c.sr = M.num("sr"); size_t pe = 0, te = 0;
@@ -145,7 +145,7 @@ static Res runCase(const std::string& dir, const ModfxCaseGolden& G) {
     for (int k = 0; k < d->nout; k++) std::memcpy(&out[((size_t)b * d->nout + k) * 128], outb[k], 512);
   }
   R.ran = true; R.n = (long)outN; bool exact = true;
-  for (size_t i = 0; i < outN; i++) { const float a = out[i], r = J[i]; if (std::memcmp(&a, &r, 4) == 0 || (std::isnan(a) && std::isnan(r))) continue; exact = false; R.nDiff++; if (R.first < 0) R.first = (long)i; }
+  for (size_t i = 0; i < outN; i++) { const float a = out[i], r = J[i]; if (std::memcmp(&a, &r, 4) == 0 || (std::isnan(a) && std::isnan(r))) continue; exact = false; R.nDiff++; if (R.first < 0) { R.first = (long)i; R.got = a; R.want = r; } }
   R.exact = exact; R.hashOk = fnv64(out.data(), outN * 4) == G.hash;
   return R;
 }
@@ -162,7 +162,7 @@ int main(int argc, char** argv) {
     if (!R.ran) { std::printf("%-24s could not be run (reference files missing or the wrong size)  FAIL\n", G.name); fails++; continue; }
     ran++; const bool ok = R.hashOk && (R.exact || !kLocalMustMatch); if (R.hashOk) exact++;
     if (!ok || !R.exact) { if (shown++ < 60) { std::printf("%-24s %s%s%s\n", G.name, R.hashOk ? "bit-exact (committed hash)" : "DIFFERS from the committed hash", R.exact ? "" : R.hashOk ? "  [the local Node reference differs: its Math.* rounds otherwise]" : "", ok ? "" : "  FAIL");
-      if (!R.exact) std::printf("    %ld of %ld samples differ; first at %ld\n", R.nDiff, R.n, R.first); } }
+      if (!R.exact) std::printf("    %ld of %ld samples differ; first at %ld: got %.9g want %.9g\n", R.nDiff, R.n, R.first, R.got, R.want); } }
     if (!ok) fails++;
   }
   if (filt.empty()) { int unc = 0; for (int m = 0; m < count(); m++) { int n = 0; for (int i = 0; i < kModfxCasesN; i++) if (!std::strncmp(kModfxCases[i].name, at(m).type, std::strlen(at(m).type)) && kModfxCases[i].name[std::strlen(at(m).type)] == '_') n++; if (n < 14) { std::printf("direct: %s has %d cases  FAIL\n", at(m).type, n); unc++; } } if (unc) fails++; }
