@@ -812,6 +812,9 @@ The owner's top priority to add is the MOD screen. Work down the list; ask befor
 
 Start a session by asking for results. Fix on `beta`. (10 Nov, 15:10: the web beta is build 560; the build numbers in the rest of this paragraph are older.) Web beta: https://matthettich.github.io/thunder-plus/beta/ (build 547 as of 10 Nov morning, 548 once its PR merges; the night of 9–10 Nov shipped 544–547, see the four "10 Nov" entries below. Decisions the lead made that night for the owner to confirm or reverse: on a phone the saved Sequencer default plays on the Page unless Audio thread is picked on that device; on a phone the safety limiter is its stand-in until another worklet loads; the resync only runs with a worklet loaded and its margins are untested on a device). Desktop: v1.3.4-beta.2 (build 541, no feed view or scopes); further desktop betas on hold until the owner asks.
 
+**Build 628** (paging sooner on small views)
+- [ ] **Phone (folded) and computer with a small Arrange / Song view:** play a song and watch Arrange and the Song screen. Pass: the next page turns noticeably earlier than before (about a third of the view from the bottom on a view under 16 rows), once per page, with the rows just played still in sight. Say if it should be sooner still, or if the ARRANGE LOOK-AHEAD setting should apply on small views too.
+
 **Build 627** (LOOP left of PLAY)
 - [ ] **Computer:** the top bar. Pass: the LOOP button is immediately left of PLAY (Alt+L and the button still work). The phone layout is unchanged (LOOP stays in the selection bar).
 
@@ -1476,6 +1479,12 @@ Tests added: `loop-empty-row` (vm).
 Build 627, on `beta`. The owner: "Put loop to the left of playback." The top bar's #tLoop was re-parented after #tSong (build 609); it now goes before it (`ps.before(lp)`). Command bar: it has no plain PLAY (its ▶ is loop play, with LOOP SEL already to its left), so nothing to move there; the pad's LOOP / PLAY pair is skin-dependent and was left alone. Mobile unchanged.
 
 Tests added: `loop-beside-play` updated.
+
+## 15 Nov (Arrange and Song page sooner; build 628)
+
+Build 628, on `beta`. The owner: "Can song and arrange page down sooner?" The look-ahead rule (`arrPageTop`, used by Arrange, the Song screen, the Phrase / Pattern rows and the cursor's own page turn in `arrKeepRow`) is now one helper, `arrAheadFor(VR)`: a view of under 16 rows turns at a third of the view from the bottom, rounded up (14 rows: 5, was 3; 8 rows: 3, was 2; 12: 4, was 3), still capped by the setting; from 16 rows it is as before (the setting, 16 by default, never over half the view: already half of a 32-row view). Numbers chosen by me: the owner asked for 'about a third'; larger views were already past that. The hold rules are untouched.
+
+Tests added: `arrange-paging` updated (small-view numbers, helper pin).
 
 ## 15 Nov (a line on the small command bar; the side panel's instrument list auditions; builds 622 and 623)
 
