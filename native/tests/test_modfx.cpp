@@ -158,6 +158,23 @@ static void bbTest(const std::string& dir) {
   std::printf("bbexpr: %d formulas (compile result, error text, run and s8 on the grid) equal the JS's and the committed hash  %s\n", (int)meta.size(), bad ? "FAIL" : "ok");
 }
 
+// Web build 633 (tests/bbexpr-const-logic.test.js): `x && constant` / `x || constant` always read the constant, so the right value comes back and every t returns (51 used to jump: a hang).
+static void bbConstTest() {
+  struct C { const char* src; double t, a, want; };
+  static const C cases[] = {{"(t && 51) + a", 0, 7, 7}, {"(t && 51) + a", 3, 7, 8}, {"(t || 51) + a", 3, 7, 8}, {"(t || 51) + a", 0, 7, 8}, {"(t || 50) + a", 2, 7, 8},
+    {"(t && 5) + a", 0, 7, 7}, {"(t || 0) + a", 0, 7, 7}, {"(t && 50) * 3 + a", 0, 7, 7}, {"t && 10", 0, 7, 0}, {"(t || 0) + (t && 51) + a", 0, 1, 1}};
+  int bad = 0;
+  for (const C& c : cases) {
+    BBProg P; std::string err; int pos = 0;
+    if (!BBProg::compile(c.src, &P, &err, &pos)) { std::printf("bbexpr const: '%s' does not compile  FAIL\n", c.src); bad++; continue; }
+    const int32_t v = P.run(c.t, c.a, 0, 0);
+    if (v != (int32_t)c.want) { std::printf("bbexpr const: '%s' at t=%g: got %d want %d  FAIL\n", c.src, c.t, v, (int)c.want); bad++; }
+    for (int t = -4; t < 600; t++) P.run(t, 3, 5, 9);   // every t returns
+  }
+  if (bad) fails++;
+  std::printf("bbexpr const (build 633, %d cases of tests/bbexpr-const-logic.test.js): %s\n", (int)(sizeof cases / sizeof cases[0]), bad ? "FAIL" : "ok");
+}
+
 // ---- 3. the direct cases
 // U20: the song's impulse responses of a case: made here exactly as tools/modfx-b-cases.mjs makes them (an integer xorshift and basic arithmetic only: no Math.*, so the same on every platform)
 struct IrObj { std::vector<float> L, R; SongIR ir; };
@@ -250,7 +267,7 @@ static Res runCase(const std::string& dir, const ModfxCaseGolden& G) {
 int main(int argc, char** argv) {
   if (argc < 2) { std::printf("modfx: no reference directory given: FAIL (a fixture that cannot run is a failure)\n"); return 1; }
   const std::string filt = argc > 2 ? argv[2] : "";
-  if (filt.empty()) { tableTest(argv[1]); bbTest(argv[1]); }
+  if (filt.empty()) { tableTest(argv[1]); bbTest(argv[1]); bbConstTest(); }
   engineTest(filt);
   int ran = 0, exact = 0, shown = 0;
   for (int i = 0; i < kModfxCasesN; i++) {
