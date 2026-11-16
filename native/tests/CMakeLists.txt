@@ -229,6 +229,34 @@ target_include_directories(test_fxzero PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../co
 add_test(NAME fxzero COMMAND test_fxzero)
 set_tests_properties(fxzero PROPERTIES SKIP_RETURN_CODE 77)
 
+# U18: the pump effects as slot kinds of the track-effect host against the worklet itself (tools/pump-dump.mjs: 80 cases + pumpLatencyOf of every type; needs Node and acorn, and the
+# repo's shipped pump/pump.wasm). No SKIP_RETURN_CODE for a missing reference: a fixture that cannot run FAILS. Only where pump itself is not built (MSVC: pump's wasm build needs clang
+# or gcc) the test says "not run" (exit 77), as test_fx does where there is no DSP library. parity-u18.sh also runs it against a pump.wasm built from the pin.
+add_executable(test_pump test_pump.cpp)
+target_link_libraries(test_pump PRIVATE thunder_core)
+target_include_directories(test_pump PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../core/src ${CMAKE_CURRENT_SOURCE_DIR})
+if(NOT MSVC)
+  target_compile_options(test_pump PRIVATE -Wall -Wextra)
+  find_package(Threads REQUIRED)
+  target_link_libraries(test_pump PRIVATE Threads::Threads)
+endif()
+if(NOT TARGET thunder_pump)
+  add_test(NAME pump COMMAND test_pump)
+  set_tests_properties(pump PROPERTIES SKIP_RETURN_CODE 77)
+elseif(NODE_EXE)
+  add_test(NAME pump_ref COMMAND ${NODE_EXE} ${CMAKE_CURRENT_SOURCE_DIR}/../tools/pump-dump.mjs ${CMAKE_CURRENT_BINARY_DIR}/pump-ref)
+  set_tests_properties(pump_ref PROPERTIES FIXTURES_SETUP pump_ref)
+  add_test(NAME pump COMMAND test_pump ${CMAKE_CURRENT_BINARY_DIR}/pump-ref)
+  set_tests_properties(pump PROPERTIES FIXTURES_REQUIRED pump_ref)
+  if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    add_test(NAME pump_cases_current COMMAND ${NODE_EXE} ${CMAKE_CURRENT_SOURCE_DIR}/../tools/pump-dump.mjs --check)
+    add_test(NAME pump_table_current COMMAND ${NODE_EXE} ${CMAKE_CURRENT_SOURCE_DIR}/../tools/pump-table.mjs --check)
+    set_tests_properties(pump_table_current PROPERTIES ENVIRONMENT "THUNDER_DEPS_DIR=${THUNDER_PUMP_DIR}/..;CXX=${CMAKE_CXX_COMPILER}")
+  endif()
+else()
+  add_test(NAME pump COMMAND test_pump)   # no directory: prints FAIL and exits 1
+endif()
+
 # U14: the track-effect host (ThunderFx) against the worklet itself (tools/fx-dump.mjs: 91 cases + the map() value sets; needs Node and acorn).
 add_executable(test_fx test_fx.cpp)
 target_link_libraries(test_fx PRIVATE thunder_core)

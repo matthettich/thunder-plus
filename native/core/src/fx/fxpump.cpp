@@ -209,7 +209,7 @@ static void hotClip(float* L, float* R, int n) { for (int k = 0; k < n; k++) { c
 void FxHost::pumpRun(Slot& s, int n) {
   PumpSlot& u = *s.pu; if (!pumpOk_ || u.h < 0) return;
   if (u.dirty) {
-    float* v = pump::values(u.h); for (int j = 0; j < u.npv; j++) v[j] = u.pv[j];
+    const int np = pump::nparams(u.pt); float* v = pump::values(u.h); for (int j = 0; j < u.npv && j < np; j++) v[j] = u.pv[j];   // (pump_values holds nparams floats: a longer list from a caller must not write past it; the JS never sends one)
     if (u.bi >= 0) v[u.bi] = u.byp ? 1.f : 0.f;
     pump::commit(u.h); u.dirty = false;
   }
