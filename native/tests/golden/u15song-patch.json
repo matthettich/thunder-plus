@@ -1,0 +1,42 @@
+{
+ "about": "D4: what is added to sounds/ELECTRO.thunder for the U15 whole-song test (native/tests/test_u15song.cpp and native/tools/u15-song-dump.mjs both read this file). tfx: the track effect slots (song format; every track's own slots are replaced; the song's master effects, a Retrigger and a Flex, are kept). cmds: tracker commands put into the phrase the track plays at song row `sr`, at phrase row `row`, in the first free command column (29 FXO, 30 FLX, 31 GAT, 32 RTG; t 32 is the master column).",
+ "frames": 384000,
+  "tfx": [
+    [{"type":"flex","on":true,"pat":5,"wait":1,"mix":255,"xf":2}],
+    [{"type":"sgate","on":true,"pat":4,"div":2,"wait":1}],
+    [{"type":"flex","on":true,"pat":115,"wait":1,"mix":220,"xf":40},{"type":"sgate","on":true,"pat":6,"div":2,"wait":1},{"type":"retrig","on":true,"mode":0,"div":3,"decay":80,"pitch":12,"gate":200,"mix":255}],
+    [],
+    [{"type":"retrig","on":false,"mode":1,"div":2}],
+    [],
+    [],
+    [],
+    [{"type":"sgate","on":true,"pat":11,"div":4,"len":255,"depth":128,"smooth":255,"wait":0}]
+  ],
+  "cmds": [
+    {"t":32,"sr":0,"row":0,"cmd":30,"v":42},
+    {"t":32,"sr":1,"row":8,"cmd":32,"v":34},
+    {"t":32,"sr":2,"row":0,"cmd":30,"v":0},
+    {"t":32,"sr":2,"row":12,"cmd":32,"v":81},
+    {"t":0,"sr":0,"row":0,"cmd":30,"v":5},
+    {"t":0,"sr":1,"row":4,"cmd":30,"v":42},
+    {"t":0,"sr":2,"row":8,"cmd":30,"v":0},
+    {"t":0,"sr":3,"row":0,"cmd":30,"v":148},
+    {"t":1,"sr":0,"row":8,"cmd":31,"v":3},
+    {"t":1,"sr":1,"row":0,"cmd":31,"v":9},
+    {"t":1,"sr":2,"row":16,"cmd":31,"v":0},
+    {"t":1,"sr":3,"row":4,"cmd":31,"v":16},
+    {"t":2,"sr":0,"row":0,"cmd":30,"v":68},
+    {"t":2,"sr":0,"row":4,"cmd":32,"v":34},
+    {"t":2,"sr":0,"row":12,"cmd":31,"v":5},
+    {"t":2,"sr":1,"row":8,"cmd":32,"v":33},
+    {"t":2,"sr":1,"row":20,"cmd":30,"v":42},
+    {"t":2,"sr":2,"row":0,"cmd":32,"v":19},
+    {"t":2,"sr":2,"row":4,"cmd":30,"v":42},
+    {"t":2,"sr":2,"row":16,"cmd":31,"v":0},
+    {"t":2,"sr":3,"row":0,"cmd":31,"v":9},
+    {"t":2,"sr":3,"row":8,"cmd":32,"v":66},
+    {"t":2,"sr":3,"row":20,"cmd":32,"v":0},
+    {"t":4,"sr":1,"row":0,"cmd":29,"v":17},
+    {"t":4,"sr":3,"row":0,"cmd":29,"v":16}
+  ]
+}
