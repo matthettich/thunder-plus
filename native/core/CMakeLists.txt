@@ -1,5 +1,5 @@
 # thunder_core: the one C++ engine library (N0: a test core only; it is thrown away in N1).
-add_library(thunder_core STATIC src/core.cpp src/rt/auto.cpp src/rt/jsmath.cpp src/rt/fdlibm.cpp src/rt/json.cpp src/song/song.cpp src/seq/seq.cpp src/voice/voice.cpp src/mix/mix.cpp src/mix/pdc.cpp src/mix/delay.cpp src/mix/beat.cpp src/master/master.cpp src/master/eq.cpp src/master/chain.cpp src/meter/meter.cpp src/fx/fxhost.cpp src/fx/clkcores.cpp src/fx/fxmap.cpp src/fx/fxbank.cpp src/render/render.cpp)
+add_library(thunder_core STATIC src/core.cpp src/rt/auto.cpp src/rt/jsmath.cpp src/rt/fdlibm.cpp src/rt/json.cpp src/song/song.cpp src/seq/seq.cpp src/voice/voice.cpp src/mix/mix.cpp src/mix/pdc.cpp src/mix/delay.cpp src/mix/beat.cpp src/master/master.cpp src/master/eq.cpp src/master/chain.cpp src/meter/meter.cpp src/fx/fxhost.cpp src/fx/clkcores.cpp src/fx/idmcores.cpp src/fx/fxmap.cpp src/fx/fxbank.cpp src/render/render.cpp)
 target_include_directories(thunder_core PUBLIC include)
 target_include_directories(thunder_core PRIVATE src)
 target_include_directories(thunder_core SYSTEM PRIVATE third_party)

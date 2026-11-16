@@ -71,12 +71,21 @@ template <class C, class Dp> struct ClkFx : Fx {
 using RetrigFx = ClkFx<RetrigCore, RtDp>;
 using SgateFx = ClkFx<StepGateCore, SgDp>;
 using FlexFx = ClkFx<FlexCore, FlexDp>;
+using GrainsFx = ClkFx<GrainsCore, GrDp>;       // U16
+using ScrambleFx = ClkFx<ScrambleCore, ScDp>;
+using GlitchFx = ClkFx<GlitchCore, GlDp>;
+using VSampFx = ClkFx<VSampCore, VsDp>;
 static Fx* make_clk(int type, double sr) {
-  switch (type) { case 93: return new RetrigFx(sr); case 94: return new SgateFx(sr); case 95: return new FlexFx(sr); default: return nullptr; }
+  switch (type) { case 93: return new RetrigFx(sr); case 94: return new SgateFx(sr); case 95: return new FlexFx(sr);
+    case 100: return new GrainsFx(sr); case 101: return new ScrambleFx(sr); case 102: return new GlitchFx(sr); case 103: return new VSampFx(sr); default: return nullptr; }
 }
 // c.p -> s.dp: the worklet's set(): {pat, mix, xf, wait} (Flex), {pat, m1, m2, div, len, depth, smooth, wait} (Step gate), {mode, div, decay, pitch, gate, mix} (Retrigger)
 static void setClkDp(Fx* fx, int t, const double* q) {
-  if (t == 95) static_cast<FlexFx*>(fx)->dp = FlexDp{q[0], q[1], q[2], q[3]};
+  if (t == 100) static_cast<GrainsFx*>(fx)->dp = GrDp{q[0], q[1], q[2], q[3], q[4], q[5], q[6], q[7], q[8], q[9], q[10], q[11]};   // {div, density, size, pos, spray, pitch, rpitch, rev, shape, spread, freeze, mix}
+  else if (t == 101) static_cast<ScrambleFx*>(fx)->dp = ScDp{q[0], q[1], q[2], q[3], q[4], q[5], q[6], q[7]};                      // {div, chance, rev, keep, vary, seed, xf, mix}
+  else if (t == 102) static_cast<GlitchFx*>(fx)->dp = GlDp{q[0], q[1], q[2], q[3], q[4], q[5], q[6], q[7], q[8], q[9], q[10]};     // {div, chance, stut, rev, pitch, tape, crush, gate, vary, seed, mix}
+  else if (t == 103) static_cast<VSampFx*>(fx)->dp = VsDp{q[0], q[1], q[2], q[3], q[4], q[5]};                                      // {model, drive, filter, rate, noise, mix}
+  else if (t == 95) static_cast<FlexFx*>(fx)->dp = FlexDp{q[0], q[1], q[2], q[3]};
   else if (t == 94) static_cast<SgateFx*>(fx)->dp = SgDp{q[0], q[1], q[2], q[3], q[4], q[5], q[6], q[7]};
   else static_cast<RetrigFx*>(fx)->dp = RtDp{q[0], q[1], q[2], q[3], q[4], q[5]};
 }
@@ -103,11 +112,11 @@ uint32_t FxHost::laneDropped() const { uint32_t n = 0; for (int i = 0; i < 11; i
 FxPlan* FxHost::plan(const FxEntry* e, int n) {
   FxPlan* pl = new FxPlan; bool used[kFxSlots] = {false}; Fx* nf[kFxSlots] = {nullptr};
   for (int i = 0; i < n && pl->n_ < kFxSlots; i++) {
-    if (e[i].t < 0 || (e[i].t > 33 && !fx_is_clocked(e[i].t))) continue;   // not an effect hosted here: left out (the sound passes)
+    if (e[i].t < 0 || (e[i].t > 33 && !fx_is_core(e[i].t))) continue;   // not an effect hosted here: left out (the sound passes)
     int j = -1; for (int k = 0; k < nCtl_; k++) if (!used[k] && std::strcmp(ctl_[k].key, e[i].key) == 0) { j = k; break; }
     const int w = pl->n_;
     if (j >= 0) { used[j] = true; pl->reuse_[w] = true; nf[w] = ctlFx_[j]; }
-    else { Fx* f; if (fx_is_clocked(e[i].t)) f = make_clk(e[i].t, sr_); else { ModuleState ms(&rand_, &stmRng_, &daisySeed_); f = make_fx(e[i].t, (float)sr_); } if (!f) continue; pl->fx_[w] = f; nf[w] = f; }
+    else { Fx* f; if (fx_is_core(e[i].t)) f = make_clk(e[i].t, sr_); else { ModuleState ms(&rand_, &stmRng_, &daisySeed_); f = make_fx(e[i].t, (float)sr_); } if (!f) continue; pl->fx_[w] = f; nf[w] = f; }
     pl->e_[w] = e[i]; pl->n_++;
   }
   nCtl_ = pl->n_; for (int i = 0; i < nCtl_; i++) { ctl_[i] = pl->e_[i]; ctlFx_[i] = nf[i]; }
@@ -142,7 +151,7 @@ void FxHost::applyEntry(Slot& s, const FxEntry& c) {
   s.nn = keyHas(c.key, "vinyl") || keyHas(c.key, "pcrush");
   double pp[12]; for (int i = 0; i < 12; i++) pp[i] = c.p[i];
   if (s.wi >= 0) { rvMix(c.p[s.wi], &s.rvDry, &s.rvWet); pp[s.wi] = 1; }
-  if (s.fx && fx_is_clocked(c.t)) setClkDp(s.fx, c.t, pp);
+  if (s.fx && fx_is_core(c.t)) setClkDp(s.fx, c.t, pp);
   else if (s.fx) for (int i = 0; i < 12; i++) s.fx->p[i] = (float)pp[i];
 }
 void FxHost::commit(FxPlan* pl) {
@@ -188,12 +197,16 @@ void FxHost::runClk(Slot& s, bool feed, int n) {
   switch (s.t) {
     case 95: { FlexFx* f = static_cast<FlexFx*>(s.fx); if (feed) f->core.feed(Lb_, Rb_, n, tr_); else f->core.process(Lb_, Rb_, n, f->dp, tr_); break; }
     case 94: { SgateFx* f = static_cast<SgateFx*>(s.fx); f->core.process(Lb_, Rb_, n, f->dp, tr_); break; }
+    case 100: { GrainsFx* f = static_cast<GrainsFx*>(s.fx); f->core.process(Lb_, Rb_, n, f->dp, tr_); break; }
+    case 101: { ScrambleFx* f = static_cast<ScrambleFx*>(s.fx); f->core.process(Lb_, Rb_, n, f->dp, tr_); break; }
+    case 102: { GlitchFx* f = static_cast<GlitchFx*>(s.fx); f->core.process(Lb_, Rb_, n, f->dp, tr_); break; }
+    case 103: { VSampFx* f = static_cast<VSampFx*>(s.fx); f->core.process(Lb_, Rb_, n, f->dp); break; }
     default: { RetrigFx* f = static_cast<RetrigFx*>(s.fx); f->core.process(Lb_, Rb_, n, f->dp, tr_); break; }
   }
 }
 void FxHost::slotRun(Slot& s, int n) {
   if (!s.fx) return;
-  if (fx_is_clocked(s.t)) { runClk(s, false, n); return; }
+  if (fx_is_core(s.t)) { runClk(s, false, n); return; }
   std::memcpy(cL_, Lb_, sizeof(float) * (size_t)n); std::memcpy(cR_, Rb_, sizeof(float) * (size_t)n);
   s.fx->process(Lb_, Rb_, n);
   for (int i = 0; i < n; i++) {   // tfx_process: keep a broken effect from poisoning the whole track
@@ -231,12 +244,12 @@ bool FxHost::process(float* L, float* R, int n, double t0, const float* bp, int 
 
 // The worklet's `ck`: what its tempo-locked slots ask of the node's sleep, by whether each is ON now (its own switch, or an FXO holding it; or still fading out):
 // 0 nothing clocked is on (sleep after 1 s of silence); 1 only switched-off Flex (it keeps a ring of the input for when it comes on): sleep once the silence is
-// longer than the 13 s ring, clock running or not; 2 Flex / Step gate on: as 1, and only while the clock is stopped; 3 Retrigger on: never (it keeps running while stopped).
+// longer than the 13 s ring, clock running or not; 2 Flex / Step gate on: as 1, and only while the clock is stopped; 3 Retrigger, Grains, Scramble or Glitch on: never (they keep running while stopped).
 int FxHost::clockedNeed() const {
   int ck = 0;
   for (int si = 0; si < nSlots_; si++) {
-    const Slot& s = slots_[si]; if (!fx_is_clocked(s.t)) continue;
-    const int c = s.t == 93 ? 3 : 2;
+    const Slot& s = slots_[si]; if (!fx_is_clocked(s.t) && !(s.t >= 100 && s.t <= 102)) continue;   // (the Vintage sampler, 103, asks nothing: the worklet's `c` is 0 for it)
+    const int c = s.t == 93 || (s.t >= 100 && s.t <= 102) ? 3 : 2;
     const float sv = s.slot >= 0 && s.slot < 8 ? swv_[s.slot] : -1.f;
     const bool live = (sv < -0.5f ? s.on : sv > 0.5f) || s.g > 0;
     const int w = live ? c : s.t == 95 ? 1 : 0; if (w > ck) ck = w;
@@ -272,7 +285,7 @@ bool FxHost::p1(float* oL, float* oR, int n, double t0, const float* bp, int bpn
     const bool lvm = tel_ && (s.t == 7 || s.t == 26 || s.t == 28);
     if (lvm) { const float a = pk(n); if (!(s.lip > a)) s.lip = a; }
     if (fade) { s.zz = false; s.zq = 0; }   // a forced run must not leave the slot asleep
-    if (fade || fx_is_clocked(s.t)) slotRun(s, n); else slotNap(s, n);   // (the tempo-locked cores keep their own time and rings: they always run)
+    if (fade || fx_is_core(s.t)) slotRun(s, n); else slotNap(s, n);   // (the JS cores keep their own time and rings, and the Vintage sampler makes its own noise: they always run)
     if (lvm) { const float a = pk(n); if (!(s.lop > a)) s.lop = a; }
     if (fade) { const double d = 1 / (sr_ * 0.005); double g = s.g;
       for (int k = 0; k < n; k++) { g = tg ? std::min(1.0, g + d) : std::max(0.0, g - d); L[k] = (float)((double)dL_[k] + ((double)L[k] - (double)dL_[k]) * g); R[k] = (float)((double)dR_[k] + ((double)R[k] - (double)dR_[k]) * g); }

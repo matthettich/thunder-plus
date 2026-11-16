@@ -18,10 +18,10 @@ import { ROOT, SR, load, clockedEffects } from './fx-src.mjs';
 import { lcg, Auto, mkNode, f32b, fnv } from './fx-dump.mjs';
 
 const F = load(), E = clockedEffects(), byKey = Object.fromEntries(E.map(e => [e.key, e]));
-const BLK = 128;
+export const BLK = 128;
 
 // ---- signals (float32) ------------------------------------------------------------------------------------------------------------------
-const SIG = {
+export const SIG = {
   // tests/flex.test.js's steady signal (a sine and a sawtooth), a little different on the right
   steady(n) { const L = new Float32Array(n), R = new Float32Array(n); for (let s = 0; s < n; s++) { L[s] = Math.fround(Math.sin(s * 0.05) * 0.5 + ((s * 7) % 200) / 400); R[s] = Math.fround(Math.sin(s * 0.031) * 0.4 + ((s * 5) % 170) / 400 - 0.2); } return [L, R]; },
   // a drum loop at 120 BPM that goes on for the whole case: a kick and a hat noise burst on every beat, a snare on 2 and 4, a bass tone under it
@@ -36,7 +36,7 @@ const SIG = {
 };
 
 // ---- the clock ----------------------------------------------------------------------------------------------------------------------------
-function clock(n, prog) {
+export function clock(n, prog) {
   const out = new Float32Array(n); let on = false, beat = 0, bpm = 120, si = 0; const segs = [...prog].sort((a, b) => a.at - b.at);
   for (let i = 0; i < n; i++) {
     while (si < segs.length && segs[si].at <= i) { const s = segs[si++]; if (s.stop) on = false; else { on = true; if (s.bpm) bpm = s.bpm; if (s.beat !== undefined) beat = s.beat; } }
@@ -149,7 +149,7 @@ add({ name: 'sleep_sgate_off', sig: 'tail', frames: SL, chain: chainOf([sgate({ 
 add({ name: 'sleep_rest', sig: 'loop', frames: 96000, chain: chainOf([flex({ pat: 5, wait: 0 }), retrig({ mode: 1 })]), msgs: [{ b: 100, msg: { rest: true } }, { b: 500, msg: { rest: false } }] });   // a muted track: silence in, the tempo-locked slots still keep time
 
 // ---- the run ----------------------------------------------------------------------------------------------------------------------------
-function runCase(c) {
+export function runCase(c) {
   const n = c.frames, [iL, iR] = SIG[c.sig](n), bpAll = clock(n, c.clock), { node, clk } = mkNode(c.chain);
   const lanes = {}; for (const k of ['sw0', 'sw1', 'sw2', 'sw3', 'sw4', 'sw5', 'sw6', 'sw7', 'flx', 'gat', 'rtg']) lanes[k] = new Auto(-1);
   for (const [k, tm, v] of c.ops || []) { if (k === 'reset') { for (const L of Object.values(lanes)) { L.cancel(tm); L.set(-1, tm); } } else lanes[k].set(v, tm); }
@@ -166,7 +166,7 @@ function runCase(c) {
   }
   return { n, iL, iR, oL, oR, bpAll };
 }
-const hex = h => '0x' + h.toString(16).padStart(16, '0') + 'ull';
+export const hex = h => '0x' + h.toString(16).padStart(16, '0') + 'ull';
 
 // ---- map() value sets (the three effects: normTfx + tfxChain) -------------------------------------------------------------------------------
 function mapSets() {
