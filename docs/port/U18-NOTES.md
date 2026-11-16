@@ -94,3 +94,65 @@ rt_core, pump_ref, pump_cases_current, pump_table_current pass; `pump` (shipped 
 2. Wake allocations: accept the JS behaviour, or add spare instances.
 3. Rebuild the web app's pump.wasm from the pin (MASTER 77 params, latency 4454).
 4. CI: the u18 step is in the wasm job (needs the pin-built wasm); it will fail on x_two_hosts_same until 1 is decided.
+
+## x_two_hosts_same: the first differing bit is in TUBE's halfband FIR dot product (D1, 16 Nov; evaluation order, nothing else)
+
+Question left open in the section above (point 5): WHICH operation in TUBE differs from the pin-built `pump.wasm`. Answer, measured: **evaluation order of a float dot product
+(reassociation), allowed by the wasm's `-ffast-math`, not libm, not FMA / contraction, not x87.** Sure about it: the bit-exact fix below is run, not argued.
+
+### Method
+A driver that calls pump's own C API (`pump_stage` / `pump_new` / `pump_io` / `pump_process`, 128-frame blocks) for type 9 (tube), preset 1 ("Warm glow": mode 0, drive 8, sag 15, mix 100; auto gain on, oversampling 2 = two halfband stages),
+on the `mix` signal of `pump-dump.mjs` (81920 frames at 48 kHz, the `x_tube_only` scratch case). Native = the strict host build of `core/pump/CMakeLists.txt` (GCC 13.3, `-O3 -fno-fast-math -ffp-contract=off -mno-mmx`),
+wasm = the pin-built `pump.wasm` (wasi-sdk 25, `-O3 -ffast-math -fno-finite-math-only -msimd128`) run in Node 22. The drivers reproduce the gate's figure: first differing output sample 2, `0xa7d98116` against `0xa7d98117`
+(1 ulp), 56135 of 81920 L samples differ. Then a temporary copy of the pump checkout (never committed) records a double / float at six points of `Engine::processChunk` and in `HalfbandStage::up` / `down` for the first block, from both builds, and the traces are compared point by point.
+
+### Bisection (first block, first differing record at each point)
+| point | what | first difference |
+|---|---|---|
+| input of pre-emphasis, pre-emphasis output (float), low cut | base-rate path before the oversampler | none (64 of 64 equal, bits) |
+| `HalfbandStage::up`, accumulator `acc`, call 3 | 1st halfband stage, 4th input sample | equal (`0x36cdd983`) |
+| **`HalfbandStage::up`, accumulator `acc`, call 4** | **5th input sample** | **native `0xb755edb3`, wasm `0xb755edb2`** |
+| upsampled buffer (two stages) | | index 14 |
+| tube stage output (`tanh`, `exp`, `sqrt`, ... in double) | | index 14, a consequence |
+| after `downsample` | | index 2 (`-0x1.112d3ep-46` against `-0x1.112d40p-46`) |
+| final L | | index 2, the gate's sample |
+
+So the first bit that differs is `acc` of the first halfband upsampler, before any nonlinear function runs. Everything after it (the curve, `std::tanh`, the 2nd stage, the down filter) differs only because its input does.
+At call 4 the input history is x[0..4] (all earlier history is zero), so the sum has five non-zero terms (`common/dsp/Oversampler.hpp` of the pump pin, line 55: `for (int j = 0; j < nEven; ++j) acc += evenTaps[j] * h[j];`; `down()` line 75 is the same loop):
+
+| term j | `evenTaps[j] * h[j]` (float) |
+|---|---|
+| 0 | `0xb648fd79` |
+| 1 | `0x369e4e18` |
+| 2 | `0xb6f0ba49` |
+| 3 | `0x3724d2ca` |
+| 4 | `0xb78fa583` |
+
+* Sequential, as the strict native build adds: partial sums `0xb648fd79, 0x35e73d6e, 0xb6b6eaee, 0x3692baa6, 0xb755edb3`. Native result `0xb755edb3`. (Native equals this sequential sum in 64 of 64 calls checked.)
+* 4 lanes, as `-msimd128` with `-ffast-math` vectorises it (lane k adds terms j = k mod 4; term 4 lands on lane 0; then `(l0+l1)+(l2+l3)`): lane partials `0xb7a8c532, 0x369e4e18, 0xb6f0ba49, 0x3724d2ca`, total `0xb755edb2`.
+  Wasm result `0xb755edb2`. (The wasm equals the 4-lane sum in 64 of 64 calls; the plain sequential sum in only 25 of 64; a halving lane reduction in 39 of 64.)
+The product terms are identical in both; only the order of the additions differs. The wasm contains `f32x4.add` / `f32x4.mul` for this loop (`-S` output of the tube unit: 12 of them). The reduction is allowed to be re-ordered only because of `-ffast-math` (`-fassociative-math`).
+
+### What it is NOT (each tested)
+* libm: not involved at the first differing bit (it is upstream of every `tanh` / `exp`). And with the reduction made strict the two builds agree on the whole run, `std::tanh` (glibc) against wasi-libc included, for this preset.
+* FMA / contraction: native is built with `-ffp-contract=off`; wasm SIMD has no FMA (no relaxed-simd). Neither contracts.
+* x87: x86-64 GCC uses SSE for float and double; the x87 `fprem` problem in `CMakeLists.txt` is a different case.
+* Native with `-ffast-math` is NOT the fix: GCC 13 with `-O3 -ffast-math -fno-finite-math-only` differs from the wasm in 52313 of 163840 samples (its vector width / unrolling differ from wasm's). Same compiler flags do not give the same reduction order on two targets.
+
+### Which change makes them equal (measured; nothing applied; no code or flag on this branch changed)
+Rebuilt the tube unit and `pump_wasm.cpp` of the pin with wasm flags changed, the native build unchanged, compared over 81920 frames, L and R (163840 samples):
+| wasm flags for the pump units | samples that differ from native |
+|---|---|
+| as now (`-ffast-math -fno-finite-math-only`) | 112298 |
+| `-ffast-math -fno-finite-math-only -fno-associative-math` | **0 (bit-exact)** |
+| `-fno-fast-math -ffp-contract=off` (strict, simd128 kept) | **0 (bit-exact)** |
+The smallest flag change is therefore `-fno-associative-math` on the wasm build of pump (`pump/wasm/build.sh` `FLAGS`, and the CMake wasm branch of `core/pump/CMakeLists.txt`); that keeps the rest of fast-math. The other route, a source change: write the two `Oversampler.hpp` loops with an explicit accumulator order that both builds keep (for example four named accumulators combined as `(a0+a1)+(a2+a3)`), which also pins the native result to the wasm's order; that changes the plugin's own output too, so it is the owner's decision. Which one to take is Fable's; the gate and goldens are unchanged here.
+
+### What this means for the failing case and the others
+* `x_two_hosts_same` (-68.4 dB): TUBE's output differs by about 1e-7 relative from the wasm, CRUSH (alone: exact) quantises it with `std::round(x * q) / q`; 14 samples land on the other side of a step. With TUBE bit-exact (rows above) CRUSH gets the same input in both builds, so those 14 flips cannot happen. This last step is an inference (TUBE and CRUSH measured separately, the two-stage chain not re-run with the changed wasm).
+* Likely, not measured: the same loop (`HalfbandStage`) is in every oversampled pump effect, so a good part of the many "-130 dB, 1 ulp" rows in the table above (TONE, CALM, LIMIT, HEAT, ...) would go with it. Other reductions (`for ... acc +=` in the true-peak interpolator, filters) are other candidates for the rest. Not run.
+* Nothing here says the native result is the wrong one: strict sequential order is what the source says.
+
+### Reproduce (the instrumentation is not in the repo)
+Copy the pinned pump checkout; add a `dbg.h` recording `(tag, index, double)` into a static array; call `dbg(...)` at the six points in `TubeEngine.hpp` and in `HalfbandStage::up/down`; export the array from `pump_wasm.cpp` (`__attribute__((export_name(...)))` for the wasm); build with the flags above; run the driver for 128 frames on both; diff the traces.
+Scratch driver, harness and traces were under `/home/claude/d1work` on the build machine and are not kept.
