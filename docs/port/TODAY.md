@@ -119,3 +119,11 @@ N1 step 10.
   pin (meta stamp 30b389d8, MASTER 75; the pin gives 72cc7e55, MASTER 77); nothing in this repo builds it (manual copy).
   **New item D6 (Sonnet, small, when a compile slot is free):** add the `x == 1.0` branch to `js_exp` exactly as V8 has it, with a
   `test_libm` case; every golden must stay unchanged; PR into `native`, merge when green, line in the review queue.
+- 11:15 B1, B3 done (Sonnet, read-only; appended to REVIEW-16NOV.md on `rev/16nov`). Section B is complete. The ports are faithful on
+  operation order, state and `js_*` routing in clkcores, idmcores, the U17 pad functions, Pitch correct and BBExpr. **Top finding, for
+  Fable (it is in the web app too, a worklet): a Bytebeat formula can loop forever**: a constant 50 or 51 is run as a jump through the
+  op 77 / 78 quirk, e.g. `(t && 51) + a`; reproduced in Node on the real JS. The 16 built-in formulas are safe; typed text can freeze
+  the audio thread. Proposed: cap executed steps per call, the same in JS and C++. Not to be fixed today (worklet; and the cap changes
+  nothing for formulas that end). Also: no module checks `ctx.block <= 128`; `modfx::find()` / `regAll()` allocate on first call (U31
+  must call them off the audio thread). Read by grep only, not in full: mod_basic, mod_stereo, mod_filters, fxbank, fxmap and parts of
+  five other modfx files (list in the report); the pump slot wake-up was not examined.
