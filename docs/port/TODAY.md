@@ -127,3 +127,13 @@ N1 step 10.
   nothing for formulas that end). Also: no module checks `ctx.block <= 128`; `modfx::find()` / `regAll()` allocate on first call (U31
   must call them off the audio thread). Read by grep only, not in full: mod_basic, mod_stereo, mod_filters, fxbank, fxmap and parts of
   five other modfx files (list in the report); the pump slot wake-up was not examined.
+- 11:40 D1 and D2 done (Sonnet; notes only, no fix applied). **D1, #182 (`n1/u18` f4ad8cb, U18-NOTES.md):** the first differing bit is the
+  float dot product `acc += evenTaps[j]*h[j]` in `HalfbandStage::up()` (pump pin, `common/dsp/Oversampler.hpp`), at the 5th input sample:
+  the wasm (`-ffast-math -msimd128`) sums in four lanes, the strict native build in sequence (0xb755edb3 against 0xb755edb2). Evaluation
+  order: not libm, not FMA, not x87. Measured: `-fno-associative-math` on the wasm build makes TUBE bit-exact with native over 163,840
+  samples; that the 14 CRUSH flips then vanish is inferred, not run. **D2, #186 (`rev/d2-mods` 98d6555, U21-NOTES.md):** the cause is
+  `-ffast-math` in both builds; built strict, native and wasm are bit-identical on eight cases (the worker's own, not the golden's).
+  Equal builds need `-fno-associative-math` on the wasm and `-fno-associative-math -fno-finite-math-only` on GCC, i.e. a golden from a
+  rebuilt `mods.wasm`: **Fable's decision, with the same question for `pump.wasm`** (one decision covers TUBE, Marbles, Tides and U25).
+  Started: one Sonnet worker for D6 (`n1/jsexp`), then D5 (`n1/modfx-fixture`), then D3 (TSan report to `/home/claude/progress/tsan.md`).
+  Still running: U22. Not started: D4, C2 onward.
