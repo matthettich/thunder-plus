@@ -1,5 +1,6 @@
 #include "engine/engine_json.h"
 #include "engine/layers.h"
+#include "engine/layer_pe.h"
 
 #include <cmath>
 
@@ -17,6 +18,7 @@ void eng_layer_from_json(EngLayer& L, Json j) {
   num(j, "lpCut", L.lpCut); num(j, "lpRes", L.lpRes); num(j, "lpEnv", L.lpEnv); num(j, "hpCut", L.hpCut); num(j, "hpRes", L.hpRes); num(j, "hpEnv", L.hpEnv);
   num(j, "fAtk", L.fAtk); num(j, "fDec", L.fDec); num(j, "delay", L.delay); num(j, "burst", L.burst); num(j, "spacing", L.spacing); num(j, "seed", L.seed);
   eng_layer_u23_from_json(L, j);
+  eng_layer_pe_from_json(L, j);   // U25 (a no-op without the library)
 }
 
 void eng_fx_from_json(EngFx& f, Json j) {

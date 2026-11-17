@@ -27,6 +27,8 @@ Each is explained at its place in `prepare.sh`. tfx.wasm built from the patched 
 | DaisySP `Effects/pitchshifter.h` (a patched copy in `ds/Effects/`) | `myrand()`'s seed per effect host, same reason | host builds (the wasm build does not use the copy) |
 | `clouds/dsp/grain.h` | no read of `lut_window[4097]` (one past the table, multiplied by 0) | every build (same value) |
 | `clouds/dsp/correlator.cc` | shift count masked to 5 bits (was a shift by 32: undefined; wasm takes it modulo 32) | every build (the wasm's result everywhere) |
+| `plaits/dsp/engine/waveshaping_engine.cc`, `plaits/dsp/speech/lpc_speech_synth.h`, `plaits/dsp/engine/wavetable_engine.cc`, `plaits/dsp/engine2/wave_terrain_engine.cc`, `plaits/dsp/oscillator/sine_oscillator.h` | indices kept inside their tables (`lut_fold`, `phonemes_`, `wave_map_`, `lut_sine` x2; U25, ASan fuzz; file, size and trigger in `prepare.sh`); no committed output changes | host builds (`#ifndef __wasm__`) |
+| `elements/dsp/string.cc`, `elements/dsp/resonator.cc` | no read of `lut_svf_shift[257]` / `lut_stiffness[257]` (one past a 257-entry table, multiplied by 0; U25, found by ASan; wasm unchanged) | host builds (`#ifndef __wasm__`) |
 
 ## Parity
 The gate is the audio, not the bytes: `native/tools/parity.sh u02` builds the three wasm files with CMake, swaps them (and the

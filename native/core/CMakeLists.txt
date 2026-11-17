@@ -27,6 +27,13 @@ if(TARGET thunder_dsp_tfx)
   target_include_directories(thunder_core PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../../dsp/tfx)
   target_compile_definitions(thunder_core PUBLIC THUNDER_HAVE_TFX=1)
 endif()
+# U25: the Plaits / Elements layer types host the strict upstream build (thunder_dsp_pe, dsp/pe_host.h) directly. layer_pe.cpp is always built (without the library the two types are simply not supported).
+target_sources(thunder_core PRIVATE src/engine/layer_pe.cpp)
+if(TARGET thunder_dsp_pe)
+  target_link_libraries(thunder_core PUBLIC thunder_dsp_pe)
+  target_include_directories(thunder_core PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/dsp)
+  target_compile_definitions(thunder_core PUBLIC THUNDER_ENGINE_PE=1)
+endif()
 # U21: the Random / Function generators (Marbles, Tides) host the mods C++ directly (make_marbles / make_tides of dsp/mods/mods.h), no wasm.
 # OFF by default: not bit-exact with the wasm-derived golden (see docs/port/U21-NOTES.md), so they are not in the registry and not gated.
 option(THUNDER_MODFX_MODS "Register the Marbles / Tides MODFX modules (hosted mods C++, built strict; gated at -100 dB against the JS wasm and by committed native hashes)" ON)

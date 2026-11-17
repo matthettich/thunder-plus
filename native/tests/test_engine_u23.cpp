@@ -134,7 +134,7 @@ int main(int argc, char** argv) {
     CHECK(eng_render_voice(V, o, tmp, 64, &n) == kEngUnsupported, "a layer of a type of a later unit must be refused");
     EngVoice W; W.layers[0].on = true; W.layers[0].type = LType::Sample; const size_t b = eng_render_bound(W, o); std::vector<float> out(b + 1);
     CHECK(b > 1 && eng_render_voice(W, o, out.data(), out.size(), &n) == kEngOk, "a sample layer with no sample must render (silently)");
-    CHECK(eng_layer_type("wavetable", 9) == LType::Wavetable && eng_layer_type("plaits", 6) == LType::Other, "layer type names"); }
+    CHECK(eng_layer_type("wavetable", 9) == LType::Wavetable && eng_layer_type("waves", 5) == LType::Other, "layer type names"); }
   std::printf("engine u23: %d failed\n", fails);
   if (!fails) std::printf("PASS test_engine_u23\n");
   return fails ? 1 : 0;

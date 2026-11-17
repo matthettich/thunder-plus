@@ -20,6 +20,7 @@
 #   native/tools/parity.sh u28     the rendered-only engines (tone, modal, swarm, drift, piano, ep, organ, breath, strings, fmdrum, wind, phase, partials, skin, chip + KeysUtil): engine_xeng (1068 factory voices bit-exact vs beta's engines.json hashes + 313 direct cases), golden current, rt_core (parity-u28.sh)
 #   native/tools/parity.sh u29     the second set of rendered-only engines (table + loaded wavetable, vector, scanned, resynth + analysis, bytebeat): engine_xeng2 (333 factory voices bit-exact vs beta's engines.json hashes + 262 direct cases), golden current, fuzz, rt_core (parity-u29.sh)
 #   native/tools/parity.sh u24     the engine's FM / additive / karplus / vosim / formant layer types: 110 factory voices + 383 direct cases bit-exact, golden current, rt_core (parity-u24.sh)
+#   native/tools/parity.sh u25     the engine's Plaits / Elements layer types (strict library): plumbing exact with the wasm's own pre-renders, -100 dB line with the cases beyond it left out by name, native hashes, rt_core (parity-u25.sh)
 #   native/tools/parity.sh u14     the track-effect host: ctest fx (91 cases vs the real ThunderFx), golden + table current, rt_core (parity-u14.sh)
 #   native/tools/parity.sh u02     the CMake-built effects wasm against every golden that renders through it (parity-u02.sh)
 # BUILD_DIR names the build folder (default /tmp/thunder-parity).
@@ -53,6 +54,7 @@ case "$unit" in
   u28) shift; exec sh "$here/parity-u28.sh" u28 "$@" ;;   # the rendered-only engines (parity-u28.sh)
   u29) shift; exec sh "$here/parity-u29.sh" u29 "$@" ;;   # the second set of rendered-only engines (parity-u29.sh)
   u24) shift; exec sh "$here/parity-u24.sh" u24 "$@" ;;   # the engine FM / additive layers (parity-u24.sh)
+  u25) shift; exec sh "$here/parity-u25.sh" u25 "$@" ;;   # the engine Plaits / Elements layers (parity-u25.sh)
   u14) shift; exec sh "$here/parity-u14.sh" u14 "$@" ;;   # the track-effect host (parity-u14.sh)   # meters and events out (parity-u13.sh)
   u02) shift; exec sh "$here/parity-u02.sh" u02 "$@" ;;   # the existing C++ DSP built from CMake: the goldens rendered through it (parity-u02.sh)
   u03) exec sh "$here/parity-u03.sh" "$@" ;;   # the pump DSP built from CMake: the goldens and pump's own compare (parity-u03.sh)

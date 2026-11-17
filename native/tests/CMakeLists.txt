@@ -291,6 +291,32 @@ else()
   add_test(NAME engine_u24 COMMAND test_engine_u24)   # no directory: prints FAIL and exits 1
 endif()
 
+# U25: the Plaits / Elements layer types against the real ENGINE block running the web's fast-math thunder-dsp.wasm (tools/engine-u25-dump.mjs): -100 dB per case, the exact cases kept exact,
+# and the native strict render pinned by committed hashes (golden/engine_u25_native.inc). Needs a PIN_WASM_DIR / waves/dsp/thunder-dsp.wasm (the file the app ships).
+add_executable(test_engine_u25 test_engine_u25.cpp)
+target_link_libraries(test_engine_u25 PRIVATE thunder_core)
+target_include_directories(test_engine_u25 PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../core/src ${CMAKE_CURRENT_SOURCE_DIR})
+if(NOT MSVC)
+  target_compile_options(test_engine_u25 PRIVATE -Wall -Wextra)
+endif()
+if(NODE_EXE)
+  add_test(NAME engine_u25_ref COMMAND ${NODE_EXE} ${CMAKE_CURRENT_SOURCE_DIR}/../tools/engine-u25-dump.mjs ${CMAKE_CURRENT_BINARY_DIR}/engine-u25-ref)
+  set_tests_properties(engine_u25_ref PROPERTIES FIXTURES_SETUP engine_u25_ref)
+  add_test(NAME engine_u25 COMMAND test_engine_u25 ${CMAKE_CURRENT_BINARY_DIR}/engine-u25-ref)
+  set_tests_properties(engine_u25 PROPERTIES FIXTURES_REQUIRED engine_u25_ref)
+else()
+  add_test(NAME engine_u25 COMMAND test_engine_u25)   # no directory: prints FAIL and exits 1
+endif()
+
+# U25: memory safety of the Plaits / Elements layers over the corners of the sliders' ranges (run under ASan + UBSan in CI)
+add_executable(test_engine_u25_fuzz test_engine_u25_fuzz.cpp)
+target_link_libraries(test_engine_u25_fuzz PRIVATE thunder_core)
+target_include_directories(test_engine_u25_fuzz PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../core/src ${CMAKE_CURRENT_SOURCE_DIR})
+if(NOT MSVC)
+  target_compile_options(test_engine_u25_fuzz PRIVATE -Wall -Wextra)
+endif()
+add_test(NAME engine_u25_fuzz COMMAND test_engine_u25_fuzz)
+
 # N1 review fixes: hostile inputs (the independent review's findings, one regression test each). Names the finding in every failure line.
 add_executable(test_hostile test_hostile.cpp)
 target_link_libraries(test_hostile PRIVATE thunder_core)

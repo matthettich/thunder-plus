@@ -149,6 +149,150 @@ new="""  // Thunder: phase == 1 would read lut_raised_cosine[257], past the 257-
 if s.count(old)!=1: sys.exit("Marbles lag_processor.cc patch failed")
 open(p,'w').write(s.replace(old,new,1))
 PY
+# Elements (U25, found by AddressSanitizer): two reads one float past a 257-entry table, each times a fraction of 0. Neither changes any output
+# (on the wasm path nothing changes; natively two new U25 cases render differently, see U25-NOTES.md).
+# 1. elements/dsp/string.cc line 128, String::Process: Interpolate(lut_svf_shift, damping_cutoff, 1.0f) with damping_cutoff == 256.0f reads [257].
+# 2. elements/dsp/resonator.cc line 67, Resonator::Process: Interpolate(lut_stiffness, geometry_, 256.0f) with geometry_ == 1.0f reads [257].
+# Host builds only (#ifdef __wasm__ keeps the original): the web's wasm module is what the existing waves goldens were made with, and its read is of fixed bytes.
+python3 - "$E/elements/dsp/string.cc" "$E/elements/dsp/resonator.cc" <<'PY'
+import sys
+for p,old,new in [(sys.argv[1],"1.0f - Interpolate(lut_svf_shift, damping_cutoff, 1.0f),","""#ifdef __wasm__
+      1.0f - Interpolate(lut_svf_shift, damping_cutoff, 1.0f),
+#else
+      1.0f - (damping_cutoff >= 256.0f ? lut_svf_shift[256] : Interpolate(lut_svf_shift, damping_cutoff, 1.0f)),
+#endif"""),
+                  (sys.argv[2],"float stiffness = Interpolate(lut_stiffness, geometry_, 256.0f);","""#ifdef __wasm__
+  float stiffness = Interpolate(lut_stiffness, geometry_, 256.0f);
+#else
+  float stiffness = geometry_ >= 1.0f ? lut_stiffness[256] : Interpolate(lut_stiffness, geometry_, 256.0f);
+#endif""")]:
+    s=open(p).read()
+    if s.count(old)!=1: sys.exit(p+" Elements patch failed")
+    open(p,'w').write(s.replace(old,new,1))
+PY
+# Plaits (U25, found by the ASan + UBSan fuzz over the whole slider ranges; the lead's order of 17 Nov: clamp each index to its table). Host builds only (#ifdef __wasm__ keeps the original read):
+# the web's wasm module is what the existing goldens were made with, and what it reads there is whatever its linear memory holds. A clamp changes no output where the index was inside its table.
+# 1. plaits/dsp/engine/waveshaping_engine.cc, WaveshapingEngine::Render: lut_fold / lut_fold_2 are 516 floats read as InterpolateHermite(table + 1, index, 512), so `index` must lie in about 0..1.
+#    Trigger: the slope oscillator at a tiny f0 (note below about -24; the engine clamps the note at -119) returns values of 1e8 and more, so ws_index = 127 * out + 128 leaves the int range (a
+#    float-to-int overflow) and the shaper table value that follows is garbage, mix * gain + 0.5 is far outside 0..1: a read up to megabytes outside lut_fold (a crash natively). Fixed by clamping
+#    ws_index to +-2e9 (inside int; NaN to 0) and `index` to the range whose table index i = trunc(index * 512) is 0 .. 512 (below -1/512 and NaN to 0, 513/512 and above to the last one inside); indices inside that range are untouched.
+# 2. plaits/dsp/speech/lpc_speech_synth.h, LPCSpeechSynth::PlayFrame(frames, frame, interpolate): reads frames[i + 1] also when interpolate is false (the blend is then 0, so the second frame
+#    is multiplied by 0). Table: phonemes_ = 15 frames x 14 bytes = 210 bytes (lpc_speech_synth_controller.cc:259, playback of a consonant, the last one i = 14 reads frame 15). Trigger: a
+#    speech model trigger that picks consonant 14, the last in the table. Fixed: with interpolate false the second frame is the first (blend 0: the same value).
+python3 - "$E/plaits/dsp/engine/waveshaping_engine.cc" "$E/plaits/dsp/speech/lpc_speech_synth.h" <<'PY'
+import sys
+p=sys.argv[1]; s=open(p).read()
+old1="    float ws_index = 127.0f * out[i] + 128.0f;\n"
+new1="""    float ws_index = 127.0f * out[i] + 128.0f;
+#ifndef __wasm__
+    if (!(ws_index >= -2.0e9f)) ws_index = ws_index > 0.0f ? 2.0e9f : -2.0e9f;   // Thunder (prepare.sh): the int conversion below needs a value inside int (NaN: -2e9)
+    else if (ws_index > 2.0e9f) ws_index = 2.0e9f;
+#endif
+"""
+old2="    float mix = x + (y - x) * shape_fractional;\n    float index = mix * wf_gain_modulation.Next() + 0.5f;\n"
+new2=old2+"""#ifndef __wasm__
+    if (!(index > -0.001953125f)) index = 0.0f;   // Thunder (prepare.sh): lut_fold has 516 entries, read at [i .. i + 3] + 1 for i = trunc(index * 512): i must be 0 .. 512 (NaN: 0)
+    else if (!(index < 1.001953125f)) index = 1.0019529f;
+#endif
+"""
+for o,n in [(old1,new1),(old2,new2)]:
+    if s.count(o)!=1: sys.exit("plaits waveshaping patch failed")
+    s=s.replace(o,n,1)
+open(p,'w').write(s)
+p=sys.argv[2]; s=open(p).read()
+old="""    PlayFrame(
+        frames[frame_integral],
+        frames[frame_integral + 1],
+        frame_fractional);
+"""
+new="""#ifdef __wasm__
+    PlayFrame(
+        frames[frame_integral],
+        frames[frame_integral + 1],
+        frame_fractional);
+#else
+    // Thunder (prepare.sh): without interpolation the blend is 0 and the second frame is multiplied by 0; do not read the frame after the table's end
+    PlayFrame(
+        frames[frame_integral],
+        frames[interpolate ? frame_integral + 1 : frame_integral],
+        frame_fractional);
+#endif
+"""
+if s.count(old)!=1: sys.exit("plaits speech patch failed")
+open(p,'w').write(s.replace(old,new,1))
+PY
+# 3. plaits/dsp/engine/wavetable_engine.cc, WavetableEngine::ReadWave (model 13, the NULL wave_map_ entry crash, U25 17 Nov): wave_map_ has 4 banks x 64 = 256 entries (LoadUserData fills all of
+#    them) but x + y * 8 + z * 64 is computed from x0 / x1 = x_integral (+ 1), y likewise (0..8) and z0 / z1 = z_integral (+ 1) folded by `7 - z` (-1 .. 3). With a quantised parameter (harmonics
+#    above 4/7: `quantization` 1) the interpolated position reaches EXACTLY 7.0 (x_fractional + 1 after Clamp()), and then the "next" corner is 8 (or, for z, -1): idx 256 and up (found: x=0 y=8
+#    z=3 idx 256; case harmonics 0.999999, morph 0.99, fm 1, note 96) or below 0. The corner is multiplied by a fractional part of 0, but it is READ: the slot past the 256 filled entries is NULL (a
+#    zero-filled shared buffer), so the read is NULL + phase: a crash natively (the wasm reads its low linear memory there, harmlessly: a different value times 0). Not a hosting difference: the
+#    web wrapper (dsp/w_plaits.cc) and pe_host.cc make the same calls with the same 16384-byte allocator. Fix: x and y to 0..7 and z to 0..3 where the corner is read (the value is multiplied by
+#    a fraction of 0 there, so no output changes), and wave_map_ allocated with the 256 entries LoadUserData writes (it allocated 64 and wrote 256: inside the shared buffer, so harmless, but wrong).
+python3 - "$E/plaits/dsp/engine/wavetable_engine.cc" <<'PY'
+import sys
+p=sys.argv[1]; s=open(p).read()
+old1="  wave_map_ = allocator->Allocate<const int16_t*>(kNumWavesPerBank);\n"
+new1="""#ifdef __wasm__
+  wave_map_ = allocator->Allocate<const int16_t*>(kNumWavesPerBank);
+#else
+  wave_map_ = allocator->Allocate<const int16_t*>(kNumBanks * kNumWavesPerBank);   // Thunder (prepare.sh): LoadUserData fills all 256
+#endif
+"""
+old2="  return InterpolateWaveHermite(\n      wave_map_[x + y * 8 + z * kNumWavesPerBank],"
+new2="""#ifndef __wasm__
+  // Thunder (prepare.sh): the corner after a coordinate of exactly 7.0 (or z folded to -1) is read with a weight of 0: keep it inside the 4 x 8 x 8 map
+  x = x < 0 ? 0 : (x > 7 ? 7 : x);
+  y = y < 0 ? 0 : (y > 7 ? 7 : y);
+  z = z < 0 ? 0 : (z > 3 ? 3 : z);
+#endif
+  return InterpolateWaveHermite(
+      wave_map_[x + y * 8 + z * kNumWavesPerBank],"""
+for o,n in [(old1,new1),(old2,new2)]:
+    if s.count(o)!=1: sys.exit("plaits wavetable patch failed")
+    s=s.replace(o,n,1)
+open(p,'w').write(s)
+PY
+# 4. plaits/dsp/engine2/wave_terrain_engine.cc, WaveTerrainEngine::Render, `aux[i] = Sine(1.0f + 0.5f * kScale * aux_s)` (model 5): Sine() is InterpolateWrap on lut_sine (512 + 4 floats) and only
+#    works for a phase of 0 or more (the file's own comment: "only works for a positive argument"). aux_s is the sum over 2 sub-samples of y + z, each in -1..1 on paper, so the phase is >= 0 on
+#    paper; the magic-sine path overshoots 1 by 0.1 % (radius 0.999 with an amplitude drifting above 1: y = -1.001 seen), so with z = -1 the phase is about -0.002 and below and the integral
+#    index is -1: a read 4 bytes before lut_sine (ASan; found with pFm -1, strike, timbre 1). Fixed: a phase at or below -1/512 (where the index would be -1; NaN too) becomes 0. Phases
+#    above it (index 0 with a negative fraction, inside the table) are left as they were.
+python3 - "$E/plaits/dsp/engine2/wave_terrain_engine.cc" <<'PY'
+import sys
+p=sys.argv[1]; s=open(p).read()
+old="    aux[i] = Sine(1.0f + 0.5f * kScale * aux_s);\n"
+new="""#ifdef __wasm__
+    aux[i] = Sine(1.0f + 0.5f * kScale * aux_s);
+#else
+    {
+      float aux_phase = 1.0f + 0.5f * kScale * aux_s;   // Thunder (prepare.sh): see the note in prepare.sh, patch 4
+      if (!(aux_phase > -1.0f / 512.0f)) aux_phase = 0.0f;
+      aux[i] = Sine(aux_phase);
+    }
+#endif
+"""
+if s.count(old)!=1: sys.exit("plaits wave terrain patch failed")
+open(p,'w').write(s.replace(old,new,1))
+PY
+# 5. plaits/dsp/oscillator/sine_oscillator.h, SineNoWrap(phase) (the header's own comment: "potentially unsafe, if phase >= 1.25"): lut_sine has 641 floats (512 + 128 + 1), Interpolate reads
+#    [index], [index + 1] with index = phase * 512. A phase of 1.25 and more, or of -1/512 and less, reads outside it. Trigger: a NaN phase (AnalogBassDrum::Render, model 21, sustain mode: the
+#    resonator at a note of about -30 and lower, scale = 0.001 / f0, goes NaN, then f, then phase_; found with tune -57, fm -0.43: a read 0 bytes after lut_sine). Fixed: NaN and phases at or below
+#    -1/512 become 0, phases of 1.25 and above become 1.2499999 (the last that reads inside); every phase in between (including the small negative ones, index 0) is untouched.
+python3 - "$E/plaits/dsp/oscillator/sine_oscillator.h" <<'PY'
+import sys
+p=sys.argv[1]; s=open(p).read()
+old="inline float SineNoWrap(float phase) {\n  return stmlib::Interpolate(lut_sine, phase, kSineLUTSize);\n}"
+new="""inline float SineNoWrap(float phase) {
+#ifndef __wasm__
+  // Thunder (prepare.sh, patch 5): keep the read inside lut_sine (641 floats)
+  if (!(phase > -1.0f / 512.0f)) phase = 0.0f;
+  else if (!(phase < 1.25f)) phase = 1.2499999f;   // the largest float below 1.25: index 639, plus 1 = 640, the last entry
+#endif
+  return stmlib::Interpolate(lut_sine, phase, kSineLUTSize);
+}"""
+if s.count(old)!=1: sys.exit("plaits SineNoWrap patch failed")
+open(p,'w').write(s.replace(old,new,1))
+PY
 # Cloud Seed: smaller delay buffers (tfx/build.sh)
 cp -r "$D/CloudSeedCore" "$O/cs"; rm -rf "$O/cs/.git"; C="$O/cs"
 $SED -i 's/DelayBufferSize = 192000 \* 2;/DelayBufferSize = 32768;/' "$C/DSP/ModulatedDelay.h" "$C/DSP/MultitapDelay.h"

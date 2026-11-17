@@ -7,6 +7,7 @@
 #include <cstring>
 #include <vector>
 
+#include "engine/layer_pe.h"
 #include "engine/layer_u24.h"
 #include "fx/u17cores.h"
 #include "rt/jsmath.h"
@@ -40,7 +41,7 @@ inline double orv(double x, double d) { return (x != 0 && x == x) ? x : d; }   /
 inline float f32(double x) { return (float)x; }
 }  // namespace
 
-void eng_init() { (void)sinTable(); (void)eng_pwm_default(nullptr, nullptr); }
+void eng_init() { (void)sinTable(); (void)eng_pwm_default(nullptr, nullptr); pe_prepare(); }
 const float* eng_sin_table() { return sinTable().v; }
 
 double eng_sinT(double p) {
@@ -74,6 +75,7 @@ uint32_t EngSeedCounter::next() {
 
 LType eng_layer_type(const char* name, size_t n) {
   { const LType u = u24_layer_type(name, n); if (u != LType::Other) return u; }   // U24
+  { const LType u = pe_layer_type(name, n); if (u != LType::Other) return u; }    // U25 (Other without the library)
   static const struct { const char* s; LType t; } T[] = {{"sine", LType::Sine}, {"tri", LType::Tri}, {"saw", LType::Saw}, {"square", LType::Square}, {"pulse", LType::Pulse},
     {"white", LType::White}, {"pink", LType::Pink}, {"brown", LType::Brown}, {"blue", LType::Blue}, {"metal", LType::Metal}, {"lfsr", LType::Lfsr}, {"dust", LType::Dust}, {"grit", LType::Grit},
     {"click", LType::Click}, {"wavetable", LType::Wavetable}, {"pd", LType::Pd}, {"chip", LType::Chip}, {"supersaw", LType::Supersaw}, {"pwm", LType::Pwm}, {"sample", LType::Sample}, {"grains", LType::Grains}};
@@ -105,6 +107,7 @@ struct Osc {
   // dust / grit
   double p = 0, cf = 0, k = 0, y = 0, cg = 0, accg = 1;
   U24Osc u24;   // U24: FM / additive / karplus / vosim / formant (layer_u24.h)
+  PeOsc pe;     // U25: plaits / elements: the pre-render's playback (layer_pe.h; made by renderLayer, which has the voice and the length)
 
   void init(const EngLayer& L, double sr) {
     const double A = L.a, B = L.b; t = L.type; R.reseed(orv(L.seed, 7));   // rng(L.seed || 7)
@@ -168,7 +171,7 @@ struct Osc {
         const double imp = R.next() < p ? (R.next() * 2 - 1) : 0; y += (imp - y) * cf; return jmax(-1, jmin(1, y * k)); }
       case LType::Grit: {
         accg += inc * mult; if (accg >= 1) { accg -= std::floor(accg); held = R.next() * 2 - 1; } y += (held - y) * cg; return y; }
-      default: return LayerOsc::handles(t) ? x.s(inc, R) : u24_is(t) ? u24.s(inc, R) : 0;
+      default: return LayerOsc::handles(t) ? x.s(inc, R) : u24_is(t) ? u24.s(inc, R) : pe_is(t) ? pe.s() : 0;
     }
   }
 };
@@ -228,7 +231,7 @@ double voiceLen(const EngVoice& V, double gate, double len) {
 }
 
 // ---- renderLayer ----------------------------------------------------------------------------------------------------------------------------------------
-void renderLayer(const EngLayer& L, const EngVoice& V, double bpm, double sr, float* out, size_t N) {
+void renderLayer(const EngLayer& L, const EngVoice& V, double bpm, double sr, float* out, size_t N, PeUse& peUse) {
   const double d0 = js_round(L.delay / 1000 * sr); if (d0 >= (double)N) return;
   const double f0 = kBase * js_pow(2, (L.tune + V.tune + L.fine / 100) / 12);
   const double ptau = jmax(L.pDec, 1) / 4000, pA = L.pAmt;
@@ -259,6 +262,7 @@ void renderLayer(const EngLayer& L, const EngVoice& V, double bpm, double sr, fl
   double l1 = 0, l2 = 0, h1 = 0, h2 = 0, la1 = 0, la2 = 0, la3 = 0, lk = 2, ha1 = 0, ha2 = 0, ha3 = 0, hk = 2;
   const double tEnd = layerLen(L, V.gate) + 0.002;
   Osc osc; osc.init(L, sr);
+  if (pe_is(L.type)) osc.pe.init(peUse, L, V, sr, jmin(tEnd + 0.01, (double)N / sr), pA, ptau);   // plaitsPre / elementsPre(L, V, preDur, pA, ptau)
   const double gain = L.level * L.level, M = (double)N - d0; const int BLK = 16;
   double ePrev = ampAt(0);
   for (double i = 0; i < M; i += BLK) {
@@ -359,14 +363,16 @@ size_t eng_render_bound(const EngVoice& V0, const EngRenderOpts& o) {
 int eng_render_voice(const EngVoice& V0, const EngRenderOpts& o, float* out, size_t cap, size_t* nOut) {
   const double sr = o.sr;
   EngVoice V = V0; applyHold(V, o);
-  for (int i = 0; i < V.nLayers; i++) { const EngLayer& L = V.layers[i]; if (L.on && L.level > 0 && (!eng_type_supported(L.type) || !u24_layer_ok(L))) return kEngUnsupported; }
+  for (int i = 0; i < V.nLayers; i++) { const EngLayer& L = V.layers[i]; if (L.on && L.level > 0 && (!eng_type_supported(L.type) || !u24_layer_ok(L) || !pe_layer_ok(L))) return kEngUnsupported; }
   const size_t bound = eng_render_bound(V0, o);
   if (bound == 0 || cap < bound) return kEngTooSmall;
   const Plan p = planOf(V, o);
   const size_t N = (size_t)p.N;
   const bool gFilt = V.gLpCut < 19900 || V.gLpEnv != 0;
   std::memset(out, 0, N * sizeof(float));
-  for (int i = 0; i < V.nLayers; i++) { const EngLayer& L = V.layers[i]; if (L.on && L.level > 0) renderLayer(L, V, o.bpm, sr, out, N); }
+  PeUse peUse;   // the Plaits / Elements Session of this voice (started by the first layer that needs it)
+  for (int i = 0; i < V.nLayers; i++) { const EngLayer& L = V.layers[i]; if (L.on && L.level > 0) renderLayer(L, V, o.bpm, sr, out, N, peUse); }
+  if (peUse.bad) return kEngUnsupported;   // a pre-render length the JS cannot allocate (it throws)
   if (gFilt) voiceFilter(V, sr, out, N);
   if (V.gAmpOn) voiceAmp(V, sr, out, N);
   {

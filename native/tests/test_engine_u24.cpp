@@ -95,7 +95,7 @@ int main(int argc, char** argv) {
     if (eng_render_voice(X, o, tmp, 64, &n) != kEngUnsupported) { std::printf("FAIL: an FM algorithm that is NaN (the JS throws) must be refused\n"); fails++; }
     static const char* const names[] = {"fm2", "fmfb", "fmmetal", "fmcross", "fm4", "fm6", "genesis", "sb", "arcade", "addsaw", "addodd", "membrane", "bell", "bar", "chord", "formant", "karplus", "vosim"};
     for (const char* nm : names) if (!eng_type_supported(eng_layer_type(nm, std::strlen(nm)))) { std::printf("FAIL: %s is not a supported layer type\n", nm); fails++; }
-    if (eng_type_supported(eng_layer_type("plaits", 6))) { std::printf("FAIL: plaits must not be supported\n"); fails++; } }
+    if (eng_type_supported(eng_layer_type("waves", 5))) { std::printf("FAIL: waves must not be supported (U30)\n"); fails++; } }
   std::printf("engine U24: %d of %d factory voices and %d of %d direct cases bit-exact against the committed hashes (beta's golden / the real JS on x86-64 Linux); local Node reference differs for %d; %d failed\n", exact, ran, cexact, cran, localDiff, fails);
   if (exact != ran || cexact != cran) fails++;
   if (!fails) std::printf("PASS test_engine_u24\n");
