@@ -675,3 +675,9 @@ if(NODE_EXE AND CMAKE_SYSTEM_NAME STREQUAL "Linux" AND CMAKE_SYSTEM_PROCESSOR MA
   add_test(NAME waves_golden_current COMMAND ${NODE_EXE} ${CMAKE_CURRENT_SOURCE_DIR}/../tools/waves-dump.mjs --check)
   add_test(NAME waves_table_current COMMAND ${NODE_EXE} ${CMAKE_CURRENT_SOURCE_DIR}/../tools/waves-gen.mjs --check)
 endif()
+
+# U30: the fuzz (random hostile patches and events; a small count here, 5000 and more under ASan + UBSan with -DTHUNDER_SANITIZE=ON: docs/port/U30-NOTES.md)
+add_executable(test_waves_fuzz test_waves_fuzz.cpp)
+target_link_libraries(test_waves_fuzz PRIVATE thunder_core)
+target_include_directories(test_waves_fuzz PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../core/src ${CMAKE_CURRENT_SOURCE_DIR})
+add_test(NAME waves_fuzz COMMAND test_waves_fuzz 150 1 20)

@@ -50,6 +50,7 @@ bool Host::havePE() {
 uint32_t Host::nextSeed() { seedN = js_to_uint32((double)seedN * 1103515245 + 12345); return seedN; }
 void Host::setRandom(Rnd k, uint32_t s) { rndKind = k; rndS = s; }
 double Host::random() {
+  if (rndKind == Rnd::Fixed) return fixed;
   if (rndKind == Rnd::Xorshift) { uint32_t s = rndS; s ^= s << 13; s ^= s >> 17; s ^= s << 5; rndS = s; return (double)s / 4294967296.0; }
   rndS += 0x6d2b79f5u; uint32_t t = rndS; t = (t ^ (t >> 15)) * (t | 1u); t ^= t + (t ^ (t >> 7)) * (t | 61u); return (double)(t ^ (t >> 14)) / 4294967296.0;
 }
@@ -254,18 +255,22 @@ struct Resampler {
     p += step;
   }
 };
+// Hostile values (the wasm indexes its tables with them unchecked): a NaN becomes the parameter's default, any value is held inside the parameter's range, and a note inside +-200 semitones
+inline double pin(const ParamDef& d, double v) { return v != v ? d.def : clamp(v, d.mn, d.mx); }
+inline double noteIn(double v) { return v != v ? 0 : clamp(v, -200, 200); }
 class PlaitsM : public WModule {
  public:
   PlaitsM(double sr, Seeds&) : ok_(sr >= 1000 && sr <= 1e6) { if (ok_) { s_ = thunder_pe::session_new(); thunder_pe::pl_init(s_); rs_.init(48000, sr, 12); } }
   ~PlaitsM() override { if (s_) thunder_pe::session_free(s_); }
   void process(const IO& io, const Ctx& c) override {
     if (!ok_ || !s_ || W(c).draft) { fill(io, 0, 0); fill(io, 1, 0); return; }
-    const double* p = io.p; const bool g = lk(io, 1); const int eng = i32(p[0]);
+    double p[6]; for (int k = 0; k < 6; k++) p[k] = pin(kWP_plaits[k], io.p[k]);
+    const bool g = lk(io, 1); const int eng = i32(p[0]);
     if (eng < 0 || eng > 23) { W(c).fail = true; return; }
     for (int i = 0; i < c.block; i++) {
       double fr[2];
       rs_.next(fr, [&](float* a, float* b) {
-        thunder_pe::pl_set(s_, eng, (float)(60 + (double)io.in[0][i]), (float)clamp(p[1] + (double)io.in[4][i], 0, 1), (float)clamp(p[2] + (double)io.in[2][i], 0, 1),
+        thunder_pe::pl_set(s_, eng, (float)(60 + noteIn((double)io.in[0][i])), (float)clamp(p[1] + (double)io.in[4][i], 0, 1), (float)clamp(p[2] + (double)io.in[2][i], 0, 1),
           (float)clamp(p[3] + (double)io.in[3][i], 0, 1), (float)p[4], (float)p[5], 0.f, 0.f, 0.f, g ? 1 : 0);
         thunder_pe::pl_trigger(s_, g && io.in[1][i] > .5 ? 1.f : 0.f);
         thunder_pe::pl_render(s_, 12);
@@ -284,13 +289,14 @@ class ElementsM : public WModule {
   ~ElementsM() override { if (s_) thunder_pe::session_free(s_); }
   void process(const IO& io, const Ctx& c) override {
     if (!ok_ || !s_ || W(c).draft) { fill(io, 0, 0); fill(io, 1, 0); return; }
-    const double* p = io.p; const int model = i32(p[0]);
+    double p[13]; for (int k = 0; k < 13; k++) p[k] = pin(kWP_elements[k], io.p[k]);
+    const int model = i32(p[0]);
     if (model < 0 || model > 2) { W(c).fail = true; return; }
     for (int i = 0; i < c.block; i++) {
       double fr[2];
       rs_.next(fr, [&](float* a, float* b) {
         const bool g = lk(io, 1) ? io.in[1][i] > .5 : true;
-        thunder_pe::el_set(s_, model, (float)(60 + (double)io.in[0][i]), (float)clamp(.8 + (double)io.in[2][i], 0, 1), (float)p[1], (float)p[2], (float)p[3], (float)p[4],
+        thunder_pe::el_set(s_, model, (float)(60 + noteIn((double)io.in[0][i])), (float)clamp(.8 + (double)io.in[2][i], 0, 1), (float)p[1], (float)p[2], (float)p[3], (float)p[4],
           (float)p[6], (float)p[7], (float)p[6], (float)p[5], (float)p[6], (float)p[8], (float)p[9], (float)p[10], (float)p[11], (float)p[12]);
         thunder_pe::el_gate(s_, g ? 1 : 0);
         thunder_pe::el_process(s_, 16);
@@ -673,7 +679,7 @@ struct FxState { FxState(Host* h) { if (h) { thunder_wasi_rand_use(&h->wasiRand)
 #endif
 class Eff : public WModule {
  public:
-  Eff(double sr, Seeds& s, int id, MapFn map, int wetAt, bool rings) : id_(id), map_(map), wetAt_(wetAt), rings_(rings), host_(static_cast<WSeeds&>(s).host) {
+  Eff(double sr, Seeds& s, const char* type, int id, MapFn map, int wetAt, bool rings) : id_(id), map_(map), wetAt_(wetAt), rings_(rings), host_(static_cast<WSeeds&>(s).host), wi_(winfo(type)) {
 #ifdef THUNDER_HAVE_TFX
     FxState st(host_); fx_ = make_fx(id, (float)sr);
 #else
@@ -690,9 +696,13 @@ class Eff : public WModule {
     const float* L0 = io.in[0]; const float* R0 = io.linked[1] ? io.in[1] : io.in[0];
     if (!fx_) { std::memcpy(io.out[0], L0, sizeof(float) * kBlock); std::memcpy(io.out[1], R0, sizeof(float) * kBlock); return; }
 #ifdef THUNDER_HAVE_TFX
+    // Hostile values (the wasm effects trap or read out of bounds on them, the JS then bypasses the effect; here they would crash): a parameter is held inside its range (a NaN takes its default), and what the map
+    // makes of it must be finite and sane; in range, which is every value a slider or a modulation cable gives, nothing changes
+    double q[16]; const int np = wi_ ? wi_->np : 0; for (int k = 0; k < np && k < 16; k++) q[k] = pin(wi_->params[k], io.p[k]);
     double P[12]; for (int k = 0; k < 12; k++) P[k] = 0;
-    if (rings_) { double q[9]; for (int k = 0; k < 9; k++) q[k] = io.p[k]; q[2] = io.p[2] + (double)io.in[2][0]; map_(q, w, P); }   // Rings: the note + the pitch input
-    else map_(io.p, w, P);
+    if (rings_) { q[2] = noteIn(q[2] + (double)io.in[2][0]); }   // Rings: the note + the pitch input
+    map_(q, w, P);
+    for (int k = 0; k < 12; k++) P[k] = P[k] != P[k] ? 0 : clamp(P[k], -1e7, 1e7);
     for (int k = 0; k < 12; k++) fx_->p[k] = (float)P[k];
     const double wm = wetAt_ < 0 ? -1 : (double)fx_->p[wetAt_]; if (wm >= 0) fx_->p[wetAt_] = 1;
     for (int i = 0; i < n; i++) { const double a = L0[i], b = R0[i], dn = (i & 1) ? 1e-18 : -1e-18; L_[i] = (float)((a > -8 && a < 8 ? a : 0) + dn); R_[i] = (float)((b > -8 && b < 8 ? b : 0) + dn); }
@@ -703,7 +713,7 @@ class Eff : public WModule {
 #endif
   }
  private:
-  int id_; MapFn map_; int wetAt_; bool rings_; Host* host_;
+  int id_; MapFn map_; int wetAt_; bool rings_; Host* host_; const WInfo* wi_;
 #ifdef THUNDER_HAVE_TFX
   Fx* fx_ = nullptr; float L_[128] = {}, R_[128] = {};
 #else
@@ -743,9 +753,7 @@ MAPF(m_fshift) { (void)c; o[0] = jsign(p[0]) * p[0] * p[0] * 2000; o[1] = p[1]; 
 MAPF(m_cab) { (void)c; o[0] = ((i32(p[0]) + 0.5) / 6); for (int k = 1; k < 6; k++) o[k] = p[k]; }
 #undef MAPF
 
-template <int ID, MapFn MAP, int WET, bool RINGS> std::unique_ptr<Module> mkEff(double sr, Seeds& s) {
-  return std::unique_ptr<Module>(new Eff(sr, s, ID, MAP, WET, RINGS));
-}
+
 // a parameter count is needed by Eff: the factory table below sets it from the generated table
 template <class M> std::unique_ptr<Module> mk(double sr, Seeds& s) { return std::unique_ptr<Module>(new M(sr, s)); }
 
@@ -779,7 +787,7 @@ void Sequencer::process(const IO& io, const Ctx& c) {
 
 struct Own { const char* type; std::unique_ptr<Module> (*make)(double, Seeds&); };
 // effect factories: id, map, wetAt (the effect()'s arguments)
-#define EF(T, ID, MAP, WET, R) {T, mkEff<ID, MAP, WET, R>}
+#define EF(T, ID, MAP, WET, R) {T, [](double sr, Seeds& s) -> std::unique_ptr<Module> { return std::unique_ptr<Module>(new Eff(sr, s, T, ID, MAP, WET, R)); }}
 const Own kOwn[] = {
   {"hostIn", mk<HostIn>}, {"vco", mk<VCO>}, {"fm", mk<FM>}, {"additive", mk<Additive>}, {"noise", mk<Noise>}, {"plaits", mk<PlaitsM>}, {"elements", mk<ElementsM>}, {"vcf", mk<VCF>}, {"vca", mk<VCA>}, {"mixer", mk<Mixer>},
   {"lfo", mk<LFO>}, {"adsr", mk<ADSR>}, {"random", mk<RandomM>}, {"atten", mk<Atten>}, {"seq", mk<Sequencer>}, {"out", mk<Out>}, {"string", mk<KString>}, {"scope", mk<Scope>}, {"expr", mk<Expression>},

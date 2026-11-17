@@ -69,11 +69,13 @@ class VoicePool {
 // tfx wasm INSTANCE (one per scope: wasi's rand(), stmlib's Random, DaisySP's myrand). A test makes one Host per "page".
 class Host {
  public:
-  enum class Rnd { Xorshift, Mulberry };
+  enum class Rnd { Xorshift, Mulberry, Fixed };
   Host() = default;
   uint32_t nextSeed();                          // seedN = (seedN * 1103515245 + 12345) >>> 0
   double random();                              // Math.random
   void setRandom(Rnd kind, uint32_t seed);      // Xorshift: tests/helpers.js freezeClock (0x9e3779b9); Mulberry: the page's renders (index.html wavesPre / wavesLiveRender)
+  void setFixed(double v) { rndKind = Rnd::Fixed; fixed = v; }   // Math.random() === v (a test's way to make a skipped module not shift the others' draws)
+  double fixed = 0.25;
   uint32_t seedN = 12345;
   Rnd rndKind = Rnd::Xorshift; uint32_t rndS = 0x9e3779b9u;
   uint64_t wasiRand = 0; uint32_t stmRng = 0x21, daisySeed = 1;   // the effects' instance state

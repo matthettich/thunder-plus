@@ -84,7 +84,7 @@ struct Slot {
 };
 struct ModNode {
   std::string id; const WInfo* wi = nullptr; const Def* def = nullptr;
-  std::vector<double> base; std::vector<uint16_t> text; int textLen = -1;
+  std::vector<uint16_t> text; int textLen = -1; std::vector<double> base, bp;   // base: the parameter values as set (the JS's inst.params); bp: the same held inside each parameter's range (what the modules get) int textLen = -1;
   bool poly = false; int idx = 0; bool inOnly = false;
   std::vector<GCable> inc; bool linked[modfx::kMaxPorts] = {}; std::vector<int> exits;
   std::vector<Slot> slots; bool slotsMade = false; bool slotsPoly = false; int weight = 1;
@@ -98,6 +98,11 @@ int weightOf(const WInfo& w) {
     "sdelay", "marbles", "tides", "pdelay", "preverb", "string", "additive", "reson", "flex", "sgate", "retrig"};
   for (const char* b : big) if (t == b) return 16;
   return 1;
+}
+// Hostile values: a module's parameter outside its declared range crashes some modules (the fuzz found it) where the JS computes with it. Held inside the range, a NaN taking the default; in range nothing changes.
+void repin(ModNode& m) {
+  m.bp.resize(m.base.size());
+  for (int k = 0; k < m.wi->np; k++) { const modfx::ParamDef& d = m.wi->params[k]; const double v = m.base[(size_t)k]; m.bp[(size_t)k] = v != v ? d.def : v < d.mn ? d.mn : v > d.mx ? d.mx : v; }
 }
 inline bool isParamPort(const std::string& p) { return p.size() >= 2 && p[0] == 'p' && p[1] == ':'; }
 bool truthyJ(Json v) {
@@ -113,9 +118,10 @@ std::string portText(Json v) { if (v.isStr()) return std::string(v.asStr()); ret
 
 class PatchImpl {
  public:
-  PatchImpl(WavesEngine* e, double sr_, int nVoices_, Host* h) : eng(e), sr(sr_), nVoices(nVoices_), N((double)nVoices_), host(h) {}
+  PatchImpl(WavesEngine* e, double sr_, int nVoices_, Host* h) : eng(e), sr(sr_), nVoices(nVoices_), N((double)nVoices_), host(h) { seeds.host = h; seeds.armed = true; }
   ~PatchImpl() { destroyAll(); }
   WavesEngine* eng; double sr; int nVoices; double N; Host* host;
+  WSeeds seeds;   // the engine's nextSeed(): a module keeps a reference to it (ChanceGate draws at its first block); armed = real draws, off while a module is being made
   std::vector<std::unique_ptr<ModNode>> mods; std::unordered_map<std::string, ModNode*> byId;
   std::vector<CableRec> cables; std::vector<ModNode*> order, tails; uint32_t ver = 0;
   int instances = 0, weight = 0; int nMods = 0, nCables = 0;
@@ -186,6 +192,7 @@ class PatchImpl {
     m->base.resize((size_t)wi->np);
     const Json ps = o.obj("params");
     for (int k = 0; k < wi->np; k++) { Json v = ps.get(wi->params[k].name); m->base[(size_t)k] = v.isNum() ? v.asNum() : wi->params[k].def; }
+    repin(*m);
     if (wi->flags & kWF_Text) { Json t = o.get("text"); if (t.isStr()) { m->text.resize(kMaxText); const int n = toU16(t.asStr(), m->text.data(), kMaxText); m->text.resize((size_t)n); m->textLen = n; } }
     if (wi->flags & kWF_Tail) { m->tailT = wparam(*wi, "time"); m->tailF = wparam(*wi, "fine"); m->tailD = wparam(*wi, "depth"); }
     ModNode* raw = m.get(); mods.push_back(std::move(m)); byId[sid] = raw; compile();
@@ -202,8 +209,8 @@ class PatchImpl {
       s.buf.assign((size_t)(nIn + nOut) * kBlock, 0.f);
       for (int k = 0; k < nIn; k++) s.in[k] = s.buf.data() + (size_t)k * kBlock;
       for (int k = 0; k < nOut; k++) s.out[k] = s.buf.data() + (size_t)(nIn + k) * kBlock;
-      s.inMo.assign((size_t)wi.np, 0); s.pm.assign((size_t)wi.np, 0.0); s.p = m.base.data();
-      if (fits && m.def) { WSeeds ws; ws.host = host; ws.armed = false; s.mod = m.def->make(sr, ws); s.drawn = ws.drawn; }
+      s.inMo.assign((size_t)wi.np, 0); s.pm.assign((size_t)wi.np, 0.0); s.p = m.bp.data();
+      if (fits && m.def) { seeds.armed = false; const uint32_t d0 = seeds.drawn; s.mod = m.def->make(sr, seeds); s.drawn = seeds.drawn - d0; seeds.armed = true; }
     }
     if (fits) { instances += cnt; weight += w; } else { m.slots.shrink_to_fit(); instances += 0; }
     // instances / weight are counted for the slots that hold an object only (a soft one holds buffers)
@@ -250,22 +257,22 @@ class PatchImpl {
       else { const float* b = outOf(-1); if (b) for (int i = 0; i < kBlock; i++) dst[i] = (float)((double)dst[i] + (double)b[i]); }
     }
     if (mods_) {
-      for (int k = 0; k < wi.np; k++) s.pm[(size_t)k] = m.base[(size_t)k];
+      for (int k = 0; k < wi.np; k++) s.pm[(size_t)k] = m.bp[(size_t)k];
       for (int k = 0; k < wi.np; k++) {
         if (!s.inMo[(size_t)k]) continue;
         const modfx::ParamDef& pd = wi.params[k];
-        double r = m.base[(size_t)k] + (double)s.mb[(size_t)k * kBlock] * (pd.mx - pd.mn);
+        double r = m.bp[(size_t)k] + (double)s.mb[(size_t)k * kBlock] * (pd.mx - pd.mn);
         r = clamp(r, pd.mn, pd.mx); if (pd.st >= 1) r = js_round((r - pd.mn) / pd.st) * pd.st + pd.mn;
         s.pm[(size_t)k] = r;
       }
       s.p = s.pm.data();
-    } else s.p = m.base.data();
+    } else s.p = m.bp.data();
   }
   void arm(Slot& s) {
     if (s.armed) return; s.armed = true;
     if (!s.mod) return;
-    WSeeds a; a.host = host; a.armed = true; s.mod->arm(a);
-    if (a.drawn == 0 && host) for (uint32_t k = 0; k < s.drawn; k++) host->nextSeed();
+    const uint32_t d0 = seeds.drawn; s.mod->arm(seeds);
+    if (seeds.drawn == d0 && host) for (uint32_t k = 0; k < s.drawn; k++) host->nextSeed();
   }
 };
 
@@ -302,7 +309,7 @@ void WavesEngine::disconnect(std::string_view aId, std::string_view aPort, std::
 }
 void WavesEngine::setParam(std::string_view id, std::string_view name, double v) {
   ModNode* m = p_->find(std::string(id)); if (!m) return;
-  const int k = wparam(*m->wi, name); if (k >= 0) m->base[(size_t)k] = v;
+  const int k = wparam(*m->wi, name); if (k >= 0) { m->base[(size_t)k] = v; repin(*m); }
   if (name == "slot") cullDirty_ = true;
 }
 void WavesEngine::setText(std::string_view id, std::string_view text) {

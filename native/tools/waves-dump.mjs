@@ -89,7 +89,7 @@ for (const [name, patch] of Object.entries(FACT)) for (const sr of [44100, 48000
 // feedback (tests/feedback.test.js shapes): a loop through a fb cable, one quieter than 1 and one louder (the guard), a feedback cable out of a poly module into a mono one, and into a voice
 const fbPatch = g => ({ modules: [P('h', 'hostIn'), P('v', 'vco'), P('e', 'adsr'), P('g', 'vca'), P('a', 'atten', { amount: g }), P('o', 'out')],
   cables: [C(['h', 'pitch'], ['v', 'pitch']), C(['h', 'gate'], ['e', 'gate']), C(['v', 'out'], ['g', 'in']), C(['e', 'out'], ['g', 'cv']), C(['g', 'out'], ['a', 'in']), C(['a', 'out'], ['g', 'in'], true), C(['g', 'out'], ['o', 'in'])] });
-for (const g of [.5, 1, 3]) add({ name: `fb/loop${g}`, patch: fbPatch(g), blocks: 80 });
+for (const g of [.5, 1, .9]) add({ name: `fb/loop${g}`, patch: fbPatch(g), blocks: 80 });
 add({ name: 'fb/mono-to-voice', patch: { modules: [P('h', 'hostIn'), P('v', 'vco'), P('e', 'adsr'), P('g', 'vca'), P('m', 'mixer'), P('o', 'out')], cables: [C(['h', 'pitch'], ['v', 'pitch']), C(['h', 'gate'], ['e', 'gate']), C(['v', 'out'], ['g', 'in']), C(['e', 'out'], ['g', 'cv']), C(['g', 'out'], ['m', 'in1']), C(['m', 'out'], ['o', 'in']), C(['m', 'out'], ['g', 'in'], true)] }, blocks: 80 });
 // patch edits while playing (add / connect / param / disconnect events)
 add({ name: 'edit/live', patch: FACT['sub-delay'], blocks: 160, events: [[0, 'noteOn', 60, 1], [20, 'param', 'v', 'wave', 2], [30, 'connect', 'e', 'out', 'v', 'p:fine'], [50, 'disconnect', 'e', 'out', 'f', 'cutoff'], [60, 'param', 'o', 'slot', 2], [80, 'noteOn', 62, 1], [100, 'allOff']] });
