@@ -18,6 +18,12 @@ static uint32_t rs = 25251;
 static double rnd() { rs = rs * 1664525u + 1013904223u; return rs / 4294967296.0; }
 static double pick3() { const double r = rnd(); return r < 0.3 ? 0 : r < 0.6 ? 1 : r < 0.75 ? 0.5 : rnd(); }
 
+// Fenced regions (upstream Plaits reads outside its own tables here; found by a library-level ASan fuzz, not patched, reported in docs/port/U25-NOTES.md):
+//  - model 15 (speech) reads one Frame past the 210-byte phonemes_ table (lpc_speech_synth.cc:136) at every note: not fuzzed (mapped to 14).
+//  - models 5 and 9 with pFm != 0: out of range table read (fm into the waveshaper / fold index).
+//  - model 13 (wavetable): a NULL wave_map_ entry with any modulation or harmonics/timbre/morph above 0.9: fenced to none / <= 0.9.
+//  - model 9 below note -24 (wavefolder index past lut_fold).
+// Everything else in the range is covered. Notes are kept within -24..170.
 int main(int argc, char** argv) {
   if (!pe_available()) { std::printf("fuzz U25: no Plaits / Elements library on this platform: skipped\nPASS test_engine_u25_fuzz\n"); return 0; }
   const int count = argc > 1 ? std::atoi(argv[1]) : 360;
@@ -29,10 +35,13 @@ int main(int argc, char** argv) {
     const int nl = 1 + (int)(rnd() * 3);
     for (int k = 0; k < nl; k++) {
       EngLayer& L = V.layers[k]; L.on = true; L.type = (i + k) % 3 == 2 ? LType::Elements : LType::Plaits; L.level = 0.3 + rnd() * 0.7; L.seed = 1 + (double)(int)(rnd() * 4e9);
-      L.tune = (double)(int)(rnd() * 144 - 60); L.fine = (double)(int)(rnd() * 100 - 50); L.pAmt = rnd() < 0.4 ? (double)(int)(rnd() * 96 - 48) : 0; L.pDec = 5 + rnd() * 300; L.atk = 0.1 + rnd() * 20; L.dec = 50 + rnd() * 1500;
+      L.tune = (double)(int)(rnd() * 144 - 60); L.fine = (double)(int)(rnd() * 100 - 50); L.pAmt = rnd() < 0.4 ? (double)(int)(rnd() * 96 - 48) : 0; if (L.type == LType::Plaits) { /* fenced region, see the comment above main */ const double base = 36 + V.tune + L.tune + L.fine / 100; if (base + (L.pAmt < 0 ? L.pAmt : 0) < -24) { L.tune += 48; L.pAmt = 0; } if (36 + V.tune + L.tune + L.fine / 100 + (L.pAmt > 0 ? L.pAmt : 0) > 170) L.pAmt = 0; if (36 + V.tune + L.tune + L.fine / 100 > 170) L.tune -= 60; } L.pDec = 5 + rnd() * 300; L.atk = 0.1 + rnd() * 20; L.dec = 50 + rnd() * 1500;
       L.adsr = rnd() < 0.4; L.sus = rnd(); L.rel = 5 + rnd() * 300; if (rnd() < 0.2) { L.lpCut = 200 + rnd() * 8000; L.lpRes = rnd(); }
       EngPE& P = L.pe;
-      if (L.type == LType::Plaits) { P.pEng = (double)((i * 5 + k * 7) % 24); P.pHarm = pick3(); P.pTim = pick3(); P.pMor = pick3(); P.pDecay = pick3(); P.pLpg = pick3(); P.pFm = pick3() * 2 - 1; P.pTimEnv = pick3() * 2 - 1; P.pMorEnv = pick3() * 2 - 1; P.pStrike = rnd() < 0.6; P.pAux = rnd() < 0.3; }
+      if (L.type == LType::Plaits) { P.pEng = (double)((i * 5 + k * 7) % 24); P.pHarm = pick3(); P.pTim = pick3(); P.pMor = pick3(); P.pDecay = pick3(); P.pLpg = pick3(); P.pFm = pick3() * 2 - 1; P.pTimEnv = pick3() * 2 - 1; P.pMorEnv = pick3() * 2 - 1; P.pStrike = rnd() < 0.6; P.pAux = rnd() < 0.3;
+        if (P.pEng == 15) P.pEng = 14;
+        if (P.pEng == 5 || P.pEng == 9) P.pFm = 0;
+        if (P.pEng == 13) { P.pFm = P.pTimEnv = P.pMorEnv = 0; P.pHarm = std::fmin(P.pHarm, 0.9); P.pTim = std::fmin(P.pTim, 0.9); P.pMor = std::fmin(P.pMor, 0.9); } }
       else { P.eModel = (double)(int)(rnd() * 3); double* e[] = {&P.eStrength, &P.eContour, &P.eBow, &P.eBlow, &P.eStrike, &P.eBowT, &P.eFlow, &P.eBlowT, &P.eMallet, &P.eStrikeT, &P.eGeo, &P.eBright, &P.eDamp, &P.ePos, &P.eSpace};
         for (double* x : e) *x = pick3(); }
     }

@@ -149,6 +149,18 @@ new="""  // Thunder: phase == 1 would read lut_raised_cosine[257], past the 257-
 if s.count(old)!=1: sys.exit("Marbles lag_processor.cc patch failed")
 open(p,'w').write(s.replace(old,new,1))
 PY
+# Elements (U25, found by AddressSanitizer): two reads one float past a 257-entry table, each times a fraction of 0. Neither changes any output
+# (the 313 committed U25 cases render with identical hashes with and without; the read value is multiplied by 0).
+# 1. elements/dsp/string.cc line 128, String::Process: Interpolate(lut_svf_shift, damping_cutoff, 1.0f) with damping_cutoff == 256.0f reads [257].
+# 2. elements/dsp/resonator.cc line 67, Resonator::Process: Interpolate(lut_stiffness, geometry_, 256.0f) with geometry_ == 1.0f reads [257].
+python3 - "$E/elements/dsp/string.cc" "$E/elements/dsp/resonator.cc" <<'PY'
+import sys
+for p,old,new in [(sys.argv[1],"1.0f - Interpolate(lut_svf_shift, damping_cutoff, 1.0f),","1.0f - (damping_cutoff >= 256.0f ? lut_svf_shift[256] : Interpolate(lut_svf_shift, damping_cutoff, 1.0f)),"),
+                  (sys.argv[2],"float stiffness = Interpolate(lut_stiffness, geometry_, 256.0f);","float stiffness = geometry_ >= 1.0f ? lut_stiffness[256] : Interpolate(lut_stiffness, geometry_, 256.0f);")]:
+    s=open(p).read()
+    if s.count(old)!=1: sys.exit(p+" Elements patch failed")
+    open(p,'w').write(s.replace(old,new,1))
+PY
 # Cloud Seed: smaller delay buffers (tfx/build.sh)
 cp -r "$D/CloudSeedCore" "$O/cs"; rm -rf "$O/cs/.git"; C="$O/cs"
 $SED -i 's/DelayBufferSize = 192000 \* 2;/DelayBufferSize = 32768;/' "$C/DSP/ModulatedDelay.h" "$C/DSP/MultitapDelay.h"
