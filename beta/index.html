@@ -1389,6 +1389,37 @@ body.mob .top:has(.brand.bhide){padding-left:0}
 body.mob:not(.noch) .top .brand{font-size:15px; letter-spacing:.03em; margin-right:0}
 #bFile .filei{display:none; width:20px; height:20px} body.mob #bFile .filei{display:block} body.mob #bFile .filet{display:none} body.mob #bFile{display:inline-flex; align-items:center; padding:0 12px}   /* the phone: a folder (owner: the ▾ alone was confusing) */
 body.mob .top #tLen{min-height:34px; padding:0 8px; align-self:auto}
+/* FOLDED PHONE, ONE TOP ROW (build 636, owner: tempo, LPB, ROWS and the time left up next to the CPU meter, the line under the tabs gone, the room to the phrase). Mobile setup under 600 px only (the same
+   condition as `fold` in applyPlatform, which moves #tClk, #tRowsBar and #tLen into .top after #tCpu). Each is a small label over a small value, like ROWS / LEFT already were; the tabs, File, Settings and Play
+   and the CPU meter are a little narrower (height stays 40 px). The tick dots (#tDots, the ticks a row has: they light one by one as it plays) are a thin strip under BPM / LPB. The line itself is gone when nothing else is on it. */
+@media (max-width:599px){
+  body.mob:not(.trkv) .top #tClk, body.mob:not(.trkv) .top #tRowsBar{display:none}
+  body.mob.trkv .top:not(:has(#segView button:nth-child(3))){gap:2px; padding-inline:0 2px}
+  body.mob.trkv .top:not(:has(#segView button:nth-child(3))){flex-wrap:nowrap}   /* Tracker / Synth only: all on one row. With Chains (or Waves) shown the switch has a row of its own (the 460 px rule) and the rest share the row below */
+  body.mob.trkv .top > .sp{display:none}
+  body.mob.trkv .top:not(:has(#segView button:nth-child(3))) #segView button{padding-inline:4px!important; font-size:11px; letter-spacing:0}
+  body.mob.trkv .top:not(:has(#segView button:nth-child(3))) :is(#bFile, #bSet){padding:0 6px; min-width:0}
+  body.mob.trkv .top:not(:has(#segView button:nth-child(3))) #tSong{padding:0 6px; margin:0}
+  body.mob.trkv .top:not(:has(#segView button:nth-child(3))) .tcpu{min-width:0; padding:0 3px} body.mob.trkv .top:not(:has(#segView button:nth-child(3))) .tcpu span{font-size:10.5px; letter-spacing:0}
+  body.mob .top #tClk, body.mob .top #tRowsBar{order:0}
+  body.mob.trkv .top #tClk{margin-left:auto}
+  body.mob .top #tClk{display:grid; grid-template-columns:auto auto; column-gap:5px; row-gap:2px; align-items:center; justify-items:center; align-self:center; flex:none; padding:0 2px; border:0}
+  body.mob .top #tClk .tce{padding:0; line-height:1; font-size:11px}
+  body.mob .top #tClk small{margin:0; font-size:8px; line-height:1; letter-spacing:.04em; font-weight:400}
+  body.mob .top #tClk .tcin{width:3ch; height:16px; padding:0; box-sizing:content-box; font-size:11px; line-height:1; outline-offset:0}   /* typing a number: the box is no wider than the digits it replaces */
+  body.mob .top #tClkB{grid-area:2 / 1} body.mob .top #tClk small:nth-of-type(1){grid-area:1 / 1}
+  body.mob .top #tClkT{grid-area:2 / 2} body.mob .top #tClk small:nth-of-type(2){grid-area:1 / 2}
+  body.mob .top #tDots{grid-area:3 / 1 / 4 / 3; display:flex; gap:1px; justify-content:center; width:0; min-width:100%; margin:1px 0 0; overflow:hidden} body.mob .top #tDots i{flex:1 1 0; max-width:3px; min-width:1px}
+  body.mob .top #tRowsBar{flex:none; align-self:stretch}
+  body.mob .top #tRowsV{min-width:0; gap:0; padding:0 3px 5px; border-inline:0; min-height:40px}
+  body.mob .top #tRowsV small{font-size:8px; letter-spacing:.04em; font-weight:400; line-height:1; margin-bottom:2px}
+  body.mob .top #tRowsV b{font-size:11px}
+  body.mob .top #tLen{min-width:0; min-height:40px; padding:0 2px 5px; margin:0; gap:2px; align-items:center}
+  body.mob .top #tLen .tlenl{font-size:8px; letter-spacing:.04em; font-weight:400}
+  body.mob .top #tLen .tlenv{font-size:11px; letter-spacing:0}
+  body.mob.inpad .ttabbar .tpat{width:0; height:0; overflow:hidden; border:0; padding:0}   /* nothing else is on the line in the pad input (the keys input keeps its OCT / TRANSP there); it stays in the layout, not display:none, so patFit() still measures the tabs */
+  body.mob.inpad .ttabbar .ttabs{border-bottom:0}   /* the bar's own bottom line stays: one line, not two */
+}
 /* LOOP on the pad (owner): lit in its own colour while the pattern loops */
 #kLoop.on, #tPad #kLoop.on:not(#zz){background:#1f9d5c!important; color:#fff!important; border-color:#1f9d5c!important}
 :root[data-skin="idm"] #tPad #kLoop.on:not(#zz):not(#zz){background:#7cd0ff!important; color:#141414!important; border-color:#7cd0ff!important; text-shadow:none!important}   /* IDM (owner): light blue, apart from EDIT's blue */   /* tight: the pad's PLAY and the COMMANDS ▶ play the song */
@@ -8578,8 +8609,15 @@ function applyPlatform(){
   document.body.classList.toggle('mob', m);
   // MOBILE TOP LINES: LEFT (the song time) sits in the top bar, left of File, in the Mobile setup; back under the tabs on desktop.
   { const len = $('tLen'), fw = $('bFile') && $('bFile').closest('.setwrap'), rb = $('tRecBar');
-    const fold = m && !mqUnfolded.matches;   /* (build 631, owner: the folded phone's top) folded: LEFT leaves the top bar for the tempo line, after BPM / LPB; unfolded Mobile and desktop as before */
-    if (len && fw && rb){ if (m && !fold && len.parentNode !== fw.parentNode) fw.before(len); else if ((!m || fold) && len.parentNode === fw.parentNode) rb.before(len); } }
+    const fold = m && !mqUnfolded.matches;   /* folded phone (builds 631 / 636): see below; unfolded Mobile and desktop as before */
+    const ck = $('tClk'), rw = $('tRowsBar'), cp = $('tCpu'), tpb = $('tPat');
+    /* (build 636, owner: the folded phone's tempo line) folded: BPM / LPB, ROWS and LEFT sit in the top bar after the CPU meter (the same elements, moved; no copies), the line under the tabs goes; unfolded Mobile and desktop put them back */
+    if (len && fw && rb && ck && rw && cp && tpb){
+      if (fold){ if (ck.parentNode !== cp.parentNode){ cp.after(ck); ck.after(rw); rw.after(len); } }
+      else {
+        if (ck.parentNode === cp.parentNode){ tpb.prepend(ck); ck.after(rw); rb.before(len); }
+        if (m && len.parentNode !== fw.parentNode) fw.before(len); else if (!m && len.parentNode === fw.parentNode) rb.before(len);
+      } } }
   document.title = m ? 'Thunder' : 'Thunder Plus'; try { dirtyShow(); } catch(e){}   // FILE SAFETY: • song — app
   const br = document.querySelector('.brand'); if (br) br.setAttribute('aria-label', m ? 'Thunder' : 'Thunder Plus');
   const ck = $('ckMobile'); if (ck) ck.checked = m;
@@ -25970,7 +26008,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 635;
+const BUILD = 636;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD + (location.pathname.includes('/beta/') ? ' · beta' : '');
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -36256,6 +36294,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [636, '16 Nov', ['Folded phone, Tracker: BPM, LPB, ROWS and the time left (LEFT) moved up into the top bar, right of the CPU meter, so the line under the tabs is gone and the phrase gets the room. Tap and type work as before; the tick dots are a thin strip under BPM / LPB']],
   [635, '16 Nov', ['Wavetable layers: with Bend fully negative the sound could drop out (a bad sample reached the voice); fixed']],
   [634, '16 Nov', ['Bottom panel: the MOD section now sits before the effects (FX), and its title bar takes the skin like the other sections (it was drawn black in the terminal-style skins, IDM among them)']],
   [633, '16 Nov', ['Bytebeat formulas: “x && number” and “x || number” now give the right value, and a formula with && 50, && 51, || 50 or || 51 can no longer freeze the sound']],
