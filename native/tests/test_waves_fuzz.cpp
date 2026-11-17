@@ -20,10 +20,10 @@ static uint64_t rs = 88172645463325252ull;
 static uint32_t rnd() { rs ^= rs << 13; rs ^= rs >> 7; rs ^= rs << 17; return (uint32_t)(rs >> 11); }
 static int ri(int n) { return (int)(rnd() % (uint32_t)n); }
 static double rv() {
-  switch (ri(14)) { case 0: return 0; case 1: return 1; case 2: return -1; case 3: return 1e308; case 4: return -1e308; case 5: return 1e-308; case 6: return 1e999; case 7: return -1e999; case 8: return 48000; case 9: return 0.5;
+  switch (ri(14)) { case 0: return 0; case 1: return 1; case 2: return -1; case 3: return 1e308; case 4: return -1e308; case 5: return 1e-308; case 6: return HUGE_VAL; case 7: return -HUGE_VAL; case 8: return 48000; case 9: return 0.5;
     case 10: return (double)ri(200) - 100; default: return (rnd() / 4294967296.0) * 4 - 2; }
 }
-static std::string num(double v) { if (v == 1e999) return "1e999"; if (v == -1e999) return "-1e999"; char b[64]; std::snprintf(b, sizeof b, "%.17g", v); return b; }
+static std::string num(double v) { if (v == HUGE_VAL) return "1e999"; if (v == -HUGE_VAL) return "-1e999"; char b[64]; std::snprintf(b, sizeof b, "%.17g", v); return b; }
 static const char* kPortJunk[] = {"in", "out", "outR", "inR", "pitch", "gate", "cv", "p:wave", "p:level", "p:slot", "p:tune", "p:nope", "p:", "toString", "constructor", "__proto__", "", "in1", "in16", "p:time", "p:gain", "p:cutoff"};
 static std::string portName(const WInfo* w, bool in) {
   if (w && ri(4)) { const int n = in ? w->nin : w->nout; if (n > 0 && ri(3)) return in ? w->in[ri(n)].name : w->out[ri(n)].name; if (in && w->np > 0 && ri(2)) return std::string("p:") + w->params[ri(w->np)].name; }
