@@ -75,7 +75,7 @@ class PitchFxCore {
 // is NaN here; the three that applyFx defaults when `!= null` are pitch2 (-12), size (0.6, Pitch delay only) and wow (0.2): pass NaN for "absent".
 struct PadDegrade { double bits, rate, noise, color, follow, dry, wet; };
 struct PadReson { double note, chord, decay, bright, mode, spread, mix; };
-struct PadPitchFx { double mode, time, fb, pitch, pitch2, tone, size, wow, mix; };
+struct PadPitchFx { double mode, time, fb, pitch, pitch2, tone, size, wow, mix; bool sizeNull = false; };   // sizeNull: the saved size was JSON null, which is 0 in the tail's `3 + f.size * 4` (the core still defaults it to 0.6, as `!= null` does)
 // Each returns the processed sound; pad_pitchfx's is longer by the tail (the JS's `N`), and is the mono sum (L + R) * 0.5 as the JS makes it. `reverb`: Pitch reverb.
 // A preverb with no `size` makes a JS exception (new Float32Array(NaN)'s set): pad_pitchfx returns an empty vector then.
 std::vector<float> pad_degrade(const PadDegrade& f, const float* a, size_t n, double sr);

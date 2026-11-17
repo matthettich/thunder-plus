@@ -67,10 +67,24 @@ class SeedCounter : public Seeds {
   uint32_t n_;
 };
 
+// THE ONE ENTRY the host renders a module through: run(). Every buffer a module reads or writes is kBlock floats long (the Ctx contract: ctx.block <= kBlock; mod_mods' cp() / fill(kBlock) and every
+// fixed-size state array rely on it), so a block of more than kBlock frames (or a negative one) is REFUSED here: nothing is called, nothing is written, run() returns false and refused() counts it. Why
+// refuse and not split: a split block would need every port, ctx.key(sck) (a fixed 128-float buffer with no offset) and the track inputs offset per chunk, and the JS never does it (its engine's
+// process(frames = BLOCK) is called by the worklet with at most one 128-frame quantum; a longer `frames` is a bug there, not a feature), whereas FxHost (the tfx host) CAN cut a longer call into 128s
+// because its buffers are as long as the call and its lanes / sources are cut with it. The host that feeds modfx (not written yet) cuts its device buffers into <= kBlock chunks BEFORE this.
+// process() is protected: no caller holding a Module* can reach it with a larger block. (Hardening, 17 Nov: docs/port/HARDENING-NOTES.md, B3-3.)
 class Module {
  public:
   virtual ~Module() = default;
+  bool run(const IO& io, const Ctx& c) {
+    if (c.block < 0 || c.block > kBlock) { refused_++; return false; }
+    process(io, c); return true;
+  }
+  uint32_t refused() const { return refused_; }
+ protected:
   virtual void process(const IO& io, const Ctx& c) = 0;
+ private:
+  uint32_t refused_ = 0;
 };
 
 struct ParamDef { const char* name; double def, mn, mx, st; };

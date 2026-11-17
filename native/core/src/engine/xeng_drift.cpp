@@ -48,7 +48,6 @@ size_t xeng_drift(const DriftP& p, double sr, double hold, float* out, size_t ca
   const size_t CR = 32; const double cdt = (double)CR / sr, sdt = 1 / sr, norm = 1 / std::sqrt((double)nv);
   const double aSaw = p.aSaw, aPul = p.aPulse, bSaw = p.bSaw, bPul = p.bPulse, sub = p.sub * 0.6, nz = p.noise * 0.5, ring = p.ring * 0.8;
   for (size_t i0 = 0; i0 < N; i0 += CR) {
-    if (bad) return kRefuse;
     const double t0 = (double)i0 * sdt;
     const double wow = (0.6 * js_sin(2 * kPi * wph) + 0.4 * step(wowP, cdt)) * wowC; wph += p.wowRate * cdt;
     const double flut = (0.5 * js_sin(2 * kPi * fph1) + 0.3 * js_sin(2 * kPi * fph2) + 0.2 * step(fpath, cdt)) * flutC; fph1 += 7.3 * cdt; fph2 += 11.9 * cdt;
@@ -61,6 +60,7 @@ size_t xeng_drift(const DriftP& p, double sr, double hold, float* out, size_t ca
       const Svf L = svf(fc * js_pow(2, step(v.fd, cdt) * 0.3 * p.drift), p.res), H = svf(p.hp, p.hpRes);
       v.la1 = L.a1; v.la2 = L.a2; v.la3 = L.a3; v.lk = L.k; v.ha1 = H.a1; v.ha2 = H.a2; v.ha3 = H.a3; v.hk = H.k;
     }
+    if (bad) return kRefuse;   // right after this control block's steps (it was at the next block's start: a voice of 32 samples or fewer, one control block, was rendered instead of refused)
     const size_t i1 = (size_t)mn((double)N, (double)(i0 + CR));
     for (size_t i = i0; i < i1; i++) {
       double s = 0;

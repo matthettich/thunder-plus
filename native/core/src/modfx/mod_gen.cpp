@@ -149,7 +149,7 @@ class Bytebeat : public Module {
   Bytebeat(double, Seeds&) { rs_.seen = true; rs_.sn = -1; progs_ = &bbProgs(); }
   void process(const IO& io, const Ctx& ctx) override {
     const double* p = io.p; const double sr = ctx.sr; const Out o = outp(io, 0); const BBProg& P = progs_->p[(int)clamp((double)i32(p[0]), 0, 15)];
-    const int32_t A = (int32_t)clamp(js_round(p[2]), 0, 255), B = (int32_t)clamp(js_round(p[3]), 0, 255), C = (int32_t)clamp(js_round(p[4]), 0, 255); const int mode = (int)clamp((double)i32(p[5]), 0, 2);
+    const int32_t A = i32(clamp(js_round(p[2]), 0, 255)), B = i32(clamp(js_round(p[3]), 0, 255)), C = i32(clamp(js_round(p[4]), 0, 255)); const int mode = (int)clamp((double)i32(p[5]), 0, 2);   // i32: a NaN knob is 0, as the JS's Int32Array store of it (no (int32_t)NaN)
     const bool pc = io.linked[0]; const double base = clamp(p[1], 250, 64000) / sr, lv = p[7]; const In PI = inp(io, 0), RS = inp(io, 1);
     const bool sm = p[6] > .005; const double g = sm ? 1 - js_exp(-2 * kPi * jmin(sr * .45, 20000 * js_pow(2, -7 * p[6])) / sr) : 1, dcR = 1 - 2 * kPi * 6 / sr;
     if (rs_(ctx)) { t_ = 0; ph_ = 0; }

@@ -42,13 +42,13 @@ size_t xeng_swarm(const SwarmP& p, double sr, double hold, float* out, size_t ca
   const double ah = h > atk ? sus + (1 - sus) * js_exp(-6.9 * (h - atk) / dec) : 1;
   double ic1 = 0, ic2 = 0, subPh = 0, a1 = 1, a2 = 0, a3 = 0;
   for (size_t i0 = 0; i0 < N; i0 += CR) {
-    if (bad) return kRefuse;
     const double t0 = (double)i0 * sdt, sh = step(shared, cdt) * driftC * p.cohes;
     for (int j = 0; j < nv; j++) {
       Vc& v = V[j];
       v.dt = f0 * js_pow(2, (v.det + step(v.dp, cdt) * driftC * (1 - p.cohes) + sh) / 1200) * sdt;
       v.lv = v.g * (truthy(p.shimmer) ? 1 - p.shimmer * (0.5 + 0.5 * step(v.sp, cdt)) : 1);
     }
+    if (bad) return kRefuse;   // here, right after this control block's steps: tested only at the next block's start a voice of 32 samples or fewer (one control block) was rendered where it must be refused (hardening, 17 Nov)
     const double fe = js_exp(-6.9 * t0 / mx(0.005, p.fdec / 1000)), fc = mx(30, mn(sr * 0.45, p.cut * kf * js_pow(2, p.fenv * 5 * fe)));
     { const double g = js_tan(kPi * fc / sr), k = 2 - 1.96 * mn(1, p.res); a1 = 1 / (1 + g * (g + k)); a2 = g * a1; a3 = g * a2; }
     const size_t i1 = (size_t)mn((double)N, (double)(i0 + CR));

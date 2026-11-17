@@ -317,7 +317,7 @@ void voiceAmp(const EngVoice& V, double sr, float* out, size_t N) {
 // the pitch effects' tail (applyFx: Math.round(sr * (...))), for the size bound only
 double pitchTail(const EngFx& f, double sr) {
   const bool rv = f.kind == EngFx::Kind::PitchReverb;
-  return js_round(sr * (rv ? 3 + f.size * 4 : jmin(8, f.time / 1000 * (1 + 6 * f.fb))));
+  return js_round(sr * (rv ? 3 + (f.sizeNull ? 0.0 : f.size) * 4 : jmin(8, f.time / 1000 * (1 + 6 * f.fb))));
 }
 inline bool fxReady(const EngFx& f) { return f.kind != EngFx::Kind::Other; }
 
@@ -386,8 +386,8 @@ int eng_render_voice(const EngVoice& V0, const EngRenderOpts& o, float* out, siz
       switch (f.kind) {
         case EngFx::Kind::Degrade: r = pad_degrade(PadDegrade{f.bits, f.rate, f.noise, f.color, f.follow, f.dry, f.wet}, out, len, sr); break;
         case EngFx::Kind::Reson: r = pad_reson(PadReson{f.note, f.chord, f.decay, f.bright, f.mode, f.spread, f.mix}, out, len, sr); break;
-        case EngFx::Kind::PitchDelay: r = pad_pitchfx(false, PadPitchFx{f.mode, f.time, f.fb, f.pitch, f.pitch2, f.tone, f.size, f.wow, f.mix}, out, len, sr); break;
-        case EngFx::Kind::PitchReverb: r = pad_pitchfx(true, PadPitchFx{f.mode, f.time, f.fb, f.pitch, f.pitch2, f.tone, f.size, f.wow, f.mix}, out, len, sr); break;
+        case EngFx::Kind::PitchDelay: r = pad_pitchfx(false, PadPitchFx{f.mode, f.time, f.fb, f.pitch, f.pitch2, f.tone, f.size, f.wow, f.mix, f.sizeNull}, out, len, sr); break;
+        case EngFx::Kind::PitchReverb: r = pad_pitchfx(true, PadPitchFx{f.mode, f.time, f.fb, f.pitch, f.pitch2, f.tone, f.size, f.wow, f.mix, f.sizeNull}, out, len, sr); break;
         default: break;
       }
       if (r.empty()) return kEngFxThrew;   // (a JS exception: RangeError in new Float32Array / set: renderVoice throws)

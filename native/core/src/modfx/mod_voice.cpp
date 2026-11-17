@@ -52,7 +52,7 @@ class PitchCorrect : public Module {
     if (ran) {
       const double T_ = env > PC_GATE ? detect(sr, w0 + B) : 0;
       if (T_ > 0) { voiced = 1; miss = 0; T = T_; midi = 69 + 12 * js_log2(sr / T_ / 440); }
-      else if (++miss > 2) voiced = 0;
+      else { miss = missInc(miss); if (miss > 2) voiced = 0; }   // JS: `++st.miss > 2` on a Number that keeps counting; here missInc saturates (util.h)
     }
     // 3. the correction
     const double kB = B / sr;

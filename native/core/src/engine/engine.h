@@ -77,6 +77,7 @@ struct EngFx {                          // one entry of V.fx: the four JS effect
   double bits, rate, noise, color, follow, dry, wet;            // degrade
   double note, chord, decay, bright, mode, spread, mix;         // reson (mode and mix also pitch fx)
   double time, fb, pitch, pitch2, tone, size, wow;              // pitch delay / reverb
+  bool sizeNull = false;                                        // the saved size was JSON null (not absent): the JS's `3 + f.size * 4` is 3 then (null * 4 = 0), while undefined makes the tail NaN (a RangeError)
   EngFx();
 };
 

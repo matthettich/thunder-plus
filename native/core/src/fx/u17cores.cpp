@@ -180,7 +180,7 @@ std::vector<float> pad_reson(const PadReson& f, const float* a, size_t n, double
   return L;
 }
 std::vector<float> pad_pitchfx(bool rv, const PadPitchFx& f, const float* a, size_t n, double sr) {
-  const double tailD = js_round(sr * (rv ? 3 + f.size * 4 : js_min(8, f.time / 1000 * (1 + 6 * f.fb))));
+  const double tailD = js_round(sr * (rv ? 3 + (f.sizeNull ? 0.0 : f.size) * 4 : js_min(8, f.time / 1000 * (1 + 6 * f.fb))));
   if (!(tailD >= 0) || tailD > 1e9) return {};   // (NaN or absurd: a RangeError in the JS)
   const size_t N = n + (size_t)tailD;
   std::vector<float> L(N, 0.f), R(N, 0.f); std::copy(a, a + n, L.begin()); std::copy(a, a + n, R.begin()); PitchFxCore d(sr);
