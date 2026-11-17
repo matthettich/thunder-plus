@@ -531,6 +531,14 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0) and `link/` (Ableton
 
 ## To-do (owner's list: keep it current; newest dated entries below have the details)
 
+### PICK UP HERE (16 Nov, 23:00)
+
+- **Web app:** build 637 is on `beta` and `main`. It contains 635 (the wavetable table is one entry longer, so a negative Bend no longer reads past it; `pumpRun` never writes more floats than the plugin has parameters), 636 (on a folded phone, BPM / LPB / ROWS / LEFT sit in the top bar beside the CPU meter) and 637 (three or four view tabs keep their own row under 600 px).
+- **Desktop:** no desktop release was made for 635 to 637. The latest desktop is **v1.3.11**, built from build 634.
+- **Web item 4 is still open:** when a note's instrument number changes during playback, both instruments sound. The fix needs a design in the sequencer core and in the page's player (notes booked ahead must be dropped and re-booked). Low severity, its own session.
+- **Native (`native`):** #182 (pump hosting), #190, #195 (U28), #196 (Linux CI split), #200 and #203 (Marbles / Tides) were merged tonight. No PRs of ours are open. Details and what is next are in `docs/port/TODAY.md` on `native`, section "Evening, 16 Nov".
+- **Waiting for the owner:** whether the web app should take the pump pin's newer MASTER (resonance stage: 77 parameters against 75, latency 4454 against 358 samples).
+
 ### PICK UP HERE (15 Nov, 21:30: a new chat starts from this; it supersedes the blocks below where they disagree)
 
 - **Update, 16 Nov 10:30 (from `docs/port/TODAY.md` on `native`; supersedes the bullets below where they disagree):**
