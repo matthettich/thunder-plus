@@ -345,3 +345,21 @@ N1 step 10.
 - **Engine units merged: U22, U23, U24, U25, U27, U28, U29.** Left in N3: U26 and U33 (running), U30 …waves and U31 …chains (Sonnet builds, lead reviews), U32
   SoundFont (needs the owner's licence decision on the Vorbis decoder), U04 LXR module, U36. The lead's own: N1 steps 10 and 11 (U34, U35, U37).
 - The owner was told at 09:10: about 40 % of the whole port, about 55 % of the way to a sideloadable Android beta (26 of 37 units merged then; the rest is the harder part).
+- **State at 15:05, 17 Nov.** Merged since 10:15: **#210 U33** pump synths, rendered path (13 synths, 520 cases against the shipped fast-math wasm: 288 exact,
+  193 within -100 dB, worst -102.1; 39 left out by name with a structural check: TRACT, ORBIT, some GLOSS / STRIKE / FREEZE; no LXR glue, not wired into
+  `xeng_render_voice`). Post-merge independent verification: SOUND (`/home/claude/progress/verify-u33.md`; 33 host mutations with 5 low gaps; 24000 fuzz renders
+  clean; the three out-of-table reads in the pump source reproduced on the unpatched pin with concrete inputs). **Pump source defects, sent to the owner as
+  `pump-synth-defects.md`:** WOB sub phase (`WobEngine.hpp` 370-371; the WEB wasm traps at 22050 Hz with note 127, Octave +2, Tune +12), `BandWaves::read`
+  (`Synth.hpp` 307), `DigiWaves::read` (`GlossEngine.hpp` 62-69), FREEZE's lazy spectra, `std::stable_sort` allocating on every block with an event
+  (`pump_synth.cpp` ~139: adopt the insertion-sort patch in `prepare-pump.sh` before the live lanes are wired). Follow-up cases: WOB tempo with a wobble target,
+  Hit 0, fractional Drum, a File over 20 s; the not-built refusal path is untested.
+- **#211 U26 MERGED after the lead's review of its live part** (Bass 45 / 45, Vox 45 / 45 factory voices; 640 non-live cases; 21 mutations). **The live shell
+  (`native/core/src/engine/live_shell.h`, provisional, not wired):** live output equals the rendered path bit for bit for 122 sequences at host blocks 128, 64,
+  17, 1 and uneven. The page's own live nodes do NOT equal their render (control blocks cut at every 128-sample quantum; the rate read once per segment; bpm /
+  wob at quantum starts; a note-off and note-on in one sample arrive as the new note only): not copied, by the owner's rule (sample-exact, one rule for live
+  and renders). **Fable confirms the twelve choices in U26-NOTES.md**, in particular: a fixed latency of BLK - 1 samples (31 bass, 15 others) in place of
+  block-quantised timing (a control block's samples depend on its END, so it can be rendered only once no later event can cut it), a note event cuts the
+  control block, integer sample offsets, a fixed queue of 256 events. **Two conditions for the wiring (Fable's, N1 step 10 / U34):** the shell's latency goes
+  into the PDC plan; a NoteOff must never be dropped on queue overflow (reserve room or coalesce), else a note sticks.
+- **Engine units merged: U22 to U29 and U33 (all but U26's wiring).** Left in N3: U30 …waves, U31 …chains (Sonnet builds, lead reviews; the big ones), U32
+  SoundFont (owner's licence decision), U04 LXR module, U36. The lead's own: N1 steps 10 and 11 (U34, U35, U37). 29 of 37 units merged.
