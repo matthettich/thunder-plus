@@ -100,7 +100,8 @@ size_t xeng_vector(const VectorP& p, double sr, double hold, double bpm0, float*
   static const double BEATS[12] = {0, 4, 2, 1.5, 1, 2.0 / 3, 0.75, 0.5, 1.0 / 3, 0.25, 1.0 / 6, 0.125};
   const double bpm = cl3(orv(bpm0, 120), 20, 400); const int di = cidx(cl3(js_round(p.sdiv), 0, 11), 0, 11);
   const double D = di == 0 ? mx(0.01, p.stime / 1000) : BEATS[di] * 60 / bpm;
-  const int L0 = (int)mn(S - 1, cl3(js_round(p.lstart), 1, 16) - 1); const bool loop = js_round(p.sloop) >= 1; const double xf = mn(D, mx(0.002, cl3(p.xfade, 0, 1) * D));
+  const int L0 = cidx(mn(S - 1, cl3(js_round(p.lstart), 1, 16) - 1), 0, S - 1);   // (NaN, not reachable from a song: the first step)
+  const bool loop = js_round(p.sloop) >= 1; const double xf = mn(D, mx(0.002, cl3(p.xfade, 0, 1) * D));
   auto stepAt = [&](double t, double* r) {   // r = [current step, next step, fade 0..1, time into the step]
     if (t < 0) t = 0; const double k = std::floor(t / D), tau = t - k * D; int cur;
     if (k < S) cur = (int)k; else if (loop) cur = L0 + (int)std::fmod(k - S, (double)(S - L0)); else cur = S - 1;

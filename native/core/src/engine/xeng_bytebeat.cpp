@@ -46,8 +46,9 @@ size_t xeng_bytebeat(const BytebeatP& p, double sr, double hold, const std::stri
   const size_t N = (size_t)Nd;
   if (!out) return N;
   if (N > cap) return 0;
-  const int32_t A = (int32_t)js_round(mx(0, mn(255, p.a))), B = (int32_t)js_round(mx(0, mn(255, p.b))), Cc = (int32_t)js_round(mx(0, mn(255, p.c)));
-  const int mode = (int)mx(0, mn(2, js_round(p.mode))), bits = (int)mx(1, mn(8, js_round(p.bits))); const int32_t keep = ~((1 << (8 - bits)) - 1);
+  const int32_t A = js_to_int32(js_round(mx(0, mn(255, p.a)))), B = js_to_int32(js_round(mx(0, mn(255, p.b)))), Cc = js_to_int32(js_round(mx(0, mn(255, p.c))));   // (run's `| 0`: NaN is 0)
+  const int mode = cidx(mx(0, mn(2, js_round(p.mode))), 0, 2); const double bitsD = mx(1, mn(8, js_round(p.bits)));
+  const int32_t keep = bitsD == bitsD ? ~((1 << (8 - (int)bitsD)) - 1) : -1;   // (1 << NaN is 1 << 0)
   const int32_t t0 = js_to_int32(mx(0, mn((double)(1 << 30), js_round(p.start)))); const double L = loopLen(p.loop);
   const double step = clock / sr; if (!(step <= 1e4)) return kRefuse;   // (a clock of 1e4 ticks a sample or more: the JS would not finish either)
   const bool sm = p.smooth > 0.005; const double g = sm ? 1 - js_exp(-2 * kPi * mn(sr * 0.45, smoothHz(p.smooth)) / sr) : 1;
