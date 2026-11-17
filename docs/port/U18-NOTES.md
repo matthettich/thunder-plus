@@ -24,7 +24,7 @@ concern is CPU on the phone, so the web app's wasm flags are NOT changed. Instea
 - (e) Wake allocations in the pump slot (pump_free + pump_new in the audio thread, as the JS does): accepted for now; spare instances are deferred to the real-time unit (U31).
 - (f) The `pump` ctest runs against the SHIPPED `pump/pump.wasm`, an older pump than the pin (MASTER 75 parameters against 77, latency 358 against 4454). Whether the web app moves to the pin's MASTER is the
   owner's decision (it changes how his mastering sounds) and is being asked. Until then the reference for the gate is the PIN-BUILT wasm (parity-u18.sh's second run) and the shipped-wasm run skips by name,
-  with the reason printed, `p_master_def`, `p_master_alt` and the 3 MASTER latency pairs (`kSkipShipped`). Each was verified (`test_pump <dir> --no-skip`): the only failures of the shipped run without
+  with the reason printed, `p_master_def`, `p_master_alt` and the 2 MASTER latency pairs (`kSkipShipped`). Each was verified (`test_pump <dir> --no-skip`): the only failures of the shipped run without
   the skip are those two cases (first differing sample 358 = the latency difference, posts differ) and they are within the gate against the pin-built wasm. Nothing else is skipped.
 The gate logic is `native/tests/test_pump.cpp` (`kGateDb`, `kRules`, `kSkipShipped`, the exact list and hash check); the golden is written by `GATE_WRITE=<file> native/tools/parity-u18.sh` (never hand-edited; rebuild test_pump after).
 
