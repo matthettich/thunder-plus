@@ -31,7 +31,7 @@ pDecay, pLpg 0..1; pFm, pTimEnv, pMorEnv -1..1; Elements knobs 0..1, model 0..2.
 Found by ASan. Both Elements, one float past / beyond a 257-entry table:
 1. `elements/dsp/string.cc:128` `lut_svf_shift` (damping_cutoff >= 256).
 2. `elements/dsp/resonator.cc:67` `lut_stiffness` (geometry_ >= 1).
-They change output for exactly two cases, `edge_el1_100` and `edge_el2_100` (knobs at 1.0): upstream read bytes beyond the table (garbage that differs between the wasm and a native build), the patch returns the last table entry. Their
+Applied to host builds only (`#ifdef __wasm__` keeps the original read), because the web's wasm is what the existing waves goldens were made with (the first CI run failed the u02 wasm parity job when the patch was in the wasm too). Natively they change output for exactly two cases, `edge_el1_100` and `edge_el2_100` (knobs at 1.0): upstream read bytes beyond the table (garbage that differs between the wasm and a native build), the patch returns the last table entry. Their
 committed native hashes were regenerated with the patch (they are new in this PR, no existing golden changed). Plaits needed no patch for the committed cases.
 
 ## Allocation in the audio path

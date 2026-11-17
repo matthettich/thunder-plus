@@ -27,7 +27,7 @@ Each is explained at its place in `prepare.sh`. tfx.wasm built from the patched 
 | DaisySP `Effects/pitchshifter.h` (a patched copy in `ds/Effects/`) | `myrand()`'s seed per effect host, same reason | host builds (the wasm build does not use the copy) |
 | `clouds/dsp/grain.h` | no read of `lut_window[4097]` (one past the table, multiplied by 0) | every build (same value) |
 | `clouds/dsp/correlator.cc` | shift count masked to 5 bits (was a shift by 32: undefined; wasm takes it modulo 32) | every build (the wasm's result everywhere) |
-| `elements/dsp/string.cc`, `elements/dsp/resonator.cc` | no read of `lut_svf_shift[257]` / `lut_stiffness[257]` (one past a 257-entry table, multiplied by 0; U25, found by ASan; no output changes) | every build |
+| `elements/dsp/string.cc`, `elements/dsp/resonator.cc` | no read of `lut_svf_shift[257]` / `lut_stiffness[257]` (one past a 257-entry table, multiplied by 0; U25, found by ASan; wasm unchanged) | host builds (`#ifndef __wasm__`) |
 
 ## Parity
 The gate is the audio, not the bytes: `native/tools/parity.sh u02` builds the three wasm files with CMake, swaps them (and the
