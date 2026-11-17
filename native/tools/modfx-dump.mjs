@@ -30,7 +30,10 @@ export const MODS19 = ['meta', 'phaser', 'width', 'pingpong', 'meter', 'limiter'
   'blades', 'onepole', 'allpass', 'dcblock', 'midside', 'dline', 'dimension', 'bbd',
   'harm', 'blipdrum', 'life', 'reson', 'degrade', 'flex', 'sgate', 'retrig', 'pitchfol', 'pitchtrk'];
 // U21 (MODFX modules C): added family by family. Their per-case seeds and signal picks use 100 + their index here (the U19 modules keep theirs; a later unit adds its own list with its own base)
-export const MODS21 = ['sdelay', 'filter', 'cut', 'compressor', 'buscomp', 'glue', 'ngate', 'autopan', 'pump', 'autotune', 'vowel', 'rotary', 'gdelay', 'reverse', 'envfilt', 'bytebeat', 'chaos'];
+export const MODS21 = ['sdelay', 'filter', 'cut', 'compressor', 'buscomp', 'glue', 'ngate', 'autopan', 'pump', 'autotune', 'vowel', 'rotary', 'gdelay', 'reverse', 'envfilt', 'bytebeat', 'chaos', 'marbles', 'tides'];
+// The modules whose native build is STRICT while the wasm they are gated against is built with -ffast-math (the lead, 16 Nov; U21-NOTES.md): their engine renders are also written out as samples
+// (<outDir>/engine_<type>_<set>.f32: L, R, then every output port, as hashFloats takes them) because the gate is -100 dB below the reference's peak, not the hash.
+export const MODS_TOL = ['marbles', 'tides'];
 export const MODS = [...MODS19, ...MODS21];
 const mi = t => { const a = MODS19.indexOf(t); if (a >= 0) return a; const b = MODS21.indexOf(t); return b >= 0 ? 100 + b : 200 + MODS_B.indexOf(t); };
 
@@ -50,10 +53,11 @@ function loadChains() {
 // ---- (1) the engine run: tests/chains.test.js's driver ------------------------------------------------------------------------------------------------------------------------------
 const BLOCKS = 400;
 function engineRun() {
+  const engineSamples = {};
   const ctx = loadChains(), TFX = new Uint8Array(fs.readFileSync(path.join(ROOT, 'chains/dsp/tfx.wasm'))), PUMP = new Uint8Array(fs.readFileSync(path.join(ROOT, 'pump/pump.wasm')));
   ctx.ChainsDSP.wasmInit({ tfxBytes: TFX }); ctx.__pumpBytes = PUMP;
   const E = new ctx.ChainsDSP.ChainsEngine(48000, { focus: 0, quality: 'full', transport: { tempo: 120, lpb: 4, ticks: 6, playing: true } }), M = ctx.ChainsDSP.MODULES;
-  function renderModule(type, over) {   // copied from tests/chains.test.js (renderModule, hashOf)
+  function renderModule(type, over, set) {   // copied from tests/chains.test.js (renderModule, hashOf)
     const m = M[type], params = {}; for (const [k, d] of Object.entries(m.params || {})) params[k] = d[0]; Object.assign(params, over);
     const aIn = Object.keys(m.inputs || {}).filter(n => m.inputs[n] === 'audio'), outs = Object.keys(m.outputs || {}), cab = [];
     if (aIn.includes('in')) cab.push({ from: ['a', 'out'], to: ['b', 'in'] }); if (aIn.includes('inR')) cab.push({ from: ['a', 'outR'], to: ['b', 'inR'] });
@@ -70,7 +74,9 @@ function engineRun() {
     }
     if (probe) { const sh = E.telemetry().shows.find(x => x[0] === 'b'); if (sh) rec.show.set(sh[1]); E.handleMessage({ op: 'telemetry', value: false }); }
     if (E.quality !== 'full') throw new Error('engine shed to draft quality while rendering ' + type);
-    return H.hashFloats([L, R, ...ports.map(p => rec[p])]);
+    const parts = [L, R, ...ports.map(p => rec[p])];
+    if (MODS_TOL.includes(type)) { const n = parts.reduce((a, x) => a + x.length, 0), f = new Float32Array(n); let o = 0; for (const x of parts) { f.set(x, o); o += x.length; } engineSamples[type + ' @' + set] = f; }
+    return H.hashFloats(parts);
   }
   const stress = m => { const o = {}; for (const [k, d] of Object.entries(m.params || {})) { const [, mn, mx, st] = d; if (mx - mn === 1 && st === 1) { o[k] = mn; continue; } let v = mn + (mx - mn) * .7; if (st >= 1) v = Math.round((v - mn) / st) * st + mn; o[k] = v; } return o; };
   const SILENCERS = new Set(['mute']), KEEP_DEFAULT = new Set(['flip']);
@@ -79,10 +85,10 @@ function engineRun() {
   for (const type of Object.keys(M).sort()) {
     const m = M[type]; if (!m || !m.process || SKIP.has(type)) continue;
     for (const [set, over] of [['default', undefined], ['stressed', stress(m)], ['switches-on', switchesOn(m)]]) {
-      ctx.__seedlog = []; out[type + ' @' + set] = renderModule(type, over); seeds[type + ' @' + set] = ctx.__seedlog;
+      ctx.__seedlog = []; out[type + ' @' + set] = renderModule(type, over, set); seeds[type + ' @' + set] = ctx.__seedlog;
     }
   }
-  return { hashes: out, seeds, M: Object.fromEntries(MODS.map(t => [t, M[t]])) };
+  return { hashes: out, seeds, samples: engineSamples, M: Object.fromEntries(MODS.map(t => [t, M[t]])) };
 }
 
 // ---- (2) the direct run -------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -251,6 +257,7 @@ if (bad) process.exit(1);
 const ctx = loadChains(), M = ctx.ChainsDSP.MODULES, outDir = arg && !arg.startsWith('--') ? arg : null;
 for (const t of MODS) if (!M[t] || !M[t].process) { console.error('modfx-dump: no such module in the JS: ' + t); process.exit(1); }
 if (outDir) { fs.mkdirSync(outDir, { recursive: true }); fs.writeFileSync(path.join(outDir, 'defs.json'), JSON.stringify(tables(engine.M)));
+  for (const [k, f] of Object.entries(engine.samples)) fs.writeFileSync(path.join(outDir, 'engine_' + k.replace(' @', '_') + '.f32'), new Uint8Array(f.buffer));
   { const b = bbCheck(ctx.__bb); fs.writeFileSync(path.join(outDir, 'bbexpr.json'), JSON.stringify({ meta: b.meta, grid: b.grid })); fs.writeFileSync(path.join(outDir, 'bbexpr.i32'), new Uint8Array(b.vals.buffer)); } }
 const direct = [];
 for (const t of MODS) for (const c of casesFor(t, M[t])) {

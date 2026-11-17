@@ -79,6 +79,11 @@ if(NOT IS_WASM)
   set(OPT_TFX -O3 -fno-fast-math -ffp-contract=off ${OPT_COMMON} -w)
 endif()
 set(OPT_MOD -O2 -ffast-math -ffunction-sections -fdata-sections -fno-exceptions -fno-rtti -w)  # mods/build.sh
+# The lead, 16 Nov (docs/port/U21-NOTES.md, "Marbles / Tides: the decision"): the web's mods.wasm keeps -ffast-math (its CPU cost without it was measured), and the native build of the
+# mods library (Marbles, Tides) is STRICT, as tfx is (U14): the same samples on every platform. Against the wasm the gate is -100 dB, not bit-exact; the native render is pinned by hashes.
+if(NOT IS_WASM)
+  set(OPT_MOD -O2 -fno-fast-math -ffp-contract=off -ffunction-sections -fdata-sections -fno-exceptions -fno-rtti -w)
+endif()
 
 # dsp_group(<lib> <name> OPTS <flags> DEFS <defs> INCS <dirs> PRE <headers to -include> SRCS <files>)
 # One OBJECT library per source file, so the wasm link can list every object in a canonical, path-independent order:

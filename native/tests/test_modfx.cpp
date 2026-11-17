@@ -6,7 +6,12 @@
 //  3. the direct cases: the module's create() / process() driven with random parameters changing mid-run, bursts, gates, CV, linked and unlinked inputs, block sizes below 128, tempo and
 //     start changes, other sample rates, tails and silences: the output compared sample by sample with the JS (bit-exact is the gate) and with the committed FNV-1a 64. A reference that is
 //     missing is a FAILURE. The sample-by-sample comparison with the LOCAL Node must also hold on x86-64 Linux; elsewhere it is reported (macOS arm64 Node rounds Math.sin / cos differently).
-//   test_modfx <dir> [module-substring]
+//   test_modfx <dir> [module-substring] [--write-native FILE]
+// MARBLES and TIDES (the lead's decision, 16 Nov; docs/port/U21-NOTES.md, "Marbles / Tides: the decision"): their golden comes from the web's mods.wasm, built with -ffast-math, no native build
+// can reproduce its order of float sums; the native mods library is STRICT (-fno-fast-math -ffp-contract=off). So for kTolTypes the gate is not the hash but: each render / case within kGateDb
+// (-100 dB: max |difference| / the reference's peak) of the reference samples (<dir>/engine_<type>_<set>.f32, <dir>/<case>.f32), the worst printed; a case that is bit-exact today stays
+// bit-exact (golden/modfx_mods_native.inc, kModsExact); and the native render itself is pinned by the SHA-256 committed in the same file (made on Linux x86-64), checked on every platform.
+// A case that cannot meet the line is left out BY NAME in kTolSkip with the reason printed; there is no wildcard. --write-native writes that golden (never hand-edited; rebuild after).
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
@@ -24,14 +29,45 @@
 #include "rt/json.h"
 #include "rt/jsmath.h"
 #include "golden/modfx_golden.inc"
+#include "golden/modfx_mods_native.inc"
+#include "sha256.h"
 
 using namespace thunder;
 using namespace thunder::modfx;
 
 static bool readFile(const std::string& path, std::string* out) { std::ifstream f(path, std::ios::binary); if (!f) return false; std::stringstream ss; ss << f.rdbuf(); *out = ss.str(); return true; }
+static int fails = 0;
+// ---- Marbles / Tides: the tolerance gate (see the header) ------------------------------------------------------------------------------------------------------------------------------
+static const double kGateDb = -100.0;
+static bool isTol(const char* type) { return !std::strcmp(type, "marbles") || !std::strcmp(type, "tides"); }
+struct TolSkip { const char* name; const char* why; };
+static const TolSkip kTolSkip[] = { {"", ""} };   // none: every case of Marbles / Tides is within the line (measured)
+static const TolSkip* tolSkipOf(const char* nm) { for (const TolSkip& k : kTolSkip) if (k.name[0] && !std::strcmp(k.name, nm)) return &k; return nullptr; }
+static bool inExact(const char* nm) { for (int i = 0; i < kModsExactN; i++) if (!std::strcmp(kModsExact[i], nm)) return true; return false; }
+static const char* nativeSha(const char* nm) { for (int i = 0; i < kModsNativeN; i++) if (!std::strcmp(kModsNative[i].name, nm)) return kModsNative[i].sha256; return nullptr; }
+static std::string shaOf(const float* f, size_t n) { Sha256 h; h.add((const char*)f, n * 4); return h.hex(); }
+struct Cmp { bool exact = true; double db = -INFINITY, err = 0, peak = 0; long nDiff = 0, first = -1; double got = 0, want = 0; };
+static Cmp compareF(const float* a, const float* r, size_t n) {
+  Cmp c;
+  for (size_t i = 0; i < n; i++) { c.peak = std::max(c.peak, (double)std::fabs(r[i])); if (std::memcmp(&a[i], &r[i], 4) == 0 || (std::isnan(a[i]) && std::isnan(r[i]))) continue;
+    c.exact = false; c.nDiff++; if (c.first < 0) { c.first = (long)i; c.got = a[i]; c.want = r[i]; } c.err = std::max(c.err, std::fabs((double)a[i] - (double)r[i])); }
+  c.db = c.exact ? -INFINITY : 20 * std::log10(c.err / std::max(c.peak, 1e-30)); return c;
+}
+struct TolRow { std::string name, sha; bool exact; };
+static std::vector<TolRow> gTol; static int gTolOk = 0, gTolExact = 0; static double gTolWorst = -INFINITY; static std::string gTolWorstName; static bool gWrite = false;
+// one Marbles / Tides render or case against its reference samples: the line, the exact list, the native hash. Returns false (and counts a failure) when one of them is broken.
+static void tolCheck(const std::string& name, const float* got, const float* ref, size_t n) {
+  const Cmp c = compareF(got, ref, n); const std::string sha = shaOf(got, n); gTol.push_back({name, sha, c.exact});
+  if (const TolSkip* k = tolSkipOf(name.c_str())) { std::printf("%-28s SKIPPED: %s\n", name.c_str(), k->why); return; }
+  bool ok = c.exact || c.db <= kGateDb; const char* why = ok ? "" : "  beyond the line";
+  if (!gWrite) { if (inExact(name.c_str()) && !c.exact) { ok = false; why = "  was bit-exact: the exact list is enforced"; }
+    const char* w = nativeSha(name.c_str()); if (!w || sha != w) { ok = false; why = w ? "  NATIVE HASH DIFFERS from the committed one (golden/modfx_mods_native.inc)" : "  no committed native hash"; } }
+  if (ok) { gTolOk++; if (c.exact) gTolExact++; else if (c.db > gTolWorst) { gTolWorst = c.db; gTolWorstName = name; } }
+  if (!c.exact || !ok) std::printf("%-28s %.1f dB (%ld of %zu samples differ)%s%s\n", name.c_str(), c.db, c.nDiff, n, why, ok ? "" : "  FAIL");
+  if (!ok) { fails++; std::printf("    first differing sample %ld: got %.9g want %.9g; largest difference %.3g against a peak of %.3g\n", c.first, c.got, c.want, c.err, c.peak); }
+}
 static uint64_t fnv64(const void* d, size_t n, uint64_t h = 0xcbf29ce484222325ull) { const unsigned char* u = (const unsigned char*)d; for (size_t i = 0; i < n; i++) { h ^= u[i]; h *= 0x100000001b3ull; } return h; }
 static uint32_t fnv32(const void* d, size_t n, uint32_t h) { const unsigned char* u = (const unsigned char*)d; for (size_t i = 0; i < n; i++) { h ^= u[i]; h *= 0x01000193u; } return h; }
-static int fails = 0;
 #if defined(__linux__) && (defined(__x86_64__) || defined(_M_X64))
 static const bool kLocalMustMatch = true;
 #else
@@ -90,7 +126,7 @@ static void paramSet(const Def& d, int set, double* p) {   // default / stress /
     double v = mn + (mx - mn) * (set == 1 ? .7 : .3); if (st >= 1) v = js_round((v - mn) / st) * st + mn; p[k] = v;
   }
 }
-static uint32_t engineHash(const Def& d, int set, const ModfxEngineGolden& G) {
+static uint32_t engineHash(const Def& d, int set, const ModfxEngineGolden& G, std::vector<float>* cat = nullptr) {
   const int BL = 400; std::vector<float> sig((size_t)BL * 128), L((size_t)BL * 128), R((size_t)BL * 128); testSignal(sig.data(), BL * 128);
   std::vector<std::vector<float>> rec((size_t)d.nout, std::vector<float>((size_t)BL * 128));
   double p[128] = {}; paramSet(d, set, p);
@@ -112,13 +148,20 @@ static uint32_t engineHash(const Def& d, int set, const ModfxEngineGolden& G) {
     }
   }
   uint32_t h = 0x811c9dc5u; h = fnv32(L.data(), L.size() * 4, h); h = fnv32(R.data(), R.size() * 4, h); for (int k = 0; k < d.nout; k++) h = fnv32(rec[(size_t)k].data(), rec[(size_t)k].size() * 4, h);
+  if (cat) { cat->clear(); cat->insert(cat->end(), L.begin(), L.end()); cat->insert(cat->end(), R.begin(), R.end()); for (int k = 0; k < d.nout; k++) cat->insert(cat->end(), rec[(size_t)k].begin(), rec[(size_t)k].end()); }
   return h;
 }
+static std::string gDir;
 static void engineTest(const std::string& filt) {
   int ran = 0, bad = 0;
   for (int i = 0; i < kModfxEngineN; i++) {
     const ModfxEngineGolden& G = kModfxEngine[i]; if (!filt.empty() && !std::strstr(G.type, filt.c_str())) continue;
     const Def* d = find(G.type); if (!d) { std::printf("engine: %s is not in the registry  FAIL\n", G.type); bad++; continue; }
+    if (isTol(G.type)) {   // Marbles / Tides: the reference is the wasm's samples, the gate the line (not the hash)
+      const std::string nm = std::string("engine_") + G.type + "_" + (G.set == 0 ? "default" : G.set == 1 ? "stressed" : "switches-on"); std::string rf;
+      std::vector<float> cat; engineHash(*d, G.set, G, &cat); ran++;
+      if (!readFile(gDir + "/" + nm + ".f32", &rf) || rf.size() != cat.size() * 4) { std::printf("%-28s reference samples missing or the wrong size  FAIL\n", nm.c_str()); bad++; continue; }
+      const int f0 = fails; tolCheck(nm, cat.data(), (const float*)rf.data(), cat.size()); if (fails != f0) { bad++; fails = f0; } continue; }
     const uint32_t h = engineHash(*d, G.set, G); ran++;
     if (h != G.hash) { std::printf("engine: %-10s @%-12s %08x, tests/golden/chains-modules.json has %08x  FAIL\n", G.type, G.set == 0 ? "default" : G.set == 1 ? "stressed" : "switches-on", h, G.hash); bad++; }
   }
@@ -218,7 +261,7 @@ static void makeSignal(const char* kind, const std::string& sigKind, size_t n, u
   }
 }
 static int gInputsChecked = 0;
-struct Res { bool ran = false, exact = false, hashOk = false; long nDiff = 0, n = 0, first = -1; double got = 0, want = 0; };
+struct Res { bool ran = false, exact = false, hashOk = false; long nDiff = 0, n = 0, first = -1; double got = 0, want = 0; std::vector<float> out, ref; };
 static Res runCase(const std::string& dir, const ModfxCaseGolden& G) {
   Res R; std::string js, in, ref;
   if (!readFile(dir + "/" + G.name + ".json", &js) || !readFile(dir + "/" + G.name + ".f32", &ref)) return R;
@@ -261,12 +304,14 @@ static Res runCase(const std::string& dir, const ModfxCaseGolden& G) {
   R.ran = true; R.n = (long)outN; bool exact = true;
   for (size_t i = 0; i < outN; i++) { const float a = out[i], r = J[i]; if (std::memcmp(&a, &r, 4) == 0 || (std::isnan(a) && std::isnan(r))) continue; exact = false; R.nDiff++; if (R.first < 0) { R.first = (long)i; R.got = a; R.want = r; } }
   R.exact = exact; R.hashOk = fnv64(out.data(), outN * 4) == G.hash;
+  if (isTol(d->type)) { R.out = out; R.ref.assign(J, J + outN); }
   return R;
 }
 
 int main(int argc, char** argv) {
   if (argc < 2) { std::printf("modfx: no reference directory given: FAIL (a fixture that cannot run is a failure)\n"); return 1; }
-  const std::string filt = argc > 2 ? argv[2] : "";
+  gDir = argv[1]; std::string filt; const char* writeNative = nullptr;
+  for (int i = 2; i < argc; i++) { if (!std::strcmp(argv[i], "--write-native") && i + 1 < argc) { writeNative = argv[++i]; gWrite = true; } else filt = argv[i]; }
   if (filt.empty()) { tableTest(argv[1]); bbTest(argv[1]); bbConstTest(); }
   engineTest(filt);
   int ran = 0, exact = 0, shown = 0;
@@ -274,6 +319,7 @@ int main(int argc, char** argv) {
     const ModfxCaseGolden& G = kModfxCases[i]; if (!filt.empty() && !std::strstr(G.name, filt.c_str())) continue;
     const Res R = runCase(argv[1], G);
     if (!R.ran) { std::printf("%-24s could not be run (reference files missing or the wrong size)  FAIL\n", G.name); fails++; continue; }
+    if (!R.out.empty()) { ran++; tolCheck(G.name, R.out.data(), R.ref.data(), R.out.size()); continue; }   // Marbles / Tides
     ran++; const bool ok = R.hashOk && (R.exact || !kLocalMustMatch); if (R.hashOk) exact++;
     if (!ok || !R.exact) { if (shown++ < 60) { std::printf("%-24s %s%s%s\n", G.name, R.hashOk ? "bit-exact (committed hash)" : "DIFFERS from the committed hash", R.exact ? "" : R.hashOk ? "  [the local Node reference differs: its Math.* rounds otherwise]" : "", ok ? "" : "  FAIL");
       if (!R.exact) std::printf("    %ld of %ld samples differ; first at %ld: got %.9g want %.9g\n", R.nDiff, R.n, R.first, R.got, R.want); } }
@@ -283,5 +329,12 @@ int main(int argc, char** argv) {
   if (filt.empty()) { int unc = 0; for (int m = 0; m < count(); m++) { int n = 0; for (int i = 0; i < kModfxCasesN; i++) if (!std::strncmp(kModfxCases[i].name, at(m).type, std::strlen(at(m).type)) && kModfxCases[i].name[std::strlen(at(m).type)] == '_') n++; if (n < 14) { std::printf("direct: %s has %d cases  FAIL\n", at(m).type, n); unc++; } } if (unc) fails++; }
   if (ran == 0) { std::printf("modfx: no case ran  FAIL\n"); fails++; }
   std::printf("modfx: %d of %d direct cases bit-exact (committed hash), %d failed\n", exact, ran, fails);
+  if (!gTol.empty()) std::printf("Marbles / Tides (native strict against the fast-math wasm): %zu renders and cases, %d inside the %.0f dB line (%d of them bit-exact); worst of the rest %s (%s)\n", gTol.size(), gTolOk, kGateDb, gTolExact,
+    std::isinf(gTolWorst) ? "none" : (std::to_string(gTolWorst) + " dB").c_str(), gTolWorstName.c_str());
+  if (writeNative) { std::ofstream o(writeNative); int ne = 0; for (auto& r : gTol) if (r.exact) ne++;
+    o << "// GENERATED by test_modfx --write-native: Marbles / Tides, the native STRICT build against the fast-math wasm (docs/port/U21-NOTES.md). kModsExact: the renders and cases that are bit-exact with the wasm today (a\n// case that leaves the list fails); kModsNative: the SHA-256 of the native render of each (made on Linux x86-64, checked on every platform).\n";
+    o << "static const char* const kModsExact[] = {\n"; for (auto& r : gTol) if (r.exact) o << "  \"" << r.name << "\",\n"; o << "  \"\"};\nstatic const int kModsExactN = " << ne << ";\n";
+    o << "struct ModsNative { const char* name; const char* sha256; };\nstatic const ModsNative kModsNative[] = {\n"; for (auto& r : gTol) o << "  {\"" << r.name << "\", \"" << r.sha << "\"},\n"; o << "  {\"\", \"\"}};\nstatic const int kModsNativeN = " << gTol.size() << ";\n";
+    std::printf("wrote %s: %d exact, %zu hashes\n", writeNative, ne, gTol.size()); }
   return fails ? 1 : 0;
 }
