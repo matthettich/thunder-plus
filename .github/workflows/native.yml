@@ -144,7 +144,7 @@ jobs:
   windows:
     name: Core (Windows x64, MSVC)
     runs-on: windows-latest
-    timeout-minutes: 20
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4   # U15: the tempo-locked effects' reference (fx-clk-dump.mjs, libm-dump.mjs) runs on every platform, bit-exact: Node 22 (V8 12.4) and acorn
