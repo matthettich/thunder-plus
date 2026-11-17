@@ -1439,5 +1439,6 @@ double js_tanh(double x) { return fdlibm_tanh(x); }
 double js_log2(double x) { return fdlibm_log2(x); }
 double js_atan2(double y, double x) { return fdlibm_atan2(y, x); }
 double js_hypot3(double a, double b, double c) { const double v[3] = {a, b, c}; return v8_hypot(v, 3); }
+double js_hypot2(double a, double b) { const double v[2] = {a, b}; return v8_hypot(v, 2); }
 
 }  // namespace thunder

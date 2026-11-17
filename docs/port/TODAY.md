@@ -263,3 +263,30 @@ N1 step 10.
   three passes into three parallel jobs, or run the `*_ref` / `*_golden_current` tests only in the GCC pass (the U24 worker measured about 530 s of them per pass before
   U28); no test removed from the GCC pass, nothing loosened. Minor, from the re-check: `xeng_swarm.cpp:48` and `xeng_drift.cpp:51` test the runaway flag only at the
   next control block (a voice of 32 samples or fewer would render, not refuse). **Nothing is running. End of the day's plan.**
+
+## Evening, 16 Nov: Fable worked the START HERE list (19:30 onward). Outcomes, in the list's order
+1. **The fast-math decision: NO to rebuilding the web wasm with `-fno-associative-math`.** Measured tonight (pin-built `pump.wasm`, wasi-sdk 25, Node 22, as
+   shipped against the same plus `-fno-associative-math`, minimum of 7 runs): LIMIT +40 %, MASTER +40 %, METER +58 %, TUNE +108 %, HEAT +13 to +27 %, STRIP +19 to
+   +34 %, VOX +22 %, SWIRL +22 %, TUBE +7 to +16 %, COMP heavy +11 %; the rest within 2 %; Marbles / Tides within about ±8 %. Output differences are -115 dB or
+   lower. That CPU is too much for the phone. Decided instead: (a) the native build of pump / mods / (later) Plaits and Elements stays strict, so native is
+   the same on every platform; (b) against the fast-math wasm these units are gated at -100 dB per case, with every case that is exact today kept exact;
+   (c) committed native-strict hashes gate the platforms against each other; (d) a quantiser after a nonlinear stage (`x_two_hosts_same`) gets a per-case rule
+   by name (a bounded number of one-step flips); (e) wake allocations: JS behaviour for now, spare instances in U31; (f) the native gate's reference is the
+   pin-built wasm; the shipped-wasm run skips the MASTER cases by name until the owner decides whether the web app takes the pin's MASTER (asked 16 Nov).
+   A later unit can get the CPU back AND exactness: write the hot reductions (oversampler FIR, limiter, meter) with an explicit lane order in the pump source.
+   Being applied by a Sonnet worker: #182 (`n1/u18`) and Marbles / Tides (`n1/mods-on`). Raw numbers: `/home/claude/sw/results` on the session's disk (not pushed).
+2. **#190 merged.** `SongRenderer::masterHook` passes `mix_.beat(kSongNT)`; the test's own master tap needed the clock too (one line, approved); goldens unchanged,
+   100 of 100 locally, CI green. From reading only: with a PDC plan the master's clock delay matches the page (`pdcSync` sets `mfx._cd`; `clockBlock` covers the master slot).
+3. **Web build 635 (on `beta` and `main`, PR #197, #199):** wavetable table one entry longer (negative Bend no longer reads past it; finite renders unchanged, no
+   golden changed); `pumpRun` never writes more floats than `pump_nparams`; test that `pump-meta.js` and `pump.wasm` agree on every plugin's parameter count.
+   Supersaw negative Detune / pwm negative Shape: not reachable from the UI (rows are 0 to 1), left. Native mirror of 635: branch `n1/wt-bend` (Sonnet, in progress).
+   **Web item 4 (both instruments sound) NOT done:** it needs booked-but-unstarted notes of an edited cell dropped and re-booked in the core AND in the page's
+   player (rows go up LEAD ahead for live engines / SoundFonts); a design for its own session, low severity (one stale note within about 0.3 s of an edit).
+   **Web build 636 (owner's request at 19:45, PR #198, on `beta` and `main`):** folded phone, BPM / LPB / ROWS / LEFT in the top bar beside the CPU meter; the line
+   under the tabs is gone. Open from CodeRabbit (minor): with four tabs between 461 and 520 px the moved controls can run past the edge.
+4. **The manager's decisions: all four confirmed.** #191 (the reference had the bug); the 60-minute limit is superseded by #196 (Linux job split into GCC / clang /
+   sanitizers in parallel: 19, 18 and 28 minutes on #195); `-fno-sanitize=vptr` (the vptr check needs RTTI and the core is `-fno-rtti`); the committed-Linux-golden gate.
+5. **#187, #188, #189, #191, #192, #193: accepted** on the gates plus the independent verifiers; Fable read REVIEW-16NOV.md (now in `native`), not the engine diffs
+   (the work plan asks no lead review of C units). Follow-ups queued, none blocking: B1-2 `kTup[-1]`, B1-5 `sinT` index 4097, B1-7 NaN-to-int casts (C++ UB where
+   the JS gives NaN: make them defined), B3-3 a `ctx.block <= 128` check, swarm / drift runaway flag tested only at the next control block.
+6. **#195 U28 merged** after #196: all CI green including the sanitizer job.

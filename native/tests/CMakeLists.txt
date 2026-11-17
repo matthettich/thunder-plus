@@ -398,6 +398,29 @@ if(THUNDER_SANITIZE AND NOT MSVC)
   target_compile_options(rt_harness PRIVATE -fno-sanitize=vptr)
 endif()
 
+# D4: U15 end to end: ELECTRO with Flex / Step gate / Retrigger and their tracker commands through SongRenderer (Mixer + FxBank) against the real JS in Node
+# (tools/u15-song-dump.mjs: the real ThunderFx worklet + the mixer model of test_mix, fed with what the C++ voices and sequencer produce). Committed Linux golden is the gate
+# everywhere; the Node comparison runs only on Linux x86-64 (Node's Math.* differs elsewhere).
+add_executable(test_u15song test_u15song.cpp)
+target_link_libraries(test_u15song PRIVATE thunder_core)
+target_include_directories(test_u15song PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../core/src ${CMAKE_CURRENT_SOURCE_DIR})
+target_compile_definitions(test_u15song PRIVATE THUNDER_ROOT="${CMAKE_CURRENT_SOURCE_DIR}/../..")
+if(NOT MSVC)
+  target_compile_options(test_u15song PRIVATE -Wall -Wextra)
+endif()
+add_test(NAME u15song COMMAND test_u15song)
+if(NODE_EXE AND CMAKE_SYSTEM_NAME STREQUAL "Linux" AND CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|AMD64")
+  file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/u15song-ref)
+  add_test(NAME u15song_dump COMMAND test_u15song --dump ${CMAKE_CURRENT_BINARY_DIR}/u15song-ref)
+  set_tests_properties(u15song_dump PROPERTIES FIXTURES_SETUP u15song_in)
+  add_test(NAME u15song_ref COMMAND ${NODE_EXE} ${CMAKE_CURRENT_SOURCE_DIR}/../tools/u15-song-dump.mjs ${CMAKE_CURRENT_BINARY_DIR}/u15song-ref)
+  set_tests_properties(u15song_ref PROPERTIES FIXTURES_REQUIRED u15song_in FIXTURES_SETUP u15song_ref)
+  add_test(NAME u15song_node COMMAND test_u15song ${CMAKE_CURRENT_BINARY_DIR}/u15song-ref)
+  set_tests_properties(u15song_node PROPERTIES FIXTURES_REQUIRED u15song_ref)
+  add_test(NAME u15song_golden_current COMMAND ${NODE_EXE} ${CMAKE_CURRENT_SOURCE_DIR}/../tools/u15-song-dump.mjs ${CMAKE_CURRENT_BINARY_DIR}/u15song-ref --check)
+  set_tests_properties(u15song_golden_current PROPERTIES FIXTURES_REQUIRED u15song_ref)
+endif()
+
 # U23: the layer types click, wavetable, pd, chip, supersaw, pwm, sample (loop, vintage modes) and grains (core/src/engine/layer_*.cpp) against the real ENGINE block (tools/engine-u23-dump.mjs) and beta's
 # tests/golden/engines.json (the committed engine_u23_voices_golden.inc): the factory voices of these types, SHA-256 bit-exact, and the direct cases against the committed Linux hashes (engine_u23_golden.inc).
 add_executable(test_engine_u23 test_engine_u23.cpp)
@@ -417,3 +440,32 @@ if(NODE_EXE)
 else()
   add_test(NAME engine_u23 COMMAND test_engine_u23)   # no directory: prints FAIL and exits 1
 endif()
+
+# U28: the rendered-only engines tone, modal, swarm, drift, piano, ep, organ, breath, strings, fmdrum, wind, phase, partials, skin and chip (core/src/engine/xeng_*.cpp) against the real ENGINE block (tools/engine-xeng-dump.mjs)
+# and beta's tests/golden/engines.json (the committed engine_xeng_voices_golden.inc): the factory voices of these engines, SHA-256 bit-exact, and the direct cases against the committed Linux hashes (engine_xeng_golden.inc).
+add_executable(test_engine_xeng test_engine_xeng.cpp)
+target_link_libraries(test_engine_xeng PRIVATE thunder_core)
+target_include_directories(test_engine_xeng PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../core/src ${CMAKE_CURRENT_SOURCE_DIR})
+if(NOT MSVC)
+  target_compile_options(test_engine_xeng PRIVATE -Wall -Wextra)
+endif()
+if(NODE_EXE)
+  add_test(NAME engine_xeng_ref COMMAND ${NODE_EXE} ${CMAKE_CURRENT_SOURCE_DIR}/../tools/engine-xeng-dump.mjs ${CMAKE_CURRENT_BINARY_DIR}/engine-xeng-ref)
+  set_tests_properties(engine_xeng_ref PROPERTIES FIXTURES_SETUP engine_xeng_ref)
+  add_test(NAME engine_xeng COMMAND test_engine_xeng ${CMAKE_CURRENT_BINARY_DIR}/engine-xeng-ref ${CMAKE_CURRENT_SOURCE_DIR}/golden/engine_xeng_voices.json)
+  set_tests_properties(engine_xeng PROPERTIES FIXTURES_REQUIRED engine_xeng_ref)
+  if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    add_test(NAME engine_xeng_golden_current COMMAND ${NODE_EXE} ${CMAKE_CURRENT_SOURCE_DIR}/../tools/engine-xeng-dump.mjs --check)
+  endif()
+else()
+  add_test(NAME engine_xeng COMMAND test_engine_xeng)   # no directory: prints FAIL and exits 1
+endif()
+
+# U28: extreme and NaN parameters of the 15 engines: no crash, no out-of-bounds access (under ASan / UBSan), refused or rendered within the bound.
+add_executable(test_engine_xeng_fuzz test_engine_xeng_fuzz.cpp)
+target_link_libraries(test_engine_xeng_fuzz PRIVATE thunder_core)
+target_include_directories(test_engine_xeng_fuzz PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../core/src ${CMAKE_CURRENT_SOURCE_DIR})
+if(NOT MSVC)
+  target_compile_options(test_engine_xeng_fuzz PRIVATE -Wall -Wextra)
+endif()
+add_test(NAME engine_xeng_fuzz COMMAND test_engine_xeng_fuzz ${CMAKE_CURRENT_SOURCE_DIR}/golden/xeng_ranges.json)
