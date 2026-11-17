@@ -1,14 +1,13 @@
-# D4: U15 whole-song test (Flex / Step gate / Retrigger on ELECTRO): NOTES (branch `n1/u15-song`, PR: DO NOT MERGE)
+# D4: U15 whole-song test (Flex / Step gate / Retrigger on ELECTRO): NOTES (branch `n1/u15-song`, PR #190)
 
-## Result: FAILS, and the cause is in the engine (not changed here)
+## Result: PASSES (fix applied with the lead's approval, 16 Nov evening)
 `native/tests/test_u15song.cpp` renders `sounds/ELECTRO.thunder` through `SongRenderer` (sequencer -> voices -> `Mixer` -> `FxBank` -> `FxHost` -> clkcores)
 with Flex, Step gate and Retrigger on tracks 0, 1, 2 (all three in series), 4, 8 and, from the song itself, on the master, plus FLX / GAT / RTG / FXO tracker commands
 (`native/tests/golden/u15song-patch.json`), 384000 frames (8 s). Reference: the real ThunderFx worklet and the page-strip model of test_mix run in Node
-(`native/tools/u15-song-dump.mjs`). Gate: bit-exact (the whole-song mixer references are bit-exact).
+(`native/tools/u15-song-dump.mjs`). Gate: bit-exact. With the fix below all 768000 samples equal Node's and the committed golden (hash `0x75c0cc2d28be319b`); no golden changed.
 
-- **Track effects: bit-exact.** With the patch's commands on tracks only, all 768000 samples equal Node's (checked before the master commands were added).
-- **With FLX / RTG commands on the master column: 171180 of 768000 samples differ. First difference: sample 5498 of both channels (0.1145 s), got -0.182175323, want -0.184038609;
-  largest difference 0.839 (+0.2 dB of the reference peak).** The two tests that fail: `u15song` (committed golden, made from Node's output) and `u15song_node`.
+The test first failed (before the fix): with FLX / RTG commands on the master column 171180 of 768000 samples differed (first at sample 5498, got -0.182175323, want -0.184038609; largest difference 0.839).
+Track effects were bit-exact.
 
 ## Cause
 `SongRenderer::masterHook` (`native/core/src/render/render.cpp`) calls `fx_->host(kSongNT).process(L, R, frames, t0)` with **no beat clock** (`bp` defaults to none), while
@@ -22,9 +21,15 @@ Proof, both measured here:
    the clock: 0 of 768000 samples differ, hash `0x75c0cc2d28be319b` = the committed golden.
 Before commands were put on the master column the song's own master Flex (FLX 00 at the start) and Retrigger (no RTG) were pass-through, which is why the track-only run hid it.
 
-## Not decided here
-The fix is an engine change (`render.cpp`, U14/U15 integration; Fable's call): pass `mix_.beat(kSongNT)` in `masterHook` (and, when the master has a latency plan, check `clockDelaySec`).
-Once it is in, `test_u15song` passes unchanged; no golden needs to change (the golden holds the JS's output).
+## Fix (applied)
+`SongRenderer::masterHook` now calls `fx_->host(kSongNT).process(L, R, frames, t0, r->mix_.beat(kSongNT), frames)`: the master node hears the clock like a track node.
+**The test's tap needed the clock too:** `tapHook` in `test_u15song.cpp` copied the old call for the master (no clock), so the check "the taps do not change the render" failed once the product
+changed; its master line now passes `C.mix->beat(NT), N` (the tap mirrors the product hook). No golden, no gate changed.
+
+## Master clock delay under a PDC plan (from reading, not tested)
+The page has one: `pdcSync` does `set(mfx._cd, pl.c.get(MT))`, and the FXC lane time adds `n._cd._pv` for any node. Native matches: `pdc.cpp` sets `out.c[NT]`, `pdc_apply` ->
+`Mixer::setClockDelays` covers all `kMixTracks` including the master, `Mixer::clockBlock` delays the master's clock when the master hook is set so `beat(kSongNT)` is the delayed copy,
+and `FxBank::event` adds `clockDelaySec(kSongNT)` to master FXC times. This test uses no PDC plan, so it is not exercised.
 
 ## What the test is, and what it relies on
 - Node cannot make the voices and the sequencer: they come from the C++ (`test_u15song --dump <dir>`: what each effects node is given after TRIM, the beat clock it hears, the
