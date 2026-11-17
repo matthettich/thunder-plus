@@ -56,16 +56,22 @@ namespace thunder {
 #define XP_MACH(X) X(machine,0) X(oct,2) X(a,0.3) X(b,0.5) X(c,0.4) X(det,0.25) X(hp,30) X(lp,3500) X(res,0.25) X(fenv,0.35) X(fdec,350) X(atk,3) X(dec,500) X(sus,0.7) X(rel,220) X(lfoRate,4) X(lfoDepth,0) X(lfoDest,0) X(glide,0) X(tune,0) X(drive,0) X(level,0)
 #define XP_BLIP(X) X(pitch,180) X(kick,0.4) X(kickT,35) X(fm,0) X(fmR,1.5) X(ring,0) X(ringF,300) X(noise,0) X(click,0.2) X(atk,0.5) X(decay,220) X(drive,0) X(filt,0) X(res,0.2) X(grain,0) X(grainT,60)
 
+// U26: the bass engine (BassCore.defaults(); tune, drive and level come from the voice) and the voice engine (VoxCore.defaults() without `txt`, which is a string: VoxP::txt)
+#define XP_BASS(X) X(oct,0) X(shape,0) X(parts,48) X(tilt,0) X(oddeven,0) X(stretch,0) X(cut,400) X(res,0.35) X(fenv,2) X(fdec,250) X(key,0.5) X(vowel,0) X(form,0) X(combF,0.5) X(comb,0) X(width,0.3) X(det,0) X(sub,0.5) X(subOct,1) \
+  X(wRate,5) X(wShape,0) X(wRetrig,1) X(wPhase,0) X(wSmooth,0.15) X(wCut,0) X(wVowel,0) X(wComb,0) X(wAmp,0) X(wDelay,0) X(wFade,0) X(atk,2) X(dec,300) X(sus,1) X(rel,80) X(glide,0) X(legato,0) X(drive,0) X(level,0) X(tune,0)
+#define XP_VOX(X) X(oct,0) X(form,0) X(robot,0.6) X(breath,0.3) X(hiss,0.5) X(clar,0.6) X(bright,0.55) X(vib,0.25) X(vibRate,5.5) X(vibDelay,250) X(glide,40) X(atk,12) X(rel,140) X(cons,1) X(bw,0.5) X(voice,1) X(sylLen,320) X(rough,0) X(choir,1) X(spread,0.4) X(drive,0) X(level,0) X(tune,0)
+
 #define XP_FIELD(n, d) double n = d;
 struct ToneP { XP_TONE(XP_FIELD) };      struct ModalP { XP_MODAL(XP_FIELD) };      struct SwarmP { XP_SWARM(XP_FIELD) };   struct DriftP { XP_DRIFT(XP_FIELD) };
 struct PianoP { XP_PIANO(XP_FIELD) };    struct EpP { XP_EP(XP_FIELD) };            struct OrganP { XP_ORGAN(XP_FIELD) };   struct BreathP { XP_BREATH(XP_FIELD) };
 struct StringsP { XP_STRINGS(XP_FIELD) }; struct FmDrumP { XP_FMDRUM(XP_FIELD) };   struct WindP { XP_WIND(XP_FIELD) };     struct PhaseP { XP_PHASE(XP_FIELD) };
 struct PartialsP { XP_PARTIALS(XP_FIELD) }; struct SkinP { XP_SKIN(XP_FIELD) };     struct ChipP { XP_CHIP(XP_FIELD) };
 struct AcidP { XP_ACID(XP_FIELD) };      struct MachP { XP_MACH(XP_FIELD) };        struct XBlipP { XP_BLIP(XP_FIELD) };
+struct BassP { XP_BASS(XP_FIELD) };      struct VoxP { XP_VOX(XP_FIELD) std::string txt = "hello world, I am a robot"; };   // U26 (the lyrics default is VoxCore.defaults().txt)
 struct TableP { XP_TABLE(XP_FIELD) };    struct VectorP { XP_VECTOR(XP_FIELD) };    struct ScannedP { XP_SCANNED(XP_FIELD) }; struct ResynthP { XP_RESYNTH(XP_FIELD) }; struct BytebeatP { XP_BYTEBEAT(XP_FIELD) };
 
-enum class XKind : uint8_t { None, Tone, Modal, Swarm, Drift, Piano, Ep, Organ, Breath, Strings, FmDrum, Wind, Phase, Partials, Skin, Chip, Table, Vector, Scanned, Resynth, Bytebeat, Acid, Mach, Blip, Other };
-XKind xeng_kind(const char* name, size_t n);   // the engine's key in XENG; None for "layers" (and the engines of U22 / U23 / U24: bass, vox, blip are not XENG), Other for an XENG engine this unit does not port
+enum class XKind : uint8_t { None, Tone, Modal, Swarm, Drift, Piano, Ep, Organ, Breath, Strings, FmDrum, Wind, Phase, Partials, Skin, Chip, Table, Vector, Scanned, Resynth, Bytebeat, Acid, Mach, Blip, Bass, Vox, Other };
+XKind xeng_kind(const char* name, size_t n);   // the engine's key in XENG; None for "layers" (bass, vox and blip are not XENG entries in the JS: renderVoice has a branch of its own for each; U27 / U26 put them here), Other for an XENG engine this unit does not port
 
 // ---- one engine's render: `X.render(P, sr, hold)` with P = xParams(V). `out` is the caller's buffer of `cap` floats; the finished sound (trimmed, faded) goes in, its length is returned. ----
 // With out == nullptr the call only returns the length N of the render before the trim (the upper bound), 0 if it is not representable. 0 is also returned if `cap` is too small.
@@ -106,6 +112,11 @@ size_t xeng_bytebeat(const BytebeatP& p, double sr, double hold, const std::stri
 size_t xeng_acid(const AcidP& p, double sr, double hold, float* out, size_t cap, bool acc = false);   // acc: renderLiveCore's 5th argument (the pad render passes false)
 size_t xeng_mach(const MachP& p, double sr, double hold, float* out, size_t cap);
 size_t xeng_blip(const XBlipP& p, double sr, double tune, double vdrive, double level, float* out, size_t cap);
+// U26: the bass engine (renderBass: one note held for `hold || V.len || 2` seconds, then released; the stereo render is mixed to mono) and the voice engine (renderVox: the whole lyric sung, one syllable per Pad step).
+// xeng_bass needs a buffer of TWO renders (the right channel lives in the second half: out[0 .. N) is the result, out[N .. 2N) the scratch): with out == nullptr it returns 2N, the buffer size to hand in. `bpm` is songBpm().
+// Neither allocates. kRefuse where the JS throws or returns an empty sound (a NaN vowel index, a lyric word `constructor`, a negative or empty Float32Array length), a render above 2^25 floats, a sample rate outside (0, 1e7].
+size_t xeng_bass(const BassP& p, double sr, double hold, double len, double bpm, float* out, size_t cap);   // `hold` and `len` as renderBass reads them: Math.max(0.05, hold || V.len || 2)
+size_t xeng_vox(const VoxP& p, double sr, float* out, size_t cap);
 void xeng_scratch_release();   // gives the calling thread's scratch arena back
 
 // ---- a voice with one of these engines: mkVoice's fields that matter (level, tune, drive, len, tail, the pad effects) and the engine's own parameter object (v[engine]) ----------------
@@ -113,6 +124,7 @@ struct XengVoice {
   XKind kind = XKind::None;
   ToneP tone; ModalP modal; SwarmP swarm; DriftP drift; PianoP piano; EpP ep; OrganP organ; BreathP breath; StringsP strings; FmDrumP fmdrum; WindP wind; PhaseP phase; PartialsP partials; SkinP skin; ChipP chip;
   AcidP acid; MachP mach; XBlipP blip;   // U27
+  BassP bass; VoxP vox;                   // U26
   TableP table; VectorP vector; ScannedP scanned; ResynthP resynth; BytebeatP bytebeat; XWtData wt; XRsData rs; std::string bbExpr; bool hasBb = false;   // U29
   double level = 0, tune = 0, drive = 0, len = 4, tail = 2, gate = 200;
   EngFx fx[kEngFx]; int nFx = 0;

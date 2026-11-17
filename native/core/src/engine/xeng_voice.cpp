@@ -71,6 +71,12 @@ const FieldRef kMach[] = { XP_MACH(XP_REF) };
 #define XP_CUR XBlipP
 const FieldRef kBlip[] = { XP_BLIP(XP_REF) };
 #undef XP_CUR
+#define XP_CUR BassP
+const FieldRef kBass[] = { XP_BASS(XP_REF) };
+#undef XP_CUR
+#define XP_CUR VoxP
+const FieldRef kVox[] = { XP_VOX(XP_REF) };   // (the lyrics, a string, are read apart)
+#undef XP_CUR
 #define XP_CUR TableP
 const FieldRef kTable[] = { XP_TABLE(XP_REF) };
 #undef XP_CUR
@@ -97,12 +103,23 @@ template <bool kSkipTDL = true, class P, size_t K> void fill(P& p, const FieldRe
   }
 }
 
+// String.prototype.slice(0, units) of a UTF-8 (WTF-8) string, counting UTF-16 code units: a pair that would be cut in two is dropped (a lone surrogate matches nothing in the lyrics' tokeniser)
+std::string slice16(std::string_view s, size_t units) {
+  size_t i = 0, u = 0; const unsigned char* p = (const unsigned char*)s.data();
+  while (i < s.size()) {
+    const unsigned c = p[i]; const size_t k = c < 0x80 ? 1 : (c >= 0xC2 && c < 0xE0) ? 2 : (c >= 0xE0 && c < 0xF0) ? 3 : (c >= 0xF0 && c < 0xF5) ? 4 : 1; const size_t w = k == 4 ? 2 : 1;
+    if (i + k > s.size() || u + w > units) break;
+    i += k; u += w;
+  }
+  return std::string(s.substr(0, i));
+}
+
 struct KindName { const char* name; XKind k; };
 const KindName kNames[] = {{"tone", XKind::Tone}, {"modal", XKind::Modal}, {"swarm", XKind::Swarm}, {"drift", XKind::Drift}, {"piano", XKind::Piano}, {"ep", XKind::Ep}, {"organ", XKind::Organ}, {"breath", XKind::Breath},
   {"strings", XKind::Strings}, {"fmdrum", XKind::FmDrum}, {"wind", XKind::Wind}, {"phase", XKind::Phase}, {"partials", XKind::Partials}, {"skin", XKind::Skin}, {"chip", XKind::Chip},
   {"table", XKind::Table}, {"vector", XKind::Vector}, {"scanned", XKind::Scanned}, {"resynth", XKind::Resynth}, {"bytebeat", XKind::Bytebeat},
   // the other entries of XENG (and the wasm-backed ones): not this unit's
-  {"acid", XKind::Acid}, {"mach", XKind::Mach}, {"blip", XKind::Blip}, {"sf", XKind::Other}, {"wavesl", XKind::Other},
+  {"acid", XKind::Acid}, {"mach", XKind::Mach}, {"blip", XKind::Blip}, {"bass", XKind::Bass}, {"vox", XKind::Vox}, {"sf", XKind::Other}, {"wavesl", XKind::Other},
   {"lxdrum", XKind::Other}, {"lxsnare", XKind::Other}, {"lxcym", XKind::Other}, {"lxhat", XKind::Other}, {"pmono", XKind::Other}, {"ppoly", XKind::Other}, {"pcoil", XKind::Other}, {"porbit", XKind::Other}};
 
 inline double holdOf(double hold, double len, double k, double m) { return orv(hold, mn(orv(len, k), m)); }   // hold || Math.min(V.len || k, m)
@@ -134,6 +151,8 @@ size_t runEngine(const XengVoice& V, double sr, double hold, double bpm, float* 
     case XKind::Acid: { AcidP P = V.acid; XP_VOICE(P); return xeng_acid(P, sr, holdOf(hold, V.len, 1, 1.2), out, cap); }   // renderLiveCore(AcidCore, P, sr, hold || Math.min(V.len || 1, 1.2), false)
     case XKind::Mach: { MachP P = V.mach; XP_VOICE(P); return xeng_mach(P, sr, holdOf(hold, V.len, 2, 2), out, cap); }       // renderLiveCore(MachCore, P, sr, hold || Math.min(V.len || 2, 2))
     case XKind::Blip: return xeng_blip(V.blip, sr, V.tune, V.drive, V.level, out, cap);   // renderBlip(V, sr): no hold
+    case XKind::Bass: { BassP P = V.bass; XP_VOICE(P); return xeng_bass(P, sr, hold, V.len, bpm, out, cap); }   // renderBass(V, sr, hold): `hold || V.len || 2`, c.bpm = songBpm(); a buffer of two renders (see xeng.h)
+    case XKind::Vox: { VoxP P = V.vox; XP_VOICE(P); return xeng_vox(P, sr, out, cap); }   // renderVox(V, sr): no hold
     default: return 0;
   }
 #undef XP_VOICE
@@ -142,7 +161,11 @@ size_t runEngine(const XengVoice& V, double sr, double hold, double bpm, float* 
 // padFx's lengths (index.html padFx, and U22's engine.cpp for the pitch effects' tails)
 inline bool fxReady(const EngFx& f) { return f.kind != EngFx::Kind::Other; }
 // engFx: pad effects run on Blip and on every engine that is not live; Acid and Machine play live in the song, so they stay dry (their voice's fx are not applied)
-bool anyFxOn(const XengVoice& V) { if (V.kind == XKind::Acid || V.kind == XKind::Mach) return false; for (int i = 0; i < V.nFx; i++) if (V.fx[i].on && fxReady(V.fx[i])) return true; return false; }
+bool anyFxOn(const XengVoice& V) {
+  if (V.kind == XKind::Acid || V.kind == XKind::Mach || V.kind == XKind::Bass || V.kind == XKind::Vox) return false;   // (renderVoice returns the bass and voice renders before padFx)
+  for (int i = 0; i < V.nFx; i++) { if (V.fx[i].on && fxReady(V.fx[i])) return true; }
+  return false;
+}
 double pitchTail(const EngFx& f, double sr) { const bool rv = f.kind == EngFx::Kind::PitchReverb; return js_round(sr * (rv ? 3 + (f.sizeNull ? 0.0 : f.size) * 4 : mn(8, f.time / 1000 * (1 + 6 * f.fb)))); }
 }  // namespace
 
@@ -166,6 +189,8 @@ bool xeng_voice_from_json(XengVoice& V, Json v, Json fx) {
     case XKind::FmDrum: fill(V.fmdrum, kFmDrum, o); break; case XKind::Wind: fill(V.wind, kWind, o); break;       case XKind::Phase: fill(V.phase, kPhase, o); break;
     case XKind::Partials: fill(V.partials, kPartials, o); break; case XKind::Skin: fill(V.skin, kSkin, o); break; case XKind::Chip: fill(V.chip, kChip, o); break;
     case XKind::Table: fill(V.table, kTable, o); xeng_wt_from_json(V.wt, v.get("wtData")); break;
+    case XKind::Bass: fill(V.bass, kBass, o); break;
+    case XKind::Vox: fill(V.vox, kVox, o); { Json t = o.get("txt"); if (o.isObj() && t.isStr()) V.vox.txt = slice16(t.asStr(), 4000); } break;   // normVox: txt is `o.txt.slice(0, 4000)` when it is a string, else the default
     case XKind::Acid: fill(V.acid, kAcid, o); break;      case XKind::Mach: fill(V.mach, kMach, o); break;        case XKind::Blip: fill<false>(V.blip, kBlip, o); break;
     case XKind::Vector: fill(V.vector, kVector, o); break; case XKind::Scanned: fill(V.scanned, kScanned, o); break;
     case XKind::Resynth: fill(V.resynth, kResynth, o); xeng_rs_from_json(V.rs, v.get("rsData")); break;

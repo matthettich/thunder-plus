@@ -22,6 +22,9 @@
 #include "engine/layer_pe.h"
 #include "engine/xeng.h"
 #include "engine/xeng_live.h"
+#include "engine/bass_core.h"
+#include "engine/vox_core.h"
+#include "engine/live_shell.h"
 #include "engine/pumpsynth.h"
 #include "voice/voice.h"
 
@@ -710,6 +713,35 @@ done:
   std::printf("rt_engine_xeng3 ok: %d renders (%zu samples) of acid / mach (7 machines) / blip and the live cores under the allocation guard\n", renders, total); return 0;
 }
 
+// U26: bass (renderBass through xeng_render_voice: nothing allocates, the core is a plain object on the stack), the bass and voice cores driven the way a live path would, and the LIVE SHELL (live_shell.h): construction allocates
+// (a voice's lyrics are parsed and its segment list sized: control thread), process() with note / rate / bpm / wob events never does. The vox renders themselves (xeng_vox, xeng_render_voice for a vox voice) DO allocate (the lyrics,
+// offline only) and are not in the guard: documented in xeng.h.
+static int run_engine_u26() {
+  using namespace thunder;
+  std::vector<XengVoice> V; std::vector<EngRenderOpts> o; std::vector<std::vector<float>> bufs;
+  { XengVoice a; a.kind = XKind::Bass; a.bass.det = 20; a.bass.parts = 64; a.bass.wCut = 3; a.bass.wShape = 2; a.bass.comb = 0.4; a.bass.vowel = 1.5; V.push_back(a); }
+  { XengVoice a; a.kind = XKind::Bass; a.bass.shape = 0.6; a.bass.sub = 0.7; a.bass.glide = 80; a.bass.wRate = 9; a.bass.wCut = 2; V.push_back(a); }
+  for (XengVoice& v : V) { v.level = -3; v.len = 0.5; EngRenderOpts e; e.hold = 0.3; o.push_back(e); bufs.emplace_back(xeng_render_bound(v, e) + 1); if (bufs.back().size() < 2) { std::printf("rt_engine_u26 FAIL: bound 0\n"); return 1; } }
+  std::vector<float> L(4096), R(4096); size_t total = 0; int renders = 0;
+  LiveBass* lb = new LiveBass(48000); LiveVox* lv = new LiveVox(48000); { VoxP p; p.txt = "ba-na-na, la"; lv->core().set(p); } { BassP p; p.wCut = 3; p.det = 20; lb->core().set(p); }
+  BassCore bc(48000); { BassP p; p.parts = 64; bc.set(p); } VoxCore vc(48000); { VoxP p; vc.set(p); }
+  {
+    rt_guard g;
+    for (int rep = 0; rep < 3; rep++) for (size_t i = 0; i < V.size(); i++) { size_t n = 0; const int st = xeng_render_voice(V[i], o[i], bufs[i].data(), bufs[i].size() - 1, &n); if (st != kEngOk) { total = 0; goto done; } total += n; renders++; }
+    for (int rep = 0; rep < 2; rep++) { bc.on(rep > 0); vc.on(rep > 0, rep, false);
+      for (int b = 0; b < 30; b++) { bc.render(L.data(), R.data(), L.size(), b * 64, b * 64 + 64, 1 + 0.01 * b); vc.render(L.data(), R.data(), L.size(), b * 64, b * 64 + 64, 1 + 0.01 * b); if (bc.bad()) { total = 0; goto done; } total += 128; }
+      bc.off(); vc.off(); renders += 2; }
+    // the live shell: blocks of 128 and of 17, events at every kind
+    for (int blk : {128, 17, 1}) { LiveEvent ev[6]; for (int k = 0; k < 6; k++) { ev[k].at = (uint32_t)(k * 3 % blk); ev[k].type = (LiveEvType)k; ev[k].v = k == 2 || k == 3 ? 1.5 : k == 4 ? 140 : 0.5; ev[k].dur = 500; ev[k].leg = k & 1; }
+      ev[0].type = LiveEvType::NoteOn; ev[1].type = LiveEvType::NoteOff;
+      for (int rep = 0; rep < 24; rep++) { const uint32_t n = (uint32_t)blk; LiveEvent mine[6]; uint32_t m = 0; for (int k = 0; k < 6; k++) if (rep % 4 == 0 || k >= 2) mine[m++] = ev[k]; mine[0].type = (rep % 2) ? LiveEvType::NoteOn : LiveEvType::NoteOff;
+        lb->process(L.data(), R.data(), n, mine, m); lv->process(L.data(), R.data(), n, mine, m); total += 2 * n; } renders += 2; }
+  }
+done:
+  delete lb; delete lv;
+  if (!total) { std::printf("rt_engine_u26 FAIL: a render failed\n"); return 1; }
+  std::printf("rt_engine_u26 ok: %d renders (%zu samples) of bass, the bass / voice cores and the live shell (bass, vox) under the allocation guard\n", renders, total); return 0;
+}
 
 // U33: the pump synths' per-block interface (PumpSynth: the live lanes' reusable path) under the guard. Control thread, outside the guard: every instrument is made (psyn_new allocates), FREEZE's built-in spectra are built
 // (PumpSynth::builtins) and the note is delivered. Under the guard: 600 blocks of 32 to 512 frames with NO event: nothing may allocate. Events are NOT allowed to be free: pump's SynthBase::run sorts the queued events with
@@ -803,5 +835,6 @@ int main(int argc, char** argv) {
   if (int r = run_pumpsynth()) return r;
   if (int r = run_engine_u24()) return r;
   if (int r = run_engine_u25()) return r;
+  if (int r = run_engine_u26()) return r;
   return run_song();
 }
