@@ -56,7 +56,8 @@ void operator delete(void* p, std::size_t) noexcept { if (rt_depth && p) rt_viol
 void operator delete[](void* p, std::size_t) noexcept { if (rt_depth && p) rt_violation("operator delete[]"); std::free(p); }
 
 // malloc / free themselves (C code, std::vector's allocator on some platforms): glibc lets us wrap them.
-#if defined(__GLIBC__)
+// (Not under AddressSanitizer: it brings its own malloc / free / posix_memalign, and wrapping a part of them hands its memory to glibc: "free(): invalid size". The operator new / delete guards above stay.)
+#if defined(__GLIBC__) && !defined(__SANITIZE_ADDRESS__)
 extern "C" {
 void* __libc_malloc(size_t); void* __libc_calloc(size_t, size_t); void* __libc_realloc(void*, size_t); void __libc_free(void*);
 void* malloc(size_t n) { if (rt_depth) rt_violation("malloc"); return __libc_malloc(n); }

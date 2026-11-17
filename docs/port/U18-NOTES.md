@@ -32,6 +32,15 @@ Result (GCC 13.3, Release, pin-built reference from wasi-sdk 25): 80 cases, 40 b
 (x_two_hosts_same, 20 samples above the line of 163840, limit 40), 0 failed, 0 native-hash differences, latency 0 of 50 differ. Every one of the 39 "within" cases is below -100 dB: none needed loosening.
 The older figures and "-80 dB" statements below are from before this decision and are history.
 
+### CI result of the first push (b9c53b9f): the tolerance gate holds everywhere, the native hashes (c) do NOT
+Same counts and the same worst case (-115.6 dB, v_hot) on every platform; 0 exact-list regressions. The committed SHA-256 of the native strict render (made with GCC 13.3 / glibc 2.39) differs on the CI runners:
+GCC 15.2 / glibc 2.42: 7 of 80 (p_calm_def / alt, p_tone_def / alt, h_series_clk, h_series_master, b_blk_mixed); clang (runner): 4 (p_calm_def / alt, h_series_clk, b_blk_mixed); macOS (arm64, Apple libm): 22. Not
+proven why (no such compiler / libm here); the cases are the ones with transcendental calls (CALM, TONE, the chains with them) and the count depends on the compiler and the libm, so the strict pump build is NOT bit-identical across
+compilers / libms: it uses the system libm (as tfx did before U14's measured same-machine comparison; tfx has the same exposure). Marbles / Tides' native hashes (U21 PR) held on macOS and in the wasm job. For the lead: either
+the pump TUs get a libm of their own (fdlibm / the core's rt/ maths) or the hash check (c) for pump becomes per-platform-class. Not loosened here: the check stays and CI stays red on it until decided.
+Also fixed on the way: rt_core aborted under the sanitizers ("free(): invalid size": rt_harness wraps malloc / free for the guard, pump's AlignedBuffer is posix_memalign + free; under ASan the pair split between
+glibc and ASan's heap): the malloc / free wrappers are off under AddressSanitizer (operator new / delete guards stay).
+
 ## What works
 Plan on the control thread (instance made with the staged values; latency measured with a temporary instance, no bypass override: `pumpLatencyOf`), values and commit, per-block process at
 any block size (chunks of kFxBlock), latency into U10's PDC path (`FxBank::pdcSlots` passes bypass and measured latency; `up` lags creative-effect transport, build 616), latency-matched
