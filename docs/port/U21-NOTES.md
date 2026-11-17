@@ -3,7 +3,7 @@
 Branch `n1/u21` (on `n1/u19`). Framework: U19's (`native/core/src/modfx/`, `native/tests/test_modfx.cpp`, `native/tools/modfx-dump.mjs`).
 Gate: `native/tools/parity.sh u21` (`parity-u21.sh`).
 
-## Done (17 modules, bit-exact with the real JS; g++-13 and clang++-18)
+## Done (17 modules + Marbles / Tides below, bit-exact with the real JS; g++-13 and clang++-18)
 - `mod_basic.cpp`: Simple delay, Filter, Low/high cut, Classic comp, Bus comp, Glue comp, Noise gate, Auto-pan, Pump. `show()` meters are not ported (UI only).
 - `mod_voice.cpp`: Pitch correct (YIN detector + splicing), Vowel filter, Rotary speaker, Granular delay, Reverse echo, Envelope filter.
 - `mod_gen.cpp` + `bbexpr.{h,cpp}`: Bytebeat with the BBExpr formula compiler ported in full (the parser is self-contained in the block, so the U19 `expr` decision did not apply), and Chaos (`ChaosCore`).
@@ -18,12 +18,35 @@ Gate numbers: 51 engine renders (17 modules x 3 parameter sets) reproduce `tests
 - The core builds with `-fno-exceptions`: the compiler returns an `Err` record instead of throwing.
 - `Float32Array.fill()` writes the whole 128-sample buffer whatever `ctx.block` is (U19's lesson) is kept where the JS uses it.
 
-## Not done: Marbles (Random generator) and Tides (Function generator)
-The wrapper is written (`native/core/src/modfx/mod_mods.cpp`: parameter block, modsClock, input/output copies, mods_process sanitising, "bad value: start afresh"), hosting `thunder_dsp_mods` directly (`make_marbles` / `make_tides`). It is built only with `-DTHUNDER_MODFX_MODS=ON` (default OFF; not registered, not in any gate), because it is NOT bit-exact against the golden, which comes from mods.wasm:
-- Measured with the defaults (`-O2 -ffast-math`): of the Marbles/Tides cases, 5 of 6 engine renders differ (Marbles @default matches) and 32 of 36 direct cases differ; the differences are float-ULP scale (first differing samples agree to about 7 digits, e.g. 0.0696506053 vs 0.0696506128). Marbles' random sequences stay in step, so the structure is right.
-- With `-fno-fast-math -ffp-contract=off` on the mods library (the U14 treatment of tfx): no better (same 5 renders).
-- Cause (not proven sample by sample): the golden is wasm compiled by clang with `-ffast-math` (reassociation, reciprocal, its own libm), which a native g++/clang build cannot reproduce bit for bit; matching it would need the wasm itself run (a wasm runtime in the core), or a hand-ordered port of the Marbles/Tides cores. Left to the lead.
-- Also: `Mod::operator new` is malloc, so the "bad value: object made again" path allocates inside process (the allocation guard would flag it); the JS's 64-object instance limit and 375-block wait are not carried over; the Marbles/Tides outputs would need the same Node reference (add `'marbles', 'tides'` to `MODS21` and regenerate the golden) if a bit-exact route is found. The mods.wasm sample rate/seed handling follow the JS (Tides seed 0, Marbles `nextSeed()`).
+## Marbles (Random generator) and Tides (Function generator): the decision (the lead, Fable, 16 Nov evening) and what it did
+The web app's `mods.wasm` is compiled with -ffast-math, which lets the compiler reorder float sums; no native build can reproduce that order (D2's section below: the cause is -ffast-math in both builds). Rebuilding the
+web wasm with `-fno-associative-math` would make the native and the wasm bit-identical, but it was measured on 16 Nov evening (same machine, Node 22, minimum of 7 runs) to cost CPU in the web app (Marbles / Tides within
+about +-8 %; the pump effects up to +108 %), and the owner's standing concern is CPU on the phone, so the web app's wasm flags are NOT changed. Instead:
+- (a) The native build of the mods library (`thunder_dsp_mods`, `core/dsp/CMakeLists.txt`, `OPT_MOD`) is STRICT: `-O2 -fno-fast-math -ffp-contract=off` (as tfx in U14); the wasm keeps mods/build.sh's flags.
+- (b) Against the fast-math wasm the gate for these two modules is a tolerance: each engine render and each direct case within -100 dB of the reference's peak (max abs difference / the reference's peak), the worst printed;
+  every case that is bit-exact today stays bit-exact (`kModsExact`, 6 of the 42). The wasm's reference samples are written by `tools/modfx-dump.mjs` (`MODS_TOL`: `engine_<type>_<set>.f32` for the 6 engine renders; the
+  direct cases' `<case>.f32` as before); `'marbles', 'tides'` are now in `MODS21` (golden rows regenerated with `node native/tools/modfx-dump.mjs --golden`: 42 rows ADDED, no existing row changed; their hashes are
+  the WASM's, kept as the reference's).
+- (c) Cross-platform determinism is gated separately: `golden/modfx_mods_native.inc` holds the SHA-256 of the native strict render of each of the 42 (made on Linux x86-64, GCC 13), checked on every platform. Written by
+  `test_modfx <ref dir> --write-native FILE` (never hand-edited; rebuild test_modfx after). Not yet seen on macOS / Android in CI: if a hash differs there, that is the finding (libm).
+- Switched on: `THUNDER_MODFX_MODS` defaults to ON, the modules are in the registry (`addModsMods`), in `test_modfx`, `rt_modfx` and the other tests that walk the registry.
+- Result (GCC 13.3, Release): 6 engine renders + 36 direct cases: all 42 inside -100 dB, 6 bit-exact, worst `tides_mod1` -106.8 dB (then `tides_stress` / `engine_tides_stressed` -119.0, `tides_none` -119.1, `tides_rand2` -120.9).
+  Marbles: worst `marbles_voiced` -132.5 dB. No case is left out (`kTolSkip` in test_modfx.cpp is empty); Marbles' random sequences did not part ways in any case.
+
+CI of the first push (7ff4fc7e): GCC, clang, macOS (native hashes held), Windows (Marbles / Tides reported not run: no mods library there), wasm and Android passed; Linux sanitizers failed in `rt_core` and `modfx`:
+`AddressSanitizer: global-buffer-overflow ... READ of size 4 ... in marbles::LagProcessor::Process(float, float, float)`. FOUND AND FIXED (17 Nov):
+- Where: `eurorack/marbles/random/lag_processor.cc:79` (upstream, line of the unpatched file): `float warped_phase = Interpolate(lut_raised_cosine, phase, 256.0f);` stmlib's `Interpolate` reads `table[i]` and `table[i + 1]`
+  with i = int(phase * 256). `lut_raised_cosine` (marbles/resources.cc) has 257 entries (0..256). Index seen under ASan: phase = 1.0 exactly (bits 3f800000, smoothness 0.0799), i = 256, so the second read is `[257]`, one float past the table.
+- Trigger: the ramp phase reaching 1.0. `dsp/mods/mod_marbles.cc` (~line 157) deliberately feeds "one sample with every ramp at its top, so the first tick after the module is made already takes a new value"; a clock ramp that reaches its
+  top does the same. Neither the web's JS wrapper nor the wasm clamps anything: the wasm reads the bytes that follow the table in its linear memory. The fraction is 0 there, so the result is `table[256]` as long as the
+  neighbouring bytes are finite (a NaN / inf neighbour would give NaN: 0 * inf); in the wasm they are finite data, so its output does not depend on the read.
+- Fix: `native/core/third_party/prepare.sh` patches the prepared copy of that file (the same mechanism as the Clouds `lut_window[4097]` patch of U14): `phase >= 1.0f ? lut_raised_cosine[256] : Interpolate(...)`. The native build and the
+  CMake-built wasm compile that prepared copy. The web's mods.wasm is built by `dsp/mods/build.sh`, which has no such patch and is not rebuilt: the web app is unaffected.
+- Result: sanitizer build locally clean (rt_core, modfx_ref, modfx pass under ASan + UBSan); the normal build: all 42 Marbles / Tides renders and cases still inside -100 dB (worst `tides_mod1` -106.8), the native hashes
+  UNCHANGED (no row changed; the sanitizer build matches the same hashes), full ctest 104 of 104. No case had to be left out of the gate.
+
+Known, left as is (as before): `Mod::operator new` is malloc, so the "bad value: object made again" path allocates inside process (an allocation guard would flag it if a case reached it; none of rt_modfx's does);
+the JS's 64-object instance limit and 375-block wait are not carried over. The mods.wasm sample rate/seed handling follow the JS (Tides seed 0, Marbles `nextSeed()`).
 
 ## Shared files (conflicts with U20 to expect, all small)
 `native/core/CMakeLists.txt` (source list after `mod_clk.cpp`, the THUNDER_MODFX_MODS block), `native/core/src/modfx/modfx.cpp` (registry line), `mods.h` (add* declarations), `native/tools/modfx-dump.mjs` (`MODS21` list, `mi()` seed offsets 100+, the `key`/`voiced` cases, `bbCheck`), `native/tests/golden/modfx_golden.inc` (regenerate with `node native/tools/modfx-dump.mjs --golden` after merging), `native/tests/test_modfx.cpp` (`keyEngine`, `bbTest`), `native/tools/parity.sh`.

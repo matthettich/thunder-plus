@@ -28,7 +28,7 @@ if(TARGET thunder_dsp_tfx)
 endif()
 # U21: the Random / Function generators (Marbles, Tides) host the mods C++ directly (make_marbles / make_tides of dsp/mods/mods.h), no wasm.
 # OFF by default: not bit-exact with the wasm-derived golden (see docs/port/U21-NOTES.md), so they are not in the registry and not gated.
-option(THUNDER_MODFX_MODS "Register the Marbles / Tides MODFX modules (hosted mods C++; NOT bit-exact against the JS wasm, ungated)" OFF)
+option(THUNDER_MODFX_MODS "Register the Marbles / Tides MODFX modules (hosted mods C++, built strict; gated at -100 dB against the JS wasm and by committed native hashes)" ON)
 if(THUNDER_MODFX_MODS AND TARGET thunder_dsp_mods)
   target_sources(thunder_core PRIVATE src/modfx/mod_mods.cpp)
   target_link_libraries(thunder_core PUBLIC thunder_dsp_mods)

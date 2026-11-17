@@ -4,7 +4,8 @@
 #   Runs: libm, modfx_ref / modfx (the real chains-worklet.js in Node: all committed tests/golden/chains-modules.json hashes reproduced by the C++ engine-style run, and every direct case
 #   bit-exact against the committed hashes, plus the 146-formula BBExpr table), modfx_golden_current (the committed .inc is what the JS gives now; Linux), rt_core (every module under the allocation guard),
 #   and the chaos / Bytebeat table generator's own --check.
-#   Marbles and Tides are not in this gate: see docs/port/U21-NOTES.md (THUNDER_MODFX_MODS, off).
+#   Marbles and Tides are in the gate by the lead's decision (16 Nov): the native mods library is strict, each render / case is within -100 dB of the fast-math wasm's reference, the exact ones stay
+#   exact, the native render is pinned by committed hashes (docs/port/U21-NOTES.md, "Marbles / Tides: the decision").
 # BUILD_DIR names the build folder (default /tmp/thunder-parity).
 set -u
 here=$(cd "$(dirname "$0")" && pwd)
