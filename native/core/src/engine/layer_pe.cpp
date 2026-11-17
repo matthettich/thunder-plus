@@ -52,6 +52,7 @@ bool pe_layer_ok(const EngLayer& L) {
   // The sliders of the app keep every knob inside its range (pHarm .. pLpg, e*: 0..1; pTimEnv, pMorEnv, pFm: -1..1; the Elements model 0..2). Outside it the upstream code indexes its tables with
   // the value (Elements' exciter with a negative one: a read far before the table, a crash here; the wasm reads whatever its linear memory holds): a song that holds such a value, which only a
   // hand-edited file can, is refused (kEngUnsupported), never rendered from memory that is not the library's.
+  if (!pe_available() && pe_is(L.type)) return false;   // no library on this platform: refused, never silent
   const EngPE& p = L.pe;
   auto in = [](double x, double lo, double hi) { return x >= lo && x <= hi; };
   if (L.type == LType::Plaits) return in(p.pHarm, 0, 1) && in(p.pTim, 0, 1) && in(p.pMor, 0, 1) && in(p.pDecay, 0, 1) && in(p.pLpg, 0, 1) && in(p.pFm, -1, 1) && in(p.pTimEnv, -1, 1) && in(p.pMorEnv, -1, 1);

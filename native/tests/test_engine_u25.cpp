@@ -74,7 +74,7 @@ int main(int argc, char** argv) {
   if (!pe_available()) {
     std::printf("engine U25: NOT BUILT on this platform (no Plaits / Elements library: the DSP libraries are not built here): the two layer types are not supported; checking only that\n");
     int bad = 0; if (eng_layer_type("plaits", 6) != LType::Other || eng_layer_type("elements", 8) != LType::Other) { std::printf("FAIL: the types must be unknown without the library\n"); bad++; }
-    EngVoice V; V.layers[0].on = true; V.layers[0].type = LType::Plaits; EngRenderOpts o; size_t n = 0; float tmp[64];
+    EngVoice V; V.layers[0].on = true; V.layers[0].level = 1; V.nLayers = 1; V.layers[0].type = LType::Plaits; EngRenderOpts o; size_t n = 0; float tmp[64];
     if (eng_render_voice(V, o, tmp, 64, &n) != kEngUnsupported) { std::printf("FAIL: a Plaits layer must be refused without the library\n"); bad++; }
     if (!bad) std::printf("PASS test_engine_u25 (library not built)\n");
     return bad ? 1 : 0;
