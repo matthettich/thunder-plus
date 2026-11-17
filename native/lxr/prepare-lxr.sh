@@ -91,6 +91,9 @@ rx('Core/Inc/Soundengine/DSPAudio/BufferTools.h', r'buf\[i\] = (buf\[i\] \* curr
 rx('Core/Src/Soundengine/MIDI/MidiParser.c', r'(\.lfo\.phaseOffset) = (value\.flt \* 0xffffffff);', r'\1 = lxr_f2u32(\2);', 4)
 rx(D+'lfo.c', r'uint32_t incInt = inc;', 'uint32_t incInt = lxr_f2u32(inc);', 1)
 rx(D+'ResonantFilter.c', r'tmp = (h \* FILTER_GAIN);', r'tmp = lxr_f2i32(\1);', 2)
+rx(D+'ResonantFilter.c', r'tmp = (ugb \* FILTER_GAIN);', r'tmp = lxr_f2i32(\1);', 2)
+rx(D+'ResonantFilter.c', r'tmp = (\(y1-h\) \* FILTER_GAIN);', r'tmp = lxr_f2i32(\1);', 2)
+rx(D+'ResonantFilter.c', r'tmp = (?!lxr_f2i32)([^;/\r\n]*FILTER_GAIN\)?);', r'tmp = lxr_f2i32(\1);', 4)
 for rel in sorted(touched):
     p = os.path.join(O, rel); s = open(p, encoding='utf-8', newline='').read()
     eol = '\r\n' if '\r\n' in s else '\n'

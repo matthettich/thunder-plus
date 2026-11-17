@@ -830,7 +830,7 @@ static int run_lxr() {
     ThunderLxrDescribe d; std::memset(&d, 0, sizeof d); a->describe(i, &d); for (int k = 0; k < THUNDER_LXR_MAX_PARAMS; k++) if (d.present[k]) V.lxr.p[k] = d.def[k];
     bufs.emplace_back(xeng_render_bound(V, o) + 1); if (bufs[(size_t)i].size() < 2) { std::printf("rt_lxr FAIL: bound 0 (%s)\n", kinds[i]); return 1; }
   }
-  std::vector<uint8_t> kit(256, 64); std::vector<float> blk(777 + 1); ThunderLxrEvent ev[3] = {{0, 0, 100, 60}, {130, 3, 90, 62}, {400, 5, 127, 70}};
+  std::vector<uint8_t> kit(247, 64);   /* NumParams */ std::vector<float> blk(777 + 1); ThunderLxrEvent ev[3] = {{0, 0, 100, 60}, {130, 3, 90, 62}, {400, 5, 127, 70}};
   for (int i = 0; i < 4; i++) { size_t n = 0; if (xeng_render_voice(vs[i], o, bufs[(size_t)i].data(), bufs[(size_t)i].size() - 1, &n) != kEngOk) { std::printf("rt_lxr FAIL: warm-up %d\n", i); return 1; } }   // takes the power-on snapshot
   if (a->live_open(kit.data(), kit.size(), 120) != THUNDER_LXR_OK) { std::printf("rt_lxr FAIL: live_open\n"); return 1; }
   size_t total = 0; int renders = 0;
