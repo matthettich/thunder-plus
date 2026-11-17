@@ -2,7 +2,7 @@
 // index.html's makeOsc / newOsc / fmOsc / addOsc / KSString, line for line. One object per layer, living on the caller's stack (no heap). The JS is the specification, quirks included:
 // every Number is a double in the JS's order of operations, the float32 values are the ones the JS writes into Float32Arrays (the Karplus-Strong delay line and excitation), Math.sin / cos /
 // exp / pow / round are the js_* functions. `blk` is the per-16-sample block hook (osc.blk(t, e0, inc) of renderLayer); `s` is the sample.
-// What the JS throws on (a chord shape or an FM ratio read past its table) is refused here with kEngUnsupported by u24_layer_ok (the JS has no value for it: never silence).
+// What the JS throws on (a chord shape or an FM ratio read past its table) is refused here with kEngUnsupported by u24_layer_ok (the JS has no value for it: never silence). More than 64 partials is NOT a JS throw: it is a limit of this port's fixed arrays, also refused.
 #ifndef THUNDER_ENGINE_LAYER_U24_H
 #define THUNDER_ENGINE_LAYER_U24_H
 #include <cmath>
@@ -15,7 +15,7 @@ namespace thunder {
 
 bool u24_is(LType t);                                  // a layer type of this unit
 LType u24_layer_type(const char* name, size_t n);      // the JS name -> LType (Other if it is not one of this unit's)
-bool u24_layer_ok(const EngLayer& L);                  // false: the JS throws or this port's fixed arrays cannot hold the layer (see layer_add.cpp)
+bool u24_layer_ok(const EngLayer& L);                  // false: the JS throws, or this port's fixed arrays cannot hold the layer (more than 64 partials: the port's limit, the JS does not throw) (see layer_add.cpp)
 
 // Math.max / Math.min on two doubles (NaN wins; +0 beats -0 for max, -0 beats +0 for min), and `x || d`
 inline double u24_max(double a, double b) { if (a != a || b != b) return NAN; if (a == 0 && b == 0) return std::signbit(a) ? b : a; return a > b ? a : b; }

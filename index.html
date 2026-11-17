@@ -4064,7 +4064,7 @@ const nop = () => {};
    square), with a formant tilt, a phase Bend, up to 8 detuned unison voices, a sub and noise. The single
    cycle is rebuilt only when the pitch rises past the harmonic limit already built, so it never aliases. */
 function wavetableOsc(L, sr, A, B, R){
-  const TN = 1024, tab = new Float32Array(TN + 1);
+  const TN = 1024, tab = new Float32Array(TN + 2);   // one spare entry (stays 0): a negative Bend can round warp() to exactly 1, so x = TN and tab[i + 1] is read
   const uni = Math.max(1, Math.min(8, Math.round(L.wtUni || 1))), spread = L.wtSpread || 0, sub = L.wtSub || 0, noise = L.wtNoise || 0, bend = L.wtBend || 0;
   const phases = new Float64Array(uni), dets = new Float64Array(uni);
   for (let v = 0; v < uni; v++){ const o = uni === 1 ? 0 : (v / (uni - 1)) * 2 - 1; dets[v] = Math.pow(2, o * spread * 0.5 / 12); phases[v] = R(); }
