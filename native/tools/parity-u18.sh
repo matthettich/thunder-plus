@@ -5,7 +5,7 @@
 #   latency pairs that depend on it are SKIPPED by name with the reason printed, every other case is gated),
 #   pump_cases_current / pump_table_current (the committed case list and pump table are what the tools give now; Linux), rt_core (the host, pump kinds included, under the allocation guard).
 #   Then the real gate: a pump.wasm BUILT FROM THE PIN (build-wasm.sh, wasi-sdk) is the reference of a second run of pump-dump.mjs + test_pump --pin: -100 dB below each reference's peak
-#   (worst case printed), the cases that are bit-exact today still bit-exact (golden/pump_gate.inc), one named rule (x_two_hosts_same), and the committed SHA-256 of the native strict render.
+#   (worst case printed), the cases that are bit-exact today still bit-exact (golden/pump_gate.inc), one named rule (x_two_hosts_same). (No committed hash of the native render: the strict pump build uses the system libm, so renders differ between toolchains; U18-NOTES.md.)
 #   The lead's decision (16 Nov): docs/port/U18-NOTES.md, "The gate". GATE_WRITE=<file> makes the second run write that golden (never hand-edit it).
 #   Nothing is skipped: a fixture that cannot run (no Node, no acorn, no wasm build) fails.
 # BUILD_DIR names the build folder (default /tmp/thunder-parity). PIN_WASM_DIR names the folder with the pin-built pump.wasm (default /tmp/thunder-parity-u18-wasm; built there if absent;

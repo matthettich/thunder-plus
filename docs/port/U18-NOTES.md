@@ -16,8 +16,9 @@ concern is CPU on the phone, so the web app's wasm flags are NOT changed. Instea
 - (b) Against the fast-math wasm reference the gate for these units (pump effects U18, Marbles / Tides, later Plaits / Elements) is a tolerance: each case within -100 dB of the reference's peak
   (max abs difference / reference peak), the worst case printed. It was -80 dB before: this TIGHTENS it. Every case that is bit-exact today stays bit-exact (`kPumpGateExact` in the generated
   `golden/pump_gate.inc`, 40 cases): a case that goes from exact to "within" fails (enforced in the pin-built run, `--pin`).
-- (c) Cross-platform determinism is gated separately: `golden/pump_gate.inc` also holds the SHA-256 of the NATIVE STRICT render of every case (made on Linux x86-64, GCC 13) and of the reference's
-  input, checked on every platform by every test_pump run. (Not yet seen on macOS / Android in CI: pump uses the system libm; if a hash differs there, that is the finding.)
+- (c) REVISED by the lead for pump only (16 Nov night): there is NO committed native-hash check for pump. First version: SHA-256 of the native strict render of every case, checked on every platform. CI showed it
+  cannot hold (next section), and the lead decided against giving pump its own libm for now. The gate of U18 on every platform is: -100 dB against the pin-built wasm, the exact list kept exact, the x_two_hosts_same rule,
+  the shipped-wasm MASTER skips. (Marbles / Tides keep their hashes: they held on macOS and in the wasm job.)
 - (d) A case where a quantiser or other discontinuity follows a nonlinear stage gets a named rule in `kRules` of test_pump.cpp: at most N samples above the -100 dB line (N = twice the measured
   count), every other sample within it. Today exactly one: `x_two_hosts_same` (TUBE into CRUSH): measured 20 samples above the line in all (-68.4 dB worst), so N = 40. A new such case must be listed by name
   with its measured numbers; there is no wildcard.
@@ -32,14 +33,19 @@ Result (GCC 13.3, Release, pin-built reference from wasi-sdk 25): 80 cases, 40 b
 (x_two_hosts_same, 20 samples above the line of 163840, limit 40), 0 failed, 0 native-hash differences, latency 0 of 50 differ. Every one of the 39 "within" cases is below -100 dB: none needed loosening.
 The older figures and "-80 dB" statements below are from before this decision and are history.
 
-### CI result of the first push (b9c53b9f): the tolerance gate holds everywhere, the native hashes (c) do NOT
+### CI result of the first push (b9c53b9f): the tolerance gate holds everywhere, the native hashes (c) did NOT: removed
 Same counts and the same worst case (-115.6 dB, v_hot) on every platform; 0 exact-list regressions. The committed SHA-256 of the native strict render (made with GCC 13.3 / glibc 2.39) differs on the CI runners:
 GCC 15.2 / glibc 2.42: 7 of 80 (p_calm_def / alt, p_tone_def / alt, h_series_clk, h_series_master, b_blk_mixed); clang (runner): 4 (p_calm_def / alt, h_series_clk, b_blk_mixed); macOS (arm64, Apple libm): 22. Not
 proven why (no such compiler / libm here); the cases are the ones with transcendental calls (CALM, TONE, the chains with them) and the count depends on the compiler and the libm, so the strict pump build is NOT bit-identical across
 compilers / libms: it uses the system libm (as tfx did before U14's measured same-machine comparison; tfx has the same exposure). Marbles / Tides' native hashes (U21 PR) held on macOS and in the wasm job. For the lead: either
-the pump TUs get a libm of their own (fdlibm / the core's rt/ maths) or the hash check (c) for pump becomes per-platform-class. Not loosened here: the check stays and CI stays red on it until decided.
+the pump TUs get a libm of their own. DECIDED (the lead): the hash check is removed for pump. Follow-up, only if cross-platform bit-identical pump renders are ever wanted: a libm of its own for pump (the core's fdlibm).
+The exact list on the other toolchains (from the CI logs of 3f79c5df, per job): the list is ENFORCED only in `--pin` runs, i.e. the wasm job's second run (GCC 15.2): 40 exact, 0 regressions. The other jobs run against the shipped wasm
+(not enforced): GCC 15 / clang Linux 38 exact of 78 (= the 40 minus the 2 MASTER skips, every listed case exact), macOS 37: `p_band_alt` is -142.0 dB there (exact on Linux), so the list is NOT exact on macOS (BAND uses libm).
+It is kept, enforced where the pin-built wasm exists (Linux); if the pin run is ever made on macOS, p_band_alt must come off the list for it.
 Also fixed on the way: rt_core aborted under the sanitizers ("free(): invalid size": rt_harness wraps malloc / free for the guard, pump's AlignedBuffer is posix_memalign + free; under ASan the pair split between
-glibc and ASan's heap): the malloc / free wrappers are off under AddressSanitizer (operator new / delete guards stay).
+glibc and ASan's heap): the malloc / free wrappers are off under AddressSanitizer. What the guard no longer covers in the sanitizer build: a direct C `malloc` / `calloc` / `realloc` / `free` inside a guarded
+callback (pump's AlignedBuffer is posix_memalign + free, the wasm-derived C code) is no longer flagged there; `operator new` / `delete` still are, and the non-sanitizer builds (GCC, clang, macOS) keep the full wrappers, so
+the same run without ASan covers them. The guard's own selftest cases for malloc / free are skipped under ASan (they are under `RT_MALLOC_GUARDED`).
 
 ## What works
 Plan on the control thread (instance made with the staged values; latency measured with a temporary instance, no bypass override: `pumpLatencyOf`), values and commit, per-block process at

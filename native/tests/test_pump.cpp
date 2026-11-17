@@ -10,13 +10,13 @@
 // THE GATE (the lead's decision, 16 Nov, docs/port/U18-NOTES.md): the web app's pump.wasm is built with -ffast-math (reassociated float sums that no native build can reproduce) and is not
 // changed; the native build of pump is STRICT. So against the wasm a case must be within kGateDb (-100 dB: max |difference| / the reference's peak) and the worst is printed; a case that
 // is bit-exact today stays bit-exact (golden/pump_gate.inc, kPumpGateExact: a case that moves from exact to "within" FAILS); a case where a quantiser follows a nonlinear stage has a
-// named rule in kRules (at most N samples above the line, all others within it). Separately, the native render itself is pinned: golden/pump_gate.inc holds the SHA-256 of the native strict
-// render of every case (made on Linux x86-64 against the pin-built reference), checked here on every platform.
+// named rule in kRules (at most N samples above the line, all others within it). REVISED by the lead (16 Nov night): there is NO committed hash of the native render for pump: the strict
+// build calls the system libm, so renders differ bit for bit between toolchains and libms (U18-NOTES.md); the gate on every platform is the line, the exact list (enforced with --pin) and the rule.
 //   --pin: the reference is the pump.wasm built from the pin (parity-u18.sh's second run): the exact list is enforced and nothing is skipped.
 //   without --pin: the reference is the SHIPPED pump/pump.wasm, older than the pin in MASTER (75 parameters against 77, latency 358 against 4454): the cases that depend on MASTER's
 //   parameter list / latency are skipped by name with the reason printed (kSkipShipped); every other case is gated the same way except that the exact list is not enforced.
 //   --no-skip: run the skipped cases anyway (how the reason for each skip was checked).
-//   --write-gate FILE: writes golden/pump_gate.inc from this run (the exact list and the hashes; never hand-edited).
+//   --write-gate FILE: writes golden/pump_gate.inc from this run (the exact list; never hand-edited).
 #include <atomic>
 #include <cmath>
 #include <cstdint>
@@ -35,7 +35,6 @@
 #include "rt/json.h"
 #include "golden/pump_cases.inc"
 #include "golden/pump_gate.inc"
-#include "sha256.h"
 
 using namespace thunder;
 
@@ -57,7 +56,7 @@ static void entriesOf(Json ch, std::vector<FxEntry>* out) {
 }
 static void setChain(FxHost& H, Json ch) { std::vector<FxEntry> v; entriesOf(ch, &v); FxPlan* p = H.plan(v.data(), (int)v.size()); H.commit(p); delete p; }
 
-struct Res { bool ran = false, exact = false, postOk = true; double db = -INFINITY, err = 0, ref = 0; long nDiff = 0, n = 0, first = -1; double firstGot = 0, firstWant = 0; int posts = 0; uint32_t remakes = 0, gated = 0; uint64_t hash = 0; long nOver = 0; std::string sha, inSha, why; };
+struct Res { bool ran = false, exact = false, postOk = true; double db = -INFINITY, err = 0, ref = 0; long nDiff = 0, n = 0, first = -1; double firstGot = 0, firstWant = 0; int posts = 0; uint32_t remakes = 0, gated = 0; uint64_t hash = 0; long nOver = 0; std::string why; };
 
 // the gate (see the header): kGateDb below the reference's peak; kRules the named per-case exceptions; kSkipShipped the cases the shipped wasm cannot be the reference of
 static const double kGateDb = -100.0;
@@ -126,7 +125,6 @@ static Res runCase(const std::string& dir, const char* name, std::vector<float>*
   for (int h = 0; h < nh; h++) { all.insert(all.end(), aL[h].begin(), aL[h].end()); all.insert(all.end(), aR[h].begin(), aR[h].end()); }
   for (size_t i = 0; i < all.size(); i++) { const double a = all[i], r = J[i]; peak = std::max(peak, std::fabs(r)); if ((float)a == (float)r || (std::isnan(a) && std::isnan(r))) continue; exact = false; if (R.first < 0) { R.first = (long)i; R.firstGot = a; R.firstWant = r; } R.nDiff++; err = std::max(err, std::fabs(a - r)); }
   { const double thr = peak * std::pow(10.0, kGateDb / 20.0); for (size_t i = 0; i < all.size(); i++) { const double a = all[i], r = J[i]; if ((float)a == (float)r || (std::isnan(a) && std::isnan(r))) continue; if (!(std::fabs(a - r) <= thr)) R.nOver++; } }
-  { Sha256 h; h.add((const char*)all.data(), all.size() * 4); R.sha = h.hex(); Sha256 hi; hi.add(in.data(), in.size()); R.inSha = hi.hex(); }
   R.n = (long)all.size(); R.exact = exact; R.ref = peak; R.db = exact ? -INFINITY : 20 * std::log10(err / std::max(peak, 1e-30)); R.err = err; R.hash = fnv(all.data(), all.size());
   if (const char* od = std::getenv("PUMP_OUT")) { std::ofstream o(std::string(od) + "/" + name + ".cpp.f32", std::ios::binary); o.write((const char*)all.data(), (std::streamsize)(all.size() * 4)); }
   if (outAll) *outAll = all;
@@ -186,7 +184,7 @@ int main(int argc, char** argv) {
   for (int i = 2; i < argc; i++) { if (!std::strcmp(argv[i], "--pin")) pin = true; else if (!std::strcmp(argv[i], "--no-skip")) noSkip = true; else if (!std::strcmp(argv[i], "--write-gate") && i + 1 < argc) writeGate = argv[++i]; else sub = argv[i]; }
   const bool all = !sub;
   std::printf("pump: reference = %s; gate %.0f dB below each reference's peak%s\n", pin ? "the pump.wasm built from the pin" : "the SHIPPED pump/pump.wasm (MASTER older than the pin's)", kGateDb, pin ? ", the exact list enforced" : "");
-  int exact = 0, ran = 0, within = 0, ruled = 0, skipped = 0, hashBad = 0, regress = 0; double worst = -INFINITY; const char* worstName = ""; std::map<std::string, uint64_t> hashes; std::map<std::string, Res> results; int failedCases = 0;
+  int exact = 0, ran = 0, within = 0, ruled = 0, skipped = 0, regress = 0; double worst = -INFINITY; const char* worstName = ""; std::map<std::string, uint64_t> hashes; std::map<std::string, Res> results; int failedCases = 0;
   if (all) latencyTest(dir, pin);
   for (int i = 0; i < kPumpCaseN; i++) {
     const char* nm = kPumpCases[i]; if (sub && !std::strstr(nm, sub)) continue;
@@ -198,9 +196,6 @@ int main(int argc, char** argv) {
     bool within100 = R.exact || R.db <= kGateDb; if (rule) within100 = R.nOver <= rule->maxOver;
     bool ok = within100 && R.postOk; const char* extra = "";
     if (pin && wasExact && !R.exact) { ok = false; regress++; extra = "  (was bit-exact: the exact list is enforced)"; }
-    // the native strict render pinned: the committed SHA-256 (Linux x86-64) on every platform
-    const char* want = nullptr; const char* wantIn = nullptr; for (int g = 0; g < kPumpGateHashN; g++) if (!std::strcmp(kPumpGateHash[g].name, nm)) { want = kPumpGateHash[g].sha256; wantIn = kPumpGateHash[g].in; }
-    bool hashOk = true; if (!writeGate) { hashOk = want && R.sha == want; if (!hashOk) { ok = false; hashBad++; extra = want && wantIn && R.inSha != wantIn ? "  NATIVE HASH DIFFERS (the reference input differs from the committed one: not this platform's render)" : "  NATIVE HASH DIFFERS from the committed one (golden/pump_gate.inc)"; } }
     char db[40]; if (R.exact) std::snprintf(db, sizeof db, "exact"); else if (rule) std::snprintf(db, sizeof db, "%.1f dB (rule)", R.db); else std::snprintf(db, sizeof db, "%.1f dB", R.db);
     if (R.exact) exact++; else if (rule) ruled++; else if (R.db <= kGateDb) within++; if (!R.exact && !rule && R.db > worst) { worst = R.db; worstName = nm; }
     std::printf("%-20s %-16s posts %-3d remakes %-3u%s%s%s%s\n", nm, db, R.posts, R.remakes, R.gated ? " (GATED)" : "", R.postOk ? "" : " POSTS DIFFER", extra, ok ? "" : "  FAIL");
@@ -209,12 +204,10 @@ int main(int argc, char** argv) {
   }
   if (writeGate) {   // the gate golden from this run: never hand-edited
     std::ofstream o(writeGate); o << "// GENERATED by test_pump --pin --write-gate (GATE_WRITE=<file> tools/parity-u18.sh): the cases that are bit-exact against the pin-built pump.wasm today (kPumpGateExact: a case that\n"
-      "// leaves the list is a regression and fails) and the SHA-256 of the native STRICT render of every case (made on Linux x86-64, checked on every platform), with the SHA-256 of the reference's input.\n";
+      "// leaves the list is a regression and fails) (made on Linux x86-64, GCC 13; enforced only with --pin).\n";
     int ne = 0; for (auto& kv : results) if (kv.second.exact) ne++;
     o << "static const char* const kPumpGateExact[] = {\n"; for (auto& kv : results) if (kv.second.exact) o << "  \"" << kv.first << "\",\n"; o << "};\nstatic const int kPumpGateExactN = " << ne << ";\n";
-    o << "struct PumpGateHash { const char* name; const char* sha256; const char* in; };\nstatic const PumpGateHash kPumpGateHash[] = {\n";
-    for (auto& kv : results) o << "  {\"" << kv.first << "\", \"" << kv.second.sha << "\", \"" << kv.second.inSha << "\"},\n";
-    o << "};\nstatic const int kPumpGateHashN = " << results.size() << ";\n"; std::printf("wrote %s: %d exact, %zu hashes\n", writeGate, ne, results.size());
+    std::printf("wrote %s: %d exact\n", writeGate, ne);
   }
   // the second pass, in reverse order: the same bits as the first (the library's statics are shared by every host and every case of the process)
   if (all) { int moved = 0, n2 = 0;
@@ -222,7 +215,7 @@ int main(int argc, char** argv) {
     if (moved) fails++;
     std::printf("order: %d cases run again in reverse order, %d gave other bits than the first time  %s\n", n2, moved, moved ? "FAIL" : "ok");
     gateTest(); }
-  std::printf("pump: %d cases run, %d bit-exact, %d within %.0f dB, %d by a named rule (%d), %d skipped; worst of the rest %s (%s); %d exact-list regressions, %d native-hash differences, %d failed\n", ran, exact, within, kGateDb, ruled, (int)(sizeof kRules / sizeof kRules[0]), skipped,
-    std::isinf(worst) ? "exact" : (std::to_string(worst) + " dB").c_str(), worstName, regress, hashBad, failedCases);
+  std::printf("pump: %d cases run, %d bit-exact, %d within %.0f dB, %d by a named rule (%d), %d skipped; worst of the rest %s (%s); %d exact-list regressions, %d failed\n", ran, exact, within, kGateDb, ruled, (int)(sizeof kRules / sizeof kRules[0]), skipped,
+    std::isinf(worst) ? "exact" : (std::to_string(worst) + " dB").c_str(), worstName, regress, failedCases);
   return fails ? 1 : 0;
 }
