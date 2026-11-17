@@ -157,11 +157,11 @@ int main(int argc, char** argv) {
     if (cexact != cran) fails++;
     if (filter.empty()) for (const char* k : kKinds) CHECK(per[k].second >= 14, "direct cases carry too few %s voices (%d)", k, per[k].second);
   }
-  // the refusals: an engine of a later unit is refused, not silent; a layers voice is not ours; bass is not ours
+  // the refusals: an engine of a later unit is refused, not silent; a layers voice is not ours; bass is U26's
   { XengVoice V; JsonDoc d; d.parse(std::string("{\"engine\":\"sf\"}")); CHECK(!xeng_voice_from_json(V, d.root(), Json()) && V.kind == XKind::Other, "an XENG engine of a later unit must be refused (Other)");
     JsonDoc e; e.parse(std::string("{\"engine\":\"layers\"}")); XengVoice W; CHECK(!xeng_voice_from_json(W, e.root(), Json()) && W.kind == XKind::None, "a layers voice is not an XENG voice");
     EngRenderOpts o; size_t n = 0; float tmp[8]; CHECK(xeng_render_voice(V, o, tmp, 8, &n) == kEngUnsupported, "rendering an Other voice must say unsupported");
-    CHECK(xeng_kind("acid", 4) == XKind::Acid && xeng_kind("mach", 4) == XKind::Mach && xeng_kind("blip", 4) == XKind::Blip && xeng_kind("sf", 2) == XKind::Other && xeng_kind("bass", 4) == XKind::None, "engine names");
+    CHECK(xeng_kind("acid", 4) == XKind::Acid && xeng_kind("mach", 4) == XKind::Mach && xeng_kind("blip", 4) == XKind::Blip && xeng_kind("sf", 2) == XKind::Other && xeng_kind("bass", 4) == XKind::Bass, "engine names");
     for (XKind k : {XKind::Acid, XKind::Mach, XKind::Blip}) { XengVoice M; M.kind = k; EngRenderOpts oo; const size_t b = xeng_render_bound(M, oo); std::vector<float> small(b ? b - 1 : 1);
       CHECK(b > 1 && xeng_render_voice(M, oo, small.data(), small.size(), &n) == kEngTooSmall, "a buffer below the bound must be refused"); } }
   std::printf("engine xeng3: %d failed\n", fails);

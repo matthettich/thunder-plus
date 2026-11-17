@@ -222,7 +222,7 @@ bool VoxCore::set(const VoxP& o) {
   if (!txtSet_ || p_.txt != txt_) {
     txt_ = p_.txt; txtSet_ = true;   // (the JS stores the new text before parsing it: a parse that throws leaves the old syllables)
     VoxLyrics L; if (!L.parse(p_.txt)) return false;
-    lyr_ = std::move(L); segs_.assign(lyr_.maxSegs + 1, Seg{-1, kEnd, 0}); if (curCo_.size() < lyr_.maxCo + 1) curCo_.resize(lyr_.maxCo + 1);   // (the playing syllable keeps its own copy of its closing phonemes: the JS's `cur` object outlives a new lyric)
+    lyr_ = std::move(L); if (segs_.size() < lyr_.maxSegs + 1) segs_.resize(lyr_.maxSegs + 1, Seg{-1, kEnd, 0}); /* (never shrunk or cleared: the segments being played are the JS's `this.segs`, which set() does not touch) */ if (curCo_.size() < lyr_.maxCo + 1) curCo_.resize(lyr_.maxCo + 1);   // (the playing syllable keeps its own copy of its closing phonemes: the JS's `cur` object outlives a new lyric)
   }
   return true;
 }

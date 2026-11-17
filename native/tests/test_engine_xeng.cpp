@@ -129,7 +129,7 @@ int main(int argc, char** argv) {
   { XengVoice V; JsonDoc d; d.parse(std::string("{\"engine\":\"sf\"}")); CHECK(!xeng_voice_from_json(V, d.root(), Json()) && V.kind == XKind::Other, "an XENG engine of a later unit must be refused (Other)");
     JsonDoc e; e.parse(std::string("{\"engine\":\"layers\"}")); XengVoice W; CHECK(!xeng_voice_from_json(W, e.root(), Json()) && W.kind == XKind::None, "a layers voice is not an XENG voice");
     EngRenderOpts o; size_t n = 0; float tmp[8]; CHECK(xeng_render_voice(V, o, tmp, 8, &n) == kEngUnsupported, "rendering an Other voice must say unsupported");
-    CHECK(xeng_kind("modal", 5) == XKind::Modal && xeng_kind("tone", 4) == XKind::Tone && xeng_kind("sf", 2) == XKind::Other && xeng_kind("bass", 4) == XKind::None, "engine names");
+    CHECK(xeng_kind("modal", 5) == XKind::Modal && xeng_kind("tone", 4) == XKind::Tone && xeng_kind("sf", 2) == XKind::Other && xeng_kind("bass", 4) == XKind::Bass, "engine names");
     XengVoice M; M.kind = XKind::Modal; EngRenderOpts oo; const size_t b = xeng_render_bound(M, oo); std::vector<float> small(b ? b - 1 : 1);
     CHECK(b > 1 && xeng_render_voice(M, oo, small.data(), small.size(), &n) == kEngTooSmall, "a buffer below the bound must be refused"); }
   std::printf("engine xeng: %d failed\n", fails);

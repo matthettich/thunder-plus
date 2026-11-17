@@ -251,7 +251,7 @@ function nanScript(E, op) {
   }
   return parts;
 }
-function runScript(E, c) {
+export function runScript(E, c) {
   const C = { bass: E.BassCore, vox: E.VoxCore }[c.kind], L = new Float32Array(c.len), R = new Float32Array(c.len), core = new C(c.sr); core.set(c.kind === 'vox' ? { ...c.p } : c.p);
   let stream = [];
   for (const op of c.ops) {

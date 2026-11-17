@@ -3,12 +3,14 @@
 // no locks, no I/O after construction. It is NOT wired into the mixer or the sequencer.
 //
 // THE RULE (one rule for live play and renders; docs/port/U26-NOTES.md part (a) describes the page's own live nodes and where they differ):
-//   * a NOTE event (on / off) takes effect at its exact sample: the control block that is running ends there and the core's next control block starts there;
-//   * the core's control blocks (32 samples for bass, 16 for the others: its envelopes, filters and partial amplitudes move linearly across one) run from the last note event, not from the host block;
+//   * a NOTE event (on / off) takes effect at its exact sample: the control block that is running ends there and the core's next control block starts there (this is what the rendered path does: renderBass / renderVox
+//     call the core's render(a, b) once per note segment);
+//   * the core's control blocks (32 samples for bass, 16 for the others: its envelopes, filters and partial amplitudes move linearly across one) run from the last note event, NOT from the host block;
 //   * a RATE / BPM / WOB event takes effect at the first control block that starts at or after its sample (a rate ramp is a Web Audio linear ramp: the value at that block's first sample);
-//   * the output for a note sequence is therefore the same whatever the host block sizes are: it equals seqRender in tools/engine-u26-dump.mjs, the JS cores driven by this rule, bit for bit.
-// A control block's samples depend on the block's END, so a block can only be rendered once no later event can cut it. LiveMode::Exact therefore delays the output by latency() = BLK - 1 samples (31 for bass, 15 for the
-// others): the first latency() samples are silence. LiveMode::Immediate has no delay and also ends a control block at every host block's end: its output depends on the host block sizes (it equals seqRender with those cuts).
+//   * so the output for a sequence of events is the same whatever the host block sizes are, and it equals tools/engine-u26-dump.mjs seqRender (the JS cores driven by this rule), bit for bit.
+// A control block's samples depend on the block's END, so a block can only be rendered once no later event can cut it: the output is delayed by latency() = BLK - 1 samples (31 for bass, 15 for the others; the first
+// latency() samples are silence). There is deliberately NO zero-latency mode: ending a control block at every host block's end (what the page's live nodes do at their 128-sample quanta) would make the sound depend on the
+// host's block size, which is the block-quantised timing this shell must not copy (see the notes, "where the page's live result differs").
 #ifndef THUNDER_ENGINE_LIVE_SHELL_H
 #define THUNDER_ENGINE_LIVE_SHELL_H
 #include <cmath>
@@ -23,7 +25,7 @@
 
 namespace thunder {
 
-enum class LiveEvType : uint8_t { NoteOn, NoteOff, RateSet, RateRamp, Bpm, Wob };
+enum class LiveEvType : uint8_t { NoteOn, NoteOff, RateSet, RateRamp, Bpm, Wob, End };   // End: the stream ends at this sample (offline use: the last control block ends here, as a rendered note's does)
 struct LiveEvent {
   uint32_t at = 0;                 // sample offset inside the process() call (0 .. n-1)
   LiveEvType type = LiveEvType::NoteOn;
@@ -45,8 +47,6 @@ struct AcidLive { using Core = AcidCore; static constexpr uint32_t kBlk = 16;
 struct MachLive { using Core = MachCore; static constexpr uint32_t kBlk = 16;
   static bool on(Core& c, const LiveEvent& e) { c.on(e.leg); return true; }
   static void off(Core& c) { c.off(); } static void bpm(Core&, double) {} static void wob(Core&, double) {} static bool bad(const Core& c) { return c.bad(); } };
-
-enum class LiveMode : uint8_t { Exact, Immediate };
 
 // The rate lane: a Web Audio AudioParam as far as the page uses it: a step (setValueAtTime) or a linear ramp (linearRampToValueAtTime) from the value the lane has when the ramp's event is reached.
 struct LiveRateLane {
@@ -76,11 +76,11 @@ template <class A>
 class LiveShell {
  public:
   static constexpr uint32_t kBlk = A::kBlk, kMaxBlock = 128, kPend = 256, kRing = 512;
-  explicit LiveShell(double sr, LiveMode mode = LiveMode::Exact) : core_(sr), mode_(mode) {
+  explicit LiveShell(double sr) : core_(sr) {
     std::memset(ringL_, 0, sizeof ringL_); std::memset(ringR_, 0, sizeof ringR_); std::memset(stgL_, 0, sizeof stgL_); std::memset(stgR_, 0, sizeof stgR_);
   }
   typename A::Core& core() { return core_; }             // set(): between process() calls (it takes effect at the core's position, up to latency() samples behind the host clock)
-  uint32_t latency() const { return mode_ == LiveMode::Exact ? kBlk - 1 : 0; }
+  static constexpr uint32_t latency() { return kBlk - 1; }   // samples of delay between an event and the first sample it affects at the output
   bool failed() const { return failed_; }                // the JS core would have thrown (a NaN vowel, a syllable number that is not a whole number, ...): the voice is silent from then on
   uint32_t dropped() const { return dropped_; }          // events that did not fit the queue (kPend) or lay outside the call
   uint32_t rejected() const { return rejected_; }        // events with a non-finite value (an AudioParam cannot hold one)
@@ -102,7 +102,7 @@ class LiveShell {
 
  private:
   struct Pend { uint64_t t; LiveEvent e; };
-  static bool isNote(LiveEvType t) { return t == LiveEvType::NoteOn || t == LiveEvType::NoteOff; }
+  static bool isNote(LiveEvType t) { return t == LiveEvType::NoteOn || t == LiveEvType::NoteOff || t == LiveEvType::End; }   // what cuts a control block
   void enqueue(LiveEvent e, uint64_t t) {
     // what the page's AudioParams do to a value: only finite numbers, clamped to the parameter's range (rate 0..256, bpm 10..999, wob 0..64)
     switch (e.type) {
@@ -126,6 +126,7 @@ class LiveShell {
       case LiveEvType::RateRamp: lane_.ramp(t, e.v, e.dur); break;
       case LiveEvType::Bpm: A::bpm(core_, e.v); break;
       case LiveEvType::Wob: A::wob(core_, e.v); break;
+      case LiveEvType::End: break;
     }
   }
   // renders control blocks up to the horizon H (every event before H is known)
@@ -134,8 +135,7 @@ class LiveShell {
       while (cnt_ && pend_[head_].t <= rendered_) { apply(pend_[head_]); head_ = (head_ + 1) % kPend; cnt_--; }
       uint64_t end = rendered_ + kBlk;
       for (uint32_t k = 0; k < cnt_; k++) { const Pend& p = pend_[(head_ + k) % kPend]; if (isNote(p.e.type)) { if (p.t < end) end = p.t; break; } }   // the next note event cuts the block
-      if (mode_ == LiveMode::Immediate) { if (H < end) end = H; }
-      else if (end > H) break;   // a later event may still cut this block: wait
+      if (end > H) break;   // a later event may still cut this block: wait
       if (end <= rendered_) break;
       block(rendered_, end);
       rendered_ = end;
@@ -149,7 +149,7 @@ class LiveShell {
     }
     for (uint32_t i = 0; i < n; i++) { ringL_[(s + i) & (kRing - 1)] = failed_ ? 0.0f : stgL_[i]; ringR_[(s + i) & (kRing - 1)] = failed_ ? 0.0f : stgR_[i]; }
   }
-  typename A::Core core_; LiveMode mode_; LiveRateLane lane_;
+  typename A::Core core_; LiveRateLane lane_;
   uint64_t clock_ = 0, rendered_ = 0; bool failed_ = false; uint32_t dropped_ = 0, rejected_ = 0;
   Pend pend_[kPend]; uint32_t head_ = 0, cnt_ = 0;
   float ringL_[kRing], ringR_[kRing], stgL_[kBlk], stgR_[kBlk];
