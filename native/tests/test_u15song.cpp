@@ -97,9 +97,9 @@ static void tapHook(void* user, int track, float* L, float* R, int N, double t0,
     }
   }
   if (C.bank->host(track).slotCount() > 0) {
-    // the master: SongRenderer::masterHook (render.cpp) runs the master host WITHOUT the beat clock; this tap does the same so that the tapped render is the product's
+    // the master: SongRenderer::masterHook (render.cpp) runs the master host with Mixer::beat(NT); this tap does the same so that the tapped render is the product's
     // (FxBank::hook, which every track gets, passes Mixer::beat(track); the page's master effects node hears the clock too: index.html setMfx -> clockTo)
-    if (track == NT) C.bank->host(track).process(L, R, N, t0); else FxBank::hook(C.bank, track, L, R, N, t0, f, nf);
+    if (track == NT) C.bank->host(track).process(L, R, N, t0, C.mix->beat(NT), N); else FxBank::hook(C.bank, track, L, R, N, t0, f, nf);
   }
 }
 
