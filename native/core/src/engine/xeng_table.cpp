@@ -14,7 +14,7 @@ double shape(int t, int k, double x) {
   const double m = (double)k / 7;
   if (t == 0) {
     const double s = m * 4, i0 = mn(3, std::floor(s)), f = s - i0; const int i = (int)i0;
-    const double w[5] = {js_sin(6.2832 * x), 1 - 4 * jabs(x - 0.5), 2 * x - 1, x < 0.5 ? 1 : -1, x < 0.12 ? 1 : -0.27};
+    const double w[5] = {js_sin(6.2832 * x), 1 - 4 * jabs(x - 0.5), 2 * x - 1, x < 0.5 ? 1.0 : -1.0, x < 0.12 ? 1 : -0.27};
     return w[i] * (1 - f) + w[i + 1] * f;
   }
   if (t == 1) {
