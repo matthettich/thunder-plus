@@ -333,3 +333,15 @@ N1 step 10.
   runs everywhere; the exact list is enforced in the shipped run on Linux x86-64 (macOS: `p_band_alt` -142 dB, system libm).
 - **WORKPLAN.md sections 7 and 9 are current** (Haiku, 4787944). In progress: the hardening list (`n1/hardening`, Sonnet).
 - Engine units merged so far: U22, U23, U24, U25, U28, U29. Not started: U26, U27, U30 to U33, U36 (see WORKPLAN's list for which are the lead's).
+- **State at 10:15, 17 Nov.** Merged since 06:45: **#208** the hardening list (B1-2, B1-5, B1-7, B1-4, B3-3 as a refusal in `Module::run()`, the swarm / drift
+  runaway flag; notes in `docs/port/HARDENING-NOTES.md`; left: the same cast shape in `mod_basic` 58 / 101 / 280, `mod_voice` 214 / 386, `mod_cv` 309, and a null
+  `pitch` of the pitch effects); **#209 U27** Acid, Machine, Blip and `renderLiveCore` (185 of 185 factory voices, 461 direct cases; the independent verifier:
+  MERGE, 24 mutations with 4 low gaps, 24000 fuzz renders clean, line-by-line read of all four; Windows job limit 20 → 60 minutes). The post-merge verification of
+  U25 came back SOUND (`/home/claude/progress/verify-u25.md`): follow-ups, none blocking: the one-step rule admits cases as a class (as decided); only the
+  `string.cc` patch changes any output (the notes say both Elements patches do); the allocation guard does not cover a first render on a thread that never called
+  `eng_init`; an Elements assertion for the no-library branch.
+- **Running (Sonnet):** U26 Bass + Vox, rendered path plus a small live shell with a "live = render" test (`n3/u26`; THE LEAD REVIEWS its live part and its
+  "Choices for the lead to confirm"); U33 pump synths, rendered path, the -100 dB rule, no LXR glue (`n3/u33`).
+- **Engine units merged: U22, U23, U24, U25, U27, U28, U29.** Left in N3: U26 and U33 (running), U30 …waves and U31 …chains (Sonnet builds, lead reviews), U32
+  SoundFont (needs the owner's licence decision on the Vorbis decoder), U04 LXR module, U36. The lead's own: N1 steps 10 and 11 (U34, U35, U37).
+- The owner was told at 09:10: about 40 % of the whole port, about 55 % of the way to a sideloadable Android beta (26 of 37 units merged then; the rest is the harder part).
