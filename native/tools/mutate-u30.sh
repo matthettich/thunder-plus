@@ -14,11 +14,11 @@ if s.count(o)!=1: print('MUTATION TEXT NOT UNIQUE (%d): %s' % (s.count(o), o)); 
 open(p,'w').write(s.replace(o,n))
 PY
   rc=$?
-  if [ $rc -ne 0 ]; then mv "$f.orig" "$f"; echo "mutation '$name': could not be applied"; bad=$((bad+1)); return; fi
+  if [ $rc -ne 0 ]; then mv "$f.orig" "$f"; touch "$f"; echo "mutation '$name': could not be applied"; bad=$((bad+1)); return; fi
   if nice cmake --build "$B" -j2 --target test_waves >/dev/null 2>&1; then
     if "$B/tests/test_waves" $G >/dev/null 2>&1; then echo "mutation '$name': SURVIVED (the tests did not notice)"; bad=$((bad+1)); else echo "mutation '$name': killed"; ok=$((ok+1)); fi
   else echo "mutation '$name': does not build"; bad=$((bad+1)); fi
-  mv "$f.orig" "$f"
+  mv "$f.orig" "$f"; touch "$f"
 }
 run "sort: the queue starts from the last module" engine.cpp 'for (size_t i = 0; i < n; i++) if (indeg[i] == 0) q.push_back((int)i);' 'for (size_t i = n; i-- > 0;) if (indeg[i] == 0) q.push_back((int)i);'
 run "sort: leftovers appended in reverse" engine.cpp 'for (size_t i = 0; i < n; i++) if (!inOrder[i]) order.push_back(mods[i].get());' 'for (size_t i = n; i-- > 0;) if (!inOrder[i]) order.push_back(mods[i].get());'

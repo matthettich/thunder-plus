@@ -287,6 +287,8 @@ static void testSortOrder() {
     CHECK((e.order() == std::vector<std::string>{"d", "c", "a", "b"}), "the cycle a<->b is left over and appended in patch order after d, c"); }
   { Doc d("{\"modules\":[" + mod("a", "atten") + "," + mod("b", "atten") + "],\"cables\":[" + cab("a", "out", "b", "in") + "," + cab("b", "out", "a", "in", true) + "]}"); WavesEngine e(48000, opts(2)); e.loadPatch(d.r);
     CHECK((e.order() == std::vector<std::string>{"a", "b"}), "a feedback cable does not decide who runs first"); }
+  { Doc d("{\"modules\":[" + mod("a", "atten") + "," + mod("b", "atten") + "],\"cables\":[" + cab("b", "out", "a", "in", true) + "]}"); WavesEngine e(48000, opts(2)); e.loadPatch(d.r);
+    CHECK((e.order() == std::vector<std::string>{"a", "b"}), "the module a feedback cable feeds runs first (patch order), not after its source"); }
 }
 static void testBehaviours() { testSortOrder(); testFeedback(); testVoices(); testSetOnly(); testPatchLoading(); testLive(); }
 // ---- the page's own offline renders (golden/waves_render.json: index.html wavesPre / wavesLiveRender run in Node) ----
