@@ -290,3 +290,21 @@ N1 step 10.
    (the work plan asks no lead review of C units). Follow-ups queued, none blocking: B1-2 `kTup[-1]`, B1-5 `sinT` index 4097, B1-7 NaN-to-int casts (C++ UB where
    the JS gives NaN: make them defined), B3-3 a `ctx.block <= 128` check, swarm / drift runaway flag tested only at the next control block.
 6. **#195 U28 merged** after #196: all CI green including the sanitizer job.
+7. **Later the same evening (state at 23:00; `native` has everything below):**
+   - **#182 U18 pump hosting MERGED**, all CI green. Gate as decided in 1, with one revision by Fable: NO committed native hashes for pump (the strict pump build
+     calls the system libm: 7 of 80 hashes differed on GCC 15, 4 on clang, 22 on macOS; cause believed, not proven). On every platform: -100 dB against the pin-built
+     wasm (worst `v_hot` -115.6 dB, the same figure everywhere), the 40 exact cases kept exact (enforced in the `--pin` run), `x_two_hosts_same` by rule (20 samples
+     over the line measured, 40 allowed), the shipped-wasm run skips MASTER by name. Under ASan the harness no longer wraps malloc / free (pump's `posix_memalign`
+     buffers); the `operator new` guard stays. **Fable read the gate and the guard change, NOT `fxpump.cpp` / `fxhost.cpp` line by line: add them to the
+     read-before-wiring list (with U07, U08, U09).** Follow-up if exact cross-platform pump renders are ever wanted: give pump the core's fdlibm.
+   - **#203 Marbles / Tides ON, MERGED**, all CI green: strict native mods library, 42 renders and cases within -100 dB of the fast-math wasm (worst `tides_mod1`
+     -106.8 dB), 6 exact kept exact, committed native hashes (they held on macOS). ASan found a real upstream read: `marbles/random/lag_processor.cc:79`
+     reads `lut_raised_cosine[257]` (257 entries) when the phase is exactly 1.0; patched in `third_party/prepare.sh` (returns `[256]`, the value the read gave
+     times a zero fraction); hashes unchanged. The web's `mods.wasm` has the same read (harmless there: finite bytes follow the table); not rebuilt.
+   - **#200 MERGED:** the native mirror of web build 635 (wavetable spare entry in the JS copy and the C++; four negative-Bend direct cases changed from NaN, two
+     edge cases added, the 61 factory-voice hashes unchanged) plus three comment fixes from the #193 review.
+   - **Web build 637 on `beta` and `main` (#201, #202):** three or four view tabs keep their own row at every width under 600 px (CodeRabbit on #199, reproduced).
+   - **Asked of the owner (16 Nov 22:20), not answered yet:** should the web app take the pin's MASTER (resonance stage: 77 parameters against 75, latency 4454
+     against 358; the shipped `pump.wasm` is byte-identical to pump 6f1ec29 with the STRIP `RunnerExtra` block removed; the other 24 types are identical)?
+   - **Open PRs of ours: none.** Next for Fable: N1 steps 10 and 11 (U34, U35, U37), the "Owed by the lead" list, web item 4's design. Next for Sonnet workers:
+     U29, then U25 (unblocked by decision 1: strict build, -100 dB gate), the small hardening list in 5, WORKPLAN section 7's table (not updated tonight).
