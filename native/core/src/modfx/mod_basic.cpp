@@ -52,6 +52,7 @@ const ParamDef kFiP[] = {{"mode", 0, 0, 3, 1}, {"slope", 0, 0, 1, 1}, {"cutoff",
 class Filter : public Module {
  public:
   Filter(double, Seeds& s) : nr_(s.next()) {}
+  void arm(Seeds& s) override { nr_ = Rng(s.next()); }   // U30
   void process(const IO& io, const Ctx& c) override {
     const double* p = io.p; const double sr = c.sr; const int B = c.block; const In L = inp(io, 0), R = inR(io, 0, 1); const Out oL = outp(io, 0), oR = outp(io, 1);
     if (rs_(c)) ph_ = 0;

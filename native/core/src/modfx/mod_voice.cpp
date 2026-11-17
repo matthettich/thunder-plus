@@ -264,6 +264,7 @@ const ParamDef kGdP[] = {{"time", .3, .02, 2, .001}, {"sync", 0, 0, 1, 1}, {"div
   {"spray", .15, 0, 1, .01}, {"reverse", 0, 0, 1, .01}, {"spread", .5, 0, 1, .01}, {"fb", .3, 0, 1, .01}, {"freeze", 0, 0, 1, 1}, {"mix", .4, 0, 1, .01}};
 class GrainDelay : public Module {
  public:
+  void arm(Seeds& s) override { r_ = Rng(s.next()); }   // U30
   GrainDelay(double sr, Seeds& s) : r_(s.next()) { const int N = 1 << (int)std::ceil(js_log2(sr * 4.5)); L_.init(N); R_.init(N); M_ = N - 1; }
   void process(const IO& io, const Ctx& ctx) override {
     const double* p = io.p; const double sr = ctx.sr; const int B = ctx.block; const In L = inp(io, 0), R = inR(io, 0, 1); const Out oL = outp(io, 0), oR = outp(io, 1); const int32_t M = M_; const double N = (double)M + 1;

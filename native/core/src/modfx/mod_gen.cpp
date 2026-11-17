@@ -109,6 +109,7 @@ const ParamDef kChP[] = {{"model", 0, 0, 6, 1}, {"rate", .35, 0, 1, .001}, {"cha
 class Chaos : public Module {
  public:
   Chaos(double, Seeds& s) : C_(0, s.next()) {}
+  void arm(Seeds& s) override { C_ = ChaosCore(0, s.next()); }   // U30
   void process(const IO& io, const Ctx& ctx) override {
     const double* p = io.p; const double sr = ctx.sr; const int m = (int)clamp((double)i32(p[0]), 0, 6); const double lv = p[4];
     if (m != m_ || C_.model != m) { m_ = m; C_.setModel(m); lx_ = C_.ox; ly_ = C_.oy; lz_ = C_.oz; }

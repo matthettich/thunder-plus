@@ -81,6 +81,7 @@ const ParamDef kBbdP[] = {{"time", .3, .02, .9, .001}, {"sync", 0, 0, 1, 1}, {"d
 class BBD : public Module {
  public:
   BBD(double sr, Seeds& s) : b_((int)std::ceil(sr * 1.3) + 4), r_(s.next()) {}
+  void arm(Seeds& s) override { r_ = Rng(s.next()); }   // U30
   void process(const IO& io, const Ctx& c) override {
     const double* p = io.p; const double sr = c.sr; const In L = inp(io, 0), R = inR(io, 0, 1); const Out oL = outp(io, 0), oR = outp(io, 1); const int N = b_.n;
     double tt = p[1] >= .5 ? 60 / (truthy(c.tempo) ? c.tempo : 120) * kPPDivs[(int)clamp((double)i32(p[2]), 0, 6)] : p[0];
