@@ -391,6 +391,7 @@ size_t xeng_vox(const VoxP& P, double sr, float* out, size_t cap) {
   }
   const double tail = mn(capD, pos + js_round((p.rel / 1000 * 1.6 + 0.03) * sr)); c.render(out, nullptr, len, pos, tail, 1); pos = tail;
   // const out = L.slice(0, Math.max(1, pos)); trim; fade
+  if (pos != pos) return kRefuse;   // a NaN release: `L.slice(0, NaN)` is empty and the JS returns an empty sound (refused, as the header says); the cast below would be UB
   const double sl = mx(1, pos); const size_t olen = sl >= (double)len ? len : (size_t)std::trunc(sl);   // slice(0, end): the end is truncated and clamped to the length
   return trim_fade(out, olen, sr, 0.002);
 }

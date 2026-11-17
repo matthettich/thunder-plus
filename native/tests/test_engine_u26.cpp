@@ -191,6 +191,8 @@ int main(int argc, char** argv) {
       CHECK(b > 1 && xeng_render_voice(M, oo, small.data(), small.size(), &n) == kEngTooSmall, "a buffer below the bound must be refused"); }
     { XengVoice V; V.kind = XKind::Vox; V.vox.txt = "constructor"; EngRenderOpts o; size_t n = 0; float t[8]; CHECK(xeng_render_bound(V, o) == 0 || xeng_render_voice(V, o, t, 8, &n) == kEngUnsupported, "the lyric word \"constructor\": the JS throws, the voice is refused"); }
     { XengVoice V; V.kind = XKind::Bass; V.bass.vowel = NAN; EngRenderOpts o; size_t n = 0; std::vector<float> t(xeng_render_bound(V, o) + 1); CHECK(xeng_render_bound(V, o) == 0 || xeng_render_voice(V, o, t.data(), t.size() - 1, &n) == kEngUnsupported, "a NaN vowel: the JS throws, the voice is refused"); }
+    { XengVoice V; V.kind = XKind::Vox; V.vox.rel = NAN; EngRenderOpts o; o.sr = 2000; size_t n = 0; const size_t b = xeng_render_bound(V, o); std::vector<float> t(b + 8, 0.0f);
+      CHECK(b == 0 || xeng_render_voice(V, o, t.data(), b, &n) == kEngUnsupported, "a NaN release: the JS returns an empty sound, the voice is refused"); }
     { VoxCore vc(48000); VoxP p; p.txt = "la na"; CHECK(vc.set(p), "set");
       CHECK(!vc.on(false, NAN, false) && !vc.on(false, 0.5, false) && !vc.on(false, INFINITY, false), "a syllable number that is not a whole number: the JS throws");
       CHECK(vc.on(false, 1, false) && vc.on(false, -3, false) && vc.on(false, 1e300, false), "wrapping syllable numbers are accepted"); }
