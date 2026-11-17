@@ -291,3 +291,10 @@ Each one-line change, test rc=1, reverted (git status clean afterwards):
 1. xeng_wind.cpp:14-16: null/empty delay line for f0 -> 0 (oct <= about -100, tune <= about -1000): out-of-bounds, FAIL.
 2. xeng_chip.cpp:19,30,36: (int)NaN indexes (NaN-only).
 3. swarm/strings NaN truthiness (above), minor.
+
+## Re-check of item 4 after bc5baa5: PASS
+- Diff b668e8f..bc5baa5 read in full. No golden file or existing case changed (only tests/CMakeLists.txt + the new fuzz test). Changes: (a) guards returning kRefuse/kEngUnsupported: wind L=ceil(sr/f0*2.6)+8, strings L, drift chorus line, each required in [1, kMaxLine=4194304] (JS throws RangeError for NaN/inf/>2^32; between 4.19M and that it only exhausts memory); (b) cidx() = same clamp as before for finite input, NaN -> low end; chip NaN index gives NaN like JS undefined arithmetic; (c) truthy() = JS falsiness; (d) render_bound/render_voice reject sr outside (0,1e7], bound 0 now kEngUnsupported instead of kEngTooSmall.
+- Runaway-loop bound: swarm/drift step refuses when hz*dt > 1e4 wraps per control step, chip noise when ninc > 1e4 per sample. UI ranges: swarm rate<=12, drift wowRate<=3, chip nfreq<=1 (ninc<=8192/sr): orders of magnitude below. Line bound: tune +-48 st, wind oct>=0, strings oct>=-1: needs f0 < ~0.06 Hz; unreachable.
+- ASan+UBSan (-O1, no-recover, -j2): ctest engine_xeng pass, engine_xeng_fuzz pass. My fork-per-render fuzz, same seed as before: finite 1800 (ok 1794, refused 6, 0 crash); with NaN/inf 1200 (ok 1170, refused 30, 0 crash). New single-field sweep (/tmp/fz28/fuzz3.cpp): every field of 15 engines x 27 values (+-1e308, -1000, -1e9.., NaN, +-inf) x sr 8k/48k, plus tune and len: 18252 renders, 135 refused, 0 crashes, 0 sanitizer reports, 0 hangs. Wind oct=-100 now refused.
+- Release (GCC): engine_xeng_ref, engine_xeng (1068 voices + direct cases), engine_xeng_golden_current, engine_xeng_fuzz: 4/4 pass.
+- Minor, not a failure: swarm/drift `bad` flag is tested only at the next control block (xeng_swarm.cpp:48, xeng_drift.cpp:51), so a voice of <=32 samples with hz*dt>1e4 renders instead of refusing; unreachable (hold >= 0.03 s).
