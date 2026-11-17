@@ -162,7 +162,7 @@ jobs:
   macos:
     name: Core (macOS universal)
     runs-on: macos-latest
-    timeout-minutes: 20
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
       - run: brew install gnu-sed   # native/core/third_party/prepare.sh needs GNU sed

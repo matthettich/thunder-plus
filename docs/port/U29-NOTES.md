@@ -21,3 +21,6 @@ Branch `n3/u29` (from `native`). Gate command: `native/tools/parity.sh u29` (PAS
 - **Loaded wavetable**: `frames x partials <= 2^21`, each at most 4096, both whole numbers, else `kEngUnsupported` (the JS allocates whatever the data says; the app writes at most 64 frames of 256 partials).
 - **Resynth**: `ResynthCore.analyse` is NOT ported (it runs on the page when a sample is loaded; the pad only stores its result). Bounds: parts <= 4096, frames x parts <= 2^22; a negative count (the JS's RangeError), zero frames with parts, and `rat` entries that are missing or not finite (the JS plays NaN) are `kEngUnsupported`.
 - A table position that is NaN reaches `cyc[NaN]` in the JS and throws: refused. Reads past a cycle table (a phase of 1 or more, from a huge note) are NaN as in the JS (`undefined`).
+
+## macOS CI time limit
+"Core (macOS universal)" was cancelled at its 20-minute `timeout-minutes` (twice), not hung: the build took about 9.5 min, ctest then had about 10.5 min and was still running tests (all passing; on macOS `engine_ref` 81 s, `engine_xeng_ref` (U28) 264 s, `fxidm_ref` 34 s, `modfx_ref` 40 s, `rt_core` 20 s). The unit's own Node reference (`engine_xeng2_ref`, about 1 min on Linux) and tests came on top of U28's. Honest work, so the limit is raised to 60 minutes (as the Linux job has); no test removed.
