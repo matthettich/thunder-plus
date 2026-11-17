@@ -176,6 +176,13 @@ function coreScripts(E) {
   add('mach_frac_bounds', 'mach', SR, 300, { machine: 4 }, [{ o: 'on', leg: false }, { o: 'r', a: 0, b: 70.5, rate: 1 }, { o: 'r', a: 70.5, b: 140, rate: 1 }, { o: 'off' }, { o: 'r', a: 140, b: 299.5, rate: 1 }]);
   // silence before a note (stage 0 and env 0 fills zeros), a note on while the last is still sounding, off twice, a bound beyond the array (writes ignored)
   for (const kind of ['acid', 'mach']) add(kind + '_edges', kind, SR, 500, {}, [{ o: 'r', a: 0, b: 64, rate: 1 }, { o: 'on', leg: true, acc: true }, { o: 'r', a: 64, b: 200, rate: 1 }, { o: 'off' }, { o: 'off' }, { o: 'r', a: 200, b: 260, rate: 1 }, { o: 'on', leg: true, acc: false }, { o: 'r', a: 260, b: 600, rate: 2 }]);
+  // added after the first mutation round (appended: no earlier case changes): the glide / slide thresholds (Math.max(0.5, ...) style `> 0.5`) for a legato note: 0.5 (not above), 0.55 and 0.7 (above); and Mach's Ensemble chord 9
+  for (const g of [0.5, 0.55, 0.7]) {
+    add('mach_glide_edge' + g, 'mach', SR, 6000, { machine: 1, glide: g, b: 0.2, oct: 2 }, [{ o: 'on', leg: false }, { o: 'r', a: 0, b: 2000, rate: 1 }, { o: 'on', leg: true }, { o: 'r', a: 2000, b: 4000, rate: 2 }, { o: 'off' }, { o: 'r', a: 4000, b: 6000, rate: 2 }]);
+    add('acid_slide_edge' + g, 'acid', SR, 6000, { slide: g, accent: 0.5 }, [{ o: 'on', leg: false, acc: false }, { o: 'r', a: 0, b: 2000, rate: 1 }, { o: 'on', leg: true, acc: false }, { o: 'r', a: 2000, b: 4000, rate: 2 }, { o: 'off' }, { o: 'r', a: 4000, b: 6000, rate: 2 }]);
+  }
+  for (const g of [0.5, 0.55, 0.7]) add('mach_glide_retrig' + g, 'mach', SR, 6000, { machine: 1, glide: g, b: 0.2 }, [{ o: 'on', leg: false }, { o: 'r', a: 0, b: 2000, rate: 1 }, { o: 'on', leg: false }, { o: 'r', a: 2000, b: 4000, rate: 2 }, { o: 'off' }, { o: 'r', a: 4000, b: 6000, rate: 2 }]);   // a second note without legato while the first sounds: Mach glides then too (its second branch)
+  for (let ci = 0; ci < 10; ci++) add('mach_chord' + ci, 'mach', SR, 4000, { machine: 4, a: ci / 10 + 0.01, b: 0.6, c: ci % 2 ? 0.5 : 0 }, [{ o: 'on', leg: false }, { o: 'r', a: 0, b: 3000, rate: 1 }, { o: 'off' }, { o: 'r', a: 3000, b: 4000, rate: 1 }]);
   return out;
 }
 function runScript(E, c) {
