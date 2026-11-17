@@ -41,5 +41,5 @@ Two nothing caught, so cases were added (`mach_glide_edge*`, `mach_glide_retrig*
 ## Least sure
 - Platforms other than Linux x86-64 were not run here. Math goes through the `js_*` helpers and `-ffp-contract=off` is the core's setting, as in U28 / U29; CI is the check. A platform that differs from the committed Linux hash is a finding to explain, not a hash to change.
 - Fractional sample rates are exercised by 6 cases (they make N fractional only when `sr * 32` or `sr * 12` clamps the length).
-- The NaN-valued renders (Machine Swarm with 11 or more voices, B above 1.8) are not hashed (a NaN's sign is the CPU's); they are in the fuzz (no crash, bound respected) and one asserts the output is NaN-valued like the JS's.
+- The NaN-valued renders (Machine Swarm with 11 or more voices, B above 1.8) are not hashed (a NaN's sign is the CPU's) ; they are in the fuzz (no crash, bound respected). That the C++ output is NaN-valued there like the JS's (checked by hand with Node: `renderLiveCore(MachCore, {machine:3, b:2.04})` gives NaN) is not asserted by a test.
 - The live interface (`xeng_live.h`) is provisional.
