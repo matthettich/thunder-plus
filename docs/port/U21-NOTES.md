@@ -33,10 +33,17 @@ about +-8 %; the pump effects up to +108 %), and the owner's standing concern is
 - Result (GCC 13.3, Release): 6 engine renders + 36 direct cases: all 42 inside -100 dB, 6 bit-exact, worst `tides_mod1` -106.8 dB (then `tides_stress` / `engine_tides_stressed` -119.0, `tides_none` -119.1, `tides_rand2` -120.9).
   Marbles: worst `marbles_voiced` -132.5 dB. No case is left out (`kTolSkip` in test_modfx.cpp is empty); Marbles' random sequences did not part ways in any case.
 
-CI of the first push (7ff4fc7e): GCC, clang, macOS (native hashes held), Windows (Marbles / Tides reported not run: no mods library there), wasm and Android pass. FAILS: Linux sanitizers, `rt_core` and `modfx`:
-`AddressSanitizer: global-buffer-overflow ... READ of size 4 ... in marbles::LagProcessor::Process(float, float, float)` (called from OutputChannel::Process, XYGenerator::Process, MarblesMod::process, rt_modfx / test_modfx), 60 bytes
-before a string constant of mod_tides.cc: upstream Marbles reads outside a lookup table for some parameter values the random-parameter cases reach (the strict native build exposes it under ASan; the wasm never checks). Not fixed yet.
-Next: find the index (ASan build locally, gdb on the first hit, which parameter), then either clamp the value in our wrapper the way the JS clamps (if the JS wrapper's range allows it) or report the upstream read to the lead.
+CI of the first push (7ff4fc7e): GCC, clang, macOS (native hashes held), Windows (Marbles / Tides reported not run: no mods library there), wasm and Android passed; Linux sanitizers failed in `rt_core` and `modfx`:
+`AddressSanitizer: global-buffer-overflow ... READ of size 4 ... in marbles::LagProcessor::Process(float, float, float)`. FOUND AND FIXED (17 Nov):
+- Where: `eurorack/marbles/random/lag_processor.cc:79` (upstream, line of the unpatched file): `float warped_phase = Interpolate(lut_raised_cosine, phase, 256.0f);` stmlib's `Interpolate` reads `table[i]` and `table[i + 1]`
+  with i = int(phase * 256). `lut_raised_cosine` (marbles/resources.cc) has 257 entries (0..256). Index seen under ASan: phase = 1.0 exactly (bits 3f800000, smoothness 0.0799), i = 256, so the second read is `[257]`, one float past the table.
+- Trigger: the ramp phase reaching 1.0. `dsp/mods/mod_marbles.cc` (~line 157) deliberately feeds "one sample with every ramp at its top, so the first tick after the module is made already takes a new value"; a clock ramp that reaches its
+  top does the same. Neither the web's JS wrapper nor the wasm clamps anything: the wasm reads the bytes that follow the table in its linear memory. The fraction is 0 there, so the result is `table[256]` as long as the
+  neighbouring bytes are finite (a NaN / inf neighbour would give NaN: 0 * inf); in the wasm they are finite data, so its output does not depend on the read.
+- Fix: `native/core/third_party/prepare.sh` patches the prepared copy of that file (the same mechanism as the Clouds `lut_window[4097]` patch of U14): `phase >= 1.0f ? lut_raised_cosine[256] : Interpolate(...)`. The native build and the
+  CMake-built wasm compile that prepared copy. The web's mods.wasm is built by `dsp/mods/build.sh`, which has no such patch and is not rebuilt: the web app is unaffected.
+- Result: sanitizer build locally clean (rt_core, modfx_ref, modfx pass under ASan + UBSan); the normal build: all 42 Marbles / Tides renders and cases still inside -100 dB (worst `tides_mod1` -106.8), the native hashes
+  UNCHANGED (no row changed; the sanitizer build matches the same hashes), full ctest 104 of 104. No case had to be left out of the gate.
 
 Known, left as is (as before): `Mod::operator new` is malloc, so the "bad value: object made again" path allocates inside process (an allocation guard would flag it if a case reached it; none of rt_modfx's does);
 the JS's 64-object instance limit and 375-block wait are not carried over. The mods.wasm sample rate/seed handling follow the JS (Tides seed 0, Marbles `nextSeed()`).

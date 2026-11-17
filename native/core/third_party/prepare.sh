@@ -134,6 +134,21 @@ $SED -i 's#1.0f / (100.0f / 32000.0f)#1.0f / (100.0f / marbles_sample_rate_hz)#;
 T="$E/tides2/ramp/ramp_extractor.h"
 $SED -i 's#^  void Reset();#  void Reset();\n  void Restart() { reset_counter_ = 1; }#' "$T"
 grep -q 'void Restart()' "$T" || { echo "Tides ramp extractor patch failed" >&2; exit 1; }
+# Marbles LagProcessor::Process (found by AddressSanitizer in U21, 17 Nov): stmlib::Interpolate(lut_raised_cosine, phase, 256.0f) reads table[i] and table[i + 1]; the table has 257 entries and the phase is
+# exactly 1.0 (the wrapper's "every ramp at its top" first sample, and a clock ramp that reaches its top), so i = 256 and [257] is one float past the table. The fraction is then 0, so the result is
+# table[256] whatever finite number is read (mods.wasm has finite bytes after it). Now that value is returned without the read. The web's mods.wasm is built by dsp/mods/build.sh, which does not have this patch.
+python3 - "$E/marbles/random/lag_processor.cc" <<'PY'
+import sys
+p=sys.argv[1]; s=open(p).read()
+old="  float warped_phase = Interpolate(lut_raised_cosine, phase, 256.0f);\n"
+new="""  // Thunder: phase == 1 would read lut_raised_cosine[257], past the 257-entry table, times a fraction of 0 (prepare.sh)
+  float warped_phase = phase >= 1.0f
+      ? lut_raised_cosine[256]
+      : Interpolate(lut_raised_cosine, phase, 256.0f);
+"""
+if s.count(old)!=1: sys.exit("Marbles lag_processor.cc patch failed")
+open(p,'w').write(s.replace(old,new,1))
+PY
 # Cloud Seed: smaller delay buffers (tfx/build.sh)
 cp -r "$D/CloudSeedCore" "$O/cs"; rm -rf "$O/cs/.git"; C="$O/cs"
 $SED -i 's/DelayBufferSize = 192000 \* 2;/DelayBufferSize = 32768;/' "$C/DSP/ModulatedDelay.h" "$C/DSP/MultitapDelay.h"
