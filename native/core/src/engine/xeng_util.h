@@ -54,7 +54,7 @@ inline double tabget(const float* T, int n, int32_t i) { return (i >= 0 && i < n
 inline double dget(const double* T, int n, double i) { return (i == i && i >= 0 && i < n) ? T[(int)i] : std::nan(""); }
 inline double fget(const float* T, int n, double i) { return (i == i && i >= 0 && i < n) ? (double)T[(int)i] : std::nan(""); }
 
-// The scratch arena of the second set: zeroed, 16-aligned blocks that stay allocated for the next render of this thread (reset() makes them free again), so the same render a second time allocates nothing.
+// The scratch arena of the second set: zeroed blocks (offsets 16-aligned) that stay allocated for the next render of this thread (reset() makes them free again), so the same render a second time allocates nothing.
 // A block is never moved: pointers stay valid until the next reset(). A take above kArenaMax bytes gives nullptr (the engine then refuses the voice).
 constexpr size_t kArenaMax = (size_t)1 << 31;
 class XArena {

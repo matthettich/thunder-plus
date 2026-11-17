@@ -42,7 +42,7 @@ void* XArena::take(size_t bytes) {
   for (size_t i = 0; i < n_; i++) if (blk_[i].cap - blk_[i].used >= bytes) { void* p = blk_[i].p + blk_[i].used; blk_[i].used += bytes; std::memset(p, 0, bytes); return p; }
   if (n_ == cap_) { const size_t nc = cap_ ? cap_ * 2 : 16; Blk* nb = static_cast<Blk*>(std::malloc(nc * sizeof(Blk))); if (!nb) return nullptr; if (n_) std::memcpy(nb, blk_, n_ * sizeof(Blk)); std::free(blk_); blk_ = nb; cap_ = nc; }
   const size_t cap = bytes > ((size_t)1 << 20) ? bytes : ((size_t)1 << 20);
-  char* p = static_cast<char*>(std::aligned_alloc(16, cap)); if (!p) return nullptr;   // (cap is a multiple of 16)
+  char* p = static_cast<char*>(std::malloc(cap)); if (!p) return nullptr;   // (malloc gives at least 8-byte alignment, enough for the doubles; offsets inside a block are multiples of 16)
   blk_[n_++] = Blk{p, cap, bytes}; std::memset(p, 0, bytes); return p;
 }
 XArena& xarena() { static thread_local XArena a; return a; }
