@@ -120,6 +120,32 @@ for (const c of cases) {
   out.push(Object.assign({}, c, { hash: h }));
   if (outDir) { const b = Buffer.alloc(r.L.length * 8); Buffer.from(r.L.buffer).copy(b, 0); Buffer.from(r.R.buffer).copy(b, r.L.length * 4); fs.writeFileSync(path.join(outDir, c.name.replace(/[\/@]/g, '_') + '.f32'), b); }
 }
+// ---- the page's own renders (index.html wavesPre / wavesLiveRender), run as they are ----
+const HTML = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
+const a0 = HTML.indexOf('function wavesDoc(){'), a1 = HTML.indexOf('/* PWM sampler'); if (a0 < 0 || a1 < a0) throw new Error('waves-dump: index.html no longer has wavesDoc / wavesPre / wavesLiveRender where this tool looks');
+const PAGE_SRC = HTML.slice(a0, a1);
+function pageRender(kind, patch, args) {
+  const ctx = H.freezeClock(H.pageScope()); H.load(ctx, 'waves/waves-worklet.js'); ctx.WavesDSP.wasmInit({ dspModule: dspMod, tfxModule: tfxMod });
+  ctx.console = { warn() {}, log() {} };
+  vm.runInContext('var S = {bpm: 120}; const WV = { ready:false, doc:null, frame:null };' + PAGE_SRC + ';globalThis.__page = { wavesPre, wavesLiveRender, WV };', ctx);
+  const pg = ctx.__page; pg.WV.doc = patch; ctx.S.bpm = args.tempo || 120;
+  if (kind === 'pre') { const r = pg.wavesPre({ wBus: args.bus, tune: args.tune, fine: args.fine }, { tune: args.vtune, gate: args.gate }, args.dur, args.pA, args.ptau); return r ? r.data : null; }
+  return pg.wavesLiveRender({ bus: args.bus, tune: args.tune, level: args.level, drive: args.drive, vel: args.vel }, args.sr, args.hold, {}, args.bpm);
+}
+const REND = []; const EXACT_PATCHES = { basic: patchFor(D0.MODULES, 'vca', defaults(D0.MODULES.vca)), 'sub-delay': FACT['sub-delay'], 'seq-noise-param-cable': FACT['seq-noise-param-cable'], expr: FACT['expr'], 'additive-string-mixer': FACT['additive-string-mixer'], 'fm-lfo': { modules: FACT['fm-lfo-space'].modules.filter(m => m.type !== 'space').map(m => m), cables: [] } };
+EXACT_PATCHES['fm-lfo'] = { modules: [P('h', 'hostIn'), P('m', 'fm', { model: 2, index: .5 }), P('l', 'lfo', { rate: 3, depth: .4 }), P('e', 'adsr'), P('g', 'vca'), P('o', 'out', { slot: 3 })], cables: [C(['h', 'pitch'], ['m', 'pitch']), C(['h', 'gate'], ['e', 'gate']), C(['l', 'out'], ['m', 'index']), C(['m', 'out'], ['g', 'in']), C(['e', 'out'], ['g', 'cv']), C(['g', 'out'], ['o', 'in']), C(['g', 'out'], ['o', 'inR'])] };
+for (const [name, patch] of Object.entries(EXACT_PATCHES)) {
+  const bus = name === 'fm-lfo' ? 3 : 1;
+  for (const args of [{ bus, tune: 0, fine: 0, vtune: 0, gate: 250, dur: 1, pA: 0, ptau: .05, tempo: 120 }, { bus, tune: 7, fine: 13, vtune: -2, gate: 80, dur: 1.5, pA: 5, ptau: .03, tempo: 97 }]) {
+    const d = pageRender('pre', patch, args); REND.push({ name: `pre/${name}/${args.tune}`, kind: 'pre', patch, args, len: d ? d.length : 0, hash: d ? H.hashFloats([d]) : 'none' });
+  }
+  for (const args of [{ bus, tune: 0, level: 0, drive: 0, vel: 100, hold: 0.4, bpm: 120, sr: 48000 }, { bus, tune: -5, level: -6, drive: .6, vel: 60, hold: 0, bpm: 90, sr: 44100 }, { bus, tune: 3, level: 3, drive: 0, vel: 127, hold: 0.2, bpm: 120, sr: 96000 }]) {
+    const d = pageRender('live', patch, args); REND.push({ name: `live/${name}/${args.sr}/${args.tune}`, kind: 'live', patch, args, len: d.length, hash: H.hashFloats([d]) });
+  }
+}
+const RGOLD = path.join(ROOT, 'native/tests/golden/waves_render.json'), rtext = JSON.stringify(REND) + '\n';
+if (process.argv.includes('--golden')) fs.writeFileSync(RGOLD, rtext);
+else if (process.argv.includes('--check')) { if ((fs.existsSync(RGOLD) ? fs.readFileSync(RGOLD, 'utf8') : '') !== rtext) { console.error('waves_render.json differs from the JS'); process.exit(1); } }
 const text = JSON.stringify(out) + '\n';
 if (process.argv.includes('--golden')) { fs.writeFileSync(GOLD, text); console.log('wrote', GOLD, out.length, 'cases'); }
 else if (process.argv.includes('--check')) { const cur = fs.existsSync(GOLD) ? fs.readFileSync(GOLD, 'utf8') : ''; if (cur !== text) { console.error('waves_cases.json differs from the JS'); process.exit(1); } console.log('waves_cases.json matches the JS'); }

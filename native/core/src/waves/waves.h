@@ -173,8 +173,8 @@ class WavesEngine {
   float* inBuf(std::string_view id, int voice, std::string_view port);
   void gatherNow(std::string_view id, int voice);
   // ---- live: swap a whole prepared patch in (audio thread, at a block start); returns the one it replaced (the control thread deletes it) ----
-  std::unique_ptr<PatchImpl> swapPatch(std::unique_ptr<PatchImpl> p);
-  std::unique_ptr<PatchImpl> preparePatch(Json doc) const;   // off the audio thread: what loadPatch builds, without touching this engine's patch (the engine's voices, seed counter and sample rate are read)
+  PatchImpl* swapPatch(PatchImpl* p);          // takes p; returns the old one (free it with waves_free_patch on the control thread)
+  PatchImpl* preparePatch(Json doc) const;     // the caller owns it (waves_free_patch)   // off the audio thread: what loadPatch builds, without touching this engine's patch (the engine's voices, seed counter and sample rate are read)
   friend class PatchImpl;
   friend class WavesLive;
  private:
@@ -193,6 +193,52 @@ void waves_mixdown(const WavesEngine& e, float* L, float* R, int n);
 double waves_soft(double x);   // soft = x => { a = |x|; a < .8 ? x : sign(x) * (.8 + .2 * tanh((a - .8) / .2)) }
 // fbAdd (the feedback guard): dst[i] += guarded(b[i] * g) for the block
 void waves_fbadd(float* dst, const float* b, double g);
+
+
+// ---- the live runner (wavesl): the page's thunder-wlive, with sample-exact events ----------------------------------------------------------------------------------------------------------------
+// WHAT THE PAGE DOES (waves/waves-worklet.js, WavesLiveProc): four lanes (r rate, g gate, t counter, l legato, v velocity) arrive as AudioParam automation; per 128-frame block the first change in a lane
+// starts a note AT THE BLOCK'S START WHATEVER SAMPLE IT WAS ON (block-quantised, up to 127 samples late), a lane's pitch is moved once per block to the one of the lane's rate at the block's END, and the
+// engine runs one 128-frame block per quantum. Here an event lands on its own sample (the block is cut there) and the output is delayed by 127 samples, as U26 (docs/port/U26-NOTES.md): a block is rendered
+// only when no event not yet seen can cut it, so the output does not depend on the host's block size. The offline render of the same events (WavesLive::renderOffline) is the same loop with no queue.
+struct LiveEvent {
+  enum Kind : uint8_t { NoteOn, NoteOff, Pitch, Tempo, Level, Drive, Bus, Patch };
+  Kind kind = NoteOn; uint8_t lane = 0; bool legato = false; int64_t at = 0;   // at: the engine sample the event lands on
+  double a = 0, b = 0;   // NoteOn: a pitch (semitones from C4), b velocity 0..1; Pitch: a pitch; Tempo: a bpm; Level: a dB; Drive: a 0..1; Bus: a 1..8; Patch: a the mailbox slot preparePatch gave
+};
+constexpr int kLiveLanes = 4, kLiveLatency = 127, kLiveQueue = 4096, kLivePending = 4096, kLiveSlots = 8;
+void waves_free_patch(PatchImpl* p);   // deletes a patch preparePatch / swapPatch handed out (PatchImpl is private to engine.cpp)
+double waves_live_pitch(double tune, double rate);   // the page's pitch(r): 36 + tune + 12 log2 r - 60 (r floored at 1e-6)
+struct LiveStats { uint64_t blocks = 0, cutBlocks = 0, lateEvents = 0, droppedEvents = 0, refusedPatches = 0, failedBlocks = 0; };
+class WavesLive {
+ public:
+  WavesLive(double sampleRate, int maxVoices, Host* host = nullptr);
+  ~WavesLive();
+  WavesLive(const WavesLive&) = delete; WavesLive& operator=(const WavesLive&) = delete;
+  bool valid() const { return eng_.valid(); }
+  // control thread
+  bool post(const LiveEvent& e);                                // false: the queue is full (counted)
+  bool preparePatch(Json doc, int64_t at);                      // builds the patch off the audio thread and posts its swap at `at`; false: refused (the playing patch stays)
+  void collectRetired();                                        // frees the patches the audio thread gave back (and any prepared one that was never applied)
+  // audio thread: no allocation, no lock. n is any number of frames
+  void process(float* L, float* R, int n);
+  int latency() const { return kLiveLatency; }
+  const LiveStats& stats() const { return st_; }
+  int64_t enginePos() const { return pos_; }
+  WavesEngine& engine() { return eng_; }
+  // the same events rendered with no queue and no latency: `frames` samples, L / R resized. (control thread: allocates)
+  static bool renderOffline(double sr, int maxVoices, Host* host, const std::vector<LiveEvent>& events, const std::vector<Json>& patches, int64_t frames, std::vector<float>& L, std::vector<float>& R);
+ private:
+  void drain();
+  void apply(const LiveEvent& e);
+  void segment(int64_t end);
+  friend struct LiveOffline;
+  WavesEngine eng_; double sr_;
+  LiveEvent q_[kLiveQueue]; std::atomic<uint32_t> qh_{0}, qt_{0};
+  LiveEvent pend_[kLivePending]; int npend_ = 0;
+  std::atomic<PatchImpl*> slot_[kLiveSlots]; std::atomic<PatchImpl*> retired_[kLiveSlots];
+  int lane_[kLiveLanes]; int64_t pos_ = 0, hostPos_ = 0; double level_ = 0, drive_ = 0; int bus_ = 1;
+  float ringL_[512], ringR_[512]; LiveStats st_;
+};
 
 // ---- the web page's offline renders of a waves patch (index.html wavesPre / wavesLiveRender) ----
 struct WavesPreArgs { double dur, pA, ptau; double tune, vtune, fine, gate /* V.gate ms */; int bus; double tempo; };

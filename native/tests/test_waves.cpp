@@ -237,11 +237,68 @@ static void testPatchLoading() {
   { Doc d("{\"modules\":[" + mod("p", "phaser") + "," + mod("q", "phaser") + "],\"cables\":[" + cab("p", "out", "q", "in") + "]}"); WavesEngine e(48000, opts(4)); e.loadPatch(d.r); bool up = false; for (auto& c : e.cables()) if (c.aPort == "outR" && c.bPort == "inR") up = true; CHECK(up, "stereoUpCables adds Out R -> In R");
     Doc d2("{\"st2\":true,\"modules\":[" + mod("p", "phaser") + "," + mod("q", "phaser") + "],\"cables\":[" + cab("p", "out", "q", "in") + "]}"); e.loadPatch(d2.r); up = false; for (auto& c : e.cables()) if (c.aPort == "outR") up = true; CHECK(!up, "not when st2 is set"); }
 }
-static void testBehaviours() { testFeedback(); testVoices(); testSetOnly(); testPatchLoading(); }
+
+// ---- the live runner: the output equals the offline render of the same events, bit for bit, at every host block size ----
+static std::vector<LiveEvent> liveEvents(bool withSwap) {
+  std::vector<LiveEvent> ev; auto E = [&](LiveEvent::Kind k, int64_t at, int lane, double a, double b = 0, bool leg = false) { LiveEvent e; e.kind = k; e.at = at; e.lane = (uint8_t)lane; e.a = a; e.b = b; e.legato = leg; ev.push_back(e); };
+  E(LiveEvent::NoteOn, 0, 0, -12, .8); E(LiveEvent::NoteOn, 100, 1, -5, 1); E(LiveEvent::NoteOn, 129, 2, 0, .5); E(LiveEvent::Pitch, 300, 0, -11.5); E(LiveEvent::Pitch, 301, 0, -11);
+  E(LiveEvent::NoteOn, 777, 0, -7, 1, true); E(LiveEvent::NoteOff, 900, 1, 0); E(LiveEvent::Tempo, 1000, 0, 140); E(LiveEvent::Level, 1001, 0, -6); E(LiveEvent::Drive, 1500, 0, .5);
+  E(LiveEvent::NoteOn, 2000, 3, 4, .9); E(LiveEvent::NoteOn, 2000, 1, 7, .9); E(LiveEvent::NoteOff, 2500, 0, 0); E(LiveEvent::NoteOn, 2600, 0, -12, 1); E(LiveEvent::NoteOn, 2600, 0, -9, 1, true);
+  E(LiveEvent::Bus, 3000, 0, 1); E(LiveEvent::NoteOff, 3500, 3, 0); E(LiveEvent::NoteOn, 3600, 2, -20, 1);
+  if (withSwap) E(LiveEvent::Patch, 4000, 0, 0);
+  E(LiveEvent::NoteOn, 4100, 1, -3, 1); E(LiveEvent::NoteOff, 5000, 1, 0); E(LiveEvent::NoteOff, 5001, 2, 0);
+  return ev;
+}
+static void testLive() {
+  const std::string patchB = patch({mod("h", "hostIn"), mod("v", "vco", "{\"wave\":0}"), mod("f", "vcf", "{\"cutoff\":0.4}"), mod("e", "adsr"), mod("g", "vca"), mod("d", "delay", "{\"time\":0.2,\"mix\":0.3}"), mod("o", "out")},
+    {cab("h", "pitch", "v", "pitch"), cab("h", "gate", "e", "gate"), cab("v", "out", "f", "in"), cab("f", "out", "g", "in"), cab("e", "out", "g", "cv"), cab("g", "out", "d", "in"), cab("d", "out", "o", "in")});
+  Doc d0(kBasic), d1(patchB); const std::vector<Json> patches = {d1.r};
+  const std::vector<LiveEvent> ev = liveEvents(true); const int64_t N = 9000;
+  std::vector<float> oL, oR; Host h0; h0.setFixed(.3);
+  CHECK(WavesLive::renderOffline(48000, 8, &h0, ev, patches, N + 400, oL, oR), "offline render");
+  double en = 0; for (int64_t i = 0; i < N; i++) en += (double)oL[(size_t)i] * oL[(size_t)i]; CHECK(en > 0, "the live render sounds");
+  const std::vector<std::vector<int>> pats = {{128}, {64}, {17}, {1}, {1, 7, 128, 300, 5, 64, 2, 1000, 3, 129}, {256}, {4096}};
+  // the first patch (kBasic) is loaded into the live node through the same mailbox before anything plays: Patch event at 0 with a second slot
+  for (const auto& pat : pats) {
+    Host h; h.setFixed(.3); WavesLive live(48000, 8, &h);
+    // patch 0 = kBasic goes in at time 0 (slot 0), the swap to patchB is event 'Patch' at 4000 (slot 1)
+    CHECK(live.preparePatch(d0.r, 0), "prepare basic");
+    // the offline side has the same two patches in the same order: [kBasic, patchB], with a Patch(0) at 0 and Patch(1) at 4000
+    for (const LiveEvent& e : ev) { LiveEvent x = e; if (x.kind == LiveEvent::Patch) continue; live.post(x); }
+    CHECK(live.preparePatch(d1.r, 4000), "prepare B");
+    std::vector<float> L((size_t)(N + 400 + 127)), R(L.size()); size_t at = 0, k = 0;
+    while (at < L.size()) { const size_t n = std::min((size_t)pat[k++ % pat.size()], L.size() - at); live.process(&L[at], &R[at], (int)n); at += n; live.collectRetired(); }
+    // offline with the same event list: kBasic at 0, patchB at 4000 (slots 0 and 1)
+    std::vector<LiveEvent> ev2 = ev; for (LiveEvent& e : ev2) if (e.kind == LiveEvent::Patch) { e.a = 1; }
+    LiveEvent first; first.kind = LiveEvent::Patch; first.at = 0; first.a = 0; ev2.insert(ev2.begin(), first);
+    std::vector<Json> both = {d0.r, d1.r}; Host h2; h2.setFixed(.3); std::vector<float> oL2, oR2; CHECK(WavesLive::renderOffline(48000, 8, &h2, ev2, both, N + 400, oL2, oR2), "offline 2");
+    size_t bad = 0, first_bad = 0; for (int64_t i = 0; i < N + 400; i++) { const size_t li = (size_t)i + 127; if (std::memcmp(&L[li], &oL2[(size_t)i], 4) || std::memcmp(&R[li], &oR2[(size_t)i], 4)) { if (!bad) first_bad = (size_t)i; bad++; } }
+    CHECK(bad == 0, "live differs from the offline render at host blocks starting %d: %zu samples, first %zu", pat[0], bad, first_bad);
+    for (int i = 0; i < 127; i++) CHECK(L[(size_t)i] == 0, "silent during the latency");
+    CHECK(live.stats().lateEvents == 0, "no late events"); CHECK(live.stats().cutBlocks > 5, "blocks are cut at events");
+  }
+  (void)oL; (void)oR;
+}
+static void testBehaviours() { testFeedback(); testVoices(); testSetOnly(); testPatchLoading(); testLive(); }
+// ---- the page's own offline renders (golden/waves_render.json: index.html wavesPre / wavesLiveRender run in Node) ----
+static void runRender(const std::string& file) {
+  std::string txt; if (!readFile(file, &txt)) { CHECK(false, "cannot read %s", file.c_str()); return; }
+  JsonDoc d; if (!d.parse(txt)) { CHECK(false, "render golden parse"); return; }
+  Json all = d.root(); int ok = 0;
+  for (size_t i = 0; i < all.size(); i++) {
+    Json c = all.at(i), a = c.get("args"); const std::string name(c.str("name"), 0, 200); std::vector<float> out;
+    if (c.str("kind") == "pre") { WavesPreArgs p; p.dur = a.num("dur"); p.pA = a.num("pA"); p.ptau = a.num("ptau"); p.tune = a.num("tune"); p.vtune = a.num("vtune"); p.fine = a.num("fine"); p.gate = a.num("gate"); p.bus = (int)a.num("bus"); p.tempo = a.num("tempo"); double rate = 0; out = waves_pre_render(c.get("patch"), p, &rate); CHECK(rate == 48000, "rate"); }
+    else { WavesLiveRenderArgs p; p.bus = (int)a.num("bus"); p.tune = a.num("tune"); p.level = a.num("level"); p.drive = a.num("drive"); p.vel = a.num("vel"); p.hold = a.num("hold"); p.bpm = a.num("bpm"); p.sr = a.num("sr"); out = waves_live_render(c.get("patch"), p); }
+    const std::string h = out.empty() ? "none" : hex(fnv({&out})); const bool same = h == c.str("hash") && (int)out.size() == (int)c.num("len");
+    CHECK(same, "%s: %s (%zu samples) != %s (%d)", name.c_str(), h.c_str(), out.size(), std::string(c.str("hash")).c_str(), (int)c.num("len")); ok += same;
+  }
+  std::printf("page renders: %d of %zu equal the page's own (wavesPre / wavesLiveRender)\n", ok, all.size());
+}
 int main(int argc, char** argv) {
-  std::string golden, nativeFile, refDir, filter, dumpDir, writeNative;
-  for (int i = 1; i < argc; i++) { const std::string a = argv[i]; if (a == "--ref" && i + 1 < argc) refDir = argv[++i]; else if (a == "--native" && i + 1 < argc) nativeFile = argv[++i]; else if (a == "--write-native" && i + 1 < argc) writeNative = argv[++i]; else if (a == "--dump" && i + 1 < argc) dumpDir = argv[++i]; else if (a == "--only" && i + 1 < argc) filter = argv[++i]; else golden = a; }
+  std::string renderFile, golden, nativeFile, refDir, filter, dumpDir, writeNative;
+  for (int i = 1; i < argc; i++) { const std::string a = argv[i]; if (a == "--ref" && i + 1 < argc) refDir = argv[++i]; else if (a == "--render" && i + 1 < argc) renderFile = argv[++i]; else if (a == "--native" && i + 1 < argc) nativeFile = argv[++i]; else if (a == "--write-native" && i + 1 < argc) writeNative = argv[++i]; else if (a == "--dump" && i + 1 < argc) dumpDir = argv[++i]; else if (a == "--only" && i + 1 < argc) filter = argv[++i]; else golden = a; }
   testBehaviours();
+  if (!renderFile.empty()) runRender(renderFile);
   if (golden.empty()) { CHECK(false, "no golden file given"); }
   else runGolden(golden, nativeFile, refDir, filter, dumpDir, writeNative);
 

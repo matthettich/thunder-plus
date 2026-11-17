@@ -287,6 +287,7 @@ WavesEngine::WavesEngine(double sampleRate, const EngineOptions& o, Host* host)
   p_.reset(new PatchImpl(this, valid_ ? sr_ : 48000, voices_.max, host_));
 }
 WavesEngine::~WavesEngine() { p_.reset(); }
+void waves_free_patch(PatchImpl* p) { delete p; }
 void WavesEngine::dispose() { p_.reset(new PatchImpl(this, valid_ ? sr_ : 48000, voices_.max, host_)); cullDirty_ = true; }
 
 bool WavesEngine::addModule(std::string_view id, std::string_view type, Json o) {
@@ -378,25 +379,25 @@ static bool readDoc(Json doc, PatchImpl& P, int nVoices, Host*) {
   }
   return true;
 }
-std::unique_ptr<PatchImpl> WavesEngine::preparePatch(Json doc) const {
+PatchImpl* WavesEngine::preparePatch(Json doc) const {
   if (!valid_) return nullptr;
   std::unique_ptr<PatchImpl> P(new PatchImpl(const_cast<WavesEngine*>(this), sr_, voices_.max, host_));
   if (!readDoc(doc, *P, voices_.max, host_)) return nullptr;
   if (!P->sync(false)) return nullptr;
-  return P;
+  return P.release();
 }
-std::unique_ptr<PatchImpl> WavesEngine::swapPatch(std::unique_ptr<PatchImpl> n) {
-  std::unique_ptr<PatchImpl> old = std::move(p_);
+PatchImpl* WavesEngine::swapPatch(PatchImpl* n) {
+  PatchImpl* old = p_.release();
   if (old) old->destroyAll();                 // _reset(): the sequencers let their notes go
-  p_ = std::move(n); p_->eng = this; cullDirty_ = true;
+  p_.reset(n); p_->eng = this; cullDirty_ = true;
   if (p_->hasT) { if (p_->tTempo) transport_.tempo = p_->tpart.tempo; if (p_->tLpb) transport_.lpb = p_->tpart.lpb; if (p_->tTicks) transport_.ticks = p_->tpart.ticks;
     if (p_->tPpq) transport_.ppq = p_->tpart.ppq; if (p_->tStart) transport_.startN = p_->tpart.startN; if (p_->tPlaying) transport_.playing = p_->tpart.playing; }
   return old;
 }
 bool WavesEngine::loadPatch(Json doc) {
-  std::unique_ptr<PatchImpl> n = preparePatch(doc);
+  PatchImpl* n = preparePatch(doc);
   if (!n) { stats_.refusedPatches++; return false; }
-  std::unique_ptr<PatchImpl> old = swapPatch(std::move(n));
+  waves_free_patch(swapPatch(n));
   return true;
 }
 int WavesEngine::patchModules() const { return p_->nMods; }
