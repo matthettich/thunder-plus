@@ -1375,8 +1375,10 @@ body.mob .top .kitname{width:auto; flex:1 1 90px; min-width:64px; max-width:220p
 @media (max-width:380px){ body.mob .top #segView:has(button:nth-child(4)) button{font-size:10.5px} }
 /* TABS ON THEIR OWN ROW (14 Nov, owner: "Tracker | Synth | Chai" on the folded Fold, 3 tabs): Tracker, Synth and Chains / Waves are 150 px (4 tabs: 170) and the rest of the bar (LEFT, File, Settings, PLAY, CPU)
    is another ~220, more than a 320-460 px screen has: with 3 tabs the switch shrank and scrolled inside itself (Chains cut), with 4 the whole bar ran off the screen (the 360 / 412 check measured the tabs, not the bar).
-   Three or more tabs now take a full row of their own there and share it out, at the normal size; two tabs (Tracker | Synth) stay beside the rest as before. */
-@media (max-width:460px){ body.mob .top{flex-wrap:wrap}
+   Three or more tabs now take a full row of their own there and share it out, at the normal size; two tabs (Tracker | Synth) stay beside the rest as before.
+   (build 637, CodeRabbit on PR #199) That row now holds all the way up to 599 px, the whole folded range: since build 636 the BPM / LPB, ROWS and LEFT sit in the same bar, and measured at 461-520 px four tabs ran the bar to 522 px
+   (3 tabs, to 528 px at 521), at 521-581 px four tabs to 581 px; 520 was too short a bound. */
+@media (max-width:599px){ body.mob .top{flex-wrap:wrap}
   body.mob .top #segView:has(button:nth-child(3)){flex:1 1 100%; min-width:0; overflow:visible}
   body.mob .top #segView:has(button:nth-child(3)) button{flex:1 1 auto; padding-inline:6px!important; letter-spacing:.02em; font-size:var(--fs-3)} }
 body.mob .top .brand{flex-shrink:1; min-width:0; overflow:hidden}
@@ -26008,7 +26010,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 636;
+const BUILD = 637;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD + (location.pathname.includes('/beta/') ? ' · beta' : '');
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -36294,6 +36296,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [637, '16 Nov', ['Folded phone with Chains and Waves shown: the Tracker / Synth / Waves / Chains tabs no longer push the bar past the screen edge on a screen 461 to 599 px wide; the tabs have their own row there, as on the narrower screens.']],
   [636, '16 Nov', ['Folded phone, Tracker: BPM, LPB, ROWS and the time left (LEFT) moved up into the top bar, right of the CPU meter, so the line under the tabs is gone and the phrase gets the room. Tap and type work as before; the tick dots are a thin strip under BPM / LPB']],
   [635, '16 Nov', ['Wavetable layers: with Bend fully negative the sound could drop out (a bad sample reached the voice); fixed']],
   [634, '16 Nov', ['Bottom panel: the MOD section now sits before the effects (FX), and its title bar takes the skin like the other sections (it was drawn black in the terminal-style skins, IDM among them)']],
