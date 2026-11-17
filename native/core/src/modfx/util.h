@@ -30,12 +30,18 @@ inline double jmod(double a, double b) { return std::fmod(a, b); }
 // A Float32Array read: an index outside the array is undefined in the JS and every sum with it NaN.
 inline double rdf(const float* b, int N, double i) { return i >= 0 && i < N && i == std::floor(i) ? (double)b[(int)i] : kNaN; }
 
+// PitchCorrect's missed-read counter: the JS's `++st.miss` is a Number that just keeps counting (`> 2` is all that is asked of it); an int here would overflow (UB) after 2^31 control blocks
+// (about 66 days on). It saturates at a cap far above 2: voiced comes out the same, the counter has no other reader. (Hardening, 17 Nov, B1-7.)
+constexpr int kMissCap = 1 << 20;
+inline int missInc(int m) { return m < kMissCap ? m + 1 : m; }
+
 // ---- sinT: the 4096-point float32 table with linear interpolation -----------------------------------------------------------------------
 constexpr int kTS = 4096;
 extern const float* const kSin;   // kSin[0..kTS]
 inline double sinT(double p) {
   p -= std::floor(p);
   const double x = p * kTS; const int32_t i = i32(x);
+  if (i >= kTS) return kNaN;   // p - floor(p) == 1 (a tiny negative p rounds to it): the JS reads SIN[4097], undefined, and its sum is NaN; never a read past the table's 4097 entries
   return (double)kSin[i] + ((double)kSin[i + 1] - (double)kSin[i]) * (x - i);
 }
 

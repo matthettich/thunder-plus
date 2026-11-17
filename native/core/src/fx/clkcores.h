@@ -29,6 +29,9 @@ struct ClkSpb {
   explicit ClkSpb(double sr) : spb(sr / 2) {}
 };
 double clk_spb(ClkSpb& o, const float* bp, int bpn, int n);
+// FlexCore's 5-tuplet slot table read: `o.q === 5 ? FlexCore.K.tup[j] : j`'s `K.tup[j]` for q == 5. K.tup is [0, 0, 1, 2, 3]; an index outside it (j = -1 when the position is a hair below a
+// beat boundary, or NaN) reads `undefined` in the JS and the sum that follows is NaN for that sample: the same here, never a read outside the table (hardening, 17 Nov; HARDENING-NOTES.md).
+double flex_tup_slot(double j);
 
 // ---- Flex ------------------------------------------------------------------------------------------------------------------------------
 struct FlexDp { double pat = 0, mix = 0, xf = 0, wait = 0; };   // the slot's mapped parameters p[0..3]

@@ -149,7 +149,7 @@ static uint32_t engineHash(const Def& d, int set, const ModfxEngineGolden& G, st
   for (int b = 0; b < BL; b++) {
     for (int k = 0; k < d.nin; k++) { const bool fed = (!std::strcmp(d.in[k].name, "in") && hasIn) || (!std::strcmp(d.in[k].name, "inR") && hasInR);
       for (int i = 0; i < 128; i++) inb[k][i] = fed ? (float)(0.0 + (double)sig[(size_t)b * 128 + i]) : 0.0f; }   // trackIn's out into the zeroed input (0 + x: a -0 becomes +0)
-    m->process(io, c);
+    m->run(io, c);
     for (int i = 0; i < 128; i++) {
       const float a = d.nout > 0 ? outb[0][i] : 0.f, bb = d.nout > 1 ? outb[1][i] : a;   // chainOut: the first output into In, the second into In R (else In plays on both sides)
       L[(size_t)b * 128 + i] = (float)(0.0 + (double)(float)(0.0 + (double)a) * 1.0); R[(size_t)b * 128 + i] = (float)(0.0 + (double)(float)(0.0 + (double)bb) * 1.0);
@@ -308,7 +308,7 @@ static Res runCase(const std::string& dir, const ModfxCaseGolden& G) {
     c.block = (int)sizes.at((size_t)b).asNum();
     for (int k = 0; k < d->nin; k++) std::memcpy(inb[k], I.data() + ((size_t)b * d->nin + k) * 128, 512);
     if (keyed) for (int i = 0; i < 128; i++) gKeyBuf[i] = (float)(.7 * (double)inb[0][127 - i]);
-    m->process(io, c);
+    m->run(io, c);
     for (int k = 0; k < d->nout; k++) std::memcpy(&out[((size_t)b * d->nout + k) * 128], outb[k], 512);
   }
   R.ran = true; R.n = (long)outN; bool exact = true;

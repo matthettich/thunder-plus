@@ -547,7 +547,7 @@ static int run_modfx() {
         for (int k = 0; k < kMaxPorts; k++) { io.linked[k] = ((b / 50 + k) % 3) != 0; for (int i = 0; i < kBlock; i++) in[k][i] = b < 1100 ? (float)(rnd() * 1.6 - .8) : 0.f; }
         for (int k = 0; k < d.np; k++) { const ParamDef& q = d.params[k]; p[k] = b < 200 ? q.def : q.mn + (q.mx - q.mn) * rnd(); }
         c.block = (b % 7 == 0) ? 1 + (b * 13) % 127 : kBlock; c.full = (b % 5) != 0; c.tempo = 60 + (b / 100) * 20; c.startN = (double)(b / 400); c.playing = (b % 9) != 0;
-        mod->process(io, c); blocks++; }
+        mod->run(io, c); blocks++; }
     }
   }
   std::printf("rt_modfx ok: %d modules x 3 sample rates, %ld blocks under the allocation guard\n", count(), blocks); return 0;

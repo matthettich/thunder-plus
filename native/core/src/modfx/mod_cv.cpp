@@ -513,7 +513,7 @@ class PitchTrk : public Module {
     if (++k_ >= 4 && n_ >= N) {
       k_ = 0;
       const double rs = sr / 4, W = 320, tMin = jmax(2, std::floor(rs / jmax(P[5], P[4] + 1))), tMax = jmin(d_.n - 2, std::ceil(rs / jmax(20, P[4])));
-      const int o = (int)jmod(w_ - W - tMax - 1 + N * 2, N); double run = 0; int best = -1;
+      const int o = i32(jmod(w_ - W - tMax - 1 + N * 2, N)); double run = 0; int best = -1;   // NaN when P[4] is NaN: tMax is NaN, the loop below does not run (t <= NaN) and `o` is never read; i32 gives 0, not (int)NaN
       d_[0] = 1;
       for (int t = 1; t <= tMax; t++) {
         double s = 0; for (int j = 0; j < 320; j++) { const double q = (double)buf_[(o + j) % N] - (double)buf_[(o + j + t) % N]; s += q * q; }

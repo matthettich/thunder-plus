@@ -28,6 +28,14 @@ void eng_fx_from_json(EngFx& f, Json j) {
   num(j, "bits", f.bits); num(j, "rate", f.rate); num(j, "noise", f.noise); num(j, "color", f.color); num(j, "follow", f.follow); num(j, "dry", f.dry); num(j, "wet", f.wet);
   num(j, "note", f.note); num(j, "chord", f.chord); num(j, "decay", f.decay); num(j, "bright", f.bright); num(j, "mode", f.mode); num(j, "spread", f.spread); num(j, "mix", f.mix);
   num(j, "time", f.time); num(j, "fb", f.fb); num(j, "pitch", f.pitch); num(j, "pitch2", f.pitch2); num(j, "tone", f.tone); num(j, "size", f.size); num(j, "wow", f.wow);
+  // JSON null is not undefined (hardening, 17 Nov; HARDENING-NOTES.md, B1-4): JSON.stringify writes null for a NaN, so a saved null reaches the JS as `null`, and `null` is 0 in every sum (3 + null * 4 = 3: a valid tail)
+  // where undefined is NaN. A key that is absent stays NaN (undefined). For the pitch effects: time, fb, tone, mix and mode are only ever summed, multiplied, compared (<, >) or `| 0`'d in PitchFxCore / its tail, where null is
+  // exactly 0, so they become 0. size is `f.size != null ? f.size : 0.6` for the core (null and undefined both give 0.6: NaN here already does) but 0 in the tail, so it keeps NaN and a flag. pitch keeps NaN: PitchFxCore
+  // tests `p.pitch !== 0` in Time-Reverse mode, where null is not 0 (not made equal here: said in the notes).
+  f.sizeNull = j.get("size").isNull();
+  if (f.kind == EngFx::Kind::PitchDelay || f.kind == EngFx::Kind::PitchReverb) {
+    if (j.get("time").isNull()) f.time = 0; if (j.get("fb").isNull()) f.fb = 0; if (j.get("tone").isNull()) f.tone = 0; if (j.get("mix").isNull()) f.mix = 0; if (j.get("mode").isNull()) f.mode = 0;
+  }
 }
 
 bool eng_voice_from_json(EngVoice& V, Json v, Json layers, Json fx) {

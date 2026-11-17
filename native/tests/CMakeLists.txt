@@ -326,6 +326,14 @@ if(NOT MSVC)
   target_compile_options(test_hostile PRIVATE -Wall -Wextra)
 endif()
 add_test(NAME hostile COMMAND test_hostile)
+# Hardening (17 Nov): the small UB / unchecked-assumption items of REVIEW-16NOV.md B1 / B3 (docs/port/HARDENING-NOTES.md), one test each; meant for the sanitizer build.
+add_executable(test_hardening test_hardening.cpp)
+target_link_libraries(test_hardening PRIVATE thunder_core)
+target_include_directories(test_hardening PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../core/src ${CMAKE_CURRENT_SOURCE_DIR})
+if(NOT MSVC)
+  target_compile_options(test_hardening PRIVATE -Wall -Wextra)
+endif()
+add_test(NAME hardening COMMAND test_hardening)
 # U11: the master processor (master-worklet.js) against the worklet itself (tools/master-dump.mjs, a Node vm: 54 cases incl. tests/golden/master.json's 18).
 add_executable(test_master test_master.cpp)
 target_link_libraries(test_master PRIVATE thunder_core)
@@ -446,10 +454,11 @@ endif()
 
 # U19: thunder_core is built with -fno-rtti, where -fsanitize=undefined drops its vptr check by itself. test_modfx and rt_harness call the virtual
 # process() / destructor of modfx::Module objects made inside the core, so their vptr check (built with RTTI) finds no typeinfo, reports "invalid vptr"
-# and its type cache frees memory inside the guarded callback. The check cannot work across an -fno-rtti library: it is off for these two only, as in the core.
+# and its type cache frees memory inside the guarded callback. The check cannot work across an -fno-rtti library: it is off for these (and test_hardening, which calls run()) only, as in the core.
 if(THUNDER_SANITIZE AND NOT MSVC)
   target_compile_options(test_modfx PRIVATE -fno-sanitize=vptr)
   target_compile_options(rt_harness PRIVATE -fno-sanitize=vptr)
+  target_compile_options(test_hardening PRIVATE -fno-sanitize=vptr)
 endif()
 
 # D4: U15 end to end: ELECTRO with Flex / Step gate / Retrigger and their tracker commands through SongRenderer (Mixer + FxBank) against the real JS in Node

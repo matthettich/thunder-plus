@@ -56,6 +56,8 @@ double hh(double a, double b, double c) {
 
 }  // namespace
 
+double flex_tup_slot(double j) { return j >= 0 && j <= 4 && j == std::floor(j) ? kTup[(int)j] : std::numeric_limits<double>::quiet_NaN(); }
+
 // ---- clkSpb ----------------------------------------------------------------------------------------------------------------------------
 double clk_spb(ClkSpb& o, const float* bp, int bpn, int n) {
   if (!bp || bpn < 2 || n < 2) return o.spb;
@@ -129,7 +131,7 @@ double FlexCore::ext(int k, double p, double bar) {
           r = src * G + (rv ? G - u : u); } } break;
       case PK_swing: { const double C = o.C, c = cs(p, C), u = (p - c) / C, h = 0.5 + o.a;
         r = c + C * (u < h ? u * 0.5 / h : 0.5 + (u - h) * 0.5 / (1 - h)); } break;
-      case PK_tup: { const double C = o.C, c = cs(p, C), u = (p - c) / C, j = js_min(o.q - 1, std::floor(u * o.q + 1e-9)), sj = o.q == 5 ? kTup[(int)j] : j;   // FLX CHECK 2: the downbeat doubles and 2-4 land late, as a quintuplet does
+      case PK_tup: { const double C = o.C, c = cs(p, C), u = (p - c) / C, j = js_min(o.q - 1, std::floor(u * o.q + 1e-9)), sj = o.q == 5 ? flex_tup_slot(j) : j;   // FLX CHECK 2: the downbeat doubles and 2-4 land late, as a quintuplet does
         r = c + C * (sj / 4 + (u - j / o.q)); } break;
       case PK_drunk: { const double s = std::floor(p * 4); r = p - hh((double)(i32(bar) & 3), s, 41) * 0.06; } break;
       case PK_lag: r = mod(p, 1) >= 0.5 ? p - 1.0 / 16 : p; break;
