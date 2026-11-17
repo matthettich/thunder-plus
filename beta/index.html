@@ -3834,7 +3834,7 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
 <script src="pump/synth/pump-synth-engine.js?v=10"></script>
 <!-- …PUMP (23 Oct 2026): the pump mastering plugins' parameter tables and presets (generated in matthettich/pump by
      wasm/build.sh); pump/pump.wasm is their DSP, fetched by the wasm loader. -->
-<script src="pump/pump-meta.js?v=6"></script>
+<script src="pump/pump-meta.js?v=7"></script>
 <script>
 /* ===ENGINE START=== */
 // The platform's own modifier in hints and tips (U15): ⌘ on a Mac / iPad, Ctrl elsewhere. (MACK, further down, is the same test.)
@@ -18581,7 +18581,7 @@ $('midiKeysSel').addEventListener('change', e => { releaseKeys(); midi.keys = +e
 moPorts(); miPorts();
 
 /* ---------- Plaits loader ---------- */
-const WASM_DSP = 'waves/dsp/thunder-dsp.wasm', WASM_TFX = 'waves/dsp/tfx.wasm', PUMP_WASM = 'pump/pump.wasm?v=6';
+const WASM_DSP = 'waves/dsp/thunder-dsp.wasm', WASM_TFX = 'waves/dsp/tfx.wasm', PUMP_WASM = 'pump/pump.wasm?v=7';
 // Each wasm is decoded and compiled once and shared: the synth here, the waves engine and the render Worker.
 let plFailed = false;
 (async () => {
@@ -26010,7 +26010,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 637;
+const BUILD = 638;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD + (location.pathname.includes('/beta/') ? ' · beta' : '');
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -36296,6 +36296,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [638, '16 Nov', ['pump is now the newest version (the one the native apps use). MASTER has a RESONANCE stage: it gently calms narrow, ringing peaks before everything else, off until you switch it on, with its own AMOUNT. With it off MASTER sounds exactly as before, but it now delays the sound by 4096 more samples (about 85 ms); renders and LATENCY COMP count it, so timing still lines up. STRIP reports more to its meters']],
   [637, '16 Nov', ['Folded phone with Chains and Waves shown: the Tracker / Synth / Waves / Chains tabs no longer push the bar past the screen edge on a screen 461 to 599 px wide; the tabs have their own row there, as on the narrower screens.']],
   [636, '16 Nov', ['Folded phone, Tracker: BPM, LPB, ROWS and the time left (LEFT) moved up into the top bar, right of the CPU meter, so the line under the tabs is gone and the phrase gets the room. Tap and type work as before; the tick dots are a thin strip under BPM / LPB']],
   [635, '16 Nov', ['Wavetable layers: with Bend fully negative the sound could drop out (a bad sample reached the voice); fixed']],
@@ -37703,7 +37704,7 @@ if (new URLSearchParams(location.search).has('seqtest')) window.__seqTest = {
 <script src="pump/ui/band.js?v=1"></script>
 <script src="pump/ui/wide.js?v=1"></script>
 <script src="pump/ui/heat.js?v=1"></script>
-<script src="pump/ui/master.js?v=2"></script>
+<script src="pump/ui/master.js?v=3"></script>
 <script src="pump/ui/gate.js?v=1"></script>
 <script src="pump/ui/tune.js?v=2"></script>
 <script src="pump/ui/chop.js?v=1"></script>
