@@ -497,3 +497,23 @@ if(NOT MSVC)
   target_compile_options(test_engine_xeng_fuzz PRIVATE -Wall -Wextra)
 endif()
 add_test(NAME engine_xeng_fuzz COMMAND test_engine_xeng_fuzz ${CMAKE_CURRENT_SOURCE_DIR}/golden/xeng_ranges.json)
+
+# U29: the second set of rendered-only engines table (+ loaded wavetable), vector, scanned, resynth (+ its analysis) and bytebeat (core/src/engine/xeng_{table,vector,scanned,resynth,bytebeat}.cpp) against the real ENGINE block
+# (tools/engine-xeng2-dump.mjs) and beta's tests/golden/engines.json (the committed engine_xeng2_voices_golden.inc): the factory voices of these engines, SHA-256 bit-exact, and the direct cases against the committed Linux hashes.
+add_executable(test_engine_xeng2 test_engine_xeng2.cpp)
+target_link_libraries(test_engine_xeng2 PRIVATE thunder_core)
+target_include_directories(test_engine_xeng2 PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../core/src ${CMAKE_CURRENT_SOURCE_DIR})
+if(NOT MSVC)
+  target_compile_options(test_engine_xeng2 PRIVATE -Wall -Wextra)
+endif()
+if(NODE_EXE)
+  add_test(NAME engine_xeng2_ref COMMAND ${NODE_EXE} ${CMAKE_CURRENT_SOURCE_DIR}/../tools/engine-xeng2-dump.mjs ${CMAKE_CURRENT_BINARY_DIR}/engine-xeng2-ref)
+  set_tests_properties(engine_xeng2_ref PROPERTIES FIXTURES_SETUP engine_xeng2_ref)
+  add_test(NAME engine_xeng2 COMMAND test_engine_xeng2 ${CMAKE_CURRENT_BINARY_DIR}/engine-xeng2-ref ${CMAKE_CURRENT_SOURCE_DIR}/golden/engine_xeng2_voices.json)
+  set_tests_properties(engine_xeng2 PROPERTIES FIXTURES_REQUIRED engine_xeng2_ref)
+  if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    add_test(NAME engine_xeng2_golden_current COMMAND ${NODE_EXE} ${CMAKE_CURRENT_SOURCE_DIR}/../tools/engine-xeng2-dump.mjs --check)
+  endif()
+else()
+  add_test(NAME engine_xeng2 COMMAND test_engine_xeng2)   # no directory: prints FAIL and exits 1
+endif()

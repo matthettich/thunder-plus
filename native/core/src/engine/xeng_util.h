@@ -4,6 +4,7 @@
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <string>
 
 #include "engine/layers.h"
 #include "engine/xeng.h"
@@ -45,6 +46,35 @@ size_t finish(float* out, size_t N, double level, double drive, double sr, doubl
 // The peak / level / drive pass alone (the engines that mix their own tail in between: Modal, Swarm, Drift use the same lines inline)
 inline double peak_of(const float* out, size_t N) { double pk = 0; for (size_t i = 0; i < N; i++) pk = mx(pk, jabs((double)out[i])); return pk; }
 void level_drive(float* out, size_t N, double level, double drive, double scale);   // lv = Math.pow(10, (level || 0) / 20) * scale, then the tanh drive: scale is (pk > 0 ? 0.8 / pk : 1), Tone's is 0.5
+
+// ---- U29 -----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+inline double cl3(double v, double a, double b) { return v < a ? a : v > b ? b : v; }   // the engines' `cl = (v, a, b) => v < a ? a : v > b ? b : v` (NaN passes through)
+// A typed array read: a read outside the array is `undefined` in the JS and the arithmetic round it gives NaN.
+inline double tabget(const float* T, int n, int32_t i) { return (i >= 0 && i < n) ? (double)T[i] : std::nan(""); }
+inline double dget(const double* T, int n, double i) { return (i == i && i >= 0 && i < n) ? T[(int)i] : std::nan(""); }
+inline double fget(const float* T, int n, double i) { return (i == i && i >= 0 && i < n) ? (double)T[(int)i] : std::nan(""); }
+
+// The scratch arena of the second set: zeroed, 16-aligned blocks that stay allocated for the next render of this thread (reset() makes them free again), so the same render a second time allocates nothing.
+// A block is never moved: pointers stay valid until the next reset(). A take above kArenaMax bytes gives nullptr (the engine then refuses the voice).
+constexpr size_t kArenaMax = (size_t)1 << 31;
+class XArena {
+ public:
+  XArena() = default; XArena(const XArena&) = delete; XArena& operator=(const XArena&) = delete;
+  ~XArena() { release(); }
+  void reset();
+  void release();
+  void* take(size_t bytes);
+  template <class T> T* get(size_t n) { if (n > kArenaMax / sizeof(T)) return nullptr; return static_cast<T*>(take(n * sizeof(T))); }
+ private:
+  struct Blk { char* p; size_t cap, used; };
+  Blk* blk_ = nullptr; size_t n_ = 0, cap_ = 0;
+};
+XArena& xarena();   // the calling thread's
+
+// SpecUtil (index.html): the in-place radix-2 FFT (re / im of length n, a power of two; inv = the e^{+i} kernel, unscaled; twiddles cached per thread), and its base64 reader.
+void spec_fft(double* re, double* im, int n, bool inv);
+// SpecUtil.unb64: the string with everything outside A-Za-z0-9+/ removed, decoded; the bytes are taken from `ar`, their count in *n (nullptr from the arena when it is out of room)
+uint8_t* spec_unb64(XArena& ar, const std::string& s, size_t* n);
 }  // namespace xe
 }  // namespace thunder
 #endif
