@@ -62,7 +62,7 @@ int main(int argc, char** argv) {
   int clean = 0, slow = 0, refused = 0; double worst = 0; int worstRun = -1;
   for (int run = 0; run < runs; run++) {
     const auto t0 = std::chrono::steady_clock::now();
-    const double srs[] = {44100, 48000, 96000, 48000, 8000, 384000, 5, 1e9, NAN}; const double sr = srs[ri(9) < 6 ? ri(3) : ri(9)];
+    const double srs[] = {44100, 48000, 96000, 192000, 8000, 384000, 5, 1e9, NAN}; const double sr = srs[ri(9) < 6 ? ri(4) : ri(9)];
     EngineOptions o; o.maxVoices = ri(10) == 0 ? ri(200) - 20 : 1 + ri(8); o.hasSeed = ri(2); o.seed = rv(); o.transport.tempo = ri(8) == 0 ? rv() : 120; o.transport.playing = ri(2);
     o.quality = ri(5) == 0 ? Quality::Draft : Quality::Full;
     Host host; if (ri(2)) host.setFixed(rnd() / 4294967296.0); else host.setRandom(ri(2) ? Host::Rnd::Xorshift : Host::Rnd::Mulberry, rnd());

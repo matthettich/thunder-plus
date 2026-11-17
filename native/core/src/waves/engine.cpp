@@ -471,7 +471,7 @@ void WavesEngine::render(int frames) {
   if (cullDirty_) doCull();
   PatchImpl& G = *p_; WCtx& ctx = ctx_;
   ctx.sr = sr_; ctx.block = frames; ctx.full = quality_ == Quality::Full; ctx.draft = quality_ == Quality::Draft;
-  ctx.tempo = transport_.tempo; ctx.lpb = transport_.lpb; ctx.ticks = transport_.ticks; ctx.playing = transport_.playing; ctx.startN = transport_.startN;
+  ctx.tempo = transport_.tempo != transport_.tempo ? 120 : transport_.tempo < -1e5 ? -1e5 : transport_.tempo > 1e5 ? 1e5 : transport_.tempo;   /* hostile tempo (NaN, inf, huge) held to +-1e5 BPM: a beat clock that overflows breaks the step gate's index */ ctx.lpb = transport_.lpb; ctx.ticks = transport_.ticks; ctx.playing = transport_.playing; ctx.startN = transport_.startN;
   ctx.eng = this; ctx.notes = voices_.rows.data(); ctx.nNotes = (int)voices_.rows.size(); ctx.host = host_; ctx.fail = false;
   for (int k = 0; k < kBuses; k++) { ctx.busL[k] = busesL_ + k * kBlock; ctx.busR[k] = busesR_ + k * kBlock; }
   const bool meter = telemetryOn_, only = only_;
