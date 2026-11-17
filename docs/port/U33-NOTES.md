@@ -42,3 +42,21 @@ For the lead: the web's CPU cost of `-fno-associative-math` was measured (TODAY.
 3. **Allocation in the render path: `SynthBase::run` (`wasm/pump_synth.cpp`) sorts the queued events with `std::stable_sort`, whose temporary buffer is an allocation.** A block WITH an event allocates once (measured in `rt_pumpsynth`: 1 `operator new` per block with a note off, all 13 instruments); a block without events allocates nothing (13 instruments x 600 blocks under the guard). For the live lanes: a block with a note on / off is a real-time violation until that sort is replaced (an insertion sort on the 512-entry queue, which is already nearly sorted).
 4. FREEZE's built-in sources are built on the first `process()` that needs each (`source()` in `pump_synth.cpp`: about a second of work, a static cache of `shared_ptr`s): `PumpSynth::builtins()` builds all seven on the control thread (the harness and the fuzz call it).
 5. (From U03, unchanged) `wasm/pump_synth.cpp` defines `struct std::mutex` in `namespace std` for wasm.
+
+## What the live lanes need (not in this PR; the lead's wiring)
+The host is provisional: `PumpSynth::midi(frame, status, d1, d2)` queues events with a sample offset, `process(n)` renders a block with no allocation after construction (rt_harness guard: 13 instruments x 600 blocks, 0 allocations), output via `PumpSynth::out(ch)`.
+- Lane to MIDI mapping, pitch bend range +-24 semitones (COIL +-12), `LIVE_FIXED` / `FIXED` overrides (x0x `seq_mode`=0, life `mode`=0 are already applied), trim 1.5 for POLY, the page's TMAP engine targets, `psyn_tempo` for WOB, sleeping of silent lanes, the `psFallback` path.
+- One audio thread only. `make` / `destroy` run on the control thread but share pump's process-global handle table: they race with `process` unless serialised (needs a U18-style gate before wiring).
+- Allocation: one `operator new` per instrument on the first block that carries an event (`std::stable_sort` in pump's `SynthBase::run`). Nothing else allocates in the render path. Pre-reserve or replace the sort when the live path is wired.
+
+## What the LXR glue needs (unit U04, not started)
+`lxr/lxr-engine.js` + `lxr_wasm.c` (GPL, a separable module) must be hosted behind the same event/block interface. Not attempted here.
+
+## Not in this PR
+LXR glue; live lanes wiring into the sequencer/mixer; wiring `pmono` etc. into `xeng_render_voice` / the JSON voice reader (`xeng_kind` still maps them to Other); pad effects (padFx) on rendered pump synths.
+
+## Mutation checks
+Mutating `pumpsynth.cpp` is caught by the gate: round->trunc on Tune (18 cases fail), trim, fade length, quiet threshold, the white key table and the offAt floor.
+
+## Fuzz totals (ASan+UBSan, `FUZZ_COMBINED=10000 FUZZ_DIRECT=2000 FUZZ_SEED=7`)
+10000 combined-field renders of `xeng_psyn` (1657 refused by design, 1548 one-sample, 0 non-finite; 784,458,712 samples; slowest 22.26 s under the 30 s per-render limit) and 2000 direct `PumpSynth` scenarios (60,057 events, 0 non-finite blocks): no crash, no timeout, nothing written past a bound. ctest runs a small count (`pumpsynth_fuzz`).
