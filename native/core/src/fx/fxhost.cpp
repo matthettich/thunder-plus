@@ -1,5 +1,6 @@
 // See fxhost.h. Each block of code keeps the worklet's statements and arithmetic order (index.html TFX_SRC: set, p1, slotRun, slotNap, tcChunks).
 #include "fx/fxhost.h"
+#include "fx/pumpfx.h"
 
 #include <algorithm>
 #include <cmath>
@@ -97,6 +98,16 @@ static void setClkDp(Fx* fx, int t, const double* q) {
   else static_cast<RetrigFx*>(fx)->dp = RtDp{q[0], q[1], q[2], q[3], q[4], q[5]};
 }
 
+// U18: a pump effect in a slot. Like ClkFx it is an Fx so that plan, commit and retirement own, keep and delete it as they do the others; process() is never called (pumpRun is).
+// The plugin instance and the slot's state are the PumpSlot; deleting it frees the plugin (pump_free) on the control thread.
+struct PumpHold : Fx {
+  PumpSlot* ps;
+  explicit PumpHold(PumpSlot* p) : ps(p) {}
+  ~PumpHold() override { delete ps; }
+  void process(float*, float*, int) override {}
+};
+static Fx* make_pump(const FxEntry& e, double sr) { PumpSlot* p = PumpSlot::make(e, sr); return p ? new PumpHold(p) : nullptr; }
+
 static void copyKey(char* d, const char* s) { std::snprintf(d, kFxKey, "%s", s); }
 static bool keyHas(const char* k, const char* needle) { return std::strstr(k, needle) != nullptr; }
 
@@ -104,7 +115,9 @@ FxPlan::~FxPlan() {
   for (int i = 0; i < kFxSlots; i++) { delete fx_[i]; delete retired_[i]; }
 }
 
-FxHost::FxHost(double sr) : sr_(sr) {
+FxHost::FxHost(double sr) : sr_(sr), node_(sr) {
+  for (int i = 0; i < 128; i++) tapIdx_[i] = -1;
+  std::memset(zero_, 0, sizeof zero_); std::memset(rL_, 0, sizeof rL_); std::memset(rR_, 0, sizeof rR_);
   for (int i = 0; i < 11; i++) lanes_[i] = new AutoN<96>(-1);
   std::memset(Lb_, 0, sizeof Lb_); std::memset(Rb_, 0, sizeof Rb_); std::memset(cL_, 0, sizeof cL_); std::memset(cR_, 0, sizeof cR_); std::memset(dL_, 0, sizeof dL_); std::memset(dR_, 0, sizeof dR_);
 }
@@ -119,12 +132,18 @@ uint32_t FxHost::laneDropped() const { uint32_t n = 0; for (int i = 0; i < 11; i
 FxPlan* FxHost::plan(const FxEntry* e, int n) {
   FxPlan* pl = new FxPlan; bool used[kFxSlots] = {false}; Fx* nf[kFxSlots] = {nullptr};
   for (int i = 0; i < n && pl->n_ < kFxSlots; i++) {
-    if (e[i].t < 0 || (e[i].t > 33 && !fx_is_core(e[i].t))) continue;   // not an effect hosted here: left out (the sound passes)
+    const bool pmp = fx_is_pump(e[i].t);
+    if (e[i].t < 0 || (e[i].t > 33 && !fx_is_core(e[i].t) && !pmp)) continue;   // not an effect hosted here: left out (the sound passes)
     int j = -1; for (int k = 0; k < nCtl_; k++) if (!used[k] && std::strcmp(ctl_[k].key, e[i].key) == 0) { j = k; break; }
     const int w = pl->n_;
     if (j >= 0) { used[j] = true; pl->reuse_[w] = true; nf[w] = ctlFx_[j]; }
-    else { Fx* f; if (fx_is_core(e[i].t)) f = make_clk(e[i].t, sr_); else { ModuleState ms(&rand_, &stmRng_, &daisySeed_); f = make_fx(e[i].t, (float)sr_); } if (!f) continue; pl->fx_[w] = f; nf[w] = f; }
+    else { Fx* f; if (pmp) f = make_pump(e[i], sr_); else if (fx_is_core(e[i].t)) f = make_clk(e[i].t, sr_); else { ModuleState ms(&rand_, &stmRng_, &daisySeed_); f = make_fx(e[i].t, (float)sr_); } if (!f) continue; pl->fx_[w] = f; nf[w] = f; }
     pl->e_[w] = e[i]; pl->n_++;
+    if (pmp) {   // LATENCY COMP counts pumpLatencyOf(slot): a temporary instance with the slot's values; the one measured for the same values before is kept
+      FxEntry& c = pl->e_[w]; const int jj = j;
+      if (jj >= 0 && ctl_[jj].npv == c.npv && ctl_[jj].bi == c.bi && std::memcmp(ctl_[jj].pv, c.pv, sizeof(float) * (size_t)c.npv) == 0) c.lat = ctl_[jj].lat;
+      else { const int l = PumpSlot::probeLatency(c, sr_); c.lat = l < 0 ? 0 : l; }
+    }
   }
   nCtl_ = pl->n_; for (int i = 0; i < nCtl_; i++) { ctl_[i] = pl->e_[i]; ctlFx_[i] = nf[i]; }
   return pl;
@@ -152,8 +171,16 @@ static void rvMix(double m, double* dry, double* wet) {   // rvMix(m): [cos(a), 
   const double a = (m < 0 ? 0 : m > 1 ? 1 : m) * kJsPi / 2, s = std::sin(a);
   *dry = std::cos(a); *wet = s * s;
 }
-void FxHost::applyEntry(Slot& s, const FxEntry& c) {
+void FxHost::applyEntry(Slot& s, const FxEntry& c, bool fresh) {
   copyKey(s.key, c.key); s.t = c.t; s.slot = c.slot; s.on = c.on;
+  if (s.pu) {   // a pump slot (set(): `s.pv = c.pv; s.dirty = true`, a new slot has just been staged and is not dirty)
+    PumpSlot& u = *s.pu; s.nn = keyHas(c.key, "pcrush");   // (slotNap: "vinyl|pcrush" always run: CRUSH speaks up on its own after a pause)
+    if (!fresh) {
+      if (u.hasRd && !u.pch) { if (u.npv != c.npv) u.pch = true; else for (int j = 0; j < u.npv; j++) if (u.pv[j] != c.pv[j]) { u.pch = true; break; } }   // values moved while resting: wake
+      u.npv = c.npv < kPumpMaxParams ? c.npv : kPumpMaxParams; std::memcpy(u.pv, c.pv, sizeof(float) * (size_t)u.npv); u.dirty = true;
+    }
+    u.sck = c.sck; u.cr = c.cr; u.clk = c.clk; return;
+  }
   s.wi = c.t == 8 ? 4 : c.t == 20 ? 7 : c.t == 24 ? 3 : -1;   // REVERB MIX: Galactic, Space and Room run fully wet; the blend is rvMix
   s.nn = keyHas(c.key, "vinyl") || keyHas(c.key, "pcrush");
   double pp[12]; for (int i = 0; i < 12; i++) pp[i] = c.p[i];
@@ -167,12 +194,14 @@ void FxHost::commit(FxPlan* pl) {
   for (int i = 0; i < pl->n_; i++) {
     const FxEntry& c = pl->e_[i]; Slot s;
     if (pl->reuse_[i]) { int j = -1; for (int k = 0; k < nSlots_; k++) if (!used[k] && std::strcmp(slots_[k].key, c.key) == 0) { j = k; break; } if (j < 0) continue; used[j] = true; s = slots_[j]; }
-    else { s.fx = pl->fx_[i]; pl->fx_[i] = nullptr; s.slot = c.slot; }
-    applyEntry(s, c); nc[nn] = c; next[nn++] = s;
+    else { s.fx = pl->fx_[i]; pl->fx_[i] = nullptr; s.slot = c.slot; if (fx_is_pump(c.t)) s.pu = static_cast<PumpHold*>(s.fx)->ps; }
+    applyEntry(s, c, !pl->reuse_[i]); nc[nn] = c; next[nn++] = s;
   }
   pl->nRetired_ = 0; for (int k = 0; k < nSlots_; k++) if (!used[k]) pl->retired_[pl->nRetired_++] = slots_[k].fx;
   for (int i = 0; i < nn; i++) { slots_[i] = next[i]; chain_[i] = nc[i]; }
   nSlots_ = nn; nChain_ = nn; idle_ = 0; pl->committed_ = true;
+  nPump_ = 0; for (int i = 0; i < nn; i++) if (slots_[i].pu) nPump_++;
+  if (nPump_) { pumpSeen_ = true; PumpGate g(true); pumpOk_ = g.ok; pumpUp(); pumpOk_ = false; }   // set(): s.up of every pump slot at once
 }
 void FxHost::kill() { dead_flag_ = true; }
 
@@ -184,7 +213,7 @@ void FxHost::psetAt(double at, int slot, const double* p12) {
 void FxHost::applyPset(int slot, const double* p12) {   // onmessage {pset}: the chain's entry for the slot gets p, then set(chain) again
   for (int i = 0; i < nChain_; i++) if (chain_[i].slot == slot) for (int k = 0; k < 12; k++) chain_[i].p[k] = p12[k];
   for (int i = 0; i < nSlots_; i++) applyEntry(slots_[i], chain_[i]);
-  idle_ = 0;
+  pumpUp(); idle_ = 0;
 }
 void FxHost::lane(int k, double v, double at) { if (k >= 0 && k < 11) lanes_[k]->set(v, at); }
 void FxHost::reset(double at) { for (int k = 0; k < 11; k++) { lanes_[k]->cancel(at); lanes_[k]->set(-1, at); } }
@@ -216,6 +245,7 @@ void FxHost::runClk(Slot& s, bool feed, int n) {
 }
 void FxHost::slotRun(Slot& s, int n) {
   if (!s.fx) return;
+  if (s.pu) { pumpRun(s, n); return; }
   if (fx_is_core(s.t)) { runClk(s, false, n); return; }   // (a core slot runs its JS core)
   std::memcpy(cL_, Lb_, sizeof(float) * (size_t)n); std::memcpy(cR_, Rb_, sizeof(float) * (size_t)n);
   s.fx->process(Lb_, Rb_, n);
@@ -247,8 +277,9 @@ bool FxHost::process(float* L, float* R, int n, double t0, const float* bp, int 
   for (int k = 0; k < 11; k++) { lanes_[k]->prune(t0); swv_[k] = (float)lanes_[k]->at(t0); }   // the k-rate params, read once: the value at the block's start
   static const float kBpDefault = 0;   // the `bp` AudioParam with nothing connected: its default value, constant over the block
   if (!bp || bpn < 1) { bp = &kBpDefault; bpn = 1; }
-  if (n <= kFxBlock) return p1(L, R, n, t0, bp, bpn);
-  for (int a = 0; a < n; a += kFxBlock) if (!p1(L + a, R + a, std::min(kFxBlock, n - a), t0, bpn > 1 ? bp + a : bp, bpn > 1 ? std::min(kFxBlock, n - a) : 1)) return false;   // (tcChunks: an a-rate param is cut with the block, a constant one is handed whole)
+  if (n <= kFxBlock) { srcOff_ = 0; return p1(L, R, n, t0, bp, bpn); }
+  struct Off { int& o; ~Off() { o = 0; } } off{srcOff_};   // the sidechain sources are cut with the block, as the inputs of tcChunks
+  for (int a = 0; a < n; a += kFxBlock) if ((srcOff_ = a, !p1(L + a, R + a, std::min(kFxBlock, n - a), t0, bpn > 1 ? bp + a : bp, bpn > 1 ? std::min(kFxBlock, n - a) : 1))) return false;   // (tcChunks: an a-rate param is cut with the block, a constant one is handed whole)
   return true;
 }
 
@@ -258,35 +289,52 @@ bool FxHost::process(float* L, float* R, int n, double t0, const float* bp, int 
 int FxHost::clockedNeed() const {
   int ck = 0;
   for (int si = 0; si < nSlots_; si++) {
-    const Slot& s = slots_[si]; if (!fx_is_clocked(s.t) && !(s.t >= 100 && s.t <= 102)) continue;   // (the Vintage sampler, 103, asks nothing: the worklet's `c` is 0 for it)
-    const int c = s.t == 93 || (s.t >= 100 && s.t <= 102) ? 3 : 2;
+    const Slot& s = slots_[si]; if (!fx_is_clocked(s.t) && !(s.t >= 100 && s.t <= 102) && !(s.pu && s.pu->clk)) continue;   // (the Vintage sampler, 103, asks nothing: the worklet's `c` is 0 for it; a clocked pump effect: GATE, STUTTER, CHOP)
+    const int c = s.t == 93 || (s.t >= 100 && s.t <= 102) || s.pu ? 3 : 2;
     const float sv = s.slot >= 0 && s.slot < 8 ? swv_[s.slot] : -1.f;
-    const bool live = (sv < -0.5f ? s.on : sv > 0.5f) || s.g > 0;
+    const bool live = (sv < -0.5f ? s.on : sv > 0.5f) || (s.pu ? !s.pu->byp : s.g > 0);
     const int w = live ? c : s.t == 95 ? 1 : 0; if (w > ck) ck = w;
   }
   return ck;
 }
 
 bool FxHost::p1(float* oL, float* oR, int n, double t0, const float* bp, int bpn) {
+  // U18: this block's pump work happens inside the gate (fxpump.cpp, REAL-TIME RULES); while the control thread is making an instance the pump slots pass the sound
+  PumpGate gate(nPump_ > 0); pumpOk_ = nPump_ > 0 && gate.ok; if (nPump_ > 0 && !gate.ok) gated_++;
+  t0_ = t0; nPtelTmp_ = 0;
+  if (nqp_ > 0) { const double due = t0 + 64 / sr_; while (nqp_ > 0 && qp_[0].at <= due) { Qp q = qp_[0]; for (int i = 1; i < nqp_; i++) qp_[i - 1] = qp_[i]; nqp_--; applyPumpPset(q.slot, q.pv, q.n); } }   // FXV of a pump slot at its time
   if (nq_ > 0) { const double due = t0 + 64 / sr_; while (nq_ > 0 && q_[0].at <= due) { Q q = q_[0]; for (int i = 1; i < nq_; i++) q_[i - 1] = q_[i]; nq_--; applyPset(q.slot, q.p); } }   // THUNDER CORE: FXV at its time
   float* L = Lb_; float* R = Rb_;
   const bool rest = restAt_ > 0 && t0 >= restAt_;
   float ip = 0; bool bad = false;
   if (!rest) for (int k = 0; k < n; k++) { const float a = oL[k], b = oR[k], v = a < 0 ? -a : a, w = b < 0 ? -b : b; if (v > ip) ip = v; if (w > ip) ip = w; if (!(v < 8 && w < 8)) bad = true; }
   const float* swv = swv_;
+  if (pqn_) { const double old = t0 - 1; int k = 0; while (k < pqn_ && pq_[k].at < old) k++; if (k) { for (int i = k; i < pqn_; i++) pq_[i - k] = pq_[i]; pqn_ -= k; } if (pqn_) idle_ = 0; }   // CREATIVE: notes due wake it (stale ones are dropped)
   // the sleep. ck: see clockedNeed; a stopped clock is bp[0] < 0 or bp[last] < 0
   const int ck = clockedNeed();
-  if ((rest && t0 - restAt_ >= 10) || (ip < 1e-7 && (double)idle_ >= sr_ && (ck == 0 || (ck < 3 && (double)idle_ >= sr_ * 14 && (ck == 1 || !(bp[0] >= 0 && bp[bpn - 1] >= 0)))))) { std::memset(oL, 0, sizeof(float) * (size_t)n); std::memset(oR, 0, sizeof(float) * (size_t)n); asleep_ = true; return true; }
+  if ((rest && t0 - restAt_ >= 10) || (ip < 1e-7 && (double)idle_ >= sr_ && (ck == 0 || (ck < 3 && (double)idle_ >= sr_ * 14 && (ck == 1 || !(bp[0] >= 0 && bp[bpn - 1] >= 0)))))) { std::memset(oL, 0, sizeof(float) * (size_t)n); std::memset(oR, 0, sizeof(float) * (size_t)n); asleep_ = true; fr_ += n; if (fr_ >= sr_ / 2) fr_ = 0; return true; }
   asleep_ = false;
   if (!rest) { std::memcpy(L, oL, sizeof(float) * (size_t)n); std::memcpy(R, oR, sizeof(float) * (size_t)n); } else { std::memset(L, 0, sizeof(float) * (size_t)(n + 1)); std::memset(R, 0, sizeof(float) * (size_t)(n + 1)); }
   // A NaN or infinity reaching the effects hangs the tape delay for good: a loud but real sample (8 to 64) is clipped to +-8, the rest zeroed
   if (bad) for (int k = 0; k < n; k++) { const float a = L[k], b = R[k]; if (!(a > -8 && a < 8)) L[k] = a > -64 && a < 64 ? (a < 0 ? -8.f : 8.f) : 0.f; if (!(b > -8 && b < 8)) R[k] = b > -64 && b < 64 ? (b < 0 ? -8.f : 8.f) : 0.f; }
   for (int k = 0; k < n; k += 2) { L[k] = (float)((double)L[k] + 1e-18); L[k + 1] = (float)((double)L[k + 1] - 1e-18); R[k] = (float)((double)R[k] + 1e-18); R[k + 1] = (float)((double)R[k + 1] - 1e-18); }   // anti-denormal
   tr_.bp = bp; tr_.bpn = bpn; tr_.flx = (double)swv_[8]; tr_.gat = (double)swv_[9]; tr_.rtg = (double)swv_[10];   // tr: the clock and the FLX / GAT / RTG params
+  pumpClock(bp, bpn, n);   // the modules' / pump's transport: playing while the beat clock runs, at its tempo, and the song position of this block's start
+  const bool pqOn = pqn_ > 0;   // notes on their way to a pump effect: none of them naps
   for (int si = 0; si < nSlots_; si++) {
     Slot& s = slots_[si];
     const float sv = s.slot >= 0 && s.slot < 8 ? swv[s.slot] : -1.f;
     const int tg = (sv < -0.5f ? s.on : sv > 0.5f) ? 1 : 0;
+    if (s.pu) {   // PUMP: on / off is the plugin's own bypass (latency-matched, crossfaded), so the timing never jumps; METER just stops
+      if (!pumpOk_) continue;
+      PumpSlot& u = *s.pu; if (sv >= -0.5f) u.fxo = true;
+      if (!pumpRest(s, n, tg != 0, pqOn)) {
+        if (u.byp != !tg) { u.byp = !tg; u.dirty = true; s.zq = 0; s.zz = false; }
+        if (!(u.bi < 0 && u.byp)) { if (u.clk || pqOn) slotRun(s, n); else slotNap(s, n); }
+      }
+      if (lvl_ && tg && s.slot >= 0 && s.slot < 8) { const float a = pk(n); if (a > lvlP_[s.slot]) lvlP_[s.slot] = a; }
+      continue;
+    }
     if (!s.gset) { s.g = tg; s.gset = true; }
     tr_.sw = (double)sv;
     if (!tg && s.g <= 0) { if (s.t == 95) runClk(s, true, n); continue; }   // (a switched-off Flex is always fed: switching it on mid-bar already has the bar to play from)
@@ -305,13 +353,16 @@ bool FxHost::p1(float* oL, float* oR, int n, double t0, const float* bp, int bpn
   if (lvl_ && ++lvlN_ >= 12) { lvlN_ = 0; std::memcpy(lvlOut_, lvlP_, sizeof lvlP_); lvlReady_ = true; std::memset(lvlP_, 0, sizeof lvlP_); }
   if (tel_ && ++telN_ >= 12) { telN_ = 0; int no = 0;
     for (int si = 0; si < nSlots_; si++) { Slot& s = slots_[si];
+      if (s.pu) { pumpTelSlot(s, &no); continue; }   // PUMP: the dynamics display (COMP, LIMIT, BAND), METER / LIMIT loudness
       if (s.t == 7 || s.t == 26 || s.t == 28) {
         FxDyn& d = dynOut_[no++]; d.slot = s.slot; copyKey(d.key, s.key); const double a = (double)s.lip, b = (double)s.lop;
         d.v[0] = 0; d.v[1] = (float)(a > 1e-9 ? 20 * std::log10(a) : -180); d.v[2] = (float)(b > 1e-9 ? 20 * std::log10(b) : -180); s.lip = 0; s.lop = 0; } }
-    if (no) nDynOut_ = no; }
+    if (no) nDynOut_ = no;
+    if (nPtelTmp_) { for (int i = 0; i < nPtelTmp_; i++) ptelOut_[i] = ptelTmp_[i]; nPtelOut_ = nPtelTmp_; } }
   std::memcpy(oL, L, sizeof(float) * (size_t)n); std::memcpy(oR, R, sizeof(float) * (size_t)n);
   float op = 0; for (int k = 0; k < n; k++) { const float v = L[k] < 0 ? -L[k] : L[k], w = R[k] < 0 ? -R[k] : R[k]; if (v > op) op = v; if (w > op) op = w; }
   idle_ = ip < 1e-7 && op < 1e-6 ? idle_ + n : 0;
+  fr_ += n; if (fr_ >= sr_ / 2) { fr_ = 0; pumpReport(); }   // the worklet's half-second report: each pump slot's `up` again and its latency ({plat})
   return true;
 }
 

@@ -79,7 +79,7 @@ jobs:
   wasm:
     name: Core (wasm, wasi-sdk)
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 30
     env:
       WASI_SDK_VERSION: '25'
     steps:
@@ -124,6 +124,12 @@ jobs:
       # (build-wasm.sh above built them into the same folder), plus pump's own wasm/compare for the nine mastering effects.
       - name: Parity u03 (pump goldens through the CMake wasm)
         run: WASI_SDK="$PWD/wasi-sdk" PARITY_SKIP_BUILD=1 native/tools/parity.sh u03 "$RUNNER_TEMP/u02-wasm"
+      # U18 gate: the pump effects as slot kinds of the track-effect host against the real worklet running the pump.wasm that build-wasm.sh just built from the pin (-100 dB below each case's peak, the worst printed; the
+      # exact cases still exact; the native render's committed hashes). Needs acorn (fx-src.mjs cuts the worklet out of index.html). The native test build is made here too (c++ of the runner).
+      - name: acorn (the reference tools)
+        run: npm i --no-save --no-audit --no-fund acorn@8
+      - name: Parity u18 (pump slot kinds against the worklet with the pin-built pump.wasm)
+        run: PIN_WASM_DIR="$RUNNER_TEMP/u02-wasm" BUILD_DIR="$RUNNER_TEMP/u18-build" native/tools/parity.sh u18
       - uses: actions/upload-artifact@v4
         with:
           name: thunder_dsp-wasm-u02

@@ -56,7 +56,8 @@ void operator delete(void* p, std::size_t) noexcept { if (rt_depth && p) rt_viol
 void operator delete[](void* p, std::size_t) noexcept { if (rt_depth && p) rt_violation("operator delete[]"); std::free(p); }
 
 // malloc / free themselves (C code, std::vector's allocator on some platforms): glibc lets us wrap them.
-#if defined(__GLIBC__)
+// (Not under AddressSanitizer: it brings its own malloc / free / posix_memalign, and wrapping a part of them hands its memory to glibc: "free(): invalid size". The operator new / delete guards above stay.)
+#if defined(__GLIBC__) && !defined(__SANITIZE_ADDRESS__)
 extern "C" {
 void* __libc_malloc(size_t); void* __libc_calloc(size_t, size_t); void* __libc_realloc(void*, size_t); void __libc_free(void*);
 void* malloc(size_t n) { if (rt_depth) rt_violation("malloc"); return __libc_malloc(n); }
@@ -437,6 +438,68 @@ static int run_fxclk() {
   std::printf("rt_fxclk ok: %d blocks, Flex / Step gate / Retrigger under the allocation guard\n", nb); return 0;
 }
 
+
+// U18: the pump effects under the guard. Four hosts carry all 25 pump types (up to 8 slots each) and run: ON / OFF by chain and by FXO lanes, parameter changes of every kind
+// (a chain with other values: pump_commit; FXV: psetPump), the transport and notes of the creative effects, COMP's sidechain sources, telemetry, odd block sizes, the node's
+// sleep and rest, and a chain swap that retires slots. Everything that makes a pump instance (plan, delete) is outside the guard (the control thread). NOT here, because the JS
+// itself does it and it allocates (pump_free + pump_new in the audio thread): the wake of a slot that rested, and a plugin that put out garbage; audioRemakes() must be 0 for
+// this run, and rt_pump_remake below shows that those two DO allocate (accepted for now, spare instances are deferred to U31: the lead, 16 Nov; fxpump.cpp REAL-TIME RULES).
+static void pump_entry(thunder::FxEntry* e, int pt, int slot, bool on) {
+  using namespace thunder;
+  e->t = kPumpT0 + pt; e->slot = slot; e->on = on; e->bi = fx_pump_bypass(pt); e->cr = fx_pump_creative(pt); e->clk = fx_pump_clocked(pt); e->npv = 0;   // npv 0: pump's own defaults
+  std::snprintf(e->key, kFxKey, "%d:p%s", slot, fx_pump_key(pt));
+}
+static int run_pump() {
+  using namespace thunder;
+#ifndef THUNDER_HAVE_PUMP
+  std::printf("rt_pump: not run on this platform: no pump library\n");
+  return 0;
+#else
+  const int kH = 4; FxHost* H[kH]; FxPlan* swap[kH]; FxEntry e[kH][8]; int n[kH] = {0, 0, 0, 0}; int pts[kH][8];
+  for (int h = 0; h < kH; h++) H[h] = new FxHost(48000.0);
+  for (int pt = 0; pt < kPumpTypes; pt++) { const int h = pt % kH; pump_entry(&e[h][n[h]], pt, n[h], true); pts[h][n[h]] = pt; n[h]++; }   // 7, 6, 6, 6 slots
+  for (int h = 0; h < kH; h++) { FxPlan* p = H[h]->plan(e[h], n[h]); H[h]->commit(p); delete p; }
+  // the same chains with other values (every parameter at a wild value: pump clamps each to its own range) and the first slot left out, made ahead of time
+  static FxEntry w[kH][8]; uint32_t sd = 11; auto rnd = [&]() { sd = sd * 1664525u + 1013904223u; return (float)(sd >> 8) / 16777216.f - 0.5f; };
+  for (int h = 0; h < kH; h++) { for (int i = 0; i < n[h]; i++) { w[h][i] = e[h][i]; w[h][i].on = true; w[h][i].npv = 24; for (int k = 0; k < w[h][i].npv; k++) w[h][i].pv[k] = rnd() * 200.f; if (fx_pump_bypass(pts[h][i]) >= 0 && fx_pump_bypass(pts[h][i]) < w[h][i].npv) w[h][i].pv[fx_pump_bypass(pts[h][i])] = 0; }
+    swap[h] = H[h]->plan(w[h], n[h]); }
+  FxPlan* shrink[kH]; for (int h = 0; h < kH; h++) shrink[h] = H[h]->plan(e[h] + 1, n[h] - 1);
+  std::vector<float> L(4096), R(4096), bp(4096), tap(4096), snd(4096); uint32_t sd2 = 7; auto rn = [&]() { sd2 = sd2 * 1664525u + 1013904223u; return (float)(sd2 >> 8) / 16777216.f - 0.5f; };
+  const float* taps[1] = {tap.data()}; const float* sends[1] = {snd.data()}; const int tm[1] = {3};
+  double t = 0, beat = 0; int nb = 0; float lv[8]; FxDyn dy[8]; PumpTelOut pt8[8]; PumpLat pl[8];
+  for (int h = 0; h < kH; h++) { H[h]->setLevels(true); H[h]->setTelemetry(true); H[h]->setTapMap(tm, 1); }
+  { rt_guard g;
+    for (int b = 0; b < 2400; b++) {
+      const int nn = (b % 7 == 0) ? 1 + (b * 37) % 700 : 128;
+      for (int h = 0; h < kH; h++) {
+        for (int i = 0; i < nn; i++) { L[(size_t)i] = b < 2000 ? rn() * 0.5f : 0.f; R[(size_t)i] = b < 2000 ? rn() * 0.5f : 0.f; tap[(size_t)i] = rn(); snd[(size_t)i] = rn(); bp[(size_t)i] = b % 400 < 300 ? (float)std::fmod(beat + i * 2.0 / 48000, 16.0) : -1.f; }
+        if (h == 0 && b == 100) { for (int s = 0; s < 8; s++) H[h]->lane(s, s % 2, t); }                      // FXO: half the slots forced off (an FXO slot never rests, so no wake) and half forced on
+        if (h == 0 && b == 300) H[h]->lane(0, -1, t);
+        if (h == 1 && b == 500) { float pv[24]; for (int k = 0; k < 24; k++) pv[k] = rn() * 100; H[h]->psetPump(t + 0.001, 0, pv, 24); }   // FXV
+        if (h == 2 && b == 200) H[h]->pmidi(1, t + 0.01, 0x90, 60, 100);
+        if (h == 2 && b == 210) H[h]->pmidi(1, t + 0.05, 0x80, 60, 0);
+        if (h == 3 && b == 600) H[h]->setRest(true, t); if (h == 3 && b == 800) H[h]->setRest(false, t);
+        if (b == 1000) H[h]->commit(swap[h]); if (b == 1400) H[h]->commit(shrink[h]);
+        H[h]->setSources(taps, 1, sends, 1);
+        H[h]->process(L.data(), R.data(), nn, t, bp.data(), b % 11 == 0 ? 1 : nn);
+        H[h]->popLevels(lv); H[h]->popDyn(dy, 8); H[h]->popPumpTel(pt8, 8); H[h]->popLatencies(pl, 8);
+      }
+      t += nn / 48000.0; beat += nn * 2.0 / 48000; if (beat >= 16) beat -= 16; nb++; }
+  }
+  // the wake of a rested slot DOES allocate in the audio thread (pump_free + pump_new, as in the JS): shown here outside the guard so that the claim in fxpump.cpp is a measured one
+  { FxHost* W = new FxHost(48000.0); FxEntry we[1]; pump_entry(&we[0], 3, 0, false); FxPlan* p = W->plan(we, 1); W->commit(p); delete p;
+    std::vector<float> a(128), c(128); for (int b = 0; b < 400; b++) { for (int i = 0; i < 128; i++) a[(size_t)i] = c[(size_t)i] = rn() * 0.3f; W->process(a.data(), c.data(), 128, b * 128 / 48000.0, bp.data(), 128); }
+    we[0].on = true; p = W->plan(we, 1); W->commit(p); delete p;
+    for (int b = 400; b < 410; b++) { for (int i = 0; i < 128; i++) a[(size_t)i] = c[(size_t)i] = rn() * 0.3f; W->process(a.data(), c.data(), 128, b * 128 / 48000.0, bp.data(), 128); }
+    const unsigned wk = W->audioRemakes(); delete W;
+    if (!wk) { std::printf("rt_pump note: no wake remake seen for an OFF slot switched on (the rest did not start in this run)\n"); } else std::printf("rt_pump: a rested slot switched on made %u instance(s) in the audio thread (as the JS does; not under the guard)\n", wk); }
+  uint32_t remakes = 0, gated = 0; for (int h = 0; h < kH; h++) { remakes += H[h]->audioRemakes(); gated += H[h]->pumpGated(); }
+  for (int h = 0; h < kH; h++) { delete swap[h]; delete shrink[h]; delete H[h]; }
+  if (remakes || gated) { std::printf("rt_pump FAIL: %u audio-thread instance remakes, %u gated blocks in a run that should have none\n", remakes, gated); return 1; }
+  std::printf("rt_pump ok: %d blocks x %d hosts, all %d pump types under the allocation guard (values moved, FXO, FXV, notes, sidechain, telemetry, rest, chain swaps)\n", nb, kH, kPumpTypes); return 0;
+#endif
+}
+
 // U16: Beat grains, Beat scramble, Glitch sequencer and the Vintage sampler under the guard: the rings are made in plan(), the grain list is a fixed array, process() takes the beat
 // clock and the lanes, odd block sizes, a clock that stops and jumps (the grains free-run), a chain swap that retires three of them (deleted outside the guard with the plan).
 static int run_fxidm() {
@@ -620,6 +683,7 @@ int main(int argc, char** argv) {
   if (int r = run_chain()) return r;
   if (int r = run_fx()) return r;
   if (int r = run_fxclk()) return r;
+  if (int r = run_pump()) return r;
   if (int r = run_fxidm()) return r;
   if (int r = run_modfx()) return r;
   if (int r = run_fxu17()) return r;

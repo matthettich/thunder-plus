@@ -8,6 +8,7 @@
 #   native/tools/parity.sh u11     the master processor: ctest master (the worklet's output, meters and golden hashes), rt_core (parity-u11.sh)
 #   native/tools/parity.sh u12     the master EQ biquads, the safety limiter, the master order in the renderer (parity-u12.sh)
 #   native/tools/parity.sh u13     meters and events out (parity-u13.sh)
+#   native/tools/parity.sh u18     the pump effects as slot kinds of the host: 80 cases against the real worklet with the shipped and a pin-built pump.wasm, latency, rt_core (parity-u18.sh)
 #   native/tools/parity.sh u15     the tempo-locked effects (Flex, Step gate, Retrigger): ctest libm, fxclk (73 cases bit-exact vs the real worklet), golden + table current, rt_core (parity-u15.sh)
 #   native/tools/parity.sh u16     the JS-only effects Beat grains / scramble / Glitch / Vintage sampler: ctest libm, fxidm (242 cases bit-exact vs the real worklet), golden + table current, rt_core (parity-u16.sh)
 #   native/tools/parity.sh u20     MODFX modules B (Spectral, Extreme stretch, Convolution reverb + the shared FFT): libm (atan2, hypot), modfx (the engine hashes and the direct cases of the three bit-exact vs the real worklet), golden current, rt_core (parity-u20.sh)
@@ -39,6 +40,7 @@ case "$unit" in
   u11) shift; exec sh "$here/parity-u11.sh" u11 "$@" ;;   # the master processor (parity-u11.sh)
   u12) shift; exec sh "$here/parity-u12.sh" u12 "$@" ;;   # the master EQ + safety limiter + OUT order (parity-u12.sh)
   u13) shift; exec sh "$here/parity-u13.sh" u13 "$@" ;;
+  u18) shift; exec sh "$here/parity-u18.sh" u18 "$@" ;;   # the pump effects as slot kinds of the track-effect host (parity-u18.sh)
   u15) shift; exec sh "$here/parity-u15.sh" u15 "$@" ;;   # the tempo-locked effects (parity-u15.sh)
   u16) shift; exec sh "$here/parity-u16.sh" u16 "$@" ;;   # the Grains / Scramble / Glitch / VSamp effects (parity-u16.sh)
   u20) shift; exec sh "$here/parity-u20.sh" u20 "$@" ;;   # MODFX modules B (parity-u20.sh)

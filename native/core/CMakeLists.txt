@@ -1,5 +1,5 @@
 # thunder_core: the one C++ engine library (N0: a test core only; it is thrown away in N1).
-add_library(thunder_core STATIC src/core.cpp src/rt/auto.cpp src/rt/jsmath.cpp src/rt/fdlibm.cpp src/rt/json.cpp src/song/song.cpp src/seq/seq.cpp src/voice/voice.cpp src/mix/mix.cpp src/mix/pdc.cpp src/mix/delay.cpp src/mix/beat.cpp src/master/master.cpp src/master/eq.cpp src/master/chain.cpp src/meter/meter.cpp src/fx/fxhost.cpp src/fx/clkcores.cpp src/fx/idmcores.cpp src/modfx/modfx.cpp src/modfx/mod_stereo.cpp src/modfx/mod_reverbs.cpp src/modfx/mod_cv.cpp src/modfx/mod_filters.cpp src/modfx/mod_delays.cpp src/modfx/mod_misc.cpp src/modfx/mod_clk.cpp src/modfx/mod_basic.cpp src/modfx/mod_voice.cpp src/modfx/mod_gen.cpp src/modfx/bbexpr.cpp src/fx/fxmap.cpp src/fx/fxbank.cpp src/render/render.cpp src/fx/u17cores.cpp src/engine/engine.cpp src/engine/engine_json.cpp)
+add_library(thunder_core STATIC src/core.cpp src/rt/auto.cpp src/rt/jsmath.cpp src/rt/fdlibm.cpp src/rt/json.cpp src/song/song.cpp src/seq/seq.cpp src/voice/voice.cpp src/mix/mix.cpp src/mix/pdc.cpp src/mix/delay.cpp src/mix/beat.cpp src/master/master.cpp src/master/eq.cpp src/master/chain.cpp src/meter/meter.cpp src/fx/fxhost.cpp src/fx/clkcores.cpp src/fx/idmcores.cpp src/modfx/modfx.cpp src/modfx/mod_stereo.cpp src/modfx/mod_reverbs.cpp src/modfx/mod_cv.cpp src/modfx/mod_filters.cpp src/modfx/mod_delays.cpp src/modfx/mod_misc.cpp src/modfx/mod_clk.cpp src/modfx/mod_basic.cpp src/modfx/mod_voice.cpp src/modfx/mod_gen.cpp src/modfx/bbexpr.cpp src/fx/fxmap.cpp src/fx/fxbank.cpp src/fx/fxpump.cpp src/render/render.cpp src/fx/u17cores.cpp src/engine/engine.cpp src/engine/engine_json.cpp)
 target_include_directories(thunder_core PUBLIC include)
 target_sources(thunder_core PRIVATE src/modfx/fftr.cpp src/modfx/mod_spectral.cpp src/modfx/mod_convolve.cpp)   # U20
 target_sources(thunder_core PRIVATE src/engine/layer_u23.cpp src/engine/layer_click.cpp src/engine/layer_wavetable.cpp src/engine/layer_pd.cpp src/engine/layer_chip.cpp src/engine/layer_supersaw.cpp src/engine/layer_pwm.cpp src/engine/layer_sample.cpp src/engine/layer_vint.cpp src/engine/layer_grains.cpp)   # U23
@@ -39,6 +39,11 @@ endif()
 option(THUNDER_WITH_PUMP "Build the pump effects and synths (thunder_pump, thunder_pump_synth) from the pinned matthettich/pump checkout (needs git + network at configure)" ON)
 if(THUNDER_WITH_PUMP)
   add_subdirectory(pump)
+endif()
+# U18: the track-effect host calls pump's pump_* entry points directly (fx/fxpump.cpp), no wasm. (MSVC: pump is not built, so a pump slot is left out of the chain.)
+if(TARGET thunder_pump)
+  target_link_libraries(thunder_core PUBLIC thunder_pump)
+  target_compile_definitions(thunder_core PUBLIC THUNDER_HAVE_PUMP=1)
 endif()
 # SAME BITS AS THE WEB COPY (U05): no fused multiply-add. JavaScript never fuses a * b + c; GCC and clang do by default
 # where the CPU has the instruction (every arm64 phone and Mac), which changes the last bit of sums like the automation

@@ -29,7 +29,7 @@ class FxBank {
   // The sequencer's events. now: the block's start time. true: taken.
   bool event(const SeqEvent& e, double now, const Mixer& m);
   void reset(int track, double t, double now);      // fxreset
-  // LATENCY COMP: one record per track slot (latency 0: the page counts only pump effects) for pdc_plan; returns the count (<= max)
+  // LATENCY COMP: one record per track slot (the pump slots' measured latency: the page counts only pump effects) for pdc_plan; returns the count (<= max)
   int pdcSlots(PdcSlot* out, int max) const;
   void setBpm(double bpm) { bpm_ = bpm; }
   uint32_t pendDropped() const { return pendDropped_; }
