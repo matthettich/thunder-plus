@@ -129,11 +129,14 @@ class PatchImpl {
   std::vector<float> fbS = std::vector<float>(kBlock);
   // scratch of compile()
   std::vector<int> indeg, q; std::vector<std::vector<int>> adj; std::vector<char> inOrder;
+  std::vector<char> cullKeep; std::vector<int> cullStack;   // doCull's scratch, sized by compile() (the audio thread allocates nothing)
 
   ModNode* find(const std::string& id) const { auto it = byId.find(id); return it == byId.end() ? nullptr : it->second; }
   void destroySlot(ModNode& m, Slot& s) {
     if (s.armed && s.mod && (m.wi->flags & kWF_PlaysNotes)) static_cast<WModule*>(s.mod.get())->destroy(eng);
+    s.armed = false;
   }
+  void letGo() { for (auto& m : mods) for (Slot& s : m->slots) destroySlot(*m, s); }   // _reset() on the audio thread (a live swap): the destroy hooks only, nothing is freed here
   void destroyNodeSlots(ModNode& m) { for (Slot& s : m.slots) destroySlot(m, s); instances -= (int)m.slots.size(); weight -= (int)m.slots.size() * m.weight; m.slots.clear(); m.slotsMade = false; }
   void destroyAll() { for (auto& m : mods) destroyNodeSlots(*m); }
 
@@ -158,7 +161,7 @@ class PatchImpl {
       for (int nx : adj[(size_t)k]) if (--indeg[(size_t)nx] == 0) q.push_back(nx);
     }
     for (size_t i = 0; i < n; i++) if (!inOrder[i]) order.push_back(mods[i].get());
-    ver++;
+    ver++; cullKeep.assign(n, 0); cullStack.clear(); cullStack.reserve(2 * n + 2);
     for (ModNode* m : order) {
       const int s = m->wi->scope;
       if (s == 2) m->poly = true; else if (s == 0) m->poly = false;
@@ -388,7 +391,7 @@ PatchImpl* WavesEngine::preparePatch(Json doc) const {
 }
 PatchImpl* WavesEngine::swapPatch(PatchImpl* n) {
   PatchImpl* old = p_.release();
-  if (old) old->destroyAll();                 // _reset(): the sequencers let their notes go
+  if (old) old->letGo();                      // _reset(): the sequencers let their notes go (the old patch is freed by the control thread)
   p_.reset(n); p_->eng = this; cullDirty_ = true;
   if (p_->hasT) { if (p_->tTempo) transport_.tempo = p_->tpart.tempo; if (p_->tLpb) transport_.lpb = p_->tpart.lpb; if (p_->tTicks) transport_.ticks = p_->tpart.ticks;
     if (p_->tPpq) transport_.ppq = p_->tpart.ppq; if (p_->tStart) transport_.startN = p_->tpart.startN; if (p_->tPlaying) transport_.playing = p_->tpart.playing; }
@@ -442,7 +445,7 @@ bool WavesEngine::handleMessage(Json m) {
 void WavesEngine::doCull() {
   cullDirty_ = false; only_ = false; if (!onlyBus_) return;
   PatchImpl& G = *p_;
-  std::vector<char> keep(G.mods.size(), 0); std::vector<int> stack;
+  std::vector<char>& keep = G.cullKeep; std::vector<int>& stack = G.cullStack; std::fill(keep.begin(), keep.end(), (char)0); stack.clear();
   for (auto& up : G.mods) {
     ModNode& m = *up;
     if (m.wi->flags & kWF_PlaysNotes) { keep[(size_t)m.idx] = 1; stack.push_back(m.idx); }

@@ -279,7 +279,16 @@ static void testLive() {
   }
   (void)oL; (void)oR;
 }
-static void testBehaviours() { testFeedback(); testVoices(); testSetOnly(); testPatchLoading(); testLive(); }
+static void testSortOrder() {
+  // Kahn's algorithm as the JS has it: a queue, started with the modules nothing feeds in patch order; a module joins the queue when its last feeder has run; a cycle is left over and appended in patch order
+  { Doc d("{\"modules\":[" + mod("a", "atten") + "," + mod("b", "atten") + "," + mod("c", "atten") + "],\"cables\":[" + cab("b", "out", "a", "in") + "]}"); WavesEngine e(48000, opts(2)); e.loadPatch(d.r);
+    CHECK((e.order() == std::vector<std::string>{"b", "c", "a"}), "tie-break: the queue starts in patch order, a joins after c"); }
+  { Doc d("{\"modules\":[" + mod("a", "atten") + "," + mod("b", "atten") + "," + mod("c", "atten") + "," + mod("d", "atten") + "],\"cables\":[" + cab("a", "out", "b", "in") + "," + cab("b", "out", "a", "in") + "," + cab("d", "out", "c", "in") + "]}"); WavesEngine e(48000, opts(2)); e.loadPatch(d.r);
+    CHECK((e.order() == std::vector<std::string>{"d", "c", "a", "b"}), "the cycle a<->b is left over and appended in patch order after d, c"); }
+  { Doc d("{\"modules\":[" + mod("a", "atten") + "," + mod("b", "atten") + "],\"cables\":[" + cab("a", "out", "b", "in") + "," + cab("b", "out", "a", "in", true) + "]}"); WavesEngine e(48000, opts(2)); e.loadPatch(d.r);
+    CHECK((e.order() == std::vector<std::string>{"a", "b"}), "a feedback cable does not decide who runs first"); }
+}
+static void testBehaviours() { testSortOrder(); testFeedback(); testVoices(); testSetOnly(); testPatchLoading(); testLive(); }
 // ---- the page's own offline renders (golden/waves_render.json: index.html wavesPre / wavesLiveRender run in Node) ----
 static void runRender(const std::string& file) {
   std::string txt; if (!readFile(file, &txt)) { CHECK(false, "cannot read %s", file.c_str()); return; }
