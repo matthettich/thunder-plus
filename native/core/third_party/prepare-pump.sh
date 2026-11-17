@@ -20,3 +20,19 @@ new="            if (subPh >= 1.0) subPh -= std::floor(subPh);   // Thunder (pre
 if s.count(old)!=1: sys.exit("WobEngine.hpp patch failed (the sub phase wrap is not there exactly once)")
 open(p,'w').write(s.replace(old,new,1))
 PY
+
+# BandWaves (common/dsp/Synth.hpp, read()) and GLOSS's DigiWaves (plugins/gloss/GlossEngine.hpp, read()): both index a table with `(int)(p * n)` and expect the phase p in [0, 1). Every caller keeps its phase there with
+# `ph += inc; if (ph >= 1.0) ph -= 1.0;`, which wraps ONCE: with inc >= 1 (a pitch at or above the sample rate: MIDI note 127 at 8000 Hz; GLOSS's voice / supersaw / digital machines at 8000 Hz and Tune +67 reproduce it) ph stays
+# at or above 1 and the read goes past the end of the table: BandWaves' tables hold n + 3 floats (259 to 2051; one table per octave), DigiWaves' tables kN + 1. Heap over-read (found by AddressSanitizer in the fuzz; in the web wasm
+# the same read lands in linear memory: no trap for a small overshoot, garbage in the sample). The patch wraps the phase into [0, 1) at the top of read() (floor; NaN and infinity read position 0): for p already in [0, 1) the code
+# does nothing, so every sound that did not read outside a table is unchanged.
+python3 - "$O/common/dsp/Synth.hpp" "$O/plugins/gloss/GlossEngine.hpp" <<'PY'
+import sys
+def patch(path, old, new):
+    s=open(path).read()
+    if s.count(old)!=1: sys.exit(path+": patch failed (the read() header is not there exactly once)")
+    open(path,'w').write(s.replace(old,new,1))
+WRAP="        if (!(p >= 0.0 && p < 1.0)) { p -= std::floor(p); if (!(p >= 0.0 && p < 1.0)) p = 0.0; }   // Thunder (prepare-pump.sh): the phase is not always in [0, 1) (inc >= 1 wraps once); NaN reads 0\n"
+patch(sys.argv[1], "    static inline double read(const std::vector<float>& d, double p)\n    {\n", "    static inline double read(const std::vector<float>& d, double p)\n    {\n"+WRAP)
+patch(sys.argv[2], "    inline double read(int w, int m, double p) const\n    {\n", "    inline double read(int w, int m, double p) const\n    {\n"+WRAP)
+PY

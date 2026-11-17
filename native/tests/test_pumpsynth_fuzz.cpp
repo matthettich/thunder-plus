@@ -2,7 +2,7 @@
 // infinite values (or every parameter at once); notes (Tune) from -200 to +300 and the non-finite ones; Hit (vel) and a kit's Drum out of range; Level and Drive extreme; sample rates 8000 to 96000 and the
 // ones pump refuses; lengths (hold) from one sample to 10 s and out of range; FREEZE's File of any length and rate; and PumpSynth driven directly: events at wild frames, blocks of 1 to 4096 frames, set() while it
 // runs. A per-render time limit (SIGALRM where there is one). Under ASan + UBSan (-DTHUNDER_SANITIZE=ON) a memory error, a signed overflow, a bad shift, a read past a table etc. aborts the run.
-//   FUZZ_COMBINED=<n>   xeng_psyn renders (default 150 in ctest; 10000+ for the local sanitizer runs)    FUZZ_DIRECT=<n>   PumpSynth scenarios (default 60)    FUZZ_SEED=<n>    FUZZ_LIMIT=<s> per render (default 30)
+//   FUZZ_COMBINED=<n>   xeng_psyn renders (default 150 in ctest; 10000+ for the local sanitizer runs)    FUZZ_DIRECT=<n>   PumpSynth scenarios (default 60)    FUZZ_SEED=<n>    FUZZ_LIMIT=<s> per render (default 30)    FUZZ_FROM=<n> replay from case n    FUZZ_VERBOSE=1 / 2 print each case (2: and its parameters)
 // A render whose output is not finite (with a Level within 300 dB and a Drive within 1e100: past those the JS overflows too) is counted and listed (the pump synths end in a safety limiter: it should not happen);
 // it is not an error of this test (see U33-NOTES.md), a crash or a timeout is.
 #include <chrono>
@@ -25,6 +25,9 @@ using namespace thunder;
 
 struct Rng { uint64_t s; explicit Rng(uint64_t x) : s(x * 0x9E3779B97F4A7C15ull + 1) {} uint64_t next() { s ^= s << 13; s ^= s >> 7; s ^= s << 17; return s; } double u() { return (double)(next() >> 11) / 9007199254740992.0; } int pick(int n) { return (int)(next() % (uint64_t)n); } };
 static std::string gWhat;
+#if defined(__SANITIZE_ADDRESS__)
+extern "C" void __asan_on_error() { std::fprintf(stderr, "pumpsynth_fuzz: the sanitizer stopped at: %s\n", gWhat.c_str()); }   // so the case can be replayed: FUZZ_FROM=<case>
+#endif
 #ifdef FUZZ_ALARM
 static void onAlarm(int) { const char m[] = "pumpsynth_fuzz: A RENDER EXCEEDED THE TIME LIMIT: "; (void)!write(2, m, sizeof m - 1); (void)!write(2, gWhat.c_str(), gWhat.size()); (void)!write(2, "\n", 1); _exit(3); }
 #endif
@@ -64,6 +67,7 @@ int main() {
   const char* e;
   const long nComb = (e = std::getenv("FUZZ_COMBINED")) ? std::atol(e) : 150, nDirect = (e = std::getenv("FUZZ_DIRECT")) ? std::atol(e) : 60;
   const uint64_t seed = (e = std::getenv("FUZZ_SEED")) ? (uint64_t)std::atoll(e) : 1;
+  const long from = (e = std::getenv("FUZZ_FROM")) ? std::atol(e) : 0;   // skip (but still draw) the cases before this one: replays one from a long run
   const int limit = (e = std::getenv("FUZZ_LIMIT")) ? std::atoi(e) : 30;
 #ifdef FUZZ_ALARM
   std::signal(SIGALRM, onAlarm);
@@ -89,6 +93,7 @@ int main() {
       F.data = r.pick(8) == 0 ? nullptr : file.data(); F.len = (double)n; F.sr = r.pick(4) == 0 ? ext(r) : rateOf(r); pf = &F;
       if (P.v[psyn_param_index(11, "source")] == P.v[psyn_param_index(11, "source")]) {} P.v[psyn_param_index(11, "source")] = 0;
     }
+    if (it < from) continue;   // (everything above only draws from the generator, so the cases after this one are the same as in a full run)
     char w[400]; std::snprintf(w, sizeof w, "case %ld seed %llu: type %d sr %g hold %g vlen %g bpm %g tune %g vel %g kd %g level %g drive %g", it, (unsigned long long)seed, P.type, sr, hold, vlen, bpm, P.tune, P.vel, P.kd, P.level, P.drive);
     gWhat = w; if (std::getenv("FUZZ_VERBOSE")) { std::fprintf(stderr, "%s\n", w); if (std::getenv("FUZZ_VERBOSE")[0] == '2') for (int i = 0; i < np; i++) if (P.v[i] == P.v[i]) std::fprintf(stderr, "    %s = %.17g\n", psyn_param(P.type, i)->sym, P.v[i]); }
     const auto t0 = std::chrono::steady_clock::now();
