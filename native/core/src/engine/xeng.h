@@ -5,7 +5,7 @@
 // branch (the voice's engine params, hold = `hold || Math.min(V.len || k, m)`, the pad effects through U17's pad_* cores) and the JSON reader.
 // U29 (the second set, xeng_table / vector / scanned / resynth / bytebeat.cpp, SpecUtil in xeng_util.cpp): table (+ a loaded wavetable V.wtData), vector, scanned, resynth (+ the analysis V.rsData) and bytebeat (the formula V.bbExpr,
 // compiled by modfx/bbexpr, reused). Those five allocate their working arrays from the per-thread scratch arena (xeng_util.h: XArena; after one warm-up render of the same size nothing is allocated); bytebeat's compiled formula allocates.
-// NOT HERE (later): sf, wavesl, the live engines (acid, mach), the wasm-backed ones. A voice of such an engine is refused (kEngUnsupported).
+// U27: acid, mach (the live engines, rendered through renderLiveCore; xeng_live.h has their cores, reusable by a live path) and the Blip drum (not an XENG entry in the JS, renderVoice has its own branch, with the pad effects). NOT HERE (later): sf, wavesl, the wasm-backed ones. A voice of such an engine is refused (kEngUnsupported).
 // Buffers: the caller hands in `out` of at least xeng_render_bound() floats; nothing here owns a pad buffer. Every engine renders without allocating EXCEPT strings, wind and drift (they
 // allocate their delay lines: a Float32Array sized from the sample rate and the pitch in the JS) and a voice with pad effects (U17's pad_* cores return std::vector). Offline, control thread.
 #ifndef THUNDER_ENGINE_XENG_H
@@ -51,14 +51,20 @@ namespace thunder {
 #define XP_RESYNTH(X) X(oct,2) X(orig,0) X(parts,64) X(speed,1) X(pos,0) X(freeze,0) X(harm,0) X(stretch,0) X(tilt,0) X(fkeep,0) X(noise,0.5) X(pmot,1) X(atk,2) X(dec,1000) X(sus,1) X(rel,200) X(tune,0) X(drive,0) X(level,0)
 #define XP_BYTEBEAT(X) X(oct,2) X(rate,8000) X(track,1) X(a,128) X(b,128) X(c,128) X(mode,0) X(bits,8) X(smooth,0) X(start,0) X(loop,0) X(atk,1) X(dec,600) X(sus,1) X(rel,40) X(tune,0) X(drive,0) X(level,0)
 
+// U27: the live engines acid and mach (their cores' defaults(); tune, drive and level come from the voice) and the Blip drum (normBlip: defaults() without `vel`; its `drive` is the blip's own, the voice's Drive is added at render)
+#define XP_ACID(X) X(oct,1) X(wave,0) X(pw,0.5) X(sub,0) X(noise,0) X(cut,380) X(res,0.72) X(envAmt,0.6) X(dec,300) X(accent,0.6) X(slide,65) X(ampDec,900) X(sus,0.8) X(rel,12) X(key,0.25) X(sat,0.25) X(tune,0) X(drive,0) X(level,0)
+#define XP_MACH(X) X(machine,0) X(oct,2) X(a,0.3) X(b,0.5) X(c,0.4) X(det,0.25) X(hp,30) X(lp,3500) X(res,0.25) X(fenv,0.35) X(fdec,350) X(atk,3) X(dec,500) X(sus,0.7) X(rel,220) X(lfoRate,4) X(lfoDepth,0) X(lfoDest,0) X(glide,0) X(tune,0) X(drive,0) X(level,0)
+#define XP_BLIP(X) X(pitch,180) X(kick,0.4) X(kickT,35) X(fm,0) X(fmR,1.5) X(ring,0) X(ringF,300) X(noise,0) X(click,0.2) X(atk,0.5) X(decay,220) X(drive,0) X(filt,0) X(res,0.2) X(grain,0) X(grainT,60)
+
 #define XP_FIELD(n, d) double n = d;
 struct ToneP { XP_TONE(XP_FIELD) };      struct ModalP { XP_MODAL(XP_FIELD) };      struct SwarmP { XP_SWARM(XP_FIELD) };   struct DriftP { XP_DRIFT(XP_FIELD) };
 struct PianoP { XP_PIANO(XP_FIELD) };    struct EpP { XP_EP(XP_FIELD) };            struct OrganP { XP_ORGAN(XP_FIELD) };   struct BreathP { XP_BREATH(XP_FIELD) };
 struct StringsP { XP_STRINGS(XP_FIELD) }; struct FmDrumP { XP_FMDRUM(XP_FIELD) };   struct WindP { XP_WIND(XP_FIELD) };     struct PhaseP { XP_PHASE(XP_FIELD) };
 struct PartialsP { XP_PARTIALS(XP_FIELD) }; struct SkinP { XP_SKIN(XP_FIELD) };     struct ChipP { XP_CHIP(XP_FIELD) };
+struct AcidP { XP_ACID(XP_FIELD) };      struct MachP { XP_MACH(XP_FIELD) };        struct XBlipP { XP_BLIP(XP_FIELD) };
 struct TableP { XP_TABLE(XP_FIELD) };    struct VectorP { XP_VECTOR(XP_FIELD) };    struct ScannedP { XP_SCANNED(XP_FIELD) }; struct ResynthP { XP_RESYNTH(XP_FIELD) }; struct BytebeatP { XP_BYTEBEAT(XP_FIELD) };
 
-enum class XKind : uint8_t { None, Tone, Modal, Swarm, Drift, Piano, Ep, Organ, Breath, Strings, FmDrum, Wind, Phase, Partials, Skin, Chip, Table, Vector, Scanned, Resynth, Bytebeat, Other };
+enum class XKind : uint8_t { None, Tone, Modal, Swarm, Drift, Piano, Ep, Organ, Breath, Strings, FmDrum, Wind, Phase, Partials, Skin, Chip, Table, Vector, Scanned, Resynth, Bytebeat, Acid, Mach, Blip, Other };
 XKind xeng_kind(const char* name, size_t n);   // the engine's key in XENG; None for "layers" (and the engines of U22 / U23 / U24: bass, vox, blip are not XENG), Other for an XENG engine this unit does not port
 
 // ---- one engine's render: `X.render(P, sr, hold)` with P = xParams(V). `out` is the caller's buffer of `cap` floats; the finished sound (trimmed, faded) goes in, its length is returned. ----
@@ -94,12 +100,19 @@ size_t xeng_vector(const VectorP& p, double sr, double hold, double bpm, float* 
 size_t xeng_scanned(const ScannedP& p, double sr, double hold, float* out, size_t cap);
 size_t xeng_resynth(const ResynthP& p, double sr, double hold, const XRsData* rs, float* out, size_t cap);
 size_t xeng_bytebeat(const BytebeatP& p, double sr, double hold, const std::string* expr, float* out, size_t cap);   // expr: V.bbExpr (nullptr = not a string)
+// U27: acid and mach (renderLiveCore with AcidCore / MachCore: a note held for `hold` seconds, then released) and the Blip drum (renderBlip). Same conventions: out == nullptr gives the length of the render, `cap` too small gives 0,
+// kRefuse where the JS throws (a negative Float32Array length, `CHORDS[NaN].length`), never finishes (a Machine Swarm of more than 1e4 voices) or returns an empty sound; no allocation at all. `hold` is renderX's `hold || Math.min(V.len || k, m)`.
+// Blip takes the voice's Tune, Drive and Level (renderBlip reads V.tune, V.drive, V.level); its own `drive` is in the parameters.
+size_t xeng_acid(const AcidP& p, double sr, double hold, float* out, size_t cap, bool acc = false);   // acc: renderLiveCore's 5th argument (the pad render passes false)
+size_t xeng_mach(const MachP& p, double sr, double hold, float* out, size_t cap);
+size_t xeng_blip(const XBlipP& p, double sr, double tune, double vdrive, double level, float* out, size_t cap);
 void xeng_scratch_release();   // gives the calling thread's scratch arena back
 
 // ---- a voice with one of these engines: mkVoice's fields that matter (level, tune, drive, len, tail, the pad effects) and the engine's own parameter object (v[engine]) ----------------
 struct XengVoice {
   XKind kind = XKind::None;
   ToneP tone; ModalP modal; SwarmP swarm; DriftP drift; PianoP piano; EpP ep; OrganP organ; BreathP breath; StringsP strings; FmDrumP fmdrum; WindP wind; PhaseP phase; PartialsP partials; SkinP skin; ChipP chip;
+  AcidP acid; MachP mach; XBlipP blip;   // U27
   TableP table; VectorP vector; ScannedP scanned; ResynthP resynth; BytebeatP bytebeat; XWtData wt; XRsData rs; std::string bbExpr; bool hasBb = false;   // U29
   double level = 0, tune = 0, drive = 0, len = 4, tail = 2, gate = 200;
   EngFx fx[kEngFx]; int nFx = 0;

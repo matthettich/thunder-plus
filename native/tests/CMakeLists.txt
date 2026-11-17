@@ -561,3 +561,23 @@ if(NOT MSVC)
   target_compile_options(test_engine_xeng2_fuzz PRIVATE -Wall -Wextra)
 endif()
 add_test(NAME engine_xeng2_fuzz COMMAND test_engine_xeng2_fuzz ${CMAKE_CURRENT_SOURCE_DIR}/golden/xeng2_ranges.json ${CMAKE_CURRENT_SOURCE_DIR}/golden/engine_xeng2_voices.json)
+
+# U27: the live engines acid and mach (renderLiveCore), the Blip drum (renderBlip) and the cores driven by scripts (core/src/engine/xeng_live.cpp, xeng_blip.cpp) against the real ENGINE block
+# (tools/engine-xeng3-dump.mjs) and beta's tests/golden/engines.json (the committed engine_xeng3_voices_golden.inc): the factory voices of these engines, SHA-256 bit-exact, and the direct cases and scripts against the committed Linux hashes.
+add_executable(test_engine_xeng3 test_engine_xeng3.cpp)
+target_link_libraries(test_engine_xeng3 PRIVATE thunder_core)
+target_include_directories(test_engine_xeng3 PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../core/src ${CMAKE_CURRENT_SOURCE_DIR})
+if(NOT MSVC)
+  target_compile_options(test_engine_xeng3 PRIVATE -Wall -Wextra)
+endif()
+if(NODE_EXE)
+  add_test(NAME engine_xeng3_ref COMMAND ${NODE_EXE} ${CMAKE_CURRENT_SOURCE_DIR}/../tools/engine-xeng3-dump.mjs ${CMAKE_CURRENT_BINARY_DIR}/engine-xeng3-ref)
+  set_tests_properties(engine_xeng3_ref PROPERTIES FIXTURES_SETUP engine_xeng3_ref)
+  add_test(NAME engine_xeng3 COMMAND test_engine_xeng3 ${CMAKE_CURRENT_BINARY_DIR}/engine-xeng3-ref ${CMAKE_CURRENT_SOURCE_DIR}/golden/engine_xeng3_voices.json)
+  set_tests_properties(engine_xeng3 PROPERTIES FIXTURES_REQUIRED engine_xeng3_ref)
+  if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    add_test(NAME engine_xeng3_golden_current COMMAND ${NODE_EXE} ${CMAKE_CURRENT_SOURCE_DIR}/../tools/engine-xeng3-dump.mjs --check)
+  endif()
+else()
+  add_test(NAME engine_xeng3 COMMAND test_engine_xeng3)   # no directory: prints FAIL and exits 1
+endif()
