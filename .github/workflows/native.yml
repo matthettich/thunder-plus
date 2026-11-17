@@ -162,7 +162,7 @@ jobs:
   macos:
     name: Core (macOS universal)
     runs-on: macos-latest
-    timeout-minutes: 20
+    timeout-minutes: 40   # was 20: the universal build alone took 13 minutes on a slow runner (U25, 17 Nov: two runs cancelled in ctest / build at the limit); 7 to 8 minutes of ctest on top
     steps:
       - uses: actions/checkout@v4
       - run: brew install gnu-sed   # native/core/third_party/prepare.sh needs GNU sed
