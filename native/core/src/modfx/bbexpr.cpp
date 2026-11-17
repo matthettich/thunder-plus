@@ -263,10 +263,9 @@ void BBProg::exec(int32_t t, int32_t a, int32_t b, int32_t c) const {
       case 51: { const double j = C(i); i = j != j ? N : (int64_t)j; break; }
       case 60: case 61: case 62: case 63: case 64: case 65: case 66: case 67: case 68: case 69: case 70: case 71: case 72: case 73: case 74: case 75: case 76:
       { const double x = rd(s), y = C(i); i++; wr(s, opU(op - 50, x, y)); break; }
-      // 77 and 78 are `St[s] !== 0 && C[i++] !== 0` and `St[s] !== 0 || C[i++] !== 0`: the JS only reads (and steps over) the constant when the first side did not decide it, so otherwise
-      // the constant is run as the next opcode. Kept as it is (a bytebeat formula `(x && 5) + 1` with x = 0 then runs the 5 as an opcode: it ends the program).
-      case 77: { const double x = rd(s); double r = 0; if (nz(x)) { const double y = C(i); i++; r = nz(y) ? 1 : 0; } wr(s, r); break; }
-      case 78: { const double x = rd(s); double r = 1; if (!nz(x)) { const double y = C(i); i++; r = nz(y) ? 1 : 0; } wr(s, r); break; }
+      // 77 / 78 (`x && constant`, `x || constant`): the constant is read before the test (web build 633), so a short-circuit no longer leaves it to run as a step.
+      case 77: { const double x = rd(s); const double y = C(i); i++; wr(s, nz(x) && nz(y) ? 1 : 0); break; }
+      case 78: { const double x = rd(s); const double y = C(i); i++; wr(s, nz(x) || nz(y) ? 1 : 0); break; }
       default: i = N;
     }
   }

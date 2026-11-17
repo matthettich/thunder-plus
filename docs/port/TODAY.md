@@ -100,6 +100,19 @@ Review queue below and REVIEW-16NOV.md first; then #182's decisions; web item 4 
 N1 step 10.
 
 ## Review queue for Fable (add a line per merged PR and per decision; newest last)
+**START HERE AT 19:00 (written 17:25). Suggested order, cheapest decisions first:**
+1. **One decision that unblocks four things:** rebuild the web app's `pump.wasm` and `mods.wasm` without reordering (`-fno-associative-math`; GCC also
+   `-fno-finite-math-only`) and regenerate their references? It settles TUBE on #182, Marbles / Tides (#186) and U25 (Plaits / Elements). It changes shipped audio
+   by ULPs, and the shipped `pump.wasm` is not from the pin anyway (MASTER 75 parameters against 77). Proofs: U18-NOTES.md on `n1/u18`, U21-NOTES.md on `rev/d2-mods`.
+2. **#190:** `SongRenderer::masterHook` gives the master effects no beat clock; a one-line fix is described in U15-NOTES.md on `n1/u15-song`. Apply, then merge #190's test.
+3. **Web app bugs found today, not fixed:** a wavetable layer with negative Bend reads one past its table (NaN; the slider reaches it, `index.html:8439`); the pump
+   worklet's value-list write at `index.html:20306` is unclamped (safe today only because meta and wasm agree); web item 4 from last night (both instruments sound).
+4. **Decisions the manager made today, to confirm or reverse:** `native`'s JS copies took build 633's two lines and `kBbHash` was regenerated (#191); the Linux CI
+   limit 30 → 60 minutes; `-fno-sanitize=vptr` (last night, #184); the committed-Linux-golden gate with the local comparison only on x86-64 Linux (U22 to U28).
+5. **Merged today on the strength of CI plus an independent Sonnet verifier, no diff read by a lead:** #187, #188, #189 (U22), #191, #192 (U23), #193 (U24). The
+   verifiers' reports and all review findings are in `docs/port/REVIEW-16NOV.md` on branch `rev/16nov` (not merged into `native`: merge it or read it there).
+6. **#195 (U28):** see the last Progress log entry for whether it was merged. **#182:** its own list in TONIGHT.md. Then last night's queue (TONIGHT.md), the "Owed by
+   the lead" list, and N1 step 10.
 - (nothing yet today; last night's queue is in TONIGHT.md and is still unreviewed)
 - #187 D6 `js_exp(1.0)` returns E as V8 does (4 lines, one `test_libm` case; no golden changed; Sonnet): merged, all CI green.
 - #188 D5 `test_modfx` builds its inputs in C++ (fixture 246 MB to 125 MB); all 1326 inputs equal Node's files bit for bit on Linux x86-64 and every hash in
@@ -107,6 +120,35 @@ N1 step 10.
   seed product above 2^53 reproduced; other platforms rest on `js_sin` equalling Node's `Math.sin`. The manager read the file list and CI, not the diff.
 - D3 ThreadSanitizer (clang 18): 83 of 86 tests, no races, but the suite is single-threaded so it proves little; `rt_core`, `rt_guard_selftest` and `song`
   do not link under TSan (`rt_harness.cpp`'s global `operator new` / `delete` collide with TSan's). The only threaded code is Android's `jni.cpp`, not built on Linux.
+- **#190 D4 (OPEN, DO NOT MERGE; a real bug in the native core, for Fable):** the new whole-song test (ELECTRO through `SongRenderer`, Flex / Step gate / Retrigger on
+  tracks 0, 1, 2, 4, 8 and the master, FLX / GAT / RTG / FXO commands; bit-exact gate against the real ThunderFx worklet in Node) passes for track effects (0 of 768000
+  samples differ) and fails for the master column (171180 differ, first at sample 5498). Cause: `SongRenderer::masterHook` runs the master effects without the beat
+  clock; the page's master node gets it (`setMfx` calls `clockTo` in `index.html`). A one-line change in `masterHook`, tried and reverted, gives 0 differences
+  (`docs/port/U15-NOTES.md` on `n1/u15-song`). Not applied: the renderer is mixer code under Fable's review. The test's inputs (voices, events, clock) come from the C++ side.
+- #189 U22 engine foundation (`native/core/src/engine/`, Sonnet): merged, all CI green. 294 of 294 factory voices of the covered families equal beta's `engines.json`
+  hashes; 183 direct cases and 1800 `voiceMod` probes gated by committed Linux hashes (the local Node comparison holds only on x86-64 Linux: macOS Node rounds differently).
+  An independent Sonnet verifier passed it (gate real, mutations caught, scope clean). The manager did NOT read the diff. Least sure of: pad effects other than the four JS
+  ones pass the sound through, as the golden's Node does (18 voices prove only the dry path; the real app has the wasm loaded); voices with JS pad effects allocate
+  (U17's `std::vector`); `EngVoice` copied on the stack a few times per render; the interface is provisional; `eng_init()` builds the sine table up front (lazy path kept).
+- **Web build 633 (Fable's own, on `beta` ede5da8 and `main` ca6bbd2; the owner asked for it at 12:02):** the Bytebeat hang from REVIEW-16NOV B1-1. Cause was not a
+  missing cap: steps 77 / 78 read their constant inside the short-circuit, so it was not consumed and ran as a step. Fixed by reading it first, in all three copies;
+  goldens unchanged; test `bbexpr-const-logic`. **Owed on `native`:** the same two lines in `native/core/src/modfx/bbexpr.cpp` (given to the U24 worker as a first small PR).
+- #192 U23 layer types click, wavetable, pd, chip, supersaw, pwm, sample, grains, vint (Sonnet): merged, all CI green; 61 of 61 factory voices equal beta's hashes, 311
+  direct cases. Independent Sonnet verifier passed it (all 61 hashes re-checked, four mutations caught, scope clean, ASan / UBSan clean on the NaN inputs; report in
+  REVIEW-16NOV.md). The manager did NOT read the diff. Least sure of: sample, grains, pwm and vint have no factory voice (direct cases only; the pwm DPCM mutation
+  failed only 3 cases); a sample layer in a vint mode allocates; `layer_vint.cpp` allows a huge buffer for a tiny sample rate. **Web app, for Fable:** a wavetable with
+  negative Bend (reachable: the slider is −1 to 1, `index.html:8439`) reads one past its table and gives NaN; the C++ returns NaN through a guard, no out-of-bounds read.
+- #191 native Bytebeat fix (mirrors web build 633; Sonnet): merged, all CI green. `native`'s three JS copies got 633's two lines (the manager's decision: the reference
+  had the bug in it); only `kBbHash` changed in `modfx_golden.inc`; the PR lists the 10 formulas whose values moved, all `&& constant` / `|| constant`. Not read by the manager.
+- CI: the Linux ctest job's limit 30 → 60 minutes in `.github/workflows/native.yml` (253a3b1, the manager's; the suite takes about 29 minutes: `*_ref` and
+  `*_golden_current` cost about 530 s per pass and run in all three passes).
+- #193 U24 layer types FM, additive, chord, karplus, vosim, formant, membrane, bell, bar (Sonnet): merged, all CI green; 110 of 110 factory voices (13 mix in U23 types), 383
+  direct cases. Independent Sonnet verifier passed all five items (hashes, five mutations, scope, ASan / UBSan clean on about 52,000 extreme renders, Karplus buffers
+  cannot be overrun; report in REVIEW-16NOV.md). The manager did NOT read the diff. Open: more than 64 partials returns unsupported (a limit of the port's fixed arrays;
+  the JS does not throw; reachable only with hand-edited song data); three wrong comments (notes and `layer_u24.h:7` say the JS throws there; `test_engine_u24.cpp:3`
+  and `parity.sh` say 97 voices, not 110; `engine-u24-dump.mjs`'s header on mixed voices).
+- Web build 634 (Sonnet, display only) and desktop v1.3.11 (run 43967032621, 11 assets, from `main` at 634, holding 633 and 634): see the Progress log. `HANDOVER.md`'s
+  release list has no v1.3.10 bullet (last night's release was never recorded there).
 
 ## Progress log (the manager updates and pushes this after every change of state; newest last)
 - 10:30 Fable: plan written. Nothing started.
@@ -165,3 +207,59 @@ N1 step 10.
   on every platform, local comparison only on x86-64 Linux; plus the verifier's two points (direct cases for the `lpRes` clamp, which no
   voice covers; an explicit init for the lazily built sine table). **Not merged. U23 / U24 not started.** If you take over here and
   `n3/u22` has no new push within 90 minutes, give exactly this fix to a new Sonnet worker.
+- 12:00 D4 done: PR #190 open, red on purpose (see the review queue: master effects get no beat clock in `SongRenderer::masterHook`). Section D is complete.
+  Running: only the U22 worker (macOS fix on #189). Nothing else can start until #189 is merged; then U23 and U24.
+- 12:45 **#189 U22 merged** (all CI green after the macOS fix). **Web build 633 is on `beta` and `main`** (the Bytebeat hang; the one web change today, at the
+  owner's word). Starting now: U23 (`n3/u23`) and U24 (`n3/u24`, after its first small PR `n1/bbexpr-const` for the native Bytebeat fix), one Sonnet worker each.
+  Not started: U28, U29 (after U23 / U24, if before 17:45). Everything in sections A, B and D is done.
+- 12:50 Both workers active. **#192 U23 open, CI running. #191 (native Bytebeat fix) open and RED on macOS and Windows:** `modfx` "bbexpr: '(t&&5)+1' … got 1
+  want 0": the C++ is right, the committed reference came from the old JS (it had the bug). **Manager's decision (for Fable to confirm):** on `n1/bbexpr-const`
+  apply build 633's two lines to `native`'s own copies of BBExpr (index.html, chains and waves worklets: the one edit allowed outside `native/`), regenerate the
+  Bytebeat reference from the fixed JS, and list in the PR every changed row (only `&& constant` / `|| constant` formulas may change; anything else: stop).
+  Sent to the U24 worker, who does it before going on with U24 (`n3/u24` is pushed, work in progress).
+- 13:45 **#192 U23: all CI green, NOT merged yet: an independent Sonnet verifier is on it** (report to `/home/claude/progress/verify-u23.md`; it also checks
+  whether the C++ reads out of bounds on a wavetable with negative Bend, which the author ported "faithfully"). U23's figures: 61 of 61 factory voices equal
+  beta's hashes, 311 direct cases, eleven mutations caught. Author's notes: supersaw is in U23, chord and karplus left to U24; sample, grains, pwm and vint have no
+  factory voice (direct cases only); voices mixing U23 and U24 types are gated only once both are merged (the second to merge regenerates fixtures and checks the
+  union; expect small conflicts in `LType`, `Osc`, `renderLayer`, CMake, `rt_harness`). **Possible web-app bugs for Fable:** a wavetable with negative Bend reads one
+  past its table (NaN); supersaw with negative Detune and pwm with negative Shape give NaN. The Linux ctest job now takes about 29 minutes.
+  Manager's next step: verifier passes → merge #192, review-queue line. Still running: the U24 worker (#191's reference, then U24).
+- 14:00 **#192 U23 merged** (verifier passed all four items). Still running: the U24 worker (#191's reference, then U24; it must rebase on U23 and check the
+  voices that mix U23 and U24 types). Next unstarted: U28 (one Sonnet worker, started now on `n3/u28`), then U29.
+- 14:35 **The session's server restarted about 14:05 and stopped the two running workers** (the disk survived). State found: **#191 (native Bytebeat fix) green and
+  merged**: the only golden change is `kBbHash` in `modfx_golden.inc`, and the PR lists the 10 formulas whose values changed, every one with `&& constant` or
+  `|| constant`; `native`'s three JS copies carry build 633's two lines. **#193 U24 and #195 U28 are open; on both, every job is green except "Core (Linux, ctest)",
+  cancelled at its 30-minute limit** (the suite has grown: U23's run took 29 minutes). Manager's decision: the limit in `.github/workflows/native.yml` goes from 30 to
+  60 minutes (a time limit, not a gate; this commit), and the workers are resumed to merge `native` into their branches, find what takes the time, and re-run CI.
+- 15:00 **Web build 634 on `beta` 241cff4 and `main` 43f2b8c** (Sonnet, display only, at the owner's word at 14:44): the bottom bar's MOD section had a solid
+  dark title bar in the terminal-style skins (`#dkMod` was missing from the per-section `--dkc` / `--dkp` list; `#dkPerf` had the same gap and was added too, not
+  asked for), and MOD now sits before FX (order: …CHAINS, MOD, FX, PERFORM, TRACK; HTML and `DK_SECS`). `npm test` green on both; screenshots taken in headless Chrome.
+  Not read by the manager. Still running: the U24 (#193) and U28 (#195) workers.
+- 15:35 **#193 U24: all CI green (Linux job about 29 minutes), `native` merged in, NOT merged yet: an independent Sonnet verifier is on it** (report to
+  `/home/claude/progress/verify-u24.md`; it also checks the Karplus stack buffers and whether membrane / bell / bar are in the PR). U24's figures: 110 of 110 factory
+  voices (13 mix in U23 types), 383 direct cases, five mutations caught. Author's decisions: a chord index past the table, a NaN algorithm and more than 64 partials
+  return `kEngUnsupported`; one line of U23's test changed (`fm2` → `plaits` as the unsupported example). **CI time:** the `*_ref` and `*_golden_current` tests take
+  about 530 s per pass and run in all three passes; running `_golden_current` only in the GCC pass would save about 4 minutes per extra pass (not done: for Fable or a chore).
+  **Desktop v1.3.11** was started at 15:08 at the owner's word (run 43967032621, from `main` at build 634); a Haiku worker watches it and records it in HANDOVER.md.
+  Still running: U28 (#195).
+- 16:00 **#193 U24 merged** (verifier passed). **Desktop v1.3.11 is released** (recorded on `beta` 89395d4). Still running: U28 (#195), which must merge `native`
+  again now. Nothing else will be started today except the verification of #195. U29, U25 and everything under "Not yours today" remain.
+- 16:30 **#195 U28: the independent verifier FAILED it on memory safety; NOT merged.** Gate, mutations and scope pass (1068 of 1068 factory voices over the 15
+  engines, 313 direct cases, six mutations caught; piano, swarm, strings equal the JS line by line). The failures: `xeng_wind.cpp:14-16`, a very low oct or tune
+  (finite, valid song JSON) overflows the delay-line length, the vector is empty and `rd` / `wr` index a null buffer (the JS throws RangeError there);
+  `xeng_chip.cpp:19,30,36`, `(int)NaN` as an array index. Sent back to the U28 worker: refuse (`kEngUnsupported`) where the JS throws, guard the NaN index to give
+  what the JS gives, check its other engines for parameter-sized buffers, add extreme / NaN cases under the sanitizers. Report in REVIEW-16NOV.md on `rev/16nov`.
+  **If you take over here:** `n3/u28` holds the work; give exactly this fix list to a Sonnet worker, then have a second verifier re-run item 4 before merging.
+- 17:25 **Wrap-up.** The server restarted again about 17:15 and stopped the U28 worker, after it had pushed its fix (bc5baa5: refuses oversized delay lines and
+  runaway loops, NaN-safe index). #195's CI: all green but the Linux job, still running. A Sonnet verifier is re-checking item 4 (sanitizers, the fuzz that found the
+  bug, that no golden or normal render changed). **Rule for #195: merge only if CI is all green AND the re-check passes; otherwise it stays open.** The outcome is the
+  next entry. Nothing else is running; no new units. No scheduled check-ins remain (all three fired). Not done today: U29, U25 (blocked on decision 1), and
+  everything under "Not yours today". Web: `beta` = build 634 + two documents commits; `main` = build 634; desktop v1.3.11 released.
+- 18:05 **#195 U28 is NOT merged: open, for tonight.** The re-check of memory safety PASSED at bc5baa5 (every change is a refusal where the JS throws or a NaN-safe
+  index; no golden or existing case changed; ASan + UBSan clean on the engine tests, the original fuzz and 18,252 extreme / NaN renders over all 15 engines; the 1068
+  voices pass in Release; appended to REVIEW-16NOV.md). **But its CI is not all green: "Core (Linux, ctest)" was cancelled at the 60-minute limit**: with U28 the GCC
+  pass takes 21 minutes, the clang pass 23, and the sanitizer pass was cut off after 14. GCC and clang passed; the sanitizer pass never finished in CI (it is clean
+  locally). The manager did not raise the limit a second time. **To finish it (a Sonnet chore, then merge):** in `.github/workflows/native.yml` split the Linux job's
+  three passes into three parallel jobs, or run the `*_ref` / `*_golden_current` tests only in the GCC pass (the U24 worker measured about 530 s of them per pass before
+  U28); no test removed from the GCC pass, nothing loosened. Minor, from the re-check: `xeng_swarm.cpp:48` and `xeng_drift.cpp:51` test the runaway flag only at the
+  next control block (a voice of 32 samples or fewer would render, not refuse). **Nothing is running. End of the day's plan.**

@@ -251,6 +251,46 @@ else()
   add_test(NAME fxu17 COMMAND test_fxu17)   # no directory: prints FAIL and exits 1
 endif()
 
+# U22: the engine foundation (tables, rng, blep, renderLayer, the oscillator scaffolding, voiceFilter / voiceAmp / voiceMod, renderVoice, mkVoice's parameters, the pad effect chain) against the real ENGINE block
+# (tools/engine-dump.mjs) and beta's tests/golden/engines.json (the committed engine_golden.inc): the 294 factory voices built only from sine / tri / saw / square / pulse and the noise types, SHA-256 bit-exact.
+add_executable(test_engine test_engine.cpp)
+target_link_libraries(test_engine PRIVATE thunder_core)
+target_include_directories(test_engine PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../core/src ${CMAKE_CURRENT_SOURCE_DIR})
+if(NOT MSVC)
+  target_compile_options(test_engine PRIVATE -Wall -Wextra)
+endif()
+if(NODE_EXE)
+  add_test(NAME engine_ref COMMAND ${NODE_EXE} ${CMAKE_CURRENT_SOURCE_DIR}/../tools/engine-dump.mjs ${CMAKE_CURRENT_BINARY_DIR}/engine-ref)
+  set_tests_properties(engine_ref PROPERTIES FIXTURES_SETUP engine_ref)
+  add_test(NAME engine COMMAND test_engine ${CMAKE_CURRENT_BINARY_DIR}/engine-ref ${CMAKE_CURRENT_SOURCE_DIR}/golden/engine_voices.json)
+  set_tests_properties(engine PROPERTIES FIXTURES_REQUIRED engine_ref)
+  if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    add_test(NAME engine_golden_current COMMAND ${NODE_EXE} ${CMAKE_CURRENT_SOURCE_DIR}/../tools/engine-dump.mjs --check)
+  endif()
+else()
+  add_test(NAME engine COMMAND test_engine)   # no directory: prints FAIL and exits 1
+endif()
+
+# U24: the FM / additive / karplus / vosim / formant layer types (core/src/engine/layer_*.cpp) against the real ENGINE block (tools/engine-u24-dump.mjs) and beta's tests/golden/engines.json
+# (the committed engine_u24_voices_golden.inc): the factory voices of U22's and U24's layer types with at least one of U24's, and the direct cases (engine_u24_golden.inc), SHA-256 bit-exact.
+add_executable(test_engine_u24 test_engine_u24.cpp)
+target_link_libraries(test_engine_u24 PRIVATE thunder_core)
+target_include_directories(test_engine_u24 PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../core/src ${CMAKE_CURRENT_SOURCE_DIR})
+if(NOT MSVC)
+  target_compile_options(test_engine_u24 PRIVATE -Wall -Wextra)
+endif()
+if(NODE_EXE)
+  add_test(NAME engine_u24_ref COMMAND ${NODE_EXE} ${CMAKE_CURRENT_SOURCE_DIR}/../tools/engine-u24-dump.mjs ${CMAKE_CURRENT_BINARY_DIR}/engine-u24-ref)
+  set_tests_properties(engine_u24_ref PROPERTIES FIXTURES_SETUP engine_u24_ref)
+  add_test(NAME engine_u24 COMMAND test_engine_u24 ${CMAKE_CURRENT_BINARY_DIR}/engine-u24-ref ${CMAKE_CURRENT_SOURCE_DIR}/golden/engine_u24_voices.json)
+  set_tests_properties(engine_u24 PROPERTIES FIXTURES_REQUIRED engine_u24_ref)
+  if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    add_test(NAME engine_u24_golden_current COMMAND ${NODE_EXE} ${CMAKE_CURRENT_SOURCE_DIR}/../tools/engine-u24-dump.mjs --check)
+  endif()
+else()
+  add_test(NAME engine_u24 COMMAND test_engine_u24)   # no directory: prints FAIL and exits 1
+endif()
+
 # N1 review fixes: hostile inputs (the independent review's findings, one regression test each). Names the finding in every failure line.
 add_executable(test_hostile test_hostile.cpp)
 target_link_libraries(test_hostile PRIVATE thunder_core)
@@ -379,4 +419,24 @@ if(NODE_EXE AND CMAKE_SYSTEM_NAME STREQUAL "Linux" AND CMAKE_SYSTEM_PROCESSOR MA
   set_tests_properties(u15song_node PROPERTIES FIXTURES_REQUIRED u15song_ref)
   add_test(NAME u15song_golden_current COMMAND ${NODE_EXE} ${CMAKE_CURRENT_SOURCE_DIR}/../tools/u15-song-dump.mjs ${CMAKE_CURRENT_BINARY_DIR}/u15song-ref --check)
   set_tests_properties(u15song_golden_current PROPERTIES FIXTURES_REQUIRED u15song_ref)
+endif()
+
+# U23: the layer types click, wavetable, pd, chip, supersaw, pwm, sample (loop, vintage modes) and grains (core/src/engine/layer_*.cpp) against the real ENGINE block (tools/engine-u23-dump.mjs) and beta's
+# tests/golden/engines.json (the committed engine_u23_voices_golden.inc): the factory voices of these types, SHA-256 bit-exact, and the direct cases against the committed Linux hashes (engine_u23_golden.inc).
+add_executable(test_engine_u23 test_engine_u23.cpp)
+target_link_libraries(test_engine_u23 PRIVATE thunder_core)
+target_include_directories(test_engine_u23 PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../core/src ${CMAKE_CURRENT_SOURCE_DIR})
+if(NOT MSVC)
+  target_compile_options(test_engine_u23 PRIVATE -Wall -Wextra)
+endif()
+if(NODE_EXE)
+  add_test(NAME engine_u23_ref COMMAND ${NODE_EXE} ${CMAKE_CURRENT_SOURCE_DIR}/../tools/engine-u23-dump.mjs ${CMAKE_CURRENT_BINARY_DIR}/engine-u23-ref)
+  set_tests_properties(engine_u23_ref PROPERTIES FIXTURES_SETUP engine_u23_ref)
+  add_test(NAME engine_u23 COMMAND test_engine_u23 ${CMAKE_CURRENT_BINARY_DIR}/engine-u23-ref ${CMAKE_CURRENT_SOURCE_DIR}/golden/engine_u23_voices.json)
+  set_tests_properties(engine_u23 PROPERTIES FIXTURES_REQUIRED engine_u23_ref)
+  if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    add_test(NAME engine_u23_golden_current COMMAND ${NODE_EXE} ${CMAKE_CURRENT_SOURCE_DIR}/../tools/engine-u23-dump.mjs --check)
+  endif()
+else()
+  add_test(NAME engine_u23 COMMAND test_engine_u23)   # no directory: prints FAIL and exits 1
 endif()
