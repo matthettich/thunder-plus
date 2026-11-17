@@ -85,13 +85,15 @@ int main() {
     }
     P.tune = tuneOf(r); P.vel = r.pick(4) == 0 ? ext(r) : (double)(r.pick(160) - 10); P.kd = r.pick(3) == 0 ? ext(r) : (double)(r.pick(14) - 2);
     P.level = r.pick(3) == 0 ? ext(r) : -80 + r.u() * 100; P.drive = r.pick(3) == 0 ? ext(r) : r.u() * 2;
-    const double sr = rateOf(r), hold = holdOf(r, sr), vlen = r.pick(3) == 0 ? ext(r) : 0, bpm = r.pick(3) == 0 ? ext(r) : 20 + r.u() * 280;
+    const double sr = rateOf(r); double hold = holdOf(r, sr);
+    if (sr > 100000 && !(hold <= 0.3)) hold = 0.02 + r.u() * 0.2;   // a long note at 768 kHz is a 15-million-sample render (30 s under ASan): legal, not interesting
+    const double vlen = r.pick(3) == 0 ? ext(r) : 0, bpm = r.pick(3) == 0 ? ext(r) : 20 + r.u() * 280;
     PsynFile F; const PsynFile* pf = nullptr;
     if (P.type == 11 && r.pick(2)) {   // FREEZE's File: any length, any rate, any content
       const size_t n = r.pick(4) == 0 ? (size_t)r.pick(3) : (size_t)(1 + r.pick(60000)); file.assign(n + 1, 0.f);
       for (size_t i = 0; i < n; i++) file[i] = r.pick(50) == 0 ? (float)ext(r) : (float)(std::sin(0.05 * (double)i) * 0.5 + (r.u() - 0.5) * 0.2);
       F.data = r.pick(8) == 0 ? nullptr : file.data(); F.len = (double)n; F.sr = r.pick(4) == 0 ? ext(r) : rateOf(r); pf = &F;
-      if (P.v[psyn_param_index(11, "source")] == P.v[psyn_param_index(11, "source")]) {} P.v[psyn_param_index(11, "source")] = 0;
+      P.v[psyn_param_index(11, "source")] = 0;   // SOURCE: File
     }
     if (it < from) continue;   // (everything above only draws from the generator, so the cases after this one are the same as in a full run)
     char w[400]; std::snprintf(w, sizeof w, "case %ld seed %llu: type %d sr %g hold %g vlen %g bpm %g tune %g vel %g kd %g level %g drive %g", it, (unsigned long long)seed, P.type, sr, hold, vlen, bpm, P.tune, P.vel, P.kd, P.level, P.drive);

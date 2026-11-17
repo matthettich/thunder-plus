@@ -56,7 +56,7 @@ for (const k of KEYS) {
   }
 }
 for (const k of KEYS) {   // the pad's macros on the defaults
-  for (const t of [-24, -7.4, 12, 24]) add('tune_' + k + '_' + t, k, Object.assign(base(k), { tune: t }), 48000, 0.3);
+  for (const t of [-24, -7.6, 0.7, 12, 24]) add('tune_' + k + '_' + t, k, Object.assign(base(k), { tune: t }), 48000, 0.3);
   for (const v of [1, 127]) add('vel_' + k + '_' + v, k, Object.assign(base(k), { vel: v }), 48000, 0.3);
   add('lvdr_' + k, k, Object.assign(base(k), { level: 6, drive: 1 }), 48000, 0.3);
   add('lvdr2_' + k, k, Object.assign(base(k), { level: -30, drive: 0.5 }), 48000, 0.3);

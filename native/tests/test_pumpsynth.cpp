@@ -134,6 +134,10 @@ int main(int argc, char** argv) {
     metaTest(root);
     if ((int)root.num("goldenBad") != 0) { std::printf("the reference's hash of %d of the %d rows of tests/golden/pump-synth.json differs from the golden: the reference is not the web's  FAIL\n", (int)root.num("goldenBad"), (int)root.num("goldenRows")); fails++; }
   }
+  if (all) {   // every name in the committed lists is a case of this run (a renamed case would otherwise leave a stale entry that gates nothing)
+    for (int i = 0; i < kPsynLeftOutN; i++) { bool found = false; for (int k = 0; k < kPsynCaseN; k++) if (!std::strcmp(kPsynCaseNames[k], kPsynLeftOut[i].name)) found = true; if (!found) { std::printf("left-out name %s is not a case  FAIL\n", kPsynLeftOut[i].name); fails++; } }
+    for (int i = 0; i < kPsynGateExactN; i++) { bool found = false; for (int k = 0; k < kPsynCaseN; k++) if (!std::strcmp(kPsynCaseNames[k], kPsynGateExact[i])) found = true; if (!found) { std::printf("exact-list name %s is not a case  FAIL\n", kPsynGateExact[i]); fails++; } }
+  }
   int ran = 0, exact = 0, within = 0, left = 0, regress = 0, failedCases = 0; double worst = -INFINITY; const char* worstName = "";
   std::map<std::string, uint64_t> hashes; std::map<std::string, Res> results;
   for (int i = 0; i < kPsynCaseN; i++) {
