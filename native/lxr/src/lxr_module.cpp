@@ -63,7 +63,8 @@ inline double mx(double a, double b) { return (a != a || b != b) ? NAN : (a > b 
 inline double round0(double x) { const double r = js_round(x); return (r != r) ? 0.0 : r; }   // Math.round(x) || 0 (a -0 is 0 too)
 inline uint8_t byteOf(double x) { double r = round0(x); r = r < 0 ? 0 : r > 255 ? 255 : r; return (uint8_t)r; }
 
-void powerOn() { lxr_host_restore(); lxr_init(0x2545F491u); lxr_init_kit(); }
+bool g_liveOpen = false;   // the live path's kit is in the firmware: any other use of it (a pad render) replaces it
+void powerOn() { g_liveOpen = false; lxr_host_restore(); lxr_init(0x2545F491u); lxr_init_kit(); }
 
 // The pad's bytes over the init kit that powerOn() left in the firmware's edit buffer (lxr-engine.js render, lines "const b = ..." to "X.lxr_set_bpm").
 void writeKit(const ThunderLxrRequest& r, uint8_t* b) {
@@ -189,7 +190,6 @@ namespace {
 constexpr int kBlk = 64, kPend = 64;
 struct LiveVoice { float blk[kBlk]; int pos = kBlk; uint64_t abs = 0; int nPend = 0; struct Ev { uint64_t at; int fw, vel, note; } pend[kPend]; };
 LiveVoice g_live[6];
-bool g_liveOpen = false;
 inline int renderVoiceOf(int v) { return v < 5 ? v : 5; }   // firmware trigger numbers 5 and 6 (closed / open hat) both play on the hat voice
 }  // namespace
 

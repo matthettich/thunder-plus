@@ -43,5 +43,55 @@ patch('Core/Src/Soundengine/DSPAudio/modulationNode.c', [
 patch('Core/Src/Soundengine/MIDI/MidiParser.c', [
   ('\t\t\tmidiParser_originalCcValues[paramNr+1] = value.itg;', '\t\t\tif((uint32_t)paramNr+1 < sizeof(midiParser_originalCcValues)) midiParser_originalCcValues[paramNr+1] = value.itg;   /* Thunder host patch */'),
   ('\t\t\tmidiParser_originalCcValues[paramNr] = value.itg;', '\t\t\tif(paramNr < sizeof(midiParser_originalCcValues)) midiParser_originalCcValues[paramNr] = value.itg;   /* Thunder host patch */')])
+
+# 4. Float -> integer conversions that are out of range (undefined behaviour in C). The wasm (non-trapping conversions) and the STM32 (VCVT) both SATURATE (NaN -> 0, a negative value
+#    to an unsigned type -> 0); x86 wraps / returns 0x80000000. The page hears the saturating result, so the host patch routes every conversion that UBSan
+#    (-fsanitize=float-cast-overflow) found through lxr_f2u32 / lxr_f2i32 / lxr_f2i16 (saturate to 32 bits, then the low 16 bits for an int16 target, as the wasm does).
+#    Helpers: Core/Inc/lxr_host_cvt.h (written here). The sites are listed in docs/port/U04-NOTES.md. Also lxr_tab(): the [1024] reads of the 1024-sample wavetable rows.
+open(os.path.join(O, 'Core/Inc/lxr_host_cvt.h'), 'w').write("""/* Thunder host patch (native/lxr/prepare-lxr.sh): saturating float -> integer conversions (the wasm's and the STM32's behaviour; C leaves out-of-range undefined). */
+#ifndef LXR_HOST_CVT_H
+#define LXR_HOST_CVT_H
+#include <stdint.h>
+static inline int32_t lxr_f2i32(double x){ if(x!=x) return 0; if(x>=2147483648.0) return INT32_MAX; if(x<=-2147483648.0) return INT32_MIN; return (int32_t)x; }
+static inline uint32_t lxr_f2u32(double x){ if(x!=x) return 0; if(x<=0.0) return 0; if(x>=4294967296.0) return UINT32_MAX; return (uint32_t)x; }
+static inline int16_t lxr_f2i16(double x){ return (int16_t)(uint16_t)((uint32_t)lxr_f2i32(x)&0xffffu); }
+/* A wavetable row is 1024 long and the firmware reads [1024] (one past a row): the next row's first sample; past the last row of a table: that row's own first sample. */
+static inline int16_t lxr_tab(const int16_t (*t)[1024], unsigned o, unsigned i){ unsigned f=o*1024u+i; if(i>1023u && o>=10u) f=o*1024u+(i&1023u); return ((const int16_t*)t)[f]; }
+#endif
+""")
+import re
+touched = set()
+def rx(rel, pat, rep, count):
+    p = os.path.join(O, rel); s = open(p, encoding='utf-8', newline='').read()
+    s, n = re.subn(pat, rep, s)
+    if n != count: sys.exit("lxr prepare: %s: pattern %r matched %d times, expected %d" % (rel, pat, n, count))
+    open(p, 'w', encoding='utf-8', newline='').write(s); touched.add(rel)
+D = 'Core/Src/Soundengine/DSPAudio/'
+OS = D + 'Oscillator.c'
+rx(OS, r'return (\(\(\([A-Za-z0-9]+\*f\)/REAL_FS\)\)\*[0-9]+) ;', r'return lxr_f2u32(\1) ;', 3)
+rx(OS, r'fast_log2\(\(uint32_t\)\(f/440\.f\)\)', 'fast_log2(lxr_f2u32(f/440.f))', 1)
+rx(OS, r'\(\(uint32_t\)\(modBuffer\[i\]\*osc->fmMod\)\)', '(lxr_f2u32(modBuffer[i]*osc->fmMod))', 5)
+rx(OS, r'(const uint32_t (?:index2|oscPhase2)) = ((?:index|osc->phase) \+ pwm \* \(UINT32_MAX/2\));', r'\1 = lxr_f2u32(\2);', 2)
+rx(OS, r'buf\[i\] = (oscOut|osc->output) \* gain;', r'buf[i] = lxr_f2i16(\1 * gain);', 10)
+rx(OS, r'\b(table|sawTable)\[osc->tableOffset\]\[(itg2?(?:\+\+)?)\]', r'lxr_tab(\1, osc->tableOffset, \2)', 26)
+# 5. calcNextOscSampleBlock / calcNextOscSampleFmBlock: a waveform number with no oscillator ("sample playback", whose code is commented out or #if 0) leaves the block buffer
+#    UNWRITTEN: the page's wasm then outputs whatever the buffer held before (a state of its linear memory), a host reads uninitialised memory. The host patch writes zeros (silence).
+rx(OS, r'(default:\s*)(calcUserSampleOscFmBlock\(osc,modBuffer,buf,size,gain\);)', r'\1memset(buf, 0, (size_t)size*sizeof(int16_t)); \2', 1)
+rx(OS, r'default://sample playback', 'default: memset(buf, 0, (size_t)size*sizeof(int16_t));//sample playback', 1)
+rx(D+'lfo.c', r'return (freq/\(LFO_SR\) \* 0xffffffff);', r'return lxr_f2u32(\1);', 2)
+rx(D+'distortion.c', r'buf\[i\] = \(x\*32767\);', 'buf[i] = lxr_f2i16(x*32767);', 2)
+rx(D+'Snare.c', r'buf\[j\] =   ?(snareVoice\.combinedVolume\s+\* tmp \* calcOnePole\( &snareVoice\.FaderVolumeFilter, adc_getFaderVolume\(3\)\));', r'buf[j] = lxr_f2i16(\1);', 2)
+rx(D+'ResonantFilter.c', r'tmp = (fastTanh\(y1\) \* 0x7fff) ;', r'tmp = lxr_f2i32(\1) ;', 2)
+rx(D+'ResonantFilter.c', r'tmp = (\(x-ugb\) \* FILTER_GAIN);', r'tmp = lxr_f2i32(\1);', 2)
+rx(D+'transientGenerator.c', r'buf\[i\] = (transient->volume\*\(transientData\[transient->waveform-2\]\[phase\]<<8\) \* \(phase < TRANSIENT_SAMPLE_LENGTH\));', r'buf[i] = lxr_f2i16(\1);', 1)
+rx(D+'CymbalVoice.c', r'buf\[j\] \*=  (cymbalVoice\.combinedVolume \* calcOnePole\( &cymbalVoice\.FaderVolumeFilter, adc_getFaderVolume\(4\)\));', r'buf[j] = lxr_f2i16(buf[j] * (\1));', 2)
+rx(D+'HiHat.c', r'buf\[j\] \*=  (hatVoice\.combinedVolume \* calcOnePole\( &hatVoice\.FaderVolumeFilter, adc_getFaderVolume\(5\)\));', r'buf[j] = lxr_f2i16(buf[j] * (\1));', 2)
+rx(D+'DrumVoice.c', r'buf\[i\] \*= (voiceArray\[voiceNr\]\.combinedVolume);', r'buf[i] = lxr_f2i16(buf[i] * (\1));', 1)
+rx('Core/Inc/Soundengine/DSPAudio/BufferTools.h', r'buf\[i\] = (buf\[i\] \* currentGain);', r'buf[i] = lxr_f2i16(\1);', 3)
+rx('Core/Src/Soundengine/MIDI/MidiParser.c', r'(\.lfo\.phaseOffset) = (value\.flt \* 0xffffffff);', r'\1 = lxr_f2u32(\2);', 4)
+for rel in sorted(touched):
+    p = os.path.join(O, rel); s = open(p, encoding='utf-8', newline='').read()
+    eol = '\r\n' if '\r\n' in s else '\n'
+    open(p, 'w', encoding='utf-8', newline='').write('#include <string.h>' + eol + '#include "lxr_host_cvt.h"' + eol + s)
 PY
 echo "lxr sources prepared in $O"
