@@ -255,3 +255,11 @@ N1 step 10.
   bug, that no golden or normal render changed). **Rule for #195: merge only if CI is all green AND the re-check passes; otherwise it stays open.** The outcome is the
   next entry. Nothing else is running; no new units. No scheduled check-ins remain (all three fired). Not done today: U29, U25 (blocked on decision 1), and
   everything under "Not yours today". Web: `beta` = build 634 + two documents commits; `main` = build 634; desktop v1.3.11 released.
+- 18:05 **#195 U28 is NOT merged: open, for tonight.** The re-check of memory safety PASSED at bc5baa5 (every change is a refusal where the JS throws or a NaN-safe
+  index; no golden or existing case changed; ASan + UBSan clean on the engine tests, the original fuzz and 18,252 extreme / NaN renders over all 15 engines; the 1068
+  voices pass in Release; appended to REVIEW-16NOV.md). **But its CI is not all green: "Core (Linux, ctest)" was cancelled at the 60-minute limit**: with U28 the GCC
+  pass takes 21 minutes, the clang pass 23, and the sanitizer pass was cut off after 14. GCC and clang passed; the sanitizer pass never finished in CI (it is clean
+  locally). The manager did not raise the limit a second time. **To finish it (a Sonnet chore, then merge):** in `.github/workflows/native.yml` split the Linux job's
+  three passes into three parallel jobs, or run the `*_ref` / `*_golden_current` tests only in the GCC pass (the U24 worker measured about 530 s of them per pass before
+  U28); no test removed from the GCC pass, nothing loosened. Minor, from the re-check: `xeng_swarm.cpp:48` and `xeng_drift.cpp:51` test the runaway flag only at the
+  next control block (a voice of 32 samples or fewer would render, not refuse). **Nothing is running. End of the day's plan.**
