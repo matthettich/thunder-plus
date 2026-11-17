@@ -104,6 +104,8 @@ function directCases(E) {
   // wavetable: the pitch rises through the envelope (the table is rebuilt as the harmonic limit falls), unison 1 / 8, every spectrum corner, the bend both ways, a very high note
   edge('edge_wt_rise', [{ ...base, type: 'wavetable', a: 0.5, b: 0.2, pAmt: -36, pDec: 200, wtUni: 3, wtSub: 0.4, wtNoise: 0.1 }], { len: 0.5 });
   for (const [i, [a, b]] of [[0, 0], [0.34, 0.5], [0.67, 1], [1, 0], [1, 1], [-0.5, 2]].entries()) edge('edge_wt_ab' + i, [{ ...base, type: 'wavetable', a, b, wtUni: 8, wtSpread: 1, wtBend: i % 2 ? 0.7 : -0.7 }], { len: 0.3 });
+  // Bend -1 and -0.5 (web build 635): warp() rounds to exactly 1 near the end of the cycle, so x = TN and tab[TN + 1] is the table's spare 0; the output is finite (before 635 -1 gave NaN here; -0.5 needs a phase within about 4e-7 of 1, which this short render does not reach, so it is a finite-and-matches case only). test_engine_u23 asserts finite for edge_wt_bend*
+  for (const [i, bd] of [-1, -0.5].entries()) edge('edge_wt_bend' + (i ? '_m05' : '_m1'), [{ ...base, type: 'wavetable', a: 0.6, b: 0.3, wtUni: 8, wtSpread: 1, wtBend: bd }], { len: 0.3 });
   edge('edge_wt_high', [{ ...base, type: 'wavetable', a: 0.8, b: 0.1, tune: 60, wtUni: 2 }], { len: 0.3 });
   edge('edge_wt_44k', [{ ...base, type: 'wavetable', a: 0.3, b: 0.6, wtUni: 5, wtBend: 0.3 }], { len: 0.3 }, 44100);
   // click: narrow / wide, single / double, at 96 kHz

@@ -26,7 +26,8 @@ struct ClickOsc { double W = 1, n = 0; bool dbl = false; void init(double A, dou
 
 struct WavetableOsc {
   static constexpr int TN = 1024;
-  float tab[TN + 1];
+  static constexpr int TL = TN + 2;   // JS: new Float32Array(TN + 2); the spare entry TN + 1 stays 0
+  float tab[TL];
   double phases[8], dets[8]; int uni = 1; double sub = 0, noise = 0, bend = 0, A = 0, B = 0, sr = 48000, builtH = -1, subPh = 0;
   void init(const EngLayer& L, double sr, double A, double B, EngRng& R);
   void build(double hmax);
