@@ -21,6 +21,7 @@
 #include "engine/engine.h"
 #include "engine/layer_pe.h"
 #include "engine/xeng.h"
+#include "engine/xeng_live.h"
 #include "voice/voice.h"
 
 #include <cmath>
@@ -684,6 +685,29 @@ done:
   std::printf("rt_engine_xeng2 ok: %d voice renders (%zu samples) of table / vector / scanned / resynth under the allocation guard\n", renders, total); return 0;
 }
 
+// U27: acid, mach (all seven machines) and blip under the guard: nothing at all allocates (the cores are plain objects on the stack, the render goes into the caller's buffer), so no warm-up render. Also the cores driven directly
+// the way a live path would (note on with legato / accent, blocks of 64, a new rate each block).
+static int run_engine_xeng3() {
+  using namespace thunder;
+  std::vector<XengVoice> V; std::vector<EngRenderOpts> o; std::vector<std::vector<float>> bufs;
+  { XengVoice a; a.kind = XKind::Acid; a.acid.res = 0.9; a.acid.wave = 0.4; a.acid.sub = 0.3; a.acid.noise = 0.1; a.acid.drive = 0.3; V.push_back(a); }
+  for (int m = 0; m < 7; m++) { XengVoice a; a.kind = XKind::Mach; a.mach.machine = m; a.mach.lfoDepth = 0.5; a.mach.lfoDest = m % 4; a.mach.glide = 80; V.push_back(a); }
+  { XengVoice a; a.kind = XKind::Blip; a.blip.filt = -0.4; a.blip.grain = 3; a.blip.fm = 0.3; a.blip.ring = 0.4; a.blip.noise = 0.3; a.blip.drive = 0.4; V.push_back(a); }
+  { XengVoice a; a.kind = XKind::Blip; a.blip.filt = 0.6; a.blip.res = 0.9; V.push_back(a); }
+  for (XengVoice& v : V) { v.level = -3; v.len = 0.5; EngRenderOpts e; e.hold = 0.3; o.push_back(e); bufs.emplace_back(xeng_render_bound(v, e) + 1); if (bufs.back().size() < 2) { std::printf("rt_engine_xeng3 FAIL: bound 0\n"); return 1; } }
+  size_t total = 0; int renders = 0; std::vector<float> L(48000), R(48000);
+  { rt_guard g;
+    for (int rep = 0; rep < 3; rep++) for (size_t i = 0; i < V.size(); i++) { size_t n = 0; const int st = xeng_render_voice(V[i], o[i], bufs[i].data(), bufs[i].size() - 1, &n); if (st != kEngOk) { total = 0; goto done; } total += n; renders++; }
+    { AcidCore a(48000); MachCore m(48000); AcidP ap; MachP mp; mp.machine = 3; a.set(ap); m.set(mp);
+      for (int rep = 0; rep < 2; rep++) { a.on(rep > 0, rep == 0); m.on(rep > 0);
+        for (int b = 0; b < 40; b++) { a.render(L.data(), R.data(), L.size(), b * 64, b * 64 + 64, 1 + 0.01 * b); m.render(L.data(), R.data(), L.size(), b * 64, b * 64 + 64, 1 + 0.01 * b); if (m.bad()) { total = 0; goto done; } total += 128; }
+        a.off(); m.off(); a.set(ap); m.set(mp); renders += 2; } }
+  }
+done:
+  if (!total) { std::printf("rt_engine_xeng3 FAIL: a render failed\n"); return 1; }
+  std::printf("rt_engine_xeng3 ok: %d renders (%zu samples) of acid / mach (7 machines) / blip and the live cores under the allocation guard\n", renders, total); return 0;
+}
+
 // U24: the FM / additive / karplus / vosim / formant layers under the guard (their oscillator objects live on the stack: Karplus-Strong's delay line is a 16 KB member, nothing allocates).
 static int run_engine_u24() {
   using namespace thunder;
@@ -746,6 +770,7 @@ int main(int argc, char** argv) {
   if (int r = run_engine()) return r;
   if (int r = run_engine_xeng()) return r;
   if (int r = run_engine_xeng2()) return r;
+  if (int r = run_engine_xeng3()) return r;
   if (int r = run_engine_u24()) return r;
   if (int r = run_engine_u25()) return r;
   return run_song();
