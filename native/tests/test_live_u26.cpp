@@ -283,14 +283,17 @@ int main(int argc, char** argv) {
     sh->process(L.data(), R.data(), 300, nullptr, 0); for (int i = 0; i < 300; i++) if (!std::isfinite(L[i]) || !std::isfinite(R[i])) { CHECK(false, "the shell wrote a non-finite sample"); break; }
     LiveEvent on; on.type = LiveEvType::NoteOn; on.at = 0; for (int rep = 0; rep < 8; rep++) { sh->process(L.data(), R.data(), 128, &on, 1); } CHECK(!sh->failed(), "retriggers");
     delete sh;
-    {   // the AudioParam ranges: rate 0..256, bpm 10..999, wob 0..64 (a value beyond is the same as the bound; a negative rate is 0)
-      struct Pair { LiveEvType t; double a, b; };
-      for (const Pair& pr : {Pair{LiveEvType::RateSet, 1000, 256}, Pair{LiveEvType::RateSet, -3, 0}, Pair{LiveEvType::RateRamp, 1e5, 256}, Pair{LiveEvType::Bpm, 5, 10}, Pair{LiveEvType::Bpm, 5000, 999}, Pair{LiveEvType::Wob, 100, 64}, Pair{LiveEvType::Wob, -1, 0}}) {
-        std::vector<float> A(600), B(600), A2(600), B2(600); BassP p; p.wCut = 3; p.det = 10;
-        for (int w = 0; w < 2; w++) { LiveBass* s2 = new LiveBass(48000); s2->core().set(p); LiveEvent e[3]; e[0].type = LiveEvType::NoteOn; e[1].type = pr.t; e[1].at = 40; e[1].v = w ? pr.b : pr.a; e[1].dur = 200; e[2].type = LiveEvType::Bpm; e[2].at = 300; e[2].v = 120;
-          if (pr.t == LiveEvType::Bpm) e[2].type = LiveEvType::Wob, e[2].v = 0;
-          s2->process(w ? B.data() : A.data(), w ? B2.data() : A2.data(), 600, e, 3); delete s2; }
-        CHECK(std::memcmp(A.data(), B.data(), 600 * 4) == 0 && std::memcmp(A2.data(), B2.data(), 600 * 4) == 0, "an event value beyond the AudioParam's range (%g) must act as the bound (%g)", pr.a, pr.b);
+    {   // the AudioParam ranges: rate 0..256, bpm 10..999, wob 0..64: a value beyond acts as the bound, and the bound is the bound (a value one step inside the range sounds different)
+      struct Pair { LiveEvType t; double beyond, bound, inside; };
+      for (const Pair& pr : {Pair{LiveEvType::RateSet, 1000, 256, 255}, Pair{LiveEvType::RateSet, -3, 0, 1}, Pair{LiveEvType::RateRamp, 1e5, 256, 255}, Pair{LiveEvType::Bpm, 5, 10, 11}, Pair{LiveEvType::Bpm, 5000, 999, 998}, Pair{LiveEvType::Wob, 100, 64, 63}, Pair{LiveEvType::Wob, -1, 0, 1}}) {
+        std::vector<float> O[3]; BassP p; p.wCut = 3; p.det = 10; p.oct = -2; p.parts = 16; p.wRate = 8;
+        for (int w = 0; w < 3; w++) { O[w].assign(600, 0.0f); std::vector<float> R2(600); LiveBass* s2 = new LiveBass(48000); s2->core().set(p); LiveEvent e[3]; e[0].type = LiveEvType::NoteOn; e[1].type = pr.t; e[1].at = 40; e[1].v = w == 0 ? pr.beyond : w == 1 ? pr.bound : pr.inside; e[1].dur = 200;
+          e[2].type = pr.t == LiveEvType::Bpm ? LiveEvType::Wob : LiveEvType::Bpm; e[2].at = 300; e[2].v = pr.t == LiveEvType::Bpm ? 0 : 120;
+          s2->process(O[w].data(), R2.data(), 600, e, 3); delete s2; }
+        double peak = 0; for (float x : O[0]) { peak = std::max(peak, (double)std::fabs(x)); }
+        CHECK(peak > 1e-3, "the clamp check must hear something (peak %g)", peak);
+        CHECK(std::memcmp(O[0].data(), O[1].data(), 600 * 4) == 0, "an event value beyond the AudioParam's range (%g) must act as the bound (%g)", pr.beyond, pr.bound);
+        CHECK(std::memcmp(O[2].data(), O[1].data(), 600 * 4) != 0, "the bound (%g) must be the bound: %g sounds different", pr.bound, pr.inside);
       }
     }
     LiveVox* v = new LiveVox(48000); VoxP p; p.txt = "la na"; v->core().set(p); LiveEvent n; n.type = LiveEvType::NoteOn; n.v = 0.5 + 1e9; n.at = 0; std::vector<float> a(200), b(200); v->process(a.data(), b.data(), 64, &n, 1); v->process(a.data(), b.data(), 64, nullptr, 0);
