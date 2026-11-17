@@ -4092,7 +4092,7 @@ const nop = () => {};
    square), with a formant tilt, a phase Bend, up to 8 detuned unison voices, a sub and noise. The single
    cycle is rebuilt only when the pitch rises past the harmonic limit already built, so it never aliases. */
 function wavetableOsc(L, sr, A, B, R){
-  const TN = 1024, tab = new Float32Array(TN + 1);
+  const TN = 1024, tab = new Float32Array(TN + 2);   // one spare entry (stays 0): a negative Bend can round warp() to exactly 1, so x = TN and tab[i + 1] is read
   const uni = Math.max(1, Math.min(8, Math.round(L.wtUni || 1))), spread = L.wtSpread || 0, sub = L.wtSub || 0, noise = L.wtNoise || 0, bend = L.wtBend || 0;
   const phases = new Float64Array(uni), dets = new Float64Array(uni);
   for (let v = 0; v < uni; v++){ const o = uni === 1 ? 0 : (v / (uni - 1)) * 2 - 1; dets[v] = Math.pow(2, o * spread * 0.5 / 12); phases[v] = R(); }
@@ -20286,6 +20286,7 @@ class ThunderFx extends AudioWorkletProcessor {
     for (let j = 0; j < s.pv.length && j < 512; j++) st[j] = s.pv[j];
     if (s.bi >= 0) st[s.bi] = s.byp ? 1 : 0;
     s.pu = P.pump_new(s.pt, sampleRate); s.dirty = false;
+    s.pn = P.pump_nparams(s.pt);   /* the wasm's own parameter count for this plugin: pumpRun never writes more floats than it (build 635) */
     s.psIn = {}; if (s.pu >= 0 && s.pst) for (const key in s.pst){ if (s.pst[key]) this.pumpState(P, s, key, s.pst[key]); s.psIn[key] = s.pst[key]; }   // …PUMP STATE
     return s.pu >= 0;
   }
@@ -20303,9 +20304,9 @@ class ThunderFx extends AudioWorkletProcessor {
     for (let i = 0; i < n; i += 4096) t += String.fromCharCode.apply(null, b.subarray(i, Math.min(n, i + 4096))); return t; }
   pumpRun(s, n){
     const P = globalThis.__pumpX; if (!P || s.dead || s.pu < 0) return;
-    if (s.dirty){ const v = new Float32Array(P.memory.buffer, P.pump_values(s.pu), s.pv.length);
-      for (let j = 0; j < s.pv.length; j++) v[j] = s.pv[j];
-      if (s.bi >= 0) v[s.bi] = s.byp ? 1 : 0;
+    if (s.dirty){ const nn = s.pn >= 0 ? Math.min(s.pv.length, s.pn) : s.pv.length, v = new Float32Array(P.memory.buffer, P.pump_values(s.pu), nn);   // nn: a meta longer than the wasm must not write past its parameter array
+      for (let j = 0; j < nn; j++) v[j] = s.pv[j];
+      if (s.bi >= 0 && s.bi < nn) v[s.bi] = s.byp ? 1 : 0;
       P.pump_commit(s.pu); s.dirty = false; }
     if (s.cr){   // …PUMP CREATIVE: the song's tempo and position, and the notes of NOTES FROM that fall in this block
       const T = this.mctx.transport, lag = (s.up || 0) * T.tempo / 60 / sampleRate; P.pump_transport(s.pu, T.tempo, T.playing ? Math.max(0, (this.ppq || 0) - lag) : 0, T.playing ? 1 : 0);   /* (build 616) s.up: the latency of the pump slots before this one: the sound reaches it that much late, so its song position is that much earlier (a GATE after CALM closed 2048 samples early) */
@@ -25969,7 +25970,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 634;
+const BUILD = 635;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD + (location.pathname.includes('/beta/') ? ' · beta' : '');
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -36255,6 +36256,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [635, '16 Nov', ['Wavetable layers: with Bend fully negative the sound could drop out (a bad sample reached the voice); fixed']],
   [634, '16 Nov', ['Bottom panel: the MOD section now sits before the effects (FX), and its title bar takes the skin like the other sections (it was drawn black in the terminal-style skins, IDM among them)']],
   [633, '16 Nov', ['Bytebeat formulas: “x && number” and “x || number” now give the right value, and a formula with && 50, && 51, || 50 or || 51 can no longer freeze the sound']],
   [632, '15 Nov', ['Folded phone, top: the tempo line now reads BPM and LPB, then ROWS, then the time left (631 had ROWS first)']],
