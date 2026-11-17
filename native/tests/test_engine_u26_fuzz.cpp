@@ -6,6 +6,10 @@
 //   test_engine_u26_fuzz            FUZZ_COMBINED=<n> sets the number of combined renders (default 300; the sanitizer pass of the PR runs 6000 or more)
 #include <algorithm>
 #include <chrono>
+#include <csignal>
+#if !defined(_WIN32)
+#include <unistd.h>
+#endif
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
@@ -26,7 +30,17 @@ static std::vector<float> buf;
 static const double kExt[] = {-1e9, -1000, -1, -0.5, 0, 0.5, 1, 2.04, 100, 1e9, 1e308, NAN, INFINITY, -INFINITY, 1e-300, -1e308};
 static const int kExtN = (int)(sizeof kExt / sizeof kExt[0]);
 
+// a crash names the case it was in (the log of a CI run is all there is): the last case is kept in a plain buffer and written by the signal handler
+static char gWhat[400];
+static void note(const std::string& w) { std::strncpy(gWhat, w.c_str(), sizeof gWhat - 1); gWhat[sizeof gWhat - 1] = 0; }
+static void onCrash(int sig) {
+#if !defined(_WIN32)
+  const char head[] = "\nFUZZ CRASH in case: "; if (write(2, head, sizeof head - 1) < 0) {} if (write(2, gWhat, std::strlen(gWhat)) < 0) {} if (write(2, "\n", 1) < 0) {}
+#endif
+  std::signal(sig, SIG_DFL); std::raise(sig);
+}
 static void renderIt(const XengVoice& V, double sr, double hold, const std::string& what) {
+  note(what);
   if (getenv("FUZZ_TRACE")) std::fprintf(stderr, "%s\n", what.c_str());
   const auto t0 = std::chrono::steady_clock::now();
   EngRenderOpts o; o.sr = sr; o.hold = hold;
@@ -62,6 +76,7 @@ static const char* const kTexts[] = {"", " ", ".", ", . ;", "a", "constructor", 
 static const int kTextN = (int)(sizeof kTexts / sizeof kTexts[0]);
 
 int main() {
+  std::signal(SIGSEGV, onCrash); std::signal(SIGABRT, onCrash); std::signal(SIGFPE, onCrash);
   eng_init();
   struct Kind { XKind k; const char* name; const Field* f; size_t n; };
   const Kind kinds[2] = {{XKind::Bass, "bass", kBassF, sizeof kBassF / sizeof(Field)}, {XKind::Vox, "vox", kVoxF, sizeof kVoxF / sizeof(Field)}};
@@ -118,6 +133,7 @@ int main() {
     const char* env = getenv("FUZZ_COMBINED"); const int total = env ? std::atoi(env) / 10 + 20 : 40;
     for (int r = 0; r < total; r++) for (int kind = 0; kind < 2; kind++) {
       const double sr = r % 3 == 0 ? kExt[rn() % kExtN] : (r % 3 == 1 ? 8000.0 : 48000.0); if (!(sr > 0.4 && sr <= 1e5)) continue;
+      note(std::string("live shell run ") + std::to_string(r) + " kind " + std::to_string(kind) + " sr " + std::to_string(sr));
       std::vector<float> L(1000), R(1000); std::vector<LiveEvent> ev;
       for (int j = 0; j < 12; j++) { LiveEvent e; e.at = rn() % 400; e.type = (LiveEvType)(rn() % 6); e.leg = rn() % 2; e.same = rn() % 2; e.v = kExt[rn() % kExtN]; e.dur = kExt[rn() % kExtN]; ev.push_back(e); }
       std::stable_sort(ev.begin(), ev.end(), [](const LiveEvent& a, const LiveEvent& b) { return a.at < b.at; });
