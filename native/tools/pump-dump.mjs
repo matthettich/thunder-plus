@@ -7,7 +7,7 @@
 //                                  taps and sends), <case>.f32 (the output: L then R, then the second node's), lat.json (pumpLatencyOf of every type, default and preset), index.txt
 //   node native/tools/pump-dump.mjs --golden / --check   the case list (names): native/tests/golden/pump_cases.inc
 // WHICH pump.wasm: --wasm / PUMP_WASM, else the repo's shipped pump/pump.wasm with its pump/pump-meta.js (always there: what the web app runs today). parity-u18.sh also runs a pump.wasm BUILT
-// FROM THE PIN (build-wasm.sh) with the pin's own meta (pump-table.mjs --meta): the native build links that pin, whose MASTER is one commit newer than the shipped wasm's.
+// FROM THE PIN (build-wasm.sh) with the pin's own meta (pump-table.mjs --meta). Since web build 638 the shipped wasm is the pin's build (same size; see U18-NOTES.md), so the two runs have the same reference.
 // The page's tfxChain pump branch is repeated by hand in pumpEntry() below ({key, pt, pv, bi, on, slot, sck, cr, clk}); pump-table.mjs --check fails when the page's text of it changes.
 import fs from 'node:fs';
 import path from 'node:path';

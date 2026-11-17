@@ -1,8 +1,7 @@
 #!/bin/sh
 # U18 parity gate: the pump effects as slot kinds of the track-effect host.  native/tools/parity.sh u18
 #   builds test_pump + rt_harness and runs: pump_ref / pump (the real ThunderFx worklet in Node with the SHIPPED pump/pump.wasm: 80 cases, latency of every type, the order check, the gate
-#   between threads; the shipped wasm is older than the pin the native build links, so MASTER (75 against 77 parameters, latency 358 against 4454) differs there by design: the cases and
-#   latency pairs that depend on it are SKIPPED by name with the reason printed, every other case is gated),
+#   between threads; since web build 638 the shipped wasm is the pin's build (MASTER 77 parameters, latency 4454), so NOTHING is skipped; the exact list is enforced there on Linux x86-64),
 #   pump_cases_current / pump_table_current (the committed case list and pump table are what the tools give now; Linux), rt_core (the host, pump kinds included, under the allocation guard).
 #   Then the real gate: a pump.wasm BUILT FROM THE PIN (build-wasm.sh, wasi-sdk) is the reference of a second run of pump-dump.mjs + test_pump --pin: -100 dB below each reference's peak
 #   (worst case printed), the cases that are bit-exact today still bit-exact (golden/pump_gate.inc), one named rule (x_two_hosts_same). (No committed hash of the native render: the strict pump build uses the system libm, so renders differ between toolchains; U18-NOTES.md.)

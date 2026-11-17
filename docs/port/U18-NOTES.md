@@ -7,6 +7,19 @@ Pump effects are slot kinds of `FxHost` (kind `kPumpT0 + type`, 200..224), not a
 sleep, FXO switching, levels/telemetry and the clkSpb transport. Code: `core/src/fx/fxpump.cpp`, `pumpfx.h`, the pump branches in `fxhost.cpp`; the 25-type table is generated
 (`pumptable.inc` from `tools/pump-table.mjs`, checked by `pump_table_current`).
 
+## 17 Nov: the shipped wasm is the pin's build (web build 638 mirrored into `native`)
+`native` took beta's build-638 pump files byte for byte (`pump/pump.wasm`, `pump/pump-meta.js`, `pump/ui/master.js`) and the `?v=` bumps they come with (`pump.wasm?v=7` and `pump-meta.js?v=7` in `index.html`, `chains/index.html` and the
+`FILES` list of `sw.js`; `master.js?v=3` in `index.html`). Not taken: HANDOVER.md, BUILD / CHANGES / the cache name in `sw.js` (native does not track the web build number; the pattern of #191 and #200).
+- **Byte-identical to the pin's build.** `native/tools/build-wasm.sh` (wasi-sdk 25, GCC pin deb07d3) gives a `pump.wasm` with the same SHA-256 as the shipped one (`ecbfadc1...1830ae`, 1,601,290 B); `pump-synth.wasm` is
+  byte-identical to the shipped `pump/synth/pump-synth.wasm` as before. The reference directories pump-dump.mjs writes from the two wasm files are identical except `which.txt` (the names of the files).
+  So the shipped-wasm run and the pin-built run are now THE SAME RUN (same reference, same native render, same figures: 80 cases, 40 bit-exact, 39 within -100 dB, worst v_hot -115.6 dB, 1 by rule, 0 failed, latency 0 of 50 differ).
+  Both are kept (the shipped run needs no wasi-sdk, so it runs in every CI job; the pin run proves the wasm is still what the pin builds, which would catch a web build that ships a different pump).
+- **Nothing is skipped any more:** `kSkipShipped`, `--no-skip` and the MASTER latency skip are removed from `test_pump.cpp`; `p_master_def` / `p_master_alt` and the MASTER latency pairs run in every `pump` ctest.
+- **The exact list is enforced in the shipped run too, on Linux x86-64** (`kExactHoldsHere`): it holds there (all 40 listed cases exact, 0 regressions, GCC 13). It is NOT enforced elsewhere without `--pin`: on macOS `p_band_alt` is -142.0 dB
+  (BAND calls the system libm; see "CI result of the first push"), so enforcing it everywhere would fail macOS. `--pin` still enforces it wherever it is run.
+- `pump_table_current` and `pump_cases_current` pass unchanged against the new meta (the committed table already had MASTER at 77 parameters: it is generated from the pin).
+- The `pump` ctest is now green on GCC 13 (it was red from the MASTER skew); `ctest` whole suite: see the PR.
+
 ## The gate: decided by the lead (Fable, 16 Nov evening) and applied here
 The web app's `pump.wasm` and `mods.wasm` are compiled with -ffast-math, which lets the compiler reorder float sums; no native build can reproduce that order. Rebuilding the web wasm with
 `-fno-associative-math` would make them bit-identical, but it was measured on 16 Nov evening (same machine, Node 22, pin-built pump, minimum of 7 runs) to cost CPU in the web app: LIMIT +40 %,
@@ -17,17 +30,16 @@ concern is CPU on the phone, so the web app's wasm flags are NOT changed. Instea
   (max abs difference / reference peak), the worst case printed. It was -80 dB before: this TIGHTENS it. Every case that is bit-exact today stays bit-exact (`kPumpGateExact` in the generated
   `golden/pump_gate.inc`, 40 cases): a case that goes from exact to "within" fails (enforced in the pin-built run, `--pin`).
 - (c) REVISED by the lead for pump only (16 Nov night): there is NO committed native-hash check for pump. First version: SHA-256 of the native strict render of every case, checked on every platform. CI showed it
-  cannot hold (next section), and the lead decided against giving pump its own libm for now. The gate of U18 on every platform is: -100 dB against the pin-built wasm, the exact list kept exact, the x_two_hosts_same rule,
-  the shipped-wasm MASTER skips. (Marbles / Tides keep their hashes: they held on macOS and in the wasm job.)
+  cannot hold (next section), and the lead decided against giving pump its own libm for now. The gate of U18 on every platform is: -100 dB against the pin-built wasm, the exact list kept exact, the x_two_hosts_same rule
+  (and, until 17 Nov, the shipped-wasm MASTER skips: gone, below). (Marbles / Tides keep their hashes: they held on macOS and in the wasm job.)
 - (d) A case where a quantiser or other discontinuity follows a nonlinear stage gets a named rule in `kRules` of test_pump.cpp: at most N samples above the -100 dB line (N = twice the measured
   count), every other sample within it. Today exactly one: `x_two_hosts_same` (TUBE into CRUSH): measured 20 samples above the line in all (-68.4 dB worst), so N = 40. A new such case must be listed by name
   with its measured numbers; there is no wildcard.
 - (e) Wake allocations in the pump slot (pump_free + pump_new in the audio thread, as the JS does): accepted for now; spare instances are deferred to the real-time unit (U31).
-- (f) The `pump` ctest runs against the SHIPPED `pump/pump.wasm`, an older pump than the pin (MASTER 75 parameters against 77, latency 358 against 4454). Whether the web app moves to the pin's MASTER is the
-  owner's decision (it changes how his mastering sounds) and is being asked. Until then the reference for the gate is the PIN-BUILT wasm (parity-u18.sh's second run) and the shipped-wasm run skips by name,
-  with the reason printed, `p_master_def`, `p_master_alt` and the 2 MASTER latency pairs (`kSkipShipped`). Each was verified (`test_pump <dir> --no-skip`): the only failures of the shipped run without
-  the skip are those two cases (first differing sample 358 = the latency difference, posts differ) and they are within the gate against the pin-built wasm. Nothing else is skipped.
-The gate logic is `native/tests/test_pump.cpp` (`kGateDb`, `kRules`, `kSkipShipped`, the exact list and hash check); the golden is written by `GATE_WRITE=<file> native/tools/parity-u18.sh` (never hand-edited; rebuild test_pump after).
+- (f) SUPERSEDED on 17 Nov (web build 638, native PR "n1/pump-638"): the web app now ships the pin's pump (`pump/pump.wasm` 1,601,290 B, MASTER 77 parameters, latency 4454, and `pump/pump-meta.js`, stamp 72cc7e55...).
+  Until then the `pump` ctest ran against an older shipped wasm (MASTER 75 parameters, latency 358) and skipped by name `p_master_def`, `p_master_alt` and the 2 MASTER latency pairs (`kSkipShipped`, with a `--no-skip` check). All of that is
+  removed: see "17 Nov: the shipped wasm is the pin's build" below. The text of this paragraph before that date is history.
+The gate logic is `native/tests/test_pump.cpp` (`kGateDb`, `kRules`, the exact list); the golden is written by `GATE_WRITE=<file> native/tools/parity-u18.sh` (never hand-edited; rebuild test_pump after).
 
 Result (GCC 13.3, Release, pin-built reference from wasi-sdk 25): 80 cases, 40 bit-exact, 39 within -100 dB (worst: v_hot -115.6 dB, then v_hot_low -115.7 is the same level; VOX -119.4 / -121.8), 1 by rule
 (x_two_hosts_same, 20 samples above the line of 163840, limit 40), 0 failed, 0 native-hash differences, latency 0 of 50 differ. Every one of the 39 "within" cases is below -100 dB: none needed loosening.
