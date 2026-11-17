@@ -130,6 +130,9 @@ jobs:
         run: npm i --no-save --no-audit --no-fund acorn@8
       - name: Parity u18 (pump slot kinds against the worklet with the pin-built pump.wasm)
         run: PIN_WASM_DIR="$RUNNER_TEMP/u02-wasm" BUILD_DIR="$RUNNER_TEMP/u18-build" native/tools/parity.sh u18
+      # U33 gate: the pump synths hosted natively against the web's PsynCore.render with the pump-synth.wasm that build-wasm.sh just built from the pin (the same gate as the shipped-wasm run in the Linux jobs).
+      - name: Parity u33 (pump synths against PsynCore.render with the pin-built pump-synth.wasm)
+        run: PIN_WASM_DIR="$RUNNER_TEMP/u02-wasm" BUILD_DIR="$RUNNER_TEMP/u33-build" native/tools/parity.sh u33
       - uses: actions/upload-artifact@v4
         with:
           name: thunder_dsp-wasm-u02

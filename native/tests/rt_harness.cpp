@@ -22,6 +22,7 @@
 #include "engine/layer_pe.h"
 #include "engine/xeng.h"
 #include "engine/xeng_live.h"
+#include "engine/pumpsynth.h"
 #include "voice/voice.h"
 
 #include <cmath>
@@ -48,9 +49,10 @@ static void rt_violation(const char* what) {
 }
 struct rt_guard { rt_guard() { rt_depth++; } ~rt_guard() { rt_depth--; } };
 
-void* operator new(std::size_t n) { if (rt_depth) rt_violation("operator new"); void* p = std::malloc(n ? n : 1); if (!p) std::abort(); return p; }
+static thread_local unsigned long rt_allocs = 0;   // operator new calls outside the guard (U33: what an event-bearing block of pump's synths allocates is counted, not forbidden)
+void* operator new(std::size_t n) { if (rt_depth) rt_violation("operator new"); rt_allocs++; void* p = std::malloc(n ? n : 1); if (!p) std::abort(); return p; }
 void* operator new[](std::size_t n) { if (rt_depth) rt_violation("operator new[]"); void* p = std::malloc(n ? n : 1); if (!p) std::abort(); return p; }
-void* operator new(std::size_t n, const std::nothrow_t&) noexcept { if (rt_depth) rt_violation("operator new (nothrow)"); return std::malloc(n ? n : 1); }
+void* operator new(std::size_t n, const std::nothrow_t&) noexcept { if (rt_depth) rt_violation("operator new (nothrow)"); rt_allocs++; return std::malloc(n ? n : 1); }
 void* operator new[](std::size_t n, const std::nothrow_t&) noexcept { if (rt_depth) rt_violation("operator new[] (nothrow)"); return std::malloc(n ? n : 1); }
 void operator delete(void* p) noexcept { if (rt_depth && p) rt_violation("operator delete"); std::free(p); }
 void operator delete[](void* p) noexcept { if (rt_depth && p) rt_violation("operator delete[]"); std::free(p); }
@@ -708,6 +710,33 @@ done:
   std::printf("rt_engine_xeng3 ok: %d renders (%zu samples) of acid / mach (7 machines) / blip and the live cores under the allocation guard\n", renders, total); return 0;
 }
 
+
+// U33: the pump synths' per-block interface (PumpSynth: the live lanes' reusable path) under the guard. Control thread, outside the guard: every instrument is made (psyn_new allocates), FREEZE's built-in spectra are built
+// (PumpSynth::builtins) and the note is delivered. Under the guard: 600 blocks of 32 to 512 frames with NO event: nothing may allocate. Events are NOT allowed to be free: pump's SynthBase::run sorts the queued events with
+// std::stable_sort, whose temporary buffer is an allocation (libstdc++ and libc++ both make one for a non-empty range). That is counted outside the guard and printed; it is the finding the notes list. The rendered path
+// (xeng_psyn) is offline and allocates by design (an instance per render).
+static int run_pumpsynth() {
+#ifndef THUNDER_HAVE_PUMP
+  std::printf("rt_pumpsynth: not run (no pump library on this platform)\n"); return 0;
+#else
+  using namespace thunder;
+  PumpSynth::builtins();
+  const int ns = 13; PumpSynth S[13]; unsigned long perEvent[13] = {0}; size_t total = 0;
+  for (int t = 0; t < ns; t++) {
+    if (!S[t].make(t, 48000.0, nullptr, 0)) { std::printf("rt_pumpsynth FAIL: type %d not made\n", t); return 1; }
+    if (t == 12) S[t].tempo(120.0);
+    S[t].midi(0, 0x90, 60, 100); S[t].process(256);   // the note on (events allocate: outside the guard)
+  }
+  { rt_guard g;
+    for (int b = 0; b < 600; b++) for (int t = 0; t < ns; t++) { const int n = 32 + (b * 37 + t * 11) % 481; S[t].process(n); const float* L = PumpSynth::out(0); for (int i = 0; i < n; i++) total += std::isfinite(L[i]) ? 1u : 0u; }
+  }
+  for (int t = 0; t < ns; t++) { const unsigned long a0 = rt_allocs; S[t].midi(5, 0x80, 60, 0); S[t].process(128); perEvent[t] = rt_allocs - a0; }
+  std::printf("rt_pumpsynth ok: 13 instruments x 600 blocks (%zu finite samples of the left channel) under the allocation guard, no event; operator new calls of one block with an event (note off): ", total);
+  for (int t = 0; t < ns; t++) std::printf("%lu%s", perEvent[t], t + 1 < ns ? " " : "\n");
+  return 0;
+#endif
+}
+
 // U24: the FM / additive / karplus / vosim / formant layers under the guard (their oscillator objects live on the stack: Karplus-Strong's delay line is a 16 KB member, nothing allocates).
 static int run_engine_u24() {
   using namespace thunder;
@@ -771,6 +800,7 @@ int main(int argc, char** argv) {
   if (int r = run_engine_xeng()) return r;
   if (int r = run_engine_xeng2()) return r;
   if (int r = run_engine_xeng3()) return r;
+  if (int r = run_pumpsynth()) return r;
   if (int r = run_engine_u24()) return r;
   if (int r = run_engine_u25()) return r;
   return run_song();
