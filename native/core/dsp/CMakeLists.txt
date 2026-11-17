@@ -222,6 +222,19 @@ dsp_group(${T} fx OPTS ${OPT_FX} PRE stdlib.h INCS ${SRC}/stub ${AW} ${DS_INCS} 
   ${AW}/Density/Density.cpp ${AW}/Density/DensityProc.cpp ${AW}/ToTape6/ToTape6.cpp ${AW}/ToTape6/ToTape6Proc.cpp
   ${D}/Source/Effects/chorus.cpp ${D}/Source/Effects/decimator.cpp)
 
+# ------------------------------------------------------------------------------------ Plaits + Elements for the engine (U25)
+# The two Mutable Instruments libraries the web app runs from thunder-dsp.wasm (dsp/build.sh: -O3 -ffast-math) for the "Macro osc" and "Resonator" layer types, built STRICT here
+# (-fno-fast-math -ffp-contract=off, as tfx and mods are: the same samples on every platform; the lead's gate rule of 16 Nov, docs/port/U25-NOTES.md). The sources are the same
+# upstream files as the plaits and elements groups of thunder_dsp_w above, plus pe_host.cc (w_plaits.cc / w_elements.cc as a Session class, no statics, no export names). NOT part of any wasm
+# module made here (thunder-dsp.wasm keeps its fast-math objects); thunder_dsp_pe and thunder_dsp_w must not be linked into one program (the upstream symbols are the same).
+set(OPT_PE -O3 -fno-fast-math -ffp-contract=off ${OPT_COMMON} -w)
+dsp_lib(thunder_dsp_pe)
+set(T thunder_dsp_pe)
+dsp_group(${T} pe OPTS ${OPT_PE} DEFS ${MI_DEFS} PRE cstdio INCS ${E} SRCS ${CMAKE_CURRENT_SOURCE_DIR}/pe_host.cc ${PLAITS_SRCS}
+  ${E}/stmlib/dsp/units.cc ${E}/stmlib/utils/random.cc ${E}/plaits/resources.cc
+  ${E}/elements/dsp/exciter.cc ${E}/elements/dsp/multistage_envelope.cc ${E}/elements/dsp/ominous_voice.cc ${E}/elements/dsp/part.cc
+  ${E}/elements/dsp/resonator.cc ${E}/elements/dsp/string.cc ${E}/elements/dsp/tube.cc ${E}/elements/dsp/voice.cc ${E}/elements/resources.cc)
+
 # ----------------------------------------------------------------------------- wasm modules (wasi-sdk toolchain only)
 if(IS_WASM)
   function(dsp_wasm exe lib out)
