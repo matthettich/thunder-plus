@@ -472,6 +472,8 @@ static const U26CaseGolden kU26CaseGolden[] = {
   {"bass_frac_bounds", "fb7fc2edbf7d5b88cf0803c0b03ed383cb1c430feaf20da8fe311f2fbda9a676", 400},
   {"bass_edges", "c6254f2e4f6032d0c6e6c8b95473248477584632a1cbae9ad1a4319fdc504cd8", 700},
   {"bass_out_of_range", "8655416fc78d5c37633e7e40005d868050d277cc5a3b638022514442d4cd4b93", 300},
+  {"bass_release_end", "74960d7c0b9031fa64915022e4b002633f72baf64dcbde310981bc11c38b93ef", 12000},
+  {"bass_release_end_again", "6df55627eef79be56b63af9d075e499fb51f4835ea187fc9ad8f4fc6927842ff", 14000},
   {"bass_stage3", "5f5f473ea484171423dc82dd7b5b2a3e779957e947665117144f99e51d36dd63", 16000},
   {"bass_nospan", "517fe4d8a81f8468ecc05067ffc71e668ef43aae3ab5b1e51e96f32acf3ac062", 100},
   {"bass_rate_extremes", "f4eedeb74c648ee87e202b949979c1b91e438afe9796be3e08c3a9ba6b534343", 12000},
@@ -763,4 +765,4 @@ static const U26CaseGolden kU26CaseGolden[] = {
   {"seq_mach_lfo_glide", "040a69cb0d3d8baac24a526912ae3d50f3602d84412e258549c966e01f49194b", 7000},
   {"seq_mach_lfo_offsets", "e208b11edb09d79c98242e29fdf67e8dd5f57e978e906e3b099626a879a41cfa", 7000},
 };
-static const int kU26CaseGoldenN = 760;
+static const int kU26CaseGoldenN = 762;

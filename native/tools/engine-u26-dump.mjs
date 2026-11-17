@@ -193,6 +193,8 @@ function coreScripts(E) {
   add('bass_frac_bounds', 'bass', SR, 400, {}, [on(false), rr(0, 70.5), rr(70.5, 140), rr(20.25, 90, 1.5), off, rr(140, 299.5)]);
   add('bass_edges', 'bass', SR, 700, {}, [rr(0, 64), on(true), rr(64, 200), off, off, rr(200, 260), on(true), rr(260, 600, 2)]);
   add('bass_out_of_range', 'bass', SR, 300, {}, [on(false), rr(0, 500), off, rr(250, 700), rr(-40, 20), rr(1e9, 1e9 + 50)]);   // writes outside the array are ignored
+  add('bass_release_end', 'bass', SR, 12000, { rel: 20 }, [on(false), rr(0, 3000), off, rr(3000, 12000)]);   // the release runs to the end (env < 1e-5: the stage becomes 0 and the blocks write zeros)
+  add('bass_release_end_again', 'bass', SR, 14000, { rel: 20, dec: 30, sus: 0.5 }, [on(false), rr(0, 3000), off, rr(3000, 9000), on(true), rr(9000, 10000), off, rr(10000, 14000)]);
   add('bass_stage3', 'bass', SR, 16000, { dec: 40, sus: 0.4 }, [on(false), rr(0, 9000), off, rr(9000, 16000)]);   // the sustain is reached (stage 3)
   add('bass_nospan', 'bass', SR, 100, {}, [on(false), rr(10, 10), rr(50, 20), rr(0, 1), off, rr(1, 2)]);   // empty and reversed ranges
   add('bass_rate_extremes', 'bass', SR, 12000, { parts: 64, det: 30 }, [on(false), rr(0, 2000, 0), rr(2000, 4000, 256), rr(4000, 6000, 0.0001), rr(6000, 8000, 1000), rr(8000, 10000, 1), off, rr(10000, 12000, 1)]);
