@@ -86,7 +86,9 @@ uint8_t* spec_unb64(XArena& ar, const std::string& str, size_t* nOut) {
   for (size_t i = 0; i < len; i += 4) {
     const int a = M[(unsigned char)s[i]], b = i + 1 < len ? M[(unsigned char)s[i + 1]] : 0, c = i + 2 < len ? M[(unsigned char)s[i + 2]] : -1, d = i + 3 < len ? M[(unsigned char)s[i + 3]] : -1;
     const int32_t v = ((a & 63) << 18) | ((b & 63) << 12) | ((c < 0 ? 0 : c) << 6) | (d < 0 ? 0 : d);
-    if (o < n) out[o++] = (uint8_t)((v >> 16) & 255); if (c >= 0 && o < n) out[o++] = (uint8_t)((v >> 8) & 255); if (d >= 0 && o < n) out[o++] = (uint8_t)(v & 255);
+    if (o < n) out[o++] = (uint8_t)((v >> 16) & 255);
+    if (c >= 0 && o < n) out[o++] = (uint8_t)((v >> 8) & 255);
+    if (d >= 0 && o < n) out[o++] = (uint8_t)(v & 255);
   }
   *nOut = o; return out;
 }
