@@ -39,11 +39,15 @@ One bug found by the gate on its first run (not by a review): `VoxCore::set()` w
 
 `test_engine_u26_fuzz`: every parameter of both engines at each of {-1e9, -1000, -1, -0.5, 0, 0.5, 1, 2.04, 100, 1e9, 1e308, NaN, +inf, -inf, 1e-300, -1e308} with and without the voice's own extremes; every field extreme at once; the voice fields, hold and sample rates (0.5 to 1e5 and the nonsense ones);
 odd lyrics (empty, rests, brackets, invalid UTF-8, U+0130, U+212A, ligatures, 200 kB of one letter, 9000 words); a COMBINED mode (2 to 7 extreme fields at once, random sample rate and hold, a per-render time limit of 20 s) and the live shell with extreme fields and extreme events.
-FUZZ_PLACEHOLDER
+Counts: default (ctest) 300 combined renders + 60 shell runs (3490 renders, 122 refused, 0 failed, 73 s Release). **Under ASan + UBSan locally: `FUZZ_COMBINED=6500` = 6500 combined renders, 996 live-shell runs, 9507 renders in all, 461 refused (input the JS cannot render), 0 failed, 18 min;** `test_engine_u26` and `test_live_u26` also clean under ASan + UBSan.
 
 ### Mutation checks
 
-MUT_PLACEHOLDER
+21 one-constant mutations, each rebuilt and run against `test_engine_u26` + `test_live_u26`; 20 caught, 1 equivalent:
+
+* bass: pitch base 65.406; decay 4.6; wSmooth 0.04; formant width 0.32; xeng_bass tail 0.02; the div table's 0.75: caught. Release end `1e-5`: **not caught at first** (no case rendered past 2.5 release times), so `bass_release_end` and `bass_release_end_again` were added: caught. Stage-3 threshold `1e-4`: **equivalent mutant** (the JS treats stages 2 and 3 identically everywhere).
+* vox: open quotient 0.6, aspiration 0.26, env floor 1e-4, jitter 0.045, choir detune 0.35, CDET table, breath open phase 0.35, shimmer 7.13, choir phase 0.618, closure voicing 0.12: all caught.
+* live shell: latency BLK-1, stable insertion order, event apply `<=`: caught by the sequences. Rate / bpm / wob clamps (256, 10, 999, 64): **not caught at first**; the clamp check now also requires that the bound is the bound (a value one step inside sounds different): caught.
 
 ## Part 2: the live shell
 
