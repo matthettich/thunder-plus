@@ -652,6 +652,38 @@ done:
   std::printf("rt_engine_xeng ok: %d voice renders (%zu samples) of 13 engines under the allocation guard\n", renders, total); return 0;
 }
 
+// U29: the second set of rendered-only engines under the guard: table (with a loaded wavetable), vector (both modes), scanned and resynth (with an analysis) take every array from the per-thread scratch arena
+// (xeng_util.h): one warm-up render of each outside the guard sizes it, then the same renders run over and over without a single allocation. Bytebeat is not here: its compiled formula is std::vector (an offline render).
+static std::string xb64(const std::vector<uint8_t>& u) {
+  static const char* T = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"; std::string s;
+  for (size_t i = 0; i < u.size(); i += 3) { const unsigned a = u[i], b = i + 1 < u.size() ? u[i + 1] : 0, c = i + 2 < u.size() ? u[i + 2] : 0, v = (a << 16) | (b << 8) | c;
+    s += T[(v >> 18) & 63]; s += T[(v >> 12) & 63]; s += i + 1 < u.size() ? T[(v >> 6) & 63] : '='; s += i + 2 < u.size() ? T[v & 63] : '='; }
+  return s;
+}
+static int run_engine_xeng2() {
+  using namespace thunder;
+  XengVoice V[5]; EngRenderOpts o[5]; std::vector<std::vector<float>> bufs;
+  uint32_t seed = 99; auto rnd = [&]() { seed = seed * 1664525u + 1013904223u; return (int)(seed >> 16); };
+  V[0].kind = XKind::Table; V[0].table.table = 4; V[0].table.unison = 3; V[0].table.pos = 0.4; V[0].table.pmod = 0.3;
+  { std::vector<uint8_t> u; for (int i = 0; i < 6 * 12 * 4; i++) u.push_back((uint8_t)rnd()); V[0].wt.present = V[0].wt.valid = true; V[0].wt.nf = 6; V[0].wt.h = 12; V[0].wt.pk = 0.5; V[0].wt.a = xb64(u); }
+  V[1].kind = XKind::Vector; V[1].vector.unison = 3; V[1].vector.venv = 1; V[1].vector.lx = 0.4; V[1].vector.wa = 12; V[1].vector.wb = 13; V[1].vector.wc = 16; V[1].vector.wd = 17;
+  V[2].kind = XKind::Vector; V[2].vector.mode = 1; V[2].vector.steps = 6; V[2].vector.sgate = 0.5; V[2].vector.sfenv = 0.5; V[2].vector.unison = 2; V[2].vector.s1 = 17; V[2].vector.spread = 0.5; o[2].bpm = 140;
+  V[3].kind = XKind::Scanned; V[3].scanned.exc = 2; V[3].scanned.path = 2; V[3].scanned.rexc = 4; V[3].scanned.hard = 0.5; V[3].scanned.masses = 80;
+  V[4].kind = XKind::Resynth; V[4].resynth.fkeep = 1; V[4].resynth.noise = 1; V[4].resynth.pmot = 1; V[4].resynth.harm = 0.4;
+  { XRsData& r = V[4].rs; r.present = true; r.pitched = true; r.np = 5; r.nf = 20; r.hop = 0.02; r.f0 = 220; r.dur = 0.4; r.pk = 1; r.npk = 1; r.rat = {1, 2, 3, 4.02, 5.1}; r.hn = {1, 2, 3, 4, 5};
+    std::vector<uint8_t> a, n, pc; for (int i = 0; i < 100; i++) a.push_back((uint8_t)(120 + rnd() % 130)); for (int i = 0; i < 160; i++) n.push_back((uint8_t)(100 + rnd() % 100)); for (int i = 0; i < 40; i++) pc.push_back((uint8_t)(rnd() & 255));
+    r.a = xb64(a); r.n = xb64(n); r.pc = xb64(pc); }
+  for (int i = 0; i < 5; i++) { V[i].level = -3; V[i].len = 0.5; o[i].hold = 0.3; bufs.emplace_back(xeng_render_bound(V[i], o[i]) + 1); if (bufs[(size_t)i].size() < 2) { std::printf("rt_engine_xeng2 FAIL: bound 0 (%d)\n", i); return 1; } }
+  size_t total = 0; int renders = 0;
+  for (int i = 0; i < 5; i++) { size_t n = 0; if (xeng_render_voice(V[i], o[i], bufs[(size_t)i].data(), bufs[(size_t)i].size() - 1, &n) != kEngOk) { std::printf("rt_engine_xeng2 FAIL: warm-up render %d\n", i); return 1; } }   // sizes the arena (and the FFT twiddles)
+  { rt_guard g;
+    for (int rep = 0; rep < 3; rep++) for (int i = 0; i < 5; i++) { size_t n = 0; const int st = xeng_render_voice(V[i], o[i], bufs[(size_t)i].data(), bufs[(size_t)i].size() - 1, &n); if (st != kEngOk) { total = 0; goto done; } total += n; renders++; }
+  }
+done:
+  if (!total) { std::printf("rt_engine_xeng2 FAIL: a render failed\n"); return 1; }
+  std::printf("rt_engine_xeng2 ok: %d voice renders (%zu samples) of table / vector / scanned / resynth under the allocation guard\n", renders, total); return 0;
+}
+
 // U24: the FM / additive / karplus / vosim / formant layers under the guard (their oscillator objects live on the stack: Karplus-Strong's delay line is a 16 KB member, nothing allocates).
 static int run_engine_u24() {
   using namespace thunder;
@@ -713,6 +745,7 @@ int main(int argc, char** argv) {
   if (int r = run_engine_u23()) return r;
   if (int r = run_engine()) return r;
   if (int r = run_engine_xeng()) return r;
+  if (int r = run_engine_xeng2()) return r;
   if (int r = run_engine_u24()) return r;
   if (int r = run_engine_u25()) return r;
   return run_song();
