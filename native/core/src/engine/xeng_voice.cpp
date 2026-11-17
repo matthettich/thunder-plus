@@ -62,6 +62,21 @@ const FieldRef kSkin[] = { XP_SKIN(XP_REF) };
 #define XP_CUR ChipP
 const FieldRef kChip[] = { XP_CHIP(XP_REF) };
 #undef XP_CUR
+#define XP_CUR TableP
+const FieldRef kTable[] = { XP_TABLE(XP_REF) };
+#undef XP_CUR
+#define XP_CUR VectorP
+const FieldRef kVector[] = { XP_VECTOR(XP_REF) };
+#undef XP_CUR
+#define XP_CUR ScannedP
+const FieldRef kScanned[] = { XP_SCANNED(XP_REF) };
+#undef XP_CUR
+#define XP_CUR ResynthP
+const FieldRef kResynth[] = { XP_RESYNTH(XP_REF) };
+#undef XP_CUR
+#define XP_CUR BytebeatP
+const FieldRef kBytebeat[] = { XP_BYTEBEAT(XP_REF) };
+#undef XP_CUR
 
 // normX: only a number that is finite overrides the default; the keys are the defaults' own; tune, drive and level are not taken from the object (xParams puts the voice's)
 template <class P, size_t K> void fill(P& p, const FieldRef (&t)[K], Json o) {
@@ -75,13 +90,14 @@ template <class P, size_t K> void fill(P& p, const FieldRef (&t)[K], Json o) {
 struct KindName { const char* name; XKind k; };
 const KindName kNames[] = {{"tone", XKind::Tone}, {"modal", XKind::Modal}, {"swarm", XKind::Swarm}, {"drift", XKind::Drift}, {"piano", XKind::Piano}, {"ep", XKind::Ep}, {"organ", XKind::Organ}, {"breath", XKind::Breath},
   {"strings", XKind::Strings}, {"fmdrum", XKind::FmDrum}, {"wind", XKind::Wind}, {"phase", XKind::Phase}, {"partials", XKind::Partials}, {"skin", XKind::Skin}, {"chip", XKind::Chip},
+  {"table", XKind::Table}, {"vector", XKind::Vector}, {"scanned", XKind::Scanned}, {"resynth", XKind::Resynth}, {"bytebeat", XKind::Bytebeat},
   // the other entries of XENG (and the wasm-backed ones): not this unit's
-  {"acid", XKind::Other}, {"mach", XKind::Other}, {"table", XKind::Other}, {"vector", XKind::Other}, {"scanned", XKind::Other}, {"resynth", XKind::Other}, {"bytebeat", XKind::Other}, {"sf", XKind::Other}, {"wavesl", XKind::Other},
+  {"acid", XKind::Other}, {"mach", XKind::Other}, {"sf", XKind::Other}, {"wavesl", XKind::Other},
   {"lxdrum", XKind::Other}, {"lxsnare", XKind::Other}, {"lxcym", XKind::Other}, {"lxhat", XKind::Other}, {"pmono", XKind::Other}, {"ppoly", XKind::Other}, {"pcoil", XKind::Other}, {"porbit", XKind::Other}};
 
 inline double holdOf(double hold, double len, double k, double m) { return orv(hold, mn(orv(len, k), m)); }   // hold || Math.min(V.len || k, m)
 
-size_t runEngine(const XengVoice& V, double sr, double hold, float* out, size_t cap) {
+size_t runEngine(const XengVoice& V, double sr, double hold, double bpm, float* out, size_t cap) {
   const double tu = orz(V.tune), dr = orz(V.drive), lv = orz(V.level);   // xParams: tune: V.tune || 0 ...
 #define XP_VOICE(P) P.tune = tu; P.drive = dr; P.level = lv
   switch (V.kind) {
@@ -100,6 +116,11 @@ size_t runEngine(const XengVoice& V, double sr, double hold, float* out, size_t 
     case XKind::Partials: { PartialsP P = V.partials; XP_VOICE(P); return xeng_partials(P, sr, holdOf(hold, V.len, 3, 4), out, cap); }
     case XKind::Skin: { SkinP P = V.skin; XP_VOICE(P); return xeng_skin(P, sr, out, cap); }
     case XKind::Chip: { ChipP P = V.chip; XP_VOICE(P); return xeng_chip(P, sr, holdOf(hold, V.len, 1, 4), out, cap); }
+    case XKind::Table: { TableP P = V.table; XP_VOICE(P); return xeng_table(P, sr, holdOf(hold, V.len, 2, 4), V.wt.present ? &V.wt : nullptr, out, cap); }   // V.wtData || null
+    case XKind::Vector: { VectorP P = V.vector; XP_VOICE(P); return xeng_vector(P, sr, holdOf(hold, V.len, 3, 6), bpm, out, cap); }   // the song tempo for note-value wave steps
+    case XKind::Scanned: { ScannedP P = V.scanned; XP_VOICE(P); return xeng_scanned(P, sr, holdOf(hold, V.len, 3, 6), out, cap); }
+    case XKind::Resynth: { ResynthP P = V.resynth; XP_VOICE(P); return xeng_resynth(P, sr, holdOf(hold, V.len, 12, 12), V.rs.present ? &V.rs : nullptr, out, cap); }   // V.rsData || null
+    case XKind::Bytebeat: { BytebeatP P = V.bytebeat; XP_VOICE(P); return xeng_bytebeat(P, sr, holdOf(hold, V.len, 2, 4), V.hasBb ? &V.bbExpr : nullptr, out, cap); }   // V.bbExpr: the formula text
     default: return 0;
   }
 #undef XP_VOICE
@@ -130,6 +151,10 @@ bool xeng_voice_from_json(XengVoice& V, Json v, Json fx) {
     case XKind::Organ: fill(V.organ, kOrgan, o); break;    case XKind::Breath: fill(V.breath, kBreath, o); break;  case XKind::Strings: fill(V.strings, kStrings, o); break;
     case XKind::FmDrum: fill(V.fmdrum, kFmDrum, o); break; case XKind::Wind: fill(V.wind, kWind, o); break;       case XKind::Phase: fill(V.phase, kPhase, o); break;
     case XKind::Partials: fill(V.partials, kPartials, o); break; case XKind::Skin: fill(V.skin, kSkin, o); break; case XKind::Chip: fill(V.chip, kChip, o); break;
+    case XKind::Table: fill(V.table, kTable, o); xeng_wt_from_json(V.wt, v.get("wtData")); break;
+    case XKind::Vector: fill(V.vector, kVector, o); break; case XKind::Scanned: fill(V.scanned, kScanned, o); break;
+    case XKind::Resynth: fill(V.resynth, kResynth, o); xeng_rs_from_json(V.rs, v.get("rsData")); break;
+    case XKind::Bytebeat: fill(V.bytebeat, kBytebeat, o); { Json b = v.get("bbExpr"); V.hasBb = b.isStr(); if (V.hasBb) V.bbExpr = std::string(b.asStr()); } break;
     default: break;
   }
   return true;
@@ -137,7 +162,7 @@ bool xeng_voice_from_json(XengVoice& V, Json v, Json fx) {
 
 size_t xeng_render_bound(const XengVoice& V, const EngRenderOpts& o) {
   if (!(o.sr > 0 && o.sr <= 1e7)) return 0;
-  const size_t N = runEngine(V, o.sr, o.hold, nullptr, 0);
+  const size_t N = runEngine(V, o.sr, o.hold, o.bpm, nullptr, 0);
   if (N == 0 || N == kRefuse) return 0;
   double len = (double)N;
   if (anyFxOn(V)) {
@@ -156,7 +181,7 @@ int xeng_render_voice(const XengVoice& V, const EngRenderOpts& o, float* out, si
   if (bound == 0) return kEngUnsupported;   // not representable (a length the JS cannot allocate either): refused, never silence
   if (cap < bound) return kEngTooSmall;
   const double sr = o.sr;
-  size_t len = runEngine(V, sr, o.hold, out, cap);
+  size_t len = runEngine(V, sr, o.hold, o.bpm, out, cap);
   if (len == kRefuse) return kEngUnsupported;
   if (len == 0) return kEngTooSmall;
   if (anyFxOn(V)) {
