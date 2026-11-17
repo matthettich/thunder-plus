@@ -59,6 +59,8 @@ const ParamDef kMaP[] = {{"div", 3, 0, 9, 1}, {"rate", 4, 0, 8, 1}, {"model", 0,
 class MarblesM : public ModsWrap {
  public:
   MarblesM(double sr, Seeds& s) : ModsWrap(sr, 0, s.next()) { rs_.seen = false; }
+  // U30: the …waves engine makes the object ahead and arms it at its first block: the seed is drawn then and the object made again with it (the one allocation on the audio thread, named in U30-NOTES.md)
+  void arm(Seeds& s) override { seed_ = s.next(); make(); }
   void process(const IO& io, const Ctx& c) override {
     const int n = c.block; const double* p = io.p; const bool rs = rs_(c);
     if (rs) ck_ = -1;
