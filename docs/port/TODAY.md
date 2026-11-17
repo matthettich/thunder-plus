@@ -100,6 +100,19 @@ Review queue below and REVIEW-16NOV.md first; then #182's decisions; web item 4 
 N1 step 10.
 
 ## Review queue for Fable (add a line per merged PR and per decision; newest last)
+**START HERE AT 19:00 (written 17:25). Suggested order, cheapest decisions first:**
+1. **One decision that unblocks four things:** rebuild the web app's `pump.wasm` and `mods.wasm` without reordering (`-fno-associative-math`; GCC also
+   `-fno-finite-math-only`) and regenerate their references? It settles TUBE on #182, Marbles / Tides (#186) and U25 (Plaits / Elements). It changes shipped audio
+   by ULPs, and the shipped `pump.wasm` is not from the pin anyway (MASTER 75 parameters against 77). Proofs: U18-NOTES.md on `n1/u18`, U21-NOTES.md on `rev/d2-mods`.
+2. **#190:** `SongRenderer::masterHook` gives the master effects no beat clock; a one-line fix is described in U15-NOTES.md on `n1/u15-song`. Apply, then merge #190's test.
+3. **Web app bugs found today, not fixed:** a wavetable layer with negative Bend reads one past its table (NaN; the slider reaches it, `index.html:8439`); the pump
+   worklet's value-list write at `index.html:20306` is unclamped (safe today only because meta and wasm agree); web item 4 from last night (both instruments sound).
+4. **Decisions the manager made today, to confirm or reverse:** `native`'s JS copies took build 633's two lines and `kBbHash` was regenerated (#191); the Linux CI
+   limit 30 → 60 minutes; `-fno-sanitize=vptr` (last night, #184); the committed-Linux-golden gate with the local comparison only on x86-64 Linux (U22 to U28).
+5. **Merged today on the strength of CI plus an independent Sonnet verifier, no diff read by a lead:** #187, #188, #189 (U22), #191, #192 (U23), #193 (U24). The
+   verifiers' reports and all review findings are in `docs/port/REVIEW-16NOV.md` on branch `rev/16nov` (not merged into `native`: merge it or read it there).
+6. **#195 (U28):** see the last Progress log entry for whether it was merged. **#182:** its own list in TONIGHT.md. Then last night's queue (TONIGHT.md), the "Owed by
+   the lead" list, and N1 step 10.
 - (nothing yet today; last night's queue is in TONIGHT.md and is still unreviewed)
 - #187 D6 `js_exp(1.0)` returns E as V8 does (4 lines, one `test_libm` case; no golden changed; Sonnet): merged, all CI green.
 - #188 D5 `test_modfx` builds its inputs in C++ (fixture 246 MB to 125 MB); all 1326 inputs equal Node's files bit for bit on Linux x86-64 and every hash in
@@ -237,3 +250,8 @@ N1 step 10.
   `xeng_chip.cpp:19,30,36`, `(int)NaN` as an array index. Sent back to the U28 worker: refuse (`kEngUnsupported`) where the JS throws, guard the NaN index to give
   what the JS gives, check its other engines for parameter-sized buffers, add extreme / NaN cases under the sanitizers. Report in REVIEW-16NOV.md on `rev/16nov`.
   **If you take over here:** `n3/u28` holds the work; give exactly this fix list to a Sonnet worker, then have a second verifier re-run item 4 before merging.
+- 17:25 **Wrap-up.** The server restarted again about 17:15 and stopped the U28 worker, after it had pushed its fix (bc5baa5: refuses oversized delay lines and
+  runaway loops, NaN-safe index). #195's CI: all green but the Linux job, still running. A Sonnet verifier is re-checking item 4 (sanitizers, the fuzz that found the
+  bug, that no golden or normal render changed). **Rule for #195: merge only if CI is all green AND the re-check passes; otherwise it stays open.** The outcome is the
+  next entry. Nothing else is running; no new units. No scheduled check-ins remain (all three fired). Not done today: U29, U25 (blocked on decision 1), and
+  everything under "Not yours today". Web: `beta` = build 634 + two documents commits; `main` = build 634; desktop v1.3.11 released.
