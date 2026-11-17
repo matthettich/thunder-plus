@@ -24,10 +24,19 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # One job per pass (GCC, clang, sanitizers) so each has its own 60-minute limit and they run in parallel. fail-fast is off: one push
+  # shows which compiler or sanitizer a failure belongs to.
   linux:
-    name: Core (Linux, ctest)
+    name: Core (Linux, ${{ matrix.name }})
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { pass: gcc, name: GCC }
+          - { pass: clang, name: clang }
+          - { pass: san, name: sanitizers }
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4   # the goldens' reference JS engine: Node 22 (as tests.yml); another V8 may differ in the last bit of Math.pow
@@ -36,28 +45,32 @@ jobs:
       # exits 1 under CI (it skips only on a developer machine). Installed at the repo root: the tool looks in <repo>/node_modules.
       - name: acorn (the fx reference tool)
         run: npm i --no-save --no-audit --no-fund acorn@8
-      - run: cmake -S native -B build -DCMAKE_BUILD_TYPE=Release
-      - run: cmake --build build -j
+      - if: ${{ matrix.pass == 'gcc' }}
+        run: cmake -S native -B build -DCMAKE_BUILD_TYPE=Release
+      - if: ${{ matrix.pass == 'gcc' }}
+        run: cmake --build build -j
       - name: Toolchain
         run: c++ --version | head -1; clang++ --version | head -1; ldd --version | head -1; node --version
-      - run: ctest --test-dir build --output-on-failure -V -R 'bench_put|core_pattern'
-      - run: ctest --test-dir build --output-on-failure
-      # The same tests with clang (the compiler of macOS and Android), in a third build directory. Runs even when the GCC run above failed,
-      # so one push shows which compiler a failure belongs to.
+      - if: ${{ matrix.pass == 'gcc' }}
+        run: ctest --test-dir build --output-on-failure -V -R 'bench_put|core_pattern'
+      - if: ${{ matrix.pass == 'gcc' }}
+        run: ctest --test-dir build --output-on-failure
+      # The same tests with clang (the compiler of macOS and Android), in a third build directory.
       - name: clang
-        if: ${{ !cancelled() }}
+        if: ${{ matrix.pass == 'clang' }}
         run: |
           CXX=clang++ CC=clang cmake -S native -B build-clang -DCMAKE_BUILD_TYPE=Release
           cmake --build build-clang -j
           ctest --test-dir build-clang --output-on-failure
       # N1 review fixes: the same tests again under AddressSanitizer + UBSan (undefined behaviour is fatal), in a second build directory.
       - name: Sanitizers (ASan + UBSan)
-        if: ${{ !cancelled() }}
+        if: ${{ matrix.pass == 'san' }}
         run: |
           cmake -S native -B build-san -DCMAKE_BUILD_TYPE=Release -DTHUNDER_SANITIZE=ON
           cmake --build build-san -j
           ctest --test-dir build-san --output-on-failure
-      - uses: actions/upload-artifact@v4
+      - if: ${{ matrix.pass == 'gcc' }}
+        uses: actions/upload-artifact@v4
         with:
           name: thunder_core-linux-x64
           path: build/core/libthunder_core.a
@@ -111,8 +124,8 @@ jobs:
       # (build-wasm.sh above built them into the same folder), plus pump's own wasm/compare for the nine mastering effects.
       - name: Parity u03 (pump goldens through the CMake wasm)
         run: WASI_SDK="$PWD/wasi-sdk" PARITY_SKIP_BUILD=1 native/tools/parity.sh u03 "$RUNNER_TEMP/u02-wasm"
-      # U18 gate: the pump effects as slot kinds of the track-effect host against the real worklet running the pump.wasm that build-wasm.sh just built from the pin (-80 dB per case, the
-      # figures printed). Needs acorn (fx-src.mjs cuts the worklet out of index.html). The native test build is made here too (c++ of the runner).
+      # U18 gate: the pump effects as slot kinds of the track-effect host against the real worklet running the pump.wasm that build-wasm.sh just built from the pin (-100 dB below each case's peak, the worst printed; the
+      # exact cases still exact; the native render's committed hashes). Needs acorn (fx-src.mjs cuts the worklet out of index.html). The native test build is made here too (c++ of the runner).
       - name: acorn (the reference tools)
         run: npm i --no-save --no-audit --no-fund acorn@8
       - name: Parity u18 (pump slot kinds against the worklet with the pin-built pump.wasm)

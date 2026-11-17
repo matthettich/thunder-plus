@@ -97,3 +97,48 @@ is in section C; read it, it changes how effects are built.
   maybe choke the previous edit-audition. Needs the core (`core/seq-core.js`, `node tools/make-core.mjs`): Fable.
 - Web items done by 20:25: 1 (624), 2 (625), 3 (626), 5 (627). The agent continues with 6 to 10.
 - #180 U15 (Sonnet agent; the lead read fxhost / fxbank changes, not clkcores.cpp line by line against the JS, and not fdlibm.cpp): merged.
+- **Web list state at 21:50: `beta` = `main` = build 631.** Done: 1 (624), 2 (625), 3 (626), 5 (627), 6 (628), 7 (629), 9 (630), 10 (631); 8 needed no build
+  (INST screen's IN USE row and the Synth page's "Used on" line already list the tracks). 4 is Fable's (above). Fable read the diffs of 624 to 631: accepted.
+  Not done: `HANDOVER.md`'s PICK UP HERE block on `beta` still describes 18:10 (Haiku: bring it up to date from this file), `docs/TEST-CHECKLIST.md` not re-exported.
+  **One follow-up for a Sonnet agent (build 632):** item 10 put the folded tempo line as ROWS, BPM / LPB, time left. The owner's words were "bpm and lpb to the
+  left of the countdown timer" and "the rows box … between left and lpb", where LEFT is the time-left box: so the order he asked for is **BPM / LPB, ROWS, LEFT**.
+  It is the `order` values in the build-631 media query (`body.mob #tRowsBar`, `body.mob #tClk`); check at 344 px in two skins with a screenshot.
+  Item 3 is only partly confirmed (the jump was reproduced from an empty cursor row only): its punch-list item asks the owner what he pressed.
+- **U18 pump hosting at 22:20: branch `n1/u18` pushed (Sonnet agent, then one commit by Fable), NO PR yet, NOT to be merged tonight: it carries decisions for Fable.**
+  Read `docs/port/U18-NOTES.md` in the branch. Pump effects are slot kinds 200 + type of `FxHost`; 80 cases against a `pump.wasm` built from the pin.
+  Fable's decision, done in the branch: host builds compile pump without `-ffast-math` (as the track effects); VOX then passes on GCC 13 and clang 20.
+  **For Opus tonight on this branch (a Sonnet agent):** (1) regenerate the reference with the PIN-built wasm (the copy Fable tested against had the shipped wasm, where
+  MASTER differs by design: 77 parameters / latency 4454 against 75 / 358) and print the full table for GCC 13, clang 20 and GCC 15 with the strict build; ctest the whole
+  suite on each; (2) `x_two_hosts_same` is −68.4 dB on both compilers (14 of 163840 samples, a CRUSH quantiser edge): find out exactly why a second host changes those 14
+  samples at all (two hosts must not influence each other: is it shared state, or the same spread showing in this case only?) and write the proof; do not gate it away;
+  (3) run `parity-u18.sh` end to end and open the PR so CI runs (the wasm job's new step was never run); leave the PR open.
+  **For Fable (not Opus):** the audio thread can allocate when a resting pump slot wakes or a plugin's output runs away (the JS does `pump_free` + `pump_new` there; kept);
+  the gate that keeps the audio thread from waiting on `pump_new` passes the sound unprocessed for a block now and then (a click when an effect is added mid-song);
+  `pump_io` is process-global, so every host must run on one audio thread (not enforced); no ThreadSanitizer run; whether the web app's `pump.wasm` is rebuilt from the pin;
+  the heap overwrite the agent found and clamped (a value list longer than the plugin's parameter count wrote past `pump_values`): check whether the web app can do the same.
+- Units U16, U17, U19 to U21 do not depend on U18: branch them from `native`.
+- **Opus (lead) from 21:05:** build 632 (Sonnet; folded header order BPM / LPB, ROWS, LEFT via the `order` values; screenshots at 344 px in IDM pink/green and Minimal black,
+  `npm test` green) pushed to `beta` and merged to `main` (ee095ad). `HANDOVER.md` PICK UP HERE brought to 21:30 and section C moved into it (Haiku, lead restored two dropped notes; `beta` 814109e, not merged to `main`: docs only).
+- #181 U16 Grains / Scramble / Glitch / VSamp (slot kinds 100 to 103, Sonnet agent; 242 cases bit-exact on GCC 13 and clang 18; `js_tanh` from V8 added to fdlibm and the libm golden): merged, all CI green.
+  **Lead's decision in it:** the agent's test failed if the C++ differed from the LOCAL Node run, which would have gone red on macOS (these cores call sin / cos / log). The gate is now the committed
+  Linux hash on every platform (bit-exact; `fxidm_golden_current` proves it on Linux), and the local-run comparison must hold only on x86-64 Linux. Same exposure in U15's `fxclk` (left as is: it passed). Least sure of:
+  the lead read the host / map / test changes, not `idmcores.cpp` line by line against the JS, nor the new `js_tanh`; the fixture is heavy (about 800 MB, 26 to 34 s in CI; 145 s here).
+- #182 U18 opened (NOT merged, by design). The Sonnet agent's follow-ups: reference from a PIN-built `pump.wasm` (wasi-sdk 25); GCC 13 = clang 18 on all 80 cases (40 bit-exact, 39 within −80 dB, worst passing
+  −115.6 dB); `x_two_hosts_same` is NOT a two-host effect: the same 14 samples and −68.4 dB with one host, hosts bit-identical to each other in both JS and C++; cause is TUBE's arithmetic spread against the wasm
+  (−128.6 dB, 1 ulp from sample 2) flipping CRUSH's `round(x*q)/q` steps. Which TUBE operation differs is open. `pump` ctest against the SHIPPED wasm fails on MASTER by design, so the PR's CI is expected red there.
+- #183 U17 Pitch reverb / Pitch delay / Resonator / Degrade (slot kinds 96 to 99; pad `applyFx` cores `pad_degrade`, `pad_reson`, `pad_pitchfx` tested directly, the pad `V.fx` loop waits for U22): 233 cases bit-exact on GCC 13 and clang 18, merged all CI green.
+  Least sure of: the pad cases rest on the agent's cut of `applyFx` out of `index.html`; pad functions return a `std::vector` (allocate: fine offline, not for a real-time pad path); Pitch reverb / delay / Resonator nap like a wasm effect (one 31.5 s case).
+- #184 U19 MODFX modules A: 54 modules in `native/core/src/modfx/` behind the agent's own minimal `Module` / `IO` / `Ctx` / `Seeds` / `Def` interface (U31 may wrap or replace it); `js_log2` from V8. 162 of 162 `chains-modules.json`
+  engine hashes and 904 direct cases bit-exact. Left: `expr` (MathExpr + per-instance text) and `scope` (`show()` data), both U31 decisions; `show()` not ported anywhere; `waves-modules.json` waits for U30 (the agent checks the shared block is
+  identical in the two worklets). **Lead's fix before merge:** the sanitizer build did not link (`SeedCounter` vtable / typeinfo emitted only in the `-fno-rtti` core) and, once linked, UBSan's vptr check on core-made objects reported "invalid vptr"
+  and freed inside the guarded callback: `SeedCounter::next` made inline, `-fno-sanitize=vptr` for `test_modfx` and `rt_harness` only (the core already has no vptr check under `-fno-rtti`; comment in `native/tests/CMakeLists.txt`). Fable: confirm or prefer moving the virtual calls into the core.
+  Degrade and Reson exist twice now (U17 track-FX cores and U19 modules): not unified.
+- #185 U20 Spectral / Extreme stretch / Convolution reverb + FFT cache; `js_atan2`, `js_hypot3` from V8: 9 engine hashes (171 of 171 overall) and 99 direct cases incl. song IRs, bit-exact; merged all CI green. Least sure of: the song-IR hand-over
+  (`Ctx::irs`, raw pointers kept while an IR is built, ~100 blocks: U31 must keep old buffers alive); FFT scratch made per instance instead of the JS's shared per-size one (fully overwritten each start); FFT tables are allocated in constructors, so U31 must make modules off the audio thread.
+  The `modfx-ref` fixture is about 189 MB with U20 (written inputs); if it keeps growing, generate the inputs in C++ instead of writing `.in.f32`.
+- #186 U21 MODFX modules C: 17 of 19 bit-exact (Simple delay, Filter, Low/high cut, Classic / Bus / Glue comp, Noise gate, Auto-pan, Pump, Pitch correct, Vowel filter, Rotary speaker, Granular delay, Reverse echo,
+  Envelope filter, Bytebeat with the full BBExpr compiler (146 formulas equal the JS), Chaos); with U19 and U20: 222 of 222 engine hashes, 1326 direct cases; GCC 13, clang 18 and the sanitizer build locally, merged all CI green.
+  **For Fable:** Marbles / Tides wrapper (`mod_mods.cpp`, hosts `thunder_dsp_mods`) is behind `-DTHUNDER_MODFX_MODS=ON`, default OFF, not registered, not gated: ULP-scale differences against the golden made from the fast-math wasm
+  (5 of 6 renders, 32 of 36 direct cases; building mods strict did not change it); cause not proved sample by sample; re-creating the object after a bad value allocates in `process`. U20 and U21 were branched from U19 in parallel and joined by a Sonnet
+  agent (both sides kept; U20's direct cases moved to seed offset 200 + index; golden regenerated). Least sure of: Pitch correct (long state chains), Bytebeat formulas beyond the 146. Fixture `modfx-ref` is now 257 MB (inputs written as files): shrink it next.
+- **Tonight's section B is done to its stop line** (U14 to U21 merged except U18, which is #182, open by design). Nothing else was started. Section B item 5 (A4 bridge timings, Android-side review fixes) left as written: needs the Fold.

@@ -19,7 +19,7 @@
 //    switch wakes it, within the block, so its switch is on the beat), and a plugin whose output went past +-64 or to NaN ("start it afresh with its settings"). Both are
 //    pump_free + pump_new in the audio thread: an allocation, a lock inside malloc, possibly milliseconds. They are kept as the JS has them (the output depends on the
 //    fresh state, so there is no way to skip them and stay equal), they happen inside the gate, and audioRemakes() counts them. An allocation-free version needs a spare
-//    instance per slot made on the control thread with the slot's values at that time: the lead's decision (the spare's values would have to follow every change).
+//    instance per slot made on the control thread with the slot's values at that time (the spare's values would have to follow every change). DECIDED (the lead, 16 Nov): the JS behaviour is accepted for now; spare instances are deferred to the real-time unit (U31).
 //  - The rest delay lines are made with the slot (the JS makes them when a rest begins): 2 x 8320 floats per slot with a bypass.
 #include "fx/pumpfx.h"
 

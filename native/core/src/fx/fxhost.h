@@ -10,12 +10,16 @@
 // process() is handed (Mixer::beat(track), what the node's `bp` AudioParam carries) and the FLX / GAT / RTG lanes, run whether the slot is on or off (Flex
 // is fed while off), and decide, with the node's sleep, when the host may sleep (`ck` of the worklet's p1).
 //
+// U16: Beat grains 100, Beat scramble 101, Glitch sequencer 102 and the Vintage sampler 103 (fx/idmcores.h) too. The first three are tempo-locked like Flex but keep
+// running while the clock is stopped (the worklet's `ck` 3) and have no feed; the Vintage sampler ignores the clock, is never napped and asks nothing of the sleep.
+//
+// U17: Pitch reverb 96, Pitch delay 97, Resonator 98 and Degrade 99 (fx/u17cores.h): no clock; Degrade always runs, the other three nap like a wasm effect (slotNap).
+//
 // U18: the 25 pump effects are slot kinds here too, ids 200 + the pump type (kPumpT0): the worklet keeps them in the same chain, with the same sleep, FXO switches
 // and levels, and the same node clock, so they are slots of this host and not a sibling (fxpump.cpp, pumpfx.h; the page's `pt`, `pv`, `bi`, `sck`, `cr`, `clk`
 // of a tfxChain entry are FxEntry's pump fields). They call the `pump_*` entry points of pump.wasm directly (library thunder_pump).
 //
-// Slot kinds the JS has that are not here yet: Beat grains / scramble / Glitch (100..102), Pitch
-// delay / reverb, Vintage sampler, Degrade, Resonator (U16), shared MODFX modules (U17). A chain entry of those kinds is
+// Slot kinds the JS has that are not here yet: shared MODFX modules (U19 to U21). A chain entry of those kinds is
 // left out of the host as the JS leaves out a slot whose engine is missing: the sound passes. `Slot` has the places they will use.
 //
 // REAL-TIME RULES. process(), psetAt(), lane(), reset(), setRest(), setLevels(), setTelemetry(), commit() allocate nothing and take no lock
@@ -30,6 +34,8 @@
 #include <string_view>
 
 #include "fx/clkcores.h"
+#include "fx/idmcores.h"
+#include "fx/u17cores.h"
 #include "rt/auto.h"
 #include "rt/json.h"
 
@@ -43,6 +49,9 @@ constexpr int kFxMaxCall = 4096;     // a call longer than this fails soft: sile
 constexpr int kFxQueue = 256;        // FXV messages waiting (the core's __q)
 constexpr int kFxKey = 24;           // "slot:type"
 inline bool fx_is_clocked(int id) { return id >= 93 && id <= 95; }   // Retrigger, Step gate, Flex (the tempo-locked JS cores)
+inline bool fx_is_idm(int id) { return id >= 100 && id <= 103; }    // U16: Beat grains, Beat scramble, Glitch sequencer, Vintage sampler (the other JS cores; 100..102 are tempo-locked, 103 is not)
+inline bool fx_is_u17(int id) { return id >= 96 && id <= 99; }      // U17: Pitch reverb 96, Pitch delay 97, Resonator 98, Degrade 99 (JS cores that never read the clock)
+inline bool fx_is_core(int id) { return fx_is_clocked(id) || fx_is_idm(id) || fx_is_u17(id); }   // a slot kind that is a JS core run by the host itself (a ClkFx), not a tfx effect
 // U18: pump effects. Kind = kPumpT0 + the pump type (pump_wasm.cpp's order: EQ 0, COMP, LIMIT, CALM, TONE, BAND, WIDE, HEAT, METER, TUBE, SNAP, GATE, ECHO, SPRING, VERB,
 // GRAIN, VOX, TUNE, CRUSH, SWIRL, STUTTER, CHOP, TWANG, MASTER, STRIP 24). The page's own slot id for them is none (it keys them by `pt`).
 constexpr int kPumpT0 = 200, kPumpTypes = 25;

@@ -15,7 +15,7 @@ static inline double u8(double v) { return v == 128 ? 0.5 : clampd(v, 0, 255) / 
 static inline double jsign(double x) { return x > 0 ? 1.0 : x < 0 ? -1.0 : x; }
 static inline double jmin(double a, double b) { return (a != a || b != b) ? std::nan("") : (a < b ? a : b); }
 
-// The table holds ids 0..33 (the wasm effects) and 93..95 (the tempo-locked JS cores): the id is not the index.
+// The table holds ids 0..33 (the wasm effects), 93..95 (the tempo-locked JS cores, U15) and 100..103 (Grains, Scramble, Glitch, VSamp, U16) and 96..99 (Pitch reverb, Pitch delay, Resonator, Degrade, U17): the id is not the index.
 static const FxDef* defOf(int id) { for (int i = 0; i < kFxDefN; i++) if (kFxDefs[i].id == id) return &kFxDefs[i]; return nullptr; }
 int fx_type_of(std::string_view key) { for (int i = 0; i < kFxDefN; i++) if (key == kFxDefs[i].key) return kFxDefs[i].id; return -1; }
 const char* fx_key_of(int id) { const FxDef* d = defOf(id); return d ? d->key : nullptr; }
@@ -82,6 +82,15 @@ void fx_map(int id, const double* f, double sr, double bpm, double restartN, dou
     // U15: the tempo-locked JS effects (TFX[...].map of index.html): Flex, Step gate, Retrigger
     case 95: p[0] = f[FXP_flex_pat]; p[1] = u8(f[FXP_flex_mix]); p[2] = 0.5 + u8(f[FXP_flex_xf]) * 19.5; p[3] = (double)js_to_int32(f[FXP_flex_wait]); break;
     case 94: p[0] = f[FXP_sgate_pat]; p[1] = f[FXP_sgate_m1]; p[2] = f[FXP_sgate_m2]; p[3] = f[FXP_sgate_div]; p[4] = std::max(0.03, u8(f[FXP_sgate_len])); p[5] = u8(f[FXP_sgate_depth]); p[6] = 0.3 + u8(f[FXP_sgate_smooth]) * 19.7; p[7] = (double)js_to_int32(f[FXP_sgate_wait]); break;
+    case 100: p[0] = f[FXP_grains_div]; p[1] = u8(f[FXP_grains_density]); p[2] = u8(f[FXP_grains_size]); p[3] = u8(f[FXP_grains_pos]); p[4] = u8(f[FXP_grains_spray]); p[5] = f[FXP_grains_pitch] - 24; p[6] = f[FXP_grains_rpitch]; p[7] = u8(f[FXP_grains_rev]); p[8] = u8(f[FXP_grains_shape]); p[9] = u8(f[FXP_grains_spread]); p[10] = f[FXP_grains_freeze]; p[11] = u8(f[FXP_grains_mix]); break;
+    case 101: p[0] = f[FXP_scramble_div]; p[1] = u8(f[FXP_scramble_chance]); p[2] = u8(f[FXP_scramble_rev]); p[3] = f[FXP_scramble_keep]; p[4] = f[FXP_scramble_vary]; p[5] = f[FXP_scramble_seed]; p[6] = u8(f[FXP_scramble_xf]) * 20; p[7] = u8(f[FXP_scramble_mix]); break;
+    case 102: p[0] = f[FXP_glitch_div]; p[1] = u8(f[FXP_glitch_chance]); p[2] = u8(f[FXP_glitch_stut]); p[3] = u8(f[FXP_glitch_rev]); p[4] = u8(f[FXP_glitch_pitch]); p[5] = u8(f[FXP_glitch_tape]); p[6] = u8(f[FXP_glitch_crush]); p[7] = u8(f[FXP_glitch_gate]); p[8] = f[FXP_glitch_vary]; p[9] = f[FXP_glitch_seed]; p[10] = u8(f[FXP_glitch_mix]); break;
+    case 103: p[0] = f[FXP_vsamp_model]; p[1] = f[FXP_vsamp_drive]; p[2] = f[FXP_vsamp_filter]; p[3] = 0.25 + u8(f[FXP_vsamp_rate]) * 0.75; p[4] = u8(f[FXP_vsamp_noise]); p[5] = u8(f[FXP_vsamp_mix]); break;
+    // U17: Pitch reverb, Pitch delay, Resonator, Degrade
+    case 96: p[0] = 1; p[1] = f[FXP_preverb_mode]; p[2] = 400; p[3] = u8(f[FXP_preverb_fb]) * 0.9; p[4] = f[FXP_preverb_pitch] - 24; p[5] = f[FXP_preverb_pitch2] - 24; p[6] = u8(f[FXP_preverb_tone]); p[7] = u8(f[FXP_preverb_size]); p[8] = 0; p[9] = u8(f[FXP_preverb_mix]); break;
+    case 97: p[0] = 0; p[1] = f[FXP_pdelay_mode]; p[2] = 20 + u8(f[FXP_pdelay_time]) * u8(f[FXP_pdelay_time]) * 1980; p[3] = u8(f[FXP_pdelay_fb]) * 0.95; p[4] = f[FXP_pdelay_pitch] - 24; p[5] = -12; p[6] = u8(f[FXP_pdelay_tone]); p[7] = 0.6; p[8] = u8(f[FXP_pdelay_wow]); p[9] = u8(f[FXP_pdelay_mix]); break;
+    case 98: p[0] = f[FXP_reson_note]; p[1] = f[FXP_reson_chord]; p[2] = f[FXP_reson_mode]; p[3] = u8(f[FXP_reson_decay]); p[4] = u8(f[FXP_reson_bright]); p[5] = u8(f[FXP_reson_spread]); p[6] = u8(f[FXP_reson_mix]); break;
+    case 99: p[0] = f[FXP_degrade_bits]; p[1] = f[FXP_degrade_rate] >= 255 ? 48000 : 300 * js_pow(160, u8(f[FXP_degrade_rate])); p[2] = u8(f[FXP_degrade_noise]); p[3] = u8(f[FXP_degrade_color]); p[4] = u8(f[FXP_degrade_follow]); p[5] = u8(f[FXP_degrade_dry]); p[6] = u8(f[FXP_degrade_wet]); break;
     case 93: p[0] = f[FXP_retrig_mode]; p[1] = f[FXP_retrig_div]; p[2] = u8(f[FXP_retrig_decay]); p[3] = f[FXP_retrig_pitch] - 24; p[4] = u8(f[FXP_retrig_gate]); p[5] = u8(f[FXP_retrig_mix]); break;
     default: break;
   }

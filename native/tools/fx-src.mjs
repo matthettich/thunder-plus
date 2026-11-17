@@ -60,3 +60,15 @@ export function clockedEffects() {
   for (const key of Object.keys(TFX)) { const D = TFX[key]; if (D.id >= 93 && D.id <= 95) out.push({ key, id: D.id, ps: D.ps.map(p => ({ k: p.k, d: p.d, min: p.min, max: p.max })), mapSrc: String(D.map) }); }
   out.sort((x, y) => x.id - y.id); return out;
 }
+// U17: Pitch reverb 96, Pitch delay 97, Resonator 98, Degrade 99 (PitchFxCore, ResonCore, DegradeCore)
+export function u17Effects() {
+  const { TFX } = load(), out = [];
+  for (const key of Object.keys(TFX)) { const D = TFX[key]; if (D.id >= 96 && D.id <= 99) out.push({ key, id: D.id, ps: D.ps.map(p => ({ k: p.k, d: p.d, min: p.min, max: p.max })), mapSrc: String(D.map) }); }
+  out.sort((x, y) => x.id - y.id); return out;
+}
+// U16: the four JS-only effects after them: Beat grains 100, Beat scramble 101, Glitch sequencer 102, Vintage sampler 103 (GrainsCore, ScrambleCore, GlitchCore, VSampCore)
+export function idmEffects() {
+  const { TFX } = load(), out = [];
+  for (const key of Object.keys(TFX)) { const D = TFX[key]; if (D.id >= 100 && D.id <= 103) out.push({ key, id: D.id, ps: D.ps.map(p => ({ k: p.k, d: p.d, min: p.min, max: p.max })), mapSrc: String(D.map) }); }
+  out.sort((x, y) => x.id - y.id); return out;
+}

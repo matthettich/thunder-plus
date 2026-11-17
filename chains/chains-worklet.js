@@ -4676,8 +4676,8 @@ class BBExpr {
           case 74: St[s] = St[s] & C[i++]; break;
           case 75: St[s] = St[s] ^ C[i++]; break;
           case 76: St[s] = St[s] | C[i++]; break;
-          case 77: St[s] = St[s] !== 0 && C[i++] !== 0 ? 1 : 0; break;
-          case 78: St[s] = St[s] !== 0 || C[i++] !== 0 ? 1 : 0; break;
+          case 77: y = C[i++]; St[s] = St[s] !== 0 && y !== 0 ? 1 : 0; break;   // read the constant first: && and || skipped it when they short-circuited, and it then ran as a step (50 / 51 jumped: a hang)
+          case 78: y = C[i++]; St[s] = St[s] !== 0 || y !== 0 ? 1 : 0; break;
           default: i = N;
         }
       }

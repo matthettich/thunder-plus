@@ -51,7 +51,8 @@ void SongRenderer::setMasterChain(const MasterChainConfig& cfg) {
 }
 void SongRenderer::masterHook(void* user, int track, float* L, float* R, int frames, double t0, const MixFeed* feeds, int nFeeds) {
   SongRenderer* r = (SongRenderer*)user;   // MASTER VOL -> master effects -> [mastering -> safety limiter] -> OUT
-  if (r->fx_ && r->fx_->host(kSongNT).slotCount() > 0) r->fx_->host(kSongNT).process(L, R, frames, t0);
+  // The master node hears the beat clock like a track node (page: setMfx calls clockTo(mfx)); without it master Flex / Step gate / Retrigger see a stopped clock.
+  if (r->fx_ && r->fx_->host(kSongNT).slotCount() > 0) r->fx_->host(kSongNT).process(L, R, frames, t0, r->mix_.beat(kSongNT), frames);
   if (r->mchain_) MasterChain::hook(r->mchain_.get(), track, L, R, frames, t0, feeds, nFeeds);
 }
 void SongRenderer::setEffects(bool on) {

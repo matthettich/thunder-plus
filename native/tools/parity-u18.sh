@@ -1,9 +1,12 @@
 #!/bin/sh
 # U18 parity gate: the pump effects as slot kinds of the track-effect host.  native/tools/parity.sh u18
 #   builds test_pump + rt_harness and runs: pump_ref / pump (the real ThunderFx worklet in Node with the SHIPPED pump/pump.wasm: 80 cases, latency of every type, the order check, the gate
-#   between threads; the shipped wasm is older than the pin the native build links, so MASTER (75 against 77 parameters, latency 358 against 4454) differs there by design),
+#   between threads; the shipped wasm is older than the pin the native build links, so MASTER (75 against 77 parameters, latency 358 against 4454) differs there by design: the cases and
+#   latency pairs that depend on it are SKIPPED by name with the reason printed, every other case is gated),
 #   pump_cases_current / pump_table_current (the committed case list and pump table are what the tools give now; Linux), rt_core (the host, pump kinds included, under the allocation guard).
-#   Then the real gate: a pump.wasm BUILT FROM THE PIN (build-wasm.sh, wasi-sdk) is the reference of a second run of pump-dump.mjs + test_pump (-80 dB per case, the figures printed).
+#   Then the real gate: a pump.wasm BUILT FROM THE PIN (build-wasm.sh, wasi-sdk) is the reference of a second run of pump-dump.mjs + test_pump --pin: -100 dB below each reference's peak
+#   (worst case printed), the cases that are bit-exact today still bit-exact (golden/pump_gate.inc), one named rule (x_two_hosts_same), and the committed SHA-256 of the native strict render.
+#   The lead's decision (16 Nov): docs/port/U18-NOTES.md, "The gate". GATE_WRITE=<file> makes the second run write that golden (never hand-edit it).
 #   Nothing is skipped: a fixture that cannot run (no Node, no acorn, no wasm build) fails.
 # BUILD_DIR names the build folder (default /tmp/thunder-parity). PIN_WASM_DIR names the folder with the pin-built pump.wasm (default /tmp/thunder-parity-u18-wasm; built there if absent;
 # WASI_SDK = a wasi-sdk 25 folder, else build-wasm.sh downloads it).
@@ -22,6 +25,6 @@ node "$here/pump-table.mjs" --meta "$meta" >/dev/null || { echo "FAIL u18 (pin m
 ref="$pin/ref"; rm -rf "$ref"
 node "$here/pump-dump.mjs" --wasm "$pin/pump.wasm" --meta "$meta" "$ref" >/dev/null || { echo "FAIL u18 (pin reference)"; exit 1; }
 echo "---- against pump.wasm built from the pin"
-"$build/tests/test_pump" "$ref" || rc=1
+if [ -n "${GATE_WRITE:-}" ]; then "$build/tests/test_pump" "$ref" --pin --write-gate "$GATE_WRITE" || rc=1; else "$build/tests/test_pump" "$ref" --pin || rc=1; fi
 [ $rc -eq 0 ] || { echo "FAIL u18"; exit 1; }
 echo "PASS u18"; exit 0
