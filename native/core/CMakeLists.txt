@@ -6,6 +6,7 @@ target_sources(thunder_core PRIVATE src/engine/layer_u23.cpp src/engine/layer_cl
 target_sources(thunder_core PRIVATE src/engine/xeng_util.cpp src/engine/xeng_voice.cpp src/engine/xeng_tone.cpp src/engine/xeng_modal.cpp src/engine/xeng_swarm.cpp src/engine/xeng_drift.cpp src/engine/xeng_piano.cpp src/engine/xeng_ep.cpp src/engine/xeng_organ.cpp src/engine/xeng_breath.cpp src/engine/xeng_strings.cpp src/engine/xeng_fmdrum.cpp src/engine/xeng_wind.cpp src/engine/xeng_phase.cpp src/engine/xeng_partials.cpp src/engine/xeng_skin.cpp src/engine/xeng_chip.cpp)   # U28
 target_sources(thunder_core PRIVATE src/engine/xeng_table.cpp src/engine/xeng_vector.cpp src/engine/xeng_scanned.cpp src/engine/xeng_resynth.cpp src/engine/xeng_bytebeat.cpp)   # U29
 target_sources(thunder_core PRIVATE src/engine/xeng_live.cpp src/engine/xeng_blip.cpp)   # U27
+target_sources(thunder_core PRIVATE src/engine/bass_core.cpp src/engine/vox_core.cpp src/engine/live_shell.cpp)   # U26
 target_sources(thunder_core PRIVATE src/engine/layer_u24.cpp src/engine/layer_fm.cpp src/engine/layer_add.cpp src/engine/layer_karplus.cpp src/engine/layer_formant.cpp)   # U24: FM / additive / karplus / vosim / formant layers
 target_include_directories(thunder_core PRIVATE src)
 target_include_directories(thunder_core SYSTEM PRIVATE third_party)
