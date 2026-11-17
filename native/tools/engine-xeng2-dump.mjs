@@ -153,6 +153,11 @@ function directCases(E) {
   e('bb_missing', 'bytebeat', {}, {}, SR, 0.5); e('bb_notstring', 'bytebeat', {}, {}, SR, 0.5, { bbExpr: 5 });
   e('bb_clamp', 'bytebeat', { rate: 1e9, a: -9, b: 999, c: 300.4, mode: 7, bits: 99, smooth: 5, start: 1e12, loop: 99, track: 9, oct: 9, sus: 3 }, {}, SR, 0.5, { bbExpr: 't*(t>>5|t>>8)' });
   e('bb_slow', 'bytebeat', { rate: 1, track: 0, loop: 1, smooth: 1, bits: 1, mode: 2 }, { tune: -24 }, 22050, 0.8, { bbExpr: 't*3&t>>5' }); e('bb_fx', 'bytebeat', {}, { tail: 1 }, SR, 0, { bbExpr: '(t*5&t>>7)|(t*3&t>>10)' }, 120, [mkFx('degrade'), { type: 'room', on: true }]);
+  // added after the first review of U29 (appended: no earlier case changes). Bytebeat: a loop that really wraps; Loop 13 is 2^20 steps (the formulas carry a t>>16 / t>>15 term: one that repeats every 2^16 steps could not show where a loop wraps), so the clock is the highest (96000 steps/s) and the output rate low (4000) to reach 1.15 million steps in 12 s; Loop 99 clamps to 13 and Loop 12 / 11 wrap at 2^19 / 2^18. Scanned: the Scatter path with fewer than 32 masses (groups of 4, not masses/8) and group ends that are not full.
+  for (const lp of [13, 99, 12, 11]) e('bb_wrap_loop' + lp, 'bytebeat', { rate: 48000, track: 1, oct: 3, loop: lp, bits: 8 }, {}, 4000, 12, { bbExpr: '(t*(t>>5|t>>8))^(t>>16)' });
+  e('bb_wrap_start', 'bytebeat', { rate: 48000, track: 1, oct: 3, loop: 13, start: 1000000, smooth: 0.3 }, {}, 4000, 12, { bbExpr: '((t*5&t>>7)|(t*3&t>>10))^(t>>15)' });
+  for (const m of [3, 4, 5, 8, 9, 13, 17, 25, 31, 32, 33, 40, 64]) e('scanned_scatter_m' + m, 'scanned', { masses: m, path: 2, exc: m % 5, ends: m % 2, pos: 0.3, rexc: 1 }, {}, SR, 0.4);
+  for (const m of [5, 9, 17, 31]) e('scanned_shuffle_m' + m, 'scanned', { masses: m, path: 1, exc: m % 5, ends: m % 2 }, {}, SR, 0.4);
   // the pad effects on engines
   for (const [i, k] of ['table', 'vector', 'scanned', 'resynth', 'bytebeat'].entries()) e('fx_' + k, k, {}, { tail: 1 + i }, SR, 0, k === 'resynth' ? { rsData: JSON.parse(JSON.stringify(snd.pluck44)) } : k === 'bytebeat' ? { bbExpr: 't*(t>>9|t>>13)' } : {}, 120, [mkFx(fxTypes[i % 4]), { type: 'room', on: true }]);
   return cases;

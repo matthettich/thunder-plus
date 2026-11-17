@@ -102,13 +102,15 @@ size_t xeng_vector(const VectorP& p, double sr, double hold, double bpm0, float*
   const double D = di == 0 ? mx(0.01, p.stime / 1000) : BEATS[di] * 60 / bpm;
   const int L0 = cidx(mn(S - 1, cl3(js_round(p.lstart), 1, 16) - 1), 0, S - 1);   // (NaN, not reachable from a song: the first step)
   const bool loop = js_round(p.sloop) >= 1; const double xf = mn(D, mx(0.002, cl3(p.xfade, 0, 1) * D));
-  auto stepAt = [&](double t, double* r) {   // r = [current step, next step, fade 0..1, time into the step]
-    if (t < 0) t = 0; const double k = std::floor(t / D), tau = t - k * D; int cur;
-    if (k < S) cur = (int)k; else if (loop) cur = L0 + (int)std::fmod(k - S, (double)(S - L0)); else cur = S - 1;
-    const int nxt = cur + 1 < S ? cur + 1 : loop ? L0 : cur;
+  auto stepAt = [&](double t, double* r) {   // r = [current step, next step, fade 0..1, time into the step]; the steps stay doubles: a NaN time gives NaN steps, as in the JS
+    if (t < 0) t = 0; const double k = std::floor(t / D), tau = t - k * D; double cur;
+    if (k < S) cur = k; else if (loop) cur = L0 + std::fmod(k - S, (double)(S - L0)); else cur = S - 1;
+    const double nxt = cur + 1 < S ? cur + 1 : loop ? (double)L0 : cur;
     double f = nxt != cur && tau > D - xf ? (tau - (D - xf)) / xf : 0; f = 0.5 - 0.5 * js_cos(kPi * f);
     r[0] = cur; r[1] = nxt; r[2] = f; r[3] = tau;
   };
+  // stepSlot[x] of the JS: undefined (NaN, or no such step) for an index that is not a step; the weight written there goes nowhere (a typed array ignores a NaN index)
+  auto slotOf = [&](double x) -> int { return (x == x && x >= 0 && x < 16 && x == std::floor(x)) ? stepSlot[(int)x] : -1; };
   // the vector envelope: from the joystick through points 1-4, then hold, loop or go back and forth
   const double PX[5] = {p.jx, p.x1, p.x2, p.x3, p.x4}, PY[5] = {p.jy, p.y1, p.y2, p.y3, p.y4}; double PT[5] = {0, p.t1, p.t2, p.t3, p.t4}; for (int k = 0; k < 5; k++) PT[k] = mx(0.001, PT[k] / 1000);
   const int vl = cidx(cl3(js_round(p.vloop), 0, 2), 0, 2); const double first = PT[1] + PT[2] + PT[3] + PT[4];
@@ -134,7 +136,7 @@ size_t xeng_vector(const VectorP& p, double sr, double hold, double bpm0, float*
   const double lph = rnd() * 6.283; const bool law = js_round(p.law) >= 1; double sr4[4] = {0, 0, 0, 0};
   auto weights = [&](double t, double* Wt) {   // fills Wt[u * NS + slot] for time t
     for (int k = 0; k < U * NS; k++) Wt[k] = 0;
-    if (seq) { for (int u = 0; u < U; u++) { stepAt(t - lag[u], sr4); const int s0 = stepSlot[(int)sr4[0]], s1 = stepSlot[(int)sr4[1]]; if (s0 >= 0) Wt[u * NS + s0] += 1 - sr4[2]; if (s1 >= 0) Wt[u * NS + s1] += sr4[2]; } return; }
+    if (seq) { for (int u = 0; u < U; u++) { stepAt(t - lag[u], sr4); const int s0 = slotOf(sr4[0]), s1 = slotOf(sr4[1]); if (s0 >= 0) Wt[u * NS + s0] += 1 - sr4[2]; if (s1 >= 0) Wt[u * NS + s1] += sr4[2]; } return; }
     double bx = p.jx, by = p.jy; if (p.venv > 0) { envPos(t); bx += (ep[0] - bx) * p.venv; by += (ep[1] - by) * p.venv; }
     if (p.lx > 0 || p.ly > 0) { const double a = lph + 2 * kPi * p.lrate * t; bx += p.lx * 0.5 * js_sin(a); by += p.ly * 0.5 * js_cos(a); }
     for (int u = 0; u < U; u++) {

@@ -144,6 +144,28 @@ int main(int argc, char** argv) {
   hostile("vector", "\"vector\":{\"mode\":1,\"sdiv\":0,\"stime\":1e-300,\"steps\":16}", "vector stime tiny"); hostile("vector", "\"vector\":{\"mode\":1,\"sdiv\":0,\"stime\":1e308}", "vector stime huge");
   hostile("vector", "\"vector\":{\"mode\":1,\"sdiv\":0,\"stime\":10,\"lstart\":16,\"steps\":2,\"sloop\":1}", "vector loop point past the steps");
   hostile("scanned", "\"scanned\":{\"urate\":4000,\"rexc\":1e-300,\"masses\":1e308}", "scanned rexc tiny"); hostile("scanned", "\"scanned\":{\"urate\":4000,\"rexc\":1e308}", "scanned rexc huge");
+  // ---- combined fields: several parameters at once from the extreme list (the single-field loop above cannot reach a failure that needs two of them, e.g. sequence mode + unison + spread + loop), a per-render time limit.
+  // The verifier's case is a named regression: spread 1e308 makes the unison lag inf * 0 = NaN for voice 0, a NaN step (the JS reads undefined and skips it).
+  hostile("vector", "\"vector\":{\"mode\":1,\"unison\":2,\"spread\":1e308,\"sloop\":1,\"sdiv\":1}", "REGRESSION vector seq + unison 2 + spread 1e308 + loop (NaN step)", 48000, 1);
+  hostile("vector", "\"vector\":{\"mode\":1,\"unison\":7,\"spread\":1e308,\"sloop\":0,\"sdiv\":4,\"sgate\":1,\"sfenv\":1}", "REGRESSION vector seq no loop NaN step", 48000, 1);
+  { uint32_t sd = 0x9e3779b9u; auto rn = [&]() { sd = sd * 1664525u + 1013904223u; return (sd >> 8) & 0xffff; };
+    const char* env = getenv("FUZZ_COMBINED"); const int total = env ? std::atoi(env) : 600; int done = 0;
+    static const double sr[] = {2000, 8000, 44100};
+    while (done < total) for (const char* kind : kinds) {
+      if (done >= total) break;
+      Json P = R.obj(kind); std::vector<std::string> names; for (size_t pi = 0; pi < 80 && !P.valAt(pi).missing(); pi++) names.push_back(std::string(P.keyAt(pi)));
+      std::string body; const int nf = 2 + (int)(rn() % 6);
+      for (int k = 0; k < nf; k++) { char tmp[96]; std::snprintf(tmp, sizeof tmp, "%.17g", vals[rn() % 9]); body += (body.empty() ? "" : ",") + std::string("\"") + names[rn() % names.size()] + "\":" + tmp; }
+      if (!strcmp(kind, "vector") && rn() % 2) body += ",\"mode\":1,\"unison\":" + std::to_string(1 + rn() % 7) + ",\"sloop\":" + std::to_string(rn() % 2) + ",\"sdiv\":" + std::to_string(rn() % 12) + (rn() % 2 ? ",\"spread\":1e308" : "");
+      if (!strcmp(kind, "table")) body += ",\"table\":4";
+      if (!strcmp(kind, "scanned") && rn() % 2) body += ",\"path\":" + std::to_string(rn() % 3) + ",\"ends\":" + std::to_string(rn() % 2) + ",\"rexc\":" + std::to_string(rn() % 3);
+      const std::string js = std::string("{\"engine\":\"") + kind + "\",\"" + kind + "\":{" + body + "}" + (rn() % 3 == 0 ? ",\"tune\":-1000" : "") + "}";
+      XengVoice V; if (!fromJson(V, js)) return 1;
+      const int before = fails; const auto t0 = std::chrono::steady_clock::now(); renderIt(V, sr[rn() % 3], (rn() % 3) * 0.05, "combined " + js);
+      if (std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count() > 20) { fails++; std::printf("FAIL: over the time limit: %s\n", js.c_str()); }
+      (void)before; done++;
+    }
+    std::printf("engine xeng2 fuzz: %d combined renders\n", done); }
   // the over-long and hostile directly: an engine whose voice was never filled
   { XengVoice V; V.kind = XKind::Resynth; EngRenderOpts o; size_t n = 0; float t[8]; const int st = xeng_render_voice(V, o, t, 8, &n); if (st != kEngTooSmall && st != kEngOk) { fails++; std::printf("FAIL: an empty resynth voice: status %d\n", st); } }
   std::printf("engine xeng2 fuzz: %d renders, %d refused, %d failed\n", renders, refused, fails);
