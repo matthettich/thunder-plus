@@ -3773,7 +3773,7 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
 <script src="pump/synth/pump-synth-engine.js?v=10"></script>
 <!-- …PUMP (23 Oct 2026): the pump mastering plugins' parameter tables and presets (generated in matthettich/pump by
      wasm/build.sh); pump/pump.wasm is their DSP, fetched by the wasm loader. -->
-<script src="pump/pump-meta.js?v=6"></script>
+<script src="pump/pump-meta.js?v=7"></script>
 <script>
 /* ===ENGINE START=== */
 // The platform's own modifier in hints and tips (U15): ⌘ on a Mac / iPad, Ctrl elsewhere. (MACK, further down, is the same test.)
@@ -17701,7 +17701,7 @@ $('midiKeysSel').addEventListener('change', e => { releaseKeys(); midi.keys = +e
 moPorts(); miPorts();
 
 /* ---------- Plaits loader ---------- */
-const WASM_DSP = 'waves/dsp/thunder-dsp.wasm', WASM_TFX = 'waves/dsp/tfx.wasm', PUMP_WASM = 'pump/pump.wasm?v=6';
+const WASM_DSP = 'waves/dsp/thunder-dsp.wasm', WASM_TFX = 'waves/dsp/tfx.wasm', PUMP_WASM = 'pump/pump.wasm?v=7';
 // Each wasm is decoded and compiled once and shared: the synth here, the waves engine and the render Worker.
 let plFailed = false;
 (async () => {
@@ -36631,7 +36631,7 @@ if (new URLSearchParams(location.search).has('seqtest')) window.__seqTest = {
 <script src="pump/ui/band.js?v=1"></script>
 <script src="pump/ui/wide.js?v=1"></script>
 <script src="pump/ui/heat.js?v=1"></script>
-<script src="pump/ui/master.js?v=2"></script>
+<script src="pump/ui/master.js?v=3"></script>
 <script src="pump/ui/gate.js?v=1"></script>
 <script src="pump/ui/tune.js?v=2"></script>
 <script src="pump/ui/chop.js?v=1"></script>

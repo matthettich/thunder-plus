@@ -3,7 +3,7 @@
 //   node native/tools/pump-table.mjs --check    exits 1 when the committed table differs from the pinned pump's parameter tables or from tfxChain's pump branch in index.html now
 //   node native/tools/pump-table.mjs --meta OUT writes the pinned pump's meta (types, parameters, factory presets) as JSON to OUT (what pump-dump.mjs reads)
 // The numbers come from pump's own parameter tables at the PIN (wasm/pump_meta.cpp compiled with the host compiler, as parity-u03.sh does), because the native build links that pin;
-// the page's pump/pump-meta.js is the shipped wasm's (the pin's MASTER has more parameters: third_party/PINS.md). `cr` and `clk` are what tfxChain sets (index.html), found in the page
+// the page's pump/pump-meta.js is the pin's too since web build 638 (before it, the shipped wasm's MASTER had fewer parameters: third_party/PINS.md). `cr` and `clk` are what tfxChain sets (index.html), found in the page
 // and checked against the expected text: a page that changes them fails --check.
 import fs from 'node:fs';
 import os from 'node:os';

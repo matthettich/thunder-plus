@@ -12,10 +12,10 @@
 // is bit-exact today stays bit-exact (golden/pump_gate.inc, kPumpGateExact: a case that moves from exact to "within" FAILS); a case where a quantiser follows a nonlinear stage has a
 // named rule in kRules (at most N samples above the line, all others within it). REVISED by the lead (16 Nov night): there is NO committed hash of the native render for pump: the strict
 // build calls the system libm, so renders differ bit for bit between toolchains and libms (U18-NOTES.md); the gate on every platform is the line, the exact list (enforced with --pin) and the rule.
-//   --pin: the reference is the pump.wasm built from the pin (parity-u18.sh's second run): the exact list is enforced and nothing is skipped.
-//   without --pin: the reference is the SHIPPED pump/pump.wasm, older than the pin in MASTER (75 parameters against 77, latency 358 against 4454): the cases that depend on MASTER's
-//   parameter list / latency are skipped by name with the reason printed (kSkipShipped); every other case is gated the same way except that the exact list is not enforced.
-//   --no-skip: run the skipped cases anyway (how the reason for each skip was checked).
+//   --pin: the reference is the pump.wasm built from the pin (parity-u18.sh's second run).
+//   without --pin: the reference is the SHIPPED pump/pump.wasm. Since web build 638 that file IS the pin's build (MASTER 77 parameters, latency 4454), so NOTHING is skipped in either run:
+//   every case, every latency pair, the same gate. The exact list is enforced in the shipped run too, but only where it was made and is known to hold: Linux x86-64 (kExactHoldsHere; on
+//   macOS p_band_alt is -142.0 dB, not exact, because BAND calls the system libm). --pin enforces it everywhere it is run (the wasm job, Linux).
 //   --write-gate FILE: writes golden/pump_gate.inc from this run (the exact list; never hand-edited).
 #include <atomic>
 #include <cmath>
@@ -58,7 +58,7 @@ static void setChain(FxHost& H, Json ch) { std::vector<FxEntry> v; entriesOf(ch,
 
 struct Res { bool ran = false, exact = false, postOk = true; double db = -INFINITY, err = 0, ref = 0; long nDiff = 0, n = 0, first = -1; double firstGot = 0, firstWant = 0; int posts = 0; uint32_t remakes = 0, gated = 0; uint64_t hash = 0; long nOver = 0; std::string why; };
 
-// the gate (see the header): kGateDb below the reference's peak; kRules the named per-case exceptions; kSkipShipped the cases the shipped wasm cannot be the reference of
+// the gate (see the header): kGateDb below the reference's peak; kRules the named per-case exceptions
 static const double kGateDb = -100.0;
 struct Rule { const char* name; long maxOver; const char* why; };
 static const Rule kRules[] = {
@@ -69,14 +69,14 @@ static const Rule kRules[] = {
 };
 static const Rule* ruleOf(const char* nm) { for (const Rule& r : kRules) if (std::strcmp(r.name, nm) == 0) return &r; return nullptr; }
 static bool inList(const char* const* l, int n, const char* nm) { for (int i = 0; i < n; i++) if (std::strcmp(l[i], nm) == 0) return true; return false; }
-struct Skip { const char* name; const char* why; };
-static const Skip kSkipShipped[] = {
-  // the shipped pump/pump.wasm is an older pump than the pin the native build links: MASTER has 75 parameters there and 77 in the pin, and its latency is 358 against 4454. Each case below
-  // fails against the shipped wasm for that reason only (verified when this list was made: the same case is within the gate against the pin-built wasm).
-  {"p_master_def", "MASTER: 75 parameters / latency 358 in the shipped wasm, 77 / 4454 in the pin"},
-  {"p_master_alt", "MASTER: 75 parameters / latency 358 in the shipped wasm, 77 / 4454 in the pin"},
-};
-static const Skip* skipOf(const char* nm) { for (const Skip& k : kSkipShipped) if (std::strcmp(k.name, nm) == 0) return &k; return nullptr; }
+
+// Where the exact list (golden/pump_gate.inc, made on Linux x86-64) is known to hold without --pin: the shipped pump.wasm is the pin's build, so the shipped run and the pin run are the same
+// reference; what differs between platforms is the native render (system libm: macOS BAND, p_band_alt, is -142 dB there).
+#if defined(__linux__) && defined(__x86_64__) && !defined(__ANDROID__)
+static const bool kExactHoldsHere = true;
+#else
+static const bool kExactHoldsHere = false;
+#endif
 
 static bool near(double a, double b, double tol) { return a == b || std::fabs(a - b) <= tol + 1e-3 * std::fabs(b) || (std::isnan(a) && std::isnan(b)); }
 
@@ -132,24 +132,22 @@ static Res runCase(const std::string& dir, const char* name, std::vector<float>*
 }
 
 // pumpLatencyOf through the plan: the latency LATENCY COMP counts, for each type with its default and preset values; and the table against the meta the reference used
-static void latencyTest(const std::string& dir, bool pin) {
+static void latencyTest(const std::string& dir) {
   std::string js; if (!readFile(dir + "/lat.json", &js)) { std::printf("lat.json missing  FAIL\n"); fails++; return; }
   JsonDoc doc; if (!doc.parse(js)) { std::printf("lat.json unreadable  FAIL\n"); fails++; return; } Json A = doc.root();
-  int bad = 0, nz = 0, info = 0, skippedLat = 0, skippedLatDiff = 0;
+  int bad = 0, nz = 0, info = 0;
   for (size_t i = 0; i < A.size(); i++) { Json x = A.at(i); const int pt = (int)x.num("pt"), lat = (int)x.num("lat");
     FxEntry e; e.t = kPumpT0 + pt; e.slot = 0; e.on = true; e.bi = (int)x.num("bi"); std::snprintf(e.key, kFxKey, "0:p%s", std::string(x.str("type")).c_str());
     Json pv = x.arr("pv"); e.npv = (int)std::min<size_t>(pv.size(), kPumpMaxParams); for (int k = 0; k < e.npv; k++) e.pv[k] = (float)pv.at((size_t)k).asNum();
     FxHost H(48000.0); FxPlan* p = H.plan(&e, 1); H.commit(p); delete p;
     const bool same = H.slotCount() == 1 && (int)H.slotLatency(0) == lat && H.slotBypass(0) == (e.bi >= 0) && PumpSlot::probeLatency(e, 48000.0) == lat;
     if (lat > 0) nz++;
-    if (!pin && std::string_view(x.str("type")) == "master") { skippedLat++; if (!same) skippedLatDiff++; continue; }   // shipped wasm's MASTER is older than the pin's (kSkipShipped)
     if (!same) { bad++; std::printf("  latency %-8s %-3s: host %d, reference %d  FAIL\n", std::string(x.str("type")).c_str(), std::string(x.str("set")).c_str(), H.slotCount() ? (int)H.slotLatency(0) : -1, lat); }
     if (std::string_view(fx_pump_key(pt) ? fx_pump_key(pt) : "") != x.str("type") || fx_pump_bypass(pt) != (int)x.num("bi")) { bad++; std::printf("  table: type %d is %s / bypass %d here, %s / %d in the reference's meta  FAIL\n", pt, fx_pump_key(pt), fx_pump_bypass(pt), std::string(x.str("type")).c_str(), (int)x.num("bi")); }
-    if (pump::nparams(pt) != (int)x.num("nparams")) { info++; std::printf("  INFO  %s: pump (the pin) has %d parameters, the reference's pump.wasm %d (the pin is newer)\n", std::string(x.str("type")).c_str(), pump::nparams(pt), (int)x.num("nparams")); }
+    if (pump::nparams(pt) != (int)x.num("nparams")) { info++; std::printf("  INFO  %s: pump (the pin) has %d parameters, the reference's pump.wasm %d (they must agree: the shipped wasm is the pin's build)\n", std::string(x.str("type")).c_str(), pump::nparams(pt), (int)x.num("nparams")); }
   }
   if (bad) fails++;
   std::printf("latency: %d type x set pairs through plan() + slotLatency() against pumpLatencyOf, %d with a latency above 0, %d differ  %s\n", (int)A.size(), nz, bad, bad ? "FAIL" : "ok");
-  if (skippedLat) std::printf("latency: SKIPPED %d MASTER pairs (%d of them differ) against the shipped wasm: its MASTER is older than the pin's (75 against 77 parameters, latency 358 against 4454); gated against the pin-built wasm\n", skippedLat, skippedLatDiff);
 }
 
 // The gate: an audio thread runs two pump slots while another thread makes and frees pump instances (the shared handle table is what they would race on). It must not crash, hang
@@ -180,22 +178,21 @@ int main(int argc, char** argv) {
   if (argc < 2) { std::printf("pump: no reference directory (Node not found): %d cases FAIL\n", kPumpCaseN); return 1; }
   const std::string dir = argv[1];
   { std::string w; if (readFile(dir + "/which.txt", &w)) std::printf("reference: pump.wasm and meta as named in %s/which.txt:\n%s", dir.c_str(), w.c_str()); }
-  bool pin = false, noSkip = false; const char* writeGate = nullptr; const char* sub = nullptr;
-  for (int i = 2; i < argc; i++) { if (!std::strcmp(argv[i], "--pin")) pin = true; else if (!std::strcmp(argv[i], "--no-skip")) noSkip = true; else if (!std::strcmp(argv[i], "--write-gate") && i + 1 < argc) writeGate = argv[++i]; else sub = argv[i]; }
-  const bool all = !sub;
-  std::printf("pump: reference = %s; gate %.0f dB below each reference's peak%s\n", pin ? "the pump.wasm built from the pin" : "the SHIPPED pump/pump.wasm (MASTER older than the pin's)", kGateDb, pin ? ", the exact list enforced" : "");
-  int exact = 0, ran = 0, within = 0, ruled = 0, skipped = 0, regress = 0; double worst = -INFINITY; const char* worstName = ""; std::map<std::string, uint64_t> hashes; std::map<std::string, Res> results; int failedCases = 0;
-  if (all) latencyTest(dir, pin);
+  bool pin = false; const char* writeGate = nullptr; const char* sub = nullptr;
+  for (int i = 2; i < argc; i++) { if (!std::strcmp(argv[i], "--pin")) pin = true; else if (!std::strcmp(argv[i], "--write-gate") && i + 1 < argc) writeGate = argv[++i]; else sub = argv[i]; }
+  const bool all = !sub; const bool enforceExact = pin || kExactHoldsHere;
+  std::printf("pump: reference = %s; gate %.0f dB below each reference's peak%s\n", pin ? "the pump.wasm built from the pin" : "the SHIPPED pump/pump.wasm (the pin's build since web build 638)", kGateDb, enforceExact ? ", the exact list enforced" : "");
+  int exact = 0, ran = 0, within = 0, ruled = 0, regress = 0; double worst = -INFINITY; const char* worstName = ""; std::map<std::string, uint64_t> hashes; std::map<std::string, Res> results; int failedCases = 0;
+  if (all) latencyTest(dir);
   for (int i = 0; i < kPumpCaseN; i++) {
     const char* nm = kPumpCases[i]; if (sub && !std::strstr(nm, sub)) continue;
-    if (!pin && !noSkip) if (const Skip* k = skipOf(nm)) { std::printf("%-20s SKIPPED (shipped wasm): %s\n", nm, k->why); skipped++; continue; }
     const Res R = runCase(dir, nm);
     if (!R.ran) { std::printf("%-20s could not be run: %s  FAIL\n", nm, R.why.c_str()); fails++; failedCases++; continue; }
     ran++; hashes[nm] = R.hash; results[nm] = R;
     const Rule* rule = ruleOf(nm); const bool wasExact = inList(kPumpGateExact, kPumpGateExactN, nm);
     bool within100 = R.exact || R.db <= kGateDb; if (rule) within100 = R.nOver <= rule->maxOver;
     bool ok = within100 && R.postOk; const char* extra = "";
-    if (pin && wasExact && !R.exact) { ok = false; regress++; extra = "  (was bit-exact: the exact list is enforced)"; }
+    if (enforceExact && wasExact && !R.exact) { ok = false; regress++; extra = "  (was bit-exact: the exact list is enforced)"; }
     char db[40]; if (R.exact) std::snprintf(db, sizeof db, "exact"); else if (rule) std::snprintf(db, sizeof db, "%.1f dB (rule)", R.db); else std::snprintf(db, sizeof db, "%.1f dB", R.db);
     if (R.exact) exact++; else if (rule) ruled++; else if (R.db <= kGateDb) within++; if (!R.exact && !rule && R.db > worst) { worst = R.db; worstName = nm; }
     std::printf("%-20s %-16s posts %-3d remakes %-3u%s%s%s%s\n", nm, db, R.posts, R.remakes, R.gated ? " (GATED)" : "", R.postOk ? "" : " POSTS DIFFER", extra, ok ? "" : "  FAIL");
@@ -211,11 +208,11 @@ int main(int argc, char** argv) {
   }
   // the second pass, in reverse order: the same bits as the first (the library's statics are shared by every host and every case of the process)
   if (all) { int moved = 0, n2 = 0;
-    for (int i = kPumpCaseN - 1; i >= 0; i--) { if (!pin && skipOf(kPumpCases[i])) continue; const Res R = runCase(dir, kPumpCases[i]); if (!R.ran) continue; n2++; if (hashes.count(kPumpCases[i]) && hashes[kPumpCases[i]] != R.hash) { moved++; std::printf("  second pass: %s gives other bits than in the first pass  FAIL\n", kPumpCases[i]); } }
+    for (int i = kPumpCaseN - 1; i >= 0; i--) { const Res R = runCase(dir, kPumpCases[i]); if (!R.ran) continue; n2++; if (hashes.count(kPumpCases[i]) && hashes[kPumpCases[i]] != R.hash) { moved++; std::printf("  second pass: %s gives other bits than in the first pass  FAIL\n", kPumpCases[i]); } }
     if (moved) fails++;
     std::printf("order: %d cases run again in reverse order, %d gave other bits than the first time  %s\n", n2, moved, moved ? "FAIL" : "ok");
     gateTest(); }
-  std::printf("pump: %d cases run, %d bit-exact, %d within %.0f dB, %d by a named rule (%d), %d skipped; worst of the rest %s (%s); %d exact-list regressions, %d failed\n", ran, exact, within, kGateDb, ruled, (int)(sizeof kRules / sizeof kRules[0]), skipped,
+  std::printf("pump: %d cases run, %d bit-exact, %d within %.0f dB, %d by a named rule (%d); worst of the rest %s (%s); %d exact-list regressions, %d failed\n", ran, exact, within, kGateDb, ruled, (int)(sizeof kRules / sizeof kRules[0]),
     std::isinf(worst) ? "exact" : (std::to_string(worst) + " dB").c_str(), worstName, regress, failedCases);
   return fails ? 1 : 0;
 }

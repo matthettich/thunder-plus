@@ -50,19 +50,12 @@ same mechanism as every other pin. WORKPLAN section 12's default was a git submo
 mechanism and one place (this file) that lists every pin, and because a sparse fetch can leave the GPL folder out of the checkout. A submodule
 would put all of `plugins/machine/` on disk. No pump source is copied into this repo.
 
-**Which pump commit the app's committed wasm came from.** Not exactly known (no stamp in the wasm, and the thunder-plus history of
-`pump/pump.wasm` is squashed). Evidence, measured on 15 Nov by `parity.sh u03`:
-- `pump/synth/pump-synth.wasm`: **byte-identical** to the CMake build at this pin (and to wasm/build.sh's at 7b8cb1d / 6f1ec29).
-- `pump/synth/pump-synth-meta.js` sha1 stamp equals the one generated from this pin.
-- `pump/pump.wasm` (1,599,108 B) is **not** byte-equal to any build tried: pin 1,601,290 B (CMake) ; wasm/build.sh at 6f1ec29, 3d53287 and 7b8cb1d
-  1,599,184 B (identical to each other); at 4a1533b 1,599,823 B; at ff046ce 1,599,488 B. wasm/build.sh and the CMake build agree on flags
-  and order, so the difference is source, not toolchain.
-- `pump/pump-meta.js` stamp (`30b389d8...`) is what pump produces from 6f1ec29 (Nov 2, STRIP) up to 4a1533b / ff046ce (Nov 14, MASTER alt-solo), and
-  **not** what the pin produces (`72cc7e55...`): the pin includes 30a3e95 "pump MASTER: resonance stage" (14 Nov, after the shipped build).
-  So the shipped pump.wasm was built from a commit between 6f1ec29 and ff046ce (possibly with uncommitted edits), and the pin's MASTER (type 23) is newer than the app's.
-- Despite that, every golden and test that renders through pump passes at the pin (see Parity), so the pin reproduces today's audio hashes.
-Consequence for U18: the pin's MASTER has parameters the app's `pump-meta.js` does not list. Regenerate `pump-meta.js` from the pin when the
-host glue lands, or pin 7b8cb1d (8 Nov, the newest commit whose meta stamp equals the shipped one) instead; the owner decides.
+**Which pump commit the app's committed wasm comes from: the pin (since web build 638, 16 Nov; `native` took the files on 17 Nov).** `pump/pump.wasm` (1,601,290 B, SHA-256 `ecbfadc17eb40fc5585e86cd95d33ac2ce977fca36320e077c1fb70cee1830ae`)
+is **byte-identical** to the `pump.wasm` that `native/tools/build-wasm.sh` builds from this pin (wasi-sdk 25), `pump/synth/pump-synth.wasm` is byte-identical to the pin's `pump-synth.wasm`, and `pump/pump-meta.js` carries the
+sha1 stamp (`72cc7e55...`) the pin generates. MASTER (type 23) has 77 parameters and latency 4454 in the web app and in the native build alike.
+History (kept as the record of the skew that 638 removed): until build 637 the shipped `pump/pump.wasm` (1,599,108 B) was not byte-equal to any build tried (pin 1,601,290 B; wasm/build.sh at 6f1ec29, 3d53287 and 7b8cb1d 1,599,184 B; at 4a1533b
+1,599,823 B; at ff046ce 1,599,488 B), its `pump-meta.js` stamp was `30b389d8...` (what pump produces from 6f1ec29 up to 4a1533b / ff046ce) and its MASTER was older than the pin's (75 parameters, latency 358: the pin adds 30a3e95
+"pump MASTER: resonance stage", 14 Nov). Measured on 15 Nov by `parity.sh u03`; resolved on 16 Nov by the owner shipping the pin in build 638. Every golden and test that renders through pump passed at the pin before and after.
 
 ### Everything the pump wasm build compiles in (`wasm/build.sh`; checked by `g++ -MM` over every translation unit)
 | Component | Licence | Where | In `thunder_pump*`? |
