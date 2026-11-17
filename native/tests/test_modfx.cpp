@@ -39,6 +39,13 @@ static bool readFile(const std::string& path, std::string* out) { std::ifstream 
 static int fails = 0;
 // ---- Marbles / Tides: the tolerance gate (see the header) ------------------------------------------------------------------------------------------------------------------------------
 static const double kGateDb = -100.0;
+#ifdef THUNDER_MODFX_MODS
+static const bool kModsBuilt = true;
+#else
+static const bool kModsBuilt = false;   // no mods library on this platform (MSVC: the DSP libraries are not built): Marbles / Tides are not in the registry
+#endif
+static bool isTolCase(const char* nm) { return !std::strncmp(nm, "marbles_", 8) || !std::strncmp(nm, "tides_", 6); }
+static int gTolNotBuilt = 0;
 static bool isTol(const char* type) { return !std::strcmp(type, "marbles") || !std::strcmp(type, "tides"); }
 struct TolSkip { const char* name; const char* why; };
 static const TolSkip kTolSkip[] = { {"", ""} };   // none: every case of Marbles / Tides is within the line (measured)
@@ -93,7 +100,9 @@ static void tableTest(const std::string& dir) {
   std::string js; if (!readFile(dir + "/defs.json", &js)) { std::printf("defs.json missing  FAIL\n"); fails++; return; }
   JsonDoc doc; if (!doc.parse(js)) { std::printf("defs.json unreadable  FAIL\n"); fails++; return; }
   Json A = doc.root(); int bad = 0;
-  if ((int)A.size() != count()) { std::printf("tables: the JS list holds %d modules, the registry %d  FAIL\n", (int)A.size(), count()); bad++; }
+  const int expect = (int)A.size() - (kModsBuilt ? 0 : 2);   // the JS list holds Marbles and Tides; a platform without the mods library has neither
+  if (!kModsBuilt) std::printf("tables: Marbles / Tides are NOT BUILT on this platform (no mods library): the 2 modules are left out of this comparison\n");
+  if (expect != count()) { std::printf("tables: the JS list holds %d modules, the registry %d  FAIL\n", (int)A.size(), count()); bad++; }
   for (int m = 0; m < count(); m++) {
     const Def& d = at(m); Json J = A.get(d.type); bool b = false;
     if (J.missing()) { std::printf("tables: %s is not in the JS list  FAIL\n", d.type); fails++; continue; }
@@ -156,6 +165,7 @@ static void engineTest(const std::string& filt) {
   int ran = 0, bad = 0;
   for (int i = 0; i < kModfxEngineN; i++) {
     const ModfxEngineGolden& G = kModfxEngine[i]; if (!filt.empty() && !std::strstr(G.type, filt.c_str())) continue;
+    if (!kModsBuilt && isTol(G.type)) { gTolNotBuilt++; continue; }
     const Def* d = find(G.type); if (!d) { std::printf("engine: %s is not in the registry  FAIL\n", G.type); bad++; continue; }
     if (isTol(G.type)) {   // Marbles / Tides: the reference is the wasm's samples, the gate the line (not the hash)
       const std::string nm = std::string("engine_") + G.type + "_" + (G.set == 0 ? "default" : G.set == 1 ? "stressed" : "switches-on"); std::string rf;
@@ -317,6 +327,7 @@ int main(int argc, char** argv) {
   int ran = 0, exact = 0, shown = 0;
   for (int i = 0; i < kModfxCasesN; i++) {
     const ModfxCaseGolden& G = kModfxCases[i]; if (!filt.empty() && !std::strstr(G.name, filt.c_str())) continue;
+    if (!kModsBuilt && isTolCase(G.name)) { gTolNotBuilt++; continue; }
     const Res R = runCase(argv[1], G);
     if (!R.ran) { std::printf("%-24s could not be run (reference files missing or the wrong size)  FAIL\n", G.name); fails++; continue; }
     if (!R.out.empty()) { ran++; tolCheck(G.name, R.out.data(), R.ref.data(), R.out.size()); continue; }   // Marbles / Tides
@@ -329,6 +340,7 @@ int main(int argc, char** argv) {
   if (filt.empty()) { int unc = 0; for (int m = 0; m < count(); m++) { int n = 0; for (int i = 0; i < kModfxCasesN; i++) if (!std::strncmp(kModfxCases[i].name, at(m).type, std::strlen(at(m).type)) && kModfxCases[i].name[std::strlen(at(m).type)] == '_') n++; if (n < 14) { std::printf("direct: %s has %d cases  FAIL\n", at(m).type, n); unc++; } } if (unc) fails++; }
   if (ran == 0) { std::printf("modfx: no case ran  FAIL\n"); fails++; }
   std::printf("modfx: %d of %d direct cases bit-exact (committed hash), %d failed\n", exact, ran, fails);
+  if (gTolNotBuilt) std::printf("Marbles / Tides: NOT RUN, %d renders and cases skipped: this platform has no mods library (THUNDER_MODFX_MODS is off here); they are gated on every platform that builds it\n", gTolNotBuilt);
   if (!gTol.empty()) std::printf("Marbles / Tides (native strict against the fast-math wasm): %zu renders and cases, %d inside the %.0f dB line (%d of them bit-exact); worst of the rest %s (%s)\n", gTol.size(), gTolOk, kGateDb, gTolExact,
     std::isinf(gTolWorst) ? "none" : (std::to_string(gTolWorst) + " dB").c_str(), gTolWorstName.c_str());
   if (writeNative) { std::ofstream o(writeNative); int ne = 0; for (auto& r : gTol) if (r.exact) ne++;
