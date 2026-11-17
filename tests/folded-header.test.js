@@ -40,3 +40,8 @@ test('build 636 CSS: the top-bar rules are inside max-width:599px and body.mob o
   assert.match(blk, /#tDots\{grid-area:3 \/ 1 \/ 4 \/ 3;/, 'the tick dots are a thin strip under BPM / LPB');
   assert.match(blk, /#tClk \.tcin\{width:3ch;/, 'the typing box is no wider than the digits');
 });
+
+test('build 637: three or more tabs keep their own row through the whole folded range (to 599 px); the two-tab bar stays out of it', () => {
+  assert.match(src, /@media \(max-width:599px\)\{ body\.mob \.top\{flex-wrap:wrap\}\n  body\.mob \.top #segView:has\(button:nth-child\(3\)\)\{flex:1 1 100%; min-width:0; overflow:visible\}/, 'the own-row block is max-width:599px, not 460');
+  assert.doesNotMatch(src, /@media \(max-width:460px\)\{ body\.mob \.top\{flex-wrap:wrap\}/, 'the old 460 px bound is gone (461-520 px overflowed with four tabs)');
+});
