@@ -11,7 +11,7 @@ HERE=$(cd "$(dirname "$0")/.." && pwd); bad=0
 hits=$(grep -rnE 'lxr_module\.h|lxr_wasm|lxr_host_|THUNDER_HAVE_LXR|thunder::lxr|Soundengine/|stm32f7xx|voiceArray|snareVoice|hatVoice|cymbalVoice|midiParser_|lxr_init|lxr_render|lxr_trigger' "$HERE/core" --include='*.cpp' --include='*.h' --include='*.c' --include='*.txt' --include='*.cmake' 2>/dev/null | grep -v '/third_party/' || true)
 [ -z "$hits" ] || { echo "LXR boundary: the core mentions the module / firmware:"; echo "$hits"; bad=1; }
 # the only files of the core that name LXR at all
-names=$(grep -rliE 'lxr' "$HERE/core" --include='*.cpp' --include='*.h' --include='*.c' --include='*.txt' 2>/dev/null | sed "s|$HERE/||" | sort | tr '\n' ' ')
+names=$(grep -rliE 'lxr' "$HERE/core" --include='*.cpp' --include='*.h' --include='*.c' --include='*.txt' 2>/dev/null | grep -v '/third_party/' | sed "s|$HERE/||" | sort | tr '\n' ' ')
 echo "files of the core that say LXR: $names"
 for f in $names; do case "$f" in core/include/thunder/lxr_seam.h|core/src/lxr/lxr_seam.cpp|core/src/engine/xeng.h|core/src/engine/xeng_voice.cpp|core/CMakeLists.txt|core/pump/CMakeLists.txt) ;; *) echo "LXR boundary: unexpected file $f"; bad=1;; esac; done
 # (core/pump/CMakeLists.txt only has a comment about leaving pump's own GPL LXR folder out.)
