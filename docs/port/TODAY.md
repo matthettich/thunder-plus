@@ -313,3 +313,23 @@ N1 step 10.
    (`resonance_on` default 0, `resonance_amount` default 100, appended), latency 4454; the MASTER window got the RESONANCE panel ported from the pin's UI; the
    other 24 types bit-identical; old songs: RESONANCE off, output bit-identical delayed 4096 samples more. **On `native` now possible:** take build 638's web
    files into `native`'s copies and remove `kSkipShipped` from `test_pump` (a Sonnet chore). A check-in is set for 03:50 on 17 Nov to pick up stalled work.
+
+## Night of 16 to 17 Nov (the owner, 23:34: "keep working on native until next we talk; the dual sound bug can wait"). State at 06:45
+- **#205 U29 MERGED** (table + loaded wavetable, vector, scanned, resynth + analysis data, bytebeat with `modfx::BBProg` reused): 333 of 333 factory voices, 284
+  direct cases. The independent verifier confirmed the gate and the set against beta itself, six mutations, scope, a line-by-line read of resynth and scanned,
+  and FAILED memory safety once: vector sequence mode with unison 2 and spread 1e308 indexed `stepSlot[(int)NaN]` (Release segfault from valid JSON). Fixed (NaN
+  flows as in the JS, `slotOf`), every cast in the five files audited, a combined-fields fuzz added (7093 renders under ASan + UBSan), direct cases for the two
+  mutations nothing caught. Report: `/home/claude/progress/verify-u29.md` on the session's disk. macOS job limit 20 → 60 minutes (it was being cancelled at 20).
+- **#206 U25 MERGED** (Plaits 24 models, Elements 3, strict native library): 317 cases; plumbing 313 of 313 bit-exact with the wasm's pre-renders injected;
+  against the fast-math wasm 27 exact, 73 inside -100 dB, 160 by the one-step rule (Fable's: every RAW int16 sample of Plaits within 1 step; 35067 samples differ
+  in all), **80 left out by name** (45 Plaits chaotic above one step; 33 Elements, different from block 0 and growing in 25, -62.8 to -99.7 dB, one at -1.4 dB; 2
+  where the WASM gives NaN from a read past a table). Committed native hashes on every platform. Five Plaits and two Elements reads outside tables patched in
+  `prepare.sh`, host builds only (model 13 wavetable: quantised x / y / z reaching exactly 7.0 read a NULL slot with weight 0; upstream also allocates 64
+  `wave_map_` entries and writes 256). Fuzz without fences: 80000 renders under ASan + UBSan, 0 failures; no region refused. **Elements parity is by name, not by
+  number: it needs the owner's ears at N1 / N3 exit.** A post-merge independent verification is running (report to `/home/claude/progress/verify-u25.md`).
+  **Web-app finding (nothing changed):** in the page one wasm instance is shared, so Plaits models 16 to 19, 22, 23 and Elements differ between a first and a
+  second render of the same layer (`stmlib::Random` and dither state carry over); native starts each voice fresh.
+- **#207 MERGED:** `native` takes web build 638's pump files; the shipped `pump.wasm` is byte-identical to the pin's build, so `kSkipShipped` is gone and MASTER
+  runs everywhere; the exact list is enforced in the shipped run on Linux x86-64 (macOS: `p_band_alt` -142 dB, system libm).
+- **WORKPLAN.md sections 7 and 9 are current** (Haiku, 4787944). In progress: the hardening list (`n1/hardening`, Sonnet).
+- Engine units merged so far: U22, U23, U24, U25, U28, U29. Not started: U26, U27, U30 to U33, U36 (see WORKPLAN's list for which are the lead's).
