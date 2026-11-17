@@ -16,7 +16,8 @@ const SHAPES = ['Bell', 'Low Shelf', 'High Shelf', 'Low Cut', 'High Cut'];
 const AUTO_F = [60, 125, 250, 500, 1000, 2000, 4000, 8000, 12000];
 const TRIMS = ['tone_trim_60', 'tone_trim_125', 'tone_trim_250', 'tone_trim_500', 'tone_trim_1k', 'tone_trim_2k', 'tone_trim_4k', 'tone_trim_8k', 'tone_trim_12k'];
 const TRIM_SN = ['60', '125', '250', '500', '1k', '2k', '4k', '8k', '12k'];
-const STAGE_ON = ['tone_on', 'dyn_on', 'stereo_on', 'loud_on'];
+const STAGE_ON = ['tone_on', 'dyn_on', 'stereo_on', 'loud_on', 'resonance_on'];   // (5: RESONANCE, first in the chain and the row, keys 1-4 unchanged)
+const SLOT = i => i === 4 ? 0 : i + 1;   // the panel's place along the row
 const UI_KEY = 'thunderplus-pump-master-ui-v1';   // the plugin's UI state (curve scale, ADVANCED), kept on this device
 const bandFreq = b => 1000 * Math.pow(2, (b - 17) / 3);
 const curveFreq = p => 20 * Math.pow(1000, p / (NCP - 1));
@@ -48,7 +49,7 @@ function tint(c, hue){
 }
 const hue = (col, row) => ((col + row) % 12) * 30 + 10;
 
-U.define('master', {W:940, H:560, nW:480, nH:1060, bypass:true, back:8192, make(ui){
+U.define('master', {W:940, H:560, nW:480, nH:1230, bypass:true, back:8192, make(ui){
   // ---- state (UIMaster's members)
   const st = (() => { try { const v = JSON.parse(localStorage.getItem(UI_KEY)); return v && typeof v === 'object' ? v : {}; } catch(e){ return {}; } })();
   let dbRange = [3, 6, 12].includes(st.range) ? st.range : 6, advanced = !!st.adv;
@@ -58,6 +59,7 @@ U.define('master', {W:940, H:560, nW:480, nH:1060, bypass:true, back:8192, make(
   const curve = new Float32Array(NCP), bandsCurve = new Float32Array(NCP), curveT = new Float32Array(NCP), bandsT = new Float32Array(NCP);
   const target = new Float32Array(NB), measured = new Float32Array(NB), eqGain = new Float32Array(NEQ), autoEq = new Float32Array(NEQ);
   let ratio = 1, thr = 0, liftMax = 0, lift = 0, sideLo = 0, sideHi = 0, makeup = 0, outPred = -70, cmpDb = 0, peakOver = 0, limLoss = 0, eqDelta = 0, inST = -Infinity, outST = -Infinity;
+  let resGr = 0, pres = 0;
   let aRatio = 1, aThr = 0, aLift = 0, aMakeup = 0, aSideLoDb = 0, aSideHiDb = 0, compGr = 0, limGr = 0, pcg = 0, plg = 0;
   let specTop = 0, specBottom = -36, hoverX = -1, hoverY = -1, lastFrameT = 0;
   const pin = [0, 0], pout = [0, 0];
@@ -67,7 +69,7 @@ U.define('master', {W:940, H:560, nW:480, nH:1060, bypass:true, back:8192, make(
     m.lvl[c] = Math.max(p, m.lvl[c] - 26 * dt);
     if (p >= m.hold[c]){ m.hold[c] = p; m.holdT[c] = 1.5; } else if ((m.holdT[c] -= dt) <= 0) m.hold[c] = Math.max(p, m.hold[c] - 18 * dt); } };
   const post = new Spectrum(KLO, KHI), fPost = new Feed(32768);
-  let display = R(), info = R(), mainP = R(); const stageP = [R(), R(), R(), R()], stageHue = [0, 0, 0, 0];
+  let display = R(), info = R(), mainP = R(); const stageP = [R(), R(), R(), R(), R()], stageHue = [0, 0, 0, 0, 0];
   let drag = 0, dragIdx = -1, dragLastY = 0, dragV = 0;   // drag 1 = a tone point (trim), 2 = a free band
 
   // the learned analysis kept in the slot, until the first telemetry frame says otherwise (the song may be stopped)
@@ -94,6 +96,8 @@ U.define('master', {W:940, H:560, nW:480, nH:1060, bypass:true, back:8192, make(
   for (let i = 0; i < 3; i++){ stageBtn[i] = ui.toggle(SD[i][0], SD[i][2]); stageBtn[i].tip = SD[i][3];
     stageAmt[i] = ui.dial(SD[i][1], 'AMOUNT', 's'); stageAmt[i].tip = SD[i][2] + ' amount (on top of INTENSITY; 100 % = as the style has it)'; }
   stageBtn[3] = ui.toggle('loud_on', 'LOUDNESS'); stageBtn[3].tip = 'Loudness: makeup gain and a true-peak limiter that only touches the peaks';
+  stageBtn[4] = ui.toggle('resonance_on', 'RESONANCE'); stageBtn[4].tip = 'Resonance: gently calms narrow, ringing peaks before everything else (off by default; adds a little latency, always reported)';
+  const resAmt = ui.dial('resonance_amount', 'AMOUNT', 's'); resAmt.tip = 'RESONANCE amount (on top of INTENSITY; 100 % = a few dB at most on a ringing peak, transparent)';
   // DESTINATION: where the master is going; picks TARGET (and TARGET mode; vinyl also folds the bass to mono).
   // Moving the TARGET dial anywhere else reads CUSTOM.
   const DEST = [
@@ -147,8 +151,9 @@ U.define('master', {W:940, H:560, nW:480, nH:1060, bypass:true, back:8192, make(
   for (const c of ui.controls) if (c instanceof Dial && c.sym) { const s = c.sym; c.fmt = v => formatParam(s, v); }
   // the rainbow: hue = (column + row) x 30 + 10 degrees
   tint(learnBtn, hue(0, 0)); tint(intDial, hue(1, 0)); tint(cmpBtn, hue(0, 1));
-  for (let i = 0; i < 4; i++) tint(stageBtn[i], stageHue[i] = hue(2 + i, 0));
-  for (let i = 0; i < 3; i++) tint(stageAmt[i], hue(2 + i, 1));
+  for (let i = 0; i < 5; i++) tint(stageBtn[i], stageHue[i] = hue(2 + SLOT(i), 0));
+  for (let i = 0; i < 3; i++) tint(stageAmt[i], hue(3 + i, 1));
+  tint(resAmt, hue(2, 1));
   tint(destM, hue(6, 1)); tint(modeSeg, hue(5, 1)); tint(targetDial, hue(5, 2)); tint(ceilDial, hue(6, 2));
   tint(advBtn, hue(0, 2)); tint(styleSeg, hue(0, 3));
   tint(resetTrimBtn, hue(2, 2)); tint(clearBandsBtn, hue(3, 2));
@@ -214,14 +219,15 @@ U.define('master', {W:940, H:560, nW:480, nH:1060, bypass:true, back:8192, make(
       info = R(W - 14 - 208, 58, 208, dh); display = R(14, 58, info.x - 12 - 14, dh);
       const y0 = display.b + 12; ph = H - 24 - 12 - y0;
       mainP = R(14, y0, 262, ph);
-      const sx = mainP.r + 10, sw = (W - 14 - sx - 3 * 10) / 4;
-      for (let i = 0; i < 4; i++) stageP[i] = R(sx + i * (sw + 10), y0, sw, ph);
+      const sx = mainP.r + 10, gap = 6, sw = (W - 14 - sx - 4 * gap) / 5;
+      for (let i = 0; i < 5; i++) stageP[i] = R(sx + SLOT(i) * (sw + gap), y0, sw, ph);
     } else {
       display = R(10, 94, W - 20, advanced ? 192 : 286);
       const y1 = display.b + 10, h1 = advanced ? 192 : 230; mainP = R(10, y1, 256, h1); info = R(276, y1, W - 10 - 276, h1);
       ph = advanced ? 258 : 192;   // (258: DYNAMICS' third row of dials fits inside its panel)
       const sy = mainP.b + 10, sw = (W - 20 - 10) / 2;
       for (let i = 0; i < 4; i++) stageP[i] = R(10 + (i & 1) * (sw + 10), sy + (i >> 1) * (ph + 10), sw, ph);
+      stageP[4] = R(10, sy + 2 * (ph + 10), W - 20, 170);   // RESONANCE: a row of its own under the four
     }
     const y0 = mainP.y;
     learnBtn.r = R(mainP.x + 14, y0 + 30, 110, 40);
@@ -230,7 +236,8 @@ U.define('master', {W:940, H:560, nW:480, nH:1060, bypass:true, back:8192, make(
     intDial.r = R(mainP.x + 140, y0 + 26, 108, Dial.heightFor('l'));
     styleSeg.r = R(mainP.x + 14, mainP.b - 38, mainP.w - 28, 26);
     const sh = Dial.heightFor('s');
-    for (let i = 0; i < 4; i++){ const p = stageP[i]; stageBtn[i].r = R(p.x + 10, p.y + 10, p.w - 20, 26); if (i < 3) stageAmt[i].r = R(p.cx - 36, p.y + 46, 72, sh); }
+    for (let i = 0; i < 5; i++){ const p = stageP[i]; stageBtn[i].r = R(p.x + 10, p.y + 10, p.w - 20, 26); if (i < 3) stageAmt[i].r = R(p.cx - 36, p.y + 46, 72, sh); }
+    resAmt.r = R(stageP[4].cx - 36, stageP[4].y + 46, 72, sh);
     const lp = stageP[3];
     destM.r = R(lp.x + 10, lp.y + 40, lp.w - 20, 22);
     modeSeg.r = R(lp.x + 10, lp.y + 66, lp.w - 20, 20);
@@ -346,7 +353,7 @@ U.define('master', {W:940, H:560, nW:480, nH:1060, bypass:true, back:8192, make(
     ui.stroke(mainP, t.dim, 1);
     ui.caption(mainP.x + 14, mainP.y + 15, 'MASTER');
     ui.caption(styleSeg.r.x, styleSeg.r.y - 10, 'STYLE');
-    for (let i = 0; i < 4; i++){ const on = V(STAGE_ON[i]) >= 0.5, c = stageDim(i); ui.stroke(stageP[i], on ? c : alpha(c, 0.45), on ? 1.5 : 1); }
+    for (let i = 0; i < 5; i++){ const on = V(STAGE_ON[i]) >= 0.5, c = stageDim(i); ui.stroke(stageP[i], on ? c : alpha(c, 0.45), on ? 1.5 : 1); }
     drawStageText();
   }
   // ADVANCED: auto's nine tone points (squares, dragged up and down) and the free bands (numbered circles)
@@ -432,9 +439,11 @@ U.define('master', {W:940, H:560, nW:480, nH:1060, bypass:true, back:8192, make(
     if (!(ana.valid && planValid)){
       // (the plugin writes this in all four; in ADVANCED, DYNAMICS and LOUDNESS have their dials there, so not those two)
       // (and learned but no frame yet: the song is stopped, the effect asleep, so the plan isn't known here yet)
-      for (let i = 0; i < 4; i++) if (!(advanced && (i === 1 || i === 3))) ana.valid && !gotFrame ? lines(i, 'LEARNED', 'PLAY TO SEE IT') : lines(i, 'WAITING FOR', 'LEARN');
+      for (let i = 0; i < 5; i++) if (!(advanced && (i === 1 || i === 3))) ana.valid && !gotFrame ? lines(i, 'LEARNED', 'PLAY TO SEE IT') : lines(i, 'WAITING FOR', 'LEARN');
       return;
     }
+    // RESONANCE: the largest reduction now (when the stage is on)
+    lines(4, 'CALMS RINGING', V('resonance_on') >= 0.5 ? 'REDUCTION ' + resGr.toFixed(1) + ' dB' : 'OFF');
     // TONE: the largest move and where
     let bestF = 1000, bestG = 0;
     for (let k = 0; k < NCP; k++) if (Math.abs(curve[k]) > Math.abs(bestG)){ bestG = curve[k]; bestF = curveFreq(k); }
@@ -515,7 +524,7 @@ U.define('master', {W:940, H:560, nW:480, nH:1060, bypass:true, back:8192, make(
     if (k === 'l'){ toggleLearn(); return true; }
     if (k === 'c'){ ui.setGesture('compare', V('compare') >= 0.5 ? 0 : 1); return true; }
     if (k === 'a'){ setAdvanced(!advanced); return true; }
-    if (k >= '1' && k <= '4'){ const s = STAGE_ON[+k - 1]; ui.setGesture(s, V(s) >= 0.5 ? 0 : 1); return true; }
+    if (k >= '1' && k <= '5'){ const s = STAGE_ON[+k - 1]; ui.setGesture(s, V(s) >= 0.5 ? 0 : 1); return true; }
     return false;
   }
 
@@ -538,12 +547,13 @@ U.define('master', {W:940, H:560, nW:480, nH:1060, bypass:true, back:8192, make(
     cmpDb = v(8); peakOver = v(9); limLoss = v(10); eqDelta = v(11); inST = v(12); outST = v(13);
     aRatio = v(14); aThr = v(15); aLift = v(16); aMakeup = v(17); aSideLoDb = v(18); aSideHiDb = v(19);
     pcg = Math.max(pcg, v(20)); plg = Math.max(plg, v(21));
+    if (t.length > B0 + 303) pres = Math.max(pres, t[B0 + 303]);   // (the resonance stage's reduction, positive dB; 308 values in the older pump)
   }
   function tick(dt){
     meterTick(outMeter, pout, dt); meterTick(inMeter, pin, dt);
     const k = 1 - Math.exp(-dt / 0.12);
     for (let i = 0; i < NCP; i++){ curve[i] += (curveT[i] - curve[i]) * k; bandsCurve[i] += (bandsT[i] - bandsCurve[i]) * k; }
-    compGr = Math.max(pcg, compGr - 12 * dt); limGr = Math.max(plg, limGr - 12 * dt); pcg = plg = 0;
+    compGr = Math.max(pcg, compGr - 12 * dt); limGr = Math.max(plg, limGr - 12 * dt); resGr = Math.max(pres, resGr - 12 * dt); pcg = plg = pres = 0;
     learnBtn.label = learning ? 'STOP ' + clock(learnSec) : ana.valid ? 'RE-LEARN' : 'LEARN';
     // the spectrum scale follows the learned song
     if (ana.valid && planValid){ let mx = -200; for (let b = 0; b < NB; b++) if (bandFreq(b) < 16000) mx = Math.max(mx, measured[b]); specTop = mx + 6; specBottom = mx - 30; }
@@ -554,7 +564,7 @@ U.define('master', {W:940, H:560, nW:480, nH:1060, bypass:true, back:8192, make(
     layout, drawBody, down, drag:dragFn, up, hover, wheel, key, frame, tick,
     leave(){ hoverX = -1; },
     reload(){ fromState(); },
-    animating(){ return U.now() - ui.lastFrame < 2 || outMeter.lvl[0] > -100 || outMeter.lvl[1] > -100 || compGr > 0.05 || limGr > 0.05; },
+    animating(){ return U.now() - ui.lastFrame < 2 || outMeter.lvl[0] > -100 || outMeter.lvl[1] > -100 || compGr > 0.05 || limGr > 0.05 || resGr > 0.05; },
     entryText(s){ if (!SHOWN.has(s)) return null; const sv = shownValue(s, V(s)); return s === 'ratio_trim' ? sv.toFixed(2) : s === 'low_mono_trim' || s === 'width_trim' ? sv.toFixed(0) : sv.toFixed(1); },
     preParse(s, txt){ if (!SHOWN.has(s)) return txt; const n = parseFloat(String(txt).trim().replace(',', '.')); return Number.isFinite(n) ? String(fromShown(s, n)) : txt; },
     fmtStatus:s => formatParam(s, V(s)),
@@ -562,7 +572,7 @@ U.define('master', {W:940, H:560, nW:480, nH:1060, bypass:true, back:8192, make(
     help(){ return [
       ['L', 'learn: start, and stop when the song has played (stopping the song also finishes it)'],
       ['C', 'compare with the original at the same loudness (COMPARE key: hold = only while held)'],
-      ['1  2  3  4', 'tone · dynamics · stereo · loudness on/off'],
+      ['1  2  3  4  5', 'tone · dynamics · stereo · loudness · resonance on/off'],
       ['INTENSITY', 'everything at once: 25 % light, 50 % medium, 100 % strong'],
       ['AMOUNT', 'one stage on top of INTENSITY'],
       ['A', 'advanced view: everything auto set, as offsets you can tweak, and eight free EQ bands'],
