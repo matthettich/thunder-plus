@@ -308,6 +308,15 @@ else()
   add_test(NAME engine_u25 COMMAND test_engine_u25)   # no directory: prints FAIL and exits 1
 endif()
 
+# U25: memory safety of the Plaits / Elements layers over the corners of the sliders' ranges (run under ASan + UBSan in CI)
+add_executable(test_engine_u25_fuzz test_engine_u25_fuzz.cpp)
+target_link_libraries(test_engine_u25_fuzz PRIVATE thunder_core)
+target_include_directories(test_engine_u25_fuzz PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../core/src ${CMAKE_CURRENT_SOURCE_DIR})
+if(NOT MSVC)
+  target_compile_options(test_engine_u25_fuzz PRIVATE -Wall -Wextra)
+endif()
+add_test(NAME engine_u25_fuzz COMMAND test_engine_u25_fuzz)
+
 # N1 review fixes: hostile inputs (the independent review's findings, one regression test each). Names the finding in every failure line.
 add_executable(test_hostile test_hostile.cpp)
 target_link_libraries(test_hostile PRIVATE thunder_core)

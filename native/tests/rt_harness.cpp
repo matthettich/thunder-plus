@@ -19,6 +19,7 @@
 #include "modfx/mods.h"
 #include "render/render.h"
 #include "engine/engine.h"
+#include "engine/layer_pe.h"
 #include "engine/xeng.h"
 #include "voice/voice.h"
 
@@ -672,6 +673,28 @@ done:
   std::printf("rt_engine_u24 ok: %d voice renders (%zu samples) of FM / additive / karplus / vosim / formant layers under the allocation guard\n", renders, total); return 0;
 }
 
+// U25: the Plaits / Elements layers under the guard. The workspace (the library's Session and the pre-render buffer, about 1.8 MB per thread) is made once off the audio thread (eng_init -> pe_prepare);
+// after that a render of these layers does not allocate: the Session is zeroed in place, the pre-render goes into the thread's buffer. (Without the library the types are not supported: the case is skipped.)
+static int run_engine_u25() {
+  using namespace thunder;
+  if (!pe_available()) { std::printf("rt_engine_u25 skipped: no Plaits / Elements library on this platform\n"); return 0; }
+  eng_init();
+  std::vector<EngVoice> vs(4); std::vector<std::vector<float>> bufs; std::vector<EngRenderOpts> os(4);
+  vs[0].layers[0].on = true; vs[0].layers[0].type = LType::Plaits; vs[0].layers[0].pe.pEng = 8; vs[0].layers[0].dec = 800; vs[0].len = 0.8;
+  vs[1].layers[0].on = true; vs[1].layers[0].type = LType::Plaits; vs[1].layers[0].pe.pEng = 18; vs[1].layers[0].pe.pStrike = 0; vs[1].layers[0].adsr = true; vs[1].layers[0].lpCut = 3000; vs[1].layers[1].on = true; vs[1].layers[1].type = LType::Plaits;
+  vs[1].layers[1].pe.pEng = 16; vs[1].len = 0.6; os[1].hold = 0.3;
+  vs[2].layers[0].on = true; vs[2].layers[0].type = LType::Elements; vs[2].layers[0].pe.eModel = 1; vs[2].layers[0].pe.eBow = 0.5; vs[2].layers[0].dec = 1000; vs[2].layers[0].tune = 12; vs[2].len = 0.8; os[2].sr = 44100;
+  vs[3].layers[0].on = true; vs[3].layers[0].type = LType::Elements; vs[3].layers[0].pe.eModel = 0; vs[3].layers[1].on = true; vs[3].layers[1].type = LType::Plaits; vs[3].layers[1].pe.pEng = 20; vs[3].layers[1].burst = 2; vs[3].len = 0.6; vs[3].drive = 0.3;
+  for (size_t i = 0; i < vs.size(); i++) { vs[i].layers[0].level = 0.7; bufs.emplace_back(eng_render_bound(vs[i], os[i]) + 1); if (bufs[i].size() < 2) { std::printf("rt_engine_u25 FAIL: bound 0\n"); return 1; } }
+  size_t total = 0; int renders = 0;
+  { rt_guard g;
+    for (int rep = 0; rep < 3; rep++) for (size_t i = 0; i < vs.size(); i++) { size_t n = 0; const int st = eng_render_voice(vs[i], os[i], bufs[i].data(), bufs[i].size() - 1, &n); if (st != kEngOk) { total = 0; goto done; } total += n; renders++; }
+  }
+done:
+  if (!total) { std::printf("rt_engine_u25 FAIL: a render failed\n"); return 1; }
+  std::printf("rt_engine_u25 ok: %d voice renders (%zu samples) of Plaits / Elements layers under the allocation guard (the thread's workspace made beforehand)\n", renders, total); return 0;
+}
+
 int main(int argc, char** argv) {
   if (argc > 1 && std::strcmp(argv[1], "--selftest") == 0) return selftest();
   if (int r = run_logger()) return r;
@@ -691,5 +714,6 @@ int main(int argc, char** argv) {
   if (int r = run_engine()) return r;
   if (int r = run_engine_xeng()) return r;
   if (int r = run_engine_u24()) return r;
+  if (int r = run_engine_u25()) return r;
   return run_song();
 }

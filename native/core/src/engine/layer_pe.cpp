@@ -39,6 +39,8 @@ void pe_prepare() { prepare(ws()); }
 bool pe_available() { return false; }   // no Plaits / Elements library on this platform (MSVC builds no DSP libraries)
 void pe_prepare() {}
 #endif
+namespace { thread_local PeTest* gTest = nullptr; }
+void pe_test_hook(PeTest* t) { gTest = t; }
 bool pe_is(LType t) { return t == LType::Plaits || t == LType::Elements; }
 LType pe_layer_type(const char* name, size_t n) {
   if (!pe_available()) return LType::Other;
@@ -47,8 +49,16 @@ LType pe_layer_type(const char* name, size_t n) {
   return LType::Other;
 }
 bool pe_layer_ok(const EngLayer& L) {
+  // The sliders of the app keep every knob inside its range (pHarm .. pLpg, e*: 0..1; pTimEnv, pMorEnv, pFm: -1..1; the Elements model 0..2). Outside it the upstream code indexes its tables with
+  // the value (Elements' exciter with a negative one: a read far before the table, a crash here; the wasm reads whatever its linear memory holds): a song that holds such a value, which only a
+  // hand-edited file can, is refused (kEngUnsupported), never rendered from memory that is not the library's.
+  const EngPE& p = L.pe;
+  auto in = [](double x, double lo, double hi) { return x >= lo && x <= hi; };
+  if (L.type == LType::Plaits) return in(p.pHarm, 0, 1) && in(p.pTim, 0, 1) && in(p.pMor, 0, 1) && in(p.pDecay, 0, 1) && in(p.pLpg, 0, 1) && in(p.pFm, -1, 1) && in(p.pTimEnv, -1, 1) && in(p.pMorEnv, -1, 1);
   if (L.type != LType::Elements) return true;
-  const int32_t m = js_to_int32(L.pe.eModel); return m >= 0 && m <= 2;
+  const int32_t m = js_to_int32(p.eModel);
+  return m >= 0 && m <= 2 && in(p.eStrength, 0, 1) && in(p.eContour, 0, 1) && in(p.eBow, 0, 1) && in(p.eBlow, 0, 1) && in(p.eStrike, 0, 1) && in(p.eBowT, 0, 1) && in(p.eFlow, 0, 1) && in(p.eBlowT, 0, 1)
+    && in(p.eMallet, 0, 1) && in(p.eStrikeT, 0, 1) && in(p.eGeo, 0, 1) && in(p.eBright, 0, 1) && in(p.eDamp, 0, 1) && in(p.ePos, 0, 1) && in(p.eSpace, 0, 1);
 }
 
 void eng_layer_pe_from_json(EngLayer& L, Json j) {
@@ -64,6 +74,11 @@ void eng_layer_pe_from_json(EngLayer& L, Json j) {
 #ifdef THUNDER_ENGINE_PE
 void PeOsc::init(PeUse& use, const EngLayer& L, const EngVoice& V, double sr, double dur, double pA, double ptau) {
   using namespace thunder_pe;
+  if (gTest && gTest->inject) {   // test hook: the web's own pre-render of this layer
+    const double rate0 = L.type == LType::Plaits ? 48000 : 32000;
+    if (gTest->next >= gTest->inject->size()) { use.bad = true; d = nullptr; n = 0; k = rate0 / sr; return; }
+    const std::vector<float>& v = (*gTest->inject)[gTest->next++]; d = v.data(); n = v.size(); k = rate0 / sr; pos = 0; return;
+  }
   Workspace& w = ws(); prepare(w);
   if (!use.started) { session_reset(w.sess); use.started = true; }   // a fresh instance's memory at the start of the voice
   Session* S = w.sess; const EngPE& P = L.pe;
@@ -100,6 +115,7 @@ void PeOsc::init(PeUse& use, const EngLayer& L, const EngVoice& V, double sr, do
     }
   }
   d = w.pre; n = N; k = rate / sr; pos = 0;
+  if (gTest && gTest->capture) gTest->capture->emplace_back(w.pre, w.pre + N);
 }
 #else
 void PeOsc::init(PeUse& use, const EngLayer&, const EngVoice&, double sr, double, double, double) { use.bad = true; d = nullptr; n = 0; k = 1 / sr; }   // unreachable: the types are refused first
