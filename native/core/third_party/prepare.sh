@@ -172,10 +172,10 @@ for p,old,new in [(sys.argv[1],"1.0f - Interpolate(lut_svf_shift, damping_cutoff
 PY
 # Plaits (U25, found by the ASan + UBSan fuzz over the whole slider ranges; the lead's order of 17 Nov: clamp each index to its table). Host builds only (#ifdef __wasm__ keeps the original read):
 # the web's wasm module is what the existing goldens were made with, and what it reads there is whatever its linear memory holds. A clamp changes no output where the index was inside its table.
-# 1. plaits/dsp/engine/waveshaping_engine.cc, WaveshapingEngine::Render: lut_fold / lut_fold_2 are 516 floats read as InterpolateHermite(table + 1, index, 512), so `index` must lie in 0..1.
+# 1. plaits/dsp/engine/waveshaping_engine.cc, WaveshapingEngine::Render: lut_fold / lut_fold_2 are 516 floats read as InterpolateHermite(table + 1, index, 512), so `index` must lie in about 0..1.
 #    Trigger: the slope oscillator at a tiny f0 (note below about -24; the engine clamps the note at -119) returns values of 1e8 and more, so ws_index = 127 * out + 128 leaves the int range (a
 #    float-to-int overflow) and the shaper table value that follows is garbage, mix * gain + 0.5 is far outside 0..1: a read up to megabytes outside lut_fold (a crash natively). Fixed by clamping
-#    ws_index to +-2e9 (inside int; NaN to 0) and `index` to 0..1 (NaN to 0).
+#    ws_index to +-2e9 (inside int; NaN to 0) and `index` to the range whose table index i = trunc(index * 512) is 0 .. 512 (below -1/512 and NaN to 0, 513/512 and above to the last one inside); indices inside that range are untouched.
 # 2. plaits/dsp/speech/lpc_speech_synth.h, LPCSpeechSynth::PlayFrame(frames, frame, interpolate): reads frames[i + 1] also when interpolate is false (the blend is then 0, so the second frame
 #    is multiplied by 0). Table: phonemes_ = 15 frames x 14 bytes = 210 bytes (lpc_speech_synth_controller.cc:259, playback of a consonant, the last one i = 14 reads frame 15). Trigger: a
 #    speech model trigger that picks consonant 14, the last in the table. Fixed: with interpolate false the second frame is the first (blend 0: the same value).
@@ -191,8 +191,8 @@ new1="""    float ws_index = 127.0f * out[i] + 128.0f;
 """
 old2="    float mix = x + (y - x) * shape_fractional;\n    float index = mix * wf_gain_modulation.Next() + 0.5f;\n"
 new2=old2+"""#ifndef __wasm__
-    if (!(index >= 0.0f)) index = 0.0f;   // Thunder (prepare.sh): lut_fold has 516 entries, index * 512 must stay inside it (NaN: 0)
-    else if (index > 1.0f) index = 1.0f;
+    if (!(index > -0.001953125f)) index = 0.0f;   // Thunder (prepare.sh): lut_fold has 516 entries, read at [i .. i + 3] + 1 for i = trunc(index * 512): i must be 0 .. 512 (NaN: 0)
+    else if (!(index < 1.001953125f)) index = 1.0019529f;
 #endif
 """
 for o,n in [(old1,new1),(old2,new2)]:
@@ -277,7 +277,7 @@ PY
 # 5. plaits/dsp/oscillator/sine_oscillator.h, SineNoWrap(phase) (the header's own comment: "potentially unsafe, if phase >= 1.25"): lut_sine has 641 floats (512 + 128 + 1), Interpolate reads
 #    [index], [index + 1] with index = phase * 512. A phase of 1.25 and more, or of -1/512 and less, reads outside it. Trigger: a NaN phase (AnalogBassDrum::Render, model 21, sustain mode: the
 #    resonator at a note of about -30 and lower, scale = 0.001 / f0, goes NaN, then f, then phase_; found with tune -57, fm -0.43: a read 0 bytes after lut_sine). Fixed: NaN and phases at or below
-#    -1/512 become 0, phases above 1.24 become 1.24; every phase in between (including the small negative ones, index 0) is untouched.
+#    -1/512 become 0, phases of 1.25 and above become 1.2499999 (the last that reads inside); every phase in between (including the small negative ones, index 0) is untouched.
 python3 - "$E/plaits/dsp/oscillator/sine_oscillator.h" <<'PY'
 import sys
 p=sys.argv[1]; s=open(p).read()
@@ -286,7 +286,7 @@ new="""inline float SineNoWrap(float phase) {
 #ifndef __wasm__
   // Thunder (prepare.sh, patch 5): keep the read inside lut_sine (641 floats)
   if (!(phase > -1.0f / 512.0f)) phase = 0.0f;
-  else if (phase > 1.24f) phase = 1.24f;
+  else if (!(phase < 1.25f)) phase = 1.2499999f;   // the largest float below 1.25: index 639, plus 1 = 640, the last entry
 #endif
   return stmlib::Interpolate(lut_sine, phase, kSineLUTSize);
 }"""

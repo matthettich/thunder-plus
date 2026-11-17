@@ -17,7 +17,7 @@
 
 using namespace thunder;
 
-static uint32_t rs = 25251;
+static uint32_t rs = 25251;   // FUZZ_SEED changes it
 static double rnd() { rs = rs * 1664525u + 1013904223u; return rs / 4294967296.0; }
 
 static double knob() {   // a slider position: the ends, the middle, close to the ends (where the tables run out), or anywhere
@@ -49,8 +49,9 @@ static double wide(double lo, double hi) {
 
 int main(int argc, char** argv) {
   if (!pe_available()) { std::printf("fuzz U25: no Plaits / Elements library on this platform: skipped\nPASS test_engine_u25_fuzz\n"); return 0; }
-  const int count = argc > 1 ? std::atoi(argv[1]) : 1200;
+  const int count = argc > 1 ? std::atoi(argv[1]) : 2400;
   const double limitS = std::getenv("FUZZ_LIMIT_S") ? std::atof(std::getenv("FUZZ_LIMIT_S")) : 60.0;
+  if (std::getenv("FUZZ_SEED")) rs = (uint32_t)std::strtoul(std::getenv("FUZZ_SEED"), nullptr, 10);
   eng_init();
   static const double srs[] = {22050, 32000, 44100, 48000, 96000};
   int fails = 0, renders = 0, refusedOk = 0, refusedHostile = 0, nonFinite = 0, byModel[24] = {}, byElModel[3] = {}; double slowest = 0; std::vector<float> buf;
