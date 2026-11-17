@@ -388,6 +388,38 @@ else()
   add_test(NAME pump COMMAND test_pump)   # no directory: prints FAIL and exits 1
 endif()
 
+# U33: the …pump synths hosted natively (core/src/engine/pumpsynth.cpp) against the web's own render path (tools/psyn-dump.mjs: PsynCore.render + the shipped pump/synth/pump-synth.wasm in Node, samples; 507 cases).
+# Gate: -100 dB per case, the exact list kept exact (Linux x86-64), named left-out cases with a structural check; psyn_fuzz: combined-fields fuzz (under ASan + UBSan with THUNDER_SANITIZE).
+add_executable(test_pumpsynth test_pumpsynth.cpp)
+target_link_libraries(test_pumpsynth PRIVATE thunder_core)
+target_include_directories(test_pumpsynth PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../core/src ${CMAKE_CURRENT_SOURCE_DIR})
+add_executable(test_pumpsynth_fuzz test_pumpsynth_fuzz.cpp)
+target_link_libraries(test_pumpsynth_fuzz PRIVATE thunder_core)
+target_include_directories(test_pumpsynth_fuzz PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../core/src ${CMAKE_CURRENT_SOURCE_DIR})
+if(NOT MSVC)
+  target_compile_options(test_pumpsynth PRIVATE -Wall -Wextra)
+  target_compile_options(test_pumpsynth_fuzz PRIVATE -Wall -Wextra)
+endif()
+if(NOT TARGET thunder_pump)
+  add_test(NAME pumpsynth COMMAND test_pumpsynth)
+  set_tests_properties(pumpsynth PROPERTIES SKIP_RETURN_CODE 77)
+  add_test(NAME pumpsynth_fuzz COMMAND test_pumpsynth_fuzz)
+  set_tests_properties(pumpsynth_fuzz PROPERTIES SKIP_RETURN_CODE 77)
+elseif(NODE_EXE)
+  add_test(NAME pumpsynth_ref COMMAND ${NODE_EXE} ${CMAKE_CURRENT_SOURCE_DIR}/../tools/psyn-dump.mjs ${CMAKE_CURRENT_BINARY_DIR}/psyn-ref)
+  set_tests_properties(pumpsynth_ref PROPERTIES FIXTURES_SETUP pumpsynth_ref)
+  add_test(NAME pumpsynth COMMAND test_pumpsynth ${CMAKE_CURRENT_BINARY_DIR}/psyn-ref)
+  set_tests_properties(pumpsynth PROPERTIES FIXTURES_REQUIRED pumpsynth_ref)
+  add_test(NAME pumpsynth_fuzz COMMAND test_pumpsynth_fuzz)
+  if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    add_test(NAME pumpsynth_cases_current COMMAND ${NODE_EXE} ${CMAKE_CURRENT_SOURCE_DIR}/../tools/psyn-dump.mjs --check)
+    add_test(NAME pumpsynth_table_current COMMAND ${NODE_EXE} ${CMAKE_CURRENT_SOURCE_DIR}/../tools/pump-synth-table.mjs --check)
+    set_tests_properties(pumpsynth_table_current PROPERTIES ENVIRONMENT "THUNDER_DEPS_DIR=${THUNDER_PUMP_DIR}/..;CXX=${CMAKE_CXX_COMPILER}")
+  endif()
+else()
+  add_test(NAME pumpsynth COMMAND test_pumpsynth)   # no directory: prints FAIL and exits 1
+endif()
+
 # U14: the track-effect host (ThunderFx) against the worklet itself (tools/fx-dump.mjs: 91 cases + the map() value sets; needs Node and acorn).
 add_executable(test_fx test_fx.cpp)
 target_link_libraries(test_fx PRIVATE thunder_core)

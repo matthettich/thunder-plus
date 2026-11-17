@@ -1,0 +1,62 @@
+# U33: the pump synths hosted natively (rendered path)
+
+Work in progress (committed at least every 30 minutes). Branch `n3/u33`, PR into `native`. Source of truth for behaviour: `pump/synth/pump-synth-engine.js` (`PsynCore.render`, `finish`, `latency`) running `pump/synth/pump-synth.wasm`.
+
+## What is in the PR
+- `native/core/src/engine/pumpsynth.{h,cpp}`: `PumpSynth` (an instance: MIDI in at a sample offset, `process(n)` per block, no allocation after `make()`; the interface the live lanes can reuse, PROVISIONAL) and
+  `xeng_psyn` (the rendered path: `PsynCore.render` line for line: Tune split into note + rate, a kit plays its Drum's note, hold, note off, 4096-sample blocks until it has died away, fold to mono with the trim, Level / Drive, silent tail trimmed, 3 ms fade),
+  `xeng_psyn_latency`. The table of the 13 instruments' parameters is generated (`pumpsynthtable.inc` from `tools/pump-synth-table.mjs`, from the PIN's own tables; `--check` also compares it with the page's `pump-synth-meta.js`).
+- Built from the pin STRICT (`core/pump/CMakeLists.txt` already did: `-O3 -fno-fast-math -ffp-contract=off`): `thunder_pump_synth` is now linked into `thunder_core`.
+- `native/tools/psyn-dump.mjs` (the reference: the web's own `PsynCore.render` in Node, SAMPLES), `native/tests/test_pumpsynth.cpp` (the gate), `test_pumpsynth_fuzz.cpp`, `rt_pumpsynth` in `rt_harness.cpp`,
+  `third_party/prepare-pump.sh` (the one patch, host builds only), `tools/parity-u33.sh`, `tools/psyn-strict-wasm.sh` (a diagnostic, below), `golden/psyn_cases.inc`, `psyn_gate.inc`, `psyn_leftout.inc` (written by the tools; never hand-edited).
+
+## Gate and result (GCC 13.3, Release, Linux x86-64; shipped pump-synth.wasm = the pin's build)
+520 cases (all 13 rows of `tests/golden/pump-synth.json`; every factory preset of the 13 synths (207); every synth with all parameters at minimum, at maximum and three seeded random sets (65); the pad's macros: Tune -24 / -7.6 / 0.7 / 12 / 24, Hit 1 / 127,
+Level + Drive twice, hold 0.02 / 3 s / `V.len`, sample rates 8000 / 44100 / 96000 (203); every Drum of the four kits (35); WOB's tempo (2); FREEZE's File source (3)).
+**288 bit-exact, 193 within -100 dB (worst: `pre_ppoly_8` -102.1 dB, then `hi_ppoly` -105.4, `rnd2_ppoly` -106.8, then -121 and lower), 39 left out by name, 0 failed.** The web golden's 13 hashes equal the reference's own hashes (the reference is the web's).
+Parameter tables: 13 synths, 861 parameters, symbol / range / default / flags equal to the page's meta; the page's KINDS (type, len, trim, kit, drums, bpm) equal; latency of every synth at 8000 / 22050 / 44100 / 48000 / 96000 Hz equal (32 samples for MONO and GLOSS, 0 for the others). Reverse-order pass: 0 changed.
+Exact list (`psyn_gate.inc`, 288) enforced on Linux x86-64 (`kExactHoldsHere`, as `test_pump.cpp`); no committed native hashes (the strict build calls the system libm).
+
+## The 39 left out of the -100 dB gate, by name (each has a structural check instead: finite; RMS over the held note within 1 dB of the reference's; length within the stated percent)
+| group | cases | figures against the web wasm | why |
+|---|---|---|---|
+| TRACT | 21: `g_ptract`, `pre_ptract_1..6,9,10,11`, `tune_ptract_*` (3), `vel_ptract_*` (2), `lvdr_ptract`, `lvdr2_ptract`, `hold_*_ptract` (3), `sr*_ptract` (3) | -16.1 to -43.3 dB; first difference at sample 36 of `g_ptract` (5.017e-05 against 5.025e-05); lengths equal (+0.5 % in one) | float reassociation: **bit-exact against a pump-synth.wasm built with `-fno-associative-math`** (only that flag added) and against a strict one. The fast-math wasm sums the oversampler's halfband FIR in four lanes (the same loop as TUBE in U18-NOTES). The vocal-tract waveguide with breath noise amplifies the one-ulp start. |
+| ORBIT | 7: `pre_porbit_3,8,9,11,13`, `rnd1_porbit`, `rnd2_porbit` | -58.6 to +4.2 dB; first differences at ulp size (sample 9518 of `pre_porbit_3`: -0.0165719464 against -0.0165719446), growing | a strange attractor is the oscillator: float reassociation, then a different trajectory; against the strict wasm these are exact (or -183.8 dB). Length differs (-5.2 % to +30.1 %, `pre_porbit_9` the largest): the ring-out ends in another 4096-sample block. |
+| ORBIT | 1: `hi_porbit` | -0.5 dB, length -0.5 % | differs from the strict wasm too (-0.3 dB): not reassociation alone; believed libm (glibc against wasi-libc) amplified by the chaos. Not proven. |
+| GLOSS | 3: `pre_pgloss_23`, `pre_pgloss_24`, `hi_pgloss` | 1.4 / 1.7 / 4.7 dB; first sample differs by 1e-7 relative; lengths +2.3 / +3.1 / -0.01 % | the same figures against the strict wasm: not reassociation; believed libm (float sin / exp in the chaotic machines). Not proven. |
+| STRIKE | 1: `hi_pstrike` | 6.0 dB (first difference at sample 11056, 1e-14 absolute), length +0.3 % | reassociation: -149.5 dB against the strict wasm. |
+| FREEZE | 2: `pre_pfreeze_4`, `rnd1_pfreeze` | -25.3 / -95.1 dB | reassociation: -104.1 / -108.8 dB against the strict wasm. |
+| FREEZE | 2: `pre_pfreeze_6`, `hi_pfreeze` | -74.8 / -83.0 dB | -74.9 / -85.0 dB against the strict wasm too: not reassociation, not chaos (level and length agree): believed libm in the spectra / grain phases. Not proven. |
+**How it was told apart** (`native/tools/psyn-strict-wasm.sh`, a diagnostic that is not part of any gate): the same pin built to wasm with the web's flags plus `-fno-associative-math` (an existing build of that exists on the session's disk too): 420 of the 481 gated cases bit-exact and all 21 TRACT cases exact; with `-fno-fast-math -ffp-contract=off`
+(what the native host is) the 520 cases are **476 bit-exact, 38 within -100 dB and 6 outside** (`pre_pgloss_23`, `pre_pgloss_24`, `hi_pgloss`, `hi_porbit`, `pre_pfreeze_6`, `hi_pfreeze`; of the 39 left out, 29 are exact against it, 4 within and these 6 outside). So the native host plays what pump's strict code plays; what is left against the fast-math wasm is its reordered sums (and for six cases the libm). valgrind (memcheck) on `pre_pgloss_23`: clean.
+For the lead: the web's CPU cost of `-fno-associative-math` was measured (TODAY.md, 16 Nov) and the owner declined it; the owner's other route (an explicit lane order in the oversampler's FIR, pump source `common/dsp/Oversampler.hpp` lines 55 and 75) would make TRACT, ORBIT (7 of 8), STRIKE and the FREEZE pair exact without a flag.
+
+## Findings in the pump source (the owner's own plugin code: he will want to fix it upstream)
+1. **WOB, `plugins/wob/WobEngine.hpp`, `synthSample()`, the SUB oscillator: reads past `sinT` (4097 floats).** `subPh += inc / (set.subOct ? 4.0 : 2.0); if (subPh >= 1.0) subPh -= 1.0;` wraps once, and `tab(subPh)` then reads `sinT[(int)(subPh * 4096)]` and `+ 1`.
+   Trigger: inc / 2 above 1, i.e. a pitch above twice the sample rate (found by the fuzz: MIDI note 127, Octave +2, Tune 12, Wobble pitch 12 at 22050 Hz with Sub above 0). The index is unbounded: AddressSanitizer SEGV (`WobEngine.hpp:338`); in the web wasm the same read goes up to the end of the 16 MB memory and traps (a RuntimeError in the render Worker).
+   Patched for host builds only in `third_party/prepare-pump.sh` (a copy in the build folder; `subPh -= std::floor(subPh)`, as the partials' phases do two lines above; for subPh in [1, 2) floor is 1, so every sound that did not read outside the table is unchanged: the 520 cases do not move). The wasm builds are not patched (their bytes stay the pin's).
+2. **BandWaves (`common/dsp/Synth.hpp`, `read()`) and GLOSS's `DigiWaves` (`plugins/gloss/GlossEngine.hpp`, `read()`) read past their tables when the phase is not in [0, 1).** Every caller keeps its phase with `ph += inc; if (ph >= 1.0) ph -= 1.0;`, which wraps once, so with `inc >= 1`
+   (a pitch at or above the sample rate) the phase stays at or above 1 and `(int)(p * n)` indexes past the end: BandWaves' tables hold `n + 3` floats (259 to 2051, one per octave), DigiWaves' `kN + 1`. Heap over-read, found by ASan in the fuzz (`Synth.hpp:314`, `GlossEngine.hpp:68`).
+   Reproduces with GLOSS at 8000 Hz, Tune +67 (MIDI note 127): machine 2 (voice), 3 (supersaw) and 4 (digital); other synths call `BandWaves::read` too (MONO, POLY, ORBIT ...: any other callers are covered by the same patch). In the web wasm the over-read lands in linear memory (garbage in the sample, no trap for a small overshoot).
+   Patched for host builds in `prepare-pump.sh`: the phase is wrapped into [0, 1) at the top of both `read()` functions (`p -= floor(p)`; NaN reads 0); for p already in [0, 1) nothing changes (the 520 cases do not move).
+3. **Allocation in the render path: `SynthBase::run` (`wasm/pump_synth.cpp`) sorts the queued events with `std::stable_sort`, whose temporary buffer is an allocation.** A block WITH an event allocates once (measured in `rt_pumpsynth`: 1 `operator new` per block with a note off, all 13 instruments); a block without events allocates nothing (13 instruments x 600 blocks under the guard). For the live lanes: a block with a note on / off is a real-time violation until that sort is replaced (an insertion sort on the 512-entry queue, which is already nearly sorted).
+4. FREEZE's built-in sources are built on the first `process()` that needs each (`source()` in `pump_synth.cpp`: about a second of work, a static cache of `shared_ptr`s): `PumpSynth::builtins()` builds all seven on the control thread (the harness and the fuzz call it).
+5. (From U03, unchanged) `wasm/pump_synth.cpp` defines `struct std::mutex` in `namespace std` for wasm.
+
+## What the live lanes need (not in this PR; the lead's wiring)
+The host is provisional: `PumpSynth::midi(frame, status, d1, d2)` queues events with a sample offset, `process(n)` renders a block with no allocation after construction (rt_harness guard: 13 instruments x 600 blocks, 0 allocations), output via `PumpSynth::out(ch)`.
+- Lane to MIDI mapping, pitch bend range +-24 semitones (COIL +-12), `LIVE_FIXED` / `FIXED` overrides (x0x `seq_mode`=0, life `mode`=0 are already applied), trim 1.5 for POLY, the page's TMAP engine targets, `psyn_tempo` for WOB, sleeping of silent lanes, the `psFallback` path.
+- One audio thread only. `make` / `destroy` run on the control thread but share pump's process-global handle table: they race with `process` unless serialised (needs a U18-style gate before wiring).
+- Allocation: one `operator new` per instrument on the first block that carries an event (`std::stable_sort` in pump's `SynthBase::run`). Nothing else allocates in the render path. Pre-reserve or replace the sort when the live path is wired.
+
+## What the LXR glue needs (unit U04, not started)
+`lxr/lxr-engine.js` + `lxr_wasm.c` (GPL, a separable module) must be hosted behind the same event/block interface. Not attempted here.
+
+## Not in this PR
+LXR glue; live lanes wiring into the sequencer/mixer; wiring `pmono` etc. into `xeng_render_voice` / the JSON voice reader (`xeng_kind` still maps them to Other); pad effects (padFx) on rendered pump synths.
+
+## Mutation checks
+Mutating `pumpsynth.cpp` is caught by the gate: round->trunc on Tune (18 cases fail), trim, fade length, quiet threshold, the white key table and the offAt floor.
+
+## Fuzz totals (ASan+UBSan, `FUZZ_COMBINED=10000 FUZZ_DIRECT=2000 FUZZ_SEED=7`)
+10000 combined-field renders of `xeng_psyn` (1657 refused by design, 1548 one-sample, 0 non-finite; 784,458,712 samples; slowest 22.26 s under the 30 s per-render limit) and 2000 direct `PumpSynth` scenarios (60,057 events, 0 non-finite blocks): no crash, no timeout, nothing written past a bound. ctest runs a small count (`pumpsynth_fuzz`).
