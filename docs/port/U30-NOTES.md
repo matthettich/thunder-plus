@@ -14,3 +14,7 @@ Branch `n3/u30`. State at the first push: design done, nothing passes yet.
 
 ## Not done yet
 wmods.cpp (waves-only modules, 33 tfx effect wrappers, Expression, Pitch delay/reverb, Scope), engine.cpp (graph, gather, render), live runner, reference tool, tests, fuzz, mutation checks, CI.
+
+## Status (WIP 2)
+- PASS: engine.cpp + wmods.cpp compile; both rows of tests/golden/waves-processor.json (quiet 9f094f39, hot 5d99c475) reproduce bit-exact in test_waves.
+- NEXT: waves.test.js behaviours, feedback cases, per-module direct cases (Node dump tool), factory patches at 44.1/48/96k, fuzz, mutations, live runner (WavesLive), waves_pre_render / waves_live_render.

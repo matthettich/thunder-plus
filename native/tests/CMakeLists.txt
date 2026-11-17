@@ -656,3 +656,12 @@ else()
   add_test(NAME live_u26 COMMAND test_live_u26)
 endif()
 add_test(NAME engine_u26_fuzz COMMAND test_engine_u26_fuzz)
+
+# U30: the …waves engine (core/src/waves) against waves/waves-worklet.js
+add_executable(test_waves test_waves.cpp)
+target_link_libraries(test_waves PRIVATE thunder_core)
+target_include_directories(test_waves PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../core/src ${CMAKE_CURRENT_SOURCE_DIR})
+if(NOT MSVC)
+  target_compile_options(test_waves PRIVATE -Wall -Wextra)
+endif()
+add_test(NAME waves COMMAND test_waves)

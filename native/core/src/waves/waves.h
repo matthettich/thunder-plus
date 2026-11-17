@@ -34,7 +34,7 @@ constexpr int kMaxVoices = 64;
 constexpr int kMaxModules = 1024;
 constexpr int kMaxCables = 16384;
 constexpr int kMaxInstances = 4096;   // module objects made for a patch (a poly module counts one per voice)
-constexpr int kMaxWeight = 16384;     // sum of the instances' weights (heavy modules count more): a stand-in for the memory budget
+constexpr int kMaxWeight = 4096;      // sum of the instances' weights (heavy modules count more): a stand-in for the memory budget
 constexpr int kMaxText = 200;         // Expression's text (the JS cuts it at 200 UTF-16 units)
 
 enum WFlags { kWF_Effect = 1, kWF_PlaysNotes = 2, kWF_Probe = 4, kWF_Text = 8, kWF_Tail = 16, kWF_Show = 32, kWF_Destroy = 64 };
@@ -96,8 +96,8 @@ struct WCtx : modfx::Ctx {
 // The seeds a state is made with (the placeholder) and then armed with (the real counter).
 class WSeeds : public modfx::Seeds {
  public:
-  uint32_t next() override { return host && armed ? host->nextSeed() : 1; }
-  Host* host = nullptr; bool armed = false;
+  uint32_t next() override { drawn++; return host && armed ? host->nextSeed() : 1; }
+  Host* host = nullptr; bool armed = false; uint32_t drawn = 0;
 };
 class WModule : public Module {   // a waves-only module (wmods.cpp)
  public:
@@ -183,7 +183,7 @@ class WavesEngine {
   VoicePool voices_; std::unique_ptr<PatchImpl> p_;
   int onlyBus_ = 0; bool only_ = false; bool cullDirty_ = false;
   float busesL_[kBuses * kBlock]; float busesR_[kBuses * kBlock];
-  WCtx ctx_; Stats stats_;
+  WCtx ctx_; Stats stats_; bool lastFailed_ = false;
 };
 
 // The worklet's mix-down: every bus summed (float32 adds in bus order), then soft() on each side. L / R: n floats.
