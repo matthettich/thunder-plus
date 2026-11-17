@@ -9,7 +9,7 @@ using l23::mn; using l23::mx; using l23::orv;
 void WavetableOsc::init(const EngLayer& L, double sr_, double A_, double B_, EngRng& R) {
   const EngU23& U = L.u23;
   sr = sr_; A = A_; B = B_;
-  for (int i = 0; i <= TN; i++) tab[i] = 0;
+  for (int i = 0; i < TL; i++) tab[i] = 0;   // entry TN + 1 is never written by build(): it stays 0, as in the JS
   uni = (int)mx(1, mn(8, js_round(orv(U.wtUni, 1))));
   const double spread = orv(U.wtSpread, 0); sub = orv(U.wtSub, 0); noise = orv(U.wtNoise, 0); bend = orv(U.wtBend, 0);
   for (int v = 0; v < 8; v++) { phases[v] = 0; dets[v] = 0; }
@@ -40,7 +40,9 @@ void WavetableOsc::blk(double inc) {
 }
 
 double WavetableOsc::s(double inc, EngRng& R) {
-  auto tb = [&](int i) { return (i >= 0 && i <= TN) ? (double)tab[i] : (double)NAN; };   // tab[i] past the table is undefined
+  // The JS table has TN + 2 entries (the last one 0): a negative Bend can round warp() to exactly 1, so x = TN, i = TN and tab[i + 1] is the spare 0. Any index outside 0..TN+1 is undefined in JS (a NaN):
+  // i = js_to_int32(x) is 0 for a NaN x and truncates toward zero, so a negative phase (i < 0) or one beyond the cycle (i + 1 > TN + 1) reads an undefined entry: NaN here, and never a read outside tab.
+  auto tb = [&](int i) { return (i >= 0 && i < TL) ? (double)tab[i] : (double)NAN; };
   double y = 0;
   for (int v = 0; v < uni; v++) {
     const double p = phases[v];

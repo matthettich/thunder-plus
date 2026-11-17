@@ -1,6 +1,6 @@
 // U24: the FM / additive layer types (core/src/engine/layer_*.cpp: fm2 fmfb fmmetal fmcross fm4 fm6 genesis sb arcade, addsaw addodd membrane bell bar chord, formant karplus vosim) against the real
 // ENGINE block of index.html (tools/engine-u24-dump.mjs runs it in Node) and beta's tests/golden/engines.json. Same pattern as test_engine (U22).
-//  1. THE GATE: each of the 97 factory voices built only from U22's and U24's layer types, with at least one of U24's: renderVoice(v, 48000, null, hold) in C++ gives the SAME SHA-256 of the float32
+//  1. THE GATE: each of the 110 factory voices built only from U22's, U23's and U24's layer types, with at least one of U24's: renderVoice(v, 48000, null, hold) in C++ gives the SAME SHA-256 of the float32
 //     bytes as beta's golden (tests/golden/engine_u24_voices_golden.inc: beta's rows, copied, never edited), on every platform.
 //  2. The direct cases (random voices and written-out edge cases through the real renderVoice): the same hash as the committed Linux hashes (engine_u24_golden.inc) on every platform.
 //  3. The local Node's run of this repo's ENGINE block (ref.json) must give the same hashes on x86-64 Linux (macOS arm64's Math.sin / cos / exp / pow differ from V8 on x86-64 Linux: reported there).

@@ -2,7 +2,7 @@
 // U24's types: fm2 fmfb fmmetal fmcross fm4 fm6 genesis sb arcade addsaw addodd membrane bell bar chord formant karplus vosim. U22's: sine tri saw square pulse white pink brown blue metal lfsr dust grit.
 //   node native/tools/engine-u24-dump.mjs --fixture <betaRoot>   (by hand, needs a checkout of `beta`: <betaRoot>/tools/engine-golden.js and tests/golden/engines.json)
 //        writes native/tests/golden/engine_u24_voices.json (the factory voices whose layers are all U22's or U24's types and at least one is U24's) and engine_u24_golden.inc's voice rows
-//        (beta's hashes, copied). The voices of U22's own types stay in engine_voices.json (U22); the ones that mix U24's types with U23's are in neither file (see docs/port/U24-NOTES.md).
+//        (beta's hashes, copied). The voices of U22's own types stay in engine_voices.json (U22); the voices that mix U24's types with U22's or U23's are in engine_u24_voices.json too (110 voices, see docs/port/U24-NOTES.md). U23's own voices stay in engine_u23_voices.json.
 //   node native/tools/engine-u24-dump.mjs [outDir]               the reference of the local Node: <outDir>/ref.json (hash + length of every fixture voice and direct case), <outDir>/cases.json (the direct cases).
 //   node native/tools/engine-u24-dump.mjs --golden               writes the direct cases' hashes into native/tests/golden/engine_u24_golden.inc (sha256 of the real JS's render, Node 22 x86-64 Linux).
 //   node native/tools/engine-u24-dump.mjs --check                exits 1 if the local Node's render of a fixture voice does not give beta's golden hash or the committed case hashes are not what the JS gives now (Linux gate).

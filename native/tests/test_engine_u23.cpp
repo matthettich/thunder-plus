@@ -114,6 +114,7 @@ int main(int argc, char** argv) {
       const int st = renderOne(c, bank, c.num("sr"), c.num("hold"), c.num("bpm", 120), buf, &hex, &n, &nl);
       const auto g = cg.find(name); const auto r = cref.find(name); cran++;
       if (st != kEngOk || g == cg.end() || r == cref.end()) { CHECK(false, "%s: status %d", name.c_str(), st); if (firstOnly) break; continue; }
+      if (name.rfind("edge_wt_bend", 0) == 0) { bool fin = n > 0; for (size_t k = 0; k < n; k++) fin = fin && std::isfinite(buf[k]); CHECK(fin, "%s: the render must be finite (Bend < 0, web build 635)", name.c_str()); }
       const bool hashOk = hex == g->second->sha256 && (long)n == g->second->len, localOk = hex == r->second.first && (long)n == r->second.second;
       if (hashOk) cexact++;
       if (!localOk) cdiff++;
