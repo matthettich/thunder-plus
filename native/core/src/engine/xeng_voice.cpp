@@ -62,6 +62,15 @@ const FieldRef kSkin[] = { XP_SKIN(XP_REF) };
 #define XP_CUR ChipP
 const FieldRef kChip[] = { XP_CHIP(XP_REF) };
 #undef XP_CUR
+#define XP_CUR AcidP
+const FieldRef kAcid[] = { XP_ACID(XP_REF) };
+#undef XP_CUR
+#define XP_CUR MachP
+const FieldRef kMach[] = { XP_MACH(XP_REF) };
+#undef XP_CUR
+#define XP_CUR XBlipP
+const FieldRef kBlip[] = { XP_BLIP(XP_REF) };
+#undef XP_CUR
 #define XP_CUR TableP
 const FieldRef kTable[] = { XP_TABLE(XP_REF) };
 #undef XP_CUR
@@ -79,10 +88,11 @@ const FieldRef kBytebeat[] = { XP_BYTEBEAT(XP_REF) };
 #undef XP_CUR
 
 // normX: only a number that is finite overrides the default; the keys are the defaults' own; tune, drive and level are not taken from the object (xParams puts the voice's)
-template <class P, size_t K> void fill(P& p, const FieldRef (&t)[K], Json o) {
+// (a Blip keeps its own `drive`: normBlip deletes only `vel`)
+template <bool kSkipTDL = true, class P, size_t K> void fill(P& p, const FieldRef (&t)[K], Json o) {
   if (!o.isObj()) return;
   for (size_t i = 0; i < K; i++) {
-    const std::string_view nm = t[i].name; if (nm == "tune" || nm == "drive" || nm == "level") continue;
+    const std::string_view nm = t[i].name; if (kSkipTDL && (nm == "tune" || nm == "drive" || nm == "level")) continue;
     Json v = o.get(nm); if (v.isNum() && std::isfinite(v.asNum())) *reinterpret_cast<double*>(reinterpret_cast<char*>(&p) + t[i].off) = v.asNum();
   }
 }
@@ -92,7 +102,7 @@ const KindName kNames[] = {{"tone", XKind::Tone}, {"modal", XKind::Modal}, {"swa
   {"strings", XKind::Strings}, {"fmdrum", XKind::FmDrum}, {"wind", XKind::Wind}, {"phase", XKind::Phase}, {"partials", XKind::Partials}, {"skin", XKind::Skin}, {"chip", XKind::Chip},
   {"table", XKind::Table}, {"vector", XKind::Vector}, {"scanned", XKind::Scanned}, {"resynth", XKind::Resynth}, {"bytebeat", XKind::Bytebeat},
   // the other entries of XENG (and the wasm-backed ones): not this unit's
-  {"acid", XKind::Other}, {"mach", XKind::Other}, {"sf", XKind::Other}, {"wavesl", XKind::Other},
+  {"acid", XKind::Acid}, {"mach", XKind::Mach}, {"blip", XKind::Blip}, {"sf", XKind::Other}, {"wavesl", XKind::Other},
   {"lxdrum", XKind::Other}, {"lxsnare", XKind::Other}, {"lxcym", XKind::Other}, {"lxhat", XKind::Other}, {"pmono", XKind::Other}, {"ppoly", XKind::Other}, {"pcoil", XKind::Other}, {"porbit", XKind::Other}};
 
 inline double holdOf(double hold, double len, double k, double m) { return orv(hold, mn(orv(len, k), m)); }   // hold || Math.min(V.len || k, m)
@@ -121,6 +131,9 @@ size_t runEngine(const XengVoice& V, double sr, double hold, double bpm, float* 
     case XKind::Scanned: { ScannedP P = V.scanned; XP_VOICE(P); return xeng_scanned(P, sr, holdOf(hold, V.len, 3, 6), out, cap); }
     case XKind::Resynth: { ResynthP P = V.resynth; XP_VOICE(P); return xeng_resynth(P, sr, holdOf(hold, V.len, 12, 12), V.rs.present ? &V.rs : nullptr, out, cap); }   // V.rsData || null
     case XKind::Bytebeat: { BytebeatP P = V.bytebeat; XP_VOICE(P); return xeng_bytebeat(P, sr, holdOf(hold, V.len, 2, 4), V.hasBb ? &V.bbExpr : nullptr, out, cap); }   // V.bbExpr: the formula text
+    case XKind::Acid: { AcidP P = V.acid; XP_VOICE(P); return xeng_acid(P, sr, holdOf(hold, V.len, 1, 1.2), out, cap); }   // renderLiveCore(AcidCore, P, sr, hold || Math.min(V.len || 1, 1.2), false)
+    case XKind::Mach: { MachP P = V.mach; XP_VOICE(P); return xeng_mach(P, sr, holdOf(hold, V.len, 2, 2), out, cap); }       // renderLiveCore(MachCore, P, sr, hold || Math.min(V.len || 2, 2))
+    case XKind::Blip: return xeng_blip(V.blip, sr, V.tune, V.drive, V.level, out, cap);   // renderBlip(V, sr): no hold
     default: return 0;
   }
 #undef XP_VOICE
@@ -128,7 +141,8 @@ size_t runEngine(const XengVoice& V, double sr, double hold, double bpm, float* 
 
 // padFx's lengths (index.html padFx, and U22's engine.cpp for the pitch effects' tails)
 inline bool fxReady(const EngFx& f) { return f.kind != EngFx::Kind::Other; }
-bool anyFxOn(const XengVoice& V) { for (int i = 0; i < V.nFx; i++) if (V.fx[i].on && fxReady(V.fx[i])) return true; return false; }
+// engFx: pad effects run on Blip and on every engine that is not live; Acid and Machine play live in the song, so they stay dry (their voice's fx are not applied)
+bool anyFxOn(const XengVoice& V) { if (V.kind == XKind::Acid || V.kind == XKind::Mach) return false; for (int i = 0; i < V.nFx; i++) if (V.fx[i].on && fxReady(V.fx[i])) return true; return false; }
 double pitchTail(const EngFx& f, double sr) { const bool rv = f.kind == EngFx::Kind::PitchReverb; return js_round(sr * (rv ? 3 + (f.sizeNull ? 0.0 : f.size) * 4 : mn(8, f.time / 1000 * (1 + 6 * f.fb)))); }
 }  // namespace
 
@@ -152,6 +166,7 @@ bool xeng_voice_from_json(XengVoice& V, Json v, Json fx) {
     case XKind::FmDrum: fill(V.fmdrum, kFmDrum, o); break; case XKind::Wind: fill(V.wind, kWind, o); break;       case XKind::Phase: fill(V.phase, kPhase, o); break;
     case XKind::Partials: fill(V.partials, kPartials, o); break; case XKind::Skin: fill(V.skin, kSkin, o); break; case XKind::Chip: fill(V.chip, kChip, o); break;
     case XKind::Table: fill(V.table, kTable, o); xeng_wt_from_json(V.wt, v.get("wtData")); break;
+    case XKind::Acid: fill(V.acid, kAcid, o); break;      case XKind::Mach: fill(V.mach, kMach, o); break;        case XKind::Blip: fill<false>(V.blip, kBlip, o); break;
     case XKind::Vector: fill(V.vector, kVector, o); break; case XKind::Scanned: fill(V.scanned, kScanned, o); break;
     case XKind::Resynth: fill(V.resynth, kResynth, o); xeng_rs_from_json(V.rs, v.get("rsData")); break;
     case XKind::Bytebeat: fill(V.bytebeat, kBytebeat, o); { Json b = v.get("bbExpr"); V.hasBb = b.isStr(); if (V.hasBb) V.bbExpr = std::string(b.asStr()); } break;
