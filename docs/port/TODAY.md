@@ -308,3 +308,8 @@ N1 step 10.
      against 358; the shipped `pump.wasm` is byte-identical to pump 6f1ec29 with the STRIP `RunnerExtra` block removed; the other 24 types are identical)?
    - **Open PRs of ours: none.** Next for Fable: N1 steps 10 and 11 (U34, U35, U37), the "Owed by the lead" list, web item 4's design. Next for Sonnet workers:
      U29, then U25 (unblocked by decision 1: strict build, -100 dB gate), the small hardening list in 5, WORKPLAN section 7's table (not updated tonight).
+8. **23:45. The owner answered (23:02): "the most up to date and fixed version should be what we use".** Web build 638 (#204) is merged into `beta` ONLY (not
+   `main`: he listens to MASTER first): `pump.wasm` and `pump-meta.js` from the pin deb07d3 (byte-identical to the pin's `wasm/build.sh`), MASTER 77 parameters
+   (`resonance_on` default 0, `resonance_amount` default 100, appended), latency 4454; the MASTER window got the RESONANCE panel ported from the pin's UI; the
+   other 24 types bit-identical; old songs: RESONANCE off, output bit-identical delayed 4096 samples more. **On `native` now possible:** take build 638's web
+   files into `native`'s copies and remove `kSkipShipped` from `test_pump` (a Sonnet chore). A check-in is set for 03:50 on 17 Nov to pick up stalled work.
