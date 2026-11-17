@@ -110,7 +110,7 @@ size_t resample(const float* x, size_t L, double from, double to, float* y) {
 }
 
 size_t finish(float* out, size_t len, double level, double drive, double sr) {
-  const double lv = js_pow(10, orv(level, 0) / 20), d0 = orv(drive, 0), dr = d0 > 0.001 ? 1 + d0 * d0 * 10 : 0, dn = dr != 0 ? 1 / js_tanh(dr) : 1;
+  const double lv = js_pow(10, std::fmax(-120.0, std::fmin(120.0, orv(level, 0))) / 20),   /* Thunder: level limited to +-120 dB (the page would turn 1e9 dB into inf, and 0 * inf into NaN) */ d0 = std::fmin(10.0, orv(drive, 0)),   /* Thunder: drive limited to 10 (the page's slider is 0..1; inf would give 0 * inf = NaN) */ dr = d0 > 0.001 ? 1 + d0 * d0 * 10 : 0, dn = dr != 0 ? 1 / js_tanh(dr) : 1;
   for (size_t i = 0; i < len; i++) { double y = (double)out[i] * lv; if (dr != 0) y = js_tanh(y * dr) * dn; out[i] = (float)y; }
   size_t end = len; while (end > 1 && std::fabs((double)out[end - 1]) < 1e-4) end--;
   const size_t n = len == 0 ? 0 : (end > 1 ? end : 1);

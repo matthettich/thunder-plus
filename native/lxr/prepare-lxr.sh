@@ -89,6 +89,8 @@ rx(D+'HiHat.c', r'buf\[j\] \*=  (hatVoice\.combinedVolume \* calcOnePole\( &hatV
 rx(D+'DrumVoice.c', r'buf\[i\] \*= (voiceArray\[voiceNr\]\.combinedVolume);', r'buf[i] = lxr_f2i16(buf[i] * (\1));', 1)
 rx('Core/Inc/Soundengine/DSPAudio/BufferTools.h', r'buf\[i\] = (buf\[i\] \* currentGain);', r'buf[i] = lxr_f2i16(\1);', 3)
 rx('Core/Src/Soundengine/MIDI/MidiParser.c', r'(\.lfo\.phaseOffset) = (value\.flt \* 0xffffffff);', r'\1 = lxr_f2u32(\2);', 4)
+rx(D+'lfo.c', r'uint32_t incInt = inc;', 'uint32_t incInt = lxr_f2u32(inc);', 1)
+rx(D+'ResonantFilter.c', r'tmp = (h \* FILTER_GAIN);', r'tmp = lxr_f2i32(\1);', 2)
 for rel in sorted(touched):
     p = os.path.join(O, rel); s = open(p, encoding='utf-8', newline='').read()
     eol = '\r\n' if '\r\n' in s else '\n'

@@ -38,3 +38,9 @@ if(CMAKE_C_COMPILER_ID STREQUAL "GNU")
   target_compile_definitions(thunder_lxr PRIVATE $<$<COMPILE_LANGUAGE:C>:__fp16=_Float16>)
 endif()
 target_link_libraries(thunder_lxr PUBLIC m)
+
+# THUNDER_SANITIZE: the firmware's C also under -fsanitize=float-cast-overflow (not part of "undefined"): the host patches (prepare-lxr.sh, section 4) route every out-of-range
+# float -> integer conversion through a saturating helper, and this keeps it that way.
+if(THUNDER_SANITIZE AND CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
+  target_compile_options(thunder_lxr PRIVATE $<$<COMPILE_LANGUAGE:C>:-fsanitize=float-cast-overflow -fno-sanitize-recover=float-cast-overflow>)
+endif()

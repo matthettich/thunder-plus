@@ -18,6 +18,10 @@ add_executable(rt_harness rt_harness.cpp)
 target_link_libraries(rt_harness PRIVATE thunder_core)
 target_include_directories(rt_harness PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../core/src)   # U07: the sequencer's step() runs under the guard too
 target_compile_definitions(rt_harness PRIVATE THUNDER_ROOT="${CMAKE_CURRENT_SOURCE_DIR}/../..")
+if(TARGET thunder_lxr)   # U04: the LXR allocation-guard case
+  target_link_libraries(rt_harness PRIVATE thunder_lxr)
+  target_compile_definitions(rt_harness PRIVATE THUNDER_HAVE_LXR=1)
+endif()
 add_test(NAME rt_core COMMAND rt_harness)
 add_test(NAME rt_guard_selftest COMMAND rt_harness --selftest)
 
@@ -675,5 +679,35 @@ if(TARGET thunder_lxr)
     add_test(NAME lxr_cases_current COMMAND ${NODE_EXE} ${CMAKE_CURRENT_SOURCE_DIR}/../tools/lxr-dump.mjs --check)
   else()
     add_test(NAME lxr COMMAND test_lxr)   # no directory: prints FAIL and exits 1
+  endif()
+endif()
+
+# U04: the seam test in both configurations: with the module (THUNDER_WITH_LXR=ON: refused before register / renders / refused after unregister) and without (OFF: refused, everything else unchanged).
+add_executable(test_lxr_seam test_lxr_seam.cpp)
+target_link_libraries(test_lxr_seam PRIVATE thunder_core)
+target_include_directories(test_lxr_seam PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../core/src)
+if(TARGET thunder_lxr)
+  target_link_libraries(test_lxr_seam PRIVATE thunder_lxr)
+  target_compile_definitions(test_lxr_seam PRIVATE THUNDER_HAVE_LXR=1)
+endif()
+if(NOT MSVC)
+  target_compile_options(test_lxr_seam PRIVATE -Wall -Wextra)
+endif()
+add_test(NAME lxr_seam COMMAND test_lxr_seam)
+if(TARGET thunder_lxr)
+  # U04 fuzz: a small count in ctest; the long run (>= 8000 renders) is `test_lxr_fuzz 8000 <seed>`, locally, under THUNDER_SANITIZE=ON.
+  add_executable(test_lxr_fuzz test_lxr_fuzz.cpp)
+  target_link_libraries(test_lxr_fuzz PRIVATE thunder_lxr thunder_core)
+  if(NOT MSVC)
+    target_compile_options(test_lxr_fuzz PRIVATE -Wall -Wextra)
+  endif()
+  add_test(NAME lxr_fuzz COMMAND test_lxr_fuzz 150 1)
+endif()
+
+# U04: the closed-build boundary (sources of the core + symbols of libthunder_core.a; an OFF build also checks every test binary).
+if(UNIX AND NOT APPLE)
+  find_program(SH_EXE sh)
+  if(SH_EXE)
+    add_test(NAME lxr_boundary COMMAND ${SH_EXE} ${CMAKE_CURRENT_SOURCE_DIR}/../tools/lxr-boundary.sh ${CMAKE_BINARY_DIR} $<IF:$<BOOL:${THUNDER_WITH_LXR}>,ON,OFF>)
   endif()
 endif()
