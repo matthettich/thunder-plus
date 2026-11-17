@@ -51,3 +51,11 @@ The committed 313 cases are ASan-clean. Fuzz: 360 renders, 0 failed. Decision fo
 2. Hashes on other platforms (libm differences in Elements; float strictness) not seen.
 3. Whether the lead accepts class Q/D left-outs (240 of 317) or wants the one-LSB rule.
 4. Reference uses a fresh wasm instance per voice; the page shares one across voices (statics persist), native resets per voice.
+
+
+## WIP 17 Nov (taken over; supersedes "Known upstream Plaits reads" above where they differ)
+Patches added in prepare.sh (host builds only), found by the unfenced ASan + UBSan fuzz: (1) waveshaping_engine.cc `lut_fold` index and the ws_index int conversion; (2) lpc_speech_synth.h phonemes_ one-frame-past read;
+(3) wavetable_engine.cc ReadWave: CAUSE of the model 13 crash: a quantised x / y / z reaches exactly 7.0, the "next" corner is index 8 (or z = -1), idx 256 and over (or below 0) is read with weight 0, the slot is NULL;
+the hosting is the same as the web wrapper's (same calls, 16384 byte allocator); wave_map_ is allocated 64 and filled with 256 (upstream), now 256; (4) wave_terrain_engine.cc aux Sine phase below -1/512 (index -1);
+(5) sine_oscillator.h SineNoWrap phase NaN / out of the 641-float table (bass drum sustain at very low notes). layer_pe.cpp refuses a layer whose note is NaN / infinite / beyond +-1e6 semitones (kEngUnsupported).
+Fuzz test rewritten with no fences (all 24 models, full ranges, hostile values, out-of-range knobs must be refused, time limit per render). Still to do: gate rule (one step), statics, goldens, CI, PR body.

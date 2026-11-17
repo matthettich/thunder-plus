@@ -19,6 +19,9 @@ inline double jmax(double a, double b) { if (a != a || b != b) return NAN; if (a
 inline double jmin(double a, double b) { if (a != a || b != b) return NAN; if (a == 0 && b == 0) return std::signbit(a) ? a : b; return a < b ? a : b; }
 inline bool truthy(double x) { return x != 0 && x == x; }
 
+// A note that is NaN, infinite or beyond +-1e6 semitones (the page's reach is about -100 .. 250) is not rendered: the voice is refused (kEngUnsupported). The upstream code indexes pitch tables with it
+// (an int conversion of NaN / huge floats: undefined, an out-of-table read), and the wasm plays garbage there.
+constexpr double kNoteLimit = 1e6;
 constexpr size_t kPlaitsMax = 48000 * 8, kElementsMax = 32000 * 8;   // the JS caps both pre-renders at 8 s
 struct Workspace {
   thunder_pe::Session* sess = nullptr;
@@ -96,6 +99,7 @@ void PeOsc::init(PeUse& use, const EngLayer& L, const EngVoice& V, double sr, do
     pl_init(S);
     for (size_t off = 0; off < N; off += 48) {
       const double t = (double)off / 48000, note = noteAt(base, pA, t, ptau);
+      if (!(std::fabs(note) < kNoteLimit)) { use.bad = true; d = nullptr; n = 0; k = rate / sr; return; }
       pl_set(S, eng, (float)note, (float)P.pHarm, (float)P.pTim, (float)P.pMor, (float)P.pDecay, (float)P.pLpg, (float)P.pFm, (float)P.pTimEnv, (float)P.pMorEnv, strike ? 1 : 0);
       pl_trigger(S, strike && t < gateS ? 1.0f : 0.0f);
       pl_render(S, 48);
@@ -107,6 +111,7 @@ void PeOsc::init(PeUse& use, const EngLayer& L, const EngVoice& V, double sr, do
     el_init(S);
     for (size_t off = 0; off < N; off += 32) {
       const double t = (double)off / 32000, note = noteAt(base, pA, t, ptau);
+      if (!(std::fabs(note) < kNoteLimit)) { use.bad = true; d = nullptr; n = 0; k = rate / sr; return; }
       el_set(S, model, (float)note, (float)P.eStrength, (float)P.eContour, (float)P.eBow, (float)P.eBlow, (float)P.eStrike, (float)P.eBowT, (float)P.eFlow, (float)P.eBlowT,
              (float)P.eMallet, (float)P.eStrikeT, (float)P.eGeo, (float)P.eBright, (float)P.eDamp, (float)P.ePos, (float)P.eSpace);
       el_gate(S, t < gateS ? 1 : 0);
