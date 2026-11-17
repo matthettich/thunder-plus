@@ -178,6 +178,17 @@ static void testFeedback() {
 static void testVoices() {
   { Doc d(kBasic); WavesEngine e(48000, opts(2)); CHECK(e.loadPatch(d.r), "basic"); CHECK(energy(e, 10) == 0, "silent before any note"); e.noteOn(60, 1); CHECK(energy(e, 40) > 0, "a held note sounds");
     e.noteOn(64, 1); e.noteOn(67, 1); e.noteOn(71, 1); CHECK(std::isfinite(energy(e, 20)), "finite with more notes than voices"); e.allNotesOff(); energy(e, 900); CHECK(energy(e, 10) < 1e-6, "silent after release"); }
+  {   // a mono audio source into a voice-scope module is shared out: 1/N per voice (N = the voice count), so 4 voices make a quarter of the amplitude of 1
+    const std::string mono = patch({mod("h", "hostIn"), mod("v", "vco", "{\"wave\":1}"), mod("e", "adsr", "{\"a\":0.005,\"d\":0.2,\"s\":0.7,\"r\":0.3}"), mod("g", "vca"), mod("o", "out")},
+      {cab("h", "gate", "e", "gate"), cab("v", "out", "g", "in"), cab("e", "out", "g", "cv"), cab("g", "out", "o", "in")});
+    double en[2]; for (int k = 0; k < 2; k++) { Doc d(mono); Host host; host.setRandom(Host::Rnd::Xorshift, 0x9e3779b9u); WavesEngine e(48000, opts(k ? 4 : 1), &host); CHECK(e.loadPatch(d.r), "mono source patch"); e.noteOn(60, 1); en[k] = energy(e, 60); }
+    CHECK(en[0] > 0 && std::fabs(en[1] / en[0] - 1.0 / 16) < 1e-3, "mono source into a voice: energy ratio %g, wanted 1/16", en[0] > 0 ? en[1] / en[0] : -1);
+  }
+  {   // a parameter past its declared range is held to it (the JS would run on the raw value; a hostile value must not reach a module)
+    std::vector<float> o2[2]; for (int k = 0; k < 2; k++) { const std::string pj = patch({mod("h", "hostIn"), mod("v", "vco", "{\"wave\":1}"), mod("e", "adsr", k ? "{\"a\":0.005,\"d\":0.2,\"s\":1,\"r\":0.3}" : "{\"a\":0.005,\"d\":0.2,\"s\":9,\"r\":0.3}"), mod("g", "vca"), mod("o", "out")},
+      {cab("h", "pitch", "v", "pitch"), cab("h", "gate", "e", "gate"), cab("v", "out", "g", "in"), cab("e", "out", "g", "cv"), cab("g", "out", "o", "in")}); o2[k] = renderLoop(pj, 40); }
+    CHECK(o2[0] == o2[1], "a sustain of 9 behaves as the declared maximum");
+  }
   VoicePool p(3);
   int a = p.on(60, 1), b = p.on(64, 1), c = p.on(67, 1); CHECK(a == 0 && b == 1 && c == 2, "fills in order");
   int d = p.on(72, 1); CHECK(d == 0, "all busy: the oldest overall is stolen (row %d)", d);
