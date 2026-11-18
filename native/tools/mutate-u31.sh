@@ -40,7 +40,7 @@ run "pump: a bad output is not noticed" chains/cmods2.cpp 'if (!(a > -8 && a < 8
 run "sidechain compressor: the ratio floor" chains/cmods.cpp 'rat = jmax(1, io.p[1]);' 'rat = jmax(2, io.p[1]);'
 run "sidechain compressor: the gain slope" chains/cmods.cpp 'js_pow(10, -over * (1 - 1 / rat) / 20)' 'js_pow(10, -over * (1 - 1 / rat) / 21)'
 run "vocoder: the talk-mode saturation" chains/cmods.cpp 'js_tanh(y * 1.6) * .625' 'js_tanh(y * 1.6) * .63'
-run "morph: the wet gain" chains/cmods.cpp 'out[i] = (float)(dry * (1 - mix) + wet * g * mix);' 'out[i] = (float)(dry * (1 - mix) + wet * g * mix * 1.01);'
+run "vocoder spectral mode: the wet gain" chains/cmods.cpp 'out[i] = (float)(dry * (1 - mix) + wet * g * mix);' 'out[i] = (float)(dry * (1 - mix) + wet * g * mix * 1.01);'
 run "osc: the level" chains/cmods.cpp 'O[i] = (float)(y * lv); ph += dt;' 'O[i] = (float)(y * lv * 1.001); ph += dt;'
 run "resample: the slice table is cut short" chains/cmods2.cpp 'kRsSlices[(int)clamp((double)i32(io.p[3]), 0, 4)]' 'kRsSlices[(int)clamp((double)i32(io.p[3]), 0, 3)]'
 nice cmake --build "$B" -j1 --target test_chains test_chains_live >/dev/null 2>&1

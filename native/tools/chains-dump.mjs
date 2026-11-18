@@ -129,6 +129,10 @@ S({ name: 'edit/live', patch: { modules: [TI('a', 1), P('g', 'vca', { gain: .5 }
 S({ name: 'edit/patch-replaced', patch: { modules: [TI('a', 1), CO('c', 1)], cables: [C(['a', 'out'], ['c', 'in'])] },
   events: [[30, 'patch', { modules: [TI('a', 1), P('f', 'vcf', { cutoff: .35 }), CO('c', 1)], cables: [C(['a', 'out'], ['f', 'in']), C(['f', 'out'], ['c', 'in'])], transport: { tempo: 90, playing: true } }]] });
 S({ name: 'edit/transport', patch: { modules: [TI('a', 1), P('l', 'lfo', { rate: 4, sync: 1 }), P('g', 'vca', {}), CO('c', 1)], cables: [C(['a', 'out'], ['g', 'in']), C(['l', 'out'], ['g', 'cv']), C(['g', 'out'], ['c', 'in'])] }, events: [[20, 'transport', { playing: false }], [40, 'transport', { playing: true, tempo: 133 }], [60, 'quality', 'draft']] });
+// found by the mutation check: parts no row of chains-modules.json reaches (the Vocoder's spectral mode, a compressor ratio below 2, an unlinked modulator)
+S({ name: 'mod2/vocoder-spectral', patch: { modules: [TI('a', 1), TI('b', 2), P('v', 'vocoder', { mode: 6, mix: .8, level: 1.2 }), CO('c', 1)], cables: [C(['a', 'out'], ['v', 'in']), C(['b', 'out'], ['v', 'inR']), C(['v', 'out'], ['c', 'in'])] } });
+S({ name: 'mod2/vocoder-spectral-unlinked', patch: { modules: [TI('a', 1), P('v', 'vocoder', { mode: 6, mix: 1 }), CO('c', 1)], cables: [C(['a', 'out'], ['v', 'in']), C(['v', 'out'], ['c', 'in'])] } });
+S({ name: 'mod2/comp-low-ratio', patch: { modules: [TI('a', 1), P('k', 'sccomp', { threshold: .1, ratio: 1.4, mix: .9 }), CO('c', 1)], cables: [C(['a', 'out'], ['k', 'in']), C(['k', 'out'], ['c', 'in'])] } });
 // the node: ThunderChains (track, bus feeds, the sidechain input, taps, sends in and out)
 const nodeS = s => S(Object.assign({ mode: 'node', track: 0, standalone: false }, s));
 nodeS({ name: 'node/basic', track: 0, patch: { modules: [TI('a', 1), P('g', 'vca', { gain: .6 }), CO('c', 1), CO('d', 2)], cables: [C(['a', 'out'], ['g', 'in']), C(['g', 'out'], ['c', 'in']), C(['g', 'out'], ['d', 'in'])] } });
