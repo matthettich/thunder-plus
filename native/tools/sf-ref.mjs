@@ -139,6 +139,7 @@ function makeSf2() {
   S.push({ nm: 'stR', d: mk(800, (i) => ((i * 61) % 16000) - 8000), sr: 32000, ls: 50, le: 750, root: 64, corr: 5, link: 2, type: 2 });
   { let s = 12345; S.push({ nm: 'noise', d: mk(3000, (i) => { s = (Math.imul(s, 1664525) + 1013904223) >>> 0; return ((s >>> 17) - 16384) * (3000 - i) / 3000 | 0; }), sr: 48000, ls: 0, le: 0, root: 60, corr: 0, link: 0, type: 1 }); }
   S.push({ nm: 'badloop', d: mk(500, (i) => ((i * 211) % 30000) - 15000), sr: 44100, ls: 9, le: 100, root: 60, corr: 0, link: 0, type: 1 });   // its loop starts before its own start (see below): the font says start 100
+  S.push({ nm: 'longloop', d: mk(500, (i) => ((i * 131) % 24000) - 12000), sr: 44100, ls: 100, le: 700, root: 60, corr: 0, link: 0, type: 1 });   // its loop END (700) lies beyond its 500 frames: the page's own guard `a.le <= a.d.length` then drops the loop
   // shdr: sample frames are laid out one after another with 46 zero frames between them
   let pos = 0; const smpl = []; const shdr = [];
   S.forEach((s) => { s.start = pos; s.end = pos + s.d.length; smpl.push(Buffer.from(s.d.buffer)); smpl.push(Buffer.alloc(46 * 2)); pos = s.end + 46; });
@@ -166,6 +167,7 @@ function makeSf2() {
     { g: [R(43, 36, 36), G(57, 1), G(58, 60), SID(4)] },
     { g: [R(43, 38, 40), G(57, 1), G(58, 60), G(51, 7), G(52, -30), G(48, 60), SID(4)] },
     { g: [R(43, 42, 46), G(54, 1), G(58, 60), SID(5)] },
+    { g: [R(43, 48, 49), G(54, 1), G(58, 60), SID(6)] },
   ]);
   inst.push(Buffer.concat([name('EOI'), u16(ibag.length)])); ibag.push(bag(igen.length, imod.length)); igen.push(Buffer.alloc(4)); imod.push(Buffer.alloc(10));
   // presets: P0 uses Layers with preset generators (attenuation, tuning, a key range) and a preset-level modulator; P1 layers Layers and Drums; P2 (bank 128) the drums

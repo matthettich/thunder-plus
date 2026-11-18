@@ -157,6 +157,7 @@ ParseStatus parse(const uint8_t* data, size_t n, Font& F, bool copy) {
     }
     presets.push_back(P);
   }
+  F.work = work;
   // presets.sort((a, b) => a.bank - b.bank || a.prog - b.prog): stable
   std::stable_sort(presets.begin(), presets.end(), [](const Preset& a, const Preset& b) { return a.bank != b.bank ? a.bank < b.bank : a.prog < b.prog; });
   F.presets = std::move(presets);

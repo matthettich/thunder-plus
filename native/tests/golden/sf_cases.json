@@ -236,6 +236,17 @@
    },
    "sr": 48000,
    "hold": 0
+  },
+  {
+   "id": "syn_loop_beyond",
+   "font": "syn",
+   "pad": {
+    "bank": 128,
+    "prog": 0,
+    "trans": -12
+   },
+   "sr": 48000,
+   "hold": 2
   }
  ],
  "lives": [
@@ -864,6 +875,36 @@
      "gain": 0.8,
      "pan": 128,
      "poly": true,
+     "col": 0
+    },
+    {
+     "f": 30000,
+     "type": "off",
+     "track": 0
+    }
+   ]
+  },
+  {
+   "id": "syn_loop_beyond_live",
+   "font": "syn",
+   "pad": {
+    "bank": 128,
+    "prog": 0
+   },
+   "frames": 60000,
+   "tracks": 1,
+   "kit": {
+    "syn": true
+   },
+   "events": [
+    {
+     "f": 100,
+     "type": "note",
+     "track": 0,
+     "rate": 0.5,
+     "gain": 0.9,
+     "pan": 128,
+     "poly": false,
      "col": 0
     },
     {

@@ -115,7 +115,7 @@ The native module compiles the same sources STRICT (no fast-math, no contraction
 
 Chosen by the owner on 17 Nov 2026 (U32). `stb_vorbis.c` at the pin: sha256 `b52cf518355f7b2d181f18b97b812f361ffeb26299d935c8cf29e842401d60a6`, 198,004 bytes.
 **Licence, read from the file at the pin** (the block just before the last lines of `stb_vorbis.c`): "This software is available under 2 licenses -- choose whichever you prefer. ALTERNATIVE A - MIT License, Copyright (c) 2017 Sean Barrett [...]
-ALTERNATIVE B - Public Domain (www.unlicense.org): This is free and unencumbered software released into the public domain." and the file's own header says "Ogg Vorbis audio decoder - v1.24 - public domain". The repository's `LICENSE` says the same
+ALTERNATIVE B - Public Domain (www.unlicense.org)"; the next line of the file: "This is free and unencumbered software released into the public domain." and the file's own header says "Ogg Vorbis audio decoder - v1.24 - public domain". The repository's `LICENSE` says the same
 ("The software libraries in this repository are in the public domain. Most of them are also available under the MIT license -- choose whichever you prefer."). Nothing is vendored: `fetch.sh` fetches the file at the pin; `THUNDER_FETCH_STB_ONLY=1 fetch.sh DEST` fetches only this (the closed build has no DSP and needs nothing else).
 `prepare-stb.sh` makes the patched copy the host builds compile (see `docs/port/U32-NOTES.md` for each patch and the input that triggers it; none while the file is empty of patches).
 The decoder runs at font load / preparation time, never on the audio thread; the host hands the bytes in (nothing in the core opens a file).

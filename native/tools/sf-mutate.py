@@ -20,6 +20,16 @@ M=[
 ('sf_decode.cpp','(size_t)bs0 / 2)','(size_t)bs0)','pageTail cap: half the short block'),
 ('sf_decode.cpp','audioPages != 1','audioPages != 2','pageTail only for one-audio-page streams'),
 ('sf_decode.cpp','if (!any) continue; }','if (false) continue; }','key-list preparation decodes zones of unlisted keys'),
+('sf_live.cpp','&& a->le <= n && a->ls >= 0','&& a->ls >= 0','live loop guard: loop end beyond the data no longer drops the loop'),
+('sf_live.h','v.rel / 4.6','v.rel / 4.5','live release time constant'),
+('sf_decode.cpp','* 0.9; const size_t n = d.size();','* 0.89; const size_t n = d.size();','resampler cutoff 0.9 -> 0.89'),
+('sf_voice.cpp','(g(52) + (double)s.corr) / 100','(g(52) - (double)s.corr) / 100','pitch correction sign'),
+('sf_live.cpp','guard++ < 1024) z.pos -= z.le - z.ls;','guard++ < 1024) z.pos -= z.le - z.ls + 1;','live loop wrap off by one'),
+('sf_live.cpp','acc(R + i, m * js_sin(a)); continue;','acc(R + i, m * js_cos(a)); continue;','mono pan, right channel'),
+('sf_decode.cpp','- (uint64_t)s.start * 2) / 2 : 0;','- (uint64_t)s.start * 2) / 2 + 1 : 0;','SF2 frames present: off by one'),
+('sf_live.cpp','kill(T_[k][q], e.t, 0.004)','kill(T_[k][q], e.t, 0.005)','stp kill time constant'),
+('sf_decode.cpp','(uint64_t)sc.lastGranule < (uint64_t)d.size()','(uint64_t)sc.lastGranule + 1 < (uint64_t)d.size()','granule trim off by one'),
+('sf_decode.cpp','info.sample_rate < kMinStreamRate','info.sample_rate < 400','stream rate floor'),
 ('sf_parse.cpp','if (s.type & 0x10) F.sf3 = true;','if (s.type & 0x20) F.sf3 = true;','sf3 flag detection'),
 ]
 only=sys.argv[1:]

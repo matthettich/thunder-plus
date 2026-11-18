@@ -23,10 +23,11 @@ constexpr int kGenN = 64;   // generator numbers kept: the player only ever read
 // ---- limits (a hostile file stops at these: parse() fails, nothing is partly built) --------------------------------------------------------------------------------------------------------------------------------
 constexpr size_t kMaxFontBytes = (size_t)1 << 31;        // the whole file
 constexpr size_t kMaxZones = (size_t)1 << 18;            // zones of all presets together (FluidR3 GM: 9455)
-constexpr size_t kMaxModPool = (size_t)1 << 22;          // modulator records of all zones together (FluidR3 GM: 26265)
-constexpr size_t kMaxWork = (size_t)1 << 27;             // preset zone x instrument zone pairs looked at while building the zones
+constexpr size_t kMaxModPool = (size_t)1 << 19;          // modulator records of all zones together (FluidR3 GM: 26265)
+constexpr size_t kMaxWork = 200000;                   // preset zone x instrument zone pairs looked at while building the zones (FluidR3 GM: 10027; this is 20x)
 constexpr size_t kMaxSampleFrames = (size_t)1 << 25;     // frames one decoded sample may have (33 million: 12 minutes at 44.1 kHz); more is refused, as the JS's failed allocation / decode gives its 1-sample silence
-constexpr int kMaxListDepth = 32;                        // nested LIST chunks
+constexpr int kMaxListDepth = 32;
+constexpr uint32_t kMinStreamRate = 4000, kMaxStreamRate = 192000;   // an Ogg stream's own sample rate outside this is refused (silent 1-frame fallback)                        // nested LIST chunks
 
 struct SampleHdr {          // shdr
   char name[21];
@@ -53,6 +54,7 @@ struct Font {
   std::vector<Zone> zones;
   std::vector<GenV> gens;
   std::vector<Mod> mods;
+  uint64_t work = 0;                                 // zone pairs looked at while building (a measure of the font's shape; the load limit is kMaxWork)
   double bytesUsed() const;                          // memory this object holds (not the view)
 };
 
@@ -76,13 +78,19 @@ const Preset* sf_preset(const Font& f, double bank, double prog);               
 
 // ---- decoded samples ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 struct Pcm {                // sfSample's {d, sr, ls, le, k}: `ls` / `le` in frames of `d` (doubles: the JS keeps them as numbers)
-  std::vector<float> d; double sr = 48000, ls = 0, le = 0, k = 1; bool ok = false, present = false;   // present: sfSample ran for it (SF.smp has the key); ok: it decoded (false: the JS's 1-sample silence fallback)
+  std::vector<float> d; double sr = 48000, ls = 0, le = 0, k = 1; bool ok = false, present = false, tooBig = false;   // present: sfSample ran for it (SF.smp has the key); ok: it decoded (false: the JS's 1-sample silence fallback)
 };
 struct DecodeOpts {
   bool pageTail = false;    // reproduce Chrome's decodeAudioData losing the last frame (at most half a short block) of a one-audio-page Ogg stream (default off: libvorbis and stb_vorbis keep every frame; U32-NOTES.md "The missing frames")
   static DecodeOpts page(double ctxRate) { DecodeOpts o; o.ctxRate = ctxRate; o.pageTail = true; return o; }   // what the web page's decodeAudioData does at this context rate (resample, lose the last frame of one-page streams)
+  uint64_t presetBytes = (uint64_t)256 << 20;   // budget of one prepare_preset call (decoded PCM bytes): over it the preset is refused (kPrepOverPresetBudget). The real font's whole-keyboard piano is 191 MB (208 MB at 48 kHz)
+  uint64_t fontBytes = (uint64_t)512 << 20;     // budget of all presets prepared from one font at once: the host keeps a counter in `fontUsed` (prepare_preset adds, the host subtracts a PresetPcm's bytes when it drops it)
+  uint64_t* fontUsed = nullptr;
+  size_t maxBytes = 0;                          // (decode_sample: refuse a sample that would be larger than this many bytes; 0 = no limit; prepare_preset sets it from the budgets)
   double ctxRate = 0;       // 0: keep each sample's own rate (default). >0: resample to this rate as the page's decodeAudioData does (sf_decode.cpp: SF3 only; see U32-NOTES.md "sample rate")
 };
+// The page's resampler as fitted to Chrome (see sf_decode.cpp); false if the result would exceed kMaxSampleFrames. Exposed for the tests.
+bool sf_resample(std::vector<float>& d, double from, double to);
 // sfSample(font, i): decode one sample (control thread; allocates). A sample the JS could not decode (bad Ogg, a failed allocation) is the fallback {d: 1 zero, sr: 48000, ls: 0, le: 0, k: 1}.
 void decode_sample(const Font& f, uint32_t i, const DecodeOpts& o, Pcm& out);
 // A preset's samples (sfPreparePreset): the zones' samples and each stereo sample's partner. `byIndex` is sized to the font's sample count; an entry that is not wanted has present == false.
@@ -92,7 +100,8 @@ struct PresetPcm {
 };
 // `keys`: null = every zone of the preset (the whole keyboard); else 128 flags, and only the zones that cover a flagged key (any velocity) are decoded, with their stereo partners. A key whose zones are not
 // decoded plays nothing (the live note refuses it, the render returns 0): the host lists the keys its song and its pad use (U32-NOTES.md "Memory"). Same samples, same bits, less RAM.
-void prepare_preset(const Font& f, const Preset* pr, const DecodeOpts& o, PresetPcm& out, const uint8_t* keys = nullptr);   // control thread; allocates; the host calls it before the pad plays
+enum PrepareStatus { kPrepOk = 0, kPrepNoPreset = 1, kPrepOverPresetBudget = 2, kPrepOverFontBudget = 3 };
+PrepareStatus prepare_preset(const Font& f, const Preset* pr, const DecodeOpts& o, PresetPcm& out, const uint8_t* keys = nullptr);   // control thread; allocates; the host calls it before the pad plays
 
 // ---- the pad's own render (sfRender: C-4, velocity 100, held for `hold`, then released; mono) -----------------------------------------------------------------------------------------------------------------
 struct PadParams { double bank = 0, prog = 0, trans = 0, velo = 0.7, atk = 1, rel = 1; double level = 0; double len = 0; };   // xParams(V) of an `sf` voice (+ V.level, V.len)

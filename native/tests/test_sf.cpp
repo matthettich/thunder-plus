@@ -322,9 +322,9 @@ struct Riff {
   static std::vector<uint8_t> chunk(const char* t, const std::vector<uint8_t>& d) { Riff r; r.tag(t); r.u32((uint32_t)d.size()); r.b.insert(r.b.end(), d.begin(), d.end()); if (d.size() & 1) r.b.push_back(0); return r.b; }
 };
 struct MiniPreset { int bank, prog; };
-static std::vector<uint8_t> miniSf2(const std::vector<MiniPreset>& pr, int gen29, uint32_t ls, uint32_t le, int mode) {
+static std::vector<uint8_t> miniSf2(const std::vector<MiniPreset>& pr, int gen29, uint32_t ls, uint32_t le, int mode, uint32_t endFrame = 100) {
   Riff smpl; for (int i = 0; i < 100; i++) smpl.u16((uint16_t)(int16_t)(i * 300 - 15000));
-  Riff shdr; shdr.name("S"); shdr.u32(0); shdr.u32(100); shdr.u32(ls); shdr.u32(le); shdr.u32(44100); shdr.b.push_back(60); shdr.b.push_back(0); shdr.u16(0); shdr.u16(1);
+  Riff shdr; shdr.name("S"); shdr.u32(0); shdr.u32(endFrame); shdr.u32(ls); shdr.u32(le); shdr.u32(44100); shdr.b.push_back(60); shdr.b.push_back(0); shdr.u16(0); shdr.u16(1);
   shdr.name("EOS"); for (int i = 0; i < 5; i++) shdr.u32(0); shdr.u16(0); shdr.u16(0); shdr.u16(0);
   Riff inst; inst.name("I"); inst.u16(0); inst.name("EOI"); inst.u16(1);
   Riff ibag; ibag.u16(0); ibag.u16(0); ibag.u16(gen29 ? 3 : 2); ibag.u16(0);
@@ -338,6 +338,22 @@ static std::vector<uint8_t> miniSf2(const std::vector<MiniPreset>& pr, int gen29
   Riff all; all.tag("sfbk"); { auto a = Riff::chunk("LIST", sdta.b); all.b.insert(all.b.end(), a.begin(), a.end()); auto c = Riff::chunk("LIST", pdta.b); all.b.insert(all.b.end(), c.begin(), c.end()); }
   return Riff::chunk("RIFF", all.b);
 }
+
+// A font of nPz preset zones x nIz instrument zones whose key ranges never meet (no zone results): only the pair walk costs anything.
+static std::vector<uint8_t> bigSf2(uint32_t nPz, uint32_t nIz) {
+  Riff smpl; for (int i = 0; i < 100; i++) smpl.u16(0);
+  Riff shdr; shdr.name("S"); shdr.u32(0); shdr.u32(100); shdr.u32(10); shdr.u32(20); shdr.u32(44100); shdr.b.push_back(60); shdr.b.push_back(0); shdr.u16(0); shdr.u16(1);
+  shdr.name("EOS"); for (int i = 0; i < 5; i++) shdr.u32(0); shdr.u16(0); shdr.u16(0); shdr.u16(0);
+  Riff inst; inst.name("I"); inst.u16(0); inst.name("EOI"); inst.u16((uint16_t)std::min<uint32_t>(nIz, 65535));
+  Riff ibag, igen, imod; for (uint32_t i = 0; i < nIz; i++) { ibag.u16((uint16_t)(2 * i)); ibag.u16(0); igen.u16(43); igen.u16(64 | (127 << 8)); igen.u16(53); igen.u16(0); } ibag.u16((uint16_t)(2 * nIz)); ibag.u16(0); igen.u16(0); igen.u16(0); for (int i = 0; i < 5; i++) imod.u16(0);
+  Riff phdr, pbag, pgen, pmod; phdr.name("P"); phdr.u16(0); phdr.u16(0); phdr.u16(0); phdr.u32(0); phdr.u32(0); phdr.u32(0); phdr.name("EOP"); phdr.u16(0); phdr.u16(0); phdr.u16((uint16_t)std::min<uint32_t>(nPz, 65535)); phdr.u32(0); phdr.u32(0); phdr.u32(0);
+  for (uint32_t i = 0; i < nPz; i++) { pbag.u16((uint16_t)(2 * i)); pbag.u16(0); pgen.u16(43); pgen.u16(0 | (63 << 8)); pgen.u16(41); pgen.u16(0); } pbag.u16((uint16_t)(2 * nPz)); pbag.u16(0); pgen.u16(0); pgen.u16(0); for (int i = 0; i < 5; i++) pmod.u16(0);
+  Riff sdta; sdta.tag("sdta"); { auto c = Riff::chunk("smpl", smpl.b); sdta.b.insert(sdta.b.end(), c.begin(), c.end()); }
+  Riff pdta; pdta.tag("pdta"); for (auto& pr2 : std::vector<std::pair<const char*, const Riff*>>{{"phdr", &phdr}, {"pbag", &pbag}, {"pmod", &pmod}, {"pgen", &pgen}, {"inst", &inst}, {"ibag", &ibag}, {"imod", &imod}, {"igen", &igen}, {"shdr", &shdr}}) { auto c = Riff::chunk(pr2.first, pr2.second->b); pdta.b.insert(pdta.b.end(), c.begin(), c.end()); }
+  Riff all; all.tag("sfbk"); { auto a = Riff::chunk("LIST", sdta.b); all.b.insert(all.b.end(), a.begin(), a.end()); auto c = Riff::chunk("LIST", pdta.b); all.b.insert(all.b.end(), c.begin(), c.end()); }
+  return Riff::chunk("RIFF", all.b);
+}
+static double nowSec() { return (double)std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now().time_since_epoch()).count() / 1e6; }
 static int doUnit() {
   // A. presets of equal bank / program keep the file's order (the JS's sort is stable)
   { std::vector<MiniPreset> v(40, MiniPreset{0, 0}); auto b = miniSf2(v, 0, 0, 0, 0); Font f; CHECK(parse(b.data(), b.size(), f) == kParseOk, "mini font parses");
@@ -370,6 +386,51 @@ static int doUnit() {
       int good = 0; for (auto& w : W) { Pcm a, c; DecodeOpts o; decode_sample(f, w.idx, o, a); o.pageTail = true; decode_sample(f, w.idx, o, c); const bool ok = a.d.size() == w.granule && c.d.size() == w.chrome && (w.idx != 0 || (!c.ok && !a.ok == false));
         if (!ok) std::printf("  sample %u: default %zu (granule %zu), pageTail %zu (Chrome %zu)\n", w.idx, a.d.size(), w.granule, c.d.size(), w.chrome); CHECK(ok, "frame counts of sample %u", w.idx); good += ok; }
       std::printf("unit: %d of 6 streams have the libvorbis frame count by default and Chrome's with pageTail\n", good); } }
+  // H. hostile fonts: memory, budgets, sample rates, parse time (each of these once cost 1.5 GB, an unbounded resample or 8 s of CPU)
+  { // H1: a header that claims 2^25 frames in a 200-byte sample chunk decodes to the frames that are there; a header that overshoots by one frame likewise
+    auto b = miniSf2({{0, 0}}, 0, 50, 55, 1, 1u << 25); Font f; CHECK(parse(b.data(), b.size(), f) == kParseOk, "claim font parses"); PresetPcm pcm; const PrepareStatus st = prepare_preset(f, sf_preset(f, 0, 0), DecodeOpts(), pcm);
+    CHECK(st == kPrepOk && pcm.bytes == 400 && pcm.byIndex[0].d.size() == 100, "a sample claiming 2^25 frames: %llu bytes", (unsigned long long)pcm.bytes);
+    auto b2 = miniSf2({{0, 0}}, 0, 50, 55, 1, 101); Font f2; parse(b2.data(), b2.size(), f2); PresetPcm p2; prepare_preset(f2, sf_preset(f2, 0, 0), DecodeOpts(), p2);
+    const double lastWant = (double)(int16_t)(99 * 300 - 15000) / 32768; CHECK(p2.byIndex[0].d.size() == 100 && p2.byIndex[0].d[99] == (float)lastWant && p2.byIndex[0].d[0] == (float)((double)(int16_t)-15000 / 32768), "the last frame of the smpl chunk is read, none past it (%zu frames)", p2.byIndex[0].d.size());
+    std::printf("unit: a sample header claiming 2^25 frames in a 200-byte chunk costs %llu bytes; the last frame is read, none past it\n", (unsigned long long)pcm.bytes); }
+  { // H2: budgets: the preset's, then the font's (a host counter)
+    auto b = miniSf2({{0, 0}}, 0, 50, 55, 1); Font f; parse(b.data(), b.size(), f); const Preset* pr = sf_preset(f, 0, 0); DecodeOpts o; o.presetBytes = 200; PresetPcm p1; const PrepareStatus s1 = prepare_preset(f, pr, o, p1);
+    std::vector<float> tmp(sf_render_bound(f, PadParams(), 44100, 1.0)); PadParams P;
+    CHECK(s1 == kPrepOverPresetBudget && p1.bytes == 0 && !p1.get(0) && sf_render(f, p1, P, 44100, 1.0, tmp.data(), tmp.size()) == 0, "preset budget: status %d bytes %llu", (int)s1, (unsigned long long)p1.bytes);
+    uint64_t used = 700; DecodeOpts o2; o2.fontBytes = 1000; o2.fontUsed = &used; PresetPcm p2; const PrepareStatus s2 = prepare_preset(f, pr, o2, p2); CHECK(s2 == kPrepOverFontBudget && used == 700 && p2.bytes == 0, "font budget: status %d used %llu", (int)s2, (unsigned long long)used);
+    used = 0; PresetPcm p3; const PrepareStatus s3 = prepare_preset(f, pr, o2, p3); CHECK(s3 == kPrepOk && used == 400 && p3.bytes == 400, "font counter: status %d used %llu", (int)s3, (unsigned long long)used);
+    std::printf("unit: preset budget refuses (status %d, nothing kept, render 0); font budget refuses at 700+400 > 1000 (status %d) and counts a success (%llu)\n", (int)s1, (int)s2, (unsigned long long)used); }
+  { std::string gb; if (readFile(std::string(THUNDER_ROOT) + "/sounds/FluidR3Mono_GM.sf3", &gb)) { Font f; parse((const uint8_t*)gb.data(), gb.size(), f);
+      // H3: an SF3 stream is bounded by the budget at decode, resampled or not (sample 116: 321867 frames = 1.29 MB at its own rate, 1.40 MB at 48 kHz)
+      Pcm a, b2, c, d2; DecodeOpts o; o.maxBytes = 100000; decode_sample(f, 116, o, a); o.maxBytes = 1300000; o.ctxRate = 48000; decode_sample(f, 116, o, b2); o.maxBytes = 2000000; decode_sample(f, 116, o, c); o.ctxRate = 0; o.maxBytes = 1300000; decode_sample(f, 116, o, d2);
+      CHECK(a.tooBig && !a.ok && a.d.size() == 1 && b2.tooBig && !b2.ok && c.ok && c.d.size() == 350331 && d2.ok && d2.d.size() == 321867, "SF3 budget: %d %d / %d %zu / %d", a.tooBig, b2.tooBig, c.ok, c.d.size(), d2.ok);
+      std::printf("unit: an SF3 sample over its byte budget is refused before and after resampling (1.29 MB native, 1.40 MB at 48 kHz)\n");
+      // H4: the stream's own sample rate outside 4000..192000 Hz is refused (a silent frame), whatever the context rate
+      const SampleHdr& h0 = f.samples[183]; std::vector<uint8_t> raw(f.smpl + h0.start, f.smpl + h0.end); size_t j = 0; for (; j + 7 < raw.size(); j++) if (raw[j] == 1 && std::memcmp(&raw[j + 1], "vorbis", 6) == 0) break;
+      int refused = 0, accepted = 0; const uint32_t R[] = {0, 1, 7, 3999, 4000, 44100, 192000, 192001, 0x7fffffffu, 0xffffffffu};
+      for (uint32_t rate : R) { std::vector<uint8_t> t = raw; std::memcpy(&t[j + 12], &rate, 4); Font g; g.sf3 = true; g.smpl = t.data(); g.smplN = t.size(); SampleHdr h = h0; h.start = 0; h.end = (uint32_t)t.size(); g.samples.push_back(h);
+        for (double ctx : {0.0, 48000.0}) { Pcm p; DecodeOpts oo; oo.ctxRate = ctx; const double t0 = nowSec(); decode_sample(g, 0, oo, p); const double dt = nowSec() - t0; const bool sane = rate >= 4000 && rate <= 192000;
+          CHECK(p.ok == sane && (sane || (p.d.size() == 1 && p.sr == 48000)) && dt < 5.0, "stream rate %u ctx %g: ok %d frames %zu sr %g (%.2f s)", rate, ctx, p.ok, p.d.size(), p.sr, dt); (sane ? accepted : refused)++; } }
+      std::printf("unit: stream rates 0, 1, 7, 3999, 192001, 2^31-1, 2^32-1 Hz refused, 4000, 44100, 192000 accepted (%d, %d decodes)\n", refused, accepted);
+      // G2: every SF3 sample of the font has exactly its last page's granule position as its frame count (the Vorbis rule, libvorbis's count), except streams whose decode ends before it
+      size_t checked = 0, equal = 0, shorter = 0, bad = 0; const uint32_t named[] = {234, 235, 704, 183, 859, 948, 8, 9, 10}; const size_t namedGr[] = {37067, 33493, 60416, 2297, 4633, 12462, 79504, 79504, 107778}; int namedOk = 0;
+      for (uint32_t i = 0; i < f.samples.size(); i++) { const SampleHdr& h = f.samples[i]; if (!(h.type & 0x10) || h.end <= h.start || h.end > f.smplN) continue; const uint8_t* p = f.smpl + h.start; const size_t n = h.end - h.start; int64_t last = -1;
+        for (size_t pos = 0; pos + 27 <= n && std::memcmp(p + pos, "OggS", 4) == 0;) { const size_t segs = p[pos + 26]; if (pos + 27 + segs > n) break; size_t body = 0; for (size_t q = 0; q < segs; q++) body += p[pos + 27 + q]; int64_t g; std::memcpy(&g, p + pos + 6, 8); last = g; pos += 27 + segs + body; }
+        Pcm pc; decode_sample(f, i, DecodeOpts(), pc); if (last <= 0) { bad++; continue; } checked++;
+        if (pc.ok && pc.d.size() == (size_t)last) equal++; else if (pc.ok && pc.d.size() < (size_t)last) shorter++; else { bad++; std::printf("  sample %u: granule %lld, frames %zu (ok %d)\n", i, (long long)last, pc.d.size(), pc.ok); }
+        for (size_t q = 0; q < sizeof named / sizeof named[0]; q++) if (named[q] == i && pc.d.size() == namedGr[q]) namedOk++; }
+      CHECK(bad == 0 && equal + shorter == checked && namedOk == 9, "granule check: %zu checked, %zu equal, %zu shorter, %zu bad, %d of 9 named samples at their granule", checked, equal, shorter, bad, namedOk);
+      std::printf("unit: all %zu SF3 samples with a granule: %zu have exactly their last page's granule as frame count, %zu end before it; samples 234 235 704 183 859 948 8 9 10 at the libvorbis counts: %d of 9\n", checked, equal, shorter, namedOk); } }
+  { // H5: a font whose zone pairs run into the millions fails fast (the limit is 20x the GM font's 10027 pairs)
+    auto big = bigSf2(30000, 30000); Font f; const double t0 = nowSec(); const ParseStatus st = parse(big.data(), big.size(), f); const double dt = nowSec() - t0;
+    CHECK(st == kParseTooBig && dt < 1.0, "30000 x 30000 zones: status %d in %.3f s (%zu bytes)", (int)st, dt, big.size());
+    auto ok = bigSf2(400, 400); Font f2; CHECK(parse(ok.data(), ok.size(), f2) == kParseOk && f2.work == 160000, "400 x 400 zones parses (work %llu)", (unsigned long long)f2.work);
+    std::printf("unit: 30000 x 30000 zones refused in %.0f ms (%zu-byte file); 400 x 400 (160000 pairs, 16x the GM font) parses\n", dt * 1000, big.size()); }
+  // R. the resampler against what Chrome 153 made of the same input (native/tests/golden/sf_resampler_chrome.json, native/tools/sf-resampler-ref.mjs)
+  { std::string gj; if (!readFile(std::string(THUNDER_ROOT) + "/native/tests/golden/sf_resampler_chrome.json", &gj)) CHECK(false, "no resampler reference"); else { JsonDoc d; CHECK(d.parse(gj), "resampler reference parses"); Json C = d.root().arr("cases"); const size_t N = (size_t)d.root().num("n"); uint32_t seed0 = (uint32_t)d.root().num("seed");
+      for (size_t i = 0; i < C.size(); i++) { Json c = C.at(i); std::vector<float> x(N); uint32_t s = seed0; for (size_t k = 0; k < N; k++) { s = s * 1664525u + 1013904223u; x[k] = (float)((double)((int)((s >> 16) & 0x3fff) - 0x2000) / 32768); }
+        CHECK(sf_resample(x, c.num("from"), c.num("to")), "resample"); Json O = c.arr("out"); const size_t m = std::min(x.size(), O.size()); double e = 0, pw = 0; for (size_t k = 0; k < m; k++) { const double r = O.at(k).asNum(); e += ((double)x[k] - r) * ((double)x[k] - r); pw += r * r; }
+        const double db = 10 * std::log10(e / pw + 1e-30); CHECK(x.size() == O.size() && db < -85, "%g -> %g Hz: %zu vs Chrome's %zu frames, %.1f dB", c.num("from"), c.num("to"), x.size(), O.size(), db); std::printf("unit: resampler %g -> %g Hz vs Chrome: %zu frames (Chrome %zu), %.1f dB\n", c.num("from"), c.num("to"), x.size(), O.size(), db); } } }
   // F. prepare_preset with a key list: only the zones that cover a listed key are decoded, with the same bits as the full preparation
   { auto b = miniSf2({{0, 0}}, 0, 50, 55, 1); Font f; CHECK(parse(b.data(), b.size(), f) == kParseOk, "mini font parses"); uint8_t none[128] = {0}, c4[128] = {0}; c4[60] = 1; PresetPcm all, one, zero;
     prepare_preset(f, sf_preset(f, 0, 0), DecodeOpts(), all); prepare_preset(f, sf_preset(f, 0, 0), DecodeOpts(), one, c4); prepare_preset(f, sf_preset(f, 0, 0), DecodeOpts(), zero, none);
@@ -384,6 +445,7 @@ static int doUnit() {
 static int doRam() {
   std::string gb; if (!readFile(std::string(THUNDER_ROOT) + "/sounds/FluidR3Mono_GM.sf3", &gb)) { std::printf("FAIL: no GM font\\n"); return 1; }
   Font f; if (parse((const uint8_t*)gb.data(), gb.size(), f) != kParseOk) return 1;
+  std::printf("GM font: %zu presets, %zu zones, %zu samples, zone pairs looked at while parsing (Font::work): %llu\n", f.presets.size(), f.zones.size(), f.samples.size(), (unsigned long long)f.work);
   struct { const char* name; int bank, prog; } P[] = {{"Grand Piano", 0, 0}, {"Fingered Bass", 0, 33}, {"Standard drum kit", 128, 0}, {"Strings", 0, 48}};
   auto now = []() { return (double)std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now().time_since_epoch()).count() / 1e6; };
   for (auto& p : P) {

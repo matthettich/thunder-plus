@@ -24,6 +24,7 @@ static const SfGolden kSfGolden[] = {
   {"render_syn_vel_only", 0x773c832d032ec50cull, 70582},
   {"render_syn_fallback", 0x7af5484819825cfcull, 74400},
   {"render_syn_hold_default", 0x14116546a58da93dull, 98400},
+  {"render_syn_loop_beyond", 0x79c0a1b7df147b70ull, 106886},
   {"live_gm_piano_poly", 0x4ca27a8517b63696ull, 256000},
   {"live_gm_bass_mono", 0x3953c1fed9339f6dull, 120064},
   {"live_gm_drums_choke", 0x8e04eeab23f3ee2bull, 300288},
@@ -32,5 +33,6 @@ static const SfGolden kSfGolden[] = {
   {"live_syn_layers_all", 0x6e8e2183d386790eull, 480000},
   {"live_syn_drums", 0x45a94caa3d874e55ull, 160256},
   {"live_syn_stereo_pair", 0x77f3000d1cd34ebaull, 100096},
+  {"live_syn_loop_beyond_live", 0x037974751f070079ull, 120064},
 };
-static const int kSfGoldenN = 29;
+static const int kSfGoldenN = 31;
