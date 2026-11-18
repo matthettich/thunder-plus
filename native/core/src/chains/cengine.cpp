@@ -263,6 +263,7 @@ bool ChainsEngine::process(int frames) {
   if (!valid_ || frames < 0 || frames > kBlock) { stats_.refusedCalls++; return false; }
   for (int j = 0; j < nbw_; j++) { const int k = bwl_[j]; std::memset(busesL_.get() + (size_t)k * kBlock, 0, sizeof(float) * kBlock); std::memset(busesR_.get() + (size_t)k * kBlock, 0, sizeof(float) * kBlock); bw_[k] = 0; }
   nbw_ = 0; std::memset(sendOut_, 0, sizeof sendOut_);
+  if (inlineService_) serviceSparesOf(p_.get());
   const bool ok = render(frames); stats_.blocks++; lastFailed_ = !ok;
   return ok;
 }
@@ -311,7 +312,7 @@ bool ChainsNode::process(const NodeIn& in, NodeOut& out, int n) {
   for (int a = 0; a < n && ok; a += kBlock) ok = p1(in, out, n, a, std::min(kBlock, n - a));
   return ok;
 }
-bool ChainsNode::p1(const NodeIn& in, NodeOut& out, int n, int a, int len) {
+bool ChainsNode::p1(const NodeIn& in, NodeOut& out, int /*n*/, int a, int len) {
   ChainsEngine& e = eng_;
   auto off = [&](const float* p) -> const float* { return p ? p + a : nullptr; };
   if (in.byp) for (int k = 1; k <= kBypSwitches; k++) e.setBypassSwitch(k, in.byp[k - 1]);

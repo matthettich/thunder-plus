@@ -47,6 +47,8 @@ int cinfo_count();
 const WInfo& cinfo_at(int i);
 const modfx::Def* cdef(std::string_view type);
 bool chains_type_is_lib(std::string_view type);
+bool chains_type_is_pump(std::string_view type);   // one of the 13 pump modules (they need the pump library, not the tfx one)
+bool chains_have_lib(std::string_view type);        // this build can run it: the library the type needs is in the build (a closed build has none)
 const waves::ModTable& chainsTable();
 void resample_release(const struct ResampleTake& t);   // cmods2.cpp   // a module built from a strict upstream library (the tfx effects, the pump modules, Marbles / Tides): not bit-exact with the web's fast-math wasm
 
@@ -125,6 +127,7 @@ class ChainsEngine {
   float* outBuf(std::string_view id, std::string_view port);
   float* inBuf(std::string_view id, std::string_view port);
   // The spare pump instances (decision (e) of U18): the control thread keeps every pump module's spare current; the audio thread swaps it in when a module's output goes bad. Call regularly.
+  void setInlineService(bool on) { inlineService_ = on; }   // true (the default, offline): process() services the spares itself at the start of each block (one thread, as the JS makes its new instance at the next block); the live runner turns it off and its control thread calls serviceSpares()
   void serviceSpares();
   uint64_t spareSwaps() const { return spareSwaps_.load(); }
   uint64_t audioRemakes() const { return audioRemakes_.load(); }   // pump_new on the audio thread: 0 here, always (a swap needs no allocation; with no spare left the module is silenced for the block)
@@ -150,7 +153,7 @@ class ChainsEngine {
   const float* sendIn_[kSends] = {}; const float* taps_[kMaxTaps] = {}; int nTaps_ = 0; int16_t tapMap_[kChannels]; bool hasTapMap_ = false;
   std::vector<int> busMap_; double bsw_[kBypSwitches + 1];
   CCtx ctx_; Stats stats_; bool lastFailed_ = false;
-  std::atomic<uint64_t> spareSwaps_{0}, audioRemakes_{0};
+  std::atomic<uint64_t> spareSwaps_{0}, audioRemakes_{0}; bool inlineService_ = true;
   std::unique_ptr<TakeQ> takes_;
 };
 void chains_free_patch(waves::PatchImpl* p);   // deletes a patch preparePatch / swapPatch handed out (PatchImpl is private to the engines)

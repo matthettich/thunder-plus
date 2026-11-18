@@ -6,6 +6,7 @@
 #include <memory>
 
 #include "chains/chains.h"
+#include "fx/pumpfx.h"
 #include "modfx/util.h"
 #include "waves/graph.h"
 #include "waves/waves.h"
@@ -354,9 +355,15 @@ const Def* cdef(std::string_view type) {
   return waves::wdef(type);   // modfx's registry, then the waves-only modules (the effects, LFO / ADSR / Random / Attenuverter, Expression, ...): the same JS
 }
 bool chains_type_is_lib(std::string_view type) {
-  if (waves::waves_type_is_fx(type) || type == "marbles" || type == "tides" || type == "pump") return true;
+  if (waves::waves_type_is_fx(type) || type == "marbles" || type == "tides") return true;
   for (int i = 0; i < kPumpTypeN; i++) if (type == kPumpTypes[i]) return true;
   return false;
+}
+bool chains_type_is_pump(std::string_view type) { for (int i = 0; i < kPumpTypeN; i++) if (type == kPumpTypes[i]) return true; return false; }
+bool chains_have_lib(std::string_view type) {
+  if (!chains_type_is_lib(type)) return true;
+  if (chains_type_is_pump(type)) return pump::available();
+  return waves::Host::haveEffects();
 }
 const waves::ModTable& chainsTable() { static const waves::ModTable t = {&cinfo, &cdef}; return t; }
 

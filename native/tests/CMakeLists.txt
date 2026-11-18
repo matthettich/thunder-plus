@@ -693,6 +693,24 @@ if(NODE_EXE AND CMAKE_SYSTEM_NAME STREQUAL "Linux" AND CMAKE_SYSTEM_PROCESSOR MA
   add_test(NAME waves_table_current COMMAND ${NODE_EXE} ${CMAKE_CURRENT_SOURCE_DIR}/../tools/waves-gen.mjs --check)
 endif()
 
+# U31: the …chains engine (core/src/chains) against chains/chains-worklet.js
+add_executable(test_chains test_chains.cpp)
+target_link_libraries(test_chains PRIVATE thunder_core)
+target_include_directories(test_chains PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../core/src ${CMAKE_CURRENT_SOURCE_DIR})
+if(NOT MSVC)
+  target_compile_options(test_chains PRIVATE -Wall -Wextra)
+endif()
+set(CHAINS_ARGS ${CMAKE_CURRENT_SOURCE_DIR}/golden/chains_cases.json --effects ${CMAKE_CURRENT_SOURCE_DIR}/golden/chains_effects.json)
+add_test(NAME chains COMMAND test_chains ${CHAINS_ARGS})   # the committed goldens: the gate on every platform
+if(NODE_EXE AND CMAKE_SYSTEM_NAME STREQUAL "Linux" AND CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|AMD64")
+  add_test(NAME chains_ref COMMAND ${NODE_EXE} ${CMAKE_CURRENT_SOURCE_DIR}/../tools/chains-dump.mjs ${CMAKE_CURRENT_BINARY_DIR}/chains-ref)
+  set_tests_properties(chains_ref PROPERTIES FIXTURES_SETUP chains_ref)
+  add_test(NAME chains_vs_js COMMAND test_chains ${CHAINS_ARGS} --ref ${CMAKE_CURRENT_BINARY_DIR}/chains-ref)
+  set_tests_properties(chains_vs_js PROPERTIES FIXTURES_REQUIRED chains_ref)
+  add_test(NAME chains_golden_current COMMAND ${NODE_EXE} ${CMAKE_CURRENT_SOURCE_DIR}/../tools/chains-dump.mjs --check)
+  add_test(NAME chains_table_current COMMAND ${NODE_EXE} ${CMAKE_CURRENT_SOURCE_DIR}/../tools/chains-gen.mjs --check)
+endif()
+
 # U30: the fuzz (random hostile patches and events; a small count here, 5000 and more under ASan + UBSan with -DTHUNDER_SANITIZE=ON: docs/port/U30-NOTES.md)
 add_executable(test_waves_fuzz test_waves_fuzz.cpp)
 target_link_libraries(test_waves_fuzz PRIVATE thunder_core)

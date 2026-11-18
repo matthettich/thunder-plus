@@ -190,7 +190,8 @@ class PumpMod : public WModule {
   ~PumpMod() override { pump_free_ctl(h_); pump_free_ctl(spare_.load()); for (auto& d : dead_) pump_free_ctl(d.load()); }
   void prepare(const double* p) override {
     if (!pump::available()) return;
-    float pv[512]; std::memset(pv, 0, sizeof pv); for (int i = 0; i < d_->nps; i++) { pv[d_->ps[i].idx] = (float)pumpValue(d_->ps[i], p[i]); stagedRaw_[i] = p[i]; }
+    float pv[512]; for (float& q : pv) q = std::nanf("");   // unwritten = the parameter's default (pump_new: NaN in the stage)
+    for (int i = 0; i < d_->nps; i++) { pv[d_->ps[i].idx] = (float)pumpValue(d_->ps[i], p[i]); stagedRaw_[i] = p[i]; }
     h_ = pump_make_staged(d_->t, pv, d_->np, sr_); if (h_ < 0) dead_state_ = true;
     for (int i = 0; i < d_->nps; i++) last_[i] = p[i];   // the JS's st.last is set when it stages the first block
     makeSpare(p);
@@ -203,7 +204,8 @@ class PumpMod : public WModule {
  private:
   void makeSpare(const double* p) {
     if (!pump::available() || dead_state_) return;
-    float pv[512]; std::memset(pv, 0, sizeof pv); for (int i = 0; i < d_->nps; i++) { pv[d_->ps[i].idx] = (float)pumpValue(d_->ps[i], p[i]); spareRaw_[i] = p[i]; rawNow_[i].store(p[i], std::memory_order_relaxed); }
+    float pv[512]; for (float& q : pv) q = std::nanf("");   // unwritten = the parameter's default (pump_new: NaN in the stage)
+    for (int i = 0; i < d_->nps; i++) { pv[d_->ps[i].idx] = (float)pumpValue(d_->ps[i], p[i]); spareRaw_[i] = p[i]; rawNow_[i].store(p[i], std::memory_order_relaxed); }
     const int s = pump_make_staged(d_->t, pv, d_->np, sr_); spare_.store(s); wantSpare_.store(false);
   }
   const PumpCh* d_; double sr_; int h_ = -1; bool dead_state_ = false; double last_[128]; double stagedRaw_[128] = {}; double spareRaw_[128] = {}; std::atomic<double> rawNow_[128];
@@ -241,8 +243,8 @@ std::unique_ptr<Module> makeResample(double sr, Seeds& s) { return std::unique_p
 template <int I> std::unique_ptr<Module> mkPump(double sr, Seeds&) { return std::unique_ptr<Module>(new PumpMod(&kPumpCh[I], sr)); }
 typedef std::unique_ptr<Module> (*Fac)(double, Seeds&);
 const Fac kFac[13] = {mkPump<0>, mkPump<1>, mkPump<2>, mkPump<3>, mkPump<4>, mkPump<5>, mkPump<6>, mkPump<7>, mkPump<8>, mkPump<9>, mkPump<10>, mkPump<11>, mkPump<12>};
-const char* const kPumpTypes[] = {"ptube", "psnap", "pgate", "pecho", "pspring", "pverb", "pgrain", "pvox", "ptune", "pcrush", "pswirl", "pstutter", "ptwang"};
-const int kPumpTypeN = 13;
+extern const char* const kPumpTypes[] = {"ptube", "psnap", "pgate", "pecho", "pspring", "pverb", "pgrain", "pvox", "ptune", "pcrush", "pswirl", "pstutter", "ptwang"};
+extern const int kPumpTypeN = 13;
 const Def* pumpDef(std::string_view type) {
   static std::vector<Def> defs = [] {
     std::vector<Def> r; r.reserve(13);
