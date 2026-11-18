@@ -23,13 +23,13 @@ test('Song: an empty row goes in BELOW the cursor row, every track; the rows bel
 });
 test('Song: the last row with a block refuses, and writes nothing', () => {
   const c = rig('song'); c.S.song[255][2] = 9; c.insRowBelow();
-  assert.match(c.log.join('|'), /song is full/); assert.ok(!c.log.includes('save')); assert.equal(c.S.song[1][0], 2);
+  assert.match(c.log.join('|'), /Song full: its last row has blocks, so nothing can move down/); assert.ok(!c.log.includes('save')); assert.equal(c.S.song[1][0], 2);
 });
 test('Phrase: rowOp(insert) one row down (its rules), the cursor back on its own row; a selection or the last row refuses', () => {
   const c = rig('phrase'); c.tv = 'phrase'; c.insRowBelow();
   assert.equal(c.log[0], 'rowOp insert at 4'); assert.equal(c.cs.phrase.y, 3);
   const d = rig('phrase'); d.tv = 'phrase'; d.selA = { v: 'phrase' }; d.insRowBelow(); assert.match(d.log[0], /drop the selection/);
-  const e = rig('phrase'); e.tv = 'phrase'; e.cs.phrase.y = 15; e.insRowBelow(); assert.match(e.log[0], /last row/);
+  const e = rig('phrase'); e.tv = 'phrase'; e.cs.phrase.y = 15; e.insRowBelow(); assert.match(e.log[0], /^Last row: nothing below it$/);
 });
 test('wiring: bar button, menu item, key, right-click', () => {
   assert.match(src, /if \(c === 'ins'\) return insRowBelow\(\);/);

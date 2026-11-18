@@ -27,7 +27,7 @@ test('hidden while playing with it off: a line each time, one toast per page loa
   const R = rig();
   R.vis(true); assert.equal(hid(R).length, 1); assert.equal(R.toasts.length, 0);
   R.vis(false); assert.equal(R.toasts.length, 1); assert.equal(R.toasts[0].label, 'Turn on');
-  assert.match(R.toasts[0].t, /^Background play is off, so playback breaks up when the screen is off or the app is in the background\.$/);
+  assert.match(R.toasts[0].t, /^Background play is off: playback breaks up when the screen is off or the app is in the background\.$/);
   R.vis(true); R.vis(false); assert.equal(hid(R).length, 2); assert.equal(R.toasts.length, 1);
 });
 
@@ -46,7 +46,7 @@ test('nothing with it on, off Android, or not playing', () => {
 
 test('switching off by hand toasts (Android only); by code does not', () => {
   let R = rig({ bgOn: true }); R.ctx.setBgOn(false, true);
-  assert.deepEqual(R.plain, ['Background play off: with the screen off, playback will break up. For testing only.']);
+  assert.deepEqual(R.plain, ['Background play off: playback breaks up with the screen off. Testing only']);
   R = rig({ bgOn: true }); R.ctx.setBgOn(false); assert.equal(R.plain.length, 0);
   R = rig({ bgOn: true, android: false }); R.ctx.setBgOn(false, true); assert.equal(R.plain.length, 0);
   R = rig({ bgOn: false }); R.ctx.setBgOn(false, true); assert.equal(R.plain.length, 0);   // already off: nothing new

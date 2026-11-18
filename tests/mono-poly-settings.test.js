@@ -80,7 +80,7 @@ test('shrinking a track that holds something asks first: Cancel leaves everythin
 test('a growth the may-it-grow rule refuses shows its reason and leaves the counts alone; setNtr shows it too', () => {
   const spare = Array.from({ length: 16 }, (_, i) => 16 + i), c = rig({ empty: spare }); set(c, 2, 8); set(c, 2, 24); const was = JSON.stringify(c.S), n = c.saves.length;
   row(c, 'POLY TRACKS').set(25);
-  assert.equal(c.toasts.length, 1); assert.match(c.toasts[0], /hidden mono tracks? \(.*\) still holds? something, so POLY cannot grow into (it|them)\. Clear (it|them) first, or lower MONO\./);
+  assert.equal(c.toasts.length, 1); assert.match(c.toasts[0], /^POLY can’t grow: \d+ hidden MONO tracks? \(.*\) still holds? data\. Clear (it|them) first, or lower MONO\.$/);
   assert.equal(JSON.stringify(c.S), was); assert.equal(c.saves.length, n); assert.equal(c.asks.length, 0);
   c.setNtr(27); assert.equal(c.toasts.length, 2, 'the total-only entry point says why too'); assert.equal(JSON.stringify(c.S), was);
   // every caller of setNtr / setTracks shows why
