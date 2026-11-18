@@ -140,6 +140,7 @@ static void testPumpSpares() {
   }
   std::printf("pump spares: %d pump modules run on a +-7.9 input with every parameter at its maximum: %d went bad at least once; %llu bad blocks, %llu spares swapped in, %llu bad blocks with no spare ready\n", types, bad,
     (unsigned long long)(chains_pump_bad() - bad0), (unsigned long long)(chains_pump_swaps() - sw0), (unsigned long long)(chains_pump_dry() - dry0));
+  CHECK(bad > 0, "some pump module went bad on the hot input, so the spare path was exercised");
   CHECK(chains_pump_swaps() - sw0 >= chains_pump_bad() - bad0 - (uint64_t)types, "a bad block is followed by a spare taking over");
 }
 
@@ -154,7 +155,41 @@ static void testChainOutTrackClamp() {
   }
 }
 
+// Resample: one take of one bar at the first bar line, the bars / slices tables, the copy of the input; no second take until rec is toggled
+static void testResampleTake() {
+  Doc d("{\"modules\":[{\"id\":\"a\",\"type\":\"trackIn\"},{\"id\":\"s\",\"type\":\"resample\",\"params\":{\"rec\":1,\"bars\":0,\"pad\":5,\"slices\":4}},{\"id\":\"c\",\"type\":\"chainOut\"}],"
+        "\"cables\":[{\"from\":[\"a\",\"out\"],\"to\":[\"s\",\"in\"]},{\"from\":[\"s\",\"out\"],\"to\":[\"c\",\"in\"]}]}");
+  EngineOptions o; o.transport.playing = true; o.transport.tempo = 120; Host h; ChainsEngine e(48000, o, &h); CHECK(e.loadPatch(d.r), "resample patch");
+  const int N = 128 * 900; const std::vector<float> in = noise(N, 77, .5f); int takes = 0; ResampleTake first; std::memset(&first, 0, sizeof first); std::vector<float> keep;
+  for (int b = 0; b < 900; b++) {
+    e.setTrackInputs(&in[(size_t)b * 128], &in[(size_t)b * 128], 1); e.process(128);
+    ResampleTake tk; while (e.popTake(&tk)) { if (!takes++) { first = tk; keep.assign(tk.L, tk.L + tk.n); } e.releaseTake(tk); }
+  }
+  CHECK(takes == 1, "one take (got %d)", takes);
+  if (takes) {
+    CHECK(first.n == 96000 && first.bars == 1 && first.slices == 32 && first.pad == 5 && first.tempo == 120 && first.sr == 48000 && std::strcmp(first.id, "s") == 0, "take: n %d bars %d slices %d pad %d tempo %g id %s", first.n, first.bars, first.slices, first.pad, first.tempo, first.id);
+    bool same = (int)keep.size() == 96000; for (int i = 0; same && i < 96000; i++) if (keep[(size_t)i] != in[(size_t)i]) same = false; CHECK(same, "the take is the input from the bar line");
+  }
+}
+// the live input's right side falls back to the left when the host gives none: the same output as the host giving the left twice
+static void testMonoFallback() {
+  Doc d(kPatch2); const int H = 4000; const std::vector<float> x = noise(H, 5, .5f); std::vector<float> L1((size_t)H), R1((size_t)H), L2((size_t)H), R2((size_t)H);
+  for (int k = 0; k < 2; k++) {
+    Host h; ChainsLive live(48000, 0, ChainsLiveConfig(), &h); CHECK(live.node().engine().loadPatch(d.r), "patch");
+    NodeIn in; in.inL = x.data(); in.inR = k ? x.data() : nullptr; NodeOut out; out.L = k ? L2.data() : L1.data(); out.R = k ? R2.data() : R1.data(); live.process(in, out, H);
+  }
+  CHECK(L1 == L2 && R1 == R2, "no right input equals the left twice"); double s = 0; for (int i = 0; i < H; i++) s += std::fabs(R1[(size_t)i]); CHECK(s > 1, "the right side is not silent");
+}
+// the sidechain compressor at ratio 1 changes nothing (the ratio's floor is 1)
+static void testCompRatioOne() {
+  Doc d("{\"modules\":[{\"id\":\"a\",\"type\":\"trackIn\"},{\"id\":\"q\",\"type\":\"sccomp\",\"params\":{\"threshold\":0,\"ratio\":1}},{\"id\":\"c\",\"type\":\"chainOut\"}],\"cables\":[{\"from\":[\"a\",\"out\"],\"to\":[\"q\",\"in\"]},{\"from\":[\"q\",\"out\"],\"to\":[\"c\",\"in\"]}]}");
+  Host h; ChainsEngine e(48000, EngineOptions(), &h); CHECK(e.loadPatch(d.r), "comp patch"); const std::vector<float> x = noise(128 * 20, 3, .5f); double worst = 0;
+  for (int b = 0; b < 20; b++) { e.setTrackInputs(&x[(size_t)b * 128], &x[(size_t)b * 128], 1); e.process(128); const float* o = e.outBuf("q", "out"); for (int i = 0; i < 128; i++) worst = std::max(worst, (double)std::fabs(o[i] - x[(size_t)b * 128 + (size_t)i])); }
+  CHECK(worst == 0, "ratio 1 leaves the sound alone (worst %g)", worst);
+}
+
 int main() {
+  testResampleTake(); testMonoFallback(); testCompRatioOne();
   testChainOutTrackClamp();
   testPumpSpares();
   testEqualsOffline(); testLatencyAndExactEvents(); testRefusals();
