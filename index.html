@@ -2094,7 +2094,7 @@ body.sdesk .dock:not(.vtrk) .pads .pad:nth-child(17)::before{content:'More pads'
 #dkFxBar .dkfc .fch{cursor:grab} #dkFxBar .dkfc.dragging{opacity:.55} #dkFxBar .droptgt{outline:3px solid var(--fxac, #ff5a1f); outline-offset:2px}
 /* …CHAINS RAIL (3 Nov, FX bar): the track's chains modules in signal order as small blocks on the same dock and offset
    blocks as the effects beside it (deckChains / deckChnFold, dkChnRail). IN and OUT are plain tags at the ends; a block's
-   square light is on (orange) or bypassed (hollow, hatched). Folded …CHAINS: a narrow rail beside the title. */
+   square light is on (orange) or bypassed (hollow, hatched). Folded …CHAINS: only its vertical title (17 Nov: it used to keep a narrow rail beside it). */
 #tDeck.fxbar #dkChn .dkb:has(> #dkChnRows.hasrail){padding:0}
 #dkChnRows.hasrail{display:block; height:100%; overflow:hidden}
 .dkcrail{display:flex; flex-flow:column wrap; align-content:flex-start; gap:7px 12px; height:100%; padding:8px 12px 12px 10px; overflow:hidden; box-sizing:border-box;
@@ -2122,12 +2122,6 @@ body.sdesk .dock:not(.vtrk) .pads .pad:nth-child(17)::before{content:'More pads'
 #tDeck .dkcrail .dkcb.dim .fon.on{background:var(--muted); border-color:var(--muted)}
 .dkcrail .dkcend.dim, .dkcrail .dkcend .dkcdim{opacity:.5}
 .dkclines path.off{stroke:var(--muted); opacity:.6}
-/* folded: the title strip, then the rail (blocks only, narrower) */
-#tDeck.fxbar #dkChn.col.hasrail{flex:0 0 auto; width:auto; min-width:26px; flex-direction:row}
-#tDeck.fxbar #dkChn.col.hasrail > .dkh{flex:0 0 26px; border-right:1px solid var(--line)}
-#dkChnRail{flex:1 1 auto; height:auto; max-width:240px; padding:8px 10px 10px 8px; gap:6px 10px}
-#dkChnRail .dkcb{width:112px; height:22px; padding:0 6px; gap:6px; font-size:var(--fs-1)}
-#dkChnRail .dkcend{font-size:var(--fs-1); padding:1px 5px}
 /* BUS (31 Oct fix): INST steps aside on a bus and left a blank gap before TRACK. …CHAINS keeps the width its controls need
    (it already grows with them); FX takes the rest, as on the master. */
 .tdeck.bus #dkFx{flex:1 1 var(--dkwf, 320px)}
@@ -33171,15 +33165,10 @@ const dkChnRailSig = (t, act, feed) => { const d = S.chainPatch; if (!d || !act.
   return t + '|' + (S.chainOn && S.chainOn[t] ? 1 : 0) + '|' + d.modules.filter(m => m && act.has(m.id)).map(m => m.id + (m.label || '') + ((m.params && m.params._byp) >= .5 ? 'b' : '') + (m.type === 'trackIn' || m.type === 'chainOut' ? '@' + (m.params && m.params.track) : '')).join(',') + '|' + c
     + (feed ? '|feed ' + feed.outT + ' ' + feed.outs.length + ' ' + [...feed.path].join(',') : ''); };
 let dkChnRailK = '';
-function deckChnFold(){   // FX BAR, …CHAINS folded: the rail beside its title (none without modules: the plain strip)
-  const sec = dkSec('chn'), fold = deck.fxbar && !deck.chn && !sec.hidden && deckShown();
-  let r = $('dkChnRail'); if (!fold){ if (r){ r.remove(); sec.classList.remove('hasrail'); dkChnRailK = ''; } return; }
-  const t = dkTrack(), own = chainMods(t), feed = own.size ? null : chainFeed(t), act = feed ? feed.act : own, k = dkChnRailSig(t, act, feed) + '|' + noChains();
-  if (k === dkChnRailK && r) return; dkChnRailK = k;
-  if (r) r.remove();
-  const has = [...act].some(id => { const m = S.chainPatch.modules.find(q => q && q.id === id); return m && m.type !== 'trackIn' && m.type !== 'chainOut'; });
-  sec.classList.toggle('hasrail', has); if (!has) return;
-  r = dkChnRail(t, act, true, feed); r.id = 'dkChnRail'; sec.append(r); dkcWire(r);
+function deckChnFold(){   // FX BAR, …CHAINS folded: only its vertical title, as MOD's (17 Nov, owner: "a collapsed chain view still shows the chain, can we make it fully collapse"); this just clears the little chain diagram an earlier build left beside the title
+  const r = $('dkChnRail'); if (r){ r.remove(); dkSec('chn').classList.remove('hasrail'); dkChnRailK = ''; }
+  const sec = dkSec('chn'); if (deck.fxbar && !deck.chn && !sec.hidden && deckShown()){   // the folded title names the track on show (it used to be the last open one's), short enough for the tab
+    const t = dkTrack(), feed = chainMods(t).size ? null : chainFeed(t); setText($('dkChnT'), feed ? '…CHAINS · OUT ' + d2(feed.outT + 1) : '…CHAINS · TRACK ' + d2(t + 1)); }
 }
 function deckChains(){
   try { deckChnFold(); } catch(e){}
