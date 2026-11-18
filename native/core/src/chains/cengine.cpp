@@ -41,7 +41,7 @@ ChainsEngine::ChainsEngine(double sampleRate, const EngineOptions& o, Host* host
   for (double& b : bsw_) b = -1;
   for (int16_t& t : tapMap_) t = -1;
   takes_.reset(new TakeQ());
-  p_.reset(newPatch(valid_ ? sr_ : 48000, host_));
+  p_.reset(newPatch(valid_ ? sr_ : 48000, host_)); curA_.store(p_.get(), std::memory_order_release);
   bindCtx();
 }
 ChainsEngine::~ChainsEngine() { p_.reset(); }
@@ -51,9 +51,9 @@ void ChainsEngine::bindCtx() {
   c.busesL = busesL_.get(); c.busesR = busesR_.get(); c.bw = bw_; c.bwl = bwl_; c.nbw = &nbw_;
   for (int n = 0; n < kSends; n++) c.sendOut[n] = sendOut_ + (size_t)n * kBlock;
   c.zero = zero_; c.takeUser = this;
-  c.onTake = [](void* user, const ResampleTake& t) { ChainsEngine* e = static_cast<ChainsEngine*>(user); if (!e->takes_->push(t)) resample_release(t); };
+  c.onTake = [](void* user, const ResampleTake& t) { ChainsEngine* e = static_cast<ChainsEngine*>(user); if (!e->takes_->push(t)) { e->stats_.droppedTakes++; resample_release(t); } };   /* queue full: the buffers are marked free in place (Resample::release only clears a flag): nothing is freed here */
 }
-void ChainsEngine::dispose() { p_.reset(newPatch(valid_ ? sr_ : 48000, host_)); }
+void ChainsEngine::dispose() { p_.reset(newPatch(valid_ ? sr_ : 48000, host_)); curA_.store(p_.get(), std::memory_order_release); }
 
 // ctx.key (SOURCE): 0 Self -> none; 1 to 8 a send; 9 and up a track's own sound (input 2, through tapMap)
 const float* ChainsEngine::keyCb(void* user, double sck) {
@@ -71,7 +71,7 @@ const float* ChainsEngine::keyCb(void* user, double sck) {
 static int chainOutTrack(const ModNode& m) { const int k = waves::wparam(*m.wi, "track"); const double v = k >= 0 ? m.base[(size_t)k] : 0; return (int)clamp((double)(i32(v) - 1), 0, kChannels - 1); }
 void ChainsEngine::prepareDerived(PatchImpl& P) const {
   const size_t n = P.mods.size();
-  if (P.act.size() != n || P.actTel.size() != n || P.bn.size() != n || P.seen.size() != n || P.stk.size() < 2 * n + 2) return;
+  if (P.act.size() != n || P.actTel.size() != n || P.bn.size() != n || P.seen.size() != n || P.stk.size() < 2 * n + 2 || P.cmp.size() != n || P.cmpLow.size() != n + 1 || P.uaS.size() != n + 1) return;
   // bypass numbers: a module's own _bn, else the lowest free one, in patch order
   { bool used[16] = {}; for (size_t i = 0; i < n; i++) { ModNode& m = *P.mods[i]; P.bn[i] = 0; if (!m.bypOk) continue; const int v = i32(m.bnP); if (v >= 1 && v <= 15 && !used[v]) { used[v] = true; P.bn[i] = v; } }
     int k = 1; for (size_t i = 0; i < n; i++) { ModNode& m = *P.mods[i]; if (!m.bypOk || P.bn[i]) continue; while (k <= 15 && used[k]) k++; if (k > 15) break; used[k] = true; P.bn[i] = k; } }
@@ -84,19 +84,18 @@ void ChainsEngine::prepareDerived(PatchImpl& P) const {
     for (auto& up : P.mods) { ModNode& m = *up; const std::string_view t = m.wi->type; if (t == "scout") anyScout = true; if (t == "chainOut" && chainOutTrack(m) == focus_) { act[(size_t)m.idx] = 1; q[nq++] = m.idx; } }
     // SENDS: a Sidechain Out runs in one node only: the node of the lowest track a Chain Out in its chain (the modules joined to it by cables, either way) goes to
     if (anyScout) {
-      for (auto& up : P.mods) {
-        ModNode& m = *up; if (std::string_view(m.wi->type) != "scout" || act[(size_t)m.idx]) continue;
-        std::fill(P.seen.begin(), P.seen.end(), (char)0); int nw = 0; w[nw++] = m.idx; P.seen[(size_t)m.idx] = 1; int low = kChannels;
-        while (nw) {
-          const int cur = w[--nw]; const ModNode& x = *P.mods[(size_t)cur]; if (std::string_view(x.wi->type) == "chainOut") low = std::min(low, chainOutTrack(x));
-          for (const waves::detail::CableRec& c : P.cables) {
-            ModNode* a = P.find(c.a0); ModNode* b = P.find(c.b0); if (!a || !b) continue;
-            ModNode* y = a->idx == cur ? b : b->idx == cur ? a : nullptr; if (!y || P.seen[(size_t)y->idx]) continue;
-            P.seen[(size_t)y->idx] = 1; w[nw++] = y->idx;
-          }
-        }
-        if (low == focus_) { act[(size_t)m.idx] = 1; q[nq++] = m.idx; }
+      // the connected components of the graph (cables either way), by index: the lowest track of a Chain Out in a scout's component decides whether this node runs it. One pass over the modules and the cables
+      // (O(modules + cables) whatever the number of scouts), no lookups by name, nothing allocated: setParam of `track` / `_bn` runs this on the audio thread
+      for (size_t i = 0; i < n; i++) P.cmp[i] = -1;
+      int ncomp = 0;
+      for (size_t i0 = 0; i0 < n; i0++) {
+        if (P.cmp[i0] >= 0) continue;
+        int nw = 0; w[nw++] = (int)i0; P.cmp[i0] = ncomp; P.cmpLow[(size_t)ncomp] = kChannels;
+        while (nw) { const int cur = w[--nw]; for (int e = P.uaS[(size_t)cur]; e < P.uaS[(size_t)cur + 1]; e++) { const int y = P.uaL[(size_t)e]; if (P.cmp[(size_t)y] < 0) { P.cmp[(size_t)y] = ncomp; w[nw++] = y; } } }
+        ncomp++;
       }
+      for (auto& up : P.mods) { const ModNode& x = *up; if (std::string_view(x.wi->type) == "chainOut") { int& lo = P.cmpLow[(size_t)P.cmp[(size_t)x.idx]]; lo = std::min(lo, chainOutTrack(x)); } }
+      for (auto& up : P.mods) { ModNode& m = *up; if (std::string_view(m.wi->type) != "scout" || act[(size_t)m.idx]) continue; if (P.cmpLow[(size_t)P.cmp[(size_t)m.idx]] == focus_) { act[(size_t)m.idx] = 1; q[nq++] = m.idx; } }
     }
     if (tel) for (auto& up : P.mods) { ModNode& m = *up; if ((std::string_view(m.wi->type) == "scin" || (m.wi->flags & waves::kWF_Probe)) && !act[(size_t)m.idx]) { act[(size_t)m.idx] = 1; q[nq++] = m.idx; } }
     while (nq) { const int k = q[--nq]; for (const waves::detail::GCable& c : P.mods[(size_t)k]->inc) if (c.src && !act[(size_t)c.src->idx]) { act[(size_t)c.src->idx] = 1; q[nq++] = c.src->idx; } }
@@ -216,7 +215,7 @@ PatchImpl* ChainsEngine::preparePatch(Json doc) const {
 PatchImpl* ChainsEngine::swapPatch(PatchImpl* n) {
   PatchImpl* old = p_.release();
   if (old) old->letGo();
-  p_.reset(n);
+  p_.reset(n); curA_.store(n, std::memory_order_release);
   if (p_->hasT) {   // setTransport(doc.transport): Object.assign of the keys it has, then startN + 1 when it starts playing
     Transport t = transport_;
     if (p_->tTempo) t.tempo = p_->tpart.tempo;
@@ -270,8 +269,9 @@ bool ChainsEngine::render(int frames) {
     ctx.text = m.text.data(); ctx.textLen = m.textLen; ctx.voice = 0; ctx.curId = m.id.c_str();
     if (m.bypOk) {   // BYPASS: the patch's own setting, or the tracker's switch for this module's number
       const int n = G.bn[(size_t)m.idx]; const double sw = n ? bsw_[n] : -1; const bool own = m.bypP >= .5;
-      const bool want = sw < -.5 ? own : sw >= 1.5 ? !own : sw >= .5;
-      if (want || m.bypassed) {
+      const bool carry = carryFade_ && m.fade > 0;   // a crossfade begun in an earlier (cut) segment goes on to its target whatever the switches say now: the 128-sample ramp is the same whatever the cuts
+      const bool want = carry ? m.fadeTo : sw < -.5 ? own : sw >= 1.5 ? !own : sw >= .5;
+      if (want || m.bypassed || carry) {
         const bool was = m.bypassed; float* dL = m.dry.data(); float* dR = dL + kBlock;
         const float* inL = s.in[m.pIn]; const float* inR = (m.pInR >= 0 && m.linked[m.pInR]) ? s.in[m.pInR] : inL;
         std::memcpy(dL, inL, sizeof(float) * kBlock); std::memcpy(dR, inR, sizeof(float) * kBlock);
@@ -279,9 +279,12 @@ bool ChainsEngine::render(int frames) {
         s.mod->run(io, ctx);
         if (ctx.fail) { stats_.failedBlocks++; std::memset(busesL_.get(), 0, sizeof(float) * kChannels * kBlock); std::memset(busesR_.get(), 0, sizeof(float) * kChannels * kBlock); return false; }
         float* oL = s.out[m.pOut]; float* oR = m.pOutR >= 0 ? s.out[m.pOutR] : nullptr;
-        if (want != was) for (int i = 0; i < kBlock; i++) { const double g = want ? (double)(i + 1) / kBlock : 1 - (double)(i + 1) / kBlock; oL[i] = (float)((double)oL[i] + ((double)dL[i] - (double)oL[i]) * g); if (oR) oR[i] = (float)((double)oR[i] + ((double)dR[i] - (double)oR[i]) * g); }
+        const int f0 = carry ? m.fade : 0;   // (a full 128 block with no fade in progress: f0 = 0, the same numbers as before)
+        if (want != was) for (int i = 0; i < kBlock; i++) { const double ph = std::min(1.0, (double)(f0 + i + 1) / kBlock); const double g = want ? ph : 1 - ph; oL[i] = (float)((double)oL[i] + ((double)dL[i] - (double)oL[i]) * g); if (oR) oR[i] = (float)((double)oR[i] + ((double)dR[i] - (double)oR[i]) * g); }
         else { std::memcpy(oL, dL, sizeof(float) * kBlock); if (oR) std::memcpy(oR, dR, sizeof(float) * kBlock); }
-        m.bypassed = want; continue;
+        if (want != was && carryFade_ && f0 + frames < kBlock) { m.fade = f0 + frames; m.fadeTo = want; }   // the segment was cut short: the ramp goes on in the next one
+        else { m.fade = 0; m.bypassed = want; }
+        continue;
       }
     }
     s.mod->run(io, ctx);

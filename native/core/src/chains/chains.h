@@ -71,7 +71,7 @@ struct CCtx : WCtx {
 };
 
 struct EngineOptions { Transport transport; Quality quality = Quality::Full; int focus = -1; };
-struct Stats { uint64_t blocks = 0, failedBlocks = 0, refusedPatches = 0, refusedCalls = 0, droppedEvents = 0; };
+struct Stats { uint64_t blocks = 0, failedBlocks = 0, refusedPatches = 0, refusedCalls = 0, droppedEvents = 0, droppedTakes = 0; };   // droppedTakes: a finished Resample take that found the 16-place take queue full (its buffers are marked free again in place: nothing is freed, nothing allocated)
 
 class ChainsEngine {
  public:
@@ -136,6 +136,7 @@ class ChainsEngine {
   float* outBuf(std::string_view id, std::string_view port);
   float* inBuf(std::string_view id, std::string_view port);
   // The spare pump instances (decision (e) of U18): the control thread keeps every pump module's spare current; the audio thread swaps it in when a module's output goes bad. Call regularly.
+  void setCarryFade(bool on) { carryFade_ = on; }   // the live runner cuts blocks at events: a Bypass crossfade then goes on across the cuts (a 128-sample ramp whatever the cuts); off for the engine API, as the JS (its blocks are whole)
   void setInlineService(bool on) { inlineService_ = on; }   // true (the default, offline): process() services the spares itself at the start of each block (one thread, as the JS makes its new instance at the next block); the live runner turns it off and its control thread calls serviceSpares()
   void serviceSpares();
   uint64_t spareSwaps() const { return spareSwaps_.load(); }
@@ -143,7 +144,7 @@ class ChainsEngine {
   // ---- live: swap a whole prepared patch in (audio thread, at a block start) ----
   waves::PatchImpl* swapPatch(waves::PatchImpl* p);       // takes p; returns the old one (free it with chains_free_patch on the control thread)
   void serviceSparesOf(waves::PatchImpl* p);              // the control thread's service of the patch the audio thread runs now
-  waves::PatchImpl* currentPatch() const { return p_.get(); }
+  waves::PatchImpl* currentPatch() const { return curA_.load(std::memory_order_acquire); }   // the patch the audio thread runs (set whenever p_ changes: construction, dispose, swapPatch / loadPatch)
   waves::PatchImpl* preparePatch(Json doc) const;         // off the audio thread: what loadPatch builds, without touching this engine's patch
   friend class ChainsLive;
  private:
@@ -162,8 +163,9 @@ class ChainsEngine {
   const float* trackL_ = nullptr; const float* trackR_ = nullptr; int trackChans_ = 0;
   const float* sendIn_[kSends] = {}; const float* taps_[kMaxTaps] = {}; int nTaps_ = 0; int16_t tapMap_[kChannels]; bool hasTapMap_ = false;
   std::vector<int> busMap_; double bsw_[kBypSwitches + 1];
+  std::atomic<waves::PatchImpl*> curA_{nullptr};
   CCtx ctx_; Stats stats_; bool lastFailed_ = false; size_t memBudget_ = kDefaultMemoryBudget; mutable std::string lastError_;
-  std::atomic<uint64_t> spareSwaps_{0}, audioRemakes_{0}; bool inlineService_ = true;
+  std::atomic<uint64_t> spareSwaps_{0}, audioRemakes_{0}; bool inlineService_ = true, carryFade_ = false;
   std::unique_ptr<TakeQ> takes_;
 };
 void chains_free_patch(waves::PatchImpl* p);   // deletes a patch preparePatch / swapPatch handed out (PatchImpl is private to the engines)
@@ -209,9 +211,12 @@ struct ChainsEvent {
   double a = 0, b = 0;                 // Param: a the value; Tempo: a bpm; Playing: a 1 or 0; Bypass: a the switch 1..15, b its value (-1 the patch's own, 0 in, 1 bypassed, 2 flipped); Patch: a the mailbox slot preparePatch gave
   char id[40] = {}; char name[24] = {};   // Param: the module id and the parameter name (a longer one is refused by post())
 };
-constexpr int kChainsLatency = 127, kChainsQueue = 4096, kChainsPending = 4096, kChainsSlots = 8, kChainsRing = 512, kChainsReserve = 256;   // kChainsReserve: places only an event that must not be lost may take
+constexpr int kChainsLatency = 127, kChainsQueue = 1024, kChainsPending = 1024, kChainsSlots = 8, kChainsRing = 512, kChainsReserve = 256;   // kChainsReserve: places only an event that must not be lost may take
 struct ChainsLiveConfig { int taps = 0; bool sc = false; bool sends = false; int feeds = 0; };   // which of the node's inputs the host feeds (fixed for the runner's life)
-struct ChainsLiveStats { uint64_t blocks = 0, cutBlocks = 0, lateEvents = 0, droppedEvents = 0, refusedPatches = 0, failedBlocks = 0, coalescedEvents = 0, deferredPatches = 0; };
+// A snapshot of the runner's counters (stats() copies them; each is written with a relaxed atomic add by whichever thread counts it, so reading from any thread is safe; the numbers of one snapshot are not one instant).
+// droppedEvents: events lost (refused by post() / drain when nothing could give way, plus a Param refused for room); droppedParams: a pending Param of ANOTHER parameter removed to make room for an event that must be kept
+// (a loss, unlike coalescedEvents: a value replaced by a later value of the same thing, or a Tempo / Bypass / Playing a later one of its kind supersedes).
+struct ChainsLiveStats { uint64_t blocks = 0, cutBlocks = 0, lateEvents = 0, droppedEvents = 0, refusedPatches = 0, failedBlocks = 0, coalescedEvents = 0, deferredPatches = 0, droppedParams = 0; };
 class ChainsLive {
  public:
   ChainsLive(double sampleRate, int track, const ChainsLiveConfig& cfg = ChainsLiveConfig(), Host* host = nullptr);
@@ -219,38 +224,44 @@ class ChainsLive {
   ChainsLive(const ChainsLive&) = delete; ChainsLive& operator=(const ChainsLive&) = delete;
   bool valid() const { return node_.engine().valid(); }
   ChainsNode& node() { return node_; }
-  // control thread
+  // CONTROL THREAD: post(), postParam(), preparePatch(), service() and loadPatch() are for ONE thread (the queue is single-producer: the host must call them from one thread, or serialise them with its own lock). A debug build
+  // (no NDEBUG) aborts with a message when a second thread calls them. The audio thread calls only process().
   bool post(const ChainsEvent& e);                                    // false: the queue is full (counted), or a Param's id / name is too long
   void setMemoryBudget(size_t bytes) { node_.engine().setMemoryBudget(bytes); }   // per patch prepared by this runner (see ChainsEngine::setMemoryBudget)
   bool postParam(const char* id, const char* name, double v, int64_t at);
+  bool loadPatch(Json doc) { return node_.engine().loadPatch(doc); }   // BEFORE the audio thread runs (control thread): a patch loaded straight into the engine; the engine tracks the current patch itself
   bool preparePatch(Json doc, int64_t at);                            // builds the patch off the audio thread and posts its swap at `at`; false: refused (the playing patch stays)
   // REQUIRED RATE: service() must run at least once per engine block of 128 frames (every 2.67 ms at 48 kHz; any faster is better) for as long as a pump module can go bad. A pump module holds ONE spare; a bad block uses it (silent for
   // that block), and the next spare is made only by service(): called every block, no block ever runs dry (measured: 400 blocks, 0 dry); every 3rd block, a third of the bad blocks found no spare (132 of 400 were silent);
-  // never: the module is silent from its second bad block on. It also frees the patches the audio thread gave back: with fewer than kChainsSlots (8) patches in flight, preparePatch() works at any rate; past that it returns false.
+  // never: the module is silent from its second bad block on. It also frees the patches the audio thread gave back: with fewer than kChainsSlots - 2 (6) patches in flight, preparePatch() works at any rate; past that it returns false (two places stay spare: one for the patch being handed over, one for the new patch's own swap).
   void service();                                                     // frees the patches the audio thread gave back and keeps the pump spares current (one control thread calls this at the rate above, and no other frees patches)
   // audio thread: no allocation, no lock. n: any number of frames. in.byp is ignored (BYP comes as events)
   void process(const NodeIn& in, NodeOut& out, int n);
   int latency() const { return kChainsLatency; }
-  const ChainsLiveStats& stats() const { return st_; }
-  int64_t enginePos() const { return pos_; }
-  double bypassSwitch(int n) const { return n >= 1 && n <= kBypSwitches ? byp_[n - 1] : -1; }   // the value the last Bypass event gave switch n (1..15; -1: the patch's own)
+  ChainsLiveStats stats() const;   // a snapshot (any thread)
+  int64_t enginePos() const { return posPub_.load(std::memory_order_relaxed); }   // the engine sample the audio thread has rendered up to (a copy it publishes after each segment: any thread may read it)
+  double bypassSwitch(int n) const   /* (diagnostics: only while process() is not running: the audio thread writes it) */ { return n >= 1 && n <= kBypSwitches ? byp_[n - 1] : -1; }   // the value the last Bypass event gave switch n (1..15; -1: the patch's own)
+  // (while the audio thread hands a patch over it holds one out of both arrays for a moment: the count can be one short then, which is why preparePatch() keeps two places spare)
   int patchesInFlight() const { int n = 0; for (int i = 0; i < kChainsSlots; i++) { if (slot_[i].load()) n++; if (retired_[i].load()) n++; } return n; }   // prepared and not yet swapped in, plus swapped out and not yet collected by service()
   // the same events rendered with no queue and no latency (control thread: allocates). in[c]: the host's channels in the order of the node's inputs: Track In L, R, then sc L, R (cfg.sc), taps, sends (cfg.sends: 8), feeds (2 each); each `frames` long
   static bool renderOffline(double sr, int track, const ChainsLiveConfig& cfg, Host* host, const std::vector<ChainsEvent>& events, const std::vector<Json>& patches, const std::vector<std::vector<float>>& inputs,
                             int64_t frames, std::vector<std::vector<float>>& outputs /* L, R, sends 0..7 */, Json initialPatch = Json(), const std::vector<int>* busMap = nullptr, const std::vector<int>* tapMap = nullptr);
  private:
   void drain();
-  void eraseAt(int j); int victim() const; void dropPatch(const ChainsEvent& e);
+  void eraseAt(int j); int victim(const ChainsEvent& e) const; void dropPatch(const ChainsEvent& e);
   void apply(const ChainsEvent& e);
   void segment(int64_t end);
   int nIn() const { return 2 + (cfg_.sc ? 2 : 0) + cfg_.taps + (cfg_.sends ? 8 : 0) + 2 * cfg_.feeds; }
   ChainsNode node_; double sr_; ChainsLiveConfig cfg_;
+  struct Ctr { std::atomic<uint64_t> blocks{0}, cutBlocks{0}, lateEvents{0}, droppedEvents{0}, refusedPatches{0}, failedBlocks{0}, coalescedEvents{0}, deferredPatches{0}, droppedParams{0}; } ctr_;
+  void ctlCheck();   // debug builds: one control thread
+  std::atomic<size_t> ctlThread_{0};
   ChainsEvent q_[kChainsQueue]; std::atomic<uint32_t> qh_{0}, qt_{0};
   ChainsEvent pend_[kChainsPending]; int npend_ = 0;
-  std::atomic<waves::PatchImpl*> slot_[kChainsSlots]; std::atomic<waves::PatchImpl*> retired_[kChainsSlots]; std::atomic<waves::PatchImpl*> cur_{nullptr};
-  int64_t pos_ = 0, hostPos_ = 0; double byp_[kBypSwitches];
+  std::atomic<waves::PatchImpl*> slot_[kChainsSlots]; std::atomic<waves::PatchImpl*> retired_[kChainsSlots]; 
+  int64_t pos_ = 0, hostPos_ = 0; double byp_[kBypSwitches]; std::atomic<int64_t> posPub_{0};
   std::unique_ptr<float[]> inRing_, outRing_, seg_, oseg_;   // inRing_: nIn() x kChainsRing; outRing_: 10 x kChainsRing; seg_ / oseg_: the segment's contiguous copies (128 each)
-  std::vector<const float*> ptrIn_; std::vector<float*> ptrOut_; ChainsLiveStats st_;
+  std::vector<const float*> ptrIn_; std::vector<float*> ptrOut_;
   friend struct ChainsLiveOffline;
 };
 

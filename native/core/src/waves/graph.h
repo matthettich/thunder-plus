@@ -48,7 +48,8 @@ struct ModNode {
   std::vector<Slot> slots; bool slotsMade = false; bool slotsPoly = false; int weight = 1;
   int tailT = -1, tailF = -1, tailD = -1;
   // U31 (…chains): the bypass state and the patch's own bypass setting (_byp), the module's bypass number as set (_bn), the dry copy kept while bypassing
-  bool bypassed = false; double bypP = 0, bnP = 0; std::vector<float> dry;
+  bool bypassed = false; int fade = 0; bool fadeTo = false; double bypP = 0, bnP = 0;   // fade / fadeTo: a bypass crossfade in progress across cut blocks (live runner): samples done of the 128, and where it goes
+  std::vector<float> dry;
   bool bypOk = false; int pIn = -1, pInR = -1, pOut = -1, pOutR = -1;   // bypOk: In and Out are audio ports (the JS's bypOk); the port numbers the bypass reads
 };
 inline int weightOf(const WInfo& w) {
@@ -124,6 +125,8 @@ class PatchImpl {
   std::vector<float> fbS = std::vector<float>(kBlock);
   // U31 (…chains): per-patch data the …chains engine computes on the control thread: the run list (focus) and the bypass numbers, by module index; chains: this patch is a …chains one
   // rawParams: a parameter is used as set (the JS: io.p = io.base), in …waves as in …chains
+  // chains: uaS / uaL: the cables as undirected adjacency by module index (CSR), cmp / cmpLow: scratch of the run list's connected components; built / sized by compile() so the audio thread's prepareDerived (setParam of `track` / `_bn`) is index-only and allocation-free
+  std::vector<int> uaS, uaL, cmp, cmpLow;
   bool chains = false, rawParams = true; std::vector<char> act, actTel; bool hasAct = false; std::vector<int> bn; std::vector<char> seen; std::vector<int> stk;   // act: the run list without telemetry, actTel: with it; seen / stk: scratch (sized by compile, so the audio thread allocates nothing)
   // scratch of compile()
   std::vector<int> indeg, q; std::vector<std::vector<int>> adj; std::vector<char> inOrder;
@@ -159,7 +162,13 @@ class PatchImpl {
       for (int nx : adj[(size_t)k]) if (--indeg[(size_t)nx] == 0) q.push_back(nx);
     }
     for (size_t i = 0; i < n; i++) if (!inOrder[i]) order.push_back(mods[i].get());
-    if (chains) { act.assign(n, 1); actTel.assign(n, 1); bn.assign(n, 0); seen.assign(n, 0); stk.assign(2 * n + 2, 0); }
+    if (chains) { act.assign(n, 1); actTel.assign(n, 1); bn.assign(n, 0); seen.assign(n, 0); stk.assign(2 * n + 2, 0);
+      cmp.assign(n, -1); cmpLow.assign(n + 1, 0); uaS.assign(n + 1, 0); uaL.clear();
+      for (const CableRec& c : cables) { ModNode* x = find(c.a0); ModNode* y = find(c.b0); if (!x || !y) continue; uaS[(size_t)x->idx + 1]++; uaS[(size_t)y->idx + 1]++; }
+      for (size_t i = 0; i < n; i++) uaS[i + 1] += uaS[i];
+      uaL.assign((size_t)uaS[n], 0); { std::vector<int>& fill = q; fill.assign(uaS.begin(), uaS.begin() + (long)n);   // (q is rebuilt below; used here as the fill cursor)
+        for (const CableRec& c : cables) { ModNode* x = find(c.a0); ModNode* y = find(c.b0); if (!x || !y) continue; uaL[(size_t)fill[(size_t)x->idx]++] = y->idx; uaL[(size_t)fill[(size_t)y->idx]++] = x->idx; } }
+    }
     ver++; cullKeep.assign(n, 0); cullStack.clear(); cullStack.reserve(2 * n + 2);
     for (ModNode* m : order) {
       const int s = m->wi->scope;

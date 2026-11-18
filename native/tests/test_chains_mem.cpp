@@ -64,11 +64,15 @@ int main(int argc, char** argv) {
     e.setMemoryBudget((size_t)8 << 30); e.setMemoryBudget(64u << 20); Doc d3(patchOf("resample", 3)); CHECK(!e.loadPatch(d3.r), "3 Resample modules (70 MiB) over a 64 MiB budget are refused"); Doc d4(patchOf("resample", 2)); CHECK(e.loadPatch(d4.r), "2 Resample modules fit 64 MiB");
     CHECK(e.valid() && e.process(128), "the engine goes on after refusals"); }
   // 3. an allocation that really fails (the budget set far above what the address space allows) is caught at the preparation boundary
+#if defined(__SANITIZE_ADDRESS__) || defined(__SANITIZE_THREAD__)
+  std::printf("(3. skipped: RLIMIT_AS and a sanitizer's shadow memory exclude each other; the Release run covers it)\n");
+#else
   { struct rlimit old, lim; getrlimit(RLIMIT_AS, &old); lim = old; lim.rlim_cur = (rlim_t)heap() + ((rlim_t)600 << 20) + (rlim_t)3 * 1000 * 1000 * 1000; setrlimit(RLIMIT_AS, &lim);
     waves::Host host; ChainsEngine e(48000, EngineOptions(), &host); e.setMemoryBudget((size_t)1 << 40);
     Doc d(patchOf("resample", 160)); const bool ok = e.loadPatch(d.r); setrlimit(RLIMIT_AS, &old);
     CHECK(!ok, "160 Resample modules do not fit the address space limit: refused, not aborted"); CHECK(!e.lastError().empty(), "with a message (%s)", e.lastError().c_str());
     Doc d1(patchOf("vca")); CHECK(e.loadPatch(d1.r), "and the engine takes a small patch after it"); }
+#endif
   std::printf(fails ? "test_chains_mem: %d FAILED\n" : "test_chains_mem: ok (%d type x rate checks)\n", fails ? fails : checked);
   return fails ? 1 : 0;
 #endif

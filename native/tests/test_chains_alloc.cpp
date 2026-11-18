@@ -63,6 +63,22 @@ int main(int argc, char** argv) {
     }
     if (g_cnt) { bad++; std::printf("ALLOC on the audio path: %-10s %lu allocator calls; first: %s\n", type.c_str(), g_cnt, g_first); }
   }
+  { // J: Resample takes: the take queue holds 16; with 18 Resample modules each finishing one take and nobody popping, two takes find it full and are dropped IN PLACE (their buffers marked free again): no allocator call, no free
+    std::string pm = "{\"modules\":[{\"id\":\"a\",\"type\":\"trackIn\"}"; std::string cb;
+    for (int i = 0; i < 18; i++) { pm += ",{\"id\":\"s" + std::to_string(i) + "\",\"type\":\"resample\",\"params\":{\"rec\":1,\"bars\":0,\"pad\":5,\"slices\":4}}"; cb += std::string(i ? "," : "") + "{\"from\":[\"a\",\"out\"],\"to\":[\"s" + std::to_string(i) + "\",\"in\"]}"; }
+    pm += ",{\"id\":\"c\",\"type\":\"chainOut\"}],\"cables\":[" + cb + "]}"; Doc dj(pm);
+    EngineOptions o; o.transport.playing = true; o.transport.tempo = 120; waves::Host host; ChainsEngine e(48000, o, &host);
+    if (!e.loadPatch(dj.r)) { std::printf("take overflow: patch refused (%s)\n", e.lastError().c_str()); bad++; }
+    else {
+      std::vector<float> x(128 * 900); uint32_t sd = 3; for (float& v : x) { sd = sd * 1664525u + 1013904223u; v = ((float)(sd >> 8) / 16777216.f - .5f); }
+      g_cnt = 0; g_have = false;
+      for (int b = 0; b < 900; b++) { e.setTrackInputs(&x[(size_t)b * 128], &x[(size_t)b * 128], 1); g_on = 1; e.process(128); g_on = 0; }
+      int popped = 0; ResampleTake tk; while (e.popTake(&tk)) { popped++; e.releaseTake(tk); }
+      std::printf("take overflow: %d takes popped, %llu dropped in place, %lu allocator calls on the audio path\n", popped, (unsigned long long)e.stats().droppedTakes, g_cnt);
+      if (g_cnt) { bad++; std::printf("ALLOC with a full take queue; first: %s\n", g_first); }
+      if (popped != 16 || e.stats().droppedTakes != 2) { bad++; std::printf("take overflow: wanted 16 popped and 2 dropped\n"); }
+    }
+  }
   std::printf("chains_alloc: audited %d module types through the live runner (patch swap + parameter / bypass / tempo events), %d allocated on the audio path\n", tested, bad);
   return (bad || (!only && (tested != expected || tested < 90))) ? 1 : 0;
 #endif

@@ -242,7 +242,7 @@ static void testChainOutLevel() {
 // the host's blocks of 128 frames with no input, to let the queue drain and the events land
 static void idle(ChainsLive& live, int blocks) { std::vector<float> a(128), b(128); NodeIn in; NodeOut out; out.L = a.data(); out.R = b.data(); for (int i = 0; i < blocks; i++) live.process(in, out, 128); }
 static void flood(ChainsLive& live, ChainsEvent::Kind k, int n, int64_t at, double a = 0, bool names = false) {   // n events of one kind, in rounds the queue can hold
-  for (int i = 0; i < n;) { int m = 0; for (; i < n && m < 1500; i++, m++) { ChainsEvent e; e.kind = k; e.at = at; e.a = a; if (names) { std::snprintf(e.id, sizeof e.id, "x"); std::snprintf(e.name, sizeof e.name, "n%d", i); } live.post(e); } idle(live, 1); }
+  for (int i = 0; i < n;) { int m = 0; for (; i < n && m < 700; i++, m++) { ChainsEvent e; e.kind = k; e.at = at; e.a = a; if (names) { std::snprintf(e.id, sizeof e.id, "x"); std::snprintf(e.name, sizeof e.name, "n%d", i); } live.post(e); } idle(live, 1); }
 }
 static Doc* sPatch2() { static Doc d(kPatch2); return &d; }
 static void testQueueRules() {
@@ -250,7 +250,7 @@ static void testQueueRules() {
   { // (a) the pending array full of parameter events: a later value of the same parameter replaces the earlier one; a new parameter is refused first; Playing / Bypass / Tempo are never lost
     Host h; ChainsLive live(48000, 0, ChainsLiveConfig(), &h); Doc p(kPatch2); CHECK(live.node().engine().loadPatch(p.r), "patch");
     ChainsEngine& E = live.node().engine(); Transport t = E.transport(); t.playing = true; E.setTransport(t);
-    flood(live, ChainsEvent::Param, 3840, FAR, 0.5, true); CHECK(live.stats().droppedEvents == 0 && live.stats().coalescedEvents == 0, "a full array: nothing lost yet");
+    flood(live, ChainsEvent::Param, kChainsPending - kChainsReserve, FAR, 0.5, true); CHECK(live.stats().droppedEvents == 0 && live.stats().coalescedEvents == 0, "a full array: nothing lost yet");
     CHECK(live.postParam("x", "n5", 0.7, FAR), "post the same parameter"); idle(live, 1); CHECK(live.stats().coalescedEvents == 1 && live.stats().droppedEvents == 0, "same (module, parameter): coalesced (%d), nothing dropped (%d)", (int)live.stats().coalescedEvents, (int)live.stats().droppedEvents);
     CHECK(live.postParam("x", "brand_new", 0.7, FAR), "post a new parameter"); idle(live, 1); CHECK(live.stats().droppedEvents == 1, "a new parameter in a full array is the one refused (%d)", (int)live.stats().droppedEvents);
     const int64_t now = live.enginePos(); ChainsEvent e; e.kind = ChainsEvent::Bypass; e.at = now + 200; e.a = 3; e.b = 1; CHECK(live.post(e), "bypass on"); e.at = now + 400; e.b = -1; CHECK(live.post(e), "bypass release");
@@ -263,20 +263,32 @@ static void testQueueRules() {
     ChainsEvent e; e.kind = ChainsEvent::Bypass; e.at = now + 200; e.a = 4; e.b = 1; live.post(e); e.at = now + 400; e.b = -1; live.post(e); e = ChainsEvent(); e.kind = ChainsEvent::Playing; e.at = now + 600; e.a = 0; live.post(e);
     idle(live, 8); CHECK(live.bypassSwitch(4) == -1, "(Tempo flood) the Bypass release landed (%g)", live.bypassSwitch(4)); CHECK(!E.transport().playing, "(Tempo flood) Playing=0 landed"); CHECK(live.stats().coalescedEvents > 0, "tempo events gave way (%d)", (int)live.stats().coalescedEvents);
   }
-  { // (b) the array full of events nothing may replace: a Patch event is dropped, and its slot is free again after service() (no leaked mailbox slot)
+  { // (b) the array full of Playing events (the last one posted wins: an earlier one gives way): a Patch event is NOT dropped, and every delivered patch lands and is collected
     Host h; ChainsLive live(48000, 0, ChainsLiveConfig(), &h); Doc p(kPatch2); CHECK(live.node().engine().loadPatch(p.r), "patch");
-    flood(live, ChainsEvent::Playing, 4200, FAR, 1); const uint64_t d0 = live.stats().droppedEvents; CHECK(d0 > 0, "the array is full and refuses (%d)", (int)d0);
+    flood(live, ChainsEvent::Playing, 4200, FAR, 1); CHECK(live.stats().droppedEvents == 0, "a Playing flood loses nothing (%d): the last state wins", (int)live.stats().droppedEvents); CHECK(live.stats().coalescedEvents > 0, "earlier Playing events gave way (%d)", (int)live.stats().coalescedEvents);
     int ok = 0; for (int i = 0; i < 30; i++) { if (live.preparePatch(sPatch2()->r, live.enginePos() + 10)) ok++; idle(live, 1); if (i % 5 == 4) live.service(); }
-    CHECK(live.patchesInFlight() <= kChainsSlots, "in flight %d", live.patchesInFlight()); CHECK(ok >= 20, "after every service() a patch can be prepared again (%d of 30 delivered)", ok);
-    CHECK(live.stats().droppedEvents - d0 >= (uint64_t)ok, "each delivered patch was dropped by the full array and counted (%d dropped for %d patches)", (int)(live.stats().droppedEvents - d0), ok);
+    CHECK(live.patchesInFlight() <= kChainsSlots - 2, "in flight %d", live.patchesInFlight()); CHECK(ok >= 20, "after every service() a patch can be prepared again (%d of 30 delivered)", ok);
+    CHECK(live.stats().droppedEvents == 0, "no patch event was dropped (%d)", (int)live.stats().droppedEvents);
     live.service(); CHECK(live.patchesInFlight() == 0, "service() freed every patch the audio thread gave back (%d left)", live.patchesInFlight());
   }
-  { // (c) service() never called: no more than kChainsSlots patches are in flight, the rest are refused (false), and one service() gives all the places back; each swap lands
+  { // F: a Playing flood, then Playing = 0: the stop lands, the engine ends stopped (the last state posted wins)
+    Host h; ChainsLive live(48000, 0, ChainsLiveConfig(), &h); Doc p(kPatch2); CHECK(live.node().engine().loadPatch(p.r), "patch"); ChainsEngine& E = live.node().engine();
+    flood(live, ChainsEvent::Playing, 4200, FAR, 1); ChainsEvent e; e.kind = ChainsEvent::Playing; e.at = live.enginePos() + 300; e.a = 0; CHECK(live.post(e), "post the stop"); idle(live, 6);
+    CHECK(!E.transport().playing, "Playing = 0 landed after a Playing flood"); CHECK(live.stats().droppedEvents == 0, "nothing dropped (%d)", (int)live.stats().droppedEvents);
+  }
+  { // E: a full array of parameters: a Playing event removes the oldest parameter event of ANOTHER parameter: that is a loss (droppedParams), not a coalesce
+    Host h; ChainsLive live(48000, 0, ChainsLiveConfig(), &h); Doc p(kPatch2); CHECK(live.node().engine().loadPatch(p.r), "patch");
+    for (int round = 0; round < 3; round++) flood(live, ChainsEvent::Param, 700, FAR, 0.5, true);   // fills pending to kChainsPending - kChainsReserve; the rest are refused
+    const uint64_t c0 = live.stats().coalescedEvents; CHECK(live.stats().droppedParams == 0, "nothing removed yet");
+    flood(live, ChainsEvent::Tempo, 400, FAR, 100); idle(live, 1);   // 256 + more events that must be kept: the array is filled, then parameters give way
+    CHECK(live.stats().droppedParams > 0, "parameters removed to make room are counted as dropped (%d)", (int)live.stats().droppedParams); (void)c0;
+  }
+  { const int kMaxFlight = kChainsSlots - 2; // (c) service() never called: no more than kChainsSlots - 2 patches are in flight, the rest are refused (false), and one service() gives all the places back; each swap lands
     Host h; ChainsLive live(48000, 0, ChainsLiveConfig(), &h); Doc p(kPatch2); CHECK(live.node().engine().loadPatch(p.r), "patch"); int ok = 0, no = 0;
     for (int i = 0; i < 14; i++) { if (live.preparePatch(sPatch2()->r, live.enginePos() + 10)) ok++; else no++; idle(live, 2); }
-    CHECK(ok == kChainsSlots && no == 14 - kChainsSlots, "14 prepares with no service(): %d delivered, %d refused (want %d / %d)", ok, no, kChainsSlots, 14 - kChainsSlots);
-    CHECK(live.patchesInFlight() == kChainsSlots, "in flight %d", live.patchesInFlight()); CHECK(live.stats().refusedPatches == (uint64_t)no, "refusals counted (%d)", (int)live.stats().refusedPatches);
-    live.service(); CHECK(live.patchesInFlight() == 0, "one service() collects the %d swapped-out patches (%d left)", kChainsSlots, live.patchesInFlight());
+    CHECK(ok == kMaxFlight && no == 14 - kMaxFlight, "14 prepares with no service(): %d delivered, %d refused (want %d / %d)", ok, no, kMaxFlight, 14 - kMaxFlight);
+    CHECK(live.patchesInFlight() == kMaxFlight, "in flight %d", live.patchesInFlight()); CHECK(live.stats().refusedPatches == (uint64_t)no, "refusals counted (%d)", (int)live.stats().refusedPatches);
+    live.service(); CHECK(live.patchesInFlight() == 0, "one service() collects the %d swapped-out patches (%d left)", kMaxFlight, live.patchesInFlight());
     CHECK(live.preparePatch(sPatch2()->r, live.enginePos() + 10), "after service() a patch is delivered again"); idle(live, 2); live.service(); CHECK(live.patchesInFlight() == 0, "and collected");
   }
   { // the queue filling up: a Param is refused with kChainsReserve places left, and those places take Playing / Bypass / Tempo / Patch events
@@ -300,6 +312,27 @@ static void testBypassRange() {
     for (int s = 1; s <= 15; s++) CHECK(live.bypassSwitch(s) == -1, "switch %d unchanged", s);
   }
   CHECK(o[0] == o[1] && pos[0] == pos[1], "out-of-range Bypass events change nothing (pos %lld / %lld)", (long long)pos[0], (long long)pos[1]);
+}
+
+// H: a Bypass crossfade is a 128-sample ramp whatever the cuts: an event that lands inside the ramp (a parameter set to the value it already has, on another module) cuts the block, and the output is bit-equal to the run
+// without it (the engine used to finish the fade in the short block and jump to fully bypassed in the next: a click). Both directions (into bypass and out of it), and two cuts inside one ramp.
+static void testBypassCut() {
+  const int H = 1800; const std::vector<float> x = noise(H, 12, .5f);
+  struct V { int64_t cutAt[2]; int ncut; };
+  for (int dir = 0; dir < 2; dir++) {   // dir 0: into bypass (switch 1 -> 1), dir 1: bypass first, then out of it
+    std::vector<float> o[4]; const V vs[4] = {{{0, 0}, 0}, {{10, 0}, 1}, {{10, 77}, 2}, {{127, 0}, 1}};
+    for (int k = 0; k < 4; k++) {
+      Host h; ChainsLive live(48000, 0, ChainsLiveConfig(), &h); Doc d(kPatch2); CHECK(live.node().engine().loadPatch(d.r), "patch");
+      const int64_t S = 520; std::vector<ChainsEvent> v;
+      if (dir == 0) ev(v, ChainsEvent::Bypass, S, 1, 1); else { ev(v, ChainsEvent::Bypass, 20, 1, 1); ev(v, ChainsEvent::Bypass, S, 1, 0); }
+      for (int c = 0; c < vs[k].ncut; c++) ev(v, ChainsEvent::Param, S + vs[k].cutAt[c], 0.9, 0, "c", "level");   // c.level is 0.9 already
+      for (const ChainsEvent& e : v) CHECK(live.post(e), "post");
+      std::vector<float> L((size_t)H), R((size_t)H); NodeIn in; in.inL = x.data(); in.inR = x.data(); NodeOut out; out.L = L.data(); out.R = R.data(); live.process(in, out, H); o[k] = L;
+      if (k) CHECK(live.stats().cutBlocks > 0, "the block was cut (%d)", (int)live.stats().cutBlocks);
+    }
+    for (int k = 1; k < 4; k++) CHECK(o[k] == o[0], "Bypass %s: an event inside the ramp (variant %d) changes the output", dir ? "release" : "on", k);
+    double mx = 0; for (size_t i = 1; i < o[0].size(); i++) mx = std::max(mx, (double)std::fabs(o[0][i] - o[0][i - 1])); CHECK(mx < 1.0, "no jump in the output (%g)", mx);
+  }
 }
 
 // the pump instances' dead handles: when service() is never called (the wiring condition broken) a module still never leaks or overflows: at most two handles die (the one that went bad and the spare that took over), then the
@@ -349,7 +382,7 @@ int main() {
   testResampleTake(); testMonoFallback(); testCompRatioOne();
   testChainOutTrackClamp();
   testPumpSpares(); testPumpNoService(); testPumpSpareAfterTakeover();
-  testFeedMonoFallback(); testSetSidechain(); testTempoClamp(); testTrackInBound(); testChainOutLevel(); testBypassRange(); testPostLimits(); testQueueRules();
+  testFeedMonoFallback(); testSetSidechain(); testTempoClamp(); testTrackInBound(); testChainOutLevel(); testBypassRange(); testPostLimits(); testQueueRules(); testBypassCut();
   testEqualsOffline(); testLatencyAndExactEvents(); testRefusals();
   std::printf(fails ? "test_chains_live: %d FAILED\n" : "test_chains_live: ok\n", fails);
   return fails ? 1 : 0;
