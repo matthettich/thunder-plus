@@ -48,6 +48,9 @@ Where native is stricter than the JS (the JS would read undefined, give NaN, or 
 - Counters to surface: `dropped()` (all voices busy), `tOverflow()`, `autoDropped()`.
 - Build: the closed build (no LXR, DSP, pump) builds; stb is fetched alone (`THUNDER_FETCH_STB_ONLY=1`).
 
+## Final run
+Closed build (LXR, DSP, pump all OFF), Release GCC, `ctest -j1` over the whole tree: 107 tests, 0 failed, 5 skipped (the pump / DSP ones, by design in this build). The default build with LXR / DSP / pump ON was NOT built here.
+
 ## Unverified or not done
 - The page's drum-kit note is NOT within -80 dB of native (-64.5 dB kick, -73.8 snare), nor the short looped samples (see Chrome quirk). The piano and bass are.
 - The Chrome measurements are manual (`sf-chrome.mjs`), not in ctest; they were taken once, with Chrome 153.
