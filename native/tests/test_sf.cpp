@@ -412,6 +412,12 @@ static int doUnit() {
         for (double ctx : {0.0, 48000.0}) { Pcm p; DecodeOpts oo; oo.ctxRate = ctx; const double t0 = nowSec(); decode_sample(g, 0, oo, p); const double dt = nowSec() - t0; const bool sane = rate >= 4000 && rate <= 192000;
           CHECK(p.ok == sane && (sane || (p.d.size() == 1 && p.sr == 48000)) && dt < 5.0, "stream rate %u ctx %g: ok %d frames %zu sr %g (%.2f s)", rate, ctx, p.ok, p.d.size(), p.sr, dt); (sane ? accepted : refused)++; } }
       std::printf("unit: stream rates 0, 1, 7, 3999, 192001, 2^31-1, 2^32-1 Hz refused, 4000, 44100, 192000 accepted (%d, %d decodes)\n", refused, accepted);
+      // H4b: the last page's granule decides the length, shortening only (libvorbis: granules 0 / 1 / 100 give 0 / 1 / 100 frames on this stream; a granule above the decoded 2304 changes nothing)
+      { std::vector<uint8_t> t = raw; size_t last = 0; for (size_t q = 0; q + 27 < t.size(); q++) if (std::memcmp(&t[q], "OggS", 4) == 0) last = q;
+        const struct { int64_t g; size_t want; } GW[] = {{1, 1}, {100, 100}, {2296, 2296}, {2297, 2297}, {2298, 2298}, {5000, 2304}, {(int64_t)1 << 40, 2304}, {0, 0}}; int okc = 0;
+        for (auto& gw : GW) { std::vector<uint8_t> u = t; std::memcpy(&u[last + 6], &gw.g, 8); Font g; g.sf3 = true; g.smpl = u.data(); g.smplN = u.size(); SampleHdr h = h0; h.start = 0; h.end = (uint32_t)u.size(); g.samples.push_back(h); Pcm p; decode_sample(g, 0, DecodeOpts(), p);
+          const bool ok = gw.want == 0 ? !p.ok : (p.ok && p.d.size() == gw.want); CHECK(ok, "last granule %lld: %zu frames (want %zu)", (long long)gw.g, p.d.size(), gw.want); okc += ok; }
+        std::printf("unit: patched last-page granules 0, 1, 100, 2296, 2297, 2298, 5000, 2^40 on sample 183: %d of 8 give the libvorbis frame count\n", okc); }
       // G2: every SF3 sample of the font has exactly its last page's granule position as its frame count (the Vorbis rule, libvorbis's count), except streams whose decode ends before it
       size_t checked = 0, equal = 0, shorter = 0, bad = 0; const uint32_t named[] = {234, 235, 704, 183, 859, 948, 8, 9, 10}; const size_t namedGr[] = {37067, 33493, 60416, 2297, 4633, 12462, 79504, 79504, 107778}; int namedOk = 0;
       for (uint32_t i = 0; i < f.samples.size(); i++) { const SampleHdr& h = f.samples[i]; if (!(h.type & 0x10) || h.end <= h.start || h.end > f.smplN) continue; const uint8_t* p = f.smpl + h.start; const size_t n = h.end - h.start; int64_t last = -1;

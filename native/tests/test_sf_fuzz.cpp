@@ -46,7 +46,7 @@ static void useFont(const Font& f, Rng& r, bool decode, uint64_t* checksum) {
     PadParams P; P.bank = p.bank; P.prog = p.prog; P.trans = (double)((int)r.u(25) - 12);
     const size_t bound = sf_render_bound(f, P, 48000, 0.2);
     if (bound == 0 || bound > ((size_t)1 << 22)) continue;
-    DecodeOpts o; o.pageTail = r.u(2) == 0; uint8_t keys[128]; for (int k = 0; k < 128; k++) keys[k] = (uint8_t)(r.u(3) == 0); PresetPcm pcm; prepare_preset(f, &p, o, pcm, r.u(2) ? keys : nullptr);
+    DecodeOpts o; o.pageTail = r.u(2) == 0; if (r.u(4) == 0) o.presetBytes = r.u(2) ? 1 + r.u(5000) : r.u(3000000); uint64_t fu = r.u(3) ? 0 : r.u(100000); o.fontBytes = r.u(2) ? (uint64_t)512 << 20 : 1 + r.u(200000); o.fontUsed = &fu; uint8_t keys[128]; for (int k = 0; k < 128; k++) keys[k] = (uint8_t)(r.u(3) == 0); PresetPcm pcm; prepare_preset(f, &p, o, pcm, r.u(2) ? keys : nullptr);
     std::vector<float> out(bound + 8, 12345.f); const size_t n = sf_render(f, pcm, P, 48000, 0.2, out.data(), bound);
     CHECK(n <= bound, "render wrote %zu of %zu", n, bound);
     for (size_t i = bound; i < bound + 8; i++) CHECK(out[i] == 12345.f, "render wrote past its buffer");
@@ -120,7 +120,7 @@ static void fuzzVoice(int iters, Rng& r) {
     }
     f.presets.push_back(pr);
     PadParams P; P.trans = xt(r); P.velo = xt(r); P.atk = xt(r); P.rel = xt(r); P.level = xt(r); P.len = xt(r); const double sr = r.u(4) ? 48000 : std::fabs(xt(r)), hold = r.u(2) ? 0.1 : xt(r);
-    const size_t bound = sf_render_bound(f, P, sr, hold); DecodeOpts o; PresetPcm pcm; prepare_preset(f, &f.presets[0], o, pcm);
+    const size_t bound = sf_render_bound(f, P, sr, hold); DecodeOpts o; if (r.u(4) == 0) o.presetBytes = 1 + r.u(3000); if (r.u(3) == 0) o.ctxRate = r.u(2) ? 48000 : xt(r); PresetPcm pcm; prepare_preset(f, &f.presets[0], o, pcm);
     if (bound > 0 && bound <= ((size_t)1 << 21)) { std::vector<float> out(bound + 4, 9.f); sf_render(f, pcm, P, sr, hold, out.data(), bound); for (size_t i = bound; i < bound + 4; i++) CHECK(out[i] == 9.f, "render past its end"); }
     SfPool pool(r.u(8) ? 48000 : std::max(8000.0, std::min(192000.0, std::fabs(xt(r)))), 4); SfPad pad; pad.font = &f; pad.pr = &f.presets[0]; pad.pcm = &pcm; pad.P = P; VoiceKit kv; kv.syn = true; kv.choke = (int)r.u(3);
     std::vector<double> arp = {0.01, 1.0, 0.03, 2.0};
