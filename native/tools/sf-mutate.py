@@ -37,6 +37,7 @@ M=[
 ('sf.h','bool pageTail = false;','bool pageTail = true;','parity mode ON by default'),
 ('sf.h','kMaxWork = 200000;','kMaxWork = 200000000;','parse work cap lifted'),
 ('sf_decode.cpp','const uint64_t n = std::min(claimed, have);','const uint64_t n = claimed;','SF2 sample no longer clamped to the data present'),
+('sf_math.cpp','log10_2lo + ivln10 * js_log(x)','log10_2lo + ivln10 * 1.0000000000000002 * js_log(x)','sf_log10 last-bit change (committed math golden)'),
 ]
 only=sys.argv[1:]
 res=[]
