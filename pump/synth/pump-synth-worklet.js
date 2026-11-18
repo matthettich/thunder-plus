@@ -126,7 +126,6 @@ class PsynProc extends AudioWorkletProcessor {
     for (let i = 0; i < this.syms.length; i++) st[i] = 0;
     this.values(st);
     this.h = X.psyn_new(this.type, sampleRate); this.dirty = false; this.fileDirty = !!this.file;
-    if (!this.told){ this.told = true; try { this.port.postMessage({opened:1}); } catch (e){} }   // (the page learns this scope's wasm instance has made an instrument: FREEZE's one-time spectra work is done, index.html psWarm)
   }
   semis(r){ return (+this.p.tune || 0) + 12 * Math.log2(r > 1e-6 ? r : 1e-6); }
   bendOf(r, note){ const b = this.nb + this.semis(r) - note, k = Math.max(-1, Math.min(1, b / this.range)); return Math.max(0, Math.min(16383, Math.round(8192 + k * 8191))); }

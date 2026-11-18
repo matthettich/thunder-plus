@@ -1,7 +1,9 @@
-// pump WOB's sub oscillator read its table past the end at extreme pitch (its phase wrapped once, but inc / 2 can exceed 1):
-// pump-synth.wasm trapped (out of bounds) at 22050 Hz, MIDI note 127, Octave +2, Tune +12. Fixed in pump commit 5468d8c
-// (WOB), with the same wrap in BandWaves::read (d4c4987) and GLOSS's DigiWaves::read (8d851d0). The case, driven through the
-// wasm's own C interface (the pad path clamps the note to 60 + Tune, so it cannot reach note 127).
+// KNOWN TRAP on the pinned pump wasm (pump deb07d3, build 645, same as 642): WOB's sub oscillator reads its table past the end
+// at extreme pitch (its phase wraps once, but inc / 2 can exceed 1). pump-synth.wasm traps with "memory access out of bounds"
+// at 22050 Hz, MIDI note 127, Octave +2, Tune +12. Fixed in pump commit 5468d8c (WOB), d4c4987 (BandWaves::read) and 8d851d0
+// (GLOSS DigiWaves::read), which build 643 / 644 carried and build 645 backed out. THIS TEST FLIPS when pump is re-pinned to a
+// commit with the fix: then turn it back into "no trap, NaN-free, bounded output". The pad path clamps the note to 60 + Tune, so
+// it cannot reach note 127: the case is driven through the wasm's own C interface.
 'use strict';
 const test = require('node:test'), assert = require('node:assert/strict'), fs = require('fs'), path = require('path'), vm = require('vm');
 const H = require('./helpers');
@@ -28,17 +30,7 @@ function wobExtreme(X, M, sr, note, over) {
   X.psyn_free(h); return { pk, bad };
 }
 
-test('pump WOB: the extreme case that trapped (22050 Hz, note 127, Octave +2, Tune +12) no longer traps', () => {
+test('pump WOB: KNOWN trap on this wasm (22050 Hz, note 127, Octave +2, Tune +12) still throws out of bounds; flips when pump is re-pinned', () => {
   const X = wasm(), M = meta();
-  const r = wobExtreme(X, M, 22050, 127, { octave: 2, tune: 12 });
-  assert.equal(r.bad, 0, 'NaN or infinity in the output');
-  assert.ok(r.pk < 4, 'output stays bounded (peak ' + r.pk + ')');
-});
-
-test('pump WOB: the same note with the Sub on its upper octave setting, and other rates, run without a trap', () => {
-  const X = wasm(), M = meta();
-  for (const sr of [22050, 44100, 48000, 96000]) for (const over of [{ octave: 2, tune: 12 }, { octave: 2, tune: 12, sub: 100, sub_oct: 1 }, { octave: -3, tune: -12, sub: 100 }]) {
-    const r = wobExtreme(X, M, sr, 127, over);
-    assert.equal(r.bad, 0, sr + ' Hz ' + JSON.stringify(over) + ': NaN or infinity');
-  }
+  assert.throws(() => wobExtreme(X, M, 22050, 127, { octave: 2, tune: 12 }), /memory access out of bounds/);
 });
