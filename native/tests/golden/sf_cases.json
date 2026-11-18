@@ -1,0 +1,877 @@
+{
+ "fonts": {
+  "gm": "sounds/FluidR3Mono_GM.sf3",
+  "syn": "native/tests/golden/sf_test.sf2"
+ },
+ "renders": [
+  {
+   "id": "gm_piano_c4",
+   "font": "gm",
+   "pad": {
+    "bank": 0,
+    "prog": 0
+   },
+   "sr": 48000,
+   "hold": 2
+  },
+  {
+   "id": "gm_piano_c2_44k",
+   "font": "gm",
+   "pad": {
+    "bank": 0,
+    "prog": 0,
+    "trans": -24,
+    "atk": 2,
+    "rel": 1.5
+   },
+   "sr": 44100,
+   "hold": 1.5
+  },
+  {
+   "id": "gm_bass",
+   "font": "gm",
+   "pad": {
+    "bank": 0,
+    "prog": 33,
+    "level": -3
+   },
+   "sr": 48000,
+   "hold": 2
+  },
+  {
+   "id": "gm_bass_22k",
+   "font": "gm",
+   "pad": {
+    "bank": 0,
+    "prog": 33,
+    "trans": 12
+   },
+   "sr": 22050,
+   "hold": 1
+  },
+  {
+   "id": "gm_kick",
+   "font": "gm",
+   "pad": {
+    "bank": 128,
+    "prog": 0,
+    "trans": -24
+   },
+   "sr": 48000,
+   "hold": 1
+  },
+  {
+   "id": "gm_snare",
+   "font": "gm",
+   "pad": {
+    "bank": 128,
+    "prog": 0,
+    "trans": -22
+   },
+   "sr": 48000,
+   "hold": 1
+  },
+  {
+   "id": "gm_strings",
+   "font": "gm",
+   "pad": {
+    "bank": 0,
+    "prog": 48,
+    "atk": 0.5,
+    "rel": 3
+   },
+   "sr": 48000,
+   "hold": 3
+  },
+  {
+   "id": "gm_square_lead",
+   "font": "gm",
+   "pad": {
+    "bank": 0,
+    "prog": 80,
+    "trans": 5
+   },
+   "sr": 48000,
+   "hold": 1.5
+  },
+  {
+   "id": "gm_warm_pad",
+   "font": "gm",
+   "pad": {
+    "bank": 0,
+    "prog": 89
+   },
+   "sr": 44100,
+   "hold": 2
+  },
+  {
+   "id": "gm_vibes_hi",
+   "font": "gm",
+   "pad": {
+    "bank": 0,
+    "prog": 11,
+    "trans": 19,
+    "level": 6
+   },
+   "sr": 48000,
+   "hold": 2
+  },
+  {
+   "id": "gm_missing_preset",
+   "font": "gm",
+   "pad": {
+    "bank": 99,
+    "prog": 99
+   },
+   "sr": 48000,
+   "hold": 1
+  },
+  {
+   "id": "syn_layers_c4",
+   "font": "syn",
+   "pad": {
+    "bank": 0,
+    "prog": 0
+   },
+   "sr": 48000,
+   "hold": 2
+  },
+  {
+   "id": "syn_layers_low",
+   "font": "syn",
+   "pad": {
+    "bank": 0,
+    "prog": 0,
+    "trans": -24,
+    "rel": 2
+   },
+   "sr": 44100,
+   "hold": 1
+  },
+  {
+   "id": "syn_layers_hi",
+   "font": "syn",
+   "pad": {
+    "bank": 0,
+    "prog": 0,
+    "trans": 24,
+    "atk": 3
+   },
+   "sr": 22050,
+   "hold": 1.5
+  },
+  {
+   "id": "syn_both",
+   "font": "syn",
+   "pad": {
+    "bank": 0,
+    "prog": 1,
+    "level": -6
+   },
+   "sr": 48000,
+   "hold": 2
+  },
+  {
+   "id": "syn_kick",
+   "font": "syn",
+   "pad": {
+    "bank": 128,
+    "prog": 0,
+    "trans": -24
+   },
+   "sr": 48000,
+   "hold": 1
+  },
+  {
+   "id": "syn_snare",
+   "font": "syn",
+   "pad": {
+    "bank": 128,
+    "prog": 0,
+    "trans": -22,
+    "rel": 4
+   },
+   "sr": 48000,
+   "hold": 0.5
+  },
+  {
+   "id": "syn_tom",
+   "font": "syn",
+   "pad": {
+    "bank": 128,
+    "prog": 0,
+    "trans": -20
+   },
+   "sr": 44100,
+   "hold": 1
+  },
+  {
+   "id": "syn_vel_only",
+   "font": "syn",
+   "pad": {
+    "bank": 3,
+    "prog": 5,
+    "trans": 2
+   },
+   "sr": 48000,
+   "hold": 1
+  },
+  {
+   "id": "syn_fallback",
+   "font": "syn",
+   "pad": {
+    "bank": 9,
+    "prog": 77
+   },
+   "sr": 48000,
+   "hold": 1
+  },
+  {
+   "id": "syn_hold_default",
+   "font": "syn",
+   "pad": {
+    "bank": 0,
+    "prog": 0,
+    "trans": 7
+   },
+   "sr": 48000,
+   "hold": 0
+  }
+ ],
+ "lives": [
+  {
+   "id": "gm_piano_poly",
+   "font": "gm",
+   "pad": {
+    "bank": 0,
+    "prog": 0
+   },
+   "frames": 64000,
+   "tracks": 2,
+   "kit": {
+    "syn": true
+   },
+   "events": [
+    {
+     "f": 300,
+     "type": "note",
+     "track": 0,
+     "rate": 1,
+     "gain": 0.9,
+     "pan": 128,
+     "poly": true,
+     "col": 0
+    },
+    {
+     "f": 2000,
+     "type": "note",
+     "track": 0,
+     "rate": 1.2599210498948732,
+     "gain": 0.7,
+     "pan": 100,
+     "poly": true,
+     "col": 1
+    },
+    {
+     "f": 5000,
+     "type": "note",
+     "track": 0,
+     "rate": 1.4983070768766815,
+     "gain": 0.6,
+     "pan": 160,
+     "poly": true,
+     "col": 2
+    },
+    {
+     "f": 9000,
+     "type": "note",
+     "track": 1,
+     "rate": 0.5,
+     "gain": 0.8,
+     "pan": 128,
+     "poly": false,
+     "col": 0
+    },
+    {
+     "f": 20000,
+     "type": "off",
+     "track": 0,
+     "cols": [
+      1
+     ]
+    },
+    {
+     "f": 24000,
+     "type": "mod",
+     "track": 0,
+     "gain": 0.2,
+     "pan": 30
+    },
+    {
+     "f": 30000,
+     "type": "off",
+     "track": 0
+    },
+    {
+     "f": 33000,
+     "type": "off",
+     "track": 1
+    }
+   ]
+  },
+  {
+   "id": "gm_bass_mono",
+   "font": "gm",
+   "pad": {
+    "bank": 0,
+    "prog": 33,
+    "velo": 0.5
+   },
+   "frames": 60000,
+   "tracks": 1,
+   "kit": {
+    "syn": true
+   },
+   "events": [
+    {
+     "f": 130,
+     "type": "note",
+     "track": 0,
+     "rate": 1,
+     "gain": 0.9,
+     "pan": 128,
+     "poly": false,
+     "col": 0
+    },
+    {
+     "f": 8000,
+     "type": "note",
+     "track": 0,
+     "rate": 1.122462048309373,
+     "gain": 1.0,
+     "pan": 128,
+     "poly": false,
+     "col": 0,
+     "slide": {
+      "from": 0.8,
+      "dur": 0.05
+     }
+    },
+    {
+     "f": 16000,
+     "type": "note",
+     "track": 0,
+     "rate": 0.7071067811865476,
+     "gain": 0.5,
+     "pan": 128,
+     "poly": false,
+     "col": 0,
+     "bend": {
+      "mul": 2,
+      "t1F": 24000
+     }
+    },
+    {
+     "f": 30000,
+     "type": "note",
+     "track": 0,
+     "rate": 1.5,
+     "gain": 0.7,
+     "pan": 128,
+     "poly": false,
+     "col": 0,
+     "vib": {
+      "spd": 5,
+      "dep": 12,
+      "t1F": 42000
+     }
+    },
+    {
+     "f": 36000,
+     "type": "mod",
+     "track": 0,
+     "mul": 1.25
+    },
+    {
+     "f": 50000,
+     "type": "off",
+     "track": 0
+    }
+   ]
+  },
+  {
+   "id": "gm_drums_choke",
+   "font": "gm",
+   "pad": {
+    "bank": 128,
+    "prog": 0,
+    "len": 0.5
+   },
+   "frames": 50000,
+   "tracks": 3,
+   "kit": {
+    "syn": false,
+    "choke": 1
+   },
+   "events": [
+    {
+     "f": 100,
+     "type": "note",
+     "track": 0,
+     "rate": 0.25,
+     "gain": 1.0,
+     "pan": 128,
+     "poly": false,
+     "col": 0
+    },
+    {
+     "f": 3000,
+     "type": "note",
+     "track": 1,
+     "rate": 0.2692,
+     "gain": 0.9,
+     "pan": 128,
+     "poly": false,
+     "col": 0
+    },
+    {
+     "f": 6000,
+     "type": "note",
+     "track": 2,
+     "rate": 0.2972,
+     "gain": 0.7,
+     "pan": 30,
+     "poly": false,
+     "col": 0
+    },
+    {
+     "f": 9000,
+     "type": "note",
+     "track": 2,
+     "rate": 0.2972,
+     "gain": 0.7,
+     "pan": 220,
+     "poly": false,
+     "col": 0
+    },
+    {
+     "f": 12000,
+     "type": "note",
+     "track": 1,
+     "rate": 0.3,
+     "gain": 0.6,
+     "pan": 128,
+     "poly": false,
+     "col": 0
+    },
+    {
+     "f": 20000,
+     "type": "stp",
+     "track": 1
+    }
+   ]
+  },
+  {
+   "id": "gm_strings_arp",
+   "font": "gm",
+   "pad": {
+    "bank": 0,
+    "prog": 48,
+    "atk": 0.5,
+    "rel": 2
+   },
+   "frames": 70000,
+   "tracks": 1,
+   "kit": {
+    "syn": true
+   },
+   "events": [
+    {
+     "f": 200,
+     "type": "note",
+     "track": 0,
+     "rate": 1,
+     "gain": 0.8,
+     "pan": 128,
+     "poly": false,
+     "col": 0,
+     "arp": [
+      [
+       200,
+       1
+      ],
+      [
+       2600,
+       1.2599210498948732
+      ],
+      [
+       5000,
+       1.4983070768766815
+      ],
+      [
+       7400,
+       2
+      ]
+     ]
+    },
+    {
+     "f": 20000,
+     "type": "note",
+     "track": 0,
+     "rate": 1.0,
+     "gain": 0.9,
+     "pan": 128,
+     "poly": true,
+     "col": 1
+    },
+    {
+     "f": 20500,
+     "type": "note",
+     "track": 0,
+     "rate": 1.5,
+     "gain": 0.9,
+     "pan": 128,
+     "poly": true,
+     "col": 2
+    },
+    {
+     "f": 21000,
+     "type": "note",
+     "track": 0,
+     "rate": 2.0,
+     "gain": 0.9,
+     "pan": 128,
+     "poly": true,
+     "col": 3
+    },
+    {
+     "f": 21500,
+     "type": "note",
+     "track": 0,
+     "rate": 2.5,
+     "gain": 0.9,
+     "pan": 128,
+     "poly": true,
+     "col": 4
+    },
+    {
+     "f": 26000,
+     "type": "off",
+     "track": 0,
+     "cols": [
+      3
+     ]
+    },
+    {
+     "f": 40000,
+     "type": "stopAll"
+    }
+   ]
+  },
+  {
+   "id": "gm_lead_cut_rel",
+   "font": "gm",
+   "pad": {
+    "bank": 0,
+    "prog": 80,
+    "velo": 1
+   },
+   "frames": 50000,
+   "tracks": 2,
+   "kit": {
+    "syn": true
+   },
+   "events": [
+    {
+     "f": 0,
+     "type": "note",
+     "track": 0,
+     "rate": 1,
+     "gain": 0.3,
+     "pan": 128,
+     "poly": false,
+     "col": 0,
+     "cutF": 6000
+    },
+    {
+     "f": 1000,
+     "type": "note",
+     "track": 1,
+     "rate": 1,
+     "gain": 1.0,
+     "pan": 128,
+     "poly": false,
+     "col": 0,
+     "relF": 9000
+    },
+    {
+     "f": 9000,
+     "type": "note",
+     "track": 0,
+     "rate": 0.5,
+     "gain": 0.6,
+     "pan": 128,
+     "poly": false,
+     "col": 0
+    },
+    {
+     "f": 15000,
+     "type": "mod",
+     "track": 0,
+     "gain": 0.5,
+     "relF": 16000
+    }
+   ]
+  },
+  {
+   "id": "syn_layers_all",
+   "font": "syn",
+   "pad": {
+    "bank": 0,
+    "prog": 0,
+    "velo": 0.9
+   },
+   "frames": 80000,
+   "tracks": 3,
+   "kit": {
+    "syn": true
+   },
+   "events": [
+    {
+     "f": 0,
+     "type": "note",
+     "track": 0,
+     "rate": 1,
+     "gain": 0.9,
+     "pan": 128,
+     "poly": false,
+     "col": 0
+    },
+    {
+     "f": 1000,
+     "type": "note",
+     "track": 1,
+     "rate": 0.5,
+     "gain": 0.8,
+     "pan": 60,
+     "poly": false,
+     "col": 0
+    },
+    {
+     "f": 2000,
+     "type": "note",
+     "track": 2,
+     "rate": 2.0,
+     "gain": 1.0,
+     "pan": 200,
+     "poly": false,
+     "col": 0
+    },
+    {
+     "f": 12000,
+     "type": "note",
+     "track": 0,
+     "rate": 1.4983070768766815,
+     "gain": 0.4,
+     "pan": 128,
+     "poly": true,
+     "col": 0
+    },
+    {
+     "f": 12500,
+     "type": "note",
+     "track": 0,
+     "rate": 1.122462048309373,
+     "gain": 0.9,
+     "pan": 128,
+     "poly": true,
+     "col": 1
+    },
+    {
+     "f": 20000,
+     "type": "mod",
+     "track": 0,
+     "gain": 0.3,
+     "pan": 10,
+     "mul": 1.2
+    },
+    {
+     "f": 30000,
+     "type": "off",
+     "track": 0,
+     "cols": [
+      0
+     ]
+    },
+    {
+     "f": 40000,
+     "type": "off",
+     "track": 1
+    },
+    {
+     "f": 45000,
+     "type": "note",
+     "track": 1,
+     "rate": 1,
+     "gain": 0.95,
+     "pan": 128,
+     "poly": false,
+     "col": 0,
+     "vib": {
+      "spd": 8,
+      "dep": 15,
+      "t1F": 60000
+     }
+    },
+    {
+     "f": 46000,
+     "type": "note",
+     "track": 2,
+     "rate": 1.5,
+     "gain": 0.9,
+     "pan": 128,
+     "poly": false,
+     "col": 0,
+     "bend": {
+      "mul": 0.5,
+      "t1F": 60000
+     }
+    },
+    {
+     "f": 65000,
+     "type": "stp",
+     "track": 0,
+     "all": true
+    }
+   ]
+  },
+  {
+   "id": "syn_drums",
+   "font": "syn",
+   "pad": {
+    "bank": 128,
+    "prog": 0,
+    "len": 0.3
+   },
+   "frames": 40000,
+   "tracks": 2,
+   "kit": {
+    "syn": false,
+    "choke": 2
+   },
+   "events": [
+    {
+     "f": 100,
+     "type": "note",
+     "track": 0,
+     "rate": 0.25,
+     "gain": 1.0,
+     "pan": 128,
+     "poly": false,
+     "col": 0
+    },
+    {
+     "f": 2500,
+     "type": "note",
+     "track": 1,
+     "rate": 0.2672,
+     "gain": 0.8,
+     "pan": 128,
+     "poly": false,
+     "col": 0
+    },
+    {
+     "f": 5200,
+     "type": "note",
+     "track": 0,
+     "rate": 0.2972,
+     "gain": 0.7,
+     "pan": 128,
+     "poly": false,
+     "col": 0
+    },
+    {
+     "f": 9000,
+     "type": "note",
+     "track": 1,
+     "rate": 0.25,
+     "gain": 1.0,
+     "pan": 128,
+     "poly": false,
+     "col": 0
+    }
+   ]
+  },
+  {
+   "id": "syn_stereo_pair",
+   "font": "syn",
+   "pad": {
+    "bank": 0,
+    "prog": 1,
+    "velo": 0.2
+   },
+   "frames": 50000,
+   "tracks": 1,
+   "kit": {
+    "syn": true
+   },
+   "events": [
+    {
+     "f": 0,
+     "type": "note",
+     "track": 0,
+     "rate": 0.9,
+     "gain": 0.5,
+     "pan": 128,
+     "poly": false,
+     "col": 0
+    },
+    {
+     "f": 9000,
+     "type": "note",
+     "track": 0,
+     "rate": 0.8,
+     "gain": 0.99,
+     "pan": 128,
+     "poly": true,
+     "col": 0
+    },
+    {
+     "f": 14000,
+     "type": "note",
+     "track": 0,
+     "rate": 1.0,
+     "gain": 0.1,
+     "pan": 128,
+     "poly": true,
+     "col": 2
+    },
+    {
+     "f": 20000,
+     "type": "note",
+     "track": 0,
+     "rate": 1.3,
+     "gain": 0.6,
+     "pan": 128,
+     "poly": true,
+     "col": 1
+    },
+    {
+     "f": 22000,
+     "type": "note",
+     "track": 0,
+     "rate": 1.6,
+     "gain": 0.8,
+     "pan": 128,
+     "poly": true,
+     "col": 0
+    },
+    {
+     "f": 30000,
+     "type": "off",
+     "track": 0
+    }
+   ]
+  }
+ ]
+}

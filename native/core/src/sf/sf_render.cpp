@@ -47,7 +47,8 @@ size_t sf_render(const Font& f, const PresetPcm& pcm, const PadParams& P, double
   for (int pi = 0; pi < S.np; pi++) {
     const Pcm& a = *pcm.get(S.picks[pi].z->s); const VoiceParams& v = vo[pi]; const double rel = rels[pi];
     const double ratio = js_pow(2, ((key - v.root) * v.scale / 100 + v.tune) / 12) * a.sr / sr;
-    const bool loop = v.modes == 1 || v.modes == 3; const double ls = a.ls, le = a.le; const float* d = a.d.data(); const double len = (double)a.d.size();
+    const double ls = a.ls, le = a.le; const bool loop = (v.modes == 1 || v.modes == 3) && ls >= 0;   // (ls >= 0: a loop that starts before the sample would read index -1; the JS reads undefined there)
+    const float* d = a.d.data(); const double len = (double)a.d.size();
     const double lg = js_pow(10, -v.atten / 200), sus = js_pow(10, -v.v.sus / 200); const auto& E = v.v;
     double pos = 0;
     for (size_t i = 0; i < N; i++) {
