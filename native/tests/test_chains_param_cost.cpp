@@ -23,7 +23,8 @@ static int g_on = 0; static unsigned long g_cnt = 0;
 #include "chains/chains.h"
 #include "rt/json.h"
 using namespace thunder; using namespace thunder::chains;
-int main() {
+int main(int argc, char** argv) {
+  const int NCAB = argc > 1 ? std::atoi(argv[1]) : 16000;   // (loading is quadratic in the cables: compile() after each one; 16000 takes about 35 s, so ctest uses 4000)
   const int NV = 510, NS = 510; std::string mods = "{\"modules\":[{\"id\":\"a\",\"type\":\"trackIn\",\"params\":{\"track\":1}},{\"id\":\"c\",\"type\":\"chainOut\",\"params\":{\"track\":1}},{\"id\":\"d\",\"type\":\"chainOut\",\"params\":{\"track\":2}}";
   for (int i = 0; i < NV; i++) mods += ",{\"id\":\"v" + std::to_string(i) + "\",\"type\":\"vca\"}";
   for (int i = 0; i < NS; i++) mods += ",{\"id\":\"s" + std::to_string(i) + "\",\"type\":\"scout\",\"params\":{\"snd\":" + std::to_string(1 + i % 8) + "}}";
@@ -31,7 +32,7 @@ int main() {
   std::set<std::tuple<int, int, int, int>> seen; std::string cab; int nc = 0; uint32_t r = 12345; auto rnd = [&](int n) { r = r * 1664525u + 1013904223u; return (int)((r >> 8) % (uint32_t)n); };
   auto name = [&](int m) { return m == 0 ? std::string("a") : m <= NV ? "v" + std::to_string(m - 1) : "s" + std::to_string(m - NV - 1); };
   // module index space: 0 = a, 1..NV = vca, NV+1..NV+NS = scouts. From: a.out or a vca's out; to: a vca's in / cv or a scout's in / inR.
-  while (nc < 16000) {
+  while (nc < NCAB) {
     const int f = rnd(NV + 1), t = 1 + rnd(NV + NS); const bool tv = t <= NV; const int tp = rnd(2); const int key = f * 2;
     if (!seen.insert({f, 0, t, tp}).second) continue; (void)key;
     cab += (nc ? "," : "") + std::string("{\"from\":[\"") + name(f) + "\",\"out\"],\"to\":[\"" + name(t) + "\",\"" + (tv ? (tp ? "cv" : "in") : (tp ? "inR" : "in")) + "\"]}"; nc++;
