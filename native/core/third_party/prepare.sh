@@ -300,8 +300,10 @@ PY
 #   rings/dsp/resonator.cc  line 57   Interpolate(lut_stiffness, structure_, 256.0f)       lut_stiffness has 257 floats      trigger: structure == 1
 #   rings/dsp/resonator.cc  line 60   Interpolate(lut_4_decades, damping_, 256.0f)         lut_4_decades has 257 floats      trigger: damping == 1
 #   clouds/dsp/granular_processor.cc lines 278-279  Interpolate(lut_xfade_in / lut_xfade_out, dry_wet, 16.0f)   17 floats each   trigger: dry/wet == 1
+#   clouds/dsp/granular_sample_player.h line 188  Interpolate(lut_grain_size, parameters.size, 256.0f)   257 floats   trigger: size == 1
+#   beads/dsp/delay_controller.h lines 94, 104, 154  Interpolate(slave_envelopes / pw, shape, 5.0f)   6 floats each (local arrays)   trigger: shape == 1
 #   warps/dsp/modulator.cc  lines 167-168 and 362-363  Interpolate(lut_xfade_in / lut_xfade_out, timbre / parameter, 256.0f)   257 floats each   trigger: timbre / the cross-fade parameter == 1
-python3 - "$E/stmlib/dsp/dsp.h" "$E/rings/dsp/resonator.cc" "$E/clouds/dsp/granular_processor.cc" "$E/warps/dsp/modulator.cc" <<'PY'
+python3 - "$E/stmlib/dsp/dsp.h" "$E/rings/dsp/resonator.cc" "$E/clouds/dsp/granular_processor.cc" "$E/warps/dsp/modulator.cc" "$E/clouds/dsp/granular_sample_player.h" "$E/beads/dsp/delay_controller.h" <<'PY'
 import sys
 def sub(p, pairs):
     s=open(p).read()
@@ -309,7 +311,7 @@ def sub(p, pairs):
         if s.count(old)!=cnt: sys.exit(p+" InterpolateTop patch failed: "+old)
         s=s.replace(old,new)
     open(p,'w').write(s)
-h,r,c,w=sys.argv[1:5]
+h,r,c,w,g,b=sys.argv[1:7]
 sub(h,[("inline float Interpolate(const float* table, float index, float size) {",
 """// Thunder (prepare.sh): Interpolate for an index that can be exactly 1.0 (index * size == size): the fraction is 0, so table[size] is the result and table[size + 1] (past the table) is not read
 inline float InterpolateTop(const float* table, float index, float size) {
@@ -327,6 +329,8 @@ sub(r,[("Interpolate(lut_stiffness, structure_, 256.0f)","InterpolateTop(lut_sti
 sub(c,[("Interpolate(lut_xfade_in, dry_wet, 16.0f)","InterpolateTop(lut_xfade_in, dry_wet, 16.0f)",1),("Interpolate(lut_xfade_out, dry_wet, 16.0f)","InterpolateTop(lut_xfade_out, dry_wet, 16.0f)",1)])
 sub(w,[("Interpolate(lut_xfade_in, lut_index, 256.0f)","InterpolateTop(lut_xfade_in, lut_index, 256.0f)",1),("Interpolate(lut_xfade_out, lut_index, 256.0f)","InterpolateTop(lut_xfade_out, lut_index, 256.0f)",1),
        ("Interpolate(lut_xfade_in, parameter, 256.0f)","InterpolateTop(lut_xfade_in, parameter, 256.0f)",1),("Interpolate(lut_xfade_out, parameter, 256.0f)","InterpolateTop(lut_xfade_out, parameter, 256.0f)",1)])
+sub(g,[("Interpolate(lut_grain_size, parameters.size, 256.0f)","InterpolateTop(lut_grain_size, parameters.size, 256.0f)",1)])
+sub(b,[("stmlib::Interpolate(slave_envelopes, shape, 5.0f)","stmlib::InterpolateTop(slave_envelopes, shape, 5.0f)",1),("stmlib::Interpolate(pw, shape, 5.0f)","stmlib::InterpolateTop(pw, shape, 5.0f)",2)])
 PY
 # Cloud Seed: smaller delay buffers than the original (192 kHz, ~67 MB per instance), but, unlike the web's tfx/build.sh (32768 and 2400, which cover 48 kHz at best), sized for 96 kHz so that no tap reads
 # or writes outside its own buffer at any rate the native core runs it at (U30): the late lines (1.5 x 530 ms = 795 ms = 76k samples at 96 kHz) and the multitap (up to 1 s) get 131072, the allpass

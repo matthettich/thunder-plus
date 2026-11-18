@@ -42,7 +42,7 @@ static std::string randomPatch(int level) {
     const char* type = bad ? (ri(2) ? "nonsense" : "constructor") : simple ? "atten" : w.type;
     s += std::string(i ? "," : "") + "{\"id\":\"" + id + "\",\"type\":\"" + type + "\",\"params\":{";
     bool f = true;
-    for (int k = 0; k < w.np && !simple; k++) if (ri(3) == 0) { s += std::string(f ? "" : ",") + "\"" + w.params[k].name + "\":" + (ri(4) ? num(w.params[k].mn + (w.params[k].mx - w.params[k].mn) * (rnd() / 4294967296.0)) : num(rv())); f = false; }
+    for (int k = 0; k < w.np && !simple; k++) if (ri(3) == 0) { s += std::string(f ? "" : ",") + "\"" + w.params[k].name + "\":" + (ri(4) ? (ri(6) == 0 ? num(ri(2) ? w.params[k].mx : w.params[k].mn) : num(w.params[k].mn + (w.params[k].mx - w.params[k].mn) * (rnd() / 4294967296.0))) : num(rv())); f = false; }
     s += "}";
     if (w.flags & kWF_Text) s += ",\"text\":\"" + textJunk() + "\"";
     s += "}";
