@@ -363,3 +363,23 @@ N1 step 10.
   into the PDC plan; a NoteOff must never be dropped on queue overflow (reserve room or coalesce), else a note sticks.
 - **Engine units merged: U22 to U29 and U33 (all but U26's wiring).** Left in N3: U30 …waves, U31 …chains (Sonnet builds, lead reviews; the big ones), U32
   SoundFont (owner's licence decision), U04 LXR module, U36. The lead's own: N1 steps 10 and 11 (U34, U35, U37). 29 of 37 units merged.
+- **State at 18:50, 17 Nov.** **Web:** build 638 went to `main` at the owner's word (16:22). **Build 639 on `beta` and `main` (#215, #216):** the Chains and
+  Waves editors were blank and dead on every build from about 620 to 638: a regex literal in `chains/index.html` and `waves/index.html` held raw U+2028 /
+  U+2029 (commit a64c7de0, the Send / Receive work), a syntax error that stopped the whole editor script. Reproduced in headless Chrome with the owner's song;
+  fixed; `tests/pages-parse.test.js` now compiles every inline script of the three pages. The owner's song is the first-open default
+  (`sounds/BETA-TESTING-ELECTRO.thunder`; `sounds/ELECTRO.thunder` untouched: native tests use it). **The desktop app (v1.3.11, build 634) still has the fault:
+  the owner was asked whether to cut v1.3.12 from `main` at 639; no answer yet.** A separate agent of the owner's is fixing the pump synth defects in the pump
+  repo; when he gives the new pump commit: re-pin native and the web app, drop the native-side patches.
+- **Native merged since 15:05: #212 U04 LXR** as a separable GPL module (seam `thunder/lxr_seam.h`; `THUNDER_WITH_LXR=OFF` builds and refuses LXR, checked in
+  CI; `lxr.wasm` is reproducible from the repo; six defects in the LXR source patched in the build copy only). **Gate, Fable's class rule: LXR parity is
+  "within -60 dB by class"** (76 exact; 711 pass the rule with RMS within 0.1 dB and equal length, worst -60.5 dB; 31 beyond -60 dB left out by name with a
+  structural check). Distribution: at the raw int16 stage 690 of 742 within 4 steps; finished sound 573 below -70 dB. **Needs the owner's ears on a kit.**
+- **#214 U30 …waves engine: reviewed by Fable, NOT merged yet.** Confirmed: the offline engine (both `waves-processor.json` rows exact, 666 cases, 16 of 16
+  mutations, live = render after a 127-sample delay at every host block size), the live runner's design. Sent back: (A) no sanitizer-only workarounds: patch the
+  Rings / Clouds / Beads / Warps table reads in `prepare.sh` for every build; (B) Cloud Seed above 48 kHz reads outside its buffers (a web finding too): size
+  the buffers for the rate natively or bypass in every build, by name; (C) the 76 inexact effect cases get the -100 dB rule against Node on x86-64 Linux in CI
+  and a committed RMS / length check elsewhere, not a switch CI does not set. Conditions for the wiring: Expression compiled at patch preparation; Marbles'
+  re-make at arm must not allocate.
+- **Running (Sonnet):** the U30 changes (`n3/u30`); follow-ups from the U33 and U25 verifications (`n1/followups`: the insertion-sort patch so pump synths do
+  not allocate on blocks with events, cases for four uncaught mutations, the not-built refusal test, U25 notes and guard items). **Next:** U31 …chains engine
+  once U30 is merged (it uses U30's `Graph`). Units merged: 30 of 37 (U04, U22 to U29, U33 added since the morning of 16 Nov).
