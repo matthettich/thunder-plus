@@ -9023,6 +9023,7 @@ function noteRate(semis){
 // Glide ramps the pitch from the previous note; Mono + Legato retunes the sounding note instead of
 // retriggering, so a melody played legato slides between notes.
 function holdNote(i, semis, vel = 1){
+  psHit();   // FREEZE's idle warm-up waits 3 s after any trigger
   audio();
   const kv = kit.voices[i], gl = Math.max(0, kv.glide || 0) / 1000, leg = !!kv.legato, mono = !!kv.mono, r = noteRate(semis), t = ctx.currentTime;
   const prev = synHeld[i];
@@ -9047,6 +9048,7 @@ function releaseNote(h, at){
   try { h.g.gain.cancelScheduledValues(t); h.g.gain.setValueAtTime(h.g.gain.value, t); h.g.gain.setTargetAtTime(0, t, rel / 4.6); h.src.stop(t + rel * 1.6 + 0.05); } catch(e){}
 }
 function play(i, vel = 1){
+  psHit();   // FREEZE's idle warm-up waits 3 s after any trigger
   audio();
   if (isSyn(i)){ stopVoice(i); const h = holdNote(i, 0, vel); playing[i] = h; releaseNote(h, ctx.currentTime + kit.voices[i].gate / 1000); return; }
   const v = kit.voices[i];
@@ -14536,6 +14538,7 @@ function flash(i){ audioWake = performance.now(); const p = padEls[i].p; p.class
 function select(i){ if (i === cur) return; audDrop(); cur = i; refreshAll(); }   // audDrop: an audition waiting on the pad before must not play this one
 const padHeld = [];
 function padPress(i, held){
+  psHit();   // FREEZE's idle warm-up waits 3 s after any trigger
   // select first: a pad that fails to sound (no audio yet, a render error) is still picked for editing
   if (held && isSyn(i) && !midi.learn){ select(i); if (padHeld[i]) releaseNote(padHeld[i]); padHeld[i] = holdNote(i, 0, 1); return; }
   if (midi.learn){ midi.target = i; midi.ccTarget = ''; select(i); renderPads(); ccBadges(); midiStatus(`Now hit a note on the controller for pad ${hx(i)}` + (midi.notes[i] >= 0 ? ` (now ${noteName(midi.notes[i])}; Unlearn clears it).` : '.')); return; }
@@ -17409,6 +17412,7 @@ function clkFrom(src){
   return false;
 }
 function onMidi(e, src){
+  psHit();   // FREEZE's idle warm-up waits 3 s after any trigger
   const [st, d1, d2] = e.data; if (!st) return;
   src = src || '';
   if (st >= 0xF8){ if (st !== 0xFE && st !== 0xFF && clkFrom(src)) clkIn(st, e.timeStamp || performance.now()); return; }   // clock, Start, Continue, Stop
@@ -22814,6 +22818,7 @@ function makePlayer(ac, out, getBuf, live, mo){   // mo: the master OUT gain (af
   }
   function play(ev){
     if (MIDI_ONLY_EV.has(ev.type)) return;
+    psHit();
     if (ac === ctx && (ev.type === 'fxc' || ev.type === 'fxreset' || ev.type === 'beat')) fxcNote(ev);   // FX BAR (live player only; core:true ones come through coreMsg)   // CC and program change: for MIDI gear only (renders pass them here too)
     if (ev.type === 'tempo'){ tempoTo(ev); return; }
     if (ev.type === 'beat'){
@@ -23735,24 +23740,33 @@ const PSYN_WK = 'pump/synth/pump-synth-worklet.js?v=13', psOK = new WeakSet(), p
    while a tail rings. UNTIL IT HAS HAPPENED, FREEZE PADS PLAY THEIR RENDER (psNode returns null for a live FREEZE node in a context not in psWarm).
    - Who asks: psWarmSoon(), from a song change (liveWarmSoon), a kit load (setKit), any sound edit (changed(): a pad switched to FREEZE), STOP.
      A kit with a live FREEZE pad, used or not, pays it (about 0.9 s and 11 MiB once per page); a kit without one pays nothing.
-   - When it runs (psWarmTick, every 100 ms once asked): not playing (tp.on) and not starting or restarting (psGoT: tStart stamps it, so PLAY
-     again and a jump to another row mid-song count as playing; STOP clears it), no sample recording (RCD.on), the audio running, and the
-     master's analysers below -70 dBFS (peak 0.00032) for 0.5 s in a row (5 ticks). Without a level source it waits 4 s of stopped time.
+   - When it runs (psWarmTick, one tick every 0.5 s, shorter only if the sample rate is above 65 kHz: the tick is shorter than a dedicated 32768-sample analyser on
+     `master`, so every tick sees ALL the sound since the last one, sparse echoes included): not playing (tp.on) and not starting or restarting (psGoT: tStart
+     stamps it, so PLAY again and a jump to another row mid-song count as playing; STOP clears it), no sample recording (RCD.on), the audio running, NOTHING above -70 dBFS
+     (peak 0.00032) for 3 s in a row (any louder tick starts the 3 s again) AND 3 s since the last trigger (psHit, psHitT). Triggers, the entry points of sound while
+     stopped: any pointerdown / touchstart / keydown (touch, mouse, keyboard hits, preview / audition buttons, Measure, the metronome, record arm: all begin with one),
+     `onMidi` (MIDI in), `play` and `padPress` (pads), `holdNote`, `preview`, the player's note function (`makePlayer`'s `play(ev)`), and any audio-context state change
+     or a tick that finds the context not running (a resume: phone screen back on, tab refocused). Without a level source it waits the same 3 s with no trigger.
    - What it does: one silent throwaway FREEZE node (psWarmUp) that the worklet answers with {opened:1} once its psyn_new has returned: then
      psWarm has the context and the throwaway is disposed. {failed}: the context is NOT marked warm (the render keeps playing), psWarming is
-     cleared and it tries again after 3 s, 6 s, 12 s (3 attempts; the next song / kit change starts again). No answer in 10 s: the same.
+     cleared and it tries again 3 s later, then 6 s later, then stops (three attempts in all; the next song / kit change starts again). No answer in 10 s: the same.
    - An offline export context (not ctx) always has live nodes: it has the time. */
 const psWarm = new WeakSet(), psWarming = new WeakSet();
 var psGoT = 0, psKeep = false, psWarmT = 0, psQ = 0, psWait = 0, psFails = 0;   // psGoT: when tStart last ran (ms); psKeep: tStart's own tStop(true) must not clear it
-const PS_GO_MS = 3000, PS_QUIET = 3.2e-4, PS_QUIET_TICKS = 5, PS_TIMEOUT = 10000;
+const PS_GO_MS = 3000, PS_QUIET = 3.2e-4, PS_QUIET_MS = 3000, PS_TIMEOUT = 10000;
 const psIsFreeze = kind => kind === 'pfreezel';
 const psFreezeDefer = (kind, warmed) => psIsFreeze(kind) && !warmed;   // true: make no live node, play the render
 const psBusy = () => !!tp.on || (performance.now() - psGoT < PS_GO_MS);   // playing, or PLAY / a restart is under way
 const psNeeds = () => !!(ctx && rt && !psWarm.has(ctx) && !psWarming.has(ctx) && psFails < 3 && !psLive.off && aset.psLive !== 'render' && kit.voices.some(v => isPsV(v) && psIsFreeze(v.engine)));
-let psBuf = null;
-function psQuietNow(){   // true quiet, false sounding, null: no level source
-  if (!(rt && rt.man && rt.man.length)) return null;
-  for (const an of rt.man){ const n = an.fftSize; if (!psBuf || psBuf.length < n) psBuf = new Float32Array(n); an.getFloatTimeDomainData(psBuf); for (let i = 0; i < n; i++) if (psBuf[i] > PS_QUIET || psBuf[i] < -PS_QUIET) return false; }
+let psBuf = null, psAn = null, psSC = null;
+var psHitT = 0;   // when something last made, or may be about to make, sound while stopped (psHit), or the audio context last changed state
+function psHit(){ psHitT = performance.now(); }
+const psTickMs = () => Math.max(100, Math.min(500, Math.floor(32768 / ((ctx && ctx.sampleRate) || 48000) * 900)));   // the analyser's window (32768 samples) is longer than a tick: every tick sees ALL the sound since the last one
+function psQuietNow(){   // true: nothing above -70 dBFS since the last tick; false: sound; null: no level source
+  if (!(rt && ctx && master)) return null;
+  if (!psAn || psAn.context !== ctx){ psAn = ctx.createAnalyser(); psAn.fftSize = 32768; psAn.smoothingTimeConstant = 0; master.connect(psAn); psBuf = new Float32Array(32768); return false; }   // (a fresh analyser has not seen a tick yet)
+  psAn.getFloatTimeDomainData(psBuf); const n = psBuf.length;
+  for (let i = 0; i < n; i++) if (psBuf[i] > PS_QUIET || psBuf[i] < -PS_QUIET) return false;
   return true;
 }
 function psWarmSoon(ms, fresh){   // ask for the idle warm-up (cheap when nothing is needed); fresh: a song / kit change, the failures are forgotten
@@ -23762,16 +23776,18 @@ function psWarmTick(){
   psWarmT = 0;
   try {
     if (!psNeeds()) return;
-    if (++psWait > 3000) return;   // (about 15 minutes of waiting: the next song / kit change asks again)
-    const q = psBusy() || (RCD && RCD.on) || !ctx || ctx.state !== 'running' ? false : psQuietNow();
-    if (q === false){ psQ = 0; psWarmT = setTimeout(psWarmTick, 300); return; }   // busy or sounding: look again soon
-    if (++psQ < (q === null ? 40 : PS_QUIET_TICKS)){ psWarmT = setTimeout(psWarmTick, 100); return; }
+    if (++psWait > 1800) return;   // (about 15 minutes of waiting: the next song / kit change asks again)
+    if (ctx && psSC !== ctx){ psSC = ctx; ctx.addEventListener('statechange', () => { psHit(); psQ = 0; }); }   // a resume (a phone's screen back on, a tab refocused) counts as a trigger
+    const tick = psTickMs(), notRun = !ctx || ctx.state !== 'running'; if (notRun) psHit();
+    const q = psQuietNow();   // read at EVERY tick (also while busy): it is all the sound since the last tick, so the 3 s have no blind spot
+    if (q === false || psBusy() || notRun || (RCD && RCD.on)){ psQ = 0; psWarmT = setTimeout(psWarmTick, tick); return; }   // busy, or sound since the last tick: the 3 s of quiet start again
+    if (++psQ * tick < PS_QUIET_MS || performance.now() - psHitT < PS_QUIET_MS){ psWarmT = setTimeout(psWarmTick, tick); return; }   // 3 s of quiet AND 3 s since the last trigger (null: no level source, the same 3 s)
     if (!psWarmUp(ctx)) psWarmT = setTimeout(psWarmTick, 2000);   // (the pump worklet is not loaded yet, or the kit has changed)
   } catch(e){ tpLog('pump FREEZE warm-up', e); }
 }
 function psWarmUp(ac){   // a throwaway FREEZE node in ac's pump-synth scope (no sound: it is not played, and goes away when its instrument is made)
   try {
-    if (ac !== ctx || psBusy() || psWarm.has(ac) || psWarming.has(ac) || !psOK.has(ac) || psLive.off || aset.psLive === 'render') return false;
+    if (ac !== ctx || psBusy() || performance.now() - psHitT < PS_QUIET_MS || psWarm.has(ac) || psWarming.has(ac) || !psOK.has(ac) || psLive.off || aset.psLive === 'render') return false;
     if (!kit.voices.some(v => isPsV(v) && psIsFreeze(v.engine))) return false;
     const sp = PsynCore.liveSpec('pfreezel'), by = PsynCore.bytes(); if (!sp || !by) return false;
     const node = new AudioWorkletNode(ac, 'thunder-psyn', {numberOfInputs:0, numberOfOutputs:1, outputChannelCount:[2],
@@ -23865,6 +23881,7 @@ function liveWarm(max){ if (!rt || !ctx) return 0; if (wkLazy() && !bassLoad.has
 // worklets are loaded and the live engines' nodes made: PLAY needn't wait for them (BATTERY: hidden and idle, it suspends).
 { const go = () => { removeEventListener('pointerdown', go, true); removeEventListener('keydown', go, true); setTimeout(() => { try { if (!rt) rtInit(); } catch(e){ tpLog('early engine start', e); } }, 0); };
   addEventListener('pointerdown', go, true); addEventListener('keydown', go, true); }
+for (const ev of ['pointerdown', 'touchstart', 'keydown']) addEventListener(ev, psHit, true);   // FREEZE's idle warm-up: a touch, click or key press is a trigger
 function liveWarmSoon(ms){ psWarmSoon(ms ? Math.max(ms, 600) : 1500, true); clearTimeout(liveWarmT); liveWarmT = setTimeout(() => { liveWarmT = 0; if (!tp.on && rt) liveWarm(); }, ms || 1200); }
 const isBassPad = i => isSyn(i) && isBassV(kit.voices[i]);
 // Synth slots the tracker plays through a live engine node (bass or voice) rather than a rendered buffer.
@@ -25163,6 +25180,7 @@ document.addEventListener('visibilitychange', () => { if (!document.hidden && tp
 // so letting one key go leaves the others sounding. Drum pads ring out as before.
 let pvHoldN = 0;
 function preview(ii, note, vol, poly, when, hold, trk){   // trk: a track to sound through (its mixer, chains and FX); none: the dry preview
+  psHit();
   audioWake = performance.now();
   const r = rtInit(), I = S.insts[ii] || S.insts[0], t = (when || ctx.currentTime) + 0.005, col = hold ? 'h' + (++pvHoldN) : undefined, tr = trk >= 0 && trk < NT ? trk : NT;
   const ev = {type:'note', t, track:tr, poly:!!poly, col, pad:I.pad, rate:Math.pow(2, (note + I.tsp - ROOT) / 12),
