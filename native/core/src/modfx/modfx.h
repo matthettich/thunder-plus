@@ -84,6 +84,10 @@ class Module {
   // U30: the …waves engine makes a module's object ahead of its first block (the JS makes it at the first block, drawing its seeds then, in the order the modules first run). A module that draws
   // a seed in its constructor (nextSeed()) takes it again here, from the real counter, at the moment the JS's create() would have run; the constructor got a placeholder.
   virtual void arm(Seeds&) {}
+  // U31: called on the control thread, once the patch is prepared, with the module's parameter values as the patch sets them (the pump modules make their instances with them here, as the JS stages them at the first block).
+  virtual void prepare(const double* /*p*/) {}
+  // U31: called by the control thread regularly (ChainsEngine::serviceSpares): the pump modules keep a spare instance current here.
+  virtual void service() {}
  protected:
   virtual void process(const IO& io, const Ctx& c) = 0;
  private:

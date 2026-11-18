@@ -29,6 +29,9 @@ using waves::Quality;
 using waves::Transport;
 using waves::WCtx;
 using waves::WInfo;
+using modfx::ParamDef;
+using modfx::PortDef;
+using waves::kWF_Destroy; using waves::kWF_Effect; using waves::kWF_PlaysNotes; using waves::kWF_Probe; using waves::kWF_Show; using waves::kWF_Tail; using waves::kWF_Text;
 
 constexpr int kBlock = 128;          // BLOCK
 constexpr int kChannels = 128;       // CHAN_COUNT: the tracks a patch can address (Track In, Chain Out, Sidechain In's Source)
@@ -43,10 +46,12 @@ const WInfo* cinfo(std::string_view type);
 int cinfo_count();
 const WInfo& cinfo_at(int i);
 const modfx::Def* cdef(std::string_view type);
-bool chains_type_is_lib(std::string_view type);   // a module built from a strict upstream library (the tfx effects, the pump modules, Marbles / Tides): not bit-exact with the web's fast-math wasm
+bool chains_type_is_lib(std::string_view type);
+const waves::ModTable& chainsTable();
+void resample_release(const struct ResampleTake& t);   // cmods2.cpp   // a module built from a strict upstream library (the tfx effects, the pump modules, Marbles / Tides): not bit-exact with the web's fast-math wasm
 
-// A finished Resample take handed to the host (the JS's ctx.engine.onResample): the buffers belong to the module until releaseTake(token).
-struct ResampleTake { char id[48]; const float* L; const float* R; int n; double sr; int bars; double tempo; int pad; int slices; int token; };
+// A finished Resample take handed to the host (the JS's ctx.engine.onResample): the buffers belong to the module until releaseTake().
+struct ResampleTake { char id[48]; const float* L; const float* R; int n; double sr; int bars; double tempo; int pad; int slices; void* owner; int which; };   // owner / which: the module and the buffer pair, for releaseTake
 
 // What the …chains-only modules reach (the JS's ctx members): set by the engine for every block.
 struct CCtx : WCtx {
@@ -91,6 +96,7 @@ class ChainsEngine {
   void setTrackInputs(const float* L, const float* R, int channels) { trackL_ = L; trackR_ = R; trackChans_ = channels; }
   void setSidechain(const float* L, const float* R, int n);   // the host's input 1 (stereo); no module of the JS reads it, kept as the JS has it
   void setTaps(const float* const* taps, int n);               // input 2: the tracks' own sounds, one channel each (null: none)
+  void endStandaloneBlock();   // ChainsProcessor's p1 after process(): the sends of this block become the next block's Sidechain In input (one block late, as the JS)
   void setSendIn(const float* const* sends, int n);            // input 3: the sends of every chain, one channel each (null entries: silence)
   void setBypassSwitch(int n, double v) { if (n >= 1 && n <= kBypSwitches) bsw_[n] = v; }   // the tracker's BYP switches: -1 the patch's own, 0 in, 1 bypassed, 2 flipped
   bool process(int frames = kBlock);   // false: refused (frames outside 0..128) or a module failed (the buses are cleared, as the worklet's catch does)
@@ -100,7 +106,7 @@ class ChainsEngine {
   const int* writtenBuses(int* n) const { *n = nbw_; return bwl_; }   // the buses written this block, in the order they were first written (ChainsProcessor sums them in this order)
   // Resample's takes (control thread): the take the audio thread finished, and giving its buffers back
   bool popTake(ResampleTake* t);
-  void releaseTake(int token);
+  void releaseTake(const ResampleTake& t);
   // ---- inspection (tests) ----
   std::vector<std::string> order() const;
   std::vector<waves::Cable> cables() const;
@@ -124,18 +130,21 @@ class ChainsEngine {
   uint64_t audioRemakes() const { return audioRemakes_.load(); }   // pump_new on the audio thread: 0 here, always (a swap needs no allocation; with no spare left the module is silenced for the block)
   // ---- live: swap a whole prepared patch in (audio thread, at a block start) ----
   waves::PatchImpl* swapPatch(waves::PatchImpl* p);       // takes p; returns the old one (free it with chains_free_patch on the control thread)
+  void serviceSparesOf(waves::PatchImpl* p);              // the control thread's service of the patch the audio thread runs now
   waves::PatchImpl* preparePatch(Json doc) const;         // off the audio thread: what loadPatch builds, without touching this engine's patch
   friend class ChainsLive;
  private:
-  struct Aux;     // the per-patch things the engine keeps beside the graph (the run list, the bypass numbers)
   struct TakeQ;   // finished Resample takes
   bool render(int frames);
   void refresh();
-  void build();
+  static const float* keyCb(void* user, double sck);
+  void bindCtx();
+  void prepareDerived(waves::PatchImpl& P) const;   // the run list and the bypass numbers of a patch (control thread; allocation-free after compile)
   double sr_; bool valid_ = true; Host* host_; std::unique_ptr<Host> ownHost_;
   Transport transport_; Quality quality_; bool telemetryOn_ = false; int focus_ = -1;
-  std::unique_ptr<waves::PatchImpl> p_; std::unique_ptr<Aux> aux_;
+  std::unique_ptr<waves::PatchImpl> p_;
   std::unique_ptr<float[]> busesL_, busesR_; uint8_t bw_[kChannels] = {}; int bwl_[kChannels] = {}; int nbw_ = 0;
+  float sendPrev_[kSends * kBlock] = {}; bool standalone_ = false; const float* sendInExt_[kSends] = {}; bool sendInSet_ = false;
   float sendOut_[kSends * kBlock] = {}; float zero_[kBlock] = {}; float scL_[kBlock] = {}, scR_[kBlock] = {}; bool scOn_ = false;
   const float* trackL_ = nullptr; const float* trackR_ = nullptr; int trackChans_ = 0;
   const float* sendIn_[kSends] = {}; const float* taps_[kMaxTaps] = {}; int nTaps_ = 0; int16_t tapMap_[kChannels]; bool hasTapMap_ = false;

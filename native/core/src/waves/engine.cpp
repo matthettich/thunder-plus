@@ -97,8 +97,8 @@ void WavesEngine::setText(std::string_view id, std::string_view text) {
 }
 
 // loadPatch's reading of the doc: false = refused (nothing changed)
-static bool readDoc(Json doc, PatchImpl& P, int nVoices, Host*) {
-  (void)nVoices;
+bool readPatchDoc(Json doc, PatchImpl& P, bool chains) {
+  P.chains = chains;
   if (!doc.isObj()) return false;
   Json mj = doc.get("modules"), cj = doc.get("cables");
   const bool hasM = !(mj.missing() || mj.isNull()), hasC = !(cj.missing() || cj.isNull());
@@ -112,7 +112,7 @@ static bool readDoc(Json doc, PatchImpl& P, int nVoices, Host*) {
     if (m.isNull()) return false;
     if (!m.isObj()) continue;
     Json idj = m.get("id"), tj = m.get("type");
-    if (!tj.isStr() || !winfo(tj.asStr())) continue;
+    if (!tj.isStr() || !P.tab->info(tj.asStr())) continue;
     if (!idj.isStr()) return false;
     if (P.find(std::string(idj.asStr()))) cm++;   // (a duplicate id: remove then add, two compiles)
     if (!P.addNode(idj.asStr(), tj.asStr(), m)) return false;
@@ -132,7 +132,7 @@ static bool readDoc(Json doc, PatchImpl& P, int nVoices, Host*) {
     std::unordered_map<std::string, std::string> type;
     for (size_t i = 0; i < nm; i++) { Json m = mj.at(i); if (m.isObj() && m.get("id").isStr()) type[std::string(m.get("id").asStr())] = m.get("type").isStr() ? std::string(m.get("type").asStr()) : std::string(); }
     auto isNew = [](const std::string& t) { return t == "vcf" || t == "vca" || t == "sccomp" || t == "blades" || t == "meta" || t == "phaser"; };
-    auto has = [&](const std::string& id, bool in, const char* port) { auto it = type.find(id); if (it == type.end()) return false; const WInfo* w = winfo(it->second); if (!w) return false; return (in ? wport_in(*w, port) : wport_out(*w, port)) >= 0; };
+    auto has = [&](const std::string& id, bool in, const char* port) { auto it = type.find(id); if (it == type.end()) return false; const WInfo* w = P.tab->info(it->second); if (!w) return false; return (in ? wport_in(*w, port) : wport_out(*w, port)) >= 0; };
     std::vector<std::string> taken;
     auto key = [](Json t) { std::string k; Json a = t.at(0), b = t.at(1); k += a.isStr() ? std::string(a.asStr()) : std::string("\x01"); k += "."; k += portText(b); return k; };
     for (size_t i = 0; i < nc; i++) { Json c = cj.at(i); if (c.isObj() && c.get("to").isArr()) taken.push_back(key(c.get("to"))); }
@@ -148,6 +148,25 @@ static bool readDoc(Json doc, PatchImpl& P, int nVoices, Host*) {
     }
     for (const CableRec& r : add) P.addCable(r, false);
   }
+  // TRACK IN STEREO (…chains only): a Track In whose Out R goes nowhere gets Out R -> In R of every module its Out feeds, where that In R is free (trackInStereoCables)
+  if (chains && !truthyJ(doc.get("ti2")) && hasM && hasC) {
+    std::unordered_map<std::string, std::string> type;
+    for (size_t i = 0; i < nm; i++) { Json m = mj.at(i); if (m.isObj() && m.get("id").isStr()) type[std::string(m.get("id").asStr())] = m.get("type").isStr() ? std::string(m.get("type").asStr()) : std::string(); }
+    auto key = [](Json t) { std::string k; Json a = t.at(0), b = t.at(1); k += a.isStr() ? std::string(a.asStr()) : std::string("\x01"); k += "."; k += portText(b); return k; };
+    auto hasIn = [&](const std::string& id) { auto it = type.find(id); if (it == type.end()) return false; const WInfo* w = P.tab->info(it->second); return w && wport_in(*w, "inR") >= 0; };
+    std::vector<std::string> taken, usedR;
+    for (size_t i = 0; i < nc; i++) { Json c = cj.at(i); if (c.isObj() && c.get("to").isArr()) taken.push_back(key(c.get("to"))); if (c.isObj() && c.get("from").isArr() && c.get("from").at(1).isStr() && c.get("from").at(1).asStr() == "outR") usedR.push_back(c.get("from").at(0).isStr() ? std::string(c.get("from").at(0).asStr()) : std::string("\x01")); }
+    std::vector<CableRec> add;
+    for (size_t i = 0; i < nc; i++) {
+      Json c = cj.at(i); Json f = c.get("from"), t = c.get("to");
+      if (!f.at(1).isStr() || f.at(1).asStr() != "out" || !t.at(1).isStr() || t.at(1).asStr() != "in") continue;
+      const std::string a = f.at(0).isStr() ? std::string(f.at(0).asStr()) : std::string("\x01"), b = t.at(0).isStr() ? std::string(t.at(0).asStr()) : std::string("\x01");
+      auto ta = type.find(a); if (ta == type.end() || ta->second != "trackIn" || std::find(usedR.begin(), usedR.end(), a) != usedR.end()) continue;
+      const std::string tk = b + ".inR";
+      if (hasIn(b) && std::find(taken.begin(), taken.end(), tk) == taken.end()) { taken.push_back(tk); CableRec r; r.a0 = a; r.a1 = "outR"; r.b0 = b; r.b1 = "inR"; add.push_back(r); }
+    }
+    for (const CableRec& r : add) P.addCable(r, false);
+  }
   Json tr = doc.get("transport");
   if (tr.isObj()) {
     P.hasT = true;
@@ -160,7 +179,7 @@ static bool readDoc(Json doc, PatchImpl& P, int nVoices, Host*) {
 PatchImpl* WavesEngine::preparePatch(Json doc) const {
   if (!valid_) return nullptr;
   std::unique_ptr<PatchImpl> P(new PatchImpl(const_cast<WavesEngine*>(this), sr_, voices_.max, host_));
-  if (!readDoc(doc, *P, voices_.max, host_)) return nullptr;
+  if (!readPatchDoc(doc, *P, false)) return nullptr;
   if (!P->sync(false)) return nullptr;
   return P.release();
 }

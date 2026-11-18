@@ -46,6 +46,9 @@ struct ModNode {
   std::vector<GCable> inc; bool linked[modfx::kMaxPorts] = {}; std::vector<int> exits;
   std::vector<Slot> slots; bool slotsMade = false; bool slotsPoly = false; int weight = 1;
   int tailT = -1, tailF = -1, tailD = -1;
+  // U31 (…chains): the bypass state and the patch's own bypass setting (_byp), the module's bypass number as set (_bn), the dry copy kept while bypassing
+  bool bypassed = false; double bypP = 0, bnP = 0; std::vector<float> dry;
+  bool bypOk = false; int pIn = -1, pInR = -1, pOut = -1, pOutR = -1;   // bypOk: In and Out are audio ports (the JS's bypOk); the port numbers the bypass reads
 };
 inline int weightOf(const WInfo& w) {
   const std::string_view t = w.type;
@@ -102,6 +105,8 @@ class PatchImpl {
   int instances = 0, weight = 0; int nMods = 0, nCables = 0;
   bool hasT = false; Transport tpart; bool tTempo = false, tLpb = false, tTicks = false, tPpq = false, tStart = false, tPlaying = false;   // the doc's transport, applied at the swap
   std::vector<float> fbS = std::vector<float>(kBlock);
+  // U31 (…chains): per-patch data the …chains engine computes on the control thread: the run list (focus) and the bypass numbers, by module index; chains: this patch is a …chains one
+  bool chains = false; std::vector<char> act, actTel; bool hasAct = false; std::vector<int> bn; std::vector<char> seen; std::vector<int> stk;   // act: the run list without telemetry, actTel: with it; seen / stk: scratch (sized by compile, so the audio thread allocates nothing)
   // scratch of compile()
   std::vector<int> indeg, q; std::vector<std::vector<int>> adj; std::vector<char> inOrder;
   std::vector<char> cullKeep; std::vector<int> cullStack;   // doCull's scratch, sized by compile() (the audio thread allocates nothing)
@@ -136,6 +141,7 @@ class PatchImpl {
       for (int nx : adj[(size_t)k]) if (--indeg[(size_t)nx] == 0) q.push_back(nx);
     }
     for (size_t i = 0; i < n; i++) if (!inOrder[i]) order.push_back(mods[i].get());
+    if (chains) { act.assign(n, 1); actTel.assign(n, 1); bn.assign(n, 0); seen.assign(n, 0); stk.assign(2 * n + 2, 0); }
     ver++; cullKeep.assign(n, 0); cullStack.clear(); cullStack.reserve(2 * n + 2);
     for (ModNode* m : order) {
       const int s = m->wi->scope;
@@ -173,6 +179,21 @@ class PatchImpl {
     repin(*m);
     if (wi->flags & kWF_Text) { Json t = o.get("text"); if (t.isStr()) { m->text.resize(kMaxText); const int n = toU16(t.asStr(), m->text.data(), kMaxText); m->text.resize((size_t)n); m->textLen = n; } }
     if (wi->flags & kWF_Tail) { m->tailT = wparam(*wi, "time"); m->tailF = wparam(*wi, "fine"); m->tailD = wparam(*wi, "depth"); }
+    if (chains) {   // …chains: _byp / _bn are kept beside the declared parameters; an older patch's Sidechain In (src / snd) becomes a Source (sckFrom)
+      { const int pi = wport_in(*wi, "in"), po = wport_out(*wi, "out"); m->pIn = pi; m->pOut = po; m->pInR = wport_in(*wi, "inR"); m->pOutR = wport_out(*wi, "outR");
+        m->bypOk = pi >= 0 && po >= 0 && std::string_view(wi->in[pi].kind) == "audio" && std::string_view(wi->out[po].kind) == "audio"; if (m->bypOk) m->dry.assign(2 * kBlock, 0.f); }
+      m->bypP = ps.get("_byp").isNum() ? ps.get("_byp").asNum() : 0; m->bnP = ps.get("_bn").isNum() ? ps.get("_bn").asNum() : 0;
+      const int sp = wparam(*wi, "sck");
+      if (sp >= 0 && !ps.get("sck").isNum()) {
+        double v = 0;
+        if (ps.isObj() && std::string_view(wi->type) == "scin") {
+          const double sn = js_round(ps.get("snd").isNum() ? ps.get("snd").asNum() : 0), k = js_round(ps.get("src").isNum() ? ps.get("src").asNum() : 0);
+          const double sn2 = sn != sn ? 0 : sn, k2 = k != k ? 0 : k;
+          v = sn2 > 0 ? (sn2 < 8 ? sn2 : 8) : k2 > 0 ? (8 + k2 < 136 ? 8 + k2 : 136) : 0;
+        }
+        m->base[(size_t)sp] = v; repin(*m);
+      }
+    }
     ModNode* raw = m.get(); mods.push_back(std::move(m)); byId[sid] = raw; compile();
     return true;
   }
@@ -188,7 +209,7 @@ class PatchImpl {
       for (int k = 0; k < nIn; k++) s.in[k] = s.buf.data() + (size_t)k * kBlock;
       for (int k = 0; k < nOut; k++) s.out[k] = s.buf.data() + (size_t)(nIn + k) * kBlock;
       s.inMo.assign((size_t)wi.np, 0); s.pm.assign((size_t)wi.np, 0.0); s.p = m.bp.data();
-      if (fits && m.def) { seeds.armed = false; const uint32_t d0 = seeds.drawn; s.mod = m.def->make(sr, seeds); s.drawn = seeds.drawn - d0; seeds.armed = true; }
+      if (fits && m.def) { seeds.armed = false; const uint32_t d0 = seeds.drawn; s.mod = m.def->make(sr, seeds); s.drawn = seeds.drawn - d0; seeds.armed = true; if (s.mod) s.mod->prepare(s.p); }
     }
     if (fits) { instances += cnt; weight += w; } else { m.slots.shrink_to_fit(); instances += 0; }
     // instances / weight are counted for the slots that hold an object only (a soft one holds buffers)
@@ -253,6 +274,9 @@ class PatchImpl {
     if (seeds.drawn == d0 && host) for (uint32_t k = 0; k < s.drawn; k++) host->nextSeed();
   }
 };
+
+// loadPatch's reading of a document into a prepared patch (engine.cpp): false = refused. chains: also the …chains older-patch cables (Track In's right side)
+bool readPatchDoc(Json doc, PatchImpl& P, bool chains);
 
 }  // namespace waves
 }  // namespace thunder

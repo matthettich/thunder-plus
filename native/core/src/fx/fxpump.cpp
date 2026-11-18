@@ -136,6 +136,13 @@ int PumpSlot::probeLatency(const FxEntry& e, double sr) {
   if (h < 0) return -1;
   const int lat = pump::latency(h); pump::destroy(h); return lat;
 }
+// U31 (the …chains pump modules): an instance made / freed on the control thread with the staged values (the JS's pumpNew without a bypass of its own). -1: refused.
+int pump_make_staged(int pt, const float* pv, int npv, double sr) {
+  if (!pump::available()) return -1;
+  const int np = pump::nparams(pt); const int n = npv < np ? npv : np;
+  CtlGate g; return stagedNew(pt, pv, n < 0 ? 0 : n, -1, false, false, sr);
+}
+void pump_free_ctl(int h) { if (h >= 0) { CtlGate g; pump::destroy(h); } }
 PumpSlot::~PumpSlot() {
   if (h >= 0) { CtlGate g; pump::destroy(h); }
   delete[] rbl; delete[] rbr;
