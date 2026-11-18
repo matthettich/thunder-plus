@@ -126,3 +126,5 @@ autowah default -87.6, stressed -89.8; beads default -66.5, stressed -77.4, swit
 
 - Windows / macOS / Android builds of this unit; only Linux GCC. The goldens are Linux hashes.
 - The rt_harness run does not reach a Resample take.
+- The `std::bad_alloc` catch at the preparation boundary needs exceptions in `cengine.cpp` only (`-fexceptions` for GCC / Clang; the rest of the core is `-fno-exceptions`); proven on Linux GCC by the RLIMIT_AS test, not on MSVC / Apple Clang. `chains_mem` and `chains_alloc` measure with glibc and skip elsewhere and under a sanitizer; the committed table `cmem.inc` serves the budget on every platform.
+- The two waves `over/additive` rows at which the JS throws are left out and logged by `waves-dump.mjs`; a pump module's output at out-of-range parameters is not compared (no native hashes for pump).
