@@ -87,6 +87,20 @@ plan; sections 1 to 4 and 9), `HANDOVER.md` on `beta` (the web app, the owner's 
   and never force-pushes. Neither PR is merged. The lead reads `chains/clive.cpp` and `cengine.cpp` line by line once U31's worker reports.
 - Check-ins (this chat): a restart check at 14:05, then after each usage reset: 15:02, 20:07 on 18 Nov; 01:12, 06:17 on 19 Nov (Mountain).
 
+## State at 15:30 on 18 Nov (the lead; newest)
+- **Web:** `main` = `beta` = build 647. 646 (#231): the side panel's instrument list above the PLAYING box. 647 (#233): two FlexCore NaN fixes (FLX E8 just
+  under a beat; `rd` at buffer index 0) and the FX bar's Flex PATTERN row writing the FLX command under the cursor (the lead fixed a `false ?? x` bug in
+  it at review). FLX 76 on the master was measured as working on both sequencers. Open: page-sequencer FLY 0D differs in headless Chrome (cause not
+  isolated); `ScrambleCore.rd` has the index pattern fixed in `FlexCore.rd` (the lead's to-do). **Desktop v1.3.13 = build 647**, released at the owner's
+  request (run 44405171015, 3 platforms, 11 assets); recorded in HANDOVER (#235, #236).
+- **U31:** the lead's line-by-line review of `clive.cpp` / `cengine.cpp` is done; 11 items (A to K) were sent to the worker at 15:05: stats data race,
+  single-producer rule, `cur_` fallback race, in-flight count one short during a swap, honest drop counts, Playing flood, queue size, the bypass
+  crossfade truncated on a cut block (a click the JS never has), `prepareDerived` cost on the audio thread, `resample_release` on the audio thread, one
+  TSan test. The worker records them in U31-NOTES.md under "Lead review, 18 Nov". Merge #227 only after those and both ctest configurations.
+- **U32:** the worker was still running its second round (last push 2168e9a, macOS reference fix). Merge #226 when its report is in and checked.
+- Workers of this chat: U31 a1971f2533efd1b7b, U32 ad2f95e69f7ff1111 (resume with a message; a new chat starts new ones from the branch notes).
+- **Next when a compiling slot is free:** the U34a worker (WIRING-DOSSIER.md part 5).
+
 ## Rules the lead set for gates (they hold for every remaining unit)
 - Ported JS: bit-exact against the web app's goldens and a Node reference; committed Linux hashes gate every platform. Never loosen a gate, never hand-edit a
   golden, no `-ffast-math`.
