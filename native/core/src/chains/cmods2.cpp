@@ -184,6 +184,7 @@ struct PumpCh { const char* key; int t, np, nps; const PumpQ* ps; };
 double pumpCurve(const PumpQ& q, double v) { v = v < 0 ? 0 : v > 1 ? 1 : v; return q.curve == 'g' ? q.mn * js_pow(q.mx / q.mn, v) : q.mn + (q.mx - q.mn) * js_pow(v, q.exp > 0 ? q.exp : 1); }
 double pumpValue(const PumpQ& q, double raw) { const double v = raw; if (!(v == v)) return q.def; return q.kind == 'n' ? pumpCurve(q, v) : v; }
 
+std::atomic<uint64_t> g_pumpSwaps{0}, g_pumpBad{0}, g_pumpDry{0};   // spares taken, blocks that went bad, blocks with no spare ready (counted for the tests and the notes)
 class PumpMod : public WModule {
  public:
   PumpMod(const PumpCh* d, double sr) : d_(d), sr_(sr) { for (int i = 0; i < 128; i++) last_[i] = NAN; }
@@ -215,7 +216,7 @@ class PumpMod : public WModule {
 void PumpMod::process(const IO& io, const Ctx& c) {
   const float* L0 = io.in[0]; const float* R0 = io.linked[1] ? io.in[1] : io.in[0]; const int n = c.block;
   auto pass = [&]() { std::memcpy(io.out[0], L0, sizeof(float) * kBlock); std::memcpy(io.out[1], R0, sizeof(float) * kBlock); };
-  if (!pump::available() || dead_state_ || h_ < 0) { if (h_ < 0 && !dead_state_ && pump::available()) { int s = spare_.exchange(-1); if (s >= 0) { h_ = s; for (int i = 0; i < d_->nps; i++) last_[i] = spareRaw_[i]; wantSpare_.store(true); } } if (h_ < 0) { if (dead_state_ || !pump::available()) pass(); else zeroOut(io.out[0]), zeroOut(io.out[1]); return; } }
+  if (!pump::available() || dead_state_ || h_ < 0) { if (h_ < 0 && !dead_state_ && pump::available()) { int s = spare_.exchange(-1); if (s >= 0) { g_pumpSwaps++; h_ = s; for (int i = 0; i < d_->nps; i++) last_[i] = spareRaw_[i]; wantSpare_.store(true); } } if (h_ < 0) { if (dead_state_ || !pump::available()) pass(); else { g_pumpDry++; zeroOut(io.out[0]), zeroOut(io.out[1]); } return; } }
   PumpGate gate(true); if (!gate.ok) { pass(); return; }   // the control thread is in pump (making a spare): this block passes the sound, nothing waits
   { const int np = pump::nparams(d_->t); float* V = nullptr;
     for (int i = 0; i < d_->nps; i++) { const PumpQ& q = d_->ps[i]; const double raw = io.p[i]; rawNow_[i].store(raw, std::memory_order_relaxed);
@@ -229,7 +230,7 @@ void PumpMod::process(const IO& io, const Ctx& c) {
   for (int i = 0; i < n; i++) { const double a = L0[i], b = R0[i], dn = (i & 1) ? 1e-18 : -1e-18; L[i] = (float)((a > -8 && a < 8 ? a : 0) + dn); R[i] = (float)((b > -8 && b < 8 ? b : 0) + dn); }
   pump::process(h_, n, 0);
   bool bad = false; for (int i = 0; i < n; i++) { const float a = L[i], b = R[i]; if (!(a > -8 && a < 8 && b > -8 && b < 8)) { bad = true; break; } }
-  if (bad) {   // gone bad: afresh next block. The JS frees and makes the instance on the audio thread; here the dead one goes to the control thread and the spare takes over.
+  if (bad) { g_pumpBad++;   // gone bad: afresh next block. The JS frees and makes the instance on the audio thread; here the dead one goes to the control thread and the spare takes over.
     const int old = h_; h_ = -1; { bool put = false; for (auto& d : dead_) { int e = -1; if (d.compare_exchange_strong(e, old)) { put = true; break; } } (void)put; /* (four failures between two services: the handle is kept by nobody; it is freed with the process) */ }
     zeroOut(io.out[0]); zeroOut(io.out[1]); wantSpare_.store(true); return;
   }
@@ -237,6 +238,9 @@ void PumpMod::process(const IO& io, const Ctx& c) {
 }
 }  // namespace
 
+uint64_t chains_pump_swaps() { return g_pumpSwaps.load(); }
+uint64_t chains_pump_bad() { return g_pumpBad.load(); }
+uint64_t chains_pump_dry() { return g_pumpDry.load(); }
 void resample_release(const ResampleTake& t) { if (t.owner) static_cast<Resample*>(t.owner)->release(t.which); }
 std::unique_ptr<Module> makeMorph(double sr, Seeds& s) { return std::unique_ptr<Module>(new Morph(sr, s)); }
 std::unique_ptr<Module> makeResample(double sr, Seeds& s) { return std::unique_ptr<Module>(new Resample(sr, s)); }

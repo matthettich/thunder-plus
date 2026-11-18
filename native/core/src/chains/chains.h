@@ -48,6 +48,7 @@ const WInfo& cinfo_at(int i);
 const modfx::Def* cdef(std::string_view type);
 bool chains_type_is_lib(std::string_view type);
 bool chains_type_is_pump(std::string_view type);   // one of the 13 pump modules (they need the pump library, not the tfx one)
+uint64_t chains_pump_swaps(); uint64_t chains_pump_bad(); uint64_t chains_pump_dry();   // the pump modules' counters (process-wide): spares swapped in, blocks that went bad, bad blocks with no spare ready
 bool chains_have_lib(std::string_view type);        // this build can run it: the library the type needs is in the build (a closed build has none)
 const waves::ModTable& chainsTable();
 void resample_release(const struct ResampleTake& t);   // cmods2.cpp   // a module built from a strict upstream library (the tfx effects, the pump modules, Marbles / Tides): not bit-exact with the web's fast-math wasm
@@ -82,7 +83,7 @@ class ChainsEngine {
   void removeModule(std::string_view id);
   void connect(std::string_view aId, std::string_view aPort, std::string_view bId, std::string_view bPort, bool fb = false);
   void disconnect(std::string_view aId, std::string_view aPort, std::string_view bId, std::string_view bPort);
-  void setParam(std::string_view id, std::string_view name, double v);
+  void setParam(std::string_view id, std::string_view name, double v);   // (no allocation: the live runner calls it on the audio thread)
   void setText(std::string_view id, std::string_view text);
   void setTransport(const Transport& t);   // Object.assign, and startN + 1 when it starts playing
   void setTransportTempo(double t) { transport_.tempo = t; }
@@ -134,6 +135,7 @@ class ChainsEngine {
   // ---- live: swap a whole prepared patch in (audio thread, at a block start) ----
   waves::PatchImpl* swapPatch(waves::PatchImpl* p);       // takes p; returns the old one (free it with chains_free_patch on the control thread)
   void serviceSparesOf(waves::PatchImpl* p);              // the control thread's service of the patch the audio thread runs now
+  waves::PatchImpl* currentPatch() const { return p_.get(); }
   waves::PatchImpl* preparePatch(Json doc) const;         // off the audio thread: what loadPatch builds, without touching this engine's patch
   friend class ChainsLive;
  private:
@@ -176,6 +178,7 @@ class ChainsNode {
  public:
   ChainsNode(double sr, int track, const EngineOptions& o = EngineOptions(), Host* host = nullptr);   // track 0..127; focus = track
   ChainsEngine& engine() { return eng_; }
+  const ChainsEngine& engine() const { return eng_; }
   int track() const { return track_; }
   // The worklet's process(ins, outs, params): any n (cut into chunks of kBlock; more than 4096 frames fails soft: silence, counted)
   bool process(const NodeIn& in, NodeOut& out, int n);
@@ -184,6 +187,56 @@ class ChainsNode {
   bool p1(const NodeIn& in, NodeOut& out, int n, int a, int len);
   ChainsEngine eng_; int track_;
   std::unique_ptr<float[]> tmpL_, tmpR_; int tw_[kMaxFeeds + 1]; int ntw_ = 0; uint64_t failedLong_ = 0;
+};
+
+
+// ---- the live runner (ChainsLive): one track's node with sample-exact events -----------------------------------------------------------------------------------------------------------------------
+// WHAT THE WORKLET DOES: one ThunderChains node runs a 128-frame block per quantum; a parameter, the tempo or a BYP switch changes at a block's start whatever sample it was meant for (the page's
+// Thunder Core queue lands a tempo within 64 samples). Here an event lands on its own sample (the block is cut there) and the output is delayed by kChainsLatency = 127 samples, as U26 and U30 (a block
+// is rendered only when no event not yet seen can cut it, so the output does not depend on the host's block size). The host's inputs go through a ring with the same delay. The offline render of the
+// same events (ChainsLive::renderOffline) is the same loop with no queue and no latency.
+struct ChainsEvent {
+  enum Kind : uint8_t { Param, Tempo, Playing, Bypass, Patch };
+  Kind kind = Param; int64_t at = 0;   // at: the engine sample the event lands on
+  double a = 0, b = 0;                 // Param: a the value; Tempo: a bpm; Playing: a 1 or 0; Bypass: a the switch 1..15, b its value (-1 the patch's own, 0 in, 1 bypassed, 2 flipped); Patch: a the mailbox slot preparePatch gave
+  char id[40] = {}; char name[24] = {};   // Param: the module id and the parameter name (a longer one is refused by post())
+};
+constexpr int kChainsLatency = 127, kChainsQueue = 4096, kChainsPending = 4096, kChainsSlots = 8, kChainsRing = 512;
+struct ChainsLiveConfig { int taps = 0; bool sc = false; bool sends = false; int feeds = 0; };   // which of the node's inputs the host feeds (fixed for the runner's life)
+struct ChainsLiveStats { uint64_t blocks = 0, cutBlocks = 0, lateEvents = 0, droppedEvents = 0, refusedPatches = 0, failedBlocks = 0; };
+class ChainsLive {
+ public:
+  ChainsLive(double sampleRate, int track, const ChainsLiveConfig& cfg = ChainsLiveConfig(), Host* host = nullptr);
+  ~ChainsLive();
+  ChainsLive(const ChainsLive&) = delete; ChainsLive& operator=(const ChainsLive&) = delete;
+  bool valid() const { return node_.engine().valid(); }
+  ChainsNode& node() { return node_; }
+  // control thread
+  bool post(const ChainsEvent& e);                                    // false: the queue is full (counted), or a Param's id / name is too long
+  bool postParam(const char* id, const char* name, double v, int64_t at);
+  bool preparePatch(Json doc, int64_t at);                            // builds the patch off the audio thread and posts its swap at `at`; false: refused (the playing patch stays)
+  void service();                                                     // frees the patches the audio thread gave back and keeps the pump spares current (one control thread calls this regularly, and no other frees patches)
+  // audio thread: no allocation, no lock. n: any number of frames. in.byp is ignored (BYP comes as events)
+  void process(const NodeIn& in, NodeOut& out, int n);
+  int latency() const { return kChainsLatency; }
+  const ChainsLiveStats& stats() const { return st_; }
+  int64_t enginePos() const { return pos_; }
+  // the same events rendered with no queue and no latency (control thread: allocates). in[c]: the host's channels in the order of the node's inputs: Track In L, R, then sc L, R (cfg.sc), taps, sends (cfg.sends: 8), feeds (2 each); each `frames` long
+  static bool renderOffline(double sr, int track, const ChainsLiveConfig& cfg, Host* host, const std::vector<ChainsEvent>& events, const std::vector<Json>& patches, const std::vector<std::vector<float>>& inputs,
+                            int64_t frames, std::vector<std::vector<float>>& outputs /* L, R, sends 0..7 */, Json initialPatch = Json(), const std::vector<int>* busMap = nullptr, const std::vector<int>* tapMap = nullptr);
+ private:
+  void drain();
+  void apply(const ChainsEvent& e);
+  void segment(int64_t end);
+  int nIn() const { return 2 + (cfg_.sc ? 2 : 0) + cfg_.taps + (cfg_.sends ? 8 : 0) + 2 * cfg_.feeds; }
+  ChainsNode node_; double sr_; ChainsLiveConfig cfg_;
+  ChainsEvent q_[kChainsQueue]; std::atomic<uint32_t> qh_{0}, qt_{0};
+  ChainsEvent pend_[kChainsPending]; int npend_ = 0;
+  std::atomic<waves::PatchImpl*> slot_[kChainsSlots]; std::atomic<waves::PatchImpl*> retired_[kChainsSlots]; std::atomic<waves::PatchImpl*> cur_{nullptr};
+  int64_t pos_ = 0, hostPos_ = 0; double byp_[kBypSwitches];
+  std::unique_ptr<float[]> inRing_, outRing_, seg_, oseg_;   // inRing_: nIn() x kChainsRing; outRing_: 10 x kChainsRing; seg_ / oseg_: the segment's contiguous copies (128 each)
+  std::vector<const float*> ptrIn_; std::vector<float*> ptrOut_; ChainsLiveStats st_;
+  friend struct ChainsLiveOffline;
 };
 
 }  // namespace chains

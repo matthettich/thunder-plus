@@ -119,7 +119,8 @@ void ChainsEngine::disconnect(std::string_view aId, std::string_view aPort, std:
   p_->compile(); p_->sync(true); prepareDerived(*p_);
 }
 void ChainsEngine::setParam(std::string_view id, std::string_view name, double v) {
-  ModNode* m = p_->find(std::string(id)); if (!m) return;
+  ModNode* m = nullptr; for (auto& up : p_->mods) if (up->id == id) { m = up.get(); break; }   // (a linear search: no std::string made, so this allocates nothing on the audio thread)
+  if (!m) return;
   const int k = waves::wparam(*m->wi, name); if (k >= 0) { m->base[(size_t)k] = v; waves::detail::repin(*m); }
   if (name == "_byp") m->bypP = v;
   else if (name == "_bn") { m->bnP = v; prepareDerived(*p_); }
@@ -168,7 +169,8 @@ bool ChainsEngine::handleMessage(Json m) {
     Json v = m.get("value"); int t[kChannels * 4]; int n = 0;
     if (v.isArr()) for (size_t i = 0; i < v.size() && n < (int)(sizeof t / sizeof t[0]); i++) { Json e = v.at(i); t[n++] = e.isNum() && e.asNum() == std::floor(e.asNum()) && e.asNum() >= 0 && e.asNum() < kChannels ? (int)e.asNum() : -1; }
     // (channel i carries track t[i]: an entry that is not a track number keeps its channel and carries none)
-    for (int16_t& x : tapMap_) x = -1; for (int i = 0; i < n; i++) if (t[i] >= 0) tapMap_[t[i]] = (int16_t)i;
+    for (int16_t& x : tapMap_) x = -1;
+    for (int i = 0; i < n; i++) if (t[i] >= 0) tapMap_[t[i]] = (int16_t)i;
     hasTapMap_ = true; return true;
   }
   if (op == "busmap") {
@@ -194,7 +196,12 @@ PatchImpl* ChainsEngine::swapPatch(PatchImpl* n) {
   p_.reset(n);
   if (p_->hasT) {   // setTransport(doc.transport): Object.assign of the keys it has, then startN + 1 when it starts playing
     Transport t = transport_;
-    if (p_->tTempo) t.tempo = p_->tpart.tempo; if (p_->tLpb) t.lpb = p_->tpart.lpb; if (p_->tTicks) t.ticks = p_->tpart.ticks; if (p_->tPpq) t.ppq = p_->tpart.ppq; if (p_->tStart) t.startN = p_->tpart.startN; if (p_->tPlaying) t.playing = p_->tpart.playing;
+    if (p_->tTempo) t.tempo = p_->tpart.tempo;
+    if (p_->tLpb) t.lpb = p_->tpart.lpb;
+    if (p_->tTicks) t.ticks = p_->tpart.ticks;
+    if (p_->tPpq) t.ppq = p_->tpart.ppq;
+    if (p_->tStart) t.startN = p_->tpart.startN;
+    if (p_->tPlaying) t.playing = p_->tpart.playing;
     setTransport(t);
   }
   return old;

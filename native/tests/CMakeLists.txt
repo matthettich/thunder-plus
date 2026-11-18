@@ -711,6 +711,14 @@ if(NODE_EXE AND CMAKE_SYSTEM_NAME STREQUAL "Linux" AND CMAKE_SYSTEM_PROCESSOR MA
   add_test(NAME chains_table_current COMMAND ${NODE_EXE} ${CMAKE_CURRENT_SOURCE_DIR}/../tools/chains-gen.mjs --check)
 endif()
 
+add_executable(test_chains_live test_chains_live.cpp)
+target_link_libraries(test_chains_live PRIVATE thunder_core)
+target_include_directories(test_chains_live PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../core/src ${CMAKE_CURRENT_SOURCE_DIR})
+if(NOT MSVC)
+  target_compile_options(test_chains_live PRIVATE -Wall -Wextra)
+endif()
+add_test(NAME chains_live COMMAND test_chains_live)
+
 # U30: the fuzz (random hostile patches and events; a small count here, 5000 and more under ASan + UBSan with -DTHUNDER_SANITIZE=ON: docs/port/U30-NOTES.md)
 add_executable(test_waves_fuzz test_waves_fuzz.cpp)
 target_link_libraries(test_waves_fuzz PRIVATE thunder_core)
