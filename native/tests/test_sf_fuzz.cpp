@@ -46,7 +46,7 @@ static void useFont(const Font& f, Rng& r, bool decode, uint64_t* checksum) {
     PadParams P; P.bank = p.bank; P.prog = p.prog; P.trans = (double)((int)r.u(25) - 12);
     const size_t bound = sf_render_bound(f, P, 48000, 0.2);
     if (bound == 0 || bound > ((size_t)1 << 22)) continue;
-    DecodeOpts o; PresetPcm pcm; prepare_preset(f, &p, o, pcm);
+    DecodeOpts o; o.pageTail = r.u(2) == 0; uint8_t keys[128]; for (int k = 0; k < 128; k++) keys[k] = (uint8_t)(r.u(3) == 0); PresetPcm pcm; prepare_preset(f, &p, o, pcm, r.u(2) ? keys : nullptr);
     std::vector<float> out(bound + 8, 12345.f); const size_t n = sf_render(f, pcm, P, 48000, 0.2, out.data(), bound);
     CHECK(n <= bound, "render wrote %zu of %zu", n, bound);
     for (size_t i = bound; i < bound + 8; i++) CHECK(out[i] == 12345.f, "render wrote past its buffer");
@@ -94,7 +94,7 @@ static void fuzzOgg(const Font& gm, const std::vector<uint32_t>& idx, int iters,
     const size_t hot = r.u(2) ? 0 : std::min<size_t>(b.size() / 2, 400); mutate(b, r, hot);
     if (r.u(4) == 0) for (int k = 0, n = 1 + (int)r.u(6); k < n; k++) b[r.u((uint32_t)std::min<size_t>(b.size(), 400))] = (uint8_t)r.next();   // the headers
     Font g; g.sf3 = true; g.smpl = b.data(); g.smplN = b.size(); SampleHdr h = s; h.start = 0; h.end = (uint32_t)b.size(); g.samples.push_back(h);
-    Pcm p; DecodeOpts o; if (r.u(3) == 0) o.ctxRate = 48000;
+    Pcm p; DecodeOpts o; if (r.u(3) == 0) o.ctxRate = 48000; o.pageTail = r.u(2) == 0;
     decode_sample(g, 0, o, p); if (p.ok) { decoded++; frames += p.d.size(); } else failed++;
     for (float v : p.d) if (!std::isfinite(v)) { /* a corrupt stream may decode to garbage; infinities would be a defect in the decode path */ CHECK(false, "non-finite decoded sample"); break; }
   }

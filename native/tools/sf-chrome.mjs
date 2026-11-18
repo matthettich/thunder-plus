@@ -1,16 +1,20 @@
 // U32: the page's own SoundFont decode and render in a real (headless) Chrome, to measure what the Node reference cannot: `decodeAudioData` on the GM font's Ogg Vorbis samples (and its resampling to the context rate) and the render built on it.
-//   node native/tools/sf-chrome.mjs DIR [ctxRate]    writes DIR/chrome_pcm_<idx>.f32, DIR/chrome_samples.json and DIR/chrome_render_<case>.f32 for the GM cases of native/tests/golden/sf_cases.json (default context rate 48000)
-//   then: test_sf chrome DIR                          compares the native decode and render with them (prints the dB figures)
+// ONE COMMAND (from the repo root, with a built test_sf):
+//   node native/tools/sf-chrome.mjs OUTDIR --test BUILD/tests/test_sf [--rates 44100,48000]
+// For each context rate it captures the page's decodeAudioData output and sfRender of the GM cases of native/tests/golden/sf_cases.json into OUTDIR/c<rate>/ (chrome_pcm_<idx>.f32, chrome_samples.json, chrome_render_<case>.f32)
+// and runs `test_sf chrome OUTDIR/c<rate> <rate>` on it, which prints the dB figures (native decode and render vs the page's). Without --test it only captures. Default rates 44100,48000.
 // The page code is index.html's SoundFont block, unchanged (`sfSample` decodes with `OfflineAudioContext.decodeAudioData`, `sfRender` renders). Needs google-chrome (or chromium) on the PATH; no npm package: the DevTools protocol is spoken over Node's WebSocket.
 import fs from 'node:fs';
 import path from 'node:path';
 import http from 'node:http';
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
-const dir = process.argv[2], ctxRate = +(process.argv[3] || 48000);
-if (!dir) { console.error('usage: sf-chrome.mjs DIR [ctxRate]'); process.exit(2); }
+const args = process.argv.slice(2), dir = args[0];
+if (!dir) { console.error('usage: sf-chrome.mjs OUTDIR [--test path/to/test_sf] [--rates 44100,48000]'); process.exit(2); }
+const opt = (n) => { const i = args.indexOf(n); return i >= 0 ? args[i + 1] : null; };
+const testBin = opt('--test'), rates = (opt('--rates') || '44100,48000').split(',').map(Number);
 fs.mkdirSync(dir, { recursive: true });
 const CASES = JSON.parse(fs.readFileSync(path.join(ROOT, 'native/tests/golden/sf_cases.json'), 'utf8'));
 const html = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
@@ -22,7 +26,7 @@ const server = http.createServer((req, res) => { res.setHeader('Access-Control-A
 await new Promise(r => server.listen(0, '127.0.0.1', r));
 const fontUrl = `http://127.0.0.1:${server.address().port}/font`;
 
-const script = `(async () => {
+const scriptFor = (ctxRate) => `(async () => {
   var ctx = {sampleRate: ${ctxRate}}, srGuess = ${ctxRate};
   const toast = () => {}, toastErr = () => {}, clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
   const norm = (V) => { const d = {bank:0, prog:0, trans:0, velo:0.7, atk:1, rel:1}, o = V.sf, r = {}; for (const k in d) r[k] = o && typeof o[k] === 'number' && isFinite(o[k]) ? o[k] : d[k]; return r; };
@@ -56,13 +60,16 @@ if (!target) { chrome.kill(); console.error('Chrome did not start'); process.exi
 const ws = new WebSocket(target.webSocketDebuggerUrl); await new Promise((r, j) => { ws.onopen = r; ws.onerror = j; });
 const reply = new Map(); let nid = 0; ws.onmessage = (m) => { const d = JSON.parse(m.data); if (d.id && reply.has(d.id)) { reply.get(d.id)(d); reply.delete(d.id); } };
 const send = (method, params) => new Promise(r => { const id = ++nid; reply.set(id, r); ws.send(JSON.stringify({ id, method, params })); });
-const res = await send('Runtime.evaluate', { expression: script, awaitPromise: true, returnByValue: true, timeout: 600000 });
+for (const ctxRate of rates) {
+  const res = await send('Runtime.evaluate', { expression: scriptFor(ctxRate), awaitPromise: true, returnByValue: true, timeout: 600000 });
+  if (res.result.exceptionDetails || res.error) { console.error(JSON.stringify(res.result.exceptionDetails || res.error).slice(0, 2000)); chrome.kill(); server.close(); process.exit(1); }
+  const o = JSON.parse(res.result.result.value), d = path.join(dir, 'c' + ctxRate); fs.mkdirSync(d, { recursive: true });
+  const meta = { ctxRate: o.ctxRate, ua: o.ua, date: new Date().toISOString().slice(0, 10), samples: [], renders: [] };
+  for (const s of o.samples) { const f = `chrome_pcm_${s.idx}.f32`; fs.writeFileSync(path.join(d, f), Buffer.from(s.d, 'base64')); meta.samples.push({ idx: s.idx, sr: s.sr, ls: s.ls, le: s.le, k: s.k, n: s.n, hdrSr: s.hdrSr, type: s.type, file: f }); }
+  for (const r of o.renders) { const f = `chrome_render_${r.id}.f32`; fs.writeFileSync(path.join(d, f), Buffer.from(r.d, 'base64')); meta.renders.push({ id: r.id, n: r.n, file: f }); }
+  fs.writeFileSync(path.join(d, 'chrome_samples.json'), JSON.stringify(meta));
+  console.log(`Chrome (${o.ua}), ${meta.date}, context rate ${o.ctxRate}: ${meta.samples.length} samples decoded, ${meta.renders.length} renders -> ${d}`);
+  if (testBin) { const r = spawnSync(testBin, ['chrome', d, String(ctxRate)], { stdio: 'inherit' }); if (r.status) console.error('test_sf chrome exited with', r.status); }
+}
 chrome.kill(); server.close();
-if (res.result.exceptionDetails || res.error) { console.error(JSON.stringify(res.result.exceptionDetails || res.error).slice(0, 2000)); process.exit(1); }
-const o = JSON.parse(res.result.result.value);
-const meta = { ctxRate: o.ctxRate, ua: o.ua, samples: [], renders: [] };
-for (const s of o.samples) { const f = `chrome_pcm_${s.idx}.f32`; fs.writeFileSync(path.join(dir, f), Buffer.from(s.d, 'base64')); meta.samples.push({ idx: s.idx, sr: s.sr, ls: s.ls, le: s.le, k: s.k, n: s.n, hdrSr: s.hdrSr, type: s.type, file: f }); }
-for (const r of o.renders) { const f = `chrome_render_${r.id}.f32`; fs.writeFileSync(path.join(dir, f), Buffer.from(r.d, 'base64')); meta.renders.push({ id: r.id, n: r.n, file: f }); }
-fs.writeFileSync(path.join(dir, 'chrome_samples.json'), JSON.stringify(meta));
-console.log(`Chrome (${o.ua}), context rate ${o.ctxRate}: ${meta.samples.length} samples decoded, ${meta.renders.length} renders`);
 process.exit(0);

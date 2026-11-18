@@ -7,6 +7,7 @@
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
+#include <chrono>
 #include <cstring>
 #include <fstream>
 #include <map>
@@ -76,8 +77,8 @@ static void samplesOfLive(const Font& f, Json c, CaseSamples& o) {
   const PadParams P = padOf(c.obj("pad")); const Preset* pr = sf_preset(f, js_round(P.bank), js_round(P.prog)); Json E = c.arr("events");
   for (size_t i = 0; i < E.size(); i++) { Json e = E.at(i); if (e.str("type") != "note") continue; double k, v; keyVel(P, e.num("rate"), e.num("gain"), &k, &v); neededFor(f, pr, k, v, o.idx); }
 }
-static void decodeInto(const Font& f, const std::set<uint32_t>& idx, PresetPcm& pcm, double ctxRate = 0) {
-  DecodeOpts dopt; dopt.ctxRate = ctxRate;
+static void decodeInto(const Font& f, const std::set<uint32_t>& idx, PresetPcm& pcm, double ctxRate = 0, bool pageTail = false) {
+  DecodeOpts dopt; dopt.ctxRate = ctxRate; dopt.pageTail = pageTail;
   pcm.byIndex.assign(f.samples.size(), Pcm()); pcm.bytes = 0;
   for (uint32_t i : idx) { decode_sample(f, i, dopt, pcm.byIndex[i]); pcm.bytes += pcm.byIndex[i].d.size() * 4; }
 }
@@ -288,12 +289,11 @@ static int doChrome(const std::string& dir, double ctxRate) {
   Json S = M.arr("samples");
   for (size_t i = 0; i < S.size(); i++) {
     Json s = S.at(i); const uint32_t idx = (uint32_t)s.num("idx");
-    std::string b; readFile(dir + "/" + std::string(s.str("file")), &b); Pcm p; decode_sample(fb.f, idx, dopt, p);
-    const size_t nc = b.size() / 4; const float* c = (const float*)b.data();
-    const size_t m = std::min(nc, p.d.size());
-    std::printf("decode sample %4u (file %g Hz): chrome %zu frames, native %zu frames @%g Hz; first %zu frames differ by %.1f dB (without the last 64: %.1f dB)\n", idx, s.num("hdrSr"), nc, p.d.size(), p.sr, m, m ? dbDiff(p.d.data(), c, m) : 0.0, m > 64 ? dbDiff(p.d.data(), c, m - 64) : 0.0);
+    std::string b; readFile(dir + "/" + std::string(s.str("file")), &b); DecodeOpts dopt2 = dopt; dopt2.pageTail = true; Pcm p, p2; decode_sample(fb.f, idx, dopt, p); decode_sample(fb.f, idx, dopt2, p2);
+    const size_t nc = b.size() / 4; const float* c = (const float*)b.data(); const size_t m = std::min(nc, p.d.size()), m2 = std::min(nc, p2.d.size());
+    std::printf("decode sample %4u (file %5g Hz): chrome %7zu frames | native %7zu frames, first %7zu differ %6.1f dB | pageTail %7zu frames, %6.1f dB\n", idx, s.num("hdrSr"), nc, p.d.size(), m, m ? dbDiff(p.d.data(), c, m) : 0.0, p2.d.size(), m2 ? dbDiff(p2.d.data(), c, m2) : 0.0);
   }
-  Json Rn = R.cases.arr("renders"); Json RR = M.arr("renders"); double worst = -1e9;
+    Json Rn = R.cases.arr("renders"); Json RR = M.arr("renders"); double worst = -1e9, worstT = -1e9;
   for (size_t i = 0; i < RR.size(); i++) {
     Json r = RR.at(i); const std::string id(r.str("id")); Json c; bool found = false;
     for (size_t j = 0; j < Rn.size(); j++) if (std::string(Rn.at(j).str("id")) == id) { c = Rn.at(j); found = true; }
@@ -304,9 +304,13 @@ static int doChrome(const std::string& dir, double ctxRate) {
     std::string b; readFile(dir + "/" + std::string(r.str("file")), &b); const size_t nc = b.size() / 4;
     if (nc != n) std::printf("render %-20s: length native %zu, chrome %zu\n", id.c_str(), n, nc);
     const double db = dbDiff(out.data(), (const float*)b.data(), std::min(n, nc)); worst = std::max(worst, db);
-    std::printf("render %-20s: native vs the page's sfRender in Chrome: %.1f dB\n", id.c_str(), db);
+    // the same render with `pageTail` (Chrome's loss of the last frame of one-page streams reproduced): what is left is the resampler and rounding
+    PresetPcm tail; decodeInto(fb.f, cs.idx, tail, ctxRate, true); size_t cutFrames = 0; for (uint32_t ix : cs.idx) cutFrames += pcm.byIndex[ix].d.size() - tail.byIndex[ix].d.size();
+    std::vector<float> out2(sf_render_bound(fb.f, P, sr, hold)); const size_t n2 = sf_render(fb.f, tail, P, sr, hold, out2.data(), out2.size()); const double dbT = n2 == nc ? dbDiff(out2.data(), (const float*)b.data(), std::min(n2, nc)) : 0; worstT = std::max(worstT, dbT);
+    if (n2 != nc) std::printf("render %-20s: with pageTail the length is %zu, chrome %zu\n", id.c_str(), n2, nc);
+    std::printf("render %-20s: native vs the page's sfRender in Chrome: %7.1f dB; with pageTail (%zu frames fewer): %7.1f dB\n", id.c_str(), db, cutFrames, dbT);
   }
-  std::printf("worst render difference %.1f dB\n", worst);
+  std::printf("worst render difference %.1f dB (with pageTail: %.1f dB)\n", worst, worstT);
   return 0;
 }
 
@@ -360,15 +364,46 @@ static int doUnit() {
       int good = 0; DecodeOpts o; o.ctxRate = 48000;
       for (auto& w : W) { Pcm p; decode_sample(f, w.idx, o, p); const bool ok = p.ls == w.ls && p.le == w.le && p.sr == 48000; if (!ok) std::printf("  sample %u: loop %g..%g, the page: %g..%g\n", w.idx, p.ls, p.le, w.ls, w.le); CHECK(ok, "sample %u loop points differ from the page's", w.idx); good += ok; }
       std::printf("unit: %d of %zu SF3 samples have the page's loop points at a 48 kHz context\n", good, sizeof W / sizeof W[0]); } }
+  // G. frame counts: the default keeps every frame up to the stream's last granule position (what libvorbis returns: measured with libsndfile / libvorbis for these six streams); `pageTail` reproduces Chrome's decodeAudioData
+  { std::string gb; if (readFile(std::string(THUNDER_ROOT) + "/sounds/FluidR3Mono_GM.sf3", &gb)) { Font f; CHECK(parse((const uint8_t*)gb.data(), gb.size(), f) == kParseOk, "GM font parses");
+      const struct { uint32_t idx; size_t granule, chrome; } W[] = {{183, 2297, 2176}, {948, 12462, 12352}, {906, 20640, 20512}, {859, 4633, 4505}, {1075, 62568, 62568}, {0, 48, 1}};
+      int good = 0; for (auto& w : W) { Pcm a, c; DecodeOpts o; decode_sample(f, w.idx, o, a); o.pageTail = true; decode_sample(f, w.idx, o, c); const bool ok = a.d.size() == w.granule && c.d.size() == w.chrome && (w.idx != 0 || (!c.ok && !a.ok == false));
+        if (!ok) std::printf("  sample %u: default %zu (granule %zu), pageTail %zu (Chrome %zu)\n", w.idx, a.d.size(), w.granule, c.d.size(), w.chrome); CHECK(ok, "frame counts of sample %u", w.idx); good += ok; }
+      std::printf("unit: %d of 6 streams have the libvorbis frame count by default and Chrome's with pageTail\n", good); } }
+  // F. prepare_preset with a key list: only the zones that cover a listed key are decoded, with the same bits as the full preparation
+  { auto b = miniSf2({{0, 0}}, 0, 50, 55, 1); Font f; CHECK(parse(b.data(), b.size(), f) == kParseOk, "mini font parses"); uint8_t none[128] = {0}, c4[128] = {0}; c4[60] = 1; PresetPcm all, one, zero;
+    prepare_preset(f, sf_preset(f, 0, 0), DecodeOpts(), all); prepare_preset(f, sf_preset(f, 0, 0), DecodeOpts(), one, c4); prepare_preset(f, sf_preset(f, 0, 0), DecodeOpts(), zero, none);
+    CHECK(one.bytes == all.bytes && one.bytes > 0 && zero.bytes == 0, "key list: bytes %llu / %llu / %llu", (unsigned long long)one.bytes, (unsigned long long)all.bytes, (unsigned long long)zero.bytes);
+    PadParams P; std::vector<float> o1(sf_render_bound(f, P, 44100, 1.0)), o2(o1.size()); const size_t n1 = sf_render(f, all, P, 44100, 1.0, o1.data(), o1.size()), n2 = sf_render(f, one, P, 44100, 1.0, o2.data(), o2.size()), n3 = sf_render(f, zero, P, 44100, 1.0, o2.data(), o2.size());
+    CHECK(n1 == n2 && std::memcmp(o1.data(), o2.data(), n1 * 4) == 0 && n3 == 0, "a key-list preparation changed the render (or the empty list still rendered)"); std::printf("unit: a key list decodes only what its keys play (empty list: nothing, render refused), same bits\n"); }
   std::printf(fails ? "FAIL: %d\n" : "OK\n", fails);
   return fails ? 1 : 0;
 }
 
+// ---- RAM and time of the decoded font (the numbers in U32-NOTES.md): `test_sf ram`
+static int doRam() {
+  std::string gb; if (!readFile(std::string(THUNDER_ROOT) + "/sounds/FluidR3Mono_GM.sf3", &gb)) { std::printf("FAIL: no GM font\\n"); return 1; }
+  Font f; if (parse((const uint8_t*)gb.data(), gb.size(), f) != kParseOk) return 1;
+  struct { const char* name; int bank, prog; } P[] = {{"Grand Piano", 0, 0}, {"Fingered Bass", 0, 33}, {"Standard drum kit", 128, 0}, {"Strings", 0, 48}};
+  auto now = []() { return (double)std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now().time_since_epoch()).count() / 1e6; };
+  for (auto& p : P) {
+    const Preset* pr = sf_preset(f, p.bank, p.prog); uint8_t all[128], oct[128], three[128]; std::memset(oct, 0, 128); std::memset(three, 0, 128); std::memset(all, 1, 128); for (int k = 60; k < 72; k++) oct[k] = 1; for (int k = 48; k < 84; k++) three[k] = 1;
+    for (int mode = 0; mode < 4; mode++) {
+      PresetPcm pc; DecodeOpts o; if (mode == 3) o.ctxRate = 48000; const double t0 = now(); prepare_preset(f, pr, o, pc, mode == 1 ? oct : mode == 2 ? three : nullptr); const double t1 = now(); size_t ns = 0; for (auto& q : pc.byIndex) ns += q.present ? 1 : 0;
+      std::printf("%-18s %-28s %4zu samples %8.1f MB  decode %.2f s\\n", p.name, mode == 0 ? "all keys, own rates" : mode == 1 ? "one octave (C4..B4)" : mode == 2 ? "three octaves (C3..B5)" : "all keys, resampled to 48 kHz", ns, (double)pc.bytes / 1048576.0, t1 - t0);
+    }
+  }
+  { size_t tot = 0, totR = 0; double t0 = now(); for (uint32_t i = 0; i < f.samples.size(); i++) { Pcm p; decode_sample(f, i, DecodeOpts(), p); tot += p.d.size() * 4; } const double t1 = now();
+    std::printf("whole font, own rates: %.1f MB, decode %.2f s\\n", (double)tot / 1048576.0, t1 - t0); (void)totR; }
+  return 0;
+}
+
 int main(int argc, char** argv) {
-  if (argc < 2 || (argc < 3 && std::strcmp(argv[1], "unit"))) { std::printf("usage: test_sf export|compare|chrome DIR | unit\n"); return 2; }
+  if (argc < 2 || (argc < 3 && std::strcmp(argv[1], "unit") && std::strcmp(argv[1], "ram"))) { std::printf("usage: test_sf export|compare|chrome DIR | unit\n"); return 2; }
   if (!std::strcmp(argv[1], "export")) return doExport(argv[2]);
   if (!std::strcmp(argv[1], "compare")) return doCompare(argv[2]);
   if (!std::strcmp(argv[1], "unit")) return doUnit();
+  if (!std::strcmp(argv[1], "ram")) return doRam();
   if (!std::strcmp(argv[1], "chrome")) return doChrome(argv[2], argc > 3 ? std::atof(argv[3]) : 0);
   return 2;
 }

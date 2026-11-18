@@ -79,6 +79,7 @@ struct Pcm {                // sfSample's {d, sr, ls, le, k}: `ls` / `le` in fra
   std::vector<float> d; double sr = 48000, ls = 0, le = 0, k = 1; bool ok = false, present = false;   // present: sfSample ran for it (SF.smp has the key); ok: it decoded (false: the JS's 1-sample silence fallback)
 };
 struct DecodeOpts {
+  bool pageTail = false;    // reproduce Chrome's decodeAudioData losing the last frame (at most half a short block) of a one-audio-page Ogg stream (default off: libvorbis and stb_vorbis keep every frame; U32-NOTES.md "The missing frames")
   double ctxRate = 0;       // 0: keep each sample's own rate (default). >0: resample to this rate as the page's decodeAudioData does (sf_decode.cpp: SF3 only; see U32-NOTES.md "sample rate")
 };
 // sfSample(font, i): decode one sample (control thread; allocates). A sample the JS could not decode (bad Ogg, a failed allocation) is the fallback {d: 1 zero, sr: 48000, ls: 0, le: 0, k: 1}.
@@ -88,7 +89,9 @@ struct PresetPcm {
   std::vector<Pcm> byIndex; uint64_t bytes = 0;
   const Pcm* get(uint32_t i) const { return i < byIndex.size() && byIndex[i].present ? &byIndex[i] : nullptr; }   // the JS's SF.smp.get / D.smp[i]: undefined when not decoded
 };
-void prepare_preset(const Font& f, const Preset* pr, const DecodeOpts& o, PresetPcm& out);   // control thread; allocates; the host calls it before the pad plays
+// `keys`: null = every zone of the preset (the whole keyboard); else 128 flags, and only the zones that cover a flagged key (any velocity) are decoded, with their stereo partners. A key whose zones are not
+// decoded plays nothing (the live note refuses it, the render returns 0): the host lists the keys its song and its pad use (U32-NOTES.md "Memory"). Same samples, same bits, less RAM.
+void prepare_preset(const Font& f, const Preset* pr, const DecodeOpts& o, PresetPcm& out, const uint8_t* keys = nullptr);   // control thread; allocates; the host calls it before the pad plays
 
 // ---- the pad's own render (sfRender: C-4, velocity 100, held for `hold`, then released; mono) -----------------------------------------------------------------------------------------------------------------
 struct PadParams { double bank = 0, prog = 0, trans = 0, velo = 0.7, atk = 1, rel = 1; double level = 0; double len = 0; };   // xParams(V) of an `sf` voice (+ V.level, V.len)
