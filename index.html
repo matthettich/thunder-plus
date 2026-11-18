@@ -14535,7 +14535,7 @@ const padHeld = [];
 function padPress(i, held){
   // select first: a pad that fails to sound (no audio yet, a render error) is still picked for editing
   if (held && isSyn(i) && !midi.learn){ select(i); if (padHeld[i]) releaseNote(padHeld[i]); padHeld[i] = holdNote(i, 0, 1); return; }
-  if (midi.learn){ midi.target = i; midi.ccTarget = ''; select(i); renderPads(); ccBadges(); midiStatus(`Now hit a note on the controller for pad ${hx(i)}` + (midi.notes[i] >= 0 ? ` (now ${noteName(midi.notes[i])}; Unlearn removes it).` : '.')); return; }
+  if (midi.learn){ midi.target = i; midi.ccTarget = ''; select(i); renderPads(); ccBadges(); midiStatus(`Now hit a note on the controller for pad ${hx(i)}` + (midi.notes[i] >= 0 ? ` (now ${noteName(midi.notes[i])}; Unlearn clears it).` : '.')); return; }
   select(i); play(i);
 }
 function refreshAll(){
@@ -15951,15 +15951,15 @@ $('kitIn').addEventListener('change', async e => {
 });
 let pending = null;
 // ONE CONFIRM (27 Oct, Phase 2): the app's one dialog (askYes); this was an inline Yes / Cancel row under the buttons.
-function ask(msg, fn, label){ askYes(msg, label || 'Yes').then(ok => { if (ok) fn(); }); }
+function ask(msg, fn){ askYes(msg, 'Yes').then(ok => { if (ok) fn(); }); }
 $('bYes').addEventListener('click', () => { $('confirmRow').hidden = true; if (pending) pending(); pending = null; });
 $('bNo').addEventListener('click', () => { $('confirmRow').hidden = true; pending = null; });
-$('bFactory').addEventListener('click', () => ask('Put the factory drums on pads 1–8? Synth slots stay.', factoryPads, 'Put them on'));
+$('bFactory').addEventListener('click', () => askYes('Put the factory drums on pads 1–8? Synth slots stay.', 'Put them on').then(ok => { if (ok) factoryPads(); }));
 $('bClassic').addEventListener('click', pickClassicKit);
 function clearKit(){ setKit({name:'New kit', slots:kit.slots, held:kit.held, voices:Array.from({length:nslots()}, (_, i) => isSyn(i)
   ? mkVoice('Synth ' + (i + 1), [{type:'saw', mode:'ADSR', atk:2, dec:400, sus:0.7, rel:200, lpCut:3000, level:0.7}], {tune:24, len:6, gate:400})
   : mkVoice('Pad ' + (i + 1), [{type:'sine', b:0.25, pAmt:24, pDec:50, atk:0.1, dec:400}]))}); }
-$('bClearKit').addEventListener('click', () => ask(`Clear all ${nslots()} slots?`, clearKit, 'Clear'));
+$('bClearKit').addEventListener('click', () => askYes(`Clear all ${nslots()} slots?`, 'Clear').then(ok => { if (ok) clearKit(); }));
 
 /* ---------- load an audio file as a sample layer ---------- */
 /* SAMPLER (owner, 5 Nov: stereo, longer samples): a sample is {data, data2, sr, name}: data the left channel (or the only
@@ -16436,7 +16436,7 @@ async function rcdOpen1(){
       if (okIo){
         // RATE (A2): the interface at another rate than the app's audio is converted (and ADAT carries 16 inputs only at 44.1 / 48 kHz)
         const op = RCD.io.opened, dr = op.deviceRate | 0, ar = ctx.sampleRate | 0;
-        RCD.note = dr && dr !== ar ? `${RCD.io.dev.name} runs at ${dr / 1000} kHz and the app at ${ar / 1000} kHz: the input is converted. Set them the same (Settings › Audio › Rate, or the interface) for a clean take.` : '';
+        RCD.note = dr && dr !== ar ? `${RCD.io.dev.name} is ${dr / 1000} kHz, the app ${ar / 1000} kHz: the take is converted. Match them (Settings › Audio › Rate) for a clean take.` : '';
         RCD.nch = RCD.io.opened.channels; if (!rcdSet.nchs || typeof rcdSet.nchs !== 'object') rcdSet.nchs = {};
         rcdSet.nchs['io:' + RCD.io.dev.inId] = RCD.nch; rcdSave(); rcdRoute(); if (RCD.ui && RCD.ui.fillCh) RCD.ui.fillCh(); if (RCD.ui && RCD.ui.latSay) RCD.ui.latSay();
         return true; }
@@ -18516,7 +18516,7 @@ async function rcdOpenIo(rec, mon){
   IOH.onGone = why => { if (!RCD.io || RCD.io.node !== node) return;
     const rec = RCD.on || !!RCD.sync;
     if (RCD.sync && RCD.sync.phase === 'rec') rcdEndAt(ctx.currentTime); else if (RCD.sync) { rcdAbort(); } else if (RCD.on) rcdStop();
-    toast('The audio input went away (' + why + ')' + (rec ? ': the take so far is kept.' : '.'), 6000);
+    toast('Audio input lost (' + why + ')' + (rec ? ': the take so far is kept' : ''), 6000);
     rcdCloseIo();   // the recorder itself stays until the take is in, then closes
     const fin = () => { if (RCD.on || RCD.sync || RCD.onDone) return void setTimeout(fin, 100); if (!RCD.io) rcdClose(); rcdUi(); }; fin(); };
   io.tick = setInterval(() => { mapUpd(); if (++io.sync % 20 === 0 && !RCD.on){ IOH.clkT = 0; iohClock(); } }, 500);   // the clocks, kept lined up
@@ -18823,7 +18823,7 @@ async function importChainsFile(f){
     S.chainPatch = d.format === 'chains.patch' ? d : normalizeChainsImport(d);
     CH.doc = S.chainPatch; chainsDropFrame();
     if (view === 'chains') showChains();
-    saveS(); chainsReload(); toast('Loaded “' + (d.meta && d.meta.name || f.name) + '”.');
+    saveS(); chainsReload(); toast('Loaded “' + (d.meta && d.meta.name || f.name) + '”');
     return true;
   } catch(err){ toast(err.message || 'Couldn’t read that chains file.'); return false; }
 }
@@ -21678,7 +21678,7 @@ function freePhraseNear(src){
 const phraseInSect = id => S.chains.some(c => c && c.some(r => r[0] === id));
 function ensureSectPhrase(cid){
   if (cid < 0 || !isEmptySect(S.chains[cid])) return;
-  const pid = !phraseInSect(cid) ? cid : freePhrase(); if (pid < 0) return toast('No free phrases left.');
+  const pid = !phraseInSect(cid) ? cid : freePhrase(); if (pid < 0) return toast('No free phrases left');
   sectRowEdit(cid, 0)[0] = pid;
   if (isEmptyPhrase(S.phrases[pid])){ S.plen[pid] = S.dlen || 16; S.plpb[pid] = 0; }
   saveS();
@@ -21693,7 +21693,7 @@ function sectForPhrase(p, x, y){
   const usedElsewhere = k => S.song.some((r, yy) => r.some((v, xx) => v === k && !(xx === x && yy === y)));
   let cid = isEmptySect(S.chains[p]) && !usedElsewhere(p) ? p : -1;
   if (cid < 0) cid = freeSect();
-  if (cid < 0){ toast('No free sects left.'); return -1; }
+  if (cid < 0){ toast('No free sects left'); return -1; }
   S.chains[cid] = freshSect(); S.chains[cid][0][0] = p;
   if (isEmptyPhrase(S.phrases[p]) && !S.plen[p]) S.plen[p] = S.dlen || 16;
   return cid;
@@ -26589,7 +26589,7 @@ function busNo(t, id){ if (!(id >= 0 && t >= 0 && t < NT && busTrack(t) && busNo
 function busNoteNo(){ busRefNotes++; busRefQ(); return true; }   // a phrase cell with a note, volume or instrument for a bus phrase
 function busRefFlush(){ const ids = busRef ? [...busRef] : [], nn = busRefNotes; busRef = null; busRefNotes = 0; if (!ids.length && !nn) return;
   const nm = ids.map(i => hp(songShown(i))).join(', ');
-  toast(ids.length ? (ids.length === 1 ? `Pattern ${nm} has notes` : `Patterns ${nm} have notes`) + ' · a bus track takes commands only' : 'A bus track takes commands only · nothing pasted', 4500); }
+  toast(ids.length ? (ids.length === 1 ? `Pattern ${nm} has notes` : `Patterns ${nm} have notes`) + ' · a bus track takes commands only' : 'A bus track takes commands, not notes · nothing pasted', 4500); }
 const pCols = () => mstView() || busFxView() ? [6, 7, 8, 9, 10, 11] : polyView() ? [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11] : [0, 4, 5, 6, 7, 8, 9, 10, 11];
 const kindAt = (v, x) => v === 'song' ? 'sect' : v === 'sect' ? (x ? 'tsp' : 'phrase') : PK[x];
 function getCell(v, x, y){
@@ -27318,7 +27318,7 @@ function modBump(d, big){
   if (c.x === 0){   // TARGET: Ctrl+arrows step through the picker's list (each track's, then the master's); an empty row takes the first
     const t = modT(), ids = []; for (let k = 0; k < ntr(); k++) for (const [id] of tgtList(k)) ids.push(id); for (const [id] of tgtList(MT)) ids.push(id);
     if (!ids.length) return;
-    if (!L){ const a = modArr(); if (a.length >= PLFO_MAX) return toast('LFO ' + (c.y + 1) + ' is empty: EDIT on TARGET picks what it moves.', 2500);
+    if (!L){ const a = modArr(); if (a.length >= PLFO_MAX) return toast('LFO ' + (c.y + 1) + ' is empty: EDIT on TARGET picks what it moves', 2500);
       const own = t === MT ? tgtList(MT) : tgtList(t), id = (own[0] || [ids[0]])[0], P = perfOf(); (P.lfo[t] || (P.lfo[t] = [])).push({id, sh:0, rt:3, dp:128}); cs.mod.y = P.lfo[t].length - 1; saveS(); draw(); return; }
     let i = ids.indexOf(L.id); if (i < 0){ const own = tgtList(t); i = Math.max(0, ids.indexOf((own[0] || [ids[0]])[0])); }
     i = clamp(i + d * (big ? 8 : 1), 0, ids.length - 1);
@@ -27485,7 +27485,7 @@ document.addEventListener('keyup', e => audRelease(e.code));
 window.addEventListener('blur', () => { for (const k of [...audHeld.keys()]) audRelease(k); try { releaseKeys(); } catch(e){} });
 function insertAt(x, y, k, chordOk){
   if (k === 'tsp') return;
-  if (k === 'fxv' && getCell(tv, x - 1, y) < 0) return toast('Pick an effect in the column to the left first.');
+  if (k === 'fxv' && getCell(tv, x - 1, y) < 0) return toast('Pick an effect in the column to the left first');
   if (chordOk && k === 'note' && tv === 'phrase' && lastChord && lastChord.ref === last.note){   // CHORD PICK-UP: Enter / EDIT on an empty note cell
     if (polyView() && !busTrack(cTrack) && cTrack !== MT) return void chordDrop(y);
     const keep = lastChord; setCell(tv, x, y, last[k]); after(k, tv, x, y, last[k]); lastChord = keep;   // a mono track holds one note: the one that was under the cursor
@@ -27853,7 +27853,7 @@ function insertPaste(){
   const c = cs.song, r = selA && selA.v === 'song' ? selRect() : null, pk = sxPicks.length ? Math.max(...sxPicks.map(q => q.y)) : -1;
   const at = (r ? r.y1 : Math.max(c.y, pk)) + 1, h = clip.picks ? Math.max(...clip.picks.map(p => p.dy)) + 1 : clip.d.length;
   if (at > 255) return toast('No room below the last row.');
-  if (!songRowsInsert(at, h)) return toast(`No room: the song’s last ${h > 1 ? h + ' rows aren’t' : 'row isn’t'} empty.`);
+  if (!songRowsInsert(at, h)) return toast(`No room: the song’s last ${h > 1 ? h + ' rows aren’t' : 'row isn’t'} empty`);
   if (r) c.x = r.x0; selA = null; sxPicks = []; c.y = at;
   if (clip.picks) pastePicks(); else if (clip.uniq) pasteClone(); else paste();
   const VR = asongOn() || (apReady && apF) ? arrRows() : songRows(); if (c.y > (c.top || 0) + VR - 1) c.top = Math.min(256 - VR, c.y - VR + 1);
@@ -28131,7 +28131,7 @@ function rowsRemove(){
 }
 function toggleSel(){
   if (onPset()) return;
-  if (!GRIDV.has(tv)) return toast('Selecting works in Song, Sect and Phrase.');
+  if (!GRIDV.has(tv)) return toast('Selecting works in Song, Sect and Phrase');
   if (selA){ selA = null; toast('Selection off'); } else { selA = {x:cs[tv].x, y:cs[tv].y, v:tv}; toast('Selecting: arrows extend · ALT copies · ALT+EDIT cuts'); }
   draw();
 }
@@ -28212,7 +28212,7 @@ function muteKey(trackOnly){
   toast(`${m.mute ? 'Muted' : 'Unmuted'} track ${d2(t + 1)} · / or \\ again ${m.mute ? 'unmutes' : 'mutes'} it`);
 }
 function soloKey(all){
-  if (all){ if (!S.mix.some(m => m.solo)) return toast('Nothing is soloed.'); S.mix.forEach(m => m.solo = false); mixChanged(); draw(); return toast('Solo cleared: every track plays.'); }
+  if (all){ if (!S.mix.some(m => m.solo)) return toast('Nothing is soloed.'); S.mix.forEach(m => m.solo = false); mixChanged(); draw(); return toast('Solo cleared: every track plays'); }
   const mst = tv === 'song' ? cs.song.x === MT : tv === 'mixer' ? onMstCell() : tv === 'fx' || tv === 'mod' ? cFxT >= NT : cTrack === MT;
   if (mst) return toast('The master can’t be soloed.');
   const t = dkTrack(), m = S.mix[t]; if (!m) return;
@@ -28471,11 +28471,11 @@ function copyHere(cut){
   if (tv === 'song' && sxPicks.length) return copyPicks(cut);
   if (selA) return copySel(cut);
   if (!GRIDV.has(tv) || onPset()) return toast('Copy works in Song, Sect and Phrase.');
-  const c = cs[tv]; if (c.y < 0) return toast('Move to a row first.');
+  const c = cs[tv]; if (c.y < 0) return toast('Move to a row first');
   const v = getCell(tv, c.x, c.y), k = kindAt(tv, c.x);
   if (tv === 'phrase' && k === 'note'){
     const ins = getCell(tv, IC, c.y);
-    if (v < 0) return toast('Nothing under the cursor to ' + (cut ? 'cut.' : 'copy.'));
+    if (v < 0) return toast('Nothing under the cursor to ' + (cut ? 'cut' : 'copy'));
     const row = new Array(IC - c.x + 1); row[0] = v; row[IC - c.x] = ins;
     clip = {v:tv, x0:c.x, d:[row], line:false};
     if (cut){ setCell(tv, c.x, c.y, -1); const r = S.phrases[cPhrase] && S.phrases[cPhrase][c.y]; if (r && r.slice(0, NCOL).every(n => n < 0)) setCell(tv, IC, c.y, -1); }
@@ -29382,7 +29382,7 @@ function mutatePhrase(){
         if (prev && emptyRow(r) && r[0] !== OFF && rnd() < a * (off ? 0.2 : 0.07)){ r[0] = prev.n; { const ii = mutIns >= 0 ? mutIns : prev.i; if (ii != null && ii >= 0) r[IC] = ii; } r[VC] = 0x50 + Math.floor(rnd() * 0x40); nA++; } } }
     saveS(); draw();
     toast(`Mutated rows ${rS(y0)}–${rS(y1)}: ${nP} pitch, ${nD} dropped, ${nA} added, ${nT} moved, ${nV} volumes` + (found ? ' · in ' + found.name : ''), 3500); };
-  const original = () => { if (S.phrases[ph0] !== P) return; orig.forEach((r, y) => { P[y] = r.slice(); }); saveS(); draw(); toast('Back to the phrase as it was.'); };
+  const original = () => { if (S.phrases[ph0] !== P) return; orig.forEach((r, y) => { P[y] = r.slice(); }); saveS(); draw(); toast('Back to the phrase as it was'); };
   genPanel('Mutate', `A variation of rows ${rS(y0)}–${rS(y1)} of this phrase` + (found ? `, in ${found.name} (${found.from})` : ', in steps and octaves (no key found in the song yet)') + '. Each press varies what is there now; Original puts it back.',
     ({field, slider}) => {
       slider('Amount', () => mutSet.amt, v => { mutSet.amt = v; });

@@ -2740,7 +2740,7 @@ class PatchStore {
   importFrom(file){
     return file.text().then(txt => {
       const d = JSON.parse(txt);
-      if (d.format !== 'waves.patch') throw new Error('That file isn’t a waves patch.');
+      if (d.format !== 'waves.patch') throw new Error('Not a waves patch');
       this.snapshot(); this._restore(JSON.stringify(d));
     });
   }
@@ -4627,7 +4627,7 @@ document.getElementById('fsave').addEventListener('click', () => savePatch(false
 document.getElementById('fsaveas').addEventListener('click', () => savePatch(true));
 document.getElementById('undobtn').addEventListener('click', undo);
 document.getElementById('redobtn').addEventListener('click', redo);
-document.getElementById('fexpmods').addEventListener('click', () => { if (!doc.custom.length){ toast('No custom modules yet.'); return; } store.exportCustom(); });
+document.getElementById('fexpmods').addEventListener('click', () => { if (!doc.custom.length){ toast('No custom modules yet'); return; } store.exportCustom(); });
 document.getElementById('fimpmods').addEventListener('click', () => pickFile('custom'));
 const pnameEl = document.getElementById('pname');
 {
@@ -4644,7 +4644,7 @@ const pnameEl = document.getElementById('pname');
       file:{
         new(){ newPatch(); }, open(){ pickFile('patch'); }, save(){ savePatch(false); }, saveAs(){ savePatch(true); },
         undo(){ undo(); }, redo(){ redo(); }, canUndo(){ return canUndo(); }, canRedo(){ return canRedo(); },
-        exportCustom(){ if (!doc.custom.length){ toast('No custom modules yet.'); return; } store.exportCustom(); },
+        exportCustom(){ if (!doc.custom.length){ toast('No custom modules yet'); return; } store.exportCustom(); },
         importCustom(){ pickFile('custom'); }
       },
       patchSettings(){

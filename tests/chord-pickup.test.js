@@ -79,12 +79,12 @@ test('mono track: the pick-up is the single note, exactly as before', () => {
 test('a chord dropped on a mono track writes only the note that was under the cursor, says so, and stays current for a poly track', () => {
   const P = rig(); chordRow(P.row(2)); P.pick(1, 2); const chord = P.c.getChord();
   const M = rig({ poly: false }); M.c.setChord(chord); M.c.last.note = 52; M.drop(0, 7);
-  assert.equal(M.row(7)[0], 52); assert.equal(M.row(7)[1], -1); assert.match(M.log.toast.at(-1), /^Dropped one note \(E-4\): the 3 notes of the chord need a poly track/);
+  assert.equal(M.row(7)[0], 52); assert.equal(M.row(7)[1], -1); assert.match(M.log.toast.at(-1), /^Dropped a note \(E-4\): 3-note chords need a poly track/);
   assert.equal(M.c.getChord(), chord, 'still current');
 });
 test('a bus or the master takes no chord (a bus refuses notes before this is reached; the drop guards it too)', () => {
   const P = rig(); chordRow(P.row(2)); P.pick(0, 2);
-  const B = rig({ bus: true }); B.c.setChord(P.c.getChord()); B.c.last.note = 48; B.drop(0, 7); assert.equal(B.row(7)[1], -1); assert.match(B.log.toast.at(-1), /^Dropped one note/);
+  const B = rig({ bus: true }); B.c.setChord(P.c.getChord()); B.c.last.note = 48; B.drop(0, 7); assert.equal(B.row(7)[1], -1); assert.match(B.log.toast.at(-1), /^Dropped a note/);
 });
 test('effect and volume columns pick up as before, and leave a chord current', () => {
   const R = rig(); chordRow(R.row(2)); R.row(2)[FX0] = 1; R.row(2)[FX0 + 1] = 0x20; R.pick(0, 2); const ch = R.c.getChord(); R.pick(FX0, 2);
