@@ -143,7 +143,7 @@ test('FREEZE rule: the pieces are wired (gate before the node, PLAY stamp, resta
   assert.match(html, /for \(const ev of \['pointerdown', 'touchstart', 'keydown'\]\) addEventListener\(ev, psHit, true\)/);
   assert.match(html, /createChannelSplitter\(2\); psAn = \[ctx\.createAnalyser\(\), ctx\.createAnalyser\(\)\]/, 'one analyser per channel');
   assert.match(html, /changed\(cur\); refreshAll\(\); try \{ if \(psIsFreeze\(x\)\) psWarmNow\('engine'\)/, 'an engine switch to FREEZE builds at once');
-  assert.match(html, /setSong\(ns, 'Loaded ' \+ \(ns\.name \|\| name\)\);\n    psWarmNow\('load'\)/, 'a song load');
+  assert.match(html, /setSong\(ns, 'Loaded ' \+ \(ns\.name \|\| name\)\);\n    try \{ psWarmNow\('load'\)/, 'a song load');
   assert.match(html, /slotsUI\(\); \} catch\(e\)\{\} psWarmNow\('kit'\); \}/, 'a kit load');
   assert.match(html, /psOK\.add\(ac\); setTimeout\(\(\) => psWarmNow\('ready'\), 0\)/, 'the pump worklet becoming ready');
   assert.match(html, /rt\.man\.forEach\(\(a, i\) => \{ a\.fftSize = 1024; sp\.connect\(a, i\); \}\); try \{ psEnsureAn\(\)/, 'analysers made at rtInit');

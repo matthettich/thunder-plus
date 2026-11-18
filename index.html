@@ -23736,17 +23736,26 @@ const PSYN_WK = 'pump/synth/pump-synth-worklet.js?v=13', psOK = new WeakSet(), p
 /* FREEZE'S ONE-TIME COST (17 and 18 Nov, pump e43ee10 / 24a24e1): pump-synth.wasm builds FREEZE's seven built-in spectra inside psyn_new, about
    0.9 s, once per wasm instance (one per audio context's worklet scope), and a live node's psyn_new runs on the audio thread: every node in
    the context stops for that long. psWarm = the audio contexts whose instance has already made a FREEZE (a new node is then instant).
-   THE RULE: the one-time build happens ONLY while the transport is stopped AND the output is quiet; never at PLAY, never during play, never
-   while a tail rings. UNTIL IT HAS HAPPENED, FREEZE PADS PLAY THEIR RENDER (psNode returns null for a live FREEZE node in a context not in psWarm).
-   - Who asks: psWarmSoon(), from a song change (liveWarmSoon), a kit load (setKit), any sound edit (changed(): a pad switched to FREEZE), STOP.
-     A kit with a live FREEZE pad, used or not, pays it (about 0.9 s and 11 MiB once per page); a kit without one pays nothing.
-   - When it runs (psWarmTick, one tick every 0.5 s, shorter only if the sample rate is above 65 kHz: the tick is shorter than a dedicated 32768-sample analyser on
-     `master`, so every tick sees ALL the sound since the last one, sparse echoes included): not playing (tp.on) and not starting or restarting (psGoT: tStart
-     stamps it, so PLAY again and a jump to another row mid-song count as playing; STOP clears it), no sample recording (RCD.on), the audio running, NOTHING above -70 dBFS
-     (peak 0.00032) for 3 s in a row (any louder tick starts the 3 s again) AND 3 s since the last trigger (psHit, psHitT). Triggers, the entry points of sound while
-     stopped: any pointerdown / touchstart / keydown (touch, mouse, keyboard hits, preview / audition buttons, Measure, the metronome, record arm: all begin with one),
-     `onMidi` (MIDI in), `play` and `padPress` (pads), `holdNote`, `preview`, the player's note function (`makePlayer`'s `play(ev)`), and any audio-context state change
-     or a tick that finds the context not running (a resume: phone screen back on, tab refocused). Without a level source it waits the same 3 s with no trigger.
+   THE RULE: the one-time build happens ONLY while the transport is stopped AND the output is quiet (BOTH channels); never at PLAY, never during play,
+   never while a tail rings. UNTIL IT HAS HAPPENED, FREEZE PADS PLAY THEIR RENDER (psNode returns null for a live FREEZE node in a context not in psWarm).
+   Two ways in:
+   1. AT ONCE (psWarmNow), where a pause is expected: a song load (loadProjText), a kit load (setKit), a pad's engine switched to FREEZE (setEngine), and the
+      worklet becoming ready (page load with a FREEZE song). If the transport is stopped, the context running, the tab visible, no recording, the worklet ready
+      and BOTH channels quiet RIGHT NOW (one fresh read of the last 0.68 s; no 3 s wait; the psHit stamp of the tap that caused the action does NOT block),
+      it builds immediately, as part of the action. If the analysers are younger than one window it waits for them (a few ms to 0.7 s) and asks again.
+      If it is not quiet it falls back to way 2.
+   2. AFTER A QUIET SPELL (psWarmSoon / psWarmTick): from a sound edit (changed()), STOP, a retry, or the fall-back of way 1. Needs the transport stopped, 3 s in a row
+      of both channels below -70 dBFS AND 3 s since the last trigger (psHit). A kit gaining its first FREEZE pad while stopped and quiet pays at once (way 1); during play
+      it pays after STOP.
+   - The quiet check: master goes through a ChannelSplitter into ONE 32768-sample analyser PER CHANNEL (a mono down-mix let anti-phase noise and a left-only
+     sound read as quiet). Both channels must peak below -70 dBFS (0.00032). The tick (psWarmTick, 500 ms, shorter only above 65 kHz) is shorter than the window, so
+     every tick sees ALL the sound since the last one, sparse echoes included. A LATE tick (more than a window since the previous one: a throttled or frozen tab) is
+     treated as not quiet and restarts the 3 s; nothing is done while document.hidden.
+   - Playing means tp.on or psGoT (tStart stamps it, so PLAY again and a jump to another row mid-song count as playing; STOP clears it). Also no sample
+     recording (RCD.on) and the audio running. Triggers (psHit, psHitT), the entry points of sound while stopped: any pointerdown / touchstart / keydown,
+     `onMidi`, `play` and `padPress`, `holdNote`, `preview`, the player's note function (`makePlayer`'s `play(ev)`), and any audio-context state change or a tick
+     that finds the context not running. They hold back way 2 only.
+   - A PLAY or a hit that arrives INSIDE the 0.9 s build waits for it (the audio thread is busy); it cannot be sliced web-side. Proper fix: pump builds the spectra lazily / in chunks.
    - What it does: one silent throwaway FREEZE node (psWarmUp) that the worklet answers with {opened:1} once its psyn_new has returned: then
      psWarm has the context and the throwaway is disposed. {failed}: the context is NOT marked warm (the render keeps playing), psWarming is
      cleared and it tries again 3 s later, then 6 s later, then stops (three attempts in all; the next song / kit change starts again). No answer in 10 s: the same.
@@ -25673,7 +25682,7 @@ async function loadProjText(text, name, where){
     /* from a file (where.file, a path or a handle): a default-named song takes the file's name, before setSong so it is not a change; a backup or the first-run song has no where.file */
     if (where && (where.file || where.path || where.h) && songNameDefault(ns.name)){ const fn = fileSongName(name); if (fn) ns.name = fn; }
     setSong(ns, 'Loaded ' + (ns.name || name));
-    psWarmNow('load');   // a FREEZE pad in the song's kit: its one-time build now, if stopped and quiet (a pause here reads as loading)
+    try { psWarmNow('load'); } catch(e){}   // a FREEZE pad in the song's kit: its one-time build now, if stopped and quiet (a pause here reads as loading)
     if (where && (where.path || where.h)){ projSet(where.path, where.h); setDirty(false); } else setDirty(!!(where && where.dirty));
     if (where && where.file && !where.path && !where.h && name){ projLoose = {f:String(name), s:S.name}; try { msMeta(); dirtyShow(); } catch(e){} }   /* no handle: the file's name is all the app has of it */
     // FIX (27 Oct, audit B2): an opened project starts a fresh undo history, as in any DAW. Undo used to bring back the
@@ -36416,6 +36425,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [644, '18 Nov', ['pump FREEZE now does its one second of one-time work right when you load a song, load a kit or switch a pad to FREEZE (if nothing is playing), so the first FREEZE hit or PLAY after that does not stall. A silent check on both stereo channels decides when it is quiet enough.']],
   [643, '17 Nov', ['The …pump effects and synths were rebuilt from the newest pump. pump WOB no longer goes silent (or stops the synth) on the very highest notes with Octave +2 and Tune +12, and pump FREEZE does its one second of one-time work only while the song is stopped and quiet; until then a FREEZE pad plays its rendered sound. TUBE, LIMIT, HEAT, STRIP, MONO, FOLD and GLOSS sound the same (the difference is far below what can be heard).']],
   [642, '17 Nov', ['Pattern view: one playhead look. While the song plays, each track shows its own bar on the row it is playing (tracks can be on different rows), including the track you are editing: your cursor cell keeps its colours with a ring on top of the bar. The black bar across all the tracks is gone, and so is the faint band that hid under the cursor. Stopped, the bars stay where each track stopped.', 'Bottom FX bar: a folded ...CHAINS is now only its vertical tab, like MOD (it used to keep a small chain diagram beside the tab). Its tab names the track on show.', 'Pattern view: FIT 32 (the pattern\u2019s own row count) on the Pattern bar, View \u203a FIT PATTERN ROWS or Ctrl/\u2318+Alt+0 makes the text as big as it can be with every row showing; A\u2212 A+ (or Ctrl/\u2318+Alt+\u2212 and +, Ctrl/\u2318+wheel or a pinch over the pattern, View \u203a PATTERN TEXT) change the text a pixel of row height at a time, not under 9 px. Remembered on this device.']],
   [641, '17 Nov', ['Pop-up messages reworded across the app, from the audit sheet you approved: shorter, no final period, and one wording for the same event everywhere (Cable removed, Loaded “name”, Couldn’t save: reason, Undo brings it back). Chains and Waves use the same texts. A few raw or half-sentences are fixed too (Loaded with no kit name, the one-time bus note starting in lower case, the MIDI file errors). Nothing about what the buttons do has changed.']],
