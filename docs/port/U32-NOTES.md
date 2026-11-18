@@ -106,7 +106,12 @@ Where native is stricter than the JS (the JS would read undefined, give NaN, or 
 18 seeded faults (`native/tools/sf-mutate.py`; run from the repo root with `SF_BUILD=<build dir>`), each must make `ctest -R '^sf(_unit)?$'` fail: sfSrc constant, velocity-modulator skip, mod-env sustain clamp, layer limit, stereo-pair zone, preset fallback bank, render loop minimum, release time constant, render normalisation, SF2 int16 scale, SF3 loop rounding, live quantum 128 to 64, prune at every piece, unstable preset sort, pageTail cap, pageTail single-page condition, key-list filter, SF3 flag detection. See the final section for the run.
 
 ## Final run
-(filled in below once the builds finish)
+Date 2026-11-18, GCC Release, `nice`, `-j1`, final code (after pageTail, key list and the Chrome-fit resampler):
+- Closed build (LXR, DSP, pump OFF): 107 tests, 0 failed, 5 skipped (fxzero, pump, pumpsynth, pumpsynth_fuzz, fx: they need pump).
+- Default build (LXR, DSP, pump ON): 151 tests, 0 failed, 1 skipped (`pumpsynth_refused`, which only runs in the closed build).
+- Mutations: all 18 CAUGHT in the final run (`SF_BUILD=<dir> python3 native/tools/sf-mutate.py`).
+- Fuzz, ASan + UBSan, `test_sf_fuzz 1500 11` (and `1500 7` and `200 x` earlier on the previous code): 6000 + 1500 mutated SF2 files (4195 + 1038 parsed and fully used), 187 mutated GM font copies (148 used), 15000 corrupted Ogg streams (3450 decoded, 11550 refused; with and without `pageTail` and resampling), 1500 extreme-field fonts (359 notes, 9000 blocks): no sanitizer report, no stb_vorbis patch.
+- `rt_harness` `run_sf`: no allocation on the audio thread.
 
 ## Unverified or not done
 - int16 storage (halves the RAM, changes the bits) is not done; the key list is the reduction.
