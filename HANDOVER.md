@@ -531,6 +531,26 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0) and `link/` (Ableton
 
 ## To-do (owner's list: keep it current; newest dated entries below have the details)
 
+### PICK UP HERE (17 Nov, 22:00)
+
+- **Web app:** `main` = `beta` = build 642. Desktop v1.3.12 is build 639; the owner has not asked for another desktop build.
+- **Build 639:** Chains and Waves editors start again (a raw U+2028 / U+2029 in a regex had stopped both since about build 620); the owner's song is the first-open default.
+- **Build 640:** a module dragged to the edge stays under the pointer; Undo of a long drag is one step.
+- **Build 641:** 299 pop-up messages reworded from the audit sheet https://claude.ai/artifact/WSbgsqqBk5oU6QbpWTKMPy; 53 not applied, listed in HANDOVER. The owner reviews the reworded pop-ups from the sheet later.
+- **Build 642:** one playhead rule in Pattern view (a bar per track on its own row, the active track included, playing and stopped); the FX bar's ...CHAINS section collapses to its tab; FIT rows and A- / A+ for the pattern grid (9 px rows is the floor).
+- **Decided by the owner (17 Nov):**
+  - The ...chains editor keeps accepting any cable into any input; no port-kind rule.
+  - Effect slots stay at 8 for now; 12 slots is a future feature.
+  - The dual sound bug (both instruments sound when a note's instrument number changes during playback) can wait.
+- **Future features, in order:**
+  1. Bus into bus, FIRST: a bus's output, with its FX, feeds another bus through ...chains.
+  2. 12 effect slots.
+- **Native port:** 31 of 37 units merged; no open pull requests; no worker running. The brief for a new chat is `docs/port/PICKUP.md` on the `native` branch. The owner starts it with: "pull thunder-plus, branch native, and continue from docs/port/PICKUP.md".
+- **Waiting on the owner:**
+  - Confirming the pump repo commit with the synth fixes, so native and the web app can be re-pinned.
+  - His ears on Elements, LXR and Plaits.
+  - The SoundFont decoder licence decision.
+
 ### PICK UP HERE (16 Nov, 23:00)
 
 - **Web app:** build 637 is on `beta` and `main`. It contains 635 (the wavetable table is one entry longer, so a negative Bend no longer reads past it; `pumpRun` never writes more floats than the plugin has parameters), 636 (on a folded phone, BPM / LPB / ROWS / LEFT sit in the top bar beside the CPU meter) and 637 (three or four view tabs keep their own row under 600 px).
