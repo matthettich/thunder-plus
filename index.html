@@ -32126,7 +32126,7 @@ function deckFxBar(){
         r.addEventListener('pointerdown', () => { dkFbPick(r); dkFbFoc = true; bar.classList.add('kfoc'); });
         r.dataset.sel = selK; r._fb = {t, k, i:D.ps.indexOf(q), q}; { const li = tgtRowId(t, k, f, q); if (li) lb.dataset.lfo = li; }
         const show = x => q.names ? (q.names[x] ?? String(x)) : (q.tpl || q.band) ? q.fmt(x, getF()) : q.fmt(x);
-        const cur = g => (q.k === 'pat' && flxCellVal(mst ? NT : dkTrack(), g)) ?? g[q.k];   // FX BAR → COMMAND CELL: what the row shows (the FLX cell under the cursor, else the effect's own)
+        const cur = g => (q.k === 'pat' ? flxCellVal(mst ? NT : dkTrack(), g) : null) ?? g[q.k];   // FX BAR → COMMAND CELL: what the row shows (the FLX cell under the cursor, else the effect's own)
         const set = x => { const g = getF(); if (!g) return; x = clamp(Math.round(x), q.min, q.max); const cell = q.k === 'pat' && g.type === 'flex' ? flxCellAt(mst ? NT : dkTrack()) : null;
           if (x === g[q.k] && !(cell && cell.r[cell.m + 1] !== x)) return; g[q.k] = x; if (cell) cell.r[cell.m + 1] = x; if (isPumpT(g.type)) delete g.pname; fxChanged(mst ? NT : dkTrack()); v.textContent = show(x); if (cell) draw(); };
         r._fbSet = d => { const g = getF(); if (g) set(cur(g) + d); };
