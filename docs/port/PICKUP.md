@@ -81,6 +81,12 @@ plan; sections 1 to 4 and 9), `HANDOVER.md` on `beta` (the web app, the owner's 
     sustains them by default. A web-side fix (decode SF3 with a wasm Vorbis decoder) is a possible future item: not started, not asked for.
 - **Then:** the wiring per `docs/port/WIRING-DOSSIER.md` part 5 (U34a first), U36, N2. Estimates: about 50 % of the port, 31 of 37 units merged.
 
+## State at 12:55 on 18 Nov (the lead, NEW chat; read after the 13:00 section, which was written just before the move)
+- New session: `native` cloned at `/home/claude/thunder-plus`, worktrees `/home/claude/wt/u31` and `/home/claude/wt/u32`. A Sonnet worker per branch was
+  started at 12:50 from heads ee359e3 (U31) and 89ad779 (U32) with the second-round lists above; each pushes every 30 minutes, fetches before pushing
+  and never force-pushes. Neither PR is merged. The lead reads `chains/clive.cpp` and `cengine.cpp` line by line once U31's worker reports.
+- Check-ins (this chat): a restart check at 14:05, then after each usage reset: 15:02, 20:07 on 18 Nov; 01:12, 06:17 on 19 Nov (Mountain).
+
 ## Rules the lead set for gates (they hold for every remaining unit)
 - Ported JS: bit-exact against the web app's goldens and a Node reference; committed Linux hashes gate every platform. Never loosen a gate, never hand-edit a
   golden, no `-ffast-math`.
