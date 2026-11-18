@@ -31,6 +31,8 @@ bool decodeOgg(const uint8_t* p, size_t n, std::vector<float>& d, double& sr) {
     d.insert(d.end(), tmp, tmp + got);
   }
   stb_vorbis_close(v);
+  // A corrupt stream can decode to infinities or NaN (a hostile codebook): the 1-sample silence instead, so nothing non-finite ever reaches a voice's filter state (U32-NOTES.md "Choices": the JS has no such check).
+  for (float x : d) if (!std::isfinite(x)) return false;
   return !d.empty();
 }
 

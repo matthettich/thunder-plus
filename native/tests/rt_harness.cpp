@@ -30,9 +30,13 @@
 #include "engine/live_shell.h"
 #include "engine/pumpsynth.h"
 #include "voice/voice.h"
+#include "sf/sf.h"
+#include "sf/sf_live.h"
 #include "waves/waves.h"
 
+#include <algorithm>
 #include <cmath>
+#include <iterator>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -244,6 +248,50 @@ static int run_voice() {
   if (pool.dropped() || pool.tOverflow() || pool.autoDropped()) return fail("the voice pool dropped notes or automation events");
   if (notes < 100 || peak <= 0) return fail("the voice run played (almost) nothing");
   std::printf("rt_harness: voice pool: %ld notes over %ld frames, peak %d voices, no allocation\n", notes, frame, pool.peakVoices());
+  return 0;
+}
+
+// ---- U32: the SoundFont live pool under the guard ---------------------------------------------------------------------------------
+// The font is parsed and the preset's samples decoded OUTSIDE the guard (the control thread, "prepared before play"); every note / off / mod / stp / stopAll and every render() runs inside it, at mixed host block sizes.
+static int run_sf() {
+  using namespace thunder; using namespace thunder::sf;
+  std::ifstream fin(std::string(THUNDER_ROOT) + "/native/tests/golden/sf_test.sf2", std::ios::binary); std::vector<uint8_t> bytes((std::istreambuf_iterator<char>(fin)), std::istreambuf_iterator<char>());
+  Font font; if (bytes.empty() || parse(bytes.data(), bytes.size(), font) != kParseOk || font.presets.empty()) return fail("sf: the test font did not load");
+  std::vector<PresetPcm> pcms(font.presets.size()); for (size_t i = 0; i < font.presets.size(); i++) prepare_preset(font, &font.presets[i], DecodeOpts(), pcms[i]);
+  const int PN = (int)std::min<size_t>(3, font.presets.size()); SfPad pads[3]; VoiceKit kit[3];
+  for (int p = 0; p < PN; p++) { pads[p].font = &font; pads[p].pr = &font.presets[(size_t)p]; pads[p].pcm = &pcms[(size_t)p]; pads[p].P.atk = 1; pads[p].P.rel = 1; pads[p].P.velo = 0.7; kit[p].syn = true; kit[p].choke = p == 1 ? 1 : 0; }
+  SfPool pool(48000, 32);
+  const int MAXB = 512; std::vector<float> L((size_t)8 * MAXB), R((size_t)8 * MAXB); float* ls[kVoiceTracks] = {}; float* rs[kVoiceTracks] = {};
+  for (int t = 0; t < 8; t++) { ls[t] = &L[(size_t)t * MAXB]; rs[t] = &R[(size_t)t * MAXB]; }
+  static const double arp[8] = {0.001, 1, 0.01, 1.5, 0.02, 2, 0.03, 1.25};
+  uint32_t rng = 20261117; auto rnd = [&]() { rng = rng * 1664525u + 1013904223u; return (rng >> 8) / 16777216.0; };
+  long frame = 0; double peak = 0; long notes = 0; bool finite = true;
+  { rt_guard g;
+    for (int blk = 0; blk < 3000; blk++) {
+      const int N = 1 + (int)(rnd() * MAXB); const double t0 = (double)frame / 48000;
+      pool.setFrame((uint64_t)frame);
+      const int ne = (int)(rnd() * 3.5);
+      for (int q = 0; q < ne; q++) {
+        SeqEvent e; const double z = rnd(); e.track = (int)(rnd() * 8); e.t = t0 + rnd() * 0.01 + 0.003; e.rate = 0.5 + rnd() * 1.5; e.gain = 0.2 + rnd() * 0.8; e.pan = rnd() * 255; e.col = (int)(rnd() * 4);
+        if (z < 0.55) { e.type = SEV_NOTE; e.poly = rnd() < 0.6; const double y = rnd(); const double* ap = nullptr;
+          if (y < 0.15) { e.has |= SH_SLIDE; e.slideFrom = 0.5; e.slideDur = 0.05; } else if (y < 0.3) { e.has |= SH_ARP; e.arpN = 4; ap = arp; } else if (y < 0.4) { e.has |= SH_VIB; e.vibSpd = 4; e.vibDep = 9; e.vibT1 = e.t + 0.2; } else if (y < 0.5) { e.has |= SH_BEND; e.bendMul = 2; e.bendT1 = e.t + 0.1; }
+          if (rnd() < 0.1) { e.has |= SH_CUT; e.cut = e.t + 0.05; }
+          const int pi = (int)(rnd() * PN); if (rnd() < 0.1) pool.take(e, &kit[pi]); else if (pool.note(e, ap, pads[pi], kit[pi])) notes++;
+        } else if (z < 0.7) { e.type = SEV_OFF; if (rnd() < 0.5) { e.has |= SH_COLS; e.cols = (uint8_t)(1u << e.col); } pool.off(e); }
+        else if (z < 0.9) { e.type = SEV_MOD; e.has |= SH_GAIN | SH_PAN; if (rnd() < 0.3) { e.has |= SH_MUL; e.mul = 1.2; } pool.mod(e, nullptr); }
+        else if (z < 0.97) { e.type = SEV_STP; e.flag = rnd() < 0.3; pool.stp(e); }
+        else pool.stopAll(t0 + 0.001);
+      }
+      std::memset(L.data(), 0, L.size() * 4); std::memset(R.data(), 0, R.size() * 4);
+      pool.render(ls, rs, N, (uint64_t)frame);
+      for (int t = 0; t < 8; t++) for (int i = 0; i < N; i++) { const double a = ls[t][i], b = rs[t][i]; if (!(a == a) || !(b == b)) finite = false; peak = std::max(peak, std::max(std::fabs(a), std::fabs(b))); }
+      frame += N;
+    }
+  }
+  if (!finite) return fail("the SoundFont pool produced NaN");
+  if (pool.tOverflow() || pool.autoDropped()) return fail("the SoundFont pool dropped automation events");
+  if (notes < 100 || peak <= 0) return fail("the SoundFont run played (almost) nothing");
+  std::printf("rt_harness: SoundFont pool: %ld notes over %ld frames (%u refused for lack of a voice), no allocation\n", notes, frame, pool.dropped());
   return 0;
 }
 
@@ -931,6 +979,7 @@ int main(int argc, char** argv) {
   if (int r = run_core()) return r;
   if (int r = run_seq()) return r;
   if (int r = run_voice()) return r;
+  if (int r = run_sf()) return r;
   if (int r = run_mix()) return r;
   if (int r = run_master()) return r;
   if (int r = run_chain()) return r;

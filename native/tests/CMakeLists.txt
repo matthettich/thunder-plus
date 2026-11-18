@@ -775,3 +775,13 @@ if(NODE_EXE)
 else()
   add_test(NAME sf COMMAND test_sf compare /nonexistent)   # no Node: fails (nothing is skipped)
 endif()
+
+# U32 fuzz: hostile SF2 / SF3 files, corrupted Ogg streams (stb_vorbis) and several extreme voice fields at once. A small count in ctest, 20000 and more under THUNDER_SANITIZE=ON (docs/port/U32-NOTES.md).
+add_executable(test_sf_fuzz test_sf_fuzz.cpp)
+target_link_libraries(test_sf_fuzz PRIVATE thunder_core)
+target_include_directories(test_sf_fuzz PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../core/src ${CMAKE_CURRENT_SOURCE_DIR})
+target_compile_definitions(test_sf_fuzz PRIVATE THUNDER_ROOT="${CMAKE_CURRENT_SOURCE_DIR}/../..")
+if(NOT MSVC)
+  target_compile_options(test_sf_fuzz PRIVATE -Wall -Wextra)
+endif()
+add_test(NAME sf_fuzz COMMAND test_sf_fuzz 200 1)
