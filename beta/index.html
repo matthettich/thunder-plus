@@ -3588,9 +3588,9 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
         <button type="button" data-v="song">SONG</button><button type="button" data-v="sect">SECT</button><button type="button" data-v="phrase">PHRASE</button><button type="button" data-v="inst">INST</button>
         <button type="button" data-v="mixer" style="grid-column:span 2">MIXER</button><button type="button" data-v="fx">FX</button><button type="button" data-v="mod">MOD</button>
       </div>
+      <div class="tcard tinlw" id="tInlSideW" hidden><span class="tinlh">INSTRUMENTS</span><div class="tinl" id="tInlSide" aria-label="Instruments and their pads"></div></div>
       <div class="tcard tcst"><div class="tstat"><b id="tState"><svg class="ic" aria-hidden="true"><use href="#ic-stop"/></svg>STOPPED</b><span id="tBpm"></span></div>
         <div class="tmeters" id="tMeters"></div></div>
-      <div class="tcard tinlw" id="tInlSideW" hidden><span class="tinlh">INSTRUMENTS</span><div class="tinl" id="tInlSide" aria-label="Instruments and their pads"></div></div>
       <button type="button" class="tlegbtn" id="tLegBtn" aria-expanded="false" title="Main keys. Press ? or F1 to see them all.">KEYS ▸</button>
       <dl class="tlegend" id="tLegPad">
         <dt>?</dt><dd>help: every key and how it all works</dd>
@@ -26012,7 +26012,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 645;
+const BUILD = 646;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD + (location.pathname.includes('/beta/') ? ' · beta' : '');
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -36309,6 +36309,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [646, '18 Nov', ['Computer side panel: the instrument list now sits above the PLAYING / STOPPED box and the meters (it was below them). Nothing else in the panel moved.']],
   [645, '18 Nov', ['The pump update of builds 643 and 644 is taken back out for now. It made pump FREEZE pause the sound for about a second in ways that could not be hidden (the first notes after a kit load or an engine switch could be lost). It returns when pump itself is changed.']],
   [642, '17 Nov', ['Pattern view: one playhead look. While the song plays, each track shows its own bar on the row it is playing (tracks can be on different rows), including the track you are editing: your cursor cell keeps its colours with a ring on top of the bar. The black bar across all the tracks is gone, and so is the faint band that hid under the cursor. Stopped, the bars stay where each track stopped.', 'Bottom FX bar: a folded ...CHAINS is now only its vertical tab, like MOD (it used to keep a small chain diagram beside the tab). Its tab names the track on show.', 'Pattern view: FIT 32 (the pattern\u2019s own row count) on the Pattern bar, View \u203a FIT PATTERN ROWS or Ctrl/\u2318+Alt+0 makes the text as big as it can be with every row showing; A\u2212 A+ (or Ctrl/\u2318+Alt+\u2212 and +, Ctrl/\u2318+wheel or a pinch over the pattern, View \u203a PATTERN TEXT) change the text a pixel of row height at a time, not under 9 px. Remembered on this device.']],
   [641, '17 Nov', ['Pop-up messages reworded across the app, from the audit sheet you approved: shorter, no final period, and one wording for the same event everywhere (Cable removed, Loaded “name”, Couldn’t save: reason, Undo brings it back). Chains and Waves use the same texts. A few raw or half-sentences are fixed too (Loaded with no kit name, the one-time bus note starting in lower case, the MIDI file errors). Nothing about what the buttons do has changed.']],
