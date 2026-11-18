@@ -1,4 +1,4 @@
-# Pick up here (written 17 Nov 2026, 21:00 Mountain, by Fable, the lead, at the owner's request to move to a new chat)
+# Pick up here (written 17 Nov 2026, 22:00 Mountain, by Fable, the lead, at the owner's request to move to a new chat)
 
 To continue the native port in a new chat, the owner says: **"pull thunder-plus, branch `native`, and continue from docs/port/PICKUP.md"**.
 This file is the brief. Background only when needed: `docs/port/TODAY.md` (the full log of 16 and 17 Nov, newest at the end), `docs/port/WORKPLAN.md` (the
@@ -50,11 +50,32 @@ plan; sections 1 to 4 and 9), `HANDOVER.md` on `beta` (the web app, the owner's 
 - **The pump repo:** another agent of his fixed the pump synth defects (`/home/claude/progress/pump-synth-defects.md` was the list; pump HEAD was e43ee10 at
   19:35 on 17 Nov). **To do when he confirms the commit:** re-pin native (`native/core/third_party/PINS.md`) and the web app (`pump/pump.wasm`,
   `pump/synth/pump-synth.wasm` and their meta, a new web build) to it, drop the native-side patches the fixes make unnecessary, re-run the pump gates.
-- **A rule for the …chains editor:** whether sidechain inputs (or all audio inputs) should refuse control cables; today the editor checks no port kinds at all.
+- (Settled 17 Nov: the …chains editor keeps accepting any cable; see below.)
 - U32's licence decision.
 
-## Web app, state at 21:00 on 17 Nov
-`main` = `beta` = build 640; desktop v1.3.12 (build 639). In progress on branches, each to be reviewed (screenshots), merged to `beta`, then `main`:
-`fix/playhead-collapse-zoom` (one playhead rule in Pattern view, the FX bar's …CHAINS section fully collapsing, fit-32-rows zoom) and `feat/toast-wording`
-(the 372 suggested pop-up wordings from the audit sheet https://claude.ai/artifact/WSbgsqqBk5oU6QbpWTKMPy). Deferred by the owner: "the dual sound bug can wait"
-(both instruments sound when a note's instrument number changes during playback).
+## Web app, state at 22:00 on 17 Nov (no web branch is open; no worker is running)
+`main` = `beta` = build 642; desktop v1.3.12 is build 639 (the owner has not asked for another). Today's web builds: 639 (Chains / Waves editors start
+again: a raw U+2028 / U+2029 in a regex had stopped both editor scripts since about build 620; the owner's song is the first-open default), 640 (a module
+dragged to the edge stays under the pointer; Undo of a long drag is one step), 641 (299 pop-up messages reworded from the audit sheet
+https://claude.ai/artifact/WSbgsqqBk5oU6QbpWTKMPy; 53 not applied, listed in HANDOVER; the owner reviews from the sheet later), 642 (one playhead rule in
+Pattern view: a bar per track on its own row, the active track included, playing and stopped; the FX bar's ...CHAINS section collapses to its tab; FIT rows
+and A- / A+ for the pattern grid: on the owner's screen 32 rows fit at 10 px rows, about 7.7 px text; the floor is 9 px rows). His tests for all of these are in
+"Owner's punch list" in HANDOVER.md.
+
+## Decided by the owner on 17 Nov
+- The ...chains editor keeps accepting any cable into any input ("leave the cables as is, as long as they do something"): no port-kind rule.
+- Effect slots stay at 8 for now; he uses bus tracks for more. **Future feature: 12 slots** (scoped: FXO's first digit is the slot 1 to 8 and 9 means "all",
+  so slots 9 to 12 need a new command; FXS reaches 15; older builds drop slots above 8 on load; new songs' mastering slots would move; the native core has 8
+  as a fixed size in about 15 places; 16 breaks both digit fields).
+- "The dual sound bug can wait" (both instruments sound when a note's instrument number changes during playback).
+
+## Future features he asked for (web app; the lead's, audio path)
+- **FIRST: bus into bus.** He wants a bus's output, with its FX, to feed another bus through ...chains ("the reverb I put on the first bus doesn't play when
+  things were on the second bus"). Today a bus is "a track with a Chain Out and no Track In of its own" (`chainsTracks`, `chainsFeed`, `chainOutTargetsOf`
+  near `index.html` 20935; the bus plan in `core/seq-core.js`), so a track that both receives (Chain Out) and sends on (Track In) is not a bus and its source
+  shows MISS. Needs: tracks processed in dependency order, cycles refused with a clear message, the latency plan following the chain, the Mixer's CHN row
+  saying what is happening, and the native core's bus plan kept in step.
+- 12 effect slots (above).
+
+## The combined `native` head was built and tested after the last two merges
+dd879896 (#217 + #214): Release GCC build clean, full ctest 143 of 144 passed with 1 intended skip, the closed build (no LXR, no DSP library, no pump) 3 of 3.
