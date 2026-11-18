@@ -7,10 +7,10 @@ const test = require('node:test'), assert = require('node:assert/strict');
 const H = require('./helpers');
 const src = H.read('index.html');
 const cut = (re, what) => { const m = src.match(re); assert.ok(m, `index.html: could not find ${what}`); return m[0]; };
-const code = cut(/function flxCellAt\(t\)\{[\s\S]*?\nconst flxCellVal = [^\n]*\n/, 'flxCellAt / flxCellVal');
+const code = cut(/function flxCellAt\(t\)\{[\s\S]*?\nconst flxCellVal = [^\n]*\n[^\n]*\nconst fbCur = [^\n]*\n/, 'flxCellAt / flxCellVal / fbCur');
 const FXC = ['VOL', 'FLX', 'FLY', 'GAT'], FX0 = 6, RW = 12, clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 function make(state) {
-  const f = new Function('st', 'FXC', 'FX0', 'RW', 'clamp', 'plen', `const S = st.S, cs = st.cs; let tv = st.tv, cTrack = st.cTrack, cPhrase = st.cPhrase; ${code}; return {flxCellAt, flxCellVal};`);
+  const f = new Function('st', 'FXC', 'FX0', 'RW', 'clamp', 'plen', `const S = st.S, cs = st.cs; let tv = st.tv, cTrack = st.cTrack, cPhrase = st.cPhrase; ${code}; return {flxCellAt, flxCellVal, fbCur};`);
   return f(state, FXC, FX0, RW, clamp, () => 16);
 }
 const row = () => new Array(RW).fill(-1);
@@ -42,7 +42,19 @@ test('the bar row for a Flex PATTERN writes the cell with the effect, and nothin
   assert.match(set, /q\.k === 'pat' && g\.type === 'flex' \? flxCellAt\(mst \? NT : dkTrack\(\)\) : null/, 'only the Flex PATTERN row looks for a cell');
   assert.match(set, /g\[q\.k\] = x; if \(cell\) cell\.r\[cell\.m \+ 1\] = x;/, 'the effect as before, the cell as well, in the same step as fxChanged');
   assert.ok(set.indexOf('cell.r[cell.m + 1] = x') < set.indexOf('fxChanged('), 'the cell is written before the one save');
-  assert.match(src, /const cur = g => \(q\.k === 'pat' && flxCellVal\(mst \? NT : dkTrack\(\), g\)\) \?\? g\[q\.k\]/, 'the row shows the cell under the cursor');
+  assert.match(src, /const cur = g => fbCur\(q, g, mst \? NT : dkTrack\(\)\);/, 'the row shows what fbCur says');
   for (const re of [/r\._fbSet = d => \{ const g = getF\(\); if \(g\) set\(cur\(g\) \+ d\)/, /let x = g \? cur\(g\) : q\.d/, /set\(cur\(g\) \+ d \* wstep\(e\)\)/, /fbPop\(v, q, getF, show, set, cur\)/])
     assert.match(src, re, String(re));
+});
+
+test('fbCur: a Flex PATTERN row reads the cell under the cursor; every other row reads the effect\'s own value (was false for them all)', () => {
+  const st = mk(), F = make(st), flex = { type: 'flex', pat: 3, mix: 200, xf: 40, wait: 1 };
+  assert.equal(F.fbCur({ k: 'pat' }, flex, 0), 0x10, 'the cell under the cursor');
+  for (const k of ['mix', 'xf', 'wait']) assert.equal(F.fbCur({ k }, flex, 0), flex[k], k + ' is the effect\'s own, with the cursor on an FLX cell');
+  assert.equal(F.fbCur({ k: 'mix' }, { type: 'delay', mix: 0 }, 0), 0, 'a value of 0 stays 0');
+  assert.equal(F.fbCur({ k: 'pat' }, { type: 'sgate', pat: 2 }, 0), 2, 'another effect with a pat key keeps its own');
+  assert.equal(F.fbCur({ k: 'pat' }, { type: 'trancegate', pat: 4 }, 0), 4);
+  st.cs.phrase.y = 0; st.cs.phrase.x = 0;   // cursor on a note: the PATTERN row is the effect's own too
+  assert.equal(make(st).fbCur({ k: 'pat' }, flex, 0), 3);
+  for (const k of ['mix', 'xf', 'wait', 'pat']) assert.ok(Number.isFinite(make(st).fbCur({ k }, flex, 0)));
 });

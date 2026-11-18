@@ -26013,7 +26013,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 646;
+const BUILD = 647;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD + (location.pathname.includes('/beta/') ? ' · beta' : '');
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -29509,6 +29509,8 @@ function flxCellAt(t){
   const m = FX0 + ((c.x - FX0) & ~1); return FXC[r[m]] === 'FLX' ? {r, m} : null;
 }
 const flxCellVal = (t, g) => { const k = g && g.type === 'flex' ? flxCellAt(t) : null; return k ? clamp(Math.max(0, k.r[k.m + 1]), 0, 255) : null; };
+// What a bar row reads and edits from: only a Flex PATTERN row can take the cell's number; every other row (and every other effect, even one with a 'pat' key) its own value.
+const fbCur = (q, g, t) => (q.k === 'pat' ? flxCellVal(t, g) : null) ?? g[q.k];
 const rowEmpty = (r, cols = NCOL) => { for (let c = 0; c < cols; c++) if (r[c] >= 0) return false; return true; };
 const segToggles = (obj, list) => { const s = el('div', 'seg'); list.forEach(([k, t]) => { const b = el('button', obj[k] ? 'on' : null, t); b.type = 'button'; b.setAttribute('aria-pressed', !!obj[k]);
   b.addEventListener('click', () => { obj[k] = !obj[k]; b.classList.toggle('on', obj[k]); b.setAttribute('aria-pressed', obj[k]); }); s.append(b); }); return s; };
@@ -32126,7 +32128,7 @@ function deckFxBar(){
         r.addEventListener('pointerdown', () => { dkFbPick(r); dkFbFoc = true; bar.classList.add('kfoc'); });
         r.dataset.sel = selK; r._fb = {t, k, i:D.ps.indexOf(q), q}; { const li = tgtRowId(t, k, f, q); if (li) lb.dataset.lfo = li; }
         const show = x => q.names ? (q.names[x] ?? String(x)) : (q.tpl || q.band) ? q.fmt(x, getF()) : q.fmt(x);
-        const cur = g => (q.k === 'pat' ? flxCellVal(mst ? NT : dkTrack(), g) : null) ?? g[q.k];   // FX BAR → COMMAND CELL: what the row shows (the FLX cell under the cursor, else the effect's own)
+        const cur = g => fbCur(q, g, mst ? NT : dkTrack());   // FX BAR → COMMAND CELL: what the row shows (the FLX cell under the cursor, else the effect's own)
         const set = x => { const g = getF(); if (!g) return; x = clamp(Math.round(x), q.min, q.max); const cell = q.k === 'pat' && g.type === 'flex' ? flxCellAt(mst ? NT : dkTrack()) : null;
           if (x === g[q.k] && !(cell && cell.r[cell.m + 1] !== x)) return; g[q.k] = x; if (cell) cell.r[cell.m + 1] = x; if (isPumpT(g.type)) delete g.pname; fxChanged(mst ? NT : dkTrack()); v.textContent = show(x); if (cell) draw(); };
         r._fbSet = d => { const g = getF(); if (g) set(cur(g) + d); };
@@ -36322,6 +36324,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [647, '18 Nov', ['Flex: two patterns could put one broken sample into the sound (FLX E8, the 5-tuplet feel, just before a beat; and a tape pattern at one spot in Flex\u2019s memory). Fixed.', 'With the cursor on an FLX command in a phrase (or the master column), the FX bar\u2019s Flex PATTERN value now shows that command\u2019s number, and changing it rewrites the command in the column. One undo step per drag, on tracks and on the master. FLY commands are not linked, and every other FX bar value works as before.']],
   [646, '18 Nov', ['Computer side panel: the instrument list now sits above the PLAYING / STOPPED box and the meters (it was below them). Nothing else in the panel moved.']],
   [645, '18 Nov', ['The pump update of builds 643 and 644 is taken back out for now. It made pump FREEZE pause the sound for about a second in ways that could not be hidden (the first notes after a kit load or an engine switch could be lost). It returns when pump itself is changed.']],
   [642, '17 Nov', ['Pattern view: one playhead look. While the song plays, each track shows its own bar on the row it is playing (tracks can be on different rows), including the track you are editing: your cursor cell keeps its colours with a ring on top of the bar. The black bar across all the tracks is gone, and so is the faint band that hid under the cursor. Stopped, the bars stay where each track stopped.', 'Bottom FX bar: a folded ...CHAINS is now only its vertical tab, like MOD (it used to keep a small chain diagram beside the tab). Its tab names the track on show.', 'Pattern view: FIT 32 (the pattern\u2019s own row count) on the Pattern bar, View \u203a FIT PATTERN ROWS or Ctrl/\u2318+Alt+0 makes the text as big as it can be with every row showing; A\u2212 A+ (or Ctrl/\u2318+Alt+\u2212 and +, Ctrl/\u2318+wheel or a pinch over the pattern, View \u203a PATTERN TEXT) change the text a pixel of row height at a time, not under 9 px. Remembered on this device.']],
