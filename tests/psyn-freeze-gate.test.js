@@ -134,7 +134,7 @@ test('FREEZE rule: the pieces are wired (gate before the node, PLAY stamp, resta
   assert.match(html, /function tStart\(mode, o\)\{\n  psGoT = performance\.now\(\)/, 'tStart stamps PLAY first');
   assert.match(html, /psKeep = true; if \(lk\) lk\.restart = true; try \{ tStop\(true\); \} finally \{ psKeep = false/, 'the restart\'s own tStop keeps the stamp');
   assert.match(html, /if \(!psKeep\) psGoT = 0; psWarmSoon\(300\)/, 'STOP clears it and asks for the idle warm-up');
-  assert.match(html, /function setKit\(k, noUndo\)\{[\s\S]*?psWarmSoon\(1500, true\); \}\n\/\/ Before replacing the kit/, 'a kit load asks');
+  assert.match(html, /function setKit\(k, noUndo\)\{[\s\S]*?psWarmNow\('kit'\); \}\n\/\/ Before replacing the kit/, 'a kit load builds at once when quiet');
   assert.match(html, /function changed\(i = cur, light\)\{\n  psWarmSoon\(1500, true\)/, 'a sound edit (an engine switch) asks');
   assert.match(html, /function liveWarmSoon\(ms\)\{ psWarmSoon\(/, 'a song change asks');
   for (const f of ['function holdNote(i, semis, vel = 1){', 'function play(i, vel = 1){', 'function padPress(i, held){', 'function onMidi(e, src){']) assert.ok(html.includes(f + '\n  psHit();'), f + ' stamps a trigger');
