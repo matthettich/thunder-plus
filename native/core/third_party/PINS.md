@@ -45,12 +45,14 @@ same tfx / thunder-dsp / mods hashes from two different checkout paths). `dsp/bu
 ## pump (U03): the owner's own repository
 | Upstream | Commit (full) | Licence | Used for | In `thunder_core`? |
 |---|---|---|---|---|
-| matthettich/pump (public; the owner's code) | `e43ee10da0df844a48ba0f4f48ba79fe44a9de1f` (main, 14 Nov 2026, 13:48 -0700) | All rights reserved, (c) 2026 wake: the owner's own code, compiled into his own app (pump `LICENSE`). Not an open licence: do not redistribute the sources | `thunder_pump` (pump_wasm.cpp + wasm/fx/*.cpp), `thunder_pump_synth` (pump_synth.cpp), `pump.wasm`, `pump-synth.wasm` | no: separate libraries (`native/core/pump`), linked by the hosting glue (U18, U33) |
+| matthettich/pump (public; the owner's code) | `e43ee10da0df844a48ba0f4f48ba79fe44a9de1f` (main, merge of PR #6 `fix/synth-table-reads`, 17 Nov 2026, 18:51 -0700; re-pinned from `deb07d331b4f` on 17 Nov, docs/port/REPIN-NATIVE-NOTES.md) | All rights reserved, (c) 2026 wake: the owner's own code, compiled into his own app (pump `LICENSE`). Not an open licence: do not redistribute the sources | `thunder_pump` (pump_wasm.cpp + wasm/fx/*.cpp), `thunder_pump_synth` (pump_synth.cpp), `pump.wasm`, `pump-synth.wasm` | no: separate libraries (`native/core/pump`), linked by the hosting glue (U18, U33) |
 
 Fetched by `fetch.sh` (sparse checkout: `common/`, `wasm/`, `plugins/` **without `plugins/machine/`**, the licence files, `tests/data/mix.f32`), the
 same mechanism as every other pin. WORKPLAN section 12's default was a git submodule; the fetch script was used instead so there is one
 mechanism and one place (this file) that lists every pin, and because a sparse fetch can leave the GPL folder out of the checkout. A submodule
 would put all of `plugins/machine/` on disk. No pump source is copied into this repo.
+
+**17 Nov re-pin to e43ee10:** `build-wasm.sh` on this pin gives `pump.wasm` 1,603,131 B (SHA-256 `474f18c1676e6fffca921dc121a209537062598297e288ac8a75e6bb27be3c87`) and `pump-synth.wasm` (`bdcddcdeec280bb90ccecb072d72827700f51375a8be6f0a0c659a1a7f7312dd`): byte-identical to the web worker's build on `web/pump-e43ee10` (PR #224). Until that PR is merged the paragraph below describes the files the app ships (the deb07d3 build). The pin's FLEX plugin (e7c55dc) is NOT in `wasm/` (25 effect types, meta unchanged).
 
 **Which pump commit the app's committed wasm comes from: the pin (since web build 638, 16 Nov; `native` took the files on 17 Nov).** `pump/pump.wasm` (1,601,290 B, SHA-256 `ecbfadc17eb40fc5585e86cd95d33ac2ce977fca36320e077c1fb70cee1830ae`)
 is **byte-identical** to the `pump.wasm` that `native/tools/build-wasm.sh` builds from this pin (wasi-sdk 25), `pump/synth/pump-synth.wasm` is byte-identical to the pin's `pump-synth.wasm`, and `pump/pump-meta.js` carries the

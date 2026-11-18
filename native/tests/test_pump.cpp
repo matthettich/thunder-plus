@@ -63,8 +63,8 @@ static const double kGateDb = -100.0;
 struct Rule { const char* name; long maxOver; const char* why; };
 static const Rule kRules[] = {
   // TUBE (oversampled: a halfband FIR whose sum order differs between the fast-math wasm and the strict native build, ~1e-7 relative) into CRUSH (std::round(x * q) / q): a handful of samples
-  // land on the other side of a quantiser step, 14 samples per host at -68.4 dB (U18-NOTES.md, "x_two_hosts_same"). The count of samples above the -100 dB line is MEASURED at 20 (both hosts, L and R; GCC 13);
-  // the limit is twice that, 40. A new case of this kind is listed here by name with its measured numbers; there is no wildcard.
+  // land on the other side of a quantiser step, 14 samples per host at -68.4 dB (U18-NOTES.md, "x_two_hosts_same"). The count of samples above the -100 dB line is MEASURED at 20 (both hosts, L and R; GCC 13) against the deb07d3 build and at 30 against the e43ee10 build (the pin since 17 Nov: its
+  // fast-math wasm still reassociates the FIR sum, see REPIN-NATIVE-NOTES.md); the limit stays 40 (NOT changed: it was twice the first figure). A new case of this kind is listed here by name with its measured numbers; there is no wildcard.
   {"x_two_hosts_same", 40, "TUBE into CRUSH: a quantiser step flips in a few samples per host (measured 20 above -100 dB in all, limit 2x)"},
 };
 static const Rule* ruleOf(const char* nm) { for (const Rule& r : kRules) if (std::strcmp(r.name, nm) == 0) return &r; return nullptr; }
