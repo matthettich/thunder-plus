@@ -1431,12 +1431,36 @@ static double v8_hypot(const double* v, int n) {
   return std::sqrt(sum) * mx;
 }
 
+// Math.log10: V8 12.4's ieee754::log10 (src/base/ieee754.cc, tag 12.4.254; fdlibm's e_log10.c on top of log), text unchanged except the names and the macros of this file (U31: Sidechain comp's
+// detector level in dB). Proven on 400000 arguments against Node 22 by ctest `chains` (committed list) and the libm check of the tool.
+static double fdlibm_log10(double x) {
+  static const double two54 = 1.80143985094819840000e+16, ivln10 = 4.34294481903251816668e-01, log10_2hi = 3.01029995663611771306e-01, log10_2lo = 3.69423907715893078616e-13;
+  double y; int32_t i, k, hx; uint32_t lx;
+  EXTRACT_WORDS(hx, lx, x);
+  k = 0;
+  if (hx < 0x00100000) {
+    if (((hx & 0x7FFFFFFF) | lx) == 0) return -std::numeric_limits<double>::infinity();
+    if (hx < 0) return std::numeric_limits<double>::quiet_NaN();
+    k -= 54; x *= two54; GET_HIGH_WORD(hx, x); GET_LOW_WORD(lx, x);
+  }
+  if (hx >= 0x7FF00000) return x + x;
+  if (hx == 0x3FF00000 && lx == 0) return 0.0;
+  k += (hx >> 20) - 1023;
+  i = (int32_t)(((uint32_t)k & 0x80000000u) >> 31);
+  hx = (hx & 0x000FFFFF) | ((0x3FF - i) << 20);
+  y = k + i;
+  SET_HIGH_WORD(x, hx); SET_LOW_WORD(x, lx);
+  double z = y * log10_2lo + ivln10 * fdlibm_log(x);
+  return z + y * log10_2hi;
+}
+
 double js_cos(double x) { return fdlibm_cos(x); }
 double js_sin(double x) { return fdlibm_sin(x); }
 double js_tan(double x) { return fdlibm_tan(x); }
 double js_log(double x) { return fdlibm_log(x); }
 double js_tanh(double x) { return fdlibm_tanh(x); }
 double js_log2(double x) { return fdlibm_log2(x); }
+double js_log10(double x) { return fdlibm_log10(x); }
 double js_atan2(double y, double x) { return fdlibm_atan2(y, x); }
 double js_hypot3(double a, double b, double c) { const double v[3] = {a, b, c}; return v8_hypot(v, 3); }
 double js_hypot2(double a, double b) { const double v[2] = {a, b}; return v8_hypot(v, 2); }

@@ -21,7 +21,7 @@ namespace thunder {
 namespace modfx {
 
 constexpr int kBlock = 128;     // the engine's BLOCK: every buffer is this long
-constexpr int kMaxPorts = 20;   // U30: the …waves Mixer has 16 inputs (it was 12)
+constexpr int kMaxPorts = 32;   // U31: the …chains Stereo mixer has 32 inputs (U30: 20, the …waves Mixer has 16; it was 12)
 
 // One of the song's impulse responses (the JS's globalThis.__thunderIR[i] = { L, R or null, sr, id }): read-only views; the host keeps the buffers alive and unchanged while a module may read
 // them (the JS's garbage collector does that there) and hands a NEW SongIR object whenever the song's IRs change (the module compares the pointer and `id`, as the JS compares the object and id).

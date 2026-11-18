@@ -9,6 +9,7 @@
 #include "modfx/bfutil.h"
 #include "modfx/mods.h"
 #include "modfx/util.h"
+#include "waves/graph.h"
 #include "waves/waves.h"
 
 #ifdef THUNDER_HAVE_TFX
@@ -819,6 +820,8 @@ const Def* wdef(std::string_view type) {
   for (const Def& d : ownDefs()) if (t == d.type) return &d;
   return nullptr;
 }
+
+const ModTable& wavesTable() { static const ModTable t = {&winfo, &wdef}; return t; }
 
 bool waves_type_is_fx(std::string_view type) { const std::string t(type); for (const Own& o : kOwn) if (o.fx && t == o.type) return true; return false; }
 
