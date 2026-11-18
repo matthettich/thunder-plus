@@ -96,76 +96,107 @@ void WavesEngine::setText(std::string_view id, std::string_view text) {
   m->text.resize(kMaxText); const int n = toU16(text, m->text.data(), kMaxText); m->text.resize((size_t)n); m->textLen = n;
 }
 
-// loadPatch's reading of the doc: false = refused (nothing changed)
+// loadPatch's reading of the doc: false = refused (nothing changed). U31: the JS's own reading, odd documents included (a document that is not an object is an empty patch; `modules` / `cables` that are falsy are empty,
+// a string iterates its characters; a module whose id is not a string has a key of its own; a cable end is indexed as the JS does (an array, a string's characters, a number's undefined); a cable whose `from` module is
+// not there is skipped before its `to` is looked at; the cable shapes at which the JS THROWS (null / number / missing ends, a cable that is not an object, a null module) refuse the patch here.
+namespace {
+struct JV { char k = 'u'; std::string s; };   // a JS value as far as ids and ports go: u undefined, n null, b bool, d number, s string, o object / array
+JV jvOf(Json v) { JV r; if (v.isStr()) { r.k = 's'; r.s = std::string(v.asStr()); } else if (v.isNum()) { char b[40]; std::snprintf(b, sizeof b, "%.15g", v.asNum()); r.k = 'd'; r.s = b; } else if (v.isBool()) { r.k = 'b'; r.s = v.asBool() ? "true" : "false"; } else if (v.isNull()) { r.k = 'n'; r.s = "null"; } else if (v.isArr() || v.isObj()) { r.k = 'o'; r.s = "[object Object]"; } else r.s = "undefined"; return r; }
+std::string keyOf(const JV& v) { if (v.k == 's') return v.s; if (v.k == 'd') return "\x01n" + v.s; if (v.k == 'b') return "\x01" "b" + v.s; if (v.k == 'n') return "\x01null"; if (v.k == 'o') return "\x01obj"; return "\x01undef"; }
+std::string portOf(const JV& v) { if (v.k == 's') return v.s; return std::string("\x01") + v.k + v.s; }
+// v[i] in JS: false when it throws (v null / undefined)
+bool jvIdx(Json v, int i, JV& out) {
+  if (v.isNull() || v.missing()) return false;
+  if (v.isArr()) { out = jvOf(v.at((size_t)i)); return true; }
+  if (v.isStr()) { std::string_view t = v.asStr(); out = JV(); if ((size_t)i < t.size() && (unsigned char)t[(size_t)i] < 0x80) { out.k = 's'; out.s = std::string(1, t[(size_t)i]); } else if ((size_t)i < t.size()) { out.k = 'o'; out.s = "?"; } else out.s = "undefined"; return true; }
+  if (v.isObj()) { out = jvOf(v.get(std::to_string(i))); return true; }
+  out = JV(); out.s = "undefined"; return true;   // a number, true / false: no such element
+}
+std::string idOfModule(Json m) { return m.isObj() ? keyOf(jvOf(m.get("id"))) : std::string("\x01undef"); }
+bool truthyJs(Json v) { if (v.missing() || v.isNull()) return false; if (v.isBool()) return v.asBool(); if (v.isNum()) { const double d = v.asNum(); return d == d && d != 0; } if (v.isStr()) return !v.asStr().empty(); return true; }
+}  // namespace
 bool readPatchDoc(Json doc, PatchImpl& P, bool chains) {
   P.chains = chains;
-  if (!doc.isObj()) return false;
-  Json mj = doc.get("modules"), cj = doc.get("cables");
-  const bool hasM = !(mj.missing() || mj.isNull()), hasC = !(cj.missing() || cj.isNull());
-  if ((hasM && !mj.isArr()) || (hasC && !cj.isArr())) return false;
-  const size_t nm = hasM ? mj.size() : 0, nc = hasC ? cj.size() : 0;
+  if (doc.isNull() || doc.missing()) return false;   // (the JS throws on `doc.modules`)
+  const bool isObj = doc.isObj();
+  Json mj = isObj ? doc.get("modules") : Json(), cj = isObj ? doc.get("cables") : Json();
+  size_t nm = 0, nc = 0; const bool hasM = mj.isArr(), hasC = cj.isArr();
+  if (truthyJs(mj)) { if (mj.isArr()) nm = mj.size(); else if (!mj.isStr()) return false; }   // a string: its characters are not modules; a number / true / object: not iterable
+  if (truthyJs(cj)) { if (cj.isArr()) nc = cj.size(); else return false; }   // (a non-empty string: its first character is a cable that is not an object: the JS throws)
   if (nm > (size_t)kMaxModules || nc > (size_t)kMaxCables) return false;
   P.nMods = (int)nm; P.nCables = (int)nc;
-  uint32_t cm = 0;
   for (size_t i = 0; i < nm; i++) {
     Json m = mj.at(i);
-    if (m.isNull()) return false;
+    if (m.isNull()) return false;   // m.id of null
     if (!m.isObj()) continue;
-    Json idj = m.get("id"), tj = m.get("type");
+    Json tj = m.get("type");
     if (!tj.isStr() || !P.tab->info(tj.asStr())) continue;
-    if (!idj.isStr()) return false;
-    if (P.find(std::string(idj.asStr()))) cm++;   // (a duplicate id: remove then add, two compiles)
-    if (!P.addNode(idj.asStr(), tj.asStr(), m)) return false;
+    if (!P.addNode(idOfModule(m), tj.asStr(), m)) return false;
   }
-  (void)cm;
   for (size_t i = 0; i < nc; i++) {
     Json c = cj.at(i);
-    if (!c.isObj()) return false;
+    if (!c.isObj()) return false;   // null / a number / a string / an array: c.from is undefined or c is null: the JS throws in connect
     Json f = c.get("from"), t = c.get("to");
-    if (!f.isArr() || !t.isArr()) return false;
-    CableRec r; Json a0 = f.at(0), b0 = t.at(0);
-    r.a0 = a0.isStr() ? std::string(a0.asStr()) : std::string("\x01"); r.a1 = portText(f.at(1)); r.b0 = b0.isStr() ? std::string(b0.asStr()) : std::string("\x01"); r.b1 = portText(t.at(1));
+    JV a0, b0, a1, b1;
+    if (!jvIdx(f, 0, a0)) return false;
+    CableRec r; r.a0 = keyOf(a0);
+    if (!P.find(r.a0)) continue;   // Graph.connect: `!this.mods.has(a[0]) || !this.mods.has(b[0])`: returns before `to` is touched
+    if (!jvIdx(t, 0, b0)) return false;
+    r.b0 = keyOf(b0); if (!P.find(r.b0)) continue;
+    jvIdx(f, 1, a1); jvIdx(t, 1, b1); r.a1 = portOf(a1); r.b1 = portOf(b1);
     P.addCable(r, c.get("fb").isBool() && c.get("fb").asBool());
   }
-  // STEREO: an older patch's right sides (stereoUpCables)
-  if (!truthyJ(doc.get("st2")) && hasM && hasC) {
-    std::unordered_map<std::string, std::string> type;
-    for (size_t i = 0; i < nm; i++) { Json m = mj.at(i); if (m.isObj() && m.get("id").isStr()) type[std::string(m.get("id").asStr())] = m.get("type").isStr() ? std::string(m.get("type").asStr()) : std::string(); }
-    auto isNew = [](const std::string& t) { return t == "vcf" || t == "vca" || t == "sccomp" || t == "blades" || t == "meta" || t == "phaser"; };
-    auto has = [&](const std::string& id, bool in, const char* port) { auto it = type.find(id); if (it == type.end()) return false; const WInfo* w = P.tab->info(it->second); if (!w) return false; return (in ? wport_in(*w, port) : wport_out(*w, port)) >= 0; };
-    std::vector<std::string> taken;
-    auto key = [](Json t) { std::string k; Json a = t.at(0), b = t.at(1); k += a.isStr() ? std::string(a.asStr()) : std::string("\x01"); k += "."; k += portText(b); return k; };
-    for (size_t i = 0; i < nc; i++) { Json c = cj.at(i); if (c.isObj() && c.get("to").isArr()) taken.push_back(key(c.get("to"))); }
-    std::vector<CableRec> add;
-    for (size_t i = 0; i < nc; i++) {
-      Json c = cj.at(i); Json f = c.get("from"), t = c.get("to");
-      if (!f.at(1).isStr() || f.at(1).asStr() != "out" || !t.at(1).isStr() || t.at(1).asStr() != "in") continue;
-      const std::string a = f.at(0).isStr() ? std::string(f.at(0).asStr()) : std::string("\x01"), b = t.at(0).isStr() ? std::string(t.at(0).asStr()) : std::string("\x01");
-      const auto ta = type.find(a), tb = type.find(b);
-      if (!(ta != type.end() && isNew(ta->second)) && !(tb != type.end() && isNew(tb->second))) continue;
-      const std::string tk = b + ".inR";
-      if (has(a, false, "outR") && has(b, true, "inR") && std::find(taken.begin(), taken.end(), tk) == taken.end()) { taken.push_back(tk); CableRec r; r.a0 = a; r.a1 = "outR"; r.b0 = b; r.b1 = "inR"; add.push_back(r); }
+  // the older patches' added cables (stereoUpCables, trackInStereoCables): both read `d.modules` / `d.cables` only when they are arrays
+  const bool st2 = isObj && truthyJs(doc.get("st2")), ti2 = isObj && truthyJs(doc.get("ti2"));
+  std::unordered_map<std::string, std::string> type;   // d.modules.map(m => [m && m.id, m && m.type]): the last of equal keys wins
+  if (hasM && hasC && (!st2 || (chains && !ti2))) {
+    for (size_t i = 0; i < nm; i++) {
+      Json m = mj.at(i); std::string k, ty;
+      if (m.isObj()) { k = idOfModule(m); if (m.get("type").isStr()) ty = std::string(m.get("type").asStr()); }
+      else if (m.isNull() || m.isBool() || m.isNum() || m.isStr()) { const bool falsy = !truthyJs(m); k = falsy ? keyOf(jvOf(m)) : std::string("\x01undef"); }
+      else k = "\x01undef";
+      type[k] = ty;
     }
-    for (const CableRec& r : add) P.addCable(r, false);
   }
-  // TRACK IN STEREO (…chains only): a Track In whose Out R goes nowhere gets Out R -> In R of every module its Out feeds, where that In R is free (trackInStereoCables)
-  if (chains && !truthyJ(doc.get("ti2")) && hasM && hasC) {
-    std::unordered_map<std::string, std::string> type;
-    for (size_t i = 0; i < nm; i++) { Json m = mj.at(i); if (m.isObj() && m.get("id").isStr()) type[std::string(m.get("id").asStr())] = m.get("type").isStr() ? std::string(m.get("type").asStr()) : std::string(); }
-    auto key = [](Json t) { std::string k; Json a = t.at(0), b = t.at(1); k += a.isStr() ? std::string(a.asStr()) : std::string("\x01"); k += "."; k += portText(b); return k; };
+  auto endOf = [](Json c, const char* which, JV& e0, JV& e1) { Json x = c.get(which); if (!truthyJs(x)) return false; jvIdx(x, 0, e0); jvIdx(x, 1, e1); return true; };
+  auto jsStr = [](const JV& v) { return v.s; };
+  auto isOut = [](const JV& v) { return v.k == 's' && v.s == "out"; }; auto isIn = [](const JV& v) { return v.k == 's' && v.s == "in"; };
+  auto has = [&](const std::string& id, bool in, const char* port) { auto it = type.find(id); if (it == type.end()) return false; const WInfo* w = P.tab->info(it->second); if (!w) return false; return (in ? wport_in(*w, port) : wport_out(*w, port)) >= 0; };
+  auto addCableOf = [&](const JV& a, const char* ap, const JV& b, const char* bp) { CableRec r; r.a0 = keyOf(a); r.a1 = ap; r.b0 = keyOf(b); r.b1 = bp; P.addCable(r, false); };
+  // STEREO (stereoUpCables)
+  if (!st2 && hasM && hasC) {
+    auto isNew = [](const std::string& t) { return t == "vcf" || t == "vca" || t == "sccomp" || t == "blades" || t == "meta" || t == "phaser"; };
+    std::vector<std::string> taken;
+    for (size_t i = 0; i < nc; i++) { Json c = cj.at(i); JV e0, e1; if (c.isObj() && endOf(c, "to", e0, e1)) taken.push_back(jsStr(e0) + "." + jsStr(e1)); }
+    struct Add { JV a, b; }; std::vector<Add> add;
+    for (size_t i = 0; i < nc; i++) {
+      Json c = cj.at(i); JV f0, f1, t0, t1; if (!c.isObj() || !endOf(c, "from", f0, f1) || !endOf(c, "to", t0, t1)) continue;
+      if (!isOut(f1) || !isIn(t1)) continue;
+      const std::string a = keyOf(f0), b = keyOf(t0); const auto ta = type.find(a), tb = type.find(b);
+      if (!(ta != type.end() && isNew(ta->second)) && !(tb != type.end() && isNew(tb->second))) continue;
+      const std::string tk = jsStr(t0) + ".inR";
+      if (has(a, false, "outR") && has(b, true, "inR") && std::find(taken.begin(), taken.end(), tk) == taken.end()) { taken.push_back(tk); add.push_back({f0, t0}); }
+    }
+    for (const Add& x : add) addCableOf(x.a, "outR", x.b, "inR");
+  }
+  // TRACK IN STEREO (…chains only): a Track In whose Out R goes nowhere gets Out R -> In R of every module its Out feeds, where that In R is free
+  if (chains && !ti2 && hasM && hasC) {
     auto hasIn = [&](const std::string& id) { auto it = type.find(id); if (it == type.end()) return false; const WInfo* w = P.tab->info(it->second); return w && wport_in(*w, "inR") >= 0; };
     std::vector<std::string> taken, usedR;
-    for (size_t i = 0; i < nc; i++) { Json c = cj.at(i); if (c.isObj() && c.get("to").isArr()) taken.push_back(key(c.get("to"))); if (c.isObj() && c.get("from").isArr() && c.get("from").at(1).isStr() && c.get("from").at(1).asStr() == "outR") usedR.push_back(c.get("from").at(0).isStr() ? std::string(c.get("from").at(0).asStr()) : std::string("\x01")); }
-    std::vector<CableRec> add;
     for (size_t i = 0; i < nc; i++) {
-      Json c = cj.at(i); Json f = c.get("from"), t = c.get("to");
-      if (!f.at(1).isStr() || f.at(1).asStr() != "out" || !t.at(1).isStr() || t.at(1).asStr() != "in") continue;
-      const std::string a = f.at(0).isStr() ? std::string(f.at(0).asStr()) : std::string("\x01"), b = t.at(0).isStr() ? std::string(t.at(0).asStr()) : std::string("\x01");
-      auto ta = type.find(a); if (ta == type.end() || ta->second != "trackIn" || std::find(usedR.begin(), usedR.end(), a) != usedR.end()) continue;
-      const std::string tk = b + ".inR";
-      if (hasIn(b) && std::find(taken.begin(), taken.end(), tk) == taken.end()) { taken.push_back(tk); CableRec r; r.a0 = a; r.a1 = "outR"; r.b0 = b; r.b1 = "inR"; add.push_back(r); }
+      Json c = cj.at(i); JV e0, e1; if (c.isObj() && endOf(c, "to", e0, e1)) taken.push_back(jsStr(e0) + "." + jsStr(e1));
+      JV f0, f1; if (c.isObj() && endOf(c, "from", f0, f1) && f1.k == 's' && f1.s == "outR") usedR.push_back(keyOf(f0));
     }
-    for (const CableRec& r : add) P.addCable(r, false);
+    struct Add { JV a, b; }; std::vector<Add> add;
+    for (size_t i = 0; i < nc; i++) {
+      Json c = cj.at(i); JV f0, f1, t0, t1; if (!c.isObj() || !endOf(c, "from", f0, f1) || !endOf(c, "to", t0, t1)) continue;
+      if (!isOut(f1) || !isIn(t1)) continue;
+      const std::string a = keyOf(f0); auto ta = type.find(a);
+      if (ta == type.end() || ta->second != "trackIn" || std::find(usedR.begin(), usedR.end(), a) != usedR.end()) continue;
+      const std::string tk = jsStr(t0) + ".inR";
+      if (hasIn(keyOf(t0)) && std::find(taken.begin(), taken.end(), tk) == taken.end()) { taken.push_back(tk); add.push_back({f0, t0}); }
+    }
+    for (const Add& x : add) addCableOf(x.a, "outR", x.b, "inR");
   }
   Json tr = doc.get("transport");
   if (tr.isObj()) {
@@ -205,11 +236,11 @@ bool WavesEngine::handleMessage(Json m) {
   const std::string_view op = m.str("op");
   auto numOf = [&](const char* k, double def, bool* ok) { Json v = m.get(k); if (v.isNum()) return v.asNum(); if (v.missing() || v.isNull()) return def; *ok = false; return def; };
   if (op == "patch") return loadPatch(m.get("value"));
-  if (op == "add") { Json id = m.get("id"), t = m.get("type"); if (!t.isStr()) return true; if (!id.isStr()) { stats_.droppedEvents++; return false; } return addModule(id.asStr(), t.asStr(), m); }
+  if (op == "add") { Json id = m.get("id"), t = m.get("type"); if (!t.isStr()) return true; return addModule(jsKey(id), t.asStr(), m); }
   if (op == "remove") { Json id = m.get("id"); if (id.isStr()) removeModule(id.asStr()); return true; }
   if (op == "connect" || op == "disconnect") {
     Json a = m.get("a"), b = m.get("b"); if (!a.isArr() || !b.isArr()) { stats_.droppedEvents++; return false; }
-    const std::string a0 = a.at(0).isStr() ? std::string(a.at(0).asStr()) : std::string("\x01"), b0 = b.at(0).isStr() ? std::string(b.at(0).asStr()) : std::string("\x01"), a1 = portText(a.at(1)), b1 = portText(b.at(1));
+    const std::string a0 = jsKey(a.at(0)), b0 = jsKey(b.at(0)), a1 = portText(a.at(1)), b1 = portText(b.at(1));
     if (op == "connect") connect(a0, a1, b0, b1, m.get("fb").isBool() && m.get("fb").asBool()); else disconnect(a0, a1, b0, b1);
     return true;
   }

@@ -235,11 +235,38 @@ static void runGolden(const std::string& golden, const std::string& effectsFile,
     ran, skipped, nPlain, nScn, nProc, nExact, nWithin, nBeyond, nStruct, worst, worstName.c_str(), nLeftOut, leftOut.empty() ? "" : " (Scope rows: audio exact, show() list not ported: ", leftOut.empty() ? "" : (leftOut + ")").c_str(), bad);
 }
 
+// documents at which the JS THROWS in loadPatch (a cable that is null or a number, a null `from` / `to` that is reached, a null module, a `cables` that is not iterable): the engine refuses and is left as it was; the documents the JS
+// plays (the 'mal/' scenarios of the golden file) load, see runGolden. A cable whose `from` module is missing is skipped BEFORE `to` is read, so a null `to` after it is no error (as the JS).
+static void testRefusals() {
+  const char* m = "{\"id\":\"a\",\"type\":\"trackIn\",\"params\":{\"track\":1}},{\"id\":\"v\",\"type\":\"vca\"},{\"id\":\"c\",\"type\":\"chainOut\",\"params\":{\"track\":1}}";
+  const char* good = "{\"from\":[\"a\",\"out\"],\"to\":[\"v\",\"in\"]},{\"from\":[\"v\",\"out\"],\"to\":[\"c\",\"in\"]}";
+  struct T { std::string doc; bool loads; const char* what; };
+  const std::vector<T> ts = {
+    {std::string("{\"modules\":[") + m + "],\"cables\":[" + good + "]}", true, "plain"},
+    {std::string("{\"modules\":[") + m + "],\"cables\":[" + good + ",{\"from\":[\"a\",\"out\"],\"to\":null}]}", false, "to: null (a is a module)"},
+    {std::string("{\"modules\":[") + m + "],\"cables\":[" + good + ",{\"from\":[\"zz\",\"out\"],\"to\":null}]}", true, "to: null after a missing from"},
+    {std::string("{\"modules\":[") + m + "],\"cables\":[" + good + ",null]}", false, "cable null"},
+    {std::string("{\"modules\":[") + m + "],\"cables\":[" + good + ",7]}", false, "cable number"},
+    {std::string("{\"modules\":[") + m + "],\"cables\":[" + good + ",{\"to\":[\"v\",\"in\"]}]}", false, "from missing"},
+    {std::string("{\"modules\":[") + m + ",null],\"cables\":[" + good + "]}", false, "module null"},
+    {std::string("{\"modules\":[") + m + "],\"cables\":{}}", false, "cables an object"},
+    {std::string("{\"modules\":5,\"cables\":[]}"), false, "modules a number"},
+    {std::string("{\"modules\":\"abc\",\"cables\":[]}"), true, "modules a string (characters are not modules)"},
+    {std::string("5"), true, "a document that is a number: an empty patch"},
+    {std::string("null"), false, "document null"},
+  };
+  for (const T& t : ts) {
+    JsonDoc d; if (!d.parse(t.doc)) { CHECK(false, "test doc does not parse: %s", t.what); continue; }
+    Host h; ChainsEngine e(48000, EngineOptions(), &h); const bool ok = e.loadPatch(d.root());
+    CHECK(ok == t.loads, "%s: loadPatch %s, the JS %s", t.what, ok ? "loaded" : "refused", t.loads ? "plays it" : "throws");
+  }
+}
 int main(int argc, char** argv) {
   std::string golden, effectsFile, refDir, filter, dumpDir, writeEffects;
   for (int i = 1; i < argc; i++) { const std::string a = argv[i]; if (a == "--ref" && i + 1 < argc) refDir = argv[++i]; else if (a == "--effects" && i + 1 < argc) effectsFile = argv[++i]; else if (a == "--write-effects" && i + 1 < argc) writeEffects = argv[++i];
     else if (a == "--filter" && i + 1 < argc) filter = argv[++i]; else if (a == "--dump" && i + 1 < argc) dumpDir = argv[++i]; else golden = a; }
   if (golden.empty()) CHECK(false, "no golden file given"); else runGolden(golden, effectsFile, refDir, filter, dumpDir, writeEffects);
+  testRefusals();
   std::printf(fails ? "test_chains: %d FAILED\n" : "test_chains: ok\n", fails);
   return fails ? 1 : 0;
 }

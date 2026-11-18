@@ -153,11 +153,11 @@ bool ChainsEngine::handleMessage(Json m) {
   if (!m.isObj()) { stats_.droppedEvents++; return false; }
   const std::string_view op = m.str("op");
   if (op == "patch") return loadPatch(m.get("value"));
-  if (op == "add") { Json id = m.get("id"), t = m.get("type"); if (!t.isStr()) return true; if (!id.isStr()) { stats_.droppedEvents++; return false; } return addModule(id.asStr(), t.asStr(), m); }
+  if (op == "add") { Json id = m.get("id"), t = m.get("type"); if (!t.isStr()) return true; return addModule(waves::detail::jsKey(id), t.asStr(), m); }
   if (op == "remove") { Json id = m.get("id"); if (id.isStr()) removeModule(id.asStr()); return true; }
   if (op == "connect" || op == "disconnect") {
     Json a = m.get("a"), b = m.get("b"); if (!a.isArr() || !b.isArr()) { stats_.droppedEvents++; return false; }
-    const std::string a0 = a.at(0).isStr() ? std::string(a.at(0).asStr()) : std::string("\x01"), b0 = b.at(0).isStr() ? std::string(b.at(0).asStr()) : std::string("\x01"), a1 = waves::detail::portText(a.at(1)), b1 = waves::detail::portText(b.at(1));
+    const std::string a0 = waves::detail::jsKey(a.at(0)), b0 = waves::detail::jsKey(b.at(0)), a1 = waves::detail::portText(a.at(1)), b1 = waves::detail::portText(b.at(1));
     if (op == "connect") connect(a0, a1, b0, b1, m.get("fb").isBool() && m.get("fb").asBool()); else disconnect(a0, a1, b0, b1);
     return true;
   }

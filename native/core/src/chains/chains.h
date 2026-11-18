@@ -224,7 +224,10 @@ class ChainsLive {
   void setMemoryBudget(size_t bytes) { node_.engine().setMemoryBudget(bytes); }   // per patch prepared by this runner (see ChainsEngine::setMemoryBudget)
   bool postParam(const char* id, const char* name, double v, int64_t at);
   bool preparePatch(Json doc, int64_t at);                            // builds the patch off the audio thread and posts its swap at `at`; false: refused (the playing patch stays)
-  void service();                                                     // frees the patches the audio thread gave back and keeps the pump spares current (one control thread calls this regularly, and no other frees patches)
+  // REQUIRED RATE: service() must run at least once per engine block of 128 frames (every 2.67 ms at 48 kHz; any faster is better) for as long as a pump module can go bad. A pump module holds ONE spare; a bad block uses it (silent for
+  // that block), and the next spare is made only by service(): called every block, no block ever runs dry (measured: 400 blocks, 0 dry); every 3rd block, a third of the bad blocks found no spare (132 of 400 were silent);
+  // never: the module is silent from its second bad block on. It also frees the patches the audio thread gave back: with fewer than kChainsSlots (8) patches in flight, preparePatch() works at any rate; past that it returns false.
+  void service();                                                     // frees the patches the audio thread gave back and keeps the pump spares current (one control thread calls this at the rate above, and no other frees patches)
   // audio thread: no allocation, no lock. n: any number of frames. in.byp is ignored (BYP comes as events)
   void process(const NodeIn& in, NodeOut& out, int n);
   int latency() const { return kChainsLatency; }
