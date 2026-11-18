@@ -135,7 +135,8 @@ static void testPumpSpares() {
     Host host; ChainsEngine e(48000, EngineOptions(), &host); if (!e.loadPatch(d.r)) { CHECK(false, "%s refused", T[i]); continue; }
     e.setInlineService(false); types++;
     const std::vector<float> s = noise(128 * 200, 9u + (uint32_t)i, 7.9f); uint64_t b0 = chains_pump_bad();
-    for (int b = 0; b < 200; b++) { e.setTrackInputs(&s[(size_t)b * 128], &s[(size_t)b * 128], 1); e.process(128); e.serviceSpares(); }
+    for (int b = 0; b < 200; b++) { e.setTrackInputs(&s[(size_t)b * 128], &s[(size_t)b * 128], 1); e.process(128); e.serviceSpares();
+      const float* po = e.outBuf("p", "out"); for (int k = 0; po && k < 128; k++) if (!(po[k] > -8 && po[k] < 8)) { CHECK(false, "%s: an output outside +-8 reached the bus in block %d", T[i], b); break; } }
     if (chains_pump_bad() > b0) { bad++; std::printf("  pump module that went bad: %s\n", T[i]); }
   }
   std::printf("pump spares: %d pump modules run on a +-7.9 input with every parameter at its maximum: %d went bad at least once; %llu bad blocks, %llu spares swapped in, %llu bad blocks with no spare ready\n", types, bad,
