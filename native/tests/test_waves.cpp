@@ -269,9 +269,15 @@ static void testPatchLoading() {
   { Doc d("{\"modules\":[" + mod("a", "nonsense") + "," + mod("b", "vca") + "],\"cables\":[" + cab("a", "out", "b", "in") + "," + cab("b", "out", "zzz", "in") + "," + cab("b", "nope", "b", "in") + "]}"); WavesEngine e(48000, opts(4)); CHECK(e.loadPatch(d.r), "unknown types and missing ends");
     CHECK(e.order().size() == 1 && e.cables().size() == 1, "an unknown type is skipped, a cable to nothing is dropped, a missing port is kept and does nothing (%zu cables)", e.cables().size()); e.process(128); }
   { Doc d1(kBasic); WavesEngine e(48000, opts(4)); CHECK(e.loadPatch(d1.r), "ok"); Doc bad("{\"modules\":[null]}"); CHECK(!e.loadPatch(bad.r), "a null module refuses the patch"); CHECK(e.order().size() == 5, "and the old patch stays");
-    Doc bad2("{\"modules\":[{\"id\":\"a#1\",\"type\":\"vca\"}]}"); CHECK(!e.loadPatch(bad2.r), "'#' in an id is refused"); Doc bad3("{\"modules\":[{\"id\":7,\"type\":\"vca\"}]}"); CHECK(!e.loadPatch(bad3.r), "a numeric id is refused");
-    Doc bad4("{\"modules\":\"abc\"}"); CHECK(!e.loadPatch(bad4.r), "modules that is not an array"); Doc bad5("{\"modules\":[],\"cables\":[{\"from\":1,\"to\":2}]}"); CHECK(!e.loadPatch(bad5.r), "cables that are not arrays");
-    Doc bad6("[1,2]"); CHECK(!e.loadPatch(bad6.r), "a patch that is not an object"); CHECK(e.stats().refusedPatches >= 5, "counted"); e.process(128); }
+    // U31: the JS's own reading (waves-worklet.js loadPatch / Graph.connect): these PLAY there, so they load here. (They were refused before U31: stricter than the JS.)
+    { Doc d2("{\"modules\":[{\"id\":\"a#1\",\"type\":\"vca\"}]}"); WavesEngine e2(48000, opts(4)); CHECK(e2.loadPatch(d2.r) && e2.order().size() == 1, "'#' in an id loads (the JS's Map takes any key)"); }
+    { Doc d3("{\"modules\":[{\"id\":7,\"type\":\"vca\"},{\"id\":\"7\",\"type\":\"vca\"}]}"); WavesEngine e3(48000, opts(4)); CHECK(e3.loadPatch(d3.r) && e3.order().size() == 2, "a numeric id loads, and 7 is not \"7\""); }
+    { Doc d4("{\"modules\":\"abc\"}"); WavesEngine e4(48000, opts(4)); CHECK(e4.loadPatch(d4.r) && e4.order().empty(), "modules a string: its characters are no modules"); }
+    { Doc d5("{\"modules\":[],\"cables\":[{\"from\":1,\"to\":2}]}"); WavesEngine e5(48000, opts(4)); CHECK(e5.loadPatch(d5.r), "a cable whose ends are not arrays is skipped"); }
+    { Doc d6("[1,2]"); WavesEngine e6(48000, opts(4)); CHECK(e6.loadPatch(d6.r) && e6.order().empty(), "a document that is not an object is an empty patch"); }
+    // where the JS throws: null cable, null end that is reached, modules / cables that are not iterable
+    Doc bad5("{\"modules\":[],\"cables\":[null]}"); CHECK(!e.loadPatch(bad5.r), "a null cable refuses the patch"); Doc bad6("{\"modules\":5}"); CHECK(!e.loadPatch(bad6.r), "modules a number refuses the patch");
+    CHECK(e.stats().refusedPatches >= 3 && e.order().size() == 5, "counted, and the old patch stays"); e.process(128); }
   { std::string s = "{\"modules\":["; for (int i = 0; i < 1025; i++) s += (i ? "," : "") + mod(("m" + std::to_string(i)).c_str(), "atten"); s += "],\"cables\":[]}"; Doc d(s); WavesEngine e(48000, opts(4)); CHECK(!e.loadPatch(d.r), "1025 modules are refused"); }
   { std::string s = "{\"modules\":["; for (int i = 0; i < 1000; i++) s += (i ? "," : "") + mod(("m" + std::to_string(i)).c_str(), "atten"); s += "],\"cables\":[]}"; Doc d(s); WavesEngine e(48000, opts(8)); CHECK(e.loadPatch(d.r), "1000 attenuverters load"); e.noteOn(60, 1); e.process(128); }
   { Doc d("{\"modules\":[" + mod("a", "atten") + "," + mod("b", "atten") + "],\"cables\":[" + cab("a", "out", "b", "in") + "," + cab("b", "out", "a", "in") + "]}"); WavesEngine e(48000, opts(4)); CHECK(e.loadPatch(d.r), "a cycle without fb"); e.process(128);

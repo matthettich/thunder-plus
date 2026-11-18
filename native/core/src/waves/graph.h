@@ -5,6 +5,7 @@
 #ifndef THUNDER_WAVES_GRAPH_H
 #define THUNDER_WAVES_GRAPH_H
 #include <algorithm>
+#include <cstdio>
 #include <cstring>
 #include <memory>
 #include <string>
@@ -74,6 +75,16 @@ inline bool truthyJ(Json v) {
   return true;
 }
 // a port name of any JSON type, as text that no real port has when it is not a string
+// U31: a module id / cable end as the JS's Map holds it: a string is itself; anything else (a number, true / false, null, a missing id, an array / object) gets a key no string id can equal (the JS's Map keys are not
+// coerced: 5 and "5" differ), so a patch with such ids loads and plays as it does in the JS. (Two ids that are both objects share one key here: they could never be the target of a cable in the JS either.)
+inline std::string jsKey(Json v) {
+  if (v.isStr()) return std::string(v.asStr());
+  if (v.isNum()) { char b[40]; std::snprintf(b, sizeof b, "\x01n%.15g", v.asNum()); return b; }
+  if (v.isBool()) return v.asBool() ? std::string("\x01btrue") : std::string("\x01bfalse");
+  if (v.isNull()) return std::string("\x01null");
+  if (v.missing()) return std::string("\x01undef");
+  return std::string("\x01obj");
+}
 inline std::string portText(Json v) { if (v.isStr()) return std::string(v.asStr()); return std::string("\x01") + std::to_string((int)v.type()) + (v.isNum() ? std::string(v.numText()) : std::string()); }
 // text
 inline int toU16(std::string_view s, uint16_t* out, int maxUnits) {
@@ -168,10 +179,10 @@ class PatchImpl {
     if (m) { byId.erase(id); mods.erase(std::remove_if(mods.begin(), mods.end(), [&](const std::unique_ptr<ModNode>& p) { return p.get() == m; }), mods.end()); }
     dropCables(id); compile();
   }
-  // false: refused (a known type with an id the JS's own keys cannot hold)
+  // false: never (an id is any key; U31)
   bool addNode(std::string_view id, std::string_view type, Json o) {
     const WInfo* wi = tab->info(type); if (!wi) return true;   // unknown type: nothing, as the JS
-    if (id.find('#') != std::string_view::npos || id.empty()) return false;
+    (void)0;   // (U31: the JS's Map takes any id: '' and '#' too)
     const std::string sid(id);
     if (find(sid)) removeNode(sid);
     auto m = std::make_unique<ModNode>(); m->id = sid; m->wi = wi; m->def = tab->def(type); m->weight = weightOf(*wi);

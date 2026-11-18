@@ -167,6 +167,33 @@ S({ name: 'over/chainOut-level-negative', patch: { modules: [TI('a', 1), CO('c',
 S({ name: 'over/chainOut-setparam-1e30', patch: { modules: [TI('a', 1), CO('c', 1, 1)], cables: [C(['a', 'out'], ['c', 'in'])] }, events: [[30, 'param', 'c', 'level', 1e30], [60, 'param', 'c', 'level', -1e30]] });
 S({ name: 'over/chainOut-track-far', patch: { modules: [TI('a', 1), CO('c', 500, 1), CO('d', -7, .5)], cables: [C(['a', 'out'], ['c', 'in']), C(['a', 'out'], ['d', 'in'])] } });
 S({ name: 'over/scin-release-below-min', taps: 2, patch: { modules: [TI('a', 1), P('i', 'scin', { sck: 9 + 1, release: .3, sens: -50, send: 5 }), P('g', 'vca', {}), CO('c', 1)], cables: [C(['a', 'out'], ['g', 'in']), C(['i', 'out'], ['g', 'cv']), C(['g', 'out'], ['c', 'in'])] } });
+// malformed documents the JS PLAYS (Graph.connect skips a cable whose end is not a module, takes any port; addModule takes any id; a module of an unknown type is skipped): the native engine must load them too.
+// (A cable that is null / a number, or a null `to`, makes the JS THROW in loadPatch: the native engine refuses such a patch; test_chains.cpp checks that.)
+{
+  const V = P('v', 'vca', { gain: .5 }), good = [C(['a', 'out'], ['v', 'in']), C(['v', 'out'], ['c', 'in'])], mk = (mods, cabs, extra) => ({ name: 'mal/' + extra, patch: { modules: mods, cables: cabs } });
+  const base = [TI('a', 1), V, CO('c', 1)];
+  S(mk(base, [...good, C(['a', 'out'], ['v', 999])], 'port-number'));
+  S(mk(base, [...good, C(['a', -1], ['v', 'in'])], 'port-negative'));
+  S(mk(base, [...good, C(['a', 1e30], ['v', 'in'])], 'port-huge'));
+  S(mk(base, [...good, { from: ['a'], to: ['v', 'in'] }], 'short-from'));
+  S(mk(base, [...good, { from: 5, to: ['v', 'in'] }], 'from-number'));
+  S(mk(base, [...good, { from: 'a', to: ['v', 'in'] }], 'from-string'));
+  S(mk(base, [{ from: 'ao', to: ['v', 'in'] }, C(['v', 'out'], ['c', 'in'])], 'from-string-2'));
+  S(mk(base, [...good, { from: { 0: 'a', 1: 'out' }, to: ['v', 'in'] }], 'from-object'));
+  S(mk(base, [...good, C([1, 'out'], ['v', 'in'])], 'id-number-in-cable'));
+  S(mk(base, [...good, { from: ['v', 'out'], to: ['v', 'cv'], fb: 'yes' }], 'fb-string'));
+  S(mk([TI('a', 1), V, P('v', 'vca', { gain: .2 }), CO('c', 1)], good, 'duplicate-id'));
+  S(mk([TI('a', 1), P('', 'vca', { gain: .5 }), CO('c', 1)], [C(['a', 'out'], ['', 'in']), C(['', 'out'], ['c', 'in'])], 'empty-id'));
+  S(mk([TI('a', 1), P(5, 'vca', { gain: .5 }), CO('c', 1)], [C(['a', 'out'], [5, 'in']), C([5, 'out'], ['c', 'in'])], 'number-id'));
+  S(mk([TI('a', 1), { type: 'vca', scope: 'mono', params: { gain: .5 } }, CO('c', 1)], [C(['a', 'out'], [null, 'in']), C([null, 'out'], ['c', 'in'])], 'missing-id'));
+  S(mk([TI('a', 1), P(null, 'vca', { gain: .5 }), CO('c', 1)], [C(['a', 'out'], [null, 'in']), C([null, 'out'], ['c', 'in'])], 'null-id'));
+  S(mk([...base, P('x', 'nope')], good, 'unknown-type'));
+  S(mk(base, [...good, C(['zz', 'out'], ['v', 'in'])], 'cable-to-missing'));
+  S(mk([...base, 7, 'x', []], good, 'module-not-object'));
+  S(mk('abc', good, 'modules-string'));
+  S(mk(base, undefined, 'no-cables'));
+  S(mk(base, [...good, C(['v', 'out'], ['v', 'in'])], 'self-cable'));
+}
 // the node: ThunderChains (track, bus feeds, the sidechain input, taps, sends in and out)
 const nodeS = s => S(Object.assign({ mode: 'node', track: 0, standalone: false }, s));
 nodeS({ name: 'node/basic', track: 0, patch: { modules: [TI('a', 1), P('g', 'vca', { gain: .6 }), CO('c', 1), CO('d', 2)], cables: [C(['a', 'out'], ['g', 'in']), C(['g', 'out'], ['c', 'in']), C(['g', 'out'], ['d', 'in'])] } });
