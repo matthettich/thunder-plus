@@ -27,7 +27,8 @@ constexpr size_t kMaxModPool = (size_t)1 << 19;          // modulator records of
 constexpr size_t kMaxWork = 200000;                   // preset zone x instrument zone pairs looked at while building the zones (FluidR3 GM: 10027; this is 20x)
 constexpr size_t kMaxSampleFrames = (size_t)1 << 25;     // frames one decoded sample may have (33 million: 12 minutes at 44.1 kHz); more is refused, as the JS's failed allocation / decode gives its 1-sample silence
 constexpr int kMaxListDepth = 32;
-constexpr uint32_t kMinStreamRate = 4000, kMaxStreamRate = 192000;   // an Ogg stream's own sample rate outside this is refused (silent 1-frame fallback)                        // nested LIST chunks
+constexpr uint32_t kMinStreamRate = 4000, kMaxStreamRate = 192000;   // an Ogg stream's own sample rate outside this, and a context rate (DecodeOpts::ctxRate) outside it, is refused (silent 1-frame fallback)
+constexpr uint32_t kMinHdrRate = 400, kMaxHdrRate = 192000;           // a sample header's rate (SF2 spec: 400..50000) outside this is refused the same way; the page plays at hdr.sr / sr, so an absurd one is an absurd pitch                        // nested LIST chunks
 
 struct SampleHdr {          // shdr
   char name[21];

@@ -114,8 +114,48 @@ The native module compiles the same sources STRICT (no fast-math, no contraction
 | nothings/stb (one file: `stb_vorbis.c`, v1.24 in its own header; `LICENSE` beside it) | `9600522de53973336fa033a289858a4354cbb04c` (master, 12 Nov 2026) | MIT or public domain (Unlicense), the reader's choice | `thunder_stb_vorbis` (a C static library linked into `thunder_core`; the in-memory API `stb_vorbis_open_memory` only: no stdio, no push-data API) | yes (permissive; the SoundFont player stays in the core) |
 
 Chosen by the owner on 17 Nov 2026 (U32). `stb_vorbis.c` at the pin: sha256 `b52cf518355f7b2d181f18b97b812f361ffeb26299d935c8cf29e842401d60a6`, 198,004 bytes.
-**Licence, read from the file at the pin** (the block just before the last lines of `stb_vorbis.c`): "This software is available under 2 licenses -- choose whichever you prefer. ALTERNATIVE A - MIT License, Copyright (c) 2017 Sean Barrett [...]
-ALTERNATIVE B - Public Domain (www.unlicense.org)"; the next line of the file: "This is free and unencumbered software released into the public domain." and the file's own header says "Ogg Vorbis audio decoder - v1.24 - public domain". The repository's `LICENSE` says the same
-("The software libraries in this repository are in the public domain. Most of them are also available under the MIT license -- choose whichever you prefer."). Nothing is vendored: `fetch.sh` fetches the file at the pin; `THUNDER_FETCH_STB_ONLY=1 fetch.sh DEST` fetches only this (the closed build has no DSP and needs nothing else).
+**Licence, read from the file at the pin.** The text below is the licence block of `stb_vorbis.c` (lines 5664 to 5702, the block just before the closing `*/`), copied byte for byte by script from the fetched file (sha256 above); the file's own header says "Ogg Vorbis audio decoder - v1.24 - public domain". The repository's `LICENSE` opens with: "The software libraries in this repository are in the public domain. Most of them are also available under the MIT license -- choose whichever you prefer.". Nothing is vendored: `fetch.sh` fetches the file at the pin; `THUNDER_FETCH_STB_ONLY=1 fetch.sh DEST` fetches only this (the closed build has no DSP and needs nothing else).
+
+```text
+------------------------------------------------------------------------------
+This software is available under 2 licenses -- choose whichever you prefer.
+------------------------------------------------------------------------------
+ALTERNATIVE A - MIT License
+Copyright (c) 2017 Sean Barrett
+Permission is hereby granted, free of charge, to any person obtaining a copy of
+this software and associated documentation files (the "Software"), to deal in
+the Software without restriction, including without limitation the rights to
+use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies
+of the Software, and to permit persons to whom the Software is furnished to do
+so, subject to the following conditions:
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+------------------------------------------------------------------------------
+ALTERNATIVE B - Public Domain (www.unlicense.org)
+This is free and unencumbered software released into the public domain.
+Anyone is free to copy, modify, publish, use, compile, sell, or distribute this
+software, either in source code form or as a compiled binary, for any purpose,
+commercial or non-commercial, and by any means.
+In jurisdictions that recognize copyright laws, the author or authors of this
+software dedicate any and all copyright interest in the software to the public
+domain. We make this dedication for the benefit of the public at large and to
+the detriment of our heirs and successors. We intend this dedication to be an
+overt act of relinquishment in perpetuity of all present and future rights to
+this software under copyright law.
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN
+ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
+WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+------------------------------------------------------------------------------
+```
 `prepare-stb.sh` makes the patched copy the host builds compile (see `docs/port/U32-NOTES.md` for each patch and the input that triggers it; none while the file is empty of patches).
 The decoder runs at font load / preparation time, never on the audio thread; the host hands the bytes in (nothing in the core opens a file).
