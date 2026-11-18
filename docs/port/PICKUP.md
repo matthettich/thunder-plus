@@ -39,6 +39,21 @@ plan; sections 1 to 4 and 9), `HANDOVER.md` on `beta` (the web app, the owner's 
   step order: U34a offline song render C API, U34b stems, then dispatch routing + Seq setters + Song lifetime (the lead reviews).
 - `docs/port/IF-SOLD.md`: what would change if the app were sold (the owner asked).
 
+## State at 11:30 on 18 Nov (the lead; supersedes the 00:10 pump paragraph above)
+- **The owner wants percentage-complete estimates whenever he asks for progress.** At this point: about 50 % of the whole port, 31 of 37 units merged
+  (84 %), about 60 % of the way to an Android install (the lead's estimates).
+- **The pump re-pin is BACKED OUT of the web app.** Builds 643 (#224) and 644 (#228) reached `beta`, never `main`. pump e43ee10 builds FREEZE's spectra
+  at creation (about 0.9 s on the web's audio thread); four verified rounds of web-side warm-up only moved the stall, and 644 lost the first notes when
+  PLAY followed a kit load or engine switch within about a second. Build 645 (branch `web/pump-backout`, a Sonnet worker) returns `beta` to 642's pump
+  files and removes the warm-up code; verify it is byte-identical to `main` for the wasm files, then merge to `beta` and `main`.
+  **PR #225 (native re-pin) is HELD**: web and native re-pin together once pump has the changes in `docs/port/PUMP-REQUESTS.md` (the owner's pump agent).
+- **U31 = PR #227, U32 = PR #226**: built; independent verifiers were running (`/home/claude/progress/verify-227.md`, `verify-226.md`; if the session is
+  new, rerun a verifier from the PR). U32: Chrome's `decodeAudioData` drops trailing frames of single-page Ogg streams, so short looped SoundFont samples
+  stop early in the web app; native decodes correctly by default (the lead's decision, told to the owner) and has a Chrome-parity mode for the gate only.
+  The Android host must pass a key list (`prepare_preset(..., keys)`: full-keyboard piano is 191 MB). U31: the lead still owes the line-by-line review of
+  its live part and a decision on the 16 library effect rows left out by name.
+- **Next:** merge U31 / U32 when verified; then the wiring per `docs/port/WIRING-DOSSIER.md` part 5 (U34a offline render C API first), U36, then N2.
+
 ## Rules the lead set for gates (they hold for every remaining unit)
 - Ported JS: bit-exact against the web app's goldens and a Node reference; committed Linux hashes gate every platform. Never loosen a gate, never hand-edit a
   golden, no `-ffast-math`.
