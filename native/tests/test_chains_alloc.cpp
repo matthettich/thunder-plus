@@ -34,7 +34,8 @@ int main(int argc, char** argv) {
   (void)argc; (void)argv; std::printf("chains_alloc: skipped (needs glibc without a sanitizer)\n"); return 77;
 #else
   const bool fast = argc > 1 && std::string(argv[1])=="fast"; const char* only = argc > 2 ? argv[2] : nullptr; const int onlyP = argc > 3 ? atoi(argv[3]) : -1;
-  int bad = 0, tested = 0;
+  int bad = 0, tested = 0, expected = 0;   // expected: every type this build can run (a closed build has no library effects, Marbles, Tides or pump modules: fewer)
+  for (int t = 0; t < cinfo_count(); t++) { const std::string ty = cinfo_at(t).type; if (ty != "trackIn" && ty != "chainOut" && chains_have_lib(ty)) expected++; }
   for (int t = 0; t < cinfo_count(); t++) {
     const WInfo& wi = cinfo_at(t); const std::string type = wi.type;
     if (type == "trackIn" || type == "chainOut") continue;
@@ -63,6 +64,6 @@ int main(int argc, char** argv) {
     if (g_cnt) { bad++; std::printf("ALLOC on the audio path: %-10s %lu allocator calls; first: %s\n", type.c_str(), g_cnt, g_first); }
   }
   std::printf("chains_alloc: audited %d module types through the live runner (patch swap + parameter / bypass / tempo events), %d allocated on the audio path\n", tested, bad);
-  return (bad || tested < 100) ? 1 : 0;
+  return (bad || (!only && (tested != expected || tested < 90))) ? 1 : 0;
 #endif
 }
