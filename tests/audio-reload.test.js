@@ -90,7 +90,7 @@ test('reload: a sample that cannot be stored stops it unless the owner says relo
 });
 
 test('reload: a failed storage write never reloads, and says why', async () => {
-  for (const k of ['kit', 'song']) { const R = rig({ writeFails: k }); assert.equal(await R.api.audReloadSafe(), false); assert.ok(!R.calls.includes('RELOAD'), k); assert.equal(R.errs.length, 1); assert.match(R.errs[0], /storage is full/); }
+  for (const k of ['kit', 'song']) { const R = rig({ writeFails: k }); assert.equal(await R.api.audReloadSafe(), false); assert.ok(!R.calls.includes('RELOAD'), k); assert.equal(R.errs.length, 1); assert.match(R.errs[0], /storage full/); }
 });
 
 test('reload: not while recording or rendering; an unplaced take asks first', async () => {

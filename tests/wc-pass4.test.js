@@ -39,7 +39,7 @@ for (const [ed, src] of Object.entries(ED)) {
     assert.doesNotMatch(src, /const old = edgeInto\(to\[0\], to\[1\]\); if \(old\) disconnect\(old, true\);/);
     assert.match(src, /Those two are already connected\./);
     assert.match(src, /const lastInto = /);
-    assert.match(src, /they add together/);
+    assert.match(src, /feed this input and add together/);
   });
   test(ed + ' M4 / M5: Find a module from a key and in the list; comments and rename; saved fields are optional', () => {
     assert.match(src, /function quickAddKey\(\)/); assert.match(src, /class:'psearch'/); assert.match(src, /'note:comment'/);

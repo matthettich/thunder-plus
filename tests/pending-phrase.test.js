@@ -16,7 +16,7 @@ function rig({ cPhrase = 0, pend = { x: 0, y: 0, p: 0 }, notes = true, taken = [
   vm.createContext(c); vm.runInContext(fn[0] + '\nthis.placePending = placePending;', c); return c;
 }
 test('the ordinary case: a note in the open pending phrase puts it on its cell', () => {
-  const c = rig(); c.placePending(); assert.deepEqual(c.log.slice(0, 1), ['set 0,0,0']); assert.equal(c.pendPlace, null); assert.match(c.log[1], /is on the song: row R0, track T1/);
+  const c = rig(); c.placePending(); assert.deepEqual(c.log.slice(0, 1), ['set 0,0,0']); assert.equal(c.pendPlace, null); assert.match(c.log[1], /^toast Phrase P0 placed at row R0, track T1$/);
 });
 test('the cursor moved to another phrase before the microtask ran: the notes still go on the song (they used to be dropped)', () => {
   const c = rig({ cPhrase: 3 }); c.placePending(); assert.equal(c.log[0], 'set 0,0,0'); assert.equal(c.pendPlace, null);
