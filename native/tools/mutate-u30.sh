@@ -38,7 +38,7 @@ run "engine: a released voice never sleeps" engine.cpp 'if (row.quiet >= quietFo
 run "live: the latency is one sample short" waves.h 'kLiveLatency = 127' 'kLiveLatency = 126'
 run "live: a block is not cut at an event" live.cpp 'if (npend_ > 0 && pend_[0].at < end) end = pend_[0].at;
       if (end > hostEnd) break;' 'if (end > hostEnd) break;'
-run "hostile guard: parameters are not held in range" graph.h 'm.bp[(size_t)k] = v != v ? d.def : v < d.mn ? d.mn : v > d.mx ? d.mx : v;' 'm.bp[(size_t)k] = v;'
+run "raw parameters: a value is held inside its declared range" graph.h 'if (m.rawP) { for (int k = 0; k < m.wi->np; k++) m.bp[(size_t)k] = m.base[(size_t)k]; return; }' 'if (false) { return; }'
 nice cmake --build "$B" -j2 --target test_waves >/dev/null 2>&1
 echo "mutations: $ok killed, $bad not"
 [ $bad -eq 0 ]

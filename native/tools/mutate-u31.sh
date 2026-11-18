@@ -16,8 +16,8 @@ open(p,'w').write(s.replace(o,n))
 PY
   rc=$?
   if [ $rc -ne 0 ]; then mv "$f.orig" "$f"; touch "$f"; echo "mutation '$name': could not be applied"; bad=$((bad+1)); return; fi
-  if nice cmake --build "$B" -j1 --target test_chains test_chains_live >/dev/null 2>&1; then
-    if timeout 600 "$B/tests/test_chains" $G >/dev/null 2>&1 && timeout 300 "$B/tests/test_chains_live" >/dev/null 2>&1; then echo "mutation '$name': SURVIVED (the tests did not notice)"; bad=$((bad+1)); else echo "mutation '$name': killed"; ok=$((ok+1)); fi
+  if nice cmake --build "$B" -j1 --target test_chains test_chains_live test_chains_mem test_chains_alloc >/dev/null 2>&1; then
+    if timeout 600 "$B/tests/test_chains" $G >/dev/null 2>&1 && timeout 600 "$B/tests/test_chains_live" >/dev/null 2>&1 && timeout 600 "$B/tests/test_chains_mem" >/dev/null 2>&1 && timeout 600 "$B/tests/test_chains_alloc" >/dev/null 2>&1; then echo "mutation '$name': SURVIVED (the tests did not notice)"; bad=$((bad+1)); else echo "mutation '$name': killed"; ok=$((ok+1)); fi
   else echo "mutation '$name': does not build"; bad=$((bad+1)); fi
   mv "$f.orig" "$f"; touch "$f"
 }
@@ -43,6 +43,30 @@ run "vocoder: the talk-mode saturation" chains/cmods.cpp 'js_tanh(y * 1.6) * .62
 run "vocoder spectral mode: the wet gain" chains/cmods.cpp 'out[i] = (float)(dry * (1 - mix) + wet * g * mix);' 'out[i] = (float)(dry * (1 - mix) + wet * g * mix * 1.01);'
 run "osc: the level" chains/cmods.cpp 'O[i] = (float)(y * lv); ph += dt;' 'O[i] = (float)(y * lv * 1.001); ph += dt;'
 run "resample: the slice table is cut short" chains/cmods2.cpp 'kRsSlices[(int)clamp((double)i32(io.p[3]), 0, 4)]' 'kRsSlices[(int)clamp((double)i32(io.p[3]), 0, 3)]'
-nice cmake --build "$B" -j1 --target test_chains test_chains_live >/dev/null 2>&1
+# the verifier's mutations of PR #227 (M1..M13; M10 is the "right output is the left" line above, kept here as the verifier wrote it), each of which an ordinary test now kills
+run "V M1 drain: same-sample events no longer stable" chains/clive.cpp 'while (i > 0 && pend_[i - 1].at > e.at)' 'while (i > 0 && pend_[i - 1].at >= e.at)'
+run "V M2 postParam: id length check off by one" chains/clive.cpp 'std::strlen(id) >= sizeof e.id' 'std::strlen(id) > sizeof e.id'
+run "V M3 live feed: right side no longer falls back to left" chains/clive.cpp 'put(k++, b ? b : a)' 'put(k++, b)'
+run "V M4 setSidechain: R not copied from L when R absent" chains/cengine.cpp 'else if (L) std::memcpy(scR_, L, sizeof(float) * (size_t)n);' 'else if (false) std::memcpy(scR_, L, sizeof(float) * (size_t)n);'
+run "V M5 pump: no new spare requested after a take-over" chains/cmods2.cpp 'wantSpare_.store(true); } } if (h_ < 0)' '} } if (h_ < 0)'
+run "V M6 hostile tempo clamp raised to 1e6" chains/cengine.cpp 'transport_.tempo > 1e5 ? 1e5' 'transport_.tempo > 1e5 ? 1e6'
+run "V M7 Bypass event: switch 0 allowed" chains/clive.cpp 'if (n >= 1 && n <= kBypSwitches) byp_[n - 1] = e.b;' 'if (n >= 0 && n <= kBypSwitches) byp_[n - 1] = e.b;'
+run "V M8 drain: late events no longer pulled up to pos_" chains/clive.cpp 'if (e.at < pos_) { e.at = pos_; st_.lateEvents++; }' 'if (false) { e.at = pos_; st_.lateEvents++; }'
+run "V M9 Track In: bound off by one" chains/cmods.cpp 'if (x.inL && x.inR && k < x.inChans)' 'if (x.inL && x.inR && k <= x.inChans)'
+run "V M10 live: right output = left" chains/clive.cpp 'if (out.R && out.R != out.L) out.R[done + j] = get(1);' 'if (out.R && out.R != out.L) out.R[done + j] = get(0);'
+run "V M11 bypass: a module settled in bypass is no longer fed silence" chains/cengine.cpp 'if (want && was) { std::memset(s.in[m.pIn], 0,' 'if (false) { std::memset(s.in[m.pIn], 0,'
+run "V M12 Chain Out: level capped at 1.5" chains/cmods.cpp 'L[i] = (float)((double)L[i] + (double)io.in[0][i] * g);' 'L[i] = (float)((double)L[i] + (double)io.in[0][i] * (g > 1.5 ? 1.5 : g));'
+run "V M13 service() no longer frees the retired patches" chains/clive.cpp 'void ChainsLive::service() {
+  for (auto& p : retired_) chains_free_patch(p.exchange(nullptr));' 'void ChainsLive::service() {'
+# the defects fixed after the verifier (queue rules, memory budget)
+run "queue: no limit on patches in flight" chains/clive.cpp 'if (k < 0 || inflight >= kChainsSlots) {' 'if (k < 0) {'
+run "queue: a dropped Patch event keeps its slot" chains/clive.cpp 'waves::PatchImpl* p = slot_[k].exchange(nullptr); if (!p) return;
+  for (int i = 0; i < kChainsSlots; i++) if (!retired_[i].load()) { retired_[i].store(p); return; }' 'waves::PatchImpl* p = slot_[k].load(); if (!p) return;
+  for (int i = 0; i < kChainsSlots; i++) if (!retired_[i].load()) { return; }'
+run "queue: no place is kept for the events that must not be lost" chains/clive.cpp '(e.kind == ChainsEvent::Param ? kChainsReserve : 0)' '0'
+run "queue: parameter events do not coalesce" chains/clive.cpp 'if (same < 0) { st_.droppedEvents++; continue; }' 'if (true) { st_.droppedEvents++; continue; }'
+run "queue: a full array drops the Playing event instead of making room" chains/clive.cpp 'const int old = victim();' 'const int old = -1;'
+run "budget: the patch is not counted against it" chains/cengine.cpp 'if (need > (double)memBudget_) {' 'if (need > 1e300) {'
+nice cmake --build "$B" -j1 --target test_chains test_chains_live test_chains_mem test_chains_alloc >/dev/null 2>&1
 echo "mutations: $ok killed, $bad not"
 [ $bad -eq 0 ]

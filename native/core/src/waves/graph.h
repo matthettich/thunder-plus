@@ -59,7 +59,7 @@ inline int weightOf(const WInfo& w) {
   for (const char* b : big) if (t == b) return 16;
   return 1;
 }
-// Hostile values: a module's parameter outside its declared range crashes some modules (the fuzz found it) where the JS computes with it. Held inside the range, a NaN taking the default; in range nothing changes.
+// Parameters: the JS uses a value as set (io.p = io.base), outside its range too, so the engines here do (rawP, the default). The held-in-range copy below (a NaN taking the default) is for a host that asks for it (rawParams false).
 inline void repin(ModNode& m) {
   m.bp.resize(m.base.size());
   if (m.rawP) { for (int k = 0; k < m.wi->np; k++) m.bp[(size_t)k] = m.base[(size_t)k]; return; }   // U31: the value as set, as the JS (io.p = io.base): no range, a NaN stays a NaN
