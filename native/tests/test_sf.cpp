@@ -76,9 +76,10 @@ static void samplesOfLive(const Font& f, Json c, CaseSamples& o) {
   const PadParams P = padOf(c.obj("pad")); const Preset* pr = sf_preset(f, js_round(P.bank), js_round(P.prog)); Json E = c.arr("events");
   for (size_t i = 0; i < E.size(); i++) { Json e = E.at(i); if (e.str("type") != "note") continue; double k, v; keyVel(P, e.num("rate"), e.num("gain"), &k, &v); neededFor(f, pr, k, v, o.idx); }
 }
-static void decodeInto(const Font& f, const std::set<uint32_t>& idx, PresetPcm& pcm) {
+static void decodeInto(const Font& f, const std::set<uint32_t>& idx, PresetPcm& pcm, double ctxRate = 0) {
+  DecodeOpts dopt; dopt.ctxRate = ctxRate;
   pcm.byIndex.assign(f.samples.size(), Pcm()); pcm.bytes = 0;
-  for (uint32_t i : idx) { decode_sample(f, i, DecodeOpts(), pcm.byIndex[i]); pcm.bytes += pcm.byIndex[i].d.size() * 4; }
+  for (uint32_t i : idx) { decode_sample(f, i, dopt, pcm.byIndex[i]); pcm.bytes += pcm.byIndex[i].d.size() * 4; }
 }
 
 static int doExport(const std::string& dir) {
@@ -277,9 +278,42 @@ static int doCompare(const std::string& dir) {
   return fails ? 1 : 0;
 }
 
+
+// ---- the page's own decode and render in Chrome (native/tools/sf-chrome.mjs DIR): the decoder difference, measured
+static int doChrome(const std::string& dir, double ctxRate) {
+  Rig R; if (!R.load()) return 1;
+  std::string meta; if (!readFile(dir + "/chrome_samples.json", &meta)) { std::printf("FAIL: no chrome_samples.json\n"); return 1; }
+  JsonDoc md; if (!md.parse(meta)) { std::printf("FAIL: chrome_samples.json\n"); return 1; }
+  Json M = md.root(); const FontBox& fb = R.fonts["gm"]; DecodeOpts dopt; dopt.ctxRate = ctxRate;
+  Json S = M.arr("samples");
+  for (size_t i = 0; i < S.size(); i++) {
+    Json s = S.at(i); const uint32_t idx = (uint32_t)s.num("idx");
+    std::string b; readFile(dir + "/" + std::string(s.str("file")), &b); Pcm p; decode_sample(fb.f, idx, dopt, p);
+    const size_t nc = b.size() / 4; const float* c = (const float*)b.data();
+    const size_t m = std::min(nc, p.d.size());
+    std::printf("decode sample %4u (file %g Hz): chrome %zu frames, native %zu frames @%g Hz; first %zu frames differ by %.1f dB (without the last 64: %.1f dB)\n", idx, s.num("hdrSr"), nc, p.d.size(), p.sr, m, m ? dbDiff(p.d.data(), c, m) : 0.0, m > 64 ? dbDiff(p.d.data(), c, m - 64) : 0.0);
+  }
+  Json Rn = R.cases.arr("renders"); Json RR = M.arr("renders"); double worst = -1e9;
+  for (size_t i = 0; i < RR.size(); i++) {
+    Json r = RR.at(i); const std::string id(r.str("id")); Json c; bool found = false;
+    for (size_t j = 0; j < Rn.size(); j++) if (std::string(Rn.at(j).str("id")) == id) { c = Rn.at(j); found = true; }
+    if (!found) continue;
+    CaseSamples cs; samplesOfRender(fb.f, c, cs); PresetPcm pcm; decodeInto(fb.f, cs.idx, pcm, ctxRate);
+    const PadParams P = padOf(c.obj("pad")); const double sr = c.num("sr"), hold = c.num("hold");
+    std::vector<float> out(sf_render_bound(fb.f, P, sr, hold)); const size_t n = sf_render(fb.f, pcm, P, sr, hold, out.data(), out.size());
+    std::string b; readFile(dir + "/" + std::string(r.str("file")), &b); const size_t nc = b.size() / 4;
+    if (nc != n) std::printf("render %-20s: length native %zu, chrome %zu\n", id.c_str(), n, nc);
+    const double db = dbDiff(out.data(), (const float*)b.data(), std::min(n, nc)); worst = std::max(worst, db);
+    std::printf("render %-20s: native vs the page's sfRender in Chrome: %.1f dB\n", id.c_str(), db);
+  }
+  std::printf("worst render difference %.1f dB\n", worst);
+  return 0;
+}
+
 int main(int argc, char** argv) {
   if (argc < 3) { std::printf("usage: test_sf export|compare DIR\n"); return 2; }
   if (!std::strcmp(argv[1], "export")) return doExport(argv[2]);
   if (!std::strcmp(argv[1], "compare")) return doCompare(argv[2]);
+  if (!std::strcmp(argv[1], "chrome")) return doChrome(argv[2], argc > 3 ? std::atof(argv[3]) : 0);
   return 2;
 }

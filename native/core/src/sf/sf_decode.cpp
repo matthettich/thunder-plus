@@ -34,9 +34,26 @@ bool decodeOgg(const uint8_t* p, size_t n, std::vector<float>& d, double& sr) {
   return !d.empty();
 }
 
+// Band-limited resampling to the context rate, as decodeAudioData does for a stream at another rate: a Kaiser-windowed sinc (beta 9, 32 zero crossings each side), in double, cutoff at the lower Nyquist.
+// Chrome's own resampler is not specified bit for bit, so this reproduces it to within its own filter error, not exactly (U32-NOTES.md "sample rate").
+double bessel0(double x) { double s = 1, t = 1; for (int k = 1; k < 40; k++) { t *= (x / (2 * k)) * (x / (2 * k)); s += t; if (t < 1e-18 * s) break; } return s; }
+void resampleTo(std::vector<float>& d, double from, double to) {
+  if (d.empty() || !(from > 0) || !(to > 0) || from == to) return;
+  const double r = to / from, fc = std::min(1.0, r), W = 32.0; const size_t n = d.size();
+  const size_t m = (size_t)std::floor((double)n * r); if (m == 0 || m > kMaxSampleFrames) return;
+  std::vector<float> o(m); const double b9 = bessel0(9.0);
+  for (size_t i = 0; i < m; i++) {
+    const double t = (double)i / r; const double half = W / fc; long a = (long)std::ceil(t - half), z = (long)std::floor(t + half); double acc = 0;
+    for (long j = a; j <= z; j++) { if (j < 0 || j >= (long)n) continue; const double x = t - (double)j, u = x / half; if (u <= -1 || u >= 1) continue;
+      const double sx = x == 0 ? 1.0 : std::sin(M_PI * fc * x) / (M_PI * fc * x); acc += (double)d[(size_t)j] * fc * sx * (bessel0(9.0 * std::sqrt(1 - u * u)) / b9); }
+    o[i] = (float)acc;
+  }
+  d.swap(o);
+}
+
 }  // namespace
 
-void decode_sample(const Font& f, uint32_t i, const DecodeOpts&, Pcm& o) {
+void decode_sample(const Font& f, uint32_t i, const DecodeOpts& opt, Pcm& o) {
   o = Pcm();
   if (i >= f.samples.size()) { fallback(o); return; }
   const SampleHdr& s = f.samples[i];
@@ -44,6 +61,7 @@ void decode_sample(const Font& f, uint32_t i, const DecodeOpts&, Pcm& o) {
     const size_t a = std::min<size_t>(s.start, f.smplN), b = std::min<size_t>(s.end, f.smplN);   // smpl.slice(start, end)
     std::vector<float> d; double sr = 0;
     if (b <= a || !decodeOgg(f.smpl + a, b - a, d, sr)) { fallback(o); return; }
+    if (opt.ctxRate > 0 && opt.ctxRate != sr) { resampleTo(d, sr, opt.ctxRate); sr = opt.ctxRate; }
     const double k = sr / (double)s.sr;
     o.d = std::move(d); o.sr = sr; o.ls = js_round((double)s.ls * k); o.le = js_round((double)s.le * k); o.k = k; o.ok = true; o.present = true;
     return;
