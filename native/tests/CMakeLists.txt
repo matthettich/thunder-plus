@@ -724,6 +724,11 @@ add_executable(test_waves_fuzz test_waves_fuzz.cpp)
 target_link_libraries(test_waves_fuzz PRIVATE thunder_core)
 target_include_directories(test_waves_fuzz PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../core/src ${CMAKE_CURRENT_SOURCE_DIR})
 add_test(NAME waves_fuzz COMMAND test_waves_fuzz 150 1 20)
+# U31: the …chains fuzz (a small count here; 3000 and more under ASan + UBSan with -DTHUNDER_SANITIZE=ON: docs/port/U31-NOTES.md)
+add_executable(test_chains_fuzz test_chains_fuzz.cpp)
+target_link_libraries(test_chains_fuzz PRIVATE thunder_core)
+target_include_directories(test_chains_fuzz PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../core/src ${CMAKE_CURRENT_SOURCE_DIR})
+add_test(NAME chains_fuzz COMMAND test_chains_fuzz 120 1 20)
 # U04: the optional LXR module (native/lxr, GPL-3.0-only) against the web app's own render path (tools/lxr-dump.mjs: lxr/lxr-engine.js LxrCore.render + the shipped lxr/lxr.wasm in Node, samples; 818 cases),
 # its live path and its refusals. Built only where the module is (THUNDER_WITH_LXR, not MSVC); the seam's own test (lxr_seam: closed and open configurations) is below and is built in BOTH.
 if(TARGET thunder_lxr)
