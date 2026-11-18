@@ -968,6 +968,7 @@ body.mob #bFile.dirty{position:relative} body.mob #bFile.dirty::before{position:
 .tpset{font-size:.74em; font-weight:400} .tpset:empty{display:none} .tpset span[data-x]{padding:0 .15em}
 .tgrid{flex:1; min-height:0; overflow:hidden; padding-top:.25em}
 .tgrid .ln{white-space:pre; line-height:1.3; height:1.3em}
+.tgrid.pvrh .ln{line-height:var(--pvrh); height:var(--pvrh)}   /* PATTERN ZOOM (pvApplyRH): whole pixels per row, so the rows and the playhead bars stay crisp */
 .tgrid .ln.wrap{white-space:normal; height:auto; max-width:68ch}   /* a text line that wraps (the FX screen's description) */
 .tgrid .fxdesc{display:block; color:var(--ts-info); font-family:var(--font); font-size:.85em; line-height:1.4; padding-bottom:.35em}
 /* Phrase: every 4th line a shade darker (on the black skins a shade lighter), in every skin, for 4/4. */
@@ -1918,6 +1919,7 @@ body.sdesk .dock:not(.vtrk) .pads .pad:nth-child(17)::before{content:'More pads'
 .tscr .pvbar .pvwarn{color:var(--ts-mute); border:1px solid currentColor; padding:.12em .3em; min-width:0; overflow:hidden; text-overflow:ellipsis}
 .tscr .pvbar :is(.pvtag,.pvwarn)[hidden]{display:none}
 .tscr .pvbar .pvsp{display:none}
+.tscr .pvbar .pvzm{display:flex; flex:none}.tscr .pvbar .pvzm button + button{border-left:0}   /* PATTERN ZOOM: A− A+ and FIT n (pvZoomBy, pvFitToggle) */
 .tscr .pvbar button{flex:none; padding:.24em .38em}
 .tscr .pvbar .pvud{display:flex; flex:none; margin-left:-.2em}
 .tscr .pvbar .pvud button{padding:.24em .35em; line-height:1}
@@ -27154,6 +27156,10 @@ function projRows(){
       info:() => 'Row numbers in Song, Sect, Phrase and Arrange: DECIMAL counts 0, 1, 2… (song rows 000–255, phrase rows 00–31); HEX is 00–FF. Phrase, sect and instrument numbers and the values stay hex'},
     {l:'TEXT SIZE', get:() => tScale, set:v => setTScale(v), min:60, max:200, step:10, big:20, d:tScaleDef(), fmt:v => v + '%',
       info:() => 'Size of the text and lines on the tracker screen (the Mixer has its own size: MIXER SIZE). Bigger shows fewer rows (and scrolls sideways when a line no longer fits); drag a finger up or down anywhere on the screen to scroll'},
+    {l:'PATTERN TEXT', get:() => pvFitOn ? PV_RH_MIN - 1 : pvRH || PV_RH_MIN - 1, set:v => { if (v < PV_RH_MIN){ pvFitOn = false; pvRH = 0; pvSave(); phraseFitScale = -1; fit(); draw(); } else pvZoomSet(false, v, false); }, min:PV_RH_MIN - 1, max:PV_RH_MAX, step:1, big:3, d:PV_RH_MIN - 1, fmt:v => v < PV_RH_MIN ? (pvFitOn ? 'FIT ' + pvRows : 'AUTO') : v + ' PX',
+      info:() => 'The Pattern view\u2019s text size on its own, as pixels of row height (AUTO is the size that fits the window; TEXT SIZE does not change it once it is set). Also A\u2212 A+ on the Pattern bar, Ctrl/\u2318+Alt+\u2212 and Ctrl/\u2318+Alt+=, and Ctrl/\u2318+wheel (or a pinch) over the pattern. The smallest is ' + PV_RH_MIN + ' px: smaller text is hard to read'},
+    {l:'FIT PATTERN ROWS', ck:'Fit all the pattern rows', get:() => pvFitOn ? 1 : 0, set:v => { if (!!v !== pvFitOn){ if (pvActive()) pvFitToggle(); else { pvFitOn = !!v; pvRH = 0; pvSave(); phraseFitScale = -1; } } }, min:0, max:1, tog:true, d:0, fmt:onOff,
+      info:() => 'ON: the Pattern view uses the biggest text at which every row of the pattern shows (32 rows need about a 660 px tall window with the panels as they are), and does it again when the window or the pattern changes. Also the FIT button on the Pattern bar and Ctrl/\u2318+Alt+0'},
     {l:'MIXER SIZE', get:() => mixScale, set:v => setMixScale(v), min:60, max:200, step:10, big:20, d:mixScaleDef(), fmt:v => v + '%',
       info:() => 'Size of the Mixer only, separate from TEXT SIZE: 100 % fills the screen, which is already larger than the 80 % Desktop text size gave it. Above that it takes whatever room is left, never past the screen (all its rows stay visible); bigger shows fewer tracks at once, and the window follows the cursor (TRK nn–nn of 32 ◀▶)'},
     {l:'PLAYHEAD OFFSET', get:() => phOff, set:v => setPhOff(v), min:-100, max:300, step:5, big:25, d:0, fmt:v => v ? sgn(v) + ' ms' : '0 ms',
@@ -30080,7 +30086,7 @@ function measure(force){
 let phraseFitBase = null, phraseFitScale = -1;
 function fit(){
   if (view !== 'tracker') return;
-  fitTries = 0; layoutSig = '';
+  fitTries = 0; layoutSig = ''; grid.classList.remove('pvrh');   // (PATTERN ZOOM sets it again below, when it is on)
   const W = scr.clientWidth - 24, H = scr.clientHeight - 16; if (W <= 0 || H <= 0) return;
   const spc = spActive() ? spCols() : 0, ROWS = tv === 'mixer' ? 20 : spc ? 12 : FITROWS;
   let fs = Math.max(7, Math.min(spc ? 40 : 30, W / ((spc || BASEW) * CW), H / (ROWS * 1.3 + 5.5)));
@@ -30100,6 +30106,7 @@ function fit(){
       phraseFitBase = fs; phraseFitScale = key;
     }
     fs = phraseFitBase;
+    if (pvZoomed() && pvActive()){ pvApplyRH(); return; }   // PATTERN ZOOM: its own size, whole pixels a row (TEXT SIZE does not multiply it)
   } else { phraseFitBase = null; phraseFitScale = -1; }
   scr.style.fontSize = Math.max(5, fs * sc / 100).toFixed(2) + 'px';
 }
@@ -35161,7 +35168,7 @@ function scrDragMove(){
     return;
   }
   if (tv === 'mixer') grid.scrollTop = sd.st + dy;
-  else { const rh = (parseFloat(scr.style.fontSize) || 14) * 1.3, n = Math.trunc(dy / rh); if (n !== sd.n){ const d = n - sd.n; sd.n = n; scrollRows(d); } }
+  else { const rh = pvRowPx(), n = Math.trunc(dy / rh); if (n !== sd.n){ const d = n - sd.n; sd.n = n; scrollRows(d); } }
   if ((tv === 'song' || tv === 'mixer') && winTrk < ntr()){
     const cw3 = (parseFloat(scr.style.fontSize) || 14) * CW * 3, n = Math.trunc(dx / cw3);
     if (n !== (sd.tn || 0)){ const d = n - (sd.tn || 0), c = cs[tv]; sd.tn = n;
@@ -35223,6 +35230,14 @@ grid.addEventListener('dblclick', e => {
 // Mouse wheel moves the cursor a row per notch, so long screens scroll.
 let vAcc = 0;
 const WK_ROWS = {}, WK_SEL = {}, WK_VAL = {};   // wheelNotch's counters (rows, Shift+wheel selection, Alt+wheel values)
+// PATTERN ZOOM (17 Nov): Ctrl+wheel (a trackpad pinch) or ⌘+wheel over the Pattern view's grid makes its text bigger or smaller, a pixel of row height a step (small pinch moves add up).
+let pvZAcc = 0;
+grid.addEventListener('wheel', e => {
+  if (!(e.ctrlKey || (MACK && e.metaKey)) || e.altKey || !pvActive()) return;
+  e.preventDefault(); e.stopPropagation();
+  pvZAcc += -(e.deltaMode === 1 ? e.deltaY * 40 : e.deltaY); if (Math.abs(pvZAcc) < 40) return;
+  const d = pvZAcc > 0 ? 1 : -1; pvZAcc = 0; pvZoomBy(d);
+}, {passive:false});
 scr.addEventListener('wheel', e => {
   if (fxp.open || (e.ctrlKey && e.target.closest && e.target.closest('#tArr'))) return;   // Ctrl+wheel over Arrange zooms it
   if (e.ctrlKey && !e.altKey) return;   // CTRL+WHEEL (3 Nov): a trackpad pinch / zoom, never a cursor move (it scrolled rows)
@@ -35311,6 +35326,9 @@ function globalKeys(e){
   if (mod && !e.altKey && e.shiftKey && (e.code === 'Comma' || e.code === 'Period')){ if (!e.repeat) stretchSel(e.code === 'Period'); return true; }   // Shrink / Expand
   if (mod && !e.altKey && e.shiftKey && e.code === 'KeyF' || (!mod && !e.altKey && e.key === 'ScrollLock')){ if (!e.repeat) followKey(); return true; }   // Ableton's key
   if (e.altKey && !mod && e.key === 'Enter'){ if (!e.repeat) playRowKey(!e.shiftKey); return true; }
+  if (mod && e.altKey && tv === 'phrase' && (e.code === 'Minus' || e.code === 'Equal' || e.code === 'NumpadSubtract' || e.code === 'NumpadAdd' || e.code === 'Digit0') && pvActive()){   // PATTERN ZOOM: Ctrl/⌘+Alt+− / = smaller / bigger text, Ctrl/⌘+Alt+0 fit all the rows
+    if (e.code === 'Digit0'){ if (!e.repeat) pvFitToggle(); } else pvZoomBy(e.code === 'Minus' || e.code === 'NumpadSubtract' ? -1 : 1);
+    return true; }
   if (e.altKey && !mod && !e.shiftKey && e.code === 'KeyG'){ if (!e.repeat) playheadKey(); return true; }   // STOP CURSOR: the cursor onto the playhead   // the row under the cursor: every track · Shift: this track
   /* RENOISE'S SELECTION TRANSPOSE (609, owner): Alt/Option+F1 / F2 a semitone down / up, Alt/Option+F11 / F12 an octave down / up; the same transposeSel as Alt+, / Alt+. */
   if (e.altKey && !mod && !e.shiftKey && /^F(1|2|11|12)$/.test(e.key)){ if (!e.repeat) transposeSel(e.key === 'F1' ? -1 : e.key === 'F2' ? 1 : e.key === 'F11' ? -12 : 12); e.preventDefault(); return true; }
@@ -37034,8 +37052,8 @@ let pvOn = (() => { try { return localStorage.getItem(PVK) !== '0'; } catch(e){ 
 let pvMode = false, pvFx = false, pvFold = true;
 // DESKTOP DEFAULT (owner, 24 Oct): the Phrase screen opens in PATTERN mode on Desktop until pattern / phrase is chosen.
 pvMode = !isMobile();
-try { const o = JSON.parse(localStorage.getItem(PVUK) || '{}') || {}; if ('m' in o) pvMode = !!o.m; pvFx = !!o.fx; pvFold = o.fold !== false; } catch(e){}
-function pvSave(){ try { localStorage.setItem(PVUK, JSON.stringify({m:pvMode, fx:pvFx, fold:pvFold})); } catch(e){} }
+try { const o = JSON.parse(localStorage.getItem(PVUK) || '{}') || {}; if ('m' in o) pvMode = !!o.m; pvFx = !!o.fx; pvFold = o.fold !== false; pvFitOn = !!o.fit; pvRH = o.rh >= PV_RH_MIN && o.rh <= PV_RH_MAX ? o.rh | 0 : 0; } catch(e){}
+function pvSave(){ try { localStorage.setItem(PVUK, JSON.stringify({m:pvMode, fx:pvFx, fold:pvFold, fit:pvFitOn, rh:pvRH})); } catch(e){} }
 function setPv(on){ pvOn = !!on; try { localStorage.setItem(PVK, pvOn ? '1' : '0'); } catch(e){} draw(); }
 // It needs width: the computer and the unfolded Fold. On the folded phone the buttons are hidden and Phrase is as before.
 let vpW = innerWidth; addEventListener('resize', () => { vpW = innerWidth; });   // (13 Nov) read once per resize: pvActive() runs dozens of times a redraw and innerWidth can force a layout on a phone
@@ -37056,6 +37074,38 @@ function pvFit(fs, W){
   }
   return f;
 }
+/* PATTERN ZOOM (17 Nov, owner: "is there a text size that would allow for 32 steps to be visible on this screen size? can we make it possible to zoom to it?").
+   The Pattern view's text size is set by the window (pvFit above, then TEXT SIZE); at a 1205 x 660 window it showed 29 of 32 rows. Two ways to take over, both per device:
+   - FIT n ROWS (the bar's FIT button, View > FIT PATTERN ROWS, Ctrl/⌘+Alt+0): the largest whole-pixel row height at which all of the pattern's n rows (and the three header lines)
+     show; it is worked out again when the window or the panels change size and when another pattern has another length.
+   - zoom in / out one pixel of row height at a time (A+ / A- on the bar, View > PATTERN TEXT, Ctrl/⌘+Alt+= and Ctrl/⌘+Alt+-, Ctrl/⌘+wheel over the grid, a trackpad pinch).
+   The row is a whole number of pixels (the font is its 1/1.3, as everywhere on the tracker screen), so the rows and the playhead bars stay crisp. FLOOR: 9 px a row (a 6.9 px font):
+   under that the digits blur together on a 1x screen; if the rows still do not fit at 9, the pattern scrolls as before and a message says so. A size set here is the final
+   size: TEXT SIZE does not multiply it. Off (the default), nothing changes. var: fit() runs before this line is passed. */
+var PV_RH_MIN = 9, PV_RH_MAX = 30, pvRH = 0, pvFitOn = false, pvRows = 0, pvRHnow = 0, pvFitShort = false;
+const pvZoomed = () => pvFitOn || pvRH > 0;
+function pvApplyRH(){   // fit(): the Pattern view's size when it is zoomed; sets the font, the row height and the grid's class
+  const rows = pvRows || plen(cPhrase) || 16, set = r => { scr.style.fontSize = (r / 1.3).toFixed(4) + 'px'; grid.style.setProperty('--pvrh', r + 'px'); grid.classList.add('pvrh'); pvRHnow = r; };
+  if (!pvFitOn){ set(clamp(pvRH, PV_RH_MIN, PV_RH_MAX)); return; }
+  const need = r => r * (rows + 3 + 0.25 / 1.3);   // the three header lines, the rows and the grid's quarter-em of padding
+  set(PV_RH_MIN); const gh = grid.clientHeight; pvFitShort = false;
+  if (!gh) return;
+  let r = clamp(Math.floor(gh / (rows + 3.2)) + 1, PV_RH_MIN, PV_RH_MAX);   // a guess; the title line and the notes under the grid change height with the text, so it is checked
+  for (; r > PV_RH_MIN; r--){ set(r); if (grid.clientHeight >= need(r) - 0.01) break; }
+  set(r); pvFitShort = grid.clientHeight < need(r) - 0.01;
+}
+const pvRowPx = () => grid.classList.contains('pvrh') ? pvRHnow : (parseFloat(scr.style.fontSize) || 14) * 1.3;
+function pvZoomSet(fitOn, rh, say){
+  pvFitOn = !!fitOn; pvRH = fitOn ? 0 : rh; pvSave(); phraseFitScale = -1; fit(); draw();
+  if (say) toast(pvFitOn ? (pvFitShort ? 'This window is too short for all ' + pvRows + ' rows at the smallest text size (' + PV_RH_MIN + ' px rows): the pattern scrolls.' : 'All ' + pvRows + ' rows fit: ' + pvRHnow + ' px rows.') : pvRH ? 'Pattern text: ' + pvRH + ' px rows.' : 'Pattern text: automatic size.');
+}
+function pvZoomBy(d){   // one pixel of row height bigger (1) or smaller (-1)
+  if (!pvActive()) return false;
+  const now = pvZoomed() ? pvRHnow : Math.round(pvRowPx()), to = clamp(now + d, PV_RH_MIN, PV_RH_MAX);
+  if (to === now && pvZoomed()){ toast(d > 0 ? 'That is the biggest pattern text.' : 'That is the smallest pattern text (' + PV_RH_MIN + ' px rows).'); return true; }
+  pvZoomSet(false, to, false); return true;
+}
+function pvFitToggle(){ if (!pvActive()) return false; if (pvFitOn) pvZoomSet(false, 0, true); else pvZoomSet(true, 0, true); return true; }
 const pvSeg = el('span', 'pvseg'); pvSeg.hidden = true; pvSeg.setAttribute('role', 'group'); pvSeg.setAttribute('aria-label', 'Phrase or pattern');
 // The full words, or PHR | PAT when the title line is tight (TITLE LINE FIT; owner, 20 Oct: PATTERN ran into the track name).
 const pvSegB = [['ph', 'PHRASE', 'PHR', 'This phrase on its own (stays chosen until you switch)'], ['pt', 'PATTERN', 'PAT', 'Pattern: every track’s phrase for this song row, side by side (stays chosen until you switch)']]
@@ -37064,10 +37114,11 @@ $('tPset').after(pvSeg);
 const pvBar = el('div', 'pvbar'); pvBar.hidden = true; pvBar.setAttribute('role', 'toolbar'); pvBar.setAttribute('aria-label', 'Pattern');
 pvBar.innerHTML = '<span class="pvrow"></span><span class="pvud"><button type="button" data-pv="prev" aria-label="Song row above" title="The song row above (Shift+Alt+↑)">▲</button>'
   + '<button type="button" data-pv="next" aria-label="Song row below" title="The song row below (Shift+Alt+↓)">▼</button></span><span class="pvtag" hidden></span><span class="pvlen"></span>'
-  + '<span class="pvwarn" hidden></span><span class="pvsp"></span><button type="button" data-pv="fx"></button><button type="button" data-pv="fold"></button>';
+  + '<span class="pvwarn" hidden></span><span class="pvsp"></span><button type="button" data-pv="fx"></button><button type="button" data-pv="fold"></button>'
+  + '<span class="pvzm"><button type="button" data-pv="zout" aria-label="Smaller pattern text">A−</button><button type="button" data-pv="zin" aria-label="Bigger pattern text">A+</button></span><button type="button" data-pv="fit"></button>';
 pvSeg.after(pvBar);
 const pvB = {row:pvBar.querySelector('.pvrow'), tag:pvBar.querySelector('.pvtag'), len:pvBar.querySelector('.pvlen'), warn:pvBar.querySelector('.pvwarn'),
-  fx:pvBar.querySelector('[data-pv=fx]'), fold:pvBar.querySelector('[data-pv=fold]')};
+  fx:pvBar.querySelector('[data-pv=fx]'), fold:pvBar.querySelector('[data-pv=fold]'), fit:pvBar.querySelector('[data-pv=fit]'), zout:pvBar.querySelector('[data-pv=zout]'), zin:pvBar.querySelector('[data-pv=zin]')};
 for (const box of [pvSeg, pvBar]){
   box.addEventListener('pointerdown', e => e.stopPropagation());   // a tap here is a button, not the start of a scroll (which would take the click)
   box.addEventListener('click', e => { const b = e.target.closest('button[data-pv]'); if (!b) return; b.blur(); pvCmd(b.dataset.pv); });
@@ -37075,6 +37126,8 @@ for (const box of [pvSeg, pvBar]){
 function pvCmd(k){
   if (k === 'ph' || k === 'pt') return pvSetMode(k === 'pt');
   if (k === 'prev' || k === 'next') return pvRow(k === 'next' ? 1 : -1);
+  if (k === 'zin' || k === 'zout') return void pvZoomBy(k === 'zin' ? 1 : -1);
+  if (k === 'fit') return void pvFitToggle();
   if (k === 'fx') pvFx = !pvFx; else if (k === 'fold') pvFold = !pvFold; else return;
   pvSave(); hKey = ''; draw();
 }
@@ -37189,7 +37242,7 @@ function pvRow(d){
 }
 // FOLLOW while the song plays: the song row (and the track, when the open one is silent) ride along.
 // Pattern view's rows on screen (followPlay pages by the same number)
-function pvVR(){ const fs = parseFloat(scr.style.fontSize) || 14; return Math.max(4, Math.floor((grid.clientHeight - fs * .25) / (fs * 1.3) + 0.02) - 3); }
+function pvVR(){ const fs = parseFloat(scr.style.fontSize) || 14; return Math.max(4, Math.floor((grid.clientHeight - fs * .25) / pvRowPx() + 0.02) - 3); }
 function pvFollow(P, own){   // the song row follows; the cursor keeps its track (and takes that track's phrase on the new row, if it has one)
   const row = own.row; if (cs.song.y !== row && !P[cTrack]){ const cid = S.song[row] ? S.song[row][cTrack] : -1, ph = cid >= 0 ? firstPhrase(cid) : -1; if (ph >= 0){ cPhrase = ph; cSect = cid; } }
   cs.song.y = row; cs.song.x = cTrack; }
@@ -37269,6 +37322,9 @@ function pvBarDraw(y, rows, lpb, warn, warnT){
   pvB.fx.classList.toggle('on', pvFx); pvB.fx.setAttribute('aria-pressed', String(pvFx));
   pvTxt(pvB.fold, 'EMPTY'); pvB.fold.title = pvFold ? 'Show the tracks with nothing on this row at full width' : 'Fold the tracks with nothing on this row to narrow strips';
   pvB.fold.classList.toggle('on', pvFold); pvB.fold.setAttribute('aria-pressed', String(pvFold));
+  pvTxt(pvB.fit, 'FIT ' + rows); pvB.fit.classList.toggle('on', pvFitOn); pvB.fit.setAttribute('aria-pressed', String(pvFitOn));
+  pvB.fit.title = (pvFitOn ? 'Back to the automatic text size' : 'Make the text as big as it can be with all ' + rows + ' rows showing (Ctrl/⌘+Alt+0)') + (pvFitOn && pvFitShort ? '. This window is too short for all of them at the smallest size' : '');
+  pvB.zout.title = 'Smaller pattern text (Ctrl/⌘+Alt+−, or Ctrl/⌘+wheel over the pattern)'; pvB.zin.title = 'Bigger pattern text (Ctrl/⌘+Alt+=, or Ctrl/⌘+wheel over the pattern)';
 }
 // The pattern's lines for draw(): header bands, column names, then the rows. Returns what draw() shows around them.
 // With Arrange (or the song strip) holding the keys the song cursor is Arrange's, not the pattern's: the pattern still
@@ -37300,6 +37356,7 @@ function pvLines(c, L, cc, rsel, playRows){
     G.push({t, cid, cur, ph, p, len, C, w, inst, more, bus:busTrack(t), dim:!cur && ((t < NT && !!(S.mix[t] && S.mix[t].mute)) || blockMuted(S, Y, t))});
   }
   let rowsN = 0; for (const g of G) if (!g.fold && g.ph >= 0) rowsN = Math.max(rowsN, g.len);
+  if (rowsN !== pvRows){ pvRows = rowsN; if (pvFitOn){ refitSize = ''; scheduleRefit(false); } }   // PATTERN ZOOM: FIT n ROWS follows the pattern's length
   // Drift: every block on this row should last as long as the rest; one that doesn't runs ahead of them (or falls behind).
   const D = []; for (const t of pvOrder()){ const cid = row[t]; if (cid >= 0) D.push(Object.assign({t}, pvBlock(cid))); }
   let warn = '', warnT = '', lpbRef = plpbOf(S, cPhrase);
