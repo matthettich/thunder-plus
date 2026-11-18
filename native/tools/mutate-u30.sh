@@ -3,9 +3,8 @@
 # the live runner's latency and cut rule, the hostile-value guard), rebuilds test_waves and requires the test to FAIL; then puts the file back. Usage: mutate-u30.sh <build dir> (a Release build of the tree)
 # It edits the working tree and restores it from a copy it makes first, so run it on a clean checkout of the unit (or one whose changes are committed).
 set -u
-export THUNDER_WAVES_PINS=1
 B=${1:?build directory}; ROOT=$(cd "$(dirname "$0")/../.." && pwd); S=$ROOT/native/core/src/waves; T=$ROOT/native/tests; ok=0; bad=0
-G="$T/golden/waves_cases.json --native $T/golden/waves_native.json --render $T/golden/waves_render.json"
+G="$T/golden/waves_cases.json --effects $T/golden/waves_effects.json --render $T/golden/waves_render.json"
 run() {   # name file old new
   name=$1; f=$S/$2; cp "$f" "$f.orig"
   OLD=$3 NEW=$4 python3 - "$f" <<'PY'
@@ -34,6 +33,7 @@ run "voice steal: the newest overall" engine.cpp 'if (rows[(size_t)j].age < rows
 run "module constant: the VCO level" wmods.cpp '(2 * t - 1 - blep(t, dt)) * .8' '(2 * t - 1 - blep(t, dt)) * .81'
 run "module constant: the ADSR decay rate" wmods.cpp 'level_ += (s - level_) * dt / jmax(d, 1e-4) * 6;' 'level_ += (s - level_) * dt / jmax(d, 1e-4) * 7;'
 run "engine: a mono source into a voice is not split" engine.cpp 'const double g = c.srcAudio ? 1 / N : 1; if (b)' 'const double g = 1; if (b)'
+run "effect map: the saturation drive range" wmods.cpp 'o[0] = .2 + u01(p[0]) * .8; o[1] = u01(p[1]); o[2] = u01(p[2]); o[3] = u01(p[3]); }' 'o[0] = .2 + u01(p[0]) * .6; o[1] = u01(p[1]); o[2] = u01(p[2]); o[3] = u01(p[3]); }'
 run "engine: a released voice never sleeps" engine.cpp 'if (row.quiet >= quietFor) row.offAt = voices_.now - hold;' 'if (row.quiet >= quietFor * 100) row.offAt = voices_.now - hold;'
 run "live: the latency is one sample short" waves.h 'kLiveLatency = 127' 'kLiveLatency = 126'
 run "live: a block is not cut at an event" live.cpp 'if (npend_ > 0 && pend_[0].at < end) end = pend_[0].at;

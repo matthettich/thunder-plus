@@ -77,59 +77,79 @@ static CaseResult runCase(Json c) {
   }
   r.ok = true; return r;
 }
-static bool tolCase(const std::string& n) { return n.rfind("mod/marbles/", 0) == 0 || n.rfind("mod/tides/", 0) == 0; }
-// Cases whose native output is not the wasm's bit for bit: the modules built from the strict upstream libraries (tfx effects, Plaits / Elements, the mods) against wasm built with fast-math (U14, U21, U25
-// settled this: the library build is the only difference). They are listed BY NAME in golden/waves_native.json with the native hash (pinned, made on Linux x86-64) and the figure measured against the
-// reference; a case outside the list must be bit-exact, a listed one must keep its pinned hash and (with the reference at hand) not get worse by more than 1 dB, and a listed one that became exact is stale.
+// Cases with a module built from a strict upstream library (the tfx effects, Marbles / Tides, Plaits / Elements) against the web's fast-math wasm (U14, U21, U25: the library build is the only difference).
+// Every other case is bit-exact with its committed hash on every platform, and so are both processor rows. For a library case:
+//  - with the reference (--ref: x86-64 Linux, where CI runs the web's own wasm through Node on every run) it is compared with it: within -100 dB of the reference's peak passes; a case that was exact when
+//    golden/waves_effects.json was made must still be exact; a case beyond -100 dB must be listed in that file BY NAME ("beyond", with its figure) and gets the structural check;
+//  - without it (macOS, Windows, ...) the structural check against the committed RMS and length of the reference (written by `--write-effects`, never typed): finite, same length, RMS within 1 dB.
+// Marbles and Tides may not be beyond -100 dB. There are no machine-specific hashes: the system libm makes the effects differ between machines.
+static double rmsOf(const std::vector<float>& L, const std::vector<float>& R) { double a = 0; for (size_t k = 0; k < L.size(); k++) a += (double)L[k] * L[k] + (double)R[k] * R[k]; return L.empty() ? 0 : std::sqrt(a / (double)(2 * L.size())); }
 static double dbOf(const std::vector<float>& L, const std::vector<float>& R, const std::string& ref, bool* ok) {
   *ok = false; if (ref.size() != L.size() * 8) return 0;
   const float* rl = (const float*)ref.data(); const float* rr = rl + L.size(); double mx = 0, pk = 0;
   for (size_t k = 0; k < L.size(); k++) { mx = std::fmax(mx, std::fmax(std::fabs((double)rl[k] - L[k]), std::fabs((double)rr[k] - R[k]))); pk = std::fmax(pk, std::fmax(std::fabs((double)rl[k]), std::fabs((double)rr[k]))); }
   *ok = true; return 20 * std::log10(mx / (pk > 0 ? pk : 1) + 1e-30);
 }
-// the pinned native hashes are the output of the strict effect libraries on one machine (GCC, x86-64 Linux, glibc): another compiler, another libm or another CPU rounds some effects
-// differently (CI's own GCC runner differs from it on "ott"). So an effect-bearing case is held to "runs and is finite" unless THUNDER_WAVES_PINS=1 is set (the local run and the mutation
-// script set it); every case without an effect is bit-exact on every platform, as are both processor rows.
-static const bool kRefBuild = std::getenv("THUNDER_WAVES_PINS") != nullptr;
-static bool patchUsesFx(Json patch) { Json m = patch.get("modules"); for (size_t i = 0; i < m.size(); i++) if (waves_type_is_fx(std::string(m.at(i).str("type")))) return true; return false; }
-// a case whose patch has a module the build has no library for (effects, Marbles / Tides: the strict libraries; Plaits / Elements: the PE build) is skipped, as on the Windows build
-static bool patchLacksLib(Json patch) {
-  Json m = patch.get("modules");
+static double refRms(const std::string& ref, size_t n) { if (ref.size() != n * 8) return -1; const float* rl = (const float*)ref.data(); double a = 0; for (size_t k = 0; k < 2 * n; k++) a += (double)rl[k] * rl[k]; return n ? std::sqrt(a / (double)(2 * n)) : 0; }
+// a library case: a module the strict libraries make; and the types a build without that library cannot run (skipped there, as on the Windows build)
+static bool patchLibCase(Json patch, bool* lacks) {
+  Json m = patch.get("modules"); bool lib = false; *lacks = false;
   for (size_t i = 0; i < m.size(); i++) { const std::string t(m.at(i).str("type"));
-    if ((waves_type_is_fx(t) || t == "marbles" || t == "tides") && !Host::haveEffects()) return true;
-    if ((t == "plaits" || t == "elements") && !Host::havePE()) return true; }
-  return false;
+    const bool eff = waves_type_is_fx(t) || t == "marbles" || t == "tides", pe = t == "plaits" || t == "elements";
+    if (eff || pe) lib = true; if (eff && !Host::haveEffects()) *lacks = true; if (pe && !Host::havePE()) *lacks = true; }
+  return lib;
 }
+static bool patchLacksLib(Json patch) { bool l; patchLibCase(patch, &l); return l; }
 static bool finiteOut(const CaseResult& r) { for (float v : r.L) if (!std::isfinite(v)) return false; for (float v : r.R) if (!std::isfinite(v)) return false; return true; }
-static void runGolden(const std::string& golden, const std::string& nativeFile, const std::string& refDir, const std::string& filter, const std::string& dumpDir, const std::string& writeNative) {
+static void runGolden(const std::string& golden, const std::string& effectsFile, const std::string& refDir, const std::string& filter, const std::string& dumpDir, const std::string& writeEffects) {
   std::string txt; if (!readFile(golden, &txt)) { CHECK(false, "cannot read %s", golden.c_str()); return; }
   JsonDoc d; if (!d.parse(txt)) { CHECK(false, "golden parse"); return; }
-  JsonDoc nd; std::string ntxt; Json pins; if (!nativeFile.empty() && readFile(nativeFile, &ntxt) && nd.parse(ntxt)) pins = nd.root();
-  if (writeNative.empty() && filter.empty() && !pins.isObj()) CHECK(false, "the pinned native hashes (waves_native.json) are missing");
-  Json all = d.root(); int ran = 0, bad = 0, tol = 0, skipped = 0, loose = 0; double worst = -999; std::string worstName; std::string outPins = "{";
+  JsonDoc nd; std::string ntxt; Json eff; if (!effectsFile.empty() && readFile(effectsFile, &ntxt) && nd.parse(ntxt)) eff = nd.root();
+  if (writeEffects.empty() && filter.empty() && !eff.isObj()) CHECK(false, "the effect-case record (waves_effects.json) is missing");
+  Json all = d.root(); int ran = 0, bad = 0, skipped = 0, nExact = 0, nWithin = 0, nBeyond = 0, nStruct = 0, nPlain = 0; double worst = -999; std::string worstName; std::string out = "{";
   for (size_t i = 0; i < all.size(); i++) {
     Json c = all.at(i); const std::string name(c.str("name")); if (!filter.empty() && name.find(filter) == std::string::npos) continue;
-    const bool fx = patchUsesFx(c.get("patch"));
-    if (patchLacksLib(c.get("patch")) && writeNative.empty()) { skipped++; continue; }
+    bool lacks = false; const bool lib = patchLibCase(c.get("patch"), &lacks);
+    if (lacks && writeEffects.empty()) { skipped++; continue; }
     CaseResult r = runCase(c); ran++;
     if (!r.ok) { CHECK(false, "%s: patch refused", name.c_str()); bad++; continue; }
     std::string fn = name; for (char& ch : fn) if (ch == '/' || ch == '@') ch = '_';
     if (!dumpDir.empty()) { std::ofstream f(dumpDir + "/" + fn + ".f32", std::ios::binary); f.write((const char*)r.L.data(), (std::streamsize)(r.L.size() * 4)); f.write((const char*)r.R.data(), (std::streamsize)(r.R.size() * 4)); }
-    const std::string h = hex(fnv({&r.L, &r.R})), want(c.str("hash"));
-    std::string ref; bool haveRef = !refDir.empty() && readFile(refDir + "/" + fn + ".f32", &ref); bool okdb = false; const double db = haveRef ? dbOf(r.L, r.R, ref, &okdb) : 0;
-    Json pin = pins.get(name);
-    if (h == want) { if (pin.isObj() && kRefBuild) { bad++; CHECK(false, "%s: listed as inexact but now bit-exact (stale entry)", name.c_str()); } continue; }
-    if (fx && !kRefBuild && writeNative.empty()) { loose++; if (!finiteOut(r)) { bad++; CHECK(false, "%s: not finite", name.c_str()); } continue; }
-    tol++;
-    if (!writeNative.empty()) { char b[256]; std::snprintf(b, sizeof b, "%s\"%s\":{\"hash\":\"%s\",\"db\":%.1f}", outPins.size() > 1 ? "," : "", name.c_str(), h.c_str(), okdb ? db : 0.0); outPins += b; continue; }
-    if (!pin.isObj()) { bad++; CHECK(false, "%s: not bit-exact (%s != %s)%s and not listed", name.c_str(), h.c_str(), want.c_str(), okdb ? (" " + std::to_string(db) + " dB").c_str() : ""); continue; }
-    if (std::string(pin.str("hash")) != h) { bad++; CHECK(false, "%s: native hash %s != pinned %s", name.c_str(), h.c_str(), std::string(pin.str("hash")).c_str()); }
-    if (okdb) { if (db > worst) { worst = db; worstName = name; } if (db > pin.num("db") + 1) { bad++; CHECK(false, "%s: %.1f dB is worse than the recorded %.1f dB", name.c_str(), db, pin.num("db")); }
-      const bool isMods = name.rfind("mod/marbles/", 0) == 0 || name.rfind("mod/tides/", 0) == 0;
-      if (isMods && db > -100) { bad++; CHECK(false, "%s: %.1f dB is above the -100 dB line for Marbles / Tides", name.c_str(), db); } }
+    const std::string h = hex(fnv({&r.L, &r.R})), want(c.str("hash")); const bool exact = h == want;
+    if (!lib) { if (exact) nPlain++; else { bad++; CHECK(false, "%s: not bit-exact (%s != %s)", name.c_str(), h.c_str(), want.c_str()); } continue; }
+    std::string ref; const bool haveRef = !refDir.empty() && readFile(refDir + "/" + fn + ".f32", &ref); bool okdb = false; const double db = haveRef ? dbOf(r.L, r.R, ref, &okdb) : 0;
+    const double rms = rmsOf(r.L, r.R);
+    if (!writeEffects.empty()) {
+      if (!okdb) { CHECK(false, "%s: --write-effects needs --ref", name.c_str()); continue; }
+      const bool beyond = !exact && db > -100; char b[420];
+      bool space = false; { Json m = c.get("patch").get("modules"); for (size_t q = 0; q < m.size(); q++) if (m.at(q).str("type") == "space") space = true; }
+      const char* why = beyond && space && c.num("sr", 48000) > 48000 ? ",\"why\":\"the web's Cloud Seed reads outside its 48 kHz buffers at this rate\"" : "";
+      std::snprintf(b, sizeof b, "%s\"%s\":{\"rms\":%.9g,\"len\":%zu,%s%s}", out.size() > 1 ? "," : "", name.c_str(), refRms(ref, r.L.size()), r.L.size(), exact ? "\"exact\":true" : beyond ? ("\"beyond\":" + std::to_string(db)).c_str() : "\"exact\":false", why);
+      out += b; continue;
+    }
+    Json rec = eff.get(name);
+    if (!rec.isObj()) { bad++; CHECK(false, "%s: a library case with no entry in waves_effects.json", name.c_str()); continue; }
+    const bool wasExact = rec.get("exact").isBool() && rec.get("exact").asBool(), beyondRec = rec.get("beyond").isNum();
+    bool ok = finiteOut(r);
+    if (!ok) { bad++; CHECK(false, "%s: output is not finite", name.c_str()); continue; }
+    if ((size_t)rec.num("len") != r.L.size()) { bad++; CHECK(false, "%s: length %zu, wanted %d", name.c_str(), r.L.size(), (int)rec.num("len")); continue; }
+    const double rr = rec.num("rms"), dr = rr > 1e-9 ? 20 * std::log10((rms + 1e-30) / rr) : (rms < 1e-9 ? 0 : 999);
+    const bool tolCaseM = name.rfind("mod/marbles/", 0) == 0 || name.rfind("mod/tides/", 0) == 0;
+    if (okdb) {
+      if (db > worst) { worst = db; worstName = name; }
+      if (exact) { nExact++; continue; }
+      if (wasExact) { bad++; CHECK(false, "%s: was bit-exact with the web's wasm, now %.1f dB", name.c_str(), db); continue; }
+      if (db <= -100) { nWithin++; continue; }
+      if (tolCaseM) { bad++; CHECK(false, "%s: %.1f dB is above the -100 dB line for Marbles / Tides", name.c_str(), db); continue; }
+      if (!beyondRec) { bad++; CHECK(false, "%s: %.1f dB is beyond -100 dB and not listed by name", name.c_str(), db); continue; }
+      nBeyond++; if (std::fabs(dr) > 1) { bad++; CHECK(false, "%s: RMS %.2f dB off the reference's (listed beyond -100 dB: structural check)", name.c_str(), dr); }
+    } else {
+      nStruct++; if (std::fabs(dr) > 1) { bad++; CHECK(false, "%s: RMS %.2f dB off the reference's (no reference here: structural check)", name.c_str(), dr); }
+    }
   }
-  if (!writeNative.empty()) { outPins += "}\n"; std::ofstream f(writeNative, std::ios::binary); f << outPins; std::printf("wrote %s (%d inexact cases)\n", writeNative.c_str(), tol); }
-  std::printf("golden cases: %d run, %d skipped (a library is missing in this build), %d bit-exact, %d listed as library-build differences (worst %.1f dB %s), %d effect cases held to finite off the reference build, %d wrong\n", ran, skipped, ran - tol - loose, tol, worst, worstName.c_str(), loose, bad);
+  if (!writeEffects.empty()) { out += "}\n"; std::ofstream f(writeEffects, std::ios::binary); f << out; std::printf("wrote %s\n", writeEffects.c_str()); return; }
+  std::printf("golden cases: %d run, %d skipped (a library is missing in this build); %d non-library cases bit-exact; library cases: %d exact, %d within -100 dB, %d beyond (left out by name, structural check), %d structural only (no reference here); worst %.1f dB %s; %d wrong\n",
+    ran, skipped, nPlain, nExact, nWithin, nBeyond, nStruct, worst, worstName.c_str(), bad);
 }
 
 // ---- behaviours tests/waves.test.js and tests/feedback.test.js assert, as native cases ----
@@ -335,12 +355,12 @@ static void runRender(const std::string& file) {
   std::printf("page renders: %d of %zu equal the page's own (wavesPre / wavesLiveRender), %d skipped (a library is missing in this build)\n", ok, all.size(), skippedR);
 }
 int main(int argc, char** argv) {
-  std::string renderFile, golden, nativeFile, refDir, filter, dumpDir, writeNative;
-  for (int i = 1; i < argc; i++) { const std::string a = argv[i]; if (a == "--ref" && i + 1 < argc) refDir = argv[++i]; else if (a == "--render" && i + 1 < argc) renderFile = argv[++i]; else if (a == "--native" && i + 1 < argc) nativeFile = argv[++i]; else if (a == "--write-native" && i + 1 < argc) writeNative = argv[++i]; else if (a == "--dump" && i + 1 < argc) dumpDir = argv[++i]; else if (a == "--only" && i + 1 < argc) filter = argv[++i]; else golden = a; }
+  std::string renderFile, golden, effectsFile, refDir, filter, dumpDir, writeEffects;
+  for (int i = 1; i < argc; i++) { const std::string a = argv[i]; if (a == "--ref" && i + 1 < argc) refDir = argv[++i]; else if (a == "--render" && i + 1 < argc) renderFile = argv[++i]; else if (a == "--effects" && i + 1 < argc) effectsFile = argv[++i]; else if (a == "--write-effects" && i + 1 < argc) writeEffects = argv[++i]; else if (a == "--dump" && i + 1 < argc) dumpDir = argv[++i]; else if (a == "--only" && i + 1 < argc) filter = argv[++i]; else golden = a; }
   testBehaviours();
   if (!renderFile.empty()) runRender(renderFile);
   if (golden.empty()) { CHECK(false, "no golden file given"); }
-  else runGolden(golden, nativeFile, refDir, filter, dumpDir, writeNative);
+  else runGolden(golden, effectsFile, refDir, filter, dumpDir, writeEffects);
 
   const std::string q = driveProcessor(.05), h = driveProcessor(1);
   std::printf("processor quiet %s hot %s\n", q.c_str(), h.c_str());

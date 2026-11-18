@@ -664,7 +664,7 @@ target_include_directories(test_waves PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../cor
 if(NOT MSVC)
   target_compile_options(test_waves PRIVATE -Wall -Wextra)
 endif()
-set(WAVES_ARGS ${CMAKE_CURRENT_SOURCE_DIR}/golden/waves_cases.json --native ${CMAKE_CURRENT_SOURCE_DIR}/golden/waves_native.json --render ${CMAKE_CURRENT_SOURCE_DIR}/golden/waves_render.json)
+set(WAVES_ARGS ${CMAKE_CURRENT_SOURCE_DIR}/golden/waves_cases.json --effects ${CMAKE_CURRENT_SOURCE_DIR}/golden/waves_effects.json --render ${CMAKE_CURRENT_SOURCE_DIR}/golden/waves_render.json)
 add_test(NAME waves COMMAND test_waves ${WAVES_ARGS})   # the committed goldens: the gate on every platform
 if(NODE_EXE AND CMAKE_SYSTEM_NAME STREQUAL "Linux" AND CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|AMD64")
   # the local comparison with the real JS (sample by sample, and the figures of the listed cases): x86-64 Linux only, where Node's Math.* is the one the goldens were made with
