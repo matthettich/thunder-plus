@@ -279,6 +279,10 @@ static void testQueueRules() {
     live.service(); CHECK(live.patchesInFlight() == 0, "one service() collects the %d swapped-out patches (%d left)", kChainsSlots, live.patchesInFlight());
     CHECK(live.preparePatch(sPatch2()->r, live.enginePos() + 10), "after service() a patch is delivered again"); idle(live, 2); live.service(); CHECK(live.patchesInFlight() == 0, "and collected");
   }
+  { // the queue filling up: a Param is refused with kChainsReserve places left, and those places take Playing / Bypass / Tempo / Patch events
+    Host h; ChainsLive live(48000, 0, ChainsLiveConfig(), &h); ChainsEvent e; e.kind = ChainsEvent::Param; e.at = FAR; std::snprintf(e.id, sizeof e.id, "x"); std::snprintf(e.name, sizeof e.name, "p"); int np = 0; while (live.post(e)) np++;
+    CHECK(np == kChainsQueue - kChainsReserve, "Param events fill the queue to %d (got %d)", kChainsQueue - kChainsReserve, np); CHECK(live.stats().droppedEvents == 1, "the refused Param is counted (%d)", (int)live.stats().droppedEvents);
+    ChainsEvent k; k.kind = ChainsEvent::Bypass; k.at = FAR; k.a = 2; k.b = -1; int nk = 0; while (live.post(k)) nk++; CHECK(nk == kChainsReserve, "the reserve takes %d more events that must not be lost (got %d)", kChainsReserve, nk); }
   { // preparePatch false when the swap cannot be queued (the queue full): the patch is freed, its slot is free
     Host h; ChainsLive live(48000, 0, ChainsLiveConfig(), &h); Doc p(kPatch2); CHECK(live.node().engine().loadPatch(p.r), "patch");
     ChainsEvent e; e.kind = ChainsEvent::Playing; e.at = FAR; e.a = 1; int n = 0; while (live.post(e)) n++; CHECK(n == kChainsQueue, "the queue holds %d", n);
@@ -291,7 +295,7 @@ static void testBypassRange() {
   const int H = 2000; const std::vector<float> x = noise(H, 8, .5f); std::vector<float> o[2]; int64_t pos[2];
   for (int k = 0; k < 2; k++) {
     Host h; ChainsLive live(48000, 0, ChainsLiveConfig(), &h); Doc d(kPatch2); CHECK(live.node().engine().loadPatch(d.r), "patch");
-    if (k) { const double sw[5] = {0, 16, -1, 100, -1e30}; for (double s : sw) { ChainsEvent e; e.kind = ChainsEvent::Bypass; e.at = 0; e.a = s; e.b = 1; live.post(e); } }
+    if (k) { const double sw[5] = {0, 16, -1, 100, -1e30}; for (double s : sw) { ChainsEvent e; e.kind = ChainsEvent::Bypass; e.at = 0; e.a = s; e.b = 0.1; live.post(e); }   /* (0.1: bits whose low part is not zero, so a stray write over a neighbouring 64-bit member shows in the output) */ }
     std::vector<float> L((size_t)H), R((size_t)H); NodeIn in; in.inL = x.data(); in.inR = x.data(); NodeOut out; out.L = L.data(); out.R = R.data(); live.process(in, out, H); o[k] = L; pos[k] = live.enginePos();
     for (int s = 1; s <= 15; s++) CHECK(live.bypassSwitch(s) == -1, "switch %d unchanged", s);
   }
@@ -315,11 +319,35 @@ static void testPumpNoService() {
   std::printf("pump without service(): %llu bad blocks, %llu spare swaps, %llu dry blocks, overflow %llu\n", (unsigned long long)(chains_pump_bad() - b0), (unsigned long long)(chains_pump_swaps() - s0), (unsigned long long)(chains_pump_dry() - dry0), (unsigned long long)(chains_pump_overflow() - o0));
 }
 
+// post(): the longest id (39 characters) and name (23) fit with their end; one more is refused (a copy would run over the neighbouring field); a Param in the past is pulled up to the engine's position and counted
+static void testPostLimits() {
+  Host h; ChainsLive live(48000, 0, ChainsLiveConfig(), &h); const std::string id39(39, 'i'), id40(40, 'i'), nm23(23, 'n'), nm24(24, 'n');
+  CHECK(live.postParam(id39.c_str(), nm23.c_str(), 1, 0), "39 / 23 characters fit"); CHECK(!live.postParam(id40.c_str(), "p", 1, 0), "a 40-character id is refused"); CHECK(!live.postParam("m", nm24.c_str(), 1, 0), "a 24-character name is refused");
+  ChainsEvent e; e.kind = ChainsEvent::Param; std::memset(e.id, 'x', 39); e.id[39] = 0; std::memset(e.name, 'y', 23); e.name[23] = 0; CHECK(live.post(e), "post(): the longest id and name"); std::memset(e.name, 'y', 24); CHECK(!live.post(e), "post(): a name with no end is refused");
+  idle(live, 4); const uint64_t late0 = live.stats().lateEvents; ChainsEvent p; p.kind = ChainsEvent::Playing; p.at = 10; p.a = 1; CHECK(live.post(p), "a Playing event in the past"); idle(live, 1);
+  CHECK(live.stats().lateEvents == late0 + 1, "an event meant for sample 10 at position %lld is late (%d)", (long long)live.enginePos(), (int)(live.stats().lateEvents - late0)); CHECK(live.node().engine().transport().playing, "and still lands");
+}
+// a pump module's spare: made again by service() after a take-over even when no block has gone bad since (the take-over asks for the next spare)
+static void testPumpSpareAfterTakeover() {
+  if (!pump::available()) { std::printf("pump spare after a take-over: no pump library in this build (skipped)\n"); return; }
+  const WInfo* wi = cinfo("ptube"); std::string ps; for (int k = 0; k < wi->np; k++) { char b[200]; std::snprintf(b, sizeof b, "%s\"%s\":%.17g", k ? "," : "", wi->params[k].name, wi->params[k].mx); ps += b; }
+  Doc d(std::string("{\"modules\":[{\"id\":\"a\",\"type\":\"trackIn\",\"params\":{\"track\":1}},{\"id\":\"p\",\"type\":\"ptube\",\"params\":{") + ps + "}},{\"id\":\"c\",\"type\":\"chainOut\",\"params\":{\"track\":1,\"level\":1}}],"
+    "\"cables\":[{\"from\":[\"a\",\"out\"],\"to\":[\"p\",\"in\"]},{\"from\":[\"a\",\"outR\"],\"to\":[\"p\",\"inR\"]},{\"from\":[\"p\",\"out\"],\"to\":[\"c\",\"in\"]},{\"from\":[\"p\",\"outR\"],\"to\":[\"c\",\"inR\"]}]}");
+  Host host; ChainsEngine e(48000, EngineOptions(), &host); CHECK(e.loadPatch(d.r), "patch"); e.setInlineService(false);
+  const std::vector<float> hot = noise(128, 31u, 7.9f), quiet = noise(128, 32u, 0.01f); auto run = [&](const std::vector<float>& x) { e.setTrackInputs(x.data(), x.data(), 1); e.process(128); };
+  const uint64_t b0 = chains_pump_bad(), s0 = chains_pump_swaps(), d0 = chains_pump_dry();
+  auto hotUntilBad = [&]() { const uint64_t nb = chains_pump_bad(); for (int i = 0; i < 400 && chains_pump_bad() == nb; i++) run(hot); return chains_pump_bad() > nb; };
+  CHECK(hotUntilBad(), "a hot input drives the module bad"); e.serviceSpares();   // the dead instance is freed, a spare is made
+  run(quiet); CHECK(chains_pump_swaps() == s0 + 1, "a quiet block: the spare takes over"); e.serviceSpares();   // the next spare is made here, though no block went bad since the take-over
+  CHECK(hotUntilBad(), "the swapped-in instance goes bad again"); CHECK(chains_pump_bad() >= b0 + 2, "two bad blocks");   // no service() now
+  run(quiet); CHECK(chains_pump_swaps() == s0 + 2 && chains_pump_dry() == d0, "the next block finds a spare: swaps %d dry %d", (int)(chains_pump_swaps() - s0), (int)(chains_pump_dry() - d0));
+}
+
 int main() {
   testResampleTake(); testMonoFallback(); testCompRatioOne();
   testChainOutTrackClamp();
-  testPumpSpares(); testPumpNoService();
-  testFeedMonoFallback(); testSetSidechain(); testTempoClamp(); testTrackInBound(); testChainOutLevel(); testBypassRange(); testQueueRules();
+  testPumpSpares(); testPumpNoService(); testPumpSpareAfterTakeover();
+  testFeedMonoFallback(); testSetSidechain(); testTempoClamp(); testTrackInBound(); testChainOutLevel(); testBypassRange(); testPostLimits(); testQueueRules();
   testEqualsOffline(); testLatencyAndExactEvents(); testRefusals();
   std::printf(fails ? "test_chains_live: %d FAILED\n" : "test_chains_live: ok\n", fails);
   return fails ? 1 : 0;
