@@ -55,26 +55,23 @@ bool decodeOgg(const uint8_t* p, size_t n, std::vector<float>& d, double& sr, bo
   return !d.empty();
 }
 
-// Band-limited resampling to the context rate, as decodeAudioData does for a stream at another rate: a Kaiser-windowed sinc (beta 9, 16 zero crossings each side, window from a 4096-point table), in double,
-// cutoff at the lower Nyquist. Chrome's own resampler is not specified bit for bit, so this reproduces it to within its filter error, not exactly (U32-NOTES.md "sample rate"). Cost: about 32 multiply-adds per output frame.
-double bessel0(double x) { double s = 1, t = 1; for (int k = 1; k < 60; k++) { t *= (x / (2 * k)) * (x / (2 * k)); s += t; if (t < 1e-18 * s) break; } return s; }
+// Resampling to the context rate as Chrome's decodeAudioData does it (Blink's SincResampler, measured, not copied: the constants were found by fitting Chrome's own output, to -136 dB on most of a long sample):
+// a 32-tap Blackman (alpha 0.16) windowed sinc, 32 kernel sub-sample offsets (+1) with linear interpolation between two neighbours, cutoff 0.9 of the lower Nyquist, no normalisation, output length floor(n * ratio),
+// input before the first and after the last frame is zero. Linear-phase, so no delay. Control thread only (it allocates), about 64 multiply-adds per output frame.
 void resampleTo(std::vector<float>& d, double from, double to) {
   if (d.empty() || !(from > 0) || !(to > 0) || from == to) return;
-  const double r = to / from, fc = std::min(1.0, r), W = 16.0; const size_t n = d.size();
+  const double r = to / from, sc = (r < 1 ? r : 1.0) * 0.9; const size_t n = d.size();
   const size_t m = (size_t)std::floor((double)n * r); if (m == 0 || m > kMaxSampleFrames) return;
-  constexpr int TN = 4096; static double tab[TN + 2]; static bool tabOk = false;   // (a function-local table: filled once, control thread only)
-  if (!tabOk) { const double b9 = bessel0(9.0); for (int i = 0; i <= TN + 1; i++) { const double u = std::min(1.0, (double)i / TN); tab[i] = bessel0(9.0 * std::sqrt(std::max(0.0, 1 - u * u))) / b9; } tabOk = true; }
-  std::vector<float> o(m); const double half = W / fc, inv = 1.0 / half;
+  constexpr int KS = 32, KO = 32; std::vector<double> K((size_t)(KO + 1) * KS);
+  for (int off = 0; off <= KO; off++) { const double so = (double)off / KO;
+    for (int i = 0; i < KS; i++) { const double x = (i - so) / KS, w = 0.42 - 0.5 * std::cos(2 * M_PI * x) + 0.08 * std::cos(4 * M_PI * x), ps = M_PI * (i - KS / 2 - so);
+      K[(size_t)off * KS + (size_t)i] = w * (ps == 0 ? sc : std::sin(sc * ps) / ps); } }
+  std::vector<float> o(m);
   for (size_t i = 0; i < m; i++) {
-    const double t = (double)i / r; const long a = (long)std::ceil(t - half), z = (long)std::floor(t + half); double acc = 0;
-    const double tf = std::floor(t); const double sp = fc == 1.0 ? (((long)tf & 1) ? -1.0 : 1.0) * std::sin(M_PI * (t - tf)) : 0;   // sin(pi t) from the fraction only: a large t would lose the digits
-    for (long j = std::max(0L, a); j <= z && j < (long)n; j++) {
-      const double x = t - (double)j, u = std::fabs(x) * inv; if (u >= 1) continue;
-      const double q = u * TN; const int qi = (int)q; const double w = tab[qi] + (tab[qi + 1] - tab[qi]) * (q - qi);
-      double sx; if (x == 0) sx = 1; else if (fc == 1.0) sx = ((j & 1) ? -sp : sp) / (M_PI * x); else sx = std::sin(M_PI * fc * x) / (M_PI * fc * x);
-      acc += (double)d[(size_t)j] * fc * sx * w;
-    }
-    o[i] = (float)acc;
+    const double t = (double)i / r; const long n0 = (long)std::floor(t); const double q = (t - (double)n0) * KO; const int lo = (int)q; const double g = q - lo; double a = 0, b2 = 0;
+    const double* k0 = &K[(size_t)lo * KS]; const double* k1 = k0 + KS;
+    for (int k = 0; k < KS; k++) { const long j = n0 + k - KS / 2; if (j < 0 || j >= (long)n) continue; const double v = (double)d[(size_t)j]; a += v * k0[k]; b2 += v * k1[k]; }
+    o[i] = (float)((1 - g) * a + g * b2);
   }
   d.swap(o);
 }

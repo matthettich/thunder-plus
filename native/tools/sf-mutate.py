@@ -17,6 +17,9 @@ M=[
 ('sf_live.cpp','(n & ~(uint64_t)127) / sr_','(n & ~(uint64_t)63) / sr_','live time quantum 128 -> 64 (block-size rule)'),
 ('sf_live.cpp','const bool edge = o0 == 0;','const bool edge = true;','prune at every piece, not only quantum edges'),
 ('sf_parse.cpp','std::stable_sort','std::sort','preset order no longer stable'),
+('sf_decode.cpp','(size_t)bs0 / 2)','(size_t)bs0)','pageTail cap: half the short block'),
+('sf_decode.cpp','audioPages != 1','audioPages != 2','pageTail only for one-audio-page streams'),
+('sf_decode.cpp','if (!any) continue; }','if (false) continue; }','key-list preparation decodes zones of unlisted keys'),
 ('sf_parse.cpp','if (s.type & 0x10) F.sf3 = true;','if (s.type & 0x20) F.sf3 = true;','sf3 flag detection'),
 ]
 only=sys.argv[1:]
@@ -27,7 +30,7 @@ for i,(f,a,b,d) in enumerate(M):
     if s.count(a)!=1: res.append((i+1,d,'PATTERN NOT UNIQUE (%d)'%s.count(a))); continue
     open(p,'w').write(s.replace(a,b))
     try:
-        b1=subprocess.run('cd '+B+' && nice cmake --build . -j2 --target test_sf 2>&1 | grep -E "error" | head -3',shell=True,capture_output=True,text=True)
+        b1=subprocess.run('cd '+B+' && nice cmake --build . -j1 --target test_sf 2>&1 | grep -E "error" | head -3',shell=True,capture_output=True,text=True)
         if b1.stdout.strip(): res.append((i+1,d,'BUILD ERROR '+b1.stdout.strip()[:100]))
         else:
             t=subprocess.run("cd "+B+" && nice ctest -R '^sf(_unit)?$' 2>&1 | tail -4",shell=True,capture_output=True,text=True)

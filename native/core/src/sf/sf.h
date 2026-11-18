@@ -80,6 +80,7 @@ struct Pcm {                // sfSample's {d, sr, ls, le, k}: `ls` / `le` in fra
 };
 struct DecodeOpts {
   bool pageTail = false;    // reproduce Chrome's decodeAudioData losing the last frame (at most half a short block) of a one-audio-page Ogg stream (default off: libvorbis and stb_vorbis keep every frame; U32-NOTES.md "The missing frames")
+  static DecodeOpts page(double ctxRate) { DecodeOpts o; o.ctxRate = ctxRate; o.pageTail = true; return o; }   // what the web page's decodeAudioData does at this context rate (resample, lose the last frame of one-page streams)
   double ctxRate = 0;       // 0: keep each sample's own rate (default). >0: resample to this rate as the page's decodeAudioData does (sf_decode.cpp: SF3 only; see U32-NOTES.md "sample rate")
 };
 // sfSample(font, i): decode one sample (control thread; allocates). A sample the JS could not decode (bad Ogg, a failed allocation) is the fallback {d: 1 zero, sr: 48000, ls: 0, le: 0, k: 1}.
