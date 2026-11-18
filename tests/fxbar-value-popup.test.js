@@ -5,8 +5,8 @@ const test = require('node:test'), assert = require('node:assert/strict'), fs = 
 const H = require('./helpers');
 const src = H.read('index.html');
 test('source: dblclick opens fbPop (slider + number box, live set, Shift fine, Enter / Esc / outside), reset and the menu stay', () => {
-  assert.match(src, /v\.addEventListener\('dblclick', e => \{ e\.preventDefault\(\); fbPop\(v, q, getF, show, set\); \}\);/);
-  const m = src.match(/function fbPop\(v, q, getF, show, set\)\{[\s\S]*?\n\}\n/); assert.ok(m, 'fbPop');
+  assert.match(src, /v\.addEventListener\('dblclick', e => \{ e\.preventDefault\(\); fbPop\(v, q, getF, show, set(?:, cur)?\); \}\);/);
+  const m = src.match(/function fbPop\(v, q, getF, show, set(?:, cur)?\)\{[\s\S]*?\n\}\n/); assert.ok(m, 'fbPop');
   assert.match(m[0], /dragMul\(ev\)/, 'Shift fine'); assert.match(m[0], /fbParse\(a, q, show\)/, 'typed entry'); assert.match(m[0], /e\.key === 'Escape'/); assert.match(m[0], /addEventListener\('pointerdown', m\._out, true\)/);
   assert.match(src, /if \(resetClick\(e\)\)\{ set\(q\.d\); return; \}/, 'Alt-click reset stays');
   assert.match(src, /v\.addEventListener\('contextmenu', e => valMenu\(e, q\.l, \{reset:/, 'right-click menu stays');
