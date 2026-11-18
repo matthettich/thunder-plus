@@ -43,8 +43,9 @@ if(EXISTS ${P}/plugins/machine)
   message(FATAL_ERROR "pump checkout contains plugins/machine (GPL-3.0-only): refusing to build; re-run third_party/fetch.sh into a clean folder")
 endif()
 
-# U33: HOST builds compile a patched COPY of the pin (third_party/prepare-pump.sh: reads outside a table found by AddressSanitizer in the synth fuzz; each one is commented there and reported to the owner).
-# The wasm builds use the pin as it is (the shipped pump.wasm / pump-synth.wasm are byte-identical to it). The copy is remade when the script changes.
+# U33: HOST builds compile a COPY of the pin (third_party/prepare-pump.sh). Since the re-pin to e43ee10 the copy carries NO patch: the four it used to make (reads outside a table, the allocating
+# stable_sort) are upstream now, and the script fails if the checkout does not hold them. The wasm builds use the pin as it is (the shipped pump.wasm / pump-synth.wasm are meant to be byte-identical to it).
+# The copy is remade when the script changes.
 if(NOT IS_WASM)
   file(SHA256 ${TP}/prepare-pump.sh pump_prep_h)
   set(pump_prep_stamp "")
