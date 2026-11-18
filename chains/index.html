@@ -2440,7 +2440,7 @@ function buildSrLab(n){
   inp.value = typeof m.text === 'string' ? m.text : '';
   const apply = () => {
     if (!doc.modules.includes(m) || !inp.isConnected) return;
-    const v = inp.value.replace(/[\r\n\t  ]+/g, ' ').slice(0, 40); inp.value = v;
+    const v = inp.value.replace(/[\r\n\t\u2028\u2029]+/g, ' ').slice(0, 40); inp.value = v;
     if (v === (typeof m.text === 'string' ? m.text : '')) return;
     if (playBlocked()){ inp.value = typeof m.text === 'string' ? m.text : ''; return; }
     store.snapshot(); m.text = v; exprSend(m, v);
