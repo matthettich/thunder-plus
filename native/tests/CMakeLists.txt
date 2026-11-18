@@ -22,6 +22,10 @@ if(TARGET thunder_lxr)   # U04: the LXR allocation-guard case
   target_link_libraries(rt_harness PRIVATE thunder_lxr)
   target_compile_definitions(rt_harness PRIVATE THUNDER_HAVE_LXR=1)
 endif()
+if(NOT MSVC)   # U25 follow-up: the Plaits / Elements case renders on a second thread (the workspace is per thread)
+  find_package(Threads REQUIRED)
+  target_link_libraries(rt_harness PRIVATE Threads::Threads)
+endif()
 add_test(NAME rt_core COMMAND rt_harness)
 add_test(NAME rt_guard_selftest COMMAND rt_harness --selftest)
 

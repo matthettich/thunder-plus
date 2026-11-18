@@ -38,9 +38,11 @@ inline double noteAt(double base, double pA, double t, double ptau) { return bas
 }  // namespace
 bool pe_available() { return true; }
 void pe_prepare() { prepare(ws()); }
+bool pe_thread_ready() { const Workspace& w = ws(); return w.sess && w.pre; }
 #else
 bool pe_available() { return false; }   // no Plaits / Elements library on this platform (MSVC builds no DSP libraries)
 void pe_prepare() {}
+bool pe_thread_ready() { return true; }   // nothing to prepare without the library
 #endif
 namespace { thread_local PeTest* gTest = nullptr; }
 void pe_test_hook(PeTest* t) { gTest = t; }

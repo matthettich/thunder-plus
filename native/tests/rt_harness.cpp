@@ -39,6 +39,7 @@
 #include <new>
 #include <sstream>
 #include <string>
+#include <thread>
 #include <vector>
 
 #if defined(__unix__) || defined(__APPLE__)
@@ -55,6 +56,7 @@ static void rt_violation(const char* what) {
 }
 struct rt_guard { rt_guard() { rt_depth++; } ~rt_guard() { rt_depth--; } };
 
+static thread_local unsigned long rt_mallocs = 0;   // malloc / calloc calls outside the guard (glibc, not under ASan: U25's per-thread workspace)
 static thread_local unsigned long rt_allocs = 0;   // operator new calls outside the guard (U33: what an event-bearing block of pump's synths allocates is counted, not forbidden)
 void* operator new(std::size_t n) { if (rt_depth) rt_violation("operator new"); rt_allocs++; void* p = std::malloc(n ? n : 1); if (!p) std::abort(); return p; }
 void* operator new[](std::size_t n) { if (rt_depth) rt_violation("operator new[]"); void* p = std::malloc(n ? n : 1); if (!p) std::abort(); return p; }
@@ -70,8 +72,8 @@ void operator delete[](void* p, std::size_t) noexcept { if (rt_depth && p) rt_vi
 #if defined(__GLIBC__) && !defined(__SANITIZE_ADDRESS__)
 extern "C" {
 void* __libc_malloc(size_t); void* __libc_calloc(size_t, size_t); void* __libc_realloc(void*, size_t); void __libc_free(void*);
-void* malloc(size_t n) { if (rt_depth) rt_violation("malloc"); return __libc_malloc(n); }
-void* calloc(size_t a, size_t b) { if (rt_depth) rt_violation("calloc"); return __libc_calloc(a, b); }
+void* malloc(size_t n) { if (rt_depth) rt_violation("malloc"); rt_mallocs++; return __libc_malloc(n); }
+void* calloc(size_t a, size_t b) { if (rt_depth) rt_violation("calloc"); rt_mallocs++; return __libc_calloc(a, b); }
 void* realloc(void* p, size_t n) { if (rt_depth) rt_violation("realloc"); return __libc_realloc(p, n); }
 void free(void* p) { if (rt_depth && p) rt_violation("free"); __libc_free(p); }
 }
@@ -822,7 +824,23 @@ static int run_engine_u25() {
   }
 done:
   if (!total) { std::printf("rt_engine_u25 FAIL: a render failed\n"); return 1; }
-  std::printf("rt_engine_u25 ok: %d voice renders (%zu samples) of Plaits / Elements layers under the allocation guard (the thread's workspace made beforehand)\n", renders, total); return 0;
+  // THE THREAD'S WORKSPACE. The guard above covers a thread that called eng_init() (so pe_prepare()). The workspace is per thread (thread_local): a thread that renders a Plaits / Elements layer without it
+  // makes it on its first render (the Session, about 1.8 MB: a calloc and a malloc), which an audio callback must never do. Two fresh threads show both: A renders without preparing (pe_thread_ready() is false
+  // before, true after; the first render allocates: counted outside the guard, glibc without ASan only), B calls pe_prepare() first and then renders under the guard, as the wiring of a live lane must.
+  bool aBefore = true, aAfter = false, bReady = false, bOk = false; unsigned long aFirst = 0, aSecond = 0;
+  { size_t nn = 0; std::vector<float> ba(bufs[0].size()), bb(bufs[0].size());
+    std::thread A([&]() { aBefore = pe_thread_ready(); const unsigned long m0 = rt_mallocs; const int st = eng_render_voice(vs[0], os[0], ba.data(), ba.size() - 1, &nn); aFirst = rt_mallocs - m0; aAfter = pe_thread_ready() && st == kEngOk;
+      const unsigned long m1 = rt_mallocs; eng_render_voice(vs[0], os[0], ba.data(), ba.size() - 1, &nn); aSecond = rt_mallocs - m1; });
+    A.join();
+    std::thread B([&]() { pe_prepare(); bReady = pe_thread_ready(); { rt_guard g; size_t n2 = 0; bOk = eng_render_voice(vs[0], os[0], bb.data(), bb.size() - 1, &n2) == kEngOk && eng_render_voice(vs[1], os[1], bufs[1].data(), bufs[1].size() - 1, &n2) == kEngOk; } });
+    B.join(); }
+#ifdef RT_MALLOC_GUARDED
+  const bool allocSeen = aFirst > 0 && aSecond == 0;
+#else
+  const bool allocSeen = true;   // malloc is not counted here (ASan or a non-glibc libc): only the readiness flags are checked
+#endif
+  if (aBefore || !aAfter || !bReady || !bOk || !allocSeen) { std::printf("rt_engine_u25 FAIL: thread workspace (unprepared thread ready before %d, after %d; first render made %lu allocations, the second %lu; prepared thread ready %d, guarded renders ok %d)\n", aBefore, aAfter, aFirst, aSecond, bReady, bOk); return 1; }
+  std::printf("rt_engine_u25 ok: %d voice renders (%zu samples) of Plaits / Elements layers under the allocation guard (the thread's workspace made beforehand); a second thread: unprepared -> its first render made %lu allocations (pe_thread_ready false then true), prepared with pe_prepare() -> guarded renders ok\n", renders, total, aFirst); return 0;
 }
 
 #ifdef THUNDER_HAVE_LXR
