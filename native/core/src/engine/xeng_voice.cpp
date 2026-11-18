@@ -3,6 +3,7 @@
 // which is there only when some effect is on and ready: without one, padFx returns the engine's render as it is).
 #include <cmath>
 #include <cstddef>
+#include <cstdio>
 #include <cstring>
 #include <string_view>
 #include <vector>
@@ -120,7 +121,7 @@ const KindName kNames[] = {{"tone", XKind::Tone}, {"modal", XKind::Modal}, {"swa
   {"table", XKind::Table}, {"vector", XKind::Vector}, {"scanned", XKind::Scanned}, {"resynth", XKind::Resynth}, {"bytebeat", XKind::Bytebeat},
   // the other entries of XENG (and the wasm-backed ones): not this unit's
   {"acid", XKind::Acid}, {"mach", XKind::Mach}, {"blip", XKind::Blip}, {"bass", XKind::Bass}, {"vox", XKind::Vox}, {"sf", XKind::Other}, {"wavesl", XKind::Other},
-  {"lxdrum", XKind::Other}, {"lxsnare", XKind::Other}, {"lxcym", XKind::Other}, {"lxhat", XKind::Other}, {"pmono", XKind::Other}, {"ppoly", XKind::Other}, {"pcoil", XKind::Other}, {"porbit", XKind::Other}};
+  {"lxdrum", XKind::Lxr}, {"lxsnare", XKind::Lxr}, {"lxcym", XKind::Lxr}, {"lxhat", XKind::Lxr}, {"pmono", XKind::Other}, {"ppoly", XKind::Other}, {"pcoil", XKind::Other}, {"porbit", XKind::Other}};
 
 inline double holdOf(double hold, double len, double k, double m) { return orv(hold, mn(orv(len, k), m)); }   // hold || Math.min(V.len || k, m)
 
@@ -152,7 +153,14 @@ size_t runEngine(const XengVoice& V, double sr, double hold, double bpm, float* 
     case XKind::Mach: { MachP P = V.mach; XP_VOICE(P); return xeng_mach(P, sr, holdOf(hold, V.len, 2, 2), out, cap); }       // renderLiveCore(MachCore, P, sr, hold || Math.min(V.len || 2, 2))
     case XKind::Blip: return xeng_blip(V.blip, sr, V.tune, V.drive, V.level, out, cap);   // renderBlip(V, sr): no hold
     case XKind::Bass: { BassP P = V.bass; XP_VOICE(P); return xeng_bass(P, sr, hold, V.len, bpm, out, cap); }   // renderBass(V, sr, hold): `hold || V.len || 2`, c.bpm = songBpm(); a buffer of two renders (see xeng.h)
-    case XKind::Vox: { VoxP P = V.vox; XP_VOICE(P); return xeng_vox(P, sr, out, cap); }   // renderVox(V, sr): no hold
+    case XKind::Vox: { VoxP P = V.vox; XP_VOICE(P); return xeng_vox(P, sr, out, cap); }
+    case XKind::Lxr: {   // U04: LxrCore.render(k, P, sr, hold, V, songBpm()) through the seam; no module registered = refused (the JS has the engine: silence would be a lie)
+      const ThunderLxrApi* api = thunder_lxr_api(); if (!api) return kRefuse;
+      ThunderLxrRequest R = V.lxr; R.tune = tu; R.drive = dr; R.level = lv; R.vlen = V.len; R.hold = hold; R.bpm = bpm; R.sr = sr;
+      if (!out) return api->render_bound(&R);
+      size_t n = 0; const int st = api->render_voice(&R, out, cap, &n);
+      return st == THUNDER_LXR_OK ? n : st == THUNDER_LXR_TOO_SMALL ? 0 : kRefuse;
+    }   // renderVox(V, sr): no hold
     default: return 0;
   }
 #undef XP_VOICE
@@ -177,6 +185,19 @@ XKind xeng_kind(const char* name, size_t n) {
 bool xeng_voice_from_json(XengVoice& V, Json v, Json fx) {
   const std::string_view en = v.str("engine"); V.kind = xeng_kind(en.data(), en.size());
   if (V.kind == XKind::None || V.kind == XKind::Other) return false;
+  if (V.kind == XKind::Lxr) {   // U04: the pad's defaults come from the module (its table of knobs); with no module the voice is not understood (as before: refused)
+    const ThunderLxrApi* api = thunder_lxr_api(); if (!api) return false;
+    const int k = en == "lxdrum" ? 0 : en == "lxsnare" ? 1 : en == "lxcym" ? 2 : 3;
+    ThunderLxrDescribe D; if (api->describe(k, &D) != THUNDER_LXR_OK) return false;
+    V.lxr.kind = k; V.len = 0;   // a voice without `len` plays the engine's own (V.len || Vc.len)
+    for (int n = 0; n < THUNDER_LXR_MAX_PARAMS; n++) V.lxr.p[n] = D.def[n];
+    V.lxr.vdst = D.vdst; V.lxr.ldst = D.ldst; V.lxr.vel = D.vel; V.lxr.open = D.open;
+    Json o = v.get(en);   // normX: a number that is finite replaces the default of a key the engine has
+    char key[8];
+    for (int n = 0; n < THUNDER_LXR_MAX_PARAMS; n++) if (D.present[n]) { std::snprintf(key, sizeof key, "p%d", n); Json x = o.get(key); if (x.isNum() && std::isfinite(x.asNum())) V.lxr.p[n] = x.asNum(); }
+    auto nx = [&](const char* kk, double& d) { Json x = o.get(kk); if (x.isNum() && std::isfinite(x.asNum())) d = x.asNum(); };
+    nx("vdst", V.lxr.vdst); nx("ldst", V.lxr.ldst); nx("vel", V.lxr.vel); if (D.hasOpen) nx("open", V.lxr.open);
+  }
   auto num = [&](const char* k, double& d) { Json x = v.get(k); if (x.isNum()) d = x.asNum(); };
   num("level", V.level); num("tune", V.tune); num("drive", V.drive); num("len", V.len); num("tail", V.tail); num("gate", V.gate);
   if (fx.size() > (size_t)kEngFx) return false;

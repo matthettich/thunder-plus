@@ -98,3 +98,12 @@ Used by `rt/json.cpp` `toDouble()` instead of the platform's `from_chars` / `str
 The header is the `fast_float.h` release asset of GitHub release v8.3.3, copied unchanged. C++11, no exceptions. Included as a SYSTEM
 include path (`third_party`) in CMake and as `-isystem` in the wasm job of `.github/workflows/native.yml`, plus an MSVC `warning(push, 0)`
 around the include. Update: change the tag, re-download the asset, and update this table and the sha256 together.
+
+## LXR firmware (U04): the optional, GPL-3.0-only module (`native/lxr`)
+| Upstream | Commit (full) | Licence | Used for | In `thunder_core`? |
+|---|---|---|---|---|
+| erica-synths/lxr-desktop-app (the files in this repository's `lxr/src/firmware/Core`, `lxr/src/stub`, `lxr/src/lxr_wasm.c`) | `a43cd4fcda23ec3d577dc425261c3eb28bd5abff` (23 Oct 2026) | GPL-3.0-only + the firmware's section 7 additional permission / terms (`lxr/src/firmware/NOTICE.md`) | `thunder_lxr` (`native/lxr`): the four LXR engines (drum, snare, cymbal, hat), offline pad render and a provisional live block | **no**: a separate library behind `THUNDER_WITH_LXR` (default ON for the owner's builds; OFF = nothing of it is configured, built or linked). The core talks to it through `thunder/lxr_seam.h` only. Facts and what a closed build leaves out: `native/lxr/LICENSES.md` |
+
+Reference: the web app's `lxr/lxr.wasm` (sha256 `ec6ab14cb540e56156814f13fe3d7a245dd9815e65f8c30331a9cfe4b360f637`), built by `lxr/build.sh` with clang `--target=wasm32-wasi -O3 -ffast-math -funsigned-char -std=gnu11`.
+**Reproducible from the repository's source: yes** (wasi-sdk 25, clang 19.1.5, `lxr/build.sh` as it is: the same sha256, byte for byte).
+The native module compiles the same sources STRICT (no fast-math, no contraction) with host-only patches made at configure time into the build directory (`native/lxr/prepare-lxr.sh`; each fails loudly if its text is not found exactly once). The patches are listed in `docs/port/U04-NOTES.md`.

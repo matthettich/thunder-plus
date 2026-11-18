@@ -21,6 +21,9 @@
 #include "engine/engine.h"
 #include "engine/layer_pe.h"
 #include "engine/xeng.h"
+#ifdef THUNDER_HAVE_LXR
+#include "thunder/lxr_module.h"
+#endif
 #include "engine/xeng_live.h"
 #include "engine/bass_core.h"
 #include "engine/vox_core.h"
@@ -812,6 +815,39 @@ done:
   std::printf("rt_engine_u25 ok: %d voice renders (%zu samples) of Plaits / Elements layers under the allocation guard (the thread's workspace made beforehand)\n", renders, total); return 0;
 }
 
+#ifdef THUNDER_HAVE_LXR
+// U04: the LXR module under the guard: the four kinds rendered as pad voices through the core's seam (xeng_render_voice) and the live path (live_open + live_process blocks with triggers),
+// repeatedly. The module owns its buffers (static: the firmware is global state anyway); a render into the caller's buffer and a live block allocate nothing.
+static int run_lxr() {
+  using namespace thunder;
+  if (thunder_lxr_module_register() != 0) { std::printf("rt_lxr FAIL: the module did not register\n"); return 1; }
+  static const char* const kinds[4] = {"lxdrum", "lxsnare", "lxcym", "lxhat"};
+  XengVoice vs[4]; EngRenderOpts o; std::vector<std::vector<float>> bufs;
+  const ThunderLxrApi* a = thunder_lxr_api();
+  for (int i = 0; i < 4; i++) {
+    XengVoice& V = vs[i]; V.kind = xeng_kind(kinds[i], std::strlen(kinds[i])); V.level = 0; V.len = 0.4;
+    std::memset(&V.lxr, 0, sizeof V.lxr); V.lxr.kind = i; V.lxr.vel = 110; V.lxr.sr = 48000; V.lxr.bpm = 120; V.lxr.vlen = 0.4; V.lxr.drive = 0.3;
+    ThunderLxrDescribe d; std::memset(&d, 0, sizeof d); a->describe(i, &d); for (int k = 0; k < THUNDER_LXR_MAX_PARAMS; k++) if (d.present[k]) V.lxr.p[k] = d.def[k];
+    bufs.emplace_back(xeng_render_bound(V, o) + 1); if (bufs[(size_t)i].size() < 2) { std::printf("rt_lxr FAIL: bound 0 (%s)\n", kinds[i]); return 1; }
+  }
+  std::vector<uint8_t> kit(247, 64);   /* NumParams */ std::vector<float> blk(777 + 1); ThunderLxrEvent ev[3] = {{0, 0, 100, 60}, {130, 3, 90, 62}, {400, 5, 127, 70}};
+  for (int i = 0; i < 4; i++) { size_t n = 0; if (xeng_render_voice(vs[i], o, bufs[(size_t)i].data(), bufs[(size_t)i].size() - 1, &n) != kEngOk) { std::printf("rt_lxr FAIL: warm-up %d\n", i); return 1; } }   // takes the power-on snapshot
+  if (a->live_open(kit.data(), kit.size(), 120) != THUNDER_LXR_OK) { std::printf("rt_lxr FAIL: live_open\n"); return 1; }
+  size_t total = 0; int renders = 0;
+  { rt_guard g;
+    for (int rep = 0; rep < 3; rep++) {
+      for (int i = 0; i < 4; i++) { size_t n = 0; const int st = xeng_render_voice(vs[i], o, bufs[(size_t)i].data(), bufs[(size_t)i].size() - 1, &n); if (st != kEngOk) { total = 0; goto done; } total += n; renders++; }
+      if (a->live_open(kit.data(), kit.size(), 120) != THUNDER_LXR_OK) { total = 0; goto done; }
+      for (int v = 0; v < 6; v++) { if (a->live_process(v, ev, 3, blk.data(), 777) != THUNDER_LXR_OK) { total = 0; goto done; } total += 777; renders++; }
+    }
+  }
+done:
+  if (!total) { std::printf("rt_lxr FAIL: a render failed\n"); return 1; }
+  thunder_lxr_unregister();
+  std::printf("rt_lxr ok: %d renders (%zu samples) of the four LXR kinds, pad and live, under the allocation guard\n", renders, total); return 0;
+}
+#endif
+
 int main(int argc, char** argv) {
   if (argc > 1 && std::strcmp(argv[1], "--selftest") == 0) return selftest();
   if (int r = run_logger()) return r;
@@ -830,6 +866,9 @@ int main(int argc, char** argv) {
   if (int r = run_engine_u23()) return r;
   if (int r = run_engine()) return r;
   if (int r = run_engine_xeng()) return r;
+#ifdef THUNDER_HAVE_LXR
+  if (int r = run_lxr()) return r;
+#endif
   if (int r = run_engine_xeng2()) return r;
   if (int r = run_engine_xeng3()) return r;
   if (int r = run_pumpsynth()) return r;

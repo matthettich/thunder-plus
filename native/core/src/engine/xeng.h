@@ -16,6 +16,7 @@
 #include <vector>
 
 #include "engine/engine.h"
+#include "thunder/lxr_seam.h"   // U04: plain C, no LXR type: the table the optional LXR module registers
 #include "rt/json.h"
 
 namespace thunder {
@@ -70,7 +71,7 @@ struct AcidP { XP_ACID(XP_FIELD) };      struct MachP { XP_MACH(XP_FIELD) };    
 struct BassP { XP_BASS(XP_FIELD) };      struct VoxP { XP_VOX(XP_FIELD) std::string txt = "hello world, I am a robot"; };   // U26 (the lyrics default is VoxCore.defaults().txt)
 struct TableP { XP_TABLE(XP_FIELD) };    struct VectorP { XP_VECTOR(XP_FIELD) };    struct ScannedP { XP_SCANNED(XP_FIELD) }; struct ResynthP { XP_RESYNTH(XP_FIELD) }; struct BytebeatP { XP_BYTEBEAT(XP_FIELD) };
 
-enum class XKind : uint8_t { None, Tone, Modal, Swarm, Drift, Piano, Ep, Organ, Breath, Strings, FmDrum, Wind, Phase, Partials, Skin, Chip, Table, Vector, Scanned, Resynth, Bytebeat, Acid, Mach, Blip, Bass, Vox, Other };
+enum class XKind : uint8_t { None, Tone, Modal, Swarm, Drift, Piano, Ep, Organ, Breath, Strings, FmDrum, Wind, Phase, Partials, Skin, Chip, Table, Vector, Scanned, Resynth, Bytebeat, Acid, Mach, Blip, Bass, Vox, Lxr, Other };   // Lxr (U04): lxdrum, lxsnare, lxcym, lxhat: rendered by the optional LXR module through thunder/lxr_seam.h, refused (kEngUnsupported) when none is registered
 XKind xeng_kind(const char* name, size_t n);   // the engine's key in XENG; None for "layers" (bass, vox and blip are not XENG entries in the JS: renderVoice has a branch of its own for each; U27 / U26 put them here), Other for an XENG engine this unit does not port
 
 // ---- one engine's render: `X.render(P, sr, hold)` with P = xParams(V). `out` is the caller's buffer of `cap` floats; the finished sound (trimmed, faded) goes in, its length is returned. ----
@@ -126,6 +127,7 @@ struct XengVoice {
   AcidP acid; MachP mach; XBlipP blip;   // U27
   BassP bass; VoxP vox;                   // U26
   TableP table; VectorP vector; ScannedP scanned; ResynthP resynth; BytebeatP bytebeat; XWtData wt; XRsData rs; std::string bbExpr; bool hasBb = false;   // U29
+  ThunderLxrRequest lxr;                  // U04: an LXR voice's pad (kind 0..3 = lxdrum, lxsnare, lxcym, lxhat), filled from the module's defaults; the voice's tune / drive / level / len are the fields below
   double level = 0, tune = 0, drive = 0, len = 4, tail = 2, gate = 200;
   EngFx fx[kEngFx]; int nFx = 0;
 };
