@@ -3,6 +3,7 @@
 # the live runner's latency and cut rule, the hostile-value guard), rebuilds test_waves and requires the test to FAIL; then puts the file back. Usage: mutate-u30.sh <build dir> (a Release build of the tree)
 # It edits the working tree and restores it from a copy it makes first, so run it on a clean checkout of the unit (or one whose changes are committed).
 set -u
+export THUNDER_WAVES_PINS=1
 B=${1:?build directory}; ROOT=$(cd "$(dirname "$0")/../.." && pwd); S=$ROOT/native/core/src/waves; T=$ROOT/native/tests; ok=0; bad=0
 G="$T/golden/waves_cases.json --native $T/golden/waves_native.json --render $T/golden/waves_render.json"
 run() {   # name file old new

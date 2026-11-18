@@ -57,7 +57,7 @@ The page's live node (`wavesLiveRender` / the lane code in `index.html`) is driv
 17. Sanitizer builds only (`__SANITIZE_ADDRESS__`, GCC): space is bypassed above 48 kHz and its size held to .9; Rings/Clouds/Beads/Warps(xmod) continuous params of exactly 1 are held to 0.99999994 (upstream reads one past its lookup tables at 1.0; the value is unused). Release behaviour is not touched. Needed so the fuzz can run clean; flagging because it means the sanitizer run does not cover those cases.
 
 ## Other platforms (found by CI)
-The pinned native hashes were made with GCC on x86-64 Linux. On clang, Apple arm64 and MSVC the strict effect libraries round differently, so there an effect-bearing case is held to "runs and is finite" (every case without an effect stays bit-exact on every platform, as do both processor rows). A build without the effects library / PE library (the Windows build) skips the cases that need it and says how many.
+The pinned native hashes are one machine's output of the strict effect libraries (GCC, x86-64 Linux); CI's own GCC runner, clang, Apple arm64 and MSVC round some effects differently (e.g. ott). So unless `THUNDER_WAVES_PINS=1` is set (local runs and the mutation script do) an effect-bearing case is held to "runs and is finite" (every case without an effect stays bit-exact on every platform, as do both processor rows). A build without the effects library / PE library (the Windows build) skips the cases that need it and says how many.
 
 ## Not in this PR
 Mixer / sequencer wiring (told not to), Scope telemetry, load shedding, idle-skip, the page's per-block pitch quantisation (replaced by sample-exact), any change to an existing golden.

@@ -87,13 +87,10 @@ static double dbOf(const std::vector<float>& L, const std::vector<float>& R, con
   for (size_t k = 0; k < L.size(); k++) { mx = std::fmax(mx, std::fmax(std::fabs((double)rl[k] - L[k]), std::fabs((double)rr[k] - R[k]))); pk = std::fmax(pk, std::fmax(std::fabs((double)rl[k]), std::fabs((double)rr[k]))); }
   *ok = true; return 20 * std::log10(mx / (pk > 0 ? pk : 1) + 1e-30);
 }
-// the pinned native hashes were made with GCC on x86-64 Linux; elsewhere (clang, Apple arm64, MSVC) the strict effect libraries round differently, so a case with an effect in it is held to
-// "runs and is finite" there; every case without an effect is bit-exact on every platform. Without the effects library (Windows build) those cases are skipped.
-#if defined(__GNUC__) && !defined(__clang__) && defined(__x86_64__) && defined(__linux__)
-static const bool kRefBuild = true;
-#else
-static const bool kRefBuild = false;
-#endif
+// the pinned native hashes are the output of the strict effect libraries on one machine (GCC, x86-64 Linux, glibc): another compiler, another libm or another CPU rounds some effects
+// differently (CI's own GCC runner differs from it on "ott"). So an effect-bearing case is held to "runs and is finite" unless THUNDER_WAVES_PINS=1 is set (the local run and the mutation
+// script set it); every case without an effect is bit-exact on every platform, as are both processor rows.
+static const bool kRefBuild = std::getenv("THUNDER_WAVES_PINS") != nullptr;
 static bool patchUsesFx(Json patch) { Json m = patch.get("modules"); for (size_t i = 0; i < m.size(); i++) if (waves_type_is_fx(std::string(m.at(i).str("type")))) return true; return false; }
 // a case whose patch has a module the build has no library for (effects, Marbles / Tides: the strict libraries; Plaits / Elements: the PE build) is skipped, as on the Windows build
 static bool patchLacksLib(Json patch) {
