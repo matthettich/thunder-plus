@@ -681,14 +681,8 @@ class Eff : public WModule {
  public:
   Eff(double sr, Seeds& s, const char* type, int id, MapFn map, int wetAt, bool rings) : id_(id), map_(map), wetAt_(wetAt), rings_(rings), host_(static_cast<WSeeds&>(s).host), wi_(winfo(type)) {
 #ifdef THUNDER_HAVE_TFX
-    // space (Cloud Seed): the tfx build shrinks its delay buffers to cover 48 kHz, so at 96 kHz its allpass taps already read into neighbouring members of the same object (reproduced, the goldens have it); above 96 kHz they would leave the object, so the effect is bypassed there (a deviation, memory safety)
-#ifdef __SANITIZE_ADDRESS__
-    // sanitizer builds only: at 96 kHz the reproduced reads before the buffer (above) are an out-of-bounds report, so the fuzz runs space only up to 48 kHz
-    if (!((id == 20 && sr > 48000) || (id == 3 && sr > 96000))) {
-#else
-    if (!((id == 20 || id == 3) && sr > 96000)) {   // id 3 (tape): its flutter delay (500 samples) is scaled by the rate and overruns it above about 157 kHz
-
-#endif
+    // space (Cloud Seed): the host build sizes its buffers for 96 kHz (third_party/prepare.sh), so above that it is bypassed, in every build
+    if (!((id == 3 || id == 20) && sr > 96000)) {   // tape (id 3): its flutter delay (500 samples) is scaled by the rate and overruns it above about 157 kHz, so it is bypassed above 96 kHz in every build
  FxState st(host_); fx_ = make_fx(id, (float)sr); }
 #else
     (void)sr;
@@ -711,12 +705,6 @@ class Eff : public WModule {
     if (rings_) { q[2] = noteIn(q[2] + (double)io.in[2][0]); }   // Rings: the note + the pitch input
     map_(q, w, P);
     for (int k = 0; k < 12; k++) P[k] = P[k] != P[k] ? 0 : clamp(P[k], -1e7, 1e7);
-#ifdef __SANITIZE_ADDRESS__   // GCC; clang's -fsanitize=address is not detected here
-    // sanitizer builds only: the upstream Rings / Clouds read one past the end of a lookup table at exactly 1.0 (the fraction is 0, so the value is unused); held a hair under 1 here so the fuzz can run clean
-    if (id_ == 20 && P[0] > .9) P[0] = .9;   // space at its largest size: the late lines (1.5 x 520 ms at 48 kHz) run past the shrunk 32768-float buffer; sanitizer builds hold the size to .9
-    if (id_ == 19) for (int k = 0; k < 7; k++) if (k != 4 && k != 5 && P[k] >= 1 && P[k] < 1.0000001) P[k] = 0.99999994;   // Warps (xmod): same table read; its two discrete params stay
-    if (id_ == 0 || id_ == 1 || id_ == 10) for (int k = 3; k < 12; k++) if (P[k] >= 1 && P[k] < 1.0000001) P[k] = 0.99999994;   // Rings, Clouds, Beads (the Clouds cross-fade table has the same read)
-#endif
     for (int k = 0; k < 12; k++) fx_->p[k] = (float)P[k];
     const double wm = wetAt_ < 0 ? -1 : (double)fx_->p[wetAt_]; if (wm >= 0) fx_->p[wetAt_] = 1;
     for (int i = 0; i < n; i++) { const double a = L0[i], b = R0[i], dn = (i & 1) ? 1e-18 : -1e-18; L_[i] = (float)((a > -8 && a < 8 ? a : 0) + dn); R_[i] = (float)((b > -8 && b < 8 ? b : 0) + dn); }
