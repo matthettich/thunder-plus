@@ -122,13 +122,13 @@ test('the limits: at least one mono, one poly, 8 in all, 24 / 32 at most; nothin
 test('may it grow: a count may not take a hidden track of the other kind that holds something; an empty one is overwritten', () => {
   const spare = Array.from({ length: 16 }, (_, i) => 16 + i), mk = emptySlot => { const c = rig({ empty: spare.concat(emptySlot == null ? [] : [emptySlot]) }); set(c, 2, 8); set(c, 2, 24); return c; };   // 6 hidden MONO tracks (3..8 -> parked), poly run used up
   const c = mk(null); assert.equal(c.S.ntr, 26); const was = JSON.stringify(c.S), nSaves = c.saves.length;
-  const r = c.setTracks(2, 25); assert.match(r.why, /hidden mono tracks? \(.*\) still holds? something, so POLY cannot grow/); assert.equal(JSON.stringify(c.S), was, 'nothing changed'); assert.equal(c.saves.length, nSaves);
+  const r = c.setTracks(2, 25); assert.match(r.why, /^POLY can’t grow: \d+ hidden MONO tracks? \(.*\) still holds? data\. Clear (it|them) first, or lower MONO\.$/); assert.equal(JSON.stringify(c.S), was, 'nothing changed'); assert.equal(c.saves.length, nSaves);
   assert.equal(c.setTracks(3, 24).why, '', 'MONO may take its own back');
   // one hidden mono track is empty (its slot 6, mono 7): POLY 25 takes that one, and nothing else of mono moves
   const d = mk(6); d.S.mix[6].vol = 224; const hid0 = d.S.ntr; set(d, 2, 25); assert.equal(d.S.ntr, hid0 + 1);
   assert.equal(noteAt(d, d.S.ntr - 1), -1, 'the new poly track is the empty one'); const others = []; for (let t = d.S.ntr; t < 32; t++) others.push(noteAt(d, t)); assert.ok(others.slice(0, 5).every(v => v >= 40), 'the other hidden mono tracks still hold their notes: ' + others);
   // the other way round: mono growth against hidden poly tracks that hold something
-  const e = rig({ empty: spare }); set(e, 8, 2); set(e, 24, 2); assert.ok(/^1 hidden poly track|^\d+ hidden poly tracks? /.test(e.setTracks(25, 2).why), 'mono cannot take poly');
+  const e = rig({ empty: spare }); set(e, 8, 2); set(e, 24, 2); assert.ok(/^MONO can’t grow: \d+ hidden POLY tracks? /.test(e.setTracks(25, 2).why), 'mono cannot take poly');
   // a hidden track that another track points at is not empty
   const f = rig({ empty: [6, 7] }); f.S.tfx[0] = [{ type: 'delay', sck: 9 + 7 }]; assert.equal(f.trackHolds(f.S, 7), true); assert.equal(f.trackHolds(f.S, 6), false);
 });

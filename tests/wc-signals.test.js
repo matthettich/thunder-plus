@@ -62,7 +62,7 @@ for (const [ed, src] of Object.entries(ED)) {
     const k0 = src.indexOf("window.addEventListener('keydown', e => {\n  if (!selCable) return;"); assert.ok(k0 > 0, 'cable key handler');
     const key = src.slice(k0, src.indexOf('\n});', k0) + 4);
     assert.match(key, /e\.key === 'Escape'\)\{ clearCableSel\(\); return; \}/);
-    assert.match(key, /store\.snapshot\(\); disconnect\(c\); toast\('Cable removed \(Undo brings it back\)\.'\);/);
+    assert.match(key, /store\.snapshot\(\); disconnect\(c\); toast\('Cable removed'\);/);
     assert.equal((key.match(/store\.snapshot\(\)/g) || []).length, 1, 'one snapshot, so one undo step');
     assert.match(src, /clearSel\(\); clearCableSel\(\); \}   \/\/ \(a middle-button pan keeps the selection\)/);
     assert.match(src, /if \(selCable && !cableEls\.has\(selCable\)\) selCable = null;/, 'a stale selection (undo rebuilt the patch) is dropped');
