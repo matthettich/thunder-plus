@@ -156,3 +156,19 @@ test('FLX and FLY on one row: the rightmost plays, and the FX bar can show FLY',
   assert.match(src, /if \(q\.c === 'FLX'\) delete fx\.FLY; else if \(q\.c === 'FLY'\) delete fx\.FLX;/, 'column order decides');
   assert.match(src, /const p = c >= 0 \? Math\.min\(511, Math\.round\(c\)\)/, 'the bar keeps FLY values');
 });
+
+// FLX CHECK 3 (18 Nov): two ways FlexCore put a NaN into the output (found measuring FLX 76 on the master, tools in /home/claude/progress/flx).
+test('FLX E8 (5-tuplet feel): a position a hair under a beat does not index past the table (was tup[-1]: NaN)', () => {
+  const f = new FlexCore(48000);
+  for (const d of [1e-10, 3e-10, 9e-10, 2e-9, 0]) for (let beat = 1; beat <= 4; beat++) for (const k of [0xE8, 0xE6, 0xE7]) {
+    const p = Math.min(3.9999999, beat - d), r = f.ext(k, p, 0);
+    assert.ok(Number.isFinite(r) && Number.isFinite(f.pg), `pattern ${k.toString(16)} at p = ${p}: r = ${r}`);
+    assert.ok(r <= p + 1e-6, `pattern ${k.toString(16)} reads ahead at p = ${p}: r = ${r}`);
+  }
+});
+
+test('FlexCore.rd: a delay of 1e-12 samples at buffer index 0 reads b[0], not b[N] (was undefined: a NaN sample)', () => {
+  const f = new FlexCore(48000), N = f.N, b = new Float32Array(N).fill(0.5);
+  for (const D of [0, 1e-12, 1e-11, 1e-10, 5e-11, 1, 3.5]) assert.ok(Number.isFinite(f.rd(b, 0, D)), 'D = ' + D);
+  assert.equal(f.rd(b, 0, 1e-12), 0.5);
+});
