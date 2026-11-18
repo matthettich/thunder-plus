@@ -28,7 +28,7 @@ struct ChainsEngine::TakeQ {
 };
 
 static bool srOk(double sr) { return sr == sr && sr >= 8000 && sr <= 384000; }
-static PatchImpl* newPatch(double sr, Host* h) { PatchImpl* P = new PatchImpl(nullptr, sr, 1, h, &chainsTable()); P->chains = true; return P; }
+static PatchImpl* newPatch(double sr, Host* h) { PatchImpl* P = new PatchImpl(nullptr, sr, 1, h, &chainsTable()); P->chains = true; P->rawParams = true; return P; }
 void chains_free_patch(PatchImpl* p) { delete p; }
 
 ChainsEngine::ChainsEngine(double sampleRate, const EngineOptions& o, Host* host)

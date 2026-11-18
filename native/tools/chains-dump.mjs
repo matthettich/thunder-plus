@@ -68,6 +68,34 @@ const outDir = process.argv.find((a, i) => i > 1 && !a.startsWith('--'));
   if (Object.keys(gold).length !== cases.length) throw new Error(`the committed golden has ${Object.keys(gold).length} rows, this makes ${cases.length}`);
 }
 
+// ---- over: every non-library module with its parameters OUTSIDE the declared range (high, low, alternating): the JS uses the value as set (io.p = io.base, chains-worklet.js addModule / setParam), the native engine must too ----
+// A NaN of the JS's float arithmetic has the machine's sign / payload: for these rows every NaN is hashed as the canonical 0x7fc00000 (native/tests/test_chains.cpp does the same for kind 'over').
+function hashCanon(arrs) {
+  let h = 0x811c9dc5 >>> 0; const tmp = new Float32Array(1), u = new Uint8Array(tmp.buffer);
+  for (const a of [].concat(arrs)) for (let i = 0; i < a.length; i++) { tmp[0] = a[i] !== a[i] ? NaN : a[i]; if (tmp[0] !== tmp[0]) { u[0] = 0; u[1] = 0; u[2] = 0xc0; u[3] = 0x7f; } for (let k = 0; k < 4; k++) { h ^= u[k]; h = Math.imul(h, 0x01000193) >>> 0; } }
+  return h.toString(16).padStart(8, '0');
+}
+{
+  const ctx = scope(), E = engineOf(ctx, 0), M = ctx.ChainsDSP.MODULES; const PT = new Set(['ptube','psnap','pgate','pecho','pspring','pverb','pgrain','pvox','ptune','pcrush','pswirl','pstutter','ptwang']); const sig = H.testSignal(128 * BLOCKS);
+  const overSet = (m, which) => { const o = {}; let i = 0; for (const [k, d] of Object.entries(m.params || {})) { const [, mn, mx] = d, span = mx - mn, hi = mx + span * .5 + 1, lo = mn - span * .5 - 1; o[k] = which === 'high' ? hi : which === 'low' ? lo : (i++ % 2 ? lo : hi); } return o; };
+  for (const type of Object.keys(M).sort()) {
+    const m = M[type]; if (!m || !m.process || type === 'trackIn' || type === 'chainOut' || m.effect === true || type === 'marbles' || type === 'tides' || PT.has(type) || m.probe === true) continue;
+    for (const set of ['high', 'low', 'alt']) {
+      const params = Object.assign(defaults(m), overSet(m, set));
+      const aIn = Object.keys(m.inputs || {}).filter(n => m.inputs[n] === 'audio'), outs = Object.keys(m.outputs || {}), cab = [];
+      if (aIn.includes('in')) cab.push({ from: ['a', 'out'], to: ['b', 'in'] }); if (aIn.includes('inR')) cab.push({ from: ['a', 'outR'], to: ['b', 'inR'] });
+      outs.slice(0, 2).forEach((p, i) => cab.push({ from: ['b', p], to: ['c', ['in', 'inR'][i]] }));
+      const patch = { modules: [{ id: 'a', type: 'trackIn', scope: 'mono', params: { track: 1 } }, { id: 'b', type, scope: 'mono', params }, { id: 'c', type: 'chainOut', scope: 'mono', params: { track: 1, level: 1 } }], cables: cab };
+      E.loadPatch(patch);
+      const ports = Object.keys(m.outputs || {}), rec = {}; for (const p of ports) rec[p] = new Float32Array(128 * BLOCKS);
+      const L = new Float32Array(128 * BLOCKS), R = new Float32Array(128 * BLOCKS);
+      for (let b = 0; b < BLOCKS; b++) { const s = sig.subarray(b * 128, (b + 1) * 128); E.setTrackInputs(s, s); E.process(128); L.set(E.bus(1), b * 128); R.set(E.busR(1), b * 128); const io = E._ios.get('b'); if (io) for (const p of ports) rec[p].set(io.out[p], b * 128); }
+      const arrs = [L, R, ...ports.map(p => rec[p])], c = { name: `over/${type}/${set}`, kind: 'mod', group: 'over', lib: false, type, patch, probe: false, ports, hash: hashCanon(arrs) };
+      cases.push(c); refs[c.name] = arrs;
+    }
+  }
+}
+
 // ---- proc: the two processors of tests/chains.test.js, hot and quiet ----
 function hotPatch(gain) {
   return { modules: [{ id: 'a', type: 'trackIn', scope: 'mono', params: { track: 1 } }, { id: 'b', type: 'utility', scope: 'mono', params: { gain, pan: 0, mono: 0, flip: 0, mute: 0 } }, { id: 'c', type: 'chainOut', scope: 'mono', params: { track: 1, level: 1 } }],
@@ -133,6 +161,12 @@ S({ name: 'edit/transport', patch: { modules: [TI('a', 1), P('l', 'lfo', { rate:
 S({ name: 'mod2/vocoder-spectral', patch: { modules: [TI('a', 1), TI('b', 2), P('v', 'vocoder', { mode: 6, mix: .8, level: 1.2 }), CO('c', 1)], cables: [C(['a', 'out'], ['v', 'in']), C(['b', 'out'], ['v', 'inR']), C(['v', 'out'], ['c', 'in'])] } });
 S({ name: 'mod2/vocoder-spectral-unlinked', patch: { modules: [TI('a', 1), P('v', 'vocoder', { mode: 6, mix: 1 }), CO('c', 1)], cables: [C(['a', 'out'], ['v', 'in']), C(['v', 'out'], ['c', 'in'])] } });
 S({ name: 'mod2/comp-low-ratio', patch: { modules: [TI('a', 1), P('k', 'sccomp', { threshold: .1, ratio: 1.4, mix: .9 }), CO('c', 1)], cables: [C(['a', 'out'], ['k', 'in']), C(['k', 'out'], ['c', 'in'])] } });
+// parameters outside their range, as the verifier found them (the JS uses the value as set): Chain Out's level above and below its range, set live to 1e30, Sidechain In's release below its minimum, Chain Out's track far out
+S({ name: 'over/chainOut-level-high', patch: { modules: [TI('a', 1), CO('c', 1, 3)], cables: [C(['a', 'out'], ['c', 'in'])] } });
+S({ name: 'over/chainOut-level-negative', patch: { modules: [TI('a', 1), CO('c', 1, -1)], cables: [C(['a', 'out'], ['c', 'in'])] } });
+S({ name: 'over/chainOut-setparam-1e30', patch: { modules: [TI('a', 1), CO('c', 1, 1)], cables: [C(['a', 'out'], ['c', 'in'])] }, events: [[30, 'param', 'c', 'level', 1e30], [60, 'param', 'c', 'level', -1e30]] });
+S({ name: 'over/chainOut-track-far', patch: { modules: [TI('a', 1), CO('c', 500, 1), CO('d', -7, .5)], cables: [C(['a', 'out'], ['c', 'in']), C(['a', 'out'], ['d', 'in'])] } });
+S({ name: 'over/scin-release-below-min', taps: 2, patch: { modules: [TI('a', 1), P('i', 'scin', { sck: 9 + 1, release: .3, sens: -50, send: 5 }), P('g', 'vca', {}), CO('c', 1)], cables: [C(['a', 'out'], ['g', 'in']), C(['i', 'out'], ['g', 'cv']), C(['g', 'out'], ['c', 'in'])] } });
 // the node: ThunderChains (track, bus feeds, the sidechain input, taps, sends in and out)
 const nodeS = s => S(Object.assign({ mode: 'node', track: 0, standalone: false }, s));
 nodeS({ name: 'node/basic', track: 0, patch: { modules: [TI('a', 1), P('g', 'vca', { gain: .6 }), CO('c', 1), CO('d', 2)], cables: [C(['a', 'out'], ['g', 'in']), C(['g', 'out'], ['c', 'in']), C(['g', 'out'], ['d', 'in'])] } });

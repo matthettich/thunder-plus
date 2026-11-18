@@ -41,7 +41,7 @@ struct Slot {
 };
 struct ModNode {
   std::string id; const WInfo* wi = nullptr; const Def* def = nullptr;
-  std::vector<uint16_t> text; int textLen = -1; std::vector<double> base, bp;   // base: the parameter values as set (the JS's inst.params); bp: the same held inside each parameter's range (what the modules get) int textLen = -1;
+  std::vector<uint16_t> text; int textLen = -1; bool rawP = false; std::vector<double> base, bp;   // base: the parameter values as set (the JS's inst.params); bp: the same held inside each parameter's range (what the modules get) int textLen = -1;
   bool poly = false; int idx = 0; bool inOnly = false;
   std::vector<GCable> inc; bool linked[modfx::kMaxPorts] = {}; std::vector<int> exits;
   std::vector<Slot> slots; bool slotsMade = false; bool slotsPoly = false; int weight = 1;
@@ -62,6 +62,7 @@ inline int weightOf(const WInfo& w) {
 // Hostile values: a module's parameter outside its declared range crashes some modules (the fuzz found it) where the JS computes with it. Held inside the range, a NaN taking the default; in range nothing changes.
 inline void repin(ModNode& m) {
   m.bp.resize(m.base.size());
+  if (m.rawP) { for (int k = 0; k < m.wi->np; k++) m.bp[(size_t)k] = m.base[(size_t)k]; return; }   // U31: the value as set, as the JS (io.p = io.base): no range, a NaN stays a NaN
   for (int k = 0; k < m.wi->np; k++) { const modfx::ParamDef& d = m.wi->params[k]; const double v = m.base[(size_t)k]; m.bp[(size_t)k] = v != v ? d.def : v < d.mn ? d.mn : v > d.mx ? d.mx : v; }
 }
 inline bool isParamPort(const std::string& p) { return p.size() >= 2 && p[0] == 'p' && p[1] == ':'; }
@@ -106,7 +107,7 @@ class PatchImpl {
   bool hasT = false; Transport tpart; bool tTempo = false, tLpb = false, tTicks = false, tPpq = false, tStart = false, tPlaying = false;   // the doc's transport, applied at the swap
   std::vector<float> fbS = std::vector<float>(kBlock);
   // U31 (…chains): per-patch data the …chains engine computes on the control thread: the run list (focus) and the bypass numbers, by module index; chains: this patch is a …chains one
-  bool chains = false; std::vector<char> act, actTel; bool hasAct = false; std::vector<int> bn; std::vector<char> seen; std::vector<int> stk;   // act: the run list without telemetry, actTel: with it; seen / stk: scratch (sized by compile, so the audio thread allocates nothing)
+  bool chains = false, rawParams = false; std::vector<char> act, actTel; bool hasAct = false; std::vector<int> bn; std::vector<char> seen; std::vector<int> stk;   // act: the run list without telemetry, actTel: with it; seen / stk: scratch (sized by compile, so the audio thread allocates nothing)
   // scratch of compile()
   std::vector<int> indeg, q; std::vector<std::vector<int>> adj; std::vector<char> inOrder;
   std::vector<char> cullKeep; std::vector<int> cullStack;   // doCull's scratch, sized by compile() (the audio thread allocates nothing)
@@ -173,7 +174,7 @@ class PatchImpl {
     const std::string sid(id);
     if (find(sid)) removeNode(sid);
     auto m = std::make_unique<ModNode>(); m->id = sid; m->wi = wi; m->def = tab->def(type); m->weight = weightOf(*wi);
-    m->base.resize((size_t)wi->np);
+    m->base.resize((size_t)wi->np); m->rawP = rawParams;
     const Json ps = o.obj("params");
     for (int k = 0; k < wi->np; k++) { Json v = ps.get(wi->params[k].name); m->base[(size_t)k] = v.isNum() ? v.asNum() : wi->params[k].def; }
     repin(*m);

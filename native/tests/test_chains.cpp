@@ -26,6 +26,11 @@ static int fails = 0;
 #define CHECK(c, ...) do { if (!(c)) { fails++; std::printf("FAIL %s:%d: ", __FILE__, __LINE__); std::printf(__VA_ARGS__); std::printf("\n"); } } while (0)
 
 typedef std::vector<std::vector<float>> Rec;   // what a case records: arrays, hashed as one stream
+static uint32_t fnvCanon(const Rec& r) {   // kind 'over': every NaN as the canonical 0x7fc00000 (the machine's NaN sign / payload differs between the JS's arithmetic and ours)
+  uint32_t h = 0x811c9dc5u;
+  for (const auto& a : r) for (float f : a) { uint32_t b; if (f != f) b = 0x7fc00000u; else std::memcpy(&b, &f, 4); for (int k = 0; k < 4; k++) { h ^= (b >> (8 * k)) & 255u; h *= 0x01000193u; } }
+  return h;
+}
 static uint32_t fnvRec(const Rec& r) {
   uint32_t h = 0x811c9dc5u;
   for (const auto& a : r) { const unsigned char* u = (const unsigned char*)a.data(); for (size_t i = 0; i < a.size() * 4; i++) { h ^= u[i]; h *= 0x01000193u; } }
@@ -173,7 +178,8 @@ static void runGolden(const std::string& golden, const std::string& effectsFile,
   JsonDoc nd; std::string ntxt; Json eff; if (!effectsFile.empty() && readFile(effectsFile, &ntxt) && nd.parse(ntxt)) eff = nd.root();
   if (writeEffects.empty() && filter.empty() && !eff.isObj()) CHECK(false, "the effect-case record (chains_effects.json) is missing");
   Json all = d.root(); int ran = 0, bad = 0, skipped = 0, nExact = 0, nWithin = 0, nBeyond = 0, nStruct = 0, nPlain = 0, nScn = 0, nProc = 0, nLeftOut = 0; double worst = -999; std::string worstName, out = "{", leftOut;
-  ModRun mr;   // the mod rows share one engine, in the JS's order: a skipped row (a library missing here) must still make the JS's draws, so the order is kept by running every row that has no missing library
+  ModRun mr, mrOver;   // mrOver: the rows of group 'over' (parameters outside their range) have an engine of their own
+  // the mod rows share one engine, in the JS's order: a skipped row (a library missing here) must still make the JS's draws, so the order is kept by running every row that has no missing library
   for (size_t i = 0; i < all.size(); i++) {
     Json c = all.at(i); const std::string name(c.str("name")), kind(c.str("kind")); if (!filter.empty() && name.find(filter) == std::string::npos) continue;
     std::string fn = name; for (char& ch : fn) if (ch == '/' || ch == '@') ch = '_';
@@ -181,7 +187,7 @@ static void runGolden(const std::string& golden, const std::string& effectsFile,
     if (kind == "mod") {
       const std::string type(c.str("type")); lib = chains_type_is_lib(type); lacks = !chains_have_lib(type);
       CHECK(lib == c.boolean("lib"), "%s: the library flag of the type disagrees with the JS (native %d)", name.c_str(), (int)lib);
-      if (!mr.render(c, &rec, probe)) { CHECK(false, "%s: patch refused", name.c_str()); bad++; continue; }
+      const bool over = c.str("group") == "over"; if (!(over ? mrOver : mr).render(c, &rec, probe)) { CHECK(false, "%s: patch refused", name.c_str()); bad++; continue; }
       if (lacks && writeEffects.empty()) { skipped++; continue; }   // (rendered all the same: the JS's draws from the shared seed counter and Math.random must happen in its order)
     } else if (kind == "proc") { rec = runProc(c); }
     else { bool ok = true; rec = runScn(c, &ok); if (!ok) { CHECK(false, "%s: patch refused", name.c_str()); bad++; continue; } }
@@ -190,7 +196,7 @@ static void runGolden(const std::string& golden, const std::string& effectsFile,
     if (c.get("deviates").isStr()) {   // a decided difference from the JS (named in the notes): the output is silence
       bool silent = true; for (const auto& a : rec) for (float v : a) if (v != 0) silent = false; CHECK(silent, "%s: %s", name.c_str(), std::string(c.str("deviates")).c_str()); nLeftOut++; continue;
     }
-    const std::string want(c.str("hash")); std::string h = hex(fnvRec(rec));
+    const std::string want(c.str("hash")); std::string h = hex(c.str("group") == "over" ? fnvCanon(rec) : fnvRec(rec));
     if (probe) {   // the Scope: its show() list (the last 515 floats of the JS's stream) is not ported; the audio ([L, R]) is compared on its own
       Rec lr(rec.begin(), rec.begin() + 2); h = hex(fnvRec(lr)); const bool same = h == c.str("hashLR"); if (!same) { bad++; CHECK(false, "%s: audio not bit-exact (%s != %s)", name.c_str(), h.c_str(), std::string(c.str("hashLR")).c_str()); } else { nLeftOut++; leftOut += (leftOut.empty() ? "" : ", ") + name; } continue;
     }
