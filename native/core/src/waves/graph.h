@@ -61,6 +61,11 @@ inline int weightOf(const WInfo& w) {
   return 1;
 }
 // Parameters: the JS uses a value as set (io.p = io.base), outside its range too, so the engines here do (rawP, the default). The held-in-range copy below (a NaN taking the default) is for a host that asks for it (rawParams false).
+// Modules whose value goes straight into a third-party C++ library: the library effects (Rings, Clouds, Beads, ...: the tfx set), Marbles and Tides. For a value outside the declared range the JS's wasm traps or reads out of its
+// tables (Tides 2: a float -> int conversion of the shape, then the index shape * 1025; Rings: the model and note index its tables), which in native C++ is undefined behaviour (found by the ASan / UBSan fuzz at raw
+// parameters). For these the value is held inside its declared range (a NaN takes the default), as U30 held every module's. Inside the range nothing changes; outside it the JS's result is a trap (silence) or garbage
+// that depends on the wasm memory layout, which no native build can reproduce, and the golden "over" rows do not include these types.
+inline bool heldInRange(std::string_view type) { return type == "marbles" || type == "tides" || waves_type_is_fx(type); }
 inline void repin(ModNode& m) {
   m.bp.resize(m.base.size());
   if (m.rawP) { for (int k = 0; k < m.wi->np; k++) m.bp[(size_t)k] = m.base[(size_t)k]; return; }   // U31: the value as set, as the JS (io.p = io.base): no range, a NaN stays a NaN
@@ -186,7 +191,7 @@ class PatchImpl {
     const std::string sid(id);
     if (find(sid)) removeNode(sid);
     auto m = std::make_unique<ModNode>(); m->id = sid; m->wi = wi; m->def = tab->def(type); m->weight = weightOf(*wi);
-    m->base.resize((size_t)wi->np); m->rawP = rawParams;
+    m->base.resize((size_t)wi->np); m->rawP = rawParams && !heldInRange(wi->type);
     const Json ps = o.obj("params");
     for (int k = 0; k < wi->np; k++) { Json v = ps.get(wi->params[k].name); m->base[(size_t)k] = v.isNum() ? v.asNum() : wi->params[k].def; }
     repin(*m);

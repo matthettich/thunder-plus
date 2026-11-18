@@ -299,11 +299,12 @@ PY
 # the pinned rows are the proof). The read sites, all in host builds only:
 #   rings/dsp/resonator.cc  line 57   Interpolate(lut_stiffness, structure_, 256.0f)       lut_stiffness has 257 floats      trigger: structure == 1
 #   rings/dsp/resonator.cc  line 60   Interpolate(lut_4_decades, damping_, 256.0f)         lut_4_decades has 257 floats      trigger: damping == 1
+#   rings/dsp/fm_voice.cc   line 81   Interpolate(lut_fm_frequency_quantizer, ratio_, 128.0f)   129 floats   trigger: structure == 1 with the FM model (found by the ASan fuzz of U31's waves run, 18 Nov)
 #   clouds/dsp/granular_processor.cc lines 278-279  Interpolate(lut_xfade_in / lut_xfade_out, dry_wet, 16.0f)   17 floats each   trigger: dry/wet == 1
 #   clouds/dsp/granular_sample_player.h line 188  Interpolate(lut_grain_size, parameters.size, 256.0f)   257 floats   trigger: size == 1
 #   beads/dsp/delay_controller.h lines 94, 104, 154  Interpolate(slave_envelopes / pw, shape, 5.0f)   6 floats each (local arrays)   trigger: shape == 1
 #   warps/dsp/modulator.cc  lines 167-168 and 362-363  Interpolate(lut_xfade_in / lut_xfade_out, timbre / parameter, 256.0f)   257 floats each   trigger: timbre / the cross-fade parameter == 1
-python3 - "$E/stmlib/dsp/dsp.h" "$E/rings/dsp/resonator.cc" "$E/clouds/dsp/granular_processor.cc" "$E/warps/dsp/modulator.cc" "$E/clouds/dsp/granular_sample_player.h" "$E/beads/dsp/delay_controller.h" <<'PY'
+python3 - "$E/stmlib/dsp/dsp.h" "$E/rings/dsp/resonator.cc" "$E/clouds/dsp/granular_processor.cc" "$E/warps/dsp/modulator.cc" "$E/clouds/dsp/granular_sample_player.h" "$E/beads/dsp/delay_controller.h" "$E/rings/dsp/fm_voice.cc" <<'PY'
 import sys
 def sub(p, pairs):
     s=open(p).read()
@@ -311,7 +312,7 @@ def sub(p, pairs):
         if s.count(old)!=cnt: sys.exit(p+" InterpolateTop patch failed: "+old)
         s=s.replace(old,new)
     open(p,'w').write(s)
-h,r,c,w,g,b=sys.argv[1:7]
+h,r,c,w,g,b,f=sys.argv[1:8]
 sub(h,[("inline float Interpolate(const float* table, float index, float size) {",
 """// Thunder (prepare.sh): Interpolate for an index that can be exactly 1.0 (index * size == size): the fraction is 0, so table[size] is the result and table[size + 1] (past the table) is not read
 inline float InterpolateTop(const float* table, float index, float size) {
@@ -328,6 +329,7 @@ inline float InterpolateTop(const float* table, float index, float size) {
 inline float Interpolate(const float* table, float index, float size) {""",1)])
 sub(r,[("Interpolate(lut_stiffness, structure_, 256.0f)","InterpolateTop(lut_stiffness, structure_, 256.0f)",1),
        ("Interpolate(\n      lut_4_decades,","InterpolateTop(\n      lut_4_decades,",1)])
+sub(f,[("Interpolate(lut_fm_frequency_quantizer, ratio_, 128.0f)","InterpolateTop(lut_fm_frequency_quantizer, ratio_, 128.0f)",1)])
 sub(c,[("Interpolate(lut_xfade_in, dry_wet, 16.0f)","InterpolateTop(lut_xfade_in, dry_wet, 16.0f)",1),("Interpolate(lut_xfade_out, dry_wet, 16.0f)","InterpolateTop(lut_xfade_out, dry_wet, 16.0f)",1)])
 sub(w,[("Interpolate(lut_xfade_in, lut_index, 256.0f)","InterpolateTop(lut_xfade_in, lut_index, 256.0f)",1),("Interpolate(lut_xfade_out, lut_index, 256.0f)","InterpolateTop(lut_xfade_out, lut_index, 256.0f)",1),
        ("Interpolate(lut_xfade_in, parameter, 256.0f)","InterpolateTop(lut_xfade_in, parameter, 256.0f)",1),("Interpolate(lut_xfade_out, parameter, 256.0f)","InterpolateTop(lut_xfade_out, parameter, 256.0f)",1)])

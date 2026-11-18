@@ -909,6 +909,13 @@ static int run_chains() {
     "{\"from\":[\"s\",\"out\"],\"to\":[\"q\",\"in\"]},{\"from\":[\"q\",\"out\"],\"to\":[\"mx\",\"in1\"]},{\"from\":[\"f\",\"out\"],\"to\":[\"mo\",\"in\"]},{\"from\":[\"os\",\"out\"],\"to\":[\"mo\",\"inB\"]},{\"from\":[\"mo\",\"out\"],\"to\":[\"mx\",\"in2\"]},"
     "{\"from\":[\"wn\",\"out\"],\"to\":[\"ex\",\"a\"]},{\"from\":[\"l\",\"out\"],\"to\":[\"ex\",\"c\"]},{\"from\":[\"ex\",\"out\"],\"to\":[\"mx\",\"in3\"]},{\"from\":[\"a\",\"out\"],\"to\":[\"o\",\"in\"]},{\"from\":[\"mx\",\"out\"],\"to\":[\"g\",\"in\"]},{\"from\":[\"l\",\"out\"],\"to\":[\"g\",\"cv\"]},{\"from\":[\"b\",\"out\"],\"to\":[\"d\",\"in\"]},"
     + std::string(fx ? "{\"from\":[\"g\",\"out\"],\"to\":[\"ch\",\"in\"]},{\"from\":[\"ch\",\"out\"],\"to\":[\"rv\",\"in\"]},{\"from\":[\"rv\",\"out\"],\"to\":[\"c\",\"in\"]},{\"from\":[\"rv\",\"outR\"],\"to\":[\"c\",\"inR\"]}" : "{\"from\":[\"g\",\"out\"],\"to\":[\"c\",\"in\"]}") + "]}";
+  // Marbles, Tides and Cloud Seed (space), the modules that were made on the audio thread before U31's in-place storage: wired into the mixer so that they run (where their libraries are in the build)
+  { std::string ex, ec; const bool mb = chains_have_lib("marbles"), td = chains_have_lib("tides"), sp = chains_have_lib("space");
+    if (mb) { ex += ",{\"id\":\"mr\",\"type\":\"marbles\"}"; ec += ",{\"from\":[\"mr\",\"x1\"],\"to\":[\"mx\",\"in4\"]}"; }
+    if (td) { ex += ",{\"id\":\"td\",\"type\":\"tides\"}"; ec += ",{\"from\":[\"td\",\"out1\"],\"to\":[\"mx\",\"in5\"]}"; }
+    if (sp) { ex += ",{\"id\":\"sp\",\"type\":\"space\"}"; ec += ",{\"from\":[\"a\",\"out\"],\"to\":[\"sp\",\"in\"]},{\"from\":[\"sp\",\"out\"],\"to\":[\"mx\",\"in6\"]}"; }
+    const size_t m0 = pj.find("],\"cables\":["); pj.insert(m0, ex); const size_t c0 = pj.rfind("]}"); pj.insert(c0, ec);
+    std::printf("rt_chains: Marbles %d, Tides %d, space %d in the patch\n", (int)mb, (int)td, (int)sp); }
   JsonDoc d; if (!d.parse(pj)) { std::printf("rt_chains FAIL: patch json\n"); return 1; }
   const char* p2 = "{\"modules\":[{\"id\":\"a\",\"type\":\"trackIn\"},{\"id\":\"g\",\"type\":\"vca\"},{\"id\":\"c\",\"type\":\"chainOut\"}],\"cables\":[{\"from\":[\"a\",\"out\"],\"to\":[\"g\",\"in\"]},{\"from\":[\"g\",\"out\"],\"to\":[\"c\",\"in\"]}],\"transport\":{\"playing\":true}}";
   JsonDoc d2; d2.parse(p2);

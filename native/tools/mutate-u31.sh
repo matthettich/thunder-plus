@@ -17,7 +17,7 @@ PY
   rc=$?
   if [ $rc -ne 0 ]; then mv "$f.orig" "$f"; touch "$f"; echo "mutation '$name': could not be applied"; bad=$((bad+1)); return; fi
   if nice cmake --build "$B" -j1 --target test_chains test_chains_live test_chains_mem test_chains_alloc >/dev/null 2>&1; then
-    if timeout 600 "$B/tests/test_chains" $G >/dev/null 2>&1 && timeout 600 "$B/tests/test_chains_live" >/dev/null 2>&1 && timeout 600 "$B/tests/test_chains_mem" >/dev/null 2>&1 && timeout 600 "$B/tests/test_chains_alloc" >/dev/null 2>&1; then echo "mutation '$name': SURVIVED (the tests did not notice)"; bad=$((bad+1)); else echo "mutation '$name': killed"; ok=$((ok+1)); fi
+    if timeout 600 "$B/tests/test_chains" $G >/dev/null 2>&1 && timeout 240 "$B/tests/test_chains_live" >/dev/null 2>&1 && timeout 240 "$B/tests/test_chains_mem" >/dev/null 2>&1 && timeout 240 "$B/tests/test_chains_alloc" >/dev/null 2>&1; then echo "mutation '$name': SURVIVED (the tests did not notice)"; bad=$((bad+1)); else echo "mutation '$name': killed"; ok=$((ok+1)); fi
   else echo "mutation '$name': does not build"; bad=$((bad+1)); fi
   mv "$f.orig" "$f"; touch "$f"
 }

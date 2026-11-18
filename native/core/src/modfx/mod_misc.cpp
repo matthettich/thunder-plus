@@ -65,7 +65,8 @@ class Harmonizer : public Module {
     const double L0 = js_round(W * .5); double bl = L0, bv = -INFINITY;
     for (double L = L0; L < L0 + PER; L += 6) { const double v = harmScore(N, d, d + dir * L, 12); if (v > bv) { bv = v; bl = L; } }
     const double c0 = bl; bv = -INFINITY;
-    for (double L = c0 - 5; L <= c0 + 5; L++) { const double v = harmScore(N, d, d + dir * L, 3); if (v > bv) { bv = v; bl = L; } }
+    // eleven candidates c0-5 .. c0+5, counted: the JS's `for (L = c0 - 5; L <= c0 + 5; L++)` never ends when c0 is infinite (a window parameter of -Infinity) or so large that L + 1 == L; the same numbers where it ends
+    for (int k = -5; k <= 5; k++) { const double L = c0 + k; const double v = harmScore(N, d, d + dir * L, 3); if (v > bv) { bv = v; bl = L; } }
     return d + dir * bl;
   }
   F32 b_; int w_ = 0; Voice v_[2];
