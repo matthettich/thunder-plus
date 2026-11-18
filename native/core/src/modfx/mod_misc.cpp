@@ -226,11 +226,12 @@ class Life : public Module {
     for (int y = 0; y < 8; y++) cur_[y] = (uint16_t)(nx[y] & m);
     gen_++;
   }
+  // (the JS's `1 << n` in lifeStep: the count is taken mod 32, and an out-of-range rot gives a negative n; a plain C++ shift of it is undefined)
   void lifeStep(const double* p, int32_t W) {
     x_++;
     if (x_ >= W) { x_ = 0; if (i32(p[2]) > 0 && gen_ + 1 >= i32(p[2])) load(p); else next(p); }
     int32_t f = 0, c = 0;
-    for (int y = 0; y < 8; y++) { const int a = (cur_[y] >> x_) & 1, b = (prev_[y] >> x_) & 1; c += a; if (p[3] >= .5 ? (a && !b) : a) f |= 1 << ((y + i32(p[5])) % 8); }
+    for (int y = 0; y < 8; y++) { const int a = (cur_[y] >> x_) & 1, b = (prev_[y] >> x_) & 1; c += a; if (p[3] >= .5 ? (a && !b) : a) f |= (int32_t)(1u << (((y + i32(p[5])) % 8) & 31)); }
     fire_ = f; cnt_ = c;
   }
   uint16_t cur_[8] = {}, prev_[8] = {}; int32_t SG_[8]; int32_t x_ = -1, gen_ = 0, fire_ = 0, cnt_ = 0; double ph_ = 1; bool lc_ = false, lr_ = false; Restart rs_;

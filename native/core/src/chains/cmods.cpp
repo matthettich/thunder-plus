@@ -367,6 +367,14 @@ const Def* cdef(std::string_view type) {
   }
   return nullptr;   // modfx's registry, then the waves-only modules (the effects, LFO / ADSR / Random / Attenuverter, Expression, ...): the same JS
 }
+struct CMem { const char* type; long b48; long perHz; };
+static const CMem kCMem[] = {
+#include "chains/cmem.inc"
+};
+double chains_module_bytes(std::string_view type, double sr) {
+  for (const CMem& m : kCMem) if (type == m.type) return (double)m.b48 + (double)m.perHz * (sr > 48000 ? sr - 48000 : 0);
+  return 64.0 * 1048576.0;   // (a type the table does not know: a generous guess, so it is never counted as free)
+}
 bool chains_type_is_lib(std::string_view type) {
   if (waves::waves_type_is_fx(type) || type == "marbles" || type == "tides") return true;
   for (int i = 0; i < kPumpTypeN; i++) if (type == kPumpTypes[i]) return true;

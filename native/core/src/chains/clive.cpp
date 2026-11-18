@@ -25,7 +25,8 @@ ChainsLive::~ChainsLive() { for (auto& p : slot_) chains_free_patch(p.exchange(n
 bool ChainsLive::post(const ChainsEvent& e) {
   if (e.kind == ChainsEvent::Param && (std::memchr(e.id, 0, sizeof e.id) == nullptr || std::memchr(e.name, 0, sizeof e.name) == nullptr)) { st_.droppedEvents++; return false; }
   const uint32_t t = qt_.load(std::memory_order_relaxed), h = qh_.load(std::memory_order_acquire);
-  if (t - h >= (uint32_t)kChainsQueue) { st_.droppedEvents++; return false; }
+  // the last kChainsReserve places are for events that must never be lost (Playing, Bypass, Tempo, Patch): a Param is refused first, so the others still find room
+  if (t - h >= (uint32_t)(kChainsQueue - (e.kind == ChainsEvent::Param ? kChainsReserve : 0))) { st_.droppedEvents++; return false; }
   q_[t % (uint32_t)kChainsQueue] = e; qt_.store(t + 1, std::memory_order_release); return true;
 }
 bool ChainsLive::postParam(const char* id, const char* name, double v, int64_t at) {
@@ -34,8 +35,10 @@ bool ChainsLive::postParam(const char* id, const char* name, double v, int64_t a
   std::strcpy(e.id, id); std::strcpy(e.name, name); return post(e);
 }
 bool ChainsLive::preparePatch(Json doc, int64_t at) {
-  int k = -1; for (int i = 0; i < kChainsSlots; i++) if (!slot_[i].load()) { k = i; break; }
-  if (k < 0) { st_.refusedPatches++; return false; }
+  // a patch in flight is one prepared and not yet swapped in (slot_) or swapped out and not yet collected (retired_): the audio thread needs a retired place for each swap, so no more than kChainsSlots may
+  // be in flight, and when they are the answer is false (service() collects the retired ones)
+  int k = -1, inflight = 0; for (int i = 0; i < kChainsSlots; i++) { if (!slot_[i].load()) { if (k < 0) k = i; } else inflight++; if (retired_[i].load()) inflight++; }
+  if (k < 0 || inflight >= kChainsSlots) { st_.refusedPatches++; return false; }
   waves::PatchImpl* p = node_.engine().preparePatch(doc);
   if (!p) { st_.refusedPatches++; return false; }
   slot_[k].store(p);
@@ -55,10 +58,31 @@ void ChainsLive::drain() {
     if (h == t) break;
     ChainsEvent e = q_[h % (uint32_t)kChainsQueue]; qh_.store(h + 1, std::memory_order_release);
     if (e.at < pos_) { e.at = pos_; st_.lateEvents++; }
-    if (npend_ >= kChainsPending) { st_.droppedEvents++; continue; }
+    // the pending array is full or nearly so: parameter events coalesce (a later value of the same module and parameter replaces the earlier one); an event that must not be lost (Playing, Bypass,
+    // Tempo, Patch) makes room by removing the oldest parameter event; a parameter event is refused first (the last kChainsReserve places are for the others); only when nothing can give way is an event dropped,
+    // and a dropped Patch hands its patch to the control thread (retired_) so its slot is free again
+    if (e.kind == ChainsEvent::Param) {
+      if (npend_ >= kChainsPending - kChainsReserve) {
+        int same = -1; for (int j = 0; j < npend_; j++) if (pend_[j].kind == ChainsEvent::Param && std::strcmp(pend_[j].id, e.id) == 0 && std::strcmp(pend_[j].name, e.name) == 0) same = j;
+        if (same < 0) { st_.droppedEvents++; continue; }
+        eraseAt(same); st_.coalescedEvents++;
+      }
+    } else if (npend_ >= kChainsPending) {
+      int old = -1; for (int j = 0; j < npend_; j++) if (pend_[j].kind == ChainsEvent::Param) { old = j; break; }
+      if (old < 0) { st_.droppedEvents++; if (e.kind == ChainsEvent::Patch) dropPatch(e); continue; }
+      eraseAt(old); st_.coalescedEvents++;
+    }
     int i = npend_; while (i > 0 && pend_[i - 1].at > e.at) { pend_[i] = pend_[i - 1]; i--; }   // stable: after every event at or before its time
     pend_[i] = e; npend_++;
   }
+}
+void ChainsLive::eraseAt(int j) { std::memmove(&pend_[j], &pend_[j + 1], sizeof(ChainsEvent) * (size_t)(npend_ - j - 1)); npend_--; }
+// a Patch event that cannot be delivered: its patch goes to the control thread (retired_; preparePatch kept a place for it) and its slot is free again
+void ChainsLive::dropPatch(const ChainsEvent& e) {
+  const int k = (int)e.a; if (k < 0 || k >= kChainsSlots) return;
+  waves::PatchImpl* p = slot_[k].exchange(nullptr); if (!p) return;
+  for (int i = 0; i < kChainsSlots; i++) if (!retired_[i].load()) { retired_[i].store(p); return; }
+  slot_[k].store(p);   // (cannot happen: preparePatch keeps in flight <= kChainsSlots) put back, never freed here
 }
 void ChainsLive::apply(const ChainsEvent& e) {
   ChainsEngine& E = node_.engine();
@@ -70,7 +94,7 @@ void ChainsLive::apply(const ChainsEvent& e) {
     case ChainsEvent::Patch: {
       const int k = (int)e.a; if (k < 0 || k >= kChainsSlots) break;
       int r = -1; for (int i = 0; i < kChainsSlots; i++) if (!retired_[i].load()) { r = i; break; }
-      if (r < 0) { st_.droppedEvents++; break; }   // nowhere to hand the old patch to (the control thread has not collected): not swapped, never freed here
+      if (r < 0) { st_.deferredPatches++; ChainsEvent again = e; again.at = pos_ + kBlock; int i = npend_; while (i > 0 && pend_[i - 1].at > again.at) { pend_[i] = pend_[i - 1]; i--; } pend_[i] = again; npend_++; break; }   // (cannot happen, see preparePatch) tried again a block later
       waves::PatchImpl* p = slot_[k].exchange(nullptr); if (!p) break;
       cur_.store(p, std::memory_order_release);
       retired_[r].store(E.swapPatch(p));

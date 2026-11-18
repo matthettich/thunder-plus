@@ -48,7 +48,9 @@ const WInfo& cinfo_at(int i);
 const modfx::Def* cdef(std::string_view type);
 bool chains_type_is_lib(std::string_view type);
 bool chains_type_is_pump(std::string_view type);   // one of the 13 pump modules (they need the pump library, not the tfx one)
-uint64_t chains_pump_swaps(); uint64_t chains_pump_bad(); uint64_t chains_pump_dry();   // the pump modules' counters (process-wide): spares swapped in, blocks that went bad, bad blocks with no spare ready
+uint64_t chains_pump_swaps(); uint64_t chains_pump_bad(); uint64_t chains_pump_dry(); uint64_t chains_pump_overflow();   // overflow: dead handles that did not fit a module's four places (0 always; the test keeps it there)   // the pump modules' counters (process-wide): spares swapped in, blocks that went bad, bad blocks with no spare ready
+double chains_module_bytes(std::string_view type, double sr);   // the heap a module of this type holds (cmem.inc: measured by tests/test_chains_mem.cpp, with a margin): the memory budget's unit
+constexpr size_t kDefaultMemoryBudget = (size_t)1 << 30;   // 1 GiB per patch (a …chains patch holds one module object each; Resample 23 MiB, Convolve 66 MiB, Pgrain 57 MiB at 48 kHz, more at higher rates)
 bool chains_have_lib(std::string_view type);        // this build can run it: the library the type needs is in the build (a closed build has none)
 const waves::ModTable& chainsTable();
 void resample_release(const struct ResampleTake& t);   // cmods2.cpp   // a module built from a strict upstream library (the tfx effects, the pump modules, Marbles / Tides): not bit-exact with the web's fast-math wasm
@@ -78,6 +80,11 @@ class ChainsEngine {
   ChainsEngine(const ChainsEngine&) = delete; ChainsEngine& operator=(const ChainsEngine&) = delete;
   bool valid() const { return valid_; }
   // ---- the JS's methods (control thread; they allocate) ----
+  // The memory budget (bytes; a PATCH is refused, with lastError() saying why, when its modules would need more: counted before anything is allocated). A failed allocation (std::bad_alloc) while a patch is
+  // prepared is caught at that boundary too and refuses the patch (where the build has exceptions: GCC / Clang; the core is built -fno-exceptions, only this file has them). Never on the audio thread.
+  void setMemoryBudget(size_t bytes) { memBudget_ = bytes ? bytes : kDefaultMemoryBudget; }
+  size_t memoryBudget() const { return memBudget_; }
+  const std::string& lastError() const { return lastError_; }
   bool loadPatch(Json doc);     // false: refused (the engine is left as it was)
   bool addModule(std::string_view id, std::string_view type, Json o = Json());   // o: {params, text}; unknown type: nothing (as the JS)
   void removeModule(std::string_view id);
@@ -154,7 +161,7 @@ class ChainsEngine {
   const float* trackL_ = nullptr; const float* trackR_ = nullptr; int trackChans_ = 0;
   const float* sendIn_[kSends] = {}; const float* taps_[kMaxTaps] = {}; int nTaps_ = 0; int16_t tapMap_[kChannels]; bool hasTapMap_ = false;
   std::vector<int> busMap_; double bsw_[kBypSwitches + 1];
-  CCtx ctx_; Stats stats_; bool lastFailed_ = false;
+  CCtx ctx_; Stats stats_; bool lastFailed_ = false; size_t memBudget_ = kDefaultMemoryBudget; mutable std::string lastError_;
   std::atomic<uint64_t> spareSwaps_{0}, audioRemakes_{0}; bool inlineService_ = true;
   std::unique_ptr<TakeQ> takes_;
 };
@@ -201,9 +208,9 @@ struct ChainsEvent {
   double a = 0, b = 0;                 // Param: a the value; Tempo: a bpm; Playing: a 1 or 0; Bypass: a the switch 1..15, b its value (-1 the patch's own, 0 in, 1 bypassed, 2 flipped); Patch: a the mailbox slot preparePatch gave
   char id[40] = {}; char name[24] = {};   // Param: the module id and the parameter name (a longer one is refused by post())
 };
-constexpr int kChainsLatency = 127, kChainsQueue = 4096, kChainsPending = 4096, kChainsSlots = 8, kChainsRing = 512;
+constexpr int kChainsLatency = 127, kChainsQueue = 4096, kChainsPending = 4096, kChainsSlots = 8, kChainsRing = 512, kChainsReserve = 256;   // kChainsReserve: places only an event that must not be lost may take
 struct ChainsLiveConfig { int taps = 0; bool sc = false; bool sends = false; int feeds = 0; };   // which of the node's inputs the host feeds (fixed for the runner's life)
-struct ChainsLiveStats { uint64_t blocks = 0, cutBlocks = 0, lateEvents = 0, droppedEvents = 0, refusedPatches = 0, failedBlocks = 0; };
+struct ChainsLiveStats { uint64_t blocks = 0, cutBlocks = 0, lateEvents = 0, droppedEvents = 0, refusedPatches = 0, failedBlocks = 0, coalescedEvents = 0, deferredPatches = 0; };
 class ChainsLive {
  public:
   ChainsLive(double sampleRate, int track, const ChainsLiveConfig& cfg = ChainsLiveConfig(), Host* host = nullptr);
@@ -213,6 +220,7 @@ class ChainsLive {
   ChainsNode& node() { return node_; }
   // control thread
   bool post(const ChainsEvent& e);                                    // false: the queue is full (counted), or a Param's id / name is too long
+  void setMemoryBudget(size_t bytes) { node_.engine().setMemoryBudget(bytes); }   // per patch prepared by this runner (see ChainsEngine::setMemoryBudget)
   bool postParam(const char* id, const char* name, double v, int64_t at);
   bool preparePatch(Json doc, int64_t at);                            // builds the patch off the audio thread and posts its swap at `at`; false: refused (the playing patch stays)
   void service();                                                     // frees the patches the audio thread gave back and keeps the pump spares current (one control thread calls this regularly, and no other frees patches)
@@ -221,11 +229,13 @@ class ChainsLive {
   int latency() const { return kChainsLatency; }
   const ChainsLiveStats& stats() const { return st_; }
   int64_t enginePos() const { return pos_; }
+  int patchesInFlight() const { int n = 0; for (int i = 0; i < kChainsSlots; i++) { if (slot_[i].load()) n++; if (retired_[i].load()) n++; } return n; }   // prepared and not yet swapped in, plus swapped out and not yet collected by service()
   // the same events rendered with no queue and no latency (control thread: allocates). in[c]: the host's channels in the order of the node's inputs: Track In L, R, then sc L, R (cfg.sc), taps, sends (cfg.sends: 8), feeds (2 each); each `frames` long
   static bool renderOffline(double sr, int track, const ChainsLiveConfig& cfg, Host* host, const std::vector<ChainsEvent>& events, const std::vector<Json>& patches, const std::vector<std::vector<float>>& inputs,
                             int64_t frames, std::vector<std::vector<float>>& outputs /* L, R, sends 0..7 */, Json initialPatch = Json(), const std::vector<int>* busMap = nullptr, const std::vector<int>* tapMap = nullptr);
  private:
   void drain();
+  void eraseAt(int j); void dropPatch(const ChainsEvent& e);
   void apply(const ChainsEvent& e);
   void segment(int64_t end);
   int nIn() const { return 2 + (cfg_.sc ? 2 : 0) + cfg_.taps + (cfg_.sends ? 8 : 0) + 2 * cfg_.feeds; }

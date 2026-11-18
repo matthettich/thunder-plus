@@ -17,6 +17,9 @@ if(MSVC)
   target_compile_options(thunder_core PRIVATE /W4 /GR-)
 else()
   target_compile_options(thunder_core PRIVATE -Wall -Wextra -fno-exceptions -fno-rtti)
+  # U31: the patch-preparation boundary of the …chains engine catches std::bad_alloc (a patch that cannot be built is refused, the process goes on): this one file has exceptions. The throw comes from operator new
+  # in the other (-fno-exceptions) code, which has unwind tables; a half-made patch is simply dropped (its memory leaks on that path, which is already the failure path).
+  set_source_files_properties(src/chains/cengine.cpp PROPERTIES COMPILE_OPTIONS "-fexceptions")
 endif()
 
 # U02: the existing C++ DSP as static libraries (see dsp/CMakeLists.txt, third_party/PINS.md)

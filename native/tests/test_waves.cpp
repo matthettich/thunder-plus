@@ -24,6 +24,11 @@ static uint32_t fnv(const std::vector<const std::vector<float>*>& arrs) {
   for (auto* a : arrs) { const unsigned char* u = (const unsigned char*)a->data(); for (size_t i = 0; i < a->size() * 4; i++) { h ^= u[i]; h *= 0x01000193u; } }
   return h;
 }
+static uint32_t fnvCanon(const std::vector<const std::vector<float>*>& arrs) {   // rows 'over/...': every NaN as the canonical 0x7fc00000 (the machine's NaN sign / payload differs from the JS's)
+  uint32_t h = 0x811c9dc5u;
+  for (auto* a : arrs) for (float f : *a) { uint32_t b; if (f != f) b = 0x7fc00000u; else std::memcpy(&b, &f, 4); for (int k = 0; k < 4; k++) { h ^= (b >> (8 * k)) & 255u; h *= 0x01000193u; } }
+  return h;
+}
 static std::string hex(uint32_t h) { char b[16]; std::snprintf(b, sizeof b, "%08x", h); return b; }
 
 // ---- the processor rows of tests/golden/waves-processor.json ----
@@ -115,7 +120,7 @@ static void runGolden(const std::string& golden, const std::string& effectsFile,
     if (!r.ok) { CHECK(false, "%s: patch refused", name.c_str()); bad++; continue; }
     std::string fn = name; for (char& ch : fn) if (ch == '/' || ch == '@') ch = '_';
     if (!dumpDir.empty()) { std::ofstream f(dumpDir + "/" + fn + ".f32", std::ios::binary); f.write((const char*)r.L.data(), (std::streamsize)(r.L.size() * 4)); f.write((const char*)r.R.data(), (std::streamsize)(r.R.size() * 4)); }
-    const std::string h = hex(fnv({&r.L, &r.R})), want(c.str("hash")); const bool exact = h == want;
+    const std::string h = hex(name.rfind("over/", 0) == 0 ? fnvCanon({&r.L, &r.R}) : fnv({&r.L, &r.R})), want(c.str("hash")); const bool exact = h == want;
     if (!lib) { if (exact) nPlain++; else { bad++; CHECK(false, "%s: not bit-exact (%s != %s)", name.c_str(), h.c_str(), want.c_str()); } continue; }
     std::string ref; const bool haveRef = !refDir.empty() && readFile(refDir + "/" + fn + ".f32", &ref); bool okdb = false; const double db = haveRef ? dbOf(r.L, r.R, ref, &okdb) : 0;
     const double rms = rmsOf(r.L, r.R);
@@ -221,11 +226,7 @@ static void testVoices() {
     double en[2]; for (int k = 0; k < 2; k++) { Doc d(mono); Host host; host.setRandom(Host::Rnd::Xorshift, 0x9e3779b9u); WavesEngine e(48000, opts(k ? 4 : 1), &host); CHECK(e.loadPatch(d.r), "mono source patch"); e.noteOn(60, 1); en[k] = energy(e, 60); }
     CHECK(en[0] > 0 && std::fabs(en[1] / en[0] - 1.0 / 16) < 1e-3, "mono source into a voice: energy ratio %g, wanted 1/16", en[0] > 0 ? en[1] / en[0] : -1);
   }
-  {   // a parameter past its declared range is held to it (the JS would run on the raw value; a hostile value must not reach a module)
-    std::vector<float> o2[2]; for (int k = 0; k < 2; k++) { const std::string pj = patch({mod("h", "hostIn"), mod("v", "vco", "{\"wave\":1}"), mod("e", "adsr", k ? "{\"a\":0.005,\"d\":0.2,\"s\":1,\"r\":0.3}" : "{\"a\":0.005,\"d\":0.2,\"s\":9,\"r\":0.3}"), mod("g", "vca"), mod("o", "out")},
-      {cab("h", "pitch", "v", "pitch"), cab("h", "gate", "e", "gate"), cab("v", "out", "g", "in"), cab("e", "out", "g", "cv"), cab("g", "out", "o", "in")}); o2[k] = renderLoop(pj, 40); }
-    CHECK(o2[0] == o2[1], "a sustain of 9 behaves as the declared maximum");
-  }
+  // (a parameter past its declared range: the JS runs on the value as set, and so does this engine since U31 (it used to hold it to the range). The golden rows over/<type>/{high,low,alt} are the JS's own renders.)
   VoicePool p(3);
   int a = p.on(60, 1), b = p.on(64, 1), c = p.on(67, 1); CHECK(a == 0 && b == 1 && c == 2, "fills in order");
   int d = p.on(72, 1); CHECK(d == 0, "all busy: the oldest overall is stolen (row %d)", d);

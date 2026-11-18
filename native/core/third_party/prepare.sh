@@ -345,6 +345,23 @@ for f in ModulatedDelay MultitapDelay ModulatedAllpass; do
   printf '#ifdef __wasm__\n#define THUNDER_CS_DELAY 32768\n#define THUNDER_CS_ALLPASS 2400\n#else\n#define THUNDER_CS_DELAY 131072\n#define THUNDER_CS_ALLPASS 4800\n#endif\n' | cat - "$C/DSP/$f.h" > "$C/DSP/$f.h.new" && mv "$C/DSP/$f.h.new" "$C/DSP/$f.h"
 done
 grep -q 'DelayBufferSize = THUNDER_CS_DELAY' "$C/DSP/ModulatedDelay.h" && grep -q 'DelayBufferSize = THUNDER_CS_ALLPASS' "$C/DSP/ModulatedAllpass.h" || { echo "Cloud Seed patch failed" >&2; exit 1; }
+# Cloud Seed (U31, host builds): RandomBuffer::Generate returns a std::vector, and the parameter changes that re-seed a line (size, decay, diffusion, pre-delay ...: UpdateLines / UpdateSeeds) call it, so a
+# parameter change on the audio thread allocated (thousands of calls in a block that changes every parameter; 336 at a first block). GenerateInto writes the same numbers (the same LcgRandom, the same float
+# arithmetic) into a caller's array: the three callers use a stack array / their own vector (sized once, when the reverb is made). The output of the effect is unchanged.
+python3 - "$C/DSP" <<'PY'
+import sys; d=sys.argv[1]
+def sub(f,pairs):
+    p=d+'/'+f; s=open(p).read()
+    for a,b in pairs:
+        if s.count(a)!=1: sys.exit("Cloud Seed GenerateInto patch failed: "+f+": "+a)
+        s=s.replace(a,b)
+    open(p,'w').write(s)
+sub('RandomBuffer.h',[("static std::vector<float> Generate(uint64_t seed, int count, float crossSeed);","static std::vector<float> Generate(uint64_t seed, int count, float crossSeed);\n\t\tstatic void GenerateInto(float* out, uint64_t seed, int count, float crossSeed);   // count <= 1024: no allocation")])
+sub('RandomBuffer.cpp',[("\tstd::vector<float> RandomBuffer::Generate(uint64_t seed, int count, float crossSeed)","\tvoid RandomBuffer::GenerateInto(float* out, uint64_t seed, int count, float crossSeed)\n\t{\n\t\tfloat a[1024], b[1024]; if (count > 1024) count = 1024;\n\t\tLcgRandom ra(seed), rb(~seed);\n\t\tfor (int i = 0; i < count; i++) { unsigned int v = ra.NextUInt(); a[i] = v / (float)UINT_MAX; }\n\t\tfor (int i = 0; i < count; i++) { unsigned int v = rb.NextUInt(); b[i] = v / (float)UINT_MAX; }\n\t\tfor (int i = 0; i < count; i++) out[i] = a[i] * (1 - crossSeed) + b[i] * crossSeed;\n\t}\n\n\tstd::vector<float> RandomBuffer::Generate(uint64_t seed, int count, float crossSeed)")])
+sub('ReverbChannel.h',[("auto delayLineSeeds = RandomBuffer::Generate(delayLineSeed, TotalLineCount * 3, crossSeed);","float delayLineSeeds[TotalLineCount * 3]; RandomBuffer::GenerateInto(delayLineSeeds, delayLineSeed, TotalLineCount * 3, crossSeed);")])
+sub('MultitapDelay.h',[("this->seedValues = RandomBuffer::Generate(seed, MaxTaps * 3, crossSeed);","this->seedValues.resize(MaxTaps * 3); RandomBuffer::GenerateInto(this->seedValues.data(), seed, MaxTaps * 3, crossSeed);")])
+sub('AllpassDiffuser.h',[("this->seedValues = RandomBuffer::Generate(seed, MaxStageCount * 3, crossSeed);","this->seedValues.resize(MaxStageCount * 3); RandomBuffer::GenerateInto(this->seedValues.data(), seed, MaxStageCount * 3, crossSeed);")])
+PY
 # Airwindows: no VST host (default: throw -> break, createEffectInstance removed)
 A="$D/airwindows/plugins/LinuxVST/src"
 for p in Density ToTape6 EQ Pressure4 Galactic TapeDelay2 DeRez2 PurestDrive Air3 Verbity2 ToVinyl4 Dubly Cabs Tube2; do

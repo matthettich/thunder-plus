@@ -2,7 +2,10 @@
 // ChainsProcessor's mix-down, ThunderChains' per-track wrapper (ChainsNode). The graph itself is U30's (waves/graph.h). docs/port/U31-NOTES.md lists what is decided differently and why.
 #include <algorithm>
 #include <cmath>
+#include <cstdio>
 #include <cstring>
+#include <new>
+#include <stdexcept>
 
 #include "chains/chains.h"
 #include "modfx/bfutil.h"
@@ -100,13 +103,23 @@ void ChainsEngine::prepareDerived(PatchImpl& P) const {
   }
 }
 
+static std::string mib(double b) { char s[40]; std::snprintf(s, sizeof s, "%.1f MiB", b / 1048576.0); return s; }
+// the heap the modules of a patch will hold, counted from their types (before any is made)
+static double patchBytes(const PatchImpl& P, double sr) { double b = 0; for (const auto& m : P.mods) b += chains_module_bytes(m->wi->type, sr); return b; }
 // ---- the JS's methods ---------------------------------------------------------------------------------------------------------------------------------------
 bool ChainsEngine::addModule(std::string_view id, std::string_view type, Json o) {
   if (!valid_) return false;
   const WInfo* wi = cinfo(type); if (!wi) return true;
   if ((int)p_->mods.size() >= waves::kMaxModules) { stats_.refusedCalls++; return false; }
-  if (!p_->addNode(id, type, o)) { stats_.refusedCalls++; return false; }
-  p_->sync(true); prepareDerived(*p_); return true;
+  if (patchBytes(*p_, sr_) + chains_module_bytes(wi->type, sr_) > (double)memBudget_) { stats_.refusedCalls++; lastError_ = "the module would take the patch over the memory budget of " + mib((double)memBudget_); return false; }
+#if defined(__cpp_exceptions)
+  try {
+#endif
+    if (!p_->addNode(id, type, o)) { stats_.refusedCalls++; return false; }
+    p_->sync(true); prepareDerived(*p_); return true;
+#if defined(__cpp_exceptions)
+  } catch (const std::bad_alloc&) { stats_.refusedCalls++; lastError_ = "out of memory while the module was being made"; p_->removeNode(std::string(id)); p_->sync(true); prepareDerived(*p_); return false; }
+#endif
 }
 void ChainsEngine::removeModule(std::string_view id) { p_->removeNode(std::string(id)); p_->sync(true); prepareDerived(*p_); }
 void ChainsEngine::connect(std::string_view aId, std::string_view aPort, std::string_view bId, std::string_view bPort, bool fb) {
@@ -184,11 +197,21 @@ bool ChainsEngine::handleMessage(Json m) {
 // ---- patches --------------------------------------------------------------------------------------------------------------------------------------------------
 PatchImpl* ChainsEngine::preparePatch(Json doc) const {
   if (!valid_) return nullptr;
-  std::unique_ptr<PatchImpl> P(newPatch(sr_, host_));
-  if (!waves::readPatchDoc(doc, *P, true)) return nullptr;
-  if (!P->sync(false)) return nullptr;
-  prepareDerived(*P);
-  return P.release();
+  lastError_.clear();
+#if defined(__cpp_exceptions)
+  try {
+#endif
+    std::unique_ptr<PatchImpl> P(newPatch(sr_, host_));
+    if (!waves::readPatchDoc(doc, *P, true)) { lastError_ = "the patch document was refused"; return nullptr; }
+    const double need = patchBytes(*P, sr_);
+    if (need > (double)memBudget_) { lastError_ = "the patch needs about " + mib(need) + " for its modules; the memory budget is " + mib((double)memBudget_); return nullptr; }
+    if (!P->sync(false)) { lastError_ = "the patch could not be built"; return nullptr; }
+    prepareDerived(*P);
+    return P.release();
+#if defined(__cpp_exceptions)
+  } catch (const std::bad_alloc&) { lastError_ = "out of memory while the patch was being prepared (the memory budget allows more than this machine has free)"; return nullptr; }
+  catch (const std::length_error&) { lastError_ = "a buffer of the patch is too large"; return nullptr; }
+#endif
 }
 PatchImpl* ChainsEngine::swapPatch(PatchImpl* n) {
   PatchImpl* old = p_.release();

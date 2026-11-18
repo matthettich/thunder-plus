@@ -228,9 +228,10 @@ function runScn(c) {
 for (const c of scn) { const arrs = runScn(c), h = hashOf(arrs); const k = Object.assign({}, c, { kind: 'scn', hash: h }); delete k.extra; cases.push(k); refs[c.name] = arrs; }
 
 const text = JSON.stringify(cases) + '\n';
+// DUMP_OVER=1 writes the over-range rows' arrays too (a local diagnosis; not by default: 450 MB)
 if (outDir) {
   fs.mkdirSync(outDir, { recursive: true });
-  for (const c of cases) { if (c.kind === 'mod' && !c.lib) continue; const a = refs[c.name], n = a.reduce((s, x) => s + x.length, 0), b = Buffer.alloc(n * 4); let o = 0; for (const x of a) { Buffer.from(x.buffer, x.byteOffset, x.byteLength).copy(b, o); o += x.byteLength; } fs.writeFileSync(path.join(outDir, c.name.replace(/[\/@]/g, '_') + '.f32'), b); }
+  for (const c of cases) { if (c.kind === 'mod' && !c.lib && !(process.env.DUMP_OVER && c.group === 'over')) continue; const a = refs[c.name], n = a.reduce((s, x) => s + x.length, 0), b = Buffer.alloc(n * 4); let o = 0; for (const x of a) { Buffer.from(x.buffer, x.byteOffset, x.byteLength).copy(b, o); o += x.byteLength; } fs.writeFileSync(path.join(outDir, c.name.replace(/[\/@]/g, '_') + '.f32'), b); }
   fs.writeFileSync(path.join(outDir, 'cases.json'), text);
 }
 if (process.argv.includes('--golden')) { fs.writeFileSync(GOLD, text); console.log('wrote', GOLD, cases.length, 'cases'); }

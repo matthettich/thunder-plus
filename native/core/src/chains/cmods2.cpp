@@ -184,7 +184,7 @@ struct PumpCh { const char* key; int t, np, nps; const PumpQ* ps; };
 double pumpCurve(const PumpQ& q, double v) { v = v < 0 ? 0 : v > 1 ? 1 : v; return q.curve == 'g' ? q.mn * js_pow(q.mx / q.mn, v) : q.mn + (q.mx - q.mn) * js_pow(v, q.exp > 0 ? q.exp : 1); }
 double pumpValue(const PumpQ& q, double raw) { const double v = raw; if (!(v == v)) return q.def; return q.kind == 'n' ? pumpCurve(q, v) : v; }
 
-std::atomic<uint64_t> g_pumpSwaps{0}, g_pumpBad{0}, g_pumpDry{0};   // spares taken, blocks that went bad, blocks with no spare ready (counted for the tests and the notes)
+std::atomic<uint64_t> g_pumpSwaps{0}, g_pumpBad{0}, g_pumpDry{0}, g_pumpOverflow{0}; struct OvList { std::atomic<int> a[64]; OvList() { for (auto& x : a) x.store(-1); } }; OvList g_ovl;   // spares taken, blocks that went bad, blocks with no spare ready (counted for the tests and the notes)
 class PumpMod : public WModule {
  public:
   PumpMod(const PumpCh* d, double sr) : d_(d), sr_(sr) { for (int i = 0; i < 128; i++) last_[i] = NAN; }
@@ -198,6 +198,7 @@ class PumpMod : public WModule {
     makeSpare(p);
   }
   void service() override {
+    for (auto& o : g_ovl.a) { const int dd = o.exchange(-1); if (dd >= 0) pump_free_ctl(dd); }
     for (auto& d : dead_) { const int dd = d.exchange(-1); if (dd >= 0) pump_free_ctl(dd); }
     if (spare_.load() < 0 && wantSpare_.load()) { double p[128]; for (int i = 0; i < d_->nps; i++) p[i] = rawNow_[i].load(std::memory_order_relaxed); makeSpare(p); }
   }
@@ -231,7 +232,10 @@ void PumpMod::process(const IO& io, const Ctx& c) {
   pump::process(h_, n, 0);
   bool bad = false; for (int i = 0; i < n; i++) { const float a = L[i], b = R[i]; if (!(a > -8 && a < 8 && b > -8 && b < 8)) { bad = true; break; } }
   if (bad) { g_pumpBad++;   // gone bad: afresh next block. The JS frees and makes the instance on the audio thread; here the dead one goes to the control thread and the spare takes over.
-    const int old = h_; h_ = -1; { bool put = false; for (auto& d : dead_) { int e = -1; if (d.compare_exchange_strong(e, old)) { put = true; break; } } (void)put; /* (four failures between two services: the handle is kept by nobody; it is freed with the process) */ }
+    const int old = h_; h_ = -1; { bool put = false; for (auto& d : dead_) { int e = -1; if (d.compare_exchange_strong(e, old)) { put = true; break; } }
+      /* a module has a spare for ONE take-over between two service() calls, so at most two handles die in that time (the one that went bad before the swap and the swapped-in one): the four places never overflow.
+         Should it ever happen the handle goes to a process-wide overflow list the control thread frees, never leaks (g_pumpOverflow counts it; the test keeps it at 0) */
+      if (!put) { g_pumpOverflow++; for (auto& o : g_ovl.a) { int e = -1; if (o.compare_exchange_strong(e, old)) break; } } }
     zeroOut(io.out[0]); zeroOut(io.out[1]); wantSpare_.store(true); return;
   }
   std::memcpy(io.out[0], L, sizeof(float) * (size_t)n); std::memcpy(io.out[1], R, sizeof(float) * (size_t)n);
@@ -241,6 +245,7 @@ void PumpMod::process(const IO& io, const Ctx& c) {
 uint64_t chains_pump_swaps() { return g_pumpSwaps.load(); }
 uint64_t chains_pump_bad() { return g_pumpBad.load(); }
 uint64_t chains_pump_dry() { return g_pumpDry.load(); }
+uint64_t chains_pump_overflow() { return g_pumpOverflow.load(); }
 void resample_release(const ResampleTake& t) { if (t.owner) static_cast<Resample*>(t.owner)->release(t.which); }
 std::unique_ptr<Module> makeMorph(double sr, Seeds& s) { return std::unique_ptr<Module>(new Morph(sr, s)); }
 std::unique_ptr<Module> makeResample(double sr, Seeds& s) { return std::unique_ptr<Module>(new Resample(sr, s)); }

@@ -107,7 +107,8 @@ class PatchImpl {
   bool hasT = false; Transport tpart; bool tTempo = false, tLpb = false, tTicks = false, tPpq = false, tStart = false, tPlaying = false;   // the doc's transport, applied at the swap
   std::vector<float> fbS = std::vector<float>(kBlock);
   // U31 (…chains): per-patch data the …chains engine computes on the control thread: the run list (focus) and the bypass numbers, by module index; chains: this patch is a …chains one
-  bool chains = false, rawParams = false; std::vector<char> act, actTel; bool hasAct = false; std::vector<int> bn; std::vector<char> seen; std::vector<int> stk;   // act: the run list without telemetry, actTel: with it; seen / stk: scratch (sized by compile, so the audio thread allocates nothing)
+  // rawParams: a parameter is used as set (the JS: io.p = io.base), in …waves as in …chains
+  bool chains = false, rawParams = true; std::vector<char> act, actTel; bool hasAct = false; std::vector<int> bn; std::vector<char> seen; std::vector<int> stk;   // act: the run list without telemetry, actTel: with it; seen / stk: scratch (sized by compile, so the audio thread allocates nothing)
   // scratch of compile()
   std::vector<int> indeg, q; std::vector<std::vector<int>> adj; std::vector<char> inOrder;
   std::vector<char> cullKeep; std::vector<int> cullStack;   // doCull's scratch, sized by compile() (the audio thread allocates nothing)
