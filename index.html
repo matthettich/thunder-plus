@@ -26012,7 +26012,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 639;
+const BUILD = 640;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD + (location.pathname.includes('/beta/') ? ' · beta' : '');
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -36309,6 +36309,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [640, '17 Nov', ['Fixed: in Chains and Waves, dragging a module to the edge of the screen scrolls the view as before, but the module now stays under your pointer. It used to run away from it (up while the screen went down), twice as fast as the view moved. Holding a drag at the edge for a second or more also no longer adds an extra Undo step: one Undo puts the module back where it started.']],
   [639, '17 Nov', ['Fixed: the Chains and Waves screens came up empty (no modules, no cables, nothing to click) in builds 619 to 638. One character in each editor’s page made the whole page fail to start. Your songs and patches were never touched: they open again with every module and cable.', 'A first-time visitor now opens the bETA tESTING eLECTRO song (with its kit) instead of the old ELECTRO. File ▾ → Load ELECTRO still loads the old one, and anyone who already has a saved song gets that song back as before.']],
   [638, '16 Nov', ['pump is now the newest version (the one the native apps use). MASTER has a RESONANCE stage: it gently calms narrow, ringing peaks before everything else, off until you switch it on, with its own AMOUNT. With it off MASTER sounds exactly as before, but it now delays the sound by 4096 more samples (about 85 ms); renders and LATENCY COMP count it, so timing still lines up. STRIP reports more to its meters']],
   [637, '16 Nov', ['Folded phone with Chains and Waves shown: the Tracker / Synth / Waves / Chains tabs no longer push the bar past the screen edge on a screen 461 to 599 px wide; the tabs have their own row there, as on the narrower screens.']],
