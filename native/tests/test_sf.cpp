@@ -310,10 +310,65 @@ static int doChrome(const std::string& dir, double ctxRate) {
   return 0;
 }
 
+// ---- unit checks that need no Node: a font built here (RIFF by hand) for the places the JS comparison cannot reach (extreme values, ties, tiny loops), and the Chrome page's own loop numbers for the SF3 rescale
+struct Riff {
+  std::vector<uint8_t> b;
+  void u16(uint16_t v) { b.push_back((uint8_t)v); b.push_back((uint8_t)(v >> 8)); } void u32(uint32_t v) { u16((uint16_t)v); u16((uint16_t)(v >> 16)); }
+  void tag(const char* t) { for (int i = 0; i < 4; i++) b.push_back((uint8_t)t[i]); } void name(const char* n) { for (int i = 0; i < 20; i++) b.push_back(i < (int)std::strlen(n) ? (uint8_t)n[i] : 0); }
+  static std::vector<uint8_t> chunk(const char* t, const std::vector<uint8_t>& d) { Riff r; r.tag(t); r.u32((uint32_t)d.size()); r.b.insert(r.b.end(), d.begin(), d.end()); if (d.size() & 1) r.b.push_back(0); return r.b; }
+};
+struct MiniPreset { int bank, prog; };
+static std::vector<uint8_t> miniSf2(const std::vector<MiniPreset>& pr, int gen29, uint32_t ls, uint32_t le, int mode) {
+  Riff smpl; for (int i = 0; i < 100; i++) smpl.u16((uint16_t)(int16_t)(i * 300 - 15000));
+  Riff shdr; shdr.name("S"); shdr.u32(0); shdr.u32(100); shdr.u32(ls); shdr.u32(le); shdr.u32(44100); shdr.b.push_back(60); shdr.b.push_back(0); shdr.u16(0); shdr.u16(1);
+  shdr.name("EOS"); for (int i = 0; i < 5; i++) shdr.u32(0); shdr.u16(0); shdr.u16(0); shdr.u16(0);
+  Riff inst; inst.name("I"); inst.u16(0); inst.name("EOI"); inst.u16(1);
+  Riff ibag; ibag.u16(0); ibag.u16(0); ibag.u16(gen29 ? 3 : 2); ibag.u16(0);
+  Riff igen; if (gen29) { igen.u16(29); igen.u16((uint16_t)gen29); } igen.u16(54); igen.u16((uint16_t)mode); igen.u16(53); igen.u16(0); igen.u16(0); igen.u16(0);
+  Riff imod; for (int i = 0; i < 5; i++) imod.u16(0);
+  Riff phdr, pbag, pgen, pmod; int k = 0;
+  for (const MiniPreset& m : pr) { char nm[20]; std::snprintf(nm, 20, "P%d", k); phdr.name(nm); phdr.u16((uint16_t)m.prog); phdr.u16((uint16_t)m.bank); phdr.u16((uint16_t)k); phdr.u32(0); phdr.u32(0); phdr.u32(0); pbag.u16((uint16_t)k); pbag.u16(0); pgen.u16(41); pgen.u16(0); k++; }
+  phdr.name("EOP"); phdr.u16(0); phdr.u16(0); phdr.u16((uint16_t)k); phdr.u32(0); phdr.u32(0); phdr.u32(0); pbag.u16((uint16_t)k); pbag.u16(0); pgen.u16(0); pgen.u16(0); for (int i = 0; i < 5; i++) pmod.u16(0);
+  Riff sdta; sdta.tag("sdta"); { auto c = Riff::chunk("smpl", smpl.b); sdta.b.insert(sdta.b.end(), c.begin(), c.end()); }
+  Riff pdta; pdta.tag("pdta"); for (auto& pr2 : std::vector<std::pair<const char*, const Riff*>>{{"phdr", &phdr}, {"pbag", &pbag}, {"pmod", &pmod}, {"pgen", &pgen}, {"inst", &inst}, {"ibag", &ibag}, {"imod", &imod}, {"igen", &igen}, {"shdr", &shdr}}) { auto c = Riff::chunk(pr2.first, pr2.second->b); pdta.b.insert(pdta.b.end(), c.begin(), c.end()); }
+  Riff all; all.tag("sfbk"); { auto a = Riff::chunk("LIST", sdta.b); all.b.insert(all.b.end(), a.begin(), a.end()); auto c = Riff::chunk("LIST", pdta.b); all.b.insert(all.b.end(), c.begin(), c.end()); }
+  return Riff::chunk("RIFF", all.b);
+}
+static int doUnit() {
+  // A. presets of equal bank / program keep the file's order (the JS's sort is stable)
+  { std::vector<MiniPreset> v(40, MiniPreset{0, 0}); auto b = miniSf2(v, 0, 0, 0, 0); Font f; CHECK(parse(b.data(), b.size(), f) == kParseOk, "mini font parses");
+    bool inOrder = f.presets.size() == 40; for (size_t i = 0; i < f.presets.size() && inOrder; i++) { char nm[20]; std::snprintf(nm, 20, "P%zu", i); inOrder = std::strcmp(f.presets[i].name, nm) == 0; }
+    CHECK(inOrder, "equal presets were reordered"); std::printf("unit: 40 presets with the same bank and program keep their order: %s\n", inOrder ? "yes" : "NO"); }
+  // B. sfPreset: exact, then the same program in bank 0 / 128, then any preset of that bank, then the first
+  { auto b = miniSf2({{0, 5}, {128, 0}, {128, 3}}, 0, 0, 0, 0); Font f; CHECK(parse(b.data(), b.size(), f) == kParseOk, "mini font parses");
+    const Preset* a = sf_preset(f, 128, 9); const Preset* c = sf_preset(f, 129, 3); const Preset* d = sf_preset(f, 0, 9); const Preset* e = sf_preset(f, 128, 3); const Preset* g = sf_preset(f, 77, 5);
+    CHECK(a && a->bank == 128 && a->prog == 0, "bank 128, program 9: expected the first preset of bank 128"); CHECK(c && c->bank == 128 && c->prog == 3, "bank 129, program 3: expected 128/3");
+    CHECK(d && d->bank == 0 && d->prog == 5, "bank 0, program 9: expected 0/5"); CHECK(e && e->bank == 128 && e->prog == 3, "exact 128/3"); CHECK(g && g->bank == 0 && g->prog == 5, "bank 77, program 5: expected 0/5");
+    std::printf("unit: sfPreset fallbacks (5 lookups) checked\n"); }
+  // C. the modulation envelope's sustain is clamped to 1000 permille, whatever the font says
+  { auto b = miniSf2({{0, 0}}, 1500, 0, 0, 0); Font f; CHECK(parse(b.data(), b.size(), f) == kParseOk, "mini font parses"); VoiceParams vp; sf_voice(f, f.zones[0], 60, 100, vp);
+    CHECK(vp.m.sus == 1.0, "mod-env sustain 1500 -> %g (expected 1)", vp.m.sus); std::printf("unit: modulation-envelope sustain 1500 is clamped to %g\n", vp.m.sus); }
+  // D. a five-frame loop still loops (the render's `le > ls + 4`): the note sustains long after the 100-frame sample has ended
+  { auto b = miniSf2({{0, 0}}, 0, 50, 55, 1); Font f; CHECK(parse(b.data(), b.size(), f) == kParseOk, "mini font parses"); PresetPcm pcm; prepare_preset(f, sf_preset(f, 0, 0), DecodeOpts(), pcm);
+    PadParams P; const size_t N = sf_render_bound(f, P, 44100, 1.0); std::vector<float> out(N); const size_t n = sf_render(f, pcm, P, 44100, 1.0, out.data(), out.size());
+    double late = 0; for (size_t i = 22050; i < 30000 && i < n; i++) late = std::max(late, (double)std::fabs(out[i]));
+    CHECK(n == N && late > 0.01, "a loop of 5 frames did not sustain (late peak %g)", late); std::printf("unit: a 5-frame loop sustains (peak at 0.5 s: %.3f)\n", late); }
+  // E. SF3 loop points rescaled to the context rate: the numbers the page's own sfSample gave in Chrome (native/tools/sf-chrome.mjs, context 48 kHz)
+  { std::string gmPath = std::string(THUNDER_ROOT) + "/sounds/FluidR3Mono_GM.sf3"; std::string gb; if (!readFile(gmPath, &gb)) { CHECK(false, "no GM font"); } else {
+      Font f; CHECK(parse((const uint8_t*)gb.data(), gb.size(), f) == kParseOk, "GM font parses");
+      const struct { uint32_t idx; double ls, le; } W[] = {{116, 261983, 350263}, {140, 552408, 644779}, {1043, 139222, 140323}, {948, 9, 13555}, {906, 9, 22457}, {730, 57210, 103476}, {183, 256, 2202}, {859, 4763, 5036}, {213, 54818, 167720}, {1075, 67684, 68073}};
+      int good = 0; DecodeOpts o; o.ctxRate = 48000;
+      for (auto& w : W) { Pcm p; decode_sample(f, w.idx, o, p); const bool ok = p.ls == w.ls && p.le == w.le && p.sr == 48000; if (!ok) std::printf("  sample %u: loop %g..%g, the page: %g..%g\n", w.idx, p.ls, p.le, w.ls, w.le); CHECK(ok, "sample %u loop points differ from the page's", w.idx); good += ok; }
+      std::printf("unit: %d of %zu SF3 samples have the page's loop points at a 48 kHz context\n", good, sizeof W / sizeof W[0]); } }
+  std::printf(fails ? "FAIL: %d\n" : "OK\n", fails);
+  return fails ? 1 : 0;
+}
+
 int main(int argc, char** argv) {
-  if (argc < 3) { std::printf("usage: test_sf export|compare DIR\n"); return 2; }
+  if (argc < 2 || (argc < 3 && std::strcmp(argv[1], "unit"))) { std::printf("usage: test_sf export|compare|chrome DIR | unit\n"); return 2; }
   if (!std::strcmp(argv[1], "export")) return doExport(argv[2]);
   if (!std::strcmp(argv[1], "compare")) return doCompare(argv[2]);
+  if (!std::strcmp(argv[1], "unit")) return doUnit();
   if (!std::strcmp(argv[1], "chrome")) return doChrome(argv[2], argc > 3 ? std::atof(argv[3]) : 0);
   return 2;
 }
