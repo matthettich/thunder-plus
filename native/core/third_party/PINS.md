@@ -45,7 +45,7 @@ same tfx / thunder-dsp / mods hashes from two different checkout paths). `dsp/bu
 ## pump (U03): the owner's own repository
 | Upstream | Commit (full) | Licence | Used for | In `thunder_core`? |
 |---|---|---|---|---|
-| matthettich/pump (public; the owner's code) | `deb07d331b4f6a058abc847106be66bfc498faa3` (main, 14 Nov 2026, 13:48 -0700) | All rights reserved, (c) 2026 wake: the owner's own code, compiled into his own app (pump `LICENSE`). Not an open licence: do not redistribute the sources | `thunder_pump` (pump_wasm.cpp + wasm/fx/*.cpp), `thunder_pump_synth` (pump_synth.cpp), `pump.wasm`, `pump-synth.wasm` | no: separate libraries (`native/core/pump`), linked by the hosting glue (U18, U33) |
+| matthettich/pump (public; the owner's code) | `e43ee10da0df844a48ba0f4f48ba79fe44a9de1f` (main, 14 Nov 2026, 13:48 -0700) | All rights reserved, (c) 2026 wake: the owner's own code, compiled into his own app (pump `LICENSE`). Not an open licence: do not redistribute the sources | `thunder_pump` (pump_wasm.cpp + wasm/fx/*.cpp), `thunder_pump_synth` (pump_synth.cpp), `pump.wasm`, `pump-synth.wasm` | no: separate libraries (`native/core/pump`), linked by the hosting glue (U18, U33) |
 
 Fetched by `fetch.sh` (sparse checkout: `common/`, `wasm/`, `plugins/` **without `plugins/machine/`**, the licence files, `tests/data/mix.f32`), the
 same mechanism as every other pin. WORKPLAN section 12's default was a git submodule; the fetch script was used instead so there is one
