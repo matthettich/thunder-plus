@@ -21,6 +21,9 @@ get() {
   git -C "$D/$name" checkout -q FETCH_HEAD
   [ "$(git -C "$D/$name" rev-parse HEAD)" = "$sha" ] || { echo "pin mismatch for $name" >&2; exit 1; }
 }
+# stb_vorbis (U32, the SoundFont player's SF3 decoder): one file of nothings/stb at an exact commit. THUNDER_FETCH_STB_ONLY=1 fetches only this (the closed build has no DSP, so it must not need the other upstreams).
+get stb https://github.com/nothings/stb 9600522de53973336fa033a289858a4354cbb04c /stb_vorbis.c /LICENSE
+[ -z "$THUNDER_FETCH_STB_ONLY" ] || { echo "third_party: stb fetched into $D"; exit 0; }
 get eurorack  https://github.com/pichenettes/eurorack    f4cfa7697095a28d292bff758beb51deb49b5a86
 # stmlib is eurorack's submodule: the commit eurorack itself records (git ls-tree HEAD stmlib)
 [ "$(git -C "$D/eurorack" ls-tree HEAD stmlib | awk '{print $3}')" = e3bd7c9cc00e4364166f9905c0509b6ffd0535ec ] || { echo "stmlib pin differs from eurorack's" >&2; exit 1; }

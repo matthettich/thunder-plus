@@ -8,6 +8,10 @@ target_sources(thunder_core PRIVATE src/engine/xeng_table.cpp src/engine/xeng_ve
 target_sources(thunder_core PRIVATE src/engine/xeng_live.cpp src/engine/xeng_blip.cpp)   # U27
 target_sources(thunder_core PRIVATE src/engine/bass_core.cpp src/engine/vox_core.cpp src/engine/live_shell.cpp)   # U26
 target_sources(thunder_core PRIVATE src/engine/layer_u24.cpp src/engine/layer_fm.cpp src/engine/layer_add.cpp src/engine/layer_karplus.cpp src/engine/layer_formant.cpp)   # U24: FM / additive / karplus / vosim / formant layers
+# U32: the SoundFont / GM player (SF2 / SF3 parse, Vorbis decode through the pinned stb_vorbis, zones and modulators, the pad render and the live note)
+add_subdirectory(sf)
+target_sources(thunder_core PRIVATE src/sf/sf_math.cpp src/sf/sf_parse.cpp src/sf/sf_decode.cpp src/sf/sf_voice.cpp src/sf/sf_render.cpp src/sf/sf_live.cpp)
+target_link_libraries(thunder_core PUBLIC thunder_stb_vorbis)
 target_sources(thunder_core PRIVATE src/lxr/lxr_seam.cpp)   # U04: the LXR seam (a registry of one pointer; no LXR code: the optional module is native/lxr)
 target_include_directories(thunder_core PRIVATE src)
 target_include_directories(thunder_core SYSTEM PRIVATE third_party)

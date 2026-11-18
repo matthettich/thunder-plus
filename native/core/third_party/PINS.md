@@ -107,3 +107,15 @@ around the include. Update: change the tag, re-download the asset, and update th
 Reference: the web app's `lxr/lxr.wasm` (sha256 `ec6ab14cb540e56156814f13fe3d7a245dd9815e65f8c30331a9cfe4b360f637`), built by `lxr/build.sh` with clang `--target=wasm32-wasi -O3 -ffast-math -funsigned-char -std=gnu11`.
 **Reproducible from the repository's source: yes** (wasi-sdk 25, clang 19.1.5, `lxr/build.sh` as it is: the same sha256, byte for byte).
 The native module compiles the same sources STRICT (no fast-math, no contraction) with host-only patches made at configure time into the build directory (`native/lxr/prepare-lxr.sh`; each fails loudly if its text is not found exactly once). The patches are listed in `docs/port/U04-NOTES.md`.
+
+## stb_vorbis (U32): the SoundFont player's decoder for SF3 samples (Ogg Vorbis)
+| Upstream | Commit (full) | Licence | Used for | In `thunder_core`? |
+|---|---|---|---|---|
+| nothings/stb (one file: `stb_vorbis.c`, v1.24 in its own header; `LICENSE` beside it) | `9600522de53973336fa033a289858a4354cbb04c` (master, 12 Nov 2026) | MIT or public domain (Unlicense), the reader's choice | `thunder_stb_vorbis` (a C static library linked into `thunder_core`; the in-memory API `stb_vorbis_open_memory` only: no stdio, no push-data API) | yes (permissive; the SoundFont player stays in the core) |
+
+Chosen by the owner on 17 Nov 2026 (U32). `stb_vorbis.c` at the pin: sha256 `b52cf518355f7b2d181f18b97b812f361ffeb26299d935c8cf29e842401d60a6`, 198,004 bytes.
+**Licence, read from the file at the pin** (the block just before the last lines of `stb_vorbis.c`): "This software is available under 2 licenses -- choose whichever you prefer. ALTERNATIVE A - MIT License, Copyright (c) 2017 Sean Barrett [...]
+ALTERNATIVE B - Public Domain (www.unlicense.org): This is free and unencumbered software released into the public domain." and the file's own header says "Ogg Vorbis audio decoder - v1.24 - public domain". The repository's `LICENSE` says the same
+("The software libraries in this repository are in the public domain. Most of them are also available under the MIT license -- choose whichever you prefer."). Nothing is vendored: `fetch.sh` fetches the file at the pin; `THUNDER_FETCH_STB_ONLY=1 fetch.sh DEST` fetches only this (the closed build has no DSP and needs nothing else).
+`prepare-stb.sh` makes the patched copy the host builds compile (see `docs/port/U32-NOTES.md` for each patch and the input that triggers it; none while the file is empty of patches).
+The decoder runs at font load / preparation time, never on the audio thread; the host hands the bytes in (nothing in the core opens a file).
