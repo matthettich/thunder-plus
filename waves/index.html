@@ -3213,8 +3213,9 @@ function buildNode(m){
       const an = start.find(q => q[0] === n) || start[0], sx2 = snapOn && an ? snapV(an[1] + dx) - an[1] : dx, sy2 = snapOn && an ? snapV(an[2] + dy) - an[2] : dy;
       for (const [g, ox, oy] of start){ g.m.pos = [Math.round(ox + sx2), Math.round(oy + sy2)]; g.el.style.left = g.m.pos[0] + 'px'; g.el.style.top = g.m.pos[1] + 'px'; }
       groupsFollow(start.map(q => q[0].m.id));   // M6: a group's box follows its modules
+      clearTimeout(store._timer);   // no autosave in the middle of a drag: held 1.2 s (at the window's edge, say) it handed the half-dragged state to the song as a second undo step; the drop's touch() saves it
     };
-    nodeDragging = v => { extra[0] -= v[0]; extra[1] -= v[1]; place(); }; nodeDragging.still = () => !moved; nodeDragging.stop = () => { stopped = true; };
+    nodeDragging = v => { extra[0] += v[0]; extra[1] += v[1]; place(); }; nodeDragging.still = () => !moved; nodeDragging.stop = () => { stopped = true; };   // the view moved by v on screen, so the module has to move by v with it (17 Nov: the sign was wrong, the module ran away from the pointer at twice the pan speed) nodeDragging.still = () => !moved; nodeDragging.stop = () => { stopped = true; };
     let pend = 0;
     const mv = ev => { lastEv = ev; if (moved || Math.hypot(ev.clientX - sx, ev.clientY - sy) > thr) autoPanAt(ev); markScene();   // (a press near the window's edge does not start the auto-pan until it is a real drag)
  if (!pend) pend = requestAnimationFrame(() => { pend = 0; place(); }); };
