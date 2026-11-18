@@ -9823,7 +9823,7 @@ function setEngine(x){
   // FIX (26 Oct): Level is the pad's, shared with its layers, so going back to layers after trying an engine left the layers
   // 6 dB down (or up). The layers' level is kept aside when the -6 dB start replaces it, and comes back with them (as tuneL).
   if (engFirst){ if (!was) v.levelL = v.level || 0; v.level = ENGINE_LEVEL; }
-  changed(cur); refreshAll();
+  changed(cur); refreshAll(); try { if (psIsFreeze(x)) psWarmNow('engine'); } catch(e){}
 }
 // …WAVES LIVE picked: a song with no waves patch gets the editor's starter (VCO → VCA with an ADSR → Out 1), so it plays
 // at once; a pad that had a waves layer keeps that layer's Bus.
@@ -15067,7 +15067,7 @@ function setKit(k, noUndo){
   setTimeout(kitUndoBase, 0); setTimeout(() => resolveSamples(), 0); WV.doc = kit.waves || null; if (WV.frame){ WV.frame.remove(); WV.frame = null; } cur = 0;
   if (kit.voices.length < nslots()) growKit();
   try { instFit(); } catch(e){}
-  for (let i = 0; i < nslots(); i++){ dirty[i] = true; cache[i] = null; } buildPads(); refreshAll(); save(); try { slotsUI(); } catch(e){} psWarmSoon(1500, true); }
+  for (let i = 0; i < nslots(); i++){ dirty[i] = true; cache[i] = null; } buildPads(); refreshAll(); save(); try { slotsUI(); } catch(e){} psWarmNow('kit'); }
 // Before replacing the kit: when the current one has samples (recorded or imported) the new one doesn't, say so.
 async function kitReplaceOk(next, what){
   const keep = new Set(); for (const v of (next && next.voices) || []) for (const L of v.layers || []) if (L.sample && L.sample.id) keep.add(L.sample.id);
@@ -23469,7 +23469,7 @@ function rtInit(){
     rt = {out, mo, lim, mfx:null, fxOk:false, chnOk:false, pend:new Set(), pl:makePlayer(ctx, out, rtBuf, true, mo), mlv:[0, 0], mlA:[0, 0], mpk:[0, 0], mpt:[0, 0]}; rtRoute(); rt.pl.applyMix(); mstSync(); if (wkLazy()) wkLiveEnsure(); else bassReady(ctx).then(ok => { if (ok) liveWarmSoon(200); });
     // the master meter listens to everything going out, synth pads included
     const sp = ctx.createChannelSplitter(2); rt.man = [ctx.createAnalyser(), ctx.createAnalyser()];
-    master.connect(sp); rt.man.forEach((a, i) => { a.fftSize = 1024; sp.connect(a, i); });
+    master.connect(sp); rt.man.forEach((a, i) => { a.fftSize = 1024; sp.connect(a, i); }); try { psEnsureAn(); } catch(e){}   // (FREEZE's quiet check: two analysers, made now so they cover a window by the first load)
     if (wkLazy()){ for (let t = 0; t <= NT; t++) wkFxAsk(t); } else rtTfxLoad();   // phones: only what the song uses (wkFxAsk)
     if (coreWanted()) setTimeout(() => { try { if (!tp.on) coreLoad(); } catch(e){} }, 0);   // not mid-song: loading it (the module, the song, every pad's render) made the first PLAY stutter
     if (!wkLazy()) rtChnLoad();
@@ -23758,19 +23758,42 @@ const psIsFreeze = kind => kind === 'pfreezel';
 const psFreezeDefer = (kind, warmed) => psIsFreeze(kind) && !warmed;   // true: make no live node, play the render
 const psBusy = () => !!tp.on || (performance.now() - psGoT < PS_GO_MS);   // playing, or PLAY / a restart is under way
 const psNeeds = () => !!(ctx && rt && !psWarm.has(ctx) && !psWarming.has(ctx) && psFails < 3 && !psLive.off && aset.psLive !== 'render' && kit.voices.some(v => isPsV(v) && psIsFreeze(v.engine)));
-let psBuf = null, psAn = null, psSC = null;
+let psBuf = null, psAn = null, psAnT = 0, psSC = null, psTickAt = 0;
 var psHitT = 0;   // when something last made, or may be about to make, sound while stopped (psHit), or the audio context last changed state
 function psHit(){ psHitT = performance.now(); }
-const psTickMs = () => Math.max(100, Math.min(500, Math.floor(32768 / ((ctx && ctx.sampleRate) || 48000) * 900)));   // the analyser's window (32768 samples) is longer than a tick: every tick sees ALL the sound since the last one
-function psQuietNow(){   // true: nothing above -70 dBFS since the last tick; false: sound; null: no level source
-  if (!(rt && ctx && master)) return null;
-  if (!psAn || psAn.context !== ctx){ psAn = ctx.createAnalyser(); psAn.fftSize = 32768; psAn.smoothingTimeConstant = 0; master.connect(psAn); psBuf = new Float32Array(32768); return false; }   // (a fresh analyser has not seen a tick yet)
-  psAn.getFloatTimeDomainData(psBuf); const n = psBuf.length;
-  for (let i = 0; i < n; i++) if (psBuf[i] > PS_QUIET || psBuf[i] < -PS_QUIET) return false;
+const psWinMs = () => 32768 / ((ctx && ctx.sampleRate) || 48000) * 1000;   // what one read of the 32768-sample analysers covers (683 ms at 48 kHz)
+const psTickMs = () => Math.max(100, Math.min(500, Math.floor(psWinMs() * 0.73)));   // a tick is shorter than that window: every tick sees ALL the sound since the last one
+function psEnsureAn(){   // TWO analysers, one per channel, from a splitter on master (one analyser would down-mix to mono: anti-phase or one-sided sound would read as silence)
+  if (!(ctx && master)) return false;
+  if (!psAn || psAn[0].context !== ctx){
+    const sp = ctx.createChannelSplitter(2); psAn = [ctx.createAnalyser(), ctx.createAnalyser()];
+    master.connect(sp); psAn.forEach((a, i) => { a.fftSize = 32768; a.smoothingTimeConstant = 0; sp.connect(a, i); }); psBuf = new Float32Array(32768); psAnT = performance.now();
+  }
+  return true;
+}
+function psQuietNow(){   // true: both channels stayed below -70 dBFS for the last 0.68 s; false: sound, or the analysers are too new to say
+  if (!rt || !psEnsureAn()) return false;
+  if (performance.now() - psAnT < psWinMs() + 60) return false;
+  for (const an of psAn){ an.getFloatTimeDomainData(psBuf); const n = psBuf.length; for (let i = 0; i < n; i++) if (psBuf[i] > PS_QUIET || psBuf[i] < -PS_QUIET) return false; }
   return true;
 }
 function psWarmSoon(ms, fresh){   // ask for the idle warm-up (cheap when nothing is needed); fresh: a song / kit change, the failures are forgotten
-  try { if (fresh) psFails = 0; if (!psNeeds()) return; clearTimeout(psWarmT); psQ = 0; psWait = 0; psWarmT = setTimeout(psWarmTick, ms || 1000); } catch(e){}
+  try { if (fresh) psFails = 0; if (!psNeeds()) return; clearTimeout(psWarmT); psQ = 0; psWait = 0; psTickAt = 0; psWarmT = setTimeout(psWarmTick, ms || 1000); } catch(e){}
+}
+/* AT ONCE (18 Nov): a song or kit load, a pad switched to FREEZE, or the pump worklet becoming ready, while stopped and both channels quiet RIGHT NOW (one read of
+   the last 0.68 s): build now, as part of that action (a pause there reads as loading); the tap that caused it does not block it. Not quiet, or not ready yet: the
+   idle rule (psWarmSoon). The after-STOP and retry paths keep the 3 s rules. */
+function psWarmNow(why){
+  try {
+    if (!psNeeds()) return false;
+    psFails = 0; psEnsureAn();
+    const ready = ctx && ctx.state === 'running' && psOK.has(ctx) && !psBusy() && !document.hidden && !(RCD && RCD.on);
+    if (!ready){ psWarmSoon(1500, true); return false; }
+    const wait = psWinMs() + 80 - (performance.now() - psAnT);
+    if (wait > 1){ psWarmSoon(1500, true); setTimeout(() => psWarmNow(why), Math.ceil(wait) + 2); return false; }   // (the analysers are new: look again when they cover a window)
+    if (!psQuietNow()){ psWarmSoon(1500, true); return false; }
+    return psWarmUp(ctx, true);
+  } catch(e){ tpLog('pump FREEZE warm-up', e); return false; }
 }
 function psWarmTick(){
   psWarmT = 0;
@@ -23778,16 +23801,17 @@ function psWarmTick(){
     if (!psNeeds()) return;
     if (++psWait > 1800) return;   // (about 15 minutes of waiting: the next song / kit change asks again)
     if (ctx && psSC !== ctx){ psSC = ctx; ctx.addEventListener('statechange', () => { psHit(); psQ = 0; }); }   // a resume (a phone's screen back on, a tab refocused) counts as a trigger
-    const tick = psTickMs(), notRun = !ctx || ctx.state !== 'running'; if (notRun) psHit();
+    const now = performance.now(), tick = psTickMs(), notRun = !ctx || ctx.state !== 'running', late = psTickAt && now - psTickAt > psWinMs(); psTickAt = now;   // late: a throttled tab ran this tick after the window had moved on
+    if (notRun) psHit();
     const q = psQuietNow();   // read at EVERY tick (also while busy): it is all the sound since the last tick, so the 3 s have no blind spot
-    if (q === false || psBusy() || notRun || (RCD && RCD.on)){ psQ = 0; psWarmT = setTimeout(psWarmTick, tick); return; }   // busy, or sound since the last tick: the 3 s of quiet start again
-    if (++psQ * tick < PS_QUIET_MS || performance.now() - psHitT < PS_QUIET_MS){ psWarmT = setTimeout(psWarmTick, tick); return; }   // 3 s of quiet AND 3 s since the last trigger (null: no level source, the same 3 s)
+    if (q === false || late || document.hidden || psBusy() || notRun || (RCD && RCD.on)){ psQ = 0; psWarmT = setTimeout(psWarmTick, tick); return; }   // busy, hidden, late, or sound since the last tick: the 3 s of quiet start again
+    if (++psQ * tick < PS_QUIET_MS || performance.now() - psHitT < PS_QUIET_MS){ psWarmT = setTimeout(psWarmTick, tick); return; }   // 3 s of quiet AND 3 s since the last trigger
     if (!psWarmUp(ctx)) psWarmT = setTimeout(psWarmTick, 2000);   // (the pump worklet is not loaded yet, or the kit has changed)
   } catch(e){ tpLog('pump FREEZE warm-up', e); }
 }
-function psWarmUp(ac){   // a throwaway FREEZE node in ac's pump-synth scope (no sound: it is not played, and goes away when its instrument is made)
+function psWarmUp(ac, force){   // a throwaway FREEZE node in ac's pump-synth scope (no sound: it is not played, and goes away when its instrument is made)
   try {
-    if (ac !== ctx || psBusy() || performance.now() - psHitT < PS_QUIET_MS || psWarm.has(ac) || psWarming.has(ac) || !psOK.has(ac) || psLive.off || aset.psLive === 'render') return false;
+    if (ac !== ctx || psBusy() || (!force && performance.now() - psHitT < PS_QUIET_MS) || psWarm.has(ac) || psWarming.has(ac) || !psOK.has(ac) || psLive.off || aset.psLive === 'render') return false;
     if (!kit.voices.some(v => isPsV(v) && psIsFreeze(v.engine))) return false;
     const sp = PsynCore.liveSpec('pfreezel'), by = PsynCore.bytes(); if (!sp || !by) return false;
     const node = new AudioWorkletNode(ac, 'thunder-psyn', {numberOfInputs:0, numberOfOutputs:1, outputChannelCount:[2],
@@ -23854,7 +23878,7 @@ function bassReady(ac){
     let pr = Promise.resolve(false);
     try { if (ac.audioWorklet){ if (!bassURL) bassURL = URL.createObjectURL(new Blob([BassCore.toString() + BASS_PROC + '\n' + VoxCore.toString() + VOX_PROC + '\n' + AcidCore.toString() + XPROC('acid', 'AcidCore') + '\n' + MachCore.toString() + XPROC('mach', 'MachCore')], {type:'text/javascript'}));
       wkNote(ac, 'bass'); pr = ac.audioWorklet.addModule(bassURL).then(() => { bassOK.add(ac); return true; }, () => false)
-        .then(ok => typeof PsynCore === 'undefined' ? ok : (wkNote(ac, 'psyn'), ac.audioWorklet.addModule(PSYN_WK)).then(() => { psOK.add(ac); return ok; }, e => { tpLog('pump synths live worklet (the live ones play their renders)', e); return ok; }))
+        .then(ok => typeof PsynCore === 'undefined' ? ok : (wkNote(ac, 'psyn'), ac.audioWorklet.addModule(PSYN_WK)).then(() => { psOK.add(ac); setTimeout(() => psWarmNow('ready'), 0); return ok; }, e => { tpLog('pump synths live worklet (the live ones play their renders)', e); return ok; }))
         .then(ok => (wkNote(ac, 'waves'), ac.audioWorklet.addModule(WAVES_WK)).then(() => { wlOK.add(ac); return ok; }, e => { tpLog('waves live worklet (it plays its render)', e); return ok; })); } } catch(e){}
     bassLoad.set(ac, pr);
   }
@@ -25649,6 +25673,7 @@ async function loadProjText(text, name, where){
     /* from a file (where.file, a path or a handle): a default-named song takes the file's name, before setSong so it is not a change; a backup or the first-run song has no where.file */
     if (where && (where.file || where.path || where.h) && songNameDefault(ns.name)){ const fn = fileSongName(name); if (fn) ns.name = fn; }
     setSong(ns, 'Loaded ' + (ns.name || name));
+    psWarmNow('load');   // a FREEZE pad in the song's kit: its one-time build now, if stopped and quiet (a pause here reads as loading)
     if (where && (where.path || where.h)){ projSet(where.path, where.h); setDirty(false); } else setDirty(!!(where && where.dirty));
     if (where && where.file && !where.path && !where.h && name){ projLoose = {f:String(name), s:S.name}; try { msMeta(); dirtyShow(); } catch(e){} }   /* no handle: the file's name is all the app has of it */
     // FIX (27 Oct, audit B2): an opened project starts a fresh undo history, as in any DAW. Undo used to bring back the
@@ -26094,7 +26119,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 643;
+const BUILD = 644;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD + (location.pathname.includes('/beta/') ? ' · beta' : '');
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);

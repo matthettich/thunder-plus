@@ -7,25 +7,28 @@ const test = require('node:test'), assert = require('node:assert/strict'), vm = 
 const H = require('./helpers');
 const html = H.read('index.html');
 const a = html.indexOf('const psWarm = new WeakSet()');
-const hEnd = html.indexOf("\n}\n", html.indexOf('function psWarmUp(ac)')) + 3;
+const hEnd = html.indexOf("\n}\n", html.indexOf('function psWarmUp(ac')) + 3;
 const helperSrc = html.slice(a, hEnd);
 
 // a world with a fake clock and timers: advance(ms) runs the timers due, in order
 function world(over) {
   const made = [], posted = [], timers = []; let now = 1e6;
   class Node { constructor(ac, name, o) { this.name = name; this.o = o; this.port = { postMessage: m => posted.push(m), onmessage: null }; made.push(this); } connect() {} disconnect() {} }
-  const level = { v: 0, pending: 0, burst(v) { level.pending = v; } };   // v: a steady level; burst: a 60 ms echo that is over by the time the next tick reads (a window that is the whole tick sees it)
-  const an = { fftSize: 0, smoothingTimeConstant: 1, context: null, getFloatTimeDomainData(b) { b.fill(0); b[b.length - 1] = Math.max(level.v, level.pending); level.pending = 0; } };
+  // two analysers (left, right) behind a splitter; level.L / level.R are steady levels, burst(v) a 60 ms echo that is over by the next read (a window covering the whole tick sees it)
+  const level = { L: 0, R: 0, pend: [0, 0], set v(x) { level.L = level.R = x; }, burst(v, ch) { if (ch === undefined || ch === 0) level.pend[0] = v; if (ch === undefined || ch === 1) level.pend[1] = v; } };
+  const ans = [], doc = { hidden: false };
+  const mkAn = () => { const i = ans.length, an = { fftSize: 0, smoothingTimeConstant: 1, context: null, getFloatTimeDomainData(b) { b.fill(0); b[b.length - 1] = Math.max(i ? level.R : level.L, level.pend[i]); level.pend[i] = 0; } }; ans.push(an); return an; };
   const ls = [];
-  const ac = { state: 'running', sampleRate: 48000, addEventListener: (n, f) => ls.push([n, f]), createAnalyser: () => { an.context = ac; return an; }, createGain: () => ({ gain: {}, connect() {}, disconnect() {} }), destination: {} };
+  const ac = { state: 'running', sampleRate: 48000, addEventListener: (n, f) => ls.push([n, f]), createAnalyser: () => { const an = mkAn(); an.context = ac; return an; }, createChannelSplitter: () => ({ connect() {} }), createGain: () => ({ gain: {}, connect() {}, disconnect() {} }), destination: {} };
   const c = Object.assign({ AudioWorkletNode: Node, ctx: ac, tp: { on: false }, psOK: new WeakSet([ac]), psSent: new WeakSet(), psLive: { off: false }, aset: { psLive: 'auto' },
     rt: {}, master: { connect() {} }, RCD: { on: false }, kit: { voices: [{ engine: 'pfreezel' }] }, isPsV: v => !!v, WASM_PRECOMPILE: false, tpLog() {}, soon: 0, liveWarmSoon() { c.soon++; },
-    performance: { now: () => now }, Float32Array, Math,
+    performance: { now: () => now }, document: doc, Float32Array, Math,
     setTimeout: (f, ms) => { const t = { f, at: now + (ms || 0), id: timers.length + 1 }; timers.push(t); return t.id; }, clearTimeout: id => { const t = timers.find(x => x.id === id); if (t) t.dead = true; },
     PsynCore: { liveSpec: () => ({ spec: 1 }), bytes: () => new Uint8Array(4), module: () => null, xeng: () => ({ pfreezel: { d: () => ({ a: 1 }) } }) } }, over || {});
-  vm.createContext(c); vm.runInContext(helperSrc + '\nthis.__x = {psWarm, psWarming, psIsFreeze, psFreezeDefer, psWarmUp, psWarmSoon, psBusy, psNeeds, get psFails(){return psFails;}, setGo(t){psGoT = t;}, psHit, psTickMs};', c);
+  vm.createContext(c); vm.runInContext(helperSrc + '\nthis.__x = {psWarm, psWarming, psIsFreeze, psFreezeDefer, psWarmUp, psWarmSoon, psWarmNow, psEnsureAn, psBusy, psNeeds, get psFails(){return psFails;}, setGo(t){psGoT = t;}, psHit, psTickMs};', c);
   const advance = ms => { const end = now + ms; for (;;) { const t = timers.filter(x => !x.dead && !x.ran && x.at <= end).sort((p, q) => p.at - q.at)[0]; if (!t) break; t.ran = true; now = Math.max(now, t.at); t.f(); } now = end; };
-  return { c, ac, made, posted, X: c.__x, level, advance, ls, now: () => now };
+  const skip = ms => { now += ms; };   // time passes with no timer run (a throttled tab)
+  return { c, ac, made, posted, X: c.__x, level, advance, skip, doc, ls, now: () => now };
 }
 
 test('FREEZE gate: a FREEZE live node is not made until the scope is warm, whatever the transport does; other engines are not gated', () => {
@@ -74,6 +77,37 @@ test('FREEZE warm-up: only when stopped, quiet for 3 s (the whole interval, not 
   w = world({ aset: { psLive: 'render' } }); w.X.psWarmSoon(500, true); w.advance(30000); assert.equal(w.made.length, 0, 'Settings: live engines off');
 });
 
+test('FREEZE quiet check is per channel: one loud channel (or an echo on one) is not quiet, on the tick path and at once', () => {
+  for (const ch of ['L', 'R']) {
+    let w = world(); w.level[ch] = 0.002; w.X.psWarmSoon(500, true);   // -54 dBFS in one channel only (a mono down-mix would read -60 or less)
+    w.advance(20000); assert.equal(w.made.length, 0, ch + ' only: not quiet');
+    w = world(); w.X.psEnsureAn(); w.advance(1000); w.level[ch] = 0.002; w.X.psWarmNow('load'); assert.equal(w.made.length, 0, 'at once: ' + ch + ' only is not quiet');
+  }
+  let w = world(); w.X.psWarmSoon(500, true); for (let i = 0; i < 12; i++) { w.level.burst(0.05, 1); w.advance(700); } assert.equal(w.made.length, 0, 'a right-only echo train does not pass');
+});
+
+test('FREEZE at once: a load / kit / engine switch builds NOW when stopped and both channels are quiet (the tap that caused it does not block); otherwise the 3 s rules', () => {
+  let w = world(); w.X.psEnsureAn(); w.advance(1000); w.X.psHit();
+  assert.equal(w.X.psWarmNow('load'), true); assert.equal(w.made.length, 1, 'built at once, with a trigger stamped a moment ago');
+  w = world(); w.X.psEnsureAn(); w.advance(1000); w.level.v = 0.05; w.X.psWarmNow('load'); assert.equal(w.made.length, 0, 'something ringing: not at once');
+  w.advance(4000); assert.equal(w.made.length, 0); w.level.v = 0; w.advance(5000); assert.equal(w.made.length, 1, 'then the 3 s rule');
+  w = world(); w.X.psEnsureAn(); w.advance(1000); w.c.tp.on = true; w.X.psWarmNow('load'); w.advance(20000); assert.equal(w.made.length, 0, 'playing: never');
+  w = world(); w.X.psEnsureAn(); w.advance(1000); w.ac.state = 'suspended'; assert.equal(w.X.psWarmNow('ready'), false); w.advance(5000); assert.equal(w.made.length, 0, 'not running');
+  w = world(); w.X.psEnsureAn(); w.advance(1000); w.doc.hidden = true; w.X.psWarmNow('load'); assert.equal(w.made.length, 0, 'hidden tab');
+  w = world({ psOK: new WeakSet() }); w.X.psEnsureAn(); w.advance(1000); assert.equal(w.X.psWarmNow('load'), false); assert.equal(w.made.length, 0, 'worklet not ready');
+  w = world({ kit: { voices: [{ engine: 'pmonol' }] } }); w.X.psEnsureAn(); w.advance(1000); assert.equal(w.X.psWarmNow('load'), false); assert.equal(w.made.length, 0, 'no FREEZE pad: nothing');
+  w = world(); w.X.psEnsureAn(); w.advance(1000); w.X.psWarmNow('load'); w.made[0].port.onmessage({ data: { opened: 1 } }); assert.equal(w.X.psWarmNow('kit'), false); assert.equal(w.made.length, 1, 'warm: nothing more');
+  // the analysers are brand new: it looks again when they cover a window, then builds at once
+  w = world(); w.X.psWarmNow('ready'); assert.equal(w.made.length, 0); w.advance(1000); assert.equal(w.made.length, 1, 'built as soon as the analysers cover a window');
+});
+
+test('FREEZE tick: a late tick (a throttled tab) or a hidden tab restarts the 3 s', () => {
+  let w = world(); w.X.psWarmSoon(500, true); w.advance(2000); w.skip(1500); w.advance(0);   // the tick that was due ran 1.5 s late: the window had moved on
+  w.advance(2500); assert.equal(w.made.length, 0, 'restarted at the late tick'); w.advance(1500); assert.equal(w.made.length, 1);
+  w = world(); w.doc.hidden = true; w.X.psWarmSoon(500, true); w.advance(20000); assert.equal(w.made.length, 0, 'hidden: nothing');
+  w.doc.hidden = false; w.advance(2000); assert.equal(w.made.length, 0); w.advance(2500); assert.equal(w.made.length, 1);
+});
+
 test('FREEZE warm-up: opened marks the scope warm and disposes the throwaway; failed does NOT (retries 3 s, then 6 s later, then stops: three attempts); no answer in 10 s is a failure', () => {
   let w = world(); w.X.psWarmSoon(500, true); w.advance(5000); assert.equal(w.made.length, 1);
   assert.equal(w.X.psWarm.has(w.ac), false, 'not warm until the node reports');
@@ -107,6 +141,12 @@ test('FREEZE rule: the pieces are wired (gate before the node, PLAY stamp, resta
   assert.ok(html.includes('function preview(ii, note, vol, poly, when, hold, trk){') && /function preview\([^\n]*\n  psHit\(\);/.test(html), 'preview stamps');
   assert.match(html, /function play\(ev\)\{\n    if \(MIDI_ONLY_EV\.has\(ev\.type\)\) return;\n    psHit\(\);/, "the player's note function stamps");
   assert.match(html, /for \(const ev of \['pointerdown', 'touchstart', 'keydown'\]\) addEventListener\(ev, psHit, true\)/);
+  assert.match(html, /createChannelSplitter\(2\); psAn = \[ctx\.createAnalyser\(\), ctx\.createAnalyser\(\)\]/, 'one analyser per channel');
+  assert.match(html, /changed\(cur\); refreshAll\(\); try \{ if \(psIsFreeze\(x\)\) psWarmNow\('engine'\)/, 'an engine switch to FREEZE builds at once');
+  assert.match(html, /setSong\(ns, 'Loaded ' \+ \(ns\.name \|\| name\)\);\n    psWarmNow\('load'\)/, 'a song load');
+  assert.match(html, /slotsUI\(\); \} catch\(e\)\{\} psWarmNow\('kit'\); \}/, 'a kit load');
+  assert.match(html, /psOK\.add\(ac\); setTimeout\(\(\) => psWarmNow\('ready'\), 0\)/, 'the pump worklet becoming ready');
+  assert.match(html, /rt\.man\.forEach\(\(a, i\) => \{ a\.fftSize = 1024; sp\.connect\(a, i\); \}\); try \{ psEnsureAn\(\)/, 'analysers made at rtInit');
   const wk = H.read('pump/synth/pump-synth-worklet.js');
   assert.match(wk, /this\.h = X\.psyn_new\(this\.type, sampleRate\);[^\n]*\n[^\n]*postMessage\(\{opened:1\}\)/);
   assert.ok(html.includes('pump-synth-worklet.js?v=13') && H.read('sw.js').includes('pump-synth-worklet.js?v=13'));
