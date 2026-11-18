@@ -143,7 +143,19 @@ static void testPumpSpares() {
   CHECK(chains_pump_swaps() - sw0 >= chains_pump_bad() - bad0 - (uint64_t)types, "a bad block is followed by a spare taking over");
 }
 
+
+// Chain Out's track is held to 1..128 for the run list (focus): 500 is track 128, -5 and 0 are track 1; the focus decides who runs it
+static void testChainOutTrackClamp() {
+  const int tr[3] = {500, -5, 0}, foc[3] = {127, 0, 0}, other[3] = {0, 1, 1};
+  for (int i = 0; i < 3; i++) {
+    Doc d(std::string("{\"modules\":[{\"id\":\"a\",\"type\":\"trackIn\"},{\"id\":\"c\",\"type\":\"chainOut\",\"params\":{\"track\":") + std::to_string(tr[i]) + "}}],\"cables\":[{\"from\":[\"a\",\"out\"],\"to\":[\"c\",\"in\"]}]}");
+    EngineOptions o; o.focus = foc[i]; Host h; ChainsEngine e(48000, o, &h); CHECK(e.loadPatch(d.r), "clamp patch"); CHECK(e.isActive("c"), "Chain Out track %d is run by the node of track %d", tr[i], foc[i] + 1);
+    EngineOptions o2; o2.focus = other[i] ? 1 : 5; Host h2; ChainsEngine e2(48000, o2, &h2); CHECK(e2.loadPatch(d.r), "clamp patch 2"); CHECK(!e2.isActive("c"), "Chain Out track %d is not run by another node", tr[i]);
+  }
+}
+
 int main() {
+  testChainOutTrackClamp();
   testPumpSpares();
   testEqualsOffline(); testLatencyAndExactEvents(); testRefusals();
   std::printf(fails ? "test_chains_live: %d FAILED\n" : "test_chains_live: ok\n", fails);
