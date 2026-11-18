@@ -19232,7 +19232,7 @@ class FlexCore {
             r = src * G + (rv ? G - u : u); } } break;
         case 'swing': { const C = o.C, c = FlexCore.cs(p, C), u = (p - c) / C, h = 0.5 + o.a;
           r = c + C * (u < h ? u * 0.5 / h : 0.5 + (u - h) * 0.5 / (1 - h)); } break;
-        case 'tup': { const C = o.C, c = FlexCore.cs(p, C), u = (p - c) / C, j = Math.min(o.q - 1, Math.floor(u * o.q + 1e-9)), sj = o.q === 5 ? FlexCore.K.tup[j] : j;   // FLX CHECK 2: was [0,1,2,3,3]: notes 2–4 read ahead (clamped: mostly straight with jumps); now the downbeat doubles and 2–4 land late, as a quintuplet does
+        case 'tup': { const C = o.C, c = FlexCore.cs(p, C), u = (p - c) / C, j = Math.max(0, Math.min(o.q - 1, Math.floor(u * o.q + 1e-9))), sj = o.q === 5 ? FlexCore.K.tup[j] : j;   // (FLX CHECK 3: p a hair under a beat gave u −3e-10, j −1, tup[−1] undefined: NaN from FLX E8)   // FLX CHECK 2: was [0,1,2,3,3]: notes 2–4 read ahead (clamped: mostly straight with jumps); now the downbeat doubles and 2–4 land late, as a quintuplet does
           r = c + C * (sj / 4 + (u - j / o.q)); } break;
         case 'drunk': { const s = Math.floor(p * 4); r = p - FlexCore.hh(bar & 3, s, 41) * 0.06; } break;
         case 'lag': r = (p % 1) >= 0.5 ? p - 1/16 : p; break;
@@ -19331,7 +19331,8 @@ class FlexCore {
   // 4-point Hermite read (half speed, tape stops and scratches stay clean on cymbals); linear within 2 samples of now,
   // where the Hermite's far point would still be unwritten.
   rd(b, w, D){
-    const N = this.N; let x = w - D; if (x < 0) x += N; const i = Math.floor(x), f = x - i, j = i + 1 >= N ? 0 : i + 1;
+    const N = this.N; let x = w - D; if (x < 0) x += N; if (x >= N) x = 0;   // FLX CHECK 3 (18 Nov): w 0 with a D of 1e-12 made N − 1e-12 = N exactly: b[N] undefined, one NaN sample
+    const i = Math.floor(x), f = x - i, j = i + 1 >= N ? 0 : i + 1;
     if (D < 2) return b[i] + (b[j] - b[i]) * f;
     const y0 = b[i ? i - 1 : N - 1], y1 = b[i], y2 = b[j], y3 = b[j + 1 >= N ? 0 : j + 1];
     return ((((y3 - y0) * 0.5 + (y1 - y2) * 1.5) * f + (y0 - 2.5 * y1 + 2 * y2 - 0.5 * y3)) * f + (y2 - y0) * 0.5) * f + y1;
