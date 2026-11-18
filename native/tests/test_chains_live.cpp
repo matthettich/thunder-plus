@@ -337,10 +337,12 @@ static void testPumpSpareAfterTakeover() {
   const std::vector<float> hot = noise(128, 31u, 7.9f), quiet = noise(128, 32u, 0.01f); auto run = [&](const std::vector<float>& x) { e.setTrackInputs(x.data(), x.data(), 1); e.process(128); };
   const uint64_t b0 = chains_pump_bad(), s0 = chains_pump_swaps(), d0 = chains_pump_dry();
   auto hotUntilBad = [&]() { const uint64_t nb = chains_pump_bad(); for (int i = 0; i < 400 && chains_pump_bad() == nb; i++) run(hot); return chains_pump_bad() > nb; };
-  CHECK(hotUntilBad(), "a hot input drives the module bad"); e.serviceSpares();   // the dead instance is freed, a spare is made
-  run(quiet); CHECK(chains_pump_swaps() == s0 + 1, "a quiet block: the spare takes over"); e.serviceSpares();   // the next spare is made here, though no block went bad since the take-over
-  CHECK(hotUntilBad(), "the swapped-in instance goes bad again"); CHECK(chains_pump_bad() >= b0 + 2, "two bad blocks");   // no service() now
-  run(quiet); CHECK(chains_pump_swaps() == s0 + 2 && chains_pump_dry() == d0, "the next block finds a spare: swaps %d dry %d", (int)(chains_pump_swaps() - s0), (int)(chains_pump_dry() - d0));
+  // the module starts with a spare. bad 1 -> swap 1 (the spare), no service -> bad 2 -> service (the next spare) -> swap 2 -> service: this one makes the third spare only because the take-over asked for it (no block went
+  // bad since) -> bad 3, no service -> swap 3 finds that spare
+  CHECK(hotUntilBad(), "a hot input drives the module bad"); run(quiet); CHECK(chains_pump_swaps() == s0 + 1, "a quiet block: the spare takes over");
+  CHECK(hotUntilBad(), "the swapped-in instance goes bad again"); e.serviceSpares(); run(quiet); CHECK(chains_pump_swaps() == s0 + 2, "the spare made by service() takes over");
+  e.serviceSpares(); CHECK(hotUntilBad(), "and goes bad"); CHECK(chains_pump_bad() >= b0 + 3, "three bad blocks");   // no service() now
+  run(quiet); CHECK(chains_pump_swaps() == s0 + 3 && chains_pump_dry() == d0, "the next block finds a spare: swaps %d dry %d", (int)(chains_pump_swaps() - s0), (int)(chains_pump_dry() - d0));
 }
 
 int main() {
