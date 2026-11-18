@@ -54,6 +54,33 @@ plan; sections 1 to 4 and 9), `HANDOVER.md` on `beta` (the web app, the owner's 
   its live part and a decision on the 16 library effect rows left out by name.
 - **Next:** merge U31 / U32 when verified; then the wiring per `docs/port/WIRING-DOSSIER.md` part 5 (U34a offline render C API first), U36, then N2.
 
+## State at 13:00 on 18 Nov: START HERE in a new chat (supersedes the pump and U31 / U32 lines above)
+- **Web:** `main` = `beta` = build 645 (#229, #230): pump files byte-identical to 642, all FREEZE warm-up code removed. The pump re-pin waits on
+  `docs/port/PUMP-REQUESTS.md`; PR #225 (native re-pin) stays open and HELD.
+- **U31 (PR #227, branch `n3/u31`) and U32 (PR #226, branch `n3/u32`) are each in a second round** after independent verification (both SOUND WITH
+  CONDITIONS; full reports in `docs/port/reviews/verify-227.md` and `verify-226.md`). A Sonnet worker was fixing each when this was written; a new chat
+  has no worker: start one per branch from the branch's notes and the list below, then merge when the list is done and the full ctest passes in both
+  configurations (give `engine_xeng_*` a 3600 s timeout on a loaded machine).
+  - **U31 list:** (1) native clamps parameters to their range at load and on `setParam` (`waves/graph.h:65`), the JS chains engine uses raw values
+    (`chains-worklet.js:5831`, `:5843`): port the JS, add out-of-range golden cases, check whether waves has the same fault; (2) audio-thread allocation:
+    Marbles `arm` -> `make()` (`modfx/mod_mods.cpp:63`) and `space` (CloudSeed `RandomBuffer::Generate`): move to preparation, and put an allocation
+    audit over every module type into ctest; (3) no memory budget and `bad_alloc` uncaught (1024 Resample modules abort): budget at preparation;
+    (4) live queue: accepted events dropped at `clive.cpp:58`, a dropped Patch event keeps its mailbox slot (`clive.cpp:73`: after 8, every swap is
+    refused), `preparePatch` returns true when it cannot deliver: Playing=0 / Bypass release are never dropped, parameter events coalesce;
+    (5) pump take-over leaks a handle when four modules fail between services (`cmods2.cpp:234`), and the host must call `service()` at a stated rate;
+    (6) the 16 rows beyond -100 dB are ACCEPTED as left out by name, but their recorded dB becomes a bound (3 dB) in `test_chains.cpp`;
+    (7) tests for the verifier's six surviving mutations; (8) `mutate-u30.sh` re-targeted at `graph.h`; (9) notes: 17 modules' `show()` not ported,
+    the closed build's 5 skips, and malformed cables (native refuses the patch: if the JS plays it, native must load it); (10) ctest timeouts.
+    The lead still owes the line-by-line review of the live part (`chains/clive.cpp`, `cengine.cpp`).
+  - **U32 list:** (1) stb keeps frames past the last-page granule for samples 234, 235, 704: trim to the granule in `decodeOgg` so the default equals
+    libvorbis exactly; (2) clamp SF2 sample sizes to the data present and add a per-preset / per-font memory budget (a 5.6 KB font allocated 1536 MB);
+    (3) lower `kMaxWork` in `sf_parse.cpp` (a hostile font spun 8 s); (4) refuse absurd sample rates; (5) committed reference data for the fitted
+    resampler and a behavioural test for a loop end beyond the data; (6) parity mode stays off by default; (7) the PINS.md licence quote.
+  - **For the owner (told 18 Nov):** in the web app on Chrome, `decodeAudioData` drops trailing frames of one-page Ogg streams, so looped SoundFont
+    zones whose loop end lies past the decode lose their loop: 159 samples, 65 of 197 GM presets (square lead stops after 0.06 to 0.08 s). Native
+    sustains them by default. A web-side fix (decode SF3 with a wasm Vorbis decoder) is a possible future item: not started, not asked for.
+- **Then:** the wiring per `docs/port/WIRING-DOSSIER.md` part 5 (U34a first), U36, N2. Estimates: about 50 % of the port, 31 of 37 units merged.
+
 ## Rules the lead set for gates (they hold for every remaining unit)
 - Ported JS: bit-exact against the web app's goldens and a Node reference; committed Linux hashes gate every platform. Never loosen a gate, never hand-edit a
   golden, no `-ffast-math`.
