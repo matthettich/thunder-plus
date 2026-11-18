@@ -4,6 +4,7 @@
 #include <cmath>
 #include <cstring>
 #include <unordered_map>
+#include <unordered_set>
 
 #include "modfx/util.h"
 #include "modfx/bfutil.h"
@@ -100,9 +101,27 @@ void WavesEngine::setText(std::string_view id, std::string_view text) {
 // a string iterates its characters; a module whose id is not a string has a key of its own; a cable end is indexed as the JS does (an array, a string's characters, a number's undefined); a cable whose `from` module is
 // not there is skipped before its `to` is looked at; the cable shapes at which the JS THROWS (null / number / missing ends, a cable that is not an object, a null module) refuse the patch here.
 namespace {
-struct JV { char k = 'u'; std::string s; };   // a JS value as far as ids and ports go: u undefined, n null, b bool, d number, s string, o object / array
-JV jvOf(Json v) { JV r; if (v.isStr()) { r.k = 's'; r.s = std::string(v.asStr()); } else if (v.isNum()) { char b[40]; std::snprintf(b, sizeof b, "%.15g", v.asNum()); r.k = 'd'; r.s = b; } else if (v.isBool()) { r.k = 'b'; r.s = v.asBool() ? "true" : "false"; } else if (v.isNull()) { r.k = 'n'; r.s = "null"; } else if (v.isArr() || v.isObj()) { r.k = 'o'; r.s = "[object Object]"; } else r.s = "undefined"; return r; }
-std::string keyOf(const JV& v) { if (v.k == 's') return v.s; if (v.k == 'd') return "\x01n" + v.s; if (v.k == 'b') return "\x01" "b" + v.s; if (v.k == 'n') return "\x01null"; if (v.k == 'o') return "\x01obj"; return "\x01undef"; }
+struct JV { char k = 'u'; std::string s; double d = 0; };   // a JS value as far as ids and ports go: u undefined, n null, b bool, d number, s string, o object / array
+JV jvOf(Json v) { JV r; if (v.isStr()) { r.k = 's'; r.s = std::string(v.asStr()); } else if (v.isNum()) { char b[40]; std::snprintf(b, sizeof b, "%.15g", v.asNum()); r.k = 'd'; r.s = b; r.d = v.asNum(); } else if (v.isBool()) { r.k = 'b'; r.s = v.asBool() ? "true" : "false"; } else if (v.isNull()) { r.k = 'n'; r.s = "null"; } else if (v.isArr() || v.isObj()) { r.k = 'o'; r.s = "[object Object]"; } else r.s = "undefined"; return r; }
+// a Map key as the JS has it (SameValueZero): a number by its exact value (-0 is 0; 15 digits would join two numbers that differ), an object / array by identity (each one is its own: a cable's `[1]` is never the module's `[1]`)
+thread_local uint64_t tlObjSeq = 0;
+std::string keyOf(const JV& v) {
+  if (v.k == 's') return v.s;
+  if (v.k == 'd') { char b[48]; std::snprintf(b, sizeof b, "\x01n%.17g", v.d == 0 ? 0.0 : v.d); return b; }
+  if (v.k == 'b') return "\x01" "b" + v.s;
+  if (v.k == 'n') return "\x01null";
+  if (v.k == 'o') return "\x01obj" + std::to_string(++tlObjSeq);
+  return "\x01undef";
+}
+// a module `type` as the JS indexes MODULES with it: a string is itself, an array of one element is that element's text (String(["a"]) is "a"); anything else is no type. false: the type is a property every object has
+// (constructor, toString, __proto__, ...): MODULES[type] is a function / object with no `params`, and the JS throws in addModule
+bool typeOf(Json m, std::string& out, bool& throws, bool* wrapped = nullptr) {
+  Json t = m.get("type"); if (wrapped) *wrapped = t.isArr(); while (t.isArr() && t.size() == 1) t = t.at(0);
+  throws = false; out.clear(); if (!t.isStr()) return false; out = std::string(t.asStr());
+  static const char* const kProto[] = {"constructor", "__proto__", "__defineGetter__", "__defineSetter__", "__lookupGetter__", "__lookupSetter__", "hasOwnProperty", "isPrototypeOf", "propertyIsEnumerable", "toString", "toLocaleString", "valueOf"};
+  for (const char* n : kProto) if (out == n) { throws = true; return false; }
+  return true;
+}
 std::string portOf(const JV& v) { if (v.k == 's') return v.s; return std::string("\x01") + v.k + v.s; }
 // v[i] in JS: false when it throws (v null / undefined)
 bool jvIdx(Json v, int i, JV& out) {
@@ -129,9 +148,10 @@ bool readPatchDoc(Json doc, PatchImpl& P, bool chains) {
     Json m = mj.at(i);
     if (m.isNull()) return false;   // m.id of null
     if (!m.isObj()) continue;
-    Json tj = m.get("type");
-    if (!tj.isStr() || !P.tab->info(tj.asStr())) continue;
-    if (!P.addNode(idOfModule(m), tj.asStr(), m)) return false;
+    std::string tn; bool throws = false; const bool isT = typeOf(m, tn, throws);
+    if (throws) return false;   // MODULES["constructor"] and the like: the JS throws
+    if (!isT || !P.tab->info(tn)) continue;
+    if (!P.addNode(idOfModule(m), tn, m)) return false;
   }
   for (size_t i = 0; i < nc; i++) {
     Json c = cj.at(i);
@@ -148,11 +168,11 @@ bool readPatchDoc(Json doc, PatchImpl& P, bool chains) {
   }
   // the older patches' added cables (stereoUpCables, trackInStereoCables): both read `d.modules` / `d.cables` only when they are arrays
   const bool st2 = isObj && truthyJs(doc.get("st2")), ti2 = isObj && truthyJs(doc.get("ti2"));
-  std::unordered_map<std::string, std::string> type;   // d.modules.map(m => [m && m.id, m && m.type]): the last of equal keys wins
+  std::unordered_set<std::string> wrapped; std::unordered_map<std::string, std::string> type;   // d.modules.map(m => [m && m.id, m && m.type]): the last of equal keys wins
   if (hasM && hasC && (!st2 || (chains && !ti2))) {
     for (size_t i = 0; i < nm; i++) {
       Json m = mj.at(i); std::string k, ty;
-      if (m.isObj()) { k = idOfModule(m); if (m.get("type").isStr()) ty = std::string(m.get("type").asStr()); }
+      if (m.isObj()) { k = idOfModule(m); bool th = false, wr = false; if (!typeOf(m, ty, th, &wr)) ty.clear(); else if (wr) wrapped.insert(k); }   // (a type given as ["x"] indexes MODULES like "x", but the JS's `=== 'trackIn'` and Set.has(type) see the array)
       else if (m.isNull() || m.isBool() || m.isNum() || m.isStr()) { const bool falsy = !truthyJs(m); k = falsy ? keyOf(jvOf(m)) : std::string("\x01undef"); }
       else k = "\x01undef";
       type[k] = ty;
@@ -173,7 +193,7 @@ bool readPatchDoc(Json doc, PatchImpl& P, bool chains) {
       Json c = cj.at(i); JV f0, f1, t0, t1; if (!c.isObj() || !endOf(c, "from", f0, f1) || !endOf(c, "to", t0, t1)) continue;
       if (!isOut(f1) || !isIn(t1)) continue;
       const std::string a = keyOf(f0), b = keyOf(t0); const auto ta = type.find(a), tb = type.find(b);
-      if (!(ta != type.end() && isNew(ta->second)) && !(tb != type.end() && isNew(tb->second))) continue;
+      if (!(ta != type.end() && !wrapped.count(a) && isNew(ta->second)) && !(tb != type.end() && !wrapped.count(b) && isNew(tb->second))) continue;
       const std::string tk = jsStr(t0) + ".inR";
       if (has(a, false, "outR") && has(b, true, "inR") && std::find(taken.begin(), taken.end(), tk) == taken.end()) { taken.push_back(tk); add.push_back({f0, t0}); }
     }
@@ -192,7 +212,8 @@ bool readPatchDoc(Json doc, PatchImpl& P, bool chains) {
       Json c = cj.at(i); JV f0, f1, t0, t1; if (!c.isObj() || !endOf(c, "from", f0, f1) || !endOf(c, "to", t0, t1)) continue;
       if (!isOut(f1) || !isIn(t1)) continue;
       const std::string a = keyOf(f0); auto ta = type.find(a);
-      if (ta == type.end() || ta->second != "trackIn" || std::find(usedR.begin(), usedR.end(), a) != usedR.end()) continue;
+      if (ta == type.end() || ta->second != "trackIn" || wrapped.count(a) || std::find(usedR.begin(), usedR.end(), a) != usedR.end()) continue;
+      if (f0.k == 'n') continue;   // (the JS's usedR holds null for every cable that is not an outR one, and this cable is not: a Track In whose id is null never gets the right side)
       const std::string tk = jsStr(t0) + ".inR";
       if (hasIn(keyOf(t0)) && std::find(taken.begin(), taken.end(), tk) == taken.end()) { taken.push_back(tk); add.push_back({f0, t0}); }
     }

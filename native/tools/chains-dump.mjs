@@ -20,7 +20,7 @@ const BYTES = new Uint8Array(fs.readFileSync(path.join(ROOT, 'chains/dsp/tfx.was
 const PUMP = new Uint8Array(fs.readFileSync(path.join(ROOT, 'pump/pump.wasm')));
 const BLOCKS = 400, TRANSPORT = { tempo: 120, lpb: 4, ticks: 6, playing: true };
 
-function scope() { const ctx = H.freezeClock(H.workletScope()); H.load(ctx, 'chains/chains-worklet.js'); ctx.ChainsDSP.wasmInit({ tfxBytes: BYTES }); ctx.__pumpBytes = PUMP; return ctx; }
+function scope() { const ctx = H.freezeClock(H.workletScope()); H.load(ctx, 'chains/chains-worklet.js', ['soft']); ctx.ChainsDSP.wasmInit({ tfxBytes: BYTES }); ctx.__pumpBytes = PUMP; return ctx; }
 function engineOf(ctx, focus, tr) { return new ctx.ChainsDSP.ChainsEngine(48000, { focus, quality: 'full', transport: tr || TRANSPORT }); }
 const SW = new Set(['mute']), KEEP_DEFAULT = new Set(['flip']);
 const defaults = m => { const p = {}; for (const [k, d] of Object.entries(m.params || {})) p[k] = d[0]; return p; };
@@ -229,7 +229,7 @@ function runScn(c) {
       if (c.standalone) { if (!E._sendPrev) { E._sendPrev = new Float32Array(8 * 128); E.sendIn = Array.from({ length: 8 }, (_, n) => E._sendPrev.subarray(n * 128, (n + 1) * 128)); } E._sendPrev.set(E.sendOut); }
       const L = new Float32Array(128), R = new Float32Array(128);
       for (const k of E._bwl) for (let i = 0; i < 128; i++) { L[i] += E.busesL[k * 128 + i]; R[i] += E.busesR[k * 128 + i]; }
-      const soft = x => { const a = Math.abs(x); return a < .8 ? x : Math.sign(x) * (.8 + .2 * Math.tanh((a - .8) / .2)); };
+      const soft = ctx.soft;   // the worklet's own mix-down clip (published by tests/helpers.js load(), not written again here)
       for (let i = 0; i < 128; i++) { L[i] = soft(L[i]); R[i] = soft(R[i]); }
       mixL.set(L, b * 128); mixR.set(R, b * 128); for (let k = 0; k < 8; k++) snd[k].set(E.sendOut.subarray(k * 128, (k + 1) * 128), b * 128);
     }
@@ -254,13 +254,59 @@ function runScn(c) {
 }
 for (const c of scn) { const arrs = runScn(c), h = hashOf(arrs); const k = Object.assign({}, c, { kind: 'scn', hash: h }); delete k.extra; cases.push(k); refs[c.name] = arrs; }
 
+// ---- mal: patches the JS is given malformed (ids of any JSON type, an empty or missing id, a type that is an Object property, cable ends that are not arrays, falsy modules / cables, a document that is not an object) ----
+// Some the JS plays (outcome 'plays': the output is hashed, NaN-canonical) and the native engine must load the same way; the rest it throws on (outcome 'refuses'; the page catches it; native refuses and keeps the playing patch)
+const malText={
+ numericId:'{"modules":[{"id":7,"type":"trackIn","params":{"track":1}},{"id":"c","type":"chainOut"}],"cables":[{"from":[7,"out"],"to":["c","in"]}]}',
+ numericIdStringRef:'{"modules":[{"id":7,"type":"trackIn","params":{"track":1}},{"id":"c","type":"chainOut"}],"cables":[{"from":["7","out"],"to":["c","in"]}]}',
+ missingId:'{"modules":[{"type":"trackIn","params":{"track":1}},{"id":"c","type":"chainOut"}],"cables":[{"from":[],"to":["c","in"]}]}',
+ emptyId:'{"modules":[{"id":"","type":"trackIn","params":{"track":1}},{"id":"c","type":"chainOut"}],"cables":[{"from":["","out"],"to":["c","in"]}]}',
+ hashId:'{"modules":[{"id":"a#1","type":"trackIn","params":{"track":1}},{"id":"c","type":"chainOut"}],"cables":[{"from":["a#1","out"],"to":["c","in"]}]}',
+ nullId:'{"modules":[{"id":null,"type":"trackIn","params":{"track":1}},{"id":"c","type":"chainOut"}],"cables":[{"from":[null,"out"],"to":["c","in"]}]}',
+ arrayId:'{"modules":[{"id":[1],"type":"trackIn","params":{"track":1}},{"id":"c","type":"chainOut"}],"cables":[{"from":[[1],"out"],"to":["c","in"]}]}',
+ boolId:'{"modules":[{"id":true,"type":"trackIn","params":{"track":1}},{"id":"c","type":"chainOut"}],"cables":[{"from":[true,"out"],"to":["c","in"]}]}',
+ floatId:'{"modules":[{"id":7.5,"type":"trackIn","params":{"track":1}},{"id":"c","type":"chainOut"}],"cables":[{"from":[7.5,"out"],"to":["c","in"]}]}',
+ floatIdSame:'{"modules":[{"id":7,"type":"trackIn","params":{"track":1}},{"id":"c","type":"chainOut"}],"cables":[{"from":[7.0,"out"],"to":["c","in"]}]}',
+ negZero:'{"modules":[{"id":0,"type":"trackIn","params":{"track":1}},{"id":"c","type":"chainOut"}],"cables":[{"from":[-0,"out"],"to":["c","in"]}]}',
+ dupId:'{"modules":[{"id":"a","type":"trackIn","params":{"track":1}},{"id":"a","type":"trackIn","params":{"track":2}},{"id":"c","type":"chainOut"}],"cables":[{"from":["a","out"],"to":["c","in"]}]}',
+ typeConstructor:'{"modules":[{"id":"a","type":"trackIn"},{"id":"x","type":"constructor"},{"id":"c","type":"chainOut"}],"cables":[{"from":["a","out"],"to":["c","in"]}]}',
+ typeToString:'{"modules":[{"id":"a","type":"trackIn"},{"id":"x","type":"toString"},{"id":"c","type":"chainOut"}],"cables":[{"from":["a","out"],"to":["c","in"]}]}',
+ typeProto:'{"modules":[{"id":"a","type":"trackIn"},{"id":"x","type":"__proto__"},{"id":"c","type":"chainOut"}],"cables":[{"from":["a","out"],"to":["c","in"]}]}',
+ typeArray:'{"modules":[{"id":"a","type":["trackIn"],"params":{"track":1}},{"id":"c","type":"chainOut"}],"cables":[{"from":["a","out"],"to":["c","in"]}]}',
+ typeHasOwn:'{"modules":[{"id":"a","type":"trackIn"},{"id":"x","type":"hasOwnProperty"},{"id":"c","type":"chainOut"}],"cables":[{"from":["a","out"],"to":["c","in"]}]}',
+ typeNumber:'{"modules":[{"id":"a","type":"trackIn"},{"id":"x","type":5},{"id":"c","type":"chainOut"}],"cables":[{"from":["a","out"],"to":["c","in"]}]}',
+ typeUnknown:'{"modules":[{"id":"a","type":"trackIn"},{"id":"x","type":"nope"},{"id":"c","type":"chainOut"}],"cables":[{"from":["a","out"],"to":["c","in"]}]}',
+ modNull:'{"modules":[null,{"id":"a","type":"trackIn"}],"cables":[]}',
+ modNumber:'{"modules":[5,"s",[1],true,{"id":"a","type":"trackIn"},{"id":"c","type":"chainOut"}],"cables":[{"from":["a","out"],"to":["c","in"]}]}',
+ cableNull:'{"modules":[{"id":"a","type":"trackIn"},{"id":"c","type":"chainOut"}],"cables":[null]}',
+ cableNumber:'{"modules":[{"id":"a","type":"trackIn"},{"id":"c","type":"chainOut"}],"cables":[5]}',
+ cableNoFrom:'{"modules":[{"id":"a","type":"trackIn"},{"id":"c","type":"chainOut"}],"cables":[{"to":["c","in"]}]}',
+ cableFromNull:'{"modules":[{"id":"a","type":"trackIn"},{"id":"c","type":"chainOut"}],"cables":[{"from":null,"to":["c","in"]}]}',
+ cableToMissing:'{"modules":[{"id":"a","type":"trackIn"},{"id":"c","type":"chainOut"}],"cables":[{"from":["a","out"]}]}',
+ cableFromString:'{"modules":[{"id":"a","type":"trackIn"},{"id":"c","type":"chainOut"}],"cables":[{"from":"aout","to":["c","in"]}]}',
+ cableFromNumber:'{"modules":[{"id":"a","type":"trackIn"},{"id":"c","type":"chainOut"}],"cables":[{"from":5,"to":7}]}',
+ cableFromBool:'{"modules":[{"id":"a","type":"trackIn"},{"id":"c","type":"chainOut"}],"cables":[{"from":true,"to":false}]}',
+ cableFromObjIdx:'{"modules":[{"id":"a","type":"trackIn"},{"id":"c","type":"chainOut"}],"cables":[{"from":{"0":"a","1":"out"},"to":{"0":"c","1":"in"}}]}',
+ cableFromEmptyObj:'{"modules":[{"id":"a","type":"trackIn"},{"id":"c","type":"chainOut"}],"cables":[{"from":{},"to":{}}]}',
+ cablePortNumber:'{"modules":[{"id":"a","type":"trackIn"},{"id":"c","type":"chainOut"}],"cables":[{"from":["a",5],"to":["c","in"]}]}',
+ cableShort:'{"modules":[{"id":"a","type":"trackIn"},{"id":"c","type":"chainOut"}],"cables":[{"from":["a"],"to":["c"]}]}',
+ cableMissingMod:'{"modules":[{"id":"a","type":"trackIn"},{"id":"c","type":"chainOut"}],"cables":[{"from":["a","out"],"to":["zz","in"]}]}',
+ modsString:'{"modules":"ab","cables":[]}', modsEmptyString:'{"modules":"","cables":[]}', modsZero:'{"modules":0,"cables":[]}', modsFalse:'{"modules":false}', modsNumber:'{"modules":5}', modsTrue:'{"modules":true}', modsObj:'{"modules":{}}', modsNull:'{"modules":null}',
+ cabsString:'{"modules":[{"id":"a","type":"trackIn"}],"cables":"ab"}', cabsEmptyString:'{"modules":[{"id":"a","type":"trackIn"}],"cables":""}', cabsZero:'{"modules":[{"id":"a","type":"trackIn"}],"cables":0}', cabsFalse:'{"modules":[],"cables":false}', cabsNumber:'{"cables":5}', cabsObj:'{"cables":{}}',
+ docString:'"abc"', docNumber:'7', docArray:'[1,2]', docNull:'null', docTrue:'true', docEmptyObj:'{}',
+};for (const [name, text] of Object.entries(malText)) {
+  let outcome = 'plays', hash = null, arrs = null;
+  try { arrs = runScn({ mode: 'engine', blocks: 20, chans: 3, taps: 0, tapmap: null, standalone: true, sc: false, sends: 0, feeds: 0, busmap: null, focus: -1, events: [], patch: JSON.parse(text) }); hash = hashCanon(arrs); } catch (e) { outcome = 'refuses'; }
+  const c = { name: 'malx/' + name, kind: 'mal', group: 'over', patchText: text, outcome }; if (outcome === 'plays') c.hash = hash; cases.push(c); if (arrs) refs[c.name] = arrs;
+}
+
 const text = JSON.stringify(cases) + '\n';
 // DUMP_OVER=1 writes the over-range rows' arrays too (a local diagnosis; not by default: 450 MB)
 if (outDir) {
   fs.mkdirSync(outDir, { recursive: true });
-  for (const c of cases) { if (c.kind === 'mod' && !c.lib && !(process.env.DUMP_OVER && c.group === 'over')) continue; const a = refs[c.name], n = a.reduce((s, x) => s + x.length, 0), b = Buffer.alloc(n * 4); let o = 0; for (const x of a) { Buffer.from(x.buffer, x.byteOffset, x.byteLength).copy(b, o); o += x.byteLength; } fs.writeFileSync(path.join(outDir, c.name.replace(/[\/@]/g, '_') + '.f32'), b); }
+  for (const c of cases) { if (!refs[c.name]) continue; if (c.kind === 'mod' && !c.lib && !(process.env.DUMP_OVER && c.group === 'over')) continue; const a = refs[c.name], n = a.reduce((s, x) => s + x.length, 0), b = Buffer.alloc(n * 4); let o = 0; for (const x of a) { Buffer.from(x.buffer, x.byteOffset, x.byteLength).copy(b, o); o += x.byteLength; } fs.writeFileSync(path.join(outDir, c.name.replace(/[\/@]/g, '_') + '.f32'), b); }
   fs.writeFileSync(path.join(outDir, 'cases.json'), text);
 }
 if (process.argv.includes('--golden')) { fs.writeFileSync(GOLD, text); console.log('wrote', GOLD, cases.length, 'cases'); }
 else if (process.argv.includes('--check')) { const cur = fs.existsSync(GOLD) ? fs.readFileSync(GOLD, 'utf8') : ''; if (cur !== text) { console.error('chains_cases.json differs from the JS'); process.exit(1); } console.log('chains_cases.json matches the JS'); }
-console.log(cases.length, 'cases:', cases.filter(c => c.kind === 'mod').length, 'mod,', cases.filter(c => c.kind === 'proc').length, 'proc,', cases.filter(c => c.kind === 'scn').length, 'scn');
+console.log(cases.length, 'cases:', cases.filter(c => c.kind === 'mod').length, 'mod,', cases.filter(c => c.kind === 'proc').length, 'proc,', cases.filter(c => c.kind === 'scn').length, 'scn,', cases.filter(c => c.kind === 'mal').length, 'mal');

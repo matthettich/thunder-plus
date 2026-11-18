@@ -103,7 +103,7 @@ static Rec runProc(Json c) {
   return r;
 }
 // ---- scn rows ----
-static Rec runScn(Json c, bool* ok) {
+static Rec runScn(Json c, bool* ok, Json patchOverride = Json()) {
   *ok = true; Host host; newHost(host);
   const int B = (int)c.num("blocks"), N = (int)c.num("blockLen", 128), focus = (int)c.num("focus", -1), chans = (int)c.num("chans", 2), ntaps = (int)c.num("taps"), nsends = (int)c.num("sends"), nfeeds = (int)c.num("feeds");
   const bool node = c.str("mode") == "node", standalone = c.boolean("standalone");
@@ -127,7 +127,7 @@ static Rec runScn(Json c, bool* ok) {
   };
   Rec r;
   if (!node) {
-    ChainsEngine e(48000, opts(focus, true), &host); if (!e.loadPatch(c.get("patch"))) { *ok = false; return r; }
+    ChainsEngine e(48000, opts(focus, true), &host); if (!e.loadPatch(patchOverride.missing() ? c.get("patch") : patchOverride)) { *ok = false; return r; }
     if (tm.isArr()) { Doc m("{\"op\":\"tapmap\",\"value\":" + ser(tm) + "}"); e.handleMessage(m.r); }
     r.assign(10, std::vector<float>((size_t)128 * B));
     std::vector<float> tl((size_t)128 * chans), tr((size_t)128 * chans); std::vector<const float*> tp((size_t)ntaps);
@@ -177,7 +177,7 @@ static void runGolden(const std::string& golden, const std::string& effectsFile,
   JsonDoc d; if (!d.parse(txt)) { CHECK(false, "golden parse"); return; }
   JsonDoc nd; std::string ntxt; Json eff; if (!effectsFile.empty() && readFile(effectsFile, &ntxt) && nd.parse(ntxt)) eff = nd.root();
   if (writeEffects.empty() && filter.empty() && !eff.isObj()) CHECK(false, "the effect-case record (chains_effects.json) is missing");
-  Json all = d.root(); int ran = 0, bad = 0, skipped = 0, nExact = 0, nWithin = 0, nBeyond = 0, nStruct = 0, nPlain = 0, nScn = 0, nProc = 0, nLeftOut = 0; double worst = -999; std::string worstName, out = "{", leftOut;
+  Json all = d.root(); int ran = 0, bad = 0, skipped = 0, nExact = 0, nWithin = 0, nBeyond = 0, nStruct = 0, nPlain = 0, nScn = 0, nProc = 0, nLeftOut = 0, nMal = 0; double worst = -999; std::string worstName, out = "{", leftOut;
   ModRun mr, mrOver;   // mrOver: the rows of group 'over' (parameters outside their range) have an engine of their own
   // the mod rows share one engine, in the JS's order: a skipped row (a library missing here) must still make the JS's draws, so the order is kept by running every row that has no missing library
   for (size_t i = 0; i < all.size(); i++) {
@@ -189,6 +189,11 @@ static void runGolden(const std::string& golden, const std::string& effectsFile,
       CHECK(lib == c.boolean("lib"), "%s: the library flag of the type disagrees with the JS (native %d)", name.c_str(), (int)lib);
       const bool over = c.str("group") == "over"; if (!(over ? mrOver : mr).render(c, &rec, probe)) { CHECK(false, "%s: patch refused", name.c_str()); bad++; continue; }
       if (lacks && writeEffects.empty()) { skipped++; continue; }   // (rendered all the same: the JS's draws from the shared seed counter and Math.random must happen in its order)
+    } else if (kind == "mal") {   // a malformed document (JSON text in the row): the JS plays it (outcome "plays": same output) or throws on it (outcome "refuses": here refused, nothing changed)
+      JsonDoc pd; if (!pd.parse(c.str("patchText"))) { CHECK(false, "%s: the row's document does not parse", name.c_str()); bad++; continue; }
+      if (c.str("outcome") == "refuses") { Host mh; ChainsEngine me(48000, EngineOptions(), &mh); const bool ld = me.loadPatch(pd.root()); if (ld) { bad++; CHECK(false, "%s: the JS throws on this document, native loaded it", name.c_str()); } else { ran++; nMal++; } continue; }
+      JsonDoc cfg; cfg.parse("{\"mode\":\"engine\",\"blocks\":20,\"chans\":3,\"standalone\":true,\"focus\":-1}"); bool ok = true; rec = runScn(cfg.root(), &ok, pd.root());
+      if (!ok) { CHECK(false, "%s: the JS plays this document, native refused it", name.c_str()); bad++; continue; }
     } else if (kind == "proc") { rec = runProc(c); }
     else { bool ok = true; rec = runScn(c, &ok); if (!ok) { CHECK(false, "%s: patch refused", name.c_str()); bad++; continue; } }
     ran++;
@@ -231,6 +236,7 @@ static void runGolden(const std::string& golden, const std::string& effectsFile,
     }
   }
   if (!writeEffects.empty()) { out += "}\n"; std::ofstream f(writeEffects, std::ios::binary); f << out; std::printf("wrote %s\n", writeEffects.c_str()); return; }
+  std::printf("malformed documents (rows 'malx/'): %d documents the JS throws on were refused; the rest the JS plays are in the scenario count below\n", nMal);
   std::printf("golden cases: %d run, %d skipped (a library is missing in this build); %d module rows without a library bit-exact, %d scenarios and %d processor rows bit-exact; library rows: %d exact, %d within -100 dB, %d beyond (left out by name, structural check), %d structural only (no reference here); worst %.1f dB %s; %d left out by name or decided otherwise%s%s; %d wrong\n",
     ran, skipped, nPlain, nScn, nProc, nExact, nWithin, nBeyond, nStruct, worst, worstName.c_str(), nLeftOut, leftOut.empty() ? "" : " (Scope rows: audio exact, show() list not ported: ", leftOut.empty() ? "" : (leftOut + ")").c_str(), bad);
 }

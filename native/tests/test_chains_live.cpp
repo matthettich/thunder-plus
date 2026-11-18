@@ -114,7 +114,7 @@ static void testLatencyAndExactEvents() {
     CHECK(L[10 + kChainsLatency] == 1.f && L[9 + kChainsLatency] == 0.f && L[11 + kChainsLatency] == 0.f, "an impulse at sample 10 comes out at %d", 10 + kChainsLatency); }
 }
 static void testRefusals() {
-  Host host; ChainsLive live(48000, 0, ChainsLiveConfig(), &host); Doc bad("{\"modules\":\"x\"}");
+  Host host; ChainsLive live(48000, 0, ChainsLiveConfig(), &host); Doc bad("{\"modules\":[null]}");   /* (the JS throws on a null module) */
   CHECK(!live.preparePatch(bad.r, 0), "a refused patch is not posted"); CHECK(live.stats().refusedPatches == 1, "counted");
   ChainsEvent e; e.kind = ChainsEvent::Param; std::memset(e.id, 'x', sizeof e.id); CHECK(!live.post(e), "an id with no end is refused");
   CHECK(!live.postParam("a_module_id_that_is_much_too_long_to_fit_in_forty_chars", "p", 1, 0), "a long id is refused"); CHECK(live.stats().droppedEvents == 2, "counted: %d", (int)live.stats().droppedEvents);
