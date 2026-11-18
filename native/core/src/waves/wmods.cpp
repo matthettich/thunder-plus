@@ -799,9 +799,9 @@ void Sequencer::process(const IO& io, const Ctx& c) {
   if (p[0] < .5 && !ext && hasNote_) { if (eng) eng->noteOff(note_); hasNote_ = false; }
 }
 
-struct Own { const char* type; std::unique_ptr<Module> (*make)(double, Seeds&); };
+struct Own { const char* type; std::unique_ptr<Module> (*make)(double, Seeds&); bool fx = false; };
 // effect factories: id, map, wetAt (the effect()'s arguments)
-#define EF(T, ID, MAP, WET, R) {T, [](double sr, Seeds& s) -> std::unique_ptr<Module> { return std::unique_ptr<Module>(new Eff(sr, s, T, ID, MAP, WET, R)); }}
+#define EF(T, ID, MAP, WET, R) {T, [](double sr, Seeds& s) -> std::unique_ptr<Module> { return std::unique_ptr<Module>(new Eff(sr, s, T, ID, MAP, WET, R)); }, true}
 const Own kOwn[] = {
   {"hostIn", mk<HostIn>}, {"vco", mk<VCO>}, {"fm", mk<FM>}, {"additive", mk<Additive>}, {"noise", mk<Noise>}, {"plaits", mk<PlaitsM>}, {"elements", mk<ElementsM>}, {"vcf", mk<VCF>}, {"vca", mk<VCA>}, {"mixer", mk<Mixer>},
   {"lfo", mk<LFO>}, {"adsr", mk<ADSR>}, {"random", mk<RandomM>}, {"atten", mk<Atten>}, {"seq", mk<Sequencer>}, {"out", mk<Out>}, {"string", mk<KString>}, {"scope", mk<Scope>}, {"expr", mk<Expression>},
@@ -831,6 +831,8 @@ const Def* wdef(std::string_view type) {
   for (const Def& d : ownDefs()) if (t == d.type) return &d;
   return nullptr;
 }
+
+bool waves_type_is_fx(std::string_view type) { const std::string t(type); for (const Own& o : kOwn) if (o.fx && t == o.type) return true; return false; }
 
 }  // namespace waves
 }  // namespace thunder

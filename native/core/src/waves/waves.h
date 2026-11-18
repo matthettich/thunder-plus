@@ -45,6 +45,7 @@ struct WInfo {
 const WInfo* winfo(std::string_view type);       // the table of one module type (generated from the JS), nullptr for an unknown type
 int winfo_count();
 const WInfo& winfo_at(int i);
+bool waves_type_is_fx(std::string_view type);    // one of the 33 track-effect wrappers (they need the effects library; their output is not bit-exact off the reference build)
 const Def* wdef(std::string_view type);          // the module factory: modfx's registry, else the waves-only ones
 int wport_in(const WInfo& w, std::string_view name);
 int wport_out(const WInfo& w, std::string_view name);

@@ -56,6 +56,9 @@ The page's live node (`wavesLiveRender` / the lane code in `index.html`) is driv
 16. Tape: its flutter delay is scaled by the rate and overruns its 500-sample buffer above about 157 kHz, so tape is bypassed above 96 kHz in every build. Space (Cloud Seed): the tfx build shrinks its buffers to 48 kHz, so at 96 kHz its taps read before the buffer inside the same object (reproduced; the goldens have it) and above 96 kHz would leave the object, so space is bypassed above 96 kHz in every build.
 17. Sanitizer builds only (`__SANITIZE_ADDRESS__`, GCC): space is bypassed above 48 kHz and its size held to .9; Rings/Clouds/Beads/Warps(xmod) continuous params of exactly 1 are held to 0.99999994 (upstream reads one past its lookup tables at 1.0; the value is unused). Release behaviour is not touched. Needed so the fuzz can run clean; flagging because it means the sanitizer run does not cover those cases.
 
+## Other platforms (found by CI)
+The pinned native hashes were made with GCC on x86-64 Linux. On clang, Apple arm64 and MSVC the strict effect libraries round differently, so there an effect-bearing case is held to "runs and is finite" (every case without an effect stays bit-exact on every platform, as do both processor rows). A build without the effects library / PE library (the Windows build) skips the cases that need it and says how many.
+
 ## Not in this PR
 Mixer / sequencer wiring (told not to), Scope telemetry, load shedding, idle-skip, the page's per-block pitch quantisation (replaced by sample-exact), any change to an existing golden.
 
