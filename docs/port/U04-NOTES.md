@@ -28,13 +28,24 @@ vdst/ldst targets, tune, velocities, level, drive, hold, length, bpm, sample rat
 ## The gate and what it found (HONEST NUMBERS)
 - The parameter bytes the native loads equal the page's in all 818 cases (exact).
 - 76 cases are bit-exact on Linux x86-64 GCC (`golden/lxr_gate.inc`, enforced there only).
-- **No case is within -100 dB except the exact ones; 742 are left out BY NAME in `golden/lxr_leftout.inc`**, each with finalDb, rawDb, a length bound and an RMS bound (written by
-  `test_lxr --write-leftout`, never hand-edited). They get the structural check (finite, RMS within bound, length within bound; 726 have the SAME length) on every platform, and where the
-  exact list holds finalDb may not worsen by more than 1 dB. Distribution (max |diff| / reference peak): 573 at <= -70 dB, 138 at -70..-60, 9 at -60..-50, 6 at -50..-30, 16 above -30.
-- Why -100 dB is out of reach: the wasm is `-ffast-math` (reassociation, contraction, reciprocals), strict native is a few ulp off, and the firmware's voice output is int16, so one flipped LSB is
-  already about -90 dB of full scale; the IIR / FM / noise paths then carry the ulp. Quiet cases are 3-5 LSB apart (about -75 dB); the 16 above -30 dB are the chaotic ones: a sample-timing or
-  branch flip in decimation / threshold paths (pre_lxcym_4, vdst_lxcym_2, ldst_lxcym_18, open_lxhat_long) or random knobs (rnd*, k127_lxcym_p201). Needs the lead's decision: accept this tier, or build a
-  fast-math native twin (clang `-O3 -ffast-math -fno-vectorize` matched the wasm's post-load state in a probe, not pursued).
+- **Lead's decision (no fast-math twin; native stays strict): a CLASS rule**, written in the test header with its reason. A non-exact case passes when every sample is within -60 dB of the
+  reference's peak, its RMS is within 0.1 dB of the reference's, and its length / tail is equal (raw and finished). Why: the wasm is `-O3 -ffast-math` and the voice output is int16, so rounding
+  differences of a step or more at the int16 stage are expected from strict native.
+- Distribution of the 742 non-exact cases (`test_lxr` prints it):
+
+  | raw int16 stage, every sample within | 1 step | 2 steps | 4 steps | 8 steps |
+  |---|---|---|---|---|
+  | cases | 42 | 67 | 690 | 703 |
+
+  | finished sound, max abs diff / reference peak | below -90 dB | -90..-80 | -80..-70 | -70..-60 | above -60 |
+  |---|---|---|---|---|---|
+  | cases | 15 | 169 | 389 | 138 | 31 |
+
+- By the class rule 711 of the 742 pass (worst passing: -60.5 dB, vdst_lxhat_11). **31 are outside it and stay out BY NAME** in `golden/lxr_leftout.inc` (with finalDb, rawDb, length and RMS bounds, and the
+  structural check: finite, RMS and length within the recorded bounds; where the exact list holds finalDb may not worsen by more than 1 dB): pre_lxcym_4, pre_lxhat_5, k127_lxdrum_p102, rnd0, rnd2, rnd3 (_lxdrum),
+  ldst_lxdrum_32, rnd1_lxsnare, ldst_lxsnare_3, tune_lxsnare_200, k127_lxcym_p201, rnd0..3_lxcym, vdst_lxcym_2, ldst_lxcym_18, k127_lxhat_p60 / p67 / p107 / p42, k0_lxhat_p33, rnd0..3_lxhat, ldst_lxhat_3 / 32,
+  drive_lxhat_1, sr_lxhat_8000, open_lxhat_long. The worst are chaotic: a sample-timing or branch flip in the decimation / threshold paths, or random knobs (a waveform number with no oscillator).
+- **LXR parity is "within -60 dB, by class": weaker than the other engines. It needs the owner's ears on a kit before the native core is trusted for LXR.**
 - Not done: direct-case extremes use knob 0/127, not each page row's own min/max.
 
 ## Findings in the LXR source (host patches, `native/lxr/prepare-lxr.sh`, applied to a copy in the build dir; each fails if its text is not found exactly once)

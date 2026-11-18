@@ -5,7 +5,10 @@
 //   (a) the firmware parameter bytes the page loads (lxr_load's input) are EXACTLY the module's (integers: the page's parameter mapping, byte for byte);
 //   (b) the firmware's own voice (the raw blocks at 44.14 kHz) and the finished pad sound are each within kGateDb (-100 dB: max |difference| / the reference's peak), with the same length;
 //   (c) the cases that are bit-exact today stay bit-exact (golden/lxr_gate.inc, written by --write-gate, never hand-edited), enforced where it holds (Linux x86-64: kExactHoldsHere);
-//   (d) a case that cannot be within -100 dB is named in golden/lxr_leftout.inc (written by --write-leftout) with its numbers, and gets a check that does not depend on the trajectory
+//   CLASS RULE (lead's decision on U04): the reference wasm is built -O3 -ffast-math and the voice output is int16, so rounding differences of a step or more at the int16 stage are expected from a
+//   strict native build (measured: most cases at -70 dB or below). A case that is not bit-exact passes when every sample is within -60 dB of the reference's peak, its RMS is within 0.1 dB of the
+//   reference's and its length is equal. LXR parity is therefore "within -60 dB, by class": weaker than the other engines; it needs the owner's ears on a kit before the native core is trusted for LXR.
+//   (d) a case beyond the class rule (the chaotic ones) is named in golden/lxr_leftout.inc (written by --write-leftout) with its numbers, and gets a check that does not depend on the trajectory
 //       (finite, RMS within kLevelDb of the reference's, the length within the stated percent). Not in the list, it must pass (b).
 // Also: the module's defaults and tables against the page's (cases.json), the render is the same after any other (the cases again in reverse order, and with a hostile render in between:
 // the firmware is global state and is put back to power-on), the live path (chunking does not change a bit, a trigger acts at the first block boundary at or after its offset, a second voice
@@ -33,7 +36,7 @@ using namespace thunder;
 static bool readFile(const std::string& path, std::string* out) { std::ifstream f(path, std::ios::binary); if (!f) return false; std::stringstream ss; ss << f.rdbuf(); *out = ss.str(); return true; }
 static uint64_t fnv(const float* f, size_t n) { uint64_t h = 0xcbf29ce484222325ull; const unsigned char* u = (const unsigned char*)f; for (size_t i = 0; i < n * 4; i++) { h ^= u[i]; h *= 0x100000001b3ull; } return h; }
 static int fails = 0;
-static const double kGateDb = -100.0, kLevelDb = 1.0, kRegressDb = 1.0;
+static const double kGateDb = -100.0, kLevelDb = 1.0, kRegressDb = 1.0, kClassDb = -60.0, kClassRmsDb = 0.1;
 #if defined(__linux__) && defined(__x86_64__) && !defined(__ANDROID__) && !defined(__clang__)
 static const bool kExactHoldsHere = true;
 #else
@@ -160,6 +163,7 @@ int main(int argc, char** argv) {
     for (int i = 0; i < kLxrLeftOutN; i++) { bool f = false; for (int k = 0; k < kLxrCaseN; k++) if (!std::strcmp(kLxrCases[k], kLxrLeftOut[i].name)) f = true; if (!f) { std::printf("left-out name %s is not a case  FAIL\n", kLxrLeftOut[i].name); fails++; } }
     for (int i = 0; i < kLxrGateExactN; i++) { bool f = false; for (int k = 0; k < kLxrCaseN; k++) if (!std::strcmp(kLxrCases[k], kLxrGateExact[i])) f = true; if (!f) { std::printf("exact-list name %s is not a case  FAIL\n", kLxrGateExact[i]); fails++; } }
   }
+  int nNon = 0, nClass = 0, dS[4] = {0, 0, 0, 0}, dB[5] = {0, 0, 0, 0, 0}; double worstClass = -INFINITY; std::string worstClassName;
   int nRun = 0, nExact = 0, nWithin = 0, nLeft = 0, nOut = 0, nKit = 0; double worst = -INFINITY, worstRaw = -INFINITY; std::string worstName, worstRawName;
   struct LeftRow { std::string nm; double fin, raw, rms, len; }; std::vector<LeftRow> left;
   std::vector<std::string> exactNow; std::vector<uint64_t> firstHash(kLxrCaseN, 0);
@@ -168,6 +172,14 @@ int main(int argc, char** argv) {
     Run R = runCase(dir, nm); nRun++;
     if (!R.ran) { fails++; nOut++; std::printf("%-34s %s  FAIL\n", nm, R.why.c_str()); continue; }
     firstHash[ci] = R.hash; if (R.kitOk) nKit++; else fails++;
+    const bool exactBoth = R.fin.exact && R.raw.exact;
+    if (!exactBoth) {   // the distribution of every non-exact case (printed below)
+      nNon++; const double st = R.raw.lenOk ? R.raw.err * 32768.0 : 1e9;
+      if (st <= 1.0001) dS[0]++; if (st <= 2.0001) dS[1]++; if (st <= 4.0001) dS[2]++; if (st <= 8.0001) dS[3]++;
+      const double db = R.fin.db; dB[db < -90 ? 0 : db < -80 ? 1 : db < -70 ? 2 : db < -60 ? 3 : 4]++;
+    }
+    const bool classOk = R.fin.lenOk && R.raw.lenOk && R.fin.finite && R.fin.db <= kClassDb && std::fabs(R.fin.rmsDb) <= kClassRmsDb;
+    if (!exactBoth && classOk) { nClass++; if (R.fin.db > worstClass) { worstClass = R.fin.db; worstClassName = nm; } }
     const LxrLeftOutEntry* lo = leftOut(nm);
     if (lo) {
       // structural check on every platform; the recorded numbers (a regression bound) only where the exact list holds, as the trajectory is the compiler's
@@ -183,13 +195,15 @@ int main(int argc, char** argv) {
     if (R.fin.exact && R.raw.exact) { nExact++; exactNow.push_back(nm); } else if (within) nWithin++;
     if (R.fin.db > worst && !R.fin.exact) { worst = R.fin.db; worstName = nm; }
     if (R.raw.db > worstRaw && !R.raw.exact) { worstRaw = R.raw.db; worstRawName = nm; }
-    bool ok = within;
-    if (writeLeft && !(R.fin.exact && R.raw.exact) && !within) { left.push_back({nm, R.fin.db, R.raw.db, R.fin.rmsDb, R.fin.lenPct}); ok = true; }
+    bool ok = within || classOk;
+    if (writeLeft && !exactBoth && !within && !classOk) { left.push_back({nm, R.fin.db, R.raw.db, R.fin.rmsDb, R.fin.lenPct}); ok = true; }
     if (enforceExact && inExact(nm) && !(R.fin.exact && R.raw.exact)) { ok = false; std::printf("%-34s was bit-exact and is not any more  FAIL\n", nm); }
     if (!ok) { fails++; std::printf("%-34s final %.1f dB (len %ld vs %ld), raw %.1f dB (len %ld vs %ld)  FAIL\n", nm, R.fin.db, R.fin.n, R.fin.nref, R.raw.db, R.raw.n, R.raw.nref); }
   }
   std::printf("cases: %d run (%d bit-exact, %d within %.0f dB, %d left out by name, %d not run); parameter bytes equal the page's in %d; worst final %.1f dB (%s), worst raw %.1f dB (%s)\n",
               nRun, nExact, nWithin, kGateDb, nLeft, nOut, nKit, worst, worstName.c_str(), worstRaw, worstRawName.c_str());
+  if (nNon) std::printf("distribution of the %d non-exact cases: raw int16 stage within 1 / 2 / 4 / 8 steps on every sample: %d / %d / %d / %d; finished sound, max|diff| / peak: below -90 dB %d, -90..-80 %d, -80..-70 %d, -70..-60 %d, above -60 %d\n"
+                        "class rule (every sample within %.0f dB of the reference's peak, RMS within %.1f dB, same length): %d pass, worst %.1f dB (%s); %d outside it, named in lxr_leftout.inc\n", nNon, dS[0], dS[1], dS[2], dS[3], dB[0], dB[1], dB[2], dB[3], dB[4], kClassDb, kClassRmsDb, nClass, worstClass, worstClassName.c_str(), nLeft);
   if (writeGate) {
     FILE* f = std::fopen(writeGate, "w"); if (!f) { std::printf("cannot write %s\n", writeGate); return 1; }
     std::fprintf(f, "// The cases whose finished render is bit-identical to the reference's wasm on x86-64 Linux with GCC: they must stay so (enforced on that platform). Written by\n// `test_lxr <ref dir> --write-gate FILE`; never hand-edited.\nstatic const char* const kLxrGateExact[] = {\n");
