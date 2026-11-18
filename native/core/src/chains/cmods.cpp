@@ -338,6 +338,13 @@ const Own kCOwn[] = {
   {"vcf", mk<VCF>}, {"vca", mk<VCA>}, {"mixer", mk<Mixer>}, {"smixer", mk<StereoMixer>}, {"osc", mk<Osc>}, {"wnoise", mk<NoiseSrc>}, {"repeat", mk<Repeat>}, {"trackIn", mk<TrackIn>}, {"chainOut", mk<ChainOut>},
   {"scin", mk<SidechainIn>}, {"sccomp", mk<SidechainComp>}, {"scout", mk<SidechainOut>}, {"vocoder", mk<Vocoder>}, {"morph", makeMorph}, {"resample", makeResample},
 };
+// A build without the hosted mods (Marbles / Tides): silence, and Marbles' draw from the seed counter (the JS's create does it at the module's first block)
+template <bool Draws, int NOut> class LibStub : public WModule {
+ public:
+  LibStub(double, Seeds&) {}
+  void arm(Seeds& s) override { if (Draws) (void)s.next(); }
+  void process(const IO& io, const Ctx& c) override { (void)c; for (int k = 0; k < NOut; k++) std::memset(io.out[k], 0, sizeof(float) * kBlock); }
+};
 std::vector<Def>& ownDefs() {
   static std::vector<Def> v = [] {
     std::vector<Def> r;
@@ -352,7 +359,13 @@ const Def* cdef(std::string_view type) {
   const std::string t(type);
   for (const Def& d : ownDefs()) if (t == d.type) return &d;
   if (const Def* p = pumpDef(type)) return p;
-  return waves::wdef(type);   // modfx's registry, then the waves-only modules (the effects, LFO / ADSR / Random / Attenuverter, Expression, ...): the same JS
+  if (const Def* d = waves::wdef(type)) return d;
+  if (t == "marbles" || t == "tides") {   // a build without the hosted mods: a silent stand-in that still makes Marbles' one draw from the seed counter at its first block (the JS's create), so the modules after it draw the same seeds
+    static const Def kMa = [] { const WInfo* w = cinfo("marbles"); return Def{"marbles", w->nin, w->in, w->nout, w->out, w->np, w->params, mk<LibStub<true, 7>>}; }();
+    static const Def kTi = [] { const WInfo* w = cinfo("tides"); return Def{"tides", w->nin, w->in, w->nout, w->out, w->np, w->params, mk<LibStub<false, 4>>}; }();
+    return t == "marbles" ? &kMa : &kTi;
+  }
+  return nullptr;   // modfx's registry, then the waves-only modules (the effects, LFO / ADSR / Random / Attenuverter, Expression, ...): the same JS
 }
 bool chains_type_is_lib(std::string_view type) {
   if (waves::waves_type_is_fx(type) || type == "marbles" || type == "tides") return true;
