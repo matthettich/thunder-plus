@@ -36,3 +36,12 @@ static const SfGolden kSfGolden[] = {
   {"live_syn_loop_beyond_live", 0x037974751f070079ull, 120064},
 };
 static const int kSfGoldenN = 31;
+// FNV-1a 64 over the float64 results of Node 22 (V8 12.4) on Linux x86-64 for the math the player depends on: log10b = Math.log10 of 30000 inputs made by an integer LCG, src = sfSrc, voice_gm = sfVoice of every zone of the GM font.
+// Node on macOS arm64 fuses multiply-adds inside Math.log10, so there the local Node is NOT a reference for these (test_sf compare checks native against these hashes instead, on every platform).
+struct SfMathGolden { const char* id; unsigned long long hash; int doubles; };
+static const SfMathGolden kSfMathGolden[] = {
+  {"voice_gm", 0xf783403dacf79049ull, 983320},
+  {"src", 0x945f5c91e3f09b9dull, 32000},
+  {"log10b", 0x2f50249cc59e6124ull, 30000},
+};
+static const int kSfMathGoldenN = 3;

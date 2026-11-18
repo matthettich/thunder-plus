@@ -39,6 +39,18 @@ static bool readFile(const std::string& p, std::string* out) { std::ifstream f(p
 static bool writeFile(const std::string& p, const void* d, size_t n) { std::ofstream f(p, std::ios::binary); if (!f) return false; f.write((const char*)d, (std::streamsize)n); return (bool)f; }
 static uint64_t fnv(const void* d, size_t n) { const uint8_t* p = (const uint8_t*)d; uint64_t h = 0xcbf29ce484222325ull; for (size_t i = 0; i < n; i++) { h ^= p[i]; h *= 0x100000001b3ull; } return h; }
 
+// Node's Math.* is the reference only where Node itself matches the committed goldens (Linux x86-64): on macOS arm64 V8 fuses multiply-adds inside Math.log10 (the same reason the libm tests use a committed golden). Everywhere the native
+// results must equal the COMMITTED hash of the Linux x86-64 Node (kSfMathGolden); the comparison with the local Node stays, and is fatal on the reference platform only.
+#if defined(__linux__) && (defined(__x86_64__) || defined(_M_X64))
+static const bool kNodeIsReference = true;
+#else
+static const bool kNodeIsReference = false;
+#endif
+static bool mathGolden(const char* id, const void* d, size_t doubles) {
+  for (int i = 0; i < kSfMathGoldenN; i++) if (std::strcmp(kSfMathGolden[i].id, id) == 0) { const uint64_t h = fnv(d, doubles * 8); const bool ok = h == kSfMathGolden[i].hash && (int)doubles == kSfMathGolden[i].doubles;
+      CHECK(ok, "%s: native hash %016llx, committed (Node 22, Linux x86-64) %016llx", id, (unsigned long long)h, kSfMathGolden[i].hash); std::printf("%s: %zu doubles, native hash %s the committed Node reference\n", id, doubles, ok ? "equals" : "DIFFERS from"); return ok; }
+  CHECK(false, "no committed math golden for %s", id); return false; }
+
 struct FontBox { std::string key; std::vector<uint8_t> bytes; Font f; };
 struct Rig {
   JsonDoc cdoc; std::string ctext; Json cases; std::map<std::string, FontBox> fonts;
@@ -209,11 +221,15 @@ static int doCompare(const std::string& dir) {
   { std::vector<char> in, out; CHECK(refBin(dir, "log10_in", &in) && refBin(dir, "log10", &out), "no log10 reference");
     const double* x = (const double*)in.data(); const double* y = (const double*)out.data(); const size_t n = in.size() / 8; size_t bad = 0;
     for (size_t i = 0; i < n; i++) { const double m = sf_log10(x[i]); if (std::memcmp(&m, &y[i], 8) != 0) { if (bad++ < 5) std::printf("  log10(%.17g): native %.17g js %.17g\n", x[i], m, y[i]); } }
-    CHECK(bad == 0, "sf_log10 differs from Math.log10 in %zu of %zu inputs", bad, n); std::printf("Math.log10: %zu inputs bit-identical\n", n - bad); }
+    if (kNodeIsReference) CHECK(bad == 0, "sf_log10 differs from Math.log10 in %zu of %zu inputs", bad, n); else if (bad) std::printf("Math.log10: %zu of %zu inputs differ from THIS platform's Node (expected off Linux x86-64: V8 fuses multiply-adds); the committed reference decides below\n", bad, n);
+    std::printf("Math.log10: %zu inputs bit-identical\n", n - bad);
+    std::vector<double> lb; { uint32_t q = 9001; auto nx = [&]() { q = q * 1664525u + 1013904223u; return q; }; for (int i = 0; i < 30000; i++) { uint32_t hi = nx() & 0x7fffffffu; const uint32_t lo = nx(); if ((hi >> 20) == 0x7ff) hi -= 0x00100000u; const uint64_t b = ((uint64_t)hi << 32) | lo; double x; std::memcpy(&x, &b, 8); lb.push_back(sf_log10(x)); } }
+    mathGolden("log10b", lb.data(), lb.size()); }
   { std::vector<char> out; CHECK(refBin(dir, "src", &out), "no sfSrc reference"); std::vector<double> mine; uint32_t s = 777; auto rnd = [&]() { s = s * 1664525u + 1013904223u; return s; };
     for (int i = 0; i < 4000; i++) { const unsigned code = i < 2000 ? (rnd() & 0xffff) : (((rnd() & 0x3) << 10) | (rnd() & 0x3ff)); const double kv[4][2] = {{60, 100}, {0, 1}, {127, 127}, {37, 64}};
       for (auto& q : kv) for (int am = 0; am < 2; am++) mine.push_back(sf_src(code, q[0], q[1], am != 0)); }
-    CHECK(out.size() == mine.size() * 8 && std::memcmp(out.data(), mine.data(), out.size()) == 0, "sfSrc differs from the JS (%zu values)", mine.size()); std::printf("sfSrc: %zu values bit-identical\n", mine.size()); }
+    const bool srcSame = out.size() == mine.size() * 8 && std::memcmp(out.data(), mine.data(), out.size()) == 0; if (kNodeIsReference) CHECK(srcSame, "sfSrc differs from the JS (%zu values)", mine.size()); std::printf("sfSrc: %zu values %s the local Node\n", mine.size(), srcSame ? "bit-identical to" : "DIFFER from");
+    mathGolden("src", mine.data(), mine.size()); }
   // ---- sfVoice, sfPick
   for (const char* fk : {"gm", "syn"}) {
     const Font& f = R.fonts[fk].f; std::vector<double> mine; const bool gm = std::string(fk) == "gm";
@@ -222,7 +238,9 @@ static int doCompare(const std::string& dir) {
     CHECK(refBin(dir, std::string("voice_") + fk, &ref), "no sfVoice reference");
     const bool same = ref.size() == mine.size() * 8 && std::memcmp(ref.data(), mine.data(), ref.size()) == 0;
     if (!same && ref.size() == mine.size() * 8) { size_t i = 0; while (std::memcmp((const double*)ref.data() + i, &mine[i], 8) == 0) i++; std::printf("  first difference at record %zu field %zu: native %.17g js %.17g\n", i / 26, i % 26, mine[i], ((const double*)ref.data())[i]); }
-    CHECK(same, "sfVoice (%s) differs from the JS", fk); std::printf("sfVoice %s: %zu zone x (key, velocity) records, %zu numbers: %s\n", fk, mine.size() / 26, mine.size(), same ? "bit-identical" : "DIFFERS");
+    if (kNodeIsReference || !gm) { CHECK(same, "sfVoice (%s) differs from the JS", fk); }
+    if (gm) mathGolden("voice_gm", mine.data(), mine.size());
+    std::printf("sfVoice %s: %zu zone x (key, velocity) records, %zu numbers: %s\n", fk, mine.size() / 26, mine.size(), same ? "bit-identical" : "DIFFERS");
     std::vector<int32_t> pk; const int vels4[4] = {1, 64, 100, 127}, vels5[5] = {1, 64, 90, 91, 127};
     for (const Preset& p : f.presets) for (int key = 0; key < 128; key++) for (int vi = 0; vi < (gm ? 4 : 5); vi++) { Pick r[4]; const int n = sf_pick(f, &p, key, gm ? vels4[vi] : vels5[vi], r);
       pk.push_back(n); for (int i = 0; i < n; i++) { pk.push_back((int32_t)(r[i].z - &f.zones[p.z0])); pk.push_back(r[i].stereo ? 1 : 0); } }

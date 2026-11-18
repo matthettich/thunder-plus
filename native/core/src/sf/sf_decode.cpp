@@ -73,6 +73,7 @@ DecodeRes decodeOgg(const uint8_t* p, size_t n, std::vector<float>& d, double& s
 // Resampling to the context rate as Chrome's decodeAudioData does it (Blink's SincResampler, measured, not copied: the constants were found by fitting Chrome's own output, to -136 dB on most of a long sample):
 // a 32-tap Blackman (alpha 0.16) windowed sinc, 32 kernel sub-sample offsets (+1) with linear interpolation between two neighbours, cutoff 0.9 of the lower Nyquist, no normalisation, output length floor(n * ratio),
 // input before the first and after the last frame is zero. Linear-phase, so no delay. Control thread only (it allocates), about 64 multiply-adds per output frame.
+constexpr double kPi = 3.14159265358979323846;   // not M_PI: MSVC does not define it without _USE_MATH_DEFINES
 bool resampleTo(std::vector<float>& d, double from, double to, size_t maxFrames) {
   if (d.empty() || !(from > 0) || !(to > 0) || from == to) return true;
   const double r = to / from, sc = (r < 1 ? r : 1.0) * 0.9; const size_t n = d.size();
@@ -80,7 +81,7 @@ bool resampleTo(std::vector<float>& d, double from, double to, size_t maxFrames)
   const size_t m = (size_t)mf;
   constexpr int KS = 32, KO = 32; std::vector<double> K((size_t)(KO + 1) * KS);
   for (int off = 0; off <= KO; off++) { const double so = (double)off / KO;
-    for (int i = 0; i < KS; i++) { const double x = (i - so) / KS, w = 0.42 - 0.5 * std::cos(2 * M_PI * x) + 0.08 * std::cos(4 * M_PI * x), ps = M_PI * (i - KS / 2 - so);
+    for (int i = 0; i < KS; i++) { const double x = (i - so) / KS, w = 0.42 - 0.5 * std::cos(2 * kPi * x) + 0.08 * std::cos(4 * kPi * x), ps = kPi * (i - KS / 2 - so);
       K[(size_t)off * KS + (size_t)i] = w * (ps == 0 ? sc : std::sin(sc * ps) / ps); } }
   std::vector<float> o(m);
   for (size_t i = 0; i < m; i++) {
