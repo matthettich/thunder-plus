@@ -21,7 +21,7 @@ namespace thunder {
 namespace modfx {
 
 constexpr int kBlock = 128;     // the engine's BLOCK: every buffer is this long
-constexpr int kMaxPorts = 12;
+constexpr int kMaxPorts = 20;   // U30: the …waves Mixer has 16 inputs (it was 12)
 
 // One of the song's impulse responses (the JS's globalThis.__thunderIR[i] = { L, R or null, sr, id }): read-only views; the host keeps the buffers alive and unchanged while a module may read
 // them (the JS's garbage collector does that there) and hands a NEW SongIR object whenever the song's IRs change (the module compares the pointer and `id`, as the JS compares the object and id).
@@ -81,6 +81,9 @@ class Module {
     process(io, c); return true;
   }
   uint32_t refused() const { return refused_; }
+  // U30: the …waves engine makes a module's object ahead of its first block (the JS makes it at the first block, drawing its seeds then, in the order the modules first run). A module that draws
+  // a seed in its constructor (nextSeed()) takes it again here, from the real counter, at the moment the JS's create() would have run; the constructor got a placeholder.
+  virtual void arm(Seeds&) {}
  protected:
   virtual void process(const IO& io, const Ctx& c) = 0;
  private:

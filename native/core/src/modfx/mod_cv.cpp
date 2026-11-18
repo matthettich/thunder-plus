@@ -72,6 +72,7 @@ const ParamDef kShP[] = {{"rate", 4, .05, 40, .01}, {"smooth", 0, 0, 1, .01}, {"
 class SampleHold : public Module {
  public:
   SampleHold(double, Seeds& s) : R_(s.next()) {}
+  void arm(Seeds& s) override { R_ = Rng(s.next()); }   // U30
   void process(const IO& io, const Ctx& c) override {
     const bool trig = io.linked[1]; const double k = 1 - js_pow(io.p[1], .15) * .9995, dep = io.p[2]; const In X = inp(io, 0), T = inp(io, 1); const Out O = outp(io, 0), N = outp(io, 1);
     for (int i = 0; i < c.block; i++) {

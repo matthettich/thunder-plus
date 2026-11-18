@@ -19,6 +19,7 @@ class Spring : public Module {
     for (int c = 0; c < 2; c++) { s_[c].d.init((int)std::ceil(sr * .2) + 4); s_[c].x.init(SPR_N * 2); s_[c].y.init(SPR_N * 2); }
     r_ = Rng(sd.next());
   }
+  void arm(Seeds& sd) override { r_ = Rng(sd.next()); }   // U30
   void process(const IO& io, const Ctx& ctx) override {
     const double* p = io.p; const double sr = ctx.sr; const In L = inp(io, 0), R = inR(io, 0, 1); const Out oL = outp(io, 0), oR = outp(io, 1);
     const double g = .55 + p[0] * .43, a = .3 + p[2] * .45, kl = 1 - js_exp(-2 * kPi * (1500 * js_pow(6, p[1])) / sr);

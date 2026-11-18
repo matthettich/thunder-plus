@@ -184,6 +184,7 @@ inline double rmOsc(int32_t w, double ph) { return w == 0 ? sinT(ph) : w == 1 ? 
 class RingMod : public Module {
  public:
   RingMod(double, Seeds& s) : nr_(s.next()) {}
+  void arm(Seeds& s) override { nr_ = Rng(s.next()); }   // U30
   void process(const IO& io, const Ctx& c) override {
     [[maybe_unused]] const In L0 = inp(io, 0);
     const In L = inp(io, 0), R = inR(io, 0, 1); const Out oL = outp(io, 0), oR = outp(io, 1); const bool ext = io.linked[2], fcv = io.linked[3]; const double* p = io.p;

@@ -674,6 +674,30 @@ else()
 endif()
 add_test(NAME engine_u26_fuzz COMMAND test_engine_u26_fuzz)
 
+# U30: the …waves engine (core/src/waves) against waves/waves-worklet.js
+add_executable(test_waves test_waves.cpp)
+target_link_libraries(test_waves PRIVATE thunder_core)
+target_include_directories(test_waves PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../core/src ${CMAKE_CURRENT_SOURCE_DIR})
+if(NOT MSVC)
+  target_compile_options(test_waves PRIVATE -Wall -Wextra)
+endif()
+set(WAVES_ARGS ${CMAKE_CURRENT_SOURCE_DIR}/golden/waves_cases.json --effects ${CMAKE_CURRENT_SOURCE_DIR}/golden/waves_effects.json --render ${CMAKE_CURRENT_SOURCE_DIR}/golden/waves_render.json)
+add_test(NAME waves COMMAND test_waves ${WAVES_ARGS})   # the committed goldens: the gate on every platform
+if(NODE_EXE AND CMAKE_SYSTEM_NAME STREQUAL "Linux" AND CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|AMD64")
+  # the local comparison with the real JS (sample by sample, and the figures of the listed cases): x86-64 Linux only, where Node's Math.* is the one the goldens were made with
+  add_test(NAME waves_ref COMMAND ${NODE_EXE} ${CMAKE_CURRENT_SOURCE_DIR}/../tools/waves-dump.mjs ${CMAKE_CURRENT_BINARY_DIR}/waves-ref)
+  set_tests_properties(waves_ref PROPERTIES FIXTURES_SETUP waves_ref)
+  add_test(NAME waves_vs_js COMMAND test_waves ${WAVES_ARGS} --ref ${CMAKE_CURRENT_BINARY_DIR}/waves-ref)
+  set_tests_properties(waves_vs_js PROPERTIES FIXTURES_REQUIRED waves_ref)
+  add_test(NAME waves_golden_current COMMAND ${NODE_EXE} ${CMAKE_CURRENT_SOURCE_DIR}/../tools/waves-dump.mjs --check)
+  add_test(NAME waves_table_current COMMAND ${NODE_EXE} ${CMAKE_CURRENT_SOURCE_DIR}/../tools/waves-gen.mjs --check)
+endif()
+
+# U30: the fuzz (random hostile patches and events; a small count here, 5000 and more under ASan + UBSan with -DTHUNDER_SANITIZE=ON: docs/port/U30-NOTES.md)
+add_executable(test_waves_fuzz test_waves_fuzz.cpp)
+target_link_libraries(test_waves_fuzz PRIVATE thunder_core)
+target_include_directories(test_waves_fuzz PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../core/src ${CMAKE_CURRENT_SOURCE_DIR})
+add_test(NAME waves_fuzz COMMAND test_waves_fuzz 150 1 20)
 # U04: the optional LXR module (native/lxr, GPL-3.0-only) against the web app's own render path (tools/lxr-dump.mjs: lxr/lxr-engine.js LxrCore.render + the shipped lxr/lxr.wasm in Node, samples; 818 cases),
 # its live path and its refusals. Built only where the module is (THUNDER_WITH_LXR, not MSVC); the seam's own test (lxr_seam: closed and open configurations) is below and is built in BOTH.
 if(TARGET thunder_lxr)

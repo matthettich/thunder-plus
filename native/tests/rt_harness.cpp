@@ -30,6 +30,7 @@
 #include "engine/live_shell.h"
 #include "engine/pumpsynth.h"
 #include "voice/voice.h"
+#include "waves/waves.h"
 
 #include <cmath>
 #include <cstdio>
@@ -843,6 +844,54 @@ done:
   std::printf("rt_engine_u25 ok: %d voice renders (%zu samples) of Plaits / Elements layers under the allocation guard (the thread's workspace made beforehand); a second thread: unprepared -> its first render made %lu allocations (pe_thread_ready false then true), prepared with pe_prepare() -> guarded renders ok\n", renders, total, aFirst); return 0;
 }
 
+
+// U30: the …waves engine and its live runner under the guard. The patch (every kind of module a voice chain uses: oscillators, FM, additive, noise, Plaits, Elements, a string, filter, envelope, LFO, random, mixer, a
+// sequencer, Expression, tfx effects, the modfx delay line and reverbs) is PREPARED outside it (every module object of every voice is made there); inside: notes on and off, parameter / text / transport
+// changes, odd block sizes, patch swaps in the live runner, events posted. Nothing may allocate. (NOT here: Marbles, whose object is made again at its first block when its seed is drawn: U30-NOTES.md.)
+static int run_waves() {
+  using namespace thunder; using namespace thunder::waves;
+  const char* pj = "{\"modules\":[{\"id\":\"h\",\"type\":\"hostIn\"},{\"id\":\"v\",\"type\":\"vco\",\"params\":{\"wave\":0}},{\"id\":\"f\",\"type\":\"fm\"},{\"id\":\"a\",\"type\":\"additive\",\"params\":{\"model\":5}},{\"id\":\"n\",\"type\":\"noise\",\"params\":{\"model\":6}},"
+    "{\"id\":\"p\",\"type\":\"plaits\"},{\"id\":\"el\",\"type\":\"elements\"},{\"id\":\"k\",\"type\":\"string\"},{\"id\":\"x\",\"type\":\"mixer\"},{\"id\":\"vf\",\"type\":\"vcf\"},{\"id\":\"e\",\"type\":\"adsr\"},{\"id\":\"g\",\"type\":\"vca\"},{\"id\":\"l\",\"type\":\"lfo\"},"
+    "{\"id\":\"r\",\"type\":\"random\"},{\"id\":\"q\",\"type\":\"seq\"},{\"id\":\"ex\",\"type\":\"expr\",\"text\":\"tanh(a*k1)+rnd*0.01\"},{\"id\":\"ch\",\"type\":\"chorus\"},{\"id\":\"rv\",\"type\":\"reverb\"},{\"id\":\"dl\",\"type\":\"dline\",\"params\":{\"time\":120}},"
+    "{\"id\":\"sp\",\"type\":\"spring\"},{\"id\":\"cl\",\"type\":\"clouds\"},{\"id\":\"o\",\"type\":\"out\"}],\"cables\":["
+    "{\"from\":[\"h\",\"pitch\"],\"to\":[\"v\",\"pitch\"]},{\"from\":[\"h\",\"pitch\"],\"to\":[\"f\",\"pitch\"]},{\"from\":[\"h\",\"pitch\"],\"to\":[\"a\",\"pitch\"]},{\"from\":[\"h\",\"gate\"],\"to\":[\"a\",\"gate\"]},{\"from\":[\"h\",\"pitch\"],\"to\":[\"n\",\"pitch\"]},"
+    "{\"from\":[\"h\",\"pitch\"],\"to\":[\"p\",\"pitch\"]},{\"from\":[\"h\",\"gate\"],\"to\":[\"p\",\"gate\"]},{\"from\":[\"h\",\"pitch\"],\"to\":[\"el\",\"pitch\"]},{\"from\":[\"h\",\"gate\"],\"to\":[\"el\",\"gate\"]},{\"from\":[\"h\",\"pitch\"],\"to\":[\"k\",\"pitch\"]},{\"from\":[\"h\",\"gate\"],\"to\":[\"k\",\"gate\"]},"
+    "{\"from\":[\"v\",\"out\"],\"to\":[\"x\",\"in1\"]},{\"from\":[\"f\",\"out\"],\"to\":[\"x\",\"in2\"]},{\"from\":[\"a\",\"out\"],\"to\":[\"x\",\"in3\"]},{\"from\":[\"n\",\"out\"],\"to\":[\"x\",\"in4\"]},{\"from\":[\"p\",\"out\"],\"to\":[\"x\",\"in5\"]},{\"from\":[\"el\",\"out\"],\"to\":[\"x\",\"in6\"]},{\"from\":[\"k\",\"out\"],\"to\":[\"x\",\"in7\"]},"
+    "{\"from\":[\"x\",\"out\"],\"to\":[\"vf\",\"in\"]},{\"from\":[\"l\",\"out\"],\"to\":[\"vf\",\"cutoff\"]},{\"from\":[\"r\",\"out\"],\"to\":[\"vf\",\"p:res\"]},{\"from\":[\"h\",\"gate\"],\"to\":[\"e\",\"gate\"]},{\"from\":[\"vf\",\"out\"],\"to\":[\"g\",\"in\"]},{\"from\":[\"e\",\"out\"],\"to\":[\"g\",\"cv\"]},"
+    "{\"from\":[\"g\",\"out\"],\"to\":[\"ex\",\"a\"]},{\"from\":[\"ex\",\"out\"],\"to\":[\"ch\",\"in\"]},{\"from\":[\"g\",\"out\"],\"to\":[\"dl\",\"in\"],\"fb\":true},{\"from\":[\"ch\",\"out\"],\"to\":[\"rv\",\"in\"]},{\"from\":[\"ch\",\"outR\"],\"to\":[\"rv\",\"inR\"]},{\"from\":[\"rv\",\"out\"],\"to\":[\"sp\",\"in\"]},"
+    "{\"from\":[\"sp\",\"out\"],\"to\":[\"cl\",\"in\"]},{\"from\":[\"cl\",\"out\"],\"to\":[\"o\",\"in\"]},{\"from\":[\"cl\",\"outR\"],\"to\":[\"o\",\"inR\"]}]}";
+  JsonDoc d; if (!d.parse(pj)) { std::printf("rt_waves FAIL: patch json\n"); return 1; }
+  Host host; host.setFixed(.37); EngineOptions o; o.maxVoices = 4; o.transport.tempo = 120; o.transport.playing = true;
+  WavesEngine e(48000, o, &host); if (!e.loadPatch(d.root())) { std::printf("rt_waves FAIL: the patch was refused\n"); return 1; }
+  JsonDoc d2; d2.parse("{\"modules\":[{\"id\":\"h\",\"type\":\"hostIn\"},{\"id\":\"v\",\"type\":\"vco\"},{\"id\":\"o\",\"type\":\"out\"}],\"cables\":[{\"from\":[\"h\",\"pitch\"],\"to\":[\"v\",\"pitch\"]},{\"from\":[\"v\",\"out\"],\"to\":[\"o\",\"in\"]}]}");
+  Host host2; host2.setFixed(.2); WavesLive live(48000, 4, &host2); live.preparePatch(d.root(), 0); live.preparePatch(d2.root(), 3000);
+  Json dj = d.root(); (void)dj;
+  const int kN = 4;   // the first live patch must also be applied: events are posted below
+  long blocks = 0; float L[512], R[512]; const int sizes[8] = {128, 64, 17, 1, 100, 128, 3, 127};
+  uint32_t sd = 5; auto rnd = [&]() { sd = sd * 1664525u + 1013904223u; return (double)(sd >> 8) / 16777216.0; };
+  { rt_guard g;
+    for (int b = 0; b < 600; b++) {
+      if (b % 40 == 0) e.noteOn(-12 + (int)(rnd() * 24), .5 + rnd() * .5); if (b % 40 == 25) e.noteOff(-12); if (b == 300) e.allNotesOff();
+      if (b % 17 == 0) { e.setParam("vf", "cutoff", rnd()); e.setParam("v", "wave", (double)(int)(rnd() * 4)); e.setParam("rv", "mix", rnd()); e.setParam("x", "l1", rnd() * 1.5); e.setParam("nope", "x", 1); }
+      if (b % 90 == 0) e.setText("ex", b % 180 ? "sin(t*220*2*pi)*a" : "a * k1 + rnd * 0.1");
+      if (b % 50 == 0) { Transport t; t.tempo = 90 + (b % 100); t.startN = b / 50; e.setTransport(t); }
+      if (b % 111 == 0) e.setOnly(b % 222 ? 1 : 0);
+      e.process(b % 9 == 0 ? 1 + b % 127 : 128); float l[128], r[128]; waves_mixdown(e, l, r, 128); blocks++;
+    }
+    // the live runner: events posted as the audio runs, host blocks of odd sizes, a patch swap
+    for (int b = 0; b < 800; b++) {
+      const int n = sizes[b % 8]; const int64_t now = live.enginePos();
+      if (b % 31 == 0) { waves::LiveEvent ev; ev.kind = waves::LiveEvent::NoteOn; ev.lane = (uint8_t)(b % kN); ev.at = now + 200; ev.a = -10 + (int)(rnd() * 20); ev.b = .8; ev.legato = b % 62 == 0; live.post(ev); }
+      if (b % 31 == 15) { waves::LiveEvent ev; ev.kind = waves::LiveEvent::NoteOff; ev.lane = (uint8_t)((b - 15) % kN); ev.at = now + 150; live.post(ev); }
+      if (b % 19 == 0) { waves::LiveEvent ev; ev.kind = waves::LiveEvent::Pitch; ev.lane = 0; ev.at = now + 130; ev.a = rnd() * 4; live.post(ev); }
+      if (b % 53 == 0) { waves::LiveEvent ev; ev.kind = b % 106 ? waves::LiveEvent::Level : waves::LiveEvent::Drive; ev.at = now + 140; ev.a = rnd(); live.post(ev); }
+      live.process(L, R, n); blocks++;
+    }
+  }
+  live.collectRetired();
+  for (int i = 0; i < 128; i++) if (!std::isfinite(L[i])) { std::printf("rt_waves FAIL: non-finite output\n"); return 1; }
+  std::printf("rt_waves ok: %ld blocks of the …waves engine and its live runner under the allocation guard (the patch prepared beforehand)\n", blocks); return 0;
+}
 #ifdef THUNDER_HAVE_LXR
 // U04: the LXR module under the guard: the four kinds rendered as pad voices through the core's seam (xeng_render_voice) and the live path (live_open + live_process blocks with triggers),
 // repeatedly. The module owns its buffers (static: the firmware is global state anyway); a render into the caller's buffer and a live block allocate nothing.
@@ -903,5 +952,6 @@ int main(int argc, char** argv) {
   if (int r = run_engine_u24()) return r;
   if (int r = run_engine_u25()) return r;
   if (int r = run_engine_u26()) return r;
+  if (int r = run_waves()) return r;
   return run_song();
 }

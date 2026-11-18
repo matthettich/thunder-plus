@@ -293,11 +293,58 @@ new="""inline float SineNoWrap(float phase) {
 if s.count(old)!=1: sys.exit("plaits SineNoWrap patch failed")
 open(p,'w').write(s.replace(old,new,1))
 PY
-# Cloud Seed: smaller delay buffers (tfx/build.sh)
+# Rings / Clouds / Warps (found by AddressSanitizer in U30, 17 Nov, with a continuous parameter at exactly 1.0): stmlib::Interpolate(table, index, size) reads table[i] and table[i + 1]; at index == 1.0 the
+# scaled index is exactly `size`, so i == size and table[i + 1] is one float past the (size + 1)-entry table. The fraction is then 0, so the result is table[size] whatever finite number is read (the web's
+# wasm has finite bytes after it). Thunder's InterpolateTop (stmlib/dsp/dsp.h) returns table[size] without the read when i >= size; every other index runs the original lines. No output changes (the goldens and
+# the pinned rows are the proof). The read sites, all in host builds only:
+#   rings/dsp/resonator.cc  line 57   Interpolate(lut_stiffness, structure_, 256.0f)       lut_stiffness has 257 floats      trigger: structure == 1
+#   rings/dsp/resonator.cc  line 60   Interpolate(lut_4_decades, damping_, 256.0f)         lut_4_decades has 257 floats      trigger: damping == 1
+#   clouds/dsp/granular_processor.cc lines 278-279  Interpolate(lut_xfade_in / lut_xfade_out, dry_wet, 16.0f)   17 floats each   trigger: dry/wet == 1
+#   clouds/dsp/granular_sample_player.h line 188  Interpolate(lut_grain_size, parameters.size, 256.0f)   257 floats   trigger: size == 1
+#   beads/dsp/delay_controller.h lines 94, 104, 154  Interpolate(slave_envelopes / pw, shape, 5.0f)   6 floats each (local arrays)   trigger: shape == 1
+#   warps/dsp/modulator.cc  lines 167-168 and 362-363  Interpolate(lut_xfade_in / lut_xfade_out, timbre / parameter, 256.0f)   257 floats each   trigger: timbre / the cross-fade parameter == 1
+python3 - "$E/stmlib/dsp/dsp.h" "$E/rings/dsp/resonator.cc" "$E/clouds/dsp/granular_processor.cc" "$E/warps/dsp/modulator.cc" "$E/clouds/dsp/granular_sample_player.h" "$E/beads/dsp/delay_controller.h" <<'PY'
+import sys
+def sub(p, pairs):
+    s=open(p).read()
+    for old,new,cnt in pairs:
+        if s.count(old)!=cnt: sys.exit(p+" InterpolateTop patch failed: "+old)
+        s=s.replace(old,new)
+    open(p,'w').write(s)
+h,r,c,w,g,b=sys.argv[1:7]
+sub(h,[("inline float Interpolate(const float* table, float index, float size) {",
+"""// Thunder (prepare.sh): Interpolate for an index that can be exactly 1.0 (index * size == size): the fraction is 0, so table[size] is the result and table[size + 1] (past the table) is not read
+inline float InterpolateTop(const float* table, float index, float size) {
+  index *= size;   // the wasm build (the parity build of the web's wasm) keeps the original read
+  MAKE_INTEGRAL_FRACTIONAL(index)
+  float a = table[index_integral];
+#ifndef __wasm__
+  if (index_integral >= static_cast<int32_t>(size)) return a;
+#endif
+  float b = table[index_integral + 1];
+  return a + (b - a) * index_fractional;
+}
+
+inline float Interpolate(const float* table, float index, float size) {""",1)])
+sub(r,[("Interpolate(lut_stiffness, structure_, 256.0f)","InterpolateTop(lut_stiffness, structure_, 256.0f)",1),
+       ("Interpolate(\n      lut_4_decades,","InterpolateTop(\n      lut_4_decades,",1)])
+sub(c,[("Interpolate(lut_xfade_in, dry_wet, 16.0f)","InterpolateTop(lut_xfade_in, dry_wet, 16.0f)",1),("Interpolate(lut_xfade_out, dry_wet, 16.0f)","InterpolateTop(lut_xfade_out, dry_wet, 16.0f)",1)])
+sub(w,[("Interpolate(lut_xfade_in, lut_index, 256.0f)","InterpolateTop(lut_xfade_in, lut_index, 256.0f)",1),("Interpolate(lut_xfade_out, lut_index, 256.0f)","InterpolateTop(lut_xfade_out, lut_index, 256.0f)",1),
+       ("Interpolate(lut_xfade_in, parameter, 256.0f)","InterpolateTop(lut_xfade_in, parameter, 256.0f)",1),("Interpolate(lut_xfade_out, parameter, 256.0f)","InterpolateTop(lut_xfade_out, parameter, 256.0f)",1)])
+sub(g,[("Interpolate(lut_grain_size, parameters.size, 256.0f)","InterpolateTop(lut_grain_size, parameters.size, 256.0f)",1)])
+sub(b,[("stmlib::Interpolate(slave_envelopes, shape, 5.0f)","stmlib::InterpolateTop(slave_envelopes, shape, 5.0f)",1),("stmlib::Interpolate(pw, shape, 5.0f)","stmlib::InterpolateTop(pw, shape, 5.0f)",2)])
+PY
+# Cloud Seed: smaller delay buffers than the original (192 kHz, ~67 MB per instance), but, unlike the web's tfx/build.sh (32768 and 2400, which cover 48 kHz at best), sized for 96 kHz so that no tap reads
+# or writes outside its own buffer at any rate the native core runs it at (U30; host builds only: the wasm build, which must equal the web's wasm, keeps 32768 and 2400): the late lines (1.5 x 530 ms = 795 ms = 76k samples at 96 kHz) and the multitap (up to 1 s) get 131072, the allpass
+# stages (at most 31.6 ms + modulation = 3.3k samples at 96 kHz) get 4800. At 44.1 and 48 kHz with every delay inside the buffer the output is the same as the web's (a delay is read relative to the write
+# position, the buffer length only matters when a tap is longer than it). The web's own buffers are smaller and its taps at 96 kHz, and at 48 kHz with the size control above about .9, read outside them.
 cp -r "$D/CloudSeedCore" "$O/cs"; rm -rf "$O/cs/.git"; C="$O/cs"
-$SED -i 's/DelayBufferSize = 192000 \* 2;/DelayBufferSize = 32768;/' "$C/DSP/ModulatedDelay.h" "$C/DSP/MultitapDelay.h"
-$SED -i 's/DelayBufferSize = 19200;/DelayBufferSize = 2400;/' "$C/DSP/ModulatedAllpass.h"
-grep -q 'DelayBufferSize = 32768' "$C/DSP/ModulatedDelay.h" && grep -q 'DelayBufferSize = 2400' "$C/DSP/ModulatedAllpass.h" || { echo "Cloud Seed patch failed" >&2; exit 1; }
+$SED -i 's/DelayBufferSize = 192000 \* 2;/DelayBufferSize = THUNDER_CS_DELAY;/' "$C/DSP/ModulatedDelay.h" "$C/DSP/MultitapDelay.h"
+$SED -i 's/DelayBufferSize = 19200;/DelayBufferSize = THUNDER_CS_ALLPASS;/' "$C/DSP/ModulatedAllpass.h"
+for f in ModulatedDelay MultitapDelay ModulatedAllpass; do
+  printf '#ifdef __wasm__\n#define THUNDER_CS_DELAY 32768\n#define THUNDER_CS_ALLPASS 2400\n#else\n#define THUNDER_CS_DELAY 131072\n#define THUNDER_CS_ALLPASS 4800\n#endif\n' | cat - "$C/DSP/$f.h" > "$C/DSP/$f.h.new" && mv "$C/DSP/$f.h.new" "$C/DSP/$f.h"
+done
+grep -q 'DelayBufferSize = THUNDER_CS_DELAY' "$C/DSP/ModulatedDelay.h" && grep -q 'DelayBufferSize = THUNDER_CS_ALLPASS' "$C/DSP/ModulatedAllpass.h" || { echo "Cloud Seed patch failed" >&2; exit 1; }
 # Airwindows: no VST host (default: throw -> break, createEffectInstance removed)
 A="$D/airwindows/plugins/LinuxVST/src"
 for p in Density ToTape6 EQ Pressure4 Galactic TapeDelay2 DeRez2 PurestDrive Air3 Verbity2 ToVinyl4 Dubly Cabs Tube2; do
