@@ -31,6 +31,7 @@
 #include "engine/pumpsynth.h"
 #include "voice/voice.h"
 #include "waves/waves.h"
+#include "chains/chains.h"
 
 #include <cmath>
 #include <cstdio>
@@ -551,12 +552,12 @@ static int run_modfx() {
   long blocks = 0; const double srs[3] = {44100, 48000, 96000};
   for (int si = 0; si < 3; si++) for (int m = 0; m < count(); m++) {
     const Def& d = at(m); const double sr = srs[si]; SeedCounter seeds(12345 + (uint32_t)m); std::unique_ptr<Module> mod = d.make(sr, seeds);
-    static float in[kMaxPorts][kBlock], out[kMaxPorts][kBlock]; static double p[128]; IO io; Ctx c; c.sr = sr;
-    for (int k = 0; k < kMaxPorts; k++) { io.in[k] = in[k]; io.out[k] = out[k]; } io.p = p;
+    static float in[kMaxPorts][kBlock], out[kMaxPorts][kBlock]; static double p[128]; IO io; Ctx c; c.sr = sr;   // U31: kMaxPorts grew to 32; the random draws stay those of the 20 ports this loop was written with
+    for (int k = 0; k < kMaxPorts; k++) { io.in[k] = in[k]; io.out[k] = out[k]; io.linked[k] = false; } io.p = p;
     uint32_t sd = 99 + (uint32_t)m; auto rnd = [&]() { sd = sd * 1664525u + 1013904223u; return (double)(sd >> 8) / 16777216.0; };
     { rt_guard g;
       for (int b = 0; b < 1500; b++) {
-        for (int k = 0; k < kMaxPorts; k++) { io.linked[k] = ((b / 50 + k) % 3) != 0; for (int i = 0; i < kBlock; i++) in[k][i] = b < 1100 ? (float)(rnd() * 1.6 - .8) : 0.f; }
+        for (int k = 0; k < 20; k++) { io.linked[k] = ((b / 50 + k) % 3) != 0; for (int i = 0; i < kBlock; i++) in[k][i] = b < 1100 ? (float)(rnd() * 1.6 - .8) : 0.f; }
         for (int k = 0; k < d.np; k++) { const ParamDef& q = d.params[k]; p[k] = b < 200 ? q.def : q.mn + (q.mx - q.mn) * rnd(); }
         c.block = (b % 7 == 0) ? 1 + (b * 13) % 127 : kBlock; c.full = (b % 5) != 0; c.tempo = 60 + (b / 100) * 20; c.startN = (double)(b / 400); c.playing = (b % 9) != 0;
         mod->run(io, c); blocks++; }
@@ -892,6 +893,80 @@ static int run_waves() {
   for (int i = 0; i < 128; i++) if (!std::isfinite(L[i])) { std::printf("rt_waves FAIL: non-finite output\n"); return 1; }
   std::printf("rt_waves ok: %ld blocks of the …waves engine and its live runner under the allocation guard (the patch prepared beforehand)\n", blocks); return 0;
 }
+
+// U31: the …chains engine, a track node and its live runner under the guard. The patch (Track In 1 and 2, VCF, Vocoder, Repeat, Resample, Sidechain Comp / In / Out, Morph, Osc, Noise, LFO, Expression, the stereo
+// mixer, BYP on a module, and, where the libraries are in the build, tfx effects) is PREPARED outside the guard; inside: blocks of odd sizes, parameter / BYP / transport changes, inputs, Resample takes, patch swaps and
+// events in the live runner. A second engine runs pump modules that GO BAD (hot input, every parameter at its maximum): the spare instance takes over inside the guard, the control thread (outside it) frees the dead
+// one and makes the next spare (decision (e) of U18). Nothing inside may allocate.
+static int run_chains() {
+  using namespace thunder; using namespace thunder::chains;
+  const bool fx = waves::Host::haveEffects();
+  std::string pj = "{\"modules\":[{\"id\":\"a\",\"type\":\"trackIn\",\"params\":{\"track\":1}},{\"id\":\"b\",\"type\":\"trackIn\",\"params\":{\"track\":2}},{\"id\":\"f\",\"type\":\"vcf\",\"params\":{\"cutoff\":0.5,\"_bn\":3}},{\"id\":\"v\",\"type\":\"vocoder\"},"
+    "{\"id\":\"r\",\"type\":\"repeat\"},{\"id\":\"s\",\"type\":\"resample\",\"params\":{\"rec\":0,\"bars\":0}},{\"id\":\"q\",\"type\":\"sccomp\",\"params\":{\"sck\":9}},{\"id\":\"i\",\"type\":\"scin\",\"params\":{\"sck\":1}},{\"id\":\"o\",\"type\":\"scout\",\"params\":{\"snd\":1}},"
+    "{\"id\":\"mo\",\"type\":\"morph\"},{\"id\":\"os\",\"type\":\"osc\"},{\"id\":\"wn\",\"type\":\"wnoise\"},{\"id\":\"l\",\"type\":\"lfo\"},{\"id\":\"ex\",\"type\":\"expr\",\"text\":\"tanh(a*k1)*0.5\"},{\"id\":\"mx\",\"type\":\"smixer\"},{\"id\":\"g\",\"type\":\"vca\"},"
+    + std::string(fx ? "{\"id\":\"rv\",\"type\":\"reverb\"},{\"id\":\"ch\",\"type\":\"chorus\"}," : "") + "{\"id\":\"c\",\"type\":\"chainOut\",\"params\":{\"track\":1}},{\"id\":\"d\",\"type\":\"chainOut\",\"params\":{\"track\":2}}],\"cables\":["
+    "{\"from\":[\"a\",\"out\"],\"to\":[\"f\",\"in\"]},{\"from\":[\"i\",\"out\"],\"to\":[\"f\",\"p:cutoff\"]},{\"from\":[\"f\",\"out\"],\"to\":[\"v\",\"in\"]},{\"from\":[\"v\",\"out\"],\"to\":[\"r\",\"in\"]},{\"from\":[\"r\",\"out\"],\"to\":[\"s\",\"in\"]},"
+    "{\"from\":[\"s\",\"out\"],\"to\":[\"q\",\"in\"]},{\"from\":[\"q\",\"out\"],\"to\":[\"mx\",\"in1\"]},{\"from\":[\"f\",\"out\"],\"to\":[\"mo\",\"in\"]},{\"from\":[\"os\",\"out\"],\"to\":[\"mo\",\"inB\"]},{\"from\":[\"mo\",\"out\"],\"to\":[\"mx\",\"in2\"]},"
+    "{\"from\":[\"wn\",\"out\"],\"to\":[\"ex\",\"a\"]},{\"from\":[\"l\",\"out\"],\"to\":[\"ex\",\"c\"]},{\"from\":[\"ex\",\"out\"],\"to\":[\"mx\",\"in3\"]},{\"from\":[\"a\",\"out\"],\"to\":[\"o\",\"in\"]},{\"from\":[\"mx\",\"out\"],\"to\":[\"g\",\"in\"]},{\"from\":[\"l\",\"out\"],\"to\":[\"g\",\"cv\"]},{\"from\":[\"b\",\"out\"],\"to\":[\"d\",\"in\"]},"
+    + std::string(fx ? "{\"from\":[\"g\",\"out\"],\"to\":[\"ch\",\"in\"]},{\"from\":[\"ch\",\"out\"],\"to\":[\"rv\",\"in\"]},{\"from\":[\"rv\",\"out\"],\"to\":[\"c\",\"in\"]},{\"from\":[\"rv\",\"outR\"],\"to\":[\"c\",\"inR\"]}" : "{\"from\":[\"g\",\"out\"],\"to\":[\"c\",\"in\"]}") + "]}";
+  JsonDoc d; if (!d.parse(pj)) { std::printf("rt_chains FAIL: patch json\n"); return 1; }
+  const char* p2 = "{\"modules\":[{\"id\":\"a\",\"type\":\"trackIn\"},{\"id\":\"g\",\"type\":\"vca\"},{\"id\":\"c\",\"type\":\"chainOut\"}],\"cables\":[{\"from\":[\"a\",\"out\"],\"to\":[\"g\",\"in\"]},{\"from\":[\"g\",\"out\"],\"to\":[\"c\",\"in\"]}],\"transport\":{\"playing\":true}}";
+  JsonDoc d2; d2.parse(p2);
+  waves::Host host; host.setFixed(.37); EngineOptions o; o.focus = 0; o.transport.playing = true;
+  ChainsEngine e(48000, o, &host); if (!e.loadPatch(d.root())) { std::printf("rt_chains FAIL: the patch was refused\n"); return 1; }
+  e.setInlineService(false);
+  std::vector<float> in(128 * 4), inR(128 * 4), tap(128), snd(8 * 128), mixL(128), mixR(128); uint32_t sd = 7; auto rnd = [&]() { sd = sd * 1664525u + 1013904223u; return (double)(sd >> 8) / 16777216.0; };
+  for (size_t i = 0; i < in.size(); i++) { in[i] = (float)(rnd() - .5) * .6f; inR[i] = (float)(rnd() - .5) * .6f; } for (float& x : tap) x = (float)(rnd() - .5) * .5f; for (float& x : snd) x = (float)(rnd() - .5) * .2f;
+  const float* taps[2] = {tap.data(), tap.data()}; const float* sends[8]; for (int k = 0; k < 8; k++) sends[k] = &snd[(size_t)k * 128];
+  long blocks = 0, takes = 0; const int sizes[8] = {128, 64, 17, 1, 100, 128, 3, 127};
+  for (int b = 0; b < 700; b++) {
+    { rt_guard g;
+      e.setTrackInputs(in.data(), inR.data(), 4); e.setTaps(taps, 2); e.setSendIn(sends, 8); e.setSidechain(tap.data(), nullptr, 128);
+      if (b % 13 == 0) { e.setParam("f", "cutoff", rnd()); e.setParam("l", "rate", rnd()); e.setParam("g", "gain", rnd()); e.setParam("nope", "x", 1); e.setParam("f", "nope", 1); }
+      if (b % 50 == 3) e.setParam("f", "_bn", (double)(1 + b % 15)); if (b % 70 == 5) e.setParam("c", "track", 1 + b % 2); if (b % 31 == 0) e.setBypassSwitch(1 + b % 15, (double)(int)(rnd() * 4) - 1);
+      if (b % 40 == 7) e.setParam("s", "rec", (double)((b / 40) & 1)); if (b % 90 == 0) e.setParam("s", "bars", (double)(b / 90 % 4));
+      if (b % 60 == 0) { Transport t; t.tempo = 90 + (b % 100); t.playing = (b / 60) & 1 ? false : true; e.setTransport(t); }
+      e.process(b % 9 == 0 ? 1 + b % 127 : 128); chains_mixdown(e, mixL.data(), mixR.data(), 128); blocks++;
+      ResampleTake tk; while (e.popTake(&tk)) { takes++; e.releaseTake(tk); }
+    }
+    e.serviceSpares();
+  }
+  // a track node with every input, and the live runner with events and a patch swap
+  { waves::Host h2; h2.setFixed(.2); ChainsLiveConfig cfg; cfg.taps = 2; cfg.sc = true; cfg.sends = true; cfg.feeds = 1; ChainsLive live(48000, 0, cfg, &h2);
+    const std::vector<int> bm = {1}; live.node().engine().setBusMap(bm.data(), 1);
+    if (!live.node().engine().loadPatch(d.root())) { std::printf("rt_chains FAIL: live patch\n"); return 1; }
+    live.preparePatch(d2.root(), 4000); live.preparePatch(d.root(), 9000);
+    std::vector<float> L(512), R(512), so(8 * 512), x(512), x2(512), x3(512); for (size_t i = 0; i < 512; i++) { x[i] = (float)(rnd() - .5) * .5f; x2[i] = x[i] * .5f; x3[i] = x[i] * .3f; }
+    const float* tps[2] = {x2.data(), x3.data()}; const float* snds[8]; for (int k = 0; k < 8; k++) snds[k] = x3.data(); const float* fd[2] = {x2.data(), x3.data()}; float* sop[8]; for (int k = 0; k < 8; k++) sop[k] = &so[(size_t)k * 512];
+    for (int b = 0; b < 800; b++) {
+      const int n = sizes[b % 8]; const int64_t now = live.enginePos();
+      { rt_guard g;
+        if (b % 11 == 0) { live.postParam("f", "cutoff", rnd(), now + 150); live.postParam("g", "gain", rnd(), now + 90); live.postParam("zz", "x", 1, now + 10); }
+        if (b % 29 == 0) { ChainsEvent ev; ev.kind = ChainsEvent::Bypass; ev.at = now + 130; ev.a = 1 + b % 15; ev.b = (double)(int)(rnd() * 3) - 1; live.post(ev); }
+        if (b % 37 == 0) { ChainsEvent ev; ev.kind = ChainsEvent::Tempo; ev.at = now + 140; ev.a = 80 + b % 60; live.post(ev); }
+        NodeIn ni; ni.inL = x.data(); ni.inR = x2.data(); ni.scL = x.data(); ni.taps = tps; ni.nTaps = 2; ni.sends = snds; ni.nSends = 8; ni.feeds = fd; ni.nFeeds = 1; NodeOut no; no.L = L.data(); no.R = R.data(); no.sends = sop; no.nSends = 8;
+        live.process(ni, no, n); blocks++;
+      }
+      live.service();
+    }
+  }
+  // pump modules that go bad: the spare takes over inside the guard; the control thread (outside) frees the dead instance and makes the next spare
+  uint64_t swaps = 0, bad = 0;
+  if (chains_have_lib("ptube") && chains_have_lib("pcrush") && chains_have_lib("pstutter")) {
+    std::string mods, cabs; const char* T[3] = {"ptube", "pcrush", "pstutter"}; std::string ids = "";
+    for (int i = 0; i < 3; i++) { const WInfo* wi = cinfo(T[i]); std::string ps; for (int k = 0; k < wi->np; k++) { char bb[200]; std::snprintf(bb, sizeof bb, "%s\"%s\":%.17g", k ? "," : "", wi->params[k].name, wi->params[k].mx); ps += bb; }
+      mods += std::string(",{\"id\":\"p") + std::to_string(i) + "\",\"type\":\"" + T[i] + "\",\"params\":{" + ps + "}}";
+      cabs += std::string(",{\"from\":[\"") + (i ? "p" + std::to_string(i - 1) : std::string("a")) + "\",\"out\"],\"to\":[\"p" + std::to_string(i) + "\",\"in\"]}"; }
+    JsonDoc dp; dp.parse("{\"modules\":[{\"id\":\"a\",\"type\":\"trackIn\"}" + mods + ",{\"id\":\"c\",\"type\":\"chainOut\"}],\"cables\":[" + cabs.substr(1) + ",{\"from\":[\"p2\",\"out\"],\"to\":[\"c\",\"in\"]}]}");
+    waves::Host h3; ChainsEngine ep(48000, o, &h3); if (!ep.loadPatch(dp.root())) { std::printf("rt_chains FAIL: pump patch\n"); return 1; } ep.setInlineService(false);
+    std::vector<float> hot(128 * 300); for (float& x : hot) x = (float)(rnd() - .5) * 15.8f; const uint64_t b0 = chains_pump_bad(), s0 = chains_pump_swaps();
+    for (int b = 0; b < 300; b++) { { rt_guard g; ep.setTrackInputs(&hot[(size_t)b * 128], &hot[(size_t)b * 128], 1); ep.process(128); blocks++; } ep.serviceSpares(); }
+    bad = chains_pump_bad() - b0; swaps = chains_pump_swaps() - s0;
+    if (bad == 0) { std::printf("rt_chains FAIL: no pump module went bad: the spare path was not exercised\n"); return 1; }
+  }
+  for (int i = 0; i < 128; i++) if (!std::isfinite(mixL[(size_t)i])) { std::printf("rt_chains FAIL: non-finite output\n"); return 1; }
+  std::printf("rt_chains ok: %ld blocks of the …chains engine, a track node and its live runner under the allocation guard (%ld Resample takes; %llu pump blocks went bad, %llu spares swapped in)\n", blocks, takes, (unsigned long long)bad, (unsigned long long)swaps); return 0;
+}
 #ifdef THUNDER_HAVE_LXR
 // U04: the LXR module under the guard: the four kinds rendered as pad voices through the core's seam (xeng_render_voice) and the live path (live_open + live_process blocks with triggers),
 // repeatedly. The module owns its buffers (static: the firmware is global state anyway); a render into the caller's buffer and a live block allocate nothing.
@@ -953,5 +1028,6 @@ int main(int argc, char** argv) {
   if (int r = run_engine_u25()) return r;
   if (int r = run_engine_u26()) return r;
   if (int r = run_waves()) return r;
+  if (int r = run_chains()) return r;
   return run_song();
 }

@@ -122,7 +122,29 @@ static void testRefusals() {
   for (float v : a) CHECK(v == 0, "silence");
 }
 
+// the pump modules' spare instances (decision (e)): a block whose output goes bad (a value outside +-8) is silent, the dead instance goes to the control thread and a spare, made there in advance, takes over at the next block
+static void testPumpSpares() {
+  if (!pump::available()) { std::printf("pump spares: no pump library in this build (skipped)\n"); return; }
+  uint64_t bad0 = chains_pump_bad(), sw0 = chains_pump_swaps(), dry0 = chains_pump_dry(); int types = 0, bad = 0;
+  for (int i = 0; i < 13; i++) {
+    static const char* const T[13] = {"ptube", "psnap", "pgate", "pecho", "pspring", "pverb", "pgrain", "pvox", "ptune", "pcrush", "pswirl", "pstutter", "ptwang"};
+    const WInfo* wi = cinfo(T[i]); if (!wi) continue;
+    std::string ps; for (int k = 0; k < wi->np; k++) { char b[200]; std::snprintf(b, sizeof b, "%s\"%s\":%.17g", k ? "," : "", wi->params[k].name, wi->params[k].mx); ps += b; }
+    Doc d(std::string("{\"modules\":[{\"id\":\"a\",\"type\":\"trackIn\",\"params\":{\"track\":1}},{\"id\":\"p\",\"type\":\"") + T[i] + "\",\"params\":{" + ps + "}},{\"id\":\"c\",\"type\":\"chainOut\",\"params\":{\"track\":1,\"level\":1}}],"
+      "\"cables\":[{\"from\":[\"a\",\"out\"],\"to\":[\"p\",\"in\"]},{\"from\":[\"a\",\"outR\"],\"to\":[\"p\",\"inR\"]},{\"from\":[\"p\",\"out\"],\"to\":[\"c\",\"in\"]},{\"from\":[\"p\",\"outR\"],\"to\":[\"c\",\"inR\"]}]}");
+    Host host; ChainsEngine e(48000, EngineOptions(), &host); if (!e.loadPatch(d.r)) { CHECK(false, "%s refused", T[i]); continue; }
+    e.setInlineService(false); types++;
+    const std::vector<float> s = noise(128 * 200, 9u + (uint32_t)i, 7.9f); uint64_t b0 = chains_pump_bad();
+    for (int b = 0; b < 200; b++) { e.setTrackInputs(&s[(size_t)b * 128], &s[(size_t)b * 128], 1); e.process(128); e.serviceSpares(); }
+    if (chains_pump_bad() > b0) { bad++; std::printf("  pump module that went bad: %s\n", T[i]); }
+  }
+  std::printf("pump spares: %d pump modules run on a +-7.9 input with every parameter at its maximum: %d went bad at least once; %llu bad blocks, %llu spares swapped in, %llu bad blocks with no spare ready\n", types, bad,
+    (unsigned long long)(chains_pump_bad() - bad0), (unsigned long long)(chains_pump_swaps() - sw0), (unsigned long long)(chains_pump_dry() - dry0));
+  CHECK(chains_pump_swaps() - sw0 >= chains_pump_bad() - bad0 - (uint64_t)types, "a bad block is followed by a spare taking over");
+}
+
 int main() {
+  testPumpSpares();
   testEqualsOffline(); testLatencyAndExactEvents(); testRefusals();
   std::printf(fails ? "test_chains_live: %d FAILED\n" : "test_chains_live: ok\n", fails);
   return fails ? 1 : 0;

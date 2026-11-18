@@ -209,7 +209,7 @@ class PatchImpl {
       for (int k = 0; k < nIn; k++) s.in[k] = s.buf.data() + (size_t)k * kBlock;
       for (int k = 0; k < nOut; k++) s.out[k] = s.buf.data() + (size_t)(nIn + k) * kBlock;
       s.inMo.assign((size_t)wi.np, 0); s.pm.assign((size_t)wi.np, 0.0); s.p = m.bp.data();
-      if (fits && m.def) { seeds.armed = false; const uint32_t d0 = seeds.drawn; s.mod = m.def->make(sr, seeds); s.drawn = seeds.drawn - d0; seeds.armed = true; if (s.mod) s.mod->prepare(s.p); }
+      if (fits && m.def) { seeds.armed = false; const uint32_t d0 = seeds.drawn; s.mod = m.def->make(sr, seeds); s.drawn = seeds.drawn - d0; seeds.armed = true; if (s.mod) { s.mod->prepare(s.p); if (wi.flags & kWF_Text) s.mod->prepareText(m.text.data(), m.textLen); } }
     }
     if (fits) { instances += cnt; weight += w; } else { m.slots.shrink_to_fit(); instances += 0; }
     // instances / weight are counted for the slots that hold an object only (a soft one holds buffers)

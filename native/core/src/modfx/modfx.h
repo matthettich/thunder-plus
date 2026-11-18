@@ -88,6 +88,8 @@ class Module {
   virtual void prepare(const double* /*p*/) {}
   // U31: called by the control thread regularly (ChainsEngine::serviceSpares): the pump modules keep a spare instance current here.
   virtual void service() {}
+  // U31: called with prepare(), for a module that takes typed text (Expression): the text (UTF-16 units, len < 0: none set) it compiles NOW, so the audio thread never compiles it at its first block.
+  virtual void prepareText(const uint16_t* /*text*/, int /*len*/) {}
  protected:
   virtual void process(const IO& io, const Ctx& c) = 0;
  private:
