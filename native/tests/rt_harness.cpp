@@ -746,28 +746,38 @@ done:
   std::printf("rt_engine_u26 ok: %d renders (%zu samples) of bass, the bass / voice cores and the live shell (bass, vox) under the allocation guard\n", renders, total); return 0;
 }
 
-// U33: the pump synths' per-block interface (PumpSynth: the live lanes' reusable path) under the guard. Control thread, outside the guard: every instrument is made (psyn_new allocates), FREEZE's built-in spectra are built
-// (PumpSynth::builtins) and the note is delivered. Under the guard: 600 blocks of 32 to 512 frames with NO event: nothing may allocate. Events are NOT allowed to be free: pump's SynthBase::run sorts the queued events with
-// std::stable_sort, whose temporary buffer is an allocation (libstdc++ and libc++ both make one for a non-empty range). That is counted outside the guard and printed; it is the finding the notes list. The rendered path
-// (xeng_psyn) is offline and allocates by design (an instance per render).
+// U33: the pump synths' per-block interface (PumpSynth: the live lanes' reusable path) under the guard, WITH events. Control thread, outside the guard: every instrument is made (psyn_new allocates) and FREEZE's built-in
+// spectra are built (PumpSynth::builtins). Under the guard, for all 13 instruments: 640 blocks of 32 to 512 frames in which every kind of block occurs: no event; a note-on; a note-off; several events at once (note-ons and
+// -offs, a chord with equal offsets, offsets NOT in queue order so the event sort has work to do, a pitch bend and a controller); and a block with 40 events queued in reverse order. Nothing may allocate in any of them.
+// (Before the fourth patch of third_party/prepare-pump.sh every block with an event made one operator new in all 13 synths: the temporary buffer of std::stable_sort in pump's SynthBase::run; this case then aborts
+// with "operator new" inside the guard. The first note-on of each instrument is under the guard too.) The rendered path (xeng_psyn) is offline and allocates by design (an instance per render).
 static int run_pumpsynth() {
 #ifndef THUNDER_HAVE_PUMP
   std::printf("rt_pumpsynth: not run (no pump library on this platform)\n"); return 0;
 #else
   using namespace thunder;
   PumpSynth::builtins();
-  const int ns = 13; PumpSynth S[13]; unsigned long perEvent[13] = {0}; size_t total = 0;
+  const int ns = 13; PumpSynth S[13]; size_t total = 0; unsigned long events = 0, blocksWithEvents = 0;
   for (int t = 0; t < ns; t++) {
     if (!S[t].make(t, 48000.0, nullptr, 0)) { std::printf("rt_pumpsynth FAIL: type %d not made\n", t); return 1; }
     if (t == 12) S[t].tempo(120.0);
-    S[t].midi(0, 0x90, 60, 100); S[t].process(256);   // the note on (events allocate: outside the guard)
   }
   { rt_guard g;
-    for (int b = 0; b < 600; b++) for (int t = 0; t < ns; t++) { const int n = 32 + (b * 37 + t * 11) % 481; S[t].process(n); const float* L = PumpSynth::out(0); for (int i = 0; i < n; i++) total += std::isfinite(L[i]) ? 1u : 0u; }
+    for (int b = 0; b < 640; b++) for (int t = 0; t < ns; t++) {
+      const int n = 32 + (b * 37 + t * 11) % 481; const int kind = (b + t) % 8; bool any = true;
+      switch (kind) {
+        case 0: S[t].midi(0, 0x90, 60, 100); events++; break;                                                   // a note-on
+        case 1: S[t].midi(n / 2, 0x80, 60, 0); events++; break;                                                 // a note-off
+        case 2: S[t].midi(n - 1, 0x90, 64, 90); S[t].midi(n - 1, 0x90, 67, 90); S[t].midi(n - 1, 0x90, 71, 90); events += 3; break;   // a chord, equal offsets: the sort must keep their order
+        case 3: S[t].midi(n - 1, 0x80, 64, 0); S[t].midi(3, 0x90, 72, 110); S[t].midi(n / 3, 0x80, 67, 0); S[t].midi(0, 0xE0, 0, 80); S[t].midi(1, 0xB0, 1, 64); events += 5; break;   // out of order, bend, CC
+        case 4: for (int e = 0; e < 40; e++) S[t].midi(n > e ? n - 1 - e : 0, e % 2 ? 0x80 : 0x90, 40 + e, 80); events += 40; break;   // 40 events, reverse offsets
+        default: any = false; break;                                                                            // no event
+      }
+      if (any) blocksWithEvents++;
+      S[t].process(n); const float* L = PumpSynth::out(0); for (int i = 0; i < n; i++) total += std::isfinite(L[i]) ? 1u : 0u;
+    }
   }
-  for (int t = 0; t < ns; t++) { const unsigned long a0 = rt_allocs; S[t].midi(5, 0x80, 60, 0); S[t].process(128); perEvent[t] = rt_allocs - a0; }
-  std::printf("rt_pumpsynth ok: 13 instruments x 600 blocks (%zu finite samples of the left channel) under the allocation guard, no event; operator new calls of one block with an event (note off): ", total);
-  for (int t = 0; t < ns; t++) std::printf("%lu%s", perEvent[t], t + 1 < ns ? " " : "\n");
+  std::printf("rt_pumpsynth ok: 13 instruments x 640 blocks (%zu finite samples of the left channel; %lu blocks with events, %lu events: note-on, note-off, several at once, reverse order) under the allocation guard\n", total, blocksWithEvents, events);
   return 0;
 #endif
 }

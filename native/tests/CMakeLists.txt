@@ -392,7 +392,7 @@ else()
   add_test(NAME pump COMMAND test_pump)   # no directory: prints FAIL and exits 1
 endif()
 
-# U33: the …pump synths hosted natively (core/src/engine/pumpsynth.cpp) against the web's own render path (tools/psyn-dump.mjs: PsynCore.render + the shipped pump/synth/pump-synth.wasm in Node, samples; 507 cases).
+# U33: the …pump synths hosted natively (core/src/engine/pumpsynth.cpp) against the web's own render path (tools/psyn-dump.mjs: PsynCore.render + the shipped pump/synth/pump-synth.wasm in Node, samples; the cases of psyn-dump.mjs).
 # Gate: -100 dB per case, the exact list kept exact (Linux x86-64), named left-out cases with a structural check; psyn_fuzz: combined-fields fuzz (under ASan + UBSan with THUNDER_SANITIZE).
 add_executable(test_pumpsynth test_pumpsynth.cpp)
 target_link_libraries(test_pumpsynth PRIVATE thunder_core)
@@ -404,6 +404,15 @@ if(NOT MSVC)
   target_compile_options(test_pumpsynth PRIVATE -Wall -Wextra)
   target_compile_options(test_pumpsynth_fuzz PRIVATE -Wall -Wextra)
 endif()
+# U33 follow-up: the not-built refusal path (THUNDER_WITH_PUMP=OFF / MSVC): every instrument refused. Built in every configuration; prints "not run" and returns 77 where pump is built. The CI step "Closed build" runs it.
+add_executable(test_pumpsynth_refused test_pumpsynth_refused.cpp)
+target_link_libraries(test_pumpsynth_refused PRIVATE thunder_core)
+target_include_directories(test_pumpsynth_refused PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../core/src ${CMAKE_CURRENT_SOURCE_DIR})
+if(NOT MSVC)
+  target_compile_options(test_pumpsynth_refused PRIVATE -Wall -Wextra)
+endif()
+add_test(NAME pumpsynth_refused COMMAND test_pumpsynth_refused)
+set_tests_properties(pumpsynth_refused PROPERTIES SKIP_RETURN_CODE 77)
 if(NOT TARGET thunder_pump)
   add_test(NAME pumpsynth COMMAND test_pumpsynth)
   set_tests_properties(pumpsynth PROPERTIES SKIP_RETURN_CODE 77)

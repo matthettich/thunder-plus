@@ -520,5 +520,18 @@ static const char* const kPsynCaseNames[] = {
   "file_pfreeze_44100",
   "file_pfreeze_22050",
   "file_pfreeze_none",
+  "bpm_pwobT_60",
+  "bpm_pwobT_137.5",
+  "bpm_pwobT_200",
+  "hit0_pmono",
+  "hit0_ppoly",
+  "hit0_pstrike",
+  "hit0_pfreeze",
+  "kdf_pstrike_0.5",
+  "kdf_pstrike_2.6",
+  "kdf_pboing_4.7",
+  "kdf_px0x_9.5",
+  "kdf_plife_6.5",
+  "file_pfreeze_long23s",
 };
-static const int kPsynCaseN = 520;
+static const int kPsynCaseN = 533;

@@ -1,6 +1,6 @@
 #!/bin/sh
 # U33 parity gate: the pump synths hosted natively.  native/tools/parity.sh u33
-#   builds test_pumpsynth + test_pumpsynth_fuzz + rt_harness and runs: pumpsynth_ref / pumpsynth (the web's PsynCore.render with the SHIPPED pump/synth/pump-synth.wasm in Node: 507 cases; -100 dB below each case's peak,
+#   builds test_pumpsynth + test_pumpsynth_fuzz + rt_harness and runs: pumpsynth_ref / pumpsynth (the web's PsynCore.render with the SHIPPED pump/synth/pump-synth.wasm in Node: every case of psyn-dump.mjs; -100 dB below each case's peak,
 #   the bit-exact cases kept exact on Linux x86-64, 39 cases left out by name with a structural check, parameter tables and KINDS equal to the page's meta, latency), pumpsynth_cases_current / pumpsynth_table_current (Linux),
 #   pumpsynth_fuzz (combined fields; FUZZ_COMBINED / FUZZ_DIRECT raise it), rt_core (rt_pumpsynth: the allocation guard).
 #   Then the same gate against a pump-synth.wasm BUILT FROM THE PIN (build-wasm.sh, wasi-sdk 25; byte-identical to the shipped one, third_party/PINS.md): PIN_WASM_DIR names the folder holding it (default /tmp/thunder-parity-u18-wasm;
