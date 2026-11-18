@@ -39,6 +39,7 @@
 #include <new>
 #include <sstream>
 #include <string>
+#include <thread>
 #include <vector>
 
 #if defined(__unix__) || defined(__APPLE__)
@@ -55,6 +56,7 @@ static void rt_violation(const char* what) {
 }
 struct rt_guard { rt_guard() { rt_depth++; } ~rt_guard() { rt_depth--; } };
 
+static thread_local unsigned long rt_mallocs = 0;   // malloc / calloc calls outside the guard (glibc, not under ASan: U25's per-thread workspace)
 static thread_local unsigned long rt_allocs = 0;   // operator new calls outside the guard (U33: what an event-bearing block of pump's synths allocates is counted, not forbidden)
 void* operator new(std::size_t n) { if (rt_depth) rt_violation("operator new"); rt_allocs++; void* p = std::malloc(n ? n : 1); if (!p) std::abort(); return p; }
 void* operator new[](std::size_t n) { if (rt_depth) rt_violation("operator new[]"); void* p = std::malloc(n ? n : 1); if (!p) std::abort(); return p; }
@@ -70,8 +72,8 @@ void operator delete[](void* p, std::size_t) noexcept { if (rt_depth && p) rt_vi
 #if defined(__GLIBC__) && !defined(__SANITIZE_ADDRESS__)
 extern "C" {
 void* __libc_malloc(size_t); void* __libc_calloc(size_t, size_t); void* __libc_realloc(void*, size_t); void __libc_free(void*);
-void* malloc(size_t n) { if (rt_depth) rt_violation("malloc"); return __libc_malloc(n); }
-void* calloc(size_t a, size_t b) { if (rt_depth) rt_violation("calloc"); return __libc_calloc(a, b); }
+void* malloc(size_t n) { if (rt_depth) rt_violation("malloc"); rt_mallocs++; return __libc_malloc(n); }
+void* calloc(size_t a, size_t b) { if (rt_depth) rt_violation("calloc"); rt_mallocs++; return __libc_calloc(a, b); }
 void* realloc(void* p, size_t n) { if (rt_depth) rt_violation("realloc"); return __libc_realloc(p, n); }
 void free(void* p) { if (rt_depth && p) rt_violation("free"); __libc_free(p); }
 }
@@ -746,28 +748,38 @@ done:
   std::printf("rt_engine_u26 ok: %d renders (%zu samples) of bass, the bass / voice cores and the live shell (bass, vox) under the allocation guard\n", renders, total); return 0;
 }
 
-// U33: the pump synths' per-block interface (PumpSynth: the live lanes' reusable path) under the guard. Control thread, outside the guard: every instrument is made (psyn_new allocates), FREEZE's built-in spectra are built
-// (PumpSynth::builtins) and the note is delivered. Under the guard: 600 blocks of 32 to 512 frames with NO event: nothing may allocate. Events are NOT allowed to be free: pump's SynthBase::run sorts the queued events with
-// std::stable_sort, whose temporary buffer is an allocation (libstdc++ and libc++ both make one for a non-empty range). That is counted outside the guard and printed; it is the finding the notes list. The rendered path
-// (xeng_psyn) is offline and allocates by design (an instance per render).
+// U33: the pump synths' per-block interface (PumpSynth: the live lanes' reusable path) under the guard, WITH events. Control thread, outside the guard: every instrument is made (psyn_new allocates) and FREEZE's built-in
+// spectra are built (PumpSynth::builtins). Under the guard, for all 13 instruments: 640 blocks of 32 to 512 frames in which every kind of block occurs: no event; a note-on; a note-off; several events at once (note-ons and
+// -offs, a chord with equal offsets, offsets NOT in queue order so the event sort has work to do, a pitch bend and a controller); and a block with 40 events queued in reverse order. Nothing may allocate in any of them.
+// (Before the fourth patch of third_party/prepare-pump.sh every block with an event made one operator new in all 13 synths: the temporary buffer of std::stable_sort in pump's SynthBase::run; this case then aborts
+// with "operator new" inside the guard. The first note-on of each instrument is under the guard too.) The rendered path (xeng_psyn) is offline and allocates by design (an instance per render).
 static int run_pumpsynth() {
 #ifndef THUNDER_HAVE_PUMP
   std::printf("rt_pumpsynth: not run (no pump library on this platform)\n"); return 0;
 #else
   using namespace thunder;
   PumpSynth::builtins();
-  const int ns = 13; PumpSynth S[13]; unsigned long perEvent[13] = {0}; size_t total = 0;
+  const int ns = 13; PumpSynth S[13]; size_t total = 0; unsigned long events = 0, blocksWithEvents = 0;
   for (int t = 0; t < ns; t++) {
     if (!S[t].make(t, 48000.0, nullptr, 0)) { std::printf("rt_pumpsynth FAIL: type %d not made\n", t); return 1; }
     if (t == 12) S[t].tempo(120.0);
-    S[t].midi(0, 0x90, 60, 100); S[t].process(256);   // the note on (events allocate: outside the guard)
   }
   { rt_guard g;
-    for (int b = 0; b < 600; b++) for (int t = 0; t < ns; t++) { const int n = 32 + (b * 37 + t * 11) % 481; S[t].process(n); const float* L = PumpSynth::out(0); for (int i = 0; i < n; i++) total += std::isfinite(L[i]) ? 1u : 0u; }
+    for (int b = 0; b < 640; b++) for (int t = 0; t < ns; t++) {
+      const int n = 32 + (b * 37 + t * 11) % 481; const int kind = (b + t) % 8; bool any = true;
+      switch (kind) {
+        case 0: S[t].midi(0, 0x90, 60, 100); events++; break;                                                   // a note-on
+        case 1: S[t].midi(n / 2, 0x80, 60, 0); events++; break;                                                 // a note-off
+        case 2: S[t].midi(n - 1, 0x90, 64, 90); S[t].midi(n - 1, 0x90, 67, 90); S[t].midi(n - 1, 0x90, 71, 90); events += 3; break;   // a chord, equal offsets: the sort must keep their order
+        case 3: S[t].midi(n - 1, 0x80, 64, 0); S[t].midi(3, 0x90, 72, 110); S[t].midi(n / 3, 0x80, 67, 0); S[t].midi(0, 0xE0, 0, 80); S[t].midi(1, 0xB0, 1, 64); events += 5; break;   // out of order, bend, CC
+        case 4: for (int e = 0; e < 40; e++) S[t].midi(n > e ? n - 1 - e : 0, e % 2 ? 0x80 : 0x90, 40 + e, 80); events += 40; break;   // 40 events, reverse offsets
+        default: any = false; break;                                                                            // no event
+      }
+      if (any) blocksWithEvents++;
+      S[t].process(n); const float* L = PumpSynth::out(0); for (int i = 0; i < n; i++) total += std::isfinite(L[i]) ? 1u : 0u;
+    }
   }
-  for (int t = 0; t < ns; t++) { const unsigned long a0 = rt_allocs; S[t].midi(5, 0x80, 60, 0); S[t].process(128); perEvent[t] = rt_allocs - a0; }
-  std::printf("rt_pumpsynth ok: 13 instruments x 600 blocks (%zu finite samples of the left channel) under the allocation guard, no event; operator new calls of one block with an event (note off): ", total);
-  for (int t = 0; t < ns; t++) std::printf("%lu%s", perEvent[t], t + 1 < ns ? " " : "\n");
+  std::printf("rt_pumpsynth ok: 13 instruments x 640 blocks (%zu finite samples of the left channel; %lu blocks with events, %lu events: note-on, note-off, several at once, reverse order) under the allocation guard\n", total, blocksWithEvents, events);
   return 0;
 #endif
 }
@@ -812,7 +824,23 @@ static int run_engine_u25() {
   }
 done:
   if (!total) { std::printf("rt_engine_u25 FAIL: a render failed\n"); return 1; }
-  std::printf("rt_engine_u25 ok: %d voice renders (%zu samples) of Plaits / Elements layers under the allocation guard (the thread's workspace made beforehand)\n", renders, total); return 0;
+  // THE THREAD'S WORKSPACE. The guard above covers a thread that called eng_init() (so pe_prepare()). The workspace is per thread (thread_local): a thread that renders a Plaits / Elements layer without it
+  // makes it on its first render (the Session, about 1.8 MB: a calloc and a malloc), which an audio callback must never do. Two fresh threads show both: A renders without preparing (pe_thread_ready() is false
+  // before, true after; the first render allocates: counted outside the guard, glibc without ASan only), B calls pe_prepare() first and then renders under the guard, as the wiring of a live lane must.
+  bool aBefore = true, aAfter = false, bReady = false, bOk = false; unsigned long aFirst = 0, aSecond = 0;
+  { size_t nn = 0; std::vector<float> ba(bufs[0].size()), bb(bufs[0].size());
+    std::thread A([&]() { aBefore = pe_thread_ready(); const unsigned long m0 = rt_mallocs; const int st = eng_render_voice(vs[0], os[0], ba.data(), ba.size() - 1, &nn); aFirst = rt_mallocs - m0; aAfter = pe_thread_ready() && st == kEngOk;
+      const unsigned long m1 = rt_mallocs; eng_render_voice(vs[0], os[0], ba.data(), ba.size() - 1, &nn); aSecond = rt_mallocs - m1; });
+    A.join();
+    std::thread B([&]() { pe_prepare(); bReady = pe_thread_ready(); { rt_guard g; size_t n2 = 0; bOk = eng_render_voice(vs[0], os[0], bb.data(), bb.size() - 1, &n2) == kEngOk && eng_render_voice(vs[1], os[1], bufs[1].data(), bufs[1].size() - 1, &n2) == kEngOk; } });
+    B.join(); }
+#ifdef RT_MALLOC_GUARDED
+  const bool allocSeen = aFirst > 0 && aSecond == 0;
+#else
+  const bool allocSeen = true;   // malloc is not counted here (ASan or a non-glibc libc): only the readiness flags are checked
+#endif
+  if (aBefore || !aAfter || !bReady || !bOk || !allocSeen) { std::printf("rt_engine_u25 FAIL: thread workspace (unprepared thread ready before %d, after %d; first render made %lu allocations, the second %lu; prepared thread ready %d, guarded renders ok %d)\n", aBefore, aAfter, aFirst, aSecond, bReady, bOk); return 1; }
+  std::printf("rt_engine_u25 ok: %d voice renders (%zu samples) of Plaits / Elements layers under the allocation guard (the thread's workspace made beforehand); a second thread: unprepared -> its first render made %lu allocations (pe_thread_ready false then true), prepared with pe_prepare() -> guarded renders ok\n", renders, total, aFirst); return 0;
 }
 
 #ifdef THUNDER_HAVE_LXR

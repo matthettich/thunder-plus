@@ -1,6 +1,6 @@
 // U33: the …pump synths hosted natively (core/src/engine/pumpsynth.{h,cpp}: PumpSynth, xeng_psyn) against the web app's own render path (tools/psyn-dump.mjs: pump/synth/pump-synth-engine.js
-// PsynCore.render + pump-synth.wasm in Node, SAMPLES): 507 cases (every row of tests/golden/pump-synth.json; every factory preset of the 13 synths; every synth with all parameters at their minimum, at
-// their maximum, and three seeded random sets; the pad's macros: Tune, Hit, Level + Drive, hold, a kit's Drum, WOB's tempo, FREEZE's File; sample rates 8000 to 96000).
+// PsynCore.render + pump-synth.wasm in Node, SAMPLES): the cases of tools/psyn-dump.mjs, kPsynCaseN in golden/psyn_cases.inc (every row of tests/golden/pump-synth.json; every factory preset of the 13 synths; every synth with all parameters at their minimum, at
+// their maximum, and three seeded random sets; the pad's macros: Tune, Hit, Level + Drive, hold, a kit's Drum, WOB's tempo with and without a wobble target, a fractional Drum, Hit 0, FREEZE's File and a File over 20 s; sample rates 8000 to 96000).
 //   test_pumpsynth <dir> [--write-gate FILE] [case-substring]
 // THE GATE (the lead's rule for a fast-math-wasm reference, docs/port/TODAY.md "Evening, 16 Nov" items 1 and 7; the pump effects' gate, U18-NOTES.md): the web's pump-synth.wasm is built with -ffast-math
 // (float sums reordered, which no native build reproduces) and the native build is STRICT. So per case:
@@ -132,6 +132,7 @@ int main(int argc, char** argv) {
   std::printf("pumpsynth: reference = web PsynCore.render + %s; gate %.0f dB below each reference's peak%s\n", std::string(root.str("wasm")).c_str(), kGateDb, enforceExact ? ", the exact list enforced" : ", the exact list NOT enforced here (not Linux x86-64)");
   if (all) {
     metaTest(root);
+    if ((int)root.num("goldenRows") != 13) { std::printf("the reference compared %d rows of tests/golden/pump-synth.json, the page has 13 synths (one row each)  FAIL\n", (int)root.num("goldenRows")); fails++; }
     if ((int)root.num("goldenBad") != 0) { std::printf("the reference's hash of %d of the %d rows of tests/golden/pump-synth.json differs from the golden: the reference is not the web's  FAIL\n", (int)root.num("goldenBad"), (int)root.num("goldenRows")); fails++; }
   }
   if (all) {   // every name in the committed lists is a case of this run (a renamed case would otherwise leave a stale entry that gates nothing)
@@ -151,7 +152,7 @@ int main(int argc, char** argv) {
     else { ok = ok && (R.exact || R.db <= kGateDb); if (R.exact) std::snprintf(db, sizeof db, "exact"); else std::snprintf(db, sizeof db, "%.1f dB", R.db);
       if (R.exact) exact++; else if (R.db <= kGateDb) within++; if (!R.exact && R.db > worst) { worst = R.db; worstName = nm; } }
     if (enforceExact && wasExact && !R.exact) { ok = false; regress++; extra = "  (was bit-exact: the exact list is enforced)"; }
-    std::printf("%-22s %-22s len %ld/%ld (%+.1f%%) rms %+.2f dB, held %+.2f dB%s%s%s%s\n", nm, db, R.n, R.nref, R.lenPct, R.rmsDb, R.holdDb, R.finite ? "" : " NOT FINITE", R.lenOk ? "" : " LENGTH DIFFERS", extra, ok ? "" : "  FAIL");
+    std::printf("%-22s %-22s len %ld/%ld (%+.1f%%) rms %+.2f dB, held %+.2f dB, bits %016llx%s%s%s%s\n", nm, db, R.n, R.nref, R.lenPct, R.rmsDb, R.holdDb, (unsigned long long)R.hash, R.finite ? "" : " NOT FINITE", R.lenOk ? "" : " LENGTH DIFFERS", extra, ok ? "" : "  FAIL");
     if (!ok || lo) std::printf("    %s: first difference at sample %ld: got %.9g want %.9g; largest %.3g against a peak of %.3g%s%s\n", lo ? "left out" : "where", R.first, R.firstGot, R.firstWant, R.err, R.peak, lo ? "; reason: " : "", lo ? lo->why : "");
     if (!ok) { fails++; failedCases++; }
   }

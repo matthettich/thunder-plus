@@ -3,7 +3,8 @@
 // (core/dsp/pe_host.h): the upstream Plaits / Elements built STRICT, against the web's fast-math thunder-dsp.wasm gated at -100 dB (docs/port/U25-NOTES.md).
 // ONE Session per rendered voice: the page keeps one thunder-dsp instance whose statics (stmlib::Random, Plaits' shared RAM, Elements' dither) go on from one layer to the next, so the layers of a
 // voice share a Session that starts zeroed, as a fresh instance does. The workspace (Session + the pre-render buffer, up to 1.5 MB) is per thread and made once: eng_init() makes it for the calling
-// thread (pe_prepare); a thread that renders a Plaits / Elements layer without it makes it on its first use (that first render allocates; every later one does not).
+// thread (pe_prepare); a thread that renders a Plaits / Elements layer without it makes it on its first use (that first render allocates; every later one does not): EVERY thread that will render
+// under an allocation rule must call pe_prepare() (or eng_init()) itself, off the audio thread, before its first render; pe_thread_ready() says whether it did (tests/rt_harness.cpp shows both cases).
 // Without the library (MSVC builds no DSP libraries) the types are not supported: eng_layer_type gives Other and a voice with such a layer is refused (kEngUnsupported).
 #ifndef THUNDER_ENGINE_LAYER_PE_H
 #define THUNDER_ENGINE_LAYER_PE_H
@@ -17,6 +18,8 @@ namespace thunder {
 
 bool pe_available();                                   // the library is built into this core
 void pe_prepare();                                     // makes the calling thread's workspace (allocates): call once off the audio thread
+bool pe_thread_ready();                                // the calling thread has its workspace (pe_prepare() / eng_init() ran on THIS thread, or a render did): a render here allocates nothing. false: the first
+                                                       // Plaits / Elements render on this thread would allocate about 1.8 MB. A thread that will render in a callback must call pe_prepare() first (docs/port/U25-NOTES.md)
 bool pe_is(LType t);                                   // plaits or elements
 LType pe_layer_type(const char* name, size_t n);       // "plaits" / "elements" (Other when the library is not built, or for any other name)
 bool pe_layer_ok(const EngLayer& L);                   // false: a knob outside the range the app's sliders have (non-finite too), or an Elements model outside 0..2: refused, see layer_pe.cpp

@@ -36,3 +36,15 @@ WRAP="        if (!(p >= 0.0 && p < 1.0)) { p -= std::floor(p); if (!(p >= 0.0 &
 patch(sys.argv[1], "    static inline double read(const std::vector<float>& d, double p)\n    {\n", "    static inline double read(const std::vector<float>& d, double p)\n    {\n"+WRAP)
 patch(sys.argv[2], "    inline double read(int w, int m, double p) const\n    {\n", "    inline double read(int w, int m, double p) const\n    {\n"+WRAP)
 PY
+
+# ALLOCATION (wasm/pump_synth.cpp, SynthBase::run, `std::stable_sort(q, q + nq, ...)`): the libstdc++ / libc++ stable_sort makes a temporary buffer (an operator new of ceil(n / 2) * 8 bytes) for every non-empty range, so EVERY block that
+# carries at least one event (a note-on, a note-off, ...) allocates once, in all 13 synths: not allowed in an audio callback (found by the verifier of U33 with a counting operator new; docs/port/U33-NOTES.md "Allocation"). The patch is a stable
+# insertion sort over the same queue (at most kMaxEvents = 512 entries, nearly sorted: the host queues in time order): the strict `>` keeps equal offsets in their queued order exactly as stable_sort does, so every render is the same bits.
+python3 - "$O/wasm/pump_synth.cpp" <<'PY'
+import sys; p=sys.argv[1]; s=open(p).read()
+old="        std::stable_sort(q, q + nq, [](const pump::synth::Midi& a, const pump::synth::Midi& b) { return a.offset < b.offset; });\n"
+new=("        // Thunder (prepare-pump.sh): was std::stable_sort, whose temporary buffer is an allocation in every block with an event; a stable insertion sort (strict >) gives the same order and allocates nothing\n"
+     "        for (int i = 1; i < nq; ++i) { const pump::synth::Midi m = q[i]; int j = i; while (j > 0 && q[j - 1].offset > m.offset) { q[j] = q[j - 1]; --j; } q[j] = m; }\n")
+if s.count(old)!=1: sys.exit("pump_synth.cpp patch failed (the stable_sort of the event queue is not there exactly once)")
+open(p,'w').write(s.replace(old,new,1))
+PY

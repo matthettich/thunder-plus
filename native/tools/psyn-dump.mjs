@@ -71,6 +71,16 @@ for (const b of [60, 200]) add('bpm_pwob_' + b, 'pwob', Object.assign(base('pwob
   add('file_pfreeze_44100', 'pfreeze', fr, 48000, 1, { file: { n: 88200, sr: 44100, f: 220 } });
   add('file_pfreeze_22050', 'pfreeze', Object.assign({}, fr, { root: 48 }), 44100, 0.5, { file: { n: 30000, sr: 22050, f: 110 } });
   add('file_pfreeze_none', 'pfreeze', fr, 48000, 0.5); }   // File with no sound: silent
+// U33 follow-ups (the verifiers' four mutations that no case caught; NEW rows, appended at the end of the list so that no earlier row moves):
+//  - WOB's tempo with a wobble TARGET (the defaults have none: the two bpm_pwob cases give the same sound at any tempo): cutoff, amplitude and pitch wobbles, synced, three tempos
+//  - Hit 0 (the pad's `vel || 100`: 0 means the default 100, not the lowest velocity)
+//  - a fractional Drum (Math.round against truncation: 0.5 -> 1, 2.6 -> 3; a whole number cannot tell them apart)
+//  - a File longer than 20 s (FREEZE's cap `sr * 20`: the page reads the first 20 s of the file; the Position at 95 % reads near the end of what it kept)
+for (const b of [60, 137.5, 200]) add('bpm_pwobT_' + b, 'pwob', Object.assign(base('pwob'), { wob_sync: 1, wob_cut: 3, wob_amp: 60, wob_pitch: 4, wob_depth: 100 }), 48000, 1.2, { bpm: b });
+for (const k of ['pmono', 'ppoly', 'pstrike', 'pfreeze']) add('hit0_' + k, k, Object.assign(base(k), { vel: 0 }), 48000, 0.3);
+for (const [k, d] of [['pstrike', 0.5], ['pstrike', 2.6], ['pboing', 4.7], ['px0x', 9.5], ['plife', 6.5]]) add('kdf_' + k + '_' + d, k, Object.assign(base(k), { kd: d }), 48000, 0.3);
+{ const fr = Object.assign(base('pfreeze'), { source: 0, position: 95 });
+  add('file_pfreeze_long23s', 'pfreeze', fr, 48000, 0.5, { file: { n: 22050 * 23, sr: 22050, f: 110 } }); }   // 23 s at 22050 Hz: the cap is 20 s = 441000 samples
 
 if (opt['write-cases'] || opt.check) {
   const inc = path.join(ROOT, 'native/tests/golden/psyn_cases.inc');

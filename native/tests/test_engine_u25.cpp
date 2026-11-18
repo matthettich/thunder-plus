@@ -18,8 +18,12 @@
 //      The test FAILS for a case that is beyond the line, outside the rule and not listed, for a listed case that is now within the line or the rule (stale), whose class changed, or that got worse than recorded by more than 1 dB.
 //  (e) THE PLUMBING GATE, hard and exact: every case rendered with the wasm's OWN pre-renders injected (pe_test_hook) must equal the reference BIT FOR BIT: the resampling, the layer filters, envelopes, pitch
 //      envelope, delay / burst, the voice stages are the JS's to the last bit; what is left of the difference between the native render and the wasm is the library's alone.
+//  (f) THE CLAMP CASES (U25 follow-up): the five host-only Plaits patches of third_party/prepare.sh clamp an index that the web's wasm reads out of its table. No case of the reference list reaches a clamp (only
+//      out-of-table inputs do, and the wasm there reads whatever its memory holds), so the clamp results themselves are checked here by one NATIVE-ONLY case per patched read (kClamp below: a voice that reaches
+//      the clamp, found with a counter in the clamp): the render must be finite, not trivially short, and equal the committed SHA-256 (golden/engine_u25_clamp.inc, written by --write-clamp, never hand-edited).
+//      A change of a clamp's value changes the render: the mutations are listed in docs/port/U25-NOTES.md.
 //  Also: the refusals, and rt_engine_u25 in rt_harness (the allocation guard).
-//   test_engine_u25 <refDir> [name-substring] [--write-native FILE] [--dump DIR] [--list]
+//   test_engine_u25 <refDir> [name-substring] [--write-native FILE] [--write-clamp FILE] [--dump DIR] [--list]
 // Without the library (Windows / MSVC builds no DSP libraries) the two layer types are not supported: the test says so and checks only that.
 #include <algorithm>
 #include <cmath>
@@ -38,6 +42,7 @@
 #include "rt/json.h"
 #include "sha256.h"
 #include "golden/engine_u25_native.inc"
+#include "golden/engine_u25_clamp.inc"
 
 using namespace thunder;
 
@@ -73,6 +78,26 @@ static Cmp compareF(const float* a, size_t na, const float* r, size_t nr) {
 struct Row { std::string name, sha; bool exact; char cls; double db; long nDiff, first; double rawLsb; bool out; };
 // the worst error of a pre-render over the samples [lo, hi) against the peak of the whole reference
 static double errDb(const float* a, const float* r, size_t n, size_t lo, size_t hi, double peak) { double e = 0; for (size_t i = lo; i < hi && i < n; i++) { if (std::isnan(a[i]) || std::isnan(r[i])) return INFINITY; e = std::max(e, std::fabs((double)a[i] - (double)r[i])); } return e == 0 ? -INFINITY : 20 * std::log10(e / std::max(peak, 1e-30)); }
+// (f) the clamp cases: one voice per patched Plaits read (prepare.sh patches 1 to 5), each found to reach its clamp. Fields: Macro osc model, note, harmonics, timbre, morph, decay, lpg, fm, timbre env, morph env, strike, aux output, voice length.
+struct ClampCase { const char* name; int eng; double note, h, t, m, dec, lpg, fm, te, me; bool strike, aux; double len; };
+static const ClampCase kClamp[] = {
+  {"clamp_p1_waveshaping_index",   9, -71.500420542457277, 0.79488119899446996, 0.52546113775701775, 0.57167555456900276, 0.18587677873038477, 0.0551285415381495, -0.43519219149138944, 0, -0.85054071240246798, true, false, 1.0},   // waveshaping: 127 * slope + 128 leaves the int range (ws_index clamped to +-2e9)
+  {"clamp_p2_speech_consonant",   15, 48, 0.2, 0.1, 0.9, 0.5, 0.5, 0, 0, 0, true, false, 0.3},                          // speech: the last consonant (frame 14) without interpolation reads no frame 15
+  {"clamp_p3_wavetable_corner",   13, 96, 0.999999, 0.5, 0.99, 0.5, 0.5, 1, 0, 0, true, false, 0.3},                    // wavetable: the corner after a coordinate of exactly 7.0 (x / y / z clamped into the 4 x 8 x 8 map)
+  {"clamp_p4_wave_terrain_aux",    5, 48.0754, 1, 1, 0.25, 0.904268, 0.45153, -0.999047, 0, 0.20726, true, true, 0.4},  // wave terrain (the AUX output is the one the clamp is in): the aux sine phase at or below -1/512 becomes 0
+  {"clamp_p5_bass_drum_sine",     21, -20.37560970950722, 1, 0.5, 0.5, 0.64096080366514618, 0.5, -0.5, 0.5, 0.11839042365707164, false, false, 1.0},     // bass drum (sustain): SineNoWrap with a phase of 1.25 or more reads the last table entry
+};
+static const int kClampN = (int)(sizeof kClamp / sizeof kClamp[0]);
+static bool clampRender(const ClampCase& c, std::string* sha, bool* finite, size_t* n, double* peak) {
+  EngVoice V; V.len = c.len; V.gate = 300; V.nLayers = 1; EngLayer& L = V.layers[0]; L.on = true; L.type = LType::Plaits; L.level = 0.8; L.tune = c.note - 36; L.dec = 1500;
+  EngPE& P = L.pe; P.pEng = c.eng; P.pHarm = c.h; P.pTim = c.t; P.pMor = c.m; P.pDecay = c.dec; P.pLpg = c.lpg; P.pFm = c.fm; P.pTimEnv = c.te; P.pMorEnv = c.me; P.pStrike = c.strike; P.pAux = c.aux;
+  EngRenderOpts o; const size_t bound = eng_render_bound(V, o); if (!bound) return false;
+  std::vector<float> buf(bound + 8, 12345.0f); *n = 0;
+  if (eng_render_voice(V, o, buf.data(), bound, n) != kEngOk || buf[bound] != 12345.0f) return false;
+  *finite = true; *peak = 0; for (size_t i = 0; i < *n; i++) { if (!std::isfinite(buf[i])) *finite = false; else *peak = std::max(*peak, (double)std::fabs(buf[i])); }
+  Sha256 h; h.add((const char*)buf.data(), *n * 4); *sha = h.hex(); return true;
+}
+static const char* clampSha(const char* nm) { for (int i = 0; i < kClampShaN; i++) if (!std::strcmp(kClampSha[i].name, nm)) return kClampSha[i].sha256; return nullptr; }
 static std::vector<Row> gRows;
 static bool gWrite = false;
 
@@ -82,16 +107,33 @@ int main(int argc, char** argv) {
     int bad = 0; if (eng_layer_type("plaits", 6) != LType::Other || eng_layer_type("elements", 8) != LType::Other) { std::printf("FAIL: the types must be unknown without the library\n"); bad++; }
     EngVoice V; V.layers[0].on = true; V.layers[0].level = 1; V.nLayers = 1; V.layers[0].type = LType::Plaits; EngRenderOpts o; size_t n = 0; float tmp[64];
     if (eng_render_voice(V, o, tmp, 64, &n) != kEngUnsupported) { std::printf("FAIL: a Plaits layer must be refused without the library\n"); bad++; }
+    V.layers[0].type = LType::Elements;
+    if (eng_render_voice(V, o, tmp, 64, &n) != kEngUnsupported) { std::printf("FAIL: an Elements layer must be refused without the library\n"); bad++; }
     if (!bad) std::printf("PASS test_engine_u25 (library not built)\n");
     return bad ? 1 : 0;
   }
   if (argc < 2) { std::printf("FAIL: usage: test_engine_u25 <refDir> [name-substring] [--write-native FILE] [--dump DIR] [--list]\n"); return 1; }
-  const std::string refDir = argv[1]; std::string filt, dumpDir; const char* writeNative = nullptr; bool list = false;
-  for (int i = 2; i < argc; i++) { if (!std::strcmp(argv[i], "--write-native") && i + 1 < argc) { writeNative = argv[++i]; gWrite = true; } else if (!std::strcmp(argv[i], "--dump") && i + 1 < argc) dumpDir = argv[++i];
+  const std::string refDir = argv[1]; std::string filt, dumpDir; const char* writeNative = nullptr; const char* writeClamp = nullptr; bool list = false;
+  for (int i = 2; i < argc; i++) { if (!std::strcmp(argv[i], "--write-native") && i + 1 < argc) { writeNative = argv[++i]; gWrite = true; } else if (!std::strcmp(argv[i], "--write-clamp") && i + 1 < argc) writeClamp = argv[++i]; else if (!std::strcmp(argv[i], "--dump") && i + 1 < argc) dumpDir = argv[++i];
     else if (!std::strcmp(argv[i], "--list")) list = true; else filt = argv[i]; }
   std::string cj, rj; if (!readFile(refDir + "/cases.json", &cj) || !readFile(refDir + "/ref.json", &rj)) { std::printf("FAIL: the reference (cases.json, ref.json) is missing: a fixture that cannot run is a failure\n"); return 1; }
   JsonDoc cdoc, rdoc; if (!cdoc.parse(cj) || !rdoc.parse(rj)) { std::printf("FAIL: a reference file does not parse\n"); return 1; }
   eng_init();
+  { // (f) the clamp cases (native only): finite, not trivially short, and the committed SHA-256
+    std::string out; int nOk = 0;
+    for (int i = 0; i < kClampN; i++) {
+      std::string sha; bool fin = false; size_t n = 0; double peak = 0;
+      if (!clampRender(kClamp[i], &sha, &fin, &n, &peak)) { std::printf("%-34s clamp case: the render failed  FAIL\n", kClamp[i].name); fails++; continue; }
+      const char* w = clampSha(kClamp[i].name); bool ok = true; const char* why = "";
+      if (!fin) { ok = false; why = "not finite"; } else if (n < 1000 || !(peak > 0)) { ok = false; why = "silent or trivially short"; }
+      else if (!writeClamp) { if (!w) { ok = false; why = "no committed value (golden/engine_u25_clamp.inc)"; } else if (sha != w) { ok = false; why = "the render differs from the committed one (a clamp's result changed)"; } }
+      if (!ok) { std::printf("%-34s clamp case: %s (%zu samples, peak %g)  FAIL\n", kClamp[i].name, why, n, peak); fails++; } else nOk++;
+      char b[200]; std::snprintf(b, sizeof b, "  {\"%s\", \"%s\"},\n", kClamp[i].name, sha.c_str()); out += b;
+    }
+    std::printf("engine U25 clamp cases: %d of %d finite and equal to the committed native render (one per patched Plaits read, prepare.sh patches 1 to 5)\n", nOk, kClampN);
+    if (writeClamp) { std::ofstream o(writeClamp); o << "// GENERATED by test_engine_u25 --write-clamp: the SHA-256 of the native render of each clamp case (kClamp in test_engine_u25.cpp: a voice that reaches one of the five host-only Plaits clamps of prepare.sh). Made on Linux x86-64. Never hand-edited.\n"
+      << "struct ClampSha { const char* name; const char* sha256; };\nstatic const ClampSha kClampSha[] = {\n" << out << "  {\"\", \"\"}};\nstatic const int kClampShaN = " << kClampN << ";\n"; std::printf("wrote %s\n", writeClamp); }
+  }
   Json C = cdoc.root().arr("cases"), R = rdoc.root().arr("cases");
   std::map<std::string, size_t> rowOf; for (size_t i = 0; i < R.size(); i++) rowOf[std::string(R.at(i).str("name"))] = i;
   if (C.size() == 0 || R.size() == 0 || R.size() > C.size()) { std::printf("FAIL: %zu cases, %zu reference rows\n", C.size(), R.size()); return 1; }
