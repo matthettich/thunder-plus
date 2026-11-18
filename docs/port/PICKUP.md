@@ -25,6 +25,20 @@ plan; sections 1 to 4 and 9), `HANDOVER.md` on `beta` (the web app, the owner's 
   every other upstream; start it when a compiling slot is free); **U36 Link / recording / inputs** (lead reviews); **Stage N2 (the Android shell)** and **N4 (Windows and Mac shells)**.
 - **Fastest route to something the owner can install:** N1 steps 10 and 11, then N2. U31 can run in parallel with a worker.
 
+## State at 00:10 on 18 Nov (the lead, same chat; check-ins are set for after each usage reset)
+- **Pump re-pin to e43ee10:** web = PR #224 into `beta` (build 643; CI green; verified SOUND WITH CONDITIONS, report `/home/claude/progress/verify-224.md`;
+  the condition, a 0.85 s audio-thread stall when a live FREEZE node is made, is fixed in 7582f8b: warm-up while stopped, render plays while playing;
+  an independent check of that fix with real playback is running; merge to `beta` then `main` when it is clean). Native = PR #225 into `native`
+  (four `prepare-pump.sh` patches dropped; exact list unchanged at 40 of 80: the fast-math wasm still reassociates `dot4`; merge after #224, mirror the
+  web files, one full ctest on the combined head). **FLEX is NOT in pump's web build: 25 types, nothing to hide** (the brief above was wrong).
+  For the owner's pump agent: `#pragma clang fp reassociate(off)` in the oversampler's `dot4`; FREEZE spectra built lazily or in chunks.
+- **Running (Sonnet):** U31 on `n3/u31`, U32 on `n3/u32` (stb_vorbis). Notes: `docs/port/U31-NOTES.md`, `U32-NOTES.md` on their branches.
+- **Wiring:** `docs/port/WIRING-DOSSIER.md` (a Sonnet read of seq / voice / mix / fxhost / fxpump / core.cpp; the lead checked its top findings against
+  the source): Seq has no time / bpm setters; Seq holds `const Song&` across a song swap; the U26 live shell drops NoteOff on a full queue
+  (`live_shell.h` enqueue); `SongRenderer::dispatch` plays sampler pads only; `core.cpp` is still the N0 stand-in; no MIDI scheduler. Its part 5 is the
+  step order: U34a offline song render C API, U34b stems, then dispatch routing + Seq setters + Song lifetime (the lead reviews).
+- `docs/port/IF-SOLD.md`: what would change if the app were sold (the owner asked).
+
 ## Rules the lead set for gates (they hold for every remaining unit)
 - Ported JS: bit-exact against the web app's goldens and a Node reference; committed Linux hashes gate every platform. Never loosen a gate, never hand-edit a
   golden, no `-ffast-math`.
