@@ -25,12 +25,13 @@ test('a HOP moves the band with the track; STOP (P null) clears every band; an u
   const before = c.lines[3 + 10].sp[0][0]; let n = 0; const add = before.classList.add; before.classList.add = x => { n++; add(x); }; c.pvPlayMark([{ phrase: 5, step: 10 }]); assert.equal(n, 0);
   c.pvPlayMark(null); assert.ok(!lit(c, 0, 10)); assert.equal(c.size(), 0);
 });
-test('wiring: spans carry pvtN, draw marks in place after the grid is built (only while playing), no rebuild or layout read', () => {
+test('wiring: spans carry pvtN, draw marks in place after the grid is built (while playing and at the stopped spot), no rebuild or layout read', () => {
   assert.match(src, /const tint = ' pvt' \+ g\.t \+/);
-  assert.match(src, /pvPlayMark\(tp\.on \? tp\.pos : null\); else if \(pvLit\.size\) pvPlayMark\(null\);/);
+  assert.match(src, /if \(tv === .phrase. && pvActive\(\)\) pvPlayMark\(P\); else if \(pvLit\.size\) pvPlayMark\(null\);/);   // 17 Nov: while playing, and stopped at RESUME spot (P)
   const body = fn[0]; assert.doesNotMatch(body, /innerHTML|offsetWidth|offsetHeight|getBoundingClientRect|clientHeight/);
 });
-test('look: ink band only (the skin\'s own --ts-ink, so Low power stays black and grey), no animation, weaker than the cursor', () => {
-  const m = src.match(/\.tgrid\.pvon span\.pvpl:not\(\.cur\):not\(\.sel\)\{([^}]*)\}/); assert.ok(m);
-  assert.match(m[1], /var\(--ts-ink\) 24%/); assert.doesNotMatch(m[1], /animation|transition|#[0-9a-f]{3,6}|blur/i);
+test('look (17 Nov): the skin\'s own ink and screen colour only (Low power stays black and grey), no animation; the cursor cell keeps its colours, ringed', () => {
+  const m = src.match(/\.tgrid\.pvon span\.pvpl:not\(\.cur\):not\(\.sel\):not\(#zz\)\{([^}]*)\}/); assert.ok(m);
+  assert.match(m[1], /background:var\(--ts-ink\)/); assert.match(m[1], /color:var\(--ts-bg\)/); assert.doesNotMatch(m[1], /animation|transition|#[0-9a-f]{3,6}|blur/i);
+  assert.match(src, /span\.pvpl\.cur:not\(#zz\)\{outline:2px solid var\(--ts-bg\)/);
 });
