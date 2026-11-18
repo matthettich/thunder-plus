@@ -99,7 +99,10 @@ bool sf_resample(std::vector<float>& d, double from, double to) { return resampl
 void decode_sample(const Font& f, uint32_t i, const DecodeOpts& opt, Pcm& o) {
   o = Pcm();
   if (i >= f.samples.size()) { fallback(o); return; }
-  const SampleHdr& s = f.samples[i]; const size_t maxFrames = opt.maxBytes / sizeof(float);   // 0: no budget
+  const SampleHdr& s = f.samples[i];
+  if (s.sr < kMinHdrRate || s.sr > kMaxHdrRate) { fallback(o); return; }   // an absurd header rate
+  if (opt.ctxRate != 0 && !(opt.ctxRate >= kMinStreamRate && opt.ctxRate <= kMaxStreamRate)) { fallback(o); return; }   // an absurd (or NaN) context rate
+  const size_t maxFrames = opt.maxBytes / sizeof(float);   // 0: no budget
   if (s.type & 0x10) {   // SF3: an Ogg Vorbis stream at start..end (bytes); loops are frames from the sample's start
     const size_t a = std::min<size_t>(s.start, f.smplN), b = std::min<size_t>(s.end, f.smplN);   // smpl.slice(start, end)
     std::vector<float> d; double sr = 0; DecodeRes r = b <= a ? kDecodeBad : decodeOgg(f.smpl + a, b - a, d, sr, opt.pageTail, maxFrames);

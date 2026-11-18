@@ -3,6 +3,8 @@
 # Usage: fetch.sh [DEST]   (default: _deps next to this script). Idempotent: a folder already at its pin is left alone.
 # Needs git and network access to github.com. Nothing here is patched: patches are applied by prepare.sh on a copy.
 set -e
+# Windows (Git for Windows sh): without this, MSYS rewrites the sparse-checkout patterns that start with "/" (e.g. /stb_vorbis.c) into C:/Program Files/Git/... and nothing is checked out.
+export MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL="*"
 H=$(cd "$(dirname "$0")" && pwd)
 D=${1:-$H/_deps}
 mkdir -p "$D"

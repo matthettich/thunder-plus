@@ -32,6 +32,11 @@ M=[
 ('sf_decode.cpp','d.resize((size_t)sc.lastGranule);','d.resize((size_t)sc.lastGranule + 1);','granule trim: one frame too many'),
 ('sf_decode.cpp','info.sample_rate < kMinStreamRate','info.sample_rate < 400','stream rate floor'),
 ('sf_parse.cpp','if (s.type & 0x10) F.sf3 = true;','if (s.type & 0x20) F.sf3 = true;','sf3 flag detection'),
+('sf_decode.cpp','s.sr < kMinHdrRate','s.sr < 399','header rate floor'),
+('sf_decode.cpp','if (opt.ctxRate != 0 &&','if (false &&','absurd context rate no longer refused'),
+('sf.h','bool pageTail = false;','bool pageTail = true;','parity mode ON by default'),
+('sf.h','kMaxWork = 200000;','kMaxWork = 200000000;','parse work cap lifted'),
+('sf_decode.cpp','const uint64_t n = std::min(claimed, have);','const uint64_t n = claimed;','SF2 sample no longer clamped to the data present'),
 ]
 only=sys.argv[1:]
 res=[]

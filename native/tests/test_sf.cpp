@@ -5,6 +5,7 @@
 //                          the committed hashes (sf_golden.inc: the test font's on every platform, the GM font's on Linux x86-64)
 #include <algorithm>
 #include <cmath>
+#include <limits>
 #include <cstdint>
 #include <cstdio>
 #include <chrono>
@@ -432,6 +433,23 @@ static int doUnit() {
     CHECK(st == kParseTooBig && dt < 1.0, "30000 x 30000 zones: status %d in %.3f s (%zu bytes)", (int)st, dt, big.size());
     auto ok = bigSf2(400, 400); Font f2; CHECK(parse(ok.data(), ok.size(), f2) == kParseOk && f2.work == 160000, "400 x 400 zones parses (work %llu)", (unsigned long long)f2.work);
     std::printf("unit: 30000 x 30000 zones refused in %.0f ms (%zu-byte file); 400 x 400 (160000 pairs, 16x the GM font) parses\n", dt * 1000, big.size()); }
+  { // H6: absurd header rates and context rates are refused (a silent frame), sane ones decode
+    int ok = 0, n = 0; const double CR[] = {0, 4000, 44100, 192000};
+    for (uint32_t hr : {0u, 1u, 399u, 400u, 44100u, 192000u, 192001u, 0xffffffffu}) { auto b = miniSf2({{0, 0}}, 0, 50, 55, 1); Font f; parse(b.data(), b.size(), f); if (f.samples.empty()) continue; f.samples[0].sr = hr; Pcm p; decode_sample(f, 0, DecodeOpts(), p);
+      const bool sane = hr >= 400 && hr <= 192000; n++; CHECK(p.ok == sane && (sane || (p.d.size() == 1 && p.sr == 48000)), "header rate %u: ok %d", hr, p.ok); ok += p.ok == sane; }
+    { auto b = miniSf2({{0, 0}}, 0, 50, 55, 1); Font f; parse(b.data(), b.size(), f); for (double c : {-1.0, 1.0, 3999.0, 192001.0, 1e300, std::numeric_limits<double>::infinity(), std::numeric_limits<double>::quiet_NaN()}) { Pcm p; DecodeOpts o; o.ctxRate = c; decode_sample(f, 0, o, p); n++; CHECK(!p.ok && p.d.size() == 1, "context rate %g refused", c); ok += !p.ok; }
+      for (double c : CR) { Pcm p; DecodeOpts o; o.ctxRate = c; decode_sample(f, 0, o, p); n++; CHECK(p.ok && p.d.size() == 100, "context rate %g accepted", c); ok += p.ok; } }
+    std::printf("unit: absurd header rates (0, 1, 399, 192001, 2^32-1) and context rates (negative, 1, 3999, 192001, 1e300, inf, NaN) refused, sane ones accepted: %d of %d\n", ok, n); }
+  { // H7: parity mode is OFF by default (the libvorbis-correct decode is the default; Chrome's frame loss and its resampler are opt-in)
+    DecodeOpts d; const DecodeOpts pg = DecodeOpts::page(48000);
+    CHECK(d.pageTail == false && d.ctxRate == 0 && pg.pageTail == true && pg.ctxRate == 48000, "defaults: pageTail %d ctxRate %g; page(48000): %d %g", d.pageTail, d.ctxRate, pg.pageTail, pg.ctxRate);
+    std::printf("unit: DecodeOpts default is pageTail off and ctxRate 0 (own rates); only DecodeOpts::page(rate) turns parity on\n"); }
+  { // H8: a loop end beyond the decoded data drops the loop (the page's guard `le <= length`): the note ends with its data; the same loop inside the data sustains
+    double tail[2] = {0, 0}; size_t len[2] = {0, 0}; const uint32_t LE[2] = {60, 150};
+    for (int c = 0; c < 2; c++) { auto b = miniSf2({{0, 0}}, 0, 10, LE[c], 1); Font f; parse(b.data(), b.size(), f); PresetPcm pcm; prepare_preset(f, sf_preset(f, 0, 0), DecodeOpts(), pcm); PadParams P; const size_t cap = sf_render_bound(f, P, 44100, 1.0); std::vector<float> o(cap + 1);
+      len[c] = sf_render(f, pcm, P, 44100, 1.0, o.data(), cap); for (size_t k = len[c] / 2; k < len[c]; k++) tail[c] += (double)o[k] * o[k]; }
+    CHECK(len[0] > 1000 && len[1] == len[0] && tail[0] > 1e-6 && tail[1] == 0, "loop inside the data sustains (tail energy %g), loop end beyond it does not (%g), %zu frames", tail[0], tail[1], len[0]);
+    std::printf("unit: loop end inside the data: second half of the note has energy %.3g; loop end beyond the data (150 > 100 frames): %.3g (the note ends with its data)\n", tail[0], tail[1]); }
   // R. the resampler against what Chrome 153 made of the same input (native/tests/golden/sf_resampler_chrome.json, native/tools/sf-resampler-ref.mjs)
   { std::string gj; if (!readFile(std::string(THUNDER_ROOT) + "/native/tests/golden/sf_resampler_chrome.json", &gj)) CHECK(false, "no resampler reference"); else { JsonDoc d; CHECK(d.parse(gj), "resampler reference parses"); Json C = d.root().arr("cases"); const size_t N = (size_t)d.root().num("n"); uint32_t seed0 = (uint32_t)d.root().num("seed");
       for (size_t i = 0; i < C.size(); i++) { Json c = C.at(i); std::vector<float> x(N); uint32_t s = seed0; for (size_t k = 0; k < N; k++) { s = s * 1664525u + 1013904223u; x[k] = (float)((double)((int)((s >> 16) & 0x3fff) - 0x2000) / 32768); }
