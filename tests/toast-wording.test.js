@@ -1,4 +1,4 @@
-// POP-UP MESSAGE WORDING (17 Nov, build 640): the owner said "apply all of the suggested toast text" from the audit sheet.
+// POP-UP MESSAGE WORDING (17 Nov, build 641): the owner said "apply all of the suggested toast text" from the audit sheet.
 // tests/fixtures/toast-wording-639.json lists what was applied as {id, file, old, new}: source fragments (a string with its quotes, or the
 // part of a longer expression that changed). No old fragment may remain in the app's files and every new one must be there.
 // CHANGES history lines (the "[build, 'date', [...]" entries) keep the old wording on purpose and are left out of the search.
