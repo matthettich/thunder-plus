@@ -21,8 +21,8 @@ plan; sections 1 to 4 and 9), `HANDOVER.md` on `beta` (the web app, the owner's 
 - **Stage N3 (engines), merged:** U22 to U29 (foundation, all layer types, Plaits / Elements, Bass / Vox, Acid / Machine / Blip, both sets of rendered-only
   engines), U30 (…waves engine), U33 (pump synths, rendered path), U04 (LXR as a separable GPL module).
 - **Not started:** **U31 …chains engine** (next for a Sonnet worker: it reuses U30's `Graph` and `waves` runner; brief it like U30 was, see the U30 entry in
-  TODAY.md, and it needs the lead's review of its live part); **U32 SoundFont player** (blocked: the owner must decide the Vorbis decoder licence question in
-  WORKPLAN section 12); **U36 Link / recording / inputs** (lead reviews); **Stage N2 (the Android shell)** and **N4 (Windows and Mac shells)**.
+  TODAY.md, and it needs the lead's review of its live part); **U32 SoundFont player** (UNBLOCKED 17 Nov 23:13: the owner chose **stb_vorbis** (public domain / MIT), pinned and fuzzed like
+  every other upstream; start it when a compiling slot is free); **U36 Link / recording / inputs** (lead reviews); **Stage N2 (the Android shell)** and **N4 (Windows and Mac shells)**.
 - **Fastest route to something the owner can install:** N1 steps 10 and 11, then N2. U31 can run in parallel with a worker.
 
 ## Rules the lead set for gates (they hold for every remaining unit)
@@ -60,7 +60,8 @@ plan; sections 1 to 4 and 9), `HANDOVER.md` on `beta` (the web app, the owner's 
   `pump/synth/pump-synth.wasm` and both metas from e43ee10 as a new web build on `beta`, prove the unchanged types are bit-identical as build 638 did, and
   re-check the WOB crash case (22050 Hz, note 127, Octave +2, Tune +12) no longer traps; (5) `PINS.md` and `native`'s copies of the web files follow.
 - (Settled 17 Nov: the …chains editor keeps accepting any cable; see below.)
-- U32's licence decision.
+- (Settled 17 Nov 23:13: U32's decoder is stb_vorbis.) He also asked for a note of what would have to change if the app were ever sold
+  (unlikely): `docs/port/IF-SOLD.md`.
 
 ## Web app, state at 22:00 on 17 Nov (no web branch is open; no worker is running)
 `main` = `beta` = build 642; desktop v1.3.12 is build 639 (the owner has not asked for another). Today's web builds: 639 (Chains / Waves editors start
