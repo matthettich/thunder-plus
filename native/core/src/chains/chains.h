@@ -104,6 +104,7 @@ class ChainsEngine {
   void dispose();
   // ---- audio thread ----
   void setTrackInputs(const float* L, const float* R, int channels) { trackL_ = L; trackR_ = R; trackChans_ = channels; }
+  const float* sidechainBuffer(int side) const { return side ? scR_ : scL_; }   // (test access) the host's input 1 as setSidechain stored it, kBlock floats
   void setSidechain(const float* L, const float* R, int n);   // the host's input 1 (stereo); no module of the JS reads it, kept as the JS has it
   void setTaps(const float* const* taps, int n);               // input 2: the tracks' own sounds, one channel each (null: none)
   void endStandaloneBlock();   // ChainsProcessor's p1 after process(): the sends of this block become the next block's Sidechain In input (one block late, as the JS)
@@ -229,13 +230,14 @@ class ChainsLive {
   int latency() const { return kChainsLatency; }
   const ChainsLiveStats& stats() const { return st_; }
   int64_t enginePos() const { return pos_; }
+  double bypassSwitch(int n) const { return n >= 1 && n <= kBypSwitches ? byp_[n - 1] : -1; }   // the value the last Bypass event gave switch n (1..15; -1: the patch's own)
   int patchesInFlight() const { int n = 0; for (int i = 0; i < kChainsSlots; i++) { if (slot_[i].load()) n++; if (retired_[i].load()) n++; } return n; }   // prepared and not yet swapped in, plus swapped out and not yet collected by service()
   // the same events rendered with no queue and no latency (control thread: allocates). in[c]: the host's channels in the order of the node's inputs: Track In L, R, then sc L, R (cfg.sc), taps, sends (cfg.sends: 8), feeds (2 each); each `frames` long
   static bool renderOffline(double sr, int track, const ChainsLiveConfig& cfg, Host* host, const std::vector<ChainsEvent>& events, const std::vector<Json>& patches, const std::vector<std::vector<float>>& inputs,
                             int64_t frames, std::vector<std::vector<float>>& outputs /* L, R, sends 0..7 */, Json initialPatch = Json(), const std::vector<int>* busMap = nullptr, const std::vector<int>* tapMap = nullptr);
  private:
   void drain();
-  void eraseAt(int j); void dropPatch(const ChainsEvent& e);
+  void eraseAt(int j); int victim() const; void dropPatch(const ChainsEvent& e);
   void apply(const ChainsEvent& e);
   void segment(int64_t end);
   int nIn() const { return 2 + (cfg_.sc ? 2 : 0) + cfg_.taps + (cfg_.sends ? 8 : 0) + 2 * cfg_.feeds; }

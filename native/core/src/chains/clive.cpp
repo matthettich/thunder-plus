@@ -68,13 +68,22 @@ void ChainsLive::drain() {
         eraseAt(same); st_.coalescedEvents++;
       }
     } else if (npend_ >= kChainsPending) {
-      int old = -1; for (int j = 0; j < npend_; j++) if (pend_[j].kind == ChainsEvent::Param) { old = j; break; }
+      const int old = victim();
       if (old < 0) { st_.droppedEvents++; if (e.kind == ChainsEvent::Patch) dropPatch(e); continue; }
       eraseAt(old); st_.coalescedEvents++;
     }
     int i = npend_; while (i > 0 && pend_[i - 1].at > e.at) { pend_[i] = pend_[i - 1]; i--; }   // stable: after every event at or before its time
     pend_[i] = e; npend_++;
   }
+}
+// the pending event that may give way when the array is full: the oldest parameter event; else a Tempo (or a BYP switch) a later event of its own kind replaces anyway; -1: none
+int ChainsLive::victim() const {
+  for (int j = 0; j < npend_; j++) if (pend_[j].kind == ChainsEvent::Param) return j;
+  for (int j = 0; j < npend_; j++) {
+    if (pend_[j].kind != ChainsEvent::Tempo && pend_[j].kind != ChainsEvent::Bypass) continue;
+    for (int k = j + 1; k < npend_; k++) if (pend_[k].kind == pend_[j].kind && (pend_[j].kind == ChainsEvent::Tempo || pend_[k].a == pend_[j].a)) return j;
+  }
+  return -1;
 }
 void ChainsLive::eraseAt(int j) { std::memmove(&pend_[j], &pend_[j + 1], sizeof(ChainsEvent) * (size_t)(npend_ - j - 1)); npend_--; }
 // a Patch event that cannot be delivered: its patch goes to the control thread (retired_; preparePatch kept a place for it) and its slot is free again

@@ -189,10 +189,137 @@ static void testCompRatioOne() {
   CHECK(worst == 0, "ratio 1 leaves the sound alone (worst %g)", worst);
 }
 
+// ---- U31 verifier follow-up: the live feed's mono fallback, setSidechain, the tempo clamp, the Track In bound, Chain Out's level, the queue rules and the mailbox ----
+// the other tracks' feed: a right side the host does not give is the left, as a host giving the left twice (the same output bit for bit)
+static void testFeedMonoFallback() {
+  const int H = 3000; const Inputs in = makeInputs(H); std::vector<std::vector<float>> o[2];
+  for (int k = 0; k < 2; k++) {
+    Host host; ChainsLive live(48000, 0, kCfg, &host); Doc p(kPatch); const std::vector<int> bm = {1}, tm = {0, 1}; live.node().engine().setBusMap(bm.data(), 1); live.node().engine().setTapMap(tm.data(), 2);
+    CHECK(live.node().engine().loadPatch(p.r), "patch"); o[k].assign(10, std::vector<float>((size_t)H, 0.f));
+    std::vector<const float*> taps = {in.ch[4].data(), in.ch[5].data()}, sends, feeds = {in.ch[14].data(), k ? in.ch[14].data() : nullptr}; for (int s = 0; s < 8; s++) sends.push_back(in.ch[(size_t)(6 + s)].data());
+    NodeIn ni; ni.inL = in.ch[0].data(); ni.inR = in.ch[1].data(); ni.scL = in.ch[2].data(); ni.scR = in.ch[3].data(); ni.taps = taps.data(); ni.nTaps = 2; ni.sends = sends.data(); ni.nSends = 8; ni.feeds = feeds.data(); ni.nFeeds = 1;
+    std::vector<float*> so; for (int s = 0; s < 8; s++) so.push_back(o[k][(size_t)(2 + s)].data()); NodeOut no; no.L = o[k][0].data(); no.R = o[k][1].data(); no.sends = so.data(); no.nSends = 8; live.process(ni, no, H);
+  }
+  CHECK(o[0] == o[1], "a feed with no right side equals the left twice"); double e = 0; for (float v : o[0][1]) e += std::fabs(v); CHECK(e > 1, "the right output carries the feed (%g)", e);
+}
+// setSidechain: no right side is the left; both given are kept; none is silence and off
+static void testSetSidechain() {
+  Host h; ChainsEngine e(48000, EngineOptions(), &h); const std::vector<float> a = noise(128, 1, .5f), b = noise(128, 2, .5f);
+  e.setSidechain(a.data(), nullptr, 128); CHECK(std::memcmp(e.sidechainBuffer(0), a.data(), 512) == 0 && std::memcmp(e.sidechainBuffer(1), a.data(), 512) == 0, "no right side: the left on both");
+  e.setSidechain(a.data(), b.data(), 128); CHECK(std::memcmp(e.sidechainBuffer(0), a.data(), 512) == 0 && std::memcmp(e.sidechainBuffer(1), b.data(), 512) == 0, "both given: kept");
+  e.setSidechain(nullptr, nullptr, 128); bool z = true; for (int i = 0; i < 128; i++) if (e.sidechainBuffer(0)[i] != 0 || e.sidechainBuffer(1)[i] != 0) z = false; CHECK(z, "none: silence");
+  e.setSidechain(a.data(), nullptr, 40); bool t = std::memcmp(e.sidechainBuffer(1), a.data(), 160) == 0; for (int i = 40; i < 128; i++) if (e.sidechainBuffer(1)[i] != 0) t = false; CHECK(t, "a short block: the rest silent");
+}
+// a hostile tempo is held to +-1e5 BPM: Resample's bar (4 * 60 / tempo seconds, tempo floored at 20 there) and the tempo it records show the value the modules were given
+static void testTempoClamp() {
+  Doc d("{\"modules\":[{\"id\":\"a\",\"type\":\"trackIn\"},{\"id\":\"s\",\"type\":\"resample\",\"params\":{\"rec\":1,\"bars\":0,\"pad\":0,\"slices\":0}},{\"id\":\"c\",\"type\":\"chainOut\"}],\"cables\":[{\"from\":[\"a\",\"out\"],\"to\":[\"s\",\"in\"]},{\"from\":[\"s\",\"out\"],\"to\":[\"c\",\"in\"]}]}");
+  const double tempi[4] = {1e30, 1e5, 2e5, -1e30}, want[4] = {1e5, 1e5, 1e5, -1e5};
+  for (int k = 0; k < 4; k++) {
+    EngineOptions o; o.transport.playing = true; o.transport.tempo = tempi[k]; Host h; ChainsEngine e(48000, o, &h); CHECK(e.loadPatch(d.r), "resample patch"); const std::vector<float> x = noise(128 * 20, 4, .5f); int got = 0; ResampleTake first; std::memset(&first, 0, sizeof first); const int NB = k == 3 ? 4700 : 20;   // (a bar at tempo 20 is 576000 samples)
+    for (int b = 0; b < NB; b++) { const size_t o = (size_t)(b % 20) * 128; e.setTrackInputs(&x[o], &x[o], 1); e.process(128); ResampleTake tk; while (e.popTake(&tk)) { if (!got++) first = tk; e.releaseTake(tk); } }
+    CHECK(got >= 1, "tempo %g: a take", tempi[k]);
+    if (got) { const int bar = (int)std::lround(4.0 * 60 / std::max(20.0, want[k]) * 48000); CHECK(first.tempo == want[k] && first.n == bar, "tempo %g: recorded tempo %g (want %g), take of %d samples (want %d)", tempi[k], first.tempo, want[k], first.n, bar); }
+  }
+}
+// Track In asks for a track the host's buffer does not hold: silence (the buffer's next block is not read)
+static void testTrackInBound() {
+  Doc d("{\"modules\":[{\"id\":\"a\",\"type\":\"trackIn\",\"params\":{\"track\":2}},{\"id\":\"c\",\"type\":\"chainOut\"}],\"cables\":[{\"from\":[\"a\",\"out\"],\"to\":[\"c\",\"in\"]},{\"from\":[\"a\",\"outR\"],\"to\":[\"c\",\"inR\"]}]}");
+  const std::vector<float> x = noise(128 * 3, 6, .5f); Host h; ChainsEngine e(48000, EngineOptions(), &h); CHECK(e.loadPatch(d.r), "patch");
+  e.setTrackInputs(x.data(), x.data(), 1); e.process(128); const float* o = e.outBuf("a", "out"); bool z = true; for (int i = 0; i < 128; i++) if (o[i] != 0) z = false; CHECK(z, "track 2 of a 1-track buffer is silent");
+  e.setTrackInputs(x.data(), x.data(), 2); e.process(128); o = e.outBuf("a", "out"); bool same = true; for (int i = 0; i < 128; i++) if (o[i] != x[(size_t)(128 + i)]) same = false; CHECK(same, "track 2 of a 2-track buffer is its second block");
+}
+// Chain Out's level is a plain gain, never held to 0..1 (the JS adds in * level): 3, -1, 0.25 and 1e30 on a constant
+static void testChainOutLevel() {
+  const double lv[4] = {3, -1, 0.25, 1e30};
+  for (int k = 0; k < 4; k++) {
+    Doc d(std::string("{\"modules\":[{\"id\":\"a\",\"type\":\"trackIn\"},{\"id\":\"c\",\"type\":\"chainOut\",\"params\":{\"level\":") + std::to_string(lv[k]) + "}}],\"cables\":[{\"from\":[\"a\",\"out\"],\"to\":[\"c\",\"in\"]},{\"from\":[\"a\",\"outR\"],\"to\":[\"c\",\"inR\"]}]}");
+    const std::vector<float> x(128 * 2, 0.5f); Host h; ChainsEngine e(48000, EngineOptions(), &h); CHECK(e.loadPatch(d.r), "patch"); e.setTrackInputs(x.data(), x.data(), 1); e.process(128);
+    const float* L = e.bus(1); const float* R = e.busR(1); const float want = (float)((double)0.5f * lv[k]);
+    CHECK(L && R && L[5] == want && R[5] == want, "Chain Out level %g: bus %g (want %g)", lv[k], L ? L[5] : 0.f, want);
+  }
+}
+
+// the host's blocks of 128 frames with no input, to let the queue drain and the events land
+static void idle(ChainsLive& live, int blocks) { std::vector<float> a(128), b(128); NodeIn in; NodeOut out; out.L = a.data(); out.R = b.data(); for (int i = 0; i < blocks; i++) live.process(in, out, 128); }
+static void flood(ChainsLive& live, ChainsEvent::Kind k, int n, int64_t at, double a = 0, bool names = false) {   // n events of one kind, in rounds the queue can hold
+  for (int i = 0; i < n;) { int m = 0; for (; i < n && m < 1500; i++, m++) { ChainsEvent e; e.kind = k; e.at = at; e.a = a; if (names) { std::snprintf(e.id, sizeof e.id, "x"); std::snprintf(e.name, sizeof e.name, "n%d", i); } live.post(e); } idle(live, 1); }
+}
+static Doc* sPatch2() { static Doc d(kPatch2); return &d; }
+static void testQueueRules() {
+  const int64_t FAR = 1000000000;
+  { // (a) the pending array full of parameter events: a later value of the same parameter replaces the earlier one; a new parameter is refused first; Playing / Bypass / Tempo are never lost
+    Host h; ChainsLive live(48000, 0, ChainsLiveConfig(), &h); Doc p(kPatch2); CHECK(live.node().engine().loadPatch(p.r), "patch");
+    ChainsEngine& E = live.node().engine(); Transport t = E.transport(); t.playing = true; E.setTransport(t);
+    flood(live, ChainsEvent::Param, 3840, FAR, 0.5, true); CHECK(live.stats().droppedEvents == 0 && live.stats().coalescedEvents == 0, "a full array: nothing lost yet");
+    CHECK(live.postParam("x", "n5", 0.7, FAR), "post the same parameter"); idle(live, 1); CHECK(live.stats().coalescedEvents == 1 && live.stats().droppedEvents == 0, "same (module, parameter): coalesced (%d), nothing dropped (%d)", (int)live.stats().coalescedEvents, (int)live.stats().droppedEvents);
+    CHECK(live.postParam("x", "brand_new", 0.7, FAR), "post a new parameter"); idle(live, 1); CHECK(live.stats().droppedEvents == 1, "a new parameter in a full array is the one refused (%d)", (int)live.stats().droppedEvents);
+    const int64_t now = live.enginePos(); ChainsEvent e; e.kind = ChainsEvent::Bypass; e.at = now + 200; e.a = 3; e.b = 1; CHECK(live.post(e), "bypass on"); e.at = now + 400; e.b = -1; CHECK(live.post(e), "bypass release");
+    e = ChainsEvent(); e.kind = ChainsEvent::Playing; e.at = now + 600; e.a = 0; CHECK(live.post(e), "playing off");
+    idle(live, 8); CHECK(live.bypassSwitch(3) == -1, "the Bypass release landed (%g)", live.bypassSwitch(3)); CHECK(!E.transport().playing, "Playing=0 landed");
+  }
+  { // the array full of events that must be kept (Tempo): Playing=0 and the Bypass release make room by replacing a Tempo a later Tempo replaces anyway
+    Host h; ChainsLive live(48000, 0, ChainsLiveConfig(), &h); Doc p(kPatch2); CHECK(live.node().engine().loadPatch(p.r), "patch"); ChainsEngine& E = live.node().engine(); Transport t = E.transport(); t.playing = true; E.setTransport(t);
+    flood(live, ChainsEvent::Tempo, 4200, FAR, 100); const int64_t now = live.enginePos();
+    ChainsEvent e; e.kind = ChainsEvent::Bypass; e.at = now + 200; e.a = 4; e.b = 1; live.post(e); e.at = now + 400; e.b = -1; live.post(e); e = ChainsEvent(); e.kind = ChainsEvent::Playing; e.at = now + 600; e.a = 0; live.post(e);
+    idle(live, 8); CHECK(live.bypassSwitch(4) == -1, "(Tempo flood) the Bypass release landed (%g)", live.bypassSwitch(4)); CHECK(!E.transport().playing, "(Tempo flood) Playing=0 landed"); CHECK(live.stats().coalescedEvents > 0, "tempo events gave way (%d)", (int)live.stats().coalescedEvents);
+  }
+  { // (b) the array full of events nothing may replace: a Patch event is dropped, and its slot is free again after service() (no leaked mailbox slot)
+    Host h; ChainsLive live(48000, 0, ChainsLiveConfig(), &h); Doc p(kPatch2); CHECK(live.node().engine().loadPatch(p.r), "patch");
+    flood(live, ChainsEvent::Playing, 4200, FAR, 1); const uint64_t d0 = live.stats().droppedEvents; CHECK(d0 > 0, "the array is full and refuses (%d)", (int)d0);
+    int ok = 0; for (int i = 0; i < 30; i++) { if (live.preparePatch(sPatch2()->r, live.enginePos() + 10)) ok++; idle(live, 1); if (i % 5 == 4) live.service(); }
+    CHECK(live.patchesInFlight() <= kChainsSlots, "in flight %d", live.patchesInFlight()); CHECK(ok >= 20, "after every service() a patch can be prepared again (%d of 30 delivered)", ok);
+    CHECK(live.stats().droppedEvents - d0 >= (uint64_t)ok, "each delivered patch was dropped by the full array and counted (%d dropped for %d patches)", (int)(live.stats().droppedEvents - d0), ok);
+    live.service(); CHECK(live.patchesInFlight() == 0, "service() freed every patch the audio thread gave back (%d left)", live.patchesInFlight());
+  }
+  { // (c) service() never called: no more than kChainsSlots patches are in flight, the rest are refused (false), and one service() gives all the places back; each swap lands
+    Host h; ChainsLive live(48000, 0, ChainsLiveConfig(), &h); Doc p(kPatch2); CHECK(live.node().engine().loadPatch(p.r), "patch"); int ok = 0, no = 0;
+    for (int i = 0; i < 14; i++) { if (live.preparePatch(sPatch2()->r, live.enginePos() + 10)) ok++; else no++; idle(live, 2); }
+    CHECK(ok == kChainsSlots && no == 14 - kChainsSlots, "14 prepares with no service(): %d delivered, %d refused (want %d / %d)", ok, no, kChainsSlots, 14 - kChainsSlots);
+    CHECK(live.patchesInFlight() == kChainsSlots, "in flight %d", live.patchesInFlight()); CHECK(live.stats().refusedPatches == (uint64_t)no, "refusals counted (%d)", (int)live.stats().refusedPatches);
+    live.service(); CHECK(live.patchesInFlight() == 0, "one service() collects the %d swapped-out patches (%d left)", kChainsSlots, live.patchesInFlight());
+    CHECK(live.preparePatch(sPatch2()->r, live.enginePos() + 10), "after service() a patch is delivered again"); idle(live, 2); live.service(); CHECK(live.patchesInFlight() == 0, "and collected");
+  }
+  { // preparePatch false when the swap cannot be queued (the queue full): the patch is freed, its slot is free
+    Host h; ChainsLive live(48000, 0, ChainsLiveConfig(), &h); Doc p(kPatch2); CHECK(live.node().engine().loadPatch(p.r), "patch");
+    ChainsEvent e; e.kind = ChainsEvent::Playing; e.at = FAR; e.a = 1; int n = 0; while (live.post(e)) n++; CHECK(n == kChainsQueue, "the queue holds %d", n);
+    CHECK(!live.preparePatch(sPatch2()->r, 0), "queue full: false"); CHECK(live.patchesInFlight() == 0, "no slot kept (%d)", live.patchesInFlight());
+    idle(live, 1); CHECK(live.preparePatch(sPatch2()->r, live.enginePos() + 5), "room again: true"); idle(live, 2); live.service(); CHECK(live.patchesInFlight() == 0, "collected");
+  }
+}
+// a Bypass event for switch 0, 16, -1 or 100 is ignored: the output and the position are those of a run without it (an out-of-range write would hit the neighbouring members)
+static void testBypassRange() {
+  const int H = 2000; const std::vector<float> x = noise(H, 8, .5f); std::vector<float> o[2]; int64_t pos[2];
+  for (int k = 0; k < 2; k++) {
+    Host h; ChainsLive live(48000, 0, ChainsLiveConfig(), &h); Doc d(kPatch2); CHECK(live.node().engine().loadPatch(d.r), "patch");
+    if (k) { const double sw[5] = {0, 16, -1, 100, -1e30}; for (double s : sw) { ChainsEvent e; e.kind = ChainsEvent::Bypass; e.at = 0; e.a = s; e.b = 1; live.post(e); } }
+    std::vector<float> L((size_t)H), R((size_t)H); NodeIn in; in.inL = x.data(); in.inR = x.data(); NodeOut out; out.L = L.data(); out.R = R.data(); live.process(in, out, H); o[k] = L; pos[k] = live.enginePos();
+    for (int s = 1; s <= 15; s++) CHECK(live.bypassSwitch(s) == -1, "switch %d unchanged", s);
+  }
+  CHECK(o[0] == o[1] && pos[0] == pos[1], "out-of-range Bypass events change nothing (pos %lld / %lld)", (long long)pos[0], (long long)pos[1]);
+}
+
+// the pump instances' dead handles: when service() is never called (the wiring condition broken) a module still never leaks or overflows: at most two handles die (the one that went bad and the spare that took over), then the
+// module is dry (silent; counted) until service() makes a spare. The JS has no dry state (it remakes the instance on the audio thread); see docs/port/U31-NOTES.md "Pump instances"
+static void testPumpNoService() {
+  if (!pump::available()) { std::printf("pump without service(): no pump library in this build (skipped)\n"); return; }
+  const WInfo* wi = cinfo("ptube"); std::string ps; for (int k = 0; k < wi->np; k++) { char b[200]; std::snprintf(b, sizeof b, "%s\"%s\":%.17g", k ? "," : "", wi->params[k].name, wi->params[k].mx); ps += b; }
+  Doc d(std::string("{\"modules\":[{\"id\":\"a\",\"type\":\"trackIn\",\"params\":{\"track\":1}},{\"id\":\"p\",\"type\":\"ptube\",\"params\":{") + ps + "}},{\"id\":\"c\",\"type\":\"chainOut\",\"params\":{\"track\":1,\"level\":1}}],"
+    "\"cables\":[{\"from\":[\"a\",\"out\"],\"to\":[\"p\",\"in\"]},{\"from\":[\"a\",\"outR\"],\"to\":[\"p\",\"inR\"]},{\"from\":[\"p\",\"out\"],\"to\":[\"c\",\"in\"]},{\"from\":[\"p\",\"outR\"],\"to\":[\"c\",\"inR\"]}]}");
+  Host host; ChainsEngine e(48000, EngineOptions(), &host); CHECK(e.loadPatch(d.r), "patch"); e.setInlineService(false);
+  const uint64_t o0 = chains_pump_overflow(), b0 = chains_pump_bad(), dry0 = chains_pump_dry(), s0 = chains_pump_swaps(); const std::vector<float> s = noise(128 * 300, 31u, 7.9f); bool range = true;
+  for (int b = 0; b < 300; b++) { e.setTrackInputs(&s[(size_t)b * 128], &s[(size_t)b * 128], 1); e.process(128); const float* po = e.outBuf("p", "out"); for (int k = 0; po && k < 128; k++) if (!(po[k] > -8 && po[k] < 8)) range = false; }
+  CHECK(range, "the output stays inside +-8 with no service()"); CHECK(chains_pump_overflow() == o0, "no dead handle overflowed (%d)", (int)(chains_pump_overflow() - o0));
+  CHECK(chains_pump_bad() - b0 >= 2, "blocks went bad (%d)", (int)(chains_pump_bad() - b0)); CHECK(chains_pump_swaps() - s0 <= 1, "one spare took over (%d)", (int)(chains_pump_swaps() - s0)); CHECK(chains_pump_dry() - dry0 > 100, "then the module is dry, counted (%d)", (int)(chains_pump_dry() - dry0));
+  const float* po = e.outBuf("p", "out"); bool zero = true; for (int k = 0; k < 128; k++) if (po[k] != 0) zero = false; CHECK(zero, "a dry module is silent");
+  e.serviceSpares(); e.setTrackInputs(&s[0], &s[0], 1); e.process(128); e.serviceSpares(); e.process(128); CHECK(chains_pump_swaps() - s0 >= 2 || chains_pump_dry() - dry0 > 100, "service() makes a spare and the module runs again");
+  std::printf("pump without service(): %llu bad blocks, %llu spare swaps, %llu dry blocks, overflow %llu\n", (unsigned long long)(chains_pump_bad() - b0), (unsigned long long)(chains_pump_swaps() - s0), (unsigned long long)(chains_pump_dry() - dry0), (unsigned long long)(chains_pump_overflow() - o0));
+}
+
 int main() {
   testResampleTake(); testMonoFallback(); testCompRatioOne();
   testChainOutTrackClamp();
-  testPumpSpares();
+  testPumpSpares(); testPumpNoService();
+  testFeedMonoFallback(); testSetSidechain(); testTempoClamp(); testTrackInBound(); testChainOutLevel(); testBypassRange(); testQueueRules();
   testEqualsOffline(); testLatencyAndExactEvents(); testRefusals();
   std::printf(fails ? "test_chains_live: %d FAILED\n" : "test_chains_live: ok\n", fails);
   return fails ? 1 : 0;

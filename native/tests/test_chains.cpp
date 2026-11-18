@@ -224,7 +224,8 @@ static void runGolden(const std::string& golden, const std::string& effectsFile,
       if (db <= -100) { nWithin++; continue; }
       if (tolCaseM) { bad++; CHECK(false, "%s: %.1f dB is above the -100 dB line for Marbles / Tides", name.c_str(), db); continue; }
       if (!beyondRec) { bad++; CHECK(false, "%s: %.1f dB is beyond -100 dB and not listed by name", name.c_str(), db); continue; }
-      nBeyond++; if (std::fabs(dr) > 1) { bad++; CHECK(false, "%s: RMS %.2f dB off the reference's (listed beyond -100 dB: structural check)", name.c_str(), dr); }
+      nBeyond++; if (db > rec2.num("beyond") + 3) { bad++; CHECK(false, "%s: %.1f dB is more than 3 dB worse than the %.1f dB recorded for it", name.c_str(), db, rec2.num("beyond")); }   // the recorded value is a bound, not a label
+      if (std::fabs(dr) > 1) { bad++; CHECK(false, "%s: RMS %.2f dB off the reference's (listed beyond -100 dB: structural check)", name.c_str(), dr); }
     } else {
       nStruct++; if (std::fabs(dr) > 1) { bad++; CHECK(false, "%s: RMS %.2f dB off the reference's (no reference here: structural check)", name.c_str(), dr); }
     }
