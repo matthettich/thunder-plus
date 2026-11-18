@@ -18583,7 +18583,7 @@ $('midiKeysSel').addEventListener('change', e => { releaseKeys(); midi.keys = +e
 moPorts(); miPorts();
 
 /* ---------- Plaits loader ---------- */
-const WASM_DSP = 'waves/dsp/thunder-dsp.wasm', WASM_TFX = 'waves/dsp/tfx.wasm', PUMP_WASM = 'pump/pump.wasm?v=7';
+const WASM_DSP = 'waves/dsp/thunder-dsp.wasm', WASM_TFX = 'waves/dsp/tfx.wasm', PUMP_WASM = 'pump/pump.wasm?v=8';
 // Each wasm is decoded and compiled once and shared: the synth here, the waves engine and the render Worker.
 let plFailed = false;
 (async () => {
@@ -18596,7 +18596,7 @@ let plFailed = false;
   // LXR ENGINES: lxr/lxr.wasm, compiled here (and handed to the render Worker) when the engine file loaded
   const lxP = typeof LxrCore !== 'undefined' ? LxrCore.load('lxr/lxr.wasm?v=1').catch(e => { console.warn('LXR engines', e); return null; }) : Promise.resolve(null);
   // …PUMP SYNTHS: pump/synth/pump-synth.wasm, compiled here and handed to the render Worker (as LXR's is)
-  const psP = typeof PsynCore !== 'undefined' ? PsynCore.load('pump/synth/pump-synth.wasm?v=7').catch(e => { tpLog('pump synths wasm (the pump engines will be silent)', e); return null; }) : Promise.resolve(null);
+  const psP = typeof PsynCore !== 'undefined' ? PsynCore.load('pump/synth/pump-synth.wasm?v=8').catch(e => { tpLog('pump synths wasm (the pump engines will be silent)', e); return null; }) : Promise.resolve(null);
   // …PUMP: the pump mastering effects (pump/pump.wasm), fetched alongside; effect nodes that asked for it get it now
   bytes(PUMP_WASM).then(async b => {
     if (WASM_PRECOMPILE) try { pumpWasmMod = await WebAssembly.compile(b); } catch(e){ pumpWasmMod = null; }   // compiled here, before any node gets it (they pass sound until it arrives, as before)
@@ -26012,7 +26012,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 642;
+const BUILD = 643;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD + (location.pathname.includes('/beta/') ? ' · beta' : '');
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
