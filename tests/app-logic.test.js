@@ -95,7 +95,7 @@ test('phrase and pattern text size stays fixed on resize and refits when TEXT SI
   const blk = cut('index.html', /let phraseFitBase = null, phraseFitScale = -1;\nfunction fit\(\)\{[\s\S]*?\n\}\n/, 'phrase fit');
   let pvCalls = 0;
   const c = sandbox({ view: 'tracker', tv: 'phrase', fitTries: 0, layoutSig: '', scr: { clientWidth: 824, clientHeight: 560, style: { fontSize: '' } },
-    grid: { clientHeight: 420 }, spActive: () => false, spCols: () => 0, FITROWS: 18, BASEW: 52, CW: 0.6, mixScale: 100, tScale: 100,
+    grid: { clientHeight: 420, classList: { remove() {}, add() {} } }, pvZoomed: () => false, spActive: () => false, spCols: () => 0, FITROWS: 18, BASEW: 52, CW: 0.6, mixScale: 100, tScale: 100,
     pvActive: () => true, pvFit: fs => { pvCalls++; return Math.min(fs, 12); } });
   vm.runInContext(blk + '\nthis.runFit=fit;', c);
   c.runFit(); const initial = c.scr.style.fontSize;
@@ -109,7 +109,7 @@ test('phrase / pattern size: PHRASE <-> PATTERN and a new font refit (the held s
   const blk = cut('index.html', /let phraseFitBase = null, phraseFitScale = -1;\nfunction fit\(\)\{[\s\S]*?\n\}\n/, 'phrase fit');
   let pv = true, pvCalls = 0;
   const c = sandbox({ view: 'tracker', tv: 'phrase', fitTries: 0, layoutSig: '', scr: { clientWidth: 824, clientHeight: 560, style: { fontSize: '' } },
-    grid: { clientHeight: 420 }, spActive: () => false, spCols: () => 0, FITROWS: 18, BASEW: 52, CW: 0.6, mixScale: 100, tScale: 100,
+    grid: { clientHeight: 420, classList: { remove() {}, add() {} } }, pvZoomed: () => false, spActive: () => false, spCols: () => 0, FITROWS: 18, BASEW: 52, CW: 0.6, mixScale: 100, tScale: 100,
     pvActive: () => pv, pvFit: fs => { pvCalls++; return Math.min(fs, 9); } });
   vm.runInContext(blk + '\nthis.runFit=fit;', c);
   c.runFit(); const pattern = c.scr.style.fontSize; assert.equal(pattern, '9.00px');
