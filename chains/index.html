@@ -2343,7 +2343,7 @@ function addNote(wx, wy){
 async function renameModule(id){
   const n = nodes.get(id); if (!n || playBlocked()) return;
   const def = MODULES[n.m.type], cur = n.m.label || def.label;
-  const nm = await askDialog('Name this module (leave it empty to go back to “' + def.label + '”):', { input:cur, ok:'Rename', label:'Module name' });
+  const nm = await askDialog('Module name (empty restores “' + def.label + '”)', { input:cur, ok:'Rename', label:'Module name' });
   if (nm == null || !nodes.has(id)) return;
   const t = String(nm).trim().slice(0, 40), next = t && t !== def.label ? t : '';
   if (next === (n.m.label || '')) return;
@@ -3108,7 +3108,7 @@ function routeTrackChange(n, v){
   const N = Math.max(1, Math.min(TRK_N, Math.round(+v) || 1)), { ins, outs } = chainTrackLists(), old = n.m.params.track | 0;
   if (n.m.type === 'trackIn'){
     // A track that already has a chain: stay here (no jump to the other chain, which was disorienting) and say so.
-    if (ins.some(m => m !== n.m && (m.params.track | 0) === N)){ toast('Track ' + N + ' already has a chain, so this one stays on track ' + old + '. Pick a free track (the list marks the used ones).'); return { reject:true }; }
+    if (ins.some(m => m !== n.m && (m.params.track | 0) === N)){ toast('Track ' + N + ' already has a chain: staying on track ' + old + '. Pick a free track (used ones are marked).'); return { reject:true }; }
     for (const o of outs) if ((o.params.track | 0) === old && !o.bus) applyChainTrack(o, N);   // this pair's Chain Out follows (a bus's stays)
     return { v:N };
   }
@@ -3116,8 +3116,8 @@ function routeTrackChange(n, v){
   // no Track In is on, it is a bus (m.bus, kept with the patch): the tracks whose Track Ins feed it play through that track,
   // after their own faders, and its fader and effects level them all. Back on a Track In's track, it's an insert again.
   const bus = !ins.some(m => (m.params.track | 0) === N);
-  if (!bus && outs.some(m => m !== n.m && !m.bus && (m.params.track | 0) === N)){ toast('Track ' + N + ' already has a chain, so this one stays on track ' + old + '.'); return { reject:true }; }
-  if (bus && !n.m.bus) toast('Chain Out is now a bus on track ' + N + '. The tracks feeding it play through track ' + N + ' after their own faders. Track ' + N + '’s fader and effects level them all.', 6000);
+  if (!bus && outs.some(m => m !== n.m && !m.bus && (m.params.track | 0) === N)){ toast('Track ' + N + ' already has a chain: staying on track ' + old); return { reject:true }; }
+  if (bus && !n.m.bus) toast('Chain Out is a bus on track ' + N + ': its tracks play through it, after their own faders.', 6000);
   if (!bus && n.m.bus) toast('Chain Out is back on track ' + N + ' as an insert.');
   n.m.bus = bus ? 1 : 0;
   return { v:N };
@@ -3441,12 +3441,12 @@ function preMenu(n, btn){
   if (fac.length){ items.push(['§Factory']); for (const [nm, v] of fac) items.push([mark(nm), () => applyPreset(n, nm, v)]); }
   if (mine.length){ items.push(['§Yours']); for (const [nm, v] of mine) items.push([mark(nm), () => applyPreset(n, nm, v)]); }
   items.push(['Save as a preset…', async () => {
-    const nm0 = await askDialog('Name this ' + (n.m.label || def.label) + ' preset (kept on this device for every patch, and in this patch so it goes with the song):', { input:cur && !PRESETS[t]?.some(p => p[0] === cur) && cur !== 'Default' ? cur : '', ok:'Save' });
+    const nm0 = await askDialog((n.m.label || def.label) + ' preset name (saved on this device and in this patch)', { input:cur && !PRESETS[t]?.some(p => p[0] === cur) && cur !== 'Default' ? cur : '', ok:'Save' });
     const nm = nm0 && nm0.trim().slice(0, 40); if (!nm) return;
     const vals = {}; for (const k in def.params) if (!PRE_SKIP.has(k)) vals[k] = n.m.params[k];
     const list = preUserOf(t).filter(x => x[0] !== nm); list.push([nm, vals]); list.sort((a, b) => a[0].localeCompare(b[0])); preUserSet(t, list.filter(x => !prePatchOf(t).some(p => p === x)));
     prePatchSet(t, prePatchOf(t).filter(x => x[0] !== nm).concat([[nm, vals]]));
-    n.m.pre = nm; delete n.m.preEd; paintPre(n); store.touch(); toast('Saved “' + nm + '”. It shows in every ' + def.label + ' preset list, and travels with this patch.');
+    n.m.pre = nm; delete n.m.preEd; paintPre(n); store.touch(); toast('Saved preset “' + nm + '”: in every ' + def.label + ' list and in this patch');
   }]);
   if (mine.length) items.push(['Delete one of yours…', () => showMenu(r.left, r.bottom + 2, mine.map(([nm]) => ['Delete “' + nm + '”', () => {
     store.snapshot(); preUserSet(t, preUser()[t] ? preUserOf(t).filter(x => x[0] !== nm && !prePatchOf(t).includes(x)) : []); prePatchSet(t, prePatchOf(t).filter(x => x[0] !== nm)); store.touch(); for (const x of nodes.values()) if (x.m.type === t && x.m.pre === nm) paintPre(x); toast('Deleted the preset “' + nm + '”.'); }]))]);
@@ -3794,11 +3794,11 @@ window.addEventListener('keydown', e => {
   e.preventDefault();
   if (e.shiftKey){
     const k = setAllMini() || setAllCollapsed(false);
-    if (k) toast((k === 1 ? '1 module' : k + ' modules') + ' changed (Alt+Shift+C again reverses it, ' + MOD + '+Z undoes it).');
+    if (k) toast((k === 1 ? '1 module' : k + ' modules') + ' changed · ' + MOD + '+Z undoes it');
     return;
   }
   const open = [...nodes.values()].some(n => !n.m.collapsed), k = setAllCollapsed(open);
-  if (k) toast((open ? 'Collapsed ' : 'Expanded ') + k + (k === 1 ? ' module' : ' modules') + ' (Alt+C does the reverse, ' + MOD + '+Z undoes it).');
+  if (k) toast((open ? 'Collapsed ' : 'Expanded ') + k + (k === 1 ? ' module' : ' modules') + ' · ' + MOD + '+Z undoes it');
 });
 
 function renderAll(){
@@ -3907,7 +3907,7 @@ window.addEventListener('keydown', e => {
   if ((e.key !== 'Delete' && e.key !== 'Backspace') || e.ctrlKey || e.metaKey || e.altKey || typing(e) || !selected.size || playMode) return;
   if ((learn && learn.on) || document.querySelector('.dlgov')) return;
   e.preventDefault(); store.snapshot(); const ids = [...selected]; for (const x of ids) removeModule(x); clearSel();
-  toast(ids.length === 1 ? 'Module removed (Undo brings it back).' : ids.length + ' modules removed (Undo brings them back).');
+  toast(ids.length === 1 ? 'Module removed · Undo brings it back' : ids.length + ' modules removed · Undo brings them back');
 });
 function setSel(id, on){ const n = nodes.get(id); if (on && n && n.gcol) return; on ? selected.add(id) : selected.delete(id); if (on) clearCableSel(); relDirty = true; if (n) n.el.classList.toggle('selected', on); }
 function clearSel(){ for (const id of selected){ const n = nodes.get(id); if (n) n.el.classList.remove('selected'); } selected.clear(); relDirty = true; }
@@ -3937,7 +3937,7 @@ window.addEventListener('keydown', e => {
   if ((learn && learn.on) || document.querySelector('.dlgov')) return;
   const c = selCable; clearCableSel(); e.preventDefault();
   if (!doc.cables.includes(c)) return;
-  store.snapshot(); disconnect(c); toast('Cable removed (Undo brings it back).');
+  store.snapshot(); disconnect(c); toast('Cable removed');
 });
 function cableKind(c){
   const src = modById(c.from[0]); const k = src && MODULES[src.type] && MODULES[src.type].outputs[c.from[1]];
@@ -3982,7 +3982,7 @@ function syncCableEls(){
       if (ev.altKey){ ev.preventDefault(); cableBendAt(ev, c); return; }
       if (ev.pointerType === 'touch'){
         const now = performance.now(), lt = hit._tap;
-        if (lt && now - lt.t < 450 && Math.hypot(ev.clientX - lt.x, ev.clientY - lt.y) < 30){ hit._tap = null; cableDblAt = performance.now(); store.snapshot(); disconnect(c); toast('Cable removed.'); }
+        if (lt && now - lt.t < 450 && Math.hypot(ev.clientX - lt.x, ev.clientY - lt.y) < 30){ hit._tap = null; cableDblAt = performance.now(); store.snapshot(); disconnect(c); toast('Cable removed'); }
         else { hit._tap = { t:now, x:ev.clientX, y:ev.clientY }; toast('Double-tap a cable to remove it.'); }
       }
     });
@@ -4183,8 +4183,8 @@ function connect(from, to, pts, snap){
   if (bridge) bridge.connect(from, to, loop);
   else if (EMBED && TW && TW.mod) TW.mod(loop ? { op:'connect', a:from, b:to, fb:true } : { op:'connect', a:from, b:to });
   syncCableEls(); store.touch();
-  if (!xcToldOnce && xcCables().has(c)){ xcToldOnce = true; toast('This cable crosses from one track\'s chain into another\'s, so it carries no signal. Use a Sidechain Out (Send 1\u20138) and Source: Send N, or a Send / Receive pair.', 6000); }
-  else if (loop) fbToast(); else if (had) toast('Two cables now feed this input: they add together (Undo takes the new one off). Drag the old one off to replace it.', 4200);
+  if (!xcToldOnce && xcCables().has(c)){ xcToldOnce = true; toast('A cable can’t cross tracks, so it carries no signal. Use a Sidechain Out (Send 1\u20138) with Source: Send N, or a Send / Receive pair.', 6000); }
+  else if (loop) fbToast(); else if (had) toast('Two cables feed this input and add together. Undo removes the new one; drag the old one off to replace it.', 4200);
   return true;
 }
 function disconnect(c, quiet){
@@ -4247,9 +4247,9 @@ function onJackDown(e, jack){
     const d = drag; drag = null; d.el.g.remove(); autoPanV = [0, 0];
     if (ev.type === 'pointercancel') return;
     const t = findTarget(ev);
-    if (!t){ if (snapped) toast('Cable removed.'); return; }
+    if (!t){ if (snapped) toast('Cable removed'); return; }
     const tt = { id: t.dataset.id, port: t.dataset.port, dir: t.dataset.dir };
-    if (tt.dir === d.anchor.dir){ if (snapped) toast('Cable removed.'); return; }
+    if (tt.dir === d.anchor.dir){ if (snapped) toast('Cable removed'); return; }
     const out = d.anchor.dir === 'out' ? d.anchor : tt, inp = d.anchor.dir === 'out' ? tt : d.anchor;
     connect([out.id, out.port], [inp.id, inp.port], d.anchor.dir === 'out' ? d.pts : d.pts.slice().reverse(), !snapped);   // (the undo step is taken inside, once the cable is accepted: a refused one leaves none)
   };
@@ -4307,7 +4307,7 @@ function squareUpCable(c){
   const ends = cableEndPts(c); if (!ends){ toast('That cable is hidden: open its group first.'); return; }
   const pts = squareUpPts(ends, c.pts); store.snapshot();
   if (pts.length) c.pts = pts; else delete c.pts;
-  drawCables(); store.touch(); toast('Squared up.');
+  drawCables(); store.touch(); toast('Cable squared up');
 }
 function bendDrag(ev, c, idx, lazy){
   ev.stopPropagation(); ev.preventDefault();
@@ -4604,7 +4604,7 @@ function renderGroups(){
     fold.addEventListener('pointerdown', e => e.stopPropagation());
     x.addEventListener('click', () => { store.snapshot(); doc.groups = doc.groups.filter(q => q !== g); renderGroups(); store.touch(); });
     fold.addEventListener('click', () => { if (playBlocked()) return; store.snapshot(); g.collapsed = !g.collapsed; renderGroups(); store.touch(); });
-    label.addEventListener('dblclick', async () => { const nm = await askDialog('Name this group:', { input:g.name, ok:'Rename' }); if (nm && nm.trim()){ store.snapshot(); g.name = nm.trim(); renderGroups(); } });
+    label.addEventListener('dblclick', async () => { const nm = await askDialog('Group name', { input:g.name, ok:'Rename' }); if (nm && nm.trim()){ store.snapshot(); g.name = nm.trim(); renderGroups(); } });
     label.addEventListener('pointerdown', e => {
       if (e.button !== 0) return;
       e.stopPropagation(); e.preventDefault(); label.setPointerCapture(e.pointerId);
@@ -4786,7 +4786,7 @@ function ctxMenu(target, x, y, o = {}){
   // A CABLE (mouse audit, 3 Nov): right-click it to remove it (double-click still does); it had no menu of its own.
   const hc = target.closest && target.closest('.hit'), cab = hc && hc._cable;
   if (cab && doc.cables.includes(cab)){
-    const its = [['Remove cable', () => { if (!doc.cables.includes(cab)) return; store.snapshot(); disconnect(cab); toast('Cable removed.'); }]];
+    const its = [['Remove cable', () => { if (!doc.cables.includes(cab)) return; store.snapshot(); disconnect(cab); toast('Cable removed'); }]];
     if (o.touch) its.unshift(['Add a bend here', () => { if (doc.cables.includes(cab)){ selectCable(cab); addBendAt(cab, worldPt({ clientX:x, clientY:y })); } }]);   // T8: the bend a mouse makes with Option-drag
     its.splice(its.length - 1, 0, ['Square up', () => squareUpCable(cab)]);   // (right angles: before Remove cable)
     showMenu(x, y, its); return; }
@@ -4814,8 +4814,8 @@ function ctxMenu(target, x, y, o = {}){
   }
   const these = n === 1 ? 'this module' : 'these ' + n + ' modules';
   if (n) items.push(['Make custom module from ' + these + '…', async () => {
-    const nm = await askDialog('Name the new custom module:', { input:'My voice', ok:'Make it' }); if (!nm || !nm.trim()) return;
-    const def = captureCustom(nm.trim(), sel); if (def) toast('“' + def.name + '” is in the module list under Custom.');
+    const nm = await askDialog('Custom module name', { input:'My voice', ok:'Make it' }); if (!nm || !nm.trim()) return;
+    const def = captureCustom(nm.trim(), sel); if (def) toast('“' + def.name + '” added under Custom');
   }]);
   if (n === 1) items.push(['Rename module… (Enter)', () => renameModule(sel[0])]);
   if (n === 1 && nodes.get(sel[0])) items.push(['About this module', () => { const q = nodes.get(sel[0]); if (q) mhelpShow(q.head, q.m.type, q.title, true); }]);   // (narrow and Mini modules have no ? button)
@@ -4828,12 +4828,12 @@ function ctxMenu(target, x, y, o = {}){
   items.push(['Select all (' + MOD + '+A)', () => { for (const k of nodes.keys()) setSel(k, true); }]);
   { // COLLAPSE ALL / EXPAND ALL (C4), each one undo step
     const all = [...nodes.values()], open = all.filter(x => !x.m.collapsed).length, shut = all.length - open, picked = sel.map(x => nodes.get(x)).filter(Boolean);
-    const say = (k, c) => toast((c ? 'Collapsed ' : 'Expanded ') + k + (k === 1 ? ' module' : ' modules') + ' (' + MOD + '+Z undoes it).');
+    const say = (k, c) => toast((c ? 'Collapsed ' : 'Expanded ') + k + (k === 1 ? ' module' : ' modules') + ' · ' + MOD + '+Z undoes it');
     if (picked.some(x => !x.m.collapsed)) items.push(['Collapse ' + (picked.length === 1 ? 'this module' : 'selected modules'), () => say(setAllCollapsed(true, sel), true)]);
     else if (picked.length && picked.some(x => x.m.collapsed)) items.push(['Expand ' + (picked.length === 1 ? 'this module' : 'selected modules'), () => say(setAllCollapsed(false, sel), false)]);
-    if (picked.some(x => viewOf(x.m) !== 'mini')) items.push(['Mini ' + (picked.length === 1 ? 'this module' : 'selected modules') + ' (title bar only)', () => { const k = setAllMini(sel); toast('Mini: ' + k + (k === 1 ? ' module' : ' modules') + ' (' + MOD + '+Z undoes it).'); }]);
+    if (picked.some(x => viewOf(x.m) !== 'mini')) items.push(['Mini ' + (picked.length === 1 ? 'this module' : 'selected modules') + ' (title bar only)', () => { const k = setAllMini(sel); toast('Mini: ' + k + (k === 1 ? ' module' : ' modules') + ' · ' + MOD + '+Z undoes it'); }]);
     if (open) items.push(['Collapse all modules (Alt+C)', () => say(setAllCollapsed(true), true)]);
-    if (all.length > all.filter(x => viewOf(x.m) === 'mini').length) items.push(['Mini all modules (Alt+Shift+C)', () => { const k = setAllMini(); toast('Mini: ' + k + (k === 1 ? ' module' : ' modules') + ' (' + MOD + '+Z undoes it).'); }]);
+    if (all.length > all.filter(x => viewOf(x.m) === 'mini').length) items.push(['Mini all modules (Alt+Shift+C)', () => { const k = setAllMini(); toast('Mini: ' + k + (k === 1 ? ' module' : ' modules') + ' · ' + MOD + '+Z undoes it'); }]);
     if (shut) items.push(['Expand all modules' + (open ? '' : ' (Alt+C)'), () => say(setAllCollapsed(false), false)]);
   }
   if (!id) items.push(['Add a comment here', () => addNote(...worldPt({ clientX:x, clientY:y }))], ['Fit all modules (F)', () => fitAll()], ['Tidy up (by signal flow)', () => tidy()], ['Snap to grid: ' + (snapOn ? 'on (turn off)' : 'off (turn on)'), () => { snapOn = !snapOn; settings.snap = snapOn; saveSettings(); toast(snapOn ? 'Snap to grid on: modules land on a 10 px grid.' : 'Snap to grid off.'); }]);
@@ -4991,7 +4991,7 @@ function renderCustom(){
   customUI.grid.replaceChildren(...(doc.custom.length ? doc.custom.map(c => {
     const b = paletteItem('c:' + c.id, c.name, false);
     b.addEventListener('contextmenu', e => { e.preventDefault(); showMenu(e.clientX, e.clientY, [
-      ['Rename “' + c.name + '”…', async () => { const nm = await askDialog('Rename this custom module:', { input:c.name, ok:'Rename' }); if (nm && nm.trim()){ store.snapshot(); c.name = nm.trim(); renderCustom(); } }],
+      ['Rename “' + c.name + '”…', async () => { const nm = await askDialog('Custom module name', { input:c.name, ok:'Rename' }); if (nm && nm.trim()){ store.snapshot(); c.name = nm.trim(); renderCustom(); } }],
       ['Delete “' + c.name + '”', () => { store.snapshot(); doc.custom = doc.custom.filter(x => x !== c); renderCustom(); store.touch(); }]]); });
     return h('div', {class:'pwrap'}, b);
   }) : [h('div', {class:'qempty', text:'Select modules (click, Shift-click or drag a box), right-click and choose Make custom module.'})]));
@@ -5045,15 +5045,15 @@ window.addEventListener('pointerdown', e => { if (!setMenu.hidden && !setMenu.co
    the tracker, the synth and this patch (the app puts the patch back here, setDoc). On its own the patch keeps its own. */
 const sharedUndo = () => !!(EMBED && TW && TW.undo);
 function flushToHost(){ if (store && store.dirty){ clearTimeout(store._timer); store.save(); } }
-function undo(){ if (sharedUndo()){ flushToHost(); TW.undo(-1); return; } if (store.back()) toast('Undone.'); }
-function redo(){ if (sharedUndo()){ flushToHost(); TW.undo(1); return; } if (store.forward()) toast('Redone.'); }
+function undo(){ if (sharedUndo()){ flushToHost(); TW.undo(-1); return; } if (store.back()) toast('Undone'); }
+function redo(){ if (sharedUndo()){ flushToHost(); TW.undo(1); return; } if (store.forward()) toast('Redone'); }
 const canUndo = () => sharedUndo() ? !!(TW.canUndo && TW.canUndo()) : !!store.undo.length;
 const canRedo = () => sharedUndo() ? !!(TW.canRedo && TW.canRedo()) : !!store.redo.length;
 function newPatch(){
   store.snapshot();
   const b = blankDoc(); for (const k of Object.keys(doc)) delete doc[k]; Object.assign(doc, b);
   clearSel(); renderAll(); loadIntoEngine(); store.touch();
-  toast('New empty patch. Press ' + MOD + '+Z to get the previous one back.');
+  toast('New empty patch · ' + MOD + '+Z brings the old one back');
 }
 const fileLoad = document.getElementById('fileload');
 let loadMode = 'patch';
@@ -5062,12 +5062,12 @@ fileLoad.addEventListener('change', () => {
   const f = fileLoad.files[0]; if (!f) return;
   const p = loadMode === 'custom'
     ? store.importCustom(f).then(k => { renderCustom(); store.touch(); toast('Imported ' + k + ' custom module' + (k === 1 ? '' : 's') + '.'); })
-    : store.importFrom(f).then(() => toast('Opened “' + doc.meta.name + '”.'));
+    : store.importFrom(f).then(() => toast('Loaded “' + doc.meta.name + '”'));
   p.catch(err => toast(err.message || 'Couldn’t open that file.'));
 });
 async function savePatch(as){
   let name = doc.meta.name || 'Untitled';
-  if (as){ const nm = await askDialog('Save the patch as:', { input:name, ok:'Save' }); if (!nm || !nm.trim()) return; name = nm.trim(); doc.meta.name = name; document.getElementById('pname').value = name; }
+  if (as){ const nm = await askDialog('Patch name', { input:name, ok:'Save' }); if (!nm || !nm.trim()) return; name = nm.trim(); doc.meta.name = name; document.getElementById('pname').value = name; }
   store.dirty = true; store.save(); store.exportTo(name); toast('Saved “' + name + '”.');
 }
 document.getElementById('fnew').addEventListener('click', newPatch);
@@ -5093,7 +5093,7 @@ const pnameEl = document.getElementById('pname');
       file:{
         new(){ newPatch(); }, open(){ pickFile('patch'); }, save(){ savePatch(false); }, saveAs(){ savePatch(true); },
         undo(){ undo(); }, redo(){ redo(); }, canUndo(){ return canUndo(); }, canRedo(){ return canRedo(); },
-        exportCustom(){ if (!doc.custom.length){ toast('No custom modules yet.'); return; } store.exportCustom(); },
+        exportCustom(){ if (!doc.custom.length){ toast('No custom modules yet'); return; } store.exportCustom(); },
         importCustom(){ pickFile('custom'); }
       },
       patchSettings(){
@@ -5186,7 +5186,7 @@ function renderBackups(){
   host.replaceChildren(...(list.length ? list.map(b => {
     let info = ''; try { const d = JSON.parse(b.p); info = ', ' + ((d.meta && d.meta.name) || 'Untitled') + ', ' + (d.modules || []).length + ' modules'; } catch (e) {}
     const r = h('button', {class:'btn', text:'Restore'});
-    r.addEventListener('click', () => { store.snapshot(); store._restore(JSON.stringify(normalize(JSON.parse(b.p)))); toast('Restored the version from ' + fmt(b.t) + '. Press ' + MOD + '+Z to undo.'); });
+    r.addEventListener('click', () => { store.snapshot(); store._restore(JSON.stringify(normalize(JSON.parse(b.p)))); toast('Restored the version from ' + fmt(b.t) + ' · ' + MOD + '+Z undoes it'); });
     return h('div', {class:'bkrow'}, h('span', {text: fmt(b.t) + info}), r);
   }) : [h('span', {class:'setsub', text:'Backups appear here while you work.'})]));
 }
@@ -5485,7 +5485,7 @@ function setMode(play, quiet){
     if (drag && drag.armed) window.dispatchEvent(new KeyboardEvent('keydown', { key:'Escape' }));
     if (!drawer.classList.contains('collapsed')) setDrawer(false);
   }
-  if (!quiet){ settings.mode = play ? 'play' : 'edit'; saveSettings(); toast(play ? 'Play: touch plays the patch; modules and cables are locked. Tap Edit to change them.' : 'Edit: modules, cables and menus work.'); }
+  if (!quiet){ settings.mode = play ? 'play' : 'edit'; saveSettings(); toast(play ? 'Play: touch plays; the patch is locked. Tap Edit to change it.' : 'Edit: modules, cables and menus work.'); }
 }
 for (const k in modeBtns) modeBtns[k].addEventListener('click', () => setMode(k === 'play'));
 window.addEventListener('keydown', e => {
@@ -5497,7 +5497,7 @@ const selBtn = document.getElementById('selbtn');
 function setSelMode(on, quiet){
   on = !!on && !playMode; selMode = on; document.body.classList.toggle('selmode', on);
   selBtn.classList.toggle('on', on); selBtn.setAttribute('aria-pressed', String(on));
-  if (!quiet) toast(on ? 'Select on: tap modules to pick them, drag the background for a box. Hold a module for Group, Copy or Delete.' : 'Select off.');
+  if (!quiet) toast(on ? 'Select: tap modules, or drag a box. Hold a module for Group, Copy, Delete.' : 'Select off');
 }
 selBtn.addEventListener('click', () => { if (playBlocked()) return; setSelMode(!selMode); });
 /* THE NARROW BAR (T12): at 640 px and below, File, Settings, Help, MIDI learn, Select, the CPU readout and the zoom buttons move into the overflow menu (the same elements, so their handlers and ids stay). */
@@ -5562,7 +5562,7 @@ function wireBridge(b){
   bridge = b;
   b.telemetry(true);
   b.on('meter', onMeter);
-  b.on('shed', s => toast(s && s.recovered ? 'CPU is free again: back to full quality.' : 'The CPU is busy: switched to draft quality.'));
+  b.on('shed', s => toast(s && s.recovered ? 'CPU is free: full quality' : 'CPU is busy: draft quality'));
   b.on('error', e => toast(e.message));
   b.loadPatch(doc);
   if (doc.quality) b.setQuality(doc.quality);

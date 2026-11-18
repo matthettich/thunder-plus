@@ -8603,8 +8603,8 @@ function setPlatform(p){
   }
   applyPlatform();
   const hid = [noWaves() ? 'waves' : '', noChains() ? 'chains' : ''].filter(Boolean);
-  toast(p === 'mobile' ? 'Mobile (Thunder): PAD input.' + (hid.length ? (hid.length > 1 ? ' Hidden editors (' : ' Hidden editor (') + hid.join(', ') + (hid.length > 1 ? ') still play their sounds.' : ') still plays its sounds.') : '')
-                       : 'Desktop (Thunder Plus): the waves and chains editors are shown.');
+  toast(p === 'mobile' ? 'Mobile: PAD input.' + (hid.length ? (hid.length > 1 ? ' Hidden editors (' : ' Hidden editor (') + hid.join(', ') + (hid.length > 1 ? ') still play.' : ') still plays.') : '')
+                       : 'Desktop: the waves and chains editors are shown.');
 }
 function applyPlatform(){
   const m = isMobile();
@@ -9494,16 +9494,16 @@ function slotVoice(i){
 }
 function kitStep(){ markKit(); try { kitFlush(); undo.past.push({k:'K', j:kitUndoJSON()}); if (undo.past.length > 200) undo.past.shift(); undo.future = []; } catch(e){} }
 function setSlots(n){
-  if (vtrk) return toast('A kit slot per track is on (Settings → Kit): the kit has a slot for every track. Turn it off to set SLOTS.', 5000);
+  if (vtrk) return toast('SLOTS is locked: a kit slot per track is on (Settings → Kit)', 5000);
   n = clamp(Math.round(n), 16, MAXSLOT); if (n === NSLOT){ slotsUI(); return; }
   kitStep();
   const was = NSLOT; NSLOT = kit.slots = n;
   for (let i = Math.min(was, n); i < Math.max(was, n); i++){ dirty[i] = true; cache[i] = null; }
   try { instFit(); } catch(e){}
-  if (n > was){ growKit(); toast(`${n} slots: ${hx(was)}–${hx(n - 1)} are new synths (THIS SLOT makes one a one-shot drum).`, 4000); }
+  if (n > was){ growKit(); toast(`${n} slots. ${hx(was)}–${hx(n - 1)} are new synths.`, 4000); }
   else { if (cur >= n) cur = n - 1; buildPads(); refreshAll(); save();
     let far = []; try { far = S.insts.map((I, k) => I.pad >= n ? hx(k) : null).filter(Boolean); } catch(e){}
-    toast(`${n} slots. The sounds of ${hx(n)}–${hx(was - 1)} are kept: more slots show them again.` + (far.length ? ` Instrument${far.length > 1 ? 's' : ''} ${far.slice(0, 6).join(', ')}${far.length > 6 ? '…' : ''} ${far.length > 1 ? 'play' : 'plays'} from hidden slot${far.length > 1 ? 's' : ''}.` : ''), 6000); }
+    toast(`${n} slots. Sounds ${hx(n)}–${hx(was - 1)} are kept, hidden.` + (far.length ? ` Instrument${far.length > 1 ? 's' : ''} ${far.slice(0, 6).join(', ')}${far.length > 6 ? '…' : ''} ${far.length > 1 ? 'play' : 'plays'} from ${far.length > 1 ? 'them' : 'it'}.` : ''), 6000); }
   slotsUI(); try { draw(); } catch(e){}
 }
 // Instruments 10 and up that nothing uses yet, still as they were made, follow the slot count: instrument k plays slot k
@@ -9522,14 +9522,14 @@ function instFit(){
   clearTimeout(sT); sPend = true; sT = setTimeout(() => { sPend = false; storeWrite(TK, JSON.stringify(songOut(S))); }, 600); songVer++;
 }
 function setSlotKind(i, held){
-  if (vtrk) return toast('A kit slot per track is on (Settings → Kit): mono tracks get drums, poly tracks synths.', 4000);
+  if (vtrk) return toast('THIS SLOT follows the track: mono = drum, poly = synth', 4000);
   if (isSyn(i) === !!held) return;
   kitStep();
   if (!Array.isArray(kit.held)) kit.held = [];
   while (kit.held.length <= i) kit.held.push(null);
   kit.held[i] = !!held; syncHeld(); dirty[i] = true; cache[i] = null;
   changed(i); buildPads(); refreshAll(); slotsUI();
-  toast(`Pad ${hx(i)} is ${held ? 'HELD now: it sounds until a note-off (up to Max len), like a synth' : 'ONE-SHOT now: it plays its whole sound, like a drum'}.`, 4000);
+  toast(`Pad ${hx(i)}: ${held ? 'HELD, sounds until note-off (up to Max len).' : 'ONE-SHOT, plays its whole sound.'}`, 4000);
 }
 const updKind = makeSeg($('vKindSeg'), [[false, 'One-shot'], [true, 'Held']], () => isSyn(cur), v => setSlotKind(cur, v));
 function slotsUI(){
@@ -9835,7 +9835,7 @@ function wlStart(v, first){
       {id:'m5', type:'out', scope:'mono', pos:[1004, 150], collapsed:false, params:{slot:1, level:1}}],
     cables:[{from:['m1', 'pitch'], to:['m2', 'pitch'], bend:0}, {from:['m1', 'gate'], to:['m3', 'gate'], bend:0}, {from:['m2', 'out'], to:['m4', 'in'], bend:0},
       {from:['m3', 'out'], to:['m4', 'cv'], bend:0}, {from:['m4', 'out'], to:['m5', 'in'], bend:0}]};
-  WV.doc = kit.waves; toast('waves live plays the song’s waves patch: a starter patch is in (Waves at the top edits it).', 4000);
+  WV.doc = kit.waves; toast('Starter waves patch added. Edit it under Waves.', 4000);
 }
 function bassPreset(i, quiet){
   const pr = BASS_PRE[i]; if (!pr) return; const v = V(), o = Object.assign({}, pr[1]);
@@ -10716,13 +10716,13 @@ function loadClassicKit(i){
     K[2].forEach(([ty, n], p) => { const it = L.find(e => e[0] === ty && e[1] === n); if (!it || !kit.voices[p]) return; kit.voices[p] = it[2](); changed(p, true); });
     kit.name = K[0].replace(/ kit$/, '') + ' kit';
     refreshAll(); save();
-    return toast(`${K[0].replace(/ kit$/, '')} kit on pads 1–8. Undo puts a pad back.`);
+    return toast(`Loaded ${K[0].replace(/ kit$/, '')} kit on pads 1–8. Undo brings it back.`);
   }
   const G = K && drumKitGroups().find(g => g[0] === K[0]); if (!G) return;
   K[1].forEach((n, p) => { const it = G[1].find(e => e[0] === n); if (!it || !kit.voices[p]) return; kit.voices[p] = it[1](); changed(p, true); });
   kit.name = kitTag(K[0]) + '-style kit';
   refreshAll(); save();
-  toast(`${kitTag(K[0])}-style kit on pads 1–8. Undo puts a pad back.`);
+  toast(`Loaded ${kitTag(K[0])}-style kit on pads 1–8. Undo brings it back.`);
 }
 /* LXR ENGINES: File ▾ → Import LXR kit (.snd)… A kit file from the LXR-02's SD card (8 name bytes, then the sound
    parameters) becomes seven pads in a row: drums 1–3, snare, cymbal, closed and open hat, each on its Firmware engine
@@ -10733,9 +10733,9 @@ function pickLxrKit(){
   inp.click();
 }
 async function importLxrKit(f){
-  let K; try { K = LxrCore.readKit(await f.arrayBuffer()); } catch(e){ return toast('That isn’t an LXR kit file (a .snd from the kit folder).'); }
+  let K; try { K = LxrCore.readKit(await f.arrayBuffer()); } catch(e){ return toast('Not an LXR kit (.snd)'); }
   const n = K.sounds.length, last = nslots() - 1, here = Math.min(cur, Math.max(0, last - n + 1));
-  const i = await askPick({title:'LXR kit: ' + K.name, body:`Its ${n} sounds (drums 1–3, snare, cymbal, closed and open hat) go on ${n} pads in a row, each on its Firmware engine. Undo puts a pad back.`},
+  const i = await askPick({title:'LXR kit: ' + K.name, body:`Its ${n} sounds (drums 1–3, snare, cymbal, closed and open hat) go on ${n} pads in a row, each on its Firmware engine. Undo brings it back.`},
     here > 0 ? ['Pads 1–' + n, `Pads ${here + 1}–${here + n} (from this pad)`] : ['Pads 1–' + n]);
   if (i < 0) return;
   const at = i === 0 ? 0 : here;
@@ -10899,7 +10899,7 @@ async function pickBreak(){
     const k = drumKits().findIndex(K => K[0] === b[3]); if (k >= 0) loadClassicKit(k);
     toast(`${b[0]}: ${b[1]} BPM, ${kitTag(b[3]).toLowerCase()} kit on pads 1–8. Press play.`);
   } else if (how === 1){
-    if (y >= 255 || !placeBreak(S, i, y)) return toast('No room for it: the song needs six free sects and up to sixteen free phrases.');
+    if (y >= 255 || !placeBreak(S, i, y)) return toast('No room: needs six free sects and up to sixteen free phrases.');
     saveS(); draw(); toast(`${b[0]} added at row ${rS(y, 3)} on tracks 1–6.`);
   }
 }
@@ -11024,10 +11024,10 @@ async function pickChopBreak(){
   if (i < 0) return;
   const f = freeSlot(), nm = k => hx(k) + ' · ' + ((kit.voices[k] && kit.voices[k].name) || 'Pad');
   const opts = [...(f >= 0 ? [['A slot this song doesn’t play: ' + nm(f), f]] : []), ['This slot: ' + nm(cur), cur], ['Another slot…', -2]];
-  const k = await askPick({title:CHOP_BREAKS[i][0], body:'The slot’s other layers are turned off and the break becomes its sample. Undo puts the sound back.'}, opts.map(o => o[0]));
+  const k = await askPick({title:CHOP_BREAKS[i][0], body:'The slot’s other layers are turned off and the break becomes its sample. Undo brings it back.'}, opts.map(o => o[0]));
   if (k < 0) return; let pad = opts[k][1];
   if (pad === -2){ const a = await askText({title:'Which slot?', body:`Hex, 00 to ${hx(nslots() - 1)}.`}, hx(f >= 0 ? f : cur), 2, 'Load'); if (a == null) return;
-    pad = parseInt(a.trim(), 16); if (!(pad >= 0 && pad < Math.min(nslots(), kit.voices.length))) return toast(`Type a slot in hex, 00 to ${hx(nslots() - 1)}.`); }
+    pad = parseInt(a.trim(), 16); if (!(pad >= 0 && pad < Math.min(nslots(), kit.voices.length))) return toast(`Not a slot. Use hex, 00 to ${hx(nslots() - 1)}.`); }
   toast('Rendering ' + CHOP_BREAKS[i][0] + '…', 3000); await new Promise(res => setTimeout(res, 40));   // about half a second on a computer, longer on a phone
   const sr = padSR(), r = renderChopBreak(i, sr), d = new Float32Array(r.L.length);
   for (let n = 0; n < d.length; n++) d[n] = (r.L[n] + r.R[n]) * 0.5;
@@ -11039,7 +11039,7 @@ async function pickChopBreak(){
     const cand = [pad, ...Array.from({length:NI}, (_, n) => n)].filter(n => n < NI && !usedI.has(n)); if (cand.length){ ins = cand[0]; S.insts[ins].pad = pad; } }
   S.insts.forEach(I => { if (I.pad === pad){ I.slc = 16; I.smode = 0; I.sync = 1; I.beats = 4; } });
   saveS(); draw();
-  toast(`${r.name} (${r.bpm} BPM) in slot ${hx(pad)}, 16 slices, synced to the tempo` + (ins >= 0 ? ` · instrument ${hx(ins)}: C-4 plays slice 1` : ''), 6000);
+  toast(`${r.name} (${r.bpm} BPM) in slot ${hx(pad)}: 16 slices, synced.` + (ins >= 0 ? ` Instrument ${hx(ins)}: C-4 plays slice 1.` : ''), 6000);
 }
 // LXR ENGINES: the firmware's init kit, its seven sounds, as one group of the pad Presets list
 const lxrPresetGroup = () => ['LXR-02 firmware', LxrCore.initKit().map(({name, kind, o}) =>
@@ -12260,7 +12260,7 @@ async function onVoicePreset(val){
   if (val === 'save'){
     const n = await askText({title:'Save preset', body:'Saved in this project, with its samples.'}, V().name || 'Preset', 60, 'Save'); if (n == null) return;
     mine.push({name:uniqName(mine, n.trim().slice(0, 60) || 'Preset'), v:voiceToJSON(V(), 'ref')}); saveS(); presetUI();
-    return toast('Saved preset “' + mine[mine.length - 1].name + '” in this song.');
+    return toast('Saved preset “' + mine[mine.length - 1].name + '”.');
   }
   if (val === 'del'){ const i = await pickDel(mine, 'voice'); if (i < 0) return; const n = mine.splice(i, 1)[0].name; saveS(); presetUI(); return toast('Deleted preset “' + n + '”.'); }
   if (val[0] === 'u'){ const p = mine[+val.slice(1)]; if (!p) return; const v = voiceFromJSON(JSON.parse(JSON.stringify(p.v))); v.name = p.name.slice(0, 24); applyVoicePreset(v); return toast('Preset: ' + p.name); }
@@ -12269,7 +12269,7 @@ async function onVoicePreset(val){
 // A layer lands on this pad at the pitch it was made for: shift by the difference between the pads' tunings.
 function applyLayerPreset(l, vt){
   const v = V(), L = freshLayer(Object.assign({}, l, {on:true}));
-  if (v.engine && v.engine !== 'layers') return toast('Layer presets are for the Layers engine.');
+  if (v.engine && v.engine !== 'layers') return toast('Layer presets need the Layers engine');
   L.tune = clamp((l.tune || 0) + (vt || 0) - (v.tune || 0), -48, 48);
   if (!l.mode) L.mode = isSyn(cur) ? 'ADSR' : 'AHD';
   if (l.sample) L.sample = smpFromJSON(l.sample);
@@ -12280,7 +12280,7 @@ async function onLayerPreset(val){
   if (val === 'save'){
     const n = await askText({title:'Save layer preset', body:'Saved in this project, with its sample.'}, (TYPE[Lc().type] || {name:'Layer'}).name, 60, 'Save'); if (n == null) return;
     mine.push({name:uniqName(mine, n.trim().slice(0, 60) || 'Layer'), l:layerToJSON(Lc(), 'ref'), vt:V().tune || 0}); saveS(); presetUI();
-    return toast('Saved layer preset “' + mine[mine.length - 1].name + '” in this song.');
+    return toast('Saved layer preset “' + mine[mine.length - 1].name + '”.');
   }
   if (val === 'del'){ const i = await pickDel(mine, 'layer'); if (i < 0) return; const n = mine.splice(i, 1)[0].name; saveS(); presetUI(); return toast('Deleted layer preset “' + n + '”.'); }
   if (val[0] === 'u'){ const p = mine[+val.slice(1)]; if (!p) return; applyLayerPreset(JSON.parse(JSON.stringify(p.l)), p.vt); return toast('Layer: ' + p.name); }
@@ -12308,14 +12308,14 @@ function presetsByRef(P){
 }
 const fullPresets = () => { const P = SP(); return {voices:P.voices.map(p => Object.assign({}, p, {v:Object.assign({}, p.v, {layers:(p.v.layers || []).map(fullSmp)})})), layers:P.layers.map(p => Object.assign({}, p, {l:fullSmp(p.l)}))}; };
 async function exportPresets(){
-  const P = SP(); if (!P.voices.length && !P.layers.length) return toast('No song presets yet: pick “＋ Save this as a preset…” in a pad’s Presets list.');
+  const P = SP(); if (!P.voices.length && !P.layers.length) return toast('No song presets. Use “＋ Save this as a preset…” in a pad’s Presets list.');
   await presetSmpFill();
   const out = {app:'thunder-presets', v:1, voices:P.voices.map(p => ({name:p.name, v:Object.assign({}, p.v, {layers:(p.v.layers || []).map(fullSmp)})})), layers:P.layers.map(p => ({name:p.name, vt:p.vt, l:fullSmp(p.l)}))};
   await deliver(`${safe(S.name || 'Song')} presets.json`, new Blob([JSON.stringify(out)], {type:'application/json'}));
 }
 async function importPresetsFile(f){
   try {
-    const j = JSON.parse(await f.text()); if (!j || j.app !== 'thunder-presets') throw new Error('That isn’t a Thunder presets file.');
+    const j = JSON.parse(await f.text()); if (!j || j.app !== 'thunder-presets') throw new Error('Not a Thunder presets file');
     const n = normPresets(j), P = SP(); let a = 0, b = 0;
     // Imported samples go to IndexedDB and the preset keeps a reference, as presets saved in the app do. Keeping the
     // audio inside the song (as before) put megabytes of base64 into every autosave and undo step, and two imports
@@ -12324,8 +12324,8 @@ async function importPresetsFile(f){
     for (const p of n.voices){ p.name = uniqName(P.voices, p.name); P.voices.push(p); a++; }
     for (const p of n.layers){ p.name = uniqName(P.layers, p.name); P.layers.push(p); b++; }
     try { await Promise.all(puts); } catch(e){ console.warn('Couldn’t store an imported sample', e); }
-    saveS(); presetUI(); toast(`Imported ${a} pad preset${a === 1 ? '' : 's'} and ${b} layer preset${b === 1 ? '' : 's'} into this song.`);
-  } catch(e){ toast((e && e.message) || 'Couldn’t read that presets file.'); }
+    saveS(); presetUI(); toast(`Imported ${a} pad and ${b} layer preset${b === 1 ? '' : 's'}.`);
+  } catch(e){ toast((e && e.message) || 'Couldn’t read that presets file'); }
 }
 /* ---------- the preset browser ----------
    kind 'voice' (pad presets) or 'layer'. Entries carry an apply() and a make() (the preset as a voice, for the ▶
@@ -12390,7 +12390,7 @@ const favs = (() => { let r = null; const load = () => { if (!r){ try { r = JSON
 function favBtn(kind, id, label, after){
   const on = favs.has(kind, id), b = el('button', 'pfav' + (on ? ' fon' : ''), on ? '★' : '☆'); b.type = 'button';
   b.title = on ? 'Take it out of Favorites' : 'Add to Favorites'; b.setAttribute('aria-label', (on ? 'Unfavorite ' : 'Favorite ') + label); b.setAttribute('aria-pressed', String(on));
-  b.addEventListener('click', e => { e.stopPropagation(); const now = favs.toggle(kind, id); toast(now ? label + ' is in Favorites' : label + ' left Favorites', 1400); if (after) after(); });
+  b.addEventListener('click', e => { e.stopPropagation(); const now = favs.toggle(kind, id); toast(now ? label + ' added to Favorites' : label + ' removed from Favorites', 1400); if (after) after(); });
   return b;
 }
 const PRK = 'thunderplus-preset-recent-v2';   // v2 (30 Oct): drums regrouped by type, so the old keys (group:item numbers) point elsewhere
@@ -12452,15 +12452,15 @@ async function previewVoice(v, btn){
   audio(); stopPreview(); if (btn) btn.classList.add('busy');
   try {
     const sr = padSR(), hold = isSyn(cur) ? (v.len || 0) : 0; let data;
-    if (v.engine === 'sf'){ toast('SoundFont presets have no preview. Put one on a pad, then tap the pad to hear it.'); return; }
+    if (v.engine === 'sf'){ toast('SoundFont presets can’t preview. Put one on a pad and play it.'); return; }
     try { data = (await renderAsync(v, sr, hold, false)).data; } catch(e){ data = renderVoice(v, sr, null, hold); }
     if (!data || !data.length) return;
     stopPreview(); const b = ctx.createBuffer(1, data.length, sr); b.copyToChannel(data, 0); const src = ctx.createBufferSource(); src.buffer = b; src.connect(master); src.start(); pbPreview = src; src.onended = () => { if (pbPreview === src) pbPreview = null; };
-  } catch(e){ toastErr('Couldn’t preview that preset.'); } finally { if (btn) btn.classList.remove('busy'); }
+  } catch(e){ toastErr('Couldn’t preview that preset'); } finally { if (btn) btn.classList.remove('busy'); }
 }
 function presetSheet(kind){
   if (pbOpen) pbOpen();
-  if (kind === 'layer' && V().engine && V().engine !== 'layers') return toast('Layer presets are for the Layers engine.');
+  if (kind === 'layer' && V().engine && V().engine !== 'layers') return toast('Layer presets need the Layers engine');
   const song = kind === 'voice' || kind === 'layer', eng = song ? null : enginePresetEntries(kind), rkind = song ? kind : eng.rk;
   const title = kind === 'voice' ? 'Pad presets' : kind === 'layer' ? 'Layer presets' : eng.title;
   const wrap = el('div', 'pbs'), box = el('div', 'pbox'); wrap.setAttribute('role', 'dialog'); wrap.setAttribute('aria-modal', 'true'); wrap.setAttribute('aria-label', title);
@@ -12481,11 +12481,11 @@ function presetSheet(kind){
     const it = el('div', 'pit'), pn = el('button', 'pn', e.name), pp = el('button', 'pp'); pn.type = pp.type = 'button'; pn.title = 'Use this preset';
     pp.innerHTML = '<svg class="ic" aria-hidden="true" style="width:12px;height:12px;fill:currentColor"><use href="#ic-play"/></svg>'; pp.title = 'Preview this preset'; pp.setAttribute('aria-label', 'Preview ' + e.name);
     pn.addEventListener('click', () => { if (early()) return; recentPresets.add(rkind, e.key); done(); e.apply(); });
-    pp.addEventListener('click', () => { if (e.prev) return e.prev(pp); try { previewVoice(e.make(), pp); } catch(err){ toastErr('Couldn’t preview that preset.'); } });
+    pp.addEventListener('click', () => { if (e.prev) return e.prev(pp); try { previewVoice(e.make(), pp); } catch(err){ toastErr('Couldn’t preview that preset'); } });
     it.append(pn, pp);
     if (e.fid) it.append(favBtn('p:' + rkind, e.fid, e.name, () => { G = presetEntries(kind); const fo = G[0] && G[0][0] === 'Favorites'; if (fo !== hadFav){ openCat += fo ? 1 : -1; hadFav = fo; } render(); }));   // FAVOURITES
     if (e.own != null){ const px = el('button', 'px', '✕'); px.type = 'button'; px.title = 'Delete this preset'; px.setAttribute('aria-label', 'Delete ' + e.name);
-      px.addEventListener('click', async () => { if (!await askYes({title:'Delete “' + e.name + '”?', body:'It is removed from this song only.'}, 'Delete')) return; const mine = kind === 'voice' ? SP().voices : SP().layers; mine.splice(e.own, 1); saveS(); toast('Deleted “' + e.name + '”.'); render(); });
+      px.addEventListener('click', async () => { if (!await askYes({title:'Delete “' + e.name + '”?', body:'It is removed from this song only.'}, 'Delete')) return; const mine = kind === 'voice' ? SP().voices : SP().layers; mine.splice(e.own, 1); saveS(); toast('Deleted preset “' + e.name + '”.'); render(); });
       it.append(px); }
     return it;
   };
@@ -12546,7 +12546,7 @@ function parseSF(buf){
   const dv = new DataView(buf), u8 = new Uint8Array(buf), td = new TextDecoder('latin1');
   const str = (o, n) => { let e = o; while (e < o + n && u8[e]) e++; return td.decode(u8.subarray(o, e)).trim(); };
   const id = o => String.fromCharCode(u8[o], u8[o + 1], u8[o + 2], u8[o + 3]);
-  if (buf.byteLength < 12 || id(0) !== 'RIFF' || id(8) !== 'sfbk') throw new Error('That isn’t a SoundFont (.sf2 or .sf3) file.');
+  if (buf.byteLength < 12 || id(0) !== 'RIFF' || id(8) !== 'sfbk') throw new Error('Not a SoundFont (.sf2 or .sf3)');
   const ch = {};
   const walk = (o, end) => { while (o + 8 <= end){ const k = id(o), n = dv.getUint32(o + 4, true);
     if (k === 'LIST') walk(o + 12, Math.min(end, o + 8 + n)); else ch[k] = {o:o + 8, n}; o += 8 + n + (n & 1); } };
@@ -12668,10 +12668,10 @@ function sfLoad(id){
     let rec = null; try { rec = await sfTx('readonly', st => st.get(id)); } catch(e){}
     let bytes = rec && rec.bytes;
     if (!bytes && id === GM_FONT.id) bytes = await sfFetchGM();
-    if (!bytes) throw new Error('SoundFont “' + id + '” isn’t on this device. Load it on the Synth page (Engine: SoundFont).');
+    if (!bytes) throw new Error('SoundFont “' + id + '” isn’t on this device: load it on the Synth page (Engine: SoundFont)');
     const f = parseSF(bytes); f.id = id; SF.fonts.set(id, f);
     return f;
-  })().catch(e => { SF.loading.delete(id); toastErr(e.message || 'SoundFont failed to load.', 6000); return null; }));
+  })().catch(e => { SF.loading.delete(id); toastErr(e.message || 'SoundFont failed to load', 6000); return null; }));
   return SF.loading.get(id);
 }
 // Sample data, decoded once per font and sample: {d:Float32Array, sr, ls, le} (loop in frames of d).
@@ -13801,7 +13801,7 @@ async function sfPanel(force){
         await sfPut(id, (f.name && f.name !== 'SoundFont' ? f.name : file.name.replace(/\.sf[23]$/i, '')).slice(0, 40), bytes); f.id = id; SF.fonts.set(id, f);
         const w = V(); w.sfFont = id; w.sfFontName = f.name; const o = XEV(), p0 = f.presets[0]; if (p0){ o.bank = p0.bank; o.prog = p0.prog; }
         changed(cur); for (const r of xRows) r.refresh(); await sfPreparePad(cur); sfPanel(true); toast(`${f.name}: ${f.presets.length} presets`); }
-      catch(e){ toast(e.message || 'That file couldn’t be read as a SoundFont.', 6000); } });
+      catch(e){ toast(e.message || 'Couldn’t read that file as a SoundFont', 6000); } });
     inp.click(); });
   const rm = el('button', 'sm', 'Remove font'); rm.type = 'button'; rm.hidden = (v.sfFont || GM_FONT.id) === GM_FONT.id && !haveGM;
   rm.addEventListener('click', async () => { const id = V().sfFont || GM_FONT.id;
@@ -13852,7 +13852,7 @@ function rsPanel(){
           await new Promise(r => setTimeout(r, 30));   // let the toast show before the analysis holds the page
           const w = V(); w.rsData = ResynthCore.analyse(mono, buf.sampleRate, {name:file.name.replace(/\.[^.]+$/, '').slice(0, 40)});
           changed(cur); rsPanel(); toast('Resynth: ' + rsLabel(w.rsData));
-        } catch(e){ toastErr('That file couldn’t be read as audio.', 5000); } });
+        } catch(e){ toastErr('Couldn’t read that file as audio', 5000); } });
       inp.click(); });
     const demo = el('button', 'sm', 'Use the built-in pluck'); demo.type = 'button';
     demo.addEventListener('click', () => { const w = V(); w.rsData = ResynthCore.demoRs(48000); changed(cur); rsPanel(); });
@@ -14001,10 +14001,10 @@ function wtPanel(){
           toast('Reading ' + (inp.files.length > 1 ? inp.files.length + ' files' : inp.files[0].name) + '…');
           await new Promise(r => setTimeout(r, 30));
           const wt = await wtImport(inp.files);
-          if (!wt){ toast('That file is silent, so there’s no wavetable to make.', 5000); return; }
+          if (!wt){ toast('Silent file: no wavetable to make', 5000); return; }
           const w = V(); w.wtData = wt; if (!w.table) w.table = normX('table', null); w.table.table = 4;
           changed(cur); refreshAll(); toast('Table: ' + wtLabel(wt));
-        } catch(e){ toastErr('That file couldn’t be read as audio.', 5000); } });
+        } catch(e){ toastErr('Couldn’t read that file as audio', 5000); } });
       inp.click(); });
     const clr = el('button', 'sm', 'Remove'); clr.type = 'button'; clr.id = 'wtClr';
     clr.addEventListener('click', () => { const w = V(); delete w.wtData; if (w.table && Math.round(w.table.table) === 4) w.table.table = 0; changed(cur); refreshAll(); });
@@ -14046,8 +14046,8 @@ function frzPanel(){
           const w = V(), li = 7; w.frzL = li;
           const L = freshLayer({on:false, type:'sample'}); L.sample = {data:mono, sr:buf.sampleRate, name:file.name.replace(/\.[^.]+$/, '').slice(0, 40)}; w.layers[li] = L;
           XEV().source = 0; changed(cur); for (const r of xRows) r.refresh(); frzPanel();
-          toast('Freeze: ' + file.name + (buf.length > n ? ' (its first 20 s)' : '') + ' · SOURCE is File · ROOT is the note it plays at');
-        } catch(e){ toastErr('That file couldn’t be read as audio.', 5000); } });
+          toast('Freeze: ' + file.name + (buf.length > n ? ' (first 20 s)' : '') + '. SOURCE is File; ROOT is the note it plays at.');
+        } catch(e){ toastErr('Couldn’t read that file as audio', 5000); } });
       inp.click(); });
     const row = el('div', 'btnrow'); row.append(ld); box.append(row, info); host.prepend(box);
   }
@@ -14066,7 +14066,7 @@ async function kitToSlots(){
   const plain = i => { const w = kit.voices[i]; return !!w && i !== cur && (!w.engine || w.engine === 'layers') && /^(Pad|Synth) \d+$/.test(w.name || '') && !used.has(i); };
   const free = []; for (let i = 0; i < Math.min(nslots(), kit.voices.length) && free.length < n; i++) if (plain(i)) free.push(i);
   const grow = n - free.length, room = MAXSLOT - nslots();
-  if (grow > 0 && (vtrk || grow > room)) return toast(vtrk ? 'A kit slot per track is on (Settings → Kit), so the kit can’t take new slots: free up ' + grow + ' slot' + (grow > 1 ? 's' : '') + ' first.' : 'Not enough room: the kit is at ' + MAXSLOT + ' slots.', 6000);
+  if (grow > 0 && (vtrk || grow > room)) return toast(vtrk ? 'Kit is locked: free up ' + grow + ' slot' + (grow > 1 ? 's' : '') + ' first (kit slot per track is on in Settings → Kit)' : 'No room: kit is at ' + MAXSLOT + ' slots.', 6000);
   const slots = free.concat(Array.from({length:Math.max(0, grow)}, (_, j) => nslots() + j));
   const names = Array.from({length:n}, (_, i) => PsynCore.drumName(tw, {kd:i}));
   const ok = await askYes({title:'Put the ' + U.title + ' kit on ' + n + ' slots?', body:names.map((d, i) => d + ' → ' + hx(slots[i])).join(' · ')
@@ -14870,7 +14870,7 @@ function kitSlots(k){ const n = Math.round(+(k && k.slots) || 16); return Math.m
 // saved kit was dropped for the factory one on every reload. Until it exists, count the kit's own voices.
 function slotsNow(){ try { return nslots(); } catch(e){ return NSLOT; } }
 function kitFromJSON(j){
-  if (!j || !Array.isArray(j.voices) || j.voices.length < 1) throw new Error('This file isn’t a Thunder kit.');
+  if (!j || !Array.isArray(j.voices) || j.voices.length < 1) throw new Error('Not a Thunder kit');
   const vs = j.voices.slice(0, MAXSLOT).map(voiceFromJSON); while (vs.length < NPAD) vs.push(mkVoice('Pad ' + (vs.length + 1), []));
   // Kits from before the synth slots get the factory synths in slots 9–16.
   if (vs.length < 16){ const fs = factorySynths(); while (vs.length < 16) vs.push(fs[vs.length - NPAD]); }
@@ -14899,7 +14899,7 @@ function growKit(){
 }
 function setVtrk(on){
   vtrk = !!on; try { localStorage.setItem(VTRK, vtrk ? '1' : '0'); } catch(e){} syncHeld();
-  try { if (vtrk && S.ntr > 24){ S.ntr = 24; saveS(); toast('A kit slot per track allows up to 24 tracks: the song has 24 now (tracks 25–32 are kept, not played).', 5000); } } catch(e){}
+  try { if (vtrk && S.ntr > 24){ S.ntr = 24; saveS(); toast('24 tracks max with a kit slot per track. Tracks 25–32 are kept, not played.', 5000); } } catch(e){}
   for (let i = 0; i < Math.max(nslots(), 40); i++){ dirty[i] = true; cache[i] = null; }
   growKit();
 }
@@ -14957,7 +14957,7 @@ async function resolveSamples(){
     }
     refreshAll();
     if (borrowed) save();   // samples read from Thunder's old store are copied into this app's own
-    if (missing) toastErr(missing + (missing > 1 ? ' samples' : ' sample') + ' couldn’t be found in this browser’s storage. Load the kit or project file to get them back.', 6000);
+    if (missing) toastErr(missing + (missing > 1 ? ' samples' : ' sample') + ' not in this browser’s storage. Load the kit or project file to restore ' + (missing > 1 ? 'them' : 'it') + '.', 6000);
     else { smpTidy(); if (!borrowed && typeof thunderTidy === 'function') setTimeout(thunderTidy, 3000); }
     // A kit saved before samples moved to IndexedDB still has them inside localStorage: move them now.
     try { if ((localStorage.getItem(KEY) || '').includes('"b64"')) save(); } catch(e){}
@@ -15044,7 +15044,7 @@ function save(){
   }
   if (!storeWrite(KEY, JSON.stringify(kitToJSON(false)))){
     // Too big with the audio inside: keep the settings at least, and say so (the samples are gone after a reload).
-    if (storeWrite(KEY, JSON.stringify(kitToJSON(true))) && typeof toast === 'function') toastErr('Storage is full: the kit was saved without its samples. Export a kit or project file to keep them.');
+    if (storeWrite(KEY, JSON.stringify(kitToJSON(true))) && typeof toast === 'function') toastErr('Storage full: kit saved without its samples. Export a kit or project file to keep them.');
   }
 }
 function loadSaved(){ try { const s = localStorage.getItem(KEY) || localStorage.getItem(OLD_KEY); return s ? kitFromJSON(JSON.parse(s)) : null; } catch(e){ console.warn('Couldn’t load the saved kit', e); return null; } }
@@ -15073,7 +15073,7 @@ async function kitReplaceOk(next, what){
 function factoryPads(){
   const f = factoryKit(), k = {name:'Factory kit', slots:kit.slots, held:kit.held, voices:kit.voices.slice(), waves:kit.waves};
   for (let p = 0; p < NPAD && p < f.voices.length; p++) k.voices[p] = f.voices[p];
-  setKit(k); toast('Factory drums on pads 1–8. The synth slots stay as they are; Undo puts the kit back.', 4000);
+  setKit(k); toast('Factory drums on pads 1–8. Synth slots stay. Undo brings it back', 4000);
 }
 
 /* ---------- files out ---------- */
@@ -15145,11 +15145,11 @@ async function writeOut(to, filename, blob){
   if (to.ai) return deliverAI(filename, blob);
   if (to.path){ const r = await DESK.outWrite(to.path, await blob.arrayBuffer());
     if (r && r.ok){ const nm = r.path.split(/[\\/]/).pop(); toastAct('Saved ' + nm + ' in ' + r.path.slice(0, r.path.length - nm.length - 1), 'Show', () => DESK.outShow(r.path)); }
-    else toastErr('Couldn’t save it: ' + ((r && r.error) || 'unknown error')); return; }
-  if (to.h){ try { const w = await to.h.createWritable(); await w.write(blob); await w.close(); toast('Saved ' + (to.h.name || filename)); } catch(e){ toastErr('Couldn’t save it: ' + ((e && e.message) || e)); } return; }
+    else toastErr('Couldn’t save: ' + ((r && r.error) || 'unknown error')); return; }
+  if (to.h){ try { const w = await to.h.createWritable(); await w.write(blob); await w.close(); toast('Saved ' + (to.h.name || filename)); } catch(e){ toastErr('Couldn’t save: ' + ((e && e.message) || e)); } return; }
   const url = URL.createObjectURL(blob), a = document.createElement('a');
   a.href = url; a.download = filename; document.body.append(a); a.click(); a.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 5000); toast('Saved ' + filename + ' to your Downloads folder', 4000);
+  setTimeout(() => URL.revokeObjectURL(url), 5000); toast('Saved ' + filename + ' to Downloads', 4000);
 }
 // A toast with one button (Show in folder).
 function toastAct(msg, label, fn){
@@ -15184,9 +15184,9 @@ let passProg = null;   // pass() reports how far its render has got here (0–1)
 async function deliverAI(filename, blob){
   if (inAI){
     let dl = null; try { dl = await window.claude.use('downloads'); } catch(e){}
-    if (!dl){ toastErr('Saving files isn’t available in this view.'); return; }
+    if (!dl){ toastErr('Can’t save files in this view'); return; }
     try { await dl.save({filename, data:blob}); toast('Saved ' + filename); }
-    catch(e){ if (e && e.code === 'declined') return; toastErr(e && e.code === 'rate_limited' ? 'A save is already waiting for you.' : 'Couldn’t save: ' + ((e && e.message) || 'unknown error')); }
+    catch(e){ if (e && e.code === 'declined') return; toastErr(e && e.code === 'rate_limited' ? 'A save is waiting for you' : 'Couldn’t save: ' + ((e && e.message) || 'unknown error')); }
     return;
   }
   const url = URL.createObjectURL(blob), a = document.createElement('a');
@@ -15203,7 +15203,7 @@ $('bExKit').addEventListener('click', () => { const fs = []; for (let i = 0; i <
 const canShare = !inAI && !!(navigator.canShare && window.File) && (() => { try { return navigator.canShare({files:[new File([new Uint8Array(4)], 'a.wav', {type:'audio/wav'})]}); } catch(e){ return false; } })();
 async function share(files){
   try { await navigator.share({files, title:'Thunder'}); }
-  catch(e){ if (e && e.name !== 'AbortError') toastErr('Sharing didn’t work here. Use Save instead.'); }
+  catch(e){ if (e && e.name !== 'AbortError') toastErr('Sharing didn’t work here. Use Save instead'); }
 }
 if (canShare){
   $('bShPad').hidden = false; $('bShKit').hidden = false;
@@ -15488,7 +15488,7 @@ function gfileToggle(open = $('gfile').hidden){
   // changes?", so they always ask, with the kit's own words (they ran at once when the song had unsaved changes).
   if (open) menuFill(host, fileItems(), it => {
     gfileToggle(false);
-    if (it.ask === 'kit'){ askYes({title:it.l + '?', body:'It replaces the sounds on those slots; the song stays. Undo puts the kit back.'}, it.l).then(ok => { if (ok) it.f(); }); return; }
+    if (it.ask === 'kit'){ askYes({title:it.l + '?', body:'It replaces the sounds on those slots; the song stays. Undo brings it back.'}, it.l).then(ok => { if (ok) it.f(); }); return; }
     if (it.ask && !projDirty){ askYes({title:it.l + '?', body:'It replaces the project you have open; the kit stays.'}, it.l).then(ok => { if (ok) it.f(); }); return; }
     it.f();
   });
@@ -15655,9 +15655,9 @@ $('audOut').addEventListener('change', async e => {
   const id = e.target.value, name = e.target.selectedOptions[0] ? e.target.selectedOptions[0].textContent : '';
   aset.sink = id; asetSave();
   if (ctx && ctx.setSinkId){
-    try { await ctx.setSinkId(id); toast('Playing through ' + (id ? name : 'the system default') + '.'); }
+    try { await ctx.setSinkId(id); toast('Playing through ' + (id ? name : 'the system default')); }
     catch(err){ toastErr('Couldn’t switch to that output' + (err && err.message ? ': ' + err.message : '.')); }
-  } else if (sinkOk) toast('Saved. It plays through ' + (id ? name : 'the system default') + ' from the first sound.');
+  } else if (sinkOk) toast('Saved. Plays through ' + (id ? name : 'the system default') + ' from the first sound.');
   audStatus(); try { const w = wvApi(); if (w && w.sinkChanged) w.sinkChanged(); } catch(e){}
 });
 $('audNames').addEventListener('click', async () => {
@@ -15686,9 +15686,9 @@ function pdcSet(v){ aset.pdcMode = v === 'on' || v === 'off' ? v : 'auto'; aset.
   try { if (rt && rt.pl) rt.pl.pdcSync(); } catch(e){}
   let T = 0; try { T = pdcPlan(ctx ? ctx.sampleRate : 48000).T; } catch(e){}
   const ms = Math.round(T * 1000), m = aset.pdcMode;
-  toast(m === 'auto' ? (T > 0 ? `Latency comp AUTO: the other tracks wait ${ms} ms while the song plays, to line up with the slowest one` : 'Latency comp AUTO: lines tracks up only when an effect has look-ahead. None does right now.')
-    : m === 'on' ? (T > 0 ? `Latency comp ON: every track waits ${ms} ms to line up with the slowest one, also while stopped` : 'Latency comp ON. No track has latency right now.')
-    : 'Latency comp OFF: a track or bus with a look-ahead effect plays late', 3200);
+  toast(m === 'auto' ? (T > 0 ? `Latency comp AUTO: other tracks wait ${ms} ms to line up with the slowest.` : 'Latency comp AUTO: no effect has look-ahead, nothing to align.')
+    : m === 'on' ? (T > 0 ? `Latency comp ON: every track waits ${ms} ms, also while stopped.` : 'Latency comp ON: no track has latency.')
+    : 'Latency comp OFF: a look-ahead effect plays late.', 3200);
   pdcNotice(); }
 const updPdc = makeSeg($('segPdc'), [['auto', 'AUTO'], ['on', 'ON'], ['off', 'OFF']], () => pdcModeOf(), pdcSet);
 /* THE ONE-TIME NOTICE (owner, 14 Nov: people who had it OFF now get AUTO, so say so once): the first time on this device that AUTO
@@ -15702,7 +15702,7 @@ function pdcNotice(){
   const sr = ctx ? ctx.sampleRate : 48000; let T = 0; try { T = pdcPlan(sr).T; } catch(e){}
   if (!(T > 0)) return;
   const w = pdcWho(sr), ms = x => Math.round(x * 1000), ps = w && TFX[w.f.type] && pumpFx(TFX[w.f.type].pump), nm = ps && ps.name ? String(ps.name).toUpperCase() : 'An effect';
-  toastOnce('pdc-auto', (w ? `${nm} on track ${w.t + 1} looks ${ms(w.l / sr)} ms ahead, so the other tracks now wait ${ms(T)} ms` : `An effect with look-ahead makes the other tracks wait ${ms(T)} ms`) + ' while the song plays, to stay in time. Audio & MIDI › LATENCY COMP turns this off.', 9000); }
+  toastOnce('pdc-auto', (w ? `${nm} on track ${w.t + 1} looks ${ms(w.l / sr)} ms ahead, so other tracks wait ${ms(T)} ms` : `An effect with look-ahead makes other tracks wait ${ms(T)} ms`) + ' to stay in time. Audio & MIDI › LATENCY COMP turns this off.', 9000); }
 const updARate = makeSeg($('segARate'), [[0, 'Device'], [44100, '44.1k'], [48000, '48k']], () => aset.rate, v => { aset.rate = v; asetSave(); audRestartRow(); });
 /* …PUMP SYNTHS LIVE (owner, 26 Oct), for this device: AUTO plays Mono live, Poly live and Coil live live, with the safety net
    (their renders when the device can't keep up); RENDERED always plays their renders, the same values' sound, which is
@@ -15947,19 +15947,19 @@ $('ckVtrk').addEventListener('change', e => setVtrk(e.target.checked));
 $('kitIn').addEventListener('change', async e => {
   const f = e.target.files[0]; e.target.value = ''; if (!f) return;
   try { const k = kitFromJSON(JSON.parse(await f.text())); if (!await kitReplaceOk(k, 'Load kit “' + (k.name || 'Kit') + '”?')) return;
-    setKit(k); toast('Loaded ' + kit.name + '. Undo puts the previous kit back.'); } catch(err){ toast(err.message || 'Couldn’t read that kit file.'); }
+    setKit(k); toast('Loaded ' + (kit.name || 'Kit') + '. Undo brings it back.'); } catch(err){ toast(err.message || 'Couldn’t read that kit file'); }
 });
 let pending = null;
 // ONE CONFIRM (27 Oct, Phase 2): the app's one dialog (askYes); this was an inline Yes / Cancel row under the buttons.
-function ask(msg, fn){ askYes(msg, 'Yes').then(ok => { if (ok) fn(); }); }
+function ask(msg, fn, label){ askYes(msg, label || 'Yes').then(ok => { if (ok) fn(); }); }
 $('bYes').addEventListener('click', () => { $('confirmRow').hidden = true; if (pending) pending(); pending = null; });
 $('bNo').addEventListener('click', () => { $('confirmRow').hidden = true; pending = null; });
-$('bFactory').addEventListener('click', () => ask('Put the factory drums on pads 1–8? The synth slots stay as they are.', factoryPads));
+$('bFactory').addEventListener('click', () => ask('Put the factory drums on pads 1–8? Synth slots stay.', factoryPads, 'Put them on'));
 $('bClassic').addEventListener('click', pickClassicKit);
 function clearKit(){ setKit({name:'New kit', slots:kit.slots, held:kit.held, voices:Array.from({length:nslots()}, (_, i) => isSyn(i)
   ? mkVoice('Synth ' + (i + 1), [{type:'saw', mode:'ADSR', atk:2, dec:400, sus:0.7, rel:200, lpCut:3000, level:0.7}], {tune:24, len:6, gate:400})
   : mkVoice('Pad ' + (i + 1), [{type:'sine', b:0.25, pAmt:24, pDec:50, atk:0.1, dec:400}]))}); }
-$('bClearKit').addEventListener('click', () => ask(`Clear all ${nslots()} slots?`, clearKit));
+$('bClearKit').addEventListener('click', () => ask(`Clear all ${nslots()} slots?`, clearKit, 'Clear'));
 
 /* ---------- load an audio file as a sample layer ---------- */
 /* SAMPLER (owner, 5 Nov: stereo, longer samples): a sample is {data, data2, sr, name}: data the left channel (or the only
@@ -16005,7 +16005,7 @@ async function loadAudioInto(f, pad){
     assignSample(pad, d, b.sampleRate, f.name.replace(/\.[^.]+$/, '').slice(0, 24), d2);
     toast(`Loaded ${f.name} into pad ${hx(pad)}, layer ${kit.voices[pad].sel + 1}` + (d2 ? ', stereo' : '') + (b.length > n ? ` (first ${SMP_MAX} s)` : ''));
     playFresh(pad);
-  } catch(err){ toastErr('Couldn’t read that audio file.'); }
+  } catch(err){ toastErr('Couldn’t read that audio file'); }
 }
 /* ===SMP EDIT START=== (5 Nov) Pure sample edits for the recorder's take editor, {data, data2, sr} in, a new one out.
    Written as its own module with tests (tests/smp-edit.test.js cuts this part out of index.html). */
@@ -16252,7 +16252,7 @@ function smbAdd(S){
   let ok = false; for (const n of [SMB_MAX, 10, 3, 1]){ try { localStorage.setItem(SMB_K, JSON.stringify(a.slice(0, n))); ok = true; break; } catch(e){} }
   SMB_MEM = ok ? null : a; if (!ok) tpLog('RECENT could not be saved (storage full): kept for this session only');
   smpHeld.set(S.id, S);   // (so a RECENT row loads from memory even if the store write below is slow or fails; the minute-by-minute prune lets it go once no pad names it)
-  try { smpPut(S).catch(e => { tpLog('could not store the sample for RECENT', e); toastErr('This sample is too big for the browser’s storage: RECENT will only have it until the app closes.', 7000); }); } catch(e){}
+  try { smpPut(S).catch(e => { tpLog('could not store the sample for RECENT', e); toastErr('Sample too big to store: RECENT keeps it only until the app closes.', 7000); }); } catch(e){}
 }
 const smbDb = () => idbOpen('thunderplus-browser');   // (its store is called 'smp' too: idbOpen makes that one; here it holds the folder handle)
 async function smbKv(k, v){ try { const db = await smbDb(); return await new Promise(res => { const tx = db.transaction('smp', v === undefined ? 'readonly' : 'readwrite'), st = tx.objectStore('smp');
@@ -16262,7 +16262,7 @@ async function smbPerm(ask){ const d = SMB.dir; if (!d) return (SMB.perm = '');
   try { let p = await d.queryPermission({mode:'read'}); if (p !== 'granted' && ask) p = await d.requestPermission({mode:'read'}); return (SMB.perm = p); } catch(e){ return (SMB.perm = 'denied'); } }
 async function smbPickDir(){
   try { const d = await window.showDirectoryPicker({id:'thunder-samples', mode:'read'}); SMB.dir = d; SMB.files = null; await smbKv('folder', d); SMB.perm = 'granted'; smbScan(); }
-  catch(e){ if (e && e.name !== 'AbortError') toastErr('Couldn’t open that folder.'); }
+  catch(e){ if (e && e.name !== 'AbortError') toastErr('Couldn’t open that folder'); }
 }
 // Every audio file under the folder (subfolders too, up to 8 deep and 20,000 files), sorted by path
 async function smbScan(){
@@ -16304,12 +16304,12 @@ function smbStop(){ if (SMB.prev){ try { SMB.prev.stop(); } catch(e){} SMB.prev 
 async function smbAudition(i){
   const row = smbRows()[i]; if (!row) return; smbStop();
   try { const o = await smbOpen(row); if (!o || SMB.sel !== i || !SMB.ui) return; audio(); const src = ctx.createBufferSource(); src.buffer = o.buf; src.connect(master); src.start(); SMB.prev = src; }
-  catch(e){ toastErr('Couldn’t read ' + row.name + '.'); }
+  catch(e){ toastErr('Couldn’t read ' + row.name); }
 }
 async function smbLoad(i){
   const row = smbRows()[i]; if (!row) return; const pad = SMB.ui ? +SMB.ui.padS.value : cur;
-  try { const o = await smbOpen(row); if (!o) return toast(`${row.name} is no longer in this app’s sample store.`); smbStop(); o.load(pad); }
-  catch(e){ toastErr('Couldn’t read ' + row.name + '.'); }
+  try { const o = await smbOpen(row); if (!o) return toast(`${row.name} is gone from this app’s sample store`); smbStop(); o.load(pad); }
+  catch(e){ toastErr('Couldn’t read ' + row.name); }
 }
 function smbUi(){
   const U = SMB.ui; if (!U) return;
@@ -16444,13 +16444,13 @@ async function rcdOpen1(){
     } catch(e){ tpLog('native input', e); rcdCloseIo(); Object.assign(RCD, {node:null, mon:null}); RCD.ioWhy = String((e && e.message) || e); }
     // NO SILENT FALLBACK: with Engine Native and the helper there, a failed open says why and records nothing (the browser's input
     // would have quietly given only inputs 1–2). Without the helper at all, the browser's input is used, as the window says.
-    if (IOH.state === 'ready'){ RCD.note = 'Native input: ' + (RCD.ioWhy || 'it didn’t open') + '. Try again, or pick Engine Browser.'; toastErr(RCD.note, 6000); return false; }
+    if (IOH.state === 'ready'){ RCD.note = 'Native input failed: ' + (RCD.ioWhy || 'it didn’t open') + '. Try again, or set Engine to Browser.'; toastErr(RCD.note, 6000); return false; }
   }
-  const md = navigator.mediaDevices; if (!md || !md.getUserMedia){ toastErr('This browser can’t record audio.'); return false; }
+  const md = navigator.mediaDevices; if (!md || !md.getUserMedia){ toastErr('This browser can’t record audio'); return false; }
   const base = {echoCancellation:false, noiseSuppression:false, autoGainControl:false, channelCount:{ideal:32}};   // INPUTS: every channel it has
   let s = null;
   if (rcdSet.input){ try { s = await md.getUserMedia({audio:Object.assign({}, base, {deviceId:{exact:rcdSet.input}})}); } catch(e){} }
-  if (!s){ try { s = await md.getUserMedia({audio:base}); } catch(e){ toastErr(e && e.name === 'NotAllowedError' ? 'Recording needs permission to use an audio input.' : 'Couldn’t open an audio input.', 5000); return false; } }
+  if (!s){ try { s = await md.getUserMedia({audio:base}); } catch(e){ toastErr(e && e.name === 'NotAllowedError' ? 'Recording needs permission to use an audio input' : 'Couldn’t open an audio input', 5000); return false; } }
   if (gone()){ s.getTracks().forEach(t => t.stop()); return false; }   // (closed while the browser asked: CodeRabbit)
   try {
     if (RCD.mod !== ctx){ wkNote(ctx, 'rec'); await ctx.audioWorklet.addModule(URL.createObjectURL(new Blob([RCD_WORKLET], {type:'application/javascript'}))); RCD.mod = ctx; }
@@ -16462,9 +16462,9 @@ async function rcdOpen1(){
     Object.assign(RCD, {stream:s, src, node, mon, inLat:+st.latency || 0, ctx, nch});
     if (!rcdSet.nchs || typeof rcdSet.nchs !== 'object') rcdSet.nchs = {};
     rcdSet.nchs[rcdSet.input || ''] = nch; rcdSave(); rcdRoute(); if (RCD.ui && RCD.ui.fillCh) RCD.ui.fillCh();
-    tr && tr.addEventListener('ended', () => { toast('The audio input went away.'); rcdAbort(); rcdClose(); rcdUi(); });
+    tr && tr.addEventListener('ended', () => { toast('Audio input lost'); rcdAbort(); rcdClose(); rcdUi(); });
     return true;
-  } catch(e){ s.getTracks().forEach(t => t.stop()); tpLog('recorder', e); toastErr('Couldn’t start recording here.'); return false; }
+  } catch(e){ s.getTracks().forEach(t => t.stop()); tpLog('recorder', e); toastErr('Couldn’t start recording'); return false; }
 }
 function rcdClose(){ RCD.gen = (RCD.gen | 0) + 1; rcdCloseIo();   // (gen: an open still in flight sees it was closed meanwhile)
   try { if (RCD.src) RCD.src.disconnect(); if (RCD.spl) RCD.spl.disconnect(); if (RCD.mrg) RCD.mrg.disconnect(); if (RCD.mon) RCD.mon.disconnect(); if (RCD.node){ RCD.node.port.onmessage = null; } } catch(e){}
@@ -16536,7 +16536,7 @@ function rcdHoldStop(){
   R.songStop = true;
   if (rcdEdgeAhead(R)) return true;
   if (tp.core) corePost({op:'hold'});   // EXACT STOP: the audio thread stops at the next pattern edge itself (rcdHeldAt)
-  R.stopReq = true; rcdUi(); toast('Recording to the end of this pattern, then stopping. Stop again to stop now.', 3000); return true; }
+  R.stopReq = true; rcdUi(); toast('Recording to the pattern’s end, then stopping. Stop again to stop now', 3000); return true; }
 // REVIEW (6 Nov): the sequencer books steps ahead (0.25 s, 1.2 s in a hidden tab) and rcdStep counts an edge when it is
 // BOOKED, so a Stop pressed just before the downbeat (the usual moment) came after the edge was counted and recorded a whole
 // extra pattern. When the last edge is still ahead of what's heard, the take ends there (and the song with it, if held).
@@ -16600,7 +16600,7 @@ function rcdStop(){
 function rcdAbort(){ RCD.sync = null; RCD.onDone = null; if (RCD.on && RCD.node) rcdGo('stop'); RCD.on = false; RCD.chunks = []; RCD.clkF = null; rcdClk(); }
 function rcdTake(t, how, beats, pats){
   if (!t){ toast('Nothing was recorded.'); rcdUi(); return; }
-  if (sePeak({data:t.data, data2:t.data2, sr:ctx.sampleRate}).peak < 1e-4) toast('The take is silent. Check that the right input is picked and turned up.', 5000);
+  if (sePeak({data:t.data, data2:t.data2, sr:ctx.sampleRate}).peak < 1e-4) toast('Take is silent: check the input is picked and turned up', 5000);
   RCD.take = {data:t.data, data2:t.data2, sr:ctx.sampleRate, how, beats, pats}; RCD.undo = []; RCD.sel = null; RCD.view = null; RCD.cursor = null; rcdUi();
 }
 /* MEASURE GEAR DELAY (owner, 7 Nov: MIDI notes sounded early against the engines, "different on every stop and start"; on
@@ -16745,7 +16745,7 @@ function rcdApply(E){
   if (L.mode !== 'ADSR' && Math.abs((L.hold || 0) - oldMs) < 2) L.hold = Math.min(SMP_MAX * 1000, Math.round(n / T.sr * 1000));   // a Hold that was the sample's length follows it
   v.len = Math.max(v.len, Math.min(SMP_MAX, n / T.sr + 0.1));
   smbAdd(S2); if (E.pad !== cur) select(E.pad); changed(E.pad); refreshAll();
-  toast(`Applied to pad ${hx(E.pad)}, layer ${E.li + 1} (${(n / T.sr).toFixed(2)} s). ${MODK}+Z on the Synth page takes it back.`, 4500);
+  toast(`Applied to pad ${hx(E.pad)}, layer ${E.li + 1} (${(n / T.sr).toFixed(2)} s). ${MODK}+Z on the Synth page undoes it`, 4500);
   playFresh(E.pad);
 }
 let rcdPrev = null;
@@ -16837,7 +16837,7 @@ function rcdDrawWave(){
 // fillIn clears again when the window is reopened over a still-open input. So the rate message is worked out here from the open input, shown
 // as that line whenever there is no other note, and as a toast once per device + rate pair (again only when the rates change).
 function rcdRateMsg(){ const o = RCD.io && RCD.io.opened, dr = o ? o.deviceRate | 0 : 0, ar = ctx ? ctx.sampleRate | 0 : 0;
-  return dr && ar && dr !== ar ? { key: RCD.io.dev.inId + ':' + dr + '>' + ar, msg: `${RCD.io.dev.name} runs at ${dr / 1000} kHz and the app at ${ar / 1000} kHz: the input is converted. Set them the same (Settings › Audio › Rate, or the interface) for a clean take.` } : null; }
+  return dr && ar && dr !== ar ? { key: RCD.io.dev.inId + ':' + dr + '>' + ar, msg: `${RCD.io.dev.name} is ${dr / 1000} kHz, the app ${ar / 1000} kHz: the take is converted. Match them (Settings › Audio › Rate) for a clean take.` } : null; }
 function rcdUi(){
   const rm = rcdRateMsg(); if (rm && RCD.rateToast !== rm.key){ RCD.rateToast = rm.key; toast(rm.msg, 8000); }
   const U = RCD.ui; if (!U) return; const R = RCD.sync, T = RCD.take;
@@ -16926,8 +16926,8 @@ async function rcdPanel(pad, opts){
           // (no prompt: the app asked for the microphone once), so the meter moves and Record starts without waiting to open it
           if (!RCD.on && !RCD.sync && RCD.ui) rcdOpen().then(() => { if (RCD.ui && RCD.ui.rec) rcdUi(); });
           return; }
-        RCD.note = 'Native input not available (no input device found): using the browser’s input.';
-      } else { if (tok !== fillTok) return; RCD.note = `Native input not available (${IOH.why || 'the desktop app’s audio input did not respond'}): using the browser’s input.`; }
+        RCD.note = 'No native input found: using the browser’s input';
+      } else { if (tok !== fillTok) return; RCD.note = `Native input didn’t respond` + (IOH.why ? ` (${IOH.why})` : '') + `: using the browser’s input`; }
     } else RCD.note = '';
     L = await rcdInputs(); if (tok !== fillTok) return; inSel.textContent = ''; inSel.append(new Option('Default input', ''));
     L.forEach((d, i) => { if (d.deviceId && d.deviceId !== 'default') inSel.append(new Option(d.label || 'Input ' + (i + 1), d.deviceId)); });
@@ -17040,7 +17040,7 @@ async function rcdPanel(pad, opts){
       const room = SMP_MAX * T.sr - T.data.length; if (room <= 0) return toast(`It’s already ${SMP_MAX} s, the longest a sample can be.`);
       if (d.length > room){ d = d.slice(0, room); if (d2) d2 = d2.slice(0, room); toast(`Joined the first ${(room / T.sr).toFixed(1)} s of it (a sample can be ${SMP_MAX} s).`); }
       rcdEdit(T => seConcat(T, {data:d, data2:d2, sr:T.sr})); RCD.view = null; rcdUi(); toast('Joined ' + f.name + ' onto the end.'); }
-    catch(e){ toastErr('Couldn’t read that audio file.'); } });
+    catch(e){ toastErr('Couldn’t read that audio file'); } });
   op('Append file…', () => apIn.click(), 'Join another sample onto the end');
   edit.append(ops);
   const padS = el('select'); for (let k = 0; k < kit.voices.length; k++) padS.append(new Option(hx(k) + ' ' + (kit.voices[k].name || ''), k)); padS.value = pad;
@@ -17334,11 +17334,11 @@ addEventListener('drop', async e => {
         const path = DESK && DESK.pathOf ? DESK.pathOf(f) : '';
         await loadProjText(JSON.stringify(j), f.name, path ? {path, file:true} : {file:true}); continue; }
       if (j && (j.format === 'chains.patch' || j.format === 'waves.patch')){ importChainsFile(f); continue; }
-      if (j && Array.isArray(j.voices)){ try { const k = kitFromJSON(j); if (await kitReplaceOk(k, 'Load kit “' + (k.name || 'Kit') + '”?')){ setKit(k); toast('Loaded ' + kit.name + '. Undo puts the previous kit back.'); } } catch(err){ toast(err.message || 'Couldn’t read that kit file.'); } continue; }
+      if (j && Array.isArray(j.voices)){ try { const k = kitFromJSON(j); if (await kitReplaceOk(k, 'Load kit “' + (k.name || 'Kit') + '”?')){ setKit(k); toast('Loaded ' + (kit.name || 'Kit') + '. Undo brings it back.'); } } catch(err){ toast(err.message || 'Couldn’t read that kit file'); } continue; }
       if (j && (j.voices || j.layers || j.presets)){ importPresetsFile(f); continue; }
       toast(f.name + ' isn’t a project, kit, preset or chains file.'); continue;
     }
-    toastErr('Can’t use ' + f.name + ' here: drop audio, a .thunder project, a kit or a .mid file.');
+    toastErr('Can’t use ' + f.name + ' here. Drop audio, a .thunder project, a kit or a .mid file.');
   }
 });
 
@@ -17420,7 +17420,7 @@ function onMidi(e, src){
     if (midi.learn && midi.ccTarget){
       for (const q in midi.cc) if (midi.cc[q] === midi.ccTarget) delete midi.cc[q];   // one knob per slider
       midi.cc[k] = midi.ccTarget; const nm = rowLabel(midi.ccTarget); midi.ccTarget = ''; saveMidi(); ccBadges(); ccMove(k, d2);
-      const m = `${nm} now follows ${ccName(k)}. Touch another slider or tap a pad, or Done.`; midiStatus(m); toast(m); return;
+      const m = `${nm} now follows ${ccName(k)}. Learn another, or tap Done.`; midiStatus(m); toast(m); return;
     }
     if (ccMove(k, d2)) return;   // a learned knob works its slider
     if (midi.learn){ toast('Touch a slider first, then turn the knob.'); return; }
@@ -17438,7 +17438,7 @@ function onMidi(e, src){
     const t = midi.target; while (midi.notes.length <= t) midi.notes.push(-1);   // slots past 16 (SLOTS, a voice per track) learn too
     midi.notes = midi.notes.map((n, i) => i === t ? d1 : (n === d1 ? -1 : n));
     midi.target = -1; saveMidi(); renderPads();
-    const m = `Pad ${hx(t)} now plays ${noteName(d1)} (${d1}). Tap another pad, touch a slider, or Done.`; midiStatus(m); toast(m); flash(t); return;
+    const m = `Pad ${hx(t)} now plays ${noteName(d1)} (${d1}). Learn another, or tap Done.`; midiStatus(m); toast(m); flash(t); return;
   }
   const vel = midi.vel ? Math.max(0.05, d2 / 127) : 1, held = [];
   let hit = false;
@@ -17568,12 +17568,12 @@ async function connectMidi1(){
     midi.access = acc; midi.on = true; saveMidi(); hookInputs(); renderPads();
     $('bMidiOn').textContent = 'Connected'; $('bMidiOn').classList.add('on');
     midi.access.onstatechange = hookInputs;
-  } catch(err){ midiStatus(inAI ? 'MIDI is blocked inside Claude. Use the installed app.' : 'MIDI permission was refused. Allow it for this site in Chrome.'); }
+  } catch(err){ midiStatus(inAI ? 'MIDI is blocked inside Claude. Use the installed app.' : 'MIDI permission refused. Allow it for this site in Chrome.'); }
 }
 function setLearn(on){
   midi.learn = on; midi.target = -1; midi.ccTarget = '';
   $('bLearn').classList.toggle('on', on); $('bLearn').textContent = on ? 'Done' : 'Learn';
-  if (on){ if (!midi.on) connectMidi(); const m = 'Learning: tap a pad and hit a note, or touch a slider and turn a knob.'; midiStatus(m); toast(m); }
+  if (on){ if (!midi.on) connectMidi(); const m = 'Learn: tap a pad and hit a note, or touch a slider and turn a knob'; midiStatus(m); toast(m); }
   else if (midi.access) hookInputs();
   renderPads(); ccBadges();
 }
@@ -17585,18 +17585,18 @@ document.addEventListener('pointerdown', e => {
   const r = e.target.closest && e.target.closest('.row'), inp = r && r.querySelector('input[type=range][id]'); if (!inp) return;
   midi.target = -1; midi.ccTarget = inp.id; renderPads(); ccBadges();
   const k = Object.keys(midi.cc).find(q => midi.cc[q] === inp.id);
-  midiStatus(`${rowLabel(inp.id)}: turn a knob on the controller` + (k ? ` (now ${ccName(k)}; Unlearn removes it)` : '') + '.');
+  midiStatus(`${rowLabel(inp.id)}: turn a knob on the controller` + (k ? ` (now ${ccName(k)}; Unlearn clears it)` : '') + '.');
 }, true);
 $('bUnlearn').addEventListener('click', () => {
   if (midi.ccTarget){ let n = 0; for (const q in midi.cc) if (midi.cc[q] === midi.ccTarget){ delete midi.cc[q]; n++; }
-    midiStatus(n ? `${rowLabel(midi.ccTarget)} no longer follows a knob.` : 'That slider had no knob.'); midi.ccTarget = ''; }
-  else if (midi.target >= 0){ const t = midi.target; midi.notes[t] = -1; midi.target = -1; midiStatus(`Pad ${hx(t)} no longer has a note.`); }
+    midiStatus(n ? `${rowLabel(midi.ccTarget)} unlearned` : 'That slider had no knob.'); midi.ccTarget = ''; }
+  else if (midi.target >= 0){ const t = midi.target; midi.notes[t] = -1; midi.target = -1; midiStatus(`Pad ${hx(t)} unlearned`); }
   else return midiStatus('With Learn on, tap a pad or touch a slider, then Unlearn.');
   saveMidi(); renderPads(); ccBadges();
 });
 $('bMidiReset').addEventListener('click', async () => {
   if (!await askYes({title:'Reset MIDI mapping?', body:'Every pad goes back to notes 36–43 (synth pads off) and every learned knob is forgotten.'}, 'Reset')) return;
-  midi.notes = DEFNOTES.slice(); midi.cc = {}; saveMidi(); renderPads(); ccBadges(); midiStatus('Pads reset to notes 36–43; knobs forgotten.');
+  midi.notes = DEFNOTES.slice(); midi.cc = {}; saveMidi(); renderPads(); ccBadges(); midiStatus('MIDI mapping reset');
 });
 makeCk($('ckVel'), () => midi.vel, v => { midi.vel = v; saveMidi(); });
 if (midi.want && (navigator.requestMIDIAccess || window.thunderDesktop)) setTimeout(() => connectMidi(), 0);   // (after the whole script: NATIVE MIDI needs the helper's code below)
@@ -18507,7 +18507,7 @@ async function rcdOpenIo(rec, mon){
     // LATE: chunks arrived after their place came round. Between takes: more delay (up to 500 ms); during one: a toast.
     if (m.under){ io.under += m.under;
       if (!RCD.on && io.D < 0.5){ io.D = Math.min(0.5, io.D + 0.05); node.port.postMessage({D:io.D}); }
-      else if (RCD.on) toast('The input fell behind for a moment: that part of the take is silent.', 4000); }
+      else if (RCD.on) toast('Input fell behind: that part of the take is silent', 4000); }
     if (m.jumps) io.jumps = m.jumps; };
   node.connect(rec, 0); node.connect(mon, 1);
   IOH.onIn = m => { if (!RCD.io || RCD.io.node !== node) return; io.lastIn = performance.now(); io.got = true;
@@ -18819,7 +18819,7 @@ function exportChains(){
 async function importChainsFile(f){
   try {
     const d = JSON.parse(await f.text());
-    if (!d || typeof d !== 'object' || (d.format !== 'chains.patch' && d.format !== 'waves.patch')) throw new Error('That file isn’t a chains patch.');
+    if (!d || typeof d !== 'object' || (d.format !== 'chains.patch' && d.format !== 'waves.patch')) throw new Error('Not a chains patch');
     S.chainPatch = d.format === 'chains.patch' ? d : normalizeChainsImport(d);
     CH.doc = S.chainPatch; chainsDropFrame();
     if (view === 'chains') showChains();
@@ -20099,7 +20099,7 @@ const PumpFX = window.PumpFX = (() => {
     open(t, k){ const f = slotOf(t, k); if (!f) return;
       const info = this.get(t, k);
       if (typeof this.openHook === 'function') return this.openHook(t, k, info);
-      toast(`pump ${pumpFx(info.type).name} doesn’t have a full window yet. The boxes here change its main settings.`); },
+      toast(`pump ${pumpFx(info.type).name} has no full window yet: these boxes change its main settings`); },
     // (stage 2) what the pop-up windows need from the app: Thunder's undo (the whole song's history; onChange follows
     // with src 'undo'), a toast, the track's name, and two hooks the windows set: ownsKey(e) (true: the app's key
     // handlers leave this key alone, see typing()) and backHook() (true: Back closed a window).
@@ -20214,7 +20214,7 @@ const mstPumpSlots = () => (S.mfx || []).map((f, k) => f && MST_PUMP.includes(f.
 const mstOn = () => S.mstPump ? mstPumpSlots().some(k => S.mfx[k].on) : !!S.mst.on;
 function mstSetOn(v){
   if (!S.mstPump){ S.mst.on = !!v; mstChanged(); return; }
-  const K = mstPumpSlots(); if (!K.length){ toast('No pump mastering on the master: add pEQ, pCOMP or pMSTR in its FX slots.'); return; }
+  const K = mstPumpSlots(); if (!K.length){ toast('No pump mastering on the master: add pEQ, pCOMP or pMSTR in its FX slots'); return; }
   K.forEach(k => S.mfx[k].on = !!v); fxChanged(NT); saveS(); mstLabel();
 }
 // The live list the worklet gets: on slots only, with each slot's parameters mapped for this rate and tempo.
@@ -21048,12 +21048,12 @@ function tfxNode(ac, chain, cid){
     if (d.pump) PumpFX._feed(n, d.pump);
     if (d.pst) PumpFX._pst(n, d.pst);   // …PUMP STATE: the plugin changed its own (MASTER learned)
     if (d.plat){ n.plat = d.plat; PumpFX._lat(n, d.plat); }
-    if (d.failed){ const t = String(d.failed).split(':')[1], F = TFX[t]; toastErr((F ? F.long.replace(/^based on /, '') : 'An effect') + ' stopped working and was bypassed. Change its settings to restart it.'); } };
+    if (d.failed){ const t = String(d.failed).split(':')[1], F = TFX[t]; toastErr((F ? F.long.replace(/^based on /, '') : 'An effect') + ' stopped and is bypassed. Change its settings to restart it.'); } };
   // FIX (sweep, 4 Nov): a node that can't start at all (the browser out of memory for its DSP, seen after many renders in a
   // small-memory browser) passed its track through dry with no word; now it says so, once per audio context.
   n.onprocessorerror = () => { if (tfxErrAc.has(ac)) return; tfxErrAc.add(ac);
     if (isOfflineAc(ac)) return;   /* a render has the answer when it ends: pass() stops with a message instead of writing a silent file */
-    toast('An effect couldn’t start, so its track plays without it. Reload the app to bring it back.', 8000); };
+    toast('An effect couldn’t start: its track plays without it. Reload to restore it', 8000); };
   return n;
 }
 const isOfflineAc = ac => typeof OfflineAudioContext !== 'undefined' && ac instanceof OfflineAudioContext;
@@ -21184,12 +21184,12 @@ function nslotsEarly(){ try { return nslots(); } catch(e){ return 32; } }
 // Set by normSong when it converted an older song's timing (see the swing fix there); swingNote() tells the person once.
 var swingConv = null;
 function swingNote(){ if (!swingConv) return; const c = swingConv; swingConv = null;
-  setTimeout(() => toast(`This song’s timing is LPB ${c.lpb}, ${c.ticks} ticks a step, ${c.bpm} BPM. Playback is unchanged.`, 7000), 1200); }
+  setTimeout(() => toast(`Timing: LPB ${c.lpb}, ${c.ticks} ticks a step, ${c.bpm} BPM. Playback is unchanged.`, 7000), 1200); }
 // SOURCE (21 Oct): set by normSong when it moved an older song off the mixer's sidechain bus; scNote() says so once.
 var scConv = null;
 function scNote(){ if (!scConv) return; const c = scConv; scConv = null;
-  setTimeout(() => toast(c.n > 1 ? `Each sidechain now has its own Source. ${c.n} tracks that fed the sidechain bus now listen to track ${d2(c.t + 1)}. Change Source to pick another.`
-    : `Each sidechain now has its own Source. The one that used this song’s sidechain bus now listens to track ${d2(c.t + 1)}.`, 8000), 1600); }
+  setTimeout(() => toast(c.n > 1 ? `Each sidechain has its own Source now. ${c.n} tracks that fed the sidechain bus now listen to track ${d2(c.t + 1)}. Change Source to pick another.`
+    : `Each sidechain has its own Source now. The one that used this song’s sidechain bus now listens to track ${d2(c.t + 1)}.`, 8000), 1600); }
 // Older songs (no sc2): every Source picked from what it used. The bus (the Mixer's SC row) becomes the lowest track that
 // fed it (Self, or Off on a Sidechain In, when none did); Sidechain In's track or send becomes its Source. In place on j,
 // before the rest of normSong reads it.
@@ -21504,7 +21504,7 @@ function flushKit(){
 addEventListener('pagehide', () => { flushS(); flushKit(); saveCur(); });
 // Another tab of the app saved the song or kit: say so once (the last tab to save wins).
 let tabWarned = false;
-addEventListener('storage', e => { if (!tabWarned && (e.key === TK || e.key === KEY) && e.newValue !== null){ tabWarned = true; toastErr('Thunder Plus is open in another tab too. The last tab to save wins, so use just one tab.', 6000); } });
+addEventListener('storage', e => { if (!tabWarned && (e.key === TK || e.key === KEY) && e.newValue !== null){ tabWarned = true; toastErr('Thunder Plus is open in another tab: the last tab to save wins, so use one', 6000); } });
 document.addEventListener('visibilitychange', () => { if (document.hidden){ flushS(); flushKit(); saveCur(); } });
 // A phrase opened from an empty song block is placed in that block once it has a note (see nav()).
 let pendPlace = null;
@@ -21519,9 +21519,9 @@ function placePending(){
   if (S.song.some(r => r && r.some(v => v >= 0 && S.chains[v] && S.chains[v].some(c => c[0] === q.p)))) return;
   const free = y => !!S.song[y] && S.song[y][q.x] < 0; let y = free(q.y) ? q.y : -1;
   for (let i = 1; y < 0 && i <= 256; i++){ const yy = (q.y + i) % 256; if (free(yy)) y = yy; }
-  if (y < 0) return toastErr(`Phrase ${hp(q.p)} has notes but track ${d2(q.x + 1)} has no free song row, so it is not on the song. Put it on a row yourself.`, 8000);
+  if (y < 0) return toastErr(`Phrase ${hp(q.p)} has notes but track ${d2(q.x + 1)} has no free song row: place it yourself`, 8000);
   setSongPhrase(q.x, y, q.p);
-  toast(y === q.y ? `Phrase ${hp(q.p)} is on the song: row ${rS(y, 3)}, track ${d2(q.x + 1)}.` : `Phrase ${hp(q.p)} is on the song at row ${rS(y, 3)}, track ${d2(q.x + 1)}: row ${rS(q.y, 3)} was taken.`, 5000);
+  toast(y === q.y ? `Phrase ${hp(q.p)} placed at row ${rS(y, 3)}, track ${d2(q.x + 1)}` : `Phrase ${hp(q.p)} placed at row ${rS(y, 3)}, track ${d2(q.x + 1)}: row ${rS(q.y, 3)} was taken`, 5000);
 }
 // An instrument past the song's ni put into a phrase (typed, recorded, imported, pasted) makes it a 64-instrument song.
 const niOf = Sx => clamp((Sx && Sx.ni) | 0 || 16, 16, NI);
@@ -23356,10 +23356,10 @@ function audMeasure(){
 // (43 ms before, 390 ms after, twice, on the Fold); a 'playback' hint legitimately sits higher, so only the measured gap counts there.
 function audStuckVerdict(m){
   if (!m || m.state === 'none') return null;
-  if (m.state !== 'running') return {why:'stuck', msg:'The audio engine is “' + m.state + '” and will not start.'};
+  if (m.state !== 'running') return {why:'stuck', msg:'The audio engine is “' + m.state + '” and won’t start.'};
   const rep = (m.base || 0) + (m.out || 0), d = Math.max(rep, m.heard || 0), ms = Math.round(d * 1000);
-  if (m.heard >= AUD_SLOW && m.heard - rep >= AUD_GAP) return {why:'delay', msg:'The sound reaches the speaker about ' + ms + ' ms late (the engine reports ' + Math.round(rep * 1000) + ' ms), so pads and the playhead will feel late.'};
-  if (m.lat !== 'playback' && rep >= AUD_SLOW) return {why:'delay', msg:'The audio output delay is about ' + ms + ' ms (about 40 ms is normal), so pads and the playhead will feel late. Bluetooth speakers do this too: then choose Not now.'};
+  if (m.heard >= AUD_SLOW && m.heard - rep >= AUD_GAP) return {why:'delay', msg:'Sound reaches the speaker ' + ms + ' ms late (engine reports ' + Math.round(rep * 1000) + ' ms): pads and the playhead will feel late.'};
+  if (m.lat !== 'playback' && rep >= AUD_SLOW) return {why:'delay', msg:'Output delay is about ' + ms + ' ms (40 ms is normal): pads and the playhead will feel late. Bluetooth does this too: choose Not now.'};
   return null;
 }
 // Settings → Audio → Reset audio engine's second half: wait for the context to run, measure, and offer the reload.
@@ -23372,7 +23372,7 @@ async function audStuckCheck(){
   const m = audMeasure(), v = audStuckVerdict(m);
   try { pbLog('reset audio engine check: ' + (v ? v.why : 'fine') + ' · state ' + m.state + ' · reported ' + Math.round((m.base + m.out) * 1000) + ' ms · measured ' + Math.round(m.heard * 1000) + ' ms'); } catch(e){}
   if (!v) return null;
-  if (await askYes({title:'Reload the app?', body:v.msg + ' Reset audio engine cannot fix this; only a reload does. Your project is saved first and comes back after it.'}, 'Reload the app')) await audReloadSafe();
+  if (await askYes({title:'Reload the app?', body:v.msg + ' Reset audio engine can’t fix this. Your project is saved first and comes back after the reload.'}, 'Reload the app')) await audReloadSafe();
   return v;
 }
 // Stop, save everything to this browser's storage (checked), then reload as applyUpdate does. Returns false, and leaves the app as it was,
@@ -23394,7 +23394,7 @@ async function audReloadSafe(){
     }
     try { flushKit(); } catch(e){}   // (the waves editor's pending edit)
     const okK = storeWrite(KEY, JSON.stringify(kitToJSON(sdbOk && smpStored ? 'ref' : false))), okS = storeWrite(TK, JSON.stringify(songOut(S)));
-    if (!(okK && okS)){ toastErr('Couldn’t save the project here (storage is full), so the app was not reloaded. Save the project to a file first (File ▾ › Save).', 7000); return false; }
+    if (!(okK && okS)){ toastErr('Couldn’t save the project (storage full), so no reload. Save it to a file first (File ▾ › Save).', 7000); return false; }
     try { saveCur(); asetSave(); } catch(e){}
     if (RCD.on || RCD.sync || rendering){ toastErr('A recording or render started meanwhile, so the app was not reloaded.', 5000); return false; }   // (review: the waits above let one start)
     try { sessionStorage.setItem('thunderplus-audreload-v1', String(Date.now())); } catch(e){}
@@ -23463,7 +23463,7 @@ function rtInit(){
     if (wkLazy()){ for (let t = 0; t <= NT; t++) wkFxAsk(t); } else rtTfxLoad();   // phones: only what the song uses (wkFxAsk)
     if (coreWanted()) setTimeout(() => { try { if (!tp.on) coreLoad(); } catch(e){} }, 0);   // not mid-song: loading it (the module, the song, every pad's render) made the first PLAY stutter
     if (!wkLazy()) rtChnLoad();
-    if (NOWK && (S.tfx.some(fxCount) || fxCount(S.mfx) || (S.chainOn || []).some(Boolean))) toast('Worklets are off for testing (Settings › Audio), so track effects and chains are silent.', 4000);   // one toast for both (WORKLETS OFF)
+    if (NOWK && (S.tfx.some(fxCount) || fxCount(S.mfx) || (S.chainOn || []).some(Boolean))) toast('Worklets are off (Settings › Audio): track effects and chains are silent', 4000);   // one toast for both (WORKLETS OFF)
   }
   return rt;
 }
@@ -23756,7 +23756,7 @@ function psFallback(why){
   if (psLive.off) return; psLive.off = true; psLive.strikes = 0;
   try { if (rt && rt.pl) rt.pl.psDrop(); } catch(e){}
   tpLog('pump synths live: playing the renders', why);
-  toast('The pump and waves live engines are using pre-rendered sound for now: ' + why + '. Settings → Audio → Live engines: tap Auto to try live again.', 8000);
+  toast('pump and waves live use pre-rendered sound for now: ' + why + '. Settings → Audio → Live engines → Auto retries live', 8000);
   try { psLiveNote(); } catch(e){}
 }
 // Phones (10 Nov): the live engines' modules (bass, vox, acid, mach, pump synths, waves live load as one group) only when the song
@@ -23949,7 +23949,7 @@ function setChainOn(t, on){
   if (added){ CH.fitNext = true; if (CH.frame) chainsDropFrame(); }   // the editor reloads with the new pair when it next opens
   else { try { const a = chApi(); if (a && a.chainOnChanged) a.chainOnChanged(); } catch(e){} }   // CHAIN OFF: the editor redraws which chains are live
   chainsPush(); draw();
-  if (on && !was) toast(added ? `Track ${t + 1} now runs through chains: its Track In and Chain Out are there, wired straight through.`
+  if (on && !was) toast(added ? `Track ${t + 1} runs through chains: Track In and Chain Out added, wired straight through.`
     : `Track ${t + 1} runs through chains again. The patch’s Track In and Chain Out decide where it goes. A Chain Out on another track makes it a bus.`);
 }
 // Re-route every track that runs through chains now, AND every track that did until this change (its Chain Out
@@ -23978,7 +23978,7 @@ function unBus(t){
   CH.doc = P; saveS();
   { const a = chApi(); let ok = false; if (a && a.setDoc && CH.frame) try { a.setDoc(P); ok = true; } catch(e){} if (!ok) chainsDropFrame(); }
   chainsReload(); dkChnSig = ''; draw();
-  toast(`Track ${d2(t + 1)} is a normal track again and plays its own notes.${src.length ? ` Track${src.length > 1 ? 's' : ''} ${src.map(x => d2(x + 1)).join(' ')} play${src.length > 1 ? '' : 's'} on ${src.length > 1 ? 'their' : 'its'} own.` : ''} The bus’s modules are still in chains, unplugged. Undo puts the bus back.`, 6000);
+  toast(`Track ${d2(t + 1)} is a normal track again.${src.length ? ` Track${src.length > 1 ? 's' : ''} ${src.map(x => d2(x + 1)).join(' ')} play${src.length > 1 ? '' : 's'} on ${src.length > 1 ? 'their' : 'its'} own.` : ''} The bus’s modules stay in chains, unplugged. Undo brings the bus back.`, 6000);
 }
 function chainsReload(){ if (rt && rt.pl) for (const b of rt.pl.buses) if (b && b.chn) b.chn._sent = null; chainsPush(); }
 function chainsTempo(){
@@ -24401,7 +24401,7 @@ function coreLoad(){
     const n = new AudioWorkletNode(ctx, 'thunder-core', {numberOfInputs:0, numberOfOutputs:NT + 5, outputChannelCount:[...new Array(NT).fill(2), 1, NT, NT, 1, 1]});   // + the mix outputs (coreMixT)
     n.port.onmessage = e => { try { coreMsg(e.data || {}); } catch(err){ tpLog('core message', err); } };
     core.node = n; core.ready = true; core.sent.clear(); coreSyncAll(); return true;
-  }, err => { tpLog('core load', err); core.loading = null; toastErr('The audio-thread sequencer didn’t load on this device, so playback is using the Page sequencer.', 3500); return false; });
+  }, err => { tpLog('core load', err); core.loading = null; toastErr('Audio-thread sequencer didn’t load: playback uses the Page sequencer', 3500); return false; });
   return core.loading;
 }
 // The core's outputs into the tracks (and the beat clock). STOP unplugs them at once (owner, Fold: a stop took 10 s while
@@ -24701,7 +24701,7 @@ function coreMsg(d){
     // re-sent STOPs included: its audio thread was too busy to read messages). Still at it 1.5 s after STOP: let it go (it is
     // cut off from the tracks and the page) and load a fresh one for the next PLAY.
     if (!tp.on && PB.stopT && now - PB.stopT > 1500 && PB.strayN >= 3){ /* (still sending, batch after batch: not one late batch) */ pbLog('the audio-thread sequencer didn’t stop: dropped it, a fresh one loads'); try { coreDrop(); } catch(e){} setTimeout(() => { try { if (!tp.on && coreWanted()) coreLoad(); } catch(e){} }, 300); return; } }
-  if (d.op === 'ready'){ core.v = d.v; if (d.v !== CORE_WANT){ core.ready = false; toast('The audio-thread sequencer here is out of date. Reload the app to use it. Until then, playback uses the Page sequencer.', 5000); } return; }
+  if (d.op === 'ready'){ core.v = d.v; if (d.v !== CORE_WANT){ core.ready = false; toast('Audio-thread sequencer is out of date: reload to use it (playback uses the Page sequencer until then)', 5000); } return; }
   if (d.op === 'error'){ tpLog('core: ' + d.where, new Error(d.message)); return; }
   if (d.op === 'started'){ pbLog(`core PLAY: reached the audio thread ${Math.round(-d.late * 1000)} ms before its start, took ${d.ms} ms`); return; }
   // WATCHDOG (the core's own, phones): it let go of the song by itself; an older PLAY's (after a STOP or a hand-over) is only logged
@@ -24889,8 +24889,8 @@ function recNote(note, vol, ii, h, ts){
   if (!rec.on || view !== 'tracker') return;
   note = clamp(Math.round(note), 0, 119);
   if (tp.on) return recLive(note, vol, ii, h, ts);
-  if (tv !== 'phrase' || cTrack === MT) return recSay('REC writes notes into a phrase: open one (or press PLAY to record as the song plays).');
-  if (busTrack(cTrack)) return recSay(`REC: track ${d2(cTrack + 1)} is a bus: FX commands only.`);   // BUS FX ONLY
+  if (tv !== 'phrase' || cTrack === MT) return recSay('REC needs a phrase: open one, or press PLAY to record as it plays');
+  if (busTrack(cTrack)) return recSay(`Can’t record on track ${d2(cTrack + 1)}: it’s a bus (FX commands only)`);   // BUS FX ONLY
   if (!S.phrases[cPhrase]) S.phrases[cPhrase] = freshPhrase();
   const y = cs.phrase.y, row = S.phrases[cPhrase][y], poly = polyView();
   // A chord: the keys held together go in one row. The first key of it starts the row afresh.
@@ -24904,11 +24904,11 @@ function recNote(note, vol, ii, h, ts){
   saveS(); draw();
 }
 function recLive(note, vol, ii, h, ts){
-  const tr = recTrack(); if (tr < 0) return recSay('REC: put the cursor on the track to record into.');
+  const tr = recTrack(); if (tr < 0) return recSay('REC: put the cursor on a track');
   if (busTrack(tr)) return recSay(`REC: track ${d2(tr + 1)} is a bus: FX commands only.`);   // BUS FX ONLY
   const at = recStep(p2a(ts || performance.now()), tr);
   if (!at) return;   // the track hasn't started yet (counting in)
-  if (at.ph < 0) return recSay(`Track ${d2(tr + 1)} has no phrase here to record into: put a block on the song first.`);
+  if (at.ph < 0) return recSay(`Track ${d2(tr + 1)} has no phrase here: add a block first`);
   if (!S.phrases[at.ph]) S.phrases[at.ph] = freshPhrase();
   const row = S.phrases[at.ph][at.y], poly = isPolyT(tr);
   let c = 0;
@@ -25011,7 +25011,7 @@ function bgHooks(){
 }
 function setBgOn(on, byHand){   // byHand: the owner flipped the switch (Settings / tracker PROJECT), not code such as a reset
   const was = bgOn; bgOn = !!on; try { localStorage.setItem('thunderplus-bgplay-v1', bgOn ? '1' : '0'); } catch(e){} bgPlay(bgOn && tp.on);
-  if (byHand && was && !bgOn && bgAndroid) try { toast('Background play off: with the screen off, playback will break up. For testing only.', 6000); } catch(e){}
+  if (byHand && was && !bgOn && bgAndroid) try { toast('Background play off: playback breaks up with the screen off. Testing only', 6000); } catch(e){}
 }
 /* BGPLAY GUARD (10 Nov): Background play left OFF cost a day of debugging (with it off Android does not treat the page as a media player:
    hidden playback is throttled, the audio clock runs away, the volume keys move the ringer). Android only: playing + hidden with it off is
@@ -25024,7 +25024,7 @@ function bgGuardHide(){
 function bgGuardShow(){
   if (!bgHidOff) return; bgHidOff = false;
   if (!bgAndroid || bgOn || bgWarned) return; bgWarned = true;
-  try { toastAct('Background play is off, so playback breaks up when the screen is off or the app is in the background.', 'Turn on',
+  try { toastAct('Background play is off: playback breaks up when the screen is off or the app is in the background.', 'Turn on',
     () => { setBgOn(true); try { $('ckBgPlay').checked = true; } catch(e){} }); } catch(e){}   // setBgOn(true) starts the element when a song is playing
 }
 try { document.addEventListener('visibilitychange', () => { if (document.hidden) bgGuardHide(); else bgGuardShow(); }); } catch(e){}
@@ -25231,7 +25231,7 @@ async function renderOut(stems){
   rprog.open(stems ? 'Rendering stems' : 'Rendering the song', 1);
   try {
     const sr = ex.sr, seq = makeSeq(S, 'song', {row:S.renderFrom, once:true});
-    if (!seq.alive()) return toast(`Nothing to render: row ${rS(S.renderFrom, 3)} is empty. Set RENDER FROM to the first row of the song.`);
+    if (!seq.alive()) return toast(`Nothing to render: row ${rS(S.renderFrom, 3)} is empty. Set RENDER FROM to the song’s first row`);
     const evs = (S.renderFrom | 0) > 0 ? chaseEvs(S.renderFrom | 0, seq.time) : []; let guard = 0;   // CHASE: the effect commands before RENDER FROM
     while (seq.alive() && seq.time < 1200 && guard++ < 100000){ const r = seq.step(); for (const e of r.evs) evs.push(e); }
     const notes = evs.filter(e => e.type === 'note' && kit.voices[e.pad]);   // (a slot the kit doesn't have is silent)
@@ -25243,7 +25243,7 @@ async function renderOut(stems){
     for (const [b, src] of BP.feeds) if (!keepT.includes(b) && audible(b) && src.some(t => keepT.includes(t))) keepT.push(b);
     keepT.sort((a, b) => a - b);
     const inBus = t => BP.pure.has(t) && (BP.targets.get(t) || []).some(b => keepT.includes(b));
-    if (!keepT.length) return toast('Every track with notes is muted.');
+    if (!keepT.length) return toast('Nothing to render: every track with notes is muted');
     const nStem = stems ? keepT.filter(t => !inBus(t)).length : 0; rprog.n = 1.15 + nStem; rprog.step(0, 'Rendering the pads…'); await idle();
     const pads = new Map(), pads2 = new Map(); let pi = 0; const pN = new Set(notes.map(e => e.pad)).size;
     // In the Worker when it can (the page stays responsive), here otherwise. STEREO SAMPLES: a stereo pad keeps its right channel (pads2).
@@ -25305,7 +25305,7 @@ function renderScope(){
   const base = () => Object.assign({}, S, {song:blankSong(), chains:S.chains.slice(), phrases:S.phrases.slice(), plen:S.plen.slice(), plpb:S.plpb.slice(),
     smute:new Array(256).fill(0), smuteX:null});
   if (tv === 'phrase'){
-    if (cTrack === MT){ toast('The master phrase holds commands only: render song rows instead (select them in Arrange).'); return null; }
+    if (cTrack === MT){ toast('Master phrase holds commands only: select song rows in Arrange to render'); return null; }
     const P = S.phrases[cPhrase], L = plen(cPhrase), sel = !!(selA && selA.v === 'phrase'), r = sel ? selRect() : {y0:0, y1:L - 1};
     const y0 = clamp(r.y0, 0, L - 1), y1 = clamp(r.y1, y0, L - 1);
     if (!P || !P.slice(y0, y1 + 1).some(rowNote)){ toast('Nothing to render: no notes in ' + (sel ? 'the selection.' : 'this phrase.')); return null; }
@@ -25323,7 +25323,7 @@ function renderScope(){
     if (S.song[y][MT] >= 0) S2.song[y - r.y0][MT] = S.song[y][MT];
   }
   if (!tracks.length){ toast('Nothing to render: ' + (sel ? 'the selected blocks are empty.' : `song row ${rS(r.y0, 3)} is empty.`)); return null; }
-  const heard = tracks.filter(t => audible(t)); if (!heard.length){ toast('Every track there is muted (or another one is soloed).'); return null; }
+  const heard = tracks.filter(t => audible(t)); if (!heard.length){ toast('Every track there is muted (or another is soloed)'); return null; }
   return {S:S2, tracks:heard.sort((a, b) => a - b), master:true, label:r.y1 > r.y0 ? `song rows ${rS(r.y0, 3)}–${rS(r.y1, 3)}` : `song row ${rS(r.y0, 3)}`,
     name:'Song ' + rS(r.y0, 3) + (r.y1 > r.y0 ? '-' + rS(r.y1, 3) : '')};
 }
@@ -25345,10 +25345,10 @@ async function renderPart(dest){
   if (dest === 'pad'){
     const f = freeSlot(), nm = i => hx(i) + ' · ' + ((kit.voices[i] && kit.voices[i].name) || 'Pad');
     const opts = [...(f >= 0 ? [['A slot this song doesn’t play: ' + nm(f), f]] : []), ['This slot: ' + nm(cur), cur], ['Another slot…', -2]];
-    const k = await askPick({title:'Render ' + part.label + ' to a slot', body:'The slot’s other layers are turned off and the render becomes its sample (undo puts the sound back).'}, opts.map(o => o[0]));
+    const k = await askPick({title:'Render ' + part.label + ' to a slot', body:'The slot’s other layers are turned off and the render becomes its sample. Undo brings it back.'}, opts.map(o => o[0]));
     if (k < 0) return; pad = opts[k][1];
     if (pad === -2){ const a = await askText({title:'Which slot?', body:`Hex, 00 to ${hx(nslots() - 1)}.`}, hx(f >= 0 ? f : cur), 2, 'Render'); if (a == null) return;
-      pad = parseInt(a.trim(), 16); if (!(pad >= 0 && pad < Math.min(nslots(), kit.voices.length))) return toast(`Type a slot in hex, 00 to ${hx(nslots() - 1)}.`); }
+      pad = parseInt(a.trim(), 16); if (!(pad >= 0 && pad < Math.min(nslots(), kit.voices.length))) return toast(`Not a slot. Use hex, 00 to ${hx(nslots() - 1)}.`); }
   }
   rendering = true; tStop();
   try {
@@ -25376,7 +25376,7 @@ async function renderPart(dest){
     }
     if (len < N){ chs = chs.map(ch => ch.slice(0, len)); const fl = Math.min(len, Math.round(sr * 0.02)); for (const ch of chs) for (let i = 0; i < fl; i++) ch[len - 1 - i] *= i / fl; }
     let pk = 0; for (const ch of chs) for (let i = 0; i < ch.length; i++){ const a = Math.abs(ch[i]); if (a > pk) pk = a; }
-    if (pk < 1e-5) return toast('The render is silent. Check whether those tracks are muted or their instruments are empty.');
+    if (pk < 1e-5) return toast('Render is silent: check for muted tracks or empty instruments');
     const g = ex.norm ? 0.966 / pk : (pk > 1 ? 0.999 / pk : 1);
     for (const ch of chs) for (let i = 0; i < ch.length; i++) ch[i] *= g;
     const secs = (chs[0].length / sr).toFixed(2);
@@ -25400,9 +25400,9 @@ async function renderPart(dest){
 }
 /* ===== RENDER PART end ===== */
 async function shareLast(){
-  if (!lastR) return toast('Render something first.');
+  if (!lastR) return toast('Nothing rendered yet');
   try { await navigator.share({files:lastR.map(f => new File([f.data], f.name, {type:'audio/wav'})), title:'Thunder'}); }
-  catch(e){ if (e && e.name !== 'AbortError') toastErr('Sharing didn’t work here. The render was saved to your downloads.'); }
+  catch(e){ if (e && e.name !== 'AbortError') toastErr('Couldn’t share the render. It was saved to Downloads instead.'); }
 }
 const canFS = !inAI && typeof window.showSaveFilePicker === 'function';
 // Chrome Android (132+) has the file pickers now, but its `types` filter is MIME-based and hides a custom
@@ -25427,7 +25427,7 @@ async function shareProj(){
   if (!await smpSaveGate()) return;
   const f = new File([projBlob()], projName(), {type:'application/json'});
   try { await navigator.share({files:[f], title:S.name || 'Thunder project'}); }
-  catch(e){ if (e && e.name === 'AbortError') return; await deliver(f.name, projBlob()); toastErr('Sharing didn’t work here, so the project was saved to your downloads instead.'); }
+  catch(e){ if (e && e.name === 'AbortError') return; await deliver(f.name, projBlob()); toastErr('Couldn’t share the project. It was saved to Downloads instead.'); }
 }
 /* Save / Save as under a new file name: a default-named song takes that name (before the file is written, so the name inside the file matches). True when it renamed. */
 function adoptFileName(fname){ if (!songNameDefault(S.name)) return false; const n = fileSongName(fname); if (!n || n === S.name) return false; S.name = n; try { saveS(); draw(); msMeta(); } catch(e){} return true; }
@@ -25509,7 +25509,7 @@ async function defSongSave(){
   flushS();
   const ok = await askYes({title:'Save as default project?', body:'New project will start from this project (its tracks, buses, chains, effects, mixer, tempo and phrases) on this device. The kit stays separate.' + (defSongTxt() ? ' It replaces your current default.' : '')}, 'Save as default');
   if (!ok) return;
-  try { localStorage.setItem(DSK, JSON.stringify(songOut(S))); toast('Saved as the default project: New project starts from it.', 3000); }
+  try { localStorage.setItem(DSK, JSON.stringify(songOut(S))); toast('Saved as default: New project starts from it', 3000); }
   catch(e){ toastErr('Couldn’t save the default project: this device’s storage is full.', 4000); }
 }
 async function defSongForget(){
@@ -25534,7 +25534,7 @@ async function saveProj(as){
       if (adoptFileName(r.path)){   /* the file the Save dialog wrote holds the old default name: once more with the new one */
         let w = null, we = null; try { w = await DESK.save(r.path, projText()); } catch(e){ we = e; }
         if (we || !w || !w.ok){   /* the rewrite failed: still unsaved. The file is now the project's (a later Save writes it), and the adopted name stays in memory (not rolled back) */
-          projSet(r.path, null); setDirty(true); toastErr('Couldn’t save to ' + projLabel() + ': ' + ((we && we.message) || (w && w.error) || 'the file could not be written') + '. The project is still unsaved.', 5000); return false; }
+          projSet(r.path, null); setDirty(true); toastErr('Couldn’t save to ' + projLabel() + ': ' + ((we && we.message) || (w && w.error) || 'the file could not be written') + '. Still unsaved.', 5000); return false; }
       }
       setDirty(false); projSet(r.path, null); toast('Saved ' + projLabel()); return true;
     }
@@ -25545,7 +25545,7 @@ async function saveProj(as){
     if (canFS){
       try { const h = await window.showSaveFilePicker(Object.assign({suggestedName:projName()}, isAndroid ? {} : {types:PJT})); adoptFileName(h.name); await writeTo(h); setDirty(false); projSet(null, h); toast('Saved ' + h.name); return true; }
       // FIX (sweep, 4 Nov): when the picker itself fails (not Cancel), the song still gets saved, as a download
-      catch(e){ if (e && e.name === 'AbortError') return false; toastErr('Couldn’t save there (' + ((e && e.message) || e) + '), so it went to your downloads.', 6000);
+      catch(e){ if (e && e.name === 'AbortError') return false; toastErr('Couldn’t save there (' + ((e && e.message) || e) + '). Saved to Downloads instead.', 6000);
         await deliver(projName(), projBlob()); setDirty(false); return true; }
     }
     if (as){ const n = await askText({title:'Save project as', body:'The song is renamed and saved to your downloads.'}, S.name, 40, 'Save'); if (n == null) return false; S.name = n.trim().slice(0, 40) || 'Song'; saveS(); draw(); msMeta(); }
@@ -25557,9 +25557,9 @@ async function saveProj(as){
 async function loadProjText(text, name, where){
   try {
     const j = JSON.parse(text);
-    if (!j || (!j.song && j.app !== 'thunder-song')) throw new Error('This file isn’t a Thunder project.');
+    if (!j || (!j.song && j.app !== 'thunder-song')) throw new Error('Not a Thunder project');
     // VERSION: a file saved by a newer build may use things this one doesn't have yet. It still opens; the user is told to update.
-    if (typeof j.build === 'number' && j.build > BUILD) toastErr(`Saved by a newer version of Thunder Plus. Some things may not play as they should. Update the app.`, 9000);
+    if (typeof j.build === 'number' && j.build > BUILD) toastErr(`Saved by a newer Thunder Plus: some things may not play right. Update the app`, 9000);
     if (j.kit){ const k = kitFromJSON(j.kit); if (!await kitReplaceOk(k, 'Open this project?')) return false; setKit(k); }
     const ns = normSong(j.app === 'thunder-song' ? j : j.song); if (ns.presets) try { presetsByRef(ns.presets); } catch(e){ tpLog('could not move preset samples out of the loaded song', e); }
     /* from a file (where.file, a path or a handle): a default-named song takes the file's name, before setSong so it is not a change; a backup or the first-run song has no where.file */
@@ -25629,7 +25629,7 @@ async function restoreBackup(){
   if (k < 0) return;
   if (!await okToLeave('restoring the backup')) return;
   const text = await kvGet(idx[k].k); if (!text) return toastErr('That backup couldn’t be read.');
-  if (await loadProjText(text, idx[k].name, {dirty:true})) toast('Restored the backup of ' + idx[k].name + ' from ' + ago(idx[k].at) + '. Save it to keep it in a file.', 5000);
+  if (await loadProjText(text, idx[k].name, {dirty:true})) toast('Restored the backup of ' + idx[k].name + ' from ' + ago(idx[k].at) + '. Save it to keep it in a file', 5000);
 }
 // DESKTOP APP: closing the window asks first when there are unsaved changes; a .thunder file opened from the desktop
 // (double-click, or dropped on the app's icon) arrives here by path.
@@ -25724,7 +25724,7 @@ const metaText = (k, type, s) => { const b = [...new TextEncoder().encode(s)].sl
 function exportMidiFile(){
   tStop();
   const m = songMidiEvents();
-  if (!m) return toast(`Nothing to export: row ${rS(S.renderFrom, 3)} is empty. Set RENDER FROM to the first row of the song.`);
+  if (!m) return toast(`Nothing to export: row ${rS(S.renderFrom, 3)} is empty. Set RENDER FROM to the song’s first row`);
   const t0 = [metaText(0, 3, S.name || 'Song'), {k:0, o:-1, d:[0xFF, 0x58, 4, 4, 2, 24, 8]}];
   for (const q of m.tempo){ const us = Math.round(60000000 / q.bpm); t0.push({k:q.k, o:-1, d:[0xFF, 0x51, 3, us >> 16 & 255, us >> 8 & 255, us & 255]}); }
   const tracks = [t0]; let n = 0;
@@ -25735,8 +25735,8 @@ function exportMidiFile(){
 // Reading a .mid: {ppq, tempo (first, BPM), tracks:[{name, notes:[{k, n, v, ch, end}]}]}; type 0 files split by channel.
 function parseSmf(buf){
   const d = new Uint8Array(buf), s4 = i => String.fromCharCode(d[i], d[i + 1], d[i + 2], d[i + 3]), u32 = i => (d[i] << 24 | d[i + 1] << 16 | d[i + 2] << 8 | d[i + 3]) >>> 0, u16 = i => d[i] << 8 | d[i + 1];
-  if (s4(0) !== 'MThd') throw new Error('not a MIDI file');
-  const fmt = u16(8), ntr = u16(10), div = u16(12); if (div & 0x8000) throw new Error('SMPTE timing isn’t supported'); if (!div) throw new Error('no timing in the header');
+  if (s4(0) !== 'MThd') throw new Error('it isn’t a MIDI file');
+  const fmt = u16(8), ntr = u16(10), div = u16(12); if (div & 0x8000) throw new Error('it uses SMPTE timing, which isn’t supported'); if (!div) throw new Error('it has no timing info');
   let p = 8 + u32(4), tempo = 0; const out = [];
   for (let n = 0; n < ntr && p + 8 <= d.length; n++){
     if (s4(p) !== 'MTrk'){ p += 8 + u32(p + 4); n--; if (p >= d.length) break; continue; }
@@ -25814,7 +25814,7 @@ async function importMidiFile(f){
   if (songEmpty && m.tempo > 0){ S.bpm = clamp(Math.round(m.tempo), 40, 300); rtAllFx(); chainsTempo(); }
   saveS(); draw();
   const tempoNote = m.tempo > 0 ? (songEmpty ? ` Tempo ${S.bpm} BPM from the file.` : ` (the file is at ${Math.round(m.tempo)} BPM; the song stays at ${S.bpm})`) : '';
-  toast(`Imported ${tracks.length} MIDI track${tracks.length === 1 ? '' : 's'} into tracks ${d2(t0 + 1)}–${d2(t0 + tracks.length)} from row ${rS(y0, 3)}: ${placed} blocks, using instrument ${hx(clamp(last.inst, 0, NI - 1))}${tracks.length > 1 ? ' and up' : ''}.` + tempoNote
+  toast(`Imported ${tracks.length} MIDI track${tracks.length === 1 ? '' : 's'} to tracks ${d2(t0 + 1)}–${d2(t0 + tracks.length)} from row ${rS(y0, 3)}: ${placed} blocks, instrument ${hx(clamp(last.inst, 0, NI - 1))}${tracks.length > 1 ? ' and up' : ''}.` + tempoNote
     + (m.tracks.length > tracks.length ? ` ${m.tracks.length - tracks.length} more didn’t fit (MONO TRACKS and POLY TRACKS).` : '') + (out ? ' Ran out of phrases or sects: the rest was left out.' : ''), 8000);
 }
 $('midIn').addEventListener('change', e => { const f = e.target.files[0]; e.target.value = ''; if (f) importMidiFile(f); });
@@ -25836,7 +25836,7 @@ async function thunderImport(asked){
   if (!asked){
     const what = [songJ && `song “${songJ.name || 'Song'}”`, kitJ && `kit “${kitJ.name || 'Kit'}”`].filter(Boolean).join(' and ');
     if (!await askYes({title:'Open Thunder’s saved work?', body:`Thunder is now part of Thunder Plus (Settings → App → Mobile). Its ${what} can still be found in this browser.\n\nYour current song “${S.name || 'Song'}” and kit “${kit.name || 'Kit'}” are saved to a project file first. You can also do this later from File.`}, 'Open')){
-      try { localStorage.setItem(TIK, 'no'); } catch(e){} toast('Kept this song and kit. To bring Thunder’s saved work over later, use File → Open Thunder’s saved work.', 5000); return;
+      try { localStorage.setItem(TIK, 'no'); } catch(e){} toast('Kept this song and kit. To bring Thunder’s saved work over later: File → Open Thunder’s saved work', 5000); return;
     }
   }
   // Wait until this kit's samples are back from storage, so the backup carries them.
@@ -25937,8 +25937,8 @@ async function irsLoad(k){
       const mk = ch => { const id = smpId(), data = buf.getChannelData(ch).slice(0, n), smp = {id, name, sr, data}; IRDATA.set(id, data); smpHeld.set(id, smp); if (sdbOk) smpPut(smp).catch(() => {}); return {ref:id}; };
       S.irs = (S.irs || []).slice(0, 4); while (S.irs.length < 4) S.irs.push(null);
       S.irs[k] = {name, sr, len:+(n / sr).toFixed(2), L:mk(0), R:buf.numberOfChannels > 1 ? mk(1) : null};
-      saveS(); irsPublish(); buildProj(); toast('Song IR ' + (k + 1) + ': ' + name + ' (' + S.irs[k].len + ' s' + (S.irs[k].R ? ', stereo' : '') + '). To use it, set a Convolution reverb’s Type to Song IR ' + (k + 1) + '.');
-    } catch(e){ toastErr('That file couldn’t be read as audio.', 5000); } });
+      saveS(); irsPublish(); buildProj(); toast('Song IR ' + (k + 1) + ': ' + name + ' (' + S.irs[k].len + ' s' + (S.irs[k].R ? ', stereo' : '') + '). Set a Convolution reverb’s Type to Song IR ' + (k + 1) + ' to use it');
+    } catch(e){ toastErr('Couldn’t read that file as audio', 5000); } });
   inp.click();
 }
 function irsUI(sec){
@@ -26360,10 +26360,10 @@ function tracksCheck(mono, poly, Sx = S){
   if (!(mono >= 1) || !(poly >= 1)) return {why:'There must be at least one MONO track and one POLY track.'};
   if (mono + poly < 8 || mono + poly > most) return {why:`The song needs 8 to ${most} tracks in all${vtrk && most < NT ? ' (a voice per track allows 24)' : ''}.`};
   const plan = ntrPlan(n0, m0, mono + poly, mono, Sx.hmono, t => trackHolds(Sx, t));
-  if (!plan) return {why:'Could not work out where the tracks go.'};
+  if (!plan) return {why:'Couldn’t place the tracks'};
   const bad = plan.over.filter(o => trackHolds(Sx, o.t));
   if (bad.length){ const k = bad[0].mono ? 'MONO' : 'POLY', o = bad[0].mono ? 'poly' : 'mono', many = bad.length > 1;
-    return {why:`${bad.length} hidden ${o} track${many ? 's' : ''} (${bad.map(b => d2(b.t + 1)).join(', ')}) still hold${many ? '' : 's'} something, so ${k} cannot grow into ${many ? 'them' : 'it'}. Clear ${many ? 'them' : 'it'} first, or lower ${k === 'MONO' ? 'POLY' : 'MONO'}.`}; }
+    return {why:`${k} can’t grow: ${bad.length} hidden ${o.toUpperCase()} track${many ? 's' : ''} (${bad.map(b => d2(b.t + 1)).join(', ')}) still hold${many ? '' : 's'} data. Clear ${many ? 'them' : 'it'} first, or lower ${k === 'MONO' ? 'POLY' : 'MONO'}.`}; }
   return {why:'', n0, m0, n1:mono + poly, plan};
 }
 // PERFORM follows the tracks too (owner, 14 Nov: two new tracks left his LFOs on the old numbers). Every target id, lock and LFO
@@ -26578,7 +26578,7 @@ const mstView = () => cTrack === MT;
 const busTrack = t => t >= 0 && t < NT && isBusT(t);
 const hasNotes = p => !!p && p.some(r => { for (let x = 0; x <= IC; x++) if (r[x] >= 0) return true; return false; });
 const busFxView = () => busTrack(cTrack) && !hasNotes(S.phrases[cPhrase]);
-function busSay(t = cTrack){ toast(`Track ${d2(t + 1)} is a bus: FX commands only, no notes (right-click → Make it a normal track).`, 4500); return true; }
+function busSay(t = cTrack){ toast(`Track ${d2(t + 1)} is a bus: FX commands only (right-click → Make it a normal track)`, 4500); return true; }
 /* NO NOTES INTO A BUS (12 Nov, owner: a bus takes commands only, but a paste or a drag could still put notes on one). busNo(t, id): the song cell (track t, block id) would put a block
    that has notes (notes, volume or instrument) on a bus: refused, remembered, and said once (busRefFlush, a tick later, so a paste that left several out names them all).
    Nothing is stripped from a song that already has notes on a bus; a refusal writes nothing, so it leaves no undo step. */
@@ -26589,7 +26589,7 @@ function busNo(t, id){ if (!(id >= 0 && t >= 0 && t < NT && busTrack(t) && busNo
 function busNoteNo(){ busRefNotes++; busRefQ(); return true; }   // a phrase cell with a note, volume or instrument for a bus phrase
 function busRefFlush(){ const ids = busRef ? [...busRef] : [], nn = busRefNotes; busRef = null; busRefNotes = 0; if (!ids.length && !nn) return;
   const nm = ids.map(i => hp(songShown(i))).join(', ');
-  toast(ids.length ? (ids.length === 1 ? `Pattern ${nm} has notes` : `Patterns ${nm} have notes`) + ' · a bus track takes commands only' : 'A bus track takes commands, not notes · nothing pasted', 4500); }
+  toast(ids.length ? (ids.length === 1 ? `Pattern ${nm} has notes` : `Patterns ${nm} have notes`) + ' · a bus track takes commands only' : 'A bus track takes commands only · nothing pasted', 4500); }
 const pCols = () => mstView() || busFxView() ? [6, 7, 8, 9, 10, 11] : polyView() ? [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11] : [0, 4, 5, 6, 7, 8, 9, 10, 11];
 const kindAt = (v, x) => v === 'song' ? 'sect' : v === 'sect' ? (x ? 'tsp' : 'phrase') : PK[x];
 function getCell(v, x, y){
@@ -26647,10 +26647,10 @@ function mstShareWarn(p){
   if (!(k.mst && k.trk.size) && !(cTrack !== MT && others.length)) return; mstShared.add(p);
   const ts = [...k.trk].sort((a, b) => a - b).map(t => d2(t + 1)).join(', ');
   if (!k.mst){ const os = others.map(t => d2(t + 1)).join(', ');
-    setTimeout(() => toastBrief('share', `Phrase ${hp(p)} also plays on track${others.length > 1 ? 's' : ''} ${os}, so edits here change those too. UNIQ on this block (Song or Arrange) gives this track its own copy.`), 60); return; }
+    setTimeout(() => toastBrief('share', `Phrase ${hp(p)} also plays on track${others.length > 1 ? 's' : ''} ${os}: edits here change those too. UNIQ on this block gives this track its own copy.`), 60); return; }
   setTimeout(() => toastBrief('share', cTrack === MT
-    ? `Phrase ${hp(p)} also plays on track${k.trk.size > 1 ? 's' : ''} ${ts}. What you write here changes there too (VOL turns their notes down). UNIQ on the block gives the master its own copy.`
-    : `Phrase ${hp(p)} also plays in the master column. There, VOL is the whole song’s level and FLX / FXO the master’s effects. UNIQ on this block (Song or Arrange) gives the track its own copy.`), 60);
+    ? `Phrase ${hp(p)} also plays on track${k.trk.size > 1 ? 's' : ''} ${ts}: edits here change those too (VOL turns their notes down). UNIQ gives the master its own copy.`
+    : `Phrase ${hp(p)} also plays in the master column, where VOL is the song’s level and FLX / FXO the master’s effects. UNIQ gives the track its own copy.`), 60);
 }
 function setCell(v, x, y, val){
   if (v === 'song' && x < NT && val >= 0 && busNo(x, val)) return false;   // NO NOTES INTO A BUS (12 Nov, owner): no write, no undo step
@@ -26778,7 +26778,7 @@ function fxActiveStep(t, d){
   let k = -1; for (let i = FXSLOTS - 1; i >= 0; i--) if (A[i] && A[i].on){ k = i; break; }
   if (k < 0) return toast(where + ' has no active effects to turn off.');
   A[k].on = false; fxChanged(t); draw();
-  return toast(`${where}: FX ${fxCount(A)}/${FXSLOTS} on. Slot ${k + 1} is off and its ${TFX[A[k].type].long} is kept. Turn the value back up to bring it back.`);
+  return toast(`${where}: FX ${fxCount(A)}/${FXSLOTS} on. Slot ${k + 1} is off, its ${TFX[A[k].type].long} kept: turn the value up to restore it`);
 }
 // An effect's short readable name for the slot lines ("Filter", "Tape delay"): the pad list's name, the module's, or
 // the description up to its colon. The full description goes under the slot's controls (owner, 19 Oct: it ran off
@@ -26960,13 +26960,13 @@ function fxPresetOpen(t, k){
 }
 async function fxPresetSave(t, k){
   const A = t >= NT ? S.mfx : S.tfx[t], f = A && A[k]; if (!f) return;
-  const name = await askText({title:'Save as a preset', body:`Saves the settings of this slot for ${fxNameOf(f.type)} under a name. The preset shows under MY PRESETS in › PRESET on every song on this device. This song keeps a copy too.`}, f.pname && f.pname !== 'INIT' ? f.pname : '', 40, 'Save');
+  const name = await askText({title:'Save as a preset', body:`Saves the settings of this slot for ${fxNameOf(f.type)} under a name. The preset shows under MY PRESETS › PRESET on every song on this device. This song keeps a copy too.`}, f.pname && f.pname !== 'INIT' ? f.pname : '', 40, 'Save');
   if (name == null || !name.trim()) return;
   const n = name.trim(); S.fxPre = S.fxPre || {}; const L = S.fxPre[f.type] = fxPreSongList(f.type).filter(p => p.name !== n);
   const v = {}; for (const q of TFX[f.type].ps) v[q.k] = f[q.k];
   L.push({name:n, v}); f.pname = n;
   fxUserPut(f.type, n, v);   // MY PRESETS: kept on this device for every song as well
-  saveS(); draw(); toast(`Saved preset “${n}” for ${fxNameOf(f.type)}: in My presets (every song) and in this song`);
+  saveS(); draw(); toast(`Saved preset “${n}” for ${fxNameOf(f.type)}: in My presets and in this song`);
 }
 /* MY PRESETS (owner, 2 Nov: "save user presets in the fx"): › SAVE AS PRESET… also keeps the preset on this device, so
    › PRESET lists it in every song under MY PRESETS (the song keeps its copy too, so it travels with the file). Same name,
@@ -26974,7 +26974,7 @@ async function fxPresetSave(t, k){
 const FXU_K = 'thunderplus-fxuser-v1';
 let fxUser = (() => { try { return normFxPre(JSON.parse(localStorage.getItem(FXU_K) || '{}')); } catch(e){ return {}; } })();
 function fxUserList(type){ const L = fxUser && fxUser[type]; return Array.isArray(L) ? L : []; }
-function fxUserPut(type, name, v){ fxUser[type] = fxUserList(type).filter(p => p.name !== name).concat([{name, v}]); try { localStorage.setItem(FXU_K, JSON.stringify(fxUser)); } catch(e){ toastErr('My presets couldn’t be saved on this device (storage full?): the preset is in the song.'); } }
+function fxUserPut(type, name, v){ fxUser[type] = fxUserList(type).filter(p => p.name !== name).concat([{name, v}]); try { localStorage.setItem(FXU_K, JSON.stringify(fxUser)); } catch(e){ toastErr('Couldn’t save My presets (storage full?). The preset is in the song'); } }
 function normFxPre(j){
   const o = {}; if (!j || typeof j !== 'object') return o;
   for (const type of Object.keys(j)) if (TFX[type] && !TFX[type].pump && Array.isArray(j[type]))
@@ -27031,7 +27031,7 @@ function fxRows(){
     if (!PUMP_CREATIVE.has(PU) || PUMP_WIN.has(PU)) rows.push({l:'› OPEN', act:() => PumpFX.open(t, k), info:() => 'Opens pump ' + pumpFx(PU).name + '’s own window (every control, its displays)' + (pumpLatTxt(t, k) ? ' · ' + pumpLatTxt(t, k) : '')});
     if (PU === 'master'){   // …PUMP MASTER: LEARN (play the song while it listens), as the plugin's LEARN key
       const L = pumpAnaLufs(f.pst && f.pst.analysis);
-      rows.push({l:'› LEARN' + (L != null ? '  LEARNED ' + L.toFixed(1) + ' LUFS' : '  NOT LEARNED YET'), act:() => { PumpFX.hold(t, k, 3, 1); toast('pump MASTER is listening. Play the song or its loudest part. FINISH LEARN or stopping the song ends it.', 6000); },
+      rows.push({l:'› LEARN' + (L != null ? '  LEARNED ' + L.toFixed(1) + ' LUFS' : '  NOT LEARNED YET'), act:() => { PumpFX.hold(t, k, 3, 1); toast('pump MASTER is listening: play the song or its loudest part. FINISH LEARN or stop to end', 6000); },
         info:() => 'Listens to the song and makes one subtle master from it (tone, dynamics, stereo, loudness). Start it, play the song, then FINISH LEARN or stop' + (L != null ? '. Learned: ' + L.toFixed(1) + ' LUFS' : '')});
       rows.push({l:'› FINISH LEARN', act:() => PumpFX.hold(t, k, 3, 2), info:() => 'Ends LEARN now and uses what it heard'});
       rows.push({l:'› CANCEL LEARN', act:() => PumpFX.hold(t, k, 3, 3), info:() => 'Stops listening and keeps the master it had'});
@@ -27186,7 +27186,7 @@ function projRows(){
     {l:'LPB', get:() => S.lpb, set:v => S.lpb = v, min:1, max:16, big:4, d:8, fmt:v => v + ' lines/beat · 1/' + (v * 4), info:() => 'Lines per beat: 4 makes each row a 16th, 8 a 32nd (new projects start at 8), 3 or 6 triplets. A phrase can set its own on its LEN line'},
     {l:'TICKS', get:() => S.ticks || TICKS, set:v => { S.ticks = v; if (tp.on && tp.seq) tp.seq.tks = v; }, min:1, max:32, big:4, d:TICKS, fmt:v => v + ' ticks a step', after:chainsTempo, info:() => 'How many ticks each step is cut into for DEL, RET, KIL, OFF, ARC, PSL and GRV (6 by default). A TIC command in a phrase changes it from that row on'},
     {l:'PATTERN LEN', get:() => S.dlen || 16, set:v => setDefLen(v), min:1, max:PROWS, big:4, d:16, fmt:v => v + (v === 1 ? ' row' : ' rows') + ' · new phrases', info:() => 'How many rows a new phrase starts with (empty phrases follow it too). Setting a phrase’s ROWS (at the right of the tab bar) or its LEN line changes this to match'},
-    {l:'› ALL PHRASES TO ' + (S.dlen || 16), dbl:true, act:() => { for (let i = 0; i < NPH; i++) S.plen[i] = S.dlen || 16; saveS(); draw(); toast(`Every phrase now plays ${S.dlen || 16} rows. Notes past that are kept, just not played.`); },
+    {l:'› ALL PHRASES TO ' + (S.dlen || 16), dbl:true, act:() => { for (let i = 0; i < NPH; i++) S.plen[i] = S.dlen || 16; saveS(); draw(); toast(`Every phrase plays ${S.dlen || 16} rows. Notes past that are kept, not played`); },
       info:() => `Sets every phrase, used or not, to ${S.dlen || 16} rows. Rows past the end keep their notes. Tap EDIT twice`},
     ...(S.flxOld ? [{l:'FLX 11–FF', opts:true, get:() => 0, set:v => { if (v){ delete S.flxOld; saveS(); toast('FLX 11–FF now play the new Flex patterns (' + MODK + '+Z undoes it).'); } }, min:0, max:1, d:0, fmt:v => v ? 'NEW' : 'AS PATTERN 10',
       info:() => 'FLX 11–FF all play pattern 10 in this song. NEW: they play the 256 Flex patterns.'}] : []),
@@ -27324,7 +27324,7 @@ function modBump(d, big){
     i = clamp(i + d * (big ? 8 : 1), 0, ids.length - 1);
     L.id = ids[i]; saveS(); draw(); return;
   }
-  if (!L) return toast('LFO ' + (c.y + 1) + ' is empty: EDIT on TARGET picks what it moves.', 2500);
+  if (!L) return toast('LFO ' + (c.y + 1) + ' is empty: EDIT on TARGET picks what it moves', 2500);
   if (c.x === 1) L.sh = clamp(L.sh + d, 0, PLFO_SHAPES.length - 1);
   else if (c.x === 2) L.rt = clamp(L.rt + d, 0, PLFO_RATES.length - 1);
   else L.dp = clamp(L.dp + d * (big ? 16 : 1), 0, 255);
@@ -27345,7 +27345,7 @@ function lfoAdd(id){
   const g = tgtParse(id), t = g.t >= NT ? MT : g.t, a = (S.perf && S.perf.lfo && S.perf.lfo[t]) || [];
   let i = a.findIndex(L => L.id === id), msg = '';
   if (i < 0){
-    if (a.length >= PLFO_MAX){ i = 0; msg = (t === MT ? 'The master' : 'Track ' + d2(t + 1)) + ' has ' + PLFO_MAX + ' LFOs already: remove one on MOD to add this.'; }
+    if (a.length >= PLFO_MAX){ i = 0; msg = (t === MT ? 'The master' : 'Track ' + d2(t + 1)) + ' has all ' + PLFO_MAX + ' LFOs: remove one on MOD first'; }
     else { const P = perfOf(); (P.lfo[t] || (P.lfo[t] = [])).push({id, sh:0, rt:3, dp:128}); i = P.lfo[t].length - 1; saveS(); msg = 'LFO ' + (i + 1) + ' added: ' + tgtLabel(id, true) + '. SHAPE, RATE and DEPTH are on this row.'; }
   } else msg = 'That parameter already has an LFO (row ' + (i + 1) + ').';
   go('mod'); cFxT = t >= NT ? NT : t; cs.mod.y = i; cs.mod.x = 0; draw(); toast(msg, 4000);
@@ -27379,7 +27379,7 @@ function fxNeed(t, type){
   if (!(t >= 0) || t > MT || !TFX[type]) return;
   const A = t >= NT ? S.mfx : S.tfx[t]; if (!A) return;
   const who = t >= NT ? 'the master' : 'track ' + d2(t + 1), have = A.findIndex(f => f && f.type === type);
-  if (have >= 0){ if (!A[have].on) toast(`${TFX[type].long.split(':')[0]} is in slot ${have + 1} of ${who} but switched off, so this command won't be heard until it's on (or FXO ${have + 1}1 turns it on).`, 5000); return; }
+  if (have >= 0){ if (!A[have].on) toast(`${TFX[type].long.split(':')[0]} in slot ${have + 1} of ${who} is off, so this command is silent until it’s on (or FXO ${have + 1}1 turns it on)`, 5000); return; }
   const k = A.findIndex(f => !f);
   if (k < 0){ toast(`${who[0].toUpperCase() + who.slice(1)} has no free FX slot for ${TFX[type].long.split(':')[0]}: this command needs one.`, 5000); return; }
   A[k] = freshTfx(type); fxChanged(t);
@@ -27464,13 +27464,13 @@ const midiTag = i => { const I = S.insts[i]; const mo = I ? I.mo | 0 : 0; return
 function newMidiInst(){
   const used = instShown(), taken = new Set(S.insts.filter(I => I && (I.mo | 0)).map(I => I.mch | 0));
   let i = -1; for (let k = 0; k < NI; k++){ const I = S.insts[k]; if (I && !(I.mo | 0) && !used.has(k) && !instTracks(k).length){ i = k; break; } }
-  if (i < 0) return toast('Every instrument is in use: free one up, or set OUTPUT to MIDI on one you have.');
+  if (i < 0) return toast('All instruments in use: free one, or set OUTPUT to MIDI on one');
   let ch = 0; while (ch < 15 && taken.has(ch)) ch++;
   const I = S.insts[i]; moRelease(); I.mo = 1; I.mch = ch; I.mpt = 0;
   cInst = last.inst = i; instPicked = true; saveS();
   if (!midi.access) { try { connectMidi(); } catch(e){} }
   go('inst'); const y = instRows().findIndex(r => r.l === 'MIDI CH'); if (y >= 0){ cs.inst.y = y; draw(); }
-  toast(`Instrument ${hx(i)} sends MIDI on port ${PORTL[0]} (${portName(0)}), channel ${ch + 1}: change MIDI CH and PORT here`, 3500);
+  toast(`Instrument ${hx(i)} sends MIDI on port ${PORTL[0]} (${portName(0)}), channel ${ch + 1}. Change MIDI CH and PORT here`, 3500);
 }
 // Hear a phrase row: the whole chord when the phrase is open from a polyphonic track.
 // A computer key typing the note (audKey, set by keysDown) holds the preview until that key is let go (20 Oct), so a MIDI
@@ -27489,7 +27489,7 @@ function insertAt(x, y, k, chordOk){
   if (chordOk && k === 'note' && tv === 'phrase' && lastChord && lastChord.ref === last.note){   // CHORD PICK-UP: Enter / EDIT on an empty note cell
     if (polyView() && !busTrack(cTrack) && cTrack !== MT) return void chordDrop(y);
     const keep = lastChord; setCell(tv, x, y, last[k]); after(k, tv, x, y, last[k]); lastChord = keep;   // a mono track holds one note: the one that was under the cursor
-    return toast(`Dropped one note (${noteS(last.note)}): the ${keep.notes.length} notes of the chord need a poly track (9–16)`, 3500);
+    return toast(`Dropped a note (${noteS(last.note)}): ${keep.notes.length}-note chords need a poly track (9–16)`, 3500);
   }
   setCell(tv, x, y, last[k]); after(k, tv, x, y, last[k]);
 }
@@ -27513,7 +27513,7 @@ function bump(d, big){
       case 'note': v = v === OFF ? last.note : clamp(v + d * (big ? 12 : 1), 0, 119); break;
       // NI instruments (00–3F): the big step jumps 8 at a time (00–07 the drum pads, 08–0F the synths, and on).
       // A big step that would run past either end does nothing (owner, 8 Nov: a slip onto ▼ while editing sent low numbers to 00).
-      case 'inst': { if (big && (v + d * 8 < 0 || v + d * 8 > NI - 1)) return; const nv = clamp(v + d * (big ? 8 : 1), 0, NI - 1); if (nv === v) toast(`Instruments go 00–${hx(NI - 1)} (${NI} of them, in hex: 0F is 15, 10 is 16). Each plays the slot set on INST › PAD.`); v = nv; break; }
+      case 'inst': { if (big && (v + d * 8 < 0 || v + d * 8 > NI - 1)) return; const nv = clamp(v + d * (big ? 8 : 1), 0, NI - 1); if (nv === v) toast(`Instruments go 00–${hx(NI - 1)} (${NI}, in hex: 0F is 15, 10 is 16). Each plays the slot set on INST › PAD.`); v = nv; break; }
       case 'fxc': if (mstView()){ const L = FXLIST_MST.slice(1), n = L.length, i = Math.max(0, L.indexOf(v)); v = L[((i + d * (big ? 4 : 1)) % n + n) % n]; }
         else v = ((v + d * (big ? 4 : 1)) % FXC.length + FXC.length) % FXC.length; break;
     }
@@ -27716,7 +27716,7 @@ function editTap(enter, stamp){   // stamp: Shift+Enter, which writes the curren
     // the current one, so Enter on an empty cell places it (keyboard arranging). Enter twice still makes a unique copy.
     if (tv === 'song' && enter && v >= 0){ const nm = sectsOn ? 'sect ' + hp(v) : 'pattern ' + hp(firstPhrase(v)); sectPicked = v;   // (picked up on purpose: Enter on an empty cell places this one, see below)
       if (last.sect === v) toast('Already current: ' + nm + ' · Enter on an empty cell places it', 1600);
-      else { last.sect = v; toast('Now current: ' + nm + ' · Enter on an empty cell places it · Enter twice makes a unique copy', 2000); draw(); }
+      else { last.sect = v; toast('Now current: ' + nm + ' · Enter on an empty cell places it, twice for a unique copy', 2000); draw(); }
       return; }
     if (tv === 'phrase') pickUp(c.x, c.y);
     // NEW, NOT A COPY (owner, 7 Nov: from the Pattern view into Arrange, EDIT on empty cells on tracks 2 and 3 gave 01 and 02 with
@@ -27763,7 +27763,7 @@ function editDouble(wasEmpty){
 const busHinted = new Set();
 // The note joins whatever the key says next (New phrase 03 …), or shows alone once the key is done.
 function busHint(t){ if (busHinted.has(t) || !isBusT(t)) return; busHinted.add(t);
-  busNote = `track ${d2(t + 1)} is a ${busOf(t)}: FX commands only, no notes`; queueMicrotask(() => { if (busNote) toast(''); }); }
+  busNote = `Track ${d2(t + 1)} is a ${busOf(t)}: FX commands only`; queueMicrotask(() => { if (busNote) toast(''); }); }
 function newBlock(c, src){
   if (src >= 0 && c && c.x < NT && busNo(c.x, src)) return;   // NO NOTES INTO A BUS (12 Nov, owner): a copy of a pattern with notes
   if (c && c.x < NT) busHint(c.x);
@@ -27776,9 +27776,9 @@ function newBlock(c, src){
     S.song[c.y][c.x] = -1;
     [cid, pid] = freePair();
   }
-  if (cid < 0) return toast('No free sects left.');
+  if (cid < 0) return toast('No free sects left');
   if (src < 0){
-    if (pid < 0) return toast('No free phrases left.');
+    if (pid < 0) return toast('No free phrases left');
     sectPicked = -1;   // (a new pattern: Enter on the next empty cell makes another new one, not a copy of a block picked earlier)
     S.chains[cid] = freshSect(); S.chains[cid][0][0] = pid;
     S.phrases[pid] = freshPhrase(); S.plen[pid] = S.dlen || 16; S.plpb[pid] = 0;
@@ -27821,7 +27821,7 @@ function makeUnique(){
   /* (build 625, owner: "pressing make unique removes selection") the selection, the picks and the cursor stay: the blocks keep their places, only their numbers change */
   saveS(); draw();
   if (!n) return toast('Nothing to make unique here.');
-  toast(made === n ? `Made ${n} block${n > 1 ? 's' : ''} unique with new phrases` : `Made ${made} of ${n} unique: no free phrases left`);
+  toast(made === n ? `Made ${n} block${n > 1 ? 's' : ''} unique` : `Made ${made} of ${n} unique: no free phrases`);
 }
 function cloneHere(){
   if (tv !== 'song') return toast('CLONE works on the SONG screen.');
@@ -27830,7 +27830,7 @@ function cloneHere(){
   const n = d.flat().filter(v => v >= 0).length;
   if (!n) return toast(sel ? 'Nothing to clone in the selection.' : 'Move onto a filled block to clone it.');
   clip = {v:'song', x0:r.x0, d, mu, line:false, uniq:true}; selA = null; draw();
-  toast(`Clone copied (${n} block${n > 1 ? 's' : ''}): ${pasteKey()} puts a unique copy, with new numbers, where the cursor is`);
+  toast(`Clone copied (${n} block${n > 1 ? 's' : ''}) · ${pasteKey()} pastes a unique copy`);
 }
 // PICKS: copy or cut the picked cells (they keep their phrases; a cut clears their blocks), paste them with the cursor at
 // their top-left, the same layout. Their blocks are shared, as a rectangle paste shares them; Clone makes unique copies.
@@ -27849,7 +27849,7 @@ function copyPicks(cut){
 function insertPaste(){
   if (edBlock()) return;
   if (tv !== 'song') return toast('Insert paste works on the Song screen and Arrange.');
-  if (!clip || clip.v !== 'song') return toast(clip ? 'That was copied on the ' + VNAME[clip.v] + ' screen. Copy song blocks or rows to insert them.' : 'Nothing copied yet: copy song rows or blocks first.');
+  if (!clip || clip.v !== 'song') return toast(clip ? 'Copied on ' + VNAME[clip.v] + '. Copy song blocks or rows to insert them.' : 'Nothing copied: copy song rows or blocks first.');
   const c = cs.song, r = selA && selA.v === 'song' ? selRect() : null, pk = sxPicks.length ? Math.max(...sxPicks.map(q => q.y)) : -1;
   const at = (r ? r.y1 : Math.max(c.y, pk)) + 1, h = clip.picks ? Math.max(...clip.picks.map(p => p.dy)) + 1 : clip.d.length;
   if (at > 255) return toast('No room below the last row.');
@@ -27866,7 +27866,7 @@ function pastePicks(){
     if (p.id < 0) continue; if (y > 255 || u > n0 || (u === n0 && t !== MT)){ out++; continue; }
     if (setCell('song', t, y, p.id) === false) continue; if (t === MT || t < NT) setBlockMute(y, t, !!p.mu); n++; }
   saveS(); draw();
-  toast(out ? `Pasted ${n} blocks · ${out} past the end were left out` : `Pasted ${n} block${n === 1 ? '' : 's'}`);
+  toast(out ? `Pasted ${n} blocks, ${out} past the end left out` : `Pasted ${n} block${n === 1 ? '' : 's'}`);
 }
 function pasteClone(){
   const c = cs.song, r = selA ? selRect() : null, y0 = r ? r.y0 : c.y, x0 = r ? r.x0 : c.x; selA = null;
@@ -27886,7 +27886,7 @@ function pasteClone(){
 function dupKey(notes){
   if (tv === 'song') return dupPattern();
   if (tv === 'phrase' || tv === 'sect' || tv === 'mixer' || tv === 'fx') return dupTrack(notes);
-  toast(`${keyHint('mod+D')} duplicates the pattern on the Song (or Arrange) and the track on Phrase, Mixer and FX.`);
+  toast(`${keyHint('mod+D')} duplicates the pattern (Song, Arrange) or the track (Phrase, Mixer, FX)`);
 }
 // The sequencer's duplicate: the song row the cursor is on (the pattern), or the selected rows, every track and the master,
 // go in again right below as new, unique copies (new phrase numbers, mutes kept); the rows below move down, section names
@@ -27899,14 +27899,14 @@ function dupPattern(){
   const src = [];
   for (let y = r.y0; y <= r.y1; y++) for (let x = 0; x <= MT; x++){ if (x >= ntr() && x !== MT) continue; const v = S.song[y][x]; if (v >= 0) src.push([x, y, v, bmu(y, x)]); }
   if (!src.length) return toast(h > 1 ? 'Nothing on those rows to duplicate.' : 'Nothing on this row to duplicate.');
-  if (!songRowsInsert(at, h)) return toast(`No room: the song’s last ${h > 1 ? h + ' rows aren’t' : 'row isn’t'} empty.`);
+  if (!songRowsInsert(at, h)) return toast(`No room: the song’s last ${h > 1 ? h + ' rows aren’t' : 'row isn’t'} empty`);
   let made = 0, last = -1;
   for (const [x, y, v, mu] of src){ const ny = y + h; newBlock({x, y:ny}, v); const id = S.song[ny][x]; if (id >= 0 && id !== v){ made++; last = id; if (mu) setBlockMute(ny, x, true); } }
   c.y += h; if (sel) selA.y += h; if (pk) for (const q of sxPicks) q.y += h;
   const VR = asongOn() || (apReady && apF) ? arrRows() : songRows(); if (c.y > (c.top || 0) + VR - 1) c.top = Math.min(256 - VR, c.y - VR + 1);
   saveS(); draw();
   if (made < src.length) return toast(`Duplicated ${made} of ${src.length} blocks: no free sects or phrases left.`);
-  toast(`Pattern${h > 1 ? 's' : ''} duplicated: row${h > 1 ? 's ' + rS(at, 3) + '–' + rS(at + h - 1, 3) : ' ' + rS(at, 3)}, ${made} block${made > 1 ? 's' : ''} as unique copies · the rows below moved down`);
+  toast(`Duplicated ${made} block${made > 1 ? 's' : ''} as unique copies, row${h > 1 ? 's ' + rS(at, 3) + '–' + rS(at + h - 1, 3) : ' ' + rS(at, 3)} · rows below moved down`);
 }
 // The pattern editor's Duplicate Track: Thunder's tracks are fixed, so the copy goes into the next track to the right of the
 // same kind (mono or poly) that has nothing on the song. It gets the volume, pan, sidechain-out and the track's effects
@@ -27924,7 +27924,7 @@ function dupTrack(notes, tAt){
   // the song is full or a hidden track in the way holds something) and the copy goes into the new one. At the most tracks there are, it says so.
   if (to < 0){
     const n0 = ntr(), most = vtrk ? 24 : NT;
-    if (n0 + 2 > most) return toast(`No empty ${poly ? 'poly' : 'mono'} track to the right of track ${d2(t + 1)}, and the song has the most tracks it can (${most}).`);
+    if (n0 + 2 > most) return toast(`No empty ${poly ? 'poly' : 'mono'} track right of track ${d2(t + 1)}, and the song is at its track limit (${most})`);
     const r = setTracks(PF + 1, n0 - PF + 1); if (r.why) return toast(r.why, 5000); const tN = r.tN; t = tN(t);   /* one of each kind, whatever the split (the half rule gives the same as TRACKS + 2) */ PF = polyFrom(); poly = t >= PF; end = poly ? ntr() : PF; to = free(); grew = true;
     if (to < 0) return toast(`Couldn’t make room for a copy of track ${d2(t + 1)}.`);
   }
@@ -27963,7 +27963,7 @@ function cloneDown(){
   // (owner, 2 Nov): when every cell the clones land on is empty, they are written there and nothing moves; rows go in only
   // if a clone would land on a block (on any of the selected tracks).
   const clash = src.some(([x, y]) => getCell('song', x, d0 + y - r.y0) >= 0);
-  if (clash && !songRowsInsert(d0, h)) return toast(`No room: the song’s last ${h > 1 ? h + ' rows aren’t' : 'row isn’t'} empty.`);
+  if (clash && !songRowsInsert(d0, h)) return toast(`No room: the song’s last ${h > 1 ? h + ' rows aren’t' : 'row isn’t'} empty`);
   let made = 0, lastId = -1;
   for (const [x, y, v] of src){
     const p = {x, y:d0 + y - r.y0}; newBlock(p, v);
@@ -27997,16 +27997,16 @@ function insRowBelow(){
   if (onPset()) return;
   if (tv === 'song'){
     const c = cs.song, at = c.y + 1;
-    if (at >= 256 || !songRowsInsert(at, 1)) return toast('The song is full: its last row has blocks, so nothing can move down.');
-    saveS(); draw(); return toast(`Inserted an empty row below ${rS(c.y, 3)} · the rows below moved down`);
+    if (at >= 256 || !songRowsInsert(at, 1)) return toast('Song full: its last row has blocks, so nothing can move down');
+    saveS(); draw(); return toast(`Inserted an empty row below ${rS(c.y, 3)} · rows below moved down`);
   }
   if (tv !== 'phrase' && tv !== 'sect') return toast('INS works on the Song, Sect and Phrase screens.');
   if (selA && selA.v === tv) return toast('INS inserts below the cursor’s row: drop the selection first (Esc).');
   if (edBlock()) return;
   const c = cs[tv], A = rowsArr(tv), L = Math.min(A.length, tv === 'phrase' ? plen(cPhrase) : A.length);
-  if (c.y + 1 >= L) return toast('That’s the last row: there is no row below it.');
+  if (c.y + 1 >= L) return toast('Last row: nothing below it');
   c.y++; rowOp('insert'); c.y--; draw();
-  toast(`Inserted an empty row below ${hx(c.y)} · the rows below moved down`);
+  toast(`Inserted an empty row below ${hx(c.y)} · rows below moved down`);
 }
 // rr: the rows to remove ({y0, y1}), when the caller already has them (the right-click menu: owner, 2 Nov, "Remove these
 // rows" on 00–07 removed one row, because the menu moved the cursor to the first row and the selection shrank with it).
@@ -28014,7 +28014,7 @@ function songRowRemove(rr){
   if (tv !== 'song') return toast('Remove row works on the SONG screen.');
   const c = cs.song, sel = !!(rr && rr.y1 >= rr.y0) || !!(selA && selA.v === 'song'), r = rr && rr.y1 >= rr.y0 ? {y0:rr.y0, y1:rr.y1} : sel ? selRect() : {y0:c.y, y1:c.y}, h = r.y1 - r.y0 + 1;
   songRowsRemove(r.y0, h); selA = null; c.y = Math.min(c.y, 255); if (sel) c.y = r.y0;
-  saveS(); draw(); toast(h > 1 ? `Removed rows ${rS(r.y0, 3)}–${rS(r.y1, 3)} · the rows below moved up` : `Removed row ${rS(r.y0, 3)} · the rows below moved up`);
+  saveS(); draw(); toast(h > 1 ? `Removed rows ${rS(r.y0, 3)}–${rS(r.y1, 3)} · rows below moved up` : `Removed row ${rS(r.y0, 3)} · rows below moved up`);
 }
 function songCells(){ const c = cs.song; if (!(selA && selA.v === 'song')) return [[c.y, c.x]]; const r = selRect(), out = []; for (let y = r.y0; y <= r.y1; y++) for (const t of sxCols(r)) out.push([y, t]); return out; }
 function songDelete(cells, keep){
@@ -28023,7 +28023,7 @@ function songDelete(cells, keep){
   selA = null;
   if (!n){ draw(); return toast('Nothing to delete here.'); }
   const undoK = keyHint('mod+Z') || 'Undo';
-  if (keep){ saveS(); draw(); return toast(n > 1 ? `Removed ${n} blocks from the song; their phrases are kept` : `Removed block ${hp([...gone.values()][0])} from the song; its phrase is kept`); }
+  if (keep){ saveS(); draw(); return toast(n > 1 ? `Removed ${n} blocks, phrases kept` : `Removed block ${hp([...gone.values()][0])}, phrase kept`); }
   const uses = new Map(); for (const r of S.song) for (const v of r) if (v >= 0) uses.set(v, (uses.get(v) || 0) + 1);
   const erased = [], kept = [];
   for (const [cid, shown] of gone){
@@ -28038,19 +28038,19 @@ function songDelete(cells, keep){
   saveS(); draw();
   const kp = kept.length === 1 ? `phrase ${hp(kept[0][0])} is still used in ${kept[0][1]} more place${kept[0][1] > 1 ? 's' : ''} in the song, so it stays` : kept.length ? `${kept.length} phrases still on the song elsewhere stay` : '';
   if (n === 1 && erased.length <= 1) return toast(erased.length ? `Deleted block ${hp([...gone.values()][0])} and its phrase · ${undoK} brings it back` : `Removed the block: ${kp}`);
-  toast(`Deleted ${n} block${n > 1 ? 's' : ''} and ${erased.length} phrase${erased.length === 1 ? '' : 's'}` + (kp ? ` (${kp})` : '') + ` · ${undoK} brings ${n > 1 ? 'them' : 'it'} back`);
+  toast(`Deleted ${n} block${n > 1 ? 's' : ''} and ${erased.length} phrase${erased.length === 1 ? '' : 's'}` + (kp ? ` (${kp})` : '') + ` · ${undoK} undoes it`);
 }
 function fxDelLast(t){
   const A = t >= NT ? S.mfx : S.tfx[t];
   let k = A.length - 1; while (k >= 0 && !A[k]) k--;
   if (k < 0) return toast('No effects to remove.');
-  A[k] = null; cFxS = k; fxChanged(t); draw(); toast(`Effect ${k + 1} removed · ${A.filter(Boolean).length} left`);
+  A[k] = null; cFxS = k; fxChanged(t); draw(); toast(`Removed effect ${k + 1} · ${A.filter(Boolean).length} left`);
 }
 // CLEAR on the FX screen's slot list (14 Nov, owner: right-click an effect, Clear: "it clears the last effect in the list"): it empties the slot the cursor is on
 function fxDelSlot(t, k){
   const A = t >= NT ? S.mfx : S.tfx[t], f = A && A[k]; cFxS = k; cs.fx.y = k + 1;
   if (!f){ draw(); return toast(`Slot ${k + 1} is already empty.`); }
-  fxSwap(t, k, A, null); fxChanged(t); draw(); toast(`Slot ${k + 1} cleared (${TFX[f.type] ? TFX[f.type].n : 'effect'}) · ${A.filter(Boolean).length} left`);
+  fxSwap(t, k, A, null); fxChanged(t); draw(); toast(`Removed ${TFX[f.type] ? TFX[f.type].n : 'effect'} from slot ${k + 1} · ${A.filter(Boolean).length} left`);
 }
 function del(){
   if (onPset()) return psetSet(cs.phrase.x, cs.phrase.x ? 0 : 16);
@@ -28150,7 +28150,7 @@ function toggleLoopPat(){
   loopPat = !loopPat;
   if (loopPat){ patRow = tp.on && tp.mode === 'song' ? patPlayRow() : -1; patCur = cs.song.y; }
   draw();
-  toast(loopPat ? (tp.on && tp.mode === 'song' ? `Looping song row ${rS(patRow, 3)}: move to another row to loop that one` : 'Loop on: the song repeats the row (pattern) it is on') : 'Loop off');
+  toast(loopPat ? (tp.on && tp.mode === 'song' ? `Looping row ${rS(patRow, 3)}: move to loop another` : 'Loop on: repeats the row you are on') : 'Loop off');
 }
 // Ctrl/⌘+Space (owner, 20 Oct): play just this pattern, round and round. LOOP goes on (if it was off) and the song plays
 // from the cursor's row, every track, repeating that row; pressed again it stops, like Space. LOOP stays on (Alt+L turns it off).
@@ -28218,7 +28218,7 @@ function soloKey(all){
   const t = dkTrack(), m = S.mix[t]; if (!m) return;
   setSolo(m, !m.solo); mixChanged(); draw();
   const n = S.mix.filter(q => q.solo).length;
-  toast(m.solo ? `Solo on: track ${d2(t + 1)}` + (n > 1 ? ` (${n} soloed)` : '') + ' · ' + keyHint('mod+shift+/') + ' clears every solo' : `Solo off: track ${d2(t + 1)}` + (n ? ` (${n} still soloed)` : ''));
+  toast(m.solo ? `Solo on: track ${d2(t + 1)}` + (n > 1 ? ` (${n} soloed)` : '') + ' · ' + keyHint('mod+shift+/') + ' clears all' : `Solo off: track ${d2(t + 1)}` + (n ? ` (${n} still soloed)` : ''));
 }
 function toggleLoop(){
   loopSel = !loopSel;
@@ -28248,7 +28248,7 @@ function syncLoop(){
 // first note, so you hear where it is; it stays on until the button, Esc, or another arrow turns it off.
 function toggleKeyTrans(){
   xposeArm = !xposeArm; keyVis();
-  toast(xposeArm ? 'Transpose lock on: ▲ or ▼ moves a semitone, and you hear the first note. Esc or the button turns it off.' : 'Transpose lock off');
+  toast(xposeArm ? 'Transpose lock on: ▲ or ▼ moves a semitone and you hear the first note. Esc or the button turns it off.' : 'Transpose lock off');
 }
 function keyTransArrow(dir){   // dir 'up' | 'down' | other; true when the arrow was used up by the transpose lock
   if (!xposeArm) return false;
@@ -28431,10 +28431,10 @@ function lineSel(dy){
 // Ctrl/⌘+A (TRACKER KEYS, 3 Nov): the cursor's column first (an effect column with its value), then again the whole track
 // (every line, what Ctrl/⌘+A always did), then again in the Pattern view the pattern (every track on the song row).
 function selectAll(){
-  if (!GRIDV.has(tv) || onPset()) return toast('Selecting works in Song, Sect and Phrase.');
+  if (!GRIDV.has(tv) || onPset()) return toast('Selecting works in Song, Sect and Phrase');
   const c = cs[tv], h = dims(tv).h, mine = !!(selA && selA.v === tv), r = mine ? selRect() : null, full = !!r && r.y0 === 0 && r.y1 >= h - 1, ak = keyHint('mod+A');
   if (mine && full && selA.line){
-    if (tv === 'phrase' && pvActive() && !selA.pat){ selA.pat = true; draw(); return toast(`Pattern selected: every track on song row ${rS(cs.song.y, 3)} · transpose or Delete acts on all of them`); }
+    if (tv === 'phrase' && pvActive() && !selA.pat){ selA.pat = true; draw(); return toast(`Pattern selected: all tracks on row ${rS(cs.song.y, 3)} · transpose and Delete act on all`); }
     return draw();
   }
   if (mine && full){ selA = {x:0, y:0, v:tv, line:true}; c.y = h - 1; draw(); return toast(tv === 'phrase' ? (pvActive() ? `Track selected · ${ak} again: the pattern` : 'Phrase selected') : 'Every line selected'); }
@@ -28484,7 +28484,7 @@ function copyHere(cut){
   // An FX command or value travels with its partner, so a pasted command keeps its setting.
   let x0 = c.x, row = [v];
   if (tv === 'phrase' && (k === 'fxc' || k === 'fxv')){ x0 = k === 'fxc' ? c.x : c.x - 1; row = [getCell(tv, x0, c.y), getCell(tv, x0 + 1, c.y)]; }
-  if (row.every(q => q < 0) && kindAt(tv, x0) !== 'tsp') return toast('Nothing under the cursor to ' + (cut ? 'cut.' : 'copy.'));
+  if (row.every(q => q < 0) && kindAt(tv, x0) !== 'tsp') return toast('Nothing under the cursor to ' + (cut ? 'cut' : 'copy'));
   clip = {v:tv, x0, d:[row], line:false, ...(tv === 'song' ? {mu:[[songMu(c.x, c.y)]]} : {})};
   if (cut) row.forEach((_, i) => setCell(tv, x0 + i, c.y, kindAt(tv, x0 + i) === 'tsp' ? 0 : -1));
   const what = tv === 'song' ? 'block ' + hp(v) : tv === 'sect' ? 'sect row' : 'cell';
@@ -28499,7 +28499,7 @@ function paste(){
   const c = cs[tv], dm = dims(tv), x0 = clip.line ? 0 : tv === 'song' ? c.x : clip.x0;
   // Pasting over a selection starts at its top row.
   const y0 = selA ? selRect().y0 : c.y; selA = null;
-  if (y0 < 0) return toast('Move to a row first.');
+  if (y0 < 0) return toast('Move to a row first');
   let n = 0, put = 0; const fxOnly = tv === 'phrase' && busTrack(cTrack); let cut = 0;   // BUS FX ONLY: a paste keeps its FX columns
   const colAt = i => { if (tv !== 'song') return x0 + i; const u = sxU(x0) + i, n0 = ntr(); return u === n0 ? MT : u < n0 ? u : -1; };   // SONG: by screen column, the master after the last track
   clip.d.forEach((row, j) => { const y = y0 + j; if (y < dm.h) n++; row.forEach((val, i) => { const x = colAt(i); if (val !== undefined && x >= 0 && (x < dm.w || (tv === 'song' && x === MT)) && y < dm.h){ if (fxOnly && x < FX0){ if (val >= 0) cut++; return; } if (setCell(tv, x, y, val) === false) return; put++;
@@ -28569,7 +28569,7 @@ function clkEdit(b){
   let done = false;
   const fin = ok => { if (done) return; done = true;
     if (ok){ const v = parseInt(inp.value, 10);
-      if (Number.isFinite(v)){ const c = clamp(v, d.min, d.max); d.set(c); saveS(); if (c !== v) toast(`${d.name} must be from ${d.min} to ${d.max}, so it was set to ${c}.`); }
+      if (Number.isFinite(v)){ const c = clamp(v, d.min, d.max); d.set(c); saveS(); if (c !== v) toast(`${d.name} must be from ${d.min} to ${d.max}, so it was set to ${c}`); }
       else toast(`Type a number for ${d.name.toLowerCase()}.`); }
     b.textContent = ''; drawPat(); draw(); };
   inp.addEventListener('keydown', e => { e.stopPropagation(); if (e.key === 'Enter'){ e.preventDefault(); fin(true); } else if (e.key === 'Escape'){ e.preventDefault(); fin(false); } });
@@ -28712,9 +28712,9 @@ function navDownToPhrase(){
   if (tv !== 'phrase') return null;
   if (pvActive()){ pvGo(x, y, null, null); return null; }
   if (!empty || (pendPlace && pendPlace.x === x && pendPlace.y === y && pendPlace.p === cPhrase)) return null;   // (the strip / panel had already made this cell's waiting phrase)
-  const fp = freePhrase(); if (fp < 0) return toast(`Empty block: showing phrase ${hp(cPhrase)}, the last one open (no free phrases left).`);
+  const fp = freePhrase(); if (fp < 0) return toast(`Empty block: showing phrase ${hp(cPhrase)}, the last one open (no free phrases left)`);
   cPhrase = fp; cs.phrase.y = 0; pendPlace = {x, y, p:fp}; draw();
-  return toast(`Empty block: new phrase ${hp(fp)}. It goes on the song at row ${rS(y, 3)} when you add a note.`);
+  return toast(`New phrase ${hp(fp)} for this block. It joins the song at row ${rS(y, 3)} when you add a note`);
 }
 let goNoNew = false;
 function nav(dir){
@@ -28738,9 +28738,9 @@ function nav(dir){
   if (tv === 'song' && !sectsOn){ cTrack = cs.song.x; const x = cs.song.x, y = cs.song.y, e = S.song[y][x] < 0; goNoNew = e; try { go('phrase'); } finally { goNoNew = false; } if (!e) return null;
     // An empty block opens a fresh phrase (not the last one open, which belongs to another block: notes typed
     // there used to land somewhere else). It goes on the song in this block as soon as it has a note.
-    const fp = freePhrase(); if (fp < 0) return toast(`Empty block: showing phrase ${hp(cPhrase)}, the last one open (no free phrases left).`);
+    const fp = freePhrase(); if (fp < 0) return toast(`Empty block: showing phrase ${hp(cPhrase)}, the last one open (no free phrases left)`);
     cPhrase = fp; cs.phrase.y = 0; pendPlace = {x, y, p:fp}; draw();
-    return toast(`Empty block: new phrase ${hp(fp)}. It goes on the song at row ${rS(y, 3)} when you add a note.`); }
+    return toast(`New phrase ${hp(fp)} for this block. It joins the song at row ${rS(y, 3)} when you add a note`); }
   if (tv === 'song'){ if (S.song[cs.song.y][cs.song.x] < 0){ cTrack = cs.song.x; go('sect'); return toast(`Empty row: showing sect ${hp(cSect)}, the last one open.`); } return go('sect'); }
   if (tv === 'sect'){ const r = sectRow(cSect, cs.sect.y); if (!r || r[0] < 0){ go('phrase'); return toast(`No phrase on that row: showing phrase ${hp(cPhrase)}, the last one open.`); } return go('phrase'); }
   if (tv === 'phrase'){ const p = S.phrases[cPhrase], r = p && p[cs.phrase.y]; cInst = r && r[IC] >= 0 ? r[IC] : last.inst; tv = 'inst'; midV = 'inst'; instViaTrk = true; draw(); }
@@ -28803,7 +28803,7 @@ function phraseGrid(dir){
   const cid = S.song[y] ? S.song[y][x] : -1;
   let p = cid >= 0 ? firstPhrase(cid) : -1;
   if (p >= 0){ cSect = cid; pendPlace = null; }
-  else { const fp = freePhrase(); if (fp < 0){ toast('No free phrases left.'); return true; } p = fp; pendPlace = {x, y, p:fp}; }
+  else { const fp = freePhrase(); if (fp < 0){ toast('No free phrases left'); return true; } p = fp; pendPlace = {x, y, p:fp}; }
   cs.song.x = x; cs.song.y = y; cTrack = x; cPhrase = p; selA = null; cs.song.pg = cs.phrase.pg = false;   // (12 Nov) the playhead's page no longer hides the cursor you moved
   if (cs.phrase.y >= 0) cs.phrase.y = clamp(cs.phrase.y, 0, plen(p) - 1);
   const VR = songViewRows(), top = cs.song.top || 0;
@@ -28880,15 +28880,15 @@ function otherPatStep(dir){
    To remove: delete this function and its line in keysDown (marked NEW PHRASE RIGHT). */
 function newPhraseRight(){
   const song = tv === 'song';
-  if (!song && tv !== 'phrase' && tv !== 'sect') return toast(`Press ${keyHint('mod+T')} on the Song, Sect or Phrase screen to add a phrase on the next empty track.`);
+  if (!song && tv !== 'phrase' && tv !== 'sect') return toast(`${keyHint('mod+T')} adds a phrase on the next empty track (Song, Sect or Phrase)`);
   if (tv === 'phrase' && !(pendPlace && pendPlace.p === cPhrase) && !pvHas(cs.song.y, cTrack, cPhrase)) followPhraseBlock();   // the row the open phrase sits on
   const t0 = song ? cs.song.x : cTrack, y = cs.song.y, n = ntr();
   if (t0 === MT || t0 >= n - 1) return toast('There is no track to the right of this one.');
   let t = -1; for (let u = t0 + 1; u < n; u++) if (!isBusT(u) && S.song[y] && S.song[y][u] < 0){ t = u; break; }
   if (t < 0) return toast(`No empty track to the right of track ${d2(t0 + 1)} on song row ${rS(y, 3)}.`);
-  const p = freePhrase(); if (p < 0) return toast('No free phrases left.');
+  const p = freePhrase(); if (p < 0) return toast('No free phrases left');
   setSongPhrase(t, y, p); const cid = S.song[y][t];
-  if (cid < 0) return toast('No free sects left.');
+  if (cid < 0) return toast('No free sects left');
   if (pendPlace && pendPlace.p === cPhrase && isEmptyPhrase(S.phrases[cPhrase])) pendPlace = null;   // an untouched new phrase stays off the song
   if (song){ cs.song.x = t; selA = null; }
   else if (tv === 'phrase' && pvActive()) pvGo(t, y, 'first', null);   // PATTERN VIEW: the cursor goes to its first column
@@ -28961,7 +28961,7 @@ function playCtx(){
     if (lv === 'song') return tStart('song', {row:lp.y0, loop:lp});
     if (tv === 'sect') return tStart('sect', {sect:cSect, track:cTrack, loop:lp});
     if (tv === 'phrase') return tStart('phrase', {phrase:cPhrase, track:cTrack, loop:lp});
-  } else if (loopSel && GRIDV.has(tv)) toast('LOOP SEL is on but nothing to loop: select 2 or more rows first.');
+  } else if (loopSel && GRIDV.has(tv)) toast('LOOP SEL is on: select 2 or more rows to loop');
   if (tv === 'sect') return tStart('sect', {sect:cSect, track:cTrack});
   // PATTERN VIEW: like the phrase, this screen's play is the open track's phrase; PLAY (Space) plays every track from the
   // pattern's song row on (owner, 19 Oct: back to this after trying PLAY = the whole pattern).
@@ -29186,7 +29186,7 @@ function genToPhrase(){
   tv = 'song'; go('phrase');
   return false;
 }
-function genRefuse(t){ return t >= 0 && t < NT && busTrack(t) ? `Track ${d2(t + 1)} is a bus · generators write notes, a bus takes commands only` : ''; }   // (a track that takes no generated notes: a bus, 12 Nov)
+function genRefuse(t){ return t >= 0 && t < NT && busTrack(t) ? `Track ${d2(t + 1)} is a bus: generators write notes, buses take commands only` : ''; }   // (a track that takes no generated notes: a bus, 12 Nov)
 function genMenu(fromKeys){
   // (the phrase opens first; Arrange beside it may scroll to the block, and a scroll of its grid closes menus, so the menu opens two frames later)
   if (tv === 'song' && view === 'tracker'){ if (!genToPhrase()) requestAnimationFrame(() => requestAnimationFrame(() => { if (tv === 'phrase') genMenuOpen(fromKeys); })); return; }
@@ -29304,7 +29304,7 @@ function euclid(k, n, r){
 }
 let eucLast = '5 16 0';
 async function euclidFill(){
-  if (view !== 'tracker' || tv !== 'phrase' || mstView()) return toast('Open a phrase first: Euclidean fill writes notes into it.');
+  if (view !== 'tracker' || tv !== 'phrase' || mstView()) return toast('Open a phrase first: Euclidean fill writes notes into it');
   if (busTrack(cTrack)) return busSay();   // BUS FX ONLY
   const a = await askText({title:'Euclidean fill', body:'HITS STEPS ROTATE INSTRUMENT, e.g. 5 16, 3 8 2, or 5 16 0 0A for instrument 0A. It fills the note column under the cursor across the selected rows, or from the cursor down. It uses the note already there, or the last one. Without an instrument, it uses the row\u2019s own, or the last one used.'}, eucLast, 12, 'Fill');
   if (a == null) return;
@@ -29356,9 +29356,9 @@ const isNoteV = v => v >= 0 && v < 120;
    Each press mutates what is there now (press again for more); ORIGINAL puts back the phrase as it was when the panel opened. */
 const mutSet = {amt:30, lanes:{pitch:true, hits:true, time:false, vol:true}};
 function mutatePhrase(){
-  if (view !== 'tracker' || tv !== 'phrase' || mstView()) return toast('Open a phrase first: Mutate makes a variation of it.');
+  if (view !== 'tracker' || tv !== 'phrase' || mstView()) return toast('Open a phrase first: Mutate makes a variation of it');
   if (busTrack(cTrack)) return busSay();
-  const P = S.phrases[cPhrase]; if (!P || isEmptyPhrase(P)) return toast('This phrase is empty: there is nothing to vary yet (try Acid line or Drum pattern).');
+  const P = S.phrases[cPhrase]; if (!P || isEmptyPhrase(P)) return toast('Empty phrase: nothing to vary yet (try Acid line or Drum pattern)');
   let y0 = 0, y1 = plen(cPhrase) - 1; if (selA && selA.v === 'phrase'){ const R = selRect(); y0 = R.y0; y1 = Math.min(R.y1, y1); }
   const ph0 = cPhrase, orig = P.map(r => r.slice()), cols = isPolyT(cTrack) ? NCOL : 1; let mutIns = -1;   /* build 629: -1 = as before (the note before it); else the instrument written on the notes this adds */
   const found = songKey(cPhrase), sc = found ? ACID_SCALES[found.scale][1] : null, root = found ? found.root : 0;
@@ -29427,7 +29427,7 @@ function drumBar(style, part, d, rnd, vary, last){
   return out;
 }
 function drumPattern(){
-  if (view !== 'tracker' || !['phrase', 'song', 'sect'].includes(tv)) return toast('Open the Song or a phrase first: Drum pattern writes on the song row under the cursor.');
+  if (view !== 'tracker' || !['phrase', 'song', 'sect'].includes(tv)) return toast('Open the Song or a phrase first: Drum pattern writes at the cursor’s song row');
   const y = cs.song.y, n = ntr(), vox = k => { const I = S.insts[k], v = I && kit.voices[I.pad]; return v ? (v.name || '') : ''; };
   // defaults: an instrument whose pad name fits, and a track: the cursor's and the next free ones that aren't buses
   const used = new Set(), trs = []; for (let t = (tv === 'song' ? cs.song.x : cTrack); t < n && trs.length < 4; t++) if (t !== MT && !isBusT(t)) trs.push(t);
@@ -29445,7 +29445,7 @@ function drumPattern(){
       // only lands on this row; REWRITE changes it everywhere, as before
       if (drumSet.uniq && blockShared(t, y)){ const nc = mstUniq(S.song[y][t]); if (nc < 0){ wrote.full = (wrote.full || 0) + 1; continue; } S.song[y][t] = nc; wrote.uq = (wrote.uq || 0) + 1; }   // (no room for a copy: that part is left as it was)
       let cid = S.song[y] ? S.song[y][t] : -1, p = cid >= 0 ? firstPhrase(cid) : -1;
-      if (p < 0){ p = freePhrase(); if (p < 0){ toast('No free phrases left.'); break; } S.phrases[p] = freshPhrase(); if (S.plen) S.plen[p] = L0; setSongPhrase(t, y, p); }
+      if (p < 0){ p = freePhrase(); if (p < 0){ toast('No free phrases left'); break; } S.phrases[p] = freshPhrase(); if (S.plen) S.plen[p] = L0; setSongPhrase(t, y, p); }
       if (!S.phrases[p]) S.phrases[p] = freshPhrase();
       const P = S.phrases[p], L = plen(p), Ls = Math.max(1, Math.floor(L / spr)), bars = Math.ceil(Ls / 16);
       const base = drumBar(st, k, d, rnd, false, false); let hits = 0;
@@ -29475,7 +29475,7 @@ function drumPattern(){
    Chords, Polymeter and Markov melody, in genPanel like Mutate. They write into the open phrase (the selection's rows, else
    the whole phrase); each roll is one undo step. Shared bits first. ===== */
 function genScope(what){
-  if (view !== 'tracker' || tv !== 'phrase' || mstView()){ toast('Open a phrase first: ' + what + ' writes into it.'); return null; }
+  if (view !== 'tracker' || tv !== 'phrase' || mstView()){ toast('Open a phrase first: ' + what + ' writes into it'); return null; }
   if (busTrack(cTrack)){ busSay(); return null; }
   let y0 = 0, y1 = plen(cPhrase) - 1; if (selA && selA.v === 'phrase'){ const R = selRect(); y0 = R.y0; y1 = Math.min(R.y1, y1); }
   const P0 = S.phrases[cPhrase] || freshPhrase(), ph = cPhrase, lpb = plpbOf(S, cPhrase), spr = Math.max(1, Math.round(lpb / 4));
@@ -29588,7 +29588,7 @@ const CHORD_MOODS = [
   ['IDM (anywhere in the key)', -1, null]];
 const chordSet = {mood:1, every:8, voicing:1, root:-1, minor:-1};
 function chordGen(){
-  if (tv === 'phrase' && !isPolyT(cTrack)) return toast('Chords needs a poly track (from track ' + d2(polyFrom() + 1) + ' on): a mono track plays one note at a time.', 3500);   // (owner, 7 Nov)
+  if (tv === 'phrase' && !isPolyT(cTrack)) return toast('Chords need a poly track (track ' + d2(polyFrom() + 1) + ' on): mono plays one note at a time', 3500);   // (owner, 7 Nov)
   const G = genScope('Chords'); if (!G) return;
   if (chordSet.root < 0) chordSet.root = G.root; const keyMinor = G.key ? ![6].includes(G.key.scale) && ACID_SCALES[G.key.scale][1].includes(3) : true;
   const MAJ = [0, 2, 4, 5, 7, 9, 11], MIN = [0, 2, 3, 5, 7, 8, 10];
@@ -29648,7 +29648,7 @@ function markovGen(){
     for (let y = 0; y < L; y++){ const r = ph[y]; if (r[IC] >= 0) ci = r[IC]; const n = r[0]; if (!isNoteV(n)) continue; const I = S.insts[ci >= 0 ? ci : r[IC]]; if (!I || !I.kf) { last = null; continue; }
       if (last != null){ if (!T.has(last)) T.set(last, []); T.get(last).push(n); gaps.push(y - lastY); }
       count.set(n, (count.get(n) || 0) + 1); tot++; last = n; lastY = y; } }
-  if (tot < 12) return toast('Markov melody learns from the song’s melodies. There are only ' + tot + ' melodic notes so far (drums don’t count). Write a few phrases first, or try Arp or Acid line.', 5000);
+  if (tot < 12) return toast('Markov melody needs more notes: the song has only ' + tot + ' melodic notes (drums don’t count). Write a few phrases first, or try Arp or Acid line.', 5000);
   const top = [...count.entries()].sort((a, b) => b[1] - a[1])[0][0];
   const roll = () => { if (!G.ok()) return; const P = G.P(), rnd = Math.random, nov = markSet.nov / 100; let n = top, y = G.y0, k = 0;
     for (let z = G.y0; z <= G.y1; z++){ const r = P[z]; r[0] = -1; if (rowEmpty(r)) r[VC] = -1; }
@@ -29894,7 +29894,7 @@ function songKey(skipPh){
 }
 function acidLine(){
   if (tv === 'song' && view === 'tracker' && genToPhrase()) return;   // (12 Nov, owner) Alt+B on the Song / Arrange opens the block's phrase first, as GEN does
-  if (view !== 'tracker' || tv !== 'phrase' || mstView()) return toast('Open a phrase first: Acid line writes a bass line into it.');
+  if (view !== 'tracker' || tv !== 'phrase' || mstView()) return toast('Open a phrase first: Acid line writes a bass line into it');
   if (busTrack(cTrack)) return busSay();
   // FIX (sweep, 4 Nov): an empty phrase is only put in the song when GENERATE writes into it, not when the panel opens
   const P0 = S.phrases[cPhrase] || freshPhrase(), ph0 = cPhrase;
@@ -29958,9 +29958,9 @@ function acidLine(){
   // ORIGINAL, as Mutate's: the phrase as it was when the panel opened (an empty phrase that is not in the song yet stays out of it)
   const orig = P().map(r => r.slice());
   const original = () => { const T = S.phrases[ph0];
-    if (cPhrase !== ph0 || (T && T.length !== orig.length)) return toast('The phrase changed: close Acid line and open it again.');
+    if (cPhrase !== ph0 || (T && T.length !== orig.length)) return toast('The phrase changed: close Acid line and open it again');
     if (!T) return toast('Nothing to go back to: the phrase is still as it was.');
-    orig.forEach((r, y) => { T[y] = r.slice(); }); saveS(); draw(); toast('Back to the phrase as it was.'); };
+    orig.forEach((r, y) => { T[y] = r.slice(); }); saveS(); draw(); toast('Back to the phrase as it was'); };
   mk('▶ / ■', () => playCtx()); mk('Original (O)', original); mk('Mutate (M)', () => roll(true)); const go = mk('Generate (G)', () => roll(false), 'ok'); mk('Done', done);
   box.append(row);
   // Keys stay in the panel: R rolls, M mutates, O puts the phrase back, Space plays or stops the phrase, Esc / Enter close.
@@ -31229,7 +31229,7 @@ function mstChainTxt(){ const on = MW_STAGES.filter(([k]) => stageOn(k)).map(([,
 function mstLabel(){ const l = $('mstLbl'); if (l && S.mstPump){ l.textContent = mstOn() ? 'On: pump ' + mstPumpSlots().filter(k => S.mfx[k].on).map(k => PUMP_SHORT[TFX[S.mfx[k].type].pump] || S.mfx[k].type).join(' → ') : 'Off'; return; } if (l) l.textContent = S.mst.on ? 'On: ' + MW_STAGES.filter(([k]) => stageOn(k)).map(([, n]) => n.toLowerCase()).join(' → ') : 'Off'; }
 function openMst(stage){
   if (S.mstPump){ const K = mstPumpSlots(), m = K.find(k => S.mfx[k].type === 'pmaster'), k = m != null ? m : K[K.length - 1];
-    if (k == null) return toast('No pump mastering on the master: add pMSTR in its FX slots (Mixer → MASTER → FX).');
+    if (k == null) return toast('No pump mastering on the master: add pMSTR in its FX slots (Mixer → MASTER → FX)');
     try { PumpFX.open(NT, k); } catch(e){ tpLog('could not open the pump mastering window', e); } return; }
   if (stage) mwSel = stage;
   // below the top bar, so the transport (Song / Stop) stays in reach while you listen
@@ -31249,12 +31249,12 @@ async function mstToPump(){
   for (let k = at; k < FXSLOTS; k++) if (A[k] && A[k].type !== MST_PUMP[k - at]) busy.push(`slot ${k + 1} (${fxNameOf(A[k].type)})`);
   const ok = await askSheet({title:'Switch to pump mastering', body:'The master gets pEQ → CALM → COMP → TONE → MASTER in FX slots '
     + `${at + 1}–${FXSLOTS}, switched on, in place of its current mastering. ` + (busy.length ? `This replaces what is in ${busy.join(', ')}. ` : '')
-    + 'The master will sound different. Undo takes it all back.'}, {ok:'Switch'});
+    + 'The master will sound different. Undo brings it back.'}, {ok:'Switch'});
   if (ok == null) return;
   MST_PUMP.forEach((k, i) => { const f = A[at + i]; if (!(f && f.type === k)) A[at + i] = freshTfx(k); A[at + i].on = true; });
   S.mst.on = false; S.mstPump = true;
   fxChanged(NT); mstChanged(); saveS();
-  closeMst(); toast('This song now masters with pump: EQ → CALM → COMP → TONE → MASTER');
+  closeMst(); toast('Mastering with pump: EQ → CALM → COMP → TONE → MASTER');
   setTimeout(() => openMst(), 60);
 }
 function closeMst(){ $('mstWin').hidden = true; mwOpenNow = false; cancelAnimationFrame(mwRaf); draw(); }
@@ -31272,7 +31272,7 @@ function mwChain(){
     const b = el('div', 'mwst' + (stageOn(k) ? ' on' : '') + (mwSel === k ? ' sel' : '')); b.setAttribute('role', 'tab'); b.setAttribute('aria-selected', String(mwSel === k)); b.dataset.k = k;
     const sw = el('button', 'sw'); sw.type = 'button'; sw.title = (stageOn(k) ? 'Switch off ' : 'Switch on ') + n.toLowerCase(); sw.setAttribute('aria-label', sw.title);
     sw.addEventListener('click', e => { e.stopPropagation(); if (k === 'eq') S.mst.eq.on = !S.mst.eq.on; else S.mst[k].on = !S.mst[k].on;
-      if (stageOn(k)){ mwSel = k; if (!S.mst.on){ S.mst.on = true; toast('Auto master on.'); } } mstChanged(); mwBuild(); });
+      if (stageOn(k)){ mwSel = k; if (!S.mst.on){ S.mst.on = true; toast('Auto master on'); } } mstChanged(); mwBuild(); });
     b.append(sw, el('span', 'nm', n), el('span', 'gr')); b.addEventListener('click', () => { mwSel = k; mwBuild(); });
     box.append(b);
   });
@@ -31560,7 +31560,7 @@ document.querySelectorAll('#tDeck .dkt').forEach(b => { const k = b.dataset.k;
   b.addEventListener('click', e => { e.stopPropagation(); setDeck(k, !deck[k]); }); });
 for (const k of DK_FOLD) dkSec(k).addEventListener('click', e => { if (!deck[k] && !e.target.closest('.dkt')) setDeck(k, true); });
 $('dkHide').addEventListener('click', () => { setDeck('on', false); toast('Panel hidden. Settings → BOTTOM PANEL brings it back.'); });
-$('dkSolo').addEventListener('click', () => { S.mix.forEach(m => m.solo = false); mixChanged(); draw(); toast('Solo cleared: every track plays.'); });
+$('dkSolo').addEventListener('click', () => { S.mix.forEach(m => m.solo = false); mixChanged(); draw(); toast('Solo cleared: every track plays'); });
 // Shown in KEYS mode when the keypad is off and the panel is on. The shown-sections' buttons sit in their own
 // headers; hidden sections wait as dashed "+" buttons in the first header, and ✕ (and SOLO) in the last.
 function deckLayout(){
@@ -31607,20 +31607,20 @@ function perfSongIn(txt){
   if (rt){ rt.pl.buses.forEach(b => { if (b && b.chn) b.chn._sent = null; }); rtAllFx(); rtRoute(); rt.pl.applyMix(); mstSync(); }
   draw();
 }
-function perfReloadSet(){ flushS(); reloadPt = JSON.stringify(songOut(S)); toast('Reload point set: RELOAD brings the song back to how it is now (the kit stays as it is).', 3000); perfDraw(); }
-function perfReload(){ if (!reloadPt) return toast('Set a reload point first (SET).'); perfSongIn(reloadPt); perfLive.sent.clear(); perfPush(); toast('Reloaded: the song is back at the reload point (Undo takes it back).', 2600); }
+function perfReloadSet(){ flushS(); reloadPt = JSON.stringify(songOut(S)); toast('Reload point set. RELOAD returns the song to this state (the kit stays).', 3000); perfDraw(); }
+function perfReload(){ if (!reloadPt) return toast('Set a reload point first (SET).'); perfSongIn(reloadPt); perfLive.sent.clear(); perfPush(); toast('Reloaded: the song is back at the reload point · Undo brings it back', 2600); }
 let perfPart = 0;
 function partSave(k){
   const P = S.parts || (S.parts = new Array(PERF_PARTS).fill(null)), was = P[k];
   P[k] = Object.assign({n:was && was.n ? was.n : 'Part ' + (k + 1)}, partSnap()); saveS(); perfDraw();
-  toast(`Part ${k + 1} keeps the instruments, the mixer and the effect values as they are now. PRT ${hx(k + 1)} switches to it.`, 3200);
+  toast(`Part ${k + 1} saved: instruments, mixer and effect values as they are now. PRT ${hx(k + 1)} switches to it.`, 3200);
 }
 function partLoad(k){
   const p = S.parts && S.parts[k]; if (!p) return toast(`Part ${k + 1} is empty: SAVE keeps the sound as it is now.`);
   S.insts = JSON.parse(JSON.stringify(p.insts));
   p.mix.forEach(([vol, pan], t) => { if (S.mix[t]){ S.mix[t].vol = clamp(int(vol, 224), 0, 255); S.mix[t].pan = clamp(int(pan, 128), 0, 255); } });
   for (const key in p.fx){ const [t, s] = key.split(':').map(Number), o = p.fx[key], A = t >= MT ? S.mfx : S.tfx[t], f = A && A[s]; if (!f || f.type !== o.type) continue; for (const q of TFX[f.type].ps) if (o[q.k] != null) f[q.k] = o[q.k]; }
-  saveS(); if (rt){ rtAllFx(); rt.pl.applyMix(); } draw(); toast(`Part ${k + 1} loaded as the song’s own sound (Undo takes it back).`, 2600);
+  saveS(); if (rt){ rtAllFx(); rt.pl.applyMix(); } draw(); toast(`Part ${k + 1} loaded as the song’s own sound · Undo brings it back`, 2600);
 }
 // A list of choices in a sheet: groups [[name, [{l, id, sub}]]], pick(id)
 function perfPick(title, groups, pick, openFirst){
@@ -32167,7 +32167,7 @@ function fbPop(v, q, getF, show, set){
   inp.addEventListener('keydown', e => { e.stopPropagation(); if (e.isComposing) return;
     if (e.key === 'Escape'){ e.preventDefault(); fbPopClose(); }
     else if (e.key === 'Enter'){ e.preventDefault(); const a = inp.value.trim(), n = a ? fbParse(a, q, show) : null;
-      if (n == null){ toast('Not a value for ' + q.l + '. Type a number from ' + q.min + ' to ' + q.max + ', or type the value as the control shows it.'); return; } set(n); fbPopClose(); }
+      if (n == null){ toast('Not a value for ' + q.l + '. Type a number from ' + q.min + ' to ' + q.max + ', or the value as shown.'); return; } set(n); fbPopClose(); }
     else if (e.key === 'ArrowUp' || e.key === 'ArrowDown'){ e.preventDefault(); const g = getF(); if (g){ x = g[q.k] + (e.key === 'ArrowUp' ? 1 : -1); set(x); sync(); } } });
   m._out = e => { if (!m.contains(e.target)) fbPopClose(); };
   document.body.append(m); sync(); addEventListener('pointerdown', m._out, true);
@@ -33482,7 +33482,7 @@ function phlGo(id){
   phlOpen(false); if (view !== 'tracker') setView('tracker');
   if (tv !== 'phrase') go('phrase');
   cPhrase = id; cs.phrase.y = 0; selA = null; draw();
-  if (!songPhraseUse().has(id)) toast(`Phrase ${hp(id)} isn't on the song: File ▾ → Phrases… → Place puts it there.`);
+  if (!songPhraseUse().has(id)) toast(`Phrase ${hp(id)} isn’t on the song: File ▾ → Phrases… → Place`);
 }
 function phlPlace(id){
   const x = cs.song.x; let y = cs.song.y;
@@ -34048,7 +34048,7 @@ function sxAim(d, e){
 function sxDrop(d){
   const r = d.r, cols = sxCols(r), NA = ntr();
   if (cols.includes(MT) && cols.length > 1) return {err:'Move the master column on its own.'};
-  if (cols.includes(MT) && d.du) return {err:'The master column stays the master column.'};
+  if (cols.includes(MT) && d.du) return {err:'The master column can’t change tracks'};
   const u0 = sxU(cols[0]) + d.du, u1 = sxU(cols[cols.length - 1]) + d.du;
   if (!cols.includes(MT) && (u0 < 0 || u1 > NA - 1)) return {err:'That would go past the last track.'};
   if (r.y0 + d.dy < 0 || r.y1 + d.dy > 255) return {err:'That would go past the end of the song.'};
@@ -34093,7 +34093,7 @@ function sxEnd(e){
   if (d.mode === 'select'){ sxSelToast(); return; }
   sxAim(d, e); sxApply(d);
 }
-function sxSelToast(){ const r = selRect(), n = sxCols(r).length * (r.y1 - r.y0 + 1); toast(`${n} cell${n > 1 ? 's' : ''} selected · drag them to move, Alt-drag to copy, right-click for more`); }
+function sxSelToast(){ const r = selRect(), n = sxCols(r).length * (r.y1 - r.y0 + 1); toast(`${n} cell${n > 1 ? 's' : ''} selected · drag to move, Alt-drag to copy, right-click for more`); }
 // Blocks land where they were dropped: a move takes them away from where they were, a copy leaves them (copies use the
 // same phrases, like paste; Clone in the menu makes new ones). Empty cells in the selection don't wipe what's there.
 function sxApply(d){
@@ -34143,10 +34143,10 @@ function swapDialog(t, y){
   const close = () => ov.remove();
   ok.addEventListener('click', () => {
     const a = +src.value, b = +dst.value, ids = sc.value === 'block' ? here : all; close();
-    if (a === b) return toast('Those are the same instrument.');
+    if (a === b) return toast('Pick two different instruments');
     let n = 0; for (const p of ids) for (const r of S.phrases[p] || []) if (r[IC] === a){ r[IC] = b; n++; }
     if (n){ saveS(); draw(); }
-    toast(n ? `Swapped ${n} note${n === 1 ? '' : 's'} from ${hx(a)} to ${hx(b)} in track ${d2(t + 1)}` : `No notes on ${hx(a)} to swap there.`);
+    toast(n ? `Swapped ${n} note${n === 1 ? '' : 's'} ${hx(a)} → ${hx(b)} in track ${d2(t + 1)}` : `No notes on ${hx(a)} to swap`);
   });
   cancel.addEventListener('click', close);
   row.append(ok, cancel); box.append(row); ov.append(box);
@@ -34514,7 +34514,7 @@ function dropNote(){
   const now = performance.now(); dropTip.ts = dropTip.ts.filter(t => now - t < 60000); dropTip.ts.push(now);
   if (dropTip.ts.length < 4) return; dropTip.ts = [];
   try { if (localStorage.getItem('thunderplus-seen-droptip')) return; localStorage.setItem('thunderplus-seen-droptip', '1'); } catch(e){ return; }
-  toastAct('Playback keeps dropping out. Set Latency to Safest for a bigger audio buffer. The app reloads and keeps your project.', 'Use Safest',
+  toastAct('Playback keeps dropping out. Set Latency to Safest (bigger buffer)? The app reloads and keeps your project', 'Use Safest',
     () => { aset.lat = 'playback'; aset.latPick = true; asetSave(); try { save(); } catch(e){} applyUpdate(); });
 }
 function cpuMeter(){
@@ -34784,7 +34784,7 @@ function selScope(needSel, what){
 // (an effect needs the same command at both ends; the rows between get that command too).
 function interpSel(){
   const q = selScope(true, 'Interpolate'); if (!q) return;
-  if (q.y1 - q.y0 < 2) return toast('Interpolate: select at least three rows. The first and last rows hold the start and end values.');
+  if (q.y1 - q.y0 < 2) return toast('Interpolate: select 3 or more rows (first and last hold the start and end values)');
   const C = pCols(), cols = new Set();
   for (let x = q.x0; x <= q.x1; x++){ if (!C.includes(x)) continue; const k = PK[x]; if (k === 'vol' || k === 'fxv') cols.add(x); else if (k === 'fxc') cols.add(x + 1); }
   let n = 0, miss = 0;
@@ -34795,7 +34795,7 @@ function interpSel(){
   }
   if (!n) return toast(cols.size ? 'Interpolate: put a value on the first and last selected rows (the same effect at both ends).' : 'Interpolate: select a volume or effect column too.');
   saveS(); draw();
-  toast(`Interpolated ${n} value${n > 1 ? 's' : ''} over ${q.y1 - q.y0 + 1} rows` + (miss ? ` (${miss} column${miss > 1 ? 's' : ''} had no value at one end)` : ''));
+  toast(`Interpolated ${n} value${n > 1 ? 's' : ''} over ${q.y1 - q.y0 + 1} rows` + (miss ? ` (${miss} column${miss > 1 ? 's' : ''} had no end value)` : ''));
 }
 // VOLUME: scale, fade in, fade out or set the volume of every row with a note (an empty volume counts as FF).
 async function volSel(){
@@ -34858,7 +34858,7 @@ function pasteMix(){
   if (clip.v !== tv) return toast('That was copied in ' + VNAME[clip.v] + '. Paste it there.');
   const c = cs[tv], dm = dims(tv), x0 = clip.line ? 0 : tv === 'song' ? c.x : clip.x0;
   const y0 = selA ? selRect().y0 : c.y; selA = null;
-  if (y0 < 0) return toast('Move to a row first.');
+  if (y0 < 0) return toast('Move to a row first');
   let n = 0;
   const fxOnly = tv === 'phrase' && busTrack(cTrack);   // BUS FX ONLY
   const colAt = i => { if (tv !== 'song') return x0 + i; const u = sxU(x0) + i, n0 = ntr(); return u === n0 ? MT : u < n0 ? u : -1; };   // SONG: by screen column (the master too)
@@ -34867,7 +34867,7 @@ function pasteMix(){
     const empty = kindAt(tv, x) === 'tsp' ? !getCell(tv, x, y) : getCell(tv, x, y) < 0, has = kindAt(tv, x) === 'tsp' ? !!val : val >= 0;
     if (empty && has){ if (setCell(tv, x, y, val) !== false) n++; } }));
   if (fxOnly && clip.d.some((row, j) => row.some((val, i) => { const x = colAt(i); return x >= 0 && x < FX0 && val >= 0; }))) return (toast(n ? 'Notes left out · this is a bus track' : 'A bus track takes commands, not notes · nothing pasted'), draw());   // (12 Nov, review: the FX cells it did write were not drawn)
-  toast(n ? `Mix-pasted ${n} cell${n > 1 ? 's' : ''} into the empty ones` : 'Mix-paste: every cell it would fill already has something.'); draw();
+  toast(n ? `Mix-pasted ${n} cell${n > 1 ? 's' : ''} into empty ones` : 'Mix-paste: nothing empty to fill'); draw();
 }
 /* ===== SELECTION TOOLS end ===== */
 /* ===== MOUSE SELECT (21 Oct): the tracker grid with a mouse works like Renoise's pattern editor =====
@@ -35563,7 +35563,7 @@ function typeHex(d){
   if (GRIDV.has(tv)){
     if (k === 'note' || k === 'fxc') return;
     if (tv === 'phrase' && (k === 'vol' || k === 'inst') && busTrack(cTrack)) return busSay();   // BUS FX ONLY
-    if (k === 'fxv' && getCell(tv, c.x - 1, c.y) < 0) return toast('Pick an effect in the column to the left first.');
+    if (k === 'fxv' && getCell(tv, c.x - 1, c.y) < 0) return toast('Pick an effect in the column to the left first');
     if (tv === 'song' && !sectsOn){
       // SHORT NUMBERS (sweep, 4 Nov): one or two digits are placed too once typing pauses (05 → 005), instead of waiting for a third
       if (!done){ const hb = hexBuf, x = c.x, y = c.y; clearTimeout(songHexT);
@@ -35623,7 +35623,7 @@ function keysDown(e, pad){
     if (k === 'Enter' && e.altKey && !e.shiftKey){ if (!e.repeat) insRowBelow(); return true; }   // (12 Nov, owner) Ctrl/⌘+Alt+Enter: insert a row below (INS); it was free
     if (k === 'Enter' && !e.altKey){ if (e.repeat && e.shiftKey) return true;
       if (e.shiftKey){ songRowInsert(); return true; }
-      if (!GRIDV.has(tv) || onPset()) return toast('Insert row works on the Song, Sect and Phrase screens.'), true;
+      if (!GRIDV.has(tv) || onPset()) return toast('Insert row works on the Song, Sect and Phrase screens'), true;
       if (!edBlock()) rowOp('insert'); return true; }
     if ((k === 'Home' || k === 'End') && !e.altKey && !e.shiftKey){ songEndKey(k === 'End'); return true; }
     // Ctrl/⌘+Shift+Backspace (owner, 3 Nov): on the Song, the whole song row (or the selected rows), as Ctrl/⌘+Shift+Enter
@@ -36016,7 +36016,7 @@ apPinB.addEventListener('click', () => apPinToggle(apPinB));
 function apPinToggle(b){
   apPin = !apPin; if (b) b.blur();
   if (!apPin && apF){ apLastKey = ''; apFollow(); }
-  draw(); toast(apPin ? `Pinned: phrase ${hp(cPhrase)} stays up while you move around the song.` : 'Unpinned: the phrase follows the song cursor.');
+  draw(); toast(apPin ? `Pinned: phrase ${hp(cPhrase)} stays up while you move around` : 'Unpinned: the phrase follows the cursor');
 }
 const apTagEl = el('span', 'aptag'); apTagEl.hidden = true;
 { const h = scr.querySelector('.thl'); if (h) h.append(apTagEl); }
@@ -36274,8 +36274,8 @@ function welcome(force){
   if (document.querySelector('.welcome')) return;
   const pad = inMode !== 'keys', wrap = el('div', 'welcome'), box = el('div', 'wbox');
   box.innerHTML = pad
-    ? `<h2>Three things to know</h2><ol><li><kbd>PLAY</kbd> plays the starter beat; <kbd>PLAY</kbd> again stops.</li><li>Move with the <kbd>▲▼◀▶</kbd> pad; <kbd>EDIT</kbd> on an empty cell adds a note or a block, <kbd>EDIT</kbd> twice makes a new phrase.</li><li>Hold <kbd>EDIT</kbd> and press <kbd>▲▼</kbd> to change a value; <kbd>SHIFT</kbd> + <kbd>▶</kbd> opens what the cursor is on.</li></ol>`
-    : `<h2>Three things to know</h2><ol><li>${playKeySwap() ? '<kbd>Space</kbd> plays the song, <kbd>Shift</kbd>+<kbd>Space</kbd> this phrase.' : '<kbd>Space</kbd> plays this screen, <kbd>Shift</kbd>+<kbd>Space</kbd> the song.'}</li><li>Arrows move; type a note (<kbd>Z</kbd>–<kbd>;</kbd>, <kbd>Q</kbd>–<kbd>P</kbd>) or hex to edit the cell; <kbd>Enter</kbd> opens what the cursor is on.</li><li><kbd>Synth</kbd> at the top is where the sounds live; <kbd>?</kbd> opens Help from anywhere.</li></ol>`;
+    ? `<h2>Three things to know</h2><ol><li><kbd>PLAY</kbd> plays the starter beat; again stops.</li><li>Move with <kbd>▲▼◀▶</kbd>. <kbd>EDIT</kbd> on an empty cell adds a note or block; <kbd>EDIT</kbd> twice makes a phrase.</li><li>Hold <kbd>EDIT</kbd> + <kbd>▲▼</kbd> to change a value; <kbd>SHIFT</kbd> + <kbd>▶</kbd> opens what’s under the cursor.</li></ol>`
+    : `<h2>Three things to know</h2><ol><li>${playKeySwap() ? '<kbd>Space</kbd> plays the song, <kbd>Shift</kbd>+<kbd>Space</kbd> this phrase.' : '<kbd>Space</kbd> plays this screen, <kbd>Shift</kbd>+<kbd>Space</kbd> the song.'}</li><li>Arrows move; type a note (<kbd>Z</kbd>–<kbd>;</kbd>, <kbd>Q</kbd>–<kbd>P</kbd>) or hex to edit; <kbd>Enter</kbd> opens what’s under the cursor.</li><li><kbd>Synth</kbd> (top) holds the sounds; <kbd>?</kbd> opens Help.</li></ol>`;
   const foot = el('div', 'wfoot'), more = el('button', null, 'More in Help'), ok = el('button', 'ok', 'Got it'); more.type = ok.type = 'button';
   foot.append(el('span', null, 'The hint line under the grid shows the keys for each screen.'), more, ok); box.append(foot); wrap.append(box);
   const close = () => { wrap.remove(); try { localStorage.setItem(WLK, '1'); } catch(e){} };
@@ -37177,7 +37177,7 @@ function pvGo(t, y, x, prow){
   let p = -1;
   if (cid >= 0){ ensureSectPhrase(cid); p = pvPhraseIn(cid, k); }
   if (p >= 0){ cSect = cid; pendPlace = null; }
-  else { const fp = freePhrase(); if (fp < 0){ toast('No free phrases left.'); return false; } p = fp; pendPlace = {x:t, y, p:fp}; }
+  else { const fp = freePhrase(); if (fp < 0){ toast('No free phrases left'); return false; } p = fp; pendPlace = {x:t, y, p:fp}; }
   cTrack = t; cPhrase = p; cs.song.x = t; cs.song.y = y; selA = null; cs.song.pg = false;   // (12 Nov) as phraseGrid
   const VR = songViewRows(), top = cs.song.top || 0;   // ARRANGE keeps the row in view
   if (y < top) cs.song.top = y; else if (y > top + VR - 1) cs.song.top = y - VR + 1;
@@ -37225,7 +37225,7 @@ const pvBandT = (e, s) => { if (!pvActive() || !s) return -1; if (s.classList.co
 grid.addEventListener('pointerdown', e => {
   if (e.pointerType !== 'mouse' || e.button !== 0) return;
   const t = pvBandT(e, e.target.closest('.pvh')); if (t < 0) return;
-  if (e.altKey){ e.stopPropagation(); e.preventDefault(); setMute(S.mix[t], !S.mix[t].mute); mixChanged(); draw(); toast(`Track ${d2(t + 1)} ${S.mix[t].mute ? 'muted' : 'unmuted'}`); return; }
+  if (e.altKey){ e.stopPropagation(); e.preventDefault(); setMute(S.mix[t], !S.mix[t].mute); mixChanged(); draw(); toast(`Track ${d2(t + 1)} ${S.mix[t].mute ? 'muted' : 'unmuted'} · right-click solos it`); return; }
   if (hdDbl(t)){ e.stopPropagation(); e.preventDefault(); nameTrack(t); }
 }, true);
 grid.addEventListener('contextmenu', e => { const t = pvBandT(e, e.target.closest('.pvh')); if (t < 0) return; e.preventDefault(); e.stopPropagation(); soloTrack(t); }, true);
@@ -37446,7 +37446,7 @@ function applyUpdate(){ try { flushS(); flushKit(); saveCur(); } catch(e){ tpLog
   try { if (DESK_APP && DESK_APP.reload){ DESK_APP.reload(); return; } } catch(e){ tpLog('desktop reload failed, using location.reload', e); }
   location.reload(); }
 // RELOAD OFFER: the app reloaded to restart the audio engine (audReloadSafe): say the song is back
-try { const t = +sessionStorage.getItem('thunderplus-audreload-v1'); if (t){ sessionStorage.removeItem('thunderplus-audreload-v1'); if (Date.now() - t < 60000) setTimeout(() => { try { toast('Reloaded to restart the audio engine. Your song is back; audio starts at your first PLAY or pad.', 5000); } catch(e){} }, 1000); } } catch(e){}
+try { const t = +sessionStorage.getItem('thunderplus-audreload-v1'); if (t){ sessionStorage.removeItem('thunderplus-audreload-v1'); if (Date.now() - t < 60000) setTimeout(() => { try { toast('Reloaded to restart audio. Your song is back; audio starts at your first PLAY or pad', 5000); } catch(e){} }, 1000); } } catch(e){}
 /* FIX (27 Oct, audit B8): a browser tab with unsaved project changes asks before it closes or reloads (F5, Ctrl+R, the tab's
    ✕). The song and kit are always kept in the browser; this is about the project file. The desktop app asks its own way,
    and the app's own reloads (an update) don't ask. */
@@ -37535,11 +37535,11 @@ async function openSharedProject(){
     const c = await caches.open('thunder-share');
     const key = new URL('__thunder-share-project', location.href).href;
     const r = await c.match(key);
-    if (!r){ if (q.get('shared') === '1') toastErr('That shared project couldn’t be read. Share it again, or save it and use File ▾ → LOAD PROJECT.', 7000); return; }
+    if (!r){ if (q.get('shared') === '1') toastErr('Couldn’t read that shared project. Share it again, or save it and use File ▾ → LOAD PROJECT', 7000); return; }
     await c.delete(key);
     const name = decodeURIComponent(r.headers.get('x-name') || 'Shared project.thunder');
     await openProjectFile(new File([await r.blob()], name, {type:r.headers.get('content-type') || 'application/octet-stream'}));
-  } catch(e){ tpLog('the shared project could not be opened', e); toastErr('That shared project couldn’t be read. Save it and use File ▾ → LOAD PROJECT.', 7000); }
+  } catch(e){ tpLog('the shared project could not be opened', e); toastErr('Couldn’t read that shared project. Save it and use File ▾ → LOAD PROJECT', 7000); }
 }
 if (new URLSearchParams(location.search).has('shared')) setTimeout(openSharedProject, 0);
 else if (FIRST_SONG) setTimeout(async () => {
