@@ -21371,7 +21371,7 @@ function demoSong(){
 // PERFORM block runs, and normSong saw them undefined then: scenes A / B came back empty, parts shrank to one, and a song with
 // a track LFO threw (PLFO_SHAPES.length), so the app opened the starter beat instead and autosaved it over the song.
 var PERF_SCENES = 16, PERF_MACROS = 8, PERF_PARTS = 16, PLFO_MAX = 4, PLFO_RATES = [1/8, 1/4, 1/2, 1, 2, 4, 8, 16, 32], PLFO_SHAPES = ['Sine', 'Triangle', 'Saw up', 'Saw down', 'Square', 'Random'];
-// FIRST RUN (owner, 31 Oct): with no song saved yet the app opens the bundled ELECTRO project (sounds/ELECTRO.thunder);
+// FIRST RUN (owner, 31 Oct; the song changed 17 Nov): with no song saved yet the app opens the bundled project (sounds/BETA-TESTING-ELECTRO.thunder, else sounds/ELECTRO.thunder);
 // the starter beat stays underneath until it has loaded (and if it can't be fetched).
 let FIRST_SONG = false;
 let S = (() => { try { const s = localStorage.getItem(TK) || localStorage.getItem('thunder-song-v1'); if (!s) FIRST_SONG = true; return s ? normSong(JSON.parse(s)) : demoSong(); } catch(e){ return demoSong(); } })();
@@ -26010,7 +26010,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 638;
+const BUILD = 639;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD + (location.pathname.includes('/beta/') ? ' · beta' : '');
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -36296,6 +36296,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [639, '17 Nov', ['Fixed: the Chains and Waves screens came up empty (no modules, no cables, nothing to click) in builds 619 to 638. One character in each editor’s page made the whole page fail to start. Your songs and patches were never touched: they open again with every module and cable.', 'A first-time visitor now opens the bETA tESTING eLECTRO song (with its kit) instead of the old ELECTRO. File ▾ → Load ELECTRO still loads the old one, and anyone who already has a saved song gets that song back as before.']],
   [638, '16 Nov', ['pump is now the newest version (the one the native apps use). MASTER has a RESONANCE stage: it gently calms narrow, ringing peaks before everything else, off until you switch it on, with its own AMOUNT. With it off MASTER sounds exactly as before, but it now delays the sound by 4096 more samples (about 85 ms); renders and LATENCY COMP count it, so timing still lines up. STRIP reports more to its meters']],
   [637, '16 Nov', ['Folded phone with Chains and Waves shown: the Tracker / Synth / Waves / Chains tabs no longer push the bar past the screen edge on a screen 461 to 599 px wide; the tabs have their own row there, as on the narrower screens.']],
   [636, '16 Nov', ['Folded phone, Tracker: BPM, LPB, ROWS and the time left (LEFT) moved up into the top bar, right of the CPU meter, so the line under the tabs is gone and the phrase gets the room. Tap and type work as before; the tick dots are a thin strip under BPM / LPB']],
@@ -37542,8 +37543,11 @@ async function openSharedProject(){
 }
 if (new URLSearchParams(location.search).has('shared')) setTimeout(openSharedProject, 0);
 else if (FIRST_SONG) setTimeout(async () => {
-  try { const r = await fetch('sounds/ELECTRO.thunder?v=2'); if (!r.ok) return; const t = await r.text();
-    if (FIRST_SONG && !projDirty) await loadProjText(t, 'ELECTRO.thunder'); } catch(e){ tpLog('the first-run song could not be loaded', e); }
+  /* FIRST-OPEN SONG (owner, 17 Nov): sounds/BETA-TESTING-ELECTRO.thunder; the older ELECTRO is the fallback if that one can't be fetched. */
+  for (const [url, nm] of [['sounds/BETA-TESTING-ELECTRO.thunder?v=1', 'BETA-TESTING-ELECTRO.thunder'], ['sounds/ELECTRO.thunder?v=2', 'ELECTRO.thunder']]){
+    try { const r = await fetch(url); if (!r.ok) continue; const t = await r.text();
+      if (FIRST_SONG && !projDirty) await loadProjText(t, nm); return; } catch(e){ tpLog('the first-run song could not be loaded', e); }
+  }
 }, 0);
 /* PLAYBACK REPORT ON SCREEN (7 Nov, testing on BrowserStack's real phones): only with ?pbshow in the URL, inert otherwise. A strip
    at the top with PLAY (the song from the top) and STOP, and the playback report (the same lines Copy playback report copies),
