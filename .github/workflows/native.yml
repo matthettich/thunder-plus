@@ -55,6 +55,14 @@ jobs:
         run: ctest --test-dir build --output-on-failure -V -R 'bench_put|core_pattern'
       - if: ${{ matrix.pass == 'gcc' }}
         run: ctest --test-dir build --output-on-failure
+      # U04: the CLOSED configuration (THUNDER_WITH_LXR=OFF: nothing of the GPL module is configured, built or linked): a small extra build with the seam's test (an LXR voice is refused,
+      # another engine renders the same) and the boundary check over its binaries. The open configuration is the build above (test_lxr, lxr_fuzz, lxr_seam, rt_core).
+      - name: Closed build (THUNDER_WITH_LXR=OFF)
+        if: ${{ matrix.pass == 'gcc' }}
+        run: |
+          cmake -S native -B build-closed -DCMAKE_BUILD_TYPE=Release -DTHUNDER_WITH_LXR=OFF -DTHUNDER_WITH_DSP=OFF -DTHUNDER_WITH_PUMP=OFF
+          cmake --build build-closed -j --target test_lxr_seam
+          ctest --test-dir build-closed --output-on-failure -R 'lxr_seam|lxr_boundary'
       # The same tests with clang (the compiler of macOS and Android), in a third build directory.
       - name: clang
         if: ${{ matrix.pass == 'clang' }}
