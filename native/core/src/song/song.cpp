@@ -187,7 +187,7 @@ bool Song::load(const char* text, size_t len, JsonError* err) {
   }
 
   // instruments, mixer
-  { const Json J = S.get("insts"); for (int i = 0; i < kNI; i++) readInst(J.isArr() ? J.at((size_t)i) : Json(), i, insts[i]); }
+  { const Json J = S.get("insts"); for (int i = 0; i < kNI; i++) { readInst(J.isArr() ? J.at((size_t)i) : Json(), i, insts[i]); instMissing[i] = !isFile && J.isArr() && !J.at((size_t)i).isObj(); } }
   { const Json J = S.get("mix");
     for (int i = 0; i < kSongNT; i++) { SongMix m; const Json o = J.isArr() ? J.at((size_t)i) : Json();
       if (o.isObj()) { m.vol = cInt(o.get("vol"), 224, 0, 255); m.trim = cInt(o.get("trim"), 128, 0, 255); m.pan = cInt(o.get("pan"), 128, 0, 255);

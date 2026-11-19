@@ -74,6 +74,7 @@ struct Song {
   bool chainOn[kSongNT] = {false};
   SongMix mix[kSongNT];
   SongInst insts[kNI];
+  bool instMissing[kNI] = {false};   // a bare song (not a file) whose insts[i] is not an object: the page's S never has one unless an edit made it; the sequencer plays instrument 0 (makeSeq: S.insts[ii] || S.insts[0])
 
   // handles into the doc (Missing when the song has none); parsed by the units that use them
   Json tfx, mfx, chainPatch, mst, perf, parts, presets, irs;

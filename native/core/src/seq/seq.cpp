@@ -289,7 +289,7 @@ void Seq::partEvsOf(Json mix, Json fx, bool own, std::vector<PEv>& out) const {
 }
 void Seq::buildParts() {
   sInsts_.resize(NI);
-  for (int i = 0; i < NI; i++) { const SongInst& I = S_.insts[i]; PInst& p = sInsts_[(size_t)i]; p.present = true; p.pad = I.pad; p.tsp = I.tsp; p.vol = I.vol; p.pan = I.pan; p.ofs = I.ofs; p.hut = I.hut; p.huv = I.huv; p.kf = I.kf != 0; p.rev = I.rev != 0; }
+  for (int i = 0; i < NI; i++) { const SongInst& I = S_.insts[i]; PInst& p = sInsts_[(size_t)i]; p.present = !S_.instMissing[i]; p.pad = I.pad; p.tsp = I.tsp; p.vol = I.vol; p.pan = I.pan; p.ofs = I.ofs; p.hut = I.hut; p.huv = I.huv; p.kf = I.kf != 0; p.rev = I.rev != 0; }
   partEvsOf(Json(), Json(), true, own_.evs);
   const Json P = S_.parts;
   for (size_t k = 0; k < P.size(); k++) { Part part; const Json p = P.isArr() ? P.at(k) : Json(); part.present = truthy(p);
@@ -557,7 +557,8 @@ const Seq::PInst& Seq::instOf(int ii) const {   // IS[ii] || IS[0] || S.insts[ii
   if (pfPart_ >= 0 && pfPart_ < (int)parts_.size() && parts_[(size_t)pfPart_].present) { const std::vector<PInst>& IS = parts_[(size_t)pfPart_].insts;
     if (ii >= 0 && ii < (int)IS.size() && IS[(size_t)ii].present) return IS[(size_t)ii];
     if (!IS.empty() && IS[0].present) return IS[0]; }
-  return sInsts_[(size_t)ci(ii, 0, NI - 1)];
+  { const PInst& s = sInsts_[(size_t)ci(ii, 0, NI - 1)]; if (s.present) return s; }   // S.insts[ii] || S.insts[0] (instrument 0 even when it is missing too: default values, where the JS would throw)
+  return sInsts_[0];
 }
 // N1 review C2: settle()'s inner loop walks every row of the loop range, so a loop of 1e8 rows held one step() for 100 ms and 2e9
 // for seconds (then signed overflow). The ends are clamped to what the mode can hold: 0..255 song rows, 0..15 chain rows, 0..31 steps.
