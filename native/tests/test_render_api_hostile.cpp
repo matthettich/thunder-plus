@@ -2,6 +2,7 @@
 // pads with extreme sizes and rates, reads with bad arguments, free mid-render, several extreme fields at once, and a fixed-seed fuzz loop.
 // A failure is a wrong return code; a crash or a sanitizer report ends the run. Usage: test_render_api_hostile [fuzz iterations (default 800)]
 #include <algorithm>
+#include <cctype>
 #include <climits>
 #include <cstdlib>
 #include <limits>
@@ -21,7 +22,7 @@ static void testCreate(const std::string& good, const std::string& electro) {
   CHECK("zero bytes", mk("", &d, err, sizeof err) == nullptr && err[0]);
   { const char tiny[] = "{\"v\":6}"; thunder_render* r = thunder_render_create((const uint8_t*)tiny, sizeof tiny - 1, &d, err, 1); CHECK("err cap 1 is NUL-terminated", err[0] == 0); thunder_render_free(r); }
   { char e5[5] = {1, 1, 1, 1, 1}; CHECK("junk", mk("not json at all", &d, e5, sizeof e5) == nullptr && e5[4] == 0 && std::strlen(e5) <= 4); }
-  CHECK("junk with embedded NULs", mk(std::string("{\"v\":6,\0\0\"x\":[", 16), &d, err, sizeof err) == nullptr);
+  CHECK("junk with embedded NULs", mk(std::string("{\"v\":6,\0\0\"x\":[", 14), &d, err, sizeof err) == nullptr);
   CHECK("huge: over the song limit", [&] { std::string big(THUNDER_RENDER_MAX_SONG_BYTES + 1, ' '); return thunder_render_create((const uint8_t*)big.data(), big.size(), &d, err, sizeof err) == nullptr; }());
   CHECK("size_t max bytes", thunder_render_create((const uint8_t*)good.data(), (size_t)-1, &d, err, sizeof err) == nullptr);
   CHECK("deeply nested (64 MiB of '[')", [&] { std::string deep(THUNDER_RENDER_MAX_SONG_BYTES, '['); return mk(deep, &d, err, sizeof err) == nullptr; }());
@@ -143,6 +144,34 @@ static std::string mutate(std::string s) {
   if (rnd() % 10 == 0 && !s.empty()) s.resize(rnd() % s.size());
   return s;
 }
+
+// several extreme fields at once: EVERY number of the song (or, for ELECTRO, a third of them) replaced by one extreme value, for each extreme
+static std::string allNumbers(const std::string& s, const char* ext, uint32_t pctOf3) {
+  std::string o; size_t i = 0;
+  while (i < s.size()) {
+    if ((s[i] >= '0' && s[i] <= '9') || (s[i] == '-' && i + 1 < s.size() && s[i + 1] >= '0' && s[i + 1] <= '9')) {
+      size_t j = i + 1; while (j < s.size() && (std::isdigit((unsigned char)s[j]) || s[j] == '.' || s[j] == 'e' || s[j] == 'E' || s[j] == '+' || s[j] == '-')) j++;
+      if (rnd() % 3 < pctOf3) o += ext; else o.append(s, i, j - i);
+      i = j;
+    } else o += s[i++];
+  }
+  return o;
+}
+static void testExtremeAll(const std::string& good, const std::string& electro) {
+  static const char* ext[] = {"0", "-1", "2147483647", "2147483648", "-2147483648", "99999999999999999999", "1e308", "-1e308", "1e-308", "4294967296", "65535", "0.5", "1e9", "255", "-128", "3.4e38"};
+  int made = 0, runs = 0; const PadSet ps; std::vector<float> a(777), b(777);
+  for (const char* e : ext) for (int pass = 0; pass < 2; pass++) {
+    const std::string s = pass == 0 ? allNumbers(good, e, 3) : allNumbers(electro, e, 1);
+    for (int fx = 0; fx < 2; fx++) {
+      thunder_render_opts o = defOpts(); o.effects = fx; o.master_chain = fx; o.pdc_mode = fx ? 1 : 0; char err[64];
+      thunder_render* r = mk(s, &o, err, sizeof err); runs++; if (!r) continue; made++;
+      for (int p = 0; p < 64; p += 3) thunder_render_set_pad(r, p, ps.pad(p), p & 1 ? ps.pad(1) : nullptr, kNS, 48000);
+      for (int k = 0; k < 5; k++) if (thunder_render_read(r, a.data(), b.data(), 777) < 0) { std::printf("FAIL extreme: read < 0\n"); g_fail++; break; }
+      thunder_render_free(r);
+    }
+  }
+  std::printf("  extreme fields at once: %d of %d songs made a handle and rendered\n", made, runs);
+}
 static void fuzz(int iters, const std::string& good, const std::string& electro) {
   const PadSet ps; int made = 0, refused = 0; long long frames = 0; int64_t nan = 0;
   std::vector<float> a(5000), b(5000);
@@ -179,6 +208,7 @@ int main(int argc, char** argv) {
   testCreate(good, electro); std::printf("  create: done\n");
   testPads(good); std::printf("  pads: done\n");
   testRead(good); std::printf("  read: done\n");
+  testExtremeAll(good, electro); std::printf("  extreme: done\n");
   fuzz(argc > 1 ? std::atoi(argv[1]) : 800, good, electro);
   if (g_fail) { std::printf("test_render_api_hostile: %d FAILED\n", g_fail); return 1; }
   std::printf("test_render_api_hostile: ok\n"); return 0;

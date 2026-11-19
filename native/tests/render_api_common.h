@@ -1,6 +1,8 @@
 // U34a test helpers: songs, made-up pads, and the DIRECT drive of SongRenderer that the C API is compared against.
 #pragma once
+#include <cctype>
 #include <cmath>
+#include <cstdlib>
 #include <cstdint>
 #include <cstdio>
 #include <cstring>

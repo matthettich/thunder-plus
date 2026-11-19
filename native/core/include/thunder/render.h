@@ -21,7 +21,8 @@
                  is 1200 s). Out of memory: THUNDER_RENDER_E_MEMORY (the allocation failure is caught inside; a build without C++ exception
                  support, such as the wasm one, aborts instead: keep to the limits there).
    MEMORY        the song is parsed once (a copy of its JSON is kept: about 3 to 10 times its size). The mixer's delay lines dominate a handle:
-                 about 30 MB at 48 kHz and 120 MB at 192 kHz, growing with the sample rate (see docs/port/U34A-NOTES.md for the measured table).
+                 measured peak (ELECTRO, 0.9 MB song, no pads): about 53 MB at 48 kHz, 143 MB at 192 kHz, 263 MB at 384 kHz; with effects and the master
+                 chain on about 94 / 218 / 385 MB (docs/port/U34A-NOTES.md). Add 4 bytes a pad sample (copied) up to the pad limit.
                  Pad buffers are copied into the handle: the host's arrays may be freed or reused as soon as set_pad returns. */
 #ifndef THUNDER_RENDER_H
 #define THUNDER_RENDER_H
