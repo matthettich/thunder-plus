@@ -68,6 +68,10 @@ void* operator new(size_t n) {
 void operator delete(void* q) noexcept { if (!q) return; char* p = (char*)q - kHdr; g_live -= (int64_t)*(size_t*)p; std::free(p); }
 void operator delete(void* q, size_t) noexcept { operator delete(q); }
 void* operator new[](size_t n) { return operator new(n); }
+void* operator new(size_t n, const std::nothrow_t&) noexcept { try { return operator new(n); } catch (...) { return nullptr; } }   // (a sanitizer brings its own nothrow versions: they must match the delete above)
+void* operator new[](size_t n, const std::nothrow_t&) noexcept { try { return operator new(n); } catch (...) { return nullptr; } }
+void operator delete(void* q, const std::nothrow_t&) noexcept { operator delete(q); }
+void operator delete[](void* q, const std::nothrow_t&) noexcept { operator delete(q); }
 void operator delete[](void* q) noexcept { operator delete(q); }
 void operator delete[](void* q, size_t) noexcept { operator delete(q); }
 
