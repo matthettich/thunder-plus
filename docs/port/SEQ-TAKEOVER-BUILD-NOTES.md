@@ -86,6 +86,8 @@ to the control thread. `seq_adopt(slot, runner)` = that handover is `next.seq->t
   | skipped snapshots | `handover(*ret[nr-1], ...)` (from the immediate predecessor, which never ran) | FAILS (3 of the 17 cases, 3 snapshots) |
   | allocation guard | `new std::vector<int>` inside takeOver | FAILS ("operator new inside the audio callback") |
   | ASan | takeOver copies 64 doubles too many into `sentVal_` | FAILS (heap-buffer-overflow) |
-  | TSan | (see below) |
+  | TSan | the control thread writes the Seq (`setBpm`) right after `slot.publish` succeeded | FAILS (data race reported in `Seq::takeOver`, exit 66) |
   Two first attempts survived and were replaced by better mutations / gates: the `bus` edit changed a track that has no notes (now it moves the bus to a track that has), and the macro edit hit a macro that a MAC command overrides (now `mac[1].v`).
   The first M6 attempt (a fresh page for every successor, leaking) was killed by the OOM killer: a failure, but not a clean one; the zeroing mutation above replaced it.
+- **Thread test** (`test_seq_takeover --threads`, ThreadSanitizer build, `-fsanitize=thread`, Release): 1000 publishes (every fifth a vars-only message) while the audio thread runs `seq_adopt` + `step` in a loop: 1000 published, 994 adoptions, 66618 audio steps, no race, exit 0.
+- **ASan + UBSan** (`-DTHUNDER_SANITIZE=ON`): `test_seq`, `test_seq_live` PASS; `test_seq_takeover --quick` PASS (24 golden runs, 17 + 17 edit runs, the session cases, 300 random hostile edits, the all-at-once dangling positions); `rt_harness` PASS. UBSan's vptr check is off for the new test (the `-fno-rtti` core makes the shared_ptr control blocks; same as test_modfx / rt_harness / test_hardening).
