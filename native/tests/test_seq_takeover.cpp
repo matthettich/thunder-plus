@@ -76,7 +76,7 @@ static std::string withCommands(const std::string& text) {
 struct Host {
   std::shared_ptr<SeqSession> sess; SnapSlot<SongSnap> slot; SeqRunner run; SeqVars vars; std::shared_ptr<const Song> decoy;
   Host(SeqMode m, const SeqOpts& o) : sess(SeqSession::create(m, o)) {}
-  bool first(std::shared_ptr<const Song> s) { if (!sess->publish(slot, std::move(s), vars)) return false; slot.adopt(); run.start(slot.get()->seq.get()); return true; }
+  bool first(std::shared_ptr<const Song> s) { if (!sess->publish(slot, std::move(s), vars)) return false; seq_adopt(slot, run); run.start(slot.get()->seq.get()); return true; }
   // control thread: `decoys` snapshots that the audio side will never run, then the real one; the audio side adopts them in one call
   bool edit(std::shared_ptr<const Song> s, int decoys = 0) {
     for (int i = 0; i < decoys; i++) if (!sess->publish(slot, decoy ? decoy : s, vars)) return false;
@@ -195,7 +195,7 @@ static void testSession() {
     for (int i = 0; i < 16; i++) ok += s2s->publish(full, s1, vars) ? 1 : 0; CHECK(ok == 19, "the ring takes 16 snapshots");
     const size_t pg = s2s->pageCount();
     CHECK(!s2s->publish(full, s2, vars), "the 17th publish is refused (ring full)"); CHECK(s2s->pageCount() == pg && s2s->idCount() == 0, "a refused publish stages nothing (pages %zu, was %zu)", s2s->pageCount(), pg);
-    CHECK(s2s->publish(full, s1, vars) == false, "still full"); full.adopt(); full.collect(); CHECK(s2s->publish(full, s2, vars) && s2s->pageCount() == 12, "after an adoption the growth is committed (pages %zu)", s2s->pageCount());
+    CHECK(s2s->publish(full, s1, vars) == false, "still full"); full.adopt([](SongSnap* const*, uint32_t) {}); full.collect(); CHECK(s2s->publish(full, s2, vars) && s2s->pageCount() == 12, "after an adoption the growth is committed (pages %zu)", s2s->pageCount());
   }
   { // takeOver refuses a Seq of another session, and a Seq that knows more target ids
     std::shared_ptr<SeqSession> a = SeqSession::create(SeqMode::Song, o), b = SeqSession::create(SeqMode::Song, o); std::shared_ptr<const Song> s = loadSong(hand()); SeqVars vars;
@@ -230,7 +230,7 @@ static void testIdsCap() {   // ruling 2: the id registry is capped; past it a n
   SeqOpts o; o.sim = true; o.once = false; SeqVars vars; std::shared_ptr<SeqSession> sess = SeqSession::create(SeqMode::Song, o); SnapSlot<SongSnap> slot; SeqRunner run;
   auto perfWith = [](int from, int to) { std::string v; for (int i = from; i < to; i++) v += std::string(v.empty() ? "" : ",") + "\"vol:" + std::to_string(i) + "\":" + std::to_string(i % 255);
     return "\"perf\":{\"sc\":[{\"v\":{" + v + "}},{\"v\":{}}],\"xa\":0,\"xb\":1,\"xf\":0,\"mac\":[],\"lk\":{},\"lfo\":{}}"; };
-  sess->publish(slot, loadSong(hand(perfWith(0, 600))), vars); slot.adopt(); run.start(slot.get()->seq.get());
+  sess->publish(slot, loadSong(hand(perfWith(0, 600))), vars); seq_adopt(slot, run); run.start(slot.get()->seq.get());
   std::vector<SeqEvent> evs(12288); SeqStep st; run.seq()->step(evs.data(), 12288, &st);
   for (int round = 1; round < 9; round++) {
     CHECK(sess->publish(slot, loadSong(hand(perfWith(round * 600, round * 600 + 600))), vars), "publish %d", round); seq_adopt(slot, run); slot.collect();
@@ -261,9 +261,9 @@ static void testHostile(const std::string& fileText, int rounds) {
   }
   { // random edits every few steps for a long run: cells and chains and phrases cleared, shortened, brought back
     SeqOpts o; o.sim = true; o.once = false; o.live = true; Host h(SeqMode::Song, o); h.first(s0); SText S = base; uint32_t rs = 12345; auto rnd = [&] { rs = rs * 1664525u + 1013904223u; return rs >> 8; };
-    std::vector<SeqEvent> evs(12288); SeqStep st; double now = 0; (void)now; int steps = 0;
+    std::vector<SeqEvent> evs(12288); SeqStep st; int steps = 0, restarts = 0; double lastT = -1e300; bool finite = true, monotone = true;
     for (int r = 0; r < rounds; r++) {
-      for (int k = 0; k < 7 + (int)(rnd() % 11) && h.seq()->alive(); k++) { h.seq()->step(evs.data(), 12288, &st); steps++; }
+      for (int k = 0; k < 7 + (int)(rnd() % 11) && h.seq()->alive(); k++) { h.seq()->step(evs.data(), 12288, &st); steps++; if (!std::isfinite(st.t)) finite = false; else { if (st.t < lastT - 1e-9) monotone = false; lastT = st.t; } }
       std::string ops = "["; const int kind = (int)(rnd() % 9); const int row = (int)(rnd() % 56), t = (int)(rnd() % 11), c = (int)(rnd() % 270);
       switch (kind) {
         case 0: ops += "[\"song\"," + std::to_string(row) + ",[" + std::string(std::to_string((int)(rnd() % 20) - 5)) + ",0,1,2,3,4,5,6,7,8,9,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1]]"; break;
@@ -277,35 +277,111 @@ static void testHostile(const std::string& fileText, int rounds) {
         default: ops += "[\"tfx\"," + std::to_string(t) + ",[null,null,null,null,null,null,null,null]]"; break; }
       (void)t; ops += "]"; JsonDoc od; if (!od.parse(ops)) { CHECK(false, "the random op is not JSON: %s", ops.c_str()); return; }
       applyOps(S, od.root()); std::shared_ptr<const Song> s = loadSong(S.text()); if (!s) return; if (!h.edit(s, (int)(rnd() % 3))) { CHECK(false, "publish in the hostile run"); return; }
-      if (!h.seq()->alive()) { S = base; s0 = loadSong(base.text()); h.edit(s0); h.seq()->shift(0); break; }
+      if (!h.seq()->alive()) { restarts++; S = base; s0 = loadSong(base.text()); h.edit(s0); h.seq()->shift(0); break; }
     }
-    CHECK(h.seq()->dropped() == 0 || true, "random edits: %d steps, no crash", steps);
+    CHECK(steps >= rounds * 7 / 2 || restarts > 0, "random edits: the run went on (%d steps in %d rounds, %d restarts)", steps, rounds, restarts);
+    CHECK(finite && monotone, "random edits: every step time is finite (%d) and never goes back (%d)", (int)finite, (int)monotone);
+    CHECK(h.seq()->dropped() == 0 && h.seq()->badSets() == 0, "random edits: nothing dropped (%llu), no bad set (%llu)", (unsigned long long)h.seq()->dropped(), (unsigned long long)h.seq()->badSets());
+    CHECK(h.sess->idOverflow() == 0 && h.sess->bytes() < SeqSession::kSeqSessionMaxBytes, "random edits: the session stayed small (%zu bytes)", h.sess->bytes());
   }
+}
+
+// ---- F1, F5 of verify-244: several sessions in one adopt, the plain adopt, the session's bytes -------------------------------------------------------
+// the plain adopt() must not compile for a SnapSlot<SongSnap> (it would leave the runner on a freed Seq); it does for a type that needs no hand-over
+struct PlainSnap { int x; };
+static_assert(!can_adopt_plain<SnapSlot<SongSnap>>::value, "F5a: SnapSlot<SongSnap>::adopt() must not be callable");
+static_assert(can_adopt_plain<SnapSlot<PlainSnap>>::value, "adopt() stays for the snapshots that need no hand-over");
+
+// a song whose phrases 0 .. nph-1 all have NTH on every row: its registry takes nph * 32 slots
+static std::string nthSong(int nph, int songRows = 8) {
+  std::string s = "{\"v\":6,\"bpm\":120,\"lpb\":4,\"ntr\":8,\"song\":["; for (int i = 0; i < songRows; i++) s += std::string(i ? "," : "") + "[0]";
+  s += "],\"chains\":[[[0,0]]],\"plen\":[16],\"phrases\":[";
+  for (int p = 0; p < nph; p++) { s += p ? ",[" : "["; for (int y = 0; y < 32; y++) { s += y ? "," : ""; s += y % 4 == 0 ? "[60,-1,-1,-1,-1,0,10,2,-1,-1,-1,-1]" : "[-1,-1,-1,-1,-1,0,10,3,-1,-1,-1,-1]"; } s += "]"; }
+  return s + "]}";
+}
+
+static void testSessionsInOneAdopt() {
+  SeqOpts o; o.sim = true; o.once = false;
+  auto songOf = [](int k) { return loadSong(hand(k ? "\"x\":" + std::to_string(k) : "", 8 + k)); };   // k-th edit of the PLAY: a few more rows each time
+  auto runA = [&](Host& a, int steps) { playRows(a, steps); };
+  // control: the final song of the new PLAY alone, played from its start
+  std::vector<std::string> ctl; { Host c(SeqMode::Song, o); c.first(songOf(2)); ctl = playRows(c, 70); }
+  CHECK(ctl.size() == 70, "control plays");
+  struct Case { const char* name; int oldAfter; std::vector<std::vector<int>> news; };   // news: per new PLAY, the songs published (k) in order; oldAfter: more snapshots of the OLD session first
+  // [A cur, B1, B2]; [A, A1, B1, B2, B3]; [A, B1, C1, C2] (two PLAYs in one call); [A, B1, B2, C1]; [A, B1, C1, C2, C3]
+  const Case cases[] = {{"A + B1 B2", 0, {{0, 2}}}, {"A + A1 + B1 B2 B3", 1, {{0, 1, 2}}}, {"A + B1 + C1 C2", 0, {{0}, {0, 2}}}, {"A + B1 B2 + C1", 0, {{0, 1}, {2}}}, {"A + B1 + C1 C2 C3", 2, {{0}, {0, 1, 2}}}};
+  for (const Case& c : cases) {
+    Host a(SeqMode::Song, o); a.first(songOf(0)); runA(a, 30);
+    for (int i = 0; i < c.oldAfter; i++) CHECK(a.sess->publish(a.slot, songOf(1), a.vars), "%s: old session publish", c.name);
+    for (const std::vector<int>& play : c.news) { std::shared_ptr<SeqSession> B = SeqSession::create(SeqMode::Song, o); for (int k : play) CHECK(B->publish(a.slot, songOf(k), a.vars), "%s: new session publish", c.name); }
+    CHECK(seq_adopt(a.slot, a.run), "%s: adopted", c.name); a.slot.collect();
+    // the host restarts the runner on a new PLAY; the newest Seq is the last published
+    CHECK(a.seq() == a.slot.get()->seq.get(), "%s: the runner is on the adopted Seq", c.name);
+    CHECK(a.seq()->alive(), "%s: the sequencer runs after the adopt (F1: a dead one meant a silent PLAY)", c.name);
+    const std::vector<std::string> r = playRows(a, 70); size_t bad = 0; for (size_t i = 0; i < ctl.size() && i < r.size(); i++) if (r[i] != ctl[i]) bad++;
+    CHECK(r.size() == 70 && bad == 0, "%s: the new PLAY plays exactly as a PLAY of its last song alone (%zu of %zu rows differ)", c.name, bad, r.size());
+  }
+  { // the same, adopted one snapshot per call (what a quick audio side does), and with no Seq current at all (the first adopt takes three)
+    Host a(SeqMode::Song, o); a.first(songOf(0)); runA(a, 30); std::shared_ptr<SeqSession> B = SeqSession::create(SeqMode::Song, o);
+    for (int k : {0, 1, 2}) { CHECK(B->publish(a.slot, songOf(k), a.vars), "publish"); seq_adopt(a.slot, a.run); a.slot.collect(); }
+    const std::vector<std::string> r = playRows(a, 70); size_t bad = 0; for (size_t i = 0; i < ctl.size() && i < r.size(); i++) if (r[i] != ctl[i]) bad++; CHECK(bad == 0 && r.size() == 70, "one snapshot per call: the same rows (%zu differ)", bad);
+    SnapSlot<SongSnap> slot; SeqRunner run; std::shared_ptr<SeqSession> C = SeqSession::create(SeqMode::Song, o); SeqVars v;
+    for (int k : {0, 1, 2}) CHECK(C->publish(slot, songOf(k), v), "publish C");
+    CHECK(seq_adopt(slot, run), "first adopt takes three"); run.start(slot.get()->seq.get()); CHECK(run.seq()->alive(), "a first adopt of three snapshots runs");
+    std::vector<SeqEvent> evs(4096); SeqStep st; std::vector<std::string> rr; for (int i = 0; i < 70; i++) { Seq* q = run.seq(); const int k = q->step(evs.data(), 4096, &st); rr.push_back(rowText(*q, st, evs.data(), k, true)); }
+    bad = 0; for (size_t i = 0; i < ctl.size(); i++) if (rr[i] != ctl[i]) bad++; CHECK(bad == 0, "no current Seq, three published: the same rows (%zu differ)", bad);
+  }
+}
+
+static void testSessionBytes() {   // F5b: a session counts its registry bytes; past kSeqSessionMaxBytes sessionFull() says so (the host starts a fresh session)
+  SeqOpts o; o.sim = true; o.once = false; SeqVars vars; SnapSlot<SongSnap> slot; std::shared_ptr<SeqSession> sess = SeqSession::create(SeqMode::Song, o);
+  CHECK(sess->bytes() < 100000 && !sess->sessionFull(), "a new session is small (%zu bytes)", sess->bytes());
+  CHECK(sess->publish(slot, loadSong(nthSong(20)), vars), "publish 20"); const size_t b1 = sess->bytes();
+  CHECK(b1 > sess->slotCount() * 3 * sizeof(uint32_t) * (size_t)kSeqTracks / 2 && !sess->sessionFull(), "20 phrases of NTH rows: %zu slots, %zu bytes, not full", sess->slotCount(), b1);
+  CHECK(sess->publish(slot, loadSong(nthSong(200)), vars) && sess->bytes() > b1 && !sess->sessionFull(), "200 phrases: more bytes (%zu), not full", sess->bytes());
+  { SeqRunner rr; seq_adopt(slot, rr); slot.collect(); }
+  CHECK(sess->publish(slot, loadSong(nthSong(700)), vars), "publish 700"); CHECK(sess->sessionFull(), "700 phrases (%zu slots): %zu bytes is past %zu", sess->slotCount(), sess->bytes(), (size_t)SeqSession::kSeqSessionMaxBytes);
+  { // a refused publish adds nothing to the count
+    SnapSlot<SongSnap> full; std::shared_ptr<SeqSession> s2 = SeqSession::create(SeqMode::Song, o); for (int i = 0; i < 16; i++) s2->publish(full, loadSong(nthSong(1)), vars);
+    const size_t b = s2->bytes(); CHECK(!s2->publish(full, loadSong(nthSong(300)), vars) && s2->bytes() == b, "a refused publish leaves the byte count (%zu, was %zu)", s2->bytes(), b); }
+  // a fresh session after it: small again, and its first snapshot starts like a new PLAY
+  { std::shared_ptr<SeqSession> fresh = SeqSession::create(SeqMode::Song, o); CHECK(fresh->publish(slot, loadSong(hand()), vars), "fresh session publish"); CHECK(!fresh->sessionFull() && fresh->bytes() < 200000, "the fresh session is small (%zu)", fresh->bytes()); }
 }
 
 // ---- 4. the control thread publishes while the audio thread steps -----------------------------------------------------------------------------------
 static int runThreads(double seconds, const std::string& fileText) {
-  SText base; baseOf(fileText, base); std::vector<std::shared_ptr<const Song>> songs; for (int v = 0; v < 6; v++) { SText S = base; JsonDoc ops; std::string o = "[[\"bpm\",null," + std::to_string(100 + v) + "],[\"phrases\"," + std::to_string(v) + ",null]]"; ops.parse(o); applyOps(S, ops.root()); songs.push_back(loadSong(S.text())); }
-  for (auto& s : songs) if (!s) return 1;
-  SeqOpts o; o.sim = true; o.once = false; o.live = true; Host h(SeqMode::Song, o); h.first(songs[0]);
-  std::atomic<bool> stop{false}; std::atomic<uint64_t> published{0}, adopted{0}, steps{0}; std::atomic<bool> bad{false}; SeqVars v2; v2.nslot = 20;
+  // several sessions (a new PLAY every ~150 publishes, or when the session is full), songs whose registries GROW inside a session (more phrases with NTH
+  // rows, more song rows: new pages, chunks, ids), ELECTRO variants, vars-only messages; the audio side steps unpaced and restarts its runner on a new PLAY.
+  SText base; baseOf(fileText, base); std::vector<std::shared_ptr<const Song>> electro; for (int v = 0; v < 6; v++) { SText S = base; JsonDoc ops; std::string o = "[[\"bpm\",null," + std::to_string(100 + v) + "],[\"phrases\"," + std::to_string(v) + ",null]]"; ops.parse(o); applyOps(S, ops.root()); electro.push_back(loadSong(S.text())); }
+  std::vector<std::shared_ptr<const Song>> grow; for (int k = 0; k < 24; k++) grow.push_back(loadSong(nthSong(4 + 12 * k, 8 + k)));
+  for (auto& s : electro) if (!s) return 1; for (auto& s : grow) if (!s) return 1;
+  SeqOpts o; o.sim = true; o.once = false; o.live = true; o.hasLoop = true; o.loopY0 = 0; o.loopY1 = 7;   // loops song rows 0 to 7: a PLAY never ends on its own
+  SnapSlot<SongSnap> slot; SeqRunner run; SeqVars vars, v2; v2.nslot = 20; std::shared_ptr<SeqSession> sess = SeqSession::create(SeqMode::Song, o);
+  if (!sess->publish(slot, grow[0], vars)) return 1; seq_adopt(slot, run); run.start(slot.get()->seq.get());
+  std::atomic<bool> stop{false}; std::atomic<uint64_t> published{0}, adopted{0}, steps{0}, newPlays{0}, dead{0}; std::atomic<bool> bad{false};
   std::thread audio([&] {
-    std::vector<SeqEvent> evs(12288); SeqStep st;
+    std::vector<SeqEvent> evs(12288); SeqStep st; const SeqSession* lastSess = nullptr; { const SongSnap* c = slot.get(); lastSess = c ? c->sess.get() : nullptr; }
     while (!stop.load(std::memory_order_relaxed)) {
-      if (seq_adopt(h.slot, h.run)) adopted++;
-      Seq* q = h.seq(); if (!q) break;
-      if (!q->alive()) break;
+      if (seq_adopt(slot, run)) { adopted++; const SongSnap* c = slot.get(); if (c->sess.get() != lastSess) { lastSess = c->sess.get(); run.start(c->seq.get()); newPlays++; } }
+      Seq* q = run.seq(); if (!q) { bad = true; break; }
+      if (!q->alive()) { dead++; std::this_thread::yield(); continue; }   // a PLAY that ended on its own (once = false: never expected)
       const int k = q->step(evs.data(), 12288, &st); steps++; if (k < 0 || !std::isfinite(st.t)) bad = true;
     }
   });
-  const auto t0 = std::chrono::steady_clock::now(); uint64_t n = 0;
+  const auto t0 = std::chrono::steady_clock::now(); uint64_t n = 0; int inSess = 0, sessions = 1, fulls = 0;
   while (std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count() < seconds || n < 1000) {
-    if (h.sess->publish(h.slot, songs[n % songs.size()], n % 5 == 4 ? v2 : h.vars)) published++; h.slot.collect(); n++;
+    if (inSess >= 150 || sess->sessionFull()) { if (sess->sessionFull()) fulls++; sess = SeqSession::create(SeqMode::Song, o); inSess = 0; sessions++; }
+    // the first of a session is the PLAY's song; the next ones are edits: the growing songs in turn (a registry that grows), ELECTRO variants between
+    const size_t pick = inSess % 7 == 6 ? 100 + (size_t)(n % electro.size()) : (size_t)std::min<int>(23, inSess / 6);
+    const std::shared_ptr<const Song>& song = pick >= 100 ? electro[pick - 100] : grow[pick];
+    if (sess->publish(slot, song, n % 5 == 4 ? v2 : vars)) { published++; inSess++; } slot.collect(); n++;
     if (n % 16 == 0) std::this_thread::sleep_for(std::chrono::microseconds(200));
   }
   stop = true; audio.join();
-  std::printf("threads: %llu published, %llu adoptions, %llu audio steps\n", (unsigned long long)published.load(), (unsigned long long)adopted.load(), (unsigned long long)steps.load());
+  std::printf("threads: %llu published, %llu adoptions, %llu audio steps, %d sessions (%llu new PLAYs seen, %d full), last session %zu bytes\n", (unsigned long long)published.load(), (unsigned long long)adopted.load(), (unsigned long long)steps.load(), sessions, (unsigned long long)newPlays.load(), fulls, sess->bytes());
   CHECK(published >= 1000 && adopted > 0 && !bad.load(), "1000 patches published while the audio side steps");
+  CHECK(sessions >= 5 && newPlays.load() >= 2, "several sessions ran (%d, %llu new PLAYs adopted)", sessions, (unsigned long long)newPlays.load());
+  CHECK(dead.load() == 0, "the sequencer never died, including across new PLAYs with several snapshots in one adopt (%llu)", (unsigned long long)dead.load());
   return fails ? 1 : 0;
 }
 
@@ -323,7 +399,7 @@ int main(int argc, char** argv) {
   std::string ids; { std::string cj; readFile(root + "/native/tests/golden/seq-edit-cases.json", cj); JsonDoc d; if (!d.parse(cj)) { std::printf("FAIL: seq-edit-cases.json\n"); return 1; } const Json a = d.root().arr("ids"); int eg = 0, es = 0, en = 0;
     for (size_t i = 0; i < a.size(); i++) { const std::string id(a.at(i).asStr()); en++; eg += editCase(root, electro, id, 0) ? 1 : 0; es += editCase(root, electro, id, 2) ? 1 : 0; }
     std::printf("%d of %d edit goldens equal (one snapshot per edit); %d of %d with three snapshots published and only the last adopted\n", eg, en, es, en); }
-  testSession(); testPerfDeleted(); testMissingRow(); testIdsCap(); testHostile(electro, quick ? 300 : 1500);
+  testSession(); testSessionsInOneAdopt(); testSessionBytes(); testPerfDeleted(); testMissingRow(); testIdsCap(); testHostile(electro, quick ? 300 : 1500);
   std::printf(fails ? "FAILED (%d)\n" : "PASS\n", fails);
   return fails ? 1 : 0;
 }

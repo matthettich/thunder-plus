@@ -15,6 +15,12 @@ std::shared_ptr<SeqSession> SeqSession::create(SeqMode mode, const SeqOpts& opts
 }
 SeqSession::~SeqSession() { for (uint32_t* p : pageTab_) delete[] p; }
 
+size_t SeqSession::bytes() const {
+  size_t b = nPages_ * (size_t)kSeqPageU32 * sizeof(uint32_t) + chunks_.size() * sizeof(SeqCountChunk) + pageTab_.size() * sizeof(uint32_t*);
+  for (const std::string& id : ids_) b += id.size() + sizeof(std::string);
+  return b;
+}
+
 uint32_t* SeqSession::ensurePage(size_t idx) {
   if (idx >= pageTab_.size()) return nullptr;
   if (!pageTab_[idx]) { pageTab_[idx] = new uint32_t[kSeqPageU32](); nPages_++; stagedPages_.push_back(idx); }

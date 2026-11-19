@@ -1,4 +1,16 @@
-IN THE MIDDLE OF: nothing: all gates green locally (Release ctest 171 of 171, ASan+UBSan, TSan); PR open, waiting for CI.
+IN THE MIDDLE OF: item 4 (F2 to F4 mutation runs: record M1 trGen_, M2 slot key, M6 mtch_ results) then item 5; items 1, 2, 3 (byte count only), the goldens and the thread test are done and pushed.
+
+## FIX JOB for #244 (verify-244): checklist (a new worker continues from here)
+- [x] 1 F1: `seq_adopt` hands over from the OLDEST snapshot of the newest's session in the popped chain (`SnapSlot::adopt(handover(chain, n))`); test `testSessionsInOneAdopt` (5 interleavings, one per call, no current Seq); mutation (always chain[0]) fails 8 checks
+- [x] 2 F5a: plain `adopt()` removed for `SnapSlot<SongSnap>` (`SnapNeedsHandover`, `can_adopt_plain`; `static_assert` in the test)
+- [x] 3 F5b: `SeqSession::bytes()`, `sessionFull()`, `kSeqSessionMaxBytes` = 8 MB; test `testSessionBytes`; the pattern-edge restart is NOT done (see "Choices for the lead" below)
+- [ ] 4 F2 to F4: new JS goldens edit-nth-dense, edit-nth-restart, edit-master-tch, edit-ticks, edit-lpb, edit-grv, edit-dlen (done); `testHostile` real assertions (done); thread test with sessions and growing registries (done); mutation results (to record)
+- [ ] 5 the two runner tests in `test_seq_live.cpp` and the comment at `Seq::setTime`
+- [ ] 6 full Release ctest, ASan + UBSan, TSan, CI green on the final head
+
+## Choices for the lead (item 3, F5b)
+The control thread does not know where the playhead is, so "start a fresh session at the next pattern edge" cannot be done from it with what exists. Done: the byte count and `sessionFull()`. Options: (a) the audio side reports a pattern edge (a counter in `SeqRunner`, read by the control thread) and the host then publishes the first snapshot of a new session there (a new PLAY's start-up; needs the new Seq to start at the playhead, i.e. `SeqOpts::at`), (b) the host starts the fresh session at the next STOP / PLAY, and warns past the limit, (c) a fresh session at once with `SeqOpts::row` / `at` set from the last `SeqStep` positions (a click is possible at the seam).
+
 
 # SEQ TAKEOVER BUILD NOTES (Part B, `n1/seq-takeover`)
 

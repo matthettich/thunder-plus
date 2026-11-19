@@ -54,6 +54,13 @@ class SeqSession : public std::enable_shared_from_this<SeqSession> {
   size_t slotCount() const { return nSlots_; }        // NTH / CND / REP slots
   size_t chunkCount() const { return chunks_.size(); }
   size_t idCount() const { return ids_.size(); }
+  // The registries only grow (slots are never reused), so the bytes of a session grow with the edits of one PLAY. Counted: the roll pages, the
+  // counter chunks, the id strings and the page table. Control thread. sessionFull(): the bytes passed kSeqSessionMaxBytes; the host should then
+  // start a fresh session (SeqSession::create + a first publish: a new PLAY's start-up, its counters restart there). Where to do that is the host's
+  // choice (see SEQ-TAKEOVER-BUILD-NOTES "Choices for the lead"): nothing here ends a session by itself.
+  static constexpr size_t kSeqSessionMaxBytes = 8u << 20;
+  size_t bytes() const;
+  bool sessionFull() const { return bytes() > kSeqSessionMaxBytes; }
   uint64_t idOverflow() const { return idOverflow_; } // ids refused because the registry was full, ever (those targets are inert)
 
  private:
@@ -86,10 +93,20 @@ struct SongSnap {
   std::unique_ptr<Seq> seq;       // declared last: destroyed first
 };
 
+template <> struct SnapNeedsHandover<SongSnap> : std::true_type {};   // the plain adopt() would leave the runner on a freed Seq
+
 // AUDIO THREAD: adopts what the control thread published; the Seq that was running hands its state to the newest one (takeOver) before it
 // goes back to the control thread, and the runner is re-pointed. Returns true when the Seq changed. No allocation, no lock.
 inline bool seq_adopt(SnapSlot<SongSnap>& slot, SeqRunner& runner) {
-  const bool changed = slot.adopt([](SongSnap& prev, SongSnap& next) { next.seq->takeOver(*prev.seq); });
+  // chain = [current (if any), then the popped, oldest first]. The newest takes over from the OLDEST snapshot of its own session in the chain: when
+  // the current Seq belongs to another session (a new PLAY, F1 of verify-244) that is the PLAY's starting Seq, which has not run and carries the
+  // start-up; every snapshot between them is retired unrun. takeOver is valid from any earlier Seq of the session (no chaining). Nothing to do
+  // when the newest is itself the first of its session.
+  const bool changed = slot.adopt([](SongSnap* const* ch, uint32_t n) {
+    SongSnap& nw = *ch[n - 1]; uint32_t j = 0;
+    while (j + 1 < n && ch[j]->sess.get() != nw.sess.get()) j++;
+    if (j + 1 < n) nw.seq->takeOver(*ch[j]->seq);
+  });
   if (changed) runner.rebind(slot.get()->seq.get());
   return changed;
 }
