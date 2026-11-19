@@ -1,3 +1,26 @@
+# verify-227 round 2 (head 9549599)
+VERDICT: NOT SOUND as it stands (all defects small and fixable; D1-D4 block). Round 2 delivered most of what it claims (queue/hand-over, budget, bad_alloc, alloc audit, bypass carry, waves goldens unchanged) but introduced a NaN crash, and the head is red on 6 CI jobs.
+DEFECTS
+ D1 [HIGH] NaN via setParam/Param event (raw path graph.h:72) -> audio-thread UB/SIGSEGV, chains AND waves. Complete per-parameter list (3192 type/param/{NaN,+Inf,-Inf} cases, ASan+UBSan, nan_asan): ONLY convolve.type (mod_convolve.cpp:113), gatedly.delay (mod_cv.cpp:310/313), rotary.speed (mod_voice.cpp:215) [SIGSEGV in Release], autotune.key (mod_voice.cpp:21 shift by INT_MIN, UB). +-Inf, +-1e300, 3e38, 1e-300 clean everywhere. D1b: filter and pump(modfx) with all params NaN: native outputs NaN where the JS throws (fail-soft silence). Pattern: own clamp() passes NaN then (int) cast as index.
+ D2 [HIGH] graph.h:89 "\x01btrue"/"\x01bfalse" hex escape out of range: clang error -> CI red on Linux clang, macOS, Android NDK, wasm, Android APK (GCC only warns and builds a different key).
+ D3 [MED] tests/CMakeLists.txt:746 Threads::Threads not found: MSVC configure fails.
+ D4 [MED] data race on PumpMod::spareRaw_ (cmods2.cpp:210 control makeSpare vs :220 audio swap), TSan WITH DSP+pump, 1 of 3 runs; builder TSan missed it. A pump param can stay stale on the swapped-in instance.
+ D5 [MED, test gaps] (a) no test puts NaN on a parameter (mutation 'NaN->0' in graph.h:72 survives all Release tests) (b) a second Bypass toggle inside a carried fade is untested (cengine.cpp:273 mutation survives; my bypass5 kills it). Fade itself is correct (80/80 bit-equal, continuous).
+ D6 [LOW] document load is quadratic in cables: 4000 -> 4.6 s, 8000 -> 17.6 s, 16000 -> 64 s; same in preparePatch (control thread only).
+ D7 [LOW] alloc audit hooks only malloc/calloc/realloc/free (posix_memalign seed in VCA not caught); malloc and operator new seeds are caught.
+ D8 [LOW] memory budget is per patch; up to 6 in flight + current (measured 2 x 890 MiB).
+ D9 [LOW] i32(v)-1 signed overflow at track=2^31 (cengine.cpp:71, cmods.cpp:177); Release output same as JS.
+ D10 [LOW] library effects/Marbles/Tides stay clamped (documented): vs raw JS only 10/33 (high) and 14/33 (low) effects within -60 dB at 1.5 spans out of range. Resample::lent_ plain bool (formal race, TSan quiet). makeSpare clears wantSpare_ after publishing the spare (lost request, LOW). Notes say 41 mutations/28 not rerun: really 47/34. +3 dB bound only enforced with --ref (chains_vs_js).
+TOTALS
+ Item1 chains 1023 JS-vs-native cases: 729/736 finite bit-equal (7 random-seed modules differ, fresh vs shared engine), only NaN defects; waves 896 cases same 4 sites; waves goldens: 666 old rows unchanged, +271 over/* rows, no tolerance/test change (fnvCanon NaN only on over/ rows).
+ Item2 chains_alloc runs in Release: 143 types, 0 allocs; seeds malloc/new caught, posix_memalign not.
+ Item3 1022 Resample/Convolve/Space/Pgrain refused in <0.05 s, RSS 7 MiB; ulimit -v bad_alloc refused, no abort; 572 loads at extreme params never exceed the table.
+ Item4 Release+ASan/UBSan/LSan: clean, accounting exact (accepted = applied + coalesced + droppedParams + dropped-in-drain), Playing 0/Bypass release/Tempo posted last always land, preparePatch false exactly when it cannot deliver, no patch leaked. TSan with DSP+pump built: builder's test and my stress clean; D4 found by pump7.
+ Item5 clean (above). Item6 max 0.37 ms (builder 0.34). Item7 pump service every block 0 dry; every 3rd a third dry; never silent; 16-row bound works with --ref.
+ Item8 41 mutations (34 builder's not rerun + 7 mine): 36 killed, 5 survived (1 equivalent: dropPatch unreachable; 1 near-equivalent Playing; 1 minor fade-end; 2 real gaps D5a/D5b).
+ Item9 sanitizer ctest on this head (bld-asan, RelWithDebInfo, THUNDER_SANITIZE=ON, per-test --timeout 3600): 162 tests, 159 passed, 0 failed, 3 skipped (pumpsynth_refused, chains_mem, chains_alloc). CI: GCC 162/162 pass (1 skip), sanitizers 162/162 pass (3 skip), node test ok; FAIL: clang, macOS, NDK, wasm, Android APK (D2), MSVC (D3); skipped CodeRabbit, APK attach.
+NOT VERIFIED: Windows/macOS/Android runs; waves-only modules (wmods) per-parameter NaN (only 'mod/*/default' rows swept); JS comparison of waves non-finite outputs.
+
 # verify-227 round 2 (started 2026-11-18) head 9549599
 VERDICT: (pending)
 ## Log (written as I go)
