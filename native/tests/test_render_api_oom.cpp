@@ -190,6 +190,47 @@ static void padBudget() {
   CHECK("free gives it all back", g_live <= base);
 }
 
+
+// V1 (verify-238-239): the budget bounds a variation replacement too (the old copy is released first when old + new do not fit together), a pad change drops the pad's variations
+// and their bytes count as freed
+static void varBudget() {
+  const size_t n = (size_t)1 << 26;   // 256 MiB of mono samples
+  float* host = (float*)std::calloc(n, 4); CHECK("host buffer", host != nullptr); if (!host) return;
+  const std::string song = shortSong(); thunder_render* r = mk(song, opts(8000, false, false));
+  const int64_t base = g_live; g_peak = g_live;
+  CHECK("variation A (pad 0), 256 MiB", thunder_render_set_variation(r, 0, 'm', 1, 0, host, (int64_t)n, 48000) == 0);
+  CHECK("variation B (pad 1), 256 MiB (the limit)", thunder_render_set_variation(r, 0, 'm', 2, 1, host, (int64_t)n, 48000) == 0);
+  CHECK("one more frame is over the limit", thunder_render_set_variation(r, 0, 'm', 3, 2, host, 1, 48000) == THUNDER_RENDER_E_LIMIT);
+  const int64_t atLimit = g_live - base;
+  CHECK("a replacement whose final state is over the limit is refused, the variation stays", thunder_render_set_variation(r, 0, 'm', 1, 0, host, (int64_t)n + 1, 48000) == THUNDER_RENDER_E_LIMIT && g_live - base == atLimit);
+  g_peak = g_live;
+  CHECK("replacing a variation at the limit with one of the same size works", thunder_render_set_variation(r, 0, 'm', 1, 0, host, (int64_t)n, 48000) == 0 && g_live - base == atLimit);
+  CHECK("... and the peak never passed the limit (the old copy was released first)", g_peak - base <= (int64_t)THUNDER_RENDER_MAX_PAD_BYTES + (1 << 20));
+  host[5] = NAN; CHECK("a non-finite sample in a replacement is E_ARG and the variation stays", thunder_render_set_variation(r, 0, 'm', 1, 0, host, (int64_t)n, 48000) == THUNDER_RENDER_E_ARG && g_live - base == atLimit); host[5] = 0;
+  CHECK("replacing with a smaller one returns the difference", thunder_render_set_variation(r, 0, 'm', 1, 0, host, (int64_t)n / 2, 48000) == 0 && g_live - base == atLimit - (int64_t)(n * 2));
+  g_peak = g_live;
+  CHECK("then the room is there again (old + new do not fit together: released first)", thunder_render_set_variation(r, 0, 'm', 1, 0, host, (int64_t)n, 48000) == 0 && g_live - base == atLimit);
+  CHECK("... peak within the limit", g_peak - base <= (int64_t)THUNDER_RENDER_MAX_PAD_BYTES + (1 << 20));
+  { g_calls = 0; g_failAt = 1; g_failed = false; g_armed = true; const int rc = thunder_render_set_variation(r, 0, 'm', 1, 0, host, (int64_t)n, 48000); g_armed = false; g_failAt = 0;
+    CHECK("an allocation failure in a limit-size replacement: E_MEMORY, the variation (released first) is gone, as render.h says", rc == THUNDER_RENDER_E_MEMORY && g_failed && nearBytes(g_live - base, atLimit - (int64_t)(n * 4)));
+    CHECK("the handle works on: it can be set again", thunder_render_set_variation(r, 0, 'm', 1, 0, host, (int64_t)n, 48000) == 0 && g_live - base == atLimit); }
+  // old + new fit together: built first, a failure leaves the old one
+  CHECK("remove B", thunder_render_set_variation(r, 0, 'm', 2, 1, nullptr, 0, 0) == 0 && nearBytes(g_live - base, atLimit - (int64_t)(n * 4)));
+  { g_calls = 0; g_failAt = 1; g_failed = false; g_armed = true; const int rc = thunder_render_set_variation(r, 0, 'm', 1, 0, host, (int64_t)n / 2, 48000); g_armed = false; g_failAt = 0;
+    CHECK("a failed replacement that fits alongside the old copy leaves the old copy", rc == THUNDER_RENDER_E_MEMORY && g_failed && nearBytes(g_live - base, atLimit - (int64_t)(n * 4))); }
+  CHECK("B again", thunder_render_set_variation(r, 0, 'm', 2, 1, host, (int64_t)n, 48000) == 0 && g_live - base == atLimit);
+  // set_pad drops the pad's variations: pad 0 (256 MiB) replaces nothing, A (pad 0) is dropped, B (pad 1) stays: 256 + 256 = the limit
+  g_peak = g_live;
+  CHECK("set_pad 0 at 256 MiB: A is dropped, the final state fits", thunder_render_set_pad(r, 0, host, nullptr, (int64_t)n, 48000) == 0 && g_live - base == atLimit);
+  CHECK("... without the handle ever holding more than the limit", g_peak - base <= (int64_t)THUNDER_RENDER_MAX_PAD_BYTES + (1 << 20));
+  CHECK("A is not there: no room for another variation", thunder_render_set_variation(r, 0, 'm', 1, 2, host, 1, 48000) == THUNDER_RENDER_E_LIMIT);
+  CHECK("removing pad 0 frees it", thunder_render_set_pad(r, 0, nullptr, nullptr, 0, 0) == 0 && nearBytes(g_live - base, atLimit - (int64_t)(n * 4)));
+  CHECK("removing pad 1 (it has B) frees B", thunder_render_set_pad(r, 1, nullptr, nullptr, 0, 0) == 0 && nearBytes(g_live - base, 0));
+  CHECK("everything fits again", thunder_render_set_variation(r, 0, 'm', 1, 0, host, (int64_t)n, 48000) == 0 && thunder_render_set_variation(r, 0, 'm', 2, 1, host, (int64_t)n, 48000) == 0 && nearBytes(g_live - base, atLimit));
+  thunder_render_free(r); std::free(host);
+  CHECK("free gives it all back", g_live <= base);
+}
+
 // D4: a hostile song and vars at their limits: the handle's memory, measured, is what the header says
 static std::string bigSong(size_t bytes, const char* key) {   // a valid song plus an ignored key holding numbers, `bytes` long
   std::string s = shortSong(); s.pop_back(); s += std::string(",\"") + key + "\":[0"; while (s.size() + 3 < bytes) s += ",0"; s += "]}"; while (s.size() < bytes) s += ' '; return s;
@@ -224,6 +265,7 @@ int main(int argc, char** argv) {
   std::printf("heap accounting: %s\n", haveHeap() ? "operator new + mallinfo2" : "operator new only (LSan / the sanitizer sees the rest)");
   if (want(argc, argv, "pad")) padFailure();
   if (want(argc, argv, "budget")) padBudget();
+  if (want(argc, argv, "varbudget")) varBudget();
   if (want(argc, argv, "sizes")) hostileSizes();
   // create: every allocation index on the short songs, a stride on ELECTRO (8000 Hz: the same allocations, smaller buffers)
   if (want(argc, argv, "create")) {
