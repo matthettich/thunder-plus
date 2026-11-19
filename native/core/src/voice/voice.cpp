@@ -144,7 +144,7 @@ bool VoicePool::note(const SeqEvent& e, const double* arp, const VoiceBuf& c, co
   // N1 review A1: refuse a note the player cannot play, before it touches anything: a rate that is not finite and above 0 (a part's
   // instrument without `tsp` makes rate = NaN, in the JS too: Math.pow(2, NaN)), a time or gain that is not finite, a pad with no
   // usable sample rate or fewer than two samples. A NaN position used to index the buffer; now no voice starts and refused() counts it.
-  if (!(e.rate > 0 && std::isfinite(e.rate)) || !std::isfinite(e.t) || !std::isfinite(e.gain) || !(c.sr > 0 && std::isfinite(c.sr)) || c.len < 2) { refused_++; return false; }
+  if (!playable(e, c)) { refused_++; return false; }
   const int tr = e.track;
   // (STUB: `if (kv.sf) return sfNote(ev)`: SoundFont pads are not this player's; the host does not call note() for them)
   for (int k = nT_[tr] - 1; k >= 0; k--) if (!live1(V_[(size_t)T_[tr][k]], e.t)) tErase(tr, k);
@@ -169,7 +169,7 @@ bool VoicePool::note(const SeqEvent& e, const double* arp, const VoiceBuf& c, co
   if (e.apn != 0 && dep(apnI) > 0) { v.apn.hz = hz(apnI); v.apn.d = dep(apnI); v.apn.t = t0n; v.hasApn = true; }
   v.data = c.data; v.data2 = tw ? nullptr : c.data2; v.len = c.len; v.sr = c.sr;
   v.base = e.rate; v.rate = e.rate; v.choke = ck; v.col = e.col; v.ended = false; v.hasStop = false; v.stopAt = 0;
-  v.syn = kv.syn; v.rel = v.syn ? ((e.has & SH_RLO) ? e.rlo : kv.rel) : 0; v.track = tr; v.end = INFINITY; v.pos = 0; v.t0 = 0; v.hasRd = false;
+  v.syn = kv.syn; v.rel = v.syn ? ((e.has & SH_RLO) ? e.rlo : kv.rel) : 0; v.track = tr; v.ser = stamp_; v.end = INFINITY; v.pos = 0; v.t0 = 0; v.hasRd = false;
   if (!(e.has & SH_SLIDE)) pitchMods(v, e.t, e.rate, e, arp);
   // (ev.ofsSec / ev.durSec: the sequencer never emits them; the JS reads them for a page that does. STUB: only the ofs form.)
   const double ofs = e.ofs == e.ofs ? e.ofs : 0, off = std::max(0.0, std::min(255.0, ofs)) / 256 * dur;
@@ -184,6 +184,20 @@ bool VoicePool::note(const SeqEvent& e, const double* arp, const VoiceBuf& c, co
   T_[tr][nT_[tr]++] = vi;
   track(v);
   return true;
+}
+
+int VoicePool::liveOnTrack(int tr, double t) {
+  if (tr < 0 || tr >= kVoiceTracks) return 0;
+  for (int k = nT_[tr] - 1; k >= 0; k--) if (!live1(V_[(size_t)T_[tr][k]], t)) tErase(tr, k);
+  return nT_[tr];
+}
+bool VoicePool::oldestOnTrack(int tr, uint64_t& serial) const {
+  if (tr < 0 || tr >= kVoiceTracks || nT_[tr] == 0) return false;
+  serial = V_[(size_t)T_[tr][0]].ser; return true;
+}
+void VoicePool::releaseOldest(int tr, double t) {
+  if (tr < 0 || tr >= kVoiceTracks || nT_[tr] == 0) return;
+  const int vi = T_[tr][0]; tErase(tr, 0); kill(vi, t, 0.006);   // (T.shift())
 }
 
 void VoicePool::off(const SeqEvent& e) {
