@@ -92,6 +92,7 @@ add_test(NAME seq_takeover_threads COMMAND test_seq_takeover --threads 2)
 # parts, sect and phrase modes, loops, JMP / END, the wrap, a hand-over) in both and compares every row, nested members included.
 if(NODE_EXE AND CMAKE_SYSTEM_NAME STREQUAL "Linux")
   add_test(NAME seq_dump_current COMMAND ${NODE_EXE} ${CMAKE_CURRENT_SOURCE_DIR}/../tools/seq-dump.mjs ${CMAKE_CURRENT_BINARY_DIR}/seq-dump)
+  add_test(NAME seq_edit_current COMMAND ${NODE_EXE} ${CMAKE_CURRENT_SOURCE_DIR}/../../tools/seq-golden.mjs --edit)   # the edit goldens (Part B) still equal what the JS gives now
   add_test(NAME seq_extra COMMAND ${NODE_EXE} ${CMAKE_CURRENT_SOURCE_DIR}/../tools/seq-extra.mjs ${CMAKE_CURRENT_BINARY_DIR}/seq-extra $<TARGET_FILE:test_seq>)
 endif()
 
