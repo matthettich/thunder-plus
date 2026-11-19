@@ -58,4 +58,7 @@ to the control thread. `seq_adopt(slot, runner)` = that handover is `next.seq->t
 (none yet)
 
 ## 4. Measurements, mutation checks
-(none yet)
+- verify-243 F3 tests added to test_seq_live (runner): (a) unstepped Seq at now-1 does not skip on the first pump; (b) one row + 1-step phrase looping with hold armed is never held.
+  Mutation (a): `hasBase()` dropped from the skip condition in runner.h -> test_seq_live FAILS ("skipped 1, first t -1"); restored.
+  Mutation (b): `sp < ls_` -> `sp <= ls_` -> FAILS ("never held (1 steps played)"); restored. Both runs Release, then reverted with git checkout.
+- seq.h: one comment line at `Seq::setTime` (after the first step it moves only time_).

@@ -132,6 +132,7 @@ class Seq {
   //   difference); one that is finite and positive is clamped to [kSeqBpmMin, kSeqBpmMax] so a step's times stay finite (counted too).
   // shift: `base += d; time += d; if (btT != null) btT += d` (:421, :778). With no base yet (never stepped) it moves time_ only.
   //   A d that is not finite, or whose result would not be finite, is ignored and counted.
+  // (After the first step setTime moves only time_, when the next step is due, not the steps' times (base_ + rel); as the JS. Never call it on a running Seq: use shift.)
   void setTime(double t);
   void setBpm(double v);
   void shift(double d);
