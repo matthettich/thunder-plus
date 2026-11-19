@@ -9,8 +9,10 @@
 #include <cstdint>
 #include <cstdio>
 #include <chrono>
+#include <cstdlib>
 #include <cstring>
 #include <fstream>
+#include <new>
 #include <map>
 #include <set>
 #include <sstream>
@@ -28,6 +30,19 @@
 #ifndef THUNDER_ROOT
 #error THUNDER_ROOT
 #endif
+
+// Peak live bytes allocated through operator new (counted, not RSS): the parse-memory tests reset it and read the peak. (stb_vorbis allocates with malloc and is not counted; parse() does not use it.)
+static size_t g_liveNew = 0, g_peakNew = 0;
+void* operator new(size_t n) { void* p = std::malloc(n + 16); if (!p) throw std::bad_alloc(); *(size_t*)p = n; g_liveNew += n; if (g_liveNew > g_peakNew) g_peakNew = g_liveNew; return (char*)p + 16; }
+void* operator new[](size_t n) { return operator new(n); }
+void operator delete(void* q) noexcept { if (!q) return; char* p = (char*)q - 16; g_liveNew -= *(size_t*)p; std::free(p); }
+void operator delete[](void* q) noexcept { operator delete(q); }
+void operator delete(void* q, size_t) noexcept { operator delete(q); }
+void operator delete[](void* q, size_t) noexcept { operator delete(q); }
+void* operator new(size_t n, const std::nothrow_t&) noexcept { try { return operator new(n); } catch (...) { return nullptr; } }   // (the sanitizer runtimes do not route these through operator new(size_t): all forms are replaced, or a pointer from one is freed by another)
+void* operator new[](size_t n, const std::nothrow_t&) noexcept { try { return operator new(n); } catch (...) { return nullptr; } }
+void operator delete(void* q, const std::nothrow_t&) noexcept { operator delete(q); }
+void operator delete[](void* q, const std::nothrow_t&) noexcept { operator delete(q); }
 
 using namespace thunder;
 using namespace thunder::sf;
@@ -373,6 +388,41 @@ static std::vector<uint8_t> bigSf2(uint32_t nPz, uint32_t nIz) {
   return Riff::chunk("RIFF", all.b);
 }
 static double nowSec() { return (double)std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now().time_since_epoch()).count() / 1e6; }
+// ---- U32 follow-up (docs/port/U32-NOTES.md "Follow-up: decode work budget"): hostile fonts built from the GM font's own Ogg streams, and the counted peak of parse()
+static std::vector<uint8_t> riffFont(const std::vector<uint8_t>& smpl, const Riff& phdr, const Riff& pbag, const Riff& pgen, const Riff& pmod, const Riff& inst, const Riff& ibag, const Riff& igen, const Riff& imod, const Riff& shdr) {
+  Riff sdta; sdta.tag("sdta"); { auto c = Riff::chunk("smpl", smpl); sdta.b.insert(sdta.b.end(), c.begin(), c.end()); }
+  Riff pdta; pdta.tag("pdta"); for (auto& pr2 : std::vector<std::pair<const char*, const Riff*>>{{"phdr", &phdr}, {"pbag", &pbag}, {"pmod", &pmod}, {"pgen", &pgen}, {"inst", &inst}, {"ibag", &ibag}, {"imod", &imod}, {"igen", &igen}, {"shdr", &shdr}}) { auto c = Riff::chunk(pr2.first, pr2.second->b); pdta.b.insert(pdta.b.end(), c.begin(), c.end()); }
+  Riff all; all.tag("sfbk"); { auto a = Riff::chunk("LIST", sdta.b); all.b.insert(all.b.end(), a.begin(), a.end()); auto c = Riff::chunk("LIST", pdta.b); all.b.insert(all.b.end(), c.begin(), c.end()); }
+  return Riff::chunk("RIFF", all.b);
+}
+// An SF3 font with ONE preset whose one instrument has nHdr zones, zone i playing sample header i; header i names byte range ranges[i % ranges.size()] of `smpl` (so headers alias streams as often as the caller wants).
+static std::vector<uint8_t> aliasSf3(const std::vector<uint8_t>& smpl, const std::vector<std::pair<uint32_t, uint32_t>>& ranges, uint32_t nHdr) {
+  Riff shdr; for (uint32_t i = 0; i < nHdr; i++) { const auto& r = ranges[i % ranges.size()]; shdr.name("S"); shdr.u32(r.first); shdr.u32(r.second); shdr.u32(0); shdr.u32(100); shdr.u32(44100); shdr.b.push_back(60); shdr.b.push_back(0); shdr.u16(0); shdr.u16(0x11); }
+  shdr.name("EOS"); for (int i = 0; i < 5; i++) shdr.u32(0); shdr.u16(0); shdr.u16(0); shdr.u16(0);
+  Riff inst; inst.name("I"); inst.u16(0); inst.name("EOI"); inst.u16((uint16_t)nHdr);
+  Riff ibag, igen, imod; for (uint32_t i = 0; i < nHdr; i++) { ibag.u16((uint16_t)(2 * i)); ibag.u16(0); igen.u16(43); igen.u16(0 | (127 << 8)); igen.u16(53); igen.u16((uint16_t)i); } ibag.u16((uint16_t)(2 * nHdr)); ibag.u16(0); igen.u16(0); igen.u16(0); for (int i = 0; i < 5; i++) imod.u16(0);
+  Riff phdr, pbag, pgen, pmod; phdr.name("P"); phdr.u16(0); phdr.u16(0); phdr.u16(0); phdr.u32(0); phdr.u32(0); phdr.u32(0); phdr.name("EOP"); phdr.u16(0); phdr.u16(0); phdr.u16(1); phdr.u32(0); phdr.u32(0); phdr.u32(0);
+  pbag.u16(0); pbag.u16(0); pbag.u16(1); pbag.u16(0); pgen.u16(41); pgen.u16(0); pgen.u16(0); pgen.u16(0); for (int i = 0; i < 5; i++) pmod.u16(0);
+  return riffFont(smpl, phdr, pbag, pgen, pmod, inst, ibag, igen, imod, shdr);
+}
+// A SF2 font of nPz preset zones x nIz instrument zones that all overlap, each zone with about nGen generators (parse memory: every pair makes a zone holding its own copy of the merged generators)
+static std::vector<uint8_t> genSf2(uint32_t nPz, uint32_t nIz, int nGen) {
+  std::vector<int> ops; for (int o = 5; o <= 58; o++) { const int bad[] = {12, 41, 43, 44, 45, 46, 47, 50, 53, 54, 57, 58}; if (std::find(std::begin(bad), std::end(bad), o) == std::end(bad)) ops.push_back(o); }   // 42 plain ops
+  std::vector<int> iops = ops; for (int o : {0, 1, 2, 3, 4, 12, 45, 50}) iops.push_back(o);
+  Riff smpl; for (int i = 0; i < 100; i++) smpl.u16(0);
+  Riff shdr; shdr.name("S"); shdr.u32(0); shdr.u32(100); shdr.u32(10); shdr.u32(20); shdr.u32(44100); shdr.b.push_back(60); shdr.b.push_back(0); shdr.u16(0); shdr.u16(1);
+  shdr.name("EOS"); for (int i = 0; i < 5; i++) shdr.u32(0); shdr.u16(0); shdr.u16(0); shdr.u16(0);
+  Riff inst; inst.name("I"); inst.u16(0); inst.name("EOI"); inst.u16((uint16_t)nIz);
+  Riff ibag, igen, imod; const int ni = std::min<int>(nGen, (int)iops.size()), np = std::min<int>(nGen, (int)ops.size()); uint32_t gi = 0;
+  for (uint32_t i = 0; i < nIz; i++) { ibag.u16((uint16_t)gi); ibag.u16(0); for (int k = 0; k < ni; k++) { igen.u16((uint16_t)iops[k]); igen.u16((uint16_t)(k + 1)); } igen.u16(53); igen.u16(0); gi += (uint32_t)ni + 1; } ibag.u16((uint16_t)gi); ibag.u16(0); igen.u16(0); igen.u16(0); for (int i = 0; i < 5; i++) imod.u16(0);
+  Riff phdr, pbag, pgen, pmod; phdr.name("P"); phdr.u16(0); phdr.u16(0); phdr.u16(0); phdr.u32(0); phdr.u32(0); phdr.u32(0); phdr.name("EOP"); phdr.u16(0); phdr.u16(0); phdr.u16((uint16_t)nPz); phdr.u32(0); phdr.u32(0); phdr.u32(0);
+  gi = 0; for (uint32_t i = 0; i < nPz; i++) { pbag.u16((uint16_t)gi); pbag.u16(0); for (int k = 0; k < np; k++) { pgen.u16((uint16_t)ops[k]); pgen.u16((uint16_t)(k + 1)); } pgen.u16(41); pgen.u16(0); gi += (uint32_t)np + 1; } pbag.u16((uint16_t)gi); pbag.u16(0); pgen.u16(0); pgen.u16(0); for (int i = 0; i < 5; i++) pmod.u16(0);
+  return riffFont(std::vector<uint8_t>(smpl.b), phdr, pbag, pgen, pmod, inst, ibag, igen, imod, shdr);
+}
+// the granule position of an Ogg stream's LAST page set to 0 (stb_vorbis and libvorbis do not check the page CRC, and this tool does not fix it: a decoder that did would refuse the stream even earlier)
+static bool zeroLastGranule(std::vector<uint8_t>& t) { size_t last = (size_t)-1; for (size_t pos = 0; pos + 27 <= t.size() && std::memcmp(&t[pos], "OggS", 4) == 0;) { last = pos; size_t segs = t[pos + 26], body = 0; if (pos + 27 + segs > t.size()) break; for (size_t q = 0; q < segs; q++) body += t[pos + 27 + q]; pos += 27 + segs + body; }
+  if (last == (size_t)-1) return false; std::memset(&t[last + 6], 0, 8); return true; }
+
 static int doUnit() {
   // A. presets of equal bank / program keep the file's order (the JS's sort is stable)
   { std::vector<MiniPreset> v(40, MiniPreset{0, 0}); auto b = miniSf2(v, 0, 0, 0, 0); Font f; CHECK(parse(b.data(), b.size(), f) == kParseOk, "mini font parses");
@@ -479,6 +529,55 @@ static int doUnit() {
     CHECK(one.bytes == all.bytes && one.bytes > 0 && zero.bytes == 0, "key list: bytes %llu / %llu / %llu", (unsigned long long)one.bytes, (unsigned long long)all.bytes, (unsigned long long)zero.bytes);
     PadParams P; std::vector<float> o1(sf_render_bound(f, P, 44100, 1.0)), o2(o1.size()); const size_t n1 = sf_render(f, all, P, 44100, 1.0, o1.data(), o1.size()), n2 = sf_render(f, one, P, 44100, 1.0, o2.data(), o2.size()), n3 = sf_render(f, zero, P, 44100, 1.0, o2.data(), o2.size());
     CHECK(n1 == n2 && std::memcmp(o1.data(), o2.data(), n1 * 4) == 0 && n3 == 0, "a key-list preparation changed the render (or the empty list still rendered)"); std::printf("unit: a key list decodes only what its keys play (empty list: nothing, render refused), same bits\n"); }
+
+  { // H9: a font of headers that alias ONE stream whose last granule is 0 (decoded in full, then thrown away, once per header) is prepared at once: refused up front from the page header (no work charged), whatever the number of headers.
+    // Before the fix: 30000 headers x a 2 KB stream = 17.7 s, 2000 headers x a 1.29 MB stream = 13.5 s (verify-226-round2.md D1).
+    std::string gb; if (readFile(std::string(THUNDER_ROOT) + "/sounds/FluidR3Mono_GM.sf3", &gb)) { Font g; parse((const uint8_t*)gb.data(), gb.size(), g);
+      const struct { uint32_t sample, n; } HC[] = {{183, 30000}, {116, 2000}};
+      for (auto& hc : HC) { const SampleHdr& h = g.samples[hc.sample]; std::vector<uint8_t> t(g.smpl + h.start, g.smpl + h.end); CHECK(zeroLastGranule(t), "no Ogg page"); auto fb = aliasSf3(t, {{0, (uint32_t)t.size()}}, hc.n);
+        Font F; CHECK(parse(fb.data(), fb.size(), F) == kParseOk && F.samples.size() == hc.n && F.zones.size() == hc.n, "alias font parses (%zu zones)", F.zones.size());
+        PresetPcm pc; const double t0 = nowSec(); const PrepareStatus st = prepare_preset(F, sf_preset(F, 0, 0), DecodeOpts(), pc); const double dt = nowSec() - t0; size_t silent = 0; for (auto& q : pc.byIndex) silent += q.present && !q.ok && q.d.size() == 1;
+        CHECK(st == kPrepOk && dt < 5.0 && silent == hc.n && pc.work == 0, "%u headers on a %zu-byte stream with granule 0: status %d, %zu silent, work %llu, %.3f s", hc.n, t.size(), (int)st, silent, (unsigned long long)pc.work, dt);
+        std::printf("unit: %u sample headers (%zu-byte font) aliasing one %zu-byte stream with last granule 0: prepared in %.3f s, work charged %llu (before the fix this took seconds, not milliseconds)\n", hc.n, fb.size(), t.size(), dt, (unsigned long long)pc.work); }
+      // the same with distinct streams: 8 MB of the font's own streams, each with granule 0: no decoding at all
+      { std::vector<uint8_t> smpl; std::vector<std::pair<uint32_t, uint32_t>> R; for (uint32_t i = 0; i < g.samples.size() && smpl.size() < ((size_t)8 << 20); i++) { const SampleHdr& h = g.samples[i]; if (!(h.type & 0x10) || h.end <= h.start || h.end - h.start < 20000 || h.end > g.smplN) continue;
+          std::vector<uint8_t> t(g.smpl + h.start, g.smpl + h.end); zeroLastGranule(t); R.push_back({(uint32_t)smpl.size(), (uint32_t)(smpl.size() + t.size())}); smpl.insert(smpl.end(), t.begin(), t.end()); }
+        auto fb = aliasSf3(smpl, R, (uint32_t)R.size()); Font F; parse(fb.data(), fb.size(), F); PresetPcm pc; const double t0 = nowSec(); const PrepareStatus st = prepare_preset(F, sf_preset(F, 0, 0), DecodeOpts(), pc); const double dt = nowSec() - t0;
+        CHECK(st == kPrepOk && pc.work == 0 && dt < 5.0, "%zu distinct granule-0 streams: status %d work %llu %.3f s", R.size(), (int)st, (unsigned long long)pc.work, dt);
+        std::printf("unit: %zu distinct granule-0 streams (%.1f MB): work charged %llu, %.3f s\n", R.size(), (double)smpl.size() / 1048576.0, (unsigned long long)pc.work, dt); } } }
+  { // H10: a stream is decoded ONCE however many headers name it (cache by byte range: offset AND length), the copies equal a stand-alone decode, and the work charged is that of one decode
+    std::string gb; if (readFile(std::string(THUNDER_ROOT) + "/sounds/FluidR3Mono_GM.sf3", &gb)) { Font g; parse((const uint8_t*)gb.data(), gb.size(), g);
+      const SampleHdr& h = g.samples[183]; std::vector<uint8_t> t(g.smpl + h.start, g.smpl + h.end); auto fb = aliasSf3(t, {{0, (uint32_t)t.size()}}, 12000); Font F; parse(fb.data(), fb.size(), F);
+      Pcm one; decode_sample(F, 0, DecodeOpts(), one); PresetPcm pc; const double t0 = nowSec(); const PrepareStatus st = prepare_preset(F, sf_preset(F, 0, 0), DecodeOpts(), pc); const double dt = nowSec() - t0; size_t same = 0; for (auto& q : pc.byIndex) same += q.ok && q.d == one.d && q.sr == one.sr;
+      CHECK(st == kPrepOk && same == 12000 && pc.work == (uint64_t)t.size() + one.d.size() + kWorkPerOpen, "12000 aliases of one good stream: status %d, %zu equal to a stand-alone decode, work %llu (one decode: %zu)", (int)st, same, (unsigned long long)pc.work, t.size() + one.d.size() + (size_t)kWorkPerOpen);
+      std::printf("unit: 12000 headers aliasing one good stream: decoded once (work %llu = %zu bytes + %zu frames + %zu per open), all 12000 equal a stand-alone decode, %.3f s\n", (unsigned long long)pc.work, t.size(), one.d.size(), (size_t)kWorkPerOpen, dt);
+      // ranges that share an offset but differ in length (a truncated stream) or follow each other are different streams: each equals its own stand-alone decode
+      const SampleHdr& h2 = g.samples[859]; std::vector<uint8_t> t2(g.smpl + h2.start, g.smpl + h2.end); std::vector<uint8_t> sm = t; sm.insert(sm.end(), t2.begin(), t2.end()); const uint32_t n1 = (uint32_t)t.size(), n2 = (uint32_t)t2.size();
+      const std::vector<std::pair<uint32_t, uint32_t>> R = {{0, n1}, {n1, n1 + n2}, {0, n1 / 2}, {0, n1 - 37}, {n1, n1 + n2 / 2}, {0, n1 + n2}};
+      for (double ctx : {0.0, 48000.0}) { auto fb2 = aliasSf3(sm, R, 60); Font F2; parse(fb2.data(), fb2.size(), F2); DecodeOpts o; o.ctxRate = ctx; PresetPcm p2; CHECK(prepare_preset(F2, sf_preset(F2, 0, 0), o, p2) == kPrepOk, "prepare"); size_t eq = 0, okc = 0;
+        for (uint32_t i = 0; i < 60; i++) { Pcm a; decode_sample(F2, i, o, a); const Pcm& b = p2.byIndex[i]; okc += a.ok; eq += a.ok == b.ok && a.d == b.d && a.sr == b.sr && a.ls == b.ls && a.le == b.le && a.k == b.k && b.present; }
+        CHECK(eq == 60, "ranges sharing an offset: %zu of 60 equal their stand-alone decode (ctx %g)", eq, ctx); std::printf("unit: 6 ranges (same offset, different lengths; adjacent) x 10 headers, ctx %g: %zu of 60 equal their own stand-alone decode (%zu decode ok)\n", ctx, eq, okc); } } }
+  { // H11: the WORK budget: every decode is charged (kept or not); over the preset's or the font's budget the preset is refused with nothing kept; a refusal reports what it spent; a kept preset adds its work to the host's counter
+    std::string gb; if (readFile(std::string(THUNDER_ROOT) + "/sounds/FluidR3Mono_GM.sf3", &gb)) { Font g; parse((const uint8_t*)gb.data(), gb.size(), g);
+      std::vector<uint8_t> smpl; std::vector<std::pair<uint32_t, uint32_t>> R; uint64_t want = 0; for (uint32_t i = 0; i < 40; i++) { const SampleHdr& h = g.samples[i]; if (!(h.type & 0x10) || h.end <= h.start) continue; Pcm p; decode_sample(g, i, DecodeOpts(), p); if (!p.ok) continue;
+        R.push_back({(uint32_t)smpl.size(), (uint32_t)(smpl.size() + (h.end - h.start))}); smpl.insert(smpl.end(), g.smpl + h.start, g.smpl + h.end); want += (h.end - h.start) + p.d.size() + kWorkPerOpen; }
+      auto fb = aliasSf3(smpl, R, (uint32_t)R.size()); Font F; parse(fb.data(), fb.size(), F); const Preset* pr = sf_preset(F, 0, 0);
+      PresetPcm a; uint64_t used = 0; DecodeOpts o; o.fontWorkUsed = &used; const PrepareStatus s0 = prepare_preset(F, pr, o, a); CHECK(s0 == kPrepOk && a.work == want && used == want, "work of %zu distinct streams: status %d, %llu (expected bytes + frames = %llu), counter %llu", R.size(), (int)s0, (unsigned long long)a.work, (unsigned long long)want, (unsigned long long)used);
+      PresetPcm b; DecodeOpts o1; o1.presetWork = want - 1; const PrepareStatus s1 = prepare_preset(F, pr, o1, b); size_t kept = 0; for (auto& q : b.byIndex) kept += q.present; CHECK(s1 == kPrepOverWorkBudget && kept == 0 && b.bytes == 0 && b.work <= want - 1 && b.work > want / 2, "preset work budget: status %d, kept %zu, spent %llu", (int)s1, kept, (unsigned long long)b.work);
+      PresetPcm c; DecodeOpts o2; o2.presetWork = want; const PrepareStatus s2 = prepare_preset(F, pr, o2, c); CHECK(s2 == kPrepOk && c.work == want, "a budget equal to the work suffices: %d", (int)s2);
+      PresetPcm d; uint64_t u2 = 1000; DecodeOpts o3; o3.fontWork = want + 999; o3.fontWorkUsed = &u2; const PrepareStatus s3 = prepare_preset(F, pr, o3, d); CHECK(s3 == kPrepOverWorkBudget && u2 == 1000, "font work budget: status %d counter %llu", (int)s3, (unsigned long long)u2);
+      o3.fontWork = want + 1000; PresetPcm d2; const PrepareStatus s4 = prepare_preset(F, pr, o3, d2); CHECK(s4 == kPrepOk && u2 == 1000 + want, "font work budget exactly met: %d counter %llu", (int)s4, (unsigned long long)u2);
+      // a decode the BYTE budget throws away is charged what it spent: sample 116 (1.29 MB stream, 321867 frames) over a 100 kB budget
+      { const SampleHdr& h = g.samples[116]; std::vector<uint8_t> t(g.smpl + h.start, g.smpl + h.end); auto f3 = aliasSf3(t, {{0, (uint32_t)t.size()}}, 1); Font F3; parse(f3.data(), f3.size(), F3); PresetPcm e; DecodeOpts o4; o4.presetBytes = 100000;
+        const PrepareStatus s5 = prepare_preset(F3, sf_preset(F3, 0, 0), o4, e); CHECK(s5 == kPrepOverPresetBudget && e.work >= t.size() + kWorkPerOpen + 20000, "a discarded decode is charged: status %d work %llu (stream %zu bytes)", (int)s5, (unsigned long long)e.work, t.size()); }
+      std::printf("unit: work budget: %zu streams cost %llu units (per open + bytes + frames); one unit less refuses (spent %llu, nothing kept); font counter refuses and counts exactly; a decode thrown away for the byte budget is charged\n", R.size(), (unsigned long long)want, (unsigned long long)b.work); } }
+  { // H12: parse memory is bounded by the font's size (counted allocation, not RSS): 400 x 500 zone pairs with ~50 generators each (a 191 KB file; 200000 pairs, 205 MB RSS before) is refused early; 20000 pairs of the same shape parse
+    auto big = genSf2(400, 500, 50); const size_t bound = kParseTableFloor + kParseTableFactor * big.size(); Font f; const size_t base = g_liveNew; g_peakNew = g_liveNew; const double t0 = nowSec(); const ParseStatus st = parse(big.data(), big.size(), f); const double dt = nowSec() - t0; const size_t peak = g_peakNew - base;
+    CHECK(st == kParseTooBig && peak <= 3 * bound, "hostile 400 x 500 x 50-generator font (%zu bytes): status %d, peak allocation %zu bytes (limit 3 x %zu)", big.size(), (int)st, peak, bound);
+    std::printf("unit: %zu-byte font, 200000 zone pairs of 50 generators: status %d (too big), counted peak %.1f MB (table limit %.1f MB = %zu MB + %zu x the file), %.0f ms\n", big.size(), (int)st, (double)peak / 1048576.0, (double)bound / 1048576.0, kParseTableFloor >> 20, kParseTableFactor, dt * 1000);
+    auto okf = genSf2(400, 50, 50); Font f2; g_peakNew = g_liveNew; const size_t base2 = g_liveNew; const ParseStatus st2 = parse(okf.data(), okf.size(), f2); const size_t peak2 = g_peakNew - base2;
+    CHECK(st2 == kParseOk && f2.zones.size() == 20000 && peak2 <= 3 * (kParseTableFloor + kParseTableFactor * okf.size()), "20000-pair font: status %d zones %zu peak %zu", (int)st2, f2.zones.size(), peak2);
+    std::printf("unit: the same shape with 20000 pairs (%zu bytes) parses: %zu zones, %zu generator records, counted peak %.1f MB\n", okf.size(), f2.zones.size(), f2.gens.size(), (double)peak2 / 1048576.0); }
   std::printf(fails ? "FAIL: %d\n" : "OK\n", fails);
   return fails ? 1 : 0;
 }
@@ -502,12 +601,23 @@ static int doRam() {
   return 0;
 }
 
+// every preset of the GM font prepared (whole keyboard) at its own rates and at 48 kHz: one line each (bytes, work, FNV of every kept sample), for before / after comparisons: `test_sf gmall`
+static int doGmAll() {
+  std::string gb; if (!readFile(std::string(THUNDER_ROOT) + "/sounds/FluidR3Mono_GM.sf3", &gb)) { std::printf("FAIL: no GM font\n"); return 1; }
+  Font f; if (parse((const uint8_t*)gb.data(), gb.size(), f) != kParseOk) return 1; uint64_t maxWork = 0, all = 0; double tt = 0;
+  for (double ctx : {0.0, 48000.0}) for (const Preset& p : f.presets) { DecodeOpts o; o.ctxRate = ctx; PresetPcm pc; const double t0 = nowSec(); const PrepareStatus st = prepare_preset(f, &p, o, pc); tt += nowSec() - t0; uint64_t h = 0xcbf29ce484222325ull; size_t ns = 0;
+    for (size_t i = 0; i < pc.byIndex.size(); i++) { const Pcm& q = pc.byIndex[i]; if (!q.present) continue; ns++; h ^= fnv(q.d.data(), q.d.size() * 4) + (uint64_t)i + (uint64_t)q.ok; h *= 0x100000001b3ull; h ^= fnv(&q.sr, 8) ^ fnv(&q.ls, 8) ^ fnv(&q.le, 8) ^ fnv(&q.k, 8); h *= 0x100000001b3ull; }
+    std::printf("ctx %g bank %d prog %d status %d samples %zu bytes %llu hash %016llx WORK %llu\n", ctx, p.bank, p.prog, (int)st, ns, (unsigned long long)pc.bytes, (unsigned long long)h, (unsigned long long)pc.work); maxWork = std::max<uint64_t>(maxWork, pc.work); all += pc.work; }
+  std::printf("presets %zu x 2: max work of one preparation %llu, total %llu, total time %.2f s\n", f.presets.size(), (unsigned long long)maxWork, (unsigned long long)all, tt); return 0;
+}
+
 int main(int argc, char** argv) {
-  if (argc < 2 || (argc < 3 && std::strcmp(argv[1], "unit") && std::strcmp(argv[1], "ram"))) { std::printf("usage: test_sf export|compare|chrome DIR | unit\n"); return 2; }
+  if (argc < 2 || (argc < 3 && std::strcmp(argv[1], "unit") && std::strcmp(argv[1], "ram") && std::strcmp(argv[1], "gmall"))) { std::printf("usage: test_sf export|compare|chrome DIR | unit\n"); return 2; }
   if (!std::strcmp(argv[1], "export")) return doExport(argv[2]);
   if (!std::strcmp(argv[1], "compare")) return doCompare(argv[2]);
   if (!std::strcmp(argv[1], "unit")) return doUnit();
   if (!std::strcmp(argv[1], "ram")) return doRam();
+  if (!std::strcmp(argv[1], "gmall")) return doGmAll();
   if (!std::strcmp(argv[1], "chrome")) return doChrome(argv[2], argc > 3 ? std::atof(argv[3]) : 0);
   return 2;
 }

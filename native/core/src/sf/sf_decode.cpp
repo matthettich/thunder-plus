@@ -4,6 +4,8 @@
 #include <climits>
 #include <cmath>
 #include <cstring>
+#include <map>
+#include <utility>
 
 #include "rt/jsmath.h"
 #include "sf/sf.h"
@@ -43,9 +45,16 @@ size_t pageTailLoss(const OggScan& sc, size_t lastFrame) {
 }
 
 // kDecodeOk, or why not. The frames of a stream are bounded by what its BYTES can hold (a Vorbis audio packet is at least a byte and decodes to at most 4096 frames), by kMaxSampleFrames and by `maxFrames` (the budget).
-enum DecodeRes { kDecodeOk, kDecodeBad, kDecodeTooBig };
-DecodeRes decodeOgg(const uint8_t* p, size_t n, std::vector<float>& d, double& sr, bool pageTail, size_t maxFrames) {
+// `work` (null: unlimited) is what prepare_preset has left to spend: the stream's bytes (and kWorkPerOpen) are charged before it is opened and every decoded frame as it is decoded; over it: kDecodeWork.
+enum DecodeRes { kDecodeOk, kDecodeBad, kDecodeTooBig, kDecodeWork };
+bool charge(uint64_t* work, uint64_t units) { if (!work) return true; if (units > *work) return false; *work -= units; return true; }
+DecodeRes decodeOgg(const uint8_t* p, size_t n, std::vector<float>& d, double& sr, bool pageTail, size_t maxFrames, uint64_t* work) {
   if (n == 0 || n > (size_t)INT_MAX) return kDecodeBad;
+  // The LAST PAGE's granule position is the stream's length and is read from the page headers, BEFORE any decoding: 0 means the stream is empty (below, a trim to 0 frames is kDecodeBad after a full decode: a hostile stream
+  // made the control thread decode megabytes for nothing). A granule above what the stream decodes to is harmless (it only shortens), so only the zero one is refused up front.
+  const OggScan sc = oggScan(p, n);
+  if (sc.lastGranule == 0) return kDecodeBad;
+  if (!charge(work, (uint64_t)n + kWorkPerOpen)) return kDecodeWork;
   int err = 0; stb_vorbis* v = stb_vorbis_open_memory(p, (int)n, &err, nullptr);
   if (!v) return kDecodeBad;
   const stb_vorbis_info info = stb_vorbis_get_info(v);
@@ -57,12 +66,12 @@ DecodeRes decodeOgg(const uint8_t* p, size_t n, std::vector<float>& d, double& s
     int ch = 0; float** o = nullptr; const int got = stb_vorbis_get_frame_float(v, &ch, &o);
     if (got <= 0 || ch < 1) break;
     if (d.size() + (size_t)got > cap) { stb_vorbis_close(v); return budgeted ? kDecodeTooBig : kDecodeBad; }
+    if (!charge(work, (uint64_t)got)) { stb_vorbis_close(v); return kDecodeWork; }
     d.insert(d.end(), o[0], o[0] + got); lastFrame = (size_t)got;
   }
   stb_vorbis_close(v);
   // The stream's length is its LAST PAGE's granule position (the Vorbis I rule; libvorbis does exactly this): stb_vorbis only trims the last block, so a granule that cuts more than that is applied here, shortening only
   // (a granule above the decoded length, or none, leaves the length as decoded).
-  const OggScan sc = oggScan(p, n);
   if (sc.lastGranule >= 0 && (uint64_t)sc.lastGranule < (uint64_t)d.size()) { d.resize((size_t)sc.lastGranule); lastFrame = std::min(lastFrame, d.size()); }
   if (pageTail && !d.empty()) { const size_t cut = pageTailLoss(sc, lastFrame); d.resize(d.size() - std::min(cut, d.size())); }
   // A corrupt stream can decode to infinities or NaN (a hostile codebook): the 1-sample silence instead, so nothing non-finite ever reaches a voice's filter state (U32-NOTES.md "Choices": the JS has no such check).
@@ -74,11 +83,12 @@ DecodeRes decodeOgg(const uint8_t* p, size_t n, std::vector<float>& d, double& s
 // a 32-tap Blackman (alpha 0.16) windowed sinc, 32 kernel sub-sample offsets (+1) with linear interpolation between two neighbours, cutoff 0.9 of the lower Nyquist, no normalisation, output length floor(n * ratio),
 // input before the first and after the last frame is zero. Linear-phase, so no delay. Control thread only (it allocates), about 64 multiply-adds per output frame.
 constexpr double kPi = 3.14159265358979323846;   // not M_PI: MSVC does not define it without _USE_MATH_DEFINES
-bool resampleTo(std::vector<float>& d, double from, double to, size_t maxFrames) {
+bool resampleTo(std::vector<float>& d, double from, double to, size_t maxFrames, uint64_t* work = nullptr, bool* overWork = nullptr) {
   if (d.empty() || !(from > 0) || !(to > 0) || from == to) return true;
   const double r = to / from, sc = (r < 1 ? r : 1.0) * 0.9; const size_t n = d.size();
   const double mf = std::floor((double)n * r); if (mf < 1 || mf > (double)kMaxSampleFrames || (maxFrames > 0 && mf > (double)maxFrames)) return false;
   const size_t m = (size_t)mf;
+  if (!charge(work, (uint64_t)m)) { if (overWork) *overWork = true; return false; }
   constexpr int KS = 32, KO = 32; std::vector<double> K((size_t)(KO + 1) * KS);
   for (int off = 0; off <= KO; off++) { const double so = (double)off / KO;
     for (int i = 0; i < KS; i++) { const double x = (i - so) / KS, w = 0.42 - 0.5 * std::cos(2 * kPi * x) + 0.08 * std::cos(4 * kPi * x), ps = kPi * (i - KS / 2 - so);
@@ -97,7 +107,12 @@ bool resampleTo(std::vector<float>& d, double from, double to, size_t maxFrames)
 
 bool sf_resample(std::vector<float>& d, double from, double to) { return resampleTo(d, from, to, 0); }
 
-void decode_sample(const Font& f, uint32_t i, const DecodeOpts& opt, Pcm& o) {
+namespace {
+// Streams already decoded in this prepare_preset, by their byte range within the font (offset, length: the sample headers may alias one stream any number of times): the result is the same whatever header names it, so a stream
+// is decoded ONCE, success or failure. A success is remembered as the index of the first sample that holds it (its PCM is copied, which the byte budgets already bound); a refusal for the budget is not remembered (it ends the preset).
+struct StreamCache { struct E { bool ok; uint32_t idx; }; std::map<std::pair<size_t, size_t>, E> m; const std::vector<Pcm>* by = nullptr; };
+
+void decodeSample(const Font& f, uint32_t i, const DecodeOpts& opt, Pcm& o, uint64_t* work, StreamCache* cache) {
   o = Pcm();
   if (i >= f.samples.size()) { fallback(o); return; }
   const SampleHdr& s = f.samples[i];
@@ -106,9 +121,18 @@ void decode_sample(const Font& f, uint32_t i, const DecodeOpts& opt, Pcm& o) {
   const size_t maxFrames = opt.maxBytes / sizeof(float);   // 0: no budget
   if (s.type & 0x10) {   // SF3: an Ogg Vorbis stream at start..end (bytes); loops are frames from the sample's start
     const size_t a = std::min<size_t>(s.start, f.smplN), b = std::min<size_t>(s.end, f.smplN);   // smpl.slice(start, end)
-    std::vector<float> d; double sr = 0; DecodeRes r = b <= a ? kDecodeBad : decodeOgg(f.smpl + a, b - a, d, sr, opt.pageTail, maxFrames);
-    if (r == kDecodeOk && opt.ctxRate > 0 && opt.ctxRate != sr) { if (resampleTo(d, sr, opt.ctxRate, maxFrames)) sr = opt.ctxRate; else r = maxFrames ? kDecodeTooBig : kDecodeBad; }
-    if (r != kDecodeOk) { fallback(o); o.tooBig = r == kDecodeTooBig; return; }
+    std::vector<float> d; double sr = 0; DecodeRes r = kDecodeBad; const std::pair<size_t, size_t> key(a, b - (b > a ? a : b));
+    bool hit = false;
+    if (b > a && cache) { const auto it = cache->m.find(key);
+      if (it != cache->m.end()) { hit = true;
+        if (!it->second.ok) r = kDecodeBad;
+        else { const Pcm& src = (*cache->by)[it->second.idx]; if (maxFrames > 0 && src.d.size() > maxFrames) r = kDecodeTooBig; else { d = src.d; sr = src.sr; r = kDecodeOk; } } } }
+    if (!hit && b > a) {
+      r = decodeOgg(f.smpl + a, b - a, d, sr, opt.pageTail, maxFrames, work);
+      if (r == kDecodeOk && opt.ctxRate > 0 && opt.ctxRate != sr) { bool ow = false; if (resampleTo(d, sr, opt.ctxRate, maxFrames, work, &ow)) sr = opt.ctxRate; else r = ow ? kDecodeWork : maxFrames ? kDecodeTooBig : kDecodeBad; }
+      if (cache && (r == kDecodeOk || r == kDecodeBad)) cache->m[key] = StreamCache::E{r == kDecodeOk, i};   // (the caller keeps `o` at index i)
+    }
+    if (r != kDecodeOk) { fallback(o); o.tooBig = r == kDecodeTooBig; o.overWork = r == kDecodeWork; return; }
     const double k = sr / (double)s.sr;
     o.d = std::move(d); o.sr = sr; o.ls = js_round((double)s.ls * k); o.le = js_round((double)s.le * k); o.k = k; o.ok = true; o.present = true;
     return;
@@ -119,6 +143,7 @@ void decode_sample(const Font& f, uint32_t i, const DecodeOpts& opt, Pcm& o) {
   const uint64_t n = std::min(claimed, have);
   if (n > kMaxSampleFrames) { fallback(o); return; }
   if (maxFrames > 0 && n > maxFrames) { fallback(o); o.tooBig = true; return; }
+  if (!charge(work, n)) { fallback(o); o.overWork = true; return; }
   o.d.assign((size_t)n, 0.0f);
   for (uint64_t j = 0; j < n; j++) {
     const size_t at = (size_t)(s.start + j) * 2; const int16_t v = (int16_t)((uint16_t)f.smpl[at] | ((uint16_t)f.smpl[at + 1] << 8));
@@ -126,12 +151,20 @@ void decode_sample(const Font& f, uint32_t i, const DecodeOpts& opt, Pcm& o) {
   }
   o.sr = (double)s.sr; o.ls = (double)s.ls - (double)s.start; o.le = (double)s.le - (double)s.start; o.k = 1; o.ok = true; o.present = true;
 }
+}  // namespace
+
+void decode_sample(const Font& f, uint32_t i, const DecodeOpts& opt, Pcm& o) { decodeSample(f, i, opt, o, nullptr, nullptr); }
 
 PrepareStatus prepare_preset(const Font& f, const Preset* pr, const DecodeOpts& opt, PresetPcm& out, const uint8_t* keys) {
-  out.byIndex.clear(); out.byIndex.resize(f.samples.size()); out.bytes = 0;
+  out.byIndex.clear(); out.byIndex.resize(f.samples.size()); out.bytes = 0; out.work = 0;
   if (!pr) return kPrepNoPreset;
   const uint64_t fontUsed = opt.fontUsed ? *opt.fontUsed : 0;
   PrepareStatus st = kPrepOk;
+  const uint64_t fontWorkUsed = opt.fontWorkUsed ? *opt.fontWorkUsed : 0;
+  uint64_t workSpent = 0;   // work units charged so far by this call (kept or not)
+  StreamCache cache; cache.by = &out.byIndex;
+  // the work left: the preset's budget and the font's, whichever is smaller
+  auto workRoom = [&]() -> uint64_t { const uint64_t a = opt.presetWork > workSpent ? opt.presetWork - workSpent : 0; const uint64_t used = fontWorkUsed + workSpent; const uint64_t b = opt.fontWork > used ? opt.fontWork - used : 0; return std::min(a, b); };
   // the room left: the preset's budget and the font's, whichever is smaller
   auto room = [&]() -> uint64_t { const uint64_t a = opt.presetBytes > out.bytes ? opt.presetBytes - out.bytes : 0; const uint64_t used = fontUsed + out.bytes; const uint64_t b = opt.fontBytes > used ? opt.fontBytes - used : 0; return std::min(a, b); };
   auto binding = [&]() -> PrepareStatus {   // which budget is the smaller one right now
@@ -141,15 +174,20 @@ PrepareStatus prepare_preset(const Font& f, const Preset* pr, const DecodeOpts& 
     if (st != kPrepOk || out.byIndex[s].present) return;
     const uint64_t r = room(); if (r < sizeof(float)) { st = binding(); return; }
     DecodeOpts o2 = opt; o2.maxBytes = (size_t)std::min<uint64_t>(r, (uint64_t)1 << 40);
-    decode_sample(f, s, o2, out.byIndex[s]);
+    uint64_t wl = workRoom(); const uint64_t wl0 = wl;
+    decodeSample(f, s, o2, out.byIndex[s], &wl, &cache);
+    workSpent += wl0 - wl;   // (also what a refused or failed decode spent)
+    if (out.byIndex[s].overWork) { st = kPrepOverWorkBudget; return; }
     if (out.byIndex[s].tooBig) { st = binding(); return; }
     out.bytes += out.byIndex[s].d.size() * sizeof(float);
   };
   for (uint32_t i = 0; i < pr->nz && st == kPrepOk; i++) { const Zone& z = f.zones[pr->z0 + i];
     if (keys) { bool any = false; for (int k = std::max(0, z.klo); k <= std::min(127, z.khi) && !any; k++) any = keys[k] != 0; if (!any) continue; }
     add(z.s); const SampleHdr& s = f.samples[z.s]; if ((s.type & 6) && s.link < f.samples.size()) add(s.link); }
-  if (st != kPrepOk) { out.byIndex.clear(); out.byIndex.resize(f.samples.size()); out.bytes = 0; return st; }   // refused: nothing is kept, the pad plays nothing
+  if (st != kPrepOk) { out.byIndex.clear(); out.byIndex.resize(f.samples.size()); out.bytes = 0; out.work = workSpent; return st; }   // (after a refusal `work` is what the call SPENT, informational: the host's counter is not touched)   // refused: nothing is kept, the pad plays nothing
+  out.work = workSpent;
   if (opt.fontUsed) *opt.fontUsed += out.bytes;
+  if (opt.fontWorkUsed) *opt.fontWorkUsed += out.work;
   return kPrepOk;
 }
 
