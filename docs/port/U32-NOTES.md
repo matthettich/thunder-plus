@@ -148,4 +148,23 @@ Date 2026-11-18, GCC 2-core machine, `nice`, `-j2`, head commit of this round (c
 - No adapter into the mixer / bridge (out of scope).
 
 ## Follow-up: decode work budget
-(in progress; filled in as the work goes)
+Cause of D1 (`docs/port/reviews/verify-226-round2.md`): `prepare_preset` charged only the bytes it KEPT. `decodeOgg` decoded a stream in full and only afterwards applied the last page's granule, and a granule of 0 trims the stream to nothing (`kDecodeBad`), so the decode was thrown away; `add()` repeated that for every sample header, and headers may alias the same stream any number of times. Nothing bounded the work.
+
+Fix (all in `native/core/src/sf/`):
+1. **Granule read before decoding** (`sf_decode.cpp`, `decodeOgg`, the `oggScan` call and `if (sc.lastGranule == 0) return kDecodeBad;` at its top): the last page header's granule 0 is refused with no decode and no charge. Only 0 is refused up front: a granule ABOVE the decoded length only shortens nothing (test H4b: 2^40 decodes to 2304 frames, as libvorbis), so refusing "absurd" ones would change results.
+2. **Cache by byte range** (`StreamCache`, `decodeSample`): key = (offset, length) within the font's smpl chunk; success (index of the first sample holding the PCM, copied for the next alias, bounded by the byte budgets) and failure are remembered per `prepare_preset` call, so aliased headers decode once. A refusal for the budget is not remembered (it ends the preset). A copy is not charged work (memcpy, already bounded by the byte budget).
+3. **Work budget** (`sf.h` `DecodeOpts::presetWork` 2^28, `fontWork` 2^29, host counter `fontWorkUsed`; `kWorkPerOpen` 32768; `PresetPcm::work`; `PrepareStatus kPrepOverWorkBudget`): every decode that runs, kept or discarded, is charged kWorkPerOpen + stream bytes + decoded frames (+ resampled frames; SF2: frames copied), taken from the smaller of the preset's and the font's room while it runs; when it runs out the preset is refused with nothing kept. After a refusal `PresetPcm::work` is what the call spent (informational; the host's counter is untouched). The font counter has the lifecycle of `fontUsed`: a kept preset adds its `work`, the host subtracts it on drop. Calibration (measured, 2 cores): a long stream decodes at 80 to 90 million units per second, an open costs 0.35 ms (setup header) = about 29000 units, hence kWorkPerOpen; the limits are about 3 s and 6 s of decode work. The most any GM preset needs is 119,206,389 units (whole keyboard at 48 kHz): limit 2.25x that.
+4. **Parse memory** (`sf_parse.cpp`, before a zone is added; `sf.h` `kParseTableFactor` 32, `kParseTableFloor` 8 MB): zones + generators + modulators (element sizes times counts) may hold at most 8 MB + 32 x the file's size, else `kParseTooBig`. What allocated: every zone pair copies its merged generators (up to 64 x 8 bytes) and modulators into `Font::zones/gens/mods`; 200000 pairs x 50 generators = about 94 MB of tables, 205 MB with vector growth. GM's tables are 0.02x its file; the test font is under the floor.
+
+Tests (`test_sf unit`, new blocks H9 to H12; the fonts are generated in the test from the GM font's own streams, `aliasSf3` / `genSf2` / `zeroLastGranule`; stb_vorbis does not check the page CRC, so the CRC is not fixed):
+| | before | after |
+|---|---|---|
+| 30000 headers on one 4003-byte stream, granule 0 (1.74 MB font) | 12.2 s | 0.001 s, work 0 |
+| 2000 headers on one 62410-byte stream (1.29 MB decoded), granule 0 | 9.2 s | 0.000 s, work 0 |
+| 128 distinct granule-0 streams, 8 MB | 0.69 s | 0.000 s |
+| 12000 aliases of one good stream | (decoded 12000 times) | 0.024 s, work = one decode |
+| 175 KB font, 200000 pairs x 50 generators: counted peak of operator new | 208.5 MB, parsed | 26.5 MB, `kParseTooBig`, 18 ms |
+| the same shape, 20000 pairs (81 KB) | parses, 13.3 MB | parses, 13.3 MB |
+| GM font, all 197 presets x (own rate, 48 kHz): status, samples, bytes, FNV of every sample | `test_sf gmall` | identical in all 394 lines; time 39.2 s before, 36.7 s after (noise) |
+(Times: this machine, Release, shared 2 cores; the verifier's 17.7 s / 13.5 s were on a loaded box. Peak allocation is counted with a replaced `operator new` in `test_sf.cpp`, not RSS.)
+Mutations 36 to 39 in `native/tools/sf-mutate.py` (work not charged on a discarded decode, cache keyed by offset only, granule check skipped, parse table bound lifted): all CAUGHT.

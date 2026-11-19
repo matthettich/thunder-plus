@@ -1,4 +1,4 @@
-# U32: seeded-fault check. For each fault: edit one line of native/core/src/sf, rebuild test_sf, run ctest sf + sf_unit; the fault must make ctest fail ("CAUGHT"). Run from the repo root: SF_BUILD=<build dir> python3 native/tools/sf-mutate.py [numbers]
+# U32: seeded-fault check (39 faults; the last four are from the D1 follow-up). For each fault: edit one line of native/core/src/sf, rebuild test_sf, run ctest sf + sf_unit; the fault must make ctest fail ("CAUGHT"). Run from the repo root: SF_BUILD=<build dir> python3 native/tools/sf-mutate.py [numbers]
 import subprocess,sys,os
 R=os.path.abspath(os.environ.get('SF_SRC','native/core/src/sf'))+'/'
 B=os.environ.get('SF_BUILD','/tmp/u32c')
@@ -38,6 +38,10 @@ M=[
 ('sf.h','kMaxWork = 200000;','kMaxWork = 200000000;','parse work cap lifted'),
 ('sf_decode.cpp','const uint64_t n = std::min(claimed, have);','const uint64_t n = claimed;','SF2 sample no longer clamped to the data present'),
 ('sf_math.cpp','log10_2lo + ivln10 * js_log(x)','log10_2lo + ivln10 * 1.0000000000000002 * js_log(x)','sf_log10 last-bit change (committed math golden)'),
+('sf_decode.cpp','workSpent += wl0 - wl;','workSpent += out.byIndex[s].ok ? wl0 - wl : 0;','work budget not charged on a decode that is discarded'),
+('sf_decode.cpp','key(a, b - (b > a ? a : b));','key(a, 0);','stream cache keyed by offset only (not offset and length)'),
+('sf_decode.cpp','if (sc.lastGranule == 0) return kDecodeBad;','if (false) return kDecodeBad;','granule 0 no longer refused before decoding'),
+('sf.h','kParseTableFactor = 32;','kParseTableFactor = 32000;','parse table bound (font size x factor) lifted'),
 ]
 only=sys.argv[1:]
 res=[]

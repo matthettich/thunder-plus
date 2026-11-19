@@ -31,6 +31,7 @@ constexpr size_t kMaxSampleFrames = (size_t)1 << 25;     // frames one decoded s
 // FluidR3 GM: its tables are 2.6 MB for a 140 MB file (0.02x); the test font fits the floor.
 constexpr size_t kParseTableFactor = 32;
 constexpr size_t kParseTableFloor = (size_t)8 << 20;
+constexpr uint64_t kWorkPerOpen = 32768;    // work units charged for opening an Ogg stream (stb_vorbis parses its setup header: 0.35 ms measured, about 29000 units of decode time), on top of its bytes and frames
 constexpr int kMaxListDepth = 32;
 constexpr uint32_t kMinStreamRate = 4000, kMaxStreamRate = 192000;   // an Ogg stream's own sample rate outside this, and a context rate (DecodeOpts::ctxRate) outside it, is refused (silent 1-frame fallback)
 constexpr uint32_t kMinHdrRate = 400, kMaxHdrRate = 192000;           // a sample header's rate (SF2 spec: 400..50000) outside this is refused the same way; the page plays at hdr.sr / sr, so an absurd one is an absurd pitch                        // nested LIST chunks
@@ -92,9 +93,9 @@ struct DecodeOpts {
   uint64_t presetBytes = (uint64_t)256 << 20;   // budget of one prepare_preset call (decoded PCM bytes): over it the preset is refused (kPrepOverPresetBudget). The real font's whole-keyboard piano is 191 MB (208 MB at 48 kHz)
   uint64_t fontBytes = (uint64_t)512 << 20;     // budget of all presets prepared from one font at once: the host keeps a counter in `fontUsed` (prepare_preset adds, the host subtracts a PresetPcm's bytes when it drops it)
   uint64_t* fontUsed = nullptr;
-  // WORK budgets (prepare_preset): every decode, kept or thrown away, is charged in work units = the stream's input bytes + the frames the decoder produced (+ the frames a resampler writes). A preset that needs more is
+  // WORK budgets (prepare_preset): every decode, kept or thrown away, is charged in work units = kWorkPerOpen per stream opened + the stream's input bytes + the frames the decoder produced (+ the frames a resampler writes). A preset that needs more is
   // refused (kPrepOverWorkBudget), whatever it keeps. The byte budgets above only count what is KEPT, so they cannot stop a font whose samples decode in full and are then discarded (a hostile granule, NaN, a failed resample).
-  // About 47 million units are one second on the reference machine, so the limits are about 6 s / 12 s of decode work. FluidR3 GM, the largest preset (whole keyboard) needs kWorkMeasured (see test_sf unit): the limits are 2x that or more.
+  // Measured here (2 cores, Release): 80 to 90 million units are one second of a long stream's decode, and opening a stream costs 0.35 ms whatever its size (hence kWorkPerOpen), so the limits are about 3 s / 6 s of decode work. FluidR3 GM: the most any of its 197 presets needs (whole keyboard, resampled to 48 kHz) is about 119 million units (`test_sf gmall`), so the preset limit is 2.3x that and the font limit 4.7x.
   uint64_t presetWork = (uint64_t)1 << 28;      // work units of one prepare_preset call (268 million)
   uint64_t fontWork = (uint64_t)1 << 29;        // work units of all presets prepared from one font at once: the host keeps a counter in `fontWorkUsed` (prepare_preset adds a kept preset's PresetPcm::work, the host subtracts it when it drops it)
   uint64_t* fontWorkUsed = nullptr;

@@ -45,7 +45,7 @@ size_t pageTailLoss(const OggScan& sc, size_t lastFrame) {
 }
 
 // kDecodeOk, or why not. The frames of a stream are bounded by what its BYTES can hold (a Vorbis audio packet is at least a byte and decodes to at most 4096 frames), by kMaxSampleFrames and by `maxFrames` (the budget).
-// `work` (null: unlimited) is what prepare_preset has left to spend: the stream's bytes are charged before it is opened and every decoded frame as it is decoded; over it: kDecodeWork.
+// `work` (null: unlimited) is what prepare_preset has left to spend: the stream's bytes (and kWorkPerOpen) are charged before it is opened and every decoded frame as it is decoded; over it: kDecodeWork.
 enum DecodeRes { kDecodeOk, kDecodeBad, kDecodeTooBig, kDecodeWork };
 bool charge(uint64_t* work, uint64_t units) { if (!work) return true; if (units > *work) return false; *work -= units; return true; }
 DecodeRes decodeOgg(const uint8_t* p, size_t n, std::vector<float>& d, double& sr, bool pageTail, size_t maxFrames, uint64_t* work) {
@@ -54,7 +54,7 @@ DecodeRes decodeOgg(const uint8_t* p, size_t n, std::vector<float>& d, double& s
   // made the control thread decode megabytes for nothing). A granule above what the stream decodes to is harmless (it only shortens), so only the zero one is refused up front.
   const OggScan sc = oggScan(p, n);
   if (sc.lastGranule == 0) return kDecodeBad;
-  if (!charge(work, n)) return kDecodeWork;
+  if (!charge(work, (uint64_t)n + kWorkPerOpen)) return kDecodeWork;
   int err = 0; stb_vorbis* v = stb_vorbis_open_memory(p, (int)n, &err, nullptr);
   if (!v) return kDecodeBad;
   const stb_vorbis_info info = stb_vorbis_get_info(v);
