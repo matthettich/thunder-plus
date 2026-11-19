@@ -16,7 +16,11 @@
 #endif
 #include "render_api_common.h"
 
-extern "C" void thunder_fx_fail_at(long k);
+#ifdef THUNDER_HAVE_TFX
+extern "C" void thunder_fx_fail_at(long k);   // core/dsp/fx_alloc.cpp (the effects' malloc)
+#else
+static void thunder_fx_fail_at(long) {}       // (a build without the DSP libraries has no effects to fail)
+#endif
 
 #if defined(__SANITIZE_ADDRESS__)
 #define TR_SANITIZED 1
@@ -222,9 +226,11 @@ int main(int argc, char** argv) {
     createFailures("short fx+master+pdc", shortS, opts(8000, true, true, 2), false, 1);
     createFailures("ELECTRO fx+master+pdc", electro, opts(8000, true, true, 1), false, 11);
   }
+#ifdef THUNDER_HAVE_TFX
   if (want(argc, argv, "fx")) {
     createFailures("ELECTRO fx+master+pdc", electro, opts(8000, true, true, 1), true, 1);
   }
+#endif
   if (want(argc, argv, "read")) readFailures("ELECTRO fx+master (8 s)", electro, opts(8000, true, true, 0, true, 8000 * 8), 24);
   std::printf(g_fail ? "FAILED: %d\n" : "OK\n", g_fail);
   return g_fail ? 1 : 0;
