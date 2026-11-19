@@ -34,13 +34,10 @@ plan; sections 1 to 4 and 9), `HANDOVER.md` on `beta` (the web app, the owner's 
 - Wiring step 3, `dispatch` routing and `noShape` (#239).
 - Web: `main` = `beta` = build 647; desktop v1.3.13 = build 647.
 
-**Open pull requests into `native` (both are finished work; each needs only a green CI run, then merge):**
-- **#240 `n1/render-v1`** (head eb14a20 = the work + `native` merged in at 07:25, so CI runs on the combined tree): the one defect of
-  `docs/port/reviews/verify-238-239.md` (replacing a variation at the limit held two copies), four test gaps, `set_pad` drops a pad's variations as the
-  page does, header corrections. Notes: `docs/port/U34A-NOTES.md`, "Follow-up after verify-238-239". The earlier head was green on nine jobs.
-- **#241 `n3/u32-d1`** (head 5a15f0c): U32's follow-up: a work budget for decodes, a stream cache, the granule read before decoding, parse memory
-  bounded (the hostile fonts: 12.2 s -> 0.001 s; GM font identical on all 394 preset lines). Notes: `docs/port/U32-NOTES.md`, "Follow-up: decode work
-  budget". Full ctest 157 of 157 in both configurations locally; CI was running at 07:15.
+**Open pull requests into `native`: none of ours (08:20 on 19 Nov).** Both follow-ups merged with every CI job green: **#240** (render API: variation
+replace within the budget, four test gaps, `set_pad` drops a pad's variations, header corrections; CI ran on the tree with U31 merged in) and **#241**
+(U32: a work budget for decodes, a stream cache, the granule read first, parse memory bounded). They overlap nowhere (render vs sf), but the head of
+`native` with both has had no CI run of its own: the next PR's run covers it.
 - (#225 `n1/repin-pump` stays open and unmerged: it waits for pump-side changes, see the 11:30 section of 18 Nov.)
 - **Lesson of the night:** a green PR is green against the `native` it was tested with. When `native` has moved, merge `native` into the branch and let
   CI run again before merging (U31's first combined run failed on a test whose premise another PR had changed).
