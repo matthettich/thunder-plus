@@ -63,6 +63,15 @@ if(NOT MSVC)
   target_compile_options(test_seq PRIVATE -Wall -Wextra)
 endif()
 add_test(NAME seq COMMAND test_seq)
+# SEQ-LIVE-DESIGN Part A: the clock setters, the SeqRunner and their hostile values against the JS's live-clock goldens (native/tests/golden/seq-*-live*.json).
+add_executable(test_seq_live test_seq_live.cpp)
+target_link_libraries(test_seq_live PRIVATE thunder_core)
+target_include_directories(test_seq_live PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../core/src ${CMAKE_CURRENT_SOURCE_DIR})
+target_compile_definitions(test_seq_live PRIVATE THUNDER_ROOT="${CMAKE_CURRENT_SOURCE_DIR}/../..")
+if(NOT MSVC)
+  target_compile_options(test_seq_live PRIVATE -Wall -Wextra)
+endif()
+add_test(NAME seq_live COMMAND test_seq_live)
 # The JS run fresh beside the C++ (Linux, where Node is installed): seq_dump_current proves the browser-less tool still gives the
 # committed goldens; seq_extra plays 19 cases the goldens do not reach (every command, PERFORM scenes / macros / locks / LFOs /
 # parts, sect and phrase modes, loops, JMP / END, the wrap, a hand-over) in both and compares every row, nested members included.

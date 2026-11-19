@@ -9,7 +9,7 @@
 //
 // Needs Chrome (or Chromium) and the playwright package: CHROME=/path/to/chrome, PLAYWRIGHT=/path/to/playwright/index.mjs
 // if they aren't found. The full event dumps go to tests/golden/out/ (not committed) for diffing.
-import http from 'http'; import fs from 'fs'; import path from 'path'; import crypto from 'crypto'; import { fileURLToPath, pathToFileURL } from 'url';
+import http from 'http'; import fs from 'fs'; import path from 'path'; import crypto from 'crypto'; import vm from 'vm'; import { fileURLToPath, pathToFileURL } from 'url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const UPDATE = process.argv.includes('--update');
@@ -33,6 +33,74 @@ const SONGS = [
   { id: 'electro-loop', file: 'sounds/ELECTRO.thunder', mode: 'song', opt: { loop: { y0: 4, y1: 6 } }, max: 800 },
   { id: 'electro-cmds', file: 'sounds/ELECTRO.thunder', mode: 'song', edit: withCommands },
 ];
+// LIVE-CLOCK CASES (docs/port/SEQ-LIVE-DESIGN.md A3; goldens native/tests/golden/seq-*-live*.json, read by ctest `seq_live`).
+// The page's makeSeq is not reachable from outside index.html (it is not a global), so these run the audio thread's copy, core/seq-core.js's
+// makeSeq, loaded into a `vm` context exactly as native/tools/seq-dump.mjs does: no browser needed. THAT PATH IS PROVEN FIRST: the four cases above
+// are run through it and must equal their committed goldens (made by the page in Chrome) byte for byte, or the live cases are not written / compared.
+// The clock is written between steps exactly as core-processor.js writes it: `time = t0` before the first step (play, :423), `bpm = v` (the 'bpm'
+// message, :354), and the catch-up skip / RESUME shift `base += d; time += d; if (btT != null) btT += d` (:778, :421).
+// live: {time0, ops: [{after: N, bpm: v | 'song', shift: d}]}: an op runs after the N-th step (1 = after the first). Each row also records the
+// clock after the step: {t, evs, clk: {time, base, bt, btT, bpm}}. 'song' = the song's own bpm (S.bpm), written into the golden as a number.
+const LIVE_SONGS = [
+  { id: 'electro-live-time', file: 'sounds/ELECTRO.thunder', mode: 'song', live: { time0: 1234.5678, ops: [] } },
+  { id: 'electro-live-bpm', file: 'sounds/ELECTRO.thunder', mode: 'song', live: { ops: [{ after: 40, bpm: 97.3 }, { after: 120, bpm: 'song' }] } },
+  { id: 'electro-live-shift', file: 'sounds/ELECTRO.thunder', mode: 'song', live: { ops: [{ after: 25, shift: 0.37 }, { after: 60, shift: -0.011 }] } },
+  { id: 'electro-cmds-live-all', file: 'sounds/ELECTRO.thunder', mode: 'song', edit: withCommands,
+    live: { time0: 1234.5678, ops: [{ after: 25, shift: 0.37 }, { after: 40, bpm: 97.3 }, { after: 60, shift: -0.011 }, { after: 120, bpm: 'song' }] } },
+];
+const LIVE_DIR = path.join(ROOT, 'native/tests/golden');
+function liveHarness() {
+  const sctx = vm.createContext({ console, registerProcessor() {}, AudioWorkletProcessor: class { constructor() { this.port = { postMessage() {}, onmessage: null }; } }, sampleRate: 48000, currentTime: 0, currentFrame: 0 });
+  vm.runInContext(fs.readFileSync(path.join(ROOT, 'core/seq-core.js'), 'utf8') + '\n;globalThis.__u = { makeSeq, coreSeeded, corePlain, coreNum, FXC,' +
+    ' load(s, v){ S = s; if (v){ if ("vtrk" in v) vtrk = v.vtrk; if ("NSLOT" in v) NSLOT = v.NSLOT; if (v.TFX) TFX = v.TFX; } busPlanH = null; busPlanVal = null; } };', sctx, { filename: 'seq-core.js' });
+  return { ctx: sctx, U: sctx.__u };
+}
+// one case on the core's makeSeq; `live` null = a plain case (the proof path), else the clock ops above. Returns {rows, info}.
+function runVm(H, text, mode, max, opt, live) {
+  const j = JSON.parse(text), bpm = j.song.bpm;
+  const Sv = vm.runInContext('(' + JSON.stringify(j.song) + ')', H.ctx), vars = vm.runInContext('({vtrk:false,NSLOT:16,TFX:{}})', H.ctx);
+  H.U.load(Sv, vars);
+  H.ctx.__c = { mode, max, o: opt || {}, live: live ? JSON.parse(JSON.stringify({ time0: live.time0 ?? null, ops: live.ops.map(o => ({ ...o, ...(o.bpm === 'song' ? { bpm } : {}) })) })) : null };
+  const rows = vm.runInContext(`(() => { const d = __c, o = d.o, L = d.live; return __u.coreSeeded(() => { const out = [];
+    const sq = __u.makeSeq(S, d.mode || 'song', {row:o.row || 0, loop:o.loop || null, once:!o.loop, sim:true});
+    if (L && L.time0 != null) sq.time = L.time0;
+    for (let n = 0; sq.alive() && n < (d.max || 20000); n++){ const r = sq.step(); const row = {t:__u.coreNum(r.t), evs:r.evs.map(__u.corePlain)};
+      if (L){ row.clk = {time:__u.coreNum(sq.time), base:__u.coreNum(sq.base), bt:__u.coreNum(sq.bt), btT:__u.coreNum(sq.btT), bpm:__u.coreNum(sq.bpm)};
+        for (const p of L.ops) if (p.after === n + 1){ if (p.bpm != null) sq.bpm = p.bpm; if (p.shift != null){ sq.base += p.shift; sq.time += p.shift; if (sq.btT != null) sq.btT += p.shift; } } }
+      out.push(row); }
+    return out; }); })()`, H.ctx);
+  return { rows, bpm: j.song.bpm, live: L2(live, bpm) };
+  function L2(l, b) { return l ? { time0: l.time0 ?? null, ops: l.ops.map(o => ({ ...o, ...(o.bpm === 'song' ? { bpm: b } : {}) })) } : null; }
+}
+function liveCases() {
+  if (process.argv.includes('--no-live')) return true;
+  const H = liveHarness(); let bad = false; const sha = t => crypto.createHash('sha256').update(t).digest('hex');
+  // 1. the proof: the four plain cases through this path equal the committed goldens
+  for (const S of SONGS) {
+    let t0 = fs.readFileSync(path.join(ROOT, S.file), 'utf8'); if (S.edit) { const j = JSON.parse(t0); S.edit(j); t0 = JSON.stringify(j); }
+    const { rows } = runVm(H, t0, S.mode, S.max || 0, S.opt || null, null);
+    const g = JSON.parse(fs.readFileSync(path.join(ROOT, `tests/golden/seq-${S.id}.json`), 'utf8')), h = sha(rows.map(r => JSON.stringify(r)).join('\n') + '\n');
+    const ok = h === g.sha256 && rows.length === g.rows; if (!ok) bad = true;
+    console.log(`${ok ? 'ok  ' : 'FAIL'} core-path proof ${S.id}: ${rows.length} rows ${ok ? '= the page\'s golden' : 'DIFFERS from the page\'s golden: live cases not written'}`);
+  }
+  if (bad) return false;
+  // 2. the live cases
+  fs.mkdirSync(LIVE_DIR, { recursive: true });
+  for (const S of LIVE_SONGS) {
+    let t0 = fs.readFileSync(path.join(ROOT, S.file), 'utf8'); if (S.edit) { const j = JSON.parse(t0); S.edit(j); t0 = JSON.stringify(j); }
+    const { rows, bpm, live } = runVm(H, t0, S.mode, S.max || 0, S.opt || null, S.live), text = rows.map(r => JSON.stringify(r)).join('\n') + '\n';
+    const counts = {}; for (const r of rows) for (const e of r.evs) counts[e.type] = (counts[e.type] || 0) + 1;
+    const now = { song: S.file, mode: S.mode, live, bpm, rows: rows.length, events: Object.values(counts).reduce((a, b) => a + b, 0), counts, sha256: sha(text),
+      rowHashes: rows.map(r => crypto.createHash('sha256').update(JSON.stringify(r)).digest('hex').slice(0, 12)) };
+    const gf = path.join(LIVE_DIR, `seq-${S.id}.json`);
+    if (UPDATE || !fs.existsSync(gf)) { fs.writeFileSync(gf, JSON.stringify(now, null, 1) + '\n'); console.log(`wrote ${path.relative(ROOT, gf)}: ${now.rows} rows, ${now.events} events`); continue; }
+    const was = JSON.parse(fs.readFileSync(gf, 'utf8')), ok = was.sha256 === now.sha256; if (!ok) bad = true;
+    console.log(`${ok ? 'ok  ' : 'FAIL'} ${S.id}: ${now.rows} rows, ${now.events} events${ok ? '' : ' (first differing row ' + now.rowHashes.findIndex((h, k) => h !== was.rowHashes[k]) + ')'}`);
+  }
+  return !bad;
+}
+const LIVE_OK = liveCases();
+if (process.argv.includes('--live-only')) process.exit(LIVE_OK ? 0 : 1);
 const TIMING = process.argv.includes('--timing');
 const CORE = process.argv.includes('--core');   // run each case on the audio thread (core/seq-core.js) instead: the same goldens must match
 const PW = process.env.PLAYWRIGHT || ['/opt/npm-tools/node_modules/playwright/index.mjs', path.join(ROOT, 'node_modules/playwright/index.mjs')].find(f => fs.existsSync(f));
@@ -49,7 +117,7 @@ const srv = http.createServer((q, r) => {
 await new Promise(ok => srv.listen(0, ok));
 const port = srv.address().port;
 const browser = await chromium.launch({ ...(CHROME ? { executablePath: CHROME } : {}), args: ['--autoplay-policy=no-user-gesture-required'] });
-let failed = false;
+let failed = !LIVE_OK;
 try {
   const page = await browser.newPage({ viewport: { width: 1400, height: 900 } });
   page.on('pageerror', e => console.error('page error:', e.message));

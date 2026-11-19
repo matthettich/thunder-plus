@@ -612,6 +612,20 @@ void Seq::lfoEvs(Ctx& c, int t, double t0, double dur) {
   for (int i = 0; i < epN; i++) { const int u = epOrd[i]; if (own && u == t) engEmit(c, u, t0, dur, ne, nullptr, 0); else engEmit(c, u, t0, dur, ne, epPts[u], epHas[u]); }
 }
 
+// ---- the clock's setters (SEQ-LIVE-DESIGN A1) ---------------------------------------------------------------------------------
+void Seq::setTime(double t) { if (!std::isfinite(t)) { badSets_++; return; } time_ = t; }
+void Seq::setBpm(double v) {
+  if (!std::isfinite(v) || !(v > 0)) { badSets_++; return; }
+  if (v < kSeqBpmMin) { v = kSeqBpmMin; badSets_++; } else if (v > kSeqBpmMax) { v = kSeqBpmMax; badSets_++; }
+  bpm_ = v;
+}
+void Seq::shift(double d) {
+  if (!std::isfinite(d)) { badSets_++; return; }
+  const double nt = time_ + d, nbase = base_ + d, nbt = btT_ + d;
+  if (!std::isfinite(nt) || (hasBase_ && !std::isfinite(nbase)) || (hasBtT_ && !std::isfinite(nbt))) { badSets_++; return; }
+  time_ = nt; if (hasBase_) base_ = nbase; if (hasBtT_) btT_ = nbt;
+}
+
 // ---- api.step() ------------------------------------------------------------------------------------------------------
 int Seq::step(SeqEvent* evs, int cap, SeqStep* out) {
   Ctx c; c.evs = evs; c.cap = cap < 0 ? 0 : cap; c.n = 0; c.dropped = 0; c.pos = out ? out->pos : nullptr;
