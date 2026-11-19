@@ -42,11 +42,19 @@ class SfPool {
 
   // sfNote(ev). `kv`: the pad's kit entry (choke, syn). Returns false if nothing sounds (no zone, no sample, no free voice, a bad event).
   bool note(const SeqEvent& e, const double* arp, const SfPad& pad, const VoiceKit& kv);
+  // True when note(e, ...) would get as far as the zones: the event is valid and the preset has at least one zone for the note's key and velocity (sfNote's `if (!picks.length) return;`: such a note takes NOTHING over). Allocates nothing.
+  // A renderer that keeps a sampler pool next to this one asks it first, so the sampler's voices on the track give way exactly when the JS's one voice list would.
+  bool covers(const SeqEvent& e, const SfPad& pad) const;
   void take(const SeqEvent& e, const VoiceKit* kit);   // a note the SAMPLER plays: this track's SoundFont voices give way (mono takeover, chokes)
   void off(const SeqEvent& e);
   void mod(const SeqEvent& e, const double* arp);
   void stp(const SeqEvent& e);
   void stopAll(double at);
+  // The poly cap across the two pools (VoicePool::stamp / liveOnTrack / oldestOnTrack / releaseOldest, same contract; verify-242 F3).
+  void stamp(uint64_t serial) { stamp_ = serial; }
+  int liveOnTrack(int track, double t);
+  bool oldestOnTrack(int track, uint64_t& serial) const;
+  void releaseOldest(int track, double t);
 
   // One host block of `frames` starting at the host's absolute frame `frame0`: adds every voice into its track's output (null outL: the track has no output and its voices are left alone; null outR: mono).
   void render(float* const* outL, float* const* outR, int frames, uint64_t frame0);
@@ -70,7 +78,7 @@ class SfPool {
   struct Voice {
     Zn z[kZones]; int nz = 0; bool st = false;
     AutoN<kAutoR> r{0}; AutoN<kAutoGFP> g{0}, f{1}, pn{0};
-    double base = 0, rate = 0, rel = 0, end = 0, t0 = 0, stopAt = 0; int choke = 0, col = 0, track = 0; bool ended = false, hasStop = false;
+    double base = 0, rate = 0, rel = 0, end = 0, t0 = 0, stopAt = 0; int choke = 0, col = 0, track = 0; uint64_t ser = 0; bool ended = false, hasStop = false;
   };
   double relTc(const Voice& v) const { return v.rel / 4.6; }   // syn is always true for these voices
   bool live1(const Voice& v, double at) const { return !v.ended && !(v.hasStop && v.stopAt <= at); }
@@ -89,7 +97,7 @@ class SfPool {
   int nAlive_ = 0, nFree_ = 0;
   int T_[kVoiceTracks][kVoiceTrackCap]; int nT_[kVoiceTracks];
   float sL_[128], sR_[128];
-  uint32_t dropped_ = 0, tOver_ = 0, refused_ = 0;
+  uint32_t dropped_ = 0, tOver_ = 0, refused_ = 0; uint64_t stamp_ = 0;
 };
 
 }  // namespace sf

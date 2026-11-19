@@ -17,6 +17,7 @@
 #include <vector>
 
 #include "render/render.h"
+#include "sf/sf.h"
 #include "rt/json.h"
 
 #if defined(__cpp_exceptions) || defined(__EXCEPTIONS) || (defined(_MSC_VER) && defined(_CPPUNWIND))
@@ -31,13 +32,20 @@
 
 using namespace thunder;
 
+// A font handed in with add_font: the copy of the file's bytes (parse() keeps a VIEW of it), the parsed tables, and the counters prepare_preset keeps per font.
+struct RenderFont {
+  std::vector<uint8_t> bytes; sf::Font font; uint64_t used = 0, workUsed = 0; size_t held = 0;
+};
+
 struct thunder_render {
   Song song;                           // must outlive R
   JsonDoc varsDoc;                     // the vars JSON (SeqVars may keep handles into it)
   SeqVars vars;
   RenderPads pads;                     // must outlive R; the buffers are in `store`
   std::vector<float> store[kRenderPads];
-  size_t padBytes = 0;
+  size_t padBytes = 0;                 // pads + variations + fonts (copy and tables) + prepared SoundFont PCM
+  std::unique_ptr<RenderFont> fonts[THUNDER_RENDER_MAX_FONTS];
+  std::unique_ptr<sf::PresetPcm> sfPcm[kRenderPads]; int sfFont[kRenderPads]; size_t sfBytes[kRenderPads];
   std::unique_ptr<SongRenderer> R;
   // options
   double sr = 48000; bool useFrames = false; int64_t frames = 0, maxFrames = 0;
@@ -102,6 +110,7 @@ thunder_render* createImpl(const uint8_t* songBytes, size_t n, const thunder_ren
   if (n > THUNDER_RENDER_MAX_SONG_BYTES) { setErr(err, cap, "song is over the size limit"); return nullptr; }
 
   std::unique_ptr<thunder_render> r(new thunder_render());
+  for (int i = 0; i < kRenderPads; i++) { r->sfFont[i] = -1; r->sfBytes[i] = 0; }
   JsonError je;
   if (n == 0 || !r->song.load((const char*)songBytes, n, &je)) {
     if (n != 0 && je.msg && !std::strcmp(je.msg, "out of memory")) { setErr(err, cap, "out of memory"); return nullptr; }   // (the parser's own report: not a bad song)
@@ -282,7 +291,8 @@ int thunder_render_stats_get(thunder_render* r, thunder_render_stats* out) {
   s.steps = t.steps; s.events = t.events; s.notes = t.notes; s.notes_played = t.notesPlayed; s.notes_no_pad = t.notesNoPad; s.notes_midi_only = t.notesMidiOnly;
   s.notes_shaped_rev = t.notesShapedRev; s.mix_events = t.mixEvents; s.peak_voices = t.peakVoices;
   s.voices_refused = t.voiceDropped; s.voice_track_full = t.voiceOverflow; s.voice_auto_dropped = t.voiceAutoDropped; s.mix_auto_dropped = t.mixAutoDropped; s.seq_dropped = t.seqDropped;
-  s.notes_live = t.notesLive; s.notes_sf = t.notesSf; s.notes_var = t.notesVar; s.notes_var_missing = t.notesVarMissing; s.notes_unshaped = t.notesUnshaped; s.events_ignored = t.eventsIgnored;
+  s.notes_live = t.notesLive; s.notes_sf = t.notesSf; s.notes_var = t.notesVar; s.notes_var_missing = t.notesVarMissing; s.notes_unshaped = t.notesUnshaped; s.events_ignored = t.eventsIgnored; s.notes_sf_played = t.notesSfPlayed;
+  s.sf_voices_refused = t.sfVoiceDropped; s.sf_voice_track_full = t.sfVoiceOverflow; s.sf_voice_auto_dropped = t.sfVoiceAutoDropped; s.peak_voices_all = t.peakVoicesAll;
   const size_t k = std::min<size_t>(out->size, sizeof s); const uint32_t keep = out->size;
   std::memcpy(out, &s, k); out->size = keep;
   return 0;
@@ -306,6 +316,104 @@ int64_t thunder_render_drain(thunder_render* r, int64_t max_frames) {
 void thunder_render_free(thunder_render* r) {
   TR_TRY { delete r; }
   TR_CATCH_ALL()
+}
+
+}  // extern "C"
+
+// ---- SoundFont pads (RENDER-SF-NOTES.md) -------------------------------------------------------------------------------------------------------------------------------------------------------------------
+namespace {
+// Gives back what pad `pad`'s prepared preset holds (the PCM bytes, the font's counters) and clears it. Allocates nothing.
+void dropPadSf(thunder_render* r, int pad) {
+  if (!r->sfPcm[pad]) return;
+  const int fi = r->sfFont[pad];
+  if (fi >= 0 && r->fonts[fi]) { RenderFont& f = *r->fonts[fi]; f.used -= std::min<uint64_t>(f.used, r->sfPcm[pad]->bytes); f.workUsed -= std::min<uint64_t>(f.workUsed, r->sfPcm[pad]->work); }
+  r->padBytes -= r->sfBytes[pad]; r->sfBytes[pad] = 0; r->sfFont[pad] = -1;
+  r->pads.sf[pad] = sf::SfPad();   // (the renderer is not running: only before the first read)
+  r->sfPcm[pad].reset();
+}
+}  // namespace
+
+extern "C" {
+
+int thunder_render_add_font(thunder_render* r, const uint8_t* bytes, size_t n) {
+  if (!r) return THUNDER_RENDER_E_ARG;
+  if (r->dead || r->started) return THUNDER_RENDER_E_STATE;
+  if (!bytes || n == 0) return THUNDER_RENDER_E_ARG;
+  TR_TRY {
+    int id = -1; for (int i = 0; i < THUNDER_RENDER_MAX_FONTS; i++) if (!r->fonts[i]) { id = i; break; }
+    if (id < 0 || n > THUNDER_RENDER_MAX_PAD_BYTES || r->padBytes + n > THUNDER_RENDER_MAX_PAD_BYTES) return THUNDER_RENDER_E_LIMIT;
+    std::unique_ptr<RenderFont> f(new RenderFont());
+    f->bytes.assign(bytes, bytes + n);
+    const sf::ParseStatus st = sf::parse(f->bytes.data(), f->bytes.size(), f->font, false);
+    if (st == sf::kParseTooBig) return THUNDER_RENDER_E_LIMIT;
+    if (st != sf::kParseOk) return THUNDER_RENDER_E_FONT;
+    f->held = n + (size_t)f->font.bytesUsed();
+    if (r->padBytes + f->held > THUNDER_RENDER_MAX_PAD_BYTES) return THUNDER_RENDER_E_LIMIT;
+    r->padBytes += f->held; r->fonts[id] = std::move(f);
+    return id;
+  }
+  TR_CATCH_BADALLOC(return THUNDER_RENDER_E_MEMORY;)
+  TR_CATCH_ALL(r->dead = true; return THUNDER_RENDER_E_INTERNAL;)
+}
+
+int thunder_render_remove_font(thunder_render* r, int font_id) {
+  if (!r) return THUNDER_RENDER_E_ARG;
+  if (r->dead || r->started) return THUNDER_RENDER_E_STATE;
+  if (font_id < 0 || font_id >= THUNDER_RENDER_MAX_FONTS || !r->fonts[font_id]) return THUNDER_RENDER_E_ARG;
+  for (int p = 0; p < kRenderPads; p++) if (r->sfFont[p] == font_id) return THUNDER_RENDER_E_ARG;   // a pad still uses it
+  r->padBytes -= r->fonts[font_id]->held; r->fonts[font_id].reset();
+  return 0;
+}
+
+int thunder_render_set_pad_sf(thunder_render* r, int pad, int font_id, int bank, int prog, const thunder_render_sf_params* params, const uint8_t* keys, size_t nkeys) {
+  if (!r) return THUNDER_RENDER_E_ARG;
+  if (r->dead || r->started) return THUNDER_RENDER_E_STATE;
+  if (!padOk(pad) || font_id < 0 || font_id >= THUNDER_RENDER_MAX_FONTS || !r->fonts[font_id] || bank < 0 || bank > 16383 || prog < 0 || prog > 127) return THUNDER_RENDER_E_ARG;
+  if ((!keys && nkeys) || (keys && (nkeys == 0 || nkeys > THUNDER_RENDER_MAX_SF_KEYS))) return THUNDER_RENDER_E_ARG;
+  sf::PadParams P; P.bank = bank; P.prog = prog;   // defaults: trans 0, velo 0.7, atk 1, rel 1, level 0, len 0
+  if (params) {
+    if (params->size < offsetof(thunder_render_sf_params, trans)) return THUNDER_RENDER_E_ARG;
+    thunder_render_sf_params q; std::memset(&q, 0, sizeof q); q.size = (uint32_t)sizeof q; q.velo = P.velo; q.atk = P.atk; q.rel = P.rel;
+    const size_t k = std::min<size_t>(params->size, sizeof q); std::memcpy(&q, params, k); q.size = (uint32_t)sizeof q;
+    if (q.reserved0 != 0) return THUNDER_RENDER_E_ARG;
+    if (!fin(q.trans) || q.trans < -128 || q.trans > 128 || !fin(q.velo) || q.velo < 0 || q.velo > 1 || !fin(q.atk) || q.atk < 0 || q.atk > 100 || !fin(q.rel) || q.rel < 0 || q.rel > 100 ||
+        !fin(q.level) || q.level < -200 || q.level > 200 || !fin(q.len) || q.len < 0 || q.len > 3600) return THUNDER_RENDER_E_ARG;
+    P.trans = q.trans; P.velo = q.velo; P.atk = q.atk; P.rel = q.rel; P.level = q.level; P.len = q.len;
+  }
+  uint8_t flags[128]; std::memset(flags, 0, sizeof flags);
+  if (keys) for (size_t i = 0; i < nkeys; i++) { if (keys[i] > 127) return THUNDER_RENDER_E_ARG; flags[keys[i]] = 1; }
+  TR_TRY {
+    RenderFont& f = *r->fonts[font_id];
+    const sf::Preset* pr = sf::sf_preset(f.font, bank, prog);
+    if (!pr) return THUNDER_RENDER_E_ARG;   // a font with no preset at all
+    // Built first (the old copy stays until the new one is in): the room is what the budget leaves with the old copy still held.
+    std::unique_ptr<sf::PresetPcm> pcm(new sf::PresetPcm());
+    sf::DecodeOpts o; const uint64_t room = THUNDER_RENDER_MAX_PAD_BYTES - std::min<size_t>(r->padBytes, THUNDER_RENDER_MAX_PAD_BYTES);
+    o.presetBytes = std::min<uint64_t>(o.presetBytes, room);
+    // the font's counters: when this pad already holds a preset of the same font, its share is still counted (the new copy is built beside it)
+    uint64_t used = f.used, wused = f.workUsed; o.fontUsed = &used; o.fontWorkUsed = &wused;
+    const sf::PrepareStatus st = sf::prepare_preset(f.font, pr, o, *pcm, keys ? flags : nullptr);
+    if (st == sf::kPrepNoPreset) return THUNDER_RENDER_E_ARG;
+    if (st != sf::kPrepOk) return THUNDER_RENDER_E_LIMIT;
+    if (r->padBytes + (size_t)pcm->bytes + (size_t)pcm->tableBytes > THUNDER_RENDER_MAX_PAD_BYTES) return THUNDER_RENDER_E_LIMIT;   // (cannot happen: presetBytes was bounded by the room)
+    // committed: nothing below can fail
+    const size_t newBytes = (size_t)pcm->bytes + (size_t)pcm->tableBytes;   // the PCM and the per-sample-header table (verify-242 F2)
+    dropPadSf(r, pad);
+    r->fonts[font_id]->used += pcm->bytes; r->fonts[font_id]->workUsed += pcm->work;
+    r->sfPcm[pad] = std::move(pcm); r->sfFont[pad] = font_id; r->sfBytes[pad] = newBytes; r->padBytes += newBytes;
+    sf::SfPad sp; sp.font = &f.font; sp.pr = pr; sp.pcm = r->sfPcm[pad].get(); sp.P = P; r->pads.sf[pad] = sp;
+    return 0;
+  }
+  TR_CATCH_BADALLOC(return THUNDER_RENDER_E_MEMORY;)
+  TR_CATCH_ALL(r->dead = true; return THUNDER_RENDER_E_INTERNAL;)
+}
+
+int thunder_render_clear_pad_sf(thunder_render* r, int pad) {
+  if (!r) return THUNDER_RENDER_E_ARG;
+  if (r->dead || r->started) return THUNDER_RENDER_E_STATE;
+  if (!padOk(pad)) return THUNDER_RENDER_E_ARG;
+  dropPadSf(r, pad);
+  return 0;
 }
 
 }  // extern "C"

@@ -108,7 +108,7 @@ bool sf_resample(std::vector<float>& d, double from, double to);
 void decode_sample(const Font& f, uint32_t i, const DecodeOpts& o, Pcm& out);
 // A preset's samples (sfPreparePreset): the zones' samples and each stereo sample's partner. `byIndex` is sized to the font's sample count; an entry that is not wanted has present == false.
 struct PresetPcm {
-  std::vector<Pcm> byIndex; uint64_t bytes = 0, work = 0;   // work: the decode work units charged for it (the host subtracts it from `fontWorkUsed` when it drops the PresetPcm)
+  std::vector<Pcm> byIndex; uint64_t bytes = 0, work = 0, tableBytes = 0;   // tableBytes: what `byIndex` itself costs (one Pcm per sample header of the font, whether the preset wants it or not), counted in the preset's byte budget (and by the host, with `bytes`) BEFORE it is allocated (verify-242 F2). work: the decode work units charged for it (the host subtracts it from `fontWorkUsed` when it drops the PresetPcm)
   const Pcm* get(uint32_t i) const { return i < byIndex.size() && byIndex[i].present ? &byIndex[i] : nullptr; }   // the JS's SF.smp.get / D.smp[i]: undefined when not decoded
 };
 // `keys`: null = every zone of the preset (the whole keyboard); else 128 flags, and only the zones that cover a flagged key (any velocity) are decoded, with their stereo partners. A key whose zones are not

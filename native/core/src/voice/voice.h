@@ -16,6 +16,7 @@
 // the page play it), tOverflow() notes a track's list could not hold, autoDropped() automation events refused by a full list.
 #ifndef THUNDER_VOICE_VOICE_H
 #define THUNDER_VOICE_VOICE_H
+#include <cmath>
 #include <cstdint>
 #include <memory>
 
@@ -62,6 +63,16 @@ class VoicePool {
   void stp(const SeqEvent& e);                          // type 'stp'
   void stopAll(double at);                              // stopAll(at)
 
+  // THE POLY CAP ACROSS TWO POOLS (verify-242 F3). The JS keeps ONE voice list per track for the sampler's and the SoundFont's voices (core/core-processor.js :442-443 and :582-583:
+  // `while (T.length >= POLY) kill(T.shift())`), so the cap of four is shared. A renderer that keeps a second pool (sf::SfPool, same four calls) does the cap itself, oldest first
+  // across both, before it calls note() (whose own cap then finds room): stamp() gives the next voice its serial (the renderer's counter, so serials compare across pools),
+  // liveOnTrack() drops this track's ended voices as note() would and returns how many are left, oldestOnTrack() the serial of the oldest, releaseOldest() lets it go (T.shift() + kill 0.006).
+  void stamp(uint64_t serial) { stamp_ = serial; }
+  int liveOnTrack(int track, double t);
+  bool oldestOnTrack(int track, uint64_t& serial) const;
+  void releaseOldest(int track, double t);
+  static bool playable(const SeqEvent& e, const VoiceBuf& c) { return e.rate > 0 && std::isfinite(e.rate) && std::isfinite(e.t) && std::isfinite(e.gain) && c.sr > 0 && std::isfinite(c.sr) && c.len >= 2; }   // note() refuses what this refuses
+
   // One block: adds every live voice into its track's output. outL[track] / outR[track]: that track's two channels (null outL: the
   // track has no output, its voices are left as they are, as the JS's `continue`; null outR: mono, both sums go to outL).
   void render(float* const* outL, float* const* outR, int frames, double t0);
@@ -103,7 +114,7 @@ class VoicePool {
     AutoN<kAutoR> r{0}; AutoN<kAutoGFP> g{0}, f{1}, pn{0};
     const float *data = nullptr, *data2 = nullptr; int len = 0; double sr = 0;
     bool hasTrm = false, hasApn = false; Trm trm, apn;
-    double base = 0, rate = 0; int choke = 0, col = 0, track = 0;
+    double base = 0, rate = 0; int choke = 0, col = 0, track = 0; uint64_t ser = 0;
     bool ended = false, hasStop = false; double stopAt = 0;
     bool syn = false; double rel = 0, end = 0, pos = 0, t0 = 0;
     bool hasRd = false; Rd rd;
@@ -129,7 +140,7 @@ class VoicePool {
   std::unique_ptr<int[]> alive_, free_;
   int nAlive_ = 0, nFree_ = 0;
   int T_[kVoiceTracks][kVoiceTrackCap]; int nT_[kVoiceTracks];
-  uint32_t dropped_ = 0, tOver_ = 0, refused_ = 0; int peakV_ = 0, peakEv_ = 0;
+  uint32_t dropped_ = 0, tOver_ = 0, refused_ = 0; int peakV_ = 0, peakEv_ = 0; uint64_t stamp_ = 0;
 };
 
 }  // namespace thunder
