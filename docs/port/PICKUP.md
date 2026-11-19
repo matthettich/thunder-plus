@@ -87,6 +87,18 @@ plan; sections 1 to 4 and 9), `HANDOVER.md` on `beta` (the web app, the owner's 
   and never force-pushes. Neither PR is merged. The lead reads `chains/clive.cpp` and `cengine.cpp` line by line once U31's worker reports.
 - Check-ins (this chat): a restart check at 14:05, then after each usage reset: 15:02, 20:07 on 18 Nov; 01:12, 06:17 on 19 Nov (Mountain).
 
+## State at 06:25 on 19 Nov (the lead; newest)
+- **U31, the ...chains engine, is MERGED (#227): 33 of 37 units.** Three verification rounds (reports in `docs/port/reviews/verify-227*.md`); the last
+  CI run was on the branch with `native` merged in (308d2f1), nine jobs green. The first combined run had failed on one test, `render_api_oom`, whose
+  premise (a read allocates) stopped holding because U31 moved the effects' allocations to preparation: the lead changed the test to pass when a read
+  allocates nothing. Follow-ups F1 to F7 of round 3 and the notes-only items of round 2 (D6, D8, D10) are still to do in a small PR.
+- **Verification of #238 + #239: SOUND WITH CONDITIONS** (`docs/port/reviews/verify-238-239.md` arrives with the follow-up PR): D1 to D8 confirmed
+  fixed; one defect V1 (replacing a variation at the 512 MiB limit holds two copies), four test gaps, two header nits. Worker a0c0a0461610425b2 on
+  `n1/render-v1` (worktree `/home/claude/wt/renderv1`) is fixing them, plus `set_pad` dropping a pad's variations as the page does, and checking the
+  track-takeover rule against the JS. Noted for the master-chain unit: 1.5 dB lower RMS at 384 kHz than at 48 kHz.
+- **U32 follow-up:** worker afe6a6893a1478d8e on `n3/u32-d1`; last push c1aadff at 04:20; it was in its full ctest at 06:18, no PR yet.
+- **Owner's rule for this morning:** from 07:15 no new unit is started; running work finishes and is pushed; a fresh START HERE goes at the top.
+
 ## State at 04:50 on 19 Nov (the lead; newest)
 - **Dispatch routing is MERGED (#239, native 9efae76)**, CI green on nine jobs; the lead read the `render.cpp` diff line by line. MUT / GEN notes play
   a variation buffer the HOST supplies (`thunder_render_set_variation`; missing: silent + `notes_var_missing`, never the base pad); live-engine and
