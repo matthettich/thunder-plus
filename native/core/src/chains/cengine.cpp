@@ -68,7 +68,7 @@ const float* ChainsEngine::keyCb(void* user, double sck) {
 }
 
 // ---- the run list and the bypass numbers (_active, _bnMap): functions of the graph and the parameters, worked out on the control thread, allocation-free once compile() sized the scratch ----
-static int chainOutTrack(const ModNode& m) { const int k = waves::wparam(*m.wi, "track"); const double v = k >= 0 ? m.base[(size_t)k] : 0; return (int)clamp((double)(i32(v) - 1), 0, kChannels - 1); }
+static int chainOutTrack(const ModNode& m) { const int k = waves::wparam(*m.wi, "track"); const double v = k >= 0 ? m.base[(size_t)k] : 0; return (int)clamp(((double)i32(v) - 1), 0, kChannels - 1); }
 void ChainsEngine::prepareDerived(PatchImpl& P) const {
   const size_t n = P.mods.size();
   if (P.act.size() != n || P.actTel.size() != n || P.bn.size() != n || P.seen.size() != n || P.stk.size() < 2 * n + 2 || P.cmp.size() != n || P.cmpLow.size() != n + 1 || P.uaS.size() != n + 1) return;

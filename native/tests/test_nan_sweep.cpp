@@ -1,7 +1,7 @@
 // U31 verification round 2 (defect D1): no crash and no out-of-range read on ANY double reaching ANY parameter of ANY module type, in the ...chains engine and in the waves engine.
 // Raw parameters are not clamped (the JS does not clamp them either), and NaN / infinity cannot come from a song file (JSON has neither) but they CAN come from setParam / a live Param event.
 // For every module type that has a case "mod/<type>/default" in the committed golden (the patch of that case is the template: it has an input and an output, so the module does work), and for every
-// parameter of that type (and `_bn` / `_byp` in chains), a fresh engine is loaded, run for a few blocks, hit with setParam(NaN | +Inf | -Inf | 1e300 | -1e300) on that one parameter, and run for 25
+// parameter of that type (and `_bn` / `_byp` in chains), a fresh engine is loaded, run for a few blocks, hit with setParam(NaN | +Inf | -Inf | 1e300 | -1e300 | 3e38 | 1e-300) on that one parameter, and run for 25
 // more blocks. Then once more with the value on ALL parameters at once. Clean = no crash, and under -DTHUNDER_SANITIZE=ON no ASan / UBSan report (the sanitizer build is where this test earns its keep:
 // an index of INT_MIN into a table is a plain segfault in Release only when it lands in unmapped memory). Output that is not finite is NOT a failure (the JS gives NaN too, for most of these).
 // Usage: test_nan_sweep chains|waves <golden cases.json> [only-type]
@@ -24,8 +24,9 @@ using namespace thunder;
 static char g_cur[256] = "";
 static void onCrash(int sig) { std::fprintf(stderr, "nan_sweep: signal %d while running: %s\n", sig, g_cur); std::_Exit(2); }
 
-static const double kVals[5] = {NAN, INFINITY, -INFINITY, 1e300, -1e300};
-static const char* kValNames[5] = {"NaN", "+Inf", "-Inf", "1e300", "-1e300"};
+static const int kNV = 7;
+static const double kVals[kNV] = {NAN, INFINITY, -INFINITY, 1e300, -1e300, 3e38, 1e-300};
+static const char* kValNames[kNV] = {"NaN", "+Inf", "-Inf", "1e300", "-1e300", "3e38", "1e-300"};
 
 static std::string slurp(const std::string& p) { std::ifstream f(p, std::ios::binary); std::stringstream ss; ss << f.rdbuf(); return ss.str(); }
 
@@ -80,7 +81,7 @@ int main(int argc, char** argv) {
     types++;
     std::vector<std::string> all; for (int k = 0; k < wi->np; k++) all.push_back(wi->params[k].name);
     if (chains) { all.push_back("_bn"); all.push_back("_byp"); }
-    for (int v = 0; v < 5; v++) {
+    for (int v = 0; v < kNV; v++) {
       for (const std::string& p : all) { std::snprintf(g_cur, sizeof g_cur, "%s %s.%s = %s", chains ? "chains" : "waves", type.c_str(), p.c_str(), kValNames[v]); params++; runOne(chains, c, id, {p}, kVals[v], st); }
       std::snprintf(g_cur, sizeof g_cur, "%s %s all parameters = %s", chains ? "chains" : "waves", type.c_str(), kValNames[v]); runOne(chains, c, id, all, kVals[v], st);
     }

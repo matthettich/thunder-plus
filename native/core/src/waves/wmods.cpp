@@ -427,7 +427,7 @@ class Out : public WModule {
  public:
   Out(double, Seeds&) {}
   void process(const IO& io, const Ctx& c) override {
-    const WCtx& w = W(c); const int k = (int)clamp((double)(i32(io.p[0]) - 1), 0, kBuses - 1); const double g = io.p[1]; float* L = w.busL[k]; float* R = w.busR[k];
+    const WCtx& w = W(c); const int k = (int)clamp(((double)i32(io.p[0]) - 1), 0, kBuses - 1); const double g = io.p[1]; float* L = w.busL[k]; float* R = w.busR[k];
     const float* inR = lk(io, 1) ? io.in[1] : io.in[0];
     for (int i = 0; i < c.block; i++) { L[i] = (float)((double)L[i] + (double)io.in[0][i] * g); R[i] = (float)((double)R[i] + (double)inR[i] * g); }
   }

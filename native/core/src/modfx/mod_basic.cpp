@@ -101,7 +101,7 @@ class LoHiCut : public Module {
  public:
   LoHiCut(double, Seeds&) {}
   void process(const IO& io, const Ctx& c) override {
-    const double* p = io.p; const double sr = c.sr; const int B = c.block; const In L = inp(io, 0), R = inR(io, 0, 1); const Out oL = outp(io, 0), oR = outp(io, 1); const int sl = (int)clamp(js_round(p[2]), 0, 2);
+    const double* p = io.p; const double sr = c.sr; const int B = c.block; const In L = inp(io, 0), R = inR(io, 0, 1); const Out oL = outp(io, 0), oR = outp(io, 1); const double sl = clamp(js_round(p[2]), 0, 2);
     const bool loOn = p[0] > 20.5, hiOn = p[1] < 19900;
     const double lt = js_log2(clamp(p[0], 10, sr * .45)), ht = js_log2(clamp(p[1], 10, sr * .45));
     lo_ = lo_ < 0 ? lt : lo_ + (lt - lo_) * .3; hi_ = hi_ < 0 ? ht : hi_ + (ht - hi_) * .3;

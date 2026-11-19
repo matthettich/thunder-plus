@@ -13,6 +13,7 @@
 #if defined(__GLIBC__) && !defined(__SANITIZE_ADDRESS__)
 #define ALLOC_AUDIT 1
 #include <execinfo.h>
+#include <dlfcn.h>
 #endif
 #include "chains/chains.h"
 #include "rt/json.h"
@@ -24,7 +25,12 @@ extern "C" { void* __libc_malloc(size_t); void* __libc_calloc(size_t, size_t); v
 void* malloc(size_t n) { if (g_on) { g_on = 0; note("malloc"); g_on = 1; } return __libc_malloc(n); }
 void* calloc(size_t a, size_t b) { if (g_on) { g_on = 0; note("calloc"); g_on = 1; } return __libc_calloc(a, b); }
 void* realloc(void* p, size_t n) { if (g_on) { g_on = 0; note("realloc"); g_on = 1; } return __libc_realloc(p, n); }
-void free(void* p) { if (g_on && p) { g_on = 0; note("free"); g_on = 1; } __libc_free(p); } }
+void free(void* p) { if (g_on && p) { g_on = 0; note("free"); g_on = 1; } __libc_free(p); }
+// The aligned family (verifier D7): posix_memalign, aligned_alloc, memalign (and with them libstdc++'s aligned and nothrow operator new, which end in these or in malloc). The real ones are found with dlsym once.
+static void* nextSym(const char* n) { return dlsym(RTLD_NEXT, n); }
+int posix_memalign(void** r, size_t a, size_t n) { const int on = g_on; g_on = 0; static int (*f)(void**, size_t, size_t) = (int (*)(void**, size_t, size_t))nextSym("posix_memalign"); if (on) note("posix_memalign"); g_on = on; return f(r, a, n); }
+void* aligned_alloc(size_t a, size_t n) { const int on = g_on; g_on = 0; static void* (*f)(size_t, size_t) = (void* (*)(size_t, size_t))nextSym("aligned_alloc"); if (on) note("aligned_alloc"); g_on = on; return f(a, n); }
+void* memalign(size_t a, size_t n) { const int on = g_on; g_on = 0; static void* (*f)(size_t, size_t) = (void* (*)(size_t, size_t))nextSym("memalign"); if (on) note("memalign"); g_on = on; return f(a, n); } }
 #else
 static int g_on = 0; static unsigned long g_cnt = 0; static char g_first[1]; static bool g_have = false;
 #endif
@@ -33,6 +39,15 @@ int main(int argc, char** argv) {
 #ifndef ALLOC_AUDIT
   (void)argc; (void)argv; std::printf("chains_alloc: skipped (needs glibc without a sanitizer)\n"); return 77;
 #else
+  {   // the audit must SEE every way to allocate (verifier D7): each of these is counted while g_on is set
+    struct Al { alignas(64) char b[64]; }; auto esc = [](void* p) { asm volatile("" : : "r"(p) : "memory"); };   // (the compiler may drop a new that is deleted unused)
+    auto seen = [&](const char* what, auto&& f) { const unsigned long before = g_cnt; g_on = 1; f(); g_on = 0; if (g_cnt == before) { std::printf("chains_alloc: the audit does not see %s\n", what); std::exit(1); } };
+    seen("malloc", [] { void* p = std::malloc(24); std::free(p); }); seen("calloc", [] { void* p = std::calloc(3, 8); std::free(p); });
+    seen("posix_memalign", [] { void* p = nullptr; if (posix_memalign(&p, 64, 100) == 0) std::free(p); }); seen("aligned_alloc", [] { void* p = aligned_alloc(64, 128); std::free(p); });
+    seen("operator new", [&] { int* q = new int(1); esc(q); delete q; }); seen("operator new[]", [&] { char* q = new char[40]; esc(q); delete[] q; }); seen("operator new (nothrow)", [&] { int* q = new (std::nothrow) int(1); esc(q); delete q; });
+    seen("aligned operator new", [&] { Al* a = new Al; esc(a); delete a; }); seen("aligned operator new[]", [&] { Al* a = new Al[2]; esc(a); delete[] a; });
+    g_cnt = 0; g_have = false;
+  }
   const bool fast = argc > 1 && std::string(argv[1])=="fast"; const char* only = argc > 2 ? argv[2] : nullptr; const int onlyP = argc > 3 ? atoi(argv[3]) : -1;
   int bad = 0, tested = 0, expected = 0;   // expected: every type this build can run (a closed build has no library effects, Marbles, Tides or pump modules: fewer)
   for (int t = 0; t < cinfo_count(); t++) { const std::string ty = cinfo_at(t).type; if (ty != "trackIn" && ty != "chainOut" && chains_have_lib(ty)) expected++; }

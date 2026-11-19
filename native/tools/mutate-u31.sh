@@ -16,8 +16,8 @@ open(p,'w').write(s.replace(o,n))
 PY
   rc=$?
   if [ $rc -ne 0 ]; then mv "$f.orig" "$f"; touch "$f"; echo "mutation '$name': could not be applied"; bad=$((bad+1)); return; fi
-  if nice cmake --build "$B" -j1 --target test_chains test_chains_live test_chains_mem test_chains_alloc >/dev/null 2>&1; then
-    if timeout 600 "$B/tests/test_chains" $G >/dev/null 2>&1 && timeout 240 "$B/tests/test_chains_live" >/dev/null 2>&1 && timeout 240 "$B/tests/test_chains_mem" >/dev/null 2>&1 && timeout 240 "$B/tests/test_chains_alloc" >/dev/null 2>&1; then echo "mutation '$name': SURVIVED (the tests did not notice)"; bad=$((bad+1)); else echo "mutation '$name': killed"; ok=$((ok+1)); fi
+  if nice cmake --build "$B" -j1 --target test_chains test_chains_live test_chains_mem test_chains_alloc test_chains_bypass >/dev/null 2>&1; then
+    if timeout 600 "$B/tests/test_chains" $G >/dev/null 2>&1 && timeout 240 "$B/tests/test_chains_live" >/dev/null 2>&1 && timeout 240 "$B/tests/test_chains_mem" >/dev/null 2>&1 && timeout 240 "$B/tests/test_chains_alloc" >/dev/null 2>&1 && timeout 300 "$B/tests/test_chains_bypass" >/dev/null 2>&1; then echo "mutation '$name': SURVIVED (the tests did not notice)"; bad=$((bad+1)); else echo "mutation '$name': killed"; ok=$((ok+1)); fi
   else echo "mutation '$name': does not build"; bad=$((bad+1)); fi
   mv "$f.orig" "$f"; touch "$f"
 }
@@ -74,7 +74,10 @@ run "review D: one place less spare in the mailbox" chains/clive.cpp 'inflight >
 run "review H: the bypass fade does not carry across cuts" chains/clive.cpp 'node_.engine().setCarryFade(true);' 'node_.engine().setCarryFade(false);'
 run "review H: the carried fade restarts instead of continuing" chains/cengine.cpp 'const int f0 = carry ? m.fade : 0;' 'const int f0 = 0;'
 run "review J: a dropped take is not counted" chains/cengine.cpp 'e->stats_.droppedTakes++;' ''
+# verification round 2 (D5): the two test gaps the verifier found
+run "round2 D5a: a NaN becomes 0 in the raw parameter path" waves/graph.h 'm.bp[(size_t)k] = m.base[(size_t)k]; return; }   // U31' 'm.bp[(size_t)k] = m.base[(size_t)k] == m.base[(size_t)k] ? m.base[(size_t)k] : 0; return; }   // U31'
+run "round2 D5b: the carried fade follows the switches instead of its target" chains/cengine.cpp 'const bool want = carry ? m.fadeTo : sw < -.5' 'const bool want = sw < -.5'
 
-nice cmake --build "$B" -j1 --target test_chains test_chains_live test_chains_mem test_chains_alloc >/dev/null 2>&1
+nice cmake --build "$B" -j1 --target test_chains test_chains_live test_chains_mem test_chains_alloc test_chains_bypass >/dev/null 2>&1
 echo "mutations: $ok killed, $bad not"
 [ $bad -eq 0 ]

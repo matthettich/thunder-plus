@@ -174,7 +174,7 @@ class TrackIn : public WModule {
  public:
   TrackIn(double, Seeds&) {}
   void process(const IO& io, const Ctx& c) override {
-    const CCtx& x = CC(c); const int k = (int)clamp((double)(i32(io.p[0]) - 1), 0, kChannels - 1);
+    const CCtx& x = CC(c); const int k = (int)clamp(((double)i32(io.p[0]) - 1), 0, kChannels - 1);
     if (x.inL && x.inR && k < x.inChans) {
       std::memcpy(io.out[0], x.inL + (size_t)k * kBlock, sizeof(float) * (size_t)c.block); std::memcpy(io.out[1], x.inR + (size_t)k * kBlock, sizeof(float) * (size_t)c.block);
     } else { zeroOut(io.out[0]); zeroOut(io.out[1]); }   // (a track beyond the host's buffer: silence; the JS reads undefined there)
@@ -184,7 +184,7 @@ class ChainOut : public WModule {
  public:
   ChainOut(double, Seeds&) {}
   void process(const IO& io, const Ctx& c) override {
-    const CCtx& x = CC(c); const int k = (int)clamp((double)(i32(io.p[0]) - 1), 0, kChannels - 1); const double g = io.p[1]; float* L = x.busL(k); float* R = x.busR(k);
+    const CCtx& x = CC(c); const int k = (int)clamp(((double)i32(io.p[0]) - 1), 0, kChannels - 1); const double g = io.p[1]; float* L = x.busL(k); float* R = x.busR(k);
     const float* inR = io.linked[1] ? io.in[1] : io.in[0];
     for (int i = 0; i < c.block; i++) { L[i] = (float)((double)L[i] + (double)io.in[0][i] * g); R[i] = (float)((double)R[i] + (double)inR[i] * g); }
   }

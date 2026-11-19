@@ -164,6 +164,7 @@ class VowelFilter : public Module {
     const double voice = clamp(p[1], 0, 2), vi = jmin(1, std::floor(voice)), vf = voice - vi, sh = js_pow(2, clamp(p[2], -1, 1));
     const double bw = js_pow(2.5, 1 - 2 * clamp(p[3], 0, 1)), ea = 1 - js_exp(-1 / (sr * .005)), er = 1 - js_exp(-1 / (sr * .12));
     const double lfoD = clamp(p[5], 0, 1) * 2, envD = clamp(p[6], -1, 1) * 4, base = clamp(p[0], 0, 4), dph = clamp(p[4], 0, 40) * 8 / sr;
+    if (!(voice == voice)) { ctx.fail = true; return; }   // JS: VF_LF[NaN] is undefined and F0[k0] throws
     const int v0 = (int)vi; const double (*F0)[3] = kVfLf.v[v0], (*F1)[3] = kVfLf.v[v0 + 1];
     for (int i0 = 0; i0 < B; i0 += 8) {
       double q = base + lfoD * sinT(ph_) + envD * jmin(1, env_ * 2.5) + (cv ? inp(io, 2)[i0] * 4 : 0);
@@ -386,7 +387,7 @@ class EnvFilter : public Module {
     const double* p = io.p; const double sr = ctx.sr; const int B = ctx.block; const In L = inp(io, 0), R = inR(io, 0, 1); const Out oL = outp(io, 0), oR = outp(io, 1), oE = outp(io, 2);
     const bool scP = io.linked[2]; const float* K = !scP && p[1] > 0 ? keyOf(ctx, p[1]) : nullptr;
     const In SL = K ? In{K} : L, SR = K ? In{K} : R, SC = inp(io, 2);
-    const int mode = (int)clamp(js_round(p[0]), 0, 2); const double base = 40 * js_pow(400, clamp(p[2], 0, 1)), oct = clamp(p[3], -1, 1) * clamp(p[4], 0, 10) * kLn2;
+    const double mode = clamp(js_round(p[0]), 0, 2); const double base = 40 * js_pow(400, clamp(p[2], 0, 1)), oct = clamp(p[3], -1, 1) * clamp(p[4], 0, 10) * kLn2;
     const double k = 2 - 1.92 * clamp(p[5], 0, 1), comp = mode == 1 ? js_pow(k, .6) * 1.32 : js_pow(k / 2, .3);
     const double ka = 1 - js_exp(-1 / (sr * jmax(p[6], 1e-4))), kr = 1 - js_exp(-1 / (sr * jmax(p[7], 1e-3)));
     const double sg = .25 * js_pow(64, clamp(p[8], 0, 1)), dr = .25 + clamp(p[9], 0, 1) * 8, dn = 1 / js_tanh(dr), mx = clamp(p[10], 0, 1), fMax = sr * .45, pf = kPi / sr;
