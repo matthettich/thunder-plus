@@ -36,6 +36,10 @@ struct PumpSlot {
 // while the control thread is making or freeing an instance: the audio thread then leaves its pump slots alone for that block (they pass the sound) and does not wait.
 struct PumpGate { explicit PumpGate(bool use); ~PumpGate(); bool ok, used; PumpGate(const PumpGate&) = delete; PumpGate& operator=(const PumpGate&) = delete; };
 
+// U31: the …chains pump modules make and free their instances here (control thread, inside the gate)
+int pump_make_staged(int pt, const float* pv, int npv, double sr);
+void pump_free_ctl(int h);
+
 // pump's C entry points (wasm/pump_wasm.cpp), thin wrappers so the rest compiles without the library (no pump: every call is a no-op and a refused creation).
 namespace pump {
 bool available();

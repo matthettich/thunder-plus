@@ -3,14 +3,20 @@
 // (Float32Array stores), the steady clock at the song tempo (modsClock), the input / output copies of `n` samples, the exports' input and output sanitising (mods_process), and "a bad value came out:
 // start it afresh" (the object is made again with the same seed on the next block).
 // OFF by default (THUNDER_MODFX_MODS): the native build of the mods C++ is not bit-exact with the wasm the golden comes from (float-ULP differences; U21-NOTES.md). Not carried over from the JS: the wasm instance's 64-object limit (and its 375-block wait) and the instance crash / restart; the object is made in the constructor (the JS makes it at the first block).
+#include <cstdlib>
 #include <cstring>
 #include <memory>
+#include <new>
 #include <vector>
 
 #include <mods.h>   // dsp/mods/mods.h (the Mod base class and the factories)
 
 #include "modfx/bfutil.h"
 #include "modfx/mods.h"
+
+// (global scope: core/dsp/mods_marbles_inplace.cc, mods_tides_inplace.cc)
+size_t mods_marbles_size(); Mod* mods_marbles_make_at(void* mem, float sr, unsigned seed);
+size_t mods_tides_size(); Mod* mods_tides_make_at(void* mem, float sr);
 
 namespace thunder {
 namespace modfx {
@@ -20,20 +26,28 @@ namespace {
 const double kDivBeats[10] = {.0625, .125, 1.0 / 6, .25, 1.0 / 3, .5, 1, 2, 4, 8};
 inline double divBeats(double v) { return kDivBeats[(int)clamp((double)i32(v), 0, 9)]; }
 
+// U31: the objects are made IN storage this wrapper owns (made with the module, when the patch is prepared): the first block of Marbles (its seed is drawn then, arm()) and the "start afresh" after a bad value
+// allocate nothing. mods_*_make_at are in core/dsp/mods_marbles_inplace.cc / mods_tides_inplace.cc (the dsp/mods sources plus the maker; dsp/ itself is not edited).
 class ModsWrap : public Module {
  protected:
-  explicit ModsWrap(double sr, int type, uint32_t seed) : sr_(sr), type_(type), seed_(seed) { make(); }
-  void make() { m_.reset(type_ == 0 ? make_marbles((float)sr_, seed_) : make_tides((float)sr_)); fresh_ = true; }
+  explicit ModsWrap(double sr, int type, uint32_t seed) : sr_(sr), type_(type), seed_(seed) {
+    store_.resize((type == 0 ? mods_marbles_size() : mods_tides_size()) + 64);   // (a failed allocation is the throwing operator new's: the preparation boundary of the engine catches it)
+    mem_ = reinterpret_cast<unsigned char*>((reinterpret_cast<uintptr_t>(store_.data()) + 63) & ~static_cast<uintptr_t>(63));
+    make();
+  }
+  ~ModsWrap() override { kill(); }
+  void kill() { if (m_) { m_->~Mod(); m_ = nullptr; } }
+  void make() { kill(); m_ = type_ == 0 ? mods_marbles_make_at(mem_, (float)sr_, seed_) : mods_tides_make_at(mem_, (float)sr_); fresh_ = true; }
   // modsOpen: this module's object, made again after a bad value (the JS asks the instance; null: 64 in use, never here)
   bool open() { if (!m_) make(); return m_ != nullptr; }
   // modsRun: mods_process (the export): inputs outside (-64, 64) cleared, outputs outside (-16, 16) cleared; a bad output means "start afresh"
   void run(int n) {
-    if (n < 1 || n > kModBlock) { m_.reset(); return; }
+    if (n < 1 || n > kModBlock) { kill(); return; }
     for (int k = 0; k < kModInputs; ++k) for (int i = 0; i < n; ++i) { const float v = IN[k][i]; if (!(v > -64.f && v < 64.f)) IN[k][i] = 0.f; }
     m_->process(IN, OUT, n);
     bool ok = true;
     for (int k = 0; k < kModOutputs; ++k) for (int i = 0; i < n; ++i) { const float v = OUT[k][i]; if (!(v > -16.f && v < 16.f)) { OUT[k][i] = 0.f; ok = false; } }
-    if (!ok) m_.reset();
+    if (!ok) kill();
   }
   void P(int k, double v) { m_->p[k] = (float)v; }   // st.P is a Float32Array on the object's parameter block
   // modsClock: a steady clock at hz (high for the first half of each note value) written to IN[off + i]; rs: Reset (a rising edge starts a pulse)
@@ -46,7 +60,7 @@ class ModsWrap : public Module {
   }
   void cp(int port, const float* src, int n) { for (int i = 0; i < n; i++) IN[port][i] = src ? src[i] : 0.f; }
   void silence(const IO& io, int nout) { for (int k = 0; k < nout; k++) std::memset(io.out[k], 0, sizeof(float) * kBlock); }
-  std::unique_ptr<Mod> m_; double sr_; int type_; uint32_t seed_; bool fresh_ = true; double ck_ = -1; bool rk_ = false; Restart rs_;
+  std::vector<unsigned char> store_; unsigned char* mem_ = nullptr; Mod* m_ = nullptr; double sr_; int type_; uint32_t seed_; bool fresh_ = true; double ck_ = -1; bool rk_ = false; Restart rs_;
   float IN[kModInputs][kModBlock] = {}, OUT[kModOutputs][kModBlock] = {};
 };
 

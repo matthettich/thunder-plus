@@ -9,6 +9,7 @@
 #include "modfx/bfutil.h"
 #include "modfx/mods.h"
 #include "modfx/util.h"
+#include "waves/graph.h"
 #include "waves/waves.h"
 
 #ifdef THUNDER_HAVE_TFX
@@ -433,7 +434,7 @@ class Out : public WModule {
  public:
   Out(double, Seeds&) {}
   void process(const IO& io, const Ctx& c) override {
-    const WCtx& w = W(c); const int k = (int)clamp((double)(i32(io.p[0]) - 1), 0, kBuses - 1); const double g = io.p[1]; float* L = w.busL[k]; float* R = w.busR[k];
+    const WCtx& w = W(c); const int k = (int)clamp(((double)i32(io.p[0]) - 1), 0, kBuses - 1); const double g = io.p[1]; float* L = w.busL[k]; float* R = w.busR[k];
     const float* inR = lk(io, 1) ? io.in[1] : io.in[0];
     for (int i = 0; i < c.block; i++) { L[i] = (float)((double)L[i] + (double)io.in[0][i] * g); R[i] = (float)((double)R[i] + (double)inR[i] * g); }
   }
@@ -630,11 +631,10 @@ const uint16_t kMxDefault[] = {'a', ' ', '*', ' ', 'k', '1'};
 class Expression : public WModule {
  public:
   Expression(double, Seeds&) {}
+  void prepareText(const uint16_t* text, int len) override { ensureSrc(len >= 0 ? text : kMxDefault, len >= 0 ? len : 6); }   // U31: compiled when the patch is prepared; the first block finds the same text and compiles nothing
   void process(const IO& io, const Ctx& c) override {
     const WCtx& w = W(c); const uint16_t* txt = w.textLen >= 0 ? w.text : kMxDefault; const int tl = w.textLen >= 0 ? w.textLen : 6;
-    if (!haveSrc_ || tl != srcLen_ || (tl && std::memcmp(txt, src_, sizeof(uint16_t) * (size_t)tl))) {
-      haveSrc_ = true; srcLen_ = tl > 200 ? 200 : tl; std::memcpy(src_, txt, sizeof(uint16_t) * (size_t)srcLen_); mxCompile(src_, tl, prog_); y_ = 0;
-    }
+    ensureSrc(txt, tl);
     if (rs_(c)) n_ = 0;
     float* O = io.out[0];
     if (prog_.err) { for (int i = 0; i < c.block; i++) O[i] = 0; return; }
@@ -651,6 +651,11 @@ class Expression : public WModule {
     y_ = y; n_ = n; rs_s_ = useR ? rs : rs_s_;
   }
  private:
+  void ensureSrc(const uint16_t* txt, int tl) {
+    if (!haveSrc_ || tl != srcLen_ || (tl && std::memcmp(txt, src_, sizeof(uint16_t) * (size_t)tl))) {
+      haveSrc_ = true; srcLen_ = tl > 200 ? 200 : tl; std::memcpy(src_, txt, sizeof(uint16_t) * (size_t)srcLen_); mxCompile(src_, tl, prog_); y_ = 0;
+    }
+  }
   Restart rs_; XProg prog_; uint16_t src_[200]; int srcLen_ = 0; bool haveSrc_ = false; double y_ = 0, n_ = 0, S_[40] = {}, V_[11] = {}; uint32_t rs_s_ = 0;
 };
 
@@ -826,6 +831,8 @@ const Def* wdef(std::string_view type) {
   for (const Def& d : ownDefs()) if (t == d.type) return &d;
   return nullptr;
 }
+
+const ModTable& wavesTable() { static const ModTable t = {&winfo, &wdef}; return t; }
 
 bool waves_type_is_fx(std::string_view type) { const std::string t(type); for (const Own& o : kOwn) if (o.fx && t == o.type) return true; return false; }
 

@@ -268,7 +268,7 @@ class XStretch : public Module {
       for (int i = 0; i < N; i++) { const double q = o + i; x[i] = q >= 0 && q < hl ? h[(int)q] * (double)w[i] : 0.0; }
     } else {
       F32& rg = c.ring; const double lo = jmax(0, (double)wpos_ - cap), hi = (double)wpos_;
-      double q = at; int k = (int)jmod(jmod(at, cap) + cap, cap);
+      double q = at; const double kd = jmod(jmod(at, cap) + cap, cap); int k = kd == kd ? (int)kd : 0;   // (a NaN `at`: q is NaN, no sample is read: the JS reads none either)
       for (int i = 0; i < N; i++, q++) { const double v = q >= lo && q < hi ? rg[k] * (double)w[i] : 0.0; x[i] = v; e += v * v; if (++k == cap_) k = 0; }
     }
     return e;

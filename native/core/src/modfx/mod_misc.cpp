@@ -65,7 +65,8 @@ class Harmonizer : public Module {
     const double L0 = js_round(W * .5); double bl = L0, bv = -INFINITY;
     for (double L = L0; L < L0 + PER; L += 6) { const double v = harmScore(N, d, d + dir * L, 12); if (v > bv) { bv = v; bl = L; } }
     const double c0 = bl; bv = -INFINITY;
-    for (double L = c0 - 5; L <= c0 + 5; L++) { const double v = harmScore(N, d, d + dir * L, 3); if (v > bv) { bv = v; bl = L; } }
+    // eleven candidates c0-5 .. c0+5, counted: the JS's `for (L = c0 - 5; L <= c0 + 5; L++)` never ends when c0 is infinite (a window parameter of -Infinity) or so large that L + 1 == L; the same numbers where it ends
+    for (int k = -5; k <= 5; k++) { const double L = c0 + k; const double v = harmScore(N, d, d + dir * L, 3); if (v > bv) { bv = v; bl = L; } }
     return d + dir * bl;
   }
   F32 b_; int w_ = 0; Voice v_[2];
@@ -226,11 +227,12 @@ class Life : public Module {
     for (int y = 0; y < 8; y++) cur_[y] = (uint16_t)(nx[y] & m);
     gen_++;
   }
+  // (the JS's `1 << n` in lifeStep: the count is taken mod 32, and an out-of-range rot gives a negative n; a plain C++ shift of it is undefined)
   void lifeStep(const double* p, int32_t W) {
     x_++;
     if (x_ >= W) { x_ = 0; if (i32(p[2]) > 0 && gen_ + 1 >= i32(p[2])) load(p); else next(p); }
     int32_t f = 0, c = 0;
-    for (int y = 0; y < 8; y++) { const int a = (cur_[y] >> x_) & 1, b = (prev_[y] >> x_) & 1; c += a; if (p[3] >= .5 ? (a && !b) : a) f |= 1 << ((y + i32(p[5])) % 8); }
+    for (int y = 0; y < 8; y++) { const int a = (cur_[y] >> x_) & 1, b = (prev_[y] >> x_) & 1; c += a; if (p[3] >= .5 ? (a && !b) : a) f |= (int32_t)(1u << (((y + i32(p[5])) % 8) & 31)); }
     fire_ = f; cnt_ = c;
   }
   uint16_t cur_[8] = {}, prev_[8] = {}; int32_t SG_[8]; int32_t x_ = -1, gen_ = 0, fire_ = 0, cnt_ = 0; double ph_ = 1; bool lc_ = false, lr_ = false; Restart rs_;

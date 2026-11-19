@@ -1,0 +1,100 @@
+// U31: the allocation audit of the live audio path over EVERY …chains module type (a verifier's driver made permanent): for each type a patch (Track In -> the module, every parameter at its maximum -> Chain Out) is
+// PREPARED, then swapped in by the live runner and run for 40 blocks of 128 / 77 / 300 frames with a parameter event for every parameter, a Bypass, a _bn change and a tempo change in every block; malloc / calloc /
+// realloc / free / operator new / delete are COUNTED while ChainsLive::process runs (service() runs outside it). Any call is a failure and the type is named with the first call's stack. Linux (glibc), not
+// under a sanitizer (they bring their own allocator): elsewhere the test is skipped (exit 77).
+#include <algorithm>
+#include <cmath>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+#include <new>
+#include <string>
+#include <vector>
+#if defined(__GLIBC__) && !defined(__SANITIZE_ADDRESS__)
+#define ALLOC_AUDIT 1
+#include <execinfo.h>
+#include <dlfcn.h>
+#endif
+#include "chains/chains.h"
+#include "rt/json.h"
+using namespace thunder; using namespace thunder::chains;
+#ifdef ALLOC_AUDIT
+static thread_local int g_on = 0; static thread_local unsigned long g_cnt = 0; static thread_local char g_first[2048]; static thread_local bool g_have = false;
+static void note(const char* w) { g_cnt++; if (!g_have) { g_have = true; void* bt[14]; int n = backtrace(bt, 14); char** sy = backtrace_symbols(bt, n); std::snprintf(g_first, sizeof g_first, "%s", w); for (int i = 2; i < n && std::strlen(g_first) < 1700; i++) { std::strcat(g_first, " <- "); std::strncat(g_first, sy[i], 110); } std::free(sy); } }
+extern "C" { void* __libc_malloc(size_t); void* __libc_calloc(size_t, size_t); void* __libc_realloc(void*, size_t); void __libc_free(void*);
+void* malloc(size_t n) { if (g_on) { g_on = 0; note("malloc"); g_on = 1; } return __libc_malloc(n); }
+void* calloc(size_t a, size_t b) { if (g_on) { g_on = 0; note("calloc"); g_on = 1; } return __libc_calloc(a, b); }
+void* realloc(void* p, size_t n) { if (g_on) { g_on = 0; note("realloc"); g_on = 1; } return __libc_realloc(p, n); }
+void free(void* p) { if (g_on && p) { g_on = 0; note("free"); g_on = 1; } __libc_free(p); }
+// The aligned family (verifier D7): posix_memalign, aligned_alloc, memalign (and with them libstdc++'s aligned and nothrow operator new, which end in these or in malloc). The real ones are found with dlsym once.
+static void* nextSym(const char* n) { return dlsym(RTLD_NEXT, n); }
+int posix_memalign(void** r, size_t a, size_t n) { const int on = g_on; g_on = 0; static int (*f)(void**, size_t, size_t) = (int (*)(void**, size_t, size_t))nextSym("posix_memalign"); if (on) note("posix_memalign"); g_on = on; return f(r, a, n); }
+void* aligned_alloc(size_t a, size_t n) { const int on = g_on; g_on = 0; static void* (*f)(size_t, size_t) = (void* (*)(size_t, size_t))nextSym("aligned_alloc"); if (on) note("aligned_alloc"); g_on = on; return f(a, n); }
+void* memalign(size_t a, size_t n) { const int on = g_on; g_on = 0; static void* (*f)(size_t, size_t) = (void* (*)(size_t, size_t))nextSym("memalign"); if (on) note("memalign"); g_on = on; return f(a, n); } }
+#else
+static int g_on = 0; static unsigned long g_cnt = 0; static char g_first[1]; static bool g_have = false;
+#endif
+struct Doc { JsonDoc d; Json r; explicit Doc(const std::string& t) { if (!d.parse(t)) std::printf("bad json: %s\n", t.c_str()); r = d.root(); } };
+int main(int argc, char** argv) {
+#ifndef ALLOC_AUDIT
+  (void)argc; (void)argv; std::printf("chains_alloc: skipped (needs glibc without a sanitizer)\n"); return 77;
+#else
+  {   // the audit must SEE every way to allocate (verifier D7): each of these is counted while g_on is set
+    struct Al { alignas(64) char b[64]; }; auto esc = [](void* p) { asm volatile("" : : "r"(p) : "memory"); };   // (the compiler may drop a new that is deleted unused)
+    auto seen = [&](const char* what, auto&& f) { const unsigned long before = g_cnt; g_on = 1; f(); g_on = 0; if (g_cnt == before) { std::printf("chains_alloc: the audit does not see %s\n", what); std::exit(1); } };
+    seen("malloc", [] { void* p = std::malloc(24); std::free(p); }); seen("calloc", [] { void* p = std::calloc(3, 8); std::free(p); });
+    seen("posix_memalign", [] { void* p = nullptr; if (posix_memalign(&p, 64, 100) == 0) std::free(p); }); seen("aligned_alloc", [] { void* p = aligned_alloc(64, 128); std::free(p); });
+    seen("operator new", [&] { int* q = new int(1); esc(q); delete q; }); seen("operator new[]", [&] { char* q = new char[40]; esc(q); delete[] q; }); seen("operator new (nothrow)", [&] { int* q = new (std::nothrow) int(1); esc(q); delete q; });
+    seen("aligned operator new", [&] { Al* a = new Al; esc(a); delete a; }); seen("aligned operator new[]", [&] { Al* a = new Al[2]; esc(a); delete[] a; });
+    g_cnt = 0; g_have = false;
+  }
+  const bool fast = argc > 1 && std::string(argv[1])=="fast"; const char* only = argc > 2 ? argv[2] : nullptr; const int onlyP = argc > 3 ? atoi(argv[3]) : -1;
+  int bad = 0, tested = 0, expected = 0;   // expected: every type this build can run (a closed build has no library effects, Marbles, Tides or pump modules: fewer)
+  for (int t = 0; t < cinfo_count(); t++) { const std::string ty = cinfo_at(t).type; if (ty != "trackIn" && ty != "chainOut" && chains_have_lib(ty)) expected++; }
+  for (int t = 0; t < cinfo_count(); t++) {
+    const WInfo& wi = cinfo_at(t); const std::string type = wi.type;
+    if (type == "trackIn" || type == "chainOut") continue;
+    if (!chains_have_lib(type)) continue; if (only && type != only) continue;
+    std::string ps; for (int k = 0; k < wi.np; k++) { char b[160]; std::snprintf(b, sizeof b, "%s\"%s\":%.17g", k ? "," : "", wi.params[k].name, wi.params[k].mx); ps += b; }
+    std::string cab = "{\"from\":[\"a\",\"out\"],\"to\":[\"m\",\"in\"]},{\"from\":[\"a\",\"outR\"],\"to\":[\"m\",\"inR\"]}"; std::string txt = type == "expr" ? ",\"text\":\"a*0.5+tanh(b)\"" : "";
+    std::string outs; for (int k = 0; k < wi.nout && k < 2; k++) outs += std::string(",{\"from\":[\"m\",\"") + wi.out[k].name + "\"],\"to\":[\"c\",\"" + (k ? "inR" : "in") + "\"]}";
+    std::string pm = std::string("{\"modules\":[{\"id\":\"a\",\"type\":\"trackIn\",\"params\":{\"track\":1}},{\"id\":\"m\",\"type\":\"") + type + "\",\"params\":{" + ps + "}" + txt + "},{\"id\":\"c\",\"type\":\"chainOut\",\"params\":{\"track\":1}}],\"cables\":[" + cab + outs + "]}";
+    std::string pm0 = std::string("{\"modules\":[{\"id\":\"a\",\"type\":\"trackIn\",\"params\":{\"track\":1}},{\"id\":\"c\",\"type\":\"chainOut\",\"params\":{\"track\":1}}],\"cables\":[{\"from\":[\"a\",\"out\"],\"to\":[\"c\",\"in\"]}]}");
+    Doc d0(pm0), d1(pm); waves::Host host; host.setFixed(.3);
+    ChainsLive L(48000, 0, ChainsLiveConfig(), &host); if (!L.valid() || !L.node().engine().loadPatch(d0.r)) { std::printf("%s: cannot start\n", type.c_str()); continue; }
+    if (!L.preparePatch(d1.r, 300)) { std::printf("%s: patch refused\n", type.c_str()); continue; }
+    std::vector<float> x(4096), l(4096), r(4096); uint32_t s = 5; for (float& v : x) { s = s * 1664525u + 1013904223u; v = ((float)(s >> 8) / 16777216.f - .5f) * 1.6f; }
+    g_cnt = 0; g_have = false; tested++;
+    for (int b = 0; b < (fast ? 12 : 40); b++) {
+      // events (control side, not under the flag): a parameter change of every parameter, a bypass, _bn, tempo
+      for (int k = 0; k < wi.np; k++) if (onlyP < 0 || k == onlyP) L.postParam("m", wi.params[k].name, wi.params[k].mn + (wi.params[k].mx - wi.params[k].mn) * ((b * 7 + k * 3) % 11) / 10.0, L.enginePos() + 200 + 5 * k);
+      if (b == 5) L.postParam("m", "_bn", 3, L.enginePos() + 160);
+      { ChainsEvent te; te.kind = ChainsEvent::Tempo; te.at = L.enginePos() + 170; te.a = 90 + b; L.post(te); }
+      ChainsEvent e; e.kind = ChainsEvent::Bypass; e.at = L.enginePos() + 190; e.a = 3; e.b = (b & 1) ? 1 : -1; L.post(e);
+      NodeIn ni; ni.inL = x.data(); ni.inR = x.data() + 100; NodeOut no; no.L = l.data(); no.R = r.data();
+      const int n = (b % 3 == 0) ? 128 : (b % 3 == 1 ? 77 : 300);
+      g_on = 1; L.process(ni, no, n); g_on = 0;
+      L.service();
+    }
+    if (g_cnt) { bad++; std::printf("ALLOC on the audio path: %-10s %lu allocator calls; first: %s\n", type.c_str(), g_cnt, g_first); }
+  }
+  { // J: Resample takes: the take queue holds 16; with 18 Resample modules each finishing one take and nobody popping, two takes find it full and are dropped IN PLACE (their buffers marked free again): no allocator call, no free
+    std::string pm = "{\"modules\":[{\"id\":\"a\",\"type\":\"trackIn\"}"; std::string cb;
+    for (int i = 0; i < 18; i++) { pm += ",{\"id\":\"s" + std::to_string(i) + "\",\"type\":\"resample\",\"params\":{\"rec\":1,\"bars\":0,\"pad\":5,\"slices\":4}}"; cb += std::string(i ? "," : "") + "{\"from\":[\"a\",\"out\"],\"to\":[\"s" + std::to_string(i) + "\",\"in\"]}"; }
+    pm += ",{\"id\":\"c\",\"type\":\"chainOut\"}],\"cables\":[" + cb + "]}"; Doc dj(pm);
+    EngineOptions o; o.transport.playing = true; o.transport.tempo = 120; waves::Host host; ChainsEngine e(48000, o, &host);
+    if (!e.loadPatch(dj.r)) { std::printf("take overflow: patch refused (%s)\n", e.lastError().c_str()); bad++; }
+    else {
+      std::vector<float> x(128 * 900); uint32_t sd = 3; for (float& v : x) { sd = sd * 1664525u + 1013904223u; v = ((float)(sd >> 8) / 16777216.f - .5f); }
+      g_cnt = 0; g_have = false;
+      for (int b = 0; b < 900; b++) { e.setTrackInputs(&x[(size_t)b * 128], &x[(size_t)b * 128], 1); g_on = 1; e.process(128); g_on = 0; }
+      int popped = 0; ResampleTake tk; while (e.popTake(&tk)) { popped++; e.releaseTake(tk); }
+      std::printf("take overflow: %d takes popped, %llu dropped in place, %lu allocator calls on the audio path\n", popped, (unsigned long long)e.stats().droppedTakes, g_cnt);
+      if (g_cnt) { bad++; std::printf("ALLOC with a full take queue; first: %s\n", g_first); }
+      if (popped != 16 || e.stats().droppedTakes != 2) { bad++; std::printf("take overflow: wanted 16 popped and 2 dropped\n"); }
+    }
+  }
+  std::printf("chains_alloc: audited %d module types through the live runner (patch swap + parameter / bypass / tempo events), %d allocated on the audio path\n", tested, bad);
+  return (bad || (!only && (tested != expected || tested < 90))) ? 1 : 0;
+#endif
+}

@@ -307,13 +307,15 @@ class GateDelay : public Module {
  public:
   explicit GateDelay(double sr, Seeds&) : b_(new uint8_t[(size_t)std::ceil(sr * 2) + 2]()), M_((int)std::ceil(sr * 2) + 2) {}
   void process(const IO& io, const Ctx& c) override {
-    const In G = inp(io, 0); const Out O = outp(io, 0); const int M = M_; const int d = (int)clamp(js_round(io.p[0] * c.sr), 0, M - 1); const double L = js_round(io.p[1] * c.sr);
+    const In G = inp(io, 0); const Out O = outp(io, 0); const int M = M_; const double dd = clamp(js_round(io.p[0] * c.sr), 0, M - 1); const double L = js_round(io.p[1] * c.sr);
+    // JS: a NaN delay makes the read index NaN, b[NaN] is undefined: x is undefined (falsy; stored as NaN in the output; `lo = x` is falsy). Native: no index at all then.
+    const bool bad = !(dd == dd); const int d = bad ? 0 : (int)dd;
     for (int i = 0; i < c.block; i++) {
       b_[w_] = G[i] >= .5 ? 1 : 0;
-      int r = w_ - d; if (r < 0) r += M; const int x = b_[r];
+      int r = w_ - d; if (r < 0) r += M; const int x = bad ? 0 : b_[r];
       if (++w_ >= M) w_ = 0;
       if (L > 0) { if (x && !lo_) hold_ = L; O[i] = hold_ > 0 ? 1 : 0; if (hold_ > 0) hold_--; }
-      else { O[i] = x; hold_ = 0; }
+      else { O[i] = bad ? (float)NAN : (float)x; hold_ = 0; }
       lo_ = x;
     }
   }

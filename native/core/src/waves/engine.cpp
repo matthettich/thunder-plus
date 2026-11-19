@@ -4,9 +4,11 @@
 #include <cmath>
 #include <cstring>
 #include <unordered_map>
+#include <unordered_set>
 
 #include "modfx/util.h"
 #include "modfx/bfutil.h"
+#include "waves/graph.h"
 #include "waves/waves.h"
 
 namespace thunder {
@@ -52,233 +54,7 @@ int VoicePool::on(double pitch, double vel) {
 void VoicePool::off(double pitch) { for (VoiceRow& r : rows) if (r.gate != 0 && r.pitch == pitch) { r.gate = 0; r.offAt = now; } }
 void VoicePool::allOff() { for (VoiceRow& r : rows) if (r.gate != 0) { r.gate = 0; r.offAt = now; } }
 
-// ---- text ---------------------------------------------------------------------------------------------------------------------------
-static int toU16(std::string_view s, uint16_t* out, int maxUnits) {
-  int n = 0; size_t i = 0;
-  while (i < s.size() && n < maxUnits) {
-    const unsigned char c = (unsigned char)s[i]; uint32_t cp; int len;
-    if (c < 0x80) { cp = c; len = 1; }
-    else if ((c >> 5) == 6 && i + 1 < s.size()) { cp = ((c & 31u) << 6) | ((unsigned char)s[i + 1] & 63u); len = 2; }
-    else if ((c >> 4) == 14 && i + 2 < s.size()) { cp = ((c & 15u) << 12) | (((unsigned char)s[i + 1] & 63u) << 6) | ((unsigned char)s[i + 2] & 63u); len = 3; }
-    else if ((c >> 3) == 30 && i + 3 < s.size()) { cp = ((c & 7u) << 18) | (((unsigned char)s[i + 1] & 63u) << 12) | (((unsigned char)s[i + 2] & 63u) << 6) | ((unsigned char)s[i + 3] & 63u); len = 4; }
-    else { cp = 0xFFFD; len = 1; }
-    i += (size_t)len;
-    if (cp >= 0x10000) { cp -= 0x10000; out[n++] = (uint16_t)(0xD800 + (cp >> 10)); if (n < maxUnits) out[n++] = (uint16_t)(0xDC00 + (cp & 1023)); }
-    else out[n++] = (uint16_t)cp;
-  }
-  return n;
-}
-
-// ---- the patch (Graph + the module states and buffers the engine keeps in _ios / _states) --------------------------------------------------
-namespace {
-struct ModNode;
-struct GCable { ModNode* src = nullptr; int srcPort = -1; bool srcAudio = false; int dstIn = -1; int dstParam = -1; bool isParam = false; bool fb = false; };
-struct CableRec { std::string a0, a1, b0, b1; bool fb = false; };
-
-struct Slot {
-  std::unique_ptr<Module> mod; bool armed = false; uint32_t drawn = 0;
-  std::vector<float> buf; float* in[modfx::kMaxPorts] = {}; float* out[modfx::kMaxPorts] = {};
-  bool asleep = false;
-  std::vector<float> mb; std::vector<char> inMo;   // the modulation buffers (one per parameter, kept) and the set in use
-  int moVer = -1; std::vector<double> pm; const double* p = nullptr;
-};
-struct ModNode {
-  std::string id; const WInfo* wi = nullptr; const Def* def = nullptr;
-  std::vector<uint16_t> text; int textLen = -1; std::vector<double> base, bp;   // base: the parameter values as set (the JS's inst.params); bp: the same held inside each parameter's range (what the modules get) int textLen = -1;
-  bool poly = false; int idx = 0; bool inOnly = false;
-  std::vector<GCable> inc; bool linked[modfx::kMaxPorts] = {}; std::vector<int> exits;
-  std::vector<Slot> slots; bool slotsMade = false; bool slotsPoly = false; int weight = 1;
-  int tailT = -1, tailF = -1, tailD = -1;
-};
-int weightOf(const WInfo& w) {
-  const std::string_view t = w.type;
-  if (t == "plaits" || t == "elements") return 64;
-  if (w.flags & kWF_Effect) return 32;
-  static const char* const big[] = {"spectral", "stretch", "convolve", "dline", "bbd", "spring", "plate", "lverb", "ensemble", "reverse", "gdelay", "harm", "dimension", "autotune", "vowel", "rotary",
-    "sdelay", "marbles", "tides", "pdelay", "preverb", "string", "additive", "reson", "flex", "sgate", "retrig"};
-  for (const char* b : big) if (t == b) return 16;
-  return 1;
-}
-// Hostile values: a module's parameter outside its declared range crashes some modules (the fuzz found it) where the JS computes with it. Held inside the range, a NaN taking the default; in range nothing changes.
-void repin(ModNode& m) {
-  m.bp.resize(m.base.size());
-  for (int k = 0; k < m.wi->np; k++) { const modfx::ParamDef& d = m.wi->params[k]; const double v = m.base[(size_t)k]; m.bp[(size_t)k] = v != v ? d.def : v < d.mn ? d.mn : v > d.mx ? d.mx : v; }
-}
-inline bool isParamPort(const std::string& p) { return p.size() >= 2 && p[0] == 'p' && p[1] == ':'; }
-bool truthyJ(Json v) {
-  if (v.missing() || v.isNull()) return false;
-  if (v.isBool()) return v.asBool();
-  if (v.isNum()) { const double d = v.asNum(); return d != 0 && d == d; }
-  if (v.isStr()) return !v.asStr().empty();
-  return true;
-}
-// a port name of any JSON type, as text that no real port has when it is not a string
-std::string portText(Json v) { if (v.isStr()) return std::string(v.asStr()); return std::string("\x01") + std::to_string((int)v.type()) + (v.isNum() ? std::string(v.numText()) : std::string()); }
-}  // namespace
-
-class PatchImpl {
- public:
-  PatchImpl(WavesEngine* e, double sr_, int nVoices_, Host* h) : eng(e), sr(sr_), nVoices(nVoices_), N((double)nVoices_), host(h) { seeds.host = h; seeds.armed = true; }
-  ~PatchImpl() { destroyAll(); }
-  WavesEngine* eng; double sr; int nVoices; double N; Host* host;
-  WSeeds seeds;   // the engine's nextSeed(): a module keeps a reference to it (ChanceGate draws at its first block); armed = real draws, off while a module is being made
-  std::vector<std::unique_ptr<ModNode>> mods; std::unordered_map<std::string, ModNode*> byId;
-  std::vector<CableRec> cables; std::vector<ModNode*> order, tails; uint32_t ver = 0;
-  int instances = 0, weight = 0; int nMods = 0, nCables = 0;
-  bool hasT = false; Transport tpart; bool tTempo = false, tLpb = false, tTicks = false, tPpq = false, tStart = false, tPlaying = false;   // the doc's transport, applied at the swap
-  std::vector<float> fbS = std::vector<float>(kBlock);
-  // scratch of compile()
-  std::vector<int> indeg, q; std::vector<std::vector<int>> adj; std::vector<char> inOrder;
-  std::vector<char> cullKeep; std::vector<int> cullStack;   // doCull's scratch, sized by compile() (the audio thread allocates nothing)
-
-  ModNode* find(const std::string& id) const { auto it = byId.find(id); return it == byId.end() ? nullptr : it->second; }
-  void destroySlot(ModNode& m, Slot& s) {
-    if (s.armed && s.mod && (m.wi->flags & kWF_PlaysNotes)) static_cast<WModule*>(s.mod.get())->destroy(eng);
-    s.armed = false;
-  }
-  void letGo() { for (auto& m : mods) for (Slot& s : m->slots) destroySlot(*m, s); }   // _reset() on the audio thread (a live swap): the destroy hooks only, nothing is freed here
-  void destroyNodeSlots(ModNode& m) { for (Slot& s : m.slots) destroySlot(m, s); instances -= (int)m.slots.size(); weight -= (int)m.slots.size() * m.weight; m.slots.clear(); m.slotsMade = false; }
-  void destroyAll() { for (auto& m : mods) destroyNodeSlots(*m); }
-
-  // ---- Graph ----
-  void compile() {
-    const size_t n = mods.size();
-    for (size_t i = 0; i < n; i++) { mods[i]->idx = (int)i; mods[i]->inc.clear(); for (bool& b : mods[i]->linked) b = false; mods[i]->exits.clear(); }
-    indeg.assign(n, 0); adj.resize(n); for (auto& a : adj) a.clear();
-    for (const CableRec& c : cables) {
-      ModNode* a = find(c.a0); ModNode* b = find(c.b0); if (!a || !b) continue;
-      GCable g; g.src = a; g.fb = c.fb; g.srcPort = wport_out(*a->wi, c.a1); g.srcAudio = g.srcPort >= 0 && std::string_view(a->wi->out[g.srcPort].kind) == "audio";
-      if (isParamPort(c.b1)) { g.isParam = true; g.dstParam = wparam(*b->wi, std::string_view(c.b1).substr(2)); }
-      else { g.dstIn = wport_in(*b->wi, c.b1); if (g.dstIn >= 0) b->linked[g.dstIn] = true; }
-      b->inc.push_back(g);
-      if (c.fb) continue;
-      adj[(size_t)a->idx].push_back(b->idx); indeg[(size_t)b->idx]++;
-    }
-    q.clear(); for (size_t i = 0; i < n; i++) if (indeg[i] == 0) q.push_back((int)i);
-    order.clear(); inOrder.assign(n, 0);
-    for (size_t h = 0; h < q.size(); h++) {
-      const int k = q[h]; order.push_back(mods[(size_t)k].get()); inOrder[(size_t)k] = 1;
-      for (int nx : adj[(size_t)k]) if (--indeg[(size_t)nx] == 0) q.push_back(nx);
-    }
-    for (size_t i = 0; i < n; i++) if (!inOrder[i]) order.push_back(mods[i].get());
-    ver++; cullKeep.assign(n, 0); cullStack.clear(); cullStack.reserve(2 * n + 2);
-    for (ModNode* m : order) {
-      const int s = m->wi->scope;
-      if (s == 2) m->poly = true; else if (s == 0) m->poly = false;
-      else { bool any = false; for (const GCable& c : m->inc) if (!c.fb && c.src && c.src->poly) { any = true; break; } m->poly = any; }
-    }
-    tails.clear(); for (auto& m : mods) if (m->poly && (m->wi->flags & kWF_Tail)) tails.push_back(m.get());
-    for (const CableRec& c : cables) {
-      ModNode* a = find(c.a0); ModNode* b = find(c.b0); if (!a || !b || !a->poly || b->poly || isParamPort(c.b1)) continue;
-      const int po = wport_out(*a->wi, c.a1); if (po < 0 || std::string_view(a->wi->out[po].kind) != "audio") continue;
-      a->exits.push_back(po);
-    }
-  }
-  bool addCable(const CableRec& c, bool fb) {   // Graph.connect: returns true when it compiled
-    if (!find(c.a0) || !find(c.b0)) return false;
-    for (CableRec& o : cables) if (o.a0 == c.a0 && o.a1 == c.a1 && o.b0 == c.b0 && o.b1 == c.b1) { if (o.fb != fb) { o.fb = fb; compile(); return true; } return false; }
-    CableRec r = c; r.fb = fb; cables.push_back(r); compile(); return true;
-  }
-  void dropCables(const std::string& id) { cables.erase(std::remove_if(cables.begin(), cables.end(), [&](const CableRec& c) { return c.a0 == id || c.b0 == id; }), cables.end()); }
-  void removeNode(const std::string& id) {
-    ModNode* m = find(id); if (m) destroyNodeSlots(*m);
-    if (m) { byId.erase(id); mods.erase(std::remove_if(mods.begin(), mods.end(), [&](const std::unique_ptr<ModNode>& p) { return p.get() == m; }), mods.end()); }
-    dropCables(id); compile();
-  }
-  // false: refused (a known type with an id the JS's own keys cannot hold)
-  bool addNode(std::string_view id, std::string_view type, Json o) {
-    const WInfo* wi = winfo(type); if (!wi) return true;   // unknown type: nothing, as the JS
-    if (id.find('#') != std::string_view::npos || id.empty()) return false;
-    const std::string sid(id);
-    if (find(sid)) removeNode(sid);
-    auto m = std::make_unique<ModNode>(); m->id = sid; m->wi = wi; m->def = wdef(type); m->weight = weightOf(*wi);
-    m->base.resize((size_t)wi->np);
-    const Json ps = o.obj("params");
-    for (int k = 0; k < wi->np; k++) { Json v = ps.get(wi->params[k].name); m->base[(size_t)k] = v.isNum() ? v.asNum() : wi->params[k].def; }
-    repin(*m);
-    if (wi->flags & kWF_Text) { Json t = o.get("text"); if (t.isStr()) { m->text.resize(kMaxText); const int n = toU16(t.asStr(), m->text.data(), kMaxText); m->text.resize((size_t)n); m->textLen = n; } }
-    if (wi->flags & kWF_Tail) { m->tailT = wparam(*wi, "time"); m->tailF = wparam(*wi, "fine"); m->tailD = wparam(*wi, "depth"); }
-    ModNode* raw = m.get(); mods.push_back(std::move(m)); byId[sid] = raw; compile();
-    return true;
-  }
-  // ---- slots (the objects of _ios / _states) ----
-  bool buildSlots(ModNode& m, bool soft) {
-    const int cnt = m.poly ? nVoices : 1; const int w = cnt * m.weight;
-    const bool fits = instances + cnt <= kMaxInstances && weight + w <= kMaxWeight;
-    if (!fits && !soft) return false;
-    m.slots.clear(); m.slots.resize((size_t)cnt); m.slotsPoly = m.poly; m.slotsMade = true;
-    const WInfo& wi = *m.wi; const int nIn = wi.nin, nOut = wi.nout;
-    for (Slot& s : m.slots) {
-      s.buf.assign((size_t)(nIn + nOut) * kBlock, 0.f);
-      for (int k = 0; k < nIn; k++) s.in[k] = s.buf.data() + (size_t)k * kBlock;
-      for (int k = 0; k < nOut; k++) s.out[k] = s.buf.data() + (size_t)(nIn + k) * kBlock;
-      s.inMo.assign((size_t)wi.np, 0); s.pm.assign((size_t)wi.np, 0.0); s.p = m.bp.data();
-      if (fits && m.def) { seeds.armed = false; const uint32_t d0 = seeds.drawn; s.mod = m.def->make(sr, seeds); s.drawn = seeds.drawn - d0; seeds.armed = true; }
-    }
-    if (fits) { instances += cnt; weight += w; } else { m.slots.shrink_to_fit(); instances += 0; }
-    // instances / weight are counted for the slots that hold an object only (a soft one holds buffers)
-    if (!fits) { m.weight = m.weight; }
-    return true;
-  }
-  void ensureMb(ModNode& m) {
-    for (const GCable& c : m.inc) if (c.isParam && c.dstParam >= 0) for (Slot& s : m.slots) if (s.mb.empty()) s.mb.assign((size_t)m.wi->np * kBlock, 0.f);
-  }
-  // after any change (_sync): a module whose poly changed loses its states; a new one gets them
-  bool sync(bool soft) {
-    for (auto& up : mods) {
-      ModNode& m = *up;
-      if (m.slotsMade && m.slotsPoly != m.poly) destroyNodeSlots(m);
-      if (!m.slotsMade) { if (!buildSlots(m, soft)) return false; }
-      ensureMb(m);
-    }
-    return true;
-  }
-  // ---- the cable sum ----
-  void gather(ModNode& m, Slot& s, int v) {
-    const WInfo& wi = *m.wi;
-    for (int k = 0; k < wi.nin; k++) std::memset(s.in[k], 0, sizeof(float) * kBlock);
-    if (s.moVer != (int)cables.size()) { std::fill(s.inMo.begin(), s.inMo.end(), 0); s.moVer = (int)cables.size(); }
-    else for (int k = 0; k < wi.np; k++) if (s.inMo[(size_t)k]) std::memset(s.mb.data() + (size_t)k * kBlock, 0, sizeof(float) * kBlock);
-    bool mods_ = false;
-    for (const GCable& c : m.inc) {
-      ModNode* src = c.src; if (!src) continue;
-      float* dst;
-      if (c.isParam) { if (c.dstParam < 0 || s.mb.empty()) continue; mods_ = true; s.inMo[(size_t)c.dstParam] = 1; dst = s.mb.data() + (size_t)c.dstParam * kBlock; }
-      else { if (c.dstIn < 0) continue; dst = s.in[c.dstIn]; }
-      auto outOf = [&](int vv) -> const float* { if (c.srcPort < 0) return nullptr; const size_t k = (size_t)(vv < 0 ? 0 : vv); if (k >= src->slots.size()) return nullptr; return src->slots[k].out[c.srcPort]; };
-      if (c.fb) {
-        if (v >= 0 && src->poly) { const float* b = outOf(v); if (b) waves_fbadd(dst, b, 1); }
-        else if (v >= 0) { const float* b = outOf(-1); if (b) waves_fbadd(dst, b, c.srcAudio ? 1 / N : 1); }
-        else if (src->poly) {
-          float* sc = fbS.data(); std::memset(sc, 0, sizeof(float) * kBlock);
-          for (int vv = 0; vv < N; vv++) { const float* b = outOf(vv); if (b) for (int i = 0; i < kBlock; i++) sc[i] = (float)((double)sc[i] + (double)b[i]); }
-          waves_fbadd(dst, sc, 1);
-        } else { const float* b = outOf(-1); if (b) waves_fbadd(dst, b, 1); }
-      } else if (v >= 0 && src->poly) { const float* b = outOf(v); if (b) for (int i = 0; i < kBlock; i++) dst[i] = (float)((double)dst[i] + (double)b[i]); }
-      else if (v >= 0) { const float* b = outOf(-1); const double g = c.srcAudio ? 1 / N : 1; if (b) for (int i = 0; i < kBlock; i++) dst[i] = (float)((double)dst[i] + (double)b[i] * g); }
-      else if (src->poly) { for (int vv = 0; vv < N; vv++) { const float* b = outOf(vv); if (b) for (int i = 0; i < kBlock; i++) dst[i] = (float)((double)dst[i] + (double)b[i]); } }
-      else { const float* b = outOf(-1); if (b) for (int i = 0; i < kBlock; i++) dst[i] = (float)((double)dst[i] + (double)b[i]); }
-    }
-    if (mods_) {
-      for (int k = 0; k < wi.np; k++) s.pm[(size_t)k] = m.bp[(size_t)k];
-      for (int k = 0; k < wi.np; k++) {
-        if (!s.inMo[(size_t)k]) continue;
-        const modfx::ParamDef& pd = wi.params[k];
-        double r = m.bp[(size_t)k] + (double)s.mb[(size_t)k * kBlock] * (pd.mx - pd.mn);
-        r = clamp(r, pd.mn, pd.mx); if (pd.st >= 1) r = js_round((r - pd.mn) / pd.st) * pd.st + pd.mn;
-        s.pm[(size_t)k] = r;
-      }
-      s.p = s.pm.data();
-    } else s.p = m.bp.data();
-  }
-  void arm(Slot& s) {
-    if (s.armed) return; s.armed = true;
-    if (!s.mod) return;
-    const uint32_t d0 = seeds.drawn; s.mod->arm(seeds);
-    if (seeds.drawn == d0 && host) for (uint32_t k = 0; k < s.drawn; k++) host->nextSeed();
-  }
-};
-
+// ---- the patch (Graph + the module states and buffers the engine keeps in _ios / _states): graph.h (U31: moved there so the …chains engine can run the same graph) ----
 // ---- the engine ---------------------------------------------------------------------------------------------------------------------
 static bool srOk(double sr) { return sr == sr && sr >= 8000 && sr <= 384000; }
 
@@ -321,57 +97,127 @@ void WavesEngine::setText(std::string_view id, std::string_view text) {
   m->text.resize(kMaxText); const int n = toU16(text, m->text.data(), kMaxText); m->text.resize((size_t)n); m->textLen = n;
 }
 
-// loadPatch's reading of the doc: false = refused (nothing changed)
-static bool readDoc(Json doc, PatchImpl& P, int nVoices, Host*) {
-  (void)nVoices;
-  if (!doc.isObj()) return false;
-  Json mj = doc.get("modules"), cj = doc.get("cables");
-  const bool hasM = !(mj.missing() || mj.isNull()), hasC = !(cj.missing() || cj.isNull());
-  if ((hasM && !mj.isArr()) || (hasC && !cj.isArr())) return false;
-  const size_t nm = hasM ? mj.size() : 0, nc = hasC ? cj.size() : 0;
+// loadPatch's reading of the doc: false = refused (nothing changed). U31: the JS's own reading, odd documents included (a document that is not an object is an empty patch; `modules` / `cables` that are falsy are empty,
+// a string iterates its characters; a module whose id is not a string has a key of its own; a cable end is indexed as the JS does (an array, a string's characters, a number's undefined); a cable whose `from` module is
+// not there is skipped before its `to` is looked at; the cable shapes at which the JS THROWS (null / number / missing ends, a cable that is not an object, a null module) refuse the patch here.
+namespace {
+struct JV { char k = 'u'; std::string s; double d = 0; };   // a JS value as far as ids and ports go: u undefined, n null, b bool, d number, s string, o object / array
+JV jvOf(Json v) { JV r; if (v.isStr()) { r.k = 's'; r.s = std::string(v.asStr()); } else if (v.isNum()) { char b[40]; std::snprintf(b, sizeof b, "%.15g", v.asNum()); r.k = 'd'; r.s = b; r.d = v.asNum(); } else if (v.isBool()) { r.k = 'b'; r.s = v.asBool() ? "true" : "false"; } else if (v.isNull()) { r.k = 'n'; r.s = "null"; } else if (v.isArr() || v.isObj()) { r.k = 'o'; r.s = "[object Object]"; } else r.s = "undefined"; return r; }
+// a Map key as the JS has it (SameValueZero): a number by its exact value (-0 is 0; 15 digits would join two numbers that differ), an object / array by identity (each one is its own: a cable's `[1]` is never the module's `[1]`)
+thread_local uint64_t tlObjSeq = 0;
+std::string keyOf(const JV& v) {
+  if (v.k == 's') return v.s;
+  if (v.k == 'd') { char b[48]; std::snprintf(b, sizeof b, "\x01n%.17g", v.d == 0 ? 0.0 : v.d); return b; }
+  if (v.k == 'b') return "\x01" "b" + v.s;
+  if (v.k == 'n') return "\x01null";
+  if (v.k == 'o') return "\x01obj" + std::to_string(++tlObjSeq);
+  return "\x01undef";
+}
+// a module `type` as the JS indexes MODULES with it: a string is itself, an array of one element is that element's text (String(["a"]) is "a"); anything else is no type. false: the type is a property every object has
+// (constructor, toString, __proto__, ...): MODULES[type] is a function / object with no `params`, and the JS throws in addModule
+bool typeOf(Json m, std::string& out, bool& throws, bool* wrapped = nullptr) {
+  Json t = m.get("type"); if (wrapped) *wrapped = t.isArr(); while (t.isArr() && t.size() == 1) t = t.at(0);
+  throws = false; out.clear(); if (!t.isStr()) return false; out = std::string(t.asStr());
+  static const char* const kProto[] = {"constructor", "__proto__", "__defineGetter__", "__defineSetter__", "__lookupGetter__", "__lookupSetter__", "hasOwnProperty", "isPrototypeOf", "propertyIsEnumerable", "toString", "toLocaleString", "valueOf"};
+  for (const char* n : kProto) if (out == n) { throws = true; return false; }
+  return true;
+}
+std::string portOf(const JV& v) { if (v.k == 's') return v.s; return std::string("\x01") + v.k + v.s; }
+// v[i] in JS: false when it throws (v null / undefined)
+bool jvIdx(Json v, int i, JV& out) {
+  if (v.isNull() || v.missing()) return false;
+  if (v.isArr()) { out = jvOf(v.at((size_t)i)); return true; }
+  if (v.isStr()) { std::string_view t = v.asStr(); out = JV(); if ((size_t)i < t.size() && (unsigned char)t[(size_t)i] < 0x80) { out.k = 's'; out.s = std::string(1, t[(size_t)i]); } else if ((size_t)i < t.size()) { out.k = 'o'; out.s = "?"; } else out.s = "undefined"; return true; }
+  if (v.isObj()) { out = jvOf(v.get(std::to_string(i))); return true; }
+  out = JV(); out.s = "undefined"; return true;   // a number, true / false: no such element
+}
+std::string idOfModule(Json m) { return m.isObj() ? keyOf(jvOf(m.get("id"))) : std::string("\x01undef"); }
+bool truthyJs(Json v) { if (v.missing() || v.isNull()) return false; if (v.isBool()) return v.asBool(); if (v.isNum()) { const double d = v.asNum(); return d == d && d != 0; } if (v.isStr()) return !v.asStr().empty(); return true; }
+}  // namespace
+bool readPatchDoc(Json doc, PatchImpl& P, bool chains) {
+  P.chains = chains;
+  if (doc.isNull() || doc.missing()) return false;   // (the JS throws on `doc.modules`)
+  const bool isObj = doc.isObj();
+  Json mj = isObj ? doc.get("modules") : Json(), cj = isObj ? doc.get("cables") : Json();
+  size_t nm = 0, nc = 0; const bool hasM = mj.isArr(), hasC = cj.isArr();
+  if (truthyJs(mj)) { if (mj.isArr()) nm = mj.size(); else if (!mj.isStr()) return false; }   // a string: its characters are not modules; a number / true / object: not iterable
+  if (truthyJs(cj)) { if (cj.isArr()) nc = cj.size(); else return false; }   // (a non-empty string: its first character is a cable that is not an object: the JS throws)
   if (nm > (size_t)kMaxModules || nc > (size_t)kMaxCables) return false;
   P.nMods = (int)nm; P.nCables = (int)nc;
-  uint32_t cm = 0;
   for (size_t i = 0; i < nm; i++) {
     Json m = mj.at(i);
-    if (m.isNull()) return false;
+    if (m.isNull()) return false;   // m.id of null
     if (!m.isObj()) continue;
-    Json idj = m.get("id"), tj = m.get("type");
-    if (!tj.isStr() || !winfo(tj.asStr())) continue;
-    if (!idj.isStr()) return false;
-    if (P.find(std::string(idj.asStr()))) cm++;   // (a duplicate id: remove then add, two compiles)
-    if (!P.addNode(idj.asStr(), tj.asStr(), m)) return false;
+    std::string tn; bool throws = false; const bool isT = typeOf(m, tn, throws);
+    if (throws) return false;   // MODULES["constructor"] and the like: the JS throws
+    if (!isT || !P.tab->info(tn)) continue;
+    if (!P.addNode(idOfModule(m), tn, m)) return false;
   }
-  (void)cm;
   for (size_t i = 0; i < nc; i++) {
     Json c = cj.at(i);
-    if (!c.isObj()) return false;
+    if (!c.isObj()) return false;   // null / a number / a string / an array: c.from is undefined or c is null: the JS throws in connect
     Json f = c.get("from"), t = c.get("to");
-    if (!f.isArr() || !t.isArr()) return false;
-    CableRec r; Json a0 = f.at(0), b0 = t.at(0);
-    r.a0 = a0.isStr() ? std::string(a0.asStr()) : std::string("\x01"); r.a1 = portText(f.at(1)); r.b0 = b0.isStr() ? std::string(b0.asStr()) : std::string("\x01"); r.b1 = portText(t.at(1));
+    JV a0, b0, a1, b1;
+    if (!jvIdx(f, 0, a0)) return false;
+    CableRec r; r.a0 = keyOf(a0);
+    if (!P.find(r.a0)) continue;   // Graph.connect: `!this.mods.has(a[0]) || !this.mods.has(b[0])`: returns before `to` is touched
+    if (!jvIdx(t, 0, b0)) return false;
+    r.b0 = keyOf(b0); if (!P.find(r.b0)) continue;
+    jvIdx(f, 1, a1); jvIdx(t, 1, b1); r.a1 = portOf(a1); r.b1 = portOf(b1);
     P.addCable(r, c.get("fb").isBool() && c.get("fb").asBool());
   }
-  // STEREO: an older patch's right sides (stereoUpCables)
-  if (!truthyJ(doc.get("st2")) && hasM && hasC) {
-    std::unordered_map<std::string, std::string> type;
-    for (size_t i = 0; i < nm; i++) { Json m = mj.at(i); if (m.isObj() && m.get("id").isStr()) type[std::string(m.get("id").asStr())] = m.get("type").isStr() ? std::string(m.get("type").asStr()) : std::string(); }
-    auto isNew = [](const std::string& t) { return t == "vcf" || t == "vca" || t == "sccomp" || t == "blades" || t == "meta" || t == "phaser"; };
-    auto has = [&](const std::string& id, bool in, const char* port) { auto it = type.find(id); if (it == type.end()) return false; const WInfo* w = winfo(it->second); if (!w) return false; return (in ? wport_in(*w, port) : wport_out(*w, port)) >= 0; };
-    std::vector<std::string> taken;
-    auto key = [](Json t) { std::string k; Json a = t.at(0), b = t.at(1); k += a.isStr() ? std::string(a.asStr()) : std::string("\x01"); k += "."; k += portText(b); return k; };
-    for (size_t i = 0; i < nc; i++) { Json c = cj.at(i); if (c.isObj() && c.get("to").isArr()) taken.push_back(key(c.get("to"))); }
-    std::vector<CableRec> add;
-    for (size_t i = 0; i < nc; i++) {
-      Json c = cj.at(i); Json f = c.get("from"), t = c.get("to");
-      if (!f.at(1).isStr() || f.at(1).asStr() != "out" || !t.at(1).isStr() || t.at(1).asStr() != "in") continue;
-      const std::string a = f.at(0).isStr() ? std::string(f.at(0).asStr()) : std::string("\x01"), b = t.at(0).isStr() ? std::string(t.at(0).asStr()) : std::string("\x01");
-      const auto ta = type.find(a), tb = type.find(b);
-      if (!(ta != type.end() && isNew(ta->second)) && !(tb != type.end() && isNew(tb->second))) continue;
-      const std::string tk = b + ".inR";
-      if (has(a, false, "outR") && has(b, true, "inR") && std::find(taken.begin(), taken.end(), tk) == taken.end()) { taken.push_back(tk); CableRec r; r.a0 = a; r.a1 = "outR"; r.b0 = b; r.b1 = "inR"; add.push_back(r); }
+  // the older patches' added cables (stereoUpCables, trackInStereoCables): both read `d.modules` / `d.cables` only when they are arrays
+  const bool st2 = isObj && truthyJs(doc.get("st2")), ti2 = isObj && truthyJs(doc.get("ti2"));
+  std::unordered_set<std::string> wrapped; std::unordered_map<std::string, std::string> type;   // d.modules.map(m => [m && m.id, m && m.type]): the last of equal keys wins
+  if (hasM && hasC && (!st2 || (chains && !ti2))) {
+    for (size_t i = 0; i < nm; i++) {
+      Json m = mj.at(i); std::string k, ty;
+      if (m.isObj()) { k = idOfModule(m); bool th = false, wr = false; if (!typeOf(m, ty, th, &wr)) ty.clear(); else if (wr) wrapped.insert(k); }   // (a type given as ["x"] indexes MODULES like "x", but the JS's `=== 'trackIn'` and Set.has(type) see the array)
+      else if (m.isNull() || m.isBool() || m.isNum() || m.isStr()) { const bool falsy = !truthyJs(m); k = falsy ? keyOf(jvOf(m)) : std::string("\x01undef"); }
+      else k = "\x01undef";
+      type[k] = ty;
     }
-    for (const CableRec& r : add) P.addCable(r, false);
+  }
+  auto endOf = [](Json c, const char* which, JV& e0, JV& e1) { Json x = c.get(which); if (!truthyJs(x)) return false; jvIdx(x, 0, e0); jvIdx(x, 1, e1); return true; };
+  auto jsStr = [](const JV& v) { return v.s; };
+  auto isOut = [](const JV& v) { return v.k == 's' && v.s == "out"; }; auto isIn = [](const JV& v) { return v.k == 's' && v.s == "in"; };
+  auto has = [&](const std::string& id, bool in, const char* port) { auto it = type.find(id); if (it == type.end()) return false; const WInfo* w = P.tab->info(it->second); if (!w) return false; return (in ? wport_in(*w, port) : wport_out(*w, port)) >= 0; };
+  auto addCableOf = [&](const JV& a, const char* ap, const JV& b, const char* bp) { CableRec r; r.a0 = keyOf(a); r.a1 = ap; r.b0 = keyOf(b); r.b1 = bp; P.addCable(r, false); };
+  // STEREO (stereoUpCables)
+  if (!st2 && hasM && hasC) {
+    auto isNew = [](const std::string& t) { return t == "vcf" || t == "vca" || t == "sccomp" || t == "blades" || t == "meta" || t == "phaser"; };
+    std::vector<std::string> taken;
+    for (size_t i = 0; i < nc; i++) { Json c = cj.at(i); JV e0, e1; if (c.isObj() && endOf(c, "to", e0, e1)) taken.push_back(jsStr(e0) + "." + jsStr(e1)); }
+    struct Add { JV a, b; }; std::vector<Add> add;
+    for (size_t i = 0; i < nc; i++) {
+      Json c = cj.at(i); JV f0, f1, t0, t1; if (!c.isObj() || !endOf(c, "from", f0, f1) || !endOf(c, "to", t0, t1)) continue;
+      if (!isOut(f1) || !isIn(t1)) continue;
+      const std::string a = keyOf(f0), b = keyOf(t0); const auto ta = type.find(a), tb = type.find(b);
+      if (!(ta != type.end() && !wrapped.count(a) && isNew(ta->second)) && !(tb != type.end() && !wrapped.count(b) && isNew(tb->second))) continue;
+      const std::string tk = jsStr(t0) + ".inR";
+      if (has(a, false, "outR") && has(b, true, "inR") && std::find(taken.begin(), taken.end(), tk) == taken.end()) { taken.push_back(tk); add.push_back({f0, t0}); }
+    }
+    for (const Add& x : add) addCableOf(x.a, "outR", x.b, "inR");
+  }
+  // TRACK IN STEREO (…chains only): a Track In whose Out R goes nowhere gets Out R -> In R of every module its Out feeds, where that In R is free
+  if (chains && !ti2 && hasM && hasC) {
+    auto hasIn = [&](const std::string& id) { auto it = type.find(id); if (it == type.end()) return false; const WInfo* w = P.tab->info(it->second); return w && wport_in(*w, "inR") >= 0; };
+    std::vector<std::string> taken, usedR;
+    for (size_t i = 0; i < nc; i++) {
+      Json c = cj.at(i); JV e0, e1; if (c.isObj() && endOf(c, "to", e0, e1)) taken.push_back(jsStr(e0) + "." + jsStr(e1));
+      JV f0, f1; if (c.isObj() && endOf(c, "from", f0, f1) && f1.k == 's' && f1.s == "outR") usedR.push_back(keyOf(f0));
+    }
+    struct Add { JV a, b; }; std::vector<Add> add;
+    for (size_t i = 0; i < nc; i++) {
+      Json c = cj.at(i); JV f0, f1, t0, t1; if (!c.isObj() || !endOf(c, "from", f0, f1) || !endOf(c, "to", t0, t1)) continue;
+      if (!isOut(f1) || !isIn(t1)) continue;
+      const std::string a = keyOf(f0); auto ta = type.find(a);
+      if (ta == type.end() || ta->second != "trackIn" || wrapped.count(a) || std::find(usedR.begin(), usedR.end(), a) != usedR.end()) continue;
+      if (f0.k == 'n') continue;   // (the JS's usedR holds null for every cable that is not an outR one, and this cable is not: a Track In whose id is null never gets the right side)
+      const std::string tk = jsStr(t0) + ".inR";
+      if (hasIn(keyOf(t0)) && std::find(taken.begin(), taken.end(), tk) == taken.end()) { taken.push_back(tk); add.push_back({f0, t0}); }
+    }
+    for (const Add& x : add) addCableOf(x.a, "outR", x.b, "inR");
   }
   Json tr = doc.get("transport");
   if (tr.isObj()) {
@@ -385,7 +231,7 @@ static bool readDoc(Json doc, PatchImpl& P, int nVoices, Host*) {
 PatchImpl* WavesEngine::preparePatch(Json doc) const {
   if (!valid_) return nullptr;
   std::unique_ptr<PatchImpl> P(new PatchImpl(const_cast<WavesEngine*>(this), sr_, voices_.max, host_));
-  if (!readDoc(doc, *P, voices_.max, host_)) return nullptr;
+  if (!readPatchDoc(doc, *P, false)) return nullptr;
   if (!P->sync(false)) return nullptr;
   return P.release();
 }
@@ -411,11 +257,11 @@ bool WavesEngine::handleMessage(Json m) {
   const std::string_view op = m.str("op");
   auto numOf = [&](const char* k, double def, bool* ok) { Json v = m.get(k); if (v.isNum()) return v.asNum(); if (v.missing() || v.isNull()) return def; *ok = false; return def; };
   if (op == "patch") return loadPatch(m.get("value"));
-  if (op == "add") { Json id = m.get("id"), t = m.get("type"); if (!t.isStr()) return true; if (!id.isStr()) { stats_.droppedEvents++; return false; } return addModule(id.asStr(), t.asStr(), m); }
+  if (op == "add") { Json id = m.get("id"), t = m.get("type"); if (!t.isStr()) return true; return addModule(jsKey(id), t.asStr(), m); }
   if (op == "remove") { Json id = m.get("id"); if (id.isStr()) removeModule(id.asStr()); return true; }
   if (op == "connect" || op == "disconnect") {
     Json a = m.get("a"), b = m.get("b"); if (!a.isArr() || !b.isArr()) { stats_.droppedEvents++; return false; }
-    const std::string a0 = a.at(0).isStr() ? std::string(a.at(0).asStr()) : std::string("\x01"), b0 = b.at(0).isStr() ? std::string(b.at(0).asStr()) : std::string("\x01"), a1 = portText(a.at(1)), b1 = portText(b.at(1));
+    const std::string a0 = jsKey(a.at(0)), b0 = jsKey(b.at(0)), a1 = portText(a.at(1)), b1 = portText(b.at(1));
     if (op == "connect") connect(a0, a1, b0, b1, m.get("fb").isBool() && m.get("fb").asBool()); else disconnect(a0, a1, b0, b1);
     return true;
   }

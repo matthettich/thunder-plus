@@ -192,11 +192,19 @@ endforeach()
 # ------------------------------------------------------------------------------------------ mods (mods/build.sh)
 dsp_lib(thunder_dsp_mods)
 set(T thunder_dsp_mods)
+# The wasm build (mods.wasm, byte-compared with the web's by parity u02) takes the web's own mod_marbles.cc / mod_tides.cc; the in-place makers (U31) are for the native build only (and their
+# files, outside dsp/, would have no canonical sort key in the wasm link: they were left out of it, "undefined symbol make_marbles").
+set(MODS_MARBLES_SRC ${CMAKE_CURRENT_SOURCE_DIR}/mods_marbles_inplace.cc)
+set(MODS_TIDES_SRC ${CMAKE_CURRENT_SOURCE_DIR}/mods_tides_inplace.cc)
+if(IS_WASM)
+  set(MODS_MARBLES_SRC ${SRC}/mods/mod_marbles.cc)
+  set(MODS_TIDES_SRC ${SRC}/mods/mod_tides.cc)
+endif()
 dsp_group(${T} core OPTS ${OPT_MOD} DEFS ${MI_DEFS} PRE cstdio INCS ${SRC}/mods ${E} SRCS ${SRC}/mods/mods.cc ${E}/stmlib/dsp/units.cc)
-dsp_group(${T} marbles OPTS ${OPT_MOD} DEFS ${MI_DEFS} PRE cstdio INCS ${SRC}/mods ${E} SRCS ${SRC}/mods/mod_marbles.cc
+dsp_group(${T} marbles OPTS ${OPT_MOD} DEFS ${MI_DEFS} PRE cstdio INCS ${SRC}/mods ${E} SRCS ${MODS_MARBLES_SRC}   # = ${SRC}/mods/mod_marbles.cc + the in-place maker (U31)
   ${E}/marbles/random/t_generator.cc ${E}/marbles/random/x_y_generator.cc ${E}/marbles/random/output_channel.cc
   ${E}/marbles/random/quantizer.cc ${E}/marbles/random/lag_processor.cc ${E}/marbles/ramp/ramp_extractor.cc ${E}/marbles/resources.cc)
-dsp_group(${T} tides OPTS ${OPT_MOD} DEFS ${MI_DEFS} PRE cstdio INCS ${SRC}/mods ${E} SRCS ${SRC}/mods/mod_tides.cc
+dsp_group(${T} tides OPTS ${OPT_MOD} DEFS ${MI_DEFS} PRE cstdio INCS ${SRC}/mods ${E} SRCS ${MODS_TIDES_SRC}   # = ${SRC}/mods/mod_tides.cc + the in-place maker (U31)
   ${E}/tides2/poly_slope_generator.cc ${E}/tides2/ramp/ramp_extractor.cc ${E}/tides2/resources.cc)
 
 # ------------------------------------------------------------------------------------ thunder-dsp (dsp/build.sh)
