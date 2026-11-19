@@ -73,7 +73,7 @@ static CaseResult runCase(Json c) {
       if (op == "noteOn") e.noteOn(x.at(2).asNum(), x.at(3).asNum());
       else if (op == "noteOff") e.noteOff(x.at(2).asNum());
       else if (op == "allOff") e.allNotesOff();
-      else if (op == "param") e.setParam(x.at(2).asStr(), x.at(3).asStr(), x.at(4).asNum());
+      else if (op == "param") e.setParam(x.at(2).asStr(), x.at(3).asStr(), x.at(4).isStr() ? (double)NAN : x.at(4).asNum());   // the "nan" rows carry the string "nan" (JSON has no NaN)
       else if (op == "connect") e.connect(x.at(2).asStr(), x.at(3).asStr(), x.at(4).asStr(), x.at(5).asStr(), x.at(6).isBool() && x.at(6).asBool());
       else if (op == "disconnect") e.disconnect(x.at(2).asStr(), x.at(3).asStr(), x.at(4).asStr(), x.at(5).asStr());
     }

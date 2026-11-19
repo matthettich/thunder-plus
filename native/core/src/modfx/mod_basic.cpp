@@ -23,6 +23,7 @@ class SimpleDelay : public Module {
   SimpleDelay(double sr, Seeds&) { const int N = 1 << (int)std::ceil(js_log2(sr * 4.2)); L_.init(N); R_.init(N); M_ = N - 1; }
   void process(const IO& io, const Ctx& c) override {
     const double* p = io.p; const double sr = c.sr; const int B = c.block; const In L = inp(io, 0), R = inR(io, 0, 1); const Out oL = outp(io, 0), oR = outp(io, 1); const int32_t M = M_;
+    if (p[0] >= .5 && tbad(js_round(p[1]))) { c.fail = true; return; }   // JS: SD_DIVS[NaN][1] throws
     const double sec = p[0] >= .5 ? 60 / bfTempo(c) * kSdDivs[tidx(js_round(p[1]), 12)] : p[2];
     const double D = clamp(sec * sr, 4, M - 4), kd = bfK(.06, sr), fb = clamp(p[3], 0, 1) * .95; const bool ping = p[4] >= .5; const double mx = clamp(p[7], 0, 1);
     const double dryG = mx <= .5 ? 1 : 2 - 2 * mx, wetG = mx >= .5 ? 1 : 2 * mx;
@@ -56,7 +57,8 @@ class Filter : public Module {
   void process(const IO& io, const Ctx& c) override {
     const double* p = io.p; const double sr = c.sr; const int B = c.block; const In L = inp(io, 0), R = inR(io, 0, 1); const Out oL = outp(io, 0), oR = outp(io, 1);
     if (rs_(c)) ph_ = 0;
-    const int mode = (int)clamp(js_round(p[0]), 0, 3); const bool s24 = p[1] >= .5; const double r = clamp(p[3], 0, 1), dep = clamp(p[5], 0, 1) * 4; const int shape = (int)clamp(js_round(p[7]), 0, 5);
+    const double mode = clamp(js_round(p[0]), 0, 3); const bool s24 = p[1] >= .5; const double r = clamp(p[3], 0, 1), dep = clamp(p[5], 0, 1) * 4; const double shape = clamp(js_round(p[7]), 0, 5);   // doubles: NaN stays NaN, as in the JS (every `mode === n` false, `mode < 2` false)
+    { const double rt = clamp(js_round(p[6]), 0, 7); if (!(rt == rt)) { c.fail = true; return; } }   // JS: LFO_DIVS[NaN][1] throws; the engine's catch clears the buses
     const double k12 = 1.414 - 1.38 * r, k2 = mode < 2 ? .765 - .73 * r : k12, k1 = mode < 2 ? 1.848 : k12;
     const double inc = bfTempo(c) / 60 / kLfoDivs[tidx(js_round(p[6]), 7)] / sr;
     const double base = js_log2(clamp(p[2], 10, sr * .45)), top = js_log2(sr * .45), ks = bfK(.005, sr);
@@ -187,8 +189,8 @@ class BusComp : public Module {
     const In SL = Kb ? In{Kb} : L, SR = Kb ? In{Kb} : R, SC = inp(io, 2);
     bcCorner(st_, p[5], sr);
     const double hg = st_.hg, K = kSqrt2d;
-    const double thr = p[0], sl = 1 - 1 / kBcRatio[tidx(js_round(p[1]), 3)], kn = 2, mk = p[4], mx = clamp(p[7], 0, 1);
-    const double ka = bfK(kBcAtt[tidx(js_round(p[2]), 6)], sr), rel = kBcRel[tidx(js_round(p[3]), 5)];
+    const double thr = p[0], sl = 1 - 1 / tget(kBcRatio, js_round(p[1]), 3), kn = 2, mk = p[4], mx = clamp(p[7], 0, 1);
+    const double ka = bfK(tget(kBcAtt, js_round(p[2]), 6), sr), rel = tget(kBcRel, js_round(p[3]), 5);
     double g = g_, kr = bcRel(st_, g, sr, rel);
     for (int i = 0; i < B; i++) {
       double xl = L[i], xr = R[i]; if (!(xl > -8 && xl < 8)) xl = 0; if (!(xr > -8 && xr < 8)) xr = 0;
@@ -277,8 +279,9 @@ class AutoPan : public Module {
   void process(const IO& io, const Ctx& c) override {
     const double* p = io.p; const double sr = c.sr; const int B = c.block; const In L = inp(io, 0), R = inR(io, 0, 1); const Out oL = outp(io, 0), oR = outp(io, 1); const bool sync = p[0] >= .5;
     if (rs_(c) && sync) ph_ = 0;
+    if (sync && tbad(js_round(p[1]))) { c.fail = true; return; }   // JS: LFO_DIVS[NaN][1] throws
     const double hz = sync ? bfTempo(c) / 60 / kLfoDivs[tidx(js_round(p[1]), 7)] : clamp(p[2], .01, 40);
-    const double inc = hz / sr, dep = clamp(p[3], 0, 1); const int shape = (int)clamp(js_round(p[4]), 0, 2); const double sq = 1 / js_tanh(4);
+    const double inc = hz / sr, dep = clamp(p[3], 0, 1); const double shape = clamp(js_round(p[4]), 0, 2); const double sq = 1 / js_tanh(4);
     double ph = ph_;
     for (int i = 0; i < B; i++) {
       ph += inc; if (ph >= 1) ph -= std::floor(ph);
@@ -301,6 +304,7 @@ class PumpDuck : public Module {
   void process(const IO& io, const Ctx& c) override {
     const double* p = io.p; const double sr = c.sr; const int B = c.block; const In L = inp(io, 0), R = inR(io, 0, 1); const Out oL = outp(io, 0), oR = outp(io, 1);
     if (rs_(c)) ph_ = 0;
+    if (tbad(js_round(p[0]))) { c.fail = true; return; }   // JS: PUMP_DIVS[NaN][1] throws
     const double inc = bfTempo(c) / 60 / kPumpDivs[tidx(js_round(p[0]), 4)] / sr;
     const double dep = clamp(p[1], 0, 1), rel = clamp(p[2], .02, 1), ex = 1 + clamp(p[3], 0, 1) * 3, kg = bfK(.002, sr);
     double ph = ph_, g = g_;

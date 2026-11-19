@@ -86,7 +86,7 @@ inline bool truthyJ(Json v) {
 inline std::string jsKey(Json v) {
   if (v.isStr()) return std::string(v.asStr());
   if (v.isNum()) { char b[40]; std::snprintf(b, sizeof b, "\x01n%.15g", v.asNum()); return b; }
-  if (v.isBool()) return v.asBool() ? std::string("\x01btrue") : std::string("\x01bfalse");
+  if (v.isBool()) return v.asBool() ? std::string("\x01" "btrue") : std::string("\x01" "bfalse");
   if (v.isNull()) return std::string("\x01null");
   if (v.missing()) return std::string("\x01undef");
   return std::string("\x01obj");

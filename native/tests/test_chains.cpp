@@ -114,7 +114,7 @@ static Rec runScn(Json c, bool* ok, Json patchOverride = Json()) {
   auto applyEv = [&](ChainsEngine& E, Json x, double* byp) {
     const std::string_view op = x.at(1).asStr();
     if (op == "bsw") { const int n = (int)x.at(2).asNum(); if (byp) byp[n - 1] = x.at(3).asNum(); else E.setBypassSwitch(n, x.at(3).asNum()); return; }
-    if (op == "param") { E.setParam(x.at(2).asStr(), x.at(3).asStr(), x.at(4).asNum()); return; }
+    if (op == "param") { Json v = x.at(4); E.setParam(x.at(2).asStr(), x.at(3).asStr(), v.isStr() ? (double)NAN : v.asNum()); return; }   // JSON has no NaN: the "nan" rows carry the string "nan"
     if (op == "connect") { E.connect(x.at(2).asStr(), x.at(3).asStr(), x.at(4).asStr(), x.at(5).asStr(), x.at(6).isBool() && x.at(6).asBool()); return; }
     if (op == "disconnect") { E.disconnect(x.at(2).asStr(), x.at(3).asStr(), x.at(4).asStr(), x.at(5).asStr()); return; }
     if (op == "patch") { Doc p("{\"op\":\"patch\",\"value\":" + ser(x.at(2)) + "}"); E.handleMessage(p.r); return; }
@@ -201,7 +201,7 @@ static void runGolden(const std::string& golden, const std::string& effectsFile,
     if (c.get("deviates").isStr()) {   // a decided difference from the JS (named in the notes): the output is silence
       bool silent = true; for (const auto& a : rec) for (float v : a) if (v != 0) silent = false; CHECK(silent, "%s: %s", name.c_str(), std::string(c.str("deviates")).c_str()); nLeftOut++; continue;
     }
-    const std::string want(c.str("hash")); std::string h = hex(c.str("group") == "over" ? fnvCanon(rec) : fnvRec(rec));
+    const std::string want(c.str("hash")); std::string h = hex(c.str("group") == "over" ? fnvCanon(rec) : fnvRec(rec));   // ("nan" rows: the JS output is finite, so plain FNV)
     if (probe) {   // the Scope: its show() list (the last 515 floats of the JS's stream) is not ported; the audio ([L, R]) is compared on its own
       Rec lr(rec.begin(), rec.begin() + 2); h = hex(fnvRec(lr)); const bool same = h == c.str("hashLR"); if (!same) { bad++; CHECK(false, "%s: audio not bit-exact (%s != %s)", name.c_str(), h.c_str(), std::string(c.str("hashLR")).c_str()); } else { nLeftOut++; leftOut += (leftOut.empty() ? "" : ", ") + name; } continue;
     }

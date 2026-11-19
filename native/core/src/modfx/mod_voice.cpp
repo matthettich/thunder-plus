@@ -18,7 +18,7 @@ const double kLn2 = 0.6931471805599453;                            // Math.LN2
 const int kScales[9][12] = {{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11}, {0, 2, 4, 5, 7, 9, 11, -1}, {0, 2, 3, 5, 7, 8, 10, -1}, {0, 2, 3, 5, 7, 8, 11, -1}, {0, 2, 4, 7, 9, -1}, {0, 3, 5, 7, 10, -1}, {0, 3, 5, 6, 7, 10, -1}, {0, 2, 3, 5, 7, 9, 10, -1}, {0, 2, 4, 5, 7, 9, 10, -1}};
 inline int32_t pcMask(int s) { int32_t m = 0; for (int k = 0; k < 12 && kScales[s][k] >= 0; k++) m |= 1 << kScales[s][k]; return m; }
 constexpr int PC_N = 8192, PC_W = 200, PC_WF = 384; constexpr double PC_FMIN = 65, PC_FMAX = 1100, PC_THR = .15, PC_GATE = .006;
-inline int pcIn(int32_t mask, double n, double key) { return (mask >> (int)jmod(jmod(n - key, 12) + 12, 12)) & 1; }
+inline int pcIn(int32_t mask, double n, double key) { const double sh = jmod(jmod(n - key, 12) + 12, 12); return (mask >> (sh == sh ? (int)sh : 0)) & 1; }   // JS: `mask >> NaN` shifts by 0 (a NaN or infinite n / key gives NaN here)
 inline double pcNearest(double m, double key, int32_t mask) {
   const double c = js_round(m); double best = c, bd = 1e9;
   for (double n = c - 6; n <= c + 6; n++) { if (!pcIn(mask, n, key)) continue; const double d = std::fabs(n - m); if (d < bd) { bd = d; best = n; } }
@@ -60,7 +60,7 @@ class PitchCorrect : public Module {
       double tgt;
       if (io.linked[2]) tgt = 69 + (inp(io, 2)[B - 1] - .5) * 96;
       else {
-        const double key = clamp(js_round(p[0]), 0, 11); const int32_t mk = mask[tidx(js_round(p[1]), 9)];
+        const double key = clamp(js_round(p[0]), 0, 11); const double sci = js_round(p[1]); const int32_t mk = tbad(sci) ? 0 : mask[tidx(sci, 9)];   // JS: PC_MASK[NaN] is undefined, and undefined >> n is 0
         const double n = pcNearest(midi, key, mk), cur = note;
         if (cur < 0 || !pcIn(mk, cur, key) || (n != cur && std::fabs(midi - cur) > std::fabs(midi - n) + .2)) note = n;
         tgt = note;
@@ -210,9 +210,10 @@ class RotarySpk : public Module {
   explicit RotarySpk(double sr, Seeds&) { const int n = 1 << (int)std::ceil(js_log2(sr * .006 + 16)); h_.init(n); d_.init(n); m_ = n - 1; }
   void process(const IO& io, const Ctx& ctx) override {
     const double* p = io.p; const double sr = ctx.sr; const int B = ctx.block; const In L = inp(io, 0), R = inR(io, 0, 1); const Out oL = outp(io, 0), oR = outp(io, 1); const int32_t m = m_; double* T = t_;
-    int sp = (int)clamp(js_round(p[0]), 0, 2);
+    double sp = clamp(js_round(p[0]), 0, 2);   // NaN for a NaN speed
     if (io.linked[2] && inp(io, 2)[B - 1] > .5) sp = 2;
-    const double th = .08 + (1 - clamp(p[1], 0, 1)) * .9, hT = kRsHorn[sp], dT = kRsDrum[sp];
+    const bool spOk = sp >= 0 && sp <= 2;   // JS: kRsHorn[NaN] is undefined, and undefined in arithmetic is NaN
+    const double th = .08 + (1 - clamp(p[1], 0, 1)) * .9, hT = spOk ? kRsHorn[(int)sp] : (double)NAN, dT = spOk ? kRsDrum[(int)sp] : (double)NAN;
     if (!go_) { go_ = 1; vh_ = hT; vd_ = dT; }
     vh_ += (hT - vh_) * (1 - js_exp(-B / (sr * th * (hT < vh_ ? 1.4 : 1))));
     vd_ += (dT - vd_) * (1 - js_exp(-B / (sr * th * 4 * (dT < vd_ ? 1.4 : 1))));
@@ -269,6 +270,7 @@ class GrainDelay : public Module {
   void process(const IO& io, const Ctx& ctx) override {
     const double* p = io.p; const double sr = ctx.sr; const int B = ctx.block; const In L = inp(io, 0), R = inR(io, 0, 1); const Out oL = outp(io, 0), oR = outp(io, 1); const int32_t M = M_; const double N = (double)M + 1;
     const bool frz = p[11] >= .5; const int cap = ctx.full ? GD_MAX : 12;
+    if (p[1] >= .5 && tbad(js_round(p[2]))) { ctx.fail = true; return; }   // JS: PP_DIVS[NaN][1] throws
     const double Ts = p[1] >= .5 ? 60 / jmax(truthy(ctx.tempo) ? ctx.tempo : 120, 20) * kPpDivs[tidx(js_round(p[2]), 7)] : p[0];
     const double T = clamp(Ts, .005, 2.5) * sr, G = clamp(p[3], .005, .5) * sr, dens = clamp(p[4], .1, 100) / sr;
     const double spray = clamp(p[7], 0, 1), jit = clamp(p[6], 0, 1), rev = clamp(p[8], 0, 1), spr = clamp(p[9], 0, 1), fb = clamp(p[10], 0, 1) * .9, mx = clamp(p[12], 0, 1), pitch = clamp(p[5], -24, 24);
@@ -321,6 +323,7 @@ class ReverseEcho : public Module {
     const double* p = io.p; const double sr = ctx.sr; const int B = ctx.block; const In L = inp(io, 0), R = inR(io, 0, 1); const Out oL = outp(io, 0), oR = outp(io, 1); const int64_t M = M_;
     const int mode = p[0] >= .5 ? 1 : 0; const bool sync = p[2] >= .5;
     if (rs_(ctx) && sync) k_ = 0;
+    if (sync && tbad(js_round(p[3]))) { ctx.fail = true; return; }   // JS: PP_DIVS[NaN][1] throws
     const double Ts = sync ? 60 / jmax(truthy(ctx.tempo) ? ctx.tempo : 120, 20) * kPpDivs[tidx(js_round(p[3]), 7)] : p[1];
     const double Tn = js_round(clamp(Ts, .02, (M + 1) / sr * .5 - .05) * sr);
     const double fb = clamp(p[4], 0, 1) * .9, mx = clamp(p[7], 0, 1);

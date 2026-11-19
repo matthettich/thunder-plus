@@ -162,15 +162,15 @@ class Lverb : public Module {
     const int32_t o0 = len_[0], o1 = len_[1], o2 = len_[2], o3 = len_[3], n0 = lenT_[0], n1 = lenT_[1], n2 = lenT_[2], n3 = lenT_[3]; const double po = pre_, pn = preT_;
     const bool fd = o0 != n0 || o1 != n1 || o2 != n2 || o3 != n3 || po != pn; const double iN = 1.0 / N;
     int32_t w = w_, pw = pw_, aw = aw_; double lp0 = lp_[0], lp1 = lp_[1], lp2 = lp_[2], lp3 = lp_[3], dn = 1e-18, ipk = 0, opk = 0;
-    const int32_t pwi_n = i32(pn), pwi_o = i32(po);
+    const bool pnNaN = pn != pn, poNaN = po != po; const int32_t pwi_n = i32(pn), pwi_o = i32(po);   // JS: (pw - NaN) & pm is 0, not pw & pm
     for (int i = 0; i < N; i++) {
       double dl = L[i], dr = R[i]; dl = dl > -8 && dl < 8 ? dl : 0; dr = dr > -8 && dr < 8 ? dr : 0;
       const double a = (dl + dr) * .5, aa = a < 0 ? -a : a; if (aa > ipk) ipk = aa;
       PB[pw & pm] = a;
-      double x = PB[(pw - pwi_n) & pm], r0 = B0[(w - n0) & m], r1 = B1[(w - n1) & m], r2 = B2[(w - n2) & m], r3 = B3[(w - n3) & m];
+      double x = PB[pnNaN ? 0 : (pw - pwi_n) & pm], r0 = B0[(w - n0) & m], r1 = B1[(w - n1) & m], r2 = B2[(w - n2) & m], r3 = B3[(w - n3) & m];
       if (fd) {
         const double u = (i + 1) * iN, v = 1 - u;
-        x = x * u + PB[(pw - pwi_o) & pm] * v; r0 = r0 * u + B0[(w - o0) & m] * v; r1 = r1 * u + B1[(w - o1) & m] * v;
+        x = x * u + PB[poNaN ? 0 : (pw - pwi_o) & pm] * v; r0 = r0 * u + B0[(w - o0) & m] * v; r1 = r1 * u + B1[(w - o1) & m] * v;
         r2 = r2 * u + B2[(w - o2) & m] * v; r3 = r3 * u + B3[(w - o3) & m] * v;
       }
       pw++;

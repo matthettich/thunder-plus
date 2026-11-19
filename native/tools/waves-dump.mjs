@@ -113,7 +113,7 @@ function run(c) {
     for (const ev of c.events) if (ev[0] === b) {
       const [, op, ...a] = ev;
       if (op === 'noteOn') E.noteOn(a[0], a[1]); else if (op === 'noteOff') E.noteOff(a[0]); else if (op === 'allOff') E.allNotesOff();
-      else if (op === 'param') E.setParam(a[0], a[1], a[2]); else if (op === 'connect') E.connect([a[0], a[1]], [a[2], a[3]], !!a[4]); else if (op === 'disconnect') E.disconnect([a[0], a[1]], [a[2], a[3]]);
+      else if (op === 'param') E.setParam(a[0], a[1], a[2] === 'nan' ? NaN : a[2]); else if (op === 'connect') E.connect([a[0], a[1]], [a[2], a[3]], !!a[4]); else if (op === 'disconnect') E.disconnect([a[0], a[1]], [a[2], a[3]]);
     }
     E.process(128); L.set(E.bus(c.bus), b * 128); R.set(E.busR(c.bus), b * 128);
   }
@@ -124,6 +124,23 @@ function hashCanon(arrs) {
   let h = 0x811c9dc5 >>> 0; const tmp = new Float32Array(1), u = new Uint8Array(tmp.buffer);
   for (const a of arrs) for (let i = 0; i < a.length; i++) { tmp[0] = a[i] !== a[i] ? NaN : a[i]; if (tmp[0] !== tmp[0]) { u[0] = 0; u[1] = 0; u[2] = 0xc0; u[3] = 0x7f; } for (let k = 0; k < 4; k++) { h ^= u[k]; h = Math.imul(h, 0x01000193) >>> 0; } }
   return h.toString(16).padStart(8, '0');
+}
+// nan: setParam(NaN) on one parameter of a non-library module at block 6 (JSON has no NaN: the event carries the string "nan", native reads it as NaN). Only parameters where the JS output is finite and the JS does
+// not throw are kept (the rest is "no crash" in the sweep, test_nan_sweep.cpp). Up to 2 per module type: first those whose output differs from the run without the NaN, then any. Plain hashes (the output is finite).
+{
+  const fin = a => { for (let i = 0; i < a.length; i++) if (!Number.isFinite(a[i])) return false; return true; };
+  for (const type of Object.keys(D0.MODULES).sort()) {
+    const m = D0.MODULES[type]; if (!m || !m.process || SKIP.has(type) || m.effect === true || OVER_SKIP.has(type) || type === 'harm') continue;
+    const mk = (name, events) => Object.assign({ sr: 48000, maxVoices: 4, seed: 7, blocks: 40, events, bus: 1, telemetry: false }, { name, patch: patchFor(D0.MODULES, type, defaults(m)), telemetry: m.probe === true });
+    let h0; try { const r = run(mk('nan/base', NOTES)); h0 = H.hashFloats([r.L, r.R]); } catch (e) { continue; }
+    const good = [];
+    for (const k of Object.keys(m.params || {})) {
+      const c = mk(`nan/${type}/${k}`, [...NOTES, [6, 'param', 'b', k, 'nan']]); let r; try { r = run(c); } catch (e) { continue; }
+      if (!fin(r.L) || !fin(r.R)) continue; const h = H.hashFloats([r.L, r.R]); good.push({ c, differs: h !== h0 });
+    }
+    good.sort((x, y) => (y.differs ? 1 : 0) - (x.differs ? 1 : 0));
+    for (const g of good.slice(0, process.env.NAN_ALL ? 999 : 2)) cases.push(g.c);
+  }
 }
 const out = []; const outDir = process.argv.find((a, i) => i > 1 && !a.startsWith('--'));
 if (outDir) fs.mkdirSync(outDir, { recursive: true });

@@ -209,7 +209,7 @@ function runScn(c) {
   const chan = j => sigOf(N * B, 12345 + 77 * j), tapS = j => sigOf(N * B, 5000 + j), sendS = k => sigOf(N * B, 7000 + k), feedS = j => sigOf(N * B, 9000 + j), scS = sigOf(N * B, 4242);
   const apply = (E, ev, bsw) => {
     const [, op, ...a] = ev;
-    if (op === 'param') E.setParam(a[0], a[1], a[2]); else if (op === 'add') E.addModule(a[0], a[1], { params: a[2] }); else if (op === 'remove') E.removeModule(a[0]);
+    if (op === 'param') E.setParam(a[0], a[1], a[2] === 'nan' ? NaN : a[2]); else if (op === 'add') E.addModule(a[0], a[1], { params: a[2] }); else if (op === 'remove') E.removeModule(a[0]);
     else if (op === 'connect') E.connect([a[0], a[1]], [a[2], a[3]], !!a[4]); else if (op === 'disconnect') E.disconnect([a[0], a[1]], [a[2], a[3]]);
     else if (op === 'params') E.handleMessage({ op: 'params', list: a[0] }); else if (op === 'patch') E.loadPatch(a[0]); else if (op === 'transport') E.handleMessage({ op: 'transport', value: a[0] });
     else if (op === 'quality') E.handleMessage({ op: 'quality', value: a[0] }); else if (op === 'telemetry') E.handleMessage({ op: 'telemetry', value: a[0] }); else if (op === 'tapmap') E.handleMessage({ op: 'tapmap', value: a[0] });
@@ -253,6 +253,31 @@ function runScn(c) {
   return rec;
 }
 for (const c of scn) { const arrs = runScn(c), h = hashOf(arrs); const k = Object.assign({}, c, { kind: 'scn', hash: h }); delete k.extra; cases.push(k); refs[c.name] = arrs; }
+
+// ---- nan: setParam(NaN) on one parameter of a non-library module (JSON has no NaN: the event carries the string "nan", native reads it as NaN). Only parameters where the JS output is FINITE are kept (the rest is
+// "no crash" in the sweep, test_nan_sweep.cpp): the native output must match bit for bit. Up to 2 per module type: first those whose output differs from the run without the NaN (the NaN did something), then any.
+// `harm` is left out: the real JS Harmonizer does not return for some extreme parameters. The ones with a random seed (chaos, wnoise, bbd) are fine: each row has a scope of its own, as in native.
+{
+  const ctx = scope(), M = ctx.ChainsDSP.MODULES; const PT = new Set(['ptube','psnap','pgate','pecho','pspring','pverb','pgrain','pvox','ptune','pcrush','pswirl','pstutter','ptwang']);
+  const fin = arrs => arrs.every(a => { for (let i = 0; i < a.length; i++) if (!Number.isFinite(a[i])) return false; return true; });
+  for (const type of Object.keys(M).sort()) {
+    const m = M[type]; if (!m || !m.process || type === 'trackIn' || type === 'chainOut' || m.effect === true || type === 'marbles' || type === 'tides' || PT.has(type) || m.probe === true || type === 'harm') continue;
+    const aIn = Object.keys(m.inputs || {}).filter(n => m.inputs[n] === 'audio'), outs = Object.keys(m.outputs || {}), cab = [];
+    if (aIn.includes('in')) cab.push({ from: ['a', 'out'], to: ['b', 'in'] }); if (aIn.includes('inR')) cab.push({ from: ['a', 'outR'], to: ['b', 'inR'] });
+    outs.slice(0, 2).forEach((p, i) => cab.push({ from: ['b', p], to: ['c', ['in', 'inR'][i]] }));
+    const patch = { modules: [{ id: 'a', type: 'trackIn', scope: 'mono', params: { track: 1 } }, { id: 'b', type, scope: 'mono', params: defaults(m) }, { id: 'c', type: 'chainOut', scope: 'mono', params: { track: 1, level: 1 } }], cables: cab };
+    const base = { mode: 'engine', blocks: 40, chans: 1, taps: 0, tapmap: null, standalone: true, sc: false, sends: 0, feeds: 0, busmap: null, focus: -1, extra: {} };
+    const h0 = hashOf(runScn(Object.assign({ name: 'nan/base', patch, events: [] }, base)));
+    const good = [];
+    for (const k of Object.keys(m.params || {})) {
+      const c = Object.assign({ name: `nan/${type}/${k}`, group: 'nan', patch, events: [[12, 'param', 'b', k, 'nan']] }, base);
+      let arrs; try { arrs = runScn(c); } catch (e) { continue; }
+      if (!fin(arrs)) continue; const h = hashOf(arrs); good.push({ c, arrs, h, differs: h !== h0 });
+    }
+    good.sort((x, y) => (y.differs ? 1 : 0) - (x.differs ? 1 : 0));
+    for (const g of good.slice(0, process.env.NAN_ALL ? 999 : 2)) { cases.push(Object.assign({}, g.c, { kind: 'scn', hash: g.h })); delete cases[cases.length - 1].extra; refs[g.c.name] = g.arrs; }
+  }
+}
 
 // ---- mal: patches the JS is given malformed (ids of any JSON type, an empty or missing id, a type that is an Object property, cable ends that are not arrays, falsy modules / cables, a document that is not an object) ----
 // Some the JS plays (outcome 'plays': the output is hashed, NaN-canonical) and the native engine must load the same way; the rest it throws on (outcome 'refuses'; the page catches it; native refuses and keeps the playing patch)

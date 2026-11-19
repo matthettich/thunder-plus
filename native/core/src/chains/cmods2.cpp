@@ -173,7 +173,7 @@ class Resample : public WModule {
   }
   void release(int which) { if (which >= 0 && which < 2) lent_[which] = false; }
  private:
-  double sr_; int cap_; F32 L_[2], R_[2]; bool lent_[2] = {false, false}; int cur_ = -1, n_ = 0, len_ = 0; bool arm_ = false, done_ = false; double t_ = 0; Restart restarted_;
+  double sr_; int cap_; F32 L_[2], R_[2]; std::atomic<bool> lent_[2] = {{false}, {false}}; /* atomic: set on the audio thread (a take handed out), cleared by release() on the control thread */ int cur_ = -1, n_ = 0, len_ = 0; bool arm_ = false, done_ = false; double t_ = 0; Restart restarted_;
 };
 
 // ---- the pump modules -------------------------------------------------------------------------------------------------------------------------------------------
@@ -188,7 +188,7 @@ std::atomic<uint64_t> g_pumpSwaps{0}, g_pumpBad{0}, g_pumpDry{0}, g_pumpOverflow
 class PumpMod : public WModule {
  public:
   PumpMod(const PumpCh* d, double sr) : d_(d), sr_(sr) { for (int i = 0; i < 128; i++) last_[i] = NAN; }
-  ~PumpMod() override { pump_free_ctl(h_); pump_free_ctl(spare_.load()); for (auto& d : dead_) pump_free_ctl(d.load()); }
+  ~PumpMod() override { pump_free_ctl(h_); { const int sv = spare_.load(); if (sv >= 0) pump_free_ctl(sv >> 1); } for (auto& d : dead_) pump_free_ctl(d.load()); }
   void prepare(const double* p) override {
     if (!pump::available()) return;
     float pv[512]; for (float& q : pv) q = std::nanf("");   // unwritten = the parameter's default (pump_new: NaN in the stage)
@@ -206,18 +206,22 @@ class PumpMod : public WModule {
  private:
   void makeSpare(const double* p) {
     if (!pump::available() || dead_state_) return;
+    wantSpare_.store(false);   // cleared BEFORE the work, not after the publish: a request the audio thread raises while this runs (it took the previous spare) must survive (verifier D4)
     float pv[512]; for (float& q : pv) q = std::nanf("");   // unwritten = the parameter's default (pump_new: NaN in the stage)
-    for (int i = 0; i < d_->nps; i++) { pv[d_->ps[i].idx] = (float)pumpValue(d_->ps[i], p[i]); spareRaw_[i] = p[i]; rawNow_[i].store(p[i], std::memory_order_relaxed); }
-    const int s = pump_make_staged(d_->t, pv, d_->np, sr_); spare_.store(s); wantSpare_.store(false);
+    // The raw values the spare was made from go in the buffer the audio thread is NOT reading: two buffers, one handed over with the spare (spare_'s store is the release, its exchange the acquire).
+    // (One buffer was a data race when the audio thread took a spare and read the values while service() made the next one.)
+    const int b = spareW_ ^ 1; spareW_ = b;
+    for (int i = 0; i < d_->nps; i++) { pv[d_->ps[i].idx] = (float)pumpValue(d_->ps[i], p[i]); spareRaw_[b][i] = p[i]; rawNow_[i].store(p[i], std::memory_order_relaxed); }
+    const int s = pump_make_staged(d_->t, pv, d_->np, sr_); spare_.store(s < 0 ? -1 : (s << 1) | b);   // the handle and the buffer it came with are one value
   }
-  const PumpCh* d_; double sr_; int h_ = -1; bool dead_state_ = false; double last_[128]; double stagedRaw_[128] = {}; double spareRaw_[128] = {}; std::atomic<double> rawNow_[128];
+  const PumpCh* d_; double sr_; int h_ = -1; bool dead_state_ = false; double last_[128]; double stagedRaw_[128] = {}; double spareRaw_[2][128] = {}; int spareW_ = 0; std::atomic<double> rawNow_[128];
   std::atomic<int> spare_{-1}; std::atomic<int> dead_[4] = {{-1}, {-1}, {-1}, {-1}}; std::atomic<bool> wantSpare_{false}; double pos_ = 0, sn_ = -1; bool haveSn_ = false;
   friend class PumpModProc;
 };
 void PumpMod::process(const IO& io, const Ctx& c) {
   const float* L0 = io.in[0]; const float* R0 = io.linked[1] ? io.in[1] : io.in[0]; const int n = c.block;
   auto pass = [&]() { std::memcpy(io.out[0], L0, sizeof(float) * kBlock); std::memcpy(io.out[1], R0, sizeof(float) * kBlock); };
-  if (!pump::available() || dead_state_ || h_ < 0) { if (h_ < 0 && !dead_state_ && pump::available()) { int s = spare_.exchange(-1); if (s >= 0) { g_pumpSwaps++; h_ = s; for (int i = 0; i < d_->nps; i++) last_[i] = spareRaw_[i]; wantSpare_.store(true); } } if (h_ < 0) { if (dead_state_ || !pump::available()) pass(); else { g_pumpDry++; zeroOut(io.out[0]), zeroOut(io.out[1]); } return; } }
+  if (!pump::available() || dead_state_ || h_ < 0) { if (h_ < 0 && !dead_state_ && pump::available()) { const int sv = spare_.exchange(-1); if (sv >= 0) { const int s = sv >> 1, b = sv & 1; g_pumpSwaps++; h_ = s; { for (int i = 0; i < d_->nps; i++) last_[i] = spareRaw_[b][i]; } wantSpare_.store(true); } } if (h_ < 0) { if (dead_state_ || !pump::available()) pass(); else { g_pumpDry++; zeroOut(io.out[0]), zeroOut(io.out[1]); } return; } }
   PumpGate gate(true); if (!gate.ok) { pass(); return; }   // the control thread is in pump (making a spare): this block passes the sound, nothing waits
   { const int np = pump::nparams(d_->t); float* V = nullptr;
     for (int i = 0; i < d_->nps; i++) { const PumpQ& q = d_->ps[i]; const double raw = io.p[i]; rawNow_[i].store(raw, std::memory_order_relaxed);
