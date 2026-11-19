@@ -30,9 +30,8 @@ plan; sections 1 to 4 and 9), `HANDOVER.md` on `beta` (the web app, the owner's 
 (Written because weekly usage reached 90%: the owner may stop here. Nothing new is started until he says so.)
 
 - **Merged today:** #243, the sequencer on a live clock (setters, `SeqRunner`); verified after the merge (`review/verify-243`), no defect.
-- **#242, the SoundFont route into the renderer (`n1/render-sf`, head 730d787):** verified, the five findings fixed (leak, budget hole, the poly
-  cap shared by both pools, test gaps, stats); the branch was rebuilt as ONE clean commit on `native` (its history held build directories).
-  **Merge it when CI on 730d787 is all green** (8 of 9 were at 12:45) and `native` has had no code change since 0280be9.
+- **#242, the SoundFont route into the renderer: MERGED at 12:50** (every CI job green on the clean commit 730d787; verified, the five findings
+  fixed: leak, budget hole, the poly cap shared by both pools, test gaps, stats). `native/build*/` is now in `.gitignore`.
 - **#244, Part B, the Song's lifetime (`n1/seq-takeover`, head e785d14):** CI green. **Do NOT merge yet:** its independent verifier was running
   (report `docs/port/reviews/verify-244.md` on `review/verify-244`; if that branch is missing or the report is unfinished, run a new verifier
   from the PR: the brief is thread and memory safety of the hand-over, `takeOver`'s cost, the `--edit` goldens, counter continuity, mutations),
