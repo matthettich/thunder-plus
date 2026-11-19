@@ -21,6 +21,7 @@
 // the song's own here; Math.sin (the sine LFO) and Math.log (a banded pump parameter's own byte) are the C library's until
 // U08 brings fdlibm's (their results are rounded to a byte or to 1/1000 before anything sees them).
 #include "seq/seq.h"
+#include "seq/session.h"
 
 #include <algorithm>
 #include <cmath>
@@ -223,14 +224,25 @@ double Seq::tgtOwnOf(const TgtId& g, bool* fxOk) const {   // tgtOwn (and tgtFx:
   }
   return g.kind == K_CUT || g.kind == K_DEC || g.kind == K_TCH ? 255 : 0;
 }
+// the ids registry (session.h): ids_ is the session's list in its order, so an index means the same in every Seq of the PLAY
+void Seq::loadIds() {
+  const std::vector<std::string>& v = sess_->ids(); ids_.reserve(v.size() + 16);
+  for (const std::string& s : v) { TgtId g; g.s = s; parseId(g); if (g.ok) g.own = tgtOwnOf(g, &g.fxOk); ids_.push_back(std::move(g)); }
+}
+int Seq::internStr(std::string_view s, TgtId&& g) {   // the index of s; a new id is appended to the registry and to ids_; -1: the registry is full (counted)
+  const int k = sess_->findId(s); if (k >= 0) return k;
+  const int n = sess_->addId(s); if (n < 0) return -1;
+  ids_.push_back(std::move(g)); return n;
+}
 int Seq::intern(Json id) {
   if (!id.isStr()) return -1;
   const std::string_view s = id.asStr();
-  for (size_t i = 0; i < ids_.size(); i++) if (ids_[i].s == s) return (int)i;
+  const int k = sess_->findId(s); if (k >= 0) return k;
   TgtId g; g.s = std::string(s); parseId(g); if (g.ok) g.own = tgtOwnOf(g, &g.fxOk);
-  ids_.push_back(std::move(g)); return (int)ids_.size() - 1;
+  return internStr(s, std::move(g));
 }
 void Seq::buildPerf() {   // perfOf(S): S.perf, or freshPerf() (no scenes' values, eight macros at 0, no locks, no LFOs)
+  loadIds();
   const Json P = S_.perf;
   for (int t = 0; t < kSeqTracks; t++) { lfoIsArr_[t] = false; for (int n = 0; n < 4; n++) lk_[t][n] = -1; }
   double xf = 0;
@@ -240,8 +252,8 @@ void Seq::buildPerf() {   // perfOf(S): S.perf, or freshPerf() (no scenes' value
     const Json A = truthy(ja) ? ja.get("v") : Json(), B = truthy(jb) ? jb.get("v") : Json();
     const auto add = [&](std::string_view k, Json) { for (const SceneEnt& e : scene_) if (ids_[(size_t)e.id].s == k) return;
       TgtId g; g.s = std::string(k); parseId(g); if (!g.ok) return;
-      int id = -1; for (size_t i = 0; i < ids_.size(); i++) if (ids_[i].s == k) id = (int)i;
-      if (id < 0) { g.own = tgtOwnOf(g, &g.fxOk); ids_.push_back(g); id = (int)ids_.size() - 1; }
+      int id = sess_->findId(k);
+      if (id < 0) { g.own = tgtOwnOf(g, &g.fxOk); id = internStr(k, std::move(g)); if (id < 0) return; }
       const Json va = A.get(k), vb = B.get(k); scene_.push_back({id, !va.missing(), !vb.missing(), jnum(va), jnum(vb)}); };
     eachKey(A, add); eachKey(B, add);
     const Json mac = P.get("mac");
@@ -325,26 +337,29 @@ void Seq::buildBus() {
     while (!w.empty()) { const int x = w.back(); w.pop_back(); for (int b : targets[x]) if (!hearT_[b]) { hearT_[b] = true; w.push_back(b); } } }
 }
 void Seq::buildCounters() {
-  // rvs: a counter for every place a chance roll can happen
-  if (mode_ == SeqMode::Song) { cellSlot_.assign((size_t)kSongRows * kSeqTracks, -1); int n = 0; for (int y = 0; y < kSongRows; y++) for (int t = 0; t < kSeqTracks; t++) if (S_.cell(y, t) >= 0) cellSlot_[(size_t)y * kSeqTracks + (size_t)t] = n++;
-    rvN_ = (size_t)n * 512; }
-  else rvN_ = (size_t)kSeqTracks * 512;
-  rv_.reset(new uint32_t[rvN_ ? rvN_ : 1]());
-  // nth / c1: a counter per track for every phrase row with NTH, CND or REP (REP can repeat either)
-  rowSlot_.assign(S_.phraseData.size() / RW, -1); nthK_ = 0;
-  for (size_t i = 0; i < rowSlot_.size(); i++) { const int16_t* r = S_.phraseData.data() + i * RW; for (int k = FX0; k < RW; k += 2) if (r[k] == NTH || r[k] == CND || r[k] == REP) { rowSlot_[i] = nthK_++; break; } }
-  const size_t n = (size_t)kSeqTracks * (size_t)std::max(1, nthK_);
-  nthCnt_.reset(new uint32_t[n]()); nthGen_.reset(new uint32_t[n]()); c1Cnt_.reset(new uint32_t[n]());
+  SeqSession& R = *sess_;
+  // rvs: a page of counters for every place a chance roll can happen: this Seq takes the session's table, and the session gives a page to every cell that has a chain now
+  pageN_ = R.pageTableSize(); pages_.reset(new uint32_t*[pageN_]); R.copyPages(pages_.get());
+  if (mode_ == SeqMode::Song) for (int y = 0; y < kSongRows; y++) for (int t = 0; t < kSeqTracks; t++) if (S_.cell(y, t) >= 0) { uint32_t*& pg = pages_[(size_t)y * kSeqTracks + (size_t)t]; if (!pg) pg = R.ensurePage((size_t)y * kSeqTracks + (size_t)t); }
+  rvN_ = 0; for (size_t i = 0; i < pageN_; i++) if (pages_[i]) rvN_ += kSeqPageU32;
+  // nth / c1: a slot, from the session, for every phrase row with NTH, CND or REP (REP can repeat either); the counters are in the session's chunks
+  rowSlot_.assign(S_.phraseData.size() / RW, -1);
+  for (int pid = 0; pid < kNPH; pid++) { const int32_t off = S_.phraseOff[(size_t)pid]; if (off < 0) continue;
+    for (int s = 0; s < PROWS; s++) { const size_t i = (size_t)off / RW + (size_t)s; const int16_t* r = S_.phraseData.data() + i * RW;
+      for (int k = FX0; k < RW; k += 2) if (r[k] == NTH || r[k] == CND || r[k] == REP) { rowSlot_[i] = R.slotFor((uint32_t)(pid * PROWS + s)); break; } } }
+  nthK_ = R.nSlots_;
+  chunks_.reset(new SeqCountChunk*[kSeqMaxChunks]); R.copyChunks(chunks_.get());
   for (int t = 0; t < kSeqTracks; t++) trGen_[t] = 1;
   arpPool_.reset(new double[(size_t)kSeqTracks * kSeqArpMax * 2]());
 }
 uint32_t* Seq::nthSlot(int t, int pid, int step, bool c1) {
   const int32_t off = pid >= 0 && pid < kNPH ? S_.phraseOff[(size_t)pid] : -1; const int slot = off >= 0 && step >= 0 && step < PROWS ? rowSlot_[(size_t)off / RW + (size_t)step] : -1;
-  if (slot < 0) { dropped_++; return nullptr; }
-  const size_t i = (size_t)t * (size_t)nthK_ + (size_t)slot;
-  if (c1) return &c1Cnt_[i];
-  if (nthGen_[i] != trGen_[t]) { nthGen_[i] = trGen_[t]; nthCnt_[i] = 0; }
-  return &nthCnt_[i];
+  SeqCountChunk* ch = slot >= 0 ? chunks_[(size_t)slot >> 8] : nullptr;
+  if (!ch) { dropped_++; return nullptr; }
+  const size_t i = (size_t)t * kSeqChunkSlots + ((size_t)slot & (kSeqChunkSlots - 1));
+  if (c1) return &ch->c1[i];
+  if (ch->gen[i] != trGen_[t]) { ch->gen[i] = trGen_[t]; ch->nth[i] = 0; }
+  return &ch->nth[i];
 }
 // chaseChance(row) for every row, once: the song is immutable, so the seeds and track chances "the rows above would have left"
 // are a table (a JMP on the audio thread then costs a copy, not a walk through the song).
@@ -371,7 +386,9 @@ void Seq::chaseChance(int row) {
   for (int t = 0; t < kSeqTracks; t++) { const Chase& c = chase_[y * kSeqTracks + (size_t)t]; Tr& T = tr_[t]; T.hasSeed = c.hasSeed != 0; T.seed = c.seed; T.tch = c.tch; T.skp = c.skp; T.chd = c.chd; }
 }
 
-Seq::Seq(const Song& song, const SeqVars& vars, SeqMode mode, const SeqOpts& opts) : S_(song), V_(vars), mode_(mode), o_(opts), mrand_(opts.randomSeed) {
+Seq::Seq(const Song& song, const SeqVars& vars, SeqMode mode, const SeqOpts& opts) : Seq(SeqSession::create(mode, opts), song, vars) {}
+Seq::Seq(std::shared_ptr<SeqSession> own, const Song& song, const SeqVars& vars) : Seq(*own, song, vars, false) { ownSess_ = std::move(own); ownSess_->commit(); }
+Seq::Seq(SeqSession& session, const Song& song, const SeqVars& vars, bool successor) : S_(song), V_(vars), mode_(session.mode()), o_(session.opts()), sess_(&session), successor_(successor), mrand_(session.opts().randomSeed) {
   once_ = o_.once; setLoop(o_.hasLoop, o_.loopY0, o_.loopY1);
   ntr_ = S_.ntr ? S_.ntr : 16;
   polyFrom_ = S_.nmono >= 1 ? std::min(S_.nmono, ntr_ - 1) : (ntr_ + 1) / 2;   // polyFrom(): Math.ceil(n / 2)
@@ -387,6 +404,8 @@ Seq::Seq(const Song& song, const SeqVars& vars, SeqMode mode, const SeqOpts& opt
   bpm_ = S_.bpm; tks_ = ci(S_.ticks ? S_.ticks : TICKS, 1, 32);
   PL_ = o_.live && !o_.sim;
   Tr* tr = tr_.get();
+  wakeOk_ = mode_ == SeqMode::Song && (once_ || o_.live);
+  if (successor_) return;   // a successor's run state comes from takeOver()
   if (mode_ == SeqMode::Song) {
     for (int t = 0; t <= MT; t++) { Tr& T = tr[t]; T.row = hasLoop_ ? ci(o_.row, loopY0_, loopY1_) : o_.row;
       if ((t < ntr_ || t == MT) && songCell(T.row, t) >= 0 && (!o_.hasOnly || ((o_.only >> t) & 1))) { T.on = true; settle(T, t); } }
@@ -401,10 +420,38 @@ Seq::Seq(const Song& song, const SeqVars& vars, SeqMode mode, const SeqOpts& opt
       T.on = true; T.cr = cr;
       if (dt >= -1e-9 && d < lenOf(pid)) { T.step = T.g = T.cnt = (int)d; T.r0 = -d * line; } else if (dt < 0) T.rel = T.r0 = -dt;
       settle(T, t); } }
-  wakeOk_ = mode_ == SeqMode::Song && (once_ || o_.live);
   if (mode_ == SeqMode::Song && o_.row > 0) chaseChance(o_.row);
 }
 Seq::~Seq() = default;
+
+// takeOver: see seq.h. Audio thread: plain copies into storage this Seq sized at its construction; no allocation, no lock, no loop longer than the
+// tables (33 tracks, 4 x 33 PERFORM numbers, the sent arrays: one entry per target id of the old Seq, at most kSeqMaxIds).
+bool Seq::takeOver(const Seq& old) {
+  if (&old == this || old.sess_ != sess_ || old.ids_.size() > ids_.size()) return false;
+  for (int t = 0; t < kSeqTracks; t++) tr_[t] = old.tr_[t];
+  time_ = old.time_; base_ = old.base_; bt_ = old.bt_; btT_ = old.btT_; hasBase_ = old.hasBase_; hasBtT_ = old.hasBtT_;
+  bpm_ = old.bpm_; tks_ = old.tks_; hasGrv_ = old.hasGrv_; grv_[0] = old.grv_[0]; grv_[1] = old.grv_[1]; hasLpb_ = old.hasLpb_; lpb_ = old.lpb_;
+  mrand_ = old.mrand_; seeded_ = old.seeded_; isSeeded_ = old.isSeeded_; hasSseed_ = old.hasSseed_; sseed_ = old.sseed_; hasPseed_ = old.hasPseed_; pseed_ = old.pseed_; mtch_ = old.mtch_;
+  hasGscl_ = old.hasGscl_; gsclScale_ = old.gsclScale_; gsclRoot_ = old.gsclRoot_;
+  hasLoop_ = old.hasLoop_; loopY0_ = old.loopY0_; loopY1_ = old.loopY1_;
+  pfXf_ = old.pfXf_; pfFill_ = old.pfFill_; pfPart_ = old.pfPart_; perfFirst_ = old.perfFirst_;
+  std::memcpy(pnoHas_, old.pnoHas_, sizeof pnoHas_); std::memcpy(pno_, old.pno_, sizeof pno_);
+  std::memcpy(trGen_, old.trGen_, sizeof trGen_);
+  badSets_ = old.badSets_; dropped_ = old.dropped_; maxEvs_ = old.maxEvs_; maxArp_ = old.maxArp_;
+  // what the JS computes once, at PLAY (ruling 1): the bus plan, the idle-LFO set, the INS clamp stay the PLAY's
+  std::memcpy(busT_, old.busT_, sizeof busT_); std::memcpy(hearT_, old.hearT_, sizeof hearT_); hasHear_ = old.hasHear_; NIs_ = old.NIs_;
+  // the macros' resting values: the JS copied them at make (PF.mac), so an edit of `v` is not heard; the effective value in force is carried
+  { const size_t nm = std::min(old.pfMac_.size(), pfMac_.size());
+    for (size_t i = 0; i < nm; i++) {
+      if (i < old.macros_.size()) { pfMac_[i] = old.pfMacSet_[i] ? old.pfMac_[i] : old.macros_[i].v; pfMacSet_[i] = 1; }
+      else { pfMac_[i] = old.pfMac_[i]; pfMacSet_[i] = old.pfMacSet_[i]; } } }
+  // the targets sent so far: an id means the same in both (the registry), and the ORDER is the Map's insertion order
+  const size_t n = old.ids_.size();
+  std::memcpy(sentHas_.data(), old.sentHas_.data(), n); std::memcpy(sentVal_.data(), old.sentVal_.data(), n * sizeof(double)); std::memcpy(sentOrd_.data(), old.sentOrd_.data(), n * sizeof(int));
+  for (size_t i = n; i < sentHas_.size(); i++) sentHas_[i] = 0;
+  sentN_ = old.sentN_; wantN_ = 0;
+  return true;
+}
 
 bool Seq::alive() const { for (int t = 0; t < kSeqTracks; t++) if (tr_[t].on) return true; return false; }
 
@@ -477,8 +524,8 @@ double Seq::roll(Tr& T, int t, int salt) {
   if (T.vn < 0) {
     uint32_t* cnt = nullptr;
     if (T.cr >= 0 && T.cr < 16 && T.step >= 0 && T.step < 32) {
-      if (mode_ == SeqMode::Song) { const int32_t cs = T.row >= 0 && T.row < kSongRows ? cellSlot_[(size_t)T.row * kSeqTracks + (size_t)t] : -1; if (cs >= 0) cnt = &rv_[(size_t)cs * 512 + (size_t)(T.cr * 32 + T.step)]; }
-      else cnt = &rv_[(size_t)t * 512 + (size_t)(T.cr * 32 + T.step)];
+      uint32_t* pg = mode_ == SeqMode::Song ? (T.row >= 0 && T.row < kSongRows ? pages_[(size_t)T.row * kSeqTracks + (size_t)t] : nullptr) : pages_[(size_t)t];
+      if (pg) cnt = &pg[T.cr * 32 + T.step];
     }
     if (cnt) { T.vn = (int)*cnt; (*cnt)++; } else { T.vn = 0; dropped_++; }
   }

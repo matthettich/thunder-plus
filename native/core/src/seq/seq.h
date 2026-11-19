@@ -29,11 +29,15 @@
 
 namespace thunder {
 
+class SeqSession;
+
 constexpr int kSeqMT = kSongNT;              // the master column's track number (MT)
 constexpr int kSeqTracks = kSongNT + 1;      // tracks 0..31 and the master column
 constexpr int kSeqArpMax = 96;               // [time, rate] pairs of one arpeggio (the JS's own limit)
 constexpr double kSeqBpmMin = 1e-3, kSeqBpmMax = 1e6;   // setBpm's clamp (see there)
 constexpr int kSeqMacros = 8;                // PERF_MACROS
+// the session's counter memory (session.h): a roll page is 16 chain rows x 32 steps; NTH / CND / REP counters live in chunks of 256 slots
+constexpr int kSeqPageU32 = 512, kSeqChunkSlots = 256, kSeqMaxChunks = 512 /* 4096 phrases x 32 rows / 256 */, kSeqMaxIds = 4096;
 
 enum class SeqMode { Song, Sect, Phrase };
 
@@ -109,11 +113,21 @@ struct SeqPos { bool valid = false; int row = 0, cr = 0, step = 0, sect = -1, ph
   bool hasPd = false; double pd = 0; };
 struct SeqStep { double t = 0; int n = 0; int tks = 0; double line = 0; uint32_t dropped = 0; SeqPos pos[kSeqTracks]; };
 
+struct SeqCountChunk { uint32_t nth[kSeqTracks * kSeqChunkSlots]; uint32_t gen[kSeqTracks * kSeqChunkSlots]; uint32_t c1[kSeqTracks * kSeqChunkSlots]; };
+
 class Seq {
  public:
   // Control thread. The Song and the vars must outlive the sequencer and must not change while it lives.
+  // This constructor makes a private one-Seq session (the Seq owns it): the renderer, the goldens and the tests use it as before.
   Seq(const Song& song, const SeqVars& vars, SeqMode mode, const SeqOpts& opts);
+  // Built by SeqSession::make (session.h): mode and opts are the session's, the counters live in its pages. successor: no start-up (no track is
+  // switched on, nothing settled): takeOver() writes the run state. The session must outlive the Seq (SongSnap guarantees it).
+  Seq(SeqSession& session, const Song& song, const SeqVars& vars, bool successor);
   ~Seq();
+  // AUDIO THREAD. The run state of `old` (any earlier Seq of the SAME session): the 33 tracks, clocks, random streams, loop, PERFORM live state and sent
+  // table, busT / hearT / NIs, the counters' generations. Song-derived tables stay the ones this Seq built from its own song. No allocation, no lock,
+  // bounded (the tracks 24 KB, the sent arrays, the tables). false, nothing copied: `old` is of another session or knows more target ids than this one.
+  bool takeOver(const Seq& old);
   Seq(const Seq&) = delete;
   Seq& operator=(const Seq&) = delete;
 
@@ -153,7 +167,7 @@ class Seq {
   // the largest counts seen (for choosing capacities from a measurement)
   int maxEventsPerStep() const { return maxEvs_; }
   int maxArpPairsPerStep() const { return maxArp_; }
-  size_t rollPlaces() const { return rvN_; }
+  size_t rollPlaces() const { return rvN_; }   // roll counters this Seq can address (pages x 512)
   size_t countRows() const { return (size_t)nthK_; }
   size_t targetIds() const { return ids_.size(); }
 
@@ -172,6 +186,7 @@ class Seq {
   struct Part { bool present = false; std::vector<PEv> evs; std::vector<PInst> insts; };
   struct Chase { uint32_t seed; int16_t tch; uint8_t hasSeed, skp, chd; };
 
+  Seq(std::shared_ptr<SeqSession> own, const Song& song, const SeqVars& vars);   // the private-session constructor's target
   // construction (control thread)
   int intern(Json id);
   void parseId(TgtId& g) const;
@@ -179,6 +194,8 @@ class Seq {
   void buildParts();
   void buildBus();
   void buildCounters();
+  void loadIds();
+  int internStr(std::string_view s, TgtId&& g);
   void buildChase();
   double tgtOwnOf(const TgtId& g, bool* fxOk) const;
   void partEvsOf(Json mix, Json fx, bool own, std::vector<PEv>& out) const;
@@ -222,6 +239,7 @@ class Seq {
   const SeqVars& V_;
   SeqMode mode_;
   SeqOpts o_;
+  SeqSession* sess_ = nullptr; std::shared_ptr<SeqSession> ownSess_; bool successor_ = false;
   bool once_ = false, hasLoop_ = false; int loopY0_ = 0, loopY1_ = 0;
   bool wakeOk_ = false, PL_ = false;
   int ntr_ = 16, polyFrom_ = 8, NIs_ = 16;
@@ -252,8 +270,8 @@ class Seq {
   std::vector<Part> parts_; Part own_;
   std::vector<PInst> sInsts_;
   // counters
-  std::vector<int32_t> cellSlot_; std::unique_ptr<uint32_t[]> rv_; size_t rvN_ = 0;
-  std::vector<int32_t> rowSlot_; int nthK_ = 0; std::unique_ptr<uint32_t[]> nthCnt_, nthGen_, c1Cnt_; uint32_t trGen_[kSeqTracks];
+  std::unique_ptr<uint32_t*[]> pages_; size_t pageN_ = 0, rvN_ = 0;   // this Seq's copy of the session's page table (song mode: row * 33 + track; else track)
+  std::vector<int32_t> rowSlot_; int nthK_ = 0; std::unique_ptr<SeqCountChunk*[]> chunks_; uint32_t trGen_[kSeqTracks];   // rowSlot_: per stored phrase row, the session's slot (-1: no counter)
   std::vector<Chase> chase_; std::vector<uint8_t> chaseHasS_; std::vector<uint32_t> chaseS_; std::vector<int16_t> chaseM_;
   std::unique_ptr<double[]> arpPool_; int arpUsed_ = 0;
   uint64_t badSets_ = 0;

@@ -22,6 +22,20 @@ class SnapSlot {
     while (out_.space() > 0 && in_.pop(p)) { if (cur_) out_.push(cur_); cur_ = p; changed = true; }
     return changed;
   }
+  // AUDIO THREAD: adopt() for a snapshot that must take state over from the one that was running. Pops everything pending. The snapshots that
+  // never ran are retired at once; handover(prev, next) is called ONCE, with the snapshot that was current before the call (when there was
+  // none: the oldest of those popped, which has not run either) and the newest, BEFORE prev goes back to the control thread. Not called when
+  // there is nothing to hand over from. No allocation (the retire list is on the stack).
+  template <class F>
+  bool adopt(F&& handover) {
+    T* ret[N]; uint32_t nr = 0; T* newest = cur_; T* p; bool changed = false;
+    while (out_.space() > nr && in_.pop(p)) { if (newest) ret[nr++] = newest; newest = p; changed = true; }
+    if (!changed) return false;
+    if (nr > 0) handover(*ret[0], *newest);
+    cur_ = newest;
+    for (uint32_t i = 0; i < nr; i++) out_.push(ret[i]);
+    return true;
+  }
   const T* get() const { return cur_; }                      // AUDIO THREAD
  private:
   Spsc<T*, N> in_, out_;

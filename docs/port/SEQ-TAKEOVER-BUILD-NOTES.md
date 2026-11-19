@@ -1,4 +1,4 @@
-IN THE MIDDLE OF: step 1 done (this plan); starting step 2 (registries + SeqSession in native/core/src/seq/session.h|cpp, Seq built through a session).
+IN THE MIDDLE OF: step 3 (takeOver is written and compiles; step 2 done: registries + SeqSession, 4+4 goldens exact through the private session). Next: the new test file test_seq_takeover.cpp (session-built goldens, identity), the instrument fallback (ruling 6), rt_harness guard.
 
 # SEQ TAKEOVER BUILD NOTES (Part B, `n1/seq-takeover`)
 
