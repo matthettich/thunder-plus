@@ -77,6 +77,12 @@ set(OPT_FX  -O3 -ffast-math ${OPT_COMMON} -w)                                   
 set(OPT_TFX ${OPT_FX})
 if(NOT IS_WASM)
   set(OPT_TFX -O3 -fno-fast-math -ffp-contract=off ${OPT_COMMON} -w)
+  # U34a verification (D5, D7): the effects are built WITH exceptions on host builds (the wasm objects are unchanged): thunder_fx_malloc throws std::bad_alloc on a
+  # null malloc (the effects' Fx::operator new does not check), and what an effect's constructor had made when an allocation failed is freed on the way out.
+  # Nothing throws on the audio path; the flag only adds the cleanup. It goes last so that it wins over -fno-exceptions in OPT_COMMON (GCC and clang: the last one wins).
+  if(NOT MSVC)
+    list(APPEND OPT_TFX -fexceptions)
+  endif()
 endif()
 set(OPT_MOD -O2 -ffast-math -ffunction-sections -fdata-sections -fno-exceptions -fno-rtti -w)  # mods/build.sh
 # The lead, 16 Nov (docs/port/U21-NOTES.md, "Marbles / Tides: the decision"): the web's mods.wasm keeps -ffast-math (its CPU cost without it was measured), and the native build of the

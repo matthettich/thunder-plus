@@ -87,6 +87,23 @@ plan; sections 1 to 4 and 9), `HANDOVER.md` on `beta` (the web app, the owner's 
   and never force-pushes. Neither PR is merged. The lead reads `chains/clive.cpp` and `cengine.cpp` line by line once U31's worker reports.
 - Check-ins (this chat): a restart check at 14:05, then after each usage reset: 15:02, 20:07 on 18 Nov; 01:12, 06:17 on 19 Nov (Mountain).
 
+## State at 02:05 on 19 Nov (the lead; newest)
+- **U34a's verification fixes are MERGED (#238, native 33d136d)**, CI green on all nine jobs. The verifier's final verdict was SOUND WITH CONDITIONS
+  (`docs/port/reviews/verify-237.md`, D1 to D8); all eight fixed with a test each, plus `thunder_render_length_estimate` (song end without voice
+  tails: ELECTRO 4,921,832 against a real 4,983,424). Things that changed outside the API: the tfx `Fx::operator new` and two `layer_pe.cpp`
+  allocations now throw / are checked; `-fexceptions` on the core files that build a handle and on the tfx effect libraries (host builds only; goldens
+  and the six ELECTRO WAVs unchanged); CloudSeed's rate is capped at 96 kHz in `fx/fxhost.cpp` and `waves/wmods.cpp` (its buffers are sized for 96
+  kHz: above that the reverb runs with 96 kHz timing); song limit 64 -> 16 MiB, vars 16 -> 4 MiB. **To check before the host (U37) relies on it: can a
+  real saved song's JSON exceed 16 MiB (embedded samples)?** No song can reach a pump effect slot through the render API, so two handles share nothing.
+  Not yet done: an independent look at #238 itself (the lead read its report only).
+- **Wiring step 3 started:** Sonnet worker a98d8ec030262b0d9, worktree `/home/claude/wt/dispatch`, branch `n1/dispatch`: dossier D2 (`dispatch` routing:
+  MUT / GEN variations, live engines, SoundFont, null kit entries) and D3 (`noShape`). Rule given: never the wrong sound; silence plus a counted stat
+  where a piece is missing. Notes: `docs/port/DISPATCH-NOTES.md`. The lead reviews its diff line by line before merge.
+- **U31 (#227):** worker a64ac5611cf5e1607 found the cause of each of the six CI failures (a fifth NaN crash site in the vowel filter; a NaN-to-int
+  cast that differs between arm64 and x86-64; Unix-only calls in two tests on MSVC; a wasm link error that predates round 2), merged native in
+  (2515ab0) and is waiting for CI. After its report: an independent verifier again (round 3, short), then merge.
+- Queue after these: Seq setters + Song lifetime (dossier D1, the lead's), U34b stems, U32's D1 follow-up, U36, the full wasm target / U37, N2.
+
 ## State at 23:05 on 18 Nov (the lead; newest)
 - **U34a is MERGED (#237, native 8e909ad)**, CI green on every platform. Its independent verifier (a0a273a4180a74c30; report so far
   `docs/port/reviews/verify-237.md`) has found defects D1 to D5 and is wrapping up: D1 `max_frames` rounds the output up to a 128-frame quantum; D2
