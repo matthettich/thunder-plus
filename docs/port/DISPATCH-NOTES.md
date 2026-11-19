@@ -1,6 +1,6 @@
 # DISPATCH NOTES: wiring step 3 (D2 routing, D3 noShape)
 
-**IN THE MIDDLE OF: code written (route + variation inputs, noShape from the instrument, stats, test_render_dispatch.cpp), NOT BUILT YET; the "before" gate numbers are being measured with the old binary (copy in /tmp/dsp-before).**
+**IN THE MIDDLE OF: code, tests and the ELECTRO gate are DONE (pushed); the full ctest in Release and under the sanitizers is running; then the PR and CI.**
 
 Branch `n1/dispatch` (from `native` 33d136d). JS lines are from this checkout (`core/core-processor.js`, `index.html`); C++ lines are `native/core/src/render/render.cpp` before this change.
 
@@ -58,3 +58,27 @@ Other events in `ev()` (not notes): `fxc`/`fxreset`/`fxp` (effect nodes), `chc` 
 * **D2c** null kit entry (row 3): already silent via "no buffer"; only the stat name.
 * **D3** `noShape` (row 11).
 * **Others, NOT fixed here (see "Choices for the lead"):** (i) the C++ sequencer is the audio-thread core's `seq-core.js`, where `applyChop` is empty (:5), so a sliced / synced instrument's events carry no `ofs` / `durSec` / `st` chop and no stretch (the page's own sequencer, which an offline render uses, does chop: index.html:22333); the pad plays from its start, unchopped. (ii) `eng` / `chc` / `tempo` events are dropped without a count. (iii) row 3 in the core takes the track over (`take`), the page does not: the native side follows the page (no takeover), as before.
+
+## 2. What exists to route TO, and the decision per route
+
+| Route | What exists (merged) | Decision | What the renderer does now |
+|---|---|---|---|
+| MUT / GEN variation | The core never makes one: the PAGE renders it (`varBuf` -> `renderVoice`, JS synth engines, `varLevel`) and posts `vbuf {k: ii:vk:pad}` (`coreVar` index.html:23561; handler `core-processor.js:338`). The native side has no voice synthesis (U34c). The render C API took only pads. | **(b) new host input**: `thunder_render_set_variation(r, ii, kind 'g'/'m', num, pad, l, frames, sr)`, same style as `set_pad` (copied, validated before anything changes, 512 MiB budget shared with the pads, one-pad frame limit, `E_STATE` after the first read, `frames == 0` removes) plus a count limit (4096) | a `SH_VK` note plays the variation keyed `(ii, kind, num, pad)`; **missing: SILENT** and `notes_var_missing` (never the base pad; a host whose page would play the base pad hands in the pad's own samples) |
+| live engines (`kv.live`) | `LiveShell` (U26: bass, vox, acid, mach), `xeng_live`, waves live; "NOT wired into the mixer or the sequencer". Needs per-track node management, event decoding, `poly` voice sets and the PDC latency (31 / 15 / 127 samples). | **(c) cannot be wired yet** | new `thunder_render_set_pad_route(r, pad, THUNDER_RENDER_ROUTE_LIVE)`: the pad's notes are SILENT, `notes_live`; the note still takes the track over (`pool_.take`: the page's live note takes the track over too, row 4). A host that wants the page's own safety net for a live pad (its rendered twin, "its twin's sound with the same values", index.html bassNode comment; what `song-ref.mjs` / the ELECTRO gate use) leaves the pad on the default SAMPLER route |
+| SoundFont (`kv.sf`) | `SfPool` (`sf/sf_live.h`, U32 merged): note / take / off / mod / stp / render, same seam as `VoicePool`. It needs an `SfPad` {Font, Preset, PresetPcm}: a parsed font, a decoded preset and the pad's params, which the host would have to hand in (font bytes up to 2 GiB, decode budgets, bank / prog / params). No render input for any of it. | **(c) for this PR**, the piece to add next is a host input for the font (`set_pad_sf`) and a `SfPool` member rendered into `mix_.inputs` next to `pool_` | `ROUTE_SF`: SILENT, `notes_sf`, takes the track over (the core's `sfNote` does) |
+| null kit entry | n/a | already silent (no buffer) | `notes_no_pad` (the page returns without taking the track over: no `take`, as before) |
+| `eng` / `chc` / `tempo` / MIDI events | engine targets act on live nodes, `chc` / `tempo` on the chains node (PR #227, not merged; not depended on) | (c) | dropped as before, now COUNTED (`events_ignored`) |
+
+## 3. D3: `noShape`
+
+`varRec` (:247) and `varBuf` / `varVoice` look at the NOTE'S instrument `S.insts[ev.ii]`: `slc > 1` or `sync` -> the pad as it is. That is a property of the event's instrument, not of the pad (two instruments can share a pad), so it is not a kit field and the C API needs nothing new: `SongRenderer::dispatch` takes the instrument from `e.ii` (a whole index in 0..63, as the JS's array index), and for such an instrument copies the pad's `VoiceBuf` with `noShape = true` and skips the variation lookup. `VoicePool` already honoured `noShape` (`note()`, `shapedReverse()`), so a reversed + shaped note of such an instrument plays (reversed, unshaped) instead of being left to the page, as `getBuf(pad, rev)` does. `notes_unshaped` counts notes that had a MUT / GEN / CUT / RES / DEC and were left unshaped for this reason.
+
+## 4. Tests (`native/tests/test_render_dispatch.cpp`, ctest `render_dispatch`)
+
+DC pads (base 0.2, MUT variation 0.4, GEN variation 0.1): the level of the output says which buffer sounded, silence is exactly 0. Cases: MUT plays the variation (ratio 2 to the base); GEN its own, not the MUT of the same number; missing variation (none, wrong kind, number, instrument, pad): exact silence + `notes_var_missing`; replace / remove a variation; LIVE and SF routes (with and without a buffer): exact silence + their counts, another pad unaffected; null kit entry; MIDI-only instrument; sliced (slc 4) and synced MUT play the pad (with and without a variation handed in), slc 1 is not sliced; DEC shapes a plain instrument and not a sliced or synced one; the C API equals a direct `SongRenderer` drive bit for bit (block sizes 1, 64, 128, 333, 4096, whole) with a variation and a live route set, stats equal; hostile arguments of both new functions (null handle, every number out of range, NaN / inf, limits, 4096-variation table, the 512 MiB budget shared with the pads, E_STATE after the first read). Mutation checks: with the `noShape = true` line removed 3 checks fail; with the variation not used 5 fail.
+
+## 5. Gates (this machine, Release GCC 13)
+
+`render-compare.sh sounds/ELECTRO.thunder` with a reference made in this session (`THUNDER_REF=/tmp/u34a-ref`, the old reference was older than the checkout and was remade): BEFORE (binary from 33d136d) / AFTER:
+plain -87.4 / -87.4 dB, `--fx` -73.0 / -73.0, `--master` -72.8 / -72.8. The six WAVs (plain, fx, master x page / core timing) are byte-identical (`cmp`) before and after: ELECTRO has no MUT / GEN and no sliced or synced instrument with shaping, so nothing there changes (the numbers are the reference's Chrome run, which is why they differ from U34a's -72.3 / -75.1).
+`node tools/seq-golden.mjs --core` (headless Chrome; JS only, this change touches no JS): electro, electro-mid, electro-loop, electro-cmds all ok.
