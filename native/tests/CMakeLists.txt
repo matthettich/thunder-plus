@@ -72,6 +72,21 @@ if(NOT MSVC)
   target_compile_options(test_seq_live PRIVATE -Wall -Wextra)
 endif()
 add_test(NAME seq_live COMMAND test_seq_live)
+# SEQ-LIVE-DESIGN Part B: the Song's lifetime under a running sequencer (SeqSession, takeOver, rebind) against the JS's edit goldens (tools/seq-golden.mjs --edit).
+find_package(Threads REQUIRED)
+add_executable(test_seq_takeover test_seq_takeover.cpp)
+target_link_libraries(test_seq_takeover PRIVATE thunder_core Threads::Threads)
+target_include_directories(test_seq_takeover PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../core/src ${CMAKE_CURRENT_SOURCE_DIR})
+target_compile_definitions(test_seq_takeover PRIVATE THUNDER_ROOT="${CMAKE_CURRENT_SOURCE_DIR}/../..")
+if(NOT MSVC)
+  target_compile_options(test_seq_takeover PRIVATE -Wall -Wextra)
+endif()
+if(THUNDER_SANITIZE)
+  add_test(NAME seq_takeover COMMAND test_seq_takeover --quick)
+else()
+  add_test(NAME seq_takeover COMMAND test_seq_takeover)
+endif()
+add_test(NAME seq_takeover_threads COMMAND test_seq_takeover --threads 2)
 # The JS run fresh beside the C++ (Linux, where Node is installed): seq_dump_current proves the browser-less tool still gives the
 # committed goldens; seq_extra plays 19 cases the goldens do not reach (every command, PERFORM scenes / macros / locks / LFOs /
 # parts, sect and phrase modes, loops, JMP / END, the wrap, a hand-over) in both and compares every row, nested members included.

@@ -74,13 +74,16 @@ struct Song {
   bool chainOn[kSongNT] = {false};
   SongMix mix[kSongNT];
   SongInst insts[kNI];
-  bool instMissing[kNI] = {false};   // a bare song (not a file) whose insts[i] is not an object: the page's S never has one unless an edit made it; the sequencer plays instrument 0 (makeSeq: S.insts[ii] || S.insts[0])
+  bool instMissing[kNI] = {false};   // pageS only: insts[i] is not an object (an edit made it; the page's S has all 64): the sequencer plays instrument 0 (makeSeq: S.insts[ii] || S.insts[0])
 
   // handles into the doc (Missing when the song has none); parsed by the units that use them
   Json tfx, mfx, chainPatch, mst, perf, parts, presets, irs;
 
   // Parses text (a file or a message). false: *err says where and why; nothing was built.
-  bool load(const char* text, size_t len, JsonError* err);
+  // pageS: the text is the page's own S as it stands after an edit (the 'song' / 'patch' ops of a running sequencer), not a file or a first load. normSong's
+  // load-time rules are then not applied again where an in-place edit can undo them (SEQ-LIVE-DESIGN Part B: the running JS sequencer reads S as edited):
+  // an empty phrase keeps the length it was given, and an instrument that is not an object stays missing (the sequencer plays instrument 0, D9).
+  bool load(const char* text, size_t len, JsonError* err, bool pageS = false);
 
   const int16_t* chain(int id) const { return id >= 0 && id < kNPH && chainOff[(size_t)id] >= 0 ? chainData.data() + chainOff[(size_t)id] : nullptr; }
   const int16_t* phrase(int id) const { return id >= 0 && id < kNPH && phraseOff[(size_t)id] >= 0 ? phraseData.data() + phraseOff[(size_t)id] : nullptr; }

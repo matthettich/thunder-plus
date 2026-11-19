@@ -1,4 +1,4 @@
-IN THE MIDDLE OF: step 3 (takeOver is written and compiles; step 2 done: registries + SeqSession, 4+4 goldens exact through the private session). Next: the new test file test_seq_takeover.cpp (session-built goldens, identity), the instrument fallback (ruling 6), rt_harness guard.
+IN THE MIDDLE OF: step 4 (gate). test_seq_takeover passes (24 golden runs, 17 edit goldens x2). Next: rt_harness guard on takeOver, measure takeOver, TSan + ASan runs, mutation checks, full ctest, PR.
 
 # SEQ TAKEOVER BUILD NOTES (Part B, `n1/seq-takeover`)
 

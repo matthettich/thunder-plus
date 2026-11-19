@@ -210,6 +210,7 @@ function editCases() {
       for (let n = 0; sq.alive() && n < d.max; n++){ const r = sq.step(); out.push(JSON.stringify({t:__u.coreNum(r.t), evs:r.evs.map(__u.corePlain)})); } return out; }); })()`, H.ctx);
     let differ = 0; for (let i = 0; i < rows.length; i++) if (JSON.stringify({ t: rows[i].t, evs: rows[i].evs }) !== plain[i]) differ++;
     now.rowsChangedByTheEdits = differ;
+    if (process.env.SEQ_EDIT_DUMP) { fs.mkdirSync(process.env.SEQ_EDIT_DUMP, { recursive: true }); fs.writeFileSync(path.join(process.env.SEQ_EDIT_DUMP, `seq-edit-${C.id}.jsonl`), text); }   // (debugging: the JS rows, one a line)
     const gf = path.join(EDIT_DIR, `seq-edit-${C.id}.json`);
     if (UPDATE || !fs.existsSync(gf)) { fs.writeFileSync(gf, JSON.stringify(now) + '\n'); wrote.push(C.id); console.log(`wrote ${path.relative(ROOT, gf)}: ${now.rows} rows, ${now.events} events, ${differ} rows differ from the unedited run`); continue; }
     const was = JSON.parse(fs.readFileSync(gf, 'utf8')), ok = was.sha256 === now.sha256 && deq(was.edits, now.edits) && deq(was.baseOps, now.baseOps); if (!ok) bad = true;
