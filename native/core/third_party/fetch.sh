@@ -3,6 +3,8 @@
 # Usage: fetch.sh [DEST]   (default: _deps next to this script). Idempotent: a folder already at its pin is left alone.
 # Needs git and network access to github.com. Nothing here is patched: patches are applied by prepare.sh on a copy.
 set -e
+# Windows (Git for Windows sh): without this, MSYS rewrites the sparse-checkout patterns that start with "/" (e.g. /stb_vorbis.c) into C:/Program Files/Git/... and nothing is checked out.
+export MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL="*"
 H=$(cd "$(dirname "$0")" && pwd)
 D=${1:-$H/_deps}
 mkdir -p "$D"
@@ -21,6 +23,9 @@ get() {
   git -C "$D/$name" checkout -q FETCH_HEAD
   [ "$(git -C "$D/$name" rev-parse HEAD)" = "$sha" ] || { echo "pin mismatch for $name" >&2; exit 1; }
 }
+# stb_vorbis (U32, the SoundFont player's SF3 decoder): one file of nothings/stb at an exact commit. THUNDER_FETCH_STB_ONLY=1 fetches only this (the closed build has no DSP, so it must not need the other upstreams).
+get stb https://github.com/nothings/stb 9600522de53973336fa033a289858a4354cbb04c /stb_vorbis.c /LICENSE
+[ -z "$THUNDER_FETCH_STB_ONLY" ] || { echo "third_party: stb fetched into $D"; exit 0; }
 get eurorack  https://github.com/pichenettes/eurorack    f4cfa7697095a28d292bff758beb51deb49b5a86
 # stmlib is eurorack's submodule: the commit eurorack itself records (git ls-tree HEAD stmlib)
 [ "$(git -C "$D/eurorack" ls-tree HEAD stmlib | awk '{print $3}')" = e3bd7c9cc00e4364166f9905c0509b6ffd0535ec ] || { echo "stmlib pin differs from eurorack's" >&2; exit 1; }
