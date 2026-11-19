@@ -56,3 +56,31 @@ then fixed on `beta` separately. The native Seq has the pads' data on its side o
   Gate: a golden from the PAGE's `makeSeq` (not `sim`) on a song with slc 4, slc 16 + SLC command, sync 1, sync 2 with STA.
 - `ev.st` (sync modes 2+, the stretched pad) stays the dossier's Q2: counted and played unstretched at `rate` until the stretch port exists; the
   count is a new stat. The lead's note: this is audible; it goes on the owner's list when the Settings switch exists.
+
+## Part B: the lead's rulings after `docs/port/SEQ-TAKEOVER-NOTES.md` (19 Nov, 11:40). Where these differ from Part B above, these hold.
+
+The analysis corrected three assumptions of the design: the running JS sequencer does NOT follow a changed `S.bpm` or a changed bus plan; a
+17 MB counter copy takes 2 to 12 ms (a block is 2.67 ms); a fixed NTH layout would be 52 MB.
+
+1. **The principle: the running sequencer hears exactly what the running JS sequencer hears.** Live where the JS reads `S` at each step, stale
+   until the next PLAY where the JS computed the value at make time. So the successor COPIES from its predecessor: `busT_`, `hearT_`, `NIs_`,
+   `bpm_`, `tks_`, the groove, `lpb_`, `perfFirst_`, and the effective macro values into `pfMac_` (a changed resting value is not heard).
+2. **Counters and ids: one `SeqSession` per PLAY, on the control thread.** It owns three append-only registries that give a position its slot for
+   the whole PLAY: a page table for `rv_` (2 KB pages for cells that held a chain at any point of the PLAY, never freed before the session ends),
+   a chunked registry for the NTH / CND / REP rows, and the `ids_` registry. Every Seq of the session is built against the session; a registry
+   change is committed only when `publish()` returned true. Slots never move, so `Tr::lk[]`, `sent*` and the counters carry over as they are.
+   ELECTRO stays at today's size; no fixed 17 MB layout, no per-edit remap.
+3. **No chaining.** Because slots are stable for the session, `takeOver(old)` is valid from ANY earlier Seq of the same session, so a snapshot
+   that was replaced before the audio thread adopted it needs nothing. The pages are the session's; a Seq holds a pointer table. The session is
+   freed only after the audio side has returned its last Seq. `takeOver` allocates nothing and its cost is bounded by the run-state inventory
+   (24 KB of `Tr`, the clocks, the rng, the sent arrays, the pointer tables): state the measured worst case in the notes.
+4. **`SongSnap` holds `shared_ptr<const Song>`** (a vars-only message publishes a new Seq on the same Song). The host re-points the `SeqRunner`
+   at the adopted Seq (`SeqRunner::rebind(Seq*)`: the pointer only, hold / lr / ls / ended / skips kept).
+5. **Deliberate differences from the JS, kept and written in the test file:** a perf deleted from the song (the JS keeps orphaned LFOs and locks
+   playing: the successor is rebuilt from the new song), and a missing song row (the JS throws: C++ treats it as empty).
+6. **A removed instrument (D9): as the JS, instrument 0.** The builder first checks whether the C++ default-instrument answer is also reachable
+   WITHOUT an edit (a phrase naming an instrument the song does not have): if it is, that is an existing difference from `makeSeq` and is fixed
+   and gated in the same PR with a golden made by the JS.
+7. **The gate:** the notes' T0 to T32, with "bpm in the song changed" reworded to "is NOT heard until the next PLAY; the `bpm` op is". Plus
+   the takeOver-at-every-step identity on the four goldens and the four live goldens, the allocation guard on `takeOver`, the thread test under
+   TSan, and a skipped-snapshot test (publish three, the audio side adopts only the last).
