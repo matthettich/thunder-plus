@@ -447,7 +447,7 @@ bool Seq::takeOver(const Seq& old) {
       else { pfMac_[i] = old.pfMac_[i]; pfMacSet_[i] = old.pfMacSet_[i]; } } }
   // the targets sent so far: an id means the same in both (the registry), and the ORDER is the Map's insertion order
   const size_t n = old.ids_.size();
-  std::memcpy(sentHas_.data(), old.sentHas_.data(), n); std::memcpy(sentVal_.data(), old.sentVal_.data(), n * sizeof(double)); std::memcpy(sentOrd_.data(), old.sentOrd_.data(), n * sizeof(int));
+  if (n) { std::memcpy(sentHas_.data(), old.sentHas_.data(), n); std::memcpy(sentVal_.data(), old.sentVal_.data(), n * sizeof(double)); std::memcpy(sentOrd_.data(), old.sentOrd_.data(), n * sizeof(int)); }   // (memcpy with a null pointer is undefined, even for 0 bytes)
   for (size_t i = n; i < sentHas_.size(); i++) sentHas_[i] = 0;
   sentN_ = old.sentN_; wantN_ = 0;
   return true;

@@ -532,6 +532,7 @@ if(THUNDER_SANITIZE AND NOT MSVC)
   target_compile_options(test_modfx PRIVATE -fno-sanitize=vptr)
   target_compile_options(rt_harness PRIVATE -fno-sanitize=vptr)
   target_compile_options(test_hardening PRIVATE -fno-sanitize=vptr)
+  target_compile_options(test_seq_takeover PRIVATE -fno-sanitize=vptr)   # SongSnap holds shared_ptrs whose control blocks the -fno-rtti core makes: the same reason
 endif()
 
 # D4: U15 end to end: ELECTRO with Flex / Step gate / Retrigger and their tracker commands through SongRenderer (Mixer + FxBank) against the real JS in Node
