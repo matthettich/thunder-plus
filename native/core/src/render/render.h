@@ -11,6 +11,7 @@
 #define THUNDER_RENDER_RENDER_H
 #include <cstdint>
 #include <memory>
+#include <vector>
 
 #include "master/chain.h"
 #include "meter/meter.h"
@@ -27,14 +28,51 @@ constexpr int kRenderPads = 256;       // pad slots a kit can have (a pad number
 constexpr int kRenderQuantum = 128;    // frames a song is rendered in (the web core's block), whatever the host's block
 constexpr int kRenderEvents = kSeqStepEvents;   // one sequencer step's events, sized for the worst case (seq.h; more are counted: stats().seqDropped)
 
+// Which player a pad's notes are for (the kit entry's `live` / `sf` of coreKitV()). Sampler: the rendered pad (or a variation of it). Live: a live engine
+// (bass, vox, acid, mach, xeng, pump synth, waves): its player is not wired into this renderer yet, so its notes are SILENT and counted (stats().notesLive).
+// SoundFont: the sf player (sf/sf_live.h) needs a font and a prepared preset from the host, which this renderer has no input for yet: silent, counted (notesSf).
+enum class PadRoute : uint8_t { Sampler = 0, Live = 1, SoundFont = 2 };
+
+// A MUT / GEN variation the host rendered (the page's `vbuf`): mono, keyed as the core's varBufs are, by instrument, kind ('g' GEN / 'm' MUT), number and pad.
+struct RenderVar {
+  int ii = 0; char kind = 0; int num = 0, pad = 0;
+  std::vector<float> data; VoiceBuf buf;   // buf.data points into data
+};
+
 struct RenderPads {
   VoiceBuf buf[kRenderPads];           // data == nullptr: the kit has no buffer for the pad (its notes are silent, as `kit.voices[pad]` missing)
   VoiceKit kit[kRenderPads];
+  PadRoute route[kRenderPads] = {};    // Sampler unless the host says otherwise
+  std::vector<RenderVar> var;          // sorted by (ii, kind, num, pad); read-only while a renderer runs
+  static bool varLess(const RenderVar& a, int ii, char kind, int num, int pad) {
+    if (a.ii != ii) return a.ii < ii;
+    if (a.kind != kind) return a.kind < kind;
+    if (a.num != num) return a.num < num;
+    return a.pad < pad; }
+  RenderVar* findVar(int ii, char kind, int num, int pad) {
+    size_t lo = 0, hi = var.size();
+    while (lo < hi) { const size_t m = (lo + hi) / 2; if (varLess(var[m], ii, kind, num, pad)) lo = m + 1; else hi = m; }
+    return lo < var.size() && var[lo].ii == ii && var[lo].kind == kind && var[lo].num == num && var[lo].pad == pad ? &var[lo] : nullptr; }
+  const RenderVar* findVar(int ii, char kind, int num, int pad) const { return const_cast<RenderPads*>(this)->findVar(ii, kind, num, pad); }
+  // Control thread. Adds or replaces (frames == 0 removes). `mono` is copied. Returns false when the allocation failed (throws only if exceptions are on).
+  void setVar(int ii, char kind, int num, int pad, const float* mono, int frames, double sr) {
+    size_t lo = 0, hi = var.size();
+    while (lo < hi) { const size_t m = (lo + hi) / 2; if (varLess(var[m], ii, kind, num, pad)) lo = m + 1; else hi = m; }
+    const bool have = lo < var.size() && var[lo].ii == ii && var[lo].kind == kind && var[lo].num == num && var[lo].pad == pad;
+    if (frames <= 0) { if (have) var.erase(var.begin() + (std::ptrdiff_t)lo); return; }
+    std::vector<float> d(mono, mono + frames);
+    if (!have) { RenderVar v; v.ii = ii; v.kind = kind; v.num = num; v.pad = pad; var.insert(var.begin() + (std::ptrdiff_t)lo, std::move(v)); }
+    RenderVar& v = var[lo]; v.data.swap(d); v.buf = VoiceBuf(); v.buf.data = v.data.data(); v.buf.len = frames; v.buf.sr = sr;
+  }
 };
 
 struct RenderStats {
   int64_t frames = 0;
   int steps = 0, events = 0, notes = 0, notesPlayed = 0, notesNoPad = 0, notesMidiOnly = 0, notesShapedRev = 0, mixEvents = 0, beats = 0;
+  // D2 / D3 routing: notesLive / notesSf: notes of a live-engine / SoundFont pad (silent: no player wired); notesVar: notes that played a MUT / GEN variation;
+  // notesVarMissing: a MUT / GEN note whose variation the host did not hand in (silent); notesUnshaped: notes of a sliced / synced instrument that had a MUT / GEN / CUT / RES / DEC and played the pad as it is (varRec);
+  // eventsIgnored: events this renderer has no route for (eng, chc, tempo, the MIDI events)
+  int notesLive = 0, notesSf = 0, notesVar = 0, notesVarMissing = 0, notesUnshaped = 0, eventsIgnored = 0;
   int peakVoices = 0, peakVoiceLane = 0, peakMixLane = 0, peakStepEvents = 0;
   uint32_t voiceDropped = 0, voiceOverflow = 0, voiceAutoDropped = 0, mixAutoDropped = 0;
   uint64_t seqDropped = 0;

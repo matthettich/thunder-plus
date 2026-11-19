@@ -180,6 +180,36 @@ int thunder_render_set_pad_kit(thunder_render* r, int pad, int choke, int syn, d
   return 0;
 }
 
+int thunder_render_set_pad_route(thunder_render* r, int pad, int route) {
+  if (!r) return THUNDER_RENDER_E_ARG;
+  if (r->dead || r->started) return THUNDER_RENDER_E_STATE;
+  if (!padOk(pad) || route < THUNDER_RENDER_ROUTE_SAMPLER || route > THUNDER_RENDER_ROUTE_SF) return THUNDER_RENDER_E_ARG;
+  r->pads.route[pad] = route == THUNDER_RENDER_ROUTE_LIVE ? PadRoute::Live : route == THUNDER_RENDER_ROUTE_SF ? PadRoute::SoundFont : PadRoute::Sampler;
+  return 0;
+}
+
+int thunder_render_set_variation(thunder_render* r, int ii, int kind, int num, int pad, const float* l, int64_t frames, double sample_rate) {
+  if (!r) return THUNDER_RENDER_E_ARG;
+  if (r->dead || r->started) return THUNDER_RENDER_E_STATE;
+  if (ii < 0 || ii >= THUNDER_RENDER_INSTS || (kind != 'g' && kind != 'm') || num < 0 || num > 255 || !padOk(pad) || frames < 0) return THUNDER_RENDER_E_ARG;
+  TR_TRY {
+    RenderVar* old = r->pads.findVar(ii, (char)kind, num, pad);
+    const size_t oldBytes = old ? old->data.size() * sizeof(float) : 0;
+    if (frames == 0) { if (old) { r->padBytes -= oldBytes; r->pads.setVar(ii, (char)kind, num, pad, nullptr, 0, 0); } return 0; }
+    if (!l || !fin(sample_rate) || sample_rate < 1 || sample_rate > 1e6) return THUNDER_RENDER_E_ARG;
+    if (frames > THUNDER_RENDER_MAX_PAD_FRAMES) return THUNDER_RENDER_E_LIMIT;
+    const size_t bytes = (size_t)frames * sizeof(float);
+    if (bytes > THUNDER_RENDER_MAX_PAD_BYTES || r->padBytes - oldBytes + bytes > THUNDER_RENDER_MAX_PAD_BYTES) return THUNDER_RENDER_E_LIMIT;
+    if (!old && r->pads.var.size() >= (size_t)THUNDER_RENDER_MAX_VARIATIONS) return THUNDER_RENDER_E_LIMIT;
+    for (int64_t i = 0; i < frames; i++) if (!fin(l[i])) return THUNDER_RENDER_E_ARG;   // validated before anything is changed
+    r->pads.setVar(ii, (char)kind, num, pad, l, (int)frames, sample_rate);   // (builds the copy first: a failed allocation leaves the table as it was)
+    r->padBytes = r->padBytes - oldBytes + bytes;
+    return 0;
+  }
+  TR_CATCH_BADALLOC(return THUNDER_RENDER_E_MEMORY;)
+  TR_CATCH_ALL(r->dead = true; return THUNDER_RENDER_E_INTERNAL;)
+}
+
 int64_t thunder_render_length(thunder_render* r) { return r ? r->total : -1; }
 int64_t thunder_render_position(thunder_render* r) { return r ? r->outPos : -1; }
 int64_t thunder_render_length_estimate(thunder_render* r) {
@@ -243,6 +273,7 @@ int thunder_render_stats_get(thunder_render* r, thunder_render_stats* out) {
   s.steps = t.steps; s.events = t.events; s.notes = t.notes; s.notes_played = t.notesPlayed; s.notes_no_pad = t.notesNoPad; s.notes_midi_only = t.notesMidiOnly;
   s.notes_shaped_rev = t.notesShapedRev; s.mix_events = t.mixEvents; s.peak_voices = t.peakVoices;
   s.voices_refused = t.voiceDropped; s.voice_track_full = t.voiceOverflow; s.voice_auto_dropped = t.voiceAutoDropped; s.mix_auto_dropped = t.mixAutoDropped; s.seq_dropped = t.seqDropped;
+  s.notes_live = t.notesLive; s.notes_sf = t.notesSf; s.notes_var = t.notesVar; s.notes_var_missing = t.notesVarMissing; s.notes_unshaped = t.notesUnshaped; s.events_ignored = t.eventsIgnored;
   const size_t k = std::min<size_t>(out->size, sizeof s); const uint32_t keep = out->size;
   std::memcpy(out, &s, k); out->size = keep;
   return 0;

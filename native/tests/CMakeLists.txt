@@ -885,6 +885,11 @@ target_include_directories(test_render_api_fix PRIVATE ${CMAKE_CURRENT_SOURCE_DI
 target_compile_definitions(test_render_api_fix PRIVATE THUNDER_ROOT="${CMAKE_CURRENT_SOURCE_DIR}/../..")
 add_test(NAME render_api_fix COMMAND test_render_api_fix)
 # the memory ones (D4 to D7): replaces the global operator new to count and to fail allocations, so it is a program of its own
+add_executable(test_render_dispatch test_render_dispatch.cpp)
+target_link_libraries(test_render_dispatch PRIVATE thunder_core)
+target_include_directories(test_render_dispatch PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../core/src ${CMAKE_CURRENT_SOURCE_DIR})
+add_test(NAME render_dispatch COMMAND test_render_dispatch)
+
 add_executable(test_render_api_oom test_render_api_oom.cpp)
 target_link_libraries(test_render_api_oom PRIVATE thunder_core)
 target_include_directories(test_render_api_oom PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../core/src ${CMAKE_CURRENT_SOURCE_DIR})
