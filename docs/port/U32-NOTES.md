@@ -1,4 +1,4 @@
-**IN THE MIDDLE OF (branch n3/u32-d1): follow-up D1, "decode work budget" (code and tests written; measuring before/after, mutations, full ctest, then the PR). See "Follow-up: decode work budget" at the end of the file.**
+**D1 follow-up (branch n3/u32-d1) is DONE and in a PR into `native`; see "Follow-up: decode work budget" at the end of the file. Nothing in progress.**
 
 # U32: the SoundFont / GM player (SF2 / SF3 parse, Vorbis decode, zones and modulators, layered zones, the pad render, the live note)
 
@@ -168,3 +168,5 @@ Tests (`test_sf unit`, new blocks H9 to H12; the fonts are generated in the test
 | GM font, all 197 presets x (own rate, 48 kHz): status, samples, bytes, FNV of every sample | `test_sf gmall` | identical in all 394 lines; time 39.2 s before, 36.7 s after (noise) |
 (Times: this machine, Release, shared 2 cores; the verifier's 17.7 s / 13.5 s were on a loaded box. Peak allocation is counted with a replaced `operator new` in `test_sf.cpp`, not RSS.)
 Mutations 36 to 39 in `native/tools/sf-mutate.py` (work not charged on a discarded decode, cache keyed by offset only, granule check skipped, parse table bound lifted): all CAUGHT.
+Runs (2026-11-19, this machine, `-j1` builds, `ctest -j2 --timeout 3600`): Release full ctest **157 tests, 0 failed, 1 skipped** (`pumpsynth_refused`, closed build only; 157 because other units were merged into `native` since the last count of 151). Sanitizer (`-DTHUNDER_SANITIZE=ON`, ASan + UBSan, `-fno-sanitize-recover`) full ctest **157 tests, 0 failed, 1 skipped** (run in five segments because the server restarted during the first attempt; includes `sf_unit` 21 s, `sf` 13 s, `sf_fuzz 200 1` 65 s, all clean). The Release run is of the commit before the last test-only edit (the counting `operator new` also replaces the nothrow forms, needed for the sanitizer runtime; it changes no library code).
+Not verified: the fuzz at 20000+ iterations (`test_sf_fuzz` with a large count) was not re-run beyond ctest's 200; macOS / Windows only through CI.
