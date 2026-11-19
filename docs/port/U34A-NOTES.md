@@ -1,5 +1,7 @@
 # U34a: offline song render C API
 
+> **IN THE MIDDLE OF (update on every push):** fixes D1..D8 and the length estimate are in and tested in Release (`ctest -R render`: 6 of 6); next: sanitizer build, the golden gate (full ctest), the six CLI WAVs `cmp`, then the PR and CI.
+
 Unit U34a of the native port (WIRING-DOSSIER 5, item 1). A public C API over `SongRenderer` so a host (wasm bridge, Android JNI, desktop) can render a song without C++ types.
 Branch `n1/u34a`, cut from `native` at 9e88d36. Stems (U34b), `dispatch()` routing (D2 / D3), live playback and the wasm bridge are NOT in this unit.
 
@@ -92,3 +94,30 @@ The numbers are the same because the WAVs are: `cmp` says all six renders (plain
 * PDC through the API with real latent slots (pump effects) against the page; only equal to the direct drive, and the plan is empty for the songs used.
 * Sample rates other than 48 kHz were created and read in the hostile test and the fuzz, but only 48 kHz output was compared with Chrome.
 * Pad rates and extreme songs are only checked for "no crash, no sanitizer report", not for sensible output.
+
+
+## Verification fixes (the independent verifier's report: `docs/port/reviews/verify-237.md`, branch `n1/u34a-fix`)
+
+Each defect was reproduced first by a test that failed on 7741ba6 (`render_api_fix`, `render_api_oom`, `render_api_noexc`; the new tests are in `native/tests/`).
+
+| | Cause | Fix (file) | Test |
+|---|---|---|---|
+| D1 | `pump()` tested the cut once a 128-frame quantum and set `total = raw - skip`: rounded up; inside the last quantum the song-end branch won and `hit_limit` stayed 0 | `total = min(avail, max_frames)`, `hit_limit = !over || avail > max_frames` (`render_api.cpp` `pump`) | `render_api_fix` caseMaxFrames: 16 cuts incl. natural-1..-129, plain and with the master latency |
+| D2 | `drain` never set `started` | `drain` sets it after its state checks | `render_api_fix` caseDrainStarts |
+| D3 | `try` / `catch` do not compile with `-fno-exceptions`; the header said "aborts instead" | `TR_TRY` / `TR_CATCH_*` macros compile the handlers away; header OUT OF MEMORY says exactly what happens (abort) | ctest `render_api_noexc` builds `tests/render_api_noexc.cpp` (includes the file, `-fno-exceptions -fno-rtti -Werror`) |
+| D4 | a replacement built the new copy before releasing the old (1.05 GiB at the limit); a 64 MiB hostile song made a 944 MiB handle (measured here; 1195 MB RSS in the verifier's run) | the final state must fit; when old + new do not fit together the old is released first (a failed allocation then leaves the pad removed: header ERRORS (3)); song limit 64 to 16 MiB, vars limit 16 to 4 MiB; measured figures in the header | `render_api_oom` padBudget (peak exactly 512 MiB; before: 768), hostileSizes |
+| D5 | a failed `create` leaked what the renderer had made (29 to 44 MB): the core files that build the handle are `-fno-exceptions`, so a throwing allocation skipped their cleanups; also `FxHost` lanes and `FxHost::plan`'s plan were raw owners | `-fexceptions` for the files that make a handle (`core/CMakeLists.txt`) and for the tfx effects (`dsp/CMakeLists.txt`); `FxHost` constructor frees its lanes, `plan()` and `FxBank::load` hold the plan in a `unique_ptr` | `render_api_oom` createFailures: a failure at EVERY allocation index of create for the short songs (180, 678), every 11th of ELECTRO (7734), every effect malloc of ELECTRO; heap (mallinfo2) and live blocks back to start each time |
+| D6 | by design the handle is dead after E_MEMORY from read, the header said only E_INTERNAL kills | rule written in the header (ERRORS (2)): dead handle, free only, getters answer; `drain` the same | `render_api_oom` readFailures: 24 injection points in a whole read of ELECTRO with effects |
+| D7 | `Fx::operator new` (the web's tfx.h, not edited) does `malloc` + `memset` unchecked | `thunder_fx_malloc` (`dsp/fx_alloc.cpp`, what the effect sources' `malloc` is) throws `std::bad_alloc` (abort without exceptions); `layer_pe.cpp` checks its two raw allocations (`use.bad`); other sites read: `json.cpp` and `core.cpp` use `nothrow` and check; the engine's `new`s throw | `render_api_oom` (test hook `thunder_fx_fail_at`): SIGSEGV before |
+| D8 | Cloud Seed's buffers are fixed arrays for 96 kHz (`prepare.sh`); above that a tap is longer than its buffer. The web has no rule (its worklet runs at the context's rate and already reads outside at 96 kHz) | the rate given to `make_cloudseed` is capped at 96 kHz (`fx/fxhost.cpp`, `waves/wmods.cpp`; third-party source untouched); at 44.1 / 48 kHz the audio is unchanged | `render_api_fix` caseHighRates (the sanitizer job sees the index; Release checks finite output); the sanitizer build of the same test |
+
+Wording: above 96 kHz the reverb is therefore shorter than the rate asks for (a documented limit, not a bug of the unit).
+
+### Test gaps
+M3 (the pad copy aliasing the host buffer) is killed by `render_api_fix` casePadCopy (the host arrays are overwritten and freed after each set_pad). M8 (drain before the end allowed) by caseDrainStarts (E_STATE before the first read and part way, and the render afterwards equals one that never saw the drains).
+
+### `thunder_render_length_estimate`
+Built. A second `Seq` (same song, vars, options and fixed random seed) is stepped to its end without any audio; the result is `seq.time() * sr - latency`, capped at `max_frames`, cached, and the exact length once known. It is an estimate: the voices' tails after the sequencer's end are what only the render can tell (ELECTRO: 4921832 estimated, 4983424 real; the short songs 11.4k frames, the pad tail). Test: `render_api_fix` caseEstimate.
+
+### Can a song reach a pump effect slot? No.
+`FxHost::entryFromSlot` maps a song's slot only through `fx_type_of(type)`, which knows the page's 34 wasm effects (0..33) and 93..95; pump kinds (200 and up) are made only by hosts that ask `FxHost::plan` for them (`fxpump.cpp`), and neither `FxBank` nor the render API does. `FxBank::event` (FXC, FXV) only moves values of slots that exist. So `pump_new` / `pump_io` (process-global) are never touched by a render and two handles on two threads share nothing mutable (TSan clean in the verifier's three-thread runs). The header's claim stands, with its reason now stated; a host needs no "one render at a time" rule. (If a future unit lets a song name a pump effect, this changes: the header says so.)

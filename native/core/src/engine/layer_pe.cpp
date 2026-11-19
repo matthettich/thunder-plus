@@ -86,6 +86,7 @@ void PeOsc::init(PeUse& use, const EngLayer& L, const EngVoice& V, double sr, do
     const std::vector<float>& v = (*gTest->inject)[gTest->next++]; d = v.data(); n = v.size(); k = rate0 / sr; pos = 0; return;
   }
   Workspace& w = ws(); prepare(w);
+  if (!w.sess || !w.pre) { use.bad = true; d = nullptr; n = 0; k = (L.type == LType::Plaits ? 48000 : 32000) / sr; return; }   // (a failed calloc / malloc: a checked error, as an empty pre-render)
   if (!use.started) { session_reset(w.sess); use.started = true; }   // a fresh instance's memory at the start of the voice
   Session* S = w.sess; const EngPE& P = L.pe;
   const bool pl = L.type == LType::Plaits;

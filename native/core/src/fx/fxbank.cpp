@@ -2,6 +2,7 @@
 #include "fx/fxbank.h"
 
 #include <algorithm>
+#include <memory>
 
 #include "rt/jsmath.h"
 
@@ -13,8 +14,8 @@ FxBank::FxBank(double sr) : sr_(sr) {
 }
 void FxBank::load(const Song& S, double bpm, double restartN) {
   bpm_ = bpm; restartN_ = restartN;
-  for (int t = 0; t < kSongNT; t++) { FxPlan* p = h_[t]->planFromSong(S.tfx.at((size_t)t), bpm, restartN); if (p) { h_[t]->commit(p); delete p; } }
-  { FxPlan* p = h_[kSongNT]->planFromSong(S.mfx, bpm, restartN); if (p) { h_[kSongNT]->commit(p); delete p; } }
+  for (int t = 0; t < kSongNT; t++) { std::unique_ptr<FxPlan> p(h_[t]->planFromSong(S.tfx.at((size_t)t), bpm, restartN)); if (p) h_[t]->commit(p.get()); }
+  { std::unique_ptr<FxPlan> p(h_[kSongNT]->planFromSong(S.mfx, bpm, restartN)); if (p) h_[kSongNT]->commit(p.get()); }
   for (int t = 0; t <= kSongNT; t++) if (h_[t]->slotCount() > 0) flush(t, 0);
 }
 void FxBank::attach(Mixer& m, bool master) {

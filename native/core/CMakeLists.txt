@@ -1,9 +1,15 @@
 # thunder_core: the one C++ engine library (N0: a test core only; it is thrown away in N1).
 add_library(thunder_core STATIC src/core.cpp src/rt/auto.cpp src/rt/jsmath.cpp src/rt/fdlibm.cpp src/rt/json.cpp src/song/song.cpp src/seq/seq.cpp src/voice/voice.cpp src/mix/mix.cpp src/mix/pdc.cpp src/mix/delay.cpp src/mix/beat.cpp src/master/master.cpp src/master/eq.cpp src/master/chain.cpp src/meter/meter.cpp src/fx/fxhost.cpp src/fx/clkcores.cpp src/fx/idmcores.cpp src/modfx/modfx.cpp src/modfx/mod_stereo.cpp src/modfx/mod_reverbs.cpp src/modfx/mod_cv.cpp src/modfx/mod_filters.cpp src/modfx/mod_delays.cpp src/modfx/mod_misc.cpp src/modfx/mod_clk.cpp src/modfx/mod_basic.cpp src/modfx/mod_voice.cpp src/modfx/mod_gen.cpp src/waves/wmods.cpp src/waves/engine.cpp src/waves/live.cpp src/modfx/bbexpr.cpp src/fx/fxmap.cpp src/fx/fxbank.cpp src/fx/fxpump.cpp src/render/render.cpp src/render/render_api.cpp src/fx/u17cores.cpp src/engine/engine.cpp src/engine/engine_json.cpp src/engine/pumpsynth.cpp)
 target_include_directories(thunder_core PUBLIC include)
-# U34a: the render C API catches std::bad_alloc, so that one file is built WITH exceptions (the rest of the core is not).
+# U34a (verification D3, D5): a failed allocation is a std::bad_alloc that render_api.cpp catches (E_MEMORY). So that what a failed thunder_render_create has already built
+# (the Song, the sequencer, the voices, the mixer's delay lines, the effects, the master chain) is freed on the way out, the files that make those objects are built WITH
+# exceptions (their constructors get the cleanup an exception needs); nothing throws on the audio path and the audio code is the same. The rest of the core, and the wasm
+# build (which has its own script and keeps -fno-exceptions), are not changed. MSVC has exceptions on already.
 if(NOT MSVC)
-  set_source_files_properties(src/render/render_api.cpp PROPERTIES COMPILE_OPTIONS "-fexceptions")
+  set_source_files_properties(
+    src/render/render_api.cpp src/render/render.cpp src/rt/json.cpp src/song/song.cpp src/seq/seq.cpp src/voice/voice.cpp src/mix/mix.cpp src/mix/pdc.cpp src/mix/delay.cpp src/mix/beat.cpp
+    src/master/master.cpp src/master/eq.cpp src/master/chain.cpp src/fx/fxhost.cpp src/fx/clkcores.cpp src/fx/idmcores.cpp src/fx/u17cores.cpp src/fx/fxmap.cpp src/fx/fxbank.cpp src/fx/fxpump.cpp
+    PROPERTIES COMPILE_OPTIONS "-fexceptions")
 endif()
 target_sources(thunder_core PRIVATE src/modfx/fftr.cpp src/modfx/mod_spectral.cpp src/modfx/mod_convolve.cpp)   # U20
 target_sources(thunder_core PRIVATE src/engine/layer_u23.cpp src/engine/layer_click.cpp src/engine/layer_wavetable.cpp src/engine/layer_pd.cpp src/engine/layer_chip.cpp src/engine/layer_supersaw.cpp src/engine/layer_pwm.cpp src/engine/layer_sample.cpp src/engine/layer_vint.cpp src/engine/layer_grains.cpp)   # U23
