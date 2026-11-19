@@ -54,6 +54,7 @@ int main(int argc, char** argv) {
   std::printf("chains_threads: %.1f s, %llu blocks, %llu events accepted, %llu patches delivered (%llu refused), stats: dropped %llu coalesced %llu droppedParams %llu deferred %llu late %llu; patches in flight at the end: %d\n", seconds,
               (unsigned long long)blocks.load(), (unsigned long long)posted, (unsigned long long)patches, (unsigned long long)refused, (unsigned long long)s.droppedEvents, (unsigned long long)s.coalescedEvents, (unsigned long long)s.droppedParams,
               (unsigned long long)s.deferredPatches, (unsigned long long)s.lateEvents, live.patchesInFlight());
+  std::printf("pump spares: %llu bad blocks, %llu spares swapped in, %llu bad blocks with no spare ready (process-wide counters; the spare hand-over of PumpMod ran under the two threads if the swaps are above 0)\n", (unsigned long long)chains_pump_bad(), (unsigned long long)chains_pump_swaps(), (unsigned long long)chains_pump_dry());
   int fails = 0;
   if (bad.load()) { std::printf("FAIL: non-finite output\n"); fails++; }
   if (blocks.load() < 100) { std::printf("FAIL: the audio thread barely ran\n"); fails++; }
