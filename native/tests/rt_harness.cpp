@@ -208,6 +208,28 @@ static int run_seq() {
   return 0;
 }
 
+// ---- CHOP: step() with chop on under the guard ---------------------------------------------------------------------------------------------------
+// Seven instruments (slc 4 grid, slc 16 with SLC, slc 4 with SMODE hits, sync 1, 2, 3, slc 8 with RET retriggers) on a looping phrase, a SeqChop handed in; every step() is inside the guard. The song and the table are the control thread's work.
+static int run_seq_chop() {
+  std::string s = "{\"v\":6,\"bpm\":120,\"lpb\":4,\"ntr\":8,\"song\":[[0,1,2,3,4,5,6]],\"chains\":[[[0,0]],[[1,0]],[[2,0]],[[3,0]],[[4,0]],[[5,0]],[[6,0]]],\"plen\":[16,16,16,16,16,16,16],\"insts\":["
+    "{\"pad\":0,\"slc\":4},{\"pad\":1,\"slc\":16},{\"pad\":0,\"slc\":4,\"smode\":1},{\"pad\":1,\"sync\":1},{\"pad\":0,\"sync\":2,\"beats\":4,\"grain\":2},{\"pad\":1,\"sync\":3,\"beats\":2},{\"pad\":0,\"slc\":8}],\"phrases\":[";
+  for (int t = 0; t < 7; t++) { s += t ? ",[" : "[";
+    for (int y = 0; y < 32; y++) { const int hit = y < 16 && y % 2 == 0; s += std::string(y ? "," : "") + "[" + std::to_string(hit ? 44 + (y * 3 + t) % 12 : -1) + ",-1,-1,-1,-1," + std::to_string(t) + ","
+        + (t == 1 && hit ? "65,5" : "-1,-1") + "," + (t == 6 && hit ? "11,36" : "-1,-1") + (t == 4 && hit ? ",25,128" : ",-1,-1") + "]"; }
+    s += "]"; }
+  s += "]}";
+  thunder::Song song; thunder::JsonError je; if (!song.load(s.data(), s.size(), &je)) return fail("the chop song does not load");
+  thunder::SeqChop chop; const double hits[] = {0, 0.31, 0.77, 1.4}; chop.setLoop(0, 2.0); chop.setLoop(1, 1.6); chop.setHits(0, 4, hits, 4);
+  thunder::SeqVars vars; thunder::SeqOpts o; o.sim = false; o.chop = &chop; o.once = false;
+  thunder::Seq sq(song, vars, thunder::SeqMode::Song, o);
+  const int CAP = 4096; std::vector<thunder::SeqEvent> evs((size_t)CAP); thunder::SeqStep st; int steps = 0; long chopped = 0;
+  { rt_guard g; for (; steps < 3000; steps++) { const int k = sq.step(evs.data(), CAP, &st); for (int i = 0; i < k; i++) { if (evs[i].has & thunder::SH_CHOP) chopped++; } } }
+  if (sq.dropped()) return fail("the chop run dropped events");
+  if (chopped == 0 || sq.chopped() == 0 || sq.chopStretched() == 0) return fail("the chop run chopped nothing (the guard would prove nothing)");
+  std::printf("rt_harness: sequencer with chop: %d steps, %ld chopped notes (%llu with st), no allocation\n", steps, chopped, (unsigned long long)sq.chopStretched());
+  return 0;
+}
+
 // ---- SEQ-LIVE A3: the runner and the clock setters under the guard ---------------------------------------------------------------
 // ELECTRO played live from a SeqRunner, a block of 128 frames at 48 kHz at a time. Inside the guard, every block: pump(); and at fixed blocks
 // setTime (before the first step, by the control path), setBpm, shift, hold(), a stalled `now` (the catch-up skip). Nothing may allocate.
@@ -1125,6 +1147,7 @@ int main(int argc, char** argv) {
   if (int r = run_logger()) return r;
   if (int r = run_core()) return r;
   if (int r = run_seq()) return r;
+  if (int r = run_seq_chop()) return r;
   if (int r = run_seq_runner()) return r;
   if (int r = run_seq_takeover()) return r;
   if (int r = run_voice()) return r;
