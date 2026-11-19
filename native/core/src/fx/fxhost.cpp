@@ -1,5 +1,7 @@
 // See fxhost.h. Each block of code keeps the worklet's statements and arithmetic order (index.html TFX_SRC: set, p1, slotRun, slotNap, tcChunks).
 #include "fx/fxhost.h"
+#include <memory>
+
 #include "fx/pumpfx.h"
 
 #include <algorithm>
@@ -28,6 +30,13 @@ struct ModuleState {
 };
 }
 #endif
+// Cloud Seed's delay buffers are fixed arrays sized for 96 kHz (third_party/prepare.sh: 131072 and 4800 samples; the web's own 32768 / 2400 are smaller still), and its taps are
+// set in samples from the rate it is given: above 96 kHz an allpass or a late line is longer than its buffer and reads before it (index -7 at 192 kHz, -4822 at 384 kHz in
+// ModulatedAllpass.h; U34a verification D8). The web app has no rule for it (its worklet only ever runs at the context's rate and reads outside the buffers at 96 kHz already).
+// So the reverb is made for at most 96 kHz: above that it runs with its 96 kHz delays and filters (its time constants are shorter, by the ratio, than the rate asks for)
+// and stays inside its buffers. At 44.1 and 48 kHz (and everything up to 96 kHz) nothing changes. The third-party source is not touched.
+static constexpr float kCloudSeedMaxSr = 96000.f;
+
 namespace thunder {
 
 #ifdef THUNDER_HAVE_TFX
@@ -45,7 +54,7 @@ static Fx* make_fx(int type, float sr) {
     case 13: f = make_tremolo(sr); break;   case 14: f = make_overdrive(sr); break;
     case 15: f = make_folder(sr); break;    case 16: f = make_autowah(sr); break;
     case 17: f = make_pitch(sr); break;     case 18: f = make_ladder(sr); break;
-    case 19: f = make_warps(sr); break;     case 20: f = make_cloudseed(sr); break;
+    case 19: f = make_warps(sr); break;     case 20: f = make_cloudseed(sr > kCloudSeedMaxSr ? kCloudSeedMaxSr : sr); break;
     case 21: f = make_derez2(sr); break;    case 22: f = make_purestdrive(sr); break;
     case 23: f = make_air3(sr); break;      case 24: f = make_verbity2(sr); break;
     case 25: f = make_comb(sr); break;      case 26: f = make_transient(sr); break;
@@ -118,7 +127,9 @@ FxPlan::~FxPlan() {
 FxHost::FxHost(double sr) : sr_(sr), node_(sr) {
   for (int i = 0; i < 128; i++) tapIdx_[i] = -1;
   std::memset(zero_, 0, sizeof zero_); std::memset(rL_, 0, sizeof rL_); std::memset(rR_, 0, sizeof rR_);
-  for (int i = 0; i < 11; i++) lanes_[i] = new AutoN<96>(-1);
+  for (int i = 0; i < 11; i++) lanes_[i] = nullptr;
+  try { for (int i = 0; i < 11; i++) lanes_[i] = new AutoN<96>(-1); }
+  catch (...) { for (int i = 0; i < 11; i++) delete lanes_[i]; throw; }   // (U34a: a constructor that throws does not run the destructor: what it had made is freed here)
   std::memset(Lb_, 0, sizeof Lb_); std::memset(Rb_, 0, sizeof Rb_); std::memset(cL_, 0, sizeof cL_); std::memset(cR_, 0, sizeof cR_); std::memset(dL_, 0, sizeof dL_); std::memset(dR_, 0, sizeof dR_);
 }
 FxHost::~FxHost() {
@@ -130,7 +141,8 @@ uint32_t FxHost::laneDropped() const { uint32_t n = 0; for (int i = 0; i < 11; i
 
 // ---- control thread --------------------------------------------------------------------------------------------------------------------
 FxPlan* FxHost::plan(const FxEntry* e, int n) {
-  FxPlan* pl = new FxPlan; bool used[kFxSlots] = {false}; Fx* nf[kFxSlots] = {nullptr};
+  std::unique_ptr<FxPlan> plp(new FxPlan); FxPlan* pl = plp.get();   // (U34a: an allocation failure part way frees the plan and the effects it has made)
+  bool used[kFxSlots] = {false}; Fx* nf[kFxSlots] = {nullptr};
   for (int i = 0; i < n && pl->n_ < kFxSlots; i++) {
     const bool pmp = fx_is_pump(e[i].t);
     if (e[i].t < 0 || (e[i].t > 33 && !fx_is_core(e[i].t) && !pmp)) continue;   // not an effect hosted here: left out (the sound passes)
@@ -146,7 +158,7 @@ FxPlan* FxHost::plan(const FxEntry* e, int n) {
     }
   }
   nCtl_ = pl->n_; for (int i = 0; i < nCtl_; i++) { ctl_[i] = pl->e_[i]; ctlFx_[i] = nf[i]; }
-  return pl;
+  return plp.release();
 }
 
 bool FxHost::entryFromSlot(Json o, int slot, double sr, double bpm, double restartN, FxEntry* out) {

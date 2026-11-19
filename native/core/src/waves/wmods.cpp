@@ -20,6 +20,13 @@ extern "C" void thunder_fx_state_use(uint32_t* stmlib_rng, uint32_t* daisy_myran
 #include "pe_host.h"
 #endif
 
+// Cloud Seed's delay buffers are fixed arrays sized for 96 kHz (third_party/prepare.sh: 131072 and 4800 samples; the web's own 32768 / 2400 are smaller still), and its taps are
+// set in samples from the rate it is given: above 96 kHz an allpass or a late line is longer than its buffer and reads before it (index -7 at 192 kHz, -4822 at 384 kHz in
+// ModulatedAllpass.h; U34a verification D8). The web app has no rule for it (its worklet only ever runs at the context's rate and reads outside the buffers at 96 kHz already).
+// So the reverb is made for at most 96 kHz: above that it runs with its 96 kHz delays and filters (its time constants are shorter, by the ratio, than the rate asks for)
+// and stays inside its buffers. At 44.1 and 48 kHz (and everything up to 96 kHz) nothing changes. The third-party source is not touched.
+static constexpr float kCloudSeedMaxSr = 96000.f;
+
 namespace thunder {
 namespace waves {
 #include "waves/wtable.inc"
@@ -663,7 +670,7 @@ Fx* make_fx(int type, float sr) {
     case 13: f = make_tremolo(sr); break;   case 14: f = make_overdrive(sr); break;
     case 15: f = make_folder(sr); break;    case 16: f = make_autowah(sr); break;
     case 17: f = make_pitch(sr); break;     case 18: f = make_ladder(sr); break;
-    case 19: f = make_warps(sr); break;     case 20: f = make_cloudseed(sr); break;
+    case 19: f = make_warps(sr); break;     case 20: f = make_cloudseed(sr > kCloudSeedMaxSr ? kCloudSeedMaxSr : sr); break;
     case 21: f = make_derez2(sr); break;    case 22: f = make_purestdrive(sr); break;
     case 23: f = make_air3(sr); break;      case 24: f = make_verbity2(sr); break;
     case 25: f = make_comb(sr); break;      case 26: f = make_transient(sr); break;

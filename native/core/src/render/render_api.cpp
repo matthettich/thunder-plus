@@ -1,6 +1,8 @@
 // U34a: the public C API of the offline song render (include/thunder/render.h): a pull model over SongRenderer. See the header for the contract.
-// This file is built WITH C++ exceptions (core/CMakeLists.txt): a failed allocation is caught here and returned as THUNDER_RENDER_E_MEMORY.
-// Nothing else in the core throws; no exception leaves an extern "C" function.
+// A failed allocation is a std::bad_alloc (the effects' malloc throws it too: dsp/fx_alloc.cpp); it is caught here and returned as THUNDER_RENDER_E_MEMORY. The files that
+// make a handle are built WITH C++ exceptions (core/CMakeLists.txt) so that what a failed create has made is freed on the way out (RAII). No exception leaves an
+// extern "C" function. Built WITHOUT exceptions (the wasm build) the try / catch below compile away (TR_TRY, TR_CATCH_*): an allocation failure is then not caught
+// and the process aborts (render.h, MEMORY). test render_api_noexc compiles this file that way.
 #include "thunder/render.h"
 
 #include <algorithm>
@@ -16,6 +18,16 @@
 
 #include "render/render.h"
 #include "rt/json.h"
+
+#if defined(__cpp_exceptions) || defined(__EXCEPTIONS) || (defined(_MSC_VER) && defined(_CPPUNWIND))
+#define TR_TRY try
+#define TR_CATCH_BADALLOC(...) catch (const std::bad_alloc&) { __VA_ARGS__ }
+#define TR_CATCH_ALL(...) catch (...) { __VA_ARGS__ }
+#else
+#define TR_TRY
+#define TR_CATCH_BADALLOC(...)
+#define TR_CATCH_ALL(...)
+#endif
 
 using namespace thunder;
 
@@ -35,6 +47,7 @@ struct thunder_render {
   int qPos = kRenderQuantum;           // next unread frame of q (kRenderQuantum: empty)
   int64_t raw = 0, skipLeft = 0, outPos = 0;
   int64_t total = -1;                  // frames of output once known
+  int64_t est = -2;                    // length_estimate's cached answer (-2: not computed yet)
   bool started = false, ended = false, hitLimit = false, dead = false;
 };
 
@@ -56,9 +69,13 @@ void pump(thunder_render* r) {
   r->qPos = 0;
   if (r->skipLeft > 0) { const int64_t d = std::min<int64_t>(r->skipLeft, kRenderQuantum); r->qPos = (int)d; r->skipLeft -= d; }
   if (!r->useFrames && !r->ended) {
-    if (r->R->songOver() && r->R->voices() == 0) { r->ended = true; }
-    else if (r->raw - r->skip >= r->maxFrames) { r->ended = true; r->hitLimit = true; }
-    if (r->ended) r->total = std::max<int64_t>(0, r->raw - r->skip);
+    const int64_t avail = std::max<int64_t>(0, r->raw - r->skip);   // the output so far, if nothing is cut
+    const bool over = r->R->songOver() && r->R->voices() == 0;
+    if (over || avail >= r->maxFrames) {
+      // The output ends exactly at max_frames: the last quantum is cut to it (not rounded up to the quantum), and hit_limit is set whenever
+      // something was cut: the song was still going (not over), or it ended inside this quantum beyond max_frames.
+      r->ended = true; r->hitLimit = !over || avail > r->maxFrames; r->total = std::min(avail, r->maxFrames);
+    }
   }
 }
 
@@ -87,11 +104,13 @@ thunder_render* createImpl(const uint8_t* songBytes, size_t n, const thunder_ren
   std::unique_ptr<thunder_render> r(new thunder_render());
   JsonError je;
   if (n == 0 || !r->song.load((const char*)songBytes, n, &je)) {
+    if (n != 0 && je.msg && !std::strcmp(je.msg, "out of memory")) { setErr(err, cap, "out of memory"); return nullptr; }   // (the parser's own report: not a bad song)
     char b[200]; std::snprintf(b, sizeof b, "the song bytes are not a song (%s at byte %zu)", n == 0 ? "empty" : (je.msg ? je.msg : "unreadable"), n == 0 ? (size_t)0 : je.offset);
     setErr(err, cap, b); return nullptr;
   }
   if (o.vars_bytes) {
-    if (!r->varsDoc.parse((const char*)o.vars_json, o.vars_bytes, &je) || !r->varsDoc.root().isObj()) { setErr(err, cap, "vars_json is not a JSON object"); return nullptr; }
+    if (!r->varsDoc.parse((const char*)o.vars_json, o.vars_bytes, &je)) { setErr(err, cap, je.msg && !std::strcmp(je.msg, "out of memory") ? "out of memory" : "vars_json is not a JSON object"); return nullptr; }
+    if (!r->varsDoc.root().isObj()) { setErr(err, cap, "vars_json is not a JSON object"); return nullptr; }
     r->vars.load(r->varsDoc.root());
   }
   r->sr = sr; r->useFrames = o.use_frames != 0; r->frames = o.frames;
@@ -119,29 +138,38 @@ bool padOk(int pad) { return pad >= 0 && pad < kRenderPads; }
 extern "C" {
 
 thunder_render* thunder_render_create(const uint8_t* song, size_t song_bytes, const thunder_render_opts* opts, char* err, size_t err_cap) {
-  try { return createImpl(song, song_bytes, opts, err, err_cap); }
-  catch (const std::bad_alloc&) { setErr(err, err_cap, "out of memory"); return nullptr; }
-  catch (...) { setErr(err, err_cap, "internal error"); return nullptr; }
+  TR_TRY { return createImpl(song, song_bytes, opts, err, err_cap); }
+  TR_CATCH_BADALLOC(setErr(err, err_cap, "out of memory"); return nullptr;)
+  TR_CATCH_ALL(setErr(err, err_cap, "internal error"); return nullptr;)
 }
 
 int thunder_render_set_pad(thunder_render* r, int pad, const float* l, const float* rr, int64_t frames, double sample_rate) {
   if (!r) return THUNDER_RENDER_E_ARG;
   if (r->dead || r->started) return THUNDER_RENDER_E_STATE;
   if (!padOk(pad) || frames < 0) return THUNDER_RENDER_E_ARG;
-  try {
+  TR_TRY {
     if (frames == 0) { r->padBytes -= r->store[pad].size() * sizeof(float); std::vector<float>().swap(r->store[pad]); r->pads.buf[pad] = VoiceBuf(); return 0; }
     if (!l || !fin(sample_rate) || sample_rate < 1 || sample_rate > 1e6) return THUNDER_RENDER_E_ARG;
     if (frames > THUNDER_RENDER_MAX_PAD_FRAMES) return THUNDER_RENDER_E_LIMIT;
     const size_t ch = rr ? 2 : 1, n = (size_t)frames * ch, old = r->store[pad].size() * sizeof(float);
+    // The budget bounds what the handle HOLDS, not only what it ends up with. The final state must fit (the old pad is replaced); then, if the old copy and
+    // the new one fit TOGETHER, the new one is built first and swapped in (a failure leaves the pad as it was); if they do not (a big pad replaced at the
+    // limit), the old copy is released first, so the pads never hold more than THUNDER_RENDER_MAX_PAD_BYTES, and an allocation failure then leaves the pad removed.
     if (n * sizeof(float) > THUNDER_RENDER_MAX_PAD_BYTES || r->padBytes - old + n * sizeof(float) > THUNDER_RENDER_MAX_PAD_BYTES) return THUNDER_RENDER_E_LIMIT;
-    std::vector<float> tmp(n);
-    for (int64_t i = 0; i < frames; i++) { const float v = l[i]; if (!fin(v)) return THUNDER_RENDER_E_ARG; tmp[(size_t)i] = v; }
-    if (rr) for (int64_t i = 0; i < frames; i++) { const float v = rr[i]; if (!fin(v)) return THUNDER_RENDER_E_ARG; tmp[(size_t)frames + (size_t)i] = v; }
-    r->store[pad].swap(tmp); r->padBytes = r->padBytes - old + n * sizeof(float);
+    for (int64_t i = 0; i < frames; i++) if (!fin(l[i])) return THUNDER_RENDER_E_ARG;   // validated before anything is changed or released
+    if (rr) for (int64_t i = 0; i < frames; i++) if (!fin(rr[i])) return THUNDER_RENDER_E_ARG;
+    std::vector<float> tmp;
+    if (r->padBytes + n * sizeof(float) > THUNDER_RENDER_MAX_PAD_BYTES) { r->pads.buf[pad] = VoiceBuf(); std::vector<float>().swap(r->store[pad]); r->padBytes -= old; }
+    tmp.resize(n);
+    std::memcpy(tmp.data(), l, (size_t)frames * sizeof(float));
+    if (rr) std::memcpy(tmp.data() + frames, rr, (size_t)frames * sizeof(float));
+    const size_t old2 = r->store[pad].size() * sizeof(float);
+    r->store[pad].swap(tmp); r->padBytes = r->padBytes - old2 + n * sizeof(float);
     VoiceBuf& b = r->pads.buf[pad]; b.data = r->store[pad].data(); b.data2 = rr ? b.data + frames : nullptr; b.len = (int)frames; b.sr = sample_rate; b.noShape = false;
     return 0;
-  } catch (const std::bad_alloc&) { return THUNDER_RENDER_E_MEMORY; }
-  catch (...) { r->dead = true; return THUNDER_RENDER_E_INTERNAL; }
+  }
+  TR_CATCH_BADALLOC(return THUNDER_RENDER_E_MEMORY;)
+  TR_CATCH_ALL(r->dead = true; return THUNDER_RENDER_E_INTERNAL;)
 }
 
 int thunder_render_set_pad_kit(thunder_render* r, int pad, int choke, int syn, double rel) {
@@ -154,6 +182,30 @@ int thunder_render_set_pad_kit(thunder_render* r, int pad, int choke, int syn, d
 
 int64_t thunder_render_length(thunder_render* r) { return r ? r->total : -1; }
 int64_t thunder_render_position(thunder_render* r) { return r ? r->outPos : -1; }
+int64_t thunder_render_length_estimate(thunder_render* r) {
+  if (!r) return -1;
+  if (r->total >= 0) return r->total;
+  if (r->est != -2) return r->est;
+  TR_TRY {
+    // A second sequencer, stepped without any audio, to its end: the same song, vars and options as the renderer's own, and the sequencer's random
+    // stream is seeded the same, so it ends where the renderer's does (the voices' tails after it are what only the render can tell).
+    SeqOpts so; so.row = r->song.renderFrom; so.once = true;
+    Seq seq(r->song, r->vars, SeqMode::Song, so);
+    std::unique_ptr<SeqEvent[]> evs(new SeqEvent[kRenderEvents]); std::unique_ptr<SeqStep> st(new SeqStep);
+    const double limit = (double)(r->maxFrames + r->skip) / r->sr;
+    int64_t steps = 0, e = -1; bool cut = false;
+    while (seq.alive()) {
+      if (seq.time() >= limit) { cut = true; break; }
+      if (++steps > 20000000) return r->est = -1;
+      seq.step(evs.get(), kRenderEvents, st.get());
+    }
+    if (cut) e = r->maxFrames;
+    else e = std::max<int64_t>(0, (int64_t)std::llround(seq.time() * r->sr) - r->skip);
+    return r->est = e;
+  }
+  TR_CATCH_BADALLOC(return -1;)   // not cached: a later call may succeed; the handle is untouched
+  TR_CATCH_ALL(return -1;)
+}
 int thunder_render_latency(thunder_render* r) { return r ? (int)std::min<int64_t>(r->skip, 0x7fffffff) : -1; }
 
 int64_t thunder_render_read(thunder_render* r, float* l, float* rr, int64_t frames) {
@@ -165,7 +217,7 @@ int64_t thunder_render_read(thunder_render* r, float* l, float* rr, int64_t fram
   { const uintptr_t a = (uintptr_t)l, b = (uintptr_t)rr, bytes = (uintptr_t)frames * sizeof(float);   // (frames is bounded by what the host could allocate; a wrap is caught below)
     if ((uintptr_t)frames > (UINTPTR_MAX / sizeof(float)) / 2) return THUNDER_RENDER_E_ARG;
     if (a < b + bytes && b < a + bytes) return THUNDER_RENDER_E_ARG; }
-  try {
+  TR_TRY {
     r->started = true;
     int64_t n = 0;
     while (n < frames) {
@@ -178,8 +230,9 @@ int64_t thunder_render_read(thunder_render* r, float* l, float* rr, int64_t fram
       r->qPos += c; n += c; r->outPos += c;
     }
     return n;
-  } catch (const std::bad_alloc&) { r->dead = true; return THUNDER_RENDER_E_MEMORY; }
-  catch (...) { r->dead = true; return THUNDER_RENDER_E_INTERNAL; }
+  }
+  TR_CATCH_BADALLOC(r->dead = true; return THUNDER_RENDER_E_MEMORY;)   // the handle is dead (render.h, ERRORS): the frames of this call are lost with it
+  TR_CATCH_ALL(r->dead = true; return THUNDER_RENDER_E_INTERNAL;)
 }
 
 int thunder_render_stats_get(thunder_render* r, thunder_render_stats* out) {
@@ -200,15 +253,19 @@ int64_t thunder_render_drain(thunder_render* r, int64_t max_frames) {
   if (r->dead) return THUNDER_RENDER_E_STATE;
   if (max_frames < 0) return THUNDER_RENDER_E_ARG;
   if (r->total < 0 || r->outPos < r->total) return THUNDER_RENDER_E_STATE;
-  try {
+  r->started = true;   // the renderer runs on: the pads and the kit are fixed from here, as after the first read
+  TR_TRY {
     float L[kRenderQuantum], Rr[kRenderQuantum]; int64_t run = 0;
     while (!(r->R->songOver() && r->R->voices() == 0) && run < max_frames) { r->R->block(L, Rr, kRenderQuantum); run += kRenderQuantum; r->raw += kRenderQuantum; }
     return (r->R->songOver() && r->R->voices() == 0) ? run : THUNDER_RENDER_E_LIMIT;
-  } catch (...) { r->dead = true; return THUNDER_RENDER_E_INTERNAL; }
+  }
+  TR_CATCH_BADALLOC(r->dead = true; return THUNDER_RENDER_E_MEMORY;)
+  TR_CATCH_ALL(r->dead = true; return THUNDER_RENDER_E_INTERNAL;)
 }
 
 void thunder_render_free(thunder_render* r) {
-  try { delete r; } catch (...) {}
+  TR_TRY { delete r; }
+  TR_CATCH_ALL()
 }
 
 }  // extern "C"
