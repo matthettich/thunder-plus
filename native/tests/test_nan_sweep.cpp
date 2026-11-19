@@ -68,7 +68,11 @@ static void runOne(bool chains, Json cs, const std::string& id, const std::vecto
 
 int main(int argc, char** argv) {
   if (argc < 3) { std::printf("usage: test_nan_sweep chains|waves <cases.json> [type]\n"); return 1; }
-  std::signal(SIGSEGV, onCrash); std::signal(SIGABRT, onCrash); std::signal(SIGFPE, onCrash); std::signal(SIGBUS, onCrash);
+  std::signal(SIGSEGV, onCrash); std::signal(SIGABRT, onCrash); std::signal(SIGFPE, onCrash); 
+#ifdef SIGBUS
+  std::signal(SIGBUS, onCrash);
+#endif
+  
   const bool chains = std::string(argv[1]) == "chains"; const char* only = argc > 3 ? argv[3] : nullptr;
   const std::string txt = slurp(argv[2]); JsonDoc d; if (!d.parse(txt)) { std::printf("nan_sweep: cannot read %s\n", argv[2]); return 1; }
   Json cases = d.root(); Stats st; int types = 0, params = 0; std::vector<std::string> seen;
