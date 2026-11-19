@@ -79,7 +79,7 @@ The numbers are the same because the WAVs are: `cmp` says all six renders (plain
 ## Conditions for the wiring
 
 * The host renders the pads itself (as the page's `renderOut` does today) and passes each as float32 plus its kit entry; the API does not call any pad renderer.
-* Create on a worker / control thread, read on a worker, never on a live audio thread: `create` allocates up to ~50 MB at 48 kHz (385 MB at 384 kHz with effects + master) and zeroes it, `read` cost was not timed with real pads in this unit (the three ELECTRO CLI renders of gate 1 ran in well under a minute each on this machine).
+* Create on a worker / control thread, read on a worker, never on a live audio thread: `create` allocates up to ~50 MB at 48 kHz (385 MB at 384 kHz with effects + master) and zeroes it, `read` cost was not timed with real pads in this unit.
 * A wasm host must budget the memory table above plus 4 bytes per pad sample (the copy) and the host's own copy during `set_pad`; pass pads one at a time and free the host copy after each.
 * A bridge that wants cancel stops calling `read` and calls `free` (free is safe at any point, including right after create).
 * Offline renders are not bit-compared with a Chrome render by this unit's tests: gate 1 is the CLI check above.
