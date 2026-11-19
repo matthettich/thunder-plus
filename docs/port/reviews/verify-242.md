@@ -44,6 +44,8 @@ Under ASan + UBSan, scratch tests (not in the PR):
 - **Exceptions**: `add_font` and `set_pad_sf` wrap their bodies in `TR_TRY` with `bad_alloc` to `E_MEMORY` and anything else to `dead` + `E_INTERNAL`; `remove_font` and `clear_pad_sf` allocate nothing and have no try. The audio path (`SfPool::note/render`, `covers`) allocates nothing (the builder's allocation counter over 60 reads; `-fexceptions` on `sf_live.cpp` only adds unwind tables). I found no way for an exception to cross the C API or the read path.
 - **Takeover and forwarding vs the JS** (`core-processor.js` `sfNote` :434, `mine` :559, `take` :568): take / off / stp / mod are forwarded to both pools; mono takeover crosses the pools both ways (sampler then SF and SF then sampler leave the other cut, tested by the builder and by my mutation); a note on an SF pad with a prepared preset and no zone for its key returns before taking over (as `sfNote`); a note on a `ROUTE_SF` pad with nothing prepared takes over and is silent (as the JS: `mine()` false, then `take(ev)`); the kill time for an SF voice cut by a mono note is `min(relTc, 0.05)` in both (the JS SF voice has `syn: true`).
 
+The existing `render_api_oom` also passes on this head under ASan + UBSan.
+
 ## Reproducing
 
 Scratch sources (not committed to the PR): `hostile.cpp` (truncation, garbage, mutate, interleave, drift, big-table), `oom.cpp`, `poly.cpp`, `mkfont.py` (SF2 writer), `mut.sh` (the five mutations). Build the same flags as `test_render_sf` plus `-DTHUNDER_SANITIZE=ON`.
