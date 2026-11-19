@@ -43,9 +43,13 @@ replace within the budget, four test gaps, `set_pad` drops a pad's variations, h
   CI run again before merging (U31's first combined run failed on a test whose premise another PR had changed).
 
 **Started 08:40 on 19 Nov (a new chat; this chat's workers are Sonnet, each in `/home/claude/wt/`):**
-- Item 1: the lead's design is `docs/port/SEQ-LIVE-DESIGN.md`. Part A (setters + `SeqRunner`) = branch `n1/seq-live`, notes `docs/port/SEQ-LIVE-NOTES.md`.
-  Part B (Song lifetime: the Seq published with its Song, `takeOver` on the audio thread) starts when A is merged.
-- Item 2: branch `n1/render-sf`, notes `docs/port/RENDER-SF-NOTES.md`.
+- Item 1, Part A (clock setters + `SeqRunner`): **MERGED, #243** (10:50; CI green, the lead read the audio-thread diff). Its verifier runs after the
+  merge: report `docs/port/reviews/verify-243.md` on branch `review/verify-243`. Part B (Song lifetime, design in `docs/port/SEQ-LIVE-DESIGN.md`):
+  the read-only first step (make-time table, run-state inventory, counter sizes) is `docs/port/SEQ-TAKEOVER-NOTES.md` on branch
+  `n1/seq-takeover-notes`; the lead rules on it, then a builder starts.
+- Item 2: **PR #242** (`n1/render-sf`), CI green, NOT merged: its verifier's report is `docs/port/reviews/verify-242.md` on `review/verify-242`.
+  Before merging: merge `native` into the branch and let CI run again. The lead still rules on its "Choices for the lead" (RENDER-SF-NOTES.md):
+  the poly cap across the two pools, PCM shared per preset before Android.
 - Item 3 is RULED: the page's sequencer is the specification, sliced / synced notes are chopped (same design file, last section). New unit "chop"
   after Part A. To tell the owner: with Settings on the audio core the web app seems to play sliced / synced instruments unchopped.
 
