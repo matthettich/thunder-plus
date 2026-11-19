@@ -87,6 +87,38 @@ plan; sections 1 to 4 and 9), `HANDOVER.md` on `beta` (the web app, the owner's 
   and never force-pushes. Neither PR is merged. The lead reads `chains/clive.cpp` and `cengine.cpp` line by line once U31's worker reports.
 - Check-ins (this chat): a restart check at 14:05, then after each usage reset: 15:02, 20:07 on 18 Nov; 01:12, 06:17 on 19 Nov (Mountain).
 
+## State at 23:05 on 18 Nov (the lead; newest)
+- **U34a is MERGED (#237, native 8e909ad)**, CI green on every platform. Its independent verifier (a0a273a4180a74c30; report so far
+  `docs/port/reviews/verify-237.md`) has found defects D1 to D5 and is wrapping up: D1 `max_frames` rounds the output up to a 128-frame quantum; D2
+  `drain` does not mark the handle started (set_pad still accepted afterwards); D3 the header's claim about builds without exceptions is false
+  (`render_api.cpp` does not compile with `-fno-exceptions`); D4 `set_pad` allocates a temporary copy beyond the stated pad budget; D5 `create` leaks on
+  an allocation failure part-way through building the renderer. **Next job when a slot is free:** a Sonnet worker fixes these on a branch from native
+  (with the length ESTIMATE for unknown-length renders), then U34b (stems).
+- **U31 (#227):** a server restart at about 21:10 stopped both workers for almost two hours (nothing noticed it: hourly checks are now set). Remote
+  head e240c43 FAILED CI on six jobs (Linux GCC, sanitizers, clang, macOS, MSVC, wasm); the old worker's later commit 353cf6a was local only. A FRESH
+  Sonnet worker (a64ac5611cf5e1607) took over at 23:00 with a tight brief: push first, read the six CI logs, finish D1 / D4 / D5 / D7 / D9 of
+  `docs/port/reviews/verify-227-round2.md`, CI green on every job. The old worker (a1971f2533efd1b7b) is retired: do not resume it.
+- **Owner, 22:59:** keep working through the night; set check-ins so nothing stalls; keep the documentation current; watch for workers looping or
+  down a rabbit hole (each brief now has a 45-minute park rule and a 20-minute push rule); weekly usage was at 76% (he will reset if it runs out);
+  "If you come to a stopping point within 1 hour of 8 am, wait for me. If not, keep going." He wants to switch chats at a clean point.
+- **Checks set (Mountain, 19 Nov):** 00:05, 01:12, 02:15, 03:15, 04:15, 05:15, 06:17, 07:15 (the 07:15 one applies the 8 am rule).
+- Still queued after the above: U32's D1 follow-up (decode work budget), dossier D2 / D3 (`dispatch` routing, `noShape`), Seq setters, U36, N2.
+
+## State at 20:20 on 18 Nov (the lead; newest)
+- **U31 (#227, head 9549599) is NOT mergeable yet.** The round-2 independent verifier (still running at 20:20; its log so far is
+  `docs/port/reviews/verify-227-round2.md`, the final one replaces it) found: **D1** `setParam(.., "type", NaN)` on `convolve` segfaults on the audio
+  thread in chains and waves (the raw-parameter change hands NaN to an index; every defect found is a NaN through setParam, never from JSON);
+  **D2** `waves/graph.h:89` `"\x01btrue"` is a greedy hex escape: clang / Apple clang / NDK / wasi-sdk refuse it (5 CI jobs red) and GCC builds a
+  wrong key; **D3** `tests/CMakeLists.txt:746` links `Threads::Threads` without `find_package(Threads)` (MSVC configure fails). Confirmed good by the
+  verifier's own tests: the bypass fade across cuts (80 of 80 bit-equal), `setParam(track)` cost max 0.37 ms, mutations (33 of 34 killed, 1 equivalent).
+  The builder (a1971f2533efd1b7b) was sent D1 to D3 at 20:15 with the lead's ruling: native never crashes on any double and does what the JS does
+  for NaN; a NaN sweep over every parameter of every module goes into ctest; CI must be green on every platform before it reports.
+- **U34a = PR #237 (head cfea0bf), built, the lead accepted the API shape** (`native/core/include/thunder/render.h`: create / set_pad / set_pad_kit /
+  length / read / position / latency / stats_get / drain / free). Merge when CI is green; an independent verifier right after. To add in U34b: a length
+  ESTIMATE for unknown-length renders (progress bars), and note that an out-of-memory aborts in a build without exceptions (wasm).
+- Still queued: U32's D1 follow-up (work budget for decodes that are discarded), U34b (stems), then D2 / D3 of the dossier, Seq setters, U36, N2.
+- Check-ins set: 01:12 and 06:17 on 19 Nov.
+
 ## State at 18:10 on 18 Nov (the lead; newest)
 - **U32 is MERGED (#226, native 4982eed): 32 of 37 units.** Round-2 independent verification: SOUND WITH CONDITIONS (`docs/port/reviews/verify-226-round2.md`):
   all seven conditions hold; ASan + UBSan full ctest 150 of 151 passed, 1 intended skip; CI green on 9 jobs. **One new defect, D1 (follow-up PR, not yet
