@@ -87,6 +87,19 @@ plan; sections 1 to 4 and 9), `HANDOVER.md` on `beta` (the web app, the owner's 
   and never force-pushes. Neither PR is merged. The lead reads `chains/clive.cpp` and `cengine.cpp` line by line once U31's worker reports.
 - Check-ins (this chat): a restart check at 14:05, then after each usage reset: 15:02, 20:07 on 18 Nov; 01:12, 06:17 on 19 Nov (Mountain).
 
+## State at 03:50 on 19 Nov (the lead; newest)
+- **U31 (#227): round-3 independent verification = SOUND WITH CONDITIONS, nothing blocking** (`docs/port/reviews/verify-227-round3.md`): D1, D2, D3, D4,
+  D5, D7, D9 verified fixed on 2515ab0; full ASan + UBSan ctest 165 of 168 passed, 0 failed, 3 intended skips; CI green on nine jobs; 561 chains and 383
+  waves NaN cases against Node with no difference; goldens gained only `nan/*` rows. The lead read the pump spare hand-over (`cmods2.cpp`) and accepts it.
+  The lead merged the current `native` into the branch (clean, no conflicts) and pushed it at 03:50 so CI runs on the COMBINED tree (U31 + the U34a
+  fixes, which changed `-fexceptions` on the DSP libraries and `wmods.cpp`). **Merge #227 as soon as that CI run is all green: then 33 of 37.**
+  Follow-ups for a small PR afterwards (F1 to F7 of the report): `mutate-u31.sh:32` no longer applies after the D9 edit; the TSan test catches the
+  reverted race in only 1 of 10 runs (longer run or random service gaps); the sweep skips the I/O modules; nothing checks that `mods.wasm` stays the
+  web's bytes; plus round 2's notes-only items D6 (quadratic document load), D8 (memory budget is per patch, six can be in flight), D10.
+- **Dispatch routing (D2 / D3):** worker a98d8ec030262b0d9 on `n1/dispatch`, resumed after the 02:40 server restart; it had pushed routes, tests and
+  notes (47a9c18) and was in its full ctest. Then PR, CI, the lead's line-by-line review.
+- Queue: Seq setters + Song lifetime (dossier D1, the lead's), U34b stems, the U31 follow-ups PR, U32's D1 follow-up, U36, full wasm / U37, N2.
+
 ## State at 02:05 on 19 Nov (the lead; newest)
 - **U34a's verification fixes are MERGED (#238, native 33d136d)**, CI green on all nine jobs. The verifier's final verdict was SOUND WITH CONDITIONS
   (`docs/port/reviews/verify-237.md`, D1 to D8); all eight fixed with a test each, plus `thunder_render_length_estimate` (song end without voice
