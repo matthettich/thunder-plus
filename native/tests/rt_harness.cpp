@@ -10,6 +10,8 @@
 
 #include "seq/seq.h"
 #include "seq/runner.h"
+#include "seq/session.h"
+#include <chrono>
 #include "song/song.h"
 #include "mix/mix.h"
 #include "mix/pdc.h"
@@ -235,6 +237,36 @@ static int run_seq_runner() {
   if (run.skips() < 1) return fail("the stalled block did not skip");
   if (sq.dropped()) return fail("the sequencer dropped events");
   std::printf("rt_harness: sequencer runner: %ld steps, %llu skips, %llu refused sets, no allocation\n", steps, (unsigned long long)run.skips(), (unsigned long long)sq.badSets());
+  return 0;
+}
+
+// ---- SEQ-LIVE Part B: seq_adopt (takeOver + rebind) and the pump under the guard ---------------------------------------------------------------
+// ELECTRO live through a SeqSession. The control side (outside the guard) publishes a new snapshot every 40 blocks: the same Song re-pointed (a vars-only
+// message) and a Song read again, three at once now and then (the skipped snapshots). Inside the guard, every block: seq_adopt() (takeOver, SeqRunner::rebind,
+// the slot's pop / push) and pump(). Nothing may allocate. takeOver's own wall time is measured on the audio side and printed (the worst case).
+static int run_seq_takeover() {
+  using namespace thunder;
+  std::string text; { std::ifstream f(std::string(THUNDER_ROOT) + "/sounds/ELECTRO.thunder", std::ios::binary); if (!f) return fail("cannot read sounds/ELECTRO.thunder"); std::ostringstream o; o << f.rdbuf(); text = o.str(); }
+  std::shared_ptr<Song> s1 = std::make_shared<Song>(), s2 = std::make_shared<Song>(); JsonError je;
+  if (!s1->load(text.data(), text.size(), &je) || !s2->load(text.data(), text.size(), &je)) return fail("ELECTRO does not load");
+  SeqVars vars; SeqOpts o; o.live = true; std::shared_ptr<SeqSession> sess = SeqSession::create(SeqMode::Song, o); SnapSlot<SongSnap> slot; SeqRunner run;
+  if (!sess->publish(slot, s1, vars)) return fail("first publish"); slot.adopt(); run.start(slot.get()->seq.get()); run.seq()->setTime(100);
+  const int CAP = 12288; std::vector<SeqEvent> evs((size_t)CAP); SeqStep st; long steps = 0, adopts = 0; double now = 100, worst = 0;
+  for (int b = 0; b < 12000; b++) {
+    if (b % 40 == 20) { if (b % 200 == 20) { sess->publish(slot, s2, vars); sess->publish(slot, s1, vars); } if (!sess->publish(slot, (b / 40) % 2 ? s1 : s2, vars)) return fail("publish"); }
+    bool changed;
+    { rt_guard g;
+      const auto t0 = std::chrono::steady_clock::now();
+      changed = seq_adopt(slot, run);
+      const double dt = std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count(); if (changed && dt > worst) worst = dt;
+      run.pump(now, 0.25, evs.data(), CAP, &st, [&](const SeqEvent*, int, const SeqStep&) { steps++; }); }
+    if (changed) adopts++;
+    slot.collect(); now += 128.0 / 48000;
+  }
+  if (steps < 400) return fail("the live sequencer played too few steps");
+  if (adopts < 200) return fail("too few adoptions");
+  if (run.seq()->dropped()) return fail("the sequencer dropped events");
+  std::printf("rt_harness: seq takeOver: %ld steps, %ld adoptions (seq_adopt incl. the slot, worst %.1f us), no allocation\n", steps, adopts, worst * 1e6);
   return 0;
 }
 
@@ -1094,6 +1126,7 @@ int main(int argc, char** argv) {
   if (int r = run_core()) return r;
   if (int r = run_seq()) return r;
   if (int r = run_seq_runner()) return r;
+  if (int r = run_seq_takeover()) return r;
   if (int r = run_voice()) return r;
   if (int r = run_sf()) return r;
   if (int r = run_mix()) return r;
