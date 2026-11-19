@@ -32,6 +32,7 @@ namespace thunder {
 constexpr int kSeqMT = kSongNT;              // the master column's track number (MT)
 constexpr int kSeqTracks = kSongNT + 1;      // tracks 0..31 and the master column
 constexpr int kSeqArpMax = 96;               // [time, rate] pairs of one arpeggio (the JS's own limit)
+constexpr double kSeqBpmMin = 1e-3, kSeqBpmMax = 1e6;   // setBpm's clamp (see there)
 constexpr int kSeqMacros = 8;                // PERF_MACROS
 
 enum class SeqMode { Song, Sect, Phrase };
@@ -124,6 +125,22 @@ class Seq {
   int loopMax() const { return mode_ == SeqMode::Song ? 255 : mode_ == SeqMode::Sect ? 15 : 31; }   // the last row / chain row / step a loop can name
   double time() const { return time_; }      // api.time: when the next step is due
   double bpm() const { return bpm_; }
+  // ---- the clock, as the JS api's writable members (SEQ-LIVE-DESIGN A1). Audio thread; no allocation, no lock. ----------------
+  // setTime: `seq.time = t0` (core-processor play, :422). Before the first step() the base is unset and step() takes it from time_.
+  //   A t that is not finite is ignored and counted (the JS would take it; every later time would be NaN): deliberate difference.
+  // setBpm: `seq.bpm = v` (:354); heard from the next step(). A v that is not finite or not > 0 is ignored and counted (deliberate
+  //   difference); one that is finite and positive is clamped to [kSeqBpmMin, kSeqBpmMax] so a step's times stay finite (counted too).
+  // shift: `base += d; time += d; if (btT != null) btT += d` (:421, :778). With no base yet (never stepped) it moves time_ only.
+  //   A d that is not finite, or whose result would not be finite, is ignored and counted.
+  void setTime(double t);
+  void setBpm(double v);
+  void shift(double d);
+  bool hasBase() const { return hasBase_; }  // the `rows` message's base / btT (:792): null before the first step
+  double base() const { return base_; }
+  bool hasBtT() const { return hasBtT_; }
+  double btT() const { return btT_; }
+  double bt() const { return bt_; }          // api.bt: the song position in beats at the last step
+  uint64_t badSets() const { return badSets_; }   // setter calls ignored or clamped (setTime, setBpm, shift), ever
   int tks() const { return tks_; }
   const double* arp(const SeqEvent& e) const { return arpPool_.get() + 2 * (size_t)e.arpOff; }   // e.arpN pairs [time, rate multiplier]
   // PERFORM's live state (the panel's): the crossfader, a macro, the FILL switch. Heard from the next perfDiff / condition.
@@ -238,6 +255,7 @@ class Seq {
   std::vector<int32_t> rowSlot_; int nthK_ = 0; std::unique_ptr<uint32_t[]> nthCnt_, nthGen_, c1Cnt_; uint32_t trGen_[kSeqTracks];
   std::vector<Chase> chase_; std::vector<uint8_t> chaseHasS_; std::vector<uint32_t> chaseS_; std::vector<int16_t> chaseM_;
   std::unique_ptr<double[]> arpPool_; int arpUsed_ = 0;
+  uint64_t badSets_ = 0;
   uint64_t dropped_ = 0; int maxEvs_ = 0, maxArp_ = 0;
 };
 

@@ -9,6 +9,7 @@
 #include "thunder/rtlog.h"
 
 #include "seq/seq.h"
+#include "seq/runner.h"
 #include "song/song.h"
 #include "mix/mix.h"
 #include "mix/pdc.h"
@@ -202,6 +203,38 @@ static int run_seq() {
     if (total < steps) return fail("the sequencer made fewer events than steps (every step has its beat)");
     std::printf("rt_harness: sequencer run %d: %d steps, %ld events, no allocation\n", k, steps, total);
   }
+  return 0;
+}
+
+// ---- SEQ-LIVE A3: the runner and the clock setters under the guard ---------------------------------------------------------------
+// ELECTRO played live from a SeqRunner, a block of 128 frames at 48 kHz at a time. Inside the guard, every block: pump(); and at fixed blocks
+// setTime (before the first step, by the control path), setBpm, shift, hold(), a stalled `now` (the catch-up skip). Nothing may allocate.
+static int run_seq_runner() {
+  std::string text; { std::ifstream f(std::string(THUNDER_ROOT) + "/sounds/ELECTRO.thunder", std::ios::binary); if (!f) return fail("cannot read sounds/ELECTRO.thunder"); std::ostringstream o; o << f.rdbuf(); text = o.str(); }
+  thunder::Song song; thunder::JsonError je; if (!song.load(text.data(), text.size(), &je)) return fail("ELECTRO does not load");
+  thunder::SeqVars vars; const int CAP = 1024; std::vector<thunder::SeqEvent> evs((size_t)CAP); thunder::SeqStep st;
+  thunder::SeqOpts o; o.live = true; thunder::Seq sq(song, vars, thunder::SeqMode::Song, o);
+  thunder::SeqRunner run; run.start(&sq);
+  long steps = 0, held = 0, ended = 0; double now = 100;
+  { rt_guard g;
+    sq.setTime(now + 0.1); sq.setTime(std::nan("")); sq.setBpm(std::nan("")); sq.setBpm(0); sq.setBpm(-5); sq.shift(std::nan(""));   // the refusals under the guard too
+    for (int b = 0; b < 20000; b++) {
+      if (b == 300) sq.setBpm(97.3);
+      if (b == 900) sq.setBpm(131);
+      if (b == 500) sq.shift(0.37);
+      if (b == 700) sq.shift(-0.011);
+      if (b == 1200) now += 0.5;                 // a stalled audio thread: the skip
+      if (b == 18000) run.hold();               // EXACT STOP: the song ends at its next pattern edge
+      const thunder::SeqPump r = run.pump(now, b < 100 ? 0.6 : 0.25, evs.data(), CAP, &st, [&](const thunder::SeqEvent*, int, const thunder::SeqStep&) { steps++; });
+      if (r.held) held++; if (r.ended) ended++;
+      now += 128.0 / 48000;
+    } }
+  if (steps < 200) return fail("the runner played too few steps");
+  if (held != 1) return fail("the held stop did not report exactly once");
+  if (ended != 0) return fail("the runner reported an end with the song still running");
+  if (run.skips() < 1) return fail("the stalled block did not skip");
+  if (sq.dropped()) return fail("the sequencer dropped events");
+  std::printf("rt_harness: sequencer runner: %ld steps, %llu skips, %llu refused sets, no allocation\n", steps, (unsigned long long)run.skips(), (unsigned long long)sq.badSets());
   return 0;
 }
 
@@ -1060,6 +1093,7 @@ int main(int argc, char** argv) {
   if (int r = run_logger()) return r;
   if (int r = run_core()) return r;
   if (int r = run_seq()) return r;
+  if (int r = run_seq_runner()) return r;
   if (int r = run_voice()) return r;
   if (int r = run_sf()) return r;
   if (int r = run_mix()) return r;
