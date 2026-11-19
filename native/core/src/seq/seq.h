@@ -78,7 +78,7 @@ struct SeqOpts {
 //   per track 256 + 62 = 318; x 33 tracks = 10494; + BEAT 1 = 10495.
 // The PERFORM events (PRT part snapshot, scenes, macros, locks, LFOs) are bounded by the song, not by the format (review C6): the
 // rest of the 12288 is theirs (1793). Past that the events are still counted (Seq::dropped, RenderStats::seqDropped), never silent.
-// 12288 x sizeof(SeqEvent) (416 B) = 5 MB, allocated once with the renderer.
+// 12288 x sizeof(SeqEvent) (456 B since the chop members, was 416) = 5.6 MB, allocated once with the renderer.
 constexpr int kSeqStepEvents = 12288;
 
 // ---- events ----------------------------------------------------------------------------------------------------------
