@@ -27,16 +27,29 @@ void SongRenderer::dispatch(const SeqEvent& e) {
     case SEV_MOD: if (e.track >= 0) pool_.mod(e, seq_->arp(e)); return;
     case SEV_NOTE: break;
     case SEV_FXC: case SEV_FXP: if (fx_) fx_->event(e, mix_.now(), mix_); return;
-    default: return;   // fxp / fxc / chc (U14), eng, the MIDI events, tempo
+    default: st_.eventsIgnored++; return;   // chc (chains), eng, the MIDI events, tempo: no route yet (counted)
   }
   if (e.track < 0) return;
   st_.notes++;
   { const int ii = to_int_sat(e.ii, -1, 1 << 20); /* N1 C3: NaN is "none" */ if (ii >= 0 && ii < kNI && S_.insts[ii].mo == 1) { st_.notesMidiOnly++; return; } }   // MIDI gear only: nothing sounds here
   const int pad = to_int_sat(e.pad, -1, 1 << 20);   // (N1 C3: a part without `pad` gives NaN: no pad, what x86 gave and what the JS's kit.voices[NaN] is)
-  if (pad < 0 || pad >= kRenderPads || !pads_.buf[pad].data) { st_.notesNoPad++; return; }   // a slot the kit doesn't have is silent
-  const VoiceBuf& b = pads_.buf[pad];
+  if (pad < 0 || pad >= kRenderPads) { st_.notesNoPad++; return; }
+  // D2: which player. A live-engine or SoundFont pad is not the sampler's: its notes are silent here (counted), but they still take the track over (a live note does: liveNote / sfNote).
+  if (pads_.route[pad] == PadRoute::Live) { st_.notesLive++; pool_.take(e, &pads_.kit[pad]); return; }
+  if (pads_.route[pad] == PadRoute::SoundFont) { st_.notesSf++; pool_.take(e, &pads_.kit[pad]); return; }
+  if (!pads_.buf[pad].data) { st_.notesNoPad++; return; }   // a slot the kit doesn't have is silent
+  VoiceBuf b = pads_.buf[pad];   // (a copy of the small descriptor: the buffer itself is not copied)
+  // D3, varRec: an instrument with slc > 1 or sync plays the pad as it is (no variation, no shaping). The JS: `S.insts[ev.ii]`, a whole index.
+  const int ii = (e.ii == e.ii && e.ii >= 0 && e.ii < kNI && e.ii == (double)(int)e.ii) ? (int)e.ii : -1;
+  bool useVar = false;
+  if (ii >= 0 && (S_.insts[ii].slc > 1 || S_.insts[ii].sync)) { b.noShape = true; if (e.has & (SH_VK | SH_TW)) st_.notesUnshaped++; }
+  else if (e.has & SH_VK) {   // D2: MUT / GEN: the variation the host rendered, by instrument, kind, number and pad; none: silent (never the base pad)
+    const RenderVar* v = ii >= 0 ? pads_.findVar(ii, e.vkKind, e.vkNum, pad) : nullptr;
+    if (!v) { st_.notesVarMissing++; pool_.take(e, &pads_.kit[pad]); return; }
+    b = v->buf; useVar = true;
+  }
   if (VoicePool::shapedReverse(e, b)) { st_.notesShapedRev++; pool_.take(e, &pads_.kit[pad]); return; }   // (the page plays a reversed + shaped note: not this player's)
-  if (pool_.note(e, seq_->arp(e), b, pads_.kit[pad], seq_->bpm())) st_.notesPlayed++;
+  if (pool_.note(e, seq_->arp(e), b, pads_.kit[pad], seq_->bpm())) { st_.notesPlayed++; if (useVar) st_.notesVar++; }
 }
 
 void SongRenderer::setPlan(const PdcPlan& plan, PdcMode mode, int64_t extraLatencyFrames) {
