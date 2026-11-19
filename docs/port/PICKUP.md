@@ -42,7 +42,14 @@ replace within the budget, four test gaps, `set_pad` drops a pad's variations, h
 - **Lesson of the night:** a green PR is green against the `native` it was tested with. When `native` has moved, merge `native` into the branch and let
   CI run again before merging (U31's first combined run failed on a test whose premise another PR had changed).
 
-**The queue, in order (nothing below is started):**
+**Started 08:40 on 19 Nov (a new chat; this chat's workers are Sonnet, each in `/home/claude/wt/`):**
+- Item 1: the lead's design is `docs/port/SEQ-LIVE-DESIGN.md`. Part A (setters + `SeqRunner`) = branch `n1/seq-live`, notes `docs/port/SEQ-LIVE-NOTES.md`.
+  Part B (Song lifetime: the Seq published with its Song, `takeOver` on the audio thread) starts when A is merged.
+- Item 2: branch `n1/render-sf`, notes `docs/port/RENDER-SF-NOTES.md`.
+- Item 3 is RULED: the page's sequencer is the specification, sliced / synced notes are chopped (same design file, last section). New unit "chop"
+  after Part A. To tell the owner: with Settings on the audio core the web app seems to play sliced / synced instruments unchopped.
+
+**The queue, in order (as of 07:30; see the lines above for what has started):**
 1. **Seq setters and the Song lifetime** (WIRING-DOSSIER D1: `time_`, `base_`, `bpm_` setters, RESUME shift, the catch-up skip, EXACT STOP hold; R1).
    The lead's design; gate `seq-golden`. This is the next step on the path to live playback, and it is the top model's work.
 2. **The SoundFont route into the renderer** (`thunder_render_set_pad_sf`, an `SfPool` rendered into the mixer), then the live-engine route. Sonnet,
