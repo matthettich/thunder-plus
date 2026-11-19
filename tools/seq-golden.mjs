@@ -149,10 +149,12 @@ const vFx = S => { const p0 = ph(S, 0, 0), p1 = ph(S, 0, 1); S.tfx[0][1] = { typ
   setCmd(S, p0, 3, 0, 'FLX', 0x20); setCmd(S, p0, 9, 0, 'GAT', 0x30); setCmd(S, p1, 5, 0, 'RTG', 0x40); setCmd(S, p1, 13, 0, 'FXV', 0x10); setCmd(S, p0, 17, 0, 'FXO', 0x31); };
 const vNth = S => {   // NTH on rows s and s + 16 (different values) of the first three phrases, which loop
   const P = [ph(S, 0, 0), ph(S, 0, 1), ph(S, 0, 2)];
-  P.forEach((p, k) => [[2 + 2 * k, 0x02], [18 + 2 * k, 0x13]].forEach(([y, v], i) => { setNote(S, p, y, 58 + 3 * k + i); setCmd(S, p, y, 0, 'NTH', v); }));
+  P.forEach((p, k) => [[2 + 2 * k, 0x21], [18 + 2 * k, 0x32]].forEach(([y, v], i) => { setNote(S, p, y, 58 + 3 * k + i); setCmd(S, p, y, 0, 'NTH', v); }));
   P.forEach((p, k) => [[4 + 2 * k, 0x03], [20 + 2 * k, 0x02]].forEach(([y, v], i) => { setNote(S, p, y, 66 + k + i); setCmd(S, p, y, 1, 'CND', v); }));
 };
-const vJmp = S => { const P = [ph(S, 0, 0), ph(S, 0, 1), ph(S, 0, 2)]; P.forEach((p, k) => setCmd(S, p, 26 + k, 0, 'JMP', 3 + k)); };
+const vJmp = S => {   // no loop: each of tracks 0 to 2 plays its phrase 6 times in a chain; the master's chain ends in a phrase with a JMP to song row 1 (fresh() on every track: new NTH counters), where the same chains play again
+  const m = S.chains[S.song[0][32]][0][0]; for (let t = 0; t < 3; t++) { const cid = S.song[0][t], p = S.chains[cid][0][0]; S.chains[cid] = Array.from({ length: 6 }, () => [p, 0]); S.song[1][t] = cid; }
+  S.chains[S.song[0][32]] = [[m, 0], [m, 0], [m, 0], [m, 0], [4000, 0]]; S.phrases[4000] = Array.from({ length: 32 }, () => [-1, -1, -1, -1, -1, 0, -1, -1, -1, -1, -1, -1]); S.plen[4000] = 32; setCmd(S, 4000, 5, 0, 'JMP', 1); };
 const vTch = S => { setCmd(S, ph(S, 0, 32), 0, 0, 'TCH', 0x40); for (let r = 0; r < 4; r++) for (let t = 0; t < 3; t++) { const p = ph(S, r, t); if (p < 0) continue; for (let y = 0; y < 32; y += 2) { setNote(S, p, y, 55 + ((y + t) % 9)); setCmd(S, p, y, 2, 'CHA', 0x90); } } };
 const vTic = S => { const p = ph(S, 0, 0); setCmd(S, p, 3, 0, 'TIC', 0); setCmd(S, p, 17, 0, 'TIC', 0); setCmd(S, ph(S, 1, 0), 3, 0, 'TIC', 0); setCmd(S, ph(S, 2, 0), 3, 0, 'TIC', 0); };
 const vGrv = S => { setCmd(S, ph(S, 0, 0), 2, 0, 'GGR', 0x24); setCmd(S, ph(S, 1, 0), 2, 0, 'TIC', 0); };
@@ -180,7 +182,7 @@ const EDIT_SONGS = [
   // F2 to F4 of verify-244 (the carried run state, and the song fields that are live or stay the PLAY's), added 19 Nov. Counters that live on across an edit:
   // NTH on rows s and s+16 of a looping phrase (the slot key), a JMP (fresh(): the track's NTH generation) before the edit, the master column's TCH.
   { id: 'nth-dense', base: vNth, loop: { y0: 0, y1: 1 }, max: 700, edits: [{ after: 100, fn: S => { setNote(S, ph(S, 0, 0), 10, 62); } }, { after: 230, fn: S => { setNote(S, ph(S, 0, 1), 12, 63); } }, { after: 360, fn: S => { setNote(S, ph(S, 0, 2), 14, 64); } }, { after: 500, fn: S => { setNote(S, ph(S, 0, 0), 11, 65); } }] },
-  { id: 'nth-restart', base: compose(vNth, vJmp), loop: { y0: 0, y1: 1 }, max: 700, edits: [{ after: 90, fn: S => { setNote(S, ph(S, 0, 0), 10, 62); } }, { after: 150, fn: S => { setNote(S, ph(S, 0, 1), 12, 63); } }, { after: 210, fn: S => { setNote(S, ph(S, 0, 2), 14, 64); } }, { after: 330, fn: S => { setNote(S, ph(S, 0, 0), 11, 65); } }, { after: 460, fn: S => { setNote(S, ph(S, 0, 1), 13, 66); } }] },
+  { id: 'nth-restart', base: compose(vNth, vJmp), max: 700, edits: [{ after: 100, fn: S => { setNote(S, ph(S, 0, 0), 10, 62); } }, { after: 175, fn: S => { setNote(S, ph(S, 0, 1), 12, 63); } }, { after: 210, fn: S => { setNote(S, ph(S, 0, 2), 14, 64); } }, { after: 245, fn: S => { setNote(S, ph(S, 0, 0), 11, 65); } }, { after: 300, fn: S => { setNote(S, ph(S, 0, 1), 13, 66); } }] },
   { id: 'master-tch', base: vTch, edits: [{ after: 60, fn: S => { for (let y = 0; y < 32; y += 2) setCmd(S, ph(S, 2, 0), y, 2, 'CHA', 0xFF); } }, { after: 130, fn: S => { for (let y = 0; y < 32; y += 2) setCmd(S, ph(S, 3, 1), y, 2, 'CHA', 0xFF); } }] },
   { id: 'ticks', base: vTic, edits: [{ after: 40, fn: S => { S.ticks = 4; } }, { after: 90, fn: S => { S.ticks = 9; } }] },
   { id: 'lpb', edits: [{ after: 30, fn: S => { S.lpb = 6; } }, { after: 80, fn: S => { S.lpb = 3; } }] },

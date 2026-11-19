@@ -1,11 +1,11 @@
-IN THE MIDDLE OF: item 4 (F2 to F4 mutation runs: record M1 trGen_, M2 slot key, M6 mtch_ results) then item 5; items 1, 2, 3 (byte count only), the goldens and the thread test are done and pushed.
+IN THE MIDDLE OF: item 6 (full gates: Release ctest, ASan + UBSan, TSan, then CI on the final head); items 1 to 5 done and pushed.
 
 ## FIX JOB for #244 (verify-244): checklist (a new worker continues from here)
 - [x] 1 F1: `seq_adopt` hands over from the OLDEST snapshot of the newest's session in the popped chain (`SnapSlot::adopt(handover(chain, n))`); test `testSessionsInOneAdopt` (5 interleavings, one per call, no current Seq); mutation (always chain[0]) fails 8 checks
 - [x] 2 F5a: plain `adopt()` removed for `SnapSlot<SongSnap>` (`SnapNeedsHandover`, `can_adopt_plain`; `static_assert` in the test)
 - [x] 3 F5b: `SeqSession::bytes()`, `sessionFull()`, `kSeqSessionMaxBytes` = 8 MB; test `testSessionBytes`; the pattern-edge restart is NOT done (see "Choices for the lead" below)
-- [ ] 4 F2 to F4: new JS goldens edit-nth-dense, edit-nth-restart, edit-master-tch, edit-ticks, edit-lpb, edit-grv, edit-dlen (done); `testHostile` real assertions (done); thread test with sessions and growing registries (done); mutation results (to record)
-- [ ] 5 the two runner tests in `test_seq_live.cpp` and the comment at `Seq::setTime`
+- [x] 4 F2 to F4: new JS goldens edit-nth-dense, edit-nth-restart, edit-master-tch, edit-ticks, edit-lpb, edit-grv, edit-dlen (done); `testHostile` real assertions (done); thread test with sessions and growing registries (done); mutations (seq.cpp, committed test_seq_takeover): M1 drop `trGen_` carry: now FAILS (edit-nth-restart, row 183; before: passed), M2 slot key `s & 15`: now FAILS (edit-nth-dense and edit-nth-restart, row 18; before: passed), M6 drop `mtch_`: FAILS (edit-master-tch, row 62; before: passed). The first versions of the NTH goldens used NTH 0x02 / 0x13 (X = 1: always plays) and a JMP inside a loop (JMP is ignored in a loop): useless, replaced by 0x21 / 0x32 and a non-loop JMP to song row 1
+- [x] 5 the two runner tests are in `test_seq_live.cpp` (verify-243 F3 a, b), mutations re-run today: `hasBase()` dropped from the skip condition FAILS (a); `sp < ls_` -> `<=` FAILS (b); the comment is at `Seq::setTime` (seq.h)
 - [ ] 6 full Release ctest, ASan + UBSan, TSan, CI green on the final head
 
 ## Choices for the lead (item 3, F5b)
