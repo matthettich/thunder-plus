@@ -52,13 +52,40 @@ to the control thread. `seq_adopt(slot, runner)` = that handover is `next.seq->t
 `Seq(SeqSession&, song, vars, successor=true)`: no start-up (no `on`, no `settle`, no hand-over `at`, no `chaseChance`): `takeOver` writes all 33 `Tr`. Table builds as for the first Seq.
 
 ## 2. Choices for the lead
-(filled in as they come)
+1. **`Song::load(..., bool pageS = false)`** (song.h). Two normSong rules are applied at LOAD only in the page, but `Song::load` re-applied them on every bare S, so a rebuilt Song differed from the JS's in-place edit:
+   an empty phrase's length (`plen` of a null / all-empty phrase was reset to `dlen`: found by the edit-plen golden at step 112) and a missing instrument. With `pageS = true` (the host passes it for the page's own S: the `song` /
+   `patch` ops and any snapshot made while a sequencer runs) neither is applied; the default `false` keeps every existing caller and `test_song` as they were. **core.cpp's wiring must pass `pageS = true`** for song / patch snapshots.
+2. **Ruling 6 (removed instrument), answer to "is it reachable without an edit?": NO.** The page's `normSong` starts from 64 `freshInst` and fills them, so every `S.insts[ii]` exists; a file or raw song gets the same defaults in C++ (`readInst`).
+   So there is no existing difference to fix with a golden of its own; the case is `edit-instrument-removed` (the JS golden: `insts[3] = null`, `insts.length = 12` under the playhead plays instrument 0). Implementation: `Song::instMissing[i]` (pageS only) and `instOf` falls back to instrument 0.
+3. **`takeOver` copies no counters.** With the session's pages / chunks shared by every Seq of the PLAY (ruling 2, 3), the successor already points at them; a "counter move" does not exist. takeOver's cost is the 33 `Tr` (728 B each) + the sent arrays + a few hundred bytes.
+4. **`SeqRunner::rebind(Seq*)` does nothing on a runner that has no sequencer** (stopped, held, never started): an adoption must not bring a stopped sequencer back. Say if you want it to bind regardless.
+5. **`SeqSession::publish` deletes the snapshot when the ring is full** (and rolls the registry back); it does not hand it back as `SnapSlot::publish` does: the staged registry growth belongs to that Seq, so a retry builds a new one.
+6. **`SnapSlot::adopt(handover)`** (new overload; `adopt()` unchanged) calls `handover(prev, next)` once, with the snapshot that RAN (or, with none running yet, the oldest popped) and the newest, before `prev` is returned. The snapshots in between are retired unrun.
+   The plain `adopt()` must not be used for a `SnapSlot<SongSnap>` after the first one: use `seq_adopt(slot, runner)` (session.h).
+7. **Registry cap 4096 ids**: past it a new target id is not interned (counted in `SeqSession::idOverflow()`), its scene entry / lock / LFO is inert. No fallback "fresh state".
+8. **`lx` (live transpose, D14) is not carried**: a successor is built with the session's opts (the PLAY's `lx`). Out of Part B; wiring would need a `SeqSession::setLx`.
+9. **The edit goldens compare events and the clock, not `pos`**: the plain goldens do not carry `pos` either (the notes asked for it; adding it means a new serialisation on both sides).
+10. **The TSan run is local** (no CI job builds with `-fsanitize=thread`); result below. ASan test runs `--quick` (a takeOver every 7th step) under the sanitizer job, to fit its time; the Release run does every step.
 
 ## 3. Parked
-(none yet)
+- Nothing parked over 45 minutes.
 
 ## 4. Measurements, mutation checks
-- verify-243 F3 tests added to test_seq_live (runner): (a) unstepped Seq at now-1 does not skip on the first pump; (b) one row + 1-step phrase looping with hold armed is never held.
-  Mutation (a): `hasBase()` dropped from the skip condition in runner.h -> test_seq_live FAILS ("skipped 1, first t -1"); restored.
-  Mutation (b): `sp < ls_` -> `sp <= ls_` -> FAILS ("never held (1 steps played)"); restored. Both runs Release, then reverted with git checkout.
-- seq.h: one comment line at `Seq::setTime` (after the first step it moves only time_).
+- **takeOver cost** (Release, this 2-core container, steady_clock, warm): with the registry FULL (4096 ids, the largest `sent*` arrays) and 33 tracks: mean 1.7 us, worst of 300 runs 5.6 us (21.6 us under ASan+UBSan). `seq_adopt` as the audio side runs it (slot pop / push, takeOver, rebind) inside rt_harness's guard: worst 39 us over 300 adoptions (cold first one included). A 128-frame block at 48 kHz is 2667 us.
+  Memory per Seq: the page table 67 KB (song mode) + the chunk table 4 KB + `rowSlot_` (phrase rows x 4 B, 0.5 MB at the format's maximum) + the tables of the old Seq as before; ELECTRO's counters are 616 pages = 1.26 MB, as before, shared by every Seq of the PLAY.
+- **No allocation**: rt_harness `run_seq_takeover` (ELECTRO live, a publish every 40 blocks, three at once every 200; 300 adoptions): zero allocations inside the guard.
+- **Constructor cost of a successor** (control thread; the 24-run identity test makes ~1800 of them per golden in ~14 s on this machine, ELECTRO): about 5 ms each; `buildChase` is the part that scales with the song (D11).
+- **Verify-243 F3 tests** (added to test_seq_live): (a) unstepped Seq at now-1 does not skip; (b) 1-row, 1-step-phrase loop with hold armed is never held. Mutations: `hasBase()` dropped from the skip condition: FAILS; `sp < ls_` -> `sp <= ls_`: FAILS. Both restored.
+- **Mutation checks, one per gate** (each applied, built, run, then `git checkout`):
+  | gate | mutation | result |
+  |---|---|---|
+  | identity (T0) | takeOver does not copy `btT_` | FAILS (every golden at row 2) |
+  | edit goldens, D1 bus plan | takeOver does not copy `busT_` | FAILS (edit-bus, first row 32) |
+  | edit goldens, D3 macros | takeOver does not carry the effective macro values | FAILS (edit-perf, row 73) |
+  | edit goldens, counters registry | `ensurePage` zeroes an existing page (counters not carried) | FAILS (edit-seed-loop, row 300) |
+  | skipped snapshots | `handover(*ret[nr-1], ...)` (from the immediate predecessor, which never ran) | FAILS (3 of the 17 cases, 3 snapshots) |
+  | allocation guard | `new std::vector<int>` inside takeOver | FAILS ("operator new inside the audio callback") |
+  | ASan | takeOver copies 64 doubles too many into `sentVal_` | FAILS (heap-buffer-overflow) |
+  | TSan | (see below) |
+  Two first attempts survived and were replaced by better mutations / gates: the `bus` edit changed a track that has no notes (now it moves the bus to a track that has), and the macro edit hit a macro that a MAC command overrides (now `mac[1].v`).
+  The first M6 attempt (a fresh page for every successor, leaking) was killed by the OOM killer: a failure, but not a clean one; the zeroing mutation above replaced it.
