@@ -64,6 +64,14 @@ struct RenderPads {
     if (!have) { RenderVar v; v.ii = ii; v.kind = kind; v.num = num; v.pad = pad; var.insert(var.begin() + (std::ptrdiff_t)lo, std::move(v)); }
     RenderVar& v = var[lo]; v.data.swap(d); v.buf = VoiceBuf(); v.buf.data = v.data.data(); v.buf.len = frames; v.buf.sr = sr;
   }
+  // The bytes the variations of pad `pad` (any instrument) hold, and dropping them (the page drops a pad's variations whenever the pad's buffer changes:
+  // core/core-processor.js:337 `case 'buf'` -> varDrop(d.pad), :239). Control thread. dropVarsOfPad returns the bytes freed; it allocates nothing.
+  size_t varBytesOfPad(int pad) const { size_t b = 0; for (const RenderVar& v : var) if (v.pad == pad) b += v.data.size() * sizeof(float); return b; }
+  size_t dropVarsOfPad(int pad) {
+    size_t b = 0, w = 0;
+    for (size_t i = 0; i < var.size(); i++) { if (var[i].pad == pad) { b += var[i].data.size() * sizeof(float); continue; } if (w != i) var[w] = std::move(var[i]); w++; }
+    var.erase(var.begin() + (std::ptrdiff_t)w, var.end());   // (order kept: still sorted)
+    return b; }
 };
 
 struct RenderStats {

@@ -19,15 +19,16 @@
                  (2) THUNDER_RENDER_E_MEMORY from read or drain (an allocation failed while rendering): the handle is dead too, and the
                  frames that call had copied out are lost with it. A dead handle accepts only free: every other call that takes one returns
                  THUNDER_RENDER_E_STATE (the getters length, position, latency, length_estimate and stats_get still answer). (3) THUNDER_RENDER_E_MEMORY
-                 from set_pad that REPLACES a pad whose old and new copy together would pass the pad limit: the old copy is released first (so
-                 the pads never hold more than the limit), and when the new one cannot be allocated the pad is removed; the handle is otherwise
+                 from set_pad that REPLACES a pad, or from set_variation that REPLACES a variation, when what the handle holds now and the new copy
+                 together would pass the pad limit: the old copy is released first (so the pads and variations never hold more than the limit), and
+                 when the new one cannot be allocated the pad (with its variations) or the variation is removed; the handle is otherwise
                  as it was. E_MEMORY from create makes no handle and leaves nothing allocated; from any other set_pad it changes nothing.
    OUTPUT        stereo, non-interleaved (L and R arrays), float32, at opts.sample_rate. The first latency() frames of the song's render are
                  dropped, as pass() does for a render (the master chain's look-ahead, and the PDC delay when pdc_mode is on). The samples are
                  the same whatever block sizes read() is called with (1, 64, 333, 4096, the whole song).
    LIMITS        song bytes <= THUNDER_RENDER_MAX_SONG_BYTES; vars bytes <= THUNDER_RENDER_MAX_VARS_BYTES; pad data (copied, 4 bytes a
-                 sample per channel) <= THUNDER_RENDER_MAX_PAD_BYTES in all, and the handle never holds more than that for pads, even while a pad is
-                 being replaced (see ERRORS (3)); one pad <= THUNDER_RENDER_MAX_PAD_FRAMES frames. Beyond a limit: THUNDER_RENDER_E_LIMIT.
+                 sample per channel) <= THUNDER_RENDER_MAX_PAD_BYTES in all, variations (4 bytes a sample) included, and the handle never holds more than that
+                 for pads and variations together, even while a pad or a variation is being replaced (see ERRORS (3)); one pad <= THUNDER_RENDER_MAX_PAD_FRAMES frames. Beyond a limit: THUNDER_RENDER_E_LIMIT.
                  A render of a song of unknown length ends at opts.max_frames at the latest, EXACTLY there (the output is cut to it, not rounded to the
                  128-frame quantum), with stats.hit_limit = 1 whenever something was cut (default 1260 s: renderOut's own limit is 1200 s).
    OUT OF MEMORY an allocation that fails is caught inside and returned as THUNDER_RENDER_E_MEMORY (create: NULL and err "out of memory"; the effects'
@@ -121,24 +122,33 @@ thunder_render* thunder_render_create(const uint8_t* song, size_t song_bytes, co
 /* Hands in pad `pad` (0 .. 255): `frames` samples of L, and of R for a stereo pad (R == NULL: mono), recorded at `sample_rate` Hz (finite,
    1 .. 1e6). The samples must be finite (else E_ARG). COPIED: the host may free or reuse its arrays when this returns. A pad set twice is replaced;
    frames == 0 (L and R may then be NULL) removes the pad (its notes are silent). Only before the first read or drain (E_STATE after).
-   The pads together may not pass THUNDER_RENDER_MAX_PAD_BYTES: a replacement is judged by the pads as they would be after it (else E_LIMIT, the pad as
-   it was); see ERRORS (3) for the one case in which a replacement releases the old copy first. */
+   The pads and variations together may not pass THUNDER_RENDER_MAX_PAD_BYTES: a replacement is judged by what the handle would hold after it (else E_LIMIT, the pad as
+   it was); see ERRORS (3) for the one case in which a replacement releases the old copy first.
+   A pad whose buffer changes LOSES ITS VARIATIONS (every instrument's, any kind and number) when the call succeeds, as the page drops them: core/core-processor.js:337
+   (`case 'buf'`: the pad's data is set or deleted, then varDrop(d.pad), :239; seq-core.js:1195 and :1097 are the same code). That includes frames == 0 (the pad removed), and the
+   bytes the variations held count as freed by the call. A failed call (E_ARG, E_LIMIT, E_STATE) drops nothing. A host sets the pad first and its variations after. */
 int thunder_render_set_pad(thunder_render* r, int pad, const float* l, const float* r_, int64_t frames, double sample_rate);
 
 /* The kit entry of a pad (the page's coreKitV(): {choke, syn, rel}); defaults 0, 0, 0. Only before the first read or drain. choke: 0 .. 255; syn: 0 / 1; rel: finite, 0 .. 60 s. */
 int thunder_render_set_pad_kit(thunder_render* r, int pad, int choke, int syn, double rel);
 
 /* Which player a pad's notes are for (the page's coreKitV() `live` / `sf`): THUNDER_RENDER_ROUTE_*. Default SAMPLER. Only before the first read or drain.
-   LIVE and SF pads are silent for now (see the defines; the notes are counted), however a buffer is set for them: a host that wants the page's own fallback for a
+   LIVE and SF pads are silent for now (see the defines; the notes are counted), however a buffer is set for them. Their notes take the track over (the previous
+   note on the track is cut, a choke group is applied), as a live note does in the page (index.html:22015-22020, startNote's isLivePad branch) and in the core (core-processor.js:693
+   liveNote, "mono: it takes over the track"); so does a MUT / GEN note whose variation is missing and a reversed + shaped note (this renderer's rule: the core's take(), core-processor.js:660, for a note it does not play). A note whose pad has NO buffer on the SAMPLER route
+   (or no kit entry) does NOT take the track over: the page's startNote returns first (index.html:22012 `!kit.voices[ev.pad]`, :22022 `if (!b) return`), and the previous note
+   goes on sounding. (The audio-thread core, core-processor.js:660, calls take() for such a note; the page, which an offline render follows, does not.) The SF route is approximate:
+   the page's sfNote returns without taking over when the font is missing or no zone matches (index.html:22066, :22069); this renderer has neither input and always takes over.
+   A host that wants the page's own fallback for a
    live pad (its rendered twin) leaves the pad on SAMPLER. A pad number outside 0 .. 255 or a route outside 0 .. 2: E_ARG. */
 int thunder_render_set_pad_route(thunder_render* r, int pad, int route);
 
 /* Hands in a MUT / GEN variation the host rendered (the page's `vbuf`, keyed ii:vk:pad): instrument `ii` (0 .. 63), `kind` 'g' (GEN) or 'm' (MUT), `num` (0 .. 255,
    the command's value), pad (0 .. 255), `frames` MONO samples of `l` (finite) recorded at `sample_rate` Hz (finite, 1 .. 1e6). COPIED. The same key replaces; frames == 0
    (l may be NULL) removes. Variations count against THUNDER_RENDER_MAX_PAD_BYTES with the pads, one pad's frame limit applies, and at most THUNDER_RENDER_MAX_VARIATIONS
-   are held (E_LIMIT). Only before the first read or drain. A MUT / GEN note whose variation is missing is SILENT and counted (stats.notes_var_missing), never the base
+   are held (E_LIMIT); a replacement at the limit follows set_pad's rule (ERRORS (3)). Only before the first read or drain. A MUT / GEN note whose variation is missing is SILENT and counted (stats.notes_var_missing), never the base
    pad: a host whose page would play the base pad (no variation could be made) hands in the pad's own samples. A note of a sliced (slc > 1) or synced instrument plays the
-   pad as it is and never looks for a variation. A pad changed with set_pad does NOT drop its variations (the page does; a host that wants that removes them). */
+   pad as it is and never looks for a variation. A pad changed with set_pad DROPS its variations (as the page does; see set_pad): set the pad first, then its variations. */
 int thunder_render_set_variation(thunder_render* r, int ii, int kind, int num, int pad, const float* l, int64_t frames, double sample_rate);
 
 /* The length of the output in frames after the trim (an unknown-length render cut at max_frames: max_frames). With opts.use_frames = 1 it is `frames`, known from the start. Otherwise it is -1
@@ -154,7 +164,8 @@ int64_t thunder_render_read(thunder_render* r, float* l, float* r_, int64_t fram
 /* An ESTIMATE of the length, for a progress bar before the render has reached its end: the sequencer's song end in output frames (after the
    latency trim), found by stepping a second sequencer, without any audio, to the end of the song (the song's rows, tempo changes and chance rolls
    included: it ends where the render's own sequencer does). It does not include the tails of the voices that still sound at the song's end
-   (reverb, long samples), which only the render can tell: the real length is usually somewhat longer, so never treat this as a promise, and
+   (reverb, long samples), which only the render can tell, and it is the START of the song's last row (the sequencer's time when it stops), so it also misses that row's own
+   duration (about 6000 frames at 120 BPM, 48 kHz, lpb 4; measured 2.3 % of ELECTRO): the real length is always longer, never shorter, than the estimate unless the render is cut, so never treat this as a promise, and
    clamp a progress fraction to 1. Capped at the render's max_frames. With use_frames = 1, or once the render has ended, it is the exact length
    (as length()). Costs a fraction of a second for a long song, once: the answer is kept. -1: not available (a null handle, a song whose end the
    stepping cannot reach in 20 million steps, or out of memory: the handle is not affected and a later call may succeed). */

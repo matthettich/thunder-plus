@@ -912,3 +912,10 @@ else()
   target_compile_options(test_render_c PRIVATE -std=c99 -Wall -Wextra -Werror -pedantic)
 endif()
 add_test(NAME render_c COMMAND test_render_c)
+
+# Follow-up after verify-238-239: the takeover of live / sf / missing-variation notes, a failed set_variation changes nothing, the variation limit's value, a pad change drops its
+# variations (the page's rule), Cloud Seed's 96 kHz cap in a Release test. (The peak-memory check of a variation replacement is in render_api_oom.)
+add_executable(test_render_var test_render_var.cpp)
+target_link_libraries(test_render_var PRIVATE thunder_core)
+target_include_directories(test_render_var PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../core/src ${CMAKE_CURRENT_SOURCE_DIR})
+add_test(NAME render_var COMMAND test_render_var)

@@ -148,24 +148,29 @@ int thunder_render_set_pad(thunder_render* r, int pad, const float* l, const flo
   if (r->dead || r->started) return THUNDER_RENDER_E_STATE;
   if (!padOk(pad) || frames < 0) return THUNDER_RENDER_E_ARG;
   TR_TRY {
-    if (frames == 0) { r->padBytes -= r->store[pad].size() * sizeof(float); std::vector<float>().swap(r->store[pad]); r->pads.buf[pad] = VoiceBuf(); return 0; }
+    // A pad whose buffer changes (set, replaced or removed) loses its variations, as the page's does (core/core-processor.js:337: 'buf' -> varDrop(pad)); they are
+    // dropped only once the call has succeeded (a failed call changes nothing), and what they hold counts as freed by the replacement.
+    const size_t varB = r->pads.varBytesOfPad(pad);
+    if (frames == 0) { r->padBytes -= r->store[pad].size() * sizeof(float); std::vector<float>().swap(r->store[pad]); r->pads.buf[pad] = VoiceBuf(); r->padBytes -= r->pads.dropVarsOfPad(pad); return 0; }
     if (!l || !fin(sample_rate) || sample_rate < 1 || sample_rate > 1e6) return THUNDER_RENDER_E_ARG;
     if (frames > THUNDER_RENDER_MAX_PAD_FRAMES) return THUNDER_RENDER_E_LIMIT;
     const size_t ch = rr ? 2 : 1, n = (size_t)frames * ch, old = r->store[pad].size() * sizeof(float);
-    // The budget bounds what the handle HOLDS, not only what it ends up with. The final state must fit (the old pad is replaced); then, if the old copy and
-    // the new one fit TOGETHER, the new one is built first and swapped in (a failure leaves the pad as it was); if they do not (a big pad replaced at the
-    // limit), the old copy is released first, so the pads never hold more than THUNDER_RENDER_MAX_PAD_BYTES, and an allocation failure then leaves the pad removed.
-    if (n * sizeof(float) > THUNDER_RENDER_MAX_PAD_BYTES || r->padBytes - old + n * sizeof(float) > THUNDER_RENDER_MAX_PAD_BYTES) return THUNDER_RENDER_E_LIMIT;
+    // The budget bounds what the handle HOLDS, not only what it ends up with. The final state must fit (the old pad and the pad's variations are replaced); then, if
+    // what the handle holds now and the new copy fit TOGETHER, the new one is built first and swapped in (a failure leaves the pad as it was); if they do not (a big pad
+    // replaced at the limit), the old copy and the variations are released first, so the pads never hold more than THUNDER_RENDER_MAX_PAD_BYTES, and an allocation
+    // failure then leaves the pad removed.
+    if (n * sizeof(float) > THUNDER_RENDER_MAX_PAD_BYTES || r->padBytes - old - varB + n * sizeof(float) > THUNDER_RENDER_MAX_PAD_BYTES) return THUNDER_RENDER_E_LIMIT;
     for (int64_t i = 0; i < frames; i++) if (!fin(l[i])) return THUNDER_RENDER_E_ARG;   // validated before anything is changed or released
     if (rr) for (int64_t i = 0; i < frames; i++) if (!fin(rr[i])) return THUNDER_RENDER_E_ARG;
     std::vector<float> tmp;
-    if (r->padBytes + n * sizeof(float) > THUNDER_RENDER_MAX_PAD_BYTES) { r->pads.buf[pad] = VoiceBuf(); std::vector<float>().swap(r->store[pad]); r->padBytes -= old; }
+    if (r->padBytes + n * sizeof(float) > THUNDER_RENDER_MAX_PAD_BYTES) { r->pads.buf[pad] = VoiceBuf(); std::vector<float>().swap(r->store[pad]); r->padBytes -= old; r->padBytes -= r->pads.dropVarsOfPad(pad); }
     tmp.resize(n);
     std::memcpy(tmp.data(), l, (size_t)frames * sizeof(float));
     if (rr) std::memcpy(tmp.data() + frames, rr, (size_t)frames * sizeof(float));
     const size_t old2 = r->store[pad].size() * sizeof(float);
     r->store[pad].swap(tmp); r->padBytes = r->padBytes - old2 + n * sizeof(float);
     VoiceBuf& b = r->pads.buf[pad]; b.data = r->store[pad].data(); b.data2 = rr ? b.data + frames : nullptr; b.len = (int)frames; b.sr = sample_rate; b.noShape = false;
+    r->padBytes -= r->pads.dropVarsOfPad(pad);   // (nothing left to drop when the release-first branch ran)
     return 0;
   }
   TR_CATCH_BADALLOC(return THUNDER_RENDER_E_MEMORY;)
@@ -202,8 +207,12 @@ int thunder_render_set_variation(thunder_render* r, int ii, int kind, int num, i
     if (bytes > THUNDER_RENDER_MAX_PAD_BYTES || r->padBytes - oldBytes + bytes > THUNDER_RENDER_MAX_PAD_BYTES) return THUNDER_RENDER_E_LIMIT;
     if (!old && r->pads.var.size() >= (size_t)THUNDER_RENDER_MAX_VARIATIONS) return THUNDER_RENDER_E_LIMIT;
     for (int64_t i = 0; i < frames; i++) if (!fin(l[i])) return THUNDER_RENDER_E_ARG;   // validated before anything is changed
-    r->pads.setVar(ii, (char)kind, num, pad, l, (int)frames, sample_rate);   // (builds the copy first: a failed allocation leaves the table as it was)
-    r->padBytes = r->padBytes - oldBytes + bytes;
+    // The same rule as set_pad: when what the handle holds now and the new copy fit together, the copy is built first (a failed allocation leaves the table as it was);
+    // when they do not (a replacement at the limit), the old variation is released first and a failed allocation leaves it removed.
+    const bool released = old && r->padBytes + bytes > THUNDER_RENDER_MAX_PAD_BYTES;
+    if (released) { r->padBytes -= oldBytes; r->pads.setVar(ii, (char)kind, num, pad, nullptr, 0, 0); }   // (`old` is dangling from here)
+    r->pads.setVar(ii, (char)kind, num, pad, l, (int)frames, sample_rate);
+    r->padBytes = r->padBytes - (released ? 0 : oldBytes) + bytes;
     return 0;
   }
   TR_CATCH_BADALLOC(return THUNDER_RENDER_E_MEMORY;)
