@@ -1,6 +1,6 @@
 # U34a: offline song render C API
 
-> **IN THE MIDDLE OF (update on every push):** fixes D1..D8 and the length estimate are in and tested in Release (`ctest -R render`: 6 of 6); next: sanitizer build, the golden gate (full ctest), the six CLI WAVs `cmp`, then the PR and CI.
+> **STATE (19 Nov):** all of D1 to D8, the test gaps and the length estimate are done and tested; PR #238 is waiting for CI (the first run found MSVC-only test assumptions, fixed). Nothing OPEN.
 
 Unit U34a of the native port (WIRING-DOSSIER 5, item 1). A public C API over `SongRenderer` so a host (wasm bridge, Android JNI, desktop) can render a song without C++ types.
 Branch `n1/u34a`, cut from `native` at 9e88d36. Stems (U34b), `dispatch()` routing (D2 / D3), live playback and the wasm bridge are NOT in this unit.
@@ -121,3 +121,11 @@ Built. A second `Seq` (same song, vars, options and fixed random seed) is steppe
 
 ### Can a song reach a pump effect slot? No.
 `FxHost::entryFromSlot` maps a song's slot only through `fx_type_of(type)`, which knows the page's 34 wasm effects (0..33) and 93..95; pump kinds (200 and up) are made only by hosts that ask `FxHost::plan` for them (`fxpump.cpp`), and neither `FxBank` nor the render API does. `FxBank::event` (FXC, FXV) only moves values of slots that exist. So `pump_new` / `pump_io` (process-global) are never touched by a render and two handles on two threads share nothing mutable (TSan clean in the verifier's three-thread runs). The header's claim stands, with its reason now stated; a host needs no "one render at a time" rule. (If a future unit lets a song name a pump effect, this changes: the header says so.)
+
+### Measurements for this fix round
+- Release GCC 13: full ctest 157 of 157 passed (1 skipped by design: `pumpsynth_refused`); sanitizers (`-DTHUNDER_SANITIZE=ON`, ASan + UBSan + LSan): 157 of 157 (same skip). Both before the last test-only edits (allocator-overhead tolerance, effects guards for MSVC); `ctest -R render` was re-run after them.
+- The six CLI WAVs of `render-compare.sh` ELECTRO (plain, `--fx`, `--master`; page and core timing) are byte-identical (`cmp`) before and after.
+- Mutations re-applied by hand: M3 (pad copy aliasing the host buffer) fails `render_api_fix` ("the render equals the one made from arrays that stayed"); M8 (drain before the end allowed) fails four checks of the same test.
+- D8 before / after: with the cap removed, the sanitizer build of `render_api_fix` stops at `ModulatedAllpass.h:140: index -7 out of bounds for type 'float [4800]'` (192 kHz); with it, 96 / 192 / 384 kHz run clean.
+- ELECTRO 48 kHz effects are unchanged (the CLI WAVs above, and the committed goldens in the full ctest).
+- MSVC: no tfx (the DSP libraries are not built there), so the read and fx-malloc cases of `render_api_oom` are compiled out there.
