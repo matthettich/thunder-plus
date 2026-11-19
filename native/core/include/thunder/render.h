@@ -67,6 +67,11 @@ extern "C" {
 #define THUNDER_RENDER_MAX_PAD_BYTES ((size_t)512 << 20)
 #define THUNDER_RENDER_MAX_PAD_FRAMES ((int64_t)1 << 28)
 #define THUNDER_RENDER_PADS 256          /* pad numbers 0 .. 255 */
+#define THUNDER_RENDER_INSTS 64          /* instrument numbers 0 .. 63 (a variation is keyed by one) */
+#define THUNDER_RENDER_MAX_VARIATIONS 4096   /* variations a handle holds */
+#define THUNDER_RENDER_ROUTE_SAMPLER 0   /* a pad's notes play its rendered buffer (or a variation of it): the default */
+#define THUNDER_RENDER_ROUTE_LIVE 1      /* a live-engine pad (the kit entry's `live`): its player is not wired in yet: its notes are SILENT and counted (stats.notes_live) */
+#define THUNDER_RENDER_ROUTE_SF 2        /* a SoundFont pad (the kit entry's `sf`): no host input for a font yet: its notes are SILENT and counted (stats.notes_sf) */
 
 typedef struct thunder_render thunder_render;
 
@@ -100,6 +105,13 @@ typedef struct thunder_render_stats {
   int32_t peak_voices;
   uint32_t voices_refused, voice_track_full, voice_auto_dropped, mix_auto_dropped;
   uint64_t seq_dropped;
+  /* appended in the dispatch step (D2 / D3); a host built against the older header never sees them */
+  int32_t notes_live;           /* notes of a THUNDER_RENDER_ROUTE_LIVE pad (silent) */
+  int32_t notes_sf;             /* notes of a THUNDER_RENDER_ROUTE_SF pad (silent) */
+  int32_t notes_var;            /* notes that played a MUT / GEN variation (a subset of notes_played) */
+  int32_t notes_var_missing;    /* MUT / GEN notes whose variation was not handed in with set_variation (silent: never the base pad) */
+  int32_t notes_unshaped;       /* notes of a sliced (slc > 1) or synced instrument with MUT / GEN / CUT / RES / DEC: the pad as it is, as the page's varRec returns it */
+  int32_t events_ignored;       /* sequencer events this renderer has no route for (eng, chc, tempo, the MIDI events) */
 } thunder_render_stats;
 
 /* Parses the song and builds the renderer. song: the app's song JSON (a .thunder file's bytes or a song message), not NUL-terminated, copied.
@@ -115,6 +127,19 @@ int thunder_render_set_pad(thunder_render* r, int pad, const float* l, const flo
 
 /* The kit entry of a pad (the page's coreKitV(): {choke, syn, rel}); defaults 0, 0, 0. Only before the first read or drain. choke: 0 .. 255; syn: 0 / 1; rel: finite, 0 .. 60 s. */
 int thunder_render_set_pad_kit(thunder_render* r, int pad, int choke, int syn, double rel);
+
+/* Which player a pad's notes are for (the page's coreKitV() `live` / `sf`): THUNDER_RENDER_ROUTE_*. Default SAMPLER. Only before the first read or drain.
+   LIVE and SF pads are silent for now (see the defines; the notes are counted), however a buffer is set for them: a host that wants the page's own fallback for a
+   live pad (its rendered twin) leaves the pad on SAMPLER. A pad number outside 0 .. 255 or a route outside 0 .. 2: E_ARG. */
+int thunder_render_set_pad_route(thunder_render* r, int pad, int route);
+
+/* Hands in a MUT / GEN variation the host rendered (the page's `vbuf`, keyed ii:vk:pad): instrument `ii` (0 .. 63), `kind` 'g' (GEN) or 'm' (MUT), `num` (0 .. 255,
+   the command's value), pad (0 .. 255), `frames` MONO samples of `l` (finite) recorded at `sample_rate` Hz (finite, 1 .. 1e6). COPIED. The same key replaces; frames == 0
+   (l may be NULL) removes. Variations count against THUNDER_RENDER_MAX_PAD_BYTES with the pads, one pad's frame limit applies, and at most THUNDER_RENDER_MAX_VARIATIONS
+   are held (E_LIMIT). Only before the first read or drain. A MUT / GEN note whose variation is missing is SILENT and counted (stats.notes_var_missing), never the base
+   pad: a host whose page would play the base pad (no variation could be made) hands in the pad's own samples. A note of a sliced (slc > 1) or synced instrument plays the
+   pad as it is and never looks for a variation. A pad changed with set_pad does NOT drop its variations (the page does; a host that wants that removes them). */
+int thunder_render_set_variation(thunder_render* r, int ii, int kind, int num, int pad, const float* l, int64_t frames, double sample_rate);
 
 /* The length of the output in frames after the trim (an unknown-length render cut at max_frames: max_frames). With opts.use_frames = 1 it is `frames`, known from the start. Otherwise it is -1
    until the render has reached its end (the song's length depends on its voices' tails, which only running the render can tell), and the

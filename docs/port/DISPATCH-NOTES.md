@@ -1,6 +1,6 @@
 # DISPATCH NOTES: wiring step 3 (D2 routing, D3 noShape)
 
-**IN THE MIDDLE OF: step 1 done (tables below); step 2 / 3 code next (variation input, route input, noShape from the song's instrument); tests after.**
+**IN THE MIDDLE OF: code written (route + variation inputs, noShape from the instrument, stats, test_render_dispatch.cpp), NOT BUILT YET; the "before" gate numbers are being measured with the old binary (copy in /tmp/dsp-before).**
 
 Branch `n1/dispatch` (from `native` 33d136d). JS lines are from this checkout (`core/core-processor.js`, `index.html`); C++ lines are `native/core/src/render/render.cpp` before this change.
 
