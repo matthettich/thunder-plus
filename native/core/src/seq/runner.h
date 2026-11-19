@@ -35,6 +35,9 @@ class SeqRunner {
   // play(): a new sequencer. hold = false, lr / ls unset, ended = false; skips kept.
   void start(Seq* s) { seq_ = s; hold_ = false; hasLr_ = false; lr_ = 0; ls_ = 0; ended_ = false; }
   void hold() { hold_ = true; }              // 'hold': EXACT STOP armed (also with no sequencer: the JS sets the flag anyway)
+  // rebind: the host adopted a successor Seq (SeqSession / takeOver): re-point at it. The pointer only: hold, lr / ls, ended and skips are kept.
+  // A runner that has no sequencer (stopped, held, never started) stays without one: an adoption must not bring a stopped sequencer back.
+  void rebind(Seq* s) { if (seq_) seq_ = s; }
   void stop() { seq_ = nullptr; }            // 'stop': this.seq = null
   Seq* seq() const { return seq_; }
   bool holdArmed() const { return hold_; }

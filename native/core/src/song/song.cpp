@@ -119,7 +119,7 @@ int Song::phrasesWithContent() const {
   return n;
 }
 
-bool Song::load(const char* text, size_t len, JsonError* err) {
+bool Song::load(const char* text, size_t len, JsonError* err, bool pageS) {
   if (!doc.parse(text, len, err)) return false;
   root = doc.root();
   auto bad = [&](const char* m) { if (err) { err->offset = 0; err->msg = m; } return false; };
@@ -183,11 +183,11 @@ bool Song::load(const char* text, size_t len, JsonError* err) {
   for (int i = 0; i < kNPH; i++) {
     const int16_t* p = phrase(i); bool empty = true;
     if (p) for (int k = 0; k < kPhraseRows * kRW; k++) if (p[k] >= 0) { empty = false; break; }
-    if (empty) plen[(size_t)i] = (int16_t)dlen;
+    if (empty && !pageS) plen[(size_t)i] = (int16_t)dlen;   // normSong's, at LOAD only; pageS (the page's own S after an edit): the length the user gave an empty phrase stays (edit-plen)
   }
 
   // instruments, mixer
-  { const Json J = S.get("insts"); for (int i = 0; i < kNI; i++) readInst(J.isArr() ? J.at((size_t)i) : Json(), i, insts[i]); }
+  { const Json J = S.get("insts"); for (int i = 0; i < kNI; i++) { readInst(J.isArr() ? J.at((size_t)i) : Json(), i, insts[i]); instMissing[i] = pageS && J.isArr() && !J.at((size_t)i).isObj(); } }
   { const Json J = S.get("mix");
     for (int i = 0; i < kSongNT; i++) { SongMix m; const Json o = J.isArr() ? J.at((size_t)i) : Json();
       if (o.isObj()) { m.vol = cInt(o.get("vol"), 224, 0, 255); m.trim = cInt(o.get("trim"), 128, 0, 255); m.pan = cInt(o.get("pan"), 128, 0, 255);

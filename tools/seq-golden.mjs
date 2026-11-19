@@ -99,7 +99,150 @@ function liveCases() {
   }
   return !bad;
 }
+// EDIT CASES (docs/port/SEQ-LIVE-DESIGN.md Part B ruling 7; goldens native/tests/golden/seq-edit-*.json, read by ctest `seq_takeover`; --edit).
+// The song is edited IN PLACE between steps of a RUNNING makeSeq, by the processor's own message handler (core-processor.js `msg`: the 'patch'
+// and 'bpm' / 'loop' cases, which core/seq-core.js carries as ThunderCore.prototype.msg, called with a stub `this`), never by hand. Each edit is
+// written here as a function over a copy of the song; the patch ops the page would send (coreDiff's [key, index, item] / [key, 'len', n] /
+// [key, 'del'] / [key, null, value]) are computed from the difference, stored in the golden, and replayed by the C++ test through the same
+// grammar. `after: N` = after the N-th step (as the live cases). The base song of a case (a variant of ELECTRO) is stored the same way (baseOps).
+// Row = {t, evs, clk}, as the live goldens. The golden is the JS's result: the C++ sequencer, taking over at the same step, must equal it.
+const EDIT_DIR = LIVE_DIR;
+const clone = o => JSON.parse(JSON.stringify(o)), deq = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+function diffOps(a, b) {
+  const ops = [];
+  for (const k of Object.keys(a)) if (!(k in b)) ops.push([k, 'del', null]);
+  for (const k of Object.keys(b)) {
+    if (!(k in a)) { ops.push([k, null, b[k]]); continue; }
+    if (deq(a[k], b[k])) continue;
+    if (Array.isArray(a[k]) && Array.isArray(b[k])) {
+      for (let i = 0; i < Math.min(a[k].length, b[k].length); i++) if (!deq(a[k][i], b[k][i])) ops.push([k, i, b[k][i]]);
+      for (let i = a[k].length; i < b[k].length; i++) ops.push([k, i, b[k][i]]);
+      if (b[k].length < a[k].length) ops.push([k, 'len', b[k].length]);
+    } else ops.push([k, null, b[k]]);
+  }
+  return ops;
+}
+const ph = (S, row, t) => { const c = S.chains[S.song[row][t]]; return c ? c[0][0] : -1; };   // the first phrase of the chain at (row, track)
+const FXN = n => ['ARP','ARC','CHA','DEL','GRV','GGR','HOP','INS','KIL','OFF','NTH','RET','REP','RND','RNL','PSL','PBN','PVB','SED','TPO','TSP','VOL','PIT','FIN','PLY','STA','PAN','TIC','WOB','FXO','FLX','GAT','RTG',
+  'CCA','CCB','CCC','CCD','PGM','BYP','CSL','DIR','MUT','GEN','PRB','FXS','FXV','SCA','SCG','CUT','RES','DEC','FDI','TRM','APN','TVL','TPN','STP','LPB','PDL','ONE','MPB','MAT','CND','NUD','RTV','SLC','XFD','MAC',
+  'LK1','LK2','LK3','LK4','PRT','END','JMP','FLY','ATK','REL','TCH','SKP','CHD'].indexOf(n);
+const setCmd = (S, pid, y, col, name, v) => { const r = S.phrases[pid][y]; r[6 + 2 * col] = FXN(name); r[7 + 2 * col] = v; };
+const setNote = (S, pid, y, n) => { S.phrases[pid][y][0] = n; if (S.phrases[pid][y][5] < 0) S.phrases[pid][y][5] = 0; };
+// variants of ELECTRO (base edits)
+const vChain = S => { for (let t = 0; t <= 9; t++) { const cid = S.song[0][t]; if (cid < 0) continue; S.chains[cid][1] = [ph(S, 1, t), 0]; S.chains[cid][2] = [ph(S, 2, t), 3]; } };
+const vPlen = S => { for (let t = 0; t <= 9; t++) { const p = ph(S, 0, t); if (p >= 0) S.plen[p] = 16; } };
+const vPerf = S => {
+  S.perf = { sc: [{ n: 'A', v: { 'vol:0': 90, 'pan:1': 40, 'vol:2': 200 } }, { n: 'B', v: { 'vol:0': 230, 'pan:1': 210, 'cut:3': 80 } }, { n: '', v: {} }, { n: '', v: {} }], xa: 0, xb: 1, xf: 60,
+    mac: [{ n: 'M1', v: 100, tg: [{ id: 'vol:3', lo: 20, hi: 240 }, { id: 'pan:4', lo: 0, hi: 255 }] }, { n: 'M2', v: 30, tg: [{ id: 'res:2', lo: 0, hi: 200 }] }].concat(Array.from({ length: 6 }, (_, i) => ({ n: 'M' + (i + 3), v: 0, tg: [] }))),
+    lk: { '1': ['vol:5', null, null, null] }, lfo: { '0': [{ id: 'pan:0', sh: 0, rt: 3, dp: 60 }], '2': [{ id: 'cut:2', sh: 1, rt: 4, dp: 90 }] } };
+  S.parts = [{ mix: S.mix.map(m => [m.vol, m.pan]), fx: {}, insts: S.insts.slice(0, 16).map(I => ({ ...I, tsp: 0 })) }, { mix: S.mix.map(m => [200, 100]), fx: {}, insts: S.insts.slice(0, 16).map(I => ({ ...I, tsp: 5 })) }];
+  const p0 = ph(S, 0, 0), p1 = ph(S, 0, 1), p2 = ph(S, 1, 0);
+  setCmd(S, p0, 9, 0, 'XFD', 200); setCmd(S, p1, 12, 0, 'MAC', 0x1F); setCmd(S, p2, 4, 0, 'PRT', 2); setCmd(S, p2, 20, 0, 'PRT', 1); setCmd(S, p1, 20, 1, 'LK1', 0); setCmd(S, p0, 25, 0, 'XFD', 20);
+  for (let r = 1; r < 8; r++) { const q = ph(S, r, 0); if (q >= 0 && S.phrases[q]) { setCmd(S, q, 9, 1, 'XFD', 100 + 17 * r); setCmd(S, q, 25, 1, 'XFD', 30 + 11 * r); } }   // a perfDiff every few steps, so an edit of a resting value would be heard
+};
+const vSeed = S => {
+  const p0 = ph(S, 0, 0), p1 = ph(S, 0, 1), p2 = ph(S, 0, 2), p3 = ph(S, 1, 0), p4 = ph(S, 2, 0);
+  setCmd(S, p0, 0, 2, 'SED', 7); setCmd(S, p0, 8, 0, 'PRB', 0x80); setCmd(S, p1, 4, 0, 'NTH', 0x02); setCmd(S, p1, 12, 0, 'NTH', 0x13); setCmd(S, p2, 6, 0, 'CND', 0x20); setCmd(S, p2, 10, 0, 'RND', 0x24);
+  setCmd(S, p3, 5, 0, 'CHA', 0x90); setCmd(S, p3, 14, 0, 'TCH', 0x90); setCmd(S, p3, 18, 0, 'SKP', 1); setCmd(S, p4, 3, 0, 'NTH', 0x04); setCmd(S, p4, 16, 0, 'RNL', 0x13); setCmd(S, p4, 24, 0, 'JMP', 20);
+};
+const vFx = S => { const p0 = ph(S, 0, 0), p1 = ph(S, 0, 1); S.tfx[0][1] = { type: 'flex', on: true }; S.tfx[1][0] = { type: 'sgate', on: true }; S.tfx[1][2] = { type: 'retrig', on: true };
+  setCmd(S, p0, 3, 0, 'FLX', 0x20); setCmd(S, p0, 9, 0, 'GAT', 0x30); setCmd(S, p1, 5, 0, 'RTG', 0x40); setCmd(S, p1, 13, 0, 'FXV', 0x10); setCmd(S, p0, 17, 0, 'FXO', 0x31); };
+const vNth = S => {   // NTH on rows s and s + 16 (different values) of the first three phrases, which loop
+  const P = [ph(S, 0, 0), ph(S, 0, 1), ph(S, 0, 2)];
+  P.forEach((p, k) => [[2 + 2 * k, 0x21], [18 + 2 * k, 0x32]].forEach(([y, v], i) => { setNote(S, p, y, 58 + 3 * k + i); setCmd(S, p, y, 0, 'NTH', v); }));
+  P.forEach((p, k) => [[4 + 2 * k, 0x03], [20 + 2 * k, 0x02]].forEach(([y, v], i) => { setNote(S, p, y, 66 + k + i); setCmd(S, p, y, 1, 'CND', v); }));
+};
+const vJmp = S => {   // no loop: each of tracks 0 to 2 plays its phrase 6 times in a chain; the master's chain ends in a phrase with a JMP to song row 1 (fresh() on every track: new NTH counters), where the same chains play again
+  const m = S.chains[S.song[0][32]][0][0]; for (let t = 0; t < 3; t++) { const cid = S.song[0][t], p = S.chains[cid][0][0]; S.chains[cid] = Array.from({ length: 6 }, () => [p, 0]); S.song[1][t] = cid; }
+  S.chains[S.song[0][32]] = [[m, 0], [m, 0], [m, 0], [m, 0], [4000, 0]]; S.phrases[4000] = Array.from({ length: 32 }, () => [-1, -1, -1, -1, -1, 0, -1, -1, -1, -1, -1, -1]); S.plen[4000] = 32; setCmd(S, 4000, 5, 0, 'JMP', 1); };
+const vTch = S => { setCmd(S, ph(S, 0, 32), 0, 0, 'TCH', 0x40); for (let r = 0; r < 4; r++) for (let t = 0; t < 3; t++) { const p = ph(S, r, t); if (p < 0) continue; for (let y = 0; y < 32; y += 2) { setNote(S, p, y, 55 + ((y + t) % 9)); setCmd(S, p, y, 2, 'CHA', 0x90); } } };
+const vTic = S => { const p = ph(S, 0, 0); setCmd(S, p, 3, 0, 'TIC', 0); setCmd(S, p, 17, 0, 'TIC', 0); setCmd(S, ph(S, 1, 0), 3, 0, 'TIC', 0); setCmd(S, ph(S, 2, 0), 3, 0, 'TIC', 0); };
+const vGrv = S => { setCmd(S, ph(S, 0, 0), 2, 0, 'GGR', 0x24); setCmd(S, ph(S, 1, 0), 2, 0, 'TIC', 0); };
+const vDlen = S => { for (let r = 1; r < 4; r++) for (let t = 0; t < 3; t++) { const cid = S.song[r][t]; if (cid >= 0) S.chains[cid][0] = [-1, 0]; } };
+const compose = (...fs) => S => fs.forEach(f => f(S));
+const EDIT_SONGS = [
+  { id: 'notes', edits: [{ after: 40, fn: S => { setNote(S, ph(S, 2, 0), 4, 67); setNote(S, ph(S, 1, 0), 9, 70); } }, { after: 70, fn: S => { setNote(S, ph(S, 1, 1), 14, 55); } }] },
+  { id: 'chain', base: vChain, edits: [{ after: 70, fn: S => { S.chains[S.song[0][0]][1][1] = 7; } }, { after: 100, fn: S => { S.chains[S.song[0][0]][0][1] = -5; S.chains[S.song[0][1]][2] = [ph(S, 5, 1), 2]; } }, { after: 150, fn: S => { S.chains[S.song[0][2]][2] = null; } }] },
+  { id: 'cell-cleared', edits: [{ after: 100, fn: S => { S.song[3][0] = -1; } }, { after: 300, fn: S => { S.song[3][0] = S.song[2][0]; S.song[10][2] = -1; } }, { after: 400, fn: S => { for (let t = 0; t <= 9; t++) S.song[14][t] = -1; } }] },
+  { id: 'chain-nulled', base: vChain, edits: [{ after: 40, fn: S => { S.chains[S.song[0][0]] = null; } }, { after: 70, fn: S => { S.chains[S.song[0][1]].length = 1; } }] },
+  { id: 'plen', base: vPlen, edits: [{ after: 100, fn: S => { S.plen[ph(S, 3, 0)] = 2; } }, { after: 111, fn: S => { S.plen[ph(S, 3, 0)] = 1; S.phrases[ph(S, 3, 1)] = null; } }, { after: 200, fn: S => { S.plen[ph(S, 6, 0)] = 32; } }] },
+  { id: 'instrument-removed', edits: [{ after: 30, fn: S => { S.insts[3] = null; S.insts.length = 12; } }] },
+  { id: 'ntr', edits: [{ after: 50, fn: S => { S.ntr = 8; } }, { after: 200, fn: S => { S.ntr = 16; } }] },
+  { id: 'bpm', edits: [{ after: 30, fn: S => { S.bpm = 150; } }, { after: 60, bpm: 97.3 }, { after: 120, bpm: 131 }, { after: 130, shift: 0.21 }] },
+  { id: 'smute', edits: [{ after: 20, fn: S => { S.smute[0] = 5; S.smute[1] = 0xFF; S.smuteM = [2]; } }, { after: 70, fn: S => { S.smute[2] = 0x3; } }] },
+  { id: 'bus', edits: [{ after: 30, fn: S => { S.chainOn[4] = true; S.chainPatch.modules[1].params.track = 5;   /* the patch's bus moves from track 4 (index 3, which has no notes) to track 5 (index 4, which has): the running JS keeps its PLAY's bus plan (D1) */ } }] },
+  { id: 'tfx', base: vFx, edits: [{ after: 40, fn: S => { S.tfx[0][1] = null; S.tfx[1][2] = { type: 'flex', on: true }; } }, { after: 80, fn: S => { S.tfx[1][0] = null; } }] },
+  { id: 'perf', base: vPerf, edits: [{ after: 5, fn: S => { S.perf.sc[1].v['vol:0'] = 10; } }, { after: 40, fn: S => { S.perf.sc[0].v['vol:0'] = 33; S.perf.lfo['0'][0].dp = 200; S.perf.lfo['2'][0].rt = 6; } },
+    { after: 60, fn: S => { delete S.perf.sc[1].v['pan:1']; S.perf.mac[0].v = 250; S.perf.mac[1].v = 250; S.perf.mac[1].tg.push({ id: 'vol:6', lo: 5, hi: 6 }); } }, { after: 100, fn: S => { S.perf.lk['1'] = ['vol:5', 'pan:5', null, null]; S.perf.lfo['3'] = [{ id: 'pan:3', sh: 2, rt: 2, dp: 80 }]; S.parts[1].insts[0].tsp = 9; S.parts[1].mix[2] = [10, 10]; } }] },
+  { id: 'seed', base: vSeed, edits: [{ after: 60, fn: S => { setCmd(S, ph(S, 0, 1), 20, 0, 'NTH', 0x03); } }, { after: 200, fn: S => { setCmd(S, ph(S, 0, 1), 4, 0, 'RNL', 0); setCmd(S, ph(S, 0, 0), 2, 1, 'SED', 9); } }, { after: 300, fn: S => { setCmd(S, ph(S, 0, 1), 4, 0, 'NTH', 0x02); setCmd(S, ph(S, 1, 0), 14, 0, 'TCH', 0x40); } }] },
+  { id: 'seed-loop', base: vSeed, loop: { y0: 0, y1: 3 }, max: 700, edits: [{ after: 40, fn: S => { setCmd(S, ph(S, 1, 0), 11, 0, 'PRB', 0x40); } }, { after: 150, loop: { y0: 1, y1: 4 } }, { after: 260, fn: S => { S.song[1][0] = -1; } }, { after: 340, fn: S => { S.song[1][0] = S.song[0][0]; } }] },
+  { id: 'sect', mode: 'sect', optx: { track: 0, sect: 0 }, base: vChain, max: 400, edits: [{ after: 20, fn: S => { setNote(S, ph(S, 0, 0), 6, 64); } }, { after: 60, fn: S => { S.chains[S.song[0][0]][1] = [ph(S, 4, 0), 0]; } }, { after: 130, fn: S => { S.plen[ph(S, 1, 0)] = 3; } }] },
+  { id: 'phrase', mode: 'phrase', optx: { track: 0, phrase: -1 }, base: S => {}, phraseOf: S => ph(S, 0, 0), max: 300, edits: [{ after: 20, fn: S => { setNote(S, ph(S, 0, 0), 10, 66); } }, { after: 50, fn: S => { S.plen[ph(S, 0, 0)] = 5; } }] },
+  { id: 'cmds', base: S => { withCommands({ song: S }); }, edits: [{ after: 25, fn: S => { S.bpm = 99; setCmd(S, ph(S, 1, 0), 3, 0, 'ARP', 0x47); } }, { after: 90, bpm: 100 }, { after: 200, fn: S => { setNote(S, ph(S, 7, 0), 2, 60); } }] },
+  // F2 to F4 of verify-244 (the carried run state, and the song fields that are live or stay the PLAY's), added 19 Nov. Counters that live on across an edit:
+  // NTH on rows s and s+16 of a looping phrase (the slot key), a JMP (fresh(): the track's NTH generation) before the edit, the master column's TCH.
+  { id: 'nth-dense', base: vNth, loop: { y0: 0, y1: 1 }, max: 700, edits: [{ after: 100, fn: S => { setNote(S, ph(S, 0, 0), 10, 62); } }, { after: 230, fn: S => { setNote(S, ph(S, 0, 1), 12, 63); } }, { after: 360, fn: S => { setNote(S, ph(S, 0, 2), 14, 64); } }, { after: 500, fn: S => { setNote(S, ph(S, 0, 0), 11, 65); } }] },
+  { id: 'nth-restart', base: compose(vNth, vJmp), max: 700, edits: [{ after: 100, fn: S => { setNote(S, ph(S, 0, 0), 10, 62); } }, { after: 175, fn: S => { setNote(S, ph(S, 0, 1), 12, 63); } }, { after: 210, fn: S => { setNote(S, ph(S, 0, 2), 14, 64); } }, { after: 245, fn: S => { setNote(S, ph(S, 0, 0), 11, 65); } }, { after: 300, fn: S => { setNote(S, ph(S, 0, 1), 13, 66); } }] },
+  { id: 'master-tch', base: vTch, edits: [{ after: 60, fn: S => { for (let y = 0; y < 32; y += 2) setCmd(S, ph(S, 2, 0), y, 2, 'CHA', 0xFF); } }, { after: 130, fn: S => { for (let y = 0; y < 32; y += 2) setCmd(S, ph(S, 3, 1), y, 2, 'CHA', 0xFF); } }] },
+  { id: 'ticks', base: vTic, edits: [{ after: 40, fn: S => { S.ticks = 4; } }, { after: 90, fn: S => { S.ticks = 9; } }] },
+  { id: 'lpb', edits: [{ after: 30, fn: S => { S.lpb = 6; } }, { after: 80, fn: S => { S.lpb = 3; } }] },
+  { id: 'grv', base: vGrv, edits: [{ after: 40, fn: S => { S.ticks = 4; } }, { after: 70, fn: S => { setNote(S, ph(S, 1, 0), 9, 70); } }] },
+  { id: 'dlen', base: vDlen, edits: [{ after: 20, fn: S => { S.dlen = 8; } }, { after: 70, fn: S => { S.dlen = 4; } }] },
+];
+function editHarness() {
+  const sctx = vm.createContext({ console, registerProcessor() {}, AudioWorkletProcessor: class { constructor() { this.port = { postMessage() {}, onmessage: null }; } }, sampleRate: 48000, currentTime: 0, currentFrame: 0 });
+  vm.runInContext(fs.readFileSync(path.join(ROOT, 'core/seq-core.js'), 'utf8') + '\n;globalThis.__u = { makeSeq, coreSeeded, corePlain, coreNum, ThunderCore,' +
+    ' load(s, v){ S = s; if (v){ if ("vtrk" in v) vtrk = v.vtrk; if ("NSLOT" in v) NSLOT = v.NSLOT; if (v.TFX) TFX = v.TFX; } busPlanH = null; busPlanVal = null; } };', sctx, { filename: 'seq-core.js' });
+  return { ctx: sctx, U: sctx.__u };
+}
+function editCases() {
+  const H = editHarness(), sha = t => crypto.createHash('sha256').update(t).digest('hex'), j0 = JSON.parse(fs.readFileSync(path.join(ROOT, 'sounds/ELECTRO.thunder'), 'utf8')); let bad = false, wrote = [];
+  // the handler under test is the processor's own: the text of its 'patch' case must be in core-processor.js too (the harness runs core/seq-core.js's copy)
+  const cp = fs.readFileSync(path.join(ROOT, 'core/core-processor.js'), 'utf8'), sc = fs.readFileSync(path.join(ROOT, 'core/seq-core.js'), 'utf8');
+  for (const key of ["case 'patch': {", "case 'bpm': if (this.seq) this.seq.bpm = d.v; return;", "case 'loop': if (this.seq) this.seq.setLoop(d.l || null); return;"]) {
+    const a = cp.indexOf(key), b = sc.indexOf(key); if (a < 0 || b < 0) { console.log(`FAIL handler text missing: ${key}`); bad = true; }
+  }
+  const patchBody = t => t.slice(t.indexOf("case 'patch': {"), t.indexOf("case 'vars':"));
+  if (patchBody(cp) !== patchBody(sc)) { console.log('FAIL the patch handler of core-processor.js and core/seq-core.js differ'); bad = true; }
+  for (const C of EDIT_SONGS) {
+    const base = clone(j0.song), orig = clone(j0.song); if (C.base) C.base(base);
+    const baseOps = diffOps(orig, base), mode = C.mode || 'song', opt = { ...(C.optx || {}) }; if (C.phraseOf) opt.phrase = C.phraseOf(base); if (C.loop) opt.loop = C.loop;
+    // the edits as patch ops, against a shadow copy of the song as the sequencer has it
+    let shadow = clone(base); const eds = C.edits.map(e => { if (!e.fn) return { ...e }; const nx = clone(shadow), r = e.fn(nx); void r; const ops = diffOps(shadow, nx); shadow = nx; return { after: e.after, patch: ops }; });
+    const vars = vm.runInContext('({vtrk:false,NSLOT:16,TFX:{}})', H.ctx);
+    H.U.load(vm.runInContext('(' + JSON.stringify(base) + ')', H.ctx), vars);
+    H.ctx.__c = { mode, max: C.max || 20000, o: opt, eds: clone(eds) };
+    const rows = vm.runInContext(`(() => { const d = __c, o = d.o; return __u.coreSeeded(() => { const out = [];
+      const sq = __u.makeSeq(S, d.mode, {row:o.row || 0, loop:o.loop || null, once:!o.loop, sim:true, track:o.track, sect:o.sect, phrase:o.phrase});
+      const P = Object.create(__u.ThunderCore.prototype); P.chase = null; P.seq = sq;
+      for (let n = 0; sq.alive() && n < d.max; n++){ const r = sq.step(); const row = {t:__u.coreNum(r.t), evs:r.evs.map(__u.corePlain)};
+        row.clk = {time:__u.coreNum(sq.time), base:__u.coreNum(sq.base), bt:__u.coreNum(sq.bt), btT:__u.coreNum(sq.btT), bpm:__u.coreNum(sq.bpm)};
+        out.push(row);
+        for (const e of d.eds) if (e.after === n + 1){
+          if (e.patch) P.msg({op:'patch', ops:e.patch}); if (e.bpm != null) P.msg({op:'bpm', v:e.bpm}); if (e.loop) P.msg({op:'loop', l:e.loop});
+          if (e.shift != null){ sq.base += e.shift; sq.time += e.shift; if (sq.btT != null) sq.btT += e.shift; } } }
+      return out; }); })()`, H.ctx);
+    const text = rows.map(r => JSON.stringify(r)).join('\n') + '\n', counts = {}; for (const r of rows) for (const e of r.evs) counts[e.type] = (counts[e.type] || 0) + 1;
+    const now = { song: 'sounds/ELECTRO.thunder', mode, opt, baseOps, edits: eds, rows: rows.length, events: Object.values(counts).reduce((a, b) => a + b, 0), counts, sha256: sha(text),
+      rowHashes: rows.map(r => crypto.createHash('sha256').update(JSON.stringify(r)).digest('hex').slice(0, 12)) };
+    // the edits must have done something: a case whose edits change no event would prove nothing. Compare with the same run without the edits.
+    H.U.load(vm.runInContext('(' + JSON.stringify(base) + ')', H.ctx), vars); H.ctx.__c.eds = [];
+    const plain = vm.runInContext(`(() => { const d = __c, o = d.o; return __u.coreSeeded(() => { const out = [];
+      const sq = __u.makeSeq(S, d.mode, {row:o.row || 0, loop:o.loop || null, once:!o.loop, sim:true, track:o.track, sect:o.sect, phrase:o.phrase});
+      for (let n = 0; sq.alive() && n < d.max; n++){ const r = sq.step(); out.push(JSON.stringify({t:__u.coreNum(r.t), evs:r.evs.map(__u.corePlain)})); } return out; }); })()`, H.ctx);
+    let differ = 0; for (let i = 0; i < rows.length; i++) if (JSON.stringify({ t: rows[i].t, evs: rows[i].evs }) !== plain[i]) differ++;
+    now.rowsChangedByTheEdits = differ;
+    if (process.env.SEQ_EDIT_DUMP) { fs.mkdirSync(process.env.SEQ_EDIT_DUMP, { recursive: true }); fs.writeFileSync(path.join(process.env.SEQ_EDIT_DUMP, `seq-edit-${C.id}.jsonl`), text); }   // (debugging: the JS rows, one a line)
+    const gf = path.join(EDIT_DIR, `seq-edit-${C.id}.json`);
+    if (UPDATE || !fs.existsSync(gf)) { fs.writeFileSync(gf, JSON.stringify(now) + '\n'); wrote.push(C.id); console.log(`wrote ${path.relative(ROOT, gf)}: ${now.rows} rows, ${now.events} events, ${differ} rows differ from the unedited run`); continue; }
+    const was = JSON.parse(fs.readFileSync(gf, 'utf8')), ok = was.sha256 === now.sha256 && deq(was.edits, now.edits) && deq(was.baseOps, now.baseOps); if (!ok) bad = true;
+    console.log(`${ok ? 'ok  ' : 'FAIL'} edit-${C.id}: ${now.rows} rows, ${differ} differ from the unedited run${ok ? '' : ' (first differing row ' + now.rowHashes.findIndex((h, k) => h !== was.rowHashes[k]) + ')'}`);
+  }
+  fs.writeFileSync(path.join(EDIT_DIR, 'seq-edit-cases.json'), JSON.stringify({ ids: EDIT_SONGS.map(c => c.id) }) + '\n');
+  return !bad;
+}
 const LIVE_OK = liveCases();
+if (process.argv.includes('--edit')) { const ok = editCases(); process.exit(LIVE_OK && ok ? 0 : 1); }
 if (process.argv.includes('--live-only')) process.exit(LIVE_OK ? 0 : 1);
 const TIMING = process.argv.includes('--timing');
 const CORE = process.argv.includes('--core');   // run each case on the audio thread (core/seq-core.js) instead: the same goldens must match

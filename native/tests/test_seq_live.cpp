@@ -145,6 +145,14 @@ static void testRunner() {
     p = r.pump(now2, none, f.evs.data(), 4096, &f.st, [](const SeqEvent*, int, const SeqStep&) {});
     CHECK(p.skipped && r.skips() == 1 && std::fabs(f.sq->time() - (now2 + 0.02)) < 1e-9, "skip just past 0.03: time moves to now + 0.02 (time %.9f, now2 + 0.02 = %.9f)", f.sq->time(), now2 + 0.02);
     r.start(f.sq.get()); CHECK(r.skips() == 1, "start() keeps skips, as the JS (never reset)"); }
+  { // verify-243 F3 (a): an unstepped Seq whose t0 is behind now (the page sends t0 a little behind currentTime): the first pump must NOT skip
+    Fix f(1, true, 0); const double now = 10; f.sq->setTime(now - 1); SeqRunner r; r.start(f.sq.get()); std::vector<double> ts;
+    const SeqPump p = r.pump(now, 0.001, f.evs.data(), 4096, &f.st, [&](const SeqEvent*, int, const SeqStep& s) { ts.push_back(s.t); });
+    CHECK(!p.skipped && r.skips() == 0 && !ts.empty() && ts[0] == now - 1, "an unstepped Seq at now - 1: no skip, the first step at t0 (skipped %d, skips %llu, first t %f)", (int)p.skipped, (unsigned long long)r.skips(), ts.empty() ? -1.0 : ts[0]); }
+  { // verify-243 F3 (b): a one-row song with a 1-step phrase looping, hold armed: the highest step never goes down, so it is never held (the JS's edge rule; F2)
+    Fix f(1, false, 0, 1); SeqRunner r; r.start(f.sq.get()); r.hold(); Got g; bool held = false;
+    blocks(f, r, 0, 128, 100, 100, &g, [&](const SeqPump& p) { held |= p.held; return p.held; });
+    CHECK(!held && g.t.size() >= 100 && r.seq() != nullptr && r.holdArmed(), "one row, 1-step phrase looping, hold armed: never held (%zu steps played)", g.t.size()); }
   { // at most 3 steps a block; a long lead fills over later blocks
     Fix f(1, true, 0); SeqRunner r; r.start(f.sq.get()); std::vector<int> per;
     for (int b = 0; b < 5; b++) { const SeqPump p = r.pump(0, 1.0, f.evs.data(), 4096, &f.st, [](const SeqEvent*, int, const SeqStep&) {}); per.push_back(p.steps); }
