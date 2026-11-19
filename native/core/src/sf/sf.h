@@ -26,6 +26,11 @@ constexpr size_t kMaxZones = (size_t)1 << 18;            // zones of all presets
 constexpr size_t kMaxModPool = (size_t)1 << 19;          // modulator records of all zones together (FluidR3 GM: 26265)
 constexpr size_t kMaxWork = 200000;                   // preset zone x instrument zone pairs looked at while building the zones (FluidR3 GM: 10027; this is 20x)
 constexpr size_t kMaxSampleFrames = (size_t)1 << 25;     // frames one decoded sample may have (33 million: 12 minutes at 44.1 kHz); more is refused, as the JS's failed allocation / decode gives its 1-sample silence
+// Parse memory: the tables parse() builds (zones + generators + modulators) are the part of a font that can be far larger than the file (a zone pair copies its generators and modulators: a 191 KB font at kMaxWork was 205 MB).
+// They may hold at most kParseTableFloor + kParseTableFactor x (the font's own size) bytes (the tables' element sizes times counts; vector growth may transiently hold about 3x that), else kParseTooBig.
+// FluidR3 GM: its tables are 2.6 MB for a 140 MB file (0.02x); the test font fits the floor.
+constexpr size_t kParseTableFactor = 32;
+constexpr size_t kParseTableFloor = (size_t)8 << 20;
 constexpr int kMaxListDepth = 32;
 constexpr uint32_t kMinStreamRate = 4000, kMaxStreamRate = 192000;   // an Ogg stream's own sample rate outside this, and a context rate (DecodeOpts::ctxRate) outside it, is refused (silent 1-frame fallback)
 constexpr uint32_t kMinHdrRate = 400, kMaxHdrRate = 192000;           // a sample header's rate (SF2 spec: 400..50000) outside this is refused the same way; the page plays at hdr.sr / sr, so an absurd one is an absurd pitch                        // nested LIST chunks
@@ -79,7 +84,7 @@ const Preset* sf_preset(const Font& f, double bank, double prog);               
 
 // ---- decoded samples ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 struct Pcm {                // sfSample's {d, sr, ls, le, k}: `ls` / `le` in frames of `d` (doubles: the JS keeps them as numbers)
-  std::vector<float> d; double sr = 48000, ls = 0, le = 0, k = 1; bool ok = false, present = false, tooBig = false;   // present: sfSample ran for it (SF.smp has the key); ok: it decoded (false: the JS's 1-sample silence fallback)
+  std::vector<float> d; double sr = 48000, ls = 0, le = 0, k = 1; bool ok = false, present = false, tooBig = false, overWork = false;   // present: sfSample ran for it (SF.smp has the key); ok: it decoded (false: the JS's 1-sample silence fallback)
 };
 struct DecodeOpts {
   bool pageTail = false;    // reproduce Chrome's decodeAudioData losing the last frame (at most half a short block) of a one-audio-page Ogg stream (default off: libvorbis and stb_vorbis keep every frame; U32-NOTES.md "The missing frames")
@@ -87,6 +92,12 @@ struct DecodeOpts {
   uint64_t presetBytes = (uint64_t)256 << 20;   // budget of one prepare_preset call (decoded PCM bytes): over it the preset is refused (kPrepOverPresetBudget). The real font's whole-keyboard piano is 191 MB (208 MB at 48 kHz)
   uint64_t fontBytes = (uint64_t)512 << 20;     // budget of all presets prepared from one font at once: the host keeps a counter in `fontUsed` (prepare_preset adds, the host subtracts a PresetPcm's bytes when it drops it)
   uint64_t* fontUsed = nullptr;
+  // WORK budgets (prepare_preset): every decode, kept or thrown away, is charged in work units = the stream's input bytes + the frames the decoder produced (+ the frames a resampler writes). A preset that needs more is
+  // refused (kPrepOverWorkBudget), whatever it keeps. The byte budgets above only count what is KEPT, so they cannot stop a font whose samples decode in full and are then discarded (a hostile granule, NaN, a failed resample).
+  // About 47 million units are one second on the reference machine, so the limits are about 6 s / 12 s of decode work. FluidR3 GM, the largest preset (whole keyboard) needs kWorkMeasured (see test_sf unit): the limits are 2x that or more.
+  uint64_t presetWork = (uint64_t)1 << 28;      // work units of one prepare_preset call (268 million)
+  uint64_t fontWork = (uint64_t)1 << 29;        // work units of all presets prepared from one font at once: the host keeps a counter in `fontWorkUsed` (prepare_preset adds a kept preset's PresetPcm::work, the host subtracts it when it drops it)
+  uint64_t* fontWorkUsed = nullptr;
   size_t maxBytes = 0;                          // (decode_sample: refuse a sample that would be larger than this many bytes; 0 = no limit; prepare_preset sets it from the budgets)
   double ctxRate = 0;       // 0: keep each sample's own rate (default). >0: resample to this rate as the page's decodeAudioData does (sf_decode.cpp: SF3 only; see U32-NOTES.md "sample rate")
 };
@@ -96,12 +107,12 @@ bool sf_resample(std::vector<float>& d, double from, double to);
 void decode_sample(const Font& f, uint32_t i, const DecodeOpts& o, Pcm& out);
 // A preset's samples (sfPreparePreset): the zones' samples and each stereo sample's partner. `byIndex` is sized to the font's sample count; an entry that is not wanted has present == false.
 struct PresetPcm {
-  std::vector<Pcm> byIndex; uint64_t bytes = 0;
+  std::vector<Pcm> byIndex; uint64_t bytes = 0, work = 0;   // work: the decode work units charged for it (the host subtracts it from `fontWorkUsed` when it drops the PresetPcm)
   const Pcm* get(uint32_t i) const { return i < byIndex.size() && byIndex[i].present ? &byIndex[i] : nullptr; }   // the JS's SF.smp.get / D.smp[i]: undefined when not decoded
 };
 // `keys`: null = every zone of the preset (the whole keyboard); else 128 flags, and only the zones that cover a flagged key (any velocity) are decoded, with their stereo partners. A key whose zones are not
 // decoded plays nothing (the live note refuses it, the render returns 0): the host lists the keys its song and its pad use (U32-NOTES.md "Memory"). Same samples, same bits, less RAM.
-enum PrepareStatus { kPrepOk = 0, kPrepNoPreset = 1, kPrepOverPresetBudget = 2, kPrepOverFontBudget = 3 };
+enum PrepareStatus { kPrepOk = 0, kPrepNoPreset = 1, kPrepOverPresetBudget = 2, kPrepOverFontBudget = 3, kPrepOverWorkBudget = 4 };
 PrepareStatus prepare_preset(const Font& f, const Preset* pr, const DecodeOpts& o, PresetPcm& out, const uint8_t* keys = nullptr);   // control thread; allocates; the host calls it before the pad plays
 
 // ---- the pad's own render (sfRender: C-4, velocity 100, held for `hold`, then released; mono) -----------------------------------------------------------------------------------------------------------------

@@ -1,3 +1,5 @@
+**IN THE MIDDLE OF (branch n3/u32-d1): follow-up D1, "decode work budget" (code and tests written; measuring before/after, mutations, full ctest, then the PR). See "Follow-up: decode work budget" at the end of the file.**
+
 # U32: the SoundFont / GM player (SF2 / SF3 parse, Vorbis decode, zones and modulators, layered zones, the pad render, the live note)
 
 Branch `n3/u32` (from `native`). Code: `native/core/src/sf/` (+ `native/core/sf/CMakeLists.txt`, `third_party/prepare-stb.sh`). Tests: `native/tests/test_sf.cpp` (`compare`, `unit`, `chrome`, `ram`), `test_sf_fuzz.cpp`, `rt_harness.cpp` (case `run_sf`), `native/tools/sf-ref.mjs` (Node reference), `sf-chrome.mjs` (the page's decode and render in Chrome), `sf-mutate.py`.
@@ -144,3 +146,6 @@ Date 2026-11-18, GCC 2-core machine, `nice`, `-j2`, head commit of this round (c
 - Chrome is the only browser measured (153, Linux); the resampler is a fit.
 - Only the Linux x86-64 hashes of the GM font are committed.
 - No adapter into the mixer / bridge (out of scope).
+
+## Follow-up: decode work budget
+(in progress; filled in as the work goes)

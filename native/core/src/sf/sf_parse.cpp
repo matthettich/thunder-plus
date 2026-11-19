@@ -148,6 +148,9 @@ ParseStatus parse(const uint8_t* data, size_t n, Font& F, bool copy) {
         if (F.zones.size() >= kMaxZones) return kParseTooBig;
         std::vector<Mod> im = defmods; mergeInto(im, imod.data() + iz.gm0, iz.gm1 - iz.gm0); mergeInto(im, imod.data() + lz.m0, lz.m1 - lz.m0);
         if (F.mods.size() + im.size() + pm.size() > kMaxModPool) return kParseTooBig;
+        { int ng = 0; for (int op = 0; op < kGenN; op++) ng += (int)(gset >> op & 1);   // the tables' own bytes after this zone: bounded by the font's size (kParseTableFactor), not only by counts
+          const uint64_t tb = ((uint64_t)F.zones.size() + 1) * sizeof(Zone) + ((uint64_t)F.gens.size() + (uint64_t)ng) * sizeof(GenV) + ((uint64_t)F.mods.size() + im.size() + pm.size()) * sizeof(Mod);
+          if (tb > (uint64_t)kParseTableFloor + (uint64_t)kParseTableFactor * n) return kParseTooBig; }
         Zone Z; Z.klo = klo; Z.khi = khi; Z.vlo = vlo; Z.vhi = vhi; Z.s = lz.t;
         Z.gOff = (uint32_t)F.gens.size(); Z.gN = 0; for (int op = 0; op < kGenN; op++) if (gset >> op & 1) { F.gens.push_back(GenV{(uint8_t)op, gv[op]}); Z.gN++; }
         Z.imOff = (uint32_t)F.mods.size(); Z.imN = (uint32_t)im.size(); F.mods.insert(F.mods.end(), im.begin(), im.end());
