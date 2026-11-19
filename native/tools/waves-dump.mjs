@@ -71,6 +71,14 @@ for (const type of Object.keys(D0.MODULES).sort()) {
   add({ name: `mod/${type}/switches`, patch: patchFor(D0.MODULES, type, Object.assign(defaults(m), switchesOn(m))), telemetry: tel });
   for (const sr of [44100, 96000]) add({ name: `mod/${type}/default@${sr}`, sr, patch: patchFor(D0.MODULES, type, defaults(m)), telemetry: tel });
 }
+// over: every non-library module with its parameters OUTSIDE the declared range (high, low, alternating). The JS runs on the value as set (waves-worklet.js addModule / setParam: io.p = io.base), so must the native engine
+// (U31: it used to hold them to the range). A NaN of the JS's arithmetic has the machine's sign / payload, so for these rows every NaN is hashed as the canonical 0x7fc00000 (test_waves.cpp does the same).
+const OVER_SKIP = new Set(['plaits', 'elements', 'marbles', 'tides']);
+const overSet = (m, which) => { const o = {}; let i = 0; for (const [k, d] of Object.entries(m.params || {})) { const [, mn, mx] = d, span = mx - mn, hi = mx + span * .5 + 1, lo = mn - span * .5 - 1; o[k] = which === 'high' ? hi : which === 'low' ? lo : (i++ % 2 ? lo : hi); } return o; };
+for (const type of Object.keys(D0.MODULES).sort()) {
+  const m = D0.MODULES[type]; if (!m || !m.process || SKIP.has(type) || m.effect === true || OVER_SKIP.has(type)) continue;
+  for (const set of ['high', 'low', 'alt']) add({ name: `over/${type}/${set}`, patch: patchFor(D0.MODULES, type, Object.assign(defaults(m), overSet(m, set))), telemetry: m.probe === true });
+}
 // "factory-like" patches: a subtractive voice with an effect chain, a Plaits voice, an FM voice into a reverb, an additive voice into a delay, and a sequenced one
 const P = (id, type, params) => ({ id, type, params: params || {} }), C = (a, b, fb) => Object.assign({ from: a, to: b }, fb ? { fb: true } : {});
 const voice = (extra, tailCab, finalFrom) => ({ modules: [P('h', 'hostIn'), P('v', 'vco', { wave: 0 }), P('f', 'vcf', { cutoff: .55, res: .45 }), P('e', 'adsr'), P('g', 'vca'), ...extra, P('o', 'out')],
@@ -105,18 +113,40 @@ function run(c) {
     for (const ev of c.events) if (ev[0] === b) {
       const [, op, ...a] = ev;
       if (op === 'noteOn') E.noteOn(a[0], a[1]); else if (op === 'noteOff') E.noteOff(a[0]); else if (op === 'allOff') E.allNotesOff();
-      else if (op === 'param') E.setParam(a[0], a[1], a[2]); else if (op === 'connect') E.connect([a[0], a[1]], [a[2], a[3]], !!a[4]); else if (op === 'disconnect') E.disconnect([a[0], a[1]], [a[2], a[3]]);
+      else if (op === 'param') E.setParam(a[0], a[1], a[2] === 'nan' ? NaN : a[2]); else if (op === 'connect') E.connect([a[0], a[1]], [a[2], a[3]], !!a[4]); else if (op === 'disconnect') E.disconnect([a[0], a[1]], [a[2], a[3]]);
     }
     E.process(128); L.set(E.bus(c.bus), b * 128); R.set(E.busR(c.bus), b * 128);
   }
   if (E.quality !== 'full') throw new Error('shed to draft: ' + c.name);
   return { L, R };
 }
+function hashCanon(arrs) {
+  let h = 0x811c9dc5 >>> 0; const tmp = new Float32Array(1), u = new Uint8Array(tmp.buffer);
+  for (const a of arrs) for (let i = 0; i < a.length; i++) { tmp[0] = a[i] !== a[i] ? NaN : a[i]; if (tmp[0] !== tmp[0]) { u[0] = 0; u[1] = 0; u[2] = 0xc0; u[3] = 0x7f; } for (let k = 0; k < 4; k++) { h ^= u[k]; h = Math.imul(h, 0x01000193) >>> 0; } }
+  return h.toString(16).padStart(8, '0');
+}
+// nan: setParam(NaN) on one parameter of a non-library module at block 6 (JSON has no NaN: the event carries the string "nan", native reads it as NaN). Only parameters where the JS output is finite and the JS does
+// not throw are kept (the rest is "no crash" in the sweep, test_nan_sweep.cpp). Up to 2 per module type: first those whose output differs from the run without the NaN, then any. Plain hashes (the output is finite).
+{
+  const fin = a => { for (let i = 0; i < a.length; i++) if (!Number.isFinite(a[i])) return false; return true; };
+  for (const type of Object.keys(D0.MODULES).sort()) {
+    const m = D0.MODULES[type]; if (!m || !m.process || SKIP.has(type) || m.effect === true || OVER_SKIP.has(type) || type === 'harm') continue;
+    const mk = (name, events) => Object.assign({ sr: 48000, maxVoices: 4, seed: 7, blocks: 40, events, bus: 1, telemetry: false }, { name, patch: patchFor(D0.MODULES, type, defaults(m)), telemetry: m.probe === true });
+    let h0; try { const r = run(mk('nan/base', NOTES)); h0 = H.hashFloats([r.L, r.R]); } catch (e) { continue; }
+    const good = [];
+    for (const k of Object.keys(m.params || {})) {
+      const c = mk(`nan/${type}/${k}`, [...NOTES, [6, 'param', 'b', k, 'nan']]); let r; try { r = run(c); } catch (e) { continue; }
+      if (!fin(r.L) || !fin(r.R)) continue; const h = H.hashFloats([r.L, r.R]); good.push({ c, differs: h !== h0 });
+    }
+    good.sort((x, y) => (y.differs ? 1 : 0) - (x.differs ? 1 : 0));
+    for (const g of good.slice(0, process.env.NAN_ALL ? 999 : 2)) cases.push(g.c);
+  }
+}
 const out = []; const outDir = process.argv.find((a, i) => i > 1 && !a.startsWith('--'));
 if (outDir) fs.mkdirSync(outDir, { recursive: true });
 for (const c of cases) {
-  let r; try { r = run(c); } catch (e) { out.push(Object.assign({}, c, { hash: 'throws', error: String(e && e.message || e) })); continue; }
-  const h = H.hashFloats([r.L, r.R]);
+  let r; try { r = run(c); } catch (e) { if (c.name.startsWith('over/')) { console.log('over-range row left out, the JS throws:', c.name, String(e && e.message || e)); continue; } out.push(Object.assign({}, c, { hash: 'throws', error: String(e && e.message || e) })); continue; }
+  const h = c.name.startsWith('over/') ? hashCanon([r.L, r.R]) : H.hashFloats([r.L, r.R]);
   out.push(Object.assign({}, c, { hash: h }));
   if (outDir) { const b = Buffer.alloc(r.L.length * 8); Buffer.from(r.L.buffer).copy(b, 0); Buffer.from(r.R.buffer).copy(b, r.L.length * 4); fs.writeFileSync(path.join(outDir, c.name.replace(/[\/@]/g, '_') + '.f32'), b); }
 }

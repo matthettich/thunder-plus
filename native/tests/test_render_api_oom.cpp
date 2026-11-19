@@ -124,7 +124,7 @@ static void readFailures(const char* name, const std::string& song, const thunde
   long total = 0;   // how many allocations a whole read makes
   { thunder_render* r = mk(song, o); installPads(r, ps); g_calls = 0; g_failAt = 0; g_armed = true; while (thunder_render_read(r, a.data(), b.data(), 4096) > 0) {} g_armed = false; total = g_calls; thunder_render_free(r); }
   std::printf("%s: a whole read makes %ld allocations\n", name, total);
-  CHECK("a read allocates (the effects make their plans)", total > 0);
+  if (total == 0) { std::printf("%s: a read allocates NOTHING (since U31 the effects allocate at preparation), so no allocation can fail inside it: nothing to inject\n", name); return; }
   int dead = 0, survived = 0, deadFx = 0; (void)deadFx;
   const int64_t live0 = g_live, heap0 = heapInUse();
   for (int i = 0; i < nProbe && total > 0; i++) {

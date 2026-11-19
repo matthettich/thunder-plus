@@ -25,6 +25,10 @@ inline void xs(uint32_t& r) { r ^= r << 13; r ^= r >> 17; r ^= r << 5; }
 inline double jmin3(double a, double b, double c) { return jmin(jmin(a, b), c); }
 
 const int CNV_KIND[14] = {0, 0, 0, 1, 0, 2, 3, 4, 5, 6, 7, 7, 7, 7};   // room, plate, spring, gated, reverse, cab, telephone, song IR
+// The JS indexes these tables with the (clamped, rounded) type, which is NaN for a NaN parameter: CNV_KIND[NaN] is undefined (no kind matches) and CNV_ROOM[Math.min(NaN, 9)] is undefined.
+// Native: a type that is not an integer 0..13 gets kind -1 (matches nothing) and the room row 0; never an out-of-range index (an (int) cast of NaN is undefined behaviour).
+inline int cnvKind(double t) { return (t >= 0 && t <= 13) ? CNV_KIND[(int)t] : -1; }
+inline int cnvRoomIdx(double t) { return (t >= 0 && t <= 13) ? (int)(t < 9 ? t : 9) : 0; }
 const double CNV_ROOM[10][11] = {{6.2, 4.4, 2.9, .8, 4, .4, .035, 1500, 1.1, .9, 50}, {30, 21, 13, .86, 3, .25, .1, 400, 1.3, .85, 35},
   {8, 5.5, 4, .93, 4, .3, .02, 3000, 1, 1.15, 60}, {0, 0, 0, 0, 0, 0, .006, 15000, .7, 1.25, 140},
   {60, 30, 32, .9, 3, .2, .25, 150, 1.5, .7, 28}, {0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 60},
@@ -110,7 +114,7 @@ class Convolve : public Module {
     const double type = clamp(js_round(p[0]), 0, 13);
     const double v1 = u01(p[1]), v2 = clamp(p[2], .1, 10), v3 = clamp(p[3], 0, .25), v4 = u01(p[4]), v5 = u01(p[5]);
     const SongIR* obj = nullptr; bool hasId = false; uint64_t id = 0;
-    if (CNV_KIND[(int)type] == 7) { const SongIR* const* T = ctx.irs; obj = T ? T[(int)type - 10] : nullptr; hasId = obj != nullptr; id = obj ? obj->id : 0; }
+    if (cnvKind(type) == 7) { const SongIR* const* T = ctx.irs; obj = T ? T[(int)type - 10] : nullptr; hasId = obj != nullptr; id = obj ? obj->id : 0; }
     if (w[0] != type || w[1] != v1 || w[2] != v2 || w[3] != v3 || w[4] != v4 || w[5] != v5 || wobj != obj || whasId != hasId || wid != id) {
       if (n - chg >= .15 * sr) chg0 = n;   // a new run of changes starts
       w[0] = type; w[1] = v1; w[2] = v2; w[3] = v3; w[4] = v4; w[5] = v5; wobj = obj; whasId = hasId; wid = id; chg = n;
@@ -338,7 +342,7 @@ class Convolve : public Module {
   }
   // Works out the IR: its length, the early reflections (written now), and everything the tail needs.
   void setup() {
-    const double srr = sr; const int kind = CNV_KIND[(int)G.type]; const double* R = CNV_ROOM[(int)jmin(G.type, 9)];
+    const double srr = sr; const int kind = cnvKind(G.type); const double* R = CNV_ROOM[cnvRoomIdx(G.type)];
     const double sc = js_pow(2, 2 * G.size - 1), tone = G.tone, erly = G.early, RT = G.decay, pre = js_round(G.pre * srr);
     G.kind = kind; G.n = 0; G.E[0] = G.E[1] = 0; G.ready = 0; G.s = 0; G.p = 0; G.c = 0; G.sub = 0; G.pre0 = (int)pre;
     for (int c = 0; c < 2; c++) {
@@ -468,7 +472,7 @@ class Convolve : public Module {
   }
   // Scale the reflections to their share of the energy (Early: up to twice it; Cab and Telephone: the room's level).
   void earlyScale() {
-    const int pre = G.pre0; const int end = (int)G.erEnd; const int kind = G.kind; const double* R = CNV_ROOM[(int)jmin(G.type, 9)]; const double erly = G.early;
+    const int pre = G.pre0; const int end = (int)G.erEnd; const int kind = G.kind; const double* R = CNV_ROOM[cnvRoomIdx(G.type)]; const double erly = G.early;
     double e = 0; for (int c = 0; c < 2; c++) { F32& A = G.ir[c]; for (int i = pre; i < end; i++) e += A[i] * A[i]; }
     e *= .5;
     const bool small = kind == 5 || kind == 6; const double share = R[5], wantE = small ? G.rm * G.rm * G.et * share / (1 - share) : G.et * share / (1 - share) * (2 * erly) * (2 * erly);

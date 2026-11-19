@@ -20,9 +20,9 @@ PY
   else echo "mutation '$name': does not build"; bad=$((bad+1)); fi
   mv "$f.orig" "$f"; touch "$f"
 }
-run "sort: the queue starts from the last module" engine.cpp 'for (size_t i = 0; i < n; i++) if (indeg[i] == 0) q.push_back((int)i);' 'for (size_t i = n; i-- > 0;) if (indeg[i] == 0) q.push_back((int)i);'
-run "sort: leftovers appended in reverse" engine.cpp 'for (size_t i = 0; i < n; i++) if (!inOrder[i]) order.push_back(mods[i].get());' 'for (size_t i = n; i-- > 0;) if (!inOrder[i]) order.push_back(mods[i].get());'
-run "sort: a feedback cable counts for the order" engine.cpp '      if (c.fb) continue;
+run "sort: the queue starts from the last module" graph.h 'for (size_t i = 0; i < n; i++) if (indeg[i] == 0) q.push_back((int)i);' 'for (size_t i = n; i-- > 0;) if (indeg[i] == 0) q.push_back((int)i);'
+run "sort: leftovers appended in reverse" graph.h 'for (size_t i = 0; i < n; i++) if (!inOrder[i]) order.push_back(mods[i].get());' 'for (size_t i = n; i-- > 0;) if (!inOrder[i]) order.push_back(mods[i].get());'
+run "sort: a feedback cable counts for the order" graph.h '      if (c.fb) continue;
       adj[' '      adj['
 run "feedback guard: the ceiling constant" engine.cpp 'else x = 1 + js_tanh(x - 1);' 'else x = 1 + js_tanh(x - 1.5);'
 run "feedback guard: the lower bound" engine.cpp 'if (!(x > -1 && x < 1)) {' 'if (!(x > -1 && x < 1.5)) {'
@@ -32,13 +32,13 @@ run "voice steal: the same pitch is not reused" engine.cpp 'if (rows[(size_t)j].
 run "voice steal: the newest overall" engine.cpp 'if (rows[(size_t)j].age < rows[(size_t)a].age) a = j; i = a;' 'if (rows[(size_t)j].age > rows[(size_t)a].age) a = j; i = a;'
 run "module constant: the VCO level" wmods.cpp '(2 * t - 1 - blep(t, dt)) * .8' '(2 * t - 1 - blep(t, dt)) * .81'
 run "module constant: the ADSR decay rate" wmods.cpp 'level_ += (s - level_) * dt / jmax(d, 1e-4) * 6;' 'level_ += (s - level_) * dt / jmax(d, 1e-4) * 7;'
-run "engine: a mono source into a voice is not split" engine.cpp 'const double g = c.srcAudio ? 1 / N : 1; if (b)' 'const double g = 1; if (b)'
+run "engine: a mono source into a voice is not split" graph.h 'const double g = c.srcAudio ? 1 / N : 1; if (b)' 'const double g = 1; if (b)'
 run "effect map: the saturation drive range" wmods.cpp 'o[0] = .2 + u01(p[0]) * .8; o[1] = u01(p[1]); o[2] = u01(p[2]); o[3] = u01(p[3]); }' 'o[0] = .2 + u01(p[0]) * .6; o[1] = u01(p[1]); o[2] = u01(p[2]); o[3] = u01(p[3]); }'
 run "engine: a released voice never sleeps" engine.cpp 'if (row.quiet >= quietFor) row.offAt = voices_.now - hold;' 'if (row.quiet >= quietFor * 100) row.offAt = voices_.now - hold;'
 run "live: the latency is one sample short" waves.h 'kLiveLatency = 127' 'kLiveLatency = 126'
 run "live: a block is not cut at an event" live.cpp 'if (npend_ > 0 && pend_[0].at < end) end = pend_[0].at;
       if (end > hostEnd) break;' 'if (end > hostEnd) break;'
-run "hostile guard: parameters are not held in range" engine.cpp 'm.bp[(size_t)k] = v != v ? d.def : v < d.mn ? d.mn : v > d.mx ? d.mx : v;' 'm.bp[(size_t)k] = v;'
+run "raw parameters: a value is held inside its declared range" graph.h 'if (m.rawP) { for (int k = 0; k < m.wi->np; k++) m.bp[(size_t)k] = m.base[(size_t)k]; return; }' 'if (false) { return; }'
 nice cmake --build "$B" -j2 --target test_waves >/dev/null 2>&1
 echo "mutations: $ok killed, $bad not"
 [ $bad -eq 0 ]

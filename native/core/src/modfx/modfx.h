@@ -21,7 +21,7 @@ namespace thunder {
 namespace modfx {
 
 constexpr int kBlock = 128;     // the engine's BLOCK: every buffer is this long
-constexpr int kMaxPorts = 20;   // U30: the …waves Mixer has 16 inputs (it was 12)
+constexpr int kMaxPorts = 32;   // U31: the …chains Stereo mixer has 32 inputs (U30: 20, the …waves Mixer has 16; it was 12)
 
 // One of the song's impulse responses (the JS's globalThis.__thunderIR[i] = { L, R or null, sr, id }): read-only views; the host keeps the buffers alive and unchanged while a module may read
 // them (the JS's garbage collector does that there) and hands a NEW SongIR object whenever the song's IRs change (the module compares the pointer and `id`, as the JS compares the object and id).
@@ -41,6 +41,7 @@ struct Ctx {
   double startN = 0;            // ctx.transport.startN || 0
   // ctx.key(sck) (U21): the Source's mono buffer of 128 floats, nullptr for Self (sck rounds to 0 or less). nullptr here: the JS's `ctx.key` undefined (the same as Self).
   const float* (*key)(void* user, double sck) = nullptr; void* keyUser = nullptr;
+  mutable bool fail = false;            // a module the JS would have thrown in (the engine abandons the block and clears the buses, as the worklet's catch does); set by a module, read by the engine
   const SongIR* const* irs = nullptr;   // globalThis.__thunderIR: four entries (a null one is an empty slot), or null for "no IRs at all" (U20: Convolve's Song IR 1 to 4)
 };
 
@@ -84,6 +85,12 @@ class Module {
   // U30: the …waves engine makes a module's object ahead of its first block (the JS makes it at the first block, drawing its seeds then, in the order the modules first run). A module that draws
   // a seed in its constructor (nextSeed()) takes it again here, from the real counter, at the moment the JS's create() would have run; the constructor got a placeholder.
   virtual void arm(Seeds&) {}
+  // U31: called on the control thread, once the patch is prepared, with the module's parameter values as the patch sets them (the pump modules make their instances with them here, as the JS stages them at the first block).
+  virtual void prepare(const double* /*p*/) {}
+  // U31: called by the control thread regularly (ChainsEngine::serviceSpares): the pump modules keep a spare instance current here.
+  virtual void service() {}
+  // U31: called with prepare(), for a module that takes typed text (Expression): the text (UTF-16 units, len < 0: none set) it compiles NOW, so the audio thread never compiles it at its first block.
+  virtual void prepareText(const uint16_t* /*text*/, int /*len*/) {}
  protected:
   virtual void process(const IO& io, const Ctx& c) = 0;
  private:

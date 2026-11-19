@@ -94,7 +94,6 @@ struct WCtx : modfx::Ctx {
   Host* host = nullptr;
   const uint16_t* text = nullptr; int textLen = -1;   // io.inst.text (UTF-16 units); textLen < 0: undefined
   bool draft = false;                           // ctx.quality === 'draft'
-  mutable bool fail = false;                    // a module the JS would have thrown in (the block is abandoned, the buses cleared)
 };
 // The seeds a state is made with (the placeholder) and then armed with (the real counter).
 class WSeeds : public modfx::Seeds {

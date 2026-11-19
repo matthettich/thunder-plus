@@ -18,7 +18,9 @@ inline double bfTempo(const Ctx& c) { return jmax(truthy(c.tempo) ? c.tempo : 12
 // bfK: one-pole coefficient for a time constant in seconds
 inline double bfK(double t, double sr) { return 1 - js_exp(-1 / (sr * jmax(t, 1e-5))); }
 // an index into a table of n from a Number the JS clamps (a NaN would be a TypeError in the JS: 0 here)
-inline int tidx(double v, int n) { return v == v ? (int)clamp(v, 0, n - 1) : 0; }
+inline int tidx(double v, int n) { return v == v ? (int)clamp(v, 0, n - 1) : 0; }   // a safe index: NaN gives 0. Only where the NaN case has been dealt with before (see tbad / tget): the JS does NOT read element 0 for NaN
+inline bool tbad(double v) { return !(v == v); }   // v (already clamped and rounded) is NaN: the JS's table[NaN] is undefined
+inline double tget(const double* t, double v, int n) { return v == v ? t[(int)clamp(v, 0, n - 1)] : (double)NAN; }   // table[v] where the JS's undefined goes into arithmetic: NaN
 
 struct Svf { double z1 = 0, z2 = 0, lp = 0, bp = 0, hp = 0; };
 inline void bfStep(Svf& s, double x, double g, double k) {
