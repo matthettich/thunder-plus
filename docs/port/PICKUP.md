@@ -25,8 +25,27 @@ plan; sections 1 to 4 and 9), `HANDOVER.md` on `beta` (the web app, the owner's 
   every other upstream; start it when a compiling slot is free); **U36 Link / recording / inputs** (lead reviews); **Stage N2 (the Android shell)** and **N4 (Windows and Mac shells)**.
 - **Fastest route to something the owner can install:** N1 steps 10 and 11, then N2. U31 can run in parallel with a worker.
 
-## START HERE (19 Nov, 07:30): the state for a new chat. The dated sections below are the history, newest first after this one.
-**Say to a new chat:** "Pull thunder-plus, branch native, and continue from docs/port/PICKUP.md. Start at START HERE (19 Nov, 07:30)."
+## START HERE (19 Nov, 12:50): the state for a new chat. The dated sections below are the history, newest first after this one.
+**Say to a new chat:** "Pull thunder-plus, branch native, and continue from docs/port/PICKUP.md. Start at START HERE (19 Nov, 12:50)."
+(Written because weekly usage reached 90%: the owner may stop here. Nothing new is started until he says so.)
+
+- **Merged today:** #243, the sequencer on a live clock (setters, `SeqRunner`); verified after the merge (`review/verify-243`), no defect.
+- **#242, the SoundFont route into the renderer (`n1/render-sf`, head 730d787):** verified, the five findings fixed (leak, budget hole, the poly
+  cap shared by both pools, test gaps, stats); the branch was rebuilt as ONE clean commit on `native` (its history held build directories).
+  **Merge it when CI on 730d787 is all green** (8 of 9 were at 12:45) and `native` has had no code change since 0280be9.
+- **#244, Part B, the Song's lifetime (`n1/seq-takeover`, head e785d14):** CI green. **Do NOT merge yet:** its independent verifier was running
+  (report `docs/port/reviews/verify-244.md` on `review/verify-244`; if that branch is missing or the report is unfinished, run a new verifier
+  from the PR: the brief is thread and memory safety of the hand-over, `takeOver`'s cost, the `--edit` goldens, counter continuity, mutations),
+  and the lead reads `takeOver` and the registries himself. Its PR also carries the two runner tests verify-243 asked for (check they are there).
+- **Next, not started:** the chop unit (ruled: `docs/port/SEQ-LIVE-DESIGN.md`, last-but-one section; Sonnet). Then the old queue from item 4.
+- **For the owner:** reproduce the suspected web bug (Settings, sequencer "Audio thread" vs "Page (old)", an instrument with SLICES 4: on Audio
+  thread every note seems to start at the top of the sample). Steps were given in the chat of 19 Nov.
+- **Lessons of today:** every brief must say "add files by path, never `git add -A`; never commit a build directory" (`native/build*/` goes
+  into `.gitignore` with #242); check a PR's file count before merging; the server restarted at 12:19 and 12:36 and stopped the workers
+  (a stopped agent of the same chat can be resumed by its id).
+- Estimates unchanged: 33 of 37 units, about 55% of the port, about 65% of the way to an Android install.
+
+## START HERE of 19 Nov, 07:30 (now history): the state for a new chat. The dated sections below are the history, newest first after this one.
 
 **Merged into `native` (33 of 37 units; about 55% of the port, about 65% of the way to an Android install):**
 - U31, the ...chains engine (#227), after three verification rounds; U32, the SoundFont player (#226).
