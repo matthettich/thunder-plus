@@ -1,4 +1,4 @@
-IN THE MIDDLE OF: step 4 (gate). test_seq_takeover passes (24 golden runs, 17 edit goldens x2). Next: rt_harness guard on takeOver, measure takeOver, TSan + ASan runs, mutation checks, full ctest, PR.
+IN THE MIDDLE OF: nothing: all gates green locally (Release ctest 171 of 171, ASan+UBSan, TSan); PR open, waiting for CI.
 
 # SEQ TAKEOVER BUILD NOTES (Part B, `n1/seq-takeover`)
 
