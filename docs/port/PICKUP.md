@@ -14,7 +14,7 @@ plan; sections 1 to 4 and 9), `HANDOVER.md` on `beta` (the web app, the owner's 
 - Machine: 2 cores, about 7 GB free disk. At most two compiling workers; delete build directories of merged work. One git network operation at a time per
   worker; `gh` through REST only (GraphQL is blocked); no CI runs on a push to `native`, only on PRs.
 
-## Where the port stands: 31 of 37 units merged; about half of the whole port by the lead's estimate
+## Where the port stands: 33 of 37 units merged (19 Nov); about 55% of the whole port by the lead's estimate
 - **Stage N1 (playback core):** every worker-buildable unit is merged, pump effect hosting (U18) and Marbles / Tides included. **Left: steps 10 and 11, the
   lead's own: U34 (offline render API and pad renders through the core), U35 (MIDI scheduling), U37 (bridge and host switch: `core.wasm` behind the Settings
   switch).** Before wiring, the lead still has to read line by line: U07 (sequencer), U08 (voices), U09 (mixer), `fxpump.cpp`, `fxhost.cpp`.
@@ -24,6 +24,51 @@ plan; sections 1 to 4 and 9), `HANDOVER.md` on `beta` (the web app, the owner's 
   TODAY.md, and it needs the lead's review of its live part); **U32 SoundFont player** (UNBLOCKED 17 Nov 23:13: the owner chose **stb_vorbis** (public domain / MIT), pinned and fuzzed like
   every other upstream; start it when a compiling slot is free); **U36 Link / recording / inputs** (lead reviews); **Stage N2 (the Android shell)** and **N4 (Windows and Mac shells)**.
 - **Fastest route to something the owner can install:** N1 steps 10 and 11, then N2. U31 can run in parallel with a worker.
+
+## START HERE (19 Nov, 07:30): the state for a new chat. The dated sections below are the history, newest first after this one.
+**Say to a new chat:** "Pull thunder-plus, branch native, and continue from docs/port/PICKUP.md. Start at START HERE (19 Nov, 07:30)."
+
+**Merged into `native` (33 of 37 units; about 55% of the port, about 65% of the way to an Android install):**
+- U31, the ...chains engine (#227), after three verification rounds; U32, the SoundFont player (#226).
+- Wiring step 1, the offline song render C API (U34a: #237, its verification fixes #238): `native/core/include/thunder/render.h`.
+- Wiring step 3, `dispatch` routing and `noShape` (#239).
+- Web: `main` = `beta` = build 647; desktop v1.3.13 = build 647.
+
+**Open pull requests into `native` (both are finished work; each needs only a green CI run, then merge):**
+- **#240 `n1/render-v1`** (head eb14a20 = the work + `native` merged in at 07:25, so CI runs on the combined tree): the one defect of
+  `docs/port/reviews/verify-238-239.md` (replacing a variation at the limit held two copies), four test gaps, `set_pad` drops a pad's variations as the
+  page does, header corrections. Notes: `docs/port/U34A-NOTES.md`, "Follow-up after verify-238-239". The earlier head was green on nine jobs.
+- **#241 `n3/u32-d1`** (head 5a15f0c): U32's follow-up: a work budget for decodes, a stream cache, the granule read before decoding, parse memory
+  bounded (the hostile fonts: 12.2 s -> 0.001 s; GM font identical on all 394 preset lines). Notes: `docs/port/U32-NOTES.md`, "Follow-up: decode work
+  budget". Full ctest 157 of 157 in both configurations locally; CI was running at 07:15.
+- (#225 `n1/repin-pump` stays open and unmerged: it waits for pump-side changes, see the 11:30 section of 18 Nov.)
+- **Lesson of the night:** a green PR is green against the `native` it was tested with. When `native` has moved, merge `native` into the branch and let
+  CI run again before merging (U31's first combined run failed on a test whose premise another PR had changed).
+
+**The queue, in order (nothing below is started):**
+1. **Seq setters and the Song lifetime** (WIRING-DOSSIER D1: `time_`, `base_`, `bpm_` setters, RESUME shift, the catch-up skip, EXACT STOP hold; R1).
+   The lead's design; gate `seq-golden`. This is the next step on the path to live playback, and it is the top model's work.
+2. **The SoundFont route into the renderer** (`thunder_render_set_pad_sf`, an `SfPool` rendered into the mixer), then the live-engine route. Sonnet,
+   the lead reviews. Until then such notes are silent and counted (`notes_sf`, `notes_live`).
+3. **The lead must rule on chop:** the C++ sequencer follows `core/seq-core.js`, where `applyChop` is empty, while the page's own sequencer chops
+   sliced / synced notes (`docs/port/DISPATCH-NOTES.md`, choice 1). Which is the specification?
+4. **U34b stems** (Sonnet). 5. **U31 follow-ups PR** (round 3's F1 to F7; round 2's notes-only D6, D8, D10; `docs/port/reviews/verify-227-round3.md`).
+6. **U36** (Link, recording, inputs), **the full wasm target and U37** (the core behind a Settings switch in the web app), **U35** MIDI scheduling,
+   then **N2**, the Android shell.
+- To check before the host relies on it: can a real saved song's JSON exceed the render API's 16 MiB song limit (embedded samples)?
+- Noted for the master-chain unit: 1.5 dB lower RMS at 384 kHz than at 48 kHz (verify-238-239).
+
+**How to run it (what worked, 18 to 19 Nov):**
+- One Sonnet worker per job, in its own `git worktree` under `/home/claude/wt/`, at most two compiling at once (2 cores). Every brief: push every 20
+  minutes, a top line in the notes saying what it is in the middle of, park any problem after 45 minutes, CI green on every job before reporting,
+  never merge. A fresh worker with a tight brief beat resuming one with a very long transcript.
+- **An independent Sonnet verifier for every unit, before or right after merge.** It found real defects every single time (crashes on NaN, a thread
+  race, build breaks on five platforms, leaks, an out-of-bounds read in the reverb). The lead reads audio-thread and API-shape diffs himself.
+- **The server restarts about every hour and stops every worker.** An hourly check (a scheduled check-in in the chat) that resumes them is required:
+  without one, two workers once sat dead for two hours. A new chat cannot resume this chat's workers: it starts new ones from the branch and notes.
+- CI does not run on pushes to `native`, only on PRs; `gh` works through REST only. Gate rules: the section "Rules the lead set for gates" below.
+- The owner (22:59 on 18 Nov): keep working without him, keep the documentation current, watch for loops and rabbit holes, be economical with usage
+  (weekly usage was at 76%). He switches chats at a clean point; close the old chat afterwards (a chat left open kept pushing to the same branches).
 
 ## State at 00:10 on 18 Nov (the lead, same chat; check-ins are set for after each usage reset)
 - **Pump re-pin to e43ee10:** web = PR #224 into `beta` (build 643; CI green; verified SOUND WITH CONDITIONS, report `/home/claude/progress/verify-224.md`;
@@ -54,7 +99,7 @@ plan; sections 1 to 4 and 9), `HANDOVER.md` on `beta` (the web app, the owner's 
   its live part and a decision on the 16 library effect rows left out by name.
 - **Next:** merge U31 / U32 when verified; then the wiring per `docs/port/WIRING-DOSSIER.md` part 5 (U34a offline render C API first), U36, then N2.
 
-## State at 13:00 on 18 Nov: START HERE in a new chat (supersedes the pump and U31 / U32 lines above)
+## State at 13:00 on 18 Nov (the START HERE of 18 Nov, now history; supersedes the pump and U31 / U32 lines above)
 - **Web:** `main` = `beta` = build 645 (#229, #230): pump files byte-identical to 642, all FREEZE warm-up code removed. The pump re-pin waits on
   `docs/port/PUMP-REQUESTS.md`; PR #225 (native re-pin) stays open and HELD.
 - **U31 (PR #227, branch `n3/u31`) and U32 (PR #226, branch `n3/u32`) are each in a second round** after independent verification (both SOUND WITH
@@ -87,7 +132,7 @@ plan; sections 1 to 4 and 9), `HANDOVER.md` on `beta` (the web app, the owner's 
   and never force-pushes. Neither PR is merged. The lead reads `chains/clive.cpp` and `cengine.cpp` line by line once U31's worker reports.
 - Check-ins (this chat): a restart check at 14:05, then after each usage reset: 15:02, 20:07 on 18 Nov; 01:12, 06:17 on 19 Nov (Mountain).
 
-## State at 06:25 on 19 Nov (the lead; newest)
+## State at 06:25 on 19 Nov (the lead)
 - **U31, the ...chains engine, is MERGED (#227): 33 of 37 units.** Three verification rounds (reports in `docs/port/reviews/verify-227*.md`); the last
   CI run was on the branch with `native` merged in (308d2f1), nine jobs green. The first combined run had failed on one test, `render_api_oom`, whose
   premise (a read allocates) stopped holding because U31 moved the effects' allocations to preparation: the lead changed the test to pass when a read
@@ -99,7 +144,7 @@ plan; sections 1 to 4 and 9), `HANDOVER.md` on `beta` (the web app, the owner's 
 - **U32 follow-up:** worker afe6a6893a1478d8e on `n3/u32-d1`; last push c1aadff at 04:20; it was in its full ctest at 06:18, no PR yet.
 - **Owner's rule for this morning:** from 07:15 no new unit is started; running work finishes and is pushed; a fresh START HERE goes at the top.
 
-## State at 04:50 on 19 Nov (the lead; newest)
+## State at 04:50 on 19 Nov (the lead)
 - **Dispatch routing is MERGED (#239, native 9efae76)**, CI green on nine jobs; the lead read the `render.cpp` diff line by line. MUT / GEN notes play
   a variation buffer the HOST supplies (`thunder_render_set_variation`; missing: silent + `notes_var_missing`, never the base pad); live-engine and
   SoundFont pads are silent with a stat through `thunder_render_set_pad_route` (the live shell and `SfPool` are not wired into the renderer yet);
@@ -116,7 +161,7 @@ plan; sections 1 to 4 and 9), `HANDOVER.md` on `beta` (the web app, the owner's 
 - Queue: Seq setters + Song lifetime (dossier D1, the lead's), SoundFont route into the renderer, U34b stems, the U31 follow-ups PR (F1 to F7), U36,
   full wasm / U37, N2.
 
-## State at 03:50 on 19 Nov (the lead; newest)
+## State at 03:50 on 19 Nov (the lead)
 - **U31 (#227): round-3 independent verification = SOUND WITH CONDITIONS, nothing blocking** (`docs/port/reviews/verify-227-round3.md`): D1, D2, D3, D4,
   D5, D7, D9 verified fixed on 2515ab0; full ASan + UBSan ctest 165 of 168 passed, 0 failed, 3 intended skips; CI green on nine jobs; 561 chains and 383
   waves NaN cases against Node with no difference; goldens gained only `nan/*` rows. The lead read the pump spare hand-over (`cmods2.cpp`) and accepts it.
@@ -129,7 +174,7 @@ plan; sections 1 to 4 and 9), `HANDOVER.md` on `beta` (the web app, the owner's 
   notes (47a9c18) and was in its full ctest. Then PR, CI, the lead's line-by-line review.
 - Queue: Seq setters + Song lifetime (dossier D1, the lead's), U34b stems, the U31 follow-ups PR, U32's D1 follow-up, U36, full wasm / U37, N2.
 
-## State at 02:05 on 19 Nov (the lead; newest)
+## State at 02:05 on 19 Nov (the lead)
 - **U34a's verification fixes are MERGED (#238, native 33d136d)**, CI green on all nine jobs. The verifier's final verdict was SOUND WITH CONDITIONS
   (`docs/port/reviews/verify-237.md`, D1 to D8); all eight fixed with a test each, plus `thunder_render_length_estimate` (song end without voice
   tails: ELECTRO 4,921,832 against a real 4,983,424). Things that changed outside the API: the tfx `Fx::operator new` and two `layer_pe.cpp`
@@ -146,7 +191,7 @@ plan; sections 1 to 4 and 9), `HANDOVER.md` on `beta` (the web app, the owner's 
   (2515ab0) and is waiting for CI. After its report: an independent verifier again (round 3, short), then merge.
 - Queue after these: Seq setters + Song lifetime (dossier D1, the lead's), U34b stems, U32's D1 follow-up, U36, the full wasm target / U37, N2.
 
-## State at 23:05 on 18 Nov (the lead; newest)
+## State at 23:05 on 18 Nov (the lead)
 - **U34a is MERGED (#237, native 8e909ad)**, CI green on every platform. Its independent verifier (a0a273a4180a74c30; report so far
   `docs/port/reviews/verify-237.md`) has found defects D1 to D5 and is wrapping up: D1 `max_frames` rounds the output up to a 128-frame quantum; D2
   `drain` does not mark the handle started (set_pad still accepted afterwards); D3 the header's claim about builds without exceptions is false
@@ -163,7 +208,7 @@ plan; sections 1 to 4 and 9), `HANDOVER.md` on `beta` (the web app, the owner's 
 - **Checks set (Mountain, 19 Nov):** 00:05, 01:12, 02:15, 03:15, 04:15, 05:15, 06:17, 07:15 (the 07:15 one applies the 8 am rule).
 - Still queued after the above: U32's D1 follow-up (decode work budget), dossier D2 / D3 (`dispatch` routing, `noShape`), Seq setters, U36, N2.
 
-## State at 20:20 on 18 Nov (the lead; newest)
+## State at 20:20 on 18 Nov (the lead)
 - **U31 (#227, head 9549599) is NOT mergeable yet.** The round-2 independent verifier (still running at 20:20; its log so far is
   `docs/port/reviews/verify-227-round2.md`, the final one replaces it) found: **D1** `setParam(.., "type", NaN)` on `convolve` segfaults on the audio
   thread in chains and waves (the raw-parameter change hands NaN to an index; every defect found is a NaN through setParam, never from JSON);
@@ -178,7 +223,7 @@ plan; sections 1 to 4 and 9), `HANDOVER.md` on `beta` (the web app, the owner's 
 - Still queued: U32's D1 follow-up (work budget for decodes that are discarded), U34b (stems), then D2 / D3 of the dossier, Seq setters, U36, N2.
 - Check-ins set: 01:12 and 06:17 on 19 Nov.
 
-## State at 18:10 on 18 Nov (the lead; newest)
+## State at 18:10 on 18 Nov (the lead)
 - **U32 is MERGED (#226, native 4982eed): 32 of 37 units.** Round-2 independent verification: SOUND WITH CONDITIONS (`docs/port/reviews/verify-226-round2.md`):
   all seven conditions hold; ASan + UBSan full ctest 150 of 151 passed, 1 intended skip; CI green on 9 jobs. **One new defect, D1 (follow-up PR, not yet
   started):** `prepare_preset` does unbounded WORK on samples that decode in full and are then discarded (last granule 0; aliased headers): a 1.7 MB
@@ -189,7 +234,7 @@ plan; sections 1 to 4 and 9), `HANDOVER.md` on `beta` (the web app, the owner's 
   set pad buffers, read blocks, position / length for progress, free to cancel), the lead's decision: no callbacks across the wasm / JNI boundary.
 - **U31:** the worker is on the lead's review items A to K (resumed after the 16:35 server restart).
 
-## State at 15:30 on 18 Nov (the lead; newest)
+## State at 15:30 on 18 Nov (the lead)
 - **Web:** `main` = `beta` = build 647. 646 (#231): the side panel's instrument list above the PLAYING box. 647 (#233): two FlexCore NaN fixes (FLX E8 just
   under a beat; `rd` at buffer index 0) and the FX bar's Flex PATTERN row writing the FLX command under the cursor (the lead fixed a `false ?? x` bug in
   it at review). FLX 76 on the master was measured as working on both sequencers. Open: page-sequencer FLY 0D differs in headless Chrome (cause not
