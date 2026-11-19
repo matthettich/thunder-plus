@@ -87,6 +87,17 @@ plan; sections 1 to 4 and 9), `HANDOVER.md` on `beta` (the web app, the owner's 
   and never force-pushes. Neither PR is merged. The lead reads `chains/clive.cpp` and `cengine.cpp` line by line once U31's worker reports.
 - Check-ins (this chat): a restart check at 14:05, then after each usage reset: 15:02, 20:07 on 18 Nov; 01:12, 06:17 on 19 Nov (Mountain).
 
+## State at 18:10 on 18 Nov (the lead; newest)
+- **U32 is MERGED (#226, native 4982eed): 32 of 37 units.** Round-2 independent verification: SOUND WITH CONDITIONS (`docs/port/reviews/verify-226-round2.md`):
+  all seven conditions hold; ASan + UBSan full ctest 150 of 151 passed, 1 intended skip; CI green on 9 jobs. **One new defect, D1 (follow-up PR, not yet
+  started):** `prepare_preset` does unbounded WORK on samples that decode in full and are then discarded (last granule 0; aliased headers): a 1.7 MB
+  hostile font takes 17.7 s on the control thread. Fix: charge every decode to a work budget and remember a failed stream by its offset; also give
+  parse memory a budget (a 191 KB font at the `kMaxWork` cap takes 205 MB). Fonts: `/home/claude/v2tmp/fonts/` (lost on a new session: the report
+  describes how to make them). Start it with a Sonnet worker when U31's worker frees a compiling slot.
+- **U34a started** (Sonnet, worktree `/home/claude/wt/u34a`, branch `n1/u34a`): the offline song render C API as a PULL model (create from song bytes,
+  set pad buffers, read blocks, position / length for progress, free to cancel), the lead's decision: no callbacks across the wasm / JNI boundary.
+- **U31:** the worker is on the lead's review items A to K (resumed after the 16:35 server restart).
+
 ## State at 15:30 on 18 Nov (the lead; newest)
 - **Web:** `main` = `beta` = build 647. 646 (#231): the side panel's instrument list above the PLAYING box. 647 (#233): two FlexCore NaN fixes (FLX E8 just
   under a beat; `rd` at buffer index 0) and the FX bar's Flex PATTERN row writing the FLX command under the cursor (the lead fixed a `false ?? x` bug in
