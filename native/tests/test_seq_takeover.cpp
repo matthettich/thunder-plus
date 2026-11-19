@@ -238,6 +238,13 @@ static void testIdsCap() {   // ruling 2: the id registry is capped; past it a n
   }
   CHECK(sess->idCount() == (size_t)kSeqMaxIds && sess->idOverflow() > 0, "the registry stops at %d ids (%zu), the overflow is counted (%llu)", kSeqMaxIds, sess->idCount(), (unsigned long long)sess->idOverflow());
   CHECK(run.seq()->targetIds() == (size_t)kSeqMaxIds && run.seq()->dropped() == 0, "the Seq holds the %d ids", kSeqMaxIds);
+  { // takeOver's wall time with the registry full (4096 ids: the largest sent arrays) and 33 tracks: the worst case the design allows
+    std::shared_ptr<const Song> sg = loadSong(hand(perfWith(0, 600))); std::unique_ptr<SongSnap> x = sess->make(sg, vars); sess->commit(); std::unique_ptr<SongSnap> y = sess->make(sg, vars); sess->commit();
+    for (int k = 0; k < 20; k++) x->seq->step(evs.data(), 12288, &st);
+    double worst = 0, sum = 0; const int N = 300;
+    for (int i = 0; i < N; i++) { const auto t0 = std::chrono::steady_clock::now(); const bool ok = y->seq->takeOver(*x->seq); const double dt = std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count(); CHECK(ok, "takeOver"); if (dt > worst) worst = dt; sum += dt; }
+    std::printf("takeOver with %zu target ids: mean %.1f us, worst of %d: %.1f us (a 128-frame block at 48 kHz is 2667 us)\n", y->seq->targetIds(), sum / N * 1e6, N, worst * 1e6);
+  }
 }
 
 // dangling positions (SEQ-TAKEOVER-NOTES section 4), all at once and then at random, with a poisoned predecessor (the old snapshot is freed right after adopt)

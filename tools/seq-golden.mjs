@@ -138,6 +138,7 @@ const vPerf = S => {
   S.parts = [{ mix: S.mix.map(m => [m.vol, m.pan]), fx: {}, insts: S.insts.slice(0, 16).map(I => ({ ...I, tsp: 0 })) }, { mix: S.mix.map(m => [200, 100]), fx: {}, insts: S.insts.slice(0, 16).map(I => ({ ...I, tsp: 5 })) }];
   const p0 = ph(S, 0, 0), p1 = ph(S, 0, 1), p2 = ph(S, 1, 0);
   setCmd(S, p0, 9, 0, 'XFD', 200); setCmd(S, p1, 12, 0, 'MAC', 0x1F); setCmd(S, p2, 4, 0, 'PRT', 2); setCmd(S, p2, 20, 0, 'PRT', 1); setCmd(S, p1, 20, 1, 'LK1', 0); setCmd(S, p0, 25, 0, 'XFD', 20);
+  for (let r = 1; r < 8; r++) { const q = ph(S, r, 0); if (q >= 0 && S.phrases[q]) { setCmd(S, q, 9, 1, 'XFD', 100 + 17 * r); setCmd(S, q, 25, 1, 'XFD', 30 + 11 * r); } }   // a perfDiff every few steps, so an edit of a resting value would be heard
 };
 const vSeed = S => {
   const p0 = ph(S, 0, 0), p1 = ph(S, 0, 1), p2 = ph(S, 0, 2), p3 = ph(S, 1, 0), p4 = ph(S, 2, 0);
@@ -157,10 +158,10 @@ const EDIT_SONGS = [
   { id: 'ntr', edits: [{ after: 50, fn: S => { S.ntr = 8; } }, { after: 200, fn: S => { S.ntr = 16; } }] },
   { id: 'bpm', edits: [{ after: 30, fn: S => { S.bpm = 150; } }, { after: 60, bpm: 97.3 }, { after: 120, bpm: 131 }, { after: 130, shift: 0.21 }] },
   { id: 'smute', edits: [{ after: 20, fn: S => { S.smute[0] = 5; S.smute[1] = 0xFF; S.smuteM = [2]; } }, { after: 70, fn: S => { S.smute[2] = 0x3; } }] },
-  { id: 'bus', edits: [{ after: 30, fn: S => { S.chainOn[1] = false; S.chainOn[0] = true; S.chainPatch.modules[0].params.track = 2; } }] },
+  { id: 'bus', edits: [{ after: 30, fn: S => { S.chainOn[4] = true; S.chainPatch.modules[1].params.track = 5;   /* the patch's bus moves from track 4 (index 3, which has no notes) to track 5 (index 4, which has): the running JS keeps its PLAY's bus plan (D1) */ } }] },
   { id: 'tfx', base: vFx, edits: [{ after: 40, fn: S => { S.tfx[0][1] = null; S.tfx[1][2] = { type: 'flex', on: true }; } }, { after: 80, fn: S => { S.tfx[1][0] = null; } }] },
   { id: 'perf', base: vPerf, edits: [{ after: 5, fn: S => { S.perf.sc[1].v['vol:0'] = 10; } }, { after: 40, fn: S => { S.perf.sc[0].v['vol:0'] = 33; S.perf.lfo['0'][0].dp = 200; S.perf.lfo['2'][0].rt = 6; } },
-    { after: 60, fn: S => { delete S.perf.sc[1].v['pan:1']; S.perf.mac[0].v = 250; S.perf.mac[1].tg.push({ id: 'vol:6', lo: 5, hi: 6 }); } }, { after: 100, fn: S => { S.perf.lk['1'] = ['vol:5', 'pan:5', null, null]; S.perf.lfo['3'] = [{ id: 'pan:3', sh: 2, rt: 2, dp: 80 }]; S.parts[1].insts[0].tsp = 9; S.parts[1].mix[2] = [10, 10]; } }] },
+    { after: 60, fn: S => { delete S.perf.sc[1].v['pan:1']; S.perf.mac[0].v = 250; S.perf.mac[1].v = 250; S.perf.mac[1].tg.push({ id: 'vol:6', lo: 5, hi: 6 }); } }, { after: 100, fn: S => { S.perf.lk['1'] = ['vol:5', 'pan:5', null, null]; S.perf.lfo['3'] = [{ id: 'pan:3', sh: 2, rt: 2, dp: 80 }]; S.parts[1].insts[0].tsp = 9; S.parts[1].mix[2] = [10, 10]; } }] },
   { id: 'seed', base: vSeed, edits: [{ after: 60, fn: S => { setCmd(S, ph(S, 0, 1), 20, 0, 'NTH', 0x03); } }, { after: 200, fn: S => { setCmd(S, ph(S, 0, 1), 4, 0, 'RNL', 0); setCmd(S, ph(S, 0, 0), 2, 1, 'SED', 9); } }, { after: 300, fn: S => { setCmd(S, ph(S, 0, 1), 4, 0, 'NTH', 0x02); setCmd(S, ph(S, 1, 0), 14, 0, 'TCH', 0x40); } }] },
   { id: 'seed-loop', base: vSeed, loop: { y0: 0, y1: 3 }, max: 700, edits: [{ after: 40, fn: S => { setCmd(S, ph(S, 1, 0), 11, 0, 'PRB', 0x40); } }, { after: 150, loop: { y0: 1, y1: 4 } }, { after: 260, fn: S => { S.song[1][0] = -1; } }, { after: 340, fn: S => { S.song[1][0] = S.song[0][0]; } }] },
   { id: 'sect', mode: 'sect', optx: { track: 0, sect: 0 }, base: vChain, max: 400, edits: [{ after: 20, fn: S => { setNote(S, ph(S, 0, 0), 6, 64); } }, { after: 60, fn: S => { S.chains[S.song[0][0]][1] = [ph(S, 4, 0), 0]; } }, { after: 130, fn: S => { S.plen[ph(S, 1, 0)] = 3; } }] },
