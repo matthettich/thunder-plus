@@ -171,8 +171,11 @@ bool VoicePool::note(const SeqEvent& e, const double* arp, const VoiceBuf& c, co
   v.base = e.rate; v.rate = e.rate; v.choke = ck; v.col = e.col; v.ended = false; v.hasStop = false; v.stopAt = 0;
   v.syn = kv.syn; v.rel = v.syn ? ((e.has & SH_RLO) ? e.rlo : kv.rel) : 0; v.track = tr; v.ser = stamp_; v.end = INFINITY; v.pos = 0; v.t0 = 0; v.hasRd = false;
   if (!(e.has & SH_SLIDE)) pitchMods(v, e.t, e.rate, e, arp);
-  // (ev.ofsSec / ev.durSec: the sequencer never emits them; the JS reads them for a page that does. STUB: only the ofs form.)
-  const double ofs = e.ofs == e.ofs ? e.ofs : 0, off = std::max(0.0, std::min(255.0, ofs)) / 256 * dur;
+  // ev.ofsSec / ev.durSec (applyChop: a sliced or synced instrument's note): from that second on, reversed from the far end of the slice (core-processor startNote).
+  // A value that is not finite (a hostile chop table) falls back to the STA form.
+  const double ofs = e.ofs == e.ofs ? e.ofs : 0;
+  const bool chopOfs = (e.has & SH_CHOP) && std::isfinite(e.ofsSec) && std::isfinite(e.durSec);
+  const double off = chopOfs ? (e.rev ? std::max(0.0, dur - e.ofsSec - e.durSec) : e.ofsSec) : std::max(0.0, std::min(255.0, ofs)) / 256 * dur;
   if (off > 0.0005) { v.f.set(0, t0n); v.f.lin(1, t0n + 0.0015); }
   v.t0 = pageTiming_ ? std::ceil(t0n * sr_ - 1e-6) / sr_ : t0n; v.pos = std::min(off, std::max(0.0, dur - 0.001)) * c.sr;
   if (e.rev || tw) {   // REVERSE / SHAPED: the reader (Rd)

@@ -45,6 +45,7 @@ struct RenderPads {
   VoiceKit kit[kRenderPads];
   PadRoute route[kRenderPads] = {};    // Sampler unless the host says otherwise
   sf::SfPad sf[kRenderPads];           // the prepared SoundFont of a pad (font == nullptr: none): borrowed, the host (the C API) keeps the font, the preset and the PCM alive for the renderer's life
+  SeqChop chop;                        // per pad: the loop length and slice points applyChop reads (seq/chop.h); the renderer hands &chop to its Seq
   std::vector<RenderVar> var;          // sorted by (ii, kind, num, pad); read-only while a renderer runs
   static bool varLess(const RenderVar& a, int ii, char kind, int num, int pad) {
     if (a.ii != ii) return a.ii < ii;
@@ -89,6 +90,9 @@ struct RenderStats {
   uint64_t seqDropped = 0;
   // appended with the SoundFont route's review (verify-242 F6): the SfPool's own counters (voiceDropped / voiceOverflow / voiceAutoDropped are the SAMPLER pool's) and the peak of both pools' voices together
   uint32_t sfVoiceDropped = 0, sfVoiceOverflow = 0, sfVoiceAutoDropped = 0; int peakVoicesAll = 0;
+  // chop (CHOP-NOTES.md): notesStretched = notes with ev.st (sync 2 / 3) played UNSTRETCHED at `rate` (the stretch port does not exist yet); seqChopped = notes chopped; seqChopSkipped = a sliced / synced
+  // instrument's note whose pad had no chop data handed in (unchopped); seqChopNoHits = SMODE on without handed-in hits (grid used)
+  int notesStretched = 0; uint64_t seqChopped = 0, seqChopSkipped = 0, seqChopNoHits = 0;
 };
 
 class SongRenderer {

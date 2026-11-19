@@ -1,4 +1,4 @@
-IN THE MIDDLE OF: step 1 done (this plan); next: seq/chop.h + Seq + voice + render + C API, then the JS golden tool case, then the tests.
+IN THE MIDDLE OF: code + goldens + seq_chop / render_chop tests pass locally (Release); next: rt_harness allocation guard, ASan/UBSan run, mutations, full ctest, PR.
 
 # CHOP NOTES: the native sequencer chops sliced and synced instruments (`applyChop`), unit "chop", branch n1/chop
 
@@ -6,10 +6,10 @@ Spec: SEQ-LIVE-DESIGN.md "Queue item 3, the chop ruling"; DISPATCH-NOTES.md (i) 
 
 ## Checklist (updated in every commit)
 - [x] 1. this plan
-- [ ] 2. `SeqChop` (seq/chop.h) + SeqOpts::chop + SeqEvent members + `Seq` applies chop
-- [ ] 3. voice: `ofsSec` / `durSec` honoured; dispatch counts `st` notes (new stat), plays them unstretched at `rate`
-- [ ] 4. render: `RenderPads::chop`, C API `thunder_render_set_pad_chop` / `thunder_render_set_pad_hits`, stats
-- [ ] 5. tools/seq-golden.mjs `--chop`: goldens made by the REAL applyChop text (+ proof the existing goldens are unchanged)
+- [x] 2. `SeqChop` (seq/chop.h) + SeqOpts::chop + SeqEvent members + `Seq` applies chop
+- [x] 3. voice: `ofsSec` / `durSec` honoured; dispatch counts `st` notes (new stat), plays them unstretched at `rate`
+- [x] 4. render: `RenderPads::chop`, C API `thunder_render_set_pad_chop` / `thunder_render_set_pad_hits`, stats
+- [x] 5. tools/seq-golden.mjs `--chop`: goldens made by the REAL applyChop text (+ proof the existing goldens are unchanged)
 - [ ] 6. tests: seq goldens (incl. takeOver edit), render DC test, hostile (ASan/UBSan), allocation guard, mutations
 - [ ] 7. full Release ctest, PR, CI green (never merge)
 

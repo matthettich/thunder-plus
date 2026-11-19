@@ -54,9 +54,10 @@ inline void event(std::string& o, const thunder::SeqEvent& e, const thunder::Seq
       w.b("acc", e.acc); w.n("apn", e.apn);
       if (!(e.has & SH_ARP)) w.nul("arp"); else if (full) { w.key("arp"); arpFull(o, e, sq); } else if (e.arpN == 0) { w.key("arp"); o += "[]"; }   // (an arpeggio is an array of pairs: dropped; an empty one is kept)
       if (!(e.has & SH_BEND)) w.nul("bend"); else bend(w);
-      w.n("col", e.col); w.opt("cut", (e.has & SH_CUT) != 0, e.cut); w.n("fdi", e.fdi); w.n("gain", e.gain); w.n("ii", e.ii); w.n("mn", e.mn); w.n("ofs", e.ofs); w.n("pad", e.pad); w.n("pan", e.pan);
+      w.n("col", e.col); w.opt("cut", (e.has & SH_CUT) != 0, e.cut); if (e.has & SH_CHOP) w.n("durSec", e.durSec); w.n("fdi", e.fdi); w.n("gain", e.gain); w.n("ii", e.ii); w.n("mn", e.mn); w.n("ofs", e.ofs); if (e.has & SH_CHOP) w.n("ofsSec", e.ofsSec); w.n("pad", e.pad); w.n("pan", e.pan);
       w.b("poly", e.poly); w.n("rate", e.rate); w.opt("rel", (e.has & SH_REL) != 0, e.rel); w.b("rev", e.rev); if (e.has & SH_RLO) w.n("rlo", e.rlo); w.opt("slc", (e.has & SH_SLC) != 0, e.slc);
       if (!(e.has & SH_SLIDE)) w.nul("slide"); else if (full) { w.key("slide"); W b(o); b.n("dur", e.slideDur); b.n("from", e.slideFrom); b.end(); }
+      if (e.has & SH_ST) { w.key("st"); W b(o); b.n("beats", e.stBeats); b.n("bpm", e.stBpm); b.n("grain", e.stGrain); b.n("mode", e.stMode); b.end(); }   // (the JS's ev.st; corePlain drops it, the chop goldens' chopPlain keeps it)
       w.n("t", e.t); w.n("tick", e.tick); w.n("track", e.track); w.n("trm", e.trm);
       if (!(e.has & SH_TW)) w.nul("tw"); else if (full) { w.key("tw"); W b(o); b.opt("cut", (e.has & SH_TWCUT) != 0, e.twCut); b.opt("dec", (e.has & SH_TWDEC) != 0, e.twDec); b.n("res", e.twRes); b.end(); }
       w.s("type", ty); w.n("vc", e.vc); w.n("vel", e.vel);

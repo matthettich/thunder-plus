@@ -7,8 +7,10 @@
 
 namespace thunder {
 
+static SeqOpts withChop(SeqOpts o, const RenderPads& pads) { o.chop = &pads.chop; return o; }
+
 SongRenderer::SongRenderer(const Song& song, const SeqVars& vars, const RenderPads& pads, double sampleRate, int maxBlock, const SeqOpts& opts, int maxVoices)
-    : S_(song), pads_(pads), sr_(sampleRate), maxBlock_(maxBlock), seq_(new Seq(song, vars, SeqMode::Song, opts)), pool_(sampleRate, maxVoices), sfpool_(sampleRate), mix_(sampleRate, kRenderQuantum),
+    : S_(song), pads_(pads), sr_(sampleRate), maxBlock_(maxBlock), seq_(new Seq(song, vars, SeqMode::Song, withChop(opts, pads))), pool_(sampleRate, maxVoices), sfpool_(sampleRate), mix_(sampleRate, kRenderQuantum),
       evs_(new SeqEvent[kRenderEvents]), step_(new SeqStep), scratch_(new float[(size_t)maxBlock * 2]()), q_(new float[(size_t)kRenderQuantum * 2]()) {
   // the page's mixer as a render sets it (applyMix, live false) and the bus plan (no bus exists until a chains host is plugged in)
   mix_.setPlan(bus_plan(song.chainPatch, song.chainOn));
@@ -61,6 +63,7 @@ void SongRenderer::dispatch(const SeqEvent& e) {
   if (VoicePool::shapedReverse(e, b)) { st_.notesShapedRev++; takeAll(e, pad); return; }   // (the page plays a reversed + shaped note: not this player's)
   if (VoicePool::playable(e, b)) capPoly(e);   // (a note the pool refuses touches nothing)
   sfpool_.take(e, &pads_.kit[pad]);   // the sampler's note takes the track's SoundFont voices over too (VoicePool::note does the sampler's own)
+  if (e.has & SH_ST) st_.notesStretched++;   // sync 2 / 3: the page plays the stretched pad; here the pad unstretched at `rate` (counted)
   if (pool_.note(e, seq_->arp(e), b, pads_.kit[pad], seq_->bpm())) { st_.notesPlayed++; if (useVar) st_.notesVar++; }
 }
 
@@ -141,7 +144,7 @@ RenderStats SongRenderer::stats() const {
   RenderStats s = st_; s.frames = frame_;
   s.peakVoices = pool_.peakVoices(); s.peakVoiceLane = pool_.peakEvents(); s.peakMixLane = mix_.peakEvents();
   s.voiceDropped = pool_.dropped(); s.voiceOverflow = pool_.tOverflow(); s.voiceAutoDropped = pool_.autoDropped(); s.mixAutoDropped = mix_.autoDropped(); s.seqDropped = seq_->dropped();
-  s.sfVoiceDropped = sfpool_.dropped(); s.sfVoiceOverflow = sfpool_.tOverflow(); s.sfVoiceAutoDropped = sfpool_.autoDropped(); s.peakVoicesAll = std::max(peakAll_, pool_.peakVoices());
+  s.seqChopped = seq_->chopped(); s.seqChopSkipped = seq_->chopSkipped(); s.seqChopNoHits = seq_->chopNoHits(); s.sfVoiceDropped = sfpool_.dropped(); s.sfVoiceOverflow = sfpool_.tOverflow(); s.sfVoiceAutoDropped = sfpool_.autoDropped(); s.peakVoicesAll = std::max(peakAll_, pool_.peakVoices());
   return s;
 }
 

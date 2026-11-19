@@ -160,7 +160,7 @@ int thunder_render_set_pad(thunder_render* r, int pad, const float* l, const flo
     // A pad whose buffer changes (set, replaced or removed) loses its variations, as the page's does (core/core-processor.js:337: 'buf' -> varDrop(pad)); they are
     // dropped only once the call has succeeded (a failed call changes nothing), and what they hold counts as freed by the replacement.
     const size_t varB = r->pads.varBytesOfPad(pad);
-    if (frames == 0) { r->padBytes -= r->store[pad].size() * sizeof(float); std::vector<float>().swap(r->store[pad]); r->pads.buf[pad] = VoiceBuf(); r->padBytes -= r->pads.dropVarsOfPad(pad); return 0; }
+    if (frames == 0) { r->padBytes -= r->store[pad].size() * sizeof(float); std::vector<float>().swap(r->store[pad]); r->pads.buf[pad] = VoiceBuf(); r->padBytes -= r->pads.dropVarsOfPad(pad); r->pads.chop.setLoop(pad, 0); return 0; }
     if (!l || !fin(sample_rate) || sample_rate < 1 || sample_rate > 1e6) return THUNDER_RENDER_E_ARG;
     if (frames > THUNDER_RENDER_MAX_PAD_FRAMES) return THUNDER_RENDER_E_LIMIT;
     const size_t ch = rr ? 2 : 1, n = (size_t)frames * ch, old = r->store[pad].size() * sizeof(float);
@@ -180,6 +180,7 @@ int thunder_render_set_pad(thunder_render* r, int pad, const float* l, const flo
     r->store[pad].swap(tmp); r->padBytes = r->padBytes - old2 + n * sizeof(float);
     VoiceBuf& b = r->pads.buf[pad]; b.data = r->store[pad].data(); b.data2 = rr ? b.data + frames : nullptr; b.len = (int)frames; b.sr = sample_rate; b.noShape = false;
     r->padBytes -= r->pads.dropVarsOfPad(pad);   // (nothing left to drop when the release-first branch ran)
+    r->pads.chop.setLoop(pad, 0);                // a changed pad loses its chop data too (its loop and hits were made from the old one)
     return 0;
   }
   TR_CATCH_BADALLOC(return THUNDER_RENDER_E_MEMORY;)
@@ -200,6 +201,22 @@ int thunder_render_set_pad_route(thunder_render* r, int pad, int route) {
   if (!padOk(pad) || route < THUNDER_RENDER_ROUTE_SAMPLER || route > THUNDER_RENDER_ROUTE_SF) return THUNDER_RENDER_E_ARG;
   r->pads.route[pad] = route == THUNDER_RENDER_ROUTE_LIVE ? PadRoute::Live : route == THUNDER_RENDER_ROUTE_SF ? PadRoute::SoundFont : PadRoute::Sampler;
   return 0;
+}
+
+int thunder_render_set_pad_chop(thunder_render* r, int pad, double loop_secs) {
+  if (!r) return THUNDER_RENDER_E_ARG;
+  if (r->dead || r->started) return THUNDER_RENDER_E_STATE;
+  if (!padOk(pad) || !fin(loop_secs) || loop_secs < 0 || loop_secs > kSeqChopMaxSecs) return THUNDER_RENDER_E_ARG;
+  return r->pads.chop.setLoop(pad, loop_secs) ? 0 : THUNDER_RENDER_E_ARG;
+}
+
+int thunder_render_set_pad_hits(thunder_render* r, int pad, int n_slices, const double* pts, int count) {
+  if (!r) return THUNDER_RENDER_E_ARG;
+  if (r->dead || r->started) return THUNDER_RENDER_E_STATE;
+  if (!padOk(pad) || n_slices < 2 || n_slices > kSeqChopMaxSlices || count < 0 || count > n_slices || (count > 0 && !pts)) return THUNDER_RENDER_E_ARG;
+  TR_TRY { return r->pads.chop.setHits(pad, n_slices, pts, count) ? 0 : THUNDER_RENDER_E_ARG; }
+  TR_CATCH_BADALLOC(return THUNDER_RENDER_E_MEMORY;)
+  TR_CATCH_ALL(r->dead = true; return THUNDER_RENDER_E_INTERNAL;)
 }
 
 int thunder_render_set_variation(thunder_render* r, int ii, int kind, int num, int pad, const float* l, int64_t frames, double sample_rate) {
@@ -292,6 +309,7 @@ int thunder_render_stats_get(thunder_render* r, thunder_render_stats* out) {
   s.notes_shaped_rev = t.notesShapedRev; s.mix_events = t.mixEvents; s.peak_voices = t.peakVoices;
   s.voices_refused = t.voiceDropped; s.voice_track_full = t.voiceOverflow; s.voice_auto_dropped = t.voiceAutoDropped; s.mix_auto_dropped = t.mixAutoDropped; s.seq_dropped = t.seqDropped;
   s.notes_live = t.notesLive; s.notes_sf = t.notesSf; s.notes_var = t.notesVar; s.notes_var_missing = t.notesVarMissing; s.notes_unshaped = t.notesUnshaped; s.events_ignored = t.eventsIgnored; s.notes_sf_played = t.notesSfPlayed;
+  s.notes_stretched = t.notesStretched; s.seq_chopped = t.seqChopped; s.seq_chop_skipped = t.seqChopSkipped; s.seq_chop_no_hits = t.seqChopNoHits;
   s.sf_voices_refused = t.sfVoiceDropped; s.sf_voice_track_full = t.sfVoiceOverflow; s.sf_voice_auto_dropped = t.sfVoiceAutoDropped; s.peak_voices_all = t.peakVoicesAll;
   const size_t k = std::min<size_t>(out->size, sizeof s); const uint32_t keep = out->size;
   std::memcpy(out, &s, k); out->size = keep;
