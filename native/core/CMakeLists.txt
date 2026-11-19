@@ -4,11 +4,12 @@ target_include_directories(thunder_core PUBLIC include)
 # U34a (verification D3, D5): a failed allocation is a std::bad_alloc that render_api.cpp catches (E_MEMORY). So that what a failed thunder_render_create has already built
 # (the Song, the sequencer, the voices, the mixer's delay lines, the effects, the master chain) is freed on the way out, the files that make those objects are built WITH
 # exceptions (their constructors get the cleanup an exception needs); nothing throws on the audio path and the audio code is the same. The rest of the core, and the wasm
-# build (which has its own script and keeps -fno-exceptions), are not changed. MSVC has exceptions on already.
+# build (which has its own script and keeps -fno-exceptions), are not changed. MSVC has exceptions on already. RENDER-SF: the SoundFont pool (its constructor) and the font parser / decoder (add_font, set_pad_sf) too.
 if(NOT MSVC)
   set_source_files_properties(
     src/render/render_api.cpp src/render/render.cpp src/rt/json.cpp src/song/song.cpp src/seq/seq.cpp src/seq/session.cpp src/voice/voice.cpp src/mix/mix.cpp src/mix/pdc.cpp src/mix/delay.cpp src/mix/beat.cpp
     src/master/master.cpp src/master/eq.cpp src/master/chain.cpp src/fx/fxhost.cpp src/fx/clkcores.cpp src/fx/idmcores.cpp src/fx/u17cores.cpp src/fx/fxmap.cpp src/fx/fxbank.cpp src/fx/fxpump.cpp
+    src/sf/sf_live.cpp src/sf/sf_parse.cpp src/sf/sf_decode.cpp
     PROPERTIES COMPILE_OPTIONS "-fexceptions")
 endif()
 target_sources(thunder_core PRIVATE src/modfx/fftr.cpp src/modfx/mod_spectral.cpp src/modfx/mod_convolve.cpp)   # U20

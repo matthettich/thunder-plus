@@ -25,8 +25,37 @@ plan; sections 1 to 4 and 9), `HANDOVER.md` on `beta` (the web app, the owner's 
   every other upstream; start it when a compiling slot is free); **U36 Link / recording / inputs** (lead reviews); **Stage N2 (the Android shell)** and **N4 (Windows and Mac shells)**.
 - **Fastest route to something the owner can install:** N1 steps 10 and 11, then N2. U31 can run in parallel with a worker.
 
-## START HERE (19 Nov, 07:30): the state for a new chat. The dated sections below are the history, newest first after this one.
-**Say to a new chat:** "Pull thunder-plus, branch native, and continue from docs/port/PICKUP.md. Start at START HERE (19 Nov, 07:30)."
+## START HERE (19 Nov, 12:50): the state for a new chat. The dated sections below are the history, newest first after this one.
+**Say to a new chat:** "Pull thunder-plus, branch native, and continue from docs/port/PICKUP.md. Start at START HERE (19 Nov, 12:50)."
+(Written because weekly usage reached 90%: the owner may stop here. Nothing new is started until he says so.)
+
+- **Merged today:** #243, the sequencer on a live clock (setters, `SeqRunner`); verified after the merge (`review/verify-243`), no defect.
+- **#242, the SoundFont route into the renderer: MERGED at 12:50** (every CI job green on the clean commit 730d787; verified, the five findings
+  fixed: leak, budget hole, the poly cap shared by both pools, test gaps, stats). `native/build*/` is now in `.gitignore`.
+- **#244, Part B, the Song's lifetime (`n1/seq-takeover`, head e785d14):** CI green, **verified SOUND WITH CONDITIONS, NOT merged**
+  (report `docs/port/reviews/verify-244.md` on `review/verify-244`). **The next job is a fix worker (Sonnet) on that branch:**
+  - **F1, blocks:** a new PLAY (session B) publishes B1, an edit publishes B2 (a successor, no start-up); if the audio side adopts both in one
+    call B1 is retired unrun, `takeOver(A -> B2)` is refused (another session) and the sequencer is dead and silent. Fix as the report says:
+    when the current Seq is of another session, hand over from the OLDEST popped snapshot of the newest one's session. Test: two sessions, two
+    publishes, one adopt; and make the thread test use several sessions and songs whose registries grow.
+  - **F2 to F4, tests:** catch a dropped `trGen_` and `mtch_` carry-over and the `s & 15` slot-key aliasing; remove `CHECK(... || true)` in
+    `testHostile`; add edit goldens for `S.ticks`, `S.lpb`, `S.grv`, `S.dlen`.
+  - **F5, the lead's rulings:** (a) the plain `adopt()` on `SnapSlot<SongSnap>` must not be callable (it leaves the runner on a freed Seq):
+    delete it for that type or make the hand-over form the only one; (b) registry slots are never reused, so one long PLAY with many edits can
+    grow the NTH / CND / REP registry towards 52 MB: count the session's bytes, and past a limit (8 MB) the control thread starts a fresh
+    session at the next pattern edge (counters restart there, as a new PLAY would); write the limit and the test in the PR.
+  - Then: merge `native` into the branch (it has #242 now), CI again, the lead reads `takeOver`, the registries and `seq_adopt`, merge.
+  - What passed: 65 to 70 s stress under TSan and ASan + UBSan with growing registries and new sessions, no report; `takeOver` 18 microseconds
+    worst case against a 2667 microsecond block, no allocation; 17 edit goldens + 4 live goldens regenerate byte-identically from the JS.
+- **Next, not started:** the chop unit (ruled: `docs/port/SEQ-LIVE-DESIGN.md`, last-but-one section; Sonnet). Then the old queue from item 4.
+- **For the owner:** reproduce the suspected web bug (Settings, sequencer "Audio thread" vs "Page (old)", an instrument with SLICES 4: on Audio
+  thread every note seems to start at the top of the sample). Steps were given in the chat of 19 Nov.
+- **Lessons of today:** every brief must say "add files by path, never `git add -A`; never commit a build directory" (`native/build*/` goes
+  into `.gitignore` with #242); check a PR's file count before merging; the server restarted at 12:19 and 12:36 and stopped the workers
+  (a stopped agent of the same chat can be resumed by its id).
+- Estimates unchanged: 33 of 37 units, about 55% of the port, about 65% of the way to an Android install.
+
+## START HERE of 19 Nov, 07:30 (now history): the state for a new chat. The dated sections below are the history, newest first after this one.
 
 **Merged into `native` (33 of 37 units; about 55% of the port, about 65% of the way to an Android install):**
 - U31, the ...chains engine (#227), after three verification rounds; U32, the SoundFont player (#226).

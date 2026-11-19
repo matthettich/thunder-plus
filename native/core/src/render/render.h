@@ -18,6 +18,7 @@
 #include "mix/mix.h"
 #include "mix/pdc.h"
 #include "seq/seq.h"
+#include "sf/sf_live.h"
 #include "fx/fxbank.h"
 #include "song/song.h"
 #include "voice/voice.h"
@@ -30,7 +31,7 @@ constexpr int kRenderEvents = kSeqStepEvents;   // one sequencer step's events, 
 
 // Which player a pad's notes are for (the kit entry's `live` / `sf` of coreKitV()). Sampler: the rendered pad (or a variation of it). Live: a live engine
 // (bass, vox, acid, mach, xeng, pump synth, waves): its player is not wired into this renderer yet, so its notes are SILENT and counted (stats().notesLive).
-// SoundFont: the sf player (sf/sf_live.h) needs a font and a prepared preset from the host, which this renderer has no input for yet: silent, counted (notesSf).
+// SoundFont: the sf player (sf/sf_live.h, one SfPool next to the VoicePool): a pad with a prepared preset (RenderPads::sf) plays through it; a pad without one is SILENT and counted (notesSf).
 enum class PadRoute : uint8_t { Sampler = 0, Live = 1, SoundFont = 2 };
 
 // A MUT / GEN variation the host rendered (the page's `vbuf`): mono, keyed as the core's varBufs are, by instrument, kind ('g' GEN / 'm' MUT), number and pad.
@@ -43,6 +44,7 @@ struct RenderPads {
   VoiceBuf buf[kRenderPads];           // data == nullptr: the kit has no buffer for the pad (its notes are silent, as `kit.voices[pad]` missing)
   VoiceKit kit[kRenderPads];
   PadRoute route[kRenderPads] = {};    // Sampler unless the host says otherwise
+  sf::SfPad sf[kRenderPads];           // the prepared SoundFont of a pad (font == nullptr: none): borrowed, the host (the C API) keeps the font, the preset and the PCM alive for the renderer's life
   std::vector<RenderVar> var;          // sorted by (ii, kind, num, pad); read-only while a renderer runs
   static bool varLess(const RenderVar& a, int ii, char kind, int num, int pad) {
     if (a.ii != ii) return a.ii < ii;
@@ -79,11 +81,14 @@ struct RenderStats {
   int steps = 0, events = 0, notes = 0, notesPlayed = 0, notesNoPad = 0, notesMidiOnly = 0, notesShapedRev = 0, mixEvents = 0, beats = 0;
   // D2 / D3 routing: notesLive / notesSf: notes of a live-engine / SoundFont pad (silent: no player wired); notesVar: notes that played a MUT / GEN variation;
   // notesVarMissing: a MUT / GEN note whose variation the host did not hand in (silent); notesUnshaped: notes of a sliced / synced instrument that had a MUT / GEN / CUT / RES / DEC and played the pad as it is (varRec);
+  // notesSf counts every note of a SoundFont-route pad; notesSfPlayed those that sounded through the SfPool (a prepared font, a zone for the key, a free voice; NOT counted in notesPlayed);
   // eventsIgnored: events this renderer has no route for (eng, chc, tempo, the MIDI events)
-  int notesLive = 0, notesSf = 0, notesVar = 0, notesVarMissing = 0, notesUnshaped = 0, eventsIgnored = 0;
+  int notesLive = 0, notesSf = 0, notesSfPlayed = 0, notesVar = 0, notesVarMissing = 0, notesUnshaped = 0, eventsIgnored = 0;
   int peakVoices = 0, peakVoiceLane = 0, peakMixLane = 0, peakStepEvents = 0;
   uint32_t voiceDropped = 0, voiceOverflow = 0, voiceAutoDropped = 0, mixAutoDropped = 0;
   uint64_t seqDropped = 0;
+  // appended with the SoundFont route's review (verify-242 F6): the SfPool's own counters (voiceDropped / voiceOverflow / voiceAutoDropped are the SAMPLER pool's) and the peak of both pools' voices together
+  uint32_t sfVoiceDropped = 0, sfVoiceOverflow = 0, sfVoiceAutoDropped = 0; int peakVoicesAll = 0;
 };
 
 class SongRenderer {
@@ -121,22 +126,29 @@ class SongRenderer {
   // latencyFrames(). Allocates nothing (a scratch block made at construction).
   void renderTrimmed(float* outL, float* outR, int64_t N);
   bool songOver() const { return !seq_->alive(); }       // the sequencer has reached the end
-  int voices() const { return pool_.active(); }          // voices still sounding
+  int voices() const { return pool_.active() + sfpool_.active(); }   // voices still sounding (the sampler's and the SoundFont pool's)
   double time() const { return (double)frame_ / sr_; }
   int64_t frame() const { return frame_; }
   Mixer& mixer() { return mix_; }
   VoicePool& pool() { return pool_; }
+  sf::SfPool& sfPool() { return sfpool_; }
+  // A tap on the mixer's per-track inputs (the sampler's and the SoundFont pool's voices summed), called each quantum just before the mixer runs; for tests. Null: none.
+  typedef void (*InputTap)(void* user, const float* const* inL, const float* const* inR, int frames, int64_t frame0);
+  void setInputTap(InputTap fn, void* user) { tap_ = fn; tapUser_ = user; }
   RenderStats stats() const;
 
   double lead = 0.25;                                    // LEAD (the core's `lead` command: 0.05..2 s)
 
  private:
   void dispatch(const SeqEvent& e);
+  void capPoly(const SeqEvent& e);                       // a poly note: the track's cap of four is shared by both pools, oldest first (core-processor.js :442-443, :582-583: one list)
+  void takeAll(const SeqEvent& e, int pad);              // a note the sampler does not play: the track's voices in BOTH pools give way (one voice list in the JS)
   void quantum();                                        // renders the next kRenderQuantum frames into q_
   const Song& S_; const RenderPads& pads_;
   double sr_; int maxBlock_;
   std::unique_ptr<Seq> seq_;
   VoicePool pool_;
+  sf::SfPool sfpool_;
   Mixer mix_;
   std::unique_ptr<SeqEvent[]> evs_;
   std::unique_ptr<SeqStep> step_;
@@ -150,6 +162,8 @@ class SongRenderer {
   static void masterHook(void* user, int track, float* L, float* R, int frames, double t0, const MixFeed* feeds, int nFeeds);
   MeterBank* meters_ = nullptr;
   RenderStats st_;
+  uint64_t serial_ = 0; int peakAll_ = 0;                // voice serials (age across the pools) and the most voices of both pools sounding together
+  InputTap tap_ = nullptr; void* tapUser_ = nullptr;
 };
 
 }  // namespace thunder

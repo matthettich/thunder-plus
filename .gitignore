@@ -12,3 +12,6 @@ electron/io/
 
 # agent worktrees made by Claude sessions (never part of the app)
 .claude/worktrees/
+
+# build directories of the native port (any name)
+native/build*/

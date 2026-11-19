@@ -945,3 +945,18 @@ add_executable(test_render_var test_render_var.cpp)
 target_link_libraries(test_render_var PRIVATE thunder_core)
 target_include_directories(test_render_var PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../core/src ${CMAKE_CURRENT_SOURCE_DIR})
 add_test(NAME render_var COMMAND test_render_var)
+
+# RENDER-SF: the SoundFont route of the offline song renderer (docs/port/RENDER-SF-NOTES.md)
+add_executable(test_render_sf test_render_sf.cpp)
+target_link_libraries(test_render_sf PRIVATE thunder_core)
+target_include_directories(test_render_sf PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../core/src ${CMAKE_CURRENT_SOURCE_DIR})
+target_compile_definitions(test_render_sf PRIVATE THUNDER_ROOT="${CMAKE_CURRENT_SOURCE_DIR}/../..")
+add_test(NAME render_sf COMMAND test_render_sf)
+
+# verify-242 F1 / F2: add_font / set_pad_sf under allocation failure (no leak of the stb_vorbis handle) and a font with very many sample headers (the per-pad table is in the budget). The program compiles
+# render_api.cpp into itself with a 128 MiB pad budget (THUNDER_RENDER_MAX_PAD_BYTES is overridable for this) so the limit is reached with little memory.
+add_executable(test_render_sf_oom test_render_sf_oom.cpp)
+target_link_libraries(test_render_sf_oom PRIVATE thunder_core)
+target_include_directories(test_render_sf_oom PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../core/src ${CMAKE_CURRENT_SOURCE_DIR}/../core/include ${CMAKE_CURRENT_SOURCE_DIR})
+target_compile_definitions(test_render_sf_oom PRIVATE THUNDER_ROOT="${CMAKE_CURRENT_SOURCE_DIR}/../..")
+add_test(NAME render_sf_oom COMMAND test_render_sf_oom)

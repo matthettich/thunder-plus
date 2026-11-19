@@ -87,6 +87,16 @@ void SfPool::take(const SeqEvent& e, const VoiceKit* kv) {
   if (ck) for (int k = 0; k < kNT; k++) if (k != e.track) for (int q = 0; q < nT_[k]; q++) if (V_[(size_t)T_[k][q]].choke == ck) kill(T_[k][q], e.t);
 }
 
+bool SfPool::covers(const SeqEvent& e, const SfPad& pad) const {
+  if (e.track < 0 || e.track >= kVoiceTracks || !pad.font || !pad.pcm) return false;
+  if (!(e.rate > 0 && std::isfinite(e.rate)) || !std::isfinite(e.t) || !std::isfinite(e.gain) || !std::isfinite(e.pan)) return false;
+  const PadParams& P = pad.P;
+  const double lr = js_log2(jmax(1e-4, e.rate));
+  const double key = jclamp(js_round(60 + 12 * lr + P.trans), 0, 127), vel = jclamp(js_round(127 * ((1 - P.velo) + P.velo * std::sqrt(jclamp(e.gain, 0, 1)))), 1, 127);
+  Pick picks[4];
+  return sf_pick(*pad.font, pad.pr, key, vel, picks) > 0;
+}
+
 bool SfPool::note(const SeqEvent& e, const double* arp, const SfPad& pad, const VoiceKit& kv) {
   if (e.track < 0 || e.track >= kVoiceTracks || !pad.font || !pad.pcm) return false;
   if (!(e.rate > 0 && std::isfinite(e.rate)) || !std::isfinite(e.t) || !std::isfinite(e.gain) || !std::isfinite(e.pan)) { refused_++; return false; }
@@ -141,7 +151,7 @@ bool SfPool::note(const SeqEvent& e, const double* arp, const SfPad& pad, const 
   if (!v.nz) { free_[nFree_++] = vi; return false; }
   const double g0 = e.gain * js_pow(10, (orv(P.level, 0) + 6) / 20);
   v.st = stAny; v.r.reset(base); v.g.reset(g0); v.f.reset(1); v.pn.reset(jclamp((e.pan - 128) / 127, -1, 1));
-  v.base = base; v.rate = base; v.choke = ck; v.col = e.col; v.ended = false; v.hasStop = false; v.stopAt = 0; v.rel = relMax * 0.4; v.track = tr; v.end = INFINITY; v.t0 = st0;
+  v.base = base; v.rate = base; v.choke = ck; v.col = e.col; v.ended = false; v.hasStop = false; v.stopAt = 0; v.rel = relMax * 0.4; v.track = tr; v.ser = stamp_; v.end = INFINITY; v.t0 = st0;
   if (!(e.has & SH_SLIDE)) pitchMods(v, e.t, base, e, arp);
   alive_[nAlive_++] = vi;
   if (e.has & SH_CUT) kill(vi, e.cut);
@@ -149,6 +159,20 @@ bool SfPool::note(const SeqEvent& e, const double* arp, const SfPad& pad, const 
   else if (!kv.syn && looped) kill(vi, st0 + jmax(0.1, orv(P.len, 2)), relTc(v));   // a drum pad: a looping zone lets go after the pad's Max len
   T_[tr][nT_[tr]++] = vi;
   return true;
+}
+
+int SfPool::liveOnTrack(int tr, double t) {
+  if (tr < 0 || tr >= kVoiceTracks) return 0;
+  for (int k = nT_[tr] - 1; k >= 0; k--) if (!live1(V_[(size_t)T_[tr][k]], t)) tErase(tr, k);
+  return nT_[tr];
+}
+bool SfPool::oldestOnTrack(int tr, uint64_t& serial) const {
+  if (tr < 0 || tr >= kVoiceTracks || nT_[tr] == 0) return false;
+  serial = V_[(size_t)T_[tr][0]].ser; return true;
+}
+void SfPool::releaseOldest(int tr, double t) {
+  if (tr < 0 || tr >= kVoiceTracks || nT_[tr] == 0) return;
+  const int vi = T_[tr][0]; tErase(tr, 0); kill(vi, t, 0.006);   // (T.shift())
 }
 
 void SfPool::off(const SeqEvent& e) {

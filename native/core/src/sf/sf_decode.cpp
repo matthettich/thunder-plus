@@ -48,6 +48,8 @@ size_t pageTailLoss(const OggScan& sc, size_t lastFrame) {
 // `work` (null: unlimited) is what prepare_preset has left to spend: the stream's bytes (and kWorkPerOpen) are charged before it is opened and every decoded frame as it is decoded; over it: kDecodeWork.
 enum DecodeRes { kDecodeOk, kDecodeBad, kDecodeTooBig, kDecodeWork };
 bool charge(uint64_t* work, uint64_t units) { if (!work) return true; if (units > *work) return false; *work -= units; return true; }
+// Closes the stb_vorbis handle on every way out, including an exception (d.insert may throw bad_alloc: the handle, about 170 KB of decoder setup, used to leak: verify-242 F1).
+struct VorbisGuard { stb_vorbis* v; ~VorbisGuard() { if (v) stb_vorbis_close(v); } VorbisGuard(const VorbisGuard&) = delete; VorbisGuard& operator=(const VorbisGuard&) = delete; };
 DecodeRes decodeOgg(const uint8_t* p, size_t n, std::vector<float>& d, double& sr, bool pageTail, size_t maxFrames, uint64_t* work) {
   if (n == 0 || n > (size_t)INT_MAX) return kDecodeBad;
   // The LAST PAGE's granule position is the stream's length and is read from the page headers, BEFORE any decoding: 0 means the stream is empty (below, a trim to 0 frames is kDecodeBad after a full decode: a hostile stream
@@ -57,19 +59,20 @@ DecodeRes decodeOgg(const uint8_t* p, size_t n, std::vector<float>& d, double& s
   if (!charge(work, (uint64_t)n + kWorkPerOpen)) return kDecodeWork;
   int err = 0; stb_vorbis* v = stb_vorbis_open_memory(p, (int)n, &err, nullptr);
   if (!v) return kDecodeBad;
+  VorbisGuard guard{v};
   const stb_vorbis_info info = stb_vorbis_get_info(v);
-  if (info.channels < 1 || info.sample_rate < kMinStreamRate || info.sample_rate > kMaxStreamRate) { stb_vorbis_close(v); return kDecodeBad; }   // 4000..192000 Hz: anything else is a hostile header
+  if (info.channels < 1 || info.sample_rate < kMinStreamRate || info.sample_rate > kMaxStreamRate) { return kDecodeBad; }   // 4000..192000 Hz: anything else is a hostile header
   sr = (double)info.sample_rate;
   const size_t byBytes = n * 4096 + 8192; size_t cap = std::min(kMaxSampleFrames, byBytes); const bool budgeted = maxFrames > 0 && maxFrames < cap; if (budgeted) cap = maxFrames;
   d.clear(); size_t lastFrame = 0;
   for (;;) {   // frame by frame (what get_samples_float does underneath): the size of the last frame is what pageTail needs
     int ch = 0; float** o = nullptr; const int got = stb_vorbis_get_frame_float(v, &ch, &o);
     if (got <= 0 || ch < 1) break;
-    if (d.size() + (size_t)got > cap) { stb_vorbis_close(v); return budgeted ? kDecodeTooBig : kDecodeBad; }
-    if (!charge(work, (uint64_t)got)) { stb_vorbis_close(v); return kDecodeWork; }
+    if (d.size() + (size_t)got > cap) { return budgeted ? kDecodeTooBig : kDecodeBad; }
+    if (!charge(work, (uint64_t)got)) { return kDecodeWork; }
     d.insert(d.end(), o[0], o[0] + got); lastFrame = (size_t)got;
   }
-  stb_vorbis_close(v);
+  stb_vorbis_close(v); guard.v = nullptr;
   // The stream's length is its LAST PAGE's granule position (the Vorbis I rule; libvorbis does exactly this): stb_vorbis only trims the last block, so a granule that cuts more than that is applied here, shortening only
   // (a granule above the decoded length, or none, leaves the length as decoded).
   if (sc.lastGranule >= 0 && (uint64_t)sc.lastGranule < (uint64_t)d.size()) { d.resize((size_t)sc.lastGranule); lastFrame = std::min(lastFrame, d.size()); }
@@ -156,8 +159,12 @@ void decodeSample(const Font& f, uint32_t i, const DecodeOpts& opt, Pcm& o, uint
 void decode_sample(const Font& f, uint32_t i, const DecodeOpts& opt, Pcm& o) { decodeSample(f, i, opt, o, nullptr, nullptr); }
 
 PrepareStatus prepare_preset(const Font& f, const Preset* pr, const DecodeOpts& opt, PresetPcm& out, const uint8_t* keys) {
-  out.byIndex.clear(); out.byIndex.resize(f.samples.size()); out.bytes = 0; out.work = 0;
+  std::vector<Pcm>().swap(out.byIndex); out.bytes = 0; out.work = 0; out.tableBytes = 0;
   if (!pr) return kPrepNoPreset;
+  // The per-sample-header table (one Pcm each, about 70 bytes: a hostile font may have millions of headers, and every pad that uses it gets its own table) is part of the preset's budget and is counted BEFORE it is allocated.
+  const uint64_t tableBytes = (uint64_t)f.samples.size() * sizeof(Pcm);
+  if (tableBytes > opt.presetBytes) return kPrepOverPresetBudget;
+  out.byIndex.resize(f.samples.size()); out.tableBytes = tableBytes;
   const uint64_t fontUsed = opt.fontUsed ? *opt.fontUsed : 0;
   PrepareStatus st = kPrepOk;
   const uint64_t fontWorkUsed = opt.fontWorkUsed ? *opt.fontWorkUsed : 0;
@@ -166,9 +173,9 @@ PrepareStatus prepare_preset(const Font& f, const Preset* pr, const DecodeOpts& 
   // the work left: the preset's budget and the font's, whichever is smaller
   auto workRoom = [&]() -> uint64_t { const uint64_t a = opt.presetWork > workSpent ? opt.presetWork - workSpent : 0; const uint64_t used = fontWorkUsed + workSpent; const uint64_t b = opt.fontWork > used ? opt.fontWork - used : 0; return std::min(a, b); };
   // the room left: the preset's budget and the font's, whichever is smaller
-  auto room = [&]() -> uint64_t { const uint64_t a = opt.presetBytes > out.bytes ? opt.presetBytes - out.bytes : 0; const uint64_t used = fontUsed + out.bytes; const uint64_t b = opt.fontBytes > used ? opt.fontBytes - used : 0; return std::min(a, b); };
+  auto room = [&]() -> uint64_t { const uint64_t pb = out.bytes + out.tableBytes; const uint64_t a = opt.presetBytes > pb ? opt.presetBytes - pb : 0; const uint64_t used = fontUsed + out.bytes; const uint64_t b = opt.fontBytes > used ? opt.fontBytes - used : 0; return std::min(a, b); };
   auto binding = [&]() -> PrepareStatus {   // which budget is the smaller one right now
-    const uint64_t a = opt.presetBytes > out.bytes ? opt.presetBytes - out.bytes : 0, used = fontUsed + out.bytes, b = opt.fontBytes > used ? opt.fontBytes - used : 0;
+    const uint64_t pb = out.bytes + out.tableBytes, a = opt.presetBytes > pb ? opt.presetBytes - pb : 0, used = fontUsed + out.bytes, b = opt.fontBytes > used ? opt.fontBytes - used : 0;
     return b < a ? kPrepOverFontBudget : kPrepOverPresetBudget; };
   auto add = [&](uint32_t s) {
     if (st != kPrepOk || out.byIndex[s].present) return;
@@ -184,7 +191,7 @@ PrepareStatus prepare_preset(const Font& f, const Preset* pr, const DecodeOpts& 
   for (uint32_t i = 0; i < pr->nz && st == kPrepOk; i++) { const Zone& z = f.zones[pr->z0 + i];
     if (keys) { bool any = false; for (int k = std::max(0, z.klo); k <= std::min(127, z.khi) && !any; k++) any = keys[k] != 0; if (!any) continue; }
     add(z.s); const SampleHdr& s = f.samples[z.s]; if ((s.type & 6) && s.link < f.samples.size()) add(s.link); }
-  if (st != kPrepOk) { out.byIndex.clear(); out.byIndex.resize(f.samples.size()); out.bytes = 0; out.work = workSpent; return st; }   // (after a refusal `work` is what the call SPENT, informational: the host's counter is not touched)   // refused: nothing is kept, the pad plays nothing
+  if (st != kPrepOk) { std::vector<Pcm>().swap(out.byIndex); out.bytes = 0; out.tableBytes = 0; out.work = workSpent; return st; }   // (after a refusal `work` is what the call SPENT, informational: the host's counter is not touched)   // refused: nothing is kept, the pad plays nothing
   out.work = workSpent;
   if (opt.fontUsed) *opt.fontUsed += out.bytes;
   if (opt.fontWorkUsed) *opt.fontWorkUsed += out.work;
