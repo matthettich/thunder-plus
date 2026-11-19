@@ -39,6 +39,10 @@ void operator delete(void* q) noexcept { if (!q) return; char* p = (char*)q - 16
 void operator delete[](void* q) noexcept { operator delete(q); }
 void operator delete(void* q, size_t) noexcept { operator delete(q); }
 void operator delete[](void* q, size_t) noexcept { operator delete(q); }
+void* operator new(size_t n, const std::nothrow_t&) noexcept { try { return operator new(n); } catch (...) { return nullptr; } }   // (the sanitizer runtimes do not route these through operator new(size_t): all forms are replaced, or a pointer from one is freed by another)
+void* operator new[](size_t n, const std::nothrow_t&) noexcept { try { return operator new(n); } catch (...) { return nullptr; } }
+void operator delete(void* q, const std::nothrow_t&) noexcept { operator delete(q); }
+void operator delete[](void* q, const std::nothrow_t&) noexcept { operator delete(q); }
 
 using namespace thunder;
 using namespace thunder::sf;
