@@ -854,6 +854,13 @@ The web app stays on pump deb07d3 (build 642's `pump/pump.wasm` and `pump/synth/
 
 Start a session by asking for results. Fix on `beta`. (10 Nov, 15:10: the web beta is build 560; the build numbers in the rest of this paragraph are older.) Web beta: https://matthettich.github.io/thunder-plus/beta/ (build 547 as of 10 Nov morning, 548 once its PR merges; the night of 9–10 Nov shipped 544–547, see the four "10 Nov" entries below. Decisions the lead made that night for the owner to confirm or reverse: on a phone the saved Sequencer default plays on the Page unless Audio thread is picked on that device; on a phone the safety limiter is its stand-in until another worklet loads; the resync only runs with a worklet loaded and its margins are untested on a device). Desktop: v1.3.4-beta.2 (build 541, no feed view or scopes); further desktop betas on hold until the owner asks.
 
+**Build 658** (envelope times in bars + lines)
+- [ ] **Computer, Synth page, a synth slot, one noise layer (pink), Amp, Time in BARS + LINES:** set Attack to 1 bar (32 lines at LPB 8). Play it from a 32-step pattern on both sequencers (page and audio-thread core) and in an export. Pass: the swell reaches full level exactly as the pattern ends.
+- [ ] **Computer:** try 2 bars, 4 bars and 8 bars (the maximum). Pass: each ends on the bar line; the line under the rows shows the seconds.
+- [ ] **Computer:** change the song BPM, then the LPB, with the swell in place. Pass: it still fits the bars (the pad re-renders).
+- [ ] **Computer:** switch MS then BARS + LINES then MS on a normal pad. Pass: the sound is about the same (within a line). An old song sounds the same.
+- [ ] **Phone:** the 8-bar swell. Pass: it renders in a few seconds and plays; tell me how long the wait was.
+
 **Build 657** (double-click the master cell: an empty block, or a whole empty row)
 - [ ] **Computer, Arrange as the Song screen:** double-click an empty MASTER cell on a row with nothing in it. Pass: every visible track (MONO and POLY, muted ones too) gets a new empty phrase, consecutive numbers in track order, and the master gets a new empty block; toast "Row NNN: an empty phrase on N tracks and the master"; ONE Undo puts the row back; tracks beyond MONO / POLY get nothing.
 - [ ] **Computer, same screen:** a row with even one filled track cell: double-click its empty master cell. Pass: only the master gets a block. A single click only moves the cursor. Double-click on a filled master cell still opens its phrase.
@@ -1682,6 +1689,15 @@ Tests added: `gen-instrument` (source pins).
 Build 630, on `beta`. The owner asked for a mod section in the FX bar: collapsible, small, showing that there are modulations, the waveform and the destinations. Added `#dkMod` (DK_SECS / DK_FOLD, `deck.mod` saved with the panel, default FOLDED so no existing layout changes) between FX and PERFORM. `deckMod()` rebuilds only when open and when the focused track's LFOs / skin / ANIMATIONS change; each row is a 48×18 canvas wave (`modMix`, the MOD screen's maths) with a dot moved by `dkModTick` from the frame loop (only open, playing, visible, ANIMATIONS on, LOW POWER DISPLAY off), the shape and rate, and the destination (`tgtLabel`). Click: MOD screen on that track. Skin colours through CSS variables (checked IDM and 909 in headless Chrome). Hidden on the phone's swipe layout (`max-width:700px` + coarse pointer): the bottom panel there is one section at a time and the owner's folded-phone width is not a place to add a page. Display code only; nothing posts to the engine.
 
 Tests added: `deck-mod-section` (source pins).
+
+## 19 Nov (envelope times in lines: MS | BARS + LINES; build 658)
+
+Build 658, branch `beta-env-lines`. Owner: noise swells that fit a pattern: 4 bars must work, 8 bars if possible; shown and entered as bars + lines. Notes with line references and the native needs: `docs/ENV-LINES-NOTES.md`.
+- Unit per envelope: layer AMP (`aU`: `atkL holdL decL relL`), layer FILTER env (`fU`: `fAtkL fDecL`), PAD amp (`gU`: `gAtkL gHoldL gDecL gRelL`); `'l'` = lines, no field = ms (old songs identical; freshLayer adds nothing). The ms fields stay as the equivalent at the last edit.
+- `renderVoice` calls `envLinesFit` (engine block): lines to ms at the song's BPM and LPB (`linesMs`, a stage at most 64 s), and lengthens `len` / `hold` to fit (ADSR in a held slot: attack + decay + one bar; never over 300 s). The Worker gets `lpb`. `padBpm` returns `bpm + lpb/100` for such a pad, so a BPM or LPB change re-renders it. `relOf` follows the release in lines.
+- Range 0 to 8 bars a stage (`32 x LPB` lines). Row shows "2 bars + 8 lines", a line under the rows gives the seconds; arrows move a bar, Shift a line, Step buttons `-- - + ++`; typing 4b, 2b8, 2.8, 12 (lines). New slider curve `sqi`; `def.parse` / `def.nudge` hooks in `rowTypeBox` / `sliderNudge`; `row.set`.
+- Speed: `renderLayer` skips `voiceMod` when no mod route has an amount (same numbers; it built an object per 16 samples and was 55 percent of a plain noise layer's render time).
+- Tests: `tests/env-lines.test.js`.
 
 ## 19 Nov (double-click the master cell: an empty block, or a whole empty row; build 657)
 
