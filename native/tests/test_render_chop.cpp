@@ -73,6 +73,22 @@ int main() {
     CHECKF(peak(o.L, SR + 12000 + 2400, 2 * SR) == 0.0, "and it is 0.25 s long, then silent"); Cfg d = c; d.hits.clear(); Out q; render(songJson("{\"pad\":0,\"slc\":4,\"smode\":1}"), d, 4096, q); CHECKF(q.st.seq_chop_no_hits == 4, "no hits: the grid, counted"); }
   // sync 2 (stretched): counted, played unstretched at rate from ofsSec until the cut; sync 1: the rate follows the tempo
   { Cfg c; c.loop = 1.0; Out o; render(songJson("{\"pad\":0,\"sync\":2,\"beats\":4}"), c, 4096, o); CHECKF(o.st.notes_stretched == 4 && o.st.notes_played == 4, "sync 2: counted (%d) and played", o.st.notes_stretched); CHECKF(o.L.size() == (size_t)kOut && mean(o.L, 2000, 20000) > 1e-4, "sync 2 plays"); }
+  // REVERSED chop (verify-chop F1): instrument rev 1, slc 4, a RAMP pad (value = frame / length). The page reads slice k back to front from its END: sample at output frame i of a note is
+  // ramp((ofsSec + durSec) * SR - i) (voice.cpp: off = max(0, dur - ofsSec - durSec) is the distance from the pad's end). A voice that took off = dur - ofsSec (a mutation) starts a slice early and fails.
+  { std::vector<float> ramp((size_t)kPad); for (int i = 0; i < kPad; i++) ramp[(size_t)i] = (float)i / (float)kPad;
+    Cfg c; c.pad = ramp; Out o; render(songJson("{\"pad\":0,\"slc\":4,\"rev\":1}"), c, 4096, o);
+    Cfg d; Out dc; render(songJson("{\"pad\":0,\"slc\":4}"), d, 4096, dc); const double g = mean(dc.L, 2000, 22000) / 0.1;   // the mixer's gain on a constant (as above)
+    CHECKF(o.st.seq_chopped == 4 && g > 1e-3, "reversed chop: 4 notes chopped (%llu)", (unsigned long long)o.st.seq_chopped);
+    for (int k = 0; k < 4; k++) {
+      const int t0 = k * SR, a = 2000, b = 8000; double want = 0;
+      for (int i = a; i < b; i++) want += (double)((k + 1) * (kPad / 4) - i) / kPad;
+      want = g * want / (b - a);
+      const double got = mean(o.L, t0 + a, t0 + b);
+      CHECKF(std::fabs(got - want) <= 0.01 * want, "reversed note %d: reads its own slice back to front (mean %g, want %g)", k, got, want);
+      // it runs down to the slice's start and stops there: the level near the end of the slice is that of the slice's first frames
+      const int e0 = kPad / 4 - 2400, e1 = kPad / 4 - 400; double w2 = 0; for (int i = e0; i < e1; i++) w2 += (double)((k + 1) * (kPad / 4) - i) / kPad; w2 = g * w2 / (e1 - e0);
+      const double g2 = mean(o.L, t0 + e0, t0 + e1); CHECKF(std::fabs(g2 - w2) <= 0.01 * w2 + 1e-6, "reversed note %d: near the slice's start at its end (mean %g, want %g)", k, g2, w2);
+    } }
   // a changed pad loses its chop data
   { thunder_render_opts op; std::memset(&op, 0, sizeof op); op.size = sizeof op; op.use_frames = 1; op.frames = SR; char err[100]; const std::string sg = slc4;
     thunder_render* r = thunder_render_create((const uint8_t*)sg.data(), sg.size(), &op, err, sizeof err); const std::vector<float> p = levels();
