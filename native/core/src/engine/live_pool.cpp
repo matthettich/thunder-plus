@@ -32,20 +32,29 @@ LivePool::~LivePool() = default;
 
 bool LivePool::addPad(int pad, const LivePadConfig& cfg) {
   if (pad < 0 || pad >= kLivePads) return false;
-  if (cfg.kind != LiveKind::Bass && cfg.kind != LiveKind::Acid && cfg.kind != LiveKind::Mach) return false;   // vox: a later stage
+  if (cfg.kind != LiveKind::Bass && cfg.kind != LiveKind::Vox && cfg.kind != LiveKind::Acid && cfg.kind != LiveKind::Mach) return false;
   PadSlot fresh; fresh.kind = cfg.kind;
-  for (int t = 0; t < kVoiceTracks; t++) {
-    if (cfg.trackMask && !(cfg.trackMask >> t & 1)) continue;
+  if (cfg.kind == LiveKind::Vox) { fresh.poly.assign((size_t)kVoiceTracks * kVoicePoly, nullptr); fresh.vg.assign((size_t)kVoiceTracks, VoxG()); }
+  auto make = [&](int t, int j) -> Node* {
     std::unique_ptr<Node> n(new Node());
-    n->pad = pad; n->track = t; n->kind = cfg.kind;
+    n->pad = pad; n->track = t; n->kind = cfg.kind; n->j = j;
+    bool ok = true;
     switch (cfg.kind) {
       case LiveKind::Bass: { auto* e = new LiveEngT<LiveBass>(sr_); n->eng.reset(e); e->shell().core().set(cfg.bass); break; }
+      case LiveKind::Vox: { auto* e = new LiveEngT<LiveVox>(sr_); n->eng.reset(e); ok = e->shell().core().set(cfg.vox); break; }   // (false: the lyrics could not be parsed)
       case LiveKind::Acid: { auto* e = new LiveEngT<LiveAcid>(sr_); n->eng.reset(e); e->shell().core().set(cfg.acid); break; }
       default: { auto* e = new LiveEngT<LiveMach>(sr_); n->eng.reset(e); e->shell().core().set(cfg.mach); break; }
     }
+    if (!ok) return nullptr;
     n->eng->setRateFeed(&n->rate, sr_);
     fresh.bytes += sizeof(Node) + n->eng->bytes();
-    fresh.byTrack[t] = n.get(); fresh.nodes.push_back(std::move(n));
+    Node* raw = n.get(); fresh.nodes.push_back(std::move(n)); return raw;
+  };
+  for (int t = 0; t < kVoiceTracks; t++) {
+    if (cfg.trackMask && !(cfg.trackMask >> t & 1)) continue;
+    Node* m = make(t, 0); if (!m) return false;
+    fresh.byTrack[t] = m;
+    if (cfg.kind == LiveKind::Vox) for (int j = 1; j <= kVoicePoly; j++) { Node* p = make(t, j); if (!p) return false; fresh.poly[(size_t)t * kVoicePoly + (size_t)(j - 1)] = p; }
   }
   pads_[pad] = std::move(fresh);   // (the nodes are made first: a throw above leaves the pad as it was)
   rebuildActive();
@@ -62,7 +71,7 @@ uint32_t LivePool::failedNodes() const { uint32_t k = 0; for (const Node* n : ac
 // ---- the timeline ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 void LivePool::cancelFrom(Node& n, int64_t T) {   // AudioParam.cancelScheduledValues(t) on gate / trig / leg: what is booked at or after T goes (a note at the same sample takes back a booked off: D4)
   int w = 0; for (int i = 0; i < n.ntl; i++) if (n.tl[i].T < T) n.tl[w++] = n.tl[i];
-  n.ntl = w;
+  n.ntl = w; rec(n, 'c', 0, 0, T);
 }
 void LivePool::book(Node& n, const TEv& e) {
   if (n.ntl >= kTimeline) {
@@ -80,15 +89,36 @@ void LivePool::book(Node& n, const TEv& e) {
 // ---- notes -----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 bool LivePool::note(const SeqEvent& e, int pad) {
   if (!has(pad)) return false;
-  Node* n = e.track >= 0 && e.track < kVoiceTracks ? pads_[pad].byTrack[e.track] : nullptr;
+  PadSlot& ps = pads_[pad];
+  Node* n = e.track >= 0 && e.track < kVoiceTracks ? ps.byTrack[e.track] : nullptr;
   if (!n) { st_.noNode++; return false; }
   if (!std::isfinite(e.rate) || !std::isfinite(e.gain) || !std::isfinite(e.pan) || ((e.has & SH_SLIDE) && (!std::isfinite(e.slideFrom) || !std::isfinite(e.slideDur)))) return false;   // (the JS would throw inside liveStart: nothing is booked)
+  if (ps.kind == LiveKind::Vox && e.poly) return polyVox(e, ps);
   startNote(*n, e);
   st_.played++;
   return true;
 }
 
-void LivePool::startNote(Node& n, const SeqEvent& e) {
+// polyVox (core-processor.js liveNote, the `ev.poly && lk.vox` branch): four nodes a track; the syllable of the note (notes within 4 ms share one), the node it takes: the same column still sounding, else a free one, else the one
+// that started longest ago (ties: the first); a note that would take the node that started at the very same time with none free is consumed and silent.
+bool LivePool::polyVox(const SeqEvent& e, PadSlot& ps) {
+  Node* nodes[kVoicePoly]; for (int j = 0; j < kVoicePoly; j++) { nodes[j] = ps.poly[(size_t)e.track * kVoicePoly + (size_t)j]; if (!nodes[j]) { st_.noNode++; return false; } }
+  VoxG& G = ps.vg[(size_t)e.track];
+  const bool leg = (e.has & SH_SLIDE) && e.slideDur > 0;
+  double kk;
+  if (std::fabs(e.t - G.lastT) < 0.004) kk = G.lastK; else { kk = leg ? std::max(0.0, G.sylN - 1) : G.sylN++; G.lastT = e.t; G.lastK = kk; }
+  Node* free_[kVoicePoly]; int nf = 0;
+  for (int j = 0; j < kVoicePoly; j++) if (!nodes[j]->curLive || nodes[j]->curStop) free_[nf++] = nodes[j];
+  Node* pick = nullptr;
+  for (int j = 0; j < kVoicePoly && !pick; j++) { const Node* b = nodes[j]; if (b->curLive && (!b->curStop || b->stopAt > e.t - 1e-6) && b->curCol == e.col && b->lastOn < e.t - 0.004) pick = nodes[j]; }   // sameCol
+  if (!pick) { Node** src = nf ? free_ : nodes; const int cnt = nf ? nf : kVoicePoly; pick = src[0]; for (int j = 1; j < cnt; j++) if (!(pick->lastOn <= src[j]->lastOn)) pick = src[j]; }
+  if (pick->lastOn >= e.t - 1e-6 && std::fabs(pick->lastOn - e.t) < 0.004 && nf == 0) return true;
+  startNote(*pick, e, kk, true);
+  st_.played++;
+  return true;
+}
+
+void LivePool::startNote(Node& n, const SeqEvent& e, double fk, bool hasFk) {
   const double t = std::isfinite(e.t) ? std::max(e.t, now_) : now_;   // Math.max(ev.t, currentTime)
   const int64_t T = sample_at_or_after(t, sr_);
   const bool leg = (e.has & SH_SLIDE) && e.slideDur > 0;
@@ -97,12 +127,13 @@ void LivePool::startNote(Node& n, const SeqEvent& e) {
   if (n.rate.size() + 3 > n.rate.capacity()) { n.rate.prune(now_); if (n.rate.size() + 3 > n.rate.capacity()) { n.rate.prune(t); n.rate.cancel(t); } }
   n.rate.hold(t);
   if (leg) { n.rate.set(e.slideFrom, t); n.rate.lin(e.rate, t + e.slideDur); } else n.rate.set(e.rate, t);
-  TEv on; on.T = T; on.type = LiveEvType::NoteOn; on.leg = leg; on.acc = n.kind != LiveKind::Bass && e.acc;
-  book(n, on);
+  TEv on; on.T = T; on.type = LiveEvType::NoteOn; on.leg = leg; on.acc = n.kind != LiveKind::Bass && n.kind != LiveKind::Vox && e.acc;
+  if (n.kind == LiveKind::Vox) { on.v = hasFk ? fk : leg ? std::max(0.0, n.sylN - 1) : n.sylN++; on.same = leg; }   // syl lane: the node's own counter, or polyVox's; `same` lane: the slide
+  book(n, on); rec(n, 'n', t, on.v, T, leg, on.acc, on.same);
   if (n.g.size() + 2 > n.g.capacity()) n.g.prune(now_);
   if (n.pn.size() + 2 > n.pn.capacity()) n.pn.prune(now_);
   n.g.set(e.gain, t); n.pn.set(std::max(-1.0, std::min(1.0, (e.pan - 128) / 127)), t);
-  n.lastOn = t; n.curLive = true; n.curStop = false;
+  n.lastOn = t; n.curLive = true; n.curStop = false; n.curCol = e.col;
   if (e.has & SH_CUT) kill(n, e.cut);
   if (e.has & SH_REL) kill(n, e.rel);
 }
@@ -112,7 +143,7 @@ void LivePool::kill(Node& n, double at) {   // kill(v, at) for a live voice: the
   n.curStop = true; n.stopAt = at;
   const double t = std::max(at, now_); const int64_t T = sample_at_or_after(t, sr_);
   if (t < n.lastOn - 1e-6) cancelFrom(n, T);
-  TEv off; off.T = T; off.type = LiveEvType::NoteOff; book(n, off);
+  TEv off; off.T = T; off.type = LiveEvType::NoteOff; book(n, off); rec(n, 'o', t, 0, T);
 }
 
 // ---- rendering -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------

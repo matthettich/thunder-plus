@@ -82,7 +82,43 @@ template <class SH, class Mk> static void kind(const char* name, Mk setParams) {
   CHECK(std::memcmp(&p0.oct, &a.core().p().oct, sizeof(double)) == 0, "%s: parameters changed by reset()", name);
 }
 
+
+// IDLE SKIP (LIVE-ROUTE B3): may a pool skip a node that has nothing to play (not run its blocks)? Only if the blocks of an idle core change nothing. The test: a core plays a note and lets it go until it is silent; a copy of it is
+// the "skipped" core (frozen); the original then renders K idle quanta (what the page's node does for ever); both then play the same second note and must give the same samples, bit for bit. A core that fails this is never skipped.
+static bool onNote(BassCore& c, bool leg) { c.on(leg); return true; }
+static bool onNote(AcidCore& c, bool leg) { c.on(leg, true); return true; }
+static bool onNote(MachCore& c, bool leg) { c.on(leg); return true; }
+static bool onNote(VoxCore& c, bool leg) { return c.on(leg, 1, false); }
+template <class C, class Mk> static bool idleNeutral(Mk setParams, const char* name, bool legB = false) {
+  bool neutral = true;
+  for (uint32_t idleQuanta : {1u, 7u, 100u, 3000u}) {
+    C x(SR); setParams(x); float L[128], R[128];
+    onNote(x, false); for (int i = 0; i < 40; i++) x.render(L, R, 128, 0, 128, 1.0);
+    x.off(); bool quiet = false;   // the release, until the first block that is all zeros: where a pool would start to skip it
+    for (int i = 0; i < 4000 && !quiet; i++) { x.render(L, R, 128, 0, 128, 1.0); double e = 0; for (int k = 0; k < 128; k++) e += std::fabs(L[k]) + std::fabs(R[k]); quiet = e == 0; }
+    CHECK(quiet);
+    C y = x;   // the frozen core
+    for (uint32_t k = 0; k < idleQuanta; k++) x.render(L, R, 128, 0, 128, 1.0);
+    onNote(x, legB); onNote(y, legB);
+    float L2[128], R2[128];
+    for (int i = 0; i < 40 && neutral; i++) { x.render(L, R, 128, 0, 128, 1.3); y.render(L2, R2, 128, 0, 128, 1.3); if (std::memcmp(L, L2, sizeof L) || std::memcmp(R, R2, sizeof R)) { neutral = false; std::printf("idle skip: %s differs after %u idle quanta (block %d)\n", name, idleQuanta, i); } }
+    if (!neutral) break;
+  }
+  return neutral;
+}
+static void testIdle() {
+  CHECK(idleNeutral<BassCore>([](BassCore& c) { BassP p; p.cut = 700; p.wAmp = 0.5; c.set(p); }, "bass"));
+  CHECK(idleNeutral<AcidCore>([](AcidCore& c) { AcidP p; p.cut = 500; c.set(p); }, "acid"));
+  CHECK(idleNeutral<MachCore>([](MachCore& c) { MachP p; p.machine = 1; c.set(p); }, "mach"));
+  bool vox = true;
+  for (const char* txt : {"la di da", "strengths spring, hmm", "s t k p", "ah"}) for (bool leg : {false, true})
+    vox = idleNeutral<VoxCore>([&](VoxCore& c) { VoxP p; p.txt = txt; p.vib = 0.6; p.vibDelay = 50; c.set(p); }, "vox", leg) && vox;
+  for (bool leg : {false, true}) { CHECK(idleNeutral<BassCore>([](BassCore& c) { BassP p; p.cut = 700; p.wAmp = 0.5; p.wRate = 3; c.set(p); }, "bass", leg)); CHECK(idleNeutral<AcidCore>([](AcidCore& c) { AcidP p; c.set(p); }, "acid", leg)); CHECK(idleNeutral<MachCore>([](MachCore& c) { MachP p; p.machine = 2; c.set(p); }, "mach", leg)); }
+  std::printf("idle skip: bass / acid / mach neutral; vox %s\n", vox ? "NEUTRAL" : "NOT neutral (the pool never skips a vox node)");
+}
+
 int main() {
+  testIdle();
   kind<LiveBass>("bass", [](BassCore& c) { BassP p; p.shape = 0.6; p.det = 0.4; p.cut = 900; p.wRate = 3; p.wAmp = 0.5; p.glide = 30; c.set(p); });
   kind<LiveVox>("vox", [](VoxCore& c) { VoxP p; p.txt = "la di da, ba ba"; p.vib = 0.4; p.sylLen = 200; c.set(p); });
   kind<LiveAcid>("acid", [](AcidCore& c) { AcidP p; p.cut = 600; p.res = 0.8; p.wave = 1; p.slide = 40; c.set(p); });

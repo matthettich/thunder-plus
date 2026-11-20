@@ -218,7 +218,7 @@ int thunder_render_set_pad_sf(thunder_render* r, int pad, int font_id, int bank,
 int thunder_render_clear_pad_sf(thunder_render* r, int pad);
 
 /* LIVE-ENGINE PADS (docs/port/LIVE-ROUTE-NOTES.md, LIVE-ROUTE-DESIGN.md L2). thunder_render_set_pad_live: pad `pad` (0 .. 255) is played by a live engine of `kind`:
-   THUNDER_RENDER_LIVE_BASS 1, _ACID 3, _MACH 4 (vox 2 and the other kinds: E_ARG until they are built). `voice_json` is the page's voice object (engine, level, tune, drive and the engine's own parameter object
+   THUNDER_RENDER_LIVE_BASS 1, _VOX 2, _ACID 3, _MACH 4 (the other kinds: E_ARG until they are built). A vox pad makes five nodes a track (the mono node and the four of polyVox). `voice_json` is the page's voice object (engine, level, tune, drive and the engine's own parameter object
    under its name), COPIED and parsed here; its engine must be the kind's. The nodes (one a track that may play the pad, per params->track_mask) are made here: nothing is allocated at a note. Only before the first read or
    drain (E_STATE after). E_ARG: a bad pad / kind / mask / JSON or an engine that is not the kind's; E_LIMIT: the nodes would pass the pad budget (THUNDER_RENDER_MAX_PAD_BYTES, shared with the pads); E_MEMORY: nothing changed.
    It does NOT change the pad's route: set THUNDER_RENDER_ROUTE_LIVE too (a ROUTE_LIVE pad with no live params is silent, counted in notes_live, and still takes its track over). A pad set twice is replaced.

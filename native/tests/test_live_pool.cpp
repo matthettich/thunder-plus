@@ -164,6 +164,91 @@ static void testSeam() {
   std::printf("seam: %d tracks sounded, %u notes played, late %u\n", sounded, s.played, s.late);
 }
 
+
+// ---- (2b) vox: the mono node (the syllable counter), polyVox (the JS's picks and syllables, from the decision-log golden), the audio of each node against the shell driven directly --------------------------------------
+struct VoxNote { SeqEvent e; double syl; bool same; };
+static void refRunVox(const VoxP& vp, const std::vector<VoxNote>& ns, int64_t total, std::vector<float>& outL, std::vector<float>& outR) {
+  LiveVox sh(SR); sh.core().set(vp);
+  static AutoN<4096> rate, g, pn; rate.reset(1); g.reset(1); pn.reset(0);
+  std::vector<LiveEvent> le; const uint32_t lat = LiveVox::latency();
+  for (const VoxNote& n : ns) {
+    const SeqEvent& e = n.e; const int64_t T = sample_at_or_after(e.t, SR); const bool leg = (e.has & SH_SLIDE) && e.slideDur > 0;
+    rate.hold(e.t); if (leg) { rate.set(e.slideFrom, e.t); rate.lin(e.rate, e.t + e.slideDur); } else rate.set(e.rate, e.t);
+    LiveEvent x; x.at = (uint32_t)T; x.type = LiveEvType::NoteOn; x.leg = leg; x.same = n.same; x.v = n.syl; le.push_back(x);
+    g.set(e.gain, e.t); pn.set(std::max(-1.0, std::min(1.0, (e.pan - 128) / 127)), e.t);
+    if (e.has & SH_REL) { LiveEvent o; o.at = (uint32_t)sample_at_or_after(e.rel, SR); o.type = LiveEvType::NoteOff; le.push_back(o); }
+  }
+  std::stable_sort(le.begin(), le.end(), [](const LiveEvent& a, const LiveEvent& b) { return a.at < b.at; });
+  const uint64_t n = (uint64_t)total + lat; std::vector<float> L(n), R(n);
+  sh.setRateFeed(&rate, SR); sh.process(L.data(), R.data(), (uint32_t)n, le.data(), (uint32_t)le.size());
+  outL.assign(total, 0); outR.assign(total, 0);
+  for (int64_t q0 = 0; q0 < total; q0 += 128) {
+    const double dt = 1 / SR, tb0 = (double)q0 / SR;
+    for (int i = 0; i < 128 && q0 + i < total; i++) {
+      const double t = tb0 + i * dt, gg = g.at(t), p = pn.at(t);
+      const double l = (double)L[q0 + i + lat] * gg, r = (double)R[q0 + i + lat] * gg; double a, b;
+      if (p <= 0) { const double x = (p + 1) * 3.14159265358979323846 / 2; a = l + r * std::cos(x); b = r * std::sin(x); }
+      else { const double x = p * 3.14159265358979323846 / 2; a = l * std::cos(x); b = r + l * std::sin(x); }
+      outL[q0 + i] = (float)(double)(float)a; outR[q0 + i] = (float)(double)(float)b;
+    }
+  }
+}
+static void testVox() {
+  Song song; JsonError je; const std::string sj = songJson(); CHECK(song.load(sj.data(), sj.size(), &je));
+  SeqVars vars; SeqOpts so; so.row = song.renderFrom; so.once = true; Seq seq(song, vars, SeqMode::Song, so);
+  std::unique_ptr<RenderPads> pads(new RenderPads()); pads->route[0] = PadRoute::Live;
+  Players pl(pads.get(), SR, 8);
+  VoxP vp; vp.txt = "la di da ba ne"; vp.sylLen = 180;
+  LivePadConfig c; c.kind = LiveKind::Vox; c.vox = vp; c.trackMask = 0b11; CHECK(pl.live().addPad(0, c));
+  std::vector<LiveTraceRec> trace; trace.reserve(4096); pl.live().setTrace(&trace);
+  std::vector<SeqEvent> evs;
+  // track 0: the mono node (slides and a release; the syllable counter counts the notes that are not slides)
+  for (int j = 0; j < 6; j++) { SeqEvent e = note(0.05 + 0.1 * j, 0, 0, 0.7 + 0.15 * j, 0.7, 128 + 10 * j); if (j % 3 == 1) { e.has |= SH_SLIDE; e.slideFrom = e.rate * 0.6; e.slideDur = 0.03; } if (j % 2 == 0) { e.has |= SH_REL; e.rel = e.t + 0.07; } evs.push_back(e); }
+  // track 1: polyVox, the first seven notes of the decision-log golden's vox_poly case (tools/live-route-dump.mjs): a chord of four within 4 ms, then three more
+  struct PN { int b, o, col; double rate; bool slide; };
+  const PN pn[7] = {{1, 0, 0, 1}, {1, 40, 1, 1.25}, {1, 80, 2, 1.5}, {1, 120, 3, 2}, {4, 0, 4, 0.5}, {6, 0, 0, 1.1, true}, {8, 0, 1, 1.3}};
+  const size_t first = evs.size();
+  for (int k = 0; k < 7; k++) { SeqEvent e = note((double)(pn[k].b * 128 + pn[k].o) / SR, 1, 0, pn[k].rate); e.poly = true; e.col = pn[k].col; if (pn[k].slide) { e.has |= SH_SLIDE; e.slideFrom = 1; e.slideDur = 0.02; } evs.push_back(e); }
+  const int64_t total = (int64_t)(0.9 * SR) / 128 * 128;
+  std::vector<std::vector<float>> gotL(2, std::vector<float>(total, 0)), gotR(2, std::vector<float>(total, 0)), bl(2, std::vector<float>(128)), br(2, std::vector<float>(128));
+  float* inL[kVoiceTracks] = {}; float* inR[kVoiceTracks] = {}; for (int t = 0; t < 2; t++) { inL[t] = bl[t].data(); inR[t] = br[t].data(); }
+  std::vector<char> done(evs.size(), 0);
+  for (int64_t q0 = 0; q0 < total; q0 += 128) {
+    const double t0 = (double)q0 / SR; pl.setTime(t0, q0);
+    for (size_t i = 0; i < evs.size(); i++) if (!done[i] && evs[i].t - 0.25 <= t0) { done[i] = 1; pl.dispatch(evs[i], seq, song); }
+    for (int t = 0; t < 2; t++) { std::fill(bl[t].begin(), bl[t].end(), 0.f); std::fill(br[t].begin(), br[t].end(), 0.f); }
+    pl.render(inL, inR, 128, t0, q0);
+    for (int t = 0; t < 2; t++) { std::copy(bl[t].begin(), bl[t].end(), gotL[t].begin() + q0); std::copy(br[t].begin(), br[t].end(), gotR[t].begin() + q0); }
+  }
+  // the picks and syllables of the poly chord, as the JS's log has them (nodes 1, 2, 3, 4, 1, 2, 3; syllables 0, 0, 0, 0, 1, 1, 2; the slide's `same` 1)
+  std::vector<LiveTraceRec> pn1; for (const LiveTraceRec& r : trace) if (r.what == 'n' && r.track == 1) pn1.push_back(r);
+  const int wantJ[7] = {1, 2, 3, 4, 1, 2, 3}; const double wantSyl[7] = {0, 0, 0, 0, 1, 1, 2}; const bool wantSame[7] = {0, 0, 0, 0, 0, 1, 0};
+  CHECKF(pn1.size() == 7, "poly notes booked: %zu", pn1.size());
+  for (size_t k = 0; k < pn1.size() && k < 7; k++) CHECKF(pn1[k].j == wantJ[k] && pn1[k].v == wantSyl[k] && pn1[k].same == wantSame[k], "poly note %zu: node %d syl %g same %d (want %d %g %d)", k, pn1[k].j, pn1[k].v, (int)pn1[k].same, wantJ[k], wantSyl[k], (int)wantSame[k]);
+  // the audio: the mono node (track 0) with the syllable counter; each poly node from the notes the trace gave it
+  { std::vector<VoxNote> ns; double sylN = 0; for (size_t i = 0; i < first; i++) { VoxNote n; n.e = evs[i]; const bool leg = (n.e.has & SH_SLIDE) && n.e.slideDur > 0; n.syl = leg ? std::max(0.0, sylN - 1) : sylN++; n.same = leg; ns.push_back(n); }
+    std::vector<float> L, R; refRunVox(vp, ns, total, L, R);
+    int64_t bad = -1; for (int64_t i = 0; i < total; i++) if (std::memcmp(&L[i], &gotL[0][i], 4) || std::memcmp(&R[i], &gotR[0][i], 4)) { bad = i; break; }
+    CHECKF(bad < 0, "vox mono differs from the shell driven directly at %lld", (long long)bad);
+    double e = 0; for (float x : gotL[0]) e += std::fabs(x); CHECK(e > 1e-3); }
+  { std::vector<float> sumL(total, 0), sumR(total, 0);
+    for (int j = 1; j <= 4; j++) {
+      std::vector<VoxNote> ns; for (size_t k = 0; k < pn1.size(); k++) if (pn1[k].j == j) { VoxNote n; n.e = evs[first + k]; n.syl = pn1[k].v; n.same = pn1[k].same; ns.push_back(n); }
+      std::vector<float> L, R; refRunVox(vp, ns, total, L, R);
+      for (int64_t i = 0; i < total; i++) { sumL[i] = (float)((double)sumL[i] + (double)L[i]); sumR[i] = (float)((double)sumR[i] + (double)R[i]); }
+    }
+    // (the mono node of track 1 adds exact zeros first)
+    int64_t bad = -1; for (int64_t i = 0; i < total; i++) if (std::memcmp(&sumL[i], &gotL[1][i], 4) || std::memcmp(&sumR[i], &gotR[1][i], 4)) { bad = i; break; }
+    CHECKF(bad < 0, "polyVox differs from the four shells driven directly at %lld", (long long)bad);
+    double e = 0; for (float x : gotL[1]) e += std::fabs(x); CHECK(e > 1e-3); }
+  // the overflow guard: five notes at one instant on one track with four nodes busy: the fifth is consumed, silent
+  { std::vector<LiveTraceRec> t2; t2.reserve(64); pl.live().setTrace(&t2); const double base = 1.0;
+    pl.setTime(base, (int64_t)(base * SR)); uint32_t before = pl.live().stats().played;
+    for (int k = 0; k < 5; k++) { SeqEvent e = note(base, 1, 0, 1.0); e.poly = true; e.col = 10 + k; pl.dispatch(e, seq, song); }
+    int ons = 0; for (const LiveTraceRec& r : t2) if (r.what == 'n') ons++;
+    CHECKF(ons == 4 && pl.live().stats().played - before == 4, "five notes at one instant: %d booked, %u played (want 4)", ons, pl.live().stats().played - before); }
+}
+
 // ---- (3) run-ahead: an event inside the look-ahead is late ------------------------------------------------------------------------------------------------------------------------------------
 static void testLate() {
   Song song; JsonError je; const std::string sj = songJson(); CHECK(song.load(sj.data(), sj.size(), &je));
@@ -216,7 +301,7 @@ static void testApi() {
   CHECK(thunder_render_set_pad_live(r, -1, 1, (const uint8_t*)ok, okn, nullptr) == THUNDER_RENDER_E_ARG);
   CHECK(thunder_render_set_pad_live(r, 256, 1, (const uint8_t*)ok, okn, nullptr) == THUNDER_RENDER_E_ARG);
   CHECK(thunder_render_set_pad_live(r, 0, 0, (const uint8_t*)ok, okn, nullptr) == THUNDER_RENDER_E_ARG);
-  CHECK(thunder_render_set_pad_live(r, 0, 2, (const uint8_t*)ok, okn, nullptr) == THUNDER_RENDER_E_ARG);   // vox: not built yet
+  CHECK(thunder_render_set_pad_live(r, 0, 2, (const uint8_t*)ok, okn, nullptr) == THUNDER_RENDER_E_ARG);   // a bass voice is not a vox
   CHECK(thunder_render_set_pad_live(r, 0, 99, (const uint8_t*)ok, okn, nullptr) == THUNDER_RENDER_E_ARG);
   CHECK(thunder_render_set_pad_live(r, 0, 1, nullptr, okn, nullptr) == THUNDER_RENDER_E_ARG);
   CHECK(thunder_render_set_pad_live(r, 0, 1, (const uint8_t*)ok, 0, nullptr) == THUNDER_RENDER_E_ARG);
@@ -236,6 +321,7 @@ static void testApi() {
 int main() {
   testStartRule();
   testSeam();
+  testVox();
   testLate();
   testApi();
   if (g_fail) { std::printf("live_pool: %d FAILED\n", g_fail); return 1; }

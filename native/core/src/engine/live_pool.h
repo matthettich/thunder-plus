@@ -31,6 +31,9 @@ struct LivePadConfig {
   uint64_t trackMask = 0;   // bit t: the pad may play on track t (0 .. 32); 0 = all 33
 };
 
+// A decision trace for tests (LIVE-ROUTE L10(f)): what the pool books on a node, in the order it books it. Off by default (no cost, no allocation); a test gives it a vector with room.
+struct LiveTraceRec { int track = 0, pad = 0, j = 0; char what = 0; double t = 0, v = 0; int64_t T = 0; bool leg = false, acc = false, same = false; };   // what: 'n' note-on (v = syllable), 'o' note-off, 'c' cancelFrom
+
 struct LiveStats { uint32_t played = 0, noNode = 0, late = 0, queueDropped = 0, forcedOff = 0, failed = 0; };
 
 class LiveEng {   // one engine as the pool uses it (a LiveShell of one of the four cores behind a small interface)
@@ -56,6 +59,7 @@ class LivePool {
   // Control thread. Makes (or replaces) the pad's nodes. false: the kind is not built yet or an allocation failed (std::bad_alloc propagates where exceptions are on).
   bool addPad(int pad, const LivePadConfig& cfg);
   void removePad(int pad);
+  void setTrace(std::vector<LiveTraceRec>* v) { trace_ = v; }
   bool has(int pad) const { return pad >= 0 && pad < kLivePads && pads_[pad].kind != LiveKind::None; }
   size_t padBytes(int pad) const { return pad >= 0 && pad < kLivePads ? pads_[pad].bytes : 0; }
 
@@ -76,14 +80,22 @@ class LivePool {
     std::unique_ptr<LiveEng> eng;
     TEv tl[kTimeline]; int ntl = 0;
     AutoN<kAutoRate> rate{1}; AutoN<kAutoGP> g{1}, pn{0};
-    double lastOn = -1; bool curLive = false, curStop = false; double stopAt = 0;
+    int j = 0;                          // 0: the mono node; 1 .. 4: a polyVox node
+    double lastOn = -1; bool curLive = false, curStop = false; double stopAt = 0; int curCol = 0;
+    double sylN = 0;                    // the mono node's syllable counter (the JS's L.sylN)
     bool started = false;
     Node() = default;
   };
-  struct PadSlot { LiveKind kind = LiveKind::None; std::vector<std::unique_ptr<Node>> nodes; Node* byTrack[kVoiceTracks] = {}; size_t bytes = 0; };
+  struct VoxG { double sylN = 0, lastT = -9, lastK = 0; };   // polyVox's syllable counter of a (track, pad): notes within 4 ms share one syllable
+  struct PadSlot {
+    LiveKind kind = LiveKind::None; std::vector<std::unique_ptr<Node>> nodes; Node* byTrack[kVoiceTracks] = {}; size_t bytes = 0;
+    std::vector<Node*> poly;            // vox: kVoicePoly nodes a track (index track * kVoicePoly + j - 1), null where the mask has none
+    std::vector<VoxG> vg;               // vox: per track
+  };
 
   void rebuildActive();
-  void startNote(Node& n, const SeqEvent& e);
+  void startNote(Node& n, const SeqEvent& e, double fk = -1, bool hasFk = false);
+  bool polyVox(const SeqEvent& e, PadSlot& ps);
   void kill(Node& n, double at);
   void cancelFrom(Node& n, int64_t T);
   void book(Node& n, const TEv& e);
@@ -94,7 +106,8 @@ class LivePool {
   PadSlot pads_[kLivePads];
   std::vector<Node*> active_;
   std::unique_ptr<float[]> scr_;     // two scratch blocks of kQuantum
-  LiveStats st_;
+  LiveStats st_; std::vector<LiveTraceRec>* trace_ = nullptr;
+  void rec(const Node& n, char what, double t, double v, int64_t T, bool leg = false, bool acc = false, bool same = false) { if (trace_) { LiveTraceRec r; r.track = n.track; r.pad = n.pad; r.j = n.j; r.what = what; r.t = t; r.v = v; r.T = T; r.leg = leg; r.acc = acc; r.same = same; trace_->push_back(r); } }
 };
 
 }  // namespace thunder

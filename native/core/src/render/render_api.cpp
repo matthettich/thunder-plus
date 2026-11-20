@@ -441,7 +441,7 @@ int thunder_render_set_pad_live(thunder_render* r, int pad, int kind, const uint
   if (!r) return THUNDER_RENDER_E_ARG;
   if (r->dead || r->started) return THUNDER_RENDER_E_STATE;
   if (!padOk(pad) || !voice_json || n == 0 || n > THUNDER_RENDER_MAX_VARS_BYTES) return THUNDER_RENDER_E_ARG;
-  if (kind != THUNDER_RENDER_LIVE_BASS && kind != THUNDER_RENDER_LIVE_ACID && kind != THUNDER_RENDER_LIVE_MACH) return THUNDER_RENDER_E_ARG;   // (vox and the other kinds are not built yet)
+  if (kind != THUNDER_RENDER_LIVE_BASS && kind != THUNDER_RENDER_LIVE_VOX && kind != THUNDER_RENDER_LIVE_ACID && kind != THUNDER_RENDER_LIVE_MACH) return THUNDER_RENDER_E_ARG;   // (the pump synths and waves: later steps)
   uint64_t mask = 0;
   if (params) {
     if (params->size < 2 * sizeof(uint32_t)) return THUNDER_RENDER_E_ARG;
@@ -458,11 +458,12 @@ int thunder_render_set_pad_live(thunder_render* r, int pad, int kind, const uint
     if (!xeng_voice_from_json(*V, doc.root(), Json())) return THUNDER_RENDER_E_ARG;
     LivePadConfig cfg; cfg.trackMask = mask;
     if (kind == THUNDER_RENDER_LIVE_BASS) { if (V->kind != XKind::Bass) return THUNDER_RENDER_E_ARG; cfg.kind = LiveKind::Bass; cfg.bass = V->bass; cfg.bass.tune = V->tune; cfg.bass.drive = V->drive; cfg.bass.level = V->level; }   // (tune, drive and level come from the voice, as the page's node params do)
+    else if (kind == THUNDER_RENDER_LIVE_VOX) { if (V->kind != XKind::Vox) return THUNDER_RENDER_E_ARG; cfg.kind = LiveKind::Vox; cfg.vox = V->vox; cfg.vox.tune = V->tune; cfg.vox.drive = V->drive; cfg.vox.level = V->level; }
     else if (kind == THUNDER_RENDER_LIVE_ACID) { if (V->kind != XKind::Acid) return THUNDER_RENDER_E_ARG; cfg.kind = LiveKind::Acid; cfg.acid = V->acid; cfg.acid.tune = V->tune; cfg.acid.drive = V->drive; cfg.acid.level = V->level; }
     else { if (V->kind != XKind::Mach) return THUNDER_RENDER_E_ARG; cfg.kind = LiveKind::Mach; cfg.mach = V->mach; cfg.mach.tune = V->tune; cfg.mach.drive = V->drive; cfg.mach.level = V->level; }
     LivePool& L = r->R->players().live();
     // the nodes' bytes count against the pad budget (the old pad's nodes are released only when the new ones are in: judged with both held)
-    size_t each = 0; { const int tracks = mask ? __builtin_popcountll(mask) : kVoiceTracks; each = (size_t)tracks * (kind == THUNDER_RENDER_LIVE_BASS ? 58000 : 39000); }
+    size_t each = 0; { const int tracks = mask ? __builtin_popcountll(mask) : kVoiceTracks; each = (size_t)tracks * (kind == THUNDER_RENDER_LIVE_BASS ? 58000 : kind == THUNDER_RENDER_LIVE_VOX ? 5 * 52000 : 39000); }
     if (r->padBytes + each > THUNDER_RENDER_MAX_PAD_BYTES) return THUNDER_RENDER_E_LIMIT;
     const size_t old = L.padBytes(pad);
     if (!L.addPad(pad, cfg)) return THUNDER_RENDER_E_ARG;

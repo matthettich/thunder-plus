@@ -1,5 +1,6 @@
-**STATUS (lead reads here). B2 done: LivePool (mono bass/acid/mach), timeline + cancelFrom + L5, rate lane as AutoN (P5), run-ahead L4, shared start rule `rt/sampletime.h` (P6d), gain/pan, `thunder_render_set_pad_live`/`clear_pad_live`, L8 stats appended. Tests: live_pool (start rule == sampler, seam L10(a) bit for bit, late, C API incl. host blocks 1/128/480/4096), live_reset, engine_u26_fuzz, render_* Release all pass; ASan/UBSan (live_pool, live_reset, render_dispatch/api/var/chop/sf, hostile) pass.
-NEXT: B3 vox (mono + polyVox + voxG + idle-skip compare). Memory per node (measured): bass 57 KB, acid 38 KB, mach 38 KB (all 33 tracks: bass 1.9 MB, acid/mach 1.3 MB a pad).**
+**STATUS (lead reads here). B3 done (pushed): vox mono node (syllable counter, `same` = slide) and polyVox (voxG, sameCol / free / oldest-lastOn picks, the overflow guard) in LivePool; kind vox (2) in `set_pad_live` (5 nodes a track). Tests: live_pool (poly picks / syllables / `same` = the JS golden's; audio of every node = the shell driven directly; guard), live_reset (idle-skip compare), Release + ASan/UBSan pass.
+IDLE SKIP: the bit-compare passes for vox as well as bass / acid / mach (a core copied at its first silent block, 1 / 7 / 100 / 3000 idle quanta, legato or not, four lyrics): idle blocks change nothing. The pool does NOT skip yet (an optimisation for after PR B).
+NEXT: B4 off / cut / rel / mod (wob D6) / stp / stopAll / bends / tempo (P4) / D4.**
 
 **Checklist (updated every commit):**
 - [x] 1a `native/tools/live-route-dump.mjs` + `native/tests/golden/live_route_log.json` / `live_route_golden.inc` (gate L10(f); 16 cases; `--check` passes). Runs `core/seq-core.js` (= `core-processor.js` + the page's declarations; core-processor.js alone lacks `NT`).
@@ -8,7 +9,7 @@ NEXT: B3 vox (mono + polyVox + voxG + idle-skip compare). Memory per node (measu
 - [ ] 3 PR B in STAGES (n1/players merged in locally; build dir native/build-live):
   - [x] B1 reset()/seek() on BassCore, VoxCore, AcidCore, MachCore and LiveShell (C1); test_live_reset (reset == fresh bit for bit at block sizes 128/17/64/1, reset+seek(c) == fresh, no allocation, params/lyrics kept); mutant: vox reset without `rnd_` -> killed by test_live_reset; live_u26 / engine_u26 still pass
   - [x] B2 LivePool skeleton + set_pad_live + timeline/cancelFrom + AutoN rate lane (P5) + run-ahead L4 + seconds-to-sample (P6d) + mono bass/acid/mach + L10(a) (test_live_pool); kill()/cut/rel for the mono node are in (B4 adds off/mod/stp/stopAll, bends, tempo, wob)
-  - [ ] B3 vox mono + polyVox (voxG), idle-skip compare
+  - [x] B3 vox mono + polyVox (voxG), idle-skip compare (test_live_reset: neutral for all four, no skip implemented yet)
   - [ ] B4 off/cut/rel/mod/wob/stp/stopAll/bends/tempo (P4)/D4
   - [ ] B5 one list per track (P2, P3), choke, C4, stats L8
   - [ ] B6 gates L10 (b)-(f), mutants, rt_harness, sanitizers; open PR B; then eng
