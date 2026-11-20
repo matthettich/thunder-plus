@@ -927,7 +927,7 @@ Object.assign(SHARED_MODULES, {
   expr:{ label:'Expression', scope:'mono', display:'expr', text:true, inputs:{ a:'audio', b:'audio', c:'cv', d:'cv' }, outputs:{ out:'audio' },
     plabels:{ a:'A', b:'B', c:'C', d:'D' },
     params:{ k1:[1,-4,4,.001], k2:[0,-4,4,.001] }, ui:{ k1:{l:'K1', f:v => v.toFixed(3)}, k2:{l:'K2', f:v => v.toFixed(3)} },
-    about:'Expression: type a line of maths and its answer is the sound, one sample at a time. A and B are the two audio inputs, C and D the two control inputs, and K1 and K2 the two sliders. Names: a, b, c, d, k1, k2, t (seconds since the song started, or since the module was made), y (this module’s own output one sample ago, so one line can be a filter or a counter), rnd (a new random number from −1 to 1 every sample), pi and sr (the sample rate). Operators: + − * / % ^, the comparisons < <= > >= == !=, && || !, and a ? b : c. Functions: sin cos tan tanh abs sqrt exp log floor ceil round sign fract, min max pow mod, clip(x, low, high), mix(a, b, amount), and tri saw sq, which are waves from −1 to 1 that repeat every 1 (saw(220 * t) is a 220 Hz saw). The result is held between −4 and 4. What you type is only ever read as maths: it is never run as a program, and a formula that cannot be read gives silence and says where the trouble is. 200 characters at most. Enter (or tapping away) applies it and Escape puts back the last one; Examples fills the field with a working formula to start from. A single Expression can be a ring modulator, a soft clipper, a crossfade, a bit crusher or a small filter.' }
+    about:'Expression: type a line of maths and its answer is the sound, one sample at a time. A and B are the two audio inputs, C and D the two control inputs, and K1 and K2 the two sliders. Names: a, b, c, d, k1, k2, t (seconds since the song started, or since the module was made), y (this module’s own output one sample ago, so one line can be a filter or a counter), rnd (a new random number from −1 to 1 every sample), pi and sr (the sample rate). Operators: + − * / % ^, the comparisons < <= > >= == !=, && || !, and a ? b : c. Functions: sin cos tan tanh abs sqrt exp log floor ceil round sign fract, min max pow mod, clip(x, low, high), mix(a, b, amount), and tri saw sq, which are waves from −1 to 1 that repeat every 1 (saw(220 * t) is a 220 Hz saw). The result is held between −4 and 4. What you type is only ever read as maths: it is never run as a program, and a formula that cannot be read gives silence and says where the trouble is. 200 characters at most. Enter (or tapping away) applies it and Escape puts back the last one; Examples fills the field with a working formula to start from. Worked examples are listed below: a sine, saw, FM, a chord, a filter and more. A single Expression can be a ring modulator, a soft clipper, a crossfade, a bit crusher or a small filter.' }
 });
 Object.assign(SHARED_FAMILY, { onepole:'afx', allpass:'afx', dcblock:'afx', midside:'afx', dline:'afx', expr:'util' });
 Object.assign(SHARED_FAMILY, { meter:'util', scope:'util', limiter:'util', utility:'util', ringmod:'afx', spring:'afx', plate:'afx', lverb:'afx', ensemble:'afx',
@@ -1588,6 +1588,37 @@ const MODULE_USE = {
 };
 const modAbout = t => (typeof PAGE_ABOUT !== 'undefined' && PAGE_ABOUT[t]) || SHARED_ABOUT[t] || (MODULES[t] && MODULES[t].about) || '';
 const modUse = t => (typeof PAGE_USE !== 'undefined' && PAGE_USE[t]) || MODULE_USE[t] || '';
+/* Worked examples shown in a module's ? help under the Try line, and on the Help page: [what it is, the formula, its name in the module's Examples menu], one formula per line (the formula in a monospace line of its own, selectable to copy).
+   The Examples menu (EXPR_EXAMPLES, in the same order) must hold the same formulas: tests/modules-expr-help.test.js checks it. Every formula is compiled and run by that test in both engines at 44100 and 48000, so a line that stops working fails the tests. No quote marks in the texts (use ’ and −). */
+const MODULE_EXAMPLES = {
+  expr:[
+    ['Sine wave at 220 Hz (full level, so turn the volume down first).', 'sin(2 * pi * 220 * t)', 'Sine 220 Hz'],
+    ['Saw wave at 220 Hz, the short way. These plain saw and square waves are harsh on high notes.', 'saw(220 * t)', 'Saw 220 Hz'],
+    ['Triangle wave at 220 Hz.', 'tri(220 * t)', 'Triangle 220 Hz'],
+    ['Square wave at 220 Hz.', 'sq(220 * t)', 'Square 220 Hz'],
+    ['K1 as the pitch: 110 Hz at 0, 220 Hz at 1, 550 Hz at 4. Moving K1 while it sounds makes the tone jump, because the pitch is multiplied by the time.', 'sin(2 * pi * (110 + k1 * 110) * t)', 'Sine pitch from K1'],
+    ['A pitch you can glide, part 1 of 2: a ramp that climbs 0 to 1 over and over, 220 Hz at K1 = 1. Cable its Out to A of a second Expression.', 'fract(y + (110 + k1 * 110) / sr)', 'Glide pitch, part 1: ramp'],
+    ['Glide, part 2 of 2: turns that ramp into a sine. Now moving K1 slides the pitch with no jump.', 'sin(2 * pi * a)', 'Glide pitch, part 2: sine'],
+    ['FM in one line: a 110 Hz sine bends a 220 Hz sine. K1 is the amount, 0 is plain, 1 to 4 gets brighter.', 'sin(2 * pi * 220 * t + k1 * sin(2 * pi * 110 * t))', 'FM sine (K1 = amount)'],
+    ['A chord (A, C sharp and E) from three sines.', '(sin(2 * pi * 220 * t) + sin(2 * pi * 277.2 * t) + sin(2 * pi * 329.6 * t)) / 3', 'Chord, A major'],
+    ['A sine that fades in over the 2 seconds after the song starts.', 'sin(2 * pi * 220 * t) * min(t / 2, 1)', 'Fade-in sine, 2 s'],
+    ['A sine at K1 kilohertz: 1000 Hz at 1, 4000 Hz at 4. Moving K1 while it sounds makes the tone jump.', 'sin(2 * pi * 1000 * k1 * t)', 'Sine at K1 kHz'],
+    ['Noise, with K1 as the level.', 'rnd * k1', 'Noise'],
+    ['The simplest one: A comes through and K1 is the level. A new Expression starts like this.', 'a * k1', 'Pass A (K1 = level)'],
+    ['Ring modulation: A times B, for metallic and bell-like tones.', 'a * b', 'Ring modulate A by B'],
+    ['Tremolo: the level of A wobbles 4 times a second.', 'a * (0.5 + 0.5 * sin(2 * pi * 4 * t))', 'Tremolo 4 Hz'],
+    ['Soft clip: rounds off the peaks of A. K1 is the drive, higher is harder.', 'tanh(a * (1 + k1 * 4))', 'Soft clip'],
+    ['Fold: loud peaks of A turn back over instead of clipping. K1 is how hard.', 'tri(a * (1 + k1 * 4) / 4 + 0.25)', 'Fold'],
+    ['Wavefolder: bends A back on itself. K1 is how hard, 0 is almost clean.', 'sin(a * (1 + k1 * 8))', 'Wavefold sine (K1)'],
+    ['Rectify: the negative half of A is flipped up, which adds an octave of buzz.', 'abs(a)', 'Rectify'],
+    ['Crossfade from A to B with a control signal in C: 0 is all A, 1 is all B (a slow LFO into C).', 'mix(a, b, clip(c, 0, 1))', 'Crossfade by C'],
+    ['Low-pass filter for A. K1 is how open it is: 1 lets everything through, 0.1 is dull (about 800 Hz), 0.01 is very dark. The clip keeps it from blowing up above 1.', 'y + (a - y) * clip(k1, 0, 1)', 'One-pole lowpass (K1)'],
+    ['Sample and hold: A is followed while C is above 0.5 and held (frozen) when C drops below it.', 'c > 0.5 ? a : y', 'Sample and hold on C'],
+    ['Bit crusher: A rounded to steps. K1 0 is rough (steps of one half), 1 is fine (one thirty-second), 4 is nearly clean.', 'round(a * (2 + k1 * 30)) / (2 + k1 * 30)', 'Bit crush (K1)'],
+    ['Gate: A comes through only while B is louder than K1, otherwise silence.', 'abs(b) > k1 ? a : 0', 'Gate A when B is loud']
+  ]
+};
+const modExamples = t => (typeof PAGE_EXAMPLES !== 'undefined' && PAGE_EXAMPLES[t]) || MODULE_EXAMPLES[t] || null;
 {
   const css = `.node > header .mq{border:0; background:none; color:var(--muted); font-size:14px; font-weight:700; line-height:1; width:20px; height:24px; padding:0; flex:none; margin-right:-4px}
 .node > header .mq:hover, .node > header .mq[aria-expanded="true"]{background:var(--panel-2); color:var(--ink)}
@@ -1596,7 +1627,8 @@ const modUse = t => (typeof PAGE_USE !== 'undefined' && PAGE_USE[t]) || MODULE_U
 .mhelp h4{margin:0 0 5px; font-size:14px; font-weight:600}
 .mhelp p{margin:0}
 .mhelp .use{margin-top:8px; padding-top:8px; border-top:1px solid color-mix(in srgb, var(--ink) 18%, transparent)}
-.mhelp .use b{display:block; font-size:11px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:var(--muted); margin-bottom:2px}`;
+.mhelp .use b{display:block; font-size:11px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:var(--muted); margin-bottom:2px}
+.mhelp .exs .ex{margin:0 0 7px} .mhelp .exs .ex p{font-size:12.5px; line-height:1.35} .mhelp .exs code{display:block; margin-top:1px; padding:2px 5px; font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size:12.5px; line-height:17px; overflow-wrap:anywhere; background:var(--panel-2)}`;
   const st = document.createElement('style'); st.textContent = css; document.head.append(st);
 }
 let mhelpEl = null, mhelpBtnOn = null, mhelpPinned = false, mhelpT = 0;
@@ -1615,7 +1647,9 @@ function mhelpShow(btn, type, title, pin){
   }
   if (mhelpBtnOn && mhelpBtnOn !== btn){ mhelpBtnOn.setAttribute('aria-expanded', 'false'); mhelpBtnOn.removeAttribute('aria-describedby'); }
   const about = modAbout(type), use = modUse(type);
-  mhelpEl.replaceChildren(h('h4', {text:title}), h('p', {text:about || 'No description yet.'}), use ? h('div', {class:'use'}, h('b', {text:'Try'}), h('p', {text:use})) : null);
+  const exs = modExamples(type);
+  mhelpEl.replaceChildren(h('h4', {text:title}), h('p', {text:about || 'No description yet.'}), use ? h('div', {class:'use'}, h('b', {text:'Try'}), h('p', {text:use})) : null,
+    exs ? h('div', {class:'use exs'}, h('b', {text:'Worked examples'}), ...exs.map(([what, f]) => h('div', {class:'ex'}, h('p', {text:what}), h('code', {text:f})))) : null);
   const c = CAT_COLOR[type]; if (c) mhelpEl.style.setProperty('--cat', c); else mhelpEl.style.removeProperty('--cat');
   mhelpEl.hidden = false; mhelpBtnOn = btn; mhelpPinned = !!pin;
   btn.setAttribute('aria-expanded', 'true'); btn.setAttribute('aria-describedby', 'mhelp');
@@ -1794,10 +1828,31 @@ setInterval(() => { if (napping()) return; const now = performance.now();
 // A module's text: kept (cut to 200 characters) only on a module whose definition takes text; on any other module it is dropped. (Also run on a pasted copy and on every load.)
 function textFix(m){ if (!m || typeof m !== 'object' || !('text' in m)) return; const d = MODULES[m.type]; if (d && d.text === true && typeof m.text === 'string') m.text = m.text.slice(0, 200); else delete m.text; }
 const EXPR_MAX = 200, EXPR_DEFAULT = 'a * k1', EXPR_HOLD = 450;
-const EXPR_EXAMPLES = [
-  ['Pass A (K1 = level)', 'a * k1'], ['Ring modulate A by B', 'a * b'], ['Soft clip', 'tanh(a * (1 + k1 * 4))'], ['Fold', 'tri(a * (1 + k1 * 4) / 4 + 0.25)'],
-  ['Rectify', 'abs(a)'], ['Crossfade by C', 'mix(a, b, clip(c, 0, 1))'], ['Sine at K1 kHz', 'sin(2 * pi * 1000 * k1 * t)'], ['One-pole lowpass (K1)', 'y + (a - y) * clip(k1, 0, 1)'],
-  ['Sample and hold on C', 'c > 0.5 ? a : y'], ['Noise', 'rnd * k1'], ['Bit crush (K1)', 'round(a * (2 + k1 * 30)) / (2 + k1 * 30)'], ['Gate A when B is loud', 'abs(b) > k1 ? a : 0']
+const EXPR_EXAMPLES = [   // [menu name, formula]: tones first, then effects; the same formulas, in the same order, as MODULE_EXAMPLES.expr (a test compares them)
+  ['Sine 220 Hz', 'sin(2 * pi * 220 * t)'],
+  ['Saw 220 Hz', 'saw(220 * t)'],
+  ['Triangle 220 Hz', 'tri(220 * t)'],
+  ['Square 220 Hz', 'sq(220 * t)'],
+  ['Sine pitch from K1', 'sin(2 * pi * (110 + k1 * 110) * t)'],
+  ['Glide pitch, part 1: ramp', 'fract(y + (110 + k1 * 110) / sr)'],
+  ['Glide pitch, part 2: sine', 'sin(2 * pi * a)'],
+  ['FM sine (K1 = amount)', 'sin(2 * pi * 220 * t + k1 * sin(2 * pi * 110 * t))'],
+  ['Chord, A major', '(sin(2 * pi * 220 * t) + sin(2 * pi * 277.2 * t) + sin(2 * pi * 329.6 * t)) / 3'],
+  ['Fade-in sine, 2 s', 'sin(2 * pi * 220 * t) * min(t / 2, 1)'],
+  ['Sine at K1 kHz', 'sin(2 * pi * 1000 * k1 * t)'],
+  ['Noise', 'rnd * k1'],
+  ['Pass A (K1 = level)', 'a * k1'],
+  ['Ring modulate A by B', 'a * b'],
+  ['Tremolo 4 Hz', 'a * (0.5 + 0.5 * sin(2 * pi * 4 * t))'],
+  ['Soft clip', 'tanh(a * (1 + k1 * 4))'],
+  ['Fold', 'tri(a * (1 + k1 * 4) / 4 + 0.25)'],
+  ['Wavefold sine (K1)', 'sin(a * (1 + k1 * 8))'],
+  ['Rectify', 'abs(a)'],
+  ['Crossfade by C', 'mix(a, b, clip(c, 0, 1))'],
+  ['One-pole lowpass (K1)', 'y + (a - y) * clip(k1, 0, 1)'],
+  ['Sample and hold on C', 'c > 0.5 ? a : y'],
+  ['Bit crush (K1)', 'round(a * (2 + k1 * 30)) / (2 + k1 * 30)'],
+  ['Gate A when B is loud', 'abs(b) > k1 ? a : 0']
 ];
 // What the module has as its formula: its own text, or the default when it has none (a string of any length is cut to the 200 the engine keeps).
 const exprText = m => m && typeof m.text === 'string' ? m.text.slice(0, EXPR_MAX) : EXPR_DEFAULT;
@@ -4772,7 +4827,7 @@ function helpDoc(){
     ['Clocks and triggers', 'Clocks and rhythm in the Modules list has the pulse tools. Clock makes the pulses and Steps plays a row of values; both follow the song’s tempo, and Reset restarts them. Clock divider and Clock multiplier slow a clock down or speed it up (×3 for triplets). Counter counts pulses, and its Step output is a staircase. Chance gate lets pulses through by chance (the same Seed gives the same pattern every time), Burst turns one pulse into a quick roll, Gate delay moves a gate later for a flam, Flip-flop turns a pulse into on and off, and Step switch passes four sounds in turn.'],
     ['Seeing signals', 'Meter (in Mix and level in the Modules list) shows how loud a sound is and Scope draws a signal as it moves, with a sound or an LFO patched into A and a second signal such as an envelope into B so you can watch them together, Trigger on Rising to hold a steady wave still and Freeze to keep the picture, and both only work while this editor is open.'],
     ['Building blocks', 'Building blocks in the Modules list are the small parts bigger effects are made of, each one channel (patch two for stereo). One-pole filter is the gentlest tone control, and it smooths a control signal. Allpass turns the phase (four in a row, mixed with the dry sound, make a phaser) or, in Echo, makes the short echoes a reverb is built from. Delay line is a bare delay from one sample to two seconds with exact feedback of its own: short it rings at a pitch (a comb, a plucked string), long it echoes, and you mix it with the dry sound yourself. DC blocker takes a steady offset out of a signal. Mid / side splits left and right into centre and width, so you can treat them differently, and puts them back.'],
-    ['Expression', 'Expression (in Control utilities in the Modules list) is a module you type into: a line of maths whose answer is the sound, worked out one sample at a time. Names: a and b are its two audio inputs, c and d its two control inputs, k1 and k2 its two sliders, t the seconds since the song started (or since the module was made), y this module’s own output one sample ago (so one line can be a filter or a counter), rnd a new random number from −1 to 1 every sample, and pi and sr (the sample rate). Operators: + − * / % ^ < <= > >= == != && || ! and a ? b : c. Functions: sin cos tan tanh abs sqrt exp log floor ceil round sign fract, min max pow mod, clip(x, low, high), mix(a, b, amount), and tri saw sq (waves from −1 to 1 that repeat every 1, so saw(220 * t) is a 220 Hz saw). The result is held between −4 and 4. What you type is only ever read as maths, never run as a program, and a formula that cannot be read gives silence and a short message under the field saying where. 200 characters at most. Enter or tapping away applies it and Escape puts back the last one; Examples fills the field with a working formula (a soft clipper, a ring modulator, a bit crusher, a sample and hold).'],
+    ['Expression', 'Expression (in Control utilities in the Modules list) is a module you type into: a line of maths whose answer is the sound, worked out one sample at a time. Names: a and b are its two audio inputs, c and d its two control inputs, k1 and k2 its two sliders, t the seconds since the song started (or since the module was made), y this module’s own output one sample ago (so one line can be a filter or a counter), rnd a new random number from −1 to 1 every sample, and pi and sr (the sample rate). Operators: + − * / % ^ < <= > >= == != && || ! and a ? b : c. Functions: sin cos tan tanh abs sqrt exp log floor ceil round sign fract, min max pow mod, clip(x, low, high), mix(a, b, amount), and tri saw sq (waves from −1 to 1 that repeat every 1, so saw(220 * t) is a 220 Hz saw). The result is held between −4 and 4. What you type is only ever read as maths, never run as a program, and a formula that cannot be read gives silence and a short message under the field saying where. 200 characters at most. Enter or tapping away applies it and Escape puts back the last one; Examples fills the field with a working formula (a soft clipper, a ring modulator, a bit crusher, a sample and hold). The ? on the module’s title bar also lists worked examples to copy: a sine, saw, triangle and square, a pitch from K1 and a smooth glide, FM, a chord, tremolo, a low-pass filter, a wavefolder and noise.'],
     ['Polyphony', 'Host In runs once for every voice, and so does anything it feeds; everything else (effects, LFOs, Out) runs once. Put effects after the voices, before Out.'],
     ['Moving around', 'Scroll with two fingers or turn the mouse wheel to pan (Shift+wheel sideways); with a mouse a middle-button drag pans too, and on a touch screen dragging the background does. Rest the pointer on a slider for a moment (it gets an outline) and the wheel changes that slider instead, Shift+wheel in fine steps. Pinch or Ctrl/⌘+wheel zooms; the zoom buttons are in the top bar (click the percentage to type one, Fit shows everything).'],
     ['Play and Edit', 'The Play and Edit switch in the top bar (Alt+E on a keyboard) decides what a touch or a click does. In Edit everything works. In Play the patch is locked for playing: sliders, selects, buttons and readouts work, but no module can be moved, selected, folded, removed or given a menu, no cable can be made or removed, and a drag on anything that is not a control moves the view. The patch is framed and tagged PLAY while it is on. The choice is remembered for this editor on this device, not saved in the patch.'],
@@ -4786,7 +4841,7 @@ function helpDoc(){
   const groups = PALETTE.filter(([g]) => !isSection(g)).map(([g, items]) => '<div class="mgroup"><h3>' + esc(g) + '</h3><div class="mgrid">' + items.map(([t]) => {
     const d = MODULES[t], ed = CAT_COLOR[t] || EDGE[famOf(t)];   // U9 (13 Nov): the card wears the module's own category colour, as the module on the patch does
     const io = (lbl, o) => Object.keys(o).length ? '<div class="io"><b>' + lbl + '</b>' + Object.entries(o).map(([p, k]) => '<span class="pt"><i' + (KIND[k] === 'gate' ? ' class="g"' : '') + ' style="background:' + KC[KIND[k]] + '"></i>' + esc((d.plabels && d.plabels[p]) || ((PORT_LABEL[p] || p) + ((p + 'R') in o ? ' L' : ''))) + '</span>').join('') + '</div>' : '';
-    return '<div class="mcard" style="--ed:' + ed + '"><h4>' + esc(d.label) + '</h4><p>' + esc(ABOUT[t] || SHARED_ABOUT[t] || d.about || '') + '</p>' + io('Inputs', d.inputs) + io('Outputs', d.outputs) + '</div>';
+    return '<div class="mcard" style="--ed:' + ed + '"><h4>' + esc(d.label) + '</h4><p>' + esc(ABOUT[t] || SHARED_ABOUT[t] || d.about || '') + '</p>' + ((modExamples(t) || []).map(([what, f]) => '<div class="ex"><p>' + esc(what) + '</p><code>' + esc(f) + '</code></div>').join('')) + io('Inputs', d.inputs) + io('Outputs', d.outputs) + '</div>';
   }).join('') + '</div></div>').join('');
   return '<!doctype html><html><head><meta charset="utf-8"><style>' +
     "@font-face{font-family:Jost;src:url('./fonts/Jost-400.woff') format('woff');font-weight:400}@font-face{font-family:Jost;src:url('./fonts/Jost-600.woff') format('woff');font-weight:600}" +
@@ -4798,6 +4853,7 @@ function helpDoc(){
     '.guide{background:#fff; border:3px solid #111; padding:4px 24px 10px; margin-bottom:22px} .guide h2{font-size:17px; margin:22px 0 8px; font-weight:600}' +
     '.guide p{font-size:14px; line-height:1.55; max-width:78ch} .mgroup h3{font-size:17px; margin:28px 0 12px; font-weight:600; border-bottom:3px solid #111; padding-bottom:6px}' +
     '.mgrid{display:grid; grid-template-columns:repeat(auto-fill, minmax(290px, 1fr)); gap:14px} .mcard{background:color-mix(in srgb, #fff 88%, var(--ed) 12%); border:3.5px solid var(--ed); padding:12px 14px}' +
+    '.mcard .ex{margin:0 0 8px} .mcard .ex p{font-size:12.5px; margin:0} .mcard code{display:block; padding:2px 5px; background:#fff; font:12.5px/17px ui-monospace,Menlo,Consolas,monospace; overflow-wrap:anywhere}' +
     '.mcard h4{margin:0 0 6px; font-size:17px; font-weight:600; border-bottom:2px solid var(--ed); padding-bottom:6px} .mcard p{margin:0 0 8px; font-size:14px; line-height:1.5}' +
     '.io{display:flex; flex-wrap:wrap; gap:5px 10px; align-items:center; font-size:12.5px; margin-top:4px} .io b{font-size:12.5px; min-width:62px}' +
     '.pt{display:inline-flex; align-items:center; gap:5px; background:#fff; border:1.5px solid #111; padding:1px 7px} .pt i{width:9px; height:9px; border-radius:50%; display:inline-block} .pt i.g{width:8px; height:8px; border-radius:1px; transform:rotate(45deg)}' +
