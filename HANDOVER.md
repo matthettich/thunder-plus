@@ -532,6 +532,25 @@ are OFL, the GM SoundFont is MIT, **except `lxr/` (GPL-3.0) and `link/` (Ableton
 
 ## To-do (owner's list: keep it current; newest dated entries below have the details)
 
+### Time stretch: what is left (20 Nov; design `docs/STRETCH-DESIGN.md` on branch `beta-stretch-design`)
+
+Owner, 19 Nov: a synced stretch like Ableton's, pitch to fit, an "oldschool" ramp stretch, and many algorithms are fine. Steps 1 and 2 are built (PRs into `beta`, builds 659 and 660); the numbers are the design's section 10.
+1. **Picker, `I.sx`, REPITCH sentence:** DONE, build 659 (PR 1).
+2. **OLDSCHOOL v2 (rendered):** DONE, build 660 (PR 2, merge after PR 1).
+3. **Stretch Worker, prerender, byte-capped cache, offline path:** not started. Today a stretch renders on the main thread at the first note (a stall on a phone); build 660 only stops a tempo drag from rendering at every step.
+4. **Chop on the audio thread** (real `applyChop` in `core/seq-core.js`, `loopSecs` and hits handed in; then `sbuf` and `mine()` for stretched notes): not started. It also fixes the open "slices on Audio thread" bug on its own. Until then synced samples play unsynced on the Audio thread sequencer.
+5. **CLEAN (Signalsmith Stretch, MIT):** not started. 5a is a spike first (wasm size, time for 10 s stereo at 0.5 to 2x, the owner's loops); 5b the module. Needs the owner's loops (below).
+6. **SLICED (drums: cut at hits, tails filled):** not started.
+7. **SMEAR (phase vocoder), EXTREME (Paul-style), SPLICE (WSOLA):** not started; own code, no dependency, can go before 5.
+8. **Live OLDSCHOOL in the voice** (the render IS the reader, so constant settings give the same sound live and rendered; also sidesteps the audio-thread stretch gap for this mode): not started.
+9. **Native stretch port** (on `native`, a separate worker): not started; `docs/STRETCH-DESIGN.md` section 9.
+10. **KEEP LENGTH and CLEAN transpose / formant:** not started, after 3 and 5.
+
+Questions for the owner:
+- Two or three of your own loops for the CLEAN listening test (a drum break, a tonal loop, ideally a full-mix excerpt), with their BPM and the tempos you fit them to.
+- Rubber Band, yes or no? It is the best known engine but GPL (or a paid licence): it could only be a separable module like LXR, never in an App Store build. Recommendation: no for now.
+- OLDSCHOOL live in the voice later (changing the loop, ramp speed or pitch while a note plays, from commands or an LFO)? That is step 8.
+
 ### PICK UP HERE (17 Nov, 22:00)
 
 - **Web app (19 Nov, build 651, PR open into `beta`, not merged):** bus into bus (branch `beta-bus-into-bus`, design `docs/BUS-INTO-BUS-DESIGN.md`, native notes `docs/BUS-INTO-BUS-NATIVE.md`); see the 19 Nov entry. Builds 648 to 650 are other open PRs: rebase and renumber if they merge first.
@@ -853,6 +872,13 @@ The web app stays on pump deb07d3 (build 642's `pump/pump.wasm` and `pump/synth/
 **The owner's checklist by importance (13 Nov):** he works from a Claude Doc, "Thunder Plus test checklist, by priority" (https://claude.ai/artifact/LrzQ18ur18Fc5gkvxmQDbK), ordered: 1 Do these first, 2 Really worth trying, 3 If you have time, 4 Safe to skip, Parked, Set aside, Done. A snapshot with his ticks is `docs/TEST-CHECKLIST.md`: re-export it whenever the doc changes, and add each new build's checks to the doc's section 1 as well as here. He said the two "decides" groups (native apps; smoothing / Worklets / clock experiments) are parked and block nothing. "Close the skip list" from him means: close section 4's items as not tested.
 
 Start a session by asking for results. Fix on `beta`. (10 Nov, 15:10: the web beta is build 560; the build numbers in the rest of this paragraph are older.) Web beta: https://matthettich.github.io/thunder-plus/beta/ (build 547 as of 10 Nov morning, 548 once its PR merges; the night of 9–10 Nov shipped 544–547, see the four "10 Nov" entries below. Decisions the lead made that night for the owner to confirm or reverse: on a phone the saved Sequencer default plays on the Page unless Audio thread is picked on that device; on a phone the safety limiter is its stand-in until another worklet loads; the resync only runs with a worklet loaded and its margins are untested on a device). Desktop: v1.3.4-beta.2 (build 541, no feed view or scopes); further desktop betas on hold until the owner asks.
+
+**Build 660** (OLDSCHOOL stretch; stacked on 659)
+- [ ] **Computer, a drum break of 2 bars on a pad, Sync to lines… at 8, 16 and 32 lines, mode OLDSCHOOL, RAMP FWD:** play it with LOOP at 10, 30 and 80 ms, SMOOTH 0 and then 30%. Pass: the break is recognisable at every length; at 10 ms a buzz about 100 Hz, at 80 ms stutters; SMOOTH 0 is the metallic stepped hard cut, 30% is softer with no clicks.
+- [ ] **Computer, same break, RAMP REV, LOOP 30 ms, SMOOTH 0 and 30%:** Pass: the sample is scrubbed from its end back to its start (the loop plays forward each time). Try PING and EASE.
+- [ ] **Computer:** LOOP BY 1/8 LINE and 1/16 LINE, then change the song tempo and LPB. Pass: the buzz follows the tempo; PITCH +5 and -7 move the grains' pitch and not the length.
+- [ ] **Computer, a song that plays while you drag TEMPO (Settings) with a synced GRANULAR, LOOP or OLDSCHOOL instrument:** Pass: no stutter while you drag, the stretch follows the tempo about a third of a second after you stop.
+- [ ] **Computer:** an old song with SYNC STRETCH or LOOP, and the REPITCH sentence from 659 against what you hear. Pass: it sounds the same as before 659.
 
 **Build 659** (sync mode picker, `I.sx`, the REPITCH sentence; no audio change)
 - [ ] **Computer, INST page, an instrument with a sample pad:** move to SYNC and press EDIT. Pass: a list opens with OFF, then the captions Repitch (REPITCH) and Character (GRANULAR, LOOP); picking one sets the row; the left and right keys still step through them.
@@ -1696,6 +1722,17 @@ Tests added: `gen-instrument` (source pins).
 Build 630, on `beta`. The owner asked for a mod section in the FX bar: collapsible, small, showing that there are modulations, the waveform and the destinations. Added `#dkMod` (DK_SECS / DK_FOLD, `deck.mod` saved with the panel, default FOLDED so no existing layout changes) between FX and PERFORM. `deckMod()` rebuilds only when open and when the focused track's LFOs / skin / ANIMATIONS change; each row is a 48×18 canvas wave (`modMix`, the MOD screen's maths) with a dot moved by `dkModTick` from the frame loop (only open, playing, visible, ANIMATIONS on, LOW POWER DISPLAY off), the shape and rate, and the destination (`tgtLabel`). Click: MOD screen on that track. Skin colours through CSS variables (checked IDM and 909 in headless Chrome). Hidden on the phone's swipe layout (`max-width:700px` + coarse pointer): the bottom panel there is one section at a time and the owner's folded-phone width is not a place to add a page. Display code only; nothing posts to the engine.
 
 Tests added: `deck-mod-section` (source pins).
+
+## 20 Nov (time stretch step 2: OLDSCHOOL; build 660)
+
+Build 660, branch `beta-stretch-oldschool` (PR 2 of two, stacked on PR 1 / build 659: it must merge after it; design `docs/STRETCH-DESIGN.md` section 7 on branch `beta-stretch-design`; checklist and "Choices for the lead": `docs/STRETCH-BUILD-NOTES.md`).
+- **Mode:** picker entry OLDSCHOOL = `I.sync` 3, `I.sx` 1 (an older build plays it as LOOP). Settings, stored only while the mode is OLDSCHOOL (`syPut` adds the defaults, drops them on leaving; `sxLoad` clamps): `og` loop in ms 0.5 to 250 (default 12), `ou` loop unit (0 = ms, 1 to 6 = 1, 1/2, 1/4, 1/8, 1/16, 1/32 of a LINE; a line is 60 / bpm / LPB s), `orp` ramp 0 FWD / 1 REV / 2 PING / 3 EASE, `ox` smooth 0 to 50 percent, `opt` pitch -24 to +24 semitones. INST rows LOOP BY, LOOP (ms, only when BY is MS), RAMP, SMOOTH, PITCH replace GRAIN for this mode.
+- **Render:** `oldschoolData` (called from `stretchData` when `st.sx === 1`; the classic code below it is untouched): exact length, grains of `g` samples, start `p_k = L * ramp(k g / T)` held per grain and kept inside the sample (`osStarts`), hard cut at SMOOTH 0, straight-read trapezoid crossfade over 2 x smooth x g otherwise, linear interpolation when PITCH is not 0 (integer reads when it is). The first grain's leading edge and the last grain's trailing edge are at full weight (the prototype faded them with no partner). Cost: 10 s in, 8 s out, pitched and smoothed about 0.1 to 0.4 s on the desktop in Node (the test bound is 1.5 s).
+- **Cache key** (`stKey`): classic keys unchanged; OLDSCHOOL adds `:sx1:<grain seconds>:<ramp>:<smooth>:<pitch>`, so every setting, and a loop in line divisions through the tempo and LPB, is in it.
+- **Tempo drag (found, then fixed for live notes):** the cache key has the tempo (rounded to 0.01 BPM) and a stretch renders synchronously on the main thread at the first note that needs it. So a TEMPO drag (the Settings slider commits every 50 ms) with a synced GRANULAR / LOOP instrument playing made a new stretch for the next note at every changed tempo, on the main thread, and filled the cache (96 entries). Now `stLiveBpm` (the idea of build 658's `lnTempo`, which debounces lines-mode envelopes): live notes at the song's own tempo use the last tempo that held for 300 ms (a change under 0.5 percent is ignored while playing; a pause of 1 s or a stopped song snaps); a TPO command's own tempo, previews, REPITCH and every offline render are exact. A static tempo is bit-identical to before (tests). Not done: the render is still on the main thread (design step 3, the Worker).
+- **Slices:** with REV, PING or EASE, SLICE BY HITS slices what you hear (equal parts of the output); FWD keeps the hit points.
+- **UI text:** on the Audio thread sequencer a synced sample plays unsynced for now (the sheet's note from build 655, and now the SYNC row's note).
+- **Tests:** `tests/stretch-oldschool.test.js` (exact length x ramps x smooth x pitch; hard cut: every jump on a grain boundary; smooth: no step over 4x the source's, max step bounds; REV and PING traverse the sample; pitch; loop in divisions; cache key; tempo drag; slices; a self-recorded golden `tests/fixtures/oldschool-golden-660.json` for the native port). `core/seq-core.js` regenerated (`node tools/make-core.mjs`): the page's `makeSeq` passes `live` to `applyChop`.
 
 ## 20 Nov (time stretch step 1: one mode picker, `I.sx`, the REPITCH sentence; build 659)
 
