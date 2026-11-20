@@ -1,5 +1,6 @@
 // See live_pool.h. The JS: core/core-processor.js liveNote / liveStart / kill (the mono branch), the page's StereoPanner / GainNode after the node (__tcPost).
 #include "engine/live_pool.h"
+#include "voice/voice.h"
 
 #include <algorithm>
 #include <cmath>
@@ -65,17 +66,19 @@ void LivePool::rebuildActive() {
   active_.clear(); size_t n = 0; for (const PadSlot& p : pads_) n += p.nodes.size();
   active_.reserve(n);
   for (PadSlot& p : pads_) for (auto& nd : p.nodes) active_.push_back(nd.get());
+  for (auto& v : byTrack_) v.clear();
+  for (Node* n : active_) byTrack_[n->track].push_back(n);
 }
 uint32_t LivePool::failedNodes() const { uint32_t k = 0; for (const Node* n : active_) if (n->eng->failed()) k++; return k; }
 
 // ---- the timeline ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 void LivePool::cancelFrom(Node& n, int64_t T) {   // AudioParam.cancelScheduledValues(t) on gate / trig / leg: what is booked at or after T goes (a note at the same sample takes back a booked off: D4)
-  int w = 0; for (int i = 0; i < n.ntl; i++) if (n.tl[i].T < T) n.tl[w++] = n.tl[i];
+  int w = 0; for (int i = 0; i < n.ntl; i++) if (n.tl[i].T < T || (n.tl[i].type != LiveEvType::NoteOn && n.tl[i].type != LiveEvType::NoteOff)) n.tl[w++] = n.tl[i];   // (gate, trig, leg: the note events; tempo and wob stay)
   n.ntl = w; rec(n, 'c', 0, 0, T);
 }
 void LivePool::book(Node& n, const TEv& e) {
   if (n.ntl >= kTimeline) {
-    if (e.type != LiveEvType::NoteOff) { st_.queueDropped++; return; }   // L5: a NoteOn is dropped and counted
+    if (e.type != LiveEvType::NoteOff) { st_.queueDropped++; return; }   // L5: a NoteOn (and a Bpm / Wob event) is dropped and counted
     // a note-off always wins: it discards what is booked at or after it and is kept
     st_.forcedOff++;
     int w = 0; for (int i = 0; i < n.ntl; i++) { if (n.tl[i].T < e.T) n.tl[w++] = n.tl[i]; else st_.queueDropped++; }
@@ -87,21 +90,21 @@ void LivePool::book(Node& n, const TEv& e) {
 }
 
 // ---- notes -----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-bool LivePool::note(const SeqEvent& e, int pad) {
+bool LivePool::note(const SeqEvent& e, int pad, double bpm, const double* arp) {
   if (!has(pad)) return false;
   PadSlot& ps = pads_[pad];
   Node* n = e.track >= 0 && e.track < kVoiceTracks ? ps.byTrack[e.track] : nullptr;
   if (!n) { st_.noNode++; return false; }
   if (!std::isfinite(e.rate) || !std::isfinite(e.gain) || !std::isfinite(e.pan) || ((e.has & SH_SLIDE) && (!std::isfinite(e.slideFrom) || !std::isfinite(e.slideDur)))) return false;   // (the JS would throw inside liveStart: nothing is booked)
-  if (ps.kind == LiveKind::Vox && e.poly) return polyVox(e, ps);
-  startNote(*n, e);
+  if (ps.kind == LiveKind::Vox && e.poly) return polyVox(e, ps, bpm, arp);
+  startNote(*n, e, bpm, arp);
   st_.played++;
   return true;
 }
 
 // polyVox (core-processor.js liveNote, the `ev.poly && lk.vox` branch): four nodes a track; the syllable of the note (notes within 4 ms share one), the node it takes: the same column still sounding, else a free one, else the one
 // that started longest ago (ties: the first); a note that would take the node that started at the very same time with none free is consumed and silent.
-bool LivePool::polyVox(const SeqEvent& e, PadSlot& ps) {
+bool LivePool::polyVox(const SeqEvent& e, PadSlot& ps, double bpm, const double* arp) {
   Node* nodes[kVoicePoly]; for (int j = 0; j < kVoicePoly; j++) { nodes[j] = ps.poly[(size_t)e.track * kVoicePoly + (size_t)j]; if (!nodes[j]) { st_.noNode++; return false; } }
   VoxG& G = ps.vg[(size_t)e.track];
   const bool leg = (e.has & SH_SLIDE) && e.slideDur > 0;
@@ -113,12 +116,12 @@ bool LivePool::polyVox(const SeqEvent& e, PadSlot& ps) {
   for (int j = 0; j < kVoicePoly && !pick; j++) { const Node* b = nodes[j]; if (b->curLive && (!b->curStop || b->stopAt > e.t - 1e-6) && b->curCol == e.col && b->lastOn < e.t - 0.004) pick = nodes[j]; }   // sameCol
   if (!pick) { Node** src = nf ? free_ : nodes; const int cnt = nf ? nf : kVoicePoly; pick = src[0]; for (int j = 1; j < cnt; j++) if (!(pick->lastOn <= src[j]->lastOn)) pick = src[j]; }
   if (pick->lastOn >= e.t - 1e-6 && std::fabs(pick->lastOn - e.t) < 0.004 && nf == 0) return true;
-  startNote(*pick, e, kk, true);
+  startNote(*pick, e, bpm, arp, kk, true);
   st_.played++;
   return true;
 }
 
-void LivePool::startNote(Node& n, const SeqEvent& e, double fk, bool hasFk) {
+void LivePool::startNote(Node& n, const SeqEvent& e, double bpm, const double* arp, double fk, bool hasFk) {
   const double t = std::isfinite(e.t) ? std::max(e.t, now_) : now_;   // Math.max(ev.t, currentTime)
   const int64_t T = sample_at_or_after(t, sr_);
   const bool leg = (e.has & SH_SLIDE) && e.slideDur > 0;
@@ -127,15 +130,102 @@ void LivePool::startNote(Node& n, const SeqEvent& e, double fk, bool hasFk) {
   if (n.rate.size() + 3 > n.rate.capacity()) { n.rate.prune(now_); if (n.rate.size() + 3 > n.rate.capacity()) { n.rate.prune(t); n.rate.cancel(t); } }
   n.rate.hold(t);
   if (leg) { n.rate.set(e.slideFrom, t); n.rate.lin(e.rate, t + e.slideDur); } else n.rate.set(e.rate, t);
+  if (n.kind == LiveKind::Bass && std::isfinite(bpm) && bpm != n.lastBpm) { bookCtl(n, LiveEvType::Bpm, t, bpm); n.lastBpm = bpm; }   // P4: the bpm lane follows the tempo (SEV_TEMPO comes after its step's notes, never before the first)
   TEv on; on.T = T; on.type = LiveEvType::NoteOn; on.leg = leg; on.acc = n.kind != LiveKind::Bass && n.kind != LiveKind::Vox && e.acc;
   if (n.kind == LiveKind::Vox) { on.v = hasFk ? fk : leg ? std::max(0.0, n.sylN - 1) : n.sylN++; on.same = leg; }   // syl lane: the node's own counter, or polyVox's; `same` lane: the slide
   book(n, on); rec(n, 'n', t, on.v, T, leg, on.acc, on.same);
   if (n.g.size() + 2 > n.g.capacity()) n.g.prune(now_);
   if (n.pn.size() + 2 > n.pn.capacity()) n.pn.prune(now_);
   n.g.set(e.gain, t); n.pn.set(std::max(-1.0, std::min(1.0, (e.pan - 128) / 127)), t);
-  n.lastOn = t; n.curLive = true; n.curStop = false; n.curCol = e.col;
+  if (n.kind == LiveKind::Bass && (e.has & SH_WOB) && std::isfinite(e.wob)) bookCtl(n, LiveEvType::Wob, t, e.wob);
+  n.lastOn = t; n.curLive = true; n.curStop = false; n.curCol = e.col; n.base = e.rate; n.vrate = e.rate; n.inT = true; n.used = true;
+  if (!leg) pitchMods(n, t, e.rate, e, arp);
   if (e.has & SH_CUT) kill(n, e.cut);
   if (e.has & SH_REL) kill(n, e.rel);
+}
+
+void LivePool::bookCtl(Node& n, LiveEvType type, double t, double v) {
+  TEv e; e.T = sample_at_or_after(std::max(t, now_), sr_); e.type = type; e.v = v; book(n, e);
+}
+
+// pitchMods (core-processor.js :525-545) on the node's rate lane. An ARP row books arpN + 1 points: the list is folded before it would overflow, and only if that is not enough the new arpeggio replaces what is booked from its first step on (P5; as the sampler's).
+void LivePool::pitchMods(Node& n, double t, double base, const SeqEvent& e, const double* arp) {
+  AutoN<kAutoRate>& pr = n.rate;
+  if (e.has & SH_ARP) {
+    if (pr.size() + e.arpN + 1 > pr.capacity()) {
+      const double t1 = e.arpN ? std::max(arp[0], t) : t;
+      pr.prune(now_);
+      if (pr.size() + e.arpN + 1 > pr.capacity()) { pr.prune(t1); pr.cancel(t1); }
+    }
+    for (int q = 0; q < e.arpN; q++) pr.set(base * arp[2 * q + 1], std::max(arp[2 * q], t));
+    if (e.arpN) pr.set(base, arp[2 * (e.arpN - 1)] + (e.arpN > 1 ? arp[2] - arp[0] : 0.02));
+  } else if (e.has & SH_BEND) {
+    if (pr.size() + 2 > pr.capacity()) pr.prune(now_);
+    pr.set(base, t); pr.lin(base * e.bendMul, e.bendT1); n.vrate = base * e.bendMul;
+  } else if ((e.has & SH_VIB) && e.vibDep != 0 && e.vibDep == e.vibDep) {
+    const double d = std::max(0.02, e.vibT1 - t), hz = 1 + e.vibSpd * 1.2, st = e.vibDep / 15 * 1.5, t0 = t + 0.0005, dd = d - 0.001;
+    if (pr.size() + 2 > pr.capacity()) pr.prune(now_);
+    pr.set(base, t);
+    Curve cv; cv.fn = voice_vib_curve; cv.p[0] = base; cv.p[1] = st; cv.p[2] = hz; cv.p[3] = d; cv.p[4] = t0; cv.p[5] = dd;
+    pr.curve(cv, t0, dd);
+  }
+}
+
+// modVoice for a live voice: gain and pan on the node's level, `mul` and the bends on its rate, cut / rel as kills; D6 (the page's modVoice): a `wob` moves the bass node's wobble at the row's time.
+void LivePool::modVoice(Node& n, const SeqEvent& e, const double* arp) {
+  if (e.has & SH_GAIN) { if (n.g.size() + 2 > n.g.capacity()) n.g.prune(now_); n.g.set(e.gain, e.t); }
+  if (e.has & SH_PAN) { if (n.pn.size() + 2 > n.pn.capacity()) n.pn.prune(now_); n.pn.set(std::max(-1.0, std::min(1.0, (e.pan - 128) / 127)), e.t); }
+  if (e.has & SH_MUL) { n.vrate = n.base * e.mul; if (n.rate.size() + 2 > n.rate.capacity()) n.rate.prune(now_); n.rate.set(n.vrate, e.t); }
+  pitchMods(n, e.t, n.vrate, e, arp);
+  if (e.has & SH_CUT) kill(n, e.cut);
+  if (e.has & SH_REL) kill(n, e.rel);
+  if (n.kind == LiveKind::Bass && (e.has & SH_WOB) && std::isfinite(e.wob)) bookCtl(n, LiveEvType::Wob, e.t, e.wob);
+}
+
+void LivePool::mod(const SeqEvent& e, const double* arp) {
+  if (e.track < 0 || e.track >= kVoiceTracks) return;
+  for (Node* n : byTrack_[e.track]) if (n->inT && n->curLive && !(n->curStop && n->stopAt <= e.t)) modVoice(*n, e, arp);   // live1
+}
+void LivePool::off(const SeqEvent& e) {
+  if (e.track < 0 || e.track >= kVoiceTracks) return;
+  for (Node* n : byTrack_[e.track]) {
+    if (!n->inT) continue;
+    if ((e.has & SH_COLS) && !(n->curCol >= 0 && n->curCol < 8 && ((e.cols >> n->curCol) & 1))) continue;
+    kill(*n, e.t); n->inT = false;
+  }
+}
+void LivePool::stp(const SeqEvent& e) {
+  for (int k = 0; k < kVoiceTracks; k++) if (e.flag || k == e.track) for (Node* n : byTrack_[k]) if (n->inT) { kill(*n, e.t); n->inT = false; }
+}
+void LivePool::tempo(double t, double bpm) {
+  if (!std::isfinite(bpm)) return;
+  for (Node* n : active_) if (n->kind == LiveKind::Bass) { bookCtl(*n, LiveEvType::Bpm, t, bpm); n->lastBpm = bpm; }
+}
+void LivePool::stopAll(double at) {   // stopAll(at): every node's voice lets go at `at`; what is booked at or after it is taken back, the gate goes low; the syllable counters and voxG start again
+  const double t = std::max(at, now_); const int64_t T = sample_at_or_after(t, sr_);
+  for (Node* n : active_) {
+    if (n->curLive && !(n->curStop && n->stopAt <= at)) { n->curStop = true; n->stopAt = at; }
+    if (n->used) { cancelFrom(*n, T); TEv off; off.T = T; off.type = LiveEvType::NoteOff; book(*n, off); rec(*n, 'o', t, 0, T); }
+    n->sylN = 0; n->inT = false;
+  }
+  for (PadSlot& p : pads_) for (VoxG& g : p.vg) g = VoxG();
+}
+double LivePool::debugRateAt(int track, int pad, int j, double t) const {
+  if (pad < 0 || pad >= kLivePads || track < 0 || track >= kVoiceTracks) return std::nan("");
+  const PadSlot& ps = pads_[pad]; const Node* n = j == 0 ? ps.byTrack[track] : (ps.poly.empty() ? nullptr : ps.poly[(size_t)track * kVoicePoly + (size_t)(j - 1)]);
+  return n ? n->rate.at(t) : std::nan("");
+}
+
+bool LivePool::debugNode(int track, int pad, int j, LiveDebugNode* o) const {
+  if (pad < 0 || pad >= kLivePads || track < 0 || track >= kVoiceTracks) return false;
+  const PadSlot& ps = pads_[pad]; const Node* n = j == 0 ? ps.byTrack[track] : (ps.poly.empty() ? nullptr : ps.poly[(size_t)track * kVoicePoly + (size_t)(j - 1)]);
+  if (!n) return false;
+  o->tl = n->tl; o->ntl = n->ntl; o->rate = &n->rate; o->g = &n->g; o->pn = &n->pn; o->sylN = n->sylN; o->lastOn = n->lastOn; o->inT = n->inT; o->curLive = n->curLive; o->curStop = n->curStop; o->stopAt = n->stopAt; o->curCol = n->curCol;
+  return true;
+}
+bool LivePool::debugVoxG(int track, int pad, double* sylN, double* lastT, double* lastK) const {
+  if (pad < 0 || pad >= kLivePads || track < 0 || track >= kVoiceTracks || pads_[pad].vg.empty()) return false;
+  const VoxG& g = pads_[pad].vg[(size_t)track]; *sylN = g.sylN; *lastT = g.lastT; *lastK = g.lastK; return true;
 }
 
 void LivePool::kill(Node& n, double at) {   // kill(v, at) for a live voice: the gate goes low at `at`; a stop before a booked later note takes that note back
@@ -153,7 +243,7 @@ void LivePool::deliver(Node& n, uint32_t count, LiveEvent* out, uint32_t* nout) 
   while (k < n.ntl && n.tl[k].T < end) {
     const TEv& e = n.tl[k++]; LiveEvent& o = out[m++];
     o = LiveEvent(); o.type = e.type; o.leg = e.leg; o.acc = e.acc; o.same = e.same; o.v = e.v;
-    if (e.T < clk) { st_.late++; o.at = 0; } else o.at = (uint32_t)(e.T - clk);
+    if (e.T < clk) { if (e.type == LiveEvType::NoteOn) st_.late++; o.at = 0; } else o.at = (uint32_t)(e.T - clk);
   }
   if (k) { std::memmove(n.tl, n.tl + k, (size_t)(n.ntl - k) * sizeof(TEv)); n.ntl -= k; }
   *nout = m;

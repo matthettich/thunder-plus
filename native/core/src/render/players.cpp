@@ -16,10 +16,11 @@ void Players::render(float* const* inL, float* const* inR, int frames, double t0
 
 bool Players::dispatch(const SeqEvent& e, const Seq& seq, const Song& song) {
   switch (e.type) {
-    case SEV_STP: pool_.stp(e); sfpool_.stp(e); return true;
-    case SEV_OFF: if (e.track >= 0) { pool_.off(e); sfpool_.off(e); } return true;
-    case SEV_MOD: if (e.track >= 0) { const double* arp = seq.arp(e); pool_.mod(e, arp); sfpool_.mod(e, arp); } return true;
+    case SEV_STP: pool_.stp(e); sfpool_.stp(e); live_.stp(e); return true;
+    case SEV_OFF: if (e.track >= 0) { pool_.off(e); sfpool_.off(e); live_.off(e); } return true;
+    case SEV_MOD: if (e.track >= 0) { const double* arp = seq.arp(e); pool_.mod(e, arp); sfpool_.mod(e, arp); live_.mod(e, arp); } return true;
     case SEV_NOTE: note(e, seq, song); return true;
+    case SEV_TEMPO: live_.tempo(e.t, e.v); return false;   // (the live bass nodes follow it; the event still counts as ignored for the renderer, as before)
     default: return false;
   }
 }
@@ -34,7 +35,7 @@ void Players::note(const SeqEvent& e, const Seq& seq, const Song& song) {
   // D2: which player. A live-engine or SoundFont pad is not the sampler's: its notes are silent here (counted), but they still take the track over (a live note does: liveNote / sfNote).
   if (pads_.route[pad] == PadRoute::Live) {
     st_.notesLive++; takeAll(e, pad);
-    if (live_.has(pad) && live_.note(e, pad)) st_.notesLivePlayed++;   // a pad with live params plays; one without stays silent (counted)
+    if (live_.has(pad) && live_.note(e, pad, seq.bpm(), seq.arp(e))) st_.notesLivePlayed++;   // a pad with live params plays; one without stays silent (counted)
     return;
   }
   if (pads_.route[pad] == PadRoute::SoundFont) {
@@ -77,6 +78,8 @@ void Players::capPoly(const SeqEvent& e) {
     if (ha && (!hb || sa < sb)) { pool_.releaseOldest(e.track, e.t); a--; } else if (hb) { sfpool_.releaseOldest(e.track, e.t); b--; } else break;
   }
 }
+
+void Players::stopAll(double at) { pool_.stopAll(at); sfpool_.stopAll(at); live_.stopAll(at); }
 
 void Players::takeAll(const SeqEvent& e, int pad) { pool_.take(e, &pads_->kit[pad]); sfpool_.take(e, &pads_->kit[pad]); }
 

@@ -38,6 +38,9 @@ struct VoiceBuf {
   double sr = 0;                  // the pad's sample rate
   bool noShape = false;           // the host's varRec returned "the pad as it is" (a sliced / synced instrument): the event's tw is not applied
 };
+// The vibrato curve of pitchMods (an automation Curve): base * 2 ** (st * sin(2 pi hz d min(1, max(0, (x - t0) / dd))) / 12), p = {base, st, hz, d, t0, dd}. Shared with the live pool (LIVE-ROUTE B4).
+double voice_vib_curve(const double* p, double x);
+
 // kv[pad]: what the sampler reads of the page's kit message ({choke, syn, rel}; live / sf pads are not this player's)
 struct VoiceKit { int choke = 0; bool syn = false; double rel = 0; };
 

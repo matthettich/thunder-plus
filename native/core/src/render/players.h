@@ -35,6 +35,7 @@ class Players {
   void setTime(double t0, int64_t frame0);
   void render(float* const* inL, float* const* inR, int frames, double t0, int64_t frame0);
 
+  void stopAll(double at);                               // every voice of every pool lets go at `at` (for a live host)
   int voices() const { return pool_.active() + sfpool_.active(); }   // voices still sounding (the sampler's and the SoundFont pool's)
   void samplePeak() { const int v = voices(); if (v > st_.peakAll) st_.peakAll = v; }
   const PlayerStats& stats() const { return st_; }

@@ -123,11 +123,11 @@ function runCase(name) {
     ctx.currentTime = b * N / SR; ctx.currentFrame = b * N;
     for (const [bb, e] of C.evs) if (bb === b) {
       const ev = JSON.parse(JSON.stringify(e));
-      if (e.op === 'stopAll') { proc.stopAll(e.at); log.push({ op: 'stopAll', at: e.at, b }); }
+      if (e.op === 'stopAll') { proc.stopAll(e.at); log.push({ op: 'stopAll', at: e.at, b }); }   // (the other entries carry `ev`: the event as it was handed in)
       else {
         const r = proc.ev(ev);
         const T = proc.T(ev.track != null ? ev.track : 0);
-        log.push({ b, type: ev.type, t: ev.t, track: ev.track, pad: ev.pad, ret: r === undefined ? null : r, live: ev.coreLive || null,
+        log.push({ b, ev: JSON.parse(JSON.stringify(e)), type: ev.type, t: ev.t, track: ev.track, pad: ev.pad, ret: r === undefined ? null : r, live: ev.coreLive || null,
           voices: T.map(v => (v.live ? (v.L.key + (v.L.ps ? '#' + v.lane : '')) : 'smp') + (v.stopAt != null ? '/stop' : '')) });
       }
     }

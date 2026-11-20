@@ -72,7 +72,7 @@ static void setP(MachCore& c, const BassP*, const AcidP*, const MachP* m) { c.se
 template <class SH> static void refRun(const BassP* bp, const AcidP* ap, const MachP* mp, const std::vector<SeqEvent>& evs, int track, int pad, int64_t total, std::vector<float>& outL, std::vector<float>& outR) {
   SH sh(SR);
   setP(sh.core(), bp, ap, mp);
-  static AutoN<4096> rate, g, pn; rate.reset(1); g.reset(1); pn.reset(0);
+  static AutoN<4096> rate, g, pn; rate.reset(0); g.reset(1); pn.reset(0);   // (the rate param starts at 0 in the page: P5)
   std::vector<LiveEvent> le; const uint32_t lat = SH::latency();
   auto ev = [&](int64_t T, LiveEvType ty, bool leg, bool acc) { LiveEvent x; x.at = (uint32_t)T; x.type = ty; x.leg = leg; x.acc = acc; le.push_back(x); };
   for (const SeqEvent& e : evs) {
@@ -169,7 +169,7 @@ static void testSeam() {
 struct VoxNote { SeqEvent e; double syl; bool same; };
 static void refRunVox(const VoxP& vp, const std::vector<VoxNote>& ns, int64_t total, std::vector<float>& outL, std::vector<float>& outR) {
   LiveVox sh(SR); sh.core().set(vp);
-  static AutoN<4096> rate, g, pn; rate.reset(1); g.reset(1); pn.reset(0);
+  static AutoN<4096> rate, g, pn; rate.reset(0); g.reset(1); pn.reset(0);   // (the rate param starts at 0 in the page: P5)
   std::vector<LiveEvent> le; const uint32_t lat = LiveVox::latency();
   for (const VoxNote& n : ns) {
     const SeqEvent& e = n.e; const int64_t T = sample_at_or_after(e.t, SR); const bool leg = (e.has & SH_SLIDE) && e.slideDur > 0;
@@ -239,7 +239,7 @@ static void testVox() {
     }
     // (the mono node of track 1 adds exact zeros first)
     int64_t bad = -1; for (int64_t i = 0; i < total; i++) if (std::memcmp(&sumL[i], &gotL[1][i], 4) || std::memcmp(&sumR[i], &gotR[1][i], 4)) { bad = i; break; }
-    CHECKF(bad < 0, "polyVox differs from the four shells driven directly at %lld", (long long)bad);
+    CHECKF(bad < 0, "polyVox differs from the four shells driven directly at %lld (%g %g; sum %g %g)", (long long)bad, bad>=0?(double)gotL[1][bad]:0.0, bad>=0?(double)gotR[1][bad]:0.0, bad>=0?(double)sumL[bad]:0.0, bad>=0?(double)sumR[bad]:0.0);
     double e = 0; for (float x : gotL[1]) e += std::fabs(x); CHECK(e > 1e-3); }
   // the overflow guard: five notes at one instant on one track with four nodes busy: the fifth is consumed, silent
   { std::vector<LiveTraceRec> t2; t2.reserve(64); pl.live().setTrace(&t2); const double base = 1.0;

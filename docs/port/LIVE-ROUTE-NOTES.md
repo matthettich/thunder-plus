@@ -1,6 +1,6 @@
-**STATUS (lead reads here). B3 done (pushed): vox mono node (syllable counter, `same` = slide) and polyVox (voxG, sameCol / free / oldest-lastOn picks, the overflow guard) in LivePool; kind vox (2) in `set_pad_live` (5 nodes a track). Tests: live_pool (poly picks / syllables / `same` = the JS golden's; audio of every node = the shell driven directly; guard), live_reset (idle-skip compare), Release + ASan/UBSan pass.
-IDLE SKIP: the bit-compare passes for vox as well as bass / acid / mach (a core copied at its first silent block, 1 / 7 / 100 / 3000 idle quanta, legato or not, four lyrics): idle blocks change nothing. The pool does NOT skip yet (an optimisation for after PR B).
-NEXT: B4 off / cut / rel / mod (wob D6) / stp / stopAll / bends / tempo (P4) / D4.**
+**STATUS (lead reads here). B4 done: off / cut / rel / mod (gain, pan, mul, bends, arp, vib; wob D6 follows the page) / stp / stopAll / tempo (P4) / D4 same-sample take-back in LivePool; the decision-log gate (L10 f) is a test: `test_live_decisions` compares the pool's booked events per node with the JS golden (gate, trig, leg, syl, same, acc, rate, g, pn lists, wob, lastOn, sylN, voxG) for 11 cases (17 nodes). Release + ASan/UBSan pass.
+NOTE: the node's rate lane starts at 0 (the page's AudioParam), so `live_pool`'s reference starts at 0; `late` counts NoteOn events only (a Bpm event booked with a note is not a second late event).
+NEXT: merge origin/native (stems #246) before PR B; B5 one list per track (P2, P3, take / capPoly order pinned for sampler and live), choke, C4, stats; stem test with a live bass pad.**
 
 **Checklist (updated every commit):**
 - [x] 1a `native/tools/live-route-dump.mjs` + `native/tests/golden/live_route_log.json` / `live_route_golden.inc` (gate L10(f); 16 cases; `--check` passes). Runs `core/seq-core.js` (= `core-processor.js` + the page's declarations; core-processor.js alone lacks `NT`).
@@ -10,10 +10,16 @@ NEXT: B4 off / cut / rel / mod (wob D6) / stp / stopAll / bends / tempo (P4) / D
   - [x] B1 reset()/seek() on BassCore, VoxCore, AcidCore, MachCore and LiveShell (C1); test_live_reset (reset == fresh bit for bit at block sizes 128/17/64/1, reset+seek(c) == fresh, no allocation, params/lyrics kept); mutant: vox reset without `rnd_` -> killed by test_live_reset; live_u26 / engine_u26 still pass
   - [x] B2 LivePool skeleton + set_pad_live + timeline/cancelFrom + AutoN rate lane (P5) + run-ahead L4 + seconds-to-sample (P6d) + mono bass/acid/mach + L10(a) (test_live_pool); kill()/cut/rel for the mono node are in (B4 adds off/mod/stp/stopAll, bends, tempo, wob)
   - [x] B3 vox mono + polyVox (voxG), idle-skip compare (test_live_reset: neutral for all four, no skip implemented yet)
-  - [ ] B4 off/cut/rel/mod/wob/stp/stopAll/bends/tempo (P4)/D4
+  - [x] B4 off/cut/rel/mod/wob/stp/stopAll/bends/tempo (P4)/D4 (test_live_decisions; stop_all's vox node and takeover / choke / poly_cap cases wait for B5)
   - [ ] B5 one list per track (P2, P3), choke, C4, stats L8
   - [ ] B6 gates L10 (b)-(f), mutants, rt_harness, sanitizers; open PR B; then eng
-- Choices for the lead: (none yet)
+- Choices for the lead (so far):
+  - SEV_TEMPO still counts in `eventsIgnored` (Players returns false for it) while it is forwarded to the live bass nodes.
+  - The rate lane follows the core's Auto semantics: `hold` at note-on (the page's cancelAndHold); mod bends do not hold.
+  - NoteOff on a full timeline: if nothing is at or after it, the latest booked event is dropped for it.
+  - Non-finite rate / gain / pan / slide values are refused silently.
+  - Players::note counts the note as live and calls takeAll first.
+  - The dump tool runs `core/seq-core.js`.
 
 
 # LIVE-ROUTE NOTES (worker, 19 Nov 2026), branch `n1/live-route`

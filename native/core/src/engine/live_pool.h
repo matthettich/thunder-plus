@@ -34,6 +34,10 @@ struct LivePadConfig {
 // A decision trace for tests (LIVE-ROUTE L10(f)): what the pool books on a node, in the order it books it. Off by default (no cost, no allocation); a test gives it a vector with room.
 struct LiveTraceRec { int track = 0, pad = 0, j = 0; char what = 0; double t = 0, v = 0; int64_t T = 0; bool leg = false, acc = false, same = false; };   // what: 'n' note-on (v = syllable), 'o' note-off, 'c' cancelFrom
 
+struct LiveTEv { int64_t T = 0; LiveEvType type = LiveEvType::NoteOn; bool leg = false, acc = false, same = false; double v = 0; };   // one booked event of a node's timeline (the events not yet handed to the shell)
+// A read-only view of a node, for tests (the decision-log gate, LIVE-ROUTE L10(f)).
+struct LiveDebugNode { const LiveTEv* tl = nullptr; int ntl = 0; const Auto* rate = nullptr; const Auto* g = nullptr; const Auto* pn = nullptr; double sylN = 0, lastOn = -1; bool inT = false, curLive = false, curStop = false; double stopAt = 0; int curCol = 0; };
+
 struct LiveStats { uint32_t played = 0, noNode = 0, late = 0, queueDropped = 0, forcedOff = 0, failed = 0; };
 
 class LiveEng {   // one engine as the pool uses it (a LiveShell of one of the four cores behind a small interface)
@@ -66,7 +70,19 @@ class LivePool {
   // The quantum's start (seconds): `now` in the JS (currentTime). Call before this quantum's events.
   void setTime(double t0) { now_ = t0; }
   // A note event on a live pad (the JS's liveNote / liveStart, the mono branch). true: a node took it; false: none for the track (counted noNode).
-  bool note(const SeqEvent& e, int pad);
+  // `bpm`: the sequencer's tempo now (P4: a bass node's bpm lane is kept current from it at each note); `arp`: Seq::arp(e), valid only for this call.
+  bool note(const SeqEvent& e, int pad, double bpm, const double* arp);
+  // The events that reach a track's live voices (the JS's off / mod / stp handlers of ev(), the live branch of kill / modVoice): `off` (all of the track's voices, or the columns of e.cols), `mod`, `stp` (e.flag: every track),
+  // SEV_TEMPO (every bass node's bpm), and stopAll(at) (every node's gate low at `at`, booked notes taken back, syllable counters and voxG reset: for a live host).
+  void off(const SeqEvent& e);
+  void mod(const SeqEvent& e, const double* arp);
+  void stp(const SeqEvent& e);
+  void tempo(double t, double bpm);
+  void stopAll(double at);
+  // For tests: the value of a node's rate lane at time t (seconds); NaN when there is no such node.
+  double debugRateAt(int track, int pad, int j, double t) const;
+  bool debugNode(int track, int pad, int j, LiveDebugNode* out) const;
+  bool debugVoxG(int track, int pad, double* sylN, double* lastT, double* lastK) const;
   // Adds the nodes' samples for [frame0, frame0 + frames) into the mixer inputs; frames <= kQuantum (one quantum).
   void render(float* const* inL, float* const* inR, int frames, int64_t frame0);
 
@@ -74,15 +90,19 @@ class LivePool {
   uint32_t failedNodes() const;
 
  private:
-  struct TEv { int64_t T = 0; LiveEvType type = LiveEvType::NoteOn; bool leg = false, acc = false, same = false; double v = 0; };
+  using TEv = LiveTEv;
   struct Node {
     int pad = 0, track = 0; LiveKind kind = LiveKind::None;
     std::unique_ptr<LiveEng> eng;
     TEv tl[kTimeline]; int ntl = 0;
-    AutoN<kAutoRate> rate{1}; AutoN<kAutoGP> g{1}, pn{0};
+    AutoN<kAutoRate> rate{0}; AutoN<kAutoGP> g{1}, pn{0};
     int j = 0;                          // 0: the mono node; 1 .. 4: a polyVox node
     double lastOn = -1; bool curLive = false, curStop = false; double stopAt = 0; int curCol = 0;
     double sylN = 0;                    // the mono node's syllable counter (the JS's L.sylN)
+    double base = 1, vrate = 1;         // the note's rate and the rate a `mul` / bend left (v.base, v.rate)
+    bool inT = false;                   // the voice is in its track's voice list (off / stp take it out; mod reaches it only there)
+    bool used = false;                  // a note was ever booked on this node (stopAll acts on used nodes)
+    double lastBpm = -1;                // the bass node's bpm lane as last set
     bool started = false;
     Node() = default;
   };
@@ -94,8 +114,11 @@ class LivePool {
   };
 
   void rebuildActive();
-  void startNote(Node& n, const SeqEvent& e, double fk = -1, bool hasFk = false);
-  bool polyVox(const SeqEvent& e, PadSlot& ps);
+  void startNote(Node& n, const SeqEvent& e, double bpm, const double* arp, double fk = -1, bool hasFk = false);
+  void pitchMods(Node& n, double t, double base, const SeqEvent& e, const double* arp);
+  void modVoice(Node& n, const SeqEvent& e, const double* arp);
+  void bookCtl(Node& n, LiveEvType type, double t, double v);   // a Bpm / Wob event at the sample of time t
+  bool polyVox(const SeqEvent& e, PadSlot& ps, double bpm, const double* arp);
   void kill(Node& n, double at);
   void cancelFrom(Node& n, int64_t T);
   void book(Node& n, const TEv& e);
@@ -105,6 +128,7 @@ class LivePool {
   double sr_; double now_ = 0;
   PadSlot pads_[kLivePads];
   std::vector<Node*> active_;
+  std::vector<Node*> byTrack_[kVoiceTracks];   // every node of a track, pad order (the track's live voices)
   std::unique_ptr<float[]> scr_;     // two scratch blocks of kQuantum
   LiveStats st_; std::vector<LiveTraceRec>* trace_ = nullptr;
   void rec(const Node& n, char what, double t, double v, int64_t T, bool leg = false, bool acc = false, bool same = false) { if (trace_) { LiveTraceRec r; r.track = n.track; r.pad = n.pad; r.j = n.j; r.what = what; r.t = t; r.v = v; r.T = T; r.leg = leg; r.acc = acc; r.same = same; trace_->push_back(r); } }
