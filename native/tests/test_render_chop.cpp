@@ -89,6 +89,13 @@ int main() {
       const int e0 = kPad / 4 - 2400, e1 = kPad / 4 - 400; double w2 = 0; for (int i = e0; i < e1; i++) w2 += (double)((k + 1) * (kPad / 4) - i) / kPad; w2 = g * w2 / (e1 - e0);
       const double g2 = mean(o.L, t0 + e0, t0 + e1); CHECKF(std::fabs(g2 - w2) <= 0.01 * w2 + 1e-6, "reversed note %d: near the slice's start at its end (mean %g, want %g)", k, g2, w2);
     } }
+  // reversed, a slice that runs PAST the pad's end (verify-247): sync 2, beats 8 at 120 bpm: target 4 s on a 2 s loop, scale 2: ofsSec 0, durSec 4 > the pad's 2 s, so dur - ofsSec - durSec is -2 and the
+  // voice's max(0, ...) puts the reader at the pad's END (ramp near 1, running down). Without the max the start is negative and the output is not that.
+  { std::vector<float> ramp((size_t)kPad); for (int i = 0; i < kPad; i++) ramp[(size_t)i] = (float)i / (float)kPad;
+    Cfg c; c.pad = ramp; Out o; render(songJson("{\"pad\":0,\"sync\":2,\"beats\":8,\"rev\":1}"), c, 4096, o, 2 * SR);
+    Cfg d; Out dc; render(songJson("{\"pad\":0,\"slc\":4}"), d, 4096, dc); const double g = mean(dc.L, 2000, 22000) / 0.1;
+    const int a0 = 2000, b0 = 8000; double want = 0; for (int i = a0; i < b0; i++) want += (double)(kPad - i) / kPad; want = g * want / (b0 - a0);
+    const double got = mean(o.L, a0, b0); CHECKF(g > 1e-3 && o.st.notes_stretched >= 1 && std::fabs(got - want) <= 0.01 * want, "reversed slice past the pad's end starts at the pad's end (mean %g, want %g)", got, want); }
   // a changed pad loses its chop data
   { thunder_render_opts op; std::memset(&op, 0, sizeof op); op.size = sizeof op; op.use_frames = 1; op.frames = SR; char err[100]; const std::string sg = slc4;
     thunder_render* r = thunder_render_create((const uint8_t*)sg.data(), sg.size(), &op, err, sizeof err); const std::vector<float> p = levels();

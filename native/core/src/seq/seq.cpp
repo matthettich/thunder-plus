@@ -299,10 +299,10 @@ void Seq::buildParts() {
           x.vol = I.get("vol").missing() ? kNaN : jnum(I.get("vol")); x.pan = I.get("pan").missing() ? kNaN : jnum(I.get("pan")); x.ofs = I.get("ofs").missing() ? kNaN : jnum(I.get("ofs"));
           x.hut = js_to_int32(jnum(I.get("hut"))); x.huv = js_to_int32(jnum(I.get("huv"))); x.kf = truthy(I.get("kf")); x.rev = truthy(I.get("rev"));
           // verify-chop F4: clamp only BEYOND what the page defines (applyChop, index.html:22333): slc = I.slc | 0 and sy = I.sync | 0 (truncation; slc < 2 = no chop), beats = I.beats || 4 (falsy or NaN -> 4),
-          // grain = I.grain == null ? 1 : I.grain | 0. Beyond the page's own range (slc > 64, sync > 3, beats outside 1..64, grain outside 0..4) the song loader's limits apply (song.cpp).
-          x.slc = to_int_sat(js_to_int32(jnum(I.get("slc"))), 0, 64); x.smode = truthy(I.get("smode")); x.sy = to_int_sat(js_to_int32(jnum(I.get("sync"))), 0, 3); x.sync = x.sy != 0;
+          // grain = I.grain == null ? 1 : I.grain | 0. Beyond the page's own range (slc > 64, beats outside 1..64, grain outside 0..4; sync only below 0) the song loader's limits apply (song.cpp).
+          x.slc = to_int_sat(js_to_int32(jnum(I.get("slc"))), 0, 64); x.smode = truthy(I.get("smode")); x.sy = std::max(0, js_to_int32(jnum(I.get("sync")))); x.sync = x.sy != 0;   /* no upper clamp: 3 is LOOP and 4.. is the page's normal stretch (index.html:22313), so a clamp to 3 would change the mode */
           x.grain = nullish(I.get("grain")) ? 1 : to_int_sat(js_to_int32(jnum(I.get("grain"))), 0, 4);
-          { const double b = jnum(I.get("beats")); x.beats = truthy(I.get("beats")) && b == b ? (double)to_int_sat(js_round(b), 1, 64) : 4; } }
+          { const double b = jnum(I.get("beats")); x.beats = truthy(I.get("beats")) && b == b ? std::min(64.0, std::max(1.0, b)) : 4;   /* raw, as the page uses it: 1.7 stays 1.7 */ } }
         part.insts.push_back(x); } }
     parts_.push_back(std::move(part)); }
 }

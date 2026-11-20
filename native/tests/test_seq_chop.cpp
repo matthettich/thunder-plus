@@ -194,7 +194,7 @@ static void testPartClamp() {
   { const Run a = play(partSong("{\"pad\":0}", "{\"pad\":0,\"slc\":4}"), &ch), b = play(handSong("{\"pad\":0,\"slc\":4}"), &ch);
     CHECK(a.notes.size() == 4 && a.chopped == 4 && sameNotes(a, b), "part path: an in-range part instrument chops like the main path (%zu)", a.notes.size()); }
   for (const char* inst : {"{\"pad\":0,\"slc\":100}", "{\"pad\":0,\"slc\":1e9}", "{\"pad\":0,\"slc\":64.4}", "{\"pad\":0,\"slc\":-5}", "{\"pad\":0,\"slc\":\"7\"}",
-                           "{\"pad\":0,\"sync\":1,\"beats\":100}", "{\"pad\":0,\"sync\":1,\"beats\":-3}", "{\"pad\":0,\"sync\":1,\"beats\":2.6}", "{\"pad\":0,\"sync\":7,\"beats\":8,\"grain\":9}",
+                           "{\"pad\":0,\"sync\":1,\"beats\":100}", "{\"pad\":0,\"sync\":1,\"beats\":-3}", "{\"pad\":0,\"sync\":3,\"beats\":8,\"grain\":9}",
                            "{\"pad\":0,\"sync\":3,\"beats\":4,\"grain\":-2}", "{\"pad\":0,\"sync\":2,\"beats\":1e12,\"grain\":null}", "{\"pad\":0,\"slc\":100,\"smode\":1}"}) {
     const Run a = play(partSong("{\"pad\":0}", inst), &ch), b = play(handSong(inst), &ch);
     CHECK(!a.notes.empty() && sameNotes(a, b) && a.chopped == b.chopped && a.skipped == b.skipped && a.stretched == b.stretched, "part path = main path for %s (%zu vs %zu notes)", inst, a.notes.size(), b.notes.size());
@@ -208,6 +208,13 @@ static void testPartClamp() {
       CHECK(r.notes.size() == 4 && sameNotes(r, four) && std::fabs(r.notes[0].rate - 1.0) < 1e-12, "part beats %s plays as 4 beats (rate %g, 1 expected; beats 1 would give 0.25)", b, r.notes.empty() ? 0.0 : r.notes[0].rate); }
     const Run absent = play(partSong("{\"pad\":0}", "{\"pad\":0,\"sync\":1}"), &g); CHECK(sameNotes(absent, four), "part beats absent plays as 4 beats");
     const Run neg = play(partSong("{\"pad\":0}", "{\"pad\":0,\"sync\":1,\"beats\":-3}"), &g); CHECK(neg.notes.size() == 4 && std::fabs(neg.notes[0].rate - 4.0) < 1e-12, "part beats -3 (truthy, beyond the page's range): clamped to 1 (rate %g, 4 expected)", neg.notes.empty() ? 0.0 : neg.notes[0].rate);
+    // beats is used RAW (no rounding), clamped 1..64: 1.7 -> 1.7 (rate = loop / target = 2 / (1.7 * 0.5)), 100 -> 64 (target 32 s)
+    { const Run b17 = play(partSong("{\"pad\":0}", "{\"pad\":0,\"sync\":1,\"beats\":1.7}"), &g), b100 = play(partSong("{\"pad\":0}", "{\"pad\":0,\"sync\":1,\"beats\":100}"), &g);
+      CHECK(b17.notes.size() == 4 && std::fabs(b17.notes[0].rate - 2.0 / (1.7 * 0.5)) < 1e-12, "part beats 1.7 stays 1.7 (rate %g)", b17.notes.empty() ? 0.0 : b17.notes[0].rate);
+      CHECK(b100.notes.size() == 4 && std::fabs(b100.notes[0].rate - 2.0 / (64 * 0.5)) < 1e-12, "part beats 100 -> 64 (rate %g)", b100.notes.empty() ? 0.0 : b100.notes[0].rate); }
+    // sync above 3 keeps its value (3 = LOOP, 4.. = the normal stretch): mode 5 stays 5, 1000 is 255 in the uint8 field, never 3
+    { const Run m5 = play(partSong("{\"pad\":0}", "{\"pad\":0,\"sync\":5}"), &g), m9 = play(partSong("{\"pad\":0}", "{\"pad\":0,\"sync\":1000}"), &g);
+      CHECK(m5.notes.size() == 4 && m5.notes[0].stMode == 5 && m9.notes.size() == 4 && m9.notes[0].stMode == 255, "part sync 5 / 1000 keep their stretch mode (%d, %d)", m5.notes.empty() ? -1 : m5.notes[0].stMode, m9.notes.empty() ? -1 : m9.notes[0].stMode); }
     // slc truncates like `I.slc | 0`: 1.9 is 1 (no chop), 2.5 is 2; grain null -> 1, grain 0 stays 0
     const Run s1 = play(partSong("{\"pad\":0}", "{\"pad\":0,\"slc\":1.9}"), &g); CHECK(s1.chopped == 0 && s1.skipped == 0, "part slc 1.9 = 1: no chop");
     const Run g0 = play(partSong("{\"pad\":0}", "{\"pad\":0,\"sync\":2,\"grain\":0}"), &g), gn = play(partSong("{\"pad\":0}", "{\"pad\":0,\"sync\":2,\"grain\":null}"), &g);

@@ -3,7 +3,7 @@
 // For every module type that has a case "mod/<type>/default" in the committed golden (the patch of that case is the template: it has an input and an output, so the module does work), and for every
 // parameter of that type (and `_bn` / `_byp` in chains), a fresh engine is loaded, run for a few blocks, hit with setParam(NaN | +Inf | -Inf | 1e300 | -1e300 | 3e38 | 1e-300) on that one parameter, and run for 25
 // more blocks. Then once more with the value on ALL parameters at once. Clean = no crash, and under -DTHUNDER_SANITIZE=ON no ASan / UBSan report (the sanitizer build is where this test earns its keep:
-// an index of INT_MIN into a table is a plain segfault in Release only when it lands in unmapped memory). Output that is not finite is NOT a failure (the JS gives NaN too, for most of these).
+// an index of INT_MIN into a table is a plain segfault in Release only when it lands in unmapped memory). Output that is not finite AFTER the hostile value is NOT a failure (the JS gives NaN too, for most of these: a finite-or-not oracle per type would need the JS run per case). But the output BEFORE it (blocks 0..4, the golden's own parameters) must be finite and no block may fail: a module that starts emitting NaN on ordinary input, or throws, fails the sweep (verify-247 F4).
 // Usage: test_nan_sweep chains|waves <golden cases.json> [only-type]
 #include <csignal>
 #include <cmath>
@@ -30,7 +30,7 @@ static const char* kValNames[kNV] = {"NaN", "+Inf", "-Inf", "1e300", "-1e300", "
 
 static std::string slurp(const std::string& p) { std::ifstream f(p, std::ios::binary); std::stringstream ss; ss << f.rdbuf(); return ss.str(); }
 
-struct Stats { int runs = 0, nonfinite = 0, failedBlocks = 0, refused = 0; };
+struct Stats { int runs = 0, nonfinite = 0, failedBlocks = 0, refused = 0, baseNonfinite = 0, baseFailed = 0; };
 
 static const waves::WInfo* infoOf(bool chains, const std::string& type) {
   if (!chains) return waves::winfo(type);
@@ -48,7 +48,8 @@ static void runOne(bool chains, Json cs, const std::string& id, const std::vecto
     if (!e.loadPatch(cs.get("patch"))) { st.refused++; return; }
     for (int b = 0; b < 30; b++) {
       if (b == 5) for (const std::string& n : names) e.setParam(id, n, val);
-      e.setTrackInputs(x, x, 1); if (!e.process(128)) st.failedBlocks++;
+      e.setTrackInputs(x, x, 1); if (!e.process(128)) { st.failedBlocks++; if (b < 5) st.baseFailed++; }
+      if (b < 5) { for (int k = 0; k < 128; k++) if (!std::isfinite(e.bus(1)[k]) || !std::isfinite(e.busR(1)[k])) { st.baseNonfinite++; break; } }
       if (b >= 5) for (int k = 0; k < 128; k++) if (!std::isfinite(e.bus(1)[k]) || !std::isfinite(e.busR(1)[k])) fin = false;
     }
   } else {
@@ -59,7 +60,8 @@ static void runOne(bool chains, Json cs, const std::string& id, const std::vecto
     for (int b = 0; b < 30; b++) {
       if (b == 0) { e.noteOn(60, 1); e.noteOn(67, .7); }
       if (b == 5) for (const std::string& n : names) e.setParam(id, n, val);
-      if (!e.process(128)) st.failedBlocks++;
+      if (!e.process(128)) { st.failedBlocks++; if (b < 5) st.baseFailed++; }
+      if (b < 5) { for (int k = 0; k < 128; k++) if (!std::isfinite(e.bus(bus)[k]) || !std::isfinite(e.busR(bus)[k])) { st.baseNonfinite++; break; } }
       if (b >= 5) for (int k = 0; k < 128; k++) if (!std::isfinite(e.bus(bus)[k]) || !std::isfinite(e.busR(bus)[k])) fin = false;
     }
   }
@@ -104,6 +106,7 @@ int main(int argc, char** argv) {
   if (!only) for (const char* sp : chains ? std::vector<const char*>{"trackIn", "chainOut"} : std::vector<const char*>{"hostIn", "out"}) {
     bool got = false; for (const std::string& s : seen) if (s == sp) got = true;
     if (!got) { std::printf("nan_sweep: the %s type was not swept (no case has a module of it?)\n", sp); return 1; } }
+  if (st.baseNonfinite || st.baseFailed) { std::printf("nan_sweep: FAIL %d runs had non-finite output and %d a failed block BEFORE the hostile value (the golden's own parameters)\n", st.baseNonfinite, st.baseFailed); return 1; }
   if (!types) { std::printf("nan_sweep: no module types found (wrong cases file?)\n"); return 1; }
   return 0;
 }
