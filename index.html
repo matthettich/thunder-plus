@@ -21283,7 +21283,7 @@ function resetTrackData(Sx, t, o = {}){
   if (m) for (const k in d) if (m[k] !== d[k]){ m[k] = d[k]; r.mix = true; r.changed = true; }
   // 4 · the effect slots (the live graph is taken down by fxChanged, as removing one effect does)
   const A = Sx.tfx && Sx.tfx[t]; if (A) for (let k = 0; k < A.length; k++) if (A[k]){ A[k] = null; r.fx++; r.changed = true; }
-  // 5 · CHN: off, unless the track is a bus (switching a bus off would cut every track that feeds it)
+  // 5 · CHN: off, unless the track is a bus or feeds one (its bus role never changes: switching it off would cut the feeders, or make the bus stop being a bus and its notes sound)
   if (Sx.chainOn && Sx.chainOn[t]){ if (o.keepChn) r.chnKept = true; else { Sx.chainOn[t] = false; r.chn = true; r.changed = true; } }
   // 6 · PERFORM: the track's own locks and LFOs, and every target that names it (scenes, macros, other tracks' locks and LFOs)
   const at = id => { if (typeof id !== 'string') return false; const a = id.split(':'); return a[1] != null && a[1] !== '' && +a[1] === t; };
@@ -21316,7 +21316,7 @@ function resetTrackFocus(){
 function resetTrackHere(){ const f = resetTrackFocus(); if (f.why) return toast(f.why); resetTrack(f.t); }
 function resetTrack(t){
   if (!(t >= 0 && t < ntr())) return toast('No track in focus.');
-  const bus = isBusT(t), r = resetTrackData(S, t, {keepChn:bus});
+  const bus = isBusT(t), fd = !bus && feedsBus(t) ? [...(busPlan().targets.get(t) || [])] : [], r = resetTrackData(S, t, {keepChn:bus || fd.length > 0});   // a reset never changes a track's bus ROLE: a bus and a feeder keep CHN
   if (!r.changed) return toast(`Track ${d2(t + 1)} is already empty and at its defaults.`);
   try { for (const key of [...fxMem.keys()]) if (key.startsWith(t + ':')) fxMem.delete(key); } catch(e){}   // SLOT MEMORY: an effect added again starts from its defaults
   if (r.blocksFreed.length && clip && clip.v === 'song') clip = null;   // a copied block could be one of the freed
@@ -21332,7 +21332,7 @@ function resetTrack(t){
   try { if (tp.core && core.mir && core.ready){ clearTimeout(core.sT); core.sT = 0; const ops = coreOps(coreDiff()); if (ops.length) corePost({op:'patch', ops}); corePost({op:'stp', track:t}); } } catch(e){ tpLog('reset track: core', e); }
   arrSig = ''; dkFbSig = ''; draw();
   const sh = r.blocksShared.length;
-  toast(`Track ${d2(t + 1)} reset · ${keyHint('mod+Z')} brings it back` + (r.chnKept ? ' · bus: CHN stays on' : '') + (sh ? ` · ${sh} shared block${sh === 1 ? '' : 's'} kept` : ''), 4000);
+  toast(`Track ${d2(t + 1)} reset · ${keyHint('mod+Z')} brings it back` + (r.chnKept ? (bus ? ' · bus: CHN stays on' : ` · CHN kept: it feeds the bus on track ${fd.map(u => d2(u + 1)).join(', ')}`) : '') + (sh ? ` · ${sh} shared block${sh === 1 ? '' : 's'} kept` : ''), 4000);
 }
 /* ---------- mastering on the master bus ----------
    S.mst, saved with the song:
@@ -36602,9 +36602,9 @@ const CHANGES = [
   [656, '19 Nov', ['Settings: FOLLOW sits directly above PHRASE ON STOP and ARRANGE ON STOP, in the View menu and in Settings (the Project screen too). Nothing else about them changed']],
   [654, '19 Nov', ['Synth page: the pads and slots the song uses have a thin line just inside their edge, so you can see which are open. Solid: a note in a phrase on the song plays it. Dotted: only phrases that are not on the song do. No line: free. A one-line key sits under the slot controls, and the info line for the selected pad says which instruments play it and how many notes. The tracker\u2019s INSTRUMENTS list is outlined the same way.']],
   [653, '19 Nov', ['FX presets: with the cursor in an effect slot\u2019s controls (a parameter row or \u203a PRESET; FX screen, tracks and the master, pump effects too), Ctrl/\u2318+\u25c0\u25b6 load the previous / next preset (EDIT+\u25c0\u25b6 on its \u203a PRESET row on the pad). Ctrl/\u2318+Shift+\u25c0\u25b6 change a parameter by 1 now. Hold it to run through them: the sound changes as you go, and the whole run is one undo step. It stops at the first and last preset.']],
+  [650, '19 Nov', ['Reset track: Ctrl+Shift+T (\u2318+Shift+T on a Mac) clears the track you are on, as deleting a track in Renoise does, but the track stays where it is. Its notes and commands on every song row go, its mixer strip (level, trim, pan, mute, solo, name, colour) and its effects go back to a new song\u2019s, and CHN goes off. A block or phrase another track also plays is left alone. One Undo (Ctrl/\u2318+Z) brings everything back. Also in Edit \u25be \u2192 Track, the Song block\u2019s right-click menu and, on a phone, File \u2192 Edit. A browser tab keeps Ctrl+Shift+T for \u201creopen closed tab\u201d: use the menu there; the desktop app gets the key.']],
   [649, '19 Nov', ['Settings: press on a slider\u2019s bar (SWING, TEMPO, LPB, TEXT SIZE\u2026) to set it there and drag to change it, with a mouse or a finger. A swipe up or down that starts on a bar still scrolls the list. Double-tap a bar to put it back to its default. Shift (mouse) or a finger held away from the bar makes it finer. The sliders no longer lock.']],
   [648, '19 Nov', ['…waves and …chains: the Expression module’s ? help now has worked examples to copy, one formula per line: a sine, saw, triangle and square, a pitch from K1 and a version that glides without a jump, FM, a chord, a fade-in, ring modulation, tremolo, a low-pass filter, a wavefolder, a bit crusher and noise. The Help page shows them on the Expression card too, and the module’s Examples menu now holds the same formulas (tones first, then effects), so you can pick one instead of typing it.']],
-  [650, '19 Nov', ['Reset track: Ctrl+Shift+T (\u2318+Shift+T on a Mac) clears the track you are on, as deleting a track in Renoise does, but the track stays where it is. Its notes and commands on every song row go, its mixer strip (level, trim, pan, mute, solo, name, colour) and its effects go back to a new song\u2019s, and CHN goes off. A block or phrase another track also plays is left alone. One Undo (Ctrl/\u2318+Z) brings everything back. Also in Edit \u25be \u2192 Track, the Song block\u2019s right-click menu and, on a phone, File \u2192 Edit. A browser tab keeps Ctrl+Shift+T for \u201creopen closed tab\u201d: use the menu there; the desktop app gets the key.']],
   [647, '18 Nov', ['Flex: two patterns could put one broken sample into the sound (FLX E8, the 5-tuplet feel, just before a beat; and a tape pattern at one spot in Flex\u2019s memory). Fixed.', 'With the cursor on an FLX command in a phrase (or the master column), the FX bar\u2019s Flex PATTERN value now shows that command\u2019s number, and changing it rewrites the command in the column. One undo step per drag, on tracks and on the master. FLY commands are not linked, and every other FX bar value works as before.']],
   [646, '18 Nov', ['Computer side panel: the instrument list now sits above the PLAYING / STOPPED box and the meters (it was below them). Nothing else in the panel moved.']],
   [645, '18 Nov', ['The pump update of builds 643 and 644 is taken back out for now. It made pump FREEZE pause the sound for about a second in ways that could not be hidden (the first notes after a kit load or an engine switch could be lost). It returns when pump itself is changed.']],

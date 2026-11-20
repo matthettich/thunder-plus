@@ -122,7 +122,7 @@ const liveCode = cut('function resetTrackFocus(){', '/* ---------- mastering on 
 function liveVm(S, o = {}) {
   const log = { toast: [], play: [], fx: [], mix: 0, saves: 0, draws: 0, core: [], chains: 0, perf: 0 };
   const c = { NT, MT, S, console, JSON, Set, Map, Object, Array, Number, queueMicrotask, clearTimeout, TRIM_0: 128, rt: o.rt === undefined ? { pl: { play: e => log.play.push(plain(e)) } } : o.rt, ctx: { currentTime: 3.5 },
-    undoHeld: false, undoWant: false, recTake: false, undoQuiet: false, ntr: () => S.ntr || 16, isBusT: t => !!(o.bus && o.bus.includes(t)), focusT: () => c.__focus, d2: n => String(n).padStart(2, '0'),
+    undoHeld: false, undoWant: false, recTake: false, undoQuiet: false, ntr: () => S.ntr || 16, isBusT: t => !!(o.bus && o.bus.includes(t)), busPlan: () => ({ targets: o.feeds || new Map() }), feedsBus: t => !(o.bus && o.bus.includes(t)) && !!(o.feeds && o.feeds.has(t)), focusT: () => c.__focus, d2: n => String(n).padStart(2, '0'),
     keyHint: s => s.replace('mod+', c.MAC ? '\u2318' : 'Ctrl+'), MAC: false, toast: (m, ms) => log.toast.push(m), fxMem: new Map(), clip: null, sxPicks: [], tpLog() {}, view: 'tracker', tv: 'song', apReady: false, apF: null, cs: { song: { x: 0, y: 0 }, mixer: { x: 0, y: 0 } }, cTrack: 0, cFxT: 0,
     mixChanged: () => { log.mix++; c.saveS(); }, fxChanged: t => { log.fx.push(t); c.saveS(); }, chApi: () => null, chainsPush: () => { log.chains++; }, dkChnSig: 'x', perfLive: { init: true }, perfPush: () => { log.perf++; },
     saveS: () => { log.saves++; c.snap(); }, tp: { core: !!o.core }, core: { mir: {}, ready: !!o.core, sT: 7 }, coreOps: x => x, coreDiff: () => (o.core ? [['song', null, 1]] : []), corePost: m => log.core.push(plain(m)), arrSig: 'a', dkFbSig: 'b', draw: () => { log.draws++; } };
@@ -152,6 +152,7 @@ test('resetTrack: a second press on the now-empty track says so and makes no und
   const c = liveVm(busy()); c.resetTrack(1); await settle(); c.log.toast.length = 0; const n = c.undo.past.length;
   c.resetTrack(1); await settle(); assert.deepEqual(c.log.toast, ['Track 02 is already empty and at its defaults.']); assert.equal(c.undo.past.length, n);
   const b = busy(); b.chainOn[0] = true; const d = liveVm(b, { bus: [0] }); d.resetTrack(0); assert.equal(d.S.chainOn[0], true); assert.match(d.log.toast[0], /^Track 01 reset \u00b7 Ctrl\+Z brings it back \u00b7 bus: CHN stays on \u00b7 1 shared block kept$/); assert.equal(d.log.chains, 0, 'CHN did not change: no re-route');
+  { const f = busy(); const g = liveVm(f, { feeds: new Map([[1, [7]]]) }); g.resetTrack(1); assert.equal(g.S.chainOn[1], true, 'a feeder keeps CHN: its bus role does not change'); assert.match(g.log.toast[0], /CHN kept: it feeds the bus on track 08/); assert.equal(g.log.chains, 0); }
   const e = liveVm(busy()); e.MAC = true; e.resetTrack(1); assert.match(e.log.toast[0], /^Track 02 reset \u00b7 \u2318Z brings it back/);
 });
 test('resetTrack while the audio-thread sequencer plays: the new song reaches the core first (patch), then the track\'s voices go (stp); the page\'s own player gets STP too', async () => {
@@ -242,6 +243,21 @@ test('no raw U+2028 / U+2029 and no stray quote in what this build added', () =>
   assert.ok(!/[\u2018\u201c]/.test(mine.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '')), 'no curly opening quotes in code');
 });
 
+test('the SOLE feeder of a bus that holds notes: reset keeps its CHN, so the bus stays a bus and every other track plays the same (it failed when CHN went off)', () => {
+  const E = ELECTRO(), P = E.chainPatch, gone = new Set(P.modules.filter(m => m.type === 'trackIn' && [2, 3, 7].includes(m.params.track)).map(m => m.id));
+  P.modules = P.modules.filter(m => !gone.has(m.id)); P.cables = P.cables.filter(c => !gone.has(c.from[0]) && !gone.has(c.to[0]));
+  for (const t of [1, 2, 6]) E.chainOn[t] = false;
+  seqCtx.__S = plain(E); vm.runInContext('S = __S; busPlanH = null; __P = busPlan();', seqCtx);
+  const feeds = plain([...seqCtx.__P.feeds]), targets = new Map(plain([...seqCtx.__P.targets]));
+  assert.deepEqual(feeds, [[3, [0]]], 'bus 3 has one feeder, track 0'); assert.ok(cellsOf(E, 3) > 0, 'the bus holds notes');
+  const before = rows(E, { once: true }, 4000), live0 = rows(E, { once: false, live: true }, 400);
+  const c = liveVm(plain(E), { bus: [3], feeds: targets, core: true }); c.resetTrack(0);
+  assert.equal(c.S.chainOn[0], true, 'CHN stays on'); assert.equal(cellsOf(c.S, 0), 0);
+  assert.deepEqual(without(rows(plain(c.S), { once: true }, 4000), 0), without(before, 0), 'other tracks, render');
+  assert.deepEqual(without(rows(plain(c.S), { once: false, live: true }, 400), 0), without(live0, 0), 'other tracks, live loop');
+  assert.ok(rows(plain(c.S), { once: true }, 4000).every(r => r.evs.every(e => e.track !== 0)), 'track 0 is silent');
+});
+
 // ---------- in a real page (opt-in) ----------
 const PW = process.env.PLAYWRIGHT || ['/opt/npm-tools/node_modules/playwright/index.mjs', '/opt/node-tools/node_modules/playwright/index.mjs'].find(f => fs.existsSync(f));
 const opt = { skip: !process.env.TP_BROWSER_TESTS ? 'opt-in: TP_BROWSER_TESTS=1' : false, timeout: 170000 };
@@ -269,6 +285,9 @@ test('in a real page: the key resets the track under the cursor, one Ctrl+Z give
       await app(B.page, `(() => { go('song'); cs.song.x = 5; cs.song.y = 0; draw(); undoReset(); tStart('song', {row:0}); return 1; })()`); await B.page.waitForTimeout(2200);
       await B.page.keyboard.press('Control+Shift+T'); await B.page.waitForTimeout(400);
       assert.equal(await app(B.page, 'S.song.filter(r => r[5] >= 0).length'), 0);
+      await B.page.waitForTimeout(0);   // (the level of the reset track within 300 ms of the key: a hung voice would still sound)
+      const lv = await app(B.page, `(() => { const a = rt && rt.pl && rt.pl.buses && rt.pl.buses[5] && rt.pl.buses[5].an; if (!a) return -1; const b = new Float32Array(a.fftSize); a.getFloatTimeDomainData(b); let m = 0; for (const x of b) m = Math.max(m, Math.abs(x)); return m; })()`);
+      assert.ok(lv === -1 || lv < 1e-4, 'track 6 is silent after the reset (level ' + lv + ')');
       if (core) { const sg = await B.page.evaluate(() => window.__seqTest.coreSig()); assert.equal(sg.same, true, 'the core has the song as the page has it'); }
       await B.page.keyboard.press('Control+z'); await B.page.waitForTimeout(300);
       assert.equal(await app(B.page, 'S.song.filter(r => r[5] >= 0).length'), 56, 'Undo brings the cells back while playing'); await app(B.page, 'tStop(); 1');
