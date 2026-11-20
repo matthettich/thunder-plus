@@ -324,14 +324,14 @@ class ThunderCore extends AudioWorkletProcessor {
   msg(d){
     if (this.chase && !this.chaseKeep(d)) this.chase = null;
     switch (d.op){
-      case 'load': S = d.S; if (d.vars){ if ('vtrk' in d.vars) vtrk = d.vars.vtrk; if ('NSLOT' in d.vars) NSLOT = d.vars.NSLOT; if (d.vars.TFX) TFX = d.vars.TFX; } busPlanH = null; busPlanVal = null; return;
-      case 'song': { if (!S){ S = d.S; return; } const pf = S.perf; for (const k of Object.keys(S)) if (!(k in d.S)) delete S[k]; Object.assign(S, d.S); S.perf = keepObj(pf, S.perf); busPlanH = null; busPlanVal = null; return; }   // in place: the running sequencer holds this object
+      case 'load': S = d.S; if (d.vars){ if ('vtrk' in d.vars) vtrk = d.vars.vtrk; if ('NSLOT' in d.vars) NSLOT = d.vars.NSLOT; if (d.vars.TFX) TFX = d.vars.TFX; } busPlanH = null; busPlanVal = null; if (this.seq && this.seq.rebus) this.seq.rebus(); return;
+      case 'song': { if (!S){ S = d.S; return; } const pf = S.perf; for (const k of Object.keys(S)) if (!(k in d.S)) delete S[k]; Object.assign(S, d.S); S.perf = keepObj(pf, S.perf); busPlanH = null; busPlanVal = null; if (this.seq && this.seq.rebus) this.seq.rebus(); return; }   // in place: the running sequencer holds this object
       case 'patch': {   // only what changed (coreDiff on the page): [key, null, value] · [key, index, item] · [key, 'len', n] · [key, 'del']
         if (!S) return;
         for (const [k, i, v] of d.ops){ if (i === null) S[k] = k === 'perf' ? keepObj(S[k], v) : v; else if (i === 'del') delete S[k]; else if (i === 'len'){ if (Array.isArray(S[k])) S[k].length = v; }
           else { if (!Array.isArray(S[k])) S[k] = []; S[k][i] = v; } }
         if (d.ops.some(o => o[0] === 'insts')) varDrop(null);   // an instrument's RANGE / GEN TYPE… changed: its variations are other sounds now
-        busPlanH = null; busPlanVal = null; return; }
+        busPlanH = null; busPlanVal = null; if (this.seq && this.seq.rebus) this.seq.rebus(); return; }
       case 'vars': if (d.vars){ if ('vtrk' in d.vars) vtrk = d.vars.vtrk; if ('NSLOT' in d.vars) NSLOT = d.vars.NSLOT; if (d.vars.TFX) TFX = d.vars.TFX; } return;
       case 'kit': this.kv = d.kv || []; kit = {voices:this.kv}; return;
       case 'buf': if (d.data) coreBufs.set(d.pad, {data:d.data, data2:d.data2 || null, sr:d.sr}); else coreBufs.delete(d.pad); varDrop(d.pad); return;   // data2: a stereo pad's right channel
