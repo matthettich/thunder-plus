@@ -194,11 +194,24 @@ static void testPartClamp() {
   { const Run a = play(partSong("{\"pad\":0}", "{\"pad\":0,\"slc\":4}"), &ch), b = play(handSong("{\"pad\":0,\"slc\":4}"), &ch);
     CHECK(a.notes.size() == 4 && a.chopped == 4 && sameNotes(a, b), "part path: an in-range part instrument chops like the main path (%zu)", a.notes.size()); }
   for (const char* inst : {"{\"pad\":0,\"slc\":100}", "{\"pad\":0,\"slc\":1e9}", "{\"pad\":0,\"slc\":64.4}", "{\"pad\":0,\"slc\":-5}", "{\"pad\":0,\"slc\":\"7\"}",
-                           "{\"pad\":0,\"sync\":1,\"beats\":100}", "{\"pad\":0,\"sync\":1,\"beats\":0}", "{\"pad\":0,\"sync\":1,\"beats\":-3}", "{\"pad\":0,\"sync\":1,\"beats\":2.6}", "{\"pad\":0,\"sync\":7,\"beats\":8,\"grain\":9}",
+                           "{\"pad\":0,\"sync\":1,\"beats\":100}", "{\"pad\":0,\"sync\":1,\"beats\":-3}", "{\"pad\":0,\"sync\":1,\"beats\":2.6}", "{\"pad\":0,\"sync\":7,\"beats\":8,\"grain\":9}",
                            "{\"pad\":0,\"sync\":3,\"beats\":4,\"grain\":-2}", "{\"pad\":0,\"sync\":2,\"beats\":1e12,\"grain\":null}", "{\"pad\":0,\"slc\":100,\"smode\":1}"}) {
     const Run a = play(partSong("{\"pad\":0}", inst), &ch), b = play(handSong(inst), &ch);
     CHECK(!a.notes.empty() && sameNotes(a, b) && a.chopped == b.chopped && a.skipped == b.skipped && a.stretched == b.stretched, "part path = main path for %s (%zu vs %zu notes)", inst, a.notes.size(), b.notes.size());
     for (const SeqEvent& e : a.notes) CHECK(noteOk(e), "part %s: a sane note", inst); }
+  // the page's `I.beats || 4` (index.html:22335, :22339): a part with beats 0 / null / "" / absent plays as 4 beats (NOT the loader's clamp to 1); a part with sync 1 at 120 bpm, loop 2 s: rate = loop / target
+  { SeqChop g; g.setLoop(0, 2.0);
+    const Run four = play(partSong("{\"pad\":0}", "{\"pad\":0,\"sync\":1,\"beats\":4}"), &g);
+    CHECK(four.notes.size() == 4 && std::fabs(four.notes[0].rate - 1.0) < 1e-12, "beats 4: rate 1 (%g)", four.notes.empty() ? 0.0 : four.notes[0].rate);
+    for (const char* b : {"0", "null", "\"\"", "false"}) {
+      const Run r = play(partSong("{\"pad\":0}", std::string("{\"pad\":0,\"sync\":1,\"beats\":") + b + "}"), &g);
+      CHECK(r.notes.size() == 4 && sameNotes(r, four) && std::fabs(r.notes[0].rate - 1.0) < 1e-12, "part beats %s plays as 4 beats (rate %g, 1 expected; beats 1 would give 0.25)", b, r.notes.empty() ? 0.0 : r.notes[0].rate); }
+    const Run absent = play(partSong("{\"pad\":0}", "{\"pad\":0,\"sync\":1}"), &g); CHECK(sameNotes(absent, four), "part beats absent plays as 4 beats");
+    const Run neg = play(partSong("{\"pad\":0}", "{\"pad\":0,\"sync\":1,\"beats\":-3}"), &g); CHECK(neg.notes.size() == 4 && std::fabs(neg.notes[0].rate - 4.0) < 1e-12, "part beats -3 (truthy, beyond the page's range): clamped to 1 (rate %g, 4 expected)", neg.notes.empty() ? 0.0 : neg.notes[0].rate);
+    // slc truncates like `I.slc | 0`: 1.9 is 1 (no chop), 2.5 is 2; grain null -> 1, grain 0 stays 0
+    const Run s1 = play(partSong("{\"pad\":0}", "{\"pad\":0,\"slc\":1.9}"), &g); CHECK(s1.chopped == 0 && s1.skipped == 0, "part slc 1.9 = 1: no chop");
+    const Run g0 = play(partSong("{\"pad\":0}", "{\"pad\":0,\"sync\":2,\"grain\":0}"), &g), gn = play(partSong("{\"pad\":0}", "{\"pad\":0,\"sync\":2,\"grain\":null}"), &g);
+    CHECK(g0.notes.size() == 4 && g0.notes[0].stGrain == 0 && gn.notes.size() == 4 && gn.notes[0].stGrain == 1, "part grain 0 stays 0, null is 1"); }
 }
 
 int main() {
