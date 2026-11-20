@@ -97,6 +97,11 @@ class LivePool {
   // Adds the nodes' samples for [frame0, frame0 + frames) into the mixer inputs; frames <= kQuantum (one quantum).
   void render(float* const* inL, float* const* inR, int frames, int64_t frame0);
 
+  // For tests (gate L10 b): called with each node's engine output of a quantum BEFORE the pan / gain stage (samples [q0, q0 + frames) of the mixer's index), for every node, from the node's first call on.
+  void bookEnd(int64_t T);   // For tests (gate L10 b): every node's stream ends at sample T (the last control block ends there, as seqRender's does)
+  using Tap = void (*)(void* user, int track, int pad, int j, const float* L, const float* R, int frames, int64_t q0);
+  void setTap(Tap f, void* user) { tap_ = f; tapUser_ = user; }
+
   const LiveStats& stats() const { return st_; }
   uint32_t failedNodes() const;
 
@@ -142,6 +147,7 @@ class LivePool {
   void runNode(Node& n, int64_t q0, int frames, float* const* inL, float* const* inR);
   void deliver(Node& n, uint32_t count, LiveEvent* out, uint32_t* nout);
 
+  Tap tap_ = nullptr; void* tapUser_ = nullptr;
   double sr_; double now_ = 0; uint64_t nextSerial_ = 0;
   PadSlot pads_[kLivePads];
   std::vector<Node*> active_;

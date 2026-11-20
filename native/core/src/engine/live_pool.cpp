@@ -258,6 +258,7 @@ void LivePool::releaseOldest(int track, double t) {
   Node* b = nullptr; if (track >= 0 && track < kVoiceTracks) for (Node* o : byTrack_[track]) if (o->inT && (!b || o->serial < b->serial)) b = o;
   if (b) { kill(*b, t); b->inT = false; }
 }
+void LivePool::bookEnd(int64_t T) { for (Node* n : active_) { TEv e; e.T = T; e.type = LiveEvType::End; book(*n, e); } }
 int LivePool::active() const { int c = 0; for (const Node* n : active_) if (n->curLive && !n->done) c++; return c; }
 void LivePool::releaseHeld(double at) { for (Node* n : active_) if (n->curLive && !n->curStop) kill(*n, at); }
 
@@ -292,6 +293,7 @@ void LivePool::runNode(Node& n, int64_t q0, int frames, float* const* inL, float
   }
   deliver(n, (uint32_t)frames, ev, &nev);
   eng.process(sL, sR, (uint32_t)frames, ev, nev);   // the engine's samples for [q0, q0 + frames)
+  if (tap_) tap_(tapUser_, n.track, n.pad, n.j, sL, sR, frames, q0);
   if (n.curLive && !n.done && n.curStop) {   // C4: the voice ends when its gate is off and the output stays under 1e-5 for 4096 samples, or 4 s after the off
     const int64_t end = q0 + frames;
     if (end > n.stopT) {
