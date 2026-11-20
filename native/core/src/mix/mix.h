@@ -100,6 +100,11 @@ class Mixer {
   void setTrack(int t, double vol, double trim, double pan, bool mute, bool solo);   // one track's values, at once (call apply() after the last)
   void setMaster(double master, double mout);              // at once
   void apply();                                            // applyMix, live false: every lane to its value now, at once
+  // applyMix(filter) (a render's stem pass, index.html:24255): the tracks in `mask` (bit t) are heard and the rest are not, whatever mute / solo say (the filter REPLACES
+  // audible(t)); mute / solo moves later keep no effect. clearHeard() returns to mute / solo. Control thread, before the first block; call apply() after (setHeard does).
+  void setHeard(uint32_t mask) { forced_ = true; forcedMask_ = mask; apply(); }
+  void clearHeard() { forced_ = false; apply(); }
+  const BusPlan& plan() const { return plan_; }
   void setPlan(const BusPlan& plan);                       // busSync
   void setChain(int t, MixInsertFn fn, void* user);        // the track runs through chains (null: it does not)
   void setFx(int t, MixInsertFn fn, void* user);           // the track's effects (U14)
@@ -182,6 +187,7 @@ class Mixer {
   // the page's values (S.mix, S.master, S.mout)
   double vol_[kSongNT], trim_[kSongNT], pan_[kSongNT], master_ = 255, mout_ = 255;
   uint32_t mute_ = 0, solo_ = 0, audible_ = 0xffffffffu;
+  bool forced_ = false; uint32_t forcedMask_ = 0;      // setHeard()
   bool mono_[kMixTracks];
   BusPlan plan_;
   Hook chn_[kMixTracks], fx_[kMixTracks], mfx_;

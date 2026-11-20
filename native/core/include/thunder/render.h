@@ -98,6 +98,13 @@ typedef struct thunder_render_opts {
   int64_t max_frames;           /* unknown-length renders end here at the latest, in frames of output, exactly (stats.hit_limit = 1 if cut). 0: 1260 s at the sample rate */
   const uint8_t* vars_json;     /* the page's coreVars() JSON {"vtrk":..,"NSLOT":..,"TFX":{..}} (NULL: the defaults) */
   size_t vars_bytes;
+  /* appended in U34b (docs/port/U34B-NOTES.md); a host built against the older header never sees it and renders the mix */
+  int32_t stem;                 /* 0: the mix. 1 .. 32: the STEM of that track (the number the page shows): what renderOut's pass(evs, {t}, .., lim = false, masterFx = false) renders: the track alone is heard
+                                   (whatever mute / solo say: stem_tracks applies them), every track still plays so chokes and takeovers match the mix, through the track's effects (opts.effects), VOL, pan, MASTER VOL
+                                   and OUT, WITHOUT the master effects, the master chain and the safety limiter (opts.master_chain is ignored for a stem) and with only the PDC latency trimmed
+                                   (the master chain's is not). With the master chain on, an unknown-length stem is therefore longer than the mix by that latency: pass use_frames = the mix's length, as the
+                                   page cuts every file to the mix's. Otherwise E_ARG from create. */
+  int32_t reserved2;            /* must be 0 */
 } thunder_render_opts;
 
 /* What a render counted (RenderStats of render.h). `size` first, as in the opts. Any time; the numbers are as of now. */
@@ -131,6 +138,9 @@ typedef struct thunder_render_stats {
   uint64_t seq_chopped;         /* notes the sequencer chopped (applyChop) */
   uint64_t seq_chop_skipped;    /* notes of a sliced / synced instrument whose pad had no set_pad_chop: left unchopped */
   uint64_t seq_chop_no_hits;    /* SMODE (find hits) slices without set_pad_hits: the equal grid was used */
+  /* appended in U34b */
+  int32_t stem;                 /* opts.stem as made (0: the mix) */
+  uint32_t heard_mask;          /* bit t: track t is heard in this render (the mix: the audible tracks; a stem: its track, and for a bus that exists its audible sources) */
 } thunder_render_stats;
 
 /* Parses the song and builds the renderer. song: the app's song JSON (a .thunder file's bytes or a song message), not NUL-terminated, copied.
@@ -243,6 +253,15 @@ int thunder_render_stats_get(thunder_render* r, thunder_render_stats* out);
    every voice has ended, at most max_frames frames. Returns the frames run (>= 0) or E_LIMIT if the voices never ended (a track with no
    output; thunder-render's exit 3). E_STATE before the end. Like the first read, it fixes the pads and the kit (set_pad is E_STATE after it). */
 int64_t thunder_render_drain(thunder_render* r, int64_t max_frames);
+
+/* The tracks that get a stem file, as renderOut decides (index.html:24304-24310): the audible tracks (mute / solo as the song has them) that have at least one note whose pad is in the
+   kit (a pad set with a buffer, a route other than SAMPLER, or a prepared SoundFont; the page's `kit.voices[e.pad]`), plus a bus that exists and has an audible source in the list, minus a
+   pure source that plays only through a bus in the list. (No bus exists in a native render until a chains host is wired, so today it is the first rule alone.) The notes are those the
+   render itself plays (the sequencer is stepped, without audio, as for length_estimate, to the end or to max_frames). Writes up to `cap` track NUMBERS 1 .. 32, ascending, into `out` (the
+   numbers opts.stem takes) and returns how many stems there are (more than cap is fine: the rest are not written); out == NULL (cap 0) asks only for the count. Call it after the pads
+   are set; any handle (mix or stem), before or after the first read. E_ARG: NULL handle, cap < 0, out != NULL with cap == 0; E_STATE: a dead handle; E_LIMIT: the song's end is out of reach
+   (20 million steps); E_MEMORY. */
+int thunder_render_stem_tracks(thunder_render* r, int32_t* out, int cap);
 
 /* Frees the handle at any time (cancel). NULL is allowed. Not while another thread is inside a call on the same handle. */
 void thunder_render_free(thunder_render* r);

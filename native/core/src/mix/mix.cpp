@@ -193,7 +193,7 @@ void Mixer::setTrack(int t, double vol, double trim, double pan, bool mute, bool
 }
 void Mixer::setMaster(double master, double mout) { master_ = master; mout_ = mout; }
 void Mixer::apply() {
-  audible_ = mix_audible(plan_, mute_, solo_);
+  audible_ = forced_ ? forcedMask_ : mix_audible(plan_, mute_, solo_);
   for (int t = 0; t < kMixTracks; t++) { Strip& s = S_[t]; const Want w = want(t); s.inp.reset(w.tg); s.g.reset(w.gv); s.pre.reset(w.prv); s.pan.reset(w.pv); s.last = w; }
   out_.reset(mix_curve(master_)); mo_.reset(mix_curve(mout_));
 }
@@ -241,7 +241,7 @@ bool Mixer::move(Auto& A, double v, double at, double ramp) {
   return ok;
 }
 void Mixer::refresh(double at, double ramp) {
-  audible_ = mix_audible(plan_, mute_, solo_);
+  audible_ = forced_ ? forcedMask_ : mix_audible(plan_, mute_, solo_);
   for (int t = 0; t < kNT; t++) { Strip& s = S_[t]; const Want w = want(t); Want& l = s.last;   // applyMix; only what moved gets an event (the same curve)
     if (w.gv != l.gv && move(s.g, w.gv, at, ramp)) l.gv = w.gv;      // `last` follows only what the lane accepted
     if (w.pv != l.pv && move(s.pan, w.pv, at, ramp)) l.pv = w.pv;

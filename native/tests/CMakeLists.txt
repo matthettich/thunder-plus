@@ -809,7 +809,12 @@ if(NOT CMAKE_SYSTEM_NAME MATCHES "WASI|Emscripten|Generic")
   add_executable(test_chains_threads test_chains_threads.cpp)
   target_link_libraries(test_chains_threads PRIVATE thunder_core Threads::Threads)
   target_include_directories(test_chains_threads PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../core/src ${CMAKE_CURRENT_SOURCE_DIR})
-  add_test(NAME chains_threads COMMAND test_chains_threads 3)
+  # U31 round-3 F2: under -fsanitize=thread the run is 30 s (the reverted D4 race was reported in about 2 of 10 runs of 3 s and 3 of 5 runs of 30 s: the window is a few hundred ns); 3 s elsewhere
+  if(CMAKE_CXX_FLAGS MATCHES "fsanitize=thread")
+    add_test(NAME chains_threads COMMAND test_chains_threads 30)
+  else()
+    add_test(NAME chains_threads COMMAND test_chains_threads 3)
+  endif()
 endif()
 # U31 verification round 2 (D5b): the Bypass crossfade across cut blocks and a second toggle inside a carried fade (the verifier's bypass5)
 add_executable(test_chains_bypass test_chains_bypass.cpp)
@@ -945,6 +950,18 @@ target_include_directories(test_render_api_fix PRIVATE ${CMAKE_CURRENT_SOURCE_DI
 target_compile_definitions(test_render_api_fix PRIVATE THUNDER_ROOT="${CMAKE_CURRENT_SOURCE_DIR}/../..")
 add_test(NAME render_api_fix COMMAND test_render_api_fix)
 # the memory ones (D4 to D7): replaces the global operator new to count and to fail allocations, so it is a program of its own
+# U34b: stems (opts.stem, thunder_render_stem_tracks; docs/port/U34B-NOTES.md): the sum of the stems is the mix, where it is not, a stem holds only its track, mute / solo, length, bad arguments.
+add_executable(test_render_stems test_render_stems.cpp)
+target_link_libraries(test_render_stems PRIVATE thunder_core)
+target_include_directories(test_render_stems PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../core/src ${CMAKE_CURRENT_SOURCE_DIR})
+target_compile_definitions(test_render_stems PRIVATE THUNDER_ROOT="${CMAKE_CURRENT_SOURCE_DIR}/../..")
+add_test(NAME render_stems COMMAND test_render_stems)
+
+add_executable(test_render_stems_bus test_render_stems_bus.cpp)
+target_link_libraries(test_render_stems_bus PRIVATE thunder_core)
+target_include_directories(test_render_stems_bus PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../core/src ${CMAKE_CURRENT_SOURCE_DIR}/../core/include ${CMAKE_CURRENT_SOURCE_DIR})
+add_test(NAME render_stems_bus COMMAND test_render_stems_bus)
+
 add_executable(test_render_dispatch test_render_dispatch.cpp)
 target_link_libraries(test_render_dispatch PRIVATE thunder_core)
 target_include_directories(test_render_dispatch PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../core/src ${CMAKE_CURRENT_SOURCE_DIR})

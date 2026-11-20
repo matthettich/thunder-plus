@@ -25,6 +25,8 @@
 
 namespace thunder {
 
+class Players;
+
 constexpr int kRenderPads = 256;       // pad slots a kit can have (a pad number is one byte)
 constexpr int kRenderQuantum = 128;    // frames a song is rendered in (the web core's block), whatever the host's block
 constexpr int kRenderEvents = kSeqStepEvents;   // one sequencer step's events, sized for the worst case (seq.h; more are counted: stats().seqDropped)
@@ -120,6 +122,15 @@ class SongRenderer {
   // Control thread, before the first block (the processors start from rest).
   void setMasterChain(const MasterChainConfig& cfg);
   MasterChain* masterChain() { return mchain_.get(); }
+  // A STEM render (U34b, renderOut's pass(evs, {t}, N, sr, getB, false, false), index.html:24351): track `track` (0..kSongNT-1) alone is heard (plus, when it is a bus of the song's chains patch, its audible
+  // sources: pass's k2, :24228) whatever mute / solo say; every track still plays (chokes, takeovers). No master effects, no master chain (mastering, safety limiter) and no master
+  // latency: setMasterChain / the master hook are refused from here on and a chain already set is dropped. MASTER VOL and OUT stay. Control thread, before the first block,
+  // and before setEffects / setMasterChain (which then leave the master alone). Returns false for a bad track.
+  bool setStem(int track);
+  // A chains host, once there is one, must set a chain hook (Mixer::setChain) only on the tracks in heardMask() of a stem render, as pass() does (`routeTrack` for `keep` only, :24258):
+  // a bus that is not heard does not exist there, so a pure source heard alone plays on its own, not through it.
+  int stem() const { return stem_; }                     // -1: the mix
+  uint32_t heardMask() const { return mix_.audibleMask(); }
   // TRACK AND MASTER EFFECTS (U14): the song's tfx effects (S.tfx / S.mfx, the 34 wasm effects) in the mixer's setFx / setMasterFx hooks, their FXO / FLX / GAT /
   // RTG / FXV events dispatched to them. Effects of the other kinds (U15 to U18) are left out. Control thread, before the first block.
   void setEffects(bool on);
@@ -130,12 +141,13 @@ class SongRenderer {
   // latencyFrames(). Allocates nothing (a scratch block made at construction).
   void renderTrimmed(float* outL, float* outR, int64_t N);
   bool songOver() const { return !seq_->alive(); }       // the sequencer has reached the end
-  int voices() const { return pool_.active() + sfpool_.active(); }   // voices still sounding (the sampler's and the SoundFont pool's)
+  int voices() const;   // voices still sounding (the sampler's and the SoundFont pool's)
   double time() const { return (double)frame_ / sr_; }
   int64_t frame() const { return frame_; }
   Mixer& mixer() { return mix_; }
-  VoicePool& pool() { return pool_; }
-  sf::SfPool& sfPool() { return sfpool_; }
+  VoicePool& pool();
+  sf::SfPool& sfPool();
+  Players& players();
   // A tap on the mixer's per-track inputs (the sampler's and the SoundFont pool's voices summed), called each quantum just before the mixer runs; for tests. Null: none.
   typedef void (*InputTap)(void* user, const float* const* inL, const float* const* inR, int frames, int64_t frame0);
   void setInputTap(InputTap fn, void* user) { tap_ = fn; tapUser_ = user; }
@@ -144,15 +156,12 @@ class SongRenderer {
   double lead = 0.25;                                    // LEAD (the core's `lead` command: 0.05..2 s)
 
  private:
-  void dispatch(const SeqEvent& e);
-  void capPoly(const SeqEvent& e);                       // a poly note: the track's cap of four is shared by both pools, oldest first (core-processor.js :442-443, :582-583: one list)
-  void takeAll(const SeqEvent& e, int pad);              // a note the sampler does not play: the track's voices in BOTH pools give way (one voice list in the JS)
+  void dispatch(const SeqEvent& e);                      // the mixer's, the beat clock's and the effects' events here; the note, off, mod and stp events go to the Players
   void quantum();                                        // renders the next kRenderQuantum frames into q_
   const Song& S_; const RenderPads& pads_;
   double sr_; int maxBlock_;
   std::unique_ptr<Seq> seq_;
-  VoicePool pool_;
-  sf::SfPool sfpool_;
+  std::unique_ptr<Players> players_;                     // the note players (render/players.h): the sampler's and the SoundFont pool, the routing, the shared voice list
   Mixer mix_;
   std::unique_ptr<SeqEvent[]> evs_;
   std::unique_ptr<SeqStep> step_;
@@ -165,8 +174,8 @@ class SongRenderer {
   std::unique_ptr<FxBank> fx_;
   static void masterHook(void* user, int track, float* L, float* R, int frames, double t0, const MixFeed* feeds, int nFeeds);
   MeterBank* meters_ = nullptr;
+  int stem_ = -1;
   RenderStats st_;
-  uint64_t serial_ = 0; int peakAll_ = 0;                // voice serials (age across the pools) and the most voices of both pools sounding together
   InputTap tap_ = nullptr; void* tapUser_ = nullptr;
 };
 
