@@ -231,3 +231,9 @@ R8. Is fixing the unrelated findings below in this change or separately?
 3. `P.loop` is computed and never read: a cycle is silently dropped today (nothing says so).
 4. Stale comment 21002 ("A bus's latency isn't compensated anywhere"): `pdcPlan` does it.
 5. `pdcPlan`'s loop guard (`busy`) returns a partial value for a cycle; harmless while cycles are dropped, wrong for option B.
+
+## Rulings (the lead, 19 Nov, 21:20)
+
+R1 yes: `ownRet`. R2: option A (the closing cable of a cycle is left out, and the Mixer says so); B later, not now. R3 yes: (source track, bus track) order, higher source first to go; note in the changelog that a song which already had a loop may drop a different cable (it was dropped silently before). R4 yes: `LOOP`, and the extra words on `ON` lines. R5: NOT now: a middle bus is heard only through the next bus (that is what the owner described); write the parallel case in HANDOVER's To-do as a possible later option with what it needs. R6 later (To-do line). R7 yes. R8: IN this change: the wrong "whose CHN is off" status line, `P.loop` now read (it drives `LOOP`), the stale comment at :21002. SEPARATE (do not change, write it up in the notes with the lines and a minimal patch that shows it, for the lead to verify): the stems double-count of a send's direct sound.
+
+Added by the owner tonight: soloing a bus must solo everything that feeds it, through any depth, and soloing a source must keep every bus downstream of it audible; muting a middle bus silences what passes through it (not the sources' other paths). `audible` is made transitive in the plan (closure masks: all upstream of t, all downstream of t) on the page mixer, the audio-thread core's copy and the render / stems. The Mixer's SOL row and status line say why a non-soloed track is still heard, if cheap.
