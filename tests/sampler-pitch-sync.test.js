@@ -141,8 +141,8 @@ test('B: the wording: "N bars + M lines", whole bars show the lines in brackets,
   assert.equal(E.slName(32, 8), '1 bar (32 lines)'); assert.equal(E.slName(1, 8), '1 line'); assert.equal(E.slName(16, 4), '1 bar (16 lines)'); assert.equal(E.slName(33, 8), '1 bar + 1 line (33 lines)');
   assert.deepEqual(Array.from(E.slChoices(8)), [8, 16, 32, 64, 128, 256], '8 to 128 lines, and 1 2 4 8 bars (32 64 128 256), merged');
   assert.deepEqual(Array.from(E.slChoices(4)), [8, 16, 32, 64, 128], 'at LPB 4 the bars land on the same numbers');
-  assert.equal(E.slPlan(64, 8, 131, 2.1, 1), '2 bars (64 lines) = 8 beats at 8 lines a beat = 3.66 s at 131 BPM; the sample is 2.10 s: it will play 43% slower (the pitch moves). The length is in lines, so it follows LPB.');
-  assert.match(E.slPlan(32, 8, 131, 2.1, 1), /^1 bar \(32 lines\) = 4 beats at 8 lines a beat = 1\.83 s at 131 BPM; the sample is 2\.10 s: it will play 15% faster/);
+  assert.equal(E.slPlan(64, 8, 131, 2.1, 1), '2 bars (64 lines) = 8 beats at 8 lines a beat = 3.66 s at 131 BPM; the sample is 2.10 s: it plays 42.7% slower, 9.6 semitones down. The length is in lines, so it follows LPB.');
+  assert.match(E.slPlan(32, 8, 131, 2.1, 1), /^1 bar \(32 lines\) = 4 beats at 8 lines a beat = 1\.83 s at 131 BPM; the sample is 2\.10 s: it plays 14\.6% faster, 2\.4 semitones up/);
   assert.match(E.slPlan(12, 8, 120, 0.75, 1), /1\.5 beats.*already fits/); assert.match(E.slPlan(32, 8, 131, 2.1, 2), /stretched out to fit \(15%\), the pitch stays/);
 });
 

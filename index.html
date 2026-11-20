@@ -11173,7 +11173,7 @@ async function pickChopBreak(){
   let ins = S.insts.findIndex(I => I.pad === pad);
   if (ins < 0){ const usedI = new Set(); for (const p of S.phrases) if (p) for (const row of p) if (row && row[IC] >= 0) usedI.add(row[IC]);
     const cand = [pad, ...Array.from({length:NI}, (_, n) => n)].filter(n => n < NI && !usedI.has(n)); if (cand.length){ ins = cand[0]; S.insts[ins].pad = pad; } }
-  S.insts.forEach(I => { if (I.pad === pad){ I.slc = 16; I.smode = 0; I.sync = 1; setBeats(I, 4); } });
+  S.insts.forEach(I => { if (I.pad === pad){ I.slc = 16; I.smode = 0; syPut(I, 1); setBeats(I, 4); } });
   saveS(); draw();
   toast(`${r.name} (${r.bpm} BPM) in slot ${hx(pad)}: 16 slices, synced.` + (ins >= 0 ? ` Instrument ${hx(ins)}: C-4 plays slice 1.` : ''), 6000);
 }
@@ -16989,7 +16989,7 @@ function rcdKeep(pad){
   assignSample(pad, Float32Array.from(T.data), T.sr, name, T.data2 ? Float32Array.from(T.data2) : null);
   // FIT TO TEMPO: a pattern take plays at the song's tempo: the pad's instruments get SYNC (repitch) and its BEATS
   let fit = 0;
-  if (T.how === 'sync' && rcdSet.fit && T.beats > 0) S.insts.forEach(I => { if (I.pad === pad){ I.sync = 1; setBeats(I, clamp(Math.round(T.beats), 1, 64)); fit++; } });
+  if (T.how === 'sync' && rcdSet.fit && T.beats > 0) S.insts.forEach(I => { if (I.pad === pad){ syPut(I, 1); setBeats(I, clamp(Math.round(T.beats), 1, 64)); fit++; } });
   if (fit) saveS();
   T.kept = true;   // (Record then doesn't ask: ASK FIRST)
   toast(`Kept the take in pad ${hx(pad)}, layer ${kit.voices[pad].sel + 1} (${(T.data.length / T.sr).toFixed(2)} s${T.data2 ? ', stereo' : ''})` + (fit ? `, fitted to ${Math.round(T.beats)} beats` : '') + '.' + (eng ? ' The pad uses the Layers engine.' : ''), 5000);
@@ -21675,6 +21675,7 @@ function normSong(j){
     I.pan = clamp(int(o.pan, 128), 0, 255); I.rev = o.rev ? 1 : 0; I.ofs = clamp(int(o.ofs, 0), 0, 255);
     I.slc = clamp(int(o.slc, 0), 0, 64); I.smode = o.smode ? 1 : 0; I.sync = clamp(int(o.sync, 0), 0, 3); I.beats = clamp(int(o.beats, 4), 1, 64); I.grain = clamp(int(o.grain, 1), 0, 4);
     if (int(o.lines, 0) > 0) I.lines = clamp(int(o.lines, 0), 1, 1024); else delete I.lines;   // SYNC TO LINES (build 655): optional, absent in older songs
+    sxLoad(o, I);   // I.sx (build 659): the algorithm inside the family; optional, absent in every older song
     I.mo = clamp(int(o.mo, 0), 0, 2); I.mch = clamp(int(o.mch, 0), 0, 15);
     // MIDI port letter (A = 0), bend range and CC slots: older songs have none (port A, ±2, the default CCs).
     I.mpt = clamp(int(o.mpt, 0), 0, NPORT - 1); I.pbr = clamp(int(o.pbr, 2), 1, 48);
@@ -23614,7 +23615,42 @@ const rtB = new Map();
      REPITCH  plays it faster or slower, so the pitch moves with the tempo;
      STRETCH  keeps the pitch: overlapping grains (GRAIN long, in beats) read the sound as a ramp sweeps through it;
      LOOP     the same ramp, but each grain is a hard little loop: the stuttery, gritty ramp-LFO trick. */
-const SYNC_MODES = ['OFF', 'REPITCH', 'STRETCH', 'LOOP'];
+const SYNC_MODES = ['OFF', 'REPITCH', 'STRETCH', 'LOOP'];   // the four classic values of I.sync (stored in every song); SY_PICK below has the names the owner sees
+/* ===STRETCH PICKER START=== (build 659; docs/STRETCH-DESIGN.md section 5)
+   One list of the ways to fit a loop to the length, used by the Instrument page's SYNC row and by the SYNC TO LINES sheet.
+   A mode is (I.sync, I.sx): I.sync stays 0 OFF, 1 REPITCH, 2 STRETCH (shown as GRANULAR), 3 LOOP exactly as in every old song, and I.sx
+   (absent = 0) picks a newer algorithm inside the family. I.sx is written only when it is not 0, so an old song's JSON does not change; a
+   build that does not know I.sx ignores it and plays I.sync's classic mode (an unknown (sync, sx) pair loads as the classic one).
+   Only modes that exist are listed. Groups show in this order and an empty group is not shown: OFF stands alone at the top. */
+const SY_GROUPS = ['Repitch', 'Clean', 'Drums', 'Character'];
+const SY_PICK = [
+  {n:'OFF', sync:0, sx:0, grp:'', tip:'The sample plays at its own speed'},
+  {n:'REPITCH', sync:1, sx:0, grp:'Repitch', tip:'Fits the length by playing faster or slower: the pitch moves with the speed'},
+  {n:'GRANULAR', sync:2, sx:0, grp:'Character', tip:'Fits the length, pitch kept: smooth overlapping grains, a texture (the old STRETCH)'},
+  {n:'LOOP', sync:3, sx:0, grp:'Character', tip:'Fits the length, pitch kept: a ramp loops little GRAIN-long pieces, gritty and stuttery'},
+];
+// the picker index of an instrument (an unknown pair counts as the classic mode of its I.sync)
+const syPick = I => { const s = (I.sync | 0), x = (I.sx | 0), i = SY_PICK.findIndex(m => m.sync === s && m.sx === x); return i >= 0 ? i : Math.max(0, SY_PICK.findIndex(m => m.sync === s && m.sx === 0)); };
+// writes a picker index into an instrument: I.sx is dropped for a classic mode (so old songs stay byte for byte as they were)
+const syPut = (I, p) => { const m = SY_PICK[p] || SY_PICK[0]; I.sync = m.sync; if (m.sx) I.sx = m.sx; else delete I.sx; };
+// loading: I.sx is kept only for a pair this build has (older songs have none)
+function sxLoad(o, I){ const x = Math.trunc(+(o && o.sx)); if (x > 0 && SY_PICK.some(m => m.sync === I.sync && m.sx === x)) I.sx = x; else delete I.sx; }
+// the list askSheet draws: group names as captions (not counted), choices in picker order. map[k] = the picker index of the k-th choice
+function syList(){
+  const L = [], map = [];
+  for (const g of ['', ...SY_GROUPS]){ const ms = SY_PICK.map((m, i) => [m, i]).filter(([m]) => m.grp === g); if (!ms.length) continue;
+    if (g) L.push({head:g}); for (const [m, i] of ms){ L.push(m.n); map.push(i); } }
+  return {L, map};
+}
+// What REPITCH does to the sound, in plain words, from the real lengths: loop = the sample's seconds, target = the length it must fill.
+// rate = loop / target is the playback speed: 0.823 plays 17.7% slower and 3.4 semitones down.
+function syRepitchText(loop, target){
+  const r = loop / target, pct = Math.abs(r - 1) * 100, st = 12 * Math.log2(r);
+  if (!(r > 0) || !isFinite(r)) return '';
+  if (pct < 0.05) return 'plays at its own speed and pitch';
+  return 'plays ' + pct.toFixed(1) + '% ' + (r > 1 ? 'faster' : 'slower') + (Math.abs(st) < 0.05 ? ', the pitch barely moves' : ', ' + Math.abs(st).toFixed(1) + ' semitone' + (Math.abs(st).toFixed(1) === '1.0' ? '' : 's') + (st > 0 ? ' up' : ' down'));
+}
+/* ===STRETCH PICKER END=== */
 const GRAIN_BEATS = [1 / 64, 1 / 32, 1 / 16, 1 / 8, 1 / 4], GRAIN_NAMES = ['1/64', '1/32', '1/16', '1/8', '1/4'];
 // How long the pad's loop is: its sample (from the layer's start, at the layer's pitch) when it has one, else the pad.
 function loopSecs(pad, data, sr){
@@ -23713,7 +23749,7 @@ function slPlan(lines, lpb, bpm, loop, mode){
   const beats = +(lines / lpb).toFixed(2), secs = slSecs(lines, lpb, bpm);
   let t = slName(lines, lpb) + ' = ' + slN(beats, 'beat') + ' at ' + lpb + ' lines a beat = ' + secs.toFixed(2) + ' s at ' + +(+bpm).toFixed(2) + ' BPM; the sample is ' + loop.toFixed(2) + ' s: ';
   const r = loop / secs, pct = Math.round(Math.abs(r - 1) * 100);
-  if (mode === 1) t += pct < 1 ? 'it already fits.' : 'it will play ' + pct + '% ' + (r > 1 ? 'faster' : 'slower') + ' (the pitch moves).';
+  if (mode === 1) t += Math.abs(r - 1) * 100 < 0.05 ? 'it already fits.' : 'it ' + syRepitchText(loop, secs) + '.';
   else t += pct < 1 ? 'it already fits (the grains still run).' : 'it will be ' + (r > 1 ? 'stretched out' : 'squeezed') + ' to fit (' + pct + '%), the pitch stays.';
   return t + ' The length is in lines, so it follows LPB.';
 }
@@ -23722,7 +23758,7 @@ function slChoices(lpb){ const a = new Set([8, 16, 32, 64, 128]); for (const b o
 // Every instrument that plays the pad gets the length (one change to the song: one undo step); lines 0 = OFF. Returns how many.
 function slSet(insts, pad, lines, mode, lpb){
   let n = 0;
-  for (const I of insts) if (I && I.pad === pad){ if (lines > 0){ I.lines = Math.min(SL_MAX, Math.max(1, Math.round(lines))); I.sync = mode >= 1 && mode <= 3 ? mode : 1; I.beats = Math.min(64, Math.max(1, Math.round(I.lines / (lpb || 4))));   /* beats: the nearest whole beats, for a build without `lines` */ } else I.sync = 0; n++; }
+  for (const I of insts) if (I && I.pad === pad){ if (lines > 0){ I.lines = Math.min(SL_MAX, Math.max(1, Math.round(lines))); syPut(I, mode >= 1 && mode < SY_PICK.length ? mode : 1); I.beats = Math.min(64, Math.max(1, Math.round(I.lines / (lpb || 4))));   /* beats: the nearest whole beats, for a build without `lines` */ } else syPut(I, 0); n++; }
   return n;
 }
 /* ===SYNC LINES END=== */
@@ -25629,9 +25665,12 @@ function syncLinesSheet(o){
     ch.forEach(([label, n]) => { const b = el('button', 'askitem', label); b.type = 'button'; b.addEventListener('click', () => { lines = n; inp.value = String(n); upd(); }); chips.append(b); btns.push([b, n]); });
     const inp = el('input'); inp.type = 'text'; inp.value = String(lines); inp.spellcheck = false; inp.maxLength = 18; inp.setAttribute('aria-label', 'Length in lines, or bars: 24, 2b, 1b8'); inp.placeholder = '24, 2b or 1b8';
     inp.setAttribute('inputmode', 'text'); inp.autocomplete = 'off';
-    const modes = el('div', 'slchips'), mb = [];
-    [1, 2, 3].forEach(m => { const b = el('button', 'askitem', SYNC_MODES[m]); b.type = 'button'; b.title = ['', 'Plays faster or slower: the pitch moves', 'Keeps the pitch: overlapping grains', 'Keeps the pitch: a gritty ramp of little loops'][m];
-      b.addEventListener('click', () => { mode = m; upd(); }); modes.append(b); mb.push(b); });
+    const modes = el('div', 'slmodes'), mb = [];   // the one grouped list of modes (syList): a caption per group, the choices as chips under it
+    { const {L, map} = syList(); let box2 = null, k = 0;
+      for (const e of L){ if (typeof e === 'object'){ modes.append(el('div', 'askhead', e.head)); box2 = el('div', 'slchips'); modes.append(box2); continue; }
+        const m = map[k++], pk = SY_PICK[m], b = el('button', 'askitem', pk.n); b.type = 'button'; b.title = pk.tip; if (m === 0) continue;
+        if (!box2){ box2 = el('div', 'slchips'); modes.append(box2); }
+        b.addEventListener('click', () => { mode = m; upd(); }); box2.append(b); mb.push([b, m]); } }
     const say = el('div', 'askmsg'), row = el('div', 'btnrow'), off = el('button', null, 'Sync off'), no = el('button', null, 'Cancel'), ok = el('button', 'ok', 'Apply');
     off.type = no.type = ok.type = 'button'; row.append(off, no, ok);
     box.append(chips, el('div', 'askhead', 'Or type it: lines, 2b (bars), 1b8 (bars and lines)'), inp, el('div', 'askhead', 'Mode'), modes, say);
@@ -25640,7 +25679,7 @@ function syncLinesSheet(o){
     const upd = () => {
       const r = slParse(inp.value, lpb); if (r.ok) lines = r.lines;
       btns.forEach(([b, n]) => { const on = r.ok && r.lines === n; b.classList.toggle('on', on); b.setAttribute('aria-pressed', String(on)); });
-      mb.forEach((b, i) => { const on = mode === i + 1; b.classList.toggle('on', on); b.setAttribute('aria-pressed', String(on)); });
+      mb.forEach(([b, m]) => { const on = mode === m; b.classList.toggle('on', on); b.setAttribute('aria-pressed', String(on)); });
       say.textContent = r.ok ? slPlan(r.lines, lpb, o.bpm, o.loop, mode) : r.err; say.classList.toggle('bad', !r.ok); ok.disabled = !r.ok;
     };
     const done = v => { if (askOpen !== done) return; askOpen = null; wrap.remove(); document.removeEventListener('keydown', key, true); res(v); };
@@ -25668,13 +25707,13 @@ async function syncToLines(pad){
   const pl = plen(cPhrase), pb = plpbOf(S, cPhrase), pn = Math.round(pl * lpb / pb);
   const phrase = pb === lpb ? ['Phrase ' + hx(cPhrase) + ': ' + slName(pl, lpb), pl] : Math.abs(pn - pl * lpb / pb) < 1e-9 && pn >= 1 ? ['Phrase ' + hx(cPhrase) + ' (' + slN(pl, 'line') + ' at LPB ' + pb + '): ' + slName(pn, lpb), pn] : null;
   const smp = kit.voices[pad].layers.find(l => l.on && l.type === 'sample' && l.sample && l.sample.data), ins = S.insts.map((I, i) => I.pad === pad ? hx(i) : null).filter(x => x);
-  const o = {lpb, bpm, loop, mode:on && I0.sync <= 3 ? I0.sync : 1, lines:(I0.lines | 0) > 0 ? I0.lines : clamp(Math.round(instBeats(I0) * lpb), 1, SL_MAX), phrase,
+  const o = {lpb, bpm, loop, mode:on ? syPick(I0) : 1, lines:(I0.lines | 0) > 0 ? I0.lines : clamp(Math.round(instBeats(I0) * lpb), 1, SL_MAX), phrase,
     body:(smp ? (smp.sample.name || 'Sample') + ' on pad ' : 'Pad ') + hx(pad) + ' · ' + loop.toFixed(2) + ' s · plays through instrument' + (ins.length > 1 ? 's ' : ' ') + ins.join(', ') + '. The length goes to all of them.',
     note:coreWanted() ? 'On the Audio thread sequencer the sample plays unsynced for now; that is being worked on. Settings › Audio › Sequencer › Page plays it synced.' : ''};
   const r = await syncLinesSheet(o); if (!r) return;
   if (r.off){ const n = slSet(S.insts, pad, 0, 0, lpb); saveS(); draw(); return toast('Sync off for ' + slN(n, 'instrument') + ' playing pad ' + hx(pad) + '. Undo brings it back.', 3500); }
   const n = slSet(S.insts, pad, r.lines, r.mode, lpb); saveS(); draw();
-  toast(slName(r.lines, lpb) + ' · ' + SYNC_MODES[r.mode] + ' · ' + slN(n, 'instrument') + ' playing pad ' + hx(pad) + ' (follows LPB). Undo brings it back.', 5000);
+  toast(slName(r.lines, lpb) + ' · ' + SY_PICK[r.mode].n + (r.mode === 1 ? ' (' + syRepitchText(loop, slSecs(r.lines, lpb, bpm)) + ')' : '') + ' · ' + slN(n, 'instrument') + ' playing pad ' + hx(pad) + ' (follows LPB). Undo brings it back.', 5000);
   try { const pi = S.insts.findIndex(I => I.pad === pad && (I.mo | 0) !== 1); if (pi >= 0 && ctx) preview(pi, ROOT, -1); } catch(e){}
 }
 $('bSyncLines').addEventListener('click', () => syncToLines(cur));
@@ -27227,6 +27266,8 @@ function setCell(v, x, y, val){
   else { if (!S.phrases[cPhrase]) S.phrases[cPhrase] = freshPhrase(); S.phrases[cPhrase][y][x] = val; if (val >= 0) mstShareWarn(cPhrase); }
   saveS();
 }
+// REPITCH's effect on this instrument, from the real sample length and the length it must fill (shown in the SYNC and BEATS rows' notes)
+function syRepitchRow(I){ const c = ensure(I.pad), loop = loopSecs(I.pad, c.data, c.sr), t = instBeats(I) * 60 / S.bpm, x = syRepitchText(loop, t); return x ? 'the loop is ' + loop.toFixed(2) + ' s and the length ' + t.toFixed(2) + ' s, so it ' + x : ''; }
 function instRows(){
   // LAYOUT (owner, 7 Nov: "choosing midi means you're still on an instrument that holds a pad sound"): OUTPUT comes first
   // and decides what the screen shows, as in Renoise (an instrument can play its sample, send MIDI, or both). Then what
@@ -27268,14 +27309,15 @@ function instRows(){
         fmt:v => v > 1 ? v + ' · C-4 plays slice 1' : 'OFF', info:() => (I.slc | 0) > 1 ? 'Each note plays one slice: C-4 the first, C#4 the second… (it wraps). TRANSPOSE and pitch commands still tune it' : 'Cut the pad into equal parts or at its hits; notes then pick a slice, for breakbeat chopping'},
       {l:'SLICE BY', get:() => I.smode ? 1 : 0, set:v => I.smode = v ? 1 : 0, min:0, max:1, tog:true, d:0, fmt:v => v ? 'HITS' : 'GRID',
         info:() => 'GRID: equal slices. HITS: a slice starts at each drum hit it finds (good for loose breaks)'},
-      {l:'SYNC', opts:true, get:() => I.sync | 0, set:v => I.sync = v, min:0, max:3, d:0, fmt:v => SYNC_MODES[v],
-        info:() => ['The sample plays at its own speed', 'Fits BEATS to the tempo by playing faster or slower (the pitch moves)', 'Fits BEATS to the tempo, pitch kept: smooth overlapping grains', 'Fits BEATS to the tempo, pitch kept: a ramp loops little GRAIN-long pieces, gritty and stuttery'][I.sync | 0]},
+      {l:'SYNC', opts:true, get:() => syPick(I), set:v => syPut(I, v), tap:() => { const {L, map} = syList(); askSheet({title:'Sync mode', body:'How the loop is fitted to its length. REPITCH changes the speed and the pitch; the others keep the pitch.'}, {list:L, cur:map.indexOf(syPick(I))}).then(r => { if (typeof r === 'number' && map[r] != null){ syPut(I, map[r]); saveS(); draw(); } }); },
+        min:0, max:SY_PICK.length - 1, d:0, fmt:v => SY_PICK[v].n,
+        info:() => SY_PICK[syPick(I)].tip + (syPick(I) === 1 ? ': ' + syRepitchRow(I) : '') + ' · EDIT opens the list'},
       {l:'BEATS', get:() => (I.lines | 0) > 0 ? clamp(Math.round(instBeats(I)), 1, 64) : I.beats || 4, set:v => setBeats(I, v), min:1, max:64, big:4, d:4,
         fmt:v => (I.lines | 0) > 0 ? slName(I.lines, S.lpb || 4) + ' = ' + slN(+instBeats(I).toFixed(2), 'beat') + ' = ' + slSecs(I.lines, S.lpb || 4, S.bpm).toFixed(2) + ' s'
           : v + (v === 1 ? ' beat' : ' beats') + ' = ' + (v * 60 / S.bpm).toFixed(2) + ' s',
-        info:() => { const c = ensure(I.pad); return ((I.lines | 0) > 0 ? 'Set in LINES (› SYNC TO LINES); changing BEATS here goes back to beats. ' : '') + 'How many beats the loop lasts. The loop is ' + loopSecs(I.pad, c.data, c.sr).toFixed(2) + ' s; › GUESS BEATS works it out'; }},
+        info:() => { const c = ensure(I.pad); return ((I.lines | 0) > 0 ? 'Set in LINES (› SYNC TO LINES); changing BEATS here goes back to beats. ' : '') + 'How many beats the loop lasts. The loop is ' + loopSecs(I.pad, c.data, c.sr).toFixed(2) + ' s; › GUESS BEATS works it out' + (syPick(I) === 1 ? ' · REPITCH: ' + syRepitchRow(I) : ''); }},
       {l:'GRAIN', opts:true, get:() => I.grain == null ? 1 : I.grain, set:v => I.grain = v, min:0, max:4, d:1, fmt:v => GRAIN_NAMES[v] + ' beat',
-        info:() => 'STRETCH and LOOP: how long each grain is. Short is smoother for STRETCH and buzzier for LOOP'},
+        info:() => 'GRANULAR and LOOP: how long each grain is. Short is smoother for GRANULAR and buzzier for LOOP'},
       {l:'› GUESS BEATS', act:() => { guessBeats(I); draw(); }, info:'Sets BEATS from the loop length and the song tempo'},
       {l:'› SYNC TO LINES', act:() => syncToLines(I.pad), info:'Fit this pad’s loop to a length in lines or bars (1 bar = 4 beats), in the sampler’s own words, for every instrument that plays the pad'},
       {l:'› PLAY SLICES', act:() => playSlices(cInst), info:'Plays every slice once, in order'},
