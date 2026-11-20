@@ -1,4 +1,4 @@
-# U35 notes: MIDI scheduling, the specification and the test ledger. STATE: analysis, notes, tool and goldens DONE (analysis phase, no C++); waiting for the lead's rulings (Part 3, section 3.4) before the build.
+# U35 notes: MIDI scheduling, the specification and the test ledger. STATE: BUILD DONE on branch n1/u35-spec (MidiSched, SPSC output ring, thunder_midi_* C API, ledger + rule + hostile + thread tests, rt_midi guard, 56 hand mutants); the PR into native is open, not merged. Part 4 is the build record.
 
 Checklist (updated in every commit)
 - [x] `tools/midi-ledger.mjs` (Node, no dependencies beyond acorn through `tools/make-core.mjs --check`), 28 ledgers + index in `native/tests/golden/midi-ledger-*.json`
@@ -7,7 +7,9 @@ Checklist (updated in every commit)
 - [x] Part 1 item 2: MIDI IN boundary
 - [x] Part 1 item 3: rules R-M1..R-M40 with the ledger case that pins each
 - [x] Part 3: proposals, rulings needed, suspected web bugs
-- [ ] (build phase, after the lead's rulings) `native/core/src/midi/`, C API, `midi_ledger` ctest
+- [x] build phase: `native/core/src/midi/` (`MidiSched`, `midi_api.cpp`), `include/thunder/midi.h`, ctests `midi_ledger` `midi_sched` `midi_api` `midi_api_threads` `rt_midi` `rt_midi_selftest`, `tools/midi-mutants.mjs`
+- [x] the lead's rulings appended (below), every ruling built and listed in the expected-difference table (Part 4.3)
+- [ ] (not done, see Part 4.6) the core's glue that calls onStep / thunder_midi_process, the shell (U36), clock IN (phase 2), B10 RPN / bank select (later opt-in)
 
 How to run: `node tools/midi-ledger.mjs` (compare, exit 1 on a difference), `--update` (write; only after checking why), `--out DIR`, `--list`, `--case NAME` (print one).
 The line numbers in the ENGINE-INVENTORY (15904 to 16419) are stale; the section "MIDI out and MIDI clock" is `index.html:16725-17197`.
@@ -199,3 +201,42 @@ Fixes (native behaviour):
 A1 accepted with the above. A3 accepted (core frames exclude device output latency; include the core's FX latency, read from the mixer each block, A6: no cache). A4, A7, A9, A10 accepted as proposed (port table is the shell's / U36's; hidden-page rules not ported; SPP computed on the control thread with a `Seq`; clock-in is phase 2).
 
 BUILD, as the 3.3 order, on the SAME branch `n1/u35-spec`: `native/core/src/midi/` `MidiSched`, the SPSC output ring, the `thunder_midi_*` C API, tests that read the ledgers plus the expected-difference table, a hand mutation for every R-M rule and every fix, an `rt_harness`-style allocation / lock proof, hostile-input tests for the C API, full ctest Release, the midi tests under ASan / UBSan and the ring under TSan.
+
+
+## Part 4. The build (U35 build phase)
+
+### 4.1 What was built
+- `native/core/src/midi/midisched.{h,cpp}`: `MidiSched`, the web's "MIDI out and MIDI clock" (index.html 16725-17197) as a scheduler that makes timed 16-byte records; it never touches a device. Frames are the core's audio frame counter at the engine rate, without the device's output latency, with the core's FX latency (set each block, no cache, A6) less the port's Gear delay.
+- The output is an SPSC ring (`rt/spsc.h`, 8192 records); `drain()` is the consumer. A record with `MIDI_F_CLEAR` is the STOP marker of one cable (the helper's `clear()`); every record carries the cable id the port had when the message was MADE, so a cable change cannot re-route what is already queued.
+- `include/thunder/midi.h` + `src/midi/midi_api.cpp`: the `thunder_midi_*` C API. CONTROL thread: `create free set_song set_port set_lead set_fx_latency set_audible start stop release panic port_clock set_cable key_on key_off raw` (each posts one command on a 256-slot wait-free ring; a full ring is `E_BUSY`, nothing changed; only `set_song` allocates, it parses and hands the Song over, the audio thread returns the old one on a retire ring and the control thread frees it). AUDIO thread: `thunder_midi_process(now, seq_time, bpm, alive)` (applies the commands, then books the clock, LFOs, glides, echoes and the outbox). CONSUMER: `drain`, `stats_get` (published through relaxed atomics, TSan clean).
+- The core's glue (not in this C API, it needs the sequencer's own types): `MidiSched::onStep(evs, n, step, seq, now)` / `onEvent(e, arp, bpm, late, now)` and the one shared lateness test `seq_note_late(eventT, now)` (0.15 s, B7) which `Players` should call for the pad (the other worker's branch `n1/players`; not edited here). `onEvent` takes the host's `late` flag, so a pad note the players drop has its MIDI note dropped too (a late mono note still ends the track's previous note: no hung note).
+- Design points that are not in the web: (1) held notes are owned per TRACK (`held_[track]`); the per port / channel / pitch COUNT is applied in time order when a message leaves the outbox (it cannot be done at booking: the OFF is booked with the ON); (2) the tempo map is a list of 256 anchors {time, beat, tempo after the step}; the beat of an anchor is integrated HERE from the previous anchor at the tempo that was in force, not taken from the sequencer's `beat` event (which integrates the new tempo over an interval fixed under the old one: the web's tick bend); tick k is at beat k/24, found from the newest anchor at or before it; (3) a clock tick keeps its own time, however late (never clamped to `now`, so the phase is kept), and is dropped and counted when more than 20 ms late (also when it waited in the outbox while the host stalled); (4) every table is a fixed array allocated in the constructor; a full one is counted in the stats, never a crash.
+
+### 4.2 Tests (ctest names; counts are the numbers of checks that can fail)
+- `midi_ledger`: the 24 native-mode ledgers (the 4 `-web` ledgers are for a port without `clear()`; the native helper always has it). Each case's song is `midi-ledger-<case>.song.json`; it is played through `Seq` + `MidiSched` on the web harness's cadence (1 ms steps, pump every 25 ms, 0.25 s look-ahead, the 17 ms song-end poll) and the fake shell's CLEAR; every message is matched (same cable, same bytes, within one frame) against the ledger. Everything that does not match must be in `native/tests/golden/midi-ledger-expect.json`; an unlisted difference fails, and so does a listed one that does not happen (each rule has its count).
+- `midi_sched`: cadence independence (the stream of 18 cases is the same on 96- and 480-frame blocks as on the web's 25 ms pump), B4 (per-track ownership, the count, the retrigger, collisions counted), B5 / B6 (STOP forgets), B7 (a 400 ms stall: strictly increasing ticks, no burst, the phase on the grid; 14 s and 60 s gaps counted in ONE call, no 512 cap; a late note dropped; a late mono note still ends its predecessor), B8 (Stop after the last tick, with a 40 ms Gear delay), B9 (three cases), and the single rules R-M4 R-M13 R-M18 R-M19 R-M21 R-M35 R-M38 R-M40.
+- `midi_api` / `midi_api_threads`: every call with NULL / NaN / negative / huge arguments; the command ring full; set_song garbage / empty / flood; 60 000 random `SeqEvent`s (NaN, infinities, tracks and instruments out of range, ARP flags with no ARP, random live keys and raw bytes) into the entry points: every record is a valid MIDI message; the three roles on three threads.
+- `rt_midi` / `rt_midi_selftest`: 60 s of the audio-thread entry points under rt_harness's guard (operator new / delete and glibc malloc / free abort) plus `pthread_mutex_lock` / `pthread_cond_wait` interposed to abort, and a scan of the MIDI sources for lock, container and I/O tokens; the selftest proves the guard catches an allocation and a lock.
+- `tools/midi-mutants.mjs`: 56 hand mutants (4.4).
+
+### 4.3 The expected-difference table (`native/tests/golden/midi-ledger-expect.json`), per B number
+@@TABLE@@
+
+### 4.4 Mutant -> test (`node tools/midi-mutants.mjs --lib native/build-u35/core/libthunder_core.a`; every one is killed)
+@@MUTANTS@@
+
+### 4.5 Choices for the lead
+1. **B9 companion (new, not in the rulings).** The web's STOP leaves a sounding note's own OFF to be dropped by the clear (its `mx.held` entry had already been pruned when the next note was booked) and relies on CC 123. The per-pitch count makes native send an explicit OFF for every note that really sounds at STOP / release (3 cases: start-stop, loop, start-midway), so a synth that ignores All Notes Off does not hang. Listed as B9 `add` rules. Say if you want the web's behaviour.
+2. **B11 (new, found while building).** `keyOn` in the web names a live key's column `'h' + (held keys + 1)`: after a key-up the next key gets the column of a key still held and ENDS it (panic-keys: the 0x40 key is ended by the 0x43 key). Native gives every live key its own column. Listed as B11. This is a web bug to fix there too if you agree.
+3. **The Stop is stamped like the last tick** (B3 + B8): stop time + FX latency - Gear delay, and never before the last tick actually sent (the web's: the stop time as is, which can precede ticks booked 3 ms later, or follow them by 38 ms when the tick booked ahead was dropped by the clear). Shown in every case with a clock.
+4. **The `cable` byte in every record.** The shell's CLEAR must work per CABLE (the web's `o.clear()` drops everything for the object whatever the port letter); ports with one cable id share one clock stream. A cable change while playing keeps the queued messages on the OLD cable (they carry its id), as the web's.
+5. **Ticks keep their own time when late** (no clamp to `now`) and are dropped past 20 ms (`kClockLateSec`); notes use the pad's 150 ms through the shared `seq_note_late`. The 20 ms is my choice: one tick is 20.8 ms at 120 bpm.
+6. **Tempo map of 256 steps** (32 s at 120 bpm): a host that books ticks later than that is counted late, never stalled.
+7. **SPP is the control thread's** (A9): `thunder_midi_start(spp)` takes it; the tests compute it with `Seq` (`sppFor` in `native/tests/midi_drive.h`). A shell-facing helper in the core would be a small follow-up.
+8. **B5 / B6 clear only at STOP** (as ruled), not at a cable change or PANIC (the web's `moRelease` does not either).
+9. The `-web` ledgers (a port without `clear()`) are not run: the native helper always has `clear()`.
+
+### 4.6 Not done
+- The core's glue: the sequencer glue that calls `onStep` / `thunder_midi_process` each block, reads the FX latency from the mixer, computes the SPP on the control thread (A9: the test helper `sppFor` shows how, from a `Seq` run to the row), sets `setAudible` from `mix_audible` (the test uses solo, then mute, without buses), and the shell that sends the records (U36). `Players` has to call `seq_note_late` (B7).
+- Clock IN (phase 2, A10); B10 (RPN / bank select, an opt-in later); the hidden-page ledger (web only); the port table (the shell's).
+- Run under TSan only for the three-thread test and the ring (`midi_api_threads`), not the whole suite.
