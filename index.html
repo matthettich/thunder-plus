@@ -26135,7 +26135,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 647;
+const BUILD = 655;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD + (location.pathname.includes('/beta/') ? ' · beta' : '');
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -36449,6 +36449,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [655, '19 Nov', ['A sample you load into a Sample layer now plays at its own pitch at C-4 (in a synth slot it came out two octaves up, with its natural pitch at C-2). Saved songs and kits are unchanged.', 'Sync to lines…: on a Sample layer (and › SYNC TO LINES on INST) fit the loop to a length you pick or type: lines, bars (2b) or bars + lines (1b8). It follows LINES PER BEAT. The Audio thread sequencer does not play SYNC yet.']],
   [647, '18 Nov', ['Flex: two patterns could put one broken sample into the sound (FLX E8, the 5-tuplet feel, just before a beat; and a tape pattern at one spot in Flex\u2019s memory). Fixed.', 'With the cursor on an FLX command in a phrase (or the master column), the FX bar\u2019s Flex PATTERN value now shows that command\u2019s number, and changing it rewrites the command in the column. One undo step per drag, on tracks and on the master. FLY commands are not linked, and every other FX bar value works as before.']],
   [646, '18 Nov', ['Computer side panel: the instrument list now sits above the PLAYING / STOPPED box and the meters (it was below them). Nothing else in the panel moved.']],
   [645, '18 Nov', ['The pump update of builds 643 and 644 is taken back out for now. It made pump FREEZE pause the sound for about a second in ways that could not be hidden (the first notes after a kit load or an engine switch could be lost). It returns when pump itself is changed.']],
