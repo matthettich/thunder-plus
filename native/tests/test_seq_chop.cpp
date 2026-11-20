@@ -120,6 +120,20 @@ static bool noteOk(const SeqEvent& e) {
   return std::isfinite(e.rate) && e.rate > 0 && std::isfinite(e.t) && (!(e.has & SH_CHOP) || (std::isfinite(e.ofsSec) && e.ofsSec >= 0 && std::isfinite(e.durSec) && e.durSec >= 0.005)) && (!(e.has & SH_CUT) || std::isfinite(e.cut));
 }
 
+// song whose track plays through PART 1 (a PRT 01 on row 0): the song's own instrument 0 is `own`, the part's instrument 0 is `part`
+static std::string partSong(const std::string& own, const std::string& part) {
+  // a part instrument holds only what it overrides: the page leaves tsp / vol / pan / ofs undefined (NaN) when absent, so give the plain ones
+  const std::string partInst = "{\"tsp\":0,\"vol\":255,\"pan\":128,\"ofs\":0," + part.substr(1);
+  std::string s = handSong(own); const std::string r0 = "[48,-1,-1,-1,-1,0,-1,-1,", r1 = "[48,-1,-1,-1,-1,0,72,1,";
+  const size_t k = s.find(r0); s.replace(k, r0.size(), r1);
+  s.pop_back(); return s + ",\"parts\":[{\"mix\":[],\"fx\":{},\"insts\":[" + partInst + "]}]}";
+}
+static bool sameNotes(const Run& a, const Run& b) {
+  if (a.notes.size() != b.notes.size() || a.notes.empty()) return false;
+  for (size_t i = 0; i < a.notes.size(); i++) { const SeqEvent &x = a.notes[i], &y = b.notes[i]; if (x.rate != y.rate || x.ofsSec != y.ofsSec || x.durSec != y.durSec || x.cut != y.cut || x.has != y.has || x.stMode != y.stMode || x.stBeats != y.stBeats || x.stGrain != y.stGrain) return false; }
+  return true;
+}
+
 static void testRules() {
   SeqChop ch; CHECK(ch.setLoop(0, 2.0), "setLoop"); const double pts4[] = {0, 0.1, 0.5, 1.5}; CHECK(ch.setHits(0, 4, pts4, 4), "setHits");
   const std::string slc4 = handSong("{\"pad\":0,\"slc\":4}");
@@ -174,6 +188,19 @@ static void testRules() {
       for (const char* inst : {"{\"pad\":0,\"sync\":1,\"beats\":64}", "{\"pad\":0,\"sync\":2,\"beats\":1}", "{\"pad\":0,\"slc\":64}"}) { const Run r = play(handSong(inst, bpm), &t, false, 30); for (const SeqEvent& e : r.notes) CHECK(noteOk(e), "loop %g bpm %d %s: note not sane (rate %g ofs %g dur %g)", loop, bpm, inst, e.rate, e.ofsSec, e.durSec); } } }
 }
 
+// verify-chop F4: a PERFORM part's instrument is clamped like the main path (song.cpp: slc 0..64, sync 0..3, beats 1..64, grain 0..4): the part's chop equals the song's own instrument's chop for the same JSON
+static void testPartClamp() {
+  SeqChop ch; ch.setLoop(0, 2.0);
+  { const Run a = play(partSong("{\"pad\":0}", "{\"pad\":0,\"slc\":4}"), &ch), b = play(handSong("{\"pad\":0,\"slc\":4}"), &ch);
+    CHECK(a.notes.size() == 4 && a.chopped == 4 && sameNotes(a, b), "part path: an in-range part instrument chops like the main path (%zu)", a.notes.size()); }
+  for (const char* inst : {"{\"pad\":0,\"slc\":100}", "{\"pad\":0,\"slc\":1e9}", "{\"pad\":0,\"slc\":64.4}", "{\"pad\":0,\"slc\":-5}", "{\"pad\":0,\"slc\":\"7\"}",
+                           "{\"pad\":0,\"sync\":1,\"beats\":100}", "{\"pad\":0,\"sync\":1,\"beats\":0}", "{\"pad\":0,\"sync\":1,\"beats\":-3}", "{\"pad\":0,\"sync\":1,\"beats\":2.6}", "{\"pad\":0,\"sync\":7,\"beats\":8,\"grain\":9}",
+                           "{\"pad\":0,\"sync\":3,\"beats\":4,\"grain\":-2}", "{\"pad\":0,\"sync\":2,\"beats\":1e12,\"grain\":null}", "{\"pad\":0,\"slc\":100,\"smode\":1}"}) {
+    const Run a = play(partSong("{\"pad\":0}", inst), &ch), b = play(handSong(inst), &ch);
+    CHECK(!a.notes.empty() && sameNotes(a, b) && a.chopped == b.chopped && a.skipped == b.skipped && a.stretched == b.stretched, "part path = main path for %s (%zu vs %zu notes)", inst, a.notes.size(), b.notes.size());
+    for (const SeqEvent& e : a.notes) CHECK(noteOk(e), "part %s: a sane note", inst); }
+}
+
 int main() {
   const std::string root = THUNDER_ROOT;
   int good = 0; const char* ids[] = {"chop-all", "chop-rev"};
@@ -182,6 +209,7 @@ int main() {
   goldenCase(root, "chop-all", true);   // the same through a session with no edit (the Seq of a session reads the same table)
   std::printf("%d of 3 chop goldens equal\n", good);
   testRules();
+  testPartClamp();
   std::printf(fails ? "FAILED (%d)\n" : "PASS\n", fails);
   return fails ? 1 : 0;
 }

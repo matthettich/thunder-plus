@@ -298,8 +298,9 @@ void Seq::buildParts() {
       for (size_t i = 0; i < in.size(); i++) { const Json I = in.at(i); PInst x; x.present = truthy(I); if (x.present) { x.pad = I.get("pad").missing() ? kNaN : jnum(I.get("pad")); x.tsp = I.get("tsp").missing() ? kNaN : jnum(I.get("tsp"));
           x.vol = I.get("vol").missing() ? kNaN : jnum(I.get("vol")); x.pan = I.get("pan").missing() ? kNaN : jnum(I.get("pan")); x.ofs = I.get("ofs").missing() ? kNaN : jnum(I.get("ofs"));
           x.hut = js_to_int32(jnum(I.get("hut"))); x.huv = js_to_int32(jnum(I.get("huv"))); x.kf = truthy(I.get("kf")); x.rev = truthy(I.get("rev"));
-          x.slc = js_to_int32(jnum(I.get("slc"))); x.smode = truthy(I.get("smode")); x.sync = truthy(I.get("sync")); x.sy = js_to_int32(jnum(I.get("sync")));
-          x.grain = I.get("grain").missing() || nullish(I.get("grain")) ? 1 : js_to_int32(jnum(I.get("grain"))); { const double b = jnum(I.get("beats")); x.beats = truthy(I.get("beats")) && b == b ? b : 4; } }
+          // verify-chop F4: slc / sync / beats / grain are clamped as the song loader does for the song's own instruments (song.cpp: cInt slc 0..64, sync 0..3, beats 1..64, grain 0..4)
+          x.slc = to_int_sat(jint(I.get("slc"), 0), 0, 64); x.smode = truthy(I.get("smode")); x.sy = to_int_sat(jint(I.get("sync"), 0), 0, 3); x.sync = x.sy != 0;
+          x.grain = to_int_sat(jint(I.get("grain"), 1), 0, 4); x.beats = to_int_sat(jint(I.get("beats"), 4), 1, 64); }
         part.insts.push_back(x); } }
     parts_.push_back(std::move(part)); }
 }
