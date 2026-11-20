@@ -3762,7 +3762,7 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
 <h3>Bass engine</h3>
 <p>Any synth slot (08 and up) can be a <b>bass</b> instead of layers: on the Synth page pick <b>Engine: Bass</b>. It is an additive mono bass in the spirit of Reaktor's Lazerbass, for dubstep and drum &amp; bass: up to 64 partials (Shape goes saw › square › triangle; Bright, Odd / even, Stretch), a sub oscillator, a resonant low-pass with its own envelope, vowel formants, a comb, Reese detune and stereo Width. The <b>Wobble</b> moves the cutoff, vowel, comb and level at a rate locked to the song's tempo (4 bars down to 1/32, triplets and dotted). In the tracker it plays live, so the wobble keeps time on every note however high you play, a held note wobbles for as long as it's held, and Glide and Legato slide between notes (PSL slides without restarting). The <b>WOB</b> command changes the rate from a row on (WOB 06 = 1/4, WOB 0B = 1/16, WOB 00 back to the voice's own). Presets get you started; the bottom panel's instrument section shows its level, cutoff, resonance and wobble. The voice's Level, Tune and Drive apply; pad effects don't (use the track's FX).</p>
 <h3>Levels: TRIM, VOL, MASTER, OUT</h3>
-<p>Each track runs <b>TRIM → chains → its FX → VOL (with mute and solo) → pan</b>. <b>TRIM</b> is the Mixer's first row: the track's input gain, 80 = 0 dB, from −18 to +18 dB, set before the chain and effects hear it. It lights yellow under the value when the signal going in runs hot (above −6 dB) and red near full scale (above −1 dB): chains has no limiter of its own. <b>VOL</b> is the fader: the bar on each track's meter (drag it, Shift for fine, double-click for 0 dB; from the keyboard, ▼ from the SC row lands on it, then Ctrl/⌘+◀▶ ±1, ▲▼ ±16) and the bottom panel's slider. On the master row, <b>MASTER</b> is the drive into the limiter (the master phrase's VOL moves it), then FX, MASTERING and <b>OUT</b>: the master fader, after the limiter, FF = 0 dB and never a boost. Its bar stands on the L / R meter (drag it sideways) and the bottom panel's master strip is OUT too. Renders and stems go through all of them as you hear them, except that with Project → <b>NORMALIZE</b> on, the rendered file is raised to just under 0 dB, so OUT doesn't change its level there (MASTER still drives the limiter). Turning a track's <b>CHN</b> on or off fades between the chain and the dry sound over 20 ms, so it doesn't click.</p>
+<p>Each track runs <b>TRIM → chains → its FX → VOL (with mute and solo) → pan</b>. <b>TRIM</b> is the Mixer's first row: the track's input gain, 80 = 0 dB, from −18 to +18 dB, set before the chain and effects hear it. It lights yellow under the value when the signal going in runs hot (above −6 dB) and red near full scale (above −1 dB): chains has no limiter of its own. <b>VOL</b> is the fader: the bar on each track's meter (drag it, Shift for fine, double-click for 0 dB; from the keyboard, ▼ from the SC row lands on it, then Ctrl/⌘+◀▶ ±1, ▲▼ ±16) and the bottom panel's slider. On the master row, <b>MASTER</b> is the drive into the limiter (the master phrase's VOL moves it), then FX, MASTERING and <b>OUT</b>: the master fader, after the limiter, FF = 0 dB and never a boost. Its bar stands on the L / R meter (drag it sideways) and the bottom panel's master strip is OUT too. Renders and stems go through all of them as you hear them, except that with Project → <b>NORMALIZE</b> on, the rendered file is raised to just under 0 dB, so OUT doesn't change its level there (MASTER still drives the limiter). Turning a track's <b>CHN</b> on or off fades between the chain and the dry sound over 20 ms, so it doesn't click. The Mixer's <b>CHN</b> row says, in two letters: <b>ON</b> the track runs through chains; <b>BS</b> it feeds a bus (heard there, not on its own); <b>MS</b> (miss) chains has no Chain Out for it, or the bus it feeds has CHN off; <b>LP</b> (loop) its cable would close a loop of buses and is left out; <b>--</b> off. Put the cursor on the cell and the status line says it in full. A bus can feed another bus: Track In of the bus into the next bus's chain; solo follows the chain.</p>
 <p><b>Buses and PRE sends.</b> A Track In patched into a Chain Out on another track feeds that bus after its fader and pan. Set the Track In's <b>Bus send</b> to <b>Before its fader</b> and the bus hears it after its chain and effects but before VOL and pan, so pulling the fader down leaves the send alone (a reverb or monitor send). Mute and solo still silence it.</p>
 <h3>Mastering</h3>
 <p><b>Settings → Master → Open mastering…</b> (or the <b>AUTO MASTER</b> cell on the Mixer's master row: ▶ from the master level, then EDIT; or › MASTERING on the FX screen's master) puts a chain on the master bus: <b>EQ → Suppress → Compress → Limit</b>. Each has its own switch; the readouts show short-term loudness in and out (LUFS) and the highest peak. <b>EQ</b>: drag a point (left/right is frequency, up/down is gain), shift-drag or scroll for width, double-click empty space to add a bell, double-click a point to switch it off; the band row sets exact values. <b>Suppress</b> turns down resonances that stick out of the spectrum (Depth, Sharpness, Selectivity, Speed; drag the lines to set its range; Delta plays only what it removes). <b>Compress</b> is a glue compressor (its sidechain high-pass keeps the bass from pumping it). <b>Limit</b> catches every peak at the Ceiling, between samples too. Renders of the song include the chain and keep its ceiling; stems don't.</p>
@@ -20778,35 +20778,50 @@ function busPlan(){
   for (let t = 0; t < NT; t++) mx(S.chainOn && S.chainOn[t] ? 2 : 1);
   if (busPlanVal && busPlanH === h) return busPlanVal;
   busPlanH = h;
-  const feeds = new Map(), targets = new Map(), pure = new Set(), pre = new Set(), P = busPlanVal = {feeds, targets, pure, pre, loop:false};   // pre: PRE SENDS
+  const feeds = new Map(), targets = new Map(), pure = new Set(), pre = new Set(), P = busPlanVal = {feeds, targets, pure, pre, loop:false, loopEdges:[], srcAll:new Map(), busAll:new Map()};   // pre: PRE SENDS; loopEdges: [source, bus] cables left out to keep the plan acyclic
   if (!ok) return P;
   const by = new Map(); for (const m of d.modules) if (m && m.id != null) by.set(m.id, m);
   const nx = new Map(); for (const c of d.cables || []) if (c && c.from && c.to){ const a = c.from[0]; if (!nx.has(a)) nx.set(a, []); nx.get(a).push(c.to[0]); }
   const trk = m => { const k = int(m.params && m.params.track, 1); return k >= 1 && k <= NT ? k - 1 : -1; };
-  // OWNER (25 Oct): a Chain Out for a track that brings its own sound in (it has a Track In of its own) is that track's own
-  // output, not a bus. A bus is a track the patch feeds from elsewhere: a Chain Out with no Track In beside it. Without this,
-  // a send (4 and 5 keep their outs and also feed 6) read the other track's out as a bus, which the loop check then skipped,
-  // so the mixer showed a bus that only half worked.
-  const ownIn = new Set();
-  for (const m of by.values()) if (m.type === 'trackIn'){ const k = trk(m); if (k >= 0) ownIn.add(k); }
-  const adj = new Map(), reaches = (a, b) => { const seen = new Set([a]), w = [a]; while (w.length){ const x = w.pop(); if (x === b) return true; for (const y of adj.get(x) || []) if (!seen.has(y)){ seen.add(y); w.push(y); } } return false; };
+  // OWNER (25 Oct): a Chain Out for a track that brings its own sound in (its Track In reaches its own Chain Out) is that track's
+  // own output, not a bus. A bus is a track the patch feeds from elsewhere. Without this, a send (4 and 5 keep their outs and also
+  // feed 6) read the other track's out as a bus, which the loop check then skipped, so the mixer showed a bus that only half worked.
+  // BUS INTO BUS (19 Nov, owner): the test is whether the track's OWN Track In reaches its OWN Chain Out (ownRet), not whether a
+  // Track In of that track exists. A track with a Track In that goes on to another bus (Track In 8 -> Chain Out 14) and a Chain Out
+  // that other tracks feed (-> mixer -> Chain Out 8) is a bus that feeds a bus; its Track In reads its own output, after its chain
+  // and FX, fader and pan. The edges are added in (source track, bus track) order, so a cable that would close a loop is always
+  // the higher-numbered source's (P.loopEdges), whatever order the modules were made in.
+  const ti = [];
   for (const m of by.values()){
-    if (m.type !== 'trackIn') continue; const t = trk(m); if (t < 0 || !(S.chainOn && S.chainOn[t])) continue;
+    if (m.type !== 'trackIn') continue; const t = trk(m); if (t < 0) continue;
     const seen = new Set([m.id]), w = [m.id], outs = new Set();
     while (w.length){ const id = w.pop(), x = by.get(id); if (x && x.type === 'chainOut'){ const o = trk(x); if (o >= 0) outs.add(o); }
       for (const y of nx.get(id) || []) if (!seen.has(y)){ seen.add(y); w.push(y); } }
-    let fed = false;
-    for (const b of [...outs].sort((a, c) => a - c)){
-      if (b === t || ownIn.has(b) || !chainsFeed(b)) continue;   // its own out, or not a bus (see ownIn above)
-      if (reaches(b, t)){ P.loop = true; continue; }
-      if (!adj.has(t)) adj.set(t, []); adj.get(t).push(b); fed = true;
-      if (!feeds.has(b)) feeds.set(b, []); feeds.get(b).push(t);
-      if (!targets.has(t)) targets.set(t, []); targets.get(t).push(b);
-    }
-    if (fed && !outs.has(t)) pure.add(t);
-    if (fed && +(m.params && m.params.pre)) pre.add(t);   // PRE SENDS (27 Oct): its Track In's Bus send is "Before its fader"
+    ti.push({m, t, outs, fed:false});
+  }
+  const ownRet = new Set(); for (const q of ti) if (q.outs.has(q.t)) ownRet.add(q.t);
+  const adj = new Map(), reaches = (a, b) => { const seen = new Set([a]), w = [a]; while (w.length){ const x = w.pop(); if (x === b) return true; for (const y of adj.get(x) || []) if (!seen.has(y)){ seen.add(y); w.push(y); } } return false; };
+  const cand = [];
+  for (const q of ti){ if (!(S.chainOn && S.chainOn[q.t])) continue;
+    for (const b of [...q.outs].sort((a, c) => a - c)){
+      if (b === q.t || ownRet.has(b) || !chainsFeed(b)) continue;   // its own out, or not a bus (see ownRet above)
+      cand.push([q.t, b, q]); } }
+  cand.sort((x, y) => x[0] - y[0] || x[1] - y[1]);
+  for (const [t, b, q] of cand){
+    if (reaches(b, t)){ P.loop = true; P.loopEdges.push([t, b]); continue; }
+    if (!adj.has(t)) adj.set(t, []); adj.get(t).push(b); q.fed = true;
+    if (!feeds.has(b)) feeds.set(b, []); feeds.get(b).push(t);
+    if (!targets.has(t)) targets.set(t, []); targets.get(t).push(b);
+  }
+  for (const q of ti){ if (!q.fed) continue;
+    if (!q.outs.has(q.t)) pure.add(q.t);
+    if (+(q.m.params && q.m.params.pre)) pre.add(q.t);   // PRE SENDS (27 Oct): its Track In's Bus send is "Before its fader"
   }
   for (const v of feeds.values()) v.sort((a, b) => a - b);
+  // CLOSURES (19 Nov, owner: solo follows the chain through any depth): srcAll.get(t) = every track upstream of t (what feeds it, and what
+  // feeds those), busAll.get(t) = every bus downstream of t. Sorted arrays; the plan is acyclic, so the walks end.
+  const clo = m => { const out = new Map(); for (const t of m.keys()){ const seen = new Set(), w = [...m.get(t)]; while (w.length){ const x = w.pop(); if (seen.has(x)) continue; seen.add(x); for (const y of m.get(x) || []) w.push(y); } out.set(t, [...seen].sort((a, b) => a - b)); } return out; };
+  P.srcAll = clo(feeds); P.busAll = clo(targets);
   return P;
 }
 // BUS GROUPS (owner, 31 Oct): a colour for each bus, given to the bus and to every track it takes in (from chains), so
@@ -20959,6 +20974,48 @@ function chainOutTargetsOf(t){
   }
   return [...out].sort((a, b) => a - b);
 }
+// BUS INTO BUS (19 Nov): the Track In tracks (other than b) whose sound reaches a Chain Out of track b, ignoring CHN and the bus rule; and whether b's own
+// Track In reaches b's own Chain Out (an own return: such a track is never a bus). Used to say why a bus hears nothing.
+function chainInSourcesOf(b){
+  const P = S.chainPatch, ms = (P && Array.isArray(P.modules)) ? P.modules : [], src = new Set(); let own = false;
+  const nx = new Map(), byId = new Map(); for (const m of ms) if (m && m.id != null){ byId.set(m.id, m); nx.set(m.id, []); }
+  for (const c of (P && P.cables) || []) if (c && c.from && c.to && nx.has(c.from[0])) nx.get(c.from[0]).push(c.to[0]);
+  for (const m of ms) if (m && m.type === 'trackIn'){ const k = int(m.params && m.params.track, 1); if (!(k >= 1 && k <= NT)) continue;
+    const seen = new Set([m.id]), w = [m.id];
+    while (w.length){ const id = w.pop(), x = byId.get(id);
+      if (x && x.type === 'chainOut' && int(x.params && x.params.track, 1) === b + 1){ if (k - 1 === b) own = true; else src.add(k - 1); }
+      for (const y of nx.get(id) || []) if (!seen.has(y)){ seen.add(y); w.push(y); } } }
+  return {src:[...src].sort((a, c) => a - c), own};
+}
+// The CHN row's label for track t (Mixer): ON, BS, MS (MISS), LP (LOOP) or --: always TWO characters (the cells are two wide); the status line says the full word. ct: chainsTracks(); P: busPlan().
+// LOOP (19 Nov): this track's Track In would close a loop of buses; that cable is left out of the plan.
+function chnTx(t, P, ct){
+  const on = chainsFeed(t), flag = !!(S.chainOn && S.chainOn[t]), bs = !on && flag && P.targets.has(t);
+  if (flag && (P.loopEdges || []).some(e => e[0] === t)) return 'LP';
+  return on ? 'ON' : bs ? 'BS' : flag && !ct.has(t) ? 'MS' : '--';
+}
+// The status line for the CHN cell of track t (Mixer).
+function chnSay(t){
+  const P = busPlan(), on = chainsFeed(t), flag = !!(S.chainOn && S.chainOn[t]), tg = !on && flag && P.targets.get(t), D = L => d2(L + 1);
+  const pl = (L, a, b) => (L.length > 1 ? b : a) + L.map(D).join(', ');
+  const head = `${trkLab(t)}${trkKind(t)} · chains `, lp = flag ? (P.loopEdges || []).filter(e => e[0] === t) : [];
+  if (lp.length) return head + 'LOOP: track ' + D(t) + ' would feed ' + pl(lp.map(e => e[1]), 'track ', 'tracks ') + ', which already feed' + (lp.length > 1 ? '' : 's') + ' it; the cable from ' + D(t) + ' is left out so nothing feeds back' + (on ? ' (the rest plays)' : '') + ' · EDIT toggles';
+  // the Chain Out targets this track's Track In reaches whose CHN is off (the only case where "whose CHN is off" is true)
+  const offT = flag ? chainOutTargetsOf(t).filter(u => u !== t && !chainsFeed(u) && !(P.targets.get(t) || []).includes(u)) : [];
+  if (on){
+    let x = 'ON (track runs through the chains patch)';
+    if (P.feeds.has(t)) x += ' · ' + busOf(t);
+    if (P.targets.has(t)) x += ' · feeds the bus on ' + pl(P.targets.get(t), 'track ', 'tracks ') + ' (heard there, not on its own' + (P.pre.has(t) ? ', before its fader' : '') + ')';
+    if (offT.length) x += ' · its Track In feeds ' + pl(offT, 'track ', 'tracks ') + ', whose CHN is off, so it plays on its own (switch that track on)';
+    const I = chainInSourcesOf(t), off = I.src.filter(u => !(S.chainOn && S.chainOn[u]));
+    if (!P.feeds.has(t) && !I.own && off.length) x += ' · nothing reaches it yet: ' + pl(off, 'track ', 'tracks ') + (off.length > 1 ? ' have' : ' has') + ' CHN off';
+    if (P.feeds.has(t) && P.targets.has(t) && S.mix[t] && S.mix[t].mute) x += ' · muted: nothing reaches ' + pl(P.targets.get(t), 'track ', 'tracks ') + ' from it';
+    return head + x + (offT.length || x.includes('nothing reaches') ? ' · EDIT toggles' : '');
+  }
+  return head + (tg ? 'BS: feeds ' + (tg.length > 1 ? 'the buses on tracks ' : 'the bus on track ') + tg.map(D).join(', ') + ' (heard there, not on its own' + (P.pre.has(t) ? ', before its fader' : '') + ') · EDIT toggles'
+    : offT.length ? 'MISS: its Chain Out feeds ' + pl(offT, 'track ', 'tracks ') + ', whose CHN is off (switch that track on, or this one) · EDIT toggles'
+    : flag ? 'MISS: the patch needs a Chain Out for this track, or a bus it can feed · EDIT toggles' : 'off · EDIT toggles');
+}
 // The tracks a NEW pair turns CHN on for: Chain Out tracks, and (BUS, 20 Oct) Track In tracks, a bus's sources.
 function chainsAutoTracks(){
   const ids = chainsTracks();
@@ -20999,7 +21056,7 @@ function pumpLatencyOf(f, sr){
   pumpLatCache.set(key, lat); return lat;
 }
 // The master's pump slots together: a render starts that much later, and pass() trims it off as it does the mastering's
-// latency. (A bus's latency isn't compensated anywhere: see pumpLatTxt.)
+// latency. (A bus's latency is compensated by pdcPlan, below, with LATENCY COMP on.)
 // FIX (build 603): a switched-OFF pump slot counts too. OFF is the plugin's own bypass, which still delays by its latency
 // (so switching it, by hand or with FXO, never moves the timing); counting only the slots that are ON left renders late by
 // the OFF slots' latency (owner's song: 4454 samples) and LATENCY COMP lined tracks up without them. Only a pump effect with
@@ -21571,10 +21628,18 @@ function freePhrase(){
 // SOLO OVER MUTE (owner, 3 Nov): a soloed track plays even when it is muted (however it was muted: keys, a click, the Mixer);
 // solo never changes the mute itself, so when the solo is cleared a muted track is muted again and the rest play.
 const audible = t => { const any = S.mix.some(m => m.solo); if (S.mix[t].solo) return true; if (S.mix[t].mute) return false; if (!any) return true;
-  // BUS (20 Oct): soloing a bus keeps its sources playing into it; soloing a source keeps its bus (DAW behaviour).
-  const P = busPlan(); for (const b of P.targets.get(t) || []) if (S.mix[b] && S.mix[b].solo) return true;
-  for (const u of P.feeds.get(t) || []) if (S.mix[u] && S.mix[u].solo) return true;
+  // BUS (20 Oct): soloing a bus keeps its sources playing into it; soloing a source keeps its bus (DAW behaviour). BUS INTO BUS (19 Nov, owner):
+  // through any depth: a soloed bus keeps everything upstream of it (srcAll), a soloed source keeps every bus downstream of it (busAll). Mute still wins.
+  const P = busPlan(); for (const b of P.busAll.get(t) || []) if (S.mix[b] && S.mix[b].solo) return true;
+  for (const u of P.srcAll.get(t) || []) if (S.mix[u] && S.mix[u].solo) return true;
   return false; };
+// Why a track that is not soloed is still heard while another is (the Mixer's info line): "heard: feeds soloed bus 14". '' when it is not that.
+function soloWhy(t){
+  if (!S.mix.some(m => m.solo) || S.mix[t].solo || S.mix[t].mute) return '';
+  const P = busPlan(), fmt = L => (L.length > 1 ? 'buses ' : 'bus ') + L.map(u => d2(u + 1)).join(', '), fmtT = L => (L.length > 1 ? 'tracks ' : 'track ') + L.map(u => d2(u + 1)).join(', ');
+  const dn = (P.busAll.get(t) || []).filter(b => S.mix[b] && S.mix[b].solo), up = (P.srcAll.get(t) || []).filter(u => S.mix[u] && S.mix[u].solo);
+  return dn.length ? 'heard: feeds soloed ' + fmt(dn) : up.length ? 'heard: takes in soloed ' + fmtT(up) : '';
+}
 // A muted song block: the sect stays on the song, it just plays silently (a pattern-matrix mute).
 // Track t's mute bit for song row y. The master column (MT) has none. JS bit operations are 32-bit (1 << 32 is 1, track
 // 1's bit), so tracks 1–32 live in smute[y] (as they always have, so every version reads them) and tracks 33 and up, only
@@ -24393,7 +24458,7 @@ function padBlink(e){
 // Phones and tablets (10 Nov): the audio-thread sequencer's module (a second thread) loads only when the owner picked it there
 // (aset.corePick, set in Settings); the saved default 'core' plays on the Page sequencer on such a device.
 function coreWanted(){ return aset.core === 'core' && (!wkLazy() || !!aset.corePick); }   // (a declaration: the Settings row reads it at load)
-const CORE_REV = '1skz324';
+const CORE_REV = '1uubxpr';
 const CORE_WANT = 7;   // the core's message set this page speaks (core-processor.js CORE_V); an older core is not used
 const CORE_URL = () => 'core/seq-core.js?v=' + BUILD + '-' + CORE_REV;
 const core = {node:null, ready:false, loading:null, gen:0, sent:new Map(), sT:0, tally:new Map(), mir:null};   // mir: what the core's song holds, as JSON per part (coreDiff)   // tally: events by who played them (test hook)
@@ -25158,10 +25223,25 @@ function renderGetB(pads, pads2, sr){
       if (rev){ d = d.slice().reverse(); if (e) e = e.slice().reverse(); }
       b = mkBuf(d, sr, e); bufs.set(k, b); } return b; };
 }
+// STEMS (BUS INTO BUS, 19 Nov): keepT (the tracks of a render, changed in place) gains every audible bus that a kept track feeds, until nothing is
+// added (so a bus that only a bus feeds is in too); returns inBus(t): a pure track whose bus is rendered has no stem of its own, it is in its
+// bus's stem. In the owner's patch (1-6, 9, 13 -> bus 8 -> bus 14) the only stem is 14's.
+function busStemPlan(keepT, BP, aud){
+  for (let more = true; more;){ more = false; for (const [b, src] of BP.feeds) if (!keepT.includes(b) && aud(b) && src.some(t => keepT.includes(t))){ keepT.push(b); more = true; } }
+  keepT.sort((a, b) => a - b);
+  return t => BP.pure.has(t) && (BP.targets.get(t) || []).some(b => keepT.includes(b));
+}
+// BUS (20 Oct): a bus track's render takes its sources with it (they play through it). BUS INTO BUS (19 Nov): and theirs, through any depth: a
+// source is added when it can be heard (audible) and the bus it feeds is in the set. A muted middle bus is not added, so what only feeds it is not either.
+function busClosure(keep){
+  const P = busPlan(), k2 = new Set(keep), w = [...keep];
+  while (w.length){ const b = w.pop(); for (const t of P.feeds.get(b) || []) if (!k2.has(t) && audible(t)){ k2.add(t); w.push(t); } }
+  return k2;
+}
 async function pass(evs, keep, N, sr, getB, lim, masterFx){
   // BUS (20 Oct): a bus track's render takes its sources with it (they play through it); one pure source rendered on its
   // own (its stem, if asked for) plays without the bus.
-  { const P = busPlan(), k2 = new Set(keep); for (const b of keep) for (const t of P.feeds.get(b) || []) if (audible(t)) k2.add(t); keep = k2; }
+  keep = busClosure(keep);   // (BUS INTO BUS, 19 Nov: through any depth)
   const M = S.mst, useM = !!(masterFx && M && M.on);
   let lat = (useM ? mstLatency(M, sr) : 0) + (masterFx ? pumpChainLatency(S.mfx, sr) : 0);   // …PUMP: the master's pump effects' latency too
   lat += Math.round(pdcPlan(sr).T * sr);   // LATENCY COMPENSATION: everything plays T later, so the render trims it too
@@ -25243,9 +25323,7 @@ async function renderOut(stems){
     // BUS (20 Oct): a bus track renders even with no notes of its own when a source plays into it; a source heard only
     // through its bus has no stem of its own: it is in the bus's stem (so the stems still add up to the mix).
     const BP = busPlan();
-    for (const [b, src] of BP.feeds) if (!keepT.includes(b) && audible(b) && src.some(t => keepT.includes(t))) keepT.push(b);
-    keepT.sort((a, b) => a - b);
-    const inBus = t => BP.pure.has(t) && (BP.targets.get(t) || []).some(b => keepT.includes(b));
+    const inBus = busStemPlan(keepT, BP, audible);   // keepT gains the buses that only buses feed, sorted; inBus(t): the track is in its bus's stem
     if (!keepT.length) return toast('Nothing to render: every track with notes is muted');
     const nStem = stems ? keepT.filter(t => !inBus(t)).length : 0; rprog.n = 1.15 + nStem; rprog.step(0, 'Rendering the pads…'); await idle();
     const pads = new Map(), pads2 = new Map(); let pi = 0; const pN = new Set(notes.map(e => e.pad)).size;
@@ -30061,16 +30139,7 @@ function info(){
     if (c.y === 7 && c.mx === 2){ const mo = S.mout == null ? 255 : S.mout; return 'Master OUT ' + hx(mo) + ' · ' + dB(curve(mo)) + ' · the master fader, after the limiter (no boost: FF is 0 dB) · drag its bar on the meter · ALT+EDIT 0 dB'; }   // GAIN STAGING
     if (c.y === 7) return 'Master ' + dB(curve(S.master)) + ' into ' + (S.mst.on && S.mst.lim && S.mst.lim.on ? 'mastering’s limiter' : S.limiter ? 'the limiter' : 'OUT (no limiter)') + (fxCount(S.mfx) ? ' · FX ' + fxList(S.mfx) : '') + ' · SHIFT+▶ master effects · ▶▶ OUT, the fader after it';
     if (c.y === 4){
-      const on = chainsFeed(c.x), flag = !!(S.chainOn && S.chainOn[c.x]);
-      const tg = !on && flag && busPlan().targets.get(c.x);
-      // MISS has two causes and they need different fixes: no Chain Out for the track, or a Chain Out feeding a track whose
-      // CHN is off (the bus is there, the bus track just is not listening). Saying "needs a Chain Out" for the second one sent
-      // the owner looking for an output that was already in the patch.
-      const ot = !on && !tg && flag ? chainOutTargetsOf(c.x).filter(u => u !== c.x) : null;
-      return `${trkLab(c.x)}${trkKind(c.x)} · chains ` + (on ? 'ON (track runs through the chains patch)'
-        : tg ? 'BS: feeds the bus on ' + (tg.length > 1 ? 'tracks ' : 'track ') + tg.map(u => d2(u + 1)).join(', ') + ' (heard there, not on its own' + (busPlan().pre.has(c.x) ? ', before its fader' : '') + ') · EDIT toggles'
-        : ot && ot.length ? 'MISS: its Chain Out feeds ' + (ot.length > 1 ? 'tracks ' : 'track ') + ot.map(u => d2(u + 1)).join(', ') + ', whose CHN is off (switch that track on, or this one) · EDIT toggles'
-        : flag ? 'MISS: the patch needs a Chain Out for this track, or a bus it can feed · EDIT toggles' : 'off · EDIT toggles');
+      return chnSay(c.x);
     }
     if (mixFv()){ const m = S.mix[c.x]; return `${trkLab(c.x)}${trkKind(c.x)} · VOL ${hx(m.vol)} · ${dB(trackGain(m.vol))} (the fader on its meter, after chains and the FX) · EDIT+◀▶ ±1, EDIT+▲▼ ±16 · ▲ SC, ▼ master row`; }
     if (c.y === 6){ const U = sckUsesOf(c.x);
@@ -30081,7 +30150,7 @@ function info(){
     // GAIN STAGING: on TRIM, what it sends in (its light) and where VOL is
     if (c.y === 0){ const b = rt && rt.pl.buses[c.x], ip = b && b.ipk > 0.00002 ? (20 * Math.log10(b.ipk)).toFixed(1) + ' dB' : '';
       return `${trkLab(c.x)}${trkKind(c.x)} · TRIM ${trimS(m.trim)} into ` + (chainsFeed(c.x) ? 'chains and ' : '') + `its FX` + (ip ? ` · in peak ${ip}` + (b.ipk >= 0.999 ? ' (over 0 dB!)' : '') : '') + ` · VOL ${dB(trackGain(m.vol))} (the bar on the meter)`; }
-    return `${trkLab(c.x)}${trkKind(c.x)} · TRIM ${trimS(m.trim)} · VOL ${dB(trackGain(m.vol))} · ${panS(m.pan)}` + (m.mute ? ' · muted' : '') + (m.solo ? ' · solo' : '');
+    return `${trkLab(c.x)}${trkKind(c.x)} · TRIM ${trimS(m.trim)} · VOL ${dB(trackGain(m.vol))} · ${panS(m.pan)}` + (m.mute ? ' · muted' : '') + (m.solo ? ' · solo' : '') + (soloWhy(c.x) ? ' · ' + soloWhy(c.x) : '');
   }
   if (tv === 'mod'){ const M = modArr()[c.y], who = fxWho(cFxT) + ' · LFO ' + (c.y + 1);
     return M ? `${who} · ${modLab(M)} · ${PLFO_SHAPES[M.sh]}, a cycle every ${modRate(M.rt)} · depth ${hx(M.dp)} (${Math.round(M.dp / 255 * 100)}%)` : `${who} is empty · EDIT picks a target for it`; }
@@ -30367,10 +30436,10 @@ function draw(){
     const fl = [{t:'FX  ', cls:'lb'}];
     for (let t = T0; t < T1; t++){ const n = fxCount(S.tfx[t]); fl.push({t:n ? d2(n) : '--', cls:cc(t, 5, n ? 'cf' : 'e') + tkm(t), x:t, y:5}, ' '); }
     const cl = [{t:'CHN ', cls:'lb'}];
-    const ct = chainsTracks(), BT = busPlan().targets;
+    const ct = chainsTracks(), BP = busPlan(), BT = BP.targets;
     for (let t = T0; t < T1; t++){
-      const on = chainsFeed(t), flag = !!(S.chainOn && S.chainOn[t]), bs = !on && flag && BT.has(t), tx = on ? 'ON' : bs ? 'BS' : flag && !ct.has(t) ? 'MISS' : '--';
-      cl.push({t:tx, cls:cc(t, 4, on || bs ? 'cf' : flag ? 'v' : 'e') + tkm(t), x:t, y:4, title:bs ? 'Track ' + d2(t + 1) + ' feeds the bus on track ' + BT.get(t).map(u => d2(u + 1)).join(', ') : undefined}, ' ');
+      const on = chainsFeed(t), flag = !!(S.chainOn && S.chainOn[t]), bs = !on && flag && BT.has(t), tx = chnTx(t, BP, ct);
+      cl.push({t:tx, cls:cc(t, 4, tx === 'LP' ? 'v' : on || bs ? 'cf' : flag ? 'v' : 'e') + tkm(t), x:t, y:4, title:tx === 'LP' ? 'Track ' + d2(t + 1) + ': its cable would close a loop of buses, so it is left out' : bs ? 'Track ' + d2(t + 1) + ' feeds the bus on track ' + BT.get(t).map(u => d2(u + 1)).join(', ') : undefined}, ' ');
     }
     L.push(cl, fl);
     const sl = [{t:'SC  ', cls:'lb', title:'Sidechain source: lit when something listens to this track (a compressor, gate, envelope filter or Sidechain In with its Source on it)'}];
