@@ -22158,7 +22158,8 @@ function normPerf(j){
 function normParts(j){
   const A = new Array(PERF_PARTS).fill(null); if (!Array.isArray(j)) return A;
   j.slice(0, PERF_PARTS).forEach((p, i) => { if (!p || typeof p !== 'object' || !Array.isArray(p.insts)) return;
-    A[i] = {n:typeof p.n === 'string' ? p.n.slice(0, 16) : '', insts:p.insts, mix:Array.isArray(p.mix) ? p.mix : [], fx:p.fx && typeof p.fx === 'object' ? p.fx : {}}; });
+    A[i] = {n:typeof p.n === 'string' ? p.n.slice(0, 16) : '', insts:p.insts.map(o => { if (!o || typeof o !== 'object' || !('sx' in o || OS_KEYS.some(k => k in o))) return o; const I = Object.assign({}, o); I.sync = Math.min(3, Math.max(0, Math.trunc(+o.sync) || 0)); sxLoad(o, I); return I; }),   /* OLDSCHOOL settings in a part are clamped like the song's (a part is otherwise kept as it is) */
+      mix:Array.isArray(p.mix) ? p.mix : [], fx:p.fx && typeof p.fx === 'object' ? p.fx : {}}; });
   return A;
 }
 const perfOf = (Sx = S) => Sx.perf || (Sx.perf = freshPerf());
@@ -23640,7 +23641,7 @@ const syPut = (I, p) => { const m = SY_PICK[p] || SY_PICK[0]; I.sync = m.sync; i
 // loading: I.sx is kept only for a pair this build has (older songs have none)
 function sxLoad(o, I){
   const x = Math.trunc(+(o && o.sx)); if (x > 0 && SY_PICK.some(m => m.sync === I.sync && m.sx === x)) I.sx = x; else delete I.sx;
-  if (I.sx === 1){ const n = (v, a, b, d, int) => { v = +v; if (!Number.isFinite(v)) v = d; v = Math.min(b, Math.max(a, v)); return int ? Math.round(v) : v; };
+  if (I.sx === 1){ const n = (v, a, b, d, int) => { v = v == null || v === '' || v === false ? NaN : +v; if (!Number.isFinite(v)) v = d; v = Math.min(b, Math.max(a, v)); return int ? Math.round(v) : v; };
     I.og = n(o.og, 0.5, 250, 12); I.ou = n(o.ou, 0, 6, 0, 1); I.orp = n(o.orp, 0, 3, 0, 1); I.ox = n(o.ox, 0, 50, 0, 1); I.opt = n(o.opt, -24, 24, 0, 1); }
   else for (const k of OS_KEYS) delete I[k];
 }
@@ -23670,10 +23671,13 @@ const OS_RAMPS = ['FWD', 'REV', 'PING', 'EASE'], OS_DIVS = [0, 1, 1 / 2, 1 / 4, 
 const OS_RAMP_FN = [u => u, u => 1 - u, u => u < 0.5 ? 2 * u : 2 - 2 * u, u => u * u * (3 - 2 * u)];
 // the grain length in seconds: ms as set, or a division of a line (a line = 60 / bpm / lpb seconds)
 const osGrainSecs = (I, bpm, lpb) => (I.ou | 0) > 0 ? OS_DIVS[Math.min(6, I.ou | 0)] * 60 / bpm / (lpb || 4) : Math.min(250, Math.max(0.5, +I.og || 12)) / 1000;
-// where each grain starts reading (samples): L source length, T output length, g grain length, r grain read ratio
+// where each grain starts reading (samples): L source length, T output length, g grain length, r grain read ratio.
+// The first grain starts at ramp(0) and the LAST at ramp(1) of the room there is (0 .. L - what a grain reads), so FWD reads the sample's last
+// sample in the last grain and REV its first in the last one.
 function osStarts(L, T, g, r, rp){
-  const f = OS_RAMP_FN[rp | 0] || OS_RAMP_FN[0], n = Math.ceil(T / g), P = new Int32Array(n), top = Math.max(0, L - Math.round(g * r) - 1);
-  for (let k = 0; k < n; k++){ const u = Math.min(1, k * g / T); P[k] = Math.min(top, Math.max(0, Math.round(L * f(u)))); }
+  const f = OS_RAMP_FN[rp | 0] || OS_RAMP_FN[0], n = Math.ceil(T / g), P = new Int32Array(n);
+  for (let k = 0; k < n; k++){ const len = Math.min(g, T - k * g), top = Math.max(0, L - 1 - Math.floor((len - 1) * r)), u = n > 1 ? k / (n - 1) : 0;   // (the last grain may be short: it still reaches the end)
+    P[k] = Math.min(top, Math.max(0, Math.round(top * f(u)))); }
   return P;
 }
 // st: {bpm, beats, gs (grain seconds), rp (ramp), x (smooth %), pt (pitch, semitones)}
@@ -23685,9 +23689,9 @@ function oldschoolData(d, sr, loop, st){
     for (let i = k ? -xf : 0; i < g + xf; i++){
       const n = s0 + i; if (n >= T) break; if (n < 0) continue;
       const w = !xf || (i >= xf && i < g - xf) ? 1 : i < xf ? (k ? (i + xf) / (2 * xf) : 1) : last ? 1 : (g + xf - i) / (2 * xf);
-      let v;
-      if (r === 1){ const j = p + i; v = j >= 0 && j < L ? d[j] : 0; }
-      else { const pos = p + i * r, j = Math.floor(pos), f = pos - j, a = j >= 0 && j < L ? d[j] : 0, b = j + 1 >= 0 && j + 1 < L ? d[j + 1] : 0; v = a + (b - a) * f; }
+      let v;   // with SMOOTH the fade may reach past the sample's ends: it holds the edge sample there (no zeros, so no click); the hard cut never does
+      if (r === 1){ let j = p + i; if (xf) j = j < 0 ? 0 : j >= L ? L - 1 : j; v = j >= 0 && j < L ? d[j] : 0; }
+      else { let pos = p + i * r; if (xf) pos = pos < 0 ? 0 : pos > L - 1 ? L - 1 : pos; const j = Math.floor(pos), f = pos - j, a = j >= 0 && j < L ? d[j] : 0, b = j + 1 >= 0 && j + 1 < L ? d[j + 1] : 0; v = a + (b - a) * f; }
       o[n] += v * w;
     }
   }
@@ -23746,29 +23750,31 @@ function stretchData(d, sr, loop, st){
 }
 const stKey = st => st ? ':' + st.mode + ':' + st.bpm + ':' + st.beats + ':' + st.grain + (st.sx ? ':sx' + st.sx + ':' + st.gs + ':' + st.rp + ':' + st.x + ':' + st.pt : '') : '';   // (every setting that changes a sample is in the key)
 // Rewrites a note event for a chopped or synced instrument. n: the note typed; semis: the pitch offsets on top of it.
-/* TEMPO WHILE IT MOVES (build 660): a stretch is rendered at the tempo of the first note that needs it, so a TEMPO drag, TAP, Link or MIDI clock
-   would render a new stretch (tens to hundreds of ms on the main thread, much more on a phone) for the next note at every step. The live
-   sequencer therefore uses, for the song's OWN tempo, the last tempo that held still for STQ_QUIET ms (the idea of build 658's lines envelopes):
-   during a drag notes keep playing the stretch they had; once it settles the next note renders the new one, once. While the song plays, a
-   change under STQ_TOL (0.5 percent) is ignored. A TPO value in the song, a preview and every offline render use the exact tempo. */
-const STQ_QUIET = 300, STQ_TOL = 0.005, stq = {bpm:0, seen:0, at:0, last:0};
-function stLiveBpm(b, songB, playing, now){
-  if (b !== songB) return b;   // a TPO command's own tempo: exact
+/* TEMPO WHILE IT MOVES (build 660, OLDSCHOOL only): a stretch is rendered at the tempo of the first note that needs it, so while TEMPO is dragged (TAP,
+   Link, MIDI clock too) every note would render a new one on the main thread. A live OLDSCHOOL note therefore uses the SETTLED tempo and LPB:
+   the song's own, once it has held still for STQ_QUIET ms (counted from the moment it last changed: stqSee stamps it, from every note and from a
+   50 ms timer). The settled values are taken at once at PLAY (a new sequencer), after a song load or undo (a new S), and whenever the tempo has
+   been still for the window. Nothing is ever ignored: after the window the stretch uses the exact tempo. A TPO command's own tempo, previews,
+   offline renders, REPITCH, GRANULAR and LOOP are exact, as on beta. (The general fix is the stretch Worker and cache, plan step 3.) */
+const STQ_QUIET = 300, stq = {bpm:0, lpb:0, sb:0, sl:0, at:0, S:null, seq:null};
+function stqSee(now){ const b = S.bpm, l = S.lpb || 4; if (b !== stq.sb || l !== stq.sl){ stq.sb = b; stq.sl = l; stq.at = now; } }
+function stSettled(now){
   if (now == null) now = performance.now();
-  if (!stq.bpm || now - stq.last > 1000){ stq.bpm = stq.seen = b; stq.at = now; }   // first note, or after a pause: snap
-  else if (b !== stq.seen){ stq.seen = b; stq.at = now; }
-  else if (b !== stq.bpm && now - stq.at >= STQ_QUIET && !(playing && Math.abs(b - stq.bpm) / stq.bpm < STQ_TOL)) stq.bpm = b;
-  stq.last = now; return stq.bpm;
+  const seq = typeof tp !== 'undefined' ? tp.seq : null;
+  if (!stq.bpm || S !== stq.S || seq !== stq.seq){ stq.S = S; stq.seq = seq; stq.sb = stq.bpm = S.bpm; stq.sl = stq.lpb = S.lpb || 4; stq.at = now; }
+  else { stqSee(now); if (now - stq.at >= STQ_QUIET){ stq.bpm = stq.sb; stq.lpb = stq.sl; } }
+  return stq;
 }
 function applyChop(ev, I, pad, n, semis, bpm, data, sr, live){
   const slc = I.slc | 0, sy = I.sync | 0; if (slc < 2 && !sy) return ev;
-  const sb = sy >= 2 && live ? stLiveBpm(bpm, S.bpm, typeof tp !== 'undefined' && !!tp.on) : bpm;   // the tempo the stretch is made at
-  const loop = loopSecs(pad, data, sr), beats = instBeats(I), target = beats * 60 / bpm, tS = beats * 60 / sb;
+  const osy = sy === 3 && (I.sx | 0) === 1, q = osy && live && bpm === S.bpm ? stSettled() : null;   // OLDSCHOOL on the live sequencer: the settled tempo
+  const sb = q ? q.bpm : bpm, lpbS = q ? q.lpb : S.lpb || 4, loop = loopSecs(pad, data, sr), beats = instBeats(I), target = beats * 60 / bpm;
+  const beatsS = q && (I.lines | 0) > 0 ? I.lines / lpbS : beats, tS = beatsS * 60 / sb;
   const sl = ev.slc != null && slc >= 2;   // SLC (owner, 1 Nov): the slice comes from the command, so the note pitches it (C-4 = as it is)
   let rate = Math.pow(2, (semis + (sl ? n - ROOT : 0)) / 12), scale = 1;
   if (sy === 1) rate *= loop / target;
-  if (sy >= 2){ ev.st = {mode:sy, bpm:Math.round(sb * 100) / 100, beats:Math.round(beats * 1e6) / 1e6, grain:I.grain == null ? 1 : I.grain | 0}; scale = tS / loop;
-    if (sy === 3 && (I.sx | 0) === 1){ const lpb = S.lpb || 4; Object.assign(ev.st, {sx:1, gs:Math.round(osGrainSecs(I, sb, lpb) * 1e6) / 1e6, rp:I.orp | 0, x:I.ox | 0, pt:I.opt | 0}); } }
+  if (sy >= 2){ ev.st = {mode:sy, bpm:Math.round(sb * 100) / 100, beats:Math.round(beatsS * 1e6) / 1e6, grain:I.grain == null ? 1 : I.grain | 0}; scale = tS / loop;
+    if (osy){ Object.assign(ev.st, {sx:1, gs:Math.round(osGrainSecs(I, sb, lpbS) * 1e6) / 1e6, rp:I.orp | 0, x:I.ox | 0, pt:I.opt | 0}); } }
   if (slc >= 2 || sy) ev.rate = rate;
   let s0 = 0, s1 = loop;
   if (slc >= 2){ const pts = I.smode && ev.st && ev.st.sx === 1 && ev.st.rp ? Array.from({length:slc}, (_, k) => loop * k / slc) : slicePoints(pad, I, data, sr),   /* OLDSCHOOL with REV / PING / EASE: slices of what you hear (equal parts); HITS belong to the source */
@@ -23847,6 +23853,7 @@ function rtBufPlain(pad, rev){
   }
   return e.b;
 }
+setInterval(() => { try { if (stq.bpm && S === stq.S) stqSee(performance.now()); } catch(e){} }, 50);   // stamps when the tempo or LPB changed (the settle window counts from here)
 function mkLimiter(ac){ const c = ac.createDynamicsCompressor(); c.threshold.value = -2; c.knee.value = 0; c.ratio.value = 20; c.attack.value = 0.002; c.release.value = 0.1; return c; }
 /* The safety limiter (Project → LIMITER, and everything played live on the Synth page): the mastering worklet's brickwall
    limiter on its own — 3 ms lookahead, true-peak, nothing past −1 dBFS. The Web Audio compressor above isn't a limiter:
@@ -37072,7 +37079,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
   [660, '20 Nov', ['New sync mode OLDSCHOOL, the classic sampler stretch: a tiny loop at the sample\u2019s own pitch whose start is scrubbed through the sample by a ramp that lasts the length. LOOP BY (ms, or 1 to 1/32 of a line), RAMP (FWD, REV, PING, EASE), SMOOTH (0 is the hard cut, up to 50% crossfade), PITCH (semitones). Pick it in the SYNC row (EDIT) or in Sync to lines\u2026. GRANULAR and LOOP sound exactly as before. While you drag TEMPO, synced samples keep the stretch they had and the new tempo is rendered once when you stop.']],
-  [659, '20 Nov', ['Sync modes in one list: the SYNC row on INST (press EDIT on it) and the Sync to lines… sheet now pick from the same grouped list (REPITCH; GRANULAR, which is the old STRETCH, and LOOP). REPITCH says what it does: \u201cplays 17.7% slower, 3.4 semitones down\u201d, worked out from the sample\u2019s real length. Nothing you hear changes; old songs are the same.']],
+  [659, '20 Nov', ['Sync modes in one list: the SYNC row on INST (press EDIT on it) and the Sync to lines… sheet now pick from the same grouped list (REPITCH; GRANULAR, which is the old STRETCH, and LOOP). REPITCH says what it does: \u201cplays 17.8% slower, 3.4 semitones down\u201d, worked out from the sample\u2019s real length. Nothing you hear changes; old songs are the same.']],
   [658, '19 Nov', ['Synth page: an envelope\u2019s times can be set in BARS + LINES instead of ms (Amp, Filter, and the Pad amp). A noise swell can now last exactly 1, 2, 4 or 8 bars of the song, at the song\u2019s BPM and LPB, and the pad is made long enough for it. Old sounds are unchanged.']],
   [657, '19 Nov', ['Arrange and Song: double-click (or double-tap) an empty MASTER cell and it gets a new empty block. If that song row has nothing on any visible track and the master is empty, the whole row is filled instead, like a hand-made row: a new empty phrase on every track in MONO / POLY and a new empty block on the master, each with its own number in track order, as one undo step. Not enough free numbers: nothing changes and a message says how many are needed and free (CLEAR UNUSED PHRASES frees some). Tracks beyond MONO / POLY get nothing. A filled master cell still opens its phrase on a double-click; Enter / EDIT on an empty master cell does the same two things.']],
   [656, '19 Nov', ['Settings: FOLLOW sits directly above PHRASE ON STOP and ARRANGE ON STOP, in the View menu and in Settings (the Project screen too). Nothing else about them changed']],

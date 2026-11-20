@@ -5,7 +5,7 @@
 const test = require('node:test'), assert = require('node:assert/strict');
 const H = require('./helpers'), S = require('./sampler-harness'), R = require('./stretch-record');
 const src = H.read('index.html'), J = x => JSON.parse(JSON.stringify(x));
-const E = S.loadSampler(src, 'stretchData, stKey, oldschoolData, osStarts, osGrainSecs, stLiveBpm, stq, STQ_QUIET, SY_PICK, syPut, OS_RAMPS, OS_DIV_NAMES,');
+const E = S.loadSampler(src, 'stretchData, stKey, oldschoolData, osStarts, osGrainSecs, stSettled, stqSee, stq, STQ_QUIET, OS_KEYS, SY_PICK, syPut, OS_RAMPS, OS_DIV_NAMES,');
 const sr = 44100, sine = (hz, secs) => S.sine(hz, sr, secs), L2 = sine(220, 2), srcStep = 0.5 * 2 * Math.PI * 220 / sr;
 const st = (o) => Object.assign({ mode: 3, sx: 1, bpm: 140, beats: 4, grain: 1, gs: 0.012, rp: 0, x: 0, pt: 0 }, o);
 const T = s0 => Math.max(64, Math.round(s0.beats * 60 / s0.bpm * sr));
@@ -43,17 +43,22 @@ test('SMOOTH > 0 (straight-read crossfade): no step beyond the source’s own, a
   const o = render(L2, { x: 50, gs: 0.012 }); assert.ok(Math.abs(o[10]) > 0 && Math.abs(o[0]) < 1e-3);
 });
 
-test('ramps: FWD walks the whole sample start to end, REV end to start, PING there and back, EASE slow at both ends', () => {
-  const Ls = 88200, Tn = 176400, g = 529, r = 1, span = g, top = Ls - span - 1;
-  const f = E.osStarts(Ls, Tn, g, r, 0), v = E.osStarts(Ls, Tn, g, r, 1), p = E.osStarts(Ls, Tn, g, r, 2), e = E.osStarts(Ls, Tn, g, r, 3), tol = Math.ceil(Ls * g / Tn) + 1;
+test('ramps: FWD walks the whole sample start to end (the last grain reads its last sample), REV end to start, PING there and back, EASE slow at both ends', () => {
+  const Ls = 88200, Tn = 176400, g = 529, r = 1, top = Ls - g;
+  const f = E.osStarts(Ls, Tn, g, r, 0), v = E.osStarts(Ls, Tn, g, r, 1), p = E.osStarts(Ls, Tn, g, r, 2), e = E.osStarts(Ls, Tn, g, r, 3);
   assert.equal(f.length, Math.ceil(Tn / g));
-  assert.equal(f[0], 0); assert.ok(top - f[f.length - 1] <= 2 * tol, 'FWD reaches the end of the sample');
-  assert.equal(v[0], top); assert.ok(v[v.length - 1] <= 2 * tol, 'REV reaches the start');
+  assert.equal(f[0], 0); assert.equal(f[f.length - 1], Ls - Math.min(g, Tn - (f.length - 1) * g), 'FWD: the last grain starts so that it reads to the last sample (it may be a short one)'); assert.ok(f[f.length - 2] <= top);
+  assert.equal(v[0], top); assert.equal(v[v.length - 1], 0, 'REV ends at the start');
   for (let k = 1; k < f.length; k++) { assert.ok(f[k] >= f[k - 1]); assert.ok(v[k] <= v[k - 1]); }
-  const peak = Math.max(...p), at = p.indexOf(peak); assert.ok(top - peak <= 2 * tol, 'PING reaches the end of the sample'); assert.ok(Math.abs(at - p.length / 2) < 3, 'in the middle');
-  assert.equal(p[0], 0); assert.ok(p[p.length - 1] <= 2 * tol, 'and comes back to the start');
+  const peak = Math.max(...p), at = p.indexOf(peak); assert.ok(top - peak <= 2 * Math.ceil(top / (p.length - 1)), 'PING reaches the end of the sample (within a grain step)'); assert.ok(Math.abs(at - p.length / 2) < 3, 'in the middle');
+  assert.equal(p[0], 0); assert.equal(p[p.length - 1], 0, 'and comes back to the start');
   for (let k = 1; k <= at; k++) assert.ok(p[k] >= p[k - 1]); for (let k = at + 1; k < p.length; k++) assert.ok(p[k] <= p[k - 1]);
   assert.ok(e[10] < f[10] && e[e.length - 10] > f[f.length - 10], 'EASE: behind FWD at the start, ahead at the end'); assert.ok(e[e.length >> 1] > 0);
+  // in the audio, with a unique-valued source: FWD reads the final sample, REV the first, at every grain size and a long grain
+  for (const gs of [0.0005, 0.012, 0.25]) for (const [rp, want] of [[0, 'last'], [1, 'first']]) {
+    const uniq = Float32Array.from({ length: 30000 }, (_, i) => (i + 1) / 30000), o = render(uniq, { rp, x: 0, gs, bpm: 120, beats: 2 }), seen = new Set(o);
+    assert.ok(seen.has(want === 'last' ? 1 : uniq[0]), `${rp ? 'REV' : 'FWD'} gs ${gs}: the ${want} sample is read`);
+  }
   // and in the audio: a ramp-shaped source read at x = 0 shows the same walk (REV decreasing, PING up then down)
   const rampSrc = Float32Array.from({ length: 44100 }, (_, i) => i / 44100), o = render(rampSrc, { rp: 1, x: 0, gs: 0.012, bpm: 120, beats: 2 }), G = Math.round(0.012 * sr);
   const firsts = []; for (let n = 0; n < o.length; n += G) firsts.push(o[n]);
@@ -103,31 +108,44 @@ test('classic modes carry no OLDSCHOOL fields; OLDSCHOOL puts every setting into
   for (const v of [{ gs: 0.02 }, { rp: 1 }, { rp: 2 }, { rp: 3 }, { x: 10 }, { pt: 3 }, { beats: 5 }]) { const h = A(v); assert.ok(!hs.has(h), 'audio differs for ' + JSON.stringify(v)); hs.add(h); }
 });
 
-test('a tempo or LPB change re-renders (new key); a TEMPO drag does not render at every step', () => {
-  // exact tempo off the live path (previews, offline render): every tempo is its own key
+test('a tempo or LPB change re-renders (new key); the settle (OLDSCHOOL only): the last settled tempo during a drag, the exact one 300 ms after, never ignored', () => {
   assert.notEqual(chop({ sync: 3, sx: 1 }, 120, 8).key, chop({ sync: 3, sx: 1 }, 121, 8).key);
   assert.notEqual(chop({ sync: 3, sx: 0 }, 120, 8).key, chop({ sync: 3, sx: 0 }, 140, 8).key);
-  // a drag: the Settings TEMPO slider commits every 50 ms; the song plays a note every 100 ms for 2 s while it drags 120 to 140, then holds
-  E.stq.bpm = 0; E.stq.seen = 0; E.stq.at = 0; E.stq.last = 0;
-  const keys = []; let t = 10000, bpm = 120;
-  const note = (b) => { keys.push(E.stLiveBpm(b, b, true, t)); };
-  note(bpm); t += 100;
-  for (let i = 0; i < 40; i++) { if (i % 1 === 0) bpm = Math.round((120 + i * 0.5) * 100) / 100; if (i % 2 === 1) note(bpm); t += 50; }   // 40 steps of 50 ms; a note every 100 ms
-  const during = new Set(keys); assert.equal(during.size, 1, 'during the drag every note plays the stretch it had (one key: ' + [...during] + ')');
-  assert.equal([...during][0], 120);
-  for (let i = 0; i < 10; i++) { note(bpm); t += 100; }   // held at 139.5 BPM
-  const after = [...new Set(keys.slice(21))]; assert.deepEqual(after, [120, 139.5], 'after it settles (300 ms) one new tempo, once');
-  assert.ok(keys.indexOf(139.5) * 100 >= 300, 'not before the quiet time');
-  // a TPO command’s own tempo is exact and moves nothing in the lagged one; a pause snaps; while playing a wobble under 0.5% is ignored
-  assert.equal(E.stLiveBpm(150, 139.5, true, t), 150, 'TPO: exact');
-  t += 5000; assert.equal(E.stLiveBpm(100, 100, false, t), 100, 'after a pause: snaps at once');
-  for (let i = 0; i < 20; i++) { t += 100; E.stLiveBpm(100.3, 100.3, true, t); } assert.equal(E.stLiveBpm(100.3, 100.3, true, t + 100), 100, 'playing: a change under 0.5% never re-renders');
-  for (let i = 0; i < 20; i++) { t += 100; E.stLiveBpm(100.3, 100.3, false, t); } assert.equal(E.stLiveBpm(100.3, 100.3, false, t + 100), 100.3, 'stopped: it follows');
-  // through applyChop: live notes use it, the page keeps the exact tempo for REPITCH and for non-live callers
-  E.stq.bpm = 0; E.stLiveBpm(120, 120, true, 50000);
-  const live = chop({ sync: 2 }, 124, 8, true), exact = chop({ sync: 2 }, 124, 8, false);
-  assert.equal(live.ev.st.bpm, 120, 'live: the lagged tempo'); assert.equal(exact.ev.st.bpm, 124, 'preview and offline render: exact');
-  assert.equal(chop({ sync: 1 }, 124, 8, true).ev.st, undefined, 'REPITCH has no stretch and keeps the exact rate');
+  const mk = (bpm, lpb) => { const St = { bpm, lpb: lpb || 8, insts: [] }; E.setKit({ voices: [] }, St); delete E.ctx.tp; return St; };
+  // change, wait: counted from the change (stqSee stamps it), not from the first note that sees it
+  let St = mk(120); assert.equal(E.stSettled(1000).bpm, 120);
+  St.bpm = 130; E.stqSee(1100);
+  assert.equal(E.stSettled(1150).bpm, 120, 'inside the window: the settled tempo'); assert.equal(E.stSettled(1399).bpm, 120);
+  assert.equal(E.stSettled(1401).bpm, 130, 'a note 300 ms after the change, the first to see it: exact'); assert.equal(E.stSettled(2000).bpm, 130);
+  // a drag of 20 changes in 1 s, a note every 100 ms
+  St = mk(120); E.stSettled(5000); const used = [];
+  for (let i = 1; i <= 20; i++) { St.bpm = 120 + i; E.stqSee(5000 + i * 50); if (i % 2 === 0) used.push(E.stSettled(5000 + i * 50 + 10).bpm); }
+  assert.deepEqual([...new Set(used)], [120], 'during the drag every note uses the last settled tempo (one render key)');
+  assert.equal(E.stSettled(6000 + 310).bpm, 140, '300 ms after the drag ends: exact');
+  // 1 BPM at 201 BPM is never ignored
+  St = mk(201); E.stSettled(9000); St.bpm = 202; E.stqSee(9100); assert.equal(E.stSettled(9200).bpm, 201); assert.equal(E.stSettled(9401).bpm, 202, '202 after the window');
+  // LPB is settled the same way
+  St = mk(131, 8); E.stSettled(100); St.lpb = 4; E.stqSee(150); assert.equal(E.stSettled(200).lpb, 8); assert.equal(E.stSettled(460).lpb, 4);
+  // PLAY at once (a new sequencer), a song load, undo / redo (a new song object): settled at once
+  St = mk(120); E.ctx.tp = { on: true, seq: {} }; E.stSettled(20000); St.bpm = 150; E.stqSee(20100);
+  assert.equal(E.stSettled(20110).bpm, 120, 'while playing: the window');
+  E.ctx.tp = { on: true, seq: {} }; assert.equal(E.stSettled(20120).bpm, 150, 'PLAY: a new sequencer takes the song\u2019s tempo at once');
+  St = mk(100); E.stSettled(30000); const St2 = { bpm: 170, lpb: 8, insts: [] }; E.setKit({ voices: [] }, St2); assert.equal(E.stSettled(30010).bpm, 170, 'a song load or undo: a new S, at once');
+  // through applyChop: OLDSCHOOL live uses it; everything else is exact
+  St = mk(120); E.ctx.__cache[0] = { data: L2, sr }; E.stSettled(40000);
+  const live = (I, bpm) => { const ev = { type: 'note', t: 1, rate: 1, ofs: 0, cut: null, slc: null }, I2 = Object.assign({ pad: 0, tsp: 0, slc: 0, smode: 0, beats: 4, grain: 1, ofs: 0 }, I); if (I.sx === 1) E.syPut(I2, 4); E.applyChop(ev, I2, 0, 48, 0, bpm, L2, sr, true); return ev; };
+  St.bpm = 124; E.stqSee(40100);
+  assert.equal(live({ sync: 3, sx: 1 }, 124).st.bpm, 120, 'OLDSCHOOL, live, inside the window: the settled tempo');
+  for (const I of [{ sync: 2 }, { sync: 3 }]) assert.equal(live(I, 124).st.bpm, 124, 'GRANULAR and LOOP are exact, as on beta');
+  assert.equal(live({ sync: 3, sx: 1 }, 150).st.bpm, 150, 'a TPO command\u2019s tempo (not the song\u2019s): exact');
+  assert.equal(live({ sync: 1 }, 124).rate, Math.pow(2, 0) * E.loopSecs(0, L2, sr) / (4 * 60 / 124), 'REPITCH: exact rate');
+  const off = chop({ sync: 3, sx: 1 }, 124, 8, false); assert.equal(off.ev.st.bpm, 124, 'preview and offline render: exact');
+});
+
+test('classic modes are bit-identical to build 658 while the tempo changes (live notes, tempo moved between notes)', () => {
+  const before = JSON.parse(H.read('tests/fixtures/stretch-before-659.json'));
+  const live = R.record(src, { live: true });   // the matrix changes bpm and LPB from case to case: every note is a changed tempo
+  assert.deepEqual(live.chop, before.chop);
 });
 
 test('slices of OLDSCHOOL: equal parts of what you hear for REV / PING / EASE, even with SLICE BY HITS; FWD keeps the hit points', () => {
@@ -136,6 +154,32 @@ test('slices of OLDSCHOOL: equal parts of what you hear for REV / PING / EASE, e
   // note C-4 = slice 0: starts at 0 and lasts a quarter of the length when the slices are equal
   assert.equal(rev.ofsSec, 0); assert.ok(Math.abs(rev.durSec - 2 / 4) < 1e-9, 'a quarter of the 2 s length: ' + rev.durSec);
   assert.ok(fwd.durSec > 0);
+});
+
+test('SMOOTH never clicks harder than the hard cut: FWD / REV / PING / EASE x LOOP 0.5 to 250 ms x SMOOTH 5 / 20 / 50 percent x pitch, on a sine, a ramp and noise; the ends hold the edge sample', () => {
+  let s = 7; const rnd = () => { s = (Math.imul(s, 1664525) + 1013904223) >>> 0; return s / 4294967296 * 2 - 1; };
+  const srcs = { sine: sine(220, 1.5), ramp: Float32Array.from({ length: 66150 }, (_, i) => 0.8 * (i / 66150 * 2 - 1)), noise: Float32Array.from({ length: 66150 }, () => 0.5 * rnd()), loud: Float32Array.from({ length: 66150 }, (_, i) => 0.8 * Math.sin(i * 0.02)) };
+  const maxStep = o => { let m = 0; for (let n = 1; n < o.length; n++) { const d = Math.abs(o[n] - o[n - 1]); if (d > m) m = d; } return m; };
+  let cases = 0, worst = 0;
+  for (const k in srcs) for (const rp of [0, 1, 2, 3]) for (const gs of [0.0005, 0.003, 0.012, 0.05, 0.25]) for (const pt of [0, 7]) {
+    const base = { gs, rp, pt, bpm: 120, beats: 3 }, hard = maxStep(render(srcs[k], Object.assign({ x: 0 }, base)));
+    for (const x of [5, 20, 50]) { const o = render(srcs[k], Object.assign({ x }, base)), m = maxStep(o); cases++;
+      worst = Math.max(worst, m / (hard || 1)); assert.ok(m <= hard * 1.0001 + 1e-6, `${k} ramp ${rp} gs ${gs} +${pt} x ${x}%: step ${m.toFixed(4)} > the hard cut's ${hard.toFixed(4)}`); }
+  }
+  assert.equal(cases, 4 * 4 * 5 * 2 * 3);
+  // the end of a FWD render of a loud sine: no click (it used to read zeros past the sample)
+  const o = render(srcs.loud, { x: 50, gs: 0.012, rp: 0, bpm: 120, beats: 2 }), tail = o.subarray(o.length - 2000); assert.ok(maxStep(tail) < 0.05, 'the last 2000 samples: max step ' + maxStep(tail));
+});
+
+test('a corrupt PERFORM part (OLDSCHOOL settings of any kind) normalises: finite render, clamped values; parts without them are kept as they were', () => {
+  const fn = src.match(/function normParts\(j\)\{[\s\S]*?\n\}\n/)[0], PERF = 'const PERF_PARTS = 8; ';
+  const norm = new Function('sxLoad', 'SY_PICK', 'OS_KEYS', PERF + fn + '; return normParts;')(...(g => [g.sxLoad, g.SY_PICK, g.OS_KEYS])(require('vm').runInContext('({sxLoad, SY_PICK, OS_KEYS})', E.ctx)));
+  const bad = { pad: 0, sync: 3, sx: 1, og: 'x', ou: 99, orp: -4, ox: 1e9, opt: 1e9 }, plain = { pad: 1, sync: 2, grain: 3, beats: 4 };
+  const parts = norm([{ n: 'a', insts: [bad, plain, null, 5], mix: [], fx: {} }]), I = parts[0].insts;
+  assert.deepEqual(J([I[0].sync, I[0].sx, I[0].og, I[0].ou, I[0].orp, I[0].ox, I[0].opt]), [3, 1, 12, 6, 0, 50, 24]);
+  assert.deepEqual(J(I[1]), plain); assert.equal(I[2], null); assert.equal(I[3], 5);
+  const nul = norm([{ insts: [{ sync: 3, sx: 1, og: null }] }])[0].insts[0]; assert.equal(nul.og, 12, 'null is the default, not 0.5 ms');
+  const o = E.stretchData(L2, sr, 2, st({ gs: E.osGrainSecs(I[0], 120, 8), rp: I[0].orp, x: I[0].ox, pt: I[0].opt })); for (const v of o) assert.ok(Number.isFinite(v));
 });
 
 test('speed and the honest note', () => {
