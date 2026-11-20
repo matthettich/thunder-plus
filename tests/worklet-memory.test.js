@@ -4,7 +4,7 @@
 // 90ab6b8, read with `git show`) and as it is now, and asserts every output sample is bit-identical.
 // SECOND PASS (build 563, per-block garbage in the chains / waves hosts and modules, rvMix, __tcOv, the pump synth's `at`, Flex's
 // closures): the same, against build 562 (commit b0cb7cc), at the bottom of this file: chains modules and host, waves engine, the pump
-// synth with MOD targets, __tcOv's result, FlexCore / StepGateCore (every pattern), plus counts: a steady block makes no typed array.
+// synth with MOD targets, __tcOv's result, (FlexCore / StepGateCore: now tests/flex-golden.test.js), plus counts: a steady block makes no typed array.
 'use strict';
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
@@ -292,27 +292,7 @@ test('__tcOv: the override result is the same numbers every block as build 562, 
   const n2 = tcOvRun(H.read('core/seq-core.js'), 256); assert.equal(n2.seen[0].length, 256);
 });
 
-// ---- Flex (every pattern, with its filters, crush and the per-sample tables) and Step gate, from index.html
-function fxCores(html) {
-  const cut = re => { const m = html.match(re); assert.ok(m, 'cut ' + re); return m[0]; };
-  return new Function(cut(/function clkSpb\(o, bp, n\)\{[\s\S]*?\n\}\n/) + cut(/class FlexCore \{[\s\S]*?\n\}\n/) + cut(/class StepGateCore \{[\s\S]*?\n\}\n/) + 'return {FlexCore, StepGateCore};')();
-}
-function runFlex(C, kind, k, blocks = 22) {
-  const sr = 48000, f = kind === 'flex' ? new C.FlexCore(sr) : new C.StepGateCore(sr), out = [];
-  const dp = kind === 'flex' ? { pat: k, mix: 1, xf: 5, wait: false } : { pat: k, m1: 0xA5, m2: 0x5A, div: k % 5, len: .6, depth: 1, smooth: 3, wait: false };
-  for (let b = 0; b < blocks; b++) {
-    const L = new Float32Array(128), R = new Float32Array(128); for (let i = 0; i < 128; i++) { L[i] = SIG[b * 128 + i]; R[i] = SIG[(b + 3) * 128 + i]; }
-    const bp = Float32Array.from({ length: 128 }, (_, i) => ((b * 128 + i) * 0.009) % 16);
-    f.process(L, R, 128, dp, { bp, flx: -1, gat: -1, sw: -1 }); out.push(L, R);
-  }
-  return out;
-}
-test('FlexCore (all 511 patterns) and StepGateCore (all patterns) render bit-identically to build 562', { skip: skip2 || !OLD.html && 'no base' }, () => {
-  const O = fxCores(OLD.html), N = fxCores(H.read('index.html')); let nz = 0;
-  for (let k = 1; k < 512; k++) { const a = runFlex(O, 'flex', k), b = runFlex(N, 'flex', k); for (let i = 0; i < a.length; i++) { bitsEqual(a[i], b[i], 'flex ' + k); } for (const x of b) nz += energy(x) > 0 ? 1 : 0; }
-  for (let k = 0; k < 16; k++) { const a = runFlex(O, 'gate', k), b = runFlex(N, 'gate', k); for (let i = 0; i < a.length; i++) bitsEqual(a[i], b[i], 'step gate ' + k); }
-  assert.ok(nz > 1000, 'the patterns must sound');
-});
+// FlexCore / StepGateCore: tests/flex-golden.test.js (a committed golden; it replaced the comparison with build 562 here, which skipped in CI and went stale at build 647)
 test('rvMix: with a scratch array the same pair and no new array; without it a fresh pair as before', () => {
   const B = load(H.read('index.html')).ctx, A = OLD.html && load(OLD.html).ctx, o = [0, 0];
   for (const m of [-.5, 0, .1, .25, .5, .77, 1, 1.5]) { const f = [...B.rvMix(m)], g = B.rvMix(m, o); assert.equal(g, o); assert.deepEqual([...g], f); if (A) assert.deepEqual(f, [...A.rvMix(m)]); }
