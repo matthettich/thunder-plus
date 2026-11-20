@@ -28,6 +28,16 @@ plan; sections 1 to 4 and 9), `HANDOVER.md` on `beta` (the web app, the owner's 
 ## START HERE (19 Nov, 17:00): the state for a new chat. The dated sections below are the history, newest first after this one.
 **Say to a new chat:** "Pull thunder-plus, branch native, and continue from docs/port/PICKUP.md. Start at START HERE (19 Nov, 17:00)."
 
+**UPDATE 19 Nov, 20:25 (a later chat; if that chat is gone, its workers are gone too: only what is pushed exists):**
+- **PR #246 `n1/u34b` (U34b stems) is OPEN, not merged.** The lead read the core diff (sound). An independent verifier was running; its report, if it
+  got that far, is `docs/port/reviews/verify-246.md` on `review/verify-246`. No report there: send a new verifier, then merge when it and CI are clean.
+- **`n1/followups-19nov` (queue item 1) was being built** (notes: `docs/port/FOLLOWUPS-19NOV-NOTES.md` on that branch). No PR yet at 20:25.
+- **The live routes (queue item 2) are designed and ruled:** `docs/port/LIVE-ROUTE-DESIGN.md` and `LIVE-ROUTE-NOTES.md` on `n1/live-route`. A worker was
+  building step 1: the decision-log golden, PR A `n1/players` (the `Players` move, no behaviour change), PR B on `n1/live-route` (LivePool: bass, vox,
+  acid, mach). Continue from the checklist at the top of LIVE-ROUTE-NOTES.md with a new Sonnet worker briefed from the design's last section.
+- Told to the owner as suspected "Audio thread" web bugs (from the code, not by ear): CUT / RES ignored on nine live engines, a WOB command on an
+  empty row ignored, a slide cut by the next note stops gliding. The native port follows the page's player for all three.
+
 **Nothing is running and no PR of ours is open** (#225 `n1/repin-pump` stays open, waiting on pump). Weekly usage was at 90% at 12:45.
 
 **Merged into `native` on 19 Nov (each verified by an independent Sonnet verifier; reports on the `review/verify-*` branches):**
