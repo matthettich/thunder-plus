@@ -1,6 +1,6 @@
 # verify-260: PR #260 `n1/players` (Players: dispatch and the pools behind one class)
 
-Verifier: independent (did not build it). PR head `cd15eaa5`, base `origin/native` `6fd16ea9`. Status: IN PROGRESS (items 1 to 3 done; 4 to 7 below as they finish).
+Verifier: independent (did not build it). PR head `cd15eaa5`, base `origin/native` `6fd16ea9`. Status: items 1 to 5, 7 done; item 6 full Release ctest still running (see section 6).
 
 ## 1. It is a move and nothing else: CONFIRMED (no behavioural difference; structural differences listed)
 
@@ -49,6 +49,43 @@ Use-after-free test (`/tmp/bid/p1.cpp`, ASan + UBSan build of the PR head): cons
 
 Contract that remains (pre-existing, documented in `players.h` and `sf_live.h`): voices borrow the pad sample memory / SoundFont PCM / variation data (the `VoiceBuf` and `PresetPcm` pointers), not the `RenderPads` struct, so the sample memory and PCM must outlive the voices that play them; `setPads` is safe only for a new `RenderPads` that points at the same live sample memory. A variation buffer (`RenderVar::data`) is in `RenderPads::var`, so freeing pads A while a MUT/GEN voice from it still sounds would be a use-after-free: worth one line in the future live-host plan.
 
-## 4 to 7
+## 4. Real-time rules unchanged: CONFIRMED
 
-(in progress)
+- `players.cpp` / `players.h`: no `new`, `std::vector`, `std::function`, mutex, `printf`, file call; no `virtual` anywhere in `Players`. `dispatch` / `note` / `capPoly` / `takeAll` are the old code. `Players::render` / `setTime` forward to the same `VoicePool::render` / `SfPool::render` calls once per 128-frame quantum; the per-sample loops are inside the pools and untouched. The only new run-time cost is one direct (non-virtual, cross-file, so not inlined) call per event and per quantum plus one pointer hop.
+- `rt_harness` (ctest `rt_core`, `rt_guard_selftest`): pass in Release and under ASan + UBSan. The whole-song case (ELECTRO, 1792 steps, 1823 notes played, 20 mixer events, 4.9 M frames, peak 21 voices) reports "no allocation" under the allocation guard on the PR head; the SoundFont pool case in that harness passes too.
+- `sizeof(Players)` = 3648; `sizeof(SongRenderer)` 36048 (base) -> 32464 (PR); `sizeof(VoicePool)` 1280, `sizeof(sf::SfPool)` 2296, `sizeof(PlayerStats)` 52, `RenderStats` 160 both.
+
+## 5. Lifetime and order: CONFIRMED
+
+- Members of `SongRenderer` in declaration order: `seq_`, `players_` (was `pool_`, `sfpool_`), `mix_`, then `evs_`, `step_`, `scratch_`, `q_`. The pools were between `seq_` and `mix_` before and the `Players` that now holds them sits in the same slot, so construction and destruction order against the mixer is as before (inside `Players`: `pool_` then `sfpool_`, destroyed `sfpool_` then `pool_`, as the old members). Nothing in `~SongRenderer` depends on the pools outliving the mixer or the reverse (it is `= default`, defined in `render.cpp`, where `Players` is complete).
+- `seq.arp(e)` is read inside the same `Players::dispatch` / `note` call that gets the event, passed to `pool_.mod / note` and `sfpool_.mod / note`; the event loop in `quantum()` still dispatches all `k` events of one `step()` before the next `step()` (`for i<k: dispatch(evs_[i]); players_->samplePeak();`), so the borrowed `arpPool_` pointer is used before the next `step()` exactly as before. `seq.bpm()` is read at call time as before.
+
+## 6. Tests and CI
+
+- Sanitizer build (`-DTHUNDER_SANITIZE=ON`, ASan + UBSan, UB fatal) of the PR head: `render_api`, `render_api_hostile`, `render_api_fix`, `render_dispatch`, `render_chop`, `render_var`, `render_sf`, `render_c`, `hostile`, `rt_core`, `rt_guard_selftest`: 11 of 11 pass. The P1 test above is clean under it too.
+- Release: the same 11 pass (section 2). Full Release ctest: see the end of this file.
+- CI on `cd15eaa5` (`gh api .../check-runs`): Core (Android arm64-v8a, NDK) success; Core (wasm, wasi-sdk) success; Core (macOS universal) success; Core (Windows x64, MSVC) success; Core (Linux, GCC) success; Core (Linux, clang) success; Android shell v0 success; `test` success; CodeRabbit and "Attach the APK" skipped; Core (Linux, sanitizers) cancelled at the 60-minute limit (22:32 to 15:31 UTC; the known problem fixed by PR #247, not this PR's: I ran the same sanitizer tests above and they pass).
+
+## 7. Mutations by hand
+
+I did not edit the PR worktree: each mutant was a modified copy of `players.cpp` compiled with the build's flags into a copy of `libthunder_core.a`, the 10 test programs (`test_render_dispatch`, `test_render_chop`, `test_render_var`, `test_render_c`, `test_render_sf`, `test_render_api`, `test_render_api_fix`, `test_render_api_hostile`, `test_hostile`, `rt_harness`) relinked and run, and the bit-identity harness run against it on 120 random songs (60 from seed 1000, 60 from seed 300) and compared with base. Scripts: `/tmp/mut/` (not committed).
+
+| Mutant | Caught by | Bit-identity harness vs base |
+| --- | --- | --- |
+| SF route: `pool_.take` moved before `capPoly` | none | identical (not observable) |
+| sampler route: `sfpool_.take` moved before `capPoly` | none | identical |
+| `takeAll`: `sfpool_.take` before `pool_.take` | none | identical |
+| SF route: `capPoly(e)` skipped | `render_sf`: line 376 "poly: four sampler notes then an SF note: the oldest sampler note rings on", 379 | 9 renders differ |
+| sampler route: `capPoly` skipped | `render_sf` line 371 "poly: four SF notes then a sampler note: the oldest SF note rings on" | 9 differ |
+| SF route: `pool_.take` replaced by `sfpool_.take` (wrong pool) | `render_sf` line 316 "sampler then sf" | 77 differ |
+| SF route: the note goes to `pool_.note` instead of `sfpool_.note` | `render_sf` (41 checks, first line 282) | 133 differ |
+| `capPoly`: serial stamped differently (`pool_` gets `s + 1`) | `render_sf` line 379 "poly: mixed ages" | 3 differ |
+| `OFF` no longer forwarded to `sfpool_` | `render_sf` (line 282, 284) | 42 differ |
+
+Findings about the test suite (not blockers for a pure move):
+1. Three order swaps survive every test and also the 120-song fuzz and are probably equivalent (the two pools are independent, and a take before the cap does not change which voices the cap finds when the track is poly). If the swaps matter, nothing would catch them: `pool_.take` / `capPoly` order, `sfpool_.take` / `capPoly` order, `takeAll` order.
+2. Every other mutant is caught by `render_sf` only. `render_dispatch`, `render_api*`, `render_var`, `render_chop`, `hostile` and `rt_core` do not exercise the poly cap and takeover across the two pools; if `render_sf` is skipped or slow-gated in some CI job, this code is unguarded.
+
+## Verdict
+
+(see below)
