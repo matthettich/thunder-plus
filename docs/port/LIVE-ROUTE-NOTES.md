@@ -1,4 +1,9 @@
-**IN THE MIDDLE OF: part 1 (the JS table) and part 2 (proposals) are written from a read-only pass; nothing is built, nothing was run (no C++, no builds, no Node); waiting for the lead's rulings before step 1.**
+**IN THE MIDDLE OF: BUILD step 1. Checklist (updated every commit):**
+- [x] 1a `native/tools/live-route-dump.mjs` + `native/tests/golden/live_route_log.json` / `live_route_golden.inc` (gate L10(f); 16 cases; `--check` passes). Runs `core/seq-core.js` (= `core-processor.js` + the page's declarations; core-processor.js alone lacks `NT`).
+- [ ] 2 PR A `n1/players` (worktree `/home/claude/wt/players`): the `Players` move, no behaviour change
+- [ ] 3 PR B: reset/seek, LivePool (mono, vox), timeline + L5, run-ahead L4, tempo, wob, gain/pan/bends, off/mod/stp/stopAll, poly cap, C4, stats L8, set_pad_live, gates L10 (a)-(f) + mutants, then `eng` last
+- Choices for the lead: (none yet)
+
 
 # LIVE-ROUTE NOTES (worker, 19 Nov 2026), branch `n1/live-route`
 
