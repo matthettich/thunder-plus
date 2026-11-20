@@ -56,6 +56,7 @@ const PIECES = [
   ['mstLatency', /const mstLatency = [^\n]*\n/],
   ['pumpChainLatency', /const pumpChainLatency = [^\n]*\n/],
   ['NM_LEN', /const NM_LEN = [^\n]*\n/],
+  ['pvHoldN', /let pvHoldN = 0;/],
   ['nmValid', /function nmValid\(b\)\{[\s\S]*?\n  return true; \}\n/],
 ];
 const code = Object.fromEntries(PIECES.map(([n, re]) => [n, cut(re, n)]));
@@ -74,6 +75,7 @@ const COPIES = [
   ['cable change', "const was = midiOut(p); moRelease(); if (was && mx.clk.on && midi.clk[p]) try { was.send([0xFC]); } catch(err){}"],
   ['preview: a held key', "const mt = hold && !when ? p2a(performance.now() + mLatOf(portOf(I)) + 1) : t;"],
   ['preview: the MIDI note', "const nid = moNote(Object.assign({}, ev, {t:mt, poly:true, cap:hold ? 16 : 4, mn:note + I.tsp + 12, vel:vol >= 0 ? vol / 255 : 1, rel:hold ? null : t + 0.3}), I);"],
+  ['preview: the live key column naming (pvHoldN, a counter that never goes down)', "col = hold ? 'h' + (++pvHoldN) : undefined"],
   ['previewOff', "if (h.nid != null) offNote(NT, h.nid, at ? t : p2a(performance.now() + mLatOf(h.p) + 1));"],
 ];
 for (const [n, s] of COPIES) if (!html.includes(s)) die(`the app's code moved: the harness copies a line of index.html ("${n}") that is no longer there verbatim. Update tools/midi-ledger.mjs.`);
@@ -148,7 +150,7 @@ function cableChange(p, id){ const was = midiOut(p); moRelease(); if (was && mx.
   midi.outIds[p] = id; if (mx.clk.on && midi.clk[p]) clkJoin(p); }
 // COPY of preview() / previewOff() (index.html:24184-24202) for a held key on a MIDI instrument: the calls into moNote / offNote only
 var HELD = new Map();
-function keyOn(ii, note, vol){ const I = S.insts[ii], t = ctx.currentTime + 0.005, col = 'h' + (HELD.size + 1);
+function keyOn(ii, note, vol){ const I = S.insts[ii], t = ctx.currentTime + 0.005, col = 'h' + (++pvHoldN);   /* the app's own counter (index.html pvHoldN, cut out above): the column is never reused */
   const ev = {type: 'note', t, track: NT, poly: true, col, pad: I.pad, rate: 1, gain: 1, pan: I.pan, ofs: I.ofs, rev: false, cut: null, slide: null, rel: null};
   const mt = p2a(performance.now() + mLatOf(portOf(I)) + 1);
   const nid = moNote(Object.assign({}, ev, {t: mt, poly: true, cap: 16, mn: note + I.tsp + 12, vel: vol >= 0 ? vol / 255 : 1, rel: null}), I);

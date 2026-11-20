@@ -134,26 +134,6 @@
    "why": "a silent note (vol 00) ends the mono note that was sounding at its own time (web: at the next note, 125 ms later)"
   },
   {
-   "case": "panic-keys",
-   "B": "B11",
-   "op": "drop",
-   "p": 0,
-   "ms": 1004,
-   "bytes": "844000",
-   "count": 1,
-   "why": "NEW (found while building): the web names a live key's column 'h' + (held keys + 1), so a key after a key-up gets the column of a key still held and ends it. Native keys have their own column"
-  },
-  {
-   "case": "panic-keys",
-   "B": "B11",
-   "op": "add",
-   "p": 0,
-   "ms": 1300,
-   "bytes": "844000",
-   "count": 1,
-   "why": "consequence: that key is still sounding at PANIC, which ends it (with the All Notes Off, as before)"
-  },
-  {
    "case": "start-stop",
    "B": "B9",
    "op": "drop",

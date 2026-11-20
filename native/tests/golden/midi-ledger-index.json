@@ -417,8 +417,8 @@
    "case": "panic-keys",
    "mode": "native",
    "msgs": 55,
-   "bytes": 4735,
-   "sha256": "52fdac776d50c5c2c7a0bbf06cb96ae5f9ca1da546eb10ccb0b59acd9201d116",
+   "bytes": 4737,
+   "sha256": "ba22963056de49cf4ba1d2f8a7c69c0c0d978fcdd3f9b57d40f2d9004e7b7927",
    "counts": {
     "on": 3,
     "off": 3,
@@ -431,8 +431,8 @@
    "case": "panic-keys",
    "mode": "web",
    "msgs": 55,
-   "bytes": 4681,
-   "sha256": "46cb40d71eba0fa02b78406252e06c0b30bdfeb08fd248341e21cdd9d968da4e",
+   "bytes": 4683,
+   "sha256": "60a6d5d7b14762a5e7c2d8a472dee50ec851e2f40a36324f9997a2c2cc881f9f",
    "counts": {
     "on": 3,
     "off": 3,

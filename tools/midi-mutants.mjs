@@ -75,7 +75,7 @@ const M = [
   ['B9a', 'an OFF for a note whose ON was never sent', 'if (cnt_[idx] == 0) { st_.offsSuppressed++; return; }', ''],
   ['B9b', 'release sends an OFF for a note not yet on', 'if (conn_[p] && onFrame_[idx] <= nf) {', 'if (conn_[p]) {'],
   ['B9c', 'release does not end a sounding note (relies on CC 123)', 'if (cnt_[idx] > 0) { if (conn_[p]', 'if (false) { if (conn_[p]'],
-  ['B11', 'live keys share one column', 'e.col = keyCol_++;', 'e.col = 1000;'],
+  ['R-M32b', 'live keys share one column (the web names them with a counter that never goes down)', 'e.col = keyCol_++;', 'e.col = 1000;'],
 ];
 
 if (args.includes('--list')) { for (const [id, what] of M) console.log(id.padEnd(10), what); process.exit(0); }
