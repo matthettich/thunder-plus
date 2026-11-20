@@ -18,6 +18,8 @@ device, so it runs in about 15 seconds.
 | `mono-poly-counts.test.js` | MONO / POLY track counts, stage 1 (`docs/MONO-POLY-PLAN.md`): `S.nmono` / `S.hmono`, `ntrPlan` / `ntrPerm` (the old songs renumber exactly as before), hidden tracks keeping their kind, `trackHolds`, `tracksHiddenBy`, the refuse rule, `setTracks` / `setNtr`, load / save, undo |
 | `gain-staging.test.js` | the 27 Oct gain staging (`docs/GAIN-STAGING.md`): TRIM's scale, `applyMix` (TRIM, VOL, the PRE tap with mute and solo), the CHN crossfade's ramps and node lifetimes, `busPlan().pre`, and source guards for the per-track graph, the master OUT (live and in renders), the Mixer rows and the song file |
 
+| `reset-track.test.js` | Reset track (build 650, `docs/RESET-TRACK-NOTES.md`): `resetTrackData` on ELECTRO and a shared-block song with the real `makeSeq` (other tracks' events unchanged), one undo step, mixer / effects / CHN / PERFORM / parts defaults, which track on which screen, the key mapping (Mac and not), text fields, menu rows; opt-in real-page run |
+
 `tests/sweep/` holds slower headless-Chrome sweeps (every engine, preset and effect through the app itself), not run by
 `npm test`: see `tests/sweep/README.md`.
 

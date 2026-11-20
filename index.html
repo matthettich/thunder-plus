@@ -3640,6 +3640,7 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
         <dt>Ctrl/⌘+Shift+Enter · Ctrl/⌘+Shift+Backspace</dt><dd>on the Song: insert · remove a whole song row, every track and the master (the selected rows, if any)</dd>
         <dt>Ctrl/⌘ S</dt><dd>save · Shift+Ctrl/⌘+S save as · Ctrl/⌘+O open · Ctrl/⌘+N new project</dd>
         <dt>Ctrl/⌘ T</dt><dd>a new, empty phrase on the nearest empty track to the right, on the song row you're on (Song, Sect, Phrase)</dd>
+        <dt>Ctrl/⌘+Shift+T</dt><dd>reset the track you're on, as deleting a track in Renoise does but the track stays in its place: its notes and commands on every song row, its mixer strip (level, trim, pan, mute, solo, name, colour), its effects and CHN go back to a new song's. Blocks and phrases another track also plays stay as they are. One undo step (Ctrl/⌘+Z brings it all back). In a browser tab the browser may take this key (reopen closed tab): use Edit ▾ → Track → Reset this track, or on a phone File → Edit → Reset this track. Works in the desktop app</dd>
         <dt>Ctrl/⌘ Z Y</dt><dd>undo, redo (Shift+Ctrl/⌘+Z redo too)</dd>
         <dt>Shift+Alt arrows</dt><dd>as PAD mode's ALT+arrows: in a phrase, the phrase above / below / left / right on the Song grid; on the Song, the next block that way</dd>
         <dt>[ ]</dt><dd>previous / next sect, phrase or instrument, by number</dd>
@@ -15403,7 +15404,7 @@ function fileItems(){
   return [
     // MENUS (owner, 31 Oct: things in the right place): with the Edit menu on screen, Undo / Redo and Phrases… are there
     // only; a phone has no Edit menu, so they stay here
-    ...(ed ? [] : [{h:'Edit'}, {l:'Undo', k:K('mod+Z'), f:() => undoStep(-1), off:!undo.past.length && !vUndo.t.some(Boolean)}, {l:'Redo', k:K('mod+shift+Z'), f:() => undoStep(1), off:!undo.future.length}, {l:'Phrases… (find ones not on the song)', f:() => phlOpen(true)}]),
+    ...(ed ? [] : [{h:'Edit'}, {l:'Undo', k:K('mod+Z'), f:() => undoStep(-1), off:!undo.past.length && !vUndo.t.some(Boolean)}, {l:'Redo', k:K('mod+shift+Z'), f:() => undoStep(1), off:!undo.future.length}, {l:'Phrases… (find ones not on the song)', f:() => phlOpen(true)}, {l:'Reset this track (notes, mixer and effects; undo brings it back)', f:resetTrackHere, off:view !== 'tracker'}]),   /* RESET TRACK (19 Nov): a phone has no Edit menu and no Ctrl/⌘+Shift+T */
     ...(isMobile() && !mqUnfolded.matches ? [{h:'Record'}, {l:'REC: ' + (rec.cnt > 0 ? 'counting in…' : rec.on ? 'ON · tap to turn off' : 'OFF · tap to turn on'), f:() => setRec(!rec.on)}] : []),   /* the folded phone's header has no REC button (build 631): the same setRec, and its state */
     {h:'Project'},
     {l:'New project', k:K('mod+N'), f:newSong, ask:'song'},
@@ -21140,6 +21141,89 @@ async function nameTrack(t){
 }
 // The track the Edit menu's "Name this track…" means: the song cursor's (not the master) or the screen's track.
 const nameTrackHere = () => nameTrack(tv === 'song' ? (cs.song.x === MT ? MT : cs.song.x) : tv === 'phrase' && cTrack === MT ? MT : dkTrack());
+/* RESET TRACK (owner, 19 Nov, build 650: "Can we make command+shift+t clear everything on a track the same way Renoise does?" … "I think Renoise deletes the track,
+   which would essentially be" a full reset). One action, one undo step, for the track under the cursor (resetTrackFocus): every place the track plays in the song
+   becomes empty, its mixer strip goes back to a new song's (level, TRIM, pan, mute, solo, name, colour), its effect slots are emptied, CHN goes off, and what PERFORM and the
+   parts hold for the track goes. The track stays where it is (the other tracks do not move) and the instruments, the kit, MONO / POLY and the …chains patch are not touched.
+   Blocks and phrases are one pool shared by every track (NPH): a block only this track played is freed, as CLEAR UNUSED PHRASES frees them; a block (or phrase) another
+   track, the master column or another block still reaches is left as it is, and only this track's cells stop pointing at it. docs/RESET-TRACK-NOTES.md has the whole inventory.
+   resetTrackData() is pure on a song object (the tests run it on real songs); resetTrack() adds what the live app needs. To remove: this block, the 'treset' menu rows, the key line. */
+const TRK_SCREENS = ['song', 'sect', 'phrase', 'mixer', 'fx', 'mod'];   // the screens whose cursor names a track (INST and PROJECT do not)
+function resetTrackData(Sx, t, o = {}){
+  const r = {changed:false, cells:0, blocksFreed:[], blocksShared:[], phrasesFreed:[], phrasesShared:[], mix:false, fx:0, chn:false, chnKept:false, blockMutes:0, perf:0, parts:0};
+  if (!Sx || !Sx.song || !(t >= 0 && t < NT)) return r;
+  // 1 · the song cells of this track (every row); the block mutes of its cells
+  const mine = new Set();
+  for (const row of Sx.song) if (row && row[t] >= 0){ mine.add(row[t]); row[t] = -1; r.cells++; r.changed = true; }
+  if (Sx.smute && t < 32) for (let y = 0; y < Sx.smute.length; y++) if ((Sx.smute[y] >> t) & 1){ Sx.smute[y] &= ~(1 << t); r.blockMutes++; r.changed = true; }
+  if (Sx.smuteX && t >= 32){ const k = (t - 32) >> 5, b = 1 << ((t - 32) & 31);
+    for (let y = 0; y < Sx.smuteX.length; y++){ const w = Sx.smuteX[y]; if (w && (w[k] & b)){ w[k] &= ~b; if (!w.some(Boolean)) Sx.smuteX[y] = null; r.blockMutes++; r.changed = true; } }
+    if (!Sx.smuteX.some(Boolean)) delete Sx.smuteX; }
+  // 2 · blocks and phrases: only what nothing else reaches is freed
+  const usedC = new Set(); for (const row of Sx.song) if (row) for (let u = 0; u <= MT; u++) if (row[u] >= 0) usedC.add(row[u]);   // the master column counts
+  const freeC = new Set(); for (const b of mine) if (usedC.has(b)) r.blocksShared.push(b); else freeC.add(b);
+  const usedP = new Set(), candP = new Set();
+  for (let v = 0; v < Sx.chains.length; v++){ const c = Sx.chains[v]; if (!c) continue;   // a block off the song counts too: it may be unfinished work
+    for (const q of c) if (q && q[0] >= 0){ (freeC.has(v) ? candP : usedP).add(q[0]); } }
+  for (const p of candP) if (usedP.has(p)) r.phrasesShared.push(p); else r.phrasesFreed.push(p);
+  for (const b of freeC){ if (Sx.chains[b]) r.changed = true; Sx.chains[b] = null; if (Sx.bcol && b in Sx.bcol){ delete Sx.bcol[b]; r.changed = true; } r.blocksFreed.push(b); }
+  for (const p of r.phrasesFreed){ if (Sx.phrases[p]) r.changed = true; Sx.phrases[p] = null; if (Sx.plen) Sx.plen[p] = Sx.dlen || 16; if (Sx.plpb) Sx.plpb[p] = 0; }
+  // 3 · the mixer strip, as a new song has it
+  const m = Sx.mix && Sx.mix[t], d = freshMix();
+  if (m) for (const k in d) if (m[k] !== d[k]){ m[k] = d[k]; r.mix = true; r.changed = true; }
+  // 4 · the effect slots (the live graph is taken down by fxChanged, as removing one effect does)
+  const A = Sx.tfx && Sx.tfx[t]; if (A) for (let k = 0; k < A.length; k++) if (A[k]){ A[k] = null; r.fx++; r.changed = true; }
+  // 5 · CHN: off, unless the track is a bus (switching a bus off would cut every track that feeds it)
+  if (Sx.chainOn && Sx.chainOn[t]){ if (o.keepChn) r.chnKept = true; else { Sx.chainOn[t] = false; r.chn = true; r.changed = true; } }
+  // 6 · PERFORM: the track's own locks and LFOs, and every target that names it (scenes, macros, other tracks' locks and LFOs)
+  const at = id => { if (typeof id !== 'string') return false; const a = id.split(':'); return a[1] != null && a[1] !== '' && +a[1] === t; };
+  const pf = Sx.perf;
+  if (pf && typeof pf === 'object'){
+    if (Array.isArray(pf.sc)) for (const sc of pf.sc) if (sc && sc.v) for (const k of Object.keys(sc.v)) if (at(k)){ delete sc.v[k]; r.perf++; }
+    if (Array.isArray(pf.mac)) for (const mc of pf.mac) if (mc && Array.isArray(mc.tg)){ const n = mc.tg.length; mc.tg = mc.tg.filter(g => !(g && at(g.id))); r.perf += n - mc.tg.length; }
+    if (pf.lk){ if (pf.lk[t]){ delete pf.lk[t]; r.perf++; }
+      for (const k of Object.keys(pf.lk)) if (Array.isArray(pf.lk[k]) && pf.lk[k].some(at)){ pf.lk[k] = pf.lk[k].map(x => at(x) ? null : x); r.perf++; if (pf.lk[k].every(x => !x)) delete pf.lk[k]; } }
+    if (pf.lfo){ if (pf.lfo[t]){ delete pf.lfo[t]; r.perf++; }
+      for (const k of Object.keys(pf.lfo)) if (Array.isArray(pf.lfo[k])){ const n = pf.lfo[k].length; pf.lfo[k] = pf.lfo[k].filter(L => !(L && at(L.id))); r.perf += n - pf.lfo[k].length; if (!pf.lfo[k].length) delete pf.lfo[k]; } } }
+  // 7 · the parts' copy of this track's level and pan, and of its effect values
+  for (const p of Sx.parts || []) if (p){
+    if (Array.isArray(p.mix) && p.mix[t] && (p.mix[t][0] !== d.vol || p.mix[t][1] !== d.pan)){ p.mix[t] = [d.vol, d.pan]; r.parts++; }
+    if (p.fx && typeof p.fx === 'object') for (const k of Object.keys(p.fx)) if (+k.split(':')[0] === t){ delete p.fx[k]; r.parts++; } }
+  if (r.perf || r.parts) r.changed = true;
+  return r;
+}
+// The track a reset means, by screen: Song and Arrange holding the keys: the song cursor's column; Sect and Phrase (Pattern view too): the open track (cTrack); Mixer: the cursor's
+// strip (the MASTER row is no track); FX and MOD: the FX track (cFxT). INST and PROJECT, the Synth page and the waves / chains screens: none. {t} or {why}.
+function resetTrackFocus(){
+  if (view !== 'tracker') return {why:'Open a track first (Song, Phrase, Mixer or FX): the reset acts on the track under the cursor.'};
+  const ap = typeof apReady !== 'undefined' && apReady && apF;
+  if (!ap && !TRK_SCREENS.includes(tv)) return {why:'No track in focus here. Go to the Song, Phrase, Mixer or FX screen, then reset.'};
+  const t = focusT();
+  if (t === MT) return {why:'The master is not a track: there is nothing to reset.'};
+  if (!(t >= 0 && t < ntr())) return {why:'No track in focus.'};
+  return {t};
+}
+function resetTrackHere(){ const f = resetTrackFocus(); if (f.why) return toast(f.why); resetTrack(f.t); }
+function resetTrack(t){
+  if (!(t >= 0 && t < ntr())) return toast('No track in focus.');
+  const bus = isBusT(t), r = resetTrackData(S, t, {keepChn:bus});
+  if (!r.changed) return toast(`Track ${d2(t + 1)} is already empty and at its defaults.`);
+  try { for (const key of [...fxMem.keys()]) if (key.startsWith(t + ':')) fxMem.delete(key); } catch(e){}   // SLOT MEMORY: an effect added again starts from its defaults
+  if (r.blocksFreed.length && clip && clip.v === 'song') clip = null;   // a copied block could be one of the freed
+  if (typeof sxPicks !== 'undefined' && sxPicks.length) sxPicks = sxPicks.filter(q => q.t !== t);
+  // The sound: this track's voices let go as STOP lets them go (the player's STP, which also ends its MIDI notes), then the mixer, effects, chains and PERFORM reach the live graph
+  try { if (rt && rt.pl && ctx) rt.pl.play({type:'stp', t:ctx.currentTime, track:t}); } catch(e){ tpLog('reset track: voices', e); }
+  try { if (r.mix) mixChanged(); } catch(e){ tpLog('reset track: mixer', e); }
+  try { fxChanged(t); } catch(e){ tpLog('reset track: effects', e); }   // (the one teardown path every removal uses: rtFx → setFx)
+  if (r.chn){ try { const a = chApi(); if (a && a.chainOnChanged) a.chainOnChanged(); } catch(e){} try { chainsPush(); } catch(e){} dkChnSig = ''; }
+  if (r.perf){ try { if (perfLive.init) perfPush(); } catch(e){} }
+  saveS();   // (one undo step: snap() settles every saveS of this event into one)
+  // The audio-thread sequencer gets the song at once (not in 100 ms), then lets this track's voices go
+  try { if (tp.core && core.mir && core.ready){ clearTimeout(core.sT); core.sT = 0; const ops = coreOps(coreDiff()); if (ops.length) corePost({op:'patch', ops}); corePost({op:'stp', track:t}); } } catch(e){ tpLog('reset track: core', e); }
+  arrSig = ''; dkFbSig = ''; draw();
+  const sh = r.blocksShared.length;
+  toast(`Track ${d2(t + 1)} reset · ${keyHint('mod+Z')} brings it back` + (r.chnKept ? ' · bus: CHN stays on' : '') + (sh ? ` · ${sh} shared block${sh === 1 ? '' : 's'} kept` : ''), 4000);
+}
 /* ---------- mastering on the master bus ----------
    S.mst, saved with the song:
      on    the whole chain (off = the master bus as before)
@@ -24393,7 +24477,7 @@ function padBlink(e){
 // Phones and tablets (10 Nov): the audio-thread sequencer's module (a second thread) loads only when the owner picked it there
 // (aset.corePick, set in Settings); the saved default 'core' plays on the Page sequencer on such a device.
 function coreWanted(){ return aset.core === 'core' && (!wkLazy() || !!aset.corePick); }   // (a declaration: the Settings row reads it at load)
-const CORE_REV = '1skz324';
+const CORE_REV = '8a147t';
 const CORE_WANT = 7;   // the core's message set this page speaks (core-processor.js CORE_V); an older core is not used
 const CORE_URL = () => 'core/seq-core.js?v=' + BUILD + '-' + CORE_REV;
 const core = {node:null, ready:false, loading:null, gen:0, sent:new Map(), sT:0, tally:new Map(), mir:null};   // mir: what the core's song holds, as JSON per part (coreDiff)   // tally: events by who played them (test hook)
@@ -26013,7 +26097,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 647;
+const BUILD = 650;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD + (location.pathname.includes('/beta/') ? ' · beta' : '');
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -29275,6 +29359,7 @@ function cmdItems(full){
       {a:'mute', l:'Mute / unmute this track', k:'/', f:muteKey}, {a:'solo', l:'Solo / unsolo this track', k:keyHint('mod+/'), f:() => soloKey(false)},
       {a:'clrms', l:'Clear all solo and mute (every track)', k:'', f:() => clearSoloMute(), off:!S.mix.some(m => m.solo || m.mute)}] : []),   // (12 Nov, owner) the pad's SOLO or MUTE tapped twice does the same
     ...(['song', 'phrase', 'mixer', 'fx'].includes(tv) || full ? [{a:'tname', l:'Name this track…', k:'', f:nameTrackHere, off:!['song', 'phrase', 'mixer', 'fx'].includes(tv)}] : []),
+    ...(TRK_SCREENS.includes(tv) || full ? [{a:'treset', l:'Reset this track (notes, mixer and effects; undo brings it back)', k:keyHint('mod+shift+T'), f:resetTrackHere, off:!TRK_SCREENS.includes(tv)}] : []),   // RESET TRACK (19 Nov)
     {h:'Make'},
     {a:'newmidi', l:'New MIDI instrument', k:'', f:newMidiInst},   // MIDI INSTRUMENTS EASIER TO FIND (5 Nov)
     ...(genItems(full).length ? [{l:'Generators', sub:genItems(full)}] : []),
@@ -34299,6 +34384,7 @@ function sxCtx(y, t){
     // DUPLICATE TRACK (owner, 3 Nov: "a right click option to duplicate a track, including the patterns/phrases in it"):
     // into the next empty track of its kind, every block as a unique copy (dupTrack with notes)
     {l:'Duplicate this track with its patterns', f:() => dupTrack(true, t), off:t === MT},
+    {l:'Reset this track (notes, mixer and effects; undo brings it back)', k:ks ? keyHint('mod+shift+T') : '', f:() => resetTrack(t), off:t === MT},   // RESET TRACK (19 Nov): the track under the pointer
     {l:'Mute / unmute', k:ks ? 'M' : '', f:() => sxMuteRect(r), off:!n},
     {l:'Loop these rows', f:() => sxLoopRows(r.y0, r.y1), off:r.y1 <= r.y0},
     {l:'Open the phrase', k:ks ? keyHint('alt+→') : '', f:sxOpen, off:multi || !filled},
@@ -35375,6 +35461,7 @@ function globalKeys(e){
   if (mod && e.shiftKey && !e.altKey && e.code === 'KeyC'){ if (!e.repeat) cloneDown(); return true; }
   if (mod && e.altKey && !e.shiftKey && e.code === 'KeyC'){ if (!e.repeat) cloneHere(); return true; }
   if (mod && !e.shiftKey && e.code === 'KeyD'){ if (!e.repeat) dupKey(e.altKey); return true; }
+  if (mod && e.shiftKey && !e.altKey && e.code === 'KeyT'){ if (!e.repeat) resetTrackHere(); return true; }   // RESET TRACK (owner, 19 Nov): Ctrl/⌘+Shift+T. A browser tab keeps this key ("reopen closed tab"): Edit ▾ → Track has the same command; the desktop app (no browser menu) gets it
   if (mod && !e.shiftKey && !e.altKey && e.code === 'KeyT'){ if (!e.repeat) newPhraseRight(); return true; }
   if (mod && !e.shiftKey && !e.altKey && e.code === 'KeyG'){ e.preventDefault(); if (!e.repeat) genMenu(true); return true; }   // GENERATORS (owner, 7 Nov): the GEN key's menu (it was the browser's Find next)   // NEW PHRASE RIGHT (a browser tab keeps Ctrl+T; the desktop app gets it)
   if (e.altKey && !mod && !e.shiftKey && e.code === 'KeyS'){ if (!e.repeat && !pbOpen) setSheet('song'); e.preventDefault(); return true; }   // SONG SETTINGS (owner, 3 Nov): Alt/⌥+S, from any screen
@@ -36324,6 +36411,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [650, '19 Nov', ['Reset track: Ctrl+Shift+T (\u2318+Shift+T on a Mac) clears the track you are on, as deleting a track in Renoise does, but the track stays where it is. Its notes and commands on every song row go, its mixer strip (level, trim, pan, mute, solo, name, colour) and its effects go back to a new song\u2019s, and CHN goes off. A block or phrase another track also plays is left alone. One Undo (Ctrl/\u2318+Z) brings everything back. Also in Edit \u25be \u2192 Track, the Song block\u2019s right-click menu and, on a phone, File \u2192 Edit. A browser tab keeps Ctrl+Shift+T for \u201creopen closed tab\u201d: use the menu there; the desktop app gets the key.']],
   [647, '18 Nov', ['Flex: two patterns could put one broken sample into the sound (FLX E8, the 5-tuplet feel, just before a beat; and a tape pattern at one spot in Flex\u2019s memory). Fixed.', 'With the cursor on an FLX command in a phrase (or the master column), the FX bar\u2019s Flex PATTERN value now shows that command\u2019s number, and changing it rewrites the command in the column. One undo step per drag, on tracks and on the master. FLY commands are not linked, and every other FX bar value works as before.']],
   [646, '18 Nov', ['Computer side panel: the instrument list now sits above the PLAYING / STOPPED box and the meters (it was below them). Nothing else in the panel moved.']],
   [645, '18 Nov', ['The pump update of builds 643 and 644 is taken back out for now. It made pump FREEZE pause the sound for about a second in ways that could not be hidden (the first notes after a kit load or an engine switch could be lost). It returns when pump itself is changed.']],

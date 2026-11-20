@@ -351,6 +351,7 @@ class ThunderCore extends AudioWorkletProcessor {
         if (d.rel) this.release(at);   // HAND-OVER (7 Nov): the page plays on from `at`, so the live engines are its own from then
         return; }
       case 'loop': if (this.seq) this.seq.setLoop(d.l || null); return;
+      case 'stp': { const at = Math.max(currentTime, d.t == null ? 0 : d.t); if (d.track >= 0 && d.track < NT){ for (const v of this.T(d.track)) this.kill(v, at, 0.004, true); this.T(d.track).length = 0; } return; }   // RESET TRACK (build 650): one track's voices let go as STOP lets them go (a voice booked to start later never sounds); the page sends the song first
       case 'bpm': if (this.seq) this.seq.bpm = d.v; return;
       case 'perf': if (!perfLive.init) perfLiveInit(); if (d.xf != null) perfLive.xf = d.xf; if (d.mac) perfLive.mac = d.mac.slice(); if (d.fill != null) perfLive.fill = !!d.fill; return;
       case 'lxp': lxp.st = d.st | 0; return;
