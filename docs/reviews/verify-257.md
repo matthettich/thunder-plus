@@ -63,3 +63,13 @@ Button `#bSyncLines` ("Sync to lines...") sits beside Edit..., shown with it (Sa
 - F4 (should fix before merge): the PR does not merge cleanly into current `origin/beta` (648 landed): conflicts in `index.html` (BUILD / CHANGES), `sw.js`, `HANDOVER.md` (`git merge-tree`). Expected by the PR; needs a rebase and the build number renumbered.
 - F5 (note): `tools/sampler-lines-check.mjs` follows the repo's `tools/*-check.mjs` pattern (`sampler-check.mjs`, `recorder-check.mjs`...), not in `npm test`: fine. No stray files.
 - Conventions: BUILD 655 and sw.js `thunderplus-v655` agree, HANDOVER entry and punch list present, CHANGES line present.
+
+## 6. Tests
+
+- `tests/sampler-pitch-sync.test.js`: 13 / 13 pass.
+- Whole suite, run file by file (183 files, one at a time, 280 s cap each): 1566 tests, 1538 pass, 1 fail, 27 skipped (browser / git-gated).
+- The one failure, `tests/worklet-memory.test.js` test 13 ("FlexCore ... bit-identically to build 562", `flex 7: 1 samples differ`), fails alone and **fails identically on current `origin/beta`** (`d894aed`, no PR code): pre-existing, not caused by this PR (the PR touches nothing in `waves/`, `chains/`, `core/`).
+
+## Verdict: MERGE AFTER FIXES
+
+Old songs, kits and presets are provably untouched (item 1, strongest evidence: byte-identical A/B in the page). Fix before merge: F4 (rebase; build number), F3 (`slSet` should also write a sensible `beats` for older builds), and decide F1 (replacing a sample in an old layer moves the owner's notes down two octaves: keep the old tune or say so in the toast / punch list). F2, F5, F6, F7 are notes.
