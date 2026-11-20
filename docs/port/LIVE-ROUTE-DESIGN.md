@@ -1,6 +1,6 @@
 # LIVE-ROUTE DESIGN: live engines into the mixer (the lead's rulings, 19 Nov 2026, 20:30)
 
-**IN THE MIDDLE OF: rulings written; the worker's JS table (LIVE-ROUTE-NOTES.md part 1) is next; nothing is built.**
+**IN THE MIDDLE OF: rulings and the worker's table are done (LIVE-ROUTE-NOTES.md); the build of step 1 is next (decision-log golden first, then PR A the `Players` move, then PR B).**
 
 Queue item 2 of PICKUP's START HERE (19 Nov, 17:00). Basis: the lead's read of `render/render.h|cpp`, `engine/live_shell.h`, `sf/sf_live.h`,
 `seq/runner.h`, `core/core-processor.js` :662-725 (`lnode`, `liveNote`, `liveStart`, `stopAll`), DISPATCH-NOTES rows 4-6, WIRING-DOSSIER (R11, seams, PDC).
@@ -62,3 +62,29 @@ Queue item 2 of PICKUP's START HERE (19 Nov, 17:00). Basis: the lead's read of `
 4. The page's OFFLINE player for live pads (`bassNode`, `bassNote`, `polyVox`, `polyPs`, index.html near :22013): every place it differs from the
    core's `liveNote` / `liveStart`. The lead rules on each difference; the default is the core's behaviour (as for the SoundFont route).
 5. Per rule: is it in step 1, and the test that pins it.
+
+## Rulings on the worker's table (the lead, 19 Nov, after LIVE-ROUTE-NOTES.md ff8ea16). Where these differ from L1 to L10, these win.
+- **C1 accepted.** `reset()` on the four cores and the shell, `seek(clock)` on the shell; neither allocates. Nodes are made, and their parameters set
+  (`VoxCore::set` allocates), inside `set_pad_live`; a bind at a note is `reset()` + `seek()`.
+- **C2 accepted: L5 moves to the pool.** Each node has its own timeline in the pool (the future events; the shell sees one 128-chunk at a time) with
+  `cancelFrom(t, mask)` used on EVERY NoteOn and kill, as `cp:535-536` and `cp:723-724`. L5's overflow rule (a note-off always wins, counted) applies to
+  that timeline. `LiveShell::enqueue` also never drops a NoteOff (for hosts that call `process` directly).
+- **C3 / D4: follow the JS** (page and core agree): a note-on at the sample of a booked note-off takes the off back; the note restarts without a
+  release. Gate L10(b) keeps the one `seqRender` sequence that differs as a listed, expected difference.
+- **C4: when a live voice counts and ends.** A live voice is in `voices()` from its note-on. It has ENDED when its gate is off and either its node's
+  output has stayed under 1e-5 for 4096 samples or 4 s have passed since the off (the JS's `stopAll` window), whichever is first. When the sequencer
+  ends (`songOver()`), `Players` releases every live voice still held at the song's end time, so an unknown-length render ends. (The page cuts
+  instead; with `use_frames` the host's length wins as before.) Poly cap: a live voice is in the track's one list (L6) by its serial.
+- **C5 accepted:** vox is 5 nodes a track (4 poly + the mono node). **C6 accepted:** the pool takes `SEV_TEMPO` (bass `bpm`, later pump and waves).
+- **C7 / D7: follow the shell, which is the page:** a slide cut by the next note glides on to that note's sample. (The core holding the FROM pitch
+  is taken as a core fault; reported to the owner.)
+- **C8 / C9 / C10 noted, no change:** waves and pump synths keep their own queues and latencies under L4 in steps 3 and 2; `stopAll` is built now for U37.
+- **D5 and D6: follow the PAGE** (as DISPATCH-NOTES: where the two players differ and the page's is the fuller behaviour, the offline reference is
+  the page). D5 (the CUT / RES low-pass on the nine kinds outside `ENG_CUT`) concerns step 2 and 3 kinds only: build it there. D6 (`mod` with `wob`
+  moves the bass wobble) is step 1. Both reported to the owner as suspected "Audio thread" sequencer bugs in the web app.
+- **D1, D2, D3, D8, D9, D10:** the port's behaviour stands (L3, L4). **D11, D12:** as the table says.
+- **`eng` (ENGINE TARGETS):** the last commit of step 1 ("1b"), in its own PR if step 1 is ready before it.
+- **The decision-log golden (`tools/live-route-dump.mjs`) is accepted as gate L10(f)** and is built FIRST (Node only, no compiler).
+- **Vox idle skip:** never skipped until the bit-compare test in the notes passes.
+- **The C API, the track mask, the `Players` layout and the build order are accepted as proposed.** Two PRs: (A) the `Players` move alone, gate: every
+  existing render test bit-identical; (B) the rest of step 1.
