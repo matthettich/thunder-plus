@@ -155,7 +155,7 @@ class MidiSched {
   Lfo lfo_[kNI];
   uint32_t nidN_ = 0;
   // tempo map (the beat events) and the clock (B2)
-  Anchor anc_[64]; int nAnc_ = 0;     // oldest first
+  static constexpr int kAnc = 256; Anchor anc_[kAnc]; int nAnc_ = 0;     // oldest first: 256 steps (32 s at 120 bpm, 4 steps a beat) of tempo map
   bool haveT0_ = false; double t0_ = 0; int spp_ = 0; bool playing_ = false;
   struct Clk { bool on = false; int64_t k = 0; bool hasLast = false; double last = 0; } clk_;
   int64_t lastTickFrame_[kMidiPorts][8]; int lastTickN_[kMidiPorts] = {0, 0, 0, 0};

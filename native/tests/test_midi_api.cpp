@@ -112,7 +112,7 @@ static void threads() {
   std::atomic<bool> stop{false}; std::atomic<long> posted{0}, bad{0}, drained{0};
   std::thread control([&] {
     uint64_t r = 12345; thunder_midi_set_port(h, 0, 1, 1, 0, 0);
-    for (int i = 0; i < 20000 && !stop; i++) {
+    long accepted = 0; for (int i = 0; i < 2000000 && !stop && accepted < 3000; i++) {
       r = r * 6364136223846793005ull + 1442695040888963407ull; const int k = (int)((r >> 33) % 12);
       int rc = 0;
       switch (k) { case 0: rc = thunder_midi_start(h, 0); break; case 1: rc = thunder_midi_stop(h); break; case 2: rc = thunder_midi_key_on(h, (int)(r >> 40) & 127, 0, 48 + (int)((r >> 20) & 15), 100); break;
@@ -120,7 +120,7 @@ static void threads() {
         case 6: rc = thunder_midi_set_port(h, (int)(r >> 50) & 3, 1, (int)(r >> 52) & 1, (double)((int)(r >> 20) % 100), (int)(r >> 50) & 3); break; case 7: rc = thunder_midi_release(h, (int)(r >> 41) & 1); break;
         case 8: { const uint8_t b[3] = {0xB0, 7, 100}; rc = thunder_midi_raw(h, 0, b, 3, 0.01); break; } case 9: rc = thunder_midi_port_clock(h, (int)(r >> 50) & 3, (int)(r >> 52) & 1); break;
         case 10: rc = thunder_midi_set_fx_latency(h, 0.01); break; default: rc = thunder_midi_set_audible(h, r); break; }
-      if (rc == 0) posted++; else if (rc != THUNDER_MIDI_E_BUSY) bad++;
+      if (rc == 0) { posted++; accepted++; } else if (rc != THUNDER_MIDI_E_BUSY) bad++;
       if (i % 16 == 0) std::this_thread::yield();
     }
     stop = true;
@@ -135,7 +135,7 @@ static void threads() {
   });
   control.join(); audio.join(); consumer.join();
   CHECK(bad == 0, "threads: %ld bad records / codes", bad.load());
-  CHECK(posted > 1000 && drained > 0, "threads: %ld commands posted, %ld records drained", posted.load(), drained.load());
+  CHECK(posted >= 3000 && drained > 0, "threads: %ld commands posted, %ld records drained", posted.load(), drained.load());
   thunder_midi_free(h);
   std::printf("threads: %ld commands, %ld records\n", posted.load(), drained.load());
 }

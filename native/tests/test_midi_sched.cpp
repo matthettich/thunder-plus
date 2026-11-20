@@ -95,7 +95,7 @@ static void stopRules() {
     CHECK(cc74 == 1, "B5: the first CSL glide of a PLAY sends its start value alone (1 CC), got %d (a glide from the old 100 would be many)", cc74);
     (void)n123; }
   { Rig r;   // B8: Stop after the last tick actually sent, never before it
-    Case C; loadCase(root(), "start-stop", C); Drive D; run(D, C);
+    Case C; loadCase(root(), "start-stop", C); C.gear[0] = 40; Drive D; run(D, C);   // a positive Gear delay puts the ticks later than the stop time: the Stop must follow them
     int64_t lastTick = -1, stopF = -1; for (const Out& o : D.kept) { if (o.b[0] == 0xF8) lastTick = std::max(lastTick, o.frame); if (o.b[0] == 0xFC) stopF = o.frame; }
     CHECK(stopF >= lastTick && lastTick > 0, "B8: the Stop (%lld) is not before the last tick (%lld)", (long long)stopF, (long long)lastTick);
     CHECK(stopF - lastTick <= 48000 * 0.03, "B8: no phantom gap: the Stop is %.2f ms after the last tick", (stopF - lastTick) * 1000.0 / 48000); }
@@ -132,8 +132,17 @@ static void stall() {
     while (sq.alive() && sq.time() < 31.0) { const int k = sq.step(evs.data(), (int)evs.size(), &st); s.onStep(evs.data(), k, st, sq, 0.0); }
     CHECK(sq.time() > 25, "(the test song runs %.1f s: needs more than 25 s for the cap test)", sq.time());
     (void)0;
-    s.book(0.0, sq.time(), sq.bpm(), true); s.book(30.0, sq.time(), sq.bpm(), true);
-    CHECK(s.stats().lateTicks > 1000, "B7: no 512-tick cap: %llu late ticks counted in one call", (unsigned long long)s.stats().lateTicks); }
+    s.book(0.0, sq.time(), sq.bpm(), true); const uint64_t t0 = s.stats().ticks; s.book(14.0, sq.time(), sq.bpm(), true);
+    CHECK(s.stats().lateTicks > 600, "B7: no 512-tick cap: %llu late ticks counted in one call (14 s = 672)", (unsigned long long)s.stats().lateTicks);
+    CHECK(s.stats().ticks - t0 >= 3, "B7: and the same call books the ticks inside the look-ahead (%llu)", (unsigned long long)(s.stats().ticks - t0)); }
+  { // the tempo map holds the last 256 steps: ticks older than its oldest anchor are late too (counted), and the clock goes on (it does not stall)
+    Case C3 = C; Drive D3; JsonError je; D3.song.load(C3.songText.data(), C3.songText.size(), &je);
+    MidiSched s(48000); configure(s, C3, D3.song);
+    SeqOpts lo; lo.hasLoop = true; lo.loopY0 = 0; lo.loopY1 = 0; lo.live = true; Seq sq(D3.song, D3.vars, SeqMode::Song, lo); sq.setTime(0.08); std::vector<SeqEvent> evs(12288); SeqStep st; s.start(0, 0);
+    while (sq.alive() && sq.time() < 61.0) { const int k = sq.step(evs.data(), (int)evs.size(), &st); s.onStep(evs.data(), k, st, sq, 0.0); }
+    s.book(0.0, sq.time(), sq.bpm(), true); const uint64_t t0 = s.stats().ticks; s.book(61.0, sq.time(), sq.bpm(), true);
+    CHECK(s.stats().lateTicks > 2800, "B7: ticks older than the oldest anchor are counted late: %llu (about 2900)", (unsigned long long)s.stats().lateTicks);
+    CHECK(s.stats().ticks - t0 >= 3, "B7: and the clock goes on: %llu ticks in the look-ahead", (unsigned long long)(s.stats().ticks - t0)); }
   // late notes: the host's lateness verdict (the shared test) drops the MIDI note too
   CHECK(seq_note_late(1.0, 1.2) && !seq_note_late(1.0, 1.1) && !seq_note_late(1.0, 0.9), "the shared lateness test: late = 0.15 s behind (and %d)", 0);
   { Rig r; r.s.onEvent(Rig::note(0, 0, 60, 1.0), nullptr, 120, true, 1.2); r.book(1.2); CHECK(r.count(0x90) == 0 && r.s.stats().lateNotes == 1, "B7: a note the host calls late is dropped and counted (%d)", 0); }
@@ -143,8 +152,68 @@ static void stall() {
   std::printf("stall: done (N %zu, S %zu messages)\n", N.kept.size(), S.kept.size());
 }
 
+
+// ---- single rules, by hand --------------------------------------------------------------------------------------------------------------------------
+static void rules() {
+  { Rig r;   // R-M4: a message already late goes out at once (never in the past)
+    r.s.onEvent(Rig::note(0, 0, 60, 0.5), nullptr, 120, false, 1.0); r.book(1.0);
+    CHECK(r.out.size() == 1 && r.out[0].frame >= 48000, "R-M4: a note booked for 0.5 s at now = 1.0 goes out at 1.0 (frame %lld)", r.out.empty() ? -1LL : (long long)r.out[0].frame); }
+  { Rig r;   // R-M13: poly, at most 4 voices on a track: the 5th ends the oldest
+    for (int c = 0; c < 5; c++) r.s.onEvent(Rig::note(0, 0, 60 + c, 1.0 + c * 0.001, true, c), nullptr, 120, false, 0.95);
+    r.book(0.95); r.book(1.05);
+    CHECK(r.count(0x90) == 5 && r.count(0x80, 60) == 1 && r.count(0x80) == 1, "R-M13: the 5th poly note ends the oldest (ons %d, offs %d)", r.count(0x90), r.count(0x80)); }
+  { Rig r;   // R-M18: CC numbers default to 74, 71, 1, 7 when the instrument has none
+    for (int k = 0; k < 4; k++) r.song.insts[0].cc[k] = -1;
+    for (int k = 0; k < 4; k++) { SeqEvent c; c.type = SEV_MCC; c.track = 0; c.ii = 0; c.k = k; c.v = 50 + k; c.t = 0.1 + k * 0.01; r.s.onEvent(c, nullptr, 120, false, 0.05); }
+    r.book(0.05); r.book(0.2);
+    int cc[4] = {74, 71, 1, 7}; bool ok = r.out.size() == 4; for (int k = 0; ok && k < 4; k++) ok = r.out[(size_t)k].b[1] == cc[k] && r.out[(size_t)k].b[2] == 50 + k;
+    CHECK(ok, "R-M18: the default CC numbers"); }
+  { Rig r;   // R-M19: a new CC value cuts a running glide
+    SeqEvent a; a.type = SEV_MCC; a.track = 0; a.ii = 0; a.k = 0; a.v = 0; a.t = 0.1; r.s.onEvent(a, nullptr, 120, false, 0.05); r.book(0.05); r.book(0.12);
+    SeqEvent g = a; g.v = 100; g.ramp = 1.0; g.t = 1.0; r.s.onEvent(g, nullptr, 120, false, 0.95);
+    SeqEvent c = a; c.v = 20; c.ramp = 0; c.t = 1.3; r.s.onEvent(c, nullptr, 120, false, 0.95);
+    for (double now = 0.95; now < 2.5; now += 0.03) r.book(now);
+    int late = 0; for (const Out& o : r.out) if ((o.b[0] & 0xF0) == 0xB0 && o.b[1] == 74 && r.msOf(o) > 1301 && o.b[2] != 20) late++;
+    CHECK(late == 0, "R-M19: after the new value at 1.3 s the glide sends nothing more (%d messages)", late); }
+  { Rig r;   // R-M21: a long bend ramp is 48 steps at most (10 ms each, capped)
+    r.song.insts[0].pbr = 48;
+    SeqEvent e = Rig::note(0, 0, 60, 1.0); e.has |= SH_BEND; e.bendMul = 2; e.bendT1 = 3.0; r.s.onEvent(e, nullptr, 120, false, 0.95);
+    for (double now = 0.95; now < 3.2; now += 0.03) r.book(now);
+    CHECK(r.count(0xE0) == 48, "R-M21: the ramp is 48 bend messages (got %d)", r.count(0xE0)); }
+  { Rig r;   // R-M35: PLAY while a song's tempo map is still held starts a new one
+    Case C; loadCase(root(), "loop", C); Drive D; JsonError je; D.song.load(C.songText.data(), C.songText.size(), &je);
+    MidiSched s(48000); configure(s, C, D.song); SeqOpts lo; lo.hasLoop = true; lo.loopY0 = 0; lo.loopY1 = 0; lo.live = true; std::vector<SeqEvent> evs(12288); SeqStep st; std::vector<MidiMsg> out(4096);
+    { Seq a(D.song, D.vars, SeqMode::Song, lo); a.setTime(0.08); s.start(0, 0); for (int i = 0; i < 20; i++) { const int k = a.step(evs.data(), (int)evs.size(), &st); s.onStep(evs.data(), k, st, a, 0.0); } s.book(0.0, a.time(), a.bpm(), true); }
+    s.start(0, 5.0);   // (no stop in between)
+    Seq b(D.song, D.vars, SeqMode::Song, lo); b.setTime(5.08);
+    int ticks = 0; double now = 5.0;
+    for (; now < 5.8; now += 0.0267) { while (b.time() < now + 0.25) { const int k = b.step(evs.data(), (int)evs.size(), &st); s.onStep(evs.data(), k, st, b, now); } s.book(now, b.time(), b.bpm(), true); }
+    int64_t n; while ((n = s.drain(out.data(), 4096)) > 0) for (int64_t i = 0; i < n; i++) if (out[(size_t)i].b[0] == 0xF8 && out[(size_t)i].frame >= 5 * 48000) ticks++;
+    CHECK(ticks >= 20 && s.stats().lateTicks == 0, "R-M35: a new PLAY starts a new tempo map: %d ticks in the first 0.7 s (about 33 expected), %llu counted late (0 expected)", ticks, (unsigned long long)s.stats().lateTicks); }
+  { Rig r;   // R-M38: the FX latency is read as it is NOW, every block
+    r.s.setFxLatency(0.010); r.s.onEvent(Rig::note(0, 0, 60, 1.0), nullptr, 120, false, 0.95); r.book(0.95);
+    r.s.setFxLatency(0.020); r.s.onEvent(Rig::note(0, 0, 62, 1.0), nullptr, 120, false, 0.95); r.book(0.96);
+    double m60 = -1, m62 = -1; for (const Out& o : r.out) if ((o.b[0] & 0xF0) == 0x90) (o.b[1] == 60 ? m60 : m62) = r.msOf(o);
+    CHECK(std::fabs(m60 - 1010) < 0.05 && std::fabs(m62 - 1020) < 0.05, "R-M38: no cache: %.3f %.3f (1010, 1020)", m60, m62); }
+  { Rig r;   // R-M40: equal timestamps keep their order: the mono track's OFF before the next ON
+    r.s.onEvent(Rig::note(0, 0, 60, 1.0), nullptr, 120, false, 0.5); r.s.onEvent(Rig::note(0, 0, 62, 1.2), nullptr, 120, false, 0.5);
+    for (double now = 0.5; now < 1.4; now += 0.03) r.book(now);
+    int on62 = -1, off60 = -1; for (size_t i = 0; i < r.out.size(); i++) { const Out& o = r.out[i]; if ((o.b[0] & 0xF0) == 0x90 && o.b[1] == 62) on62 = (int)i; if ((o.b[0] & 0xF0) == 0x80 && o.b[1] == 60) off60 = (int)i; }
+    CHECK(off60 >= 0 && on62 > off60 && r.out[(size_t)on62].frame == r.out[(size_t)off60].frame, "R-M40: the OFF comes before the ON at the same time (off at %d, on at %d)", off60, on62); }
+  { Rig r;   // B9a: a cable change (release while playing) ends the sounding note; its own OFF, still waiting in the outbox, must not follow as a second OFF
+    SeqEvent e = Rig::note(0, 0, 60, 1.0); e.has |= SH_CUT; e.cut = 1.6; r.s.onEvent(e, nullptr, 120, false, 0.95); r.book(0.95); r.book(1.05);
+    r.s.release(1.1, true); r.drain();
+    for (double now = 1.1; now < 1.8; now += 0.03) r.book(now);
+    CHECK(r.count(0x80, 60) == 1, "B9: one OFF for the note, not a second one from the outbox (%d)", r.count(0x80, 60)); }
+  { Rig r;   // B9: a note whose ON is already in the shell's queue (a few ms ahead) when the STOP comes: the shell drops it, so no OFF for it
+    r.s.onEvent(Rig::note(0, 0, 60, 1.03), nullptr, 120, false, 0.99); r.book(0.99);
+    r.s.stop(0.995); r.drain();
+    CHECK(r.count(0x90, 60) == 0 && r.count(0x80, 60) == 0, "B9: no ON (cleared) and no OFF: ons %d, offs %d", r.count(0x90, 60), r.count(0x80, 60)); }
+  std::printf("single rules: done\n");
+}
+
 int main() {
-  cadence(); ownership(); stopRules(); stall();
+  cadence(); ownership(); stopRules(); stall(); rules();
   std::printf("%d failures\n", fails);
   return fails ? 1 : 0;
 }

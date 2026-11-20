@@ -97,7 +97,7 @@ void MidiSched::emit(const PendMsg& m) {
       push(m.port, m.b, m.len, fr, m.kind, 0, m.cable);
     } else {
       if (cnt_[idx] == 0) { st_.offsSuppressed++; return; }                  // B9: nothing sounding there
-      if (--cnt_[idx] > 0) { st_.offsSuppressed++; return; }                 // B4: another track still holds it
+      if (cnt_[idx] > 0 && --cnt_[idx] > 0) { st_.offsSuppressed++; return; }   // B4: another track still holds it
       push(m.port, m.b, m.len, fr, m.kind, 0, m.cable);
     }
     return;
@@ -403,7 +403,7 @@ void MidiSched::moLfo(double now, double seqTime, double bpm) {
 // ---- the tempo map and the clock (B2, B3, B7, B8) --------------------------------------------------------------------------------------
 void MidiSched::addAnchor(double t, double b, double bpm) {
   if (!std::isfinite(t) || !std::isfinite(b) || !(bpm > 0) || !std::isfinite(bpm)) { st_.badEvents++; return; }
-  if (nAnc_ == 64) { std::memmove(anc_, anc_ + 1, 63 * sizeof(Anchor)); nAnc_ = 63; }
+  if (nAnc_ == kAnc) { std::memmove(anc_, anc_ + 1, (kAnc - 1) * sizeof(Anchor)); nAnc_ = kAnc - 1; }
   anc_[nAnc_++] = {t, b, bpm};
 }
 // the song position in beats at audio time t: forward from the newest anchor at or before t (the first one's if none)
@@ -437,7 +437,7 @@ void MidiSched::moClock(double now, double seqTime, double bpm) {
   const double limit = std::min(seqTime, now + kClockAheadSec);
   int ps[kMidiPorts], np; clkPorts(ps, np);
   { const int64_t first = (int64_t)std::ceil(anc_[0].b * 24 - 1e-9);   // ticks older than the oldest anchor we still hold are long gone (the host stalled): late, dropped, counted
-    if (clk_.k < first) { st_.lateTicks += (uint64_t)(first - clk_.k); clk_.k = first; } }
+    if (clk_.k < first && anc_[0].t < now) { st_.lateTicks += (uint64_t)(first - clk_.k); clk_.k = first; } }
   for (int n = 0; n < 4096; n++) {
     bool ok; const double tk = timeOfBeat((double)clk_.k / 24, seqTime, bpm, ok);
     if (!ok || !(tk < limit)) break;
