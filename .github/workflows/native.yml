@@ -24,19 +24,19 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # One job per pass (GCC, clang, sanitizers) so each has its own 60-minute limit and they run in parallel. fail-fast is off: one push
+  # One job per pass (GCC, clang, sanitizers) so each has its own time limit (60 minutes; 120 for the sanitizers, whose ctest alone takes about 55 minutes on the runner: PRs #246 / #247 were CANCELLED at 60) and they run in parallel. fail-fast is off: one push
   # shows which compiler or sanitizer a failure belongs to.
   linux:
     name: Core (Linux, ${{ matrix.name }})
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: ${{ matrix.timeout }}
     strategy:
       fail-fast: false
       matrix:
         include:
-          - { pass: gcc, name: GCC }
-          - { pass: clang, name: clang }
-          - { pass: san, name: sanitizers }
+          - { pass: gcc, name: GCC, timeout: 60 }
+          - { pass: clang, name: clang, timeout: 60 }
+          - { pass: san, name: sanitizers, timeout: 120 }
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4   # the goldens' reference JS engine: Node 22 (as tests.yml); another V8 may differ in the last bit of Math.pow

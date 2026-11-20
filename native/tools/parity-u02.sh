@@ -17,6 +17,8 @@ for f in tfx thunder-dsp mods; do [ -f "$OUT/$f.wasm" ] || { echo "missing $OUT/
 for p in "waves/dsp/tfx.wasm tfx" "chains/dsp/tfx.wasm tfx" "waves/dsp/thunder-dsp.wasm thunder-dsp"; do
   set -- $p; if cmp -s "$OUT/$2.wasm" "$R/$1"; then echo "INFO  bytes equal   $1"; else echo "INFO  bytes differ  $1 (built $(wc -c <"$OUT/$2.wasm") B, committed $(wc -c <"$R/$1") B)"; fi
 done
+# U31 round-3 F4: the web's mods.wasm (embedded in both worklets) is the pinned bytes (FAIL otherwise); the built one is compared as INFO
+sh "$R/native/tools/mods-wasm-check.sh" "$OUT/mods.wasm"
 T="$OUT/tree"; rm -rf "$T"; mkdir -p "$T"
 ( cd "$R" && tar --exclude=./.git --exclude=./native --exclude=./stable --exclude=./beta --exclude=./node_modules -cf - . ) | ( cd "$T" && tar -xf - )
 [ -d "$R/node_modules" ] && ln -s "$R/node_modules" "$T/node_modules"

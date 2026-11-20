@@ -29,7 +29,7 @@ run "source key: a track is off by one" chains/cengine.cpp 'const int k = iv - k
 run "source key: a send reads the wrong one" chains/cengine.cpp 'return e->sendPrev_ + (size_t)n * kBlock;' 'return e->sendPrev_ + (size_t)(n ^ 1) * kBlock;'
 run "sends: the standalone block of delay is lost" chains/cengine.cpp 'void ChainsEngine::endStandaloneBlock() { std::memcpy(sendPrev_, sendOut_, sizeof sendPrev_); standalone_ = true; }' 'void ChainsEngine::endStandaloneBlock() { standalone_ = true; }'
 run "buses: a written bus is not marked as free again" chains/cengine.cpp 'sizeof(float) * kBlock); bw_[k] = 0; }' 'sizeof(float) * kBlock); }'
-run "Chain Out: the track is not held in range" chains/cengine.cpp 'return (int)clamp((double)(i32(v) - 1), 0, kChannels - 1); }' 'return (int)(i32(v) - 1); }'
+run "Chain Out: the track is not held in range" chains/cengine.cpp 'return (int)clamp(((double)i32(v) - 1), 0, kChannels - 1); }' 'return (int)((double)i32(v) - 1); }'
 run "mix-down: the soft clip is left out" chains/cengine.cpp 'L[i] = (float)modfx::soft((double)L[i]); R[i] = (float)modfx::soft((double)R[i]);' 'L[i] = L[i]; R[i] = R[i];'
 run "live: the latency is one sample short" chains/chains.h 'constexpr int kChainsLatency = 127' 'constexpr int kChainsLatency = 126'
 run "live: a block is not cut at an event" chains/clive.cpp 'if (npend_ > 0 && pend_[0].at < end) end = pend_[0].at;' ''
