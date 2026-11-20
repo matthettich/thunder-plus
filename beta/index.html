@@ -26075,7 +26075,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 649;
+const BUILD = 656;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD + (location.pathname.includes('/beta/') ? ' · beta' : '');
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -27232,14 +27232,14 @@ function projRows(){
       info:() => 'ON: while a song plays, the screen redraws about 24 times a second instead of at the screen’s full rate. It also switches to the Low power (black) skin, and back when turned off. The audio engine also sleeps after 30 s of silence and wakes on the next note, which can start a moment late. That saves battery; the picture is a little less smooth, and the sound is unchanged. OFF (the default): as before. This device only'},
     {l:'METERS WHILE PLAYING', segs:true, get:() => MTR_MODES.indexOf(mtrMode), set:v => setMeters(MTR_MODES[v]), min:0, max:2, d:0, fmt:v => ['SMOOTH', 'LIGHT', 'OFF'][v] || 'SMOOTH',   // METERS (M.RATE)
       info:() => 'How often the level meters and the other moving marks are drawn while a song plays: the Mixer, the top bar’s meters, the FX bar, the master window, the spectrum. SMOOTH (the default): as before. LIGHT: about 10 times a second, less drawing and less battery; a short peak still shows. OFF: the meters stay empty while a song plays and come back when it stops; the sound, the peak and CLIP checks and the playback report are unchanged. Separate from LOW POWER DISPLAY (with both on, the slower one wins). This device only'},
-    {l:'FOLLOW', segs:true, get:() => followMode, set:v => setFollow(v), min:0, max:2, d:0, fmt:v => ['OFF', 'PATTERN', 'ON'][v] || 'OFF',
-      info:() => 'While the song plays. ON: Song and Phrase scroll with the playhead, and Phrase (and Sect) switch to what the cursor’s track is playing. PATTERN: Phrase (and Sect) switch to what the cursor’s track is playing and Arrange turns its pages with the song, but the phrase’s rows stay where you put them. OFF: the screen stays where you put it, except that Arrange still turns its pages when the playhead runs off it. While you work in Arrange it waits until you’ve left it alone for a minute. The cursor stays on its row in every mode, so you can edit while it plays'},
     {l:'ARRANGE LOOK-AHEAD', get:() => ARR_AHEADS.indexOf(arrAhead), set:v => setArrAhead(v), min:0, max:ARR_AHEADS.length - 1, d:3, fmt:v => ARR_AHEADS[v] + ' ROWS',
       info:() => 'How many rows from the bottom of Arrange the page turns, for the playhead and for the cursor when you move it down with the keys or the wheel: the view turns once, so the row lands near the top and the next phrases are in sight. 16 by default; never more than half of what Arrange shows (a short view uses a quarter). A click never turns the page'},
     {l:'TAB', segs:true, get:() => tabTracks ? 1 : 0, set:v => setTabTracks(!!v), min:0, max:1, d:1, fmt:v => v ? 'TRACKS' : 'COLUMNS',
       info:() => 'In a phrase. TRACKS (as Renoise): Tab / Shift+Tab go to the next / previous track’s phrase. COLUMNS: they step note → instrument → FX1 → FX2 → FX3, so the instrument is one press away'},
     {l:'RESUME', ck:'Playback resumes from pause', get:() => resumeOn ? 1 : 0, set:v => setResume(!!v), min:0, max:1, tog:true, d:0, fmt:onOff,
       info:() => 'ON: after you stop the song, PLAY carries on from where it stopped (the playhead stays there to show it), unless you have moved the cursor since. OFF: PLAY starts from the cursor, as before. Either way the stopped spot stays lit'},
+    {l:'FOLLOW', segs:true, get:() => followMode, set:v => setFollow(v), min:0, max:2, d:0, fmt:v => ['OFF', 'PATTERN', 'ON'][v] || 'OFF',
+      info:() => 'While the song plays. ON: Song and Phrase scroll with the playhead, and Phrase (and Sect) switch to what the cursor’s track is playing. PATTERN: Phrase (and Sect) switch to what the cursor’s track is playing and Arrange turns its pages with the song, but the phrase’s rows stay where you put them. OFF: the screen stays where you put it, except that Arrange still turns its pages when the playhead runs off it. While you work in Arrange it waits until you’ve left it alone for a minute. The cursor stays on its row in every mode, so you can edit while it plays'},
     {l:'PHRASE ON STOP', segs:true, get:() => stopCurOn ? 1 : 0, set:v => setStopCur(!!v), min:0, max:1, d:1, fmt:v => v ? 'PLAYHEAD' : 'STAYS',   // CLEARER (owner, 3 Nov: "what is this supposed to communicate?"): was STOP CURSOR, STAYS / THERE
       info:() => 'Where the edit cursor goes when you stop the song while editing a phrase (and on the other screens). STAYS: it stays where you were editing. PLAYHEAD: it jumps to where the song stopped (the song row, your track’s phrase and step), ready to edit there. ARRANGE ON STOP is the same for Arrange. STOP twice still goes to the top; Alt+G puts the cursor on the playhead at any time'},
     {l:'ARRANGE ON STOP', segs:true, get:() => stopArrOn ? 1 : 0, set:v => setStopArr(!!v), min:0, max:1, d:1, fmt:v => v ? 'PLAYHEAD' : 'STAYS',
@@ -36386,6 +36386,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [656, '19 Nov', ['Settings: FOLLOW sits directly above PHRASE ON STOP and ARRANGE ON STOP, in the View menu and in Settings (the Project screen too). Nothing else about them changed']],
   [649, '19 Nov', ['Settings: press on a slider\u2019s bar (SWING, TEMPO, LPB, TEXT SIZE\u2026) to set it there and drag to change it, with a mouse or a finger. A swipe up or down that starts on a bar still scrolls the list. Double-tap a bar to put it back to its default. Shift (mouse) or a finger held away from the bar makes it finer. The sliders no longer lock.']],
   [648, '19 Nov', ['…waves and …chains: the Expression module’s ? help now has worked examples to copy, one formula per line: a sine, saw, triangle and square, a pitch from K1 and a version that glides without a jump, FM, a chord, a fade-in, ring modulation, tremolo, a low-pass filter, a wavefolder, a bit crusher and noise. The Help page shows them on the Expression card too, and the module’s Examples menu now holds the same formulas (tones first, then effects), so you can pick one instead of typing it.']],
   [647, '18 Nov', ['Flex: two patterns could put one broken sample into the sound (FLX E8, the 5-tuplet feel, just before a beat; and a tape pattern at one spot in Flex\u2019s memory). Fixed.', 'With the cursor on an FLX command in a phrase (or the master column), the FX bar\u2019s Flex PATTERN value now shows that command\u2019s number, and changing it rewrites the command in the column. One undo step per drag, on tracks and on the master. FLY commands are not linked, and every other FX bar value works as before.']],
@@ -36842,7 +36843,7 @@ const SHEETS = {
     ['Patterns', ['PATTERN LEN', '› ALL PHRASES TO']],
     ['Impulse responses', 'irs']]},
 };
-const SHEET_QUICK = ['TEXT SIZE', 'MIXER SIZE', 'SIMPLE PHRASE', 'FOLLOW', 'COMMANDS', 'COMMAND BAR'];   // kept in the menus' Screen part too
+const SHEET_QUICK = ['TEXT SIZE', 'MIXER SIZE', 'SIMPLE PHRASE', 'FOLLOW', 'PHRASE ON STOP', 'ARRANGE ON STOP', 'COMMANDS', 'COMMAND BAR'];   // (19 Nov, owner: FOLLOW sits directly above PHRASE ON STOP and ARRANGE ON STOP)   // kept in the menus' Screen part too
 const rowKey = r => r.l.replace(/\s+\d+$/, '');                    // '› ALL PHRASES TO 16' → '› ALL PHRASES TO'
 const sheetKeys = new Set(Object.values(SHEETS).flatMap(K => K.groups.flatMap(([, ks]) => Array.isArray(ks) ? ks : [])));
 const inSheet = r => SET_SHEETS && sheetKeys.has(rowKey(r));
@@ -37060,7 +37061,7 @@ function buildScreen(){
     const R = rowsByKey(), sec = t => { const x = el('section', 'tsec'); x.append(el('h3', null, t)); return x; };
     const sz = sec('Size'), ds = sec('Display'), more = sec('More');
     for (const k of SHEET_QUICK){ const r = R.get(k); if (r) (k === 'TEXT SIZE' || k === 'MIXER SIZE' ? sz : ds).append(tsetRow(r)); }
-    let g2 = ''; for (const r of projRows()){ if (r.sec) g2 = r.sec; if (g2 === 'Screen' && r.l !== 'SKIN' && !inSheet(r)) ds.append(tsetRow(r)); }
+    let g2 = ''; for (const r of projRows()){ if (r.sec) g2 = r.sec; if (g2 === 'Screen' && r.l !== 'SKIN' && !inSheet(r) && !SHEET_QUICK.includes(rowKey(r))) ds.append(tsetRow(r)); }
     more.append(sheetBtn('screen'), sheetBtn('skin'));
     list.replaceChildren(el('div', 'sethead', 'Screen'), ...[sz, ds].filter(x => x.childElementCount > 1), more); if (sk) sk.hidden = true; return;
   }
