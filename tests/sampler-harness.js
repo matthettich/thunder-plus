@@ -19,7 +19,7 @@ function loadSampler(h, extra) {
     + 'const markSmpNew = () => {}, smbAdd = () => {}, changed = () => {}, refreshAll = () => {}, ensure = pad => globalThis.__cache[pad];\n'
     + 'globalThis.__cache = [];\n';
   const tail = '\n;globalThis.__E = {freshLayer, mkVoice, renderVoice, assignSample, applyChop, loopSecs, SYNC_MODES, setKit:(k, s) => { kit = k; S = s; }, setCur:i => { cur = i; }, getS:() => S,\n'
-    + '  ' + (lines ? lines : '') + 'smpOwnTune: typeof smpOwnTune === "function" ? smpOwnTune : null};';
+    + '  ' + (lines ? lines : '') + 'slParse, slName, slPlan, slSecs, slChoices, slSet, instBeats, setBeats, slBar, SL_MAX, smpOwnTune: typeof smpOwnTune === "function" ? smpOwnTune : null};';
   vm.runInContext(eng + '\n' + stubs + own + '\n' + assign + '\n' + chopSrc + tail, ctx, { filename: 'index.html(sampler)' });
   ctx.__E.ctx = ctx; return ctx.__E;
 }

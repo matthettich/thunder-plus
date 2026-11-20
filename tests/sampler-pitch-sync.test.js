@@ -59,3 +59,96 @@ test('A: a song with an old-style sample in a synth slot gives the same events a
   const before = JSON.parse(H.read('tests/fixtures/sampler-chop-before-655.json'));
   assert.deepEqual(JSON.parse(JSON.stringify(S.chopFixture(E))), before);
 });
+
+/* ---------------- job B: SYNC TO LINES ---------------- */
+const loadInst = o => { const int = (v, d) => Number.isFinite(+v) && v !== null && v !== '' ? Math.round(+v) : d, clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+  const code = src.match(/I\.slc = clamp\(int\(o\.slc, 0\), 0, 64\);[\s\S]*?else delete I\.lines;/)[0];
+  const I = { slc: 0, beats: 4, sync: 0, lines: 999 }; new Function('I', 'o', 'int', 'clamp', code)(I, o, int, clamp); return I; };
+// a song's pad with a sample of 2.10 s in it, an instrument on it
+function withPad(bpm, lpb, I) {
+  const v = E.mkVoice('S', [], { tune: 0, len: 3, gate: 400, tail: 0 }); E.setKit({ voices: [v] }, { bpm, lpb, insts: [I] }); E.setCur(0);
+  E.assignSample(0, S.sine(220, 44100, 2.1), 44100, 'brk'); const d = E.renderVoice(v, 48000, null, 0); E.ctx.__cache[0] = { data: d, sr: 48000 };
+  return { d, loop: E.loopSecs(0, d, 48000) };
+}
+const chopOf = (bpm, lpb, I, n = 48) => { const { d, loop } = withPad(bpm, lpb, I), ev = { type: 'note', t: 1, rate: 1, ofs: 0, cut: null, slc: null };
+  E.applyChop(ev, I, 0, n, 0, bpm, d, 48000); return { ev, loop }; };
+
+test('B: a length in lines becomes seconds at the song’s LPB and BPM, and the sample is fitted to it (REPITCH rate = loop / target)', () => {
+  for (const [lines, lpb, bpm] of [[32, 8, 131], [16, 4, 120], [12, 8, 90], [24, 8, 174], [1, 16, 60], [128, 4, 100], [1024, 16, 300]]) {
+    const secs = lines * 60 / (bpm * lpb); assert.equal(E.slSecs(lines, lpb, bpm), secs);
+    const { ev, loop } = chopOf(bpm, lpb, { pad: 0, tsp: 0, slc: 0, sync: 1, beats: 4, lines, grain: 1, ofs: 0 });
+    assert.ok(Math.abs(ev.rate - loop / secs) < 1e-12, `${lines} lines at LPB ${lpb}, ${bpm} BPM: rate ${ev.rate} want ${loop / secs}`);
+    assert.ok(Math.abs(ev.durSec / ev.rate - secs) < 1e-9, 'the note lasts exactly the length');
+  }
+  const { ev } = chopOf(131, 8, { pad: 0, tsp: 0, slc: 0, sync: 1, beats: 4, lines: 32, grain: 1, ofs: 0 });
+  assert.ok(Math.abs(ev.rate - 2.1 / (32 * 60 / (131 * 8))) < 0.001, '32 lines at LPB 8 = 4 beats = 1.83 s: the 2.10 s sample plays 15% faster'); assert.ok(Math.abs(ev.rate - 1.1463) < 0.001);
+  assert.equal(chopOf(131, 8, { pad: 0, tsp: 0, slc: 0, sync: 1, beats: 4, lines: 32, grain: 1, ofs: 0 }).ev.rate, chopOf(131, 8, { pad: 0, tsp: 0, slc: 0, sync: 1, beats: 4, grain: 1, ofs: 0 }).ev.rate, '32 lines at LPB 8 is BEATS 4, exactly');
+});
+
+test('B: lines that are not a whole number of beats are exact (12 lines at LPB 8 = 1.5 beats); the stretch modes get the fractional beats', () => {
+  const r = chopOf(120, 8, { pad: 0, tsp: 0, slc: 0, sync: 2, beats: 4, lines: 12, grain: 1, ofs: 0 });
+  assert.equal(r.ev.st.beats, 1.5); assert.equal(r.ev.st.mode, 2);
+  assert.ok(Math.abs(r.ev.durSec - 0.75) < 1e-9, '1.5 beats at 120 BPM = 0.75 s'); assert.equal(r.ev.rate, 1);
+  assert.equal(chopOf(120, 7, { pad: 0, tsp: 0, slc: 0, sync: 3, beats: 4, lines: 10, grain: 1, ofs: 0 }).ev.st.beats, 1.428571, 'rounded to 6 places for the stretch cache key');
+});
+
+test('B: the length follows the song’s LPB (the lines stay, the time changes); a phrase’s own LPB does not enter', () => {
+  const I = { pad: 0, tsp: 0, slc: 0, sync: 1, beats: 4, lines: 32, grain: 1, ofs: 0 };
+  const a = chopOf(120, 8, I).ev.durSec / chopOf(120, 8, I).ev.rate, b = chopOf(120, 4, I).ev.durSec / chopOf(120, 4, I).ev.rate;
+  assert.ok(Math.abs(a - 2) < 1e-9 && Math.abs(b - 4) < 1e-9, `${a} s at LPB 8, ${b} s at LPB 4`);
+  assert.match(src, /const instBeats = I => \(I\.lines \| 0\) > 0 \? I\.lines \/ \(S\.lpb \|\| 4\) : \(I\.beats \|\| 4\);/);
+});
+
+test('B: exact storage: `lines` round-trips through the song loader; an old song (no field) loads and plays as before', () => {
+  assert.equal(loadInst({ sync: 1, beats: 4, lines: 37 }).lines, 37);
+  assert.equal(loadInst(JSON.parse(JSON.stringify({ sync: 2, beats: 8, lines: 1024 }))).lines, 1024);
+  assert.equal(loadInst({ lines: 5000 }).lines, 1024, 'clamped'); assert.ok(!('lines' in loadInst({ sync: 1, beats: 8 })), 'an old song: no field (a stale one is removed)');
+  assert.ok(!('lines' in loadInst({ lines: 0 })) && !('lines' in loadInst({ lines: -3 })) && !('lines' in loadInst({ lines: 'x' })));
+  assert.equal(loadInst({ sync: 1, beats: 8 }).beats, 8);
+  assert.doesNotMatch(src.match(/const freshInst = [^\n]*\n[^\n]*\n/)[0], /lines/, 'a new instrument has no lines field: saved songs do not change');
+  // BEATS-only instruments are exactly as in build 647 (the 216-case fixture above), and any write of BEATS drops lines
+  const I = { beats: 4, lines: 12 }; E.setBeats(I, 8); assert.equal(JSON.stringify(I), '{"beats":8}');
+  assert.match(src, /set:v => setBeats\(I, v\), min:1, max:64/, 'the BEATS row writes beats and drops lines');
+});
+
+test('B: SYNC TO LINES sets every instrument that plays the pad, and only those; OFF turns SYNC off; one change to the song (one undo step)', () => {
+  const insts = [{ pad: 3, sync: 0, beats: 4 }, { pad: 5, sync: 2, beats: 2 }, { pad: 3, sync: 1, beats: 8, lines: 9 }, null, { pad: 3, sync: 0, beats: 1, mo: 1 }];
+  assert.equal(E.slSet(insts, 3, 24, 2), 3);
+  assert.deepEqual(insts.filter(i => i && i.pad === 3).map(i => [i.lines, i.sync]), [[24, 2], [24, 2], [24, 2]]);
+  assert.equal(JSON.stringify(insts[1]), '{"pad":5,"sync":2,"beats":2}', 'another pad’s instrument is untouched');
+  assert.equal(E.slSet(insts, 3, 0, 0), 3); assert.deepEqual(insts.filter(i => i && i.pad === 3).map(i => i.sync), [0, 0, 0]);
+  E.slSet(insts, 3, 4000.4, 9); assert.equal(insts[0].lines, 1024); assert.equal(insts[0].sync, 1, 'a mode out of range becomes REPITCH');
+  // one undo step: the sheet applies with slSet then ONE saveS() (snap() coalesces what changes in the same turn into one step); undo restores the JSON before
+  const fn = src.match(/async function syncToLines\(pad\)\{[\s\S]*?\n\}\n/)[0];
+  assert.equal((fn.match(/saveS\(\)/g) || []).length, 2, 'one saveS() on OFF, one on Apply (never both)'); assert.equal((fn.match(/slSet\(/g) || []).length, 2);
+  const before = JSON.stringify([{ pad: 3, sync: 0, beats: 4 }]), after = [JSON.parse(before)[0]]; E.slSet(after, 3, 24, 1);
+  assert.notEqual(JSON.stringify(after), before); assert.ok(!('lines' in JSON.parse(before)[0]), 'the undo snapshot has no field: restoring it removes the length');
+  assert.match(fn, /toast\(slName\(r\.lines, lpb\)/, 'a toast says what was done');
+});
+
+test('B: the type-in takes lines, bars, or bars + lines, 1 to 1024, and says why when it can’t', () => {
+  const p = (t, lpb = 8) => E.slParse(t, lpb);
+  assert.equal(p('24').ok, true); assert.equal(p('24').lines, 24); assert.equal(p(' 24 lines ').lines, 24); assert.equal(p('1 line').lines, 1);
+  assert.equal(p('2b').lines, 64); assert.equal(p('2b', 4).lines, 32); assert.equal(p('1b8').lines, 40); assert.equal(p('2 bars + 8 lines').lines, 72); assert.equal(p('1 bar').lines, 32);
+  assert.equal(p('1024').ok, true); assert.equal(p('1025').ok, false); assert.equal(p('0').ok, false); assert.equal(p('32b').ok, true); assert.equal(p('33b').ok, false, '33 bars at LPB 8 is over the maximum');
+  for (const bad of ['', 'abc', '-4', '1.5', '2.5b', '1e3', '12 beats', '2b-1', '1b8b', '0b0']) assert.equal(p(bad).ok, false, JSON.stringify(bad) + ' is refused');
+  assert.match(p('x').err, /lines|bars/); assert.match(p('0').err, /least 1/); assert.match(p('2000').err, /1024/);
+});
+
+test('B: the wording: "N bars + M lines", whole bars show the lines in brackets, and the sentence says what will happen', () => {
+  assert.equal(E.slName(64, 8), '2 bars (64 lines)'); assert.equal(E.slName(40, 8), '1 bar + 8 lines (40 lines)'); assert.equal(E.slName(24, 8), '24 lines');
+  assert.equal(E.slName(32, 8), '1 bar (32 lines)'); assert.equal(E.slName(1, 8), '1 line'); assert.equal(E.slName(16, 4), '1 bar (16 lines)'); assert.equal(E.slName(33, 8), '1 bar + 1 line (33 lines)');
+  assert.deepEqual(Array.from(E.slChoices(8)), [8, 16, 32, 64, 128, 256], '8 to 128 lines, and 1 2 4 8 bars (32 64 128 256), merged');
+  assert.deepEqual(Array.from(E.slChoices(4)), [8, 16, 32, 64, 128], 'at LPB 4 the bars land on the same numbers');
+  assert.equal(E.slPlan(64, 8, 131, 2.1, 1), '2 bars (64 lines) = 8 beats at 8 lines a beat = 3.66 s at 131 BPM; the sample is 2.10 s: it will play 43% slower (the pitch moves). The length is in lines, so it follows LPB.');
+  assert.match(E.slPlan(32, 8, 131, 2.1, 1), /^1 bar \(32 lines\) = 4 beats at 8 lines a beat = 1\.83 s at 131 BPM; the sample is 2\.10 s: it will play 15% faster/);
+  assert.match(E.slPlan(12, 8, 120, 0.75, 1), /1\.5 beats.*already fits/); assert.match(E.slPlan(32, 8, 131, 2.1, 2), /stretched out to fit \(15%\), the pitch stays/);
+});
+
+test('B: the sheet and the buttons exist (Sync to lines… on the sample layer, › SYNC TO LINES on INST); the audio-thread core does not rewrite SYNC notes', () => {
+  assert.match(src, /id="bSyncLines"[^>]*hidden>Sync to lines…<\/button>/); assert.match(src, /\$\('bSyncLines'\)\.hidden = \$\('bEditSmp'\)\.hidden;/);
+  assert.match(src, /\{l:'› SYNC TO LINES', act:\(\) => syncToLines\(I\.pad\)/);
+  const core = H.read('core/seq-core.js'); assert.match(core, /function applyChop\(\)\{\}/, 'the core’s applyChop is a stub: SYNC is a page-sequencer feature today');
+  assert.match(core, /if \(c\)\{ applyChop\(ev, I, ev\.pad/, 'and it is only reached when ensure() gives a buffer, which the core’s ensure() never does');
+  assert.match(core, /function ensure\(\)\{ return null; \}/);
+});
