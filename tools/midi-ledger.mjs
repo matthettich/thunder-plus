@@ -178,16 +178,20 @@ const OFFN = 200;
 // a step is {n: [48, 52], v: 255, i: 0, fx: [['KIL', 4], ...]} (n: tracker notes, C-4 = 48 = MIDI 60; OFFN = the OFF note; at most 3 commands)
 function mkSong(spec) {
   const S = JSON.parse(JSON.stringify(ELECTRO));
+  for (const k of ['chainPatch', 'presets', 'irs', 'secs', 'sc2', 'fxPre', 'flx256', 'mst', 'master']) delete S[k];   // (the C++ test reads the same compact song)
   S.song = Array.from({ length: 256 }, () => new Array(33).fill(-1));
+  S.chains = []; S.phrases = []; S.plen = []; S.plpb = [];
   S.bpm = spec.bpm || 120; S.swing = spec.swing || 50; S.swingB = spec.swingB || 2; S.lpb = spec.lpb || 4; S.ticks = spec.ticks || 6; S.ntr = spec.ntr || 16;
   S.tfx = new Array(32).fill(null); S.mfx = []; S.mst = spec.mst ? ELECTRO.mst : { on: false };
-  S.mix.forEach(m => { m.mute = false; m.solo = false; });
+  if (!spec.mst) delete S.mst;
+  S.mix = S.mix.map(m => ({ vol: 224, trim: 128, pan: 128, mute: false, solo: false })); S.chainOn = new Array(32).fill(true);
   for (const t of spec.mute || []) S.mix[t].mute = true;
   for (const t of spec.solo || []) S.mix[t].solo = true;
   S.smute = new Array(256).fill(0);
+  S.insts = S.insts.slice(0, 16);
   const I0 = JSON.parse(JSON.stringify(ELECTRO.insts[0]));
   for (const [ii, o] of Object.entries(spec.insts || {})) S.insts[+ii] = Object.assign({}, JSON.parse(JSON.stringify(S.insts[+ii] || I0)), o);
-  let pid = 2000, cid = 2000, endDone = false;
+  let pid = 0, cid = 0, endDone = false;
   for (const [t, T] of Object.entries(spec.tracks || {})) {
     const chain = [];
     for (const ph of T.phrases || [T.rows]) {
@@ -207,8 +211,11 @@ function mkSong(spec) {
     S.chains[cid] = chain; S.song[spec.row0 || 0][+t] = cid++;
     for (let y = 1; y < (spec.rows || 1); y++) S.song[y][+t] = S.song[0][+t];   // (one chain on the rows 0..rows-1: the song block is `rows` rows deep)
   }
+  for (let i = 0; i < S.phrases.length; i++) if (!S.phrases[i]) S.phrases[i] = null;
+  for (let i = 0; i < S.chains.length; i++) if (!S.chains[i]) S.chains[i] = null;
   return S;
 }
+const trim = S => { let n = S.song.length; while (n > 1 && S.song[n - 1].every(v => v < 0)) n--; S.song = S.song.slice(0, n); S.smute = S.smute.slice(0, n); return S; };
 // a row of notes helper
 const N = (n, extra) => Object.assign({ n: Array.isArray(n) ? n : [n] }, extra || {});
 
@@ -417,6 +424,7 @@ for (const C of todo) {
     const name = `midi-ledger-${C.id}${C.native === 'both' && !native ? '-web' : ''}.json`;
     const text = '{\n' + Object.entries(s).filter(([k]) => k !== 'msgs').map(([k, v]) => ` ${JSON.stringify(k)}: ${JSON.stringify(v)}`).join(',\n') + ',\n "msgs": [\n' + s.msgs.map(m => '  ' + JSON.stringify(m)).join(',\n') + '\n ]\n}\n';
     files.push([name, text]);
+    { const sn = `midi-ledger-${C.id}.song.json`; if (!files.some(f => f[0] === sn)) files.push([sn, JSON.stringify({ app: 'thunder-song', v: 6, song: trim(mkSong(C.song)) }) + '\n']); }
     index.push({ file: name, case: C.id, mode: s.mode, msgs: s.msgs.length, bytes: Buffer.byteLength(text), sha256: crypto.createHash('sha256').update(text).digest('hex'), counts: s.counts, findings: s.findings.length });
   }
 }

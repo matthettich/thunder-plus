@@ -22,6 +22,7 @@ target_sources(thunder_core PRIVATE src/engine/layer_u24.cpp src/engine/layer_fm
 # U32: the SoundFont / GM player (SF2 / SF3 parse, Vorbis decode through the pinned stb_vorbis, zones and modulators, the pad render and the live note)
 add_subdirectory(sf)
 target_sources(thunder_core PRIVATE src/sf/sf_math.cpp src/sf/sf_parse.cpp src/sf/sf_decode.cpp src/sf/sf_voice.cpp src/sf/sf_render.cpp src/sf/sf_live.cpp)
+target_sources(thunder_core PRIVATE src/midi/midisched.cpp)  # U35: MIDI scheduling
 target_link_libraries(thunder_core PUBLIC thunder_stb_vorbis)
 target_sources(thunder_core PRIVATE src/lxr/lxr_seam.cpp)   # U04: the LXR seam (a registry of one pointer; no LXR code: the optional module is native/lxr)
 target_include_directories(thunder_core PRIVATE src)

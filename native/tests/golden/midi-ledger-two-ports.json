@@ -3,7 +3,7 @@
  "mode": "native",
  "why": "two instruments on two ports and channels, a per-port Gear delay (+10 ms, -5 ms), two letters on one cable (C = A) with clock on A, C and B: the cable gets clock once",
  "setup": {"bpm":120,"swing":50,"lpb":4,"ticks":6,"ports":["A","B","A",null],"clock":[true,true,true,false],"gearDelayMs":[10,-5,0,0],"outputLatencyS":0,"pdcT":0,"masteringOn":false,"playAtMs":500,"play":"song","playOpts":{},"actions":[],"endMs":2500,"insts":{"0":{"mo":1,"mch":0,"mpt":0,"pbr":2},"1":{"mo":1,"mch":5,"mpt":1,"pbr":2},"2":{"mo":1,"mch":9,"mpt":2,"pbr":2},"3":{"mo":1,"mch":1,"mpt":3,"pbr":2}},"tracks":[0,1,2,3]},
- "seqEvents": {"beat":8,"note":5,"off":3},
+ "seqEvents": {"beat":8,"note":6,"off":3},
  "counts": {"start":2,"on":5,"off":5,"clock":84,"cc":3,"stop":2},
  "droppedByClear": 0,
  "drops": [{"sent":1768,"port":"A","what":"clear","dropped":0},{"sent":1768,"port":"B","what":"clear","dropped":0}],

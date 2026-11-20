@@ -180,3 +180,22 @@ The test reads `midi-ledger-<case>.json`, builds the song from `setup`, drives `
 - **B8. STOP's `[0xFC]` is timestamped after the last booked tick**, but `moRelease` clears queued ticks first, so with a native port the Stop follows ticks that never went out (`start-stop`: the last tick sent is at 1895.5 ms, the Stop at 1938.2 ms): a gap of two missing ticks before the Stop. Harmless; noted for the A1 rule.
 - **B9. `release` sends a second note-off at `h.t + 0.001` for a note that had not started**, after the clear removed its note-on: a stray off. Harmless.
 - **B10. No bank select and no RPN for bend range** (A5): a program change goes to bank 0's program, and a song using PBN / PVB / slides at `pbr` 12 sounds wrong on gear left at 2 semitones. Documented rather than bug.
+
+## Rulings (the lead, 19 Nov, 20:50)
+
+THE OWNER'S DECISION (20:45): the suspected web bugs are FIXED IN THE NATIVE PORT, not copied. The web app is left as it is. So the ledgers stay the web's truth, and every case a fix touches gets an explicit, listed expected difference (a small `midi-ledger-expect.json` or a table in the test: case, which messages differ, why, the B number); everything not listed must match exactly as A1 says. No silent tolerance.
+
+Fixes (native behaviour):
+- B1: a note that is silent (vol 00, a velocity that rounds to 0) ends the track's previous mono gear note at its own time (`moOff` first), and sends no note-on.
+- B2 / A2: accepted as proposed: tick times integrate the tempo map forward from the anchor at or before the tick; the stream is monotonic and regular. Goldens: ticks more than 100 ms from a change exact; inside, the rule "monotonic, each interval between the two tempos' tick lengths".
+- B3: Start, Continue, SPP and the clock ticks get the same Gear delay as notes on that port, so the first note never precedes Start. Stop too.
+- B4: held notes are owned per TRACK. A track's off / takeover ends only the notes that track holds. When two tracks hold the same pitch on one port + channel, the note-off goes out when the LAST holder lets go (a per port/channel/pitch count); a retrigger of a pitch another track holds sends off then on. Stats count the shared-channel collisions so a shell can warn.
+- B5 / B6 / A8: STOP clears the last-CC table and the used-channel table after sending its All Notes Off, so the first CSL glide of a PLAY sends its start value and a STOP only addresses channels used in that run.
+- B7: no 512-tick cap and no burst: the scheduler books ticks per block; if the host stalls past the look-ahead, late ticks are DROPPED and counted, and the phase is kept (never a burst in the past). A pad note the players drop for lateness has its MIDI note dropped too: expose the rule so `Players` and `MidiSched` use one lateness test (design the hook; `Players` is being written on branch `n1/players` by another worker, do not edit its files: give `MidiSched` an entry point the host calls with the event and a `late` flag).
+- B8: Stop is stamped at the stop time, after the last tick actually sent, with no phantom gap.
+- B9: no note-off for a note whose note-on was never sent.
+- B10 / A5: keep (no RPN, no bank select); a later opt-in, not now.
+
+A1 accepted with the above. A3 accepted (core frames exclude device output latency; include the core's FX latency, read from the mixer each block, A6: no cache). A4, A7, A9, A10 accepted as proposed (port table is the shell's / U36's; hidden-page rules not ported; SPP computed on the control thread with a `Seq`; clock-in is phase 2).
+
+BUILD, as the 3.3 order, on the SAME branch `n1/u35-spec`: `native/core/src/midi/` `MidiSched`, the SPSC output ring, the `thunder_midi_*` C API, tests that read the ledgers plus the expected-difference table, a hand mutation for every R-M rule and every fix, an `rt_harness`-style allocation / lock proof, hostile-input tests for the C API, full ctest Release, the midi tests under ASan / UBSan and the ring under TSan.
