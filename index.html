@@ -682,6 +682,12 @@ body.mlearn .row.mtarget input[type=range]{outline:3px solid var(--pl); outline-
 .pad.syn{background:var(--panel2)}
 .pad.syn b::after{content:" SYN"; font-size:var(--fs-2); font-weight:500; letter-spacing:.06em; color:var(--muted)}
 .pad.syn.hit b::after{color:var(--inv)}
+/* IN USE OUTLINE (19 Nov, owner): a pad or slot that a note on the song plays has a thin solid line just inside its edge, one only phrases that are not on the song play has the same line dotted; free ones have nothing.
+   An outline (the box-shadow is the pad's offset block, the border is the cursor's): no layout shift. currentColor so it is the tile's own text colour in every skin (ink on paper, light on the dark skins, the accent's text on the cursor pad). */
+.pad.uOn, .pad.uOff{outline:1.5px solid color-mix(in srgb, currentColor 72%, transparent); outline-offset:-3px}
+.pad.uOff{outline-style:dotted}
+.pad.sel.uOn, .pad.sel.uOff{outline-offset:-5px}   /* inside the cursor pad's thick border */
+.padkey{font-size:var(--fs-2); color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0} .padkey[hidden]{display:none}
 
 .toast{position:fixed; left:50%; transform:translateX(-50%); bottom:calc(110px + env(safe-area-inset-bottom,0px));
   background:var(--panel); color:var(--ink); border:2px solid var(--ink); box-shadow:4px 4px 0 0 var(--ink); padding:9px 15px; font-size:var(--fs-4); z-index:130; max-width:calc(100% - 32px)}
@@ -1102,6 +1108,7 @@ body.mob #bFile.dirty{position:relative} body.mob #bFile.dirty::before{position:
 .tinl button i{font-style:normal; font-weight:600; opacity:.55; margin-right:6px}
 .tinl button.on{background:var(--ink); color:var(--inv)} .tinl button.on i{opacity:.8}
 .tinl button.mo i{opacity:1}
+.tinl button.uOn, .tinl button.uOff{outline:1px solid color-mix(in srgb, currentColor 60%, transparent); outline-offset:-2px} .tinl button.uOff{outline-style:dotted}   /* IN USE OUTLINE: as the Synth page's pads */
 .tinlp{flex:1 1 0; max-width:440px; align-self:stretch; align-content:center; overflow:hidden; padding:0 4px}
 @media (max-width:560px){ .tinlp{display:none!important} }
 .mtr{min-height:0; padding:0; border:1px solid var(--line); background:var(--panel); height:58px; display:flex; flex-direction:column; align-items:stretch; gap:0}
@@ -3318,7 +3325,7 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
 
   <section class="band voice">
     <div class="bar vbar">
-      <div class="vrow vkit" id="vKit"><span class="vel">Slots</span><span class="grp" role="group" aria-label="How many slots the kit has"><button type="button" class="sm" id="kSlotDn" aria-label="Fewer slots" title="8 fewer slots (the ones taken away keep their sound: more slots bring it back)">−</button><button type="button" class="sm kslotn" id="kSlotN" title="How many slots (pads) the kit has, 16 to 64. Tap to type a number">16</button><button type="button" class="sm" id="kSlotUp" aria-label="More slots" title="8 more slots">+</button></span><span class="vel">This pad</span><div class="seg" id="vKindSeg" role="group" aria-label="How this pad plays"></div><span class="lbl" id="vKindLbl"></span></div>
+      <div class="vrow vkit" id="vKit"><span class="vel">Slots</span><span class="grp" role="group" aria-label="How many slots the kit has"><button type="button" class="sm" id="kSlotDn" aria-label="Fewer slots" title="8 fewer slots (the ones taken away keep their sound: more slots bring it back)">−</button><button type="button" class="sm kslotn" id="kSlotN" title="How many slots (pads) the kit has, 16 to 64. Tap to type a number">16</button><button type="button" class="sm" id="kSlotUp" aria-label="More slots" title="8 more slots">+</button></span><span class="vel">This pad</span><div class="seg" id="vKindSeg" role="group" aria-label="How this pad plays"></div><span class="lbl" id="vKindLbl"></span><span class="padkey" id="padKey" hidden title="A thin line just inside a pad or slot: a note in a phrase on the song plays it. A dotted line: only phrases that are not on the song do. No line: free.">outlined = used in this song · dotted = off the song</span></div>
       <div class="vrow vttl"><span class="ttl" id="vNum">Pad 1</span><span class="lbl vused" id="vUsed" aria-live="off"></span><span class="vmeter" id="vMeter" title="Level of what you play here (pads, keys, MIDI), −48 to +6 dB. The line is 0 dB: past it the bar turns red and the safety limiter (Project → LIMITER) is holding the peaks down." aria-hidden="true"><i></i><b></b></span></div>
       <div class="vrow vid"><input id="vName" type="text" aria-label="Pad name" spellcheck="false"><button class="sm play" id="vPlay" title="Play this pad (Shift+Space)"><svg class="ic" aria-hidden="true"><use href="#ic-play"/></svg>Play</button><button type="button" class="sm" id="vAud" aria-pressed="true" title="Audition: play this pad after each change you make to it, so you hear the edit. Turn it off to edit in silence.">Audition</button></div>
       <div class="vengine" id="vEngine" hidden><span class="vel">Engine</span><div class="seg" id="vEngSeg"></div><span class="lbl" id="vEngLbl"></span></div>   <!-- SYNTH UX A: the engine picker sits right under the name row, above the waveform -->
@@ -14514,8 +14521,47 @@ function padTracks(){
   padUseM = {sig, S, m}; return m;
 }
 function padUsedText(i){ try { const a = padTracks().get(i); if (!a || !a.size) return 'unused'; return 'Track' + (a.size > 1 ? 's ' : ' ') + [...a].sort((x, y) => x - y).map(t => d2(t + 1) + (tName(t) ? ' ' + tName(t) : '')).join(' · '); } catch(e){ return ''; } }
-function usedUI(){ const u = $('vUsed'); if (!u || isMobile()) return; const x = padUsedText(cur), t = x === 'unused' || !x ? 'unused' : 'Used on: ' + x; if (u.textContent !== t){ u.textContent = t; u.title = 'The tracks whose phrases play an instrument on this slot (' + t + ')'; } }
+/* IN USE OUTLINE (19 Nov, owner: "lightly outline instruments that are in use in a song when viewing them on the synth page"). One pass over every phrase
+   (docs/INUSE-OUTLINE-NOTES.md): a NOTE plays an instrument (the row's INS command, else its I column, else the one the phrase had last, else 00: what the player does), and the
+   instrument plays a pad (S.insts[ii].pad; with a kit slot per track the note's own track does: voiceForTrack). A phrase is ON the song when a song cell reaches it
+   (phraseTracks); every other phrase is OFF. A PERFORM part (S.parts[k].insts) can swap the instruments, so the pads it would play for the same notes count as in use too.
+   Memoised on songVer (saveS: every edit, undo, load), the instruments' and parts' pads and vtrk, so a redraw costs a string compare; the scan itself is ~1 ms on ELECTRO. */
+let padUseC = null;
+function padUseMap(){
+  const sig = songVer + ':' + (vtrk ? 1 : 0) + ':' + S.insts.map(I => I && I.pad).join(',') + ':' + (S.parts || []).map(q => q && q.insts ? q.insts.map(I => I ? I.pad : '').join(',') : '').join('|');
+  if (padUseC && padUseC.sig === sig && padUseC.S === S) return padUseC;
+  const pads = new Map(), insts = {on:new Map(), off:new Map()}, PT = phraseTracks(), parts = (S.parts || []).filter(q => q && Array.isArray(q.insts));
+  const slot = pad => { let u = pads.get(pad); if (!u) pads.set(pad, u = {on:new Map(), off:new Map(), part:new Set()}); return u; };
+  const add = (m, k, n) => m.set(k, (m.get(k) || 0) + n);
+  S.phrases.forEach((p, pid) => {
+    if (!p) return; const ts = PT.get(pid), onSong = !!ts, L = Math.min(plen(pid), p.length); let carry = 0;
+    for (let y = 0; y < L; y++){ const r = p[y]; if (!r) continue;
+      let n = 0; for (let c = 0; c < NCOL; c++) if (isNoteV(r[c])) n++; if (!n) continue;   // only a row with a note plays (and carries) an instrument
+      let ii = r[IC] >= 0 ? r[IC] : carry; for (let m = FX0; m < RW; m += 2) if (FXC[r[m]] === 'INS' && r[m + 1] >= 0) ii = r[m + 1];
+      ii = Math.min(ii, NI - 1); carry = ii; add(onSong ? insts.on : insts.off, ii, n);
+      if (vtrk){ if (onSong) for (const t of ts) add(slot(voiceForTrack(t)).on, ii, n); continue; }   // a kit slot per track: the track picks the pad, whatever the instrument
+      const I = S.insts[ii] || S.insts[0]; if (I) add(slot(I.pad)[onSong ? 'on' : 'off'], ii, n);
+      if (onSong) for (const q of parts){ const J = q.insts[ii] || q.insts[0]; if (J && J.pad >= 0 && (!I || J.pad !== I.pad)) slot(J.pad).part.add(ii); } } });
+  return padUseC = {sig, S, pads, insts};
+}
+// 0 free, 1 in use on the song (or through a PERFORM part), 2 only in phrases that are not on the song
+function padUseState(i){ try { const u = padUseMap().pads.get(i); return !u ? 0 : u.on.size || u.part.size ? 1 : u.off.size ? 2 : 0; } catch(e){ return 0; } }   // (S, or the kit's helpers, may not exist yet at start-up)
+function instUseState(k){ try { const u = padUseMap().insts; return u.on.has(k) ? 1 : u.off.has(k) ? 2 : 0; } catch(e){ return 0; } }
+// The same in a few words, for the waveform's line (one line, no wrapping)
+function padUseShort(i){ const st = padUseState(i), u = padUseMap().pads.get(i); if (st === 0) return 'not in the song'; if (st === 2) return 'only in phrases not on the song';
+  const n = useSum(u.on); return n ? 'in use: inst ' + useInst(u.on) + ' · ' + n + ' note' + (n === 1 ? '' : 's') : 'in use via a PERFORM part: inst ' + useInst(new Map([...u.part].map(k => [k, 1]))); }
+const useSum = m => { let n = 0; for (const v of m.values()) n += v; return n; };
+const useInst = m => [...m.keys()].sort((a, b) => a - b).map(k => hx(k)).join(', ');
+// The cursor pad's sentence: "used by instrument 03, 07 · 42 notes on the song" (+ the unplaced phrases' notes, + a PERFORM part's instruments); '' when nothing plays it
+function padUseText(i){ try { const u = padUseMap().pads.get(i); if (!u) return '';
+  const nOn = useSum(u.on), nOff = useSum(u.off), pi = [...u.part].filter(k => !u.on.has(k)), a = [];
+  if (nOn) a.push('used by instrument ' + useInst(u.on) + ' · ' + nOn + ' note' + (nOn === 1 ? '' : 's') + ' on the song');
+  if (pi.length) a.push((nOn ? 'also ' : '') + 'played through a PERFORM part by instrument ' + useInst(new Map(pi.map(k => [k, 1]))));
+  if (nOff) a.push((nOn || pi.length ? 'also ' : 'only ') + 'in phrases not on the song: instrument ' + useInst(u.off) + ' · ' + nOff + ' note' + (nOff === 1 ? '' : 's'));
+  return a.join(' · '); } catch(e){ return ''; } }
+function usedUI(){ const u = $('vUsed'); if (!u || isMobile()) return; const x = padUsedText(cur), k = padUseText(cur), t = (x === 'unused' || !x ? 'unused' : 'Used on: ' + x) + (k ? ' · ' + k : ''); if (u.textContent !== t){ u.textContent = t; u.title = 'The tracks whose phrases play an instrument on this slot, and which instruments and how many notes (' + t + ')'; } }
 function renderPads(){
+  let anyUse = false;
   kit.voices.forEach((v, i) => {
     if (i >= padEls.length) return;
     const {p, n, m, b} = padEls[i];
@@ -14529,10 +14575,12 @@ function renderPads(){
     p.title = (vtrk && trackOfPad(i) >= 0 ? `Track ${d2(trackOfPad(i) + 1)} · ` : '') + (ins.length ? `Instrument ${ins.map(k => hx(k)).join(', ')} in the tracker` : 'No tracker instrument plays this pad') + (isMobile() ? '' : ' · ' + (padUsedText(i) === 'unused' ? 'unused in the song' : 'used on ' + padUsedText(i).toLowerCase()));
     m.textContent = midi.on ? (midi.notes[i] >= 0 ? noteName(midi.notes[i]) : isSyn(i) ? '' : '—') : '';
     p.classList.toggle('sel', i === cur);
+    { const us = padUseState(i); p.classList.toggle('uOn', us === 1); p.classList.toggle('uOff', us === 2); anyUse = anyUse || us > 0; }   // IN USE OUTLINE
     p.classList.toggle('learn', midi.learn && midi.target !== i);
     p.classList.toggle('learning', midi.learn && midi.target === i);
-    p.setAttribute('aria-label', `Pad ${hx(i)}, ${v.name}${isSyn(i) ? ', synth' : ''}`);
+    p.setAttribute('aria-label', `Pad ${hx(i)}, ${v.name}${isSyn(i) ? ', synth' : ''}${p.classList.contains('uOn') ? ', in use on the song' : p.classList.contains('uOff') ? ', only in phrases not on the song' : ''}`);
   });
+  { const k = $('padKey'); if (k) k.hidden = !anyUse; }   // the legend shows only when something is outlined
 }
 function flash(i){ audioWake = performance.now(); const p = padEls[i].p; p.classList.add('hit'); setTimeout(() => p.classList.remove('hit'), 90); }
 function select(i){ if (i === cur) return; audDrop(); cur = i; refreshAll(); }   // audDrop: an audition waiting on the pad before must not play this one
@@ -14625,8 +14673,8 @@ function drawWave(){
   const g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, w, h);
   const c = cache[cur], meta = $('wMeta');
   // IN USE (31 Oct): which tracks play this pad's sound (through which instruments)
-  const inUse = () => { try { const u = padUses(cur); const sp = el('span', u.length ? 'inuse' : null, u.length ? 'in use: ' + u.map(x => 'TRK ' + trkList(x.tracks) + ' (inst ' + hx(x.i) + ')').join(' · ') : 'not in the song');
-    sp.title = u.length ? 'This sound plays on ' + u.map(x => 'track ' + trkList(x.tracks) + ' through instrument ' + hx(x.i)).join(', ') + '. Changing it changes it there.' : 'No instrument in the song plays this pad'; meta.append(sp); } catch(e){} };
+  const inUse = () => { try { const u = padUses(cur), k = padUseText(cur), st = padUseState(cur), sp = el('span', st === 1 ? 'inuse' : null, padUseShort(cur));
+    sp.title = (k ? k + '. ' : 'No instrument in the song plays this pad. ') + (u.length ? 'This sound plays on ' + u.map(x => 'track ' + trkList(x.tracks) + ' through instrument ' + hx(x.i)).join(', ') + '. Changing it changes it there.' : ''); meta.append(sp); } catch(e){} };
   g.fillStyle = cssv('--screen'); g.fillRect(0, 0, w, h);
   // STALE WAVE (13 Nov): a pad with no render yet left the pad before's time, peak and "in use" under an empty box
   if (!c){ meta.innerHTML = ''; meta.append(el('span', null, 'rendering…')); inUse(); return; }
@@ -26575,8 +26623,9 @@ function instList(){
     const I = S.insts[i]; if (!I || (i >= 16 && i !== cInst && !shown.has(i))) continue;   // 10–3F only once used or set up
     const v = kit.voices[I.pad], pn = (v && v.name) || 'Pad ' + (I.pad + 1), mo = I.mo | 0;
     const nm = mo === 1 ? 'MIDI ' + PORTL[portOf(I)] + ' ch ' + d2((I.mch | 0) + 1) : pn + (mo === 2 ? ' +MIDI' : '');
-    sig += nm + '/' + I.pad + ';';
-    rows.push(`<button type="button" data-i="${i}" class="${i === cInst ? 'on' : ''}${mo ? ' mo' : ''}" title="INST ${hx(i)} plays pad ${hx(I.pad)} ${esc(pn)}${mo ? ' · MIDI port ' + PORTL[portOf(I)] + ' ch ' + ((I.mch | 0) + 1) : ''}"><i>${hx(i)}</i>${esc(nm)}</button>`);
+    const us = instUseState(i);   // IN USE OUTLINE: a note on the song plays it (1), only a phrase that is not on the song does (2)
+    sig += nm + '/' + I.pad + '/' + us + ';';
+    rows.push(`<button type="button" data-i="${i}" class="${i === cInst ? 'on' : ''}${mo ? ' mo' : ''}${us === 1 ? ' uOn' : us === 2 ? ' uOff' : ''}" title="INST ${hx(i)} plays pad ${hx(I.pad)} ${esc(pn)}${mo ? ' · MIDI port ' + PORTL[portOf(I)] + ' ch ' + ((I.mch | 0) + 1) : ''}${us === 1 ? ' · played by notes on the song' : us === 2 ? ' · played only by phrases that are not on the song' : ''}"><i>${hx(i)}</i>${esc(nm)}</button>`);
   }
   if (sig === inlSig) return; inlSig = sig;
   const h = rows.join(''); $('tInlSide').innerHTML = h; pd.innerHTML = h;
@@ -36464,6 +36513,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
 const CHANGES = [
   [657, '19 Nov', ['Arrange and Song: double-click (or double-tap) an empty MASTER cell and it gets a new empty block. If that song row has nothing on any visible track and the master is empty, the whole row is filled instead, like a hand-made row: a new empty phrase on every track in MONO / POLY and a new empty block on the master, each with its own number in track order, as one undo step. Not enough free numbers: nothing changes and a message says how many are needed and free (CLEAR UNUSED PHRASES frees some). Tracks beyond MONO / POLY get nothing. A filled master cell still opens its phrase on a double-click; Enter / EDIT on an empty master cell does the same two things.']],
   [656, '19 Nov', ['Settings: FOLLOW sits directly above PHRASE ON STOP and ARRANGE ON STOP, in the View menu and in Settings (the Project screen too). Nothing else about them changed']],
+  [654, '19 Nov', ['Synth page: the pads and slots the song uses have a thin line just inside their edge, so you can see which are open. Solid: a note in a phrase on the song plays it. Dotted: only phrases that are not on the song do. No line: free. A one-line key sits under the slot controls, and the info line for the selected pad says which instruments play it and how many notes. The tracker\u2019s INSTRUMENTS list is outlined the same way.']],
   [653, '19 Nov', ['FX presets: with the cursor in an effect slot\u2019s controls (a parameter row or \u203a PRESET; FX screen, tracks and the master, pump effects too), Ctrl/\u2318+\u25c0\u25b6 load the previous / next preset (EDIT+\u25c0\u25b6 on its \u203a PRESET row on the pad). Ctrl/\u2318+Shift+\u25c0\u25b6 change a parameter by 1 now. Hold it to run through them: the sound changes as you go, and the whole run is one undo step. It stops at the first and last preset.']],
   [649, '19 Nov', ['Settings: press on a slider\u2019s bar (SWING, TEMPO, LPB, TEXT SIZE\u2026) to set it there and drag to change it, with a mouse or a finger. A swipe up or down that starts on a bar still scrolls the list. Double-tap a bar to put it back to its default. Shift (mouse) or a finger held away from the bar makes it finer. The sliders no longer lock.']],
   [648, '19 Nov', ['…waves and …chains: the Expression module’s ? help now has worked examples to copy, one formula per line: a sine, saw, triangle and square, a pitch from K1 and a version that glides without a jump, FM, a chord, a fade-in, ring modulation, tremolo, a low-pass filter, a wavefolder, a bit crusher and noise. The Help page shows them on the Expression card too, and the module’s Examples menu now holds the same formulas (tones first, then effects), so you can pick one instead of typing it.']],
