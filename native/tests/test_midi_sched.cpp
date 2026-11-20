@@ -216,8 +216,132 @@ static void rules() {
   std::printf("single rules: done\n");
 }
 
+
+// ---- F3: a STOP anywhere in a note's last 100 ms never leaves it hanging, and never ends it twice ----------------------------------------------------------
+static void stopSweep() {
+  int bad = 0, runs = 0, onRuns = 0;
+  for (int ms = 940; ms <= 1700; ms++) {   // the note is on from 1.000 s to 1.600 s (cut); the sweep covers before the ON, the ON frame itself, the whole note and after the OFF
+    for (int mode = 0; mode < 2; mode++) {   // 0: books every 10 ms; 1: books every 37 ms (a bigger block: the OFF is out of the outbox earlier or later)
+      Rig r; r.s.setBlock(mode ? 0.037 : 0.010);
+      SeqEvent e = Rig::note(0, 0, 60, 1.0); e.has |= SH_CUT; e.cut = 1.6; r.s.onEvent(e, nullptr, 120, false, 0.9);
+      const double step = mode ? 0.037 : 0.010; double now = 0.9; const double stopT = ms / 1000.0;
+      while (now + step <= stopT + 1e-9) { r.book(now); now += step; }
+      r.book(now); if (now < stopT - 1e-9) now = now;   // (the last block before the stop)
+      r.s.stop(stopT); r.drain();
+      for (double t = stopT + 0.01; t < 1.9; t += 0.03) r.book(t);   // the host goes on (the stopped scheduler must send nothing more for the note)
+      const int64_t sf = (int64_t)std::llround(stopT * 48000);
+      int ons = 0, offs = 0, sounding = 0; int64_t offF = -1; std::vector<const Out*> seq60;
+      for (const Out& o : r.out) if (o.b[1] == 60 && ((o.b[0] & 0xF0) == 0x90 || (o.b[0] & 0xF0) == 0x80) && o.port == 0) seq60.push_back(&o);
+      std::stable_sort(seq60.begin(), seq60.end(), [](const Out* a, const Out* b) { return a->frame < b->frame; });
+      for (const Out* o : seq60) { const bool on = (o->b[0] & 0xF0) == 0x90 && o->b[2] > 0; if (on) { ons++; sounding++; } else { offs++; sounding--; offF = o->frame; } }
+      runs++; if (ons) onRuns++;
+      const bool ok = sounding == 0 && ons == offs && ons <= 1 && (ons == 0 || offF <= std::max<int64_t>(sf, 48000 * 16 / 10));
+      if (!ok) { if (bad++ < 5) CHECK(false, "F3: STOP at %d ms (mode %d): %d on, %d off, %d left sounding, the off at frame %lld (stop %lld)", ms, mode, ons, offs, sounding, (long long)offF, (long long)sf); }
+    }
+  }
+  CHECK(bad == 0 && onRuns > 600, "F3: %d of %d stop times left a hung or doubled note (%d runs had a note)", bad, runs, onRuns);
+  std::printf("F3 sweep: %d runs, %d with a note, %d bad\n", runs, onRuns, bad);
+}
+
+// ---- F4: a stalled consumer: what the ring drops, in what order ---------------------------------------------------------------------------------------
+static void stalledConsumer() {
+  const int cap = kMidiRingCap;
+  { Rig r;
+    const uint8_t tick[1] = {0xF8}, cc[3] = {0xB0, 7, 100}, on[3] = {0x90, 30, 100}, offb[3] = {0x80, 30, 0};
+    const int nT = cap + 800; for (int i = 0; i < nT; i++) r.s.liveRaw(0, tick, 1, 0, 0.0);
+    const int keptT = cap - kRingReserveLow + 1;                     // accepted while at least `reserve` slots are free
+    CHECK((int)r.s.stats().dropTicks == nT - keptT && r.s.stats().dropCtl == 0 && r.s.stats().mayHang == 0, "F4: ticks go first: %d dropped, expected %d", (int)r.s.stats().dropTicks, nT - keptT);
+    for (int i = 0; i < 100; i++) r.s.liveRaw(0, cc, 3, 0, 0.0);
+    CHECK(r.s.stats().dropCtl == 100 && r.s.stats().dropNoteOn == 0, "F4: CCs are dropped below the reserve (%d)", (int)r.s.stats().dropCtl);
+    for (int i = 0; i < 400; i++) r.s.liveRaw(0, on, 3, 0, 0.0);
+    CHECK((int)r.s.stats().dropNoteOn == 400 - (kRingReserveLow - kRingReserveNote) && r.s.stats().dropOff == 0, "F4: note-ons are dropped next, below the smaller reserve (%d dropped)", (int)r.s.stats().dropNoteOn);
+    for (int i = 0; i < 100; i++) r.s.liveRaw(0, offb, 3, 0, 0.0);
+    CHECK(r.s.stats().dropOff == 0 && r.s.stats().mayHang == 0, "F4: note-offs are still accepted while ANY slot is free (%d dropped)", (int)r.s.stats().dropOff);
+    r.s.stop(0.5);   // CLEAR markers (one per connected port) and the rest of a stop
+    r.drain(); int clears = 0; (void)clears;
+    CHECK(r.s.stats().dropClear == 0 && r.s.stats().mayHang == 0, "F4: the STOP's CLEAR markers made it into the full ring (%d dropped)", (int)r.s.stats().dropClear);
+    // and the consumer did get them: drain through the raw ring
+    Rig q; for (int i = 0; i < nT; i++) q.s.liveRaw(0, tick, 1, 0, 0.0); q.s.stop(0.5);
+    MidiMsg b[512]; int nclr = 0; for (;;) { const int64_t n = q.s.drain(b, 512); if (n <= 0) break; for (int64_t i = 0; i < n; i++) if (b[i].flags & MIDI_F_CLEAR) nclr++; }
+    CHECK(nclr == 2, "F4: both CLEAR markers are in the stream (%d)", nclr);
+  }
+  { Rig r; const uint8_t offb[3] = {0x80, 30, 0};   // only when the ring is completely full of important records is one of them dropped, counted, and flagged
+    for (int i = 0; i < cap + 10; i++) r.s.liveRaw(0, offb, 3, 0, 0.0);
+    CHECK(r.s.stats().dropOff == 10 && r.s.stats().ringFull == 10 && r.s.stats().mayHang == 1, "F4: 10 offs dropped only at a completely full ring (%d), the hung-note flag is set (%d)", (int)r.s.stats().dropOff, (int)r.s.stats().mayHang);
+    r.drain(); r.s.panic(1.0); r.drain();
+    CHECK(r.s.stats().mayHang == 0, "F4: a panic that could be queued clears the flag"); }
+  { Rig r; const uint8_t tick[1] = {0xF8}, on[3] = {0x90, 30, 100};   // a dropped note-on cancels its own later off
+    for (int i = 0; i < cap; i++) r.s.liveRaw(0, tick, 1, 0, 0.0);
+    for (int i = 0; i < 300; i++) r.s.liveRaw(0, on, 3, 0, 0.0);
+    const uint64_t d0 = r.s.stats().dropNoteOn;
+    SeqEvent e = Rig::note(0, 0, 60, 1.0); e.has |= SH_CUT; e.cut = 1.2; r.s.onEvent(e, nullptr, 120, false, 0.9);
+    r.s.book(0.9, 0.9, 120, false); r.s.book(1.05, 1.05, 120, false); r.s.book(1.25, 1.25, 120, false);
+    CHECK(r.s.stats().dropNoteOn == d0 + 1, "F4: the ON of the note was dropped (%d)", (int)(r.s.stats().dropNoteOn - d0));
+    r.drain(); CHECK(r.count(0x90, 60) == 0 && r.count(0x80, 60) == 0, "F4: and its OFF never follows (on %d, off %d)", r.count(0x90, 60), r.count(0x80, 60));
+    CHECK(r.s.stats().offsSuppressed >= 1, "F4: the OFF is counted as suppressed"); }
+  std::printf("stalled consumer: done\n");
+}
+
+// ---- F7: the boundaries and limits the verifier's extra mutants found untested ----------------------------------------------------------------------------
+struct Harness {   // a Song with the clock on, a Seq on a loop of the 'loop' case at one row per beat, the scheduler
+  Case C; Drive D; MidiSched* s = nullptr; Seq* q = nullptr; std::vector<SeqEvent> evs; SeqStep st; double t0 = 0;
+  explicit Harness(const char* name = "loop") : evs(12288) { loadCase(root(), name, C); JsonError je; D.song.load(C.songText.data(), C.songText.size(), &je); D.song.lpb = 1; s = new MidiSched(48000); configure(*s, C, D.song); s->setFxLatency(0); for (int p = 0; p < 4; p++) s->setPort(p, !C.ports[(size_t)p].empty(), C.clk[(size_t)p] != 0, 0, p); }
+  ~Harness() { delete q; delete s; }
+  void begin(double startAt, double firstStep) { SeqOpts lo; lo.hasLoop = true; lo.loopY0 = C.y0; lo.loopY1 = C.y1; lo.live = true; q = new Seq(D.song, D.vars, SeqMode::Song, lo); s->start(0, startAt); q->setTime(firstStep); t0 = firstStep; }
+  std::vector<double> grid; std::vector<int64_t> tf;
+  void steps(int n, double now) { for (int i = 0; i < n; i++) { const int k = q->step(evs.data(), (int)evs.size(), &st); for (int j = 0; j < k; j++) if (evs[j].type == SEV_BEAT) grid.push_back(evs[j].t); s->onStep(evs.data(), k, st, *q, now); } }
+  int ticks() { MidiMsg b[512]; int n = 0; for (;;) { const int64_t k = s->drain(b, 512); if (k <= 0) break; for (int64_t i = 0; i < k; i++) if (b[i].b[0] == 0xF8 && b[i].kind == MK_CLOCK) { n++; last = b[i].frame; tf.push_back(b[i].frame); } } return n; }
+  int64_t last = -1;
+};
+static void boundaries() {
+  { Harness h; h.begin(0.0, 0.5); h.steps(256, 0.0);   // V2: one call books at most 4096 ticks (here 6000 are late): the loop bound is exactly 4096
+    h.s->book(0.0, h.q->time(), h.q->bpm(), true); h.ticks();
+    const uint64_t l0 = h.s->stats().lateTicks; h.s->book(400.0, h.q->time(), h.q->bpm(), true);
+    CHECK(h.s->stats().lateTicks - l0 == 4096, "V2: one book call counts 4096 late ticks and no more (%llu)", (unsigned long long)(h.s->stats().lateTicks - l0)); }
+  int nExact = -1, nPast = -1; uint64_t lExact = 9, lPast = 9;
+  for (int past = 0; past < 2; past++) {   // V3 / V4: a tick exactly 20 ms late is sent, one ulp later it is dropped (tick 0 is at 0.5 s exactly, no FX latency, no Gear delay)
+    Harness h; h.begin(0.0, 0.5); h.steps(1, 0.0);
+    double now = 0.52; while (now - kClockLateSec > 0.5) now = std::nextafter(now, 0.0); while (now - kClockLateSec < 0.5) now = std::nextafter(now, 1.0);
+    if (past) while (now - kClockLateSec <= 0.5) now = std::nextafter(now, 1.0); else CHECK(now - kClockLateSec == 0.5, "V3: found the boundary instant (%.17g)", now);
+    h.s->book(now, h.q->time(), h.q->bpm(), true); const int n = h.ticks(); (past ? nPast : nExact) = n; (past ? lPast : lExact) = h.s->stats().lateTicks;
+  }
+  CHECK(lExact == 0 && lPast == 1 && nExact == nPast + 1, "V3/V4: tick 0 exactly on the 20 ms limit is sent (%d ticks, %llu late), one ulp past it dropped (%d ticks, %llu late)", nExact, (unsigned long long)lExact, nPast, (unsigned long long)lPast);
+  { Harness h; h.begin(0.0, 0.5); h.steps(1, 0.0);   // V4: the same boundary at the OUTBOX release: tick 0 (0.5 s) is booked 70 ms ahead (more than the 60 ms lead: it waits there) and released exactly 20 ms late
+    double now = 0.52; while (now - kClockLateSec > 0.5) now = std::nextafter(now, 0.0); while (now - kClockLateSec < 0.5) now = std::nextafter(now, 1.0);
+    h.s->book(0.43, h.q->time(), h.q->bpm(), true); const int nWait = h.ticks();
+    CHECK(nWait == 0 && h.s->pendCount() >= 1, "V4: the tick waits in the outbox (%d sent, %d waiting)", nWait, h.s->pendCount());
+    h.s->book(now, h.q->time(), h.q->bpm(), true); const int n0 = h.ticks();
+    CHECK(n0 >= 1 && h.s->stats().lateTicks == 0, "V4: a tick released from the outbox exactly 20 ms late is sent (%d, %llu late)", n0, (unsigned long long)h.s->stats().lateTicks); }
+  { Harness h; h.begin(0.0, 0.5);   // V17: the tempo map keeps the NEWEST 256 steps: a tempo change at step 260 still bends the clock right (tick 24 j is on step j's time)
+    double now = 0.4; for (int i = 0; i < 300; i++) { if (i == 260) h.q->setBpm(240); h.steps(1, now); const double endT = h.q->time(); for (; now < endT - 0.3; now += 0.05) { h.s->book(now, h.q->time(), h.q->bpm(), true); h.ticks(); } }
+    int bad = 0, chk = 0; for (size_t j = 270; j < 296 && j < h.grid.size(); j++) { const size_t k = 24 * j; if (k >= h.tf.size()) break; chk++; if (std::llabs(h.tf[k] - (int64_t)std::llround(h.grid[j] * 48000)) > 1) bad++; }
+    CHECK(chk >= 20 && bad == 0, "V17: after step 256 and a tempo change the ticks stay on the rows (%d checked, %d off)", chk, bad); }
+  { Harness h; h.begin(0.0, 0.5); h.steps(1, 0.0);   // B7b: a tick that waited in the outbox while the host stalled is dropped when it is released, counted, not sent
+    h.s->book(0.43, h.q->time(), h.q->bpm(), true); h.ticks();
+    h.s->book(5.0, h.q->time(), h.q->bpm(), true); const int n = h.ticks();
+    CHECK(n == 0 && h.s->stats().lateTicks >= 1 && h.s->pendCount() == 0, "B7b: the stalled tick is dropped (%d sent, %llu late, %d waiting)", n, (unsigned long long)h.s->stats().lateTicks, h.s->pendCount()); }
+  { Harness h; h.C.gear[0] = 40; h.s->setPort(0, true, true, 40, 0); h.begin(0.0, 0.5); h.steps(8, 0.0);   // V18: with a 40 ms Gear delay several ticks are already queued AFTER the stop time; the Stop still follows the last tick at or before it
+    for (double now = 0.5; now < 1.0 - 1e-9; now += 0.02) h.s->book(now, h.q->time(), h.q->bpm(), true);
+    h.s->book(1.0, h.q->time(), h.q->bpm(), true); h.s->stop(1.0);
+    MidiMsg b[512]; int64_t lastLe = -1, stopF = -1, afterNf = 0; const int64_t nf = 48000;
+    for (;;) { const int64_t n = h.s->drain(b, 512); if (n <= 0) break; for (int64_t i = 0; i < n; i++) { if (b[i].b[0] == 0xF8) { if (b[i].frame <= nf) lastLe = std::max(lastLe, b[i].frame); else afterNf++; } if (b[i].b[0] == 0xFC) stopF = b[i].frame; } }
+    CHECK(afterNf >= 2 && lastLe > 0 && stopF == lastLe, "V18: Stop at frame %lld = the last tick at or before the stop (%lld), with %lld ticks queued after it", (long long)stopF, (long long)lastLe, (long long)afterNf); }
+  { Rig r; r.s.setPort(1, true, true, 0, 5);   // V8: the CLEAR marker carries the port's cable
+    r.s.stop(0.5); MidiMsg b[64]; bool found = false, ok = true;
+    for (;;) { const int64_t n = r.s.drain(b, 64); if (n <= 0) break; for (int64_t i = 0; i < n; i++) if (b[i].flags & MIDI_F_CLEAR) { if (b[i].port == 1) { found = true; ok = ok && b[i].cable == 5; } } }
+    CHECK(found && ok, "V8: port 1's CLEAR marker names its cable (5)"); }
+  { Rig r;   // V15: a note whose ON is exactly at the stop frame is delivered (the shell keeps frame == marker): it needs its OFF
+    r.s.onEvent(Rig::note(0, 0, 60, 1.0), nullptr, 120, false, 0.95); r.book(0.95);
+    r.s.stop(1.0); r.drain();
+    CHECK(r.count(0x90, 60) == 1 && r.count(0x80, 60) == 1, "V15: ON at the stop frame (kept) and its OFF at the stop (on %d, off %d)", r.count(0x90, 60), r.count(0x80, 60)); }
+  { Rig r; const uint8_t tick[1] = {0xF8};   // V21: the ring-full counter counts
+    for (int i = 0; i < kMidiRingCap + 5; i++) r.s.liveRaw(0, tick, 1, 0, 0.0);
+    CHECK(r.s.stats().ringFull == (uint64_t)(5 + kRingReserveLow - 1), "V21: ringFull counts every dropped record (%llu)", (unsigned long long)r.s.stats().ringFull); }
+  std::printf("boundaries: done\n");
+}
+
 int main() {
-  cadence(); ownership(); stopRules(); stall(); rules();
+  cadence(); ownership(); stopRules(); stall(); rules(); stopSweep(); stalledConsumer(); boundaries();
   std::printf("%d failures\n", fails);
   return fails ? 1 : 0;
 }
