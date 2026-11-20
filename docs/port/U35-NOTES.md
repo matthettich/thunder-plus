@@ -220,10 +220,73 @@ BUILD, as the 3.3 order, on the SAME branch `n1/u35-spec`: `native/core/src/midi
 - `tools/midi-mutants.mjs`: 56 hand mutants (4.4).
 
 ### 4.3 The expected-difference table (`native/tests/golden/midi-ledger-expect.json`), per B number
-@@TABLE@@
+- **B1**: a silent note (vol 00) ends the mono note at its own time, sends no note-on. Cases: velocity (move).
+- **B2**: tick times integrate the tempo map forward; monotonic, regular; ticks inside a tempo change are checked by the rule (each interval between the two tempos' tick lengths), the rest exact. Cases: tempo-clock (zone x10); tempo-live (zone x15, zone x15).
+- **B3**: Start / Continue / SPP / clock ticks carry the Gear delay; the Stop is stamped stop time + FX latency - Gear delay; the cable-change Stop (sent without a timestamp by the web) is stamped at the change. Cases: two-ports (stop x2, gear x86); tempo-clock (stop x1); tempo-live (stop x1); song-end (stop x1); clock-port-toggle (stop x1, move); fx-latency (stop x1, gear x31).
+- **B4**: per-track ownership + per port/channel/pitch count: the retrigger OFF is added, the first holder's OFF is not sent. Cases: chan-share (add, drop).
+- **B8**: the Stop is at the stop time (+ FX latency), not at the last tick the web had booked ahead. Cases: start-midway (move); loop (move); start-stop (move).
+- **B9**: no OFF for a note whose ON the STOP dropped (2 web OFFs per case, dropped); companion: the OFF of the note that did sound is added (1 per case). Cases: start-stop (drop, drop, add); loop (drop, drop, add); start-midway (drop, drop, add). B5 / B6 have no ledger case (the ledgers never play twice): they are pinned in `midi_sched`.
+- **B11**: (new) live keys get their own column: the web ends a still-held key; native sends that key's OFF at PANIC. Cases: panic-keys (drop, add).
+- Rules in the file: 29. B10 / A5: nothing differs (kept). B5 / B6: pinned in `midi_sched` (the ledgers never play twice), no ledger difference.
 
 ### 4.4 Mutant -> test (`node tools/midi-mutants.mjs --lib native/build-u35/core/libthunder_core.a`; every one is killed)
-@@MUTANTS@@
+- R-M1 -> test_midi_ledger (FX latency not added)
+- R-M2 -> test_midi_ledger (Gear delay not applied to notes)
+- R-M3/B3 -> test_midi_ledger (the clock / Start / join ignore the Gear delay)
+- R-M4 -> test_midi_sched (a late message is not clamped to now)
+- R-M5 -> test_midi_ledger (a port with no cable still sends)
+- R-M6 -> test_midi_ledger (a note-off sent as 0x90)
+- R-M7 -> test_midi_ledger (velocity scale)
+- R-M8/B1 -> test_midi_ledger (a silent note does not end the mono note)
+- R-M9a -> test_midi_ledger (channel mask)
+- R-M9b -> test_midi_ledger (port clamp)
+- R-M10 -> test_midi_ledger (mono: a new note does not end the track's notes)
+- R-M11a -> test_midi_ledger (rel))
+- R-M11b -> test_midi_ledger (mlen) ignored)
+- R-M12 -> test_midi_ledger (an OFF event does not end the track's notes)
+- R-M13 -> test_midi_sched (poly cap 8 instead of 4)
+- R-M14/B4a -> test_midi_ledger (no per-pitch count: an OFF always goes out)
+- B4b -> test_midi_ledger (a retrigger of a held pitch sends no OFF first)
+- B4c -> test_midi_sched (a collision is not counted)
+- R-M15 -> test_midi_ledger (mo 0) does not end the gear's note)
+- R-M16 -> test_midi_ledger (a muted track still plays)
+- R-M17 -> test_midi_ledger (PGM not 1 ms early)
+- R-M18 -> test_midi_sched (default CC numbers)
+- R-M19a -> test_midi_ledger (CSL glide steps every 20 ms)
+- R-M19b -> test_midi_sched (CSL: a new value does not cut the glide)
+- R-M20 -> test_midi_ledger (pitch bend repeated)
+- R-M21 -> test_midi_sched (ramp steps)
+- R-M22 -> test_midi_ledger (ARP: no return to the own pitch)
+- R-M23 -> test_midi_ledger (ECHO length rule)
+- R-M24 -> test_midi_ledger (LFO rate list)
+- R-M25 -> test_midi_ledger (clock ticks per beat)
+- R-M26 -> test_midi_ledger (Start byte)
+- R-M27 -> test_midi_ledger (Stop byte)
+- R-M28 -> test_midi_ledger (a port lit mid-song does not join)
+- R-M30 -> test_midi_ledger (STOP does not clear what is queued)
+- R-M31 -> test_midi_ledger (no outbox: everything goes out at booking)
+- R-M32 -> test_midi_ledger (live key offset)
+- R-M33 -> test_midi_ledger (PANIC without All Notes Off)
+- R-M34/B6 -> test_midi_sched (STOP does not forget the used channels)
+- B5 -> test_midi_sched (STOP does not forget the last CC values)
+- R-M35 -> test_midi_sched (PLAY does not reset the tempo map)
+- R-M36 -> test_midi_ledger (a pad instrument sends CC)
+- R-M38 -> test_midi_sched (only the first value counts))
+- R-M40 -> test_midi_sched (equal times reorder)
+- B2 -> test_midi_ledger (retroactive) beat)
+- B3b -> test_midi_ledger (Stop without the Gear delay)
+- B7a -> test_midi_sched (a late tick is sent)
+- B7b -> test_midi_sched (a tick in the outbox past its time is sent)
+- B7c -> test_midi_sched (the burst))
+- B7d -> test_midi_sched (512-tick cap)
+- B7e -> test_midi_sched (a late note is played)
+- B7f -> test_midi_sched (ticks older than the oldest anchor stall the clock)
+- B8 -> test_midi_sched (Stop before the last tick sent)
+- B9a -> test_midi_sched (an OFF for a note whose ON was never sent)
+- B9b -> test_midi_sched (release sends an OFF for a note not yet on)
+- B9c -> test_midi_ledger (relies on CC 123))
+- B11 -> test_midi_ledger (live keys share one column)
+- 56 mutants, 0 survivors (run against the CMake Release `libthunder_core.a`).
 
 ### 4.5 Choices for the lead
 1. **B9 companion (new, not in the rulings).** The web's STOP leaves a sounding note's own OFF to be dropped by the clear (its `mx.held` entry had already been pruned when the next note was booked) and relies on CC 123. The per-pitch count makes native send an explicit OFF for every note that really sounds at STOP / release (3 cases: start-stop, loop, start-midway), so a synth that ignores All Notes Off does not hang. Listed as B9 `add` rules. Say if you want the web's behaviour.
