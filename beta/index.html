@@ -152,9 +152,12 @@ body.mob .gsethead{display:flex; justify-content:flex-end; position:sticky; top:
 .gset .tsr select{min-width:0; flex:1 1 140px; max-width:240px}
 .gset .tsr input[type=text]{flex:1 1 140px; max-width:240px}
 .gset .tsr input[type=range]{flex:1 1 100px; width:auto; min-width:80px}
-/* Sliders in Settings are locked: a finger scrolling the menu passes over them. Tap one to unlock it, then drag;
-   it locks again a few seconds after you stop. */
-:is(#gset,.rlock) input[type=range]:not(.unl){pointer-events:none; opacity:.5}
+/* BAR DRAG (19 Nov, build 649): the Settings menu's and the sheets' sliders take the pointer through script (barDrag below), not the
+   browser: a press sets the value, a drag scrubs it, a vertical swipe still scrolls the list (touch-action:pan-y on the cell that
+   holds a slider, so the browser keeps vertical pans and hands the script the sideways ones). They no longer lock (they did from
+   27 Oct: tap to unlock, 4 s). */
+:is(#gset,.rlock) input[type=range]{pointer-events:none}
+:is(#gset,.rlock) :has(> input[type=range]){touch-action:pan-y}
 /* ONE SLIDER (27 Oct, Phase 2): a vertical swipe over a slider scrolls the page; the value tip while dragging; the slider the
    wheel will move (it rested under the pointer) is outlined */
 input[type=range], .row:has(> input[type=range]), .acidr, .acidf:has(input[type=range]){touch-action:pan-y}
@@ -15314,7 +15317,7 @@ function gsetToggle(open = !gsetOpen(), mode, btn){
   if (open && !$('gedit').hidden) geditToggle(false);
   if (open){ gsetMode = isMobile() ? 'all' : mode || (gsetOpen() ? gsetMode : 'set'); gsetBtn = btn || (gsetMode === 'view' ? $('bView') : gsetMode === 'aud' ? $('bAud') : $('bSet')); }
   const b = gsetBtn || $('bSet');
-  $('gset').hidden = !open; if (!open) rlLockAll();
+  $('gset').hidden = !open;
   for (const x of [$('bSet'), $('bView'), $('bAud')]){ const on = open && x === b; x.classList.toggle('on', on); x.setAttribute('aria-expanded', String(on)); }
   if (open){ if ($('gset').parentElement !== b.parentElement) b.parentElement.append($('gset'));   // drop down under the button pressed
     $('gset').setAttribute('aria-label', gsetMode === 'view' ? 'View' : gsetMode === 'aud' ? 'Audio and MIDI' : 'Settings');
@@ -15331,32 +15334,91 @@ $('bSet').addEventListener('click', () => gsetPress('set', $('bSet')));
 $('gsetDone').addEventListener('click', () => gsetToggle(false));   // same as tapping the gear again
 $('bView').addEventListener('click', () => gsetPress('view', $('bView')));
 $('bAud').addEventListener('click', () => gsetPress('aud', $('bAud')));
-// Settings sliders are locked so scrolling the menu, or a stray tap on a slider's track, can't change a setting.
-// A tap (not a drag) on a locked slider unlocks just that one; it locks again 4 s after it was last moved, and
-// all of them lock when the menu closes. The − and + buttons, lists and switches work as before.
-const RLOCK_MS = 4000; let rlDown = null;
-function rlRanges(){ return document.querySelectorAll('#gset input[type=range], .rlock input[type=range]'); }   // the menu and the settings sheets
-function rlAt(x, y){ for (const r of rlRanges()){ if (r.disabled) continue; const b = r.getBoundingClientRect();
-  if (b.width && x >= b.left - 4 && x <= b.right + 4 && y >= b.top - 8 && y <= b.bottom + 8) return r; } return null; }
-function rlArm(r){ clearTimeout(r._lk); r._lk = setTimeout(() => { if (r._held) return rlArm(r); r.classList.remove('unl'); }, RLOCK_MS); }
-function rlLockAll(){ for (const r of rlRanges()){ clearTimeout(r._lk); r._held = false; r.classList.remove('unl'); } }
-// The lock's listeners, on the Settings menu and on each settings sheet (SETTINGS SHEETS) as it opens.
-function rlWire(n){
-  n.addEventListener('pointerdown', e => {
-    if (e.target.matches && e.target.matches('input[type=range].unl')){ e.target._held = true; rlArm(e.target); rlDown = null; return; }
-    rlDown = {x:e.clientX, y:e.clientY, id:e.pointerId};
-  }, true);
-  n.addEventListener('pointercancel', () => { rlDown = null; }, true);
-  n.addEventListener('pointerup', e => {
-    const d = rlDown; rlDown = null; if (!d || d.id !== e.pointerId || Math.hypot(e.clientX - d.x, e.clientY - d.y) > 10) return;
-    const r = rlAt(e.clientX, e.clientY); if (!r || r.classList.contains('unl')) return;
-    rlLockAll(); r.classList.add('unl'); rlArm(r); toast('Slider unlocked: drag it to change. It locks again after a few seconds.');
-  }, true);
-  n.addEventListener('input', e => { if (e.target.matches && e.target.matches('input[type=range].unl')) rlArm(e.target); }, true);
+/* ===== BAR DRAG (19 Nov, build 649; owner: "make sliders like the swing slider controllable by clicking on the slider and dragging") =====
+   The sliders of the Settings menu and of the settings sheets (#gset, .rlock): every row tsetRow draws with a bar (SWING, TEMPO,
+   LPB, TEXT SIZE…) and the Audio rows. They were locked (tap, then drag, 4 s); now:
+   - a press on the bar sets the value under the pointer, a drag scrubs it, letting go commits (one Undo step: undoHeld holds the
+     snapshot while the pointer is down); the bar is the input's own, so a curve in the row's range is the one drawn;
+   - a mouse press drags at once. A finger: a sideways move of SLOP px (more across than up or down) starts the drag, a move more up
+     or down is a scroll and the browser takes it (nothing is changed), a still press of HOLD ms starts the drag, and a tap sets the
+     value on release;
+   - fine: Shift on a mouse (a tenth of the travel), a finger more than FINE_Y px above or below the bar (the same);
+   - a second tap / click at the same spot within DBL_MS puts the row back to its default (row.d, through input._reset); so does
+     Alt / Ctrl / ⌘ -click (as every host slider);
+   - the value goes in as the browser's own slider does it: input.value and an 'input' event while it moves (the thumb and the number at
+     every frame, the 'input' event, which is what changes the song, at most every LIVE ms or 2x its own cost, and once more on release),
+     one 'change' on release, so a `late` row (MONO / POLY TRACKS) only shows the number until release, PATTERN LEN rebuilds then.
+   The pure parts (sdSnap, sdValue, sdFineValue, sdGesture, sdDouble) are cut out and run by tests/bar-drag.test.js. */
+const SD = {SLOP:8, HOLD:350, THUMB:9, FINE_Y:60, FINE:0.1, DBL_MS:400, DBL_PX:14, LIVE:50};
+function sdSnap(v, mn, mx, st){   // onto the grid mn, mn+st… and inside [mn, mx]
+  if (!(mx > mn)) return mn; st = st > 0 ? st : 1;
+  const top = mn + Math.floor((mx - mn) / st + 1e-9) * st;
+  return +Math.min(top, Math.max(mn, Math.round((v - mn) / st) * st + mn)).toFixed(6);
 }
-rlWire($('gset'));
-addEventListener('pointerup', () => { for (const r of rlRanges()) if (r._held){ r._held = false; rlArm(r); } }, true);
-addEventListener('pointercancel', () => { for (const r of rlRanges()) r._held = false; }, true);
+// the thumb's centre runs from left + THUMB/2 to right - THUMB/2, so the thumb stays under the pointer
+const sdFrac = (x, box, th = SD.THUMB) => Math.min(1, Math.max(0, (x - box.left - th / 2) / Math.max(1, box.width - th)));
+const sdValue = (x, box, mn, mx, st, th) => sdSnap(mn + sdFrac(x, box, th) * (mx - mn), mn, mx, st);
+function sdFineValue(x, xA, vA, box, mn, mx, st, th = SD.THUMB){   // a tenth of the travel since the anchor (xA, vA), vA not snapped
+  const raw = Math.min(mx, Math.max(mn, vA + (x - xA) / Math.max(1, box.width - th) * (mx - mn) * SD.FINE)); return {raw, v:sdSnap(raw, mn, mx, st)};
+}
+const sdFineOn = (touch, shift, y, box) => touch ? Math.abs(y - (box.top + box.height / 2)) > SD.FINE_Y : !!shift;
+function sdGesture(touch, x, y, t){   // st: 'wait' (a finger, undecided) | 'drag' | 'scroll'
+  const g = {st:touch ? 'wait' : 'drag', moved:false, held:false};
+  g.move = (x2, y2) => { const dx = Math.abs(x2 - x), dy = Math.abs(y2 - y);
+    if (Math.max(dx, dy) >= SD.SLOP){ g.moved = true; if (g.st === 'wait') g.st = dy > dx ? 'scroll' : 'drag'; } return g.st; };
+  g.hold = t2 => { if (g.st === 'wait' && t2 - t >= SD.HOLD){ g.st = 'drag'; g.held = true; } return g.st; };
+  g.up = () => g.st === 'scroll' ? 'scroll' : g.moved || g.held ? 'drag' : 'tap';
+  return g;
+}
+const sdDouble = (last, r, t, x, y) => !!last && last.r === r && t - last.t < SD.DBL_MS && Math.hypot(x - last.x, y - last.y) < SD.DBL_PX;
+let sdLast = null;   // the last plain tap {r, t, x, y}
+function sdAt(e){
+  const t = e.target; if (!t || !t.closest) return null;
+  const host = t.closest('#gset, .rlock'); if (!host || t.closest('button, select, a, textarea, label') || (t.matches('input') && !t.matches('input[type=range]'))) return null;
+  for (const q of host.querySelectorAll('input[type=range]')){ if (q.disabled) continue; const b = q.getBoundingClientRect();
+    if (b.width > 0 && b.height > 0 && e.clientX >= b.left - 4 && e.clientX <= b.right + 4 && e.clientY >= b.top - 8 && e.clientY <= b.bottom + 8) return q; }
+  return null;
+}
+function barDrag(e, r){
+  const touch = e.pointerType !== 'mouse', id = e.pointerId, t0 = performance.now(), x0 = e.clientX, y0 = e.clientY;
+  const mn = r.min === '' ? 0 : +r.min, mx = r.max === '' ? 100 : +r.max, st = +r.step > 0 ? +r.step : 1, g = sdGesture(touch, x0, y0, t0);   // read at the press
+  let x = x0, y = y0, shift = e.shiftKey, raf = 0, hold = 0, done = false, changed = false, fine = null;
+  const dbl = typeof r._reset === 'function' && sdDouble(sdLast, r, t0, x0, y0); sdLast = null;
+  const reset = () => { r.focus({preventScroll:true}); r._reset(); };
+  // The thumb, the number and the tip follow the pointer at once; what the 'input' event does (the song changes, saveS, draw: 15 to 40 ms
+  // on a slow machine, TEMPO also re-times the effects) runs at most every LIVE ms, or 2x what it took, and once more on release.
+  let dirty = false, lastC = 0, cost = 0, tm = 0;
+  const commit = () => { clearTimeout(tm); tm = 0; if (!dirty || !r.isConnected) return; dirty = false; const t = performance.now(); r.dispatchEvent(new Event('input', {bubbles:true})); cost = performance.now() - t; lastC = t + cost; };
+  const put = v => { if (!r.isConnected || v === +r.value) return; r.value = String(v); changed = dirty = true; if (r._out && r._show) r._out.textContent = r._show(v); sliderTip(r, true);
+    const wait = Math.max(SD.LIVE, 2 * cost) - (performance.now() - lastC); if (wait <= 0) commit(); else if (!tm) tm = setTimeout(commit, wait); };
+  const at = () => { if (!r.isConnected) return; const box = r.getBoundingClientRect();
+    if (sdFineOn(touch, shift, y, box)){ if (!fine) fine = {x, v:+r.value}; put(sdFineValue(x, fine.x, fine.v, box, mn, mx, st).v); }
+    else { fine = null; put(sdValue(x, box, mn, mx, st)); } };
+  const flush = () => { raf = 0; if (!done) at(); };
+  if (!touch){
+    if (resetClick(e) || dbl){ if (typeof r._reset === 'function') reset(); return; }
+    e.preventDefault(); r.focus({preventScroll:true}); at();   // a mouse press: the value at once
+  } else hold = setTimeout(() => { if (g.hold(performance.now())){ r.focus({preventScroll:true}); at(); } }, SD.HOLD);
+  try { (e.target.setPointerCapture || (() => {})).call(e.target, id); } catch(_){}
+  const mv = ev => { if (ev.pointerId !== id || done) return; x = ev.clientX; y = ev.clientY; shift = ev.shiftKey;
+    const was = g.st, s = g.move(x, y);
+    if (s === 'scroll') return end(ev);   // the browser scrolls the list: nothing was changed
+    if (s === 'drag'){ if (was === 'wait'){ clearTimeout(hold); r.focus({preventScroll:true}); } if (!raf) raf = requestAnimationFrame(flush); } };
+  const end = ev => { if (ev.pointerId !== id || done) return; done = true;
+    clearTimeout(hold); cancelAnimationFrame(raf); for (const k of ['pointermove', 'pointerup', 'pointercancel']) removeEventListener(k, k === 'pointermove' ? mv : end, true);
+    try { (ev.target.releasePointerCapture || (() => {})).call(ev.target, id); } catch(_){}
+    const up = ev.type === 'pointerup', kind = g.up();
+    if (up){ x = ev.clientX; y = ev.clientY; }
+    if (kind === 'drag') at();   // where it was let go (pointercancel: where it was last seen)
+    else if (kind === 'tap' && up){
+      if (touch){ if (dbl && typeof r._reset === 'function') reset(); else at(); }
+      if (!dbl) sdLast = {r, t:performance.now(), x:x0, y:y0}; }
+    commit(); sliderTip(r, false);
+    if (changed && r.isConnected) r.dispatchEvent(new Event('change', {bubbles:true})); };
+  addEventListener('pointermove', mv, true); addEventListener('pointerup', end, true); addEventListener('pointercancel', end, true);
+}
+document.addEventListener('pointerdown', e => { if (e.button !== 0 || !e.isPrimary) return; const r = sdAt(e); if (r) barDrag(e, r); }, true);
+/* ===== end BAR DRAG ===== */
 // A tap outside an open menu closes it and does nothing else: the pointerdown is stopped here (capture phase) and
 // the pointerup/click of the same tap is swallowed too, so the d-pad, a pad or a button under the menu isn't pressed.
 function swallowTap(e){
@@ -17272,8 +17334,8 @@ function sliderTip(r, on){
   if (on && !r.isConnected) on = false;
   if (!on){ if (sldTip) sldTip.hidden = true; return; }
   if (!sldTip){ sldTip = el('div', 'sldtip'); sldTip.setAttribute('aria-hidden', 'true'); document.body.append(sldTip); }
-  const row = r.closest('.row'), o = r._out || (row && row.querySelector('output'));
-  sldTip.textContent = o && o.textContent ? o.textContent : String(r.value);
+  const row = r.closest('.row'), o = r._out || (row && row.querySelector('output')) || (r.parentElement && r.parentElement.querySelector('output'));
+  sldTip.textContent = typeof r._show === 'function' ? r._show(+r.value) : o && o.textContent ? o.textContent : String(r.value);
   const b = r.getBoundingClientRect(), mn = r.min === '' ? 0 : +r.min, mx = r.max === '' ? 100 : +r.max, f = mx > mn ? (+r.value - mn) / (mx - mn) : 0;
   sldTip.hidden = false; sldTip.style.left = Math.round(b.left + f * b.width) + 'px'; sldTip.style.top = Math.round(b.top) + 'px';
 }
@@ -26013,7 +26075,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 648;
+const BUILD = 649;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD + (location.pathname.includes('/beta/') ? ' · beta' : '');
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -36324,6 +36386,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [649, '19 Nov', ['Settings: press on a slider\u2019s bar (SWING, TEMPO, LPB, TEXT SIZE\u2026) to set it there and drag to change it, with a mouse or a finger. A swipe up or down that starts on a bar still scrolls the list. Double-tap a bar to put it back to its default. Shift (mouse) or a finger held away from the bar makes it finer. The sliders no longer lock.']],
   [648, '19 Nov', ['…waves and …chains: the Expression module’s ? help now has worked examples to copy, one formula per line: a sine, saw, triangle and square, a pitch from K1 and a version that glides without a jump, FM, a chord, a fade-in, ring modulation, tremolo, a low-pass filter, a wavefolder, a bit crusher and noise. The Help page shows them on the Expression card too, and the module’s Examples menu now holds the same formulas (tones first, then effects), so you can pick one instead of typing it.']],
   [647, '18 Nov', ['Flex: two patterns could put one broken sample into the sound (FLX E8, the 5-tuplet feel, just before a beat; and a tape pattern at one spot in Flex\u2019s memory). Fixed.', 'With the cursor on an FLX command in a phrase (or the master column), the FX bar\u2019s Flex PATTERN value now shows that command\u2019s number, and changing it rewrites the command in the column. One undo step per drag, on tracks and on the master. FLY commands are not linked, and every other FX bar value works as before.']],
   [646, '18 Nov', ['Computer side panel: the instrument list now sits above the PLAYING / STOPPED box and the meters (it was below them). Nothing else in the panel moved.']],
@@ -36799,11 +36862,11 @@ function sheetShell(cls, title, label, ph){
   const born = performance.now(), early = () => performance.now() - born < 350;
   const sh = {wrap, box, list, q, early, onClose:null};
   const key = e => { if (e.key === 'Escape' && !(e.target === q && q.value)){ e.preventDefault(); e.stopPropagation(); sh.done(); } else if (wrap.contains(e.target)) e.stopPropagation(); };
-  sh.done = () => { if (pbOpen !== sh.done) return; pbOpen = null; sheetRefresh = null; rlLockAll(); wrap.remove(); document.removeEventListener('keydown', key, true); if (sh.onClose) sh.onClose(); };
+  sh.done = () => { if (pbOpen !== sh.done) return; pbOpen = null; sheetRefresh = null; wrap.remove(); document.removeEventListener('keydown', key, true); if (sh.onClose) sh.onClose(); };
   close.addEventListener('click', () => sh.done());
   wrap.addEventListener('click', e => { if (early() && e.target !== close){ e.preventDefault(); e.stopPropagation(); } }, true);
   wrap.addEventListener('pointerdown', e => { if (e.target === wrap){ e.preventDefault(); sh.done(); } });
-  document.addEventListener('keydown', key, true); rlWire(wrap);
+  document.addEventListener('keydown', key, true);
   pbOpen = sh.done; document.body.append(wrap); try { box.focus({preventScroll:true}); } catch(e){}
   return sh;
 }
@@ -36939,6 +37002,8 @@ function tsetRow(r){
   rg.addEventListener('input', () => { if (r.late) out.textContent = show(+rg.value); else put(+rg.value); });
   if (r.late){ rg.dataset.fk = r.l + '|range'; rg.addEventListener('focus', () => { tsetFk = rg.dataset.fk; }); }
   rg.addEventListener('change', () => { if (r.late){ put(+rg.value); tsetFk = rg.dataset.fk; buildProjKeep(); } else if (r.l === 'PATTERN LEN') buildProj(); });
+  rg._out = out; rg._show = show;   // BAR DRAG: the value tip and the number read them
+  if (r.d != null) rg._reset = () => { rg.value = clamp(r.d, r.min, r.max); rg.dispatchEvent(new Event('input', {bubbles:true})); rg.dispatchEvent(new Event('change', {bubbles:true})); };   // BAR DRAG: double-tap / Alt-click: the row's default, by the same two events a drag ends with
   bDn = btn('−', -st, 'Less'); bUp = btn('+', st, 'More'); lim();
   c.append(bDn, rg, bUp, out);
   row.append(lab(), c, inf); return row;
