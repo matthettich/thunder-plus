@@ -26610,7 +26610,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 658;
+const BUILD = 659;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD + (location.pathname.includes('/beta/') ? ' · beta' : '');
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -36998,6 +36998,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [659, '20 Nov', ['Sync modes in one list: the SYNC row on INST (press EDIT on it) and the Sync to lines… sheet now pick from the same grouped list (REPITCH; GRANULAR, which is the old STRETCH, and LOOP). REPITCH says what it does: \u201cplays 17.7% slower, 3.4 semitones down\u201d, worked out from the sample\u2019s real length. Nothing you hear changes; old songs are the same.']],
   [658, '19 Nov', ['Synth page: an envelope\u2019s times can be set in BARS + LINES instead of ms (Amp, Filter, and the Pad amp). A noise swell can now last exactly 1, 2, 4 or 8 bars of the song, at the song\u2019s BPM and LPB, and the pad is made long enough for it. Old sounds are unchanged.']],
   [657, '19 Nov', ['Arrange and Song: double-click (or double-tap) an empty MASTER cell and it gets a new empty block. If that song row has nothing on any visible track and the master is empty, the whole row is filled instead, like a hand-made row: a new empty phrase on every track in MONO / POLY and a new empty block on the master, each with its own number in track order, as one undo step. Not enough free numbers: nothing changes and a message says how many are needed and free (CLEAR UNUSED PHRASES frees some). Tracks beyond MONO / POLY get nothing. A filled master cell still opens its phrase on a double-click; Enter / EDIT on an empty master cell does the same two things.']],
   [656, '19 Nov', ['Settings: FOLLOW sits directly above PHRASE ON STOP and ARRANGE ON STOP, in the View menu and in Settings (the Project screen too). Nothing else about them changed']],
