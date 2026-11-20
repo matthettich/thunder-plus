@@ -20916,14 +20916,15 @@ function busPlan(){
   for (const q of ti){ if (!(S.chainOn && S.chainOn[q.t])) continue;
     for (const b of [...q.outs].sort((a, c) => a - c)){
       if (b === q.t || ownRet.has(b) || !chainsFeed(b)) continue;   // its own out, or not a bus (see ownRet above)
-      cand.push([q.t, b, q]); } }
-  cand.sort((x, y) => x[0] - y[0] || x[1] - y[1]);
-  for (const [t, b, q] of cand){
-    if (reaches(b, t)){ P.loop = true; P.loopEdges.push([t, b]); continue; }
-    if (!adj.has(t)) adj.set(t, []); adj.get(t).push(b); q.fed = true;
-    if (!feeds.has(b)) feeds.set(b, []); feeds.get(b).push(t);
-    if (!targets.has(t)) targets.set(t, []); targets.get(t).push(b);
-  }
+      cand.push({t:q.t, b, q, ok:false}); } }
+  // which edges are kept: decided in (source, bus) order, so a loop always leaves out the same cable ...
+  for (const e of cand.slice().sort((x, y) => x.t - y.t || x.b - y.b)){
+    if (reaches(e.b, e.t)){ P.loop = true; P.loopEdges.push([e.t, e.b]); continue; }
+    if (!adj.has(e.t)) adj.set(e.t, []); adj.get(e.t).push(e.b); e.ok = true; e.q.fed = true; }
+  // ... but the Maps are filled in the patch's own (module, bus) order, as before this change: busGroups gives a track that feeds two buses the first one's colour
+  for (const e of cand) if (e.ok){
+    if (!feeds.has(e.b)) feeds.set(e.b, []); feeds.get(e.b).push(e.t);
+    if (!targets.has(e.t)) targets.set(e.t, []); targets.get(e.t).push(e.b); }
   for (const q of ti){ if (!q.fed) continue;
     if (!q.outs.has(q.t)) pure.add(q.t);
     if (+(q.mod.params && q.mod.params.pre)) pre.add(q.t);   // PRE SENDS (27 Oct): its Track In's Bus send is "Before its fader"
@@ -22140,8 +22141,8 @@ function partEvs(p, at){
 }
 function makeSeq(S, mode, o){
   const once = !!o.once, tr = []; let loop = o.loop || null;
-  // BUS FX ONLY (owner, 22 Oct): the tracks that are buses when PLAY starts play their commands, not their notes; a track
-  // that becomes a bus while it plays keeps its notes until PLAY starts again.
+  // BUS FX ONLY (owner, 22 Oct): the tracks that are buses play their commands, not their notes. (20 Nov: api.rebus() re-reads which tracks are
+  // buses when a cable edit changes the plan while the song plays; before, a track that became a bus kept its notes until PLAY started again.)
   // LFOs that can be heard (owner, 10 Nov): null = every track's; a phrase, a sect or BUS PLAY play one set of tracks, so only
   // their LFOs, those of the buses they feed (even through other buses) and the master's run.
   let hearT = null;
@@ -22152,6 +22153,7 @@ function makeSeq(S, mode, o){
     rel:0, g:0, grv:null, dir:0, pp:1, cnt:0, r0:0, wr:0, tch:null, skp:0, chd:0, seed:null, vn:-1});   // tch / skp / chd / seed: TCH, SKP, CHD and the track's SED; vn: see roll   // dir/pp/cnt: DIR's play direction, ping-pong heading, steps played this pass; r0: when it entered its song row
   for (let t = 0; t <= MT; t++) tr.push(fresh());
   const api = {time:0, bpm:S.bpm, tks:clamp(S.ticks || TICKS, 1, 32), grv:null, base:null, bt:0, btT:null};
+  api.rebus = () => { busT.clear(); for (let t = 0; t < NT; t++) if (isBusT(t)) busT.add(t); };   // BUS EDITS WHILE PLAYING (20 Nov): the notes of a track that became a bus (or stopped being one) follow the plan from the next row; called when the plan changes
   // PERFORM: live play shares the panel's state (perfLive: a crossfader move is heard at once, and XFD / MAC move the panel);
   // anything else (renders, MIDI export) starts from the song's own. The first step sends what the scenes and macros ask for.
   const PL = !!(o.live && !o.sim), PFS = perfOf(S);
@@ -22757,7 +22759,19 @@ function makePlayer(ac, out, getBuf, live, mo){   // mo: the master OUT gain (af
   // source no longer goes to the speakers (only through its bus). Rebuilt when the plan or the nodes change; off: no buses
   // (a render of one source's stem).
   let busKey = '', busOff = false;
+  /* PLAN CHANGES (20 Nov, verifier F3 on build 651): audible() (solo, mute) reads the bus plan, and nothing re-applied the mix when a cable edit changed
+     the plan, so with a solo or mute set the gains stayed on the OLD plan until the next mixer change (STOP and PLAY do not cure it). A new plan (busPlan
+     answers the same object until the patch or CHN changes) now applies the mix again, with applyMix's usual 12 ms glide, and tells the page sequencer to
+     re-read which tracks are buses. With no solo the plan changes no gain, so nothing is touched then. Live only: a render's mix is its `keep`. */
+  let planSeen = null;
+  function planChanged(){
+    const P0 = busPlan(); if (P0 === planSeen) return; planSeen = P0;
+    if (!live) return;
+    if (S.mix.some(m => m.solo)) applyMix(mixFilt);
+    try { if (typeof tp !== 'undefined' && tp.seq && tp.seq.rebus) tp.seq.rebus(); } catch(e){}
+  }
   function busSync(){
+    planChanged();
     const P = busOff ? null : busPlan(), want = [];
     if (P) for (const [bt, src] of P.feeds){ const b = buses[bt]; if (b && b.chn) want.push([bt, src.slice(0, 32)]); }
     const routed = new Set(); if (P) for (const [, src] of want) for (const t of src) if (P.pure.has(t)) routed.add(t);
@@ -23322,7 +23336,9 @@ function makePlayer(ac, out, getBuf, live, mo){   // mo: the master OUT gain (af
   /* MUTED TRACKS REST (build 607): tell a track's effects node whether the track can be heard (see the note in ThunderFx.p1). Live only:
      a render builds no effects node for a track that isn't heard. */
   function fxRest(t, on){ const b = buses[t]; if (!live || !b || !b.fx || t >= NT) return; const r = !on; if (b.fx._rest === r) return; b.fx._rest = r; try { b.fx.port.postMessage({rest:r}); } catch(e){} }
+  let mixFilt = null;   // the filter of the last applyMix (a render's `keep`), so a plan change can apply the same mix again
   function applyMix(filter){
+    mixFilt = filter || null;
     const at = ac.currentTime;
     buses.forEach((b, t) => {
       if (t >= NT){ b.g.gain.value = 1; return; }

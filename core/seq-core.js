@@ -158,14 +158,15 @@ function busPlan(){
   for (const q of ti){ if (!(S.chainOn && S.chainOn[q.t])) continue;
     for (const b of [...q.outs].sort((a, c) => a - c)){
       if (b === q.t || ownRet.has(b) || !chainsFeed(b)) continue;   // its own out, or not a bus (see ownRet above)
-      cand.push([q.t, b, q]); } }
-  cand.sort((x, y) => x[0] - y[0] || x[1] - y[1]);
-  for (const [t, b, q] of cand){
-    if (reaches(b, t)){ P.loop = true; P.loopEdges.push([t, b]); continue; }
-    if (!adj.has(t)) adj.set(t, []); adj.get(t).push(b); q.fed = true;
-    if (!feeds.has(b)) feeds.set(b, []); feeds.get(b).push(t);
-    if (!targets.has(t)) targets.set(t, []); targets.get(t).push(b);
-  }
+      cand.push({t:q.t, b, q, ok:false}); } }
+  // which edges are kept: decided in (source, bus) order, so a loop always leaves out the same cable ...
+  for (const e of cand.slice().sort((x, y) => x.t - y.t || x.b - y.b)){
+    if (reaches(e.b, e.t)){ P.loop = true; P.loopEdges.push([e.t, e.b]); continue; }
+    if (!adj.has(e.t)) adj.set(e.t, []); adj.get(e.t).push(e.b); e.ok = true; e.q.fed = true; }
+  // ... but the Maps are filled in the patch's own (module, bus) order, as before this change: busGroups gives a track that feeds two buses the first one's colour
+  for (const e of cand) if (e.ok){
+    if (!feeds.has(e.b)) feeds.set(e.b, []); feeds.get(e.b).push(e.t);
+    if (!targets.has(e.t)) targets.set(e.t, []); targets.get(e.t).push(e.b); }
   for (const q of ti){ if (!q.fed) continue;
     if (!q.outs.has(q.t)) pure.add(q.t);
     if (+(q.mod.params && q.mod.params.pre)) pre.add(q.t);   // PRE SENDS (27 Oct): its Track In's Bus send is "Before its fader"
@@ -263,8 +264,8 @@ function partEvs(p, at){
 }
 function makeSeq(S, mode, o){
   const once = !!o.once, tr = []; let loop = o.loop || null;
-  // BUS FX ONLY (owner, 22 Oct): the tracks that are buses when PLAY starts play their commands, not their notes; a track
-  // that becomes a bus while it plays keeps its notes until PLAY starts again.
+  // BUS FX ONLY (owner, 22 Oct): the tracks that are buses play their commands, not their notes. (20 Nov: api.rebus() re-reads which tracks are
+  // buses when a cable edit changes the plan while the song plays; before, a track that became a bus kept its notes until PLAY started again.)
   // LFOs that can be heard (owner, 10 Nov): null = every track's; a phrase, a sect or BUS PLAY play one set of tracks, so only
   // their LFOs, those of the buses they feed (even through other buses) and the master's run.
   let hearT = null;
@@ -275,6 +276,7 @@ function makeSeq(S, mode, o){
     rel:0, g:0, grv:null, dir:0, pp:1, cnt:0, r0:0, wr:0, tch:null, skp:0, chd:0, seed:null, vn:-1});   // tch / skp / chd / seed: TCH, SKP, CHD and the track's SED; vn: see roll   // dir/pp/cnt: DIR's play direction, ping-pong heading, steps played this pass; r0: when it entered its song row
   for (let t = 0; t <= MT; t++) tr.push(fresh());
   const api = {time:0, bpm:S.bpm, tks:clamp(S.ticks || TICKS, 1, 32), grv:null, base:null, bt:0, btT:null};
+  api.rebus = () => { busT.clear(); for (let t = 0; t < NT; t++) if (isBusT(t)) busT.add(t); };   // BUS EDITS WHILE PLAYING (20 Nov): the notes of a track that became a bus (or stopped being one) follow the plan from the next row; called when the plan changes
   // PERFORM: live play shares the panel's state (perfLive: a crossfader move is heard at once, and XFD / MAC move the panel);
   // anything else (renders, MIDI export) starts from the song's own. The first step sends what the scenes and macros ask for.
   const PL = !!(o.live && !o.sim), PFS = perfOf(S);
@@ -1197,14 +1199,14 @@ class ThunderCore extends AudioWorkletProcessor {
   msg(d){
     if (this.chase && !this.chaseKeep(d)) this.chase = null;
     switch (d.op){
-      case 'load': S = d.S; if (d.vars){ if ('vtrk' in d.vars) vtrk = d.vars.vtrk; if ('NSLOT' in d.vars) NSLOT = d.vars.NSLOT; if (d.vars.TFX) TFX = d.vars.TFX; } busPlanH = null; busPlanVal = null; return;
-      case 'song': { if (!S){ S = d.S; return; } const pf = S.perf; for (const k of Object.keys(S)) if (!(k in d.S)) delete S[k]; Object.assign(S, d.S); S.perf = keepObj(pf, S.perf); busPlanH = null; busPlanVal = null; return; }   // in place: the running sequencer holds this object
+      case 'load': S = d.S; if (d.vars){ if ('vtrk' in d.vars) vtrk = d.vars.vtrk; if ('NSLOT' in d.vars) NSLOT = d.vars.NSLOT; if (d.vars.TFX) TFX = d.vars.TFX; } busPlanH = null; busPlanVal = null; if (this.seq && this.seq.rebus) this.seq.rebus(); return;
+      case 'song': { if (!S){ S = d.S; return; } const pf = S.perf; for (const k of Object.keys(S)) if (!(k in d.S)) delete S[k]; Object.assign(S, d.S); S.perf = keepObj(pf, S.perf); busPlanH = null; busPlanVal = null; if (this.seq && this.seq.rebus) this.seq.rebus(); return; }   // in place: the running sequencer holds this object
       case 'patch': {   // only what changed (coreDiff on the page): [key, null, value] · [key, index, item] · [key, 'len', n] · [key, 'del']
         if (!S) return;
         for (const [k, i, v] of d.ops){ if (i === null) S[k] = k === 'perf' ? keepObj(S[k], v) : v; else if (i === 'del') delete S[k]; else if (i === 'len'){ if (Array.isArray(S[k])) S[k].length = v; }
           else { if (!Array.isArray(S[k])) S[k] = []; S[k][i] = v; } }
         if (d.ops.some(o => o[0] === 'insts')) varDrop(null);   // an instrument's RANGE / GEN TYPE… changed: its variations are other sounds now
-        busPlanH = null; busPlanVal = null; return; }
+        busPlanH = null; busPlanVal = null; if (this.seq && this.seq.rebus) this.seq.rebus(); return; }
       case 'vars': if (d.vars){ if ('vtrk' in d.vars) vtrk = d.vars.vtrk; if ('NSLOT' in d.vars) NSLOT = d.vars.NSLOT; if (d.vars.TFX) TFX = d.vars.TFX; } return;
       case 'kit': this.kv = d.kv || []; kit = {voices:this.kv}; return;
       case 'buf': if (d.data) coreBufs.set(d.pad, {data:d.data, data2:d.data2 || null, sr:d.sr}); else coreBufs.delete(d.pad); varDrop(d.pad); return;   // data2: a stereo pad's right channel

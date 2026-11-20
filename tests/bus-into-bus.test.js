@@ -168,7 +168,7 @@ test('compatibility: 6000 random patches: identical plans unless the patch has t
     // the newly working shape: a track with a Track In, none of which reaches its own Chain Out, is fed by another track's Track In
     const differs = JSON.stringify(view(a)) !== JSON.stringify(view(b));
     if (differs){ newShape++; assert.ok(Array.from(b.feeds.keys()).some(t => a.targets.size >= 0 && !a.feeds.has(t) && mods.some(q => q.type === 'trackIn' && q.params.track === t + 1)), 'a plan changed without the newly working shape: ' + JSON.stringify([view(a), view(b)])); }
-    else same++;
+    else { same++; assert.deepEqual([...b.feeds.keys()], [...a.feeds.keys()], 'feeds keeps the patch\'s own order (busGroups colours)'); assert.deepEqual([...b.targets].map(([k, v]) => k + ':' + v), [...a.targets].map(([k, v]) => k + ':' + v), 'targets keeps its order and lists'); }
   }
   assert.ok(same > 2000 && newShape > 20, `same ${same}, newly working ${newShape}, loops ${loops}`);
 });
@@ -268,4 +268,102 @@ test('no block of delay: an impulse into track 01 comes out of Chain Out 14 in t
 test('tests/fixtures/bus-into-bus-native.json is up to date (node tools/make-bus-fixtures.mjs)', () => {
   const { execFileSync } = require('child_process');
   execFileSync(process.execPath, [require('path').join(__dirname, '..', 'tools', 'make-bus-fixtures.mjs'), '--check'], { stdio: 'pipe' });
+});
+
+/* ---- F1 (verifier): colours of a send that feeds two buses do not change ---- */
+test('busGroups: a source that feeds two buses takes the same bus colour as before this change (the verifier\'s patch)', () => {
+  const S = songOf([T('a', 'trackIn', 3), T('oa', 'chainOut', 6), T('b', 'trackIn', 1), T('ob5', 'chainOut', 5), T('ob6', 'chainOut', 6)], [Cb('a', 'oa'), Cb('b', 'ob5'), Cb('b', 'ob6')], [1, 3, 5, 6]);
+  const groups = planSrc => { const c = planCtx(S, planSrc); vm.runInContext('const BUS_COLORS = ["c1","c2","c3","c4","c5","c6","c7","c8"];' + cut(/function busGroups\(\)\{[\s\S]*?\n\}\n/, 'busGroups') + '\nthis.busGroups = busGroups;', c); return Array.from(c.busGroups());
+  };
+  const before = groups(OLD), after = groups(cut(RE_PLAN, 'busPlan'));
+  assert.deepEqual(after, before, 'colours: ' + JSON.stringify(before));
+  assert.deepEqual(before.find(([t]) => t === 0)[1], 'c2', 'track 01 has bus 06\'s colour, as on build 647');
+});
+
+/* ---- F3 (verifier): a plan change re-applies the mix, and the sequencer re-reads which tracks are buses ---- */
+function mixRig(S){
+  const calls = [], mkb = t => ({ g:{ gain:{ setTargetAtTime:v => calls.push(['g', t, v]), value:0 } }, p:{ pan:{ setTargetAtTime(){}, value:0 } }, scs:{ gain:{ setTargetAtTime(){}, value:0 } }, inp:{ gain:{ setTargetAtTime(){}, value:0 } }, pre:{ gain:{ setTargetAtTime(){}, value:0 } } });
+  const c = planCtx(S), rebus = []; c.buses = Array.from({ length:NT + 1 }, (_, t) => mkb(t)); c.ac = { currentTime:0 }; c.live = true; c.trackGain = v => 1; c.trimGain = v => 1; c.TRIM_0 = 128; c.clamp = (v, a, b) => Math.min(b, Math.max(a, v)); c.tp = { seq:{ rebus:() => rebus.push(1) } };
+  vm.runInContext(cut(/const audible = t => \{[\s\S]*?return false; \};\n/, 'audible'), c);
+  const i0 = src.indexOf('  let mixFilt = null;'), i1 = src.indexOf("  // Puts track t's effects between its input and its fader"), j0 = src.indexOf('  let planSeen = null;'), j1 = src.indexOf('  function busSync(){');
+  assert.ok(i0 > 0 && i1 > i0 && j0 > 0 && j1 > j0, 'applyMix / planChanged moved');
+  vm.runInContext(src.slice(i0, i1) + src.slice(j0, j1) + '\nthis.applyMix = applyMix; this.planChanged = planChanged;', c);
+  return { c, calls, rebus, gains(){ const g = {}; for (const [k, t, v] of calls) g[t] = v; return Array.from({ length:NT }, (_, t) => g[t]); } };
+}
+const ownerNoLink = () => { const S = owner(); S.chainPatch.modules = S.chainPatch.modules.filter(m => m.id !== 'ti8' && m.id !== 'co14'); S.chainPatch.cables = S.chainPatch.cables.filter(c => c.from[0] !== 'ti8'); return S; };
+const EDITS = {
+  'add the bus-into-bus cable': { from: S => ownerNoLink().chainPatch, to: S => owner().chainPatch, on: [...SRC, 8, 14] },
+  'remove the bus-into-bus cable': { from: S => owner().chainPatch, to: S => ownerNoLink().chainPatch, on: [...SRC, 8, 14] },
+  'switch CHN off on the first bus': { from: S => owner().chainPatch, to: S => owner().chainPatch, on: [...SRC, 8, 14], then: S => { S.chainOn[7] = false; } },
+  'switch CHN off on a source': { from: S => owner().chainPatch, to: S => owner().chainPatch, on: [...SRC, 8, 14], then: S => { S.chainOn[0] = false; } },
+};
+function editCase(name, setMix){
+  const E = EDITS[name], S = songOf(E.from().modules, E.from().cables, E.on); setMix(S);
+  const R = mixRig(S); R.c.planChanged();   // the plan the player started with
+  const before = R.gains(); R.calls.length = 0;
+  S.chainPatch = E.to(); if (E.then) E.then(S);   // the cable edit
+  R.c.planChanged();   // what busSync does at the end of routeTrack
+  const fresh = mixRig(S); fresh.c.applyMix();   // the gains a fresh applyMix on the new plan gives
+  return { got: Object.assign([], before, R.gains().map((v, i) => v === undefined ? before[i] : v)), want: fresh.gains(), before, R };
+}
+for (const name of Object.keys(EDITS)){
+  test('F3: with a solo set, ' + name + ': the gains follow the new plan at once (equal to a fresh applyMix)', () => {
+    const r = editCase(name, S => { S.mix[13].solo = true; });
+    assert.deepEqual(r.got, r.want); assert.notDeepEqual(r.before, r.want, 'control: the old gains are NOT right for the new plan');
+  });
+  test('F3: with a solo and a mute set, ' + name + ': the same', () => {
+    const r = editCase(name, S => { S.mix[13].solo = true; S.mix[2].mute = true; S.mix[7].mute = name.startsWith('add'); });
+    assert.deepEqual(r.got, r.want);
+  });
+  test('F3: with no solo (and a mute), ' + name + ': nothing is touched (no applyMix, so no click risk)', () => {
+    const r = editCase(name, S => { S.mix[2].mute = true; });
+    assert.equal(r.R.calls.length, 0, 'no gain was set'); assert.deepEqual(r.got, r.before);
+  });
+}
+test('F3: the same plan twice does nothing; a new plan tells the sequencer to re-read its buses once', () => {
+  const S = songOf(ownerNoLink().chainPatch.modules, ownerNoLink().chainPatch.cables, [...SRC, 8, 14]); S.mix[13].solo = true; const R = mixRig(S);
+  R.c.planChanged(); assert.equal(R.rebus.length, 1); const n = R.calls.length; R.c.planChanged(); assert.equal(R.calls.length, n); assert.equal(R.rebus.length, 1);
+  S.chainPatch = owner().chainPatch; R.c.planChanged(); assert.equal(R.rebus.length, 2);
+});
+test('F3: busSync starts with planChanged() (the line that carries the fix)', () => assert.match(src, /function busSync\(\)\{\n    planChanged\(\);/));
+test('F3: a render does not re-apply the mix on a plan change (its `keep` filter stays)', () => {
+  const S = songOf(ownerNoLink().chainPatch.modules, ownerNoLink().chainPatch.cables, [...SRC, 8, 14]); S.mix[13].solo = true; const R = mixRig(S); R.c.live = false;
+  R.c.planChanged(); S.chainPatch = owner().chainPatch; R.c.planChanged(); assert.equal(R.calls.length, 0);
+});
+
+/* (d) the audio-thread core: the running sequencer's bus set follows a plan change that reaches it as a 'song' / 'patch' message */
+function coreRig(){
+  let time = 0; class AWP { constructor(){ this.port = { postMessage(){}, onmessage:null }; } }
+  const reg = {}, ctx = { console, Math, Float32Array, Float64Array, Int32Array, Uint32Array, Uint8Array, Map, Set, JSON, Date, Number, String, Object, Array, isFinite, parseInt, parseFloat, AudioWorkletProcessor:AWP, registerProcessor:(n, c) => { reg[n] = c; }, sampleRate:48000 };
+  Object.defineProperty(ctx, 'currentTime', { get:() => time }); ctx.globalThis = ctx; vm.createContext(ctx);
+  vm.runInContext(H.read('core/seq-core.js'), ctx, { filename:'seq-core.js' });
+  vm.runInContext("TFX = {};", ctx);
+  const proc = new reg['thunder-core']({});
+  return { ctx, proc, send: d => proc.port.onmessage({ data:JSON.parse(JSON.stringify(d)) }) };
+}
+function songWithNotes(chainPatch, on){
+  const row = y => y % 2 ? [-1, 0, 0, 0, 0, 0, -1, 0, -1, 0, -1, 0] : [48 + y, 0, 0, 0, 0, 0, -1, 0, -1, 0, -1, 0];
+  const S = { bpm:120, ticks:6, ntr:8, swing:50, swingB:2, lpb:4, dlen:4, plen:[4], tune:new Array(12).fill(0), insts:[{ pad:0 }], parts:[], song:Array.from({ length:256 }, () => new Array(33).fill(-1)), chains:[[[0, 0]]], phrases:[Array.from({ length:4 }, (_, y) => row(y))],
+    mix:Array.from({ length:32 }, () => ({ vol:128, pan:128, mute:false, solo:false })), tfx:Array.from({ length:32 }, () => []), mfx:[], smute:new Array(256).fill(0), perf:{ sc:[], mac:[], lk:{}, xa:0, xb:1, xf:0, lfo:{} }, chainPatch, chainOn:new Array(32).fill(false) };
+  for (const t of on) S.chainOn[t - 1] = true; for (let y = 0; y < 64; y++){ S.song[y][0] = 0; S.song[y][1] = 0; }   // tracks 01 and 02 both have notes
+  return S;
+}
+const noteTracks = (sq, n) => { const out = new Set(); for (let i = 0; i < n && sq.alive(); i++) for (const e of sq.step().evs) if (e.type === 'note') out.add(e.track + 1); return [...out].sort(); };
+const linkPatch = () => ({ format:'chains.patch', modules:[T('a', 'trackIn', 1), T('oa', 'chainOut', 2)], cables:[Cb('a', 'oa')] });
+for (const how of ['song', 'patch']){
+  test('(d) the core\'s bus set follows a plan change while the song plays ("' + how + '"): the notes of a track that becomes a bus stop, and come back when it stops being one', () => {
+    const C = coreRig(); C.send({ op:'load', S:songWithNotes(null, []) });
+    const sq = C.ctx.makeSeq(vm.runInContext('S', C.ctx), 'song', { row:0, sim:true }); C.proc.seq = sq;
+    assert.deepEqual(noteTracks(sq, 8), [1, 2], 'no plan: both tracks play their notes');
+    const edit = S2 => { if (how === 'song') C.send({ op:'song', S:S2 }); else C.send({ op:'patch', ops:[['chainPatch', null, S2.chainPatch], ['chainOn', null, S2.chainOn]] }); };
+    edit(songWithNotes(linkPatch(), [1, 2]));   // Track In 1 -> Chain Out 2: track 02 is a bus now
+    assert.deepEqual(noteTracks(sq, 8), [1], 'track 02 is a bus: commands only');
+    edit(songWithNotes(null, []));
+    assert.deepEqual(noteTracks(sq, 8), [1, 2], 'and back');
+  });
+}
+test('(d) the page\'s sequencer has the same rebus (one makeSeq, two copies) and the page calls it when the plan changes', () => {
+  assert.match(src, /api\.rebus = \(\) => \{ busT\.clear\(\);/); assert.match(coreSrc, /api\.rebus = \(\) => \{ busT\.clear\(\);/);
+  assert.equal(H.read('core/core-processor.js').split('this.seq.rebus()').length - 1, 3, 'load, song and patch');
+  assert.match(src, /tp\.seq && tp\.seq\.rebus\) tp\.seq\.rebus\(\)/);
 });
