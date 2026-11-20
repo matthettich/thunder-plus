@@ -8895,7 +8895,24 @@ function renderAsync(v, sr, hold, stages){
 }
 const padSR = () => ctx ? ctx.sampleRate : srGuess;
 // A pad that renders in time with the song re-renders when the tempo changes: synced mod LFOs/sequence, or a Vector wave sequence in note values.
-const padBpm = i => { const v = kit.voices[i]; if (voiceLines(v)) return songBpm() + songLpb() / 100; return voiceSynced(v) || (v && v.engine === 'vector' && v.vector && (v.vector.mode | 0) === 1 && (v.vector.sdiv | 0) > 0) || (isLxV(v) && LxrCore.synced(v)) || (v && (v.engine === 'pwob' || v.engine === 'pwobl') && v.engine && v[v.engine] && v[v.engine].wob_sync !== 0) ? songBpm() : 0; };   // …PUMP WOB: its wobble follows the tempo   // LXR ENGINES: an LFO synced to the tempo
+/* LN TEMPO START */
+/* TEMPO AND LINES (build 658): a pad with a lines-mode envelope follows the song's tempo, but not at once. While BPM or LPB keep changing
+   (a TEMPO drag, TAP, Link or MIDI clock) nothing re-renders; after LN_QUIET ms without a change the pad's tempo becomes the song's and
+   the pad renders once (latest tempo wins; bgRender never runs two renders of one pad). While the song plays, a change under LN_TOL
+   (0.5 percent) of the tempo the pad was last rendered at is ignored, so a clock that wobbles by a fraction of a BPM never re-renders. */
+const LN_QUIET = 300, LN_TOL = 0.005;
+const lnT = {bpm:0, lpb:0, sb:0, sl:0, at:0, gen:0};
+function lnTempo(){
+  const b = songBpm(), l = songLpb(), now = performance.now();
+  if (!lnT.bpm){ lnT.bpm = lnT.sb = b; lnT.lpb = lnT.sl = l; lnT.at = now; return lnT; }
+  if (b !== lnT.sb || l !== lnT.sl){ lnT.sb = b; lnT.sl = l; lnT.at = now; }
+  else if ((b !== lnT.bpm || l !== lnT.lpb) && now - lnT.at >= LN_QUIET){
+    const near = l === lnT.lpb && tp.on && Math.abs(b - lnT.bpm) / lnT.bpm < LN_TOL;
+    if (!near){ lnT.bpm = b; lnT.lpb = l; lnT.gen++; } }
+  return lnT; }
+/* LN TEMPO END */
+setInterval(() => { try { if (!kit.voices.some(voiceLines)) return; const g = lnT.gen; lnTempo(); if (lnT.gen !== g) prerender(); } catch(e){} }, 100);   // the trailing call
+const padBpm = i => { const v = kit.voices[i]; if (voiceLines(v)){ const t = lnTempo(); return t.bpm + t.lpb / 100; } return voiceSynced(v) || (v && v.engine === 'vector' && v.vector && (v.vector.mode | 0) === 1 && (v.vector.sdiv | 0) > 0) || (isLxV(v) && LxrCore.synced(v)) || (v && (v.engine === 'pwob' || v.engine === 'pwobl') && v.engine && v[v.engine] && v[v.engine].wob_sync !== 0) ? songBpm() : 0; };   // …PUMP WOB: its wobble follows the tempo   // LXR ENGINES: an LFO synced to the tempo
 function stale(i){ const c = slotAt(cache, i); return !c || slotAt(dirty, i) || c.sr !== padSR() || (c.bpm || 0) !== padBpm(i); }
 function install(i, c){ slotAt(padRev, i); padRev[i] = (padRev[i] || 0) + 1; cache[i] = c; dirty[i] = false; bufs[i] = null; if (typeof coreBuf === 'function') try { coreBuf(i); } catch(e){} }
 function bgRender(i){
@@ -9639,40 +9656,53 @@ function lnParse(t){
   if ((m = t.match(/^(\d+)\s*b(?:ars?)?(?:\s*\+?\s*(\d+)\s*(?:l|lines?)?)?$/))) n = +m[1] * bar + (+m[2] || 0);
   else if ((m = t.match(/^(\d+)\.(\d+)$/))) n = +m[1] * bar + +m[2];
   else if ((m = t.match(/^(\d+)\s*(?:l|lines?)?$/))) n = +m[1];
-  return n == null ? null : Math.min(lnMax(), n); }
+  if (n == null){ toast('Type bars and lines like 4b, 2b8 or 2.8, or a number of lines like 12.', 4000); return null; }
+  if (n > lnMax()){ toast('At most 8 bars (' + lnMax() + ' lines at ' + songLpb() + ' lines a beat).', 3000); return lnMax(); }
+  return n; }
 function lnNudge(v, dir, fine){ const bar = lnBar(); v = Math.round(v);
   const n = fine ? v + dir : dir > 0 ? (Math.floor(v / bar) + 1) * bar : (Math.ceil(v / bar) - 1) * bar; return Math.max(0, Math.min(lnMax(), n)); }
 const lnSecs = ms => (ms / 1000).toFixed(2) + ' s';
 function envUnitUI(o){
   const {sec, getObj, uKey, keys, rowsMap, idp} = o, msDef = k => rowsMap[k].def, lrows = {};
   const ur = el('div', 'segrow'); ur.append(el('span', null, 'Time in')); const ug = el('div', 'seg'); ur.append(ug); rowsMap[keys[0]].r.before(ur);
-  let cur = keys[0], unitUpd = () => {};
-  const syncMs = () => { const ob = getObj(), bpm = songBpm(), lpb = songLpb(); for (const k of keys) ob[k] = Math.round(linesMs(envLinesOf(ob, k, bpm, lpb), bpm, lpb) * 10) / 10; };
+  let curK = keys[0], unitUpd = () => {};
+  const syncMs = k => { const ob = getObj(), bpm = songBpm(), lpb = songLpb(); ob[k] = Math.round(linesMs(envLinesOf(ob, k, bpm, lpb), bpm, lpb) * 10) / 10; };   // the ms cache of the stage just edited
   for (const k of keys){
     const def = {l:msDef(k).l, min:0, max:lnMax(), c:'sqi', d:null, f:lnText, parse:lnParse, nudge:lnNudge};
-    const r = makeRow(def, k + 'L', getObj, {idp, on:() => { syncMs(); o.on(); infoUpd(); }}); r.r.classList.add('lnrow'); r.r.hidden = true;
+    const r = makeRow(def, k + 'L', getObj, {idp, on:() => { syncMs(k); o.on(); infoUpd(); }}); r.r.classList.add('lnrow'); r.r.hidden = true;
     rowsMap[k].r.after(r.r); lrows[k] = r; if (o.reg) o.reg(r);
-    for (const ev of ['focus', 'pointerdown']) r.inp.addEventListener(ev, () => { cur = k; stepUpd(); }); }
+    for (const ev of ['focus', 'pointerdown']) r.inp.addEventListener(ev, () => { curK = k; stepUpd(); }); }
   const info = el('div', 'readout'), note = el('p', 'note');
   note.textContent = 'In bars + lines a time is a number of the song’s lines: a bar is 4 beats, so at 8 lines a beat 1 bar is 32 lines (one pattern), up to 8 bars. The seconds follow the song’s BPM and LPB when the pad is rendered (a tempo command in the song does not change them). Arrows: a bar, Shift: a line. Type 4b, 2b8, 2.8 or 12 (lines). The pad is made long enough for the envelope; raise Max len to hold a note longer.';
   const sr = el('div', 'segrow'), sl = el('span', null, 'Step'), sg = el('div', 'seg'); sr.append(sl, sg);
-  const stepUpd = () => { sl.textContent = 'Step ' + String(msDef(cur).l).toLowerCase(); };
+  const stepUpd = () => { sl.textContent = 'Step ' + String(msDef(curK).l).toLowerCase(); };
   for (const [t, ti, dir, fine] of [['−−', 'One bar less', -1, false], ['−', 'One line less', -1, true], ['+', 'One line more', 1, true], ['++', 'One bar more', 1, false]]){
-    const b = el('button', null, t); b.type = 'button'; b.title = ti; b.setAttribute('aria-label', ti + ' (' + msDef(cur).l + ')');
-    b.addEventListener('click', () => { const r = lrows[cur], v = +getObj()[r.key] || 0, nv = r.def.nudge(v, dir, fine); if (nv !== v) r.set(nv); }); sg.append(b); }
+    const b = el('button', null, t); b.type = 'button'; b.title = ti; b.setAttribute('aria-label', ti + ' (' + msDef(curK).l + ')');
+    b.addEventListener('click', () => { const r = lrows[curK], v = +getObj()[r.key] || 0, nv = r.def.nudge(v, dir, fine); if (nv !== v) r.set(nv); }); sg.append(b); }
   sec.append(info, sr, note);
   const infoUpd = () => { const ob = getObj(), lines = ob[uKey] === 'l'; info.hidden = sr.hidden = note.hidden = !lines; if (!lines) return;
     const bpm = songBpm(), lpb = songLpb(), parts = [];
     for (const k of keys) if (!lrows[k].r.hidden){ const n = envLinesOf(ob, k, bpm, lpb); parts.push(msDef(k).l + ' ' + lnText(n) + ' = ' + lnSecs(linesMs(n, bpm, lpb))); }
-    setText(info, parts.join(' · ') + ' · at ' + bpm + ' BPM, ' + lpb + ' lines a beat'); };
+    let warn = ''; try { const v = V(), hold = isSyn(cur) ? v.len : 0, fit = envLinesFit(v, hold);
+      if (fit){ const act = v.layers.filter(L => L.on && L.level > 0).length, secs = (hold ? fit.hold : voiceLen(fit.V)) * act;
+        if (secs > 60) warn = ' · Slow: this pad is about ' + Math.round(secs) + ' s of sound over ' + act + ' layers, and can take minutes to render on a phone.'; } } catch(e){}
+    setText(info, parts.join(' · ') + ' · at ' + bpm + ' BPM, ' + lpb + ' lines a beat' + warn); };
   const setU = u => { const ob = getObj(), bpm = songBpm(), lpb = songLpb();
-    if (u === 'l' && ob[uKey] !== 'l'){ for (const k of keys) ob[k + 'L'] = Math.min(lnMax(), msLines(ob[k], bpm, lpb)); ob[uKey] = 'l'; syncMs(); }
-    else if (u !== 'l' && ob[uKey] === 'l'){ for (const k of keys){ const d = msDef(k), ms = linesMs(envLinesOf(ob, k, bpm, lpb), bpm, lpb); ob[k] = Math.max(d.min, Math.min(d.max, snapDef(d, ms))); delete ob[k + 'L']; } delete ob[uKey]; }
+    if (u === 'l' && ob[uKey] !== 'l'){ for (const k of keys) ob[k + 'L'] = Math.min(lnMax(), msLines(ob[k], bpm, lpb)); ob[uKey] = 'l'; }   // the ms values stay as they were
+    else if (u !== 'l' && ob[uKey] === 'l'){ const cut = [];
+      for (const k of keys){ const d = msDef(k), n = envLinesOf(ob, k, bpm, lpb);
+        if (n !== msLines(ob[k], bpm, lpb)){   // a stage that was never changed keeps its ms exactly; the others take the lines' time
+          const ms = linesMs(n, bpm, lpb), v = Math.max(d.min, Math.min(d.max, snapDef(d, ms)));
+          if (ms > d.max + 0.5) cut.push(d.l + ' was ' + lnText(n) + ' (' + lnSecs(ms) + '): MS goes up to ' + Math.round(d.max) + ' ms, so it is now ' + Math.round(v) + ' ms');
+          ob[k] = v; }
+        delete ob[k + 'L']; }
+      delete ob[uKey];
+      if (cut.length) toast(cut.join('. ') + '. Undo brings the lines back.', 6000); }
     o.after(); o.on(); };
   unitUpd = makeSeg(ug, [['ms', 'MS'], ['l', 'BARS + LINES']], () => getObj()[uKey] === 'l' ? 'l' : 'ms', setU);
   return {upd(){ const ob = getObj(), lines = ob[uKey] === 'l';
     for (const k of keys){ const hide = o.hide(k, ob); rowsMap[k].r.hidden = lines || hide; lrows[k].r.hidden = !lines || hide; lrows[k].def.max = lnMax(); if (lines) lrows[k].refresh(); }
-    if (lines && lrows[cur].r.hidden) cur = keys.find(k => !lrows[k].r.hidden) || keys[0];
+    if (lines && lrows[curK].r.hidden) curK = keys.find(k => !lrows[k].r.hidden) || keys[0];
     unitUpd(); stepUpd(); infoUpd(); }};
 }
 /* clearing a layer's line times: a new model, Clear and Random start from plain ms (build 658) */

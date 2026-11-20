@@ -60,3 +60,6 @@ The design keeps the ENGINE in ms: the cores and the C++ engines do not change. 
 5. Storage: separate optional fields (`atkL` ...) plus the unit `aU: 'l'`; the ms fields stay as the equivalent at the last edit, so a build without this feature (or code that reads `atk` directly) still sees a sane ms value. Saving in ms mode writes nothing new.
 6. Lengths: lines-mode envelope makes the buffer long enough for its stages plus one bar of sustain on ADSR (never more than 300 s, today's cap); ordinary pads untouched. Holding a note longer than that: raise Max len (existing row).
 7. 8 bars: shipped at LPB 8 if the measured phone render time after the `voiceMod` fast path is acceptable (see PR text).
+
+## 6. Tempo-driven re-render (verifier F2)
+`lnTempo()`: the tempo a lines pad renders at follows the song's after 300 ms without a change (a 100 ms poll then calls `prerender`); while the song plays, a change under 0.5 percent of the tempo of the last render is ignored (LPB changes always count). `bgRender` already runs one render per pad and goes again at the latest tempo. The native host should do the same.

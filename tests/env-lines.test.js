@@ -120,9 +120,79 @@ test('the pad amp (gU) and the filter envelope (fU) take lines too', () => {
 });
 
 test('source guards: the page re-renders on BPM / LPB, the Worker gets lpb, saving in ms writes nothing new', () => {
-  assert.match(src, /if \(voiceLines\(v\)\) return songBpm\(\) \+ songLpb\(\) \/ 100;/, 'padBpm');
+  assert.match(src, /if \(voiceLines\(v\)\)\{ const t = lnTempo\(\); return t\.bpm \+ t\.lpb \/ 100; \}/, 'padBpm');
   assert.match(src, /bpm:songBpm\(\), lpb:songLpb\(\)/, 'renderAsync posts lpb');
   assert.match(src, /S = \{bpm:m\.bpm \|\| 120, lpb:m\.lpb \|\| 4\}/, 'the Worker keeps lpb');
   const fl = src.slice(src.indexOf('function freshLayer(o){'), src.indexOf('/* Voice modulation matrix'));
   assert.ok(!/aU|fU|atkL/.test(fl), 'freshLayer adds no new field');
+});
+
+// ---- TEMPO DRIVEN RE-RENDERS (F2): the pad's tempo follows the song's after 300 ms of quiet, and not at all for a wobble under 0.5 percent while playing
+function tempoRig() {
+  const a = src.indexOf('/* LN TEMPO START */'), b = src.indexOf('/* LN TEMPO END */');
+  assert.ok(a > 0 && b > a);
+  const c = vm.createContext({ Math, performance: { now: () => c.__t }, songBpm: () => c.__bpm, songLpb: () => c.__lpb, tp: { on: false }, __t: 0, __bpm: 120, __lpb: 8 });
+  vm.runInContext(src.slice(a, b) + ';globalThis.lnTempo = lnTempo; globalThis.lnT = lnT;', c);
+  // the page's poller: every 100 ms look; count how often the pad would render (the effective tempo changed)
+  c.renders = 0; c.poll = () => { const g = c.lnT.gen; c.lnTempo(); if (c.lnT.gen !== g) c.renders++; };
+  c.run = (ms, f) => { for (let t = 0; t < ms; t += 10) { c.__t += 10; if (f) f(t); if (c.__t % 100 === 0) c.poll(); } };
+  c.poll();
+  return c;
+}
+test('F2: 20 tempo changes in 1 s make one render, after 300 ms of quiet, at the final tempo', () => {
+  const c = tempoRig();
+  c.run(1000, t => { if (t % 50 === 0) c.__bpm = 120 + t / 50 + 1; });   // a drag: a change every 50 ms
+  assert.equal(c.renders, 0, 'no render while it moves');
+  c.run(500);
+  assert.equal(c.renders, 1); assert.equal(c.lnT.bpm, c.__bpm); assert.equal(c.lnT.lpb, 8);
+  c.run(2000); assert.equal(c.renders, 1);
+});
+test('F2: a steady external-clock wobble under 0.5 percent while playing renders nothing', () => {
+  const c = tempoRig(); c.tp.on = true;
+  c.run(5000, t => { if (t % 20 === 0) c.__bpm = 120 + ((t / 20) % 2 ? 0.4 : -0.4); });
+  c.run(1000); assert.equal(c.renders, 0);
+  // a real change (more than 0.5 percent from the last render) renders once, with the new tempo
+  c.__bpm = 126; c.run(1000); assert.equal(c.renders, 1); assert.equal(c.lnT.bpm, 126);
+  // and the length that render makes is right at that tempo
+  tempo(c.lnT.bpm, c.lnT.lpb);
+  assert.ok(Math.abs(E.linesMs(32, c.lnT.bpm, c.lnT.lpb) - 32 / 8 * 60 / 126 * 1000) < 1e-9);
+});
+test('F2: stopped, a small change still re-renders (the threshold is for a playing song); an LPB change always does', () => {
+  const c = tempoRig(); c.__bpm = 120.4; c.run(1000); assert.equal(c.renders, 1);
+  c.tp.on = true; c.__lpb = 4; c.run(1000); assert.equal(c.renders, 2);
+});
+
+// ---- the unit rows (F3, F4): the helper cut out of index.html with stand-ins for the page's rows
+function uiRig(obj, lpb = 8, bpm = 120) {
+  const a = src.indexOf('const lnBar = () =>'), b = src.indexOf("/* clearing a layer's line times");
+  assert.ok(a > 0 && b > a);
+  const toasts = [], seg = {}, mk = () => ({ append() {}, before() {}, after() {}, classList: { add() {} }, hidden: false, textContent: '', addEventListener() {}, setAttribute() {} });
+  const c = vm.createContext({ Math, S: { bpm, lpb }, toasts, seg, toast: m => toasts.push(m), el: () => mk(), setText() {}, snapDef: (d, v) => Math.round(v * 10) / 10,
+    makeSeg: (h, o, get, set) => { seg.set = set; return () => {}; }, makeRow: (def, key) => ({ def, key, r: mk(), inp: mk(), set() {}, refresh() {} }),
+    V: () => ({layers: [], len: 6}), isSyn: () => true, cur: 0, voiceLen: () => 0 });
+  vm.runInContext(src.slice(src.indexOf('function songBpm()'), src.indexOf('function envLinesFit')) + src.slice(a, b) + ';globalThis.__ui = {lnParse, lnText, envUnitUI};', c);
+  const defs = k => ({ l: { atk: 'Attack', dec: 'Decay' }[k], min: k === 'atk' ? 0.1 : 1, max: k === 'atk' ? 2000 : 6000, f: v => v + ' ms' });
+  const rowsMap = {}; for (const k of ['atk', 'dec']) rowsMap[k] = { def: defs(k), r: { before() {}, after() {}, hidden: false } };
+  c.__ui.envUnitUI({ sec: { append() {} }, getObj: () => obj, uKey: 'aU', keys: ['atk', 'dec'], rowsMap, idp: 'l', on() {}, after() {}, hide: () => false });
+  return { c, toasts, seg, ui: c.__ui };
+}
+test('F4: lines -> MS says what was shortened, and a stage that was never changed comes back exactly', () => {
+  const L = { atk: 0.5, dec: 300 };
+  const { toasts, seg } = uiRig(L);
+  seg.set('l'); assert.equal(L.aU, 'l'); assert.equal(L.atkL, 0); assert.equal(L.decL, 5); assert.equal(L.atk, 0.5, 'ms kept');
+  seg.set('ms'); assert.equal(L.atk, 0.5, '0.5 ms round trip is exact'); assert.equal(L.dec, 300); assert.equal(toasts.length, 0);
+  assert.ok(!('aU' in L) && !('atkL' in L), 'nothing left behind');
+  // 4 bars at 120 BPM / LPB 8 = 8 s: more than the 2 s the Attack row goes to
+  const M = { atk: 1, dec: 300, aU: 'l', atkL: 128, decL: 8 }; const r2 = uiRig(M); r2.seg.set('ms');
+  assert.equal(M.atk, 2000); assert.equal(r2.toasts.length, 1);
+  assert.match(r2.toasts[0], /Attack was 4 bars \(8\.00 s\): MS goes up to 2000 ms, so it is now 2000 ms/);
+  assert.match(r2.toasts[0], /Undo/);
+  assert.equal(M.dec, 500, 'the decay (8 lines = 1 s at 8/beat... 0.5 s) comes back as its time');
+});
+test('F3: a typed value that clamps or is not understood says so', () => {
+  const { ui, toasts } = uiRig({ atk: 1, dec: 1 });
+  assert.equal(ui.lnParse('4b'), 128); assert.equal(ui.lnParse('2b8'), 72); assert.equal(ui.lnParse('2.8'), 72); assert.equal(ui.lnParse('12'), 12); assert.equal(toasts.length, 0);
+  assert.equal(ui.lnParse('9b'), 256); assert.match(toasts.pop(), /At most 8 bars/);
+  assert.equal(ui.lnParse('8b1'), 256); assert.match(toasts.pop(), /At most 8 bars/);
+  for (const bad of ['-1', 'abc', '']) { assert.equal(ui.lnParse(bad), null); assert.match(toasts.pop(), /4b, 2b8 or 2\.8/); }
 });

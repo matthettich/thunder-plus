@@ -859,6 +859,7 @@ Start a session by asking for results. Fix on `beta`. (10 Nov, 15:10: the web be
 - [ ] **Computer:** try 2 bars, 4 bars and 8 bars (the maximum). Pass: each ends on the bar line; the line under the rows shows the seconds.
 - [ ] **Computer:** change the song BPM, then the LPB, with the swell in place. Pass: it still fits the bars (the pad re-renders).
 - [ ] **Computer:** switch MS then BARS + LINES then MS on a normal pad. Pass: the sound is about the same (within a line). An old song sounds the same.
+- [ ] **Computer:** drag TEMPO with a 4-bar swell pad in the song. Pass: no stutter while you drag, the swell re-fits when you let go (about a third of a second later).
 - [ ] **Phone:** the 8-bar swell. Pass: it renders in a few seconds and plays; tell me how long the wait was.
 
 **Build 657** (double-click the master cell: an empty block, or a whole empty row)
@@ -1697,7 +1698,9 @@ Build 658, branch `beta-env-lines`. Owner: noise swells that fit a pattern: 4 ba
 - `renderVoice` calls `envLinesFit` (engine block): lines to ms at the song's BPM and LPB (`linesMs`, a stage at most 64 s), and lengthens `len` / `hold` to fit (ADSR in a held slot: attack + decay + one bar; never over 300 s). The Worker gets `lpb`. `padBpm` returns `bpm + lpb/100` for such a pad, so a BPM or LPB change re-renders it. `relOf` follows the release in lines.
 - Range 0 to 8 bars a stage (`32 x LPB` lines). Row shows "2 bars + 8 lines", a line under the rows gives the seconds; arrows move a bar, Shift a line, Step buttons `-- - + ++`; typing 4b, 2b8, 2.8, 12 (lines). New slider curve `sqi`; `def.parse` / `def.nudge` hooks in `rowTypeBox` / `sliderNudge`; `row.set`.
 - Speed: `renderLayer` skips `voiceMod` when no mod route has an amount (same numbers; it built an object per 16 samples and was 55 percent of a plain noise layer's render time).
-- Tests: `tests/env-lines.test.js`.
+- Verifier fixes (PR #259): the tempo re-render is debounced (`lnTempo`: a lines pad takes the song's BPM / LPB after 300 ms without a change, then renders once; while PLAYING a change under 0.5 percent of the tempo it was last rendered at is ignored, so Link / MIDI clock jitter never loops); lines -> MS names the stages it had to shorten in a toast (Undo brings them back) and a stage never edited keeps its ms exactly; a typed value that clamps ("At most 8 bars") or is not understood says so; the row's info line warns when the pad is over about 60 s of sound across layers.
+- Known: a build without this feature opens a lines-mode pad with the cached ms and its old Max len, so it cuts the swell at the saved Max len (6 s on a synth slot). Stored values are lines: an LPB change keeps the line count ("4 bars" at LPB 8 reads "8 bars" at LPB 4; it ends on the same row).
+- Tests: `tests/env-lines.test.js` (15, with a fake clock for the tempo debounce).
 
 ## 19 Nov (double-click the master cell: an empty block, or a whole empty row; build 657)
 
