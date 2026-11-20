@@ -113,6 +113,6 @@ test('source: text fields never reach it (typing() returns before fileKeys / key
 });
 test('source: Help & keys and the build', () => {
   assert.match(src, /<td>FX presets<\/td><td><kbd>Ctrl\/⌘<\/kbd> <kbd>◀▶<\/kbd> with the cursor anywhere in an effect slot’s controls/);
-  assert.match(src, /EDIT \+ ◀▶ on a › PRESET row/); assert.match(src, /const BUILD = 653;/); assert.match(src, /\[653, '19 Nov'/);
-  assert.match(H.read('sw.js'), /thunderplus-v653/);
+  assert.match(src, /EDIT \+ ◀▶ on a › PRESET row/); assert.ok(+/const BUILD = (\d+);/.exec(src)[1] >= 653, 'BUILD is this build or a later one'); assert.match(src, /\[653, '19 Nov'/);
+  assert.ok(+/thunderplus-v(\d+)/.exec(H.read('sw.js'))[1] >= 653, 'sw cache is this build or a later one');
 });
