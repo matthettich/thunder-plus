@@ -17,6 +17,7 @@ class AcidCore {
   void set(const AcidP& o);              // set(o): a field that is not finite is the default
   void on(bool leg, bool acc);
   void off();
+  void reset();                          // back to a fresh core's state, the parameters kept; no allocation (LIVE ROUTE C1)
   void render(float* L, float* R, size_t len, double a, double b, double rate);
   const AcidP& p() const { return p_; }
  private:
@@ -33,6 +34,7 @@ class MachCore {
   void set(const MachP& o);
   void on(bool leg);
   void off();
+  void reset();                          // back to a fresh core's state, the parameters kept; no allocation (LIVE ROUTE C1)
   void render(float* L, float* R, size_t len, double a, double b, double rate);
   bool bad() const { return bad_; }      // the JS would have thrown (a TypeError: the Ensemble chord index is NaN) or never finished (a Swarm voice count above 1e4): the render is refused
   const MachP& p() const { return p_; }

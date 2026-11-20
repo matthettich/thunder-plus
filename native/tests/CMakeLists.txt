@@ -675,6 +675,11 @@ target_include_directories(test_engine_u26 PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/.
 add_executable(test_live_u26 test_live_u26.cpp)
 target_link_libraries(test_live_u26 PRIVATE thunder_core)
 target_include_directories(test_live_u26 PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../core/src ${CMAKE_CURRENT_SOURCE_DIR})
+# LIVE ROUTE B1 (C1): reset() / seek() of the live cores and the shell: reset equals a fresh core bit for bit, no allocation.
+add_executable(test_live_reset test_live_reset.cpp)
+target_link_libraries(test_live_reset PRIVATE thunder_core)
+target_include_directories(test_live_reset PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../core/src ${CMAKE_CURRENT_SOURCE_DIR})
+add_test(NAME live_reset COMMAND test_live_reset)
 # U26: extreme / NaN parameters of bass and vox, combined fields, sample rates 0.5 to 1e5, a per-render time limit.
 add_executable(test_engine_u26_fuzz test_engine_u26_fuzz.cpp)
 target_link_libraries(test_engine_u26_fuzz PRIVATE thunder_core)

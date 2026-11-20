@@ -84,6 +84,14 @@ class LiveShell {
   bool failed() const { return failed_; }                // the JS core would have thrown (a NaN vowel, a syllable number that is not a whole number, ...): the voice is silent from then on
   uint32_t dropped() const { return dropped_; }          // events that did not fit the queue (kPend) or lay outside the call
   uint32_t rejected() const { return rejected_; }        // events with a non-finite value (an AudioParam cannot hold one)
+  // LIVE ROUTE (C1). reset(): everything as a fresh shell's (the core reset with its parameters kept, the rate lane, the queue, the clocks at 0, the counters, the rings silent). seek(clock): the shell's clock (and
+  // the core's position) is `clock` from now: the queue is dropped, the first latency() samples after it are silence. A bind to a note is reset() + seek(). Neither allocates.
+  void reset() {
+    core_.reset(); lane_ = LiveRateLane(); clock_ = 0; rendered_ = 0; origin_ = 0; failed_ = false; dropped_ = 0; rejected_ = 0; head_ = 0; cnt_ = 0;
+    std::memset(ringL_, 0, sizeof ringL_); std::memset(ringR_, 0, sizeof ringR_); std::memset(stgL_, 0, sizeof stgL_); std::memset(stgR_, 0, sizeof stgR_);
+  }
+  void seek(uint64_t clock) { clock_ = clock; rendered_ = clock; origin_ = clock; head_ = 0; cnt_ = 0; }
+  uint64_t clock() const { return clock_; }
 
   // Renders n samples into L and R (separate arrays) and applies the n-sample call's events (any order; the same offset keeps its order). n of any size: it runs in chunks of up to kMaxBlock.
   void process(float* L, float* R, uint32_t n, const LiveEvent* ev, uint32_t nev) {
@@ -94,7 +102,7 @@ class LiveShell {
       advance(clock_ + m);
       for (uint32_t j = 0; j < m; j++) {
         const int64_t t = (int64_t)(clock_ + j) - (int64_t)latency();
-        if (t < 0 || failed_) { L[base + j] = 0; R[base + j] = 0; } else { L[base + j] = ringL_[(uint64_t)t & (kRing - 1)]; R[base + j] = ringR_[(uint64_t)t & (kRing - 1)]; }
+        if (t < (int64_t)origin_ || failed_) { L[base + j] = 0; R[base + j] = 0; } else { L[base + j] = ringL_[(uint64_t)t & (kRing - 1)]; R[base + j] = ringR_[(uint64_t)t & (kRing - 1)]; }
       }
       clock_ += m;
     }
@@ -150,7 +158,7 @@ class LiveShell {
     for (uint32_t i = 0; i < n; i++) { ringL_[(s + i) & (kRing - 1)] = failed_ ? 0.0f : stgL_[i]; ringR_[(s + i) & (kRing - 1)] = failed_ ? 0.0f : stgR_[i]; }
   }
   typename A::Core core_; LiveRateLane lane_;
-  uint64_t clock_ = 0, rendered_ = 0; bool failed_ = false; uint32_t dropped_ = 0, rejected_ = 0;
+  uint64_t clock_ = 0, rendered_ = 0, origin_ = 0; bool failed_ = false; uint32_t dropped_ = 0, rejected_ = 0;
   Pend pend_[kPend]; uint32_t head_ = 0, cnt_ = 0;
   float ringL_[kRing], ringR_[kRing], stgL_[kBlk], stgR_[kBlk];
 };
