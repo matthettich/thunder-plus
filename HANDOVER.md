@@ -884,6 +884,11 @@ Start a session by asking for results. Fix on `beta`. (10 Nov, 15:10: the web be
 - [ ] **FX bar (bottom):** click a value, Cmd+Left / Right still change that value by 1 (the bar has no preset row; unchanged). **A text field** (a name box): Cmd+Left / Right still move the caret to line start / end, no preset changes.
 - [ ] **Phone (pad mode):** EDIT + ◀▶ on a `› PRESET` row steps the presets; on a parameter row it still changes the value.
 
+**Build 652** (playback report: tracks line; chasing "solo, change an effect, quiet until Restart audio")
+- [ ] **Computer (desktop app):** play your song, solo a track, change an effect on (a) the soloed track, (b) another track, (c) the master, then un-solo. Pass: full level returns each time. Repeat with the bus in the patch. If it ever stays quiet: Settings > Audio > Copy playback report BEFORE Restart audio and paste it (the `tracks` line says which track is shut).
+- [ ] **Phone:** same with one track. Pass: full level back.
+- [ ] **Computer:** press STOP then PLAY quickly. Pass: no "1 s / 3 s after STOP" line reports the next play's level.
+
 **Build 651** (bus into bus; solo follows the chain; two-letter CHN labels)
 - [ ] **Computer, his patch:** Track In 1, 2, 3, 4, 5, 6, 9, 13 → Stereo mixer → Chain Out 8; Track In 8 → Chain Out 14 (CHN on for those tracks). Pass: the CHN row says BS under the eight tracks and ON under 08 and 14; the Mixer line on 08 says "bus of tracks 01 ... 13 · feeds the bus on track 14"; the reverb he put on the first bus is heard through the second bus (and the eight tracks are not heard dry).
 - [ ] **Computer, the same:** put a delay or reverb on bus 14 only, then on 08 only: both are heard. Play it a while: no click, no change in timing between the buses (an impulse or a kick through both buses lands on the beat; with LATENCY COMP on and a look-ahead effect on 08 it still does).
@@ -1740,6 +1745,13 @@ Branch `beta-reset-track` (from `beta` at 647; builds 648 and 649 are in other o
 - Lead's ruling after verification (F1): a reset never changes a track's bus ROLE: CHN also stays on for a track that feeds a bus (the empty track feeds silence), so the bus keeps muting its own notes; toast names the bus. Stated plainly (F2, F3, no code change): the song loop shortens when this track alone held the last rows (playing from such a row just ends); other tracks' sidechain Sources naming this track stop ducking. Undo restores both. The opt-in page test now also checks the reset track's level on both sequencers.
 - Choices made (for the lead): CHN goes off for the track except when the track is a bus or feeds one; the ...chains patch is not edited; names and colours are reset with the strip; sidechain Sources of other tracks that name this track are left; PERFORM / parts entries of the track are removed.
 - Tests: `tests/reset-track.test.js` (18, plus 1 opt-in real-page run with `TP_BROWSER_TESTS=1`: the key, undo identical, other tracks' events unchanged on ELECTRO, playing on the page and on the audio thread).
+
+## 19 Nov (solo + effect change left the mix quiet: NOT reproduced; playback report gets a tracks line; build 652)
+
+Branch `beta-solo-fx-quiet`. Owner (desktop 1.3.13, build 647, seq=core): "I soloed a track and then changed FX and the whole song went quiet until I reset audio." His log: clock steady, no drops; plays about 17 dB down (average -32 dB, peak -10.6) for three plays, then normal. Full trace, what was tried and the ranked suspects: `docs/SOLO-FX-QUIET-NOTES.md`.
+- **Not reproduced** in headless Chrome on his song (`sounds/BETA-TESTING-ELECTRO.thunder`) with `tests/sweep/solo-fx.mjs` (solo, add / remove / retype / bypass / parameter on the soloed, a silenced, the bus and the master, running and stopped, solo held 1.5 s and 12 s, both sequencers for the first cases), nor at node level (rest, chain edit, wake). No fix made.
+- **Added:** the "1 s / 3 s after STOP" report lines are cancelled by the next PLAY (`pbStopCancel`); a `tracks (...)` line on PLAY and 1 s after a solo / mute change (audible, fader gain, effects resting, SHUT / STUCK-REST flags). `tests/playback-report-stop-timers.test.js`.
+- **Next time it happens:** Settings > Audio > Copy playback report straight away, BEFORE Restart audio, and read the `tracks` line.
 
 ## 19 Nov (Settings sliders: press and drag a bar; build 649)
 
