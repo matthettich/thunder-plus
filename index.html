@@ -14306,7 +14306,8 @@ function modSelect(host, label, key){
 
 function pitchReadout(){
   const L = Lc(), ro = $('pitchRO');
-  if (L.type === 'sample'){ ro.textContent = '0 st plays the sample at its recorded pitch'; return; }
+  if (L.type === 'sample'){ const st = Math.round(((L.tune || 0) + V().tune + (L.fine || 0) / 100) * 100) / 100;   // layer + voice tune: 0 plays it as recorded at C-4
+    ro.textContent = st === 0 ? 'plays the sample at its recorded pitch at C-4' : (st > 0 ? '+' : '') + st + ' st from its recorded pitch at C-4'; return; }
   const m = 36 + L.tune + V().tune + L.fine / 100, f = BASE * Math.pow(2, (m - 36) / 12), r = Math.round(m);
   ro.textContent = '≈ ' + (f < 1000 ? f.toFixed(1) + ' Hz' : (f / 1000).toFixed(2) + ' kHz') + ' · ' + NOTE[((r % 12) + 12) % 12] + (Math.floor(r / 12) - 1);
 }
@@ -15977,6 +15978,8 @@ function smpChannels(b){
   if (b.numberOfChannels > 2) for (let c = 2; c < b.numberOfChannels; c++){ const ch = b.getChannelData(c), k = c & 1 ? d2 : d; for (let i = 0; i < n; i++) k[i] += ch[i] * 0.5; }   // 5.1 and up: folded onto the two
   return {d, d2:diff || b.numberOfChannels > 2 ? d2 : null, n};
 }
+// The layer tune that cancels the voice's tune (clamped to a layer's range), so a sample plays at its own pitch at C-4.
+const smpOwnTune = v => { const t = -((v && v.tune) || 0); return t < -48 ? -48 : t > 48 ? 48 : t + 0; };
 function assignSample(vi, data, sr, name, data2, id){
   if (typeof markSmpNew === 'function') markSmpNew();   // (the close prompt: unsaved samples)
   const v = kit.voices[vi], li = v.sel;
@@ -15985,8 +15988,12 @@ function assignSample(vi, data, sr, name, data2, id){
   // A PWM sampler layer keeps its clock and mode and just takes the new sound.
   if (v.layers[li] && (v.layers[li].type === 'pwm' || v.layers[li].type === 'grains')){ v.layers[li].sample = smp; v.layers[li].on = true;
     v.len = Math.max(v.len, Math.min(SMP_MAX, data.length / sr + 0.1)); cur = vi; changed(vi); refreshAll(); return; }
+  // OWN PITCH AT C-4 (19 Nov, owner: "it plays back very fast ... normal pitch is at C-2"): a pad is rendered once at (layer tune + voice
+  // tune) and the note then moves it from C-4, so a sample whose layer has tune 0 in a synth slot (voice tune +24) sounded two octaves up
+  // at C-4. A NEW sample layer takes the opposite of the voice's tune, so voice + layer = 0 and the sample plays as it is at C-4, on a synth
+  // slot and on a drum pad (voice tune 0: unchanged). Only this load writes it; a saved layer keeps the tune it has (see docs/SAMPLER-NOTES.md).
   v.layers[li] = freshLayer({on:true, type:'sample', level:0.9, mode:'AHD', atk:0.1, hold:Math.min(SMP_MAX * 1000, Math.round(lenMs)), dec:40,
-    sample:smp});
+    tune:smpOwnTune(v), sample:smp});
   v.len = Math.max(v.len, Math.min(SMP_MAX, data.length / sr + 0.1));
   cur = vi; changed(vi); refreshAll();
 }
