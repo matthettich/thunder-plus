@@ -30,6 +30,8 @@ env:
   # A release: a pushed vX.Y.Z tag, or Run workflow with a version typed in.
   TAG: ${{ (github.event_name == 'workflow_dispatch' && inputs.version != '') && format('v{0}', inputs.version) || github.ref_name }}
   RELEASING: ${{ (github.event_name == 'workflow_dispatch' && inputs.version != '') || startsWith(github.ref, 'refs/tags/v') }}
+  # A desktop BETA (Run workflow with "Beta" ticked, or a pushed tag like v1.3.14-beta.1) gets its own icon (the dogs swap colours): electron/copy-app.js reads this.
+  THUNDER_BETA: ${{ ((github.event_name == 'workflow_dispatch' && inputs.prerelease) || (startsWith(github.ref, 'refs/tags/v') && contains(github.ref_name, '-beta'))) && '1' || '0' }}
   APP_DIR: electron                        # where package.json is
   RELEASE_REPO: matthettich/thunder-plus   # where releases go (the app's updater reads them from here)
 
