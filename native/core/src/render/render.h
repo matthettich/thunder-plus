@@ -95,6 +95,9 @@ struct RenderStats {
   // chop (CHOP-NOTES.md): notesStretched = notes with ev.st (sync 2 / 3) played UNSTRETCHED at `rate` (the stretch port does not exist yet); seqChopped = notes chopped; seqChopSkipped = a sliced / synced
   // instrument's note whose pad had no chop data handed in (unchopped); seqChopNoHits = SMODE on without handed-in hits (grid used)
   int notesStretched = 0; uint64_t seqChopped = 0, seqChopSkipped = 0, seqChopNoHits = 0;
+  // LIVE ROUTE (L8): notesLive stays every note of a live pad; notesLivePlayed those a live node sounded; liveNoNode: no node for the track (silent); liveLate: events that arrived inside the look-ahead (applied at the node's clock);
+  // liveQueueDropped: events a full node timeline dropped; liveForcedOff: note-offs that had to discard queued events (L5); liveFailed: nodes whose core refused (bad() / failed_)
+  int notesLivePlayed = 0; uint32_t liveNoNode = 0, liveLate = 0, liveQueueDropped = 0, liveForcedOff = 0, liveFailed = 0;
 };
 
 class SongRenderer {

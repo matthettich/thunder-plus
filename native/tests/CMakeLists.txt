@@ -680,6 +680,11 @@ add_executable(test_live_reset test_live_reset.cpp)
 target_link_libraries(test_live_reset PRIVATE thunder_core)
 target_include_directories(test_live_reset PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../core/src ${CMAKE_CURRENT_SOURCE_DIR})
 add_test(NAME live_reset COMMAND test_live_reset)
+# LIVE ROUTE B2: the live pool: the start rule, the seam against the shell driven directly, run-ahead, the C API.
+add_executable(test_live_pool test_live_pool.cpp)
+target_link_libraries(test_live_pool PRIVATE thunder_core)
+target_include_directories(test_live_pool PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../core/src ${CMAKE_CURRENT_SOURCE_DIR})
+add_test(NAME live_pool COMMAND test_live_pool)
 # U26: extreme / NaN parameters of bass and vox, combined fields, sample rates 0.5 to 1e5, a per-render time limit.
 add_executable(test_engine_u26_fuzz test_engine_u26_fuzz.cpp)
 target_link_libraries(test_engine_u26_fuzz PRIVATE thunder_core)

@@ -5,12 +5,13 @@
 
 namespace thunder {
 
-Players::Players(const RenderPads* pads, double sampleRate, int maxVoices) : pads_(pads), pool_(sampleRate, maxVoices), sfpool_(sampleRate) {}
+Players::Players(const RenderPads* pads, double sampleRate, int maxVoices) : pads_(pads), pool_(sampleRate, maxVoices), sfpool_(sampleRate), live_(sampleRate) {}
 
-void Players::setTime(double t0, int64_t frame0) { pool_.setTime(t0); sfpool_.setFrame((uint64_t)frame0); }
+void Players::setTime(double t0, int64_t frame0) { pool_.setTime(t0); sfpool_.setFrame((uint64_t)frame0); live_.setTime(t0); }
 void Players::render(float* const* inL, float* const* inR, int frames, double t0, int64_t frame0) {
   pool_.render(inL, inR, frames, t0);
   sfpool_.render(inL, inR, frames, (uint64_t)frame0);   // adds into the same inputs
+  live_.render(inL, inR, frames, frame0);
 }
 
 bool Players::dispatch(const SeqEvent& e, const Seq& seq, const Song& song) {
@@ -31,7 +32,11 @@ void Players::note(const SeqEvent& e, const Seq& seq, const Song& song) {
   const int pad = to_int_sat(e.pad, -1, 1 << 20);   // (N1 C3: a part without `pad` gives NaN: no pad, what x86 gave and what the JS's kit.voices[NaN] is)
   if (pad < 0 || pad >= kRenderPads) { st_.notesNoPad++; return; }
   // D2: which player. A live-engine or SoundFont pad is not the sampler's: its notes are silent here (counted), but they still take the track over (a live note does: liveNote / sfNote).
-  if (pads_.route[pad] == PadRoute::Live) { st_.notesLive++; takeAll(e, pad); return; }
+  if (pads_.route[pad] == PadRoute::Live) {
+    st_.notesLive++; takeAll(e, pad);
+    if (live_.has(pad) && live_.note(e, pad)) st_.notesLivePlayed++;   // a pad with live params plays; one without stays silent (counted)
+    return;
+  }
   if (pads_.route[pad] == PadRoute::SoundFont) {
     st_.notesSf++;
     const sf::SfPad& sp = pads_.sf[pad];

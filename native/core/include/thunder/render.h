@@ -131,6 +131,13 @@ typedef struct thunder_render_stats {
   uint64_t seq_chopped;         /* notes the sequencer chopped (applyChop) */
   uint64_t seq_chop_skipped;    /* notes of a sliced / synced instrument whose pad had no set_pad_chop: left unchopped */
   uint64_t seq_chop_no_hits;    /* SMODE (find hits) slices without set_pad_hits: the equal grid was used */
+  /* appended with the live-engine route (docs/port/LIVE-ROUTE-DESIGN.md L8). notes_live stays every note of a ROUTE_LIVE pad. */
+  int32_t notes_live_played;    /* notes of a live pad a live node sounded (a subset of notes_live) */
+  uint32_t live_no_node;        /* live notes with no node for their track (silent; they still take the track over) */
+  uint32_t live_late;           /* live events that arrived for a time already inside the look-ahead: applied at the node's clock, at most latency() samples late */
+  uint32_t live_queue_dropped;  /* live events a full node timeline dropped (a note-off is never dropped) */
+  uint32_t live_forced_off;     /* note-offs that had to discard queued events to be kept */
+  uint32_t live_failed;         /* live nodes whose core refused (the JS would have thrown): silent from then on */
 } thunder_render_stats;
 
 /* Parses the song and builds the renderer. song: the app's song JSON (a .thunder file's bytes or a song message), not NUL-terminated, copied.
@@ -209,6 +216,24 @@ int thunder_render_add_font(thunder_render* r, const uint8_t* bytes, size_t n);
 int thunder_render_remove_font(thunder_render* r, int font_id);
 int thunder_render_set_pad_sf(thunder_render* r, int pad, int font_id, int bank, int prog, const thunder_render_sf_params* params, const uint8_t* keys, size_t nkeys);
 int thunder_render_clear_pad_sf(thunder_render* r, int pad);
+
+/* LIVE-ENGINE PADS (docs/port/LIVE-ROUTE-NOTES.md, LIVE-ROUTE-DESIGN.md L2). thunder_render_set_pad_live: pad `pad` (0 .. 255) is played by a live engine of `kind`:
+   THUNDER_RENDER_LIVE_BASS 1, _ACID 3, _MACH 4 (vox 2 and the other kinds: E_ARG until they are built). `voice_json` is the page's voice object (engine, level, tune, drive and the engine's own parameter object
+   under its name), COPIED and parsed here; its engine must be the kind's. The nodes (one a track that may play the pad, per params->track_mask) are made here: nothing is allocated at a note. Only before the first read or
+   drain (E_STATE after). E_ARG: a bad pad / kind / mask / JSON or an engine that is not the kind's; E_LIMIT: the nodes would pass the pad budget (THUNDER_RENDER_MAX_PAD_BYTES, shared with the pads); E_MEMORY: nothing changed.
+   It does NOT change the pad's route: set THUNDER_RENDER_ROUTE_LIVE too (a ROUTE_LIVE pad with no live params is silent, counted in notes_live, and still takes its track over). A pad set twice is replaced.
+   thunder_render_clear_pad_live removes the pad's nodes (0 if it had none). */
+#define THUNDER_RENDER_LIVE_BASS 1
+#define THUNDER_RENDER_LIVE_VOX 2
+#define THUNDER_RENDER_LIVE_ACID 3
+#define THUNDER_RENDER_LIVE_MACH 4
+typedef struct thunder_render_live_params {
+  uint32_t size;                /* sizeof(thunder_render_live_params) as the caller compiled it */
+  uint32_t reserved0;           /* must be 0 */
+  uint64_t track_mask;          /* bit t: track t may play this pad (t = 0 .. 32); 0: all 33 tracks. Bits above 32: E_ARG */
+} thunder_render_live_params;
+int thunder_render_set_pad_live(thunder_render* r, int pad, int kind, const uint8_t* voice_json, size_t n, const thunder_render_live_params* params);
+int thunder_render_clear_pad_live(thunder_render* r, int pad);
 
 /* The length of the output in frames after the trim (an unknown-length render cut at max_frames: max_frames). With opts.use_frames = 1 it is `frames`, known from the start. Otherwise it is -1
    until the render has reached its end (the song's length depends on its voices' tails, which only running the render can tell), and the

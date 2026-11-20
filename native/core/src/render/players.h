@@ -9,6 +9,7 @@
 #define THUNDER_RENDER_PLAYERS_H
 #include <cstdint>
 
+#include "engine/live_pool.h"
 #include "render/render.h"
 
 namespace thunder {
@@ -17,6 +18,7 @@ namespace thunder {
 struct PlayerStats {
   int notes = 0, notesPlayed = 0, notesNoPad = 0, notesMidiOnly = 0, notesShapedRev = 0;
   int notesLive = 0, notesSf = 0, notesSfPlayed = 0, notesVar = 0, notesVarMissing = 0, notesUnshaped = 0, notesStretched = 0;
+  int notesLivePlayed = 0;                              // notes of a live pad a node sounded (a subset of notesLive)
   int peakAll = 0;   // the most voices of all pools sounding together (sampled after every event: samplePeak())
 };
 
@@ -40,6 +42,8 @@ class Players {
   const VoicePool& pool() const { return pool_; }
   sf::SfPool& sfPool() { return sfpool_; }
   const sf::SfPool& sfPool() const { return sfpool_; }
+  LivePool& live() { return live_; }                     // the live engines' pool (declare a pad with live().addPad before the first block)
+  const LivePool& live() const { return live_; }
 
  private:
   void note(const SeqEvent& e, const Seq& seq, const Song& song);
@@ -48,6 +52,7 @@ class Players {
   const RenderPads* pads_;
   VoicePool pool_;
   sf::SfPool sfpool_;
+  LivePool live_;
   PlayerStats st_;
   uint64_t serial_ = 0;                                  // voice serials (age across the pools)
 };

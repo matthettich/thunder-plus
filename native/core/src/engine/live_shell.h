@@ -21,6 +21,7 @@
 #include "engine/bass_core.h"
 #include "engine/vox_core.h"
 #include "engine/xeng_live.h"
+#include "rt/auto.h"
 #include "rt/jsmath.h"
 
 namespace thunder {
@@ -92,6 +93,8 @@ class LiveShell {
   }
   void seek(uint64_t clock) { clock_ = clock; rendered_ = clock; origin_ = clock; head_ = 0; cnt_ = 0; }
   uint64_t clock() const { return clock_; }
+  // LIVE ROUTE (P5): the rate lane from an automation list in SECONDS (the pool's, with the sampler's folding) instead of RateSet / RateRamp events: each control block reads it at its first sample, s / sr. Null: the shell's own lane.
+  void setRateFeed(const Auto* a, double sr) { feed_ = a; feedSr_ = sr; }
 
   // Renders n samples into L and R (separate arrays) and applies the n-sample call's events (any order; the same offset keeps its order). n of any size: it runs in chunks of up to kMaxBlock.
   void process(float* L, float* R, uint32_t n, const LiveEvent* ev, uint32_t nev) {
@@ -111,6 +114,7 @@ class LiveShell {
  private:
   struct Pend { uint64_t t; LiveEvent e; };
   static bool isNote(LiveEvType t) { return t == LiveEvType::NoteOn || t == LiveEvType::NoteOff || t == LiveEvType::End; }   // what cuts a control block
+  static double clampRate(double v) { return v < 0 ? 0 : v > 256 ? 256 : v; }   // the AudioParam's range (as enqueue clamps a RateSet)
   void enqueue(LiveEvent e, uint64_t t) {
     // what the page's AudioParams do to a value: only finite numbers, clamped to the parameter's range (rate 0..256, bpm 10..999, wob 0..64)
     switch (e.type) {
@@ -152,12 +156,12 @@ class LiveShell {
   void block(uint64_t s, uint64_t e) {
     const uint32_t n = (uint32_t)(e - s);
     if (!failed_) {
-      core_.render(stgL_, stgR_, kBlk, 0, (double)n, lane_.at((double)s));   // one control block (n <= kBlk), written at 0..n of the staging arrays
+      core_.render(stgL_, stgR_, kBlk, 0, (double)n, feed_ ? clampRate(feed_->at((double)s / feedSr_)) : lane_.at((double)s));   // one control block (n <= kBlk), written at 0..n of the staging arrays
       if (A::bad(core_)) failed_ = true;
     }
     for (uint32_t i = 0; i < n; i++) { ringL_[(s + i) & (kRing - 1)] = failed_ ? 0.0f : stgL_[i]; ringR_[(s + i) & (kRing - 1)] = failed_ ? 0.0f : stgR_[i]; }
   }
-  typename A::Core core_; LiveRateLane lane_;
+  typename A::Core core_; LiveRateLane lane_; const Auto* feed_ = nullptr; double feedSr_ = 48000;
   uint64_t clock_ = 0, rendered_ = 0, origin_ = 0; bool failed_ = false; uint32_t dropped_ = 0, rejected_ = 0;
   Pend pend_[kPend]; uint32_t head_ = 0, cnt_ = 0;
   float ringL_[kRing], ringR_[kRing], stgL_[kBlk], stgR_[kBlk];
