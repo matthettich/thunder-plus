@@ -25,7 +25,48 @@ plan; sections 1 to 4 and 9), `HANDOVER.md` on `beta` (the web app, the owner's 
   every other upstream; start it when a compiling slot is free); **U36 Link / recording / inputs** (lead reviews); **Stage N2 (the Android shell)** and **N4 (Windows and Mac shells)**.
 - **Fastest route to something the owner can install:** N1 steps 10 and 11, then N2. U31 can run in parallel with a worker.
 
-## START HERE (19 Nov, 12:50): the state for a new chat. The dated sections below are the history, newest first after this one.
+## START HERE (19 Nov, 17:00): the state for a new chat. The dated sections below are the history, newest first after this one.
+**Say to a new chat:** "Pull thunder-plus, branch native, and continue from docs/port/PICKUP.md. Start at START HERE (19 Nov, 17:00)."
+
+**Nothing is running and no PR of ours is open** (#225 `n1/repin-pump` stays open, waiting on pump). Weekly usage was at 90% at 12:45.
+
+**Merged into `native` on 19 Nov (each verified by an independent Sonnet verifier; reports on the `review/verify-*` branches):**
+- **#243** the sequencer on a live clock: `Seq::setTime / setBpm / shift`, `SeqRunner` (catch-up skip, 3 steps a block, EXACT STOP).
+- **#242** the SoundFont route into the offline renderer: `thunder_render_add_font / set_pad_sf`, the poly cap shared by both pools.
+- **#244** the Song's lifetime under a running sequencer: `SeqSession`, `SongSnap`, `Seq::takeOver`, `seq_adopt`, `SeqRunner::rebind`.
+- **#245** chop: sliced / synced instruments chopped as the page's `applyChop` (`seq/chop.h` `SeqChop`, `thunder_render_set_pad_chop / _hits`).
+- Design and rulings: `docs/port/SEQ-LIVE-DESIGN.md`. Notes: `SEQ-LIVE-NOTES.md`, `SEQ-TAKEOVER-NOTES.md`, `SEQ-TAKEOVER-BUILD-NOTES.md`,
+  `RENDER-SF-NOTES.md`, `CHOP-NOTES.md` (all in `docs/port/`).
+
+**Estimates (the lead's): 33 of 37 units (89%); about 60% of the whole port; about 72% of the way to an Android install.**
+
+**The queue, in order (nothing started):**
+1. **A small follow-ups PR (Sonnet):** a reversed-chop render test (verify-chop F1: `voice.cpp` ~:178 `max(0, dur - ofsSec - durSec)` is untested);
+   the PERFORM-part path clamps slc / beats as the main path (verify-chop F4); U31's round-3 follow-ups (F1 to F7, `reviews/verify-227-round3.md`).
+2. **The live routes:** the live-engine route and the SoundFont LIVE route into the mixer (the renderer has the SoundFont route; `notes_live`
+   notes are still silent and counted). Conditions: PICKUP's "Conditions recorded for the wiring", R11 (the U26 shell must never drop a NoteOff).
+3. **U34b stems** (Sonnet).
+4. **U36** (Link, recording, inputs), **the full wasm target and U37** (the core behind a Settings switch in the web app), **U35** MIDI
+   scheduling, then **N2**, the Android shell.
+- **Conditions for U37 (the host), from today:** the host sets the start time on a PLAY's first Seq before publishing it and calls
+  `runner.start` after `seq_adopt` on a new session; past `sessionFull()` (8 MB) it stops growing the registries and warns (no restart at a
+  pattern edge); `SeqChop` is read-only while a Seq runs, so a pad change during PLAY publishes a new table with the snapshot; the host
+  calls `set_pad_chop` (and `set_pad_hits` for SMODE instruments) after every `set_pad`, with `loopSecs` of the pad AS RENDERED.
+- **Known and audible until the stretch port exists:** sync modes STRETCH and LOOP play unstretched (counted in `notes_stretched`), and their
+  offsets and slice lengths are those of the stretched timeline, so slices land in the wrong place.
+- Still open from before: can a saved song's JSON exceed the render API's 16 MiB limit; the 1.5 dB RMS difference at 384 kHz (master chain).
+
+**For the owner:**
+- Reproduce the suspected web bug: Settings, sequencer "Audio thread" vs "Page (old)", an instrument with SLICES 4, four notes a semitone
+  apart: on Audio thread every note seems to start at the top of the sample. The chop builder adds: the worklet already has the pad data
+  (`core/seq-core.js` :912), only `applyChop` is a stub there, so the web fix is to stop stubbing it (a `beta` job when he confirms).
+
+**Lessons of 19 Nov:** every brief says "add files by path, never `git add -A`" (two branches had build directories committed;
+`native/build*/` is in `.gitignore` now) and "every pushed commit compiles; a checklist in the notes updated in every commit"; check a PR's
+file count before merging; the sanitizers CI job takes about 50 minutes; start the verifier while CI runs; the server restarted at 12:19
+and 12:36 and stopped the workers (a stopped agent of the same chat is resumed by its id).
+
+## START HERE of 19 Nov, 12:50 (now history)
 **Say to a new chat:** "Pull thunder-plus, branch native, and continue from docs/port/PICKUP.md. Start at START HERE (19 Nov, 12:50)."
 (Written because weekly usage reached 90%: the owner may stop here. Nothing new is started until he says so.)
 
