@@ -88,3 +88,17 @@ Queue item 2 of PICKUP's START HERE (19 Nov, 17:00). Basis: the lead's read of `
 - **Vox idle skip:** never skipped until the bit-compare test in the notes passes.
 - **The C API, the track mask, the `Players` layout and the build order are accepted as proposed.** Two PRs: (A) the `Players` move alone, gate: every
   existing render test bit-identical; (B) the rest of step 1.
+
+## Rulings P1 to P6 (the pre-wiring read)
+
+P1 (PR A, `Players`). Do NOT hold `const Song&` for the routing reads (`insts[ii].mo / slc / sync`). `Players::event` takes the Song it should read as an argument (or a `setSong(const Song*)` called by the owner each quantum): a live host adopts a new `SongSnap` while playing and the old Song is freed. `SongRenderer` passes its own `S_`. Same for pads: `Players` reads `RenderPads` through a pointer the owner can re-point between quanta (`setPads(const RenderPads*)`), never a stored reference. No behaviour change offline.
+
+P2 (PR B, takeover on a poly track). In the JS, bass / acid / mach `liveNote` is the MONO branch even when `ev.poly` is true: it kills every other voice on the track. `VoicePool::take` / `SfPool::take` do nothing for a poly event (voice.cpp ~:141). So the live route's takeover of the sampler and SoundFont voices must not go through `takeAll(e)` unchanged for those kinds: pass an event copy with `poly = false` (or add an explicit `takeMono`), and pin it with a test (a poly track, a sampler chord, then a bass note: the chord is released) and a mutation.
+
+P3 (PR B, the poly cap). Check the JS before coding it: live notes do NOT run the `while (T.length >= POLY) kill(T.shift())` cap themselves (`liveNote` has no such loop: polyVox / polyPs pick a node instead), but a live voice IS in `T`, so a later sampler or SoundFont poly note can shift a live voice out. Reproduce exactly that asymmetry, state it in the notes with the lines, test it.
+
+P4 (PR B, tempo). `SEV_TEMPO` is emitted only when a step changes bpm or tks (seq.cpp ~:993), AFTER that step's notes, never at the start and never on `Seq::setBpm`. So: `Players::event` receives `bpm` on every call (it already does): the pool keeps the bpm lane current from that argument at each note (a Bpm event at the note's time when it differs from the node's last), and handles `SEV_TEMPO` by its own time. Events of one step are applied in TIME order to a node's timeline, not arrival order.
+
+P5 (PR B, replaces part of L5). An ARP books up to 97 rate points for one note; "drop a Rate event on overflow" would recreate the stuck-pitch bug the sampler fixed (N1 review B5). The node's RATE lane is therefore not in the general event queue: use `AutoN<kAutoR>` with the same folding as voice.cpp ~:108-118 (read how the sampler does it and reuse it), sampled by the shell feed at each control block. L5's rule stays for the note / bpm / wob / eng timeline.
+
+P6 (PR B, small ones). (a) `seq.arp(e)` is valid only until the next `step()`: copy what you need at the event. (b) `SEV_MOD` carries `wob` (seq.cpp ~:937): that is D6's input. (c) `SEV_ENG` is change-only (up to 4 points): keep the per-TRACK engine state in the pool so a node bound later starts from it (the JS's `engSt` + `engPut` at liveStart). (d) One seconds-to-sample rule, the sampler's: the first sample i with `tb0 + i*dt >= t` (read voice.cpp's start rule and use the same function), so a live note and a sampler note at the same `ev.t` start on the same sample; test exactly that.

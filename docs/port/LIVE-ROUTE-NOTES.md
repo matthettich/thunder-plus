@@ -1,6 +1,7 @@
 **IN THE MIDDLE OF: BUILD step 1. Checklist (updated every commit):**
 - [x] 1a `native/tools/live-route-dump.mjs` + `native/tests/golden/live_route_log.json` / `live_route_golden.inc` (gate L10(f); 16 cases; `--check` passes). Runs `core/seq-core.js` (= `core-processor.js` + the page's declarations; core-processor.js alone lacks `NT`).
-- [ ] 2 PR A `n1/players` (worktree `/home/claude/wt/players`): the `Players` move, no behaviour change
+- [~] 2 PR A `n1/players` (worktree `/home/claude/wt/players`): `Players` committed and pushed (render/players.{h,cpp}); P1 applied (no stored Song/pads refs); full ctest Release 181/181 pass (1 skipped: pumpsynth_refused); ASan/UBSan render tests building; PR not yet opened
+- [x] P1-P6 rulings appended to LIVE-ROUTE-DESIGN.md (PR B must follow them)
 - [ ] 3 PR B: reset/seek, LivePool (mono, vox), timeline + L5, run-ahead L4, tempo, wob, gain/pan/bends, off/mod/stp/stopAll, poly cap, C4, stats L8, set_pad_live, gates L10 (a)-(f) + mutants, then `eng` last
 - Choices for the lead: (none yet)
 
