@@ -1012,3 +1012,8 @@ target_link_libraries(test_render_sf_oom PRIVATE thunder_core)
 target_include_directories(test_render_sf_oom PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../core/src ${CMAKE_CURRENT_SOURCE_DIR}/../core/include ${CMAKE_CURRENT_SOURCE_DIR})
 target_compile_definitions(test_render_sf_oom PRIVATE THUNDER_ROOT="${CMAKE_CURRENT_SOURCE_DIR}/../..")
 add_test(NAME render_sf_oom COMMAND test_render_sf_oom)
+
+add_executable(test_live_tracklist test_live_tracklist.cpp)
+target_link_libraries(test_live_tracklist PRIVATE thunder_core)
+target_include_directories(test_live_tracklist PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../core/src ${CMAKE_CURRENT_SOURCE_DIR})
+add_test(NAME live_tracklist COMMAND test_live_tracklist)

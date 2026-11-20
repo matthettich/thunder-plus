@@ -178,6 +178,7 @@ class SongRenderer {
   static void masterHook(void* user, int track, float* L, float* R, int frames, double t0, const MixFeed* feeds, int nFeeds);
   MeterBank* meters_ = nullptr;
   int stem_ = -1;
+  bool liveReleased_ = false;   // C4: the live voices were released at the song's end
   RenderStats st_;
   InputTap tap_ = nullptr; void* tapUser_ = nullptr;
 };

@@ -71,7 +71,18 @@ class LivePool {
   void setTime(double t0) { now_ = t0; }
   // A note event on a live pad (the JS's liveNote / liveStart, the mono branch). true: a node took it; false: none for the track (counted noNode).
   // `bpm`: the sequencer's tempo now (P4: a bass node's bpm lane is kept current from it at each note); `arp`: Seq::arp(e), valid only for this call.
-  bool note(const SeqEvent& e, int pad, double bpm, const double* arp);
+  // `choke`: the pad's kit choke group (the voice keeps it). `*poly` (if given) is set when the note went the polyVox way: such a note takes nothing over and chokes nothing (the JS's polyVox branch has no takeover); every other live note is the MONO branch
+  // (it takes the track over, whatever ev.poly says: P2) and the caller gives the track's sampler / SoundFont voices the same takeover.
+  bool note(const SeqEvent& e, int pad, double bpm, const double* arp, int choke = 0, bool* poly = nullptr);
+  // The track's ONE voice list (L6), the live part of it: the JS's take() for a note another player plays or none (sweep the voices that have let go, kill all of the track's live voices for a non-poly note, the choke group of the other tracks),
+  // and the poly cap's view of it (P3: a live voice is in T, so a later sampler / SoundFont poly note can shift it out; a live note has no cap loop of its own).
+  void take(const SeqEvent& e, int choke);
+  int liveOnTrack(int track, double t) const;                 // the track's live voices still in T at t (core's live1)
+  bool oldestOnTrack(int track, uint64_t& serial) const;      // the oldest of them (by serial)
+  void releaseOldest(int track, double t);                    // T.shift(): its gate goes low at t, it leaves T
+  void stamp(uint64_t serial) { nextSerial_ = serial; }       // the serial the next live note's voice gets (one counter for all pools)
+  int active() const;                                         // C4: live voices sounding: from the note-on until the gate is off and the node has been quiet (< 1e-5) for 4096 samples, or 4 s since the off
+  void releaseHeld(double at);                                // C4: the song is over: every live voice still held lets go at `at`
   // The events that reach a track's live voices (the JS's off / mod / stp handlers of ev(), the live branch of kill / modVoice): `off` (all of the track's voices, or the columns of e.cols), `mod`, `stp` (e.flag: every track),
   // SEV_TEMPO (every bass node's bpm), and stopAll(at) (every node's gate low at `at`, booked notes taken back, syllable counters and voxG reset: for a live host).
   void off(const SeqEvent& e);
@@ -104,6 +115,10 @@ class LivePool {
     bool used = false;                  // a note was ever booked on this node (stopAll acts on used nodes)
     double lastBpm = -1;                // the bass node's bpm lane as last set
     bool started = false;
+    uint64_t serial = 0;                // the voice's age in the track's list (the poly cap)
+    int choke = 0;                      // the voice's choke group (the kit's, at its note-on)
+    int64_t stopT = 0;                  // the sample the gate went low at (C4)
+    int64_t quiet = 0; bool done = false;   // C4: samples of output under 1e-5 since the off; the voice has ended (counts no more)
     Node() = default;
   };
   struct VoxG { double sylN = 0, lastT = -9, lastK = 0; };   // polyVox's syllable counter of a (track, pad): notes within 4 ms share one syllable
@@ -120,12 +135,14 @@ class LivePool {
   void bookCtl(Node& n, LiveEvType type, double t, double v);   // a Bpm / Wob event at the sample of time t
   bool polyVox(const SeqEvent& e, PadSlot& ps, double bpm, const double* arp);
   void kill(Node& n, double at);
+  void chokeKill(int track, int ck, double t);
+  int curChoke_ = 0;                 // the choke group of the note being started
   void cancelFrom(Node& n, int64_t T);
   void book(Node& n, const TEv& e);
   void runNode(Node& n, int64_t q0, int frames, float* const* inL, float* const* inR);
   void deliver(Node& n, uint32_t count, LiveEvent* out, uint32_t* nout);
 
-  double sr_; double now_ = 0;
+  double sr_; double now_ = 0; uint64_t nextSerial_ = 0;
   PadSlot pads_[kLivePads];
   std::vector<Node*> active_;
   std::vector<Node*> byTrack_[kVoiceTracks];   // every node of a track, pad order (the track's live voices)

@@ -69,24 +69,29 @@ int main(int argc, char** argv) {
   Song song; const std::string sj = songJson(); if (!song.load(sj.data(), sj.size(), &je)) return 2;
   SeqVars vars; SeqOpts so; so.row = song.renderFrom; so.once = true; Seq seq(song, vars, SeqMode::Song, so);
   // the cases of this stage; the rest are listed
-  const std::set<std::string> run = {"bass_mono", "bass_kill_back", "bass_same_sample", "acid_mach", "vox_mono", "vox_poly", "vox_idle_gap", "mod_stp", "no_node", "late", "stop_all"};
+  const std::set<std::string> run = {"bass_mono", "bass_kill_back", "bass_same_sample", "acid_mach", "vox_mono", "vox_poly", "vox_idle_gap", "mod_stp", "no_node", "late", "stop_all", "takeover", "choke_cross", "poly_cap"};
+  std::vector<float> dc((size_t)(SR * 3), 0.25f);   // the sampler pads' buffer (pads 5 and 7): voices that stay for the case
   int ran = 0, skipped = 0, compared = 0;
   Json root = doc.root();
   for (size_t ci = 0; ci < root.size(); ci++) {
     Json C = root.at(ci); const std::string id(C.str("id"));
     if (!run.count(id)) { skipped++; continue; }
     std::unique_ptr<RenderPads> pads(new RenderPads());
-    for (int p : {0, 1, 2, 3, 4, 8}) pads->route[p] = PadRoute::Live;
+    for (int p : {0, 1, 2, 3, 4, 6, 8}) pads->route[p] = PadRoute::Live;
+    for (int p : {5, 7}) { pads->buf[p].data = dc.data(); pads->buf[p].len = (int)dc.size(); pads->buf[p].sr = SR; }
+    pads->kit[6].choke = 1; pads->kit[7].choke = 1;   // the dump's table: pad 6 a bass with choke 1, pad 7 a sampler with choke 1
+    const bool viaPlayers = id == "takeover" || id == "choke_cross" || id == "poly_cap";   // the cases that need the sampler's voices: the whole path, takeover and cap included
     Players pl(pads.get(), SR, 8);
     uint64_t mask = 0; for (size_t i = 0; i < C.get("tracks").size(); i++) mask |= (uint64_t)1 << (int)C.get("tracks").at(i).asNum();
     if (!mask) mask = (uint64_t)1 << 31;   // no node for the case's tracks
     LivePadConfig b, v, a, m; b.kind = LiveKind::Bass; v.kind = LiveKind::Vox; a.kind = LiveKind::Acid; m.kind = LiveKind::Mach; b.trackMask = v.trackMask = a.trackMask = m.trackMask = mask;
-    CHECKF(pl.live().addPad(0, b) && pl.live().addPad(1, v) && pl.live().addPad(2, a) && pl.live().addPad(3, m), "%s: pads", id.c_str());
+    CHECKF(pl.live().addPad(0, b) && pl.live().addPad(1, v) && pl.live().addPad(2, a) && pl.live().addPad(3, m) && pl.live().addPad(6, b), "%s: pads", id.c_str());
     Json evs = C.get("events"); std::vector<JEv> list; for (size_t i = 0; i < evs.size(); i++) list.push_back(convert(evs.at(i)));
     for (JEv& j : list) {
       pl.setTime((double)j.b * 128 / SR, (int64_t)j.b * 128);
       if (j.stopAll) { pl.stopAll(j.at); continue; }
       // (straight into the live pool: an arpeggio's pairs are the case's, not the sequencer's table; the takeover of the other pools is B5's and is checked there)
+      if (viaPlayers) { pl.dispatch(j.e, seq, song); continue; }
       const SeqEvent& e = j.e; const double* arp = j.arp.empty() ? nullptr : j.arp.data();
       if (e.type == SEV_NOTE) pl.live().note(e, (int)e.pad, 120, arp); else if (e.type == SEV_OFF) pl.live().off(e); else if (e.type == SEV_MOD) pl.live().mod(e, arp); else if (e.type == SEV_STP) pl.live().stp(e);
     }
@@ -95,7 +100,7 @@ int main(int argc, char** argv) {
     for (size_t ni = 0; ni < nodes.size(); ni++) {
       const std::string key(nodes.keyAt(ni)); Json N = nodes.valAt(ni);
       int track = 0, pad = 0, j = 0; char kind[16] = {}; { const int n = std::sscanf(key.c_str(), "%d:%d:%15[a-z]:%d", &track, &pad, kind, &j); if (n < 3) continue; if (n < 4) j = 0; }
-      if (pad > 3) continue;   // pump synths, waves, the choke pad: later
+      if (pad > 3 && pad != 6) continue;   // pump synths, waves: later
       if (id == "stop_all" && pad == 1) continue;   // (its vox notes are taken over by a pump-synth note: B5)
       LiveDebugNode d; if (!pl.live().debugNode(track, pad, j, &d)) { CHECKF(false, "%s: no node %s", id.c_str(), key.c_str()); continue; }
       compared++;
@@ -130,7 +135,7 @@ int main(int argc, char** argv) {
     // the case with no node: nothing is booked, every note is counted
     if (id == "no_node") CHECKF(pl.live().stats().noNode == 2, "no_node: counted %u", pl.live().stats().noNode);
   }
-  std::printf("decision log: %d cases compared (%d nodes), %d skipped (B5: takeover, choke, the poly cap across pools; pump synths, waves)\n", ran, compared, skipped);
+  std::printf("decision log: %d cases compared (%d nodes), %d skipped (pump synths, waves: later steps)\n", ran, compared, skipped);
   if (g_fail) { std::printf("live_decisions: %d FAILED\n", g_fail); return 1; }
   std::printf("live_decisions: all checks passed\n"); return 0;
 }

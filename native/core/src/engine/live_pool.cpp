@@ -90,13 +90,18 @@ void LivePool::book(Node& n, const TEv& e) {
 }
 
 // ---- notes -----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-bool LivePool::note(const SeqEvent& e, int pad, double bpm, const double* arp) {
+bool LivePool::note(const SeqEvent& e, int pad, double bpm, const double* arp, int choke, bool* poly) {
+  if (poly) *poly = false;
   if (!has(pad)) return false;
   PadSlot& ps = pads_[pad];
   Node* n = e.track >= 0 && e.track < kVoiceTracks ? ps.byTrack[e.track] : nullptr;
   if (!n) { st_.noNode++; return false; }
   if (!std::isfinite(e.rate) || !std::isfinite(e.gain) || !std::isfinite(e.pan) || ((e.has & SH_SLIDE) && (!std::isfinite(e.slideFrom) || !std::isfinite(e.slideDur)))) return false;   // (the JS would throw inside liveStart: nothing is booked)
-  if (ps.kind == LiveKind::Vox && e.poly) return polyVox(e, ps, bpm, arp);
+  if (ps.kind == LiveKind::Vox && e.poly) { if (poly) *poly = true; curChoke_ = choke; return polyVox(e, ps, bpm, arp); }
+  // the mono branch (liveNote): every voice of the track but this node's own gives way (its gate goes low at the note), the list is cleared, then the choke group of the other tracks
+  for (Node* o : byTrack_[e.track]) { if (o != n && o->inT) kill(*o, e.t); o->inT = false; }
+  chokeKill(e.track, choke, e.t);
+  curChoke_ = choke;
   startNote(*n, e, bpm, arp);
   st_.played++;
   return true;
@@ -138,6 +143,7 @@ void LivePool::startNote(Node& n, const SeqEvent& e, double bpm, const double* a
   if (n.pn.size() + 2 > n.pn.capacity()) n.pn.prune(now_);
   n.g.set(e.gain, t); n.pn.set(std::max(-1.0, std::min(1.0, (e.pan - 128) / 127)), t);
   if (n.kind == LiveKind::Bass && (e.has & SH_WOB) && std::isfinite(e.wob)) bookCtl(n, LiveEvType::Wob, t, e.wob);
+  n.serial = nextSerial_; n.choke = curChoke_; n.done = false; n.quiet = 0;
   n.lastOn = t; n.curLive = true; n.curStop = false; n.curCol = e.col; n.base = e.rate; n.vrate = e.rate; n.inT = true; n.used = true;
   if (!leg) pitchMods(n, t, e.rate, e, arp);
   if (e.has & SH_CUT) kill(n, e.cut);
@@ -204,7 +210,7 @@ void LivePool::tempo(double t, double bpm) {
 void LivePool::stopAll(double at) {   // stopAll(at): every node's voice lets go at `at`; what is booked at or after it is taken back, the gate goes low; the syllable counters and voxG start again
   const double t = std::max(at, now_); const int64_t T = sample_at_or_after(t, sr_);
   for (Node* n : active_) {
-    if (n->curLive && !(n->curStop && n->stopAt <= at)) { n->curStop = true; n->stopAt = at; }
+    if (n->curLive && !(n->curStop && n->stopAt <= at)) { n->curStop = true; n->stopAt = at; n->stopT = T; }
     if (n->used) { cancelFrom(*n, T); TEv off; off.T = T; off.type = LiveEvType::NoteOff; book(*n, off); rec(*n, 'o', t, 0, T); }
     n->sylN = 0; n->inT = false;
   }
@@ -228,10 +234,37 @@ bool LivePool::debugVoxG(int track, int pad, double* sylN, double* lastT, double
   const VoxG& g = pads_[pad].vg[(size_t)track]; *sylN = g.sylN; *lastT = g.lastT; *lastK = g.lastK; return true;
 }
 
+// ---- the track's one voice list (the live part) ----------------------------------------------------------------------------------------------------------------------------------------------
+static inline bool live1(bool inT, bool curLive, bool curStop, double stopAt, double t) { return inT && curLive && !(curStop && stopAt <= t); }
+void LivePool::chokeKill(int track, int ck, double t) {   // for (k != track) for (v of T(k)) if (v.choke === ck) kill(v, t)
+  if (!ck) return;
+  for (int k = 0; k < kVoiceTracks; k++) if (k != track) for (Node* o : byTrack_[k]) if (o->inT && o->choke == ck) kill(*o, t);
+}
+void LivePool::take(const SeqEvent& e, int choke) {
+  if (e.track < 0 || e.track >= kVoiceTracks) return;
+  for (Node* o : byTrack_[e.track]) if (o->inT && !live1(o->inT, o->curLive, o->curStop, o->stopAt, e.t)) o->inT = false;   // (the sweep)
+  if (!e.poly) for (Node* o : byTrack_[e.track]) if (o->inT) { kill(*o, e.t); o->inT = false; }
+  chokeKill(e.track, choke, e.t);
+}
+int LivePool::liveOnTrack(int track, double t) const {
+  int c = 0; if (track >= 0 && track < kVoiceTracks) for (const Node* o : byTrack_[track]) if (live1(o->inT, o->curLive, o->curStop, o->stopAt, t)) c++;
+  return c;
+}
+bool LivePool::oldestOnTrack(int track, uint64_t& serial) const {
+  bool h = false; if (track >= 0 && track < kVoiceTracks) for (const Node* o : byTrack_[track]) if (o->inT && (!h || o->serial < serial)) { serial = o->serial; h = true; }
+  return h;
+}
+void LivePool::releaseOldest(int track, double t) {
+  Node* b = nullptr; if (track >= 0 && track < kVoiceTracks) for (Node* o : byTrack_[track]) if (o->inT && (!b || o->serial < b->serial)) b = o;
+  if (b) { kill(*b, t); b->inT = false; }
+}
+int LivePool::active() const { int c = 0; for (const Node* n : active_) if (n->curLive && !n->done) c++; return c; }
+void LivePool::releaseHeld(double at) { for (Node* n : active_) if (n->curLive && !n->curStop) kill(*n, at); }
+
 void LivePool::kill(Node& n, double at) {   // kill(v, at) for a live voice: the gate goes low at `at`; a stop before a booked later note takes that note back
   if (!n.curLive || (n.curStop && n.stopAt <= at)) return;
   n.curStop = true; n.stopAt = at;
-  const double t = std::max(at, now_); const int64_t T = sample_at_or_after(t, sr_);
+  const double t = std::max(at, now_); const int64_t T = sample_at_or_after(t, sr_); n.stopT = T;
   if (t < n.lastOn - 1e-6) cancelFrom(n, T);
   TEv off; off.T = T; off.type = LiveEvType::NoteOff; book(n, off); rec(n, 'o', t, 0, T);
 }
@@ -259,6 +292,14 @@ void LivePool::runNode(Node& n, int64_t q0, int frames, float* const* inL, float
   }
   deliver(n, (uint32_t)frames, ev, &nev);
   eng.process(sL, sR, (uint32_t)frames, ev, nev);   // the engine's samples for [q0, q0 + frames)
+  if (n.curLive && !n.done && n.curStop) {   // C4: the voice ends when its gate is off and the output stays under 1e-5 for 4096 samples, or 4 s after the off
+    const int64_t end = q0 + frames;
+    if (end > n.stopT) {
+      const int from = (int)std::max<int64_t>(0, n.stopT - q0); float pk = 0; for (int i = from; i < frames; i++) pk = std::max(pk, std::max(std::fabs(sL[i]), std::fabs(sR[i])));
+      if (pk < 1e-5f) n.quiet += frames - from; else n.quiet = 0;
+      if (n.quiet >= 4096 || (double)(end - n.stopT) >= 4 * sr_) n.done = true;
+    }
+  }
   // the page's GainNode and StereoPanner after the node (__tcPost), then into the track's input
   float* oL = inL ? inL[n.track] : nullptr; float* oR = inR ? inR[n.track] : nullptr; if (!oL) return;
   const double dt = 1 / sr_, tb0 = (double)q0 / sr_, tb1 = tb0 + frames * dt;

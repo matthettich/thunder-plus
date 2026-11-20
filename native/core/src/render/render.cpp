@@ -97,6 +97,7 @@ void SongRenderer::quantum() {
     st_.steps++; if (k > st_.peakStepEvents) st_.peakStepEvents = k;
     for (int i = 0; i < k; i++) { dispatch(evs_[i]); players_->samplePeak(); }
   }
+  if (!liveReleased_ && !seq_->alive()) { liveReleased_ = true; players_->songOver(seq_->time()); }   // C4: live voices are held until the song's end (the page cuts there; an unknown-length render must be able to end)
   // 2. the voices into their tracks' inputs, then the mixer
   players_->render(mix_.inputsL(), mix_.inputsR(), N, t0, qFrame_);
   if (tap_) tap_(tapUser_, mix_.inputsL(), mix_.inputsR(), N, qFrame_);

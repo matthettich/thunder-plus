@@ -1,6 +1,6 @@
-**STATUS (lead reads here). B4 done: off / cut / rel / mod (gain, pan, mul, bends, arp, vib; wob D6 follows the page) / stp / stopAll / tempo (P4) / D4 same-sample take-back in LivePool; the decision-log gate (L10 f) is a test: `test_live_decisions` compares the pool's booked events per node with the JS golden (gate, trig, leg, syl, same, acc, rate, g, pn lists, wob, lastOn, sylN, voxG) for 11 cases (17 nodes). Release + ASan/UBSan pass.
-NOTE: the node's rate lane starts at 0 (the page's AudioParam), so `live_pool`'s reference starts at 0; `late` counts NoteOn events only (a Bpm event booked with a note is not a second late event).
-NEXT: merge origin/native (stems #246) before PR B; B5 one list per track (P2, P3, take / capPoly order pinned for sampler and live), choke, C4, stats; stem test with a live bass pad.**
+**STATUS (lead reads here). B5 done: the track's ONE voice list across the sampler, SoundFont and live pools (Players): P2 (a bass / acid / mach note is the mono branch on a poly event: the sampler's / SF voices give way; polyVox takes nothing over, chokes nothing), P3 (a live voice is in T and counts for the cap, oldest by serial across the three pools; a live note has no cap loop), mono live takes live, a sampler mono note takes live, choke both ways, C4 (voices() counts live voices; ends after the off + 4096 quiet samples or 4 s; `songOver` releases held voices at the song's end). `test_live_tracklist` (new) + the golden cases takeover / choke_cross / poly_cap through Players in `test_live_decisions` (14 cases, 23 nodes) + stem test (live bass pad) in `test_live_pool`. origin/native merged (stems).
+NOTE: SoundFont: the same three lines as the sampler's (take / cap / choke call the live pool), tested only through the sampler (the SF pool needs a font); `render_sf` still passes.
+NEXT: B6: L10 (b) JS parity via seqRender, (d) rt_harness with live pads, sanitizers, mutants list, open PR B; then `eng`.**
 
 **Checklist (updated every commit):**
 - [x] 1a `native/tools/live-route-dump.mjs` + `native/tests/golden/live_route_log.json` / `live_route_golden.inc` (gate L10(f); 16 cases; `--check` passes). Runs `core/seq-core.js` (= `core-processor.js` + the page's declarations; core-processor.js alone lacks `NT`).
@@ -11,7 +11,7 @@ NEXT: merge origin/native (stems #246) before PR B; B5 one list per track (P2, P
   - [x] B2 LivePool skeleton + set_pad_live + timeline/cancelFrom + AutoN rate lane (P5) + run-ahead L4 + seconds-to-sample (P6d) + mono bass/acid/mach + L10(a) (test_live_pool); kill()/cut/rel for the mono node are in (B4 adds off/mod/stp/stopAll, bends, tempo, wob)
   - [x] B3 vox mono + polyVox (voxG), idle-skip compare (test_live_reset: neutral for all four, no skip implemented yet)
   - [x] B4 off/cut/rel/mod/wob/stp/stopAll/bends/tempo (P4)/D4 (test_live_decisions; stop_all's vox node and takeover / choke / poly_cap cases wait for B5)
-  - [ ] B5 one list per track (P2, P3), choke, C4, stats L8
+  - [x] B5 one list per track (P2, P3), choke, C4 (stats L8 were done in B2-B4); test_live_tracklist; mutants M_P2_poly_copy, M_polyvox_takes, M_cap_ignores_live, M_cap_order, M_choke_live, M_samplermono_takes_live, M_mono_live_keeps_others, M_sampler_no_live_take, M_serial_not_stamped, M_poly_vox_stale_choke, M_voices_no_live all killed by test_live_tracklist; M_no_songover killed by test_live_pool (testSongOver)
   - [ ] B6 gates L10 (b)-(f), mutants, rt_harness, sanitizers; open PR B; then eng
 - Choices for the lead (so far):
   - SEV_TEMPO still counts in `eventsIgnored` (Players returns false for it) while it is forwarded to the live bass nodes.
@@ -20,6 +20,9 @@ NEXT: merge origin/native (stems #246) before PR B; B5 one list per track (P2, P
   - Non-finite rate / gain / pan / slide values are refused silently.
   - Players::note counts the note as live and calls takeAll first.
   - The dump tool runs `core/seq-core.js`.
+  - The seam test (L10 a) now gives each live pad its own tracks: pads that share a track take each other over (mono live takes live, as the JS does), so the independent-shell reference no longer holds there.
+  - C4's "ended" flag only feeds `voices()`; the pick logic (free / sameCol) stays the JS's (a live voice never ends there).
+  - The golden cases takeover / choke_cross / poly_cap compare the LIVE nodes' lists; the sampler side of them (T of the sampler pool) is pinned by test_live_tracklist, not by the golden.
 
 
 # LIVE-ROUTE NOTES (worker, 19 Nov 2026), branch `n1/live-route`

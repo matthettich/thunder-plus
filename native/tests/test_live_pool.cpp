@@ -108,28 +108,28 @@ static void testSeam() {
   const int padB = 0, padA = 1, padM = 2; pads->route[padB] = pads->route[padA] = pads->route[padM] = PadRoute::Live;
   Players pl(pads.get(), SR, 8);
   BassP bp; bp.shape = 0.3; bp.cut = 700; bp.glide = 20; AcidP ap; ap.cut = 500; ap.res = 0.7; MachP mp; mp.machine = 1; mp.lp = 2000;
-  LivePadConfig cb; cb.kind = LiveKind::Bass; cb.bass = bp; cb.trackMask = 0b1011;   // tracks 0, 1, 3
-  LivePadConfig ca; ca.kind = LiveKind::Acid; ca.acid = ap; ca.trackMask = 0b0111;
-  LivePadConfig cm; cm.kind = LiveKind::Mach; cm.mach = mp; cm.trackMask = 0;       // all tracks
+  LivePadConfig cb; cb.kind = LiveKind::Bass; cb.bass = bp; cb.trackMask = 0b000011;   // tracks 0, 1 (each pad has its own tracks: a mono live note takes its track over, so pads sharing a track are the takeover test's)
+  LivePadConfig ca; ca.kind = LiveKind::Acid; ca.acid = ap; ca.trackMask = 0b001100;   // tracks 2, 3
+  LivePadConfig cm; cm.kind = LiveKind::Mach; cm.mach = mp; cm.trackMask = 0b110000;  // tracks 4, 5
   CHECK(pl.live().addPad(padB, cb)); CHECK(pl.live().addPad(padA, ca)); CHECK(pl.live().addPad(padM, cm));
   CHECK(!pl.live().addPad(3, LivePadConfig()));   // a pad with no kind
 
   // the notes: increasing in time on each (track, pad); each ends by its own `rel`, so the reference needs no cancel
   std::vector<SeqEvent> evs;
   const int tracks[3] = {0, 1, 3};
-  for (int k = 0; k < 3; k++) for (int j = 0; j < 7; j++) {
+  for (int k = 0; k < 2; k++) for (int j = 0; j < 7; j++) {
     SeqEvent e = note(0.02 + j * 0.11 + k * 0.0031 + rnd() * 0.01, tracks[k], padB, 0.6 + 0.2 * j, 0.5 + 0.05 * j, 40 + 30 * j); e.t = std::round(e.t * 1e9) / 1e9;
     if (j % 3 == 1) { e.has |= SH_SLIDE; e.slideFrom = e.rate * 0.5; e.slideDur = 0.03; }
     if (j % 2 == 0) { e.has |= SH_REL; e.rel = e.t + 0.05 + 0.005 * j; }
     evs.push_back(e);
   }
-  for (int k = 0; k < 3; k++) for (int j = 0; j < 6; j++) {
-    SeqEvent e = note(0.03 + j * 0.13 + k * 0.002, k, padA, 0.5 + 0.25 * j, 0.7, 128 + 10 * j); e.acc = j % 2; if (j % 3 == 2) { e.has |= SH_SLIDE; e.slideFrom = 1; e.slideDur = 0.02; }
+  for (int k = 0; k < 2; k++) for (int j = 0; j < 6; j++) {
+    SeqEvent e = note(0.03 + j * 0.13 + k * 0.002, 2 + k, padA, 0.5 + 0.25 * j, 0.7, 128 + 10 * j); e.acc = j % 2; if (j % 3 == 2) { e.has |= SH_SLIDE; e.slideFrom = 1; e.slideDur = 0.02; }
     if (j % 2) { e.has |= SH_REL; e.rel = e.t + 0.09; }
     evs.push_back(e);
   }
-  for (int k = 0; k < 4; k++) for (int j = 0; j < 5; j++) {
-    SeqEvent e = note(0.01 + j * 0.15 + k * 0.0007, k + 4 * (k == 3), padM, 0.8 + 0.1 * j, 0.6, 128 + 20 * j - 40);
+  for (int k = 0; k < 2; k++) for (int j = 0; j < 5; j++) {
+    SeqEvent e = note(0.01 + j * 0.15 + k * 0.0007, 4 + k, padM, 0.8 + 0.1 * j, 0.6, 128 + 20 * j - 40);
     if (j % 2 == 0) { e.has |= SH_REL; e.rel = e.t + 0.1; }
     evs.push_back(e);
   }
@@ -158,9 +158,9 @@ static void testSeam() {
     CHECKF(bad < 0, "track %d differs from the shell driven directly at sample %lld (%g vs %g)", t, (long long)bad, bad >= 0 ? eL[bad] : 0.0, bad >= 0 ? gotL[t][bad] : 0.0);
     double e = 0; for (float x : gotL[t]) e += std::fabs(x); if (e > 1e-3) sounded++;
   }
-  CHECKF(sounded >= 4, "only %d tracks sounded", sounded);
+  CHECKF(sounded >= 5, "only %d tracks sounded", sounded);
   const LiveStats& s = pl.live().stats(); CHECKF(s.late == 0 && s.queueDropped == 0 && s.noNode == 0, "late %u dropped %u noNode %u", s.late, s.queueDropped, s.noNode);
-  std::printf("memory per node: bass %zu B, acid %zu B, mach %zu B (padBytes / nodes: %zu / 3, %zu / 3, %zu / 33)\n", pl.live().padBytes(padB) / 3, pl.live().padBytes(padA) / 3, pl.live().padBytes(padM) / 33, pl.live().padBytes(padB), pl.live().padBytes(padA), pl.live().padBytes(padM));
+  std::printf("memory per node: bass %zu B, acid %zu B, mach %zu B (padBytes / nodes: %zu / 2, %zu / 2, %zu / 2)\n", pl.live().padBytes(padB) / 2, pl.live().padBytes(padA) / 2, pl.live().padBytes(padM) / 2, pl.live().padBytes(padB), pl.live().padBytes(padA), pl.live().padBytes(padM));
   std::printf("seam: %d tracks sounded, %u notes played, late %u\n", sounded, s.played, s.late);
 }
 
@@ -308,6 +308,21 @@ static void testStem() {
   CHECKF(mix > 1.0 && s0 > 1.0, "the mix and the stem of the live bass track hold the bass (%g, %g)", mix, s0);
   CHECKF(s1 == 0, "another track's stem holds no bass (%g)", s1);
 }
+
+// C4: a render of unknown length ends: the sequencer's end releases the live voice that is still held (a bass note with no release), so voices() reaches 0 (the page cuts at the end instead)
+static void testSongOver() {
+  const std::string sg = apiSong(); thunder_render_opts o; std::memset(&o, 0, sizeof o); o.size = sizeof o;   // use_frames 0: the length is the song's
+  char err[200]; thunder_render* r = thunder_render_create((const uint8_t*)sg.data(), sg.size(), &o, err, sizeof err); if (!r) { std::printf("create: %s\n", err); g_fail++; return; }
+  const char* json = "{\"engine\":\"bass\",\"level\":0,\"tune\":0,\"drive\":0,\"bass\":{\"cut\":600}}";
+  CHECK(thunder_render_set_pad_route(r, 0, THUNDER_RENDER_ROUTE_LIVE) == 0); CHECK(thunder_render_set_pad_live(r, 0, THUNDER_RENDER_LIVE_BASS, (const uint8_t*)json, std::strlen(json), nullptr) == 0);
+  std::vector<float> L(4096), R(4096); int64_t got = 0; const int64_t cap = 48000LL * 40;
+  for (;;) { const int64_t n = thunder_render_read(r, L.data(), R.data(), 4096); if (n <= 0) break; got += n; if (got > cap) break; }
+  thunder_render_stats st; std::memset(&st, 0, sizeof st); st.size = sizeof st; CHECK(thunder_render_stats_get(r, &st) == 0);
+  CHECKF(got > 0 && got <= cap, "the render did not end (%lld frames)", (long long)got);
+  CHECKF(st.voices_active == 0 && st.song_over, "voices_active %d song_over %d", (int)st.voices_active, (int)st.song_over);
+  std::printf("unknown length: ended after %.2f s\n", (double)got / 48000);
+  thunder_render_free(r);
+}
 static void testApi() {
   thunder_render_stats s0, s1; const std::vector<float> none = apiRender(4096, false, true, &s0), a = apiRender(4096, true, true, &s1);
   CHECKF(s0.notes_live == 4 && s0.notes_live_played == 0, "notes_live %d played %d (no live params: silent, counted)", s0.notes_live, s0.notes_live_played);
@@ -348,6 +363,7 @@ int main() {
   testVox();
   testLate();
   testStem();
+  testSongOver();
   testApi();
   if (g_fail) { std::printf("live_pool: %d FAILED\n", g_fail); return 1; }
   std::printf("live_pool: all checks passed\n"); return 0;

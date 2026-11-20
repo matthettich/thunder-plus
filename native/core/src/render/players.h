@@ -36,7 +36,8 @@ class Players {
   void render(float* const* inL, float* const* inR, int frames, double t0, int64_t frame0);
 
   void stopAll(double at);                               // every voice of every pool lets go at `at` (for a live host)
-  int voices() const { return pool_.active() + sfpool_.active(); }   // voices still sounding (the sampler's and the SoundFont pool's)
+  int voices() const { return pool_.active() + sfpool_.active() + live_.active(); }   // voices still sounding (the sampler's, the SoundFont pool's, the live engines': C4)
+  void songOver(double at) { live_.releaseHeld(at); }    // C4: the sequencer has ended: live voices still held let go at `at`
   void samplePeak() { const int v = voices(); if (v > st_.peakAll) st_.peakAll = v; }
   const PlayerStats& stats() const { return st_; }
   VoicePool& pool() { return pool_; }
