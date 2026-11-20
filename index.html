@@ -3787,7 +3787,7 @@ addEventListener('dragover', e => e.preventDefault()); addEventListener('drop', 
 <h3>Drum pads and synths</h3>
 <p>The kit has 16 slots to start, up to 64: <b>SLOTS</b> at the top of the Synth page (− and + step by 8, tap the number to type one; fewer slots only hide the last ones, and their sounds come back). <b>THIS SLOT</b> sets how the selected slot plays: <b>ONE-SHOT</b> plays its whole sound, like a drum; <b>HELD</b> sounds until note-off, like a synth. By default: <b>1–8</b> are drum pads: one-shots that play their whole sound. <b>9–16</b> are synths for melodies and chords (Bass, Pluck, Keys, Pad, Lead, Bell, Organ, Sub to start): a note holds at its sustain level for as long as you hold it, up to the slot’s Max len, then fades over its release when you let go. C-4 plays middle C. In the tracker, instruments 08–0F play the synth slots in a new project. <b>A kit slot per track</b> (Settings → Kit) grows the kit past 16 slots: every song track gets its own pad — drums on mono tracks, a simple synth on poly ones. The pads stay the same size and scroll up and down.</p>
 <h3>Chopping breaks</h3>
-<p>Load a drum loop into a pad (Synth → Load sample), then on its instrument (<b>INST</b>) set <b>SLICES</b> (GRID cuts equal parts, HITS cuts at each drum hit it finds). Each note now plays one slice: C-4 the first, C#4 the second and so on, so you can rearrange the break in a phrase. <b>SYNC</b> fits the loop to the song tempo: set <b>BEATS</b> to how long the loop is (or use › GUESS BEATS). REPITCH changes its speed and pitch together; STRETCH keeps the pitch with smooth grains; LOOP keeps the pitch with little tempo-synced loops for a gritty, stuttery sound (<b>GRAIN</b> sets their length). › PLAY SLICES auditions them in order. <b>Sync to lines…</b> (on a Sample layer, or › SYNC TO LINES on INST) fits the loop to a length you pick or type: 8 to 128 lines, 1 to 8 bars, <kbd>24</kbd> for lines, <kbd>2b</kbd> for bars, <kbd>1b8</kbd> for a bar and 8 lines. It sets every instrument that plays the pad. The length is in lines, so it follows LINES PER BEAT if you change it later; the Audio thread sequencer does not play SYNC yet. A sample you load plays at its own pitch at C-4.</p>
+<p>Load a drum loop into a pad (Synth → Load sample), then on its instrument (<b>INST</b>) set <b>SLICES</b> (GRID cuts equal parts, HITS cuts at each drum hit it finds). Each note now plays one slice: C-4 the first, C#4 the second and so on, so you can rearrange the break in a phrase. <b>SYNC</b> fits the loop to the song tempo: set <b>BEATS</b> to how long the loop is (or use › GUESS BEATS). REPITCH changes its speed and pitch together; STRETCH keeps the pitch with smooth grains; LOOP keeps the pitch with little tempo-synced loops for a gritty, stuttery sound (<b>GRAIN</b> sets their length). › PLAY SLICES auditions them in order. <b>Sync to lines…</b> (on a Sample layer, or › SYNC TO LINES on INST) fits the loop to a length you pick or type: 8 to 128 lines, 1 to 8 bars, <kbd>24</kbd> for lines, <kbd>2b</kbd> for bars, <kbd>1b8</kbd> for a bar and 8 lines. It sets every instrument that plays the pad. The length is in lines, so it follows LINES PER BEAT if you change it later; on the Audio thread sequencer the sample plays unsynced for now. A sample you load plays at its own pitch at C-4.</p>
 <h3>Chords and polyphony</h3>
 <p><b>The poly tracks play chords</b> (the last 8 of 16 in a new song; Settings → Song → MONO TRACKS and POLY TRACKS set how many of each, at least one of each, 8 to 24 tracks in all, or 32 without a voice per track): the green POLY box on the right of Song and Mixer. The mono tracks, in the pink MONO box on the left, play one note at a time. Open a phrase from a polyphonic track and it shows four note columns, N1–N4, so a row can hold a chord. Notes on these tracks ring over each other, up to 4 at a time per track; a fifth steals the oldest. A note OFF in any note column releases everything on the track. The mono tracks stay one note at a time, and a phrase played there uses only N1.</p>
 <h3>Two input modes</h3>
@@ -16105,10 +16105,24 @@ function assignSample(vi, data, sr, name, data2, id){
   // tune) and the note then moves it from C-4, so a sample whose layer has tune 0 in a synth slot (voice tune +24) sounded two octaves up
   // at C-4. A NEW sample layer takes the opposite of the voice's tune, so voice + layer = 0 and the sample plays as it is at C-4, on a synth
   // slot and on a drum pad (voice tune 0: unchanged). Only this load writes it; a saved layer keeps the tune it has (see docs/SAMPLER-NOTES.md).
-  v.layers[li] = freshLayer({on:true, type:'sample', level:0.9, mode:'AHD', atk:0.1, hold:Math.min(SMP_MAX * 1000, Math.round(lenMs)), dec:40,
-    tune:smpOwnTune(v), sample:smp});
+  // REPLACING A SAMPLE (20 Nov, the lead's ruling): a Sample layer that is already there keeps its pitch settings exactly (tune, fine, the
+  // pitch envelope), so the notes written for it sound as before; only a NEW Sample layer gets the corrected tune. A kept tuning under which
+  // C-4 is not the sample's own pitch is said in a toast (smpKeptMsg).
+  const old = v.layers[li], keep = !!(old && old.type === 'sample' && old.sample && old.sample.data);
+  const nl = freshLayer({on:true, type:'sample', level:0.9, mode:'AHD', atk:0.1, hold:Math.min(SMP_MAX * 1000, Math.round(lenMs)), dec:40,
+    tune:keep ? old.tune : smpOwnTune(v), sample:smp});
+  if (keep){ nl.fine = old.fine; nl.pAmt = old.pAmt; nl.pDec = old.pDec; }
+  v.layers[li] = nl;
   v.len = Math.max(v.len, Math.min(SMP_MAX, data.length / sr + 0.1));
+  const msg = keep ? smpKeptMsg(nl, v) : null; if (msg && typeof setTimeout === 'function' && typeof toast === 'function') setTimeout(() => toast(msg, 7000), 80);   // after the loader's own toast
   cur = vi; changed(vi); refreshAll();
+  return msg;
+}
+// What to tell when a replaced sample keeps a tuning under which C-4 is not its own pitch: null when C-4 is right. total = layer + voice tune (+ fine).
+function smpKeptMsg(L, v){
+  const total = Math.round((L.tune || 0) + (v.tune || 0) + (L.fine || 0) / 100); if (total === 0) return null;
+  const t = Math.round((L.tune || 0) - total), neg = t < 0 ? '\u2212' : '';   // the TUNE that makes it 0
+  return 'Kept this layer\u2019s tuning: it plays at its own pitch at ' + noteS(Math.max(0, Math.min(119, ROOT - total))) + '. Set TUNE to ' + neg + Math.abs(t) + ' for C-4.';
 }
 $('bLoad').addEventListener('click', () => smbPanel(cur));   // SAMPLE BROWSER (was the file picker: ＋ Files… in the panel)
 $('bRecSmp').addEventListener('click', () => rcdPanel(cur));
@@ -16845,7 +16859,7 @@ function rcdKeep(pad){
   const T = RCD.take; if (!T) return;
   if (!T.data.length) return toast('The take is empty.');
   pad = clamp(pad | 0, 0, kit.voices.length - 1);
-  const v = kit.voices[pad], eng = v.engine && v.engine !== 'layers'; if (eng) v.engine = 'layers';   // a sample plays on the Layers engine
+  const v = kit.voices[pad], eng = v.engine && v.engine !== 'layers'; if (eng){ v.engine = 'layers'; if (typeof v.tuneL === 'number') v.tune = v.tuneL; }   // a sample plays on the Layers engine (with the Layers tune the slot had, as switching back does: the load then cancels it)
   const name = 'Rec ' + new Date().toTimeString().slice(0, 5).replace(':', '.');
   if (pad !== cur) select(pad);
   assignSample(pad, Float32Array.from(T.data), T.sr, name, T.data2 ? Float32Array.from(T.data2) : null);
@@ -23562,11 +23576,11 @@ const slSecs = (lines, lpb, bpm) => lines * 60 / ((bpm || 120) * (lpb || 4));
 // What the type-in field takes: 24 (lines), 2b (bars), 1b8 or 2 bars + 8 lines (bars and lines)
 function slParse(str, lpb){
   const t = String(str == null ? '' : str).trim().toLowerCase().replace(/\s+/g, ' '); let m, lines;
-  if ((m = /^(\d{1,6})(?: ?l(?:ines?)?)?$/.exec(t))) lines = +m[1];
-  else if ((m = /^(\d{1,6}) ?b(?:ars?)?(?: ?\+? ?(\d{1,6})(?: ?l(?:ines?)?)?)?$/.exec(t))) lines = +m[1] * slBar(lpb) + (m[2] ? +m[2] : 0);
+  if ((m = /^(\d{1,12})(?: ?l(?:ines?)?)?$/.exec(t))) lines = +m[1];
+  else if ((m = /^(\d{1,12}) ?b(?:ars?)?(?: ?\+? ?(\d{1,12})(?: ?l(?:ines?)?)?)?$/.exec(t))) lines = +m[1] * slBar(lpb) + (m[2] ? +m[2] : 0);
   else return {ok:false, err:'Type lines (24), bars (2b) or bars and lines (1b8).'};
   if (!(lines >= 1)) return {ok:false, err:'At least 1 line.'};
-  if (lines > SL_MAX) return {ok:false, err:'At most ' + SL_MAX + ' lines.'};
+  if (lines > SL_MAX) return {ok:false, err:'At most ' + SL_MAX + ' lines (' + Math.floor(SL_MAX / slBar(lpb)) + ' bars at ' + (lpb || 4) + ' lines a beat).'};
   return {ok:true, lines};
 }
 // The plain-words line: what the length is in beats and seconds, and what the mode does to the sample
@@ -23581,9 +23595,9 @@ function slPlan(lines, lpb, bpm, loop, mode){
 // The lengths the sheet offers: 8 to 128 lines and 1, 2, 4, 8 bars (merged, in order)
 function slChoices(lpb){ const a = new Set([8, 16, 32, 64, 128]); for (const b of [1, 2, 4, 8]) a.add(b * slBar(lpb)); return [...a].sort((x, y) => x - y); }
 // Every instrument that plays the pad gets the length (one change to the song: one undo step); lines 0 = OFF. Returns how many.
-function slSet(insts, pad, lines, mode){
+function slSet(insts, pad, lines, mode, lpb){
   let n = 0;
-  for (const I of insts) if (I && I.pad === pad){ if (lines > 0){ I.lines = Math.min(SL_MAX, Math.max(1, Math.round(lines))); I.sync = mode >= 1 && mode <= 3 ? mode : 1; } else I.sync = 0; n++; }
+  for (const I of insts) if (I && I.pad === pad){ if (lines > 0){ I.lines = Math.min(SL_MAX, Math.max(1, Math.round(lines))); I.sync = mode >= 1 && mode <= 3 ? mode : 1; I.beats = Math.min(64, Math.max(1, Math.round(I.lines / (lpb || 4))));   /* beats: the nearest whole beats, for a build without `lines` */ } else I.sync = 0; n++; }
   return n;
 }
 /* ===SYNC LINES END=== */
@@ -25522,10 +25536,10 @@ async function syncToLines(pad){
   const smp = kit.voices[pad].layers.find(l => l.on && l.type === 'sample' && l.sample && l.sample.data), ins = S.insts.map((I, i) => I.pad === pad ? hx(i) : null).filter(x => x);
   const o = {lpb, bpm, loop, mode:on && I0.sync <= 3 ? I0.sync : 1, lines:(I0.lines | 0) > 0 ? I0.lines : clamp(Math.round(instBeats(I0) * lpb), 1, SL_MAX), phrase,
     body:(smp ? (smp.sample.name || 'Sample') + ' on pad ' : 'Pad ') + hx(pad) + ' · ' + loop.toFixed(2) + ' s · plays through instrument' + (ins.length > 1 ? 's ' : ' ') + ins.join(', ') + '. The length goes to all of them.',
-    note:coreWanted() ? 'Sequencer: Audio thread does not play SYNC yet (a known open bug: sliced and synced instruments play unchanged there). Settings › Audio › Sequencer › Page plays it.' : ''};
+    note:coreWanted() ? 'On the Audio thread sequencer the sample plays unsynced for now; that is being worked on. Settings › Audio › Sequencer › Page plays it synced.' : ''};
   const r = await syncLinesSheet(o); if (!r) return;
-  if (r.off){ const n = slSet(S.insts, pad, 0, 0); saveS(); draw(); return toast('Sync off for ' + slN(n, 'instrument') + ' playing pad ' + hx(pad) + '. Undo brings it back.', 3500); }
-  const n = slSet(S.insts, pad, r.lines, r.mode); saveS(); draw();
+  if (r.off){ const n = slSet(S.insts, pad, 0, 0, lpb); saveS(); draw(); return toast('Sync off for ' + slN(n, 'instrument') + ' playing pad ' + hx(pad) + '. Undo brings it back.', 3500); }
+  const n = slSet(S.insts, pad, r.lines, r.mode, lpb); saveS(); draw();
   toast(slName(r.lines, lpb) + ' · ' + SYNC_MODES[r.mode] + ' · ' + slN(n, 'instrument') + ' playing pad ' + hx(pad) + ' (follows LPB). Undo brings it back.', 5000);
   try { const pi = S.insts.findIndex(I => I.pad === pad && (I.mo | 0) !== 1); if (pi >= 0 && ctx) preview(pi, ROOT, -1); } catch(e){}
 }
@@ -36810,13 +36824,13 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
 const CHANGES = [
   [657, '19 Nov', ['Arrange and Song: double-click (or double-tap) an empty MASTER cell and it gets a new empty block. If that song row has nothing on any visible track and the master is empty, the whole row is filled instead, like a hand-made row: a new empty phrase on every track in MONO / POLY and a new empty block on the master, each with its own number in track order, as one undo step. Not enough free numbers: nothing changes and a message says how many are needed and free (CLEAR UNUSED PHRASES frees some). Tracks beyond MONO / POLY get nothing. A filled master cell still opens its phrase on a double-click; Enter / EDIT on an empty master cell does the same two things.']],
   [656, '19 Nov', ['Settings: FOLLOW sits directly above PHRASE ON STOP and ARRANGE ON STOP, in the View menu and in Settings (the Project screen too). Nothing else about them changed']],
+  [655, '19 Nov', ['A sample you load into a Sample layer now plays at its own pitch at C-4 (in a synth slot it came out two octaves up, with its natural pitch at C-2). Saved songs and kits are unchanged.', 'Sync to lines…: on a Sample layer (and › SYNC TO LINES on INST) fit the loop to a length you pick or type: lines, bars (2b) or bars + lines (1b8). It follows LINES PER BEAT. On the Audio thread sequencer it plays unsynced for now.']],
   [654, '19 Nov', ['Synth page: the pads and slots the song uses have a thin line just inside their edge, so you can see which are open. Solid: a note in a phrase on the song plays it. Dotted: only phrases that are not on the song do. No line: free. A one-line key sits under the slot controls, and the info line for the selected pad says which instruments play it and how many notes. The tracker\u2019s INSTRUMENTS list is outlined the same way.']],
   [653, '19 Nov', ['FX presets: with the cursor in an effect slot\u2019s controls (a parameter row or \u203a PRESET; FX screen, tracks and the master, pump effects too), Ctrl/\u2318+\u25c0\u25b6 load the previous / next preset (EDIT+\u25c0\u25b6 on its \u203a PRESET row on the pad). Ctrl/\u2318+Shift+\u25c0\u25b6 change a parameter by 1 now. Hold it to run through them: the sound changes as you go, and the whole run is one undo step. It stops at the first and last preset.']],
   [651, '19 Nov', ['A bus can feed another bus through chains: Track In of the first bus \u2192 the second bus\u2019s chain. Before, a track that had both a Chain Out other tracks fed and a Track In of its own was not a bus, so the tracks feeding it said MISS and played dry. Now they say BS, the first bus plays through the second, and 08 and 14 say ON.', 'Solo follows the chain through any depth: soloing a bus keeps everything that feeds it, soloing a source keeps every bus after it, and the Mixer\u2019s info line says why a track that is not soloed is still heard (\u201cheard: feeds soloed bus 14\u201d). Muting a middle bus silences what passes through it.', 'The Mixer\u2019s CHN row is always two characters wide: MS (was MISS), LP (a cable that would close a loop of buses, left out), ON, BS, --. The line under the Mixer says the full word and, for MISS, no longer blames a CHN that is on. A song that already had a loop may now drop a different cable than before (it was dropped silently).', 'Stems: with a bus feeding a bus, the last bus\u2019s stem holds everything that plays through it.']],
   [650, '19 Nov', ['Reset track: Ctrl+Shift+T (\u2318+Shift+T on a Mac) clears the track you are on, as deleting a track in Renoise does, but the track stays where it is. Its notes and commands on every song row go, its mixer strip (level, trim, pan, mute, solo, name, colour) and its effects go back to a new song\u2019s, and CHN goes off. A block or phrase another track also plays is left alone. One Undo (Ctrl/\u2318+Z) brings everything back. Also in Edit \u25be \u2192 Track, the Song block\u2019s right-click menu and, on a phone, File \u2192 Edit. A browser tab keeps Ctrl+Shift+T for \u201creopen closed tab\u201d: use the menu there; the desktop app gets the key.']],
   [649, '19 Nov', ['Settings: press on a slider\u2019s bar (SWING, TEMPO, LPB, TEXT SIZE\u2026) to set it there and drag to change it, with a mouse or a finger. A swipe up or down that starts on a bar still scrolls the list. Double-tap a bar to put it back to its default. Shift (mouse) or a finger held away from the bar makes it finer. The sliders no longer lock.']],
   [648, '19 Nov', ['…waves and …chains: the Expression module’s ? help now has worked examples to copy, one formula per line: a sine, saw, triangle and square, a pitch from K1 and a version that glides without a jump, FM, a chord, a fade-in, ring modulation, tremolo, a low-pass filter, a wavefolder, a bit crusher and noise. The Help page shows them on the Expression card too, and the module’s Examples menu now holds the same formulas (tones first, then effects), so you can pick one instead of typing it.']],
-  [655, '19 Nov', ['A sample you load into a Sample layer now plays at its own pitch at C-4 (in a synth slot it came out two octaves up, with its natural pitch at C-2). Saved songs and kits are unchanged.', 'Sync to lines…: on a Sample layer (and › SYNC TO LINES on INST) fit the loop to a length you pick or type: lines, bars (2b) or bars + lines (1b8). It follows LINES PER BEAT. The Audio thread sequencer does not play SYNC yet.']],
   [647, '18 Nov', ['Flex: two patterns could put one broken sample into the sound (FLX E8, the 5-tuplet feel, just before a beat; and a tape pattern at one spot in Flex\u2019s memory). Fixed.', 'With the cursor on an FLX command in a phrase (or the master column), the FX bar\u2019s Flex PATTERN value now shows that command\u2019s number, and changing it rewrites the command in the column. One undo step per drag, on tracks and on the master. FLY commands are not linked, and every other FX bar value works as before.']],
   [646, '18 Nov', ['Computer side panel: the instrument list now sits above the PLAYING / STOPPED box and the meters (it was below them). Nothing else in the panel moved.']],
   [645, '18 Nov', ['The pump update of builds 643 and 644 is taken back out for now. It made pump FREEZE pause the sound for about a second in ways that could not be hidden (the first notes after a kit load or an engine switch could be lost). It returns when pump itself is changed.']],

@@ -55,6 +55,7 @@ the pad as it is (rate 1) and was faithfully playing the wrongly tuned render. F
 | CHOP BREAKS | `pickChopBreak` 11023 (turns the other layers off, SLICES 16, SYNC 1, BEATS 4) | `assignSample` | 0 | -(voice tune) |
 | Resample (bounce a pad / the song into a slot) | 20938 | `assignSample` | 0 | -(voice tune) |
 | Render a part / stem to a slot | 25400 | `assignSample` | 0 | -(voice tune) |
+| Any load over a layer that is already a Sample layer with data (20 Nov, review F1) | `assignSample` keeps its tune, fine and pitch envelope | the old layer's | unchanged (a toast says so when C-4 is not the sample's own pitch) |
 | Editor Apply (replaces the data of the layer that is there) | `rcdApply` 16747 | none: keeps the layer and its tune | unchanged | unchanged |
 | PWM or Grains layer taking a sample | `assignSample` first branch | none: keeps its own clock and tune | unchanged | unchanged |
 | Layer preset / kit / song / undo containing a sample | `layerFromJSON` 14865, `voiceFromJSON`: `freshLayer(j)` | the saved tune is the tune it gets | unchanged | unchanged |
@@ -156,8 +157,19 @@ audio-thread core has no `applyChop`, so a native sequencer implements all of it
 
 1. Fix at load, no marker: a later change of the voice's Tune moves the sample too. A render-side marker would change playback for every layer.
 2. PWM / Grains layers taking a sample keep their own tune; only the Sample layer type was fixed.
-3. `rcdKeep` into a slot whose engine is not Layers: voice tune is 0 then (`tuneL` kept aside), so it sounds right now and +24 if the engine is toggled away and back. Not touched.
+3. (Done, review F2) `rcdKeep` into a slot on another engine now restores the Layers tune (`tuneL`) when it switches the slot to Layers, as switching back does, so the corrected tune cancels the right number. Only a recorder keep into such a slot is affected.
 4. Lines are whole numbers (no halves; the field could hold them). Use bars + lines, or LPB 16.
 5. The type-in is one field (`24`, `2b`, `1b8`), not two BARS / LINES fields.
 6. Max 1024 lines; the song's LPB, never a phrase's.
-7. The audio-thread sequencer does not play SYNC (open bug, shown in the sheet): test SYNC TO LINES on the Page sequencer.
+7. On the audio-thread sequencer the sample plays unsynced for now (the sheet says so calmly): test SYNC TO LINES on the Page sequencer.
+
+### Review fixes (20 Nov, `docs/reviews/verify-257.md`)
+
+- **F1 (the lead's ruling):** loading a sample over an existing Sample layer (with data) keeps that layer's `tune`, `fine`, `pAmt` and `pDec`
+  exactly, so notes already written sound the same; only a NEW Sample layer (the slot had none) gets minus the voice tune. When the kept
+  tuning leaves C-4 off the sample's own pitch, `assignSample` returns and toasts (after the loader's own toast) e.g. "Kept this layer's tuning: it
+  plays at its own pitch at C-2. Set TUNE to −24 for C-4." (note and TUNE computed from layer + voice tune + fine). No toast when C-4 is right.
+- **F3:** `slSet` also writes `beats` = the lines / LPB rounded to a whole number, 1..64, so build 647 and the released app (which ignore `lines`)
+  play something close. `lines` stays the truth for this build; writing BEATS still drops it. OFF leaves `beats` alone.
+- **F2:** done, see choice 3. **F6:** the Audio thread line is "On the Audio thread sequencer the sample plays unsynced for now; that is being worked on."
+  **F7:** a too-large entry (any number of digits) says "At most 1024 lines (32 bars at 8 lines a beat)."

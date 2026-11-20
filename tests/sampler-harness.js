@@ -10,17 +10,19 @@ function loadSampler(h, extra) {
   if (A < 0 || B < 0 || C < 0 || D < 0) throw new Error('index.html: an anchor moved');
   const chopSrc = h.slice(C, D);
   const own = /const smpOwnTune = [^\n]*\n/.test(h) ? cutRe(h, /const smpOwnTune = [^\n]*\n/, 'smpOwnTune') : '';
+  const kept = /function smpKeptMsg/.test(h) ? cutRe(h, /function smpKeptMsg\([\s\S]*?\n\}\n/, 'smpKeptMsg') : '';
+  const nn = cutRe(h, /const NN = [^\n]*\n/, 'NN') + cutRe(h, /const noteS = [^\n]*\n/, 'noteS');
   const assign = cutRe(h, /function assignSample\([\s\S]*?\n\}\n/, 'assignSample');
   const lines = extra || '';
   const ctx = vm.createContext({ console, Math, Float32Array, Float64Array, Int16Array, Int32Array, Uint8Array, Uint32Array, Array, Object, JSON, Map, Set, WeakMap,
     Number, String, Boolean, Error, Promise, setTimeout, clearTimeout, performance, WebAssembly, RegExp, Date, Symbol, isFinite, isNaN, parseInt, parseFloat });
   ctx.globalThis = ctx; ctx.self = ctx;
-  const stubs = 'const ROOT = 48; const clamp = (v, a, b) => Math.max(a, Math.min(b, v)); let cur = 0, kit = {voices:[]}, S = {bpm:120, lpb:8, insts:[]};\n'
+  const stubs = 'const ROOT = 48, OFF = 200; const clamp = (v, a, b) => Math.max(a, Math.min(b, v)); let cur = 0, kit = {voices:[]}, S = {bpm:120, lpb:8, insts:[]};\n'
     + 'const markSmpNew = () => {}, smbAdd = () => {}, changed = () => {}, refreshAll = () => {}, ensure = pad => globalThis.__cache[pad];\n'
     + 'globalThis.__cache = [];\n';
   const tail = '\n;globalThis.__E = {freshLayer, mkVoice, renderVoice, assignSample, applyChop, loopSecs, SYNC_MODES, setKit:(k, s) => { kit = k; S = s; }, setCur:i => { cur = i; }, getS:() => S,\n'
     + '  ' + (lines ? lines : '') + 'slParse, slName, slPlan, slSecs, slChoices, slSet, instBeats, setBeats, slBar, SL_MAX, smpOwnTune: typeof smpOwnTune === "function" ? smpOwnTune : null};';
-  vm.runInContext(eng + '\n' + stubs + own + '\n' + assign + '\n' + chopSrc + tail, ctx, { filename: 'index.html(sampler)' });
+  vm.runInContext(eng + '\n' + stubs + own + '\n' + nn + kept + '\n' + assign + '\n' + chopSrc + tail, ctx, { filename: 'index.html(sampler)' });
   ctx.__E.ctx = ctx; return ctx.__E;
 }
 const sine = (hz, sr, secs) => Float32Array.from({ length: Math.round(sr * secs) }, (_, i) => 0.5 * Math.sin(2 * Math.PI * hz * i / sr));

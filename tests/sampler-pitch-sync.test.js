@@ -113,15 +113,15 @@ test('B: exact storage: `lines` round-trips through the song loader; an old song
 
 test('B: SYNC TO LINES sets every instrument that plays the pad, and only those; OFF turns SYNC off; one change to the song (one undo step)', () => {
   const insts = [{ pad: 3, sync: 0, beats: 4 }, { pad: 5, sync: 2, beats: 2 }, { pad: 3, sync: 1, beats: 8, lines: 9 }, null, { pad: 3, sync: 0, beats: 1, mo: 1 }];
-  assert.equal(E.slSet(insts, 3, 24, 2), 3);
+  assert.equal(E.slSet(insts, 3, 24, 2, 8), 3);
   assert.deepEqual(insts.filter(i => i && i.pad === 3).map(i => [i.lines, i.sync]), [[24, 2], [24, 2], [24, 2]]);
   assert.equal(JSON.stringify(insts[1]), '{"pad":5,"sync":2,"beats":2}', 'another pad’s instrument is untouched');
-  assert.equal(E.slSet(insts, 3, 0, 0), 3); assert.deepEqual(insts.filter(i => i && i.pad === 3).map(i => i.sync), [0, 0, 0]);
-  E.slSet(insts, 3, 4000.4, 9); assert.equal(insts[0].lines, 1024); assert.equal(insts[0].sync, 1, 'a mode out of range becomes REPITCH');
+  assert.equal(E.slSet(insts, 3, 0, 0, 8), 3); assert.deepEqual(insts.filter(i => i && i.pad === 3).map(i => i.sync), [0, 0, 0]);
+  E.slSet(insts, 3, 4000.4, 9, 8); assert.equal(insts[0].lines, 1024); assert.equal(insts[0].sync, 1, 'a mode out of range becomes REPITCH');
   // one undo step: the sheet applies with slSet then ONE saveS() (snap() coalesces what changes in the same turn into one step); undo restores the JSON before
   const fn = src.match(/async function syncToLines\(pad\)\{[\s\S]*?\n\}\n/)[0];
   assert.equal((fn.match(/saveS\(\)/g) || []).length, 2, 'one saveS() on OFF, one on Apply (never both)'); assert.equal((fn.match(/slSet\(/g) || []).length, 2);
-  const before = JSON.stringify([{ pad: 3, sync: 0, beats: 4 }]), after = [JSON.parse(before)[0]]; E.slSet(after, 3, 24, 1);
+  const before = JSON.stringify([{ pad: 3, sync: 0, beats: 4 }]), after = [JSON.parse(before)[0]]; E.slSet(after, 3, 24, 1, 8);
   assert.notEqual(JSON.stringify(after), before); assert.ok(!('lines' in JSON.parse(before)[0]), 'the undo snapshot has no field: restoring it removes the length');
   assert.match(fn, /toast\(slName\(r\.lines, lpb\)/, 'a toast says what was done');
 });
@@ -133,6 +133,7 @@ test('B: the type-in takes lines, bars, or bars + lines, 1 to 1024, and says why
   assert.equal(p('1024').ok, true); assert.equal(p('1025').ok, false); assert.equal(p('0').ok, false); assert.equal(p('32b').ok, true); assert.equal(p('33b').ok, false, '33 bars at LPB 8 is over the maximum');
   for (const bad of ['', 'abc', '-4', '1.5', '2.5b', '1e3', '12 beats', '2b-1', '1b8b', '0b0']) assert.equal(p(bad).ok, false, JSON.stringify(bad) + ' is refused');
   assert.match(p('x').err, /lines|bars/); assert.match(p('0').err, /least 1/); assert.match(p('2000').err, /1024/);
+  assert.match(p('99999999999').err, /At most 1024 lines \(32 bars at 8 lines a beat\)/, 'a very long number says the limit, not "type lines"'); assert.match(p('1b99999999').err, /At most 1024/);
 });
 
 test('B: the wording: "N bars + M lines", whole bars show the lines in brackets, and the sentence says what will happen', () => {
@@ -151,4 +152,41 @@ test('B: the sheet and the buttons exist (Sync to lines… on the sample layer, 
   const core = H.read('core/seq-core.js'); assert.match(core, /function applyChop\(\)\{\}/, 'the core’s applyChop is a stub: SYNC is a page-sequencer feature today');
   assert.match(core, /if \(c\)\{ applyChop\(ev, I, ev\.pad/, 'and it is only reached when ensure() gives a buffer, which the core’s ensure() never does');
   assert.match(core, /function ensure\(\)\{ return null; \}/);
+});
+
+/* ---------------- review fixes (F1, F2, F3, F6) ---------------- */
+test('F1: loading over an existing Sample layer keeps its pitch settings and says so; a new layer gets the corrected tune', () => {
+  const mk = (vt, tune, fine) => { const v = E.mkVoice('S', [], { tune: vt, len: 1.2, gate: 400, tail: 0 });
+    v.layers[0] = E.freshLayer({ on: true, type: 'sample', level: 0.9, mode: 'AHD', atk: 0.1, hold: 1000, dec: 40, tune, fine: fine || 0, pAmt: 5, pDec: 70, sample: { data: S.sine(1000, 44100, 1), sr: 44100, name: 'old' } }); return v; };
+  // an old tune-0 sample layer on a synth slot: replaced, it keeps tune 0 (and fine, pitch envelope), so existing notes sound the same
+  const v = mk(24, 0, 12); E.setKit({ voices: [v] }, { bpm: 120, lpb: 8, insts: [] }); E.setCur(0);
+  const before = E.renderVoice(v, 48000, null, 0), hz0 = S.freqOf(before, 48000, 0.2);
+  const msg = E.assignSample(0, S.sine(1000, 44100, 1), 44100, 'new');
+  const L = v.layers[0]; assert.equal(L.tune, 0); assert.equal(L.fine, 12); assert.equal(L.pAmt, 5); assert.equal(L.pDec, 70); assert.equal(L.sample.name, 'new');
+  assert.ok(Math.abs(S.freqOf(E.renderVoice(v, 48000, null, 0), 48000, 0.2) - hz0) < 8, 'same rendered pitch as the old layer gave (' + hz0 + ' Hz)');
+  assert.equal(msg, 'Kept this layer\u2019s tuning: it plays at its own pitch at C-2. Set TUNE to \u221224 for C-4.');
+  // the toast numbers are real: a layer at +7 in a drum pad plays at its own pitch at F-3 (7 semitones below C-4... note 48 - 7 = 41)
+  const v2 = mk(0, 7); E.setKit({ voices: [v2] }, { bpm: 120, lpb: 8, insts: [] }); assert.equal(E.assignSample(0, S.sine(1000, 44100, 1), 44100, 'n'), 'Kept this layer\u2019s tuning: it plays at its own pitch at F-3. Set TUNE to 0 for C-4.');
+  const v3 = mk(24, -24); E.setKit({ voices: [v3] }, { bpm: 120, lpb: 8, insts: [] }); assert.equal(E.assignSample(0, S.sine(1000, 44100, 1), 44100, 'n'), null, 'C-4 already right: no toast');
+  assert.equal(v3.layers[0].tune, -24);
+  // a slot with no Sample layer: a new layer, corrected
+  const v4 = E.mkVoice('S', [{ type: 'saw' }], { tune: 24, len: 1, gate: 400, tail: 0 }); E.setKit({ voices: [v4] }, { bpm: 120, lpb: 8, insts: [] });
+  assert.equal(E.assignSample(0, S.sine(1000, 44100, 1), 44100, 'n'), null); assert.equal(v4.layers[0].tune, -24);
+  assert.ok(Math.abs(S.freqOf(E.renderVoice(v4, 48000, null, 0), 48000, 0.2) - 1000) < 1, '1000 Hz at C-4');
+});
+
+test('F3: SYNC TO LINES also writes the nearest whole BEATS for a build without `lines`', () => {
+  const insts = [{ pad: 1, sync: 0, beats: 4 }];
+  E.slSet(insts, 1, 64, 1, 8); assert.equal(insts[0].beats, 8); assert.equal(insts[0].lines, 64);
+  E.slSet(insts, 1, 12, 1, 8); assert.equal(insts[0].beats, 2, '1.5 beats: the nearest whole'); E.slSet(insts, 1, 1, 1, 16); assert.equal(insts[0].beats, 1, 'at least 1');
+  E.slSet(insts, 1, 1024, 1, 4); assert.equal(insts[0].beats, 64, 'at most 64');
+  const I = { pad: 0, tsp: 0, slc: 0, sync: 1, beats: 4, grain: 1, ofs: 0 }; E.slSet([I], 0, 64, 1, 8);
+  const old = Object.assign({}, I); delete old.lines;   // a 647-style reader sees only beats
+  assert.equal(E.instBeats(old) * 60 / 120, E.instBeats(Object.assign({}, I)) * 60 / 120, 'the same target for a whole-beat length');
+  const before = JSON.stringify(insts[0]); E.setBeats(insts[0], 3); assert.ok(!('lines' in insts[0])); assert.notEqual(JSON.stringify(insts[0]), before);
+});
+
+test('F2: a recorder take kept into a slot on another engine restores the Layers tune first; F6: the audio-thread line is calm', () => {
+  assert.match(src, /if \(eng\)\{ v\.engine = 'layers'; if \(typeof v\.tuneL === 'number'\) v\.tune = v\.tuneL; \}/);
+  assert.match(src, /On the Audio thread sequencer the sample plays unsynced for now; that is being worked on\./); assert.doesNotMatch(src, /known open bug: sliced/);
 });
