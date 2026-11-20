@@ -67,6 +67,7 @@ struct MidiStats {               // all counted since construction; read with st
 class MidiSched {
  public:
   explicit MidiSched(double sampleRate);   // control thread: allocates everything
+  ~MidiSched();
   MidiSched(const MidiSched&) = delete;
   MidiSched& operator=(const MidiSched&) = delete;
 
@@ -174,7 +175,7 @@ class MidiSched {
   void pendInsert(const PendMsg& m);
   void clkPorts(int* ps, int& n) const;
   void sendClk(const uint8_t* b, int len, double t, uint8_t kind);
-  bool audibleT(int t) const { return t >= 32 || ((audible_ >> t) & 1); }
+  bool audibleT(int t) const { return t >= 32 || (t >= 0 && ((audible_ >> t) & 1)); }
 
   void offOne(Held& h, double at);
   void moOff(int t, double at);

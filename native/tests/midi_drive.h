@@ -14,6 +14,7 @@
 
 #include "midi/midisched.h"
 #include "rt/json.h"
+#include "seq/runner.h"
 #include "seq/seq.h"
 #include "song/song.h"
 
@@ -153,5 +154,45 @@ inline bool run(Drive& D, const Case& C, F&& pre) {
   D.sched = nullptr; delete seq; return true;
 }
 inline bool run(Drive& D, const Case& C) { return run(D, C, [](MidiSched&) {}); }
+
+// The same case on the live core's cadence: every `block` frames the host runs SeqRunner::pump (3 steps a block, look-ahead 0.25 s), MidiSched::book, and the song-end
+// check; actions fire at the first block at or after their ms. Used by the cadence-independence and stall tests. `stallAt` / `stallFrames`: no block runs for that
+// long from block time stallAt (ms): a host that stalled, then resumes at the later time.
+inline bool runBlocks(Drive& D, const Case& C, int block, int stallAtMs = -1, int stallMs = 0) {
+  D.C = C; D.kept.clear(); D.cleared = 0;
+  JsonError je; if (!D.song.load(C.songText.data(), C.songText.size(), &je)) return false;
+  MidiSched sched(D.sr); D.sched = &sched; configure(sched, C, D.song);
+  SeqOpts o; o.live = true; o.row = C.row; if (C.hasLoop) { o.hasLoop = true; o.loopY0 = C.y0; o.loopY1 = C.y1; }
+  Seq* seq = nullptr; SeqRunner runner; bool on = false, started = false; size_t ai = 0;
+  std::vector<SeqEvent> evs(12288); SeqStep st; int keyH[128]; for (int& h : keyH) h = -1;
+  const int64_t total = (int64_t)C.endMs * (int64_t)D.sr / 1000 / block + 1;
+  bool stalled = false;
+  for (int64_t b = 1; b <= total; b++) {
+    double now = (double)(b * block) / D.sr;
+    if (stallAtMs >= 0 && !stalled && now * 1000 >= stallAtMs) { stalled = true; b += (int64_t)stallMs * (int64_t)D.sr / 1000 / block; now = (double)(b * block) / D.sr; }
+    const double ms = now * 1000;
+    if (!started && ms >= C.playAt) {
+      started = true; seq = new Seq(D.song, D.vars, SeqMode::Song, o);
+      sched.start(C.row > 0 ? sppFor(D.song, D.vars, C.row) : 0, now); seq->setTime(now + 0.08); runner.start(seq); on = true;
+    }
+    while (ai < C.actions.size() && C.actions[ai].at <= ms) {
+      const Action& a = C.actions[ai++];
+      if (a.op == "stop") { if (on) { on = false; runner.stop(); sched.stop(now); } }
+      else if (a.op == "bpm") { if (on && seq) seq->setBpm(a.dv); }
+      else if (a.op == "clk") sched.portToggled(a.p, a.on, now);
+      else if (a.op == "cable") { int cab = a.p; for (int q = 0; q < 4; q++) if (D.C.ports[q] == a.id) { cab = q; break; } D.C.ports[a.p] = a.id; sched.cableChanged(a.p, true, cab, now); }
+      else if (a.op == "keyOn") { if (a.n >= 0 && a.n < 128) keyH[a.n] = sched.liveNoteOn(a.ii, a.n, a.v, 16, now); }
+      else if (a.op == "keyOff") { if (a.n >= 0 && a.n < 128 && keyH[a.n] >= 0) { sched.liveNoteOff(keyH[a.n], now); keyH[a.n] = -1; } }
+      else if (a.op == "panic") sched.panic(now);
+    }
+    if (on) {
+      runner.pump(now, 0.25, evs.data(), (int)evs.size(), &st, [&](const SeqEvent* e, int n, const SeqStep& step) { sched.onStep(e, n, step, *seq, now); });
+      sched.book(now, seq->time(), seq->bpm(), seq->alive());
+      if (!seq->alive() && now > seq->time() + 0.3) { on = false; runner.stop(); sched.stop(now); }
+    } else sched.book(now, now, 120, false);
+    D.drainAll();
+  }
+  D.sched = nullptr; delete seq; return true;
+}
 }  // namespace mdrive
 #endif

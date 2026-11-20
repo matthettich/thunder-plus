@@ -13,7 +13,8 @@ namespace {
 constexpr double kInf = std::numeric_limits<double>::infinity();
 inline double clampd(double v, double a, double b) { return v < a ? a : v > b ? b : v; }
 inline int clampi(int v, int a, int b) { return v < a ? a : v > b ? b : v; }
-inline int rnd(double x) { return (int)js_round(x); }
+inline int rnd(double x) { const double r = js_round(x); return r != r ? 0 : (int)(r < -1e9 ? -1e9 : r > 1e9 ? 1e9 : r); }   // JS Math.round, then an int that cannot overflow
+inline int ceilClamp(double x, int lo, int hi) { const double c = std::ceil(x); return c != c ? lo : (int)(c < lo ? lo : c > hi ? hi : c); }
 const double kLfoRates[14] = {1.0 / 6, 1.0 / 4, 1.0 / 3, 1.0 / 2, 2.0 / 3, 3.0 / 4, 1, 4.0 / 3, 3.0 / 2, 2, 4, 8, 16, 32};   // LFO_RATES :17133
 }  // namespace
 
@@ -30,6 +31,8 @@ MidiSched::MidiSched(double sampleRate) : sr_(sampleRate > 1000 && sampleRate < 
   for (auto& b : bend_) b = {false, 8192, 0};
   std::memset(lastTickFrame_, 0, sizeof lastTickFrame_);
 }
+
+MidiSched::~MidiSched() { delete[] pend_; delete[] cnt_; delete[] owner_; delete[] onFrame_; delete[] held_; delete[] pendRet_; delete[] ccv_; }
 
 // ---- configuration ---------------------------------------------------------------------------------------------------------------
 void MidiSched::setPort(int p, bool connected, bool clockOn, double gearMs, int cable) {
@@ -55,7 +58,7 @@ void MidiSched::send(const uint8_t* b, int len, double t, bool hasT, int port, u
   if (port < 0 || port >= kMidiPorts || !conn_[port]) return;              // :16788 no cable: nothing
   double at = hasT ? t + fxLat_ - latSec(port) : now_;
   if (!std::isfinite(at)) { st_.badArgs++; return; }
-  if (at < now_) at = now_;                                                  // :16791 Math.max(now, at)
+  if (at < now_ && kind != MK_CLOCK) at = now_;                              // :16791 Math.max(now, at). A tick keeps its own (past) time: the phase stays on the grid (B7)
   PendMsg m; m.at = at; m.ord = ord_++; m.port = (uint8_t)port; m.len = (uint8_t)len; m.kind = kind; m.track = (uint8_t)track; m.cable = (uint8_t)cable_[port];
   for (int i = 0; i < len && i < 3; i++) m.b[i] = b[i];
   if (hasT && at - now_ > lead_) pendInsert(m); else emit(m);               // the outbox :16790
@@ -70,7 +73,11 @@ void MidiSched::pendInsert(const PendMsg& m) {
 }
 void MidiSched::flush(double now) {
   int i = 0;
-  while (i < nPend_ && pend_[i].at - now <= lead_ + 1e-12) { emit(pend_[i]); i++; }
+  while (i < nPend_ && pend_[i].at - now <= lead_ + 1e-12) {
+    if (pend_[i].kind == MK_CLOCK && pend_[i].at < now - kClockLateSec) st_.lateTicks++;   // B7: a tick that waited past its time while the host stalled is dropped, not burst
+    else emit(pend_[i]);
+    i++;
+  }
   if (i) { std::memmove(pend_, pend_ + i, (size_t)(nPend_ - i) * sizeof(PendMsg)); nPend_ -= i; }
 }
 // A message leaves the scheduler (in time order). Notes are owned per port / channel / pitch (B4) and a note-off without a sounding note is not sent (B9).
@@ -194,12 +201,12 @@ bool MidiSched::rampOnce(int p, int ch, double t0) {   // :16866 'p:ch:t0.toFixe
 }
 void MidiSched::bendRamp(int p, int ch, double a, double b, int rng, double t0, double t1) {   // :16868
   bendTo(p, ch, a, rng, t0, true);
-  const int n = clampi((int)std::ceil((t1 - t0) / 0.01), 1, 48);
+  const int n = ceilClamp((t1 - t0) / 0.01, 1, 48);
   for (int i = 1; i <= n; i++) bendTo(p, ch, a + (b - a) * i / n, rng, t0 + (t1 - t0) * i / n, true);
 }
 void MidiSched::bendVib(int p, int ch, double c, double spd, double dep, int rng, double t0, double t1) {   // :16874
   const double d = std::max(0.02, t1 - t0), hz = 1 + spd * 1.2, st = dep / 15 * 1.5;
-  const int N = clampi((int)std::ceil(d * hz * 16), 8, 160);
+  const int N = ceilClamp(d * hz * 16, 8, 160);
   for (int i = 0; i < N; i++) bendTo(p, ch, c + st * js_sin(2 * 3.141592653589793 * hz * d * i / (N - 1)), rng, t0 + d * i / (N - 1), true);
   bendTo(p, ch, c, rng, t1, true);
 }
@@ -296,8 +303,9 @@ void MidiSched::moMod(const SeqEvent& e, const double* arp) {
 
 // moCmd :16995: CCA..CCD, PGM, MPB, MAT
 void MidiSched::moCmd(const SeqEvent& e) {
+  if (!(e.ii >= 0 && e.ii < kNI) || !S_) return;
+  if (e.track < 0 || e.track > 32) { st_.badEvents++; return; }
   const int ii = (int)e.ii;
-  if (!(e.ii >= 0) || ii >= kNI || !S_) return;
   const SongInst& I = S_->insts[ii];
   if (!I.mo || !(e.track >= 32 || audibleT(e.track))) return;
   const int p = clampi(I.mpt, 0, kMidiPorts - 1), ch = I.mch & 15;
@@ -428,6 +436,8 @@ void MidiSched::moClock(double now, double seqTime, double bpm) {
   if (!wanted || !clk_.on || !nAnc_) return;
   const double limit = std::min(seqTime, now + kClockAheadSec);
   int ps[kMidiPorts], np; clkPorts(ps, np);
+  { const int64_t first = (int64_t)std::ceil(anc_[0].b * 24 - 1e-9);   // ticks older than the oldest anchor we still hold are long gone (the host stalled): late, dropped, counted
+    if (clk_.k < first) { st_.lateTicks += (uint64_t)(first - clk_.k); clk_.k = first; } }
   for (int n = 0; n < 4096; n++) {
     bool ok; const double tk = timeOfBeat((double)clk_.k / 24, seqTime, bpm, ok);
     if (!ok || !(tk < limit)) break;
