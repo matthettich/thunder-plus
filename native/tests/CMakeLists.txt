@@ -911,6 +911,18 @@ target_include_directories(test_render_api_fix PRIVATE ${CMAKE_CURRENT_SOURCE_DI
 target_compile_definitions(test_render_api_fix PRIVATE THUNDER_ROOT="${CMAKE_CURRENT_SOURCE_DIR}/../..")
 add_test(NAME render_api_fix COMMAND test_render_api_fix)
 # the memory ones (D4 to D7): replaces the global operator new to count and to fail allocations, so it is a program of its own
+# U34b: stems (opts.stem, thunder_render_stem_tracks; docs/port/U34B-NOTES.md): the sum of the stems is the mix, where it is not, a stem holds only its track, mute / solo, length, bad arguments.
+add_executable(test_render_stems test_render_stems.cpp)
+target_link_libraries(test_render_stems PRIVATE thunder_core)
+target_include_directories(test_render_stems PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../core/src ${CMAKE_CURRENT_SOURCE_DIR})
+target_compile_definitions(test_render_stems PRIVATE THUNDER_ROOT="${CMAKE_CURRENT_SOURCE_DIR}/../..")
+add_test(NAME render_stems COMMAND test_render_stems)
+
+add_executable(test_render_stems_bus test_render_stems_bus.cpp)
+target_link_libraries(test_render_stems_bus PRIVATE thunder_core)
+target_include_directories(test_render_stems_bus PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../core/src ${CMAKE_CURRENT_SOURCE_DIR}/../core/include ${CMAKE_CURRENT_SOURCE_DIR})
+add_test(NAME render_stems_bus COMMAND test_render_stems_bus)
+
 add_executable(test_render_dispatch test_render_dispatch.cpp)
 target_link_libraries(test_render_dispatch PRIVATE thunder_core)
 target_include_directories(test_render_dispatch PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../core/src ${CMAKE_CURRENT_SOURCE_DIR})

@@ -1,4 +1,4 @@
-**NOW (step 1): this notes file, with the JS table and the API design, is the first commit; the C++ (mixer override, stem option, stem list) comes next.**
+**NOW: the C++ and the tests (render_stems, render_stems_bus) are in and pass in Release; next: the full Release ctest, the sanitizer run, mutation checks, then the PR.**
 
 # U34b: stems through the offline render C API
 
@@ -8,11 +8,11 @@ Only `native/` and `docs/port/` change; `index.html` is the specification (line 
 ## Checklist (updated in every commit)
 
 - [x] 1. The JS stem export read, the table below written, the API designed (this file)
-- [ ] 2. Mixer: a "heard" override (the page's `applyMix(filter)`)
-- [ ] 3. Renderer: stem mode (no master effects, no master chain, only the stem's tracks heard)
-- [ ] 4. C API: `opts.stem`, `thunder_render_stem_tracks`, stats fields; header text
-- [ ] 5. Tests: sum of stems, where it does not add up, silence of a track with no notes, mute / solo, length, bad arguments
-- [ ] 6. Golden / parity case (if the tree has render parity tooling that fits)
+- [x] 2. Mixer: a "heard" override (the page's `applyMix(filter)`)
+- [x] 3. Renderer: stem mode (no master effects, no master chain, only the stem's tracks heard)
+- [x] 4. C API: `opts.stem`, `thunder_render_stem_tracks`, stats fields; header text
+- [x] 5. Tests: sum of stems, where it does not add up, silence of a track with no notes, mute / solo, length, bad arguments
+- [ ] 6. Golden / parity case (if the tree has render parity tooling that fits): see "Parity" below
 - [ ] 7. Release ctest, sanitizer ctest of the render tests, PR
 
 ## 1. What the web app does when the owner exports stems
@@ -83,9 +83,10 @@ Rules of a stem handle (each is a line of the JS above):
 
 The one-pass form is a pure speed-up that can be added later behind the same stem list; it is not needed for parity.
 
-### Dormant until a chains host exists (buses)
+### Buses
 
-`inBus`, the bus-adds-its-sources rule and "a bus stem includes its sources" are written against the mixer's own plan (`Mixer::busMask`, `routedMask`, `BusPlan`), so they switch on when a chain hook makes a bus exist. Today `busMask() == 0`: every track is its own stem, which is what the mix does too (every track plays on its own). The JS, with a bus, would instead fold pure sources into the bus's stem. There is no way to make a bus through the C API, so the logic is tested at `SongRenderer` level with a pass-through chain hook (see Tests), not through the C API.
+`keepT`'s bus rules need only the song's chains patch (`busPlan`: feeds, targets, pure), not the chains engine, so they are applied from the mixer's own `BusPlan` (`Mixer::plan()`), as the page does: a bus track with an audible source in the list is listed even with no notes; a pure source whose bus is in the list has no stem of its own; the stem of a bus plays its audible sources with it (`pass`'s `k2`). ELECTRO's patch has buses: its list is 5 stems, not the 8 tracks with notes.
+Until a chains host sets a chain hook on a bus (`Mixer::setChain`), no bus EXISTS in a native render: a pure source plays on its own in the mix, and in its bus's stem (it is heard there, directly), so the stems still add up to the mix. When a host wires the chains, it must set the hook only on HEARD tracks of a stem render (`SongRenderer::heardMask()`), as `pass` calls `routeTrack` for `keep` only (24258): then a pure source asked for alone plays directly, because its bus does not exist in that pass. Test `render_stems_bus` does this with a pass-through hook.
 
 ## Choices for the lead
 
