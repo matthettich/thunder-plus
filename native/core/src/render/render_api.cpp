@@ -505,7 +505,7 @@ int thunder_render_set_pad_live(thunder_render* r, int pad, int kind, const uint
     else { if (V->kind != XKind::Mach) return THUNDER_RENDER_E_ARG; cfg.kind = LiveKind::Mach; cfg.mach = V->mach; cfg.mach.tune = V->tune; cfg.mach.drive = V->drive; cfg.mach.level = V->level; }
     LivePool& L = r->R->players().live();
     // the nodes' bytes count against the pad budget (the old pad's nodes are released only when the new ones are in: judged with both held)
-    size_t each = 0; { int tracks = kVoiceTracks; if (mask) { tracks = 0; for (uint64_t m = mask; m; m &= m - 1) tracks++; }   // (popcount, portable) each = (size_t)tracks * (kind == THUNDER_RENDER_LIVE_BASS ? 58000 : kind == THUNDER_RENDER_LIVE_VOX ? 5 * 52000 : 39000); }
+    size_t each = 0; { int tracks = kVoiceTracks; if (mask) { tracks = 0; for (uint64_t m = mask; m; m &= m - 1) tracks++; } each = (size_t)tracks * (kind == THUNDER_RENDER_LIVE_BASS ? 58000 : kind == THUNDER_RENDER_LIVE_VOX ? 5 * 52000 : 39000); }
     if (r->padBytes + each > THUNDER_RENDER_MAX_PAD_BYTES) return THUNDER_RENDER_E_LIMIT;
     const size_t old = L.padBytes(pad);
     if (!L.addPad(pad, cfg)) return THUNDER_RENDER_E_ARG;
