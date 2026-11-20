@@ -434,6 +434,7 @@ body:not(.nowv) .wvMobNote{display:none}
    (Noise filter, Tone level, Period quantize…). The tracker deck's and Settings' rows keep their own. */
 :root{--lblw:104px}
 :is(#main, #synRight) .row{grid-template-columns:var(--lblw) minmax(0,1fr) 64px}
+:is(#main, #synRight) .row.lnrow{grid-template-columns:var(--lblw) minmax(0,1fr) 118px}   /* envelope times in lines: "2 bars + 8 lines" */
 :is(#main, #synRight) .row label{white-space:normal; overflow:visible; text-overflow:clip; overflow-wrap:anywhere; line-height:1.15}
 :is(#main, #synRight) .segrow>span{width:var(--lblw); white-space:normal; overflow-wrap:anywhere; line-height:1.15}
 :is(#main, #synRight) .selrow{grid-template-columns:var(--lblw) minmax(0,1fr)}
@@ -4413,10 +4414,11 @@ function renderLayer(L, V, sr, out, N){
   const osc = makeOsc(L, sr, L.type === 'plaits' ? plaitsPre(L, V, preDur, pA, ptau) : L.type === 'elements' ? elementsPre(L, V, preDur, pA, ptau) : L.type === 'waves' ? wavesPre(L, V, preDur, pA, ptau) : null);
   const gain = L.level * L.level, M = N - d0, BLK = 16;
   let ePrev = ampAt(0);
+  const noMod = !(V.r1amt || V.r2amt || V.r3amt || V.r4amt || V.r5amt || V.r6amt || V.r7amt);   // no route has an amount: voiceMod would add only zeros (build 658: it built an object per block)
   for (let i = 0; i < M; i += BLK){
     const t = i / sr; if (t > tEnd) break;
     const e0 = ePrev, e1 = ampAt((i + BLK) / sr); ePrev = e1;
-    const mo = voiceMod(V, t);
+    const mo = noMod ? MOD0 : voiceMod(V, t);
     const inc = f0 * Math.pow(2, (pA * Math.exp(-t / ptau) + (gPA ? gPA * Math.exp(-((d0 + i) / sr) / gPtau) : 0) + mo.pitch) / 12) / sr;
     osc.blk(t, e0, inc);
     if (lpOn || hpOn){ const fe = fenv(t);
@@ -4995,9 +4997,9 @@ function relOf(V){
   if (isXEngV(V) && XENG[V.engine].rel) return Math.max(1, XENG[V.engine].rel(xParams(V))) / 1000;   // an engine that says (pump: its amp release)
   const own = isBassV(V) ? V.bass : isVoxV(V) ? V.vox : isXEngV(V) && V.engine !== 'sf' ? xParams(V) : null;
   if (own && typeof own.rel === 'number') return V.engine === 'chip' ? Math.max(1, own.rel * 1000 / 60) / 1000 : Math.max(1, own.rel) / 1000;
-  let r = 0; for (const L of V.layers || []) if (L.on && L.level > 0 && L.mode === 'ADSR') r = Math.max(r, L.rel);
+  let r = 0; for (const L of V.layers || []) if (L.on && L.level > 0 && L.mode === 'ADSR') r = Math.max(r, envMs(L, 'aU', 'rel'));
   if (isBlipV(V) || isXEngV(V)) return Math.max(30, r) / 1000;
-  if (V.gAmpOn && V.gMode === 'ADSR') return Math.max(1, V.gRel || 1) / 1000;
+  if (V.gAmpOn && V.gMode === 'ADSR') return Math.max(1, envMs(V, 'gU', 'gRel') || 1) / 1000;
   return (r > 0 ? Math.max(1, r) : 30) / 1000;
 }
 // Voice-wide filter and amp: they run on the layers AFTER they are summed, so one setting shapes every
@@ -5047,6 +5049,7 @@ function renderVoice(V, sr, stages, hold){
   // STEREO SAMPLES (5 Nov): a layer whose sample has a right channel (data2) makes the pad stereo: the voice is rendered
   // again with each such sample's right channel, and that render rides on the result as .r (the Worker sends it as
   // data2; install() keeps it as c.data2). Every other layer is seeded, so it comes out the same in both: centred.
+  { const fit = envLinesFit(V, hold); if (fit){ V = fit.V; hold = fit.hold; } }   // times in lines -> ms at the song's BPM and LPB (build 658)
   const a = renderLayersOnly(V, sr, stages, hold);
   if (!V.layers.some(L => L.on && L.level > 0 && L.sample && L.sample.data && L.sample.data2 && smpLayerT(L.type))) return a;
   const VR = Object.assign({}, V, {layers:V.layers.map(L => L.sample && L.sample.data2 ? Object.assign({}, L, {sample:Object.assign({}, L.sample, {data:L.sample.data2, data2:null, _vint:null})}) : L)});
@@ -5101,9 +5104,42 @@ function freshLayer(o){
 const SYNC_NAMES = ['Free', '1/32', '1/16', '1/8', '1/4', '1/2', '1 bar', '2 bars', '4 bars'];
 const SYNC_BEATS = [0, 0.125, 0.25, 0.5, 1, 2, 4, 8, 16];
 function songBpm(){ try { return (S && S.bpm) || 120; } catch(e){ return 120; } }
+/* ENVELOPE TIMES IN LINES (build 658; owner, 19 Nov: noise swells that fit a pattern). An envelope may keep its times as a number of
+   tracker lines instead of ms: the layer's amp (unit field `aU`, times atkL holdL decL relL), the layer's filter envelope (`fU`:
+   fAtkL fDecL) and the pad amp (`gU`: gAtkL gHoldL gDecL gRelL). 'l' = lines; no unit field = ms, the old way, and a voice with
+   none renders exactly as before. The engines stay in ms: renderVoice calls envLinesFit first, which turns the lines into ms at
+   the song's CURRENT BPM and LPB (seconds = lines / LPB * 60 / BPM, one stage at most 64 s) and lengthens the pad to fit. A tempo
+   command in the song does not re-time a rendered envelope. The page re-renders such a pad when the song's BPM or LPB changes (padBpm). */
+function songLpb(){ try { return Math.max(1, Math.round((S && S.lpb) || 4)); } catch(e){ return 4; } }
+const ENVL_LAYER = [['aU', ['atk', 'hold', 'dec', 'rel']], ['fU', ['fAtk', 'fDec']]], ENVL_VOICE = [['gU', ['gAtk', 'gHold', 'gDec', 'gRel']]];
+const ENVL_MAXMS = 64000, ENVL_MAXLEN = 300;   // a stage at most 64 s; a pad at most 300 s (the Max len row's own top)
+const linesMs = (n, bpm, lpb) => Math.min(ENVL_MAXMS, Math.max(0, +n || 0) / Math.max(1, lpb) * 60 / Math.max(1, bpm) * 1000);
+const msLines = (ms, bpm, lpb) => Math.max(0, Math.round((+ms || 0) / 1000 * Math.max(1, bpm) / 60 * Math.max(1, lpb)));
+const envLinesOf = (o, k, bpm, lpb) => o[k + 'L'] != null ? +o[k + 'L'] || 0 : msLines(o[k], bpm, lpb);
+const envMs = (o, u, k) => o[u] === 'l' ? linesMs(envLinesOf(o, k, songBpm(), songLpb()), songBpm(), songLpb()) : o[k];   // one time of an envelope, in ms, now
+const voiceLines = V => !!V && ((V.gAmpOn && V.gU === 'l') || (V.layers || []).some(L => L && L.on && L.level > 0 && (L.aU === 'l' || L.fU === 'l')));
+function envLinesFit(V, hold){
+  if (!voiceLines(V)) return null;
+  const bpm = songBpm(), lpb = songLpb(), bar = 240 / Math.max(1, bpm), W = Object.assign({}, V); let need = 0;
+  const conv = (o, spec) => { let M = null;
+    for (const [u, ks] of spec) if (o[u] === 'l'){ M = M || Object.assign({}, o); for (const k of ks) M[k] = linesMs(envLinesOf(o, k, bpm, lpb), bpm, lpb); }
+    return M; };
+  W.layers = V.layers.map(L => { if (!L || !L.on || !(L.level > 0)) return L;
+    const M = conv(L, ENVL_LAYER); if (!M) return L;
+    if (L.aU === 'l'){   // the pad must last as long as this layer's stages (an ADSR in a held slot: attack, decay and a bar of sustain)
+      const base = (M.delay || 0) / 1000 + (M.burst | 0) * (M.spacing || 0) / 1000;
+      const t = M.mode === 'ADSR' ? (hold > 0 ? (M.atk + M.dec) / 1000 + bar : Math.max(V.gate / 1000, M.atk / 1000) + M.rel / 1000) : (M.atk + M.hold + M.dec) / 1000;
+      need = Math.max(need, base + t + 0.005); }
+    return M; });
+  if (V.gAmpOn && V.gU === 'l'){ const M = conv(V, ENVL_VOICE); for (const k of ['gAtk', 'gHold', 'gDec', 'gRel']) W[k] = M[k];
+    need = Math.max(need, (W.gMode === 'ADSR' ? (hold > 0 ? (W.gAtk + W.gDec) / 1000 + bar : Math.max(V.gate / 1000, W.gAtk / 1000) + W.gRel / 1000) : (W.gAtk + W.gHold + W.gDec) / 1000) + 0.005); }
+  W.len = Math.min(ENVL_MAXLEN, Math.max(V.len || 0, need));
+  return {V:W, hold:hold ? Math.min(ENVL_MAXLEN, Math.max(hold, need)) : 0};
+}
 const voiceSynced = V => !!V && ([1, 2, 3].some(i => (V['lfo' + i + 'Sync'] | 0) && (V['lfo' + i + 'Depth'] || 0)) || ((V.seqSync | 0) && (V.seqDepth || 0)));
 // Random values for the S&H and smooth-random LFO shapes: the same every render, so a pad sounds the same each time.
 const hashRnd = (n, k) => { let x = (n * 374761393 + k * 668265263) | 0; x = Math.imul(x ^ (x >>> 13), 1274126177); x ^= x >>> 16; return (x >>> 0) / 2147483648 - 1; };
+const MOD0 = Object.freeze({pitch:0, level:0, lpcut:0, hpcut:0});
 function voiceMod(V, t){
   let pitch = 0, level = 0, lpcut = 0, hpcut = 0;
   const gate = Math.max(V.gate, 1) / 1000;
@@ -8524,13 +8560,13 @@ const VM = {
 const MOD_DESTS = ['Off', 'Pitch', 'Level', 'Cutoff', 'HP cutoff'];
 const MOD_SRC = [['r1', 'LFO 1'], ['r2', 'LFO 2'], ['r3', 'LFO 3'], ['r4', 'Env 1'], ['r5', 'Env 2'], ['r6', 'Env 3'], ['r7', 'Seq']];
 const toPos = (d, v) => d.c === 'log' || d.c === 'logf' ? Math.log(v / d.min) / Math.log(d.max / d.min)
-  : d.c === 'sq' ? Math.sqrt(Math.max(0, (v - d.min) / (d.max - d.min))) : (v - d.min) / (d.max - d.min);
+  : d.c === 'sq' || d.c === 'sqi' ? Math.sqrt(Math.max(0, (v - d.min) / (d.max - d.min))) : (v - d.min) / (d.max - d.min);   // sqi: whole numbers on a squared curve (envelope times in lines)
 function fromPos(d, p){
-  return snapDef(d, d.c === 'log' || d.c === 'logf' ? d.min * Math.pow(d.max / d.min, p) : d.c === 'sq' ? d.min + (d.max - d.min) * p * p : d.min + (d.max - d.min) * p);
+  return snapDef(d, d.c === 'log' || d.c === 'logf' ? d.min * Math.pow(d.max / d.min, p) : d.c === 'sq' || d.c === 'sqi' ? d.min + (d.max - d.min) * p * p : d.min + (d.max - d.min) * p);
 }
 // The step a row's value takes (what a drag lands on); a typed value is snapped the same way (SLIDER ENTRY, 14 Nov).
 function snapDef(d, v){
-  if (d.c === 'int') v = Math.round(v); else if (d.c === 'half') v = Math.round(v * 2) / 2;
+  if (d.c === 'int' || d.c === 'sqi') v = Math.round(v); else if (d.c === 'half') v = Math.round(v * 2) / 2;
   else if (d.c === 'logf') v = +v.toPrecision(4);   /* a fine log curve (the module effects' small times): four figures, never rounded to 0 */
   else if (d.c === 'log' || d.c === 'sq') v = v < 10 ? Math.round(v * 10) / 10 : Math.round(v);
   else v = Math.round(v * 1000) / 1000;
@@ -8792,7 +8828,7 @@ function rwStart(plMod, txMod, lxMod, psMod){
     const t = sc.textContent, A = t.indexOf('/* ===ENGINE ' + 'START=== */'), B = t.indexOf('/* ===ENGINE ' + 'END=== */');
     if (A < 0 || B < A) return;
     const glue = `
-var S = {bpm:120}, WVOK = false, LXOK = false, PSOK = false;
+var S = {bpm:120, lpb:4}, WVOK = false, LXOK = false, PSOK = false;
 self.onmessage = async e => {
   const m = e.data;
   if (m.op === 'init'){
@@ -8808,7 +8844,7 @@ self.onmessage = async e => {
   if (m.op === 'irs'){ self.__thunderIR = m.v; return; }   // the song's impulse responses (Convolution reverb)
   if (m.op === 'render'){
     try {
-      S = {bpm:m.bpm || 120}; WV.doc = m.waves || null;
+      S = {bpm:m.bpm || 120, lpb:m.lpb || 4}; WV.doc = m.waves || null;
       const st = m.stages ? new Map() : null, d = renderVoice(m.v, m.sr, st, m.hold), sts = [];
       if (st) (m.v.fx || []).forEach((f, k) => { const pk = st.get(f); if (pk) sts.push([k, pk]); });
       const d2 = d.r || null; postMessage({op:'done', id:m.id, data:d, data2:d2, st:sts}, d2 ? [d.buffer, d2.buffer] : [d.buffer]);
@@ -8840,13 +8876,13 @@ function renderAsync(v, sr, hold, stages){
   if (!rwCan(v)) return Promise.reject(new Error('no worker'));
   return new Promise((ok, no) => {
     const id = ++PW.id; PW.jobs.set(id, {ok, no});
-    try { PW.w.postMessage({op:'render', id, v, sr, hold, stages:!!stages, bpm:songBpm(), waves:WV.doc}); }
+    try { PW.w.postMessage({op:'render', id, v, sr, hold, stages:!!stages, bpm:songBpm(), lpb:songLpb(), waves:WV.doc}); }
     catch(e){ PW.jobs.delete(id); no(e); }   // a voice the Worker can't be sent: render here
   });
 }
 const padSR = () => ctx ? ctx.sampleRate : srGuess;
 // A pad that renders in time with the song re-renders when the tempo changes: synced mod LFOs/sequence, or a Vector wave sequence in note values.
-const padBpm = i => { const v = kit.voices[i]; return voiceSynced(v) || (v && v.engine === 'vector' && v.vector && (v.vector.mode | 0) === 1 && (v.vector.sdiv | 0) > 0) || (isLxV(v) && LxrCore.synced(v)) || (v && (v.engine === 'pwob' || v.engine === 'pwobl') && v.engine && v[v.engine] && v[v.engine].wob_sync !== 0) ? songBpm() : 0; };   // …PUMP WOB: its wobble follows the tempo   // LXR ENGINES: an LFO synced to the tempo
+const padBpm = i => { const v = kit.voices[i]; if (voiceLines(v)) return songBpm() + songLpb() / 100; return voiceSynced(v) || (v && v.engine === 'vector' && v.vector && (v.vector.mode | 0) === 1 && (v.vector.sdiv | 0) > 0) || (isLxV(v) && LxrCore.synced(v)) || (v && (v.engine === 'pwob' || v.engine === 'pwobl') && v.engine && v[v.engine] && v[v.engine].wob_sync !== 0) ? songBpm() : 0; };   // …PUMP WOB: its wobble follows the tempo   // LXR ENGINES: an LFO synced to the tempo
 function stale(i){ const c = slotAt(cache, i); return !c || slotAt(dirty, i) || c.sr !== padSR() || (c.bpm || 0) !== padBpm(i); }
 function install(i, c){ slotAt(padRev, i); padRev[i] = (padRev[i] || 0) + 1; cache[i] = c; dirty[i] = false; bufs[i] = null; if (typeof coreBuf === 'function') try { coreBuf(i); } catch(e){} }
 function bgRender(i){
@@ -9197,7 +9233,7 @@ function rowTypeBox(row, opts){
   let done = false;
   const finish = (commit, back) => {
     if (done) return; done = true;
-    const v = commit && inp.value !== t0 ? rowParse(d, inp.value, fmt) : null;   /* Escape, or leaving it unchanged, cancels */
+    const v = commit && inp.value !== t0 ? (d.parse ? d.parse(inp.value) : rowParse(d, inp.value, fmt)) : null;   /* Escape, or leaving it unchanged, cancels */
     if (v != null && v !== prev){ row.getObj()[row.key] = v; row.refresh(); (opts.on || (() => changed(cur, true)))(); }
     else row.refresh();
     if (back){ try { row.inp.focus({preventScroll:true}); } catch(_){} }   /* Enter / Escape: the slider keeps the keys (arrows nudge it) */
@@ -9217,7 +9253,8 @@ function makeRow(def, key, getObj, opts = {}){
   r.append(lab, inp, out);
   const reset = () => { if (row.def.d == null) return; getObj()[key] = row.def.d; row.refresh(); (opts.on || (() => changed(cur, true)))(); };
   const row = {def, key, getObj, r, lab, inp, out, fmt:opts.fmt,
-    refresh(){ const o = getObj(); const v = o[key]; inp.value = Math.round(toPos(this.def, v) * 1000); setText(out, (this.fmt || this.def.f || pct)(v)); }};
+    refresh(){ const o = getObj(); const v = o[key]; inp.value = Math.round(toPos(this.def, v) * 1000); setText(out, (this.fmt || this.def.f || pct)(v)); },
+    set(v){ getObj()[key] = v; row.refresh(); (opts.on || (() => changed(cur, true)))(); }};   // set: a value written from outside the slider (the bars + lines steps)
   inp.addEventListener('input', () => { const o = getObj(); o[key] = fromPos(row.def, inp.value / 1000);
     setText(out, (row.fmt || row.def.f || pct)(o[key])); (opts.on || (() => changed(cur, true)))(); });
   const two = () => r.classList.contains('two');   // a two-state row (twoStateRow): two buttons, nothing to type, so its name's double-click still resets
@@ -9557,9 +9594,9 @@ for (const [fk, fname] of Object.entries(FAMS)){
 }
 makePick(sel);   // SYNTH UX B: the app's own picker in front of the (hidden, still authoritative) select
 sel.addEventListener('change', () => { const L = Lc(), was = L.type; L.type = sel.value; L.on = true;
-  if (L.type === 'elements' && was !== 'elements'){ Object.assign(L, {mode:'AHD', atk:0.5, hold:0, dec:Math.max(L.dec, 4000), pAmt:0}); if (L.tune === 0) L.tune = 12; }
-  if (L.type === 'waves' && was !== 'waves'){ Object.assign(L, {mode:'AHD', atk:0.5, hold:8000, dec:2000, pAmt:0, wBus:L.wBus || 1}); if (L.tune === 0) L.tune = 24; }
-  if (L.type === 'plaits' && was !== 'plaits'){ Object.assign(L, {mode:'AHD', atk:0.5, hold:0, dec:Math.max(L.dec, 3000), pAmt:0}); if (L.tune === 0) L.tune = 12; }
+  if (L.type === 'elements' && was !== 'elements'){ lnClear(L); Object.assign(L, {mode:'AHD', atk:0.5, hold:0, dec:Math.max(L.dec, 4000), pAmt:0}); if (L.tune === 0) L.tune = 12; }
+  if (L.type === 'waves' && was !== 'waves'){ lnClear(L); Object.assign(L, {mode:'AHD', atk:0.5, hold:8000, dec:2000, pAmt:0, wBus:L.wBus || 1}); if (L.tune === 0) L.tune = 24; }
+  if (L.type === 'plaits' && was !== 'plaits'){ lnClear(L); Object.assign(L, {mode:'AHD', atk:0.5, hold:0, dec:Math.max(L.dec, 3000), pAmt:0}); if (L.tune === 0) L.tune = 12; }
   refreshLayer(); changed(); });
 $('lOn').addEventListener('click', () => { const L = Lc(); L.on = !L.on; refreshLayer(); changed(); });
 $('lRand').addEventListener('click', () => { randLayer(Lc()); refreshLayer(); changed(); playFresh(cur); });
@@ -9575,6 +9612,58 @@ function section(title, keys, extra){
   if (extra) extra(s, made);
   secs.append(s); return made;
 }
+
+/* ENVELOPE TIMES IN LINES (build 658): a MS | BARS + LINES choice for an envelope's times (see envLinesFit). In lines the times are
+   whole lines of the song (a bar = 4 beats = 4 x LPB lines), up to 8 bars; the value shows as "2 bars + 8 lines", the line under
+   the rows gives the seconds at the song's tempo. Steps: the arrows move a bar (Shift: a line); the Step buttons do the same. */
+const lnBar = () => 4 * songLpb(), lnMax = () => 32 * songLpb();
+function lnText(v){ const n = Math.max(0, Math.round(+v || 0)), bar = lnBar(), b = Math.floor(n / bar), r = n - b * bar;
+  if (!n) return '0 lines'; const w = (x, one) => x + ' ' + one + (x === 1 ? '' : 's');
+  return !b ? w(r, 'line') : w(b, 'bar') + (r ? ' + ' + w(r, 'line') : ''); }
+// Typed: "4b" or "4 bars", "2b8" or "2 bars + 8", "2.8" (2 bars and 8 lines), "12" or "12 lines" (a bare number is lines). Else null.
+function lnParse(t){
+  t = String(t == null ? '' : t).trim().toLowerCase().replace(',', '.'); const bar = lnBar(); let m, n = null;
+  if ((m = t.match(/^(\d+)\s*b(?:ars?)?(?:\s*\+?\s*(\d+)\s*(?:l|lines?)?)?$/))) n = +m[1] * bar + (+m[2] || 0);
+  else if ((m = t.match(/^(\d+)\.(\d+)$/))) n = +m[1] * bar + +m[2];
+  else if ((m = t.match(/^(\d+)\s*(?:l|lines?)?$/))) n = +m[1];
+  return n == null ? null : Math.min(lnMax(), n); }
+function lnNudge(v, dir, fine){ const bar = lnBar(); v = Math.round(v);
+  const n = fine ? v + dir : dir > 0 ? (Math.floor(v / bar) + 1) * bar : (Math.ceil(v / bar) - 1) * bar; return Math.max(0, Math.min(lnMax(), n)); }
+const lnSecs = ms => (ms / 1000).toFixed(2) + ' s';
+function envUnitUI(o){
+  const {sec, getObj, uKey, keys, rowsMap, idp} = o, msDef = k => rowsMap[k].def, lrows = {};
+  const ur = el('div', 'segrow'); ur.append(el('span', null, 'Time in')); const ug = el('div', 'seg'); ur.append(ug); rowsMap[keys[0]].r.before(ur);
+  let cur = keys[0], unitUpd = () => {};
+  const syncMs = () => { const ob = getObj(), bpm = songBpm(), lpb = songLpb(); for (const k of keys) ob[k] = Math.round(linesMs(envLinesOf(ob, k, bpm, lpb), bpm, lpb) * 10) / 10; };
+  for (const k of keys){
+    const def = {l:msDef(k).l, min:0, max:lnMax(), c:'sqi', d:null, f:lnText, parse:lnParse, nudge:lnNudge};
+    const r = makeRow(def, k + 'L', getObj, {idp, on:() => { syncMs(); o.on(); infoUpd(); }}); r.r.classList.add('lnrow'); r.r.hidden = true;
+    rowsMap[k].r.after(r.r); lrows[k] = r; if (o.reg) o.reg(r);
+    for (const ev of ['focus', 'pointerdown']) r.inp.addEventListener(ev, () => { cur = k; stepUpd(); }); }
+  const info = el('div', 'readout'), note = el('p', 'note');
+  note.textContent = 'In bars + lines a time is a number of the song’s lines: a bar is 4 beats, so at 8 lines a beat 1 bar is 32 lines (one pattern), up to 8 bars. The seconds follow the song’s BPM and LPB when the pad is rendered (a tempo command in the song does not change them). Arrows: a bar, Shift: a line. Type 4b, 2b8, 2.8 or 12 (lines). The pad is made long enough for the envelope; raise Max len to hold a note longer.';
+  const sr = el('div', 'segrow'), sl = el('span', null, 'Step'), sg = el('div', 'seg'); sr.append(sl, sg);
+  const stepUpd = () => { sl.textContent = 'Step ' + String(msDef(cur).l).toLowerCase(); };
+  for (const [t, ti, dir, fine] of [['−−', 'One bar less', -1, false], ['−', 'One line less', -1, true], ['+', 'One line more', 1, true], ['++', 'One bar more', 1, false]]){
+    const b = el('button', null, t); b.type = 'button'; b.title = ti; b.setAttribute('aria-label', ti + ' (' + msDef(cur).l + ')');
+    b.addEventListener('click', () => { const r = lrows[cur], v = +getObj()[r.key] || 0, nv = r.def.nudge(v, dir, fine); if (nv !== v) r.set(nv); }); sg.append(b); }
+  sec.append(info, sr, note);
+  const infoUpd = () => { const ob = getObj(), lines = ob[uKey] === 'l'; info.hidden = sr.hidden = note.hidden = !lines; if (!lines) return;
+    const bpm = songBpm(), lpb = songLpb(), parts = [];
+    for (const k of keys) if (!lrows[k].r.hidden){ const n = envLinesOf(ob, k, bpm, lpb); parts.push(msDef(k).l + ' ' + lnText(n) + ' = ' + lnSecs(linesMs(n, bpm, lpb))); }
+    setText(info, parts.join(' · ') + ' · at ' + bpm + ' BPM, ' + lpb + ' lines a beat'); };
+  const setU = u => { const ob = getObj(), bpm = songBpm(), lpb = songLpb();
+    if (u === 'l' && ob[uKey] !== 'l'){ for (const k of keys) ob[k + 'L'] = Math.min(lnMax(), msLines(ob[k], bpm, lpb)); ob[uKey] = 'l'; syncMs(); }
+    else if (u !== 'l' && ob[uKey] === 'l'){ for (const k of keys){ const d = msDef(k), ms = linesMs(envLinesOf(ob, k, bpm, lpb), bpm, lpb); ob[k] = Math.max(d.min, Math.min(d.max, snapDef(d, ms))); delete ob[k + 'L']; } delete ob[uKey]; }
+    o.after(); o.on(); };
+  unitUpd = makeSeg(ug, [['ms', 'MS'], ['l', 'BARS + LINES']], () => getObj()[uKey] === 'l' ? 'l' : 'ms', setU);
+  return {upd(){ const ob = getObj(), lines = ob[uKey] === 'l';
+    for (const k of keys){ const hide = o.hide(k, ob); rowsMap[k].r.hidden = lines || hide; lrows[k].r.hidden = !lines || hide; lrows[k].def.max = lnMax(); if (lines) lrows[k].refresh(); }
+    if (lines && lrows[cur].r.hidden) cur = keys.find(k => !lrows[k].r.hidden) || keys[0];
+    unitUpd(); stepUpd(); infoUpd(); }};
+}
+/* clearing a layer's line times: a new model, Clear and Random start from plain ms (build 658) */
+const lnClear = L => { for (const [u, ks] of ENVL_LAYER){ delete L[u]; for (const k of ks) delete L[k + 'L']; } };
 let ampModeUpd, plStrikeUpd, plAuxUpd;
 const srcRows = section('Source', ['a','b','level','delay','burst','spacing']);
 // SYNTH UX B (13 Nov): where Source's second control is a switch (Sample: Reverse; Digital: Loop) it shows as two buttons, not a slider.
@@ -9649,7 +9738,9 @@ const ampRows = section('Amp', [], s => {
 });
 for (const k of ['atk','hold','dec','sus','rel']){ const r = makeRow(P[k], k, Lc, {idp:'l', on:() => changed()}); secs.lastChild.append(r.r); ampRows[k] = r; }
 const gateNote = el('div', 'readout', 'Sustain holds for the pad’s Gate time.'); secs.lastChild.append(gateNote);
-section('Filter', ['lpCut','lpRes','lpEnv','hpCut','hpRes','hpEnv','fAtk','fDec']);
+const ampUnit = envUnitUI({sec:secs.lastChild, getObj:Lc, uKey:'aU', keys:['atk','hold','dec','rel'], rowsMap:ampRows, idp:'l', on:() => changed(), after:() => refreshLayer(), hide:(k, L) => L.mode === 'ADSR' ? k === 'hold' : k === 'rel'});
+const fltRows = section('Filter', ['lpCut','lpRes','lpEnv','hpCut','hpRes','hpEnv','fAtk','fDec']);
+const fltUnit = envUnitUI({sec:secs.lastChild, getObj:Lc, uKey:'fU', keys:['fAtk','fDec'], rowsMap:fltRows, idp:'l', on:() => changed(), after:() => refreshLayer(), hide:() => false});
 
 
 /* ---------- bass engine editor ----------
@@ -14181,13 +14272,14 @@ function bassViz(){
 // These edit the voice object (V), not the selected layer, and renderVoice applies them to all the
 // layers at once: a low-pass filter with its own envelope, and an amp envelope over the whole voice.
 let vAmpModeUpd, vAmpOnUpd;
-const vgRows = [], vAmpRows = {}, vmSelUpd = [];
+const vgRows = [], vAmpRows = {}, vmSelUpd = []; let vAmpUnit = null;
 function refreshVoiceGlobals(){
   const v = V(), adsr = v.gMode === 'ADSR';
   vAmpRows.gHold.r.hidden = adsr; vAmpRows.gSus.r.hidden = !adsr; vAmpRows.gRel.r.hidden = !adsr;
   vAmpOnUpd(); vAmpModeUpd();
   for (const f of vmSelUpd) f();
   for (const r of vgRows) r.refresh();
+  if (typeof vAmpUnit !== 'undefined' && vAmpUnit) vAmpUnit.upd();
 }
 (function buildVoiceGlobals(){
   const host = $('voiceSecs');
@@ -14204,6 +14296,7 @@ function refreshVoiceGlobals(){
   { const r = makeRow(VGP.gAmpAmt, 'gAmpAmt', V, {idp:'vg'}); as.append(r.r); vgRows.push(r); }
   for (const [k, def] of [['gAtk',P.atk],['gHold',P.hold],['gDec',P.dec],['gSus',P.sus],['gRel',P.rel]]){
     const r = makeRow(def, k, V, {idp:'vg'}); as.append(r.r); vgRows.push(r); vAmpRows[k] = r; }
+  vAmpUnit = envUnitUI({sec:as, getObj:V, uKey:'gU', keys:['gAtk','gHold','gDec','gRel'], rowsMap:vAmpRows, idp:'vg', on:() => changed(), after:() => refreshVoiceGlobals(), hide:(k, v) => v.gMode === 'ADSR' ? k === 'gHold' : k === 'gRel', reg:r => vgRows.push(r)});
 })();
 
 /* ---------- voice play (glide / legato / mono) ---------- */
@@ -14343,6 +14436,7 @@ function refreshLayer(){
   }
   ampModeUpd();
   for (const r of rows) if (r.getObj === Lc) r.refresh();
+  ampUnit.upd(); fltUnit.upd();   // MS | BARS + LINES: which rows show
   pitchReadout();
   renderStrip();
   secTabsUpd();
@@ -14814,7 +14908,7 @@ function randLayer(L, keepOn){
   Object.assign(L, freshLayer(), {on:true, type:t.id, a:Math.random(), b:Math.random(), level:rnd(0.5, 0.9)});
   L.tune = fam === 'noise' ? rint(-12, 24) : rint(-12, 30);
   if (Math.random() < 0.6){ L.pAmt = Math.round(rnd(2, 36)) * (Math.random() < 0.9 ? 1 : -1); L.pDec = Math.round(logr(8, 400)); }
-  L.atk = Math.round(logr(0.1, 8) * 10) / 10; L.hold = Math.random() < 0.25 ? Math.round(logr(1, 80)) : 0; L.dec = Math.round(logr(25, 900));
+  lnClear(L); L.atk = Math.round(logr(0.1, 8) * 10) / 10; L.hold = Math.random() < 0.25 ? Math.round(logr(1, 80)) : 0; L.dec = Math.round(logr(25, 900));
   if (Math.random() < 0.5){ L.lpCut = Math.round(logr(300, 16000)); L.lpRes = rnd(0, 0.7); L.lpEnv = rnd(0, 0.8); L.fDec = Math.round(logr(10, 600)); }
   if (Math.random() < 0.4){ L.hpCut = Math.round(logr(40, 6000)); L.hpRes = rnd(0, 0.5); }
   if (fam === 'noise' && Math.random() < 0.2){ L.burst = rint(2, 4); L.spacing = Math.round(rnd(6, 16)); }
@@ -17140,6 +17234,7 @@ function sliderSet(r, v){
    many steps as it needs to change by one. The keys stay with the slider (the tracker's cursor and the pad list don't see
    them) until Escape lets go. The change goes through sliderSet, the same call a drag makes. */
 function sliderNudge(r, dir, fine){
+  { const row0 = r._row; if (row0 && row0.def.nudge){ const o = row0.getObj(), nv = row0.def.nudge(+o[row0.key] || 0, dir, fine); if (nv !== (+o[row0.key] || 0)) row0.set(nv); return; } }   // envelope times in lines: a bar, or a line with Shift
   const mn = r.min === '' ? 0 : +r.min, mx = r.max === '' ? 100 : +r.max, st = r.step === 'any' || !+r.step ? (mx - mn) / 1000 : +r.step, row = r._row;
   const cur0 = row ? row.getObj()[row.key] : null, inc = fine ? 1 : 10; let n = inc, nv = +r.value;
   for (let k = 0; k < 1000; k++){
