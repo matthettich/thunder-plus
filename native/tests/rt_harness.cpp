@@ -21,6 +21,7 @@
 #include "fx/fxbank.h"
 #include "modfx/mods.h"
 #include "render/render.h"
+#include "render/players.h"
 #include "engine/engine.h"
 #include "engine/layer_pe.h"
 #include "engine/xeng.h"
@@ -460,6 +461,40 @@ static int run_song() {
   if (s.notesPlayed < 1000 || peak <= 0) return fail("the song render played (almost) nothing");
   if (s.beats < 100 || !R.mixer().clock().on() || R.mixer().clock().dropped()) return fail("the beat clock did not follow the song");
   std::printf("rt_harness: whole song: %d steps, %d notes played, %d mixer events, %lld frames + %.2f s until the pool emptied, peak %d voices, no allocation\n", s.steps, s.notesPlayed, s.mixEvents, (long long)(s.frames - tail), tail / 48000.0, s.peakVoices);
+  return 0;
+}
+
+// ---- LIVE ROUTE: the same song with four of its pads played by the live engines (bass, vox, acid, mach on every track), through SongRenderer::block, every block inside the guard ------------------------------------------------
+// The pads are declared outside the guard (the nodes allocate). The song's end releases the held live voices (C4), so the pool empties.
+static int run_live() {
+  using namespace thunder;
+  std::string text; { std::ifstream f(std::string(THUNDER_ROOT) + "/sounds/ELECTRO.thunder", std::ios::binary); if (!f) return fail("cannot read sounds/ELECTRO.thunder"); std::ostringstream o; o << f.rdbuf(); text = o.str(); }
+  Song song; JsonError je; if (!song.load(text.data(), text.size(), &je)) return fail("ELECTRO does not load");
+  SeqVars vars; static RenderPads pads; const int PN = 64, NS = 24000; static std::vector<float> pd((size_t)PN * NS);
+  for (int p = 0; p < PN; p++) { float* d = &pd[(size_t)p * NS]; for (int i = 0; i < NS; i++) d[i] = (float)std::sin(0.01 * (p % 7 + 1) * i) * (1.0f - (float)i / NS) * 0.3f;
+    pads.buf[p].data = d; pads.buf[p].len = NS; pads.buf[p].sr = 48000; pads.kit[p].syn = p >= 8; pads.kit[p].rel = p >= 8 ? 0.1 : 0; pads.kit[p].choke = p == 3 ? 1 : 0; }
+  std::vector<int> used; for (int i = 0; i < kNI; i++) { const int pd2 = (int)song.insts[i].pad; if (pd2 >= 0 && pd2 < PN && std::find(used.begin(), used.end(), pd2) == used.end()) used.push_back(pd2); }
+  if (used.size() < 4) return fail("ELECTRO uses fewer than four pads");
+  SeqOpts o; o.once = true; o.row = song.renderFrom;
+  const int MAXB = 512; SongRenderer R(song, vars, pads, 48000, MAXB, o);
+  const LiveKind kinds[4] = {LiveKind::Bass, LiveKind::Vox, LiveKind::Acid, LiveKind::Mach};
+  for (int k = 0; k < 4; k++) { LivePadConfig c; c.kind = kinds[k]; c.trackMask = 0; BassP bp; VoxP vp; vp.txt = "la di da ba"; AcidP ap; MachP mp; c.bass = bp; c.vox = vp; c.acid = ap; c.mach = mp;
+    pads.route[used[(size_t)k]] = PadRoute::Live; if (!R.players().live().addPad(used[(size_t)k], c)) return fail("addPad failed"); }
+  std::vector<float> L((size_t)MAXB), Rr((size_t)MAXB);
+  uint32_t rng = 11; auto rnd = [&]() { rng = rng * 1664525u + 1013904223u; return (rng >> 8) / 16777216.0; };
+  double peak = 0; bool finite = true; long tail = 0;
+  { rt_guard g;
+    while (!R.songOver() && R.frame() < 48000L * 600) { const int N = 1 + (int)(rnd() * MAXB); R.block(L.data(), Rr.data(), N);
+      for (int i = 0; i < N; i++) { const double a = L[(size_t)i], b = Rr[(size_t)i]; if (!(a == a) || !(b == b)) finite = false; peak = std::max(peak, std::max(std::fabs(a), std::fabs(b))); } }
+    while (R.voices() > 0 && tail < 48000L * 30) { R.block(L.data(), Rr.data(), MAXB); tail += MAXB; }
+  }
+  const RenderStats s = R.stats();
+  if (!R.songOver()) return fail("the live song did not end");
+  if (R.voices() != 0) return fail("the voice pool did not empty after the live song ended (held live voices)");
+  if (!finite) return fail("the live song produced NaN");
+  if (s.notesLivePlayed < 20 || peak <= 0) return fail("the live song played (almost) nothing");
+  if (s.liveFailed || s.liveQueueDropped) return fail("the live pool lost events");
+  std::printf("rt_harness: live song: %d live notes played (%u late, %u no node), %.2f s until the pool emptied, peak %d voices, no allocation\n", s.notesLivePlayed, s.liveLate, s.liveNoNode, tail / 48000.0, s.peakVoicesAll);
   return 0;
 }
 
@@ -1175,5 +1210,6 @@ int main(int argc, char** argv) {
   if (int r = run_engine_u26()) return r;
   if (int r = run_waves()) return r;
   if (int r = run_chains()) return r;
+  if (int r = run_live()) return r;
   return run_song();
 }

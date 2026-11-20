@@ -200,6 +200,7 @@ static void testVox() {
   Players pl(pads.get(), SR, 8);
   VoxP vp; vp.txt = "la di da ba ne"; vp.sylLen = 180;
   LivePadConfig c; c.kind = LiveKind::Vox; c.vox = vp; c.trackMask = 0b11; CHECK(pl.live().addPad(0, c));
+  std::printf("memory per vox node: %zu B (padBytes %zu / 10 nodes)\n", pl.live().padBytes(0) / 10, pl.live().padBytes(0));
   std::vector<LiveTraceRec> trace; trace.reserve(4096); pl.live().setTrace(&trace);
   std::vector<SeqEvent> evs;
   // track 0: the mono node (slides and a release; the syllable counter counts the notes that are not slides)

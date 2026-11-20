@@ -1,6 +1,6 @@
-**STATUS (lead reads here). B5 done: the track's ONE voice list across the sampler, SoundFont and live pools (Players): P2 (a bass / acid / mach note is the mono branch on a poly event: the sampler's / SF voices give way; polyVox takes nothing over, chokes nothing), P3 (a live voice is in T and counts for the cap, oldest by serial across the three pools; a live note has no cap loop), mono live takes live, a sampler mono note takes live, choke both ways, C4 (voices() counts live voices; ends after the off + 4096 quiet samples or 4 s; `songOver` releases held voices at the song's end). `test_live_tracklist` (new) + the golden cases takeover / choke_cross / poly_cap through Players in `test_live_decisions` (14 cases, 23 nodes) + stem test (live bass pad) in `test_live_pool`. origin/native merged (stems).
-NOTE: SoundFont: the same three lines as the sampler's (take / cap / choke call the live pool), tested only through the sampler (the SF pool needs a font); `render_sf` still passes.
-NEXT: B6: L10 (b) JS parity via seqRender, (d) rt_harness with live pads, sanitizers, mutants list, open PR B; then `eng`.**
+**STATUS (lead reads here). B6 done, PR B open (see the PR). Gates: L10 (a) seam, (b) `test_live_jsparity` (68 seqRender sequences played through Players, node output before gain / pan = the JS hashes bit for bit: bass 36, vox 8, acid 12, mach 12), (c) mutants (list below), (d) `rt_harness` live song (ELECTRO, four pads live, no allocation, pool empties), (e) Release ctest + ASan/UBSan of the live / render tests, (f) decision-log golden (`test_live_decisions`, 14 cases / 23 nodes). SoundFont pool: same rules tested with FluidR3 (test_live_tracklist testSoundFont).
+NOT DONE: pump synths and waves as live kinds (golden cases pump_lanes / waves_live are skipped), `eng` (SEV_ENG, 1b), idle skip (an optimisation), a live host's seek (PR C).
+NEXT: `eng` after the PR.**
 
 **Checklist (updated every commit):**
 - [x] 1a `native/tools/live-route-dump.mjs` + `native/tests/golden/live_route_log.json` / `live_route_golden.inc` (gate L10(f); 16 cases; `--check` passes). Runs `core/seq-core.js` (= `core-processor.js` + the page's declarations; core-processor.js alone lacks `NT`).
@@ -12,7 +12,7 @@ NEXT: B6: L10 (b) JS parity via seqRender, (d) rt_harness with live pads, saniti
   - [x] B3 vox mono + polyVox (voxG), idle-skip compare (test_live_reset: neutral for all four, no skip implemented yet)
   - [x] B4 off/cut/rel/mod/wob/stp/stopAll/bends/tempo (P4)/D4 (test_live_decisions; stop_all's vox node and takeover / choke / poly_cap cases wait for B5)
   - [x] B5 one list per track (P2, P3), choke, C4 (stats L8 were done in B2-B4); test_live_tracklist; mutants M_P2_poly_copy, M_polyvox_takes, M_cap_ignores_live, M_cap_order, M_choke_live, M_samplermono_takes_live, M_mono_live_keeps_others, M_sampler_no_live_take, M_serial_not_stamped, M_poly_vox_stale_choke, M_voices_no_live all killed by test_live_tracklist; M_no_songover killed by test_live_pool (testSongOver)
-  - [ ] B6 gates L10 (b)-(f), mutants, rt_harness, sanitizers; open PR B; then eng
+  - [x] B6 gates L10 (b)-(f), mutants, rt_harness, sanitizers; PR B opened; `eng` after
 - Choices for the lead (so far):
   - SEV_TEMPO still counts in `eventsIgnored` (Players returns false for it) while it is forwarded to the live bass nodes.
   - The rate lane follows the core's Auto semantics: `hold` at note-on (the page's cancelAndHold); mod bends do not hold.
@@ -22,6 +22,9 @@ NEXT: B6: L10 (b) JS parity via seqRender, (d) rt_harness with live pads, saniti
   - The dump tool runs `core/seq-core.js`.
   - The seam test (L10 a) now gives each live pad its own tracks: pads that share a track take each other over (mono live takes live, as the JS does), so the independent-shell reference no longer holds there.
   - C4's "ended" flag only feeds `voices()`; the pick logic (free / sameCol) stays the JS's (a live voice never ends there).
+  - L10 (b) plays 68 of the 122 seqRender sequences: the rest need what the sequencer cannot say (a bpm lane event, a rate event with no note, a ramp on a non-legato note, `same` without a slide) or are the D4 expected difference (a note-off in the sample of a note-on: the pool takes the off back). A legato note is a slide with a constant rate in these tests. `LivePool::setTap` / `bookEnd` are test hooks (the node's output before gain / pan; seqRender's last control block ends at N).
+  - Mutants (each killed): test_live_tracklist: M_P2_poly_copy, M_polyvox_takes, M_cap_ignores_live, M_cap_order, M_choke_live, M_samplermono_takes_live, M_mono_live_keeps_others, M_sampler_no_live_take, M_serial_not_stamped, M_poly_vox_stale_choke, M_voices_no_live, and through the SoundFont pool S_sf_no_live_take, S_sf_poly_copy, S_sf_cap_no_sf; test_live_pool: M_no_songover; test_live_jsparity: J_leg_lost (25 sequences), J_start_floor (the start rule); test_live_decisions: the lists of every gate / rate / syl / wob rule of the golden (killed by the hand mutations of B2-B4 in the earlier commits).
+  - Memory per node (padBytes / nodes): bass 57 KB, acid 38 KB, mach 38 KB, vox 47 KB (5 nodes a track = 235 KB); 33 tracks: bass 1.9 MB, acid / mach 1.3 MB, vox 7.8 MB.
   - The golden cases takeover / choke_cross / poly_cap compare the LIVE nodes' lists; the sampler side of them (T of the sampler pool) is pinned by test_live_tracklist, not by the golden.
 
 

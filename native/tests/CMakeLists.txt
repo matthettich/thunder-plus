@@ -1016,6 +1016,7 @@ add_test(NAME render_sf_oom COMMAND test_render_sf_oom)
 add_executable(test_live_tracklist test_live_tracklist.cpp)
 target_link_libraries(test_live_tracklist PRIVATE thunder_core)
 target_include_directories(test_live_tracklist PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../core/src ${CMAKE_CURRENT_SOURCE_DIR})
+target_compile_definitions(test_live_tracklist PRIVATE THUNDER_ROOT="${CMAKE_CURRENT_SOURCE_DIR}/../..")
 add_test(NAME live_tracklist COMMAND test_live_tracklist)
 
 # LIVE ROUTE L10 (b): the pool's node output against the JS seqRender's committed hashes (needs the reference directory of engine-u26-dump.mjs, as live_u26)

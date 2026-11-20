@@ -6,6 +6,8 @@
 //   C4: a live voice counts in voices() from its note-on, ends after its gate is off and its output is quiet (or 4 s), and nothing counts it before
 //   test_live_tracklist
 #include <cmath>
+#include <fstream>
+#include <iterator>
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
@@ -16,7 +18,12 @@
 #include "engine/live_pool.h"
 #include "render/players.h"
 #include "render/render.h"
+#include "sf/sf.h"
 #include "song/song.h"
+
+#ifndef THUNDER_ROOT
+#error THUNDER_ROOT
+#endif
 
 using namespace thunder;
 static int g_fail = 0;
@@ -24,9 +31,10 @@ static int g_fail = 0;
 #define CHECKF(c, ...) do { if (!(c)) { std::printf("FAIL %s:%d: %s: ", __FILE__, __LINE__, #c); std::printf(__VA_ARGS__); std::printf("\n"); g_fail++; } } while (0)
 static const double SR = 48000;
 
-enum { P_BASS = 0, P_SMP = 1, P_ACID = 2, P_VOX = 3, P_SMP_CK = 4, P_BASS_CK = 5, P_VOX_CK = 6 };
+enum { P_SF = 7, P_BASS = 0, P_SMP = 1, P_ACID = 2, P_VOX = 3, P_SMP_CK = 4, P_BASS_CK = 5, P_VOX_CK = 6 };
 
 struct Fx {
+  std::vector<uint8_t> fontBytes; sf::Font font; sf::PresetPcm pcm;   // the SoundFont pad (pad 7): FluidR3's program 19, key 60 prepared (as test_render_sf's seam)
   Song song; SeqVars vars; SeqOpts so; std::unique_ptr<Seq> seq; std::unique_ptr<RenderPads> pads; std::unique_ptr<Players> pl; std::vector<float> dc;
   Fx() {
     JsonError je; const std::string sj = "{\"v\":6,\"bpm\":120,\"lpb\":4,\"ntr\":8,\"song\":[[0]],\"chains\":[[[0,0]]],\"plen\":[4],\"phrases\":[[[-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1],[-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1],[-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1],[-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1]]]}";
@@ -36,6 +44,10 @@ struct Fx {
     for (int p : {P_SMP, P_SMP_CK}) { pads->buf[p].data = dc.data(); pads->buf[p].len = (int)dc.size(); pads->buf[p].sr = SR; }
     pads->kit[P_SMP_CK].choke = 1; pads->kit[P_BASS_CK].choke = 1; pads->kit[P_VOX_CK].choke = 1;
     for (int p : {P_BASS, P_ACID, P_VOX, P_BASS_CK, P_VOX_CK}) pads->route[p] = PadRoute::Live;
+    { std::ifstream ff(std::string(THUNDER_ROOT) + "/sounds/FluidR3Mono_GM.sf3", std::ios::binary); fontBytes.assign((std::istreambuf_iterator<char>(ff)), std::istreambuf_iterator<char>());
+      CHECK(sf::parse(fontBytes.data(), fontBytes.size(), font) == sf::kParseOk);
+      const sf::Preset* pr = sf::sf_preset(font, 0, 19); uint8_t flags[128] = {}; flags[60] = 1; sf::DecodeOpts dop; CHECK(sf::prepare_preset(font, pr, dop, pcm, flags) == sf::kPrepOk);
+      static sf::PadParams P; P.bank = 0; P.prog = 19; pads->route[P_SF] = PadRoute::SoundFont; pads->sf[P_SF].font = &font; pads->sf[P_SF].pr = pr; pads->sf[P_SF].pcm = &pcm; pads->sf[P_SF].P = P; }
     pl.reset(new Players(pads.get(), SR, 16));
     BassP bp; AcidP ap; VoxP vp; vp.txt = "la di da ba"; vp.sylLen = 180;
     LivePadConfig c; c.kind = LiveKind::Bass; c.bass = bp; c.trackMask = 0b1111; CHECK(pl->live().addPad(P_BASS, c)); CHECK(pl->live().addPad(P_BASS_CK, c));
@@ -47,7 +59,8 @@ struct Fx {
     SeqEvent e; e.type = SEV_NOTE; e.t = t; e.track = track; e.pad = pad; e.rate = 1; e.gain = 0.8; e.pan = 128; e.poly = poly; e.col = col;
     CHECK(pl->dispatch(e, *seq, song));
   }
-  int smp(int track, double t) { return pl->pool().liveOnTrack(track, t); }   // the sampler's voices in T at t (a voice killed at or before t is gone)
+  int smp(int track, double t) { return pl->pool().liveOnTrack(track, t); }
+  int sfv(int track, double t) { return pl->sfPool().liveOnTrack(track, t); }   // the SoundFont pool's voices in T at t   // the sampler's voices in T at t (a voice killed at or before t is gone)
   LiveDebugNode node(int track, int pad, int j = 0) { LiveDebugNode d; if (!pl->live().debugNode(track, pad, j, &d)) { std::printf("no node %d %d %d\n", track, pad, j); g_fail++; } return d; }
   bool inT(int track, int pad, int j = 0) { return node(track, pad, j).inT; }
   bool let(int track, int pad, double t, int j = 0) { const LiveDebugNode d = node(track, pad, j); return d.curStop && std::fabs(d.stopAt - t) < 1e-12; }   // its gate went low at t
@@ -144,8 +157,20 @@ static void testEnding() {   // C4
   CHECKF(g.pl->voices() == 0, "songOver did not release the held voice (%d)", g.pl->voices());
 }
 
+static void testSoundFont() {   // the same rules through the SoundFont pool (Players::note's SF branch: cap, live take, SF take, choke)
+  { Fx f; f.play(0.10, 0, P_SF, true); f.play(0.11, 0, P_SF, true); CHECKF(f.sfv(0, 0.2) == 2, "sf chord %d", f.sfv(0, 0.2));
+    f.play(0.30, 0, P_BASS, true); CHECKF(f.sfv(0, 0.30) == 0, "P2 through the SoundFont pool: the chord survives a bass note (%d)", f.sfv(0, 0.30)); }
+  { Fx f; f.play(0.10, 0, P_ACID, false); f.play(0.20, 0, P_SF, true); CHECKF(f.inT(0, P_ACID) && !f.let(0, P_ACID, 0.20), "a poly SoundFont note took a live voice over");
+    f.play(0.30, 0, P_SF, false); CHECKF(f.let(0, P_ACID, 0.30) && !f.inT(0, P_ACID), "a mono SoundFont note did not take the live voice over"); }
+  { Fx f; f.play(0.10, 0, P_VOX, true, 0); int vj = 0; for (int j = 1; j <= 4; j++) if (f.inT(0, P_VOX, j)) vj = j; CHECK(vj > 0);
+    for (int k = 0; k < 3; k++) f.play(0.20 + 0.01 * k, 0, P_SF, true); CHECK(f.sfv(0, 0.3) == 3);
+    f.play(0.40, 0, P_SF, true); CHECKF(f.let(0, P_VOX, 0.40, vj) && f.sfv(0, 0.40) == 4, "P3 through the SoundFont pool: the oldest voice (the live one) did not give way (sf %d)", f.sfv(0, 0.40)); }
+  { Fx f; f.pads->kit[P_SF].choke = 1; f.play(0.10, 2, P_BASS_CK, false); f.play(0.30, 1, P_SF, true); CHECKF(f.let(2, P_BASS_CK, 0.30), "a SoundFont note did not choke the live voice of its group");
+    Fx g; g.pads->kit[P_SF].choke = 1; g.play(0.10, 1, P_SF, true); CHECK(g.sfv(1, 0.2) == 1); g.play(0.30, 2, P_BASS_CK, false); CHECKF(g.sfv(1, 0.30) == 0, "a live note did not choke the SoundFont voice of its group"); }
+}
+
 int main() {
-  testP2(); testMonoTakesLive(); testPolyCap(); testChoke(); testEnding();
+  testP2(); testMonoTakesLive(); testPolyCap(); testChoke(); testEnding(); testSoundFont();
   if (g_fail) { std::printf("live_tracklist: %d FAILED\n", g_fail); return 1; }
   std::printf("live_tracklist: all checks passed\n"); return 0;
 }
