@@ -1,4 +1,4 @@
-IN THE MIDDLE OF: item 3e (writing F5-F7 notes), then the full Release ctest, ASan/UBSan runs, PR. Items 1, 2, 3a-3d done.
+IN THE MIDDLE OF: nothing: all items done, gates pass locally; PR open, waiting for CI (the sanitizers job takes ~50 min). Never merge.
 
 # FOLLOWUPS-19NOV NOTES: small follow-ups PR (branch n1/followups-19nov, into native)
 
@@ -13,4 +13,5 @@ IN THE MIDDLE OF: item 3e (writing F5-F7 notes), then the full Release ctest, AS
   - F5 (a sweep guard is invisible in Release, UB only): nothing to fix in code; the ASan+UBSan CI job and local sanitizer runs run `nan_sweep_*` and catch it (verifier: 3 of 3 seeds under the sanitizer). Taking it further would mean a Release-visible oracle for signed overflow: not possible.
   - F6 (Track In beyond the host's channels: silence here, NaN in the JS): a documented, decided deviation (U31-NOTES); changing it would change audio behaviour, which this PR must not.
   - F7 (not run by the verifier): (a) `Resample::lent_` as a plain bool under TSan: `test_chains_threads` has no resample module in its patch, so it would not exercise the variable; it needs a resample module plus a take / release driver in the test (about a day of care, no product change). (b) pump mutants (pump bad output, V M5) in `mutate-u31.sh`: they need the pump library, which the verifier's Release build lacked; they are in the script and run in a full-library build. (c) waves JS non-finite compare: needs the Node reference harness (scratch tools of the verifier, not committed).
-- [ ] 4. full Release ctest, sanitizer runs, PR
+- [x] 4. full Release ctest: 176 tests, 175 passed, 0 failed, 1 skipped (pumpsynth_refused, by design). ASan+UBSan (RelWithDebInfo, `-DTHUNDER_SANITIZE=ON`): `hostile`, `chains_threads`, `nan_sweep_chains` (with the 4 new types), `nan_sweep_waves`, `seq_chop` (with testPartClamp), `render_chop` (with the reversed test): all pass, no report. TSan (separate build, DSP + pump on): `chains_threads` 10 x 3 s and 3 x 30 s clean. Not run here: `rt_harness` and `render_api_hostile` under the sanitizers (not touched by this PR).
+- [ ] 5. CI green on every job
