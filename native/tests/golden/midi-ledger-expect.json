@@ -207,6 +207,17 @@
    "count2": 10
   },
   {
+   "case": "tempo-clock",
+   "B": "B12",
+   "op": "realign",
+   "p": 0,
+   "from": 2575,
+   "until": 8000,
+   "count": 90,
+   "count2": 92,
+   "why": "clock realigned after TPO: the web integrates the new tempo over the interval that was timed at the old one, so every tick after the TPO is 1.5 ticks (about 42 ms at 120 bpm) behind the notes for good; native integrates each interval with the tempo in force when its step started, so tick k is on beat k/24 through any number of TPOs"
+  },
+  {
    "case": "tempo-live",
    "B": "B2",
    "op": "zone",

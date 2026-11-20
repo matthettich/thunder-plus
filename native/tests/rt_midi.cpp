@@ -133,7 +133,7 @@ int main(int argc, char** argv) {
       if (b == 2600) s.start(0, now);
       if (b == 2700) { s.setPort(0, true, true, 5, 0); s.portToggled(1, true, now); s.cableChanged(2, true, 0, now); }
       if (b % 97 == 0) { const int k = s.liveNoteOn(0, 40 + b % 20, 100, 16, now); if (k >= 0) { keys++; s.liveNoteOff(k, now + 0.05); } }
-      if (thunder_midi_process(h, now, now + 0.1, 120, 1) < 0) return fail("process");
+      if (thunder_midi_process(h, now, 128.0 / 48000, now + 0.1, 120, 1) < 0) return fail("process");
     }
     msgs += s.drain(out.data(), (int64_t)out.size()); const int64_t n = thunder_midi_drain(h, cout.data(), (int64_t)cout.size()); if (n < 0) return fail("drain"); msgs += n;
     now += 128.0 / 48000;

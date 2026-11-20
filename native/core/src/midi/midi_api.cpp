@@ -1,5 +1,6 @@
 // U35: the thunder_midi_* C API (include/thunder/midi.h). A handle = one MidiSched + a command ring (control -> audio) + a retire ring (audio -> control: the
 // songs the audio thread no longer uses) + the published stats. The audio thread only pops / pushes the rings and calls MidiSched: no allocation, no lock.
+#include <cassert>
 #include "thunder/midi.h"
 
 #include <atomic>
@@ -17,7 +18,7 @@ using namespace thunder;
 namespace {
 enum Op : uint8_t { OP_SONG = 1, OP_PORT, OP_LEAD, OP_FXLAT, OP_AUDIBLE, OP_START, OP_STOP, OP_RELEASE, OP_PANIC, OP_PCLOCK, OP_CABLE, OP_KEYON, OP_KEYOFF, OP_RAW };
 struct Cmd { uint8_t op; uint8_t raw[3]; int32_t a, b, c, d; double x; uint64_t m; void* p; };
-constexpr int kStatN = 24;
+constexpr int kStatN = 28;
 }  // namespace
 
 struct thunder_midi {
@@ -25,11 +26,22 @@ struct thunder_midi {
   Spsc<Cmd, kMidiCmdCap> cmds;
   Spsc<Song*, 8> retire;
   std::atomic<uint64_t> pub[kStatN];
+  std::atomic<int> ctlIn{0};    // debug builds: how many CONTROL calls are inside right now (the control calls are single-producer: > 1 is a caller bug)
   Song* cur = nullptr;          // audio thread's song (freed by the control thread once retired / at free)
   int outstanding = 0;          // songs posted and not yet freed (control thread)
   int keySlot[128];             // audio thread: key -> sched live handle
   explicit thunder_midi(double sr) : sched(sr) { for (auto& a : pub) a.store(0, std::memory_order_relaxed); for (int& k : keySlot) k = -1; }
 };
+
+#ifndef NDEBUG
+struct CtlGuard {   // the control calls post on a SINGLE-PRODUCER ring (and set_song / the song retire count are plain state): two threads inside them at once is a bug in the caller
+  std::atomic<int>* a; explicit CtlGuard(thunder_midi* h) : a(h ? &h->ctlIn : nullptr) { if (a) { const int was = a->fetch_add(1); assert(was == 0 && "thunder_midi: two threads in the CONTROL calls (single producer)"); (void)was; } }
+  ~CtlGuard() { if (a) a->fetch_sub(1); }
+};
+#define CTL_GUARD(h) CtlGuard ctlGuard_(h)
+#else
+#define CTL_GUARD(h) ((void)0)
+#endif
 
 namespace {
 void setErr(char* err, size_t cap, const char* m) { if (err && cap) std::snprintf(err, cap, "%s", m); }
@@ -40,7 +52,7 @@ bool fin(double v) { return std::isfinite(v); }
 void publish(thunder_midi* h) {
   const MidiStats& s = h->sched.stats();
   const uint64_t v[kStatN] = {s.sent, s.ringFull, s.pendFull, s.heldFull, s.echoFull, s.glideFull, s.rampKeyFull, s.lateTicks, s.lateNotes, s.collisions, s.sameTrackRetrig, s.offsSuppressed,
-                              s.onsSilent, s.ticks, s.starts, s.stops, s.badEvents, s.badArgs, s.cmdFull, s.maxPend, 0, 0, 0, 0};
+                              s.onsSilent, s.ticks, s.starts, s.stops, s.badEvents, s.badArgs, s.cmdFull, s.maxPend, s.dropTicks, s.dropCtl, s.dropNoteOn, s.dropStart, s.dropOff, s.dropClear, s.futFull, s.mayHang};
   for (int i = 0; i < kStatN; i++) h->pub[i].store(v[i], std::memory_order_relaxed);
 }
 
@@ -81,7 +93,7 @@ void thunder_midi_free(thunder_midi* h) {
   delete h;
 }
 
-int thunder_midi_set_song(thunder_midi* h, const uint8_t* json, size_t bytes) {
+int thunder_midi_set_song(thunder_midi* h, const uint8_t* json, size_t bytes) { CTL_GUARD(h);
   if (!h || !json || bytes == 0 || bytes > THUNDER_MIDI_MAX_SONG_BYTES) return THUNDER_MIDI_E_ARG;
   reap(h);
   if (h->outstanding >= 6) return THUNDER_MIDI_E_BUSY;
@@ -96,31 +108,31 @@ int thunder_midi_set_song(thunder_midi* h, const uint8_t* json, size_t bytes) {
   return THUNDER_MIDI_OK;
 }
 
-int thunder_midi_set_port(thunder_midi* h, int port, int connected, int clock_on, double gear_ms, int cable) {
+int thunder_midi_set_port(thunder_midi* h, int port, int connected, int clock_on, double gear_ms, int cable) { CTL_GUARD(h);
   if (!h || port < 0 || port >= THUNDER_MIDI_PORTS || !fin(gear_ms) || cable < 0 || cable > 250) return THUNDER_MIDI_E_ARG;
   Cmd c; std::memset(&c, 0, sizeof c); c.op = OP_PORT; c.a = port; c.b = connected != 0; c.c = clock_on != 0; c.d = cable; c.x = gear_ms; return post(h, c);
 }
-int thunder_midi_set_lead(thunder_midi* h, double s) { if (!h || !fin(s) || s < 0.005 || s > 0.5) return THUNDER_MIDI_E_ARG; Cmd c; std::memset(&c, 0, sizeof c); c.op = OP_LEAD; c.x = s; return post(h, c); }
-int thunder_midi_set_fx_latency(thunder_midi* h, double s) { if (!h || !fin(s) || s < 0 || s > 2) return THUNDER_MIDI_E_ARG; Cmd c; std::memset(&c, 0, sizeof c); c.op = OP_FXLAT; c.x = s; return post(h, c); }
-int thunder_midi_set_audible(thunder_midi* h, uint64_t mask) { if (!h) return THUNDER_MIDI_E_ARG; Cmd c; std::memset(&c, 0, sizeof c); c.op = OP_AUDIBLE; c.m = mask; return post(h, c); }
-int thunder_midi_start(thunder_midi* h, int spp) { if (!h || spp < 0 || spp > 16383) return THUNDER_MIDI_E_ARG; Cmd c; std::memset(&c, 0, sizeof c); c.op = OP_START; c.a = spp; return post(h, c); }
-int thunder_midi_stop(thunder_midi* h) { if (!h) return THUNDER_MIDI_E_ARG; Cmd c; std::memset(&c, 0, sizeof c); c.op = OP_STOP; return post(h, c); }
-int thunder_midi_release(thunder_midi* h, int playing) { if (!h) return THUNDER_MIDI_E_ARG; Cmd c; std::memset(&c, 0, sizeof c); c.op = OP_RELEASE; c.a = playing != 0; return post(h, c); }
-int thunder_midi_panic(thunder_midi* h) { if (!h) return THUNDER_MIDI_E_ARG; Cmd c; std::memset(&c, 0, sizeof c); c.op = OP_PANIC; return post(h, c); }
-int thunder_midi_port_clock(thunder_midi* h, int port, int on) {
+int thunder_midi_set_lead(thunder_midi* h, double s) { CTL_GUARD(h); if (!h || !fin(s) || s < 0.005 || s > 0.5) return THUNDER_MIDI_E_ARG; Cmd c; std::memset(&c, 0, sizeof c); c.op = OP_LEAD; c.x = s; return post(h, c); }
+int thunder_midi_set_fx_latency(thunder_midi* h, double s) { CTL_GUARD(h); if (!h || !fin(s) || s < 0 || s > 2) return THUNDER_MIDI_E_ARG; Cmd c; std::memset(&c, 0, sizeof c); c.op = OP_FXLAT; c.x = s; return post(h, c); }
+int thunder_midi_set_audible(thunder_midi* h, uint64_t mask) { CTL_GUARD(h); if (!h) return THUNDER_MIDI_E_ARG; Cmd c; std::memset(&c, 0, sizeof c); c.op = OP_AUDIBLE; c.m = mask; return post(h, c); }
+int thunder_midi_start(thunder_midi* h, int spp) { CTL_GUARD(h); if (!h || spp < 0 || spp > 16383) return THUNDER_MIDI_E_ARG; Cmd c; std::memset(&c, 0, sizeof c); c.op = OP_START; c.a = spp; return post(h, c); }
+int thunder_midi_stop(thunder_midi* h) { CTL_GUARD(h); if (!h) return THUNDER_MIDI_E_ARG; Cmd c; std::memset(&c, 0, sizeof c); c.op = OP_STOP; return post(h, c); }
+int thunder_midi_release(thunder_midi* h, int playing) { CTL_GUARD(h); if (!h) return THUNDER_MIDI_E_ARG; Cmd c; std::memset(&c, 0, sizeof c); c.op = OP_RELEASE; c.a = playing != 0; return post(h, c); }
+int thunder_midi_panic(thunder_midi* h) { CTL_GUARD(h); if (!h) return THUNDER_MIDI_E_ARG; Cmd c; std::memset(&c, 0, sizeof c); c.op = OP_PANIC; return post(h, c); }
+int thunder_midi_port_clock(thunder_midi* h, int port, int on) { CTL_GUARD(h);
   if (!h || port < 0 || port >= THUNDER_MIDI_PORTS) return THUNDER_MIDI_E_ARG;
   Cmd c; std::memset(&c, 0, sizeof c); c.op = OP_PCLOCK; c.a = port; c.b = on != 0; return post(h, c);
 }
-int thunder_midi_set_cable(thunder_midi* h, int port, int connected, int cable) {
+int thunder_midi_set_cable(thunder_midi* h, int port, int connected, int cable) { CTL_GUARD(h);
   if (!h || port < 0 || port >= THUNDER_MIDI_PORTS || cable < 0 || cable > 250) return THUNDER_MIDI_E_ARG;
   Cmd c; std::memset(&c, 0, sizeof c); c.op = OP_CABLE; c.a = port; c.b = connected != 0; c.c = cable; return post(h, c);
 }
-int thunder_midi_key_on(thunder_midi* h, int key, int inst, int note, int vol) {
+int thunder_midi_key_on(thunder_midi* h, int key, int inst, int note, int vol) { CTL_GUARD(h);
   if (!h || key < 0 || key > 127 || inst < 0 || inst >= kNI || note < -200 || note > 300 || vol < -1 || vol > 255) return THUNDER_MIDI_E_ARG;
   Cmd c; std::memset(&c, 0, sizeof c); c.op = OP_KEYON; c.a = key; c.b = inst; c.c = note; c.d = vol; return post(h, c);
 }
-int thunder_midi_key_off(thunder_midi* h, int key) { if (!h || key < 0 || key > 127) return THUNDER_MIDI_E_ARG; Cmd c; std::memset(&c, 0, sizeof c); c.op = OP_KEYOFF; c.a = key; return post(h, c); }
-int thunder_midi_raw(thunder_midi* h, int port, const uint8_t* bytes, int len, double extra_seconds) {
+int thunder_midi_key_off(thunder_midi* h, int key) { CTL_GUARD(h); if (!h || key < 0 || key > 127) return THUNDER_MIDI_E_ARG; Cmd c; std::memset(&c, 0, sizeof c); c.op = OP_KEYOFF; c.a = key; return post(h, c); }
+int thunder_midi_raw(thunder_midi* h, int port, const uint8_t* bytes, int len, double extra_seconds) { CTL_GUARD(h);
   if (!h || !bytes || port < 0 || port >= THUNDER_MIDI_PORTS || len < 1 || len > 3 || !fin(extra_seconds) || extra_seconds < 0 || extra_seconds > 10) return THUNDER_MIDI_E_ARG;
   const int st = bytes[0];
   if (st < 0x80 || st == 0xF0 || st == 0xF7) return THUNDER_MIDI_E_ARG;
@@ -131,10 +143,11 @@ int thunder_midi_raw(thunder_midi* h, int port, const uint8_t* bytes, int len, d
   return post(h, c);
 }
 
-int thunder_midi_process(thunder_midi* h, double now_sec, double seq_time, double bpm, int seq_alive) {
-  if (!h || !fin(now_sec) || now_sec < 0 || !fin(seq_time) || !(bpm > 0) || !fin(bpm)) return THUNDER_MIDI_E_ARG;
+int thunder_midi_process(thunder_midi* h, double now_sec, double block_sec, double seq_time, double bpm, int seq_alive) {
+  if (!h || !fin(now_sec) || now_sec < 0 || !fin(block_sec) || block_sec < 0 || block_sec > 1 || !fin(seq_time) || !(bpm > 0) || !fin(bpm)) return THUNDER_MIDI_E_ARG;
   int n = 0; Cmd c;
   while (n < kMidiCmdCap && h->cmds.pop(c)) { apply(h, c, now_sec); n++; }
+  h->sched.setBlock(block_sec);
   h->sched.book(now_sec, seq_time, bpm, seq_alive != 0);
   publish(h);
   return n;
@@ -149,7 +162,7 @@ int64_t thunder_midi_drain(thunder_midi* h, thunder_midi_msg* out, int64_t cap) 
 int thunder_midi_stats_get(const thunder_midi* h, thunder_midi_stats* out) {
   if (!h || !out || out->size < 16) return THUNDER_MIDI_E_ARG;
   thunder_midi_stats t; std::memset(&t, 0, sizeof t); t.size = out->size;
-  uint64_t* f = &t.sent; for (int i = 0; i < 20; i++) f[i] = h->pub[i].load(std::memory_order_relaxed);
+  uint64_t* f = &t.sent; for (int i = 0; i < 28; i++) f[i] = h->pub[i].load(std::memory_order_relaxed);
   const size_t n = out->size < sizeof t ? out->size : sizeof t; std::memcpy(out, &t, n);
   return THUNDER_MIDI_OK;
 }

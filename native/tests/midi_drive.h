@@ -59,7 +59,9 @@ inline bool loadCase(const std::string& root, const std::string& name, Case& C, 
 struct Drive {
   Case C; Song song; SeqVars vars; MidiSched* sched = nullptr;
   std::vector<Out> kept;                 // what the shell delivered (CLEAR applied), in stream order
+  std::vector<double> grid;              // the time of every sequencer step the scheduler was given (one beat event each): row j is at beat j / lpb
   int64_t cleared = 0;
+  MidiStats stats;                       // the scheduler's counters at the end of the run
   double sr = 48000;
   int cableOf(int p) const { if (C.ports[p].empty()) return -1 - p; for (int q = 0; q <= p; q++) if (C.ports[q] == C.ports[p]) return q; return p; }
   void shell(const MidiMsg* m, int64_t n) {
@@ -104,21 +106,22 @@ inline int sppFor(const Song& song, const SeqVars& vars, int row) {
 // Runs the case to its end (the web harness's stepMs loop). `pre` is called once with the scheduler before the run (hostile tests).
 template <class F>
 inline bool run(Drive& D, const Case& C, F&& pre) {
-  D.C = C; D.kept.clear(); D.cleared = 0;
+  D.C = C; D.kept.clear(); D.cleared = 0; D.grid.clear();
   JsonError je; if (!D.song.load(C.songText.data(), C.songText.size(), &je)) return false;
   MidiSched sched(D.sr); D.sched = &sched; configure(sched, C, D.song); pre(sched);
   SeqOpts o; o.live = true; o.row = C.row; if (C.hasLoop) { o.hasLoop = true; o.loopY0 = C.y0; o.loopY1 = C.y1; }
   Seq* seq = nullptr; bool on = false, started = false; size_t ai = 0; double ahead = 0;
   std::vector<SeqEvent> evs(4096); SeqStep st;
   int keyH[128]; for (int& h : keyH) h = -1;
-  int pumpDue = 0, frameDue = 17;      // ms (the page's timers: the frame timer was made first)
+  int pumpDue = 25, frameDue = 17;      // ms (the page's timers: the frame timer was made first)
   const auto pump = [&](double now) {
-    if (!on) return;
+    if (!on) { sched.book(now, now, 120, false); return; }   // stopped: the outbox is still released (live keys, panic)
     const double outLat = std::min(0.6, C.outLat), want = std::max(0.25, outLat + 0.1);
     ahead = want <= (ahead ? ahead : 0.25) ? want : std::min(want, (ahead ? ahead : 0.25) + 0.75 * 0.025);
     int n = 0;
     while (seq->alive() && seq->time() < now + ahead && n++ < 64) {
       const int k = seq->step(evs.data(), (int)evs.size(), &st);
+      for (int i = 0; i < k; i++) if (evs[i].type == SEV_BEAT) D.grid.push_back(evs[i].t);
       sched.onStep(evs.data(), k, st, *seq, now);
     }
     sched.book(now, seq->time(), seq->bpm(), seq->alive());
@@ -144,14 +147,14 @@ inline bool run(Drive& D, const Case& C, F&& pre) {
     }
     // the timers due this ms, by due time then creation order: the frame timer (17 ms) first when both are due
     for (;;) {
-      const bool f = ms >= frameDue, p = on && ms >= pumpDue;
+      const bool f = ms >= frameDue, p = ms >= pumpDue;
       if (!f && !p) break;
       if (f && (!p || frameDue <= pumpDue)) { frameDue += 17; if (on && !seq->alive() && now > seq->time() + 0.3) { on = false; sched.stop(now); } }
       else { pumpDue += 25; pump(now); }
     }
     D.drainAll();
   }
-  D.sched = nullptr; delete seq; return true;
+  D.stats = sched.stats(); D.sched = nullptr; delete seq; return true;
 }
 inline bool run(Drive& D, const Case& C) { return run(D, C, [](MidiSched&) {}); }
 
@@ -159,9 +162,9 @@ inline bool run(Drive& D, const Case& C) { return run(D, C, [](MidiSched&) {}); 
 // check; actions fire at the first block at or after their ms. Used by the cadence-independence and stall tests. `stallAt` / `stallFrames`: no block runs for that
 // long from block time stallAt (ms): a host that stalled, then resumes at the later time.
 inline bool runBlocks(Drive& D, const Case& C, int block, int stallAtMs = -1, int stallMs = 0) {
-  D.C = C; D.kept.clear(); D.cleared = 0;
+  D.C = C; D.kept.clear(); D.cleared = 0; D.grid.clear();
   JsonError je; if (!D.song.load(C.songText.data(), C.songText.size(), &je)) return false;
-  MidiSched sched(D.sr); D.sched = &sched; configure(sched, C, D.song);
+  MidiSched sched(D.sr); D.sched = &sched; configure(sched, C, D.song); sched.setBlock((double)block / D.sr);
   SeqOpts o; o.live = true; o.row = C.row; if (C.hasLoop) { o.hasLoop = true; o.loopY0 = C.y0; o.loopY1 = C.y1; }
   Seq* seq = nullptr; SeqRunner runner; bool on = false, started = false; size_t ai = 0;
   std::vector<SeqEvent> evs(12288); SeqStep st; int keyH[128]; for (int& h : keyH) h = -1;
@@ -186,13 +189,66 @@ inline bool runBlocks(Drive& D, const Case& C, int block, int stallAtMs = -1, in
       else if (a.op == "panic") sched.panic(now);
     }
     if (on) {
-      runner.pump(now, 0.25, evs.data(), (int)evs.size(), &st, [&](const SeqEvent* e, int n, const SeqStep& step) { sched.onStep(e, n, step, *seq, now); });
+      runner.pump(now, 0.25, evs.data(), (int)evs.size(), &st, [&](const SeqEvent* e, int n, const SeqStep& step) { for (int i = 0; i < n; i++) if (e[i].type == SEV_BEAT) D.grid.push_back(e[i].t); sched.onStep(e, n, step, *seq, now); });
       sched.book(now, seq->time(), seq->bpm(), seq->alive());
       if (!seq->alive() && now > seq->time() + 0.3) { on = false; runner.stop(); sched.stop(now); }
     } else sched.book(now, now, 120, false);
     D.drainAll();
   }
-  D.sched = nullptr; delete seq; return true;
+  D.stats = sched.stats(); D.sched = nullptr; delete seq; return true;
+}
+
+// F6: the same case on the live core's cadence with SAMPLE-ACCURATE control: a block is cut where a control action (or the Play) falls, so the actions happen at the same
+// frame whatever `block` is, and a tempo change (the page's setBpm) is applied by the step loop at the first step at or after its time, as the host does. What MidiSched
+// sends must then be IDENTICAL for every block size (test_midi_ledger's four-block-size check). Actions fire at frame = ms * sr / 1000.
+inline bool runExact(Drive& D, const Case& C, int block) {
+  D.C = C; D.kept.clear(); D.cleared = 0; D.grid.clear();
+  JsonError je; if (!D.song.load(C.songText.data(), C.songText.size(), &je)) return false;
+  MidiSched sched(D.sr); D.sched = &sched; configure(sched, C, D.song);
+  SeqOpts o; o.live = true; o.row = C.row; if (C.hasLoop) { o.hasLoop = true; o.loopY0 = C.y0; o.loopY1 = C.y1; }
+  Seq* seq = nullptr; SeqRunner runner; bool on = false, started = false; size_t ai = 0;
+  std::vector<SeqEvent> evs(12288); SeqStep st; int keyH[128]; for (int& h : keyH) h = -1;
+  struct BpmAt { double t; double v; }; std::vector<BpmAt> bpms;
+  const int64_t endF = (int64_t)C.endMs * (int64_t)D.sr / 1000, playF = (int64_t)C.playAt * (int64_t)D.sr / 1000;
+  const auto actF = [&](size_t i) { return (int64_t)C.actions[i].at * (int64_t)D.sr / 1000; };
+  size_t bi = 0; for (const Action& a : C.actions) if (a.op == "bpm") bpms.push_back({a.at / 1000.0, a.dv});   // tempo changes are by STEP TIME (the first step at or after it), whatever the block
+  int64_t endStop = -1;   // the song-end check, to the frame: known once the run has been simulated (below)
+  for (int64_t pos = 0; pos < endF;) {
+    const double now = (double)pos / D.sr;
+    if (!started && pos >= playF) {
+      started = true; seq = new Seq(D.song, D.vars, SeqMode::Song, o);
+      sched.start(C.row > 0 ? sppFor(D.song, D.vars, C.row) : 0, now); seq->setTime(now + 0.08); runner.start(seq); on = true;
+    }
+    while (ai < C.actions.size() && actF(ai) <= pos) {
+      const Action& a = C.actions[ai++];
+      if (a.op == "stop") { if (on) { on = false; runner.stop(); sched.stop(now); } }
+      else if (a.op == "bpm") {}   // (handled by the step loop, below)
+      else if (a.op == "clk") sched.portToggled(a.p, a.on, now);
+      else if (a.op == "cable") { int cab = a.p; for (int q = 0; q < 4; q++) if (D.C.ports[q] == a.id) { cab = q; break; } D.C.ports[a.p] = a.id; sched.cableChanged(a.p, true, cab, now); }
+      else if (a.op == "keyOn") { if (a.n >= 0 && a.n < 128) keyH[a.n] = sched.liveNoteOn(a.ii, a.n, a.v, 16, now); }
+      else if (a.op == "keyOff") { if (a.n >= 0 && a.n < 128 && keyH[a.n] >= 0) { sched.liveNoteOff(keyH[a.n], now); keyH[a.n] = -1; } }
+      else if (a.op == "panic") sched.panic(now);
+    }
+    int64_t len = block; int64_t nxt = endF;
+    if (!started) nxt = std::min(nxt, playF);
+    if (ai < C.actions.size()) nxt = std::min(nxt, actF(ai));
+    if (on && endStop >= 0 && endStop > pos) nxt = std::min(nxt, endStop);   // the song-end check lands on the frame, not on a block
+    if (nxt > pos && nxt - pos < len) len = nxt - pos;
+    sched.setBlock((double)len / D.sr);
+    if (on) {
+      runner.pump(now, 0.25, evs.data(), (int)evs.size(), &st, [&](const SeqEvent* e, int n, const SeqStep& step) {
+        for (int i = 0; i < n; i++) if (e[i].type == SEV_BEAT) D.grid.push_back(e[i].t);
+        sched.onStep(e, n, step, *seq, now);
+        while (bi < bpms.size() && step.t >= bpms[bi].t) seq->setBpm(bpms[bi++].v);   // (after the step: the next one is timed with it)
+      });
+      sched.book(now, seq->time(), seq->bpm(), seq->alive());
+      if (!seq->alive() && endStop < 0) endStop = (int64_t)std::floor((seq->time() + 0.3) * D.sr) + 1;
+      if (endStop >= 0 && pos >= endStop) { on = false; runner.stop(); sched.stop(now); }
+    } else sched.book(now, now, 120, false);
+    D.drainAll();
+    pos += len;
+  }
+  D.stats = sched.stats(); D.sched = nullptr; delete seq; return true;
 }
 }  // namespace mdrive
 #endif

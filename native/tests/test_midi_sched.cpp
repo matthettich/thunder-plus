@@ -145,8 +145,12 @@ static void stall() {
     CHECK(s.stats().ticks - t0 >= 3, "B7: and the clock goes on: %llu ticks in the look-ahead", (unsigned long long)(s.stats().ticks - t0)); }
   // late notes: the host's lateness verdict (the shared test) drops the MIDI note too
   CHECK(seq_note_late(1.0, 1.2) && !seq_note_late(1.0, 1.1) && !seq_note_late(1.0, 0.9), "the shared lateness test: late = 0.15 s behind (and %d)", 0);
-  { Rig r; r.s.onEvent(Rig::note(0, 0, 60, 1.0), nullptr, 120, true, 1.2); r.book(1.2); CHECK(r.count(0x90) == 0 && r.s.stats().lateNotes == 1, "B7: a note the host calls late is dropped and counted (%d)", 0); }
-  { Rig r; r.s.onEvent(Rig::note(0, 0, 60, 0.5), nullptr, 120, false, 0.45); r.book(0.45); r.book(0.6);
+  { Rig r; r.song.insts[0].mo = 2; r.s.onEvent(Rig::note(0, 0, 60, 1.0), nullptr, 120, true, 1.2); r.book(1.2); CHECK(r.count(0x90) == 0 && r.s.stats().lateNotes == 1, "B7: the MIDI companion of a pad note the players dropped is dropped and counted (%d)", 0); }
+  for (double late : {0.2, 1.0, 30.0}) { Rig r;   // F8: a MIDI-only instrument has no pad to drop: its late note is sent at once (at `now`), as the page does, and is not counted late
+    r.s.onEvent(Rig::note(0, 0, 60, 1.0), nullptr, 120, true, 1.0 + late); r.book(1.0 + late);
+    CHECK(r.count(0x90, 60) == 1 && r.s.stats().lateNotes == 0, "F8: a MIDI-only note %.1f s late is sent (%d), not dropped", late, r.count(0x90, 60));
+    CHECK(r.out.size() && r.out[0].frame == (int64_t)std::llround((1.0 + late) * 48000), "F8: and at once: frame %lld", r.out.size() ? (long long)r.out[0].frame : -1LL); }
+  { Rig r; r.song.insts[0].mo = 2; r.s.onEvent(Rig::note(0, 0, 60, 0.5), nullptr, 120, false, 0.45); r.book(0.45); r.book(0.6);
     r.s.onEvent(Rig::note(0, 0, 64, 1.0), nullptr, 120, true, 1.2); r.book(1.2);
     CHECK(r.count(0x80, 60) == 1 && r.count(0x90, 64) == 0, "B7: a late mono note still ends the track's previous note (no hang)"); }
   std::printf("stall: done (N %zu, S %zu messages)\n", N.kept.size(), S.kept.size());

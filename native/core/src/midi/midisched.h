@@ -33,6 +33,9 @@ constexpr int kMidiKeysTrack = 33;            // live keys (the page's track NT,
 constexpr int kMidiHeldCap = 128;             // held notes per track (an ARP can book 96 steps); counted when exceeded
 constexpr int kMidiPendCap = 4096;            // the outbox
 constexpr int kMidiRingCap = 8192;            // output records
+constexpr int kMidiFutCap = 4096;             // pushed note messages that are still ahead of `now` (STOP must undo them: F3)
+constexpr int kRingReserveLow = 512;          // F4: below this many free slots clock ticks, CCs, bends and pressure are dropped
+constexpr int kRingReserveNote = 256;         // F4: below this many, note-ons (and Start / SPP) are dropped too; OFF / CLEAR / All Notes Off / Stop only at 0 free
 constexpr int kMidiCmdCap = 256;              // commands from other threads
 constexpr double kNoteLateSec = 0.15;         // index.html:23827: a note more than this behind `now` is dropped (pad and MIDI)
 constexpr double kClockLateSec = 0.020;       // a clock tick more than this behind `now` is dropped (B7)
@@ -62,6 +65,9 @@ struct MidiStats {               // all counted since construction; read with st
   uint64_t sameTrackRetrig = 0, offsSuppressed = 0, onsSilent = 0;   // an on onto a pitch the same track holds; offs not sent (another holder / never on); B1 notes
   uint64_t ticks = 0, starts = 0, stops = 0, badEvents = 0, badArgs = 0, cmdFull = 0;
   uint64_t maxPend = 0;
+  // F4: what the ring dropped when the consumer stalled, by kind (every drop also counts in ringFull)
+  uint64_t dropTicks = 0, dropCtl = 0, dropNoteOn = 0, dropStart = 0, dropOff = 0, dropClear = 0, futFull = 0;
+  uint64_t mayHang = 0;                                         // 1 = a NOTE-OFF / CLEAR / All Notes Off / Stop was dropped: the gear may be left with hung notes, the shell should send PANIC (cleared by panic())
 };
 
 class MidiSched {
@@ -78,6 +84,7 @@ class MidiSched {
   void setFxLatency(double sec);                                 // mastering + master pump FX + safety limiter + PDC, read each block (no cache); 0..2 s
   void setAudible(uint64_t mask) { audible_ = mask; }            // bit t set = track t is heard (mix mute / solo / bus rule is the mixer's: mix_audible); tracks >= 32 always
   void setSampleRate(double sr);
+  void setBlock(double sec);                                     // F6: the host's block length (0 = the web's cadence): every look-ahead below grows by it, so what is sent never depends on the block size
 
   // ---- transport (audio thread) ---------------------------------------------------------------------------------------------------
   void start(int spp /* Song Position Pointer in 16ths, 0 = from the top */, double now);   // moStart
@@ -117,7 +124,7 @@ class MidiSched {
  private:
   struct Held { uint8_t p, ch, n, base, vel, rng; double fine, t, end; int32_t col; uint32_t nid; };
   struct PendRet { uint8_t p, ch, n, base, vel, rng; double fine, t, end; int32_t col; uint32_t nid; };   // an ARP's return
-  struct PendMsg { double at; uint32_t ord; uint8_t port, len, kind, track; uint8_t b[3]; uint8_t cable; };
+  struct PendMsg { double at; int64_t fr; uint32_t ord; uint8_t port, len, kind, track; uint8_t b[3]; uint8_t cable; };
   struct EchoN { double t, off, len; uint8_t p, ch, n, vel; bool on; };
   struct Glide { int32_t key; uint8_t p, ch, cc; double a, b, t0, t1, at; int last; bool cut; };
   struct Lfo { int v = -1; double t = 0; bool hasT = false; double trig[64]; int nTrig = 0; };
@@ -129,7 +136,7 @@ class MidiSched {
   bool conn_[kMidiPorts] = {false, false, false, false}, clkOn_[kMidiPorts] = {false, false, false, false};
   double gear_[kMidiPorts] = {0, 0, 0, 0};
   int cable_[kMidiPorts] = {-1, -2, -3, -4};
-  double sr_, lead_ = kDefaultLeadSec, fxLat_ = 0, now_ = 0;
+  double sr_, lead_ = kDefaultLeadSec, fxLat_ = 0, now_ = 0, block_ = 0;
   const Song* S_ = nullptr;
   uint64_t audible_ = ~uint64_t(0);
   MidiStats st_;
@@ -140,7 +147,8 @@ class MidiSched {
   // ownership (B4)
   uint8_t* cnt_;              // [port][ch][pitch] holders of a sounding note
   int8_t* owner_;             // [port][ch][pitch] the last track that sent a note-on (-1 none)
-  int64_t* onFrame_;          // frame of the last note-on sent
+  uint8_t* wire_;             // [port][ch][pitch] 1 = the last note message PUSHED for it is an on (what the gear is told, in time order)
+  struct Fut { int64_t fr; int32_t idx; uint8_t on; }; Fut fut_[kMidiFutCap]; int nFut_ = 0;   // pushed note messages not yet due: a STOP's CLEAR discards them, so it undoes them (F3)
   // the page's `mx`
   Held* held_;                // [track][kMidiHeldCap]
   int nHeld_[kMidiTracks] = {0};
@@ -156,6 +164,7 @@ class MidiSched {
   uint32_t nidN_ = 0;
   // tempo map (the beat events) and the clock (B2)
   static constexpr int kAnc = 256; Anchor anc_[kAnc]; int nAnc_ = 0;     // oldest first: 256 steps (32 s at 120 bpm, 4 steps a beat) of tempo map
+  double bpmPrev_ = -1;       // the tempo after the previous step (F5)
   bool haveT0_ = false; double t0_ = 0; int spp_ = 0; bool playing_ = false;
   struct Clk { bool on = false; int64_t k = 0; bool hasLast = false; double last = 0; } clk_;
   int64_t lastTickFrame_[kMidiPorts][8]; int lastTickN_[kMidiPorts] = {0, 0, 0, 0};
@@ -170,7 +179,9 @@ class MidiSched {
   int64_t frameOf(double sec) const { return (int64_t)std::llround(sec * sr_); }
   void send(const uint8_t* b, int len, double t, bool hasT, int port, uint8_t kind, int track);
   void emit(const PendMsg& m);
-  void push(int port, const uint8_t* b, int len, int64_t frame, uint8_t kind, uint8_t flags, int cable = -1000);
+  bool push(int port, const uint8_t* b, int len, int64_t frame, uint8_t kind, uint8_t flags, int cable = -1000);   // false = dropped (F4)
+  bool pushNote(int port, const uint8_t* b, int64_t frame, uint8_t kind, int cable, int idx, bool on);
+  double leadEff() const { return lead_ + block_; }
   void flush(double now);
   void pendInsert(const PendMsg& m);
   void clkPorts(int* ps, int& n) const;

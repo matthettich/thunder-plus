@@ -10,7 +10,8 @@
    THE FLOW     the host's audio code calls thunder_midi_process() once per block (it applies the commands the control thread posted, then books the clock, the LFOs,
                 the glides, the echoes and the outbox up to the look-ahead). The core's sequencer glue feeds events through the C++ entry points of
                 core/src/midi/midisched.h (onStep / onEvent with the shared lateness test): not part of this C API.
-   THREADS      THREE roles, never more than one thread in each: CONTROL (every thunder_midi_set_* / start / stop / release / panic / key_* / raw call, create,
+   THREADS      THREE roles, never more than one thread in each (the control calls are SINGLE-PRODUCER: one control thread, or the caller serialises them; debug
+                builds assert it): CONTROL (every thunder_midi_set_* / start / stop / release / panic / key_* / raw call, create,
                 free: they post commands on a wait-free ring and allocate nothing but set_song, which parses); AUDIO (thunder_midi_process and the C++ entry
                 points: no allocation, no lock, no I/O, bounded work); CONSUMER (thunder_midi_drain, thunder_midi_stats_get: any one other thread). A command
                 that finds the ring full returns THUNDER_MIDI_E_BUSY and changes nothing: retry after the next block.
@@ -68,6 +69,10 @@ typedef struct thunder_midi_stats { /* all counted since create */
   uint64_t same_track_retrig, offs_suppressed, silent_notes;
   uint64_t ticks, starts, stops, bad_events, bad_args, cmd_full;
   uint64_t max_pend;
+  /* F4: the ring is full because the consumer stalled: what was dropped, by kind (each also counts in ring_full). Order of dropping: clock ticks, CCs, bends,
+     pressure, program (below 512 free slots); then note-ons, Start / SPP (below 256); NOTE-OFF, CLEAR, All Notes Off and Stop only when NOTHING is free. */
+  uint64_t drop_ticks, drop_ctl, drop_note_on, drop_start, drop_off, drop_clear, fut_full;
+  uint64_t may_hang;                /* 1 = a NOTE-OFF / CLEAR / All Notes Off / Stop was dropped: the gear may be left with hung notes: the shell should send PANIC (thunder_midi_panic clears it) */
 } thunder_midi_stats;
 
 /* CONTROL thread. NULL and `err` (when err != NULL and errcap > 0) on a bad rate (8000 .. 384000) or no memory. */
@@ -94,8 +99,9 @@ int thunder_midi_key_off(thunder_midi* h, int key);
 int thunder_midi_raw(thunder_midi* h, int port, const uint8_t* bytes, int len, double extra_seconds);   /* thru: one complete channel / system message, 1..3 bytes (no SysEx) */
 
 /* AUDIO thread: apply the posted commands, then book up to the look-ahead. now_sec = this block's start in the core's audio time (frames / rate),
+   block_sec = this block's length (frames / rate; 0 = none known): the look-aheads grow by it, so the stream is the same for every block size (F6),
    seq_time = the sequencer's next step time, bpm its tempo, seq_alive 0 / 1. Returns the number of commands applied (>= 0) or a negative code. */
-int thunder_midi_process(thunder_midi* h, double now_sec, double seq_time, double bpm, int seq_alive);
+int thunder_midi_process(thunder_midi* h, double now_sec, double block_sec, double seq_time, double bpm, int seq_alive);
 
 /* CONSUMER: up to cap records in order; returns how many (>= 0) or a negative code. */
 int64_t thunder_midi_drain(thunder_midi* h, thunder_midi_msg* out, int64_t cap);

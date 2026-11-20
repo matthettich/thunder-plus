@@ -58,7 +58,7 @@ static void hostileC() {
   CHECK(thunder_midi_set_song(h, (const uint8_t*)"not json at all", 15) == THUNDER_MIDI_E_SONG, "set_song garbage");
   const int rEmpty = thunder_midi_set_song(h, (const uint8_t*)"{}", 2); CHECK(rEmpty == THUNDER_MIDI_E_SONG || rEmpty == 0, "set_song {} is a song or an error: %d", rEmpty); const int pre = rEmpty == 0 ? 1 : 0;
   CHECK(thunder_midi_set_song(h, (const uint8_t*)"x", (size_t)1 << 40) == THUNDER_MIDI_E_ARG, "set_song over the limit");
-  CHECK(thunder_midi_process(h, NAN, 0, 120, 0) < 0 && thunder_midi_process(h, -1, 0, 120, 0) < 0 && thunder_midi_process(h, 0, NAN, 120, 0) < 0 && thunder_midi_process(h, 0, 0, 0, 0) < 0 && thunder_midi_process(h, 0, 0, NAN, 0) < 0 && thunder_midi_process(nullptr, 0, 0, 120, 0) < 0, "process: NaN / null");
+  CHECK(thunder_midi_process(h, NAN, 0, 0, 120, 0) < 0 && thunder_midi_process(h, -1, 0, 0, 120, 0) < 0 && thunder_midi_process(h, 0, 0, NAN, 120, 0) < 0 && thunder_midi_process(h, 0, 0, 0, 0, 0) < 0 && thunder_midi_process(h, 0, 0, 0, NAN, 0) < 0 && thunder_midi_process(h, 0, NAN, 0, 120, 0) < 0 && thunder_midi_process(h, 0, -1, 0, 120, 0) < 0 && thunder_midi_process(nullptr, 0, 0, 0, 120, 0) < 0, "process: NaN / null");
   thunder_midi_msg buf[4];
   CHECK(thunder_midi_drain(nullptr, buf, 4) < 0 && thunder_midi_drain(h, nullptr, 4) < 0 && thunder_midi_drain(h, buf, -1) < 0 && thunder_midi_drain(h, nullptr, 0) == 0 && thunder_midi_drain(h, buf, 0) == 0, "drain args");
   thunder_midi_stats st; std::memset(&st, 0, sizeof st);
@@ -67,13 +67,13 @@ static void hostileC() {
   // the command ring full: BUSY, then room after a block
   int busy = 0, okc = 0; for (int i = 0; i < 1000; i++) { const int r = thunder_midi_set_lead(h, 0.06); if (r == THUNDER_MIDI_E_BUSY) busy++; else if (r == 0) okc++; }
   CHECK(busy > 0 && okc + pre == 256, "the ring (256) fills: %d accepted (+%d before), %d busy", okc, pre, busy);
-  CHECK(thunder_midi_process(h, 0.01, 0, 120, 0) == okc + pre, "process applies the %d posted commands", okc + pre);
+  CHECK(thunder_midi_process(h, 0.01, 0, 0, 120, 0) == okc + pre, "process applies the %d posted commands", okc + pre);
   CHECK(thunder_midi_set_lead(h, 0.06) == 0, "room again");
   // songs: more than the hand-over allows in flight: BUSY, never a leak (ASan checks at free)
   const std::string song = readSong(); int sb = 0, so = 0;
   for (int i = 0; i < 40; i++) { const int r = thunder_midi_set_song(h, (const uint8_t*)song.data(), song.size()); if (r == 0) so++; else if (r == THUNDER_MIDI_E_BUSY) sb++; }
   CHECK(so >= 1 && sb >= 1, "set_song: %d accepted, %d busy", so, sb);
-  thunder_midi_process(h, 0.02, 0, 120, 0); thunder_midi_process(h, 0.03, 0, 120, 0);
+  thunder_midi_process(h, 0.02, 0, 0, 120, 0); thunder_midi_process(h, 0.03, 0, 0, 120, 0);
   CHECK(thunder_midi_set_song(h, (const uint8_t*)song.data(), song.size()) == 0, "set_song after the audio thread took the first");
   thunder_midi_free(h);   // (a song still posted, one current, some retired: all freed)
   std::printf("C API arguments: done\n");
@@ -125,7 +125,7 @@ static void threads() {
     }
     stop = true;
   });
-  std::thread audio([&] { double now = 0; while (!stop) { thunder_midi_process(h, now, now + 0.1, 120, 1); now += 128.0 / 48000; } thunder_midi_process(h, now, now, 120, 0); });
+  std::thread audio([&] { double now = 0; while (!stop) { thunder_midi_process(h, now, 128.0 / 48000, now + 0.1, 120, 1); now += 128.0 / 48000; } thunder_midi_process(h, now, 0, now, 120, 0); });
   std::thread consumer([&] {
     thunder_midi_msg b[256]; uint64_t last = 0; bool first = true;
     while (!stop || true) { const int64_t n = thunder_midi_drain(h, b, 256); if (n < 0) { bad++; break; } for (int64_t i = 0; i < n; i++) if (!validMsg(b[i])) bad++; drained += n;

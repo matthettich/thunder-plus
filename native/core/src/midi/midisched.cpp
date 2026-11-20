@@ -22,7 +22,7 @@ MidiSched::MidiSched(double sampleRate) : sr_(sampleRate > 1000 && sampleRate < 
   pend_ = new PendMsg[kMidiPendCap];
   cnt_ = new uint8_t[kMidiPorts * 16 * 128]();
   owner_ = new int8_t[kMidiPorts * 16 * 128];
-  onFrame_ = new int64_t[kMidiPorts * 16 * 128]();
+  wire_ = new uint8_t[kMidiPorts * 16 * 128]();
   held_ = new Held[(size_t)kMidiTracks * kMidiHeldCap]();
   pendRet_ = new PendRet[(size_t)kMidiTracks * 8]();
   ccv_ = new int16_t[kMidiPorts * 16 * 128];
@@ -32,7 +32,7 @@ MidiSched::MidiSched(double sampleRate) : sr_(sampleRate > 1000 && sampleRate < 
   std::memset(lastTickFrame_, 0, sizeof lastTickFrame_);
 }
 
-MidiSched::~MidiSched() { delete[] pend_; delete[] cnt_; delete[] owner_; delete[] onFrame_; delete[] held_; delete[] pendRet_; delete[] ccv_; }
+MidiSched::~MidiSched() { delete[] pend_; delete[] cnt_; delete[] owner_; delete[] wire_; delete[] held_; delete[] pendRet_; delete[] ccv_; }
 
 // ---- configuration ---------------------------------------------------------------------------------------------------------------
 void MidiSched::setPort(int p, bool connected, bool clockOn, double gearMs, int cable) {
@@ -44,13 +44,45 @@ void MidiSched::setPort(int p, bool connected, bool clockOn, double gearMs, int 
 void MidiSched::setLead(double sec) { lead_ = std::isfinite(sec) ? clampd(sec, 0.005, 0.5) : kDefaultLeadSec; }
 void MidiSched::setFxLatency(double sec) { fxLat_ = std::isfinite(sec) ? clampd(sec, 0, 2) : 0; }
 void MidiSched::setSampleRate(double sr) { if (sr > 1000 && sr < 1e6) sr_ = sr; }
+void MidiSched::setBlock(double sec) { block_ = std::isfinite(sec) ? clampd(sec, 0, 1) : 0; }
 
 // ---- output ------------------------------------------------------------------------------------------------------------------------
-void MidiSched::push(int port, const uint8_t* b, int len, int64_t frame, uint8_t kind, uint8_t flags, int cable) {
+// F4: what the ring gives up first when the consumer stalls. 0 = clock ticks, CCs, bends, pressure, program; 1 = note-ons, Start / SPP / Continue; 2 = NOTE-OFF,
+// CLEAR, All Notes Off / All Sound Off, Stop and everything a release or panic sends (a dropped one can leave the gear sounding).
+static int prioOf(const uint8_t* b, int len, uint8_t kind, uint8_t flags) {
+  if ((flags & MIDI_F_CLEAR) || kind == MK_RELEASE || kind == MK_PANIC || kind == MK_STOP || len < 1) return 2;
+  const int st = b[0], ty = st & 0xF0;
+  if (ty == 0x80) return 2;
+  if (ty == 0x90) return len >= 3 && b[2] > 0 ? 1 : 2;
+  if (ty == 0xB0 && len >= 2 && (b[1] == 120 || b[1] == 123)) return 2;
+  if (st == 0xFC) return 2;
+  if (st == 0xFA || st == 0xFB || st == 0xF2) return 1;
+  return 0;
+}
+bool MidiSched::push(int port, const uint8_t* b, int len, int64_t frame, uint8_t kind, uint8_t flags, int cable) {
   MidiMsg m; std::memset(&m, 0, sizeof m);
   m.frame = frame; m.port = (uint8_t)port; m.len = (uint8_t)len; m.flags = flags; m.kind = kind; m.cable = (uint8_t)(cable == -1000 ? cable_[port] : cable);   // pad = the cable the port had when the message was made
   for (int i = 0; i < len && i < 3; i++) m.b[i] = b[i];
-  if (ring_.push(m)) st_.sent++; else st_.ringFull++;
+  const int pr = prioOf(b, len, kind, flags); const uint32_t sp = ring_.space();
+  if (sp == 0 || (pr == 0 && sp < (uint32_t)kRingReserveLow) || (pr == 1 && sp < (uint32_t)kRingReserveNote) || !ring_.push(m)) {
+    st_.ringFull++;
+    const int st = len >= 1 ? b[0] : 0, ty = st & 0xF0;
+    if (pr == 2) { st_.mayHang = 1; if ((flags & MIDI_F_CLEAR) || st == 0xFC || (ty == 0xB0 && len >= 2 && (b[1] == 120 || b[1] == 123))) st_.dropClear++; else st_.dropOff++; }
+    else if (pr == 1) { if (ty == 0x90) st_.dropNoteOn++; else st_.dropStart++; }
+    else if (st == 0xF8) st_.dropTicks++; else st_.dropCtl++;
+    return false;
+  }
+  st_.sent++; return true;
+}
+// A note message to the gear: remembered by pitch (wire_: what the gear was last told) and, while it is still ahead of `now`, in fut_ (F3).
+bool MidiSched::pushNote(int port, const uint8_t* b, int64_t frame, uint8_t kind, int cable, int idx, bool on) {
+  if (!push(port, b, 3, frame, kind, 0, cable)) return false;
+  wire_[idx] = on ? 1 : 0;
+  if (frame > frameOf(now_)) {
+    if (nFut_ >= kMidiFutCap) { st_.futFull++; std::memmove(fut_, fut_ + 1, (kMidiFutCap - 1) * sizeof(Fut)); nFut_ = kMidiFutCap - 1; }
+    fut_[nFut_++] = {frame, idx, (uint8_t)(on ? 1 : 0)};
+  }
+  return true;
 }
 
 // msend :16787. `hasT` false = "now" (t null): no FX latency, no Gear delay. A scheduled message is `early` (B3: the transport too).
@@ -59,26 +91,29 @@ void MidiSched::send(const uint8_t* b, int len, double t, bool hasT, int port, u
   double at = hasT ? t + fxLat_ - latSec(port) : now_;
   if (!std::isfinite(at)) { st_.badArgs++; return; }
   if (at < now_ && kind != MK_CLOCK) at = now_;                              // :16791 Math.max(now, at). A tick keeps its own (past) time: the phase stays on the grid (B7)
-  PendMsg m; m.at = at; m.ord = ord_++; m.port = (uint8_t)port; m.len = (uint8_t)len; m.kind = kind; m.track = (uint8_t)track; m.cable = (uint8_t)cable_[port];
+  PendMsg m; m.at = at; m.fr = 0; m.ord = ord_++; m.port = (uint8_t)port; m.len = (uint8_t)len; m.kind = kind; m.track = (uint8_t)track; m.cable = (uint8_t)cable_[port];
   for (int i = 0; i < len && i < 3; i++) m.b[i] = b[i];
-  if (hasT && at - now_ > lead_) pendInsert(m); else emit(m);               // the outbox :16790
+  pendInsert(m);   // F2/F6: EVERYTHING waits in the time-sorted outbox and is released by book() in (frame, creation) order: Start / Continue before tick 0, and the stream does not depend on when the host asks
 }
-void MidiSched::pendInsert(const PendMsg& m) {
+void MidiSched::pendInsert(const PendMsg& m0) {
+  PendMsg m = m0; m.fr = frameOf(m.at);
   if (nPend_ >= kMidiPendCap) { st_.pendFull++; emit(m); return; }
   int lo = 0, hi = nPend_;
-  while (lo < hi) { const int mid = (lo + hi) >> 1; if (pend_[mid].at <= m.at) lo = mid + 1; else hi = mid; }   // after equal times: order kept
+  while (lo < hi) { const int mid = (lo + hi) >> 1; if (pend_[mid].fr <= m.fr) lo = mid + 1; else hi = mid; }   // by frame, then creation order
   std::memmove(pend_ + lo + 1, pend_ + lo, (size_t)(nPend_ - lo) * sizeof(PendMsg));
   pend_[lo] = m; nPend_++;
   if ((uint64_t)nPend_ > st_.maxPend) st_.maxPend = (uint64_t)nPend_;
 }
 void MidiSched::flush(double now) {
   int i = 0;
-  while (i < nPend_ && pend_[i].at - now <= lead_ + 1e-12) {
+  const double lead = leadEff();
+  while (i < nPend_ && pend_[i].at - now <= lead + 1e-12) {
     if (pend_[i].kind == MK_CLOCK && pend_[i].at < now - kClockLateSec) st_.lateTicks++;   // B7: a tick that waited past its time while the host stalled is dropped, not burst
     else emit(pend_[i]);
     i++;
   }
   if (i) { std::memmove(pend_, pend_ + i, (size_t)(nPend_ - i) * sizeof(PendMsg)); nPend_ -= i; }
+  { const int64_t nf = frameOf(now); int w = 0; for (int k = 0; k < nFut_; k++) if (fut_[k].fr > nf) fut_[w++] = fut_[k]; nFut_ = w; }   // what is due can no longer be undone by a STOP
 }
 // A message leaves the scheduler (in time order). Notes are owned per port / channel / pitch (B4) and a note-off without a sounding note is not sent (B9).
 void MidiSched::emit(const PendMsg& m) {
@@ -90,15 +125,15 @@ void MidiSched::emit(const PendMsg& m) {
     if (on) {
       if (cnt_[idx] > 0) {
         if (owner_[idx] != (int8_t)m.track) st_.collisions++; else st_.sameTrackRetrig++;
-        const uint8_t o[3] = {(uint8_t)(0x80 | ch), (uint8_t)n, 0}; push(m.port, o, 3, fr, m.kind, 0, m.cable);   // off, then on
+        const uint8_t o[3] = {(uint8_t)(0x80 | ch), (uint8_t)n, 0}; pushNote(m.port, o, fr, m.kind, m.cable, idx, false);   // off, then on
       }
       if (cnt_[idx] < 255) cnt_[idx]++;
-      owner_[idx] = (int8_t)m.track; onFrame_[idx] = fr;
-      push(m.port, m.b, m.len, fr, m.kind, 0, m.cable);
+      owner_[idx] = (int8_t)m.track;
+      if (!pushNote(m.port, m.b, fr, m.kind, m.cable, idx, true) && cnt_[idx] > 0) cnt_[idx]--;   // F4: a note-on the ring dropped cancels its own later off
     } else {
       if (cnt_[idx] == 0) { st_.offsSuppressed++; return; }                  // B9: nothing sounding there
       if (cnt_[idx] > 0 && --cnt_[idx] > 0) { st_.offsSuppressed++; return; }   // B4: another track still holds it
-      push(m.port, m.b, m.len, fr, m.kind, 0, m.cable);
+      pushNote(m.port, m.b, fr, m.kind, m.cable, idx, false);
     }
     return;
   }
@@ -330,7 +365,7 @@ void MidiSched::moCmd(const SeqEvent& e) {
 
 void MidiSched::moRamp(double now) {   // :17032 CSL glides, booked 80 ms ahead
   if (!nGlide_) return;
-  const double upto = now + kClockAheadSec; int w = 0;
+  const double upto = now + kClockAheadSec + block_; int w = 0;
   for (int i = 0; i < nGlide_; i++) {
     Glide r = glide_[i];
     for (int n = 0; r.at <= std::min(upto, r.t1) && n < 40; n++, r.at += kLfoDt) {
@@ -345,7 +380,7 @@ void MidiSched::moRamp(double now) {   // :17032 CSL glides, booked 80 ms ahead
 
 void MidiSched::moEcho(double now) {   // :17047
   if (!nEcho_) return;
-  const double upto = now + kEchoAheadSec; int w = 0;
+  const double upto = now + kEchoAheadSec + block_; int w = 0;
   for (int i = 0; i < nEcho_; i++) {
     EchoN x = echo_[i]; bool drop = false;
     const auto same = [&](const Held& h) { return h.p == x.p && h.ch == x.ch && h.n == x.n; };
@@ -380,7 +415,7 @@ void MidiSched::lfoTrig(int ii, double t) {
 }
 void MidiSched::moLfo(double now, double seqTime, double bpm) {
   if (!nAnc_ || !haveT0_ || !S_) return;
-  const double upto = std::min(seqTime, now + kClockAheadSec);
+  const double upto = std::min(seqTime, now + kClockAheadSec + block_);
   for (int ii = 0; ii < kNI; ii++) {
     const SongInst& I = S_->insts[ii]; const int cc = I.lcc >= 0 ? clampi(I.lcc, 0, 127) : -1;
     if (cc < 0 || !I.mo) continue;
@@ -434,7 +469,7 @@ void MidiSched::sendClk(const uint8_t* b, int len, double t, uint8_t kind) {
 void MidiSched::moClock(double now, double seqTime, double bpm) {
   bool wanted = false; for (int p = 0; p < kMidiPorts; p++) wanted = wanted || clkOn_[p];
   if (!wanted || !clk_.on || !nAnc_) return;
-  const double limit = std::min(seqTime, now + kClockAheadSec);
+  const double limit = std::min(seqTime, now + kClockAheadSec + block_);
   int ps[kMidiPorts], np; clkPorts(ps, np);
   { const int64_t first = (int64_t)std::ceil(anc_[0].b * 24 - 1e-9);   // ticks older than the oldest anchor we still hold are long gone (the host stalled): late, dropped, counted
     if (clk_.k < first && anc_[0].t < now) { st_.lateTicks += (uint64_t)(first - clk_.k); clk_.k = first; } }
@@ -482,35 +517,40 @@ void MidiSched::onEvent(const SeqEvent& e, const double* arp, double bpm, bool l
   const SongInst& I = S_->insts[(int)e.ii];
   if (!I.mo) { moOff(e.track, e.t); return; }                                  // the column switched to a pad instrument
   if (!audibleT(e.track)) { moOff(e.track, e.t); return; }                      // a muted track lets its gear go quiet
-  if (late) { st_.lateNotes++; if (!e.poly) moOff(e.track, e.t); return; }     // B7: the pad's lateness verdict is MIDI's too
+  // B7 / F8: the pad's lateness verdict is MIDI's too, but only for an instrument that HAS a pad voice (OUTPUT 2, MIDI + PAD). A MIDI-only instrument (OUTPUT 1)
+  // has no pad to drop: the page never drops its note for lateness, it goes out at once, late (send() clamps it to `now`).
+  if (late && I.mo != 1) { st_.lateNotes++; if (!e.poly) moOff(e.track, e.t); return; }
   moNote(e, I, arp, bpm, 4);
 }
 
 void MidiSched::onStep(const SeqEvent* evs, int n, const SeqStep& step, const Seq& seq, double now) {
   now_ = now;
   const double bpm = seq.bpm();
+  // F5 / B12: the tempo IN FORCE WHEN THIS STEP STARTED. The sequencer times the step's length with it and only then applies the step's own TPO, so it is the tempo of the
+  // interval from this step to the next (the web integrated the tempo after the step over that interval: the clock was bent for good after every TPO).
+  double bpmStart = bpm;
+  for (int i = 0; i < n; i++) if (evs[i].type == SEV_TEMPO) bpmStart = bpmPrev_ > 0 ? bpmPrev_ : (S_ && S_->bpm > 0 ? (double)S_->bpm : bpm);
+  bpmPrev_ = bpm;
   for (int i = 0; i < n; i++) {
     const SeqEvent& e = evs[i];
     onEvent(e, (e.has & SH_ARP) ? seq.arp(e) : nullptr, bpm, e.type == SEV_NOTE && seq_note_late(e.t, now), now);
   }
   for (int t = 0; t < 32; t++) if (nPendRet_[t]) pendFlush(t, step.t);          // ARP returns due by this row, on tracks the row left alone
-  for (int i = 0; i < n; i++) if (evs[i].type == SEV_BEAT) {   // the tempo map: this step's time and the tempo AFTER the step (it measures the next interval)
-    // B2: the beat is integrated HERE, forward from the previous anchor at the tempo that was in force over the interval. The sequencer's own beat (e.v)
-    // integrates the tempo it has NOW over an interval whose length was fixed under the old one, which is what bent the web's ticks around a tempo change.
+  for (int i = 0; i < n; i++) if (evs[i].type == SEV_BEAT) {   // the tempo map: this step's time, its beat, and the tempo that measures the interval after it
     const double b = nAnc_ ? anc_[nAnc_ - 1].b + (evs[i].t - anc_[nAnc_ - 1].t) * anc_[nAnc_ - 1].bpm / 60 : evs[i].v;
-    addAnchor(evs[i].t, b, bpm);
+    addAnchor(evs[i].t, b, bpmStart);
   }
 }
 
 void MidiSched::book(double now, double seqTime, double bpm, bool seqAlive) {
   now_ = now; (void)seqAlive;
-  moClock(now, seqTime, bpm); moLfo(now, seqTime, bpm); moRamp(now); moEcho(now);
+  moClock(now, seqTime, bpm); moLfo(now, seqTime, bpm); moRamp(now); moEcho(now);   // all into the outbox, in (frame, creation) order (F2)
   flush(now);
 }
 
 // ---- transport ---------------------------------------------------------------------------------------------------------------------------
 void MidiSched::start(int spp, double now) {   // moStart :17071
-  now_ = now; nAnc_ = 0; haveT0_ = false; t0_ = 0; playing_ = true;
+  now_ = now; nAnc_ = 0; haveT0_ = false; t0_ = 0; playing_ = true; bpmPrev_ = -1;
   for (auto& L : lfo_) { L.v = -1; L.hasT = false; L.nTrig = 0; }
   clk_ = Clk(); bool wanted = false; for (int p = 0; p < kMidiPorts; p++) wanted = wanted || clkOn_[p];
   spp_ = (wanted && spp > 0) ? clampi(spp, 0, 16383) : 0;
@@ -524,11 +564,22 @@ void MidiSched::releaseAll(double now, bool playing, bool stopping) {
     nPend_ = 0;                                                                 // mobDrop
     for (int p = 0; p < kMidiPorts; p++) if (conn_[p]) push(p, nullptr, 0, nf, MK_RELEASE, MIDI_F_CLEAR);   // o.clear()
   }
-  // every note that SOUNDS ends now (B9: one whose on was never sent gets no off; B4: one off per pitch, whoever held it)
+  // every note that SOUNDS at the stop time ends now (B9: one whose on was never sent gets no off; B4: one off per pitch, whoever held it).
+  // F3: what the gear has been told is judged BY TIME. A STOP's CLEAR discards every message queued after `nf`, an off that was already pushed for a later
+  // frame included, so those are undone first (newest first) and the pitch left sounding gets its one off here, whatever was in the ring.
+  if (!playing) for (int i = nFut_ - 1; i >= 0; i--) if (fut_[i].fr > nf) wire_[fut_[i].idx] = fut_[i].on ? 0 : 1;
+  // the offs go in the web's order: the held notes track by track as they were played (moRelease walks mx.held), then whatever else sounds, by pitch
+  for (int t = 0; t < kMidiTracks; t++) for (int i = 0; i < nHeld_[t]; i++) {
+    const Held& h = held_[(size_t)t * kMidiHeldCap + i]; const int idx = (h.p * 16 + h.ch) * 128 + h.n;
+    if (wire_[idx]) { if (conn_[h.p]) { const uint8_t b[3] = {(uint8_t)(0x80 | h.ch), h.n, 0}; push(h.p, b, 3, nf, MK_RELEASE, 0); } wire_[idx] = 0; }
+  }
   for (int p = 0; p < kMidiPorts; p++) for (int ch = 0; ch < 16; ch++) for (int n = 0; n < 128; n++) {
     const int idx = (p * 16 + ch) * 128 + n;
-    if (cnt_[idx] > 0) { if (conn_[p] && onFrame_[idx] <= nf) { const uint8_t b[3] = {(uint8_t)(0x80 | ch), (uint8_t)n, 0}; push(p, b, 3, nf, MK_RELEASE, 0); } else if (conn_[p]) st_.offsSuppressed++; }
+    if (wire_[idx]) { if (conn_[p]) { const uint8_t b[3] = {(uint8_t)(0x80 | ch), (uint8_t)n, 0}; push(p, b, 3, nf, MK_RELEASE, 0); } }
+    else if (cnt_[idx] > 0 && conn_[p]) st_.offsSuppressed++;
   }
+  std::memset(wire_, 0, kMidiPorts * 16 * 128);
+  if (!playing) nFut_ = 0; else for (int k = 0; k < nFut_; k++) if (fut_[k].fr > nf) wire_[fut_[k].idx] = fut_[k].on;   // the queued messages still play: the gear's state after them
   std::memset(cnt_, 0, kMidiPorts * 16 * 128); std::memset(owner_, -1, kMidiPorts * 16 * 128);
   for (int k = 0; k < kMidiPorts * 16; k++) if ((used_ >> k) & 1) {
     const int p = k >> 4, ch = k & 15; if (!conn_[p]) continue;
@@ -563,6 +614,7 @@ void MidiSched::stop(double now) {
 }
 
 void MidiSched::panic(double now) {   // :23849
+  st_.mayHang = 0;                                              // F4: the panic is the answer to the flag (set again below if even this cannot be queued)
   releaseAll(now, false); now_ = now; const int64_t nf = frameOf(now);
   for (int p = 0; p < kMidiPorts; p++) {
     if (!conn_[p]) continue;
