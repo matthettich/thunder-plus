@@ -25,6 +25,7 @@
 
 #include "rt/json.h"
 #include "rt/rng.h"
+#include "seq/chop.h"
 #include "song/song.h"
 
 namespace thunder {
@@ -66,6 +67,7 @@ struct SeqOpts {
   uint32_t randomSeed = 0x2545F491u;         // stands for Math.random (see above)
   int lx = 0;                                // lxp.st: the live transpose (used when live)
   bool hasAt = false; int atRef = 0; SeqAt at[kSeqTracks];   // o.at / o.atRef: each track where it was (a hand-over)
+  const SeqChop* chop = nullptr;             // the pads' loop lengths and slice points (chop.h); borrowed, must outlive every Seq built from these opts. null: no pad has chop data
 };
 
 // N1 review B4: the most events one step() can write, so that no step drops one (a dropped OFF / STP hangs a live note). Worst case the
@@ -76,7 +78,7 @@ struct SeqOpts {
 //   per track 256 + 62 = 318; x 33 tracks = 10494; + BEAT 1 = 10495.
 // The PERFORM events (PRT part snapshot, scenes, macros, locks, LFOs) are bounded by the song, not by the format (review C6): the
 // rest of the 12288 is theirs (1793). Past that the events are still counted (Seq::dropped, RenderStats::seqDropped), never silent.
-// 12288 x sizeof(SeqEvent) (416 B) = 5 MB, allocated once with the renderer.
+// 12288 x sizeof(SeqEvent) (456 B since the chop members, was 416) = 5.6 MB, allocated once with the renderer.
 constexpr int kSeqStepEvents = 12288;
 
 // ---- events ----------------------------------------------------------------------------------------------------------
@@ -87,7 +89,8 @@ const char* seq_ev_name(uint8_t type);      // the JS's `type` string
 // which optional members an event carries (the JS's "key present and not null")
 enum : uint32_t { SH_CUT = 1u << 0, SH_REL = 1u << 1, SH_SLIDE = 1u << 2, SH_TW = 1u << 3, SH_TWCUT = 1u << 4, SH_TWDEC = 1u << 5, SH_RLO = 1u << 6,
   SH_SLC = 1u << 7, SH_WOB = 1u << 8, SH_ARP = 1u << 9, SH_BEND = 1u << 10, SH_VIB = 1u << 11, SH_COLS = 1u << 12, SH_BAND = 1u << 13,
-  SH_GAIN = 1u << 14, SH_PAN = 1u << 15, SH_MUL = 1u << 16, SH_VK = 1u << 17 };
+  SH_GAIN = 1u << 14, SH_PAN = 1u << 15, SH_MUL = 1u << 16, SH_VK = 1u << 17,
+  SH_CHOP = 1u << 18 /* ofsSec, durSec (applyChop) */, SH_ST = 1u << 19 /* stMode, stBpm, stBeats, stGrain: the JS's ev.st (sync 2 / 3) */ };
 
 // One event, flat. Which members mean something depends on `type` (the JS event's keys, in brackets):
 //   beat   t, v [b]                               tempo  t, v [bpm], tks
@@ -106,6 +109,9 @@ struct SeqEvent {
   double pad = 0, rate = 0, gain = 0, pan = 0, ofs = 0, cut = 0, rel = 0, slideFrom = 0, slideDur = 0, twCut = 0, twRes = 0, twDec = 0, rlo = 0, slc = 0,
     fdi = 0, trm = 0, apn = 0, wob = 0, bendMul = 0, bendT1 = 0, vibSpd = 0, vibDep = 0, vibT1 = 0, mn = 0, vel = 0, tick = 0, vc = 0, mul = 0;
   double engC[5] = {0, 0, 0, 0, 0}, engO[7] = {0, 0, 0, 0, 0, 0, 0};
+  // applyChop (CHOP-NOTES.md): ofsSec / durSec with SH_CHOP; stBpm / stBeats / stMode / stGrain with SH_ST
+  double ofsSec = 0, durSec = 0, stBpm = 0, stBeats = 0;
+  uint8_t stMode = 0, stGrain = 0;
 };
 
 // Where a track was on this step (the JS's `pos`: the playhead, the piano's sounding notes).
@@ -163,6 +169,12 @@ class Seq {
   void setMac(int i, double v) { if (i >= 0 && i < (int)pfMac_.size()) { pfMac_[(size_t)i] = v; pfMacSet_[(size_t)i] = 1; } }
   void setFill(bool on) { pfFill_ = on; }
 
+  // applyChop counters (ever): chopped = notes chopped; chopSkipped = slc > 1 || sync held but the pad had no handed-in loop (the note is left unchopped);
+  // chopNoHits = SMODE on and no hits handed in for (pad, slc): the grid was used; chopStretched = notes with ev.st (sync 2 / 3)
+  uint64_t chopped() const { return chopped_; }
+  uint64_t chopSkipped() const { return chopSkipped_; }
+  uint64_t chopNoHits() const { return chopNoHits_; }
+  uint64_t chopStretched() const { return chopStretched_; }
   uint64_t dropped() const { return dropped_; }   // events (or counters) that did not fit, ever: the tests assert 0
   // the largest counts seen (for choosing capacities from a measurement)
   int maxEventsPerStep() const { return maxEvs_; }
@@ -182,7 +194,8 @@ class Seq {
   struct Macro { double v; bool hasV; std::vector<MacTg> tg; };
   struct Lfo { bool present; int id; bool ok; double sh, rt, dp; };
   struct PEv { uint8_t type; int track, slot, pi; double v; };
-  struct PInst { bool present = false; double pad = 0, tsp = 0, vol = 0, pan = 0, ofs = 0; int hut = 0, huv = 0; bool kf = false, rev = false; };
+  struct PInst { bool present = false; double pad = 0, tsp = 0, vol = 0, pan = 0, ofs = 0; int hut = 0, huv = 0; bool kf = false, rev = false;
+    int slc = 0; bool smode = false, sync = false; int sy = 0, grain = 1; double beats = 4; };   // applyChop: I.slc|0, I.smode, I.sync (truthy) and I.sync|0, I.grain, I.beats || 4
   struct Part { bool present = false; std::vector<PEv> evs; std::vector<PInst> insts; };
   struct Chase { uint32_t seed; int16_t tch; uint8_t hasSeed, skp, chd; };
 
@@ -275,6 +288,8 @@ class Seq {
   std::vector<Chase> chase_; std::vector<uint8_t> chaseHasS_; std::vector<uint32_t> chaseS_; std::vector<int16_t> chaseM_;
   std::unique_ptr<double[]> arpPool_; int arpUsed_ = 0;
   uint64_t badSets_ = 0;
+  uint64_t chopped_ = 0, chopSkipped_ = 0, chopNoHits_ = 0, chopStretched_ = 0;
+  void applyChop(SeqEvent& ev, const PInst& I, int n, double semis, double bpm);
   uint64_t dropped_ = 0; int maxEvs_ = 0, maxArp_ = 0;
 };
 

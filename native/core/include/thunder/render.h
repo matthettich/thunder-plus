@@ -126,6 +126,11 @@ typedef struct thunder_render_stats {
   uint32_t sf_voice_track_full; /* SoundFont notes dropped because the track's voice list was full */
   uint32_t sf_voice_auto_dropped; /* automation events the SoundFont voices dropped (a full list) */
   int32_t peak_voices_all;      /* the most voices of BOTH players (sampler + SoundFont) sounding at once */
+  /* appended with the chop unit (docs/port/CHOP-NOTES.md) */
+  int32_t notes_stretched;      /* notes of a sync 2 / 3 instrument: played UNSTRETCHED at their rate (the stretch is not ported yet; the page plays it stretched) */
+  uint64_t seq_chopped;         /* notes the sequencer chopped (applyChop) */
+  uint64_t seq_chop_skipped;    /* notes of a sliced / synced instrument whose pad had no set_pad_chop: left unchopped */
+  uint64_t seq_chop_no_hits;    /* SMODE (find hits) slices without set_pad_hits: the equal grid was used */
 } thunder_render_stats;
 
 /* Parses the song and builds the renderer. song: the app's song JSON (a .thunder file's bytes or a song message), not NUL-terminated, copied.
@@ -162,6 +167,14 @@ int thunder_render_set_pad_route(thunder_render* r, int pad, int route);
    are held (E_LIMIT); a replacement at the limit follows set_pad's rule (ERRORS (3)). Only before the first read or drain. A MUT / GEN note whose variation is missing is SILENT and counted (stats.notes_var_missing), never the base
    pad: a host whose page would play the base pad (no variation could be made) hands in the pad's own samples. A note of a sliced (slc > 1) or synced instrument plays the
    pad as it is and never looks for a variation. A pad changed with set_pad DROPS its variations (as the page does; see set_pad): set the pad first, then its variations. */
+/* CHOP DATA (docs/port/CHOP-NOTES.md). A sliced (slc > 1) or synced instrument's notes are chopped by the sequencer as the page's applyChop does. It needs two things of the pad that the
+   host prepares (the page's loopSecs and slicePoints): set_pad_chop: the pad's loop length in seconds (finite, > 0, <= 1e6; 0 removes the pad's chop data); set_pad_hits: with the instrument's
+   SMODE on, the slice points of the pad cut into n_slices (2 .. 64) parts: count (1 .. n_slices) seconds, each finite and in 0 .. 1e6, as slicePoints returns them (count 0 removes). With SMODE off the points
+   are the equal grid, which the sequencer computes. Both only before the first read or drain (E_STATE after), E_ARG for a bad argument before anything changes, E_MEMORY from set_pad_hits. A pad with no
+   loop: its sliced / synced notes play unchopped (stats.seq_chop_skipped). set_pad on a pad DROPS its chop data (set the pad first). */
+int thunder_render_set_pad_chop(thunder_render* r, int pad, double loop_secs);
+int thunder_render_set_pad_hits(thunder_render* r, int pad, int n_slices, const double* pts, int count);
+
 int thunder_render_set_variation(thunder_render* r, int ii, int kind, int num, int pad, const float* l, int64_t frames, double sample_rate);
 
 /* SOUNDFONT PADS (docs/port/RENDER-SF-NOTES.md). A font is handed in ONCE (add_font) and shared by any number of pads (set_pad_sf names it by id), so a font used by 8 pads is

@@ -6,6 +6,7 @@
 //   node tools/seq-golden.mjs            compare (exit 1 on any difference; the first differing row is printed)
 //   node tools/seq-golden.mjs --update   write the goldens (only after checking why they changed)
 //   node tools/seq-golden.mjs --core     the same cases on the audio thread (core/seq-core.js): must match the same goldens
+//   node tools/seq-golden.mjs --chop     the chop cases (applyChop of index.html, in a vm; see CHOP CASES)
 //
 // Needs Chrome (or Chromium) and the playwright package: CHROME=/path/to/chrome, PLAYWRIGHT=/path/to/playwright/index.mjs
 // if they aren't found. The full event dumps go to tests/golden/out/ (not committed) for diffing.
@@ -241,6 +242,117 @@ function editCases() {
   fs.writeFileSync(path.join(EDIT_DIR, 'seq-edit-cases.json'), JSON.stringify({ ids: EDIT_SONGS.map(c => c.id) }) + '\n');
   return !bad;
 }
+
+// CHOP CASES (docs/port/CHOP-NOTES.md; goldens native/tests/golden/seq-chop-*.json, read by ctest `seq_chop`; --chop).
+// The page's chop is `applyChop` (index.html), which core/seq-core.js carries as an empty stub (the worklet has no pad data). Here the audio thread's makeSeq runs in a `vm` as in the
+// live cases, but with sim OFF and with the stub line of core/seq-core.js replaced AT RUN TIME by `ensure` over this tool's own pad table, and the REAL text of loopSecs, findHits,
+// sliceMemo, slicePoints and applyChop taken out of index.html by name (nothing is copied into this tool). The pad data (samples, kit layers) is the tool's own test data. The
+// golden stores what the real functions return for the pads (loop length, the SMODE hits) so the C++ test hands in exactly that; the rows (events with ofsSec, durSec and st) are the JS's.
+// PROOF FIRST: the four plain cases through this harness (sim off) must equal their committed goldens: ELECTRO has no sliced or synced instrument, so the real functions change nothing.
+const CORE_STUBS = 'function ensurePlay(){ return null; } function ensure(){ return null; } function varWant(){} function applyChop(){}';
+function chopSource() {
+  const idx = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8'), core = fs.readFileSync(path.join(ROOT, 'core/seq-core.js'), 'utf8');
+  if (!core.includes(CORE_STUBS)) throw new Error('core/seq-core.js: the stub line changed');
+  const fn = name => { const i = idx.indexOf('\nfunction ' + name + '('); if (i < 0) throw new Error('index.html: no function ' + name);
+    let k = idx.indexOf('{', i), d = 0; for (; k < idx.length; k++) { const c = idx[k]; if (c === '{') d++; else if (c === '}' && --d === 0) break; } return idx.slice(i + 1, k + 1); };
+  const memo = 'const sliceMemo = new Map();'; if (!idx.includes(memo)) throw new Error('index.html: no sliceMemo');
+  const real = [fn('loopSecs'), fn('findHits'), memo, fn('slicePoints'), fn('applyChop')].join('\n');
+  return core.replace(CORE_STUBS, 'function ensurePlay(i){ return __ensure(i); } function ensure(i){ return __ensure(i); } function varWant(){}') + '\n' + real +
+    `\nconst __pads = []; function __ensure(i){ return kit.voices[i] ? __pads[i] || null : null; }
+const __cp = e => { const o = {}; for (const k of Object.keys(e).sort()){ const v = e[k];
+  if (typeof v === 'number') o[k] = coreNum(v); else if (typeof v === 'string' || typeof v === 'boolean' || v === null) o[k] = v;
+  else if (k === 'st' && v){ const s = {}; for (const q of Object.keys(v).sort()) s[q] = typeof v[q] === 'number' ? coreNum(v[q]) : v[q]; o[k] = s; }
+  else if (Array.isArray(v) && v.every(x => typeof x === 'number')) o[k] = v.map(coreNum); } return o; };
+// the tool's own pad data: bursts every 0.25 s on a noise floor (so SMODE finds hits); pad 0 and 2 have a sample layer (loopSecs reads it), pad 1 none (the whole pad)
+function __mk(secs, sr, seed){ const n = Math.round(secs * sr), d = new Float32Array(n); let s = seed; const r = () => ((s = (s * 1664525 + 1013904223) >>> 0) / 4294967296) - 0.5;
+  for (let i = 0; i < n; i++){ const ph = (i / sr) % 0.25; d[i] = ph < 0.05 ? r() * Math.exp(-ph * 60) : r() * 0.01; } return d; }
+function __setup(){ kit = {voices:[]};
+  const L = (secs, sr, tune, fine, a, delay) => ({on:true, type:'sample', sample:{data:new Float32Array(Math.round(secs * sr)), sr}, tune, fine, a, delay});
+  kit.voices[0] = {tune:0, layers:[L(2, 44100, -2, 10, 0.05, 15)]}; __pads[0] = {data:__mk(2.0, 48000, 11), sr:48000};
+  kit.voices[1] = {tune:0, layers:[]}; __pads[1] = {data:__mk(1.6, 48000, 22), sr:48000};
+  kit.voices[2] = {tune:0, layers:[L(1.5, 48000, 0, 0, 0, 0)]}; __pads[2] = {data:__mk(2.0, 48000, 33), sr:48000};
+  kit.voices[3] = {tune:0, layers:[]}; __pads[3] = {data:__mk(1.0, 48000, 44), sr:48000}; sliceMemo.clear(); coreBufs.clear(); __pads.forEach((p, i) => coreBufs.set(i, p)); }   // (core/seq-core.js :912 gives ensure / ensurePlay over coreBufs: the pad table is put there)
+function __padInfo(want){ const out = {}; for (const [pad, n, sm] of want){ const k = String(pad); const I = out[k] || (out[k] = {loop:loopSecs(pad, __pads[pad].data, __pads[pad].sr), hits:{}});
+    if (sm) I.hits[n] = slicePoints(pad, {slc:n, smode:1}, __pads[pad].data, __pads[pad].sr); } return out; }
+globalThis.__u = { makeSeq, coreSeeded, corePlain, coreNum, ThunderCore, __cp, __setup, __padInfo,
+  load(s, v){ S = s; if (v){ if ("vtrk" in v) vtrk = v.vtrk; if ("NSLOT" in v) NSLOT = v.NSLOT; if (v.TFX) TFX = v.TFX; } busPlanH = null; busPlanVal = null; } };`;
+}
+function chopHarness() {
+  const sctx = vm.createContext({ console, Math, registerProcessor() {}, AudioWorkletProcessor: class { constructor() { this.port = { postMessage() {}, onmessage: null }; } }, sampleRate: 48000, currentTime: 0, currentFrame: 0 });
+  vm.runInContext(chopSource(), sctx, { filename: 'seq-core+applyChop.js' }); sctx.__u.__setup();
+  return { ctx: sctx, U: sctx.__u };
+}
+// a song for the chop cases: ELECTRO's frame (mix, tfx, ... so the JS and C++ both load it), seven tracks, one phrase each, instruments 0-7 (see CHOP_INSTS)
+const CHOP_INSTS = [   // [pad, fields]
+  [0, { slc: 4 }], [1, { slc: 16 }], [2, { sync: 1, beats: 4 }], [1, { sync: 2, beats: 4, grain: 1 }], [0, { sync: 3, beats: 2, grain: 2 }], [0, { slc: 4, smode: 1 }], [2, { slc: 8 }], [3, {}]];
+function chopSong(variant) {
+  const j = JSON.parse(fs.readFileSync(path.join(ROOT, 'sounds/ELECTRO.thunder'), 'utf8')), S = j.song, mine = ['song', 'chains', 'phrases', 'plen', 'insts'];
+  for (const k of Object.keys(S)) if (!mine.includes(k) && JSON.stringify(S[k]).length > 4000) delete S[k];
+  const tpl = S.insts[0]; S.insts = CHOP_INSTS.map(([pad, f]) => ({ ...tpl, pad, ...f })); S.bpm = 120; S.lpb = 4; S.ntr = 8;
+  const row = (n, ins) => [n, -1, -1, -1, -1, ins, -1, -1, -1, -1, -1, -1], PH = [];
+  const notes = [[48, 49, 50, 52, 46, 44, 51, 53, 48, 47, 45, 55, 54, 48, 56, 60], [48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48], [48, 55, 48, 60, 48, 52, 48, 40, 48, 48, 53, 48, 61, 48, 48, 50],
+    [48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48], [48, 50, 48, 48, 52, 48, 48, 48, 49, 48, 48, 48, 48, 55, 48, 48], [48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 47, 46, 45],
+    [40, 44, 48, 52, 56, 60, 64, 68, 72, 36, 41, 47, 50, 53, 59, 66]];
+  for (let t = 0; t < 7; t++) PH.push(Array.from({ length: 32 }, (_, y) => y < 16 ? row(notes[t][y], t) : row(-1, 0)));
+  const cmd = (t, y, col, name, v) => { const r = PH[t][y]; r[6 + 2 * col] = FXN(name); r[7 + 2 * col] = v; };
+  [0, 1, 2, 3, 15, 4, 20, 17, 5, 9, 11, 13, 14, 7, 31 % 16 + 12, 8].forEach((v, y) => cmd(1, y, 0, 'SLC', v));   // slc 16 with the SLC command (20 wraps)
+  [64, 128, 200, 32, 255].forEach((v, k) => { cmd(3, 2 * k, 0, 'STA', v); cmd(4, 2 * k + 1, 0, 'STA', v); });   // sync 2 and 3 with STA (offset) notes
+  cmd(2, 3, 0, 'STA', 100); cmd(0, 8, 0, 'TPO', 90); cmd(0, 12, 0, 'KIL', 2); cmd(6, 5, 0, 'RET', 0x24); cmd(6, 9, 1, 'KIL', 1);   // a bpm change mid-song, a KIL shorter than the slice, retriggers
+  if (variant === 'sync-rev') PH.forEach((p, t) => p.forEach((r, y) => { if (r[0] >= 0 && y % 3 === 0) { r[6 + 2 * 2] = FXN('PLY'); r[7 + 2 * 2] = 1; } }));   // PLY 1: reversed notes
+  S.phrases = PH; S.plen = PH.map(() => 16); S.chains = PH.map((_, t) => [[t, 0]]); S.song = Array.from({ length: 256 }, (_, r) => Array.from({ length: 33 }, (_, t) => r < 8 && t < 7 ? t : -1));
+  return { v: j.v, song: S };
+}
+const CHOP_CASES = [
+  { id: 'chop-all', variant: 'all', desc: 'slc 4 around the root, slc 16 + SLC, sync 1 on a loop at another tempo, sync 2 / 3 with STA, TPO mid-song, retriggers, KIL' },
+  { id: 'chop-rev', variant: 'sync-rev', desc: 'the same song with PLY 1 on every third note (reversed: the offset counts from the far end)' },
+  { id: 'chop-edit', variant: 'all', edits: [{ after: 20, fn: S => { S.insts[0].slc = 8; S.insts[5].slc = 6; } }, { after: 60, fn: S => { S.insts[2].sync = 0; S.insts[6].slc = 0; S.insts[7].sync = 1; } }],
+    desc: 'a takeOver after edits that change slc (and sync on / off) of running instruments' },
+];
+function chopCases() {
+  const H = chopHarness(), sha = t => crypto.createHash('sha256').update(t).digest('hex'); let bad = false;
+  // 1. the proof: the four plain cases through THIS harness, sim OFF, equal their committed goldens
+  for (const C of SONGS) {
+    let t0 = fs.readFileSync(path.join(ROOT, C.file), 'utf8'); if (C.edit) { const j = JSON.parse(t0); C.edit(j); t0 = JSON.stringify(j); }
+    const j = JSON.parse(t0); H.U.__setup(); H.U.load(vm.runInContext('(' + JSON.stringify(j.song) + ')', H.ctx), vm.runInContext('({vtrk:false,NSLOT:16,TFX:{}})', H.ctx));
+    H.ctx.__c = { mode: C.mode, max: C.max || 20000, o: C.opt || {} };
+    const rows = vm.runInContext(`(() => { const d = __c, o = d.o; return __u.coreSeeded(() => { const out = [];
+      const sq = __u.makeSeq(S, d.mode, {row:o.row || 0, loop:o.loop || null, once:!o.loop, sim:false});
+      for (let n = 0; sq.alive() && n < d.max; n++){ const r = sq.step(); out.push({t:__u.coreNum(r.t), evs:r.evs.map(__u.corePlain)}); } return out; }); })()`, H.ctx);
+    const g = JSON.parse(fs.readFileSync(path.join(ROOT, `tests/golden/seq-${C.id}.json`), 'utf8')), ok = sha(rows.map(r => JSON.stringify(r)).join('\n') + '\n') === g.sha256 && rows.length === g.rows; if (!ok) bad = true;
+    console.log(`${ok ? 'ok  ' : 'FAIL'} chop-harness proof ${C.id} (real applyChop, sim off): ${rows.length} rows ${ok ? '= the page\'s golden' : 'DIFFERS'}`);
+  }
+  if (bad) return false;
+  // 2. the chop cases
+  for (const C of CHOP_CASES) {
+    const f = chopSong(C.variant), base = clone(f.song); let shadow = clone(base);
+    const eds = (C.edits || []).map(e => { const nx = clone(shadow); e.fn(nx); const ops = diffOps(shadow, nx); shadow = nx; return { after: e.after, patch: ops }; });
+    const want = [], addWant = S => S.insts.forEach(I => { if ((I.slc | 0) > 1 && I.smode && !want.some(w => w[0] === I.pad && w[1] === I.slc)) want.push([I.pad, I.slc, 1]); });
+    addWant(base); let s2 = clone(base); for (const e of eds) { const a = clone(s2); for (const [k, i, v] of e.patch) { if (i === null) a[k] = v; else if (i === 'len') a[k].length = v; else if (i !== 'del') a[k][i] = v; else delete a[k]; } s2 = a; addWant(s2); }
+    H.U.__setup(); const pads = H.ctx.__want = want, info = JSON.parse(JSON.stringify(vm.runInContext('__u.__padInfo(__want).constructor === Object ? __u.__padInfo(__want) : null', H.ctx)));
+    for (const p of [0, 1, 2, 3]) if (!info[p]) info[p] = JSON.parse(JSON.stringify(vm.runInContext(`__u.__padInfo([[${p}, 2, 0]])`, H.ctx)))[p];
+    H.U.__setup(); H.U.load(vm.runInContext('(' + JSON.stringify(base) + ')', H.ctx), vm.runInContext('({vtrk:false,NSLOT:16,TFX:{}})', H.ctx));
+    H.ctx.__c = { max: 20000, eds: clone(eds) };
+    const rows = vm.runInContext(`(() => { const d = __c; return __u.coreSeeded(() => { const out = [];
+      const sq = __u.makeSeq(S, 'song', {row:0, loop:null, once:true, sim:false});
+      const P = Object.create(__u.ThunderCore.prototype); P.chase = null; P.seq = sq;
+      for (let n = 0; sq.alive() && n < d.max; n++){ const r = sq.step(); out.push({t:__u.coreNum(r.t), evs:r.evs.map(__u.__cp)});
+        for (const e of d.eds) if (e.after === n + 1) P.msg({op:'patch', ops:e.patch}); }
+      return out; }); })()`, H.ctx);
+    const text = rows.map(r => JSON.stringify(r)).join('\n') + '\n', counts = {}; let chopped = 0, stN = 0;
+    if (process.env.CHOP_DUMP) fs.writeFileSync(path.join(process.env.CHOP_DUMP, C.id + '.jsonl'), text);   // (debugging: the JS rows, one a line)
+    for (const r of rows) for (const e of r.evs) { counts[e.type] = (counts[e.type] || 0) + 1; if (e.type === 'note') { if (e.ofsSec != null) chopped++; if (e.st) stN++; } }
+    const now = { desc: C.desc, fileText: JSON.stringify(f), pads: info, edits: eds, rows: rows.length, events: Object.values(counts).reduce((a, b) => a + b, 0), counts, chopped, stretched: stN, sha256: sha(text),
+      rowHashes: rows.map(r => crypto.createHash('sha256').update(JSON.stringify(r)).digest('hex').slice(0, 12)) };
+    if (process.env.CHOP_DEBUG) console.log(JSON.stringify(counts), JSON.stringify(rows.flatMap(r => r.evs).filter(e => e.type === 'note').slice(0, 3)));
+    if (!chopped || (C.variant === 'all' && !stN)) { console.log(`FAIL ${C.id}: no chopped notes (${chopped}) / no st notes (${stN}): the case proves nothing`); bad = true; continue; }
+    const gf = path.join(LIVE_DIR, `seq-${C.id}.json`);
+    if (UPDATE || !fs.existsSync(gf)) { fs.writeFileSync(gf, JSON.stringify(now) + '\n'); console.log(`wrote ${path.relative(ROOT, gf)}: ${now.rows} rows, ${now.events} events, ${chopped} chopped notes, ${stN} with st`); continue; }
+    const was = JSON.parse(fs.readFileSync(gf, 'utf8')), ok = was.sha256 === now.sha256 && deq(was.pads, now.pads) && was.fileText === now.fileText && deq(was.edits, now.edits); if (!ok) bad = true;
+    console.log(`${ok ? 'ok  ' : 'FAIL'} ${C.id}: ${now.rows} rows, ${chopped} chopped notes, ${stN} with st`);
+  }
+  return !bad;
+}
+if (process.argv.includes('--chop')) { process.exit(chopCases() ? 0 : 1); }
 const LIVE_OK = liveCases();
 if (process.argv.includes('--edit')) { const ok = editCases(); process.exit(LIVE_OK && ok ? 0 : 1); }
 if (process.argv.includes('--live-only')) process.exit(LIVE_OK ? 0 : 1);

@@ -289,14 +289,17 @@ void Seq::partEvsOf(Json mix, Json fx, bool own, std::vector<PEv>& out) const {
 }
 void Seq::buildParts() {
   sInsts_.resize(NI);
-  for (int i = 0; i < NI; i++) { const SongInst& I = S_.insts[i]; PInst& p = sInsts_[(size_t)i]; p.present = !S_.instMissing[i]; p.pad = I.pad; p.tsp = I.tsp; p.vol = I.vol; p.pan = I.pan; p.ofs = I.ofs; p.hut = I.hut; p.huv = I.huv; p.kf = I.kf != 0; p.rev = I.rev != 0; }
+  for (int i = 0; i < NI; i++) { const SongInst& I = S_.insts[i]; PInst& p = sInsts_[(size_t)i]; p.present = !S_.instMissing[i]; p.pad = I.pad; p.tsp = I.tsp; p.vol = I.vol; p.pan = I.pan; p.ofs = I.ofs; p.hut = I.hut; p.huv = I.huv; p.kf = I.kf != 0; p.rev = I.rev != 0;
+    p.slc = I.slc; p.smode = I.smode != 0; p.sync = I.sync != 0; p.sy = I.sync; p.grain = I.grain; p.beats = I.beats ? I.beats : 4; }
   partEvsOf(Json(), Json(), true, own_.evs);
   const Json P = S_.parts;
   for (size_t k = 0; k < P.size(); k++) { Part part; const Json p = P.isArr() ? P.at(k) : Json(); part.present = truthy(p);
     if (part.present) { partEvsOf(p.get("mix"), p.get("fx"), false, part.evs); const Json in = p.get("insts");
       for (size_t i = 0; i < in.size(); i++) { const Json I = in.at(i); PInst x; x.present = truthy(I); if (x.present) { x.pad = I.get("pad").missing() ? kNaN : jnum(I.get("pad")); x.tsp = I.get("tsp").missing() ? kNaN : jnum(I.get("tsp"));
           x.vol = I.get("vol").missing() ? kNaN : jnum(I.get("vol")); x.pan = I.get("pan").missing() ? kNaN : jnum(I.get("pan")); x.ofs = I.get("ofs").missing() ? kNaN : jnum(I.get("ofs"));
-          x.hut = js_to_int32(jnum(I.get("hut"))); x.huv = js_to_int32(jnum(I.get("huv"))); x.kf = truthy(I.get("kf")); x.rev = truthy(I.get("rev")); }
+          x.hut = js_to_int32(jnum(I.get("hut"))); x.huv = js_to_int32(jnum(I.get("huv"))); x.kf = truthy(I.get("kf")); x.rev = truthy(I.get("rev"));
+          x.slc = js_to_int32(jnum(I.get("slc"))); x.smode = truthy(I.get("smode")); x.sync = truthy(I.get("sync")); x.sy = js_to_int32(jnum(I.get("sync")));
+          x.grain = I.get("grain").missing() || nullish(I.get("grain")) ? 1 : js_to_int32(jnum(I.get("grain"))); { const double b = jnum(I.get("beats")); x.beats = truthy(I.get("beats")) && b == b ? b : 4; } }
         part.insts.push_back(x); } }
     parts_.push_back(std::move(part)); }
 }
@@ -437,7 +440,7 @@ bool Seq::takeOver(const Seq& old) {
   pfXf_ = old.pfXf_; pfFill_ = old.pfFill_; pfPart_ = old.pfPart_; perfFirst_ = old.perfFirst_;
   std::memcpy(pnoHas_, old.pnoHas_, sizeof pnoHas_); std::memcpy(pno_, old.pno_, sizeof pno_);
   std::memcpy(trGen_, old.trGen_, sizeof trGen_);
-  badSets_ = old.badSets_; dropped_ = old.dropped_; maxEvs_ = old.maxEvs_; maxArp_ = old.maxArp_;
+  badSets_ = old.badSets_; chopped_ = old.chopped_; chopSkipped_ = old.chopSkipped_; chopNoHits_ = old.chopNoHits_; chopStretched_ = old.chopStretched_; dropped_ = old.dropped_; maxEvs_ = old.maxEvs_; maxArp_ = old.maxArp_;
   // what the JS computes once, at PLAY (ruling 1): the bus plan, the idle-LFO set, the INS clamp stay the PLAY's
   std::memcpy(busT_, old.busT_, sizeof busT_); std::memcpy(hearT_, old.hearT_, sizeof hearT_); hasHear_ = old.hasHear_; NIs_ = old.NIs_;
   // the macros' resting values: the JS copied them at make (PF.mac), so an edit of `v` is not heard; the effective value in force is carried
@@ -553,6 +556,38 @@ int Seq::dirNext(Tr& T, int y, int L) {
   int n = y + T.pp; if (n >= L) { T.pp = -1; n = std::max(0, L - 2); } else if (n < 0) { T.pp = 1; n = std::min(L - 1, 1); }
   return n;
 }
+// applyChop (index.html:22333), the part the pad data does not touch done as the JS does it, in the same order and arithmetic. The pad's loopSecs and (SMODE) slice points
+// come from SeqOpts::chop. A pad with no loop handed in: the JS's `ensure(pad)` null case (the call is skipped, the event keeps its rate and no chop), counted.
+void Seq::applyChop(SeqEvent& ev, const PInst& I, int n, double semis, double bpm) {
+  const int slc = I.slc, sy = I.sy;
+  if (slc < 2 && !sy) return;
+  const int pad = (ev.pad == ev.pad && ev.pad >= 0 && ev.pad < kSeqChopPads && ev.pad == (double)(int)ev.pad) ? (int)ev.pad : -1;
+  const SeqChop* ch = o_.chop;
+  if (!ch || pad < 0 || !ch->has(pad)) { chopSkipped_++; return; }
+  const double loop = ch->loop(pad), target = I.beats * 60 / bpm;
+  const bool sl = (ev.has & SH_SLC) && slc >= 2;   // SLC: the slice comes from the command, so the note pitches it
+  double rate = js_pow(2, (semis + (sl ? n - ROOT : 0)) / 12), scale = 1;
+  if (sy == 1) rate *= loop / target;
+  if (sy >= 2) scale = target / loop;
+  double s0 = 0, s1 = loop;
+  if (slc >= 2) {
+    const int nn = std::min(slc, kSeqChopMaxSlices); int cnt = nn; const double* pts = nullptr; bool grid = true;
+    if (I.smode) { pts = ch->hits(pad, nn, &cnt); if (!pts) { chopNoHits_++; cnt = nn; } else grid = false; }
+    const double kd = sl ? std::fmod(ev.slc, (double)slc) : (double)(((n - ROOT) % slc + slc) % slc);
+    const int k = (kd == kd && kd >= 0 && kd < cnt && kd == (double)(int)kd) ? (int)kd : 0;   // (the JS reads pts[k]: undefined for a k outside the points; here the first slice)
+    const auto pt = [&](int i) { return grid ? loop * i / nn : pts[i]; };
+    s0 = pt(k); s1 = k + 1 < cnt ? pt(k + 1) : loop;
+  } else if (ev.ofs > 0) s0 = loop * std::max(0.0, std::min(255.0, ev.ofs)) / 256;   // STA on a synced loop
+  const double ofsSec = s0 * scale, durSec = std::max(0.005, (s1 - s0) * scale), end = ev.t + durSec / (slc >= 2 || sy ? rate : ev.rate);
+  // a value that is not finite (a hostile table, an extreme tempo) leaves the note as the sequencer made it: counted
+  if (!(std::isfinite(rate) && std::isfinite(ofsSec) && std::isfinite(durSec) && std::isfinite(end) && ofsSec >= 0)) { chopSkipped_++; return; }
+  if (sy >= 2) { ev.has |= SH_ST; ev.stMode = (uint8_t)std::min(sy, 255); ev.stBpm = js_round(bpm * 100) / 100; ev.stBeats = I.beats; ev.stGrain = (uint8_t)std::max(0, std::min(255, I.grain)); chopStretched_++; }
+  if (slc >= 2 || sy) ev.rate = rate;
+  ev.has |= SH_CHOP; ev.ofsSec = ofsSec; ev.durSec = durSec;
+  if (!(ev.has & SH_CUT)) { ev.has |= SH_CUT; ev.cut = end; } else ev.cut = std::min(ev.cut, end);
+  chopped_++;
+}
+
 const Seq::PInst& Seq::instOf(int ii) const {   // IS[ii] || IS[0] || S.insts[ii] || S.insts[0], IS = instsNow()
   if (pfPart_ >= 0 && pfPart_ < (int)parts_.size() && parts_[(size_t)pfPart_].present) { const std::vector<PInst>& IS = parts_[(size_t)pfPart_].insts;
     if (ii >= 0 && ii < (int)IS.size() && IS[(size_t)ii].present) return IS[(size_t)ii];
@@ -873,7 +908,8 @@ int Seq::step(SeqEvent* evs, int cap, SeqStep* out) {
           if (hasBend) { ev.has |= SH_BEND; ev.bendMul = bendMul; ev.bendT1 = end; }
           if (hasVib) { ev.has |= SH_VIB; ev.vibSpd = vibSpd; ev.vibDep = vibDep; ev.vibT1 = end; }
           ev.ii = ii; ev.mn = note + 12 + ntc / 100; ev.vel = hg * volv / 255; ev.tick = tick; ev.vc = vcv;
-          // (applyChop and varWant: not in sim mode, and the core's copies do nothing)
+          // applyChop: sliced / synced instruments (not in sim mode: the golden runs). The pad's chop data is handed in (SeqOpts::chop); a pad without it is the JS's `ensure()` returning null: unchanged.
+          if (!o_.sim && (I.slc > 1 || I.sync)) { applyChop(ev, I, n, note - n, nb); if (!q) firstRate = ev.rate; }
           if (every) {
             // RTV: the retriggers' level curve, signed; without it RET's own fade
             const double K = std::max(1.0, std::ceil((end - 1e-6 - nat) / (every * tick)) - 1); const bool hasRv = fx.H(RTV); const int rv = hasRv ? s8(fx[RTV]) : 0;
