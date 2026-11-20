@@ -19,6 +19,7 @@
 #include "render/render.h"
 #include "sf/sf.h"
 #include "rt/json.h"
+#include "rt/num.h"
 
 #if defined(__cpp_exceptions) || defined(__EXCEPTIONS) || (defined(_MSC_VER) && defined(_CPPUNWIND))
 #define TR_TRY try
@@ -55,6 +56,7 @@ struct thunder_render {
   int qPos = kRenderQuantum;           // next unread frame of q (kRenderQuantum: empty)
   int64_t raw = 0, skipLeft = 0, outPos = 0;
   int64_t total = -1;                  // frames of output once known
+  int stem = 0;                        // opts.stem (0: the mix)
   int64_t est = -2;                    // length_estimate's cached answer (-2: not computed yet)
   bool started = false, ended = false, hitLimit = false, dead = false;
 };
@@ -94,10 +96,11 @@ thunder_render* createImpl(const uint8_t* songBytes, size_t n, const thunder_ren
     if (opts->size < offsetof(thunder_render_opts, sample_rate)) { setErr(err, cap, "opts.size is too small"); return nullptr; }
 #define TR_COPY(f) if (opts->size >= offsetof(thunder_render_opts, f) + sizeof(opts->f)) o.f = opts->f
     TR_COPY(reserved0); TR_COPY(sample_rate); TR_COPY(effects); TR_COPY(master_chain); TR_COPY(pdc_mode); TR_COPY(page_timing); TR_COPY(use_frames);
-    TR_COPY(reserved1); TR_COPY(frames); TR_COPY(max_frames); TR_COPY(vars_json); TR_COPY(vars_bytes);
+    TR_COPY(reserved1); TR_COPY(frames); TR_COPY(max_frames); TR_COPY(vars_json); TR_COPY(vars_bytes); TR_COPY(stem); TR_COPY(reserved2);
 #undef TR_COPY
   }
-  if (o.reserved0 != 0 || o.reserved1 != 0) { setErr(err, cap, "opts.reserved must be 0"); return nullptr; }
+  if (o.stem < 0 || o.stem > kSongNT) { setErr(err, cap, "opts.stem must be 0..32"); return nullptr; }
+  if (o.reserved0 != 0 || o.reserved1 != 0 || o.reserved2 != 0) { setErr(err, cap, "opts.reserved must be 0"); return nullptr; }
   double sr = o.sample_rate == 0 ? 48000.0 : o.sample_rate;
   if (!fin(sr) || sr < 8000 || sr > 384000) { setErr(err, cap, "opts.sample_rate must be 8000..384000"); return nullptr; }
   if ((o.effects | 1) != 1 || (o.master_chain | 1) != 1 || (o.page_timing | 1) != 1 || (o.use_frames | 1) != 1) { setErr(err, cap, "opts flags must be 0 or 1"); return nullptr; }
@@ -122,11 +125,13 @@ thunder_render* createImpl(const uint8_t* songBytes, size_t n, const thunder_ren
     if (!r->varsDoc.root().isObj()) { setErr(err, cap, "vars_json is not a JSON object"); return nullptr; }
     r->vars.load(r->varsDoc.root());
   }
+  r->stem = o.stem;
   r->sr = sr; r->useFrames = o.use_frames != 0; r->frames = o.frames;
   r->maxFrames = o.max_frames ? o.max_frames : (int64_t)(sr * 1260);
   SeqOpts so; so.row = r->song.renderFrom; so.once = true;
   r->R.reset(new SongRenderer(r->song, r->vars, r->pads, sr, kRenderQuantum, so));
   r->R->pool().setPageTiming(o.page_timing != 0);
+  if (o.stem > 0) r->R->setStem(o.stem - 1);   // first: a stem has no master effects and no master chain (the calls below leave the master alone)
   if (o.effects) r->R->setEffects(true);
   if (o.master_chain) r->R->setMasterChain(master_chain_from_song(r->song.mst, r->song.limiter));
   if (o.pdc_mode) {
@@ -271,6 +276,42 @@ int64_t thunder_render_length_estimate(thunder_render* r) {
   TR_CATCH_BADALLOC(return -1;)   // not cached: a later call may succeed; the handle is untouched
   TR_CATCH_ALL(return -1;)
 }
+int thunder_render_stem_tracks(thunder_render* r, int32_t* out, int cap) {
+  if (!r || cap < 0 || (out && cap == 0)) return THUNDER_RENDER_E_ARG;
+  if (r->dead) return THUNDER_RENDER_E_STATE;
+  TR_TRY {
+    // The notes: the same sequencer as the render's, stepped without audio (see length_estimate). A note counts when its track is 0..NT-1 and its pad is in the kit.
+    SeqOpts so; so.row = r->song.renderFrom; so.once = true;
+    Seq seq(r->song, r->vars, SeqMode::Song, so);
+    std::unique_ptr<SeqEvent[]> evs(new SeqEvent[kRenderEvents]); std::unique_ptr<SeqStep> st(new SeqStep);
+    const double limit = (double)(r->maxFrames + r->skip) / r->sr;
+    uint32_t has = 0; int64_t steps = 0;
+    while (seq.alive() && seq.time() < limit) {
+      if (++steps > 20000000) return THUNDER_RENDER_E_LIMIT;
+      const int k = seq.step(evs.get(), kRenderEvents, st.get());
+      for (int i = 0; i < k; i++) {
+        const SeqEvent& e = evs[i];
+        if (e.type != SEV_NOTE || e.track < 0 || e.track >= kSongNT) continue;
+        const int pad = to_int_sat(e.pad, -1, 1 << 20);
+        if (pad < 0 || pad >= kRenderPads) continue;
+        if (r->pads.buf[pad].data || r->pads.route[pad] != PadRoute::Sampler || r->pads.sf[pad].font) has |= 1u << e.track;
+      }
+    }
+    uint32_t mute = 0, solo = 0;
+    for (int t = 0; t < kSongNT; t++) { if (r->song.mix[t].mute) mute |= 1u << t; if (r->song.mix[t].solo) solo |= 1u << t; }
+    const BusPlan& P = r->R->mixer().plan();   // the patch's plan, as the page's busPlan(): a bus is a track with sources (BP.feeds), a pure source plays only through its bus
+    const uint32_t aud = mix_audible(P, mute, solo);
+    uint32_t keep = aud & has;
+    for (int b = 0; b < kSongNT; b++) if (P.feedMask[b] && !(keep >> b & 1u) && (aud >> b & 1u) && (P.feedMask[b] & keep)) keep |= 1u << b;
+    uint32_t list = keep;
+    for (int t = 0; t < kSongNT; t++) if ((keep >> t & 1u) && (P.pure >> t & 1u) && (P.targets[t] & keep)) list &= ~(1u << t);   // inside its bus's stem
+    int n = 0;
+    for (int t = 0; t < kSongNT; t++) if (list >> t & 1u) { if (out && n < cap) out[n] = t + 1; n++; }
+    return n;
+  }
+  TR_CATCH_BADALLOC(return THUNDER_RENDER_E_MEMORY;)
+  TR_CATCH_ALL(return THUNDER_RENDER_E_INTERNAL;)
+}
 int thunder_render_latency(thunder_render* r) { return r ? (int)std::min<int64_t>(r->skip, 0x7fffffff) : -1; }
 
 int64_t thunder_render_read(thunder_render* r, float* l, float* rr, int64_t frames) {
@@ -311,6 +352,7 @@ int thunder_render_stats_get(thunder_render* r, thunder_render_stats* out) {
   s.notes_live = t.notesLive; s.notes_sf = t.notesSf; s.notes_var = t.notesVar; s.notes_var_missing = t.notesVarMissing; s.notes_unshaped = t.notesUnshaped; s.events_ignored = t.eventsIgnored; s.notes_sf_played = t.notesSfPlayed;
   s.notes_stretched = t.notesStretched; s.seq_chopped = t.seqChopped; s.seq_chop_skipped = t.seqChopSkipped; s.seq_chop_no_hits = t.seqChopNoHits;
   s.sf_voices_refused = t.sfVoiceDropped; s.sf_voice_track_full = t.sfVoiceOverflow; s.sf_voice_auto_dropped = t.sfVoiceAutoDropped; s.peak_voices_all = t.peakVoicesAll;
+  s.stem = r->stem; s.heard_mask = r->R->heardMask();
   const size_t k = std::min<size_t>(out->size, sizeof s); const uint32_t keep = out->size;
   std::memcpy(out, &s, k); out->size = keep;
   return 0;

@@ -120,6 +120,15 @@ class SongRenderer {
   // Control thread, before the first block (the processors start from rest).
   void setMasterChain(const MasterChainConfig& cfg);
   MasterChain* masterChain() { return mchain_.get(); }
+  // A STEM render (U34b, renderOut's pass(evs, {t}, N, sr, getB, false, false), index.html:24351): track `track` (0..kSongNT-1) alone is heard (plus, when it is a bus of the song's chains patch, its audible
+  // sources: pass's k2, :24228) whatever mute / solo say; every track still plays (chokes, takeovers). No master effects, no master chain (mastering, safety limiter) and no master
+  // latency: setMasterChain / the master hook are refused from here on and a chain already set is dropped. MASTER VOL and OUT stay. Control thread, before the first block,
+  // and before setEffects / setMasterChain (which then leave the master alone). Returns false for a bad track.
+  bool setStem(int track);
+  // A chains host, once there is one, must set a chain hook (Mixer::setChain) only on the tracks in heardMask() of a stem render, as pass() does (`routeTrack` for `keep` only, :24258):
+  // a bus that is not heard does not exist there, so a pure source heard alone plays on its own, not through it.
+  int stem() const { return stem_; }                     // -1: the mix
+  uint32_t heardMask() const { return mix_.audibleMask(); }
   // TRACK AND MASTER EFFECTS (U14): the song's tfx effects (S.tfx / S.mfx, the 34 wasm effects) in the mixer's setFx / setMasterFx hooks, their FXO / FLX / GAT /
   // RTG / FXV events dispatched to them. Effects of the other kinds (U15 to U18) are left out. Control thread, before the first block.
   void setEffects(bool on);
@@ -165,6 +174,7 @@ class SongRenderer {
   std::unique_ptr<FxBank> fx_;
   static void masterHook(void* user, int track, float* L, float* R, int frames, double t0, const MixFeed* feeds, int nFeeds);
   MeterBank* meters_ = nullptr;
+  int stem_ = -1;
   RenderStats st_;
   uint64_t serial_ = 0; int peakAll_ = 0;                // voice serials (age across the pools) and the most voices of both pools sounding together
   InputTap tap_ = nullptr; void* tapUser_ = nullptr;

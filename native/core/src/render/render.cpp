@@ -87,7 +87,17 @@ void SongRenderer::setPlan(const PdcPlan& plan, PdcMode mode, int64_t extraLaten
   PdcApply a; a.mode = mode; a.live = false; pdc_apply(mix_, plan, a);
 }
 
+bool SongRenderer::setStem(int track) {
+  if (track < 0 || track >= kSongNT) return false;
+  const uint32_t aud = mix_.audibleMask();   // mute / solo as the song has them (not yet forced)
+  uint32_t m = 1u << track;
+  m |= mix_.plan().feedMask[track] & aud;   // a bus's stem plays its audible sources with it (pass's k2, :24228: from the patch's plan, as the page, whether or not a chains host has made the bus yet)
+  stem_ = track; mchain_.reset(); mix_.setMasterFx(nullptr, nullptr);
+  mix_.setHeard(m);
+  return true;
+}
 void SongRenderer::setMasterChain(const MasterChainConfig& cfg) {
+  if (stem_ >= 0) return;   // a stem has no master chain
   if (!mchain_) mchain_.reset(new MasterChain(sr_, maxBlock_));
   mchain_->configure(cfg); mix_.setMasterFx(&SongRenderer::masterHook, this);
 }
@@ -101,6 +111,10 @@ void SongRenderer::setEffects(bool on) {
   if (!on) { fx_.reset(); for (int t = 0; t < kSongNT; t++) mix_.setFx(t, nullptr, nullptr); mix_.setMasterFx(mchain_ ? &SongRenderer::masterHook : nullptr, mchain_ ? this : nullptr); return; }
   fx_.reset(new FxBank(sr_)); fx_->load(S_, S_.bpm);
   fx_->attach(mix_, false);
+  if (stem_ >= 0) {   // a stem: no master effects (the master hook stays off); effects only on the tracks that are heard (pass(): `for (const t of keep) pl.setFx(...)`, index.html:24256)
+    const uint32_t heard = mix_.audibleMask(); for (int t = 0; t < kSongNT; t++) if (!(heard >> t & 1u)) mix_.setFx(t, nullptr, nullptr);
+    return;
+  }
   mix_.setMasterFx((mchain_ || fx_->host(kSongNT).slotCount() > 0) ? &SongRenderer::masterHook : nullptr, this);
 }
 void SongRenderer::renderTrimmed(float* outL, float* outR, int64_t N) {
