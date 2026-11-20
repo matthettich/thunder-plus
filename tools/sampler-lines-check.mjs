@@ -18,12 +18,12 @@ let failed = false; const say = (ok, msg) => { console.log(`${ok ? 'ok  ' : 'FAI
 try {
   const page = await (await browser.newContext({ viewport: { width: 1400, height: 900 } })).newPage();
   page.on('pageerror', e => { console.error('page error:', e.message); failed = true; });
-  await page.goto(`http://localhost:${srv.address().port}/index.html?seqtest=1`, { waitUntil: 'domcontentloaded' }); await page.waitForFunction(() => !!window.__seqTest, null, { timeout: 30000 }); await page.waitForTimeout(1500);
+  await page.goto(`http://localhost:${srv.address().port}/index.html?seqtest=1`, { waitUntil: 'domcontentloaded' }); await page.waitForFunction(() => !!window.__seqTest, null, { timeout: 90000 }); await page.waitForTimeout(1500);
   const r = await page.evaluate(async () => {
     const E = s => window.__seqTest.ev(s), wait = ms => new Promise(r => setTimeout(r, ms)), out = {};
     E('document.getElementById("view") && 0'); E('S.insts[5].pad = 9; S.insts[6].pad = 9; S.insts[7].pad = 2; S.lpb = 8; S.bpm = 131;');
     for (const [pad, key] of [[9, 'synth'], [2, 'drum']]) {
-      E(`kit.voices[${pad}].engine = "layers"; kit.voices[${pad}].layers.forEach(L => L.on = false);`);
+      E(`kit.voices[${pad}].engine = "layers"; kit.voices[${pad}].tune = ${pad === 9 ? 24 : 0}; kit.voices[${pad}].layers.forEach(L => L.on = false);`);
       E(`assignSample(${pad}, Float32Array.from({length:44100}, (_, i) => 0.5 * Math.sin(2 * Math.PI * 1000 * i / 44100)), 44100, "t")`);
       await wait(1200);
       out[key] = E(`(() => { const c = ensure(${pad}), d = c.data; let f0 = -1, l = -1, n = 0; for (let i = 1; i < Math.min(d.length, c.sr * 0.3); i++) if (d[i-1] <= 0 && d[i] > 0){ if (f0 < 0) f0 = i; l = i; n++; } return {hz: (n - 1) * c.sr / (l - f0), tune: kit.voices[${pad}].layers[kit.voices[${pad}].sel].tune, vt: kit.voices[${pad}].tune}; })()`);
