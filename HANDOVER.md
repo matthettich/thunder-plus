@@ -853,6 +853,9 @@ The web app stays on pump deb07d3 (build 642's `pump/pump.wasm` and `pump/synth/
 
 Start a session by asking for results. Fix on `beta`. (10 Nov, 15:10: the web beta is build 560; the build numbers in the rest of this paragraph are older.) Web beta: https://matthettich.github.io/thunder-plus/beta/ (build 547 as of 10 Nov morning, 548 once its PR merges; the night of 9–10 Nov shipped 544–547, see the four "10 Nov" entries below. Decisions the lead made that night for the owner to confirm or reverse: on a phone the saved Sequencer default plays on the Page unless Audio thread is picked on that device; on a phone the safety limiter is its stand-in until another worklet loads; the resync only runs with a worklet loaded and its margins are untested on a device). Desktop: v1.3.4-beta.2 (build 541, no feed view or scopes); further desktop betas on hold until the owner asks.
 
+**Build 656** (FOLLOW above PHRASE ON STOP and ARRANGE ON STOP)
+- [ ] **Computer, View menu (desktop app and browser), and phone, Settings > Screen:** Pass: FOLLOW sits directly above PHRASE ON STOP and ARRANGE ON STOP; FOLLOW (OFF / PATTERN / ON), PHRASE ON STOP and ARRANGE ON STOP (STAYS / PLAYHEAD) each still change and keep their value after a reload. On the Project screen the three are also in that order.
+
 **Build 649** (press and drag a bar in Settings; branch `beta-drag-sliders`, PR into `beta`)
 - [ ] **Computer (mouse), Settings > Song (the Song sheet), a song PLAYING:** press on the SWING bar away from the thumb, then drag sideways. Pass: the value jumps to the press, follows the pointer, the number beside the bar follows, the groove changes while you drag, and letting go leaves it there. Same on TEMPO: the tempo follows (a little behind the pointer is fine) and the song keeps playing.
 - [ ] **Computer:** after dragging SWING, one Ctrl/\u2318+Z puts it back to where it was before the drag (one step, not many). Hold Shift while dragging: the value moves ten times slower. Double-click a bar: it goes back to its default (SWING 50).
@@ -1627,6 +1630,13 @@ Tests added: `gen-instrument` (source pins).
 Build 630, on `beta`. The owner asked for a mod section in the FX bar: collapsible, small, showing that there are modulations, the waveform and the destinations. Added `#dkMod` (DK_SECS / DK_FOLD, `deck.mod` saved with the panel, default FOLDED so no existing layout changes) between FX and PERFORM. `deckMod()` rebuilds only when open and when the focused track's LFOs / skin / ANIMATIONS change; each row is a 48×18 canvas wave (`modMix`, the MOD screen's maths) with a dot moved by `dkModTick` from the frame loop (only open, playing, visible, ANIMATIONS on, LOW POWER DISPLAY off), the shape and rate, and the destination (`tgtLabel`). Click: MOD screen on that track. Skin colours through CSS variables (checked IDM and 909 in headless Chrome). Hidden on the phone's swipe layout (`max-width:700px` + coarse pointer): the bottom panel there is one section at a time and the owner's folded-phone width is not a place to add a page. Display code only; nothing posts to the engine.
 
 Tests added: `deck-mod-section` (source pins).
+
+## 19 Nov (FOLLOW above PHRASE ON STOP and ARRANGE ON STOP; build 656)
+
+Build 656, branch `beta-follow-order` (from `beta`). Owner: "Can we move the FOLLOW setting to above PHRASE ON STOP and ARRANGE ON STOP? In the View menu and any other menus that have all three." Full list of lists with line numbers: `docs/FOLLOW-ORDER-NOTES.md`.
+- **Project screen rows (`projRows`):** FOLLOW moved down to sit above the two ON STOP rows (was ahead of ARRANGE LOOK-AHEAD, TAB, RESUME).
+- **View menu and Settings > Screen (`SHEET_QUICK`, `buildScreen`):** PHRASE ON STOP and ARRANGE ON STOP added to the quick rows right after FOLLOW; the later Screen loop skips quick rows so none repeats. No other menu, Help text or Electron menu lists all three; FOLLOW is missing from none that has the two ON STOP rows.
+- Nothing is keyed to row numbers (`cs.project.y` is not saved). Test added: `tests/follow-order.test.js` (2).
 
 ## 19 Nov (Settings sliders: press and drag a bar; build 649)
 
