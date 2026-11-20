@@ -9,7 +9,7 @@ if(NOT MSVC)
   set_source_files_properties(
     src/render/render_api.cpp src/render/render.cpp src/rt/json.cpp src/song/song.cpp src/seq/seq.cpp src/seq/session.cpp src/voice/voice.cpp src/mix/mix.cpp src/mix/pdc.cpp src/mix/delay.cpp src/mix/beat.cpp
     src/master/master.cpp src/master/eq.cpp src/master/chain.cpp src/fx/fxhost.cpp src/fx/clkcores.cpp src/fx/idmcores.cpp src/fx/u17cores.cpp src/fx/fxmap.cpp src/fx/fxbank.cpp src/fx/fxpump.cpp
-    src/sf/sf_live.cpp src/sf/sf_parse.cpp src/sf/sf_decode.cpp
+    src/sf/sf_live.cpp src/sf/sf_parse.cpp src/sf/sf_decode.cpp src/midi/midisched.cpp src/midi/midi_api.cpp
     PROPERTIES COMPILE_OPTIONS "-fexceptions")
 endif()
 target_sources(thunder_core PRIVATE src/modfx/fftr.cpp src/modfx/mod_spectral.cpp src/modfx/mod_convolve.cpp)   # U20

@@ -63,6 +63,7 @@ int main(int argc, char** argv) {
       } else if (r.op == "add") {                 // native sends a message the web does not
         for (Act& x : act) if (!x.used && x.p == r.p && hex(x.b, x.len) == r.hexb && std::fabs(x.ms - r.ms) <= 0.01) { x.used = true; hit++; break; }
       } else CHECK(false, "%s: unknown rule op %s", name.c_str(), r.op.c_str());
+      if (verbose) std::printf("   rule %d %s %s: %d\n", ruleNo, r.B.c_str(), r.op.c_str(), hit);
       CHECK(r.count < 0 ? hit > 0 : hit == r.count, "%s rule %d (%s %s): matched %d messages, the table says %d", name.c_str(), ruleNo, r.B.c_str(), r.op.c_str(), hit, r.count);
     }
     std::vector<int> missing; int matched = 0;

@@ -1,5 +1,5 @@
 {
- "note": "Expected differences between the web app's MIDI ledgers and the native MidiSched (owner's decision, 19 Nov 20:45: suspected web bugs are FIXED in the native port, the ledgers stay the web's truth). Each rule: case, B number, op, why, count. Ops: gear/stop (the web's message is expected shifted), drop (a web message native does not send), add (a native message the web does not send), move (a web message expected at another time), zone (clock ticks checked by the B2 rule). test_midi_ledger.cpp applies them and checks every count; an unlisted difference fails.",
+ "note": "Expected differences between the web app's MIDI ledgers and the native MidiSched (owner's decision, 19 Nov 20:45: suspected web bugs are FIXED in the native port, the ledgers stay the web's truth). Each rule: case, B number, op, why, count (the exact number of web messages it touches). Ops: gear/stop (the web's message is expected shifted), drop (a web message native does not send), add (a native message the web does not send), move (a web message expected at another time), zone (clock ticks checked by the B2 rule). test_midi_ledger.cpp applies them and checks every count; an unlisted difference fails.",
  "rules": [
   {
    "case": "start-midway",
@@ -39,42 +39,42 @@
    "B": "B3",
    "op": "stop",
    "why": "B3 + B8: the Stop is stamped like the last tick: stop time + FX latency - Gear delay (web: the stop time as is, before the last tick it had booked)",
-   "count": -1
+   "count": 2
   },
   {
    "case": "tempo-clock",
    "B": "B3",
    "op": "stop",
    "why": "B3 + B8: the Stop is stamped like the last tick: stop time + FX latency - Gear delay (web: the stop time as is, before the last tick it had booked)",
-   "count": -1
+   "count": 1
   },
   {
    "case": "tempo-live",
    "B": "B3",
    "op": "stop",
    "why": "B3 + B8: the Stop is stamped like the last tick: stop time + FX latency - Gear delay (web: the stop time as is, before the last tick it had booked)",
-   "count": -1
+   "count": 1
   },
   {
    "case": "song-end",
    "B": "B3",
    "op": "stop",
    "why": "B3 + B8: the Stop is stamped like the last tick: stop time + FX latency - Gear delay (web: the stop time as is, before the last tick it had booked)",
-   "count": -1
+   "count": 1
   },
   {
    "case": "clock-port-toggle",
    "B": "B3",
    "op": "stop",
    "why": "B3 + B8: the Stop is stamped like the last tick: stop time + FX latency - Gear delay (web: the stop time as is, before the last tick it had booked)",
-   "count": -1
+   "count": 1
   },
   {
    "case": "fx-latency",
    "B": "B3",
    "op": "stop",
    "why": "B3 + B8: the Stop is stamped like the last tick: stop time + FX latency - Gear delay (web: the stop time as is, before the last tick it had booked)",
-   "count": -1
+   "count": 1
   },
   {
    "case": "two-ports",
@@ -87,7 +87,7 @@
     "f2"
    ],
    "why": "Start and the clock ticks get the port's Gear delay like the notes (web: none), so the first note never precedes Start",
-   "count": -1
+   "count": 86
   },
   {
    "case": "fx-latency",
@@ -100,7 +100,7 @@
     "f2"
    ],
    "why": "Start and the clock ticks get the port's Gear delay like the notes (web: none), so the first note never precedes Start",
-   "count": -1
+   "count": 31
   },
   {
    "case": "chan-share",
