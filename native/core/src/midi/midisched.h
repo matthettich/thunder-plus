@@ -51,7 +51,7 @@ struct MidiMsg {                 // 16 bytes
   int64_t frame;                 // the core's audio frame the message is for (see above)
   uint8_t port, len, flags, kind;
   uint8_t b[3];
-  uint8_t pad;
+  uint8_t cable;                 // the port's cable id (setPort) when the message was made: the shell's CLEAR works per cable, and a cable change must not re-route queued messages
 };
 static_assert(sizeof(MidiMsg) == 16, "MidiMsg is 16 bytes");
 
@@ -116,7 +116,7 @@ class MidiSched {
  private:
   struct Held { uint8_t p, ch, n, base, vel, rng; double fine, t, end; int32_t col; uint32_t nid; };
   struct PendRet { uint8_t p, ch, n, base, vel, rng; double fine, t, end; int32_t col; uint32_t nid; };   // an ARP's return
-  struct PendMsg { double at; uint32_t ord; uint8_t port, len, kind, track; uint8_t b[3]; };
+  struct PendMsg { double at; uint32_t ord; uint8_t port, len, kind, track; uint8_t b[3]; uint8_t cable; };
   struct EchoN { double t, off, len; uint8_t p, ch, n, vel; bool on; };
   struct Glide { int32_t key; uint8_t p, ch, cc; double a, b, t0, t1, at; int last; bool cut; };
   struct Lfo { int v = -1; double t = 0; bool hasT = false; double trig[64]; int nTrig = 0; };
@@ -169,7 +169,7 @@ class MidiSched {
   int64_t frameOf(double sec) const { return (int64_t)std::llround(sec * sr_); }
   void send(const uint8_t* b, int len, double t, bool hasT, int port, uint8_t kind, int track);
   void emit(const PendMsg& m);
-  void push(int port, const uint8_t* b, int len, int64_t frame, uint8_t kind, uint8_t flags);
+  void push(int port, const uint8_t* b, int len, int64_t frame, uint8_t kind, uint8_t flags, int cable = -1000);
   void flush(double now);
   void pendInsert(const PendMsg& m);
   void clkPorts(int* ps, int& n) const;
@@ -201,7 +201,7 @@ class MidiSched {
   double beatAt(double t, double bpm) const;
   double timeOfBeat(double beat, double seqTime, double bpm, bool& ok) const;
   void joinPort(int p, bool all, double now);
-  void releaseAll(double now, bool playing);
+  void releaseAll(double now, bool playing, bool stopping = false);
   int clampPort(int p) const { return p < 0 ? 0 : p >= kMidiPorts ? kMidiPorts - 1 : p; }
 };
 

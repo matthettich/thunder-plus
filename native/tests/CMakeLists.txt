@@ -72,6 +72,17 @@ if(NOT MSVC)
   target_compile_options(test_seq_live PRIVATE -Wall -Wextra)
 endif()
 add_test(NAME seq_live COMMAND test_seq_live)
+
+# U35: MIDI scheduling (MidiSched) against the web app's MIDI ledgers (tests/golden/midi-ledger-*.json) and the expected-difference table
+# (tests/golden/midi-ledger-expect.json: the owner's fixes B1..B9, each listed with its case and why).
+add_executable(test_midi_ledger test_midi_ledger.cpp)
+target_link_libraries(test_midi_ledger PRIVATE thunder_core)
+target_include_directories(test_midi_ledger PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../core/src ${CMAKE_CURRENT_SOURCE_DIR})
+target_compile_definitions(test_midi_ledger PRIVATE THUNDER_ROOT="${CMAKE_CURRENT_SOURCE_DIR}/../..")
+if(NOT MSVC)
+  target_compile_options(test_midi_ledger PRIVATE -Wall -Wextra)
+endif()
+add_test(NAME midi_ledger COMMAND test_midi_ledger)
 # SEQ-LIVE-DESIGN Part B: the Song's lifetime under a running sequencer (SeqSession, takeOver, rebind) against the JS's edit goldens (tools/seq-golden.mjs --edit).
 find_package(Threads REQUIRED)
 add_executable(test_seq_takeover test_seq_takeover.cpp)

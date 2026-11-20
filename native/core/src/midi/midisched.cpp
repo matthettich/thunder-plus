@@ -43,9 +43,9 @@ void MidiSched::setFxLatency(double sec) { fxLat_ = std::isfinite(sec) ? clampd(
 void MidiSched::setSampleRate(double sr) { if (sr > 1000 && sr < 1e6) sr_ = sr; }
 
 // ---- output ------------------------------------------------------------------------------------------------------------------------
-void MidiSched::push(int port, const uint8_t* b, int len, int64_t frame, uint8_t kind, uint8_t flags) {
+void MidiSched::push(int port, const uint8_t* b, int len, int64_t frame, uint8_t kind, uint8_t flags, int cable) {
   MidiMsg m; std::memset(&m, 0, sizeof m);
-  m.frame = frame; m.port = (uint8_t)port; m.len = (uint8_t)len; m.flags = flags; m.kind = kind;
+  m.frame = frame; m.port = (uint8_t)port; m.len = (uint8_t)len; m.flags = flags; m.kind = kind; m.cable = (uint8_t)(cable == -1000 ? cable_[port] : cable);   // pad = the cable the port had when the message was made
   for (int i = 0; i < len && i < 3; i++) m.b[i] = b[i];
   if (ring_.push(m)) st_.sent++; else st_.ringFull++;
 }
@@ -56,7 +56,7 @@ void MidiSched::send(const uint8_t* b, int len, double t, bool hasT, int port, u
   double at = hasT ? t + fxLat_ - latSec(port) : now_;
   if (!std::isfinite(at)) { st_.badArgs++; return; }
   if (at < now_) at = now_;                                                  // :16791 Math.max(now, at)
-  PendMsg m; m.at = at; m.ord = ord_++; m.port = (uint8_t)port; m.len = (uint8_t)len; m.kind = kind; m.track = (uint8_t)track;
+  PendMsg m; m.at = at; m.ord = ord_++; m.port = (uint8_t)port; m.len = (uint8_t)len; m.kind = kind; m.track = (uint8_t)track; m.cable = (uint8_t)cable_[port];
   for (int i = 0; i < len && i < 3; i++) m.b[i] = b[i];
   if (hasT && at - now_ > lead_) pendInsert(m); else emit(m);               // the outbox :16790
 }
@@ -83,20 +83,20 @@ void MidiSched::emit(const PendMsg& m) {
     if (on) {
       if (cnt_[idx] > 0) {
         if (owner_[idx] != (int8_t)m.track) st_.collisions++; else st_.sameTrackRetrig++;
-        const uint8_t o[3] = {(uint8_t)(0x80 | ch), (uint8_t)n, 0}; push(m.port, o, 3, fr, m.kind, 0);   // off, then on
+        const uint8_t o[3] = {(uint8_t)(0x80 | ch), (uint8_t)n, 0}; push(m.port, o, 3, fr, m.kind, 0, m.cable);   // off, then on
       }
       if (cnt_[idx] < 255) cnt_[idx]++;
       owner_[idx] = (int8_t)m.track; onFrame_[idx] = fr;
-      push(m.port, m.b, m.len, fr, m.kind, 0);
+      push(m.port, m.b, m.len, fr, m.kind, 0, m.cable);
     } else {
       if (cnt_[idx] == 0) { st_.offsSuppressed++; return; }                  // B9: nothing sounding there
       if (--cnt_[idx] > 0) { st_.offsSuppressed++; return; }                 // B4: another track still holds it
-      push(m.port, m.b, m.len, fr, m.kind, 0);
+      push(m.port, m.b, m.len, fr, m.kind, 0, m.cable);
     }
     return;
   }
   if (m.kind == MK_CLOCK) { int& k = lastTickN_[m.port]; lastTickFrame_[m.port][k & 7] = fr; k++; }
-  push(m.port, m.b, m.len, fr, m.kind, 0);
+  push(m.port, m.b, m.len, fr, m.kind, 0, m.cable);
 }
 int64_t MidiSched::drain(MidiMsg* out, int64_t cap) {
   int64_t n = 0; MidiMsg m;
@@ -484,7 +484,12 @@ void MidiSched::onStep(const SeqEvent* evs, int n, const SeqStep& step, const Se
     onEvent(e, (e.has & SH_ARP) ? seq.arp(e) : nullptr, bpm, e.type == SEV_NOTE && seq_note_late(e.t, now), now);
   }
   for (int t = 0; t < 32; t++) if (nPendRet_[t]) pendFlush(t, step.t);          // ARP returns due by this row, on tracks the row left alone
-  for (int i = 0; i < n; i++) if (evs[i].type == SEV_BEAT) addAnchor(evs[i].t, evs[i].v, bpm);   // the tempo map: this step's beat and the tempo AFTER the step
+  for (int i = 0; i < n; i++) if (evs[i].type == SEV_BEAT) {   // the tempo map: this step's time and the tempo AFTER the step (it measures the next interval)
+    // B2: the beat is integrated HERE, forward from the previous anchor at the tempo that was in force over the interval. The sequencer's own beat (e.v)
+    // integrates the tempo it has NOW over an interval whose length was fixed under the old one, which is what bent the web's ticks around a tempo change.
+    const double b = nAnc_ ? anc_[nAnc_ - 1].b + (evs[i].t - anc_[nAnc_ - 1].t) * anc_[nAnc_ - 1].bpm / 60 : evs[i].v;
+    addAnchor(evs[i].t, b, bpm);
+  }
 }
 
 void MidiSched::book(double now, double seqTime, double bpm, bool seqAlive) {
@@ -503,7 +508,7 @@ void MidiSched::start(int spp, double now) {   // moStart :17071
 }
 
 // moRelease :17176. `playing` = tp.on: a cable / OUTPUT / CH edit while the song runs does not clear the outbox.
-void MidiSched::releaseAll(double now, bool playing) {
+void MidiSched::releaseAll(double now, bool playing, bool stopping) {
   now_ = now; const int64_t nf = frameOf(now);
   if (!playing) {
     nPend_ = 0;                                                                 // mobDrop
@@ -523,8 +528,7 @@ void MidiSched::releaseAll(double now, bool playing) {
   for (int t = 0; t < kMidiTracks; t++) { nHeld_[t] = 0; nPendRet_[t] = 0; }
   for (auto& b : bend_) b.has = false;
   nRampKeys_ = 0; nGlide_ = 0; nEcho_ = 0;
-  for (int i = 0; i < kMidiPorts * 16 * 128; i++) ccv_[i] = -1;                 // B5
-  used_ = 0;                                                                    // B6
+  if (stopping) { for (int i = 0; i < kMidiPorts * 16 * 128; i++) ccv_[i] = -1; used_ = 0; }   // B5, B6: only a STOP forgets (after the All Notes Off above)
   if (sus_.on) { sus_.on = false; if (conn_[sus_.p]) { const uint8_t b[3] = {(uint8_t)(0xB0 | sus_.ch), 64, 0}; push(sus_.p, b, 3, nf, MK_RELEASE, 0); } }
   for (auto& k : keys_) k.used = false;
 }
@@ -533,7 +537,7 @@ void MidiSched::release(double now, bool playing) { releaseAll(now, playing); }
 // moStop :17191 (B8: the Stop is stamped at the stop time, after the last tick actually sent; B3: with the port's Gear delay)
 void MidiSched::stop(double now) {
   now_ = now; const bool was = clk_.on; const int64_t nf = frameOf(now);
-  releaseAll(now, false);
+  releaseAll(now, false, true);
   if (was) {
     int ps[kMidiPorts], n; clkPorts(ps, n);
     if (!n) for (int p = 0; p < kMidiPorts; p++) if (conn_[p]) ps[n++] = p;
@@ -618,7 +622,7 @@ void MidiSched::liveRaw(int port, const uint8_t* b, int len, double extraSec, do
   if (ty == 0xB0) { ccv_[((port * 16 + ch) * 128) + b[1]] = b[2]; used_ |= 1ull << (port * 16 + ch); if (b[1] == 64 && b[2] >= 64) sus_ = {true, (uint8_t)port, (uint8_t)ch}; }
   else if (ty == 0xE0) { const int k = port * 16 + ch; bend_[k] = {true, b[1] | (b[2] << 7), now}; used_ |= 1ull << k; }
   else if (ty == 0xC0 || ty == 0xD0 || ty == 0xA0) used_ |= 1ull << (port * 16 + ch);
-  PendMsg m; m.at = now + extraSec; m.ord = ord_++; m.port = (uint8_t)port; m.len = (uint8_t)len; m.kind = MK_LIVE; m.track = 0xFF;
+  PendMsg m; m.at = now + extraSec; m.ord = ord_++; m.port = (uint8_t)port; m.len = (uint8_t)len; m.kind = MK_LIVE; m.track = 0xFF; m.cable = (uint8_t)cable_[port];
   for (int i = 0; i < len; i++) m.b[i] = b[i];
   emit(m);
 }
