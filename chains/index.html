@@ -1594,26 +1594,34 @@ const MODULE_USE = {
 };
 const modAbout = t => (typeof PAGE_ABOUT !== 'undefined' && PAGE_ABOUT[t]) || SHARED_ABOUT[t] || (MODULES[t] && MODULES[t].about) || '';
 const modUse = t => (typeof PAGE_USE !== 'undefined' && PAGE_USE[t]) || MODULE_USE[t] || '';
-/* Worked examples shown in a module's ? help under the Try line, and on the Help page: [what it is, the formula], one formula per line (the formula in a monospace line of its own, selectable to copy).
-   Every formula is compiled and run by tests/modules-expr-help.test.js in both engines at 44100 and 48000, so a line that stops working fails the tests. No quote marks in the texts (use ’ and −). */
+/* Worked examples shown in a module's ? help under the Try line, and on the Help page: [what it is, the formula, its name in the module's Examples menu], one formula per line (the formula in a monospace line of its own, selectable to copy).
+   The Examples menu (EXPR_EXAMPLES, in the same order) must hold the same formulas: tests/modules-expr-help.test.js checks it. Every formula is compiled and run by that test in both engines at 44100 and 48000, so a line that stops working fails the tests. No quote marks in the texts (use ’ and −). */
 const MODULE_EXAMPLES = {
   expr:[
-    ['Sine wave at 220 Hz (full level, so turn the volume down first).', 'sin(2 * pi * 220 * t)'],
-    ['Saw wave at 220 Hz, the short way. These plain saw and square waves are harsh on high notes.', 'saw(220 * t)'],
-    ['Triangle wave at 220 Hz.', 'tri(220 * t)'],
-    ['Square wave at 220 Hz.', 'sq(220 * t)'],
-    ['K1 as the pitch: 110 Hz at 0, 220 Hz at 1, 550 Hz at 4. Moving K1 while it sounds makes the tone jump, because the pitch is multiplied by the time.', 'sin(2 * pi * (110 + k1 * 110) * t)'],
-    ['A pitch you can glide, part 1 of 2: a ramp that climbs 0 to 1 over and over, 220 Hz at K1 = 1. Cable its Out to A of a second Expression.', 'fract(y + (110 + k1 * 110) / sr)'],
-    ['Glide, part 2 of 2: turns that ramp into a sine. Now moving K1 slides the pitch with no jump.', 'sin(2 * pi * a)'],
-    ['FM in one line: a 110 Hz sine bends a 220 Hz sine. K1 is the amount, 0 is plain, 1 to 4 gets brighter.', 'sin(2 * pi * 220 * t + k1 * sin(2 * pi * 110 * t))'],
-    ['A chord (A, C sharp and E) from three sines.', '(sin(2 * pi * 220 * t) + sin(2 * pi * 277.2 * t) + sin(2 * pi * 329.6 * t)) / 3'],
-    ['A sine that fades in over the 2 seconds after the song starts.', 'sin(2 * pi * 220 * t) * min(t / 2, 1)'],
-    ['Ring modulation: A times B, for metallic and bell-like tones.', 'a * b'],
-    ['Tremolo: the level of A wobbles 4 times a second.', 'a * (0.5 + 0.5 * sin(2 * pi * 4 * t))'],
-    ['Low-pass filter for A. K1 is how open it is: 1 lets everything through, 0.1 is dull (about 800 Hz), 0.01 is very dark. The clip keeps it from blowing up above 1.', 'y + (a - y) * clip(k1, 0, 1)'],
-    ['Wavefolder: bends A back on itself. K1 is how hard, 0 is almost clean.', 'sin(a * (1 + k1 * 8))'],
-    ['Bit crusher: A in steps of one eighth.', 'round(a * 8) / 8'],
-    ['Noise, with K1 as the level.', 'rnd * k1']
+    ['Sine wave at 220 Hz (full level, so turn the volume down first).', 'sin(2 * pi * 220 * t)', 'Sine 220 Hz'],
+    ['Saw wave at 220 Hz, the short way. These plain saw and square waves are harsh on high notes.', 'saw(220 * t)', 'Saw 220 Hz'],
+    ['Triangle wave at 220 Hz.', 'tri(220 * t)', 'Triangle 220 Hz'],
+    ['Square wave at 220 Hz.', 'sq(220 * t)', 'Square 220 Hz'],
+    ['K1 as the pitch: 110 Hz at 0, 220 Hz at 1, 550 Hz at 4. Moving K1 while it sounds makes the tone jump, because the pitch is multiplied by the time.', 'sin(2 * pi * (110 + k1 * 110) * t)', 'Sine pitch from K1'],
+    ['A pitch you can glide, part 1 of 2: a ramp that climbs 0 to 1 over and over, 220 Hz at K1 = 1. Cable its Out to A of a second Expression.', 'fract(y + (110 + k1 * 110) / sr)', 'Glide pitch, part 1: ramp'],
+    ['Glide, part 2 of 2: turns that ramp into a sine. Now moving K1 slides the pitch with no jump.', 'sin(2 * pi * a)', 'Glide pitch, part 2: sine'],
+    ['FM in one line: a 110 Hz sine bends a 220 Hz sine. K1 is the amount, 0 is plain, 1 to 4 gets brighter.', 'sin(2 * pi * 220 * t + k1 * sin(2 * pi * 110 * t))', 'FM sine (K1 = amount)'],
+    ['A chord (A, C sharp and E) from three sines.', '(sin(2 * pi * 220 * t) + sin(2 * pi * 277.2 * t) + sin(2 * pi * 329.6 * t)) / 3', 'Chord, A major'],
+    ['A sine that fades in over the 2 seconds after the song starts.', 'sin(2 * pi * 220 * t) * min(t / 2, 1)', 'Fade-in sine, 2 s'],
+    ['A sine at K1 kilohertz: 1000 Hz at 1, 4000 Hz at 4. Moving K1 while it sounds makes the tone jump.', 'sin(2 * pi * 1000 * k1 * t)', 'Sine at K1 kHz'],
+    ['Noise, with K1 as the level.', 'rnd * k1', 'Noise'],
+    ['The simplest one: A comes through and K1 is the level. A new Expression starts like this.', 'a * k1', 'Pass A (K1 = level)'],
+    ['Ring modulation: A times B, for metallic and bell-like tones.', 'a * b', 'Ring modulate A by B'],
+    ['Tremolo: the level of A wobbles 4 times a second.', 'a * (0.5 + 0.5 * sin(2 * pi * 4 * t))', 'Tremolo 4 Hz'],
+    ['Soft clip: rounds off the peaks of A. K1 is the drive, higher is harder.', 'tanh(a * (1 + k1 * 4))', 'Soft clip'],
+    ['Fold: loud peaks of A turn back over instead of clipping. K1 is how hard.', 'tri(a * (1 + k1 * 4) / 4 + 0.25)', 'Fold'],
+    ['Wavefolder: bends A back on itself. K1 is how hard, 0 is almost clean.', 'sin(a * (1 + k1 * 8))', 'Wavefold sine (K1)'],
+    ['Rectify: the negative half of A is flipped up, which adds an octave of buzz.', 'abs(a)', 'Rectify'],
+    ['Crossfade from A to B with a control signal in C: 0 is all A, 1 is all B (a slow LFO into C).', 'mix(a, b, clip(c, 0, 1))', 'Crossfade by C'],
+    ['Low-pass filter for A. K1 is how open it is: 1 lets everything through, 0.1 is dull (about 800 Hz), 0.01 is very dark. The clip keeps it from blowing up above 1.', 'y + (a - y) * clip(k1, 0, 1)', 'One-pole lowpass (K1)'],
+    ['Sample and hold: A is followed while C is above 0.5 and held (frozen) when C drops below it.', 'c > 0.5 ? a : y', 'Sample and hold on C'],
+    ['Bit crusher: A rounded to steps. K1 0 is rough (steps of one half), 1 is fine (one thirty-second), 4 is nearly clean.', 'round(a * (2 + k1 * 30)) / (2 + k1 * 30)', 'Bit crush (K1)'],
+    ['Gate: A comes through only while B is louder than K1, otherwise silence.', 'abs(b) > k1 ? a : 0', 'Gate A when B is loud']
   ]
 };
 const modExamples = t => (typeof PAGE_EXAMPLES !== 'undefined' && PAGE_EXAMPLES[t]) || MODULE_EXAMPLES[t] || null;
@@ -1826,10 +1834,31 @@ setInterval(() => { if (napping()) return; const now = performance.now();
 // A module's text: kept (cut to 200 characters) only on a module whose definition takes text; on any other module it is dropped. (Also run on a pasted copy and on every load.)
 function textFix(m){ if (!m || typeof m !== 'object' || !('text' in m)) return; const d = MODULES[m.type]; if (d && d.text === true && typeof m.text === 'string') m.text = m.text.slice(0, 200); else delete m.text; }
 const EXPR_MAX = 200, EXPR_DEFAULT = 'a * k1', EXPR_HOLD = 450;
-const EXPR_EXAMPLES = [
-  ['Pass A (K1 = level)', 'a * k1'], ['Ring modulate A by B', 'a * b'], ['Soft clip', 'tanh(a * (1 + k1 * 4))'], ['Fold', 'tri(a * (1 + k1 * 4) / 4 + 0.25)'],
-  ['Rectify', 'abs(a)'], ['Crossfade by C', 'mix(a, b, clip(c, 0, 1))'], ['Sine at K1 kHz', 'sin(2 * pi * 1000 * k1 * t)'], ['One-pole lowpass (K1)', 'y + (a - y) * clip(k1, 0, 1)'],
-  ['Sample and hold on C', 'c > 0.5 ? a : y'], ['Noise', 'rnd * k1'], ['Bit crush (K1)', 'round(a * (2 + k1 * 30)) / (2 + k1 * 30)'], ['Gate A when B is loud', 'abs(b) > k1 ? a : 0']
+const EXPR_EXAMPLES = [   // [menu name, formula]: tones first, then effects; the same formulas, in the same order, as MODULE_EXAMPLES.expr (a test compares them)
+  ['Sine 220 Hz', 'sin(2 * pi * 220 * t)'],
+  ['Saw 220 Hz', 'saw(220 * t)'],
+  ['Triangle 220 Hz', 'tri(220 * t)'],
+  ['Square 220 Hz', 'sq(220 * t)'],
+  ['Sine pitch from K1', 'sin(2 * pi * (110 + k1 * 110) * t)'],
+  ['Glide pitch, part 1: ramp', 'fract(y + (110 + k1 * 110) / sr)'],
+  ['Glide pitch, part 2: sine', 'sin(2 * pi * a)'],
+  ['FM sine (K1 = amount)', 'sin(2 * pi * 220 * t + k1 * sin(2 * pi * 110 * t))'],
+  ['Chord, A major', '(sin(2 * pi * 220 * t) + sin(2 * pi * 277.2 * t) + sin(2 * pi * 329.6 * t)) / 3'],
+  ['Fade-in sine, 2 s', 'sin(2 * pi * 220 * t) * min(t / 2, 1)'],
+  ['Sine at K1 kHz', 'sin(2 * pi * 1000 * k1 * t)'],
+  ['Noise', 'rnd * k1'],
+  ['Pass A (K1 = level)', 'a * k1'],
+  ['Ring modulate A by B', 'a * b'],
+  ['Tremolo 4 Hz', 'a * (0.5 + 0.5 * sin(2 * pi * 4 * t))'],
+  ['Soft clip', 'tanh(a * (1 + k1 * 4))'],
+  ['Fold', 'tri(a * (1 + k1 * 4) / 4 + 0.25)'],
+  ['Wavefold sine (K1)', 'sin(a * (1 + k1 * 8))'],
+  ['Rectify', 'abs(a)'],
+  ['Crossfade by C', 'mix(a, b, clip(c, 0, 1))'],
+  ['One-pole lowpass (K1)', 'y + (a - y) * clip(k1, 0, 1)'],
+  ['Sample and hold on C', 'c > 0.5 ? a : y'],
+  ['Bit crush (K1)', 'round(a * (2 + k1 * 30)) / (2 + k1 * 30)'],
+  ['Gate A when B is loud', 'abs(b) > k1 ? a : 0']
 ];
 // What the module has as its formula: its own text, or the default when it has none (a string of any length is cut to the 200 the engine keeps).
 const exprText = m => m && typeof m.text === 'string' ? m.text.slice(0, EXPR_MAX) : EXPR_DEFAULT;

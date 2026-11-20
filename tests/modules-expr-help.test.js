@@ -12,7 +12,10 @@ const BOTH = [['chains', chainsCtx().ChainsDSP], ['waves', wavesCtx().WavesDSP]]
 const listOf = src => { const b = /\/\* ===SHARED EDITOR START===[\s\S]*?===SHARED EDITOR END=== \*\//.exec(src)[0]; const i = b.indexOf('const MODULE_EXAMPLES = ');
   assert.ok(i >= 0); const o = b.indexOf('{', i); let d = 0, q = null, j = o; for (; j < b.length; j++) { const c = b[j]; if (q) { if (c === '\\') j++; else if (c === q) q = null; continue; } if (c === "'") q = c; else if (c === '{') d++; else if (c === '}' && --d === 0) break; }
   return vm.runInNewContext('(' + b.slice(o, j + 1) + ')').expr.map(a => [...a]); };
-const LIST = { chains: listOf(ED.chains), waves: listOf(ED.waves) };
+const menuOf = src => { const b = /\/\* ===SHARED EDITOR START===[\s\S]*?===SHARED EDITOR END=== \*\//.exec(src)[0], i = b.indexOf('const EXPR_EXAMPLES = ['), o = b.indexOf('[', i + 20); let d = 0, q = null, j = o;
+  for (; j < b.length; j++) { const c = b[j]; if (q) { if (c === '\\') j++; else if (c === q) q = null; continue; } if (c === "'") q = c; else if (c === '[') d++; else if (c === ']' && --d === 0) break; }
+  return vm.runInNewContext('(' + b.slice(o, j + 1) + ')').map(a => [...a]); };
+const LIST = { chains: listOf(ED.chains), waves: listOf(ED.waves) }, MENU = { chains: menuOf(ED.chains), waves: menuOf(ED.waves) };
 const F = Object.fromEntries(LIST.chains.map(([w, f]) => [f, w]));
 // one Expression run: seconds of audio; ins = per-input function of the sample number; returns the output
 function run(D, SR, text, over, secs, ins) {
@@ -28,6 +31,12 @@ const rms = x => Math.sqrt(x.reduce((s, v) => s + v * v, 0) / x.length);
 const finite = x => x.every(Number.isFinite);
 const SINE = n => i => Math.sin(2 * Math.PI * n * i / 48000);
 
+test('the Examples menu and the help list hold the same formulas in the same order (they cannot drift), in both editors; every menu formula compiles in both engines', () => {
+  for (const ed of ['chains', 'waves']) { assert.equal(JSON.stringify(MENU[ed].map(e => e[1])), JSON.stringify(LIST[ed].map(e => e[1])), ed + ': menu formulas = help formulas'); assert.equal(MENU[ed].length, LIST[ed].length); }
+  assert.equal(JSON.stringify(MENU.chains), JSON.stringify(MENU.waves));
+  for (const [name, D] of BOTH) for (const [nm, f] of MENU[name]) { const P = D.MathExpr.compile(f); assert.equal(P.err, 0, name + ' ' + nm); assert.ok(P.n <= 128 && f.length <= 200, nm); }
+  assert.equal(new Set(LIST.chains.map(e => e[1])).size, LIST.chains.length, 'no formula twice');
+});
 test('the help list is the same text in both editors, plain, and every line is one short formula', () => {
   assert.equal(JSON.stringify(LIST.chains), JSON.stringify(LIST.waves)); assert.ok(LIST.chains.length >= 12);
   for (const [what, f] of LIST.chains) {
@@ -86,7 +95,8 @@ for (const [name, D] of BOTH) for (const SR of [48000, 44100]) {
     const tr = run(D, SR, 'a * (0.5 + 0.5 * sin(2 * pi * 4 * t))', {}, 1, ins), q = (s, w) => peak(tr.subarray(Math.round(s * SR), Math.round((s + w) * SR)));
     assert.ok(peak(tr) <= 1 && q(.0625 - .005, .01) > .95 && q(.1875 - .005, .01) < .02, 'level ' + q(.0625 - .005, .01) + ' ' + q(.1875 - .005, .01));   // 4 Hz: full level at 1/16 s, nearly silent at 3/16 s
     const a1 = run(D, SR, 'sin(a * (1 + k1 * 8))', { k1: 1 }, 1, ins), a0 = run(D, SR, 'sin(a * (1 + k1 * 8))', { k1: 0 }, 1, ins); assert.ok(peak(a1) <= 1 && peak(a0) < .85 && peak(a0) > .8, 'fold K1=0 peak ' + peak(a0));
-    const bc = run(D, SR, 'round(a * 8) / 8', {}, 1, ins), lv = new Set(Array.from(bc, v => Math.round(v * 8))); assert.ok(lv.size <= 17 && lv.size >= 15 && peak(bc) <= 1, 'levels ' + lv.size);
+    const bf = 'round(a * (2 + k1 * 30)) / (2 + k1 * 30)', lv = (k1) => new Set(Array.from(run(D, SR, bf, { k1 }, 1, ins), v => Math.round(v * (2 + k1 * 30))));
+    assert.ok(lv(0).size <= 5 && lv(0).size >= 3 && lv(1).size > 15 && lv(1).size > 3 * lv(0).size && peak(run(D, SR, bf, { k1: 1 }, 1, ins)) <= 1.02, 'levels ' + lv(0).size + ' ' + lv(1).size);
     const nz = run(D, SR, 'rnd * k1', { k1: .5 }, 1); assert.ok(peak(nz) <= .5 && peak(nz) > .49 && Math.abs(nz.reduce((s, v) => s + v, 0) / nz.length) < .01);
   });
   test(tag + 'low-pass: stable for K1 0 to 1 (and clipped above), cutoff near the stated figures, blows up past 2 without the clip', () => {
@@ -96,5 +106,15 @@ for (const [name, D] of BOTH) for (const SR of [48000, 44100]) {
     assert.ok(Math.abs(gain(.1, 800) - Math.SQRT1_2) < .06, '0.1 at 800 Hz ' + gain(.1, 800)); assert.ok(gain(.01, 76) > .6 && gain(.01, 76) < .8 && gain(.01, 2000) < .1, 'k1 .01: ' + gain(.01, 76) + ' ' + gain(.01, 2000)); assert.ok(gain(1, 5000) > .99);
     const bare = run(D, SR, 'y + (a - y) * k1', { k1: 3 }, .2, { a: SINE(220) }); assert.ok(peak(bare) > 3.9, 'unclipped K1 = 3 runs away to the ±4 hold: ' + peak(bare));
     const edge = run(D, SR, 'y + (a - y) * k1', { k1: 1.9 }, .2, { a: SINE(220) }); assert.ok(peak(edge) <= 1.5);
+  });
+  test(tag + 'the other menu formulas: pass, soft clip, fold, rectify, crossfade, sample and hold, gate, sine at K1 kHz', () => {
+    const ins = { a: SINE(220), b: SINE(333), c: i => Math.sin(2 * Math.PI * 3 * i / SR) };
+    assert.ok(Math.abs(peak(run(D, SR, 'a * k1', { k1: .5 }, 1, ins)) - .5) < 1e-3);
+    assert.ok(peak(run(D, SR, 'tanh(a * (1 + k1 * 4))', { k1: 1 }, 1, ins)) < 1 && peak(run(D, SR, 'tri(a * (1 + k1 * 4) / 4 + 0.25)', { k1: 1 }, 1, ins)) <= 1 + 1e-6);
+    assert.ok(Math.min(...run(D, SR, 'abs(a)', {}, 1, ins)) >= 0);
+    const cf = run(D, SR, 'mix(a, b, clip(c, 0, 1))', {}, 1, ins); assert.ok(finite(cf) && peak(cf) <= 1.0001);
+    const sh = run(D, SR, 'c > 0.5 ? a : y', {}, 1, ins); let held = 0; for (let i = 1; i < sh.length; i++) if (sh[i] === sh[i - 1]) held++; assert.ok(held > SR * .3, 'it holds: ' + held);
+    const g = run(D, SR, 'abs(b) > k1 ? a : 0', { k1: .5 }, 1, ins); assert.ok(g.some(v => v === 0) && peak(g) > .9);
+    const k = run(D, SR, 'sin(2 * pi * 1000 * k1 * t)', { k1: 1 }, 1); assert.ok(Math.abs(crossings(k) - 2000) <= 1, 'crossings ' + crossings(k));
   });
 }
