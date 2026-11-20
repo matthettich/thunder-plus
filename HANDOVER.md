@@ -856,6 +856,13 @@ Start a session by asking for results. Fix on `beta`. (10 Nov, 15:10: the web be
 **Build 656** (FOLLOW above PHRASE ON STOP and ARRANGE ON STOP)
 - [ ] **Computer, View menu (desktop app and browser), and phone, Settings > Screen:** Pass: FOLLOW sits directly above PHRASE ON STOP and ARRANGE ON STOP; FOLLOW (OFF / PATTERN / ON), PHRASE ON STOP and ARRANGE ON STOP (STAYS / PLAYHEAD) each still change and keep their value after a reload. On the Project screen the three are also in that order.
 
+**Build 653** (FX presets: Cmd/Ctrl + Left / Right)
+- [ ] **Desktop app (Mac), FX screen, a reverb in a slot, cursor on its `› PRESET` row, the song playing:** hold Cmd+Right. Pass: presets step through INIT, factory, mine, this song with no glitch and no lag in the audio, the row's name and the toast follow, it stops at the last one; Cmd+Left goes back; one Cmd+Z returns to where you started.
+- [ ] **Cursor on a reverb's DECAY row (a parameter), Cmd+Right:** the preset changes, the cursor stays on DECAY and shows the new value; Cmd+Shift+Right changes DECAY by 1. On a SLOT row Cmd+arrows still change the effect; on ACTIVE still toggles.
+- [ ] **Same on the master's slots, and on a pump effect (its factory list).** Pass: the same.
+- [ ] **FX bar (bottom):** click a value, Cmd+Left / Right still change that value by 1 (the bar has no preset row; unchanged). **A text field** (a name box): Cmd+Left / Right still move the caret to line start / end, no preset changes.
+- [ ] **Phone (pad mode):** EDIT + ◀▶ on a `› PRESET` row steps the presets; on a parameter row it still changes the value.
+
 **Build 649** (press and drag a bar in Settings; branch `beta-drag-sliders`, PR into `beta`)
 - [ ] **Computer (mouse), Settings > Song (the Song sheet), a song PLAYING:** press on the SWING bar away from the thumb, then drag sideways. Pass: the value jumps to the press, follows the pointer, the number beside the bar follows, the groove changes while you drag, and letting go leaves it there. Same on TEMPO: the tempo follows (a little behind the pointer is fine) and the song keeps playing.
 - [ ] **Computer:** after dragging SWING, one Ctrl/\u2318+Z puts it back to where it was before the drag (one step, not many). Hold Shift while dragging: the value moves ten times slower. Double-click a bar: it goes back to its default (SWING 50).
@@ -1637,6 +1644,13 @@ Build 656, branch `beta-follow-order` (from `beta`). Owner: "Can we move the FOL
 - **Project screen rows (`projRows`):** FOLLOW moved down to sit above the two ON STOP rows (was ahead of ARRANGE LOOK-AHEAD, TAB, RESUME).
 - **View menu and Settings > Screen (`SHEET_QUICK`, `buildScreen`):** PHRASE ON STOP and ARRANGE ON STOP added to the quick rows right after FOLLOW; the later Screen loop skips quick rows so none repeats. No other menu, Help text or Electron menu lists all three; FOLLOW is missing from none that has the two ON STOP rows.
 - Nothing is keyed to row numbers (`cs.project.y` is not saved). Test added: `tests/follow-order.test.js` (2).
+
+## 19 Nov (FX presets: Cmd/Ctrl + Left / Right step through them; build 653)
+
+Build 653, branch `beta-fx-preset-keys` (from `beta` at 647; open PRs hold 648-652). Owner: "Can we make it so pressing Cmd plus left and right on FX presets scrolls through them?" Notes with line references: `docs/FX-PRESET-KEYS-NOTES.md`.
+- **What it does:** `bump` (the value key: Ctrl/Cmd + arrows, the pad's EDIT + arrows) on a row with `pstep` (the `› PRESET` row, built-in and pump) calls `fxPresetStep(t, k, d)`; owner (19 Nov, via the lead): the same from any parameter row of the slot (`pslot`, handled in `keysDown` before the value bump; the cursor stays), so the value nudge on parameter rows moved to Ctrl/Cmd+Shift+◀▶ (the pad's EDIT+◀▶ is unchanged there). It steps the list `fxPresetItems(type)` (the picker's own list) and applies through `fxPreApply` / `PumpFX.applyPreset` (the picker's apply). Stops at the ends (the list does not wrap), toast "First / Last preset". Held: at most one apply per 40 ms, newest target (nothing queues). A run of presses (each within 1 s of the last) is one undo step: the later presses take back the step `snap()` made (`fxPK.grp`). A changed ("custom") slot: either key goes to INIT.
+- **Not changed:** parameter rows keep Cmd/Ctrl+◀▶ = value; ▲▼ (big) never step presets; text fields (`typing()` returns first); the FX bar (no preset row; its Cmd+arrows change the value); the picker open, or Arrange holding the keys: no step. The Synth page presets (`applyVoicePreset`, a sheet) and the chains / waves module presets (frames, own key handlers) are separate pickers: not done.
+- Tests: `tests/fx-preset-keys.test.js` (11). Not run in a real page: headless Chrome could not start here (proxy).
 
 ## 19 Nov (Settings sliders: press and drag a bar; build 649)
 
