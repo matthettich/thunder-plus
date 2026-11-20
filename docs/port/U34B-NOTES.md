@@ -1,4 +1,4 @@
-**NOW: the C++ and the tests (render_stems, render_stems_bus) are in and pass in Release; next: the full Release ctest, the sanitizer run, mutation checks, then the PR.**
+**DONE: built, Release ctest 183 of 183 (1 skipped by design), render tests under ASan + UBSan pass, mutations killed; the PR is open.**
 
 # U34b: stems through the offline render C API
 
@@ -12,8 +12,8 @@ Only `native/` and `docs/port/` change; `index.html` is the specification (line 
 - [x] 3. Renderer: stem mode (no master effects, no master chain, only the stem's tracks heard)
 - [x] 4. C API: `opts.stem`, `thunder_render_stem_tracks`, stats fields; header text
 - [x] 5. Tests: sum of stems, where it does not add up, silence of a track with no notes, mute / solo, length, bad arguments
-- [ ] 6. Golden / parity case (if the tree has render parity tooling that fits): see "Parity" below
-- [ ] 7. Release ctest, sanitizer ctest of the render tests, PR
+- [x] 6. Golden / parity case: none possible here (needs the Chrome reference); see "Parity" below
+- [x] 7. Release ctest (183: 182 passed, 1 skipped by design, 0 failed), sanitizer run of render_stems, render_stems_bus, render_c, render_api, render_api_hostile, render_chop (6 of 6), mutations M1 to M4 (setHeard ignored; master chain kept in a stem; list ignores mute / solo; bus rule off) each fail the new tests, PR
 
 ## 1. What the web app does when the owner exports stems
 
@@ -88,16 +88,40 @@ The one-pass form is a pure speed-up that can be added later behind the same ste
 `keepT`'s bus rules need only the song's chains patch (`busPlan`: feeds, targets, pure), not the chains engine, so they are applied from the mixer's own `BusPlan` (`Mixer::plan()`), as the page does: a bus track with an audible source in the list is listed even with no notes; a pure source whose bus is in the list has no stem of its own; the stem of a bus plays its audible sources with it (`pass`'s `k2`). ELECTRO's patch has buses: its list is 5 stems, not the 8 tracks with notes.
 Until a chains host sets a chain hook on a bus (`Mixer::setChain`), no bus EXISTS in a native render: a pure source plays on its own in the mix, and in its bus's stem (it is heard there, directly), so the stems still add up to the mix. When a host wires the chains, it must set the hook only on HEARD tracks of a stem render (`SongRenderer::heardMask()`), as `pass` calls `routeTrack` for `keep` only (24258): then a pure source asked for alone plays directly, because its bus does not exist in that pass. Test `render_stems_bus` does this with a pass-through hook.
 
+## Built (what is in the tree)
+
+| File | What |
+|---|---|
+| `native/core/include/thunder/render.h` | `thunder_render_opts.stem` (+ `reserved2`), `thunder_render_stats.stem` / `heard_mask`, `thunder_render_stem_tracks` |
+| `native/core/src/mix/mix.h`, `mix.cpp` | `Mixer::setHeard(mask)` / `clearHeard()`: the page's `applyMix(filter)` (the filter REPLACES `audible`); `Mixer::plan()` |
+| `native/core/src/render/render.h`, `render.cpp` | `SongRenderer::setStem(track)`, `stem()`, `heardMask()`: no master chain, no master effects, track effects only on heard tracks |
+| `native/core/src/render/render_api.cpp` | the option, its checks, the stem list (a second `Seq`, as `length_estimate`), the stats |
+| `native/tests/test_render_stems.cpp` (ctest `render_stems`) | S1 to S6 |
+| `native/tests/test_render_stems_bus.cpp` (ctest `render_stems_bus`) | S7: buses, with a pass-through chain hook set the way a host will |
+| `native/tests/test_render_c.c` | the new fields from C99 |
+
+No allocation was added to the render path (`setStem` and the list run on the control thread; the render loop is unchanged). Counters: `stats.stem`, `stats.heard_mask`; no counter of a stem's own was needed (a stem handle reports the same counters as a mix handle).
+
+## Results
+
+Measured by `render_stems` (Release, GCC): sum of stems against the mix, ELECTRO 5 s at 48 kHz, no master chain: max |mix - sum| 7e-08 to 9e-08 (about 1e-7 of the peak, which is float32 rounding: the mix adds the tracks before MASTER VOL / OUT, a stem has one track); with the track effects, and with effects + PDC auto: the same. The synthetic song with pan, VOL, TRIM, MASTER 200 and OUT 180: 4e-08. The stated tolerance is 1e-6 of the mix's peak. With the master chain on the mix: max |mix - sum| 0.72 (the mix peaks at 0.89): they must not add up there, and the test says so.
+
+## Parity
+
+The tree's JS-parity tooling for renders is `native/tools/render-compare.sh` / `render-diff.mjs`: it compares a CLI render with a Chrome reference of the page's `renderOut`, and the Chrome reference cannot be made on this machine (U34a notes: "not available"). So no stem golden was added. What stands in for it is the line-referenced table above (each rule is a line of `renderOut` / `pass`) and the structural tests. The CLI (`thunder-render`) was NOT given a `--stem` option: nothing in the brief asked for it; it is a small addition if the lead wants a Chrome stem comparison later (the page's stem pass would be the reference).
+
 ## Choices for the lead
 
-(filled in as built; each is a ruling the lead may change)
+(each is a ruling the lead may change)
 
 1. **`opts.stem` is 1-based (0 = the mix)**, so the zero-filled default stays the mix and the number is the one the page shows. A bad value (negative, > 32) is E_ARG from create.
 2. **A stem of a muted / non-listed track is allowed and renders it** (the JS's pass ignores mute / solo inside a pass); only `thunder_render_stem_tracks` applies mute / solo. A host that takes the list gets the JS's files.
 3. **`master_chain` and master effects are ignored (not an error) for a stem**, so one options struct serves the mix and all stems.
-4. **"A pad is in the kit"** (the JS's `kit.voices[e.pad]`, 24302) is, natively: the pad has a buffer, or a route other than SAMPLER (live / SoundFont), or a prepared SoundFont preset. A pad with no buffer on the sampler route counts as absent. A live or SoundFont pad's track gets a (silent today for live) stem, as in the JS.
+4. **The list's bus rules follow the patch's plan, not whether a bus exists** (see Buses): ELECTRO's list is 5 stems, its pure sources being inside their buses' stems, as the page does. Until a chains host exists a bus's stem holds its sources heard directly. The lead may prefer one stem per track until the chains are wired; it is one line (`P.pure` / `P.feedMask` in `thunder_render_stem_tracks`, `feedMask` in `SongRenderer::setStem`).
+4b. **"A pad is in the kit"** (the JS's `kit.voices[e.pad]`, 24302) is, natively: the pad has a buffer, or a route other than SAMPLER (live / SoundFont), or a prepared SoundFont preset. A pad with no buffer on the sampler route counts as absent. A live or SoundFont pad's track gets a (silent today for live) stem, as in the JS.
 5. **The note scan's horizon is the render's own** (`max_frames` + the latency), not the JS's 1200 s / 100 000 steps (24301), so the list matches what the native mix plays. They differ only for a song longer than 1200 s.
 6. **A stem is the whole track's sound**, MIDI-only notes included in the list (a silent file), as in the JS (24304 vs 24264).
+8. **A finding in U34a's header, not changed here:** `length_estimate` says the real length is "always longer, never shorter" than the estimate. A song whose notes are short (the `render_stems` synthetic song: estimate 42000, real 36096 frames) ends its voices BEFORE the sequencer's last row ends, so the estimate can be above the real length. A progress bar must clamp, as the header already says; the sentence should say "usually".
 7. **Export gain, tail trim and the 20 ms fade (24332-24344) stay with the host**: they need the mix's peak and floats. The notes say how (Levels, Length rows).
 
 ## The length item (PICKUP, "To add in U34b: a length ESTIMATE ...")
@@ -106,4 +130,8 @@ Both halves were built in U34a's follow-up and are merged: `thunder_render_lengt
 
 ## Not verified / limits
 
-(filled in at the end)
+- Not compared with Chrome (no reference on this machine): the stems follow the table above line by line; a stem WAV of the page against a native stem is the open gate (add `--stem N` to `thunder-render` and a case in `render-compare.sh` when a reference can be made).
+- Master effects and the master chain are never in a stem, so `opts.effects` + `stem` runs the track effects only; the master chain's 384 kHz question of U34a does not touch stems.
+- A sidechain from another track is not reachable in a native render (only pump COMP has a source: `fxhost.h` `sck`), so the page's "the other track is silent in this pass" case has nothing to match.
+- The sum test is at 48 kHz, 5 s of ELECTRO; the full song and other rates were not run.
+- Several stems cost several renders (as the page): ELECTRO 5 s, 5 stems and the mix, about 12 s of test time in Release.
