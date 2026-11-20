@@ -32,32 +32,32 @@ test('old songs: loading and saving the instruments is byte for byte as in build
 });
 
 test('the picker lists only modes that exist, in groups, and each is a (sync, sx) pair', () => {
-  assert.deepEqual(J(E.SY_PICK.map(m => m.n)), ['OFF', 'REPITCH', 'GRANULAR', 'LOOP']);
-  assert.deepEqual(J(E.SY_PICK.map(m => [m.sync, m.sx])), [[0, 0], [1, 0], [2, 0], [3, 0]]);
+  assert.deepEqual(J(E.SY_PICK.map(m => m.n)), ['OFF', 'REPITCH', 'GRANULAR', 'LOOP', 'OLDSCHOOL']);
+  assert.deepEqual(J(E.SY_PICK.map(m => [m.sync, m.sx])), [[0, 0], [1, 0], [2, 0], [3, 0], [3, 1]]);
   const { L, map } = E.syList();
-  assert.deepEqual(J(L), ['OFF', { head: 'Repitch' }, 'REPITCH', { head: 'Character' }, 'GRANULAR', 'LOOP']);
-  assert.deepEqual(J(map), [0, 1, 2, 3]);
+  assert.deepEqual(J(L), ['OFF', { head: 'Repitch' }, 'REPITCH', { head: 'Character' }, 'GRANULAR', 'LOOP', 'OLDSCHOOL']);
+  assert.deepEqual(J(map), [0, 1, 2, 3, 4]);
   assert.ok(!L.some(e => e && e.head === 'Clean' || e && e.head === 'Drums'), 'no empty groups, no entries for modes that do not exist yet');
   for (const m of E.SY_PICK) assert.ok(m.tip && (m.grp === '' || E.SY_GROUPS.includes(m.grp)));
 });
 
 test('syPut / syPick: a classic mode writes no I.sx; every picker index reads back; an unknown pair reads as the classic mode of its sync', () => {
-  for (let p = 0; p < E.SY_PICK.length; p++) { const I = { sync: 0, beats: 4, grain: 1 }; E.syPut(I, p); assert.equal(E.syPick(I), p); assert.equal(I.sync, E.SY_PICK[p].sync); assert.ok(!('sx' in I)); }
+  for (let p = 0; p < E.SY_PICK.length; p++) { const I = { sync: 0, beats: 4, grain: 1 }; E.syPut(I, p); assert.equal(E.syPick(I), p); assert.equal(I.sync, E.SY_PICK[p].sync); assert.equal('sx' in I, E.SY_PICK[p].sx > 0); }
   const I = { sync: 3, sx: 7 }; assert.equal(E.syPick(I), 3, 'sync 3 with an sx this build does not know is LOOP');
-  const J = { sync: 2, sx: 1 }; assert.equal(E.syPick(J), 2);
+  const J2 = { sync: 2, sx: 1 }; assert.equal(E.syPick(J2), 2, 'sync 2 has no sx 1: GRANULAR');
   const K = { sync: 3, sx: 1 }; E.syPut(K, 2); assert.ok(!('sx' in K), 'changing to a classic mode drops a stale sx');
 });
 
-test('sxLoad: a song with I.sx loads on a build that has no such mode as the classic mode of its sync (nearest classic), and the loader of build 658 simply ignores the field', () => {
-  const songs = [{ pad: 3, sync: 3, sx: 1, beats: 4, grain: 2 }, { pad: 3, sync: 2, sx: 2, beats: 4, grain: 2 }, { pad: 3, sync: 1, sx: 5 }];
+test('sxLoad: an sx this build has is kept; one it has not loads as the classic mode of its sync; a loader that ignores the field (build 658 and 659) plays LOOP for OLDSCHOOL', () => {
+  const songs = [{ pad: 3, sync: 3, sx: 1, beats: 4, grain: 2, og: 30, ou: 0, orp: 1, ox: 25, opt: -5 }, { pad: 3, sync: 2, sx: 2, beats: 4, grain: 2 }, { pad: 3, sync: 1, sx: 5 }];
   const now = R.loadInsts(src, songs).map(JSON.parse);
-  for (const o of now) assert.ok(!('sx' in o), 'this build has no such mode: the field is not kept');
-  assert.deepEqual(now.map(o => o.sync), [3, 2, 1]);
-  // "a loader that ignores the field" = the same loader lines without the sxLoad call = build 658's
-  const noSx = R.loadInsts(src.replace(/\n\s*sxLoad\(o, I\);[^\n]*/, ''), songs).map(JSON.parse);
-  assert.notEqual(src.length, src.replace(/\n\s*sxLoad\(o, I\);[^\n]*/, '').length, 'the call is there to remove');
-  assert.deepEqual(noSx.map(o => o.sync), [3, 2, 1]); for (const o of noSx) assert.ok(!('sx' in o));
-  assert.deepEqual(noSx, now, 'with no mode defined the two loaders agree');
+  assert.equal(now[0].sx, 1); assert.deepEqual(J([now[0].og, now[0].ou, now[0].orp, now[0].ox, now[0].opt]), [30, 0, 1, 25, -5]);
+  assert.ok(!('sx' in now[1]) && !('sx' in now[2]) && !('og' in now[1])); assert.deepEqual(now.map(o => o.sync), [3, 2, 1]);
+  // "a loader that ignores the field" = the same loader lines without the sxLoad call = what builds 658 and 659 do with a song from build 660
+  const strip = src.replace(/\n\s*sxLoad\(o, I\);[^\n]*/, ''); assert.notEqual(src.length, strip.length, 'the call is there to remove');
+  const old = R.loadInsts(strip, songs).map(JSON.parse);
+  assert.deepEqual(old.map(o => o.sync), [3, 2, 1], 'sync is as saved: OLDSCHOOL (sync 3, sx 1) is LOOP to an older build');
+  for (const o of old) assert.ok(!('sx' in o) && !('og' in o), 'the older build keeps none of the new fields');
 });
 
 test('REPITCH sentence: the numbers come from the real sample length', () => {
@@ -87,8 +87,15 @@ test('the sheet text says it too (slPlan), and the picker is one list for both p
   assert.ok(!/I\.sync = (mode|1|0)[;\s]/.test(src.slice(src.indexOf('===STRETCH PICKER START==='), src.indexOf('===SYNC LINES END==='))), 'nothing in the sync code writes I.sync directly any more (syPut does)');
 });
 
-test('SYNC TO LINES: slSet writes the picker mode (sync and, later, sx) and OFF clears both', () => {
+test('SYNC TO LINES: slSet writes the picker mode (sync and sx) and OFF clears both', () => {
   const insts = [{ pad: 0, sync: 0 }, { pad: 0, sync: 3, sx: 1 }, { pad: 1, sync: 2 }];
   E.slSet(insts, 0, 16, 2, 8); assert.deepEqual(insts.map(i => [i.sync, i.sx]), [[2, undefined], [2, undefined], [2, undefined]]);
   E.slSet(insts, 0, 0, 0, 8); assert.deepEqual(insts.map(i => i.sync), [0, 0, 2]); assert.ok(!('sx' in insts[1]));
+});
+
+test('SYNC TO LINES with OLDSCHOOL: sync 3, sx 1 and the defaults; back to a classic mode drops them (a song with none of it is unchanged)', () => {
+  const insts = [{ pad: 0, sync: 0 }, { pad: 0, sync: 2, grain: 3 }];
+  E.slSet(insts, 0, 16, 4, 8); for (const I of insts) assert.deepEqual(J([I.sync, I.sx, I.og, I.ou, I.orp, I.ox, I.opt]), [3, 1, 12, 0, 0, 0, 0]);
+  insts[0].og = 30; E.slSet(insts, 0, 16, 4, 8); assert.equal(insts[0].og, 30, 'picking OLDSCHOOL again keeps its settings');
+  E.slSet(insts, 0, 16, 3, 8); for (const I of insts) assert.deepEqual(Object.keys(I).filter(k => /^(sx|og|ou|orp|ox|opt)$/.test(k)), []);
 });

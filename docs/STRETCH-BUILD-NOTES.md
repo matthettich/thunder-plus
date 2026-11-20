@@ -6,7 +6,7 @@
   - [x] code in `index.html`
   - [x] tests `tests/stretch-picker.test.js`
   - [x] build commit (BUILD, sw.js, changelog, HANDOVER, punch list), push, PR
-- [ ] PR 2, build 660, branch `beta-stretch-oldschool` (stacked on PR 1): IN THE MIDDLE OF: nothing yet
+- [ ] PR 2, build 660, branch `beta-stretch-oldschool` (stacked on PR 1): IN THE MIDDLE OF: code and tests written (index.html, tests/stretch-oldschool.test.js); next: browser smoke, full npm test, then the build commit (BUILD 660, sw.js, changelog, HANDOVER incl. "Time stretch: what is left"), push, open PR
 
 ## Choices for the lead
 (filled in as they come up)

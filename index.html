@@ -22747,7 +22747,7 @@ function makeSeq(S, mode, o){
               rev:fx.PLY != null ? (fx.PLY & 1) === 1 : !!I.rev, cut:fx.KIL != null ? nat + fx.KIL * tick : null, rel:fx.OFF != null ? nat + fx.OFF * tick : null,
               slide:fx.PSL && !q ? {from:T.rate, dur:fx.PSL * tick} : null, vk:fx.GEN != null ? 'g' + fx.GEN : fx.MUT != null ? 'm' + fx.MUT : null, tw:pc != null || pdc != null ? {cut:pc, res:prs, dec:pdc} : null, ...(T.cRel != null ? {rlo:decSec(T.cRel)} : {}), slc:fx.SLC != null ? fx.SLC : null, fdi:fx.FDI != null ? fx.FDI * tick : T.cAtk != null ? decSec(T.cAtk) : 0, trm:fx.TRM || 0, apn:fx.APN || 0, wob:fx.WOB != null ? wobOf(fx.WOB) : null, acc:(fx.VOL != null ? fx.VOL : r[VC]) >= 0xC0, ...mods,
               ii, mn:note + 12 + ntc / 100, vel:hg * (fx.VOL != null ? fx.VOL : r[VC] >= 0 ? r[VC] : 255) / 255, tick, vc:fx.VOL != null ? fx.VOL : r[VC]};   // ii, mn (MIDI note: C-4 is 60), vel: for MIDI out; tick: NOTE LEN
-            if (!o.sim && ((I.slc | 0) > 1 || I.sync)){ const c = o.live ? ensurePlay(ev.pad) : ensure(ev.pad); if (c){ applyChop(ev, I, ev.pad, n, note - n, nb, c.data, c.sr); if (!q) firstRate = ev.rate; } }
+            if (!o.sim && ((I.slc | 0) > 1 || I.sync)){ const c = o.live ? ensurePlay(ev.pad) : ensure(ev.pad); if (c){ applyChop(ev, I, ev.pad, n, note - n, nb, c.data, c.sr, !!o.live); if (!q) firstRate = ev.rate; } }
             if (ev.vk && o.live && !o.sim) try { varWant(ev); } catch(e){}   // MUT / GEN: start its render now, ahead of the note
             evs.push(ev);
             if (every){ let k = 1;
@@ -23628,13 +23628,22 @@ const SY_PICK = [
   {n:'REPITCH', sync:1, sx:0, grp:'Repitch', tip:'Fits the length by playing faster or slower: the pitch moves with the speed'},
   {n:'GRANULAR', sync:2, sx:0, grp:'Character', tip:'Fits the length, pitch kept: smooth overlapping grains, a texture (the old STRETCH)'},
   {n:'LOOP', sync:3, sx:0, grp:'Character', tip:'Fits the length, pitch kept: a ramp loops little GRAIN-long pieces, gritty and stuttery'},
+  {n:'OLDSCHOOL', sync:3, sx:1, grp:'Character', tip:'The classic sampler stretch: a tiny loop at the sample\u2019s own pitch whose start is scrubbed through the sample by a ramp that lasts the length'},
 ];
+// OLDSCHOOL's own settings (only present while the mode is OLDSCHOOL): og loop in ms, ou loop unit (0 = ms, 1..6 = 1, 1/2 … 1/32 of a LINE), orp ramp, ox smooth %, opt pitch in semitones
+const OS_KEYS = ['og', 'ou', 'orp', 'ox', 'opt'], OS_DEF = {og:12, ou:0, orp:0, ox:0, opt:0};
 // the picker index of an instrument (an unknown pair counts as the classic mode of its I.sync)
 const syPick = I => { const s = (I.sync | 0), x = (I.sx | 0), i = SY_PICK.findIndex(m => m.sync === s && m.sx === x); return i >= 0 ? i : Math.max(0, SY_PICK.findIndex(m => m.sync === s && m.sx === 0)); };
 // writes a picker index into an instrument: I.sx is dropped for a classic mode (so old songs stay byte for byte as they were)
-const syPut = (I, p) => { const m = SY_PICK[p] || SY_PICK[0]; I.sync = m.sync; if (m.sx) I.sx = m.sx; else delete I.sx; };
+const syPut = (I, p) => { const m = SY_PICK[p] || SY_PICK[0]; I.sync = m.sync; if (m.sx) I.sx = m.sx; else delete I.sx;
+  if (m.sx === 1){ for (const k of OS_KEYS) if (I[k] == null) I[k] = OS_DEF[k]; } else for (const k of OS_KEYS) delete I[k]; };
 // loading: I.sx is kept only for a pair this build has (older songs have none)
-function sxLoad(o, I){ const x = Math.trunc(+(o && o.sx)); if (x > 0 && SY_PICK.some(m => m.sync === I.sync && m.sx === x)) I.sx = x; else delete I.sx; }
+function sxLoad(o, I){
+  const x = Math.trunc(+(o && o.sx)); if (x > 0 && SY_PICK.some(m => m.sync === I.sync && m.sx === x)) I.sx = x; else delete I.sx;
+  if (I.sx === 1){ const n = (v, a, b, d, int) => { v = +v; if (!Number.isFinite(v)) v = d; v = Math.min(b, Math.max(a, v)); return int ? Math.round(v) : v; };
+    I.og = n(o.og, 0.5, 250, 12); I.ou = n(o.ou, 0, 6, 0, 1); I.orp = n(o.orp, 0, 3, 0, 1); I.ox = n(o.ox, 0, 50, 0, 1); I.opt = n(o.opt, -24, 24, 0, 1); }
+  else for (const k of OS_KEYS) delete I[k];
+}
 // the list askSheet draws: group names as captions (not counted), choices in picker order. map[k] = the picker index of the k-th choice
 function syList(){
   const L = [], map = [];
@@ -23649,6 +23658,40 @@ function syRepitchText(loop, target){
   if (!(r > 0) || !isFinite(r)) return '';
   if (pct < 0.05) return 'plays at its own speed and pitch';
   return 'plays ' + pct.toFixed(1) + '% ' + (r > 1 ? 'faster' : 'slower') + (Math.abs(st) < 0.05 ? ', the pitch barely moves' : ', ' + Math.abs(st).toFixed(1) + ' semitone' + (Math.abs(st).toFixed(1) === '1.0' ? '' : 's') + (st > 0 ? ' up' : ' down'));
+}
+/* OLDSCHOOL (build 660; docs/STRETCH-DESIGN.md section 7): the classic hardware-sampler / tracker stretch, rendered into the stretch cache.
+   The output is exactly T samples (the length). It is cut into grains of g samples; grain k plays a hard little loop of the sample at its
+   own pitch (or PITCH semitones off it), starting at p_k = L * ramp(k*g / T) rounded to a sample, held for the whole grain (a sampler whose loop
+   start moves continuously reads the new start only when its loop wraps: the same sound). The ramp lasts the whole length: FWD scrubs the
+   sample start to end, REV end to start, PING there and back, EASE slow at both ends. p is kept inside the sample, so the last grains of FWD
+   keep repeating the end. SMOOTH 0 is the authentic hard cut (every jump sits on a grain boundary); SMOOTH x > 0 crossfades neighbours over
+   2*x*g samples, reading the sample straight on past each grain's ends (not wrapped), so there is no step beyond the fade. */
+const OS_RAMPS = ['FWD', 'REV', 'PING', 'EASE'], OS_DIVS = [0, 1, 1 / 2, 1 / 4, 1 / 8, 1 / 16, 1 / 32], OS_DIV_NAMES = ['MS', '1 LINE', '1/2 LINE', '1/4 LINE', '1/8 LINE', '1/16 LINE', '1/32 LINE'];
+const OS_RAMP_FN = [u => u, u => 1 - u, u => u < 0.5 ? 2 * u : 2 - 2 * u, u => u * u * (3 - 2 * u)];
+// the grain length in seconds: ms as set, or a division of a line (a line = 60 / bpm / lpb seconds)
+const osGrainSecs = (I, bpm, lpb) => (I.ou | 0) > 0 ? OS_DIVS[Math.min(6, I.ou | 0)] * 60 / bpm / (lpb || 4) : Math.min(250, Math.max(0.5, +I.og || 12)) / 1000;
+// where each grain starts reading (samples): L source length, T output length, g grain length, r grain read ratio
+function osStarts(L, T, g, r, rp){
+  const f = OS_RAMP_FN[rp | 0] || OS_RAMP_FN[0], n = Math.ceil(T / g), P = new Int32Array(n), top = Math.max(0, L - Math.round(g * r) - 1);
+  for (let k = 0; k < n; k++){ const u = Math.min(1, k * g / T); P[k] = Math.min(top, Math.max(0, Math.round(L * f(u)))); }
+  return P;
+}
+// st: {bpm, beats, gs (grain seconds), rp (ramp), x (smooth %), pt (pitch, semitones)}
+function oldschoolData(d, sr, loop, st){
+  const L = Math.min(d.length, Math.round(loop * sr)), T = Math.max(64, Math.round(st.beats * 60 / st.bpm * sr)), o = new Float32Array(T);
+  const r = Math.pow(2, (st.pt || 0) / 12), g = Math.min(T, Math.max(8, Math.round(st.gs * sr))), xf = Math.round(Math.min(50, Math.max(0, st.x || 0)) / 100 * g), P = osStarts(L, T, g, r, st.rp);
+  for (let k = 0, s0 = 0; s0 < T; k++, s0 += g){
+    const p = P[k], last = s0 + g >= T;
+    for (let i = k ? -xf : 0; i < g + xf; i++){
+      const n = s0 + i; if (n >= T) break; if (n < 0) continue;
+      const w = !xf || (i >= xf && i < g - xf) ? 1 : i < xf ? (k ? (i + xf) / (2 * xf) : 1) : last ? 1 : (g + xf - i) / (2 * xf);
+      let v;
+      if (r === 1){ const j = p + i; v = j >= 0 && j < L ? d[j] : 0; }
+      else { const pos = p + i * r, j = Math.floor(pos), f = pos - j, a = j >= 0 && j < L ? d[j] : 0, b = j + 1 >= 0 && j + 1 < L ? d[j + 1] : 0; v = a + (b - a) * f; }
+      o[n] += v * w;
+    }
+  }
+  return o;
 }
 /* ===STRETCH PICKER END=== */
 const GRAIN_BEATS = [1 / 64, 1 / 32, 1 / 16, 1 / 8, 1 / 4], GRAIN_NAMES = ['1/64', '1/32', '1/16', '1/8', '1/4'];
@@ -23680,6 +23723,7 @@ function slicePoints(pad, I, data, sr){
 }
 // The synced stretch: an output exactly BEATS long at the tempo, read from the loop by grains that a ramp walks through it.
 function stretchData(d, sr, loop, st){
+  if (st.sx === 1) return oldschoolData(d, sr, loop, st);   // OLDSCHOOL (build 660); the classic modes below are untouched
   const inN = Math.min(d.length, Math.round(loop * sr)), outN = Math.max(64, Math.round(st.beats * 60 / st.bpm * sr)), o = new Float32Array(outN);
   const W = Math.max(64, Math.round(GRAIN_BEATS[st.grain | 0] * 60 / st.bpm * sr)), k = inN / outN;
   if (st.mode === 3){   // LOOP: back-to-back grains, each a hard loop of W samples, with 1.5 ms crossfades
@@ -23700,18 +23744,35 @@ function stretchData(d, sr, loop, st){
   }
   return o;
 }
-const stKey = st => st ? ':' + st.mode + ':' + st.bpm + ':' + st.beats + ':' + st.grain : '';
+const stKey = st => st ? ':' + st.mode + ':' + st.bpm + ':' + st.beats + ':' + st.grain + (st.sx ? ':sx' + st.sx + ':' + st.gs + ':' + st.rp + ':' + st.x + ':' + st.pt : '') : '';   // (every setting that changes a sample is in the key)
 // Rewrites a note event for a chopped or synced instrument. n: the note typed; semis: the pitch offsets on top of it.
-function applyChop(ev, I, pad, n, semis, bpm, data, sr){
+/* TEMPO WHILE IT MOVES (build 660): a stretch is rendered at the tempo of the first note that needs it, so a TEMPO drag, TAP, Link or MIDI clock
+   would render a new stretch (tens to hundreds of ms on the main thread, much more on a phone) for the next note at every step. The live
+   sequencer therefore uses, for the song's OWN tempo, the last tempo that held still for STQ_QUIET ms (the idea of build 658's lines envelopes):
+   during a drag notes keep playing the stretch they had; once it settles the next note renders the new one, once. While the song plays, a
+   change under STQ_TOL (0.5 percent) is ignored. A TPO value in the song, a preview and every offline render use the exact tempo. */
+const STQ_QUIET = 300, STQ_TOL = 0.005, stq = {bpm:0, seen:0, at:0, last:0};
+function stLiveBpm(b, songB, playing, now){
+  if (b !== songB) return b;   // a TPO command's own tempo: exact
+  if (now == null) now = performance.now();
+  if (!stq.bpm || now - stq.last > 1000){ stq.bpm = stq.seen = b; stq.at = now; }   // first note, or after a pause: snap
+  else if (b !== stq.seen){ stq.seen = b; stq.at = now; }
+  else if (b !== stq.bpm && now - stq.at >= STQ_QUIET && !(playing && Math.abs(b - stq.bpm) / stq.bpm < STQ_TOL)) stq.bpm = b;
+  stq.last = now; return stq.bpm;
+}
+function applyChop(ev, I, pad, n, semis, bpm, data, sr, live){
   const slc = I.slc | 0, sy = I.sync | 0; if (slc < 2 && !sy) return ev;
-  const loop = loopSecs(pad, data, sr), beats = instBeats(I), target = beats * 60 / bpm;
+  const sb = sy >= 2 && live ? stLiveBpm(bpm, S.bpm, typeof tp !== 'undefined' && !!tp.on) : bpm;   // the tempo the stretch is made at
+  const loop = loopSecs(pad, data, sr), beats = instBeats(I), target = beats * 60 / bpm, tS = beats * 60 / sb;
   const sl = ev.slc != null && slc >= 2;   // SLC (owner, 1 Nov): the slice comes from the command, so the note pitches it (C-4 = as it is)
   let rate = Math.pow(2, (semis + (sl ? n - ROOT : 0)) / 12), scale = 1;
   if (sy === 1) rate *= loop / target;
-  if (sy >= 2){ ev.st = {mode:sy, bpm:Math.round(bpm * 100) / 100, beats:Math.round(beats * 1e6) / 1e6, grain:I.grain == null ? 1 : I.grain | 0}; scale = target / loop; }
+  if (sy >= 2){ ev.st = {mode:sy, bpm:Math.round(sb * 100) / 100, beats:Math.round(beats * 1e6) / 1e6, grain:I.grain == null ? 1 : I.grain | 0}; scale = tS / loop;
+    if (sy === 3 && (I.sx | 0) === 1){ const lpb = S.lpb || 4; Object.assign(ev.st, {sx:1, gs:Math.round(osGrainSecs(I, sb, lpb) * 1e6) / 1e6, rp:I.orp | 0, x:I.ox | 0, pt:I.opt | 0}); } }
   if (slc >= 2 || sy) ev.rate = rate;
   let s0 = 0, s1 = loop;
-  if (slc >= 2){ const pts = slicePoints(pad, I, data, sr), k = sl ? ev.slc % slc : ((n - ROOT) % slc + slc) % slc; s0 = pts[k]; s1 = k + 1 < pts.length ? pts[k + 1] : loop; }
+  if (slc >= 2){ const pts = I.smode && ev.st && ev.st.sx === 1 && ev.st.rp ? Array.from({length:slc}, (_, k) => loop * k / slc) : slicePoints(pad, I, data, sr),   /* OLDSCHOOL with REV / PING / EASE: slices of what you hear (equal parts); HITS belong to the source */
+     k = sl ? ev.slc % slc : ((n - ROOT) % slc + slc) % slc; s0 = pts[k]; s1 = k + 1 < pts.length ? pts[k + 1] : loop; }
   else if (ev.ofs > 0) s0 = loop * clamp(ev.ofs, 0, 255) / 256;   // STA on a synced loop (owner, 1 Nov: Renoise's 0S chopping): from that point of the loop on (it was ignored: always the top)
   ev.ofsSec = s0 * scale; ev.durSec = Math.max(0.005, (s1 - s0) * scale);
   const end = ev.t + ev.durSec / ev.rate; ev.cut = ev.cut == null ? end : Math.min(ev.cut, end);
@@ -23751,7 +23812,7 @@ function slPlan(lines, lpb, bpm, loop, mode){
   const r = loop / secs, pct = Math.round(Math.abs(r - 1) * 100);
   if (mode === 1) t += Math.abs(r - 1) * 100 < 0.05 ? 'it already fits.' : 'it ' + syRepitchText(loop, secs) + '.';
   else t += pct < 1 ? 'it already fits (the grains still run).' : 'it will be ' + (r > 1 ? 'stretched out' : 'squeezed') + ' to fit (' + pct + '%), the pitch stays.';
-  return t + ' The length is in lines, so it follows LPB.';
+  return t + (mode === 4 ? ' Set LOOP, RAMP, SMOOTH and PITCH on the INST page.' : '') + ' The length is in lines, so it follows LPB.';
 }
 // The lengths the sheet offers: 8 to 128 lines and 1, 2, 4, 8 bars (merged, in order)
 function slChoices(lpb){ const a = new Set([8, 16, 32, 64, 128]); for (const b of [1, 2, 4, 8]) a.add(b * slBar(lpb)); return [...a].sort((x, y) => x - y); }
@@ -27311,13 +27372,25 @@ function instRows(){
         info:() => 'GRID: equal slices. HITS: a slice starts at each drum hit it finds (good for loose breaks)'},
       {l:'SYNC', opts:true, get:() => syPick(I), set:v => syPut(I, v), tap:() => { const {L, map} = syList(); askSheet({title:'Sync mode', body:'How the loop is fitted to its length. REPITCH changes the speed and the pitch; the others keep the pitch.'}, {list:L, cur:map.indexOf(syPick(I))}).then(r => { if (typeof r === 'number' && map[r] != null){ syPut(I, map[r]); saveS(); draw(); } }); },
         min:0, max:SY_PICK.length - 1, d:0, fmt:v => SY_PICK[v].n,
-        info:() => SY_PICK[syPick(I)].tip + (syPick(I) === 1 ? ': ' + syRepitchRow(I) : '') + ' · EDIT opens the list'},
+        info:() => SY_PICK[syPick(I)].tip + (syPick(I) === 1 ? ': ' + syRepitchRow(I) : '') + ' · EDIT opens the list' + ((I.sync | 0) > 0 && coreWanted() ? ' · On the Audio thread sequencer the sample plays unsynced for now; that is being worked on. Settings › Audio › Sequencer › Page plays it synced.' : '')},
       {l:'BEATS', get:() => (I.lines | 0) > 0 ? clamp(Math.round(instBeats(I)), 1, 64) : I.beats || 4, set:v => setBeats(I, v), min:1, max:64, big:4, d:4,
         fmt:v => (I.lines | 0) > 0 ? slName(I.lines, S.lpb || 4) + ' = ' + slN(+instBeats(I).toFixed(2), 'beat') + ' = ' + slSecs(I.lines, S.lpb || 4, S.bpm).toFixed(2) + ' s'
           : v + (v === 1 ? ' beat' : ' beats') + ' = ' + (v * 60 / S.bpm).toFixed(2) + ' s',
         info:() => { const c = ensure(I.pad); return ((I.lines | 0) > 0 ? 'Set in LINES (› SYNC TO LINES); changing BEATS here goes back to beats. ' : '') + 'How many beats the loop lasts. The loop is ' + loopSecs(I.pad, c.data, c.sr).toFixed(2) + ' s; › GUESS BEATS works it out' + (syPick(I) === 1 ? ' · REPITCH: ' + syRepitchRow(I) : ''); }},
+      ...(syPick(I) === 4 ? [
+        {l:'LOOP BY', opts:true, get:() => I.ou | 0, set:v => I.ou = v, min:0, max:6, d:0, fmt:v => OS_DIV_NAMES[v],
+          info:() => 'How long the little loop is: in milliseconds, or a division of a LINE (it then follows the tempo and LPB). It is ' + (osGrainSecs(I, S.bpm, S.lpb || 4) * 1000).toFixed(1) + ' ms now. A hard cut every loop buzzes at 1000 / that many Hz'},
+        ...((I.ou | 0) === 0 ? [{l:'LOOP', get:() => Math.round(Math.min(250, Math.max(0.5, +I.og || 12)) * 2), set:v => I.og = v / 2, min:1, max:500, big:20, d:24, fmt:v => (v / 2) + ' ms',
+          info:() => 'The loop that is scrubbed, 0.5 to 250 ms. Short and it buzzes, long and it stutters'}] : []),
+        {l:'RAMP', opts:true, get:() => I.orp | 0, set:v => I.orp = v, min:0, max:3, d:0, fmt:v => OS_RAMPS[v],
+          info:() => ['FWD: the loop\u2019s start moves from the start of the sample to its end over the length', 'REV: from the end back to the start', 'PING: forward, then back, in one length', 'EASE: forward, slow at both ends'][I.orp | 0] + (((I.orp | 0) > 0 && (I.slc | 0) > 1 && I.smode) ? ' · SLICE BY HITS slices what you hear (equal parts) here' : '')},
+        {l:'SMOOTH', get:() => I.ox | 0, set:v => I.ox = v, min:0, max:50, big:10, d:0, fmt:v => v ? v + '%' : '0 · hard cut',
+          info:() => 'A crossfade between the little loops, as a share of the loop. 0 is the classic hard cut: the steps are the sound'},
+        {l:'PITCH', get:() => I.opt | 0, set:v => I.opt = v, min:-24, max:24, big:12, d:0, fmt:v => v ? sgn(v) + ' st' : '0 · own pitch',
+          info:() => 'The pitch of the little loops, in semitones. The length does not change'},
+      ] : [
       {l:'GRAIN', opts:true, get:() => I.grain == null ? 1 : I.grain, set:v => I.grain = v, min:0, max:4, d:1, fmt:v => GRAIN_NAMES[v] + ' beat',
-        info:() => 'GRANULAR and LOOP: how long each grain is. Short is smoother for GRANULAR and buzzier for LOOP'},
+        info:() => 'GRANULAR and LOOP: how long each grain is. Short is smoother for GRANULAR and buzzier for LOOP'}]),
       {l:'› GUESS BEATS', act:() => { guessBeats(I); draw(); }, info:'Sets BEATS from the loop length and the song tempo'},
       {l:'› SYNC TO LINES', act:() => syncToLines(I.pad), info:'Fit this pad’s loop to a length in lines or bars (1 bar = 4 beats), in the sampler’s own words, for every instrument that plays the pad'},
       {l:'› PLAY SLICES', act:() => playSlices(cInst), info:'Plays every slice once, in order'},
