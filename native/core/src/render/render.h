@@ -25,6 +25,8 @@
 
 namespace thunder {
 
+class Players;
+
 constexpr int kRenderPads = 256;       // pad slots a kit can have (a pad number is one byte)
 constexpr int kRenderQuantum = 128;    // frames a song is rendered in (the web core's block), whatever the host's block
 constexpr int kRenderEvents = kSeqStepEvents;   // one sequencer step's events, sized for the worst case (seq.h; more are counted: stats().seqDropped)
@@ -130,12 +132,13 @@ class SongRenderer {
   // latencyFrames(). Allocates nothing (a scratch block made at construction).
   void renderTrimmed(float* outL, float* outR, int64_t N);
   bool songOver() const { return !seq_->alive(); }       // the sequencer has reached the end
-  int voices() const { return pool_.active() + sfpool_.active(); }   // voices still sounding (the sampler's and the SoundFont pool's)
+  int voices() const;   // voices still sounding (the sampler's and the SoundFont pool's)
   double time() const { return (double)frame_ / sr_; }
   int64_t frame() const { return frame_; }
   Mixer& mixer() { return mix_; }
-  VoicePool& pool() { return pool_; }
-  sf::SfPool& sfPool() { return sfpool_; }
+  VoicePool& pool();
+  sf::SfPool& sfPool();
+  Players& players();
   // A tap on the mixer's per-track inputs (the sampler's and the SoundFont pool's voices summed), called each quantum just before the mixer runs; for tests. Null: none.
   typedef void (*InputTap)(void* user, const float* const* inL, const float* const* inR, int frames, int64_t frame0);
   void setInputTap(InputTap fn, void* user) { tap_ = fn; tapUser_ = user; }
@@ -144,15 +147,12 @@ class SongRenderer {
   double lead = 0.25;                                    // LEAD (the core's `lead` command: 0.05..2 s)
 
  private:
-  void dispatch(const SeqEvent& e);
-  void capPoly(const SeqEvent& e);                       // a poly note: the track's cap of four is shared by both pools, oldest first (core-processor.js :442-443, :582-583: one list)
-  void takeAll(const SeqEvent& e, int pad);              // a note the sampler does not play: the track's voices in BOTH pools give way (one voice list in the JS)
+  void dispatch(const SeqEvent& e);                      // the mixer's, the beat clock's and the effects' events here; the note, off, mod and stp events go to the Players
   void quantum();                                        // renders the next kRenderQuantum frames into q_
   const Song& S_; const RenderPads& pads_;
   double sr_; int maxBlock_;
   std::unique_ptr<Seq> seq_;
-  VoicePool pool_;
-  sf::SfPool sfpool_;
+  std::unique_ptr<Players> players_;                     // the note players (render/players.h): the sampler's and the SoundFont pool, the routing, the shared voice list
   Mixer mix_;
   std::unique_ptr<SeqEvent[]> evs_;
   std::unique_ptr<SeqStep> step_;
@@ -166,7 +166,6 @@ class SongRenderer {
   static void masterHook(void* user, int track, float* L, float* R, int frames, double t0, const MixFeed* feeds, int nFeeds);
   MeterBank* meters_ = nullptr;
   RenderStats st_;
-  uint64_t serial_ = 0; int peakAll_ = 0;                // voice serials (age across the pools) and the most voices of both pools sounding together
   InputTap tap_ = nullptr; void* tapUser_ = nullptr;
 };
 
