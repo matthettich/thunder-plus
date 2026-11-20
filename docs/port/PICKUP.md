@@ -28,6 +28,22 @@ plan; sections 1 to 4 and 9), `HANDOVER.md` on `beta` (the web app, the owner's 
 ## START HERE (19 Nov, 17:00): the state for a new chat. The dated sections below are the history, newest first after this one.
 **Say to a new chat:** "Pull thunder-plus, branch native, and continue from docs/port/PICKUP.md. Start at START HERE (19 Nov, 17:00)."
 
+**UPDATE 19 Nov, 22:45 (the owner went to bed; "merge everything", then "push a new desktop beta"). Only what is pushed exists.**
+NATIVE (branch `native`):
+- #246 `n1/u34b` stems: open, CI green except sanitizers (was running); verifier report expected on `review/verify-246`. Merge when both are clean.
+- #247 `n1/followups-19nov`: open (beats 0 -> 4 fixed); verifier report expected on `review/verify-247`. Merge when clean.
+- Live routes: design + rulings L1-L10, C1-C11, P1-P6 in `docs/port/LIVE-ROUTE-DESIGN.md` on `n1/live-route`; worker building the decision-log golden, PR A `n1/players`, PR B on `n1/live-route`.
+- U35 MIDI: `n1/u35-spec` (notes, `tools/midi-ledger.mjs`, 28 ledgers, rulings: the web's MIDI bugs B1-B9 are FIXED natively, each with a listed expected difference); worker building `MidiSched`.
+- The lead's pre-wiring read: `docs/port/reviews/prewire-19nov.md` (F1-F3 must be fixed before U37).
+WEB (branch `beta`; each PR holds a build number; every merge makes the next need a rebase of BUILD / sw.js / changelog / HANDOVER; merge one at a time when CI is green on the rebased head):
+- MERGED: #248 Expression examples (648).
+- Ready after rebase: #252 beta icon (`beta-icon-swap`), #249 drag sliders (649), #253 FOLLOW order (656).
+- #250 FX preset keys (653): the owner has not answered whether moving the value nudge to mod+Shift+arrows is right; the lead's call if he stays silent: merge as built (his own example needs it) and tell him.
+- #251 reset track (650): verifier report expected on `review/verify-251`.
+- Building, no PR yet at 22:45: `beta-bus-into-bus` (651; rulings in `docs/BUS-INTO-BUS-DESIGN.md`; CHN labels two letters: MS, LP), `beta-solo-fx-quiet` (652, bug hunt), `beta-inuse-outline` (654), `beta-sampler-pitch-sync` (655; bars + lines), `beta-master-dblclick` (657; a NEW master block), `beta-env-lines` (658; 4 bars must work, 8 if cheap; bars + lines).
+- Design only: `beta-stretch-design` (`docs/STRETCH-DESIGN.md`): build steps 1 and 2 after 655 merges. Waiting on the owner: his test loops, Rubber Band yes / no, OLDSCHOOL rendered first (the lead's default: yes).
+- DESKTOP BETA when the web PRs are in: run `desktop.yml` from `beta` through the API with `inputs[version]=1.3.14-beta.1`, `inputs[prerelease]=true` (the beta icon is picked by `THUNDER_BETA=1`, set by the workflow for a prerelease). Beta and stable share one appId: the beta replaces the stable app.
+
 **UPDATE 19 Nov, 20:25 (a later chat; if that chat is gone, its workers are gone too: only what is pushed exists):**
 - **PR #246 `n1/u34b` (U34b stems) is OPEN, not merged.** The lead read the core diff (sound). An independent verifier was running; its report, if it
   got that far, is `docs/port/reviews/verify-246.md` on `review/verify-246`. No report there: send a new verifier, then merge when it and CI are clean.
