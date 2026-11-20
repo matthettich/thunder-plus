@@ -1722,6 +1722,13 @@ Build 654, branch `beta-inuse-outline` (from `beta` at 647). Owner, 19 Nov: "Can
 - **Not done:** the Instrument page keeps its own IN USE row (bare I columns count there); the Edit menu's Instrument... list and the Acid panel's picker (which already has "· free") are unchanged. In a kit-slot-per-track song, phrases not on the song have no track so cannot be dotted.
 - Tests: `tests/pad-inuse-outline.test.js` (the scan on fixtures, invalidation, source pins); opt-in `node tests/sweep/inuse-outline.mjs [--shots=1]` loads both shipped songs and checks every pad against an independent count of the song file.
 
+## 19 Nov (solo + effect change left the mix quiet: NOT reproduced; playback report gets a tracks line; build 652)
+
+Branch `beta-solo-fx-quiet`. Owner (desktop 1.3.13, build 647, seq=core): "I soloed a track and then changed FX and the whole song went quiet until I reset audio." His log: clock steady, no drops; plays about 17 dB down (average -32 dB, peak -10.6) for three plays, then normal. Full trace, what was tried and the ranked suspects: `docs/SOLO-FX-QUIET-NOTES.md`.
+- **Not reproduced** in headless Chrome on his song (`sounds/BETA-TESTING-ELECTRO.thunder`) with `tests/sweep/solo-fx.mjs` (solo, add / remove / retype / bypass / parameter on the soloed, a silenced, the bus and the master, running and stopped, solo held 1.5 s and 12 s, both sequencers for the first cases), nor at node level (rest, chain edit, wake). No fix made.
+- **Added:** the "1 s / 3 s after STOP" report lines are cancelled by the next PLAY (`pbStopCancel`); a `tracks (...)` line on PLAY and 1 s after a solo / mute change (audible, fader gain, effects resting, SHUT / STUCK-REST flags). `tests/playback-report-stop-timers.test.js`.
+- **Next time it happens:** Settings > Audio > Copy playback report straight away, BEFORE Restart audio, and read the `tracks` line.
+
 ## 19 Nov (bus into bus: a bus feeds another bus; solo follows the chain; two-letter CHN labels; build 651)
 
 Build 651, branch `beta-bus-into-bus` (from `beta` at 647; PR into `beta`, not merged; open PRs hold 648 to 650). Owner's report with screenshots: Track In 1, 2, 3, 4, 5, 6, 9, 13 → Stereo mixer → Chain Out 8, then Track In 8 → Chain Out 14: the Mixer's CHN row said MISS on every track feeding the first bus. Analysis and rulings: `docs/BUS-INTO-BUS-DESIGN.md` (R1 to R8 ruled by the lead 19 Nov 21:20). Native: `docs/BUS-INTO-BUS-NATIVE.md` (nothing in `native/` touched).
@@ -1745,13 +1752,6 @@ Branch `beta-reset-track` (from `beta` at 647; builds 648 and 649 are in other o
 - Lead's ruling after verification (F1): a reset never changes a track's bus ROLE: CHN also stays on for a track that feeds a bus (the empty track feeds silence), so the bus keeps muting its own notes; toast names the bus. Stated plainly (F2, F3, no code change): the song loop shortens when this track alone held the last rows (playing from such a row just ends); other tracks' sidechain Sources naming this track stop ducking. Undo restores both. The opt-in page test now also checks the reset track's level on both sequencers.
 - Choices made (for the lead): CHN goes off for the track except when the track is a bus or feeds one; the ...chains patch is not edited; names and colours are reset with the strip; sidechain Sources of other tracks that name this track are left; PERFORM / parts entries of the track are removed.
 - Tests: `tests/reset-track.test.js` (18, plus 1 opt-in real-page run with `TP_BROWSER_TESTS=1`: the key, undo identical, other tracks' events unchanged on ELECTRO, playing on the page and on the audio thread).
-
-## 19 Nov (solo + effect change left the mix quiet: NOT reproduced; playback report gets a tracks line; build 652)
-
-Branch `beta-solo-fx-quiet`. Owner (desktop 1.3.13, build 647, seq=core): "I soloed a track and then changed FX and the whole song went quiet until I reset audio." His log: clock steady, no drops; plays about 17 dB down (average -32 dB, peak -10.6) for three plays, then normal. Full trace, what was tried and the ranked suspects: `docs/SOLO-FX-QUIET-NOTES.md`.
-- **Not reproduced** in headless Chrome on his song (`sounds/BETA-TESTING-ELECTRO.thunder`) with `tests/sweep/solo-fx.mjs` (solo, add / remove / retype / bypass / parameter on the soloed, a silenced, the bus and the master, running and stopped, solo held 1.5 s and 12 s, both sequencers for the first cases), nor at node level (rest, chain edit, wake). No fix made.
-- **Added:** the "1 s / 3 s after STOP" report lines are cancelled by the next PLAY (`pbStopCancel`); a `tracks (...)` line on PLAY and 1 s after a solo / mute change (audible, fader gain, effects resting, SHUT / STUCK-REST flags). `tests/playback-report-stop-timers.test.js`.
-- **Next time it happens:** Settings > Audio > Copy playback report straight away, BEFORE Restart audio, and read the `tracks` line.
 
 ## 19 Nov (Settings sliders: press and drag a bar; build 649)
 

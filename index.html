@@ -24415,7 +24415,7 @@ function tStart(mode, o){
   if (mode === 'song' && (o.row | 0) > 0) try { chaseFx(o.row | 0, seq.time); } catch(e){ tpLog('chase', e); }   // CHASE: the effect commands before the start row
   tp.core = false;
   if (coreWanted() && core.ready && !core.bad && !(o && o.page)) coreStart(mode, o, t0start, rsFirst ? {ref:pz.ref, row:pz.row, step:pz.step} : null);
-  rkReset(); pbStopCancel(); pbLog('PLAY ' + mode + ' · ' + pbState()); pbTracks('PLAY'); pbLvReset(); setTimeout(() => { if (tp.on) pbLog(`4 s into PLAY: level ${pbLevel()}`); }, 4000);   // (9 Nov: to compare Latency settings)   // not loaded yet: this PLAY as before, the core loads at STOP
+  pbStopCancel(); rkReset(); pbLog('PLAY ' + mode + ' · ' + pbState()); pbLvReset(); pbTracks('PLAY'); setTimeout(() => { if (tp.on) pbLog(`4 s into PLAY: level ${pbLevel()}`); }, 4000);   // (9 Nov: to compare Latency settings)   // not loaded yet: this PLAY as before, the core loads at STOP
   try { if (pwB) pwStep = Math.floor(pwB.level * 20); const pw = pwFmt(pwState(), true); if (pw) pbLog(pw); } catch(e){}   // POWER STATE in the report
   if (lkp) lkStarted(lkp);   // ABLETON LINK: Link's exact tempo; ours tells the session
   tp.timer = pumpTimer(); pump(); if (!handing) draw(); songBtn(); chainsTempo(); if (typeof frameWake === 'function') frameWake();   // (a hand-over happens out of view: no draw, which was most of its time)
