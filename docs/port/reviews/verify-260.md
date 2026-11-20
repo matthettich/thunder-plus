@@ -1,6 +1,6 @@
 # verify-260: PR #260 `n1/players` (Players: dispatch and the pools behind one class)
 
-Verifier: independent (did not build it). PR head `cd15eaa5`, base `origin/native` `6fd16ea9`. Status: items 1 to 5, 7 done; item 6 full Release ctest still running (see section 6).
+Verifier: independent (did not build it). PR head `cd15eaa5`, base `origin/native` `6fd16ea9`. Status: complete. Verdict: MERGE.
 
 ## 1. It is a move and nothing else: CONFIRMED (no behavioural difference; structural differences listed)
 
@@ -63,8 +63,8 @@ Contract that remains (pre-existing, documented in `players.h` and `sf_live.h`):
 ## 6. Tests and CI
 
 - Sanitizer build (`-DTHUNDER_SANITIZE=ON`, ASan + UBSan, UB fatal) of the PR head: `render_api`, `render_api_hostile`, `render_api_fix`, `render_dispatch`, `render_chop`, `render_var`, `render_sf`, `render_c`, `hostile`, `rt_core`, `rt_guard_selftest`: 11 of 11 pass. The P1 test above is clean under it too.
-- Release: the same 11 pass (section 2). Full Release ctest: see the end of this file.
-- CI on `cd15eaa5` (`gh api .../check-runs`): Core (Android arm64-v8a, NDK) success; Core (wasm, wasi-sdk) success; Core (macOS universal) success; Core (Windows x64, MSVC) success; Core (Linux, GCC) success; Core (Linux, clang) success; Android shell v0 success; `test` success; CodeRabbit and "Attach the APK" skipped; Core (Linux, sanitizers) cancelled at the 60-minute limit (22:32 to 15:31 UTC; the known problem fixed by PR #247, not this PR's: I ran the same sanitizer tests above and they pass).
+- Release: the same 11 pass (section 2). Full Release ctest on the PR head (`ctest -j2`, 181 tests, 4538 s): 180 passed, 0 failed, 1 skipped (`pumpsynth_refused`, skipped by its own CMake condition, nothing to do with this PR); that includes `render_api_oom` and `render_sf_oom` (allocation-failure injection through the new heap-allocated `Players`).
+- CI on `cd15eaa5` (`gh api .../check-runs`): Core (Android arm64-v8a, NDK) success; Core (wasm, wasi-sdk) success; Core (macOS universal) success; Core (Windows x64, MSVC) success; Core (Linux, GCC) success; Core (Linux, clang) success; Android shell v0 success; `test` success; CodeRabbit and "Attach the APK" skipped; Core (Linux, sanitizers) cancelled at the 60-minute limit (14:32 to 15:31 UTC; the known problem fixed by PR #247, not this PR's: I ran the same sanitizer tests above and they pass).
 
 ## 7. Mutations by hand
 
@@ -83,9 +83,11 @@ I did not edit the PR worktree: each mutant was a modified copy of `players.cpp`
 | `OFF` no longer forwarded to `sfpool_` | `render_sf` (line 282, 284) | 42 differ |
 
 Findings about the test suite (not blockers for a pure move):
-1. Three order swaps survive every test and also the 120-song fuzz and are probably equivalent (the two pools are independent, and a take before the cap does not change which voices the cap finds when the track is poly). If the swaps matter, nothing would catch them: `pool_.take` / `capPoly` order, `sfpool_.take` / `capPoly` order, `takeAll` order.
+1. Three order swaps survive every test and also the 120-song fuzz and are probably equivalent (the two pools are independent; I did not prove it). If the swaps matter, nothing would catch them: `pool_.take` / `capPoly` order, `sfpool_.take` / `capPoly` order, `takeAll` order.
 2. Every other mutant is caught by `render_sf` only. `render_dispatch`, `render_api*`, `render_var`, `render_chop`, `hostile` and `rt_core` do not exercise the poly cap and takeover across the two pools; if `render_sf` is skipped or slow-gated in some CI job, this code is unguarded.
 
-## Verdict
+## Verdict: MERGE
 
-(see below)
+It is a move. No difference in order, condition, argument, counter or type was found; the structural differences (heap-allocated `Players`, counters in `PlayerStats` copied in `stats()`, four accessors now out of line) have no effect on any output. 950 renders are bit- and stats-identical to `origin/native`, ruling P1 holds and the ASan test (with a negative control) is clean, real-time rules are unchanged, full ctest and the render group under ASan + UBSan pass, and every CI job except the known-cancelled sanitizer job is green.
+
+Nits, none blocking: (a) `Players::note` shadows the `pads_` member with a local `const RenderPads&` of the same name; rename it when `setPads` is first used by a live host. (b) The voices borrow the variation buffers inside `RenderPads::var`; a live host that re-points pads while a MUT/GEN voice sounds must keep the old pads' `var` alive (same rule as the sample memory; worth one line in `players.h`). (c) The test-suite gaps in section 7.
