@@ -855,6 +855,9 @@ Start a session by asking for results. Fix on `beta`. (10 Nov, 15:10: the web be
 **Build 648** (Expression: worked examples in the ? help)
 - [ ] **Computer or phone, …waves:** add Expression (Modules, Control utilities), tap its ? and read the list of worked examples under Try (one formula per line, selectable). Open its Examples menu and pick Sine 220 Hz (the field fills in and applies), send its Out to the output and play a note or the song. Pass: a steady 220 Hz sine (a low A, full level, so turn it down first). Then add a second Expression: pick Glide pitch, part 1: ramp in the first, cable its Out to A of the second, pick Glide pitch, part 2: sine in the second and send that to the output. Pass: a 220 Hz sine, and dragging the first one's K1 slides the pitch smoothly with no jumps (K1 0 is 110 Hz, 4 is 550 Hz). Typing the one-line `sin(2 * pi * (110 + k1 * 110) * t)` and moving K1 while it sounds does jump, as the help says. The Examples menu lists the same formulas as the help (24, tones first), in …chains too, and the help is on each editor's Help page (Expression card).
 
+**Desktop beta icon (19 Nov, PR on `beta-icon-swap`)**
+- [ ] **Mac or Windows, after the next desktop BETA (pre-release) is built:** install it; the Dock / taskbar / window icon shows the two dogs with swapped colours (left dog grey, right dog brown). The stable app's icon is unchanged. Note: the beta replaces the stable app on install.
+
 **Build 647** (flex NaN fixes; the FX bar's Flex PATTERN writes the FLX command)
 - [ ] **Computer, Phrase screen, a track with a Flex effect (or the master column with one) and the bottom FX bar on:** put the cursor on an FLX command (FLX 10, say), change PATTERN in the FX bar by dragging or the wheel. Pass: the number in the column follows at once, the bar shows the command's pattern while the cursor is on it, one Ctrl/\u2318+Z brings the command back to 10 (and the effect's own PATTERN), and with the cursor on a note or an FLY command nothing in the column changes. Every other FX bar value (delay time, mix, thresholds) still edits as before.
 - [ ] **Computer:** FLX E8 (5-tuplet feel) on a track and on the master plays without a click or dropout, also over a long play.
@@ -1615,6 +1618,10 @@ Tests added: `gen-instrument` (source pins).
 Build 630, on `beta`. The owner asked for a mod section in the FX bar: collapsible, small, showing that there are modulations, the waveform and the destinations. Added `#dkMod` (DK_SECS / DK_FOLD, `deck.mod` saved with the panel, default FOLDED so no existing layout changes) between FX and PERFORM. `deckMod()` rebuilds only when open and when the focused track's LFOs / skin / ANIMATIONS change; each row is a 48×18 canvas wave (`modMix`, the MOD screen's maths) with a dot moved by `dkModTick` from the frame loop (only open, playing, visible, ANIMATIONS on, LOW POWER DISPLAY off), the shape and rate, and the destination (`tgtLabel`). Click: MOD screen on that track. Skin colours through CSS variables (checked IDM and 909 in headless Chrome). Hidden on the phone's swipe layout (`max-width:700px` + coarse pointer): the bottom panel there is one section at a time and the owner's folded-phone width is not a place to add a page. Display code only; nothing posts to the engine.
 
 Tests added: `deck-mod-section` (source pins).
+
+## 19 Nov (desktop beta gets its own icon: the two dogs swap colours; branch `beta-icon-swap`)
+
+Owner: "invert the colors of the beta's icon so it's easy to tell which is which ... the brown dog should be grey and the grey brown. Only on the beta." `tools/make-beta-icon.py` swaps the dogs' fills in the 512 master (the only source) into `electron/icons-beta/`; `electron/copy-app.js` uses them when `THUNDER_BETA=1`, which `desktop.yml` sets for a pre-release run or a `-beta` tag. Stable icon files and the web app's icons are unchanged; no version bump, no web build. Notes: `docs/BETA-ICON-NOTES.md`; look: `docs/beta-icon-compare.png`. Beta and stable still share appId and product name, so installing a beta replaces the stable app.
 
 ## 18 Nov (FLX 76 on the master; flex NaN fixes; the FX bar writes the FLX command; build 647)
 

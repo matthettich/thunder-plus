@@ -11,6 +11,17 @@ for (const f of PARTS){
   if (!fs.existsSync(from)){ console.error('Missing from the app: ' + f); process.exit(1); }
   fs.cpSync(from, path.join(dst, f), {recursive:true});
 }
+// BETA ICON: a desktop beta (THUNDER_BETA=1, set by desktop.yml for a pre-release or a -beta tag) swaps the two dogs' colours.
+// It replaces only the 512 / 192 "any" icons inside ./app (the window icon, and electron-builder's .icns / .ico / AppImage icon
+// read app/icons/plus-icon-512.png); the repo's icons/ folder and every stable build are untouched. Made by tools/make-beta-icon.py.
+if (process.env.THUNDER_BETA === '1'){
+  for (const f of ['plus-icon-512.png', 'plus-icon-192.png']){
+    const from = path.join(__dirname, 'icons-beta', f);
+    if (!fs.existsSync(from)){ console.error('Missing beta icon: ' + from); process.exit(1); }
+    fs.copyFileSync(from, path.join(dst, 'icons', f));
+  }
+  console.log('Beta build: using the swapped-dogs icon');
+}
 // LXR ENGINES: lxr/ (the LXR-02 firmware's voices, GPL-3.0) when it is there, its source and licence included.
 // Leave the folder out of the repo to build without it; the app then has no Firmware engines.
 if (fs.existsSync(path.join(src, 'lxr'))) fs.cpSync(path.join(src, 'lxr'), path.join(dst, 'lxr'), {recursive:true});
