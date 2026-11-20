@@ -26075,7 +26075,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 656;
+const BUILD = 657;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD + (location.pathname.includes('/beta/') ? ' · beta' : '');
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -27831,7 +27831,7 @@ function editTap(enter, stamp){   // stamp: Shift+Enter, which writes the curren
     // NEW, NOT A COPY (owner, 7 Nov: from the Pattern view into Arrange, EDIT on empty cells on tracks 2 and 3 gave 01 and 02 with
     // 00's notes: the "current" block was placed, and UNIQUE PER TRACK copied it). An empty block gets a new empty pattern,
     // unless a pattern was picked up with Enter on purpose (keyboard arranging, 3 Nov): then that one is placed.
-    if (tv === 'song' && !sectsOn && k !== 'tsp' && v < 0 && !(sectPicked >= 0 && sectPicked === last.sect && S.chains[sectPicked])){ lastTap = {t:0, key:'', empty:false}; return newBlock(c, -1); }
+    if (tv === 'song' && !sectsOn && k !== 'tsp' && v < 0 && !(sectPicked >= 0 && sectPicked === last.sect && S.chains[sectPicked])){ lastTap = {t:0, key:'', empty:false}; return c.x === MT ? masterDrop(c.y) : newBlock(c, -1); }
     if (k !== 'tsp' && v < 0){ lastTap.empty = true; insertAt(c.x, c.y, k, true); }
     else if (tv === 'phrase'){ const p = S.phrases[cPhrase]; if (p) aud(p[c.y]); }
     return;
@@ -27914,6 +27914,39 @@ function newBlock(c, src){
   setCell('song', c.x, c.y, cid); after('sect', 'song', c.x, c.y, cid);
   const ph = firstPhrase(cid);
   return toast((src < 0 ? 'New phrase ' : 'Unique copy: phrase ') + hp(ph) + (ph !== cid ? ' (block ' + hp(cid) + ')' : '') + ' · SHIFT+▶ opens it');
+}
+// MASTER CELL: DROP AN EMPTY BLOCK (owner, 19 Nov: "double clicking on the master in Arrange or Song drop an empty block, and if master is empty and all of the
+// rows are empty it fills all with empty patterns"). Called by Arrange's double-click / double-tap on a master cell (arrGo), and by Enter / EDIT on an empty
+// master cell on the Song (editTap), so the screens share this one function. A block is a sect holding one phrase (as newBlock makes it: the same number when both
+// are free). Master cell already filled: nothing here (the callers' own filled-cell action runs: opens its phrase). Otherwise:
+//   CASE B, every VISIBLE track's cell (0 .. ntr()-1) in song row y is empty: one new empty block on each of them, in track order with consecutive free numbers
+//     (muted and bus tracks too, as they draw), and one on the master. Tracks past MONO + POLY keep their data and get nothing. All or nothing: with fewer
+//     free numbers than cells it changes nothing and says how many are needed and free.
+//   CASE A, anything else: only the master block (newBlock's, with its own toast).
+// All the writes happen in one go before one saveS(), so Undo is one step and a playing sequencer is told once, as for any song-grid edit.
+function masterDrop(y){
+  const row = S.song[y]; if (!row || row[MT] >= 0) return false;
+  const NA = ntr(), c = cs.song; let any = false;
+  for (let t = 0; t < NA; t++) if (row[t] >= 0){ any = true; break; }
+  if (any){ c.x = MT; c.y = y; newBlock({x:MT, y}, -1); return true; }
+  const need = NA + 1, uc = new Set(), up = new Set();
+  for (const r of S.song) for (const v of r) if (v >= 0) uc.add(v);
+  for (const ch of S.chains) if (ch) for (const r of ch) if (r[0] >= 0) up.add(r[0]);
+  let fs = 0, fp = 0;
+  for (let i = 0; i < NPH; i++){ if (!uc.has(i) && isEmptySect(S.chains[i])) fs++; if (!up.has(i) && isEmptyPhrase(S.phrases[i])) fp++; }
+  const free = Math.min(fs, fp);
+  if (free < need){ c.x = MT; c.y = y; draw();
+    toast(`Row ${rS(y, 3)} needs ${need} new phrases (${NA} tracks and the master) but only ${free} ${free === 1 ? 'is' : 'are'} free · nothing changed · CLEAR UNUSED PHRASES frees numbers`, 3200); return true; }
+  sectPicked = -1;
+  for (let k = 0; k < need; k++){
+    const t = k < NA ? k : MT, [cid, pid] = freePair(); if (cid < 0 || pid < 0) break;   // (cannot happen after the count above)
+    S.chains[cid] = freshSect(); S.chains[cid][0][0] = pid;
+    S.phrases[pid] = freshPhrase(); S.plen[pid] = S.dlen || 16; S.plpb[pid] = 0;
+    row[t] = cid;
+  }
+  c.x = MT; c.y = y; saveS(); draw();
+  toast(`Row ${rS(y, 3)}: an empty phrase on ${NA} track${NA === 1 ? '' : 's'} and the master · ${MODK}+Z undoes`, 2400);
+  return true;
 }
 // CLONE (Ctrl/⌘+Alt+C, the command row's CLN, Edit ▾, right-click) on the song (owner, 19 Oct: "Cmd+D then paste drops
 // the clone on the cell that was copied"): it COPIES the block under the cursor (or the selected blocks) as a unique
@@ -33850,9 +33883,9 @@ function arrGo(y, t, sysDbl){
   // DOUBLE-CLICK AN EMPTY CELL beside any screen too (owner, 2 Nov): a new empty pattern there; on Phrase it opens. Its own
   // tap memory, since the paging and empty-cell rules below take the first click.
   { const k = y + ':' + t, now = performance.now(), empty = !(S.song[y] && S.song[y][t] >= 0);
-    if (empty && t !== MT && !sectsOn && !asongOn() && tv !== 'song'){
+    if (empty && !sectsOn && !asongOn() && tv !== 'song'){
       if (arrEmptyTap.k === k && (now - arrEmptyTap.t < 380 || sysDbl)){
-        arrEmptyTap = {t:0, k:''}; arrNewAt(y, t); return; }
+        arrEmptyTap = {t:0, k:''}; if (t === MT) masterDrop(y); else arrNewAt(y, t); return; }
       arrEmptyTap = {t:now, k}; } }
   if (!asongOn() && apArrGo(y, t)) return;   // ARRANGE PAGING: on Phrase a tap pages into Arrange instead
   // Beside any other screen a tap on an EMPTY cell just puts the song cursor there, highlighted, and the screen stays
@@ -33864,6 +33897,7 @@ function arrGo(y, t, sysDbl){
   const filled = S.song[y][t] >= 0;
   if (filled && (dbl || tv === 'phrase')){ tv = 'song'; go('phrase'); return; }
   // DOUBLE-CLICK AN EMPTY CELL (SunVox, 21 Oct): a new phrase there (as EDIT×2), and it opens. Not the master column.
+  if (!filled && dbl && t === MT && asongOn() && tv === 'song' && !sectsOn){ masterDrop(y); return; }   // MASTER CELL (19 Nov): an empty block, or a whole empty row
   if (!filled && dbl && t !== MT && asongOn() && tv === 'song' && !sectsOn){ newBlock({x:t, y}, -1); if (S.song[y][t] >= 0){ tv = 'song'; go('phrase'); } else draw(); return; }
   if (tv !== 'song') go('song'); else draw();
 }
@@ -36428,6 +36462,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [657, '19 Nov', ['Arrange and Song: double-click (or double-tap) an empty MASTER cell and it gets a new empty block. If that song row has nothing on any visible track and the master is empty, the whole row is filled instead, like a hand-made row: a new empty phrase on every track in MONO / POLY and a new empty block on the master, each with its own number in track order, as one undo step. Not enough free numbers: nothing changes and a message says how many are needed and free (CLEAR UNUSED PHRASES frees some). Tracks beyond MONO / POLY get nothing. A filled master cell still opens its phrase on a double-click; Enter / EDIT on an empty master cell does the same two things.']],
   [656, '19 Nov', ['Settings: FOLLOW sits directly above PHRASE ON STOP and ARRANGE ON STOP, in the View menu and in Settings (the Project screen too). Nothing else about them changed']],
   [653, '19 Nov', ['FX presets: with the cursor in an effect slot\u2019s controls (a parameter row or \u203a PRESET; FX screen, tracks and the master, pump effects too), Ctrl/\u2318+\u25c0\u25b6 load the previous / next preset (EDIT+\u25c0\u25b6 on its \u203a PRESET row on the pad). Ctrl/\u2318+Shift+\u25c0\u25b6 change a parameter by 1 now. Hold it to run through them: the sound changes as you go, and the whole run is one undo step. It stops at the first and last preset.']],
   [649, '19 Nov', ['Settings: press on a slider\u2019s bar (SWING, TEMPO, LPB, TEXT SIZE\u2026) to set it there and drag to change it, with a mouse or a finger. A swipe up or down that starts on a bar still scrolls the list. Double-tap a bar to put it back to its default. Shift (mouse) or a finger held away from the bar makes it finer. The sliders no longer lock.']],
