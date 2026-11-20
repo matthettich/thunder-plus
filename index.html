@@ -20797,7 +20797,7 @@ function busPlan(){
     const seen = new Set([m.id]), w = [m.id], outs = new Set();
     while (w.length){ const id = w.pop(), x = by.get(id); if (x && x.type === 'chainOut'){ const o = trk(x); if (o >= 0) outs.add(o); }
       for (const y of nx.get(id) || []) if (!seen.has(y)){ seen.add(y); w.push(y); } }
-    ti.push({m, t, outs, fed:false});
+    ti.push({mod:m, t, outs, fed:false});
   }
   const ownRet = new Set(); for (const q of ti) if (q.outs.has(q.t)) ownRet.add(q.t);
   const adj = new Map(), reaches = (a, b) => { const seen = new Set([a]), w = [a]; while (w.length){ const x = w.pop(); if (x === b) return true; for (const y of adj.get(x) || []) if (!seen.has(y)){ seen.add(y); w.push(y); } } return false; };
@@ -20815,12 +20815,12 @@ function busPlan(){
   }
   for (const q of ti){ if (!q.fed) continue;
     if (!q.outs.has(q.t)) pure.add(q.t);
-    if (+(q.m.params && q.m.params.pre)) pre.add(q.t);   // PRE SENDS (27 Oct): its Track In's Bus send is "Before its fader"
+    if (+(q.mod.params && q.mod.params.pre)) pre.add(q.t);   // PRE SENDS (27 Oct): its Track In's Bus send is "Before its fader"
   }
   for (const v of feeds.values()) v.sort((a, b) => a - b);
   // CLOSURES (19 Nov, owner: solo follows the chain through any depth): srcAll.get(t) = every track upstream of t (what feeds it, and what
   // feeds those), busAll.get(t) = every bus downstream of t. Sorted arrays; the plan is acyclic, so the walks end.
-  const clo = m => { const out = new Map(); for (const t of m.keys()){ const seen = new Set(), w = [...m.get(t)]; while (w.length){ const x = w.pop(); if (seen.has(x)) continue; seen.add(x); for (const y of m.get(x) || []) w.push(y); } out.set(t, [...seen].sort((a, b) => a - b)); } return out; };
+  const clo = mp => { const out = new Map(); for (const t of mp.keys()){ const seen = new Set(), w = Array.from(mp.get(t)); while (w.length){ const x = w.pop(); if (seen.has(x)) continue; seen.add(x); for (const y of mp.get(x) || []) w.push(y); } out.set(t, [...seen].sort((a, b) => a - b)); } return out; };
   P.srcAll = clo(feeds); P.busAll = clo(targets);
   return P;
 }
@@ -24458,7 +24458,7 @@ function padBlink(e){
 // Phones and tablets (10 Nov): the audio-thread sequencer's module (a second thread) loads only when the owner picked it there
 // (aset.corePick, set in Settings); the saved default 'core' plays on the Page sequencer on such a device.
 function coreWanted(){ return aset.core === 'core' && (!wkLazy() || !!aset.corePick); }   // (a declaration: the Settings row reads it at load)
-const CORE_REV = '1uubxpr';
+const CORE_REV = '1hi0bz9';
 const CORE_WANT = 7;   // the core's message set this page speaks (core-processor.js CORE_V); an older core is not used
 const CORE_URL = () => 'core/seq-core.js?v=' + BUILD + '-' + CORE_REV;
 const core = {node:null, ready:false, loading:null, gen:0, sent:new Map(), sT:0, tally:new Map(), mir:null};   // mir: what the core's song holds, as JSON per part (coreDiff)   // tally: events by who played them (test hook)
@@ -26091,7 +26091,7 @@ let mixScale = (() => { try { const v = parseInt(localStorage.getItem(MSK), 10);
 // BUILD (owner, 25 Oct): so "which build is this?" has an answer without the console. It is the service-worker cache number,
 // and a test fails if the two disagree (sw.js: CACHE = 'thunderplus-vNNN'). The desktop app also shows its packaged version,
 // which the updater bridge reports, so a test build is identifiable by both the web build and the app release.
-const BUILD = 648;
+const BUILD = 651;
 const buildStamp = () => (deskUpd && deskUpd.version ? 'v' + deskUpd.version + ' · ' : '') + 'build ' + BUILD + (location.pathname.includes('/beta/') ? ' · beta' : '');
 // A row number as it is shown: n digits in decimal (3 for the 256 song rows), hex otherwise.
 const rS = (y, n = 2) => stepDec ? String(y).padStart(n, '0') : hx(y, n === 1 ? 1 : 2);
@@ -36393,6 +36393,7 @@ $('welcomeAgain').addEventListener('click', () => { hideHelp(); welcome(true); }
    (thunderplus-seen-build). A first run sets it quietly (the welcome comes first). Help's header has What's new to see it
    again. Add a line to CHANGES with every build that changes something you'd notice: [build, date, [lines]], newest first. */
 const CHANGES = [
+  [651, '19 Nov', ['A bus can feed another bus through chains: Track In of the first bus \u2192 the second bus\u2019s chain. Before, a track that had both a Chain Out other tracks fed and a Track In of its own was not a bus, so the tracks feeding it said MISS and played dry. Now they say BS, the first bus plays through the second, and 08 and 14 say ON.', 'Solo follows the chain through any depth: soloing a bus keeps everything that feeds it, soloing a source keeps every bus after it, and the Mixer\u2019s info line says why a track that is not soloed is still heard (\u201cheard: feeds soloed bus 14\u201d). Muting a middle bus silences what passes through it.', 'The Mixer\u2019s CHN row is always two characters wide: MS (was MISS), LP (a cable that would close a loop of buses, left out), ON, BS, --. The line under the Mixer says the full word and, for MISS, no longer blames a CHN that is on. A song that already had a loop may now drop a different cable than before (it was dropped silently).', 'Stems: with a bus feeding a bus, the last bus\u2019s stem holds everything that plays through it.']],
   [648, '19 Nov', ['…waves and …chains: the Expression module’s ? help now has worked examples to copy, one formula per line: a sine, saw, triangle and square, a pitch from K1 and a version that glides without a jump, FM, a chord, a fade-in, ring modulation, tremolo, a low-pass filter, a wavefolder, a bit crusher and noise. The Help page shows them on the Expression card too, and the module’s Examples menu now holds the same formulas (tones first, then effects), so you can pick one instead of typing it.']],
   [647, '18 Nov', ['Flex: two patterns could put one broken sample into the sound (FLX E8, the 5-tuplet feel, just before a beat; and a tape pattern at one spot in Flex\u2019s memory). Fixed.', 'With the cursor on an FLX command in a phrase (or the master column), the FX bar\u2019s Flex PATTERN value now shows that command\u2019s number, and changing it rewrites the command in the column. One undo step per drag, on tracks and on the master. FLY commands are not linked, and every other FX bar value works as before.']],
   [646, '18 Nov', ['Computer side panel: the instrument list now sits above the PLAYING / STOPPED box and the meters (it was below them). Nothing else in the panel moved.']],

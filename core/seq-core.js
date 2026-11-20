@@ -150,7 +150,7 @@ function busPlan(){
     const seen = new Set([m.id]), w = [m.id], outs = new Set();
     while (w.length){ const id = w.pop(), x = by.get(id); if (x && x.type === 'chainOut'){ const o = trk(x); if (o >= 0) outs.add(o); }
       for (const y of nx.get(id) || []) if (!seen.has(y)){ seen.add(y); w.push(y); } }
-    ti.push({m, t, outs, fed:false});
+    ti.push({mod:m, t, outs, fed:false});
   }
   const ownRet = new Set(); for (const q of ti) if (q.outs.has(q.t)) ownRet.add(q.t);
   const adj = new Map(), reaches = (a, b) => { const seen = new Set([a]), w = [a]; while (w.length){ const x = w.pop(); if (x === b) return true; for (const y of adj.get(x) || []) if (!seen.has(y)){ seen.add(y); w.push(y); } } return false; };
@@ -168,12 +168,12 @@ function busPlan(){
   }
   for (const q of ti){ if (!q.fed) continue;
     if (!q.outs.has(q.t)) pure.add(q.t);
-    if (+(q.m.params && q.m.params.pre)) pre.add(q.t);   // PRE SENDS (27 Oct): its Track In's Bus send is "Before its fader"
+    if (+(q.mod.params && q.mod.params.pre)) pre.add(q.t);   // PRE SENDS (27 Oct): its Track In's Bus send is "Before its fader"
   }
   for (const v of feeds.values()) v.sort((a, b) => a - b);
   // CLOSURES (19 Nov, owner: solo follows the chain through any depth): srcAll.get(t) = every track upstream of t (what feeds it, and what
   // feeds those), busAll.get(t) = every bus downstream of t. Sorted arrays; the plan is acyclic, so the walks end.
-  const clo = m => { const out = new Map(); for (const t of m.keys()){ const seen = new Set(), w = [...m.get(t)]; while (w.length){ const x = w.pop(); if (seen.has(x)) continue; seen.add(x); for (const y of m.get(x) || []) w.push(y); } out.set(t, [...seen].sort((a, b) => a - b)); } return out; };
+  const clo = mp => { const out = new Map(); for (const t of mp.keys()){ const seen = new Set(), w = Array.from(mp.get(t)); while (w.length){ const x = w.pop(); if (seen.has(x)) continue; seen.add(x); for (const y of mp.get(x) || []) w.push(y); } out.set(t, [...seen].sort((a, b) => a - b)); } return out; };
   P.srcAll = clo(feeds); P.busAll = clo(targets);
   return P;
 }
