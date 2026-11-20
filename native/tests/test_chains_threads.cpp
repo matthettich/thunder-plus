@@ -16,7 +16,8 @@ static std::string patch(double gain, bool pump) {
   std::string pm = "{\"modules\":[{\"id\":\"a\",\"type\":\"trackIn\",\"params\":{\"track\":1}},{\"id\":\"g\",\"type\":\"vca\",\"params\":{\"gain\":" + std::to_string(gain) + "}},{\"id\":\"m\",\"type\":\"vca\"},{\"id\":\"c\",\"type\":\"chainOut\",\"params\":{\"track\":1,\"level\":0.9}}";
   std::string cb = "{\"from\":[\"a\",\"out\"],\"to\":[\"g\",\"in\"]},{\"from\":[\"g\",\"out\"],\"to\":[\"m\",\"in\"]},{\"from\":[\"m\",\"out\"],\"to\":[\"c\",\"in\"]}";
   if (pump) { const WInfo* wi = cinfo("ptube"); std::string ps; for (int k = 0; k < wi->np; k++) { char b[200]; std::snprintf(b, sizeof b, "%s\"%s\":%.17g", k ? "," : "", wi->params[k].name, wi->params[k].mx); ps += b; }
-    pm += ",{\"id\":\"p\",\"type\":\"ptube\",\"params\":{" + ps + "}}"; cb += ",{\"from\":[\"a\",\"out\"],\"to\":[\"p\",\"in\"]},{\"from\":[\"p\",\"out\"],\"to\":[\"c\",\"inR\"]}"; }
+    // U31 round-3 F2: four pump modules (each has its own spare hand-over), so a run holds four times the take-overs of the old one
+    for (const char* id : {"p", "p2", "p3", "p4"}) { pm += std::string(",{\"id\":\"") + id + "\",\"type\":\"ptube\",\"params\":{" + ps + "}}"; cb += std::string(",{\"from\":[\"a\",\"out\"],\"to\":[\"") + id + "\",\"in\"]},{\"from\":[\"" + id + "\",\"out\"],\"to\":[\"c\",\"inR\"]}"; } }
   return pm + "],\"cables\":[" + cb + "],\"transport\":{\"tempo\":110,\"playing\":true}}";
 }
 int main(int argc, char** argv) {
@@ -27,14 +28,17 @@ int main(int argc, char** argv) {
   std::atomic<bool> stop{false}; std::atomic<uint64_t> blocks{0}; std::atomic<bool> bad{false};
   std::thread audio([&] {
     std::vector<float> x(4096), L(4096), R(4096); uint32_t sd = 9; for (float& v : x) { sd = sd * 1664525u + 1013904223u; v = ((float)(sd >> 8) / 16777216.f - .5f) * 15.8f; }
-    int pos = 0; const int sizes[5] = {128, 64, 100, 17, 300};
+    int pos = 0; uint32_t ga = 12345; const int sizes[5] = {128, 64, 100, 17, 300};
     while (!stop.load(std::memory_order_relaxed)) {
       const int n = sizes[blocks.load(std::memory_order_relaxed) % 5]; NodeIn in; in.inL = &x[(size_t)pos]; in.inR = &x[(size_t)pos]; NodeOut out; out.L = L.data(); out.R = R.data(); live.process(in, out, n);
       for (int i = 0; i < n; i++) if (!std::isfinite(L[(size_t)i]) || !std::isfinite(R[(size_t)i])) bad = true;
       pos = (pos + n) % 3000; blocks++;
+      // U31 round-3 F2: random gaps on the audio side too, so the control thread's service() lands at many different offsets from the audio thread's spare take-over (a fixed rhythm hit the D4 window
+      // only 1 run in 10); a gap is a short sleep or a yield, never inside process()
+      ga = ga * 1664525u + 1013904223u; const uint32_t g = (ga >> 8) % 32; if (g == 0) std::this_thread::sleep_for(std::chrono::microseconds((ga >> 16) % 300)); else if (g < 4) std::this_thread::yield();
     }
   });
-  uint64_t posted = 0, patches = 0, refused = 0, iters = 0; const auto t0 = std::chrono::steady_clock::now();
+  uint64_t posted = 0, patches = 0, refused = 0, iters = 0, nextPatch = 0; const auto t0 = std::chrono::steady_clock::now();
   uint32_t r = 77; auto rnd = [&](int n) { r = r * 1664525u + 1013904223u; return (int)((r >> 8) % (uint32_t)n); };
   while (std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count() < seconds) {
     iters++; const int64_t at = live.enginePos() + rnd(600);
@@ -44,10 +48,13 @@ int main(int argc, char** argv) {
       else if (w < 8) { ChainsEvent e; e.kind = ChainsEvent::Playing; e.at = at; e.a = rnd(2); posted += live.post(e) ? 1 : 0; }
       else if (w < 9) { ChainsEvent e; e.kind = ChainsEvent::Tempo; e.at = at; e.a = 60 + rnd(120); posted += live.post(e) ? 1 : 0; }
       else posted += live.postParam("m", "track", 1, at) ? 1 : 0; }
-    if (iters % 40 == 0) { JsonDoc d; d.parse(patch(0.3 + (iters % 7) / 10.0, pump)); if (live.preparePatch(d.root(), at + 200)) patches++; else refused++; }
-    if (iters % 3 == 0) live.service();
+    if (iters >= nextPatch) { nextPatch = iters + 6 + (uint64_t)rnd(30);   // a new patch every 6..35 iterations (a fresh pump module goes bad each time: more spare take-overs)
+       JsonDoc d; d.parse(patch(0.3 + (iters % 7) / 10.0, pump)); if (live.preparePatch(d.root(), at + 200)) patches++; else refused++; }
+    // service() on most iterations, and the pause after it random: none, a spin, a yield, a short or a long sleep (the old fixed 300 us rhythm)
+    if (rnd(4) != 0) live.service();
+    if (rnd(3) == 0) for (int k = rnd(400); k > 0; k--) live.service();   // a burst: the take-over window of the audio thread is a few hundred ns, so poll it back to back
     const ChainsLiveStats s = live.stats(); (void)s;
-    std::this_thread::sleep_for(std::chrono::microseconds(300));
+    { const int w = rnd(8); if (w < 3) { /* no pause */ } else if (w == 3) std::this_thread::yield(); else if (w < 6) std::this_thread::sleep_for(std::chrono::microseconds(10 + rnd(100))); else std::this_thread::sleep_for(std::chrono::microseconds(200 + rnd(800))); }
   }
   stop = true; audio.join(); live.service();
   const ChainsLiveStats s = live.stats();

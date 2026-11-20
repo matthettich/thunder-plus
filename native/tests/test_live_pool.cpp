@@ -284,6 +284,30 @@ static std::vector<float> apiRender(int block, bool live, bool route, thunder_re
   CHECK(thunder_render_clear_pad_live(r, 0) == THUNDER_RENDER_E_STATE);
   thunder_render_free(r); L.insert(L.end(), R.begin(), R.end()); return L;
 }
+
+// ---- (4b) stems (U34b): a stem of the track that plays a live bass pad holds the bass; another track's stem does not -----------------------------------------------------------------------------
+static std::string stemSong() {   // track 0: notes on inst 0 (pad 0, live bass); track 1: notes on inst 1 (pad 1, no buffer: silent)
+  std::string s = "{\"v\":6,\"bpm\":120,\"lpb\":4,\"ntr\":8,\"song\":[[0,1]],\"chains\":[[[0,0]],[[1,0]]],\"plen\":[8,8],\"insts\":[{\"pad\":0,\"tsp\":0,\"slc\":0,\"sync\":0,\"mo\":0},{\"pad\":1,\"tsp\":0,\"slc\":0,\"sync\":0,\"mo\":0}],\"phrases\":[";
+  for (int p = 0; p < 2; p++) { s += p ? ",[" : "["; for (int i = 0; i < 8; i++) { char b[120]; if (i % 2 == 0) std::snprintf(b, sizeof b, "%s[%d,-1,-1,-1,-1,%d,-1,-1,-1,-1,-1,-1]", i ? "," : "", 48 + 3 * i, p); else std::snprintf(b, sizeof b, ",[-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1]"); s += b; } s += "]"; }
+  return s + "]}";
+}
+static double stemEnergy(int stem) {
+  const std::string sg = stemSong(); thunder_render_opts o; std::memset(&o, 0, sizeof o); o.size = sizeof o; o.use_frames = 1; o.frames = 48000; o.stem = stem;
+  char err[200]; thunder_render* r = thunder_render_create((const uint8_t*)sg.data(), sg.size(), &o, err, sizeof err); if (!r) { std::printf("create: %s\n", err); g_fail++; return -1; }
+  const char* json = "{\"engine\":\"bass\",\"level\":0,\"tune\":0,\"drive\":0,\"bass\":{\"cut\":600}}";
+  CHECK(thunder_render_set_pad_route(r, 0, THUNDER_RENDER_ROUTE_LIVE) == 0);
+  thunder_render_live_params lp; std::memset(&lp, 0, sizeof lp); lp.size = sizeof lp; lp.track_mask = 0b11;
+  CHECK(thunder_render_set_pad_live(r, 0, THUNDER_RENDER_LIVE_BASS, (const uint8_t*)json, std::strlen(json), &lp) == 0);
+  std::vector<float> L(48000), R(48000); int64_t got = 0;
+  while (got < 48000) { const int64_t n = thunder_render_read(r, L.data() + got, R.data() + got, std::min<int64_t>(4096, 48000 - got)); if (n <= 0) break; got += n; }
+  double e = 0; for (int64_t i = 0; i < got; i++) e += std::fabs(L[i]) + std::fabs(R[i]);
+  thunder_render_free(r); return e;
+}
+static void testStem() {
+  const double mix = stemEnergy(0), s0 = stemEnergy(1), s1 = stemEnergy(2);
+  CHECKF(mix > 1.0 && s0 > 1.0, "the mix and the stem of the live bass track hold the bass (%g, %g)", mix, s0);
+  CHECKF(s1 == 0, "another track's stem holds no bass (%g)", s1);
+}
 static void testApi() {
   thunder_render_stats s0, s1; const std::vector<float> none = apiRender(4096, false, true, &s0), a = apiRender(4096, true, true, &s1);
   CHECKF(s0.notes_live == 4 && s0.notes_live_played == 0, "notes_live %d played %d (no live params: silent, counted)", s0.notes_live, s0.notes_live_played);
@@ -323,6 +347,7 @@ int main() {
   testSeam();
   testVox();
   testLate();
+  testStem();
   testApi();
   if (g_fail) { std::printf("live_pool: %d FAILED\n", g_fail); return 1; }
   std::printf("live_pool: all checks passed\n"); return 0;

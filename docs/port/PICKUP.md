@@ -28,6 +28,36 @@ plan; sections 1 to 4 and 9), `HANDOVER.md` on `beta` (the web app, the owner's 
 ## START HERE (19 Nov, 17:00): the state for a new chat. The dated sections below are the history, newest first after this one.
 **Say to a new chat:** "Pull thunder-plus, branch native, and continue from docs/port/PICKUP.md. Start at START HERE (19 Nov, 17:00)."
 
+**UPDATE 20 Nov, 08:55. Only what is pushed exists.**
+WEB: all twelve PRs of 19 Nov are MERGED into `beta` (build 658, head 1dfbf7ad, CI green): #248-#259 (Expression examples, beta icon, drag sliders, FOLLOW order, FX preset keys, master double-click, in-use outline, reset track, bus into bus + the applyMix-after-plan-change fix, sampler pitch + SYNC TO LINES, playback-report diagnostics, envelope times in bars + lines). **Desktop beta 1.3.14-beta.1 was started ONCE** (run 44766538470 from `beta`, prerelease): do not start it again; check the release page. Building now on `beta`: stretch steps 1 and 2 (`beta-stretch-picker` 659, `beta-stretch-oldschool` 660; design `docs/STRETCH-DESIGN.md` on `beta-stretch-design`), and `beta-flex-golden` (the FlexCore test's reference is stale since 647 and skipped in CI). Not merged to `main`: the owner has not asked.
+NATIVE: #247 follow-ups MERGED (the sanitizers CI job now has 120 minutes; it takes about 42). #246 stems: verdict MERGE (`review/verify-246`), branch updated onto native, merge when CI is green; its three follow-ups (F1 the length-estimate comment is wrong, F2 / F3 two missing audio tests) go into the next follow-ups PR. #260 `n1/players` (PR A): verifier report on `review/verify-260`; merge on a MERGE verdict + green CI. Live routes PR B on `n1/live-route` in stages B1-B6 (B1 done: reset / seek; status at the top of `docs/port/LIVE-ROUTE-NOTES.md`). U35 `n1/u35-spec`: MidiSched building. After bus into bus on the web, the native mixer needs `docs/BUS-INTO-BUS-NATIVE.md` (on `beta`) applied; after SYNC TO LINES and envelope lines, the native host must read `insts[i].lines` and the envelope unit fields (`docs/SAMPLER-NOTES.md`, `docs/ENV-LINES-NOTES.md` on `beta`).
+
+**UPDATE 19 Nov, 22:45 (the owner went to bed; "merge everything", then "push a new desktop beta"). Only what is pushed exists.**
+NATIVE (branch `native`):
+- #246 `n1/u34b` stems: open, CI green except sanitizers (was running); verifier report expected on `review/verify-246`. Merge when both are clean.
+- #247 `n1/followups-19nov`: open (beats 0 -> 4 fixed); verifier report expected on `review/verify-247`. Merge when clean.
+- Live routes: design + rulings L1-L10, C1-C11, P1-P6 in `docs/port/LIVE-ROUTE-DESIGN.md` on `n1/live-route`; worker building the decision-log golden, PR A `n1/players`, PR B on `n1/live-route`.
+- U35 MIDI: `n1/u35-spec` (notes, `tools/midi-ledger.mjs`, 28 ledgers, rulings: the web's MIDI bugs B1-B9 are FIXED natively, each with a listed expected difference); worker building `MidiSched`.
+- The lead's pre-wiring read: `docs/port/reviews/prewire-19nov.md` (F1-F3 must be fixed before U37).
+WEB (branch `beta`; each PR holds a build number; every merge makes the next need a rebase of BUILD / sw.js / changelog / HANDOVER; merge one at a time when CI is green on the rebased head):
+- MERGED: #248 Expression examples (648).
+- Ready after rebase: #252 beta icon (`beta-icon-swap`), #249 drag sliders (649), #253 FOLLOW order (656).
+- #250 FX preset keys (653): the owner has not answered whether moving the value nudge to mod+Shift+arrows is right; the lead's call if he stays silent: merge as built (his own example needs it) and tell him.
+- #251 reset track (650): verifier report expected on `review/verify-251`.
+- Building, no PR yet at 22:45: `beta-bus-into-bus` (651; rulings in `docs/BUS-INTO-BUS-DESIGN.md`; CHN labels two letters: MS, LP), `beta-solo-fx-quiet` (652, bug hunt), `beta-inuse-outline` (654), `beta-sampler-pitch-sync` (655; bars + lines), `beta-master-dblclick` (657; a NEW master block), `beta-env-lines` (658; 4 bars must work, 8 if cheap; bars + lines).
+- Design only: `beta-stretch-design` (`docs/STRETCH-DESIGN.md`): build steps 1 and 2 after 655 merges. Waiting on the owner: his test loops, Rubber Band yes / no, OLDSCHOOL rendered first (the lead's default: yes).
+- DESKTOP BETA when the web PRs are in: run `desktop.yml` from `beta` through the API with `inputs[version]=1.3.14-beta.1`, `inputs[prerelease]=true` (the beta icon is picked by `THUNDER_BETA=1`, set by the workflow for a prerelease). Beta and stable share one appId: the beta replaces the stable app.
+
+**UPDATE 19 Nov, 20:25 (a later chat; if that chat is gone, its workers are gone too: only what is pushed exists):**
+- **PR #246 `n1/u34b` (U34b stems) is OPEN, not merged.** The lead read the core diff (sound). An independent verifier was running; its report, if it
+  got that far, is `docs/port/reviews/verify-246.md` on `review/verify-246`. No report there: send a new verifier, then merge when it and CI are clean.
+- **`n1/followups-19nov` (queue item 1) was being built** (notes: `docs/port/FOLLOWUPS-19NOV-NOTES.md` on that branch). No PR yet at 20:25.
+- **The live routes (queue item 2) are designed and ruled:** `docs/port/LIVE-ROUTE-DESIGN.md` and `LIVE-ROUTE-NOTES.md` on `n1/live-route`. A worker was
+  building step 1: the decision-log golden, PR A `n1/players` (the `Players` move, no behaviour change), PR B on `n1/live-route` (LivePool: bass, vox,
+  acid, mach). Continue from the checklist at the top of LIVE-ROUTE-NOTES.md with a new Sonnet worker briefed from the design's last section.
+- Told to the owner as suspected "Audio thread" web bugs (from the code, not by ear): CUT / RES ignored on nine live engines, a WOB command on an
+  empty row ignored, a slide cut by the next note stops gliding. The native port follows the page's player for all three.
+
 **Nothing is running and no PR of ours is open** (#225 `n1/repin-pump` stays open, waiting on pump). Weekly usage was at 90% at 12:45.
 
 **Merged into `native` on 19 Nov (each verified by an independent Sonnet verifier; reports on the `review/verify-*` branches):**
