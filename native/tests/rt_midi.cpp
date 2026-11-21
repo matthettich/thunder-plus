@@ -20,6 +20,7 @@
 
 #include "midi_drive.h"
 #include "thunder/midi.h"
+#include "thunder/midiport.h"
 
 static thread_local int rt_depth = 0;
 static void rt_violation(const char* what) { rt_depth = 0; std::fputs("rt_midi: ", stderr); std::fputs(what, stderr); std::fputs(" inside the audio callback\n", stderr); std::abort(); }
@@ -58,6 +59,12 @@ extern "C" int pthread_cond_wait(pthread_cond_t* c, pthread_mutex_t* m) {
   return real_cond(c, m);
 }
 
+// U36 PR A: the pump's sink and clock: counters only (no container, no lock). The sender thread is not the audio thread, but the pump keeps the same rule so that a simple shell may call it from one.
+static int64_t g_nowNs = 1000000000; static long g_sent = 0, g_gone = 0;
+static int64_t sinkNow(void*) { return g_nowNs; }
+static int sinkSend(void*, uint64_t dev, const uint8_t* b, int len, int64_t) { if (dev > 2 || len < 1 || b[0] < 0x80) return -1; g_sent++; return 0; }
+static void sinkClear(void*, uint64_t) { g_gone++; }
+
 using namespace mdrive;
 static int fail(const char* m) { std::fprintf(stderr, "rt_midi FAIL: %s\n", m); return 1; }
 
@@ -74,7 +81,7 @@ static int selftest() {
 }
 
 static int scanSource() {
-  const char* files[] = {"/native/core/src/midi/midisched.cpp", "/native/core/src/midi/midisched.h", "/native/core/src/midi/midi_api.cpp"};
+  const char* files[] = {"/native/core/src/midi/midisched.cpp", "/native/core/src/midi/midisched.h", "/native/core/src/midi/midi_api.cpp", "/native/core/src/midi/midiport.cpp"};   // U36: the pump and the clock map are scanned too
   const char* bad[] = {"mutex", "lock_guard", "unique_lock", "condition_variable", "pthread_", "sem_wait", "std::thread", "std::cout", "std::cerr", "printf(", "fopen", "std::vector", "std::string", "std::map", "std::function", "push_back", "malloc(", "std::make_"};
   int found = 0;
   for (const char* f : files) {
@@ -103,6 +110,13 @@ int main(int argc, char** argv) {
   thunder_midi_set_song(h, (const uint8_t*)songText.data(), songText.size());
   for (int p = 0; p < 4; p++) thunder_midi_set_port(h, p, 1, p < 2, p * 3.0, p);
   thunder_midi_set_fx_latency(h, 0.0716);
+  // U36: a second handle behind a port table and a send queue; its sender runs inside the guard too
+  thunder_midi* h2 = thunder_midi_create(48000, nullptr, 0); if (!h2) return fail("create 2");
+  thunder_midi_set_song(h2, (const uint8_t*)songText.data(), songText.size());
+  thunder_midiout_sink sk; sk.user = nullptr; sk.now_ns = sinkNow; sk.send = sinkSend; sk.clear = sinkClear; sk.caps = 0;
+  thunder_midiout* po = thunder_midiout_create(h2, 48000, &sk); if (!po) return fail("midiout create");
+  thunder_midiout_dev dv[2]; std::memset(dv, 0, sizeof dv); std::strcpy(dv[0].id, "n:A"); std::strcpy(dv[0].name, "A"); dv[0].token = 1; std::strcpy(dv[1].id, "n:B"); std::strcpy(dv[1].name, "B"); dv[1].token = 2;
+  thunder_midiout_set_devices(po, dv, 2); thunder_midiout_assign(po, 0, "n:A"); thunder_midiout_assign(po, 1, "n:B"); thunder_midiout_assign(po, 2, "n:A"); thunder_midiout_set_clock(po, 0, 1); thunder_midiout_set_out_latency(po, 20000000);
   // the direct (C++) path: a scheduler of its own, fed by the runner, under the guard; and the C handle's process() with posted commands
   thunder::MidiSched s(48000); configure(s, C, D.song);
   thunder::SeqOpts o; o.live = true; o.hasLoop = true; o.loopY0 = 0; o.loopY1 = 0; thunder::Seq sq(D.song, D.vars, thunder::SeqMode::Song, o);
@@ -124,6 +138,14 @@ int main(int argc, char** argv) {
     if (b == 2000) sq.setBpm(133);
     if (b == 4500) now += 0.4;                                         // a stalled host
     if (b == 8000) { thunder_midi_release(h, 1); }
+    // U36 control side for the second handle: live keys and raw ticks / notes, a hot-plug every 1500 blocks, STOP / PLAY
+    if (b % 40 == 0) { thunder_midi_key_on(h2, b % 100, 0, 50 + b % 10, 100); thunder_midi_key_off(h2, (b + 80) % 100); }
+    { const uint8_t tk = 0xF8; thunder_midi_raw(h2, b % 3, &tk, 1, 0.004); if (b % 3 == 0) { const uint8_t nt[3] = {0x90, (uint8_t)(40 + b % 40), 90}; thunder_midi_raw(h2, b % 2, nt, 3, 0.02); } }
+    if (b % 1500 == 700) thunder_midiout_set_devices(po, dv, 1);
+    if (b % 1500 == 900) thunder_midiout_set_devices(po, dv, 2);
+    if (b % 2000 == 1900) { thunder_midi_stop(h2); thunder_midiout_set_playing(po, 0); }
+    if (b % 2000 == 100) { thunder_midi_start(h2, 0); thunder_midiout_set_playing(po, 1); }
+    g_nowNs = 1000000000 + (int64_t)b * 2666667;
     {
       rt_guard g;
       run.pump(now, 0.25, evs.data(), (int)evs.size(), &st, [&](const thunder::SeqEvent* e, int n, const thunder::SeqStep& step) { s.onStep(e, n, step, sq, now); steps++; });
@@ -134,6 +156,9 @@ int main(int argc, char** argv) {
       if (b == 2700) { s.setPort(0, true, true, 5, 0); s.portToggled(1, true, now); s.cableChanged(2, true, 0, now); }
       if (b % 97 == 0) { const int k = s.liveNoteOn(0, 40 + b % 20, 100, 16, now); if (k >= 0) { keys++; s.liveNoteOff(k, now + 0.05); } }
       if (thunder_midi_process(h, now, 128.0 / 48000, now + 0.1, 120, 1) < 0) return fail("process");
+      if (thunder_midi_process(h2, now, 128.0 / 48000, now + 0.1, 120, 1) < 0) return fail("process 2");
+      thunder_midiout_clock_map(po, (int64_t)b * 128, g_nowNs + 20000000);
+      for (int k = 0; k < 4; k++) { g_nowNs += 600000; int64_t nx = 0; if (thunder_midiout_pump(po, &nx) < 0) return fail("pump"); }
     }
     msgs += s.drain(out.data(), (int64_t)out.size()); const int64_t n = thunder_midi_drain(h, cout.data(), (int64_t)cout.size()); if (n < 0) return fail("drain"); msgs += n;
     now += 128.0 / 48000;
@@ -147,6 +172,10 @@ int main(int argc, char** argv) {
               "operator new guarded only (sanitizer build)"
 #endif
   );
+  thunder_midiout_stats ps; std::memset(&ps, 0, sizeof ps); ps.size = sizeof ps; thunder_midiout_stats_get(po, &ps);
+  if (g_sent < 1000 || ps.sent != (uint64_t)g_sent) return fail("the pump did too little or its count is wrong");
+  std::printf("rt_midi: the pump and the clock map (midiport): %ld messages sent, %llu dropped (gone) %llu cleared, no allocation, no lock\n", g_sent, (unsigned long long)ps.dropped_gone, (unsigned long long)ps.dropped_cleared);
+  thunder_midiout_free(po); thunder_midi_free(h2);
   thunder_midi_free(h);
   return 0;
 }
