@@ -5,8 +5,9 @@
 //
 // L4 (RUN AHEAD): the shell's clock runs lat() samples ahead of the mixer's: in quantum [q0, q0 + 128) the shell is given the events of [q0 + lat, q0 + lat + 128) and returns the engine's samples for
 // [q0, q0 + 128), so a note sounds on its own sample. A node's first call has lat() samples of pre-roll. An event for a time already inside the look-ahead is applied at the shell's clock and counted (liveLate).
-// L5 (a note-off always wins): the timeline holds kTimeline events a node; when it is full a NoteOn is dropped (liveQueueDropped); a NoteOff discards what is booked at or after it (liveForcedOff) and is kept.
+// L5 (a note-off always wins): the timeline holds kTimeline events a node; when it is full a NoteOn / Bpm / Wob event is dropped (liveQueueDropped); a NoteOff discards what is booked at or after it (liveForcedOff) and is kept; LiveShell::enqueue follows the same rule.
 //
+// L2 AS BUILT (verify-265 F6): one node per masked track (vox: five), all made in addPad, none at a note, no bind / re-bind: memory per pad per track is bass 57 KB, acid 38 KB, mach 38 KB, vox 235 KB. There is no idle skip yet (it comes with `eng`).
 // REAL-TIME RULES: addPad allocates; note() and render() allocate nothing.
 #ifndef THUNDER_ENGINE_LIVE_POOL_H
 #define THUNDER_ENGINE_LIVE_POOL_H
@@ -38,7 +39,7 @@ struct LiveTEv { int64_t T = 0; LiveEvType type = LiveEvType::NoteOn; bool leg =
 // A read-only view of a node, for tests (the decision-log gate, LIVE-ROUTE L10(f)).
 struct LiveDebugNode { const LiveTEv* tl = nullptr; int ntl = 0; const Auto* rate = nullptr; const Auto* g = nullptr; const Auto* pn = nullptr; double sylN = 0, lastOn = -1; bool inT = false, curLive = false, curStop = false; double stopAt = 0; int curCol = 0; };
 
-struct LiveStats { uint32_t played = 0, noNode = 0, late = 0, queueDropped = 0, forcedOff = 0, failed = 0; };
+struct LiveStats { uint32_t played = 0, noNode = 0, late = 0, queueDropped = 0, forcedOff = 0, failed = 0, refused = 0; };   // queueDropped / forcedOff include the nodes' shells' own queues (L5)
 
 class LiveEng {   // one engine as the pool uses it (a LiveShell of one of the four cores behind a small interface)
  public:
@@ -50,6 +51,8 @@ class LiveEng {   // one engine as the pool uses it (a LiveShell of one of the f
   virtual bool failed() const = 0;
   virtual void setRateFeed(const Auto* a, double sr) = 0;
   virtual size_t bytes() const = 0;
+  virtual uint32_t shellDropped() const = 0;   // events the shell's own queue dropped or refused (LiveShell::dropped / rejected)
+  virtual uint32_t shellForced() const = 0;    // note-offs the shell's queue kept by discarding later events
 };
 
 class LivePool {
@@ -102,7 +105,7 @@ class LivePool {
   using Tap = void (*)(void* user, int track, int pad, int j, const float* L, const float* R, int frames, int64_t q0);
   void setTap(Tap f, void* user) { tap_ = f; tapUser_ = user; }
 
-  const LiveStats& stats() const { return st_; }
+  LiveStats stats() const;   // the pool's counters plus the nodes' shells' queue counters
   uint32_t failedNodes() const;
 
  private:
@@ -134,6 +137,7 @@ class LivePool {
   };
 
   void rebuildActive();
+  void sanitize(SeqEvent& e, const double* arp);   // F4: refuse non-finite fields, clamp magnitudes (counted)
   void startNote(Node& n, const SeqEvent& e, double bpm, const double* arp, double fk = -1, bool hasFk = false);
   void pitchMods(Node& n, double t, double base, const SeqEvent& e, const double* arp);
   void modVoice(Node& n, const SeqEvent& e, const double* arp);

@@ -1,5 +1,5 @@
 // LIVE ROUTE gate L10(f): the decision log of the core's live-engine player (core/seq-core.js = core-processor.js + the page's declarations: ThunderCore's liveNote / liveStart /
-// kill / off / mod / stp / stopAll, voxG), run in a Node `vm` with fake nodes registered in globalThis.__tcNodes. No audio: the log is what the
+// kill / off / mod / stp / stopAll, voxG; with Auto.hold patched to the page's cancelAndHoldAtTime, D7), run in a Node `vm` with fake nodes registered in globalThis.__tcNodes. No audio: the log is what the
 // core DECIDES, per event: which node key (and pump-synth lane) it drives, and each node's override Auto timelines afterwards (gate, trig, leg,
 // rate, syl, same, acc, vel, wob, plus the level g and pan pn: every event {kind, time, value}). The native LivePool must give the same decisions.
 //   node native/tools/live-route-dump.mjs              prints the log of every case (JSON lines) to stdout
@@ -75,6 +75,10 @@ const CASES = {
   choke_cross: { tracks: [0, 1], evs: [   // a choke group across tracks: live bass (pad 6) and a sampler pad (7), both ways
     [0, note({ t: FB(1), pad: 6, track: 0 })], [0, note({ t: FB(3), pad: 7, track: 1 })], [0, note({ t: FB(5), pad: 6, track: 1 })],
     [0, note({ t: FB(7), pad: 7, track: 0, poly: true, col: 0 })], [0, note({ t: FB(9), pad: 6, track: 0 })] ] },
+  vox_samecol: { tracks: [0], evs: [   // the same-column pick: a column that is still sounding is re-taken by ITS node although a free one exists (and not when it started within 4 ms: then it is a chord note)
+    [0, note({ t: FB(1), pad: 1, poly: true, col: 0 })], [0, note({ t: FB(3), pad: 1, poly: true, col: 1 })], [0, note({ t: FB(5), pad: 1, poly: true, col: 2 })],
+    [0, note({ t: FB(7), pad: 1, poly: true, col: 1 })], [0, note({ t: FB(9), pad: 1, poly: true, col: 3 })], [0, note({ t: FB(9, 100), pad: 1, poly: true, col: 3 })],
+    [0, off({ t: FB(12), cols: [2] })], [0, note({ t: FB(14), pad: 1, poly: true, col: 2 })] ] },
   poly_cap: { tracks: [0], evs: [   // the cap of 4 by serial across pools: sampler poly notes and vox live notes on one track
     ...[0, 1, 2].map(k => [0, note({ t: FB(1 + k), pad: 5, poly: true, col: k })]),
     [0, note({ t: FB(5), pad: 1, poly: true, col: 3 })], [0, note({ t: FB(6), pad: 1, poly: true, col: 4 })], [0, note({ t: FB(7), pad: 5, poly: true, col: 5 })] ] },
@@ -95,7 +99,10 @@ function makeCore() {
   const ctx = vm.createContext({ console, registerProcessor(n, c) { Cls = c; }, AudioWorkletProcessor: class { constructor() { this.port = { postMessage() {}, onmessage: null }; } },
     sampleRate: SR, currentTime: 0, currentFrame: 0 });
   vm.runInContext('Math.random = () => 0;', ctx);
-  vm.runInContext(src + '\n;globalThis.__lr = { bufs: coreBufs, setS(s){ S = s; } };', ctx, { filename: 'seq-core.js' });
+  // D7 (verify-265 F3): the PAGE cuts a rate ramp at the next note with cancelAndHoldAtTime (index.html bassNote: the ramp goes on gliding up to the note); the core's Auto.hold drops the ramp's end event and leaves the lane at the ramp's start
+  // (a core fault, reported to the owner). The log is the page's: hold() here keeps a ramp that is still running as a ramp to the value it has at t.
+  const D7 = '\n;Auto.prototype.hold = function (t) { const v = this.at(t), A = this.ev; let ramp = false; for (let q = 0; q < A.length; q++) if (A[q].t >= t) { ramp = A[q].k === 1; break; } this.cancel(t); if (ramp) this.lin(v, t); else this.set(v, t); };';
+  vm.runInContext(src + D7 + '\n;globalThis.__lr = { bufs: coreBufs, setS(s){ S = s; } };', ctx, { filename: 'seq-core.js' });
   return { ctx, proc: new Cls(), U: ctx.__lr };
 }
 

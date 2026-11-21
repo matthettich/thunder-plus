@@ -138,16 +138,17 @@ typedef struct thunder_render_stats {
   uint64_t seq_chopped;         /* notes the sequencer chopped (applyChop) */
   uint64_t seq_chop_skipped;    /* notes of a sliced / synced instrument whose pad had no set_pad_chop: left unchopped */
   uint64_t seq_chop_no_hits;    /* SMODE (find hits) slices without set_pad_hits: the equal grid was used */
-  /* appended with the live-engine route (docs/port/LIVE-ROUTE-DESIGN.md L8). notes_live stays every note of a ROUTE_LIVE pad. */
+  /* appended in U34b */
+  int32_t stem;                 /* opts.stem as made (0: the mix) */
+  uint32_t heard_mask;          /* bit t: track t is heard in this render (the mix: the audible tracks; a stem: its track, and for a bus that exists its audible sources) */
+  /* appended LAST (after U34b's stem / heard_mask, so an older header still reads those where it always did) with the live-engine route (docs/port/LIVE-ROUTE-DESIGN.md L8). notes_live stays every note of a ROUTE_LIVE pad. */
   int32_t notes_live_played;    /* notes of a live pad a live node sounded (a subset of notes_live) */
   uint32_t live_no_node;        /* live notes with no node for their track (silent; they still take the track over) */
   uint32_t live_late;           /* live events that arrived for a time already inside the look-ahead: applied at the node's clock, at most latency() samples late */
   uint32_t live_queue_dropped;  /* live events a full node timeline dropped (a note-off is never dropped) */
   uint32_t live_forced_off;     /* note-offs that had to discard queued events to be kept */
   uint32_t live_failed;         /* live nodes whose core refused (the JS would have thrown): silent from then on */
-  /* appended in U34b */
-  int32_t stem;                 /* opts.stem as made (0: the mix) */
-  uint32_t heard_mask;          /* bit t: track t is heard in this render (the mix: the audible tracks; a stem: its track, and for a bus that exists its audible sources) */
+  uint32_t live_refused;        /* live note / mod fields refused at the pool's entry (non-finite or absurd: see LIVE-ROUTE-NOTES.md, the rule per field); the event or the field is not applied */
 } thunder_render_stats;
 
 /* Parses the song and builds the renderer. song: the app's song JSON (a .thunder file's bytes or a song message), not NUL-terminated, copied.

@@ -84,11 +84,12 @@ class LiveShell {
   static constexpr uint32_t latency() { return kBlk - 1; }   // samples of delay between an event and the first sample it affects at the output
   bool failed() const { return failed_; }                // the JS core would have thrown (a NaN vowel, a syllable number that is not a whole number, ...): the voice is silent from then on
   uint32_t dropped() const { return dropped_; }          // events that did not fit the queue (kPend) or lay outside the call
+  uint32_t forced() const { return forced_; }            // note-offs that had to discard queued events to be kept (L5)
   uint32_t rejected() const { return rejected_; }        // events with a non-finite value (an AudioParam cannot hold one)
   // LIVE ROUTE (C1). reset(): everything as a fresh shell's (the core reset with its parameters kept, the rate lane, the queue, the clocks at 0, the counters, the rings silent). seek(clock): the shell's clock (and
   // the core's position) is `clock` from now: the queue is dropped, the first latency() samples after it are silence. A bind to a note is reset() + seek(). Neither allocates.
   void reset() {
-    core_.reset(); lane_ = LiveRateLane(); clock_ = 0; rendered_ = 0; origin_ = 0; failed_ = false; dropped_ = 0; rejected_ = 0; head_ = 0; cnt_ = 0;
+    core_.reset(); lane_ = LiveRateLane(); clock_ = 0; rendered_ = 0; origin_ = 0; failed_ = false; dropped_ = 0; rejected_ = 0; forced_ = 0; head_ = 0; cnt_ = 0;
     std::memset(ringL_, 0, sizeof ringL_); std::memset(ringR_, 0, sizeof ringR_); std::memset(stgL_, 0, sizeof stgL_); std::memset(stgR_, 0, sizeof stgR_);
   }
   void seek(uint64_t clock) { clock_ = clock; rendered_ = clock; origin_ = clock; head_ = 0; cnt_ = 0; }
@@ -124,7 +125,19 @@ class LiveShell {
       case LiveEvType::NoteOn: if (!std::isfinite(e.v)) e.v = 0; break;
       default: break;
     }
-    if (cnt_ >= kPend) { dropped_++; return; }
+    if (cnt_ >= kPend) {
+      if (e.type != LiveEvType::NoteOff && e.type != LiveEvType::End) { dropped_++; return; }
+      // L5 / C2: a note-off (or the end) is never dropped: it sets a forced-off time, every queued event at or after that time is discarded (counted), and the core gets off() at that sample
+      forced_++;
+      uint32_t w = 0;
+      for (uint32_t k = 0; k < cnt_; k++) { const Pend p = pend_[(head_ + k) % kPend]; if (p.t < t) pend_[(head_ + w++) % kPend] = p; else dropped_++; }
+      cnt_ = w;
+      if (cnt_ >= kPend) {   // (all of it is earlier: the latest rate / tempo / wobble event gives way, else the latest event)
+        uint32_t v = cnt_ - 1; for (uint32_t k = cnt_; k > 0; k--) if (!isNote(pend_[(head_ + k - 1) % kPend].e.type)) { v = k - 1; break; }
+        for (uint32_t k = v; k + 1 < cnt_; k++) pend_[(head_ + k) % kPend] = pend_[(head_ + k + 1) % kPend];
+        cnt_--; dropped_++;
+      }
+    }
     uint32_t pos = cnt_;   // a stable insertion in time order
     while (pos > 0 && pend_[(head_ + pos - 1) % kPend].t > t) { pend_[(head_ + pos) % kPend] = pend_[(head_ + pos - 1) % kPend]; pos--; }
     pend_[(head_ + pos) % kPend] = Pend{t, e}; cnt_++;
@@ -162,7 +175,7 @@ class LiveShell {
     for (uint32_t i = 0; i < n; i++) { ringL_[(s + i) & (kRing - 1)] = failed_ ? 0.0f : stgL_[i]; ringR_[(s + i) & (kRing - 1)] = failed_ ? 0.0f : stgR_[i]; }
   }
   typename A::Core core_; LiveRateLane lane_; const Auto* feed_ = nullptr; double feedSr_ = 48000;
-  uint64_t clock_ = 0, rendered_ = 0, origin_ = 0; bool failed_ = false; uint32_t dropped_ = 0, rejected_ = 0;
+  uint64_t clock_ = 0, rendered_ = 0, origin_ = 0; bool failed_ = false; uint32_t dropped_ = 0, rejected_ = 0, forced_ = 0;
   Pend pend_[kPend]; uint32_t head_ = 0, cnt_ = 0;
   float ringL_[kRing], ringR_[kRing], stgL_[kBlk], stgR_[kBlk];
 };

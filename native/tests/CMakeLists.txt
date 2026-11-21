@@ -1027,3 +1027,14 @@ if(NODE_EXE)
   add_test(NAME live_jsparity COMMAND test_live_jsparity ${CMAKE_CURRENT_BINARY_DIR}/engine-u26-ref)
   set_tests_properties(live_jsparity PROPERTIES FIXTURES_REQUIRED engine_u26_ref)
 endif()
+
+# the C ABI of the render structs: the offset of every field is pinned (fields are only ever appended)
+add_executable(test_render_abi test_render_abi.cpp)
+target_include_directories(test_render_abi PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../core/include)
+add_test(NAME render_abi COMMAND test_render_abi)
+
+# the verifier's round on the live route (verify-265): queue overflow never drops a note-off, hostile numbers, the timeline's forced off
+add_executable(test_live_review test_live_review.cpp)
+target_link_libraries(test_live_review PRIVATE thunder_core)
+target_include_directories(test_live_review PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../core/src ${CMAKE_CURRENT_SOURCE_DIR})
+add_test(NAME live_review COMMAND test_live_review)
