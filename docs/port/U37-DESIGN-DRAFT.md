@@ -368,7 +368,7 @@ Each: the question, the options (trade-off in one line), my recommendation.
 - The index.html at the root of `native` is not the `beta` one; line numbers `web:` are `beta` cdd9439 fetched shallow (`git fetch --depth=1 origin beta`).
 - `seq.cpp:993` (`SEV_TEMPO`), `voice.cpp:186`, `fxpump.cpp:143-150` and `mix/mix.cpp` details are quoted from `prewire-19nov.md` (line numbers of c97da6f): re-check before editing.
 
-## 12. The lead's rulings (21 Nov, 12:15; Fable, lead of 21 Nov)
+## 12. The lead's rulings (21 Nov, 11:20; Fable, lead of 21 Nov)
 
 Checked by the lead in the code before ruling: finding 1 (no `LiveHost`, no `live.h`: `native/core/include/thunder/` has `core.h lxr_seam.h midi.h midiport.h render.h rtlog.h` only) and finding 2 (`Mixer::setChain` has no caller outside `mix/`; `render.cpp:17`, `:36` say no chains host). Both are true. The pump-effects-in-a-song claim of finding 2 was NOT checked by the lead (the author did not read `fxbank.cpp` end to end): P3's builder confirms it first.
 
