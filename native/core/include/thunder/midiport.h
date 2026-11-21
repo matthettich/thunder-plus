@@ -3,6 +3,10 @@
    (thunder_midiout_assign), gives the audio clock's map to the host clock (thunder_midiout_clock_map), and calls thunder_midiout_pump in a loop on a thread of its own;
    the pump calls the shell's sink to send a message when it is due. Design and rulings: docs/port/U36-SPEC.md section 3 and 8, decisions in docs/port/U36-NOTES.md.
 
+   THE DEVICE TOKEN (contract) Every sink call names a device by the TOKEN the shell put in thunder_midiout_dev, never by a position in a list, so no lock is needed between set_devices (CONTROL) and
+             pump (SENDER). The pump may call send / clear with a token that set_devices has just taken out of the list (the pump read the cable an instant before): the sink must answer
+             an unknown token with send < 0 and ignore it in clear, and its token-to-device table must be safe to read from the sender thread while the control thread changes it (a
+             lock of its own, or a copy swapped atomically; the core takes none). Nothing else needs a lock: clock_map stays lock-free, for the audio callback.
    THREADS   CONTROL: create, free, set_devices, assign, set_clock, set_gear, set_playing, set_out_latency, get_port: the ONE thread that also calls the thunder_midi_set_* calls
              (single producer); they re-sync the scheduler's ports and return THUNDER_MIDIOUT_E_BUSY if its command ring was full (the table is updated anyway: repeat the call
              or any later control call and the scheduler is brought up to date). SENDER: thunder_midiout_pump, the ONLY thread that calls thunder_midi_drain; every sink call comes
@@ -47,13 +51,16 @@ typedef struct thunder_midiout_dev {         /* one physical output, as the shel
   char id[THUNDER_MIDIOUT_ID_BYTES];         /* the web's id: "n:" + the port's name, " #2" for the second of two with one name (and "n:Name / PortName" for a device with several outputs) */
   char name[THUNDER_MIDIOUT_ID_BYTES];       /* what Settings shows */
   uint32_t flags;                            /* THUNDER_MIDIOUT_DEV_TS */
+  uint32_t reserved;                         /* 0 */
+  uint64_t token;                            /* the shell's own handle for this device (any value, e.g. a pointer or a counter): what send / clear are given. It must stay the same for as long as
+                                                the shell keeps the device open, whatever the device's place in the list; two listed devices must not share one */
 } thunder_midiout_dev;
 
 typedef struct thunder_midiout_sink {        /* implemented by the shell */
   void* user;
   int64_t (*now_ns)(void* user);             /* the host clock the times are in (Android CLOCK_MONOTONIC, Mac mach host time as ns, Windows QPC as ns); callable from any thread */
-  int (*send)(void* user, int dev, const uint8_t* b, int len, int64_t at_ns);   /* dev = index in the list last given to set_devices; at_ns <= now: send now; 0 on success, < 0 = the device is gone */
-  void (*clear)(void* user, int dev);        /* optional (NULL): drop what the OS still holds for the device (CoreMIDI MIDIFlushOutput); called only with CAP_TS, when a CLEAR meets a stamped message not yet due */
+  int (*send)(void* user, uint64_t dev, const uint8_t* b, int len, int64_t at_ns);   /* dev = a thunder_midiout_dev.token; at_ns <= now: send now; 0 on success, < 0 = the device is gone */
+  void (*clear)(void* user, uint64_t dev);   /* optional (NULL): drop what the OS still holds for the device (CoreMIDI MIDIFlushOutput); called only with CAP_TS, when a CLEAR meets a stamped message not yet due */
   uint32_t caps;                             /* THUNDER_MIDIOUT_CAP_TS or 0 */
 } thunder_midiout_sink;
 
@@ -96,7 +103,7 @@ int thunder_midiout_set_out_latency(thunder_midiout* o, int64_t ns);        /* t
 int thunder_midiout_get_port(const thunder_midiout* o, int port, thunder_midiout_port* out);   /* CONTROL */
 
 /* ANY thread, wait-free. Core frame `frame0` is AUDIBLE at host time `host_ns0` (the device's output latency is already in it: the core adds none). Called ~10 to 50 times
-   a second, from the audio callback or the shell's own timer. Smoothed as the web's mapUpd (2 % a call, a jump over 50 ms taken at once, never earlier than set_out_latency says). */
+   a second, from the audio callback or the shell's own timer. Smoothed as the web's mapUpd: 2 % per 25 ms of host time between calls (the web's call rate while playing, so the time constant is the same at any callback size), a jump over 50 ms taken at once, never earlier than set_out_latency says. */
 void thunder_midiout_clock_map(thunder_midiout* o, int64_t frame0, int64_t host_ns0);
 
 /* SENDER, one thread only. Drains the scheduler's records into the queue, applies CLEAR markers, sends what is due; returns how many it sent (>= 0) or a negative code.

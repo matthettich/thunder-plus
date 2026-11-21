@@ -18,7 +18,7 @@ using namespace thunder;
 
 namespace {
 constexpr int kPorts = 4, kDevs = THUNDER_MIDIOUT_MAX_DEVS, kIdBytes = THUNDER_MIDIOUT_ID_BYTES, kCabs = 200, kQ = THUNDER_MIDIOUT_MAX_QUEUE;
-constexpr double kSmooth = 0.02, kJumpNs = 50e6, kImpMinNs = -500e6;   // the web's mapUpd: 2 % a call, a jump over 50 ms is taken at once, the floor applies while imp > -0.5 s
+constexpr double kKeep = 0.98, kRefNs = 25e6, kJumpNs = 50e6, kImpMinNs = -500e6;   // the web's mapUpd: 2 % per call at the web's call rate (below), a jump over 50 ms is taken at once, the floor applies while imp > -0.5 s
 constexpr int64_t kNoNext = INT64_MAX;
 constexpr int kHand = 256;
 constexpr int kSpinCap = 1 << 20;   // a stuck clock must not hang the pump
@@ -54,9 +54,14 @@ struct thunder_midiout {
   } c;
 
   // ---- control -> pump ----
-  std::atomic<int16_t> cabDev[kCabs];      // the cable's device in the current list, -1 none
+  // THE LIST AS THE PUMP SEES IT, per cable slot (L1 / L2 of the lead's read of #268): `cabLive` = the cable's device is in the current list, `cabTok` = the token the shell gave it. set_devices
+  // writes a slot only when its value CHANGES (a device that stays listed is never seen as gone, whatever the pump is doing), the token before the live flag when a device appears, and
+  // the pump reads a slot once per message and sends with the token it read: the sink looks the token up itself, so a list that is renumbered while the pump runs cannot send to
+  // the wrong device (an unknown token is a failed send: "gone").
+  std::atomic<uint8_t> cabLive[kCabs];
+  std::atomic<uint64_t> cabTok[kCabs];
   std::atomic<uint32_t> epoch;             // bumped by every set_devices
-  std::atomic<uint8_t> gone[kDevs];        // the sink said so: until the next set_devices
+  std::atomic<uint8_t> cabGone[kCabs];     // the sink said so for the cable's device: until the next set_devices
   std::atomic<int64_t> outLat;             // the clock map's floor, ns
 
   // ---- the clock map: a seqlock, one writer at a time (busy), the pump reads ----
@@ -69,7 +74,7 @@ struct thunder_midiout {
   // ---- the pump (SENDER thread only) ----
   thunder_midi_msg q[kQ]; int head, tail;       // sorted by frame (stable), the live part is [head, tail)
   uint32_t seenEpoch;
-  struct Hand { thunder_midi_msg m; int64_t at; int dev; bool live; } hand[kHand]; int handN;   // the last stamped messages given to the OS (CAP_TS): what a CLEAR may have to recall (and what the OS's flush must not lose)
+  struct Hand { thunder_midi_msg m; int64_t at; uint64_t dev; bool live; } hand[kHand]; int handN;   // the last stamped messages given to the OS (CAP_TS): what a CLEAR may have to recall (and what the OS's flush must not lose)
   std::atomic<uint64_t> st[10];                  // the stats, in the order of thunder_midiout_stats from `sent`
 };
 
@@ -89,7 +94,7 @@ int cabOf(thunder_midiout* o, const char* id) {   // the sticky slot of a device
   for (int i = 0; i < kCabs; i++) {
     if (!c.cab[i].used) { if (free < 0) free = i; continue; }
     if (std::strcmp(c.cab[i].id, id) == 0) { c.cab[i].seq = ++c.cabSeq; return i; }
-    if (o->cabDev[i].load(std::memory_order_relaxed) < 0 && (oldest < 0 || c.cab[i].seq < c.cab[oldest].seq)) oldest = i;
+    if (o->cabLive[i].load(std::memory_order_relaxed) == 0 && (oldest < 0 || c.cab[i].seq < c.cab[oldest].seq)) oldest = i;
   }
   const int s = free >= 0 ? free : oldest >= 0 ? oldest : 0;
   c.cab[s].used = true; copyId(c.cab[s].id, id); c.cab[s].seq = ++c.cabSeq; return s;
@@ -146,10 +151,10 @@ void enqueue(thunder_midiout* o, const thunder_midi_msg& m) {
   const uint64_t n = (uint64_t)(o->tail - o->head); if (n > o->st[S_MAXQ].load(std::memory_order_relaxed)) setSt(o, S_MAXQ, n);
 }
 
-int devOfCable(const thunder_midiout* o, int cable) {
-  if (cable < 0 || cable >= kCabs) return -1;
-  const int d = o->cabDev[cable].load(std::memory_order_relaxed);
-  return d >= 0 && d < kDevs && !o->gone[d].load(std::memory_order_relaxed) ? d : -1;
+bool listed(const thunder_midiout* o, int cable) { return cable >= 0 && cable < kCabs && o->cabLive[cable].load(std::memory_order_acquire) != 0; }
+bool resolve(const thunder_midiout* o, int cable, uint64_t& tok) {   // the cable's device token, false if it is not listed (or the sink said it is gone)
+  if (!listed(o, cable) || o->cabGone[cable].load(std::memory_order_relaxed)) return false;
+  tok = o->cabTok[cable].load(std::memory_order_relaxed); return true;
 }
 
 // A CLEAR marker (the cable's STOP): what is queued for the cable after the marker's frame goes. What the OS already holds, stamped for later (CAP_TS), is recalled with the sink's
@@ -159,7 +164,7 @@ void applyClear(thunder_midiout* o, const thunder_midi_msg& m, int64_t now) {
   for (int i = o->tail - 1; i >= o->head; i--) if (o->q[i].cable == m.cable && o->q[i].frame > m.frame) { qRemove(o, i); n++; }
   if (!(o->sink.caps & THUNDER_MIDIOUT_CAP_TS) || !o->sink.clear) { if (n) bump(o, S_CLEARED, n); return; }
   const int64_t t = o->sink.now_ns(o->sink.user); (void)now;
-  int devs[kHand], nd = 0;
+  uint64_t devs[kHand]; int nd = 0;
   for (int i = 0; i < kHand; i++) { const auto& h = o->hand[i]; if (h.live && h.m.cable == m.cable && h.at > t) { bool seen = false; for (int k = 0; k < nd; k++) seen = seen || devs[k] == h.dev; if (!seen) devs[nd++] = h.dev; } }
   for (int k = 0; k < nd; k++) {
     o->sink.clear(o->sink.user, devs[k]);
@@ -182,8 +187,9 @@ thunder_midiout* thunder_midiout_create(thunder_midi* core_midi, double sample_r
   if (!o) return nullptr;
   o->core = core_midi; o->sr = sample_rate; o->sink = *sink;
   std::memset(&o->c, 0, sizeof o->c);
-  for (auto& d : o->cabDev) d.store(-1, std::memory_order_relaxed);
-  for (auto& g : o->gone) g.store(0, std::memory_order_relaxed);
+  for (auto& d : o->cabLive) d.store(0, std::memory_order_relaxed);
+  for (auto& d : o->cabTok) d.store(0, std::memory_order_relaxed);
+  for (auto& g : o->cabGone) g.store(0, std::memory_order_relaxed);
   for (auto& s : o->st) s.store(0, std::memory_order_relaxed);
   o->epoch.store(0, std::memory_order_relaxed); o->outLat.store(0, std::memory_order_relaxed);
   o->busy.clear(); o->mseq.store(0, std::memory_order_relaxed); o->mOffBits.store(0, std::memory_order_relaxed); o->mHost.store(0, std::memory_order_relaxed); o->mValid.store(0, std::memory_order_relaxed);
@@ -202,9 +208,18 @@ int thunder_midiout_set_devices(thunder_midiout* o, const thunder_midiout_dev* d
   auto& c = o->c;
   for (int i = 0; i < n; i++) c.devs[i] = devs[i];
   c.ndevs = n;
-  for (int i = 0; i < kCabs; i++) o->cabDev[i].store(-1, std::memory_order_relaxed);
-  for (int i = 0; i < n; i++) o->cabDev[cabOf(o, c.devs[i].id)].store((int16_t)i, std::memory_order_relaxed);
-  for (auto& g : o->gone) g.store(0, std::memory_order_relaxed);
+  // the new mapping is built on the side and each slot is written once, and only if it changed (a device that stays listed is never "unlisted" for a moment: the pump would drop its
+  // queued note-offs as gone). `gone` marks are per cable and are cleared for the slots of the new list only: a device the sink failed on gets its chance again at every scan.
+  uint8_t nl[kCabs]; uint64_t nt[kCabs]; std::memset(nl, 0, sizeof nl); std::memset(nt, 0, sizeof nt);
+  for (int i = 0; i < n; i++) { const int sl = cabOf(o, c.devs[i].id); nl[sl] = 1; nt[sl] = c.devs[i].token; }
+  for (int i = 0; i < kCabs; i++) {
+    const bool was = o->cabLive[i].load(std::memory_order_relaxed) != 0;
+    if (nl[i]) {
+      if (!was || o->cabTok[i].load(std::memory_order_relaxed) != nt[i]) o->cabTok[i].store(nt[i], std::memory_order_relaxed);
+      if (!was) o->cabLive[i].store(1, std::memory_order_release);
+      if (o->cabGone[i].load(std::memory_order_relaxed)) o->cabGone[i].store(0, std::memory_order_relaxed);
+    } else if (was) o->cabLive[i].store(0, std::memory_order_release);
+  }
   o->epoch.fetch_add(1, std::memory_order_release);
   return sync(o);
 }
@@ -254,9 +269,9 @@ void thunder_midiout_clock_map(thunder_midiout* o, int64_t frame0, int64_t host_
     const double now = (double)o->sink.now_ns(o->sink.user), imp = t0 * 1e9 - (heardAt + (now - (double)host_ns0));
     if (imp < fl && imp > kImpMinNs) off += fl - imp;
   }
-  const uint32_t s = o->mseq.load(std::memory_order_relaxed);
+  const uint32_t s = o->mseq.load(std::memory_order_relaxed); const int64_t prevHost = o->mHost.load(std::memory_order_relaxed);
   double cur = bitsToD(o->mOffBits.load(std::memory_order_relaxed));
-  if (!o->mValid.load(std::memory_order_relaxed) || std::fabs(off - cur) > kJumpNs) cur = off; else cur += (off - cur) * kSmooth;   // a jump over 50 ms (a new device, a restart) at once
+  if (!o->mValid.load(std::memory_order_relaxed) || std::fabs(off - cur) > kJumpNs) cur = off; else cur += (off - cur) * (1.0 - std::pow(kKeep, std::fmin(std::fmax((double)(host_ns0 - prevHost), 0.0), 2e9) / kRefNs));   // a jump over 50 ms (a new device, a restart) at once
   o->mseq.store(s + 1, std::memory_order_release);                       // odd: being written
   o->mOffBits.store(dToBits(cur), std::memory_order_release); o->mHost.store(host_ns0, std::memory_order_release); o->mValid.store(1, std::memory_order_release);
   o->mseq.store(s + 2, std::memory_order_release);
@@ -300,7 +315,7 @@ int thunder_midiout_pump(thunder_midiout* o, int64_t* next_ns) {
   const uint32_t ep = o->epoch.load(std::memory_order_acquire);
   if (ep != o->seenEpoch) {
     o->seenEpoch = ep; uint64_t n = 0;
-    for (int i = o->tail - 1; i >= o->head; i--) if (devOfCable(o, o->q[i].cable) < 0) { qRemove(o, i); n++; }
+    for (int i = o->tail - 1; i >= o->head; i--) if (!listed(o, o->q[i].cable)) { qRemove(o, i); n++; }
     if (n) bump(o, S_GONE, n);
   }
   if (!map.valid) return 0;
@@ -309,8 +324,8 @@ int thunder_midiout_pump(thunder_midiout* o, int64_t* next_ns) {
   int sent = 0;
   while (o->head < o->tail) {
     const thunder_midi_msg m = o->q[o->head];
-    const int dev = devOfCable(o, m.cable);
-    if (dev < 0) { o->head++; bump(o, S_GONE); continue; }
+    uint64_t dev;
+    if (!resolve(o, m.cable, dev)) { o->head++; bump(o, S_GONE); continue; }
     int64_t at = atNs(map.off, o->sr, m.frame);
     const int64_t lead = ts ? THUNDER_MIDIOUT_SEND_AHEAD_NS : THUNDER_MIDIOUT_SPIN_NS;
     if (at - now > lead) { if (next_ns) *next_ns = at - lead; break; }
@@ -323,7 +338,7 @@ int thunder_midiout_pump(thunder_midiout* o, int64_t* next_ns) {
     if (m.b[0] == 0xF8 && late > THUNDER_MIDIOUT_TICK_LATE_NS) { bump(o, S_LATE); bump(o, S_LATETICK); continue; }   // B7: a late tick is dropped, never sent in a burst
     if (late > THUNDER_MIDIOUT_LATE_NS || stale) bump(o, S_LATE);
     const int r = o->sink.send(o->sink.user, dev, m.b, m.len, at);
-    if (r < 0) { bump(o, S_ERR); bump(o, S_GONE); o->gone[dev].store(1, std::memory_order_relaxed); continue; }
+    if (r < 0) { bump(o, S_ERR); bump(o, S_GONE); o->cabGone[m.cable].store(1, std::memory_order_relaxed); continue; }
     bump(o, S_SENT); sent++;
     if (ts && at > now) { auto& h = o->hand[o->handN]; h.m = m; h.at = at; h.dev = dev; h.live = true; o->handN = (o->handN + 1) % kHand; }
   }

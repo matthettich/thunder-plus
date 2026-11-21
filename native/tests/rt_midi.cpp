@@ -62,8 +62,8 @@ extern "C" int pthread_cond_wait(pthread_cond_t* c, pthread_mutex_t* m) {
 // U36 PR A: the pump's sink and clock: counters only (no container, no lock). The sender thread is not the audio thread, but the pump keeps the same rule so that a simple shell may call it from one.
 static int64_t g_nowNs = 1000000000; static long g_sent = 0, g_gone = 0;
 static int64_t sinkNow(void*) { return g_nowNs; }
-static int sinkSend(void*, int dev, const uint8_t* b, int len, int64_t) { if (dev < 0 || len < 1 || b[0] < 0x80) return -1; g_sent++; return 0; }
-static void sinkClear(void*, int) { g_gone++; }
+static int sinkSend(void*, uint64_t dev, const uint8_t* b, int len, int64_t) { if (dev > 2 || len < 1 || b[0] < 0x80) return -1; g_sent++; return 0; }
+static void sinkClear(void*, uint64_t) { g_gone++; }
 
 using namespace mdrive;
 static int fail(const char* m) { std::fprintf(stderr, "rt_midi FAIL: %s\n", m); return 1; }
@@ -115,7 +115,7 @@ int main(int argc, char** argv) {
   thunder_midi_set_song(h2, (const uint8_t*)songText.data(), songText.size());
   thunder_midiout_sink sk; sk.user = nullptr; sk.now_ns = sinkNow; sk.send = sinkSend; sk.clear = sinkClear; sk.caps = 0;
   thunder_midiout* po = thunder_midiout_create(h2, 48000, &sk); if (!po) return fail("midiout create");
-  thunder_midiout_dev dv[2]; std::memset(dv, 0, sizeof dv); std::strcpy(dv[0].id, "n:A"); std::strcpy(dv[0].name, "A"); std::strcpy(dv[1].id, "n:B"); std::strcpy(dv[1].name, "B");
+  thunder_midiout_dev dv[2]; std::memset(dv, 0, sizeof dv); std::strcpy(dv[0].id, "n:A"); std::strcpy(dv[0].name, "A"); dv[0].token = 1; std::strcpy(dv[1].id, "n:B"); std::strcpy(dv[1].name, "B"); dv[1].token = 2;
   thunder_midiout_set_devices(po, dv, 2); thunder_midiout_assign(po, 0, "n:A"); thunder_midiout_assign(po, 1, "n:B"); thunder_midiout_assign(po, 2, "n:A"); thunder_midiout_set_clock(po, 0, 1); thunder_midiout_set_out_latency(po, 20000000);
   // the direct (C++) path: a scheduler of its own, fed by the runner, under the guard; and the C handle's process() with posted commands
   thunder::MidiSched s(48000); configure(s, C, D.song);

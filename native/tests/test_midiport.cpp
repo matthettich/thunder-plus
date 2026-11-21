@@ -30,17 +30,17 @@ struct Fake {
   std::atomic<int64_t> now{0}; int64_t step = 0;      // now_ns returns the clock and then advances it by `step` (a spinning pump needs a clock that moves)
   uint32_t caps = 0; std::vector<Rec> rec; bool fail[32] = {}; int clears[32] = {};
   static int64_t nowFn(void* u) { Fake* f = (Fake*)u; const int64_t v = f->now.load(); if (f->step) f->now.store(v + f->step); return v; }
-  static int sendFn(void* u, int dev, const uint8_t* b, int len, int64_t at) {
-    Fake* f = (Fake*)u; if (dev < 0 || dev >= 32 || f->fail[dev]) return -1;
-    Rec r; std::memset(&r, 0, sizeof r); r.dev = dev; r.len = len; std::memcpy(r.b, b, (size_t)len); r.at = at; r.sentAt = f->now.load(); f->rec.push_back(r); return 0;
+  static int sendFn(void* u, uint64_t dev, const uint8_t* b, int len, int64_t at) {
+    Fake* f = (Fake*)u; if (dev >= 32 || f->fail[dev]) return -1;   // a token this fake does not know is a gone device
+    Rec r; std::memset(&r, 0, sizeof r); r.dev = (int)dev; r.len = len; std::memcpy(r.b, b, (size_t)len); r.at = at; r.sentAt = f->now.load(); f->rec.push_back(r); return 0;
   }
-  static void clearFn(void* u, int dev) { Fake* f = (Fake*)u; if (dev >= 0 && dev < 32) f->clears[dev]++; for (Rec& r : f->rec) if (r.dev == dev && r.at > f->now.load()) r.recalled = true; }   // the OS drops what it holds for the device
+  static void clearFn(void* u, uint64_t dev) { Fake* f = (Fake*)u; if (dev < 32) f->clears[dev]++; for (Rec& r : f->rec) if ((uint64_t)r.dev == dev && r.at > f->now.load()) r.recalled = true; }   // the OS drops what it holds for the device
   thunder_midiout_sink sink() { thunder_midiout_sink s; s.user = this; s.now_ns = nowFn; s.send = sendFn; s.clear = clearFn; s.caps = caps; return s; }
 };
 
 static std::vector<thunder_midiout_dev> devList(const std::vector<std::string>& ids) {
   std::vector<thunder_midiout_dev> v;
-  for (const std::string& s : ids) { thunder_midiout_dev d; std::memset(&d, 0, sizeof d); std::snprintf(d.id, sizeof d.id, "%s", s.c_str()); std::snprintf(d.name, sizeof d.name, "%s", s.c_str()); v.push_back(d); }
+  for (const std::string& s : ids) { thunder_midiout_dev d; std::memset(&d, 0, sizeof d); std::snprintf(d.id, sizeof d.id, "%s", s.c_str()); std::snprintf(d.name, sizeof d.name, "%s", s.c_str()); d.token = v.size(); v.push_back(d); }   // the token is the list position unless a test sets its own
   return v;
 }
 static int setDevs(thunder_midiout* o, const std::vector<std::string>& ids) { const auto v = devList(ids); return thunder_midiout_set_devices(o, v.data(), (int)v.size()); }
@@ -176,7 +176,7 @@ static void test1() {
     Drive ref; runBlocks(ref, C, 128);
     { RunRes R; RunOpt op; op.out = true; op.step = 1000; op.latNs = 26000000; op.setOutLat = true; runHost(C, op, R); check1(C, R, ref, 0, 26000000, 2, "spin"); CHECK(g_lastStats.late == 0, "1 spin %s: %llu messages late", name.c_str(), (unsigned long long)g_lastStats.late); }
     { RunRes R; RunOpt op; op.out = true; op.caps = THUNDER_MIDIOUT_CAP_TS; op.latNs = 26000000; op.setOutLat = true; runHost(C, op, R); check1(C, R, ref, 0, 26000000, 2, "ts"); }
-    { RunRes R; RunOpt op; op.out = true; op.step = 1000; op.latNs = 26000000; op.setOutLat = true; op.driftPpm = 1000; runHost(C, op, R); check1(C, R, ref, 1000, 26000000, 300000, "drift"); }   // T6: output latency and 1000 ppm of drift
+    { RunRes R; RunOpt op; op.out = true; op.step = 1000; op.latNs = 26000000; op.setOutLat = true; op.driftPpm = 1000; runHost(C, op, R); check1(C, R, ref, 1000, 26000000, 1500000, "drift"); }   // T6: output latency and 1000 ppm of drift; the web's smoothing (time constant 25 ms / 0.02 = 1.24 s) trails a 1000 ppm drift by about 1.2 ms
     n++;
   }
   CHECK(n >= 24, "1: only %d cases", n);
@@ -248,17 +248,18 @@ static void test4() {
     CHECK(s.sent == 0 && s.dropped_nomap == 1 && r.fk.rec.empty(), "4: before the first map the message is counted in dropped_nomap and not sent (%llu / %llu)", (unsigned long long)s.sent, (unsigned long long)s.dropped_nomap); }
   { Rig r; setDevs(r.o, {"X"}); thunder_midiout_assign(r.o, 0, "X"); r.proc();
     // smoothing: the first map is taken as it is, then 2 % of each difference; a jump over 50 ms is taken at once; 40 ms is smoothed
-    int64_t frame0 = 0, host = r.host0; thunder_midiout_clock_map(r.o, frame0, host); double off = lineOff(frame0, host);
+    int64_t frame0 = 0, host = r.host0; thunder_midiout_clock_map(r.o, frame0, host); double off = lineOff(frame0, host); int64_t prevH = host;
+    const auto alpha = [&](int64_t h) { const double a = 1.0 - std::pow(0.98, (double)(h - prevH) / 25e6); prevH = h; return a; };   // 2 % per 25 ms of host time between calls
     int64_t F = Fn += 100, got = atOf(r, F); CHECK(got == want(off, F), "4: the first map is taken as it is (%lld vs %lld)", (long long)got, (long long)want(off, F));
-    frame0 = 4800; host += 100000000LL + 3000000LL; thunder_midiout_clock_map(r.o, frame0, host); off += (lineOff(frame0, host) - off) * 0.02;   // 3 ms off the line
-    F = Fn += 100; got = atOf(r, F); CHECK(got == want(off, F), "4: 2 %% of a 3 ms step (%lld vs %lld)", (long long)got, (long long)want(off, F));
-    for (int k = 0; k < 5; k++) { frame0 += 4800; host += 100000000LL + 3000000LL; thunder_midiout_clock_map(r.o, frame0, host); off += (lineOff(frame0, host) - off) * 0.02; }
+    frame0 = 4800; host += 100000000LL + 3000000LL; thunder_midiout_clock_map(r.o, frame0, host); off += (lineOff(frame0, host) - off) * alpha(host);   // 3 ms off the line
+    F = Fn += 100; got = atOf(r, F); CHECK(got == want(off, F), "4: a 3 ms step at 103 ms spacing (%lld vs %lld)", (long long)got, (long long)want(off, F));
+    for (int k = 0; k < 5; k++) { frame0 += 4800; host += 100000000LL + 3000000LL; thunder_midiout_clock_map(r.o, frame0, host); off += (lineOff(frame0, host) - off) * alpha(host); }
     F = Fn += 100; got = atOf(r, F); CHECK(got == want(off, F), "4: five more smoothed steps (%lld vs %lld)", (long long)got, (long long)want(off, F));
-    frame0 += 4800; host += 100000000LL + 60000000LL; thunder_midiout_clock_map(r.o, frame0, host); off = lineOff(frame0, host);   // a 60 ms jump: at once
+    frame0 += 4800; host += 100000000LL + 60000000LL; thunder_midiout_clock_map(r.o, frame0, host); off = lineOff(frame0, host); prevH = host;   // a 60 ms jump: at once
     F = Fn += 100; got = atOf(r, F); CHECK(got == want(off, F), "4: a 60 ms jump is taken at once (%lld vs %lld)", (long long)got, (long long)want(off, F));
-    frame0 += 4800; host += 100000000LL + 40000000LL; thunder_midiout_clock_map(r.o, frame0, host); off += (lineOff(frame0, host) - off) * 0.02;   // 40 ms: smoothed
+    frame0 += 4800; host += 100000000LL + 40000000LL; thunder_midiout_clock_map(r.o, frame0, host); off += (lineOff(frame0, host) - off) * alpha(host);   // 40 ms: smoothed
     F = Fn += 100; got = atOf(r, F); CHECK(got == want(off, F), "4: a 40 ms step is still smoothed (%lld vs %lld)", (long long)got, (long long)want(off, F));
-    frame0 += 4800; host -= 70000000LL; thunder_midiout_clock_map(r.o, frame0, host); off = lineOff(frame0, host);   // a jump backwards over 50 ms: also at once
+    frame0 += 4800; host -= 70000000LL; thunder_midiout_clock_map(r.o, frame0, host); off = lineOff(frame0, host); prevH = host;   // a jump backwards over 50 ms: also at once
     F = Fn += 100; got = atOf(r, F); CHECK(got == want(off, F), "4: a jump back over 50 ms is taken at once (%lld vs %lld)", (long long)got, (long long)want(off, F));
     // a map that has not been refreshed for 2 s: still used, and counted in `late`
     const auto s0 = statsOf(r.o); r.raw(0, {0x90, 60, 100}, 0.0); r.proc(); r.fk.now.store(host + 2500000000LL); r.pump(); const auto s1 = statsOf(r.o);
@@ -423,8 +424,8 @@ static void test12() {
 struct RealSink {
   std::atomic<uint64_t> sent{0}; int64_t last[32] = {}; uint64_t errs = 0;
   static int64_t nowFn(void*) { return std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now().time_since_epoch()).count(); }
-  static int sendFn(void* u, int dev, const uint8_t* b, int len, int64_t at) { RealSink* s = (RealSink*)u; if (dev < 0 || dev >= 32 || len < 1 || b[0] < 0x80) return -1; s->last[dev] = at; s->sent.fetch_add(1); return 0; }
-  static void clearFn(void*, int) {}
+  static int sendFn(void* u, uint64_t dev, const uint8_t* b, int len, int64_t at) { RealSink* s = (RealSink*)u; if (dev >= 32 || len < 1 || b[0] < 0x80) return -1; s->last[dev] = at; s->sent.fetch_add(1); return 0; }
+  static void clearFn(void*, uint64_t) {}
 };
 static void threadsOnce(uint32_t caps) {
   thunder_midi* h = thunder_midi_create(48000, nullptr, 0); RealSink rs; thunder_midiout_sink sk; sk.user = &rs; sk.now_ns = RealSink::nowFn; sk.send = RealSink::sendFn; sk.clear = RealSink::clearFn; sk.caps = caps;
@@ -458,9 +459,77 @@ static void threadsOnce(uint32_t caps) {
   thunder_midiout_free(o); thunder_midi_free(h);
 }
 
+// ---- L1 / L2 of the lead's read: set_devices while the pump runs ----------------------------------------------------------------------------------
+// The control thread calls set_devices in a tight loop with the SAME list (L1: a device that stays listed must never look gone to the pump: no queued note-off may be dropped) or with the list
+// RENUMBERED each time (L2: the tokens stay the device's, so a message for X reaches X whatever the list's order), while it posts notes (60 for the letter on X, 61 for the one on Y) and the
+// audio and sender threads run. Every posted note must reach the sink, once, on its own device's token.
+struct TokSink {
+  std::atomic<uint64_t> sent{0}, wrong{0}; std::atomic<uint64_t> n60{0}, n61{0};
+  static int64_t nowFn(void*) { return std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now().time_since_epoch()).count(); }
+  static int sendFn(void* u, uint64_t tok, const uint8_t* b, int len, int64_t) {
+    TokSink* s = (TokSink*)u; if (len != 3 || (b[0] & 0xF0) != 0x90) return 0;
+    if ((b[1] == 60 && tok != 10) || (b[1] == 61 && tok != 11)) s->wrong.fetch_add(1);
+    (b[1] == 60 ? s->n60 : s->n61).fetch_add(1); s->sent.fetch_add(1); return 0;
+  }
+  static void clearFn(void*, uint64_t) {}
+};
+static void threadsDevs(bool renumber) {
+  thunder_midi* h = thunder_midi_create(48000, nullptr, 0); TokSink ts; thunder_midiout_sink sk; sk.user = &ts; sk.now_ns = TokSink::nowFn; sk.send = TokSink::sendFn; sk.clear = TokSink::clearFn; sk.caps = 0;
+  thunder_midiout* o = thunder_midiout_create(h, 48000, &sk);
+  thunder_midiout_dev dv[2]; std::memset(dv, 0, sizeof dv); std::strcpy(dv[0].id, "X"); std::strcpy(dv[0].name, "X"); dv[0].token = 10; std::strcpy(dv[1].id, "Y"); std::strcpy(dv[1].name, "Y"); dv[1].token = 11;
+  const thunder_midiout_dev swapped[2] = {dv[1], dv[0]};
+  thunder_midiout_set_devices(o, dv, 2); thunder_midiout_assign(o, 0, "X"); thunder_midiout_assign(o, 1, "Y");
+  thunder_midi_process(h, 0, 128.0 / 48000, 0, 120, 0);
+  std::atomic<bool> stop{false}; const int64_t t0 = TokSink::nowFn(nullptr);
+  std::thread audio([&] { int64_t b = 1; while (!stop.load()) { const double now = (double)b * 128 / 48000; const int64_t due = t0 + (int64_t)(now * 1e9);
+    while (TokSink::nowFn(nullptr) < due && !stop.load()) std::this_thread::sleep_for(std::chrono::microseconds(100));
+    thunder_midi_process(h, now, 128.0 / 48000, now, 120, 0); thunder_midiout_clock_map(o, b * 128, due); b++; } });
+  std::thread sender([&] { while (!stop.load()) { thunder_midiout_pump(o, nullptr); std::this_thread::sleep_for(std::chrono::microseconds(200)); } });
+  uint64_t posted = 0; int k = 0; const auto c0 = std::chrono::steady_clock::now(); auto lastPost = c0;
+  while (std::chrono::steady_clock::now() - c0 < std::chrono::milliseconds(1500)) {
+    thunder_midiout_set_devices(o, renumber && (k & 1) ? swapped : dv, 2); k++;
+    const auto n = std::chrono::steady_clock::now();
+    if (n - lastPost > std::chrono::milliseconds(1)) { lastPost = n; const uint8_t a[3] = {0x90, 60, 100}, c[3] = {0x90, 61, 100}; if (thunder_midi_raw(h, 0, a, 3, 0.01) == 0) posted++; if (thunder_midi_raw(h, 1, c, 3, 0.01) == 0) posted++; }
+  }
+  stop.store(true); audio.join(); sender.join();
+  // the rest: single-threaded now, the same real clock; the queue holds at most 70 ms
+  double now = (double)(TokSink::nowFn(nullptr) - t0) / 1e9;
+  for (int i = 0; i < 400; i++) { thunder_midi_process(h, now, 128.0 / 48000, now, 120, 0); thunder_midiout_clock_map(o, (int64_t)std::llround(now * 48000), TokSink::nowFn(nullptr)); thunder_midiout_pump(o, nullptr); std::this_thread::sleep_for(std::chrono::milliseconds(1)); now = (double)(TokSink::nowFn(nullptr) - t0) / 1e9; }
+  const auto st = statsOf(o);
+  CHECK(posted > 500 && ts.sent.load() == posted, "L1%s: every posted note reached the sink once (posted %llu, sent %llu, %d list swaps)", renumber ? "/L2 renumbered" : "", (unsigned long long)posted, (unsigned long long)ts.sent.load(), k);
+  CHECK(st.dropped_gone == 0 && st.send_errors == 0 && st.dropped_cleared == 0, "L1%s: nothing was dropped as gone (%llu), no send error (%llu)", renumber ? "/L2 renumbered" : "", (unsigned long long)st.dropped_gone, (unsigned long long)st.send_errors);
+  CHECK(ts.wrong.load() == 0, "L2%s: no message reached the wrong device token (%llu)", renumber ? " renumbered" : "", (unsigned long long)ts.wrong.load());
+  std::printf("L1/L2 (%s): %llu notes posted, %llu sent, %d set_devices, dropped_gone %llu\n", renumber ? "renumbered" : "same list", (unsigned long long)posted, (unsigned long long)ts.sent.load(), k, (unsigned long long)st.dropped_gone);
+  thunder_midiout_free(o); thunder_midi_free(h);
+}
+
+// L2 without threads: an unknown token is the sink's "gone" (a pump that raced a removal); a renumbered list with stable tokens keeps every message on its own device
+static void testTokens() {
+  Rig r; thunder_midiout_dev dv[2]; std::memset(dv, 0, sizeof dv); std::strcpy(dv[0].id, "X"); std::strcpy(dv[0].name, "X"); dv[0].token = 7; std::strcpy(dv[1].id, "Y"); std::strcpy(dv[1].name, "Y"); dv[1].token = 3;
+  thunder_midiout_set_devices(r.o, dv, 2); thunder_midiout_assign(r.o, 0, "X"); thunder_midiout_assign(r.o, 1, "Y"); r.proc(); thunder_midiout_clock_map(r.o, 0, r.host0);
+  r.raw(0, {0x90, 60, 100}, 0.010); r.raw(1, {0x90, 61, 100}, 0.010); r.proc();
+  const thunder_midiout_dev sw[2] = {dv[1], dv[0]}; thunder_midiout_set_devices(r.o, sw, 2);   // renumbered between the core's records and the pump
+  r.fk.now.store(r.host0 + 100000000); r.pump();
+  int x = 0, y = 0; for (const Rec& q : r.fk.rec) { if (q.b[1] == 60 && q.dev == 7) x++; if (q.b[1] == 61 && q.dev == 3) y++; }
+  CHECK(x == 1 && y == 1 && portOf(r.o, 0).dev == 1 && portOf(r.o, 1).dev == 0, "L2: after a renumbering each note went to its own token (X %d, Y %d), the letters follow the list", x, y);
+}
+
+// L3: the same step of the host clock, smoothed at two call rates, has the same time constant (the web's: 2 % per 25 ms; its pump, 40 Hz, is what calls mapUpd while playing)
+static void testRates() {
+  const double sr = 48000; int64_t at[2] = {0, 0}; const int64_t spacing[2] = {5000000, 25000000}; const int64_t F = 481000;
+  for (int v = 0; v < 2; v++) {
+    Rig r; setDevs(r.o, {"X"}); thunder_midiout_assign(r.o, 0, "X"); r.proc(); const int64_t dt = spacing[v];
+    thunder_midiout_clock_map(r.o, 0, r.host0);
+    for (int64_t k = 1; k * dt <= 250000000; k++) thunder_midiout_clock_map(r.o, (int64_t)std::llround((double)(k * dt) * sr / 1e9), r.host0 + k * dt + 3000000);   // the host clock steps 3 ms at 5 ms or 25 ms spacing
+    at[v] = atOf(r, F);
+  }
+  const int64_t want = (int64_t)std::llround(1e9 + 3e6 * (1.0 - std::pow(0.98, 253e6 / 25e6)) + (double)F * 1e9 / sr);   // the 3 ms step itself counts as elapsed host time: 253 ms of the web's 25 ms units
+  CHECK(std::llabs(at[0] - want) <= 20 && std::llabs(at[1] - want) <= 20, "L3: 250 ms after a 3 ms step the map is %lld (5 ms calls) and %lld (25 ms calls), the web's rate gives %lld", (long long)at[0], (long long)at[1], (long long)want);
+}
+
 int main(int argc, char** argv) {
-  if (argc > 1 && std::strcmp(argv[1], "--threads") == 0) { threadsOnce(0); threadsOnce(THUNDER_MIDIOUT_CAP_TS); std::printf(fails ? "midiport threads: FAILED\n" : "midiport threads: ok\n"); return fails ? 1 : 0; }
-  test12(); test6(); test3(); test4(); test2(); test7(); testT2(); test1(); test5();
+  if (argc > 1 && std::strcmp(argv[1], "--threads") == 0) { threadsOnce(0); threadsOnce(THUNDER_MIDIOUT_CAP_TS); threadsDevs(false); threadsDevs(true); std::printf(fails ? "midiport threads: FAILED\n" : "midiport threads: ok\n"); return fails ? 1 : 0; }
+  test12(); test6(); testTokens(); testRates(); test3(); test4(); test2(); test7(); testT2(); test1(); test5();
   std::printf(fails ? "midiport: %d FAILED\n" : "midiport: all passed\n", fails);
   return fails ? 1 : 0;
 }
