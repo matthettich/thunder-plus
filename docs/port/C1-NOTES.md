@@ -6,7 +6,8 @@ Branch `n1/chains-c1` (from `native`, with PR #279's `n1/chains-c1g` merged: gol
 - DONE: `native/core/src/chains/chost.{h,cpp}` (`ChainsHost`, `ChainsPlan`), `ChainsEngine::setBusMap` capacity, `SongRenderer::setChains` + dispatch cases, `thunder_render_opts.chains`, `thunder-render --chains`, CMake,
   `test_chains_song` (all golden cases exact through Mixer+ChainsHost, and through SongRenderer where a case has no events), `test_chains_host`.
 - DONE too: `n1/chains-c1g` re-merged (22 cases, all exact, the Chrome chc rule in); the six mutations below.
-- NEXT: full Release ctest (running), ASan+UBSan on chains / render / mix / bus tests, the PR.
+- DONE too: full Release ctest 210 tests, 0 failed (1 skipped: pumpsynth_refused); ASan+UBSan on every test whose name has chains / render / mix / bus (all pass; chains_mem and chains_alloc skip themselves under a sanitizer); the PR.
+- NEXT: nothing in C1's scope; see the open questions.
 - OPEN QUESTIONS: see the end.
 
 ## Design as built
@@ -28,3 +29,14 @@ Branch `n1/chains-c1` (from `native`, with PR #279's `n1/chains-c1g` merged: gol
 | an un-heard track hooked in a stem (`heard` ignored in `plan`) | h/stem-plain-track, h/stem-source-only (plan and hash), `test_chains_host` section 4 |
 | `ceil` in float (tempo rule; chc rule separately) | g/tempo-change; f/byp-fuzz-quantum-start; the rule checks of `test_chains_host` |
 | the tempo rule used for `chc` | f/byp-chrome-rule-k5 |
+
+## test_render_bus_chain
+Kept and passing. The stand-in CAN be replaced by the real host: with `opts.chains = 1` (a Track In -> Chain Out patch) the two-bus mix differs from the stand-in's by max |diff| 0 (bit-identical); stems and heard masks equal too. A block of the test now checks that; the stand-in stays for the older cases (live = true keeps hooks on muted buses, which the offline host does not do).
+
+## Open questions / not done
+- Pump / MODFX track effects (FX1), live (C2), taps / sends / sidechain (C3), the CHN switch ramp, Resample, patch edits during play: not in C1. Memory budget is still per patch (D7 (a), one budget per host, not done).
+- A tempo event whose ceil(t/q)*q is at or after the render's length is sent by the page BEFORE quantum 0 (index.html:23229); the native renderer does not know the render length, so such an event is simply never applied. Only a trailing event; not reproduced.
+- Heard set offline is `audibleMask()`: a CHN track with a Chain Out but no notes gets a node (the page's `keep` is tracks with notes plus bus closure). Only a chain that makes sound from nothing (Osc) would differ.
+- `commit` returns void: what it replaced is in the plan object (`retiredPatches()` / `retiredNodes()`), freed by deleting the plan.
+- `chc` for the same switch on two events in one quantum: the later wins (stable order); not pinned by a golden.
+- Statics are primed in `plan()` (cinfo / chainsTable / cdef); the allocation audit over hook, commit (two swaps) and the event apply shows 0 allocator calls.
