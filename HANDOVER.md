@@ -854,6 +854,12 @@ The web app stays on pump deb07d3 (build 642's `pump/pump.wasm` and `pump/synth/
 
 Start a session by asking for results. Fix on `beta`. (10 Nov, 15:10: the web beta is build 560; the build numbers in the rest of this paragraph are older.) Web beta: https://matthettich.github.io/thunder-plus/beta/ (build 547 as of 10 Nov morning, 548 once its PR merges; the night of 9–10 Nov shipped 544–547, see the four "10 Nov" entries below. Decisions the lead made that night for the owner to confirm or reverse: on a phone the saved Sequencer default plays on the Page unless Audio thread is picked on that device; on a phone the safety limiter is its stand-in until another worklet loads; the resync only runs with a worklet loaded and its margins are untested on a device). Desktop: v1.3.4-beta.2 (build 541, no feed view or scopes); further desktop betas on hold until the owner asks.
 
+**Build 659** (sync mode picker, `I.sx`, the REPITCH sentence; no audio change)
+- [ ] **Computer, INST page, an instrument with a sample pad:** move to SYNC and press EDIT. Pass: a list opens with OFF, then the captions Repitch (REPITCH) and Character (GRANULAR, LOOP); picking one sets the row; the left and right keys still step through them.
+- [ ] **Computer and phone, a sample layer, Sync to lines…:** the Mode choice shows the same names under the same captions. Pass: REPITCH, GRANULAR and LOOP are there, no others.
+- [ ] **Computer, a loop of about 3 s, 8 beats at 140 BPM, mode REPITCH:** read the sentence in the sheet, in the toast and in the SYNC and BEATS rows' notes. Pass: it says the real speed change and semitones (for example "plays 17.7% slower, 3.4 semitones down") and that is what you hear against the original (a tuner or the original pitch).
+- [ ] **Computer:** open a song that already uses SYNC (any of REPITCH, STRETCH, LOOP). Pass: it sounds exactly as before; STRETCH now shows as GRANULAR.
+
 **Build 658** (envelope times in bars + lines)
 - [ ] **Computer, Synth page, a synth slot, one noise layer (pink), Amp, Time in BARS + LINES:** set Attack to 1 bar (32 lines at LPB 8). Play it from a 32-step pattern on both sequencers (page and audio-thread core) and in an export. Pass: the swell reaches full level exactly as the pattern ends.
 - [ ] **Computer:** try 2 bars, 4 bars and 8 bars (the maximum). Pass: each ends on the bar line; the line under the rows shows the seconds.
@@ -1696,6 +1702,15 @@ Tests added: `gen-instrument` (source pins).
 Build 630, on `beta`. The owner asked for a mod section in the FX bar: collapsible, small, showing that there are modulations, the waveform and the destinations. Added `#dkMod` (DK_SECS / DK_FOLD, `deck.mod` saved with the panel, default FOLDED so no existing layout changes) between FX and PERFORM. `deckMod()` rebuilds only when open and when the focused track's LFOs / skin / ANIMATIONS change; each row is a 48×18 canvas wave (`modMix`, the MOD screen's maths) with a dot moved by `dkModTick` from the frame loop (only open, playing, visible, ANIMATIONS on, LOW POWER DISPLAY off), the shape and rate, and the destination (`tgtLabel`). Click: MOD screen on that track. Skin colours through CSS variables (checked IDM and 909 in headless Chrome). Hidden on the phone's swipe layout (`max-width:700px` + coarse pointer): the bottom panel there is one section at a time and the owner's folded-phone width is not a place to add a page. Display code only; nothing posts to the engine.
 
 Tests added: `deck-mod-section` (source pins).
+
+## 20 Nov (time stretch step 1: one mode picker, `I.sx`, the REPITCH sentence; build 659)
+
+Build 659, branch `beta-stretch-picker` (PR 1 of two; the design is `docs/STRETCH-DESIGN.md` on branch `beta-stretch-design`; checklist and choices: `docs/STRETCH-BUILD-NOTES.md`). No audio change.
+- **One list:** `SY_PICK` (name, `sync`, `sx`, group, tip) is the only list of modes; `syList()` makes the grouped list for `askSheet` (group names as captions, empty groups not shown, OFF at the top). The INST page's SYNC row (`tap`: press EDIT) and the SYNC TO LINES sheet's mode choice both use it; the row's value is the picker index (`syPick(I)`), written with `syPut(I, index)`. STRETCH is shown as GRANULAR; LOOP keeps its name. Only modes that exist are listed (Clean and Drums have none yet).
+- **`I.sx`:** the algorithm inside the family; absent = 0; written only when not 0 (`syPut` deletes it for a classic mode), loaded by `sxLoad` only for a (sync, sx) pair this build has, else dropped. `I.sync` is 0..3 exactly as in every old song, so a build that does not know `I.sx` ignores it and plays the classic mode of `I.sync`. Nothing in this build writes an `sx` yet (PR 2 adds OLDSCHOOL as sync 3, sx 1: an older build then plays it as LOOP).
+- **The REPITCH sentence** (`syRepitchText(loop, target)`): "plays 17.7% slower, 3.4 semitones down" from the sample's real length (`loopSecs`) and the length it fills; in the SYNC TO LINES sheet and toast and in the SYNC and BEATS rows' notes.
+- **Old songs identical, proven:** `tests/fixtures/stretch-before-659.json` was recorded from build 658 by `tests/stretch-record.js`; `tests/stretch-picker.test.js` compares 90 stretch renders (sync 2 and 3 x GRAIN 0..4 x tempos x lengths, by hash and cache key), 768 `applyChop` events, and the instrument loader on the two shipped songs (128 instruments) and a constructed song (sync 0..3 x grain 0..4 x lines): all identical.
+- `tests/sampler-pitch-sync.test.js`: the two sentence pins moved to the new wording (that is the one intended text change).
 
 ## 19 Nov (envelope times in lines: MS | BARS + LINES; build 658)
 
