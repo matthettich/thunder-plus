@@ -528,19 +528,10 @@ void MidiSched::onStep(const SeqEvent* evs, int n, const SeqStep& step, const Se
   const double bpm = seq.bpm();
   // F5 / B12: the tempo IN FORCE WHEN THIS STEP STARTED. The sequencer times the step's length with it and only then applies the step's own TPO, so it is the tempo of the
   // interval from this step to the next (the web integrated the tempo after the step over that interval: the clock was bent for good after every TPO).
-  double bpmStart = bpm; bool hasTempo = false;
-  for (int i = 0; i < n; i++) if (evs[i].type == SEV_TEMPO) hasTempo = true, bpmStart = bpmPrev_ > 0 ? bpmPrev_ : (S_ && S_->bpm > 0 ? (double)S_->bpm : bpm);
-  // N1: bpmPrev_ is the tempo after the PREVIOUS STEP, which is not the tempo this step started at when a live tempo change (the host's setBpm) landed in between. The sequencer
-  // counts its beats (SEV_BEAT's v) with the tempo in force when the step starts, over the interval since the previous step, so that tempo is
-  // (v - previous v) * 60 / (t - previous t): read it from there. When it equals bpmPrev_ (no live change: always, but for rounding) bpmPrev_ itself is kept, bit for bit.
-  for (int i = 0; i < n; i++) if (evs[i].type == SEV_BEAT) {
-    if (hasBeat_ && hasTempo) {
-      const double dt = evs[i].t - beatT_, db = evs[i].v - beatV_, d = dt > 1e-9 ? db * 60 / dt : 0;
-      if (std::isfinite(d) && d > 0 && d < 1e6 && !(bpmPrev_ > 0 && std::fabs(d - bpmPrev_) <= 1e-9 * bpmPrev_)) bpmStart = d;
-    }
-    hasBeat_ = true; beatT_ = evs[i].t; beatV_ = evs[i].v;
-  }
-  bpmPrev_ = bpm;
+  // N1: the tempo the sequencer timed this step with, before its own TPO (SeqStep::bpm0 = Seq::bpm_ at the start of step(); seq.cpp: `line = 60 / bpm_ / lpb` uses it, nb is applied at the end).
+  // A live setBpm between two steps is in it; a Seq::shift (the runner's stall skip) does not disturb it, as it would a tempo derived from beat counts.
+  double bpmStart = bpm;
+  for (int i = 0; i < n; i++) if (evs[i].type == SEV_TEMPO) bpmStart = step.bpm0 > 0 ? step.bpm0 : bpm;
   for (int i = 0; i < n; i++) {
     const SeqEvent& e = evs[i];
     onEvent(e, (e.has & SH_ARP) ? seq.arp(e) : nullptr, bpm, e.type == SEV_NOTE && seq_note_late(e.t, now), now);
@@ -560,7 +551,7 @@ void MidiSched::book(double now, double seqTime, double bpm, bool seqAlive) {
 
 // ---- transport ---------------------------------------------------------------------------------------------------------------------------
 void MidiSched::start(int spp, double now) {   // moStart :17071
-  now_ = now; nAnc_ = 0; haveT0_ = false; t0_ = 0; playing_ = true; bpmPrev_ = -1; hasBeat_ = false;
+  now_ = now; nAnc_ = 0; haveT0_ = false; t0_ = 0; playing_ = true;
   for (auto& L : lfo_) { L.v = -1; L.hasT = false; L.nTrig = 0; }
   clk_ = Clk(); bool wanted = false; for (int p = 0; p < kMidiPorts; p++) wanted = wanted || clkOn_[p];
   spp_ = (wanted && spp > 0) ? clampi(spp, 0, 16383) : 0;

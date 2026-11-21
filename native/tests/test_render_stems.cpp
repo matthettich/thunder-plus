@@ -6,9 +6,9 @@
 //   S4  mute / solo as the JS audible(): the list leaves a muted track and every track not soloed; solo wins over mute; the mix is the sum of the listed stems; a stem asked for directly ignores them
 //   S5  length: use_frames stems are exact; an unknown-length stem is longer than the mix by the master chain's latency; the estimate and the exact length of a stem handle
 //   S6  bad arguments: errors, no crash
-//   S8  (FU2) a stem of a track that is NOT soloed, asked for while another track is soloed, has the sound of that track (the pass replaces mute / solo); the list leaves it out
-//   S9  (FU3) a cross-track choke inside a stem: a track's notes are still choked by another track's notes that are not heard in the pass (every track still plays)
-//   S10 (FU1) the unknown-length estimate is never above the real length (the render does not end before the sequencer's end)
+//   S8  (item 2) a stem of a track that is NOT soloed, asked for while another track is soloed, has the sound of that track (the pass replaces mute / solo); the list leaves it out
+//   S9  (item 2/3) a cross-track choke inside a stem: a track's notes are still choked by another track's notes that are not heard in the pass (every track still plays)
+//   S10 (item 1) the unknown-length estimate is never above the real length (the render does not end before the sequencer's end)
 //   S7  SongRenderer level: a bus that exists (a pass-through chain hook) plays its audible sources in its stem; a pure source plays only through it and has no stem of its own
 #include <algorithm>
 #include <cmath>
@@ -256,7 +256,7 @@ int main() {
     CHECK("S5 the same length (no master chain)", sa.L.size() == sb.L.size() && thunder_render_length(a) == (int64_t)sa.L.size() && thunder_render_length(b) == (int64_t)sb.L.size());
     std::printf("S5 synthetic: estimate %lld, real %zu\n", (long long)ea, sa.L.size());
     CHECK("S5 the estimate is within a pad length of the real length", std::llabs(ea - (int64_t)sa.L.size()) <= 24000 + 6128);
-    CHECK("S5 (FU1) the estimate is never above the real length", ea <= (int64_t)sa.L.size());
+    CHECK("S5 (item 1) the estimate is never above the real length", ea <= (int64_t)sa.L.size());
     CHECK("S5 after the end the estimate is the exact length", thunder_render_length_estimate(a) == (int64_t)sa.L.size() && thunder_render_length_estimate(b) == (int64_t)sb.L.size());
     thunder_render_free(a); thunder_render_free(b);
     // with the master chain a stem has no latency to trim: longer than the mix by the chain's latency; the estimate follows
@@ -296,7 +296,7 @@ int main() {
     CHECK("S6 stem_tracks after a failed create is not reachable: NULL is E_ARG", thunder_render_stem_tracks(nullptr, nullptr, 0) < 0);
   }
 
-  // ---- S8 (FU2): a stem under solo --------------------------------------------------------------------------------------------------------------------------------------------------
+  // ---- S8 (item 2): a stem under solo --------------------------------------------------------------------------------------------------------------------------------------------------
   {
     const char* M2[] = {"{}", "{}", "{\"solo\":true}", "{}", "{}"};
     const std::string solo = synth(0x1F, mixJson(M2, 5));
@@ -310,7 +310,7 @@ int main() {
     thunder_render* s = make(solo, ps, mkOpts(0, false, false, 48000)); CHECK("S8 the list holds only the soloed track", stemList(s) == std::vector<int>({3})); thunder_render_free(s);
   }
 
-  // ---- S9 (FU3): a cross-track choke inside a stem ------------------------------------------------------------------------------------------------------------------------------------
+  // ---- S9 (item 2/3): a cross-track choke inside a stem ------------------------------------------------------------------------------------------------------------------------------------
   {
     // pads are 0.5 s long (4 rows). Track 1 (pad 0) plays on rows 0 and 4, track 2 (pad 1) on rows 2 and 6; pads 0 and 1 are choke group 1, so every note of track 2 cuts the sounding note of track 1.
     const std::string song = synthRows({{0, 4}, {2, 6}});
@@ -324,14 +324,13 @@ int main() {
       thunder_render_opts oo = mkOpts(0, false, false, 48000); thunder_render* r = thunder_render_create((const uint8_t*)sj.data(), sj.size(), &oo, nullptr, 0); Stereo out;
       if (!r || !installPadsChoke(r, ps, 1)) { g_fail++; if (r) thunder_render_free(r); return out; } out = readAll(r); thunder_render_free(r); return out; };
     const Stereo st1 = go(1, 1), st1free = go(1, 0), st2 = go(2, 1), ref1 = muted(1), ref2 = muted(2);
-    { double d = 0, e1 = 0, e0 = 0; for (size_t i = 0; i < st1.L.size() && i < st1free.L.size(); i++) { d += std::fabs(st1.L[i] - st1free.L[i]); if (i > 14000 && i < 24000) { e1 += std::fabs(st1.L[i]); e0 += std::fabs(st1free.L[i]); } } std::printf("S9 diag: sum|diff| %g, energy 0.29-0.5 s with choke %g, without %g, sizes %zu %zu\n", d, e1, e0, st1.L.size(), st1free.L.size()); }
     CHECK("S9 the stem of the choked track has sound", peakOf(st1) > 0.001);
     CHECK("S9 the choke is audible: the stem differs from the one without a choke group (the other track's notes cut it)", !bitSame(st1, st1free));
     CHECK("S9 the stem of the choked track equals the mix with the other track muted (the other track still plays and chokes)", bitSame(st1, ref1));
     CHECK("S9 the stem of the choking track equals the mix with the first track muted", bitSame(st2, ref2));
   }
 
-  // ---- S10 (FU1): the estimate is never above the real length -------------------------------------------------------------------------------------------------------------------------
+  // ---- S10 (item 1): the estimate is never above the real length -------------------------------------------------------------------------------------------------------------------------
   {
     int bad = 0, n = 0;
     for (unsigned tr : {0x01u, 0x02u, 0x05u, 0x1Fu, 0x10u}) for (int master : {0, 1}) {
@@ -344,6 +343,14 @@ int main() {
     const std::string tail = synthRows({{0}});   // one note on row 0; rows 1..7 empty
     thunder_render* r = make(tail, ps, mkOpts(0, false, false, 0)); const int64_t est = r ? thunder_render_length_estimate(r) : -1; const Stereo s = r ? readAll(r) : Stereo(); thunder_render_free(r);
     std::printf("S10 empty tail: estimate %lld, real %zu\n", (long long)est, s.L.size());
+    // other rates and a master chain (latency > 0) with an empty tail: real >= estimate, and not by more than the 0.25 s lead
+    for (double rate : {44100.0, 96000.0}) for (int master : {0, 1}) {
+      thunder_render_opts o = mkOpts(0, false, master != 0, 0); o.sample_rate = rate; char err[100] = {0};
+      thunder_render* q = thunder_render_create((const uint8_t*)tail.data(), tail.size(), &o, err, sizeof err); if (!q) { g_fail++; continue; }
+      for (int p = 0; p < ps.n; p++) { thunder_render_set_pad(q, p, ps.pad(p), (p & 1) ? ps.pad((p + 1) % ps.n) : nullptr, kNS, 48000); thunder_render_set_pad_kit(q, p, PadSet::choke(p), PadSet::syn(p), PadSet::rel(p)); }
+      const int64_t e = thunder_render_length_estimate(q); const Stereo z = readAll(q); thunder_render_free(q);
+      CHECK("S10 other rate / master chain: real >= estimate, within half a second", e > 0 && (int64_t)z.L.size() >= e && (int64_t)z.L.size() - e < (int64_t)(0.5 * rate));
+    }
     CHECK("S10 estimates never above the real length (10 songs)", n == 10 && bad == 0);
     CHECK("S10 a song with empty rows after its last note: real >= estimate", est > 0 && (int64_t)s.L.size() >= est);
   }

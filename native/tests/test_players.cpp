@@ -7,7 +7,7 @@
 //   P2  a mono note takes the track over in BOTH pools, whichever route it is (sampler, SoundFont), and a Live-routed note and a missing variation take it over without sounding
 //   P3  a poly note refused by the sampler (a buffer the pool cannot play) touches nothing (no cap, no takeover)
 //   P4  the choke: a note of a choke group silences the group's voices on OTHER tracks in both pools, and none on its own track
-//   P5  off / mod / stp reach both pools
+//   P5  off and stp end both pools; mod is accepted (its effect is in the output, not in the voice lists)
 //   P6  setPads re-points the pads between calls
 // WHAT THIS CANNOT PIN (found by mutation, see the notes): the order of `take` and `capPoly` inside note() is not observable. For a poly note take() only drops dead voices (capPoly's liveOnTrack
 // does the same) and chokes OTHER tracks (the cap counts this track); for a mono note capPoly returns before it counts. So swapping those two calls does not change any voice list, any output
@@ -149,6 +149,11 @@ int main() {
     a.go(0, PAD_SMP_A, t += 0.01, true); a.go(0, PAD_SF, t += 0.01, true); a.go(5, PAD_SMP_A, t += 0.01, true);
     SeqEvent off; off.type = SEV_OFF; off.track = 0; off.t = t += 0.01; a.P->dispatch(off, *a.seq, a.song);
     CHECK(a.smp(0, Q) == 0 && a.sfv(0, Q) == 0 && a.smp(5, Q) == 1, "off ends the track in both pools, not another track (%d / %d / %d)", a.smp(0, Q), a.sfv(0, Q), a.smp(5, Q));
+    // stp ends the track in both pools (the web's stop-note); mod reaches both pools (a pitch change is audible only in the output, so this checks that it is accepted and kills nothing)
+    a.go(7, PAD_SMP_A, t += 0.01, true); a.go(7, PAD_SF, t += 0.01, true);
+    SeqEvent mod; mod.type = SEV_MOD; mod.track = 7; mod.t = t += 0.01; mod.rate = 1; CHECK(a.P->dispatch(mod, *a.seq, a.song) && a.smp(7, Q) == 1 && a.sfv(7, Q) == 1, "mod is the players' event and takes nothing over (%d / %d)", a.smp(7, Q), a.sfv(7, Q));
+    SeqEvent stp; stp.type = SEV_STP; stp.track = 7; stp.t = t += 0.01; const bool stpOk = a.P->dispatch(stp, *a.seq, a.song);
+    CHECK(stpOk && a.smp(7, Q) == 0 && a.sfv(7, Q) == 0, "stp ends the track's voices in both pools (%d / %d)", a.smp(7, Q), a.sfv(7, Q));
     CHECK(!a.P->dispatch(SeqEvent(), *a.seq, a.song), "an event of another type is not the players' (false, nothing done)"); }
 
   // ---- P6: setPads re-points the pads between calls ------------------------------------------------------------------------------------------------------------------------------------

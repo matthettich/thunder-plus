@@ -286,7 +286,7 @@ static void stalledConsumer() {
 struct Harness {   // a Song with the clock on, a Seq on a loop of the 'loop' case at one row per beat, the scheduler
   Case C; Drive D; MidiSched* s = nullptr; Seq* q = nullptr; std::vector<SeqEvent> evs; SeqStep st; double t0 = 0;
   explicit Harness(const char* name = "loop", const char* row8 = nullptr) : evs(12288) { loadCase(root(), name, C);
-    if (row8) { const std::string from = "[55,-1,-1,-1,-1,0,-1,-1,-1,-1,-1,-1]"; const size_t at = C.songText.find(from); if (at != std::string::npos) C.songText.replace(at, from.size(), row8); else std::printf("FAIL: the tempo-clock song has no row 8 to replace\n"); }
+    if (row8) { const std::string from = "[55,-1,-1,-1,-1,0,-1,-1,-1,-1,-1,-1]"; const size_t at = C.songText.find(from); if (at != std::string::npos) C.songText.replace(at, from.size(), row8); else CHECK(false, "the tempo-clock song has no row 8 to replace (the two-TPO-row case would be vacuous)"); }
     JsonError je; D.song.load(C.songText.data(), C.songText.size(), &je); D.song.lpb = 1; D.song.swing = 50; s = new MidiSched(48000); configure(*s, C, D.song); s->setFxLatency(0); for (int p = 0; p < 4; p++) s->setPort(p, !C.ports[(size_t)p].empty(), C.clk[(size_t)p] != 0, 0, p); }
   ~Harness() { delete q; delete s; }
   void begin(double startAt, double firstStep, bool loop = true) { SeqOpts lo; if (loop) { lo.hasLoop = true; lo.loopY0 = C.y0; lo.loopY1 = C.y1; } lo.live = true; q = new Seq(D.song, D.vars, SeqMode::Song, lo); s->start(0, startAt); q->setTime(firstStep); t0 = firstStep; }
@@ -298,12 +298,19 @@ struct Harness {   // a Song with the clock on, a Seq on a loop of the 'loop' ca
 // ---- FU4 / FU5: the tempo map across TPO rows (N1, T1) ------------------------------------------------------------------------------------------------------------------------------
 // tempo-clock's song at one row per beat, no swing: 32 rows, a TPO 90 command on row 16 (and, with `row8`, another on row 8). The rule: tick 24 j is at row j's time, to the frame, whatever the
 // tempo did before or after (the clock integrates each interval with the tempo in force when the step STARTED). liveAt / liveBpm: the host's setBpm lands just before step `liveAt`.
-static int tempoOracle(const char* row8, int liveAt, double liveBpm, int jFrom, int jTo, int* checked) {
+static int tempoOracle(const char* row8, int liveAt, double liveBpm, int jFrom, int jTo, int* checked, int shiftAt = -1) {
   Harness h("tempo-clock", row8); h.begin(0.0, 0.5, false);
   double now = 0.4;
-  for (int i = 0; i < 30; i++) { if (i == liveAt) h.q->setBpm(liveBpm); h.steps(1, now); const double endT = h.q->time(); for (; now < endT - 0.3; now += 0.05) { h.s->book(now, h.q->time(), h.q->bpm(), true); h.ticks(); } }
+  for (int i = 0; i < 30; i++) { if (i == liveAt) h.q->setBpm(liveBpm); if (i == shiftAt) h.q->shift(0.2); h.steps(1, now); const double endT = h.q->time(); for (; now < endT - 0.3; now += 0.05) { h.s->book(now, h.q->time(), h.q->bpm(), true); h.ticks(); } }
   for (int k = 0; k < 40; k++, now += 0.05) { h.s->book(now, h.q->time(), h.q->bpm(), true); h.ticks(); }
   int bad = 0; *checked = 0;
+  if (shiftAt >= 0) {   // a stall skip keeps the clock's PHASE (B7: ticks do not follow the shifted rows), so what is checked is the TEMPO of the ticks: after the skip and before the TPO row's interval ends
+    // (beats 16.5 to 17) they are 60 / 120 / 24 s apart (the interval after the TPO step is still timed at 120), from beat 18 on 60 / 90 / 24 s (the TPO's 90)
+    for (size_t k = 24 * 16 + 10; k + 1 < h.tf.size() && k < 24 * 24; k++) {
+      const double want = k < 24 * 17 - 1 ? 48000.0 * 60 / (liveAt >= 0 ? liveBpm : 120.0) / 24 : k >= 24 * 18 ? 48000.0 * 60 / 90 / 24 : -1; if (want < 0) continue; (*checked)++;
+      if (std::fabs((double)(h.tf[k + 1] - h.tf[k]) - want) > 2) { if (bad++ < 3) std::printf("   tick %zu to %zu: %lld frames apart, %.1f expected\n", k, k + 1, (long long)(h.tf[k + 1] - h.tf[k]), want); } }
+    return bad;
+  }
   for (int j = jFrom; j < jTo && (size_t)j < h.grid.size(); j++) { const size_t k = 24 * (size_t)j; if (k >= h.tf.size()) break; (*checked)++;
     if (std::llabs(h.tf[k] - (int64_t)std::llround(h.grid[(size_t)j] * 48000)) > 1) { if (bad++ < 3) std::printf("   tick of row %d at frame %lld, row at %lld\n", j, (long long)h.tf[k], (long long)std::llround(h.grid[(size_t)j] * 48000)); } }
   return bad;
@@ -320,6 +327,11 @@ static void tempoRows() {
   CHECK(chk >= 12 && bad == 0, "N1: a live tempo change just before a TPO row: ticks on the rows after it (%d checked, %d off)", chk, bad);
   bad = tempoOracle("[55,-1,-1,-1,-1,0,19,75,-1,-1,-1,-1]", 16, 148.9, 10, 26, &chk);
   CHECK(chk >= 12 && bad == 0, "N1: the same after two TPO rows (%d checked, %d off)", chk, bad);
+  // F1 of verify-267: the runner's stall skip (Seq::shift) just before the TPO step moves every later row by 0.2 s; the clock keeps its phase (B7) and must keep the right TEMPO
+  bad = tempoOracle(nullptr, -1, 0, 17, 26, &chk, 16);
+  CHECK(chk >= 100 && bad == 0, "N1: a Seq::shift (stall skip) just before a TPO row: the ticks keep the tempo (%d checked, %d off)", chk, bad);
+  bad = tempoOracle(nullptr, 16, 163.3, 17, 26, &chk, 16);
+  CHECK(chk >= 100 && bad == 0, "N1: a live tempo change AND a shift before the TPO row (%d checked, %d off)", chk, bad);
   bad = tempoOracle(nullptr, 8, 140.0, 4, 26, &chk);   // a live change NOT next to a TPO row: always right (the control)
   CHECK(chk >= 18 && bad == 0, "N1 control: a live change in the middle (%d checked, %d off)", chk, bad);
 }

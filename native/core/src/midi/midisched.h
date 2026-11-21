@@ -164,8 +164,6 @@ class MidiSched {
   uint32_t nidN_ = 0;
   // tempo map (the beat events) and the clock (B2)
   static constexpr int kAnc = 256; Anchor anc_[kAnc]; int nAnc_ = 0;     // oldest first: 256 steps (32 s at 120 bpm, 4 steps a beat) of tempo map
-  double bpmPrev_ = -1;       // the tempo after the previous step (F5)
-  double beatT_ = 0, beatV_ = 0; bool hasBeat_ = false;   // the previous step's time and the sequencer's own beat count at it (N1: the tempo a step started at is read off them)
   bool haveT0_ = false; double t0_ = 0; int spp_ = 0; bool playing_ = false;
   struct Clk { bool on = false; int64_t k = 0; bool hasLast = false; double last = 0; } clk_;
   int64_t lastTickFrame_[kMidiPorts][8]; int lastTickN_[kMidiPorts] = {0, 0, 0, 0};
