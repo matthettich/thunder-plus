@@ -41,11 +41,15 @@ export const LAW_SRC = ['const NT = 32, MT = NT;', coreSrc.match(/^const curve =
   coreSrc.match(/^const clamp = .*$/m)[0], coreSrc.match(/^const int = .*$/m)[0], coreSrc.match(/^function chainsTracks\(\)\{[\s\S]*?\n\}/m)[0], coreSrc.match(/^const chainsFeed = .*$/m)[0],
   coreSrc.match(/^let busPlanH = null;\nlet busPlanVal = null;\nfunction busPlan\(\)\{[\s\S]*?\n\}/m)[0], 'let S = null;', PAGE_SRC].join('\n');
 
+// C1g: which sources makeCore runs. The default is the repository root's old snapshot (this file's own goldens); chains-song-dump.mjs hands it the pinned beta copy (useSources) so the model
+// has beta's busPlan (bus into bus) and audible. Nothing else in this file changes.
+let SRC = null;
+export function useSources(core, page) { SRC = { core, page }; }
 export function makeCore() {
   let Cls = null;
   const ctx = vm.createContext({ console, registerProcessor(n, c) { Cls = c; }, AudioWorkletProcessor: class { constructor() { this.port = { postMessage() {}, onmessage: null }; } },
     sampleRate: SR, currentTime: 0, currentFrame: 0 });
-  vm.runInContext(coreSrc + '\n' + PAGE_SRC + '\n;globalThis.__u09 = { Auto, curve, trackGain, trimGain, audible, busPlan, chainsFeed, chainsTracks, setS(s){ S = s; busPlanH = null; busPlanVal = null; } };', ctx, { filename: 'seq-core.js' });
+  vm.runInContext((SRC ? SRC.core : coreSrc) + '\n' + (SRC ? SRC.page : PAGE_SRC) + '\n;globalThis.__u09 = { Auto, curve, trackGain, trimGain, audible, busPlan, chainsFeed, chainsTracks, setS(s){ S = s; busPlanH = null; busPlanVal = null; } };', ctx, { filename: 'seq-core.js' });
   return { ctx, proc: new Cls(), U: ctx.__u09 };
 }
 
