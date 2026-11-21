@@ -22,6 +22,7 @@
 #include "modfx/mods.h"
 #include "render/render.h"
 #include "render/players.h"
+#include "render/pads_snap.h"
 #include "engine/engine.h"
 #include "engine/layer_pe.h"
 #include "engine/xeng.h"
@@ -537,6 +538,49 @@ static int run_live() {
   if (s.notesLivePlayed < 20 || peak <= 0) return fail("the live song played (almost) nothing");
   if (s.liveFailed || s.liveQueueDropped) return fail("the live pool lost events");
   std::printf("rt_harness: live song: %d live notes played (%u late, %u no node), %.2f s until the pool emptied, peak %d voices, no allocation\n", s.notesLivePlayed, s.liveLate, s.liveNoNode, tail / 48000.0, s.peakVoicesAll);
+  return 0;
+}
+
+// ---- U37 P1: the pads snapshot under the guard ---------------------------------------------------------------------------------------------------------
+// The control side (outside the guard) replaces pads, publishes and collects between quanta. Inside the guard, every quantum: PadsHost::beginQuantum (the scan of the voices' epochs, the adopt of
+// a published snapshot when there is one, Players::setPads, Seq::setChop), then notes on the adopted pads and the voices' render. Nothing may allocate or free; every free is the control side's.
+static int run_pads_snap() {
+  using namespace thunder;
+  std::string text; { std::ifstream f(std::string(THUNDER_ROOT) + "/sounds/ELECTRO.thunder", std::ios::binary); if (!f) return fail("cannot read sounds/ELECTRO.thunder"); std::ostringstream o; o << f.rdbuf(); text = o.str(); }
+  Song song; JsonError je; if (!song.load(text.data(), text.size(), &je)) return fail("ELECTRO does not load");
+  SeqVars vars; SeqOpts so; so.once = true; Seq sq(song, vars, SeqMode::Song, so);
+  PadsHost* host = PadsHost::create(); if (!host) return fail("PadsHost::create");
+  Players pl(nullptr, 48000, 64);
+  const int PN = 8, NS = 12000; std::vector<float> d((size_t)NS);
+  auto setp = [&](int p, int v) { for (int i = 0; i < NS; i++) d[(size_t)i] = (float)std::sin(0.02 * (p + 1) * i) * 0.3f * (1.0f - (float)i / NS) + 0.001f * (float)(v % 7); return host->setPad(p, d.data(), nullptr, NS, 48000); };
+  for (int p = 0; p < PN; p++) if (setp(p, 0) != 0) return fail("setPad");
+  host->chop().setLoop(0, 1.0); if (host->publish() != PadsHost::kOk) return fail("publish");
+  static float store[kVoiceTracks][128]; float* ptr[kVoiceTracks]; for (int i = 0; i < kVoiceTracks; i++) ptr[i] = store[i];
+  uint32_t rng = 99; auto rnd = [&]() { rng = rng * 1664525u + 1013904223u; return (rng >> 8) / 16777216.0; };
+  int adopted = 0, notes = 0, maxVoices = 0; bool finite = true; int64_t frame = 0;
+  for (int q = 0; q < 1500; q++) {
+    if (q % 9 == 0) { if (setp((int)(rnd() * PN), q) != 0) return fail("setPad (loop)"); if (host->publish() == PadsHost::kFull) { host->collect(); } }
+    host->collect();   // control thread: outside the guard
+    const double t0 = (double)frame / 48000;
+    { rt_guard g;
+      if (host->beginQuantum(pl, &sq)) adopted++;
+      pl.setTime(t0, frame);
+      if (q % 2 == 0) { SeqEvent e; e.type = SEV_NOTE; e.track = (int)(rnd() * 8); e.pad = (int)(rnd() * PN); e.ii = 0; e.t = t0 + rnd() * 0.01; e.poly = rnd() < 0.5; e.rate = 1; e.gain = 1; e.pan = 128; e.vel = 1; pl.dispatch(e, sq, song); notes++; }
+      for (int i = 0; i < kVoiceTracks; i++) std::memset(store[i], 0, sizeof store[i]);
+      pl.render(ptr, ptr, 128, t0, frame);
+      for (int i = 0; i < 128; i++) if (!(store[0][i] == store[0][i])) finite = false;
+      if (pl.voices() > maxVoices) maxVoices = pl.voices(); }
+    frame += 128;
+  }
+  { rt_guard g; pl.stopAll((double)frame / 48000); }
+  for (int q = 0; q < 400 && pl.voices() > 0; q++) { const double t0 = (double)frame / 48000; { rt_guard g; host->beginQuantum(pl, &sq); pl.setTime(t0, frame); pl.render(ptr, ptr, 128, t0, frame); } frame += 128; }
+  { rt_guard g; host->beginQuantum(pl, &sq); }
+  host->collect();
+  const bool leak = host->retired() != 0 || host->buffers() != (size_t)PN;
+  const size_t made = host->made(); pl.setPads(nullptr); delete host;
+  if (adopted < 100 || notes < 500 || maxVoices < 2 || !finite) return fail("the pads snapshot run played too little or produced NaN");
+  if (leak) return fail("pads snapshot: a retired buffer was not freed after its voices ended");
+  std::printf("rt_harness: pads snapshot: %d adopts, %d notes, %d voices at most, %zu buffers made, every one freed by the control side, no allocation on the audio side\n", adopted, notes, maxVoices, made);
   return 0;
 }
 
@@ -1254,5 +1298,6 @@ int main(int argc, char** argv) {
   if (int r = run_chains()) return r;
   if (int r = run_live()) return r;
   if (int r = run_live_eng()) return r;
+  if (int r = run_pads_snap()) return r;
   return run_song();
 }

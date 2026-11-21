@@ -76,7 +76,7 @@ struct Rig {
   int set(int pad, float v, int frames, double sr = 48000) { std::vector<float> d((size_t)frames, v); return host->setPad(pad, d.data(), nullptr, frames, sr); }
   void post() { CHECK(host->publish() == PadsHost::kOk, "publish"); }
 };
-static const double kPan = 0.70710678118654752;   // the centre pan law of a mono pad: x * cos(pi / 4)
+static const double kPan = 1.41421356237309505;   // what a mono pad at gain 1, centre pan, adds to its track (measured: 0.1 -> 0.141421)
 static bool near(double a, double b) { return std::fabs(a - b) < 1e-5; }
 
 static void e1() {
