@@ -82,7 +82,78 @@ The sound does not change (the players ignore `ev.st`). See "What a stretch port
 Done first (before any change): the pinned beta's plain, live-clock, edit and chop cases were run against the committed goldens. Result: every golden is bit-identical EXCEPT `seq-edit-bus.json`
 (see "Goldens changed"). The new goldens (lines, sx, the voice stp message) are additions.
 
-## STATUS
-(see the end of this file; updated at each commit)
+## WHAT WAS DONE, per item (the gaps above are closed unless a line says otherwise)
 
-- 20 Nov: gap list written; pin + new golden tool in; the only existing golden that moves is `seq-edit-bus.json`. Nothing built yet for items 1-4.
+### 1. SYNC TO LINES: closed
+- `song.h` / `song.cpp`: `SongInst::lines` (loader = `int(o.lines, 0) > 0 ? clamp(.., 1, 1024) : 0`, index.html:21677). `seq.h` / `seq.cpp`: `PInst::lines` (song instruments and PERFORM parts; a part's value is raw `lines | 0`, as the page's
+  un-normalised part instrument), `Seq::instBeats(I)` = `lines > 0 ? lines / (S.lpb || 4) : beats` and `applyChop` uses it for `target` (REPITCH rate, stretch scale, `ofsSec`, `durSec`, `cut`) and for `ev.stBeats`
+  (now `round(beats * 1e6) / 1e6` as the page, `seq.cpp` applyChop). The song's lpb only: a phrase's lpb (`plpb`) and the LPB command do not enter (tested: golden `chop-lines` has an LPB command and TPO commands).
+- TEMPO for the note: `applyChop`'s `bpm` is the tempo of the row's note (`nb`: a TPO command on the row, else the sequencer's bpm), unchanged; lines turn into beats at the SONG's lpb. (Item 2's envelope conversion uses a different tempo: see there.)
+- The sampler-pitch half of #257: no native code assigns samples to layers, nothing to mirror (a layer keeps the `tune` it was saved with). A future host (U37) that loads a sample into a pad must follow `assignSample` /
+  `smpOwnTune` (index.html:16219): a NEW Sample layer gets `tune = -(voice tune)` clamped +-48; a load over an existing Sample layer keeps that layer's tune, fine and pitch envelope.
+- Tests: goldens `seq-chop-lines.json`, `seq-chop-lines-edit.json` (lines changed / 0 / removed / added while running, a takeOver at each), `seq-chop-parts.json` (part instruments) made by the WEB's own `applyChop`
+  (`seq-golden-web.mjs --chop`), compared row for row, sha256 and counts by `test_seq_chop` (ctest `seq_chop`); hand-computed rules for the loader's and a part's different handling of bad values (`testWebFollow`).
+
+### 2. Envelope times in lines: closed as far as native has a host; the host call is NOT wired (there is no host yet)
+- `engine.h` / `engine_json.cpp`: `EngLayer::{aLines, fLines, aL[4], fL[2]}`, `EngVoice::{gLines, gL[4]}` read from `aU atkL holdL decL relL`, `fU fAtkL fDecL`, `gU gAtkL gHoldL gDecL gRelL` (absent / null = NaN = "use the saved ms").
+  The ms fields stay as saved. New `engine/env_lines.cpp`: `eng_env_lines_fit(V, &hold, bpm, lpb)` = `envLinesFit` (every expression in the JS's order), `eng_layer_rel_ms` / `eng_voice_grel_ms` = `envMs` for the note-off fade (`relOf`).
+- WHICH TEMPO: the web uses the SONG's `S.bpm` and `S.lpb` (`songBpm()` / `songLpb()`, index.html:5119 / :5126), read when the render STARTS (`renderAsync` posts them, :8892), NOT the tempo at a note and NOT a TPO command.
+  Native matches: the function takes the song's bpm and lpb as arguments, the host passes `song.bpm` and `song.lpb` at the moment it starts the pad render (the same two numbers `EngRenderOpts::bpm` already carries for the synced LFOs). Re-rendering
+  when bpm or lpb changes (with the page's 300 ms / 0.5% settling, `lnTempo :8905`) is the host's policy: not in this PR.
+- Where the host calls it: before `eng_render_voice` / `eng_render_bound`: `EngVoice V; eng_voice_from_json(..); double hold = isSyn ? V.len : 0; eng_env_lines_fit(V, &hold, song.bpm, song.lpb); opts.hold = hold;`
+  and `kit[].rel = max(30 ms ..)` from `eng_layer_rel_ms` (the page's `relOf :5013` logic is the host's, not ported). Nothing in `native/` builds pads from JSON today (pads come in as audio through `thunder_render_set_pad`), so no existing call site changed.
+- Tests: `test_envlines` (ctest `envlines`) against `tests/golden/envlines-web.json`, the web's own `envLinesFit` / `envMs` run by `tools/envlines-dump.mjs` over 160 generated voices at 11 (bpm, lpb) pairs
+  (bpm 0 / NaN, lpb 0.2 / 2.6, 40 BPM at 5000 lines = the 64 s clamp, a len pushed to the 300 s cap): every double equal (`memcmp`); plus the audio: a lines voice renders sample for sample as its ms equivalent, an old voice is untouched.
+  `envlines_current` re-runs the dump and compares with the committed file.
+- Known difference: a numeric STRING in `atkL` etc. reads as 0 here (the JS: its number); a file the page never writes.
+
+### 3. Reset track's `stp`: closed (voices); MIDI: nothing to do; pump NOTES FROM: not built
+- `VoicePool::stopTrack`, `sf::SfPool::stopTrack`, `Players::stopTrack(track, t)` = the core's message handler (`seq-core.js:1229`): `at = max(now, t)`, `0 <= track < NT`, `kill(.., 0.004, stop = true)` for every voice of the track, list cleared.
+- The sequencer's STP command (`SEV_STP`) was already right: `VoicePool::stp` and `SfPool::stp` are the JS handler of `seq-core.js:1525` (stop = false, `k <= NT`, `all` = the flag), both reached through `Players::dispatch`. Checked, not changed.
+  It is NOT what reset track sends to the core: the difference is `stop`: a voice booked to start at or after the stop never sounds (the stop-all behaviour).
+- MIDI: the web's reset track does nothing for MIDI either (`moEv` has no `stp`; the comment at index.html:21530 means `pmNotes`, the pump NOTES FROM routing). `MidiSched::onEvent` ignores `SEV_STP` the same way: nothing to add. (`src/midi/` not touched.)
+- Pump NOTES FROM (`pmNotes`, index.html:23289): native `Players` has no such routing yet, so nothing is ended there; recorded for when the pump note path is wired.
+- Tests: `voice` case `stp_msg` (tools/voice-dump.mjs runs the web's ThunderCore `msg({op:'stp'..})` in Node; test_voice compares the sampler pool bit for bit, the hash is in `voice_golden.inc`); `test_stptrack` (ctest `stptrack`)
+  through `Players` for BOTH pools: control vs stopTrack vs STP vs another track vs a bad track, and the note booked 1 ms after the stop (silent after stopTrack, a blip after STP) for the sampler and the SoundFont pool.
+
+### 4. Stretch modes `sx`: parsed and carried, sound unchanged
+- `SongInst::{sx, og, ou, orp, ox, opt}` by `song_sx_load` = `sxLoad` (index.html:23642: sx kept only for (sync 3, sx 1), the OLDSCHOOL values clamped, else defaults); a part's instrument that has `sx` or an OS key is normalised as `normParts` (:22161: sync truncated and
+  clamped 0..3, then `sxLoad`). `SeqEvent::{stSx, stGs, stRp, stX, stPt}` = the JS's `ev.st.{sx, gs, rp, x, pt}` (applyChop :23777); `gs` = `round(osGrainSecs * 1e6) / 1e6`. With SLICES + SMODE + ramp (`orp != 0`) the slices are equal parts, not the hits (:23780).
+- Tests: goldens `seq-chop-sx.json` (OLDSCHOOL on four instruments, a sx on sync 2 that must be inert, line-division grains at a TPO, ramp + SMODE) and `seq-chop-parts.json`, from the web's own `applyChop`, row for row; hand tests for the loader's clamps.
+- WHAT SOUNDS DIFFERENT NATIVELY TODAY for a song with `sx`: everything about the stretch itself, exactly as already for GRANULAR (2) and LOOP (3): `Players::note` (players.cpp:60) plays the pad UNSTRETCHED at `ev.rate`
+  (counted in `notesStretched`), from `ofsSec` for `durSec` (the scaled slice), where the web plays a buffer made by `stretchData` that is exactly BEATS long at the tempo. For OLDSCHOOL that means: the tiny-loop scrub (`gs`, RAMP `rp`, SMOOTH `x`) and
+  the PITCH `pt` are not applied, the note is as long as the pad (cut at `durSec`), not as long as the length asked. A song WITHOUT `sx` is unchanged. Also: the page's LIVE OLDSCHOOL notes take a settled tempo (300 ms wall clock, `stSettled`);
+  the native sequencer always uses the exact tempo (as the page's offline renders do); that matters only while the tempo is being dragged.
+- What a stretch port will need (beta cdd9439, index.html): `loopSecs :23703` (already handed in as `SeqChop`), `stretchData :23729` (classic STRETCH / LOOP, `GRAIN_BEATS :23701`) and `oldschoolData :23684` with `osStarts :23677`, `OS_RAMP_FN :23671`,
+  `OS_DIVS :23670` (output length `max(64, round(beats * 60 / bpm * sr))`; per channel for a stereo pad); the cache key `stKey :23751` (mode, bpm, beats, grain and for sx 1: gs, rp, x, pt); the consumers: the page player `getBuf :23838`, the offline renderers
+  `:25807` / `:25922` / `:26034` (the stem length estimate reads `st.beats * 60 / st.bpm`); natively: `Players::note` would take a stretched `VoiceBuf` from a cache keyed like `stKey` (like `RenderPads::var`), built on the control thread BEFORE the note (it is far too slow
+  for the audio thread: the design wants a Worker + a byte-capped cache, `docs/STRETCH-DESIGN.md` on `beta-stretch-design`), and the render length estimate in `render_api.cpp`. Reference data for it: `tests/fixtures/oldschool-golden-660.json` (a golden recorded from the JS
+  implementation, not independent), `tests/fixtures/stretch-before-659.json` (the classic modes), `tests/stretch-oldschool.test.js` on `beta`. This PR makes the sequencer deliver everything such a port needs in `ev.st` (mode, bpm, beats, grain, sx, gs, rp, x, pt).
+
+### 5. Goldens against the current beta
+Method: the pin (above); first run: the unchanged tools against the committed goldens, then `--update` and `git diff`.
+| golden | result | cause |
+|---|---|---|
+| `tests/golden/seq-electro*.json` (root, read by `seq_dump_current`, `seq_extra`) | identical | none |
+| `seq-electro-live-{time,bpm,shift}.json`, `seq-electro-cmds-live-all.json` | byte-identical | none |
+| `seq-edit-*.json` (24 files) | 23 byte-identical | none |
+| `seq-edit-bus.json` | CHANGED: 216 note events of the track that becomes a bus are dropped from row 32 on (`note` 1823 -> 1607, rows changed 216) | web PR #254's review fix F3 (20 Nov, build 651): `makeSeq` gains `api.rebus()` and the audio-thread core calls it on `load`, `song` and `patch` (`seq-core.js:279`, `:1202-1214`): after a cable edit the notes of a track that became a bus follow the new plan from the next row (before: kept playing until PLAY). Native: the successor Seq of a takeOver keeps ITS busT_ (built from its own song) instead of the old Seq's (`Seq::takeOver`, one memcpy removed) |
+| `seq-chop-{all,rev,edit}.json` | byte-identical | none (the new lines / sx code returns the old values for a song without the new fields) |
+| `voice_golden.inc` | the 22 old hashes identical; ONE ADDED (`stp_msg`) | item 3 |
+| NEW: `seq-chop-lines.json`, `seq-chop-lines-edit.json`, `seq-chop-sx.json`, `seq-chop-parts.json`, `envlines-web.json` | added | items 1, 4, 2 |
+No unexplained change.
+
+## Tests (how to run)
+`cmake -S native -B build -DCMAKE_BUILD_TYPE=Release && cmake --build build -j1 && ctest --test-dir build`. New or changed: `seq_chop` (7 goldens + `testWebFollow`), `seq_takeover` (edit-bus re-recorded), `seq_edit_current` / `seq_chop_current`
+(Node: the pinned web code still gives the committed goldens, live-clock and edit and chop), `voice` / `voice_golden_current` (stp_msg), `envlines` / `envlines_current`, `stptrack`. To move to a newer beta: `git archive origin/beta index.html core | tar -x -C DIR; node native/tools/web-pin.mjs DIR <sha>`,
+then `node native/tools/seq-golden-web.mjs --live-only --edit --chop` (compare), `--update` only after reading the diff, `node native/tools/voice-dump.mjs --golden`, `node native/tools/envlines-dump.mjs`.
+
+## For the lead
+1. The repository root of `native` still carries the OLD web snapshot (`core/seq-core.js`, `index.html`, `tools/seq-golden.mjs`): these tools were not touched (outside `native/` and `docs/port/`). `mix-dump.mjs` (`mix_golden_current`, `busplan`),
+   `song-golden`, `u15-song-dump` and the other `native/tools/*-dump.mjs` still read it. Moving the root snapshot to beta is a decision for you (it is what `BUS-INTO-BUS-NOTES` left open too).
+2. The envelope conversion has no call site: U37 (the host) must call `eng_env_lines_fit` / `eng_layer_rel_ms` with the song's bpm / lpb when it renders a pad, and re-render on a bpm / lpb change (policy of `lnTempo`).
+3. OLDSCHOOL's live settled tempo is not modelled (wall clock); native always uses the exact tempo.
+4. Takeover and buses: the successor's bus set comes from its own song, but `hearT_` (which LFOs are heard) stays the PLAY's (the page's rebus only re-reads busT); the live host needs no extra call for a cable edit (a new snapshot is the call).
+
+## STATUS
+- 21 Nov: items 1-5 built and tested locally (see the full ctest line below when it is in); PR not opened yet.
