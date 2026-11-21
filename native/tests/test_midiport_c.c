@@ -3,9 +3,12 @@
 #include <stddef.h>
 #include <stdio.h>
 #include <string.h>
+#include <math.h>
 
 #include "thunder/midi.h"
 #include "thunder/midiport.h"
+
+static void cpyS(char* d, const char* src) { memcpy(d, src, strlen(src) + 1); }   /* (MSVC warns on strcpy: C4996) */
 
 /* the ABI the header promises (LP64 and any ABI where uint64_t aligns to 8): a change here is a break for every shell */
 typedef char sz_dev[sizeof(thunder_midiout_dev) == 208 ? 1 : -1];
@@ -40,12 +43,12 @@ int main(void) {
   CHECK(thunder_midiout_set_devices(o, NULL, 1) == THUNDER_MIDIOUT_E_ARG, "set_devices(NULL list, n 1)");
   CHECK(thunder_midiout_set_devices(o, NULL, -1) == THUNDER_MIDIOUT_E_ARG && thunder_midiout_set_devices(o, dv, 33) == THUNDER_MIDIOUT_E_ARG, "set_devices(n out of range)");
   CHECK(thunder_midiout_set_devices(o, NULL, 0) == THUNDER_MIDIOUT_OK, "set_devices(NULL, 0) is the empty list");
-  memset(dv, 0, sizeof dv); strcpy(dv[0].id, "n:A"); strcpy(dv[0].name, "A"); dv[0].token = 1; strcpy(dv[1].id, "n:B"); strcpy(dv[1].name, "B"); dv[1].token = 2;
+  memset(dv, 0, sizeof dv); cpyS(dv[0].id, "n:A"); cpyS(dv[0].name, "A"); dv[0].token = 1; cpyS(dv[1].id, "n:B"); cpyS(dv[1].name, "B"); dv[1].token = 2;
   CHECK(thunder_midiout_set_devices(o, dv, 2) == THUNDER_MIDIOUT_OK, "set_devices(2)");
   CHECK(thunder_midiout_assign(NULL, 0, "n:A") == THUNDER_MIDIOUT_E_ARG && thunder_midiout_assign(o, 0, NULL) == THUNDER_MIDIOUT_E_ARG && thunder_midiout_assign(o, 4, "n:A") == THUNDER_MIDIOUT_E_ARG && thunder_midiout_assign(o, -1, "") == THUNDER_MIDIOUT_E_ARG, "assign bad args");
   CHECK(thunder_midiout_assign(o, 0, "n:A") == THUNDER_MIDIOUT_OK, "assign");
   CHECK(thunder_midiout_set_clock(NULL, 0, 1) == THUNDER_MIDIOUT_E_ARG && thunder_midiout_set_clock(o, 4, 1) == THUNDER_MIDIOUT_E_ARG, "set_clock bad args");
-  CHECK(thunder_midiout_set_gear(NULL, 0, 1) == THUNDER_MIDIOUT_E_ARG && thunder_midiout_set_gear(o, 4, 1) == THUNDER_MIDIOUT_E_ARG && thunder_midiout_set_gear(o, 0, 0.0 / 0.0) == THUNDER_MIDIOUT_E_ARG, "set_gear bad args");
+  CHECK(thunder_midiout_set_gear(NULL, 0, 1) == THUNDER_MIDIOUT_E_ARG && thunder_midiout_set_gear(o, 4, 1) == THUNDER_MIDIOUT_E_ARG && thunder_midiout_set_gear(o, 0, (double)NAN) == THUNDER_MIDIOUT_E_ARG, "set_gear bad args");
   CHECK(thunder_midiout_set_playing(NULL, 1) == THUNDER_MIDIOUT_E_ARG, "set_playing(NULL)");
   CHECK(thunder_midiout_set_out_latency(NULL, 0) == THUNDER_MIDIOUT_E_ARG && thunder_midiout_set_out_latency(o, -1) == THUNDER_MIDIOUT_E_ARG && thunder_midiout_set_out_latency(o, 2000000001LL) == THUNDER_MIDIOUT_E_ARG, "set_out_latency bad args");
   CHECK(thunder_midiout_set_out_latency(o, 2000000000LL) == THUNDER_MIDIOUT_OK, "set_out_latency(2 s)");
