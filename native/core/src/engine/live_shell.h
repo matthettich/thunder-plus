@@ -90,19 +90,20 @@ class LiveShell {
   // LIVE ROUTE (C1). reset(): everything as a fresh shell's (the core reset with its parameters kept, the rate lane, the queue, the clocks at 0, the counters, the rings silent). seek(clock): the shell's clock (and
   // the core's position) is `clock` from now: the queue is dropped, the first latency() samples after it are silence. A bind to a note is reset() + seek(). Neither allocates.
   void reset() {
-    core_.reset(); lane_ = LiveRateLane(); clock_ = 0; rendered_ = 0; origin_ = 0; failed_ = false; dropped_ = 0; rejected_ = 0; forced_ = 0; head_ = 0; cnt_ = 0;
+    core_.reset(); lane_ = LiveRateLane(); clock_ = 0; rendered_ = 0; origin_ = 0; lastLive_ = 0; failed_ = false; dropped_ = 0; rejected_ = 0; forced_ = 0; head_ = 0; cnt_ = 0;
     std::memset(ringL_, 0, sizeof ringL_); std::memset(ringR_, 0, sizeof ringR_); std::memset(stgL_, 0, sizeof stgL_); std::memset(stgR_, 0, sizeof stgR_);
   }
-  void seek(uint64_t clock) { clock_ = clock; rendered_ = clock; origin_ = clock; head_ = 0; cnt_ = 0; }
+  void seek(uint64_t clock) { clock_ = clock; rendered_ = clock; origin_ = clock; lastLive_ = clock; head_ = 0; cnt_ = 0; }
   uint64_t clock() const { return clock_; }
   // LIVE ROUTE 1b, the idle skip. idle(): nothing queued and the core would only render silence (every further control block changes nothing but what the core's idleBlocks() advances). fastForward(H): the shell as process() would leave it
   // after running with no events up to the host clock H: the whole control blocks that end by H are done without rendering them (the core's idleBlocks at the rate lane's value), the rings hold silence, the clock is H. Needs the rate lane constant from here on.
-  bool idle() const { return cnt_ == 0 && (failed_ || A::idle(core_)); }
+  // (and the host has been handed everything the core rendered while it was not idle: the shell runs latency() samples ahead, the ring still holds that tail until the clock is latency() past the last non-idle block)
+  bool idle() const { return cnt_ == 0 && (failed_ || A::idle(core_)) && clock_ >= lastLive_ + latency(); }
   void fastForward(uint64_t H) {
     if (H <= clock_) return;
     const uint64_t nb = H > rendered_ ? (H - rendered_) / kBlk : 0;
     if (nb) {
-      if (!failed_) A::idleBlocks(core_, nb, feed_ ? clampRate(feed_->at((double)rendered_ / feedSr_)) : lane_.at((double)rendered_));
+      if (!failed_) A::idleBlocks(core_, nb, rateAt(rendered_));
       const uint64_t last = rendered_ + nb * kBlk, cnt = nb * kBlk < kRing ? nb * kBlk : kRing;
       for (uint64_t i = 0; i < cnt; i++) { ringL_[(last - 1 - i) & (kRing - 1)] = 0.0f; ringR_[(last - 1 - i) & (kRing - 1)] = 0.0f; }
       rendered_ = last;
@@ -110,7 +111,8 @@ class LiveShell {
     clock_ = H;
   }
   // LIVE ROUTE (P5): the rate lane from an automation list in SECONDS (the pool's, with the sampler's folding) instead of RateSet / RateRamp events: each control block reads it at its first sample, s / sr. Null: the shell's own lane.
-  void setRateFeed(const Auto* a, double sr) { feed_ = a; feedSr_ = sr; }
+  // before1: the time (seconds) of the lane's first event ever (null: none known). The page's `rate` AudioParam is 1 until its first event, the core's list (and so the pool's) starts at 0: a control block that starts before it reads 1.
+  void setRateFeed(const Auto* a, double sr, const double* before1 = nullptr) { feed_ = a; feedSr_ = sr; first_ = before1; }
   // LIVE ROUTE 1b: the twelve engine-target lanes (seconds), read at each control block's first sample like the rate; null / !on: no targets (nothing runs)
   void setEngFeed(const EngFeed* f) { eng_ = f; }
 
@@ -183,10 +185,12 @@ class LiveShell {
       rendered_ = end;
     }
   }
+  double rateAt(uint64_t s) const { if (!feed_) return lane_.at((double)s); const double t = (double)s / feedSr_; return first_ && t < *first_ ? 1.0 : clampRate(feed_->at(t)); }
   void block(uint64_t s, uint64_t e) {
     const uint32_t n = (uint32_t)(e - s);
     if (!failed_) {
-      const double rt = feed_ ? clampRate(feed_->at((double)s / feedSr_)) : lane_.at((double)s);
+      if (!A::idle(core_)) lastLive_ = e;   // (this block may produce sound: the tail it leaves in the ring reaches the host latency() samples later)
+      const double rt = rateAt(s);
       if (eng_ && eng_->on) {   // the page's engOn / engOff around the control block
         double v[12], sv[7]; engRead(*eng_, (double)s / feedSr_, v); const bool sw = A::engIn(core_, v, sv);
         core_.render(stgL_, stgR_, kBlk, 0, (double)n, rt);
@@ -196,8 +200,8 @@ class LiveShell {
     }
     for (uint32_t i = 0; i < n; i++) { ringL_[(s + i) & (kRing - 1)] = failed_ ? 0.0f : stgL_[i]; ringR_[(s + i) & (kRing - 1)] = failed_ ? 0.0f : stgR_[i]; }
   }
-  typename A::Core core_; LiveRateLane lane_; const Auto* feed_ = nullptr; const EngFeed* eng_ = nullptr; double feedSr_ = 48000;
-  uint64_t clock_ = 0, rendered_ = 0, origin_ = 0; bool failed_ = false; uint32_t dropped_ = 0, rejected_ = 0, forced_ = 0;
+  typename A::Core core_; LiveRateLane lane_; const Auto* feed_ = nullptr; const double* first_ = nullptr; const EngFeed* eng_ = nullptr; double feedSr_ = 48000;
+  uint64_t clock_ = 0, rendered_ = 0, origin_ = 0, lastLive_ = 0; bool failed_ = false; uint32_t dropped_ = 0, rejected_ = 0, forced_ = 0;
   Pend pend_[kPend]; uint32_t head_ = 0, cnt_ = 0;
   float ringL_[kRing], ringR_[kRing], stgL_[kBlk], stgR_[kBlk];
 };

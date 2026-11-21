@@ -50,7 +50,7 @@ class LiveEng {   // one engine as the pool uses it (a LiveShell of one of the f
   virtual uint64_t clock() const = 0;
   virtual uint32_t latency() const = 0;
   virtual bool failed() const = 0;
-  virtual void setRateFeed(const Auto* a, double sr) = 0;
+  virtual void setRateFeed(const Auto* a, double sr, const double* before1) = 0;
   virtual void setEngFeed(const EngFeed* f) = 0;
   virtual size_t bytes() const = 0;
   virtual uint32_t shellDropped() const = 0;   // events the shell's own queue dropped or refused (LiveShell::dropped / rejected)
@@ -124,6 +124,7 @@ class LivePool {
     std::unique_ptr<LiveEng> eng;
     TEv tl[kTimeline]; int ntl = 0;
     AutoN<kAutoRate> rate{0}; AutoN<kAutoGP> g{1}, pn{0};
+    double rateT0 = 1e300;              // the time of the rate lane's first event ever (before it the page's AudioParam reads its default, 1)
     int j = 0;                          // 0: the mono node; 1 .. 4: a polyVox node
     double lastOn = -1; bool curLive = false, curStop = false; double stopAt = 0; int curCol = 0;
     double sylN = 0;                    // the mono node's syllable counter (the JS's L.sylN)

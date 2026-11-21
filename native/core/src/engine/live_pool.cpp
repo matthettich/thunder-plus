@@ -21,7 +21,7 @@ class LiveEngT final : public LiveEng {
   uint64_t clock() const override { return sh_.clock(); }
   uint32_t latency() const override { return SH::latency(); }
   bool failed() const override { return sh_.failed(); }
-  void setRateFeed(const Auto* a, double sr) override { sh_.setRateFeed(a, sr); }
+  void setRateFeed(const Auto* a, double sr, const double* before1) override { sh_.setRateFeed(a, sr, before1); }
   void setEngFeed(const EngFeed* f) override { sh_.setEngFeed(f); }
   size_t bytes() const override { return sizeof(*this); }
   uint32_t shellDropped() const override { return sh_.dropped(); }
@@ -53,7 +53,7 @@ bool LivePool::addPad(int pad, const LivePadConfig& cfg) {
     }
     if (!ok) return nullptr;
     n->engL.reset(new Node::EngLanes()); for (int i = 0; i < 12; i++) n->feed.a[i] = &n->engL->a[i];
-    n->eng->setRateFeed(&n->rate, sr_); n->eng->setEngFeed(&n->feed);
+    n->eng->setRateFeed(&n->rate, sr_, &n->rateT0); n->eng->setEngFeed(&n->feed);
     fresh.bytes += sizeof(Node) + sizeof(Node::EngLanes) + n->eng->bytes();
     Node* raw = n.get(); fresh.nodes.push_back(std::move(n)); return raw;
   };
@@ -178,6 +178,7 @@ void LivePool::startNote(Node& n, const SeqEvent& e, double bpm, const double* a
   cancelFrom(n, T);                                                    // gate, trig, leg
   // the rate: hold, then the slide or the step (the list is folded like the sampler's rather than a point dropped: P5)
   if (n.rate.size() + 3 > n.rate.capacity()) { n.rate.prune(now_); if (n.rate.size() + 3 > n.rate.capacity()) { n.rate.prune(t); n.rate.cancel(t); } }
+  n.rateT0 = std::min(n.rateT0, t);
   holdRamp(n.rate, t);   // D7: the page's cancelAndHoldAtTime
   if (leg) { n.rate.set(e.slideFrom, t); n.rate.lin(e.rate, t + e.slideDur); } else n.rate.set(e.rate, t);
   if (n.kind == LiveKind::Bass && std::isfinite(bpm) && bpm != n.lastBpm) { bookCtl(n, LiveEvType::Bpm, t, bpm); n.lastBpm = bpm; }   // P4: the bpm lane follows the tempo (SEV_TEMPO comes after its step's notes, never before the first)
@@ -220,6 +221,7 @@ void LivePool::bookCtl(Node& n, LiveEvType type, double t, double v) {
 
 // pitchMods (core-processor.js :525-545) on the node's rate lane. An ARP row books arpN + 1 points: the list is folded before it would overflow, and only if that is not enough the new arpeggio replaces what is booked from its first step on (P5; as the sampler's).
 void LivePool::pitchMods(Node& n, double t, double base, const SeqEvent& e, const double* arp) {
+  n.rateT0 = std::min(n.rateT0, t);
   AutoN<kAutoRate>& pr = n.rate;
   if (e.has & SH_ARP) {
     if (pr.size() + e.arpN + 1 > pr.capacity()) {
@@ -246,7 +248,7 @@ void LivePool::modVoice(Node& n, const SeqEvent& e, const double* arp) {
   wake(n);
   if (e.has & SH_GAIN) { if (n.g.size() + 2 > n.g.capacity()) n.g.prune(now_); n.g.set(e.gain, e.t); }
   if (e.has & SH_PAN) { if (n.pn.size() + 2 > n.pn.capacity()) n.pn.prune(now_); n.pn.set(std::max(-1.0, std::min(1.0, (e.pan - 128) / 127)), e.t); }
-  if (e.has & SH_MUL) { n.vrate = n.base * e.mul; if (n.rate.size() + 2 > n.rate.capacity()) n.rate.prune(now_); n.rate.set(n.vrate, e.t); }
+  if (e.has & SH_MUL) { n.rateT0 = std::min(n.rateT0, e.t); n.vrate = n.base * e.mul; if (n.rate.size() + 2 > n.rate.capacity()) n.rate.prune(now_); n.rate.set(n.vrate, e.t); }
   pitchMods(n, e.t, n.vrate, e, arp);
   if (e.has & SH_CUT) kill(n, e.cut);
   if (e.has & SH_REL) kill(n, e.rel);
