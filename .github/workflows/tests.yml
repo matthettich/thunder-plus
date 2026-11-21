@@ -1,0 +1,33 @@
+# TESTS: every push to beta and every pull request runs the Node tests and the sequencer goldens.
+# The sequencer goldens need a browser (headless Chrome), so `npm test` alone does not run them: three of them were
+# stale for two days in Nov 2026 without anyone noticing. The runner image ships Google Chrome; playwright is only the driver.
+name: Tests
+on:
+  push:
+    branches: [beta]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: acorn (some tests cut functions out of index.html with it; they skip without it)
+        run: npm i --no-save --no-audit --no-fund acorn@8 acorn-walk@8
+      - name: Node tests (npm test)
+        run: npm test
+      - name: Playwright driver (no browser download; the image has Chrome)
+        run: PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 npm i --no-save --no-audit --no-fund playwright@1.56.1
+      - name: Sequencer goldens (page sequencer)
+        run: PLAYWRIGHT="$PWD/node_modules/playwright/index.mjs" node tools/seq-golden.mjs
+      - name: Sequencer goldens (audio-thread core)
+        run: PLAYWRIGHT="$PWD/node_modules/playwright/index.mjs" node tools/seq-golden.mjs --core

@@ -1,0 +1,1748 @@
+[
+ {
+  "id": "T001",
+  "file": "index.html",
+  "old": "'No room for it: the song needs six free sects and up to sixteen free phrases.'",
+  "new": "'No room: needs six free sects and up to sixteen free phrases.'"
+ },
+ {
+  "id": "T009",
+  "file": "index.html",
+  "old": "'REC writes notes into a phrase: open one (or press PLAY to record as the song plays).'",
+  "new": "'REC needs a phrase: open one, or press PLAY to record as it plays'"
+ },
+ {
+  "id": "T011",
+  "file": "index.html",
+  "old": "'REC: put the cursor on the track to record into.'",
+  "new": "'REC: put the cursor on a track'"
+ },
+ {
+  "id": "T023",
+  "file": "index.html",
+  "old": "'No free sects left.'",
+  "new": "'No free sects left'"
+ },
+ {
+  "id": "T024",
+  "file": "index.html",
+  "old": "'No free phrases left.'",
+  "new": "'No free phrases left'"
+ },
+ {
+  "id": "T058",
+  "file": "index.html",
+  "old": "'The song is full: its last row has blocks, so nothing can move down.'",
+  "new": "'Song full: its last row has blocks, so nothing can move down'"
+ },
+ {
+  "id": "T062",
+  "file": "index.html",
+  "old": "'That’s the last row: there is no row below it.'",
+  "new": "'Last row: nothing below it'"
+ },
+ {
+  "id": "T087",
+  "file": "index.html",
+  "old": "'Selecting works in Song, Sect and Phrase.'",
+  "new": "'Selecting works in Song, Sect and Phrase'"
+ },
+ {
+  "id": "T108",
+  "file": "index.html",
+  "old": "'LOOP SEL is on but nothing to loop: select 2 or more rows first.'",
+  "new": "'LOOP SEL is on: select 2 or more rows to loop'"
+ },
+ {
+  "id": "T117",
+  "file": "index.html",
+  "old": "'The master column stays the master column.'",
+  "new": "'The master column can’t change tracks'"
+ },
+ {
+  "id": "T139",
+  "file": "index.html",
+  "old": "'Insert row works on the Song, Sect and Phrase screens.'",
+  "new": "'Insert row works on the Song, Sect and Phrase screens'"
+ },
+ {
+  "id": "T185",
+  "file": "index.html",
+  "old": "'Move to a row first.'",
+  "new": "'Move to a row first'"
+ },
+ {
+  "id": "T193",
+  "file": "index.html",
+  "old": "'Open a phrase first: Euclidean fill writes notes into it.'",
+  "new": "'Open a phrase first: Euclidean fill writes notes into it'"
+ },
+ {
+  "id": "T197",
+  "file": "index.html",
+  "old": "'Open a phrase first: Mutate makes a variation of it.'",
+  "new": "'Open a phrase first: Mutate makes a variation of it'"
+ },
+ {
+  "id": "T198",
+  "file": "index.html",
+  "old": "'This phrase is empty: there is nothing to vary yet (try Acid line or Drum pattern).'",
+  "new": "'Empty phrase: nothing to vary yet (try Acid line or Drum pattern)'"
+ },
+ {
+  "id": "T202",
+  "file": "index.html",
+  "old": "'Open the Song or a phrase first: Drum pattern writes on the song row under the cursor.'",
+  "new": "'Open the Song or a phrase first: Drum pattern writes at the cursor’s song row'"
+ },
+ {
+  "id": "T216",
+  "file": "index.html",
+  "old": "'Open a phrase first: Acid line writes a bass line into it.'",
+  "new": "'Open a phrase first: Acid line writes a bass line into it'"
+ },
+ {
+  "id": "T219",
+  "file": "index.html",
+  "old": "'The phrase changed: close Acid line and open it again.'",
+  "new": "'The phrase changed: close Acid line and open it again'"
+ },
+ {
+  "id": "T221",
+  "file": "index.html",
+  "old": "'Back to the phrase as it was.'",
+  "new": "'Back to the phrase as it was'"
+ },
+ {
+  "id": "T223",
+  "file": "index.html",
+  "old": "'Those are the same instrument.'",
+  "new": "'Pick two different instruments'"
+ },
+ {
+  "id": "T227",
+  "file": "index.html",
+  "old": "'Interpolate: select at least three rows. The first and last rows hold the start and end values.'",
+  "new": "'Interpolate: select 3 or more rows (first and last hold the start and end values)'"
+ },
+ {
+  "id": "T258",
+  "file": "index.html",
+  "old": "'Pick an effect in the column to the left first.'",
+  "new": "'Pick an effect in the column to the left first'"
+ },
+ {
+  "id": "T263",
+  "file": "index.html",
+  "old": "'Every instrument is in use: free one up, or set OUTPUT to MIDI on one you have.'",
+  "new": "'All instruments in use: free one, or set OUTPUT to MIDI on one'"
+ },
+ {
+  "id": "T298",
+  "file": "index.html",
+  "old": "'Auto master on.'",
+  "new": "'Auto master on'"
+ },
+ {
+  "id": "T299",
+  "file": "index.html",
+  "old": "'Solo cleared: every track plays.'",
+  "new": "'Solo cleared: every track plays'"
+ },
+ {
+  "id": "T313",
+  "file": "index.html",
+  "old": "'No pump mastering on the master: add pEQ, pCOMP or pMSTR in its FX slots.'",
+  "new": "'No pump mastering on the master: add pEQ, pCOMP or pMSTR in its FX slots'"
+ },
+ {
+  "id": "T315",
+  "file": "index.html",
+  "old": "'An effect couldn’t start, so its track plays without it. Reload the app to bring it back.'",
+  "new": "'An effect couldn’t start: its track plays without it. Reload to restore it'"
+ },
+ {
+  "id": "T325",
+  "file": "index.html",
+  "old": "'My presets couldn’t be saved on this device (storage full?): the preset is in the song.'",
+  "new": "'Couldn’t save My presets (storage full?). The preset is in the song'"
+ },
+ {
+  "id": "T329",
+  "file": "index.html",
+  "old": "'pump MASTER is listening. Play the song or its loudest part. FINISH LEARN or stopping the song ends it.'",
+  "new": "'pump MASTER is listening: play the song or its loudest part. FINISH LEARN or stop to end'"
+ },
+ {
+  "id": "T343",
+  "file": "index.html",
+  "old": "'No pump mastering on the master: add pMSTR in its FX slots (Mixer → MASTER → FX).'",
+  "new": "'No pump mastering on the master: add pMSTR in its FX slots (Mixer → MASTER → FX)'"
+ },
+ {
+  "id": "T346",
+  "file": "index.html",
+  "old": "'This song now masters with pump: EQ → CALM → COMP → TONE → MASTER'",
+  "new": "'Mastering with pump: EQ → CALM → COMP → TONE → MASTER'"
+ },
+ {
+  "id": "T365",
+  "file": "index.html",
+  "old": "'Could not work out where the tracks go.'",
+  "new": "'Couldn’t place the tracks'"
+ },
+ {
+  "id": "T372",
+  "file": "index.html",
+  "old": "'Reload point set: RELOAD brings the song back to how it is now (the kit stays as it is).'",
+  "new": "'Reload point set. RELOAD returns the song to this state (the kit stays).'"
+ },
+ {
+  "id": "T374",
+  "file": "index.html",
+  "old": "'Reloaded: the song is back at the reload point (Undo takes it back).'",
+  "new": "'Reloaded: the song is back at the reload point · Undo brings it back'"
+ },
+ {
+  "id": "T382",
+  "file": "index.html",
+  "old": "'A kit slot per track is on (Settings → Kit): the kit has a slot for every track. Turn it off to set SLOTS.'",
+  "new": "'SLOTS is locked: a kit slot per track is on (Settings → Kit)'"
+ },
+ {
+  "id": "T385",
+  "file": "index.html",
+  "old": "'A kit slot per track is on (Settings → Kit): mono tracks get drums, poly tracks synths.'",
+  "new": "'THIS SLOT follows the track: mono = drum, poly = synth'"
+ },
+ {
+  "id": "T392",
+  "file": "index.html",
+  "old": "'That isn’t an LXR kit file (a .snd from the kit folder).'",
+  "new": "'Not an LXR kit (.snd)'"
+ },
+ {
+  "id": "T409",
+  "file": "index.html",
+  "old": "'A kit slot per track allows up to 24 tracks: the song has 24 now (tracks 25–32 are kept, not played).'",
+  "new": "'24 tracks max with a kit slot per track. Tracks 25–32 are kept, not played.'"
+ },
+ {
+  "id": "T411",
+  "file": "index.html",
+  "old": "'Factory drums on pads 1–8. The synth slots stay as they are; Undo puts the kit back.'",
+  "new": "'Factory drums on pads 1–8. Synth slots stay. Undo brings it back'"
+ },
+ {
+  "id": "T416",
+  "file": "index.html",
+  "old": "'Couldn’t read that audio file.'",
+  "new": "'Couldn’t read that audio file'"
+ },
+ {
+  "id": "T417",
+  "file": "index.html",
+  "old": "'This sample is too big for the browser’s storage: RECENT will only have it until the app closes.'",
+  "new": "'Sample too big to store: RECENT keeps it only until the app closes.'"
+ },
+ {
+  "id": "T418",
+  "file": "index.html",
+  "old": "'Couldn’t open that folder.'",
+  "new": "'Couldn’t open that folder'"
+ },
+ {
+  "id": "T424",
+  "file": "index.html",
+  "old": "'This browser can’t record audio.'",
+  "new": "'This browser can’t record audio'"
+ },
+ {
+  "id": "T426",
+  "file": "index.html",
+  "old": "'The audio input went away.'",
+  "new": "'Audio input lost'"
+ },
+ {
+  "id": "T427",
+  "file": "index.html",
+  "old": "'Couldn’t start recording here.'",
+  "new": "'Couldn’t start recording'"
+ },
+ {
+  "id": "T429",
+  "file": "index.html",
+  "old": "'Recording to the end of this pattern, then stopping. Stop again to stop now.'",
+  "new": "'Recording to the pattern’s end, then stopping. Stop again to stop now'"
+ },
+ {
+  "id": "T431",
+  "file": "index.html",
+  "old": "'The take is silent. Check that the right input is picked and turned up.'",
+  "new": "'Take is silent: check the input is picked and turned up'"
+ },
+ {
+  "id": "T438",
+  "file": "index.html",
+  "old": "'Native input not available (no input device found): using the browser’s input.'",
+  "new": "'No native input found: using the browser’s input'"
+ },
+ {
+  "id": "T450",
+  "file": "index.html",
+  "old": "'The input fell behind for a moment: that part of the take is silent.'",
+  "new": "'Input fell behind: that part of the take is silent'"
+ },
+ {
+  "id": "T465",
+  "file": "index.html",
+  "old": "'Layer presets are for the Layers engine.'",
+  "new": "'Layer presets need the Layers engine'"
+ },
+ {
+  "id": "T471",
+  "file": "index.html",
+  "old": "'No song presets yet: pick “＋ Save this as a preset…” in a pad’s Presets list.'",
+  "new": "'No song presets. Use “＋ Save this as a preset…” in a pad’s Presets list.'"
+ },
+ {
+  "id": "T472",
+  "file": "index.html",
+  "old": "'That isn’t a Thunder presets file.'",
+  "new": "'Not a Thunder presets file'"
+ },
+ {
+  "id": "T476",
+  "file": "index.html",
+  "old": "'SoundFont presets have no preview. Put one on a pad, then tap the pad to hear it.'",
+  "new": "'SoundFont presets can’t preview. Put one on a pad and play it.'"
+ },
+ {
+  "id": "T477",
+  "file": "index.html",
+  "old": "'Couldn’t preview that preset.'",
+  "new": "'Couldn’t preview that preset'"
+ },
+ {
+  "id": "T482",
+  "file": "index.html",
+  "old": "'That isn’t a SoundFont (.sf2 or .sf3) file.'",
+  "new": "'Not a SoundFont (.sf2 or .sf3)'"
+ },
+ {
+  "id": "T496",
+  "file": "index.html",
+  "old": "'That file couldn’t be read as audio.'",
+  "new": "'Couldn’t read that file as audio'"
+ },
+ {
+  "id": "T498",
+  "file": "index.html",
+  "old": "'That file is silent, so there’s no wavetable to make.'",
+  "new": "'Silent file: no wavetable to make'"
+ },
+ {
+  "id": "T509",
+  "file": "index.html",
+  "old": "'waves live plays the song’s waves patch: a starter patch is in (Waves at the top edits it).'",
+  "new": "'Starter waves patch added. Edit it under Waves.'"
+ },
+ {
+  "id": "T522",
+  "file": "waves/index.html",
+  "old": "'Cable removed (Undo brings it back).'",
+  "new": "'Cable removed'"
+ },
+ {
+  "id": "T523",
+  "file": "waves/index.html",
+  "old": "'Cable removed.'",
+  "new": "'Cable removed'"
+ },
+ {
+  "id": "T528",
+  "file": "waves/index.html",
+  "old": "'Two cables now feed this input: they add together (Undo takes the new one off). Drag the old one off to replace it.'",
+  "new": "'Two cables feed this input and add together. Undo removes the new one; drag the old one off to replace it.'"
+ },
+ {
+  "id": "T534",
+  "file": "waves/index.html",
+  "old": "'Squared up.'",
+  "new": "'Cable squared up'"
+ },
+ {
+  "id": "T567",
+  "file": "index.html",
+  "old": "'That file isn’t a chains patch.'",
+  "new": "'Not a chains patch'"
+ },
+ {
+  "id": "T592",
+  "file": "chains/index.html",
+  "old": "'Cable removed (Undo brings it back).'",
+  "new": "'Cable removed'"
+ },
+ {
+  "id": "T593",
+  "file": "chains/index.html",
+  "old": "'Cable removed.'",
+  "new": "'Cable removed'"
+ },
+ {
+  "id": "T599",
+  "file": "chains/index.html",
+  "old": "'Two cables now feed this input: they add together (Undo takes the new one off). Drag the old one off to replace it.'",
+  "new": "'Two cables feed this input and add together. Undo removes the new one; drag the old one off to replace it.'"
+ },
+ {
+  "id": "T605",
+  "file": "chains/index.html",
+  "old": "'Squared up.'",
+  "new": "'Cable squared up'"
+ },
+ {
+  "id": "T628",
+  "file": "chains/index.html",
+  "old": "'No custom modules yet.'",
+  "new": "'No custom modules yet'"
+ },
+ {
+  "id": "T637",
+  "file": "index.html",
+  "old": "'This file isn’t a Thunder kit.'",
+  "new": "'Not a Thunder kit'"
+ },
+ {
+  "id": "T640",
+  "file": "index.html",
+  "old": "'Storage is full: the kit was saved without its samples. Export a kit or project file to keep them.'",
+  "new": "'Storage full: kit saved without its samples. Export a kit or project file to keep them.'"
+ },
+ {
+  "id": "T644",
+  "file": "index.html",
+  "old": "'Saving files isn’t available in this view.'",
+  "new": "'Can’t save files in this view'"
+ },
+ {
+  "id": "T648",
+  "file": "index.html",
+  "old": "'Sharing didn’t work here. Use Save instead.'",
+  "new": "'Sharing didn’t work here. Use Save instead'"
+ },
+ {
+  "id": "T666",
+  "file": "index.html",
+  "old": "'Every track with notes is muted.'",
+  "new": "'Nothing to render: every track with notes is muted'"
+ },
+ {
+  "id": "T670",
+  "file": "index.html",
+  "old": "'The master phrase holds commands only: render song rows instead (select them in Arrange).'",
+  "new": "'Master phrase holds commands only: select song rows in Arrange to render'"
+ },
+ {
+  "id": "T673",
+  "file": "index.html",
+  "old": "'Every track there is muted (or another one is soloed).'",
+  "new": "'Every track there is muted (or another is soloed)'"
+ },
+ {
+  "id": "T680",
+  "file": "index.html",
+  "old": "'The render is silent. Check whether those tracks are muted or their instruments are empty.'",
+  "new": "'Render is silent: check for muted tracks or empty instruments'"
+ },
+ {
+  "id": "T684",
+  "file": "index.html",
+  "old": "'Render something first.'",
+  "new": "'Nothing rendered yet'"
+ },
+ {
+  "id": "T685",
+  "file": "index.html",
+  "old": "'Sharing didn’t work here. The render was saved to your downloads.'",
+  "new": "'Couldn’t share the render. It was saved to Downloads instead.'"
+ },
+ {
+  "id": "T686",
+  "file": "index.html",
+  "old": "'Sharing didn’t work here, so the project was saved to your downloads instead.'",
+  "new": "'Couldn’t share the project. It was saved to Downloads instead.'"
+ },
+ {
+  "id": "T689",
+  "file": "index.html",
+  "old": "'Saved as the default project: New project starts from it.'",
+  "new": "'Saved as default: New project starts from it'"
+ },
+ {
+  "id": "T702",
+  "file": "index.html",
+  "old": "'This file isn’t a Thunder project.'",
+  "new": "'Not a Thunder project'"
+ },
+ {
+  "id": "T703",
+  "file": "index.html",
+  "old": "`Saved by a newer version of Thunder Plus. Some things may not play as they should. Update the app.`",
+  "new": "`Saved by a newer Thunder Plus: some things may not play right. Update the app`"
+ },
+ {
+  "id": "T730",
+  "file": "index.html",
+  "old": "'Kept this song and kit. To bring Thunder’s saved work over later, use File → Open Thunder’s saved work.'",
+  "new": "'Kept this song and kit. To bring Thunder’s saved work over later: File → Open Thunder’s saved work'"
+ },
+ {
+  "id": "T735",
+  "file": "index.html",
+  "old": "'That shared project couldn’t be read. Share it again, or save it and use File ▾ → LOAD PROJECT.'",
+  "new": "'Couldn’t read that shared project. Share it again, or save it and use File ▾ → LOAD PROJECT'"
+ },
+ {
+  "id": "T758",
+  "file": "index.html",
+  "old": "'Learning: tap a pad and hit a note, or touch a slider and turn a knob.'",
+  "new": "'Learn: tap a pad and hit a note, or touch a slider and turn a knob'"
+ },
+ {
+  "id": "T764",
+  "file": "index.html",
+  "old": "'Pads reset to notes 36–43; knobs forgotten.'",
+  "new": "'MIDI mapping reset'"
+ },
+ {
+  "id": "T776",
+  "file": "index.html",
+  "old": "'Couldn’t save the project here (storage is full), so the app was not reloaded. Save the project to a file first (File ▾ › Save).'",
+  "new": "'Couldn’t save the project (storage full), so no reload. Save it to a file first (File ▾ › Save).'"
+ },
+ {
+  "id": "T778",
+  "file": "index.html",
+  "old": "'Worklets are off for testing (Settings › Audio), so track effects and chains are silent.'",
+  "new": "'Worklets are off (Settings › Audio): track effects and chains are silent'"
+ },
+ {
+  "id": "T784",
+  "file": "index.html",
+  "old": "'The audio-thread sequencer didn’t load on this device, so playback is using the Page sequencer.'",
+  "new": "'Audio-thread sequencer didn’t load: playback uses the Page sequencer'"
+ },
+ {
+  "id": "T788",
+  "file": "index.html",
+  "old": "'The audio-thread sequencer here is out of date. Reload the app to use it. Until then, playback uses the Page sequencer.'",
+  "new": "'Audio-thread sequencer is out of date: reload to use it (playback uses the Page sequencer until then)'"
+ },
+ {
+  "id": "T790",
+  "file": "index.html",
+  "old": "'Background play off: with the screen off, playback will break up. For testing only.'",
+  "new": "'Background play off: playback breaks up with the screen off. Testing only'"
+ },
+ {
+  "id": "T822",
+  "file": "index.html",
+  "old": "'Reloaded to restart the audio engine. Your song is back; audio starts at your first PLAY or pad.'",
+  "new": "'Reloaded to restart audio. Your song is back; audio starts at your first PLAY or pad'"
+ },
+ {
+  "id": "T828",
+  "file": "index.html",
+  "old": "'Thunder Plus is open in another tab too. The last tab to save wins, so use just one tab.'",
+  "new": "'Thunder Plus is open in another tab: the last tab to save wins, so use one'"
+ },
+ {
+  "id": "T010",
+  "file": "index.html",
+  "old": "`REC: track ${d2(cTrack + 1)} is a bus: FX commands only.`",
+  "new": "`Can’t record on track ${d2(cTrack + 1)}: it’s a bus (FX commands only)`"
+ },
+ {
+  "id": "T012",
+  "file": "index.html",
+  "old": "has no phrase here to record into: put a block on the song first.`",
+  "new": "has no phrase here: add a block first`"
+ },
+ {
+  "id": "T017",
+  "file": "index.html",
+  "old": "FX commands only, no notes (right-click → Make it a normal track).`",
+  "new": "FX commands only (right-click → Make it a normal track)`"
+ },
+ {
+  "id": "T022",
+  "file": "index.html",
+  "old": "busNote = `track ${d2(t + 1)} is a ${busOf(t)}: FX commands only, no notes`",
+  "new": "busNote = `Track ${d2(t + 1)} is a ${busOf(t)}: FX commands only`"
+ },
+ {
+  "id": "T029",
+  "file": "index.html",
+  "old": "unique with new phrases` : `Made ${made} of ${n} unique: no free phrases left`",
+  "new": "unique` : `Made ${made} of ${n} unique: no free phrases`"
+ },
+ {
+  "id": "T032",
+  "file": "index.html",
+  "old": "): ${pasteKey()} puts a unique copy, with new numbers, where the cursor is`",
+  "new": ") · ${pasteKey()} pastes a unique copy`"
+ },
+ {
+  "id": "T036",
+  "file": "index.html",
+  "old": "'That was copied on the ' + VNAME[clip.v] + ' screen. Copy song",
+  "new": "'Copied on ' + VNAME[clip.v] + '. Copy song"
+ },
+ {
+  "id": "T036",
+  "file": "index.html",
+  "old": "'Nothing copied yet: copy song rows or blocks first.'",
+  "new": "'Nothing copied: copy song rows or blocks first.'"
+ },
+ {
+  "id": "T040",
+  "file": "index.html",
+  "old": "${out} past the end were left out`",
+  "new": "${out} past the end left out`"
+ },
+ {
+  "id": "T040",
+  "file": "index.html",
+  "old": "`Pasted ${n} blocks · ",
+  "new": "`Pasted ${n} blocks, "
+ },
+ {
+  "id": "T044",
+  "file": "index.html",
+  "old": "duplicates the pattern on the Song (or Arrange) and the track on Phrase, Mixer and FX.`",
+  "new": "duplicates the pattern (Song, Arrange) or the track (Phrase, Mixer, FX)`"
+ },
+ {
+  "id": "T046",
+  "file": "index.html",
+  "old": "row isn’t'} empty.`",
+  "new": "row isn’t'} empty`"
+ },
+ {
+  "id": "T048",
+  "file": "index.html",
+  "old": "`Pattern${h > 1 ? 's' : ''} duplicated: row${h > 1 ? 's ' + rS(at, 3) + '–' + rS(at + h - 1, 3) : ' ' + rS(at, 3)}, ${made} block${made > 1 ? 's' : ''} as unique copies · the rows below moved down`",
+  "new": "`Duplicated ${made} block${made > 1 ? 's' : ''} as unique copies, row${h > 1 ? 's ' + rS(at, 3) + '–' + rS(at + h - 1, 3) : ' ' + rS(at, 3)} · rows below moved down`"
+ },
+ {
+  "id": "T059",
+  "file": "index.html",
+  "old": "${rS(c.y, 3)} · the rows below moved down`",
+  "new": "${rS(c.y, 3)} · rows below moved down`"
+ },
+ {
+  "id": "T064",
+  "file": "index.html",
+  "old": "${rS(r.y1, 3)} · the rows below moved up` : `Removed row ${rS(r.y0, 3)} · the rows below moved up`",
+  "new": "${rS(r.y1, 3)} · rows below moved up` : `Removed row ${rS(r.y0, 3)} · rows below moved up`"
+ },
+ {
+  "id": "T066",
+  "file": "index.html",
+  "old": "`Removed ${n} blocks from the song; their phrases are kept` : `Removed block ${hp([...gone.values()][0])} from the song; its phrase is kept`",
+  "new": "`Removed ${n} blocks, phrases kept` : `Removed block ${hp([...gone.values()][0])}, phrase kept`"
+ },
+ {
+  "id": "T075",
+  "file": "index.html",
+  "old": "`Looping song row ${rS(patRow, 3)}: move to another row to loop that one` : 'Loop on: the song repeats the row (pattern) it is on'",
+  "new": "`Looping row ${rS(patRow, 3)}: move to loop another` : 'Loop on: repeats the row you are on'"
+ },
+ {
+  "id": "T088",
+  "file": "index.html",
+  "old": "every track on song row ${rS(cs.song.y, 3)} · transpose or Delete acts on all of them`",
+  "new": "all tracks on row ${rS(cs.song.y, 3)} · transpose and Delete act on all`"
+ },
+ {
+  "id": "T093",
+  "file": "index.html",
+  "old": "(no free phrases left).`",
+  "new": "(no free phrases left)`"
+ },
+ {
+  "id": "T094",
+  "file": "index.html",
+  "old": "`Empty block: new phrase ${hp(fp)}. It goes on the song at row ${rS(y, 3)} when you add a note.`",
+  "new": "`New phrase ${hp(fp)} for this block. It joins the song at row ${rS(y, 3)} when you add a note`"
+ },
+ {
+  "id": "T100",
+  "file": "index.html",
+  "old": "`Press ${keyHint('mod+T')} on the Song, Sect or Phrase screen to add a phrase on the next empty track.`",
+  "new": "`${keyHint('mod+T')} adds a phrase on the next empty track (Song, Sect or Phrase)`"
+ },
+ {
+  "id": "T111",
+  "file": "index.html",
+  "old": "isn't on the song: File ▾ → Phrases… → Place puts it there.`",
+  "new": "isn’t on the song: File ▾ → Phrases… → Place`"
+ },
+ {
+  "id": "T120",
+  "file": "index.html",
+  "old": "selected · drag them to move,",
+  "new": "selected · drag to move,"
+ },
+ {
+  "id": "T068",
+  "file": "index.html",
+  "old": "` · ${undoK} brings ${n > 1 ? 'them' : 'it'} back`",
+  "new": "` · ${undoK} undoes it`"
+ },
+ {
+  "id": "T148",
+  "file": "index.html",
+  "old": "? 'muted' : 'unmuted'}`);",
+  "new": "? 'muted' : 'unmuted'} · right-click solos it`);"
+ },
+ {
+  "id": "T150",
+  "file": "index.html",
+  "old": "has no free song row, so it is not on the song. Put it on a row yourself.`",
+  "new": "has no free song row: place it yourself`"
+ },
+ {
+  "id": "T151",
+  "file": "index.html",
+  "old": "`Phrase ${hp(q.p)} is on the song: row ${rS(y, 3)}, track ${d2(q.x + 1)}.` : `Phrase ${hp(q.p)} is on the song at row ${rS(y, 3)}, track ${d2(q.x + 1)}: row ${rS(q.y, 3)} was taken.`",
+  "new": "`Phrase ${hp(q.p)} placed at row ${rS(y, 3)}, track ${d2(q.x + 1)}` : `Phrase ${hp(q.p)} placed at row ${rS(y, 3)}, track ${d2(q.x + 1)}: row ${rS(q.y, 3)} was taken`"
+ },
+ {
+  "id": "T152",
+  "file": "index.html",
+  "old": "${os}, so edits here change those too. UNIQ on this block (Song or Arrange) gives this track its own copy.`",
+  "new": "${os}: edits here change those too. UNIQ on this block gives this track its own copy.`"
+ },
+ {
+  "id": "T153",
+  "file": "index.html",
+  "old": "${ts}. What you write here changes there too (VOL turns their notes down). UNIQ on the block gives the master its own copy.`",
+  "new": "${ts}: edits here change those too (VOL turns their notes down). UNIQ gives the master its own copy.`"
+ },
+ {
+  "id": "T153",
+  "file": "index.html",
+  "old": "in the master column. There, VOL is the whole song’s level and FLX / FXO the master’s effects. UNIQ on this block (Song or Arrange) gives the track its own copy.`",
+  "new": "in the master column, where VOL is the song’s level and FLX / FXO the master’s effects. UNIQ gives the track its own copy.`"
+ },
+ {
+  "id": "T159",
+  "file": "index.html",
+  "old": "`Dropped one note (${noteS(last.note)}): the ${keep.notes.length} notes of the chord need a poly track (9–16)`",
+  "new": "`Dropped a note (${noteS(last.note)}): ${keep.notes.length}-note chords need a poly track (9–16)`"
+ },
+ {
+  "id": "T163",
+  "file": "index.html",
+  "old": "' · Enter on an empty cell places it · Enter twice makes a unique copy'",
+  "new": "' · Enter on an empty cell places it, twice for a unique copy'"
+ },
+ {
+  "id": "T165",
+  "file": "index.html",
+  "old": "${hx(c.y)} · the rows below moved down`",
+  "new": "${hx(c.y)} · rows below moved down`"
+ },
+ {
+  "id": "T166",
+  "file": "index.html",
+  "old": "moves a semitone, and you hear",
+  "new": "moves a semitone and you hear"
+ },
+ {
+  "id": "T181",
+  "file": "index.html",
+  "old": "(cut ? 'cut.' : 'copy.')",
+  "new": "(cut ? 'cut' : 'copy')"
+ },
+ {
+  "id": "T191",
+  "file": "index.html",
+  "old": "is a bus · generators write notes, a bus takes commands only`",
+  "new": "is a bus: generators write notes, buses take commands only`"
+ },
+ {
+  "id": "T206",
+  "file": "index.html",
+  "old": "' writes into it.'",
+  "new": "' writes into it'"
+ },
+ {
+  "id": "T211",
+  "file": "index.html",
+  "old": "'Chords needs a poly track (from track ' + d2(polyFrom() + 1) + ' on): a mono track plays one note at a time.'",
+  "new": "'Chords need a poly track (track ' + d2(polyFrom() + 1) + ' on): mono plays one note at a time'"
+ },
+ {
+  "id": "T214",
+  "file": "index.html",
+  "old": "'Markov melody learns from the song’s melodies. There are only ' + tot + ' melodic notes so far (drums don’t count).",
+  "new": "'Markov melody needs more notes: the song has only ' + tot + ' melodic notes (drums don’t count)."
+ },
+ {
+  "id": "T224",
+  "file": "index.html",
+  "old": "`Swapped ${n} note${n === 1 ? '' : 's'} from ${hx(a)} to ${hx(b)} in track ${d2(t + 1)}` : `No notes on ${hx(a)} to swap there.`",
+  "new": "`Swapped ${n} note${n === 1 ? '' : 's'} ${hx(a)} → ${hx(b)} in track ${d2(t + 1)}` : `No notes on ${hx(a)} to swap`"
+ },
+ {
+  "id": "T229",
+  "file": "index.html",
+  "old": "had no value at one end)",
+  "new": "had no end value)"
+ },
+ {
+  "id": "T250",
+  "file": "index.html",
+  "old": "into the empty ones` : 'Mix-paste: every cell it would fill already has something.'",
+  "new": "into empty ones` : 'Mix-paste: nothing empty to fill'"
+ },
+ {
+  "id": "T262",
+  "file": "index.html",
+  "old": "stays up while you move around the song.` : 'Unpinned: the phrase follows the song cursor.'",
+  "new": "stays up while you move around` : 'Unpinned: the phrase follows the cursor'"
+ },
+ {
+  "id": "T264",
+  "file": "index.html",
+  "old": "channel ${ch + 1}: change MIDI CH",
+  "new": "channel ${ch + 1}. Change MIDI CH"
+ },
+ {
+  "id": "T265",
+  "file": "index.html",
+  "old": "(${NI} of them, in hex:",
+  "new": "(${NI}, in hex:"
+ },
+ {
+  "id": "T272",
+  "file": "index.html",
+  "old": "`Each sidechain now has its own Source. ${c.n} tracks",
+  "new": "`Each sidechain has its own Source now. ${c.n} tracks"
+ },
+ {
+  "id": "T272",
+  "file": "index.html",
+  "old": "`Each sidechain now has its own Source. The one",
+  "new": "`Each sidechain has its own Source now. The one"
+ },
+ {
+  "id": "T273",
+  "file": "index.html",
+  "old": "now runs through chains: its Track In and Chain Out are there, wired straight through.`",
+  "new": "runs through chains: Track In and Chain Out added, wired straight through.`"
+ },
+ {
+  "id": "T275",
+  "file": "index.html",
+  "old": "is a normal track again and plays its own notes.${",
+  "new": "is a normal track again.${"
+ },
+ {
+  "id": "T275",
+  "file": "index.html",
+  "old": "The bus’s modules are still in chains, unplugged. Undo puts the bus back.`",
+  "new": "The bus’s modules stay in chains, unplugged. Undo brings the bus back.`"
+ },
+ {
+  "id": "T278",
+  "file": "index.html",
+  "old": "track to the right of track ${d2(t + 1)}, and the song has the most tracks it can (${most}).`",
+  "new": "track right of track ${d2(t + 1)}, and the song is at its track limit (${most})`"
+ },
+ {
+  "id": "T288",
+  "file": "index.html",
+  "old": "' clears every solo'",
+  "new": "' clears all'"
+ },
+ {
+  "id": "T309",
+  "file": "index.html",
+  "old": "doesn’t have a full window yet. The boxes here change its main settings.`",
+  "new": "has no full window yet: these boxes change its main settings`"
+ },
+ {
+  "id": "T352",
+  "file": "pump/ui/kit.js",
+  "old": "' doesn’t have a full window yet. The FX boxes change its main settings.'",
+  "new": "' has no full window yet: these boxes change its main settings'"
+ },
+ {
+  "id": "T314",
+  "file": "index.html",
+  "old": "' stopped working and was bypassed. Change",
+  "new": "' stopped and is bypassed. Change"
+ },
+ {
+  "id": "T321",
+  "file": "index.html",
+  "old": "is off and its ${TFX[A[k].type].long} is kept. Turn the value back up to bring it back.`",
+  "new": "is off, its ${TFX[A[k].type].long} kept: turn the value up to restore it`"
+ },
+ {
+  "id": "T323",
+  "file": "index.html",
+  "old": "The preset shows under MY PRESETS in › PRESET on every song on this device.",
+  "new": "The preset shows under MY PRESETS › PRESET on every song on this device."
+ },
+ {
+  "id": "T324",
+  "file": "index.html",
+  "old": "in My presets (every song) and in this song`",
+  "new": "in My presets and in this song`"
+ },
+ {
+  "id": "T332",
+  "file": "index.html",
+  "old": "is in slot ${have + 1} of ${who} but switched off, so this command won't be heard until it's on (or FXO ${have + 1}1 turns it on).`",
+  "new": "in slot ${have + 1} of ${who} is off, so this command is silent until it’s on (or FXO ${have + 1}1 turns it on)`"
+ },
+ {
+  "id": "T340",
+  "file": "index.html",
+  "old": "`Effect ${k + 1} removed · ",
+  "new": "`Removed effect ${k + 1} · "
+ },
+ {
+  "id": "T342",
+  "file": "index.html",
+  "old": "`Slot ${k + 1} cleared (${TFX[f.type] ? TFX[f.type].n : 'effect'}) · ",
+  "new": "`Removed ${TFX[f.type] ? TFX[f.type].n : 'effect'} from slot ${k + 1} · "
+ },
+ {
+  "id": "T345",
+  "file": "index.html",
+  "old": "Undo takes it all back.'",
+  "new": "Undo brings it back.'"
+ },
+ {
+  "id": "T351",
+  "file": "index.html",
+  "old": "', or type the value as the control shows it.'",
+  "new": "', or the value as shown.'"
+ },
+ {
+  "id": "T356",
+  "file": "index.html",
+  "old": "picks what it moves.', 2500",
+  "new": "picks what it moves', 2500"
+ },
+ {
+  "id": "T359",
+  "file": "index.html",
+  "old": "' has ' + PLFO_MAX + ' LFOs already: remove one on MOD to add this.'",
+  "new": "' has all ' + PLFO_MAX + ' LFOs: remove one on MOD first'"
+ },
+ {
+  "id": "T362",
+  "file": "index.html",
+  "old": "`This song’s timing is LPB ${c.lpb}",
+  "new": "`Timing: LPB ${c.lpb}"
+ },
+ {
+  "id": "T366",
+  "file": "index.html",
+  "old": "{why:`${bad.length} hidden ${o} track${many ? 's' : ''} (${bad.map(b => d2(b.t + 1)).join(', ')}) still hold${many ? '' : 's'} something, so ${k} cannot grow into ${many ? 'them' : 'it'}. Clear",
+  "new": "{why:`${k} can’t grow: ${bad.length} hidden ${o.toUpperCase()} track${many ? 's' : ''} (${bad.map(b => d2(b.t + 1)).join(', ')}) still hold${many ? '' : 's'} data. Clear"
+ },
+ {
+  "id": "T368",
+  "file": "index.html",
+  "old": "`Every phrase now plays ${S.dlen || 16} rows. Notes past that are kept, just not played.`",
+  "new": "`Every phrase plays ${S.dlen || 16} rows. Notes past that are kept, not played`"
+ },
+ {
+  "id": "T370",
+  "file": "index.html",
+  "old": "so it was set to ${c}.`",
+  "new": "so it was set to ${c}`"
+ },
+ {
+  "id": "T375",
+  "file": "index.html",
+  "old": "`Part ${k + 1} keeps the instruments, the mixer and the effect values as they are now.",
+  "new": "`Part ${k + 1} saved: instruments, mixer and effect values as they are now."
+ },
+ {
+  "id": "T377",
+  "file": "index.html",
+  "old": "own sound (Undo takes it back).`",
+  "new": "own sound · Undo brings it back`"
+ },
+ {
+  "id": "T383",
+  "file": "index.html",
+  "old": "`${n} slots: ${hx(was)}–${hx(n - 1)} are new synths (THIS SLOT makes one a one-shot drum).`",
+  "new": "`${n} slots. ${hx(was)}–${hx(n - 1)} are new synths.`"
+ },
+ {
+  "id": "T384",
+  "file": "index.html",
+  "old": "`${n} slots. The sounds of ${hx(n)}–${hx(was - 1)} are kept: more slots show them again.` + (far.length ? ` Instrument${far.length > 1 ? 's' : ''} ${far.slice(0, 6).join(', ')}${far.length > 6 ? '…' : ''} ${far.length > 1 ? 'play' : 'plays'} from hidden slot${far.length > 1 ? 's' : ''}.` : '')",
+  "new": "`${n} slots. Sounds ${hx(n)}–${hx(was - 1)} are kept, hidden.` + (far.length ? ` Instrument${far.length > 1 ? 's' : ''} ${far.slice(0, 6).join(', ')}${far.length > 6 ? '…' : ''} ${far.length > 1 ? 'play' : 'plays'} from ${far.length > 1 ? 'them' : 'it'}.` : '')"
+ },
+ {
+  "id": "T386",
+  "file": "index.html",
+  "old": "`Pad ${hx(i)} is ${held ? 'HELD now: it sounds until a note-off (up to Max len), like a synth' : 'ONE-SHOT now: it plays its whole sound, like a drum'}.`",
+  "new": "`Pad ${hx(i)}: ${held ? 'HELD, sounds until note-off (up to Max len).' : 'ONE-SHOT, plays its whole sound.'}`"
+ },
+ {
+  "id": "T390",
+  "file": "index.html",
+  "old": "kit on pads 1–8. Undo puts a pad back.`",
+  "new": "kit on pads 1–8. Undo brings it back.`"
+ },
+ {
+  "id": "T390",
+  "file": "index.html",
+  "old": "toast(`${K[0].replace",
+  "new": "toast(`Loaded ${K[0].replace"
+ },
+ {
+  "id": "T391",
+  "file": "index.html",
+  "old": "toast(`${kitTag(K[0])}-style kit on pads 1–8. Undo puts a pad back.`)",
+  "new": "toast(`Loaded ${kitTag(K[0])}-style kit on pads 1–8. Undo brings it back.`)"
+ },
+ {
+  "id": "T393",
+  "file": "index.html",
+  "old": "each on its Firmware engine. Undo puts a pad back.`",
+  "new": "each on its Firmware engine. Undo brings it back.`"
+ },
+ {
+  "id": "T400",
+  "file": "index.html",
+  "old": "Undo puts the sound back.'",
+  "new": "Undo brings it back.'"
+ },
+ {
+  "id": "T402",
+  "file": "index.html",
+  "old": "`Type a slot in hex, 00 to ${hx(nslots() - 1)}.`",
+  "new": "`Not a slot. Use hex, 00 to ${hx(nslots() - 1)}.`"
+ },
+ {
+  "id": "T404",
+  "file": "index.html",
+  "old": "`${r.name} (${r.bpm} BPM) in slot ${hx(pad)}, 16 slices, synced to the tempo` + (ins >= 0 ? ` · instrument ${hx(ins)}: C-4 plays slice 1` : '')",
+  "new": "`${r.name} (${r.bpm} BPM) in slot ${hx(pad)}: 16 slices, synced.` + (ins >= 0 ? ` Instrument ${hx(ins)}: C-4 plays slice 1.` : '')"
+ },
+ {
+  "id": "T406",
+  "file": "index.html",
+  "old": "'A kit slot per track is on (Settings → Kit), so the kit can’t take new slots: free up ' + grow + ' slot' + (grow > 1 ? 's' : '') + ' first.' : 'Not enough room: the kit is at '",
+  "new": "'Kit is locked: free up ' + grow + ' slot' + (grow > 1 ? 's' : '') + ' first (kit slot per track is on in Settings → Kit)' : 'No room: kit is at '"
+ },
+ {
+  "id": "T412",
+  "file": "index.html",
+  "old": "Undo puts the kit back.'",
+  "new": "Undo brings it back.'"
+ },
+ {
+  "id": "T420",
+  "file": "index.html",
+  "old": "row.name + '.'",
+  "new": "row.name"
+ },
+ {
+  "id": "T421",
+  "file": "index.html",
+  "old": "is no longer in this app’s sample store.`",
+  "new": "is gone from this app’s sample store`"
+ },
+ {
+  "id": "T423",
+  "file": "index.html",
+  "old": "'Native input: ' + (RCD.ioWhy || 'it didn’t open') + '. Try again, or pick Engine Browser.'",
+  "new": "'Native input failed: ' + (RCD.ioWhy || 'it didn’t open') + '. Try again, or set Engine to Browser.'"
+ },
+ {
+  "id": "T425",
+  "file": "index.html",
+  "old": "'Recording needs permission to use an audio input.' : 'Couldn’t open an audio input.'",
+  "new": "'Recording needs permission to use an audio input' : 'Couldn’t open an audio input'"
+ },
+ {
+  "id": "T435",
+  "file": "index.html",
+  "old": "+Z on the Synth page takes it back.`",
+  "new": "+Z on the Synth page undoes it`"
+ },
+ {
+  "id": "T436",
+  "file": "index.html",
+  "old": "`${RCD.io.dev.name} runs at ${dr / 1000} kHz and the app at ${ar / 1000} kHz: the input is converted. Set them the same (Settings › Audio › Rate, or the interface) for a clean take.`",
+  "new": "`${RCD.io.dev.name} is ${dr / 1000} kHz, the app ${ar / 1000} kHz: the take is converted. Match them (Settings › Audio › Rate) for a clean take.`"
+ },
+ {
+  "id": "T439",
+  "file": "index.html",
+  "old": "`Native input not available (${IOH.why || 'the desktop app’s audio input did not respond'}): using the browser’s input.`",
+  "new": "`Native input didn’t respond` + (IOH.why ? ` (${IOH.why})` : '') + `: using the browser’s input`"
+ },
+ {
+  "id": "T461",
+  "file": "index.html",
+  "old": "'” in this song.'",
+  "new": "'”.'"
+ },
+ {
+  "id": "T473",
+  "file": "index.html",
+  "old": "`Imported ${a} pad preset${a === 1 ? '' : 's'} and ${b} layer preset${b === 1 ? '' : 's'} into this song.`",
+  "new": "`Imported ${a} pad and ${b} layer preset${b === 1 ? '' : 's'}.`"
+ },
+ {
+  "id": "T474",
+  "file": "index.html",
+  "old": "'Couldn’t read that presets file.'",
+  "new": "'Couldn’t read that presets file'"
+ },
+ {
+  "id": "T475",
+  "file": "index.html",
+  "old": "label + ' is in Favorites' : label + ' left Favorites'",
+  "new": "label + ' added to Favorites' : label + ' removed from Favorites'"
+ },
+ {
+  "id": "T481",
+  "file": "index.html",
+  "old": "toast('Deleted “' + e.name + '”.')",
+  "new": "toast('Deleted preset “' + e.name + '”.')"
+ },
+ {
+  "id": "T487",
+  "file": "index.html",
+  "old": "isn’t on this device. Load it on the Synth page (Engine: SoundFont).'",
+  "new": "isn’t on this device: load it on the Synth page (Engine: SoundFont)'"
+ },
+ {
+  "id": "T488",
+  "file": "index.html",
+  "old": "'SoundFont failed to load.'",
+  "new": "'SoundFont failed to load'"
+ },
+ {
+  "id": "T492",
+  "file": "index.html",
+  "old": "'That file couldn’t be read as a SoundFont.'",
+  "new": "'Couldn’t read that file as a SoundFont'"
+ },
+ {
+  "id": "T503",
+  "file": "index.html",
+  "old": "(buf.length > n ? ' (its first 20 s)' : '') + ' · SOURCE is File · ROOT is the note it plays at'",
+  "new": "(buf.length > n ? ' (first 20 s)' : '') + '. SOURCE is File; ROOT is the note it plays at.'"
+ },
+ {
+  "id": "T515",
+  "file": "waves/index.html",
+  "old": "'Name this module (leave it empty to go back to “' + def.label + '”):'",
+  "new": "'Module name (empty restores “' + def.label + '”)'"
+ },
+ {
+  "id": "T517",
+  "file": "waves/index.html",
+  "old": "' changed (Alt+Shift+C again reverses it, ' + MOD + '+Z undoes it).'",
+  "new": "' changed · ' + MOD + '+Z undoes it'"
+ },
+ {
+  "id": "T518",
+  "file": "waves/index.html",
+  "old": "' (Alt+C does the reverse, ' + MOD + '+Z undoes it).'",
+  "new": "' · ' + MOD + '+Z undoes it'"
+ },
+ {
+  "id": "T521",
+  "file": "waves/index.html",
+  "old": "'Module removed (Undo brings it back).' : ids.length + ' modules removed (Undo brings them back).'",
+  "new": "'Module removed · Undo brings it back' : ids.length + ' modules removed · Undo brings them back'"
+ },
+ {
+  "id": "T536",
+  "file": "waves/index.html",
+  "old": "askDialog('Name this group:'",
+  "new": "askDialog('Group name'"
+ },
+ {
+  "id": "T539",
+  "file": "waves/index.html",
+  "old": "askDialog('Name the new custom module:'",
+  "new": "askDialog('Custom module name'"
+ },
+ {
+  "id": "BUG-loaded",
+  "file": "index.html",
+  "old": "toast('Loaded ' + kit.name + '.",
+  "new": "toast('Loaded ' + (kit.name || 'Kit') + '."
+ },
+ {
+  "id": "T576",
+  "file": "chains/index.html",
+  "old": "'Name this module (leave it empty to go back to “' + def.label + '”):'",
+  "new": "'Module name (empty restores “' + def.label + '”)'"
+ },
+ {
+  "id": "T587",
+  "file": "chains/index.html",
+  "old": "' changed (Alt+Shift+C again reverses it, ' + MOD + '+Z undoes it).'",
+  "new": "' changed · ' + MOD + '+Z undoes it'"
+ },
+ {
+  "id": "T588",
+  "file": "chains/index.html",
+  "old": "' (Alt+C does the reverse, ' + MOD + '+Z undoes it).'",
+  "new": "' · ' + MOD + '+Z undoes it'"
+ },
+ {
+  "id": "T591",
+  "file": "chains/index.html",
+  "old": "'Module removed (Undo brings it back).' : ids.length + ' modules removed (Undo brings them back).'",
+  "new": "'Module removed · Undo brings it back' : ids.length + ' modules removed · Undo brings them back'"
+ },
+ {
+  "id": "T607",
+  "file": "chains/index.html",
+  "old": "askDialog('Name this group:'",
+  "new": "askDialog('Group name'"
+ },
+ {
+  "id": "T612",
+  "file": "chains/index.html",
+  "old": "askDialog('Name the new custom module:'",
+  "new": "askDialog('Custom module name'"
+ },
+ {
+  "id": "T540",
+  "file": "waves/index.html",
+  "old": "'” is in the module list under Custom.'",
+  "new": "'” added under Custom'"
+ },
+ {
+  "id": "T613",
+  "file": "chains/index.html",
+  "old": "'” is in the module list under Custom.'",
+  "new": "'” added under Custom'"
+ },
+ {
+  "id": "T541",
+  "file": "waves/index.html",
+  "old": "' (' + MOD + '+Z undoes it).'",
+  "new": "' · ' + MOD + '+Z undoes it'"
+ },
+ {
+  "id": "T614",
+  "file": "chains/index.html",
+  "old": "' (' + MOD + '+Z undoes it).'",
+  "new": "' · ' + MOD + '+Z undoes it'"
+ },
+ {
+  "id": "T545",
+  "file": "waves/index.html",
+  "old": "askDialog('Rename this custom module:'",
+  "new": "askDialog('Custom module name'"
+ },
+ {
+  "id": "T618",
+  "file": "chains/index.html",
+  "old": "askDialog('Rename this custom module:'",
+  "new": "askDialog('Custom module name'"
+ },
+ {
+  "id": "T548",
+  "file": "waves/index.html",
+  "old": "'New empty patch. Press ' + MOD + '+Z to get the previous one back.'",
+  "new": "'New empty patch · ' + MOD + '+Z brings the old one back'"
+ },
+ {
+  "id": "T621",
+  "file": "chains/index.html",
+  "old": "'New empty patch. Press ' + MOD + '+Z to get the previous one back.'",
+  "new": "'New empty patch · ' + MOD + '+Z brings the old one back'"
+ },
+ {
+  "id": "T550",
+  "file": "waves/index.html",
+  "old": "toast('Opened “' + doc.meta.name + '”.')",
+  "new": "toast('Loaded “' + doc.meta.name + '”')"
+ },
+ {
+  "id": "T623",
+  "file": "chains/index.html",
+  "old": "toast('Opened “' + doc.meta.name + '”.')",
+  "new": "toast('Loaded “' + doc.meta.name + '”')"
+ },
+ {
+  "id": "T552",
+  "file": "waves/index.html",
+  "old": "askDialog('Save the patch as:'",
+  "new": "askDialog('Patch name'"
+ },
+ {
+  "id": "T625",
+  "file": "chains/index.html",
+  "old": "askDialog('Save the patch as:'",
+  "new": "askDialog('Patch name'"
+ },
+ {
+  "id": "T557",
+  "file": "waves/index.html",
+  "old": "'. Press ' + MOD + '+Z to undo.'",
+  "new": "' · ' + MOD + '+Z undoes it'"
+ },
+ {
+  "id": "T630",
+  "file": "chains/index.html",
+  "old": "'. Press ' + MOD + '+Z to undo.'",
+  "new": "' · ' + MOD + '+Z undoes it'"
+ },
+ {
+  "id": "T559",
+  "file": "waves/index.html",
+  "old": "'Play: touch plays the patch; modules and cables are locked. Tap Edit to change them.'",
+  "new": "'Play: touch plays; the patch is locked. Tap Edit to change it.'"
+ },
+ {
+  "id": "T631",
+  "file": "chains/index.html",
+  "old": "'Play: touch plays the patch; modules and cables are locked. Tap Edit to change them.'",
+  "new": "'Play: touch plays; the patch is locked. Tap Edit to change it.'"
+ },
+ {
+  "id": "T560",
+  "file": "waves/index.html",
+  "old": "'Select on: tap modules to pick them, drag the background for a box. Hold a module for Group, Copy or Delete.' : 'Select off.'",
+  "new": "'Select: tap modules, or drag a box. Hold a module for Group, Copy, Delete.' : 'Select off'"
+ },
+ {
+  "id": "T632",
+  "file": "chains/index.html",
+  "old": "'Select on: tap modules to pick them, drag the background for a box. Hold a module for Group, Copy or Delete.' : 'Select off.'",
+  "new": "'Select: tap modules, or drag a box. Hold a module for Group, Copy, Delete.' : 'Select off'"
+ },
+ {
+  "id": "T562",
+  "file": "waves/index.html",
+  "old": "'CPU is free again: ' + s.voices + ' voices, ' + s.quality + ' quality.' : s.step === 3 ? 'The CPU is overloaded: notes were cut.' : 'The CPU is busy: dropped to ' + s.voices + ' voices' + (s.quality === 'draft' ? ', draft quality.' : '.')",
+  "new": "'CPU is free: ' + s.voices + ' voices, ' + s.quality + ' quality' : s.step === 3 ? 'CPU is overloaded: notes were cut' : 'CPU is busy: ' + s.voices + ' voices' + (s.quality === 'draft' ? ', draft quality' : '')"
+ },
+ {
+  "id": "T634",
+  "file": "chains/index.html",
+  "old": "'CPU is free again: back to full quality.' : 'The CPU is busy: switched to draft quality.'",
+  "new": "'CPU is free: full quality' : 'CPU is busy: draft quality'"
+ },
+ {
+  "id": "T577",
+  "file": "chains/index.html",
+  "old": "' already has a chain, so this one stays on track ' + old + '. Pick a free track (the list marks the used ones).'",
+  "new": "' already has a chain: staying on track ' + old + '. Pick a free track (used ones are marked).'"
+ },
+ {
+  "id": "T578",
+  "file": "chains/index.html",
+  "old": "' already has a chain, so this one stays on track ' + old + '.'",
+  "new": "' already has a chain: staying on track ' + old"
+ },
+ {
+  "id": "T579",
+  "file": "chains/index.html",
+  "old": "'Chain Out is now a bus on track ' + N + '. The tracks feeding it play through track ' + N + ' after their own faders. Track ' + N + '’s fader and effects level them all.'",
+  "new": "'Chain Out is a bus on track ' + N + ': its tracks play through it, after their own faders.'"
+ },
+ {
+  "id": "T584",
+  "file": "chains/index.html",
+  "old": "'Name this ' + (n.m.label || def.label) + ' preset (kept on this device for every patch, and in this patch so it goes with the song):'",
+  "new": "(n.m.label || def.label) + ' preset name (saved on this device and in this patch)'"
+ },
+ {
+  "id": "T585",
+  "file": "chains/index.html",
+  "old": "'Saved “' + nm + '”. It shows in every ' + def.label + ' preset list, and travels with this patch.'",
+  "new": "'Saved preset “' + nm + '”: in every ' + def.label + ' list and in this patch'"
+ },
+ {
+  "id": "T598",
+  "file": "chains/index.html",
+  "old": "'This cable crosses from one track\\'s chain into another\\'s, so it carries no signal. Use a Sidechain Out (Send 1\\u20138) and Source: Send N,",
+  "new": "'A cable can’t cross tracks, so it carries no signal. Use a Sidechain Out (Send 1\\u20138) with Source: Send N,"
+ },
+ {
+  "id": "T638",
+  "file": "index.html",
+  "old": "' couldn’t be found in this browser’s storage. Load the kit or project file to get them back.'",
+  "new": "' not in this browser’s storage. Load the kit or project file to restore ' + (missing > 1 ? 'them' : 'it') + '.'"
+ },
+ {
+  "id": "T643",
+  "file": "index.html",
+  "old": "' to your Downloads folder'",
+  "new": "' to Downloads'"
+ },
+ {
+  "id": "T646",
+  "file": "index.html",
+  "old": "'A save is already waiting for you.'",
+  "new": "'A save is waiting for you'"
+ },
+ {
+  "id": "T654",
+  "file": "index.html",
+  "old": "'. Undo puts the previous kit back.'",
+  "new": "'. Undo brings it back.'"
+ },
+ {
+  "id": "T655",
+  "file": "index.html",
+  "old": "'Couldn’t read that kit file.'",
+  "new": "'Couldn’t read that kit file'"
+ },
+ {
+  "id": "T660",
+  "file": "index.html",
+  "old": "' here: drop audio, a .thunder project, a kit or a .mid file.'",
+  "new": "' here. Drop audio, a .thunder project, a kit or a .mid file.'"
+ },
+ {
+  "id": "T664",
+  "file": "index.html",
+  "old": "Set RENDER FROM to the first row of the song.`",
+  "new": "Set RENDER FROM to the song’s first row`"
+ },
+ {
+  "id": "T675",
+  "file": "index.html",
+  "old": "becomes its sample (undo puts the sound back).'",
+  "new": "becomes its sample. Undo brings it back.'"
+ },
+ {
+  "id": "T696",
+  "file": "index.html",
+  "old": "'. The project is still unsaved.'",
+  "new": "'. Still unsaved.'"
+ },
+ {
+  "id": "T700",
+  "file": "index.html",
+  "old": "'), so it went to your downloads.'",
+  "new": "'). Saved to Downloads instead.'"
+ },
+ {
+  "id": "T716",
+  "file": "index.html",
+  "old": "Save it to keep it in a file.'",
+  "new": "Save it to keep it in a file'"
+ },
+ {
+  "id": "T726",
+  "file": "index.html",
+  "old": "MIDI track${tracks.length === 1 ? '' : 's'} into tracks",
+  "new": "MIDI track${tracks.length === 1 ? '' : 's'} to tracks"
+ },
+ {
+  "id": "T726",
+  "file": "index.html",
+  "old": "blocks, using instrument",
+  "new": "blocks, instrument"
+ },
+ {
+  "id": "T739",
+  "file": "index.html",
+  "old": "'the system default') + '.'",
+  "new": "'the system default')"
+ },
+ {
+  "id": "T741",
+  "file": "index.html",
+  "old": "'Saved. It plays through '",
+  "new": "'Saved. Plays through '"
+ },
+ {
+  "id": "T743",
+  "file": "index.html",
+  "old": "`Latency comp AUTO: the other tracks wait ${ms} ms while the song plays, to line up with the slowest one` : 'Latency comp AUTO: lines tracks up only when an effect has look-ahead. None does right now.'",
+  "new": "`Latency comp AUTO: other tracks wait ${ms} ms to line up with the slowest.` : 'Latency comp AUTO: no effect has look-ahead, nothing to align.'"
+ },
+ {
+  "id": "T743",
+  "file": "index.html",
+  "old": "`Latency comp ON: every track waits ${ms} ms to line up with the slowest one, also while stopped` : 'Latency comp ON. No track has latency right now.'",
+  "new": "`Latency comp ON: every track waits ${ms} ms, also while stopped.` : 'Latency comp ON: no track has latency.'"
+ },
+ {
+  "id": "T743",
+  "file": "index.html",
+  "old": "'Latency comp OFF: a track or bus with a look-ahead effect plays late'",
+  "new": "'Latency comp OFF: a look-ahead effect plays late.'"
+ },
+ {
+  "id": "T744",
+  "file": "index.html",
+  "old": "so the other tracks now wait ${ms(T)} ms` : `An effect with look-ahead makes the other tracks wait ${ms(T)} ms`) + ' while the song plays, to stay in time. Audio",
+  "new": "so other tracks wait ${ms(T)} ms` : `An effect with look-ahead makes other tracks wait ${ms(T)} ms`) + ' to stay in time. Audio"
+ },
+ {
+  "id": "T751",
+  "file": "index.html",
+  "old": "Touch another slider or tap a pad, or Done.`",
+  "new": "Learn another, or tap Done.`"
+ },
+ {
+  "id": "T753",
+  "file": "index.html",
+  "old": "Tap another pad, touch a slider, or Done.`",
+  "new": "Learn another, or tap Done.`"
+ },
+ {
+  "id": "T757",
+  "file": "index.html",
+  "old": "'MIDI permission was refused. Allow",
+  "new": "'MIDI permission refused. Allow"
+ },
+ {
+  "id": "T759",
+  "file": "index.html",
+  "old": "Unlearn removes it)`",
+  "new": "Unlearn clears it)`"
+ },
+ {
+  "id": "T768",
+  "file": "index.html",
+  "old": "and will not start.'",
+  "new": "and won’t start.'"
+ },
+ {
+  "id": "T769",
+  "file": "index.html",
+  "old": "'The sound reaches the speaker about ' + ms + ' ms late (the engine reports ' + Math.round(rep * 1000) + ' ms), so pads and the playhead will feel late.'",
+  "new": "'Sound reaches the speaker ' + ms + ' ms late (engine reports ' + Math.round(rep * 1000) + ' ms): pads and the playhead will feel late.'"
+ },
+ {
+  "id": "T770",
+  "file": "index.html",
+  "old": "'The audio output delay is about ' + ms + ' ms (about 40 ms is normal), so pads and the playhead will feel late. Bluetooth speakers do this too: then choose Not now.'",
+  "new": "'Output delay is about ' + ms + ' ms (40 ms is normal): pads and the playhead will feel late. Bluetooth does this too: choose Not now.'"
+ },
+ {
+  "id": "T771",
+  "file": "index.html",
+  "old": "' Reset audio engine cannot fix this; only a reload does. Your project is saved first and comes back after it.'",
+  "new": "' Reset audio engine can’t fix this. Your project is saved first and comes back after the reload.'"
+ },
+ {
+  "id": "T779",
+  "file": "index.html",
+  "old": "'The pump and waves live engines are using pre-rendered sound for now: ' + why + '. Settings → Audio → Live engines: tap Auto to try live again.'",
+  "new": "'pump and waves live use pre-rendered sound for now: ' + why + '. Settings → Audio → Live engines → Auto retries live'"
+ },
+ {
+  "id": "T791",
+  "file": "index.html",
+  "old": "'Background play is off, so playback breaks up",
+  "new": "'Background play is off: playback breaks up"
+ },
+ {
+  "id": "T792",
+  "file": "index.html",
+  "old": "'). To use it, set a Convolution reverb’s Type to Song IR ' + (k + 1) + '.'",
+  "new": "'). Set a Convolution reverb’s Type to Song IR ' + (k + 1) + ' to use it'"
+ },
+ {
+  "id": "T807",
+  "file": "index.html",
+  "old": "'Couldn’t save it: '",
+  "new": "'Couldn’t save: '"
+ },
+ {
+  "id": "T760",
+  "file": "index.html",
+  "old": "no longer follows a knob.`",
+  "new": "unlearned`"
+ },
+ {
+  "id": "T761",
+  "file": "index.html",
+  "old": "no longer has a note.`",
+  "new": "unlearned`"
+ },
+ {
+  "id": "T794",
+  "file": "index.html",
+  "old": "Set Latency to Safest for a bigger audio buffer. The app reloads and keeps your project.'",
+  "new": "Set Latency to Safest (bigger buffer)? The app reloads and keeps your project'"
+ },
+ {
+  "id": "T795",
+  "file": "index.html",
+  "old": "'Mobile (Thunder): PAD input.'",
+  "new": "'Mobile: PAD input.'"
+ },
+ {
+  "id": "T795",
+  "file": "index.html",
+  "old": ") still play their sounds.' : ') still plays its sounds.')",
+  "new": ") still play.' : ') still plays.')"
+ },
+ {
+  "id": "T802",
+  "file": "index.html",
+  "old": "<kbd>PLAY</kbd> again stops.</li><li>Move with the <kbd>▲▼◀▶</kbd> pad; <kbd>EDIT</kbd> on an empty cell adds a note or a block, <kbd>EDIT</kbd> twice makes a new phrase.</li><li>Hold <kbd>EDIT</kbd> and press <kbd>▲▼</kbd> to change a value; <kbd>SHIFT</kbd> + <kbd>▶</kbd> opens what the cursor is on.",
+  "new": "again stops.</li><li>Move with <kbd>▲▼◀▶</kbd>. <kbd>EDIT</kbd> on an empty cell adds a note or block; <kbd>EDIT</kbd> twice makes a phrase.</li><li>Hold <kbd>EDIT</kbd> + <kbd>▲▼</kbd> to change a value; <kbd>SHIFT</kbd> + <kbd>▶</kbd> opens what’s under the cursor."
+ },
+ {
+  "id": "T803",
+  "file": "index.html",
+  "old": "or hex to edit the cell; <kbd>Enter</kbd> opens what the cursor is on.</li><li><kbd>Synth</kbd> at the top is where the sounds live; <kbd>?</kbd> opens Help from anywhere.",
+  "new": "or hex to edit; <kbd>Enter</kbd> opens what’s under the cursor.</li><li><kbd>Synth</kbd> (top) holds the sounds; <kbd>?</kbd> opens Help."
+ },
+ {
+  "id": "T795",
+  "file": "index.html",
+  "old": "'Desktop (Thunder Plus): the waves",
+  "new": "'Desktop: the waves"
+ },
+ {
+  "id": "T567b",
+  "file": "index.html",
+  "old": "f.name) + '”.');",
+  "new": "f.name) + '”');"
+ },
+ {
+  "id": "T023b",
+  "file": "index.html",
+  "old": "toast('No free sects left.')",
+  "new": "toast('No free sects left')"
+ },
+ {
+  "id": "T024b",
+  "file": "index.html",
+  "old": "toast('No free phrases left.')",
+  "new": "toast('No free phrases left')"
+ },
+ {
+  "id": "T087b",
+  "file": "index.html",
+  "old": "Selecting works in Song, Sect and Phrase.'",
+  "new": "Selecting works in Song, Sect and Phrase'"
+ },
+ {
+  "id": "T258b",
+  "file": "index.html",
+  "old": "to the left first.'",
+  "new": "to the left first'"
+ },
+ {
+  "id": "T567b",
+  "file": "chains/index.html",
+  "old": "That file isn’t a chains patch.'",
+  "new": "Not a chains patch'"
+ },
+ {
+  "id": "T567c",
+  "file": "waves/index.html",
+  "old": "That file isn’t a waves patch.'",
+  "new": "Not a waves patch'"
+ },
+ {
+  "id": "T628b",
+  "file": "chains/index.html",
+  "old": "toast('No custom modules yet.')",
+  "new": "toast('No custom modules yet')"
+ },
+ {
+  "id": "T628c",
+  "file": "waves/index.html",
+  "old": "toast('No custom modules yet.')",
+  "new": "toast('No custom modules yet')"
+ },
+ {
+  "id": "T426b",
+  "file": "index.html",
+  "old": "toast('The audio input went away (' + why + ')' + (rec ? ': the take so far is kept.' : '.')",
+  "new": "toast('Audio input lost (' + why + ')' + (rec ? ': the take so far is kept' : '')"
+ },
+ {
+  "id": "T759b",
+  "file": "index.html",
+  "old": "Unlearn removes it)",
+  "new": "Unlearn clears it)"
+ },
+ {
+  "id": "T413",
+  "file": "index.html",
+  "old": "ask('Put the factory drums on pads 1–8? The synth slots stay as they are.', factoryPads)",
+  "new": "askYes('Put the factory drums on pads 1–8? Synth slots stay.', 'Put them on').then(ok => { if (ok) factoryPads(); })"
+ },
+ {
+  "id": "T414",
+  "file": "index.html",
+  "old": "ask(`Clear all ${nslots()} slots?`, clearKit)",
+  "new": "askYes(`Clear all ${nslots()} slots?`, 'Clear').then(ok => { if (ok) clearKit(); })"
+ },
+ {
+  "id": "T546",
+  "file": "waves/index.html",
+  "old": "toast('Undone.')",
+  "new": "toast('Undone')"
+ },
+ {
+  "id": "T547",
+  "file": "waves/index.html",
+  "old": "toast('Redone.')",
+  "new": "toast('Redone')"
+ },
+ {
+  "id": "T619",
+  "file": "chains/index.html",
+  "old": "toast('Undone.')",
+  "new": "toast('Undone')"
+ },
+ {
+  "id": "T620",
+  "file": "chains/index.html",
+  "old": "toast('Redone.')",
+  "new": "toast('Redone')"
+ },
+ {
+  "id": "T720",
+  "file": "index.html",
+  "old": "'not a MIDI file'",
+  "new": "'it isn’t a MIDI file'"
+ },
+ {
+  "id": "T721",
+  "file": "index.html",
+  "old": "'SMPTE timing isn’t supported'",
+  "new": "'it uses SMPTE timing, which isn’t supported'"
+ },
+ {
+  "id": "T722",
+  "file": "index.html",
+  "old": "'no timing in the header'",
+  "new": "'it has no timing info'"
+ },
+ {
+  "id": "T736",
+  "file": "index.html",
+  "old": "'That shared project couldn’t be read. Save it and use File ▾ → LOAD PROJECT.'",
+  "new": "'Couldn’t read that shared project. Save it and use File ▾ → LOAD PROJECT'"
+ }
+]

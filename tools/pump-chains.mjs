@@ -57,10 +57,10 @@ const wblock = `${W_START} (written by tools/pump-chains.mjs from pump/pump-meta
    without them a module passes its input through. */
 const PUMP_CH = ${JSON.stringify(spec)};
 function pumpWasmX(){
-  const g = globalThis; if (g.__pumpX) return g.__pumpX; if (!g.__pumpBytes) return null;
-  try { const z = () => 0, m = new WebAssembly.Module(g.__pumpBytes);
+  const g = globalThis; if (g.__pumpX) return g.__pumpX; if (!g.__pumpMod && !g.__pumpBytes) return null;
+  try { const z = () => 0, m = g.__pumpMod || new WebAssembly.Module(g.__pumpBytes);   // __pumpMod: compiled on the page (no compile on this thread)
     const x = new WebAssembly.Instance(m, {wasi_snapshot_preview1:{fd_close:z, fd_seek:z, fd_write:z, proc_exit:z}}).exports;
-    if (x._initialize) x._initialize(); g.__pumpX = x; return x; } catch (e){ g.__pumpBytes = null; return null; }
+    if (x._initialize) x._initialize(); g.__pumpX = x; return x; } catch (e){ g.__pumpBytes = null; g.__pumpMod = null; return null; }
 }
 function pumpCurve(q, v){ v = v < 0 ? 0 : v > 1 ? 1 : v; return q[5] === 'log' ? q[3] * Math.pow(q[4] / q[3], v) : q[3] + (q[4] - q[3]) * Math.pow(v, q[6] > 0 ? q[6] : 1); }
 function pumpModule(key, d){

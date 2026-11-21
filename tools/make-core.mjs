@@ -19,7 +19,7 @@ const walk = await import(pathToFileURL(path.join(NM, 'acorn-walk/dist/walk.mjs'
 
 // What the core starts from, and what it must not take: the render helpers (the main thread prepares buffers) and the
 // live song / kit, which the core keeps its own copies of (set by the processor's messages).
-const ROOTS = ['makeSeq', 'trackGain', 'curve', 'shapeData', 'sfPick', 'sfVoice'];   // (trackGain, curve: the core's mix outputs, TVA and the master VOL; shapeData: CUT / RES / DEC)
+const ROOTS = ['makeSeq', 'trackGain', 'curve', 'shapeData', 'sfPick', 'sfVoice', 'pumpPv'];   // (pumpPv: MOD's …pump rows, as the page makes them; trackGain, curve: the core's mix outputs, TVA and the master VOL; shapeData: CUT / RES / DEC)
 // TFX (the effect table) holds DSP and display code from other scripts; the core only reads each effect's pump flag and
 // its controls' k / min / max, which the page sends (coreTfx in index.html).
 const STOP = new Set(['ensurePlay', 'ensure', 'varWant', 'applyChop', 'S', 'kit', 'TFX']);

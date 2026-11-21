@@ -24,14 +24,18 @@ function renderModule(E, M, type, over) {
   // control module's golden hash a hash of nothing). So the module's outputs are cabled into the output whatever their kind:
   // the first into its left input, the second into its right (connect() does not restrict port kinds, as in the editor).
   const sink = ['in', 'inR']; outs.slice(0, 2).forEach((p, i) => cab.push({ from: ['b', p], to: ['c', sink[i]] }));
+  // A PROBE (the Scope) has no output to cable: it runs while the editor watches (telemetry on) and what it makes is its show() list, which is recorded as its one "port".
+  const probe = m.probe === true; if (probe) { cab.push({ from: ['a', 'out'], to: ['b', 'a'] }, { from: ['a', 'outR'], to: ['b', 'b'] }); }
   E.loadPatch({ modules: [{ id: 'a', type: 'trackIn', scope: 'mono', params: { track: 1 } }, { id: 'b', type, scope: 'mono', params }, { id: 'c', type: 'chainOut', scope: 'mono', params: { track: 1, level: 1 } }], cables: cab });
-  const ports = Object.keys(m.outputs || {}), rec = {}; for (const p of ports) rec[p] = new Float32Array(128 * BLOCKS);
+  if (probe) E.handleMessage({ op: 'telemetry', value: true });
+  const ports = probe ? ['show'] : Object.keys(m.outputs || {}), rec = {}; for (const p of ports) rec[p] = new Float32Array(probe ? 3 + 512 : 128 * BLOCKS);
   const sig = H.testSignal(128 * BLOCKS), L = new Float32Array(128 * BLOCKS), R = new Float32Array(128 * BLOCKS);
   for (let b = 0; b < BLOCKS; b++) {
     const s = sig.subarray(b * 128, (b + 1) * 128); E.setTrackInputs(s, s); E.process(128);
     L.set(E.bus(1), b * 128); R.set(E.busR(1), b * 128);
-    const io = E._ios.get('b'); if (io) for (const p of ports) rec[p].set(io.out[p], b * 128);
+    const io = E._ios.get('b'); if (io && !probe) for (const p of ports) rec[p].set(io.out[p], b * 128);
   }
+  if (probe){ const sh = E.telemetry().shows.find(x => x[0] === 'b'); if (sh) rec.show.set(sh[1]); E.handleMessage({ op: 'telemetry', value: false }); }
   // Under load the engine sheds to 'draft' quality, which changes the DSP. A golden hash taken then would be wrong, so say so.
   if (E.quality !== 'full') throw new Error('engine shed to draft quality while rendering ' + type + ' (machine too slow for a stable hash)');
   return { L, R, rec, ports };
@@ -64,7 +68,7 @@ test('chains: the real effects wasm loads, and records no error', () => {
 const SILENCERS = new Set(['mute']);
 const KEEP_DEFAULT = new Set(['flip']);   // Utility: flip (left polarity) + mono (sum) cancels a centred signal to exact silence, which is correct DSP but hashes nothing
 const switchesOn = m => { const o = {}; for (const [k, d] of Object.entries(m.params || {})) { const [, mn, mx, st] = d; if (KEEP_DEFAULT.has(k)) { o[k] = d[0]; continue; } if (mx - mn === 1 && st === 1) { o[k] = SILENCERS.has(k) ? mn : mx; continue; } let v = mn + (mx - mn) * .3; if (st >= 1) v = Math.round((v - mn) / st) * st + mn; o[k] = v; } return o; };
-const SKIP = new Set(['trackIn', 'chainOut']);
+const SKIP = new Set(['trackIn', 'chainOut', 'send', 'recv']);   // send, recv: never run, the graph's compile step resolves them into cables (tests/chains-sendrecv.test.js)
 test('chains: every module renders finite audio and matches its golden hash (defaults, stressed, switches on)', () => {
   const { E, D } = engine(), actual = {}, bad = [];
   for (const type of Object.keys(D.MODULES).sort()) {
@@ -83,7 +87,7 @@ test('chains: every module renders finite audio and matches its golden hash (def
 test('chains: modules that generate or process a signal are not silent', () => {
   const { E, D } = engine(), dead = [];
   // Modules that legitimately output nothing without an external trigger or a patched side input are named, with the reason.
-  const NEEDS_TRIGGER = new Set(['beads', 'blipdrum', 'scout', 'scin', 'mixer', 'smixer', 'divider', 'euclid', 'logic', 'gateex', 'clock', 'life', 'marbles', 'steps', 'envfol', 'pitchfol', 'pitchtrk', 'adsr', 'atten', 'math', 'quant', 'slew', 'snh', 'random', 'tides', 'meta', 'reverse']);
+  const NEEDS_TRIGGER = new Set(['scope', 'beads', 'blipdrum', 'scout', 'scin', 'mixer', 'smixer', 'divider', 'euclid', 'logic', 'gateex', 'clock', 'life', 'marbles', 'steps', 'envfol', 'pitchfol', 'pitchtrk', 'adsr', 'atten', 'math', 'rect', 'switch', 'xfade', 'clkmul', 'chance', 'counter', 'stepsw', 'burst', 'gatedly', 'flipflop', 'quant', 'slew', 'snh', 'random', 'tides', 'meta', 'reverse', 'dline', 'expr', 'morph']);   // expr: its default formula (a * k1) works on input A, which the harness does not feed (it feeds In); tests/modules-expr.test.js tests its sound.  // dline: the stressed Time (1.4 s) is longer than the 1.07 s render, so it is silent; tests/modules-delay.test.js tests its sound  // morph: the harness feeds only In (sound A), and Convolve with B silent is silence by design; the Shape pass (switches on) is audible and tests/modules-morph.test.js tests the sound
   for (const type of Object.keys(D.MODULES).sort()) {
     const m = D.MODULES[type]; if (!m || !m.process || SKIP.has(type) || NEEDS_TRIGGER.has(type)) continue;
     const r = renderModule(E, D.MODULES, type, stress(m)); if (!Object.keys(m.outputs || {}).length) continue;

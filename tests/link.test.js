@@ -60,7 +60,7 @@ test('link: main.js loads the addon optionally, and every handler answers withou
   // index.html: no Link without the desktop bridge (the website), and every hook outside the block is guarded
   const html = H.read('index.html');
   assert.match(html, /const LINKAPI = \(window\.thunderDesktop && window\.thunderDesktop\.link\) \|\| null;/);
-  assert.match(html, /const lkp = lk \? lkPlan\(/); assert.match(html, /if \(tp\.on && lk && !lk\.restart\) lkStopped\(\)/);
+  assert.match(html, /const lkp = lk \? lkPlan\(/); assert.match(html, /if \(tp\.on && lk && !lk\.restart\) (lkStopped\(\)|G\('Link', lkStopped\))/);   // (10 Nov: tStop runs it through its logging helper G)
 });
 
 test('link: the real addon, when built here (node link/build.js), loads and answers without going on the network', { skip: !fs.existsSync(path.join(H.ROOT, 'electron/link/thunder_link.node')) && 'not built here' }, async () => {
@@ -73,4 +73,13 @@ test('link: the real addon, when built here (node link/build.js), loads and answ
   const at = L.now() + 500000; L.start(at, 4, false);
   let d = Infinity; for (let i = 0; i < 50 && Math.abs(d) >= 2; i++) { d = L.timeAtBeat(0, 4) - at; if (Math.abs(d) >= 2) await tick(10); }
   assert.ok(Math.abs(d) < 2, 'alone, beat 0 moves to our start (off by ' + d + ' µs)');
+});
+
+test('desktop: Apply (reload) goes through the shell, because main.js cancels every page navigation', () => {
+  const main = H.read('electron/main.js'), pre = H.read('electron/preload.js'), html = H.read('index.html');
+  assert.match(main, /will-navigate', \(e, url\) => \{ e\.preventDefault\(\)/, 'the guard that swallowed location.reload()');
+  assert.match(main, /ipcMain\.on\('thunder:reload', e => \{[^\n]*e\.sender\.reload\(\)/, 'main reloads the sender\'s own window');
+  assert.match(pre, /reload: \(\) => ipcRenderer\.send\('thunder:reload'\)/, 'preload offers thunderDesktop.app.reload');
+  const fn = html.match(/function applyUpdate\(\)\{[\s\S]*?\n  location\.reload\(\); \}/);
+  assert.ok(fn && /DESK_APP && DESK_APP\.reload\)\{ DESK_APP\.reload\(\); return; \}/.test(fn[0]) && /selfReload = true;/.test(fn[0]), 'applyUpdate: the desktop bridge first, location.reload() for the website');
 });

@@ -1,0 +1,15 @@
+# CodeRabbit: review PRs into the port branch and the beta branch too (the default branch, main, is always reviewed).
+# CodeRabbit reads this file from the PR's head, so it has to exist on every branch PRs are cut from: main, beta and native.
+reviews:
+  auto_review:
+    enabled: true
+    drafts: false
+    base_branches:
+      - "^native$"
+      - "^beta$"
+  path_instructions:
+    - path: "native/core/**"
+      instructions: >-
+        C++ audio engine. Code reachable from the audio callback must not allocate, lock, throw or do I/O.
+        Flag data races between the control, audio and consumer threads, unbounded loops, and any change
+        that could alter rendered output for existing songs (goldens must stay bit-identical).

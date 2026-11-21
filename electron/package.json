@@ -2,7 +2,7 @@
   "name": "thunder-plus",
   "productName": "Thunder Plus",
   "version": "1.1.0",
-  "description": "...Thunder Plus: drum synth, bass synth and tracker.",
+  "description": "Thunder Plus: drum synth, bass synth and tracker.",
   "author": "Matt Hettich",
   "license": "UNLICENSED",
   "main": "main.js",
@@ -28,11 +28,14 @@
       "updater.js",
       "preload.js",
       "link-session.js",
+      "io-helper.js",
       "link/**/*",
+      "io/**/*",
       "app/**/*"
     ],
     "asarUnpack": [
-      "link/*.node"
+      "link/*.node",
+      "io/*.node"
     ],
     "directories": {
       "output": "dist",
@@ -61,7 +64,7 @@
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
-      "shortcutName": "...Thunder Plus"
+      "shortcutName": "Thunder Plus"
     },
     "mac": {
       "target": [
@@ -81,8 +84,9 @@
       "category": "public.app-category.music",
       "icon": "app/icons/plus-icon-512.png",
       "extendInfo": {
-        "NSMicrophoneUsageDescription": "...Thunder Plus uses an audio input only when you record a sample into a pad."
-      }
+        "NSMicrophoneUsageDescription": "Thunder Plus uses an audio input only when you record a sample into a pad."
+      },
+      "hardenedRuntime": false
     },
     "linux": {
       "target": [
@@ -103,11 +107,12 @@
       {
         "ext": "thunder",
         "name": "Thunder Plus project",
-        "description": "...Thunder Plus project",
+        "description": "Thunder Plus project",
         "role": "Editor",
         "mimeType": "application/x-thunder-plus"
       }
-    ]
+    ],
+    "afterPack": "scripts/adhoc-sign.js"
   },
   "dependencies": {
     "electron-updater": "6.6.2"

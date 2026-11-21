@@ -126,6 +126,31 @@ try {
     say(z.scrolled, 'ZOOM: Shift+wheel scrolls'); say(z.pinched, 'ZOOM: two fingers pinching apart zoom in'); say(z.moved, 'ZOOM: a click on the overview moves the view there'); say(z.fit, 'ZOOM: FIT shows the whole take'); }
   say(r4.cleared, 'EDIT: closing lets the edit go (Record a sample… starts clean)');
   say(r4.undone === 22050, `EDIT: the Synth page's Undo takes the Apply back (${r4.undone} frames)`);
+  // KEYS (owner, 8 Nov, desktop app): Space plays / stops even with a menu button focused (it used to open the menu); solo and
+  // mute keys work on the Synth page too. Real key presses through the page's keyboard, focus set the way a click leaves it.
+  { const E = s => page.evaluate(x => window.__seqTest.ev(x), s), wait = ms => page.waitForTimeout(ms);
+    await E("setView('tracker'); if (tp.on) tStop();"); await wait(300);
+    const q = async () => ({ on: await E('!!tp.on'), file: await E("!$('gfile').hidden"), edit: await E("!$('gedit').hidden"), focus: await E('document.activeElement && document.activeElement.id') });
+    await page.focus('#bFile'); const f0 = await q(); await page.keyboard.press('Space'); await wait(500); const f1 = await q();
+    say(f0.focus === 'bFile' && f1.on && !f1.file && f1.focus === 'bFile', `KEYS: Space on the focused File ▾ button starts the song and leaves the menu closed (${JSON.stringify(f1)})`);
+    await page.keyboard.press('Space'); await wait(500); const f2 = await q();
+    say(!f2.on && !f2.file, `KEYS: Space again stops it (${JSON.stringify(f2)})`);
+    await page.focus('#bEdit'); await page.keyboard.press('Space'); await wait(500); const f3 = await q(); await page.keyboard.press('Space'); await wait(500);
+    say(f3.on && !f3.edit && !(await q()).on, `KEYS: the same on Edit ▾ (${JSON.stringify(f3)})`);
+    await page.keyboard.press('ArrowDown'); await wait(200); const f4 = await q();
+    say(f4.file || f4.edit, 'KEYS: ▼ on a focused menu button still opens it');
+    await E("gfileToggle(false); geditToggle(false);");
+    await E("setView('synth'); document.activeElement && document.activeElement.blur(); S.mix.forEach(m => { m.solo = false; m.mute = false; });"); await wait(200);
+    const t = await E('dkTrack()');
+    await page.keyboard.press('Control+/'); await wait(200); const s1 = await E('S.mix.map(m => m.solo)');
+    say(s1[t] === true && s1.filter(Boolean).length === 1, `KEYS: Ctrl+/ on the Synth page solos the current track (${t + 1}) ${JSON.stringify(s1.slice(0, 4))}`);
+    await page.keyboard.press('Control+Shift+/'); await wait(200); const s2 = await E('S.mix.some(m => m.solo)');
+    say(s2 === false, 'KEYS: Ctrl+Shift+/ on the Synth page clears every solo');
+    await page.keyboard.press('/'); await wait(200); const m1 = await E('S.mix.map(m => m.mute)');
+    say(m1[t] === true && m1.filter(Boolean).length === 1, `KEYS: / on the Synth page mutes the current track (${t + 1}) ${JSON.stringify(m1.slice(0, 4))}`);
+    await page.keyboard.press('\\'); await wait(200); const m2 = await E('S.mix.some(m => m.mute)');
+    say(m2 === false, 'KEYS: \\ unmutes it again');
+    await E("setView('tracker')"); }
   await c.close();
 } finally { await browser.close(); srv.close(); fs.rmSync(dir, { recursive: true, force: true }); }
 process.exit(failed ? 1 : 0);
