@@ -21,10 +21,13 @@ class LiveEngT final : public LiveEng {
   uint64_t clock() const override { return sh_.clock(); }
   uint32_t latency() const override { return SH::latency(); }
   bool failed() const override { return sh_.failed(); }
-  void setRateFeed(const Auto* a, double sr) override { sh_.setRateFeed(a, sr); }
+  void setRateFeed(const Auto* a, double sr, const double* before1) override { sh_.setRateFeed(a, sr, before1); }
+  void setEngFeed(const EngFeed* f) override { sh_.setEngFeed(f); }
   size_t bytes() const override { return sizeof(*this); }
   uint32_t shellDropped() const override { return sh_.dropped(); }
   uint32_t shellForced() const override { return sh_.forced(); }
+  bool idle() const override { return sh_.idle(); }
+  void fastForward(uint64_t H) override { sh_.fastForward(H); }
  private:
   SH sh_;
 };
@@ -49,8 +52,9 @@ bool LivePool::addPad(int pad, const LivePadConfig& cfg) {
       default: { auto* e = new LiveEngT<LiveMach>(sr_); n->eng.reset(e); e->shell().core().set(cfg.mach); break; }
     }
     if (!ok) return nullptr;
-    n->eng->setRateFeed(&n->rate, sr_);
-    fresh.bytes += sizeof(Node) + n->eng->bytes();
+    n->engL.reset(new Node::EngLanes()); for (int i = 0; i < 12; i++) n->feed.a[i] = &n->engL->a[i];
+    n->eng->setRateFeed(&n->rate, sr_, &n->rateT0); n->eng->setEngFeed(&n->feed);
+    fresh.bytes += sizeof(Node) + sizeof(Node::EngLanes) + n->eng->bytes();
     Node* raw = n.get(); fresh.nodes.push_back(std::move(n)); return raw;
   };
   for (int t = 0; t < kVoiceTracks; t++) {
@@ -80,6 +84,7 @@ void LivePool::cancelFrom(Node& n, int64_t T) {   // AudioParam.cancelScheduledV
   n.ntl = w; rec(n, 'c', 0, 0, T);
 }
 void LivePool::book(Node& n, const TEv& e) {
+  wake(n);
   if (n.ntl >= kTimeline) {
     if (e.type != LiveEvType::NoteOff && e.type != LiveEvType::End) { st_.queueDropped++; return; }   // L5: a NoteOn (and a Bpm / Wob event) is dropped and counted
     // a note-off always wins: it discards what is booked at or after it and is kept
@@ -150,6 +155,7 @@ bool LivePool::note(const SeqEvent& e0, int pad, double bpm, const double* arp, 
 // that started longest ago (ties: the first); a note that would take the node that started at the very same time with none free is consumed and silent.
 bool LivePool::polyVox(const SeqEvent& e, PadSlot& ps, double bpm, const double* arp) {
   Node* nodes[kVoicePoly]; for (int j = 0; j < kVoicePoly; j++) { nodes[j] = ps.poly[(size_t)e.track * kVoicePoly + (size_t)j]; if (!nodes[j]) { st_.noNode++; return false; } }
+  for (int j = 0; j < kVoicePoly; j++) nodes[j]->bound = true;   // (lnode made all four)
   VoxG& G = ps.vg[(size_t)e.track];
   const bool leg = (e.has & SH_SLIDE) && e.slideDur > 0;
   double kk;
@@ -172,6 +178,7 @@ void LivePool::startNote(Node& n, const SeqEvent& e, double bpm, const double* a
   cancelFrom(n, T);                                                    // gate, trig, leg
   // the rate: hold, then the slide or the step (the list is folded like the sampler's rather than a point dropped: P5)
   if (n.rate.size() + 3 > n.rate.capacity()) { n.rate.prune(now_); if (n.rate.size() + 3 > n.rate.capacity()) { n.rate.prune(t); n.rate.cancel(t); } }
+  n.rateT0 = std::min(n.rateT0, t);
   holdRamp(n.rate, t);   // D7: the page's cancelAndHoldAtTime
   if (leg) { n.rate.set(e.slideFrom, t); n.rate.lin(e.rate, t + e.slideDur); } else n.rate.set(e.rate, t);
   if (n.kind == LiveKind::Bass && std::isfinite(bpm) && bpm != n.lastBpm) { bookCtl(n, LiveEvType::Bpm, t, bpm); n.lastBpm = bpm; }   // P4: the bpm lane follows the tempo (SEV_TEMPO comes after its step's notes, never before the first)
@@ -182,11 +189,30 @@ void LivePool::startNote(Node& n, const SeqEvent& e, double bpm, const double* a
   if (n.pn.size() + 2 > n.pn.capacity()) n.pn.prune(now_);
   n.g.set(e.gain, t); n.pn.set(std::max(-1.0, std::min(1.0, (e.pan - 128) / 127)), t);
   if (n.kind == LiveKind::Bass && (e.has & SH_WOB) && std::isfinite(e.wob)) bookCtl(n, LiveEvType::Wob, t, e.wob);
+  n.bound = true;
+  { const EngSt& es = engSt_[n.track]; if (es.has) engPut(n, es.c, es.o, t, false); }   // the track's commands and LFOs as they are now (cp:731)
   n.serial = nextSerial_; n.choke = curChoke_; n.done = false; n.quiet = 0;
   n.lastOn = t; n.curLive = true; n.curStop = false; n.curCol = e.col; n.base = e.rate; n.vrate = e.rate; n.inT = true; n.used = true;
   if (!leg) pitchMods(n, t, e.rate, e, arp);
   if (e.has & SH_CUT) kill(n, e.cut);
   if (e.has & SH_REL) kill(n, e.rel);
+}
+
+// engEv / engPut (core-processor.js :386-399): the track's state, then the twelve lanes of each node of the track that exists. A `set` for the commands, a ramp from the last point for the offsets once the node has the targets on.
+void LivePool::engPut(Node& n, const double c[5], const double o[7], double at, bool ramp) {
+  const bool rp = ramp && n.engOn; n.feed.on = true;
+  for (int k = 0; k < 5; k++) if (std::isfinite(c[k])) { AutoN<kAutoEng>& A = n.engL->a[k]; if (A.size() + 2 > A.capacity()) A.prune(now_); A.set(c[k], at); }
+  for (int k = 0; k < 7; k++) if (std::isfinite(o[k])) { AutoN<kAutoEng>& A = n.engL->a[5 + k]; if (A.size() + 2 > A.capacity()) A.prune(now_); if (rp) A.lin(o[k], at); else A.set(o[k], at); }
+  n.engOn = true;
+}
+void LivePool::eng(const SeqEvent& e) {
+  if (e.track < 0 || e.track >= kVoiceTracks) { st_.refused++; return; }   // F4 (the new entry point): a track that is not one, a time that is not a number: refused whole, counted
+  if (!std::isfinite(e.t)) { st_.refused++; return; }
+  { bool bad = false; for (int k = 0; k < 5; k++) if (!std::isfinite(e.engC[k])) bad = true; for (int k = 0; k < 7; k++) if (!std::isfinite(e.engO[k])) bad = true; if (bad) st_.refused++; }   // (a value that is not a number is not put: an AudioParam cannot hold it; the rest of the event stands; once an event)
+  const double at = std::max(e.t, now_);
+  bool def = true; for (int k = 0; k < 5; k++) if (!(e.engC[k] < 0)) def = false; for (int k = 0; k < 7; k++) if (e.engO[k] != 0 && e.engO[k] == e.engO[k]) def = false;   // (!(c < 0): NaN is not a default; a falsy offset is 0 or NaN)
+  EngSt& es = engSt_[e.track]; es.has = !def; if (!def) { for (int k = 0; k < 5; k++) es.c[k] = e.engC[k]; for (int k = 0; k < 7; k++) es.o[k] = e.engO[k]; }
+  for (Node* n : byTrack_[e.track]) { if (!n->bound) continue; if (def && !n->engOn) continue; engPut(*n, e.engC, e.engO, at, true); }
 }
 
 void LivePool::bookCtl(Node& n, LiveEvType type, double t, double v) {
@@ -195,6 +221,7 @@ void LivePool::bookCtl(Node& n, LiveEvType type, double t, double v) {
 
 // pitchMods (core-processor.js :525-545) on the node's rate lane. An ARP row books arpN + 1 points: the list is folded before it would overflow, and only if that is not enough the new arpeggio replaces what is booked from its first step on (P5; as the sampler's).
 void LivePool::pitchMods(Node& n, double t, double base, const SeqEvent& e, const double* arp) {
+  n.rateT0 = std::min(n.rateT0, t);
   AutoN<kAutoRate>& pr = n.rate;
   if (e.has & SH_ARP) {
     if (pr.size() + e.arpN + 1 > pr.capacity()) {
@@ -218,9 +245,10 @@ void LivePool::pitchMods(Node& n, double t, double base, const SeqEvent& e, cons
 
 // modVoice for a live voice: gain and pan on the node's level, `mul` and the bends on its rate, cut / rel as kills; D6 (the page's modVoice): a `wob` moves the bass node's wobble at the row's time.
 void LivePool::modVoice(Node& n, const SeqEvent& e, const double* arp) {
+  wake(n);
   if (e.has & SH_GAIN) { if (n.g.size() + 2 > n.g.capacity()) n.g.prune(now_); n.g.set(e.gain, e.t); }
   if (e.has & SH_PAN) { if (n.pn.size() + 2 > n.pn.capacity()) n.pn.prune(now_); n.pn.set(std::max(-1.0, std::min(1.0, (e.pan - 128) / 127)), e.t); }
-  if (e.has & SH_MUL) { n.vrate = n.base * e.mul; if (n.rate.size() + 2 > n.rate.capacity()) n.rate.prune(now_); n.rate.set(n.vrate, e.t); }
+  if (e.has & SH_MUL) { n.rateT0 = std::min(n.rateT0, e.t); n.vrate = n.base * e.mul; if (n.rate.size() + 2 > n.rate.capacity()) n.rate.prune(now_); n.rate.set(n.vrate, e.t); }
   pitchMods(n, e.t, n.vrate, e, arp);
   if (e.has & SH_CUT) kill(n, e.cut);
   if (e.has & SH_REL) kill(n, e.rel);
@@ -262,7 +290,10 @@ void LivePool::stopAll(double at) {   // stopAll(at): every node's voice lets go
     if (n->curLive && !(n->curStop && n->stopAt <= at)) { n->curStop = true; n->stopAt = at; n->stopT = T; }
     if (n->used) { cancelFrom(*n, T); TEv off; off.T = T; off.type = LiveEvType::NoteOff; book(*n, off); rec(*n, 'o', t, 0, T); }
     n->sylN = 0; n->inT = false;
+    if (n->bound && n->feed.on) { for (int k = 0; k < 12; k++) { AutoN<kAutoEng>& A = n->engL->a[k]; A.cancel(at); A.set(k < 5 ? -1 : 0, at); } }   // ENGINE TARGETS: the twelve back to their defaults
+    n->engOn = false;
   }
+  for (EngSt& s : engSt_) s = EngSt();
   for (PadSlot& p : pads_) for (VoxG& g : p.vg) g = VoxG();
 }
 double LivePool::debugRateAt(int track, int pad, int j, double t) const {
@@ -275,6 +306,7 @@ bool LivePool::debugNode(int track, int pad, int j, LiveDebugNode* o) const {
   if (pad < 0 || pad >= kLivePads || track < 0 || track >= kVoiceTracks) return false;
   const PadSlot& ps = pads_[pad]; const Node* n = j == 0 ? ps.byTrack[track] : (ps.poly.empty() ? nullptr : ps.poly[(size_t)track * kVoicePoly + (size_t)(j - 1)]);
   if (!n) return false;
+  if (n->feed.on) for (int k = 0; k < 12; k++) o->eng[k] = n->feed.a[k]; o->engBound = n->bound; o->engOn = n->engOn;
   o->tl = n->tl; o->ntl = n->ntl; o->rate = &n->rate; o->g = &n->g; o->pn = &n->pn; o->sylN = n->sylN; o->lastOn = n->lastOn; o->inT = n->inT; o->curLive = n->curLive; o->curStop = n->curStop; o->stopAt = n->stopAt; o->curCol = n->curCol;
   return true;
 }
@@ -332,8 +364,27 @@ void LivePool::deliver(Node& n, uint32_t count, LiveEvent* out, uint32_t* nout) 
   *nout = m;
 }
 
-void LivePool::runNode(Node& n, int64_t q0, int frames, float* const* inL, float* const* inR) {
+// The idle skip (LIVE ROUTE 1b). A node whose voice has ended and whose output is silent (nothing booked, the core idle, the rate lane constant) is not processed: it adds exact zeros, so nothing is mixed. Whatever
+// processing it would have done is done at once by wake() when something is next booked on it (book(): a note, an off, a tempo / wobble event) or its rate lane is written without a booking (modVoice): the shell's clock and control-block grid, the core's carried state
+// (the vox pitch latch). The tests compare a skipping pool with a processing one bit for bit.
+void LivePool::pruneLanes(Node& n, int64_t q0) {
+  const double tb0 = (double)q0 / sr_;
+  n.g.prune(tb0); n.pn.prune(tb0); { const int64_t keep = (int64_t)n.eng->clock() - 2 * (int64_t)LiveBass::kBlk; if (keep > 0) n.rate.prune((double)keep / sr_); if (n.feed.on) for (int k = 0; k < 12; k++) n.engL->a[k].prune((double)keep / sr_); }   // (the shell's next control block starts at or after clock - kBlk)
+}
+void LivePool::wake(Node& n) {
+  if (!n.skip) return;
+  n.skip = false; skipped_--;
   LiveEng& eng = *n.eng; const uint32_t lat = eng.latency();
+  if (!n.started) { eng.seek((uint64_t)qEnd_); n.started = true; }   // (a node that never ran: its idle blocks leave no state a note reads, the core's go_ latches the pitch at every block: where it "started" does not show)
+  eng.fastForward((uint64_t)(qEnd_ + (int64_t)lat));   // (the lanes are pruned by the next quantum that runs: the lists' values do not depend on when)
+}
+void LivePool::setIdleSkip(bool on) { if (!on) for (Node* n : active_) wake(*n); idleSkip_ = on; }
+uint32_t LivePool::idleNodes() const { return skipped_; }
+
+void LivePool::runNode(Node& n, int64_t q0, int frames, float* const* inL, float* const* inR) {
+  if (n.skip) { if (tap_) { std::memset(scr_.get(), 0, 2 * kQuantum * sizeof(float)); tap_(tapUser_, n.track, n.pad, n.j, scr_.get(), scr_.get() + kQuantum, frames, q0); } return; }   // (a skipped node's engine output is silence: a tap reads zeros, so the JS parity runs with the skip on)
+  LiveEng& eng = *n.eng; const uint32_t lat = eng.latency();
+  if (!n.started && idleSkip_ && n.ntl == 0) { n.skip = true; skipped_++; if (tap_) { std::memset(scr_.get(), 0, 2 * kQuantum * sizeof(float)); tap_(tapUser_, n.track, n.pad, n.j, scr_.get(), scr_.get() + kQuantum, frames, q0); } return; }   // (a node nothing was ever booked on)
   float* sL = scr_.get(); float* sR = scr_.get() + kQuantum;
   LiveEvent ev[kTimeline + 1]; uint32_t nev = 0;
   if (!n.started) {   // the first call: the shell starts at this quantum and runs lat samples of pre-roll, so that it is lat ahead of the mixer
@@ -351,10 +402,14 @@ void LivePool::runNode(Node& n, int64_t q0, int frames, float* const* inL, float
       if (n.quiet >= 4096 || (double)(end - n.stopT) >= 4 * sr_) n.done = true;
     }
   }
+  if (idleSkip_ && n.ntl == 0 && (!n.curLive || n.done) && eng.idle()) {   // the idle skip: the rate lane must stay as it is (the idle core latches the pitch from it)
+    double rv; const int64_t t0 = (int64_t)eng.clock() - 2 * (int64_t)(lat + 1);
+    if (n.rate.constFrom(t0 > 0 ? (double)t0 / sr_ : 0.0, &rv)) { n.skip = true; skipped_++; }
+  }
   // the page's GainNode and StereoPanner after the node (__tcPost), then into the track's input
   float* oL = inL ? inL[n.track] : nullptr; float* oR = inR ? inR[n.track] : nullptr; if (!oL) return;
   const double dt = 1 / sr_, tb0 = (double)q0 / sr_, tb1 = tb0 + frames * dt;
-  n.g.prune(tb0); n.pn.prune(tb0); { const int64_t keep = (int64_t)eng.clock() - 2 * (int64_t)LiveBass::kBlk; if (keep > 0) n.rate.prune((double)keep / sr_); }   // (the shell's next control block starts at or after clock - kBlk)
+  pruneLanes(n, q0);
   double gc = 0, pc = 0; const bool gok = n.g.constBlk(tb0, tb1, &gc), pok = n.pn.constBlk(tb0, tb1, &pc);
   for (int i = 0; i < frames; i++) {
     const double t = tb0 + i * dt, g = gok ? gc : n.g.at(t), p = pok ? pc : n.pn.at(t);
@@ -370,6 +425,7 @@ void LivePool::runNode(Node& n, int64_t q0, int frames, float* const* inL, float
 void LivePool::render(float* const* inL, float* const* inR, int frames, int64_t frame0) {
   if (frames <= 0 || frames > kQuantum) return;
   for (Node* n : active_) runNode(*n, frame0, frames, inL, inR);
+  qEnd_ = frame0 + frames; lastQ0_ = frame0;
 }
 
 }  // namespace thunder

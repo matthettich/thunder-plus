@@ -1115,6 +1115,12 @@ target_link_libraries(test_live_review PRIVATE thunder_core)
 target_include_directories(test_live_review PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../core/src ${CMAKE_CURRENT_SOURCE_DIR})
 add_test(NAME live_review COMMAND test_live_review)
 
+# LIVE ROUTE 1b: the idle skip, a skipping pool against a processing one, bit for bit (test_live_idle --bench: the cost of a silent vox pad on 33 tracks)
+add_executable(test_live_idle test_live_idle.cpp)
+target_link_libraries(test_live_idle PRIVATE thunder_core)
+target_include_directories(test_live_idle PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../core/src ${CMAKE_CURRENT_SOURCE_DIR})
+add_test(NAME live_idle COMMAND test_live_idle)
+
 # bus into bus: a two-bus chain through the offline renderer (analytic reference), transitive solo, stems through any depth
 add_executable(test_render_bus_chain test_render_bus_chain.cpp)
 target_link_libraries(test_render_bus_chain PRIVATE thunder_core)

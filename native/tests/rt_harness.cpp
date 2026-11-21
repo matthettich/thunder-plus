@@ -464,6 +464,48 @@ static int run_song() {
   return 0;
 }
 
+// ---- LIVE ROUTE 1b: a pool of the four live pads driven directly under the guard: notes, ENGINE TARGETS events (up to 4 points a lane, more than a lane holds: pruning and overflow), stopAll, hostile eng values, idle
+// stretches (the idle skip: a node leaves the pass and wakes at its next event) and the notes after them. The pads are declared outside the guard. Nothing may allocate, nothing may be non-finite.
+static int run_live_eng() {
+  using namespace thunder;
+  LivePool lp(48000); const LiveKind kinds[4] = {LiveKind::Bass, LiveKind::Vox, LiveKind::Acid, LiveKind::Mach};
+  for (int k = 0; k < 4; k++) { LivePadConfig c; c.kind = kinds[k]; c.trackMask = 0xFFu; c.vox.txt = "la di da ba"; if (!lp.addPad(k, c)) return fail("addPad failed (live eng)"); }
+  const int NT = 8; static std::vector<float> bufL((size_t)kVoiceTracks * 128), bufR((size_t)kVoiceTracks * 128); float* inL[kVoiceTracks]; float* inR[kVoiceTracks];
+  for (int t = 0; t < kVoiceTracks; t++) { inL[t] = bufL.data() + (size_t)t * 128; inR[t] = bufR.data() + (size_t)t * 128; }
+  uint32_t rng = 5; auto rnd = [&]() { rng = rng * 1664525u + 1013904223u; return (rng >> 8) / 16777216.0; };
+  const double nan = std::numeric_limits<double>::quiet_NaN(), inf = std::numeric_limits<double>::infinity();
+  bool finite = true; uint32_t maxIdle = 0, notes = 0; const int64_t total = 48000LL * 14;
+  { rt_guard g;
+    for (int64_t q0 = 0; q0 < total; q0 += 128) {
+      const double now = (double)q0 / 48000; lp.setTime(now);
+      if (q0 % (128 * 20) == 0) {   // every ~53 ms: a round of events 0.1 s ahead, with long quiet stretches (seconds 4..8 and 10..12 play nothing)
+        const double sec = now; const bool quiet = (sec >= 4 && sec < 8) || (sec >= 10 && sec < 12);
+        for (int t = 0; t < NT; t++) {
+          if (!quiet && rnd() < 0.5) { SeqEvent e; e.type = SEV_NOTE; e.t = now + 0.1 + rnd() * 0.01; e.track = t; e.pad = (double)(int)(rnd() * 4); e.rate = 0.5 + rnd(); e.gain = 1; e.pan = 128; e.poly = (int)e.pad == 1 && rnd() < 0.5; e.col = (int)(rnd() * 3);
+            if (lp.note(e, (int)e.pad, 120, nullptr)) notes++;
+            SeqEvent o; o.type = SEV_OFF; o.t = e.t + 0.02 + rnd() * 0.1; o.track = t; lp.off(o); }
+          if ((!quiet && rnd() < 0.3) || (quiet && rnd() < 0.02)) { SeqEvent e; e.type = SEV_ENG; e.t = now + 0.05 + rnd() * 0.2; e.track = t;
+            for (int k = 0; k < 5; k++) e.engC[k] = rnd() < 0.5 ? -1 : rnd() * 100; for (int k = 0; k < 7; k++) e.engO[k] = rnd() < 0.5 ? 0 : (rnd() - 0.5) * 40;
+            if (rnd() < 0.05) e.engC[(int)(rnd() * 5)] = rnd() < 0.5 ? nan : inf; if (rnd() < 0.03) e.t = nan; lp.eng(e); }
+        }
+        if (rnd() < 0.05) lp.tempo(now + 0.1, 60 + rnd() * 120);
+        if (rnd() < 0.02 && !quiet) lp.stopAll(now + 0.1);
+        if (quiet && rnd() < 0.01) lp.stopAll(now + 0.1);
+      }
+      for (int t = 0; t < NT; t++) { std::fill(inL[t], inL[t] + 128, 0.f); std::fill(inR[t], inR[t] + 128, 0.f); }
+      lp.render(inL, inR, 128, q0); maxIdle = std::max(maxIdle, lp.idleNodes());
+      for (int t = 0; t < NT; t++) for (int i = 0; i < 128; i++) if (!std::isfinite(inL[t][i]) || !std::isfinite(inR[t][i])) finite = false;
+    }
+  }
+  const LiveStats s = lp.stats();
+  if (!finite) return fail("the live eng pool produced a non-finite sample");
+  if (notes < 50) return fail("the live eng pool played (almost) nothing");
+  if (maxIdle == 0) return fail("the idle skip never engaged in the live eng pool");
+  if (s.failed) return fail("the live eng pool lost a node");
+  std::printf("rt_harness: live eng pool: %u notes, ENGINE TARGETS events, stopAll, %u nodes idle at most, %u refused values, no allocation\n", notes, maxIdle, s.refused);
+  return 0;
+}
+
 // ---- LIVE ROUTE: the same song with four of its pads played by the live engines (bass, vox, acid, mach on every track), through SongRenderer::block, every block inside the guard ------------------------------------------------
 // The pads are declared outside the guard (the nodes allocate). The song's end releases the held live voices (C4), so the pool empties.
 static int run_live() {
@@ -1211,5 +1253,6 @@ int main(int argc, char** argv) {
   if (int r = run_waves()) return r;
   if (int r = run_chains()) return r;
   if (int r = run_live()) return r;
+  if (int r = run_live_eng()) return r;
   return run_song();
 }

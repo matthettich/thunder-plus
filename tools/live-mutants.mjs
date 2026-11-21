@@ -15,7 +15,9 @@ const args = process.argv.slice(2);
 const opt = (n, d) => { const i = args.indexOf(n); return i < 0 ? d : args[i + 1]; };
 const BUILD = path.resolve(opt('--build', path.join(ROOT, 'native/build')));
 const ONLY = opt('--only', null);
-const SRC = { pool: 'native/core/src/engine/live_pool.cpp', shell: 'native/core/src/engine/live_shell.h', render: 'native/core/src/render/render.cpp' };
+const SRC = { pool: 'native/core/src/engine/live_pool.cpp', shell: 'native/core/src/engine/live_shell.h', render: 'native/core/src/render/render.cpp', vox: 'native/core/src/engine/vox_core.cpp', engt: 'native/core/src/engine/eng_targets.h' };
+const TESTS_WITH_SHELL = ['test_live_review', 'test_live_idle', 'test_live_pool'];   // the tests whose own TU instantiates the shell / the eng tables: recompiled against a mutated header too (else their inline copies would shadow the mutant at link time)
+const HDR = { shell: 'live_shell.h', engt: 'eng_targets.h' };   // the header mutants: compiled against a mutated copy found first on the include path
 const text = Object.fromEntries(Object.entries(SRC).map(([k, v]) => [k, fs.readFileSync(path.join(ROOT, v), 'utf8')]));
 
 // [id, what, file, old, new]
@@ -41,6 +43,39 @@ const M = [
   ['F4e', 'magnitudes are not clamped (gain 1e300)', 'pool', 'static inline double mag(double v) { return v < -1e6 ? -1e6 : v > 1e6 ? 1e6 : v; }', 'static inline double mag(double v) { return v; }'],
   ['F4f', 'refusals are not counted', 'pool', 'auto drop = [&](uint32_t bit) { e.has &= ~bit; st_.refused++; };', 'auto drop = [&](uint32_t bit) { e.has &= ~bit; };'],
   ['F4g', 'a non-finite tempo is applied', 'pool', 'if (!std::isfinite(bpm) || !std::isfinite(t)) { st_.refused++; return; }', ''],
+  // ENGINE TARGETS (1b)
+  ['E01', 'an eng event puts nothing on the nodes', 'pool', 'engPut(*n, e.engC, e.engO, at, true); }', '(void)0; }'],
+  ['E02', 'the track\'s engine state is not kept (a node bound later starts from the defaults)', 'pool', 'es.has = !def;', 'es.has = false;'],
+  ['E03', 'the offsets are SET at the event, not ramped', 'pool', 'engPut(*n, e.engC, e.engO, at, true); }', 'engPut(*n, e.engC, e.engO, at, false); }'],
+  ['E04', 'a default eng reaches a node whose targets are off', 'pool', 'if (def && !n->engOn) continue;', ''],
+  ['E05', 'stopAll keeps the track\'s engine state', 'pool', 'for (EngSt& s : engSt_) s = EngSt();', ''],
+  ['E06', 'stopAll leaves the lanes', 'pool', 'A.cancel(at); A.set(k < 5 ? -1 : 0, at); }', '(void)A; }'],
+  ['E07', 'a poly vox note does not bind the four nodes', 'pool', 'for (int j = 0; j < kVoicePoly; j++) nodes[j]->bound = true;', ''],
+  ['E08', 'eng_targets: bass cut and res swapped', 'engt', 'engMapBass() { static const EngMap<BassP> M = {{&BassP::cut, &BassP::res,', 'engMapBass() { static const EngMap<BassP> M = {{&BassP::res, &BassP::cut,'],
+  ['E09', 'eng_targets: vox atk and rel swapped', 'engt', '{{&VoxP::bright, nullptr, nullptr, &VoxP::atk, nullptr, nullptr, &VoxP::rel}', '{{&VoxP::bright, nullptr, nullptr, &VoxP::rel, nullptr, nullptr, &VoxP::atk}'],
+  ['E10', 'eng_targets: acid cut upper bound 6000 -> 5000', 'engt', '{6000, 1.05, 1, 0, 4000, 1, 1000}', '{5000, 1.05, 1, 0, 4000, 1, 1000}'],
+  ['E11', 'eng_targets: mach lp lower bound 60 -> 50', 'engt', '{60, 0, 0, 0.5, 1, 0, 1}', '{50, 0, 0, 0.5, 1, 0, 1}'],
+  ['E12', 'the swap is not restored after the block', 'shell', 'if (sw) A::engOut(core_, sv);', ''],
+  ['E13', 'the engine lanes are read one sample late', 'shell', 'engRead(*eng_, sample_time((int64_t)s, feedSr_), v)', 'engRead(*eng_, sample_time((int64_t)s + 1, feedSr_), v)'],
+  ['E14', 'the swap-in formula: the k=-1 (no cutoff) test is dropped', 'engt', 'if (c < 0 && o == 0) continue;', ''],
+  // IDLE SKIP (1b)
+  ['I01', 'vox idleBlocks advances nothing (the pitch latch, the clocks)', 'vox', 'for (uint64_t i = 0; i < nb; i++) { st_ += n; step(c, dt); }', '(void)nb;'],
+  ['I02', 'vox idleBlocks does not advance the pitch', 'vox', 'for (uint64_t i = 0; i < nb; i++) { st_ += n; step(c, dt); }', 'for (uint64_t i = 0; i < nb; i++) { st_ += n; vt_ += dt; }'],
+  ['I03', 'fastForward leaves the rings as they were', 'shell', '      for (uint64_t i = 0; i < cnt; i++) { ringL_[(last - 1 - i) & (kRing - 1)] = 0.0f; ringR_[(last - 1 - i) & (kRing - 1)] = 0.0f; }\n', ''],
+  ['I04', 'fastForward does one control block too many', 'shell', 'const uint64_t nb = H > rendered_ ? (H - rendered_) / kBlk : 0;', 'const uint64_t nb = H > rendered_ ? (H - rendered_) / kBlk + 1 : 0;'],
+  ['I05', 'the skip does not look at the rate lane', 'pool', 'if (n.rate.constFrom(t0 > 0 ? (double)t0 / sr_ : 0.0, &rv)) {', 'if (true || n.rate.constFrom(t0 > 0 ? (double)t0 / sr_ : 0.0, &rv)) {'],
+  ['I18', 'verify-272 F1: the skip does not wait for the host to be handed the last live block\'s tail', 'shell', ' && clock_ >= lastLive_ + latency(); }', '; }'],
+  ['I19', 'verify-272 F1: the tail wait is one sample short', 'shell', ' && clock_ >= lastLive_ + latency(); }', ' && clock_ + 1 >= lastLive_ + latency(); }'],
+  ['I20', 'verify-272 F2: the shell reads the lane\'s own value (0) before its first event', 'shell', 'return first_ && t < *first_ ? 1.0 : clampRate(feed_->at(t)); }', 'return clampRate(feed_->at(t)); }'],
+  ['V05', 'verify-272 V05: the rate default is read at the lane\'s first event too (<=)', 'shell', 'return first_ && t < *first_ ? 1.0 :', 'return first_ && t <= *first_ ? 1.0 :'],
+  ['V15', 'verify-272 V15: every track\'s engine state is stored as track 0\'s', 'pool', 'EngSt& es = engSt_[e.track]; es.has = !def;', 'EngSt& es = engSt_[0]; es.has = !def;'],
+  ['I21', 'verify-272 item 7: the rate is read at s / sr, not at the sample\'s time (sample_time)', 'shell', 'const double t = sample_time((int64_t)s, feedSr_); return first_', 'const double t = (double)s / feedSr_; return first_'],
+  ['I22', 'verify-272 item 6: the engine lanes are read at s / sr, not at the sample\'s time', 'shell', 'engRead(*eng_, sample_time((int64_t)s, feedSr_), v)', 'engRead(*eng_, (double)s / feedSr_, v)'],
+  ['I17', 'a booking does not wake the node', 'pool', 'void LivePool::book(Node& n, const TEv& e) {\n  wake(n);', 'void LivePool::book(Node& n, const TEv& e) {'],
+  ['I08', 'a mod (a rate lane write with nothing booked) does not wake the node', 'pool', 'void LivePool::modVoice(Node& n, const SeqEvent& e, const double* arp) {\n  wake(n);', 'void LivePool::modVoice(Node& n, const SeqEvent& e, const double* arp) {'],
+  ['I11', 'the skipped node is brought to the wrong clock (the last quantum\'s start)', 'pool', 'eng.fastForward((uint64_t)(qEnd_ + (int64_t)lat));', 'eng.fastForward((uint64_t)(lastQ0_ + (int64_t)lat));'],
+  ['I12', 'a node that never ran is woken with the wrong clock (seek 1000 late)', 'pool', 'eng.seek((uint64_t)qEnd_); n.started = true;', 'eng.seek((uint64_t)qEnd_ + 1000); n.started = true;'],
+  ['I13', 'a voice that has not ended may be skipped', 'pool', '&& (!n.curLive || n.done) && eng.idle()', '&& eng.idle()'],
 ];
 
 if (args.includes('--list')) { for (const [id, what] of M) console.log(id.padEnd(8), what); process.exit(0); }
@@ -49,7 +84,7 @@ if (args.includes('--check')) { let bad = 0; for (const [id, , f, from] of M) { 
 const run = (cmd, a, o = {}) => spawnSync(cmd, a, { encoding: 'utf8', maxBuffer: 1 << 26, ...o });
 const flagsOf = f => { const t = fs.readFileSync(path.join(BUILD, 'core/CMakeFiles/thunder_core.dir/flags.make'), 'utf8'); const g = k => ((t.match(new RegExp('^' + k + ' = (.*)$', 'm')) || [])[1] || '').split(/\s+/).filter(Boolean); return [...g('CXX_DEFINES'), ...g('CXX_INCLUDES'), ...g('CXX_FLAGS')]; };
 const CXXF = flagsOf();
-const tests = ['test_live_pool', 'test_live_tracklist', 'test_live_decisions', 'test_live_reset', 'test_live_review', 'test_live_jsparity'];
+const tests = ['test_live_pool', 'test_live_idle', 'test_live_tracklist', 'test_live_decisions', 'test_live_reset', 'test_live_review', 'test_live_jsparity'];
 const tdir = path.join(BUILD, 'tests');
 const linkOf = t => fs.readFileSync(path.join(tdir, 'CMakeFiles', t + '.dir/link.txt'), 'utf8').trim();
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'livemut-'));
@@ -61,15 +96,15 @@ for (const [id, what, file, from, to] of M) {
   const mutated = text[file].replace(from, () => to), objs = [];
   const cc = (src, extra, out) => { const r = run('c++', [...extra, ...CXXF, '-c', src, '-o', out]); return r; };
   let r;
-  if (file === 'shell') {   // the header: the pool's TU and the shell's explicit instantiations are compiled against the mutated copy (found first on the include path)
-    fs.mkdirSync(path.join(tmp, 'inc/engine'), { recursive: true }); fs.writeFileSync(path.join(tmp, 'inc/engine/live_shell.h'), mutated);
+  if (HDR[file]) {   // a header: the pool's TU and the shell's explicit instantiations are compiled against the mutated copy (found first on the include path)
+    fs.mkdirSync(path.join(tmp, 'inc/engine'), { recursive: true }); fs.writeFileSync(path.join(tmp, 'inc/engine', HDR[file]), mutated);
     for (const f of ['live_pool.cpp', 'live_shell.cpp']) { const o = path.join(tmp, f + '.o'); r = cc(path.join(ROOT, 'native/core/src/engine', f), ['-I' + path.join(tmp, 'inc')], o); if (r.status) break; objs.push(o); }
   } else { const src = path.join(tmp, path.basename(SRC[file])); fs.writeFileSync(src, mutated); const o = src + '.o'; r = cc(src, [], o); objs.push(o); }
   if (r.status) { console.log(`${id.padEnd(8)} DOES NOT COMPILE (a compile failure is not a kill): ${what}\n${r.stderr.split('\n').slice(0, 5).join('\n')}`); survivors++; continue; }
   let killedBy = null;
   for (const t of tests) {
     let tobj = `CMakeFiles/${t}.dir/${t}.cpp.o`, extra = '';
-    if (file === 'shell' && t === 'test_live_review') {   // the test drives a LiveShell directly: its own copy of the template is compiled against the mutated header too
+    if (HDR[file] && TESTS_WITH_SHELL.includes(t)) {   // the test drives a LiveShell directly: its own copy of the template is compiled against the mutated header too
       const tf = fs.readFileSync(path.join(tdir, 'CMakeFiles', t + '.dir/flags.make'), 'utf8'), g = k => ((tf.match(new RegExp('^' + k + ' = (.*)$', 'm')) || [])[1] || '').split(/\s+/).filter(Boolean);
       const o = path.join(tmp, t + '.mut.o'); const c2 = run('c++', ['-I' + path.join(tmp, 'inc'), ...g('CXX_DEFINES'), ...g('CXX_INCLUDES'), ...g('CXX_FLAGS'), '-c', path.join(ROOT, 'native/tests', t + '.cpp'), '-o', o]);
       if (c2.status) { console.error(c2.stderr.split('\n').slice(0, 8).join('\n')); process.exit(2); } tobj = o; }

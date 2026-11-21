@@ -23,7 +23,9 @@ class BassCore {
   void render(float* L, float* R, size_t len, double a, double b, double rate);
   // the JS would have thrown (Vowel is NaN: this.vow[NaN][0]): the render is refused. Sticky; the core writes nothing more.
   bool bad() const { return bad_; }
+  bool idle() const { return stage_ == 0; }   // no sound and no state a block would change (block() returns at once): the live shell may skip it (LIVE ROUTE 1b)
   const BassP& p() const { return p_; }
+  BassP& pm() { return p_; }   // the engine targets swap values in for one control block (eng_targets.h)
   double bpm = 120, wob = 0;             // the tempo and the WOB command (beats per wobble cycle, 0 = the Rate division), set by the host as the JS's c.bpm / c.wob
  private:
   void block(float* L, float* R, size_t len, double a, double b, double rate);

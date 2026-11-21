@@ -86,7 +86,8 @@ template <class SH> static void refRun(const BassP* bp, const AcidP* ap, const M
   std::stable_sort(le.begin(), le.end(), [](const LiveEvent& a, const LiveEvent& b) { return a.at < b.at; });
   const uint64_t n = (uint64_t)total + lat; std::vector<float> L(n), R(n);
   // events are offsets inside the one call: a call of n samples takes events with at < n
-  sh.setRateFeed(&rate, SR);
+  const double rate1 = rate.size() ? rate.event(0).t : 1e300;   // (the page's rate AudioParam reads its default, 1, before the lane's first event)
+  sh.setRateFeed(&rate, SR, &rate1);
   sh.process(L.data(), R.data(), (uint32_t)n, le.data(), (uint32_t)le.size());
   outL.assign(total, 0); outR.assign(total, 0);
   for (int64_t q0 = 0; q0 < total; q0 += 128) {
@@ -180,7 +181,8 @@ static void refRunVox(const VoxP& vp, const std::vector<VoxNote>& ns, int64_t to
   }
   std::stable_sort(le.begin(), le.end(), [](const LiveEvent& a, const LiveEvent& b) { return a.at < b.at; });
   const uint64_t n = (uint64_t)total + lat; std::vector<float> L(n), R(n);
-  sh.setRateFeed(&rate, SR); sh.process(L.data(), R.data(), (uint32_t)n, le.data(), (uint32_t)le.size());
+  const double rate1 = rate.size() ? rate.event(0).t : 1e300;
+  sh.setRateFeed(&rate, SR, &rate1); sh.process(L.data(), R.data(), (uint32_t)n, le.data(), (uint32_t)le.size());
   outL.assign(total, 0); outR.assign(total, 0);
   for (int64_t q0 = 0; q0 < total; q0 += 128) {
     const double dt = 1 / SR, tb0 = (double)q0 / SR;

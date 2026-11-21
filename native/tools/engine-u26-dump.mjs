@@ -280,8 +280,31 @@ export function seqRender(E, c, cuts = []) {
   let v0 = 1, t0 = 0, v1 = 1, t1 = 0;
   const at = t => t >= t1 ? v1 : v0 + (v1 - v0) * ((t - t0) / (t1 - t0));
   const note = e => e.type === 'on' || e.type === 'off';
+  // ENGINE TARGETS (1b): the twelve lanes (seconds, as the pool keeps them), the track's state, the node's engOn flag, and the page's engOn swap around each control block (index.html:22597-22621)
+  const lanes = Array.from({ length: 12 }, (_, i) => ({ def: i < 5 ? -1 : 0, ev: [] })); let engSt = null, engOn = false, engUsed = false;
+  const laneAt = (Ln, x) => { let v = Ln.def, pt = 0; for (const e of Ln.ev) { if (e.k === 1) { if (x < e.t) return e.t > pt ? v + (e.v - v) * (x - pt) / (e.t - pt) : e.v; v = e.v; pt = e.t; } else { if (x < e.t) return v; v = e.v; pt = e.t; } } return v; };
+  const stT = S => { const q = Math.floor(S / 128) * 128; return q / c.sr + (S - q) * (1 / c.sr); };   // the sampler's / pool's seconds for a sample (rt/sampletime.h)
+  const put = (cc, oo, at, ramp) => { const rp = ramp && engOn; engUsed = true; for (let k = 0; k < 5; k++) if (typeof cc[k] === 'number' && isFinite(cc[k])) lanes[k].ev.push({ k: 0, t: at, v: cc[k] });
+    for (let k = 0; k < 7; k++) if (typeof oo[k] === 'number' && isFinite(oo[k])) lanes[5 + k].ev.push({ k: rp ? 1 : 0, t: at, v: oo[k] }); engOn = true; };
+  const EFM = { bass: [['cut', 30, 18000], ['res', 0, 1], ['fenv', -6, 6], ['atk', 0.5, 2000], ['dec', 1, 4000], ['sus', 0, 1], ['rel', 1, 4000]], vox: [['bright', 0, 1, 1], null, null, ['atk', 0.5, 400], null, null, ['rel', 1, 3000]],
+    acid: [['cut', 40, 6000], ['res', 0, 1.05], ['envAmt', 0, 1], null, ['ampDec', 1, 4000], ['sus', 0, 1], ['rel', 1, 1000]], mach: [['lp', 60, 16000], ['res', 0, 1], ['fenv', 0, 1], ['atk', 0.5, 2000], ['dec', 1, 4000], ['sus', 0, 1], ['rel', 1, 4000]] }[c.kind];
+  const ec = (x, a, b) => x < a ? a : x > b ? b : x;
+  const engSwap = sec => {   // -> the stored values to put back, or null
+    const v = []; for (let i = 0; i < 12; i++) { const d = i < 5 ? -1 : 0; let x = laneAt(lanes[i], sec); if (x !== x) x = d; v.push(ec(x, i < 5 ? -1 : -255, 255)); }
+    if (!(v[0] >= 0 || v[1] >= 0 || v[2] >= 0 || v[3] >= 0 || v[4] >= 0 || v[5] !== 0 || v[6] !== 0 || v[7] !== 0 || v[8] !== 0 || v[9] !== 0 || v[10] !== 0 || v[11] !== 0)) return null;
+    const p = core.p, sv = new Array(7).fill(0), CI = [0, 1, -1, 3, 2, -1, 4], K = 18000 / 30, D = 4 / 0.008;
+    for (let k = 0; k < 7; k++) if (EFM[k]) sv[k] = p[EFM[k][0]];
+    for (let k = 0; k < 7; k++) { const f = EFM[k]; if (!f) continue; const ci = CI[k], cm = ci < 0 ? -1 : v[ci], o = v[5 + k]; if (cm < 0 && o === 0) continue;
+      const own = sv[k], lo = f[1], hi = f[2]; let e;
+      if (k === 0 && !f[3]) e = ec((cm < 0 ? own : 30 * Math.pow(K, cm / 255)) * Math.pow(K, o / 255), lo, hi);
+      else if (k === 0 || k === 1 || k === 5) { const b = cm < 0 ? (own - lo) / (hi - lo) : cm / 255; e = lo + ec(b + o / 255, 0, 1) * (hi - lo); }
+      else if (k === 2) e = ec(own + o / 255 * (hi - lo), lo, hi);
+      else { const b = cm < 0 ? own / 1000 : 0.008 * Math.pow(D, Math.min(cm, 254) / 254); e = ec(b * Math.pow(D, o / 254), lo / 1000, hi / 1000) * 1000; }
+      p[f[0]] = e; }
+    return sv; };
   const apply = e => {
     switch (e.type) {
+      case 'eng': break;   // (booked up front: the sequencer's events reach the lanes LEAD ahead of the audio)
       case 'on': if (c.kind === 'vox') core.on(!!e.leg, Math.round(e.syl || 0), !!e.same); else if (c.kind === 'acid') core.on(!!e.leg, !!e.acc); else core.on(!!e.leg); break;
       case 'off': core.off(); break;
       case 'rate': v0 = v1 = e.v; t0 = t1 = e.t; break;
@@ -290,13 +313,16 @@ export function seqRender(E, c, cuts = []) {
       case 'wob': core.wob = e.v; break;
     }
   };
+  // the lanes are booked as the sequencer's events come, ahead of the samples they act on (the pool is handed everything within its 0.25 s lead): eng events and the state a note puts, in event order
+  for (const e of ev) { if (e.type === 'eng') { const at = stT(e.t); let def = true; for (let k = 0; k < 5; k++) if (!(e.c[k] < 0)) def = false; for (let k = 0; k < 7; k++) if (e.o[k]) def = false;
+      engSt = def ? null : { c: e.c, o: e.o }; if (def && !engOn) continue; put(e.c, e.o, at, true); } else if (e.type === 'on' && engSt) put(engSt.c, engSt.o, stT(e.t), false); }
   let ei = 0, s = 0;
   while (s < N) {
     while (ei < ev.length && ev[ei].t <= s) apply(ev[ei++]);
     let nn = Infinity; for (let j = ei; j < ev.length; j++) if (note(ev[j])) { nn = ev[j].t; break; }
     let end = Math.min(s + BL, nn, N);
     for (const cu of cuts) if (cu > s && cu < end) end = cu;
-    core.render(L, R, s, end, at(s)); s = end;
+    { const sv = engUsed ? engSwap(s / c.sr) : null; core.render(L, R, s, end, at(s)); if (sv) for (let k = 0; k < 7; k++) if (EFM[k]) core.p[EFM[k][0]] = sv[k]; } s = end;
   }
   return [L, R];
 }
@@ -334,6 +360,28 @@ function seqCases(E) {
   // acid / mach: five scenarios on three sounds each
   const AP = { init: {}, fast: { slide: 200, accent: 1, cut: 900, res: 0.85 }, sub: { sub: 0.5, noise: 0.2, wave: 0.7 } }, MP = { init: {}, ens: { machine: 4, a: 0.35, glide: 150 }, lfo: { machine: 3, lfoDest: 2, lfoDepth: 0.7, lfoRate: 5 } };
   const XS = { slidecut: [on(0), rate(2000, 1.25), ramp(2000, 2, 6000), on(2000, { leg: true }), rate(4000, 0.8), on(4000), off(6500)], single: [on(0), off(4000)], legato: [on(10), on(2000, { leg: true }), off(4500)], retrig: [on(0, { acc: true }), on(1500), on(1501, { acc: true }), off(4000)], glide: [on(0), rate(2000, 2), on(2000, { leg: true, acc: true }), ramp(3000, 0.5, 1000), off(5000)], offsets: [on(1), off(2), on(17), off(31), on(32, { leg: true }), off(33), on(34), off(900)] };
+  // engine targets: the page's `eng` event (c: cut res dec atk rel, -1 = none; o: cut res env atk dec sus rel) as steps and ramps, a default state with the targets on, a state before the node's first note
+  const eng = (t, c, o) => ({ t, type: 'eng', c: [-1, -1, -1, -1, -1].map((d, i) => c[i] === undefined ? d : c[i]), o: [0, 0, 0, 0, 0, 0, 0].map((d, i) => o[i] === undefined ? d : o[i]) });
+  const ES = {
+    sweep: [on(0), eng(300, [120, 80, , 20], [, 40, -30]), eng(1500, [120, 80, , 20], [90, 40, -30, 0, 0, 0, 25]), eng(2600, [200, , 180, 60, 100], [-50, , , 30, , 8]), off(3600), on(4000), eng(5200, [], []), off(6500)],
+    late: [eng(0, [60], [20, 10]), on(40), eng(900, [], [-70, 25]), on(2500, { leg: true }), eng(3400, [255, 255, 255, 255, 255], [255, 255, 255, 255, 255, 255, 255]), off(5000)],
+    // (a node's first note is not at sample 0 in held / first500: the blocks before it read the page's `rate` AudioParam default, 1, which the vox core latches: the pool's shell reads 1 before the rate lane's first event)
+    first500: [on(500), eng(700, [100, 50, , 40, 60], [30, , -20]), eng(2500, [], [10]), off(3600)],
+    // the state set BEFORE a node's first note, the note not at sample 0 (verify-272 item 6): the note's own sample is a block start, and the eng lane's set is AT that sample's time
+    v_e0: [eng(0, [100, 60], [20, -30]), on(500), off(3000)],
+    v_e1000: [eng(0, [100, 60], [20, -30]), on(1000), off(3000)],
+    // a rate set at the note's own sample (the note cuts the control block there: the block must read the note's rate; 500 and 1000 are samples whose time is one ulp above s / sr, 480 is exact: V05)
+    rate500: [rate(500, 2), on(500), off(3000)],
+    rate480: [rate(480, 2), on(480), off(3000)],
+    rate2nd: [on(0), off(400), rate(1000, 1.5), on(1000), off(3000)],
+    held: [on(10), eng(10, [30, 0, 5, 200, 254], [-255, -255, -255, -255, -255, -255, -255]), eng(4000, [], []), eng(4001, [], []), off(5200)],
+  };
+  for (const [pn, p] of [['init', {}], ['alt', null]]) for (const [sn, evs] of Object.entries(ES)) {
+    const alt = { bass: bassOf('Reese (DnB)'), vox: voxOf('Choir'), acid: AP.fast, mach: MP.ens };
+    for (const kd of ['bass', 'vox', 'acid', 'mach']) add('seq_eng_' + kd + '_' + pn + '_' + sn, kd, p === null ? alt[kd] : p, 7000, kd === 'vox' ? evs.map(e => e.type === 'on' ? { ...e, syl: 0 } : e) : evs); }
+  // parameters OUTSIDE the target's range, one target (the cutoff) moved: the untouched ones must not be clamped or rescaled by the swap (the `c < 0 && o == 0` skip of eng_targets.h, mutant E14)
+  const OOR = { bass: { atk: 3000, dec: 5000, rel: 6000 }, vox: { atk: 500, rel: 4000 }, acid: { ampDec: 5000, rel: 2000 }, mach: { atk: 3000, dec: 5000, rel: 6000 } };
+  for (const kd of ['bass', 'vox', 'acid', 'mach']) { const evs = [on(0), eng(300, [120], []), eng(1800, [], [-40]), off(3600)]; add('seq_eng_' + kd + '_oor_cutonly', kd, OOR[kd], 7000, kd === 'vox' ? evs.map(e => e.type === 'on' ? { ...e, syl: 0 } : e) : evs); }
   for (const [pn, p] of Object.entries(AP)) for (const [sn, evs] of Object.entries(XS)) add('seq_acid_' + pn + '_' + sn, 'acid', p, 7000, evs);
   for (const [pn, p] of Object.entries(MP)) for (const [sn, evs] of Object.entries(XS)) add('seq_mach_' + pn + '_' + sn, 'mach', p, 7000, evs);
   return out;

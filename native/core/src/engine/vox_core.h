@@ -35,11 +35,17 @@ class VoxCore {
   void render(float* L, float* R, size_t len, double a, double b, double rate);
   size_t nSyl() const { return lyr_.syl.size(); }
   const VoxP& p() const { return p_; }
-  // a core that is not producing sound (envelope 0 and no target): the shell may skip it
+  VoxP& pm() { return p_; }   // the engine targets swap values in for one control block (eng_targets.h)
+  // A core that is not producing sound (envelope 0 and no target) and has no plan left to walk: the live shell may skip it (LIVE ROUTE 1b, the idle skip); idleBlocks(nb, rate) then does what nb idle blocks at `rate` leave behind
+  bool idle() const;
+  void idleBlocks(uint64_t nb, double rate);
  private:
   enum Kind : uint8_t { kHold, kGlide, kClo, kBurst, kFric, kAsp, kSon, kEnd };
   struct Seg { int ph; Kind k; double d; };
   struct Ctl { double f1, f2, f3, av, an, ah, nf, nb, nz; };
+  struct Ck { double kf, ka, kn1, kn2, lt, kg; bool burst; };
+  Ck prep(const Seg* g, double dt, double rate) const;
+  void step(const Ck& c, double dt);
   void block(float* L, float* R, size_t len, double a, double b, double rate);
   void enter();
   double ms(double x) const;

@@ -155,7 +155,7 @@ int main(int argc, char** argv) {
   {
     Json C = cdoc.root().arr("cases"); int ran = 0, exact = 0, same = 0, localDiff = 0; std::map<std::string, std::pair<int, int>> per;
     for (size_t ci = 0; ci < C.size(); ci++) {
-      Json c = C.at(ci); if (!c.get("live").asBool()) continue;
+      Json c = C.at(ci); if (!c.get("live").asBool() || c.str("name").rfind("seq_eng_", 0) == 0) continue;   // (the engine-target sequences are the pool's: test_live_jsparity)
       const Seq q = seqOf(c); const auto g = cg.find(q.name); ran++; per[q.kind].second++;
       if (g == cg.end()) { CHECK(false, "%s: no committed hash", q.name.c_str()); continue; }
       const uint32_t lat = latencyOf(q.kind); std::vector<float> L0, R0; bool allSame = true, hashOk = false, localOk = false;
@@ -262,7 +262,7 @@ int main(int argc, char** argv) {
       CHECK(d.step(5, 1, 1, &leg) == PageLaneDecoder::kOn && leg, "counter and gate rise together: on(leg >= 0.5)"); }
     // lanes built the way the page schedules them, decoded: the notes come back at their samples, in order (a note-off and a note-on in the same sample reach the page as the new note only: see the notes)
     int ran = 0; Json C = cdoc.root().arr("cases");
-    for (size_t ci = 0; ci < C.size(); ci++) { Json c = C.at(ci); if (!c.get("live").asBool() || c.str("kind") != "bass" || c.str("name").find("_init_") == std::string_view::npos) continue;
+    for (size_t ci = 0; ci < C.size(); ci++) { Json c = C.at(ci); if (!c.get("live").asBool() || c.str("kind") != "bass" || c.str("name").find("_init_") == std::string_view::npos || c.str("name").rfind("seq_eng_", 0) == 0) continue;
       const Seq q = seqOf(c); std::vector<double> g, t, l; lanesFromEvents(q, q.N, g, t, l); PageLaneDecoder d; std::vector<std::pair<size_t, int>> got, want;
       for (size_t s = 0; s < q.N; s++) { bool leg; const auto o = d.step(t[s], g[s], l[s], &leg); if (o == PageLaneDecoder::kOn) got.push_back({s, leg ? 2 : 1}); else if (o == PageLaneDecoder::kOff) got.push_back({s, 0}); }
       for (size_t i = 0; i < q.ev.size(); i++) { const LiveEvent& e = q.ev[i]; const bool nextOnSame = i + 1 < q.ev.size() && q.ev[i + 1].at == e.at && q.ev[i + 1].type == LiveEvType::NoteOn;
