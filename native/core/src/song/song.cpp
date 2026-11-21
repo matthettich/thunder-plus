@@ -116,6 +116,7 @@ void readInst(Json o, int i, SongInst& I) {
 }
 
 }  // namespace
+double song_js_plus(Json v) { return jsPlus(v); }
 
 // index.html sxLoad (:23642): I.sx = Math.trunc(+o.sx) kept only for a (sync, sx) pair the picker has (SY_PICK: only OLDSCHOOL = sync 3, sx 1); with sx 1 the OLDSCHOOL values are clamped
 // (n(v, a, b, d, int): missing / null / '' / false = the default, a non-finite number = the default, clamp, then Math.round for the integer ones), else they are deleted (here: defaults).

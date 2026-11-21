@@ -33,6 +33,7 @@ constexpr int kKnownBuild = 616;     // BUILD of the page this core was ported f
 struct SongMix { int vol = 224, trim = 128, pan = 128; bool mute = false, solo = false; int col = 0; };
 
 struct SongSx { int sx = 0, ou = 0, orp = 0, ox = 0, opt = 0; double og = 12; };
+double song_js_plus(Json v);   // the JS's unary +x of a JSON value (a numeric string is its number; NaN if not numeric)
 SongSx song_sx_load(Json o, int sync);   // index.html sxLoad (:23642): the instrument object `o`, its (already clamped) sync
 
 struct SongInst {

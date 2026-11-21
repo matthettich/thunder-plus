@@ -91,6 +91,7 @@ class LivePool {
   void off(const SeqEvent& e);
   void mod(const SeqEvent& e, const double* arp);
   void stp(const SeqEvent& e);
+  void stopTrack(int track, double t);   // reset track (the core message 'stp'): held live voices of the track let go at max(now, t); a note booked at or after it is taken back
   void tempo(double t, double bpm);
   void stopAll(double at);
   // For tests: the value of a node's rate lane at time t (seconds); NaN when there is no such node.

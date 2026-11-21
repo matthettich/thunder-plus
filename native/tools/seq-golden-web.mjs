@@ -88,7 +88,8 @@ function liveCases() {
     const now = { song: S.file, mode: S.mode, live, bpm, rows: rows.length, events: Object.values(counts).reduce((a, b) => a + b, 0), counts, sha256: sha(text),
       rowHashes: rows.map(r => crypto.createHash('sha256').update(JSON.stringify(r)).digest('hex').slice(0, 12)) };
     const gf = path.join(LIVE_DIR, `seq-${S.id}.json`);
-    if (UPDATE || !fs.existsSync(gf)) { fs.writeFileSync(gf, JSON.stringify(now, null, 1) + '\n'); console.log(`wrote ${path.relative(ROOT, gf)}: ${now.rows} rows, ${now.events} events`); continue; }
+    if (!UPDATE && !fs.existsSync(gf)) { console.log(`FAIL missing golden ${path.relative(ROOT, gf)} (compare mode never writes: use --update)`); bad = true; continue; }
+    if (UPDATE) { fs.writeFileSync(gf, JSON.stringify(now, null, 1) + '\n'); console.log(`wrote ${path.relative(ROOT, gf)}: ${now.rows} rows, ${now.events} events`); continue; }
     const was = JSON.parse(fs.readFileSync(gf, 'utf8')), ok = was.sha256 === now.sha256; if (!ok) bad = true;
     console.log(`${ok ? 'ok  ' : 'FAIL'} ${S.id}: ${now.rows} rows, ${now.events} events${ok ? '' : ' (first differing row ' + now.rowHashes.findIndex((h, k) => h !== was.rowHashes[k]) + ')'}`);
   }
@@ -230,11 +231,13 @@ function editCases() {
     now.rowsChangedByTheEdits = differ;
     if (process.env.SEQ_EDIT_DUMP) { fs.mkdirSync(process.env.SEQ_EDIT_DUMP, { recursive: true }); fs.writeFileSync(path.join(process.env.SEQ_EDIT_DUMP, `seq-edit-${C.id}.jsonl`), text); }   // (debugging: the JS rows, one a line)
     const gf = path.join(EDIT_DIR, `seq-edit-${C.id}.json`);
-    if (UPDATE || !fs.existsSync(gf)) { fs.writeFileSync(gf, JSON.stringify(now) + '\n'); wrote.push(C.id); console.log(`wrote ${path.relative(ROOT, gf)}: ${now.rows} rows, ${now.events} events, ${differ} rows differ from the unedited run`); continue; }
+    if (!UPDATE && !fs.existsSync(gf)) { console.log(`FAIL missing golden ${path.relative(ROOT, gf)} (compare mode never writes: use --update)`); bad = true; continue; }
+    if (UPDATE) { fs.writeFileSync(gf, JSON.stringify(now) + '\n'); wrote.push(C.id); console.log(`wrote ${path.relative(ROOT, gf)}: ${now.rows} rows, ${now.events} events, ${differ} rows differ from the unedited run`); continue; }
     const was = JSON.parse(fs.readFileSync(gf, 'utf8')), ok = was.sha256 === now.sha256 && deq(was.edits, now.edits) && deq(was.baseOps, now.baseOps); if (!ok) bad = true;
     console.log(`${ok ? 'ok  ' : 'FAIL'} edit-${C.id}: ${now.rows} rows, ${differ} differ from the unedited run${ok ? '' : ' (first differing row ' + now.rowHashes.findIndex((h, k) => h !== was.rowHashes[k]) + ')'}`);
   }
-  fs.writeFileSync(path.join(EDIT_DIR, 'seq-edit-cases.json'), JSON.stringify({ ids: EDIT_SONGS.map(c => c.id) }) + '\n');
+  { const mf = path.join(EDIT_DIR, 'seq-edit-cases.json'), want = JSON.stringify({ ids: EDIT_SONGS.map(c => c.id) }) + '\n';
+    if (UPDATE) fs.writeFileSync(mf, want); else if (!fs.existsSync(mf) || fs.readFileSync(mf, 'utf8') !== want) { console.log('FAIL seq-edit-cases.json missing or different (compare mode never writes: use --update)'); bad = true; } }
   return !bad;
 }
 
@@ -313,7 +316,7 @@ function chopSong(variant) {
   // and is the page's normalised form (normParts: sync 0..3, sxLoad). PRT is sequencer-wide: after PRT 1 every track's later notes resolve through the part's instruments (track 6 included); the golden is the web's own result either way.
   if (variant === 'parts') {
     cmd(7, 0, 0, 'PRT', 1); cmd(7, 9, 0, 'TPO', 80);
-    S.parts = [{ n: 'P1', mix: [], fx: {}, insts: [{ tsp: 0, vol: 255, pan: 128, ofs: 0, pad: 2, slc: 4, smode: 1, sync: 3, beats: 4, lines: 13, grain: 1, sx: 1, og: 3.5, ou: 0, orp: 1, ox: 5, opt: 2 }] }];
+    S.parts = [{ n: 'P1', mix: [], fx: {}, insts: [{ tsp: 0, vol: 255, pan: 128, ofs: 0, pad: 2, slc: 4, smode: 1, sync: 3, beats: 4, lines: 12.9, grain: 1, sx: 1, og: 3.5, ou: 0, orp: 1, ox: 5, opt: 2 }] }];
   }
   if (variant === 'sync-rev') PH.forEach((p, t) => p.forEach((r, y) => { if (r[0] >= 0 && y % 3 === 0) { r[6 + 2 * 2] = FXN('PLY'); r[7 + 2 * 2] = 1; } }));   // PLY 1: reversed notes
   S.phrases = PH; S.plen = PH.map(() => 16); S.chains = PH.map((_, t) => [[t, 0]]); S.song = Array.from({ length: 256 }, (_, r) => Array.from({ length: 33 }, (_, t) => r < 8 && t < (V8 ? 8 : 7) ? t : -1));
@@ -371,7 +374,8 @@ function chopCases() {
     if (((C.variant === 'sx' || C.variant === 'parts') && !sxN) || (C.variant === 'lines' && !fracBeats)) { console.log(`FAIL ${C.id}: no OLDSCHOOL notes (${sxN}) / no fractional beats (${fracBeats}): the case proves nothing`); bad = true; continue; }
     if (!chopped || (C.variant === 'all' && !stN)) { console.log(`FAIL ${C.id}: no chopped notes (${chopped}) / no st notes (${stN}): the case proves nothing`); bad = true; continue; }
     const gf = path.join(LIVE_DIR, `seq-${C.id}.json`);
-    if (UPDATE || !fs.existsSync(gf)) { fs.writeFileSync(gf, JSON.stringify(now) + '\n'); console.log(`wrote ${path.relative(ROOT, gf)}: ${now.rows} rows, ${now.events} events, ${chopped} chopped notes, ${stN} with st`); continue; }
+    if (!UPDATE && !fs.existsSync(gf)) { console.log(`FAIL missing golden ${path.relative(ROOT, gf)} (compare mode never writes: use --update)`); bad = true; continue; }
+    if (UPDATE) { fs.writeFileSync(gf, JSON.stringify(now) + '\n'); console.log(`wrote ${path.relative(ROOT, gf)}: ${now.rows} rows, ${now.events} events, ${chopped} chopped notes, ${stN} with st`); continue; }
     const was = JSON.parse(fs.readFileSync(gf, 'utf8')), ok = was.sha256 === now.sha256 && deq(was.pads, now.pads) && was.fileText === now.fileText && deq(was.edits, now.edits); if (!ok) bad = true;
     console.log(`${ok ? 'ok  ' : 'FAIL'} ${C.id}: ${now.rows} rows, ${chopped} chopped notes, ${stN} with st`);
   }

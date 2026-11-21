@@ -3,6 +3,7 @@
 // Then the audio side: a voice in lines renders to exactly the voice in ms that the JS's numbers describe (same length, same samples), and an old voice (no unit field) is untouched.
 #include <cmath>
 #include <cstdio>
+#include <limits>
 #include <cstring>
 #include <fstream>
 #include <sstream>
@@ -70,6 +71,16 @@ int main(int argc, char** argv) {
     EngVoice V; const Json none; eng_voice_from_json(V, d.root(), d.root().arr("layers"), none); double hold = 6; const EngVoice V0 = V;
     CHECK(!eng_env_lines_fit(V, &hold, 120, 8) && hold == 6 && V.len == V0.len && V.layers[0].atk == V0.layers[0].atk, "a voice without a unit field is changed");
     CHECK(render(V, 0, 120) == render(V0, 0, 120), "an old voice renders differently"); }
+  // verify-271 F3: a numeric string in an `...L` field is the JS's `+x || 0` ("8" = 8, "x" = 0); Math.min / Math.max keep a NaN
+  { auto fitAtk = [&](const char* atkL, double bpm, double lpb) { std::string js = std::string("{\"gate\":200,\"len\":4,\"layers\":[{\"on\":true,\"type\":\"white\",\"level\":0.8,\"mode\":\"AHD\",\"aU\":\"l\",\"atk\":5,\"hold\":0,\"dec\":300,\"atkL\":") + atkL + "}]}";
+      JsonDoc d; if (!d.parse(js)) return -1.0; EngVoice V; const Json none; eng_voice_from_json(V, d.root(), d.root().arr("layers"), none); double hold = 0; eng_env_lines_fit(V, &hold, bpm, lpb); return V.layers[0].atk; };
+    const double n8 = fitAtk("8", 120, 4), s8 = fitAtk("\"8\"", 120, 4), sx = fitAtk("\"x\"", 120, 4), n0 = fitAtk("0", 120, 4);
+    CHECK(n8 == 1000 && s8 == n8, "atkL \"8\" = %g, 8 = %g (8 lines at 120 BPM, lpb 4 = 1000 ms)", s8, n8);
+    CHECK(sx == n0, "atkL \"x\" = %g, 0 = %g", sx, n0);
+    const double inf = std::numeric_limits<double>::infinity();
+    { EngVoice V; const Json none; JsonDoc d; d.parse("{\"gate\":200,\"len\":4,\"layers\":[{\"on\":true,\"type\":\"white\",\"level\":0.8,\"mode\":\"AHD\",\"aU\":\"l\"}]}"); eng_voice_from_json(V, d.root(), d.root().arr("layers"), none);
+      V.layers[0].aL[0] = inf; double hold = 0; eng_env_lines_fit(V, &hold, 120, inf);
+      CHECK(V.layers[0].atk != V.layers[0].atk, "Infinity lines at an Infinity lpb: Math.min(64000, NaN) = NaN, got %g", V.layers[0].atk); } }
   std::printf("envlines: %zu cases, %d with lines, %d rendered, %d failed\n", cases.size(), nFit, nRender, fails);
   return fails ? 1 : 0;
 }

@@ -239,12 +239,12 @@ static void testWebFollow() {
     { const Run r = play(part ? partSong("{\"pad\":0}", "{\"pad\":0,\"sync\":2,\"lines\":7}") : handSong("{\"pad\":0,\"sync\":2,\"lines\":7}"), &g);
       CHECK(r.notes.size() == 4 && (r.notes[0].has & SH_ST) && r.notes[0].stBeats == 1.75 && close(r.notes[0].durSec, 1.75 * 60 / 120) && r.notes[0].ofsSec == 0, "%s: sync 2, 7 lines: st.beats %g, durSec %g", w, r.notes.empty() ? 0.0 : r.notes[0].stBeats, r.notes.empty() ? 0.0 : r.notes[0].durSec); }
   }
-  // the song's loader: lines is int() rounded and clamped 1..1024 (index.html:21677); a part's instrument is raw: `lines | 0` (truncated, int32-wrapped, no clamp)
+  // the song's loader: lines is int() rounded and clamped 1..1024 (index.html:21677); a part's instrument is raw: the test is `lines | 0` (int32-wrapped), the value divided is the raw number, no clamp
   CHECK(close(rate0("{\"pad\":0,\"sync\":1,\"lines\":2.9}", false), 2.0 / (3 / 4.0 * 0.5)), "song lines 2.9 -> 3 (%g)", rate0("{\"pad\":0,\"sync\":1,\"lines\":2.9}", false));
-  CHECK(close(rate0("{\"pad\":0,\"sync\":1,\"lines\":2.9}", true), 2.0 / (2 / 4.0 * 0.5)), "part lines 2.9 -> 2 (%g)", rate0("{\"pad\":0,\"sync\":1,\"lines\":2.9}", true));
+  CHECK(close(rate0("{\"pad\":0,\"sync\":1,\"lines\":2.9}", true), 2.0 / (2.9 / 4.0 * 0.5)), "part lines 2.9: the test is lines | 0 (2 > 0), the value divided is the raw 2.9 (%g)", rate0("{\"pad\":0,\"sync\":1,\"lines\":2.9}", true));
   CHECK(close(rate0("{\"pad\":0,\"sync\":1,\"lines\":5000}", false), 2.0 / (1024 / 4.0 * 0.5)), "song lines 5000 -> 1024 (%g)", rate0("{\"pad\":0,\"sync\":1,\"lines\":5000}", false));
   CHECK(close(rate0("{\"pad\":0,\"sync\":1,\"lines\":5000}", true), 2.0 / (5000 / 4.0 * 0.5)), "part lines 5000 stays 5000 (%g)", rate0("{\"pad\":0,\"sync\":1,\"lines\":5000}", true));
-  CHECK(close(rate0("{\"pad\":0,\"sync\":1,\"lines\":4294967297}", true), 2.0 / (1 / 4.0 * 0.5)), "part lines 2^32 + 1 wraps to 1 (%g)", rate0("{\"pad\":0,\"sync\":1,\"lines\":4294967297}", true));
+  CHECK(close(rate0("{\"pad\":0,\"sync\":1,\"lines\":4294967297}", true), 2.0 / (4294967297.0 / 4.0 * 0.5)), "part lines 2^32 + 1: the test wraps (1 > 0), the raw value is divided (%g)", rate0("{\"pad\":0,\"sync\":1,\"lines\":4294967297}", true));
   { const Run r = play(partSong("{\"pad\":0}", "{\"pad\":0,\"sync\":1,\"lines\":1e300}"), &g); for (const SeqEvent& e : r.notes) CHECK(noteOk(e), "a hostile lines in a part: a sane note"); }
   // lines follows the SONG's lpb, not a phrase's or the LPB command's: the same song at lpb 8 halves the beats
   { std::string s = handSong("{\"pad\":0,\"sync\":1,\"lines\":8}"); const size_t k = s.find("\"lpb\":4"); s.replace(k, 7, "\"lpb\":8"); const Run r = play(s, &g);

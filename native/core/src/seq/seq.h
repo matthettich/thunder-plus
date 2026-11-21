@@ -198,6 +198,7 @@ class Seq {
   struct PEv { uint8_t type; int track, slot, pi; double v; };
   struct PInst { bool present = false; double pad = 0, tsp = 0, vol = 0, pan = 0, ofs = 0; int hut = 0, huv = 0; bool kf = false, rev = false;
     int slc = 0; bool smode = false, sync = false; int sy = 0, grain = 1; double beats = 4;   // applyChop: I.slc|0, I.smode, I.sync (truthy) and I.sync|0, I.grain, I.beats || 4
+    double linesRaw = 0;   // the value the division uses: a part's instrument is raw (index.html:23793 `I.lines / (S.lpb || 4)`); a song instrument's is its (integer) lines
     int lines = 0;   // I.lines | 0 (SYNC TO LINES: > 0 = the length in lines of the SONG's lpb; instBeats)
     int sx = 0, ou = 0, orp = 0, ox = 0, opt = 0; double og = 12; };   // I.sx | 0 (1 with sync 3 = OLDSCHOOL), I.ou, I.orp, I.ox, I.opt, I.og (osGrainSecs)
   struct Part { bool present = false; std::vector<PEv> evs; std::vector<PInst> insts; };

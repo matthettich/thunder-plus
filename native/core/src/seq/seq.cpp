@@ -292,7 +292,7 @@ void Seq::buildParts() {
   sInsts_.resize(NI);
   for (int i = 0; i < NI; i++) { const SongInst& I = S_.insts[i]; PInst& p = sInsts_[(size_t)i]; p.present = !S_.instMissing[i]; p.pad = I.pad; p.tsp = I.tsp; p.vol = I.vol; p.pan = I.pan; p.ofs = I.ofs; p.hut = I.hut; p.huv = I.huv; p.kf = I.kf != 0; p.rev = I.rev != 0;
     p.slc = I.slc; p.smode = I.smode != 0; p.sync = I.sync != 0; p.sy = I.sync; p.grain = I.grain; p.beats = I.beats ? I.beats : 4;
-    p.lines = I.lines; p.sx = I.sx; p.og = I.og; p.ou = I.ou; p.orp = I.orp; p.ox = I.ox; p.opt = I.opt; }
+    p.lines = I.lines; p.linesRaw = I.lines; p.sx = I.sx; p.og = I.og; p.ou = I.ou; p.orp = I.orp; p.ox = I.ox; p.opt = I.opt; }
   partEvsOf(Json(), Json(), true, own_.evs);
   const Json P = S_.parts;
   for (size_t k = 0; k < P.size(); k++) { Part part; const Json p = P.isArr() ? P.at(k) : Json(); part.present = truthy(p);
@@ -307,7 +307,7 @@ void Seq::buildParts() {
           { const double b = jnum(I.get("beats")); x.beats = truthy(I.get("beats")) && b == b ? std::min(64.0, std::max(1.0, b)) : 4;   /* raw, as the page uses it: 1.7 stays 1.7 */ }
           // WEB-FOLLOW: `I.lines | 0` (raw, no clamp: a part's instrument is not normalised, index.html:23793); an instrument with sx or an OLDSCHOOL key is normalised by normParts (index.html:22161): sync
           // truncated and clamped 0..3, then sxLoad. Without them the raw sync stays (the line above).
-          x.lines = js_to_int32(jnum(I.get("lines")));
+          x.lines = js_to_int32(jnum(I.get("lines"))); x.linesRaw = jnum(I.get("lines"));   // the test is `lines | 0 > 0`, the divided value the raw number
           { static const char* const kOs[] = {"sx", "og", "ou", "orp", "ox", "opt"}; bool any = false; for (const char* k : kOs) if (!I.get(k).missing()) any = true;
             if (any) { const double sv = std::trunc(jnum(I.get("sync"))); x.sy = sv == sv ? (int)std::min(3.0, std::max(0.0, sv)) : 0; x.sync = x.sy != 0;
               const SongSx sx = song_sx_load(I, x.sy); x.sx = sx.sx; x.og = sx.og; x.ou = sx.ou; x.orp = sx.orp; x.ox = sx.ox; x.opt = sx.opt; } } }
@@ -546,7 +546,7 @@ int Seq::dirNext(Tr& T, int y, int L) {
   int n = y + T.pp; if (n >= L) { T.pp = -1; n = std::max(0, L - 2); } else if (n < 0) { T.pp = 1; n = std::min(L - 1, 1); }
   return n;
 }
-double Seq::instBeats(const PInst& I) const { return I.lines > 0 ? (double)I.lines / (double)(S_.lpb ? S_.lpb : 4) : I.beats; }   // index.html:23793
+double Seq::instBeats(const PInst& I) const { return I.lines > 0 ? I.linesRaw / (double)(S_.lpb ? S_.lpb : 4) : I.beats; }   // index.html:23793
 // applyChop (index.html:22333), the part the pad data does not touch done as the JS does it, in the same order and arithmetic. The pad's loopSecs and (SMODE) slice points
 // come from SeqOpts::chop. A pad with no loop handed in: the JS's `ensure(pad)` null case (the call is skipped, the event keeps its rate and no chop), counted.
 void Seq::applyChop(SeqEvent& ev, const PInst& I, int n, double semis, double bpm) {

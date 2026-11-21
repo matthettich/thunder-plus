@@ -1,6 +1,7 @@
 #include "engine/engine_json.h"
 #include "engine/layers.h"
 #include "engine/layer_pe.h"
+#include "song/song.h"
 
 #include <cmath>
 
@@ -8,8 +9,8 @@ namespace thunder {
 namespace {
 inline void num(Json j, std::string_view k, double& d) { Json v = j.get(k); if (v.isNum()) d = v.asNum(); }
 // a saved `...L` number (index.html envLinesOf: `o[k + 'L'] != null ? +o[k + 'L'] || 0 : msLines(..)`): null / absent = the key is absent (NaN); a number as is; a boolean 0 / 1 (the JS's +x). Anything else (a string,
-// an array) reads as 0 here (the JS: +x || 0, a numeric string would count): not a file the page writes.
-inline double lnum(Json j, std::string_view k) { Json v = j.get(k); if (v.isNum()) return v.asNum(); if (v.isBool()) return v.asBool() ? 1 : 0; if (v.missing() || v.isNull()) return kEngNoLines; return 0; }
+// an array of one number) the JS's `+x || 0`: a numeric string counts, anything non-numeric is 0.
+inline double lnum(Json j, std::string_view k) { Json v = j.get(k); if (v.missing() || v.isNull()) return kEngNoLines; const double x = song_js_plus(v); return x != x ? 0 : x; }   // +x || 0
 inline bool unitL(Json j, std::string_view k) { Json v = j.get(k); return v.isStr() && v.asStr() == "l"; }
 }
 
