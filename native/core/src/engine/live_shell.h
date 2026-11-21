@@ -24,6 +24,7 @@
 #include "rt/auto.h"
 #include "engine/eng_targets.h"
 #include "rt/jsmath.h"
+#include "rt/sampletime.h"
 
 namespace thunder {
 
@@ -185,14 +186,14 @@ class LiveShell {
       rendered_ = end;
     }
   }
-  double rateAt(uint64_t s) const { if (!feed_) return lane_.at((double)s); const double t = (double)s / feedSr_; return first_ && t < *first_ ? 1.0 : clampRate(feed_->at(t)); }
+  double rateAt(uint64_t s) const { if (!feed_) return lane_.at((double)s); const double t = sample_time((int64_t)s, feedSr_); return first_ && t < *first_ ? 1.0 : clampRate(feed_->at(t)); }
   void block(uint64_t s, uint64_t e) {
     const uint32_t n = (uint32_t)(e - s);
     if (!failed_) {
       if (!A::idle(core_)) lastLive_ = e;   // (this block may produce sound: the tail it leaves in the ring reaches the host latency() samples later)
       const double rt = rateAt(s);
       if (eng_ && eng_->on) {   // the page's engOn / engOff around the control block
-        double v[12], sv[7]; engRead(*eng_, (double)s / feedSr_, v); const bool sw = A::engIn(core_, v, sv);
+        double v[12], sv[7]; engRead(*eng_, sample_time((int64_t)s, feedSr_), v); const bool sw = A::engIn(core_, v, sv);
         core_.render(stgL_, stgR_, kBlk, 0, (double)n, rt);
         if (sw) A::engOut(core_, sv);
       } else core_.render(stgL_, stgR_, kBlk, 0, (double)n, rt);   // one control block (n <= kBlk), written at 0..n of the staging arrays

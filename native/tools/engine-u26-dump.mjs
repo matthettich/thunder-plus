@@ -367,6 +367,13 @@ function seqCases(E) {
     late: [eng(0, [60], [20, 10]), on(40), eng(900, [], [-70, 25]), on(2500, { leg: true }), eng(3400, [255, 255, 255, 255, 255], [255, 255, 255, 255, 255, 255, 255]), off(5000)],
     // (a node's first note is not at sample 0 in held / first500: the blocks before it read the page's `rate` AudioParam default, 1, which the vox core latches: the pool's shell reads 1 before the rate lane's first event)
     first500: [on(500), eng(700, [100, 50, , 40, 60], [30, , -20]), eng(2500, [], [10]), off(3600)],
+    // the state set BEFORE a node's first note, the note not at sample 0 (verify-272 item 6): the note's own sample is a block start, and the eng lane's set is AT that sample's time
+    v_e0: [eng(0, [100, 60], [20, -30]), on(500), off(3000)],
+    v_e1000: [eng(0, [100, 60], [20, -30]), on(1000), off(3000)],
+    // a rate set at the note's own sample (the note cuts the control block there: the block must read the note's rate; 500 and 1000 are samples whose time is one ulp above s / sr, 480 is exact: V05)
+    rate500: [rate(500, 2), on(500), off(3000)],
+    rate480: [rate(480, 2), on(480), off(3000)],
+    rate2nd: [on(0), off(400), rate(1000, 1.5), on(1000), off(3000)],
     held: [on(10), eng(10, [30, 0, 5, 200, 254], [-255, -255, -255, -255, -255, -255, -255]), eng(4000, [], []), eng(4001, [], []), off(5200)],
   };
   for (const [pn, p] of [['init', {}], ['alt', null]]) for (const [sn, evs] of Object.entries(ES)) {

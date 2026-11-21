@@ -172,6 +172,38 @@ static void testEngHostile() {
   std::printf("hostile eng numbers: %d runs, %d with a non-finite output, %d refusals counted\n", runs, nonFinite, refused);
 }
 
+// V15 (verify-272): the engine state is per TRACK. One pad on two tracks; an eng on one track must leave the other's output bit for bit as without it, and must change its own.
+static void testEngTracks() {
+  const LiveKind kinds[] = {LiveKind::Bass, LiveKind::Vox, LiveKind::Acid, LiveKind::Mach};
+  int checked = 0;
+  for (LiveKind kind : kinds) {
+    std::vector<float> out[3][2];   // [which eng: 0 none, 1 track 1, 2 track 0][track]
+    for (int which = 0; which < 3; which++) {
+      LivePool lp(SR);
+      { LivePadConfig cfg; cfg.kind = kind; cfg.trackMask = 3; if (kind == LiveKind::Bass) cfg.bass.rel = 20; if (kind == LiveKind::Vox) cfg.vox.txt = "la"; CHECK(lp.addPad(0, cfg)); }
+      const int64_t total = 128 * 60; std::vector<float> bl[2], br[2]; for (int tr = 0; tr < 2; tr++) { bl[tr].assign(128, 0.f); br[tr].assign(128, 0.f); out[which][tr].assign((size_t)total, 0.f); }
+      float* inL[kVoiceTracks] = {}; float* inR[kVoiceTracks] = {}; for (int tr = 0; tr < 2; tr++) { inL[tr] = bl[tr].data(); inR[tr] = br[tr].data(); }
+      for (int64_t q0 = 0; q0 < total; q0 += 128) {
+        lp.setTime((double)q0 / SR);
+        if (q0 == 0) {
+          for (int tr = 0; tr < 2; tr++) lp.note(mkNote(0.01, tr, 0, 1), 0, 120, nullptr);
+          if (which) { SeqEvent e; e.type = SEV_ENG; e.t = 0.02; e.track = which == 1 ? 1 : 0; for (int k = 0; k < 5; k++) e.engC[k] = -1; for (int k = 0; k < 7; k++) e.engO[k] = 0; e.engC[0] = 120; e.engC[1] = 90; e.engO[0] = 60; e.engO[2] = -80; lp.eng(e); }
+          for (int tr = 0; tr < 2; tr++) lp.note(mkNote(0.1, tr, 0, 1.5), 0, 120, nullptr);   // (a node bound / retriggered later reads the kept state of ITS track)
+        }
+        for (int tr = 0; tr < 2; tr++) { std::fill(bl[tr].begin(), bl[tr].end(), 0.f); std::fill(br[tr].begin(), br[tr].end(), 0.f); }
+        lp.render(inL, inR, 128, q0);
+        for (int tr = 0; tr < 2; tr++) for (int i = 0; i < 128; i++) out[which][tr][(size_t)(q0 + i)] = bl[tr][(size_t)i];
+      }
+    }
+    const bool same0 = out[1][0] == out[0][0], same1 = out[2][1] == out[0][1], diff1 = out[1][1] != out[0][1], diff0 = out[2][0] != out[0][0];
+    CHECKF(same0, "kind %d: an eng on track 1 changed track 0's output", (int)kind);
+    CHECKF(same1, "kind %d: an eng on track 0 changed track 1's output", (int)kind);
+    CHECKF(diff1 && diff0, "kind %d: the eng did not change its own track's output (the test is blind)", (int)kind);
+    checked++;
+  }
+  std::printf("eng state per track: %d kinds, each isolated both ways\n", checked);
+}
+
 int main() {
   testBpmAtNote();
   testShell();
@@ -179,6 +211,7 @@ int main() {
   testTimelineForcedOff();
   testHostile();
   testEngHostile();
+  testEngTracks();
   if (g_fail) { std::printf("live_review: %d FAILED\n", g_fail); return 1; }
   std::printf("live_review: all checks passed\n"); return 0;
 }
