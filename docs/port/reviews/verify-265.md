@@ -105,3 +105,26 @@ The builder's mutants are hand edits that are not in the repo (no names in any f
 * CI on `fbd4c5e7`: all jobs success (Linux GCC, clang, sanitizers; macOS universal; Windows MSVC; wasm; Android NDK; `test`).
 * `LivePool::setTap`, `bookEnd`, `setTrace` are called only by tests; no C entry point reaches them (`Players::live()` is C++ only). Cost when unused: one null-pointer test per node per quantum (tap) and per booked event (trace).
 * File list: 31 files, all under `native/` or `docs/port/`, no stray files. The two ID-bearing notes (`LIVE-ROUTE-NOTES.md` "Choices") say "non-finite note values are refused silently": true, and incomplete (F4).
+
+## Re-check at 841b222 (20 Nov 2026)
+Diff read: `git diff fbd4c5e 841b222` (21 files). Release build and an ASan+UBSan build, my own probes rebuilt against them. CI on 841b222: all jobs green (sanitizers included).
+
+| # | Verdict | Evidence of my own |
+|---|---|---|
+| F1 | CLOSED | Old-header caller (base `render.h`) against the new lib: 1212 of 1212 renders identical to the baseline in output AND in all 35 stats fields (was 1212 wrong; heard_mask 1045, stem 167). `test_render_abi` pins every field of `thunder_render_opts` and `thunder_render_stats`; I inserted a field mid-struct in a scratch copy of the header: 13 FAILs for stats, 8 for opts. |
+| F2 | CLOSED | `probe_b4` (257 in flight, all 62 alignments): 0 stuck of 62 (was 14). Shell direct, 10 to 300 wobs + off: tail energy 0 every time; drops counted (256 -> 1, 300 -> 45). Shell and pool both follow C2 (off kept, queued events at or after it discarded, counted as forcedOff / queueDropped). |
+| F3 | CLOSED | Rate at 0.55 / 0.59 / 0.5999 / 0.6 / 0.61 s = 1.25 / 1.45 / 1.4995 / 1.5 / 1.5 (page 1.45 at 0.59; was 1.0). New `slidecut` sequences play bit for bit for all four kinds. |
+| F4 | CLOSED | `probe_h`: 2592 numeric-field runs (all fields, all four kinds, NaN / Inf / 1e300), 0 non-finite samples (was 463684); 1e5 notes, extreme times, re-declare, C API garbage (4106 E_ARG, 0 other), OOM sweep (106 E_MEMORY then success): all clean, Release and ASan. Non-finite is refused and counted in `live_refused`. The only change to a finite value is the +-1e6 magnitude clamp on gain / mul / bendMul / vibSpd / vibDep; it is not a JS clamp but is far outside any UI range, and all 119 parity sequences are bit-exact, so no valid value is altered. |
+| F5 | CLOSED | `test_live_jsparity` plays 119 of 119 sequences bit for bit (bass 71, vox 12, acid 18, mach 18; was 68). Of the 54 earlier skips, all 27 expressible ones are now played; the 27 still skipped are the D4 expected difference (7) and vox `same` / syllable numbers (20), which the sequencer cannot say. My 24 mutants: all killed (the 9 survivors X04 X23 X08 X10 X11 X12 X14 X17 X20 each killed, by live_decisions / live_review / live_jsparity / live_pool). X21 no longer matched the code (`hold` replaced by `holdRamp`); I re-targeted it as two mutants (cancel instead of holdRamp; always-step): both killed. Builder's `tools/live-mutants.mjs`: 21 mutants, 0 survivors. |
+| F6 | CLOSED | Header and notes now say one node per masked track, made in `set_pad_live`, no idle skip, no re-bind. My heap measurement matches the stated numbers: bass 56 KB, acid 37 KB, mach 37.5 KB, vox 235 KB per track; 33 tracks 1.9 / 1.3 / 1.3 / 7.9 MB. |
+
+### What the fixes may have broken
+* **`engine_u26_golden.inc`:** 762 -> 786 cases: 24 ADDED (the new `wobedge` and `slidecut` sequences), 0 changed, 0 removed (only the count constant differs). A fresh `node tools/engine-u26-dump.mjs --check`: "90 voices and 786 cases match the committed hashes". No engine's audio differs for a valid input.
+* **No-live-pads identity** (1212 renders against `origin/native` 26780bee): identical (output, 35 stats fields, stem, heard mask).
+* **Same-sample start:** unchanged. Sampler starts at T; vox / mach at T+0; bass / acid at T+1 (the core's own k0 = 1).
+* **Tests:** full Release ctest 190 of 190 (1 skipped, `pumpsynth_refused`), includes `rt_core` (live pads) and `rt_guard_selftest`. ASan + UBSan: 20 of 20 of the live, render, hostile and rt tests built and run pass (the two `*_oom` tests were not built in my sanitizer tree).
+
+### Note (not a blocker)
+`tools/live-route-dump.mjs` now patches `Auto.prototype.hold` inside the vm with a hand-written emulation of the page's cancelAndHoldAtTime, so the D7 log is no longer the app's own code. It is correct by my measurement (1.45 at 0.59 s), but it is the same class of risk as an emulated reference; the app's `Auto.hold` itself is reported by the builder as a core fault.
+
+### Final verdict: MERGE
