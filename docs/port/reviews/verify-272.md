@@ -106,7 +106,7 @@ Not blocking, to file: (1) `eng(0)+on(500)` undetermined (item 6), bass / acid /
 
 # Re-check of 12015e10
 
-**Verdict: NOT YET: in progress** (items 1-3 done, 4 and 5 running; updated 16:45Z)
+**Verdict: MERGE** (items 1, 2, 3, 5 pass; item 4 explained, not equal to the merge-base by design; updated 16:52Z)
 
 ## 1. The change
 `git diff 90bf414d..12015e10`: 6 files; code = `live_shell.h` only (+3 lines): `rateAt` and the eng-lane read in `block()` use `sample_time((int64_t)s, sr)` instead of `(double)s / sr`. `sample_time` (`rt/sampletime.h`) is `q/sr + (s-q)*(1/sr)` with q the 128-frame quantum start = the sampler's own `tb0 + i*dt`, and the page's live-core override reads lanes at `currentTime + i*dt` (core-processor.js `__tcOv`), so it is the right clock; `s/sr` can be one ulp BELOW the note's own time (samples 500, 1000), so the block holding the note read the lane before its first event (the default) instead of the set at the note: that is the cause of my item 6 (eng lane) and of the rate-default effect on bass / mach songs (item 4). Other files: notes, tests (`test_live_review` +33), mutants, tool scenarios (`v_e0`, `v_e1000`, `rate500`, `rate480`, `rate2nd`).
@@ -118,3 +118,6 @@ Goldens: `engine_u26_golden.inc` against 90bf414d: 40 hashes added, 0 changed, 0
 
 ## 5. V05 and V15 (killed)
 Reran with the tool on 12015e10 against my build: V05 (`<=`) killed by `test_live_jsparity` (`seq_eng_bass_init_rate500`); V15 (state stored as track 0's) killed by `test_live_review` (`same0`, an eng on track 1 changed track 0); my own original V15 (a later node READS track 0's state) killed by `test_live_review` (`same1`); I21 (rate read at `s/sr`) killed by jsparity `rate500`; I22 (eng lanes read at `s/sr`) killed by jsparity `v_e0`. 5 of 5 dead.
+
+## 4. The 3 of 80 bass / mach live-pad songs against the merge-base
+Same song program (`vfy_song`, live=1, vox pad replaced by bass, seeds 3008 / 3062 / 3071, output + stats hashed at four host blocks, block-size independent): on 12015e10 they still do NOT equal the merge-base (sum |L|: 3008 43775.1 vs 43802.4; 3062 41446.2 vs 41492.9; 3071 42162.0 vs 41886.3; on 90bf414d they were 43773.6 / 41486.2 / 41946.5), so the three songs now differ from BOTH earlier heads. The builder's cause is confirmed by mutants rather than by a song-level proof: the merge-base (and 90bf414d) read the shell's rate / eng lanes at `s / sr`, which at samples such as 500 and 1000 is one ulp BELOW the note's own time `sample_time(s)`, so the control block that starts the note read the lane BEFORE its first event (default) instead of the note's value; `rate500` / `v_e0` fail on exactly that read (mutants I21 / I22 are killed by jsparity), and seqRender reads at the sample's time. So the head differs from the merge-base in the direction of the JS reference (the note's first block now takes the note's rate). I did not prove at song level that every sample difference comes from that read (no song-level oracle; the pool-vs-JS scenarios are the proof), and the merge-base's own first-block read was wrong at those samples, so equality with it is not expected. A wider count follows if the run finishes.
