@@ -60,6 +60,13 @@ void BassCore::on(bool leg) {
   }
   go_ = true;   // the next block sets the pitch: glide from the last note, or jump to it
 }
+void BassCore::reset() {   // = a fresh core with set(p()): what the constructor does, then set()
+  std::memset(aA_, 0, sizeof aA_); std::memset(aT_, 0, sizeof aT_); std::memset(phA_, 0, sizeof phA_); std::memset(phB_, 0, sizeof phB_);
+  for (int k = 1; k <= kN; k++) phB_[k] = std::fmod(k * 0.618034, 1.0);
+  stage_ = 0; env_ = 0; fe_ = 0; lph_ = 0; lu_ = 0; lsm_ = 0; sh_ = 0.5; rnd_ = 22222; f_ = 0; lf_ = 0; subPh_ = 0; norm_ = 0.3; wt_ = 0;
+  held_ = false; go_ = false; bad_ = false; bpm = 120; wob = 0;
+  const BassP keep = p_; set(keep);
+}
 void BassCore::off() { held_ = false; if (stage_ != 0 && stage_ < 4) stage_ = 4; }
 double BassCore::rand_() { rnd_ = std::fmod(rnd_ * 16807, 2147483647.0); return rnd_ / 2147483647.0; }   // (below 2^45: exact in doubles)
 double BassCore::shape_(double ph) const {

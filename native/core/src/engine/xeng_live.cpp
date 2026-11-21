@@ -22,6 +22,7 @@ inline void put(float* L, float* R, size_t len, double i, double y) {
 
 // ================================================================ AcidCore ====================================================================================================================
 AcidCore::AcidCore(double sr) : sr_(sr) { set(AcidP()); }
+void AcidCore::reset() { const AcidP keep = p_; *this = AcidCore(sr_); set(keep); }
 
 void AcidCore::set(const AcidP& o) {
   const AcidP d;   // `for (const k in p) if (typeof p[k] !== 'number' || !isFinite(p[k])) p[k] = AcidCore.defaults()[k] || 0`
@@ -85,6 +86,7 @@ void AcidCore::block(float* L, float* R, size_t len, double a, double b, double 
 
 // ================================================================ MachCore ====================================================================================================================
 MachCore::MachCore(double sr) : sr_(sr) { for (int i = 0; i < 10; i++) ph_[i] = std::fmod(i * 0.618034, 1.0); set(MachP()); }
+void MachCore::reset() { const MachP keep = p_; *this = MachCore(sr_); set(keep); }
 
 void MachCore::set(const MachP& o) {
   const MachP d;

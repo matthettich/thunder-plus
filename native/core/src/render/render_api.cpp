@@ -17,6 +17,8 @@
 #include <vector>
 
 #include "render/render.h"
+#include "render/players.h"
+#include "engine/xeng.h"
 #include "sf/sf.h"
 #include "rt/json.h"
 #include "rt/num.h"
@@ -354,6 +356,7 @@ int thunder_render_stats_get(thunder_render* r, thunder_render_stats* out) {
   s.notes_stretched = t.notesStretched; s.seq_chopped = t.seqChopped; s.seq_chop_skipped = t.seqChopSkipped; s.seq_chop_no_hits = t.seqChopNoHits;
   s.sf_voices_refused = t.sfVoiceDropped; s.sf_voice_track_full = t.sfVoiceOverflow; s.sf_voice_auto_dropped = t.sfVoiceAutoDropped; s.peak_voices_all = t.peakVoicesAll;
   s.stem = r->stem; s.heard_mask = r->R->heardMask();
+  s.notes_live_played = t.notesLivePlayed; s.live_no_node = t.liveNoNode; s.live_late = t.liveLate; s.live_queue_dropped = t.liveQueueDropped; s.live_forced_off = t.liveForcedOff; s.live_failed = t.liveFailed; s.live_refused = t.liveRefused;
   const size_t k = std::min<size_t>(out->size, sizeof s); const uint32_t keep = out->size;
   std::memcpy(out, &s, k); out->size = keep;
   return 0;
@@ -474,6 +477,52 @@ int thunder_render_clear_pad_sf(thunder_render* r, int pad) {
   if (r->dead || r->started) return THUNDER_RENDER_E_STATE;
   if (!padOk(pad)) return THUNDER_RENDER_E_ARG;
   dropPadSf(r, pad);
+  return 0;
+}
+
+int thunder_render_set_pad_live(thunder_render* r, int pad, int kind, const uint8_t* voice_json, size_t n, const thunder_render_live_params* params) {
+  if (!r) return THUNDER_RENDER_E_ARG;
+  if (r->dead || r->started) return THUNDER_RENDER_E_STATE;
+  if (!padOk(pad) || !voice_json || n == 0 || n > THUNDER_RENDER_MAX_VARS_BYTES) return THUNDER_RENDER_E_ARG;
+  if (kind != THUNDER_RENDER_LIVE_BASS && kind != THUNDER_RENDER_LIVE_VOX && kind != THUNDER_RENDER_LIVE_ACID && kind != THUNDER_RENDER_LIVE_MACH) return THUNDER_RENDER_E_ARG;   // (the pump synths and waves: later steps)
+  uint64_t mask = 0;
+  if (params) {
+    if (params->size < 2 * sizeof(uint32_t)) return THUNDER_RENDER_E_ARG;
+    thunder_render_live_params q; std::memset(&q, 0, sizeof q); q.size = (uint32_t)sizeof q;
+    const size_t k = std::min<size_t>(params->size, sizeof q); std::memcpy(&q, params, k); q.size = (uint32_t)sizeof q;
+    if (q.reserved0 != 0 || (q.track_mask >> 33) != 0) return THUNDER_RENDER_E_ARG;
+    mask = q.track_mask;
+  }
+  TR_TRY {
+    JsonDoc doc; JsonError je;
+    if (!doc.parse((const char*)voice_json, n, &je)) return je.msg && !std::strcmp(je.msg, "out of memory") ? THUNDER_RENDER_E_MEMORY : THUNDER_RENDER_E_ARG;
+    if (!doc.root().isObj()) return THUNDER_RENDER_E_ARG;
+    std::unique_ptr<XengVoice> V(new XengVoice());
+    if (!xeng_voice_from_json(*V, doc.root(), Json())) return THUNDER_RENDER_E_ARG;
+    LivePadConfig cfg; cfg.trackMask = mask;
+    if (kind == THUNDER_RENDER_LIVE_BASS) { if (V->kind != XKind::Bass) return THUNDER_RENDER_E_ARG; cfg.kind = LiveKind::Bass; cfg.bass = V->bass; cfg.bass.tune = V->tune; cfg.bass.drive = V->drive; cfg.bass.level = V->level; }   // (tune, drive and level come from the voice, as the page's node params do)
+    else if (kind == THUNDER_RENDER_LIVE_VOX) { if (V->kind != XKind::Vox) return THUNDER_RENDER_E_ARG; cfg.kind = LiveKind::Vox; cfg.vox = V->vox; cfg.vox.tune = V->tune; cfg.vox.drive = V->drive; cfg.vox.level = V->level; }
+    else if (kind == THUNDER_RENDER_LIVE_ACID) { if (V->kind != XKind::Acid) return THUNDER_RENDER_E_ARG; cfg.kind = LiveKind::Acid; cfg.acid = V->acid; cfg.acid.tune = V->tune; cfg.acid.drive = V->drive; cfg.acid.level = V->level; }
+    else { if (V->kind != XKind::Mach) return THUNDER_RENDER_E_ARG; cfg.kind = LiveKind::Mach; cfg.mach = V->mach; cfg.mach.tune = V->tune; cfg.mach.drive = V->drive; cfg.mach.level = V->level; }
+    LivePool& L = r->R->players().live();
+    // the nodes' bytes count against the pad budget (the old pad's nodes are released only when the new ones are in: judged with both held)
+    size_t each = 0; { int tracks = kVoiceTracks; if (mask) { tracks = 0; for (uint64_t m = mask; m; m &= m - 1) tracks++; } each = (size_t)tracks * (kind == THUNDER_RENDER_LIVE_BASS ? 58000 : kind == THUNDER_RENDER_LIVE_VOX ? 5 * 52000 : 39000); }
+    if (r->padBytes + each > THUNDER_RENDER_MAX_PAD_BYTES) return THUNDER_RENDER_E_LIMIT;
+    const size_t old = L.padBytes(pad);
+    if (!L.addPad(pad, cfg)) return THUNDER_RENDER_E_ARG;
+    r->padBytes = r->padBytes - old + L.padBytes(pad);
+    return 0;
+  }
+  TR_CATCH_BADALLOC(return THUNDER_RENDER_E_MEMORY;)
+  TR_CATCH_ALL(r->dead = true; return THUNDER_RENDER_E_INTERNAL;)
+}
+
+int thunder_render_clear_pad_live(thunder_render* r, int pad) {
+  if (!r) return THUNDER_RENDER_E_ARG;
+  if (r->dead || r->started) return THUNDER_RENDER_E_STATE;
+  if (!padOk(pad)) return THUNDER_RENDER_E_ARG;
+  LivePool& L = r->R->players().live();
+  r->padBytes -= L.padBytes(pad); L.removePad(pad);
   return 0;
 }
 
