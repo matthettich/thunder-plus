@@ -239,3 +239,9 @@ Each: options, recommendation, what ports most easily across Android / Mac / Win
 6. Android manifest and permission needs; the stability of `MidiDeviceInfo.getId()`; naming of multi-port devices (3.3, 5.3).
 7. Windows MIDI Services (5.9).
 8. That the pump can meet "drain every 2 ms" on Android without a real-time priority (the helper's 2 ms poll is a Node thread, not Android).
+
+## 8. The lead's rulings (Fable, 20 Nov 21:40 Mountain; the builder follows these)
+- **5.1 to 5.10: every recommendation is accepted as written** (5.1 c: one core pump, `CAP_TS` hands over 20 ms early; 5.2 a: `native/core/src/midi/`; 5.3 a with `n:Name / PortName`, `stable_id` later; 5.4 a; 5.5 a: `midi.cfg` read as arrays of four plus the new upward event `midi.ports`, and the builder adds the one-line note to CORE-BRIDGE.md, BRIDGE_V stays 1; 5.6 a; 5.7 a; 5.8 one phase 2 in the order given; 5.9 a: WinMM through libremidi; 5.10 constants + stats, tuned after the owner's device tests).
+- **Build order changed to keep clear of open work in the song renderer:** PR A = T1, T2, T5, T6 and the pump half of T7 (new files plus `midi_api.cpp`; nothing in `render/` or `mix/`). PR B = T3, T4, the rest of T7: it edits `render.cpp` / `players.h`, so it starts only after #265 (`n1/live-route`) and `n1/bus-into-bus` are merged, rebased on them. T9 (the Android sink) after PR A. T10 stays with N4.
+- 2.2's `audible`: PR B checks UNVERIFIED 3 against the bus-into-bus plan (transitive solo) before it widens the mask; if `audibleMask()` and the web differ for a chained bus, stop and write it up.
+- F-review by the lead: PR A's pump and clock map, all of PR B.
