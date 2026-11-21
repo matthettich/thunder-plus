@@ -47,3 +47,13 @@ CI on head 44561ecb (`check-runs`): 11 of 11 completed, all success or skipped (
 
 ## Verdict
 MERGE AFTER FIXES: F1 (skip must not drop the final block's tail), F2 (rate lane default 1 before its first event; restore the `held` scenario to `on(10)`), F3 (should fix): E14 survives and the JS parity never runs with the skip on (tap disables it), F4 (note): `hold-vs-chrome` not in CI, fixture proposal above.
+
+# Re-check of 90bf414d
+
+Fresh worktree of `origin/n1/live-eng` 90bf414d (commits 6df11e31, d4f96ea1, 90bf414d), Release build, my own harnesses (`vfy_pool`, `vfy_idle`, `vfy_host`) compiled against the new head.
+
+## 1. F1 (idle skip tail): FIXED
+* `vfy_pool`, 300 random scripts (seeds 1..300, all four kinds, mono + poly vox, gaps of 4096 samples / 4 s +-1, mods / tempo / stopAll in silences, quanta 128 / 37 / 1), skip ON vs `setIdleSkip(false)`, output + live stats: **0 differing** (was 14). Skip engaged in 294.
+* The same with eng events (seeds 1000..1299, eng at note-ons and in silences, 1-4 points): **0 differing**, skip engaged in 300.
+* `vfy_idle` (the 1300 direct resume cases: N = 1, 2, 7, 100, 3000 quanta x variants x offsets; was 50 differing, all mach): **0 differing**, skip engaged in all 1300.
+* My one-bass-note reproducer (seed 60) and the mach + stopAll one (seed 33): old head skip-on hash 65a1f028... vs skip-off 89073009...; new head skip-on 89073009... = the old skip-off hash (and 33: new skip-on 9e396b4e... = old skip-off). So the reproducer failed on the old head (I ran it there with this harness, 26 and 15 samples) and is bit-identical to unskipped on the new one. The builder's harness not failing on this reproducer is not a contradiction: it fails only where the core goes idle exactly as the host is still being handed the ring, which depends on `lat` vs the quantum.
