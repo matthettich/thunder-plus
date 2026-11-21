@@ -1086,3 +1086,14 @@ add_executable(test_render_bus_chain test_render_bus_chain.cpp)
 target_link_libraries(test_render_bus_chain PRIVATE thunder_core)
 target_include_directories(test_render_bus_chain PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../core/src ${CMAKE_CURRENT_SOURCE_DIR}/../core/include ${CMAKE_CURRENT_SOURCE_DIR})
 add_test(NAME render_bus_chain COMMAND test_render_bus_chain)
+
+
+# VERIFY-266 (independent verifier of bus into bus, docs/port/reviews/verify-266.md): bus_plan / mix_audible by hand from the web's busPlan(); notes on the buses of a chain
+add_executable(test_busplan_verify266 test_busplan_verify266.cpp)
+target_link_libraries(test_busplan_verify266 PRIVATE thunder_core)
+target_include_directories(test_busplan_verify266 PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../core/src ${CMAKE_CURRENT_SOURCE_DIR})
+add_test(NAME busplan_verify266 COMMAND test_busplan_verify266)
+add_executable(test_render_bus_notes test_render_bus_notes.cpp)
+target_link_libraries(test_render_bus_notes PRIVATE thunder_core)
+target_include_directories(test_render_bus_notes PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../core/src ${CMAKE_CURRENT_SOURCE_DIR}/../core/include ${CMAKE_CURRENT_SOURCE_DIR})
+add_test(NAME render_bus_notes COMMAND test_render_bus_notes)

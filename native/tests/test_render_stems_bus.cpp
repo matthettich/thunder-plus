@@ -83,6 +83,19 @@ int main() {
     CHECK("bus into bus in ascending order (0 -> 2 -> 5): the only stem is bus 5 (number 6)", listWith(plain, plan(0, 2, 5)) == std::vector<int>({6}));
     CHECK("a muted middle bus is not added, so what only it feeds is not either: the source keeps its own stem (0 -> 5 -> 2, 5 muted)", listWith(mutedMid, plan(0, 5, 2)) == std::vector<int>({1}));
   }
+  { // From a REAL chains patch (not a hand-made plan): track 1 -> Chain Out 6, Track In 6 -> Chain Out 3 gives 0 -> 5 -> 2 (0-based): the downstream bus (3) has a LOWER number than its upstream bus (6).
+    // The plan is built by the renderer from the patch; the list goes through thunder_render_stem_tracks. Only track 1 has notes: the only stem is bus 3.
+    std::string j = "{\"v\":6,\"bpm\":120,\"lpb\":4,\"ntr\":8,\"song\":[[0]],\"chains\":[[[0,0]]],\"plen\":[8],\"insts\":[";
+    for (int i = 0; i < 8; i++) j += std::string(i ? "," : "") + "{\"pad\":" + std::to_string(i) + ",\"tsp\":0,\"slc\":0,\"sync\":0,\"mo\":0}";
+    j += "],\"phrases\":[[";
+    for (int r = 0; r < 8; r++) { char b[128]; if (r % 2 == 0 && r < 6) std::snprintf(b, sizeof b, "%s[60,-1,-1,-1,-1,0,-1,-1,-1,-1,-1,-1]", r ? "," : ""); else std::snprintf(b, sizeof b, ",[-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1]"); j += b; }
+    j += "]],\"chainOn\":[true,false,true,false,false,true,false,false],\"chainPatch\":{\"format\":\"chains.patch\",\"modules\":[{\"id\":\"a\",\"type\":\"trackIn\",\"params\":{\"track\":1}},{\"id\":\"o6\",\"type\":\"chainOut\",\"params\":{\"track\":6}},{\"id\":\"b\",\"type\":\"trackIn\",\"params\":{\"track\":6}},{\"id\":\"o3\",\"type\":\"chainOut\",\"params\":{\"track\":3}}],\"cables\":[{\"from\":[\"a\",\"out\"],\"to\":[\"o6\",\"in\"]},{\"from\":[\"b\",\"out\"],\"to\":[\"o3\",\"in\"]}]}}";
+    thunder_render_opts o; std::memset(&o, 0, sizeof o); o.size = sizeof o; o.use_frames = 1; o.frames = 4800;
+    thunder_render* r = thunder_render_create((const uint8_t*)j.data(), j.size(), &o, nullptr, 0); CHECK("the real patch loads", r != nullptr);
+    if (r) { installPads(r, ps); const BusPlan& P = r->R->mixer().plan();
+      CHECK("the plan from the patch: 1 -> 6 -> 3 (0 -> 5 -> 2), tracks 1 and 6 pure", P.feedMask[5] == 1u && P.feedMask[2] == 32u && P.pure == 33u && !P.loop);
+      CHECK("real patch, the downstream bus has the LOWER number (0 -> 5 -> 2): the only stem is bus 3", list(r) == std::vector<int>({3})); thunder_render_free(r); }
+  }
   std::printf("%s (%d failures)\n", g_fail ? "FAILED" : "ok", g_fail);
   return g_fail ? 1 : 0;
 }

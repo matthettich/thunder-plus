@@ -33,27 +33,33 @@ int main(int argc, char** argv) {
     } else { Json S = C.get("S"); patch = S.get("chainPatch"); for (int t = 0; t < kSongNT; t++) { chainOn[t] = S.arr("chainOn").at((size_t)t).asBool(); Json m = S.arr("mix").at((size_t)t); if (m.boolean("mute")) mute |= 1u << t; if (m.boolean("solo")) solo |= 1u << t; } }
     const BusPlan P = bus_plan(patch, chainOn);
     std::string why;
-    if (id == "cross") {   // SUPERSEDED by bus into bus: the old web (this checkout's index.html) said "a track with a Track In is no bus"; now 1 -> 4 is kept and 4 -> 1 (the higher source) is left out
-      if (P.feedMask[3] != 1u || P.targets[0] != 8u || P.targets[3] != 0u || P.feedMask[0] != 0u || P.pure != 1u || !P.loop || P.loopTo[3] != 1u) why += " (bus-into-bus loop rule)";
-      std::printf("%-28s superseded by bus into bus (loop: the closing cable of the higher source is left out)%s\n", id.c_str(), why.empty() ? "  ok" : ("  FAIL" + why).c_str()); if (!why.empty()) fails++; continue; }
+    // `cross` (Track In 1 -> Chain Out 4, Track In 4 -> Chain Out 1) is SUPERSEDED by bus into bus: the reference this runs against (tools/mix-dump.mjs, this checkout's index.html)
+    // still says "a track with a Track In is no bus", so for this one case the routing expectations are the bus-into-bus ones (worked out by hand and equal to the web's own answer
+    // at beta: 1 -> 4 is kept, 4 -> 1 (the higher source) is left out): feeds[3] = {0}, targets[0] = {3}, pure = {0}, loop, loopTo[3] = {0}. Everything else (pre, chains_feed,
+    // audible) is still compared with the reference like every other case.
+    const bool cross = id == "cross";
     for (int t = 0; t < kSongNT; t++) {
-      if ((double)P.feedMask[t] != W.arr("feeds").at((size_t)t).asNum()) why += " feeds[" + std::to_string(t) + "]";
-      if ((double)P.targets[t] != W.arr("targets").at((size_t)t).asNum()) why += " targets[" + std::to_string(t) + "]";
+      const double wf = cross ? (t == 3 ? 1.0 : 0.0) : W.arr("feeds").at((size_t)t).asNum(), wt = cross ? (t == 0 ? 8.0 : 0.0) : W.arr("targets").at((size_t)t).asNum();
+      if ((double)P.feedMask[t] != wf) why += " feeds[" + std::to_string(t) + "]";
+      if ((double)P.targets[t] != wt) why += " targets[" + std::to_string(t) + "]";
+      if (cross) { if (P.feedLen[t] != (t == 3 ? 1 : 0) || (t == 3 && (P.nFeeds[t] != 1 || P.feeds[t][0] != 0))) why += " list[" + std::to_string(t) + "]"; continue; }
       Json L = W.get("lists").get(std::to_string(t));
       if ((int)L.size() != P.feedLen[t]) why += " list length[" + std::to_string(t) + "]";
       else for (int j = 0; j < P.nFeeds[t]; j++) if ((double)P.feeds[t][j] != L.at((size_t)j).asNum()) { why += " list[" + std::to_string(t) + "]"; break; }
     }
-    if ((double)P.pure != W.num("pure")) why += " pure";
+    if ((double)P.pure != (cross ? 1.0 : W.num("pure"))) why += " pure";
     if ((double)P.pre != W.num("pre")) why += " pre";
-    if (P.loop != W.boolean("loop")) why += " loop";
+    if (P.loop != (cross ? true : W.boolean("loop"))) why += " loop";
+    if (cross) { for (int t = 0; t < kSongNT; t++) if (P.loopTo[t] != (t == 3 ? 1u : 0u)) why += " loopTo[" + std::to_string(t) + "]"; }   // the omitted-edge masks: exactly the higher source's closing cable
     if (!W.get("srcAll").missing()) {   // bus into bus: the closures and the cables left out
       for (int t = 0; t < kSongNT; t++) {
         if ((double)P.srcAll[t] != W.arr("srcAll").at((size_t)t).asNum()) why += " srcAll[" + std::to_string(t) + "]";
         if ((double)P.busAll[t] != W.arr("busAll").at((size_t)t).asNum()) why += " busAll[" + std::to_string(t) + "]";
       }
-      Json LE = W.arr("loopEdges"); int nl = 0; for (int t = 0; t < kSongNT; t++) for (int b = 0; b < kSongNT; b++) if (P.loopTo[t] >> b & 1u) nl++;
-      if ((int)LE.size() != nl) why += " loopEdges (count)";
-      for (size_t j = 0; j < LE.size(); j++) { const int a = (int)LE.at(j).at(0).asNum(), b = (int)LE.at(j).at(1).asNum(); if (a < 0 || a >= kSongNT || b < 0 || b >= kSongNT || !(P.loopTo[a] >> b & 1u)) why += " loopEdges"; }
+      // the omitted edges as MASKS (loopTo[source] has bit bus), built from the fixture and compared for every source: a duplicate listed edge cannot hide an unexpected one
+      Json LE = W.arr("loopEdges"); uint32_t want[kSongNT] = {0};
+      for (size_t j = 0; j < LE.size(); j++) { const int a = (int)LE.at(j).at(0).asNum(), b = (int)LE.at(j).at(1).asNum(); if (a < 0 || a >= kSongNT || b < 0 || b >= kSongNT) why += " loopEdges (range)"; else want[a] |= 1u << b; }
+      for (int t = 0; t < kSongNT; t++) if (P.loopTo[t] != want[t]) why += " loopTo[" + std::to_string(t) + "]";
     }
     if ((double)chains_feed(patch, chainOn) != W.num("chainsFeed")) why += " chainsFeed";
     { const uint32_t nm = W.get("srcAll").missing() ? 0xffffffffu : 0xffffu;   // the bus-into-bus fixture was made with 16 tracks
