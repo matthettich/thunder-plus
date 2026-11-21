@@ -8,9 +8,13 @@
              an unknown token with send < 0 and ignore it in clear, and its token-to-device table must be safe to read from the sender thread while the control thread changes it (a
              lock of its own, or a copy swapped atomically; the core takes none). Nothing else needs a lock: clock_map stays lock-free, for the audio callback.
              A send that returns < 0 marks the device's cable gone UNTIL THE NEXT set_devices (which gives it another chance): a shell that lists only on hot-plug must call set_devices again to revive it.
-   BEFORE THE FIRST MAP Everything the pump drains before the first thunder_midiout_clock_map is dropped (dropped_nomap), a Start included: the shell must call clock_map once before PLAY
-             (thunder_midi_start). clock_map is meant to be called from the audio callback, right after thunder_midi_process (the floor compares the callback's clock with the last block start);
-             from a timer it adds up to the age of the pair to the floor's shift.
+   BEFORE THE FIRST MAP Before the first thunder_midiout_clock_map nothing is SENT: the pump queues what the core makes (a Start, SPP and the first notes included) and holds it; the fixed queue bounds it
+             (F4's order: clock ticks go first, a note-off, Stop or CLEAR never; evictions count in queue_full), and a CLEAR still applies to what is queued. dropped_nomap is kept in the struct for ABI and is no
+             longer counted. When the first map arrives the one lateness rule is applied to the backlog: a note-on or controller more than 150 ms in the past is dropped (dropped_stale; its note-off may still
+             be sent, harmless); a note-off, Start, Stop, SPP, Continue and every CLEAR are always sent; a clock tick more than 20 ms late is dropped; the rest goes out at once (a late one counts in `late`).
+             Call clock_map once per audio callback AFTER thunder_midi_process / midi_end of the block (the floor then reads this block's start; the order is not needed for correctness: nothing is lost
+             before the first map). Nothing else may call clock_map before the audio thread's first call has returned (a second caller makes the audio thread's call a no-op). From a timer it adds up to the age of
+             the pair to the floor's shift.
    LIFETIME  thunder_midiout_free: after BOTH the sender thread (pump) and every thread that calls clock_map (the audio callback) have stopped.
    THREADS   CONTROL: create, free, set_devices, assign, set_clock, set_gear, set_playing, set_out_latency, get_port: the ONE thread that also calls the thunder_midi_set_* calls
              (single producer); set_devices, assign, set_clock, set_gear and set_playing re-sync the scheduler's ports and return THUNDER_MIDIOUT_E_BUSY if its command ring was full (the table is
@@ -41,6 +45,7 @@ extern "C" {
 #define THUNDER_MIDIOUT_SPIN_NS 500000LL           /* no CAP_TS: the pump waits until this long before the time, then spins */
 #define THUNDER_MIDIOUT_LATE_NS 2000000LL          /* a message sent later than this behind its time counts in stats.late */
 #define THUNDER_MIDIOUT_TICK_LATE_NS 20000000LL    /* a clock tick later than this is dropped, never sent in a burst */
+#define THUNDER_MIDIOUT_BACKLOG_NS 150000000LL     /* at the FIRST map after a hold: a note-on or controller more than this behind its time is dropped (stats.dropped_stale) */
 #define THUNDER_MIDIOUT_STALE_NS 2000000000LL      /* a clock map not refreshed for this long is stale (counted, still used) */
 
 #define THUNDER_MIDIOUT_DEV_TS 1u            /* thunder_midiout_dev.flags: the OS honours a send time (informational) */
@@ -85,13 +90,14 @@ typedef struct thunder_midiout_stats {       /* all counted since create */
   uint64_t sent;                             /* messages the sink accepted */
   uint64_t dropped_gone;                     /* the message's device is not listed, or the sink said it is gone */
   uint64_t dropped_cleared;                  /* removed by a CLEAR marker */
-  uint64_t dropped_nomap;                    /* drained before the first clock map */
+  uint64_t dropped_nomap;                    /* no longer counted: records wait for the first clock map (kept for ABI) */
   uint64_t late;                             /* sent (or a tick dropped) more than 2 ms behind its time, or sent while the map was stale */
   uint64_t queue_full;                       /* a message did not fit: it, or a lower-priority one, was dropped (clock ticks, then CCs, then note-ons, never a note-off or Stop) */
   uint64_t max_queue;                        /* the most messages the queue held */
   uint64_t send_errors;                      /* the sink returned < 0 */
   uint64_t dropped_late_ticks;               /* clock ticks more than 20 ms behind: dropped (also in late) */
   uint64_t may_hang;                         /* 1 = a note-off, Stop or All Notes Off did not fit: the shell should send PANIC (thunder_midi_panic) */
+  uint64_t dropped_stale;                    /* the backlog rule of the first map: a held note-on or controller (CC, bend, pressure, program) more than 150 ms in the past was dropped; its note-off may still be sent (harmless) */
 } thunder_midiout_stats;
 
 /* CONTROL. NULL on a bad argument (null core_midi / sink / now_ns / send, a rate outside 8000..384000) or no memory. The core_midi and the sink must outlive it. */

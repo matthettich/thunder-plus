@@ -12,7 +12,7 @@ static void cpyS(char* d, const char* src) { memcpy(d, src, strlen(src) + 1); } 
 
 /* the ABI the header promises (LP64 and any ABI where uint64_t aligns to 8): a change here is a break for every shell */
 typedef char sz_dev[sizeof(thunder_midiout_dev) == 208 ? 1 : -1];
-typedef char sz_stats[sizeof(thunder_midiout_stats) == 88 ? 1 : -1];
+typedef char sz_stats[sizeof(thunder_midiout_stats) == 96 ? 1 : -1];
 typedef char off_token[offsetof(thunder_midiout_dev, token) == 200 ? 1 : -1];
 typedef char off_sent[offsetof(thunder_midiout_stats, sent) == 8 ? 1 : -1];
 typedef char off_hang[offsetof(thunder_midiout_stats, may_hang) == 80 ? 1 : -1];

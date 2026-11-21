@@ -152,7 +152,7 @@ class Mixer {
 
   uint32_t autoDropped() const;      // automation events a full lane refused (must stay 0)
   int peakEvents() const { return peakEv_; }   // the longest lane seen
-  uint32_t audibleMask() const { return audible_; }
+  uint64_t audibleMask() const { return audible_; }   // U36 PR B: widened to the 64-bit mask MidiSched::setAudible takes (bit t = track t is heard; the mixer has kNT = 32 tracks, so the high bits are 0 and MidiSched treats tracks >= 32 as always heard)
   uint32_t routedMask() const { return routed_; }   // the pure sources playing only through a bus that exists
   uint32_t busMask() const { return busOn_; }       // the buses that exist
 

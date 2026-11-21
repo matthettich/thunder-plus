@@ -111,11 +111,18 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
   add_executable(test_android_midi_sink test_android_midi_sink.cpp ${CMAKE_CURRENT_SOURCE_DIR}/../android/app/src/main/cpp/midi_out.cpp)
   target_link_libraries(test_android_midi_sink PRIVATE thunder_core Threads::Threads)
   target_include_directories(test_android_midi_sink PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../core/src ${CMAKE_CURRENT_SOURCE_DIR}/../android/app/src/main/cpp)
-  # DebugSong (midi_out.cpp) owns a Seq, whose shared_ptr<SeqSession> control block the -fno-rtti core made (its vtable has no typeinfo): UBSan's vptr check cannot work across that boundary (a false positive, as test_seq_takeover / test_seq_chop above). Off for this target only.
+  # DebugSong (midi_out.cpp) owns a Seq, whose shared_ptr<SeqSession> control block the -fno-rtti core made (its vtable has no typeinfo): UBSan's vptr check cannot work across that boundary (a false positive, as for test_seq_takeover and test_seq_chop further down). Off for this target only.
   target_compile_options(test_android_midi_sink PRIVATE -Wall -Wextra -fno-sanitize=vptr)
   add_test(NAME android_midi_sink COMMAND test_android_midi_sink)
   set_tests_properties(android_midi_sink PROPERTIES TIMEOUT 120)
 endif()
+# U36 (PR B): the MIDI glue inside SongRenderer (setMidi) and Players' lateness rule (setDropLate): spec 3.6 cases 9, 10, 11
+add_executable(test_midi_glue test_midi_glue.cpp)
+target_link_libraries(test_midi_glue PRIVATE thunder_core)
+target_include_directories(test_midi_glue PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../core/src ${CMAKE_CURRENT_SOURCE_DIR})
+target_compile_definitions(test_midi_glue PRIVATE THUNDER_ROOT="${CMAKE_CURRENT_SOURCE_DIR}/../..")
+add_test(NAME midi_glue COMMAND test_midi_glue)
+
 # U36 (PR A): the MIDI port table, the clock map and the timed send queue (thunder_midiout_*) against a fake sink and a fake clock; the three-thread case runs under TSan in CI.
 add_executable(test_midiport test_midiport.cpp)
 target_link_libraries(test_midiport PRIVATE thunder_core Threads::Threads)
