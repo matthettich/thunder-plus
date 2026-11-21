@@ -35,7 +35,7 @@
 //   G7 event delivery        TEMPO, index.html:23222-23236 (tempoTo, offline branch): `q = 128 / sr, at = Math.ceil(ev.t / q) * q`; at <= 0 or at >= the render length: sent at once (before quantum 0); else ac.suspend(at): sent before the
 //                            quantum that starts at `at`, i.e. quantum ceil(ev.t / q); messages of the same `at` in event order (MEASURED in Chrome 153, chains-krate-check.mjs: agrees for every k). CHC, index.html:23272: setValueAtTime(ev.v, max(ev.t, 0)) on the node's k-rate parameter b<k>;
 //                            Chrome's measured rule (chains-krate-check.mjs, 2400 measurements per rate, 48000 and 44100 Hz, no exception) is quantum = ceil(ceil(t * sr) / 128), t * sr in double; NOT the page's ceil(t / q) (that differs when t is exactly a quantum start, e.g. k = 5 at 48 kHz).
-//   G8 keep rule             index.html:25909-25913 (renderOut: keepT = audible tracks that have notes, busStemPlan adds buses) and 25946-25952 (a stem: Set([t])); pass() then busClosure (25829).
+//   G8 keep rule             `noteTracks` (explicit in every case and in `expect`) is the page's `notes.some(e => e.track === t)`: a track with no notes is not kept, so it gets no node and no sound from a patch alone (case l). index.html:25909-25913 (renderOut: keepT = audible tracks that have notes, busStemPlan adds buses) and 25946-25952 (a stem: Set([t])); pass() then busClosure (25829).
 //   G9 the inputs            the synthetic generator below (not the page's voices).
 // WHAT IT DOES NOT PROVE: it is not Chrome. (1) The event timing is MEASURED (chc and tempo, see G7) but only with a tiny worklet, not the page's whole graph; port-message delivery of the initial transport (G6) is not measured. (2) The mixer strip is the model of mix-dump.mjs (Chrome-checked there for the chains-off strip; with a node in it the node's output is taken as exact and gain 1 / pre / fader are the model's).
 // (3) The sum of the wet path and the dry path (dry gain 0) is taken as the wet path alone (a signed zero of -0 + +0 could differ). (4) No track effects, no master effects, no mastering, no limiter, no PDC: the output is the master
@@ -117,7 +117,7 @@ const wire = (a, b, pb) => outCab(a, b, pb || 'in');
 
 // ---- the cases ----
 const cases = [];
-const addCase = c => cases.push(Object.assign({ stem: null, events: [], quanta: QUANTA, controls: [] }, c));
+const addCase = c => cases.push(Object.assign({ stem: null, events: [], quanta: QUANTA, controls: [], noteTracks: c.inputs.map(q => q.t).sort((a, b) => a - b) }, c));   // noteTracks: the tracks that HAVE NOTES (index.html:25909); by default the tracks that have an input
 const st = t => ({ t, mono: false }), mo = t => ({ t, mono: true });
 const frameT = frames => frames / SR;   // a time in seconds from a frame count: the way Chrome reads currentTime
 // ELECTRO's own patch: tracks 1, 2, 3, 7 -> Stereo mixer -> Chain Out of track 4 (bus 3); sources 0, 1, 2, 6 are pure; the bus track 3 has CHN on and a Chain Out
@@ -175,6 +175,10 @@ addCase({ name: 'k/twenty-sources', note: 'twenty sources into one bus (two Ster
     for (let t = 0; t < 16; t++) cs.push(wire('t' + t, 'mx1', 'in' + (t + 1))); for (let t = 16; t < 20; t++) cs.push(wire('t' + t, 'mx2', 'in' + (t - 15)));
     cs.push(wire('mx1', 'co'), wire('mx2', 'co')); s.chainPatch = PATCH(mods, cabs(...cs)); for (let t = 0; t < 20; t++) { s.mix[t] = { vol: 150 + 3 * t, trim: 128, pan: 40 + 9 * t, mute: false, solo: false }; } return s; },
   inputs: Array.from({ length: 20 }, (_, t) => (t % 7 === 3 ? mo(t) : st(t))).concat([st(22), st(25)]) });
+
+addCase({ name: 'l/chain-out-no-notes', note: 'track 9 has CHN on, a Chain Out and an oscillator patched straight into it, but NO notes: the page keeps only tracks with notes (and the bus closure), so it gets no node and is SILENT; track 5 (with notes) plays. Control treatAsNotes: with track 9 treated as having notes the oscillator is heard',
+  song: () => { const s = electroFrag(); s.chainOn = s.chainOn.map(() => false); s.chainOn[8] = true; s.chainPatch = PATCH([mod('osc1', 'osc', { wave: 1, freq: 330, fm: 0, level: 0.5 }), CO('co9', 9)], [{ from: ['osc1', 'out'], to: ['co9', 'in'] }, { from: ['osc1', 'out'], to: ['co9', 'inR'] }]); return s; },
+  inputs: [st(4)], noteTracks: [4], controls: ['treatAsNotes'], controlNote: 8 });
 
 // ---- the library-effect rule: a case may not use one of the module types chains_cases.json leaves out as "within a recorded dB" ----
 const LIB = (() => { const c = JSON.parse(fs.readFileSync(path.join(ROOT, 'native/tests/golden/chains_cases.json'), 'utf8')); return new Set(c.filter(x => x.kind === 'mod' && x.lib).map(x => x.type)); })();
@@ -247,7 +251,7 @@ function run(c, opt = {}) {
   const core = makeCore(); core.U.setS(S);
   let keep;
   if (c.stem != null) keep = new Set([c.stem]);
-  else { const has = new Set(c.inputs.map(q => q.t)), keepT = [];
+  else { const has = new Set(c.noteTracks.concat(opt.treatAsNotes != null ? [opt.treatAsNotes] : [])), keepT = [];   // G8: the page's `notes.some(e => e.track === t)`
     for (let t = 0; t < NT; t++) if (core.U.audible(t) && has.has(t)) keepT.push(t);
     core.ctx.busStemPlan(keepT, core.U.busPlan(), core.U.audible); keep = new Set(keepT); }
   keep = core.ctx.busClosure(keep);
@@ -282,7 +286,7 @@ function run(c, opt = {}) {
     let hq = 0x811c9dc5 >>> 0; hq = fnv(hq, oL); hq = fnv(hq, oR); qh.push(hex8(hq)); h = fnv(h, oL); h = fnv(h, oR);
   }
   return { hash: hex8(h), qh: qh.join(''), head: { L: Array.from(L.subarray(0, 16), bits), R: Array.from(R.subarray(0, 16), bits) }, L, R,
-    expect: { heard: [...keep].sort((a, b) => a - b), nodes: M.nodeOrder.slice(), busMaps: M.busMaps, pre: M.preSet.slice().sort((a, b) => a - b), routed: [...M.routed].sort((a, b) => a - b), eventQuanta: evBlocks } };
+    expect: { noteTracks: c.noteTracks.slice(), heard: [...keep].sort((a, b) => a - b), nodes: M.nodeOrder.slice(), busMaps: M.busMaps, pre: M.preSet.slice().sort((a, b) => a - b), routed: [...M.routed].sort((a, b) => a - b), eventQuanta: evBlocks } };
 }
 
 // ---- the golden file ----
@@ -306,9 +310,9 @@ function build() {
     if (seenNames.has(c.name)) throw new Error('duplicate case ' + c.name); seenNames.add(c.name);
     const r = run(c), S0 = typeof c.song === 'function' ? c.song() : c.song;
     const controls = {};
-    for (const v of c.controls) { const x = run(c, { [v]: true }); if (x.hash === r.hash) throw new Error(`${c.name}: the control ${v} gives the same hash as the case: the case does not pin what it says`); controls[v] = x.hash; }
+    for (const v of c.controls) { const x = run(c, v === 'treatAsNotes' ? { treatAsNotes: c.controlNote } : { [v]: true }); if (x.hash === r.hash) throw new Error(`${c.name}: the control ${v} gives the same hash as the case: the case does not pin what it says`); controls[v] = x.hash; }
     if (c.events.length) for (const sh of [-1, 1]) { const x = run(c, { shift: sh }); if (x.hash === r.hash) throw new Error(`${c.name}: the events one quantum ${sh < 0 ? 'early' : 'late'} give the same hash: the events do not matter in this case`); controls['events' + (sh < 0 ? 'EarlyBy1' : 'LateBy1')] = x.hash; }
-    out.push({ name: c.name, note: c.note, song: S0, inputs: c.inputs, stem: c.stem, events: c.events, quanta: c.quanta, expect: r.expect, hash: r.hash, head: r.head, qh: r.qh, controls });
+    out.push({ name: c.name, note: c.note, song: S0, inputs: c.inputs, noteTracks: c.noteTracks, stem: c.stem, events: c.events, quanta: c.quanta, expect: r.expect, hash: r.hash, head: r.head, qh: r.qh, controls });
   }
   return out;
 }
