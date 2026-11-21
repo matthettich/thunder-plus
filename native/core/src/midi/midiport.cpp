@@ -167,6 +167,7 @@ bool resolve(const thunder_midiout* o, int cable, uint64_t& tok) {   // the cabl
 }
 // The sink failed on `tok` for `cable` (PUMP thread): mark THAT token. No compare with the cable's current token first: there is no window for control to slip a replacement into.
 void markGone(thunder_midiout* o, int cable, uint64_t tok) {
+  if (o->cabGone[cable].load(std::memory_order_relaxed) && o->cabGoneTok[cable].load(std::memory_order_relaxed) == o->cabTok[cable].load(std::memory_order_relaxed)) return;   // the cable's current token is already marked: a late failure of an OLDER token (a replay of history) must not move the mark off it
   o->cabGoneTok[cable].store(tok, std::memory_order_relaxed);
   o->cabGone[cable].store(1, std::memory_order_release);
 }

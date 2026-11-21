@@ -118,3 +118,6 @@ PR B = T3, T4, tests 9-11 of spec 3.6, the rest of T7, and the carried gone-toke
 
 ## Tests (GCC, Linux x86-64, Release, -j1) -- see the end of this file for the final run
 Full `ctest` (Release, -j1, before the last test-only edits): 204 tests, 100% passed, 1 skipped (`pumpsynth_refused`, as before). ASan + UBSan: `test_midi_glue`, `test_midiport` (+ `--threads`), `rt_midi`, `test_midi_api`, `test_midi_ledger`, `test_players`: clean. TSan: `test_midiport --threads`, `test_midiport`, `test_midi_glue`: no report. Mutants caught: `resolve` ignoring the gone token (2 failures); a `new` in `quantum()`'s glue (`rt_midi` aborts: operator new inside the audio callback).
+
+## CodeRabbit round on #274
+Fixed: `markGone` no longer moves the mark off a token that is already marked (a late failure of an older token's replay cannot unmark the current one); `setDropLate` is a relaxed atomic (any thread); the `clock_map` header says nothing else may call it before the audio thread's first call; `rt_midi` destroys the renderer before freeing its handle; `test_midi_glue` checks the audio comparison's setup. Not changed: the first `clock_map` has no output-latency floor (the floor needs a completed block; the shell's pair already includes the output latency, and the floor only guards against the pair being too early), which is PR A's documented behaviour (decision 4).

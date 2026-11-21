@@ -11,7 +11,7 @@
    BEFORE THE FIRST MAP Everything the pump drains before the first thunder_midiout_clock_map is dropped (dropped_nomap), a Start included: the shell must call clock_map once before PLAY
              (thunder_midi_start). In the audio callback call clock_map BEFORE thunder_midi_process (or midi_begin) of the block, not after it: the pair (the frame the block starts at, the host time it is heard) is
              known in advance, and a pump that runs between the block's process and its clock_map would drain the block's records (the first PLAY's Start and first notes) while no map exists and drop them
-             (midiport_threads flake, 21 Nov: 4 notes in 2996, all in dropped_nomap). After the first map the order does not matter (the floor compares the callback's clock with the last block start, so the
+             (midiport_threads flake, 21 Nov: 4 notes in 2996, all in dropped_nomap). Nothing else may call clock_map before that first call has returned (a second caller makes the audio thread's call a no-op: the first map would then be missing). After the first map the order does not matter (the floor compares the callback's clock with the last block start, so the
              pair is at most one block older). From a timer it adds up to the age of the pair to the floor's shift.
    LIFETIME  thunder_midiout_free: after BOTH the sender thread (pump) and every thread that calls clock_map (the audio callback) have stopped.
    THREADS   CONTROL: create, free, set_devices, assign, set_clock, set_gear, set_playing, set_out_latency, get_port: the ONE thread that also calls the thunder_midi_set_* calls

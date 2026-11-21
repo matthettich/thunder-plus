@@ -110,8 +110,9 @@ static void test9() {
   }
   std::printf("9 glue_cadence: %d songs, %ld records compared with the scheduler driven directly\n", cases, records);
   // the hook never changes the audio, and no hook is the renderer as it was (the existing render, stem and golden tests are the other half of that)
-  { Case C; loadCase(THUNDER_ROOT, "two-ports", C);
-    Host A, B; A.init(C.songText, C, false); B.init(C.songText, C, true);
+  { Case C; if (!loadCase(THUNDER_ROOT, "two-ports", C)) { CHECK(false, "9: no two-ports case"); return; }
+    Host A, B; const bool okA = A.init(C.songText, C, false), okB = B.init(C.songText, C, true);
+    if (!okA || !okB) { CHECK(false, "9: the audio comparison does not build"); return; }
     std::vector<float> a, b; std::vector<Rec> sink; const int64_t frames = 128 * 400;
     { std::vector<float> L(480), R(480); for (int64_t d = 0; d < frames;) { const int n = (int)std::min<int64_t>(480, frames - d); A.R->block(L.data(), R.data(), n); a.insert(a.end(), L.begin(), L.begin() + n); a.insert(a.end(), R.begin(), R.begin() + n); d += n; } }
     runGlue(B, 480, frames, sink, &b);

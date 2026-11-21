@@ -13,6 +13,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <fstream>
+#include <memory>
 #include <new>
 #include <sstream>
 #include <string>
@@ -124,7 +125,7 @@ int main(int argc, char** argv) {
   thunder_midi_set_song(h3, (const uint8_t*)songText.data(), songText.size());
   for (int p = 0; p < 4; p++) thunder_midi_set_port(h3, p, 1, p < 2, p * 2.0, p);
   thunder::RenderPads rpads; thunder::SeqOpts ro; ro.live = true; ro.hasLoop = true; ro.loopY0 = 0; ro.loopY1 = 0;
-  thunder::SongRenderer rend(D.song, D.vars, rpads, 48000, 128, ro, 16);
+  std::unique_ptr<thunder::SongRenderer> rendp(new thunder::SongRenderer(D.song, D.vars, rpads, 48000, 128, ro, 16)); thunder::SongRenderer& rend = *rendp;
   if (!rend.setMidi(h3)) return fail("setMidi");
   rend.players().setDropLate(true);
   float rl[128], rr[128]; std::vector<thunder_midi_msg> gout(4096); long gmsgs = 0;
@@ -200,6 +201,7 @@ int main(int argc, char** argv) {
   std::printf("rt_midi: the pump and the clock map (midiport): %ld messages sent, %llu dropped (gone) %llu cleared, no allocation, no lock\n", g_sent, (unsigned long long)ps.dropped_gone, (unsigned long long)ps.dropped_cleared);
   if (gmsgs < 500 || rend.stats().steps < 100) return fail("the glue run did too little");
   std::printf("rt_midi: SongRenderer::quantum() with setMidi: %ld records, %d steps, no allocation, no lock\n", gmsgs, rend.stats().steps);
+  rendp.reset();   // the renderer holds h3 until it is destroyed
   thunder_midiout_free(po); thunder_midi_free(h2); thunder_midi_free(h3);
   thunder_midi_free(h);
   return 0;

@@ -7,6 +7,7 @@
 // REAL-TIME RULES: the constructor allocates; dispatch() / render() allocate nothing and take no lock.
 #ifndef THUNDER_RENDER_PLAYERS_H
 #define THUNDER_RENDER_PLAYERS_H
+#include <atomic>
 #include <cstdint>
 
 #include "engine/live_pool.h"
@@ -34,7 +35,8 @@ class Players {
   // choke group (MidiSched's rule: "a late mono note still ends the previous note"); a late poly note touches nothing. Off / mod / stp and every other event are never dropped for lateness.
   // The web: coreMsg drops a note more than 0.15 s late for the notes the PAGE plays (live engines, SoundFonts, variations: index.html coreMsg `e.t < ctx.currentTime - 0.15`); the web's own core plays its sampler notes at once whatever
   // their lateness, which natively gives way to the one rule for pad and MIDI (the lead's ruling, U36-SPEC 2.5). A MIDI-only instrument (OUTPUT 1) sounds no pad and is not counted here, as before.
-  void setDropLate(bool on) { dropLate_ = on; }
+  // Any thread (a relaxed atomic): the audio thread reads it in note(), a host may flip it between quanta.
+  void setDropLate(bool on) { dropLate_.store(on, std::memory_order_relaxed); }
 
   // A note, off, mod or stp event (any other type: returns false, nothing done). `seq` gives the arp table and the bpm the voices read.
   bool dispatch(const SeqEvent& e, const Seq& seq, const Song& song);
@@ -63,7 +65,7 @@ class Players {
   sf::SfPool sfpool_;
   LivePool live_;
   PlayerStats st_;
-  bool dropLate_ = false; double t0_ = 0;                // setDropLate; the quantum's start (setTime)
+  std::atomic<bool> dropLate_{false}; double t0_ = 0;                // setDropLate; the quantum's start (setTime)
   uint64_t serial_ = 0;                                  // voice serials (age across the pools)
 };
 
