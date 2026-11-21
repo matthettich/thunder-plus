@@ -151,7 +151,7 @@ bool SfPool::note(const SeqEvent& e, const double* arp, const SfPad& pad, const 
   if (!v.nz) { free_[nFree_++] = vi; return false; }
   const double g0 = e.gain * js_pow(10, (orv(P.level, 0) + 6) / 20);
   v.st = stAny; v.r.reset(base); v.g.reset(g0); v.f.reset(1); v.pn.reset(jclamp((e.pan - 128) / 127, -1, 1));
-  v.base = base; v.rate = base; v.choke = ck; v.col = e.col; v.ended = false; v.hasStop = false; v.stopAt = 0; v.rel = relMax * 0.4; v.track = tr; v.ser = stamp_; v.end = INFINITY; v.t0 = st0;
+  v.base = base; v.rate = base; v.choke = ck; v.col = e.col; v.ended = false; v.hasStop = false; v.stopAt = 0; v.rel = relMax * 0.4; v.track = tr; v.ser = stamp_; v.end = INFINITY; v.t0 = st0; v.ep = pad.epoch;
   if (!(e.has & SH_SLIDE)) pitchMods(v, e.t, base, e, arp);
   alive_[nAlive_++] = vi;
   if (e.has & SH_CUT) kill(vi, e.cut);

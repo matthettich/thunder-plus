@@ -28,8 +28,9 @@ bool Players::dispatch(const SeqEvent& e, const Seq& seq, const Song& song) {
 }
 
 void Players::note(const SeqEvent& e, const Seq& seq, const Song& song) {
-  const RenderPads& pads_ = *this->pads_;
   if (e.track < 0) return;
+  if (!this->pads_) { st_.notes++; st_.notesNoPad++; return; }   // U37 P1 (verify-276 F3): no pads handed in yet (a live host before its first snapshot): silent, counted; never taken where the pads are always set (every render)
+  const RenderPads& pads_ = *this->pads_;
   st_.notes++;
   { const int ii = to_int_sat(e.ii, -1, 1 << 20); /* N1 C3: NaN is "none" */ if (ii >= 0 && ii < kNI && song.insts[ii].mo == 1) { st_.notesMidiOnly++; return; } }   // MIDI gear only: nothing sounds here
   const int pad = to_int_sat(e.pad, -1, 1 << 20);   // (N1 C3: a part without `pad` gives NaN: no pad, what x86 gave and what the JS's kit.voices[NaN] is)

@@ -170,6 +170,11 @@ class Seq {
   void setXf(double v) { pfXf_ = v; }
   void setMac(int i, double v) { if (i >= 0 && i < (int)pfMac_.size()) { pfMac_[(size_t)i] = v; pfMacSet_[(size_t)i] = 1; } }
   void setFill(bool on) { pfFill_ = on; }
+  // U37 P1 (prewire F3). Re-points the chop table the notes are cut with. AUDIO THREAD, between steps (the host's adopt, before the quantum's steps); a pointer store: no allocation, no lock. The table
+  // must stay valid until the next setChop (a PadsSnap's, kept by the snapshot slot until the one after it is adopted). The Seq derives NOTHING from the table at construction or takeOver: applyChop reads
+  // `o_.chop` afresh on every chopped note (and the only other place that names it is the opts copy), so no cache has to be refreshed. What is NOT redone: events the Seq already stepped (up to `lead`
+  // ahead) were cut with the old table. A Seq made by SeqSession::make starts with the session's opts.chop: the host calls setChop on it at adopt, before its first step (never step it before).
+  void setChop(const SeqChop* c) { o_.chop = c; }
 
   // applyChop counters (ever): chopped = notes chopped; chopSkipped = slc > 1 || sync held but the pad had no handed-in loop (the note is left unchopped);
   // chopNoHits = SMODE on and no hits handed in for (pad, slc): the grid was used; chopStretched = notes with ev.st (sync 2 / 3)
