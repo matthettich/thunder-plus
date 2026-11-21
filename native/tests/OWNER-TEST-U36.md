@@ -32,6 +32,9 @@ Please also say by ear: "tight" or "jittery / late / early" (the notes should be
 2. Plug it back in. Expected: within a few seconds `devices:` lists it again and the letter shows `A=n:Your Device` again by itself (the letter keeps its choice). Tap
    **MIDI out test** again: it plays as before.
 
+## 3b. Stop against a note (stuck notes)
+Use a USB synth. Start the test and tap Stop (or let the app stop the engine) just BEFORE a note is due: do it ten times, at different moments, and again at a fast tempo (the song's tempo up as far as the app lets you). PASS: after every Stop the synth is silent and no note hangs. If one note hangs, silence the synth (power it off and on), then tap **COPY MIDI** straight away and send the text, plus which try it was (first / later) and the tempo.
+
 ## 4. What to send back
 Tap **COPY MIDI** (it puts the blue text on the clipboard; paste it into the chat): the full block that starts `MIDI out ports:` after one finished test, plus:
 - the device name and what it is (interface / synth / Bluetooth does NOT count: USB only),
