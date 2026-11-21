@@ -126,7 +126,9 @@ add_test(NAME seq_takeover_threads COMMAND test_seq_takeover --threads 2)
 # parts, sect and phrase modes, loops, JMP / END, the wrap, a hand-over) in both and compares every row, nested members included.
 if(NODE_EXE AND CMAKE_SYSTEM_NAME STREQUAL "Linux")
   add_test(NAME seq_dump_current COMMAND ${NODE_EXE} ${CMAKE_CURRENT_SOURCE_DIR}/../tools/seq-dump.mjs ${CMAKE_CURRENT_BINARY_DIR}/seq-dump)
-  add_test(NAME seq_edit_current COMMAND ${NODE_EXE} ${CMAKE_CURRENT_SOURCE_DIR}/../../tools/seq-golden.mjs --edit)   # the edit goldens (Part B) still equal what the JS gives now
+  # WEB-FOLLOW (20 Nov): the live / edit / chop goldens are made from the PINNED beta (native/tests/web-ref, native/tools/web-pin.mjs), not from this branch's older copy of the web app at the repository root
+  add_test(NAME seq_edit_current COMMAND ${NODE_EXE} ${CMAKE_CURRENT_SOURCE_DIR}/../tools/seq-golden-web.mjs --edit)   # the edit goldens (Part B) and the live-clock goldens still equal what the pinned JS gives
+  add_test(NAME seq_chop_current COMMAND ${NODE_EXE} ${CMAKE_CURRENT_SOURCE_DIR}/../tools/seq-golden-web.mjs --chop)   # the chop goldens (the page's applyChop, in a vm) still equal what the pinned JS gives
   add_test(NAME seq_extra COMMAND ${NODE_EXE} ${CMAKE_CURRENT_SOURCE_DIR}/../tools/seq-extra.mjs ${CMAKE_CURRENT_BINARY_DIR}/seq-extra $<TARGET_FILE:test_seq>)
 endif()
 

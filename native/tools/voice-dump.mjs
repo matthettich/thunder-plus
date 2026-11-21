@@ -11,10 +11,11 @@ import fs from 'node:fs';
 import path from 'node:path';
 import vm from 'node:vm';
 import { fileURLToPath } from 'node:url';
+import { seqCoreText } from './webref.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const SR = 48000, NT = 32;
-const src = fs.readFileSync(path.join(ROOT, 'core/seq-core.js'), 'utf8');
+const src = seqCoreText();   // the pinned beta copy (native/tests/web-ref, see web-pin.mjs); THUNDER_WEB_REF=root reads the repository root's older core/seq-core.js
 
 // ---- the synthetic pads (mirrored in test_voice.cpp) ----------------------------------------------------------------------
 // sine : mono, 44100 Hz, 22050 samples: a 440 Hz oscillator (y[n] = c y[n-1] - y[n-2]) decaying by 0.99997 a sample
