@@ -141,10 +141,10 @@ bool ChainsHost::event(const SeqEvent& e) {
 void ChainsHost::beginBlock(int64_t frame) {
   int n = 0;
   while (n < nEv_ && ev_[n].due <= frame) {
-    const Ev& e = ev_[n++]; st_.eventsApplied++;
-    if (e.type == SEV_CHC) { if (node_[e.track]) node_[e.track]->engine().setBypassSwitch(e.p, e.v); else st_.chcNoNode++; }
+    const Ev& e = ev_[n++];
+    if (e.type == SEV_CHC) { if (node_[e.track]) { node_[e.track]->engine().setBypassSwitch(e.p, e.v); st_.eventsApplied++; } else st_.chcNoNode++; }   // (the node went away after the event was queued: counted, not applied)
     else {
-      tp_.tempo = e.v; if (e.tks > 0) tp_.ticks = e.tks;
+      st_.eventsApplied++; tp_.tempo = e.v; if (e.tks > 0) tp_.ticks = e.tks;
       for (int t = 0; t < kSongNT; t++) if (node_[t]) { chains::ChainsEngine& g = node_[t]->engine(); waves::Transport tr = g.transport(); tr.tempo = e.v; if (e.tks > 0) tr.ticks = e.tks; g.setTransport(tr); }
     }
   }

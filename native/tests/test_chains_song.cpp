@@ -108,7 +108,8 @@ static bool runMixer(const Case& c, Out* out) {
   ChainsHost host(kSr); ChainsSongTransport tp; tp.tempo = c.bpm; tp.lpb = c.lpb; tp.ticks = c.ticks;
   std::unique_ptr<ChainsPlan> plan(host.plan(c.patch, c.chainOn, heard, tp));
   if (!plan) { std::printf("FAIL %s: plan() returned null\n", c.name.c_str()); g_fail++; return false; }
-  host.commit(plan.get(), mix);
+  host.commit(plan.get(), mix); host.settle(plan.get());
+  if (c.name[0] == 'a' || c.name[0] == 'b') std::printf("  memory (D7): %d node(s), patch %.2f MB + node %.2f MB per track, %.2f MB in all (budget %.0f MB)\n", plan->nodes(), plan->patchBytes() / 1048576.0, kChainsNodeOverhead / 1048576.0, plan->bytes() / 1048576.0, host.budget() / 1048576.0);
   const bool pok = checkPlan(c, heard, plan->nodeMask(), mix.plan(), mix.routedMask(), host, plan.get());
   if (!pok) { g_fail++; std::printf("FAIL %s: plan differs from expect\n", c.name.c_str()); return false; }
   for (const SeqEvent& e : c.events) host.event(e);

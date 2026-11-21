@@ -53,6 +53,12 @@ static std::string patchF() {
     "{\"from\":[\"mA\",\"out\"],\"to\":[\"ap\",\"in\"]},{\"from\":[\"mA\",\"outR\"],\"to\":[\"ap\",\"inR\"]},{\"from\":[\"ap\",\"out\"],\"to\":[\"o4\",\"in\"]},{\"from\":[\"ap\",\"outR\"],\"to\":[\"o4\",\"inR\"]}";
   return std::string(kHead) + "\"modules\":[" + kMods + ",{\"id\":\"ap\",\"type\":\"autopan\",\"params\":{\"sync\":1,\"div\":2}}],\"cables\":[" + cabs + "]}";
 }
+// E: only Track In 1 feeds the mixer (bus map [0], where patchA's is [0, 1])
+static std::string patchE() {
+  const char* mods = "{\"id\":\"i1\",\"type\":\"trackIn\",\"params\":{\"track\":1,\"pre\":0}},{\"id\":\"mA\",\"type\":\"smixer\",\"params\":{\"chans\":2,\"level\":1,\"l1\":0.8,\"p1\":-0.4}},{\"id\":\"o4\",\"type\":\"chainOut\",\"params\":{\"track\":4,\"level\":1}}";
+  const char* cabs = "{\"from\":[\"i1\",\"out\"],\"to\":[\"mA\",\"in1\"]},{\"from\":[\"i1\",\"outR\"],\"to\":[\"mA\",\"in1R\"]},{\"from\":[\"mA\",\"out\"],\"to\":[\"o4\",\"in\"]},{\"from\":[\"mA\",\"outR\"],\"to\":[\"o4\",\"inR\"]}";
+  return std::string(kHead) + "\"modules\":[" + mods + "],\"cables\":[" + cabs + "]}";
+}
 struct Doc { JsonDoc d; Json r; explicit Doc(const std::string& t) { if (!d.parse(t)) std::printf("bad json: %s\n", t.c_str()); r = d.root(); } };
 static bool same(const std::vector<float>& a, const std::vector<float>& b) { return a.size() == b.size() && std::memcmp(a.data(), b.data(), a.size() * sizeof(float)) == 0; }
 
@@ -121,6 +127,14 @@ int main() {
     CHECK("the transport is the song's", h.node(3)->engine().transport().tempo == 131 && h.node(3)->engine().transport().lpb == 8 && h.node(3)->engine().transport().playing);
   }
 
+  // 2b. a swap whose feeds change: the node's bus map follows the new plan (commit sets it on an existing node too)
+  {
+    Doc pa(patchA()), pe(patchE()); ChainsHost h(kSr); auto mix = mkMixer(); std::unique_ptr<ChainsPlan> p1(planOf(h, pa)); adopt(h, p1.get(), *mix);
+    CHECK("map [0, 1] first", h.node(3)->engine().busMap() == std::vector<int>({0, 1}));
+    std::unique_ptr<ChainsPlan> p2(planOf(h, pe)); adopt(h, p2.get(), *mix);
+    CHECK("after the swap the map is the new patch's [0], as the plan's", h.node(3)->engine().busMap() == std::vector<int>({0}) && p2->busMap(3) == std::vector<int>({0}) && mix->plan().nFeeds[3] == 1);
+  }
+
   // 3. a hostile patch: refused, the playing patch stays; a fresh node for a hostile patch is no node (the track plays dry, no bus)
   {
     Doc pa(patchA()); Doc bad(std::string(kHead) + "\"modules\":[" + kMods + "],\"cables\":[null]}");
@@ -133,6 +147,10 @@ int main() {
     adopt(h, p2.get(), *mix); CHECK("hostile: nothing swapped", p2->retiredPatches() == 0);
     for (int q = 10; q < 30; q++) { hookRun(h, sig, q, L, R, q * 128 / kSr); ref.run(sig, q); const bool s = same(L, ref.L) && same(R, ref.R); if (!s && ok) std::printf("  first difference at quantum %d\n", q); ok = ok && s; }
     CHECK("hostile: the playing patch goes on, state kept", ok);
+    {   // a refused document with ANOTHER bus plan (one feed) must not reach the mixer or the node's map
+      std::string e = patchE(); e.insert(e.find("\"cables\":[") + 10, "null,"); Doc bad2(e); CHECK("bad2 parses", bad2.r.isObj());
+      std::unique_ptr<ChainsPlan> pb2(planOf(h, bad2)); CHECK("hostile 2: refused", pb2 && pb2->refused() == 1 && pb2->noop()); adopt(h, pb2.get(), *mix);
+      CHECK("hostile 2: the mixer's bus plan and the node's map are the playing patch's", mix->plan().nFeeds[3] == 2 && h.node(3)->engine().busMap() == std::vector<int>({0, 1})); }
     ChainsHost h2(kSr); auto mix2 = mkMixer(); std::unique_ptr<ChainsPlan> q1(planOf(h2, bad)); CHECK("fresh hostile: refused", q1 && q1->refused() == 1 && q1->nodeMask() == 0);
     adopt(h2, q1.get(), *mix2); CHECK("fresh hostile: no hook, no bus", mix2->busMask() == 0 && h2.node(3) == nullptr);
   }
@@ -177,6 +195,12 @@ int main() {
     }
     CHECK("three applied, the chc for the node-less track counted", h.stats().eventsApplied == 3 && h.stats().chcNoNode == 1 && h.pendingEvents() == 0);
     CHECK("the host's transport follows", h.transport().tempo == 90 && h.transport().ticks == 5);
+    // two events at the same time: the later one given is applied last (a stable order)
+    SeqEvent s1 = t1; s1.v = 91; s1.t = 40 * 128 / kSr - 1e-9; SeqEvent s2 = s1; s2.v = 101; h.event(s1); h.event(s2); h.beginBlock(40 * 128); CHECK("same frame: the one given last wins", h.node(3)->engine().transport().tempo == 101);
+    // a node that goes away after its chc was queued: counted, not applied
+    { ChainsHost h3(kSr); auto mix3 = mkMixer(); std::unique_ptr<ChainsPlan> p3(planOf(h3, pa)); adopt(h3, p3.get(), *mix3);
+      SeqEvent g = c1e; g.t = 50 * 128 / kSr; const uint64_t ap0 = h3.stats().eventsApplied, nn0 = h3.stats().chcNoNode; CHECK("chc queued", h3.event(g)); std::unique_ptr<ChainsPlan> rm(planOf(h3, pa, 0)); adopt(h3, rm.get(), *mix3); h3.beginBlock(51 * 128);
+      CHECK("the node went away: counted as no node, not as applied", h3.stats().chcNoNode == nn0 + 1 && h3.stats().eventsApplied == ap0); }
     // a block that starts later than the event's frame (a host that skipped some) applies everything due at or before it
     SeqEvent late = t1; late.v = 77; late.t = 30 * 128 / kSr; h.event(late); h.beginBlock(31 * 128); CHECK("an event due before the block's frame is applied", h.node(3)->engine().transport().tempo == 77);
   }
@@ -194,8 +218,16 @@ int main() {
   {
     Doc pa(patchA()), pb(patchB());
     {   // 7a. an abandoned plan: the control view never saw it, the next plan makes a FRESH node (it must not try to swap a node that was freed)
-      ChainsHost h(kSr); auto mix = mkMixer(); std::unique_ptr<ChainsPlan> p1(planOf(h, pa)); CHECK("7a plan", p1 && p1->nodeMask() == (1u << 3));
+      ChainsHost h(kSr); auto mix = mkMixer();
+      { std::unique_ptr<ChainsPlan> w(planOf(h, pa)); h.settle(w.get()); }   // (statics made)
+#ifdef ALLOC_AUDIT
+      const long live0 = g_live;
+#endif
+      std::unique_ptr<ChainsPlan> p1(planOf(h, pa)); CHECK("7a plan", p1 && p1->nodeMask() == (1u << 3));
       h.settle(p1.get()); p1.reset();
+#ifdef ALLOC_AUDIT
+      CHECK("7a the abandoned plan gave back everything it made", g_live == live0);
+#endif
       CHECK("7a abandoned: no node", h.node(3) == nullptr && mix->busMask() == 0);
       std::unique_ptr<ChainsPlan> p2(planOf(h, pb)); CHECK("7a the next plan is a fresh node", p2 && p2->nodeMask() == (1u << 3));
       adopt(h, p2.get(), *mix); CHECK("7a node made, nothing retired", h.node(3) != nullptr && p2->retiredPatches() == 0 && p2->retiredNodes() == 0);

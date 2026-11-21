@@ -92,6 +92,14 @@ int main() {
     CHECK("real host, stem of the last bus = the mix", diff(render(js, 3, N, ps, false, true), mix, 1) <= 1e-6 * pk);
     CHECK("real host, stem of the middle bus = the source times its fader", diff(render(js, 2, N, ps, false, true), ref, gA) <= 1e-6 * pk);
     thunder_render* a = make(js, 2, N, ps, false, true); CHECK("real host: stem(middle bus) hooks only heard tracks", a && a->R->chainsHost() && a->R->chainsHost()->node(1) != nullptr && a->R->chainsHost()->node(2) == nullptr && a->R->chainsHost()->node(0) == nullptr); if (a) thunder_render_free(a); }
+  // C1 F5: opts.chains made wrong or impossible fails the create with a text; the counters of a good run are in the stats struct (all 0: nothing dropped, nothing failed)
+  { thunder_render_opts o; std::memset(&o, 0, sizeof o); o.size = sizeof o; o.use_frames = 1; o.frames = 128; char err[200] = "";
+    o.chains = 2; CHECK("chains = 2 is E_ARG", thunder_render_create((const uint8_t*)js.data(), js.size(), &o, err, sizeof err) == nullptr && std::strstr(err, "0 or 1") != nullptr);
+    std::string bad = js; const size_t at = bad.find("\"cables\":[{"); if (at != std::string::npos) bad.replace(at, 11, "\"cables\":[null,{"); o.chains = 1; err[0] = 0;
+    thunder_render* r = thunder_render_create((const uint8_t*)bad.data(), bad.size(), &o, err, sizeof err); CHECK("a chain patch the engine refuses: the create fails with a chains error", r == nullptr && std::strstr(err, "chains") != nullptr); if (r) thunder_render_free(r);
+    o.chains = 0; err[0] = 0; r = thunder_render_create((const uint8_t*)bad.data(), bad.size(), &o, err, sizeof err); CHECK("the same song without chains is made", r != nullptr); if (r) thunder_render_free(r);
+    thunder_render* g = make(js, 0, N, ps, false, true); if (g) { readAll(g, N); thunder_render_stats st; std::memset(&st, 0, sizeof st); st.size = sizeof st; thunder_render_stats_get(g, &st);
+      CHECK("chains stats: nothing dropped, bad, failed, refused", st.chains_events_dropped == 0 && st.chains_events_bad == 0 && st.chains_failed_blocks == 0 && st.chains_feed_mismatch == 0 && st.chains_refused == 0); thunder_render_free(g); } }
   { thunder_render* m = make(js, 0, N, ps);
     const BusPlan& P = m->R->mixer().plan();
     CHECK("plan: 1 feeds 2, 2 feeds 3; the middle bus is pure", m && P.feedMask[1] == 1u && P.feedMask[2] == 2u && P.pure == 3u);
