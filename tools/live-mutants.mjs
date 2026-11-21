@@ -96,7 +96,7 @@ for (const [id, what, file, from, to] of M) {
   let killedBy = null;
   for (const t of tests) {
     let tobj = `CMakeFiles/${t}.dir/${t}.cpp.o`, extra = '';
-    if (HDR[file] && (t === 'test_live_review' || t === 'test_live_idle')) {   // the test drives a LiveShell directly: its own copy of the template is compiled against the mutated header too
+    if (file === 'shell' && (t === 'test_live_review' || t === 'test_live_idle')) {   // the test drives a LiveShell directly: its own copy of the template is compiled against the mutated header too
       const tf = fs.readFileSync(path.join(tdir, 'CMakeFiles', t + '.dir/flags.make'), 'utf8'), g = k => ((tf.match(new RegExp('^' + k + ' = (.*)$', 'm')) || [])[1] || '').split(/\s+/).filter(Boolean);
       const o = path.join(tmp, t + '.mut.o'); const c2 = run('c++', ['-I' + path.join(tmp, 'inc'), ...g('CXX_DEFINES'), ...g('CXX_INCLUDES'), ...g('CXX_FLAGS'), '-c', path.join(ROOT, 'native/tests', t + '.cpp'), '-o', o]);
       if (c2.status) { console.error(c2.stderr.split('\n').slice(0, 8).join('\n')); process.exit(2); } tobj = o; }
