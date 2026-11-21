@@ -209,6 +209,7 @@ void applyClear(thunder_midiout* o, const thunder_midi_msg& m, int64_t now) {
     }
     // what was not recalled and plays or has played: P = live, not yet handled, this device and cable, after the marker, stamp at or before R (R >= t)
     auto inP = [&](const auto& h) { return h.live && !h.done && h.dev == devs[k] && h.m.cable == m.cable && h.m.frame > m.frame && h.at <= R; };
+    struct Rel { uint8_t ch, note; int64_t at; } rel[kHand]; int nr = 0;   // collected first: recording a release in hand[] moves the ring
     for (int i = 0; i < kHand; i++) {
       auto& e = o->hand[(o->handN + i) % kHand];
       if (!inP(e)) continue;
@@ -221,12 +222,24 @@ void applyClear(thunder_midiout* o, const thunder_midi_msg& m, int64_t now) {
         if (inP(f) && (fty == 0x80 || fty == 0x90) && (f.m.b[0] & 0x0F) == (e.m.b[0] & 0x0F) && f.m.len >= 2 && f.m.b[1] == e.m.b[1]) last = false;
       }
       if (!last) continue;
-      const uint8_t off[3] = {(uint8_t)(0x80 | (e.m.b[0] & 0x0F)), e.m.b[1], 0};
       const int64_t at = e.at + THUNDER_MIDIOUT_RELEASE_GAP_NS;
-      if (o->sink.send(o->sink.user, devs[k], off, 3, at > t ? at : t) < 0) { bump(o, S_ERR); bump(o, S_GONE); setSt(o, S_HANG, 1); markGone(o, m.cable, devs[k]); }
-      else { bump(o, S_SENT); bump(o, S_RELEASED); }
+      rel[nr].ch = (uint8_t)(e.m.b[0] & 0x0F); rel[nr].note = e.m.b[1]; rel[nr].at = at > t ? at : t; nr++;
     }
     for (int i = 0; i < kHand; i++) { auto& e = o->hand[i]; if (inP(e)) e.done = true; }
+    bool relFailed = false;   // the first failed release ends the sending for this device (as the replay loop does): the rest are counted
+    for (int i = 0; i < nr; i++) {
+      if (relFailed) { bump(o, S_GONE); continue; }
+      const uint8_t off[3] = {(uint8_t)(0x80 | rel[i].ch), rel[i].note, 0};
+      if (o->sink.send(o->sink.user, devs[k], off, 3, rel[i].at) < 0) { relFailed = true; bump(o, S_ERR); bump(o, S_GONE); setSt(o, S_HANG, 1); markGone(o, m.cable, devs[k]); continue; }
+      bump(o, S_SENT); bump(o, S_RELEASED);
+      // A release that is still to play is a handed-over message like any other: a LATER CLEAR whose sink recalls it must replay it. It goes into the ring as handled (done: nothing
+      // releases it) with frame 0 (before every later marker: the replay rule, never the dropped-after-the-marker one), only into a slot that is free (its message is due): a slot
+      // that holds a message still to play is never overwritten (that message could no longer be recalled and restored).
+      if (rel[i].at > t) {
+        auto& slot = o->hand[o->handN];
+        if (!(slot.live && slot.at > t)) { std::memset(&slot.m, 0, sizeof slot.m); slot.m.cable = m.cable; slot.m.len = 3; slot.m.kind = THUNDER_MIDI_K_RELEASE; std::memcpy(slot.m.b, off, 3); slot.m.frame = 0; slot.at = rel[i].at; slot.dev = devs[k]; slot.live = true; slot.done = true; o->handN = (o->handN + 1) % kHand; }
+      }
+    }
   }
   if (n) bump(o, S_CLEARED, n);
 }

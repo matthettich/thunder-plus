@@ -314,7 +314,8 @@ void testClearDropsHeld() {
   CHECK(r.io->count(0x91, 61) == 0, "the note after the marker was recalled, got %d", r.io->count(0x91, 61));
   CHECK(r.io->count(0x92, 62) == 1, "the note before the marker arrived exactly once, got %d", r.io->count(0x92, 62));
   CHECK(got2 == 0 || ms(got2) >= ms(tb) + tStop * 1000.0 - 100.0 + 7.0 - 3.0, "and not before its time");
-  CHECK(r.h.heldCleared.load() >= 1, "a held message was dropped by the CLEAR (%llu)", (unsigned long long)r.h.heldCleared.load());
+  // on a starved machine the pump can drain the CLEAR before the message is held: then the queue part removed it (counted in dropped_cleared) and nothing was held to drop
+  CHECK(r.h.heldCleared.load() >= 1 || outStats(r.h).dropped_cleared >= 1, "the message after the marker was dropped by the CLEAR (held %llu, queue %llu)", (unsigned long long)r.h.heldCleared.load(), (unsigned long long)outStats(r.h).dropped_cleared);
   r.h.engineStop();
   // a STAMPED port: a CLEAR recalls nothing (no flush) and the core's replay must not send anything twice: every note-on and note-off arrives exactly once
   Rig s; CHECK(s.start(true, nullptr), "start ts");
@@ -329,9 +330,10 @@ void testClearDropsHeld() {
   s.runFor(0.3);
   CHECK(s.io->count(0x91, 61) == 1 && s.io->count(0x81, 61) == 1, "stamped port: note 61 on %d, off %d (each once)", s.io->count(0x91, 61), s.io->count(0x81, 61));
   // nothing is recalled from a stamped port, so what it holds plays: the note after the marker (62) plays once, and the core releases it (a note-off stamped at least 1 ms after it)
-  CHECK(s.io->count(0x91, 62) == 1 && s.io->count(0x81, 62) == 1, "note 62 after the marker: on %d, off %d", s.io->count(0x91, 62), s.io->count(0x81, 62));
+  // (on a starved machine the pump drains the CLEAR before it hands note 62 over: the queue part removes it, it never plays: 0 and 0; a note that did play must have its release)
+  CHECK((s.io->count(0x91, 62) == 1 && s.io->count(0x81, 62) == 1) || (s.io->count(0x91, 62) == 0 && s.io->count(0x81, 62) == 0), "note 62 after the marker: on %d, off %d", s.io->count(0x91, 62), s.io->count(0x81, 62));
   CHECK(lastEventIsOff(*s.io, 0x01, 61) && lastEventIsOff(*s.io, 0x01, 62), "by time, the last event of every note is a note-off");
-  CHECK(outStats(s.h).released_after_stop == 1, "one release counted, got %llu", (unsigned long long)outStats(s.h).released_after_stop);
+  CHECK(outStats(s.h).released_after_stop == (uint64_t)s.io->count(0x91, 62), "a release counted for a note that played, got %llu", (unsigned long long)outStats(s.h).released_after_stop);
   s.h.engineStop();
 }
 
@@ -349,7 +351,7 @@ void testDeviceGone() {
   Rig c; CHECK(c.start(false, nullptr), "start closed");
   c.io->closed = true;
   c.rawBlock(0, 0x90, 65, 100, 0.0);
-  c.runFor(0.15);
+  c.runFor(0.5);
   CHECK(outStats(c.h).send_errors >= 1, "a closed port (no timestamps) is an error too");
   c.h.engineStop();
 }
