@@ -43,6 +43,10 @@ struct Engine {
   int32_t (*aaTs)(void*, int32_t, int64_t*, int64_t*) = nullptr;
   int64_t (*aaWritten)(void*) = nullptr;
   int lastLatSentMs = -1;
+  // The AAudio timestamp is read by ONE thread (AAudio does not list getTimestamp among its thread-safe calls): while MIDI out runs it is the audio callback (tsRead, every 20 ms),
+  // and probeLoop reads this snapshot instead. A seqlock: tsSeq odd = being written. pos / ns / written as tsRead got them, tsMono = our clock at that moment.
+  std::atomic<uint32_t> tsSeq{0};
+  std::atomic<int64_t> tsPos{0}, tsNs{0}, tsWritten{0}, tsMono{0};
 };
 Engine g;
 rtlog g_rt;   // A5's clock-drift logger (native/core/include/thunder/rtlog.h)
@@ -96,6 +100,10 @@ bool tsRead(void*, tpa::TsPair* p) {
   int64_t pos = 0, ns = 0;
   if (g.aaTs(stream, CLOCK_MONOTONIC, &pos, &ns) != 0) return false;
   p->pos = pos; p->ns = ns; p->written = g.aaWritten(stream);
+  const uint32_t q = g.tsSeq.load(std::memory_order_relaxed);
+  g.tsSeq.store(q + 1, std::memory_order_release);
+  g.tsPos.store(p->pos, std::memory_order_release); g.tsNs.store(p->ns, std::memory_order_release); g.tsWritten.store(p->written, std::memory_order_release); g.tsMono.store(monoNs(), std::memory_order_release);
+  g.tsSeq.store(q + 2, std::memory_order_release);
   return true;
 }
 
@@ -119,12 +127,21 @@ void probeLoop() {
       rtlog_host_underruns(&g_rt, under - g.xrunBase.load());
       int latFrames = 0;
       int64_t pos = 0, tns = 0;
-      if (ts && written && ts(stream, CLOCK_MONOTONIC, &pos, &tns) == 0) {
-        timespec t; clock_gettime(CLOCK_MONOTONIC, &t);
-        int64_t now = (int64_t)t.tv_sec * 1000000000LL + t.tv_nsec;
+      bool have = false; int64_t wr = 0;
+      if (g.midi) {   // the callback owns getTimestamp: read its snapshot (up to 20 ms old; the written count is carried forward at the stream's rate)
+        for (int tries = 0; tries < 4 && !have; tries++) {
+          const uint32_t a = g.tsSeq.load(std::memory_order_acquire);
+          if (a == 0 || (a & 1)) continue;
+          pos = g.tsPos.load(std::memory_order_acquire); tns = g.tsNs.load(std::memory_order_acquire); const int64_t w = g.tsWritten.load(std::memory_order_acquire), m = g.tsMono.load(std::memory_order_acquire);
+          if (g.tsSeq.load(std::memory_order_acquire) != a) continue;
+          wr = w + (int64_t)((double)(monoNs() - m) * 1e-9 * g.device.sampleRate); have = true;
+        }
+      } else if (ts && written && ts(stream, CLOCK_MONOTONIC, &pos, &tns) == 0) { wr = written(stream); have = true; }   // no MIDI out: this thread is the only reader
+      if (have) {
+        const int64_t now = monoNs();
         // frames still to be played = written - (position presented at `tns`, advanced to now)
         double presented = (double)pos + (double)(now - tns) * 1e-9 * g.device.sampleRate;
-        double lat = (double)written(stream) - presented;
+        double lat = (double)wr - presented;
         if (lat > 0 && lat < g.device.sampleRate) latFrames = (int)lat;
       }
       g.latFrames = latFrames;

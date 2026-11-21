@@ -86,10 +86,10 @@ class MidiPorts private constructor(private val app: Context) {
         val mine = registry.entries.filter { it.key.deviceId == id }
         if (dev == null) { failed.add(id); return }   // the open failed
         if (mine.isEmpty()) { try { dev.close() } catch (e: Exception) { }; return }   // the device left while it was opening
-        val n = NativeMidi.nativeAttach(dev, mine.map { it.token }.toLongArray(), mine.map { it.key.portNumber }.toIntArray(), mine.map { it.ts }.toBooleanArray())
-        if (n <= 0) { failed.add(id); try { dev.close() } catch (e: Exception) { }; note = "AMidi could not open device $id"; return }
+        val ok = NativeMidi.nativeAttach(dev, mine.map { it.token }.toLongArray(), mine.map { it.key.portNumber }.toIntArray(), mine.map { it.ts }.toBooleanArray())
+        if (ok.isEmpty()) { failed.add(id); try { dev.close() } catch (e: Exception) { }; note = "AMidi could not open device $id (tap MIDI A: next device to retry)"; return }
         opened[id] = dev
-        mine.forEach { attached.add(it.token) }   // a port that did not open stays unlisted only if n < mine.size: the core then reports a send error for it, never a crash
+        ok.forEach { attached.add(it) }   // only the ports that really opened are listed
         pushList()
     }
 
@@ -106,6 +106,7 @@ class MidiPorts private constructor(private val app: Context) {
 
     /** Debug UI: letter A to the next listed device (or the first). */
     fun cycleA(): String {
+        retryFailed()
         val ids = listedIds
         if (ids.isEmpty()) { assignedA = ""; NativeMidi.nativeAssign(0, ByteArray(0)); note = "no MIDI output device listed"; return note }
         val i = ids.indexOf(assignedA)
@@ -115,9 +116,13 @@ class MidiPorts private constructor(private val app: Context) {
         return note
     }
 
+    /** A device whose open failed is tried again (a failure can be temporary): on every debug-UI tap, never in a loop. */
+    private fun retryFailed() { if (failed.isNotEmpty()) { failed.clear(); rescan() } }
+
     /** Debug UI: starts the engine if needed, puts A on a device if it has none, runs the two-bar test. Returns what to show. */
     fun runTest(ctx: Context): String {
         if (!ThunderHost.ensureRunning(ctx)) return "audio did not start"
+        retryFailed()
         if (assignedA.isEmpty() || assignedA !in listedIds) cycleA()
         val r = NativeMidi.nativeTest()
         val tid = NativeMidi.nativeSenderTid()
@@ -125,7 +130,8 @@ class MidiPorts private constructor(private val app: Context) {
         note = when (r) {
             0 -> "MIDI out test running: about 5 s to port A ($assignedA)"
             -2 -> "port A has no listed device (plug in a USB MIDI device)"
-            -3 -> "a test is already running"
+            -3 -> "a test is already running (wait for it to finish)"
+            -5 -> "the engine has only just started: tap again in a second"
             -1 -> "no engine"
             else -> "MIDI out test failed ($r)"
         }

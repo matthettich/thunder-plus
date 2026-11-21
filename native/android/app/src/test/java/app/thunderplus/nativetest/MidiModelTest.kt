@@ -103,4 +103,16 @@ class MidiModelTest {
         assertEquals(t, reg.entries.map { it.token })
         assertEquals(listOf(0, 1), reg.entries.map { it.key.portNumber })
     }
+
+    @Test fun idsAreUniqueAfterSuffixAndAfterTruncation() {
+        val r = MidiIds.build(listOf(dev(1, "Synth"), dev(2, "Synth"), dev(3, "Synth #2")))
+        assertEquals(3, r.map { it.second }.toSet().size)
+        assertEquals(listOf("n:Synth", "n:Synth #2", "n:Synth #2 #2"), r.map { it.second })
+        // two different long names with the same first 93 characters become one id after shortening: the second takes a number
+        val a = "x".repeat(150) + "a"; val b = "x".repeat(150) + "b"
+        val t = MidiIds.build(listOf(dev(1, a), dev(2, b)))
+        assertEquals(2, t.map { it.second }.toSet().size)
+        assertTrue(t.all { MidiIds.utf8Len(it.second) <= 95 })
+        assertTrue(t[1].second.endsWith(" #2"))
+    }
 }

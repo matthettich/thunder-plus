@@ -90,6 +90,10 @@ struct DebugSong {
 };
 
 // ---- MidiHost: control -----------------------------------------------------------------------------------------------------------------------
+static void (*g_enter)() = nullptr;
+static void (*g_leave)() = nullptr;
+void MidiHost::setSenderThreadHooks(void (*enter)(), void (*leave)()) { g_enter = enter; g_leave = leave; }
+
 MidiHost::MidiHost() : nowFn_(&monoNs) { std::memset(&sink_, 0, sizeof sink_); }
 MidiHost::~MidiHost() { engineStop(); }
 
@@ -139,7 +143,7 @@ bool MidiHost::engineStart(double sr, TsFn tsFn, void* tsUser) {
   o_ = thunder_midiout_create(h_, sr, &sink_);
   if (!o_) { thunder_midi_free(h_); h_ = nullptr; return false; }
   sr_ = sr; tsFn_ = tsFn; tsUser_ = tsUser;
-  frames_ = 0; lastMapNs_ = 0; mapped_ = false; nHeld_ = 0;
+  frames_ = 0; lastMapNs_ = 0; mapped_ = false; mapReady_.store(false, std::memory_order_release); nHeld_ = 0;
   if (!held_) held_.reset(new (std::nothrow) Held[kHeld]);
   if (!held_) { thunder_midiout_free(o_); thunder_midi_free(h_); o_ = nullptr; h_ = nullptr; return false; }
   applyDevicesLocked();
@@ -163,6 +167,21 @@ void MidiHost::engineStop() {
   std::lock_guard<std::mutex> g(ctl_);
   if (!h_) return;
   running_.store(false, std::memory_order_release);
+  // A song still playing: the audio callback has stopped, so THIS thread takes its role for one last block: Stop (notes off, CLEAR, clock Stop) goes through the real queue, and the
+  // sender gets up to 200 ms to deliver it before it is stopped (a synth must not be left holding a note).
+  if (mapReady_.load(std::memory_order_acquire) && dbgOwned_ && dbgOwned_->state.load(std::memory_order_acquire) != DebugSong::FINISHED) {
+    const double now = (double)frames_ / sr_ + 0.01;
+    thunder::midi_begin(h_, now, 0.01, 0.0, ~(uint64_t)0);
+    thunder::midi_sched(h_).stop(now);
+    thunder::midi_end(h_, now, now, 120, false);
+    thunder_midiout_set_playing(o_, 0);
+    uint64_t last = ~(uint64_t)0; int still = 0;
+    for (int i = 0; i < 200 && still < 15; i++) {
+      timespec ts{0, 1000000}; nanosleep(&ts, nullptr);
+      thunder_midiout_stats st; std::memset(&st, 0, sizeof st); st.size = sizeof st; thunder_midiout_stats_get(o_, &st);
+      still = (st.sent + st.dropped_gone == last) ? still + 1 : 0; last = st.sent + st.dropped_gone;
+    }
+  }
   stop_.store(true, std::memory_order_release);
   if (sender_.joinable()) sender_.join();   // the caller stopped the audio callback first: nobody calls clock_map or process any more
   thunder_midiout_free(o_); o_ = nullptr;
@@ -196,6 +215,7 @@ void MidiHost::setOutLatencyNs(int64_t ns) {
 int MidiHost::debugTest() {
   std::lock_guard<std::mutex> g(ctl_);
   if (!o_ || !h_) return -1;
+  if (!mapReady_.load(std::memory_order_acquire)) return -5;   // the pump drops whatever it drains before the first clock map
   freeDebugLocked(false);
   if (dbgOwned_) return -3;
   thunder_midiout_port p; if (thunder_midiout_get_port(o_, 0, &p) != THUNDER_MIDIOUT_OK || p.state != THUNDER_MIDIOUT_PORT_OK) return -2;
@@ -305,6 +325,7 @@ void MidiHost::senderMain() {
 #elif defined(__linux__)
   tid_.store((int)syscall(SYS_gettid), std::memory_order_release);
 #endif
+  if (g_enter) g_enter();
   const int64_t kMaxSleep = 2000000, kEarly = 300000;
   while (!stop_.load(std::memory_order_acquire)) {
     int64_t next = INT64_MAX;
@@ -320,6 +341,7 @@ void MidiHost::senderMain() {
       clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME, &ts, nullptr);
     } else sched_yield();
   }
+  if (g_leave) g_leave();
 }
 
 // ---- MidiHost: audio --------------------------------------------------------------------------------------------------------------------------
@@ -355,7 +377,7 @@ void MidiHost::audioBlock(int frames) {
     }
     (exact ? mapExact : mapFallback).fetch_add(1, std::memory_order_relaxed);
     thunder_midiout_clock_map(o_, frame0, host0);
-    mapped_ = true; lastMapNs_ = mono;
+    mapped_ = true; lastMapNs_ = mono; mapReady_.store(true, std::memory_order_release);
   }
   frames_ = F + frames;
 }

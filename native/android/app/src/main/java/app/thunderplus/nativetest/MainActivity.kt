@@ -129,7 +129,12 @@ class MainActivity : Activity() {
         // U36 T9 DEBUG (no live song host yet): MIDI out test = two bars of notes + MIDI clock to port A through the real scheduler / pump / sink; "MIDI A: next" picks the device.
         val midiRow = row(
             btn("MIDI out test") { midiLine.text = MidiPorts.get(this).runTest(this) },
-            btn("MIDI A: next device") { midiLine.text = MidiPorts.get(this).cycleA() })
+            btn("MIDI A: next device") { midiLine.text = MidiPorts.get(this).cycleA() },
+            btn("COPY MIDI") {
+                val t = MidiPorts.get(this).statusText()
+                try { (getSystemService(CLIPBOARD_SERVICE) as ClipboardManager).setPrimaryClip(ClipData.newPlainText("MIDI out", t)); Toast.makeText(this, "MIDI status copied", Toast.LENGTH_SHORT).show() }
+                catch (e: Exception) { Toast.makeText(this, "The clipboard refused", Toast.LENGTH_LONG).show() }
+            })
         midiLine = TextView(this).apply { setTextColor(Color.rgb(120, 220, 255)); typeface = Typeface.MONOSPACE; setTextSize(TypedValue.COMPLEX_UNIT_SP, 9f); text = "MIDI out: -" }
         verdict = TextView(this).apply { setTextColor(Color.WHITE); setTextSize(TypedValue.COMPLEX_UNIT_SP, 26f); typeface = Typeface.DEFAULT_BOLD; text = "ready" }
         readout = TextView(this).apply { setTextColor(Color.WHITE); typeface = Typeface.MONOSPACE; setTextSize(TypedValue.COMPLEX_UNIT_SP, 10f) }

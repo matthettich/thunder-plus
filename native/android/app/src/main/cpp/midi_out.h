@@ -98,13 +98,16 @@ class MidiHost {
   void detach(uint64_t token) { table_.remove(token); }
   PortTable& table() { return table_; }
   // DEBUG PATH (no live song host yet: U37). Posts thunder_midi_start, a live ping (raw note on / off) and a two-bar song of its own through the real scheduler, pump and sink
-  // to port A, with the MIDI clock on. 0 = started; -1 no engine; -2 port A has no listed device; -3 a test is already running; -4 the song did not load / no memory.
+  // to port A, with the MIDI clock on. 0 = started; -1 no engine; -2 port A has no listed device; -3 a test is already running; -4 the song did not load / no memory; -5 no clock map yet (the first audio callbacks have not run: try again).
   int debugTest();
   // Housekeeping for a finished test (turns the transport flag off, frees the song). Call from the UI's timer. Returns true while a test runs.
   bool debugPoll();
   // A text for the debug screen: the letters, the device list, thunder_midiout_stats, the map counters. Never empty.
   std::string status();
   int senderTid() const { return tid_.load(std::memory_order_acquire); }
+  // Called by the sender thread when it starts / before it ends (the Android shell attaches it to the JVM: AMidiDevice_release, which the last port reference may trigger on that
+  // thread, needs an attached thread). Set once, before engineStart.
+  static void setSenderThreadHooks(void (*enter)(), void (*leave)());
 
   // ---- AUDIO ------------------------------------------------------------------------------------------------------------------------------------------------
   // Once per audio callback, AFTER the block was rendered, with the callback's frame count. Counts the frames itself (it must equal the core's audio clock: it starts at 0 when
@@ -148,6 +151,7 @@ class MidiHost {
   std::atomic<int> prio_{-1};               // the sender's setpriority result: 0 ok, 1 refused, -1 not tried
   // audio-thread owned
   int64_t frames_ = 0, lastMapNs_ = 0; bool mapped_ = false;
+  std::atomic<bool> mapReady_{false};   // the first clock_map has been published (the pump drops everything before it)
   // the debug song: control creates, publishes the pointer (release); the audio thread uses it, and when it is finished clears the pointer and sets the state to FINISHED; control frees only then
   std::atomic<DebugSong*> dbg_{nullptr};
   DebugSong* dbgOwned_ = nullptr;

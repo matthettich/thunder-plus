@@ -63,6 +63,8 @@ void scenario(bool exact, bool ts, bool hotplug) {
   CHECK(h.assign(0, "n:Fake") == 0, "assign before the engine (saved)");
   g_fed = 0;
   CHECK(h.engineStart(sr, exact ? &exactTs : nullptr, nullptr), "engineStart");
+  CHECK(h.debugTest() == -5, "before the first clock map the test is refused");
+  { int64_t d0 = tpa::monoNs(); for (int i = 0; i < 4; i++) { d0 += (int64_t)(blk / sr * 1e9); sleepUntil(d0); h.audioBlock(blk); g_fed += blk; } }
   CHECK(h.debugTest() == 0, "debugTest starts (port A is listed)");
   CHECK(h.debugTest() == -3, "a second test is refused while one runs");
   const int64_t t0 = tpa::monoNs(); int64_t due = t0; bool gone = false, back = false;
@@ -101,11 +103,30 @@ void scenario(bool exact, bool ts, bool hotplug) {
   h.engineStop();   // twice is fine
 }
 
+// The engine is stopped while the song plays: the last block (Stop: notes off, clock Stop) is delivered before the sender ends.
+void testStopMidSong() {
+  const double sr = 48000; const int blk = 128;
+  tpa::MidiHost h; auto io = std::make_shared<FakeIo>();
+  h.attach(3, io, true); h.setDevices({dev("n:Fake", 3, true)}); h.assign(0, "n:Fake");
+  g_fed = 0; CHECK(h.engineStart(sr, nullptr, nullptr), "start");
+  int64_t due = tpa::monoNs();
+  for (int i = 0; i < 4; i++) { due += (int64_t)(blk / sr * 1e9); sleepUntil(due); h.audioBlock(blk); }
+  CHECK(h.debugTest() == 0, "test");
+  const int64_t t0 = tpa::monoNs();
+  while (tpa::monoNs() - t0 < 1500000000LL) { due += (int64_t)(blk / sr * 1e9); sleepUntil(due); h.audioBlock(blk); }   // 1.5 s in: the first arpeggio note is sounding or about to
+  h.engineStop();
+  CHECK(io->count(0xFC) == 1, "Stop reached the port before the sender ended, got %d", io->count(0xFC));
+  CHECK(io->count(0x80) >= io->count(0x90), "no note left on: %d on, %d off", io->count(0x90), io->count(0x80));
+}
+
 void testNoDevice() {
   tpa::MidiHost h;
   CHECK(h.debugTest() == -1, "no engine");
   CHECK(h.engineStart(48000, nullptr, nullptr), "start");
+  CHECK(h.debugTest() == -5, "no clock map yet");
+  for (int i = 0; i < 4; i++) h.audioBlock(128);
   CHECK(h.debugTest() == -2, "port A not assigned");
+  for (int i = 0; i < 4; i++) h.audioBlock(128);
   CHECK(h.assign(0, "n:Nobody") == 0 && h.debugTest() == -2, "assigned but not listed: MISSING");
   CHECK(h.assign(4, "x") != 0, "bad port letter");
   tpa::DevInfo bad = dev("n:A", 1, false), dup = dev("n:B", 1, false);
@@ -117,6 +138,7 @@ void testNoDevice() {
 int main() {
   testTable();
   testNoDevice();
+  testStopMidSong();
   scenario(false, true, false);
   scenario(true, false, false);
   scenario(true, true, true);

@@ -60,22 +60,31 @@ object MidiIds {
     fun build(devices: List<ScanDevice>): List<Triple<PortKey, String, String>> {
         val out = ArrayList<Triple<PortKey, String, String>>()
         val seen = HashMap<String, Int>()
+        val used = HashSet<String>()   // the FINAL ids: the core refuses the whole list for a repeated id
         for (d in devices.sortedBy { it.deviceId }) {
             val name = cleanName(d.name)
             val several = d.ports.size > 1
             for (p in d.ports.sortedBy { it.portNumber }) {
                 val portName = if (several) cleanName(p.name.ifBlank { "Port ${p.portNumber + 1}" }) else ""
                 val shown0 = if (several) "$name / $portName" else name
-                val count = (seen[shown0] ?: 0) + 1
+                var count = (seen[shown0] ?: 0) + 1
+                var id: String
+                var shown: String
+                while (true) {   // a clash after the suffix or after shortening (e.g. "Synth", "Synth", "Synth #2") takes the next number
+                    val suffix = if (count > 1) " #$count" else ""
+                    // the whole "n:" + shown + suffix must fit: shorten the name (and the port name) first, never the suffix
+                    val room = MAX_ID_BYTES - 2 - utf8Len(suffix)
+                    val cut = if (utf8Len(shown0) <= room) shown0 else if (several) {
+                        val pn = clampUtf8(portName, room / 3)
+                        clampUtf8(name, room - utf8Len(" / ") - utf8Len(pn)) + " / " + pn
+                    } else clampUtf8(name, room)
+                    shown = cut + suffix
+                    id = "n:$shown"
+                    if (used.add(id)) break
+                    count++
+                }
                 seen[shown0] = count
-                val suffix = if (count > 1) " #$count" else ""
-                // the whole "n:" + shown + suffix must fit: shorten the name (and the port name) first
-                val room = MAX_ID_BYTES - 2 - utf8Len(suffix)
-                val shown = if (utf8Len(shown0) <= room) shown0 else if (several) {
-                    val pn = clampUtf8(portName, room / 3)
-                    clampUtf8(name, room - utf8Len(" / ") - utf8Len(pn)) + " / " + pn
-                } else clampUtf8(name, room)
-                out.add(Triple(PortKey(d.deviceId, p.portNumber), "n:$shown$suffix", "$shown$suffix"))
+                out.add(Triple(PortKey(d.deviceId, p.portNumber), id, shown))
             }
         }
         return out

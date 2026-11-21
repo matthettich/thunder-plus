@@ -9,8 +9,9 @@ watch the MIDI clock (a drum machine that shows tempo, or a MIDI monitor), bette
 
 ## 1. Plug in, pick the device
 1. Install and open the app. Plug the MIDI device into the phone (allow the prompt if Android shows one).
-2. At the bottom strip you will see a blue-grey text block that starts `MIDI out ports:` and, under `devices:`, a line such as `n:Your Device`. If `devices:` says `none`
-   after 5 seconds, unplug and replug once; if still none, copy the text and report it (that is already a finding).
+2. At the bottom strip you will see a blue-grey text block. Before the audio engine runs it says `MIDI out: engine not running`; the part under `devices:` already lists your
+   device, for example `n:Your Device`. If `devices:` says `none` after 5 seconds, unplug and replug once; if still none, tap **COPY MIDI** and report the text (that is already a
+   finding). The lines `MIDI out ports:`, `stats:` and `core:` appear after you tap **MIDI out test** once (which starts the engine).
 3. If the device has several MIDI outputs, each shows as `n:Name / PortName`. Tap **MIDI A: next device** until the line `A = ...` is the one you want.
 
 ## 2. The test
@@ -26,11 +27,13 @@ Please also say by ear: "tight" or "jittery / late / early" (the notes should be
 ## 3. Hot-plug
 1. Start the test and, while it plays (within the first 3 seconds), unplug the USB device. Expected: the sound stops, the app does not crash. The text now shows
    `A=(not connected)`, and `devices: none`.
+   The interrupted test keeps running silently until it ends (about 5 s): wait for it before tapping **MIDI out test** again (otherwise it says "already running").
+   If your synth keeps sounding a note (it got a Note On and never the Note Off), switch the synth off and on, or press its panic / All Notes Off, before going on.
 2. Plug it back in. Expected: within a few seconds `devices:` lists it again and the letter shows `A=n:Your Device` again by itself (the letter keeps its choice). Tap
    **MIDI out test** again: it plays as before.
 
 ## 4. What to send back
-Tap the blue text so you can long-press and copy it (or retype these numbers): the full block that starts `MIDI out ports:` after one finished test, plus:
+Tap **COPY MIDI** (it puts the blue text on the clipboard; paste it into the chat): the full block that starts `MIDI out ports:` after one finished test, plus:
 - the device name and what it is (interface / synth / Bluetooth does NOT count: USB only),
 - tight or jittery, notes correct or not, clock seen or not,
 - the unplug / replug result (did A show "(not connected)" and then rejoin?),
