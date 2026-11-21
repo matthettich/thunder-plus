@@ -2,7 +2,7 @@
 
 Builder: Claude (Sonnet). Items from the verifier reports `verify-246`, `verify-264`, `verify-260` (on the `review/verify-*` branches). Only `native/` and `docs/port/` change.
 
-## Status: all six items done. Release ctest (GCC, CI flags): 190 tests, 189 passed, 0 failed, 1 skipped by design (`pumpsynth_refused`). Not run here: sanitizers, clang, closed build, MSVC, macOS (CI does).
+## Status: all six items done. After verify-267 fixes and the merge of #266: Release ctest (GCC): 192 tests, 191 passed, 0 failed, 1 skipped by design (`pumpsynth_refused`). Not run here: sanitizers, clang, closed build, MSVC, macOS (CI does).
 
 | # | Item | Result |
 |---|---|---|
