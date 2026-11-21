@@ -15,7 +15,7 @@ function source(sr) {
 }
 const EXTRA = 'stretchData, stKey, GRAIN_BEATS,';
 
-function record(html) {
+function record(html, opt) {
   const E = S.loadSampler(html, EXTRA), out = { stretch: [], chop: [], load: {} };
   const sr = 44100, d = source(sr);
   // 1. the stretched audio: mode 2 (STRETCH) and 3 (LOOP) x GRAIN 0..4 x tempos x lengths
@@ -30,7 +30,7 @@ function record(html) {
     St.bpm = bpm; St.lpb = lpb;
     const I = { pad: 0, tsp: 0, slc, smode: 0, sync, beats: 3, ofs: 0 }; if (grain != null) I.grain = grain; if (lines) I.lines = lines;
     const ev = { type: 'note', t: 1, rate: Math.pow(2, (n - 48) / 12), ofs: 0, cut: null, slc: null };
-    E.applyChop(ev, I, 0, n, 0, bpm, d, sr);
+    E.applyChop(ev, I, 0, n, 0, bpm, d, sr, !!(opt && opt.live));
     out.chop.push([sync, grain, slc, lines, bpm, lpb, n, ev.rate, ev.ofsSec == null ? null : ev.ofsSec, ev.durSec == null ? null : ev.durSec, ev.cut, ev.st ? [ev.st.mode, ev.st.bpm, ev.st.beats, ev.st.grain, E.stKey(ev.st)] : null]);
   }
   return out;
