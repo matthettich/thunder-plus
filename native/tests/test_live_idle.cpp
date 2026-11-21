@@ -16,6 +16,7 @@
 #include <vector>
 
 #include "engine/live_pool.h"
+#include "engine/live_shell.h"
 #include "rt/sampletime.h"
 #include "seq/seq.h"
 
@@ -26,7 +27,7 @@ static int g_fail = 0;
 static const double SR = 48000;
 
 using Act = std::function<void(LivePool&)>;
-struct Script { std::vector<std::pair<double, Act>> evs; double secs = 6; double voxGlide = 80; };   // (the time an event is handed over at, what it does)
+struct Script { std::vector<std::pair<double, Act>> evs; double secs = 6; double voxGlide = 80; std::vector<size_t> mustWake; };   // mustWake: events that must take a node out of the skip (checked on the skipping pool: idleNodes() drops)   // (the time an event is handed over at, what it does)
 
 static SeqEvent mkNote(double t, int track, double rate) { SeqEvent e; e.type = SEV_NOTE; e.t = t; e.track = track; e.pad = 0; e.rate = rate; e.gain = 1; e.pan = 128; return e; }
 static Act N(double t, int tr, double rate, bool poly = false, int col = 0, bool slide = false, double slideDur = 0.15, int choke = 0) {
@@ -51,7 +52,7 @@ static LivePadConfig cfgOf(LiveKind kind, double voxGlide) {
   return c;
 }
 
-struct Result { bool equal = true; uint32_t maxIdle = 0, idleOther = 0; int64_t firstDiff = -1; };
+struct Result { bool equal = true; uint32_t maxIdle = 0, idleOther = 0; int64_t firstDiff = -1; int wakeFail = 0; };
 // Runs the script on a skipping and on a processing pool, quantum by quantum, and compares the two mixes bit for bit (both channels of tracks 0 and 2) and the counters.
 static Result runPair(LiveKind kind, const Script& sc) {
   LivePool A(SR), B(SR); const LivePadConfig cfg = cfgOf(kind, sc.voxGlide);
@@ -63,7 +64,8 @@ static Result runPair(LiveKind kind, const Script& sc) {
   const int64_t total = (int64_t)(sc.secs * SR);
   for (int64_t q0 = 0; q0 < total; q0 += 128) {
     const double t0 = (double)q0 / SR; A.setTime(t0); B.setTime(t0);
-    for (size_t i = 0; i < sc.evs.size(); i++) if (!doneA[i] && sc.evs[i].first <= t0) { doneA[i] = 1; sc.evs[i].second(A); sc.evs[i].second(B); }
+    for (size_t i = 0; i < sc.evs.size(); i++) if (!doneA[i] && sc.evs[i].first <= t0) { doneA[i] = 1; const uint32_t before = A.idleNodes(); sc.evs[i].second(A); sc.evs[i].second(B);
+      if (std::find(sc.mustWake.begin(), sc.mustWake.end(), i) != sc.mustWake.end() && !(A.idleNodes() < before)) r.wakeFail++; }
     for (auto* v : {&al, &ar, &a2l, &a2r, &bl, &br, &b2l, &b2r}) std::fill(v->begin(), v->end(), 0.f);
     A.render(ia, ra, 128, q0); B.render(ib, rb, 128, q0);
     r.maxIdle = std::max(r.maxIdle, A.idleNodes()); r.idleOther += B.idleNodes();
@@ -77,12 +79,49 @@ static Result runPair(LiveKind kind, const Script& sc) {
   return r;
 }
 
+
+// ---- the shell's contract: fastForward(clock + N) == processing N samples of silence, for every N, bit for bit (including the output ring and the vox pitch latch) -----------------------------------------------------
+template <class SH> static void setupCore(SH& sh) { (void)sh; }
+template <> void setupCore<LiveBass>(LiveBass& sh) { BassP p; p.rel = 40; p.glide = 60; sh.core().set(p); }
+template <> void setupCore<LiveVox>(LiveVox& sh) { VoxP p; p.txt = "la di"; p.glide = 80; sh.core().set(p); }
+static LiveEvent lev(uint32_t at, LiveEvType t, double v = 0) { LiveEvent e; e.at = at; e.type = t; e.v = v; return e; }
+template <class SH> static int shellCase(const char* name) {
+  int cases = 0; const int Ns[] = {1, 3, 15, 16, 17, 31, 33, 100, 127, 128, 129, 200, 511, 512, 513, 700, 1000, 1500, 3000, 9000};
+  for (int N : Ns) for (int rate2 = 0; rate2 < 2; rate2++) {
+    SH A(SR), B(SR); setupCore(A); setupCore(B);
+    std::vector<float> la(128), ra(128), lb(128), rb(128);
+    auto both = [&](uint32_t n, const LiveEvent* ev, uint32_t nev) { A.process(la.data(), ra.data(), n, ev, nev); B.process(lb.data(), rb.data(), n, ev, nev); return std::memcmp(la.data(), lb.data(), n * 4) == 0 && std::memcmp(ra.data(), rb.data(), n * 4) == 0; };
+    bool eq = true; int chunks = 0;
+    { const LiveEvent ev[] = {lev(0, LiveEvType::RateSet, 0.7), lev(3, LiveEvType::NoteOn)}; eq &= both(128, ev, 2); }
+    { const LiveEvent ev[] = {lev(10, LiveEvType::NoteOff)}; eq &= both(128, ev, 1); }
+    while (!A.idle() && chunks < 2000) { eq &= both(128, nullptr, 0); chunks++; }
+    CHECKF(A.idle() && B.idle(), "%s: the shell never went idle", name);
+    // a second, short note at another rate: the pitch latch is still gliding (slowly: 80 ms) when the voice ends, so the number of idle blocks counts
+    { const LiveEvent ev[] = {lev(0, LiveEvType::RateSet, 1.5), lev(5, LiveEvType::NoteOn)}; eq &= both(128, ev, 2); }
+    { const LiveEvent ev[] = {lev(60, LiveEvType::NoteOff)}; eq &= both(128, ev, 1); }
+    chunks = 0; while (!A.idle() && chunks < 2000) { eq &= both(128, nullptr, 0); chunks++; }
+    CHECKF(A.idle() && B.idle(), "%s: the shell never went idle (2)", name);
+    // A: N samples of silence processed; B: the same by fastForward
+    for (int left = N; left > 0;) { const uint32_t m = (uint32_t)std::min(left, 128); A.process(la.data(), ra.data(), m, nullptr, 0); left -= (int)m; }
+    B.fastForward(B.clock() + (uint64_t)N);
+    CHECKF(A.clock() == B.clock(), "%s N=%d: the clocks differ (%llu, %llu)", name, N, (unsigned long long)A.clock(), (unsigned long long)B.clock());
+    { const uint32_t o = 1 + (uint32_t)(N % 13) + (uint32_t)rate2 * 16;   // (the note starts 1 .. 28 samples after the stretch: before the next control block ends)
+      const LiveEvent ev[] = {lev(o > 1 ? o - 1 : 0, LiveEvType::RateSet, rate2 ? 1.3 : 0.7), lev(o, LiveEvType::NoteOn), lev(100, LiveEvType::Bpm, 133)}; eq &= both(128, ev, 3); }
+    for (int i = 0; i < 6; i++) eq &= both(128, nullptr, 0);
+    { const LiveEvent ev[] = {lev(20, LiveEvType::NoteOff)}; eq &= both(128, ev, 1); }
+    for (int i = 0; i < 8; i++) eq &= both(128, nullptr, 0);
+    CHECKF(eq, "%s N=%d rate2=%d: the fast-forwarded shell differs from the processed one", name, N, rate2); cases++;
+  }
+  return cases;
+}
+
 static const char* nameOf(LiveKind k) { return k == LiveKind::Bass ? "bass" : k == LiveKind::Vox ? "vox" : k == LiveKind::Acid ? "acid" : "mach"; }
 static int g_runs = 0;
 static void expect(LiveKind kind, const char* what, const Script& sc) {
   const Result r = runPair(kind, sc); g_runs++;
   CHECKF(r.equal, "%s / %s: the skipping pool differs from the processing one (first differing quantum at sample %lld)", nameOf(kind), what, (long long)r.firstDiff);
   CHECKF(r.maxIdle > 0, "%s / %s: the skip was never engaged (the test is not testing)", nameOf(kind), what);
+  CHECKF(r.wakeFail == 0, "%s / %s: an event that must end the skip of a node did not (%d)", nameOf(kind), what, r.wakeFail);
   CHECKF(r.idleOther == 0, "%s / %s: the processing pool skipped", nameOf(kind), what);
 }
 
@@ -99,6 +138,7 @@ int main(int argc, char** argv) {
     }
     return 0;
   }
+  { const int c = shellCase<LiveBass>("bass") + shellCase<LiveVox>("vox") + shellCase<LiveAcid>("acid") + shellCase<LiveMach>("mach"); std::printf("idle skip: %d shell fast-forward cases (every N from 1 to 9000 samples) equal to processing, bit for bit\n", c); }
   const LiveKind kinds[] = {LiveKind::Bass, LiveKind::Vox, LiveKind::Acid, LiveKind::Mach};
   for (LiveKind kind : kinds) {
     // 1. the first note after an idle stretch, at offsets that are not aligned to a quantum, a control block or a sample step, with a rate that differs from the last one (0.7 -> 1.3)
@@ -132,14 +172,14 @@ int main(int argc, char** argv) {
       at(s, 0.10, N(0.10, 0, 1.2, false, 0, true, 3.0)); at(s, 0.30, O(0.30, 0)); at(s, 2.0, N(2.0, 0, 0.8)); at(s, 2.2, O(2.2, 0)); at(s, 6.0, N(6.0, 0, 1.5)); at(s, 6.2, O(6.2, 0));
       expect(kind, "a slide that outlasts the voice", s); }
     // 4c. a voice another track's note choked is over, but it is still in its track's list (a mod reaches it): a `mul` writes its rate lane while the node idles, with nothing booked (the lane is not constant any more)
-    { Script s; s.secs = 7;
+    { Script s; s.secs = 7; s.voxGlide = 900;
       at(s, 0.10, N(0.10, 0, 1.0, false, 0, false, 0.15, 1)); at(s, 0.50, N(0.50, 2, 1.0, false, 0, false, 0.15, 1)); at(s, 0.70, O(0.70, 2));
-      at(s, 2.0, MUL(2.0, 0, 2.0)); at(s, 4.0, N(4.0, 0, 1.3));  at(s, 4.2, O(4.2, 0));
+      s.mustWake.push_back(s.evs.size()); s.evs.push_back({3.70, MUL(0.45, 0, 2.0)});   /* (a mod timed before the stop, delivered late, a little before the next note (handed over at 3.75): it still reaches the voice, and the idle blocks after it, a slow glide, must see its rate) */ at(s, 4.0, N(4.0, 0, 1.3));  at(s, 4.2, O(4.2, 0));
       expect(kind, "a mod on a choked, idle node", s); }
     // 4d. the first note of a node handed over right after the pool's first quantum (the node ran no quantum yet: its first idle blocks are the wake's), and a very slow glide (the pitch latch has not converged: the number of idle blocks counts)
     { Script s; s.secs = 3; s.voxGlide = 900;
-      at(s, 0.25 + 128.0 / SR + 0.0007, N(0.25 + 128.0 / SR + 0.0007, 2, 1.3)); at(s, 0.5, O(0.5, 2));
-      at(s, 0.10, N(0.10, 0, 0.5)); at(s, 0.30, O(0.30, 0)); at(s, 1.9, N(1.9, 0, 1.7)); at(s, 2.1, O(2.1, 0));
+      s.evs.push_back({128.0 / SR, N(0.26, 2, 1.3)}); at(s, 0.5, O(0.5, 2));   /* (handed over at the pool's second quantum) */
+      at(s, 0.10, N(0.10, 0, 0.5)); at(s, 0.30, O(0.30, 0)); at(s, 0.60, N(0.60, 0, 1.7)); at(s, 0.75, O(0.75, 0)); at(s, 1.9, N(1.9, 0, 1.2)); at(s, 2.1, O(2.1, 0));
       expect(kind, "the first note of a node right after the first quantum, a slow glide", s); }
     // 4e. the first note after the stretch at every alignment of the ring of the shell (512 samples) and of the control block: the shell's output ring must hold silence where the idle blocks would have written it
     for (int k = 0; k < 60; k++) {

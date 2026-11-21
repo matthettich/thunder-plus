@@ -367,7 +367,7 @@ void LivePool::wake(Node& n) {
   if (!n.skip) return;
   n.skip = false; skipped_--;
   LiveEng& eng = *n.eng; const uint32_t lat = eng.latency();
-  if (!n.started) { eng.seek((uint64_t)n.firstQ0); n.started = true; }   // (the first call's pre-roll runs no whole control block: nothing to do for it)
+  if (!n.started) { eng.seek((uint64_t)qEnd_); n.started = true; }   // (a node that never ran: its idle blocks leave no state a note reads, the core's go_ latches the pitch at every block: where it "started" does not show)
   eng.fastForward((uint64_t)(qEnd_ + (int64_t)lat));   // (the lanes are pruned by the next quantum that runs: the lists' values do not depend on when)
 }
 void LivePool::setIdleSkip(bool on) { if (!on) for (Node* n : active_) wake(*n); idleSkip_ = on; }
@@ -376,7 +376,7 @@ uint32_t LivePool::idleNodes() const { return skipped_; }
 void LivePool::runNode(Node& n, int64_t q0, int frames, float* const* inL, float* const* inR) {
   if (n.skip) return;
   LiveEng& eng = *n.eng; const uint32_t lat = eng.latency();
-  if (!n.started && idleSkip_ && !tap_ && n.ntl == 0) { n.skip = true; n.firstQ0 = q0; skipped_++; return; }   // (a node nothing was ever booked on)
+  if (!n.started && idleSkip_ && !tap_ && n.ntl == 0) { n.skip = true; skipped_++; return; }   // (a node nothing was ever booked on)
   float* sL = scr_.get(); float* sR = scr_.get() + kQuantum;
   LiveEvent ev[kTimeline + 1]; uint32_t nev = 0;
   if (!n.started) {   // the first call: the shell starts at this quantum and runs lat samples of pre-roll, so that it is lat ahead of the mixer

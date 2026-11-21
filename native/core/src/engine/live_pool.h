@@ -132,7 +132,7 @@ class LivePool {
     bool used = false;                  // a note was ever booked on this node (stopAll acts on used nodes)
     double lastBpm = -1;                // the bass node's bpm lane as last set
     bool started = false;
-    bool skip = false; int64_t firstQ0 = 0;   // the idle skip: the node is not processed (its voice has ended and its output is silent); firstQ0: where its first call would have been (a node that never ran)
+    bool skip = false;   // the idle skip: the node is not processed (its voice has ended and its output is silent, or it never ran)
     struct EngLanes { AutoN<kAutoEng> a[12]; EngLanes() { for (int i = 0; i < 12; i++) a[i].reset(i < 5 ? -1 : 0); } };   // the twelve engine targets (seconds): c* default -1, o* default 0
     std::unique_ptr<EngLanes> engL; EngFeed feed;   // (allocated with the node; the lanes exist from the first put on: feed.on)
     bool engOn = false, bound = false;               // the JS's L.engOn; the node exists in the JS (a note was started on it: it is in the track's engine list)

@@ -66,7 +66,7 @@ const M = [
   ['I17', 'a booking does not wake the node', 'pool', 'void LivePool::book(Node& n, const TEv& e) {\n  wake(n);', 'void LivePool::book(Node& n, const TEv& e) {'],
   ['I08', 'a mod (a rate lane write with nothing booked) does not wake the node', 'pool', 'void LivePool::modVoice(Node& n, const SeqEvent& e, const double* arp) {\n  wake(n);', 'void LivePool::modVoice(Node& n, const SeqEvent& e, const double* arp) {'],
   ['I11', 'the skipped node is brought to the wrong clock (the last quantum\'s start)', 'pool', 'eng.fastForward((uint64_t)(qEnd_ + (int64_t)lat));', 'eng.fastForward((uint64_t)(lastQ0_ + (int64_t)lat));'],
-  ['I12', 'a node that never ran starts at the wrong quantum', 'pool', 'n.skip = true; n.firstQ0 = q0; skipped_++; return; }', 'n.skip = true; n.firstQ0 = q0 + 128; skipped_++; return; }'],
+  ['I12', 'a node that never ran is woken with the wrong clock (seek 1000 late)', 'pool', 'eng.seek((uint64_t)qEnd_); n.started = true;', 'eng.seek((uint64_t)qEnd_ + 1000); n.started = true;'],
   ['I13', 'a voice that has not ended may be skipped', 'pool', '&& (!n.curLive || n.done) && eng.idle()', '&& eng.idle()'],
 ];
 
@@ -96,7 +96,7 @@ for (const [id, what, file, from, to] of M) {
   let killedBy = null;
   for (const t of tests) {
     let tobj = `CMakeFiles/${t}.dir/${t}.cpp.o`, extra = '';
-    if (HDR[file] && t === 'test_live_review') {   // the test drives a LiveShell directly: its own copy of the template is compiled against the mutated header too
+    if (HDR[file] && (t === 'test_live_review' || t === 'test_live_idle')) {   // the test drives a LiveShell directly: its own copy of the template is compiled against the mutated header too
       const tf = fs.readFileSync(path.join(tdir, 'CMakeFiles', t + '.dir/flags.make'), 'utf8'), g = k => ((tf.match(new RegExp('^' + k + ' = (.*)$', 'm')) || [])[1] || '').split(/\s+/).filter(Boolean);
       const o = path.join(tmp, t + '.mut.o'); const c2 = run('c++', ['-I' + path.join(tmp, 'inc'), ...g('CXX_DEFINES'), ...g('CXX_INCLUDES'), ...g('CXX_FLAGS'), '-c', path.join(ROOT, 'native/tests', t + '.cpp'), '-o', o]);
       if (c2.status) { console.error(c2.stderr.split('\n').slice(0, 8).join('\n')); process.exit(2); } tobj = o; }
