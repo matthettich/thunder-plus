@@ -103,3 +103,8 @@ Correct, and now exercised. `runNode` hands a skipped node's tap zeros (the node
 ## Verdict: MERGE (with follow-ups)
 F1 FIXED (0 of 300 + 0 of 300 with eng + 0 of 1300 resume cases differ; was 14 / - / 50). F2 FIXED (original `held` restored, 151 of 151, my 255 minus the item-6 case equal, `test_live_decisions` and its golden untouched, goldens additions only). E14 dead. The tap change is sound and exercised. CI green.
 Not blocking, to file: (1) `eng(0)+on(500)` undetermined (item 6), bass / acid / mach, 62-sample start-up transient; (2) mutant gaps V05 (`<` vs `<=` at a note on a control-block start with first-note rate != 1) and V15 (per-track engine-state isolation); (3) bass / mach songs change vs the merge-base through the rate default, mechanism unnamed; (4) full ctest / sanitizer builds not run by me; (5) `hold-vs-chrome` fixture for CI (first round).
+
+# Re-check of 12015e10
+
+**Verdict: NOT YET: in progress** (updated as items finish; started 16:30Z)
+
