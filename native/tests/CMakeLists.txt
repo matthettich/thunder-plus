@@ -1090,6 +1090,23 @@ else()
 endif()
 add_test(NAME render_c COMMAND test_render_c)
 
+# U37 P0: the live host's contract (live.h, live_host.h): compile and size checks only, no bodies yet. Keeps the header honest in CI.
+add_executable(test_live_h test_live_h.c)
+set_target_properties(test_live_h PROPERTIES C_STANDARD 99 C_STANDARD_REQUIRED ON C_EXTENSIONS OFF LINKER_LANGUAGE C)
+target_include_directories(test_live_h PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../core/include)
+if(MSVC)
+  target_compile_options(test_live_h PRIVATE /W4 /WX)
+else()
+  target_compile_options(test_live_h PRIVATE -std=c99 -Wall -Wextra -Werror -pedantic)
+endif()
+add_test(NAME live_h COMMAND test_live_h)
+add_executable(test_live_h_cpp test_live_h_cpp.cpp)
+target_include_directories(test_live_h_cpp PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../core/src ${CMAKE_CURRENT_SOURCE_DIR}/../core/include)
+if(NOT MSVC)
+  target_compile_options(test_live_h_cpp PRIVATE -Wall -Wextra)
+endif()
+add_test(NAME live_h_cpp COMMAND test_live_h_cpp)
+
 # Follow-up after verify-238-239: the takeover of live / sf / missing-variation notes, a failed set_variation changes nothing, the variation limit's value, a pad change drops its
 # variations (the page's rule), Cloud Seed's 96 kHz cap in a Release test. (The peak-memory check of a variation replacement is in render_api_oom.)
 add_executable(test_render_var test_render_var.cpp)
