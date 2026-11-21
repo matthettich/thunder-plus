@@ -14,7 +14,7 @@ plan; sections 1 to 4 and 9), `HANDOVER.md` on `beta` (the web app, the owner's 
 - Machine: 2 cores, about 7 GB free disk. At most two compiling workers; delete build directories of merged work. One git network operation at a time per
   worker; `gh` through REST only (GraphQL is blocked); no CI runs on a push to `native`, only on PRs.
 
-## Where the port stands: 35 of 37 units merged (20 Nov); about 65% of the whole port by the lead's estimate (the table below is of 19 Nov: see START HERE)
+## Where the port stands: 35 of 37 units merged, U36's core complete (21 Nov); about 68% of the whole port by the lead's estimate (the lists below are older: see START HERE)
 - **Stage N1 (playback core):** every worker-buildable unit is merged, pump effect hosting (U18) and Marbles / Tides included. **Left: steps 10 and 11, the
   lead's own: U34 (offline render API and pad renders through the core), U35 (MIDI scheduling), U37 (bridge and host switch: `core.wasm` behind the Settings
   switch).** Before wiring, the lead still has to read line by line: U07 (sequencer), U08 (voices), U09 (mixer), `fxpump.cpp`, `fxhost.cpp`.
@@ -25,7 +25,34 @@ plan; sections 1 to 4 and 9), `HANDOVER.md` on `beta` (the web app, the owner's 
   every other upstream; start it when a compiling slot is free); **U36 Link / recording / inputs** (lead reviews); **Stage N2 (the Android shell)** and **N4 (Windows and Mac shells)**.
 - **Fastest route to something the owner can install:** N1 steps 10 and 11, then N2. U31 can run in parallel with a worker.
 
-## START HERE (21 Nov, 05:15): the state for a new chat. Everything below this section is history, newest first.
+## START HERE (21 Nov, 09:15): the state for a new chat. Everything below this section is history, newest first.
+**Say to a new chat:** "Pull thunder-plus, branch native, and continue from docs/port/PICKUP.md. Start at START HERE (21 Nov, 09:15)."
+
+**Who runs what.** The chat that wrote this (lead of 20-21 Nov) hands EVERYTHING over except what follows. The older chat (lead of 19-20 Nov) may still hold `n1/live-eng` (PR #272: ENGINE TARGETS + the idle skip): if #272 is still open and its branch has not moved for a day, ask the owner whether that chat is dead before taking it over. No worker survives a chat: re-brief from the branch and its notes.
+
+**How to run it** (the owner's rules, unchanged; see "How the owner wants this run" at the top and the 05:15 section below): Sonnet builders in `/home/claude/wt/<name>`, an independent Sonnet verifier per code PR (report on `review/verify-NNN`), the lead reads every core diff and rules, CodeRabbit reviews every PR into `native` automatically (one round by the builder, the lead decides the rest), merge by squash when ALL CI is green (sanitizers: 45 to 70 minutes). At most two compiling workers. Never `git fetch --unshallow` in the shared clone. The owner wants few messages: one update when asked or when something needs him, with a percentage.
+
+### State of `native` at 09:15: 35 of 37 units merged; U36's core is complete; about 68 % of the port
+Merged since 20 Nov 21:00: #265 live route step 1 (the older chat), #266 bus into bus, #267 follow-ups, #268 U36 PR A (port table, pump, clock map), #269 CodeRabbit config, #271 the web's 19-20 Nov changes (lines, envelope lines, reset track incl. live voices, `sx` carried, goldens from the pinned web copy in `native/tests/web-ref`), #273 bus-into-bus tests, **#274 U36 PR B** (`SongRenderer::setMidi` + `setSeqStart`, `Players::setDropLate`, the pump HOLDS records until the first clock map and drops note-ons / CCs more than 0.15 s old at that first map, the gone-TOKEN fix). What each did and every ruling: the 05:15 section below, `docs/port/U36-SPEC.md` section 8, `docs/port/U36-NOTES.md`, the reviews in `docs/port/reviews/verify-26x/27x.md`.
+
+### Open
+- **#275 `n2/u36-android-midi`: U36 T9, the Android MIDI OUT sink.** Built by a Sonnet worker, NOT yet read by the lead and NOT verified. Kotlin `MidiModel.kt` (no Android imports, JUnit-tested in CI), `MidiPorts.kt`, `NativeMidi.kt`; C++ `midi_out.{h,cpp}` (token table, sender thread, clock map; AMidi behind `PortIo`; Linux ctest `android_midi_sink`), `midi_jni.cpp`; a debug "MIDI out test" button; `native/tests/OWNER-TEST-U36.md`. Android CI jobs green on 44ea1c36; the slow jobs and CodeRabbit's second review were still running. TO DO: the lead reads `midi_out.cpp` (sender thread, shutdown order, the clock-map pair from AAudio) and anything called from the AAudio callback; a verifier; merge; then the owner's device test (Fold + a USB MIDI device). The builder's three questions, ruled: (1) `CAP_TS` for the whole sink with only USB ports stamped, other ports held by the shell and sent plain: ACCEPTED; (2) a write AMidi refuses 4 times 0.2 ms apart is a send error and the cable is gone until the next `set_devices`: accepted for now, re-check after the device test (a briefly full buffer should not mute a device for 3 s); (3) the one-last-block-then-Stop at engine stop is debug-only: U37 owns the real one.
+- #272 (the older chat's), #225 `n1/repin-pump` (old, untouched).
+
+### Next, in order
+1. #275 as above.
+2. **U37's design: the lead's own work, the next big item.** Inputs: `docs/port/reviews/prewire-19nov.md` (one design for F2 + F3: an immutable pads-and-chop snapshot with deferred free; pump never on two threads; the live route's idle skip), `docs/port/CORE-BRIDGE.md`, `docs/port/WIRING-DOSSIER.md`, and the duties found on 20-21 Nov: `setMidi` + `setSeqStart(0.08)` with `thunder_midi_start`; post `thunder_midi_stop` when STOP is asked or 0.3 s after `songOver()`, then one more quantum before destroying the renderer; `clock_map` once per audio callback AFTER the block, with the shell's own (frame, host time) pair; `setDropLate(true)`; `Players::stopTrack` for reset track; republish the Seq snapshot on every chain-patch edit (the web's `rebus`); `eng_env_lines_fit` with the song's bpm and lpb before a render and again on a settled tempo change (verify-271 F4); verify-274 F4's list. Then the full wasm target.
+3. U36 T10 (CoreMIDI / WinMM sinks) belongs to N4 with the desktop shells. MIDI in, clock in, Measure: phase 2.
+4. Not ported: the stretch itself (`sx` / OLDSCHOOL play like LOOP natively; needs in `docs/port/WEB-FOLLOW-20NOV-NOTES.md`); live route steps 2 and 3; U04's LXR seam.
+5. Small: move the root web snapshot and the older dump tools (mix-dump, song-golden, u15-song-dump) to `native/tests/web-ref`; the golden-harness hardening and the `[5]`-in-an-`...L`-field point CodeRabbit raised on #271; `midi_glue`'s equivalent mutant (verify-274 F3).
+
+### Decisions made for the owner on 20-21 Nov (told; he can reverse any)
+With the live host's `setDropLate` on, notes more than 0.15 s late after a stall or seek are SKIPPED on every route (the web's core plays them in a burst): pads and gear agree. The pump holds MIDI until the first clock map, then drops stale note-ons / CCs. All ten U36 spec questions as recommended. Devices are identified by a shell-supplied token. Clock-map smoothing is per 25 ms of host time. Reset track stops live voices. Native keeps the web's stems double-count (incl. the nested-send form) until the web fixes it.
+
+### Waiting on the owner
+The device test of #275 once merged (`native/tests/OWNER-TEST-U36.md`). From before: loops for the CLEAN stretch listening test; Rubber Band yes / no; whether to convert the five skipped web tests; a side-by-side beta app; anything he finds in beta.2. For the web's queue: the stems double-count also shows for a nested send.
+
+## START HERE of 21 Nov, 05:15 (now history)
 **Say to a new chat:** "Pull thunder-plus, branch native, and continue from docs/port/PICKUP.md. Start at START HERE (21 Nov, 05:15)."
 
 **Two chats still run.** The OLD chat (lead of 19-20 Nov) merged #265 (live route step 1) at 00:52 and keeps ONLY `n1/live-eng` (PR #272: ENGINE TARGETS + the idle skip). Do not touch `n1/live-eng` / #272. The NEW chat (lead of 20-21 Nov, this section's author) runs everything else.
