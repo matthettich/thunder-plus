@@ -79,13 +79,13 @@ struct thunder_midiout {
   thunder_midi_msg q[kQ]; int head, tail;       // sorted by frame (stable), the live part is [head, tail)
   uint32_t seenEpoch;
   bool held;                               // PUMP thread: records were queued while no map existed (the first map's backlog rule applies once)
-  struct Hand { thunder_midi_msg m; int64_t at; uint64_t dev; bool live; } hand[kHand]; int handN;   // the last stamped messages given to the OS (CAP_TS): what a CLEAR may have to recall (and what the OS's flush must not lose)
+  struct Hand { thunder_midi_msg m; int64_t at; uint64_t dev; bool live; bool done; } hand[kHand]; int handN;   // the last stamped messages given to the OS (CAP_TS): what a CLEAR may have to recall (and what the OS's flush must not lose)
   struct { bool ok; double off; int64_t host; } lastSnap;   // the last map the pump read whole: kept when a writer is caught mid-update
-  std::atomic<uint64_t> st[11];                  // the stats, in the order of thunder_midiout_stats from `sent`
+  std::atomic<uint64_t> st[12];                  // the stats, in the order of thunder_midiout_stats from `sent`
 };
 
 namespace {
-enum St { S_SENT, S_GONE, S_CLEARED, S_NOMAP, S_LATE, S_QFULL, S_MAXQ, S_ERR, S_LATETICK, S_HANG, S_STALE };
+enum St { S_SENT, S_GONE, S_CLEARED, S_NOMAP, S_LATE, S_QFULL, S_MAXQ, S_ERR, S_LATETICK, S_HANG, S_STALE, S_RELEASED };
 inline void bump(thunder_midiout* o, int i, uint64_t n = 1) { o->st[i].store(o->st[i].load(std::memory_order_relaxed) + n, std::memory_order_relaxed); }   // one writer (the pump)
 inline void setSt(thunder_midiout* o, int i, uint64_t v) { o->st[i].store(v, std::memory_order_relaxed); }
 
@@ -175,19 +175,24 @@ void markGone(thunder_midiout* o, int cable, uint64_t tok) {
 
 // A CLEAR marker (the cable's STOP): what is queued for the cable after the marker's frame goes. What the OS already holds, stamped for later (CAP_TS), is recalled with the sink's
 // clear(), which drops EVERYTHING the device holds, the messages before the marker's frame too (CoreMIDI's MIDIFlushOutput): those are sent again with the same stamp.
+// clear() returns R, the time up to which nothing was recalled (midiport.h): no clear, or R = INT64_MAX, recalls nothing. What is NOT recalled plays: it is not replayed, and a note-on after
+// the marker that is still to play (stamp in (t, R]) gets its note-off here, stamped RELEASE_GAP_NS after it (MidiSched::releaseAll undid that note-on, so no off was made for it, and its
+// off for the pitch that was already sounding is stamped at the marker, BEFORE it): the last message for every note of the device is a note-off. A recalling sink (R <= t) is untouched.
 void applyClear(thunder_midiout* o, const thunder_midi_msg& m, int64_t now) {
   uint64_t n = 0;
   for (int i = o->tail - 1; i >= o->head; i--) if (o->q[i].cable == m.cable && o->q[i].frame > m.frame) { qRemove(o, i); n++; }
-  if (!(o->sink.caps & THUNDER_MIDIOUT_CAP_TS) || !o->sink.clear) { if (n) bump(o, S_CLEARED, n); return; }
+  if (!(o->sink.caps & THUNDER_MIDIOUT_CAP_TS)) { if (n) bump(o, S_CLEARED, n); return; }
   const int64_t t = o->sink.now_ns(o->sink.user); (void)now;
   uint64_t devs[kHand]; int nd = 0;
-  for (int i = 0; i < kHand; i++) { const auto& h = o->hand[i]; if (h.live && h.m.cable == m.cable && h.m.frame > m.frame && h.at > t) {   // only a device that holds something this CLEAR cancels is flushed
+  for (int i = 0; i < kHand; i++) { const auto& h = o->hand[i]; if (h.live && !h.done && h.m.cable == m.cable && h.m.frame > m.frame && h.at > t) {   // only a device that holds something this CLEAR cancels is asked
     bool seen = false; for (int k = 0; k < nd; k++) seen = seen || devs[k] == h.dev; if (!seen) devs[nd++] = h.dev; } }
   for (int k = 0; k < nd; k++) {
-    o->sink.clear(o->sink.user, devs[k]); bool failed = false;
-    for (int i = 0; i < kHand; i++) {   // the ring is in send order: the ones before the marker are sent again, in that order
+    int64_t R = o->sink.clear ? o->sink.clear(o->sink.user, devs[k]) : INT64_MAX;
+    if (R < t) R = t;   // a recall cannot reach what is already due
+    bool failed = false;
+    for (int i = 0; i < kHand; i++) {   // the ring is in send order: the ones before the marker are sent again, in that order (only what was recalled: stamp after R)
       auto& h = o->hand[(o->handN + i) % kHand];
-      if (!h.live || h.dev != devs[k] || h.at <= t) continue;
+      if (!h.live || h.dev != devs[k] || h.at <= R) continue;
       if (h.m.cable == m.cable && h.m.frame > m.frame) { h.live = false; n++; continue; }
       if (failed) { h.live = false; bump(o, S_GONE); continue; }   // the device failed during this replay: what is left of its history is lost with it
       if (o->sink.send(o->sink.user, h.dev, h.m.b, h.m.len, h.at) < 0) {
@@ -195,6 +200,26 @@ void applyClear(thunder_midiout* o, const thunder_midi_msg& m, int64_t now) {
         markGone(o, h.m.cable, h.dev);   // the same rule as a normal send: the failed token
       }
     }
+    // what was not recalled and still plays: P = live, not yet handled, this device and cable, after the marker, stamp in (t, R]
+    auto inP = [&](const auto& h) { return h.live && !h.done && h.dev == devs[k] && h.m.cable == m.cable && h.m.frame > m.frame && h.at > t && h.at <= R; };
+    for (int i = 0; i < kHand; i++) {
+      auto& e = o->hand[(o->handN + i) % kHand];
+      if (!inP(e)) continue;
+      const int ty = e.m.b[0] & 0xF0;
+      if (ty != 0x90 || e.m.len < 3 || e.m.b[2] == 0) continue;   // only a note-on needs a release
+      bool last = true;   // the last message for its note among P (an off after it, or another on that gets the release)
+      for (int j = i + 1; j < kHand && last; j++) {
+        const auto& f = o->hand[(o->handN + j) % kHand];
+        const int fty = f.m.b[0] & 0xF0;
+        if (inP(f) && (fty == 0x80 || fty == 0x90) && (f.m.b[0] & 0x0F) == (e.m.b[0] & 0x0F) && f.m.len >= 2 && f.m.b[1] == e.m.b[1]) last = false;
+      }
+      if (!last) continue;
+      const uint8_t off[3] = {(uint8_t)(0x80 | (e.m.b[0] & 0x0F)), e.m.b[1], 0};
+      const int64_t at = e.at + THUNDER_MIDIOUT_RELEASE_GAP_NS;
+      if (o->sink.send(o->sink.user, devs[k], off, 3, at > t ? at : t) < 0) { bump(o, S_ERR); bump(o, S_GONE); setSt(o, S_HANG, 1); markGone(o, m.cable, devs[k]); }
+      else { bump(o, S_SENT); bump(o, S_RELEASED); }
+    }
+    for (int i = 0; i < kHand; i++) { auto& e = o->hand[i]; if (inP(e)) e.done = true; }
   }
   if (n) bump(o, S_CLEARED, n);
 }
@@ -387,7 +412,7 @@ int thunder_midiout_pump(thunder_midiout* o, int64_t* next_ns) {
       continue;
     }
     bump(o, S_SENT); sent++;
-    if (early && at > now) { auto& h = o->hand[o->handN]; h.m = m; h.at = at; h.dev = dev; h.live = true; o->handN = (o->handN + 1) % kHand; }
+    if (early && at > now) { auto& h = o->hand[o->handN]; h.m = m; h.at = at; h.dev = dev; h.live = true; h.done = false; o->handN = (o->handN + 1) % kHand; }
   }
   if (o->head == o->tail) { o->head = o->tail = 0; }
   return sent;
@@ -399,7 +424,7 @@ int thunder_midiout_stats_get(const thunder_midiout* o, thunder_midiout_stats* o
   t.sent = o->st[S_SENT].load(std::memory_order_relaxed); t.dropped_gone = o->st[S_GONE].load(std::memory_order_relaxed); t.dropped_cleared = o->st[S_CLEARED].load(std::memory_order_relaxed);
   t.dropped_nomap = o->st[S_NOMAP].load(std::memory_order_relaxed); t.late = o->st[S_LATE].load(std::memory_order_relaxed); t.queue_full = o->st[S_QFULL].load(std::memory_order_relaxed);
   t.max_queue = o->st[S_MAXQ].load(std::memory_order_relaxed); t.send_errors = o->st[S_ERR].load(std::memory_order_relaxed); t.dropped_late_ticks = o->st[S_LATETICK].load(std::memory_order_relaxed);
-  t.may_hang = o->st[S_HANG].load(std::memory_order_relaxed); t.dropped_stale = o->st[S_STALE].load(std::memory_order_relaxed);
+  t.may_hang = o->st[S_HANG].load(std::memory_order_relaxed); t.dropped_stale = o->st[S_STALE].load(std::memory_order_relaxed); t.released_after_stop = o->st[S_RELEASED].load(std::memory_order_relaxed);
   { thunder_midi_stats cs; std::memset(&cs, 0, sizeof cs); cs.size = sizeof cs; if (thunder_midi_stats_get(o->core, &cs) == THUNDER_MIDI_OK && cs.may_hang) t.may_hang = 1; }   // the scheduler's own ring lost a note-off / Stop too
   const size_t n = out->size < sizeof t ? out->size : sizeof t; std::memcpy(out, &t, n);
   return THUNDER_MIDIOUT_OK;

@@ -53,7 +53,7 @@ static void lateChoke() {
 struct HSink { int64_t now = 0; std::vector<std::pair<int64_t, int>> sent; };
 static int64_t hNow(void* u) { return ((HSink*)u)->now; }
 static int hSend(void* u, uint64_t, const uint8_t* b, int, int64_t at) { HSink* s = (HSink*)u; s->sent.push_back({at, b[0]}); return 0; }
-static void hClear(void*, uint64_t) {}
+static int64_t hClear(void*, uint64_t) { return 0; }
 static void holdBurst() {
   thunder_midi* h = thunder_midi_create(48000, nullptr, 0); HSink hs; hs.now = 1000000000;
   thunder_midiout_sink sk; std::memset(&sk, 0, sizeof sk); sk.user = &hs; sk.now_ns = hNow; sk.send = hSend; sk.clear = hClear; sk.caps = 0;

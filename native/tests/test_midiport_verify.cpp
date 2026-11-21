@@ -17,7 +17,7 @@ struct Fake {
   int64_t now = 0, step = 0; uint32_t caps = 0; std::vector<Rec> rec;
   static int64_t nowFn(void* u) { Fake* f = (Fake*)u; const int64_t v = f->now; f->now += f->step; return v; }
   static int sendFn(void* u, uint64_t dev, const uint8_t* b, int len, int64_t at) { Fake* f = (Fake*)u; Rec r{}; r.dev = dev; r.len = len; std::memcpy(r.b, b, (size_t)len); r.at = at; f->rec.push_back(r); return 0; }
-  static void clearFn(void* u, uint64_t dev) { Fake* f = (Fake*)u; for (Rec& r : f->rec) if (r.dev == dev && r.at > f->now) r.recalled = true; }   // MIDIFlushOutput: the OS drops what it holds for the device
+  static int64_t clearFn(void* u, uint64_t dev) { Fake* f = (Fake*)u; for (Rec& r : f->rec) if (r.dev == dev && r.at > f->now) r.recalled = true; return 0; }   // MIDIFlushOutput: the OS drops what it holds for the device
   thunder_midiout_sink sink() { thunder_midiout_sink s; s.user = this; s.now_ns = nowFn; s.send = sendFn; s.clear = clearFn; s.caps = caps; return s; }
 };
 struct Rig {
