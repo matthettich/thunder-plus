@@ -2,10 +2,10 @@
 
 Branch `n1/u37-p1-pads` (base `native` 63f82d0). Design: `U37-DESIGN-DRAFT.md` 3.4, 9 (row P1), 12 (D5); prewire F2 + F3.
 
-## Status (update at every push)
-- DONE (code written): `render/pads_snap.{h,cpp}` (PadBuf, PadsSnap, PadsHost), epoch fields in `VoiceBuf` / `SfPad`, `epochMins` in `VoicePool`, `SfPool`, `Players`,
-  `Seq::setChop`, CMake, `tests/test_live_pads_epoch.cpp`.
-- NEXT: build + run `live_pads_epoch`; rt_harness section; full ctest Release; ASan+UBSan subset; TSan; three mutations; PR.
+## Status
+- DONE and verified: code, `live_pads_epoch` (2072 checks), rt_harness section `run_pads_snap`, full ctest Release (213 tests: 212 passed, 1 skipped: `pumpsynth_refused`, as before),
+  ctest under ASan + UBSan for the names matching render|players|voice|seq|sf|live|chop|rt_ (55 of 55), `live_pads_epoch` under ThreadSanitizer (no report).
+- Nothing of P2 onward (no LiveHost, no C API).
 
 ## Design as built
 - `RenderPads` is the snapshot's payload unchanged in layout (`PadsSnap::pads`). `Players::setPads` and `Seq::setChop` point into it. `SongRenderer` and the C API keep their by-reference `RenderPads`
@@ -44,4 +44,8 @@ Freed iff `refs == 0 && epoch < minLive[slot]`; `minLive[slot] = 2^64-1` when no
 3. `setPad` copies the pad again when only its variations change (PadBuf is immutable). Option: split variations into their own refcounted object.
 
 ## Mutations
-(to be filled in)
+Each made on `pads_snap.cpp`, the test seen to fail, then undone:
+1. `collect()` frees every retired buffer regardless of the board (`if (true)`): e1 / e3 / e4 and the threaded e5 (161233 poisoned samples) fail.
+2. `collect()` compares with the minimum over ALL slots instead of the buffer's own slot: e3 fails (pad 2's retired buffers are held by pad 0's voice: "freed per pad").
+3. `beginQuantum` does not call `seq->setChop`: e6 fails (events differ from a fresh Seq; every note unchopped).
+4. (extra) `<=` instead of `<` in the free test: e2 / e4 / e5 fail (a buffer is freed while the voice that started on it lives).
