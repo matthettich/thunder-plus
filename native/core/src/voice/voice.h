@@ -30,6 +30,12 @@ constexpr int kVoicePoly = 4;              // POLY: a poly track holds at most f
 constexpr int kVoiceTrackCap = 8;          // per-track list (never more than kVoicePoly + 1 in the JS's flow)
 constexpr int kRdRing = 16384;             // RD_RING
 
+// DEFERRED FREE OF A PAD'S DATA (U37 P1, render/pads_snap.h). A voice that took a pad's data from a PadsSnap records which buffer it took: `epoch` (the buffer's own number, > 0; 0 = not tracked: the
+// by-reference pads of SongRenderer / the C API, whose owner outlives the renderer) and `slot` (0..kEpochSlots-1: the sampler's audio of pad p is slot p, the SoundFont data of pad p slot 256 + p).
+// The pools report the smallest epoch per slot over their voices (epochMins) so the control side knows what it may free. Nothing here changes a sample of any render.
+constexpr int kEpochSlots = 512;
+constexpr uint64_t kEpochNone = ~(uint64_t)0;   // "no voice uses this slot"
+
 // A rendered pad as the sampler reads it (the JS's coreBufs entry {data, data2, sr}, or a variation buffer).
 struct VoiceBuf {
   const float* data = nullptr;
@@ -37,6 +43,7 @@ struct VoiceBuf {
   int len = 0;                    // data.length
   double sr = 0;                  // the pad's sample rate
   bool noShape = false;           // the host's varRec returned "the pad as it is" (a sliced / synced instrument): the event's tw is not applied
+  uint64_t epoch = 0; int slot = -1;   // U37 P1: which PadBuf this is (see kEpochSlots); the voice records them. 0 / -1: not tracked
 };
 // The vibrato curve of pitchMods (an automation Curve): base * 2 ** (st * sin(2 pi hz d min(1, max(0, (x - t0) / dd))) / 12), p = {base, st, hz, d, t0, dd}. Shared with the live pool (LIVE-ROUTE B4).
 double voice_vib_curve(const double* p, double x);
@@ -95,6 +102,10 @@ class VoicePool {
   //      its rate lane per sample, from the note's time. (Arpeggios and vibrato are not timed the page's way here: no test song has them.)
   void setPageTiming(bool on) { pageTiming_ = on; }
 
+  // U37 P1. For every voice that is alive (sounding OR booked to start later: both are in the alive list from note() on) and was started on a tracked buffer: mins[slot] = min(mins[slot], its epoch).
+  // `mins` has kEpochSlots entries, set to kEpochNone by the caller. Audio thread, once a quantum; allocates nothing.
+  void epochMins(uint64_t* mins) const { for (int ai = 0; ai < nAlive_; ai++) { const Voice& v = V_[(size_t)alive_[ai]]; if (v.eslot >= 0 && v.eslot < kEpochSlots && v.ep < mins[v.eslot]) mins[v.eslot] = v.ep; } }
+
   int active() const { return nAlive_; }
   int capacity() const { return cap_; }
   uint32_t dropped() const { return dropped_; }
@@ -124,6 +135,7 @@ class VoicePool {
     bool ended = false, hasStop = false; double stopAt = 0;
     bool syn = false; double rel = 0, end = 0, pos = 0, t0 = 0;
     bool hasRd = false; Rd rd;
+    uint64_t ep = 0; int eslot = -1;   // the buffer this voice started on (VoiceBuf::epoch / slot), for epochMins
   };
 
   double relTc(const Voice& v) const { return v.syn ? v.rel / 4.6 : 0.004; }

@@ -7,7 +7,7 @@ target_include_directories(thunder_core PUBLIC include)
 # build (which has its own script and keeps -fno-exceptions), are not changed. MSVC has exceptions on already. RENDER-SF: the SoundFont pool (its constructor) and the font parser / decoder (add_font, set_pad_sf) too.
 if(NOT MSVC)
   set_source_files_properties(
-    src/render/render_api.cpp src/render/render.cpp src/render/players.cpp src/engine/live_pool.cpp src/rt/json.cpp src/song/song.cpp src/seq/seq.cpp src/seq/session.cpp src/voice/voice.cpp src/mix/mix.cpp src/mix/pdc.cpp src/mix/delay.cpp src/mix/beat.cpp
+    src/render/render_api.cpp src/render/render.cpp src/render/players.cpp src/render/pads_snap.cpp src/engine/live_pool.cpp src/rt/json.cpp src/song/song.cpp src/seq/seq.cpp src/seq/session.cpp src/voice/voice.cpp src/mix/mix.cpp src/mix/pdc.cpp src/mix/delay.cpp src/mix/beat.cpp
     src/master/master.cpp src/master/eq.cpp src/master/chain.cpp src/fx/fxhost.cpp src/fx/clkcores.cpp src/fx/idmcores.cpp src/fx/u17cores.cpp src/fx/fxmap.cpp src/fx/fxbank.cpp src/fx/fxpump.cpp
     src/sf/sf_live.cpp src/sf/sf_parse.cpp src/sf/sf_decode.cpp src/midi/midisched.cpp src/midi/midi_api.cpp src/midi/midi_spp.cpp
     PROPERTIES COMPILE_OPTIONS "-fexceptions")
@@ -18,6 +18,7 @@ target_sources(thunder_core PRIVATE src/engine/xeng_util.cpp src/engine/xeng_voi
 target_sources(thunder_core PRIVATE src/engine/xeng_table.cpp src/engine/xeng_vector.cpp src/engine/xeng_scanned.cpp src/engine/xeng_resynth.cpp src/engine/xeng_bytebeat.cpp)   # U29
 target_sources(thunder_core PRIVATE src/engine/xeng_live.cpp src/engine/xeng_blip.cpp)   # U27
 target_sources(thunder_core PRIVATE src/engine/bass_core.cpp src/engine/vox_core.cpp src/engine/live_shell.cpp src/engine/live_pool.cpp)   # U26 / LIVE ROUTE
+target_sources(thunder_core PRIVATE src/render/pads_snap.cpp)   # U37 P1: the pads-and-chop snapshot with deferred free
 target_sources(thunder_core PRIVATE src/engine/layer_u24.cpp src/engine/layer_fm.cpp src/engine/layer_add.cpp src/engine/layer_karplus.cpp src/engine/layer_formant.cpp)   # U24: FM / additive / karplus / vosim / formant layers
 # U32: the SoundFont / GM player (SF2 / SF3 parse, Vorbis decode through the pinned stb_vorbis, zones and modulators, the pad render and the live note)
 add_subdirectory(sf)
