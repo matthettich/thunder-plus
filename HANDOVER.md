@@ -873,6 +873,13 @@ The web app stays on pump deb07d3 (build 642's `pump/pump.wasm` and `pump/synth/
 
 Start a session by asking for results. Fix on `beta`. (10 Nov, 15:10: the web beta is build 560; the build numbers in the rest of this paragraph are older.) Web beta: https://matthettich.github.io/thunder-plus/beta/ (build 547 as of 10 Nov morning, 548 once its PR merges; the night of 9–10 Nov shipped 544–547, see the four "10 Nov" entries below. Decisions the lead made that night for the owner to confirm or reverse: on a phone the saved Sequencer default plays on the Page unless Audio thread is picked on that device; on a phone the safety limiter is its stand-in until another worklet loads; the resync only runs with a worklet loaded and its margins are untested on a device). Desktop: v1.3.4-beta.2 (build 541, no feed view or scopes); further desktop betas on hold until the owner asks.
 
+**Native port, U36 T9: MIDI out from the Android test app (21 Nov; PR #275)**
+- [ ] **Phone (Galaxy Z Fold 6) and a USB MIDI synth or interface:** install the test APK, artifact `thunder-plus-native-n0-android-apk` from https://github.com/matthettich/thunder-plus/actions/runs/44935839127 (kept until 21 Dec). The full steps are in `native/tests/OWNER-TEST-U36.md` on the `native` branch (about 10 minutes).
+- [ ] **Tap MIDI out test:** Pass: one high note, then eight evenly spaced notes (C E G C twice) in about 4 seconds, no stuck note, and the `stats:` line shows `err 0`, `gone 0`, `hang 0`. Say whether the timing sounded tight or jittery.
+- [ ] **Unplug the USB device while it plays, then plug it back in:** Pass: no crash, the text shows `A=(not connected)`, then the device comes back by itself and the test plays again.
+- [ ] **Stop just before a note, ten tries, and again at a fast tempo (step 3b of the sheet):** Pass: no note hangs. Known: a hung note is possible on gear with very low latency; a fix is being built, so a hang here is useful to report, not a surprise.
+- [ ] **Send back:** the COPY MIDI text after one finished test, the device name, and the `map exact / fallback / odd / offset` numbers from the `core:` line.
+
 **Build 660** (OLDSCHOOL stretch; stacked on 659)
 - [ ] **Computer, a drum break of 2 bars on a pad, Sync to lines… at 8, 16 and 32 lines, mode OLDSCHOOL, RAMP FWD:** play it with LOOP at 10, 30 and 80 ms, SMOOTH 0 and then 30%. Pass: the break is recognisable at every length; at 10 ms a buzz about 100 Hz, at 80 ms stutters; SMOOTH 0 is the metallic stepped hard cut, 30% is softer with no clicks.
 - [ ] **Computer, same break, RAMP REV, LOOP 30 ms, SMOOTH 0 and 30%:** Pass: the sample is scrubbed from its end back to its start (the loop plays forward each time). Try PING and EASE.
