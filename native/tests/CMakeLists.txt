@@ -1039,3 +1039,15 @@ add_executable(test_render_bus_chain test_render_bus_chain.cpp)
 target_link_libraries(test_render_bus_chain PRIVATE thunder_core)
 target_include_directories(test_render_bus_chain PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../core/src ${CMAKE_CURRENT_SOURCE_DIR}/../core/include ${CMAKE_CURRENT_SOURCE_DIR})
 add_test(NAME render_bus_chain COMMAND test_render_bus_chain)
+
+# VERIFY-266: bus_plan / mix_audible against answers worked out by hand from the web's busPlan() / audible() at beta (no reference file)
+add_executable(test_busplan_verify266 test_busplan_verify266.cpp)
+target_link_libraries(test_busplan_verify266 PRIVATE thunder_core)
+target_include_directories(test_busplan_verify266 PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../core/src ${CMAKE_CURRENT_SOURCE_DIR})
+add_test(NAME busplan_verify266 COMMAND test_busplan_verify266)
+
+# VERIFY-266: a middle bus that also has notes: its notes are dropped (makeSeq busT), the mix is unchanged
+add_executable(test_render_bus_notes test_render_bus_notes.cpp)
+target_link_libraries(test_render_bus_notes PRIVATE thunder_core)
+target_include_directories(test_render_bus_notes PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../core/src ${CMAKE_CURRENT_SOURCE_DIR}/../core/include ${CMAKE_CURRENT_SOURCE_DIR})
+add_test(NAME render_bus_notes COMMAND test_render_bus_notes)
