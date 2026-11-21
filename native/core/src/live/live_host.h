@@ -91,7 +91,7 @@ struct LiveMasterMsg { MasterChainConfig cfg; };
 
 // An event record waiting for poll(): fixed slots so that the audio side writes one without allocating. `bytes` of `data` are valid (thunder_live_ev_* of live.h).
 struct LiveEvSlot { uint16_t bytes = 0; uint8_t data[THUNDER_LIVE_EV_MAX] = {0}; };
-constexpr uint32_t kLiveEvRing = 1024;               // 330 KB; a full ring refuses the NEWEST record (stats.evt_dropped)
+constexpr uint32_t kLiveEvRing = 1024;               // 330 KB; a full ring refuses the NEWEST record (stats.evt_dropped); the critical ring is 64 records
 
 // One step of the test dump (F_DUMP_STEPS): the head says how many raw events follow in the event ring. Raw SeqEvent copies (456 B each); the control side turns them into JSON in dumpStep().
 struct LiveDumpHead { int64_t frame = 0; double t = 0, bpm0 = 0; int32_t tks = 0, n = 0; uint64_t validMask = 0; };
@@ -225,14 +225,17 @@ class LiveHost {
   void quantum();                                    // template: SongRenderer::quantum (render.cpp:93-120)
   void applyCommands(int64_t qStart, int64_t qEnd);  // step 1: pop cmds_ / fxParams_ into pend_ (Spsc::pop, rt/spsc.h:22), apply every due command in ring order (see applyOne)
   void applyOne(const LiveCmd& c, int64_t qStart);   // the switch: Play -> applyPlay; Stop -> runner_.stop() (runner.h:41), players_->stopAll(at) (players.h:52), mix_->songLanesReset() (mix.h:133), mix_->clockStop(at) (mix.h:135),
-                                                     // midi_sched(midi_).stop(now) (midi_host.h:20; MidiSched::stop midisched.h:92), state IDLE, STATE record; Hold -> runner_.hold() (runner.h:37); Loop / Bpm / Perf -> the running Seq's setters
+                                                     // pendMidiStop_ = true (MidiSched::stop is called by midiBegin, midisched.h:92), state IDLE, STATE record; Hold -> runner_.hold() (runner.h:37); Loop / Bpm / Perf -> the running Seq's setters
                                                      // (seq.h:146, 159, 170-172) if runner_.seq(); Lead -> lead_; StopTrack -> players_->stopTrack (players.h:47); MixSet -> mix_->set (mix.h:132); FxCommit -> fxBank_->host(t).commit(plan)
                                                      // (fxhost.h:134) and the plan to fxBack_; Meters -> meterBank_->setRate; SongAck -> an ack record
   void applyPlay(PlayPlan* p, int64_t t0Frame, int spp, int pdcMode, int64_t qStart);   // adopt songSlot_ (seq_adopt, session.h:100), runner_.start(songSlot_.get()->seq.get()) (runner.h:36), seq->setTime(t0) (seq.h:158),
                                                      // mix_->load(*p->song) (mix.h:100), songLanesReset, clockStop, commit every p->fx[t] (fxhost.h:134), mchain_->configure(p->master) (chain.h:44), pdc_apply (pdc.h:48),
-                                                     // midi_sched(midi_).start(spp, now) (midisched.h:90), tempo seed from the Seq's bpm (seq.h:149 bpm(); fxBank_->setBpm fxbank.h:34, players_->live().tempo live_pool.h:99), STATE PLAYING; the PlayPlan goes to playBack_
+                                                     // pendMidiStartSpp_ = spp (the Start itself is called by midiBegin, right after midi_begin: midisched.h:90), tempo seed from the Seq's bpm (seq.h:149 bpm(); fxBank_->setBpm fxbank.h:34, players_->live().tempo live_pool.h:99), STATE PLAYING; the PlayPlan goes to playBack_
   void adopt(int64_t qStart);                        // step 2: seq_adopt(songSlot_, runner_) (session.h:100); padsHost_->beginQuantum(*players_, runner_.seq()) (pads_snap.h:113); busSlot_ / pdcSlot_ / masterSlot_.adopt() (snap.h:29); post SONG / PADS records
-  void midiBegin(double t0);                         // step 4: midi_begin(midi_, t0, 128 / sr, min(2, latency / sr), mix_->audibleMask()) (midi_host.h:18; render.cpp:101); < 0: count, panic once
+  void midiBegin(double t0);                         // step 4: midi_begin(midi_, t0, 128 / sr, min(2, latency / sr), mix_->audibleMask()) (midi_host.h:18; render.cpp:101; < 0: count, panic once); THEN, in this order, the direct calls
+                                                     // queued by step 1 in pendMidiStop_ / pendMidiStartSpp_: MidiSched::stop(t0) (midisched.h:92), MidiSched::start(spp, t0) (midisched.h:90). Same `now`, same figures, same point as the posted
+                                                     // OP_STOP / OP_START of blockBegin (midi_api.cpp:83-90, apply :70-71) except for ring order against other posted commands and stop's `at`: P4's done-test is byte-equality with the
+                                                     // posted path for the 18 ledger songs; the posted path is the fallback (live.h, MIDI)
   template <class F> SeqPump stepLoop(double t0, F&& onStep);   // step 5: runner_.pump(t0, lead_, evs_, kRenderEvents, step_, onStep) (runner.h:50); onStep: midi_sched(midi_).onStep (midisched.h:103), dump, then dispatch() each
   void dispatch(const SeqEvent& e);                  // SongRenderer::dispatch (render.cpp:28): mixer events (mix.h:131), the beat clock, FxBank::event (fxbank.h:30), Players::dispatch (players.h:44); chc / eng / tempo / MIDI events counted ignored
   void midiEnd(double t0);                           // step 6: midi_end(midi_, t0, seq time, seq bpm, alive) (midi_host.h:22; render.cpp:109)
@@ -276,6 +279,7 @@ class LiveHost {
   Spsc<FxPlan*, 64> fxBack_;                         // committed FxPlans (their `retired_` objects go with them)
   // ---- AUDIO -> CONSUMER ----
   Spsc<LiveEvSlot, kLiveEvRing> evRing_;             // audio pushes records, the consumer thread pops (poll)
+  Spsc<LiveEvSlot, 64> evCrit_;                      // the CRITICAL records (STATE, HELD, ERROR, SONG, PADS) only: own ring, so a flood of POS / METERS cannot drop one; poll merges the two rings by `seq`
   std::unique_ptr<SeqEvent[]> dumpEvs_; uint32_t dumpEvCap_ = 0;   // F_DUMP_STEPS: raw events, written by audio, read by control after it pops the matching head (the Spsc release / acquire orders them)
   std::unique_ptr<Spsc<LiveDumpHead, 1024>> dumpHeads_;
   // ---- published numbers (audio writes with relaxed stores once a quantum; any thread reads: each value valid, the set not one instant) ----
@@ -303,6 +307,8 @@ class LiveHost {
   int stateA_ = THUNDER_LIVE_STATE_IDLE;             // the audio side's own copy of state_
   bool songOverDone_ = false; double endStopAt_ = -1;   // C4's songOver once; the MIDI stop 0.3 s later
   bool midiBeginFailedOnce_ = false;
+  bool pendMidiStop_ = false; int pendMidiStartSpp_ = -1;   // set by step 1, done by midiBegin right after midi_begin (stop first, then start)
+  int thread_prepares_ = 0;                          // process(): pe_prepare() on this thread's first call; stats.thread_prepares
   PlayerStats lastPlayerStats_;                      // for the LATE record (changed since last post)
   int64_t nextClockAt_ = 0, nextPosAt_ = 0, nextLateAt_ = 0;   // frames: the next CLOCK / POS / LATE record is due at or after
   uint32_t evSeq_ = 0, evtDropped_ = 0, cmdLate_ = 0, reanchors_ = 0;

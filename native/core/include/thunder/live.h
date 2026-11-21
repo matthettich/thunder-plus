@@ -23,7 +23,7 @@
           epochs, adopts a newly published pads snapshot, re-points Players and the Seq's chop table. Then the bus plan, the PDC plan and the master configuration.
           The pads adopt is ALWAYS after seq_adopt and before the runner, so that a Seq that has just been adopted gets the current chop table before it steps.
        3. CLOCKS. players.setTime(t0, frame), mixer.setTime(t0); t0 = frame / sample_rate.
-       4. MIDI BEGIN. midi_begin(midi, t0, 128 / sr, latency, audible mask) (midi_host.h:18). Unconditional, also when no step is due.
+       4. MIDI BEGIN. midi_begin(midi, t0, 128 / sr, latency, audible mask) (midi_host.h:18). Unconditional, also when no step is due. Then, IMMEDIATELY AFTER it returns: the direct MidiSched::stop / start queued by step 1 (see MIDI).
        5. STEP. runner.pump(t0, lead, ...): the catch-up skip, EXACT STOP, at most 3 steps (runner.h:50). For each step: MidiSched::onStep, then every event of
           the step is dispatched (mixer, beat clock, effects, Players): the order of render.cpp:106-108. NEW against the renderer: the runner, hold, the HELD and ENDED
           reports, the optional step dump.
@@ -51,8 +51,8 @@
                 path allocates nothing, ever (rt_harness runs it under an allocator that aborts). What a host must still respect: this header's limits and the render.h
                 MEMORY figures. Known exception, by construction: in a build WITHOUT C++ exceptions (wasm) the control paths that use std::vector / std::string inside the
                 parser (Song::load, SeqVars::load, the pads snapshot's RenderPads copy, the SoundFont parse) cannot catch a failed allocation: there the call may abort. The
-                host keeps inside opts.max_song_bytes / max_pad_bytes (E_LIMIT is returned BEFORE any such allocation) and treats a trap as fatal (docs/port/U37-P0-NOTES.md,
-                question 4). A native build with exceptions catches them and returns E_MEMORY.
+                host keeps inside opts.max_song_bytes / max_pad_bytes (E_LIMIT is returned BEFORE any such allocation) and treats a trap as fatal and falls back (ruling D14; docs/port/U37-P0-NOTES.md, question 4). P6 (the wasm target) MUST MEASURE the largest
+                song and pad set that stays inside these limits on a phone before the limits are trusted. A native build with exceptions catches them and returns E_MEMORY.
    ABI          Structs that cross the API start with a `size` field (sizeof as the caller compiled it): a field the caller's struct does not reach keeps its default,
                 a field a newer caller has and this build does not know must be zero. Zero-fill, set `size`, set what you want; every zero is the default. Event records
                 have fixed sizes, the same on wasm32 and 64-bit (no pointer, no size_t, no long): see EVENTS. A function a build does not have is not exported; the
@@ -63,6 +63,7 @@
                 the host (keys, previews and MIDI thru stay with the page: D16); MIDI in, MIDI clock in, Link, recording, input metering; pad renders, song renders and
                 stems (render.h); the live engines other than bass / vox / acid / mach (D8: a pad of another kind stays on the SAMPLER route and plays its rendered twin);
                 a live master-chain swap while it does not exist in C++ (THUNDER_LIVE_CAP_MASTER_SWAP, below).
+                THIS HEADER IS USED BY THE WEB HOST AND BY EVERY SHELL: nothing in it may assume a page (no DOM, no JSON message names, no wall clock, no Web MIDI).
    THREAD LEGEND    CONTROL: one thread at a time (any thread, never two at once; the same thread that makes the thunder_midi_* / thunder_midiout_* control calls on this
                     host's MIDI handle). AUDIO: thunder_live_process only. ANY: any thread, any time. */
 #ifndef THUNDER_LIVE_H
@@ -149,9 +150,9 @@ uint32_t thunder_live_caps(void);
 /* CONTROL (any thread, once, before anything else). Allocates everything the host will ever need EXCEPT what the calls below add (a song, pads, effect objects): the
    voices, the mixer's delay rings (ELECTRO: about 53 MB at 48 kHz without effects, 94 MB with; 143 / 218 MB at 192 kHz: render.h MEMORY), the event buffers (5.6 MB), the rings,
    the MIDI scheduler when F_MIDI. Returns NULL and writes `err` (NUL-terminated, truncated to err_cap; err may be NULL with err_cap 0) on a bad option or no memory ("out of memory"),
-   leaving nothing allocated. The AUDIO thread must have called pe_prepare() before its first render (the Plaits / Elements workspace is per
-   thread and allocates): thunder_live_process does it itself on its first call, which is then the one call that allocates; a host calls it once with frames = 0 before the stream starts (the web: from the first message
-   handler, which runs on the rendering thread). The state is
+   leaving nothing allocated. The first thunder_live_process call on a thread prepares that thread's Plaits / Elements workspace (pe_prepare(): per thread,
+   it allocates) and is the one call that may allocate; stats.thread_prepares counts how many times it happened (more than 1: the audio thread changed). The web does it from its first message handler with frames = 0
+   (that handler runs on the rendering thread); a shell cannot run anything on the audio thread before the stream starts (the system makes that thread), so it accepts the allocation in its first callback, before any song plays. The state is
    IDLE: no song, no pads, nothing playing, silent. The handle lives until thunder_live_destroy. */
 thunder_live* thunder_live_create(const thunder_live_opts* opts, char* err, size_t err_cap);
 
@@ -171,10 +172,20 @@ int thunder_live_process(thunder_live* L, float* out_l, float* out_r, int frames
 
 /* ANY. A snapshot of the counters (all since create unless it says otherwise). The audio side's numbers are published once a quantum with relaxed stores: each is a
    valid value, the set is not one instant. `size` first (in: sizeof as the caller compiled it; a field past it is not written). */
-#define THUNDER_LIVE_STATE_IDLE 0        /* nothing is playing and no sequencer exists (before the first play, after a stop has been applied) */
-#define THUNDER_LIVE_STATE_PLAYING 1     /* a sequencer is stepping, or voices of an ended / held song may still sound */
-#define THUNDER_LIVE_STATE_ENDED 2       /* the song ended (STATE record ENDED); the MIDI stop follows 0.3 s later; the host stays here until thunder_live_stop or a new play */
-#define THUNDER_LIVE_STATE_HELD 3        /* EXACT STOP: the sequencer stopped at a pattern edge (HELD record); voices ring out until thunder_live_stop */
+#define THUNDER_LIVE_STATE_IDLE 0        /* no sequencer exists and the MIDI scheduler is stopped; voices already sounding may still ring out. Also the state before the first play */
+#define THUNDER_LIVE_STATE_PLAYING 1     /* a sequencer is stepping */
+#define THUNDER_LIVE_STATE_ENDED 2       /* the sequencer ran out (ENDED record); the MIDI stop follows 0.3 s later and then the state is IDLE */
+#define THUNDER_LIVE_STATE_HELD 3        /* EXACT STOP: the sequencer stopped at a pattern edge (HELD record); voices ring out and MIDI keeps running until thunder_live_stop */
+/* THE STATE MACHINE. Each cell: state after the event is APPLIED (at a quantum top; the CONTROL call only queues it), then the record posted. STOPPED is a record, not a state: it announces the move to IDLE.
+   Hold only arms a flag of the runner (SeqRunner::hold); a held edge, the song's end and the 0.3 s timer are events of the audio side.
+     event \ state                 IDLE                   PLAYING                  HELD                     ENDED
+     play                          PLAYING, PLAYING       PLAYING, PLAYING         PLAYING, PLAYING         PLAYING, PLAYING   (a new session, Seq and MIDI Start every time; voices are NOT cut; the ENDED timer is cancelled)
+     stop                          IDLE, none             IDLE, STOPPED arg 0      IDLE, STOPPED arg 0      IDLE, STOPPED arg 0   (stopAll + MIDI stop; from IDLE the MIDI stop is repeated, harmless)
+     hold                          IDLE, none (armed)     PLAYING, none (armed)    HELD, none (no-op)       ENDED, none (armed, no effect)
+     a step at an edge, hold armed -                      HELD, HELD (positions)   -                        -
+     the sequencer runs out        -                      ENDED, ENDED             -                        -                     (Players::songOver; arms the 0.3 s timer)
+     0.3 s after ENDED             -                      -                        -                        IDLE, STOPPED arg 1   (MidiSched::stop)
+   A play on a host that is PLAYING or HELD does not stop the old song's voices or its MIDI first (the page stops first, as tStop does). */
 typedef struct thunder_live_stats {
   uint32_t size;
   int32_t state;                /* THUNDER_LIVE_STATE_*, as of the last quantum */
@@ -198,7 +209,7 @@ typedef struct thunder_live_stats {
   int32_t pad_retired;          /* of those, retired */
   uint32_t cmd_busy;            /* E_BUSY answers given (control side) */
   uint32_t cmd_late;            /* timed commands applied at once because the waiting list was full */
-  uint32_t evt_dropped;         /* events the full event ring refused (the oldest is kept; clock events carry this counter) */
+  uint32_t evt_dropped;         /* records any ring refused (the oldest is kept; CLOCK records carry this counter) */
   uint32_t reanchors;           /* process calls whose frame0 was not the expected one */
   uint32_t song_pending;        /* snapshots published and not yet adopted (0 .. THUNDER_LIVE_SONG_RING) */
   uint32_t session_full;        /* 1: SeqSession::sessionFull(): the PLAY's registries passed 8 MB; a new play starts a fresh session (see song_publish) */
@@ -208,7 +219,9 @@ typedef struct thunder_live_stats {
   uint32_t midi_may_hang;       /* the MIDI scheduler's may_hang (thunder_midi_stats): the shell should panic */
   uint32_t live_failed;         /* live nodes whose core refused: silent from then on */
   uint32_t live_late;           /* live events that arrived inside the look-ahead */
-  uint32_t reserved[4];         /* 0 */
+  uint32_t thread_prepares;     /* times a process call prepared its thread's workspace (1 normally; more: the audio thread changed) */
+  uint32_t evt_crit_dropped;    /* critical records (STATE, HELD, ERROR, SONG, PADS) the critical ring refused: see EVENTS; also counted in evt_dropped */
+  uint32_t reserved[2];         /* 0 */
 } thunder_live_stats;
 int thunder_live_stats_get(const thunder_live* L, thunder_live_stats* out);
 
@@ -269,8 +282,8 @@ int thunder_live_pad_route(thunder_live* L, int pad, int route);
 
 /* CONTROL. Allocates. A MUT / GEN variation the host rendered (render.h set_variation: key ii 0 .. 63, kind 'g' / 'm', num 0 .. 255, pad 0 .. 255, `frames` MONO samples of l at `rate`).
    COPIED. The same key replaces; frames == 0 removes. At most THUNDER_RENDER_MAX_VARIATIONS (4096); the budget counts it. Stage the pad first (its audio change drops its variations).
-   COST (not contract): until PadsHost can change variations without re-copying the pad (P1 open question 3), each call re-copies the pad's audio once per publish, so set all the variations
-   of a pad, then publish once. Errors: E_ARG (also: the pad has no audio staged), E_LIMIT, E_MEMORY. */
+WHAT THE CALLER MAY RELY ON: the host STAGES the variation (a copy, held until the next publish) and builds the pad's snapshot ONCE at thunder_live_pads_publish, so a pad with any number of variations costs ONE copy
+   of the pad at publish (plus the variations' own samples, which exist twice between this call and the publish: set all of a pad's variations, then publish once). The budget counts the staged copy at once. Errors: E_ARG (also: the pad has no audio staged), E_LIMIT, E_MEMORY. */
 int thunder_live_var_set(thunder_live* L, int ii, int kind, int num, int pad, const float* l, int64_t frames, double rate);
 
 /* CONTROL. The chop data of a pad (render.h CHOP DATA): pad_chop: the pad's loop length in seconds (finite, > 0, <= 1e6; 0 removes); pad_hits: with the instrument's SMODE on, the slice points
@@ -292,7 +305,7 @@ int thunder_live_pad_sf_clear(thunder_live* L, int pad);
 /* CONTROL. LIVE-ENGINE PADS (render.h LIVE-ENGINE PADS: kinds BASS 1, VOX 2, ACID 3, MACH 4; the voice JSON is copied and parsed; params->track_mask). The nodes are made HERE (a vox pad: 235 KB a masked
    track; they count against the budget); nothing is allocated at a note. They do not change the route: set THUNDER_RENDER_ROUTE_LIVE too. THE CATCH: LivePool::addPad is a control call that today
    must not overlap the audio thread (live_pool.h:71). With THUNDER_LIVE_CAP_LIVE_SWAP the new pool travels with the next pads snapshot and the audio side swaps to it at the quantum top: live voices
-   sounding at that moment are cut (released), the sampler's voices are not touched. WITHOUT the cap these calls are E_STATE while the state is not IDLE (and in IDLE they act at once): the page then
+   sounding at that moment are cut (released), the sampler's voices are not touched. WITHOUT the cap these calls are E_STATE while the state is not IDLE (and in IDLE they act at once; a threaded shell must also have no process call in flight: Players renders its live pool every quantum, so the cap is what makes the call safe against a running audio thread): the page then
    changes live pads only between plays. Errors: E_ARG, E_LIMIT, E_STATE, E_MEMORY, E_UNSUPPORTED (a kind not built: see THUNDER_LIVE_CAP_ENGINES). pad_live_clear removes the pad's nodes (0 if none). */
 int thunder_live_pad_live(thunder_live* L, int pad, int kind, const uint8_t* voice_json, size_t n, const thunder_render_live_params* params);
 int thunder_live_pad_live_clear(thunder_live* L, int pad);
@@ -335,8 +348,7 @@ typedef struct thunder_live_play_opts {   /* the Seq's options (SeqOpts, seq.h) 
 /* CONTROL. Allocates (a fresh SeqSession for this PLAY and its starting Seq, the Players-side plans, the effects plans of the song, the master chain's configuration, the PDC plan) and uses the LAST
    PUBLISHED song and vars. Then queues the play command; at the top of the next quantum the audio side (1) adopts the new snapshot (the runner starts on its Seq: SeqRunner::start; a Seq that was running is
    dropped, its voices are NOT cut: the page stops first, or calls stop_track / stop), (2) Seq::setTime(t0), (3) mixer.load(song) at once (every level as the song has it, no ramp) + songLanesReset + clockStop,
-   (4) commits the song's track and master effects, the master chain configuration and the PDC plan, (5) starts the MIDI scheduler (MidiSched::start(spp, now), D-1: called by the audio side before midi_begin in
-   the same quantum, so the Start never lands after the first step), (6) seeds the tempo consumers from Seq::bpm() (SEV_TEMPO is not emitted at the start: seq.cpp:995 emits it only on a change: the mixer's beat clock, FxBank::setBpm, LivePool::tempo), (7) posts a STATE record PLAYING. The seed is applied: Seq options as given, `chop` = the current pads snapshot's table (set again every
+   (4) commits the song's track and master effects, the master chain configuration and the PDC plan, (5) starts the MIDI scheduler (MidiSched::start(spp, t0), D-1: called by the audio side right after midi_begin of the same quantum (see MIDI), so the Start never lands after the first step), (6) seeds the tempo consumers from Seq::bpm() (SEV_TEMPO is not emitted at the start: seq.cpp:995 emits it only on a change: the mixer's beat clock, FxBank::setBpm, LivePool::tempo), (7) posts a STATE record PLAYING. The seed is applied: Seq options as given, `chop` = the current pads snapshot's table (set again every
    quantum by PadsHost::beginQuantum). The host's own rules (ruling D-4): Players::setDropLate(true) is set once at create: a note more than 0.15 s late is not played (counted in stats.notes_late).
    NO `at`: t0 is the time. A t0 already past is caught up by the runner (skip). A t0 more than `lead` ahead waits (the runner steps when the next step is within lead).
    Errors: E_STATE (no song published; an effects plan staged by fx_plan and not committed; a dead handle), E_ARG (bad field), E_LIMIT (a song that needs more nodes / voices than the budget), E_MEMORY,
@@ -344,7 +356,7 @@ typedef struct thunder_live_play_opts {   /* the Seq's options (SeqOpts, seq.h) 
 int thunder_live_play(thunder_live* L, const thunder_live_play_opts* o);
 
 /* CONTROL. STOP. Queues the stop. Applied at the quantum containing `at` (THUNDER_LIVE_NOW: the next): SeqRunner::stop; Players::stopAll(at) (every voice of every pool lets go at `at`, booked notes are taken back);
-   mixer.songLanesReset() + clockStop(at); the MIDI scheduler is stopped (MidiSched::stop(now): all notes off, CLEAR, clock Stop: D-2); a STATE record STOPPED. The host goes IDLE. Effects tails are NOT cut.
+   mixer.songLanesReset() + clockStop(at); the MIDI scheduler is stopped (MidiSched::stop(t0): all notes off, CLEAR, clock Stop: D-2; applied right after midi_begin of that quantum, see MIDI); a STATE record STOPPED. The host goes IDLE (THE STATE MACHINE). Effects tails are NOT cut.
    A song_publish issued after this call returns no longer reaches the sequencer. Stop on an IDLE host: 0, harmless (it still stops MIDI). The silence never waits for the core: a host also mutes its own output. */
 int thunder_live_stop(thunder_live* L, int64_t at);
 
@@ -419,11 +431,19 @@ int thunder_live_master_config(thunder_live* L, const uint8_t* mst_json, size_t 
 /* ---- 7. MIDI ---------------------------------------------------------------------------------------------------------------------------------------------- */
 /* THE HOST OWNS ITS thunder_midi (F_MIDI): made at create, freed at destroy, NEVER given to the page (a raw pointer the audio side reads is not safe to swap: PICKUP duty D-8 (e)). What the host does itself, in this order:
      song_publish   thunder_midi_set_song(song text) (parsed there; the old one retired by a later control call).
-     play           (audio side, step 1, before midi_begin of the same quantum) MidiSched::start(spp, now): Start + Song Position, the first notes. D-1: the Start never comes after the first step of the Seq.
+     play           (audio side, step 4, IMMEDIATELY AFTER midi_begin of the quantum that applies the play, before the step loop) MidiSched::start(spp, t0). D-1: the Start never comes after the first step of the Seq.
      every quantum  midi_begin / onStep / midi_end (steps 4 to 6), also quanta without a step; the audible mask and the FX latency (the master chain's + the PDC delay) are taken from the mixer every block.
-     stop           (audio side, step 1) MidiSched::stop(now): all notes off, CLEAR, clock Stop; forgets last CC values.
+     stop           (audio side, step 4, immediately after midi_begin, before the step loop) MidiSched::stop(t0): all notes off, CLEAR, clock Stop; forgets last CC values.
      song end       Players::songOver at the end; the MIDI stop follows 0.3 s later (the web's frame() rule) on its own; STATE ENDED is posted at the end, STOPPED at the MIDI stop.
      midi_begin < 0 counted in stats.midi_begin_failed (a debug build asserts); the first one posts thunder_midi_panic once.
+   WHERE THE DIRECT CALLS SIT, AND P4's DONE-TEST. A posted thunder_midi_start / _stop is applied inside midi_begin (blockBegin, midi_api.cpp:83-90): first setFxLatency / setAudible with this block's figures, then every posted
+   command in ring order (apply(): OP_START -> MidiSched::start(spp, now), OP_STOP -> MidiSched::stop(now), midi_api.cpp:70-71), then setBlock; `now` is the quantum's start. The host's direct call is made right after midi_begin
+   returns, with the same `now` and the same figures in force, before onStep. It is the posted command's point EXCEPT (1) its place among OTHER posted commands (one the shell posted before the play runs before the Start in both
+   paths; one posted after the play is popped by midi_begin before the direct Start here, but after it in the posted path) and (2) stop's `at` (the posted path has none: it stops at the block top; the host stops at the quantum
+   containing `at`). It is NOT provable from the code that the two are byte-identical in every case, so P4's DONE-TEST decides it: the record stream (Start, SPP, the first Gear-delayed notes; Stop, CLEAR, note-offs) of the
+   direct path must be BYTE-EQUAL to the posted path (thunder_midi_start / _stop posted before the block) for the 18 ledger songs (native/tests/golden/midi-ledger-expect.json, test_midi_ledger.cpp). If it is not,
+   THE POSTED PATH IS THE FALLBACK P4 MUST USE: thunder_live_play / thunder_live_stop post thunder_midi_start / _stop themselves, before they queue their own command, and the 0.3 s song-end stop is posted by the CONTROL side
+   when thunder_live_collect sees the ENDED record. The contract of this header is the same either way.
    The records' `frame` is the host timeline's frame EXCLUDING the device's output latency and INCLUDING the core's FX latency (midi.h THE OUTPUT). */
 
 /* ANY thread for the call; the handle is used under midi.h's own THREAD rules. Returns the host's thunder_midi, or NULL without F_MIDI. Valid until thunder_live_destroy; the shell passes it to
@@ -443,7 +463,10 @@ int thunder_live_midi_lead(thunder_live* L, double seconds);
 /* ---- 8. EVENTS TO THE HOST -------------------------------------------------------------------------------------------------------------------------------- */
 /* ONE consumer thread (any non-audio thread; the worklet's process() after the block in the web). Records are PACKED, little-endian, 8-byte aligned, of the fixed sizes below, the same on wasm32 and 64-bit.
    Every record starts with thunder_live_ev_head; `bytes` is the record's whole size (a reader skips a type it does not know by it); `f` is the frame the event refers to on the host's timeline. Rates (CORE-BRIDGE section 4):
-   CLOCK 10 a second, POS 30 a second while playing, METERS at the wanted rate (<= 30), ROWS per tracker row, the others when they happen. A full event ring drops the NEWEST (stats.evt_dropped; the next CLOCK carries the count);  */
+   CLOCK 10 a second, POS 30 a second while playing, METERS at the wanted rate (<= 30), ROWS per tracker row, the others when they happen. TWO RINGS, ONE ORDER. The CRITICAL records (STATE, HELD, ERROR, SONG, PADS: each is the only report of something that happened, and at most a few come per quantum) have their own ring of 64 records, so that
+   a flood of POS / ROWS / METERS / CLOCK can never push one out; the rest share the big ring (1024 records). thunder_live_poll merges the two by `seq`, so the reader sees them in the order they were posted. A full ring refuses
+   the NEWEST record of its kind and counts it (stats.evt_dropped; the next CLOCK carries the total; a critical one is also in stats.evt_crit_dropped): a consumer that stops polling for 64 critical records loses the 65th, and
+   knows it by the gap in `seq` and by the counter. Nothing is dropped silently. A consumer polls at least once every 100 ms (a worklet: once per block or per message). */
 #define THUNDER_LIVE_EV_CLOCK 1
 #define THUNDER_LIVE_EV_POS 2
 #define THUNDER_LIVE_EV_ROWS 3
@@ -496,7 +519,7 @@ typedef struct thunder_live_ev_meters {   /* 304 bytes. f = the frame at the end
 } thunder_live_ev_meters;
 
 #define THUNDER_LIVE_ST_PLAYING 1         /* play was applied: f = the frame; arg = 0 */
-#define THUNDER_LIVE_ST_STOPPED 2         /* stop was applied and the MIDI stop booked (also 0.3 s after the song's end): arg 0 stop, 1 after the end */
+#define THUNDER_LIVE_ST_STOPPED 2         /* the move to IDLE (THE STATE MACHINE): arg 0 by thunder_live_stop, 1 by the 0.3 s MIDI stop after the song's end */
 #define THUNDER_LIVE_ST_ENDED 3           /* the sequencer ran out (once per play); f = the sequencer's end time; voices may still sound */
 typedef struct thunder_live_ev_state {    /* 24 bytes */
   thunder_live_ev_head h;
