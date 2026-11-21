@@ -1,13 +1,14 @@
 // See players.h. The code here is SongRenderer::dispatch / capPoly / takeAll as they were in render.cpp (N1 / U09 and the SoundFont route), moved.
 #include "render/players.h"
 
+#include "midi/midisched.h"   // seq_note_late: the one lateness rule of pad and MIDI
 #include "rt/num.h"
 
 namespace thunder {
 
 Players::Players(const RenderPads* pads, double sampleRate, int maxVoices) : pads_(pads), pool_(sampleRate, maxVoices), sfpool_(sampleRate), live_(sampleRate) {}
 
-void Players::setTime(double t0, int64_t frame0) { pool_.setTime(t0); sfpool_.setFrame((uint64_t)frame0); live_.setTime(t0); }
+void Players::setTime(double t0, int64_t frame0) { t0_ = t0; pool_.setTime(t0); sfpool_.setFrame((uint64_t)frame0); live_.setTime(t0); }
 void Players::render(float* const* inL, float* const* inR, int frames, double t0, int64_t frame0) {
   pool_.render(inL, inR, frames, t0);
   sfpool_.render(inL, inR, frames, (uint64_t)frame0);   // adds into the same inputs
@@ -32,6 +33,8 @@ void Players::note(const SeqEvent& e, const Seq& seq, const Song& song) {
   { const int ii = to_int_sat(e.ii, -1, 1 << 20); /* N1 C3: NaN is "none" */ if (ii >= 0 && ii < kNI && song.insts[ii].mo == 1) { st_.notesMidiOnly++; return; } }   // MIDI gear only: nothing sounds here
   const int pad = to_int_sat(e.pad, -1, 1 << 20);   // (N1 C3: a part without `pad` gives NaN: no pad, what x86 gave and what the JS's kit.voices[NaN] is)
   if (pad < 0 || pad >= kRenderPads) { st_.notesNoPad++; return; }
+  // B7 (setDropLate): too late to play, on any route. A mono note still ends the track's previous voices (and its choke group), as MidiSched does for the gear; a poly one touches nothing.
+  if (dropLate_ && seq_note_late(e.t, t0_)) { st_.notesLate++; if (!e.poly) { takeAll(e, pad); live_.take(e, pads_.kit[pad].choke); } return; }
   // D2: which player. A live-engine or SoundFont pad is not the sampler's: its notes are silent here (counted), but they still take the track over (a live note does: liveNote / sfNote).
   if (pads_.route[pad] == PadRoute::Live) {
     st_.notesLive++;

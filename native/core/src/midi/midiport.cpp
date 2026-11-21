@@ -63,7 +63,9 @@ struct thunder_midiout {
   std::atomic<uint64_t> cabTok[kCabs];
   std::atomic<uint32_t> epoch;             // bumped by every set_devices
   std::atomic<uint8_t> cabPurge[kCabs];    // the slot was reused for another device id: whatever is queued for the cable belongs to the old one (the pump drops it at its next epoch sweep)
-  std::atomic<uint8_t> cabGone[kCabs];     // the sink said so for the cable's device: until the next set_devices
+  std::atomic<uint8_t> cabGone[kCabs];     // the sink said so for the cable's device: until the next set_devices (the mark; only the pump sets it, set_devices clears it)
+  std::atomic<uint64_t> cabGoneTok[kCabs]; // ...and WHICH token failed (PR B, CodeRabbit on #268): a cable is gone iff the mark is set AND this equals its current token, so control replacing the token between the
+                                           // pump's failed send and its mark can never mute the replacement (the pump stores the token, then the mark with release; resolve reads the mark with acquire, then the token)
   std::atomic<int64_t> outLat;             // the clock map's floor, ns
 
   // ---- the clock map: a seqlock, one writer at a time (busy), the pump reads ----
@@ -156,9 +158,17 @@ void enqueue(thunder_midiout* o, const thunder_midi_msg& m) {
 }
 
 bool listed(const thunder_midiout* o, int cable) { return cable >= 0 && cable < kCabs && o->cabLive[cable].load(std::memory_order_acquire) != 0; }
-bool resolve(const thunder_midiout* o, int cable, uint64_t& tok) {   // the cable's device token, false if it is not listed (or the sink said it is gone)
-  if (!listed(o, cable) || o->cabGone[cable].load(std::memory_order_relaxed) || o->cabPurge[cable].load(std::memory_order_acquire)) return false;   // a purge flag: the slot was just reused, a record that is still queued belongs to the old device
-  tok = o->cabTok[cable].load(std::memory_order_relaxed); return true;
+bool resolve(const thunder_midiout* o, int cable, uint64_t& tok) {   // the cable's device token, false if it is not listed (or the sink said THIS token is gone)
+  if (!listed(o, cable) || o->cabPurge[cable].load(std::memory_order_acquire)) return false;   // a purge flag: the slot was just reused, a record that is still queued belongs to the old device
+  const bool marked = o->cabGone[cable].load(std::memory_order_acquire) != 0;
+  const uint64_t t = o->cabTok[cable].load(std::memory_order_relaxed);
+  if (marked && o->cabGoneTok[cable].load(std::memory_order_relaxed) == t) return false;   // the token the sink failed on is still the cable's
+  tok = t; return true;
+}
+// The sink failed on `tok` for `cable` (PUMP thread): mark THAT token. No compare with the cable's current token first: there is no window for control to slip a replacement into.
+void markGone(thunder_midiout* o, int cable, uint64_t tok) {
+  o->cabGoneTok[cable].store(tok, std::memory_order_relaxed);
+  o->cabGone[cable].store(1, std::memory_order_release);
 }
 
 // A CLEAR marker (the cable's STOP): what is queued for the cable after the marker's frame goes. What the OS already holds, stamped for later (CAP_TS), is recalled with the sink's
@@ -180,7 +190,7 @@ void applyClear(thunder_midiout* o, const thunder_midi_msg& m, int64_t now) {
       if (failed) { h.live = false; bump(o, S_GONE); continue; }   // the device failed during this replay: what is left of its history is lost with it
       if (o->sink.send(o->sink.user, h.dev, h.m.b, h.m.len, h.at) < 0) {
         h.live = false; failed = true; bump(o, S_ERR); bump(o, S_GONE);
-        uint64_t cur; if (resolve(o, h.m.cable, cur) && cur == h.dev) o->cabGone[h.m.cable].store(1, std::memory_order_relaxed);   // the same rule as a normal send
+        markGone(o, h.m.cable, h.dev);   // the same rule as a normal send: the failed token
       }
     }
   }
@@ -199,6 +209,7 @@ thunder_midiout* thunder_midiout_create(thunder_midi* core_midi, double sample_r
   for (auto& d : o->cabLive) d.store(0, std::memory_order_relaxed);
   for (auto& d : o->cabTok) d.store(0, std::memory_order_relaxed);
   for (auto& g : o->cabGone) g.store(0, std::memory_order_relaxed);
+  for (auto& g : o->cabGoneTok) g.store(0, std::memory_order_relaxed);
   for (auto& g : o->cabPurge) g.store(0, std::memory_order_relaxed);
   for (auto& s : o->st) s.store(0, std::memory_order_relaxed);
   o->epoch.store(0, std::memory_order_relaxed); o->outLat.store(0, std::memory_order_relaxed);
@@ -362,7 +373,7 @@ int thunder_midiout_pump(thunder_midiout* o, int64_t* next_ns) {
     { const int64_t t = o->sink.now_ns(o->sink.user); if (t > now) now = t; }   // a slow send (a failed one too) must count against the next message's lateness
     if (r < 0) {
       bump(o, S_ERR); bump(o, S_GONE);
-      uint64_t cur; if (resolve(o, m.cable, cur) && cur == dev) o->cabGone[m.cable].store(1, std::memory_order_relaxed);   // only the token that failed: a replacement for the same id is not marked
+      markGone(o, m.cable, dev);   // only the token that failed: a replacement for the same id is not marked (resolve compares the mark's token with the cable's current one)
       continue;
     }
     bump(o, S_SENT); sent++;

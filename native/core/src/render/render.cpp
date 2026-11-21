@@ -3,6 +3,7 @@
 
 #include <algorithm>
 
+#include "midi/midi_host.h"
 #include "render/players.h"
 
 namespace thunder {
@@ -41,8 +42,8 @@ void SongRenderer::setPlan(const PdcPlan& plan, PdcMode mode, int64_t extraLaten
 }
 
 bool SongRenderer::setStem(int track) {
-  if (track < 0 || track >= kSongNT) return false;
-  const uint32_t aud = mix_.audibleMask();   // mute / solo as the song has them (not yet forced)
+  if (track < 0 || track >= kSongNT || midi_) return false;   // (a MIDI hook would read the stem's forced mask as the audible mask)
+  const uint32_t aud = (uint32_t)mix_.audibleMask();   // mute / solo as the song has them (not yet forced)
   uint32_t m = 1u << track;
   // a bus's stem plays its audible sources with it, and theirs through any depth (busClosure: a walk over the feeds that adds a track only when it is audible, so a muted middle bus
   // does not pull in what only feeds it); from the patch's plan, as the page, whether or not a chains host has made the bus yet
@@ -67,7 +68,7 @@ void SongRenderer::setEffects(bool on) {
   fx_.reset(new FxBank(sr_)); fx_->load(S_, S_.bpm);
   fx_->attach(mix_, false);
   if (stem_ >= 0) {   // a stem: no master effects (the master hook stays off); effects only on the tracks that are heard (pass(): `for (const t of keep) pl.setFx(...)`, index.html:24256)
-    const uint32_t heard = mix_.audibleMask(); for (int t = 0; t < kSongNT; t++) if (!(heard >> t & 1u)) mix_.setFx(t, nullptr, nullptr);
+    const uint32_t heard = (uint32_t)mix_.audibleMask(); for (int t = 0; t < kSongNT; t++) if (!(heard >> t & 1u)) mix_.setFx(t, nullptr, nullptr);
     return;
   }
   mix_.setMasterFx((mchain_ || fx_->host(kSongNT).slotCount() > 0) ? &SongRenderer::masterHook : nullptr, this);
@@ -92,13 +93,18 @@ void SongRenderer::quantum() {
   const int N = kRenderQuantum;
   const double t0 = (double)qFrame_ / sr_;
   players_->setTime(t0, qFrame_); mix_.setTime(t0);
+  // U36 PR B, MIDI OUT (null hook: nothing here runs). A. before the steps: the posted commands, this block's figures. latencyFrames() is read every block, no cache (the web's moFxLat, A6); the clamp keeps midi_begin's
+  // argument check (0..2 s) from refusing a block over an absurd plan. The live engines run ahead by their latency and add none (LIVE-ROUTE-DESIGN L4).
+  const bool midi = midi_ && midi_begin(midi_, t0, (double)kRenderQuantum / sr_, std::min(2.0, std::max(0.0, (double)latencyFrames() / sr_)), mix_.audibleMask()) >= 0;
   // 1. step the song up to LEAD ahead (at most 3 steps a quantum, as the web core's block)
   int n = 0;
   while (seq_->alive() && seq_->time() < t0 + lead && n++ < 3) {
     const int k = seq_->step(evs_.get(), kRenderEvents, step_.get());
     st_.steps++; if (k > st_.peakStepEvents) st_.peakStepEvents = k;
+    if (midi) midi_sched(midi_).onStep(evs_.get(), k, *step_, *seq_, t0);   // B. the whole step first, then its events are dispatched (the order midi_drive.h pins)
     for (int i = 0; i < k; i++) { dispatch(evs_[i]); players_->samplePeak(); }
   }
+  if (midi) midi_end(midi_, t0, seq_->time(), seq_->bpm(), seq_->alive());   // C. book the outbox, the clock, the LFOs and publish
   if (!liveReleased_ && !seq_->alive()) { liveReleased_ = true; players_->songOver(seq_->time()); }   // C4: live voices are held until the song's end (the page cuts there; an unknown-length render must be able to end)
   // 2. the voices into their tracks' inputs, then the mixer
   players_->render(mix_.inputsL(), mix_.inputsR(), N, t0, qFrame_);

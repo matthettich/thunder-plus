@@ -106,6 +106,13 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
   add_test(NAME rt_midi COMMAND rt_midi)
   add_test(NAME rt_midi_selftest COMMAND rt_midi --selftest)
 endif()
+# U36 (PR B): the MIDI glue inside SongRenderer (setMidi) and Players' lateness rule (setDropLate): spec 3.6 cases 9, 10, 11
+add_executable(test_midi_glue test_midi_glue.cpp)
+target_link_libraries(test_midi_glue PRIVATE thunder_core)
+target_include_directories(test_midi_glue PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../core/src ${CMAKE_CURRENT_SOURCE_DIR})
+target_compile_definitions(test_midi_glue PRIVATE THUNDER_ROOT="${CMAKE_CURRENT_SOURCE_DIR}/../..")
+add_test(NAME midi_glue COMMAND test_midi_glue)
+
 # U36 (PR A): the MIDI port table, the clock map and the timed send queue (thunder_midiout_*) against a fake sink and a fake clock; the three-thread case runs under TSan in CI.
 add_executable(test_midiport test_midiport.cpp)
 target_link_libraries(test_midiport PRIVATE thunder_core Threads::Threads)

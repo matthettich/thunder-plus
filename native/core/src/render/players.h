@@ -19,6 +19,7 @@ struct PlayerStats {
   int notes = 0, notesPlayed = 0, notesNoPad = 0, notesMidiOnly = 0, notesShapedRev = 0;
   int notesLive = 0, notesSf = 0, notesSfPlayed = 0, notesVar = 0, notesVarMissing = 0, notesUnshaped = 0, notesStretched = 0;
   int notesLivePlayed = 0;                              // notes of a live pad a node sounded (a subset of notesLive)
+  int notesLate = 0;                                    // setDropLate: notes dropped for lateness (counted in `notes`, in no route's counter)
   int peakAll = 0;   // the most voices of all pools sounding together (sampled after every event: samplePeak())
 };
 
@@ -28,6 +29,12 @@ class Players {
   // dispatch() takes the Song it should read, and the pads are read through a pointer the owner may re-point between quanta (setPads). The pads must outlive their use.
   Players(const RenderPads* pads, double sampleRate, int maxVoices);
   void setPads(const RenderPads* pads) { pads_ = pads; }
+  // LATENESS (B7, U36 PR B). Off by default: every render is bit-identical to before. On (the live host turns it on): a NOTE whose time is more than kNoteLateSec (0.15 s, midisched.h seq_note_late) behind the
+  // quantum's start t0 (setTime) is not played, by any route (sampler, SoundFont, live engine), and counts in stats().notesLate. A late MONO note (not e.poly) still lets go of the track's previous voices and its
+  // choke group (MidiSched's rule: "a late mono note still ends the previous note"); a late poly note touches nothing. Off / mod / stp and every other event are never dropped for lateness.
+  // The web: coreMsg drops a note more than 0.15 s late for the notes the PAGE plays (live engines, SoundFonts, variations: index.html coreMsg `e.t < ctx.currentTime - 0.15`); the web's own core plays its sampler notes at once whatever
+  // their lateness, which natively gives way to the one rule for pad and MIDI (the lead's ruling, U36-SPEC 2.5). A MIDI-only instrument (OUTPUT 1) sounds no pad and is not counted here, as before.
+  void setDropLate(bool on) { dropLate_ = on; }
 
   // A note, off, mod or stp event (any other type: returns false, nothing done). `seq` gives the arp table and the bpm the voices read.
   bool dispatch(const SeqEvent& e, const Seq& seq, const Song& song);
@@ -56,6 +63,7 @@ class Players {
   sf::SfPool sfpool_;
   LivePool live_;
   PlayerStats st_;
+  bool dropLate_ = false; double t0_ = 0;                // setDropLate; the quantum's start (setTime)
   uint64_t serial_ = 0;                                  // voice serials (age across the pools)
 };
 

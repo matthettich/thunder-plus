@@ -19,6 +19,8 @@
 #include <vector>
 
 #include "midi_drive.h"
+#include "render/players.h"
+#include "render/render.h"
 #include "thunder/midi.h"
 #include "thunder/midiport.h"
 
@@ -117,6 +119,15 @@ int main(int argc, char** argv) {
   thunder_midiout* po = thunder_midiout_create(h2, 48000, &sk); if (!po) return fail("midiout create");
   thunder_midiout_dev dv[2]; std::memset(dv, 0, sizeof dv); std::strcpy(dv[0].id, "n:A"); std::strcpy(dv[0].name, "A"); dv[0].token = 1; std::strcpy(dv[1].id, "n:B"); std::strcpy(dv[1].name, "B"); dv[1].token = 2;
   thunder_midiout_set_devices(po, dv, 2); thunder_midiout_assign(po, 0, "n:A"); thunder_midiout_assign(po, 1, "n:B"); thunder_midiout_assign(po, 2, "n:A"); thunder_midiout_set_clock(po, 0, 1); thunder_midiout_set_out_latency(po, 20000000);
+  // U36 PR B (T7): the glue inside SongRenderer::quantum(): a third handle behind setMidi, rendered block by block under the guard (midi_begin, onStep per step, midi_end, and Players with setDropLate on)
+  thunder_midi* h3 = thunder_midi_create(48000, nullptr, 0); if (!h3) return fail("create 3");
+  thunder_midi_set_song(h3, (const uint8_t*)songText.data(), songText.size());
+  for (int p = 0; p < 4; p++) thunder_midi_set_port(h3, p, 1, p < 2, p * 2.0, p);
+  thunder::RenderPads rpads; thunder::SeqOpts ro; ro.live = true; ro.hasLoop = true; ro.loopY0 = 0; ro.loopY1 = 0;
+  thunder::SongRenderer rend(D.song, D.vars, rpads, 48000, 128, ro, 16);
+  if (!rend.setMidi(h3)) return fail("setMidi");
+  rend.players().setDropLate(true);
+  float rl[128], rr[128]; std::vector<thunder_midi_msg> gout(4096); long gmsgs = 0;
   // the direct (C++) path: a scheduler of its own, fed by the runner, under the guard; and the C handle's process() with posted commands
   thunder::MidiSched s(48000); configure(s, C, D.song);
   thunder::SeqOpts o; o.live = true; o.hasLoop = true; o.loopY0 = 0; o.loopY1 = 0; thunder::Seq sq(D.song, D.vars, thunder::SeqMode::Song, o);
@@ -145,9 +156,20 @@ int main(int argc, char** argv) {
     if (b % 1500 == 900) thunder_midiout_set_devices(po, dv, 2);
     if (b % 2000 == 1900) { thunder_midi_stop(h2); thunder_midiout_set_playing(po, 0); }
     if (b % 2000 == 100) { thunder_midi_start(h2, 0); thunder_midiout_set_playing(po, 1); }
+    // U36 PR B control side for the glue's handle: PLAY / STOP / ports / keys / a new song, between the blocks
+    if (b == 5) thunder_midi_start(h3, 0);
+    if (b % 90 == 20) { thunder_midi_key_on(h3, b % 100, 0, 52 + b % 8, 100); thunder_midi_key_off(h3, (b + 40) % 100); }
+    if (b == 2500) thunder_midi_set_cable(h3, 1, 1, 0);
+    if (b == 3000) thunder_midi_port_clock(h3, 0, 0);
+    if (b == 3300) thunder_midi_port_clock(h3, 0, 1);
+    if (b == 4200) thunder_midi_panic(h3);
+    if (b == 5200) thunder_midi_stop(h3);
+    if (b == 5300) thunder_midi_start(h3, 0);
+    if (b % 1700 == 900) thunder_midi_set_song(h3, (const uint8_t*)songText.data(), songText.size());
     g_nowNs = 1000000000 + (int64_t)b * 2666667;
     {
       rt_guard g;
+      rend.block(rl, rr, 128);   // quantum(): midi_begin, onStep per step, midi_end, the Players (lateness drop on)
       run.pump(now, 0.25, evs.data(), (int)evs.size(), &st, [&](const thunder::SeqEvent* e, int n, const thunder::SeqStep& step) { s.onStep(e, n, step, sq, now); steps++; });
       s.book(now, sq.time(), sq.bpm(), sq.alive());
       if (b == 1500) s.panic(now);
@@ -160,6 +182,7 @@ int main(int argc, char** argv) {
       thunder_midiout_clock_map(po, (int64_t)b * 128, g_nowNs + 20000000);
       for (int k = 0; k < 4; k++) { g_nowNs += 600000; int64_t nx = 0; if (thunder_midiout_pump(po, &nx) < 0) return fail("pump"); }
     }
+    { const int64_t gn = thunder_midi_drain(h3, gout.data(), (int64_t)gout.size()); if (gn < 0) return fail("drain 3"); gmsgs += gn; }
     msgs += s.drain(out.data(), (int64_t)out.size()); const int64_t n = thunder_midi_drain(h, cout.data(), (int64_t)cout.size()); if (n < 0) return fail("drain"); msgs += n;
     now += 128.0 / 48000;
   }
@@ -175,7 +198,9 @@ int main(int argc, char** argv) {
   thunder_midiout_stats ps; std::memset(&ps, 0, sizeof ps); ps.size = sizeof ps; thunder_midiout_stats_get(po, &ps);
   if (g_sent < 1000 || ps.sent != (uint64_t)g_sent) return fail("the pump did too little or its count is wrong");
   std::printf("rt_midi: the pump and the clock map (midiport): %ld messages sent, %llu dropped (gone) %llu cleared, no allocation, no lock\n", g_sent, (unsigned long long)ps.dropped_gone, (unsigned long long)ps.dropped_cleared);
-  thunder_midiout_free(po); thunder_midi_free(h2);
+  if (gmsgs < 500 || rend.stats().steps < 100) return fail("the glue run did too little");
+  std::printf("rt_midi: SongRenderer::quantum() with setMidi: %ld records, %d steps, no allocation, no lock\n", gmsgs, rend.stats().steps);
+  thunder_midiout_free(po); thunder_midi_free(h2); thunder_midi_free(h3);
   thunder_midi_free(h);
   return 0;
 }

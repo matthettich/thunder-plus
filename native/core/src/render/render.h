@@ -23,6 +23,8 @@
 #include "song/song.h"
 #include "voice/voice.h"
 
+struct thunder_midi;   // thunder/midi.h (the MIDI scheduler's handle): setMidi
+
 namespace thunder {
 
 class Players;
@@ -129,14 +131,20 @@ class SongRenderer {
   // sources: pass's k2, :24228) whatever mute / solo say; every track still plays (chokes, takeovers). No master effects, no master chain (mastering, safety limiter) and no master
   // latency: setMasterChain / the master hook are refused from here on and a chain already set is dropped. MASTER VOL and OUT stay. Control thread, before the first block,
   // and before setEffects / setMasterChain (which then leave the master alone). Returns false for a bad track.
-  bool setStem(int track);
+  bool setStem(int track);   // also false once setMidi has set a hook (a stem's forced heard mask would reach the MIDI scheduler as the audible mask)
   // A chains host, once there is one, must set a chain hook (Mixer::setChain) only on the tracks in heardMask() of a stem render, as pass() does (`routeTrack` for `keep` only, :24258):
   // a bus that is not heard does not exist there, so a pure source heard alone plays on its own, not through it.
   int stem() const { return stem_; }                     // -1: the mix
-  uint32_t heardMask() const { return mix_.audibleMask(); }
+  uint32_t heardMask() const { return (uint32_t)mix_.audibleMask(); }
   // TRACK AND MASTER EFFECTS (U14): the song's tfx effects (S.tfx / S.mfx, the 34 wasm effects) in the mixer's setFx / setMasterFx hooks, their FXO / FLX / GAT /
   // RTG / FXV events dispatched to them. Effects of the other kinds (U15 to U18) are left out. Control thread, before the first block.
   void setEffects(bool on);
+  // MIDI OUT (U36 PR B, docs/port/U36-SPEC.md 2.2): the host's MIDI scheduler, fed from the block render. Null (the default) = nothing changes: every render, stem and golden is bit-identical.
+  // With a hook, each quantum calls midi_begin(h, t0, kRenderQuantum / sr, latencyFrames() / sr, mixer().audibleMask()) before the step loop, MidiSched::onStep(evs, k, step, seq, t0) for each
+  // step BEFORE its events are dispatched, and midi_end(h, t0, seq time, bpm, alive) after the loop (so the records are made in the 128-frame quanta, whatever the host's block).
+  // The handle (midi/midi_host.h; the control thread creates it and posts PLAY / STOP / ports through thunder_midi_*) must outlive the renderer or be cleared first. Control thread, before the first
+  // block, like setEffects. Returns false (and leaves the hook null) for a stem render: it has no MIDI, and its forced mask is not the audible mask.
+  bool setMidi(thunder_midi* h) { if (h && stem_ >= 0) return false; midi_ = h; return true; }
   FxBank* fxBank() { return fx_.get(); }
   // METERS (U13): every block, after the mixer, the tracks' post-pan pairs and the master output are fed to `bank` and its clock advanced (null: none). The bank outlives the renderer.
   void setMeters(MeterBank* bank) { meters_ = bank; }
@@ -179,6 +187,7 @@ class SongRenderer {
   static void masterHook(void* user, int track, float* L, float* R, int frames, double t0, const MixFeed* feeds, int nFeeds);
   MeterBank* meters_ = nullptr;
   int stem_ = -1;
+  thunder_midi* midi_ = nullptr;                         // setMidi
   bool liveReleased_ = false;   // C4: the live voices were released at the song's end
   RenderStats st_;
   InputTap tap_ = nullptr; void* tapUser_ = nullptr;

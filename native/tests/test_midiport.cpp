@@ -523,6 +523,64 @@ static void testTokens() {
   CHECK(x == 1 && y == 1 && portOf(r.o, 0).dev == 1 && portOf(r.o, 1).dev == 0, "L2: after a renumbering each note went to its own token (X %d, Y %d), the letters follow the list", x, y);
 }
 
+// PR B (CodeRabbit on #268): the gone mark holds the TOKEN that failed. A sink whose send fails and, INSIDE that call, makes control replace the device's token (set_devices with the same id and a new
+// token): the replacement must still get the next message, in the normal send path (N) and in the CLEAR replay path (C). The window the review found (between the pump's compare and its store) cannot be
+// entered from a sink callback, so this pins the outcome the token rule guarantees; "control" runs show that without a replacement the failed cable stays gone (the mark still works).
+struct GoneSink {
+  struct R { uint64_t tok; uint8_t b[3]; int len; int64_t at; };
+  thunder_midiout* o = nullptr; int64_t now = 0; std::vector<R> rec; uint64_t failTok = 0; bool armed = false, doReplace = false; int clears = 0, fails = 0; uint32_t caps = 0;
+  static int64_t nowFn(void* u) { return ((GoneSink*)u)->now; }
+  static int sendFn(void* u, uint64_t tok, const uint8_t* b, int len, int64_t at) {
+    GoneSink* t = (GoneSink*)u;
+    if (t->armed && tok == t->failTok) {
+      t->armed = false; t->fails++;
+      if (t->doReplace) { thunder_midiout_dev d; std::memset(&d, 0, sizeof d); std::strcpy(d.id, "X"); std::strcpy(d.name, "X"); d.token = tok + 1; thunder_midiout_set_devices(t->o, &d, 1); }   // control replaces the token during the failing send
+      return -1;
+    }
+    R r; std::memset(&r, 0, sizeof r); r.tok = tok; r.len = len; std::memcpy(r.b, b, (size_t)len); r.at = at; t->rec.push_back(r); return 0;
+  }
+  static void clearFn(void* u, uint64_t) { ((GoneSink*)u)->clears++; }
+};
+static int notesTo(const GoneSink& t, int key, uint64_t tok) { int n = 0; for (const auto& r : t.rec) if (r.b[0] == 0x90 && r.b[1] == key && r.tok == tok) n++; return n; }
+static void testGoneToken() {
+  const double sr = 48000, blk = 128.0 / sr; const int64_t host0 = 1000000000;
+  for (int path = 0; path < 2; path++) {          // 0: the normal send; 1: the CLEAR replay
+    for (int rep = 1; rep >= 0; rep--) {          // 1: the token is replaced inside the failing send; 0: control run, nothing replaced
+      thunder_midi* h = thunder_midi_create(sr, nullptr, 0); GoneSink ts; ts.caps = path ? THUNDER_MIDIOUT_CAP_TS : 0;
+      thunder_midiout_sink sk; std::memset(&sk, 0, sizeof sk); sk.user = &ts; sk.now_ns = GoneSink::nowFn; sk.send = GoneSink::sendFn; sk.clear = GoneSink::clearFn; sk.caps = ts.caps;
+      thunder_midiout* o = thunder_midiout_create(h, sr, &sk); ts.o = o; ts.now = host0; ts.doReplace = rep != 0;
+      thunder_midiout_dev d; std::memset(&d, 0, sizeof d); std::strcpy(d.id, "X"); std::strcpy(d.name, "X"); d.token = 1; thunder_midiout_set_devices(o, &d, 1); thunder_midiout_assign(o, 0, "X");
+      double now = 0; const auto proc = [&]() { thunder_midi_process(h, now, blk, now, 120, 0); now += blk; };
+      const auto raw = [&](int key, double extra) { const uint8_t m[3] = {0x90, (uint8_t)key, 100}; thunder_midi_raw(h, 0, m, 3, extra); };
+      const auto hostOf = [&](double t) { return host0 + (int64_t)std::llround(t * 1e9); };
+      proc(); thunder_midiout_clock_map(o, 0, host0);
+      if (path == 0) {
+        const double bn = now; raw(60, 0.010); raw(61, 0.020); proc();
+        ts.failTok = 1; ts.armed = true; ts.now = hostOf(bn + 0.010) - 400000; int64_t nx; thunder_midiout_pump(o, &nx);   // note 60 is due: its send fails, the token is replaced inside it
+        ts.now = hostOf(bn + 0.020) - 400000; thunder_midiout_pump(o, &nx);                                                                  // note 61 is due
+        const thunder_midiout_stats s = statsOf(o);
+        CHECK(ts.fails == 1 && s.send_errors == 1, "gone token (normal path, replaced %d): the failing send happened once (%d, %llu)", rep, ts.fails, (unsigned long long)s.send_errors);
+        if (rep) CHECK(notesTo(ts, 61, 2) == 1 && s.dropped_gone == 1, "gone token (normal path): the REPLACEMENT (token 2) got the next note (%d); only the failed note was counted as gone (%llu)", notesTo(ts, 61, 2), (unsigned long long)s.dropped_gone);
+        else CHECK(notesTo(ts, 61, 1) == 0 && s.dropped_gone == 2, "gone token (normal path, control): without a replacement the failed cable stays gone (%d sent, %llu dropped)", notesTo(ts, 61, 1), (unsigned long long)s.dropped_gone);
+      } else {
+        // CAP_TS: note 60 at +12 ms and 62 at +30 ms are handed to the OS early; STOP at ~21 ms puts a CLEAR between them; the flush re-sends note 60 and THAT send fails
+        const double t60 = now + 0.012; raw(60, 0.012); raw(62, 0.030); proc();
+        ts.now = hostOf(t60) - 1000000; int64_t nx; thunder_midiout_pump(o, &nx);
+        CHECK(ts.rec.size() == 2, "gone token (replay): both notes are handed to the OS early (%zu)", ts.rec.size());
+        for (int i = 0; i < 6; i++) proc();
+        thunder_midi_stop(h); proc();
+        ts.failTok = 1; ts.armed = true; thunder_midiout_pump(o, &nx);   // the CLEAR flushes the device (note 62 was after it) and sends note 60 again: that send fails, control replaces the token inside it
+        CHECK(ts.clears == 1 && ts.fails == 1, "gone token (replay): the device was flushed once and the replay's send failed once (%d, %d)", ts.clears, ts.fails);
+        const double b70 = now; raw(70, 0.010); proc(); ts.now = hostOf(b70 + 0.010) - 400000; thunder_midiout_pump(o, &nx);
+        const thunder_midiout_stats s = statsOf(o);
+        if (rep) CHECK(notesTo(ts, 70, 2) == 1, "gone token (replay path): the REPLACEMENT (token 2) got the next note (%d)", notesTo(ts, 70, 2));
+        else CHECK(notesTo(ts, 70, 1) == 0 && s.dropped_gone >= 1, "gone token (replay path, control): without a replacement the failed cable stays gone (%d sent, %llu dropped)", notesTo(ts, 70, 1), (unsigned long long)s.dropped_gone);
+      }
+      thunder_midiout_free(o); thunder_midi_free(h);
+    }
+  }
+}
+
 // L3: the same step of the host clock, smoothed at two call rates, has the same time constant (the web's: 2 % per 25 ms; its pump, 40 Hz, is what calls mapUpd while playing)
 static void testRates() {
   const double sr = 48000; int64_t at[2] = {0, 0}; const int64_t spacing[2] = {5000000, 25000000}; const int64_t F = 481000;
@@ -569,7 +627,7 @@ static void testReview() {
 
 int main(int argc, char** argv) {
   if (argc > 1 && std::strcmp(argv[1], "--threads") == 0) { threadsOnce(0); threadsOnce(THUNDER_MIDIOUT_CAP_TS); threadsDevs(false); threadsDevs(true); std::printf(fails ? "midiport threads: FAILED\n" : "midiport threads: ok\n"); return fails ? 1 : 0; }
-  test12(); test6(); testTokens(); testRates(); testReview(); test3(); test4(); test2(); test7(); testT2(); test1(); test5();
+  test12(); test6(); testTokens(); testGoneToken(); testRates(); testReview(); test3(); test4(); test2(); test7(); testT2(); test1(); test5();
   std::printf(fails ? "midiport: %d FAILED\n" : "midiport: all passed\n", fails);
   return fails ? 1 : 0;
 }
