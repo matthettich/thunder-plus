@@ -87,3 +87,71 @@ CI: this test is not in the TSan job; the control/sender/audio interplay (table 
 - `AMidiDevice_release` threading (the sender attach is a defensive guess) and whether Java `MidiDevice.close()` while a held message still references the port is harmless.
 - `setpriority(-19)` and `Process.setThreadPriority` effect for the sender.
 - Whether the sanitizer false positive (F1) is what I think it is: not reproduced locally yet.
+
+---
+
+# Re-check of b7b464f
+
+MERGE AFTER FIXES (one blocking item, R1: the PR does not compile for Android as pushed; the rest is small).
+
+Method: read of the diff 44ea1c36..b7b464f for the PR's own files (midi_out.{h,cpp}, midi_jni.cpp, jni.cpp, MidiPorts.kt, the test and its CMake block), the core's `applyClear` (`midiport.cpp:164-190`) and the new U36-NOTES round 2 entries. I did NOT build or run the sanitizer test this time (the core alone takes more than 30 minutes at -j1 under ASan on this machine); no NDK is on this machine, so everything Android-only is unverified. CI on b7b464f: `test` (Linux ctest) was success when I looked; the Android jobs had not reported yet.
+
+## Old findings
+
+- F1 (CI sanitizer): FIXED as far as I can tell: `-fno-sanitize=vptr` on the test target, same as two other tests (CMake comment explains it). Not run by me.
+- F2 (held messages lost at stop): FIXED for the debug path. `engineStop` now waits for quiet of `25 ms + latency` AND `heldCount_ == 0`, and `senderMain` pumps once more and `flushAllHeld()` after `stop_`. I could not break it: `heldCount_` is written only by the sender (release) and read by control (acquire); control resets it only after `join`; `pump` in the final step runs while `o_` is still valid (freed after join); the loop is bounded by `200 + need` iterations (need at most 325), so `ctl_` is held at most about 530 ms plus stat reads (UI jank on the main thread, not an ANR). Residual, unchanged from F9: the drain only runs when a debug song is playing; the real host (U37) must post its own Stop before `engineStop`. Note: `flushAllHeld` also sends held messages that are not yet due (up to 20 ms early); acceptable only because it runs after the drain.
+- F3 (CLEAR vs held): FIXED, with the caveats under "clearDev" below.
+- F4 (refused write kills the cable): PARTLY. The partial-write resend from byte n is correct (`AmidiPort::send`, progress does not count as a refusal). The main point is NOT fixed (builder says so): four zero-byte writes still return -1, the core marks the cable gone until the next `set_devices`, and Kotlin re-lists only on hot-plug. The partial-write change is in Android-only code (never compiled or run by the Linux test).
+- F5 (fallback map): PARTLY. `mono` is now the callback start (`dataCallback` reads `cbStart` first, passes `t0`): fixed. The fallback adds `outLatNs_`, which is 0 in a fresh process (it is set only by the probe from a successful timestamp), so on the first engine start after install, which is the owner's first test, the fallback is still early by the output latency. `mapReady_` is still set on the first fallback pair. Suggest not publishing a fallback pair as "ready" for the debug test until about 500 ms or the first exact pair, or seeding `outLatNs_` from `AAudioStream_getBufferSize + framesPerBurst`.
+- F6 (JNI UTF-8): the conversion is FIXED (see item 5 below), but the line that uses it does not compile (R1).
+- F7 (held vs immediate order): FIXED: `sendTo` calls `flushDeferred(now)` before sending or holding for a port without timestamps; I found no recursion (`flushDeferred` calls `PortIo::send` directly, never `sendTo`/`clearDev`), no starvation (one pass, at most 256 entries per message) and no cross-device effect that matters (streams are per device; a due message of device Y is sent a little earlier than its own flush would, which is within the 50 us rule). A held message can still be overtaken only if the core's map moves a later message earlier than an already held one (jump of the smoothed map): note.
+- F8 (note): left, now counted (`early>3B`). Fine.
+- F9, F10: no code, as stated. F9 residual above.
+- F11 (CMake conflict): FIXED: merge d69edb9 keeps both the `test_midi_glue` block and the test block.
+- CodeRabbit "partial attach" (MidiPorts.kt): FIXED in logic. `missing` is filled in `onOpened` from `mine` minus `ok`, removed when the device leaves, and `retryMissing()` attaches only those tokens to the already open device; ports already attached are untouched; a second `nativeAttach` creates a second `AmidiDevice` handle for the same Java device, which is fine (each port keeps its own). It runs only on a debug-UI tap (`retryFailed()` from `cycleA`/`runTest`), never in a loop, as intended. Not compiled by anyone (Kotlin).
+
+## New findings
+
+### R1 (BLOCKING): `midi_jni.cpp:140` does not compile
+```
+JNIEXPORT jstring ... nativeStatus(JNIEnv* env, jobject) { return env->NewStringUTF(tpa::toJniUtf8(tpa::host().status()).c_str());   // NewStringUTF wants MODIFIED UTF-8: ... under CheckJNI }
+```
+The closing `}` of the function is inside the `//` comment. The next line `}  // extern "C"` then closes the function, and the `extern "C" {` block is never closed: `error: expected '}' at end of input` (I reproduced the pattern with g++ -fsyntax-only). This file is Android-only, so the Linux job cannot see it; it breaks "Core (Android arm64-v8a, NDK)" and "Android shell v0 (debug APK)". Fix: move the comment above the line or put the `}` before it. (Also a reminder that Android-only files need at least a syntax check on Linux with stub headers.)
+
+### R2 (should-fix, device-only, note-level until measured): flush may drop a due-but-undelivered note-off, and flush is not private to this app
+`clearDev` -> `PortIo::flush` -> `AMidiInputPort_sendFlush(port_)` for a stamped port. Core replay (`midiport.cpp:178-186`) re-sends only entries with `h.at > t` (t read in `applyClear`). A message with `at <= t` is assumed delivered. In Android the stamp is honoured by the MIDI service/driver scheduler on its own thread, so a message with `at` just before `t` can still be pending when the flush arrives (scheduler lag of about a millisecond or more): it is discarded and not replayed. Sequence: note-off stamped T+5.0 ms, Stop at T+5.4 ms, scheduler delivers at T+6.0 ms: flush at T+5.4 discards it, replay skips it (at <= t): stuck note. Also, the flush is delivered to the device's receiver for that port, which other clients of the same port share (my understanding of the Android MIDI service, unverified), so another app's scheduled data on that port can be discarded. Suggest: replay with a small margin is not available in the core, so either measure on the Fold with the owner test (a stuck note after Stop on a USB synth is the symptom) or do not flush and rely on the 20 ms rule for TS ports.
+Signature check of `AMidiInputPort_sendFlush(const AMidiInputPort*)` -> `media_status_t`, API 29: I believe it is right from memory of amidi.h; no NDK here, UNVERIFIED (the Android CI job will compile it once R1 is fixed).
+
+### R3 (note): `clearDev` duplicate window is up to 50 us, not 1 us
+For a port without timestamps `sendTo` sends a message immediately when `at <= now + 50 us` (`midi_out.cpp` ~line 303). If a CLEAR is applied in the last 50 us before that message's `at` (core `t < at`), the message was already sent (not in `held_`, so `clearDev` cannot drop it) and the core replays it (`h.at > t`, frame before the marker): a duplicate. A duplicate note-on precedes the Stop's note-offs, so no stuck note; a duplicate clock tick or CC is harmless. Probability about 50 us per message at the moment of Stop. Also the replay uses `sendTo`, which holds it again: delivered once at its time otherwise, as the test checks.
+
+### Order and loss analysis of `clearDev` (item 1), as I could reason it
+- Thread: the core calls `sink.clear` and `sink.send` only from inside `thunder_midiout_pump` (`applyClear` at pump start, `midiport.cpp:320`), so both run on the sender thread; `held_`/`nHeld_` are sender-only: no race. `engineStop`'s final pump also runs on the sender.
+- Core calls `clear(dev)` only when the history holds a message of that device with `frame > marker.frame` and `at > t`. All held messages come from such handed-over messages (they enter the history when `early && at > now`). A held message not in the history (its `at` was already past when the pump re-read the clock after a slow `flushDeferred`) is due almost at once; `clearDev` sends it if `h.at <= now`, so I found no loss path from that.
+- `clearDev` drops held entries with `at > now` for the device: those with `frame > marker` are also dropped by the core (correct); those with `frame <= marker` are replayed by the core through `sendTo` and held again, in ring (time) order: delivered once. Due entries are sent now, and the core does not replay `at <= t` entries. The note-offs that follow the CLEAR are queued after the marker and never in the history at that moment, so the order rule of midiport.h holds (a CLEAR recalls what was queued before it, never the note-offs after).
+- Duplicate note-on: only R3. Lost note-off: only through R2 (stamped ports).
+
+### R4 (note): `outLatNs_` and `audioBlock(frames, t0)` (item 4)
+Audio thread now reads `outLatNs_` (an `std::atomic<int64_t>`, relaxed, lock-free on arm64/x86-64) and `t0`: no lock, allocation, JNI or non-atomic read of a field written by another thread was added. `cbStart` is read before `setFlushToZero`: harmless. `heldCount_`/`earlyLong`/`heldCleared` are not touched by the audio thread.
+
+### Item 5 `toJniUtf8`: OK
+Bounds `i + len <= n` handle a truncated sequence at the end (becomes `?` per byte); lead bytes 0x80..0xC1 and 0xF5..0xFF give `len == 0` -> `?`; overlong 2/3/4-byte forms, values above 0x10FFFF and encoded surrogates (ED A0..BF) are rejected (each byte becomes `?`); 4-byte forms become two 3-byte surrogates; NUL becomes C0 80. No out-of-range read found. FIXED (modulo R1).
+
+## Tests (item 7)
+New tests and what they kill:
+- `testMapPair`: `+off` instead of `-off`, dropping the `written - F` term, removing the 20 ms rate limit (old #1, #5).
+- `testMapWindow`: removing or widening the `ns` window (old #2).
+- `testHeldUntilDue`: held message sent early or late (`got` against its time) (old #3, partly #4: only coarse changes to `kEarly`/`kMaxSleep`).
+- `testOrderHeldVsImmediate`: removing the `flushDeferred` call in `sendTo`.
+- `testStopMidSongNoTs` (40 ms latency): the old 15 ms drain, no wait for `heldCount_` (old #10).
+- `testClearDropsHeld`: no `clearDev`, `clearDev` not dropping post-marker held notes, replay delivered early or twice for a note-on before the marker; a stamped port is flushed once.
+- `testDeviceGone`: ignoring a send result (old #6); `testJniUtf8`: the converter; `tableUsableFromDtor`: destroying a port under the table lock (old #8).
+- `testHeldCap`: sends 356 messages and says the cap path is unreachable through the core, so it cannot kill a mutation of the `kHeld` branch (old #7 still uncaught).
+
+Still uncaught (of my earlier ten): #7 (the `kHeld` and `len > 3` branches), #9 (`copyClamped` at 95 bytes, `setOutLatencyNs` clamp, the E_BUSY retry in `applyDevicesLocked`), and the sleep constants beyond a coarse change (#4). New uncaught: removing the final `flushAllHeld` in `senderMain` (the builder says so; the drain covers it); the `h.at <= now` send inside `clearDev` (single device and no duplicate check in the test); `clearDev` matching `h.dev == dev` (one device in the rig: dropping other devices' held notes would pass); the fallback `+ outLatNs_` (indistinguishable from the core's floor); `AmidiPort::send` partial-write and `flush` (Android-only); `retryMissing`; and a duplicate in the 50 us window (R3).
+
+## Unverified without a device (new)
+- Everything in midi_jni.cpp, jni.cpp and MidiPorts.kt: never compiled by the builder, and R1 shows they do not compile today.
+- `AMidiInputPort_sendFlush`: existence and signature from memory; what the flush discards (R2), whether it affects other clients of the port, and its effect on USB note-offs already stamped.
+- Whether partial writes happen at all; the cost of the extra `flushDeferred` per message on a real phone.
+- The owner test should add: after Stop on a USB synth, no stuck note (R2); and the `held`/`heldCleared` counters on a Bluetooth or virtual port.
