@@ -6,6 +6,9 @@
 //   E4  a SoundFont voice keeps its pad's SoundFont data (font + decoded PCM) alive the same way
 //   E5  two real threads: the control thread replaces the same pad 1000 times (publish + collect) while the audio thread plays notes on it and on a shared pad; no sample ever comes from a freed buffer (a freed
 //       buffer is poisoned with 1000.0 in the free hook; run under ASan / TSan for the real check), nothing leaks (every buffer is freed in the end)
+//   E0  no pads yet: a note is counted as no-pad (no null dereference); create() publishes an empty snapshot the first quantum adopts
+//   E7  MUT variations (a variation voice keeps its pad's buffer; a variation change is a change) and a stereo pad
+//   E8  the order inside beginQuantum, deterministically: a test seam runs publish + collect between its stages (adopt above the scan would free a buffer a voice is on)
 //   E6  a chop change (hits edited) published and adopted between steps: the Seq's events from that step on equal those of a Seq built fresh with the new table; before it, those of the old table
 #include <atomic>
 #include <cmath>
@@ -40,32 +43,38 @@ static std::string handSong(const std::string& inst, int bpm = 120) {
   return s + "]]}";
 }
 
-// ---- the free log: every buffer the host frees, in order; the freed audio is poisoned (a read of it shows up as a huge sample)
-struct FreeLog { std::vector<std::pair<int, uint64_t>> v; int count(int slot) const { int n = 0; for (auto& p : v) n += p.first == slot; return n; } bool has(uint64_t ep) const { for (auto& p : v) if (p.second == ep) return true; return false; } };
-static void onFree(void* user, const PadBuf* b) {
-  FreeLog* l = (FreeLog*)user; l->v.push_back({b->slot, b->epoch});
-  if (b->mem) { float* m = b->mem; for (size_t i = 0; i < b->bytes() / sizeof(float); i++) m[i] = 1000.0f; }
-  if (b->varMem) { size_t n = 0; for (int i = 0; i < b->nVars; i++) n += (size_t)b->vars[i].frames; for (size_t i = 0; i < n; i++) b->varMem[i] = 1000.0f; }
+// ---- the free log: every buffer the host frees, in order, tagged by its frame count (the tests give each pad its own length). A freed buffer is poisoned with 1000.0 and QUARANTINED (the hook takes the memory from
+// the host, which then frees nothing): a voice that still reads it hears 1000.0, whatever the allocator would have done with the chunk.
+struct FreeLog {
+  std::vector<std::pair<int, uint64_t>> v; std::vector<float*> keep;
+  int count(int frames) const { int n = 0; for (auto& p : v) n += p.first == frames; return n; }
+  bool has(uint64_t ep) const { for (auto& p : v) if (p.second == ep) return true; return false; }
+  ~FreeLog() { for (float* p : keep) delete[] p; }
+};
+static void onFree(void* user, PadBuf* b) {
+  FreeLog* l = (FreeLog*)user; l->v.push_back({b->frames, b->epoch});
+  if (b->mem) { const size_t n = b->bytes() / sizeof(float); for (size_t i = 0; i < n; i++) b->mem[i] = 1000.0f; l->keep.push_back(b->mem); b->mem = nullptr; }
+  if (b->varMem) { size_t n = 0; for (int i = 0; i < b->nVars; i++) n += (size_t)b->vars[i].frames; for (size_t i = 0; i < n; i++) b->varMem[i] = 1000.0f; l->keep.push_back(b->varMem); b->varMem = nullptr; }
 }
 
 struct Rig {
-  Song song; SeqVars vars; std::unique_ptr<Seq> seq; PadsHost* host = nullptr; std::unique_ptr<Players> P; FreeLog log;
-  float store[kVoiceTracks][128]; float* ptr[kVoiceTracks]; int64_t frame = 0; bool ok = false;
+  Song song; SeqVars vars; std::unique_ptr<Seq> seq; PadsHost* host = nullptr; std::unique_ptr<Players> P; FreeLog log;   // (log is declared before host's use and outlives it)
+  float store[kVoiceTracks][128], storeR[kVoiceTracks][128]; float* ptr[kVoiceTracks]; float* ptrR[kVoiceTracks]; int64_t frame = 0; bool ok = false, stereoOut = false;
   explicit Rig(const std::string& text = handSong("{\"pad\":0,\"slc\":0,\"sync\":0,\"mo\":0}")) {
     JsonError je; if (!song.load(text.data(), text.size(), &je)) { std::printf("song does not load\n"); return; }
     SeqOpts so; so.once = true; seq.reset(new Seq(song, vars, SeqMode::Song, so));
-    host = PadsHost::create(); if (!host) return;
+    P.reset(new Players(nullptr, 48000, 64));   // no pads until the first snapshot is adopted: a note is then counted as no-pad (E0)
+    host = PadsHost::create(*P); if (!host) return;
     host->setFreeHook(&onFree, &log);
-    P.reset(new Players(nullptr, 48000, 64));   // no pads until the first snapshot is adopted (every note is then "no pad")
-    for (int i = 0; i < kVoiceTracks; i++) ptr[i] = store[i];
+    for (int i = 0; i < kVoiceTracks; i++) { ptr[i] = store[i]; ptrR[i] = storeR[i]; }
     ok = true;
   }
-  ~Rig() { P.reset(); seq.reset(); delete host; }
+  ~Rig() { delete host; host = nullptr; P.reset(); seq.reset(); }
   // one 128-frame quantum, as the host runs it: beginQuantum first, then the voices
   bool quantum() {
     const bool adopted = host->beginQuantum(*P, seq.get());
     const double t0 = (double)frame / 48000; P->setTime(t0, frame);
-    std::memset(store, 0, sizeof store); P->render(ptr, ptr, 128, t0, frame); frame += 128; return adopted;
+    std::memset(store, 0, sizeof store); std::memset(storeR, 0, sizeof storeR); P->render(ptr, stereoOut ? ptrR : ptr, 128, t0, frame); frame += 128; return adopted;
   }
   void quanta(int n) { for (int i = 0; i < n; i++) quantum(); }
   double now() const { return (double)frame / 48000; }
@@ -81,15 +90,15 @@ static bool near(double a, double b) { return std::fabs(a - b) < 1e-5; }
 
 static void e1() {
   Rig r; if (!r.ok) { CHECK(false, "rig"); return; }
-  const int SEC4 = 48000 * 4;
-  CHECK(r.set(0, 0.1f, SEC4) == 0 && r.set(1, 0.3f, SEC4) == 0 && r.set(2, 0.5f, 4800) == 0, "setPad");
+  const int SEC4 = 192000, L1 = 190000;   // each pad has its own length: the free log tells them apart
+  CHECK(r.set(0, 0.1f, SEC4) == 0 && r.set(1, 0.3f, L1) == 0 && r.set(2, 0.5f, 4800) == 0, "setPad");
   r.post(); CHECK(r.quantum(), "the first snapshot is adopted");
   const float* p1 = r.host->current()->pads.buf[1].data; const uint64_t ep0 = r.host->current()->pads.buf[0].epoch, ep1 = r.host->current()->pads.buf[1].epoch;
-  CHECK(p1 && ep0 > 0 && ep1 > 0 && r.host->current()->pads.buf[0].slot == 0, "the snapshot's descriptors carry epoch and slot");
+  CHECK(p1 && ep0 > 0 && ep1 > 0 && ep1 != ep0, "the snapshot's descriptors carry their epochs");
   r.go(0, 0, r.now()); r.go(1, 1, r.now()); r.quanta(3);
   CHECK(near(r.out(0), 0.1 * kPan) && near(r.out(1), 0.3 * kPan), "both voices sound: %g %g", r.out(0), r.out(1));
   // the same data again: nothing changes (no new buffer)
-  { const uint64_t made = r.host->made(); CHECK(r.set(1, 0.3f, SEC4) == 0 && r.host->made() == made && r.host->padBuf(1) && r.host->padBuf(1)->epoch == ep1, "setPad with the same data changes nothing"); }
+  { const uint64_t made = r.host->made(); CHECK(r.set(1, 0.3f, L1) == 0 && r.host->made() == made && r.host->padBuf(1) && r.host->padBuf(1)->epoch == ep1, "setPad with the same data changes nothing"); }
   // replace pad 0 (a voice is on it), leave pad 1 alone
   CHECK(r.set(0, 0.2f, SEC4) == 0, "replace pad 0"); r.post(); CHECK(r.quantum(), "the new snapshot is adopted");
   CHECK(r.host->current()->pads.buf[1].data == p1 && r.host->current()->pads.buf[1].epoch == ep1, "the unchanged pad is SHARED between the two snapshots (same pointer)");
@@ -100,11 +109,11 @@ static void e1() {
   CHECK(near(r.out(0), 0.1 * kPan), "the voice still reads the OLD buffer after the replacement: %g", r.out(0));
   r.go(2, 0, r.now()); r.quanta(2);
   CHECK(near(r.out(2), 0.2 * kPan), "a new note takes the NEW buffer: %g", r.out(2));
-  r.host->collect(); CHECK(!r.log.has(ep0) && r.log.count(1) == 0, "still held; pad 1 never freed");
+  r.host->collect(); CHECK(!r.log.has(ep0) && r.log.count(L1) == 0, "still held; pad 1 never freed");
   // the voices end: the old buffer goes, and only it
   CHECK(r.endVoices(), "voices ended"); r.quantum(); const size_t n = r.host->collect();
   CHECK(r.log.has(ep0) && n == 1 && r.host->retired() == 0, "freed after the voice ended and collect() ran (%zu freed)", n);
-  CHECK(!r.log.has(ep1) && r.log.count(1) == 0 && r.host->current()->pads.buf[1].data == p1, "the shared pad is never freed");
+  CHECK(!r.log.has(ep1) && r.log.count(L1) == 0 && r.host->current()->pads.buf[1].data == p1, "the shared pad is never freed");
 }
 
 static void e2() {
@@ -124,13 +133,13 @@ static void e2() {
 
 static void e3() {
   Rig r; if (!r.ok) { CHECK(false, "rig"); return; }
-  CHECK(r.set(0, 0.1f, 48000 * 4) == 0 && r.set(2, 0.5f, 4800) == 0, "setPad"); r.post(); r.quantum();
+  CHECK(r.set(0, 0.1f, 192000) == 0 && r.set(2, 0.5f, 4800) == 0, "setPad"); r.post(); r.quantum();
   const uint64_t ep0 = r.host->current()->pads.buf[0].epoch;
   r.go(0, 0, r.now()); r.quanta(2);
-  CHECK(r.set(0, 0.2f, 48000 * 4) == 0, "replace pad 0"); r.post(); r.quantum(); r.host->collect();
+  CHECK(r.set(0, 0.2f, 192000) == 0, "replace pad 0"); r.post(); r.quantum(); r.host->collect();
   for (int i = 0; i < 5; i++) { CHECK(r.set(2, (float)(0.6 + 0.01 * i), 4800) == 0, "replace pad 2"); r.post(); r.quantum(); r.host->collect(); }
   CHECK(!r.log.has(ep0), "pad 0's old buffer is held by its voice");
-  CHECK(r.log.count(2) == 5 && r.log.count(0) == 0, "every retired buffer of pad 2 is freed at once, though they are NEWER than the one held (freed: pad 2 %d, pad 0 %d)", r.log.count(2), r.log.count(0));
+  CHECK(r.log.count(4800) == 5 && r.log.count(192000) == 0, "every retired buffer of pad 2 is freed at once, though they are NEWER than the one held (freed: pad 2 %d, pad 0 %d)", r.log.count(4800), r.log.count(192000));
   CHECK(r.host->retired() == 1, "only pad 0's old buffer waits (%zu)", r.host->retired());
 }
 
@@ -146,7 +155,7 @@ static void e4() {
   sf::PadParams P; P.bank = 0; P.prog = 19;
   CHECK(r.host->setSf(0, font, pr, pcm1, P) == 0 && r.host->setRoute(0, PadRoute::SoundFont) == 0, "setSf");
   r.post(); r.quantum();
-  const uint64_t ep = r.host->current()->pads.sf[0].epoch; CHECK(ep > 0 && r.host->current()->pads.sf[0].slot == kRenderPads, "the snapshot's SfPad carries epoch and slot");
+  const uint64_t ep = r.host->current()->pads.sf[0].epoch; CHECK(ep > 0, "the snapshot's SfPad carries its epoch");
   r.go(0, 0, r.now()); r.quanta(4); CHECK(r.P->sfPool().active() == 1, "an SF voice sounds");
   CHECK(r.host->setSf(0, font, pr, pcm2, P) == 0, "replace the SoundFont data"); pcm1.reset();   // (the host's buffer is now the only holder of the old PCM)
   r.post(); r.quantum(); r.host->collect(); r.host->collect();
@@ -190,6 +199,72 @@ static void e5() {
   CHECK((uint64_t)lg->v.size() == made, "every buffer ever made was freed, at the latest at teardown (%zu of %llu)", lg->v.size(), (unsigned long long)made);
 }
 
+
+static void e0() {
+  Rig r; if (!r.ok) { CHECK(false, "rig"); return; }
+  r.go(0, 0, 0.0);
+  CHECK(r.P->stats().notes == 1 && r.P->stats().notesNoPad == 1 && r.P->voices() == 0, "a note before any pads exist is counted as no-pad, nothing sounds (notes %d, noPad %d)", r.P->stats().notes, r.P->stats().notesNoPad);
+  CHECK(r.host->current() == nullptr, "nothing adopted yet");
+  CHECK(r.quantum() && r.host->current() != nullptr, "create() published an empty snapshot: the first quantum adopts it");
+  r.go(0, 0, 0.1); CHECK(r.P->stats().notesNoPad == 2, "an empty pad: no-pad, counted");
+}
+
+static void e7() {
+  Rig r; if (!r.ok) { CHECK(false, "rig"); return; }
+  std::vector<float> a(48000, 0.1f), v1(48000, 0.7f), v2(48000, 0.9f), a2(48000, 0.2f), w1(48000, 0.3f);
+  PadVarIn vin[2] = {{0, 'm', 1, v1.data(), 48000, 48000.0}, {0, 'g', 2, v2.data(), 48000, 48000.0}};
+  CHECK(r.host->setPad(0, a.data(), nullptr, 48000, 48000, vin, 2) == 0, "setPad with two variations"); r.post(); r.quantum();
+  const uint64_t ep = r.host->padBuf(0)->epoch;
+  { // the identical-data test sees variations
+    const uint64_t made = r.host->made();
+    CHECK(r.host->setPad(0, a.data(), nullptr, 48000, 48000, vin, 2) == 0 && r.host->made() == made && r.host->padBuf(0)->epoch == ep, "the same pad and variations again: a no-op");
+    std::vector<float> v1b = v1; v1b[1000] = 0.71f; PadVarIn c1[2] = {{0, 'm', 1, v1b.data(), 48000, 48000.0}, {0, 'g', 2, v2.data(), 48000, 48000.0}};
+    CHECK(r.host->setPad(0, a.data(), nullptr, 48000, 48000, c1, 2) == 0 && r.host->padBuf(0)->epoch != ep, "one variation sample changed: a new buffer");
+    CHECK(r.host->setPad(0, a.data(), nullptr, 48000, 48000, vin, 2) == 0 && r.host->padBuf(0)->epoch != ep, "and back: another new buffer");
+    CHECK(r.host->setPad(0, a.data(), nullptr, 48000, 48000, vin, 1) == 0, "one variation fewer: accepted");
+    CHECK(r.host->setPad(0, a.data(), nullptr, 48000, 48000, vin, 2) == 0, "and back");
+    PadVarIn dup[2] = {vin[0], vin[0]}; CHECK(r.host->setPad(0, a.data(), nullptr, 48000, 48000, dup, 2) == PadsHost::kArg, "a duplicate variation is refused");
+    r.post(); r.quantum(); r.host->collect(); }
+  const uint64_t ep2 = r.host->current()->pads.var.empty() ? 0 : r.host->current()->pads.var[0].buf.epoch;
+  CHECK(r.host->current()->pads.var.size() == 2 && ep2 == r.host->current()->pads.buf[0].epoch && ep2 > ep, "the snapshot's variations carry their pad's buffer epoch (%llu)", (unsigned long long)ep2);
+  SeqEvent e = Rig::note(0, 0, r.now(), true); e.has |= SH_VK; e.vkKind = 'm'; e.vkNum = 1; r.P->dispatch(e, *r.seq, r.song);
+  r.quanta(3); CHECK(near(r.out(0), 0.7 * kPan), "the MUT variation sounds: %g", r.out(0));
+  CHECK(r.host->setPad(0, a2.data(), nullptr, 48000, 48000, nullptr, 0) == 0, "replace the pad (variations gone)"); r.post(); r.quantum(); r.host->collect(); r.host->collect();
+  CHECK(!r.log.has(ep2), "a variation voice keeps its pad's buffer alive (its variation data is in it)");
+  r.quanta(5); CHECK(near(r.out(0), 0.7 * kPan), "and keeps sounding the OLD variation: %g", r.out(0));
+  CHECK(r.endVoices(), "ended"); r.quantum(); r.host->collect(); CHECK(r.log.has(ep2), "freed after it ended");
+  // a stereo pad: L 0.2, R 0.6; its voice keeps the stereo buffer (both channels) through a replacement
+  std::vector<float> L(48000, 0.2f), R(48000, 0.6f), L2(48000, 0.4f), R2(48000, 0.1f);
+  CHECK(r.host->setPad(4, L.data(), R.data(), 48000, 48000) == 0, "stereo setPad"); r.post(); r.quantum(); r.stereoOut = true;
+  const uint64_t eps = r.host->padBuf(4)->epoch; r.go(1, 4, r.now()); r.quanta(3);
+  const double l0 = r.store[1][127], r0 = r.storeR[1][127]; CHECK(l0 > 0.05 && r0 > 0.05 && std::fabs(l0 - r0) > 0.01, "a stereo pad: two different channels (%g %g)", l0, r0);
+  CHECK(r.host->setPad(4, L2.data(), R2.data(), 48000, 48000) == 0, "replace it"); r.post(); r.quantum(); r.host->collect(); r.host->collect(); CHECK(!r.log.has(eps), "held by its stereo voice");
+  r.quanta(3); CHECK(near(r.store[1][127], l0) && near(r.storeR[1][127], r0), "both channels still read the old buffer (%g %g)", r.store[1][127], r.storeR[1][127]);
+  CHECK(r.endVoices(), "ended"); r.quantum(); r.host->collect(); CHECK(r.log.has(eps), "freed after");
+  // the remaining setters: a removal and a clear release their buffers
+  CHECK(r.host->setPad(4, nullptr, nullptr, 0, 48000) == 0 && r.host->padBuf(4) == nullptr, "setPad(frames 0) removes");
+  CHECK(r.host->setKit(4, VoiceKit()) == 0 && r.host->setRoute(4, PadRoute::Sampler) == 0 && r.host->setSfParams(4, sf::PadParams()) == 0 && r.host->clearSf(4) == 0, "the small setters");
+  CHECK(r.host->setPad(0, a.data(), nullptr, 48000, 48000, vin, 5000) == PadsHost::kArg, "more variations than the C API allows: refused");
+}
+
+// E8: the order inside beginQuantum, made deterministic with the seam: at every stage of one quantum the control side runs collect()
+struct SeamCtx { Rig* r; uint64_t ep; int calls = 0, freedAt = -1; };
+static void seamFn(void* u, int stage) { SeamCtx* c = (SeamCtx*)u; c->calls++; c->r->host->collect(); if (c->freedAt < 0 && c->r->log.has(c->ep)) c->freedAt = stage; }
+static void e8() {
+  Rig r; if (!r.ok) { CHECK(false, "rig"); return; }
+  CHECK(r.set(0, 0.1f, 192000) == 0, "setPad"); r.post(); r.quantum();
+  const uint64_t ep0 = r.host->current()->pads.buf[0].epoch;
+  r.go(0, 0, r.now());   // a note started AFTER the last scan: the board does not know it yet
+  CHECK(r.set(0, 0.2f, 192000) == 0, "replace"); r.post();
+  SeamCtx c; c.r = &r; c.ep = ep0; r.host->setSeam(&seamFn, &c);
+  CHECK(r.quantum(), "the replacement is adopted in this quantum");
+  r.host->setSeam(nullptr, nullptr);
+  CHECK(c.calls == 5, "the seam ran at every stage (%d)", c.calls);
+  CHECK(c.freedAt < 0 && !r.log.has(ep0), "collect() at every stage of the quantum did not free the buffer a voice started on (freed at stage %d)", c.freedAt);
+  r.quanta(3); CHECK(near(r.out(0), 0.1 * kPan), "and the voice reads it: %g", r.out(0));
+  r.host->collect(); CHECK(!r.log.has(ep0), "held"); CHECK(r.endVoices(), "ended"); r.quantum(); r.host->collect(); CHECK(r.log.has(ep0), "freed once it ended");
+}
+
 struct Ev { int step; SeqEvent e; };
 static bool sameEv(const SeqEvent& a, const SeqEvent& b) {
   return a.type == b.type && a.track == b.track && a.t == b.t && a.pad == b.pad && a.rate == b.rate && a.ofsSec == b.ofsSec && a.durSec == b.durSec && a.cut == b.cut && a.has == b.has && a.gain == b.gain && a.mn == b.mn;
@@ -213,7 +288,7 @@ static void e6() {
   int differ = 0; for (size_t i = 0; i < f1.size() && i < f2.size(); i++) if (!sameEv(f1[i].e, f2[i].e)) differ++;
   CHECK(differ >= 2, "the two tables make different notes (%d differ): the test is not vacuous", differ);
   // the live path: a host, a Players, a Seq made with NO table (as a session's opts would carry none)
-  PadsHost* host = PadsHost::create(); std::unique_ptr<Players> P(new Players(nullptr, 48000, 8));
+  std::unique_ptr<Players> P(new Players(nullptr, 48000, 8)); PadsHost* host = PadsHost::create(*P);
   std::vector<float> pad(96000, 0.1f);
   CHECK(host->setPad(0, pad.data(), nullptr, 96000, 48000) == 0, "setPad");
   host->chop().setLoop(0, 2.0); host->chop().setHits(0, 4, h1, 4); CHECK(host->publish() == 0, "publish 1");
@@ -232,11 +307,16 @@ static void e6() {
   }
   CHECK(bad == 0 && nBefore == 2 && nAfter == 2, "events before step %d equal the old table's, from it on a fresh Seq with the new table's (%d differ; notes %d + %d)", K, bad, nBefore, nAfter);
   CHECK(A.chopped() == 4 && A.chopSkipped() == 0, "all four notes were chopped (%llu, skipped %llu)", (unsigned long long)A.chopped(), (unsigned long long)A.chopSkipped());
-  P.reset(); delete host;
+  // (b) a Seq made AFTER the adopt (as SeqSession::make does) carries a stale table in its opts and no snapshot changes at its first quantum: beginQuantum must still point it at the current table
+  { SeqOpts ob; ob.once = true; ob.chop = &c1; Seq B(song, vars, SeqMode::Song, ob);
+    const std::vector<Ev> lb = run(B, [&](int) { host->beginQuantum(*P, &B); });
+    int badB = 0; if (lb.size() != f2.size()) badB = 1; else for (size_t i = 0; i < lb.size(); i++) if (!sameEv(lb[i].e, f2[i].e)) badB++;
+    CHECK(badB == 0 && B.chopped() == 4, "a Seq made after the adopt is re-pointed at the current table at its first quantum (%d differ, %llu chopped)", badB, (unsigned long long)B.chopped()); }
+  delete host; P.reset();
 }
 
 int main() {
-  e1(); e2(); e3(); e4(); e5(); e6();
+  e0(); e1(); e2(); e3(); e4(); e5(); e6(); e7(); e8();
   std::printf("live_pads_epoch: %d checks, %d failed\n", g_checks, g_fail);
   return g_fail ? 1 : 0;
 }

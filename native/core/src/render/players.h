@@ -51,8 +51,10 @@ class Players {
 
   void stopAll(double at);                               // every voice of every pool lets go at `at` (for a live host)
   int voices() const { return pool_.active() + sfpool_.active() + live_.active(); }   // voices still sounding (the sampler's, the SoundFont pool's, the live engines': C4)
-  // U37 P1: the smallest epoch of the pad data each slot's live or booked voices started on (both pools; the live engines hold no pad data: a node owns its parameters). mins: kEpochSlots entries, kEpochNone where no voice. Audio thread, allocation-free.
-  void epochMins(uint64_t* mins) const { pool_.epochMins(mins); sfpool_.epochMins(mins); }
+  // U37 P1: the epoch each voice slot's live or booked voice started on, both pools (the live engines hold no pad data: a node owns its parameters). out: epochSlots() entries, zeroed by the caller; the sampler pool's
+  // slots first, then the SoundFont pool's. 0 = no voice or an untracked one. Audio thread, allocation-free.
+  int epochSlots() const { return pool_.capacity() + sfpool_.capacity(); }
+  void epochVoices(uint64_t* out) const { pool_.epochVoices(out); sfpool_.epochVoices(out + pool_.capacity()); }
   void songOver(double at) { live_.releaseHeld(at); }    // C4: the sequencer has ended: live voices still held let go at `at`
   void samplePeak() { const int v = voices(); if (v > st_.peakAll) st_.peakAll = v; }
   const PlayerStats& stats() const { return st_; }

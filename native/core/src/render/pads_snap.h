@@ -1,33 +1,53 @@
-// THE PADS-AND-CHOP SNAPSHOT WITH DEFERRED FREE (U37 P1; prewire-19nov F2 + F3; U37-DESIGN-DRAFT 3.4 and the lead's ruling D5).
+// THE PADS-AND-CHOP SNAPSHOT WITH DEFERRED FREE (U37 P1; prewire-19nov F2 + F3; U37-DESIGN-DRAFT 3.4; the lead's rulings D5 and D5 refined at round 2 of PR #276).
 //
 // THE PROBLEM. A voice borrows a pad's samples (VoiceBuf::data, an SF voice's PCM) and the sequencer borrows the chop table (SeqOpts::chop); the C API's RenderPads keeps both for the renderer's life, which a live
 // host cannot: the page replaces a pad, or edits its slice points, while notes sound.
 //
-// THE DESIGN, in one paragraph. The CONTROL side owns every PadBuf (one pad's audio and its variations, or one pad's prepared SoundFont) and counts references to it; only snapshots (and the builder's own "current pad"
-// table) hold references, and a reference moves on the control thread only. A PadsSnap is built whole on the control side (a RenderPads, the exact payload Players and Seq read today, plus the references that keep its
-// buffers alive), published through a SnapSlot, adopted by the audio thread at the top of a quantum, and handed back through the slot to be deleted on the control side. A PadBuf nobody refers to any more is RETIRED, not
-// freed: voices that started on it may still read it. Every voice that takes a PadBuf's data records the buffer's EPOCH (its own number, a counter that only grows, > 0) and its SLOT (the sampler's audio of pad p: p; the
-// SoundFont data of pad p: 256 + p). Once a quantum the audio side publishes, per slot, the smallest epoch over its live or booked voices (kEpochNone: none). collect() frees a retired buffer only when its epoch is below
-// the published minimum of ITS slot. Per slot, so a long sample on pad A holds pad A's old buffers only; nothing of pad B.
+// THE DESIGN, in one paragraph. The CONTROL side owns every PadBuf (one pad's audio and its variations, or one pad's prepared SoundFont) and counts references to it; only snapshots (and the builder's own "current
+// pad" table) hold references, and a reference moves on the control thread only. A PadsSnap is built whole on the control side (a RenderPads, the exact payload Players and Seq read today, plus the references that keep
+// its buffers alive), published through a SnapSlot, adopted by the audio thread at the top of a quantum, and handed back through the slot to be deleted on the control side. A PadBuf nobody refers to any more is
+// RETIRED, not freed: voices that started on it may still read it. Every voice that takes a PadBuf's data records the buffer's EPOCH (unique, > 0). Once a quantum the audio side publishes, in the BOARD, one atomic
+// per voice slot of the pools that can hold pad data (the sampler pool's capacity + the SoundFont pool's): the epoch of the buffer that slot's live or booked voice is on, 0 when it has none. collect() frees a
+// retired buffer when no board entry equals its epoch. Exact: a long sample on pad A holds ITS buffer and nothing else (not later buffers of pad A, not any buffer of another pad).
 //
-// THE FREE RULE, exactly. Buffer b (slot s, epoch e) is freed by collect() iff  refs(b) == 0  AND  e < minLive[s]   (minLive[s] = kEpochNone = 2^64-1 when no voice of slot s is alive: every retired buffer of the slot goes).
-//   * Why `<`: a voice that started on b recorded e itself, so while one lives minLive[s] <= e and the test fails. A voice that started on a NEWER buffer of the slot (epoch > e) does not hold b: e < its epoch: b goes.
-//     A voice that started on an OLDER buffer (epoch < e) keeps b too: the minimum cannot tell the two apart. That is a bounded over-retention (b lives as long as the oldest voice of its slot), never a use after free.
-//   * Why it is safe: a voice can only start on a buffer of the CURRENT snapshot, whose references keep refs > 0; the snapshot is returned through the ring only after the audio side published the minima of that same
-//     beginQuantum() call (scan, THEN adopt, then the ring push, which is a release); every voice that started on b before it was retired was alive at that scan or ended before it. The control side reads the minima
-//     after popping the snapshot (acquire), so it sees that scan or a later one; a later one is as safe (voices only start on buffers that are in the current snapshot).
-//   * Identical data: setPad with the same samples, rate and variations as the pad already has is a no-op (the buffer stays shared, same pointer, same epoch). A REPLACED pad whose data happens to be identical is a
-//     new object with a new, larger epoch; the old one is retired and freed by the rule above (while a voice sounds on it, the new one is not blocked by it: its epoch is larger, and `e < min` is the OLD one's test).
-//     A retired buffer is never revived: refs can only grow from a snapshot being built, and the builder holds the only reference of a pad that no published snapshot names (refs 0 means it is in neither).
-//   * epoch 0 / slot -1 mean "not tracked" (SongRenderer's by-reference pads): such voices are ignored by the scan.
+// THE FREE RULE, exactly. Buffer b (epoch e) is freed by collect() iff  refs(b) == 0  AND  for no board entry k: board[k] == e.
+//   Control-side cost of a collect(): one pass over the board (nBoard loads, nBoard <= kBoardMax = 512, 96 with the default pools) plus retired x nBoard compares. With R retired buffers: R * nBoard compares, no
+//   allocation; R is bounded by the pad replacements made since the oldest voice on a retired buffer started.
 //
-// THREAD RULES. Control thread: everything except beginQuantum(), one thread at a time (the one that calls thunder_post in the web / the shells' control thread). Audio thread: beginQuantum() only (and reading the
-// snapshot it adopted). The audio side allocates nothing, takes no lock, frees nothing, throws nothing. All control-side allocations of the new code are `new (std::nothrow)` and return kNoMem; the two places that
-// use a std::vector (the snapshot's RenderPads copy: the chop table's vector, `var`) are in pads_snap.cpp, which is built WITH exceptions like render.cpp and catches std::bad_alloc; a build without exceptions
-// (the wasm one) would abort there on exhaustion (see docs/port/U37-P1-NOTES.md, open question 1).
+// WHY IT IS SAFE. Facts: (F1) a voice only starts on a buffer named by the snapshot Players currently points at (the adopted one); that snapshot holds a reference, so the buffer has refs > 0 and is not retired.
+// (F2) the audio thread returns a snapshot to the control side only inside slot.adopt() (the ring push, a release), and beginQuantum() runs the scan and the board stores BEFORE it. (F3) a buffer is retired only
+// when the last snapshot naming it has been deleted by collect(), i.e. after that snapshot was popped from the ring (an acquire). (F4) a voice's entry holds from the scan that first sees it (it is in the alive list
+// from note() on, booked or sounding) until the first scan after it ended; a voice reads the buffer only between those.
+//   * Voice V started on b in quantum Q (after Q's scan, at the latest) while b's snapshot S was current. b can be retired only after S is returned, at the earliest by Q+1's adopt, which runs after Q+1's scan.
+//     Q+1's scan sees V if V is alive at that scan and stores its epoch (release) before the ring push (release); the control side pops S (acquire) and then loads the board (acquire): it sees that store or a later
+//     one. If V ended before the scan, its last read precedes the scan in program order, hence the push, hence the control side's free. So V never reads a freed buffer.
+//   * A later board value is as safe as the one stored before the push: entries only change when voices start (on buffers that are NOT retired: F1) or end.
+//   * A voice slot reused by a new voice between two scans: the entry shows the newest voice's epoch (or the same one). The older voice has ended (its slot was freed only when it ended), so it needs nothing; the
+//     newer one is covered from its own first scan on, as above. Entries are compared by value, so no entry can "belong" to the wrong buffer: epochs are unique, never reused.
+//   * A voice that ends: its entry goes to 0 at the next scan; until then the buffer is merely held longer.
+//   * The board is read entry by entry while the audio thread writes: an entry is only ever 0 -> e (a voice starts on a non-retired buffer), e -> 0 (it ended) or e -> e' (slot reused): a torn view of two entries
+//     cannot hide a voice, because a voice keeps its own entry nonzero from its first scan to its end.
+//   * The board covers exactly the pools of the Players the host was created for (create() checks the capacities fit kBoardMax; beginQuantum() refuses another Players).
+//   * Identical data: setPad with the same samples, rate, channels and variations as the pad already has is a no-op (the buffer stays shared, same pointer, same epoch, AND the pad's chop data is KEPT: unlike
+//     the C API's thunder_render_set_pad, which clears it on every call; a CHANGED pad loses its chop data). A REPLACED pad with identical content is a new object with a new epoch. A retired buffer is never revived.
+//   * epoch 0 means "not tracked" (SongRenderer's by-reference pads): the board entry is 0 and nothing is held.
+// PRECONDITIONS (the host, P2): (1) beginQuantum() runs on the audio thread at the top of every quantum, after seq_adopt() and before any note of the quantum is dispatched or any Seq is stepped; (2) Players::pads_
+// is only set through it (one Players per PadsHost); (3) THE SEQ: the host passes the Seq the runner uses, EVERY quantum (beginQuantum points it at the current table every call, so a Seq just made by SeqSession or
+// adopted by seq_adopt gets the table before its first step, whatever its opts carried: create the session with opts.chop = nullptr anyway). A Seq the host holds but does not pass keeps a pointer into a snapshot that
+// goes back to the control side and is freed: use after free. That is the host's bug; beginQuantum asserts (debug builds) that a snapshot is not adopted with a null `seq` after a Seq was seen, until the host says
+// seqGone() (it dropped its Seq), and counts such adopts (orphanAdopts()).
+// THE TEST SEAM. setSeam(fn, user): a function pointer, null in a product build; beginQuantum() calls it, if set, between its stages (0 entry, 1 after the scan, 2 after the board stores, 3 after the adopt, 4 after
+// the re-point) so a test can run publish() + collect() at exactly those points. A function pointer rather than a compile-time define: the tests then run the very binary a product links (a define would make the
+// core library the tests use differ from the product's), and the cost is five loads and predictable never-taken branches per 2.7 ms quantum.
+//
+// THREAD RULES. Control thread: everything except beginQuantum(), seqGone() and current(), one thread at a time (the one that calls thunder_post in the web / the shells' control thread). Audio thread: those. The
+// audio side allocates nothing, takes no lock, frees nothing, throws nothing. All control-side allocations of the new code are `new (std::nothrow)` and return kNoMem; the places that use a std::vector (the snapshot's
+// RenderPads copy: the chop table's vector, `var`) are in pads_snap.cpp, built WITH exceptions like render.cpp, catching std::bad_alloc (a failure there may leak the partial copy); a build without exceptions
+// (wasm) aborts there on exhaustion (docs/port/U37-P1-NOTES.md, open question 1). Stage, then publish once: a pad published before its chop data is set plays unchopped (counted: seqChopSkipped) until the next publish.
 #ifndef THUNDER_RENDER_PADS_SNAP_H
 #define THUNDER_RENDER_PADS_SNAP_H
 #include <atomic>
+#include <cassert>
 #include <cstdint>
 #include <memory>
 
@@ -45,14 +65,13 @@ struct PadVarIn { int ii = 0; char kind = 0; int num = 0; const float* mono = nu
 
 // One pad's borrowed data. Immutable once a snapshot names it. Control thread only touches refs / retired link.
 struct PadBuf {
-  uint64_t epoch = 0;          // unique, grows with every PadBuf made (> 0)
-  int slot = 0;                // 0..255: pad p's audio; 256 + p: pad p's SoundFont data
-  // audio (slot < 256)
+  uint64_t epoch = 0;          // unique, grows with every PadBuf made (> 0), never reused
+  // audio
   float* mem = nullptr;        // L then R in one allocation
   int frames = 0; double rate = 0; bool stereo = false;
   struct Var { int ii = 0; char kind = 0; int num = 0; int frames = 0; double sr = 0; const float* data = nullptr; };
   Var* vars = nullptr; int nVars = 0; float* varMem = nullptr;
-  // SoundFont (slot >= 256): keeps the font, the preset's PCM alive; `pr` points into font->presets
+  // SoundFont: keeps the font, the preset's PCM alive; `pr` points into font->presets
   std::shared_ptr<const sf::Font> font; std::shared_ptr<const sf::PresetPcm> pcm; const sf::Preset* pr = nullptr;
   // control-side bookkeeping
   uint32_t refs = 0; PadBuf* nextRetired = nullptr;
@@ -73,7 +92,9 @@ struct PadsSnap {
 class PadsHost {
  public:
   enum Err { kOk = 0, kArg = -1, kNoMem = -2, kFull = -3 };
-  static PadsHost* create();                         // control thread; nullptr: out of memory
+  // Control thread; nullptr: out of memory, or the pools of `pl` have more voice slots than kBoardMax. Publishes an EMPTY snapshot: the first beginQuantum() adopts it, so `pl` has pads (none) from then on.
+  static PadsHost* create(const Players& pl);
+  static constexpr int kBoardMax = 512;
   ~PadsHost();                                       // after the audio thread has stopped: frees everything, whatever the voices say
   PadsHost(const PadsHost&) = delete;
   PadsHost& operator=(const PadsHost&) = delete;
@@ -100,17 +121,21 @@ class PadsHost {
   uint64_t freed() const { return freed_; }
   uint64_t lastEpoch() const { return nextEpoch_ - 1; }
   const PadBuf* padBuf(int pad, int kind = 0) const { return pad >= 0 && pad < kRenderPads && (kind == 0 || kind == 1) ? cur_[kind][pad] : nullptr; }   // the builder's current buffer (tests)
-  // Called with each buffer just before it is freed (tests). Control thread.
-  typedef void (*FreeHook)(void* user, const PadBuf* b);
+  // Called with each buffer just before it is freed (tests). Control thread. The hook may take ownership of `mem` / `varMem` (and set them to nullptr): a test keeps freed audio poisoned instead of returning it to the allocator.
+  typedef void (*FreeHook)(void* user, PadBuf* b);
   void setFreeHook(FreeHook fn, void* user) { hook_ = fn; hookUser_ = user; }
 
   // ---- AUDIO THREAD ---------------------------------------------------------------------------------------------------------------------------------
   // Once per quantum, at its top, BEFORE the sequencer steps (and after seq_adopt, so that a Seq that has just been adopted gets the table too):
-  //   1. publishes the per-slot minimum epoch of the live and booked voices of `pl` (only the slots whose value changed are stored);
+  //   1. publishes, per voice slot of `pl`, the epoch of its live or booked voice, or 0 (only the entries whose value changed are stored);
   //   2. adopts a newly published snapshot, if any: pl.setPads(its pads);
   //   3. points `seq` (the Seq the runner now uses; may be null) at the current snapshot's chop table (a pointer store, every call: harmless when unchanged).
   // Returns true when a new snapshot was adopted. No allocation, no lock, no free, no exception.
   bool beginQuantum(Players& pl, Seq* seq);
+  void seqGone() { seqSeen_ = false; }               // audio thread: the host dropped its Seq (a stopped play): a snapshot may now be adopted with a null seq
+  uint64_t orphanAdopts() const { return orphan_; }  // adopts with a null seq after a Seq was seen (a host bug)
+  typedef void (*Seam)(void* user, int stage);
+  void setSeam(Seam fn, void* user) { seam_ = fn; seamUser_ = user; }   // tests; before the first beginQuantum
   const PadsSnap* current() const { return slot_->get(); }   // audio thread
 
  private:
@@ -119,16 +144,22 @@ class PadsHost {
   void release(PadBuf* b);                           // control: one reference less; the last one retires the buffer
   void freeBuf(PadBuf* b);
   void addRef(PadBuf* b) { b->refs++; }
-  PadBuf* newBuf(int slot);                          // refs 1, epoch next
+  PadBuf* newBuf();                                  // refs 1, epoch next
+  void seam(int stage) { if (seam_) seam_(seamUser_, stage); }
 
   SnapSlot<PadsSnap>* slot_ = nullptr;
+  const Players* owner_ = nullptr; int nBoard_ = 0;
   RenderPads stage_;                                 // control: kit, route, sf params, chop (buf / var unused)
   PadBuf* cur_[2][kRenderPads] = {};                 // control: the builder's reference per pad
   PadBuf* retired_ = nullptr;                        // control: refs == 0, waiting for their voices
   uint64_t nextEpoch_ = 1, nextId_ = 1, made_ = 0, freed_ = 0;
   FreeHook hook_ = nullptr; void* hookUser_ = nullptr;
-  std::atomic<uint64_t> board_[kEpochSlots];         // audio writes (release), control reads (acquire): min live epoch per slot
-  uint64_t mins_[kEpochSlots], last_[kEpochSlots];   // audio only: this quantum's scan; what board_ holds
+  Seam seam_ = nullptr; void* seamUser_ = nullptr;
+  bool seqSeen_ = false; uint64_t orphan_ = 0;       // audio only
+  // The board and the audio-only scratch each start on their own cache line, apart from the control-written fields above and from each other (verify-276 F8).
+  alignas(64) std::atomic<uint64_t> board_[kBoardMax];   // audio writes (release), control reads (acquire): the epoch each voice slot's voice is on, 0 none
+  alignas(64) uint64_t scan_[kBoardMax];                 // audio only: this quantum's scan
+  alignas(64) uint64_t last_[kBoardMax];                 // audio only: what board_ holds
 };
 
 }  // namespace thunder

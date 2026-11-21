@@ -169,7 +169,7 @@ bool VoicePool::note(const SeqEvent& e, const double* arp, const VoiceBuf& c, co
   if (e.fdi > 0) { v.g.set(0, t0n); v.g.lin(e.gain, t0n + e.fdi); }
   if (e.trm != 0 && dep(trmI) > 0) { const double k = dep(trmI) / 2; v.trm.hz = hz(trmI); v.trm.d = e.gain * k; v.trm.t = t0n; v.hasTrm = true; if (!(e.fdi > 0)) v.g.v0 = e.gain * (1 - k); }
   if (e.apn != 0 && dep(apnI) > 0) { v.apn.hz = hz(apnI); v.apn.d = dep(apnI); v.apn.t = t0n; v.hasApn = true; }
-  v.data = c.data; v.data2 = tw ? nullptr : c.data2; v.len = c.len; v.sr = c.sr; v.ep = c.epoch; v.eslot = c.slot;
+  v.data = c.data; v.data2 = tw ? nullptr : c.data2; v.len = c.len; v.sr = c.sr; v.ep = c.epoch;
   v.base = e.rate; v.rate = e.rate; v.choke = ck; v.col = e.col; v.ended = false; v.hasStop = false; v.stopAt = 0;
   v.syn = kv.syn; v.rel = v.syn ? ((e.has & SH_RLO) ? e.rlo : kv.rel) : 0; v.track = tr; v.ser = stamp_; v.end = INFINITY; v.pos = 0; v.t0 = 0; v.hasRd = false;
   if (!(e.has & SH_SLIDE)) pitchMods(v, e.t, e.rate, e, arp);

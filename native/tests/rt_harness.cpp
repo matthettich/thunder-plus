@@ -549,8 +549,8 @@ static int run_pads_snap() {
   std::string text; { std::ifstream f(std::string(THUNDER_ROOT) + "/sounds/ELECTRO.thunder", std::ios::binary); if (!f) return fail("cannot read sounds/ELECTRO.thunder"); std::ostringstream o; o << f.rdbuf(); text = o.str(); }
   Song song; JsonError je; if (!song.load(text.data(), text.size(), &je)) return fail("ELECTRO does not load");
   SeqVars vars; SeqOpts so; so.once = true; Seq sq(song, vars, SeqMode::Song, so);
-  PadsHost* host = PadsHost::create(); if (!host) return fail("PadsHost::create");
   Players pl(nullptr, 48000, 64);
+  PadsHost* host = PadsHost::create(pl); if (!host) return fail("PadsHost::create");
   const int PN = 8, NS = 12000; std::vector<float> d((size_t)NS);
   auto setp = [&](int p, int v) { for (int i = 0; i < NS; i++) d[(size_t)i] = (float)std::sin(0.02 * (p + 1) * i) * 0.3f * (1.0f - (float)i / NS) + 0.001f * (float)(v % 7); return host->setPad(p, d.data(), nullptr, NS, 48000); };
   for (int p = 0; p < PN; p++) if (setp(p, 0) != 0) return fail("setPad");
