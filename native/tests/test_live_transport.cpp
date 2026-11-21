@@ -153,7 +153,87 @@ static void reanchor() {
   CHECK(w.state() == THUNDER_LIVE_STATE_PLAYING, "still PLAYING after re-anchors");
 }
 
+
+// ---- round 2 (verify-283): the engine timeline across re-anchors, F9, F4, F5, F6, F8, F10, F13 and the behaviours the verifier found unkilled ----
+static std::vector<std::string> dumpAll(LiveHost* h) { std::vector<std::string> v; static char js[16384]; for (int n; (n = h->dumpStep(js, sizeof js)) > 0;) v.emplace_back(js, (size_t)n); return v; }
+static double dumpT(const std::string& row) { const size_t i = row.find("\"t\":"); return i == std::string::npos ? -1 : std::atof(row.c_str() + i + 4); }
+
+static void reanchors() {
+  // a timed command that waits across a backward re-anchor is judged against the new mapping: it applies where the HOST frame reaches `at`
+  { W w; thunder_live_play_opts po = playOpts(THUNDER_LIVE_NOW); w.H->play(po); w.run(48000); w.ev();
+    const int64_t at = w.fr + 96000; w.H->bpm(111, at); const uint64_t a0 = stats(w.H.h).cmds_applied;
+    w.fr = 0; w.run(48000); CHECK(stats(w.H.h).cmds_applied == a0, "after a backward re-anchor the command still waits (host frame %lld < %lld)", (long long)w.fr, (long long)at);
+    w.run(at - w.fr - 400); CHECK(stats(w.H.h).cmds_applied == a0, "and does not apply early");
+    w.run(800); CHECK(stats(w.H.h).cmds_applied == a0 + 1, "it applies when the host frame reaches `at` (%lld)", (long long)w.fr); w.run(4800); { const int v = lastBpm10(w.ev()); CHECK(v == 1110, "bpm heard %d", v); } CHECK(w.state() == THUNDER_LIVE_STATE_PLAYING, "playing on"); }
+  // an `at` that fell inside a forward gap: due at the next quantum
+  { W w; thunder_live_play_opts po = playOpts(THUNDER_LIVE_NOW); w.H->play(po); w.run(48000); w.ev(); const int64_t at = w.fr + 10000; w.H->bpm(122, at); const uint64_t a0 = stats(w.H.h).cmds_applied;
+    w.fr += 20000; w.run(Q); CHECK(stats(w.H.h).cmds_applied == a0 + 1, "an `at` inside the skipped gap is applied at the next quantum"); w.run(4800); { const int v = lastBpm10(w.ev()); CHECK(v == 1220, "bpm heard %d", v); } }
+  // the ENDED timer still fires across a backward re-anchor, its STOPPED record on the new host frames
+  { W w; thunder_live_play_opts po = playOpts(THUNDER_LIVE_NOW); po.has_only = 1; po.only = 0; w.run(Q * 8); w.ev(); w.H->play(po); w.run(Q * 4); w.ev(); w.fr = 100; w.run(48000); auto s = states(w.ev());
+    bool stopped = false; for (auto& r : s) if (stSt(r) == THUNDER_LIVE_ST_STOPPED && stArg(r) == 1) { stopped = true; CHECK(evF(r) >= 100 && evF(r) <= w.fr, "STOPPED.f %lld is on the new timeline", (long long)evF(r)); }
+    CHECK(stopped && w.state() == THUNDER_LIVE_STATE_IDLE, "ENDED timer fires after the re-anchor"); }
+  // CLOCK and POS records keep coming and their frames follow the new host timeline
+  { W w; thunder_live_play_opts po = playOpts(THUNDER_LIVE_NOW); w.H->play(po); w.run(48000); w.ev(); w.fr = 7; w.run(48000); int nc = 0; for (auto& r : w.ev()) if (evType(r) == THUNDER_LIVE_EV_CLOCK) { nc++; CHECK(evF(r) >= 7 && evF(r) <= 7 + 48000 + 128, "CLOCK on the new timeline"); } CHECK(nc >= 8, "CLOCK keeps coming (%d)", nc); }
+}
+
+// F9: a quantum runs between the push of the Play command and the publish of its snapshot (a test seam inside play()): the running song must not meet the new session's unstarted Seq
+struct SeamCtx { W* w; int quanta; };
+static void seamRun(void* u) { SeamCtx* c = (SeamCtx*)u; c->w->run((int64_t)Q * c->quanta); }
+static void playInterleaving() {
+  thunder_live_opts o = opts(THUNDER_LIVE_F_DUMP_STEPS); W w(THUNDER_LIVE_F_DUMP_STEPS); (void)o;
+  thunder_live_play_opts a = playOpts(THUNDER_LIVE_NOW); w.H->play(a); w.run(48000); dumpAll(w.H.h);   // A is playing; drain its rows
+  w.ev();
+  const int64_t T0 = w.fr + 48000 * 3; thunder_live_play_opts b = playOpts(T0); SeamCtx ctx{&w, 3}; w.H->setTestSeam(seamRun, &ctx);
+  CHECK(w.H->play(b) == 0, "play B with a quantum (3) between its two statements"); w.H->setTestSeam(nullptr, nullptr);
+  w.run(48000 * 5); auto rows = dumpAll(w.H.h); bool mono = true; double prev = -1; int beforeT0 = 0, atT0 = 0; const double t0e = (double)(T0 - 0) / 48000;
+  for (auto& r : rows) { const double t = dumpT(r); if (t + 1e-9 < prev) mono = false; prev = t; if (t < t0e - 1e-6) beforeT0++; else atT0++; }
+  CHECK(mono && !rows.empty(), "step times only go forward across the start of B (%zu rows)", rows.size());
+  CHECK(!rows.empty() && std::fabs(dumpT(rows[(size_t)beforeT0]) - t0e) < 1e-6, "B's first step is at its t0 (%g vs %g)", beforeT0 < (int)rows.size() ? dumpT(rows[(size_t)beforeT0]) : -1.0, t0e);
+  auto s = states(w.ev()); int playing = 0; for (auto& r : s) if (stSt(r) == THUNDER_LIVE_ST_PLAYING) playing++; CHECK(playing == 1, "one PLAYING record for B (%d)", playing);
+  // two plays before one quantum: exactly one starts (the second); the first's plan is given back
+  W v; thunder_live_play_opts pa = playOpts(THUNDER_LIVE_NOW); pa.has_only = 1; pa.only = 0; thunder_live_play_opts pb = playOpts(THUNDER_LIVE_NOW); v.H->play(pa); v.H->play(pb); v.run(Q * 4); s = states(v.ev()); playing = 0; int ended = 0;
+  for (auto& r : s) { if (stSt(r) == THUNDER_LIVE_ST_PLAYING) playing++; if (stSt(r) == THUNDER_LIVE_ST_ENDED) ended++; } CHECK(playing == 1 && ended == 0 && v.state() == THUNDER_LIVE_STATE_PLAYING, "two plays before one quantum: only the second runs (%d PLAYING, %d ENDED)", playing, ended);
+}
+
+static void policies() {
+  // F4: the 0.3 s runs from the SONG's end, whatever the look-ahead
+  { W w; w.H->lead(2.0, THUNDER_LIVE_NOW); thunder_live_play_opts po = playOpts(THUNDER_LIVE_NOW); po.has_only = 1; po.only = 0; w.H->play(po); int64_t endedF = -1, stopF = -1; for (int i = 0; i < 40000 / Q * 2; i++) { w.run(Q); for (auto& r : states(w.ev())) { if (stSt(r) == THUNDER_LIVE_ST_ENDED) endedF = evF(r); if (stSt(r) == THUNDER_LIVE_ST_STOPPED) stopF = w.fr; } }
+    CHECK(endedF >= 0 && stopF - endedF >= 14400 - Q, "lead 2 s: STOPPED not before 0.3 s after the song's end (%lld frames after)", (long long)(stopF - endedF)); }
+  // F5: an IDLE publish that answers E_BUSY changes nothing
+  { W w; w.run(Q); w.ev(); thunder_live_play_opts po = playOpts(THUNDER_LIVE_NOW); int n = 0; while (w.H->bpm(100, THUNDER_LIVE_NOW) == 0) n++; CHECK(n == THUNDER_LIVE_CMD_RING, "ring filled (%d)", n);
+    CHECK(w.H.song(w.song, 2) == THUNDER_LIVE_E_BUSY, "the IDLE publish is E_BUSY"); w.run(Q); w.ev(); CHECK(w.H->play(po) == 0, "play"); w.run(Q * 2); int64_t rev = -1; for (auto& r : W::of(w.ev(), THUNDER_LIVE_EV_SONG)) rev = evAs<thunder_live_ev_song>(r).rev;
+    CHECK(rev == -1 || rev == 1, "the song of the refused publish (rev 2) is not the one that plays (SONG rev %lld)", (long long)rev); CHECK(stats(w.H.h).cmds_no_seq >= 1, "bpm with no sequencer is dropped and counted (%u)", stats(w.H.h).cmds_no_seq); }
+  // F6: after HELD a publish takes the IDLE path: no snapshot is built, the song does not resume
+  { W w; thunder_live_play_opts po = playOpts(THUNDER_LIVE_NOW); w.H->play(po); w.run(Q * 4); w.H->hold(THUNDER_LIVE_NOW); for (int i = 0; i < 48000 * 30 / Q && w.state() != THUNDER_LIVE_STATE_HELD; i++) w.run(Q); CHECK(w.state() == THUNDER_LIVE_STATE_HELD, "HELD");
+    w.ev(); CHECK(w.H.song(w.song, 5) == 0 && stats(w.H.h).song_pending == 0, "publish in HELD: no snapshot pending (%u)", stats(w.H.h).song_pending); const uint64_t st0 = stats(w.H.h).steps; w.run(48000); CHECK(w.state() == THUNDER_LIVE_STATE_HELD && stats(w.H.h).steps == st0, "the held song does not resume");
+    int64_t rev = -1; for (auto& r : W::of(w.ev(), THUNDER_LIVE_EV_SONG)) rev = evAs<thunder_live_ev_song>(r).rev; CHECK(rev == 5, "SONG record for rev 5 (%lld)", (long long)rev); }
+  // F10: stop and play clear the waiting list
+  { W w; thunder_live_play_opts po = playOpts(THUNDER_LIVE_NOW); w.H->play(po); w.run(Q * 4); w.ev(); w.H->bpm(150, w.fr + 48000 * 3); w.H->loop(1, 0, 0, w.fr + 48000 * 3); w.H->mixSet(0, THUNDER_LIVE_MIX_VOL, 10, 0, w.fr + 48000 * 3); w.run(Q);
+    w.H->stop(THUNDER_LIVE_NOW); w.run(Q); CHECK(stats(w.H.h).cmds_cleared == 3, "stop cleared the 3 waiting commands (%u)", stats(w.H.h).cmds_cleared); w.H->play(po); w.run(48000 * 4); w.ev(); w.run(4800); { const int v = lastBpm10(w.ev()); CHECK(v != 1500 && v > 0, "the old play's bpm never lands in the new one (%d)", v); }
+    w.H->bpm(133, w.fr + 48000 * 6); w.run(Q); thunder_live_play_opts p2 = playOpts(THUNDER_LIVE_NOW); w.H->play(p2); w.run(Q * 2); CHECK(stats(w.H.h).cmds_cleared == 4, "a play that starts clears too (%u)", stats(w.H.h).cmds_cleared); }
+  // F13: Seq-bound commands with no sequencer are dropped and counted
+  { W w; w.run(Q); w.H->bpm(120, THUNDER_LIVE_NOW); w.H->loop(1, 0, 1, THUNDER_LIVE_NOW); w.H->perf(THUNDER_LIVE_PERF_XF, 0, 0.5, THUNDER_LIVE_NOW); w.H->lead(0.5, THUNDER_LIVE_NOW); const uint64_t ca0 = stats(w.H.h).cmds_applied; w.run(Q); CHECK(stats(w.H.h).cmds_no_seq == 3 && stats(w.H.h).cmds_applied == ca0 + 4, "3 dropped and counted, all 4 in cmds_applied (%u, %llu)", stats(w.H.h).cmds_no_seq, (unsigned long long)stats(w.H.h).cmds_applied); }
+  // F8: the true range of each key (mix.h:84, mix_pan = (v - 128) / 127 clamped: 128 is the centre, a left pan is below it)
+  { Host H(opts()); CHECK(H->mixSet(3, THUNDER_LIVE_MIX_PAN, 0, 0, -1) == 0 && H->mixSet(3, THUNDER_LIVE_MIX_PAN, 255, 0, -1) == 0 && H->mixSet(3, THUNDER_LIVE_MIX_PAN, 128, 0, -1) == 0, "pan 0 / 128 / 255");
+    CHECK(H->mixSet(3, THUNDER_LIVE_MIX_PAN, -0.5, 0, -1) == THUNDER_LIVE_E_ARG && H->mixSet(3, THUNDER_LIVE_MIX_PAN, 255.5, 0, -1) == THUNDER_LIVE_E_ARG && H->mixSet(3, THUNDER_LIVE_MIX_VOL, -1, 0, -1) == THUNDER_LIVE_E_ARG && H->mixSet(3, THUNDER_LIVE_MIX_TRIM, 256, 0, -1) == THUNDER_LIVE_E_ARG && H->mixSet(32, THUNDER_LIVE_MIX_OUT, 255, 0, -1) == 0 && H->mixSet(3, THUNDER_LIVE_MIX_MUTE, 0.5, 0, -1) == THUNDER_LIVE_E_ARG, "outside each key's range: E_ARG"); }
+  // lead: a long look-ahead steps ahead (the value is used, not only checked)
+  { W a, b; thunder_live_play_opts po = playOpts(THUNDER_LIVE_NOW); a.H->lead(0.05, THUNDER_LIVE_NOW); b.H->lead(2.0, THUNDER_LIVE_NOW); a.H->play(po); b.H->play(po); a.run(Q * 30); b.run(Q * 30);
+    CHECK(stats(b.H.h).steps > stats(a.H.h).steps + 20, "lead 2 s steps further ahead than lead 0.05 s (%llu vs %llu)", (unsigned long long)stats(b.H.h).steps, (unsigned long long)stats(a.H.h).steps); }
+  // stop: every voice is let go (stopAll), and the pad snapshot published after a stop is adopted (seqGone)
+  { W w; thunder_live_play_opts po = playOpts(THUNDER_LIVE_NOW); w.H->play(po); w.run(48000 * 3); CHECK(stats(w.H.h).voices > 0, "voices sound"); w.H->stop(THUNDER_LIVE_NOW); w.run(Q * 150); CHECK(stats(w.H.h).voices == 0, "stop lets every voice go (%d)", stats(w.H.h).voices);
+    w.ev(); std::vector<float> t(1000, 0.1f); CHECK(w.H->padSet(60, t.data(), nullptr, 1000, SR) == 0 && w.H->padsPublish() == 0, "pad after stop"); w.run(Q * 2); int np = 0; for (auto& r : w.ev()) if (evType(r) == THUNDER_LIVE_EV_PADS) np++; CHECK(np == 1, "the pads snapshot published after a stop is adopted, not held back (%d PADS records)", np); }
+  // stop_track: the track's voices go, other tracks' do not
+  { W w; thunder_live_play_opts po = playOpts(THUNDER_LIVE_NOW); po.has_loop = 1; po.loop_y0 = 0; po.loop_y1 = 0; w.H->play(po); w.run(48000 * 3); const int v0 = stats(w.H.h).voices; w.H->loop(1, 0, 0, THUNDER_LIVE_NOW); w.H->hold(THUNDER_LIVE_NOW);
+    for (int i = 0; i < 48000 * 30 / Q && w.state() != THUNDER_LIVE_STATE_HELD; i++) w.run(Q); const int vh = stats(w.H.h).voices; CHECK(vh > 0, "voices ring on in HELD (%d, was %d)", vh, v0);
+    for (int t = 0; t < 32; t++) w.H->stopTrack(t, THUNDER_LIVE_NOW); w.run(Q * 150); CHECK(stats(w.H.h).voices == 0, "stop_track on every track lets every voice go (%d)", stats(w.H.h).voices); }
+  // the play's default start: the next quantum + 0.08 s
+  { W w(THUNDER_LIVE_F_DUMP_STEPS); w.run(Q * 5); thunder_live_play_opts po = playOpts(THUNDER_LIVE_NOW); w.H->play(po); w.run(Q * 40); auto rows = dumpAll(w.H.h); const double want = (double)(Q * 5 + (int64_t)std::llround(0.08 * SR)) / SR;
+    CHECK(!rows.empty() && std::fabs(dumpT(rows[0]) - want) < 2e-6, "t0 < 0: the first step is at the next quantum + 0.08 s (%g vs %g)", rows.empty() ? -1.0 : dumpT(rows[0]), want); }
+  // host_stats: the output latency reaches the CLOCK records
+  { W w; w.H->hostStats(512, 3); w.run(48000); bool ok = false; for (auto& r : w.ev()) if (evType(r) == THUNDER_LIVE_EV_CLOCK) { const auto c = evAs<thunder_live_ev_clock>(r); ok = c.out_lat == 512 && c.under == 3; } CHECK(ok, "CLOCK carries the host's latency and underruns"); }
+}
+
 int main() {
-  stateTable(); commands(); timed(); ring(); mixer(); reanchor();
+  stateTable(); commands(); timed(); ring(); mixer(); reanchor(); reanchors(); playInterleaving(); policies();
   std::printf("live_transport: %d checks, %d failed\n", g_checks, g_fail); return g_fail ? 1 : 0;
 }
