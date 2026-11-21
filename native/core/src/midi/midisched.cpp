@@ -528,9 +528,10 @@ void MidiSched::onStep(const SeqEvent* evs, int n, const SeqStep& step, const Se
   const double bpm = seq.bpm();
   // F5 / B12: the tempo IN FORCE WHEN THIS STEP STARTED. The sequencer times the step's length with it and only then applies the step's own TPO, so it is the tempo of the
   // interval from this step to the next (the web integrated the tempo after the step over that interval: the clock was bent for good after every TPO).
+  // N1: the tempo the sequencer timed this step with, before its own TPO (SeqStep::bpm0 = Seq::bpm_ at the start of step(); seq.cpp: `line = 60 / bpm_ / lpb` uses it, nb is applied at the end).
+  // A live setBpm between two steps is in it; a Seq::shift (the runner's stall skip) does not disturb it, as it would a tempo derived from beat counts.
   double bpmStart = bpm;
-  for (int i = 0; i < n; i++) if (evs[i].type == SEV_TEMPO) bpmStart = bpmPrev_ > 0 ? bpmPrev_ : (S_ && S_->bpm > 0 ? (double)S_->bpm : bpm);
-  bpmPrev_ = bpm;
+  for (int i = 0; i < n; i++) if (evs[i].type == SEV_TEMPO) bpmStart = step.bpm0 > 0 ? step.bpm0 : bpm;
   for (int i = 0; i < n; i++) {
     const SeqEvent& e = evs[i];
     onEvent(e, (e.has & SH_ARP) ? seq.arp(e) : nullptr, bpm, e.type == SEV_NOTE && seq_note_late(e.t, now), now);
@@ -550,7 +551,7 @@ void MidiSched::book(double now, double seqTime, double bpm, bool seqAlive) {
 
 // ---- transport ---------------------------------------------------------------------------------------------------------------------------
 void MidiSched::start(int spp, double now) {   // moStart :17071
-  now_ = now; nAnc_ = 0; haveT0_ = false; t0_ = 0; playing_ = true; bpmPrev_ = -1;
+  now_ = now; nAnc_ = 0; haveT0_ = false; t0_ = 0; playing_ = true;
   for (auto& L : lfo_) { L.v = -1; L.hasT = false; L.nTrig = 0; }
   clk_ = Clk(); bool wanted = false; for (int p = 0; p < kMidiPorts; p++) wanted = wanted || clkOn_[p];
   spp_ = (wanted && spp > 0) ? clampi(spp, 0, 16383) : 0;

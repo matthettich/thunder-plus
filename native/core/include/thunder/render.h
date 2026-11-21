@@ -260,8 +260,8 @@ int64_t thunder_render_read(thunder_render* r, float* l, float* r_, int64_t fram
    latency trim), found by stepping a second sequencer, without any audio, to the end of the song (the song's rows, tempo changes and chance rolls
    included: it ends where the render's own sequencer does). It does not include the tails of the voices that still sound at the song's end
    (reverb, long samples), which only the render can tell, and it is the START of the song's last row (the sequencer's time when it stops), so it also misses that row's own
-   duration (about 6000 frames at 120 BPM, 48 kHz, lpb 4; measured 2.3 % of ELECTRO): the real length is always longer, never shorter, than the estimate unless the render is cut, so never treat this as a promise, and
-   clamp a progress fraction to 1. Capped at the render's max_frames. With use_frames = 1, or once the render has ended, it is the exact length
+   duration (about 6000 frames at 120 BPM, 48 kHz, lpb 4; measured 2.3 % of ELECTRO): the real length is never SHORTER than the estimate unless the render is cut (an unknown-length render does not end before its audio clock has reached the sequencer's end), and
+   usually longer. It is not a promise either way: clamp a progress fraction to 1. Capped at the render's max_frames. With use_frames = 1, or once the render has ended, it is the exact length
    (as length()). Costs a fraction of a second for a long song, once: the answer is kept. -1: not available (a null handle, a song whose end the
    stepping cannot reach in 20 million steps, or out of memory: the handle is not affected and a later call may succeed). */
 int64_t thunder_render_length_estimate(thunder_render* r);

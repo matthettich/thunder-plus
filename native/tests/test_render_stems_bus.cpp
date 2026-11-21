@@ -65,6 +65,24 @@ int main() {
     thunder_render* m = make(mj, 0, N, ps); CHECK("muted source: only the track on its own", m && list(m) == std::vector<int>({3})); thunder_render_free(m);
     thunder_render* b = make(mj, 2, N, ps); CHECK("the bus stem of a muted source: heard mask is the bus alone, silent", b && b->R->heardMask() == 2u && peakOf(readAll(b, N)) == 0); thunder_render_free(b);
   }
+  { // FU3: bus INTO bus. The page's busStemPlan repeats until nothing is added, so the stem list does not depend on the order buses are visited in (a JS Map walk there, ascending track numbers here).
+    // Today's bus_plan cannot make a bus that is also a source (ownIn), so the plan is written by hand: source 0 -> bus 5 -> bus 2 (the downstream bus has the LOWER number: a single ascending pass misses it).
+    // Only track 0 has notes. Expected (web): keepT {0} gains 5 (a kept source feeds it), then 2 (5 is kept now); the pure tracks 0 and 5 are inside their bus's stem: the only stem is bus 2 (number 3).
+    std::string js = "{\"v\":6,\"bpm\":120,\"lpb\":4,\"ntr\":8,\"song\":[[0]],\"chains\":[[[0,0]]],\"plen\":[8],\"insts\":[";
+    for (int i = 0; i < 8; i++) js += std::string(i ? "," : "") + "{\"pad\":" + std::to_string(i) + ",\"tsp\":0,\"slc\":0,\"sync\":0,\"mo\":0}";
+    js += "],\"phrases\":[[";
+    for (int r = 0; r < 8; r++) { char b[128]; if (r % 2 == 0 && r < 6) std::snprintf(b, sizeof b, "%s[60,-1,-1,-1,-1,0,-1,-1,-1,-1,-1,-1]", r ? "," : ""); else std::snprintf(b, sizeof b, ",[-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1]"); js += b; }
+    js += "]]";
+    const std::string plain = js + "}", mutedMid = js + ",\"mix\":[{},{},{},{},{},{\"mute\":true}]}";
+    auto plan = [](int src, int mid, int down) { BusPlan P; P.feedMask[mid] = 1u << src; P.feedMask[down] = 1u << mid; P.targets[src] = 1u << mid; P.targets[mid] = 1u << down; P.pure = (1u << src) | (1u << mid);
+      P.feeds[mid][0] = (uint8_t)src; P.nFeeds[mid] = P.feedLen[mid] = 1; P.feeds[down][0] = (uint8_t)mid; P.nFeeds[down] = P.feedLen[down] = 1; return P; };
+    auto listWith = [&](const std::string& song, const BusPlan& P) { thunder_render_opts o; std::memset(&o, 0, sizeof o); o.size = sizeof o; o.use_frames = 1; o.frames = 4800;
+      thunder_render* r = thunder_render_create((const uint8_t*)song.data(), song.size(), &o, nullptr, 0); std::vector<int> v; if (!r) { g_fail++; return v; }
+      installPads(r, ps); r->R->mixer().setPlan(P); v = list(r); thunder_render_free(r); return v; };
+    CHECK("bus into bus, the downstream bus has the LOWER number (0 -> 5 -> 2): the only stem is bus 2 (number 3)", listWith(plain, plan(0, 5, 2)) == std::vector<int>({3}));
+    CHECK("bus into bus in ascending order (0 -> 2 -> 5): the only stem is bus 5 (number 6)", listWith(plain, plan(0, 2, 5)) == std::vector<int>({6}));
+    CHECK("a muted middle bus is not added, so what only it feeds is not either: the source keeps its own stem (0 -> 5 -> 2, 5 muted)", listWith(mutedMid, plan(0, 5, 2)) == std::vector<int>({1}));
+  }
   std::printf("%s (%d failures)\n", g_fail ? "FAILED" : "ok", g_fail);
   return g_fail ? 1 : 0;
 }
