@@ -151,7 +151,9 @@ add_test(NAME seq_takeover_threads COMMAND test_seq_takeover --threads 2)
 # parts, sect and phrase modes, loops, JMP / END, the wrap, a hand-over) in both and compares every row, nested members included.
 if(NODE_EXE AND CMAKE_SYSTEM_NAME STREQUAL "Linux")
   add_test(NAME seq_dump_current COMMAND ${NODE_EXE} ${CMAKE_CURRENT_SOURCE_DIR}/../tools/seq-dump.mjs ${CMAKE_CURRENT_BINARY_DIR}/seq-dump)
-  add_test(NAME seq_edit_current COMMAND ${NODE_EXE} ${CMAKE_CURRENT_SOURCE_DIR}/../../tools/seq-golden.mjs --edit)   # the edit goldens (Part B) still equal what the JS gives now
+  # WEB-FOLLOW (20 Nov): the live / edit / chop goldens are made from the PINNED beta (native/tests/web-ref, native/tools/web-pin.mjs), not from this branch's older copy of the web app at the repository root
+  add_test(NAME seq_edit_current COMMAND ${NODE_EXE} ${CMAKE_CURRENT_SOURCE_DIR}/../tools/seq-golden-web.mjs --edit)   # the edit goldens (Part B) and the live-clock goldens still equal what the pinned JS gives
+  add_test(NAME seq_chop_current COMMAND ${NODE_EXE} ${CMAKE_CURRENT_SOURCE_DIR}/../tools/seq-golden-web.mjs --chop)   # the chop goldens (the page's applyChop, in a vm) still equal what the pinned JS gives
   add_test(NAME seq_extra COMMAND ${NODE_EXE} ${CMAKE_CURRENT_SOURCE_DIR}/../tools/seq-extra.mjs ${CMAKE_CURRENT_BINARY_DIR}/seq-extra $<TARGET_FILE:test_seq>)
 endif()
 
@@ -1112,6 +1114,33 @@ target_link_libraries(test_render_bus_chain PRIVATE thunder_core)
 target_include_directories(test_render_bus_chain PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../core/src ${CMAKE_CURRENT_SOURCE_DIR}/../core/include ${CMAKE_CURRENT_SOURCE_DIR})
 add_test(NAME render_bus_chain COMMAND test_render_bus_chain)
 
+# WEB-FOLLOW item 2: envelope times in lines (web #259) against the web's own envLinesFit / envMs (tests/golden/envlines-web.json, made by tools/envlines-dump.mjs from the pinned beta)
+add_executable(test_envlines test_envlines.cpp)
+target_link_libraries(test_envlines PRIVATE thunder_core)
+target_include_directories(test_envlines PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../core/src ${CMAKE_CURRENT_SOURCE_DIR})
+if(NOT MSVC)
+  target_compile_options(test_envlines PRIVATE -Wall -Wextra)
+endif()
+add_test(NAME envlines COMMAND test_envlines ${CMAKE_CURRENT_SOURCE_DIR}/../..)
+if(NODE_EXE AND CMAKE_SYSTEM_NAME STREQUAL "Linux")
+  add_test(NAME envlines_current COMMAND ${NODE_EXE} ${CMAKE_CURRENT_SOURCE_DIR}/../tools/envlines-dump.mjs --check)
+endif()
+
+# WEB-FOLLOW item 3: reset track's `stp` message = Players::stopTrack (both pools); the sampler's version is bit-exact against the web's core in `voice` (case stp_msg)
+add_executable(test_stptrack test_stptrack.cpp)
+target_link_libraries(test_stptrack PRIVATE thunder_core)
+target_include_directories(test_stptrack PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../core/src ${CMAKE_CURRENT_SOURCE_DIR})
+target_compile_definitions(test_stptrack PRIVATE THUNDER_ROOT="${CMAKE_CURRENT_SOURCE_DIR}/../..")
+if(NOT MSVC)
+  target_compile_options(test_stptrack PRIVATE -Wall -Wextra)
+endif()
+add_test(NAME stptrack COMMAND test_stptrack)
+
+# VERIFY-271 F1: reset track must let a LIVE engine's voice go too (LivePool::stopTrack, called by Players::stopTrack)
+add_executable(test_stptrack_live test_stptrack_live.cpp)
+target_link_libraries(test_stptrack_live PRIVATE thunder_core)
+target_include_directories(test_stptrack_live PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../core/src ${CMAKE_CURRENT_SOURCE_DIR})
+add_test(NAME stptrack_live COMMAND test_stptrack_live)
 
 # VERIFY-266 (independent verifier of bus into bus, docs/port/reviews/verify-266.md): bus_plan / mix_audible by hand from the web's busPlan(); notes on the buses of a chain
 add_executable(test_busplan_verify266 test_busplan_verify266.cpp)

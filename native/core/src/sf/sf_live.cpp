@@ -205,6 +205,13 @@ void SfPool::stp(const SeqEvent& e) {
   for (int k = 0; k < kVoiceTracks; k++) if (e.flag || k == e.track) { for (int q = 0; q < nT_[k]; q++) kill(T_[k][q], e.t, 0.004); nT_[k] = 0; }
 }
 
+void SfPool::stopTrack(int track, double t) {
+  if (!(track >= 0 && track < kNT)) return;
+  const double at = jmax(now_, t == t ? t : 0.0);
+  for (int q = 0; q < nT_[track]; q++) kill(T_[track][q], at, 0.004, true);
+  nT_[track] = 0;
+}
+
 void SfPool::stopAll(double at) {
   for (int ai = 0; ai < nAlive_; ai++) kill(alive_[ai], at, 0.004, true);
   for (int k = 0; k < kVoiceTracks; k++) nT_[k] = 0;

@@ -65,6 +65,9 @@ class VoicePool {
   void mod(const SeqEvent& e, const double* arp);       // type 'mod'
   void stp(const SeqEvent& e);                          // type 'stp'
   void stopAll(double at);                              // stopAll(at)
+  // RESET TRACK (web #251, the core's message {op:'stp', track}, seq-core.js:1229): ONE track's voices let go as STOP lets them go: at = max(currentTime, t); for 0 <= track < NT every voice of the track gets
+  // kill(v, at, 0.004, stop = TRUE) (a voice booked to start at or after `at` never sounds) and the list is cleared. Unlike stp() (the sequencer's STP command: stop = false, the master column too).
+  void stopTrack(int track, double t);
 
   // THE POLY CAP ACROSS TWO POOLS (verify-242 F3). The JS keeps ONE voice list per track for the sampler's and the SoundFont's voices (core/core-processor.js :442-443 and :582-583:
   // `while (T.length >= POLY) kill(T.shift())`), so the cap of four is shared. A renderer that keeps a second pool (sf::SfPool, same four calls) does the cap itself, oldest first

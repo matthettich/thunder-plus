@@ -291,7 +291,8 @@ void Seq::partEvsOf(Json mix, Json fx, bool own, std::vector<PEv>& out) const {
 void Seq::buildParts() {
   sInsts_.resize(NI);
   for (int i = 0; i < NI; i++) { const SongInst& I = S_.insts[i]; PInst& p = sInsts_[(size_t)i]; p.present = !S_.instMissing[i]; p.pad = I.pad; p.tsp = I.tsp; p.vol = I.vol; p.pan = I.pan; p.ofs = I.ofs; p.hut = I.hut; p.huv = I.huv; p.kf = I.kf != 0; p.rev = I.rev != 0;
-    p.slc = I.slc; p.smode = I.smode != 0; p.sync = I.sync != 0; p.sy = I.sync; p.grain = I.grain; p.beats = I.beats ? I.beats : 4; }
+    p.slc = I.slc; p.smode = I.smode != 0; p.sync = I.sync != 0; p.sy = I.sync; p.grain = I.grain; p.beats = I.beats ? I.beats : 4;
+    p.lines = I.lines; p.linesRaw = I.lines; p.sx = I.sx; p.og = I.og; p.ou = I.ou; p.orp = I.orp; p.ox = I.ox; p.opt = I.opt; }
   partEvsOf(Json(), Json(), true, own_.evs);
   const Json P = S_.parts;
   for (size_t k = 0; k < P.size(); k++) { Part part; const Json p = P.isArr() ? P.at(k) : Json(); part.present = truthy(p);
@@ -303,7 +304,13 @@ void Seq::buildParts() {
           // grain = I.grain == null ? 1 : I.grain | 0. Beyond the page's own range (slc > 64, beats outside 1..64, grain outside 0..4; sync only below 0) the song loader's limits apply (song.cpp).
           x.slc = to_int_sat(js_to_int32(jnum(I.get("slc"))), 0, 64); x.smode = truthy(I.get("smode")); x.sy = std::max(0, js_to_int32(jnum(I.get("sync")))); x.sync = x.sy != 0;   /* no upper clamp: 3 is LOOP and 4.. is the page's normal stretch (index.html:22313), so a clamp to 3 would change the mode */
           x.grain = nullish(I.get("grain")) ? 1 : to_int_sat(js_to_int32(jnum(I.get("grain"))), 0, 4);
-          { const double b = jnum(I.get("beats")); x.beats = truthy(I.get("beats")) && b == b ? std::min(64.0, std::max(1.0, b)) : 4;   /* raw, as the page uses it: 1.7 stays 1.7 */ } }
+          { const double b = jnum(I.get("beats")); x.beats = truthy(I.get("beats")) && b == b ? std::min(64.0, std::max(1.0, b)) : 4;   /* raw, as the page uses it: 1.7 stays 1.7 */ }
+          // WEB-FOLLOW: `I.lines | 0` (raw, no clamp: a part's instrument is not normalised, index.html:23793); an instrument with sx or an OLDSCHOOL key is normalised by normParts (index.html:22161): sync
+          // truncated and clamped 0..3, then sxLoad. Without them the raw sync stays (the line above).
+          x.lines = js_to_int32(jnum(I.get("lines"))); x.linesRaw = jnum(I.get("lines"));   // the test is `lines | 0 > 0`, the divided value the raw number
+          { static const char* const kOs[] = {"sx", "og", "ou", "orp", "ox", "opt"}; bool any = false; for (const char* k : kOs) if (!I.get(k).missing()) any = true;
+            if (any) { const double sv = std::trunc(jnum(I.get("sync"))); x.sy = sv == sv ? (int)std::min(3.0, std::max(0.0, sv)) : 0; x.sync = x.sy != 0;
+              const SongSx sx = song_sx_load(I, x.sy); x.sx = sx.sx; x.og = sx.og; x.ou = sx.ou; x.orp = sx.orp; x.ox = sx.ox; x.opt = sx.opt; } } }
         part.insts.push_back(x); } }
     parts_.push_back(std::move(part)); }
 }
@@ -422,8 +429,10 @@ bool Seq::takeOver(const Seq& old) {
   std::memcpy(pnoHas_, old.pnoHas_, sizeof pnoHas_); std::memcpy(pno_, old.pno_, sizeof pno_);
   std::memcpy(trGen_, old.trGen_, sizeof trGen_);
   badSets_ = old.badSets_; chopped_ = old.chopped_; chopSkipped_ = old.chopSkipped_; chopNoHits_ = old.chopNoHits_; chopStretched_ = old.chopStretched_; dropped_ = old.dropped_; maxEvs_ = old.maxEvs_; maxArp_ = old.maxArp_;
-  // what the JS computes once, at PLAY (ruling 1): the bus plan, the idle-LFO set, the INS clamp stay the PLAY's
-  std::memcpy(busT_, old.busT_, sizeof busT_); std::memcpy(hearT_, old.hearT_, sizeof hearT_); hasHear_ = old.hasHear_; NIs_ = old.NIs_;
+  // what the JS computes once, at PLAY (ruling 1): the idle-LFO set and the INS clamp stay the PLAY's (the bus set does not: see rebus below)
+  // WEB-FOLLOW (web api.rebus, 20 Nov): the NOTES of a track that became a bus (or stopped being one) follow the NEW plan from the next row, so busT_ is the one this Seq built from its own song,
+  // NOT the old Seq's; hearT_ (the LFOs that can be heard) stays the PLAY's, as the page's rebus() only re-reads busT.
+  std::memcpy(hearT_, old.hearT_, sizeof hearT_); hasHear_ = old.hasHear_; NIs_ = old.NIs_;
   // the macros' resting values: the JS copied them at make (PF.mac), so an edit of `v` is not heard; the effective value in force is carried
   { const size_t nm = std::min(old.pfMac_.size(), pfMac_.size());
     for (size_t i = 0; i < nm; i++) {
@@ -537,6 +546,7 @@ int Seq::dirNext(Tr& T, int y, int L) {
   int n = y + T.pp; if (n >= L) { T.pp = -1; n = std::max(0, L - 2); } else if (n < 0) { T.pp = 1; n = std::min(L - 1, 1); }
   return n;
 }
+double Seq::instBeats(const PInst& I) const { return I.lines > 0 ? I.linesRaw / (double)(S_.lpb ? S_.lpb : 4) : I.beats; }   // index.html:23793
 // applyChop (index.html:22333), the part the pad data does not touch done as the JS does it, in the same order and arithmetic. The pad's loopSecs and (SMODE) slice points
 // come from SeqOpts::chop. A pad with no loop handed in: the JS's `ensure(pad)` null case (the call is skipped, the event keeps its rate and no chop), counted.
 void Seq::applyChop(SeqEvent& ev, const PInst& I, int n, double semis, double bpm) {
@@ -545,15 +555,18 @@ void Seq::applyChop(SeqEvent& ev, const PInst& I, int n, double semis, double bp
   const int pad = (ev.pad == ev.pad && ev.pad >= 0 && ev.pad < kSeqChopPads && ev.pad == (double)(int)ev.pad) ? (int)ev.pad : -1;
   const SeqChop* ch = o_.chop;
   if (!ch || pad < 0 || !ch->has(pad)) { chopSkipped_++; return; }
-  const double loop = ch->loop(pad), target = I.beats * 60 / bpm;
+  // SYNC TO LINES: the length is instBeats(I) (a length in lines follows the SONG's lpb at the moment of the note; never a phrase's lpb or the LPB command). The page's live OLDSCHOOL notes use a
+  // SETTLED tempo after a 300 ms wall-clock window (index.html stSettled): not reproducible in a step, so native always uses the exact tempo, as the page's offline renders and previews do.
+  const double beatsI = instBeats(I), loop = ch->loop(pad), target = beatsI * 60 / bpm;
+  const bool osy = I.sy == 3 && I.sx == 1;   // OLDSCHOOL
   const bool sl = (ev.has & SH_SLC) && slc >= 2;   // SLC: the slice comes from the command, so the note pitches it
   double rate = js_pow(2, (semis + (sl ? n - ROOT : 0)) / 12), scale = 1;
   if (sy == 1) rate *= loop / target;
-  if (sy >= 2) scale = target / loop;
+  if (sy >= 2) scale = target / loop;   // (the page: tS / loop with tS = beatsS * 60 / sb: the same numbers off the live sequencer)
   double s0 = 0, s1 = loop;
   if (slc >= 2) {
     const int nn = std::min(slc, kSeqChopMaxSlices); int cnt = nn; const double* pts = nullptr; bool grid = true;
-    if (I.smode) { pts = ch->hits(pad, nn, &cnt); if (!pts) { chopNoHits_++; cnt = nn; } else grid = false; }
+    if (I.smode && !(osy && I.orp != 0)) { pts = ch->hits(pad, nn, &cnt);   /* OLDSCHOOL with REV / PING / EASE: the slices of what you hear (equal parts); HITS belong to the source (index.html:23780) */ if (!pts) { chopNoHits_++; cnt = nn; } else grid = false; }
     const double kd = sl ? std::fmod(ev.slc, (double)slc) : (double)(((n - ROOT) % slc + slc) % slc);
     const int k = (kd == kd && kd >= 0 && kd < cnt && kd == (double)(int)kd) ? (int)kd : 0;   // (the JS reads pts[k]: undefined for a k outside the points; here the first slice)
     const auto pt = [&](int i) { return grid ? loop * i / nn : pts[i]; };
@@ -562,7 +575,14 @@ void Seq::applyChop(SeqEvent& ev, const PInst& I, int n, double semis, double bp
   const double ofsSec = s0 * scale, durSec = std::max(0.005, (s1 - s0) * scale), end = ev.t + durSec / (slc >= 2 || sy ? rate : ev.rate);
   // a value that is not finite (a hostile table, an extreme tempo) leaves the note as the sequencer made it: counted
   if (!(std::isfinite(rate) && std::isfinite(ofsSec) && std::isfinite(durSec) && std::isfinite(end) && ofsSec >= 0)) { chopSkipped_++; return; }
-  if (sy >= 2) { ev.has |= SH_ST; ev.stMode = (uint8_t)std::min(sy, 255); ev.stBpm = js_round(bpm * 100) / 100; ev.stBeats = I.beats; ev.stGrain = (uint8_t)std::max(0, std::min(255, I.grain)); chopStretched_++; }
+  if (sy >= 2) { ev.has |= SH_ST; ev.stMode = (uint8_t)std::min(sy, 255); ev.stBpm = js_round(bpm * 100) / 100; ev.stBeats = js_round(beatsI * 1e6) / 1e6; ev.stGrain = (uint8_t)std::max(0, std::min(255, I.grain)); chopStretched_++;
+    ev.stSx = 0; ev.stGs = 0; ev.stRp = ev.stX = 0; ev.stPt = 0;
+    if (osy) {   // index.html:23777: {sx:1, gs: round(osGrainSecs(I, sb, lpbS) * 1e6) / 1e6, rp: I.orp | 0, x: I.ox | 0, pt: I.opt | 0}
+      static const double kDiv[7] = {0, 1, 0.5, 0.25, 0.125, 0.0625, 0.03125};   // OS_DIVS
+      const int lpbS = S_.lpb ? S_.lpb : 4;
+      double og = I.og; if (!(og == og) || og == 0) og = 12;   // +I.og || 12
+      const double gs = I.ou > 0 ? kDiv[std::min(6, I.ou)] * 60 / bpm / lpbS : std::min(250.0, std::max(0.5, og)) / 1000;
+      ev.stSx = 1; ev.stGs = js_round(gs * 1e6) / 1e6; ev.stRp = (uint8_t)std::max(0, std::min(255, I.orp)); ev.stX = (uint8_t)std::max(0, std::min(255, I.ox)); ev.stPt = (int8_t)std::max(-128, std::min(127, I.opt)); } }
   if (slc >= 2 || sy) ev.rate = rate;
   ev.has |= SH_CHOP; ev.ofsSec = ofsSec; ev.durSec = durSec;
   if (!(ev.has & SH_CUT)) { ev.has |= SH_CUT; ev.cut = end; } else ev.cut = std::min(ev.cut, end);

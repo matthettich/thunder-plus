@@ -32,8 +32,14 @@ constexpr int kKnownBuild = 616;     // BUILD of the page this core was ported f
 
 struct SongMix { int vol = 224, trim = 128, pan = 128; bool mute = false, solo = false; int col = 0; };
 
+struct SongSx { int sx = 0, ou = 0, orp = 0, ox = 0, opt = 0; double og = 12; };
+double song_js_plus(Json v);   // the JS's unary +x of a JSON value (a numeric string is its number; NaN if not numeric)
+SongSx song_sx_load(Json o, int sync);   // index.html sxLoad (:23642): the instrument object `o`, its (already clamped) sync
+
 struct SongInst {
   int pad = 0, tsp = 0, vol = 255, pan = 128, rev = 0, ofs = 0, slc = 0, smode = 0, sync = 0, beats = 4, grain = 1;
+  // WEB-FOLLOW (20 Nov): SYNC TO LINES `lines` (0 = absent; web #257) and the stretch algorithm `sx` with OLDSCHOOL's own settings (web #259-#263: index.html sxLoad). Carried, never used to sound.
+  int lines = 0, sx = 0, ou = 0, orp = 0, ox = 0, opt = 0; double og = 12;
   int mo = 0, mch = 0, mpt = 0, pbr = 2;
   int cc[4] = {74, 71, 1, 7};
   int lcc = -1, lsh = 0; double lrb = 4; int ldp = 64, lct = 64, lrg = 0;

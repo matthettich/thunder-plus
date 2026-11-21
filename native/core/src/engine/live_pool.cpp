@@ -246,6 +246,12 @@ void LivePool::stp(const SeqEvent& e) {
   if (!std::isfinite(e.t)) { st_.refused++; return; }
   for (int k = 0; k < kVoiceTracks; k++) if (e.flag || k == e.track) for (Node* n : byTrack_[k]) if (n->inT) { kill(*n, e.t); n->inT = false; }
 }
+void LivePool::stopTrack(int track, double t) {
+  if (!(track >= 0 && track < kVoiceTracks)) return;
+  const double at = std::max(now_, t == t ? t : 0.0);   // Math.max(currentTime, d.t == null ? 0 : d.t)
+  if (!std::isfinite(at)) { st_.refused++; return; }
+  for (Node* n : byTrack_[track]) if (n->inT) { kill(*n, at); n->inT = false; }
+}
 void LivePool::tempo(double t, double bpm) {
   if (!std::isfinite(bpm) || !std::isfinite(t)) { st_.refused++; return; }
   for (Node* n : active_) if (n->kind == LiveKind::Bass) { bookCtl(*n, LiveEvType::Bpm, t, bpm); n->lastBpm = bpm; }

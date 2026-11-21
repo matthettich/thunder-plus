@@ -1,12 +1,17 @@
 #include "engine/engine_json.h"
 #include "engine/layers.h"
 #include "engine/layer_pe.h"
+#include "song/song.h"
 
 #include <cmath>
 
 namespace thunder {
 namespace {
 inline void num(Json j, std::string_view k, double& d) { Json v = j.get(k); if (v.isNum()) d = v.asNum(); }
+// a saved `...L` number (index.html envLinesOf: `o[k + 'L'] != null ? +o[k + 'L'] || 0 : msLines(..)`): null / absent = the key is absent (NaN); a number as is; a boolean 0 / 1 (the JS's +x). Anything else (a string,
+// an array of one number) the JS's `+x || 0`: a numeric string counts, anything non-numeric is 0.
+inline double lnum(Json j, std::string_view k) { Json v = j.get(k); if (v.missing() || v.isNull()) return kEngNoLines; const double x = song_js_plus(v); return x != x ? 0 : x; }   // +x || 0
+inline bool unitL(Json j, std::string_view k) { Json v = j.get(k); return v.isStr() && v.asStr() == "l"; }
 }
 
 void eng_layer_from_json(EngLayer& L, Json j) {
@@ -17,6 +22,8 @@ void eng_layer_from_json(EngLayer& L, Json j) {
   num(j, "atk", L.atk); num(j, "hold", L.hold); num(j, "dec", L.dec); num(j, "sus", L.sus); num(j, "rel", L.rel);
   num(j, "lpCut", L.lpCut); num(j, "lpRes", L.lpRes); num(j, "lpEnv", L.lpEnv); num(j, "hpCut", L.hpCut); num(j, "hpRes", L.hpRes); num(j, "hpEnv", L.hpEnv);
   num(j, "fAtk", L.fAtk); num(j, "fDec", L.fDec); num(j, "delay", L.delay); num(j, "burst", L.burst); num(j, "spacing", L.spacing); num(j, "seed", L.seed);
+  L.aLines = unitL(j, "aU"); L.fLines = unitL(j, "fU");   // web #259: times in lines (the ms above stay as saved)
+  { static const char* const kA[4] = {"atkL", "holdL", "decL", "relL"}, *const kF[2] = {"fAtkL", "fDecL"}; for (int i = 0; i < 4; i++) L.aL[i] = lnum(j, kA[i]); for (int i = 0; i < 2; i++) L.fL[i] = lnum(j, kF[i]); }
   eng_layer_u23_from_json(L, j);
   eng_layer_pe_from_json(L, j);   // U25 (a no-op without the library)
 }
@@ -43,6 +50,7 @@ bool eng_voice_from_json(EngVoice& V, Json v, Json layers, Json fx) {
   num(v, "gPAmt", V.gPAmt); num(v, "gPDec", V.gPDec); num(v, "gLpCut", V.gLpCut); num(v, "gLpRes", V.gLpRes); num(v, "gLpEnv", V.gLpEnv); num(v, "gFAtk", V.gFAtk); num(v, "gFDec", V.gFDec);
   Json ao = v.get("gAmpOn"); if (ao.isBool()) V.gAmpOn = ao.asBool(); else if (ao.isNum()) V.gAmpOn = ao.asNum() != 0;
   Json gm = v.get("gMode"); if (gm.isStr()) V.gAdsr = gm.asStr() == "ADSR";
+  V.gLines = unitL(v, "gU"); { static const char* const kG[4] = {"gAtkL", "gHoldL", "gDecL", "gRelL"}; for (int i = 0; i < 4; i++) V.gL[i] = lnum(v, kG[i]); }   // web #259
   num(v, "gAtk", V.gAtk); num(v, "gHold", V.gHold); num(v, "gDec", V.gDec); num(v, "gSus", V.gSus); num(v, "gRel", V.gRel); num(v, "gAmpAmt", V.gAmpAmt);
   static const char* const kRate[3] = {"lfo1Rate", "lfo2Rate", "lfo3Rate"}, *const kShape[3] = {"lfo1Shape", "lfo2Shape", "lfo3Shape"}, *const kDepth[3] = {"lfo1Depth", "lfo2Depth", "lfo3Depth"}, *const kSync[3] = {"lfo1Sync", "lfo2Sync", "lfo3Sync"};
   static const char* const kA[3] = {"env1A", "env2A", "env3A"}, *const kD[3] = {"env1D", "env2D", "env3D"}, *const kS[3] = {"env1S", "env2S", "env3S"}, *const kR[3] = {"env1R", "env2R", "env3R"};

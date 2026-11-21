@@ -43,7 +43,7 @@ static bool readFile(const std::string& path, std::string* out) { std::ifstream 
 
 static uint64_t fnv(const float* f, size_t n) { uint64_t h = 0xcbf29ce484222325ull; const unsigned char* u = (const unsigned char*)f; for (size_t i = 0; i < n * 4; i++) { h ^= u[i]; h *= 0x100000001b3ull; } return h; }
 
-struct Ev { int b = 0; bool stopAll = false; double at = 0; SeqEvent e; std::vector<double> arp; };
+struct Ev { int b = 0; bool stopAll = false, stpMsg = false; double at = 0; int track = 0; SeqEvent e; std::vector<double> arp; };
 
 static SeqEvent toEvent(Json j, std::vector<double>* arp) {
   SeqEvent e; const std::string_view ty = j.str("type");
@@ -74,7 +74,8 @@ static bool runCase(Json meta, Result* R) {
     VoiceKit k; Json q = kj.at(i); k.choke = (int)q.num("choke"); k.syn = q.boolean("syn"); k.rel = q.num("rel"); kits.push_back(k); }
   std::vector<Ev> evs; Json ej = meta.arr("events");
   for (size_t i = 0; i < ej.size(); i++) { Ev v; v.b = (int)ej.at(i).num("b"); Json e = ej.at(i).obj("e");
-    if (e.str("op") == "stopAll") { v.stopAll = true; v.at = e.num("at"); } else v.e = toEvent(e, &v.arp); evs.push_back(std::move(v)); }
+    if (e.str("op") == "stopAll") { v.stopAll = true; v.at = e.num("at"); } else if (e.str("op") == "stp") { v.stpMsg = true; v.at = e.num("t", 0); v.track = (int)e.num("track", -1); }   // the core's reset-track message: Pool::stopTrack
+    else v.e = toEvent(e, &v.arp); evs.push_back(std::move(v)); }
   VoicePool pool(SR, 64);
   std::vector<float> L((size_t)K * N), Rr((size_t)K * N); float* ls[thunder::kVoiceTracks] = {}; float* rs[thunder::kVoiceTracks] = {};
   for (int t = 0; t < K; t++) { ls[t] = &L[(size_t)t * N]; rs[t] = &Rr[(size_t)t * N]; }
@@ -84,6 +85,7 @@ static bool runCase(Json meta, Result* R) {
     pool.setTime(t0);
     for (const Ev& v : evs) if (v.b == b) {
       if (v.stopAll) { pool.stopAll(v.at); continue; }
+      if (v.stpMsg) { pool.stopTrack(v.track, v.at); continue; }
       const SeqEvent& e = v.e; const double* arp = v.arp.empty() ? nullptr : v.arp.data();
       switch (e.type) {
         case SEV_OFF: pool.off(e); break;

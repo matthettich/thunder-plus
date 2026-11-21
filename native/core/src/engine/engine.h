@@ -20,6 +20,7 @@
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <limits>
 
 #include "engine/layer_params.h"
 #include "engine/layer_pe_params.h"
@@ -60,6 +61,8 @@ enum class LType : uint8_t { Sine, Tri, Saw, Square, Pulse, White, Pink, Brown, 
 LType eng_layer_type(const char* name, size_t n);   // the layer's `type` string; Other for a type this unit does not port (the JS's own names for all of them: see TYPES)
 bool eng_type_supported(LType t);
 
+constexpr double kEngNoLines = std::numeric_limits<double>::quiet_NaN();   // an absent `...L` key
+
 struct EngLayer {                       // freshLayer's fields that render (the rest of the JS object is for other layer types and the UI)
   bool on = false;
   LType type = LType::Sine;
@@ -71,6 +74,10 @@ struct EngLayer {                       // freshLayer's fields that render (the 
   EngU23 u23;                           // U23: wavetable / sample / vint / loop fields and the sample (layer_params.h)
   EngPE pe;                             // U25: the Plaits / Elements fields (layer_pe_params.h)
   double seed = 1;                      // the number the JS holds (a uint32 from the counter, or whatever a song says)
+  // ENVELOPE TIMES IN LINES (web #259, index.html:5127): the unit fields. aLines = `aU === 'l'` (the amp's atk hold dec rel), fLines = `fU === 'l'` (fAtk fDec). aL / fL are the saved `atkL holdL decL relL` /
+  // `fAtkL fDecL` in lines; NaN = the key is absent (null or undefined: the JS then takes msLines of the saved ms). The ms fields above stay as saved until eng_env_lines_fit rewrites them.
+  bool aLines = false, fLines = false;
+  double aL[4] = {kEngNoLines, kEngNoLines, kEngNoLines, kEngNoLines}, fL[2] = {kEngNoLines, kEngNoLines};
 };
 
 struct EngFx {                          // one entry of V.fx: the four JS effects' values as the page's own (bits, rate in Hz, time in ms ...); a value the JS leaves undefined is NaN
@@ -99,6 +106,8 @@ struct EngVoice {                       // mkVoice's fields that render (index.h
   double envA[3] = {10, 10, 1}, envD[3] = {300, 300, 500}, envS[3] = {0.7, 0, 0.5}, envR[3] = {200, 200, 300};
   double seqRate = 8, seqDepth = 0, seqSync = 0, seq[32] = {};
   double rdst[7] = {}, ramt[7] = {};    // r1dst .. r7dst, r1amt .. r7amt
+  bool gLines = false;                  // `gU === 'l'`: the pad amp's gAtk gHold gDec gRel are in lines (gL = gAtkL gHoldL gDecL gRelL; NaN = absent), only with gAmpOn
+  double gL[4] = {kEngNoLines, kEngNoLines, kEngNoLines, kEngNoLines};
 };
 
 // ---- the render ----------------------------------------------------------------------------------------------------------------------------------------
@@ -114,6 +123,15 @@ size_t eng_render_bound(const EngVoice& V, const EngRenderOpts& o);
 int eng_render_voice(const EngVoice& V, const EngRenderOpts& o, float* out, size_t cap, size_t* n);
 // The same without the pad effects, the trailing trim and the fade: renderLayersOnly's `out` before them (N floats): what tests and later units may want to probe.
 size_t eng_layers_len(const EngVoice& V, const EngRenderOpts& o);   // N
+
+// ENVELOPE TIMES IN LINES (web #259; index.html envLinesFit :5134, linesMs :5129, envMs :5132). The HOST calls this on its copy of a voice before eng_render_voice (control thread, allocation-free):
+// every time kept in lines becomes ms at the SONG's tempo and LPB (seconds = lines / lpb * 60 / bpm, one stage at most 64 s) and the pad is lengthened to fit (V.len, *hold). bpm = songBpm() (the song's own
+// bpm, 120 when 0 / NaN), lpb = songLpb() (round(S.lpb || 4), at least 1), both as they are when the render STARTS (not a tempo command's, not the tempo at a note). Returns false and changes nothing when
+// the voice has no lines envelope (voiceLines): such a voice renders exactly as before. *hold: renderVoice's `hold` in and out (seconds).
+bool eng_env_lines_fit(EngVoice& V, double* hold, double bpm, double lpb);
+// One layer's / the pad's release in ms as the page's relOf reads it (envMs(L, 'aU', 'rel'), envMs(V, 'gU', 'gRel')): the note-off fade the host hands to the core (kit[].rel).
+double eng_layer_rel_ms(const EngLayer& L, double bpm, double lpb);
+double eng_voice_grel_ms(const EngVoice& V, double bpm, double lpb);
 
 struct EngMod { double pitch, level, lpcut, hpcut; };
 EngMod eng_voice_mod(const EngVoice& V, double t, double bpm);   // voiceMod

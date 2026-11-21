@@ -112,6 +112,8 @@ struct SeqEvent {
   // applyChop (CHOP-NOTES.md): ofsSec / durSec with SH_CHOP; stBpm / stBeats / stMode / stGrain with SH_ST
   double ofsSec = 0, durSec = 0, stBpm = 0, stBeats = 0;
   uint8_t stMode = 0, stGrain = 0;
+  // WEB-FOLLOW: OLDSCHOOL (sync 3 + sx 1) adds sx / gs / rp / x / pt to the JS's ev.st (applyChop, index.html:23777); carried for a stretch port, nothing plays them yet. stSx 0 = the key is absent
+  double stGs = 0; uint8_t stSx = 0, stRp = 0, stX = 0; int8_t stPt = 0;
 };
 
 // Where a track was on this step (the JS's `pos`: the playhead, the piano's sounding notes).
@@ -195,7 +197,10 @@ class Seq {
   struct Lfo { bool present; int id; bool ok; double sh, rt, dp; };
   struct PEv { uint8_t type; int track, slot, pi; double v; };
   struct PInst { bool present = false; double pad = 0, tsp = 0, vol = 0, pan = 0, ofs = 0; int hut = 0, huv = 0; bool kf = false, rev = false;
-    int slc = 0; bool smode = false, sync = false; int sy = 0, grain = 1; double beats = 4; };   // applyChop: I.slc|0, I.smode, I.sync (truthy) and I.sync|0, I.grain, I.beats || 4
+    int slc = 0; bool smode = false, sync = false; int sy = 0, grain = 1; double beats = 4;   // applyChop: I.slc|0, I.smode, I.sync (truthy) and I.sync|0, I.grain, I.beats || 4
+    double linesRaw = 0;   // the value the division uses: a part's instrument is raw (index.html:23793 `I.lines / (S.lpb || 4)`); a song instrument's is its (integer) lines
+    int lines = 0;   // I.lines | 0 (SYNC TO LINES: > 0 = the length in lines of the SONG's lpb; instBeats)
+    int sx = 0, ou = 0, orp = 0, ox = 0, opt = 0; double og = 12; };   // I.sx | 0 (1 with sync 3 = OLDSCHOOL), I.ou, I.orp, I.ox, I.opt, I.og (osGrainSecs)
   struct Part { bool present = false; std::vector<PEv> evs; std::vector<PInst> insts; };
   struct Chase { uint32_t seed; int16_t tch; uint8_t hasSeed, skp, chd; };
 
@@ -290,6 +295,7 @@ class Seq {
   uint64_t badSets_ = 0;
   uint64_t chopped_ = 0, chopSkipped_ = 0, chopNoHits_ = 0, chopStretched_ = 0;
   void applyChop(SeqEvent& ev, const PInst& I, int n, double semis, double bpm);
+  double instBeats(const PInst& I) const;   // index.html:23793 instBeats: lines > 0 ? lines / (S.lpb || 4) : (I.beats || 4)
   uint64_t dropped_ = 0; int maxEvs_ = 0, maxArp_ = 0;
 };
 

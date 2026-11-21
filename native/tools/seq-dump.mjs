@@ -14,9 +14,10 @@ import path from 'node:path';
 import vm from 'node:vm';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
+import { seqCoreText } from './webref.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
-const src = fs.readFileSync(path.join(ROOT, 'core/seq-core.js'), 'utf8');
+const src = seqCoreText();   // the pinned beta copy (native/tests/web-ref, see web-pin.mjs); THUNDER_WEB_REF=root reads the repository root's older core/seq-core.js
 const ctx = vm.createContext({ console, registerProcessor() {}, AudioWorkletProcessor: class { constructor() { this.port = { postMessage() {}, onmessage: null }; } },
   sampleRate: 48000, currentTime: 0, currentFrame: 0 });
 vm.runInContext(src + '\n;globalThis.__u07 = { makeSeq, coreSeeded, corePlain, coreNum, FXC,' +

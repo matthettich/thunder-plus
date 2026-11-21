@@ -50,6 +50,7 @@ class SfPool {
   void mod(const SeqEvent& e, const double* arp);
   void stp(const SeqEvent& e);
   void stopAll(double at);
+  void stopTrack(int track, double t);   // the reset-track message: VoicePool::stopTrack, same contract
   // The poly cap across the two pools (VoicePool::stamp / liveOnTrack / oldestOnTrack / releaseOldest, same contract; verify-242 F3).
   void stamp(uint64_t serial) { stamp_ = serial; }
   int liveOnTrack(int track, double t);
