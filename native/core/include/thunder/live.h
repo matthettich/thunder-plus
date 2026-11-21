@@ -61,7 +61,7 @@
                 have fixed sizes, the same on wasm32 and 64-bit (no pointer, no size_t, no long): see EVENTS. A function a build does not have is not exported; the
                 caps word says which optional parts the build has.
 
-   NOT IN THIS API  chains and bus modules (the chains host: ruling D1; a song that uses them falls back to the JS core); the stretch (sync 2 / 3, sx: D10); LXR (U04's
+   NOT IN THIS API  chains and bus modules (the chains host: ruling D1; a song that uses them falls back to the JS core); the stretch (sync 2 / 3, sx: D10); the U04 drum module (U04's
                 seam is not wired; `lxp` has no function); a live swap of pump effects (D1; psetPump exists in C++, but one command would be 1.1 KB); note.on / note.off from
                 the host (keys, previews and MIDI thru stay with the page: D16); MIDI in, MIDI clock in, Link, recording, input metering; pad renders, song renders and
                 stems (render.h); the live engines other than bass / vox / acid / mach (D8: a pad of another kind stays on the SAMPLER route and plays its rendered twin);
