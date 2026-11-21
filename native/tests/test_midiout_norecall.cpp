@@ -52,7 +52,7 @@ std::string songText() {   // the debug song of midi_out.cpp
 struct Result { bool ok = true; uint64_t released = 0, cleared = 0, sent = 0; int clears = 0; int stuck = 0, dup = 0; };
 
 // One run. leadNs: the Stop is issued this long BEFORE the second note-on's time (negative: after it).
-Result run(int mode, int64_t latNs, double gearMs, int64_t leadNs) {
+Result run(int mode, int64_t latNs, double gearMs, int64_t leadNs, int64_t pumpDelayNs = 0) {   // pumpDelayNs: the pump does not run for this long after the Stop is posted (the CLEAR is drained late)
   const double sr = 48000; const int blk = 128; const int64_t H0 = 1000000000LL;
   Os os; os.mode = mode; os.now = H0;
   thunder_midiout_sink sk; std::memset(&sk, 0, sizeof sk); sk.user = &os; sk.now_ns = Os::nowFn; sk.send = Os::sendFn; sk.clear = mode == 0 ? nullptr : Os::clearFn; sk.caps = THUNDER_MIDIOUT_CAP_TS;
@@ -86,9 +86,8 @@ Result run(int mode, int64_t latNs, double gearMs, int64_t leadNs) {
       thunder_midiout_clock_map(o, frames, H0 + (int64_t)(now * 1e9) + latNs);
       frames += blk; nextBlk += blkNs;
     }
-    thunder_midiout_pump(o, nullptr);
+    if (!stopped || t >= tStop + pumpDelayNs) thunder_midiout_pump(o, nullptr);
   }
-  (void)tStop;
   Result R; thunder_midiout_stats ss; std::memset(&ss, 0, sizeof ss); ss.size = sizeof ss; thunder_midiout_stats_get(o, &ss);
   R.released = ss.released_after_stop; R.cleared = ss.dropped_cleared; R.sent = ss.sent; R.clears = os.clears;
   // the device's view: what was not recalled, by stamp (then by arrival)
@@ -120,6 +119,15 @@ int main() {
     if (!R.ok) { bad++; if (bad <= 10) std::printf("FAIL mode %d lat %lld ms gear %.0f lead %d ms: %d notes left on, %d replayed note-ons\n", mode, (long long)(lat / 1000000), gear, lead, R.stuck, R.dup); g_fail++; }
     if (mode == 2) CHECK(R.released == 0, "a recalling sink never gets a release (lat %lld gear %.0f lead %d: %llu)", (long long)(lat / 1000000), gear, lead, (unsigned long long)R.released);
   }
+  // the CLEAR is drained late (the pump stalls after the Stop): a note-on that was handed over, and is already due when the CLEAR is drained, must be released too, with every kind of sink
+  uint64_t lateReleased[3] = {0, 0, 0};
+  for (int mode = 0; mode <= 2; mode++) for (int64_t lat : {(int64_t)0, (int64_t)5000000}) for (double gear : gears) for (int64_t dly : {500000LL, 2000000LL, 10000000LL}) for (int lead = -5; lead <= 25; lead++) {
+    const Result R = run(mode, lat, gear, (int64_t)lead * 1000000LL, dly);
+    runs++; lateReleased[mode] += R.released;
+    if (!R.ok) { bad++; if (bad <= 10) std::printf("FAIL late drain %lld us mode %d lat %lld ms gear %.0f lead %d ms: %d notes left on, %d replayed note-ons\n", (long long)(dly / 1000), mode, (long long)(lat / 1000000), gear, lead, R.stuck, R.dup); g_fail++; }
+  }
+  std::printf("late drain: releases sent: no clear %llu, INT64_MAX %llu, recalling %llu\n", (unsigned long long)lateReleased[0], (unsigned long long)lateReleased[1], (unsigned long long)lateReleased[2]);
+  CHECK(lateReleased[2] > 0, "a recalling sink releases a note-on that was already due when the CLEAR was drained (%llu)", (unsigned long long)lateReleased[2]);
   std::printf("%d runs, %d with a stuck or replayed note; releases sent: no clear %llu, clear returns INT64_MAX %llu, recalling %llu\n", runs, bad, (unsigned long long)releasedTotal[0], (unsigned long long)releasedTotal[1], (unsigned long long)releasedTotal[2]);
   CHECK(releasedTotal[0] > 20 && releasedTotal[0] == releasedTotal[1], "the release path was exercised and is the same for a NULL clear and INT64_MAX (%llu, %llu)", (unsigned long long)releasedTotal[0], (unsigned long long)releasedTotal[1]);
   if (g_fail) { std::printf("%d FAILED\n", g_fail); return 1; }

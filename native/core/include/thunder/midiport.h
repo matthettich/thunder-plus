@@ -77,8 +77,8 @@ typedef struct thunder_midiout_sink {        /* implemented by the shell */
                                                 with a stamp LATER than R was dropped, one stamped at or before R was not (it has been sent or will play). Return 0 (any time not after the core's own clock) when
                                                 everything not yet due was recalled: today's behaviour, the core replays what came before the marker. Return INT64_MAX when nothing was recalled (what a NULL clear means). A sink that
                                                 recalls only part must return INT64_MAX (or the time up to which it is sure nothing was recalled): never claim a recall that did not happen. What was NOT recalled plays, so
-                                                the core does not replay it, and for every note-on after the CLEAR's frame that it hands to a not-recalled stamp it sends the matching note-off (RELEASE_GAP_NS after the
-                                                note-on's stamp): the device is never left holding a note */
+                                                the core does not replay it, and for every note-on after the CLEAR's frame that it handed over and that was not recalled (also one that was already due when the CLEAR
+                                                was drained) it sends the matching note-off (RELEASE_GAP_NS after the note-on's stamp, or at once if that is past): the device is never left holding a note */
   uint32_t caps;                             /* THUNDER_MIDIOUT_CAP_TS or 0 */
 } thunder_midiout_sink;
 

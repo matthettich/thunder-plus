@@ -176,18 +176,24 @@ void markGone(thunder_midiout* o, int cable, uint64_t tok) {
 // A CLEAR marker (the cable's STOP): what is queued for the cable after the marker's frame goes. What the OS already holds, stamped for later (CAP_TS), is recalled with the sink's
 // clear(), which drops EVERYTHING the device holds, the messages before the marker's frame too (CoreMIDI's MIDIFlushOutput): those are sent again with the same stamp.
 // clear() returns R, the time up to which nothing was recalled (midiport.h): no clear, or R = INT64_MAX, recalls nothing. What is NOT recalled plays: it is not replayed, and a note-on after
-// the marker that is still to play (stamp in (t, R]) gets its note-off here, stamped RELEASE_GAP_NS after it (MidiSched::releaseAll undid that note-on, so no off was made for it, and its
-// off for the pitch that was already sounding is stamped at the marker, BEFORE it): the last message for every note of the device is a note-off. A recalling sink (R <= t) is untouched.
+// the marker that was handed over and not recalled (stamp at or before max(R, t): still to play, or already due and sent) gets its note-off here, stamped RELEASE_GAP_NS after it, or at t
+// if later (MidiSched::releaseAll undid that note-on, so no off was made for it, and its off for the pitch that was already sounding is stamped at the marker, BEFORE it): the last
+// message for every note of the device is a note-off. A recalling sink adds note-offs only for a note-on that was already due when the CLEAR was drained (a late pump); clear() is
+// asked only for a device that holds something a recall can reach (stamp after t).
 void applyClear(thunder_midiout* o, const thunder_midi_msg& m, int64_t now) {
   uint64_t n = 0;
   for (int i = o->tail - 1; i >= o->head; i--) if (o->q[i].cable == m.cable && o->q[i].frame > m.frame) { qRemove(o, i); n++; }
   if (!(o->sink.caps & THUNDER_MIDIOUT_CAP_TS)) { if (n) bump(o, S_CLEARED, n); return; }
   const int64_t t = o->sink.now_ns(o->sink.user); (void)now;
-  uint64_t devs[kHand]; int nd = 0;
-  for (int i = 0; i < kHand; i++) { const auto& h = o->hand[i]; if (h.live && !h.done && h.m.cable == m.cable && h.m.frame > m.frame && h.at > t) {   // only a device that holds something this CLEAR cancels is asked
-    bool seen = false; for (int k = 0; k < nd; k++) seen = seen || devs[k] == h.dev; if (!seen) devs[nd++] = h.dev; } }
+  uint64_t devs[kHand]; bool ask[kHand]; int nd = 0;   // every device with a handed-over message after the marker; ask = clear() is called (something a recall can reach: stamp after t)
+  for (int i = 0; i < kHand; i++) { const auto& h = o->hand[i]; if (h.live && !h.done && h.m.cable == m.cable && h.m.frame > m.frame) {
+    int k = 0; while (k < nd && devs[k] != h.dev) k++;
+    if (k == nd) { devs[nd] = h.dev; ask[nd] = false; nd++; }
+    if (h.at > t) ask[k] = true; } }
   for (int k = 0; k < nd; k++) {
-    int64_t R = o->sink.clear ? o->sink.clear(o->sink.user, devs[k]) : INT64_MAX;
+    int64_t R = t;   // nothing to recall: what is already due was not recalled
+    if (ask[k]) {
+    R = o->sink.clear ? o->sink.clear(o->sink.user, devs[k]) : INT64_MAX;
     if (R < t) R = t;   // a recall cannot reach what is already due
     bool failed = false;
     for (int i = 0; i < kHand; i++) {   // the ring is in send order: the ones before the marker are sent again, in that order (only what was recalled: stamp after R)
@@ -200,8 +206,9 @@ void applyClear(thunder_midiout* o, const thunder_midi_msg& m, int64_t now) {
         markGone(o, h.m.cable, h.dev);   // the same rule as a normal send: the failed token
       }
     }
-    // what was not recalled and still plays: P = live, not yet handled, this device and cable, after the marker, stamp in (t, R]
-    auto inP = [&](const auto& h) { return h.live && !h.done && h.dev == devs[k] && h.m.cable == m.cable && h.m.frame > m.frame && h.at > t && h.at <= R; };
+    }
+    // what was not recalled and plays or has played: P = live, not yet handled, this device and cable, after the marker, stamp at or before R (R >= t)
+    auto inP = [&](const auto& h) { return h.live && !h.done && h.dev == devs[k] && h.m.cable == m.cable && h.m.frame > m.frame && h.at <= R; };
     for (int i = 0; i < kHand; i++) {
       auto& e = o->hand[(o->handN + i) % kHand];
       if (!inP(e)) continue;
