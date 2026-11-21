@@ -332,7 +332,7 @@ void testClearDropsHeld() {
   // nothing is recalled from a stamped port, so what it holds plays: the note after the marker (62) plays once, and the core releases it (a note-off stamped at least 1 ms after it)
   // (on a starved machine the pump drains the CLEAR before it hands note 62 over: the queue part removes it, it never plays: 0 and 0; a note that did play must have its release)
   CHECK((s.io->count(0x91, 62) == 1 && s.io->count(0x81, 62) == 1) || (s.io->count(0x91, 62) == 0 && s.io->count(0x81, 62) == 0), "note 62 after the marker: on %d, off %d", s.io->count(0x91, 62), s.io->count(0x81, 62));
-  CHECK(lastEventIsOff(*s.io, 0x01, 61) && lastEventIsOff(*s.io, 0x01, 62), "by time, the last event of every note is a note-off");
+  CHECK(lastEventIsOff(*s.io, 0x01, 61) && (s.io->count(0x91, 62) == 0 || lastEventIsOff(*s.io, 0x01, 62)), "by time, the last event of every note that played is a note-off (note 62 may never have played: see above)");
   CHECK(outStats(s.h).released_after_stop == (uint64_t)s.io->count(0x91, 62), "a release counted for a note that played, got %llu", (unsigned long long)outStats(s.h).released_after_stop);
   s.h.engineStop();
 }
