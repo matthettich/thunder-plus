@@ -126,6 +126,7 @@ class PadsHost {
   // U37 P2, the budget's figures (control thread): the bytes of every PadBuf alive (the builder's current ones, those in snapshots, and the RETIRED ones that voices may still read), and of those the retired ones.
   size_t bytesHeld() const { return bytes_; }
   size_t bytesRetired() const;
+  int boardSlots() const { return nBoard_; }          // the voice slots the epoch board was sized for at create() (verify-276 R2-4: beginQuantum asserts it equals the pool's epochSlots())
   uint64_t made() const { return made_; }
   uint64_t freed() const { return freed_; }
   uint64_t lastEpoch() const { return nextEpoch_ - 1; }
