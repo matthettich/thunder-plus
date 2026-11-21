@@ -2,6 +2,7 @@
 #include "render/render.h"
 
 #include <algorithm>
+#include <cassert>
 
 #include "midi/midi_host.h"
 #include "render/players.h"
@@ -93,9 +94,11 @@ void SongRenderer::quantum() {
   const int N = kRenderQuantum;
   const double t0 = (double)qFrame_ / sr_;
   players_->setTime(t0, qFrame_); mix_.setTime(t0);
-  // U36 PR B, MIDI OUT (null hook: nothing here runs). A. before the steps: the posted commands, this block's figures. latencyFrames() is read every block, no cache (the web's moFxLat, A6); the clamp keeps midi_begin's
-  // argument check (0..2 s) from refusing a block over an absurd plan. The live engines run ahead by their latency and add none (LIVE-ROUTE-DESIGN L4).
-  const bool midi = midi_ && midi_begin(midi_, t0, (double)kRenderQuantum / sr_, std::min(2.0, std::max(0.0, (double)latencyFrames() / sr_)), mix_.audibleMask()) >= 0;
+  // U36 PR B, MIDI OUT (null hook: nothing here runs). A. before the steps: the posted commands, this block's figures. latencyFrames() is read every block, no cache (the web's moFxLat, A6). The calls
+  // cannot be refused (render.h): t0 is finite and >= 0, the quantum's length is a constant, the latency is clamped to 0..2 s, the Seq's tempo is 40..300 and its time finite. The live engines run ahead
+  // by their latency and add none (LIVE-ROUTE-DESIGN L4).
+  const bool midi = midi_ != nullptr;
+  if (midi) { [[maybe_unused]] const int rc = midi_begin(midi_, t0, std::min(1.0, (double)kRenderQuantum / sr_), std::min(2.0, std::max(0.0, (double)latencyFrames() / sr_)), mix_.audibleMask()); assert(rc >= 0); }
   // 1. step the song up to LEAD ahead (at most 3 steps a quantum, as the web core's block)
   int n = 0;
   while (seq_->alive() && seq_->time() < t0 + lead && n++ < 3) {
@@ -104,7 +107,7 @@ void SongRenderer::quantum() {
     if (midi) midi_sched(midi_).onStep(evs_.get(), k, *step_, *seq_, t0);   // B. the whole step first, then its events are dispatched (the order midi_drive.h pins)
     for (int i = 0; i < k; i++) { dispatch(evs_[i]); players_->samplePeak(); }
   }
-  if (midi) midi_end(midi_, t0, seq_->time(), seq_->bpm(), seq_->alive());   // C. book the outbox, the clock, the LFOs and publish
+  if (midi) { [[maybe_unused]] const bool ok = midi_end(midi_, t0, seq_->time(), seq_->bpm(), seq_->alive()); assert(ok); }   // C. book the outbox, the clock, the LFOs and publish
   if (!liveReleased_ && !seq_->alive()) { liveReleased_ = true; players_->songOver(seq_->time()); }   // C4: live voices are held until the song's end (the page cuts there; an unknown-length render must be able to end)
   // 2. the voices into their tracks' inputs, then the mixer
   players_->render(mix_.inputsL(), mix_.inputsR(), N, t0, qFrame_);

@@ -245,7 +245,7 @@ static void test4() {
   { Rig r; setDevs(r.o, {"X"}); thunder_midiout_assign(r.o, 0, "X"); r.proc();   // frames before the first map: nothing can be timed, so nothing is SENT; the record WAITS (ruling of 21 Nov: a lost Start is worse than a late burst)
     r.raw(0, {0x90, 60, 100}, 0.01); r.proc(); r.pump(); const auto s = statsOf(r.o);
     CHECK(s.sent == 0 && s.dropped_nomap == 0 && r.fk.rec.empty(), "4: before the first map the message is held, not sent and not dropped (%llu sent / %llu no-map)", (unsigned long long)s.sent, (unsigned long long)s.dropped_nomap);
-    thunder_midiout_clock_map(r.o, 0, r.host0); r.fk.now.store(r.host0 + 200000000); r.pump();
+    thunder_midiout_clock_map(r.o, 0, r.host0); r.fk.now.store(r.host0 + 80000000); r.pump();
     CHECK(r.fk.rec.size() == 1 && r.fk.rec[0].b[1] == 60, "4: when the first map arrives the held note is sent (%zu)", r.fk.rec.size()); }
   { Rig r; setDevs(r.o, {"X"}); thunder_midiout_assign(r.o, 0, "X"); r.proc();
     // smoothing: the first map is taken as it is, then 2 % of each difference; a jump over 50 ms is taken at once; 40 ms is smoothed
@@ -484,8 +484,8 @@ struct TokSink {
   }
   static void clearFn(void*, uint64_t) {}
 };
-// order 0: the shell's contract (clock_map BEFORE thunder_midi_process of the block: the pair is known in advance); order 1: the old order with a 3 ms gap after the FIRST process (midiout_flake, a permanent case):
-// the first records are drained while no map exists, are HELD, and nothing is lost.
+// clock_map once per callback AFTER process (the documented order). order 1 adds a 3 ms gap after the FIRST process (midiout_flake, a permanent case): the first records are drained while no map exists, are HELD,
+// and nothing is lost.
 static void threadsDevs(bool renumber, int order = 0) {
   thunder_midi* h = thunder_midi_create(48000, nullptr, 0); TokSink ts; thunder_midiout_sink sk; sk.user = &ts; sk.now_ns = TokSink::nowFn; sk.send = TokSink::sendFn; sk.clear = TokSink::clearFn; sk.caps = 0;
   thunder_midiout* o = thunder_midiout_create(h, 48000, &sk);
@@ -496,10 +496,9 @@ static void threadsDevs(bool renumber, int order = 0) {
   std::atomic<bool> stop{false}; const int64_t t0 = TokSink::nowFn(nullptr);
   std::thread audio([&] { int64_t b = 1; while (!stop.load()) { const double now = (double)b * 128 / 48000; const int64_t due = t0 + (int64_t)(now * 1e9);
     while (TokSink::nowFn(nullptr) < due && !stop.load()) std::this_thread::sleep_for(std::chrono::microseconds(100));
-    if (order == 0) thunder_midiout_clock_map(o, b * 128, due);
     thunder_midi_process(h, now, 128.0 / 48000, now, 120, 0);
-    if (order == 1) { if (b == 1) std::this_thread::sleep_for(std::chrono::milliseconds(3)); thunder_midiout_clock_map(o, b * 128, due); }
-    b++; } });
+    if (order == 1 && b == 1) std::this_thread::sleep_for(std::chrono::milliseconds(3));   // a pump in this gap meets records and no map: they are HELD
+    thunder_midiout_clock_map(o, b * 128, due); b++; } });
   std::thread sender([&] { while (!stop.load()) { thunder_midiout_pump(o, nullptr); std::this_thread::sleep_for(std::chrono::microseconds(200)); } });
   uint64_t posted = 0; int k = 0; const auto c0 = std::chrono::steady_clock::now(); auto lastPost = c0;
   while (std::chrono::steady_clock::now() - c0 < std::chrono::milliseconds(1500)) {
@@ -515,7 +514,7 @@ static void threadsDevs(bool renumber, int order = 0) {
   CHECK(posted > 500 && st.dropped_nomap == 0 && ts.sent.load() == posted, "L1%s: every posted note reached the sink once (posted %llu, sent %llu, no-map %llu, %d list swaps)", renumber ? "/L2 renumbered" : "", (unsigned long long)posted, (unsigned long long)ts.sent.load(), (unsigned long long)st.dropped_nomap, k);
   CHECK(st.dropped_gone == 0 && st.send_errors == 0 && st.dropped_cleared == 0, "L1%s: nothing was dropped as gone (%llu), no send error (%llu)", renumber ? "/L2 renumbered" : "", (unsigned long long)st.dropped_gone, (unsigned long long)st.send_errors);
   { thunder_midi_stats cs; std::memset(&cs, 0, sizeof cs); cs.size = sizeof cs; thunder_midi_stats_get(h, &cs);   // THE LEDGER: every record the core made is sent, or in exactly one drop counter (no CLEAR in this run, no CAP_TS: nothing is counted twice)
-    const uint64_t made = cs.sent, accounted = st.sent + st.dropped_gone + st.dropped_cleared + st.dropped_nomap + st.dropped_late_ticks + st.queue_full;
+    const uint64_t made = cs.sent, accounted = st.sent + st.dropped_gone + st.dropped_cleared + st.dropped_nomap + st.dropped_late_ticks + st.queue_full + st.dropped_stale;
     CHECK(cs.ring_full == 0 && made == accounted, "L1%s ledger: the core made %llu records (ring full %llu); sent %llu + gone %llu + cleared %llu + no-map %llu + late ticks %llu + queue full %llu = %llu", renumber ? "/L2" : "", (unsigned long long)made, (unsigned long long)cs.ring_full,
           (unsigned long long)st.sent, (unsigned long long)st.dropped_gone, (unsigned long long)st.dropped_cleared, (unsigned long long)st.dropped_nomap, (unsigned long long)st.dropped_late_ticks, (unsigned long long)st.queue_full, (unsigned long long)accounted); }
   CHECK(ts.wrong.load() == 0, "L2%s: no message reached the wrong device token (%llu)", renumber ? " renumbered" : "", (unsigned long long)ts.wrong.load());
@@ -541,7 +540,7 @@ static void testHold() {
     r.raw(0, {0xF2, 0, 0}, 0.0100); r.raw(0, {0xFA}, 0.0105); r.raw(0, {0x90, 60, 100}, 0.0110); r.raw(0, {0x90, 62, 100}, 0.0200); r.proc();
     r.pump(); r.proc(); r.pump(); const auto s0 = statsOf(r.o);
     CHECK(r.fk.rec.empty() && s0.sent == 0 && s0.dropped_nomap == 0, "hold 1: nothing is sent before the first map and nothing is dropped (%zu sent, %llu no-map)", r.fk.rec.size(), (unsigned long long)s0.dropped_nomap);
-    thunder_midiout_clock_map(r.o, 0, r.host0); r.fk.now.store(r.host0 + 500000000); r.pump(); const auto s1 = statsOf(r.o);
+    thunder_midiout_clock_map(r.o, 0, r.host0); r.fk.now.store(r.host0 + 60000000); r.pump(); const auto s1 = statsOf(r.o);   // inside the 150 ms backlog window
     const bool order = r.fk.rec.size() == 4 && r.fk.rec[0].b[0] == 0xF2 && r.fk.rec[1].b[0] == 0xFA && r.fk.rec[2].b[1] == 60 && r.fk.rec[3].b[1] == 62;
     CHECK(order && s1.sent == 4 && s1.dropped_nomap == 0, "hold 1: SPP, Start and both notes reach the sink in order once the map exists (%zu sent)", r.fk.rec.size()); }
   { // (2) no map ever, more records than the queue holds: nothing is sent; note-offs survive (evicting note-ons), every eviction is counted
@@ -554,7 +553,26 @@ static void testHold() {
     int offs = 0; for (const Rec& x : r.fk.rec) if (x.b[0] == 0x80) offs++;
     thunder_midi_stats cs; std::memset(&cs, 0, sizeof cs); cs.size = sizeof cs; thunder_midi_stats_get(r.h, &cs);
     CHECK(offs == 100 && s1.may_hang == 0, "hold 2: all 100 note-offs survived the full queue (%d), may_hang %llu", offs, (unsigned long long)s1.may_hang);
-    CHECK(cs.ring_full == 0 && cs.sent == s1.sent + s1.queue_full + s1.dropped_gone + s1.dropped_cleared + s1.dropped_late_ticks, "hold 2 ledger: made %llu = sent %llu + queue full %llu", (unsigned long long)cs.sent, (unsigned long long)s1.sent, (unsigned long long)s1.queue_full); }
+    CHECK(cs.ring_full == 0 && cs.sent == s1.sent + s1.queue_full + s1.dropped_gone + s1.dropped_cleared + s1.dropped_late_ticks + s1.dropped_stale, "hold 2 ledger: made %llu = sent %llu + queue full %llu", (unsigned long long)cs.sent, (unsigned long long)s1.sent, (unsigned long long)s1.queue_full); }
+}
+
+// 21 Nov ruling 3: at the FIRST map after a hold, a note-on or controller more than 150 ms in the past is dropped (dropped_stale); note-offs, Start / Stop / SPP / Continue are always sent (the verifier's 1.07 s probe)
+static void testBacklog() {
+  Rig r; setDevs(r.o, {"X"}); thunder_midiout_assign(r.o, 0, "X"); r.proc();
+  r.raw(0, {0xFA}, 0.005);
+  for (int k = 0; k < 400; k++) {
+    if (k % 66 == 0) { r.raw(0, {0x90, (uint8_t)(60 + k / 66), 100}, 0.010); r.raw(0, {0xB0, 7, (uint8_t)(k / 66)}, 0.011); r.raw(0, {0x80, (uint8_t)(60 + k / 66), 0}, 0.200); }
+    r.proc(); r.pump();
+  }
+  CHECK(r.fk.rec.empty(), "backlog: nothing is sent while no map exists (%zu)", r.fk.rec.size());
+  thunder_midiout_clock_map(r.o, 0, r.host0); r.fk.now.store(r.host0 + (int64_t)std::llround(r.now * 1e9)); r.pump(); const auto s = statsOf(r.o);
+  int ons = 0, ccs = 0, offs = 0, starts = 0; for (const Rec& x : r.fk.rec) { if (x.b[0] == 0x90 && x.b[2] > 0) ons++; if (x.b[0] == 0xB0) ccs++; if (x.b[0] == 0x80) offs++; if (x.b[0] == 0xFA) starts++; }
+  CHECK(ons == 1 && ccs == 1 && s.dropped_stale == 12, "backlog: the six older note-ons and six CCs (more than 150 ms ago) are dropped and counted, the one inside the window is sent (%d notes, %d CCs sent, %llu stale)", ons, ccs, (unsigned long long)s.dropped_stale);
+  CHECK(starts == 1 && !r.fk.rec.empty() && r.fk.rec[0].b[0] == 0xFA && offs >= 5, "backlog: Start and the due note-offs are always sent, Start first (%d starts, %d offs)", starts, offs);
+  // only the first map: a later late message is the ordinary rule (sent late, counted in `late`)
+  r.raw(0, {0x90, 70, 100}, 0.0); r.proc(); r.fk.now.store(r.fk.now.load() + 400000000); thunder_midiout_clock_map(r.o, (int64_t)std::llround(r.now * 48000), r.fk.now.load()); r.pump();
+  int on70 = 0; for (const Rec& x : r.fk.rec) if (x.b[0] == 0x90 && x.b[1] == 70) on70++;
+  CHECK(on70 == 1 && statsOf(r.o).dropped_stale == 12, "backlog: the rule applies once, at the first map (%d)", on70);
 }
 
 // PR B (CodeRabbit on #268): the gone mark holds the TOKEN that failed. A sink whose send fails and, INSIDE that call, makes control replace the device's token (set_devices with the same id and a new
@@ -661,7 +679,7 @@ static void testReview() {
 
 int main(int argc, char** argv) {
   if (argc > 1 && std::strcmp(argv[1], "--threads") == 0) { threadsOnce(0); threadsOnce(THUNDER_MIDIOUT_CAP_TS); threadsDevs(false); threadsDevs(true); threadsDevs(false, 1); std::printf(fails ? "midiport threads: FAILED\n" : "midiport threads: ok\n"); return fails ? 1 : 0; }
-  test12(); test6(); testTokens(); testHold(); testGoneToken(); testRates(); testReview(); test3(); test4(); test2(); test7(); testT2(); test1(); test5();
+  test12(); test6(); testTokens(); testHold(); testBacklog(); testGoneToken(); testRates(); testReview(); test3(); test4(); test2(); test7(); testT2(); test1(); test5();
   std::printf(fails ? "midiport: %d FAILED\n" : "midiport: all passed\n", fails);
   return fails ? 1 : 0;
 }

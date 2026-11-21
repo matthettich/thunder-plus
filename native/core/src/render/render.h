@@ -141,9 +141,14 @@ class SongRenderer {
   void setEffects(bool on);
   // MIDI OUT (U36 PR B, docs/port/U36-SPEC.md 2.2): the host's MIDI scheduler, fed from the block render. Null (the default) = nothing changes: every render, stem and golden is bit-identical.
   // With a hook, each quantum calls midi_begin(h, t0, kRenderQuantum / sr, latencyFrames() / sr, mixer().audibleMask()) before the step loop, MidiSched::onStep(evs, k, step, seq, t0) for each
-  // step BEFORE its events are dispatched, and midi_end(h, t0, seq time, bpm, alive) after the loop (so the records are made in the 128-frame quanta, whatever the host's block).
-  // The handle (midi/midi_host.h; the control thread creates it and posts PLAY / STOP / ports through thunder_midi_*) must outlive the renderer or be cleared first. Control thread, before the first
-  // block, like setEffects. Returns false (and leaves the hook null) for a stem render: it has no MIDI, and its forced mask is not the audible mask.
+  // step before its events are dispatched, and midi_end(h, t0, seq time, bpm, alive) after the loop (so the records are made in the 128-frame quanta, whatever the host's block). Every argument is
+  // finite and in range by construction (t0 >= 0, the quantum's length is a constant, the latency is clamped to 0..2 s, the Seq keeps its tempo in 40..300): the calls cannot be refused.
+  // WHAT THE HOST OWES (the renderer never touches the scheduler's transport): (1) the handle outlives the renderer (or setMidi(nullptr) first, between blocks); setMidi only before the first block, like
+  // setEffects, from the control thread; (2) post thunder_midi_start(h, spp) before the quantum in which the song starts, and setSeqStart(0.08) when it does (below: the web starts its sequencer 80 ms after
+  // Play, which is what gives SPP its 50 ms and a Gear delay its room); (3) post thunder_midi_stop(h) when STOP is asked, or 0.3 s after songOver() (the web's frame() rule); (4) run one more
+  // quantum (begin / end) after stopping before the renderer is destroyed, so the scheduler's releases and CLEARs are booked; (5) call thunder_midiout_clock_map once per audio callback AFTER the block.
+  // SEQUENCER START: the Seq starts at `sec` on the core's timeline (default 0: an offline render starts at once). The web's PLAY does seq.setTime(now + 0.08). Control thread, before the first block (false after it).
+  bool setSeqStart(double sec) { if (qFrame_ != 0 || !(sec >= 0) || !(sec < 3600)) return false; seq_->setTime(sec); return true; }
   bool setMidi(thunder_midi* h) { if (h && stem_ >= 0) return false; midi_ = h; return true; }
   FxBank* fxBank() { return fx_.get(); }
   // METERS (U13): every block, after the mixer, the tracks' post-pan pairs and the master output are fed to `bank` and its clock advanced (null: none). The bank outlives the renderer.

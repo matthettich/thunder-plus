@@ -33,7 +33,7 @@ void Players::note(const SeqEvent& e, const Seq& seq, const Song& song) {
   { const int ii = to_int_sat(e.ii, -1, 1 << 20); /* N1 C3: NaN is "none" */ if (ii >= 0 && ii < kNI && song.insts[ii].mo == 1) { st_.notesMidiOnly++; return; } }   // MIDI gear only: nothing sounds here
   const int pad = to_int_sat(e.pad, -1, 1 << 20);   // (N1 C3: a part without `pad` gives NaN: no pad, what x86 gave and what the JS's kit.voices[NaN] is)
   if (pad < 0 || pad >= kRenderPads) { st_.notesNoPad++; return; }
-  // B7 (setDropLate): too late to play, on any route. A mono note still ends the track's previous voices (and its choke group), as MidiSched does for the gear; a poly one touches nothing.
+  // B7 (setDropLate): too late to play, on any route (the web's core would play it at once: see players.h). A mono note still ends the track's previous voices (and its choke group), as MidiSched does for the gear; a poly one touches nothing.
   if (dropLate_.load(std::memory_order_relaxed) && seq_note_late(e.t, t0_)) { st_.notesLate++; if (!e.poly) { takeAll(e, pad); live_.take(e, pads_.kit[pad].choke); } return; }
   // D2: which player. A live-engine or SoundFont pad is not the sampler's: its notes are silent here (counted), but they still take the track over (a live note does: liveNote / sfNote).
   if (pads_.route[pad] == PadRoute::Live) {

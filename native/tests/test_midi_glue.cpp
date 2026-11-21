@@ -40,12 +40,21 @@ static int firstDiff(const std::vector<Rec>& a, const std::vector<Rec>& b) { con
 constexpr double kSr = 48000;
 struct Host {
   Case C; Song song; SeqVars vars; RenderPads pads; SeqOpts so; std::unique_ptr<thunder::SongRenderer> R; thunder_midi* h = nullptr; std::string text;
+  double seqStart = 0;          // SongRenderer::setSeqStart (the web's PLAY: 0.08 s)
+  bool sound = false;           // every instrument OUTPUT 2 (pad + MIDI) and every pad a tone: the render is NOT silent
+  std::vector<float> tone;
   Host() {}
   ~Host() { R.reset(); if (h) thunder_midi_free(h); }
   bool init(const std::string& songText, const Case& c, bool hook = true) {
     C = c; text = songText; JsonError je; if (!song.load(text.data(), text.size(), &je)) return false;
+    if (sound) {
+      tone.resize(48000); for (size_t i = 0; i < tone.size(); i++) tone[i] = 0.5f * (float)std::sin(0.05 * (double)i);
+      for (int i = 0; i < thunder::kNI; i++) song.insts[i].mo = 2;
+      for (int p = 0; p < thunder::kRenderPads; p++) { pads.buf[p].data = tone.data(); pads.buf[p].len = (int)tone.size(); pads.buf[p].sr = 48000; }
+    }
     so.live = true; so.row = C.row; if (C.hasLoop) { so.hasLoop = true; so.loopY0 = C.y0; so.loopY1 = C.y1; }
     R.reset(new thunder::SongRenderer(song, vars, pads, kSr, 4096, so, 16));
+    if (seqStart > 0 && !R->setSeqStart(seqStart)) return false;
     if (!hook) return true;
     h = thunder_midi_create(kSr, nullptr, 0); if (!h) return false;
     thunder_midi_set_song(h, (const uint8_t*)text.data(), text.size());
@@ -57,9 +66,11 @@ struct Host {
 };
 
 // The stream through the renderer: `frames` frames in host blocks of `block`, drained after every block.
-static bool runGlue(Host& H, int block, int64_t frames, std::vector<Rec>& out, std::vector<float>* audio = nullptr) {
-  std::vector<float> L((size_t)block), Rr((size_t)block); H.play();
+// `stopRule`: the host's STOP of the web's frame(): 0.3 s after the sequencer has ended, thunder_midi_stop (what the renderer's header says the host owes)
+static bool runGlue(Host& H, int block, int64_t frames, std::vector<Rec>& out, std::vector<float>* audio = nullptr, bool stopRule = false) {
+  std::vector<float> L((size_t)block), Rr((size_t)block); H.play(); bool stopped = false;
   for (int64_t done = 0; done < frames;) {
+    if (stopRule && !stopped && H.R->songOver() && (double)done / kSr > H.R->seqTime() + 0.3) { stopped = true; thunder_midi_stop(H.h); }
     const int n = (int)std::min<int64_t>(block, frames - done); H.R->block(L.data(), Rr.data(), n); done += n; H.drain(out);
     if (audio) { audio->insert(audio->end(), L.begin(), L.begin() + n); audio->insert(audio->end(), Rr.begin(), Rr.begin() + n); }
   }
@@ -109,13 +120,34 @@ static void test9() {
     cases++;
   }
   std::printf("9 glue_cadence: %d songs, %ld records compared with the scheduler driven directly\n", cases, records);
+  // THE REAL REFERENCE (21 Nov verifier F1): the renderer WITH the web's 0.08 s Seq start (setSeqStart) against runBlocks itself (block 128; Play at the first block at or after playAt; the Seq starts
+  // 0.08 s after it; no actions, no FX latency: the renderer has none here). Every record, every field, CLEAR applied by the same shell: the Play block's frame moves the renderer's. All 18 songs, start-midway and loop.
+  { const char* all[] = {"two-ports", "mono-notes", "tempo-clock", "echo", "lfo-cc", "bend-fine", "cc-ins", "cc-program", "chan-share", "column-switch", "modes-mixed", "muted-solo", "note-len", "overlap-poly", "slide-arp", "song-end", "velocity", "fx-latency", "start-midway", "loop"};
+    int n = 0; long recs = 0;
+    for (const char* nm : all) {
+      Case C; if (!loadCase(THUNDER_ROOT, nm, C)) { CHECK(false, "9: no case %s", nm); continue; }
+      C.actions.clear(); C.fxLat = 0;
+      Drive D; D.sr = kSr; if (!runBlocks(D, C, 128)) { CHECK(false, "9: runBlocks failed on %s", nm); continue; }
+      const int64_t total = (int64_t)C.endMs * (int64_t)kSr / 1000 / 128 + 1; int64_t b = 1; while ((double)(b * 128) / kSr * 1000 < C.playAt) b++;
+      Host H; H.seqStart = 0.08; if (!H.init(C.songText, C)) { CHECK(false, "9: %s does not build", nm); continue; }
+      std::vector<Rec> got; runGlue(H, 128, (total - b + 1) * 128, got, nullptr, true);
+      Drive G; G.C = C; std::vector<MidiMsg> raw(got.size()); for (size_t i = 0; i < got.size(); i++) std::memcpy(&raw[i], &got[i], sizeof(MidiMsg)); G.shell(raw.data(), (int64_t)raw.size());
+      const int64_t shift = b * 128; size_t bad = G.kept.size() == D.kept.size() ? G.kept.size() : 0; bool same = G.kept.size() == D.kept.size();
+      for (size_t i = 0; same && i < G.kept.size(); i++) { const Out& x = D.kept[i]; const Out& y = G.kept[i]; if (x.frame != y.frame + shift || x.port != y.port || x.len != y.len || x.kind != y.kind || x.cab != y.cab || std::memcmp(x.b, y.b, 3)) { same = false; bad = i; } }
+      CHECK(same && !D.kept.empty() && G.cleared == D.cleared, "9 glue_vs_runBlocks %s: the renderer with the 0.08 s start equals runBlocks record for record (%zu vs %zu records, first difference at %zu; cleared %lld vs %lld)", nm, G.kept.size(), D.kept.size(), bad, (long long)G.cleared, (long long)D.cleared);
+      if (!same && std::getenv("GLUE_DEBUG")) for (size_t i = 0; i < 6 && i < G.kept.size() && i < D.kept.size(); i++) std::printf("   rb %02x %02x %02x @%lld k%d p%d | gl %02x %02x %02x @%lld+%lld k%d p%d\n", D.kept[i].b[0], D.kept[i].b[1], D.kept[i].b[2], (long long)D.kept[i].frame, D.kept[i].kind, D.kept[i].port, G.kept[i].b[0], G.kept[i].b[1], G.kept[i].b[2], (long long)G.kept[i].frame, (long long)shift, G.kept[i].kind, G.kept[i].port);
+      n++; recs += (long)D.kept.size();
+    }
+    std::printf("9 glue_vs_runBlocks: %d songs, %ld records equal to runBlocks (setSeqStart 0.08)\n", n, recs); }
   // the hook never changes the audio, and no hook is the renderer as it was (the existing render, stem and golden tests are the other half of that)
   { Case C; if (!loadCase(THUNDER_ROOT, "two-ports", C)) { CHECK(false, "9: no two-ports case"); return; }
-    Host A, B; const bool okA = A.init(C.songText, C, false), okB = B.init(C.songText, C, true);
+    Host A, B; A.sound = B.sound = true; const bool okA = A.init(C.songText, C, false), okB = B.init(C.songText, C, true);
     if (!okA || !okB) { CHECK(false, "9: the audio comparison does not build"); return; }
     std::vector<float> a, b; std::vector<Rec> sink; const int64_t frames = 128 * 400;
     { std::vector<float> L(480), R(480); for (int64_t d = 0; d < frames;) { const int n = (int)std::min<int64_t>(480, frames - d); A.R->block(L.data(), R.data(), n); a.insert(a.end(), L.begin(), L.begin() + n); a.insert(a.end(), R.begin(), R.begin() + n); d += n; } }
     runGlue(B, 480, frames, sink, &b);
+    float pk = 0; for (float v : a) pk = std::max(pk, std::fabs(v));
+    CHECK(pk > 0.01f && A.R->stats().notesPlayed > 0, "9: the audio compared is NOT silent (peak %g, %d notes played)", (double)pk, A.R->stats().notesPlayed);
     CHECK(a.size() == b.size() && std::memcmp(a.data(), b.data(), a.size() * sizeof(float)) == 0, "9: the audio with the MIDI hook is bit-identical to the audio without it");
     CHECK(A.R->stats().steps == B.R->stats().steps && A.R->stats().events == B.R->stats().events, "9: the same steps and events with and without the hook"); }
 }
@@ -277,6 +309,20 @@ static void test11() {
       }
       (void)P;
     }
+  }
+  // the previous voice on the SoundFont and the live route (mutants M3b / M3c of the verifier: a late MONO note must end THEIR voices too; a late poly one touches nothing)
+  for (int poly = 0; poly < 2; poly++) {
+    if (haveSf) {
+      Players P(&pads, kPadSr, 16); P.setTime(T0, (int64_t)(T0 * kPadSr)); P.setDropLate(true);
+      P.dispatch(note(0, PAD_SF, T0 - 0.001, false, 0), seq, song);
+      const int before = P.sfPool().liveOnTrack(0, Q); P.dispatch(note(0, PAD_SMP, T0 - 0.16, poly != 0, 0), seq, song);
+      CHECK(before == 1 && P.stats().notesLate == 1 && P.sfPool().liveOnTrack(0, Q) == (poly ? 1 : 0), "11 players_late SoundFont previous voice, late %s note: before %d, after %d", poly ? "poly" : "mono", before, P.sfPool().liveOnTrack(0, Q));
+    }
+    { Players P(&pads, kPadSr, 16); P.setTime(T0, (int64_t)(T0 * kPadSr)); P.setDropLate(true);
+      LivePadConfig cfg; cfg.kind = LiveKind::Bass; cfg.trackMask = 1; const bool added = P.live().addPad(PAD_LIVE, cfg); CHECK(added, "11: a live bass pad");
+      P.dispatch(note(0, PAD_LIVE, T0 - 0.001, false, 0), seq, song);
+      const int before = P.live().liveOnTrack(0, Q); P.dispatch(note(0, PAD_SMP, T0 - 0.16, poly != 0, 0), seq, song);
+      CHECK(before == 1 && P.stats().notesLate == 1 && P.live().liveOnTrack(0, Q) == (poly ? 1 : 0), "11 players_late live previous voice, late %s note: before %d, after %d", poly ? "poly" : "mono", before, P.live().liveOnTrack(0, Q)); }
   }
   // off / mod / stp are never dropped for lateness
   { Players P(&pads, kPadSr, 16); P.setTime(T0, (int64_t)(T0 * kPadSr)); P.setDropLate(true);

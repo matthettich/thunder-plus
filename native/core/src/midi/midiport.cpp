@@ -78,13 +78,14 @@ struct thunder_midiout {
   // ---- the pump (SENDER thread only) ----
   thunder_midi_msg q[kQ]; int head, tail;       // sorted by frame (stable), the live part is [head, tail)
   uint32_t seenEpoch;
+  bool held;                               // PUMP thread: records were queued while no map existed (the first map's backlog rule applies once)
   struct Hand { thunder_midi_msg m; int64_t at; uint64_t dev; bool live; } hand[kHand]; int handN;   // the last stamped messages given to the OS (CAP_TS): what a CLEAR may have to recall (and what the OS's flush must not lose)
   struct { bool ok; double off; int64_t host; } lastSnap;   // the last map the pump read whole: kept when a writer is caught mid-update
-  std::atomic<uint64_t> st[10];                  // the stats, in the order of thunder_midiout_stats from `sent`
+  std::atomic<uint64_t> st[11];                  // the stats, in the order of thunder_midiout_stats from `sent`
 };
 
 namespace {
-enum St { S_SENT, S_GONE, S_CLEARED, S_NOMAP, S_LATE, S_QFULL, S_MAXQ, S_ERR, S_LATETICK, S_HANG };
+enum St { S_SENT, S_GONE, S_CLEARED, S_NOMAP, S_LATE, S_QFULL, S_MAXQ, S_ERR, S_LATETICK, S_HANG, S_STALE };
 inline void bump(thunder_midiout* o, int i, uint64_t n = 1) { o->st[i].store(o->st[i].load(std::memory_order_relaxed) + n, std::memory_order_relaxed); }   // one writer (the pump)
 inline void setSt(thunder_midiout* o, int i, uint64_t v) { o->st[i].store(v, std::memory_order_relaxed); }
 
@@ -215,7 +216,7 @@ thunder_midiout* thunder_midiout_create(thunder_midi* core_midi, double sample_r
   for (auto& s : o->st) s.store(0, std::memory_order_relaxed);
   o->epoch.store(0, std::memory_order_relaxed); o->outLat.store(0, std::memory_order_relaxed);
   o->busy.clear(); o->mseq.store(0, std::memory_order_relaxed); o->mOffBits.store(0, std::memory_order_relaxed); o->mHost.store(0, std::memory_order_relaxed); o->mValid.store(0, std::memory_order_relaxed);
-  std::memset(o->q, 0, sizeof o->q); o->head = o->tail = 0; o->seenEpoch = 0; std::memset(o->hand, 0, sizeof o->hand); o->handN = 0; o->lastSnap.ok = false; o->lastSnap.off = 0; o->lastSnap.host = 0;
+  std::memset(o->q, 0, sizeof o->q); o->head = o->tail = 0; o->seenEpoch = 0; o->held = false; std::memset(o->hand, 0, sizeof o->hand); o->handN = 0; o->lastSnap.ok = false; o->lastSnap.off = 0; o->lastSnap.host = 0;
   return o;
 }
 
@@ -314,6 +315,14 @@ bool readMap(const thunder_midiout* o, Snap& r) {   // false: no consistent snap
 }
 }  // namespace
 
+// A message the backlog rule may drop: a note-on or a controller (CC, pitch bend, pressure, program), never All Notes Off / All Sound Off, note-offs, Start / Stop / SPP / Continue, ticks (own rule).
+static bool staleClass(const thunder_midi_msg& m) {
+  const int ty = m.b[0] & 0xF0;
+  if (ty == 0x90) return m.len >= 3 && m.b[2] > 0;
+  if (ty == 0xB0) return !(m.len >= 2 && (m.b[1] == 120 || m.b[1] == 123));
+  return ty == 0xA0 || ty == 0xC0 || ty == 0xD0 || ty == 0xE0;
+}
+
 // ---- the pump ------------------------------------------------------------------------------------------------------------------
 int thunder_midiout_pump(thunder_midiout* o, int64_t* next_ns) {
   if (!o) return THUNDER_MIDIOUT_E_ARG;
@@ -330,6 +339,7 @@ int thunder_midiout_pump(thunder_midiout* o, int64_t* next_ns) {
     if (n <= 0) break;
     for (int64_t i = 0; i < n; i++) {
       if (buf[i].flags & THUNDER_MIDI_F_CLEAR) { applyClear(o, buf[i], now); continue; }
+      if (!map.valid) o->held = true;
       // no map yet: the record WAITS in the queue (its frame needs no map; step 3 sends nothing until one exists). A lost Start is worse than a late burst; the fixed queue and F4's eviction order bound it.
       enqueue(o, buf[i]);
     }
@@ -344,6 +354,7 @@ int thunder_midiout_pump(thunder_midiout* o, int64_t* next_ns) {
   }
   if (!map.valid) return 0;
   { const int64_t t = o->sink.now_ns(o->sink.user); if (t > now) now = t; }   // the drain and the CLEARs took time
+  const bool backlog = o->held; o->held = false;   // the first pump with a map after a hold: the backlog rule applies to what is due now
   const bool stale = now - map.host > THUNDER_MIDIOUT_STALE_NS;
   // 3. what is due
   int sent = 0;
@@ -365,6 +376,7 @@ int thunder_midiout_pump(thunder_midiout* o, int64_t* next_ns) {
     }
     o->head++;
     const int64_t late = now - at;
+    if (backlog && late > THUNDER_MIDIOUT_BACKLOG_NS && staleClass(m)) { bump(o, S_STALE); continue; }   // the one lateness rule at the first map: a note-on or controller from the past is not replayed
     if (m.b[0] == 0xF8 && late > THUNDER_MIDIOUT_TICK_LATE_NS) { bump(o, S_LATE); bump(o, S_LATETICK); continue; }   // B7: a late tick is dropped, never sent in a burst
     if (late > THUNDER_MIDIOUT_LATE_NS || stale) bump(o, S_LATE);
     const int r = o->sink.send(o->sink.user, dev, m.b, m.len, at);
@@ -387,7 +399,7 @@ int thunder_midiout_stats_get(const thunder_midiout* o, thunder_midiout_stats* o
   t.sent = o->st[S_SENT].load(std::memory_order_relaxed); t.dropped_gone = o->st[S_GONE].load(std::memory_order_relaxed); t.dropped_cleared = o->st[S_CLEARED].load(std::memory_order_relaxed);
   t.dropped_nomap = o->st[S_NOMAP].load(std::memory_order_relaxed); t.late = o->st[S_LATE].load(std::memory_order_relaxed); t.queue_full = o->st[S_QFULL].load(std::memory_order_relaxed);
   t.max_queue = o->st[S_MAXQ].load(std::memory_order_relaxed); t.send_errors = o->st[S_ERR].load(std::memory_order_relaxed); t.dropped_late_ticks = o->st[S_LATETICK].load(std::memory_order_relaxed);
-  t.may_hang = o->st[S_HANG].load(std::memory_order_relaxed);
+  t.may_hang = o->st[S_HANG].load(std::memory_order_relaxed); t.dropped_stale = o->st[S_STALE].load(std::memory_order_relaxed);
   { thunder_midi_stats cs; std::memset(&cs, 0, sizeof cs); cs.size = sizeof cs; if (thunder_midi_stats_get(o->core, &cs) == THUNDER_MIDI_OK && cs.may_hang) t.may_hang = 1; }   // the scheduler's own ring lost a note-off / Stop too
   const size_t n = out->size < sizeof t ? out->size : sizeof t; std::memcpy(out, &t, n);
   return THUNDER_MIDIOUT_OK;

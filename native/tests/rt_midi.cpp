@@ -124,11 +124,14 @@ int main(int argc, char** argv) {
   thunder_midi* h3 = thunder_midi_create(48000, nullptr, 0); if (!h3) return fail("create 3");
   thunder_midi_set_song(h3, (const uint8_t*)songText.data(), songText.size());
   for (int p = 0; p < 4; p++) thunder_midi_set_port(h3, p, 1, p < 2, p * 2.0, p);
-  thunder::RenderPads rpads; thunder::SeqOpts ro; ro.live = true; ro.hasLoop = true; ro.loopY0 = 0; ro.loopY1 = 0;
+  std::vector<float> tone(48000, 0.1f); thunder::RenderPads rpads;   // NON-EMPTY: every pad has a buffer, so the renderer's own Players play (and Players::note's lateness branch runs under the guard below)
+  for (int p = 0; p < thunder::kRenderPads; p++) { rpads.buf[p].data = tone.data(); rpads.buf[p].len = (int)tone.size(); rpads.buf[p].sr = 48000; rpads.kit[p].choke = p % 3; }
+  thunder::SeqOpts ro; ro.live = true; ro.hasLoop = true; ro.loopY0 = 0; ro.loopY1 = 0;
   std::unique_ptr<thunder::SongRenderer> rendp(new thunder::SongRenderer(D.song, D.vars, rpads, 48000, 128, ro, 16)); thunder::SongRenderer& rend = *rendp;
   if (!rend.setMidi(h3)) return fail("setMidi");
   rend.players().setDropLate(true);
   float rl[128], rr[128]; std::vector<thunder_midi_msg> gout(4096); long gmsgs = 0;
+  thunder::Players PL(&rpads, 48000, 16); PL.setDropLate(true); long lateIn = 0;   // late and on-time, mono and poly notes dispatched under the guard
   // the direct (C++) path: a scheduler of its own, fed by the runner, under the guard; and the C handle's process() with posted commands
   thunder::MidiSched s(48000); configure(s, C, D.song);
   thunder::SeqOpts o; o.live = true; o.hasLoop = true; o.loopY0 = 0; o.loopY1 = 0; thunder::Seq sq(D.song, D.vars, thunder::SeqMode::Song, o);
@@ -170,6 +173,7 @@ int main(int argc, char** argv) {
     g_nowNs = 1000000000 + (int64_t)b * 2666667;
     {
       rt_guard g;
+      { PL.setTime(now, (int64_t)b * 128); for (int k = 0; k < 4; k++) { thunder::SeqEvent e; e.type = thunder::SEV_NOTE; e.track = k; e.pad = (b + k) % 7; e.ii = -1; e.t = now + ((k & 1) ? 0.02 : -0.16); e.poly = k >= 2; e.rate = 1; e.gain = 1; e.pan = 128; e.vel = 1; PL.dispatch(e, sq, D.song); } }
       rend.block(rl, rr, 128);   // quantum(): midi_begin, onStep per step, midi_end, the Players (lateness drop on)
       run.pump(now, 0.25, evs.data(), (int)evs.size(), &st, [&](const thunder::SeqEvent* e, int n, const thunder::SeqStep& step) { s.onStep(e, n, step, sq, now); steps++; });
       s.book(now, sq.time(), sq.bpm(), sq.alive());
@@ -199,8 +203,10 @@ int main(int argc, char** argv) {
   thunder_midiout_stats ps; std::memset(&ps, 0, sizeof ps); ps.size = sizeof ps; thunder_midiout_stats_get(po, &ps);
   if (g_sent < 1000 || ps.sent != (uint64_t)g_sent) return fail("the pump did too little or its count is wrong");
   std::printf("rt_midi: the pump and the clock map (midiport): %ld messages sent, %llu dropped (gone) %llu cleared, no allocation, no lock\n", g_sent, (unsigned long long)ps.dropped_gone, (unsigned long long)ps.dropped_cleared);
+  lateIn = PL.stats().notesLate;
   if (gmsgs < 500 || rend.stats().steps < 100) return fail("the glue run did too little");
-  std::printf("rt_midi: SongRenderer::quantum() with setMidi: %ld records, %d steps, no allocation, no lock\n", gmsgs, rend.stats().steps);
+  if (lateIn < 1000 || PL.stats().notesPlayed < 1) { std::fprintf(stderr, "late %ld played %d renderer played %d\n", lateIn, PL.stats().notesPlayed, rend.stats().notesPlayed); return fail("the Players run did too little"); }
+  std::printf("rt_midi: SongRenderer::quantum() with setMidi: %ld records, %d steps; Players: %ld late notes dropped, %d played; no allocation, no lock\n", gmsgs, rend.stats().steps, lateIn, PL.stats().notesPlayed);
   rendp.reset();   // the renderer holds h3 until it is destroyed
   thunder_midiout_free(po); thunder_midi_free(h2); thunder_midi_free(h3);
   thunder_midi_free(h);

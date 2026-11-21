@@ -32,10 +32,12 @@ class Players {
   void setPads(const RenderPads* pads) { pads_ = pads; }
   // LATENESS (B7, U36 PR B). Off by default: every render is bit-identical to before. On (the live host turns it on): a NOTE whose time is more than kNoteLateSec (0.15 s, midisched.h seq_note_late) behind the
   // quantum's start t0 (setTime) is not played, by any route (sampler, SoundFont, live engine), and counts in stats().notesLate. A late MONO note (not e.poly) still lets go of the track's previous voices and its
-  // choke group (MidiSched's rule: "a late mono note still ends the previous note"); a late poly note touches nothing. Off / mod / stp and every other event are never dropped for lateness.
-  // The web: coreMsg drops a note more than 0.15 s late for the notes the PAGE plays (live engines, SoundFonts, variations: index.html coreMsg `e.t < ctx.currentTime - 0.15`); the web's own core plays its sampler notes at once whatever
-  // their lateness, which natively gives way to the one rule for pad and MIDI (the lead's ruling, U36-SPEC 2.5). A MIDI-only instrument (OUTPUT 1) sounds no pad and is not counted here, as before.
-  // Any thread (a relaxed atomic): the audio thread reads it in note(), a host may flip it between quanta.
+  // choke group (MidiSched's rule); a late poly note touches nothing. Off / mod / stp and every other event are never dropped for lateness.
+  // THIS IS NOT THE WEB'S RULE, ON PURPOSE. The web's own core PLAYS a late sampler, SoundFont or live-engine note at once (core-processor.js: sampler startNote at max(ev.t, currentTime) :591, SoundFont :447, live
+  // liveNote :694); index.html coreMsg drops `e.t < currentTime - 0.15` (:25325) only for notes the core did not play, because `if (e.core) continue` (:25315) comes first. And the web's gear path (moEv :18153, before
+  // that test) sends a late OUTPUT 2 note. Natively ONE rule covers pad and gear (the lead's ruling, U36-SPEC 2.5): after a stall or a seek of more than 0.15 s the pad and the gear agree and there is no burst of
+  // late hits; the web plays them in a burst. Audible difference: only when the sequencer lags the audio clock by more than 0.15 s. A late mono note ends the previous voice in both. A MIDI-only instrument
+  // (OUTPUT 1) sounds no pad and is not counted here, as before.
   void setDropLate(bool on) { dropLate_.store(on, std::memory_order_relaxed); }
 
   // A note, off, mod or stp event (any other type: returns false, nothing done). `seq` gives the arp table and the bpm the voices read.
