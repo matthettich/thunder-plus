@@ -6,7 +6,7 @@ Branch `n1/u37-p2-livehost` (base `native` 56ffdc3 + the P0 contract files from 
 - DONE, scope A: `native/core/src/live/live_host.cpp`: create / destroy, `process` (128-frame grid, re-anchor), command ring + 64-entry waiting list, song publish, pads (wrapping `PadsHost`, with the budget), transport (play, stop, hold, loop, bpm, lead, perf, stop_track), mix_set, the state machine (IDLE, PLAYING, HELD, ENDED, 0.3 s timer), both event rings merged by `seq` in `poll`, stats, host_stats, the step dump. `live/dump_plain.h` is the step dump's JSON writer.
 - DONE, scope B: `PadsHost::setPadTake`, the byte counter (`bytesHeld` / `bytesRetired`, retired buffers included), R2-2 (`beginQuantum` holds a pending snapshot when no Seq is passed after one was seen, counted in `orphanAdopts`), R2-4 (`assert(pl.epochSlots() == nBoard_)`, plus the accessor `boardSlots()` for a test that also works under NDEBUG).
 - DONE, tests (all in `native/tests`): `live_equals_render`, `live_step_dump`, `live_transport`, `live_events`, `live_pads`, `live_threads`; `rt_harness` runs `LiveHost::process` under the allocation guard (with and without the step dump); `live_pads_epoch` has checks for R2-2, setPadTake / the byte counter and R2-4.
-- NOT in P2 (scope C): effects (`fx_plan`, `fx_commit`, `fx_param`: E_STATE), master chain (`master_config`: E_STATE), PDC (`pdc_set`: E_STATE), MIDI (F_MIDI refused at create), meters (F_METERS refused), SoundFonts and live-engine pads (`font_add`, `pad_sf`, `pad_live`: E_UNSUPPORTED), the C API (`thunder_live_*` wrappers, `thunder_live_alloc`), wasm. `create` rejects F_MIDI / F_EFFECTS / F_MASTER / F_METERS with a clear error.
+- NOT in P2 (scope C): effects (`fx_plan`, `fx_commit`, `fx_param`: E_STATE), master chain (`master_config`: E_STATE), PDC (`pdc_set`: E_STATE), MIDI (F_MIDI / F_EFFECTS / F_MASTER refused at create), meters (F_METERS accepted, no METERS records), SoundFonts and live-engine pads (`font_add`, `pad_sf`, `pad_live`: E_UNSUPPORTED), the C API (`thunder_live_*` wrappers, `thunder_live_alloc`), wasm. `create` rejects F_MIDI / F_EFFECTS / F_MASTER with a clear error.
 
 ## Where each method stands
 create / ~LiveHost / collect / process: done. songPublish: done (IDLE ack, PLAYING successor snapshot, 17th waiting publish E_BUSY, session full flag). padSet / padTake / padKit / padRoute / varSet / padChop / padHits / padsPublish: done. play / stop / hold / loop / bpm / lead / perf / stopTrack / mixSet: done. poll / statsGet / hostStats / dumpStep: done. fxPlan / fxCommit / fxParam / pdcSet / masterConfig / midi* / metersWant / font* / padSf* / padLive*: stubs answering as live.h says for a host made without the part (P3, P4, later).
@@ -34,4 +34,15 @@ CONTROL calls: one thread at a time. AUDIO: `process` only (it allocates nothing
 3. The ENDED timer's start (departure 7): if the page wants it from the sequencer's end time, it is one line.
 
 ## Mutations (tests that kill them) and results
-(filled in at the end of the session)
+Each was applied to the code, the named test went red, and the change was undone (git clean afterwards):
+1. M1 `process` never re-anchors (live_host.cpp, the `frame0 != nextFrame_` test): `live_transport` fails (reanchors 0, no REANCHOR record).
+2. M2 waiting list holds 32 instead of 64: `live_transport` fails (the 65th is no longer the only late command).
+3. M3 `poll` merges the two rings in the wrong direction: `live_events` fails (seq not ascending).
+4. M4 the budget forgets retired bytes: `live_pads` fails (the transient E_LIMIT does not happen).
+5. M5 ENDED timer 0.2 s instead of 0.3 s: `live_transport` fails (STOPPED 9600 frames after).
+6. M6 R2-2 hold removed from `PadsHost::beginQuantum`: `live_pads_epoch` fails.
+7. M7 `setPadTake` forgets the byte counter: `live_pads_epoch` fails.
+
+## Test results so far
+- Release, full ctest: 213 of 213 passed (1 skipped: pumpsynth_refused) before the four new tests were registered; the four (live_transport, live_events, live_pads, live_threads) and live_equals_render, live_step_dump, live_pads_epoch pass (217 registered). rt_core (the harness incl. LiveHost with and without the dump) passes.
+- Checkpoint: the whole of scope A and B is built and green in Release. NEXT: ASan+UBSan run of the tests whose names contain live, render, players, seq, voice, mix, rt_ (reconfigure with -DTHUNDER_SANITIZE=ON, `ctest -R`), TSan run of live_threads and live_pads_epoch, then the PR into `native` (REST), delete the build dir.
