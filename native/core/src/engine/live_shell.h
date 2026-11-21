@@ -21,6 +21,7 @@
 #include "engine/bass_core.h"
 #include "engine/vox_core.h"
 #include "engine/xeng_live.h"
+#include "rt/auto.h"
 #include "rt/jsmath.h"
 
 namespace thunder {
@@ -83,7 +84,18 @@ class LiveShell {
   static constexpr uint32_t latency() { return kBlk - 1; }   // samples of delay between an event and the first sample it affects at the output
   bool failed() const { return failed_; }                // the JS core would have thrown (a NaN vowel, a syllable number that is not a whole number, ...): the voice is silent from then on
   uint32_t dropped() const { return dropped_; }          // events that did not fit the queue (kPend) or lay outside the call
+  uint32_t forced() const { return forced_; }            // note-offs that had to discard queued events to be kept (L5)
   uint32_t rejected() const { return rejected_; }        // events with a non-finite value (an AudioParam cannot hold one)
+  // LIVE ROUTE (C1). reset(): everything as a fresh shell's (the core reset with its parameters kept, the rate lane, the queue, the clocks at 0, the counters, the rings silent). seek(clock): the shell's clock (and
+  // the core's position) is `clock` from now: the queue is dropped, the first latency() samples after it are silence. A bind to a note is reset() + seek(). Neither allocates.
+  void reset() {
+    core_.reset(); lane_ = LiveRateLane(); clock_ = 0; rendered_ = 0; origin_ = 0; failed_ = false; dropped_ = 0; rejected_ = 0; forced_ = 0; head_ = 0; cnt_ = 0;
+    std::memset(ringL_, 0, sizeof ringL_); std::memset(ringR_, 0, sizeof ringR_); std::memset(stgL_, 0, sizeof stgL_); std::memset(stgR_, 0, sizeof stgR_);
+  }
+  void seek(uint64_t clock) { clock_ = clock; rendered_ = clock; origin_ = clock; head_ = 0; cnt_ = 0; }
+  uint64_t clock() const { return clock_; }
+  // LIVE ROUTE (P5): the rate lane from an automation list in SECONDS (the pool's, with the sampler's folding) instead of RateSet / RateRamp events: each control block reads it at its first sample, s / sr. Null: the shell's own lane.
+  void setRateFeed(const Auto* a, double sr) { feed_ = a; feedSr_ = sr; }
 
   // Renders n samples into L and R (separate arrays) and applies the n-sample call's events (any order; the same offset keeps its order). n of any size: it runs in chunks of up to kMaxBlock.
   void process(float* L, float* R, uint32_t n, const LiveEvent* ev, uint32_t nev) {
@@ -94,7 +106,7 @@ class LiveShell {
       advance(clock_ + m);
       for (uint32_t j = 0; j < m; j++) {
         const int64_t t = (int64_t)(clock_ + j) - (int64_t)latency();
-        if (t < 0 || failed_) { L[base + j] = 0; R[base + j] = 0; } else { L[base + j] = ringL_[(uint64_t)t & (kRing - 1)]; R[base + j] = ringR_[(uint64_t)t & (kRing - 1)]; }
+        if (t < (int64_t)origin_ || failed_) { L[base + j] = 0; R[base + j] = 0; } else { L[base + j] = ringL_[(uint64_t)t & (kRing - 1)]; R[base + j] = ringR_[(uint64_t)t & (kRing - 1)]; }
       }
       clock_ += m;
     }
@@ -103,6 +115,7 @@ class LiveShell {
  private:
   struct Pend { uint64_t t; LiveEvent e; };
   static bool isNote(LiveEvType t) { return t == LiveEvType::NoteOn || t == LiveEvType::NoteOff || t == LiveEvType::End; }   // what cuts a control block
+  static double clampRate(double v) { return v < 0 ? 0 : v > 256 ? 256 : v; }   // the AudioParam's range (as enqueue clamps a RateSet)
   void enqueue(LiveEvent e, uint64_t t) {
     // what the page's AudioParams do to a value: only finite numbers, clamped to the parameter's range (rate 0..256, bpm 10..999, wob 0..64)
     switch (e.type) {
@@ -112,7 +125,19 @@ class LiveShell {
       case LiveEvType::NoteOn: if (!std::isfinite(e.v)) e.v = 0; break;
       default: break;
     }
-    if (cnt_ >= kPend) { dropped_++; return; }
+    if (cnt_ >= kPend) {
+      if (e.type != LiveEvType::NoteOff && e.type != LiveEvType::End) { dropped_++; return; }
+      // L5 / C2: a note-off (or the end) is never dropped: it sets a forced-off time, every queued event at or after that time is discarded (counted), and the core gets off() at that sample
+      forced_++;
+      uint32_t w = 0;
+      for (uint32_t k = 0; k < cnt_; k++) { const Pend p = pend_[(head_ + k) % kPend]; if (p.t < t) pend_[(head_ + w++) % kPend] = p; else dropped_++; }
+      cnt_ = w;
+      if (cnt_ >= kPend) {   // (all of it is earlier: the latest rate / tempo / wobble event gives way, else the latest event)
+        uint32_t v = cnt_ - 1; for (uint32_t k = cnt_; k > 0; k--) if (!isNote(pend_[(head_ + k - 1) % kPend].e.type)) { v = k - 1; break; }
+        for (uint32_t k = v; k + 1 < cnt_; k++) pend_[(head_ + k) % kPend] = pend_[(head_ + k + 1) % kPend];
+        cnt_--; dropped_++;
+      }
+    }
     uint32_t pos = cnt_;   // a stable insertion in time order
     while (pos > 0 && pend_[(head_ + pos - 1) % kPend].t > t) { pend_[(head_ + pos) % kPend] = pend_[(head_ + pos - 1) % kPend]; pos--; }
     pend_[(head_ + pos) % kPend] = Pend{t, e}; cnt_++;
@@ -144,13 +169,13 @@ class LiveShell {
   void block(uint64_t s, uint64_t e) {
     const uint32_t n = (uint32_t)(e - s);
     if (!failed_) {
-      core_.render(stgL_, stgR_, kBlk, 0, (double)n, lane_.at((double)s));   // one control block (n <= kBlk), written at 0..n of the staging arrays
+      core_.render(stgL_, stgR_, kBlk, 0, (double)n, feed_ ? clampRate(feed_->at((double)s / feedSr_)) : lane_.at((double)s));   // one control block (n <= kBlk), written at 0..n of the staging arrays
       if (A::bad(core_)) failed_ = true;
     }
     for (uint32_t i = 0; i < n; i++) { ringL_[(s + i) & (kRing - 1)] = failed_ ? 0.0f : stgL_[i]; ringR_[(s + i) & (kRing - 1)] = failed_ ? 0.0f : stgR_[i]; }
   }
-  typename A::Core core_; LiveRateLane lane_;
-  uint64_t clock_ = 0, rendered_ = 0; bool failed_ = false; uint32_t dropped_ = 0, rejected_ = 0;
+  typename A::Core core_; LiveRateLane lane_; const Auto* feed_ = nullptr; double feedSr_ = 48000;
+  uint64_t clock_ = 0, rendered_ = 0, origin_ = 0; bool failed_ = false; uint32_t dropped_ = 0, rejected_ = 0, forced_ = 0;
   Pend pend_[kPend]; uint32_t head_ = 0, cnt_ = 0;
   float ringL_[kRing], ringR_[kRing], stgL_[kBlk], stgR_[kBlk];
 };

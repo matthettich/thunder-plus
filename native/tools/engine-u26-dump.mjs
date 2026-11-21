@@ -314,6 +314,10 @@ function seqCases(E) {
     wob: [{ t: 0, type: 'bpm', v: 140 }, on(10), { t: 3000, type: 'wob', v: 0.5 }, { t: 5000, type: 'wob', v: 0 }, { t: 6000, type: 'bpm', v: 70 }, off(9000)],
     offsets: [on(1), off(2), on(33), off(64), on(65, { leg: true }), off(127), on(128), off(129), on(130), on(160, { leg: true }), rate(161, 3), off(255), on(256), off(257), on(300), rate(310, 2), off(1000)],
     off_early: [on(5), off(9), on(9), off(10), on(11), off(4000)],
+    // the tempo and wobble events on control-block starts (the blocks start at 10 + 32 k after the note): one sample late changes the sound
+    wobedge: [{ t: 0, type: 'bpm', v: 140 }, on(10), { t: 3018, type: 'wob', v: 0.5 }, { t: 5002, type: 'wob', v: 0 }, { t: 5994, type: 'bpm', v: 70 }, off(9000)],
+    // D7: a slide cut by the next note glides ON up to it (the page's cancelAndHoldAtTime), then the note's own rate
+    slidecut: [rate(0, 1), on(0), rate(2000, 1.25), ramp(2000, 2, 6000), on(2000, { leg: true }), rate(4000, 0.8), on(4000), off(9000)],
   };
   for (const [pn, p] of Object.entries(BP)) for (const [sn, evs] of Object.entries(BS)) add('seq_bass_' + pn + '_' + sn, 'bass', p, sn === 'offsets' ? 3000 : 10000, evs);
   add('seq_bass_sr22050', 'bass', BP.reese, 8000, BS.legato, 22050);
@@ -323,12 +327,13 @@ function seqCases(E) {
     single: [on(0, { syl: 0 }), off(5000)], sylchange: [on(0, { syl: 0 }), off(3000), on(3100, { syl: 1 }), off(6000), on(6200, { syl: 2, leg: true }), off(9000), on(9001, { syl: 3 }), off(14000)],
     same: [on(0, { syl: 0 }), on(4000, { syl: 1, same: true, leg: true }), on(7000, { syl: 2, leg: true }), off(10000)], rest: [on(0, { syl: 0 }), off(3000), on(3500, { syl: 1 }), off(5000), on(6000, { syl: 4 }), off(9000), on(9500, { syl: 99 }), off(13000)],
     glide: [rate(0, 1), on(0, { syl: 0 }), rate(4000, 1.5), ramp(4000, 2, 3000), on(4000, { syl: 1, same: true, leg: true }), off(9000)], tight: [on(0, { syl: 0 }), off(49), on(55, { syl: 1 }), off(70), on(71, { syl: 2 }), off(9000)],
+    slidecut: [rate(0, 1), on(0, { syl: 0 }), rate(2000, 1.25), ramp(2000, 2, 6000), on(2000, { syl: 0, same: true, leg: true }), rate(4000, 0.8), on(4000, { syl: 1 }), off(9000)],
     offsets: [on(1, { syl: 0 }), off(2), on(17, { syl: 1 }), off(31), on(32, { syl: 2 }), off(33), on(48, { syl: 3, leg: true }), off(500), on(501, { syl: 4 }), rate(505, 2), off(3000)],
   };
   for (const [pn, p] of Object.entries(VP)) for (const [sn, evs] of Object.entries(VSC)) add('seq_vox_' + pn + '_' + sn, 'vox', p, sn === 'offsets' ? 4000 : 16000, evs);
   // acid / mach: five scenarios on three sounds each
   const AP = { init: {}, fast: { slide: 200, accent: 1, cut: 900, res: 0.85 }, sub: { sub: 0.5, noise: 0.2, wave: 0.7 } }, MP = { init: {}, ens: { machine: 4, a: 0.35, glide: 150 }, lfo: { machine: 3, lfoDest: 2, lfoDepth: 0.7, lfoRate: 5 } };
-  const XS = { single: [on(0), off(4000)], legato: [on(10), on(2000, { leg: true }), off(4500)], retrig: [on(0, { acc: true }), on(1500), on(1501, { acc: true }), off(4000)], glide: [on(0), rate(2000, 2), on(2000, { leg: true, acc: true }), ramp(3000, 0.5, 1000), off(5000)], offsets: [on(1), off(2), on(17), off(31), on(32, { leg: true }), off(33), on(34), off(900)] };
+  const XS = { slidecut: [on(0), rate(2000, 1.25), ramp(2000, 2, 6000), on(2000, { leg: true }), rate(4000, 0.8), on(4000), off(6500)], single: [on(0), off(4000)], legato: [on(10), on(2000, { leg: true }), off(4500)], retrig: [on(0, { acc: true }), on(1500), on(1501, { acc: true }), off(4000)], glide: [on(0), rate(2000, 2), on(2000, { leg: true, acc: true }), ramp(3000, 0.5, 1000), off(5000)], offsets: [on(1), off(2), on(17), off(31), on(32, { leg: true }), off(33), on(34), off(900)] };
   for (const [pn, p] of Object.entries(AP)) for (const [sn, evs] of Object.entries(XS)) add('seq_acid_' + pn + '_' + sn, 'acid', p, 7000, evs);
   for (const [pn, p] of Object.entries(MP)) for (const [sn, evs] of Object.entries(XS)) add('seq_mach_' + pn + '_' + sn, 'mach', p, 7000, evs);
   return out;

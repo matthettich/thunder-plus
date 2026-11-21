@@ -19,6 +19,7 @@ class BassCore {
   void set(const BassP& o);              // set(o) with the whole parameter object (a partial object is the caller's merge)
   void on(bool leg);
   void off();
+  void reset();                          // back to a fresh core's state (the voice at rest, bpm 120, wob 0, the phases as constructed, `bad` cleared), the parameters kept (p()); no allocation (LIVE ROUTE C1)
   void render(float* L, float* R, size_t len, double a, double b, double rate);
   // the JS would have thrown (Vowel is NaN: this.vow[NaN][0]): the render is refused. Sticky; the core writes nothing more.
   bool bad() const { return bad_; }

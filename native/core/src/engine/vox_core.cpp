@@ -214,6 +214,16 @@ VoxCore::VoxCore(double sr) : sr_(sr) {
   set(VoxP());
 }
 
+void VoxCore::reset() {   // the constructor's state (and its `segs_` / `curCo_` contents) with the parameters, the text and the parsed lyrics kept
+  nsegs_ = 0; si_ = 0; st_ = 0; hold_ = false; coda_ = false; hasCur_ = false; curNu_ = -1; curCoN_ = 0;
+  for (Seg& s : segs_) s = Seg{-1, kEnd, 0}; for (int16_t& c : curCo_) c = 0;
+  env_ = 0; envT_ = 0; ph_ = 0; lf_ = 0; vt_ = 0; go_ = true;
+  k_ = Ctl{500, 1500, 2500, 0, 0, 0, 4000, 3000, 0}; tg_ = k_;
+  std::memset(r_, 0, sizeof r_); lp_ = 0; dc_ = 0; dcx_ = 0;
+  rnd_ = 12345; vph_ = 0; an1_ = 0; yp_ = 0; nl_ = 0; nl2_ = 0; jt_ = 0; shm_ = 1; odd_ = 0;
+  for (int j = 0; j < 8; j++) { cph_[j] = std::fmod(j * 0.618, 1.0); cdp_[j] = std::fmod(j * 0.371, 1.0); }
+}
+
 bool VoxCore::set(const VoxP& o) {
 #define XP_CP(n, d) p_.n = o.n;
   XP_VOX(XP_CP)

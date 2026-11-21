@@ -99,6 +99,7 @@ void SongRenderer::quantum() {
     st_.steps++; if (k > st_.peakStepEvents) st_.peakStepEvents = k;
     for (int i = 0; i < k; i++) { dispatch(evs_[i]); players_->samplePeak(); }
   }
+  if (!liveReleased_ && !seq_->alive()) { liveReleased_ = true; players_->songOver(seq_->time()); }   // C4: live voices are held until the song's end (the page cuts there; an unknown-length render must be able to end)
   // 2. the voices into their tracks' inputs, then the mixer
   players_->render(mix_.inputsL(), mix_.inputsR(), N, t0, qFrame_);
   if (tap_) tap_(tapUser_, mix_.inputsL(), mix_.inputsR(), N, qFrame_);
@@ -113,6 +114,7 @@ RenderStats SongRenderer::stats() const {
   const PlayerStats& p = players_->stats(); const VoicePool& pool_ = players_->pool(); const sf::SfPool& sfpool_ = players_->sfPool();
   s.notes = p.notes; s.notesPlayed = p.notesPlayed; s.notesNoPad = p.notesNoPad; s.notesMidiOnly = p.notesMidiOnly; s.notesShapedRev = p.notesShapedRev;
   s.notesLive = p.notesLive; s.notesSf = p.notesSf; s.notesSfPlayed = p.notesSfPlayed; s.notesVar = p.notesVar; s.notesVarMissing = p.notesVarMissing; s.notesUnshaped = p.notesUnshaped; s.notesStretched = p.notesStretched;
+  s.notesLivePlayed = p.notesLivePlayed; { const LiveStats l = players_->live().stats(); s.liveNoNode = l.noNode; s.liveLate = l.late; s.liveQueueDropped = l.queueDropped; s.liveForcedOff = l.forcedOff; s.liveFailed = players_->live().failedNodes(); s.liveRefused = l.refused; }
   s.peakVoices = pool_.peakVoices(); s.peakVoiceLane = pool_.peakEvents(); s.peakMixLane = mix_.peakEvents();
   s.voiceDropped = pool_.dropped(); s.voiceOverflow = pool_.tOverflow(); s.voiceAutoDropped = pool_.autoDropped(); s.mixAutoDropped = mix_.autoDropped(); s.seqDropped = seq_->dropped();
   s.seqChopped = seq_->chopped(); s.seqChopSkipped = seq_->chopSkipped(); s.seqChopNoHits = seq_->chopNoHits(); s.sfVoiceDropped = sfpool_.dropped(); s.sfVoiceOverflow = sfpool_.tOverflow(); s.sfVoiceAutoDropped = sfpool_.autoDropped(); s.peakVoicesAll = std::max(p.peakAll, pool_.peakVoices());

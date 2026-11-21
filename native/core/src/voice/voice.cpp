@@ -34,6 +34,8 @@ double vibCurve(const double* p, double x) {
 
 }  // namespace
 
+double voice_vib_curve(const double* p, double x) { return vibCurve(p, x); }
+
 // ---- Rd -------------------------------------------------------------------------------------------------------------------
 void VoicePool::Rd::init(const float* s, const float* s2, int length, double sr, bool hasTw, bool hasCut, double cut, double res, bool hasDec, double dec, bool reverse, double start) {
   src = s; src2 = s2; rev = reverse; len = length; N = length; tw = hasTw; f = false; tau = 0; hi = lo = 0; kd = 1; e = 1; l1 = l2 = 0;

@@ -713,6 +713,21 @@ target_include_directories(test_engine_u26 PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/.
 add_executable(test_live_u26 test_live_u26.cpp)
 target_link_libraries(test_live_u26 PRIVATE thunder_core)
 target_include_directories(test_live_u26 PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../core/src ${CMAKE_CURRENT_SOURCE_DIR})
+# LIVE ROUTE B1 (C1): reset() / seek() of the live cores and the shell: reset equals a fresh core bit for bit, no allocation.
+add_executable(test_live_reset test_live_reset.cpp)
+target_link_libraries(test_live_reset PRIVATE thunder_core)
+target_include_directories(test_live_reset PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../core/src ${CMAKE_CURRENT_SOURCE_DIR})
+add_test(NAME live_reset COMMAND test_live_reset)
+# LIVE ROUTE B2: the live pool: the start rule, the seam against the shell driven directly, run-ahead, the C API.
+add_executable(test_live_pool test_live_pool.cpp)
+target_link_libraries(test_live_pool PRIVATE thunder_core)
+target_include_directories(test_live_pool PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../core/src ${CMAKE_CURRENT_SOURCE_DIR})
+add_test(NAME live_pool COMMAND test_live_pool)
+# LIVE ROUTE gate L10(f): the pool's decisions against the JS core's (tools/live-route-dump.mjs, golden/live_route_log.json).
+add_executable(test_live_decisions test_live_decisions.cpp)
+target_link_libraries(test_live_decisions PRIVATE thunder_core)
+target_include_directories(test_live_decisions PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../core/src ${CMAKE_CURRENT_SOURCE_DIR})
+add_test(NAME live_decisions COMMAND test_live_decisions ${CMAKE_CURRENT_SOURCE_DIR}/golden/live_route_log.json)
 # U26: extreme / NaN parameters of bass and vox, combined fields, sample rates 0.5 to 1e5, a per-render time limit.
 add_executable(test_engine_u26_fuzz test_engine_u26_fuzz.cpp)
 target_link_libraries(test_engine_u26_fuzz PRIVATE thunder_core)
@@ -1035,6 +1050,32 @@ target_link_libraries(test_render_sf_oom PRIVATE thunder_core)
 target_include_directories(test_render_sf_oom PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../core/src ${CMAKE_CURRENT_SOURCE_DIR}/../core/include ${CMAKE_CURRENT_SOURCE_DIR})
 target_compile_definitions(test_render_sf_oom PRIVATE THUNDER_ROOT="${CMAKE_CURRENT_SOURCE_DIR}/../..")
 add_test(NAME render_sf_oom COMMAND test_render_sf_oom)
+
+add_executable(test_live_tracklist test_live_tracklist.cpp)
+target_link_libraries(test_live_tracklist PRIVATE thunder_core)
+target_include_directories(test_live_tracklist PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../core/src ${CMAKE_CURRENT_SOURCE_DIR})
+target_compile_definitions(test_live_tracklist PRIVATE THUNDER_ROOT="${CMAKE_CURRENT_SOURCE_DIR}/../..")
+add_test(NAME live_tracklist COMMAND test_live_tracklist)
+
+# LIVE ROUTE L10 (b): the pool's node output against the JS seqRender's committed hashes (needs the reference directory of engine-u26-dump.mjs, as live_u26)
+add_executable(test_live_jsparity test_live_jsparity.cpp)
+target_link_libraries(test_live_jsparity PRIVATE thunder_core)
+target_include_directories(test_live_jsparity PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../core/src ${CMAKE_CURRENT_SOURCE_DIR})
+if(NODE_EXE)
+  add_test(NAME live_jsparity COMMAND test_live_jsparity ${CMAKE_CURRENT_BINARY_DIR}/engine-u26-ref)
+  set_tests_properties(live_jsparity PROPERTIES FIXTURES_REQUIRED engine_u26_ref)
+endif()
+
+# the C ABI of the render structs: the offset of every field is pinned (fields are only ever appended)
+add_executable(test_render_abi test_render_abi.cpp)
+target_include_directories(test_render_abi PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../core/include)
+add_test(NAME render_abi COMMAND test_render_abi)
+
+# the verifier's round on the live route (verify-265): queue overflow never drops a note-off, hostile numbers, the timeline's forced off
+add_executable(test_live_review test_live_review.cpp)
+target_link_libraries(test_live_review PRIVATE thunder_core)
+target_include_directories(test_live_review PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../core/src ${CMAKE_CURRENT_SOURCE_DIR})
+add_test(NAME live_review COMMAND test_live_review)
 
 # bus into bus: a two-bus chain through the offline renderer (analytic reference), transitive solo, stems through any depth
 add_executable(test_render_bus_chain test_render_bus_chain.cpp)

@@ -30,6 +30,7 @@ class VoxCore {
   bool set(const VoxP& o);               // false: the JS's set() threw (the new lyrics could not be parsed; the parameters are kept, the old syllables too, as in the JS)
   bool on(bool leg, double n, bool same);
   void off();
+  void reset();                          // back to a fresh core's state, the parameters and the parsed lyrics kept; no allocation (LIVE ROUTE C1)
   bool busy() const { return coda_ && (double)si_ < (double)nsegs_ - 1; }
   void render(float* L, float* R, size_t len, double a, double b, double rate);
   size_t nSyl() const { return lyr_.syl.size(); }

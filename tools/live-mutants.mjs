@@ -1,0 +1,88 @@
+#!/usr/bin/env node
+// LIVE ROUTE: hand mutation of the live pool, the shell, and the song-end release (verify-265 F5: "the builder's mutants are not in the repo"). Each mutant is one exact text replacement (it must match
+// exactly once, so a refactor is noticed, not ignored); the mutated file is compiled in place of its object (a header mutant: the pool's and the shell's TUs are compiled against the mutated header) and the live tests
+// are linked and run against it. A mutant that no test fails is a SURVIVOR and the script exits 1.
+//   node tools/live-mutants.mjs --build native/build [--only X08] [--list] [--check]
+// It needs a built native/ tree (the tests' objects and libthunder_core.a; the compile flags and link lines are read from the build directory).
+import fs from 'node:fs';
+import path from 'node:path';
+import os from 'node:os';
+import { spawnSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
+
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const args = process.argv.slice(2);
+const opt = (n, d) => { const i = args.indexOf(n); return i < 0 ? d : args[i + 1]; };
+const BUILD = path.resolve(opt('--build', path.join(ROOT, 'native/build')));
+const ONLY = opt('--only', null);
+const SRC = { pool: 'native/core/src/engine/live_pool.cpp', shell: 'native/core/src/engine/live_shell.h', render: 'native/core/src/render/render.cpp' };
+const text = Object.fromEntries(Object.entries(SRC).map(([k, v]) => [k, fs.readFileSync(path.join(ROOT, v), 'utf8')]));
+
+// [id, what, file, old, new]
+const M = [
+  ['X04', 'polyVox: the same-column pick is disabled', 'pool', 'b->curCol == e.col && b->lastOn < e.t - 0.004) pick', 'false && b->curCol == e.col && b->lastOn < e.t - 0.004) pick'],
+  ['X23', 'polyVox: the same-column pick ignores the 4 ms rule', 'pool', 'b->curCol == e.col && b->lastOn < e.t - 0.004) pick', 'b->curCol == e.col) pick'],
+  ['X08', 'the timeline\'s forced off discards nothing', 'pool', 'if (n.tl[i].T < e.T) n.tl[w++] = n.tl[i]; else st_.queueDropped++; }', 'n.tl[w++] = n.tl[i]; }'],
+  ['X08b', 'a full timeline drops the note-off too', 'pool', 'if (e.type != LiveEvType::NoteOff && e.type != LiveEvType::End) { st_.queueDropped++; return; }', '{ st_.queueDropped++; return; }'],
+  ['X10', 'tempo() is a no-op', 'pool', 'for (Node* n : active_) if (n->kind == LiveKind::Bass) { bookCtl(*n, LiveEvType::Bpm, t, bpm); n->lastBpm = bpm; }', ''],
+  ['X11', 'the bpm at a note is not booked', 'pool', 'std::isfinite(bpm) && bpm != n.lastBpm) {', 'std::isfinite(bpm) && false) {'],
+  ['X12', 'tempo() one sample late', 'pool', 'bookCtl(*n, LiveEvType::Bpm, t, bpm); n->lastBpm = bpm; }\n}', 'bookCtl(*n, LiveEvType::Bpm, t + 1.0 / sr_, bpm); n->lastBpm = bpm; }\n}'],
+  ['X17', 'D6: a mod with wob does not move the bass wobble', 'pool', 'bookCtl(n, LiveEvType::Wob, e.t, e.wob);', '(void)0;'],
+  ['X20', 'C4: the quiet window is one sample', 'pool', 'n.quiet >= 4096', 'n.quiet >= 1'],
+  ['X14', 'C4: the held voices are released 5 s after the song\'s end', 'render', 'players_->songOver(seq_->time());', 'players_->songOver(seq_->time() + 5);'],
+  ['F3', 'D7: a slide cut by the next note holds the FROM pitch (the core\'s Auto::hold)', 'pool', 'holdRamp(n.rate, t);', 'n.rate.hold(t);'],
+  ['F2a', 'the shell drops a note-off when its queue is full', 'shell', '      if (e.type != LiveEvType::NoteOff && e.type != LiveEvType::End) { dropped_++; return; }', '      { dropped_++; return; }'],
+  ['F2b', 'the shell keeps the events after a forced off', 'shell', 'if (p.t < t) pend_[(head_ + w++) % kPend] = p; else dropped_++;', 'pend_[(head_ + w++) % kPend] = p;'],
+  ['F2c', 'the shell does not count a forced off', 'shell', '      forced_++;\n', ''],
+  ['F4a', 'a note\'s non-finite time is not refused', 'pool', 'if (!std::isfinite(e0.t) || !std::isfinite(e0.rate)', 'if (!std::isfinite(e0.rate)'],
+  ['F4b', 'a non-finite `mul` is applied', 'pool', 'if ((e.has & SH_MUL) && !f(e.mul)) drop(SH_MUL);', ''],
+  ['F4c', 'a non-finite bend is applied', 'pool', 'if ((e.has & SH_BEND) && (!f(e.bendMul) || !f(e.bendT1))) drop(SH_BEND);', ''],
+  ['F4d', 'a non-finite vibrato is applied', 'pool', 'if ((e.has & SH_VIB) && (!f(e.vibSpd) || !f(e.vibDep) || !f(e.vibT1))) drop(SH_VIB);', ''],
+  ['F4e', 'magnitudes are not clamped (gain 1e300)', 'pool', 'static inline double mag(double v) { return v < -1e6 ? -1e6 : v > 1e6 ? 1e6 : v; }', 'static inline double mag(double v) { return v; }'],
+  ['F4f', 'refusals are not counted', 'pool', 'auto drop = [&](uint32_t bit) { e.has &= ~bit; st_.refused++; };', 'auto drop = [&](uint32_t bit) { e.has &= ~bit; };'],
+  ['F4g', 'a non-finite tempo is applied', 'pool', 'if (!std::isfinite(bpm) || !std::isfinite(t)) { st_.refused++; return; }', ''],
+];
+
+if (args.includes('--list')) { for (const [id, what] of M) console.log(id.padEnd(8), what); process.exit(0); }
+if (args.includes('--check')) { let bad = 0; for (const [id, , f, from] of M) { const n = text[f].split(from).length - 1; if (n !== 1) { console.log(id + ': ' + n + ' matches'); bad++; } } console.log(bad ? bad + ' mutants do not match' : 'all ' + M.length + ' mutants match exactly once'); process.exit(bad ? 1 : 0); }
+
+const run = (cmd, a, o = {}) => spawnSync(cmd, a, { encoding: 'utf8', maxBuffer: 1 << 26, ...o });
+const flagsOf = f => { const t = fs.readFileSync(path.join(BUILD, 'core/CMakeFiles/thunder_core.dir/flags.make'), 'utf8'); const g = k => ((t.match(new RegExp('^' + k + ' = (.*)$', 'm')) || [])[1] || '').split(/\s+/).filter(Boolean); return [...g('CXX_DEFINES'), ...g('CXX_INCLUDES'), ...g('CXX_FLAGS')]; };
+const CXXF = flagsOf();
+const tests = ['test_live_pool', 'test_live_tracklist', 'test_live_decisions', 'test_live_reset', 'test_live_review', 'test_live_jsparity'];
+const tdir = path.join(BUILD, 'tests');
+const linkOf = t => fs.readFileSync(path.join(tdir, 'CMakeFiles', t + '.dir/link.txt'), 'utf8').trim();
+const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'livemut-'));
+let survivors = 0; const table = [];
+for (const [id, what, file, from, to] of M) {
+  if (ONLY && id !== ONLY) continue;
+  const n = text[file].split(from).length - 1;
+  if (n !== 1) { console.error(`mutant ${id}: the text to replace occurs ${n} times (must be exactly 1): the source moved, update tools/live-mutants.mjs`); process.exit(2); }
+  const mutated = text[file].replace(from, () => to), objs = [];
+  const cc = (src, extra, out) => { const r = run('c++', [...extra, ...CXXF, '-c', src, '-o', out]); return r; };
+  let r;
+  if (file === 'shell') {   // the header: the pool's TU and the shell's explicit instantiations are compiled against the mutated copy (found first on the include path)
+    fs.mkdirSync(path.join(tmp, 'inc/engine'), { recursive: true }); fs.writeFileSync(path.join(tmp, 'inc/engine/live_shell.h'), mutated);
+    for (const f of ['live_pool.cpp', 'live_shell.cpp']) { const o = path.join(tmp, f + '.o'); r = cc(path.join(ROOT, 'native/core/src/engine', f), ['-I' + path.join(tmp, 'inc')], o); if (r.status) break; objs.push(o); }
+  } else { const src = path.join(tmp, path.basename(SRC[file])); fs.writeFileSync(src, mutated); const o = src + '.o'; r = cc(src, [], o); objs.push(o); }
+  if (r.status) { console.log(`${id.padEnd(8)} DOES NOT COMPILE (a compile failure is not a kill): ${what}\n${r.stderr.split('\n').slice(0, 5).join('\n')}`); survivors++; continue; }
+  let killedBy = null;
+  for (const t of tests) {
+    let tobj = `CMakeFiles/${t}.dir/${t}.cpp.o`, extra = '';
+    if (file === 'shell' && t === 'test_live_review') {   // the test drives a LiveShell directly: its own copy of the template is compiled against the mutated header too
+      const tf = fs.readFileSync(path.join(tdir, 'CMakeFiles', t + '.dir/flags.make'), 'utf8'), g = k => ((tf.match(new RegExp('^' + k + ' = (.*)$', 'm')) || [])[1] || '').split(/\s+/).filter(Boolean);
+      const o = path.join(tmp, t + '.mut.o'); const c2 = run('c++', ['-I' + path.join(tmp, 'inc'), ...g('CXX_DEFINES'), ...g('CXX_INCLUDES'), ...g('CXX_FLAGS'), '-c', path.join(ROOT, 'native/tests', t + '.cpp'), '-o', o]);
+      if (c2.status) { console.error(c2.stderr.split('\n').slice(0, 8).join('\n')); process.exit(2); } tobj = o; }
+    const line = linkOf(t).replace(`CMakeFiles/${t}.dir/${t}.cpp.o`, `${tobj} ${objs.join(' ')}`).replace(` -o ${t} `, ` -o ${path.join(tmp, t)} `);
+    const l = run('sh', ['-c', line], { cwd: tdir });
+    if (l.status) { console.error(l.stderr.split('\n').slice(0, 8).join('\n')); process.exit(2); }
+    const x = run(path.join(tmp, t), t === 'test_live_jsparity' ? [path.join(tdir, 'engine-u26-ref')] : t === 'test_live_decisions' ? [path.join(ROOT, 'native/tests/golden/live_route_log.json')] : [], { timeout: 600000 });
+    if (x.status === 2) { console.error(t + ' exited 2 (a usage error): the script\'s arguments are wrong'); process.exit(2); }
+    if (x.status !== 0) { const first = (x.stdout.split('\n').find(l2 => /^FAIL|differs/.test(l2)) || (x.status === null ? 'timeout / crash' : 'exit ' + x.status)).slice(0, 110); killedBy = t + ': ' + first; break; }
+  }
+  if (!killedBy) { survivors++; console.log(`${id.padEnd(8)} SURVIVED: ${what}`); table.push([id, what, 'SURVIVED']); }
+  else { console.log(`${id.padEnd(8)} killed by ${killedBy}   (${what})`); table.push([id, what, killedBy]); }
+}
+fs.rmSync(tmp, { recursive: true, force: true });
+console.log(`${M.length} mutants, ${survivors} survivors`);
+process.exit(survivors ? 1 : 0);
