@@ -397,3 +397,5 @@ Checked by the lead in the code before ruling: finding 1 (no `LiveHost`, no `liv
 Asked of the owner on 21 Nov: O1 (where to try the switch), O2 (fall back with a message, or refuse), O4 (how many songs use chains or pump effects; three songs to listen to). O3, O5, O6 are decided as the recommendations unless he says otherwise (O6: desktop only).
 
 Started 21 Nov: P1 (pads snapshot + deferred free) with a Sonnet builder on `n1/u37-p1-pads`. P0's `live.h` is the lead's and is written while P1 builds.
+
+**The owner's answers (21 Nov, 12:45).** O1: the Android app first (so P6 to P10, the web host, wait; the N2 shell is wired after P5). O2: the old engine plays what the new one cannot, with a message. O4: ALL his songs use chains: D1 is changed, the chains host is built now, in parallel with P2 (`docs/port/CHAINS-HOST-DESIGN-DRAFT.md`, branch `n1/chains-design`).
