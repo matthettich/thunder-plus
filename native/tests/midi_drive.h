@@ -12,6 +12,7 @@
 #include <string>
 #include <vector>
 
+#include "midi/midi_spp.h"
 #include "midi/midisched.h"
 #include "rt/json.h"
 #include "seq/runner.h"
@@ -90,18 +91,8 @@ inline void configure(MidiSched& s, const Case& C, const Song& song) {
   s.setAudible(aud);
 }
 
-// The Song Position Pointer for a PLAY from `row` (index.html sppFor: the beat of the row inside its block, in 16ths). The control thread / shell computes it
-// (A9); here from a Seq run from the top: the first step whose playhead is on `row` (or beyond) gives the beat.
-inline int sppFor(const Song& song, const SeqVars& vars, int row) {
-  SeqOpts o; o.once = true; o.sim = true; Seq sq(song, vars, SeqMode::Song, o);
-  std::vector<SeqEvent> evs(4096); SeqStep st;
-  for (int n = 0; n < 100000 && sq.alive(); n++) {
-    const int k = sq.step(evs.data(), (int)evs.size(), &st);
-    int r = -1; for (int t = 0; t < kSeqTracks; t++) if (st.pos[t].valid && st.pos[t].row > r) r = st.pos[t].row;
-    if (r >= row) { for (int i = 0; i < k; i++) if (evs[i].type == SEV_BEAT) return std::max(0, std::min(16383, (int)std::llround(evs[i].v * 4))); return 0; }
-  }
-  return 0;
-}
+// The Song Position Pointer for a PLAY from `row` (index.html sppFor). U36 T1: the helper moved into the core (midi/midi_spp.h, the control thread's); this is the call the cases use.
+inline int sppFor(const Song& song, const SeqVars& vars, int row) { return std::max(0, midi_spp_for(song, vars, row)); }
 
 // Runs the case to its end (the web harness's stepMs loop). `pre` is called once with the scheduler before the run (hostile tests).
 template <class F>
