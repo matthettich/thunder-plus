@@ -9,6 +9,7 @@
 // Also: no block of delay in a chain (the same sample positions as the source alone), a muted middle bus silences the mix, solo follows the chain, and the stems.
 #include "render/render_api.cpp"
 #include "render_api_common.h"
+#include "chains/chost.h"
 
 using namespace u34;
 static int g_fail = 0;
@@ -31,10 +32,11 @@ static std::string song(bool chain, const char* m0 = "{}", const char* m1 = null
 }
 struct Stereo { std::vector<float> L, R; };
 // live: a hook on every bus (a live host: a muted bus still exists, busSync); not live: only on the heard ones (the web's offline pass(): routeTrack for `keep` only)
-static thunder_render* make(const std::string& js, int stem, int64_t frames, const PadSet& ps, bool live = false) {
-  thunder_render_opts o; std::memset(&o, 0, sizeof o); o.size = sizeof o; o.use_frames = 1; o.frames = frames; o.stem = stem;
+static thunder_render* make(const std::string& js, int stem, int64_t frames, const PadSet& ps, bool live = false, bool real = false) {
+  thunder_render_opts o; std::memset(&o, 0, sizeof o); o.size = sizeof o; o.use_frames = 1; o.frames = frames; o.stem = stem; o.chains = real ? 1 : 0;   // real: the C1 ChainsHost (opts.chains) instead of the stand-in
   thunder_render* r = thunder_render_create((const uint8_t*)js.data(), js.size(), &o, nullptr, 0); if (!r) { std::printf("create failed\n"); g_fail++; return nullptr; }
   installPads(r, ps);
+  if (real) return r;
   const uint32_t heard = r->R->heardMask();
   for (int t = 0; t < 8; t++) if ((live || (heard >> t & 1u)) && r->R->mixer().plan().feedMask[t]) r->R->mixer().setChain(t, standIn, nullptr);
   return r;
@@ -43,7 +45,7 @@ static thunder_render* make(const std::string& js, int stem, int64_t frames, con
 static Stereo readAll(thunder_render* r, int64_t n) { Stereo s; s.L.assign((size_t)n, 0); s.R.assign((size_t)n, 0); int64_t got = 0; while (got < n) { const int64_t k = thunder_render_read(r, s.L.data() + got, s.R.data() + got, std::min<int64_t>(4096, n - got)); if (k <= 0) break; got += k; }
   if (got != n) { std::printf("FAIL readAll: the render stopped after %lld of %lld frames (line %d)\n", (long long)got, (long long)n, __LINE__); g_fail++; }
   return s; }
-static Stereo render(const std::string& js, int stem, int64_t N, const PadSet& ps, bool live = false) { thunder_render* r = make(js, stem, N, ps, live); Stereo s; if (r) { s = readAll(r, N); thunder_render_free(r); } return s; }
+static Stereo render(const std::string& js, int stem, int64_t N, const PadSet& ps, bool live = false, bool real = false) { thunder_render* r = make(js, stem, N, ps, live, real); Stereo s; if (r) { s = readAll(r, N); thunder_render_free(r); } return s; }
 static double peakOf(const Stereo& s) { double p = 0; for (float v : s.L) p = std::max(p, (double)std::fabs(v)); for (float v : s.R) p = std::max(p, (double)std::fabs(v)); return p; }
 // max |a - k b| over both channels
 static double diff(const Stereo& a, const Stereo& b, double k) { double e = 0; for (size_t i = 0; i < a.L.size() && i < b.L.size(); i++) e = std::max(e, std::max(std::fabs(a.L[i] - k * b.L[i]), std::fabs(a.R[i] - k * b.R[i]))); return e; }
@@ -83,6 +85,13 @@ int main() {
     std::printf("two-bus chain: source alone peak %.4f, chain peak %.4f, max |mix - alone * gA * gB| %.3g (gA %.4f gB %.4f)\n", pk, peakOf(mix), e, gA, gB);
     CHECK("the chain's mix is the source alone times both buses' faders, sample for sample (no block of delay between the buses)", e <= 1e-6 * pk);
     CHECK("the middle bus does not also reach the master (its sound is heard once)", peakOf(mix) < pk * 1.0001 * gA * gB + 1e-6); }
+  // C1: the REAL chains host (opts.chains, a Track In -> Chain Out patch run by the engine) gives the stand-in's mix, the stems and the heard masks: the stand-in can be replaced by it
+  { const Stereo real = render(js, 0, N, ps, false, true);
+    std::printf("real chains host: max |real - stand-in| %.3g (stand-in peak %.4f)\n", diff(real, mix, 1), peakOf(mix));
+    CHECK("the real host plays the two-bus chain as the stand-in does", diff(real, mix, 1) <= 1e-6 * pk);
+    CHECK("real host, stem of the last bus = the mix", diff(render(js, 3, N, ps, false, true), mix, 1) <= 1e-6 * pk);
+    CHECK("real host, stem of the middle bus = the source times its fader", diff(render(js, 2, N, ps, false, true), ref, gA) <= 1e-6 * pk);
+    thunder_render* a = make(js, 2, N, ps, false, true); CHECK("real host: stem(middle bus) hooks only heard tracks", a && a->R->chainsHost() && a->R->chainsHost()->node(1) != nullptr && a->R->chainsHost()->node(2) == nullptr && a->R->chainsHost()->node(0) == nullptr); if (a) thunder_render_free(a); }
   { thunder_render* m = make(js, 0, N, ps);
     const BusPlan& P = m->R->mixer().plan();
     CHECK("plan: 1 feeds 2, 2 feeds 3; the middle bus is pure", m && P.feedMask[1] == 1u && P.feedMask[2] == 2u && P.pure == 3u);

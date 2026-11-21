@@ -129,10 +129,10 @@ static void tapFn(void* user, const float* const* inL, const float* const* inR, 
   Tap* tp = (Tap*)user; const size_t q = (size_t)(frame0 / 128); (void)frames;
   for (size_t k = 0; k < tp->c->inputs.size(); k++) { const int t = tp->c->inputs[k].first; std::memcpy(const_cast<float*>(inL[t]), tp->in->L[k].data() + q * 128, 128 * sizeof(float)); if (!tp->c->inputs[k].second) std::memcpy(const_cast<float*>(inR[t]), tp->in->R[k].data() + q * 128, 128 * sizeof(float)); }
 }
-static std::string songText(const Case& c) {   // a silent song (no pad is handed in) that carries the case's mixer, CHN flags and patch
+static std::string songText(const Case& c, const char* songRow = "[0]", const char* row0 = "[-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1]") {   // a silent song (no pad is handed in) that carries the case's mixer, CHN flags and patch
   std::string s = "{\"v\":6,\"bpm\":" + std::to_string(c.bpm) + ",\"lpb\":" + std::to_string(c.lpb) + ",\"ticks\":" + std::to_string(c.ticks) + ",\"master\":" + std::to_string(c.master) + ",\"mout\":" + std::to_string(c.mout) +
-    ",\"ntr\":8,\"song\":[[0]],\"chains\":[[[0,0]]],\"plen\":[8],\"phrases\":[[";
-  for (int i = 0; i < 8; i++) s += std::string(i ? "," : "") + "[-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1]";
+    ",\"ntr\":8,\"song\":[" + std::string(songRow) + "],\"chains\":[[[0,0]]],\"plen\":[8],\"phrases\":[[";
+  for (int i = 0; i < 8; i++) s += std::string(i ? "," : "") + (i == 0 ? row0 : "[-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1]");
   s += "]],\"mix\":[";
   for (int t = 0; t < kSongNT; t++) { char b[160]; std::snprintf(b, sizeof b, "%s{\"vol\":%g,\"trim\":%g,\"pan\":%g,\"mute\":%s,\"solo\":%s}", t ? "," : "", c.mix[t].vol, c.mix[t].trim, c.mix[t].pan, c.mix[t].mute ? "true" : "false", c.mix[t].solo ? "true" : "false"); s += b; }
   s += "],\"chainOn\":["; for (int t = 0; t < kSongNT; t++) s += std::string(t ? "," : "") + (c.chainOn[t] ? "true" : "false");
@@ -155,6 +155,25 @@ static bool runRenderer(const Case& c, Out* out) {
   return true;
 }
 
+// the dispatch cases: a song whose bus track (track 3 of case a/electro) plays a row with BYP (command 38, value 0x11: switch 1 bypassed) and TPO (command 19, value 90): both reach the chains host through
+// SongRenderer::dispatch, the node's tempo becomes 90, and the chc is not counted as ignored (the tempo still is: the Players see it too)
+static void testSeqEvents(const Case& c) {
+  const std::string text = songText(c, "[-1,-1,-1,0]", "[60,-1,-1,-1,-1,0,38,17,19,90,-1,-1]"); Song song; JsonError je;
+  if (!song.load(text.data(), text.size(), &je)) { std::printf("FAIL: the event song did not load (%s)\n", je.msg ? je.msg : "?"); g_fail++; return; }
+  SeqVars vars; RenderPads pads; SeqOpts so; so.row = song.renderFrom; so.once = true;
+  int ign0 = 0;
+  for (int on = 0; on < 2; on++) {
+    SongRenderer r(song, vars, pads, kSr, 128, so); r.setChains(on != 0);
+    std::vector<float> L(128), R(128); for (int b = 0; b < 400; b++) r.block(L.data(), R.data(), 128);
+    if (on) {
+      const ChainsHostStats st = r.chainsHost()->stats(); const bool node = r.chainsHost()->node(3) != nullptr;
+      CHECK("dispatch: chc and tempo reached the host and were applied", node && st.eventsApplied >= 2 && st.chcNoNode == 0 && st.droppedEvents == 0 && st.badEvents == 0);
+      CHECK("dispatch: the node's tempo is the TPO's", node && r.chainsHost()->node(3)->engine().transport().tempo == 90);
+      CHECK("dispatch: the one chc is no longer counted ignored; the tempo still is (the Players see it too)", r.stats().eventsIgnored == ign0 - 1);
+    } else { ign0 = r.stats().eventsIgnored; CHECK("chains off: no host, chc and tempo are ignored as before", r.chainsHost() == nullptr && ign0 >= 2); }
+  }
+}
+
 int main(int argc, char** argv) {
   if (argc < 2) { std::printf("usage: test_chains_song <chains_song_cases.json> [name]\n"); return 2; }
   std::ifstream f(argv[1], std::ios::binary); std::ostringstream ss; ss << f.rdbuf(); const std::string text = ss.str();
@@ -171,6 +190,7 @@ int main(int argc, char** argv) {
     if (c.events.empty()) { const int b2 = g_fail; nRend++; Out r; if (runRenderer(c, &r)) report(c, r, "SongRenderer"); if (g_fail == b2) nRendExact++; }
     std::printf("%-28s %s\n", c.name.c_str(), g_fail == before ? "exact" : "FAILED");
   }
+  for (size_t i = 0; i < cs.size() && !only; i++) { Case c = readCase(cs.at(i)); if (c.name == "a/electro") { testSeqEvents(c); break; } }
   std::printf("chains_song: %d cases, %d exact through Mixer+ChainsHost; %d without events, %d exact through SongRenderer\n", n, nExact, nRend, nRendExact);
   if (n == 0) { std::printf("FAIL: no case ran\n"); return 1; }
   std::printf(g_fail ? "FAILED (%d)\n" : "OK\n", g_fail);
