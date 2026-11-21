@@ -1,0 +1,444 @@
+{
+ "note": "tools/midi-ledger.mjs: one ledger per case; msgs are in the order the port was handed them; ms = the timestamp given to send() minus 1000 (the audio clock, ms); kind k says which part of the app sent it",
+ "cases": [
+  {
+   "file": "midi-ledger-mono-notes.json",
+   "case": "mono-notes",
+   "mode": "native",
+   "msgs": 15,
+   "bytes": 1683,
+   "sha256": "db2480525fd8aa87822afceceaa1af19810b9e05f3955befc2349c49ea0805b0",
+   "counts": {
+    "on": 7,
+    "off": 7,
+    "cc": 1
+   },
+   "findings": 0
+  },
+  {
+   "file": "midi-ledger-note-len.json",
+   "case": "note-len",
+   "mode": "native",
+   "msgs": 11,
+   "bytes": 1403,
+   "sha256": "050743786f5eaca8bfae3ed0265256081eabcd177259dc5ba52b97402032a17e",
+   "counts": {
+    "on": 5,
+    "off": 5,
+    "cc": 1
+   },
+   "findings": 0
+  },
+  {
+   "file": "midi-ledger-overlap-poly.json",
+   "case": "overlap-poly",
+   "mode": "native",
+   "msgs": 27,
+   "bytes": 2516,
+   "sha256": "73f42631226b35ae669fb6c33fe4ebe53f80773647f3ffa53c40372fd137223a",
+   "counts": {
+    "on": 13,
+    "off": 13,
+    "cc": 1
+   },
+   "findings": 0
+  },
+  {
+   "file": "midi-ledger-chan-share.json",
+   "case": "chan-share",
+   "mode": "native",
+   "msgs": 7,
+   "bytes": 1172,
+   "sha256": "378a62e755cc12516caf2aa98640bc5367ddd97e68ef02d17c7d9990d4bbacfe",
+   "counts": {
+    "on": 3,
+    "off": 3,
+    "cc": 1
+   },
+   "findings": 0
+  },
+  {
+   "file": "midi-ledger-two-ports.json",
+   "case": "two-ports",
+   "mode": "native",
+   "msgs": 101,
+   "bytes": 7770,
+   "sha256": "136d5be6fd527bca94e055f9ded29c98da6070c99d0d83361788669e4c0e4b58",
+   "counts": {
+    "start": 2,
+    "on": 5,
+    "off": 5,
+    "clock": 84,
+    "cc": 3,
+    "stop": 2
+   },
+   "findings": 0
+  },
+  {
+   "file": "midi-ledger-velocity.json",
+   "case": "velocity",
+   "mode": "native",
+   "msgs": 17,
+   "bytes": 1774,
+   "sha256": "3f55f59b38049c892da7f2edae6b8a8dd2b25bebf409f81cb5a479d53ce26afb",
+   "counts": {
+    "on": 8,
+    "off": 8,
+    "cc": 1
+   },
+   "findings": 0
+  },
+  {
+   "file": "midi-ledger-tempo-clock.json",
+   "case": "tempo-clock",
+   "mode": "native",
+   "msgs": 219,
+   "bytes": 15879,
+   "sha256": "bd2a940566ca99c35c58f7f040bdbd16081fc86750422bde5d0a7303f014e1e2",
+   "counts": {
+    "start": 1,
+    "on": 15,
+    "clock": 186,
+    "off": 15,
+    "cc": 1,
+    "stop": 1
+   },
+   "findings": 0
+  },
+  {
+   "file": "midi-ledger-tempo-live.json",
+   "case": "tempo-live",
+   "mode": "native",
+   "msgs": 149,
+   "bytes": 11042,
+   "sha256": "b9ed77352c3be3b616694f9d08be5ddde259e553100fc0a8593b7ee887e92f25",
+   "counts": {
+    "start": 1,
+    "on": 4,
+    "clock": 138,
+    "off": 4,
+    "cc": 1,
+    "stop": 1
+   },
+   "findings": 0
+  },
+  {
+   "file": "midi-ledger-start-stop.json",
+   "case": "start-stop",
+   "mode": "native",
+   "msgs": 74,
+   "bytes": 5806,
+   "sha256": "f564d6c3d37dbb3e4b93842020aa1d53eea289ea01087b61b38b3a9830130f50",
+   "counts": {
+    "start": 1,
+    "on": 3,
+    "clock": 64,
+    "off": 4,
+    "cc": 1,
+    "stop": 1
+   },
+   "findings": 0
+  },
+  {
+   "file": "midi-ledger-start-stop-web.json",
+   "case": "start-stop",
+   "mode": "web",
+   "msgs": 76,
+   "bytes": 5912,
+   "sha256": "4d45921960be0265ad099c2d643544f840361e3c85bd7956af576a94998e5369",
+   "counts": {
+    "clock": 66,
+    "start": 1,
+    "on": 3,
+    "off": 4,
+    "cc": 1,
+    "stop": 1
+   },
+   "findings": 0
+  },
+  {
+   "file": "midi-ledger-song-end.json",
+   "case": "song-end",
+   "mode": "native",
+   "msgs": 49,
+   "bytes": 4025,
+   "sha256": "a6655880d59bde89b5d68e7bb3559683ecf59a0a714afe847b495d63f54ea658",
+   "counts": {
+    "start": 1,
+    "on": 2,
+    "clock": 42,
+    "off": 2,
+    "cc": 1,
+    "stop": 1
+   },
+   "findings": 0
+  },
+  {
+   "file": "midi-ledger-song-end-web.json",
+   "case": "song-end",
+   "mode": "web",
+   "msgs": 49,
+   "bytes": 3985,
+   "sha256": "e6f4bdd18a1ef6898317e19a0d9825a7fc3226c31556ac78dc5773c7ed5ccaf2",
+   "counts": {
+    "clock": 42,
+    "start": 1,
+    "on": 2,
+    "off": 2,
+    "cc": 1,
+    "stop": 1
+   },
+   "findings": 0
+  },
+  {
+   "file": "midi-ledger-start-midway.json",
+   "case": "start-midway",
+   "mode": "native",
+   "msgs": 158,
+   "bytes": 11545,
+   "sha256": "7bb43e443d03c197ad18cd2d73b1552ee537e2f02e04c745b721d555ee1e100b",
+   "counts": {
+    "spp": 1,
+    "continue": 1,
+    "on": 6,
+    "clock": 141,
+    "off": 7,
+    "cc": 1,
+    "stop": 1
+   },
+   "findings": 0
+  },
+  {
+   "file": "midi-ledger-clock-port-toggle.json",
+   "case": "clock-port-toggle",
+   "mode": "native",
+   "msgs": 186,
+   "bytes": 13608,
+   "sha256": "c8a09ec4b5621b5f5db31d2e87f72e106b49b321c1e95b85c1f574d3b2bc4b03",
+   "counts": {
+    "start": 1,
+    "on": 2,
+    "clock": 172,
+    "off": 2,
+    "spp": 2,
+    "continue": 2,
+    "stop": 3,
+    "cc": 2
+   },
+   "findings": 0
+  },
+  {
+   "file": "midi-ledger-clock-port-toggle-web.json",
+   "case": "clock-port-toggle",
+   "mode": "web",
+   "msgs": 186,
+   "bytes": 13569,
+   "sha256": "3b2bc3ffff006dd2acaff1a8d3f864aac6b5fe2746e9990a39df81b176f6ec39",
+   "counts": {
+    "clock": 172,
+    "start": 1,
+    "on": 2,
+    "spp": 2,
+    "continue": 2,
+    "off": 2,
+    "stop": 3,
+    "cc": 2
+   },
+   "findings": 0
+  },
+  {
+   "file": "midi-ledger-loop.json",
+   "case": "loop",
+   "mode": "native",
+   "msgs": 271,
+   "bytes": 19354,
+   "sha256": "3cff1b20d530ba5c76f47658550202d8c090740696c6618a93fe17ce3a6fbfe3",
+   "counts": {
+    "start": 1,
+    "on": 15,
+    "clock": 237,
+    "off": 16,
+    "cc": 1,
+    "stop": 1
+   },
+   "findings": 0
+  },
+  {
+   "file": "midi-ledger-cc-program.json",
+   "case": "cc-program",
+   "mode": "native",
+   "msgs": 35,
+   "bytes": 3253,
+   "sha256": "c5b4d4ff1db5dc1ebc8d30d784c4f1bef1c5a250710401a07ac50f9d3be714d4",
+   "counts": {
+    "pgm": 1,
+    "cc": 28,
+    "on": 2,
+    "bend": 1,
+    "at": 1,
+    "off": 2
+   },
+   "findings": 0
+  },
+  {
+   "file": "midi-ledger-cc-ins.json",
+   "case": "cc-ins",
+   "mode": "native",
+   "msgs": 7,
+   "bytes": 1240,
+   "sha256": "27543cd135af76bf01f73016baa5521e15ce3b7b96341e99bfeae23dd5cbdc5c",
+   "counts": {
+    "pgm": 1,
+    "cc": 4,
+    "on": 1,
+    "off": 1
+   },
+   "findings": 0
+  },
+  {
+   "file": "midi-ledger-slide-arp.json",
+   "case": "slide-arp",
+   "mode": "native",
+   "msgs": 72,
+   "bytes": 5843,
+   "sha256": "d3cae29e41196a07cd2f62b49805179675beb2a7b90edc2ea07046a5459db7e0",
+   "counts": {
+    "on": 18,
+    "off": 18,
+    "bend": 35,
+    "cc": 1
+   },
+   "findings": 0
+  },
+  {
+   "file": "midi-ledger-bend-fine.json",
+   "case": "bend-fine",
+   "mode": "native",
+   "msgs": 22,
+   "bytes": 2169,
+   "sha256": "7c9df52150a6903da857a77f08e411d7ae6c96744a0074e79e646c84529c8d7c",
+   "counts": {
+    "bend": 11,
+    "on": 5,
+    "off": 5,
+    "cc": 1
+   },
+   "findings": 0
+  },
+  {
+   "file": "midi-ledger-modes-mixed.json",
+   "case": "modes-mixed",
+   "mode": "native",
+   "msgs": 6,
+   "bytes": 1217,
+   "sha256": "24840fa6ff9590e048e2e8d0b8a3cf8ee705cde20668f2c92811ee9db464e759",
+   "counts": {
+    "on": 2,
+    "off": 2,
+    "cc": 2
+   },
+   "findings": 0
+  },
+  {
+   "file": "midi-ledger-column-switch.json",
+   "case": "column-switch",
+   "mode": "native",
+   "msgs": 5,
+   "bytes": 1088,
+   "sha256": "11e3cc0d101a508e5a91f31bbb0ce05e6fa6ee60ffa3864c6aad94c019e1fef5",
+   "counts": {
+    "on": 2,
+    "off": 2,
+    "cc": 1
+   },
+   "findings": 0
+  },
+  {
+   "file": "midi-ledger-echo.json",
+   "case": "echo",
+   "mode": "native",
+   "msgs": 17,
+   "bytes": 1882,
+   "sha256": "76e9eb49136b1232c0dd4f89e18de213d149850f4c1bbd94828e98a9008507b9",
+   "counts": {
+    "on": 8,
+    "off": 8,
+    "cc": 1
+   },
+   "findings": 0
+  },
+  {
+   "file": "midi-ledger-lfo-cc.json",
+   "case": "lfo-cc",
+   "mode": "native",
+   "msgs": 172,
+   "bytes": 12358,
+   "sha256": "e9d6e7b4b6e55398f69481032944e05a91c6e9a19cfed40800f3553ffa1a4262",
+   "counts": {
+    "on": 2,
+    "cc": 168,
+    "off": 2
+   },
+   "findings": 0
+  },
+  {
+   "file": "midi-ledger-fx-latency.json",
+   "case": "fx-latency",
+   "mode": "native",
+   "msgs": 35,
+   "bytes": 3180,
+   "sha256": "bce185b3c36ac7f68c960ffb1fc9aecbe453f0b85c1f36e3729aac1c1ab8f892",
+   "counts": {
+    "start": 1,
+    "on": 1,
+    "clock": 30,
+    "off": 1,
+    "cc": 1,
+    "stop": 1
+   },
+   "findings": 0
+  },
+  {
+   "file": "midi-ledger-muted-solo.json",
+   "case": "muted-solo",
+   "mode": "native",
+   "msgs": 5,
+   "bytes": 1012,
+   "sha256": "458d90584f411c0926ee521bd84a3d89de876125677e00f0b8c762f89f47a8aa",
+   "counts": {
+    "on": 2,
+    "off": 2,
+    "cc": 1
+   },
+   "findings": 0
+  },
+  {
+   "file": "midi-ledger-panic-keys.json",
+   "case": "panic-keys",
+   "mode": "native",
+   "msgs": 55,
+   "bytes": 4737,
+   "sha256": "ba22963056de49cf4ba1d2f8a7c69c0c0d978fcdd3f9b57d40f2d9004e7b7927",
+   "counts": {
+    "on": 3,
+    "off": 3,
+    "cc": 49
+   },
+   "findings": 0
+  },
+  {
+   "file": "midi-ledger-panic-keys-web.json",
+   "case": "panic-keys",
+   "mode": "web",
+   "msgs": 55,
+   "bytes": 4683,
+   "sha256": "60a6d5d7b14762a5e7c2d8a472dee50ec851e2f40a36324f9997a2c2cc881f9f",
+   "counts": {
+    "on": 3,
+    "off": 3,
+    "cc": 49
+   },
+   "findings": 0
+  }
+ ]
+}

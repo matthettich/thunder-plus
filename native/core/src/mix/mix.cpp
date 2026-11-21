@@ -99,7 +99,7 @@ double mix_trim_gain(double v) {
 double mix_pan(double v) { return std::max(-1.0, std::min(1.0, (v - 128) / 127)); }
 
 // ---- busPlan -------------------------------------------------------------------------------------------------------------------------
-BusPlan::BusPlan() { std::memset(feeds, 0, sizeof feeds); for (int t = 0; t < kSongNT; t++) { nFeeds[t] = 0; feedLen[t] = 0; feedMask[t] = 0; targets[t] = 0; } }
+BusPlan::BusPlan() { std::memset(feeds, 0, sizeof feeds); for (int t = 0; t < kSongNT; t++) { nFeeds[t] = 0; feedLen[t] = 0; feedMask[t] = 0; targets[t] = 0; loopTo[t] = srcAll[t] = busAll[t] = 0; } }
 
 uint32_t chains_tracks(Json d) {
   uint32_t ids = 0; Json mods = d.arr("modules");
@@ -122,32 +122,51 @@ BusPlan bus_plan(Json d, const bool* chainOn) {
   { Json cs = d.get("cables"); if (cs.isArr()) for (size_t i = 0; i < cs.size(); i++) { Json c = cs.at(i); if (!c.isObj() || !truthy(c.get("from")) || !truthy(c.get("to"))) continue;
       nx[keyOf(first(c.get("from")), &uniq)].push_back(keyOf(first(c.get("to")), &uniq)); } }
   const uint32_t cfeed = chains_feed(d, chainOn);
-  uint32_t ownIn = 0;
-  for (const std::string& k : order) { Json m = by[k]; if (isType(m, "trackIn")) { const int t = trk(m); if (t >= 0) ownIn |= 1u << t; } }
-  std::vector<int> adj[kNT];
-  auto reaches = [&](int a, int b) { uint32_t seen = 1u << a; std::vector<int> w{a}; while (!w.empty()) { const int x = w.back(); w.pop_back(); if (x == b) return true; for (int y : adj[x]) if (!(seen >> y & 1u)) { seen |= 1u << y; w.push_back(y); } } return false; };
-  std::vector<int> feeds[kNT];
+  // BUS INTO BUS (19 Nov, web build 651): a bus is a track the patch feeds from elsewhere whose OWN Track In (if any) does not reach its OWN
+  // Chain Out (ownRet); a track can be a source and a bus. Edges are decided in (source, bus) order so a loop always drops the same cable.
+  struct Ti { Json mod; int t; uint32_t outs; bool fed; };
+  std::vector<Ti> ti; uint32_t ownRet = 0;
   for (const std::string& k : order) {
     Json m = by[k];
     if (!isType(m, "trackIn")) continue;
-    const int t = trk(m);
-    if (t < 0 || !(chainOn && chainOn[t])) continue;
+    const int t = trk(m); if (t < 0) continue;
     std::map<std::string, bool> seen; seen[k] = true; std::vector<std::string> w{k}; uint32_t outs = 0;
     while (!w.empty()) { const std::string id = w.back(); w.pop_back(); auto x = by.find(id); if (x != by.end() && isType(x->second, "chainOut")) { const int o = trk(x->second); if (o >= 0) outs |= 1u << o; }
       auto n = nx.find(id); if (n != nx.end()) for (const std::string& y : n->second) if (!seen.count(y)) { seen[y] = true; w.push_back(y); } }
-    bool fed = false;
-    for (int b = 0; b < kNT; b++) {   // [...outs].sort()
-      if (!(outs >> b & 1u)) continue;
-      if (b == t || (ownIn >> b & 1u) || !(cfeed >> b & 1u)) continue;   // its own out, or not a bus
-      if (reaches(b, t)) { P.loop = true; continue; }
-      adj[t].push_back(b); fed = true;
-      feeds[b].push_back(t); P.targets[t] |= 1u << b;
-    }
-    if (fed && !(outs >> t & 1u)) P.pure |= 1u << t;
-    { const double pre = toNumber(paramOf(m, "pre")); if (fed && pre == pre && pre != 0) P.pre |= 1u << t; }
+    ti.push_back(Ti{m, t, outs, false});
+    if (outs >> t & 1u) ownRet |= 1u << t;
   }
+  std::vector<int> adj[kNT];
+  auto reaches = [&](int a, int b) { uint32_t seen = 1u << a; std::vector<int> w{a}; while (!w.empty()) { const int x = w.back(); w.pop_back(); if (x == b) return true; for (int y : adj[x]) if (!(seen >> y & 1u)) { seen |= 1u << y; w.push_back(y); } } return false; };
+  struct Cand { int t, b; size_t q; bool ok; };
+  std::vector<Cand> cand;
+  for (size_t q = 0; q < ti.size(); q++) {
+    const int t = ti[q].t; if (!(chainOn && chainOn[t])) continue;
+    for (int b = 0; b < kNT; b++) {   // [...outs].sort()
+      if (!(ti[q].outs >> b & 1u)) continue;
+      if (b == t || (ownRet >> b & 1u) || !(cfeed >> b & 1u)) continue;   // its own out, or not a bus
+      cand.push_back(Cand{t, b, q, false});
+    }
+  }
+  { std::vector<size_t> ord(cand.size()); for (size_t i = 0; i < ord.size(); i++) ord[i] = i;
+    std::stable_sort(ord.begin(), ord.end(), [&](size_t x, size_t y) { return cand[x].t != cand[y].t ? cand[x].t < cand[y].t : cand[x].b < cand[y].b; });
+    for (size_t i : ord) { Cand& e = cand[i];
+      if (reaches(e.b, e.t)) { P.loop = true; P.loopTo[e.t] |= 1u << e.b; continue; }
+      adj[e.t].push_back(e.b); e.ok = true; ti[e.q].fed = true; } }
+  std::vector<int> feeds[kNT];
+  for (const Cand& e : cand) if (e.ok) { feeds[e.b].push_back(e.t); P.targets[e.t] |= 1u << e.b; }   // (the patch's own order, as the JS)
+  for (const Ti& q : ti) { if (!q.fed) continue;
+    if (!(q.outs >> q.t & 1u)) P.pure |= 1u << q.t;
+    const double pre = toNumber(paramOf(q.mod, "pre")); if (pre == pre && pre != 0) P.pre |= 1u << q.t; }
   for (int b = 0; b < kNT; b++) { std::sort(feeds[b].begin(), feeds[b].end()); P.feedLen[b] = (int)feeds[b].size(); P.nFeeds[b] = std::min(P.feedLen[b], kMixFeedMax);
     for (int j = 0; j < P.feedLen[b]; j++) { P.feedMask[b] |= 1u << feeds[b][(size_t)j]; if (j < kMixFeedMax) P.feeds[b][j] = (uint8_t)feeds[b][(size_t)j]; } }
+  // CLOSURES: srcAll[t] = every track upstream of t, busAll[t] = every bus downstream of t (the plan is acyclic, so the walks end)
+  for (int t = 0; t < kNT; t++) {
+    for (int dir = 0; dir < 2; dir++) {
+      const uint32_t* step = dir ? P.targets : P.feedMask; uint32_t seen = step[t];
+      for (bool more = true; more;) { more = false; for (int x = 0; x < kNT; x++) if ((seen >> x & 1u) && (step[x] & ~seen)) { seen |= step[x]; more = true; } }
+      (dir ? P.busAll : P.srcAll)[t] = seen; }
+  }
   return P;
 }
 
@@ -156,7 +175,7 @@ uint32_t mix_audible(const BusPlan& P, uint32_t mute, uint32_t solo) {
   for (int t = 0; t < kNT; t++) {
     const uint32_t bit = 1u << t; bool on;
     if (solo & bit) on = true; else if (mute & bit) on = false; else if (!solo) on = true;
-    else on = (P.targets[t] & solo) != 0 || (P.feedMask[t] & solo) != 0;   // soloing a bus keeps its sources; soloing a source keeps its bus
+    else on = (P.busAll[t] & solo) != 0 || (P.srcAll[t] & solo) != 0;   // soloing a bus keeps everything upstream of it; soloing a source keeps every bus downstream (any depth)
     if (on) a |= bit;
   }
   return a;

@@ -9,7 +9,7 @@ if(NOT MSVC)
   set_source_files_properties(
     src/render/render_api.cpp src/render/render.cpp src/render/players.cpp src/engine/live_pool.cpp src/rt/json.cpp src/song/song.cpp src/seq/seq.cpp src/seq/session.cpp src/voice/voice.cpp src/mix/mix.cpp src/mix/pdc.cpp src/mix/delay.cpp src/mix/beat.cpp
     src/master/master.cpp src/master/eq.cpp src/master/chain.cpp src/fx/fxhost.cpp src/fx/clkcores.cpp src/fx/idmcores.cpp src/fx/u17cores.cpp src/fx/fxmap.cpp src/fx/fxbank.cpp src/fx/fxpump.cpp
-    src/sf/sf_live.cpp src/sf/sf_parse.cpp src/sf/sf_decode.cpp
+    src/sf/sf_live.cpp src/sf/sf_parse.cpp src/sf/sf_decode.cpp src/midi/midisched.cpp src/midi/midi_api.cpp
     PROPERTIES COMPILE_OPTIONS "-fexceptions")
 endif()
 target_sources(thunder_core PRIVATE src/modfx/fftr.cpp src/modfx/mod_spectral.cpp src/modfx/mod_convolve.cpp)   # U20
@@ -22,6 +22,7 @@ target_sources(thunder_core PRIVATE src/engine/layer_u24.cpp src/engine/layer_fm
 # U32: the SoundFont / GM player (SF2 / SF3 parse, Vorbis decode through the pinned stb_vorbis, zones and modulators, the pad render and the live note)
 add_subdirectory(sf)
 target_sources(thunder_core PRIVATE src/sf/sf_math.cpp src/sf/sf_parse.cpp src/sf/sf_decode.cpp src/sf/sf_voice.cpp src/sf/sf_render.cpp src/sf/sf_live.cpp)
+target_sources(thunder_core PRIVATE src/midi/midisched.cpp src/midi/midi_api.cpp)  # U35: MIDI scheduling
 target_link_libraries(thunder_core PUBLIC thunder_stb_vorbis)
 target_sources(thunder_core PRIVATE src/lxr/lxr_seam.cpp)   # U04: the LXR seam (a registry of one pointer; no LXR code: the optional module is native/lxr)
 target_include_directories(thunder_core PRIVATE src)
