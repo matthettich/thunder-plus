@@ -35,7 +35,7 @@ static void applyVox(VoxP& P, Json o) { XP_VOX(XP_GETP) if (o.get("txt").isStr()
 static void applyAcid(AcidP& P, Json o) { XP_ACID(XP_GETP) }
 static void applyMach(MachP& P, Json o) { XP_MACH(XP_GETP) }
 
-struct Ev { double t; std::string type; double v = 0, dur = 0; bool leg = false, acc = false, same = false; double syl = 0; };
+struct Ev { double t; std::string type; double c[5], o[7]; double v = 0, dur = 0; bool leg = false, acc = false, same = false; double syl = 0; };
 struct Tapped { std::vector<float> L, R; int64_t want = 0; };
 static void tapFn(void* u, int, int, int j, const float* L, const float* R, int frames, int64_t q0) {
   if (j != 0) return;   // (vox: the poly nodes are silent here)
@@ -55,7 +55,7 @@ int main(int argc, char** argv) {
     Json c = C.at(ci); if (!c.get("live").asBool()) continue;
     const std::string name(c.str("name")), kind(c.str("kind")); const double sr = c.num("sr"); const int64_t N = (int64_t)c.num("N");
     std::vector<Ev> evs; Json E = c.arr("events");
-    for (size_t i = 0; i < E.size(); i++) { Json e = E.at(i); Ev v; v.t = e.num("t"); v.type = std::string(e.str("type")); v.v = e.num("v", 0); v.dur = e.num("dur", 0); v.leg = e.get("leg").asBool(); v.acc = e.get("acc").asBool(); v.same = e.get("same").asBool(); v.syl = e.num("syl", 0); if (v.t < (double)N) evs.push_back(v); }
+    for (size_t i = 0; i < E.size(); i++) { Json e = E.at(i); Ev v; v.t = e.num("t"); v.type = std::string(e.str("type")); v.v = e.num("v", 0); v.dur = e.num("dur", 0); v.leg = e.get("leg").asBool(); v.acc = e.get("acc").asBool(); v.same = e.get("same").asBool(); v.syl = e.num("syl", 0); for (int k = 0; k < 5; k++) v.c[k] = e.get("c").isArr() && e.get("c").at((size_t)k).isNum() ? e.get("c").at((size_t)k).asNum() : std::nan(""); for (int k = 0; k < 7; k++) v.o[k] = e.get("o").isArr() && e.get("o").at((size_t)k).isNum() ? e.get("o").at((size_t)k).asNum() : std::nan(""); if (v.t < (double)N) evs.push_back(v); }
     std::stable_sort(evs.begin(), evs.end(), [](const Ev& a, const Ev& b) { return a.t < b.t; });
     // the translation; `why` names what the sequencer cannot say
     std::vector<SeqEvent> out; std::string why; double v0 = 1, t0 = 0, v1 = 1, t1 = 0;
@@ -65,27 +65,30 @@ int main(int argc, char** argv) {
       int nOn = 0, nOff = 0; const Ev* rateEv = nullptr; const Ev* ramp = nullptr; const Ev* on = nullptr; bool laneAfterOn = false;
       for (size_t k = i; k < j; k++) { const Ev& e = evs[k];
         if (e.type == "on") { nOn++; if (!on) on = &e; } else if (e.type == "off") nOff++;
-        else if (e.type == "rate") { rateEv = &e; if (on) laneAfterOn = true; } else if (e.type == "ramp") { ramp = &e; if (on) laneAfterOn = true; } else why = "a " + e.type + " event"; }
+        else if (e.type == "rate") { rateEv = &e; if (on) laneAfterOn = true; } else if (e.type == "ramp") { ramp = &e; if (on) laneAfterOn = true; } else if (e.type == "eng") {} else why = "a " + e.type + " event"; }
       if (!why.empty()) break;
       if (nOn && nOff) { why = "a note-off in the sample of a note-on (D4: expected difference)"; break; }
       if (laneAfterOn) { why = "a rate event after the note in its sample"; break; }
       if ((rateEv || ramp) && nOn != 1) { why = "a rate event without exactly one note"; break; }
       if (ramp && !on->leg) { why = "a ramp on a note that is not legato"; break; }
       if (kind == "vox" && nOn && on->same != on->leg) { why = "vox: `same` is not the slide"; break; }
-      if (nOn) {
-        SeqEvent e; e.type = SEV_NOTE; e.t = sample_time((int64_t)evs[i].t, sr); e.track = 0; e.pad = 0; e.gain = 1; e.pan = 128; e.poly = false; e.acc = on->acc;
-        double from = rateEv ? rateEv->v : at(evs[i].t);   // the lane's value when the note starts
-        if (ramp) { e.rate = ramp->v; e.has |= SH_SLIDE; e.slideFrom = from; e.slideDur = ramp->dur / sr; }
-        else { e.rate = rateEv ? rateEv->v : from; if (on->leg) { e.has |= SH_SLIDE; e.slideFrom = e.rate; e.slideDur = 0.001; } }
-        out.push_back(e);
-      } else if (nOff) { SeqEvent e; e.type = SEV_OFF; e.t = sample_time((int64_t)evs[i].t, sr); e.track = 0; out.push_back(e); }
-      else if (rateEv || ramp) { why = "a rate event with no note"; break; }
+      for (size_t k = i; k < j; k++) { const Ev& g = evs[k];   // the group's events in their order (an eng before or after the note keeps its place)
+        if (g.type == "on" && &g == on) {
+          SeqEvent e; e.type = SEV_NOTE; e.t = sample_time((int64_t)evs[i].t, sr); e.track = 0; e.pad = 0; e.gain = 1; e.pan = 128; e.poly = false; e.acc = on->acc;
+          double from = rateEv ? rateEv->v : at(evs[i].t);   // the lane's value when the note starts
+          if (ramp) { e.rate = ramp->v; e.has |= SH_SLIDE; e.slideFrom = from; e.slideDur = ramp->dur / sr; }
+          else { e.rate = rateEv ? rateEv->v : from; if (on->leg) { e.has |= SH_SLIDE; e.slideFrom = e.rate; e.slideDur = 0.001; } }
+          out.push_back(e);
+        } else if (g.type == "off") { SeqEvent e; e.type = SEV_OFF; e.t = sample_time((int64_t)evs[i].t, sr); e.track = 0; out.push_back(e); }
+        else if (g.type == "eng") { SeqEvent e; e.type = SEV_ENG; e.t = sample_time((int64_t)evs[i].t, sr); e.track = 0; for (int q = 0; q < 5; q++) e.engC[q] = g.c[q]; for (int q = 0; q < 7; q++) e.engO[q] = g.o[q]; out.push_back(e); } }
+      if (!nOn && !nOff && (rateEv || ramp)) { why = "a rate event with no note"; break; }
       for (size_t k = i; k < j; k++) { const Ev& e = evs[k]; if (e.type == "rate") { v0 = v1 = e.v; t0 = t1 = e.t; } else if (e.type == "ramp") { const double cur = at(e.t); v0 = cur; t0 = e.t; v1 = e.v; t1 = e.t + e.dur; } }
       i = j;
     }
     perKind[kind]++;
     if (!why.empty()) { skip[why]++; continue; }
     const auto g = cg.find(name); if (g == cg.end()) { CHECKF(false, "%s: no committed hash", name.c_str()); continue; }
+    if (std::getenv("ENGDBG")) std::fprintf(stderr, "CASE %s\n", name.c_str());
     // play it
     std::unique_ptr<RenderPads> pads(new RenderPads()); pads->route[0] = PadRoute::Live; Players pl(pads.get(), sr, 8);
     LivePadConfig cfg; cfg.trackMask = 1;
@@ -106,6 +109,9 @@ int main(int argc, char** argv) {
     if (kind == "vox") { size_t k = 0; bool okSyl = true; for (const Ev& e : evs) if (e.type == "on") { size_t m = 0; for (const LiveTraceRec& r : trace) if (r.what == 'n') { if (m++ == k) { if (r.v != std::round(e.syl)) okSyl = false; break; } } k++; }
       if (!okSyl) { skip["vox: the syllable numbers are not the node's counter's"]++; continue; } }
     Sha256 h; h.add((const char*)T.L.data(), (size_t)N * 4); h.add((const char*)T.R.data(), (size_t)N * 4);
+    if (const char* rd = std::getenv("JSP_REF")) if (name.rfind("seq_eng_", 0) == 0) { std::ifstream rf(std::string(rd) + "/c" + std::to_string(ci) + ".f32", std::ios::binary); std::vector<float> ref((size_t)N * 2); rf.read((char*)ref.data(), (std::streamsize)ref.size() * 4);
+      for (int64_t i = 0; i < N; i++) if (std::memcmp(&ref[(size_t)i], &T.L[(size_t)i], 4)) { std::printf("  %s: first L diff at %lld: JS %.9g pool %.9g\n", name.c_str(), (long long)i, ref[(size_t)i], T.L[(size_t)i]); break; }
+      if (std::getenv("JSP_DUMP")) { for (int64_t i = 2646; i < 2662; i++) std::printf("   %lld JS %.9g pool %.9g\n", (long long)i, ref[(size_t)i], T.L[(size_t)i]); int64_t cnt = 0, mx = 0; double md = 0; for (int64_t i = 0; i < N; i++) if (std::memcmp(&ref[(size_t)i], &T.L[(size_t)i], 4)) { cnt++; md = std::fmax(md, std::fabs((double)ref[(size_t)i] - T.L[(size_t)i])); mx = i; } std::printf("  ndiff %lld maxdiff %g last %lld\n", (long long)cnt, md, (long long)mx); } }
     ran++; perKind[kind + "/ran"]++;
     const bool ok = h.hex() == g->second->sha256 && N == g->second->len;
     if (ok) { same++; okKind[kind]++; } else { std::printf("%-34s the pool's node output differs from seqRender's hash\n", name.c_str()); g_fail++; }
