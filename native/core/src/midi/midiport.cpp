@@ -323,17 +323,14 @@ int thunder_midiout_pump(thunder_midiout* o, int64_t* next_ns) {
   Snap map; if (readMap(o, map)) { o->lastSnap.ok = map.valid; o->lastSnap.off = map.off; o->lastSnap.host = map.host; } else if (o->lastSnap.ok) { map.valid = true; map.off = o->lastSnap.off; map.host = o->lastSnap.host; }   // a writer caught mid-update: the last whole map
   else { map.valid = o->mValid.load(std::memory_order_acquire) != 0; map.off = bitsToD(o->mOffBits.load(std::memory_order_acquire)); map.host = o->mHost.load(std::memory_order_acquire); }   // never read whole yet: the offset is one 64-bit atomic, always a real value; "no map" only if none was ever written
 
-  // 1. the scheduler's records into the queue: a CLEAR marker applies to what is queued at that point of the stream; before the first map nothing can be timed
+  // 1. the scheduler's records into the queue: a CLEAR marker applies to what is queued at that point of the stream; before the first map records are queued, not sent (step 3)
   thunder_midi_msg buf[128];
   for (int rounds = 0; rounds < 128; rounds++) {
     const int64_t n = thunder_midi_drain(o->core, buf, 128);
     if (n <= 0) break;
     for (int64_t i = 0; i < n; i++) {
       if (buf[i].flags & THUNDER_MIDI_F_CLEAR) { applyClear(o, buf[i], now); continue; }
-      if (!map.valid) {   // the first map may have been published while this pump ran: look again before a record is given up
-        Snap m2; if (readMap(o, m2) && m2.valid) { map = m2; o->lastSnap.ok = true; o->lastSnap.off = m2.off; o->lastSnap.host = m2.host; }
-        else { bump(o, S_NOMAP); continue; }
-      }
+      // no map yet: the record WAITS in the queue (its frame needs no map; step 3 sends nothing until one exists). A lost Start is worse than a late burst; the fixed queue and F4's eviction order bound it.
       enqueue(o, buf[i]);
     }
   }
