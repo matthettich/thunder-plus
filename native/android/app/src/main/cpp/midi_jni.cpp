@@ -47,8 +47,6 @@ class AmidiPort : public tpa::PortIo {
     }
     return -1;
   }
-  // sink.clear on a stamped port: AMidi's flush message makes the system discard what it holds for later (API 29; UNVERIFIED on the Fold). The core then re-sends the messages before its marker.
-  void flush() override { if (port_) AMidiInputPort_sendFlush(port_); }
  private:
   std::shared_ptr<AmidiDevice> dev_;
   AMidiInputPort* port_;
@@ -137,6 +135,7 @@ JNIEXPORT jint JNICALL Java_app_thunderplus_nativetest_NativeMidi_nativeAssign(J
 JNIEXPORT jint JNICALL Java_app_thunderplus_nativetest_NativeMidi_nativeTest(JNIEnv*, jobject) { return tpa::host().debugTest(); }
 JNIEXPORT jboolean JNICALL Java_app_thunderplus_nativetest_NativeMidi_nativePoll(JNIEnv*, jobject) { return tpa::host().debugPoll() ? JNI_TRUE : JNI_FALSE; }
 JNIEXPORT jint JNICALL Java_app_thunderplus_nativetest_NativeMidi_nativeSenderTid(JNIEnv*, jobject) { return tpa::host().senderTid(); }
-JNIEXPORT jstring JNICALL Java_app_thunderplus_nativetest_NativeMidi_nativeStatus(JNIEnv* env, jobject) { return env->NewStringUTF(tpa::toJniUtf8(tpa::host().status()).c_str());   // NewStringUTF wants MODIFIED UTF-8: a device name with an emoji (4 bytes) would abort under CheckJNI }
+// NewStringUTF wants MODIFIED UTF-8: a device name with an emoji (4 bytes) would abort under CheckJNI.
+JNIEXPORT jstring JNICALL Java_app_thunderplus_nativetest_NativeMidi_nativeStatus(JNIEnv* env, jobject) { return env->NewStringUTF(tpa::toJniUtf8(tpa::host().status()).c_str()); }
 
 }  // extern "C"

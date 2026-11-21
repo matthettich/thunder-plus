@@ -145,6 +145,7 @@ bool MidiHost::engineStart(double sr, TsFn tsFn, void* tsUser) {
   if (!o_) { thunder_midi_free(h_); h_ = nullptr; return false; }
   sr_ = sr; tsFn_ = tsFn; tsUser_ = tsUser;
   frames_ = 0; lastMapNs_ = 0; mapped_ = false; mapReady_.store(false, std::memory_order_release); nHeld_ = 0; heldCount_.store(0, std::memory_order_relaxed);
+  std::memset(sent_, 0, sizeof sent_); sentN_ = 0; replay_ = false;
   if (!held_) held_.reset(new (std::nothrow) Held[kHeld]);
   if (!held_) { thunder_midiout_free(o_); thunder_midi_free(h_); o_ = nullptr; h_ = nullptr; return false; }
   applyDevicesLocked();
@@ -295,13 +296,32 @@ std::string MidiHost::status() {
 // sends or holds anything for such a port it first sends every held message that is due (flushDeferred), so a message that is sent at once can never overtake an earlier held one:
 // the held ones still waiting are all later than `at`, because `at` is not before any earlier message's time. A CLEAR (clearDev) drops the not-yet-due held messages of its device,
 // the same as the core drops its own queue; what the core replays after a clear (the messages before the marker) comes back through sendTo and is held again.
+int MidiHost::emit(const std::shared_ptr<PortIo>& io, uint64_t dev, const uint8_t* b, int len, int64_t at, int64_t ioAt) {
+  const int r = io->send(b, len, ioAt);
+  if (r >= 0 && len >= 1 && len <= 3) { Sent& s = sent_[sentN_]; sentN_ = (sentN_ + 1) % kSent; s.dev = dev; s.len = (uint8_t)len; std::memcpy(s.b, b, (size_t)len); s.at = at; s.used = false; }
+  return r;
+}
+
+// The core's replay after a clear(dev) re-sends the messages of its history that are before the marker and not yet due. A message that sendTo really sent (a stamped one the OS holds, or
+// one sent under the 50 us rule) must not go out again: the first unused equal entry (device, bytes, the core's time) is consumed and the replay dropped. One that was only held (and
+// dropped by clearDev) is not in the list and goes through as usual.
+bool MidiHost::swallowReplay(uint64_t dev, const uint8_t* b, int len, int64_t at) {
+  if (len < 1 || len > 3) return false;
+  for (int k = 1; k <= kSent; k++) {
+    Sent& s = sent_[((sentN_ - k) % kSent + kSent) % kSent];
+    if (s.len == len && !s.used && s.at == at && s.dev == dev && std::memcmp(s.b, b, (size_t)len) == 0) { s.used = true; replaySwallowed.fetch_add(1, std::memory_order_relaxed); return true; }
+  }
+  return false;
+}
+
 int MidiHost::sendTo(uint64_t dev, const uint8_t* b, int len, int64_t at) {
   PortTable::Entry e = table_.find(dev);
   if (!e.io) { sendUnknown.fetch_add(1, std::memory_order_relaxed); return -1; }
-  if (e.ts) { const int r = e.io->send(b, len, at); return r < 0 ? -1 : 0; }
+  if (replay_ && replayDev_ == dev && swallowReplay(dev, b, len, at)) return 0;   // the core re-sends what a CLEAR could not recall: it was sent already
+  if (e.ts) { const int r = emit(e.io, dev, b, len, at, at); return r < 0 ? -1 : 0; }
   const int64_t now = nowFn_();
   flushDeferred(now);   // due held messages go first (F7)
-  if (at <= now + 50000 || len < 1) { const int r = e.io->send(b, len, 0); return r < 0 ? -1 : 0; }
+  if (at <= now + 50000 || len < 1) { const int r = emit(e.io, dev, b, len, at, 0); return r < 0 ? -1 : 0; }
   if (len > 3) { earlyLong.fetch_add(1, std::memory_order_relaxed); const int r = e.io->send(b, len, 0); return r < 0 ? -1 : 0; }   // SysEx: not held (Held::b is 3 bytes)
   if (nHeld_ >= kHeld) { deferFull.fetch_add(1, std::memory_order_relaxed); const int r = e.io->send(b, len, 0); return r < 0 ? -1 : 0; }
   Held& h = held_[nHeld_++];
@@ -315,14 +335,13 @@ int MidiHost::sendTo(uint64_t dev, const uint8_t* b, int len, int64_t at) {
 // came BEFORE the marker and are not yet due. So: a stamped port is asked to flush what the OS holds; a port without stamps loses its held messages that are not yet due (those due
 // are sent now: the core does not replay them). A message of this device that is due within a microsecond of the core's own clock read may be sent here AND replayed (a duplicate): accepted.
 void MidiHost::clearDev(uint64_t dev) {
-  PortTable::Entry e = table_.find(dev);
-  if (e.io && e.ts) e.io->flush();
+  replay_ = true; replayDev_ = dev;   // the core's replay follows at once, inside this pump call (senderMain ends the mode after the pump returns)
   const int64_t now = nowFn_();
   int w = 0;
   for (int i = 0; i < nHeld_; i++) {
     Held& h = held_[i];
     if (h.dev == dev) {
-      if (h.at <= now) { if (h.io->send(h.b, h.len, 0) < 0) deferFail.fetch_add(1, std::memory_order_relaxed); }
+      if (h.at <= now) { if (emit(h.io, h.dev, h.b, h.len, h.at, 0) < 0) deferFail.fetch_add(1, std::memory_order_relaxed); }
       else heldCleared.fetch_add(1, std::memory_order_relaxed);
       h.io.reset();
       continue;
@@ -335,7 +354,7 @@ void MidiHost::clearDev(uint64_t dev) {
 }
 
 void MidiHost::flushAllHeld() {
-  for (int i = 0; i < nHeld_; i++) { Held& h = held_[i]; if (h.io->send(h.b, h.len, 0) < 0) deferFail.fetch_add(1, std::memory_order_relaxed); h.io.reset(); }
+  for (int i = 0; i < nHeld_; i++) { Held& h = held_[i]; if (emit(h.io, h.dev, h.b, h.len, h.at, 0) < 0) deferFail.fetch_add(1, std::memory_order_relaxed); h.io.reset(); }
   nHeld_ = 0;
   heldCount_.store(0, std::memory_order_release);
 }
@@ -347,7 +366,7 @@ int64_t MidiHost::flushDeferred(int64_t now) {
   for (int i = 0; i < nHeld_; i++) {
     Held& h = held_[i];
     if (h.at <= now + 50000) {
-      if (h.io->send(h.b, h.len, 0) < 0) deferFail.fetch_add(1, std::memory_order_relaxed);
+      if (emit(h.io, h.dev, h.b, h.len, h.at, 0) < 0) deferFail.fetch_add(1, std::memory_order_relaxed);
       h.io.reset();
     } else {
       if (w != i) { held_[w] = std::move(h); }
@@ -372,6 +391,7 @@ void MidiHost::senderMain() {
   while (!stop_.load(std::memory_order_acquire)) {
     int64_t next = INT64_MAX;
     thunder_midiout_pump(o_, &next);
+    replay_ = false;
     int64_t now = nowFn_();
     const int64_t nd = flushDeferred(now);
     now = nowFn_();
@@ -384,7 +404,7 @@ void MidiHost::senderMain() {
     } else sched_yield();
   }
   // told to stop: hand over whatever the core has due, then send every held message at once, in order (a Stop or a note-off must not be lost with the array)
-  { int64_t next = INT64_MAX; thunder_midiout_pump(o_, &next); }
+  { int64_t next = INT64_MAX; thunder_midiout_pump(o_, &next); replay_ = false; }
   flushAllHeld();
   if (g_leave) g_leave();
 }

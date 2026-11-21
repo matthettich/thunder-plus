@@ -27,10 +27,9 @@ static int g_fail = 0;
 namespace {
 struct Rec { uint8_t b[3]; int len; int64_t at, got; };
 struct FakeIo : tpa::PortIo {
-  std::mutex mu; std::vector<Rec> r; std::atomic<int> failNext{0}; std::atomic<bool> closed{false}; std::atomic<int> delayUs{0}; std::atomic<int> flushes{0};
+  std::mutex mu; std::vector<Rec> r; std::atomic<int> failNext{0}; std::atomic<bool> closed{false}; std::atomic<int> delayUs{0};
   std::function<void()> onDtor;
   ~FakeIo() override { if (onDtor) onDtor(); }
-  void flush() override { flushes++; }
   int send(const uint8_t* b, int len, int64_t at) override {
     if (closed.load()) return -1;
     if (failNext.load() > 0) { failNext--; return -1; }
@@ -309,15 +308,20 @@ void testClearDropsHeld() {
   CHECK(got2 == 0 || ms(got2) >= ms(tb) + tStop * 1000.0 - 100.0 + 7.0 - 3.0, "and not before its time");
   CHECK(r.h.heldCleared.load() >= 1, "a held message was dropped by the CLEAR (%llu)", (unsigned long long)r.h.heldCleared.load());
   r.h.engineStop();
-  // a stamped port is asked to flush
+  // a STAMPED port: a CLEAR recalls nothing (no flush) and the core's replay must not send anything twice: every note-on and note-off arrives exactly once
   Rig s; CHECK(s.start(true, nullptr), "start ts");
   s.runFor(0.05);
-  s.rawBlock(0, 0x91, 61, 100, 0.060);
-  s.blocks(16);   // the note (at 60 ms) is handed over, stamped, 20 ms ahead
+  const double sStop = kStopBlocks * kBlk / kSr;
+  s.rawBlock(0, 0x91, 61, 100, sStop + 0.008 - kBlk / kSr);   // on and off both before the marker (stop + 10 ms): handed over stamped, still held by the OS at the CLEAR, replayed by the core
+  { const uint8_t b[3] = {0x81, 61, 0}; CHECK(thunder_midi_raw(s.h.coreMidi(), 0, b, 3, sStop + 0.009 - kBlk / kSr) == 0, "raw off"); }
+  { const uint8_t b[3] = {0x91, 62, 100}; CHECK(thunder_midi_raw(s.h.coreMidi(), 0, b, 3, sStop + 0.016 - kBlk / kSr) == 0, "raw after"); }   // after the marker, handed over stamped: this is what makes the core call clear + replay
+  s.blocks(kStopBlocks - 1);
   { const double now = (double)g_fed.load() / kSr + 0.01;
     thunder::midi_begin(s.h.coreMidi(), now, 0.01, 0.0, ~(uint64_t)0); thunder::midi_sched(s.h.coreMidi()).stop(now); thunder::midi_end(s.h.coreMidi(), now, now, 120, false); }
-  s.runFor(0.2);
-  CHECK(s.io->flushes.load() >= 1, "the stamped port was flushed (%d)", s.io->flushes.load());
+  s.runFor(0.3);
+  CHECK(s.io->count(0x91, 61) == 1 && s.io->count(0x81, 61) == 1, "stamped port: note 61 on %d, off %d (each once)", s.io->count(0x91, 61), s.io->count(0x81, 61));
+  CHECK(s.io->count(0x91, 62) == 1, "nothing is recalled from a stamped port: the note after the marker plays (up to 20 ms after the Stop, as before), got %d", s.io->count(0x91, 62));
+  CHECK(s.h.replaySwallowed.load() >= 2, "the core's replay was swallowed (%llu)", (unsigned long long)s.h.replaySwallowed.load());
   s.h.engineStop();
 }
 
